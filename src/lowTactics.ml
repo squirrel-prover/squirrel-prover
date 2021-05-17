@@ -34,8 +34,7 @@ module type Sequent = sig
 
   module Hyps : Hyps.HypsSeq with type hyp = hyp and type sequent = t
 
-  val reach_to_hyp :             Term.message -> hyp
-  val hyp_to_reach : ?loc:L.t -> hyp -> Term.message
+  val reach_to_hyp : Term.message -> hyp
 
   val env : t -> Vars.env
   val set_env : Vars.env -> t -> t
@@ -50,10 +49,15 @@ module type Sequent = sig
   val table : t -> Symbols.table
   val set_table  : Symbols.table -> t -> t
 
-  val ty_vars : t -> Type.tvars
+  val ty_vars : t -> Type.tvars 
 
-  val is_hyp_or_lemma  : lsymb -> t -> bool
-  val get_hyp_or_lemma : lsymb -> t -> Ident.t option * Type.tvars * hyp
+  val is_hyp_or_lemma        : lsymb -> t -> bool
+  val is_equiv_hyp_or_lemma  : lsymb -> t -> bool
+  val is_reach_hyp_or_lemma  : lsymb -> t -> bool
+
+  val get_hyp_or_lemma       : lsymb -> t -> Goal.hyp_or_lemma
+  val get_equiv_hyp_or_lemma : lsymb -> t -> Goal.equiv_hyp_or_lemma
+  val get_reach_hyp_or_lemma : lsymb -> t -> Goal.reach_hyp_or_lemma
 
   val query_happens : precise:bool -> t -> Term.timestamp -> bool
 
@@ -470,8 +474,10 @@ module LowTac (S : Sequent) = struct
       : rw_erule * S.sequent list * Ident.t option = 
       match Args.convert_as_lsymb [Args.Theory rw_type] with
       | Some str when S.is_hyp_or_lemma str s ->
-        let id_opt, ty_vars, f = S.get_hyp_or_lemma str s in
-        let f = S.hyp_to_reach ~loc:(L.loc str) f in
+        let lem = S.get_reach_hyp_or_lemma str s in        
+        let ty_vars = lem.gc_tyvars in
+        let id_opt = match lem.gc_name with `Hyp id -> Some id | _ -> None in
+        let f = lem.gc_concl in
 
         (* We are using an hypothesis, hence no new sub-goals *)
         let premise = [] in

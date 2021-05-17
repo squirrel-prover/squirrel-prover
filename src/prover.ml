@@ -76,10 +76,10 @@ let error_handler loc k f a =
 (*------------------------------------------------------------------*)
 (** {2 Prover state} *)
 
-let goals        : (Goal.goal_concl * Goal.t) list   ref = ref []
-let current_goal : (Goal.goal_concl * Goal.t) option ref = ref None
+let goals        : (Goal.lemma * Goal.t) list   ref = ref []
+let current_goal : (Goal.lemma * Goal.t) option ref = ref None
 let subgoals     : Goal.t list ref = ref []
-let goals_proved : Goal.goal_concls ref = ref []
+let goals_proved : Goal.lemmas ref = ref []
 
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
@@ -107,11 +107,11 @@ type option_def = option_name * option_val
 let option_defs : option_def list ref= ref []
 
 type proof_state = { 
-  goals        : (Goal.goal_concl * Goal.t) list;
+  goals        : (Goal.lemma * Goal.t) list;
   table        : Symbols.table;
-  current_goal : (Goal.goal_concl * Goal.t) option;
+  current_goal : (Goal.lemma * Goal.t) option;
   subgoals     : Goal.t list;
-  goals_proved : Goal.goal_concls;
+  goals_proved : Goal.lemmas;
   option_defs  : option_def list;
   params       : Config.params;
   prover_mode  : prover_mode;
@@ -617,51 +617,38 @@ let () =
                   tactic_group = Logical}
     (fun _ -> Tactics.id)
 
-let find_proved_goal gname : Goal.goal_concl option =
+(*------------------------------------------------------------------*)
+let get_lemma_opt gname : Goal.lemma option =
   match List.find_opt (fun g -> g.Goal.gc_name = gname) !goals_proved with
   | None -> None
   | Some gconcl -> Some gconcl
 
-let exists_proved_goal gname : bool = find_proved_goal gname <> None
+(*------------------------------------------------------------------*)
+let is_lemma gname : bool = get_lemma_opt gname <> None 
 
-let is_goal_formula gname : bool =
-  match find_proved_goal gname with
+let is_reach_lemma gname : bool =
+  match get_lemma_opt gname with
   | None -> false
-  | Some gconcl -> Goal.is_reach_gconcl gconcl
+  | Some gconcl -> Goal.is_reach_lemma gconcl
 
-let is_equiv_goal_formula gname : bool =
-  match find_proved_goal gname with
+let is_equiv_lemma gname : bool =
+  match get_lemma_opt gname with
   | None -> false
-  | Some gconcl -> Goal.is_equiv_gconcl gconcl
+  | Some gconcl -> Goal.is_equiv_lemma gconcl
 
-let get_goal_formula gname : SE.system_expr * Type.tvars * Term.message =
-  match find_proved_goal (L.unloc gname) with
+(*------------------------------------------------------------------*)
+let get_lemma gname : Goal.lemma = match get_lemma_opt (L.unloc gname) with
   | None -> 
     soft_failure ~loc:(L.loc gname)
       (Failure ("no proved goal named " ^ (L.unloc gname)))
 
-  | Some gc ->
-    match gc.gc_concl with    
-    | `Reach f -> gc.gc_system, gc.gc_tyvars, f
+  | Some gc -> gc
 
-    | _ ->
-      soft_failure ~loc:(L.loc gname)
-        (Failure ("not a reachability goal: " ^ (L.unloc gname)))
+let get_reach_lemma (gname : lsymb) : Goal.reach_lemma =
+  Goal.to_reach_lemma ~loc:(L.loc gname) (get_lemma gname) 
 
-let get_equiv_goal_formula gname : SE.system_expr * Type.tvars * Equiv.form =
-  match find_proved_goal (L.unloc gname) with
-  | None -> 
-    soft_failure ~loc:(L.loc gname)
-      (Failure ("no proved goal named " ^ (L.unloc gname)))
-
-  | Some gc ->
-    match gc.gc_concl with    
-    | `Equiv f -> gc.gc_system, gc.gc_tyvars, f
-
-    | _ ->
-      soft_failure ~loc:(L.loc gname)
-        (Failure ("no an equivalence goal: " ^ (L.unloc gname)))
-
+let get_equiv_lemma (gname : lsymb) : Goal.equiv_lemma =
+  Goal.to_equiv_lemma ~loc:(L.loc gname) (get_lemma gname) 
 
 
 (*------------------------------------------------------------------*)
@@ -704,7 +691,7 @@ let declare_new_goal_i table (gname,g) =
       c, g
   in
 
-  if exists_proved_goal gn then
+  if is_lemma gn then
     raise (ParseError "a goal with this name already exists");
 
   goals :=  (c,g) :: !goals;
@@ -715,8 +702,8 @@ let declare_new_goal table loc (n, g) =
   error_handler loc KGoal (declare_new_goal_i table) (n, g)
 
 let add_proved_goal gconcl =
-  if exists_proved_goal gconcl.Goal.gc_name then
-    raise (ParseError "A formula with this name alread exists");
+  if is_lemma gconcl.Goal.gc_name then
+    raise (ParseError "a formula with this name alread exists");
 
   goals_proved := gconcl :: !goals_proved
 

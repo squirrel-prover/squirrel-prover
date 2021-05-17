@@ -10,29 +10,48 @@ open Utils
 module T = Prover.TraceTactics
 module Args = TacticsArgs
 module L = Location
+module SE = SystemExpr
 
 open LowTactics
 
-(** Extends [TraceSequent] with function relying on the [Prover] module *)
+(** Extends [TraceSequent] with function relying on the [Prover] module. *)
+(* FIXME: redudancy with EquivTactics *)
 module TraceSequent = struct
   include TraceSequent
 
   let is_hyp_or_lemma (name : lsymb) (s : sequent) =
-    Hyps.mem_name (L.unloc name) s || Prover.is_goal_formula (L.unloc name)
+    Hyps.mem_name (L.unloc name) s || Prover.is_lemma (L.unloc name)
 
-  (** Get a hypothesis or lemma by name (in the hyp case, return its id). *)
+  let is_equiv_hyp_or_lemma (name : lsymb) (s : sequent) =
+    Hyps.mem_name (L.unloc name) s || Prover.is_equiv_lemma (L.unloc name)
+
+  let is_reach_hyp_or_lemma (name : lsymb) (s : sequent) =
+    Hyps.mem_name (L.unloc name) s || Prover.is_reach_lemma (L.unloc name)
+
   let get_hyp_or_lemma (name : lsymb) (s : sequent) =
-    let hyp_opt, (system,tyvars,f) =
+    let lem = 
       if Hyps.mem_name (L.unloc name) s then
         let id, f = Hyps.by_name name s in
-        Some id, (system s, [], f)
-      else None, Prover.get_goal_formula name in
+        Goal.{ gc_name = `Hyp id;
+               gc_system = system s;
+               gc_tyvars = [];
+               gc_concl = `Reach f; }           
+      else 
+        let lem = Prover.get_lemma name in
+        { lem with gc_name = `Lemma lem.Goal.gc_name }
+    in
 
     (* Verify that it applies to the current system. *)
-    if not (SystemExpr.systems_compatible (TraceSequent.system s) system) then
+    if not (SE.systems_compatible (TraceSequent.system s) lem.gc_system) then
       Tactics.hard_failure Tactics.NoAssumpSystem;
 
-    hyp_opt, tyvars, f
+    lem
+
+  let get_reach_hyp_or_lemma name s =
+    Goal.to_reach_lemma ~loc:(L.loc name) (get_hyp_or_lemma name s)
+
+  let get_equiv_hyp_or_lemma name s =
+    Goal.to_equiv_lemma ~loc:(L.loc name) (get_hyp_or_lemma name s)
 end
 
 module TS = TraceSequent
@@ -907,17 +926,17 @@ let () = T.register "assumption"
   * If given an introduction patterns, apply it to the generated hypothesis. *)
 let use ip (name : lsymb) (ths : Theory.term list) (s : TS.t) =
   (* Get formula to apply. *)
-  let _, ty_vars, f = TS.get_hyp_or_lemma name s in
+  let lem = TS.get_reach_hyp_or_lemma name s in
 
   (* FIXME *)
-  if ty_vars <> [] then
+  if lem.gc_tyvars <> [] then
     Tactics.(soft_failure (Failure "free type variables not supported with \
                                     use tactic")) ;
 
   (* Get universally quantified variables, verify that lengths match. *)
-  let uvars,f = match f with
+  let uvars,f = match lem.gc_concl with
     | ForAll (uvars,f) -> uvars,f
-    | _ -> [],f in
+    | _ as f           -> [],f in
 
   if List.length uvars <> List.length ths then
     Tactics.(soft_failure (Failure "incorrect number of arguments")) ;
@@ -2026,8 +2045,8 @@ let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) :
   let subgoals, pat, in_opt = 
     match args with
     | [Args.ApplyIn (Theory.PT_hol pt,in_opt)] ->
-      let _, tyvars, f = TS.get_hyp_or_lemma pt.p_pt_hid s in
-      let f_args, f = Term.decompose_forall f in
+      let lem = TS.get_reach_hyp_or_lemma pt.p_pt_hid s in
+      let f_args, f = Term.decompose_forall lem.gc_concl in
       let f_args, subst = Term.erefresh_vars `Global f_args in
       let f = Term.subst subst f in
 
@@ -2061,7 +2080,7 @@ let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) :
       let f = Term.subst subst f in
 
       let pat = Term.Match.{ 
-          pat_tyvars = tyvars;
+          pat_tyvars = lem.gc_tyvars;
           pat_vars = !pat_vars;
           pat_term = f; } 
       in      

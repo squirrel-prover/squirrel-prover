@@ -6,36 +6,51 @@
 open Utils
 
 module T = Prover.EquivTactics
-
 module Args = TacticsArgs
-
 module L = Location
+module SE = SystemExpr
 
 open LowTactics
 
 
 (** Extends [EquivSequent] with function relying on the [Prover] module *)
+(* FIXME: redudancy with EquivTactics *)
 module EquivSequent = struct
   include EquivSequent
 
-  (*------------------------------------------------------------------*)
   let is_hyp_or_lemma (name : lsymb) (s : sequent) =
-    Hyps.mem_name (L.unloc name) s || Prover.is_goal_formula (L.unloc name)
+    Hyps.mem_name (L.unloc name) s || Prover.is_lemma (L.unloc name)
 
-  (** Get a hypothesis or lemma by name (in the hyp case, return its id). *)
+  let is_equiv_hyp_or_lemma (name : lsymb) (s : sequent) =
+    Hyps.mem_name (L.unloc name) s || Prover.is_equiv_lemma (L.unloc name)
+
+  let is_reach_hyp_or_lemma (name : lsymb) (s : sequent) =
+    Hyps.mem_name (L.unloc name) s || Prover.is_reach_lemma (L.unloc name)
+
   let get_hyp_or_lemma (name : lsymb) (s : sequent) =
-    let hyp_opt, (system,tyvars,f) =
+    let lem = 
       if Hyps.mem_name (L.unloc name) s then
         let id, f = Hyps.by_name name s in
-        Some id, (system s, [], f)
-      else None, Prover.get_equiv_goal_formula name
+        Goal.{ gc_name = `Hyp id;
+               gc_system = system s;
+               gc_tyvars = [];
+               gc_concl = `Equiv f; }           
+      else 
+        let lem = Prover.get_lemma name in
+        { lem with gc_name = `Lemma lem.Goal.gc_name }
     in
 
     (* Verify that it applies to the current system. *)
-    if not (SystemExpr.systems_compatible (EquivSequent.system s) system) then
+    if not (SE.systems_compatible (EquivSequent.system s) lem.gc_system) then
       Tactics.hard_failure Tactics.NoAssumpSystem;
 
-    hyp_opt, tyvars, f
+    lem
+
+  let get_reach_hyp_or_lemma name s =
+    Goal.to_reach_lemma ~loc:(L.loc name) (get_hyp_or_lemma name s)
+
+  let get_equiv_hyp_or_lemma name s =
+    Goal.to_equiv_lemma ~loc:(L.loc name) (get_hyp_or_lemma name s)
 end
 
 module ES = EquivSequent

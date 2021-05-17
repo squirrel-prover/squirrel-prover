@@ -138,18 +138,20 @@ module TraceTactics : Tactics_sig with type judgment = TraceSequent.t
 module EquivTactics : Tactics_sig with type judgment = Goal.t
 
 (*------------------------------------------------------------------*)
+(** {2 Misc} *)
+
+val get_lemma       : lsymb -> Goal.lemma
+val get_reach_lemma : lsymb -> Goal.reach_lemma
+val get_equiv_lemma : lsymb -> Goal.equiv_lemma
+
+val is_lemma       : string -> bool
+val is_reach_lemma : string -> bool
+val is_equiv_lemma : string -> bool
+
+(*------------------------------------------------------------------*)
 (** {2 Utilities for parsing} *)
 
 exception ParseError of string
-
-val get_goal_formula : 
-  lsymb -> SE.system_expr * Type.tvars * Term.message 
-
-val get_equiv_goal_formula : 
-  lsymb -> SE.system_expr * Type.tvars * Equiv.form
-
-val is_goal_formula : string -> bool
-val is_equiv_goal_formula : string -> bool
 
 type parsed_input =
   | ParsedInputDescr of Decl.declarations

@@ -5,26 +5,47 @@ type lsymb = Theory.lsymb
 
 type t = Trace of TraceSequent.t | Equiv of EquivSequent.t
 
-(** A goal of the prover is simply a name and a formula *)
-type named_goal = string * t
-
-(** A goal conclusion *)
-type goal_concl = { 
-  gc_name   : string; 
-  gc_tyvars : Type.tvars;
-  gc_system : SE.system_expr;
-  gc_concl  : [`Equiv of Equiv.form | `Reach of Term.message];
-}
-
-type goal_concls = goal_concl list
-
 val pp : Format.formatter -> t -> unit
 val pp_init : Format.formatter -> t -> unit
 
 val get_env : t -> Vars.env
 
-val is_reach_gconcl : goal_concl -> bool
-val is_equiv_gconcl : goal_concl -> bool
+(*------------------------------------------------------------------*)
+type named_goal = string * t
+
+(*------------------------------------------------------------------*)
+type ('a,'b) lemma_g = { 
+  gc_name   : 'a; 
+  gc_tyvars : Type.tvars;
+  gc_system : SE.system_expr;
+  gc_concl  : 'b;
+}
+
+(*------------------------------------------------------------------*)
+type gform = [`Equiv of Equiv.form | `Reach of Term.message]
+
+type       lemma = (string,        gform) lemma_g
+type equiv_lemma = (string,   Equiv.form) lemma_g
+type reach_lemma = (string, Term.message) lemma_g
+
+type lemmas = lemma list
+
+
+(*------------------------------------------------------------------*)
+type ghyp = [ `Hyp of Ident.t | `Lemma of string ]
+
+type       hyp_or_lemma = (ghyp,        gform) lemma_g
+type equiv_hyp_or_lemma = (ghyp,   Equiv.form) lemma_g
+type reach_hyp_or_lemma = (ghyp, Term.message) lemma_g
+
+(*------------------------------------------------------------------*)
+val is_reach_lemma : ('a, gform) lemma_g -> bool
+val is_equiv_lemma : ('a, gform) lemma_g -> bool
+
+val to_reach_lemma : 
+  ?loc:L.t -> ('a, gform) lemma_g -> ('a, Term.message) lemma_g
+val to_equiv_lemma : 
+  ?loc:L.t -> ('a, gform) lemma_g -> ('a, Equiv.form)   lemma_g
 
 (*------------------------------------------------------------------*)
 (** {2 Type of parsed goals} *)
@@ -51,10 +72,10 @@ type p_goal = Decl.p_goal_name * p_goal_form
 val make_equiv_goal :
   table:Symbols.table ->
   string ->
-  SE.system_expr -> Theory.bnds -> p_equiv_form L.located -> goal_concl * t
+  SE.system_expr -> Theory.bnds -> p_equiv_form L.located -> lemma * t
 
 val make_trace_goal :
-  tbl:Symbols.table -> string -> Decl.p_goal_reach_cnt -> goal_concl * t
+  tbl:Symbols.table -> string -> Decl.p_goal_reach_cnt -> lemma * t
 
 val make_equiv_goal_process :
-  table:Symbols.table -> string -> SE.system_expr -> goal_concl * t
+  table:Symbols.table -> string -> SE.system_expr -> lemma * t
