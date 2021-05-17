@@ -1228,6 +1228,16 @@ let rec split (instance : constr_instance) : model list =
     dbg "@[<v 2>No_unif@]";
     []
 
+let split_models instance =
+  let models = split instance in
+  
+  dbg "@[<v 1>final models (%d models):@;%a@]"
+    (List.length models)
+    (Fmt.list (pp_constr_instance ~full:false))
+    (List.map (fun x -> x.inst) models);
+
+  models
+
 (** The minimal models a of constraint.
     Here, minimanility means inclusion w.r.t. the predicates. *)
 type models = model list
@@ -1239,7 +1249,7 @@ let cptd = ref 0
 let models_conjunct (l : trace_literal list) : models =
   let l = Form.mk_list l in
   let instance = mk_instance l in
-  split instance 
+  split_models instance 
 
 (** Memoisation *)
 let models_conjunct =
@@ -1314,7 +1324,7 @@ let query ~precise (models : models) (ats : trace_literal list) =
     let insts = List.map (fun model ->
         add_forms model.inst forms 
       ) models in
-    List.for_all (fun inst -> split inst = []) insts
+    List.for_all (fun inst -> split_models inst = []) insts
 
 (* adds debugging information *)
 let query ~precise models ats =

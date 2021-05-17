@@ -254,6 +254,10 @@ type 'a pat = {
   pat_term : 'a term; 
 }
 
+(** Make a pattern out of a formula: all universally quantified variables 
+    are added to [pat_vars]. *)
+val pat_of_form : message -> Type.message pat
+
 (** Module signature of matching. 
     We can only match a [Term.term] into a [Term.term] or a [Equiv.form].
     Hence, the type of term we match into is abstract.

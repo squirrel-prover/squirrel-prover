@@ -345,8 +345,8 @@ Proof.
   intro Hap He Hc.
   depends PDIS5, Pfail => // Hap2.
   expand exec, cond.
-  rewrite !(pkSa@PDIS5 = pk(kS)) in *; 1: auto.
-  destruct He as [_ [_ Hchk]].
+  destruct He as [_ [He Hchk]].
+  rewrite !He in *.
   expand sidPa.
   euf Hchk => Euf. 
 

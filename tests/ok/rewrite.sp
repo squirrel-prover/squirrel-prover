@@ -26,23 +26,12 @@ axiom foog (x : message) : gg(x,b) = c.
 (* (f(x) = z && f(x) = y && (f(z) = z || z = y)). *)
 (* Proof. *)
 (*   intro H. *)
-(*   rewrite (forall (x : message), f(x) = a); *)
+(*   rewrite foo; *)
 (*   1: by intro x1; apply foo. *)
 (*   assumption. *)
 (* Qed. *)
 
 (* rewrite the first occurrence found. *)
-goal _ (x, y, z : message) : 
-((a = z && f(z) = y) && (f(z) = z || z = y)) =>
-(f(x) = z && f(z) = y && (f(z) = z || z = y)).
-Proof.
-  intro H.
-  rewrite (forall (x : message), f(x) = a);
-  1: by intro x1; apply foo.
-  assumption.
-Qed.
-
-(* same but directly using the axiom. *)
 goal _ (x, y, z : message) : 
 ((a = z && f(z) = y) && (f(z) = z || z = y)) =>
 (f(x) = z && f(z) = y && (f(z) = z || z = y)).
@@ -175,10 +164,12 @@ Qed.
 (*------------------------------------------------------------------*)
 (* cannot rewrite if all rhs variables are not bound by the lhs *)
 (* same goal, but proved chaining rewrites. *)
+axiom fooA (t : message) : f(a) = t.
+
 goal _ (x, y, z : message) : 
 f(a) = b.
 Proof.
-  checkfail rewrite (forall (t : message), f(a) = t) exn BadRewriteRule.
+  checkfail rewrite fooA exn BadRewriteRule.
 Abort.
 
 
@@ -300,4 +291,30 @@ Proof.
   rewrite H2; 1: by intro _; apply HPi.
   rewrite H3.
   intro _ _; congruence.
+Qed.
+
+(*------------------------------------------------------------------*)
+(* rewriting with pattern holes *)
+
+abstract P : message -> message -> boolean.
+
+goal _ (z : message) :
+  (forall (x,y : message), P(x,y) => f(y) = x) =>
+   P(a, z) => <f(z),b> = <a, b>.
+Proof.
+  intro H Assum.
+  rewrite (H a _).
+  assumption.
+  congruence.
+Qed.
+
+(* same but we also give a (useless) pattern hole *)
+goal _ (z : message) :
+  (forall (x,y : message), P(x,y) => f(y) = x) =>
+   P(a, z) => <f(z),b> = <a, b>.
+Proof.
+  intro H Assum.
+  rewrite (H a _).
+  assumption.
+  congruence.
 Qed.

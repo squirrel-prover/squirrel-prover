@@ -140,7 +140,7 @@ goal [auth] S1_charac :
 Proof.
   intro Hap Hcond1 Hcond4.
   expand cond, pkP.
-  rewrite (fst(input@S) = pk(kP)) in Hcond1.
+  rewrite Meq in Hcond1.
   euf Hcond1.
 
   case H1.
@@ -153,7 +153,7 @@ goal [auth] P1_charac :
 Proof.
   intro Hap Hcond1 Hcond4.
   expand cond.
-  rewrite (pkS@P1 = pk(kS)) in *.
+  rewrite /pkS Meq in *.
   euf Hcond1.
 
   case H2.

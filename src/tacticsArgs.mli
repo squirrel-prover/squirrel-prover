@@ -28,7 +28,7 @@ type 'a rw_item_g = {
 }
 
 (** Rewrite or expand item*)
-type rw_item = [`Form of Theory.formula | `Expand of Theory.term] rw_item_g
+type rw_item = [`Rw of Theory.p_pt_hol | `Expand of Theory.term] rw_item_g
 
 (** Expand item*)
 type expnd_item = [`Expand of Theory.term] rw_item_g

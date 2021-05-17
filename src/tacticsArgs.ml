@@ -36,7 +36,7 @@ type 'a rw_item_g = {
 }
 
 (** Rewrite or expand item*)
-type rw_item = [`Form of Theory.formula | `Expand of Theory.term] rw_item_g
+type rw_item = [`Rw of Theory.p_pt_hol | `Expand of Theory.term] rw_item_g
 
 (** Expand item*)
 type expnd_item = [`Expand of Theory.term] rw_item_g
@@ -68,7 +68,7 @@ let pp_rw_item ppf rw_item =
 
 let pp_rw_arg ppf rw_arg = match rw_arg with
   | R_s_item s -> pp_s_item ppf s
-  | R_item r -> pp_rw_item ppf r
+  | R_item r -> Fmt.pf ppf "..."
 
 (*------------------------------------------------------------------*)
 type apply_in = lsymb option

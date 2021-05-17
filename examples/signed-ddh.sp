@@ -92,7 +92,7 @@ goal [secretP] P_charac (i:index):
 Proof.
   simpl.
   expand cond, pkS(i)@Pchall1(i).
-  rewrite (fst(fst(input@Pchall1(i))) = pk(skS)) in Meq. 
+  rewrite Meq0 in Meq. 
   euf Meq.
   exists j.
 Qed.
@@ -108,7 +108,7 @@ Proof.
   use H1 with S(r).
   expand exec, cond.
   expand pkp(r)@S1(r).
-  rewrite (fst(input@S(r)) = pk(skP)) in *.
+  rewrite Meq in *.
   euf H0.
   by exists i.
 Qed.

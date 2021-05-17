@@ -446,8 +446,8 @@ let is_impl f = destr_impl f <> None
 let is_pair f = destr_pair f <> None
 
 (*------------------------------------------------------------------*)
-(** for [fs] of arity 2 *)
-let mk_destr_many fs =
+(** for [fs] of arity 2, left associative *)
+let mk_destr_many_left fs =
   let rec destr l f =
     if l < 0 then assert false;
     if l = 1 then Some [f]
@@ -458,12 +458,24 @@ let mk_destr_many fs =
   in
   destr
 
-let destr_ors   = mk_destr_many f_or
-let destr_ands  = mk_destr_many f_and
-let destr_impls = mk_destr_many f_impl
+(** for [fs] of arity 2, right associative *)
+let mk_destr_many_right fs =
+  let rec destr l f =
+    if l < 0 then assert false;
+    if l = 1 then Some [f]
+    else match destr_fun ~fs f with
+      | None -> None
+      | Some [f;g] -> omap (fun l -> f :: l) (destr (l-1) g)    
+      | _ -> assert false
+  in
+  destr
+
+let destr_ors   = mk_destr_many_left  f_or
+let destr_ands  = mk_destr_many_left  f_and
+let destr_impls = mk_destr_many_right f_impl
 
 (*------------------------------------------------------------------*)
-(** for any [fs] *)
+(** for any associative [fs] *)
 let mk_decompose fs =
   let rec decompose f = match destr_fun ~fs f with
     | None -> [f]
@@ -473,7 +485,14 @@ let mk_decompose fs =
 
 let decompose_ors   = mk_decompose f_or  
 let decompose_ands  = mk_decompose f_and 
-let decompose_impls = mk_decompose f_impl
+
+let decompose_impls f =
+  let rec decompose f = match destr_fun ~fs:f_impl f with
+    | None -> [f]
+    | Some [f;g] -> f :: decompose g
+    | _ -> assert false
+  in
+  decompose f
 
 let decompose_impls_last f =
   let forms = decompose_impls f in
@@ -1241,6 +1260,16 @@ type 'a pat = {
   pat_vars : Vars.Sv.t; 
   pat_term : 'a term;
 }
+
+let pat_of_form (t : 'a term) =
+  let vs, t = decompose_forall t in
+  let vs, s = erefresh_vars `Global vs in
+  let t = subst s t in
+
+  { pat_tyvars = [];
+    pat_vars = Vars.Sv.of_list vs; 
+    pat_term = t; } 
+
 
 (** Module signature of matching. 
     The type of term we match into is abstract. *)

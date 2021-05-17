@@ -601,7 +601,8 @@ and do_simpl_pat (h : Args.ip_handler) (ip : Args.simpl_pat) s : sequent list =
   | `Hyp id, Args.Srewrite dir -> 
     let f = Hyps.by_id id s in
     let s = Hyps.remove id s in
-    let erule = LT.form_to_rw_erule ~loc:(L.loc dir) (L.unloc dir) f in
+    let pat = Term.pat_of_form f in
+    let erule = LT.pat_to_rw_erule ~loc:(L.loc dir) (L.unloc dir) pat in
     let s, subgoals = LT.rewrite ~all:false [`Goal] (`Many, Some id, erule) s in
     subgoals @ [s]
 
@@ -2045,45 +2046,7 @@ let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) :
   let subgoals, pat, in_opt = 
     match args with
     | [Args.ApplyIn (Theory.PT_hol pt,in_opt)] ->
-      let lem = TS.get_reach_hyp_or_lemma pt.p_pt_hid s in
-      let f_args, f = Term.decompose_forall lem.gc_concl in
-      let f_args, subst = Term.erefresh_vars `Global f_args in
-      let f = Term.subst subst f in
-
-      let pt_args_l = List.length pt.p_pt_args in
-
-      if List.length f_args < pt_args_l then
-        hard_failure ~loc:(L.loc pt.p_pt_hid)  (Failure "too many arguments");
-
-      let f_args0, f_args1 = List.takedrop pt_args_l f_args in
-
-
-      let cenv = Theory.{ table = TS.table s; cntxt = InGoal; } in 
-      let pat_vars = ref (Vars.Sv.of_list f_args1) in
-
-      let subst = 
-        List.map2 (fun p_arg (Vars.EVar f_arg) ->
-            let ty = Vars.ty f_arg in
-            let t = 
-              Theory.convert ~pat:true cenv (TS.ty_vars s) (TS.env s) p_arg ty
-            in
-            let new_p_vs = 
-              Vars.Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
-            in
-            pat_vars := Vars.Sv.union (!pat_vars) new_p_vs;
-      
-            Term.ESubst (Term.Var f_arg, t)
-          ) pt.p_pt_args f_args0
-      in
-
-      (* instantiate [f_args0] by [args] *)
-      let f = Term.subst subst f in
-
-      let pat = Term.Match.{ 
-          pat_tyvars = lem.gc_tyvars;
-          pat_vars = !pat_vars;
-          pat_term = f; } 
-      in      
+      let _, pat = LT.convert_pt_hol pt s in
       [], pat, in_opt
 
     | [Args.ApplyIn (Theory.PT_form f,in_opt)] ->
@@ -2092,15 +2055,7 @@ let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) :
         | Args.Arg (Boolean f) ->
           let subgoal = TS.set_goal f s in
 
-          let vs, f = Term.decompose_forall f in
-          let vs, subst = Term.erefresh_vars `Global vs in
-          let f = Term.subst subst f in
-
-          let pat = Term.Match.{ 
-              pat_tyvars = [];
-              pat_vars = Vars.Sv.of_list vs; 
-              pat_term = f; } 
-          in
+          let pat = Term.pat_of_form f in
 
           [subgoal], pat, in_opt
 

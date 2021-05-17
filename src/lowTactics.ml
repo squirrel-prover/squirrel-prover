@@ -189,6 +189,54 @@ module LowTac (S : Sequent) = struct
     in
     s, List.rev subs
 
+
+  (*------------------------------------------------------------------*)
+  (** {3 Conversion}*)
+
+  (** Parse a partially applied lemma or hypothesis as a pattern. *)
+  let convert_pt_hol (pt : Theory.p_pt_hol) (s : S.sequent) : 
+    Goal.ghyp * Type.message Term.pat = 
+    let lem = S.get_reach_hyp_or_lemma pt.p_pt_hid s in
+    let f_args, f = Term.decompose_forall lem.gc_concl in
+    let f_args, subst = Term.erefresh_vars `Global f_args in
+    let f = Term.subst subst f in
+
+    let pt_args_l = List.length pt.p_pt_args in
+
+    if List.length f_args < pt_args_l then
+      hard_failure ~loc:(L.loc pt.p_pt_hid)  (Failure "too many arguments");
+
+    let f_args0, f_args1 = List.takedrop pt_args_l f_args in
+
+
+    let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in 
+    let pat_vars = ref (Vars.Sv.of_list f_args1) in
+
+    let subst = 
+      List.map2 (fun p_arg (Vars.EVar f_arg) ->
+          let ty = Vars.ty f_arg in
+          let t = 
+            Theory.convert ~pat:true cenv (S.ty_vars s) (S.env s) p_arg ty
+          in
+          let new_p_vs = 
+            Vars.Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
+          in
+          pat_vars := Vars.Sv.union (!pat_vars) new_p_vs;
+
+          Term.ESubst (Term.Var f_arg, t)
+        ) pt.p_pt_args f_args0
+    in
+
+    (* instantiate [f_args0] by [args] *)
+    let f = Term.subst subst f in
+
+    let pat = Term.{ 
+        pat_tyvars = lem.gc_tyvars;
+        pat_vars = !pat_vars;
+        pat_term = f; } 
+    in      
+    lem.gc_name, pat
+
   (*------------------------------------------------------------------*)
   (** {3 Macro unfolding}*)
 
@@ -436,14 +484,8 @@ module LowTac (S : Sequent) = struct
     s, subs
 
   (** Make a rewrite rule from a formula *)
-  let form_to_rw_erule ?(ty_vars=[]) ?loc dir f : rw_erule = 
-    let vs, f = Term.decompose_forall f in
-    let vs, subst = Term.erefresh_vars `Global vs in
-    let f = Term.subst subst f in
-
-    let vs = Vars.Sv.of_list vs in
-
-    let subs, f = Term.decompose_impls_last f in
+  let pat_to_rw_erule ?loc dir (p : Type.message Term.pat) : rw_erule = 
+    let subs, f = Term.decompose_impls_last p.pat_term in
 
     let e = match f with
       | Term.Atom (`Message   (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
@@ -460,7 +502,7 @@ module LowTac (S : Sequent) = struct
         Term.ESubst (t2,t1)
     in
 
-    let rule = ty_vars, vs, subs, e in
+    let rule = p.pat_tyvars, p.pat_vars, subs, e in
 
     (* We check that the rule is valid *)
     check_erule rule;
@@ -470,36 +512,20 @@ module LowTac (S : Sequent) = struct
   (** Parse rewrite tactic arguments as rewrite rules with possible subgoals 
       showing the rule validity. *)
   let p_rw_item (rw_arg : Args.rw_item) s : rw_earg * S.sequent list =
-    let p_rw_rule dir (rw_type : Theory.formula) 
+    let p_rw_rule dir (p_pt : Theory.p_pt_hol) 
       : rw_erule * S.sequent list * Ident.t option = 
-      match Args.convert_as_lsymb [Args.Theory rw_type] with
-      | Some str when S.is_hyp_or_lemma str s ->
-        let lem = S.get_reach_hyp_or_lemma str s in        
-        let ty_vars = lem.gc_tyvars in
-        let id_opt = match lem.gc_name with `Hyp id -> Some id | _ -> None in
-        let f = lem.gc_concl in
+      let ghyp, pat = convert_pt_hol p_pt s in
+      let id_opt = match ghyp with `Hyp id -> Some id | _ -> None in
 
-        (* We are using an hypothesis, hence no new sub-goals *)
-        let premise = [] in
+      (* We are using an hypothesis, hence no new sub-goals *)
+      let premise = [] in
 
-        form_to_rw_erule ~ty_vars dir f, premise, id_opt
-
-      | _ -> 
-        let cenv = Theory.{ table = S.table s;
-                            cntxt = InGoal; } in 
-        let f = 
-          Theory.convert cenv (S.ty_vars s) (S.env s) rw_type Type.Boolean 
-        in
-
-        (* create new sub-goal *)
-        let premise = [S.set_reach_goal f s] in
-
-        form_to_rw_erule ~loc:(L.loc rw_type) dir f, premise, None
+      pat_to_rw_erule dir pat, premise, id_opt
     in
 
     let p_rw_item (rw_arg : Args.rw_item) : rw_earg * (S.sequent list) = 
       let rw, subgoals = match rw_arg.rw_type with
-        | `Form f -> 
+        | `Rw f -> 
           let dir = L.unloc rw_arg.rw_dir in
           (* (rewrite rule, subgols, hyp id) if applicable *)
           let rule, subgoals, id_opt = p_rw_rule dir f in

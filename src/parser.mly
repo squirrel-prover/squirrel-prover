@@ -454,7 +454,7 @@ rw_dir:
 | MINUS { `RightToLeft }
 
 rw_type:
-| f=sterm        { `Form f }  
+| pt=spt         { `Rw pt }  
 | SLASH t=sterm  { `Expand t }
 
 expnd_type:
@@ -548,12 +548,21 @@ as_ip:
 sel_tacs:
 | l=slist1(sel_tac,PARALLEL) { l }
 
-apply_arg:
+pt:
 | hid=lsymb args=slist(sterm,empty)
-    { Theory.PT_hol { p_pt_hid = hid; p_pt_args = args} }
+    { { p_pt_hid = hid; p_pt_args = args} }
 
-| LPAREN f=term RPAREN
-    { Theory.PT_form f }
+/* non-ambiguous pt */
+spt:
+| hid=lsymb
+    { Theory.{ p_pt_hid = hid; p_pt_args = []} }
+| LPAREN pt=pt RPAREN
+    { pt }
+
+apply_arg:
+| pt=pt                  { Theory.PT_hol pt }
+
+| LPAREN f=term RPAREN   { Theory.PT_form f }
 
 (*------------------------------------------------------------------*)
 tac:
