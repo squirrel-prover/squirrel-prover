@@ -236,7 +236,7 @@ let simple_pair _table s = SimplePair s
 (* This is the only case where we have to check that the system are 
    compatible. *)
 let pair table a b =  
-  let se = Pair(a,b) in
+  let se = if a = b then Single a else Pair(a,b) in
   check_system_expr table se; se
 
 (*------------------------------------------------------------------*)
