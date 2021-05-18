@@ -50,7 +50,7 @@ fa 0.
 fa 1.
 fa 1.
 prf 1.
-help. (* HELP !! completement perdue - en particulier _i78 me semble louche *)
+help. (* HELP !! completement perdue je voulais faire yesif - en particulier _i78 me semble louche *)
 admit.
 admit.
 admit.
