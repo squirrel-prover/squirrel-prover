@@ -241,6 +241,19 @@ let () =
     (only_equiv assumption)
 
 (*------------------------------------------------------------------*)
+let byequiv s =
+  [Goal.Trace (ES.trace_seq_of_equiv_seq s)]
+
+let () =
+  T.register "byequiv"
+    ~tactic_help:{general_help = "transform an equivalence goal into a \
+                                  reachability goal.";
+                  detailed_help = "";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    (only_equiv byequiv)
+
+(*------------------------------------------------------------------*)
 (* TODO: factorize with the identical trace tactics *)
 let revert (hid : Ident.t) (s : ES.t) =
   let f = Hyps.by_id hid s in
@@ -829,64 +842,64 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
 end
 
 let fa_dup_int i s =
-  match nth i (ES.goal_as_equiv s) with
-  | before, e, after ->
-      let biframe_without_e = List.rev_append before after in
-      let cntxt = ES.mk_trace_cntxt s in
-      begin try
-        (* we expect that e is of the form exec@pred(tau) && phi *)
-        let (tau,phi) =
-          let f,g = match e with
-            | Term.Fun (fs,_, [f;g]) when fs = Term.f_and -> f,g
-
-            | Term.Seq (vars, Term.Fun (fs,_, [f;g])) when fs = Term.f_and ->
-              let _, subst = Term.refresh_vars `Global vars in
-              Term.subst subst f,
-              Term.subst subst g
-
-            | _ -> raise Not_FADUP_formula
-          in
-
-          match f,g with
-            | (Term.Macro (fm,[], Term.Pred tau), phi) when fm = Term.exec_macro
-              -> (tau,phi)
-            | (phi, Term.Macro (fm,[], Term.Pred tau)) when fm = Term.exec_macro
-              -> (tau,phi)
-            | _ -> raise Not_FADUP_formula
-        in
-
-        let frame_at_pred_tau = 
-          Term.Macro (Term.frame_macro,[],Term.Pred tau)
-        in
-        (* we first check that frame@pred(tau) is in the biframe *)
-        if not (List.mem frame_at_pred_tau biframe_without_e) then
-          raise Not_FADUP_formula;
-        
-        (* we iterate over the formula phi to check if it contains only
-         * allowed subterms *)
-        let iter = new check_fadup ~cntxt tau in
-        iter#check_formula phi ;
-        (* on success, we keep only exec@pred(tau) *)
-        let new_elem = Term.Macro (Term.exec_macro,[],Term.Pred tau) in
-
-        [ES.set_equiv_goal (List.rev_append before (new_elem::after)) s]
-
-      with
-      | Not_FADUP_formula ->
-          soft_failure (Tactics.Failure "can only apply the tactic on \
-          a formula of the form (exec@pred(tau) && phi) with frame@pred(tau)\
-          in the biframe")
-
-      | Not_FADUP_iter ->
-          soft_failure (Tactics.Failure "the formula contains subterms \
-          that are not handled by the FADUP rule")
-    end
-
-  | exception Out_of_range ->
+  let before, e, after = 
+    try nth i (ES.goal_as_equiv s) 
+    with Out_of_range ->
       soft_failure (Tactics.Failure "out of range position")
+  in
+
+  let biframe_without_e = List.rev_append before after in
+  let cntxt = ES.mk_trace_cntxt s in
+  try
+    (* we expect that e is of the form exec@pred(tau) && phi *)
+    let (tau,phi) =
+      let f,g = match e with
+        | Term.Fun (fs,_, [f;g]) when fs = Term.f_and -> f,g
+
+        | Term.Seq (vars, Term.Fun (fs,_, [f;g])) when fs = Term.f_and ->
+          let _, subst = Term.refresh_vars `Global vars in
+          Term.subst subst f,
+          Term.subst subst g
+
+        | _ -> raise Not_FADUP_formula
+      in
+
+      match f,g with
+      | (Term.Macro (fm,[], Term.Pred tau), phi) when fm = Term.exec_macro
+        -> (tau,phi)
+      | (phi, Term.Macro (fm,[], Term.Pred tau)) when fm = Term.exec_macro
+        -> (tau,phi)
+      | _ -> raise Not_FADUP_formula
+    in
+
+    let frame_at_pred_tau = 
+      Term.Macro (Term.frame_macro,[],Term.Pred tau)
+    in
+    (* we first check that frame@pred(tau) is in the biframe *)
+    if not (List.mem frame_at_pred_tau biframe_without_e) then
+      raise Not_FADUP_formula;
+
+    (* we iterate over the formula phi to check if it contains only
+     * allowed subterms *)
+    let iter = new check_fadup ~cntxt tau in
+    iter#check_formula phi ;
+    (* on success, we keep only exec@pred(tau) *)
+    let new_elem = Term.Macro (Term.exec_macro,[],Term.Pred tau) in
+
+    [ES.set_equiv_goal (List.rev_append before (new_elem::after)) s]
+
+  with
+  | Not_FADUP_formula ->
+    soft_failure (Tactics.Failure "can only apply the tactic on \
+                                   a formula of the form (exec@pred(tau) && phi) \
+                                   with frame@pred(tau) in the biframe")
+
+  | Not_FADUP_iter ->
+    soft_failure (Tactics.Failure "the formula contains subterms \
+                                   that are not handled by the FADUP rule")
 
 
-let fadup Args.(Opt (Int, p)) s =
+let fadup Args.(Opt (Int, p)) s : ES.sequents =
   match p with
   | None -> fa_dup s
   | Some (Args.Int i) -> fa_dup_int i s
@@ -1595,13 +1608,11 @@ let () = T.register_typed "ifeq"
 (** Automatic simplification *)
 
 let auto ~close ~strong s sk (fk : Tactics.fk) = 
-  let wrap tac s sk fk = 
-    try sk (tac s) fk with
-    | Tactics.Tactic_soft_failure e -> fk e in
-
   let open Tactics in
   match s with
   | Goal.Equiv s ->
+    (* REM *)
+    dbg "equiv auto";
     let sk l _ = 
       if close && l <> [] 
       then fk (None, GoalNotClosed)
@@ -1613,21 +1624,29 @@ let auto ~close ~strong s sk (fk : Tactics.fk) =
 
     let wfadup s sk fk = 
       let fk _ = sk [s] fk in
-      wrap (fadup (Args.Opt (Args.Int, None))) s sk fk in
+      LT.wrap_fail (fadup (Args.Opt (Args.Int, None))) s sk fk in
 
-    andthen_list
+    let conclude s sk fk  =
+      if close || Config.auto_intro () then 
+        orelse_list [LT.wrap_fail refl_tac;
+                     LT.wrap_fail assumption] s sk fk
+      else fk (None, GoalNotClosed)
+    in
+
+    andthen_list ~cut:true
       [try_tac wfadup;
        try_tac
-         (andthen_list 
-            [wrap (expand_all ());
+         (andthen_list ~cut:true
+            [LT.wrap_fail (expand_all ());
              try_tac wfadup;
-             orelse_list [wrap refl_tac;
-                          wrap assumption]])]
+             conclude])]
       s sk fk
 
   | Goal.Trace t ->
+    (* REM *)
+    dbg "trace auto";
     let sk l fk = sk (List.map (fun s -> Goal.Trace s) l) fk in
-    TraceTactics.simplify ~close ~strong t sk fk
+    TraceTactics.simpl ~close ~strong t sk fk
 
 let tac_auto ~close ~strong args s sk (fk : Tactics.fk) =
    auto ~close ~strong s sk fk 
@@ -2021,7 +2040,7 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-let split_seq (i, ht) s : ES.sequent = 
+let split_seq (i, ht) s : ES.sequent =   
   let before, t, after =
     try nth i (ES.goal_as_equiv s) with
     | Out_of_range -> 
@@ -2068,7 +2087,7 @@ let split_seq (i, ht) s : ES.sequent =
     Term.Seq (is, term) 
   in
  
-  let frame = before @ [mk_one ti_t; mk_one ti_f] @ after in
+  let frame = List.rev_append before ([mk_one ti_t; mk_one ti_f] @ after) in
   ES.set_equiv_goal frame s
   
 let split_seq_args args s : ES.sequent list =
