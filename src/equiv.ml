@@ -128,7 +128,7 @@ module Match : Term.MatchS with type t = form = struct
   let rec find_map :
     type b. many:bool -> 
     Vars.env -> form -> b Term.pat -> 
-    (b Term.term -> Vars.evars -> mv -> b Term.term) -> 
+    (b Term.term -> Vars.evars -> Term.mv -> b Term.term) -> 
     form option
     = fun ~many env e p func ->
       match e with

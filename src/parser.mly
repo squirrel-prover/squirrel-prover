@@ -478,10 +478,14 @@ rw_arg:
 rw_args:
 | l=slist1(rw_arg, empty) { l }
 
+single_target:
+| id=lsymb { id }
+| i=loc(int)    { L.mk_loc (L.loc i) (string_of_int (L.unloc i)) }
+
 in_target:
-|                          { `Goal }
-| IN l=slist1(lsymb,COMMA) { `Hyps l }
-| IN STAR                  { `All }
+|                                  { `Goal }
+| IN l=slist1(single_target,COMMA) { `Hyps l }
+| IN STAR                          { `All }
 
 apply_in:
 |             { None }

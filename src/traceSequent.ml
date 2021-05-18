@@ -7,7 +7,7 @@ module T = Tactics
 
 type lsymb = Theory.lsymb
 
-type hyp = Term.message
+type form = Term.message
 
 (*------------------------------------------------------------------*)
 (* For debugging *)
@@ -520,10 +520,15 @@ let mk_trace_cntxt s =
     models = Some (get_models s);
   }
 
-module Match : Term.MatchS with type t = hyp = Term.Match
+module Match : Term.MatchS with type t = form = Term.Match
 
 
 let set_reach_goal t s = set_goal t s
 
 let reach_to_hyp t = t
 let hyp_to_reach ?loc t = t
+
+(*------------------------------------------------------------------*)
+let mem_felem _ _ = false
+let change_felem _ _ _ = assert false
+let get_felem _ _ = assert false

@@ -16,7 +16,7 @@ type lsymb = Theory.lsymb
 type t
 type sequent = t
 
-type hyp = Term.message
+type form = Term.message
 
 val pp : Format.formatter -> sequent -> unit
 
@@ -137,9 +137,9 @@ val maximal_elems :
     It removes trivial equalities (e.g x=x). *)
 val subst : Term.subst -> sequent -> sequent
 
-val subst_hyp : Term.subst -> hyp -> hyp
+val subst_hyp : Term.subst -> form -> form
 
-val get_terms : hyp -> Term.message list
+val get_terms : form -> Term.message list
 
 (** [get_all_terms s] returns all the messages appearing at toplevel
   * in [s]. *)
@@ -147,9 +147,14 @@ val get_all_messages : sequent -> Term.message list
 
 val set_reach_goal : Term.message -> t -> t
 
-val reach_to_hyp :             Term.message -> hyp
-val hyp_to_reach : ?loc:L.t -> hyp -> Term.message
+val reach_to_hyp :             Term.message -> form
+val hyp_to_reach : ?loc:L.t -> form -> Term.message
 
 val mk_trace_cntxt : t -> Constr.trace_cntxt
 
-module Match : Term.MatchS with type t = hyp 
+module Match : Term.MatchS with type t = form 
+
+(*------------------------------------------------------------------*)
+val mem_felem    : int -> t -> bool
+val change_felem : int -> Term.message list -> t -> t
+val get_felem    : int -> t -> Term.message

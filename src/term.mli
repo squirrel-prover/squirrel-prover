@@ -258,14 +258,14 @@ type 'a pat = {
     are added to [pat_vars]. *)
 val pat_of_form : message -> Type.message pat
 
+(** Matching variable assignment (types must be compatible). *)
+type mv = eterm Vars.Mv.t
+
 (** Module signature of matching. 
     We can only match a [Term.term] into a [Term.term] or a [Equiv.form].
     Hence, the type of term we match into is abstract.
     The type we match from is fixed to Term.term. *)
 module type MatchS = sig
-  (** match substitution *)
-  type mv
-
   (** Abstract type of terms we are matching in. *)
   type t
 

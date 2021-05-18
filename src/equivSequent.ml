@@ -1,3 +1,5 @@
+open Utils
+
 module L = Location
 module Args = TacticsArgs
 module T = Tactics
@@ -24,7 +26,7 @@ type hyps = H.hyps
 (*------------------------------------------------------------------*)
 (** {2 Equivalence sequent} *)
 
-type hyp = Equiv.form
+type form = Equiv.form
 
 (** An equivalence sequent features:
   * - two frames given as a single [goal] containing bi-terms
@@ -283,6 +285,16 @@ let query_happens ~precise (s : t) (a : Term.timestamp) =
   let s = trace_seq_of_equiv_seq ~goal:Term.mk_false s in
   TS.query_happens ~precise s a
 
+(*------------------------------------------------------------------*)
+let mem_felem i s = 
+  goal_is_equiv s && 
+  i < List.length (goal_as_equiv s)
+  
+let change_felem i elems s =
+  let before, _, after = List.splitat i (goal_as_equiv s) in
+  set_equiv_goal (List.rev_append before (elems @ after)) s
+
+let get_felem i s = let _, t, _ = List.splitat i (goal_as_equiv s) in t
 
 (*------------------------------------------------------------------*)
 (** {2 Matching} *)

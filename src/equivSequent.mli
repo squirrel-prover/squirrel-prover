@@ -17,7 +17,7 @@ type sequent = t
 type sequents = sequent list
 
 
-type hyp = Equiv.form
+type form = Equiv.form
 
 (** Initialize a sequent for the diff-equivalence of the given system.  
     Remark that if the projection of the system is not None, the goal will 
@@ -33,7 +33,7 @@ val pp_init : Format.formatter -> t -> unit
    been applied to its conclusion and hypotheses. *)
 val subst     : Term.subst -> t -> t
 
-val subst_hyp : Term.subst -> hyp -> hyp
+val subst_hyp : Term.subst -> form -> form
 
 (*------------------------------------------------------------------*)
 (** {2 Hypotheses functions} *)
@@ -89,16 +89,21 @@ val trace_seq_of_equiv_seq : ?goal:Term.message -> t -> TraceSequent.t
 
 val trace_seq_of_reach : Term.message -> t -> TraceSequent.t
 
-val get_terms : hyp -> Term.message list
+val get_terms : form -> Term.message list
 val get_models : t -> Constr.models
 
 val mk_trace_cntxt : t -> Constr.trace_cntxt
 
 val query_happens : precise:bool -> t -> Term.timestamp -> bool
 
-val reach_to_hyp :             Term.message -> hyp
-val hyp_to_reach : ?loc:L.t -> hyp -> Term.message
+val reach_to_hyp :             Term.message -> form
+val hyp_to_reach : ?loc:L.t -> form -> Term.message
+
+(*------------------------------------------------------------------*)
+val mem_felem    : int -> t -> bool
+val change_felem : int -> Term.message list -> t -> t
+val get_felem    : int -> t -> Term.message
 
 (*------------------------------------------------------------------*)
 (** {2 Matching} *)
-module Match : Term.MatchS with type t = hyp
+module Match : Term.MatchS with type t = form

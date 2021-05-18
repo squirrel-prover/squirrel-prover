@@ -11,7 +11,11 @@ let rec pp_s_item fmt = function
   | Tryauto  _    -> Fmt.pf fmt "//"
 
 (** Tactic target. *)
-type in_target = [`Goal | `All | `Hyps of lsymb list] 
+type in_target = [
+  | `Goal
+  | `All
+  | `Hyps of lsymb list         (* hypotheses, or frame elements *)
+] 
 
 let pp_in_target ppf (in_t : in_target) = 
   match in_t with

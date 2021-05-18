@@ -14,7 +14,7 @@ open LowTactics
 
 
 (** Extends [EquivSequent] with function relying on the [Prover] module *)
-(* FIXME: redudancy with EquivTactics *)
+(* FIXME: (partial) redudancy with EquivTactics *)
 module EquivSequent = struct
   include EquivSequent
 
@@ -47,7 +47,12 @@ module EquivSequent = struct
     lem
 
   let get_reach_hyp_or_lemma name s =
-    Goal.to_reach_lemma ~loc:(L.loc name) (get_hyp_or_lemma name s)
+    let lem = get_hyp_or_lemma name s in
+    if Goal.is_reach_lemma lem 
+    then Goal.to_reach_lemma ~loc:(L.loc name) lem
+    else
+      let lem = Goal.to_equiv_lemma lem in
+      { lem with Goal.gc_concl = EquivSequent.hyp_to_reach lem.gc_concl }
 
   let get_equiv_hyp_or_lemma name s =
     Goal.to_equiv_lemma ~loc:(L.loc name) (get_hyp_or_lemma name s)
@@ -68,24 +73,17 @@ module LT = LowTactics.LowTac(EquivSequent)
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
 
+let split_equiv_goal i s =
+  try List.splitat i (ES.goal_as_equiv s) 
+  with List.Out_of_range ->
+    soft_failure (Tactics.Failure "out of range position")
+  
+
 (*------------------------------------------------------------------*)
 (* same as [LT.wrap_fail], but for goals *)
 let wrap_fail f (s: Goal.t) sk fk =
   try sk (f s) fk with
   | Tactics.Tactic_soft_failure e -> fk e
-
-(*------------------------------------------------------------------*)
-exception Out_of_range
-
-(** When [0 <= i < List.length l], [nth i l] returns [before,e,after]
-  * such that [List.rev_append before (e::after) = l] and
-  * [List.length before = i].
-  * @raise Out_of_range when [i] is out of range. *)
-let nth i l =
-  let rec aux i acc = function
-    | [] -> raise Out_of_range
-    | e::tl -> if i=0 then acc,e,tl else aux (i-1) (e::acc) tl
-  in aux i [] l
 
 (*------------------------------------------------------------------*)
 (** {2 Logical Tactics} *)
@@ -148,11 +146,7 @@ let () =
        | [] -> only_equiv (fun _ sk fk -> sk [] fk)
        | [Args.Int_parsed i] ->
            pure_equiv begin fun s sk fk ->
-             let before,_,after = nth i (ES.goal_as_equiv s) in
-             let s =
-               ES.set_equiv_goal (List.rev_append before after) s
-             in
-               sk [s] fk
+             sk [ES.change_felem i [] s] fk
            end
        | _ -> bad_args ())
 
@@ -649,38 +643,34 @@ let fa_expand t =
   filterBoolAsMsg (aux (Term.head_normal_biterm t))
 
 let fa Args.(Int i) s =
-  match nth i (ES.goal_as_equiv s) with
-    | before, e, after ->
-        begin try
-          (* Special case for try find, otherwise we use fa_expand *)
-          match e with
-          | Find (vars,c,t,e) ->
-            let env = ref (ES.env s) in
-            let vars' = List.map (Vars.fresh_r env) vars in
-            let subst =
-              List.map2
-                (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
-                vars vars'
-            in
-            let c' = Term.(Seq (vars, c)) in
-            let t' = Term.subst subst t in
-            let biframe =
-              List.rev_append before
-                (Equiv.[ c' ; t' ; e ] @ after)
-            in
-            [ ES.set_env !env (ES.set_equiv_goal biframe s) ]
-          | _ ->
-            let biframe =
-              List.rev_append before (fa_expand e @ after) in
-              [ ES.set_equiv_goal biframe s ]
-          with
-          | No_common_head ->
-              soft_failure (Tactics.Failure "No common construct")
-          | No_FA ->
-              soft_failure (Tactics.Failure "FA not applicable")
-        end
-    | exception Out_of_range ->
-        soft_failure (Tactics.Failure "Out of range position")
+  let before, e, after = split_equiv_goal i s in
+  try
+    (* Special case for try find, otherwise we use fa_expand *)
+    match e with
+    | Find (vars,c,t,e) ->
+      let env = ref (ES.env s) in
+      let vars' = List.map (Vars.fresh_r env) vars in
+      let subst =
+        List.map2
+          (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
+          vars vars'
+      in
+      let c' = Term.(Seq (vars, c)) in
+      let t' = Term.subst subst t in
+      let biframe =
+        List.rev_append before
+          (Equiv.[ c' ; t' ; e ] @ after)
+      in
+      [ ES.set_env !env (ES.set_equiv_goal biframe s) ]
+    | _ ->
+      let biframe =
+        List.rev_append before (fa_expand e @ after) in
+      [ ES.set_equiv_goal biframe s ]
+  with
+  | No_common_head ->
+    soft_failure (Tactics.Failure "No common construct")
+  | No_FA ->
+    soft_failure (Tactics.Failure "FA not applicable")
 
 let () =
   T.register_typed "fa"
@@ -841,11 +831,7 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
 end
 
 let fa_dup_int i s =
-  let before, e, after =
-    try nth i (ES.goal_as_equiv s)
-    with Out_of_range ->
-      soft_failure (Tactics.Failure "out of range position")
-  in
+  let before, e, after = split_equiv_goal i s in
 
   let biframe_without_e = List.rev_append before after in
   let cntxt = ES.mk_trace_cntxt s in
@@ -1080,23 +1066,20 @@ let mk_if_term cntxt env t biframe =
 
 
 let fresh Args.(Int i) s =
-  match nth i (ES.goal_as_equiv s) with
-    | before, e, after ->
-        (* the biframe to consider when checking the freshness *)
-        let biframe = List.rev_append before after in
-        let cntxt   = ES.mk_trace_cntxt s in
-        let env     = ES.env s in
-        begin match mk_if_term cntxt env e biframe with
-        | if_term ->
-          let biframe = List.rev_append before (if_term :: after) in
-          [ES.set_equiv_goal biframe s]
+  let before, e, after = split_equiv_goal i s in
 
-        | exception Fresh.Not_name ->
-          soft_failure
-            (Tactics.Failure "Can only apply fresh tactic on names")
-        end
-    | exception Out_of_range ->
-        soft_failure (Tactics.Failure "Out of range position")
+  (* the biframe to consider when checking the freshness *)
+  let biframe = List.rev_append before after in
+  let cntxt   = ES.mk_trace_cntxt s in
+  let env     = ES.env s in
+  match mk_if_term cntxt env e biframe with
+  | if_term ->
+    let biframe = List.rev_append before (if_term :: after) in
+    [ES.set_equiv_goal biframe s]
+
+  | exception Fresh.Not_name ->
+    soft_failure
+      (Tactics.Failure "Can only apply fresh tactic on names")
 
 let () =
   T.register_typed "fresh"
@@ -1297,38 +1280,35 @@ let get_ite ~cntxt elem =
 let yes_no_if b Args.(Int i) s =
   let cntxt = ES.mk_trace_cntxt s in
 
-  match nth i (ES.goal_as_equiv s) with
-  | before, elem, after ->
-    (* search for the first occurrence of an if-then-else in [elem] *)
-    begin match get_ite ~cntxt elem with
-    | None ->
-      soft_failure
-        (Tactics.Failure
-          "can only be applied on a term with at least one occurrence
+  let before, elem, after = split_equiv_goal i s in
+
+  (* search for the first occurrence of an if-then-else in [elem] *)
+  match get_ite ~cntxt elem with
+  | None ->
+    soft_failure
+      (Tactics.Failure
+         "can only be applied on a term with at least one occurrence
           of an if then else term")
 
-    | Some (c,t,e) ->
-      (* Context with bound variables (eg try find) are not (yet) supported.
-       * This is detected by checking that there is no "new" variable,
-       * which are used by the iterator to represent bound variables. *)
-      let vars = (Term.get_vars c) @ (Term.get_vars t) @ (Term.get_vars e) in
-      if List.exists (function Vars.(EVar v) -> Vars.is_new v) vars then
-        soft_failure (Tactics.Failure "application of this tactic \
-          inside a context that bind variables is not supported");
+  | Some (c,t,e) ->
+    (* Context with bound variables (eg try find) are not (yet) supported.
+     * This is detected by checking that there is no "new" variable,
+     * which are used by the iterator to represent bound variables. *)
+    let vars = (Term.get_vars c) @ (Term.get_vars t) @ (Term.get_vars e) in
+    if List.exists (function Vars.(EVar v) -> Vars.is_new v) vars then
+      soft_failure 
+        (Failure "application of this tactic \
+                  inside a context that bind variables is not supported");
 
-      let branch, trace_sequent = simplify_ite b s c t e in
-      let new_elem =
-        Equiv.subst_equiv
-          [Term.ESubst (Term.mk_ite ~simpl:false c t e,branch)]
-          [elem]
-      in
-      let biframe = List.rev_append before (new_elem @ after) in
-      [ Goal.Trace trace_sequent;
-        Goal.Equiv (ES.set_equiv_goal biframe s) ]
-    end
-
-  | exception Out_of_range ->
-     soft_failure (Tactics.Failure "out of range position")
+    let branch, trace_sequent = simplify_ite b s c t e in
+    let new_elem =
+      Equiv.subst_equiv
+        [Term.ESubst (Term.mk_ite ~simpl:false c t e,branch)]
+        [elem]
+    in
+    let biframe = List.rev_append before (new_elem @ after) in
+    [ Goal.Trace trace_sequent;
+      Goal.Equiv (ES.set_equiv_goal biframe s) ]
 
 let () =
  T.register_typed "noif"
@@ -1411,40 +1391,34 @@ let push_formula (j: 'a option) f term =
 
   | _ -> mk_ite term
 
-let ifcond Args.(Pair (Int i,
-                              Pair (Opt (Int, j),
-                                    Boolean f))) s =
-  match nth i (ES.goal_as_equiv s) with
-  | before, e, after ->
-    let cond, positive_branch, negative_branch =
-      match e with
-      | Term.Fun (fs,_,[c;t;e]) when fs = Term.f_ite -> (c, t, e)
-      | _ ->  soft_failure
-                (Tactics.Failure "can only be applied to a conditional")
+let ifcond Args.(Pair (Int i, Pair (Opt (Int, j), Boolean f))) s =
+  let before, e, after = split_equiv_goal i s in
+
+  let cond, positive_branch, negative_branch =
+    match e with
+    | Term.Fun (fs,_,[c;t;e]) when fs = Term.f_ite -> (c, t, e)
+    | _ ->  soft_failure
+              (Tactics.Failure "can only be applied to a conditional")
+  in
+
+  try
+    let new_elem = 
+      Term.mk_ite ~simpl:false
+        cond (push_formula j f positive_branch) negative_branch
+    in
+    let biframe = List.rev_append before (new_elem :: after) in
+    let trace_sequent = 
+      ES.trace_seq_of_reach Term.(mk_impl ~simpl:false cond f) s 
     in
 
-    begin try
-        let new_elem =
-          Term.mk_ite ~simpl:false
-            cond (push_formula j f positive_branch) negative_branch
-        in
-        let biframe = List.rev_append before (new_elem :: after) in
-        let trace_sequent =
-          ES.trace_seq_of_reach Term.(mk_impl ~simpl:false cond f) s
-        in
-
-        [ Goal.Trace trace_sequent;
-          Goal.Equiv (ES.set_equiv_goal biframe s) ]
-      with
-      | Not_ifcond ->
-        soft_failure
-          (Tactics.Failure "the formula contains variables that overlap with \
-                            variables bound by \
-                            a seq or a try find construct")
-    end
-  | exception Out_of_range ->
-    soft_failure (Tactics.Failure "out of range position")
-
+    [ Goal.Trace trace_sequent;
+      Goal.Equiv (ES.set_equiv_goal biframe s) ]
+  with
+  | Not_ifcond ->
+    soft_failure 
+      (Tactics.Failure "the formula contains variables that overlap with \
+                        variables bound by \
+                        a seq or a try find construct")
 
 
 let () =
@@ -1465,32 +1439,29 @@ let () =
 let trivial_if (Args.Int i) (s : ES.sequent) =
   let cntxt = ES.mk_trace_cntxt s in
 
-  match nth i (ES.goal_as_equiv s) with
-  | before, elem, after ->
-    (* search for the first occurrence of an if-then-else in [elem] *)
-    begin match get_ite ~cntxt elem with
-    | None ->
-      soft_failure
-        (Tactics.Failure
-          "can only be applied on a term with at least one occurrence \
-           of an if then else term")
-    | Some (c,t,e) ->
-      let trace_seq =
-        ES.trace_seq_of_reach (Term.Atom (`Message (`Eq,t,e))) s
-      in
-      let trace_goal  = Goal.Trace trace_seq in
+  let before, elem, after = split_equiv_goal i s in
 
-      let new_elem =
-        Equiv.subst_equiv
-          [Term.ESubst (Term.mk_ite c t e,t)]
-          [elem]
-      in
-      let biframe = List.rev_append before (new_elem @ after) in
-      [ trace_goal;
-        Goal.Equiv (ES.set_equiv_goal biframe s) ]
-    end
-  | exception Out_of_range ->
-     soft_failure (Tactics.Failure "out of range position")
+  (* search for the first occurrence of an if-then-else in [elem] *)
+  match get_ite ~cntxt elem with
+  | None ->
+    soft_failure
+      (Tactics.Failure
+         "can only be applied on a term with at least one occurrence \
+          of an if then else term")
+  | Some (c,t,e) ->
+    let trace_seq = 
+      ES.trace_seq_of_reach (Term.Atom (`Message (`Eq,t,e))) s
+    in
+    let trace_goal  = Goal.Trace trace_seq in
+
+    let new_elem =
+      Equiv.subst_equiv
+        [Term.ESubst (Term.mk_ite c t e,t)]
+        [elem]
+    in
+    let biframe = List.rev_append before (new_elem @ after) in
+    [ trace_goal;
+      Goal.Equiv (ES.set_equiv_goal biframe s) ]
 
 let () =
  T.register_typed "trivialif"
@@ -1507,31 +1478,29 @@ let ifeq Args.(Pair (Int i, Pair (Message (t1,ty1), Message (t2,ty2)))) s =
   (* check that types are equal *)
   LT.check_ty_eq ty1 ty2;
 
-  match nth i (ES.goal_as_equiv s) with
-  | before, e, after ->
-    let cond, positive_branch, negative_branch =
-      match e with
-      | Term.Fun (fs,_,[c;t;e]) when fs = Term.f_ite -> (c, t, e)
-      | _ -> soft_failure
-               (Tactics.Failure "Can only be applied to a conditional.")
-    in
-    let new_elem =
-      Term.mk_ite
-        cond
-        (Term.subst [Term.ESubst (t1,t2)] positive_branch)
-        negative_branch
-    in
-    let biframe = List.rev_append before (new_elem :: after) in
-    let trace_s =
-      ES.trace_seq_of_reach
-        (Term.mk_impl ~simpl:false cond Term.(Atom (`Message (`Eq,t1,t2)))) s
-    in
+  let before, e, after = split_equiv_goal i s in
 
-    [ Goal.Trace trace_s;
-      Goal.Equiv (ES.set_equiv_goal biframe s) ]
+  let cond, positive_branch, negative_branch =
+    match e with
+    | Term.Fun (fs,_,[c;t;e]) when fs = Term.f_ite -> (c, t, e)
+    | _ -> soft_failure
+             (Tactics.Failure "Can only be applied to a conditional.")
+  in
+  let new_elem =
+    Term.mk_ite 
+      cond
+      (Term.subst [Term.ESubst (t1,t2)] positive_branch)
+      negative_branch
+  in
+  let biframe = List.rev_append before (new_elem :: after) in
 
-  | exception Out_of_range ->
-     soft_failure (Tactics.Failure "Out of range position")
+  let trace_s = 
+    ES.trace_seq_of_reach 
+      (Term.mk_impl ~simpl:false cond Term.(Atom (`Message (`Eq,t1,t2)))) s
+  in
+
+  [ Goal.Trace trace_s;
+    Goal.Equiv (ES.set_equiv_goal biframe s) ]
 
 let () = T.register_typed "ifeq"
     ~general_help:"If the given conditional implies the equality of the two \
@@ -1890,84 +1859,80 @@ let combine_conj_formulas p q =
                                         Term.mk_ands !aux_q)))
 
 let prf Args.(Int i) s =
-  match nth i (ES.goal_as_equiv s) with
-  | before, e, after ->
-    let biframe = List.rev_append before after in
-    let cntxt = ES.mk_trace_cntxt s in
-    let env = ES.env s in
+  let before, e, after = split_equiv_goal i s in
 
-    let e = Term.head_normal_biterm e in
+  let biframe = List.rev_append before after in
+  let cntxt = ES.mk_trace_cntxt s in
+  let env = ES.env s in
 
-    (* search for the first occurrence of a hash in [e] *)
-    begin match Iter.get_ftype ~cntxt e Symbols.Hash with
-      | None ->
-        soft_failure
-          (Tactics.Failure
-             "PRF can only be applied on a term with at least one occurrence \
-              of a hash term h(t,k)")
+  let e = Term.head_normal_biterm e in
 
-      | Some ((Term.Fun ((fn,_), ftyp, [m; key])) as hash) ->
-        (* Context with bound variables (eg try find) are not (yet) supported.
-         * This is detected by checking that there is no "new" variable,
-         * which are used by the iterator to represent bound variables. *)
-        let vars = Term.get_vars hash in
-        if List.exists Vars.(function EVar v -> is_new v) vars then
-          soft_failure
-            (Tactics.Failure "Application of this tactic inside \
-                              a context that bind variables is not supported");
+  (* search for the first occurrence of a hash in [e] *)
+  match Iter.get_ftype ~cntxt e Symbols.Hash with
+  | None ->
+    soft_failure
+      (Tactics.Failure
+         "PRF can only be applied on a term with at least one occurrence \
+          of a hash term h(t,k)")
 
-        let phi_left  = mk_prf_phi_proj PLeft  cntxt env biframe e hash in
-        let phi_right = mk_prf_phi_proj PRight cntxt env biframe e hash in
+  | Some ((Term.Fun ((fn,_), ftyp, [m; key])) as hash) ->
+    (* Context with bound variables (eg try find) are not (yet) supported.
+     * This is detected by checking that there is no "new" variable,
+     * which are used by the iterator to represent bound variables. *)
+    let vars = Term.get_vars hash in
+    if List.exists Vars.(function EVar v -> is_new v) vars then
+      soft_failure
+        (Tactics.Failure "Application of this tactic inside \
+                          a context that bind variables is not supported");
 
-        (* check that there are no type variables*)
-        assert (ftyp.fty_vars = []);
+    let phi_left  = mk_prf_phi_proj PLeft  cntxt env biframe e hash in
+    let phi_right = mk_prf_phi_proj PRight cntxt env biframe e hash in
 
-        let nty = ftyp.fty_out in
-        let ndef = Symbols.{ n_iarr = 0; n_ty = nty; } in
-        let table,n =
-          Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
+    (* check that there are no type variables*)
+    assert (ftyp.fty_vars = []);
+
+    let nty = ftyp.fty_out in
+    let ndef = Symbols.{ n_iarr = 0; n_ty = nty; } in
+    let table,n = 
+      Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
+    in
+    let ns = Term.mk_isymb n nty [] in
+    let s = ES.set_table table s in
+
+    let oracle_formula =
+      Prover.get_oracle_tag_formula (Symbols.to_string fn)
+    in
+
+    let final_if_formula = 
+      if Term.is_false oracle_formula 
+      then combine_conj_formulas phi_left phi_right
+      else 
+        let (Vars.EVar uvarm),(Vars.EVar uvarkey),f = 
+          match oracle_formula with
+          | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
+          | _ -> assert false
         in
-        let ns = Term.mk_isymb n nty [] in
-        let s = ES.set_table table s in
+        match Vars.ty uvarm,Vars.ty uvarkey with
+        | Type.(Message, Message) -> 
+          let f = Term.subst [
+              ESubst (Term.Var uvarm,m);
+              ESubst (Term.Var uvarkey,key);] f in
 
-        let oracle_formula =
-          Prover.get_oracle_tag_formula (Symbols.to_string fn)
-        in
+          Term.mk_and
+            (Term.mk_not f)  
+            (combine_conj_formulas phi_left phi_right)
 
-        let final_if_formula =
-          if Term.is_false oracle_formula
-          then combine_conj_formulas phi_left phi_right
-          else
-            let (Vars.EVar uvarm),(Vars.EVar uvarkey),f =
-              match oracle_formula with
-              | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
-              | _ -> assert false
-            in
-            match Vars.ty uvarm,Vars.ty uvarkey with
-            | Type.(Message, Message) ->
-              let f = Term.subst [
-                  ESubst (Term.Var uvarm,m);
-                  ESubst (Term.Var uvarkey,key);] f in
+        | _ -> assert false
+    in
 
-              Term.mk_and
-                (Term.mk_not f)
-                (combine_conj_formulas phi_left phi_right)
+    let if_term = Term.mk_ite final_if_formula (Term.Name ns) hash in
+    let new_elem =
+      Equiv.subst_equiv [Term.ESubst (hash,if_term)] [e] 
+    in
+    let biframe = (List.rev_append before (new_elem @ after)) in
+    [ES.set_equiv_goal biframe s]
 
-            | _ -> assert false
-        in
-
-        let if_term = Term.mk_ite final_if_formula (Term.Name ns) hash in
-        let new_elem =
-          Equiv.subst_equiv [Term.ESubst (hash,if_term)] [e]
-        in
-        let biframe = (List.rev_append before (new_elem @ after)) in
-        [ES.set_equiv_goal biframe s]
-
-      | _ -> assert false
-    end
-
-  | exception Out_of_range ->
-    soft_failure (Tactics.Failure "Out of range position")
+  | _ -> assert false
 
 let () =
   T.register_typed "prf"
@@ -1981,12 +1946,8 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-let split_seq (i, ht) s : ES.sequent =
-  let before, t, after =
-    try nth i (ES.goal_as_equiv s) with
-    | Out_of_range ->
-      soft_failure (Tactics.Failure "Out of range position")
-  in
+let split_seq (i, ht) s : ES.sequent =   
+  let before, t, after = split_equiv_goal i s in
 
   let is, ti = match t with
     | Seq (is, ti) -> is, ti
@@ -2053,171 +2014,164 @@ let () =
 (** CCA1 *)
 
 let cca1 Args.(Int i) s =
-  match nth i (ES.goal_as_equiv s) with
-  | before, e, after ->
-    let biframe = List.rev_append before after in
-    let cntxt = ES.mk_trace_cntxt s in
-    let table = cntxt.table in
-    let env = ES.env s in
+  let before, e, after = split_equiv_goal i s in
 
-    let e = Term.head_normal_biterm e in
+  let biframe = List.rev_append before after in
+  let cntxt = ES.mk_trace_cntxt s in
+  let table = cntxt.table in
+  let env = ES.env s in
 
-    let get_subst_hide_enc enc fnenc m fnpk sk fndec r eis is_top_level =
-      (* we check that the random is fresh, and the key satisfy the
-         side condition. *)
+  let e = Term.head_normal_biterm e in
+
+  let get_subst_hide_enc enc fnenc m fnpk sk fndec r eis is_top_level =
+    (* we check that the random is fresh, and the key satisfy the
+       side condition. *)
+
+    (* we create the fresh cond reachability goal *)
+    let random_fresh_cond = 
+      fresh_cond cntxt env (Term.Name r) biframe 
+    in
+
+    let fresh_seq = ES.trace_seq_of_reach random_fresh_cond s in
+    let fresh_goal = Goal.Trace fresh_seq in
+
+    let new_subst =
+      if is_top_level then
+        Term.ESubst (enc, Term.mk_len m)
+      else
+        let new_m = Term.mk_zeroes (Term.mk_len m) in
+        let new_term = match fnpk with
+          | Some (fnpk,pkis) ->
+            Term.mk_fun table fnenc eis
+              [new_m; Term.Name r;
+               Term.mk_fun table fnpk pkis [Term.Name sk]]
+
+          | None ->
+            Term.mk_fun table fnenc eis [new_m; Term.Name r; Term.Name sk]
+        in
+        Term.ESubst (enc, new_term)
+    in
+    (fresh_goal, new_subst)
+  in
+
+  (* first, we check if the term is an encryption at top level, in which case
+     we will completely replace the encryption by the length, else we will
+     replace the plain text by the lenght *)
+  let is_top_level = match e with
+    | Term.Fun ((fnenc,eis), _,
+                [m; Term.Name r;
+                 Term.Fun ((fnpk,is), _, [Term.Name sk])])
+      when (Symbols.is_ftype fnpk Symbols.PublicKey cntxt.table
+            && Symbols.is_ftype fnenc Symbols.AEnc table) -> true
+
+    | Term.Fun ((fnenc,eis), _, [m; Term.Name r; Term.Name sk])
+      when Symbols.is_ftype fnenc Symbols.SEnc table -> true
+
+    | _ -> false
+  in
+
+  (* search for the first occurrence of an asymmetric encryption in [e], that
+     do not occur under a decryption symbol. *)
+  let rec hide_all_encs enclist =
+    match enclist with
+    | (Term.Fun ((fnenc,eis), _, 
+                 [m; Term.Name r;
+                  Term.Fun ((fnpk,is), _, [Term.Name sk])])
+       as enc) :: q 
+      when (Symbols.is_ftype fnpk Symbols.PublicKey table
+            && Symbols.is_ftype fnenc Symbols.AEnc table) ->
       begin
-
-        (* we create the fresh cond reachability goal *)
-        let random_fresh_cond =
-          fresh_cond cntxt env (Term.Name r) biframe
-        in
-
-        let fresh_seq = ES.trace_seq_of_reach random_fresh_cond s in
-        let fresh_goal = Goal.Trace fresh_seq in
-
-        let new_subst =
-          if is_top_level then
-            Term.ESubst (enc, Term.mk_len m)
-          else
-            let new_m = Term.mk_zeroes (Term.mk_len m) in
-            let new_term = match fnpk with
-              | Some (fnpk,pkis) ->
-                Term.mk_fun table fnenc eis
-                  [new_m; Term.Name r;
-                   Term.mk_fun table fnpk pkis [Term.Name sk]]
-
-              | None ->
-                Term.mk_fun table fnenc eis [new_m; Term.Name r; Term.Name sk]
-            in
-            Term.ESubst (enc, new_term)
-        in
-        (fresh_goal, new_subst)
-      end
-    in
-
-    (* first, we check if the term is an encryption at top level, in which case
-       we will completely replace the encryption by the length, else we will
-       replace the plain text by the lenght *)
-    let is_top_level = match e with
-      | Term.Fun ((fnenc,eis), _,
-                  [m; Term.Name r;
-                   Term.Fun ((fnpk,is), _, [Term.Name sk])])
-        when (Symbols.is_ftype fnpk Symbols.PublicKey cntxt.table
-              && Symbols.is_ftype fnenc Symbols.AEnc table) -> true
-
-      | Term.Fun ((fnenc,eis), _, [m; Term.Name r; Term.Name sk])
-        when Symbols.is_ftype fnenc Symbols.SEnc table -> true
-
-      | _ -> false
-    in
-
-    (* search for the first occurrence of an asymmetric encryption in [e], that
-       do not occur under a decryption symbol. *)
-    let rec hide_all_encs enclist =
-      begin match
-          enclist
-        with
-        | (Term.Fun ((fnenc,eis), _,
-                     [m; Term.Name r;
-                      Term.Fun ((fnpk,is), _, [Term.Name sk])])
-           as enc) :: q
-          when (Symbols.is_ftype fnpk Symbols.PublicKey table
-                && Symbols.is_ftype fnenc Symbols.AEnc table) ->
-          begin
-            match Symbols.Function.get_data fnenc table with
-            (* we check that the encryption function is used with the associated
-               public key *)
-            | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk
-              ->
-              begin
-                try
-                  Euf.key_ssc ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
-                    ~cntxt fndec sk.s_symb;
-
-                  if not (List.mem
-                            (Term.mk_fun table fnpk is [Term.Name sk])
-                            biframe) then
-                    soft_failure
-                      (Tactics.Failure
-                         "The public key must be inside the frame in order to \
-                          use CCA1");
-
-                  let (fgoals, substs) = hide_all_encs q in
-                  let fgoal,subst =
-                    get_subst_hide_enc
-                      enc fnenc m (Some (fnpk,is))
-                      sk fndec r eis is_top_level
-                  in
-                  (fgoal :: fgoals,subst :: substs)
-
-                with Euf.Bad_ssc ->  soft_failure Tactics.Bad_SSC
-              end
-
-            | _ ->
-              soft_failure
-                (Tactics.Failure
-                   "The first encryption symbol is not used with the correct \
-                    public key function.")
-          end
-
-        | (Term.Fun ((fnenc,eis), _, [m; Term.Name r; Term.Name sk])
-           as enc) :: q when Symbols.is_ftype fnenc Symbols.SEnc table
+        match Symbols.Function.get_data fnenc table with
+        (* we check that the encryption function is used with the associated
+           public key *)
+        | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk
           ->
           begin
-            match Symbols.Function.get_data fnenc table with
-            (* we check that the encryption function is used with the associated
-               public key *)
-            | Symbols.AssociatedFunctions [fndec]
-              ->
-              begin
-                try
-                  Cca.symenc_key_ssc ~elems:(ES.goal_as_equiv s) ~messages:[enc]
-                    ~cntxt fnenc fndec sk.s_symb;
-                  (* we check that the randomness is ok in the system and the
-                     biframe, except for the encryptions we are looking at, which
-                     is checked by adding a fresh reachability goal. *)
-                  Cca.symenc_rnd_ssc ~cntxt env fnenc sk biframe;
-                  let (fgoals, substs) = hide_all_encs q in
-                  let fgoal,subst =
-                    get_subst_hide_enc enc fnenc m (None) sk fndec r eis is_top_level
-                  in
-                  (fgoal :: fgoals,subst :: substs)
-                with Euf.Bad_ssc ->  soft_failure Tactics.Bad_SSC
-              end
-            | _ ->
-              soft_failure
-                (Tactics.Failure
-                   "The first encryption symbol is not used with the correct public \
-                    key function.")
+            try
+              Euf.key_ssc ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
+                ~cntxt fndec sk.s_symb;
+
+              if not (List.mem
+                        (Term.mk_fun table fnpk is [Term.Name sk])
+                        biframe) then
+                soft_failure
+                  (Tactics.Failure
+                     "The public key must be inside the frame in order to \
+                      use CCA1");
+
+              let (fgoals, substs) = hide_all_encs q in
+              let fgoal,subst =
+                get_subst_hide_enc
+                  enc fnenc m (Some (fnpk,is)) 
+                  sk fndec r eis is_top_level
+              in
+              (fgoal :: fgoals,subst :: substs)
+
+            with Euf.Bad_ssc ->  soft_failure Tactics.Bad_SSC
           end
-        | [] -> [], []
+
         | _ ->
           soft_failure
             (Tactics.Failure
-               "CCA1 can only be applied on a term with at least one occurrence \
-                of an encryption term enc(t,r,pk(k))")
+               "The first encryption symbol is not used with the correct \
+                public key function.")
       end
-    in
 
-    let fgoals, substs =
-      hide_all_encs ((Iter.get_ftypes ~excludesymtype:Symbols.ADec
-                        ~cntxt e Symbols.AEnc)
-                     @ (Iter.get_ftypes ~excludesymtype:Symbols.SDec
-                          ~cntxt e Symbols.SEnc))
-    in
+    | (Term.Fun ((fnenc,eis), _, [m; Term.Name r; Term.Name sk])
+       as enc) :: q when Symbols.is_ftype fnenc Symbols.SEnc table
+      ->
+      begin
+        match Symbols.Function.get_data fnenc table with
+        (* we check that the encryption function is used with the associated
+           public key *)
+        | Symbols.AssociatedFunctions [fndec]
+          ->
+          begin
+            try
+              Cca.symenc_key_ssc ~elems:(ES.goal_as_equiv s) ~messages:[enc]
+                ~cntxt fnenc fndec sk.s_symb;
+              (* we check that the randomness is ok in the system and the
+                 biframe, except for the encryptions we are looking at, which
+                 is checked by adding a fresh reachability goal. *)
+              Cca.symenc_rnd_ssc ~cntxt env fnenc sk biframe;
+              let (fgoals, substs) = hide_all_encs q in
+              let fgoal,subst =
+                get_subst_hide_enc enc fnenc m (None) sk fndec r eis is_top_level
+              in
+              (fgoal :: fgoals,subst :: substs)
+            with Euf.Bad_ssc ->  soft_failure Tactics.Bad_SSC
+          end
+        | _ ->
+          soft_failure
+            (Tactics.Failure
+               "The first encryption symbol is not used with the correct public \
+                key function.")
+      end
 
-    if substs = [] then
+    | [] -> [], []
+    | _ ->
       soft_failure
         (Tactics.Failure
            "CCA1 can only be applied on a term with at least one occurrence \
-            of an encryption term enc(t,r,pk(k))");
+            of an encryption term enc(t,r,pk(k))")
+  in
 
-    let new_elem =    Equiv.subst_equiv substs [e] in
-    let biframe = (List.rev_append before (new_elem @ after)) in
-    Goal.Equiv (ES.set_equiv_goal biframe s) :: fgoals
+  let fgoals, substs = 
+    hide_all_encs ((Iter.get_ftypes ~excludesymtype:Symbols.ADec
+                      ~cntxt e Symbols.AEnc)
+                   @ (Iter.get_ftypes ~excludesymtype:Symbols.SDec
+                        ~cntxt e Symbols.SEnc)) 
+  in
 
-  | exception Out_of_range ->
-    soft_failure (Tactics.Failure "Out of range position")
+  if substs = [] then
+    soft_failure
+      (Tactics.Failure
+         "CCA1 can only be applied on a term with at least one occurrence \
+          of an encryption term enc(t,r,pk(k))");
+
+  let new_elem =    Equiv.subst_equiv substs [e] in
+  let biframe = (List.rev_append before (new_elem @ after)) in
+  Goal.Equiv (ES.set_equiv_goal biframe s) :: fgoals
 
 
 let () =
@@ -2238,171 +2192,170 @@ let () =
 let enckp
   Args.(Pair (Int i, Pair (Opt (Message, m1), Opt (Message, m2))))
   s =
-  match nth i (ES.goal_as_equiv s) with
-  | exception Out_of_range ->
-    soft_failure (Tactics.Failure "Out of range position")
-  | before, e, after ->
-    let biframe = List.rev_append before after in
-    let cntxt = ES.mk_trace_cntxt s in
-    let table = cntxt.table in
-    let env = ES.env s in
+  let before, e, after = split_equiv_goal i s in
+  
+  let biframe = List.rev_append before after in
+  let cntxt = ES.mk_trace_cntxt s in
+  let table = cntxt.table in
+  let env = ES.env s in
 
-    (* Apply tactic to replace key(s) in [enc] using [new_key].
-     * Precondition:
-     * [enc = Term.Fun ((fnenc,indices), [m; Term.Name r; k])].
-     * Verify that the encryption primitive is used correctly,
-     * that the randomness is fresh and that the keys satisfy their SSC. *)
-    let apply
-        ~(enc     : Term.message)
-        ~(new_key : Term.message option)
-        ~(fnenc   : Term.fname)
-        ~(indices : 'a)
-        ~(m       : 'b)
-        ~(r       : Term.nsymb)
-        ~(k       : Term.message)
-      : Goal.t list =
-      let k = Term.head_normal_biterm k in
-      (* Verify that key is well-formed, depending on whether the encryption is
-       * symmetric or not. Return the secret key and appropriate SSC. *)
-      let ssc, wrap_pk, sk =
-        if Symbols.is_ftype fnenc Symbols.SEnc table then
-          match Symbols.Function.get_data fnenc table with
-            | Symbols.AssociatedFunctions [fndec] ->
-              (fun (sk,system) ->
-                 let cntxt = Constr.{ cntxt with system } in
-                 Cca.symenc_key_ssc
-                   ~cntxt fnenc fndec
-                   ~elems:(ES.goal_as_equiv s) sk.Term.s_symb;
-                 Cca.symenc_rnd_ssc ~cntxt env fnenc sk biframe;
-                 ()
-              ),
-              (fun x -> x),
-              k
-            | _ -> assert false
+  (* Apply tactic to replace key(s) in [enc] using [new_key].
+   * Precondition:
+   * [enc = Term.Fun ((fnenc,indices), [m; Term.Name r; k])].
+   * Verify that the encryption primitive is used correctly,
+   * that the randomness is fresh and that the keys satisfy their SSC. *)
+  let apply
+      ~(enc     : Term.message)
+      ~(new_key : Term.message option)
+      ~(fnenc   : Term.fname)
+      ~(indices : 'a) 
+      ~(m       : 'b)
+      ~(r       : Term.nsymb)
+      ~(k       : Term.message)
+    : Goal.t list =
 
-        else
-          match Symbols.Function.get_data fnenc table with
-          | Symbols.AssociatedFunctions [fndec;fnpk] ->
-            (fun (sk,system) ->
-               let cntxt = Constr.{ cntxt with system } in
-               Euf.key_ssc ~cntxt ~elems:(ES.goal_as_equiv s)
-                 ~allow_functions:(fun x -> x = fnpk) fndec sk.s_symb),
-            (fun x -> Term.mk_fun table fnpk indices [x]),
-            begin match k with
-              | Term.Fun ((fnpk',indices'), _, [sk])
-                when fnpk = fnpk' && indices = indices' -> sk
-              | Term.Fun ((fnpk',indices'), _, [sk])
-                when fnpk = fnpk' && indices = indices' -> sk
-              | _ ->
-                soft_failure
-                  (Tactics.Failure
-                     "The first encryption is not used \
-                      with the correct public key function")
-            end
-          | _ -> assert false
+    let k = Term.head_normal_biterm k in
+    (* Verify that key is well-formed, depending on whether the encryption is
+     * symmetric or not. Return the secret key and appropriate SSC. *)
+    let ssc, wrap_pk, sk =
+      if Symbols.is_ftype fnenc Symbols.SEnc table then
+        match Symbols.Function.get_data fnenc table with
+        | Symbols.AssociatedFunctions [fndec] ->
+          (fun (sk,system) ->
+             let cntxt = Constr.{ cntxt with system } in
+             Cca.symenc_key_ssc
+               ~cntxt fnenc fndec
+               ~elems:(ES.goal_as_equiv s) sk.Term.s_symb;
+             Cca.symenc_rnd_ssc ~cntxt env fnenc sk biframe;
+             ()
+          ),
+          (fun x -> x),
+          k
+        | _ -> assert false
 
-      in
-      let project = function
-        | Term.Name n -> n,n
-        | Term.(Diff (Name l, Name r)) -> l,r
-        | _ -> soft_failure (Tactics.Failure "Secret keys must be names")
-      in
-
-      let skl, skr = project sk in
-      let (new_skl, new_skr), new_key =
-        match new_key with
-          | Some k -> project k, k
-          | None -> (skl, skl), Term.Name skl
-      in
-
-      LT.check_ty_eq (Term.ty new_key) (Term.ty sk);
-
-      (* Verify all side conditions, and create the reachability goal
-       * for the freshness of [r]. *)
-      let random_fresh_cond =
-        try
-          (* For each key we actually only need to verify the SSC
-           * wrt. the appropriate projection of the system. *)
-          let sysl = SystemExpr.(project_system PLeft cntxt.system) in
-          let sysr = SystemExpr.(project_system PRight cntxt.system) in
-          List.iter ssc
-            (List.sort_uniq Stdlib.compare
-               [(skl, sysl); (skr, sysr); (new_skl, sysl); (new_skr, sysr)]) ;
-          let context =
-            Equiv.subst_equiv [Term.ESubst (enc,Term.empty)] [e]
-          in
-          fresh_cond cntxt env (Term.Name r) (context@biframe)
-        with Euf.Bad_ssc -> soft_failure Tactics.Bad_SSC
-      in
-      let fresh_goal = ES.trace_seq_of_reach random_fresh_cond s in
-
-      (* Equivalence goal where [enc] is modified using [new_key]. *)
-      let new_enc =
-        Term.mk_fun table fnenc indices [m; Term.Name r; wrap_pk new_key]
-      in
-      let new_elem =
-        Equiv.subst_equiv [Term.ESubst (enc,new_enc)] [e]
-      in
-      let biframe = (List.rev_append before (new_elem @ after)) in
-
-      [Goal.Trace fresh_goal;
-       Goal.Equiv (ES.set_equiv_goal biframe s)]
+      else
+        match Symbols.Function.get_data fnenc table with
+        | Symbols.AssociatedFunctions [fndec;fnpk] ->
+          (fun (sk,system) ->
+             let cntxt = Constr.{ cntxt with system } in
+             Euf.key_ssc ~cntxt ~elems:(ES.goal_as_equiv s)
+               ~allow_functions:(fun x -> x = fnpk) fndec sk.s_symb),
+          (fun x -> Term.mk_fun table fnpk indices [x]),
+          begin match k with
+            | Term.Fun ((fnpk',indices'), _, [sk])
+              when fnpk = fnpk' && indices = indices' -> sk
+            | Term.Fun ((fnpk',indices'), _, [sk])
+              when fnpk = fnpk' && indices = indices' -> sk
+            | _ ->
+              soft_failure
+                (Tactics.Failure
+                   "The first encryption is not used \
+                    with the correct public key function")
+          end
+        | _ -> assert false
 
     in
-
-    let target,new_key = match m1,m2 with
-      | Some (Message (m1, _)), Some (Message (m2, _)) ->
-        Some m1, Some m2
-
-      | Some (Message (m1, _)), None ->
-        begin match m1 with
-          | Term.Fun ((f,_),_,[_;_;_]) -> Some m1, None
-          | _ -> None, Some m1
-        end
-      | None, None -> None, None
-      | None, Some _ -> assert false
+    let project = function
+      | Term.Name n -> n,n
+      | Term.(Diff (Name l, Name r)) -> l,r
+      | _ -> soft_failure (Tactics.Failure "Secret keys must be names")
     in
 
-    match target with
-    | Some (Term.Fun ((fnenc,indices), _, [m; Term.Name r; k]) as enc) ->
-      apply ~enc ~new_key ~fnenc ~indices ~m ~r ~k
-    | Some _ ->
-      soft_failure
-        (Tactics.Failure ("Target must be of the form enc(_,r,_) where \
-                           r is a name"))
-    | None ->
-      let encs =
-        Iter.get_ftypes ~excludesymtype:Symbols.ADec ~cntxt e Symbols.AEnc @
-        Iter.get_ftypes ~excludesymtype:Symbols.SDec ~cntxt e Symbols.SEnc
-      in
-      (** Run [apply] on first item in [encs] that is well-formed
-        * and has a diff in its key.
-        * We could also backtrack in case of failure. *)
-      let diff_key = function
-        | Term.Diff _ | Term.Fun (_, _, [Term.Diff _]) -> true
-        | _ -> false
-      in
-      let rec find = function
-        | Term.Fun ((fnenc,indices), _, [m; Term.Name r; k]) as enc :: _
-          when diff_key k ->
-          apply ~enc ~new_key ~fnenc ~indices ~m ~r ~k
-        | _ :: q -> find q
-        | [] ->
-          soft_failure
-            (Tactics.Failure ("No subterm of the form enc(_,r,k) where \
-                               r is a name and k contains a diff(_,_)"))
-      in find encs
+    let skl, skr = project sk in
+    let (new_skl, new_skr), new_key =
+      match new_key with
+      | Some k -> project k, k
+      | None -> (skl, skl), Term.Name skl
+    in
+
+    LT.check_ty_eq (Term.ty new_key) (Term.ty sk);
+
+    (* Verify all side conditions, and create the reachability goal
+     * for the freshness of [r]. *)
+    let random_fresh_cond =
+      try
+        (* For each key we actually only need to verify the SSC
+         * wrt. the appropriate projection of the system. *)
+        let sysl = SystemExpr.(project_system PLeft cntxt.system) in
+        let sysr = SystemExpr.(project_system PRight cntxt.system) in
+        List.iter ssc
+          (List.sort_uniq Stdlib.compare
+             [(skl, sysl); (skr, sysr); (new_skl, sysl); (new_skr, sysr)]) ;
+        let context =
+          Equiv.subst_equiv [Term.ESubst (enc,Term.empty)] [e]
+        in
+        fresh_cond cntxt env (Term.Name r) (context@biframe)
+      with Euf.Bad_ssc -> soft_failure Tactics.Bad_SSC
+    in
+    let fresh_goal = ES.trace_seq_of_reach random_fresh_cond s in
+
+    (* Equivalence goal where [enc] is modified using [new_key]. *)
+    let new_enc =
+      Term.mk_fun table fnenc indices [m; Term.Name r; wrap_pk new_key]
+    in
+    let new_elem =
+      Equiv.subst_equiv [Term.ESubst (enc,new_enc)] [e]
+    in
+    let biframe = (List.rev_append before (new_elem @ after)) in
+
+    [Goal.Trace fresh_goal;
+     Goal.Equiv (ES.set_equiv_goal biframe s)]
+
+  in
+
+  let target,new_key = match m1,m2 with
+    | Some (Message (m1, _)), Some (Message (m2, _)) ->
+      Some m1, Some m2
+
+    | Some (Message (m1, _)), None ->
+      begin match m1 with
+        | Term.Fun ((f,_),_,[_;_;_]) -> Some m1, None
+        | _ -> None, Some m1
+      end
+    | None, None -> None, None
+    | None, Some _ -> assert false
+  in
+
+  match target with
+  | Some (Term.Fun ((fnenc,indices), _, [m; Term.Name r; k]) as enc) ->
+    apply ~enc ~new_key ~fnenc ~indices ~m ~r ~k
+  | Some _ ->
+    soft_failure
+      (Tactics.Failure ("Target must be of the form enc(_,r,_) where \
+                         r is a name"))
+  | None ->
+    let encs =
+      Iter.get_ftypes ~excludesymtype:Symbols.ADec ~cntxt e Symbols.AEnc @
+      Iter.get_ftypes ~excludesymtype:Symbols.SDec ~cntxt e Symbols.SEnc
+    in
+    (** Run [apply] on first item in [encs] that is well-formed
+      * and has a diff in its key.
+      * We could also backtrack in case of failure. *)
+    let diff_key = function
+      | Term.Diff _ | Term.Fun (_, _, [Term.Diff _]) -> true
+      | _ -> false
+    in
+    let rec find = function
+      | Term.Fun ((fnenc,indices), _, [m; Term.Name r; k]) as enc :: _
+        when diff_key k ->
+        apply ~enc ~new_key ~fnenc ~indices ~m ~r ~k
+      | _ :: q -> find q
+      | [] ->
+        soft_failure
+          (Tactics.Failure ("No subterm of the form enc(_,r,k) where \
+                             r is a name and k contains a diff(_,_)"))
+    in find encs
 
 let () =
- T.register_typed "enckp"
-   ~general_help:"Change the key in some encryption subterm."
-   ~detailed_help:"This captures the fact that an encryption key may hide the \
-                   key.  The term and new key can be passed as arguments, \
-                   otherwise the tactic applies to the first subterm of the form \
-                   enc(_,r,k) where r is a name and k features a diff operator."
-   ~tactic_group:Cryptographic
-   (only_equiv_typed enckp)
-   Args.(Pair (Int, Pair (Opt Message,Opt Message)))
+  T.register_typed "enckp"
+    ~general_help:"Change the key in some encryption subterm."
+    ~detailed_help:"This captures the fact that an encryption key may hide the \
+                    key.  The term and new key can be passed as arguments, \
+                    otherwise the tactic applies to the first subterm of the form \
+                    enc(_,r,k) where r is a name and k features a diff operator."
+    ~tactic_group:Cryptographic
+    (only_equiv_typed enckp)
+    Args.(Pair (Int, Pair (Opt Message,Opt Message)))
 
 (*------------------------------------------------------------------*)
 (** XOR *)
@@ -2487,35 +2440,28 @@ let mk_xor_if_term_name cntxt env t mess_name biframe =
 
 
 let xor Args.(Pair (Int i, Opt (Message, opt_m))) s =
-  match nth i (ES.goal_as_equiv s) with
-  | before, e, after ->
-    (* the biframe to consider when checking the freshness *)
-    let biframe = List.rev_append before after in
-    let cntxt = ES.mk_trace_cntxt s in
-    let env = ES.env s in
-    let res =
-      try
-        match opt_m with
-        | None -> mk_xor_if_term cntxt env e biframe
-        | Some (Args.Message (m,ty)) ->
-          (* for now, we only allow the xor rule on message type. *)
-          LT.check_ty_eq ty Type.Message;
+  let before, e, after = split_equiv_goal i s in
 
-          mk_xor_if_term_name cntxt env e m biframe
-      with Not_xor ->
-        soft_failure
-          (Tactics.Failure
-             "Can only apply xor tactic on terms of the form u XOR v")
-    in
-    begin match res with
+  (* the biframe to consider when checking the freshness *)
+  let biframe = List.rev_append before after in
+  let cntxt = ES.mk_trace_cntxt s in
+  let env = ES.env s in
+  let res =
+    try
+      match opt_m with
+      | None -> mk_xor_if_term cntxt env e biframe
+      | Some (Args.Message (m,ty)) ->
+        (* for now, we only allow the xor rule on message type. *)
+        LT.check_ty_eq ty Type.Message;
 
-    | if_term ->
-      let biframe = List.rev_append before (if_term::after) in
-      [ES.set_equiv_goal biframe s]
-    end
-
-  | exception Out_of_range ->
-    soft_failure (Tactics.Failure "Out of range position")
+        mk_xor_if_term_name cntxt env e m biframe
+    with Not_xor -> 
+      soft_failure
+        (Tactics.Failure
+           "Can only apply xor tactic on terms of the form u XOR v")
+  in
+  let biframe = List.rev_append before (res :: after) in
+  [ES.set_equiv_goal biframe s]
 
 
 let () =

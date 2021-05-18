@@ -82,6 +82,15 @@ module List = struct
   let takedrop i l =
     if i < 0 then failwith "invalid argument";
     takedrop0 [] i l
+
+  (*------------------------------------------------------------------*)
+  exception Out_of_range
+    
+  let splitat i l =
+    let rec aux i acc = function
+      | [] -> raise Out_of_range
+      | e::tl -> if i=0 then acc,e,tl else aux (i-1) (e::acc) tl
+    in aux i [] l
 end
 
 (*------------------------------------------------------------------*)

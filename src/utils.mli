@@ -40,6 +40,14 @@ module List : sig
 
   (** [takedrop n l] returns the a result equal to [take n l, drop n l]. *)
   val takedrop : int -> 'a list -> 'a list * 'a list
+
+  exception Out_of_range
+
+  (** When [0 <= i < List.length l], [splitat i l] returns [before,e,after]
+   * such that [List.rev_append before (e::after) = l] and
+   * [List.length before = i].
+   * @raise Out_of_range when [i] is out of range. *)
+  val splitat : int -> 'a list -> 'a list * 'a * 'a list
 end
 
 (*------------------------------------------------------------------*)

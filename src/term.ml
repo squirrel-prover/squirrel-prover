@@ -1271,11 +1271,12 @@ let pat_of_form (t : 'a term) =
     pat_term = t; } 
 
 
+(** Matching variable assignment (types must be compatible). *)
+type mv = eterm Mv.t
+
 (** Module signature of matching. 
     The type of term we match into is abstract. *)
 module type MatchS = sig
-  type mv
-
   type t
 
   val pp_pat : Format.formatter -> 'a pat -> unit
@@ -1291,9 +1292,6 @@ module type MatchS = sig
 end
 
 module Match : MatchS with type t = message = struct 
-  (** Variable assignment (types must be compatible). *)
-  type mv = eterm Mv.t
-
   type t = message
 
   let to_subst (mv : mv) : subst =

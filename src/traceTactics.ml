@@ -602,7 +602,7 @@ and do_simpl_pat (h : Args.ip_handler) (ip : Args.simpl_pat) s : sequent list =
     let s = Hyps.remove id s in
     let pat = Term.pat_of_form f in
     let erule = LT.pat_to_rw_erule ~loc:(L.loc dir) (L.unloc dir) pat in
-    let s, subgoals = LT.rewrite ~all:false [`Goal] (`Many, Some id, erule) s in
+    let s, subgoals = LT.rewrite ~all:false [T_goal] (`Many, Some id, erule) s in
     subgoals @ [s]
 
   | `Var _, (Args.SAndOr _ | Args.Srewrite _) ->
@@ -2063,8 +2063,8 @@ let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) :
   in
 
   let target = match in_opt with
-    | Some lsymb -> `Hyp (fst (Hyps.by_name lsymb s))
-    | None       -> `Goal
+    | Some lsymb -> LT.T_hyp (fst (Hyps.by_name lsymb s))
+    | None       -> LT.T_goal
   in
   subgoals, pat, target
 
@@ -2072,8 +2072,9 @@ let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) :
 let apply_tac_args (args : Args.parser_arg list) s =
   let subgoals, pat, target = p_apply_args args s in
   match target with
-  | `Goal   -> subgoals @ apply pat s
-  | `Hyp id -> subgoals @ apply_in pat id s
+  | LT.T_goal    -> subgoals @ apply pat s      
+  | LT.T_hyp id  -> subgoals @ apply_in pat id s 
+  | LT.T_felem _ -> assert false
 
 let apply_tac args = LT.wrap_fail (apply_tac_args args)
 

@@ -318,3 +318,39 @@ Proof.
   assumption.
   congruence.
 Qed.
+
+(*------------------------------------------------------------------*)
+(* rewriting frame elements *)
+
+equiv _ (x,y,z : message) : 
+  [forall (x,y : message), f(<x,y>) = x] ->
+  diff(f(<x,y>),x), x, diff(f(<z,z>), z).
+Proof.
+  intro H.
+  by rewrite H in 0,2.
+Qed.
+
+equiv _ (x : message) : 
+  [forall (x,y : message), f(<x,y>) = x] ->
+  x.
+Proof.
+  intro H.
+  checkfail try(rewrite H in 0); auto exn GoalNotClosed.
+Abort.
+
+
+equiv _ (x : message) : 
+  [forall (x,y : message), f(<x,y>) = x] ->
+  x.
+Proof.
+  intro H.
+  checkfail try(rewrite H in 1); auto exn GoalNotClosed.
+Abort.
+
+equiv _ (x : message) : 
+  [forall (x,y : message), f(<x,y>) = x] ->
+  x.
+Proof.
+  intro H.
+  checkfail try(rewrite H in 0,1); auto exn GoalNotClosed.
+Abort.

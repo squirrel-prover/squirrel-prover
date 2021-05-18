@@ -30,17 +30,17 @@ module type Sequent = sig
   val pp : Format.formatter -> t -> unit
 
   (** type of hypotheses and goals *)
-  type hyp 
+  type form
 
-  module Hyps : Hyps.HypsSeq with type hyp = hyp and type sequent = t
+  module Hyps : Hyps.HypsSeq with type hyp = form and type sequent = t
 
-  val reach_to_hyp : Term.message -> hyp
+  val reach_to_hyp : Term.message -> form
 
   val env : t -> Vars.env
   val set_env : Vars.env -> t -> t
 
-  val goal : t -> hyp
-  val set_goal : hyp -> t -> t
+  val goal : t -> form
+  val set_goal : form -> t -> t
   val set_reach_goal : Term.message -> t -> t
 
   val system : t -> SystemExpr.system_expr
@@ -59,6 +59,10 @@ module type Sequent = sig
   val get_equiv_hyp_or_lemma : lsymb -> t -> Goal.equiv_hyp_or_lemma
   val get_reach_hyp_or_lemma : lsymb -> t -> Goal.reach_hyp_or_lemma
 
+  val mem_felem    : int -> t -> bool
+  val change_felem : int -> Term.message list -> t -> t
+  val get_felem    : int -> t -> Term.message
+
   val query_happens : precise:bool -> t -> Term.timestamp -> bool
 
   val mk_trace_cntxt : t -> Constr.trace_cntxt
@@ -66,14 +70,14 @@ module type Sequent = sig
   val get_models : t -> Constr.models
 
   val subst     : Term.subst ->   t ->   t
-  val subst_hyp : Term.subst -> hyp -> hyp
+  val subst_hyp : Term.subst -> form -> form
 
   (** get (some) terms appearing in an hypothesis.
       In an equiv formula, does not return terms under (equiv) binders. *)
-  val get_terms : hyp -> Term.message list
+  val get_terms : form -> Term.message list
 
   (** Matching in hypotheses *)
-  module Match : Term.MatchS with type t = hyp
+  module Match : Term.MatchS with type t = form
 end
 
 (*------------------------------------------------------------------*)
@@ -147,28 +151,61 @@ module LowTac (S : Sequent) = struct
 
   (*------------------------------------------------------------------*)
   (** {3 Targets} *)
-  type target = [`Goal | `Hyp of Ident.t]
+  type target = 
+    | T_goal
+    | T_hyp of Ident.t
+    | T_felem of int       (* frame element in an equiv *)
 
   type targets = target list
 
   let target_all s : target list =
-    `Goal :: List.map (fun ldecl -> `Hyp (fst ldecl)) (Hyps.to_list s)
+    T_goal :: List.map (fun ldecl -> T_hyp (fst ldecl)) (Hyps.to_list s)
+
+  let make_single_target (symb : lsymb) (s : S.sequent) : target =
+    let name = L.unloc symb in
+
+    let error () = 
+      soft_failure ~loc:(L.loc symb)
+        (Tactics.Failure ("unknown hypothesis or frame element " ^ name))
+    in
+
+    if Hyps.mem_name name s then
+      T_hyp (fst (Hyps.by_name symb s))
+    else
+      match int_of_string_opt name with
+      | Some i ->
+        if S.mem_felem i s then T_felem i else error ()
+      | None -> error ()
 
   let make_in_targets (in_t : Args.in_target) (s : S.sequent) : targets * bool =
     match in_t with
     | `Hyps symbs -> 
-      List.map (fun symb -> `Hyp (fst (Hyps.by_name symb s))) symbs, false
+      List.map (fun symb -> make_single_target symb s) symbs, false
     | `All -> target_all s, true
-    | `Goal -> [`Goal], false
+    | `Goal -> [T_goal], false
 
+(*------------------------------------------------------------------*)
+  (** Formulas of different types *)
+  type cform = 
+    | Cform  of S.form
+    | Ctform of Term.message
 
-  (* rewrite in a single target *)
+  let mk_form f  = Cform  f
+  let mk_tform f = Ctform f
+
+(*------------------------------------------------------------------*)
+  let subst_cform subst = function
+    | Ctform f -> Ctform (Term.subst subst f)
+    | Cform  f -> Cform  (S.subst_hyp subst f)
+
+  (** Apply some function [doit] to a single target. *)
   let do_target 
-      (doit : (S.hyp * Ident.t option) -> S.hyp * S.hyp list) 
+      (doit : (cform * Ident.t option) -> cform * S.form list) 
       (s : S.sequent) (t : target) : S.sequent * S.sequent list =
     let f, s, tgt_id = match t with
-      | `Goal -> S.goal s, s, None
-      | `Hyp id -> Hyps.by_id id s, Hyps.remove id s, Some id
+      | T_goal    -> Cform  (S.goal s       ),               s , None
+      | T_hyp id  -> Cform  (Hyps.by_id id s), Hyps.remove id s, Some id
+      | T_felem i -> Ctform (S.get_felem i s),               s , None
     in
 
     let f,subs = doit (f,tgt_id) in
@@ -176,9 +213,11 @@ module LowTac (S : Sequent) = struct
       List.map (fun sub -> S.set_goal sub s) subs
     in
 
-    match t with
-    | `Goal -> S.set_goal f s, subs
-    | `Hyp id -> Hyps.add (Args.Named (Ident.name id)) f s, subs
+    match t, f with
+    | T_goal,    Cform  f -> S.set_goal f s, subs
+    | T_hyp id,  Cform  f -> Hyps.add (Args.Named (Ident.name id)) f s, subs
+    | T_felem i, Ctform f -> S.change_felem i [f] s, subs
+    | _ -> assert false
 
   let do_targets doit (s : S.sequent) targets : S.sequent * S.sequent list = 
     let s, subs = 
@@ -265,7 +304,7 @@ module LowTac (S : Sequent) = struct
     let subst = unfold_macro ~canfail:true t s in
     if subst = [] then soft_failure (Failure "nothing to expand");
 
-    let doit (f,_) = S.subst_hyp subst f, [] in
+    let doit (f,_) = subst_cform subst f, [] in
     let s, subs = do_targets doit s targets in
     assert (subs = []);
     s
@@ -301,11 +340,12 @@ module LowTac (S : Sequent) = struct
       (m : [`Any | `MSymb of Symbols.macro Symbols.t])
       (targets : targets) (s : S.t) : Term.St.t =
     List.fold_left (fun occs target -> 
-        let form = match target with
-          | `Goal   -> S.goal s
-          | `Hyp id -> Hyps.by_id id s
+        let terms = match target with
+          | T_goal    -> S.get_terms (S.goal s)
+          | T_hyp id  -> S.get_terms  (Hyps.by_id id s)
+          | T_felem i -> [S.get_felem i s]
         in
-        find_occs_macro_terms ~st:occs m (S.get_terms form)
+        find_occs_macro_terms ~st:occs m terms
       ) St.empty targets
 
   let subst_of_occs_macro ~(canfail : bool) (occs : Term.St.t) s : Term.subst =
@@ -353,7 +393,7 @@ module LowTac (S : Sequent) = struct
 
       if subst = [] then soft_failure (Failure "nothing to expand");
 
-      let doit (f,_) = S.subst_hyp subst f, [] in
+      let doit (f,_) = subst_cform subst f, [] in
       let s, subs = do_targets doit s targets in
       assert (subs = []);
       s
@@ -415,7 +455,7 @@ module LowTac (S : Sequent) = struct
 
     (* Return: (f, subs) *)
     let rec doit
-      : type a. Args.rw_count -> a rw_rule -> S.hyp -> S.hyp = 
+      : type a. Args.rw_count -> a rw_rule -> cform -> cform = 
       fun mult (tyvars, sv, rsubs, l, r) f ->
 
         (* Substitute [occ] by [r] (where free variables
@@ -444,7 +484,15 @@ module LowTac (S : Sequent) = struct
         in
         let many = match mult with `Once -> false | `Any | `Many -> true in
 
-        let f_opt = S.Match.find_map ~many (S.env s) f pat rw_inst in
+        let f_opt = match f with
+          | Cform f -> 
+            let f_opt = S.Match.find_map ~many (S.env s) f pat rw_inst in
+            omap mk_form f_opt
+
+          | Ctform f -> 
+            let f_opt = Term.Match.find_map ~many (S.env s) f pat rw_inst in
+            omap mk_tform f_opt
+        in
 
         match mult, f_opt with
         | `Any, None -> f
@@ -466,7 +514,7 @@ module LowTac (S : Sequent) = struct
         Ident.name hyp_id <> "_" 
     in
 
-    let doit_tgt (f,tgt_id : S.hyp * Ident.t option) : S.hyp * S.hyp list =
+    let doit_tgt (f,tgt_id : cform * Ident.t option) : cform * S.form list =
       match rw with
       | mult,  id_opt, (tyvars, sv, subs, Term.ESubst (l,r)) ->
         if is_same id_opt tgt_id 
