@@ -31,7 +31,7 @@
 %token TIME WHERE WITH ORACLE EXN
 %token LARGE NAMEFIXEDLENGTH
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
-%token REWRITE REVERT CLEAR GENERALIZE DEPENDS APPLY SPLITSEQ
+%token REWRITE REVERT CLEAR GENERALIZE DEPENDS APPLY SPLITSEQ CONSTSEQ
 %token BY INTRO AS DESTRUCT REMEMBER
 %token PROOF QED UNDO ABORT
 %token EOF
@@ -661,8 +661,11 @@ tac:
   | l=lloc(APPLY) t=apply_arg w=apply_in
     { mk_abstract l "apply" [TacticsArgs.ApplyIn (t, w)] }
 
-  | l=lloc(SPLITSEQ) i=INT LPAREN ht=hterm RPAREN 
+  | l=lloc(SPLITSEQ) i=loc(INT) COLON LPAREN ht=hterm RPAREN 
     { mk_abstract l "splitseq" [TacticsArgs.SplitSeq (i, ht)] }
+
+  | l=lloc(CONSTSEQ) i=loc(INT) COLON terms=slist1(sterm, empty)
+    { mk_abstract l "constseq" [TacticsArgs.ConstSeq (i, terms)] }
 
   | l=lloc(DDH) g=lsymb COMMA i1=lsymb COMMA i2=lsymb COMMA i3=lsymb 
     { mk_abstract l "ddh"
@@ -698,6 +701,7 @@ help_tac_i:
 | REWRITE    { "rewrite"}  
 | APPLY      { "apply"}  
 | SPLITSEQ   { "splitseq"}  
+| CONSTSEQ   { "constseq"}  
 | DDH        { "ddh"}      
 
 

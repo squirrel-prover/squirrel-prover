@@ -13,7 +13,7 @@ seq(i->(if not((A(i) <= A(j) && A(i) <> t)) then <ok(i),input@A(i)>))
 seq (i -> <ok(i), input@A(i)>).
 Proof.
   intro H.
-  nosimpl(splitseq 0 (fun (l:index) -> A(l) <= A(j) && A(l) <> t)).
+  nosimpl(splitseq 0: (fun (l:index) -> A(l) <= A(j) && A(l) <> t)).
   auto.
 Qed.  
 
@@ -25,7 +25,7 @@ seq(i->(if not((A(i) <= A(j) && A(i) <> t)) then <ok(i),input@A(i)>))
 seq (i -> <ok(i), input@A(i)>).
 Proof.
   intro H.
-  nosimpl(splitseq 0 (fun (i:index) -> A(i) <= A(j) && A(i) <> t)).
+  nosimpl(splitseq 0: (fun (i:index) -> A(i) <= A(j) && A(i) <> t)).
   auto.
 Qed.  
 
@@ -37,6 +37,6 @@ seq(i0->(if not((A(i0) <= A(i) && A(i0) <> t)) then <ok(i0),input@A(i0)>))
 seq (i -> <ok(i), input@A(i)>).
 Proof.
   intro H.
-  nosimpl(splitseq 0 (fun (l:index) -> A(l) <= A(i) && A(l) <> t)).
+  nosimpl(splitseq 0: (fun (l:index) -> A(l) <= A(i) && A(l) <> t)).
   auto.
 Qed.  

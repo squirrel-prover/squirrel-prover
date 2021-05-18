@@ -103,7 +103,8 @@ type parser_arg =
   | SimplPat    of simpl_pat
   | RewriteIn   of rw_arg list * in_target
   | ApplyIn     of Theory.p_pt * apply_in
-  | SplitSeq    of int * Theory.hterm
+  | SplitSeq    of int L.located * Theory.hterm
+  | ConstSeq    of int L.located * Theory.term list
   | Remember    of Theory.term * lsymb
 
 type parser_args = parser_arg list

@@ -125,6 +125,7 @@
   "yesif"
   "intctxt"
   "splitseq"
+  "constseq"
   "byequiv"
 ))
 

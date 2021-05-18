@@ -237,6 +237,7 @@ let mk_of_bool t = mk_fbuiltin Symbols.fs_of_bool [] [t]
 
 (*------------------------------------------------------------------*)
 (** {3 For formulas} *)
+(** Some smart constructors are redefined later, after substitutions. *)
 
 let mk_not_ns term  = mk_fbuiltin Symbols.fs_not [] [term]
 
@@ -301,6 +302,9 @@ let mk_indices_eq vect_i vect_j =
     (List.map2 (fun i j ->
          if i = j then mk_true else Atom (`Index (`Eq, i, j))
        ) vect_i vect_j)
+
+let mk_lambda evs ht = match ht with
+  | Lambda (evs', t) -> Lambda (evs @ evs', t) 
 
 (*------------------------------------------------------------------*)
 (** {2 Typing} *)
@@ -870,47 +874,6 @@ let fv : 'a term -> Sv.t = fun term ->
 
 let get_vars t = fv t |> Sv.elements
 
-
-(*------------------------------------------------------------------*)
-(** {2 More smart constructors} *)
-
-let mk_forall ?(simpl=false) l f = 
-  let l = 
-    if simpl then
-      let fv = fv f in
-      List.filter (fun v -> Sv.mem v fv) l 
-    else l
-  in
-  mk_forall l f
-
-let mk_exists ?(simpl=false) l f = 
-  let l = 
-    if simpl then
-      let fv = fv f in
-      List.filter (fun v -> Sv.mem v fv) l 
-    else l
-  in
-  mk_exists l f
-
-let mk_lambda evs ht = match ht with
-  | Lambda (evs', t) -> Lambda (evs @ evs', t) 
-
-
-let mk_atom : type a b. ord -> a term -> b term -> message =
-  fun ord t1 t2 ->
-  match kind t1, kind t2 with
-  | Type.KMessage, Type.KMessage ->    
-    Atom (`Message (as_ord_eq ord, t1, t2))
-
-  | Type.KIndex, Type.KIndex ->    
-    let v1, v2 = oget (destr_var t1), oget (destr_var t2) in
-    Atom (`Index (as_ord_eq ord, v1, v2))
-
-  | Type.KTimestamp, Type.KTimestamp ->    
-    Atom (`Timestamp (ord, t1, t2))
-
-  | _ -> assert false
-
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
 
@@ -1214,6 +1177,61 @@ let tfold : type a. (eterm -> 'b -> 'b) -> a term -> 'b -> 'b =
   let fi e = vref := (f e !vref) in  
   titer fi t;
   !vref
+
+
+
+(*------------------------------------------------------------------*)
+(** {2 More smart constructors} *)
+
+(* FIXME: improve variable naming (see mk_seq) *)
+let mk_forall ?(simpl=false) l f = 
+  let l = 
+    if simpl then
+      let fv = fv f in
+      List.filter (fun v -> Sv.mem v fv) l 
+    else l
+  in
+  mk_forall l f
+
+(* FIXME: improve variable naming (see mk_seq) *)
+let mk_exists ?(simpl=false) l f = 
+  let l = 
+    if simpl then
+      let fv = fv f in
+      List.filter (fun v -> Sv.mem v fv) l 
+    else l
+  in
+  mk_exists l f
+
+
+let mk_atom : type a b. ord -> a term -> b term -> message =
+  fun ord t1 t2 ->
+  match kind t1, kind t2 with
+  | Type.KMessage, Type.KMessage ->    
+    Atom (`Message (as_ord_eq ord, t1, t2))
+
+  | Type.KIndex, Type.KIndex ->    
+    let v1, v2 = oget (destr_var t1), oget (destr_var t2) in
+    Atom (`Index (as_ord_eq ord, v1, v2))
+
+  | Type.KTimestamp, Type.KTimestamp ->    
+    Atom (`Timestamp (ord, t1, t2))
+
+  | _ -> assert false
+
+(* only refresh necessary vars, hence we need an environment *)
+let mk_seq env is term =
+  let env =
+    let env_vars = Sv.of_list (Vars.to_list env) in
+    let term_vars = fv term in
+    let vars = Sv.elements (Sv.inter env_vars term_vars) in
+    ref (Vars.of_list vars)
+  in
+
+  let is, s = refresh_vars (`InEnv env) is in
+  let term = subst s term in
+
+  Seq (is, term)
 
 (*------------------------------------------------------------------*)
 (** {2 Apply} *)

@@ -374,6 +374,8 @@ val mk_indices_eq  : Vars.index list -> Vars.index list -> message
 
 val mk_atom : ord -> 'a term -> 'b term -> message 
 
+val mk_seq : Vars.env -> Vars.index list -> message -> message
+
 (*------------------------------------------------------------------*)
 (** {2 Simplification} *)
 

@@ -96,6 +96,12 @@ let only_equiv t (s : Goal.t) =
   | Goal.Equiv s -> t s
   | _ -> soft_failure (Tactics.Failure "equivalence goal expected")
 
+(** As [only_equiv], but with an extra arguments. *)
+let only_equiv_arg t arg (s : Goal.t) =
+  match s with
+  | Goal.Equiv s -> t arg s
+  | _ -> soft_failure (Tactics.Failure "equivalence goal expected")
+
 (** Wrap a tactic expecting and returning equivalence goals
   * into a general prover tactic. *)
 let pure_equiv t s sk fk =
@@ -1946,12 +1952,14 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-let split_seq (i, ht) s : ES.sequent =   
+let split_seq (li, ht) s : ES.sequent =
+  let i = L.unloc li in
   let before, t, after = split_equiv_goal i s in
 
   let is, ti = match t with
     | Seq (is, ti) -> is, ti
-    | _ -> soft_failure ~loc:(L.loc ht) (Failure "not a seq")
+    | _ -> 
+      soft_failure ~loc:(L.loc li) (Failure (string_of_int i ^ " is not a seq"))
   in
 
   (* check that types are compatible *)
@@ -1975,20 +1983,9 @@ let split_seq (i, ht) s : ES.sequent =
   let ti_t = Term.mk_ite cond               ti Term.mk_zero in
   let ti_f = Term.mk_ite (Term.mk_not cond) ti Term.mk_zero in
 
-  let mk_one term =
-    let env =
-      let vars = Vars.to_list (ES.env s)
-                 |> Sv.of_list in
-      let vars = Sv.elements (Sv.inter vars (Term.fv term)) in
-      ref (Vars.of_list vars)
-    in
-
-    let is, subst = Term.refresh_vars (`InEnv env) is in
-    let term = Term.subst subst term in
-
-    Term.Seq (is, term)
-  in
-  let frame = List.rev_append before ([mk_one ti_t; mk_one ti_f] @ after) in
+  let env = ES.env s in
+  let frame = List.rev_append before ([Term.mk_seq env is ti_t; 
+                                       Term.mk_seq env is ti_f] @ after) in
   ES.set_equiv_goal frame s
 
 let split_seq_args args s : ES.sequent list =
@@ -2006,6 +2003,63 @@ let () =
                   tactic_group = Logical}
     (pure_equiv_arg split_seq_tac)
 
+(*------------------------------------------------------------------*)
+let const_seq (li, terms) s : Goal.t list =   
+  let i = L.unloc li in
+
+  let terms, term_tys = 
+    List.split @@
+    List.map (fun p_term -> 
+        let term, term_ty = LT.convert_i s p_term in
+        term, (term_ty, L.loc p_term)
+      ) terms
+  in
+
+  let before, e, after = split_equiv_goal i s in
+  let e_is, e_ti = match e with
+    | Seq (is, ti) -> is, ti
+    | _ -> 
+      soft_failure ~loc:(L.loc li) (Failure (string_of_int i ^ " is not a seq"))
+  in
+
+  (* check that types are compatible *)
+  List.iter (fun (term_ty, loc) -> 
+      LT.check_ty_eq ~loc term_ty (Term.ty e_ti)
+    ) term_tys;
+
+  (* refresh variables *)
+  let env = ref (ES.env s) in
+  let e_is, subst = Term.refresh_vars (`InEnv env) e_is in
+  let e_ti = Term.subst subst e_ti in
+
+  let eqs = List.map (fun term ->
+      Term.mk_atom `Eq e_ti term
+    ) terms
+  in
+  let cond = 
+    Term.mk_forall ~simpl:true (List.map Vars.evar e_is)
+      (Term.mk_ors ~simpl:true eqs)
+  in
+  let s_reach = ES.trace_seq_of_reach cond s in
+  
+  let frame = List.rev_append before (terms @ after) in
+  [ Goal.Trace s_reach;
+    Goal.Equiv (ES.set_equiv_goal frame s) ]
+
+let const_seq_args args s : Goal.t list =
+  match args with
+  | [Args.ConstSeq (i, t)] -> const_seq (i, t) s
+  | _ -> bad_args ()
+
+let const_seq_tac args s sk fk = LT.wrap_fail (const_seq_args args) s sk fk
+
+let () =
+  T.register_general "constseq"
+    ~tactic_help:{general_help = "simplifies a constant sequence";
+                  detailed_help = "";
+                  usages_sorts = [];
+                  tactic_group = Logical}
+    (only_equiv_arg const_seq_tac)
 
 (*------------------------------------------------------------------*)
 (** Symmetric encryption **)

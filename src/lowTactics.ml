@@ -99,17 +99,17 @@ module LowTac (S : Sequent) = struct
     | Tactics.Tactic_soft_failure e -> fk e
 
   (*------------------------------------------------------------------*)
-  let check_ty_eq ty1 ty2 = 
+  let check_ty_eq ?loc ty1 ty2 = 
     if not (Type.equal ty1 ty2) then
-      soft_failure 
+      soft_failure ?loc 
         (Failure (Fmt.strf "types %a and %a are not compatible" 
                     Type.pp ty1 Type.pp ty2));
     ()
 
   (*------------------------------------------------------------------*)
-  let check_hty_eq hty1 hty2 = 
+  let check_hty_eq ?loc hty1 hty2 = 
     if not (Type.ht_equal hty1 hty2) then
-      soft_failure 
+      soft_failure ?loc
         (Failure (Fmt.strf "types %a and %a are not compatible" 
                     Type.pp_ht hty1 Type.pp_ht hty2));
     ()
