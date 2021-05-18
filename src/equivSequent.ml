@@ -54,6 +54,9 @@ let init system table env hyps f = {
 
 type sequent = t
 
+type sequents = sequent list
+
+
 let pp_goal fmt = function
   | Equiv.Atom (Equiv.Equiv e) -> Equiv.pp_equiv_numbered fmt e
   | _  as f -> Equiv.pp fmt f

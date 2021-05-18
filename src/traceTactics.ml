@@ -1805,7 +1805,7 @@ let new_simpl ~congr ~constr s =
 let clear_triv s sk fk = sk [Hyps.clear_triv s] fk
 
 (** Simplify goal. *)
-let simplify ~close ~strong =
+let _simpl ~close ~strong =
   let open Tactics in
   let intro = Config.auto_intro () in
   
@@ -1860,7 +1860,7 @@ let rec simpl ~strong ~close : TS.t Tactics.tac =
   let open Tactics in
   let (>>) = andthen ~cut:true in
   (* if [close], we introduce as much as possible to help. *)
-  simplify ~close ~strong >> 
+  _simpl ~close ~strong >> 
 
   if not strong
   then (fun g sk fk -> sk [g] fk)

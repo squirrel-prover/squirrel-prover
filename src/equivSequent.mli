@@ -14,6 +14,9 @@ type hyps = H.hyps
 type t
 type sequent = t
 
+type sequents = sequent list
+
+
 type hyp = Equiv.form
 
 (** Initialize a sequent for the diff-equivalence of the given system.  
