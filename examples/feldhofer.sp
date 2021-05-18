@@ -188,6 +188,9 @@ Proof.
 
   induction t.
 
+  (* init *)
+  auto.
+
   (* Action 1/4: Reader *)
 
   expand seq(k->nr(k)),k.
@@ -308,10 +311,9 @@ Proof.
   fa 2. fa 3.  fa 3.
 
   enckp 3, k_fresh; 1: auto. 
-  auto.
+
   expand seq(i,j->nt(i,j)),i,j.
   fa 4.
   fresh 5.
   by fresh 4; yesif 4. 
-  auto.
 Qed.

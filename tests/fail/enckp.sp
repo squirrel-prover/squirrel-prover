@@ -49,8 +49,8 @@ system [sharedrnd] !_i
 equiv  [sharedrnd] test.
 Proof.
 enrich diff(n,m); induction t. 
-expandall; fresh 0; yesif 0. 
-by auto.
+by expandall; fresh 0; yesif 0. 
+
 expandall. 
 fa 1; fa 2; fa 2; fa 2.
 checkfail enckp 2 exn SEncSharedRandom.
@@ -62,7 +62,8 @@ Abort.
 system  [sharedrndframe] !_i (out(c,<diff(n,m), enc(n,r1(i),diff(k,kbis))>)).
 equiv  [sharedrndframe] test2.
 Proof.
-enrich diff(n,m). induction t. expandall. fresh 0. yesif 0. by auto.
+enrich diff(n,m). induction t. expandall. fresh 0. 
+by yesif 0. 
 enrich enc(m,r1(i),k). expandall. fa 2; fa 3; fa 3; fa 3.
  checkfail enckp 3 exn SEncSharedRandom.
 Abort.
@@ -74,7 +75,8 @@ system [nornd] !_i (out(c,<n, enc(n,r1(i),diff(k,kbis))>) | out(c,enc(n,ok,k))).
 
 equiv [nornd] test3.
 Proof.
-enrich diff(n,m). induction t. expandall. fresh 0. yesif 0. by auto.
+enrich diff(n,m). induction t. expandall. fresh 0. 
+by yesif 0. 
 expandall. fa 1; fa 2; fa 2; fa 2.
 checkfail enckp 3 exn SEncNoRandom.
 Abort.
@@ -85,7 +87,7 @@ Abort.
 equiv test : <r,enc(n,r,diff(k,kbis))>.
 Proof.
   enckp 0.
-  (* the tactic succeeds, but create a false reachability goal *)
+  (* the tactic succeeds, but create a non-valid reachability goal *)
 Abort.
 (** END TEST **)
 
@@ -94,7 +96,7 @@ Abort.
 equiv test : enc(n,r,diff(k,kbis)), r.
 Proof.
   enckp 0.
-  (* the tactic succeeds, but create a false reachability goal *)
+  (* the tactic succeeds, but create a non-valid reachability goal *)
 Abort.
 (** END TEST **)
 

@@ -36,6 +36,6 @@ equiv test : diff(xor(n1,ok),xor(n1,ko)).
 Proof.
   xor 0.
   yesif 0.
-  use len_ok; use len_ko; namelength n1,dummy. 
+  by use len_ok; use len_ko; namelength n1,dummy. 
   auto.
 Qed.

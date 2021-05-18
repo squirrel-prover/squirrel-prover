@@ -458,6 +458,8 @@ Proof.
 
   induction t.
 
+  auto.
+
   (* P1 *)
   by expandall; fa 17.
   (* P2 *)

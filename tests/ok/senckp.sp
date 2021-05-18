@@ -41,7 +41,9 @@ Proof.
   auto.
   (* Decompose explicitly to make sure the context
    * is still there. *)
-  nosimpl(fa 0). nosimpl(fa 0). fa 3.
+  nosimpl(fa 0). nosimpl(fa 0). 
+  fa 3.
+  refl.
 Qed.
 
 equiv test_diffsimpl : enc(n,r,diff(k1,k1)).
@@ -61,5 +63,7 @@ Proof.
   auto.
   (* Decompose explicitly to make sure the context
    * is still there. *)
-  nosimpl(fa 0). nosimpl(fa 0). fa 3.
+  nosimpl(fa 0). nosimpl(fa 0). 
+  fa 3. 
+  refl.
 Qed.

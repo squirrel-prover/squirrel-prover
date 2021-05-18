@@ -255,6 +255,8 @@ Proof.
 
    induction t.
 
+   auto.
+
    (* P *)
    by expandall; fa 7.
    (* P1 *)

@@ -10,13 +10,16 @@ system in(c,x); if x=ok then out(c,diff(x,ok)).
 equiv test.
 Proof.
 induction t.
+
+auto. 
+
 expandall.
 fa 0; fa 1.
 nosimpl(ifeq 1,input@A,ok). 
 auto.
 
 nosimpl(fadup).
-by assumption.
+assumption.
 
 expandall.
 by fa 0.

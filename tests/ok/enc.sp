@@ -18,15 +18,17 @@ enrich diff(n,m).
 enrich pk(sk).
 
 induction t.
+
 expandall.
 fresh 1.
-yesif 1.
-auto.
+by yesif 1.
 
 expandall.
 fa 2; fa 3; fa 3; fa 3.  
 cca1 3.
 
 admit 3.
+auto.
+
 auto.
 Qed.

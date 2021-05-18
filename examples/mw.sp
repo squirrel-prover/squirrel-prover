@@ -170,7 +170,7 @@ Qed.
 
 equiv unlinkability.
 Proof.
-induction t.
+induction t; try auto.
 
 (* Case R *)
 expand frame@R(r); expand exec@R(r).
@@ -183,6 +183,7 @@ yesif 1.
 by (repeat split => r0 _; 
     try (depends R(r0), R1(r0) by auto);
     try (depends R(r0), R2(r0) by auto)).
+auto. 
 
 (* Case R1 *)
 expand frame@R1(r); expand exec@R1(r).
@@ -280,6 +281,7 @@ use tags_neq; project; auto.
 xor 1,n_PRF.
 yesif 1. 
 by use len_id with i; use len_id' with i,t; namelength n_PRF, dummy.
+auto.
 
 (* Case R2 *)
 expand frame@R2(r); expand exec@R2(r).
@@ -318,8 +320,8 @@ by (repeat split => > _;
 
 fresh 1. 
 yesif 1; 1: auto.
-auto.
 xor 1, n_PRF.
-yesif 1; 1: auto.
+yesif 1.
 by use len_id with i; use len_id' with i,t; namelength n_PRF,dummy.
+auto.
 Qed.

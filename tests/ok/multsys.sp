@@ -16,23 +16,25 @@ equiv test.
 Proof.
 induction t.
 
-expandall.
-fa 0; fa 1. 
-noif 1. 
-auto.
+auto. 
 
 expandall.
-fa 0.
+fa 0; fa 1. 
+by noif 1. 
+
+expandall.
+by fa 0.
 Qed.
 
 equiv [toto] test2.
 Proof.
 induction t.
 
+auto.
+
 expandall.
 fa 0; fa 1. 
-noif 1.
-auto.
+by noif 1.
 
 expandall.
 by fa 0.

@@ -16,6 +16,8 @@ equiv test_left_bis.
 Proof.
 induction t.
 
+auto.
+
 expand frame@A.
 by fa 0.
 
@@ -24,8 +26,8 @@ fa 0; fa 1.
 expand exec@B.
 equivalent cond@B, False.
 by expand cond@B. 
-noif 1.
-auto.
+by noif 1.
+
 expand frame@B1.
 by fa 0.
 Qed.

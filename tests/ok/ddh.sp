@@ -14,7 +14,10 @@ system !_i ( out(c, diff((g^a(i))^b(i),g^k(i)))).
 equiv ddh_goal.
 Proof.
 induction t.
+
+auto.
+
 expand frame@init; expand exec@init.
 
-ddh g, a, b, k.
+by ddh g, a, b, k.
 Qed.

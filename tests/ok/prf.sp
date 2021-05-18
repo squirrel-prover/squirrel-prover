@@ -32,6 +32,9 @@ equiv [test] test2.
 Proof.
 
 induction t.
+
+auto.
+
 expandall.
 fa 0.
 fa 1. fa 1. prf 1.

@@ -21,12 +21,11 @@ enrich diff(n,m).
 induction t.
 expandall.
 fresh 0.
-yesif 0.
-by auto.
+by yesif 0.
 
 enrich enc(m,r(i),sk).
 expandall.
-fa 2; fa 3; fa 3; fa 3.  cca1 3.
+fa 2; fa 3; fa 3; fa 3.  
+cca1 3.
 
-admit 2.
 Qed.

@@ -16,6 +16,9 @@ Proof.
 enrich seq(i->h(ok,k(i))).
 
  induction t. 
+
+ auto.
+
  expand frame@A(i).
  expand output@A(i).
  expand exec@A(i).
@@ -23,8 +26,7 @@ enrich seq(i->h(ok,k(i))).
  fa 2.
  equivalent cond@A(i), False.
  by expand cond@A(i); auto.
- noif 2. 
- auto.
+ by noif 2. 
 
  expand frame@A1(i).
  expand output@A1(i).
@@ -36,5 +38,5 @@ enrich seq(i->h(ok,k(i))).
  auto.
  fa 2.
 
- expand seq(i->h(ok,k(i))),i.
+ by expand seq(i->h(ok,k(i))),i.
 Qed.

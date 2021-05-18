@@ -22,8 +22,7 @@ by project; auto.
 fresh 1.
 
 prf 0.
-yesif 0. 
-auto.
+by yesif 0. 
 Qed.
 
 
@@ -32,7 +31,7 @@ system [test]  in(c,x); let surp = diff(m,n) in let mac = h(<x,surp>,k) in  out(
 equiv [test] test2.
 Proof.
 
-induction t.
+induction t; try auto.
 expandall.
 fa 0; fa 1; fa 1. 
 prf 1.
@@ -55,5 +54,5 @@ by split; intro H0; case H0; depends A, A1.
 split; 1: auto. 
 by split; intro H0; case H0; depends A, A1. 
 
-fresh 1.
+by fresh 1.
 Qed.

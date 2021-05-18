@@ -15,5 +15,5 @@ equiv testFresh : diff(f(ok),f(ok)),diff(n,m),k.
 
 Proof.
   fresh 2.
-  fresh 0.
+  by fresh 0.
 Qed.

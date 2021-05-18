@@ -181,6 +181,9 @@ equiv unlinkability.
 Proof.
   induction t.
 
+  (* init *)
+  auto.
+
   (* Case R *)
   expand frame@R(j); expand exec@R(j).
   expand cond@R(j); expand output@R(j).
@@ -189,6 +192,7 @@ Proof.
   repeat split => // j0 H1. 
   by depends R(j0),R1(j0).
   by depends R(j0),R2(j0).
+  auto.
 
   (* Case R1 *)
   expand frame@R1(j); expand exec@R1(j).
@@ -295,5 +299,4 @@ Proof.
 
   fresh 2.
   by fresh 1; yesif 1.
-  auto.
 Qed.

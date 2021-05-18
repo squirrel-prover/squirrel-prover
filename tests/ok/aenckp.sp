@@ -64,4 +64,5 @@ Proof.
   (* Decompose explicitly to make sure the context
    * is still there. *)
   nosimpl(fa 0). nosimpl(fa 0). fa 3.
+  auto.
 Qed.
