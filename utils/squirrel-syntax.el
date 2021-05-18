@@ -120,11 +120,12 @@
   "ifeq"
   "noif"
   "prf"
-  "refl"
   "trivialif"
   "xor"
   "yesif"
   "intctxt"
+  "splitseq"
+  "byequiv"
 ))
 
 (defvar squirrel-closing-keywords '(
@@ -134,6 +135,7 @@
   "congruence"
   "constraints"
   "auto"
+  "refl"
 ))
 
 (defvar squirrel-tacticals-keywords '(
