@@ -1159,33 +1159,20 @@ let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
     hard_failure
       (Tactics.Failure "can only expand with sequences with parameters")
 
-(* Expand all occurrences of the given macro [term] inside [s] *)
-let expand (term : Theory.term) (s : ES.t) =
-  (* final function once the substitution has been computed *)
-  let succ a subst =
-    let new_s = 
-      ES.set_equiv_goal (List.map (Term.subst subst) (ES.goal_as_equiv s)) s
-    in   
-    
-    if not (ES.query_happens ~precise:true s a) 
-    then soft_failure (Tactics.MustHappen a)
-    else [Goal.Equiv new_s]
-  in
+(*------------------------------------------------------------------*)
+(* TODO: factorize *)
+let expand_tac args s =
+    let args = List.map (function
+        | Args.Theory t -> t
+        | _ -> bad_args ()
+      ) args
+    in
+    [LT.expands args s] 
 
-  let table = ES.table s in
+let expand_tac args = LT.wrap_fail (expand_tac args)
 
-  (* computes the substitution dependeing on the sort of term *)
-  match LT.convert_i s term with
-    | Macro (ms,l,a), ty ->
-      if Macros.is_defined ms.s_symb a table then
-        succ a [Term.ESubst (Macro (ms,l,a),
-                             Macros.get_definition (ES.mk_trace_cntxt s) ms a)]
-      else soft_failure (Tactics.Failure "cannot expand this macro")
-
-    | _ ->
-      soft_failure (Tactics.Failure "can only expand macros")
-
-(* Does not rely on the typed registering, as it parsed a substitution. *)
+(*------------------------------------------------------------------*)
+(* Does not rely on the typed registration, as it parses a substitution. *)
 let () = T.register_general "expand"
 
     ~tactic_help:{general_help = "Expand all occurrences of the given macro, or \
@@ -1198,10 +1185,7 @@ let () = T.register_general "expand"
                   usages_sorts = [Sort None];
                   tactic_group = Structural}
   (function
-    | [Args.Theory v] ->
-      only_equiv (fun s sk fk -> match expand v s with
-          | subgoals -> sk subgoals fk
-          | exception Tactics.Tactic_soft_failure e -> fk e)
+    | [Args.Theory v] as args -> pure_equiv (expand_tac args)
 
     | (Args.Theory v)::ids ->
         let ids =
@@ -1218,54 +1202,14 @@ let () = T.register_general "expand"
      | _ -> bad_args ())
 
 (*------------------------------------------------------------------*)
-(** Expands all macro occurrences inside the biframe, if the macro is not at
-  * some pred(A) but about at a concrete action that is known to happen.
-  * Acts recursively, also expanding the macros inside macro definition. *)
-let expand_all () s =
-  let cntxt = ES.mk_trace_cntxt s in
-
-  let expand_all_macros t =
-    let rec aux : type a. a Term.term -> a Term.term = function
-      | Macro (ms,l,a) as m
-        when Macros.is_defined ms.s_symb a cntxt.table ->
-        if ES.query_happens ~precise:true s a 
-        then aux (Macros.get_definition cntxt ms a)
-        else m
-
-      | Macro _ as m -> m
-      | Fun (f, fty, l) -> Fun (f, fty, List.map aux l)
-      | Name n as a-> a
-      | Var x as a -> a
-      | Diff(a, b) -> Diff(aux a, aux b)
-      | Seq _ as a -> a
-      | Find _ as a -> a
-      | ForAll _ as a -> a
-      | Exists _ as a -> a
-
-      | Atom (`Message (o, t, t')) -> Atom (`Message (o, aux t, aux t'))
-      | Atom (`Index _) as a-> a
-      | Atom (`Timestamp _) as a->  a
-      | Atom (`Happens _) as a->  a
-      | Pred _ as a -> a
-      | Action _ as a -> a
-    in
-
-    aux t
-  in
-
-  let biframe = ES.goal_as_equiv s
-                |> List.map (expand_all_macros)
-  in
-  [ES.set_equiv_goal biframe s]
-
+(* TODO: factorize *)
 let () = T.register "expandall"
-    ~tactic_help:{general_help = "Expand all occurrences of macros that are \
-                                  about explicit actions.";
-                  detailed_help = "Calls expand on all possible macros, and acts \
-                                   recursively.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Structural}
-         (pure_equiv_typed expand_all ())
+    ~tactic_help:{
+      general_help  = "Expand all possible macros in the sequent.";
+      detailed_help = "";
+      tactic_group  = Structural;
+      usages_sorts  = []; }
+    (pure_equiv_typed LT.expand_all_l `All)
 
 (*------------------------------------------------------------------*)
 (** Replace all occurrences of [t1] by [t2] inside of [s],
@@ -1557,8 +1501,7 @@ let () =
 
    
 (*------------------------------------------------------------------*)
-(* allows to replace inside the positive branch of an if then else a term by
-   another, if the condition implies there is equality. *)
+(* TODO: should be a rewriting rule *)
 let ifeq Args.(Pair (Int i, Pair (Message (t1,ty1), Message (t2,ty2)))) s =
 
   (* check that types are equal *)
@@ -1637,7 +1580,7 @@ let auto ~close ~strong s sk (fk : Tactics.fk) =
       [try_tac wfadup;
        try_tac
          (andthen_list ~cut:true
-            [LT.wrap_fail (expand_all ());
+            [LT.wrap_fail (LT.expand_all_l `All);
              try_tac wfadup;
              conclude])]
       s sk fk
