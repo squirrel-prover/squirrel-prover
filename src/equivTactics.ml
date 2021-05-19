@@ -229,8 +229,7 @@ let assumption s =
 
   if Hyps.exists in_hyp s
   then []
-  else
-    soft_failure (Tactics.Failure "not in hypothesis.")
+  else Tactics.soft_failure Tactics.NotHypothesis
 
 let () =
   T.register "assumption"
