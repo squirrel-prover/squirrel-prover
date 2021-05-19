@@ -22,8 +22,26 @@ process tag(j:index) =
   kT := h1(kT,key);
   out(cT, h2(kT,key'));out(cS,diff(kT,n)).
 
-system (!_j T: tag(j) | !_j O: in(cO,x);out(cO,<h1(x,key),h2(x,key')>))
+system (!_j T: tag(j) | !_j O: in(cO,x);out(cO,<h1(x,key),h2(x,key')>)).
 
+(* LIBRARIES *)
+(* A inclure dans une lib standard *)
+
+set autoIntro=false.
+
+goal if_false  (b : boolean, x,y : message):
+ (not b) => if b then x else y = y.
+Proof.
+ by intro *; noif. 
+Qed.
+
+goal if_true (b : boolean, x,y : message):
+ b => if b then x else y = x.
+Proof.
+  by intro *; yesif.
+Qed.
+
+set autoIntro=true.
 
 (* AXIOM *)
 
@@ -39,8 +57,9 @@ induction t.
 
 (* init *)
 intro *.
-admit. (* HELP !! easy mais je ne sais pas quoi dire *)
-
+(* admit. (* HELP !! easy mais je ne sais pas quoi dire *) *)
+rewrite if_false. (* note: if_false est un lemme plus haut. *)
+by byequiv.
 
 (* t = T(j) *)
 intro *.
@@ -50,7 +69,10 @@ fa 0.
 fa 1.
 fa 1.
 prf 1.
-help. (* HELP !! completement perdue je voulais faire yesif - en particulier _i78 me semble louche *)
+rewrite if_true in 1.
+byequiv.
+admit.
+(* help. (* HELP !! completement perdue je voulais faire yesif - en particulier _i78 me semble louche *) *)
 admit.
 admit.
 admit.
