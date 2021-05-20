@@ -1306,13 +1306,15 @@ let simplify_ite b s cond positive_branch negative_branch =
     (negative_branch, trace_s)
 
 
-(** [get_ite ~cntxt elem] returns None if there is no ITE term in [elem],
-    Some ite otherwise, where [ite] is the first ITE term encountered.
-    Does not explore macros. *)
 let get_ite ~cntxt elem =
-  let iter = new Iter.get_ite_term ~cntxt in
-  List.iter iter#visit_message [elem];
-  iter#get_ite
+  match Iter.get_ite_term cntxt elem with
+  | [] -> None
+  | occ :: _ ->
+    (* Context with bound variables (eg try find) are not supported. *)
+    if not (Sv.is_empty occ.Iter.occ_vars) then
+      soft_failure (Tactics.Failure "cannot be applied in a under a binder");
+
+    Some (occ.Iter.occ_cnt)
 
 let yes_no_if b Args.(Int i) s =
   let cntxt = ES.mk_trace_cntxt s in
@@ -2564,7 +2566,7 @@ exception Not_context
 class ddh_context ~(cntxt:Constr.trace_cntxt) ~gen ~exp exact a b c
   = object (self)
 
- inherit Iter.iter_approx_macros ~exact ~full:true ~cntxt as super
+ inherit Iter.iter_approx_macros ~exact ~cntxt as super
 
   method visit_macro ms a =
     match Symbols.Macro.get_def ms.s_symb cntxt.table with
@@ -2599,7 +2601,7 @@ end
 exception Macro_found
 
 class find_macros ~(cntxt:Constr.trace_cntxt) exact = object (self)
- inherit Iter.iter_approx_macros ~exact ~full:true ~cntxt as super
+ inherit Iter.iter_approx_macros ~exact ~cntxt as super
 
   method visit_macro ms a =
     match Symbols.Macro.get_def ms.s_symb cntxt.table with

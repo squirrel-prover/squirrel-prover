@@ -1,7 +1,7 @@
 open Term
 
 class check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)
-  inherit Iter.iter_approx_macros ~exact:false ~full:true ~cntxt as super
+  inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
   method visit_message t = match t with
     | Term.Fun ((fn,_), _, [m;r; Term.Name _]) when fn = enc_fn ->
       self#visit_message m; self#visit_message r
@@ -36,7 +36,7 @@ let symenc_key_ssc ?(messages=[]) ?(elems=[]) ~cntxt enc_fn dec_fn key_n =
 (* Iterator to check that the given randoms are only used in random seed
    position for encryption. *)
 class check_rand ~allow_vars ~cntxt enc_fn randoms = object (self)
-  inherit Iter.iter_approx_macros ~exact:false ~full:true ~cntxt as super
+  inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
   method visit_message t = match t with
     | Term.Fun ((fn,_), _, [m1;Term.Name _; m2]) when fn = enc_fn ->
       self#visit_message m1; self#visit_message m2

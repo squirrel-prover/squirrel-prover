@@ -90,7 +90,7 @@ end
   * with [exact], in which case all macros will be expanded and must
   * thus be defined.
   * If [full] is false, may not visit all macros. *)
-class iter_approx_macros ~exact ~full ~(cntxt:Constr.trace_cntxt) = object (self)
+class iter_approx_macros ~exact ~(cntxt:Constr.trace_cntxt) = object (self)
 
   inherit iter ~cntxt as super
 
@@ -101,7 +101,7 @@ class iter_approx_macros ~exact ~full ~(cntxt:Constr.trace_cntxt) = object (self
       | Symbols.(Input | Output | State _ | Cond | Exec | Frame) -> ()
       | Symbols.Global _ ->
           if exact then
-            if full || Macros.is_defined ms.s_symb a cntxt.table then
+            if Macros.is_defined ms.s_symb a cntxt.table then
               self#visit_message
                 (Macros.get_definition cntxt ms a)
             else ()
@@ -129,7 +129,7 @@ end
 class get_f_messages ?(drop_head=true)
     ?(fun_wrap_key=None)
     ~(cntxt:Constr.trace_cntxt) f k = object (self)
-  inherit iter_approx_macros ~exact:true ~full:true ~cntxt as super
+  inherit iter_approx_macros ~exact:true ~cntxt as super
   val mutable occurrences : (Vars.index list * Term.message) list = []
   method get_occurrences = occurrences
   method visit_message = function
@@ -162,7 +162,7 @@ end
    excluded type. *)
 class get_ftypes_term
     ?excludesymtype ~(cntxt:Constr.trace_cntxt) symtype = object (self)
-  inherit iter_approx_macros ~exact:true ~full:true ~cntxt as super
+  inherit iter_approx_macros ~exact:true ~cntxt as super
   val mutable func : Term.message list = []
   method get_func = func
   method visit_message = function
@@ -253,11 +253,35 @@ let tfold_occ : type b.
 (*------------------------------------------------------------------*)
 (** {2 If-Then-Else} *)
 
-class get_ite_term ~(cntxt:Constr.trace_cntxt) = object (self)
-  inherit iter_approx_macros ~exact:true ~full:false ~cntxt as super
-  val mutable ite : (Term.message * Term.message * Term.message) option = None
-  method get_ite = ite
-  method visit_message = function
-    | Fun (f,_,[c;t;e]) when f = Term.f_ite -> ite <- Some (c,t,e)
-    | m -> super#visit_message m
-end
+type ite_occ = (Term.message * Term.message * Term.message) occ
+
+type ite_occs = ite_occ list
+
+(** Does not remove duplicates. 
+    Does not look below macros. *)
+let get_ite_term : type a. Constr.trace_cntxt -> a Term.term -> ite_occs = 
+  fun constr t ->
+
+  let rec get : 
+    type a. a Term.term -> fv:Sv.t -> cond:Term.message -> ite_occs =
+    fun t ~fv ~cond ->
+      let occs =       
+        tfold_occ (fun ~fv ~cond (Term.ETerm t) occs -> 
+            get t ~fv ~cond @ occs
+          ) ~fv ~cond t []
+      in
+
+      match t with
+      | Fun (f,_,[c;t;e]) when f = Term.f_ite -> 
+        let occ = { 
+          occ_cnt  = c,t,e;
+          occ_vars = fv; 
+          occ_cond = cond; } 
+        in
+        occ :: occs
+
+      | _ -> occs
+  in
+  
+  get t ~fv:Sv.empty ~cond:Term.mk_true
+    

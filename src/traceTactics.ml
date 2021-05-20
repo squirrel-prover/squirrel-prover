@@ -2110,22 +2110,19 @@ let apply_yes_no_if b s =
   let cntxt = TS.mk_trace_cntxt s in
   let conclusion = TS.goal s in
   (* search for the first occurrence of an if-then-else in [elem] *)
-  let iter = new Iter.get_ite_term ~cntxt in
-  List.iter iter#visit_message [conclusion];
-  match iter#get_ite with
-  | None ->
+  match Iter.get_ite_term cntxt conclusion with
+  | [] ->
     soft_failure
       (Tactics.Failure
          "the conclusion must contain at least \
           one occurrence of an if term")
 
-  | Some (c,t,e) ->
-    (* Context with bound variables (eg try find) are not (yet) supported.
-     * This is detected by checking that there is no "new" variable,
-     * which are used by the iterator to represent bound variables. *)
-    let vars = (Term.get_vars c) @ (Term.get_vars t) @ (Term.get_vars e) in
-    if List.exists Vars.(function EVar v -> is_new v) vars then
+  | occ :: _ ->
+    (* Context with bound variables (eg try find) are not supported. *)
+    if not (Sv.is_empty occ.Iter.occ_vars) then
       soft_failure (Tactics.Failure "cannot be applied in a under a binder");
+
+    let c,t,e = occ.occ_cnt in
 
     let branch, trace_sequent =
       if b then (t, TS.set_goal c s)
@@ -2481,7 +2478,7 @@ exception Name_not_hidden
 class name_under_enc (cntxt:Constr.trace_cntxt) enc is_pk target_n key_n
   = object (self)
 
- inherit Iter.iter_approx_macros ~exact:false ~full:true ~cntxt as super
+ inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
 
  method visit_message t =
     Printer.pr "test: %a" Term.pp t;

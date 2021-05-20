@@ -5,7 +5,7 @@ exception Var_found
 exception Not_name
 
 class find_name ~(cntxt:Constr.trace_cntxt) exact name = object (self)
-  inherit Iter.iter_approx_macros ~exact ~full:true ~cntxt as super
+  inherit Iter.iter_approx_macros ~exact ~cntxt as super
 
   method visit_message t = match t with
     | Term.Name ns -> if ns.s_symb = name then raise Name_found
@@ -14,7 +14,7 @@ class find_name ~(cntxt:Constr.trace_cntxt) exact name = object (self)
 end
 
 class get_name_indices ~(cntxt:Constr.trace_cntxt) exact name = object (self)
-  inherit Iter.iter_approx_macros ~exact ~full:true ~cntxt as super
+  inherit Iter.iter_approx_macros ~exact ~cntxt as super
 
   val mutable indices : (Vars.index list) list = []
   method get_indices = List.sort_uniq Stdlib.compare indices
@@ -29,7 +29,7 @@ class get_name_indices ~(cntxt:Constr.trace_cntxt) exact name = object (self)
 end
 
 class get_actions ~(cntxt:Constr.trace_cntxt) = object (self)
-  inherit Iter.iter_approx_macros ~exact:false ~full:true ~cntxt as super
+  inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
 
   val mutable actions : Term.timestamp list = []
   method get_actions = actions
