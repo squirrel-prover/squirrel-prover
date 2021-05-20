@@ -52,7 +52,7 @@ module EquivSequent = struct
     then Goal.to_reach_lemma ~loc:(L.loc name) lem
     else
       let lem = Goal.to_equiv_lemma lem in
-      { lem with Goal.gc_concl = EquivSequent.hyp_to_reach lem.gc_concl }
+      { lem with Goal.gc_concl = EquivSequent.form_to_reach lem.gc_concl }
 
   let get_equiv_hyp_or_lemma name s =
     Goal.to_equiv_lemma ~loc:(L.loc name) (get_hyp_or_lemma name s)
@@ -201,6 +201,38 @@ let () =
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
     (only_equiv refl_tac)
+
+(*------------------------------------------------------------------*)
+let do_case_tac (args : Args.parser_arg list) s : sequent list =
+  match Args.convert_as_lsymb args with
+  | Some str when Hyps.mem_name (L.unloc str) s ->
+    let id, _ = Hyps.by_name str s in
+    List.map (fun (LT.CHyp _, ss) -> ss) (LT.hypothesis_case ~nb:`Any id s)
+
+  | _ ->
+    match LT.convert_args s args Args.(Sort ETerm) with
+    | Args.Arg (ETerm (ty, f, _)) ->
+      begin
+        match Type.kind ty with
+        | Type.KTimestamp -> LT.timestamp_case f s
+
+        | Type.KMessage -> bad_args ()
+        | Type.KIndex -> bad_args ()
+      end
+    | _ -> bad_args ()
+
+
+let case_tac args = LT.wrap_fail (do_case_tac args)
+
+let () =
+  T.register_general "case"
+    ~tactic_help:
+      {general_help = "Perform a case analysis.";
+       detailed_help = "";
+       usages_sorts = [Sort Args.Timestamp;
+                       Sort Args.String;];
+       tactic_group = Logical}
+    (pure_equiv_arg case_tac)
 
 (*------------------------------------------------------------------*)
 (** For each element of the biframe, checks that it is a member of the

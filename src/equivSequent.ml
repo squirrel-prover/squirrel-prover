@@ -226,9 +226,9 @@ let goal_as_equiv s = match goal s with
       
 let set_reach_goal f s = set_goal Equiv.(Atom (Reach f)) s
 
-let reach_to_hyp t = Equiv.Atom (Equiv.Reach t)
+let reach_to_form t = Equiv.Atom (Equiv.Reach t)
 
-let hyp_to_reach ?loc (e : Equiv.form) = 
+let form_to_reach ?loc (e : Equiv.form) = 
   match e with
   | Equiv.Atom (Equiv.Reach f) -> f
   | _ ->     
@@ -298,4 +298,7 @@ let get_felem i s = let _, t, _ = List.splitat i (goal_as_equiv s) in t
 
 (*------------------------------------------------------------------*)
 (** {2 Matching} *)
-module Match : Term.MatchS with type t = Equiv.form = Equiv.Match
+module Match = Equiv.Match
+
+(*------------------------------------------------------------------*)
+module Smart = Equiv.Smart

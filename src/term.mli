@@ -330,10 +330,74 @@ val f_len    : fsymb
 val f_zeroes : fsymb
   
 (*------------------------------------------------------------------*)
-(** {2 Smart constructors} *)
+(** {2 Smart constructors and destructors} *)
+
+(** Module type for smart constructors and destructors on first-order formulas,
+    where the type is abstracted. Instantiated by both [Term] and [Equiv]. *)
+module type SmartFO = sig
+  type form
+
+  (** {3 Constructors} *)
+  val mk_true    : form
+  val mk_false   : form
+
+  val mk_not   : ?simpl:bool -> form              -> form
+  val mk_and   : ?simpl:bool -> form      -> form -> form
+  val mk_ands  : ?simpl:bool -> form list         -> form
+  val mk_or    : ?simpl:bool -> form      -> form -> form
+  val mk_ors   : ?simpl:bool -> form list         -> form
+  val mk_impl  : ?simpl:bool -> form      -> form -> form
+  val mk_impls : ?simpl:bool -> form list -> form -> form
+
+  val mk_forall : ?simpl:bool -> Vars.evars -> form -> form
+  val mk_exists : ?simpl:bool -> Vars.evars -> form -> form
+
+  (*------------------------------------------------------------------*)
+  (** {3 Destructors} *)
+
+  val destr_forall : form -> (Vars.evar list * form) option
+  val destr_exists : form -> (Vars.evar list * form) option
+
+  (*------------------------------------------------------------------*)
+  val destr_false : form ->         unit  option
+  val destr_true  : form ->         unit  option
+  val destr_not   : form ->         form  option
+  val destr_and   : form -> (form * form) option
+  val destr_or    : form -> (form * form) option
+  val destr_impl  : form -> (form * form) option
+
+  (*------------------------------------------------------------------*)
+  val is_false : form -> bool
+  val is_true  : form -> bool
+  val is_not   : form -> bool
+  val is_and   : form -> bool
+  val is_or    : form -> bool
+  val is_impl  : form -> bool
+
+  (*------------------------------------------------------------------*)
+  (** left-associative *)
+  val destr_ands  : int -> form -> form list option
+  val destr_ors   : int -> form -> form list option
+  val destr_impls : int -> form -> form list option
+
+  val decompose_forall : form -> Vars.evar list * form
+  val decompose_exists : form -> Vars.evar list * form
+
+  (*------------------------------------------------------------------*)
+  val decompose_ands  : form -> form list 
+  val decompose_ors   : form -> form list 
+  val decompose_impls : form -> form list 
+
+  val decompose_impls_last : form -> form list * form
+
+end
+
+module Smart : SmartFO with type form = message
+
+include module type of Smart
 
 (*------------------------------------------------------------------*)
-(** {3 For terms} *)
+(** {3 Smart constructors: terms} *)
 
 val mk_fun :
   Symbols.table ->
@@ -342,8 +406,6 @@ val mk_fun :
   Type.message term list ->
   Type.message term
     
-val mk_true    : message
-val mk_false   : message
 val mk_zero    : message
 val mk_fail    : message
 val mk_len     : message -> message
@@ -352,18 +414,7 @@ val mk_of_bool : message -> message
 val mk_pair    : message -> message -> message
  
 (*------------------------------------------------------------------*)
-(** {3 For messages} *)
-
-val mk_not   : ?simpl:bool -> message                 -> message
-val mk_and   : ?simpl:bool -> message      -> message -> message
-val mk_ands  : ?simpl:bool -> message list            -> message
-val mk_or    : ?simpl:bool -> message      -> message -> message
-val mk_ors   : ?simpl:bool -> message list            -> message
-val mk_impl  : ?simpl:bool -> message      -> message -> message
-val mk_impls : ?simpl:bool -> message list -> message -> message
-  
-val mk_forall : ?simpl:bool -> Vars.evars -> message -> message
-val mk_exists : ?simpl:bool -> Vars.evars -> message -> message
+(** {3 Smart constructors: messages} *)
 
 val mk_ite : ?simpl:bool -> message -> message -> message -> message
   
@@ -377,6 +428,22 @@ val mk_atom : ord -> 'a term -> 'b term -> message
 val mk_seq : Vars.env -> Vars.index list -> message -> message
 
 (*------------------------------------------------------------------*)
+(** {3 Destructors} *)
+
+val destr_var : 'a term -> 'a Vars.var option
+    
+(*------------------------------------------------------------------*)
+val destr_action : 
+  timestamp -> (Symbols.action Symbols.t * Vars.index list) option
+
+(*------------------------------------------------------------------*)
+val destr_pair : message -> (message * message) option
+
+(*------------------------------------------------------------------*)
+val destr_matom : generic_atom -> (ord_eq * message * message) option 
+
+
+(*------------------------------------------------------------------*)
 (** {2 Simplification} *)
 
 val not_message_atom  : message_atom  -> message_atom
@@ -384,54 +451,6 @@ val not_index_atom    : index_atom    -> index_atom
 val not_trace_eq_atom : trace_eq_atom -> trace_eq_atom
 
 val not_simpl : message -> message
-
-(*------------------------------------------------------------------*)
-(** {2 Destructors} *)
-
-val destr_action : 
-  timestamp -> (Symbols.action Symbols.t * Vars.index list) option
-
-val destr_forall : message -> (Vars.evar list * message) option
-val destr_exists : message -> (Vars.evar list * message) option
-
-(*------------------------------------------------------------------*)
-val destr_false : message ->               unit  option
-val destr_true  : message ->               unit  option
-val destr_not   : message ->            message  option
-val destr_and   : message -> (message * message) option
-val destr_or    : message -> (message * message) option
-val destr_impl  : message -> (message * message) option
-
-(*------------------------------------------------------------------*)
-val is_false : message -> bool
-val is_true  : message -> bool
-val is_not   : message -> bool
-val is_and   : message -> bool
-val is_or    : message -> bool
-val is_impl  : message -> bool
-
-(*------------------------------------------------------------------*)
-(** left-associative *)
-val destr_ands  : int -> message -> message list option
-val destr_ors   : int -> message -> message list option
-val destr_impls : int -> message -> message list option
-
-val decompose_forall : message -> Vars.evar list * message
-val decompose_exists : message -> Vars.evar list * message
-
-(*------------------------------------------------------------------*)
-val decompose_ands  : message -> message list 
-val decompose_ors   : message -> message list 
-val decompose_impls : message -> message list 
-
-val decompose_impls_last : message -> message list * message
-
-(*------------------------------------------------------------------*)
-val destr_var : 'a term -> 'a Vars.var option
-val destr_pair : message -> (message * message) option
-
-(*------------------------------------------------------------------*)
-val destr_matom : generic_atom -> (ord_eq * message * message) option 
 
 (*------------------------------------------------------------------*)
 (** {2 Sets and Maps } *)

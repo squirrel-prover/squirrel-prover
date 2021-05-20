@@ -34,7 +34,7 @@ module type Sequent = sig
 
   module Hyps : Hyps.HypsSeq with type hyp = form and type sequent = t
 
-  val reach_to_hyp : Term.message -> form
+  val reach_to_form : Term.message -> form
 
   val env : t -> Vars.env
   val set_env : Vars.env -> t -> t
@@ -76,8 +76,13 @@ module type Sequent = sig
       In an equiv formula, does not return terms under (equiv) binders. *)
   val get_terms : form -> Term.message list
 
-  (** Matching in hypotheses *)
+  (*------------------------------------------------------------------*)
+  (** {3 Matching} *)
   module Match : Term.MatchS with type t = form
+
+  (*------------------------------------------------------------------*)
+  (** {3 Smart constructors and destructots} *)
+  module Smart : Term.SmartFO with type form = form  
 end
 
 (*------------------------------------------------------------------*)
@@ -135,6 +140,51 @@ module LowTac (S : Sequent) = struct
     Theory.convert_ht conv_env (S.ty_vars s) env ht
 
   (*------------------------------------------------------------------*)
+  (** Parse a partially applied lemma or hypothesis as a pattern. *)
+  let convert_pt_hol (pt : Theory.p_pt_hol) (s : S.sequent) : 
+    Goal.ghyp * Type.message Term.pat = 
+    let lem = S.get_reach_hyp_or_lemma pt.p_pt_hid s in
+    let f_args, f = Term.decompose_forall lem.gc_concl in
+    let f_args, subst = Term.erefresh_vars `Global f_args in
+    let f = Term.subst subst f in
+
+    let pt_args_l = List.length pt.p_pt_args in
+
+    if List.length f_args < pt_args_l then
+      hard_failure ~loc:(L.loc pt.p_pt_hid)  (Failure "too many arguments");
+
+    let f_args0, f_args1 = List.takedrop pt_args_l f_args in
+
+
+    let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in 
+    let pat_vars = ref (Vars.Sv.of_list f_args1) in
+
+    let subst = 
+      List.map2 (fun p_arg (Vars.EVar f_arg) ->
+          let ty = Vars.ty f_arg in
+          let t = 
+            Theory.convert ~pat:true cenv (S.ty_vars s) (S.env s) p_arg ty
+          in
+          let new_p_vs = 
+            Vars.Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
+          in
+          pat_vars := Vars.Sv.union (!pat_vars) new_p_vs;
+
+          Term.ESubst (Term.Var f_arg, t)
+        ) pt.p_pt_args f_args0
+    in
+
+    (* instantiate [f_args0] by [args] *)
+    let f = Term.subst subst f in
+
+    let pat = Term.{ 
+        pat_tyvars = lem.gc_tyvars;
+        pat_vars = !pat_vars;
+        pat_term = f; } 
+    in      
+    lem.gc_name, pat
+
+  (*------------------------------------------------------------------*)
   let make_exact ?loc env ty name =  
     match Vars.make_exact env ty name with
     | None ->
@@ -184,7 +234,7 @@ module LowTac (S : Sequent) = struct
     | `All -> target_all s, true
     | `Goal -> [T_goal], false
 
-(*------------------------------------------------------------------*)
+  (*------------------------------------------------------------------*)
   (** Formulas of different types *)
   type cform = 
     | Cform  of S.form
@@ -193,7 +243,7 @@ module LowTac (S : Sequent) = struct
   let mk_form f  = Cform  f
   let mk_tform f = Ctform f
 
-(*------------------------------------------------------------------*)
+  (*------------------------------------------------------------------*)
   let subst_cform subst = function
     | Ctform f -> Ctform (Term.subst subst f)
     | Cform  f -> Cform  (S.subst_hyp subst f)
@@ -228,53 +278,6 @@ module LowTac (S : Sequent) = struct
     in
     s, List.rev subs
 
-
-  (*------------------------------------------------------------------*)
-  (** {3 Conversion}*)
-
-  (** Parse a partially applied lemma or hypothesis as a pattern. *)
-  let convert_pt_hol (pt : Theory.p_pt_hol) (s : S.sequent) : 
-    Goal.ghyp * Type.message Term.pat = 
-    let lem = S.get_reach_hyp_or_lemma pt.p_pt_hid s in
-    let f_args, f = Term.decompose_forall lem.gc_concl in
-    let f_args, subst = Term.erefresh_vars `Global f_args in
-    let f = Term.subst subst f in
-
-    let pt_args_l = List.length pt.p_pt_args in
-
-    if List.length f_args < pt_args_l then
-      hard_failure ~loc:(L.loc pt.p_pt_hid)  (Failure "too many arguments");
-
-    let f_args0, f_args1 = List.takedrop pt_args_l f_args in
-
-
-    let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in 
-    let pat_vars = ref (Vars.Sv.of_list f_args1) in
-
-    let subst = 
-      List.map2 (fun p_arg (Vars.EVar f_arg) ->
-          let ty = Vars.ty f_arg in
-          let t = 
-            Theory.convert ~pat:true cenv (S.ty_vars s) (S.env s) p_arg ty
-          in
-          let new_p_vs = 
-            Vars.Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
-          in
-          pat_vars := Vars.Sv.union (!pat_vars) new_p_vs;
-
-          Term.ESubst (Term.Var f_arg, t)
-        ) pt.p_pt_args f_args0
-    in
-
-    (* instantiate [f_args0] by [args] *)
-    let f = Term.subst subst f in
-
-    let pat = Term.{ 
-        pat_tyvars = lem.gc_tyvars;
-        pat_vars = !pat_vars;
-        pat_term = f; } 
-    in      
-    lem.gc_name, pat
 
   (*------------------------------------------------------------------*)
   (** {3 Macro unfolding}*)
@@ -522,7 +525,7 @@ module LowTac (S : Sequent) = struct
         else
           let f = doit mult (tyvars, sv, subs, l, r) f in
           let subs = List.rev !built_subs in
-          f, List.map S.reach_to_hyp subs
+          f, List.map S.reach_to_form subs
     in
 
     let s, subs = do_targets doit_tgt s targets in
@@ -607,4 +610,74 @@ module LowTac (S : Sequent) = struct
 
     | Rw_expand arg -> [expand targets arg s]
 
+
+  (*------------------------------------------------------------------*)
+  (** {3 Case tactic}*)
+  (** Type for case and destruct tactics handlers *)
+  type c_handler =
+    | CHyp of Ident.t
+
+  type c_res = c_handler * S.sequent
+
+  (** Case analysis on a timestamp *)
+  let timestamp_case (ts : Term.timestamp) s : S.sequent list =
+    let system = S.system s in
+    let table  = S.table s in
+
+    let mk_case descr : Vars.evar list * Term.timestamp =
+      let env = ref (S.env s) in
+      let indices, s = Term.refresh_vars (`InEnv env) descr.Action.indices in
+
+      let name =
+        SystemExpr.action_to_term table system
+          (Action.subst_action s descr.Action.action)
+      in
+      (* FIXME: is this second substitution useful ? *)
+      let name = Term.subst s name in
+
+      List.map (fun x -> Vars.EVar x) indices, name
+    in
+
+    let cases = SystemExpr.map_descrs table system mk_case in
+
+    List.map (fun (indices, ts_case) ->
+        let ts_subst =
+          if indices = [] then [Term.ESubst (ts, ts_case)] else []
+        in
+        let goal = S.subst_hyp ts_subst (S.goal s) in
+        let prem =
+          Term.mk_exists indices
+            (Term.Atom (`Timestamp (`Eq,ts, ts_case)))
+        in
+        let prem = S.reach_to_form prem in
+        S.set_goal (S.Smart.mk_impl ~simpl:false prem goal) s
+      ) cases
+
+  (** Case analysis on disjunctions in an hypothesis.
+      When [nb=`Any], recurses.
+      When [nb=`Some l], destruct at most [l]. *)
+  let hypothesis_case ~nb id (s : S.sequent) : c_res list =
+    let destr_err () = soft_failure (Failure "not a disjunction") in
+
+    let rec case acc form = match S.Smart.destr_or form with
+      | Some (f,g) -> case (case acc g) f
+      | None       -> form :: acc in
+
+    let form = Hyps.by_id id s in
+    let s = Hyps.remove id s in
+
+    let cases = match nb with
+      | `Any -> case [] form
+      | `Some l -> match S.Smart.destr_ors l form with
+        | None -> destr_err ()
+        | Some cases -> cases
+    in
+
+    if cases = [] then destr_err ();
+
+    List.map (fun g ->
+        let ng = Ident.name id in
+        let idg, sg = Hyps.add_i (Args.Named ng) g s in
+        ( CHyp idg, sg )
+      ) cases
 end

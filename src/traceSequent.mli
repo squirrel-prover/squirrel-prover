@@ -147,14 +147,18 @@ val get_all_messages : sequent -> Term.message list
 
 val set_reach_goal : Term.message -> t -> t
 
-val reach_to_hyp :             Term.message -> form
-val hyp_to_reach : ?loc:L.t -> form -> Term.message
+val reach_to_form :             Term.message -> form
+val form_to_reach : ?loc:L.t -> form -> Term.message
 
 val mk_trace_cntxt : t -> Constr.trace_cntxt
-
-module Match : Term.MatchS with type t = form 
 
 (*------------------------------------------------------------------*)
 val mem_felem    : int -> t -> bool
 val change_felem : int -> Term.message list -> t -> t
 val get_felem    : int -> t -> Term.message
+
+(*------------------------------------------------------------------*)
+module Match = Term.Match
+
+(*------------------------------------------------------------------*)
+module Smart = Term.Smart

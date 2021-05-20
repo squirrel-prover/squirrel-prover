@@ -96,8 +96,8 @@ val mk_trace_cntxt : t -> Constr.trace_cntxt
 
 val query_happens : precise:bool -> t -> Term.timestamp -> bool
 
-val reach_to_hyp :             Term.message -> form
-val hyp_to_reach : ?loc:L.t -> form -> Term.message
+val reach_to_form :             Term.message -> form
+val form_to_reach : ?loc:L.t -> form -> Term.message
 
 (*------------------------------------------------------------------*)
 val mem_felem    : int -> t -> bool
@@ -107,3 +107,6 @@ val get_felem    : int -> t -> Term.message
 (*------------------------------------------------------------------*)
 (** {2 Matching} *)
 module Match : Term.MatchS with type t = form
+
+(*------------------------------------------------------------------*)
+module Smart : Term.SmartFO with type form = form

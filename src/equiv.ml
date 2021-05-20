@@ -109,6 +109,119 @@ let rec subst s (f : form) =
       let f = subst s (ForAll (evs,f)) in
       mk_forall [v] f
 
+(*------------------------------------------------------------------*)
+(** {2 Smart constructors and destructors} *)
+type _form = form
+
+(* TODO: factorize with code in Term.ml ? *)
+module Smart : Term.SmartFO with type form = _form = struct
+  type form = _form
+
+  let todo () = Tactics.soft_failure (Failure "not implemented")
+
+  (** {3 Constructors} *)
+  let mk_true  = Atom (Reach Term.mk_true)
+  let mk_false = Atom (Reach Term.mk_false)
+
+  let mk_not   ?simpl f = todo ()
+  let mk_and   ?simpl f1 f2 = todo ()
+  let mk_ands  ?simpl forms = todo ()
+  let mk_or    ?simpl f1 f2 = todo ()
+  let mk_ors   ?simpl forms = todo ()
+
+  let mk_impl  ?simpl f1 f2 = Impl (f1, f2)
+  let rec mk_impls ?simpl l f = match l with
+    | [] -> f
+    | f0 :: impls -> Impl (f0, mk_impls impls f)
+
+  let mk_forall0 l f =
+    if l = [] then f 
+    else match f with
+      | ForAll (l', f) -> ForAll (l @ l', f)
+      | _ -> ForAll (l, f)
+
+  let mk_forall ?(simpl=false) l f = 
+    let l = 
+      if simpl then
+        let fv = fv f in
+        List.filter (fun v -> Sv.mem v fv) l 
+      else l
+    in
+    mk_forall l f
+
+  let mk_exists ?simpl es f = todo ()
+
+  (*------------------------------------------------------------------*)
+  (** {3 Destructors} *)
+
+  let destr_forall = function
+    | ForAll (es, f) -> Some (es, f)
+    | _ -> None
+      
+  let destr_exists f = todo ()
+
+  (*------------------------------------------------------------------*)
+  let destr_false f = todo ()
+  let destr_true  f = todo ()
+  let destr_not   f = todo ()
+  let destr_and   f = todo ()
+  let destr_or    f = todo ()
+  let destr_impl = function 
+    | Impl (f1, f2) -> Some (f1, f2)
+    | _ -> None
+
+  (*------------------------------------------------------------------*)
+  let is_false f = todo ()
+  let is_true  f = todo ()
+  let is_not   f = todo ()
+  let is_and   f = todo ()
+  let is_or    f = todo ()
+  let is_impl = function Impl _ -> true | _ -> false
+
+  (*------------------------------------------------------------------*)
+  (** left-associative *)
+  let destr_ands  i f = todo ()
+  let destr_ors   i f = todo ()
+
+  let destr_impls =
+    let rec destr l f =
+      if l < 0 then assert false;
+      if l = 1 then Some [f]
+      else match destr_impl f with
+        | None -> None
+        | Some (f,g) -> omap (fun l -> f :: l) (destr (l-1) g)    
+    in
+    destr
+
+  (*------------------------------------------------------------------*)
+  let decompose_forall = function 
+    | ForAll (es, f) ->  es, f
+    | _ as f -> [], f
+
+  let decompose_exists f = todo ()
+
+  (*------------------------------------------------------------------*)
+  let decompose_ands  f = todo ()
+  let decompose_ors   f = todo ()
+
+  let decompose_impls f =
+    let rec decompose f = match destr_impl f with
+      | None -> [f]
+      | Some (f,g) -> f :: decompose g
+    in
+    decompose f
+
+  let decompose_impls_last f =
+    let forms = decompose_impls f in
+    let rec last = function
+      | [] -> assert false
+      | [f] -> [], f
+      | f :: fs -> 
+        let prems, goal = last fs in
+        f :: prems, goal
+    in 
+    last forms
+end
 
 (*------------------------------------------------------------------*)
 (** {2 Matching} *)

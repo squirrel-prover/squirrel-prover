@@ -250,83 +250,6 @@ let () =
     revert_tac
 
 (*------------------------------------------------------------------*)
-(** Type for case and destruct tactics handlers *)
-type c_handler =
-  | CHyp of Ident.t
-
-type c_res = c_handler * sequent
-
-(** Case analysis on a timestamp *)
-let timestamp_case (ts : Term.timestamp) s : sequent list =
-  let system = TS.system s in
-  let table  = TS.table s in
-
-  let mk_case descr : Vars.evar list * Term.timestamp =
-    let indices =
-      let env = ref (TS.env s) in
-      List.map
-        (fun i -> Vars.fresh_r env i)
-        descr.Action.indices
-    in
-
-    let subst =
-      List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
-        descr.Action.indices indices
-    in
-
-    let name =
-      SystemExpr.action_to_term table system
-        (Action.subst_action subst descr.Action.action)
-    in
-    (* FIXME: is this second substitution useful ? *)
-    let name = Term.subst subst name in
-
-    List.map (fun x -> Vars.EVar x) indices, name
-  in
-
-  let cases = SystemExpr.map_descrs table system mk_case in
-
-  List.map (fun (indices, ts_case) ->
-      let ts_subst =
-        if indices = [] then [Term.ESubst (ts, ts_case)] else []
-      in
-      let goal = Term.subst ts_subst (TS.goal s) in
-      let prem =
-        Term.mk_exists indices
-          (Term.Atom (`Timestamp (`Eq,ts, ts_case)))
-      in
-      TS.set_goal (Term.mk_impl ~simpl:false prem goal) s
-    ) cases
-
-(** Case analysis on disjunctions in an hypothesis.
-    When [nb=`Any], recurses.
-    When [nb=`Some l], destruct at most [l]. *)
-let hypothesis_case ~nb id (s : sequent) : c_res list =
-  let destr_err () = soft_failure (Failure "not a disjunction") in
-
-  let rec case acc form = match Term.destr_or form with
-    | Some (f,g) -> case (case acc g) f
-    | None       -> form :: acc in
-
-  let form = Hyps.by_id id s in
-  let s = Hyps.remove id s in
-
-  let cases = match nb with
-    | `Any -> case [] form
-    | `Some l -> match Term.destr_ors l form with
-      | None -> destr_err ()
-      | Some cases -> cases
-  in
-
-  if cases = [] then destr_err ();
-
-  List.map (fun g ->
-      let ng = Ident.name id in
-      let idg, sg = Hyps.add_i (Args.Named ng) g s in
-      ( CHyp idg, sg )
-    ) cases
-
-
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
   * This can be used with [vars = []] if orig is an [if-then-else] term. *)
 let case_cond orig vars c t e s : sequent list =
@@ -406,18 +329,19 @@ let message_case (t : Term.message) ty s : sequent list =
   | Type.Boolean -> boolean_case t s
   | _ -> conditional_case t s
 
+(*------------------------------------------------------------------*)
 let do_case_tac (args : Args.parser_arg list) s : sequent list =
   match Args.convert_as_lsymb args with
   | Some str when Hyps.mem_name (L.unloc str) s ->
     let id, _ = Hyps.by_name str s in
-    List.map (fun (CHyp _, ss) -> ss) (hypothesis_case ~nb:`Any id s)
+    List.map (fun (LT.CHyp _, ss) -> ss) (LT.hypothesis_case ~nb:`Any id s)
 
   | _ ->
     match LT.convert_args s args Args.(Sort ETerm) with
     | Args.Arg (ETerm (ty, f, _)) ->
       begin
         match Type.kind ty with
-        | Type.KTimestamp -> timestamp_case f s
+        | Type.KTimestamp -> LT.timestamp_case f s
 
         | Type.KMessage -> message_case f ty s
 
@@ -429,15 +353,12 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
 let case_tac args = LT.wrap_fail (do_case_tac args)
 
 let () =
-  let open Tactics in
   T.register_general "case"
     ~tactic_help:
       {general_help = "Perform case analysis on a timestamp, a message built \
                        using a conditional, or a disjunction hypothesis.";
        detailed_help = "A timestamp will be instantiated by all \
-                        possible actions, a disjunction hypothesis A \
-                        v B => C will produce two goals A => B and B \
-                        => C, and a message with a conditional will \
+                        possible actions, and a message with a conditional will \
                         be split into the two branches.";
        usages_sorts = [Sort Args.Timestamp;
                        Sort Args.String;
@@ -446,8 +367,8 @@ let () =
     case_tac
 
 
-
 (*------------------------------------------------------------------*)
+(* TODO: remove, as it is subsumed by the tactic `assumption` ? *)
 let false_left s =
   if Hyps.exists (fun _ f -> Term.is_false f) s
   then []
@@ -567,13 +488,13 @@ let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
     ss
 
   | Args.Or s_ip ->
-    let ss = hypothesis_case ~nb:(`Some (List.length s_ip)) hid s in
+    let ss = LT.hypothesis_case ~nb:(`Some (List.length s_ip)) hid s in
 
     if List.length ss <> List.length s_ip then
       hard_failure (Tactics.PatNumError (List.length s_ip, List.length ss));
 
     (* For each case, apply the corresponding simple pattern *)
-    List.map2 (fun (CHyp id, s) ip ->
+    List.map2 (fun (LT.CHyp id, s) ip ->
         do_simpl_pat (`Hyp id) ip s
       ) ss s_ip
 
@@ -582,10 +503,10 @@ let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
 
   | Args.Split ->
     (* Destruct many Or *)
-    let ss = hypothesis_case ~nb:`Any hid s in
+    let ss = LT.hypothesis_case ~nb:`Any hid s in
 
     (* For each case, apply the corresponding simple pattern *)
-    List.map (fun (CHyp id, s) ->
+    List.map (fun (LT.CHyp id, s) ->
         revert id s
       ) ss
 

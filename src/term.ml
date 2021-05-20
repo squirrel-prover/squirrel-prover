@@ -208,18 +208,73 @@ let init = Action(Symbols.init_action,[])
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors} *)
 
-(*------------------------------------------------------------------*)
-(** {3 For terms} *)
-
 let mk_fun table fname indices terms =
   let fty = Symbols.ftype table fname in
   Fun ((fname,indices), fty, terms)
 
 let mk_fbuiltin = mk_fun Symbols.builtins_table
 
+(*------------------------------------------------------------------*)
+(** {3 For first-order formulas} *)
 
-let mk_true  = mk_fbuiltin Symbols.fs_true  [] []
-let mk_false = mk_fbuiltin Symbols.fs_false [] []
+(** Smart constructors.
+    The module is included after its definition. *)
+module SmartConstructors = struct
+  let mk_true  = mk_fbuiltin Symbols.fs_true  [] []
+  let mk_false = mk_fbuiltin Symbols.fs_false [] []
+  (** Some smart constructors are redefined later, after substitutions. *)
+
+  let mk_not_ns term  = mk_fbuiltin Symbols.fs_not [] [term]
+
+  let mk_and_ns  t0 t1 = mk_fbuiltin Symbols.fs_and  [] [t0;t1]
+  let mk_or_ns   t0 t1 = mk_fbuiltin Symbols.fs_or   [] [t0;t1]
+  let mk_impl_ns t0 t1 = mk_fbuiltin Symbols.fs_impl [] [t0;t1]
+
+
+  let mk_not ?(simpl=true) t1 = match t1 with
+    | Fun (fs,_,[t]) when fs = f_not && simpl -> t
+    | t -> mk_not_ns t
+
+  let mk_and ?(simpl=true) t1 t2 = match t1,t2 with
+    | tt, t when tt = mk_true && simpl -> t
+    | t, tt when tt = mk_true && simpl -> t
+    | t1,t2 -> mk_and_ns t1 t2
+
+  let mk_ands ?(simpl=true) ts = List.fold_left (mk_and ~simpl) mk_true ts
+
+  let mk_or ?(simpl=true) t1 t2 = match t1,t2 with
+    | tf, t when tf = mk_false && simpl -> t
+    | t, tf when tf = mk_false && simpl -> t
+    | t1,t2 -> mk_or_ns t1 t2
+
+  let mk_ors ?(simpl=true) ts = List.fold_left (mk_or ~simpl) mk_false ts
+
+  let mk_impl ?(simpl=true) t1 t2 = match t1,t2 with
+    | tf, _ when tf = mk_false && simpl -> mk_true
+    | tt, t when tt = mk_true && simpl -> t
+    | t1,t2 -> mk_impl_ns t1 t2
+
+  let mk_impls ?(simpl=true) ts t =
+    List.fold_left (fun tres t0 -> (mk_impl ~simpl) t0 tres) t ts
+
+  let mk_forall l f = 
+    if l = [] then f 
+    else match f with
+      | ForAll (l', f) -> ForAll (l @ l', f)
+      | _ -> ForAll (l, f)
+
+  let mk_exists l f = 
+    if l = [] then f 
+    else match f with
+      | Exists (l', f) -> Exists (l @ l', f)
+      | _ -> Exists (l, f)
+end
+
+include SmartConstructors
+
+(*------------------------------------------------------------------*)
+(** {3 For terms} *)
+
 let mk_zero  = mk_fbuiltin Symbols.fs_zero  [] []
 let mk_fail  = mk_fbuiltin Symbols.fs_fail  [] []
 
@@ -237,52 +292,6 @@ let mk_of_bool t = mk_fbuiltin Symbols.fs_of_bool [] [t]
 
 (*------------------------------------------------------------------*)
 (** {3 For formulas} *)
-(** Some smart constructors are redefined later, after substitutions. *)
-
-let mk_not_ns term  = mk_fbuiltin Symbols.fs_not [] [term]
-
-let mk_and_ns  t0 t1 = mk_fbuiltin Symbols.fs_and  [] [t0;t1]
-let mk_or_ns   t0 t1 = mk_fbuiltin Symbols.fs_or   [] [t0;t1]
-let mk_impl_ns t0 t1 = mk_fbuiltin Symbols.fs_impl [] [t0;t1]
-
-
-let mk_not ?(simpl=true) t1 = match t1 with
-  | Fun (fs,_,[t]) when fs = f_not && simpl -> t
-  | t -> mk_not_ns t
-
-let mk_and ?(simpl=true) t1 t2 = match t1,t2 with
-  | tt, t when tt = mk_true && simpl -> t
-  | t, tt when tt = mk_true && simpl -> t
-  | t1,t2 -> mk_and_ns t1 t2
-
-let mk_ands ?(simpl=true) ts = List.fold_left (mk_and ~simpl) mk_true ts
-
-let mk_or ?(simpl=true) t1 t2 = match t1,t2 with
-  | tf, t when tf = mk_false && simpl -> t
-  | t, tf when tf = mk_false && simpl -> t
-  | t1,t2 -> mk_or_ns t1 t2
-
-let mk_ors ?(simpl=true) ts = List.fold_left (mk_or ~simpl) mk_false ts
-
-let mk_impl ?(simpl=true) t1 t2 = match t1,t2 with
-  | tf, _ when tf = mk_false && simpl -> mk_true
-  | tt, t when tt = mk_true && simpl -> t
-  | t1,t2 -> mk_impl_ns t1 t2
-
-let mk_impls ?(simpl=true) ts t =
-  List.fold_left (fun tres t0 -> (mk_impl ~simpl) t0 tres) t ts
-
-let mk_forall l f = 
-  if l = [] then f 
-  else match f with
-    | ForAll (l', f) -> ForAll (l @ l', f)
-    | _ -> ForAll (l, f)
-
-let mk_exists l f = 
-  if l = [] then f 
-  else match f with
-    | Exists (l', f) -> Exists (l @ l', f)
-    | _ -> Exists (l, f)
 
 let mk_timestamp_leq t1 t2 = match t1,t2 with
   | _, Pred t2' -> `Timestamp (`Lt, t1, t2')
@@ -382,42 +391,6 @@ let cast : type a b. a Type.kind -> b term -> a term =
 (*------------------------------------------------------------------*)
 (** {2 Destructors} *)
 
-let destr_action = function
-  | Action (s,is) -> Some (s,is)
-  | _ -> None
-
-(*------------------------------------------------------------------*)
-let rec destr_exists = function
-  | Exists (vs, f) -> 
-    begin
-      match destr_exists f with
-      | Some (vs', f) -> Some (vs @ vs', f)
-      | None -> Some (vs, f)
-    end
-  | _ -> None
-
-let rec decompose_exists = function
-  | Exists (vs, f) -> 
-    let vs', f0 = decompose_exists f in
-    vs @ vs', f0
-  | _ as f -> [], f
-
-let rec destr_forall = function
-  | ForAll (vs, f) -> 
-    begin
-      match destr_forall f with
-      | Some (vs', f) -> Some (vs @ vs', f)
-      | None -> Some (vs, f)
-    end
-  | _ -> None
-
-let rec decompose_forall = function
-  | ForAll (vs, f) -> 
-    let vs', f0 = decompose_forall f in
-    vs @ vs', f0
-  | _ as f -> [], f
-
-(*------------------------------------------------------------------*)
 let destr_fun ?fs = function
   | Fun (fs', _, l) when fs = None     -> Some l
   | Fun (fs', _, l) when fs = Some fs' -> Some l
@@ -427,97 +400,144 @@ let oas_seq0 = omap as_seq0
 let oas_seq1 = omap as_seq1
 let oas_seq2 = omap as_seq2
 
-let destr_false f = oas_seq0 (destr_fun ~fs:f_false f)
-let destr_true  f = oas_seq0 (destr_fun ~fs:f_true  f)
-
-
-let destr_not  f = oas_seq1 (destr_fun ~fs:f_not f)
-
-let destr_or   f = oas_seq2 (destr_fun ~fs:f_or   f)
-let destr_and  f = oas_seq2 (destr_fun ~fs:f_and  f)
-let destr_impl f = oas_seq2 (destr_fun ~fs:f_impl f)
-let destr_pair f = oas_seq2 (destr_fun ~fs:f_pair f)
-
 (*------------------------------------------------------------------*)
-let is_false f = destr_false f <> None
-let is_true  f = destr_true f <> None
+(** {3 For first-order formulas} *)
 
-let is_not f = destr_not f <> None
+(** Smart destrucrots.
+    The module is included after its definition. *)
+module SmartDestructors = struct
+  let rec destr_exists = function
+    | Exists (vs, f) -> 
+      begin
+        match destr_exists f with
+        | Some (vs', f) -> Some (vs @ vs', f)
+        | None -> Some (vs, f)
+      end
+    | _ -> None
 
-let is_or   f = destr_or   f <> None
-let is_and  f = destr_and  f <> None
-let is_impl f = destr_impl f <> None
-let is_pair f = destr_pair f <> None
+  let rec decompose_exists = function
+    | Exists (vs, f) -> 
+      let vs', f0 = decompose_exists f in
+      vs @ vs', f0
+    | _ as f -> [], f
 
-(*------------------------------------------------------------------*)
-(** for [fs] of arity 2, left associative *)
-let mk_destr_many_left fs =
-  let rec destr l f =
-    if l < 0 then assert false;
-    if l = 1 then Some [f]
-    else match destr_fun ~fs f with
-      | None -> None
-      | Some [f;g] -> omap (fun l -> l @ [g]) (destr (l-1) f)    
+  let rec destr_forall = function
+    | ForAll (vs, f) -> 
+      begin
+        match destr_forall f with
+        | Some (vs', f) -> Some (vs @ vs', f)
+        | None -> Some (vs, f)
+      end
+    | _ -> None
+
+  let rec decompose_forall = function
+    | ForAll (vs, f) -> 
+      let vs', f0 = decompose_forall f in
+      vs @ vs', f0
+    | _ as f -> [], f
+
+  (*------------------------------------------------------------------*)
+  let destr_false f = oas_seq0 (destr_fun ~fs:f_false f)
+  let destr_true  f = oas_seq0 (destr_fun ~fs:f_true  f)
+
+  let destr_not  f = oas_seq1 (destr_fun ~fs:f_not f)
+
+  let destr_or   f = oas_seq2 (destr_fun ~fs:f_or   f)
+  let destr_and  f = oas_seq2 (destr_fun ~fs:f_and  f)
+  let destr_impl f = oas_seq2 (destr_fun ~fs:f_impl f)
+  let destr_pair f = oas_seq2 (destr_fun ~fs:f_pair f)
+
+  (*------------------------------------------------------------------*)
+  let is_false f = destr_false f <> None
+  let is_true  f = destr_true f <> None
+
+  let is_not f = destr_not f <> None
+
+  let is_or   f = destr_or   f <> None
+  let is_and  f = destr_and  f <> None
+  let is_impl f = destr_impl f <> None
+  let is_pair f = destr_pair f <> None
+
+
+  (*------------------------------------------------------------------*)
+  (** for [fs] of arity 2, left associative *)
+  let mk_destr_many_left fs =
+    let rec destr l f =
+      if l < 0 then assert false;
+      if l = 1 then Some [f]
+      else match destr_fun ~fs f with
+        | None -> None
+        | Some [f;g] -> omap (fun l -> l @ [g]) (destr (l-1) f)    
+        | _ -> assert false
+    in
+    destr
+
+  (** for [fs] of arity 2, right associative *)
+  let mk_destr_many_right fs =
+    let rec destr l f =
+      if l < 0 then assert false;
+      if l = 1 then Some [f]
+      else match destr_fun ~fs f with
+        | None -> None
+        | Some [f;g] -> omap (fun l -> f :: l) (destr (l-1) g)    
+        | _ -> assert false
+    in
+    destr
+
+  let destr_ors   = mk_destr_many_left  f_or
+  let destr_ands  = mk_destr_many_left  f_and
+  let destr_impls = mk_destr_many_right f_impl
+
+  (*------------------------------------------------------------------*)
+  (** for any associative [fs] *)
+  let mk_decompose fs =
+    let rec decompose f = match destr_fun ~fs f with
+      | None -> [f]
+      | Some l -> List.concat_map decompose l
+    in
+    decompose
+
+  let decompose_ors   = mk_decompose f_or  
+  let decompose_ands  = mk_decompose f_and 
+
+  let decompose_impls f =
+    let rec decompose f = match destr_fun ~fs:f_impl f with
+      | None -> [f]
+      | Some [f;g] -> f :: decompose g
       | _ -> assert false
-  in
-  destr
+    in
+    decompose f
 
-(** for [fs] of arity 2, right associative *)
-let mk_destr_many_right fs =
-  let rec destr l f =
-    if l < 0 then assert false;
-    if l = 1 then Some [f]
-    else match destr_fun ~fs f with
-      | None -> None
-      | Some [f;g] -> omap (fun l -> f :: l) (destr (l-1) g)    
-      | _ -> assert false
-  in
-  destr
+  let decompose_impls_last f =
+    let forms = decompose_impls f in
+    let rec last = function
+      | [] -> assert false
+      | [f] -> [], f
+      | f :: fs -> 
+        let prems, goal = last fs in
+        f :: prems, goal
+    in 
+    last forms
 
-let destr_ors   = mk_destr_many_left  f_or
-let destr_ands  = mk_destr_many_left  f_and
-let destr_impls = mk_destr_many_right f_impl
+end
+
+include SmartDestructors
 
 (*------------------------------------------------------------------*)
-(** for any associative [fs] *)
-let mk_decompose fs =
-  let rec decompose f = match destr_fun ~fs f with
-    | None -> [f]
-    | Some l -> List.concat_map decompose l
-  in
-  decompose
+let destr_var : type a. a term -> a Vars.var option = function
+  | Var v -> Some v
+  | _ -> None
 
-let decompose_ors   = mk_decompose f_or  
-let decompose_ands  = mk_decompose f_and 
-
-let decompose_impls f =
-  let rec decompose f = match destr_fun ~fs:f_impl f with
-    | None -> [f]
-    | Some [f;g] -> f :: decompose g
-    | _ -> assert false
-  in
-  decompose f
-
-let decompose_impls_last f =
-  let forms = decompose_impls f in
-  let rec last = function
-    | [] -> assert false
-    | [f] -> [], f
-    | f :: fs -> 
-      let prems, goal = last fs in
-      f :: prems, goal
-  in 
-  last forms
+(*------------------------------------------------------------------*)
+let destr_action = function
+  | Action (s,is) -> Some (s,is)
+  | _ -> None
 
 (*------------------------------------------------------------------*)
 let as_ord_eq (ord : ord) : ord_eq = match ord with
   | `Eq -> `Eq
   | `Neq -> `Neq
   | _ -> assert false
-
-let destr_var : type a. a term -> a Vars.var option = function
-  | Var v -> Some v
-  | _ -> None
       
 let destr_matom (at : generic_atom) : (ord_eq * message * message) option = 
   match at with
@@ -1179,29 +1199,95 @@ let tfold : type a. (eterm -> 'b -> 'b) -> a term -> 'b -> 'b =
   !vref
 
 
-
 (*------------------------------------------------------------------*)
-(** {2 More smart constructors} *)
+(** {2 Smart constructors and destructors -- Part 2} *)
 
-(* FIXME: improve variable naming (see mk_seq) *)
-let mk_forall ?(simpl=false) l f = 
-  let l = 
-    if simpl then
-      let fv = fv f in
-      List.filter (fun v -> Sv.mem v fv) l 
-    else l
-  in
-  mk_forall l f
+module type SmartFO = sig
+  type form
 
-(* FIXME: improve variable naming (see mk_seq) *)
-let mk_exists ?(simpl=false) l f = 
-  let l = 
-    if simpl then
-      let fv = fv f in
-      List.filter (fun v -> Sv.mem v fv) l 
-    else l
-  in
-  mk_exists l f
+  (** {3 Constructors} *)
+  val mk_true    : form
+  val mk_false   : form
+
+  val mk_not   : ?simpl:bool -> form              -> form
+  val mk_and   : ?simpl:bool -> form      -> form -> form
+  val mk_ands  : ?simpl:bool -> form list         -> form
+  val mk_or    : ?simpl:bool -> form      -> form -> form
+  val mk_ors   : ?simpl:bool -> form list         -> form
+  val mk_impl  : ?simpl:bool -> form      -> form -> form
+  val mk_impls : ?simpl:bool -> form list -> form -> form
+
+  val mk_forall : ?simpl:bool -> Vars.evars -> form -> form
+  val mk_exists : ?simpl:bool -> Vars.evars -> form -> form
+
+  (*------------------------------------------------------------------*)
+  (** {3 Destructors} *)
+
+  val destr_forall : form -> (Vars.evar list * form) option
+  val destr_exists : form -> (Vars.evar list * form) option
+
+  (*------------------------------------------------------------------*)
+  val destr_false : form ->         unit  option
+  val destr_true  : form ->         unit  option
+  val destr_not   : form ->         form  option
+  val destr_and   : form -> (form * form) option
+  val destr_or    : form -> (form * form) option
+  val destr_impl  : form -> (form * form) option
+
+  (*------------------------------------------------------------------*)
+  val is_false : form -> bool
+  val is_true  : form -> bool
+  val is_not   : form -> bool
+  val is_and   : form -> bool
+  val is_or    : form -> bool
+  val is_impl  : form -> bool
+
+  (*------------------------------------------------------------------*)
+  (** left-associative *)
+  val destr_ands  : int -> form -> form list option
+  val destr_ors   : int -> form -> form list option
+  val destr_impls : int -> form -> form list option
+
+  val decompose_forall : form -> Vars.evar list * form
+  val decompose_exists : form -> Vars.evar list * form
+
+  (*------------------------------------------------------------------*)
+  val decompose_ands  : form -> form list 
+  val decompose_ors   : form -> form list 
+  val decompose_impls : form -> form list 
+
+  val decompose_impls_last : form -> form list * form
+end
+
+module Smart : SmartFO with type form = message = struct
+  type form = message
+
+  include SmartConstructors
+  include SmartDestructors
+
+  (* FIXME: improve variable naming (see mk_seq) *)
+  let mk_forall ?(simpl=false) l f = 
+    let l = 
+      if simpl then
+        let fv = fv f in
+        List.filter (fun v -> Sv.mem v fv) l 
+      else l
+    in
+    mk_forall l f
+
+  (* FIXME: improve variable naming (see mk_seq) *)
+  let mk_exists ?(simpl=false) l f = 
+    let l = 
+      if simpl then
+        let fv = fv f in
+        List.filter (fun v -> Sv.mem v fv) l 
+      else l
+    in
+    mk_exists l f
+
+end
+
+include Smart
 
 
 let mk_atom : type a b. ord -> a term -> b term -> message =
@@ -1677,6 +1763,7 @@ let make_bi_term  : type a. a term -> a term -> a term = fun t1 t2 ->
   head_normal_biterm (Diff (t1, t2))
 
 
+
 (*------------------------------------------------------------------*)
 (** {2 Sets and Maps } *)
 
@@ -1687,6 +1774,9 @@ end
 
 module Mt = Map.Make (T)
 module St = Set.Make (T)
+
+
+
 
 (*------------------------------------------------------------------*)
 (** {2 Tests} *)

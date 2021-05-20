@@ -56,3 +56,8 @@ val fv : form -> Vars.Sv.t
 (*------------------------------------------------------------------*)
 (** {2 Matching} *)
 module Match : Term.MatchS with type t = form
+
+(*------------------------------------------------------------------*)
+(** {2 Smart constructors and destructots} *)
+type _form = form
+module Smart : Term.SmartFO with type form = _form
