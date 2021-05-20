@@ -1330,15 +1330,6 @@ let yes_no_if b Args.(Int i) s =
           of an if then else term")
 
   | Some (c,t,e) ->
-    (* Context with bound variables (eg try find) are not (yet) supported.
-     * This is detected by checking that there is no "new" variable,
-     * which are used by the iterator to represent bound variables. *)
-    let vars = (Term.get_vars c) @ (Term.get_vars t) @ (Term.get_vars e) in
-    if List.exists (function Vars.(EVar v) -> Vars.is_new v) vars then
-      soft_failure 
-        (Failure "application of this tactic \
-                  inside a context that bind variables is not supported");
-
     let branch, trace_sequent = simplify_ite b s c t e in
     let new_elem =
       Equiv.subst_equiv
@@ -1907,71 +1898,75 @@ let prf Args.(Int i) s =
   let e = Term.head_normal_biterm e in
 
   (* search for the first occurrence of a hash in [e] *)
-  match Iter.get_ftype ~cntxt e Symbols.Hash with
-  | None ->
-    soft_failure
-      (Tactics.Failure
-         "PRF can only be applied on a term with at least one occurrence \
-          of a hash term h(t,k)")
-
-  | Some ((Term.Fun ((fn,_), ftyp, [m; key])) as hash) ->
-    (* Context with bound variables (eg try find) are not (yet) supported.
-     * This is detected by checking that there is no "new" variable,
-     * which are used by the iterator to represent bound variables. *)
-    let vars = Term.get_vars hash in
-    if List.exists Vars.(function EVar v -> is_new v) vars then
+  let hash_occ = 
+    match Iter.get_ftypes (ES.table s) Symbols.Hash e with
+    | [] ->
       soft_failure
-        (Tactics.Failure "Application of this tactic inside \
-                          a context that bind variables is not supported");
+        (Tactics.Failure
+           "PRF can only be applied on a term with at least one occurrence \
+            of a hash term h(t,k)")
+        
+    | occ :: _ ->
+      if not (Sv.is_empty occ.Iter.occ_vars) then
+        soft_failure
+          (Tactics.Failure "application below a binder is not supported");
+      occ
+  in
 
-    let phi_left  = mk_prf_phi_proj PLeft  cntxt env biframe e hash in
-    let phi_right = mk_prf_phi_proj PRight cntxt env biframe e hash in
+  let fn, ftyp, m, key, hash = match hash_occ.Iter.occ_cnt with
+    | Term.Fun ((fn,_), ftyp, [m; key]) as hash ->
+      fn, ftyp, m, key, hash
+    | _ -> assert false 
+  in
 
-    (* check that there are no type variables*)
-    assert (ftyp.fty_vars = []);
+  let phi_left  = mk_prf_phi_proj PLeft  cntxt env biframe e hash in
+  let phi_right = mk_prf_phi_proj PRight cntxt env biframe e hash in
 
-    let nty = ftyp.fty_out in
-    let ndef = Symbols.{ n_iarr = 0; n_ty = nty; } in
-    let table,n = 
-      Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
-    in
-    let ns = Term.mk_isymb n nty [] in
-    let s = ES.set_table table s in
+  (* check that there are no type variables*)
+  assert (ftyp.fty_vars = []);
 
-    let oracle_formula =
-      Prover.get_oracle_tag_formula (Symbols.to_string fn)
-    in
+  let nty = ftyp.fty_out in
+  let ndef = Symbols.{ n_iarr = 0; n_ty = nty; } in
+  let table,n = 
+    Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
+  in
+  let ns = Term.mk_isymb n nty [] in
+  let s = ES.set_table table s in
 
-    let final_if_formula = 
-      if Term.is_false oracle_formula 
-      then combine_conj_formulas phi_left phi_right
-      else 
-        let (Vars.EVar uvarm),(Vars.EVar uvarkey),f = 
-          match oracle_formula with
-          | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
-          | _ -> assert false
-        in
-        match Vars.ty uvarm,Vars.ty uvarkey with
-        | Type.(Message, Message) -> 
-          let f = Term.subst [
-              ESubst (Term.Var uvarm,m);
-              ESubst (Term.Var uvarkey,key);] f in
+  let oracle_formula =
+    Prover.get_oracle_tag_formula (Symbols.to_string fn)
+  in
 
-          Term.mk_and
-            (Term.mk_not f)  
-            (combine_conj_formulas phi_left phi_right)
-
+  let final_if_formula = 
+    if Term.is_false oracle_formula 
+    then combine_conj_formulas phi_left phi_right
+    else 
+      let (Vars.EVar uvarm),(Vars.EVar uvarkey),f = 
+        match oracle_formula with
+        | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
         | _ -> assert false
-    in
+      in
+      match Vars.ty uvarm, Vars.ty uvarkey with
+      | Type.(Message, Message) -> 
+        let f = 
+          Term.subst [
+            ESubst (Term.Var uvarm, m);
+            ESubst (Term.Var uvarkey, key);] f 
+        in
 
-    let if_term = Term.mk_ite final_if_formula (Term.Name ns) hash in
-    let new_elem =
-      Equiv.subst_equiv [Term.ESubst (hash,if_term)] [e] 
-    in
-    let biframe = (List.rev_append before (new_elem @ after)) in
-    [ES.set_equiv_goal biframe s]
+        Term.mk_and
+          (Term.mk_not f)  
+          (combine_conj_formulas phi_left phi_right)
 
-  | _ -> assert false
+      | _ -> assert false
+  in
+
+  let if_term = Term.mk_ite final_if_formula (Term.Name ns) hash in
+  let new_elem =
+    Equiv.subst_equiv [Term.ESubst (hash,if_term)] [e] 
+  in
+  let biframe = (List.rev_append before (new_elem @ after)) in
+  [ES.set_equiv_goal biframe s]
 
 let () =
   T.register_typed "prf"
@@ -2159,95 +2154,102 @@ let cca1 Args.(Int i) s =
 
   (* search for the first occurrence of an asymmetric encryption in [e], that
      do not occur under a decryption symbol. *)
-  let rec hide_all_encs enclist =
+  (* FIXME: Adrien: the description is not accurrate *)
+  let rec hide_all_encs (enclist : Iter.mess_occs) = 
     match enclist with
-    | (Term.Fun ((fnenc,eis), _, 
-                 [m; Term.Name r;
-                  Term.Fun ((fnpk,is), _, [Term.Name sk])])
-       as enc) :: q 
-      when (Symbols.is_ftype fnpk Symbols.PublicKey table
-            && Symbols.is_ftype fnenc Symbols.AEnc table) ->
-      begin
-        match Symbols.Function.get_data fnenc table with
-        (* we check that the encryption function is used with the associated
-           public key *)
-        | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk
-          ->
-          begin
-            try
-              Euf.key_ssc ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
-                ~cntxt fndec sk.s_symb;
-
-              if not (List.mem
-                        (Term.mk_fun table fnpk is [Term.Name sk])
-                        biframe) then
-                soft_failure
-                  (Tactics.Failure
-                     "The public key must be inside the frame in order to \
-                      use CCA1");
-
-              let (fgoals, substs) = hide_all_encs q in
-              let fgoal,subst =
-                get_subst_hide_enc
-                  enc fnenc m (Some (fnpk,is)) 
-                  sk fndec r eis is_top_level
-              in
-              (fgoal :: fgoals,subst :: substs)
-
-            with Euf.Bad_ssc ->  soft_failure Tactics.Bad_SSC
-          end
-
-        | _ ->
-          soft_failure
-            (Tactics.Failure
-               "The first encryption symbol is not used with the correct \
-                public key function.")
-      end
-
-    | (Term.Fun ((fnenc,eis), _, [m; Term.Name r; Term.Name sk])
-       as enc) :: q when Symbols.is_ftype fnenc Symbols.SEnc table
-      ->
-      begin
-        match Symbols.Function.get_data fnenc table with
-        (* we check that the encryption function is used with the associated
-           public key *)
-        | Symbols.AssociatedFunctions [fndec]
-          ->
-          begin
-            try
-              Cca.symenc_key_ssc ~elems:(ES.goal_as_equiv s) ~messages:[enc]
-                ~cntxt fnenc fndec sk.s_symb;
-              (* we check that the randomness is ok in the system and the
-                 biframe, except for the encryptions we are looking at, which
-                 is checked by adding a fresh reachability goal. *)
-              Cca.symenc_rnd_ssc ~cntxt env fnenc sk biframe;
-              let (fgoals, substs) = hide_all_encs q in
-              let fgoal,subst =
-                get_subst_hide_enc enc fnenc m (None) sk fndec r eis is_top_level
-              in
-              (fgoal :: fgoals,subst :: substs)
-            with Euf.Bad_ssc ->  soft_failure Tactics.Bad_SSC
-          end
-        | _ ->
-          soft_failure
-            (Tactics.Failure
-               "The first encryption symbol is not used with the correct public \
-                key function.")
-      end
-
     | [] -> [], []
-    | _ ->
-      soft_failure
-        (Tactics.Failure
-           "CCA1 can only be applied on a term with at least one occurrence \
-            of an encryption term enc(t,r,pk(k))")
+    | occ :: occs ->
+      (* FIXME: check that this is what we want. *)
+      if not (Sv.is_empty occ.Iter.occ_vars) then
+        soft_failure (Tactics.Failure "cannot be applied in a under a binder");
+
+      match occ.Iter.occ_cnt with
+      | (Term.Fun ((fnenc,eis), _, 
+                   [m; Term.Name r;
+                    Term.Fun ((fnpk,is), _, [Term.Name sk])])
+         as enc) 
+        when (Symbols.is_ftype fnpk Symbols.PublicKey table
+              && Symbols.is_ftype fnenc Symbols.AEnc table) ->
+        begin
+          match Symbols.Function.get_data fnenc table with
+          (* we check that the encryption function is used with the associated
+             public key *)
+          | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk
+            ->
+            begin
+              try
+                Euf.key_ssc ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
+                  ~cntxt fndec sk.s_symb;
+
+                if not (List.mem
+                          (Term.mk_fun table fnpk is [Term.Name sk])
+                          biframe) then
+                  soft_failure
+                    (Tactics.Failure
+                       "The public key must be inside the frame in order to \
+                        use CCA1");
+
+                let (fgoals, substs) = hide_all_encs occs in
+                let fgoal,subst =
+                  get_subst_hide_enc
+                    enc fnenc m (Some (fnpk,is)) 
+                    sk fndec r eis is_top_level
+                in
+                (fgoal :: fgoals,subst :: substs)
+
+              with Euf.Bad_ssc ->  soft_failure Tactics.Bad_SSC
+            end
+
+          | _ ->
+            soft_failure
+              (Tactics.Failure
+                 "The first encryption symbol is not used with the correct \
+                  public key function.")
+        end
+
+      | (Term.Fun ((fnenc,eis), _, [m; Term.Name r; Term.Name sk])
+         as enc) when Symbols.is_ftype fnenc Symbols.SEnc table
+        ->
+        begin
+          match Symbols.Function.get_data fnenc table with
+          (* we check that the encryption function is used with the associated
+             public key *)
+          | Symbols.AssociatedFunctions [fndec]
+            ->
+            begin
+              try
+                Cca.symenc_key_ssc ~elems:(ES.goal_as_equiv s) ~messages:[enc]
+                  ~cntxt fnenc fndec sk.s_symb;
+                (* we check that the randomness is ok in the system and the
+                   biframe, except for the encryptions we are looking at, which
+                   is checked by adding a fresh reachability goal. *)
+                Cca.symenc_rnd_ssc ~cntxt env fnenc sk biframe;
+                let (fgoals, substs) = hide_all_encs occs in
+                let fgoal,subst =
+                  get_subst_hide_enc enc fnenc m (None) sk fndec r eis is_top_level
+                in
+                (fgoal :: fgoals,subst :: substs)
+              with Euf.Bad_ssc ->  soft_failure Tactics.Bad_SSC
+            end
+          | _ ->
+            soft_failure
+              (Tactics.Failure
+                 "The first encryption symbol is not used with the correct public \
+                  key function.")
+        end
+
+      | _ ->
+        soft_failure
+          (Tactics.Failure
+             "CCA1 can only be applied on a term with at least one occurrence \
+              of an encryption term enc(t,r,pk(k))")
   in
 
   let fgoals, substs = 
     hide_all_encs ((Iter.get_ftypes ~excludesymtype:Symbols.ADec
-                      ~cntxt e Symbols.AEnc)
+                      table Symbols.AEnc e)
                    @ (Iter.get_ftypes ~excludesymtype:Symbols.SDec
-                        ~cntxt e Symbols.SEnc)) 
+                        table Symbols.SEnc e)) 
   in
 
   if substs = [] then
@@ -2412,8 +2414,8 @@ let enckp
                          r is a name"))
   | None ->
     let encs =
-      Iter.get_ftypes ~excludesymtype:Symbols.ADec ~cntxt e Symbols.AEnc @
-      Iter.get_ftypes ~excludesymtype:Symbols.SDec ~cntxt e Symbols.SEnc
+      Iter.get_ftypes ~excludesymtype:Symbols.ADec table Symbols.AEnc e @
+      Iter.get_ftypes ~excludesymtype:Symbols.SDec table Symbols.SEnc e
     in
     (** Run [apply] on first item in [encs] that is well-formed
       * and has a diff in its key.
@@ -2422,14 +2424,22 @@ let enckp
       | Term.Diff _ | Term.Fun (_, _, [Term.Diff _]) -> true
       | _ -> false
     in
+
     let rec find = function
-      | Term.Fun ((fnenc,indices), _, [m; Term.Name r; k]) as enc :: _
-        when diff_key k ->
-        apply ~enc ~new_key ~fnenc ~indices ~m ~r ~k
-      | _ :: q -> find q
+      | occ :: occs ->
+        if not (Sv.is_empty occ.Iter.occ_vars) then find occs 
+        else 
+        begin match occ.Iter.occ_cnt with
+          | Term.Fun ((fnenc,indices), _, [m; Term.Name r; k]) as enc 
+            when diff_key k ->
+            apply ~enc ~new_key ~fnenc ~indices ~m ~r ~k
+      
+          | _ -> find occs
+        end
+      
       | [] ->
         soft_failure
-          (Tactics.Failure ("No subterm of the form enc(_,r,k) where \
+          (Tactics.Failure ("no subterm of the form enc(_,r,k) where \
                              r is a name and k contains a diff(_,_)"))
     in find encs
 

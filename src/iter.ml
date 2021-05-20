@@ -158,41 +158,6 @@ class get_f_messages ?(drop_head=true)
     | m -> super#visit_message m
 end
 
-(** Get the terms of given type, that do not appear under a symbol of the
-   excluded type. *)
-class get_ftypes_term
-    ?excludesymtype ~(cntxt:Constr.trace_cntxt) symtype = object (self)
-  inherit iter_approx_macros ~exact:true ~cntxt as super
-  val mutable func : Term.message list = []
-  method get_func = func
-  method visit_message = function
-    | Term.Fun ((fn,_),_,l) as fn_term ->
-        if Symbols.is_ftype fn symtype cntxt.table
-        then func <- fn_term :: func
-        else begin
-          match excludesymtype with
-          | Some ex when Symbols.is_ftype fn ex cntxt.table -> ()
-          | _ -> List.iter self#visit_message l
-        end
-    | m -> super#visit_message m
-end
-
-(** [get_ftype ~system elem ftype] returns [None] if there is no term in [elem]
-   with a function symbol head of the fiven ftype, [Some fun] otherwise, where
-   [fun] is the first term of the given type encountered. Does not explore
-   macros. *)
-let get_ftype ~(cntxt:Constr.trace_cntxt) elem stype =
-  let iter = new get_ftypes_term ~cntxt stype in
-  List.iter iter#visit_message [elem];
-  match iter#get_func with
-  | p::q -> Some p
-  | [] -> None
-
-let get_ftypes ?excludesymtype ~(cntxt:Constr.trace_cntxt) elem stype =
-  let iter = new get_ftypes_term ?excludesymtype ~cntxt stype in
-  List.iter iter#visit_message [elem];
-  iter#get_func
-
 (*------------------------------------------------------------------*)
 (** {2 Occurrences} *)
 type 'a occ = { 
@@ -249,6 +214,53 @@ let tfold_occ : type b.
         func ~fv ~cond (Term.ETerm t) acc
       ) t acc
 
+(*------------------------------------------------------------------*)
+(** {2 get_ftype} *)
+
+type mess_occ = Term.message occ
+
+type mess_occs = mess_occ list
+
+(** Looks for occurrences of subterms using a function symbol of the given kind 
+    (Hash, Dec, ...).
+    Does not recurse below terms whose head is excluded by [excludesymtype]. *)
+let get_ftypes : type a.
+  ?excludesymtype:Symbols.function_def ->
+  Symbols.table ->
+  Symbols.function_def ->
+  a Term.term -> mess_occs = 
+  fun ?excludesymtype table symtype t ->
+  
+    let rec get : 
+    type a. a Term.term -> fv:Sv.t -> cond:Term.message -> mess_occs =
+    fun t ~fv ~cond ->
+      let occs () =       
+        tfold_occ (fun ~fv ~cond (Term.ETerm t) occs -> 
+            get t ~fv ~cond @ occs
+          ) ~fv ~cond t []
+      in
+
+      match t with
+      | Term.Fun ((fn,_),_,l) ->
+        let head_occ = 
+          if Symbols.is_ftype fn symtype table
+          then [{ occ_cnt  = t;
+                  occ_vars = fv; 
+                  occ_cond = cond; }]
+          else []
+        in
+
+        let rec_occs = match excludesymtype with
+          | Some ex when Symbols.is_ftype fn ex table -> []
+          | _ -> occs ()
+        in
+
+        head_occ @ rec_occs 
+        
+      | _ -> occs ()
+  in
+  
+  get t ~fv:Sv.empty ~cond:Term.mk_true
 
 (*------------------------------------------------------------------*)
 (** {2 If-Then-Else} *)
