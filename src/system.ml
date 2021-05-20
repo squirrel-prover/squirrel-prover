@@ -48,7 +48,7 @@ let get_data table s_symb =
     | System_data (m,d) -> m,d
     | _ -> assert false
 
-let descrs table s = fst (get_data table s)
+let descrs table s = Msh.map Action.refresh_descr (fst (get_data table s))
 let symbs table s = snd (get_data table s)
 
 let pp_system table fmt s =
@@ -80,7 +80,7 @@ let add_action
 (*------------------------------------------------------------------*)
 let descr_of_shape table (system : Symbols.system Symbols.t) shape =
   let descrs,_ = get_data table system in
-  Msh.find shape descrs
+  Action.refresh_descr (Msh.find shape descrs)
 
 (** We look whether the shape already has a name in another system,
     with the same number of indices.

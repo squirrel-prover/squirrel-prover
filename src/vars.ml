@@ -44,7 +44,8 @@ let kind v = Type.kind (v.var_type)
 let tsubst s v = { v with var_type = Type.tsubst s v.var_type }
 
 (*------------------------------------------------------------------*)
-let pp ppf v = Fmt.pf ppf "%s%s" (if v.is_new then "#" else "") (name v)
+let pp ppf v = 
+  Fmt.pf ppf "%s%s" (name v) (if v.is_new then string_of_int v.i_suffix else "")
 
 let pp_e ppf (EVar v) = pp ppf v
 

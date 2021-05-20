@@ -91,18 +91,24 @@ let project_system proj = function
     end
 
 (*------------------------------------------------------------------*)
-let make_bi_descr s1 s2 d1 d2 =
+let make_bi_descr s1 s2 (d1 : Action.descr) (d2 : Action.descr) : Action.descr =
   let incompatible s = incompatible_error s1 s2 s in
 
-  let open Action in
+  if List.length d1.indices <> List.length d2.indices then
+    incompatible "cannot merge two actions with different number of indices";
+
+  (* Note: d1 and d2 must have globally refreshed indices *)
+  let subst = List.map2 (fun i1 i2 -> 
+      Term.ESubst (Term.Var i1, Term.Var i2)
+    ) d2.indices d1.indices 
+  in
+  let d2 = Action.subst_descr subst d2 in
+  
   if not ( d1.name = d2.name ) then
     incompatible "cannot merge two actions with disctinct names";
 
   if not ( d1.input = d2.input ) then
     incompatible "cannot merge two actions with disctinct inputs";
-
-  if not ( d1.indices = d2.indices ) then
-    incompatible "cannot merge two actions with disctinct indices";
 
   if Action.same_shape d1.action d2.action = None then 
     incompatible "cannot merge two actions with different shapes";
@@ -164,13 +170,13 @@ let descr_of_shape table (se : system_expr) shape =
 
 let descr_of_action table (system : system_expr) a =
   let descr = descr_of_shape table system (Action.get_shape a) in
-  (* We know that [descr.action] and [a] have the same shape,
-   * but run [same_shape] anyway to obtain the substitution from
-   * one to the other. *)
-  match Action.same_shape descr.action a with
-  | None -> assert false
-  | Some subst ->
-    Action.subst_descr subst descr
+  let d_indices = descr.indices in
+  let a_indices = Action.get_indices a in
+  let subst = 
+    List.map2 (fun v v' -> Term.ESubst (Var v, Var v')) d_indices a_indices 
+  in
+
+  Action.subst_descr subst descr 
 
 let descrs table se = 
   let same_shapes descrs1 descrs2 = 
@@ -188,16 +194,20 @@ let descrs table se =
     and sname2 = get_id s2 in
     let left_descrs  = System.descrs table sname1 in
     let right_descrs = System.descrs table sname2 in
+
     if not (same_shapes left_descrs right_descrs) then
       bisystem_error (SE_DifferentControlFlow (sname1,sname2));
+
     System.Msh.mapi
       (fun shape _ -> descr_of_shape table se shape)
       left_descrs
+
   | SimplePair id ->
     let fds = System.descrs table id in
     System.Msh.mapi
       (fun shape descr -> Action.pi_descr Term.PNone descr)
       fds
+
   | Single s ->
     (* we must projet before iterating *)
     let sname = get_id s in

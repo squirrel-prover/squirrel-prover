@@ -328,6 +328,7 @@ module LowTac (S : Sequent) = struct
         | _ -> st in
 
       (* we do not recurse under binders *)
+      (* FIXME: expand under binders *)
       match t with
       | ForAll _ | Exists _ | Find _ | Seq _ -> st
       | _ -> Term.tfold (fun t st -> find st t) t st

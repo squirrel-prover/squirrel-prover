@@ -1780,7 +1780,6 @@ let rec simpl ~strong ~close : TS.t Tactics.tac =
   (* if [close], we introduce as much as possible to help. *)
   _simpl ~close ~strong >>
 
-
   if not strong
   then (fun g sk fk -> sk [g] fk)
   else

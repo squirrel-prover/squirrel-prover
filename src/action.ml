@@ -211,7 +211,10 @@ let subst_descr subst descr =
   let subst_term = Term.subst subst in
   let indices = List.map (Term.subst_var subst) descr.indices  in
   let condition =
-    fst descr.condition, Term.subst subst (snd descr.condition) in
+    (* FIXME: do we need to substitute ? *)
+     fst descr.condition,
+     (* List.map (Term.subst_var subst) (fst descr.condition), *)
+     Term.subst subst (snd descr.condition) in
   let updates =
     List.map (fun (ss,t) -> 
         Term.subst_isymb subst ss, subst_term t
@@ -220,6 +223,10 @@ let subst_descr subst descr =
   let output = fst descr.output, subst_term (snd descr.output) in
   {name; action; input; indices; condition; updates; output }
 
+
+let refresh_descr descr =
+  let indices, s = Term.refresh_vars `Global descr.indices in
+  subst_descr s descr
 
 (*------------------------------------------------------------------*)
 let debug = false

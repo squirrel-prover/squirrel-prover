@@ -1552,8 +1552,6 @@ let auto ~close ~strong s sk (fk : Tactics.fk) =
   let open Tactics in
   match s with
   | Goal.Equiv s ->
-    (* REM *)
-    dbg "equiv auto";
     let sk l _ =
       if close && l <> []
       then fk (None, GoalNotClosed)
@@ -1584,8 +1582,6 @@ let auto ~close ~strong s sk (fk : Tactics.fk) =
       s sk fk
 
   | Goal.Trace t ->
-    (* REM *)
-    dbg "trace auto";
     let sk l fk = sk (List.map (fun s -> Goal.Trace s) l) fk in
     TraceTactics.simpl ~close ~strong t sk fk
 
@@ -1742,21 +1738,17 @@ let prf_mk_direct env (param : prf_param) (is, m) =
 (** indirect cases: occurences of hashes in actions of the system *)
 let prf_mk_indirect env cntxt (param : prf_param)
     (frame_actions : Fresh.ts_occs) (a, is_m_l) =
+
   let env = ref env in
 
   let vars = List.fold_left (fun vars (is, m) ->
-      let is = Sv.of_list (List.map Vars.evar is) in
-      Sv.union vars (Sv.union is (Term.fv m))
+      Sv.union (Sv.add_list vars is) (Term.fv m)
     ) Sv.empty is_m_l
   in
-
-  (* we remove the free variables already in [a.Action.indices] from [vars] *)
-  let vars = Sv.diff vars (Sv.of_list (List.map Vars.evar a.Action.indices)) in
-
+  let vars = Sv.union vars (Sv.of_list (List.map Vars.evar a.Action.indices)) in
   let vars = Sv.elements vars in
 
-  let eindices = List.map Vars.evar a.Action.indices in
-  let vars', subst = Term.erefresh_vars (`InEnv env) (eindices @ vars) in
+  let vars, subst = Term.erefresh_vars (`InEnv env) vars in
 
   (* apply [subst] to the action and to the list of
    * key indices with the hashed messages *)
@@ -1796,7 +1788,7 @@ let prf_mk_indirect env cntxt (param : prf_param)
           list_of_is_m)
   in
 
-  Term.mk_forall vars' (Term.mk_impl disj conj)
+  Term.mk_forall vars (Term.mk_impl disj conj)
 
 
 let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
@@ -1856,7 +1848,8 @@ let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
   let phi_actions =
     List.rev_map
       (prf_mk_indirect env cntxt param frame_actions)
-      indirect_hashes in
+      indirect_hashes 
+  in
   Term.mk_ands (phi_frame @ phi_actions)
 
 let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =

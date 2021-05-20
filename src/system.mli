@@ -28,7 +28,8 @@ val of_lsymb : lsymb -> Symbols.table -> system_name
 (** Declare a new system, without any associated actions. *)
 val declare_empty : Symbols.table -> lsymb -> Symbols.table * system_name
 
-(** @Raise Not_found if no action corresponds to the wanted shape. *)
+(** Get a (refreshed) descr.
+    @Raise Not_found if no action corresponds to the wanted shape. *)
 val descr_of_shape :
   Symbols.table -> Symbols.system Symbols.t -> Action.shape -> 
   Action.descr
@@ -38,7 +39,7 @@ module Msh : Map.S with type key = Action.shape
 type Symbols.data +=
   System_data of Action.descr Msh.t * Symbols.action Symbols.t Msh.t
 
-(** Return all the action descriptions of a given system. *)
+(** Return (refreshed) action descriptions of a given system. *)
 val descrs : 
   Symbols.table ->
   Symbols.system Symbols.t ->

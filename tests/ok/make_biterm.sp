@@ -25,7 +25,7 @@ system [t2] !_i if diff(False,ok=ok) then (S:= diff(koo,ok); out(c,diff(ko,S))).
 equiv [left:t1, right:t2] test.
 Proof.
 induction t.
-auto.
+auto. 
 
 nosimpl(expandall).
 fa 0. fa 1.
