@@ -531,7 +531,7 @@ and do_simpl_pat (h : Args.ip_handler) (ip : Args.simpl_pat) s : sequent list =
 
 
 (*------------------------------------------------------------------*)
-(** [do_intro name t judge] introduces the topmost variable of the goal. *)
+(** introduces the topmost variable of the goal. *)
 let rec do_intro_var (s : TS.t) : Args.ip_handler * sequent =
   let form = TS.goal s in
   match form with
@@ -554,7 +554,7 @@ let rec do_intro_var (s : TS.t) : Args.ip_handler * sequent =
 
   | _ -> soft_failure Tactics.NothingToIntroduce
 
-(** [do_intro name t judge] introduces the topmost element of the goal. *)
+(** introduces the topmost element of the goal. *)
 let rec do_intro (s : TS.t) : Args.ip_handler * sequent =
   let form = TS.goal s in
   match form with
@@ -1883,7 +1883,6 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-
 let apply (pat : Type.message Term.pat) (s : TS.t) =
   let subs, f = Term.decompose_impls_last pat.pat_term in
 
@@ -2014,21 +2013,21 @@ let () =
     apply_tac
 
 (*------------------------------------------------------------------*)
-let rec do_intros (intros : Args.intro_pattern list) s =
+let rec do_intros_ip (intros : Args.intro_pattern list) s =
   match intros with
   | [] -> [s]
 
   | (Args.SItem s_item) :: intros ->
-    do_intros_list intros (do_s_item s_item s)
+    do_intros_ip_list intros (do_s_item s_item s)
 
   | (Args.Simpl s_ip) :: intros ->
     let ss = do_intro_pat s_ip s in
-    do_intros_list intros ss
+    do_intros_ip_list intros ss
 
   | (Args.SExpnd s_e) :: intros ->
     let ss = LT.do_rw_item (s_e :> Args.rw_item) `Goal s in
     let ss = as_seq1 ss in (* we get exactly one new goal *)
-    do_intros intros ss
+    do_intros_ip intros ss
 
   | (Args.StarV loc) :: intros0 ->
     let repeat, s =
@@ -2040,25 +2039,25 @@ let rec do_intros (intros : Args.intro_pattern list) s =
         false, s
     in
     let intros = if repeat then intros else intros0 in
-    do_intros intros s
+    do_intros_ip intros s
 
   | (Args.Star loc) :: intros ->
     try
       let handler, s = do_intro s in
       let s = do_naming_pat handler Args.AnyName s in
-      do_intros [Args.Star loc] s
+      do_intros_ip [Args.Star loc] s
 
     with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> [s]
 
 
-and do_intros_list intros ss = List.concat_map (do_intros intros) ss
+and do_intros_ip_list intros ss = List.concat_map (do_intros_ip intros) ss
 
-let intro_args args s =
+let intro_tac_args args s =
   match args with
-  | [Args.IntroPat intros] -> do_intros intros s
+  | [Args.IntroPat intros] -> do_intros_ip intros s
   | _ -> bad_args ()
 
-let intro_tac args = LT.wrap_fail (intro_args args)
+let intro_tac args = LT.wrap_fail (intro_tac_args args)
 
 let () =
   T.register_general "intro"
