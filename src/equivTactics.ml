@@ -1748,7 +1748,7 @@ let prf_mk_direct env (param : prf_param) (is, m) =
 
 (** indirect cases: occurences of hashes in actions of the system *)
 let prf_mk_indirect env cntxt (param : prf_param)
-    (frame_actions : Fresh.macro_ts_occs) (a, is_m_l) =
+    (frame_actions : Fresh.ts_occs) (a, is_m_l) =
   let env = ref env in
 
   let vars = List.fold_left (fun vars (is, m) ->
@@ -1781,11 +1781,11 @@ let prf_mk_indirect env cntxt (param : prf_param)
   let env0 = !env in
   (* if new_action occurs before a macro timestamp occurence of the frame *)
   let do1 mts_occ =
-    let occ_vars = Sv.elements mts_occ.Fresh.mtso_vars in
+    let occ_vars = Sv.elements mts_occ.Iter.occ_vars in
     let occ_vars, occ_subst = Term.erefresh_vars (`InEnv (ref env0)) occ_vars in
     let subst = occ_subst @ subst in
-    let ts   = Term.subst subst mts_occ.mtso_ts   in
-    let cond = Term.subst subst mts_occ.mtso_cond in
+    let ts   = Term.subst subst mts_occ.occ_cnt   in
+    let cond = Term.subst subst mts_occ.occ_cond in
     Term.mk_exists ~simpl:true occ_vars
       (Term.mk_and
          (Term.Atom (Term.mk_timestamp_leq new_action ts))

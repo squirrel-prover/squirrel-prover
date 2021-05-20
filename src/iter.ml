@@ -1,11 +1,11 @@
-open Term
+module Sv = Vars.Sv
 
 (*------------------------------------------------------------------*)
 (** Iterate over all boolean and message subterms.
   * Bound variables are represented as newly generated fresh variables.
   * When a macro is encountered, its expansion is visited as well. *)
 class iter ~(cntxt:Constr.trace_cntxt) = object (self)
-  method visit_message t = match t with
+  method visit_message (t : Term.message) = match t with
     | Fun (_, _,l) -> List.iter self#visit_message l
 
     | Macro (ms,l,a) ->
@@ -46,7 +46,7 @@ end
   * Note that [iter] could be obtained as a derived class of [fold],
   * but this would break the way we modify the iteration using inheritance.  *)
 class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
-  method fold_message (x : 'a) t : 'a = match t with
+  method fold_message (x : 'a) (t : Term.message) : 'a = match t with
     | Fun (_, _,l) -> List.fold_left self#fold_message x l
 
     | Macro (ms,l,a) ->
@@ -193,9 +193,66 @@ let get_ftypes ?excludesymtype ~(cntxt:Constr.trace_cntxt) elem stype =
   List.iter iter#visit_message [elem];
   iter#get_func
 
+(*------------------------------------------------------------------*)
+(** {2 Occurrences} *)
+type 'a occ = { 
+  occ_cnt  : 'a;              
+  occ_vars : Sv.t;             (* variables binded above the occurrence *)
+  occ_cond : Term.message;     (* conditions above the occurrence *)
+}
+
+type 'a occs = 'a occ list  
+
+(** Like [Term.tfold], but also propagate downward (globally refreshed) 
+    binded variables and conditions. *)
+let tfold_occ : type b.
+  (fv:Sv.t -> cond:Term.message -> Term.eterm -> 'a -> 'a) -> 
+  fv:Sv.t -> cond:Term.message -> b Term.term -> 'a -> 'a = 
+  fun func ~fv ~cond t acc ->
+  match t with
+  | Term.ForAll (evs, t)
+  | Term.Exists (evs, t) -> 
+    let evs, subst = Term.erefresh_vars `Global evs in
+    let t = Term.subst subst t in
+    let fv = Sv.union fv (Sv.of_list evs) in 
+    func ~fv ~cond (Term.ETerm t) acc
+
+  | Term.Seq (is, t) ->
+    let is, subst = Term.refresh_vars `Global is in
+    let t = Term.subst subst t in
+    let fv = Sv.add_list fv is in
+    func ~fv ~cond (Term.ETerm t) acc
+
+  | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite -> 
+    func ~fv ~cond (Term.ETerm c) acc                               |>
+    func ~fv ~cond:(Term.mk_and cond c) (Term.ETerm t)              |>
+    func ~fv ~cond:(Term.mk_and cond (Term.mk_not c)) (Term.ETerm e)
+
+  | Term.Find (is, c, t, e) -> 
+    let is, subst = Term.refresh_vars `Global is in
+    let c, t = Term.subst subst c, Term.subst subst t in
+    let fv1 = Sv.add_list fv is in
+
+    func ~fv:fv1 ~cond (Term.ETerm c) acc                               |>
+    func ~fv:fv1 ~cond:(Term.mk_and cond c) (Term.ETerm t)              |>
+    func ~fv:fv  ~cond:(Term.mk_and cond (Term.mk_not c)) (Term.ETerm e)  
+
+  | Term.Macro  _
+  | Term.Name   _
+  | Term.Fun    _
+  | Term.Pred   _
+  | Term.Action _
+  | Term.Var    _
+  | Term.Diff   _
+  | Term.Atom   _ -> 
+    Term.tfold (fun (Term.ETerm t) acc -> 
+        func ~fv ~cond (Term.ETerm t) acc
+      ) t acc
 
 
+(*------------------------------------------------------------------*)
 (** {2 If-Then-Else} *)
+
 class get_ite_term ~(cntxt:Constr.trace_cntxt) = object (self)
   inherit iter_approx_macros ~exact:true ~full:false ~cntxt as super
   val mutable ite : (Term.message * Term.message * Term.message) option = None
