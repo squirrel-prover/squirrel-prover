@@ -1,4 +1,5 @@
 open Utils
+open Rewrite
 
 module Args = TacticsArgs
 module L = Location
@@ -351,16 +352,6 @@ module LowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Rewriting types and functions}*)
 
-  (** A rewrite rule is a tuple: 
-      (type variables, term variables, premisses, left term, right term)
-      Invariant: if (tyvars,sv,φ,l,r) is a rewrite rule, then
-      - sv ⊆ FV(l)
-      - ((FV(r) ∪ FV(φ)) ∩ sv) ⊆ FV(l) *)
-  type 'a rw_rule = 
-    Type.tvars * Vars.Sv.t * Term.message list * 'a Term.term * 'a Term.term
-
-  type rw_erule = Type.tvars * Vars.Sv.t * Term.message list * Term.esubst
-
   type rw_arg = 
     | Rw_rw of Ident.t option * rw_erule
     (* The ident is the ident of the hyp the rule came from (if any) *)
@@ -368,21 +359,7 @@ module LowTac (S : Sequent.S) = struct
     | Rw_expand of Theory.term
 
   type rw_earg = Args.rw_count * rw_arg
-
-  (** Check that the rule is correct. *)
-  let check_erule ((_, sv, h, Term.ESubst (l,r)) : rw_erule) : unit =
-    let fvl, fvr = Term.fv l, Term.fv r in
-    let sh = List.fold_left (fun sh h ->
-        Vars.Sv.union sh (Term.fv h)
-      ) Vars.Sv.empty h
-    in
-
-    if not (Vars.Sv.subset sv fvl) || 
-       not (Vars.Sv.subset (Vars.Sv.inter (Vars.Sv.union fvr sh) sv) fvl) then 
-      hard_failure Tactics.BadRewriteRule;
-    ()
-
-
+  
   (** [rewrite ~all tgt rw_args] rewrites [rw_arg] in [tgt].
       If [all] is true, then does not fail if no rewriting occurs. *)
   let rewrite ~all 
