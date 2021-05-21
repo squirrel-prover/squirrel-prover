@@ -260,6 +260,10 @@ let trace_seq_of_equiv_seq ?goal s =
     ) s trace_s 
 
 (*------------------------------------------------------------------*)
+let get_trace_literals s = 
+  TS.get_trace_literals (trace_seq_of_equiv_seq ~goal:Term.mk_false s)
+
+(*------------------------------------------------------------------*)
 let get_models (s : t) =
   let s = trace_seq_of_equiv_seq ~goal:Term.mk_false s in
   TS.get_models s

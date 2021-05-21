@@ -125,6 +125,7 @@ end
 include S
 
 type sequent = S.t
+type sequents = sequent list
 
 let pp ppf s =
   let open Fmt in

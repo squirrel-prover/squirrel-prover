@@ -6,7 +6,8 @@ type lsymb = Theory.lsymb
 module type S = sig
   type t
   type sequent = t
-
+  type sequents = sequent list
+    
   val pp : Format.formatter -> t -> unit
 
   (** type of hypotheses and goals *)
@@ -16,16 +17,20 @@ module type S = sig
 
   val reach_to_form : Term.message -> form
 
+  (** the environment of the sequent. *)
   val env : t -> Vars.env
   val set_env : Vars.env -> t -> t
 
+  (** the goal of the sequent. *)
   val goal : t -> form
   val set_goal : form -> t -> t
   val set_reach_goal : Term.message -> t -> t
 
+  (** the system of the sequent *)
   val system : t -> SystemExpr.system_expr
   val set_system : SystemExpr.system_expr -> t -> t
 
+  (** the symbol table of the sequent. *)
   val table : t -> Symbols.table
   val set_table  : Symbols.table -> t -> t
 
@@ -38,6 +43,8 @@ module type S = sig
   val query_happens : precise:bool -> t -> Term.timestamp -> bool
 
   val mk_trace_cntxt : t -> Constr.trace_cntxt
+
+  val get_trace_literals : t -> Term.trace_literal list
 
   val get_models : t -> Constr.models
 

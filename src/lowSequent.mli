@@ -6,6 +6,7 @@ type lsymb = Theory.lsymb
 module type S = sig
   type t
   type sequent = t
+  type sequents = sequent list
 
   val pp : Format.formatter -> t -> unit
 
@@ -39,8 +40,17 @@ module type S = sig
 
   val mk_trace_cntxt : t -> Constr.trace_cntxt
 
+  val get_trace_literals : t -> Term.trace_literal list
+
+  (** [get_models s] returns a set of minimal models corresponding to the 
+      trace atoms in the sequent [s]. 
+      See module [Constr]. 
+      May timeout. *)
   val get_models : t -> Constr.models
 
+  (** [subst subst s] returns the sequent [s] where the substitution has
+      been applied to all hypotheses and the goal.
+      It removes trivial equalities (e.g x=x). *)
   val subst     : Term.subst ->   t ->   t
   val subst_hyp : Term.subst -> form -> form
 
