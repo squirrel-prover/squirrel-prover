@@ -455,12 +455,13 @@ module LowTac (S : Sequent) = struct
       (rw : Args.rw_count * Ident.t option * rw_erule) (s : S.sequent)
     : S.sequent * S.sequent list =
     let found1, cpt_occ = ref false, ref 0 in
-    let built_subs = ref [] in
 
     (* Return: (f, subs) *)
     let rec doit
-      : type a. Args.rw_count -> a rw_rule -> cform -> cform = 
+      : type a. Args.rw_count -> a rw_rule -> cform -> cform * Term.form list = 
       fun mult (tyvars, sv, rsubs, l, r) f ->
+
+        let subs_r = ref [] in
 
         (* Substitute [occ] by [r] (where free variables
            are instantiated according to [mv], and variables binded above the
@@ -473,13 +474,14 @@ module LowTac (S : Sequent) = struct
           found1 := true;
 
           let subst = S.Match.to_subst mv in
-          let r1 = Term.cast (Term.kind occ) (Term.subst subst r) in
-          let rsubs1 = 
+          let r = Term.cast (Term.kind occ) (Term.subst subst r) in
+          let rsubs = 
             List.map (fun rsub ->
                 Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
-              ) rsubs in
-          built_subs := List.rev_append rsubs1 !built_subs;
-          r1
+              ) rsubs 
+          in
+          subs_r := rsubs;
+          r
         in
 
         (* tries to find an occurence of [l] and rewrite it. *)
@@ -499,15 +501,18 @@ module LowTac (S : Sequent) = struct
         in
 
         match mult, f_opt with
-        | `Any, None -> f
+        | `Any, None -> f, !subs_r
 
         | (`Once | `Many), None -> 
           if not all 
           then soft_failure Tactics.NothingToRewrite 
-          else f
+          else f, !subs_r
 
-        | (`Many | `Any), Some f -> doit `Any (tyvars, sv, rsubs, l, r) f
-        | `Once, Some f -> f
+        | (`Many | `Any), Some f -> 
+          let f, rsubs' = doit `Any (tyvars, sv, rsubs, l, r) f in
+          f, List.rev_append (!subs_r) rsubs'
+
+        | `Once, Some f -> f, !subs_r
     in
 
     let is_same (hyp_id : Ident.t option) (target_id : Ident.t option) = 
@@ -524,8 +529,8 @@ module LowTac (S : Sequent) = struct
         if is_same id_opt tgt_id 
         then f, []
         else
-          let f = doit mult (tyvars, sv, subs, l, r) f in
-          let subs = List.rev !built_subs in
+          let f, subs = doit mult (tyvars, sv, subs, l, r) f in
+          let subs = List.rev subs in
           f, List.map S.reach_to_form subs
     in
 
