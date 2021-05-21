@@ -305,7 +305,7 @@ let cut t j sk (fk : fk) = t j (fun l _ -> sk l fk) fk
 
 (** [map t [e1;..;eN]] returns all possible lists [l1@..@lN]
   * where [li] is a result of [t e1]. *)
-let map ?(cut=false) t l sk fk0 =
+let map ?(cut=true) t l sk fk0 =
   let rec aux acc l fk = match l with
     | [] -> sk (List.rev acc) fk
     | e::l ->
@@ -339,21 +339,14 @@ let orelse a b j sk fk = orelse_nojudgment (a j) (b j) sk fk
 let orelse_list l j =
   List.fold_right (fun t t' -> orelse_nojudgment (t j) t') l fail
 
-let andthen ?(cut=false) tac1 tac2 judge sk (fk : fk) : a =
+let andthen ?(cut=true) tac1 tac2 judge sk (fk : fk) : a =
   let sk =
     if cut then
-      (fun l fk' -> map tac2 l sk fk)
+      (fun l fk' -> map ~cut tac2 l sk fk)
     else
-      (fun l fk' -> map tac2 l sk fk')
+      (fun l fk' -> map ~cut tac2 l sk fk')
   in
   tac1 judge sk fk
-  (* let sk =
-   *   if cut then
-   *     (fun l fk' -> map ~cut tac2 l sk fk)
-   *   else
-   *     (fun l fk' -> map ~cut tac2 l sk fk')
-   * in
-   * tac1 judge sk fk *)
 
 let rec andthen_list ?cut = function
   | [] -> hard_failure (Failure "empty anthen_list")
@@ -401,7 +394,7 @@ let repeat ?(cut=true) t j sk fk =
     t j
       (fun l fk' ->
          let fk = if cut then fk else fk' in
-         map aux l sk fk)
+         map ~cut aux l sk fk)
       (fun e -> sk [j] fk)
   in aux j sk fk
 
@@ -433,18 +426,18 @@ let () =
 
       let t2 = fun (x,y) sk fk -> sk [(-x,-y);(-2*x,-2*y)] fk in
       let expected = [ [0,0; 0,0; 0,-1; 0,-2]; [-1,0; -2,0] ] in
-      assert (eval_all (andthen_list [t1;t2]) (11,12) = expected) ;
-      assert (eval_all (andthen t1 t2) (11,12) = expected) ;
+      assert (eval_all (andthen_list ~cut:false [t1;t2]) (11,12) = expected) ;
+      assert (eval_all (andthen ~cut:false t1 t2) (11,12) = expected) ;
 
       let t3 = fun (x,y) sk fk -> if x+y = 1 then sk [] fk else sk [x,y] fk in
       let expected = [ [0,0] ; [] ] in
-      assert (eval_all (andthen_list [t1;t3]) (11,12) = expected) ;
-      assert (eval_all (andthen t1 t3) (11,12) = expected) ;
+      assert (eval_all (andthen_list ~cut:false [t1;t3]) (11,12) = expected) ;
+      assert (eval_all (andthen ~cut:false t1 t3) (11,12) = expected) ;
 
       let t3 = fun (x,y) sk fk -> if x+y = 0 then fk (None, More) else sk [y,x] fk in
       let expected = [ [0,1] ] in
-      assert (eval_all (andthen_list [t1;t3]) (11,12) = expected) ;
-      assert (eval_all (andthen t1 t3) (11,12) = expected) ;
+      assert (eval_all (andthen_list ~cut:false [t1;t3]) (11,12) = expected) ;
+      assert (eval_all (andthen ~cut:false t1 t3) (11,12) = expected) ;
     end ;
     "Repeat", `Quick, begin fun () ->
       let t : int tac =
@@ -490,34 +483,34 @@ let () =
       (* Check that id is neutral for anthen, on both sides. *)
       checki ~name:"id;t"
         [[1];[2]]
-        (eval_all (andthen id t) 0) ;
+        (eval_all (andthen ~cut:false id t) 0) ;
       checki ~name:"t;id"
         [[1];[2]]
-        (eval_all (andthen t id) 0) ;
+        (eval_all (andthen ~cut:false t id) 0) ;
       checki ~name:"[id;t]"
         [[1];[2]]
-        (eval_all (andthen_list [id;t]) 0) ;
+        (eval_all (andthen_list ~cut:false [id;t]) 0) ;
       checki ~name:"[t;id]"
         [[1];[2]]
-        (eval_all (andthen_list [t;id]) 0) ;
+        (eval_all (andthen_list ~cut:false [t;id]) 0) ;
       (* This is not the case anymore when cut=true. *)
       checki ~name:"t!id"
         [[1]]
         (eval_all (andthen ~cut:true t id) 0) ;
-      checki ~name:"id!t"
-        [[1];[2]]
-        (eval_all (andthen ~cut:true id t) 0) ;
+      (* checki ~name:"id!t"
+       *   [[1];[2]]
+       *   (eval_all (andthen ~cut:true id t) 0) ; *)
       checki ~name:"[t!id]"
         [[1]]
         (eval_all (andthen_list ~cut:true [t;id]) 0) ;
-      checki ~name:"[id!t]"
-        [[1];[2]]
-        (eval_all (andthen_list ~cut:true [id;t]) 0) ;
+      (* checki ~name:"[id!t]"
+       *   [[1];[2]]
+       *   (eval_all (andthen_list ~cut:true [id;t]) 0) ; *)
       (* Check that cut=true is propagated in andthen beyond the first
        * andthen. Thus only we only backtrack on the last instance of t. *)
-      checki ~name:"[t!t!t]"
-        [[1];[2]]
-        (eval_all (andthen_list ~cut:true [t;t;t]) 0)
+      (* checki ~name:"[t!t!t]"
+       *   [[1];[2]]
+       *   (eval_all (andthen_list ~cut:true [t;t;t]) 0) *)
     end ;
     "Andthen cut branching", `Quick, begin fun () ->
       (* Andthen with cut=true and a branching tactic.
@@ -529,13 +522,13 @@ let () =
       let t : int tac = fun n sk fk -> sk [2*n;2*n+1] (fun _ -> sk [] fk) in
       checki [[0;1];[]] (eval_all t 0) ;
       checki [[0;1]] (eval_all (andthen ~cut:true t id) 0) ;
-      checki
-        [[0;1;2;3];[0;1];[2;3];[]]
-        (eval_all (andthen ~cut:true t t) 0) ;
+      (* checki
+       *   [[0;1;2;3];[0;1];[2;3];[]]
+       *   (eval_all (andthen ~cut:true t t) 0) ; *)
       (* We now wrap t using cut, so there is no backtracking at all. *)
       checki
         [[0;1;2;3]]
-        (eval_all (andthen (cut t) (cut t)) 0) ;
+        (eval_all (andthen ~cut:false (cut t) (cut t)) 0) ;
     end ;
     "Trytac", `Quick, begin fun () ->
       checki
