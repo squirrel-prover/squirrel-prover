@@ -452,32 +452,6 @@ module LowTac (S : Sequent.S) = struct
 
     s, subs
 
-  (** Make a rewrite rule from a formula *)
-  let pat_to_rw_erule ?loc dir (p : Type.message Term.pat) : rw_erule = 
-    let subs, f = Term.decompose_impls_last p.pat_term in
-
-    let e = match f with
-      | Term.Atom (`Message   (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
-      | Term.Atom (`Timestamp (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
-      | Term.Atom (`Index     (`Eq, t1, t2)) -> 
-        Term.ESubst (Term.Var t1,Term.Var t2)
-      | _ -> hard_failure ?loc (Tactics.Failure "not an equality") 
-    in
-
-    let e = match dir with
-      | `LeftToRight -> e
-      | `RightToLeft -> 
-        let Term.ESubst (t1,t2) = e in
-        Term.ESubst (t2,t1)
-    in
-
-    let rule = p.pat_tyvars, p.pat_vars, subs, e in
-
-    (* We check that the rule is valid *)
-    check_erule rule;
-
-    rule
-
   (** Parse rewrite tactic arguments as rewrite rules with possible subgoals 
       showing the rule validity. *)
   let p_rw_item (rw_arg : Args.rw_item) s : rw_earg * S.sequent list =
@@ -598,4 +572,8 @@ module LowTac (S : Sequent.S) = struct
         let idg, sg = Hyps.add_i (Args.Named ng) g s in
         ( CHyp idg, sg )
       ) cases
+
+  (*------------------------------------------------------------------*)
+  (** Reduce *)
+  let reduce_sequent s = S.map (S.reduce s) s        
 end

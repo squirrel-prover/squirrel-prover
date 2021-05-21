@@ -482,7 +482,7 @@ and do_simpl_pat (h : Args.ip_handler) (ip : Args.simpl_pat) s : sequent list =
     let f = Hyps.by_id id s in
     let s = Hyps.remove id s in
     let pat = Term.pat_of_form f in
-    let erule = LT.pat_to_rw_erule ~loc:(L.loc dir) (L.unloc dir) pat in
+    let erule = Rewrite.pat_to_rw_erule ~loc:(L.loc dir) (L.unloc dir) pat in
     let s, subgoals = LT.rewrite ~all:false [T_goal] (`Many, Some id, erule) s in
     subgoals @ [s]
 
@@ -1663,7 +1663,9 @@ let () =
 (*------------------------------------------------------------------*)
 (** New goal simplification *)
 
+
 let new_simpl ~congr ~constr s =
+  let s = LT.reduce_sequent s in
   let goals = Term.decompose_ands (TS.goal s) in
   let goals = List.filter_map (fun goal ->
       if Hyps.is_hyp goal s || Term.f_triv goal then None

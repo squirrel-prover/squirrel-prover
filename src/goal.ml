@@ -132,7 +132,8 @@ let convert_equiv_form cenv ty_vars env (p : p_equiv_form) =
 
   conve p
 
-let make_trace_goal ~tbl gname (pg : Decl.p_goal_reach_cnt) : lemma * t =
+let make_trace_goal ~tbl ~hint_db gname (pg : Decl.p_goal_reach_cnt) 
+  : lemma * t =
   let system = SE.parse_se tbl pg.g_system in
 
   let ty_vars = List.map (fun ls -> Type.mk_tvar (L.unloc ls)) pg.g_tyvars in  
@@ -143,7 +144,7 @@ let make_trace_goal ~tbl gname (pg : Decl.p_goal_reach_cnt) : lemma * t =
 
   let g = Theory.convert conv_env ty_vars env pg.g_form Type.Boolean in
 
-  let s = TS.init ~system ~table:tbl ~ty_vars ~env ~goal:g in
+  let s = TS.init ~system ~table:tbl ~hint_db ~ty_vars ~env ~goal:g in
 
   let gc = 
     mk_goal_concl gname system ty_vars (`Reach (Term.mk_forall evs g)) 
@@ -152,7 +153,7 @@ let make_trace_goal ~tbl gname (pg : Decl.p_goal_reach_cnt) : lemma * t =
   (* final proved formula, current sequent *)
   gc, Trace s
 
-let make_equiv_goal ~table
+let make_equiv_goal ~table ~hint_db
     gname se (bnds : Theory.bnds) (p_form : p_equiv_form L.located) : lemma * t =
   let env, evs = Theory.convert_p_bnds table [] Vars.empty_env bnds in
 
@@ -162,10 +163,10 @@ let make_equiv_goal ~table
 
   let gc = mk_goal_concl gname se [] (`Equiv (Equiv.mk_forall evs f)) in
   
-  gc, Equiv (ES.init se table env ES.H.empty f)
+  gc, Equiv (ES.init se table hint_db env ES.H.empty f)
 
 
-let make_equiv_goal_process ~table gname system : lemma * t =
+let make_equiv_goal_process ~table ~hint_db gname system : lemma * t =
   let env, ts = Vars.make `Approx Vars.empty_env Type.Timestamp "t" in
   let term = Term.Macro (Term.frame_macro,[],Term.Var ts) in
   let goal = Equiv.(Atom (Equiv [term])) in
@@ -181,4 +182,4 @@ let make_equiv_goal_process ~table gname system : lemma * t =
     mk_goal_concl gname system [] (`Equiv (Equiv.mk_forall [Vars.EVar ts] goal)) 
   in
   
-  ( gc, Equiv (ES.init system table env hyps goal) )
+  ( gc, Equiv (ES.init system table hint_db env hyps goal) )

@@ -11,6 +11,10 @@ type rw_erule = Type.tvars * Vars.Sv.t * Term.message list * Term.esubst
 (*------------------------------------------------------------------*)
 val check_erule : rw_erule -> unit
 
+val pat_to_rw_erule : 
+  ?loc:Location.t ->
+  [< `LeftToRight | `RightToLeft ] -> Type.message Term.pat -> rw_erule
+
 (*------------------------------------------------------------------*)
 val rewrite_head : 
   rw_erule -> 'a Term.term -> ('a Term.term * Term.message list) option 

@@ -1,33 +1,36 @@
 open Utils
 
-(* module L = Location
- * module TS = TraceSequent *)
-
+module L = Location
 module Sv = Vars.Sv
+
+type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
 let rev_subst subst = 
-  List.map (fun (Term.ESubst (u,v)) -> Term.ESubst (u,v)) subst
+  List.map (fun (Term.ESubst (u,v)) -> Term.ESubst (v,u)) subst
+
+let rules = []
 
 (*------------------------------------------------------------------*)
+type reduce_param = { delta : bool; }
 
-let rules : Rewrite.rw_erule list = []
+let rp_full = { delta = true; }
 
 (*------------------------------------------------------------------*)
 module Mk (S : LowSequent.S) = struct
-
   (* TODOs: 
      - conds ignored for now.
-     - macros not expanded for now. *)
+     - trace literals not updated *)
   type state = { 
+    param      : reduce_param;
     trace_lits : Constr.trace_literals;
-    subst      : Term.esubst list; (* propagated downward, not yet applied *)
     conds      : Term.message list;     (* accumulated conditions *)
   }
                  
   (** Reduce a term in a given context. 
       The sequent's hypotheses must be used sparsingly *)
   let reduce : type a. S.t -> a Term.term -> a Term.term = fun s t ->
+    let exception NoExp in
     
     (** Invariant: we must ensure that fv(reduce(u)) ⊆ fv(t)
         Return: reduced term, reduction occurred *)
@@ -50,13 +53,46 @@ module Mk (S : LowSequent.S) = struct
     (** Reduce once at head position *)
     and reduce_head_once : type a. state -> a Term.term -> a Term.term * bool = 
       fun st t ->
+        let t, has_red = expand_head_once st t in
+        let t, has_red' = rewrite_head_once st t in
+        t, has_red || has_red'
+
+    (** Expand once at head position *)
+    and expand_head_once : type a. state -> a Term.term -> a Term.term * bool = 
+      fun st t ->
+        if not st.param.delta 
+        then t, false 
+        else try _expand_head_once st t with NoExp -> t, false
+
+    and _expand_head_once : type a. state -> a Term.term -> a Term.term * bool = 
+      fun st t ->
+        match t with
+        | Term.Macro (ms, l, ts) ->
+          assert (l = []);
+          let models = 
+            match Constr.models_conjunct st.trace_lits with
+            | Utils.Timeout -> raise NoExp
+            | Utils.Result models -> models 
+          in 
+          
+          if Constr.query ~precise:true models [`Pos, `Happens ts] then
+            match Macros.get_definition_opt (S.mk_trace_cntxt s) ms ts with
+            | None -> raise NoExp
+            | Some mdef -> mdef, true
+          else raise NoExp
+
+        | _ -> raise NoExp
+
+    (** Rewrite once at head position *)
+    and rewrite_head_once : type a. state -> a Term.term -> a Term.term * bool = 
+      fun st t ->
         let rule = List.find_map (fun rule ->
             match Rewrite.rewrite_head rule t with
             | None -> None
             | Some (red_t, subs) ->
               let subs_valid =  
                 List.for_all (fun sub -> 
-                    fst (reduce st sub) = Term.mk_true
+                    fst (reduce { st with param = rp_full } sub) = Term.mk_true
                   ) subs 
               in              
               if subs_valid then Some red_t else None            
@@ -74,26 +110,26 @@ module Mk (S : LowSequent.S) = struct
         | Term.Exists (evs, t0) 
         | Term.ForAll (evs, t0) -> 
           let _, subst = Term.erefresh_vars `Global evs in
-          let st = { st with subst = subst @ st.subst; } in
+          let t0 = Term.subst subst t0 in
+          (* let st = { st with subst = subst @ st.subst; } in *)
           let red_t0, has_red = reduce st t0 in
 
           if not has_red then t, false
           else
-            let r_subst =
-              List.map (fun (Term.ESubst (u,v)) -> Term.ESubst (u,v)) subst
-            in
+            let r_subst = rev_subst subst in
             let red_t0 = Term.subst r_subst red_t0 in
             let red_t : Term.message = 
               match t with
-              | Term.Exists _ -> Term.mk_exists ~simpl:true evs red_t0 
-              | Term.ForAll _ -> Term.mk_forall ~simpl:true evs red_t0 
+              | Term.Exists _ -> Term.mk_exists ~simpl:false evs red_t0 
+              | Term.ForAll _ -> Term.mk_forall ~simpl:false evs red_t0 
               | _ -> assert false
             in
             Term.cast (Term.kind t) red_t, true
 
         | Term.Seq (is, t0) ->
           let _, subst = Term.refresh_vars `Global is in
-          let st = { st with subst = subst @ st.subst; } in
+          let t0 = Term.subst subst t0 in
+          (* let st = { st with subst = subst @ st.subst; } in *)
           let red_t0, has_red = reduce st t0 in
 
           if not has_red then t, false
@@ -117,7 +153,9 @@ module Mk (S : LowSequent.S) = struct
 
         | Term.Find (is, c, t, e) -> 
           let _, subst = Term.refresh_vars `Global is in
-          let st1 = { st with subst = subst @ st.subst; } in
+          let c, t = Term.subst subst c, Term.subst subst t in
+          (* let st1 = { st with subst = subst @ st.subst; } in *)
+          let st1 = st in
 
           let c, has_red0 = reduce st1 c in
 
@@ -150,8 +188,31 @@ module Mk (S : LowSequent.S) = struct
           t, has_red
 
     in
-    let state = { trace_lits = []; subst = []; conds = []; } in
+    let param = { delta = false; } in
+    let trace_lits = S.get_trace_literals s in
+    let state = { param; trace_lits; conds = []; } in
     let t, _ = reduce state t in
     t
 
+
+  let rec reduce_equiv s e : Equiv.form =
+    match e with
+    | Equiv.ForAll (vs, e) -> 
+      let _, subst = Term.erefresh_vars `Global vs in
+      let e = Equiv.subst subst e in
+      let red_e = reduce_equiv s e in
+
+      let r_subst = rev_subst subst in
+      let red_e = Equiv.subst r_subst red_e in
+      Equiv.ForAll (vs, red_e)
+
+    | Equiv.Impl (e1, e2) ->
+      Equiv.Impl (reduce_equiv s e1, reduce_equiv s e2)
+    
+    | Equiv.Atom (Reach f) -> 
+      Equiv.Atom (Reach (reduce s f))
+
+    | Equiv.Atom (Equiv e) -> 
+      let e = List.map (reduce s) e in
+      Equiv.Atom (Equiv.Equiv e)
 end

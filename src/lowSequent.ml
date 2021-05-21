@@ -55,6 +55,8 @@ module type S = sig
       In an equiv formula, does not return terms under (equiv) binders. *)
   val get_terms : form -> Term.message list
 
+  val map : (form -> form) -> t -> t
+
   (*------------------------------------------------------------------*)
   (** {3 Matching} *)
   module Match : Term.MatchS with type t = form

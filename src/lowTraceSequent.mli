@@ -18,6 +18,7 @@ include LowSequent.S with type form = Term.message
 val init : 
   system:SystemExpr.system_expr -> 
   table:Symbols.table ->
+  hint_db:Hint.hint_db ->
   ty_vars:Type.tvars ->
   env:Vars.env ->
   goal:Term.message ->

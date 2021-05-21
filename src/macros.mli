@@ -27,6 +27,9 @@ val is_defined :
 val get_definition :
   Constr.trace_cntxt -> Term.msymb -> Term.timestamp -> Term.message
 
+val get_definition_opt :
+  Constr.trace_cntxt -> Term.msymb -> Term.timestamp -> Term.message option
+
 (** When [m] is a global macro symbol,
   * [get_definition se table m li] return a term which resembles the one that
   * would be obtained with [get_definition m li ts] for some [ts],

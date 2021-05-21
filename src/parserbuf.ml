@@ -95,7 +95,7 @@ let parse_theory_buf ?(test=false) lexbuf filename =
 let parse_theory_test ?(test=false) filename =
   let lexbuf = Lexing.from_channel (Stdlib.open_in filename) in
   let decls = parse_theory_buf ~test lexbuf filename in
-  Prover.declare_list Symbols.builtins_table decls
+  Prover.declare_list Symbols.builtins_table Hint.empty_hint_db decls
 
 let parse parser parser_name string =
   let lexbuf = Lexing.from_string string in
@@ -188,7 +188,7 @@ let () =
             abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
         in
         let decl = Location.mk_loc Location._dummy decl_i in
-        Prover.declare table decl in
+        Prover.declare table Hint.empty_hint_db decl in
       ignore (parse_process table "in(c,x); out(c, if x=x then x else error)"
               : Process.process)
     end ;
@@ -202,7 +202,7 @@ let () =
               abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
         in
         let decl = Location.mk_loc Location._dummy decl_i in
-        Prover.declare table decl
+        Prover.declare table Hint.empty_hint_db decl
       in
       
       let table =
@@ -215,7 +215,7 @@ let () =
         in
         
         let decl = Location.mk_loc Location._dummy decl_i in
-        Prover.declare table decl
+        Prover.declare table Hint.empty_hint_db decl
       in
       ignore (parse_process table
                 "in(c,x); \

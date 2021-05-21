@@ -43,3 +43,8 @@ let get_reach_hyp_or_lemma name s =
 
 let get_equiv_hyp_or_lemma name s =
   Goal.to_equiv_lemma ~loc:(L.loc name) (get_hyp_or_lemma name s)
+
+(*------------------------------------------------------------------*)
+module Reduce = Reduction.Mk(LowTraceSequent)
+
+let reduce s t = Reduce.reduce s t

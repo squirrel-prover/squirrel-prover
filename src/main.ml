@@ -75,8 +75,10 @@ exception Unfinished
 
 (* State of the main loop.
    TODO: include everything currently handled statefully in Prover.ml *)
-type loop_state = { mode : Prover.prover_mode;
-                    table : Symbols.table; }
+type loop_state = { 
+  mode : Prover.prover_mode;
+  table : Symbols.table;  
+}
 
 (** The main loop body. *)
 let main_loop_body ~test state =
@@ -98,7 +100,8 @@ let main_loop_body ~test state =
       { mode = new_mode; table = new_table; }
 
     | GoalMode, ParsedInputDescr decls ->
-      let table = Prover.declare_list state.table decls in
+      let hint_db = Prover.current_hint_db () in
+      let table = Prover.declare_list state.table hint_db decls in
       Printer.pr "%a" System.pp_systems table;
       { mode = GoalMode; table = table; }
 
@@ -122,9 +125,18 @@ let main_loop_body ~test state =
       Printer.prt `Result "Exiting proof mode.@.";
       { state with mode = GoalMode }
 
+    | GoalMode, ParsedHint h ->
+      let db = Prover.current_hint_db () in 
+      let db = 
+        match h with
+        | Hint.Hint_rewrite id -> Prover.add_hint_rewrite id db
+      in
+      Prover.set_hint_db db;
+      state
+
     | GoalMode, ParsedSetOption sp ->
       Config.set_param sp;
-      { state with mode = GoalMode }
+      state
 
     | GoalMode, ParsedGoal goal ->
       begin
@@ -138,7 +150,10 @@ let main_loop_body ~test state =
             | Some es -> cmd_error (StartProofError es)
           end
         | Prover.Gm_goal g ->
-          let i,f = Prover.declare_new_goal state.table (L.loc goal) g in
+          let hint_db = Prover.current_hint_db () in
+          let i,f = 
+            Prover.declare_new_goal state.table hint_db (L.loc goal) g 
+          in
           Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
             i
             Goal.pp_init f;
@@ -168,7 +183,7 @@ let main_loop_body ~test state =
     [save] allows to specify is the current state must be saved, so that
     one can backtrack.
 *)
-let rec main_loop ~test ?(save=true) state =
+let rec main_loop ~test ?(save=true) (state : loop_state) =
   if !interactive then Printer.prt `Prompt "";
   (* Save the state if instructed to do so.
    * In practice we save except after errors and the first call. *)

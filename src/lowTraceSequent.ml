@@ -62,6 +62,8 @@ module S : sig
     system : SystemExpr.system_expr ;
     table : Symbols.table;
 
+    hint_db : Hint.hint_db;
+
     ty_vars : Type.tvars;
     (** Free type variables of the sequent. *)
 
@@ -79,6 +81,7 @@ module S : sig
   val init_sequent :
     system:SystemExpr.system_expr ->
     table:Symbols.table ->
+    hint_db:Hint.hint_db ->
     ty_vars:Type.tvars ->
     env:Vars.env ->
     conclusion:Term.message ->
@@ -97,15 +100,18 @@ end = struct
   type t = {
     system     : SystemExpr.system_expr ;
     table      : Symbols.table;
+    hint_db    : Hint.hint_db;
     ty_vars    : Type.tvars;
     env        : Vars.env;
+    (* hind_db    : Reduction. *)
     hyps       : H.hyps;
     conclusion : Term.message;
   }
 
-  let init_sequent ~system ~table ~ty_vars ~env ~conclusion = {
+  let init_sequent ~system ~table ~hint_db ~ty_vars ~env ~conclusion = {
     system ;
     table;
+    hint_db;
     ty_vars;
     env;
     hyps = H.empty;
@@ -119,7 +125,7 @@ end = struct
     and env        = Utils.odflt t.env env
     and hyps       = Utils.odflt t.hyps hyps
     and conclusion = Utils.odflt t.conclusion conclusion in
-    { system; table; ty_vars; env; hyps; conclusion; } 
+    { t with system; table; ty_vars; env; hyps; conclusion; } 
 end
 
 include S
@@ -453,8 +459,8 @@ let set_goal a s =
         when Config.auto_intro () -> Hyps.add_macro_defs s a
       | _ -> s
 
-let init ~system ~table ~ty_vars ~env ~goal =
-  init_sequent ~system ~table ~ty_vars ~env ~conclusion:goal
+let init ~system ~table ~hint_db ~ty_vars ~env ~goal =
+  init_sequent ~system ~table ~hint_db ~ty_vars ~env ~conclusion:goal
 
 let goal s = s.conclusion
 
@@ -530,6 +536,9 @@ let form_to_reach ?loc t = t
 let mem_felem _ _ = false
 let change_felem _ _ _ = assert false
 let get_felem _ _ = assert false
+
+(*------------------------------------------------------------------*)
+let map f s : sequent = set_goal (f (goal s)) (Hyps.map f s)
 
 (*------------------------------------------------------------------*)
 module Match = Term.Match

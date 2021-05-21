@@ -106,6 +106,8 @@ type option_def = option_name * option_val
 
 let option_defs : option_def list ref= ref []
 
+let hint_db : Hint.hint_db ref = ref Hint.empty_hint_db
+
 type proof_state = { 
   goals        : (Goal.lemma * Goal.t) list;
   table        : Symbols.table;
@@ -115,6 +117,8 @@ type proof_state = {
   option_defs  : option_def list;
   params       : Config.params;
   prover_mode  : prover_mode;
+
+  hint_db      : Hint.hint_db;
 }
 
 let proof_states_history : proof_state list ref = ref []
@@ -134,14 +138,15 @@ let reset () =
 
 let save_state mode table =
   proof_states_history :=
-    { goals = !goals;
-      table = table;
+    { goals        = !goals;
+      table        = table;
       current_goal = !current_goal;
-      subgoals = !subgoals;
+      subgoals     = !subgoals;
       goals_proved = !goals_proved;
-      option_defs = !option_defs;
-      params = Config.get_params ();
-      prover_mode = mode }
+      option_defs  = !option_defs;
+      params       = Config.get_params ();
+      prover_mode  = mode;
+      hint_db      = !hint_db; }
     :: (!proof_states_history)
 
 let rec reset_state n =
@@ -156,6 +161,8 @@ let rec reset_state n =
     goals_proved := p.goals_proved;
     option_defs := p.option_defs;
     Config.set_params p.params;
+
+    hint_db := p.hint_db;
 
     ( p.prover_mode, p.table )
   | _::q, n -> proof_states_history := q; reset_state (n-1)
@@ -659,16 +666,17 @@ type parsed_input =
   | ParsedInputDescr of Decl.declarations
   | ParsedQed
   | ParsedAbort
-  | ParsedSetOption of Config.p_set_param
-  | ParsedTactic of TacticsArgs.parser_arg Tactics.ast
-  | ParsedUndo of int
-  | ParsedGoal of gm_input
+  | ParsedSetOption  of Config.p_set_param
+  | ParsedTactic     of TacticsArgs.parser_arg Tactics.ast
+  | ParsedUndo       of int
+  | ParsedGoal       of gm_input
+  | ParsedHint       of Hint.p_hint
   | EOF
 
 let unnamed_goal () = 
   L.mk_loc L._dummy ("unnamedgoal"^(string_of_int (List.length (!goals_proved))))
 
-let declare_new_goal_i table (gname,g) =
+let declare_new_goal_i table ~hint_db (gname,g) =
   let gname = match gname with
     | Decl.P_unknown -> unnamed_goal ()
     | Decl.P_named s -> s 
@@ -678,16 +686,16 @@ let declare_new_goal_i table (gname,g) =
   let c, g = match g with
     | Goal.P_equiv_goal (p_system, env,f) ->
       let system = SE.parse_se table p_system in
-      let c, g = Goal.make_equiv_goal ~table gn system env f in
+      let c, g = Goal.make_equiv_goal ~table ~hint_db gn system env f in
       c, g
 
     | Goal.P_equiv_goal_process p_system ->
       let system = SE.parse_se table p_system in
-      let c, g = Goal.make_equiv_goal_process ~table gn system in
+      let c, g = Goal.make_equiv_goal_process ~hint_db ~table gn system in
       c, g
 
     | Goal.P_trace_goal reach -> 
-      let c, g = Goal.make_trace_goal ~tbl:table gn reach in
+      let c, g = Goal.make_trace_goal ~hint_db ~tbl:table gn reach in
       c, g
   in
 
@@ -698,8 +706,8 @@ let declare_new_goal_i table (gname,g) =
 
   (L.unloc gname,g)
 
-let declare_new_goal table loc (n, g) =
-  error_handler loc KGoal (declare_new_goal_i table) (n, g)
+let declare_new_goal table hint_db loc (n, g) =
+  error_handler loc KGoal (declare_new_goal_i table ~hint_db) (n, g)
 
 let add_proved_goal gconcl =
   if is_lemma gconcl.Goal.gc_name then
@@ -793,6 +801,10 @@ let start_proof () = match !current_goal, !goals with
 
 let current_goal () = omap (fun (gc, goal) -> gc.Goal.gc_name, goal) !current_goal
 
+let current_hint_db () = !hint_db
+
+let set_hint_db db = hint_db := db
+
 (*------------------------------------------------------------------*)
 (** {2 Declaration parsing} *)
 
@@ -867,7 +879,7 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
 (*------------------------------------------------------------------*)
 (** {2 Declaration processing} *)
     
-let declare_i table decl = match L.unloc decl with
+let declare_i table hint_db decl = match L.unloc decl with
   | Decl.Decl_channel s            -> Channel.declare table s
   | Decl.Decl_process (id,pkind,p) ->
     let pkind = List.map (fun (x,t) ->
@@ -881,7 +893,7 @@ let declare_i table decl = match L.unloc decl with
       | Decl.P_unknown -> unnamed_goal ()
       | Decl.P_named n -> n
     in
-    let gc, _ = Goal.make_trace_goal ~tbl:table (L.unloc name) gdecl in
+    let gc, _ = Goal.make_trace_goal ~tbl:table ~hint_db (L.unloc name) gdecl in
     add_proved_goal gc;
     table
 
@@ -962,9 +974,14 @@ let declare_i table decl = match L.unloc decl with
     table
 
 
-let declare table decl =
+let declare table hint_db decl =
   let loc = L.loc decl in
-  error_handler loc KDecl (declare_i table) decl
+  error_handler loc KDecl (declare_i table hint_db) decl
 
-let declare_list table decls =
-  List.fold_left (fun table d -> declare table d) table decls
+let declare_list table hint_db decls =
+  List.fold_left (fun table d -> declare table hint_db d) table decls
+
+(*------------------------------------------------------------------*)
+let add_hint_rewrite (s : lsymb) db =
+  let lem = get_reach_lemma s in
+  Hint.add_hint_rewrite s lem.Goal.gc_tyvars lem.Goal.gc_concl db

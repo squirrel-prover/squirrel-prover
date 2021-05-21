@@ -21,6 +21,8 @@ val current_goal : unit -> Goal.named_goal option
 *)
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
+val current_hint_db : unit -> Hint.hint_db
+val set_hint_db : Hint.hint_db -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Parser types} *)
@@ -159,14 +161,16 @@ type parsed_input =
   | ParsedInputDescr of Decl.declarations
   | ParsedQed
   | ParsedAbort
-  | ParsedSetOption of Config.p_set_param
-  | ParsedTactic of TacticsArgs.parser_arg Tactics.ast
-  | ParsedUndo of int
-  | ParsedGoal of gm_input
+  | ParsedSetOption  of Config.p_set_param
+  | ParsedTactic     of TacticsArgs.parser_arg Tactics.ast
+  | ParsedUndo       of int
+  | ParsedGoal       of gm_input
+  | ParsedHint       of Hint.p_hint
   | EOF
 
 (** Declare a new goal to the current goals, and returns it *)
-val declare_new_goal : Symbols.table -> L.t -> Goal.p_goal -> Goal.named_goal
+val declare_new_goal : 
+  Symbols.table -> Hint.hint_db -> L.t -> Goal.p_goal -> Goal.named_goal
 
 (** From the name of the function, returns the corresponding formula. If no tag
    formula was defined, returns False. *)
@@ -212,7 +216,12 @@ val pp_decl_error :
 (** {2 Declaration processing} *)
 
 (** Process a declaration. *)
-val declare      : Symbols.table -> Decl.declaration  -> Symbols.table
+val declare : 
+  Symbols.table -> Hint.hint_db -> Decl.declaration  -> Symbols.table
 
 (** Process a list of declaration. *)
-val declare_list : Symbols.table -> Decl.declarations -> Symbols.table
+val declare_list : 
+  Symbols.table -> Hint.hint_db -> Decl.declarations -> Symbols.table
+
+(*------------------------------------------------------------------*)
+val add_hint_rewrite : lsymb -> Hint.hint_db -> Hint.hint_db

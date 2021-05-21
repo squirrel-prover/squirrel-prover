@@ -33,7 +33,7 @@
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDS APPLY SPLITSEQ CONSTSEQ
 %token BY INTRO AS DESTRUCT REMEMBER
-%token PROOF QED UNDO ABORT
+%token PROOF QED UNDO ABORT HINT
 %token EOF
 
 %nonassoc QUANTIF
@@ -795,7 +795,10 @@ option_param:
 set_option:
 | SET n=ID EQ param=option_param DOT { (n, param) }
 
-interactive :
+hint:
+| HINT REWRITE id=lsymb DOT { Hint.Hint_rewrite id }
+
+interactive:
 | set=set_option     { Prover.ParsedSetOption set }
 | decls=declarations { Prover.ParsedInputDescr decls }
 | u=undo             { Prover.ParsedUndo u }
@@ -803,4 +806,5 @@ interactive :
 | qed                { Prover.ParsedQed }
 | abort              { Prover.ParsedAbort }
 | g=goal             { Prover.ParsedGoal g }
+| h=hint             { Prover.ParsedHint h }
 | EOF                { Prover.EOF }

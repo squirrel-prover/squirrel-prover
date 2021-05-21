@@ -21,7 +21,8 @@ include LowSequent.S with type form = Equiv.form
     Remark that if the projection of the system is not None, the goal will 
     be trivial. *)
 val init : 
-  SystemExpr.system_expr -> Symbols.table -> Vars.env -> hyps -> Equiv.form -> t
+  SystemExpr.system_expr -> Symbols.table -> Hint.hint_db ->
+  Vars.env -> hyps -> Equiv.form -> t
 
 val pp_init : Format.formatter -> t -> unit
 

@@ -75,11 +75,16 @@ type p_goal = Decl.p_goal_name * p_goal_form
 
 val make_equiv_goal :
   table:Symbols.table ->
+  hint_db:Hint.hint_db ->
   string ->
   SE.system_expr -> Theory.bnds -> p_equiv_form L.located -> lemma * t
 
 val make_trace_goal :
-  tbl:Symbols.table -> string -> Decl.p_goal_reach_cnt -> lemma * t
+  tbl:Symbols.table -> 
+  hint_db:Hint.hint_db ->
+  string -> Decl.p_goal_reach_cnt -> lemma * t
 
 val make_equiv_goal_process :
-  table:Symbols.table -> string -> SE.system_expr -> lemma * t
+  table:Symbols.table -> 
+  hint_db:Hint.hint_db ->
+  string -> SE.system_expr -> lemma * t

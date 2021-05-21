@@ -44,15 +44,17 @@ type t = {
   hyps    : H.hyps;
   goal    : Equiv.form;
   system  : SystemExpr.system_expr;
+  hint_db : Hint.hint_db;
 }
 
-let init system table env hyps f = {
+let init system table hint env hyps f = {
   env     = env ; 
   table   = table ;
   ty_vars = [];
-  goal    = f ; 
+  goal    = f; 
   hyps    = hyps;
   system  = system;
+  hint_db = hint;
 }
 
 type sequent = t
@@ -241,6 +243,7 @@ let trace_seq_of_equiv_seq ?goal s =
   let system  = system s in
   let table   = table s in
   let ty_vars = ty_vars s in
+  let hint_db = s.hint_db in
 
   let goal = match goal, s.goal with
     | Some g, _ -> g
@@ -250,7 +253,7 @@ let trace_seq_of_equiv_seq ?goal s =
                                                   formulas")
   in
 
-  let trace_s = TS.init ~system ~table ~ty_vars ~env ~goal in
+  let trace_s = TS.init ~system ~table ~hint_db ~ty_vars ~env ~goal in
   
   (* We add all relevant hypotheses *)
   Hyps.fold (fun id hyp trace_s -> match hyp with
@@ -300,6 +303,9 @@ let change_felem i elems s =
   set_equiv_goal (List.rev_append before (elems @ after)) s
 
 let get_felem i s = let _, t, _ = List.splitat i (goal_as_equiv s) in t
+
+(*------------------------------------------------------------------*)
+let map f s : sequent = set_goal (f (goal s)) (Hyps.map f s)
 
 (*------------------------------------------------------------------*)
 (** {2 Matching} *)
