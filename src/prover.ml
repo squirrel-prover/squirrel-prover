@@ -5,8 +5,8 @@ module L    = Location
 module Args = TacticsArgs
 module SE   = SystemExpr
 
-module TS = TraceSequent
-module ES = EquivSequent
+module TS = LowTraceSequent
+module ES = LowEquivSequent
 
 type lsymb = Theory.lsymb
 

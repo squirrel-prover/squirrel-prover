@@ -5,6 +5,8 @@
 module L = Location
 module SE = SystemExpr
 
+module TS = LowTraceSequent
+
 type lsymb = Theory.lsymb
 
 (** [current_goal] returns the current (sub)goal of the prover,
@@ -134,7 +136,7 @@ end
 
 val pp_ast : Format.formatter -> TacticsArgs.parser_arg Tactics.ast -> unit
 
-module TraceTactics : Tactics_sig with type judgment = TraceSequent.t
+module TraceTactics : Tactics_sig with type judgment = TS.t
 module EquivTactics : Tactics_sig with type judgment = Goal.t
 
 (*------------------------------------------------------------------*)

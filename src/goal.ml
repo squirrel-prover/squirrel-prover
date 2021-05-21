@@ -2,8 +2,8 @@ open Utils
     
 module L = Location
 
-module TS = TraceSequent
-module ES = EquivSequent
+module TS = LowTraceSequent
+module ES = LowEquivSequent
 
 module SE = SystemExpr
 

@@ -1,9 +1,13 @@
 module L = Location
 module SE = SystemExpr
 
+module TS = LowTraceSequent
+module ES = LowEquivSequent
+
 type lsymb = Theory.lsymb
 
-type t = Trace of TraceSequent.t | Equiv of EquivSequent.t
+(*------------------------------------------------------------------*)
+type t = Trace of TS.t | Equiv of ES.t
 
 val pp : Format.formatter -> t -> unit
 val pp_init : Format.formatter -> t -> unit
