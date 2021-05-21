@@ -1083,21 +1083,24 @@ let refresh_var (arg : refresh_arg) v =
   | `Global    -> Vars.make_new_from v
   | `InEnv env -> Vars.fresh_r env v
 
+(* the substitution must be build reversed w.r.t. vars, to handle capture *)
 let refresh_vars (arg : refresh_arg) vars =
   let vars' = List.map (refresh_var arg) vars in
   let subst = 
-    List.map2 (fun v v' -> ESubst (Var v, Var v')) vars vars' 
+    List.rev_map2 (fun v v' -> ESubst (Var v, Var v')) vars vars' 
   in
   vars', subst
 
+(* the substitution must be build reversed w.r.t. vars, to handle capture *)
 let erefresh_vars (arg : refresh_arg) evars =
   let l = 
-    List.map (fun (Vars.EVar v) -> 
+    List.rev_map (fun (Vars.EVar v) -> 
         let v' = refresh_var arg v in
         Vars.EVar v', ESubst (Var v, Var v') 
       ) evars
   in
-  List.split l
+  let vars, subst = List.split l in
+  List.rev vars, subst
 
 let refresh_vars_env env vs = 
   let env = ref env in

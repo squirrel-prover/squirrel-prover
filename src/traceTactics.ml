@@ -859,14 +859,21 @@ let use ip (name : lsymb) (ths : Theory.term list) (s : TS.t) =
     | ForAll (uvars,f) -> uvars,f
     | _ as f           -> [],f in
 
-  if List.length uvars <> List.length ths then
-    Tactics.(soft_failure (Failure "incorrect number of arguments")) ;
+  if List.length uvars < List.length ths then
+    Tactics.(soft_failure (Failure "too many arguments")) ;
+  
+  let uvars, uvars0 = List.takedrop (List.length ths) uvars in
+  let f = Term.mk_forall ~simpl:false uvars0 f in
 
-  let subst =
-    let table = TS.table s in
-    Theory.parse_subst table (TS.ty_vars s) (TS.env s) uvars ths in
+  (* refresh *)
+  let uvars, subst = Term.erefresh_vars `Global uvars in
+  let f = Term.subst subst f in
 
-  (* Formula with universal quantifications introduced. *)
+  let subst = 
+    Theory.parse_subst (TS.table s) (TS.ty_vars s) (TS.env s) uvars ths 
+  in
+
+  (* instantiate [f] *)
   let f = Term.subst subst f in
 
   (* Compute subgoals by introducing implications on the left. *)

@@ -15,3 +15,9 @@ Proof.
   intro x'.
   by use one with x'.
 Qed.
+
+goal _ (z,u,w,x:message): (forall (x, y, x : message), f(x)=b) => f(z) = b.
+Proof.
+  intro H. 
+  by use H with w, u, z.
+Qed.
