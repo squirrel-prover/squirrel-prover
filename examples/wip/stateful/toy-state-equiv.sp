@@ -39,7 +39,8 @@ goal stateUpdate :
 forall (t:timestamp), happens(t) =>
   (forall (i,j:index), t=T(i,j) => kT(i)@t = hkey(kT(i)@pred(t),key(i))).
 Proof.
-by auto.
+(* by auto. *)
+intro *. subst t, T(i,j).
 Qed.
 
 goal onlyTagActions :
@@ -72,28 +73,28 @@ case t.
 (* t = init *)
 left.
 
-(* t = T(i1,j) *)
-assert (i=i1 || i<>i1).
+(* t = T(i0,j) *)
+assert (i=i0 || i<>i0).
 case H0.
 
 (* t = T(i,j) *)
 right; exists j.
 
-(* t = T(i1,j) with i<>i1 *)
-subst t,T(i1,j).
-assert kT(i)@T(i1,j) = kT(i)@pred(T(i1,j)).
-expand kT(i)@T(i1,j).
+(* t = T(i0,j) with i<>i0 *)
+subst t,T(i0,j).
+assert kT(i)@T(i0,j) = kT(i)@pred(T(i0,j)).
+expand kT(i)@T(i0,j).
 by noif.
-use H with pred(T(i1,j)),i.
-case H0.
+use H with pred(T(i0,j)),i as HH0.
+case HH0.
 
   left.
-  by use H0 with j'.
+  by use H1 with j'.
 
   right.
-  exists j1.
-  use H1 with j'.
-  by case H0.
+  exists j0.
+  use H2 with j'.
+  by case H1.
 Qed.
 
 goal stateInequality :
@@ -118,15 +119,15 @@ case H1.
 
 (* kT(i)@pred(T(i,j)) = kT(i)@init
    this can actually happen only if tag i has not played from init to pred(T(i,j))
-   but we know that T(i,j1) < T(i,j): absurd *)
-by use H1 with j1; case H0.
+   but we know that T(i,j0) < T(i,j): absurd *)
+by use H1 with j0; case H0.
 
 (* kT(i)@pred(T(i,j)) = kT(i)@T(i,j2)
    then we should have that T(i,j1) <= T(i,j2) *)
-assert (T(i,j1) <= T(i,j2)).
-use H2 with j1. case H1. case H0. case H0.
+assert (T(i,j0) <= T(i,j1)).
+use H2 with j0. case H1. case H0. case H0.
 
-by use H with T(i,j2),pred(T(i,j1)),i,j2,i.
+by use H with T(i,j1),pred(T(i,j0)),i,j1,i.
 Qed.
 
 goal stateInequalityHelpful :
@@ -146,7 +147,8 @@ expand frame@T(i,j). expand exec@T(i,j). expand cond@T(i,j).
 fa 0.
 fa 1. fa 1.
 expand output@T(i,j). expand kT(i)@T(i,j).
-prf 1. yesif 1.
-use stateInequalityHelpful with i,j,j1.
+prf 1.
+yesif 1.
+use stateInequalityHelpful with i,j,j0. 
 fresh 1. yesif 1.
 Qed.
