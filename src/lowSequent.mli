@@ -13,6 +13,8 @@ module type S = sig
   (** type of hypotheses and goals *)
   type form
 
+  val pp_form : Format.formatter -> form -> unit
+
   module Hyps : Hyps.HypsSeq with type hyp = form and type sequent = t
 
   val reach_to_form : Term.message -> form
@@ -41,6 +43,8 @@ module type S = sig
   val mk_trace_cntxt : t -> Constr.trace_cntxt
 
   val get_trace_literals : t -> Term.trace_literal list
+
+  val get_hint_db : t -> Hint.hint_db
 
   (** [get_models s] returns a set of minimal models corresponding to the 
       trace atoms in the sequent [s]. 

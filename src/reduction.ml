@@ -9,8 +9,6 @@ type lsymb = Theory.lsymb
 let rev_subst subst = 
   List.map (fun (Term.ESubst (u,v)) -> Term.ESubst (v,u)) subst
 
-let rules = []
-
 (*------------------------------------------------------------------*)
 type reduce_param = { delta : bool; }
 
@@ -23,6 +21,7 @@ module Mk (S : LowSequent.S) = struct
      - trace literals not updated *)
   type state = { 
     param      : reduce_param;
+    hint_db    : Hint.hint_db;
     trace_lits : Constr.trace_literals;
     conds      : Term.message list;     (* accumulated conditions *)
   }
@@ -37,7 +36,13 @@ module Mk (S : LowSequent.S) = struct
     (** TODO: memoisation *)
     let rec reduce : type a. state -> a Term.term -> a Term.term * bool = 
       fun st t ->
+        (* REM *)
+        (* Fmt.epr "reduce %a@." Term.pp t; *)
+
         let t, has_red = reduce_head_once st t in
+
+        (* REM *)
+        (* Fmt.epr "reduce head %a@." Term.pp t; *)
 
         if has_red then fst (reduce st t), true
         else
@@ -86,7 +91,7 @@ module Mk (S : LowSequent.S) = struct
     (** Rewrite once at head position *)
     and rewrite_head_once : type a. state -> a Term.term -> a Term.term * bool = 
       fun st t ->
-        let rule = List.find_map (fun rule ->
+        let rule = List.find_map (fun (_, rule) ->
             match Rewrite.rewrite_head rule t with
             | None -> None
             | Some (red_t, subs) ->
@@ -96,7 +101,7 @@ module Mk (S : LowSequent.S) = struct
                   ) subs 
               in              
               if subs_valid then Some red_t else None            
-          ) rules 
+          ) (Hint.get_rewrite_db st.hint_db)
         in
         
         match rule with
@@ -190,7 +195,8 @@ module Mk (S : LowSequent.S) = struct
     in
     let param = { delta = false; } in
     let trace_lits = S.get_trace_literals s in
-    let state = { param; trace_lits; conds = []; } in
+    let hint_db = S.get_hint_db s in
+    let state = { param; hint_db; trace_lits; conds = []; } in
     let t, _ = reduce state t in
     t
 

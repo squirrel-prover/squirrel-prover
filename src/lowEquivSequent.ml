@@ -29,6 +29,8 @@ type hyps = H.hyps
 
 type form = Equiv.form
 
+let pp_form = Equiv.pp
+
 (** An equivalence sequent features:
   * - two frames given as a single [goal] containing bi-terms
   *   of sort boolean or message;
@@ -303,6 +305,8 @@ let change_felem i elems s =
   set_equiv_goal (List.rev_append before (elems @ after)) s
 
 let get_felem i s = let _, t, _ = List.splitat i (goal_as_equiv s) in t
+
+let get_hint_db s = s.hint_db
 
 (*------------------------------------------------------------------*)
 let map f s : sequent = set_goal (f (goal s)) (Hyps.map f s)
