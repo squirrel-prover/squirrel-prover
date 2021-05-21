@@ -49,3 +49,10 @@ goal _ (x:timestamp,y:timestamp,z:timestamp):
 Proof.
  auto.
 Qed.
+
+axiom eq_iff (x, y : boolean) : (x = y) = (x <=> y).
+
+goal _ (t, t' : timestamp): (t <= pred(t')) = (t < t').
+Proof. 
+  by rewrite eq_iff. 
+Qed.

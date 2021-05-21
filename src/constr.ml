@@ -1051,7 +1051,7 @@ let log_segment_eq eq =
 let log_split f =
   dbg "@[<v 2>Splitting clause:@, %a@]" Form.pp_disj f
     
-let log_init_eqs eqs =
+let log_new_eqs eqs =
   let pp_eq fmt (ut1, ut2) =
     Fmt.pf fmt "%a = %a" pp_ut ut1 pp_ut ut2 in
   
@@ -1059,7 +1059,7 @@ let log_init_eqs eqs =
     Fmt.pf fmt "@[<hv 2>%a@]" 
       (Fmt.list ~sep:Fmt.comma pp_eq) eqs in
       
-  dbg "@[<v 2>Adding new init equalities:@, %a@]"
+  dbg "@[<v 2>Adding new equalities:@, %a@]"
     pp_eqs eqs
 
 let log_new_neqs neqs =
@@ -1103,10 +1103,10 @@ let find_segment_disj instance g =
 (*------------------------------------------------------------------*)
 (** Looks for instances of the rule:
     ∀ τ, (happens(τ) ∧ ¬happens(pred(τ))) ⇒ τ = init *)
-let find_eq_init inst =  
+let find_eq_init (inst : constr_instance) =  
   let uf = inst.uf in
 
-  let new_eqs = List.filter_map (fun (ut1, ut2) ->     
+  List.filter_map (fun (ut1, ut2) ->     
       let uf, uts = mgus uf [ut1;ut2] in
       let ut1, ut2 = Utils.as_seq2 uts in
 
@@ -1114,14 +1114,42 @@ let find_eq_init inst =
       else
         let ut = if ut_equal ut1 uundef then ut2 else ut1 in
         let _, put = mgu uf (upred ut) in
-        
+
         if ut_equal put uundef &&
            (not (ut_equal put uinit)) &&
            (not (ut_equal ut uinit))
         then Some (ut, uinit)
         else None
-    ) inst.neqs in
+    ) inst.neqs 
 
+(*------------------------------------------------------------------*)
+(** Looks for instances of the rule:
+    ∀ τ τ', τ ≤ τ' ∧ pred(τ') = ⊥ ⇒ τ = τ' *)
+let find_pred_undef (inst : constr_instance) graph =  
+  let uf = inst.uf in
+
+  UtG.fold_edges (fun t t' new_eqs ->
+      let uf, uts = mgus uf [t;t'] in
+      let t, t' = Utils.as_seq2 uts in
+
+      if is_undef uf (upred t') && 
+         not (ut_equal t t')    (* do not add existing equalities *)
+      then (t, t') :: new_eqs 
+      else new_eqs
+    ) graph []
+
+let find_new_eqs inst graph = 
+  let uf = inst.uf in
+  let new_eqs = find_eq_init inst @ find_pred_undef inst graph in
+  let new_eqs = 
+    (* we remove already known equalities *)
+    List.filter (fun (t,t') -> 
+      let uf, uts = mgus uf [t;t'] in
+      let t, t' = Utils.as_seq2 uts in
+
+        not (ut_equal t t')
+      ) new_eqs 
+  in
   if new_eqs = [] then None else Some new_eqs
 
 (*------------------------------------------------------------------*)
@@ -1179,9 +1207,9 @@ let rec split (instance : constr_instance) : model list =
     
     let g = UtGOp.transitive_closure g in
 
-    begin match find_eq_init instance with
+    begin match find_new_eqs instance g with
       | Some new_eqs ->
-        log_init_eqs new_eqs;
+        log_new_eqs new_eqs;
         split { instance with eqs = new_eqs @ instance.eqs; }
         
       | None -> match find_new_undef instance g with
