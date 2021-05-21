@@ -1462,7 +1462,7 @@ module Match : MatchS with type t = message = struct
         | Action (s,is), Action (s',is') -> smatch (s,is) (s',is') mv
 
         | Diff (a,b), Diff (a', b') ->
-          tmatch_l [a;b] [a';b'] mv (* TODO: check this *)
+          tmatch_l [a;b] [a';b'] mv
 
         | Atom at, Atom at' -> atmatch at at' mv
 

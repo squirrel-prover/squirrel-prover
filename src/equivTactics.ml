@@ -1263,7 +1263,7 @@ let equiv_message m1 m2 (s : ES.t) =
   in
   subgoals
 
-
+(* TODO: subsumed by rewrite *)
 let equivalent arg s = match arg with
   | Args.Pair (t1,t2) ->
     match t1, t2 with
@@ -1276,7 +1276,6 @@ let equivalent arg s = match arg with
         else equiv_message f1 f2 s
 
       | _ ->
-        (* TODO: improve error message + add locations *)
         hard_failure
           (Tactics.Failure ("expected a pair of messages of the same types"))
 

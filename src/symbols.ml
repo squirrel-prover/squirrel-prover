@@ -485,7 +485,7 @@ let is_ftype s ftype table =
     | _,t when t = ftype -> true
     | _ -> false
     | exception Not_found -> 
-      (* TODO: location *)
+      (* TODO: this should be an assert false *)
       symb_err L._dummy (Unbound_identifier s.name)
 
 module Macro = Make (struct
