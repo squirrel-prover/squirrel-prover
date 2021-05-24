@@ -137,6 +137,7 @@
   "constraints"
   "auto"
   "refl"
+  "hint"
 ))
 
 (defvar squirrel-tacticals-keywords '(

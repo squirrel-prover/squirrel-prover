@@ -181,7 +181,7 @@ let get_def :
   |  _ -> assert false
 
 (*------------------------------------------------------------------*)
-let get_definition : type a. 
+let get_definition : 
   Constr.trace_cntxt -> Term.msymb -> Term.timestamp -> Term.message =
   fun cntxt symb ts ->
   let ts_action = 
@@ -205,6 +205,9 @@ let get_definition : type a.
   let mdef = get_def cntxt.system cntxt.table symb ts_action in
   Term.subst [Term.ESubst (ts_action, ts)] mdef 
 
+let get_definition_opt cntxt symb ts =
+  try Some (get_definition cntxt symb ts) with
+  | Tactics.Tactic_soft_failure _ -> None
 
 
 (*------------------------------------------------------------------*)

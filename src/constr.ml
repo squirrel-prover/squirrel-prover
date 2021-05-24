@@ -19,6 +19,8 @@ let dbg s = Printer.prt (if Config.debug_constr () then `Dbg else `Ignore) s
 
 type trace_literal = Term.trace_literal
 
+type trace_literals = trace_literal list
+
 (*------------------------------------------------------------------*)
 module TraceLits : sig 
   type t = private C of trace_literal list

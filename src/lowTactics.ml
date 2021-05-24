@@ -1,4 +1,5 @@
 open Utils
+open Rewrite
 
 module Args = TacticsArgs
 module L = Location
@@ -21,74 +22,9 @@ let soft_failure = Tactics.soft_failure
 let bad_args () = hard_failure (Failure "improper arguments")
 
 (*------------------------------------------------------------------*)
-(** {2 Module type for sequents}*)
-
-module type Sequent = sig
-  type t
-  type sequent = t
-
-  val pp : Format.formatter -> t -> unit
-
-  (** type of hypotheses and goals *)
-  type form
-
-  module Hyps : Hyps.HypsSeq with type hyp = form and type sequent = t
-
-  val reach_to_form : Term.message -> form
-
-  val env : t -> Vars.env
-  val set_env : Vars.env -> t -> t
-
-  val goal : t -> form
-  val set_goal : form -> t -> t
-  val set_reach_goal : Term.message -> t -> t
-
-  val system : t -> SystemExpr.system_expr
-  val set_system : SystemExpr.system_expr -> t -> t
-
-  val table : t -> Symbols.table
-  val set_table  : Symbols.table -> t -> t
-
-  val ty_vars : t -> Type.tvars 
-
-  val is_hyp_or_lemma        : lsymb -> t -> bool
-  val is_equiv_hyp_or_lemma  : lsymb -> t -> bool
-  val is_reach_hyp_or_lemma  : lsymb -> t -> bool
-
-  val get_hyp_or_lemma       : lsymb -> t -> Goal.hyp_or_lemma
-  val get_equiv_hyp_or_lemma : lsymb -> t -> Goal.equiv_hyp_or_lemma
-  val get_reach_hyp_or_lemma : lsymb -> t -> Goal.reach_hyp_or_lemma
-
-  val mem_felem    : int -> t -> bool
-  val change_felem : int -> Term.message list -> t -> t
-  val get_felem    : int -> t -> Term.message
-
-  val query_happens : precise:bool -> t -> Term.timestamp -> bool
-
-  val mk_trace_cntxt : t -> Constr.trace_cntxt
-
-  val get_models : t -> Constr.models
-
-  val subst     : Term.subst ->   t ->   t
-  val subst_hyp : Term.subst -> form -> form
-
-  (** get (some) terms appearing in an hypothesis.
-      In an equiv formula, does not return terms under (equiv) binders. *)
-  val get_terms : form -> Term.message list
-
-  (*------------------------------------------------------------------*)
-  (** {3 Matching} *)
-  module Match : Term.MatchS with type t = form
-
-  (*------------------------------------------------------------------*)
-  (** {3 Smart constructors and destructots} *)
-  module Smart : Term.SmartFO with type form = form  
-end
-
-(*------------------------------------------------------------------*)
 (** {2 Functor building tactics from a Sequent module}*)
 
-module LowTac (S : Sequent) = struct
+module LowTac (S : Sequent.S) = struct
 
   module Hyps = S.Hyps
 
@@ -416,16 +352,6 @@ module LowTac (S : Sequent) = struct
   (*------------------------------------------------------------------*)
   (** {3 Rewriting types and functions}*)
 
-  (** A rewrite rule is a tuple: 
-      (type variables, term variables, premisses, left term, right term)
-      Invariant: if (tyvars,sv,φ,l,r) is a rewrite rule, then
-      - sv ⊆ FV(l)
-      - ((FV(r) ∪ FV(φ)) ∩ sv) ⊆ FV(l) *)
-  type 'a rw_rule = 
-    Type.tvars * Vars.Sv.t * Term.message list * 'a Term.term * 'a Term.term
-
-  type rw_erule = Type.tvars * Vars.Sv.t * Term.message list * Term.esubst
-
   type rw_arg = 
     | Rw_rw of Ident.t option * rw_erule
     (* The ident is the ident of the hyp the rule came from (if any) *)
@@ -433,21 +359,7 @@ module LowTac (S : Sequent) = struct
     | Rw_expand of Theory.term
 
   type rw_earg = Args.rw_count * rw_arg
-
-  (** Check that the rule is correct. *)
-  let check_erule ((_, sv, h, Term.ESubst (l,r)) : rw_erule) : unit =
-    let fvl, fvr = Term.fv l, Term.fv r in
-    let sh = List.fold_left (fun sh h ->
-        Vars.Sv.union sh (Term.fv h)
-      ) Vars.Sv.empty h
-    in
-
-    if not (Vars.Sv.subset sv fvl) || 
-       not (Vars.Sv.subset (Vars.Sv.inter (Vars.Sv.union fvr sh) sv) fvl) then 
-      hard_failure Tactics.BadRewriteRule;
-    ()
-
-
+  
   (** [rewrite ~all tgt rw_args] rewrites [rw_arg] in [tgt].
       If [all] is true, then does not fail if no rewriting occurs. *)
   let rewrite ~all 
@@ -539,32 +451,6 @@ module LowTac (S : Sequent) = struct
     if all && not !found1 then soft_failure Tactics.NothingToRewrite;
 
     s, subs
-
-  (** Make a rewrite rule from a formula *)
-  let pat_to_rw_erule ?loc dir (p : Type.message Term.pat) : rw_erule = 
-    let subs, f = Term.decompose_impls_last p.pat_term in
-
-    let e = match f with
-      | Term.Atom (`Message   (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
-      | Term.Atom (`Timestamp (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
-      | Term.Atom (`Index     (`Eq, t1, t2)) -> 
-        Term.ESubst (Term.Var t1,Term.Var t2)
-      | _ -> hard_failure ?loc (Tactics.Failure "not an equality") 
-    in
-
-    let e = match dir with
-      | `LeftToRight -> e
-      | `RightToLeft -> 
-        let Term.ESubst (t1,t2) = e in
-        Term.ESubst (t2,t1)
-    in
-
-    let rule = p.pat_tyvars, p.pat_vars, subs, e in
-
-    (* We check that the rule is valid *)
-    check_erule rule;
-
-    rule
 
   (** Parse rewrite tactic arguments as rewrite rules with possible subgoals 
       showing the rule validity. *)
@@ -686,4 +572,8 @@ module LowTac (S : Sequent) = struct
         let idg, sg = Hyps.add_i (Args.Named ng) g s in
         ( CHyp idg, sg )
       ) cases
+
+  (*------------------------------------------------------------------*)
+  (** Reduce *)
+  let reduce_sequent s = S.map (S.reduce s) s        
 end

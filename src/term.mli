@@ -107,9 +107,10 @@ type timestamp = Type.timestamp term
 type eterm = ETerm : 'a term -> eterm
 
 (** Does not recurse. *)
-val tmap  : (eterm -> eterm) -> 'a term -> 'a term 
-val titer : (eterm -> unit) -> 'a term -> unit
-val tfold : (eterm -> 'a -> 'a) -> 'b term -> 'a -> 'a
+val tmap       : (eterm -> eterm) -> 'a term -> 'a term 
+val titer      : (eterm -> unit) -> 'a term -> unit
+val tfold      : (eterm -> 'a -> 'a) -> 'b term -> 'a -> 'a
+val tmap_fold  : ('b -> eterm -> 'b * eterm) -> 'b -> 'a term -> 'b * 'a term 
 
 (*------------------------------------------------------------------*)
 (** {2 Subset of all atoms} *)

@@ -120,6 +120,7 @@ rule token = parse
 | "equiv"             { EQUIV }
 | "axiom"             { AXIOM }
 | "Proof."            { PROOF }
+| "hint"              { HINT }
 | "Qed."              { QED }
 | "Abort."            { ABORT }
 | "help"              { HELP }
