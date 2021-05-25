@@ -5,25 +5,22 @@ set autoIntro=false.
 
 name k:message
 
-system  null.
+system null.
 
 axiom dummy_false_axiom (ma : message):
 exists (m:message), m=k && ma=k.
 
 goal [left] dummy (ma : message) : ma=k.
 Proof.
- use dummy_false_axiom with ma. 
- auto.
+ by use dummy_false_axiom with ma. 
 Qed.
 
 goal [right] _ (ma : message): ma=k.
 Proof.
- use dummy_false_axiom with ma.
- auto.
+ by use dummy_false_axiom with ma.
 Qed.
 
 goal _ (ma : message) : ma=k.
 Proof.
- use dummy_false_axiom with ma.
- auto.
+ by use dummy_false_axiom with ma.
 Qed.
