@@ -1145,35 +1145,41 @@ let expand_tac args s =
 
 let expand_tac args = LT.wrap_fail (expand_tac args)
 
-(*------------------------------------------------------------------*)
 (* Does not rely on the typed registration, as it parses a substitution. *)
 let () = T.register_general "expand"
 
-    ~tactic_help:{general_help = "Expand all occurrences of the given macro, or \
-                                  expand the given sequence using the given \
-                                  indices.";
+    ~tactic_help:{general_help = "Expand the given macro.";
                   detailed_help = "The value of the macro is obtained by looking \
                                    at the corresponding action in the \
                                    protocol. It cannot be used on macros with \
                                    unknown timestamp.";
                   usages_sorts = [Sort None];
                   tactic_group = Structural}
-  (function
-    | [Args.Theory v] as args -> pure_equiv (expand_tac args)
+    (pure_equiv_arg expand_tac)
 
-    | (Args.Theory v)::ids ->
-        let ids =
-          List.map (function
-               | Args.Theory th -> th
-               | _ -> bad_args ()
-            ) ids
-        in
-        pure_equiv
-          (fun s sk fk -> match expand_seq v ids s with
-             | subgoals -> sk subgoals fk
-             | exception Tactics.Tactic_soft_failure e -> fk e)
+(*------------------------------------------------------------------*)
+let expand_seq args s =
+  match args with
+  | (Args.Theory v) :: ids ->
+    let ids =
+      List.map (function
+          | Args.Theory th -> th
+          | _ -> bad_args ()
+        ) ids
+    in
+    expand_seq v ids s 
+  | _ -> bad_args ()
 
-     | _ -> bad_args ())
+let expand_seq_tac args = LT.wrap_fail (expand_seq args)
+
+(* Does not rely on the typed registration, as it parses a substitution. *)
+let () = T.register_general "expandseq"
+
+    ~tactic_help:{general_help = "Expand the given sequence.";
+                  detailed_help = "";
+                  usages_sorts = [];
+                  tactic_group = Structural}
+    (pure_equiv_arg expand_seq_tac)
 
 (*------------------------------------------------------------------*)
 (* TODO: factorize *)
