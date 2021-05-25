@@ -185,8 +185,7 @@ Proof.
   auto.
 
   (* Case R *)
-  expand frame@R(j); expand exec@R(j).
-  expand cond@R(j); expand output@R(j).
+  expand frame, exec, cond, output.
   fa 0; fa 1; fa 1.
   fresh 1; yesif 1.
   repeat split => // j0 H1. 
@@ -195,8 +194,7 @@ Proof.
   auto.
 
   (* Case R1 *)
-  expand frame@R1(j); expand exec@R1(j).
-  expand output@R1(j).
+  expand frame, exec, output.
   fa 0; fa 1.
 
   equivalent
@@ -268,8 +266,7 @@ Proof.
   by fresh 1.
 
   (* Case R2 *)
-  expand frame@R2(j); expand exec@R2(j).
-  expand output@R2(j).
+  expand frame, exec, output.
   fa 0; fa 1.
   equivalent
     cond@R2(j),
@@ -282,8 +279,7 @@ Proof.
   by fadup 1.
 
   (* Case T *)
-  expand frame@T(i,k); expand exec@T(i,k).
-  expand cond@T(i,k); expand output@T(i,k).
+  expand frame, exec, cond, output.
   expand m2(i,k)@T(i,k).
   fa 0. fa 1. fa 1. fa 1.
   prf 2.

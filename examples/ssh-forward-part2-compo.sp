@@ -466,7 +466,7 @@ Proof.
   by expandall; fa 17.
  (* P3 *)
   expandall; fa 17.
-  by expand seq(i -> r2(i)),i.
+  by expandseq seq(i -> r2(i)),i.
  (* A *)
   by expandall; fa 17.
   (* A1 *)
@@ -481,9 +481,9 @@ Proof.
   by expandall; fa 17.
   (* SDISauth3 *)
   expandall; fa 17.
-  by expand seq(i -> a(i)),i.
+  by expandseq seq(i -> a(i)),i.
   (* Sfail *)
-  expand frame@Sfail.
+  expand frame.
 
   equivalent exec@Sfail, false. 
   split; 2: by auto. 
@@ -492,7 +492,7 @@ Proof.
   depends Sok, Sfail => // _.
   executable Sfail; 1,2: auto.  
   by intro H0; use H0 with Sok.
-  by expand exec@Sfail.
+  by expand exec.
 
   by fa 17; fa 18; noif 18.
   (* A3 *)
@@ -513,10 +513,10 @@ Proof.
   by expandall; fa 17.
   (* PDISauth7 *)
   expandall; fa 17.
-  expand seq(i -> b(i)),i. 
-  by expand seq(i -> bke1(i)),i.
+  expandseq seq(i -> b(i)),i. 
+  by expandseq seq(i -> bke1(i)),i.
   (* Pfail *)
-  expand frame@Pfail.
+  expand frame.
 
   equivalent exec@Pfail, false. 
   split; 2: by auto. 
@@ -525,7 +525,7 @@ Proof.
   depends PDIS5, Pfail => // _.
   executable Pfail; 1,2: auto.  
   by intro H0; use H0 with PDIS5.
-  by expand exec@Pfail.
+  by expand exec.
 
   by fa 17; fa 18; noif 18.
  (* A4 *)

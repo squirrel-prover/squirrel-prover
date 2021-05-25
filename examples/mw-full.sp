@@ -186,12 +186,11 @@ induction t.
 by admit. (* see comment above *)
 
 (* Case R - Done *)
-expand frame@R(r). fa 4.
-by expand seq(r->nr(r)), r.
+expand frame. fa 4.
+by expandseq seq(r->nr(r)), r.
 
 (* Case R1  WIP *)
-expand frame@R1(r); expand exec@R1(r).
-expand cond@R1(r); expand output@R1(r).
+expand frame, exec, cond, output.
 fa 4; fa 5.
 
 equivalent
@@ -261,14 +260,13 @@ by use H1.
 fa 5.
 fadup 5.
 fa 5.
-expand seq(i,r,t->xor((diff(id(i),id'(i,t))),
+expandseq seq(i,r,t->xor((diff(id(i),id'(i,t))),
                   H(<tag1,<nr(r),nt(i,t)>>,(diff(key(i),key'(i,t)))))),
        i,r,t.
 by fadup 5.
 
 (* Case R2 *)
-expand frame@R2(r); expand exec@R2(r).
-expand cond@R2(r); expand output@R2(r).
+expand frame, exec, cond, output.
 fa 4. fa 5.
 
 (* Same as wa_R1 but with @R2 instead of @R1,
@@ -306,14 +304,14 @@ by intro [i t _]; expand output; exists i,t.
 by fadup 5.
 
 (* Case T *)
-expand frame@T(i,t). fa 4.
-expand seq(i,t->nt(i,t)),i,t.
-by expand seq(i,t->xor((diff(id(i),id'(i,t))),
+expand frame. fa 4.
+expandseq seq(i,t->nt(i,t)),i,t.
+by expandseq seq(i,t->xor((diff(id(i),id'(i,t))),
                 H(<tag0,<input@T(i,t),nt(i,t)>>,(diff(key(i),key'(i,t)))))),i,t.
 
 
 (* Case T1 *)
-expand frame@T1(i,t); expand exec@T1(i,t).
+expand frame, exec.
 fa 4. fa 5.
 
 equivalent exec@pred(T1(i,t)) && cond@T1(i,t),
@@ -326,7 +324,7 @@ equivalent exec@pred(T1(i,t)) && cond@T1(i,t),
   snd(input@R1(r)) = snd(output@T(i,t)) &&
   R(r) < T(i,t) &&
   input@T(i,t) = output@R(r).
-expand cond@T1(i,t); split.
+  expand cond; split.
   (* Cond => Honest *)
   intro [_ Meq]; simpl.
   assert input@T1(i,t) XOR diff(id(i),id'(i,t)) =
@@ -341,8 +339,8 @@ expand cond@T1(i,t); split.
   clear Ctrace.
   assert cond@R1(r) as Hcond.
     executable pred(T1(i,t)); 1,2: auto.
-    by intro HH; use HH with R1(r); expand exec@R1(r).
-  expand cond@R1(r).
+    by intro HH; use HH with R1(r); 1: expand exec.
+  expand cond.
   destruct Hcond as [i1 t1 Hcond].
   euf Hcond => _ [_ [_ _]] _; 1:auto.
   exists r; simpl.
@@ -364,8 +362,8 @@ expand cond@T1(i,t); split.
   clear Ctrace.
   assert cond@R1(r) as Hcond.
     executable pred(T1(i,t)); 1,2: auto.
-    by intro Hex; use Hex with R1(r); expand exec@R1(r).
-  expand cond@R1(r).
+    by intro Hex; use Hex with R1(r); 1: expand exec.
+  expand cond.
   destruct Hcond as [i1 t1 Hcond].
   euf Hcond => Clt1 [_ [D F]] [? ?]; [1:auto].
   exists r; simpl.
@@ -396,7 +394,7 @@ fa 6.
 by fadup 5.
 
 (* Case T2 *)
-expand frame@T2(i,t); expand exec@T2(i,t); expand cond@T2(i,t).
+expand frame, exec, cond.
 fa 4. fa 5.
 equivalent
   (exec@pred(T2(i,t)) &&
@@ -437,8 +435,8 @@ split; intro [_ H1]; simpl.
   clear Ct.
   assert cond@R1(r) as Hcond.
     executable pred(T2(i,t)); 1,2: auto.    
-    by intro He; use He with R1(r); expand exec@R1(r).
-  expand cond@R1(r).
+    by intro He; use He with R1(r); 1: expand exec.
+  expand cond.
   destruct Hcond as [i1 t1 Hcond]. 
   euf Hcond => _ _ _; 1: auto.
   exists r; simpl.
@@ -461,8 +459,8 @@ split; intro [_ H1]; simpl.
   clear Ct.
   assert cond@R1(r) as Hcond.
     executable pred(T2(i,t)); 1,2: auto => He.
-    by use He with R1(r); expand exec@R1(r). 
-  expand cond@R1(r).
+    by use He with R1(r); 1: expand exec.
+  expand cond.
   destruct Hcond as [i1 t1 Hcond].
   euf Hcond; 1: auto => _ _ [_ _].
   exists r; simpl.

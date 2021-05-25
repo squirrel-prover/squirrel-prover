@@ -173,8 +173,7 @@ Proof.
 induction t; try auto.
 
 (* Case R *)
-expand frame@R(r); expand exec@R(r).
-expand cond@R(r);expand output@R(r).
+expand frame, exec, cond, output.
 fa 0.
 fa 1.
 fa 1.
@@ -186,8 +185,7 @@ by (repeat split => r0 _;
 auto. 
 
 (* Case R1 *)
-expand frame@R1(r); expand exec@R1(r).
-expand cond@R1(r); expand output@R1(r).
+expand frame, exec, cond, output.
 
 fa 0; fa 1.
 
@@ -284,8 +282,7 @@ by use len_id with i; use len_id' with i,t; namelength n_PRF, dummy.
 auto.
 
 (* Case R2 *)
-expand frame@R2(r); expand exec@R2(r).
-expand cond@R2(r); expand output@R2(r).
+expand frame, exec, cond, output.
 
 fa 0. fa 1.
 
@@ -302,8 +299,7 @@ by use wa_R2 with r.
 by fadup 1.
 
 (* Case T *)
-expand frame@T(i,t); expand exec@T(i,t).
-expand cond@T(i,t);expand output@T(i,t).
+expand frame, exec, cond, output.
 fa 0.
 fa 1.
 fa 1.

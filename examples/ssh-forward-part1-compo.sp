@@ -265,9 +265,9 @@ Proof.
    by expandall; fa 7.
    (* Pauth3 *)
    expandall; fa 7.
-   by expand seq(i->g^b(i)),i. 
+   by expandseq seq(i->g^b(i)),i. 
    (* Pfail *)
-   expand frame@Pfail.
+   expand frame.
 
    equivalent exec@Pfail, False.
      expand exec. 
@@ -296,11 +296,9 @@ Proof.
 
    (* Sauth3 *)
    expandall; fa 7.
-   by expand seq(i->g^a(i)),i.
+   by expandseq seq(i->g^a(i)),i.
    (* Safil *)
-   expand frame@Sfail.
-
-   expand frame@Sfail.
+   expand frame.
 
    equivalent exec@Sfail, False.
      expand exec. 

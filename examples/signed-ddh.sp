@@ -127,34 +127,32 @@ Proof.
     by ddh g,a,b,k.
     (* Pchall *)
     expandall.
-    expand seq(i->g^a(i)), i.
+    expandseq seq(i->g^a(i)), i.
     by fa 6.
     (* Pchall1 *)
     expandall.
-    expand seq(i->g^a(i)), i.
+    expandseq seq(i->g^a(i)), i.
     by fa 6.
     (* A *)
     expandall.
-    expand  seq(i->g^a(i)), i.
+    expandseq  seq(i->g^a(i)), i.
     by fa 6.
     (* S *)
     expandall.
-    expand  seq(i->g^b(i)), j.
+    expandseq  seq(i->g^b(i)), j.
     by fa 6.
     (* S1 *)
     expandall.
-    expand  seq(i->g^b(i)), j.
+    expandseq  seq(i->g^b(i)), j.
     by fa 6.
     (* Case Schall2 *)
     expandall.
-    expand  seq(i->g^a(i)), l.
-    expand seq(i->g^b(i)), j.
-    expand seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), l, j.
+    expandseq  seq(i->g^a(i)), l.
+    expandseq seq(i->g^b(i)), j.
+    expandseq seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), l, j.
     by fa 8.
     (* Schall3 *)
-    expand frame@Schall3(j).
-    expand exec@Schall3(j).
-    expand output@Schall3(j).
+    expand frame, exec, output.
 
 
     equivalent exec@pred(Schall3(j)) && cond@Schall3(j), False.
@@ -170,7 +168,7 @@ Proof.
     by noif 6.
     (* A1 *)
     expandall.
-    expand  seq(i->g^b(i)), j.
+    expandseq  seq(i->g^b(i)), j.
     fa 6.
     (* A2 *)
      expandall.
@@ -194,22 +192,20 @@ Proof.
     by ddh g,a,b,k.
     (* Pchall *)
     expandall.
-    expand seq(i->g^a(i)), i.
+    expandseq seq(i->g^a(i)), i.
     by fa 6.
     (* Pchall1 *)
     expandall.
-    expand seq(i->g^a(i)), i.
+    expandseq seq(i->g^a(i)), i.
     by fa 6.
     (* Case Pchall2 *)
     expandall.
-    expand seq(i->g^a(i)), i.
-    expand seq(i->g^b(i)), j.
-    expand seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), i, j.
+    expandseq seq(i->g^a(i)), i.
+    expandseq seq(i->g^b(i)), j.
+    expandseq seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), i, j.
     by fa 8.
     (* Pchall3 *)
-    expand frame@Pchall3(i).
-    expand exec@Pchall3(i).
-    expand output@Pchall3(i).
+    expand frame, exec, output.
 
 
     equivalent exec@pred(Pchall3(i)) && cond@Pchall3(i), False.
@@ -226,22 +222,22 @@ Proof.
     noif 6.
     (* A *)
     expandall.
-    expand  seq(i->g^a(i)), i.
+    expandseq seq(i->g^a(i)), i.
     by fa 6.
 
     (* S *)
     expandall.
-    expand  seq(i->g^b(i)), j.
+    expandseq seq(i->g^b(i)), j.
     by fa 6.
 
     (* S1 *)
     expandall.
-    expand  seq(i->g^b(i)), j.
+    expandseq seq(i->g^b(i)), j.
     by fa 6.
 
     (* A1 *)
     expandall.
-    expand  seq(i->g^b(i)), j.
+    expandseq seq(i->g^b(i)), j.
     by fa 6.
 
     (* A2 *)

@@ -43,7 +43,7 @@ goal wa_R :
        snd(output@T(i,k)) = snd(input@R(j)))).
 Proof.
   intro *.
-  expand cond@R(j).
+  expand cond.
   split.
   project.
   (* LEFT *) by euf Meq; exists i, k0.
@@ -78,8 +78,8 @@ Proof.
   induction t.
 
   (* Case R *)
-  expand frame@R(j). fa 0. fa 1.
-  expand exec@R(j). expand output@R(j).
+  expand frame. fa 0. fa 1.
+  expand exec, output.
   equivalent
     (cond@R(j)),
     (exists (i,k:index), T(i,k) < R(j) &&
@@ -89,8 +89,8 @@ Proof.
   by fadup 1.
 
   (* Case R1 *)
-  expand frame@R1(j). fa 0. fa 1.
-  expand exec@R1(j). expand output@R1(j).
+  expand frame. fa 0. fa 1.
+  expand exec, output.
   equivalent
     (cond@R1(j)),
     (not(exists (i,k:index), T(i,k) < R1(j) &&
@@ -100,8 +100,7 @@ Proof.
   by fadup 1.
 
   (* Case T *)
-  expand frame@T(i,k); expand exec@T(i,k).
-  expand cond@T(i,k); expand output@T(i,k).
+  expand frame, exec, cond, output.
   fa 0; fa 1; fa 1; fa 1.
   prf 2.
   yesif 2. 

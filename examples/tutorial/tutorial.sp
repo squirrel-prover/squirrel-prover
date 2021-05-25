@@ -183,7 +183,7 @@ help.
 help simpl.
 
 simpl.
-expand cond@R(j,i).
+expand cond.
 euf H.
 by exists k.
 Qed.

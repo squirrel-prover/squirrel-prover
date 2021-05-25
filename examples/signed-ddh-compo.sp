@@ -187,16 +187,16 @@ Proof.
 
    (* P3 *)
    expandall; fa 6.
-   expand seq(i->g^b(i)),j.
+   expandseq seq(i->g^b(i)),j.
 
    (* P4 *)
-   expand frame@P4; expand exec@P4.
+   expand frame, exec.
    fa 6.
 
    equivalent exec@pred(P4) && cond@P4, False.
    executable pred(P4). 
    depends P1, P4; use H2 with P1. 
-   expand exec@P1.
+   expand exec.
    by use P1_charac.
 
    by fa 7; noif 7.
@@ -218,16 +218,16 @@ Proof.
 
    (* S3 *)
    expandall.
-   expand seq(i->g^a(i)),l.
+   expandseq seq(i->g^a(i)),l.
    fa 7.
 
    (* S4 *)
-   expand frame@S4; expand exec@S4.
+   expand frame, exec.
 
    equivalent exec@pred(S4) && cond@S4, False.
    executable pred(S4). 
    depends S1, S4; use H2 with S1. 
-   expand exec@S1. 
+   expand exec. 
    by use S1_charac.
 
    by fa 6; fa 7; noif 7.

@@ -193,13 +193,13 @@ Proof.
 
   (* Action 1/4: Reader *)
 
-  expand seq(k->nr(k)),k.
+  expandseq seq(k->nr(k)),k.
   expandall.
   by fa 3.
 
   (* Action 2/4: Reader1 *)
 
-  expand frame@Reader1(k).
+  expand frame.
   equivalent
     exec@Reader1(k),
     exec@pred(Reader1(k)) &&
@@ -209,7 +209,7 @@ Proof.
       input@Tag(i,j) = output@Reader(k).
   by use wa_Reader1 with k.
 
-  expand output@Reader1(k).
+  expand output.
   fa 2. fa 3. fadup 3.
 
   equivalent
@@ -283,15 +283,15 @@ Proof.
   fa 3; fadup 3.
   fa 3; fadup 3.
   enckp 3, k_fresh; 1: auto.
-  expand seq(k->nr(k)),k.
-  expand seq(i,j->nt(i,j)),i,j.
+  expandseq seq(k->nr(k)),k.
+  expandseq seq(i,j->nt(i,j)),i,j.
   fa 5.
   fresh 6.
   by fresh 5; yesif 5.
 
   (* Action 3/4: Reader2 *)
 
-  expand frame@Reader2(k).
+  expand frame.
 
   equivalent
     exec@Reader2(k),
@@ -312,7 +312,7 @@ Proof.
 
   enckp 3, k_fresh; 1: auto. 
 
-  expand seq(i,j->nt(i,j)),i,j.
+  expandseq seq(i,j->nt(i,j)),i,j.
   fa 4.
   fresh 5.
   by fresh 4; yesif 4. 
