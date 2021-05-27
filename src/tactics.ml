@@ -314,10 +314,11 @@ let map ?(cut=true) t l sk fk0 =
              let fk = if cut then fk0 else fk in
              aux (List.rev_append r acc) l fk)
           fk
-  in aux [] l fk0
+  in 
+  aux [] l fk0
 
 (** Like [map], but only apply the tactic to selected judgements. *)
-let map_sel sel_tacs l sk fk =
+let map_sel ?(cut=true) sel_tacs l sk fk0 =
   check_sel sel_tacs l;         (* check user input *)
 
   let rec aux i acc l fk = match l with
@@ -327,10 +328,11 @@ let map_sel sel_tacs l sk fk =
       | Some (_,t) ->
         t e
           (fun r fk ->
+             let fk = if cut then fk0 else fk in
              aux (i + 1) (List.rev_append r acc) l fk)
           fk
       | None -> aux (i + 1) (e :: acc) l fk
-  in aux 1 [] l fk
+  in aux 1 [] l fk0
 
 let orelse_nojudgment a b sk (fk : fk)  = a sk (fun _ -> b sk fk)
 
@@ -348,13 +350,16 @@ let andthen ?(cut=true) tac1 tac2 judge sk (fk : fk) : a =
   in
   tac1 judge sk fk
 
-let rec andthen_list ?cut = function
+let rec andthen_list ?(cut=true) = function
   | [] -> hard_failure (Failure "empty anthen_list")
   | [t] -> t
-  | t::l -> andthen ?cut t (andthen_list ?cut l)
+  | t::l -> andthen ~cut t (andthen_list ~cut l)
 
-let andthen_sel tac1 sel_tacs judge sk (fk : fk) : a =
-  let sk l fk' = map_sel sel_tacs l sk fk' in
+let andthen_sel ?(cut=true) tac1 sel_tacs judge sk (fk : fk) : a =
+  let sk l fk' = 
+    let fk = if cut then fk else fk' in
+    map_sel ~cut sel_tacs l sk fk
+  in
   tac1 judge sk fk
 
 let id j sk fk = sk [j] fk
