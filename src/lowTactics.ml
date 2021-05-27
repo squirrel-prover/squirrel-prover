@@ -576,4 +576,26 @@ module LowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** Reduce *)
   let reduce_sequent s = S.map (S.reduce s) s        
+
+  (*------------------------------------------------------------------*)
+  (** Revert *)
+  let revert (hid : Ident.t) (s : S.t) : S.t =
+    let f = Hyps.by_id hid s in
+    let s = Hyps.remove hid s in
+    S.set_goal (S.Smart.mk_impl ~simpl:false f (S.goal s)) s
+
+  let revert_str (hyp_name : lsymb) s : S.t =
+    let hid,_ = Hyps.by_name hyp_name s in
+    revert hid s
+
+  let revert_args (args : Args.parser_arg list) s : S.t list =
+    let s =
+      List.fold_left (fun s arg -> match arg with
+          | Args.String_name arg -> revert_str arg s
+          | _ -> bad_args ()
+        ) s args in
+    [s]
+
+  let revert_tac args s sk fk = wrap_fail (revert_args args) s sk fk
+
 end

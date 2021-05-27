@@ -239,26 +239,6 @@ let () =
     (only_equiv byequiv)
 
 (*------------------------------------------------------------------*)
-(* TODO: factorize with the identical trace tactics *)
-let revert (hid : Ident.t) (s : ES.t) =
-  let f = Hyps.by_id hid s in
-  let s = Hyps.remove hid s in
-  ES.set_goal (Equiv.Impl (f,ES.goal s)) s
-
-let revert_str (hyp_name : lsymb) s =
-  let hid,_ = Hyps.by_name hyp_name s in
-  revert hid s
-
-let revert_args (args : Args.parser_arg list) s =
-  let s =
-    List.fold_left (fun s arg -> match arg with
-        | Args.String_name arg -> revert_str arg s
-        | _ -> bad_args ()
-      ) s args in
-  [s]
-
-let revert_tac args s sk fk = LT.wrap_fail (revert_args args) s sk fk
-
 let () =
   T.register_general "revert"
     ~tactic_help:{
@@ -267,7 +247,7 @@ let () =
       detailed_help = "";
       tactic_group  = Logical;
       usages_sorts = []; }
-    (pure_equiv_arg revert_tac)
+    (pure_equiv_arg LT.revert_tac)
 
 (*------------------------------------------------------------------*)
 (* TODO: factorize with corresponding, more general, trace tactics *)
@@ -472,7 +452,7 @@ let generalize (ts : Term.timestamp) s =
     ) s [] in
 
   (* generalized sequent *)
-  let s = List.fold_left (fun s id -> revert id s) s gen_hyps in
+  let s = List.fold_left (fun s id -> LT.revert id s) s gen_hyps in
 
   (* function introducing back generalized hypotheses *)
   let intro_back s =

@@ -180,25 +180,6 @@ let do_naming_pat (ip_handler : Args.ip_handler) nip s : sequent =
     Hyps.add nip f s
 
 (*------------------------------------------------------------------*)
-let revert (hid : Ident.t) (s : sequent) : sequent =
-  let f = Hyps.by_id hid s in
-  let s = Hyps.remove hid s in
-  TS.set_goal (Term.mk_impl ~simpl:false f (TS.goal s)) s
-
-let revert_str (hyp_name : lsymb) s =
-  let hid,_ = Hyps.by_name hyp_name s in
-  revert hid s
-
-let revert_args (args : Args.parser_arg list) s =
-  let s =
-    List.fold_left (fun s arg -> match arg with
-        | Args.String_name arg -> revert_str arg s
-        | _ -> bad_args ()
-      ) s args in
-  [s]
-
-let revert_tac args s sk fk = LT.wrap_fail (revert_args args) s sk fk
-
 let () =
   T.register_general "revert"
     ~tactic_help:{
@@ -207,7 +188,7 @@ let () =
       detailed_help = "";
       tactic_group  = Logical;
       usages_sorts = []; }
-    revert_tac
+    LT.revert_tac
 
 (*------------------------------------------------------------------*)
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
@@ -467,7 +448,7 @@ let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
 
     (* For each case, apply the corresponding simple pattern *)
     List.map (fun (LT.CHyp id, s) ->
-        revert id s
+        LT.revert id s
       ) ss
 
 (** Apply an simple pattern a handler. *)
