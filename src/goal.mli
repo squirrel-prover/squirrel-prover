@@ -52,17 +52,10 @@ val to_equiv_lemma :
 (*------------------------------------------------------------------*)
 (** {2 Type of parsed goals} *)
 
-type p_equiv = Theory.term list 
-
-type p_equiv_form = 
-  | PEquiv of p_equiv
-  | PReach of Theory.formula
-  | PImpl  of p_equiv_form * p_equiv_form
-
 type p_goal_form =
   | P_trace_goal of Decl.p_goal_reach_cnt
 
-  | P_equiv_goal of SE.p_system_expr * Theory.bnds * p_equiv_form L.located
+  | P_equiv_goal of SE.p_system_expr * Theory.bnds * Theory.equiv_form L.located
 
   | P_equiv_goal_process of SE.p_system_expr
 
@@ -75,7 +68,7 @@ val make_equiv_goal :
   table:Symbols.table ->
   hint_db:Hint.hint_db ->
   string ->
-  SE.system_expr -> Theory.bnds -> p_equiv_form L.located -> lemma * t
+  SE.system_expr -> Theory.bnds -> Theory.equiv_form L.located -> lemma * t
 
 val make_trace_goal :
   tbl:Symbols.table -> 

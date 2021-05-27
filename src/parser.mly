@@ -19,7 +19,7 @@
 %token LANGLE RANGLE
 %token AND OR NOT TRUE FALSE HAPPENS
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS
-%token XOR STAR UNDERSCORE QMARK TICK
+%token XOR STAR UNDERSCORE QMARK TICK TILDE
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token DIFF LEFT RIGHT SEQ 
 %token NEW OUT PARALLEL NULL
@@ -735,10 +735,13 @@ equiv:
 | ei=term COMMA eis=equiv { ei::eis }
 
 equiv_form:
-| LBRACKET f=term RBRACKET         { Goal.PReach f }
-| e=equiv                          { Goal.PEquiv e }
+| LBRACKET f=term RBRACKET         { Theory.PReach f }
+| /* TILDE LPAREN */ e=equiv /* RPAREN */      { Theory.PEquiv e }
 /* | LPAREN f=equiv_form RPAREN       { f } */
-| f=equiv_form ARROW f0=equiv_form { Goal.PImpl (f,f0) }
+| f=equiv_form ARROW f0=equiv_form { Theory.PImpl (f,f0) }
+/* | FORALL LPAREN vs=arg_list RPAREN sep f=equiv_form %prec QUANTIF */
+/*                                    { Theory.PForAll (vs,f)  } */
+
 
 args:
 |                                    { [] }

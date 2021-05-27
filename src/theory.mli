@@ -89,6 +89,17 @@ type hterm_i =
 type hterm = hterm_i L.located
 
 (*------------------------------------------------------------------*)
+(** {2 Equivalence formulas} *)
+
+type equiv = term list 
+
+type equiv_form = 
+  | PEquiv  of equiv
+  | PReach  of formula
+  | PImpl   of equiv_form * equiv_form
+  | PForAll of bnds * equiv_form
+
+(*------------------------------------------------------------------*)
 (** {2 Declaration of new symbols} *)
 
 
@@ -300,6 +311,9 @@ val convert_ht :
   ?ty_env:Type.Infer.env -> 
   ?pat:bool ->
   conv_env -> Type.tvars -> Vars.env -> hterm -> Type.hty * Term.hterm
+
+val convert_equiv_form : 
+  conv_env -> Type.tvars -> Vars.env -> equiv_form -> Equiv.form
 
 (** Existantial type wrapping a converted term and its sort.
     The location is the location of the original [Theory.term].  *)

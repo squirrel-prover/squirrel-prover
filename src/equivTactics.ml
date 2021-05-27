@@ -456,6 +456,22 @@ let () =
     (pure_equiv_arg (LT.generalize_tac ~dependent:true))
 
 (*------------------------------------------------------------------*)
+let () =
+  T.register_general "apply"
+    ~tactic_help:{
+      general_help=
+        "Matches the goal with the conclusion of the formula F provided \
+         (directly, using lemma, or using an axiom), trying to instantiate \
+         F variables. Creates one subgoal for each premises of F.\n\
+         Usage: apply my_lem.\n       \
+         apply my_axiom.\n       \
+         apply (forall (x:message), F => G).";
+      detailed_help="";
+      usages_sorts=[];
+      tactic_group=Structural}
+    (pure_equiv_arg LT.apply_tac)
+
+(*------------------------------------------------------------------*)
 (** [generalize ts s] reverts all hypotheses that talk about [ts] in [s],
     by introducing them in the goal.
     Also returns a function that introduce back the generalized hypothesis.*)

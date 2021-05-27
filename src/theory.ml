@@ -244,13 +244,24 @@ let pp_i = pp_term_i
 
 
 (*------------------------------------------------------------------*)
-(** {2 Higher-order terms.} *)
+(** {2 Higher-order terms} *)
 
 (** For now, we need (and allow) almost no higher-order terms. *)
 type hterm_i =
   | Lambda of bnds * term
 
 type hterm = hterm_i L.located
+
+(*------------------------------------------------------------------*)
+(** {2 Equivalence formulas} *)
+
+type equiv = term list 
+
+type equiv_form = 
+  | PEquiv  of equiv
+  | PReach  of formula
+  | PImpl   of equiv_form * equiv_form
+  | PForAll of bnds * equiv_form
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
@@ -1264,11 +1275,47 @@ let econvert (cenv : conv_env) ty_vars subst t : eterm option =
     Some (ETerm (ty, tt, loc))
   with Conv e -> None
 
+(** exported outside Theory.ml *)
 let convert_index table ty_vars env t =
   let cenv = { table = table; cntxt = InGoal; } in
   match convert cenv ty_vars env t Type.Index with
   | Term.Var x -> x
   | _ -> conv_err (L.loc t) (Index_not_var (L.unloc t))
+
+(*------------------------------------------------------------------*)
+(** {2 Convert equiv formulas} *)
+
+let convert_el cenv ty_vars (env : Vars.env) el : Term.message =   
+  let t, _ = convert_i cenv ty_vars env el in
+  t  
+
+let convert_equiv cenv ty_vars (env : Vars.env) (e : equiv) =
+  List.map (convert_el cenv ty_vars env) e
+
+let convert_equiv_form cenv ty_vars env (p : equiv_form) =
+  let rec conve cenv ty_vars env p =
+    let conve ?(cenv=cenv) ?(ty_vars=ty_vars) ?(env=env) p = 
+       conve cenv ty_vars env p 
+    in
+
+    match p with
+    | PImpl (f,f0) -> Equiv.Impl (conve f, conve f0)
+
+    | PEquiv e -> 
+      Equiv.Atom (Equiv.Equiv (convert_equiv cenv ty_vars env e))
+
+    | PReach f -> 
+      Equiv.Atom (Equiv.Reach (convert cenv ty_vars env f Type.Boolean))
+
+    | PForAll (bnds, e) ->
+      let env, evs =
+        convert_p_bnds cenv.table ty_vars env bnds 
+      in
+      let e = conve ~env e in
+      Equiv.mk_forall evs e
+  in      
+
+  conve cenv ty_vars env p
 
 (*------------------------------------------------------------------*)
 (** {2 State and substitution parsing} *)

@@ -132,5 +132,5 @@ Proof.
    * there should not be a second index variable i1 in the
    * second case. *)
   by auto.
-  checkfail assert (i1=i1) exn CannotConvert.
+  remember i as i1.
 Abort.

@@ -93,17 +93,10 @@ let to_equiv_lemma ?loc gconcl =
 (*------------------------------------------------------------------*)
 (** {2 Parsed goals} *)
 
-type p_equiv = Theory.term list 
-
-type p_equiv_form = 
-  | PEquiv  of p_equiv
-  | PReach  of Theory.formula
-  | PImpl   of p_equiv_form * p_equiv_form
-
 type p_goal_form =
   | P_trace_goal of Decl.p_goal_reach_cnt
 
-  | P_equiv_goal of SE.p_system_expr * Theory.bnds * p_equiv_form L.located
+  | P_equiv_goal of SE.p_system_expr * Theory.bnds * Theory.equiv_form L.located
 
   | P_equiv_goal_process of SE.p_system_expr
 
@@ -111,26 +104,6 @@ type p_goal = Decl.p_goal_name * p_goal_form
 
 (*------------------------------------------------------------------*)
 (** {2 Convert equivalence formulas and goals} *)
-
-let convert_el cenv ty_vars (env : Vars.env) el : Term.message =   
-  let t, _ = Theory.convert_i cenv ty_vars env el in
-  t  
-
-let convert_equiv cenv ty_vars (env : Vars.env) (e : p_equiv) =
-  List.map (convert_el cenv ty_vars env) e
-
-let convert_equiv_form cenv ty_vars env (p : p_equiv_form) =
-  let rec conve p =
-    match p with
-    | PImpl (f,f0) -> 
-      Equiv.Impl (conve f, conve f0)
-    | PEquiv e -> 
-      Equiv.Atom (Equiv.Equiv (convert_equiv cenv ty_vars env e))
-    | PReach f -> 
-      Equiv.Atom (Equiv.Reach (Theory.convert cenv ty_vars env f Type.Boolean))
-  in
-
-  conve p
 
 let make_trace_goal ~tbl ~hint_db gname (pg : Decl.p_goal_reach_cnt) 
   : lemma * t =
@@ -154,12 +127,12 @@ let make_trace_goal ~tbl ~hint_db gname (pg : Decl.p_goal_reach_cnt)
   gc, Trace s
 
 let make_equiv_goal ~table ~hint_db
-    gname se (bnds : Theory.bnds) (p_form : p_equiv_form L.located) : lemma * t =
+    gname se (bnds : Theory.bnds) (p_form : Theory.equiv_form L.located) : lemma * t =
   let env, evs = Theory.convert_p_bnds table [] Vars.empty_env bnds in
 
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
 
-  let f = convert_equiv_form conv_env [] env (L.unloc p_form) in
+  let f = Theory.convert_equiv_form conv_env [] env (L.unloc p_form) in
 
   let gc = mk_goal_concl gname se [] (`Equiv (Equiv.mk_forall evs f)) in
   

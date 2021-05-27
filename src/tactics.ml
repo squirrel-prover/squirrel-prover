@@ -377,7 +377,6 @@ let checkfail_tac exc t j (sk : 'a sk) (fk : fk) =
   with
   | (Tactic_soft_failure (_,e) | Tactic_hard_failure (_,e)) when e = exc ->
     sk [j] fk
-  | Theory.Conv _ when exc=CannotConvert -> sk [j] fk
   | (Tactic_soft_failure (_, Failure _) |
      Tactic_hard_failure (_, Failure _) )
     when exc=Failure "" -> sk [j] fk
