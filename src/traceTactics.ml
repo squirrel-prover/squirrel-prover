@@ -1795,120 +1795,6 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-let apply (pat : Term.message Term.pat) (s : TS.t) : TS.t list =
-  let subs, f = Term.decompose_impls_last pat.pat_term in
-
-  if not (Vars.Sv.subset pat.pat_vars (Term.fv f)) then
-    soft_failure ApplyBadInst;
-
-  let pat = { pat with pat_term = f } in
-
-  match Term.Match.try_match (TS.goal s) pat with
-  | `NoMatch | `FreeTyv -> soft_failure ApplyMatchFailure
-  | `Match mv ->
-    let subst = Term.Match.to_subst mv in
-
-    let goals = List.map (Term.subst subst) subs in
-    List.map (fun g -> TS.set_goal g s) goals
-
-(** [apply_in f hyp s] tries to match a premise of [f] with the conclusion of
-    [hyp], and replaces [hyp] by the conclusion of [f].
-    It generates a new subgoal for any remaining premises of [f], plus all
-    premises of the original [hyp].
-
-    E.g., if `H1 : A -> B` and `H2 : A` then `apply H1 in H2` replaces
-    `H2 : A` by `H2 : B`
-*)
-let apply_in (pat : Term.message Term.pat) (hyp : Ident.t) (s : TS.t) 
-  : TS.t list =
-  let fprems, fconcl = Term.decompose_impls_last pat.pat_term in
-
-  let h = Hyps.by_id hyp s in
-  let hprems, hconcl = Term.decompose_impls_last h in
-
-  let try1 fprem =
-    if not (Vars.Sv.subset pat.pat_vars (Term.fv fprem)) then None
-    else
-      let pat = { pat with pat_term = fprem } in
-
-      match Term.Match.try_match hconcl pat with
-      | `NoMatch | `FreeTyv -> None
-      | `Match mv -> Some mv
-  in
-
-  (* try to match a premise of [form] with [hconcl] *)
-  let rec find_match acc fprems = match fprems with
-    | [] -> None
-    | fprem :: fprems ->
-      match try1 fprem with
-      | None -> find_match (fprem :: acc) fprems
-      | Some mv ->
-        (* premises of [form], minus the matched premise *)
-        let fprems_other = List.rev_append acc fprems in
-        Some (fprems_other, mv)
-  in
-
-  match find_match [] fprems with
-  | None -> soft_failure ApplyMatchFailure
-  | Some (fsubgoals,mv) ->
-    let subst = Term.Match.to_subst mv in
-
-    (* instantiate the inferred variables everywhere *)
-    let fprems_other = List.map (Term.subst subst) fsubgoals in
-    let fconcl = Term.subst subst fconcl in
-
-    let goal1 =
-      let s = Hyps.remove hyp s in
-      Hyps.add (Args.Named (Ident.name hyp)) fconcl s
-    in
-
-    List.map (fun prem ->
-        TS.set_goal prem s
-      ) (hprems @               (* remaining premises of [hyp] *)
-         fprems_other)          (* remaining premises of [form] *)
-    @
-    [goal1]
-
-
-(** Parse apply tactic arguments *)
-let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) :
-  TS.t list * Term.message Term.pat * LT.target =
-  let subgoals, pat, in_opt =
-    match args with
-    | [Args.ApplyIn (Theory.PT_hol pt,in_opt)] ->
-      let _, pat = LT.convert_pt_hol pt s in
-      [], pat, in_opt
-
-    | [Args.ApplyIn (Theory.PT_form f,in_opt)] ->
-      begin
-        match LT.convert_args s args Args.(Sort Boolean) with
-        | Args.Arg (Boolean f) ->
-          let subgoal = TS.set_goal f s in
-          let pat = Term.pat_of_form f in
-          [subgoal], pat, in_opt
-
-        | _ -> bad_args ()
-      end
-
-    | _ -> bad_args ()
-  in
-
-  let target = match in_opt with
-    | Some lsymb -> LT.T_hyp (fst (Hyps.by_name lsymb s))
-    | None       -> LT.T_goal
-  in
-  subgoals, pat, target
-
-
-let apply_tac_args (args : Args.parser_arg list) s : TS.t list =
-  let subgoals, pat, target = p_apply_args args s in
-  match target with
-  | LT.T_goal    -> subgoals @ apply pat s      
-  | LT.T_hyp id  -> subgoals @ apply_in pat id s 
-  | LT.T_felem _ -> assert false
-
-let apply_tac args = LT.wrap_fail (apply_tac_args args)
-
 let () =
   T.register_general "apply"
     ~tactic_help:{
@@ -1922,7 +1808,7 @@ let () =
       detailed_help="";
       usages_sorts=[];
       tactic_group=Structural}
-    apply_tac
+    LT.apply_tac
 
 (*------------------------------------------------------------------*)
 let rec do_intros_ip (intros : Args.intro_pattern list) s =

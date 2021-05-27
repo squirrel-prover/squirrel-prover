@@ -9,6 +9,8 @@ type lsymb = Theory.lsymb
 
 type form = Term.message
 
+let s_kind = LowSequent.KReach
+
 let pp_form = Term.pp
 
 (*------------------------------------------------------------------*)
@@ -533,6 +535,7 @@ let set_reach_goal t s = set_goal t s
 
 let reach_to_form t = t
 let form_to_reach ?loc t = t
+let gform_of_form f = `Reach f
 
 let get_hint_db s = s.hint_db
 

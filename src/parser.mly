@@ -569,7 +569,7 @@ spt:
 apply_arg:
 | pt=pt                  { Theory.PT_hol pt }
 
-| LPAREN f=term RPAREN   { Theory.PT_form f }
+/* | LPAREN f=term RPAREN   { Theory.PT_form f } */
 
 %inline generalize_dependent:
 | GENERALIZE DEPENDENT { }

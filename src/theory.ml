@@ -1360,7 +1360,7 @@ type p_pt_hol = {
 (** Parser type for `apply` arguments *)
 type p_pt =
   | PT_hol  of p_pt_hol (* (partially applied) hypothesis or lemma *)
-  | PT_form of term
+  (* | PT_form of term *)
 
 (*------------------------------------------------------------------*)
 (** {2 Tests} *)

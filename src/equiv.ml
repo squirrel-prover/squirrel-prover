@@ -121,6 +121,10 @@ let tfold : (form -> 'b -> 'b) -> form -> 'b -> 'b =
   titer fi t;
   !vref
 
+(*------------------------------------------------------------------*)
+(** {2 Generalized formuals} *)
+
+type gform = [`Equiv of form | `Reach of Term.message]
 
 (*------------------------------------------------------------------*)
 (** {2 Substitution} *)

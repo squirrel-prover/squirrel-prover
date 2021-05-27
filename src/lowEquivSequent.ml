@@ -29,6 +29,8 @@ type hyps = H.hyps
 
 type form = Equiv.form
 
+let s_kind = LowSequent.KEquiv
+
 let pp_form = Equiv.pp
 
 (** An equivalence sequent features:
@@ -232,6 +234,7 @@ let goal_as_equiv s = match goal s with
 let set_reach_goal f s = set_goal Equiv.(Atom (Reach f)) s
 
 let reach_to_form t = Equiv.Atom (Equiv.Reach t)
+let gform_of_form f = `Equiv f
 
 let form_to_reach ?loc (e : Equiv.form) = 
   match e with

@@ -55,6 +55,11 @@ val tfold      : (form -> 'a -> 'a) -> form -> 'a -> 'a
 val tmap_fold  : ('b -> form -> 'b * form) -> 'b -> form -> 'b * form 
 
 (*------------------------------------------------------------------*)
+(** {2 Generalized formuals} *)
+
+type gform = [`Equiv of form | `Reach of Term.message]
+
+(*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
 
 val subst : Term.subst -> form -> form

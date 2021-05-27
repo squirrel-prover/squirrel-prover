@@ -15,4 +15,10 @@ module type S = sig
   val get_reach_hyp_or_lemma : lsymb -> t -> Goal.reach_hyp_or_lemma
 
   val reduce : t -> form -> form
+
+  val convert_pt_hol : 
+    Theory.p_pt_hol -> 'a LowSequent.s_kind -> t -> Goal.ghyp * 'a Term.pat
 end
+
+(** Function building a Sequent.S form a LowSequent.S *)
+module Mk (LS : LowSequent.S) : S with type t = LS.t and type form = LS.form

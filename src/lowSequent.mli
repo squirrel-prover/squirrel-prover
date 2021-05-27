@@ -1,6 +1,11 @@
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
+type _ s_kind = 
+  | KReach : Term.message s_kind
+  | KEquiv :   Equiv.form s_kind
+
+(*------------------------------------------------------------------*)
 (** {2 Module type for sequents} *)
 
 module type S = sig
@@ -10,15 +15,23 @@ module type S = sig
 
   val pp : Format.formatter -> t -> unit
 
+  (*------------------------------------------------------------------*)
   (** type of hypotheses and goals *)
   type form
 
   val pp_form : Format.formatter -> form -> unit
 
+  (*------------------------------------------------------------------*)
+  (** The kind of the sequent: allows type introspection *)
+  val s_kind : form s_kind
+
+  (*------------------------------------------------------------------*)
   module Hyps : Hyps.HypsSeq with type hyp = form and type sequent = t
 
+  (*------------------------------------------------------------------*)
   val reach_to_form :                    Term.message -> form
   val form_to_reach : ?loc:Location.t -> form -> Term.message
+  val gform_of_form : form -> Equiv.gform
 
   val env : t -> Vars.env
   val set_env : Vars.env -> t -> t
@@ -31,7 +44,7 @@ module type S = sig
   val set_system : SystemExpr.system_expr -> t -> t
 
   val table : t -> Symbols.table
-  val set_table  : Symbols.table -> t -> t
+  val set_table : Symbols.table -> t -> t
 
   val ty_vars : t -> Type.tvars 
 

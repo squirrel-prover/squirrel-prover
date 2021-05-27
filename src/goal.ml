@@ -46,9 +46,7 @@ type ('a,'b) lemma_g = {
 }
 
 (*------------------------------------------------------------------*)
-type gform = [`Equiv of Equiv.form | `Reach of Term.message]
-
-type       lemma = (string,        gform) lemma_g
+type       lemma = (string,   Equiv.gform) lemma_g
 type equiv_lemma = (string,   Equiv.form) lemma_g
 type reach_lemma = (string, Term.message) lemma_g
 
@@ -58,7 +56,7 @@ type lemmas = lemma list
 (*------------------------------------------------------------------*)
 type ghyp = [ `Hyp of Ident.t | `Lemma of string ]
 
-type       hyp_or_lemma = (ghyp,        gform) lemma_g
+type       hyp_or_lemma = (ghyp,   Equiv.gform) lemma_g
 type equiv_hyp_or_lemma = (ghyp,   Equiv.form) lemma_g
 type reach_hyp_or_lemma = (ghyp, Term.message) lemma_g
 
@@ -80,7 +78,9 @@ let to_reach_lemma ?loc gconcl =
   match gconcl.gc_concl with
   | `Reach f -> { gconcl with gc_concl = f }
 
-  | `Equiv _ -> 
+  | `Equiv (Equiv.Atom (Reach f)) -> { gconcl with gc_concl = f }
+
+  | `Equiv _ ->
     Tactics.soft_failure ?loc (Failure "expected a reachability formula")
 
 let to_equiv_lemma ?loc gconcl = 

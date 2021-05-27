@@ -76,51 +76,6 @@ module LowTac (S : Sequent.S) = struct
     Theory.convert_ht conv_env (S.ty_vars s) env ht
 
   (*------------------------------------------------------------------*)
-  (** Parse a partially applied lemma or hypothesis as a pattern. *)
-  let convert_pt_hol (pt : Theory.p_pt_hol) (s : S.sequent) : 
-    Goal.ghyp * Term.message Term.pat = 
-    let lem = S.get_reach_hyp_or_lemma pt.p_pt_hid s in
-    let f_args, f = Term.decompose_forall lem.gc_concl in
-    let f_args, subst = Term.erefresh_vars `Global f_args in
-    let f = Term.subst subst f in
-
-    let pt_args_l = List.length pt.p_pt_args in
-
-    if List.length f_args < pt_args_l then
-      hard_failure ~loc:(L.loc pt.p_pt_hid)  (Failure "too many arguments");
-
-    let f_args0, f_args1 = List.takedrop pt_args_l f_args in
-
-
-    let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in 
-    let pat_vars = ref (Vars.Sv.of_list f_args1) in
-
-    let subst = 
-      List.map2 (fun p_arg (Vars.EVar f_arg) ->
-          let ty = Vars.ty f_arg in
-          let t = 
-            Theory.convert ~pat:true cenv (S.ty_vars s) (S.env s) p_arg ty
-          in
-          let new_p_vs = 
-            Vars.Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
-          in
-          pat_vars := Vars.Sv.union (!pat_vars) new_p_vs;
-
-          Term.ESubst (Term.Var f_arg, t)
-        ) pt.p_pt_args f_args0
-    in
-
-    (* instantiate [f_args0] by [args] *)
-    let f = Term.subst subst f in
-
-    let pat = Term.{ 
-        pat_tyvars = lem.gc_tyvars;
-        pat_vars = !pat_vars;
-        pat_term = f; } 
-    in      
-    lem.gc_name, pat
-
-  (*------------------------------------------------------------------*)
   let make_exact ?loc env ty name =  
     match Vars.make_exact env ty name with
     | None ->
@@ -189,9 +144,9 @@ module LowTac (S : Sequent.S) = struct
       (doit : (cform * Ident.t option) -> cform * S.form list) 
       (s : S.sequent) (t : target) : S.sequent * S.sequent list =
     let f, s, tgt_id = match t with
-      | T_goal    -> Cform  (S.goal s       ),               s , None
+      | T_goal    -> Cform  (S.goal s       ),                s, None
       | T_hyp id  -> Cform  (Hyps.by_id id s), Hyps.remove id s, Some id
-      | T_felem i -> Ctform (S.get_felem i s),               s , None
+      | T_felem i -> Ctform (S.get_felem i s),                s, None
     in
 
     let f,subs = doit (f,tgt_id) in
@@ -454,10 +409,10 @@ module LowTac (S : Sequent.S) = struct
 
   (** Parse rewrite tactic arguments as rewrite rules with possible subgoals 
       showing the rule validity. *)
-  let p_rw_item (rw_arg : Args.rw_item) s : rw_earg * S.sequent list =
-    let p_rw_rule dir (p_pt : Theory.p_pt_hol) 
-      : rw_erule * S.sequent list * Ident.t option = 
-      let ghyp, pat = convert_pt_hol p_pt s in
+  let p_rw_item (rw_arg : Args.rw_item) (s : S.t) : rw_earg * S.sequent list =
+    let p_rw_rule dir (p_pt : Theory.p_pt_hol) :
+      rw_erule * S.sequent list * Ident.t option = 
+      let ghyp, pat = S.convert_pt_hol p_pt LowSequent.KReach s in
       let id_opt = match ghyp with `Hyp id -> Some id | _ -> None in
 
       (* We are using an hypothesis, hence no new sub-goals *)
@@ -707,5 +662,120 @@ module LowTac (S : Sequent.S) = struct
     wrap_fail (generalize_tac_args ~dependent args)
 
 
+  (*------------------------------------------------------------------*)
+  (** {3 Apply} *)
+  let apply (pat : S.form Term.pat) (s : S.t) : S.t list =
+    let subs, f = S.Smart.decompose_impls_last pat.pat_term in
+
+    if not (Vars.Sv.subset pat.pat_vars (S.fv_form f)) then
+      soft_failure ApplyBadInst;
+
+    let pat = { pat with pat_term = f } in
+
+    match S.Match.try_match (S.goal s) pat with
+    | `NoMatch | `FreeTyv -> soft_failure ApplyMatchFailure
+    | `Match mv ->
+      let subst = Term.Match.to_subst mv in
+
+      let goals = List.map (S.subst_hyp subst) subs in
+      List.map (fun g -> S.set_goal g s) goals
+
+  (** [apply_in f hyp s] tries to match a premise of [f] with the conclusion of
+      [hyp], and replaces [hyp] by the conclusion of [f].
+      It generates a new subgoal for any remaining premises of [f], plus all
+      premises of the original [hyp].
+
+      E.g., if `H1 : A -> B` and `H2 : A` then `apply H1 in H2` replaces
+      `H2 : A` by `H2 : B`
+  *)
+  let apply_in (pat : S.form Term.pat) (hyp : Ident.t) (s : S.t) 
+    : S.t list =
+    let fprems, fconcl = S.Smart.decompose_impls_last pat.pat_term in
+
+    let h = Hyps.by_id hyp s in
+    let hprems, hconcl = S.Smart.decompose_impls_last h in
+
+    let try1 (fprem : S.form) =
+      if not (Vars.Sv.subset pat.pat_vars (S.fv_form fprem)) then None
+      else
+        let pat = { pat with pat_term = fprem } in
+
+        match S.Match.try_match hconcl pat with
+        | `NoMatch | `FreeTyv -> None
+        | `Match mv -> Some mv
+    in
+
+    (* try to match a premise of [form] with [hconcl] *)
+    let rec find_match acc fprems = match fprems with
+      | [] -> None
+      | fprem :: fprems ->
+        match try1 fprem with
+        | None -> find_match (fprem :: acc) fprems
+        | Some mv ->
+          (* premises of [form], minus the matched premise *)
+          let fprems_other = List.rev_append acc fprems in
+          Some (fprems_other, mv)
+    in
+
+    match find_match [] fprems with
+    | None -> soft_failure ApplyMatchFailure
+    | Some (fsubgoals,mv) ->
+      let subst = Term.Match.to_subst mv in
+
+      (* instantiate the inferred variables everywhere *)
+      let fprems_other = List.map (S.subst_hyp subst) fsubgoals in
+      let fconcl = S.subst_hyp subst fconcl in
+
+      let goal1 =
+        let s = Hyps.remove hyp s in
+        Hyps.add (Args.Named (Ident.name hyp)) fconcl s
+      in
+
+      List.map (fun prem ->
+          S.set_goal prem s
+        ) (hprems @               (* remaining premises of [hyp] *)
+           fprems_other)          (* remaining premises of [form] *)
+      @
+      [goal1]
+
+
+  (** Parse apply tactic arguments *)
+  let p_apply_args (args : Args.parser_arg list) (s : S.sequent) :
+    S.t list * S.form Term.pat * target =
+    let subgoals, pat, in_opt =
+      match args with
+      | [Args.ApplyIn (Theory.PT_hol pt,in_opt)] ->
+        let _, pat = S.convert_pt_hol pt S.s_kind s in
+        [], pat, in_opt
+
+      (* | [Args.ApplyIn (Theory.PT_form f,in_opt)] ->
+       *   begin
+       *     match convert_args s args Args.(Sort Boolean) with
+       *     | Args.Arg (Boolean f) ->
+       *       let subgoal = S.set_goal f s in
+       *       let pat = Term.pat_of_form f in
+       *       [subgoal], pat, in_opt
+       * 
+       *     | _ -> bad_args ()
+       *   end *)
+
+      | _ -> bad_args ()
+    in
+
+    let target = match in_opt with
+      | Some lsymb -> T_hyp (fst (Hyps.by_name lsymb s))
+      | None       -> T_goal
+    in
+    subgoals, pat, target
+
+
+  let apply_tac_args (args : Args.parser_arg list) s : S.t list =
+    let subgoals, pat, target = p_apply_args args s in
+    match target with
+    | T_goal    -> subgoals @ apply pat s      
+    | T_hyp id  -> subgoals @ apply_in pat id s 
+    | T_felem _ -> assert false
+
+  let apply_tac args = wrap_fail (apply_tac_args args)
 
 end

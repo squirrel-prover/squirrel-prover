@@ -28,7 +28,7 @@ module Mk (S : LowSequent.S) = struct
                  
   (** Reduce a term in a given context. 
       The sequent's hypotheses must be used sparsingly *)
-  let reduce : type a. S.t -> a Term.term -> a Term.term = fun s t ->
+  let reduce_term : type a. S.t -> a Term.term -> a Term.term = fun s t ->
     let exception NoExp in
     
     (** Invariant: we must ensure that fv(reduce(u)) ⊆ fv(t)
@@ -49,11 +49,6 @@ module Mk (S : LowSequent.S) = struct
           let t, has_red = reduce_subterms st t in
           if has_red then fst (reduce st t), true
           else t, false
-
-    (* (** Return: reduces terms, at least one term reduced  *)
-     * and reduces : type a. state -> a Term.term list -> a Term.term list * bool = 
-     *   fun st ts ->
-     *     ts, false *)
 
     (** Reduce once at head position *)
     and reduce_head_once : type a. state -> a Term.term -> a Term.term * bool = 
@@ -216,9 +211,15 @@ module Mk (S : LowSequent.S) = struct
       Equiv.Impl (reduce_equiv s e1, reduce_equiv s e2)
     
     | Equiv.Atom (Reach f) -> 
-      Equiv.Atom (Reach (reduce s f))
+      Equiv.Atom (Reach (reduce_term s f))
 
     | Equiv.Atom (Equiv e) -> 
-      let e = List.map (reduce s) e in
+      let e = List.map (reduce_term s) e in
       Equiv.Atom (Equiv.Equiv e)
+
+  (** We need type introspection there *)
+  let reduce s (t : S.form) : S.form = match S.s_kind with
+    | LowSequent.KEquiv -> reduce_equiv s t
+    | LowSequent.KReach -> reduce_term  s t
+
 end
