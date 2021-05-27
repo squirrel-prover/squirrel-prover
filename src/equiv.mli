@@ -48,6 +48,15 @@ val mk_forall : Vars.evar list -> form -> form
 
 val mk_reach_atom : Term.message -> form
 
+(** Does not recurse. *)
+val tmap       : (form -> form) -> form -> form 
+val titer      : (form -> unit) -> form -> unit
+val tfold      : (form -> 'a -> 'a) -> form -> 'a -> 'a
+val tmap_fold  : ('b -> form -> 'b * form) -> 'b -> form -> 'b * form 
+
+(*------------------------------------------------------------------*)
+(** {2 Substitutions} *)
+
 val subst : Term.subst -> form -> form
 
 (** Free variables *)

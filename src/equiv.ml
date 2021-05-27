@@ -85,6 +85,44 @@ let mk_forall evs f = match evs, f with
 let mk_reach_atom f = Atom (Reach f)
 
 (*------------------------------------------------------------------*)
+(** {2 Map (does not recurse) } *)
+
+(** Does not recurse. 
+    Applies to arguments of index atoms (see atom_map). *)
+let tmap (func : form -> form) (t : form) : form = 
+
+  let rec tmap = function
+    | ForAll (vs, b)    -> ForAll (vs, func b)      
+    | Impl (f1, f2) -> Impl (tmap f1, tmap f2)
+    | Atom at -> Atom at
+  in
+  tmap t
+
+let tmap_fold : ('b -> form -> 'b * form) -> 'b -> form -> 'b * form = 
+  fun func b t ->
+  let bref = ref b in
+  let g t = 
+    let b, t = func !bref t in
+    bref := b;
+    t
+  in
+  let t = tmap g t in
+  !bref, t   
+
+let titer (f : form -> unit) (t : form) : unit = 
+  let g e = f e; e in
+  ignore (tmap g t)
+
+let tfold : (form -> 'b -> 'b) -> form -> 'b -> 'b = 
+  fun f t v -> 
+  let vref : 'b ref = ref v in
+  let fi e = vref := (f e !vref) in  
+  titer fi t;
+  !vref
+
+
+(*------------------------------------------------------------------*)
+(** {2 Substitution} *)
 
 (** Free variables. *)
 let rec fv = function
@@ -108,6 +146,21 @@ let rec subst s (f : form) =
       let v, s = Term.subst_binding v s in
       let f = subst s (ForAll (evs,f)) in
       mk_forall [v] f
+
+let tsubst_atom (ts : Type.tsubst) (at : atom) =  
+  match at with
+  | Reach t -> Reach (Term.tsubst ts t)
+  | Equiv e -> Equiv (List.map (Term.tsubst ts) e)
+
+(** Type substitution *)
+let tsubst (ts : Type.tsubst) (t : form) =  
+  (* no need to substitute in the types of [Name], [Macro], [Fun] *)
+  let rec tsubst = function
+    | Atom at -> Atom (tsubst_atom ts at)
+    | _ as term -> tmap tsubst term
+  in
+
+  tsubst t
 
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructors} *)
