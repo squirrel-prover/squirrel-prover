@@ -78,7 +78,7 @@ module LowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** Parse a partially applied lemma or hypothesis as a pattern. *)
   let convert_pt_hol (pt : Theory.p_pt_hol) (s : S.sequent) : 
-    Goal.ghyp * Type.message Term.pat = 
+    Goal.ghyp * Term.message Term.pat = 
     let lem = S.get_reach_hyp_or_lemma pt.p_pt_hid s in
     let f_args, f = Term.decompose_forall lem.gc_concl in
     let f_args, subst = Term.erefresh_vars `Global f_args in
@@ -397,7 +397,7 @@ module LowTac (S : Sequent.S) = struct
         in
 
         (* tries to find an occurence of [l] and rewrite it. *)
-        let pat = 
+        let pat : a Term.term Term.pat = 
           Term.{ pat_tyvars = tyvars; pat_vars = sv; pat_term = l; } 
         in
         let many = match mult with `Once -> false | `Any | `Many -> true in

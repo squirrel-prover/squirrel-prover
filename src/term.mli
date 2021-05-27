@@ -252,12 +252,12 @@ val apply_ht : hterm -> 'a term list -> hterm
 type 'a pat = { 
   pat_tyvars : Type.tvars; 
   pat_vars : Vars.Sv.t; 
-  pat_term : 'a term; 
+  pat_term : 'a; 
 }
 
 (** Make a pattern out of a formula: all universally quantified variables 
     are added to [pat_vars]. *)
-val pat_of_form : message -> Type.message pat
+val pat_of_form : message -> message pat
 
 (** Matching variable assignment (types must be compatible). *)
 type mv = eterm Vars.Mv.t
@@ -270,14 +270,18 @@ module type MatchS = sig
   (** Abstract type of terms we are matching in. *)
   type t
 
-  val pp_pat : Format.formatter -> 'a pat -> unit
+  val pp_pat : 
+    (Format.formatter -> 'a -> unit) ->
+    Format.formatter -> 'a pat -> unit
+
 
   val to_subst : mv -> subst
 
   (** [try_match t p] tries to match [p] with [t] (at head position). 
       If it succeeds, it returns a map instantiating the variables [p.pat_vars] 
       as substerms of [t]. *)
-  val try_match : t -> 'b pat -> [ `FreeTyv | `NoMatch | `Match of mv ] 
+  val try_match : 
+    ?mv:mv -> t -> t pat -> [ `FreeTyv | `NoMatch | `Match of mv ] 
 
   (** [find_map env t p func] looks for an occurence [t'] of [pat] in [t],
       where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
@@ -285,8 +289,8 @@ module type MatchS = sig
       - if [many = false], a *single* occurence of [pat] by [func t' θ]. 
       - if [many = true], all occurences found. *)
   val find_map :
-    many:bool -> Vars.env -> t -> 'b pat -> 
-    ('b term -> Vars.evars -> mv -> 'b term) -> 
+    many:bool -> Vars.env -> t -> 'a term pat -> 
+    ('a term -> Vars.evars -> mv -> 'a term) -> 
     t option
 end
 

@@ -1795,7 +1795,7 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-let apply (pat : Type.message Term.pat) (s : TS.t) : TS.t list =
+let apply (pat : Term.message Term.pat) (s : TS.t) : TS.t list =
   let subs, f = Term.decompose_impls_last pat.pat_term in
 
   if not (Vars.Sv.subset pat.pat_vars (Term.fv f)) then
@@ -1819,7 +1819,7 @@ let apply (pat : Type.message Term.pat) (s : TS.t) : TS.t list =
     E.g., if `H1 : A -> B` and `H2 : A` then `apply H1 in H2` replaces
     `H2 : A` by `H2 : B`
 *)
-let apply_in (pat : Type.message Term.pat) (hyp : Ident.t) (s : TS.t) 
+let apply_in (pat : Term.message Term.pat) (hyp : Ident.t) (s : TS.t) 
   : TS.t list =
   let fprems, fconcl = Term.decompose_impls_last pat.pat_term in
 
@@ -1872,7 +1872,7 @@ let apply_in (pat : Type.message Term.pat) (hyp : Ident.t) (s : TS.t)
 
 (** Parse apply tactic arguments *)
 let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) :
-  TS.t list * Type.message Term.pat * LT.target =
+  TS.t list * Term.message Term.pat * LT.target =
   let subgoals, pat, in_opt =
     match args with
     | [Args.ApplyIn (Theory.PT_hol pt,in_opt)] ->

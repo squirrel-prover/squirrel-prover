@@ -1364,8 +1364,8 @@ let tsubst : type a. Type.tsubst -> a term -> a term =
     The free type variables must be inferred. *)
 type 'a pat = { 
   pat_tyvars : Type.tvars; 
-  pat_vars : Vars.Sv.t; 
-  pat_term : 'a term;
+  pat_vars   : Vars.Sv.t; 
+  pat_term   : 'a;
 }
 
 let pat_of_form (t : 'a term) =
@@ -1386,15 +1386,18 @@ type mv = eterm Mv.t
 module type MatchS = sig
   type t
 
-  val pp_pat : Format.formatter -> 'a pat -> unit
+  val pp_pat : 
+    (Format.formatter -> 'a -> unit) ->
+    Format.formatter -> 'a pat -> unit
 
   val to_subst : mv -> subst
 
-  val try_match : t -> 'b pat -> [ `FreeTyv | `NoMatch | `Match of mv ] 
+  val try_match :
+    ?mv:mv -> t -> t pat -> [ `FreeTyv | `NoMatch | `Match of mv ] 
 
   val find_map :
-    many:bool -> Vars.env -> t -> 'b pat -> 
-    ('b term -> Vars.evars -> mv -> 'b term) -> 
+    many:bool -> Vars.env -> t -> 'a term pat -> 
+    ('a term -> Vars.evars -> mv -> 'a term) -> 
     t option
 end
 
@@ -1408,18 +1411,18 @@ module Match : MatchS with type t = message = struct
           ESubst (Var v, cast (Vars.kind v) t) :: subst
       ) mv [] 
   
-  let pp_pat fmt p =
+  let pp_pat pp_t fmt p =
     Fmt.pf fmt "@[<hov 0>{term = @[%a@];@ tyvars = @[%a@];@ vars = @[%a@]}@]"
-      pp p.pat_term 
+      pp_t p.pat_term 
       (Fmt.list ~sep:Fmt.sp Type.pp_tvar) p.pat_tyvars
       (Fmt.list ~sep:Fmt.sp Vars.pp_e) (Sv.elements p.pat_vars)
 
   (** [try_match t p] tries to match [p] with [t] (at head position). 
       If it succeeds, it returns a map instantiating the variables [p.pat_vars] 
       as substerms of [t]. *)
-  let try_match : type a b. a term -> b pat -> 
+  let try_match : type a b. ?mv:mv -> a term -> b term pat -> 
     [`FreeTyv | `NoMatch | `Match of mv] = 
-    fun t p -> 
+    fun ?mv t p -> 
     let exception NoMatch in
 
     (* [ty_env] must be closed at the end of the matching *)
@@ -1546,7 +1549,11 @@ module Match : MatchS with type t = message = struct
     in
 
     try 
-      let mv = tmatch t pat Mv.empty in
+      let mv_init = match mv with 
+        | None -> Mv.empty
+        | Some mv -> mv 
+      in
+      let mv = tmatch t pat mv_init in
       
       if not (Type.Infer.is_closed ty_env) 
       then `FreeTyv
@@ -1564,7 +1571,7 @@ module Match : MatchS with type t = message = struct
                         
   let find_map :
     type a b. many:bool -> 
-    Vars.env -> a term -> b pat -> 
+    Vars.env -> a term -> b term pat -> 
     (b term -> Vars.evars -> mv -> b term) -> 
     a term option
     = fun ~many env t p func ->

@@ -13,7 +13,7 @@ val check_erule : rw_erule -> unit
 
 val pat_to_rw_erule : 
   ?loc:Location.t ->
-  [< `LeftToRight | `RightToLeft ] -> Type.message Term.pat -> rw_erule
+  [< `LeftToRight | `RightToLeft ] -> Term.message Term.pat -> rw_erule
 
 (*------------------------------------------------------------------*)
 val rewrite_head : 

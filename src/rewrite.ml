@@ -23,7 +23,7 @@ let check_erule ((_, sv, h, Term.ESubst (l,r)) : rw_erule) : unit =
   ()
 
 (** Make a rewrite rule from a formula *)
-let pat_to_rw_erule ?loc dir (p : Type.message Term.pat) : rw_erule = 
+let pat_to_rw_erule ?loc dir (p : Term.message Term.pat) : rw_erule = 
   let subs, f = Term.decompose_impls_last p.pat_term in
 
   let e = match f with

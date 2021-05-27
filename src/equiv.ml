@@ -3,6 +3,7 @@ open Utils
 (** Equivalence formulas.  *)
 
 module Sv = Vars.Sv
+module Mv = Vars.Mv
 
 (*------------------------------------------------------------------*)
 (** {2 Equivalence} *)
@@ -285,15 +286,71 @@ module Match : Term.MatchS with type t = form = struct
   include TMatch
 
   type t = form
+ 
+  let try_match ?mv (t : form) (p : form Term.pat) = 
+    let exception NoMatch in
 
-  let try_match (t : form) pat = 
-    match t with
-    | Atom (Reach f) -> TMatch.try_match f pat
-    | _ -> `NoMatch
+    (* [ty_env] must be closed at the end of the matching *)
+    let ty_env = Type.Infer.mk_env () in
+    let univars, ty_subst  = Type.Infer.open_tvars ty_env p.pat_tyvars in
+    let pat = tsubst ty_subst p.pat_term in    
 
+    (* substitute back the univars by the corresponding tvars *)
+    let ty_subst_rev = 
+      List.fold_left2 (fun s tv tu -> 
+          Type.tsubst_add_univar s tu (Type.TVar tv)
+        ) Type.tsubst_empty p.pat_tyvars univars 
+    in
+
+    let term_match term pat mv : Term.mv = 
+      let pat = 
+        Term.{ pat_tyvars = []; 
+               pat_vars = p.pat_vars; 
+               pat_term = pat; }
+      in
+      match TMatch.try_match ~mv term pat with
+      | `Match mv -> mv
+      | _ -> raise NoMatch
+    in
+
+    let rec tmatch t pat mv : Term.mv = match t, pat with
+      | Impl (t1, t2), Impl (pat1, pat2) -> 
+        let mv = tmatch t1 pat1 mv in
+        tmatch t2 pat2 mv
+
+      | ForAll _, _ -> raise NoMatch
+      | Atom (Reach t), Atom (Reach pat) -> term_match t pat mv
+
+      | Atom (Equiv es), Atom (Equiv pat_es) -> 
+        List.fold_right2 term_match es pat_es mv
+
+      | _ -> raise NoMatch
+    in
+
+    try 
+      let mv_init = match mv with 
+        | None -> Mv.empty
+        | Some mv -> mv 
+      in
+      let mv = tmatch t pat mv_init in
+
+      if not (Type.Infer.is_closed ty_env) 
+      then `FreeTyv
+      else 
+        let mv = 
+          Mv.fold (fun (Vars.EVar v) t mv -> 
+              let v = Vars.tsubst ty_subst_rev v in
+              Mv.add (Vars.EVar v) t mv
+            ) mv Vars.Mv.empty 
+        in
+        `Match mv
+
+    with NoMatch -> `NoMatch
+    
+  
   let rec find_map :
     type b. many:bool -> 
-    Vars.env -> form -> b Term.pat -> 
+    Vars.env -> form -> b Term.term Term.pat -> 
     (b Term.term -> Vars.evars -> Term.mv -> b Term.term) -> 
     form option
     = fun ~many env e p func ->
