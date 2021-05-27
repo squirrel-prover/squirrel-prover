@@ -31,7 +31,7 @@
 %token TIME WHERE WITH ORACLE EXN
 %token LARGE NAMEFIXEDLENGTH
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
-%token REWRITE REVERT CLEAR GENERALIZE DEPENDS APPLY SPLITSEQ CONSTSEQ
+%token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY SPLITSEQ CONSTSEQ
 %token BY INTRO AS DESTRUCT REMEMBER
 %token PROOF QED UNDO ABORT HINT
 %token EOF
@@ -546,6 +546,9 @@ tac_formula:
 as_ip:
 | AS ip=simpl_pat { ip }
 
+as_n_ips:
+| AS n_ips=slist1(naming_pat, empty) { n_ips }
+
 %inline sel_tac:
 | s=selector COLON r=tac { (s,r) }
 
@@ -567,6 +570,9 @@ apply_arg:
 | pt=pt                  { Theory.PT_hol pt }
 
 | LPAREN f=term RPAREN   { Theory.PT_form f }
+
+%inline generalize_dependent:
+| GENERALIZE DEPENDENT { }
 
 (*------------------------------------------------------------------*)
 tac:
@@ -629,9 +635,12 @@ tac:
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
       mk_abstract l "revert" ids }
 
-  | l=lloc(GENERALIZE) ids=slist1(sterm, empty)     
-    { let ids = List.map (fun id -> TacticsArgs.Theory id) ids in
-      mk_abstract l "generalize" ids }
+  | l=lloc(GENERALIZE) terms=slist1(sterm, empty) n_ips_o=as_n_ips?
+    { mk_abstract l "generalize" [TacticsArgs.Generalize (terms, n_ips_o)] }
+
+  | l=lloc(generalize_dependent) terms=slist1(sterm, empty) n_ips_o=as_n_ips?
+    { mk_abstract l "generalize dependent"
+                  [TacticsArgs.Generalize (terms, n_ips_o)] }
 
   | l=lloc(CLEAR) ids=slist1(lsymb, empty)     
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
@@ -726,8 +735,8 @@ equiv:
 | ei=term COMMA eis=equiv { ei::eis }
 
 equiv_form:
-| LBRACKET f=term RBRACKET      { Goal.PReach f }
-| e=equiv                       { Goal.PEquiv e }
+| LBRACKET f=term RBRACKET         { Goal.PReach f }
+| e=equiv                          { Goal.PEquiv e }
 /* | LPAREN f=equiv_form RPAREN       { f } */
 | f=equiv_form ARROW f0=equiv_form { Goal.PImpl (f,f0) }
 

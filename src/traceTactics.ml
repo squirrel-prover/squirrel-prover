@@ -157,27 +157,22 @@ let () = T.register "expandall"
 
 (*------------------------------------------------------------------*)
 (** Apply a naming pattern to a variable or hypothesis. *)
-let do_naming_pat (ip_handler : Args.ip_handler) nip s : sequent =
+let do_naming_pat (ip_handler : Args.ip_handler) n_ip s : sequent =
   match ip_handler with
   | `Var Vars.EVar v ->
-    let env = ref (TS.env s) in
-
-    let v' = match nip with
-      | Args.Unnamed
-      | Args.AnyName ->
-        Vars.fresh_r env v
-      | Args.Named name -> LT.make_exact_r env (Vars.ty v) name
+    let env, v' = 
+      LT.var_of_naming_pat n_ip ~dflt_name:(Vars.name v) (Vars.ty v) (TS.env s)
     in
     let subst = [Term.ESubst (Term.Var v, Term.Var v')] in
 
     (* FIXME: we substitute everywhere. This is inefficient. *)
-    TS.subst subst (TS.set_env !env s)
+    TS.subst subst (TS.set_env env s)
 
   | `Hyp hid ->
     let f = Hyps.by_id hid s in
     let s = Hyps.remove hid s in
 
-    Hyps.add nip f s
+    Hyps.add n_ip f s
 
 (*------------------------------------------------------------------*)
 let () =
@@ -657,56 +652,23 @@ let () =
     simpl_left_tac
 
 (*------------------------------------------------------------------*)
-(** Generalize *)
-
-let generalize (v : Vars.evar) s : sequent =
-  let env = TS.env s in
-  if not (List.mem v (Vars.to_list env)) then
-    hard_failure (Failure (Fmt.str "unknown variable %a" Vars.pp_e v));
-
-  let bad_hyps = Hyps.fold (fun id f bad_hyps ->
-      if Vars.Sv.mem v (Term.fv f)
-      then id :: bad_hyps
-      else bad_hyps
-    ) s [] in
-
-  if bad_hyps <> [] then
-    soft_failure (Failure (Fmt.str "%a appears in hypotheses %a"
-                             Vars.pp_e v (Fmt.list Ident.pp) bad_hyps));
-
-  let goal = Term.mk_forall [v] (TS.goal s) in
-  let env = Vars.rm_evar env v in
-
-  TS.set_env env (TS.set_goal goal s)
-
-let generalize_l vs s : sequent = List.fold_right generalize vs s
-
-let generalize_tac_args (args : Args.parser_arg list) s =
-    let vars =
-      List.map (fun arg ->
-          match LT.convert_args s [arg] (Args.Sort Args.ETerm) with
-          | Args.Arg (Args.ETerm (_, Term.Var v, _)) -> Vars.EVar v
-
-          | Args.Arg (Args.ETerm (_, _, loc)) ->
-            hard_failure ~loc (Failure "arguments must be variables")
-
-          | _ -> bad_args ()
-        ) args
-    in
-
-    [generalize_l vars s]
-
-let generalize_tac args = LT.wrap_fail (generalize_tac_args args)
-
 let () =
   T.register_general "generalize"
     ~tactic_help:{
-      general_help = "Generalize over some variables";
+      general_help = "Generalize the goal on some terms";
       detailed_help = "";
       tactic_group  = Logical;
       usages_sorts = []; }
-    generalize_tac
+    (LT.generalize_tac ~dependent:false)
 
+let () =
+  T.register_general "generalize dependent"
+    ~tactic_help:{
+      general_help = "Generalize the goal and hypotheses on some terms";
+      detailed_help = "";
+      tactic_group  = Logical;
+      usages_sorts = []; }
+    (LT.generalize_tac ~dependent:true)
 
 (*------------------------------------------------------------------*)
 (** Induction *)
@@ -1833,7 +1795,7 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-let apply (pat : Type.message Term.pat) (s : TS.t) =
+let apply (pat : Type.message Term.pat) (s : TS.t) : TS.t list =
   let subs, f = Term.decompose_impls_last pat.pat_term in
 
   if not (Vars.Sv.subset pat.pat_vars (Term.fv f)) then
@@ -1857,8 +1819,8 @@ let apply (pat : Type.message Term.pat) (s : TS.t) =
     E.g., if `H1 : A -> B` and `H2 : A` then `apply H1 in H2` replaces
     `H2 : A` by `H2 : B`
 *)
-
-let apply_in (pat : Type.message Term.pat) (hyp : Ident.t) (s : TS.t) =
+let apply_in (pat : Type.message Term.pat) (hyp : Ident.t) (s : TS.t) 
+  : TS.t list =
   let fprems, fconcl = Term.decompose_impls_last pat.pat_term in
 
   let h = Hyps.by_id hyp s in
@@ -1910,7 +1872,7 @@ let apply_in (pat : Type.message Term.pat) (hyp : Ident.t) (s : TS.t) =
 
 (** Parse apply tactic arguments *)
 let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) :
-  sequent list * Type.message Term.pat * LT.target =
+  TS.t list * Type.message Term.pat * LT.target =
   let subgoals, pat, in_opt =
     match args with
     | [Args.ApplyIn (Theory.PT_hol pt,in_opt)] ->
@@ -1938,7 +1900,7 @@ let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) :
   subgoals, pat, target
 
 
-let apply_tac_args (args : Args.parser_arg list) s =
+let apply_tac_args (args : Args.parser_arg list) s : TS.t list =
   let subgoals, pat, target = p_apply_args args s in
   match target with
   | LT.T_goal    -> subgoals @ apply pat s      

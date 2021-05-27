@@ -17,22 +17,19 @@ module type S = sig
 
   module Hyps : Hyps.HypsSeq with type hyp = form and type sequent = t
 
-  val reach_to_form : Term.message -> form
+  val reach_to_form :                    Term.message -> form
+  val form_to_reach : ?loc:Location.t -> form -> Term.message
 
-  (** the environment of the sequent. *)
   val env : t -> Vars.env
   val set_env : Vars.env -> t -> t
 
-  (** the goal of the sequent. *)
   val goal : t -> form
   val set_goal : form -> t -> t
   val set_reach_goal : Term.message -> t -> t
 
-  (** the system of the sequent *)
   val system : t -> SystemExpr.system_expr
   val set_system : SystemExpr.system_expr -> t -> t
 
-  (** the symbol table of the sequent. *)
   val table : t -> Symbols.table
   val set_table  : Symbols.table -> t -> t
 
@@ -55,11 +52,12 @@ module type S = sig
   val subst     : Term.subst ->   t ->   t
   val subst_hyp : Term.subst -> form -> form
 
-  (** get (some) terms appearing in an hypothesis.
-      In an equiv formula, does not return terms under (equiv) binders. *)
   val get_terms : form -> Term.message list
 
   val map : (form -> form) -> t -> t
+
+  val fv_form : form -> Vars.Sv.t
+  val fv      : t    -> Vars.Sv.t
 
   (*------------------------------------------------------------------*)
   (** {3 Matching} *)

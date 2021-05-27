@@ -57,6 +57,3 @@ val trace_seq_of_equiv_seq : ?goal:Term.message -> t -> TS.t
 val trace_seq_of_reach : Term.message -> t -> TS.t
 
 val query_happens : precise:bool -> t -> Term.timestamp -> bool
-
-val reach_to_form :             Term.message -> form
-val form_to_reach : ?loc:L.t -> form -> Term.message

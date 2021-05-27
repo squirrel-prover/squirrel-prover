@@ -116,6 +116,7 @@ rule token = parse
 | "splitseq"          { SPLITSEQ }
 | "constseq"          { CONSTSEQ }
 | "remember"          { REMEMBER }
+| "dependent"         { DEPENDENT }
 | "goal"              { GOAL }
 | "equiv"             { EQUIV }
 | "axiom"             { AXIOM }

@@ -574,11 +574,22 @@ module LowTac (S : Sequent.S) = struct
       ) cases
 
   (*------------------------------------------------------------------*)
-  (** Reduce *)
+  (** {3 Reduce} *)
   let reduce_sequent s = S.map (S.reduce s) s        
 
   (*------------------------------------------------------------------*)
-  (** Revert *)
+  (** {3 Naming} *)
+
+  let var_of_naming_pat 
+      n_ip ~dflt_name (ty : 'a Type.ty) env : Vars.env * 'a Vars.var = 
+    match n_ip with
+    | Args.Unnamed
+    | Args.AnyName    -> Vars.make `Approx env ty dflt_name
+    | Args.Named name -> make_exact env ty name
+
+  (*------------------------------------------------------------------*)
+  (** {3 Revert} *)
+
   let revert (hid : Ident.t) (s : S.t) : S.t =
     let f = Hyps.by_id hid s in
     let s = Hyps.remove hid s in
@@ -597,5 +608,104 @@ module LowTac (S : Sequent.S) = struct
     [s]
 
   let revert_tac args s sk fk = wrap_fail (revert_args args) s sk fk
+
+  (*------------------------------------------------------------------*)
+  (** {3 Generalize} *)
+
+  let try_clean_env vars s : S.t =
+    let s_fv = S.fv s in
+    let clear = Sv.diff vars (Sv.inter vars s_fv) in
+    let env = Vars.rm_evars (S.env s) (Sv.elements clear) in
+    S.set_env env s
+
+  let _generalize ~dependent (Term.ETerm t) s : Vars.evar * S.t =
+    let v = Vars.make_new (Term.ty t) "_x" in
+
+    let subst = [Term.ESubst (t, Term.Var v)] in
+
+    let s = 
+      if not dependent 
+      then S.set_goal (S.subst_hyp subst (S.goal s)) s 
+      else S.subst subst s
+    in
+
+    let gen_hyps, s = 
+      if not dependent 
+      then [], s
+      else
+        Hyps.fold (fun id f (gen_hyps, s) ->
+            if Vars.Sv.mem (Vars.EVar v) (S.fv_form f)
+            then f :: gen_hyps, Hyps.remove id s
+            else gen_hyps, s
+          ) s ([], s)
+    in
+
+    let goal = S.Smart.mk_impls ~simpl:true gen_hyps (S.goal s) in
+    Vars.EVar v, S.set_goal goal s
+
+  (** [terms] and [n_ips] must be of the same length *)
+  let generalize ~dependent terms n_ips s : S.t = 
+    let s, vars = 
+      List.fold_right (fun term (s, vars) ->
+          let var, s = _generalize ~dependent term s in
+          s, var :: vars
+        ) terms (s,[])
+    in
+
+    (* clear unused variables among [terms] free variables *)
+    let t_fv = 
+      List.fold_left (fun vars (Term.ETerm t) -> 
+          Sv.union vars (Term.fv t)
+        ) Sv.empty terms 
+    in
+    let s = try_clean_env t_fv s in
+
+    (* we rename generalized variables *)
+    let _, new_vars, subst = 
+      List.fold_left2 (fun (env, new_vars, subst) (Vars.EVar v) n_ip ->
+          let env, v' = 
+            var_of_naming_pat n_ip ~dflt_name:"x" (Vars.ty v) env 
+          in
+          env, 
+          Vars.EVar v' :: new_vars,
+          Term.ESubst (Term.Var v, Term.Var v') :: subst
+        ) (S.env s, [], []) vars n_ips
+    in
+    let s = S.subst subst s in
+
+    (* quantify universally *)
+    let new_vars = List.rev new_vars in
+    let goal = S.Smart.mk_forall ~simpl:false new_vars (S.goal s) in
+    S.set_goal goal s 
+
+  let generalize_tac_args ~dependent args s : S.t list =
+    match args with
+    | [Args.Generalize (terms, n_ips_opt)] ->
+      let terms =
+        List.map (fun arg ->
+            match convert_args s [Args.Theory arg] (Args.Sort Args.ETerm) with
+            | Args.Arg (Args.ETerm (_, t, _)) -> Term.ETerm t
+
+            | _ -> bad_args ()
+          ) terms
+      in
+      let n_ips = 
+        match n_ips_opt with 
+        | None -> List.map (fun _ -> Args.AnyName) terms
+        | Some n_ips ->
+          if List.length n_ips <> List.length terms then
+            hard_failure (Failure "not the same number of arguments \
+                                   and naming patterns");
+          n_ips
+      in
+
+      [generalize ~dependent terms n_ips s]
+
+    | _ -> assert false
+
+  let generalize_tac ~dependent args = 
+    wrap_fail (generalize_tac_args ~dependent args)
+
+
 
 end

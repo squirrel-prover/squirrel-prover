@@ -92,6 +92,7 @@
   "intro"
   "apply"
   "generalize"
+  "dependent"
   "revert"
   "destruct"
   "as"

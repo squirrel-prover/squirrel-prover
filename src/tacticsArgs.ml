@@ -159,7 +159,7 @@ type ip_handler = [
 (*------------------------------------------------------------------*)
 (** {2 Tactics args} *)
 
-(** One tactic argument (in the parser) *)
+(** A parser tactic argument *)
 type parser_arg =
   | String_name of lsymb
   | Int_parsed  of int
@@ -172,6 +172,7 @@ type parser_arg =
   | SplitSeq    of int L.located * Theory.hterm
   | ConstSeq    of int L.located * Theory.term list
   | Remember    of Theory.term * lsymb
+  | Generalize  of Theory.term list * naming_pat list option
 
 type parser_args = parser_arg list
 
@@ -199,7 +200,13 @@ let pp_parser_arg ppf = function
   | SplitSeq (i, ht) -> Fmt.pf ppf "%d ..." (L.unloc i)
 
   | Remember (t, id) ->
-    Fmt.pf ppf "remember %a as %s" Theory.pp t (L.unloc id) 
+    Fmt.pf ppf "%a as %s" Theory.pp t (L.unloc id) 
+
+  | Generalize (terms, None) ->
+    Fmt.pf ppf "%a" (Fmt.list ~sep:Fmt.sp Theory.pp) terms
+
+  | Generalize (terms, Some _) ->
+    Fmt.pf ppf "%a as ..." (Fmt.list ~sep:Fmt.sp Theory.pp) terms
 
 (*------------------------------------------------------------------*)      
 type ('a, 'b) pair

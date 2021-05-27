@@ -148,7 +148,11 @@ let of_list l =
 
 let rm_var e v = M.remove (name v) e
 
+let rm_vars e vs = List.fold_left rm_var e vs
+
 let rm_evar e (EVar v) = rm_var e v
+
+let rm_evars e vs = List.fold_left rm_evar e vs
 
 let prefix_count_regexp = Pcre.regexp "#*(_*.*[^0-9])([0-9]*)$"
 
@@ -157,13 +161,23 @@ let prefix_count_regexp = Pcre.regexp "#*(_*.*[^0-9])([0-9]*)$"
     
 let cpt_new = ref 0
 
+let make_new ty name = 
+  incr cpt_new;
+  { name     = name;
+    s_prefix = name;
+    i_suffix = !cpt_new;
+    is_new   = true;
+    var_type = ty; }
+
 let make_new_from v =
   incr cpt_new;
   { v with name     = v.s_prefix;
            is_new   = true; 
            i_suffix = !cpt_new; }
 
+(*------------------------------------------------------------------*)
 let cpt_pat = ref 0
+
 let make_pat typ = 
   incr cpt_pat;
   { name     = "_" ^ (string_of_int !cpt_pat);

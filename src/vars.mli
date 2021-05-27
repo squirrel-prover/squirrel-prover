@@ -87,8 +87,10 @@ val find   : env -> string -> 'a Type.kind -> 'a var
 (** [rm_var env v] returns [env] minus the variable [v].
   * returns the same [env] if no variable is found. *)
 val rm_var  : env -> 'a var -> env
+val rm_evar : env ->   evar -> env
 
-val rm_evar : env -> evar -> env
+val rm_vars  : env -> 'a var list -> env
+val rm_evars : env ->   evar list -> env
 
 
 (*------------------------------------------------------------------*)
@@ -100,6 +102,7 @@ val rm_evar : env -> evar -> env
   * The variables generated in this way are not meant to be seen by
   * the user. *)
 val make_new_from : 'a var -> 'a var
+val make_new : 'a Type.t -> string -> 'a var
 
 (** [is_new v] returns [true] iff variable [v] has been created
   * using [make_new_from]. *)

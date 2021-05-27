@@ -96,9 +96,9 @@ let to_equiv_lemma ?loc gconcl =
 type p_equiv = Theory.term list 
 
 type p_equiv_form = 
-  | PEquiv of p_equiv
-  | PReach of Theory.formula
-  | PImpl of p_equiv_form * p_equiv_form
+  | PEquiv  of p_equiv
+  | PReach  of Theory.formula
+  | PImpl   of p_equiv_form * p_equiv_form
 
 type p_goal_form =
   | P_trace_goal of Decl.p_goal_reach_cnt

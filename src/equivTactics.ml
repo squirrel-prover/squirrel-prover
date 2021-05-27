@@ -437,6 +437,25 @@ let simpl_impl s =
     ) s
 
 (*------------------------------------------------------------------*)
+let () =
+  T.register_general "generalize"
+    ~tactic_help:{
+      general_help = "Generalize the goal on some terms";
+      detailed_help = "";
+      tactic_group  = Logical;
+      usages_sorts = []; }
+    (pure_equiv_arg (LT.generalize_tac ~dependent:false))
+
+let () =
+  T.register_general "generalize dependent"
+    ~tactic_help:{
+      general_help = "Generalize the goal and hypotheses on some terms";
+      detailed_help = "";
+      tactic_group  = Logical;
+      usages_sorts = []; }
+    (pure_equiv_arg (LT.generalize_tac ~dependent:true))
+
+(*------------------------------------------------------------------*)
 (** [generalize ts s] reverts all hypotheses that talk about [ts] in [s],
     by introducing them in the goal.
     Also returns a function that introduce back the generalized hypothesis.*)

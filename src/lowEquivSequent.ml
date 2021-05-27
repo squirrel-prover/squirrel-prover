@@ -312,7 +312,18 @@ let get_hint_db s = s.hint_db
 let map f s : sequent = set_goal (f (goal s)) (Hyps.map f s)
 
 (*------------------------------------------------------------------*)
-(** {2 Matching} *)
+let fv_form (f : form) = Equiv.fv f
+
+(*------------------------------------------------------------------*)
+let fv s : Vars.Sv.t = 
+  let h_vars = 
+    Hyps.fold (fun _ f vars -> 
+        Vars.Sv.union (fv_form f) vars
+      ) s Vars.Sv.empty
+  in
+  Vars.Sv.union h_vars (fv_form (goal s))
+
+(*------------------------------------------------------------------*)
 module Match = Equiv.Match
 
 (*------------------------------------------------------------------*)

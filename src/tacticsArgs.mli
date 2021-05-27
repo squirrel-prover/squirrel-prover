@@ -106,6 +106,7 @@ type parser_arg =
   | SplitSeq    of int L.located * Theory.hterm
   | ConstSeq    of int L.located * Theory.term list
   | Remember    of Theory.term * lsymb
+  | Generalize  of Theory.term list * naming_pat list option
 
 type parser_args = parser_arg list
                                

@@ -17,7 +17,8 @@ module type S = sig
 
   module Hyps : Hyps.HypsSeq with type hyp = form and type sequent = t
 
-  val reach_to_form : Term.message -> form
+  val reach_to_form :                    Term.message -> form
+  val form_to_reach : ?loc:Location.t -> form -> Term.message
 
   val env : t -> Vars.env
   val set_env : Vars.env -> t -> t
@@ -63,6 +64,9 @@ module type S = sig
   val get_terms : form -> Term.message list
 
   val map : (form -> form) -> t -> t
+
+  val fv_form : form -> Vars.Sv.t
+  val fv      : t    -> Vars.Sv.t
 
   (*------------------------------------------------------------------*)
   (** {3 Matching} *)

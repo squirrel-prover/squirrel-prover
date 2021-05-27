@@ -80,6 +80,3 @@ val maximal_elems :
 (** [get_all_terms s] returns all the messages appearing at toplevel
   * in [s]. *)
 val get_all_messages : sequent -> Term.message list
-
-val reach_to_form :             Term.message -> form
-val form_to_reach : ?loc:L.t -> form -> Term.message
