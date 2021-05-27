@@ -245,17 +245,29 @@ let revert (hid : Ident.t) (s : ES.t) =
   let s = Hyps.remove hid s in
   ES.set_goal (Equiv.Impl (f,ES.goal s)) s
 
-let revert_str (Args.String hyp_name) (s : ES.t) =
+let revert_str (hyp_name : lsymb) s =
   let hid,_ = Hyps.by_name hyp_name s in
-  [revert hid s]
+  revert hid s
+
+let revert_args (args : Args.parser_arg list) s =
+  let s =
+    List.fold_left (fun s arg -> match arg with
+        | Args.String_name arg -> revert_str arg s
+        | _ -> bad_args ()
+      ) s args in
+  [s]
+
+let revert_tac args s sk fk = LT.wrap_fail (revert_args args) s sk fk
 
 let () =
-  T.register_typed "revert"
-    ~general_help:"Take an hypothesis H, and turns the conclusion C into the \
-                   implication H => C."
-    ~detailed_help:""
-    ~tactic_group:Logical
-    (pure_equiv_typed revert_str) Args.String
+  T.register_general "revert"
+    ~tactic_help:{
+      general_help = "Take an hypothesis H, and turns the conclusion C into the \
+                      implication H => C.";
+      detailed_help = "";
+      tactic_group  = Logical;
+      usages_sorts = []; }
+    (pure_equiv_arg revert_tac)
 
 (*------------------------------------------------------------------*)
 (* TODO: factorize with corresponding, more general, trace tactics *)
