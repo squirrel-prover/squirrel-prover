@@ -283,6 +283,7 @@ end
 
 (*------------------------------------------------------------------*)
 (** {2 Matching} *)
+
 module Match : Term.MatchS with type t = form = struct 
   module TMatch = Term.Match
 
@@ -291,7 +292,7 @@ module Match : Term.MatchS with type t = form = struct
 
   type t = form
  
-  let try_match ?mv (t : form) (p : form Term.pat) = 
+  let try_match ?mv ?(mode=`Eq) (t : form) (p : form Term.pat) = 
     let exception NoMatch in
 
     (* [ty_env] must be closed at the end of the matching *)
@@ -306,6 +307,12 @@ module Match : Term.MatchS with type t = form = struct
         ) Type.tsubst_empty p.pat_tyvars univars 
     in
 
+    let flip = function
+      | `Eq        -> `Eq
+      | `Covar     -> `Contravar
+      | `Contravar -> `Covar
+    in
+
     let term_match term pat mv : Term.mv = 
       let pat = 
         Term.{ pat_tyvars = []; 
@@ -317,17 +324,48 @@ module Match : Term.MatchS with type t = form = struct
       | _ -> raise NoMatch
     in
 
-    let rec tmatch t pat mv : Term.mv = match t, pat with
-      | Impl (t1, t2), Impl (pat1, pat2) -> 
-        let mv = tmatch t1 pat1 mv in
-        tmatch t2 pat2 mv
+    (** Greedily check entailment through an inclusion check of [terms] in
+        [terms']. *)
+    let rec tmatch_e_incl terms terms' mv : Term.mv =
+      List.fold_right (fun term mv ->
+          let mv_opt = 
+            List.find_map (fun term' ->
+                try Some (term_match term term' mv) with
+                  NoMatch -> None
+              ) terms' 
+          in
+          match mv_opt with
+          | Some mv -> mv
+          | None -> raise NoMatch
+        ) terms mv
+    in
 
-      | ForAll _, _ -> raise NoMatch
-      | Atom (Reach t), Atom (Reach pat) -> term_match t pat mv
-
-      | Atom (Equiv es), Atom (Equiv pat_es) -> 
+    (** Check entailment between two equivalences.
+        - [Covar]    : [pat_es] entails [es]
+        - [Contravar]: [es] entails [pat_es] *)
+    let tmatch_e ~mode es pat_es mv : Term.mv =
+      match mode with
+      | `Eq -> 
+        if List.length es <> List.length pat_es then raise NoMatch;
+        
         List.fold_right2 term_match es pat_es mv
 
+      | `Covar     -> tmatch_e_incl es pat_es mv
+      | `Contravar -> tmatch_e_incl pat_es es mv
+    in
+
+    let rec tmatch ~mode t pat mv : Term.mv = match t, pat with
+      | Impl (t1, t2), Impl (pat1, pat2) -> 
+        let mv = tmatch ~mode:(flip mode) t1 pat1 mv in
+        tmatch ~mode t2 pat2 mv
+
+      | Atom (Reach t), Atom (Reach pat) -> 
+        term_match t pat mv
+          
+      | Atom (Equiv es), Atom (Equiv pat_es) -> 
+        tmatch_e ~mode es pat_es mv
+          
+      | ForAll _, _ -> raise NoMatch
       | _ -> raise NoMatch
     in
 
@@ -336,7 +374,12 @@ module Match : Term.MatchS with type t = form = struct
         | None -> Mv.empty
         | Some mv -> mv 
       in
-      let mv = tmatch t pat mv_init in
+      let mode = match mode with
+        | `Eq -> `Eq
+        | `EntailRL -> `Covar
+        | `EntailLR -> `Contravar
+      in
+      let mv = tmatch ~mode t pat mv_init in
 
       if not (Type.Infer.is_closed ty_env) 
       then `FreeTyv

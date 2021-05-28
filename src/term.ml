@@ -1393,8 +1393,9 @@ module type MatchS = sig
   val to_subst : mv -> subst
 
   val try_match :
-    ?mv:mv -> t -> t pat -> [ `FreeTyv | `NoMatch | `Match of mv ] 
-
+    ?mv:mv -> ?mode:[`Eq | `EntailLR | `EntailRL] ->
+    t -> t pat -> [ `FreeTyv | `NoMatch | `Match of mv ] 
+                  
   val find_map :
     many:bool -> Vars.env -> t -> 'a term pat -> 
     ('a term -> Vars.evars -> mv -> 'a term) -> 
@@ -1417,13 +1418,13 @@ module Match : MatchS with type t = message = struct
       (Fmt.list ~sep:Fmt.sp Type.pp_tvar) p.pat_tyvars
       (Fmt.list ~sep:Fmt.sp Vars.pp_e) (Sv.elements p.pat_vars)
 
-  (** [try_match t p] tries to match [p] with [t] (at head position). 
-      If it succeeds, it returns a map instantiating the variables [p.pat_vars] 
-      as substerms of [t]. *)
-  let try_match : type a b. ?mv:mv -> a term -> b term pat -> 
+  let try_match : type a b. 
+    ?mv:mv -> ?mode:[`Eq | `EntailLR | `EntailRL] -> a term -> b term pat -> 
     [`FreeTyv | `NoMatch | `Match of mv] = 
-    fun ?mv t p -> 
+    fun ?mv ?mode t p -> 
     let exception NoMatch in
+    
+    (* Term matching ignores [mode]. Matching in [Equiv] does not. *)
 
     (* [ty_env] must be closed at the end of the matching *)
     let ty_env = Type.Infer.mk_env () in

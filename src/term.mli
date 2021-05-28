@@ -278,10 +278,15 @@ module type MatchS = sig
   val to_subst : mv -> subst
 
   (** [try_match t p] tries to match [p] with [t] (at head position). 
-      If it succeeds, it returns a map instantiating the variables [p.pat_vars] 
-      as substerms of [t]. *)
+      If it succeeds, it returns a map [θ] instantiating the variables 
+      [p.pat_vars] as substerms of [t], and:
+
+      - if [mode = `Eq] then [t = pθ] (default mode);
+      - if [mode = `EntailLR] then [t = pθ] or [t ⇒ pθ] (boolean case).
+      - if [mode = `EntailRL] then [t = pθ] or [pθ ⇒ t] (boolean case). *)
   val try_match : 
-    ?mv:mv -> t -> t pat -> [ `FreeTyv | `NoMatch | `Match of mv ] 
+    ?mv:mv -> ?mode:[`Eq | `EntailLR | `EntailRL] ->
+    t -> t pat -> [ `FreeTyv | `NoMatch | `Match of mv ] 
 
   (** [find_map env t p func] looks for an occurence [t'] of [pat] in [t],
       where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].

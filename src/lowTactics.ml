@@ -672,7 +672,8 @@ module LowTac (S : Sequent.S) = struct
 
     let pat = { pat with pat_term = f } in
 
-    match S.Match.try_match (S.goal s) pat with
+    (* we check that [pat] entails [S.goal s] *)
+    match S.Match.try_match ~mode:`EntailRL (S.goal s) pat with
     | `NoMatch | `FreeTyv -> soft_failure ApplyMatchFailure
     | `Match mv ->
       let subst = Term.Match.to_subst mv in
@@ -700,7 +701,8 @@ module LowTac (S : Sequent.S) = struct
       else
         let pat = { pat with pat_term = fprem } in
 
-        match S.Match.try_match hconcl pat with
+        (* we check that [hconcl] entails [pat] *)
+        match S.Match.try_match ~mode:`EntailLR hconcl pat with
         | `NoMatch | `FreeTyv -> None
         | `Match mv -> Some mv
     in

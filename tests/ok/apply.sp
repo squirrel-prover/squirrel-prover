@@ -108,3 +108,26 @@ Proof.
  rewrite !-assoc !inv !neuter in H.
  assumption.
 Qed.
+
+(*==================================================================*)
+(* test equiv apply *)
+
+equiv _ (x, y : message) : x, y -> x.
+Proof. 
+ intro H; apply H. 
+Qed.
+
+equiv _ (x, y : message) : y, x -> x.
+Proof. 
+ intro H; apply H. 
+Qed.
+
+(* equiv _ (x, y : message) : [a = b] -> ([a = b] -> y, x) -> x. *)
+(* Proof.  *)
+(*  intro H0 H; apply H; assumption.  *)
+(* Qed. *)
+
+equiv _ (x, y : message) : x -> x, y.
+Proof. 
+ checkfail intro H; try apply H; auto exn GoalNotClosed. 
+Abort.
