@@ -48,6 +48,7 @@ type naming_pat =
   | Unnamed   (** '_' *)
   | AnyName   (** '?' *)
   | Named of string
+  | Approx  of string        (* only used internally *)
 
 type and_or_pat =
   | Or      of simpl_pat list

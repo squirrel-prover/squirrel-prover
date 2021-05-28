@@ -89,6 +89,7 @@ type naming_pat =
   | Unnamed                  (** '_' *)
   | AnyName                  (** '?' *)
   | Named   of string
+  | Approx  of string        (* only used internally *)
 
 type and_or_pat =
   | Or      of simpl_pat list
@@ -114,9 +115,10 @@ type intro_pattern =
 
 (*------------------------------------------------------------------*)
 let pp_naming_pat fmt = function
-  | Unnamed -> Fmt.pf fmt "_"
-  | AnyName -> Fmt.pf fmt "?"
-  | Named s -> Fmt.pf fmt "%s" s
+  | Unnamed  -> Fmt.pf fmt "_"
+  | AnyName  -> Fmt.pf fmt "?"
+  | Named s  -> Fmt.pf fmt "%s" s
+  | Approx s -> Fmt.pf fmt "≈%s" s
 
 let rec pp_and_or_pat fmt = function
   | Or      l ->

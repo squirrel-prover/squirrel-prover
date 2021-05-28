@@ -18,7 +18,7 @@ abstract even : message -> boolean.
 (* reach *)
 
 goal _ :
- (forall (x,x0 : message), x = a || x0 = b) =>
+ (forall (x,y : message), x = a || y = b) =>
  (forall (y,x : message), x = a || y = b).
 Proof.
   intro Ass y x.
@@ -27,11 +27,11 @@ Proof.
 Qed.
 
 goal _ :
- (forall (x,y : message), x = a || y = b) =>
+ (forall (u,v : message), u = a || v = b) =>
  (forall (y,x : message), x = a || y = b).
 Proof.
   intro Ass y x.
-  generalize x y as x y.
+  generalize x y as u v.
   assumption.
 Qed.
 

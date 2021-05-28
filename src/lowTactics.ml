@@ -539,8 +539,9 @@ module LowTac (S : Sequent.S) = struct
       n_ip ~dflt_name (ty : 'a Type.ty) env : Vars.env * 'a Vars.var = 
     match n_ip with
     | Args.Unnamed
-    | Args.AnyName    -> Vars.make `Approx env ty dflt_name
-    | Args.Named name -> make_exact env ty name
+    | Args.AnyName     -> Vars.make `Approx env ty dflt_name
+    | Args.Approx name -> Vars.make `Approx env ty name
+    | Args.Named name  -> make_exact env ty name
 
   (*------------------------------------------------------------------*)
   (** {3 Revert} *)
@@ -646,7 +647,12 @@ module LowTac (S : Sequent.S) = struct
       in
       let n_ips = 
         match n_ips_opt with 
-        | None -> List.map (fun _ -> Args.AnyName) terms
+        | None -> 
+          List.map (fun (Term.ETerm t) -> 
+              match t with
+              | Term.Var v -> Args.Approx (Vars.name v) (* use the same name *)
+              | _ -> Args.AnyName
+            ) terms
         | Some n_ips ->
           if List.length n_ips <> List.length terms then
             hard_failure (Failure "not the same number of arguments \

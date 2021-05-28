@@ -151,9 +151,11 @@ module Hyps
 
   let add_i npat f s =
     let force, approx, name = match npat with
-      | Args.Unnamed -> true, true, "_"
-      | Args.AnyName -> false, true, "H"
-      | Args.Named s -> true, false, s in
+      | Args.Unnamed  -> true, true, "_"
+      | Args.AnyName  -> false, true, "H"
+      | Args.Named s  -> true, false, s 
+      | Args.Approx s -> true, true, s 
+    in
 
     let id = fresh_id ~approx name s in
     

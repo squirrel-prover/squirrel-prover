@@ -259,6 +259,7 @@ let do_naming_pat (ip_handler : Args.ip_handler) nip s : ES.sequent =
     let v' = match nip with
       | Args.Unnamed
       | Args.AnyName -> Vars.fresh_r env v
+      | Args.Approx name -> Vars.make_r `Approx env (Vars.ty v) name
 
       | Args.Named name ->
         match Vars.make_exact_r env (Vars.ty v) name with
