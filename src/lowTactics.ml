@@ -514,10 +514,9 @@ module LowTac (S : Sequent.S) = struct
         in
         let goal = S.subst_hyp ts_subst (S.goal s) in
         let prem =
-          Term.mk_exists indices
-            (Term.Atom (`Timestamp (`Eq,ts, ts_case)))
+          S.Smart.mk_exists ~simpl:false indices
+            (S.reach_to_form (Term.Atom (`Timestamp (`Eq,ts, ts_case))))
         in
-        let prem = S.reach_to_form prem in
         S.set_goal (S.Smart.mk_impl ~simpl:false prem goal) s
       ) cases
 

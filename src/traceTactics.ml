@@ -304,15 +304,15 @@ let () =
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "destruct"
-    ~tactic_help:{general_help = "Destruct an hypothesis. An optional And/Or \
-                                  introduction pattern can be given.\n\n\
-                                  Usages: destruct H.\n\
-                                 \        destruct H as [A | [B C]]";
-                  detailed_help = "";
-                  usages_sorts = [];
-                  tactic_group = Logical}
+    ~tactic_help:{
+      general_help = "Destruct an hypothesis. An optional And/Or \
+                      introduction pattern can be given.\n\n\
+                      Usages: destruct H.\n\
+                     \        destruct H as [A | [B C]]";
+      detailed_help = "";
+      usages_sorts = [];
+      tactic_group = Logical}
     LT.destruct_tac
-
 
 (*------------------------------------------------------------------*)
 let () =

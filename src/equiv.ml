@@ -65,23 +65,34 @@ let fv_atom = function
 (** {2 Equivalence formulas} *)
 (** We only support a small fragment for now *)
 
+type quant = ForAll | Exists
+
 type form = 
-  | ForAll of Vars.evar list * form
+  | Quant of quant * Vars.evar list * form
   | Atom   of atom
   | Impl   of (form * form)
 
 let rec pp fmt = function
   | Atom at -> pp_atom fmt at
+
   | Impl (f0, f) -> 
     Fmt.pf fmt "@[<v 2>%a ->@ %a@]" pp f0 pp f
-  | ForAll (vs, f) -> 
+
+  | Quant (ForAll, vs, f) -> 
     Fmt.pf fmt "@[<v 2>forall (@[%a@]),@ %a@]"
       Vars.pp_typed_list vs pp f
 
-let mk_forall evs f = match evs, f with
+  | Quant (Exists, vs, f) -> 
+    Fmt.pf fmt "@[<v 2>exists (@[%a@]),@ %a@]"
+      Vars.pp_typed_list vs pp f
+
+let mk_quant q evs f = match evs, f with
   | [], _ -> f
-  | _, ForAll (evs', f) -> ForAll (evs @ evs', f)
-  | _, _ -> ForAll (evs, f)
+  | _, Quant (q, evs', f) -> Quant (q, evs @ evs', f)
+  | _, _ -> Quant (q, evs, f)
+
+let mk_forall = mk_quant ForAll
+let mk_exists = mk_quant Exists
 
 let mk_reach_atom f = Atom (Reach f)
 
@@ -93,7 +104,7 @@ let mk_reach_atom f = Atom (Reach f)
 let tmap (func : form -> form) (t : form) : form = 
 
   let rec tmap = function
-    | ForAll (vs, b)    -> ForAll (vs, func b)      
+    | Quant (q, vs, b) -> Quant (q, vs, func b)      
     | Impl (f1, f2) -> Impl (tmap f1, tmap f2)
     | Atom at -> Atom at
   in
@@ -133,7 +144,7 @@ type gform = [`Equiv of form | `Reach of Term.message]
 let rec fv = function
   | Atom at -> fv_atom at
   | Impl (f,f0) -> Sv.union (fv f) (fv f0)
-  | ForAll (evs, b) -> Sv.diff (fv b) (Sv.of_list evs)
+  | Quant (_, evs, b) -> Sv.diff (fv b) (Sv.of_list evs)
 
 let rec subst s (f : form) = 
   if s = [] ||
@@ -146,10 +157,10 @@ let rec subst s (f : form) =
 
     | Impl (f0, f) -> Impl (subst s f0, subst s f)
 
-    | ForAll ([], f) -> subst s f
-    | ForAll (v :: evs, b) -> 
+    | Quant (_, [], f) -> subst s f
+    | Quant (q, v :: evs, b) -> 
       let v, s = Term.subst_binding v s in
-      let f = subst s (ForAll (evs,b)) in
+      let f = subst s (Quant (q, evs,b)) in
       mk_forall [v] f
 
 let tsubst_atom (ts : Type.tsubst) (at : atom) =  
@@ -192,12 +203,6 @@ module Smart : Term.SmartFO with type form = _form = struct
     | [] -> f
     | f0 :: impls -> Impl (f0, mk_impls impls f)
 
-  let mk_forall0 l f =
-    if l = [] then f 
-    else match f with
-      | ForAll (l', f) -> ForAll (l @ l', f)
-      | _ -> ForAll (l, f)
-
   let mk_forall ?(simpl=false) l f = 
     let l = 
       if simpl then
@@ -207,16 +212,24 @@ module Smart : Term.SmartFO with type form = _form = struct
     in
     mk_forall l f
 
-  let mk_exists ?simpl es f = todo ()
+  let mk_exists ?(simpl=false) l f = 
+    let l = 
+      if simpl then
+        let fv = fv f in
+        List.filter (fun v -> Sv.mem v fv) l 
+      else l
+    in
+    mk_exists l f
 
   (*------------------------------------------------------------------*)
   (** {3 Destructors} *)
 
-  let destr_forall = function
-    | ForAll (es, f) -> Some (es, f)
+  let destr_quant q = function
+    | Quant (q', es, f) when q = q' -> Some (es, f)
     | _ -> None
-      
-  let destr_exists f = None
+
+  let destr_forall = destr_quant ForAll
+  let destr_exists = destr_quant Exists
 
   (*------------------------------------------------------------------*)
   let destr_false f = todo ()
@@ -236,8 +249,8 @@ module Smart : Term.SmartFO with type form = _form = struct
   let is_or    f = false
   let is_impl = function Impl _ -> true | _ -> false
 
-  let is_forall = function ForAll _ -> true | _ -> false
-  let is_exists f = false
+  let is_forall = function Quant (ForAll, _, _) -> true | _ -> false
+  let is_exists = function Quant (Exists, _, _) -> true | _ -> false
 
   let is_matom = function
     | Atom (Reach f) -> Term.is_matom f
@@ -263,11 +276,15 @@ module Smart : Term.SmartFO with type form = _form = struct
     | _ -> None
 
   (*------------------------------------------------------------------*)
-  let decompose_forall = function 
-    | ForAll (es, f) ->  es, f
+  let rec decompose_quant q = function 
+    | Quant (q', es, f) when q = q' -> 
+      let es', f = decompose_quant q f in
+      es @ es', f
+
     | _ as f -> [], f
 
-  let decompose_exists f = todo ()
+  let decompose_forall = decompose_quant ForAll
+  let decompose_exists = decompose_quant Exists
 
   (*------------------------------------------------------------------*)
   let decompose_ands  f = todo ()
@@ -376,7 +393,7 @@ module Match : Term.MatchS with type t = form = struct
       | Atom (Equiv es), Atom (Equiv pat_es) -> 
         tmatch_e ~mode es pat_es mv
           
-      | ForAll _, _ -> raise NoMatch
+      | Quant _, _ -> raise NoMatch
       | _ -> raise NoMatch
     in
 
@@ -446,6 +463,6 @@ module Match : Term.MatchS with type t = form = struct
         in
         if found then Some (Impl (e1, e2)) else None
 
-      | ForAll (vs, e) -> None  (* FIXME: match under binders *)
+      | Quant _ -> None  (* FIXME: match under binders *)
 
 end

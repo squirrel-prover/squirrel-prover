@@ -198,14 +198,14 @@ module Mk (S : LowSequent.S) = struct
 
   let rec reduce_equiv s e : Equiv.form =
     match e with
-    | Equiv.ForAll (vs, e) -> 
+    | Equiv.Quant (q, vs, e) -> 
       let _, subst = Term.erefresh_vars `Global vs in
       let e = Equiv.subst subst e in
       let red_e = reduce_equiv s e in
 
       let r_subst = rev_subst subst in
       let red_e = Equiv.subst r_subst red_e in
-      Equiv.ForAll (vs, red_e)
+      Equiv.Quant (q, vs, red_e)
 
     | Equiv.Impl (e1, e2) ->
       Equiv.Impl (reduce_equiv s e1, reduce_equiv s e2)

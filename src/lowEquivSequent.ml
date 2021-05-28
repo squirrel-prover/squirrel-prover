@@ -293,7 +293,7 @@ let rec get_terms (f : Equiv.form) : Term.message list =
   | Equiv.Atom (Equiv.Reach f) -> [f]
   | Equiv.Atom (Equiv.Equiv e) -> e
   | Equiv.Impl (e1, e2) -> get_terms e1 @ get_terms e2
-  | Equiv.ForAll (vs, e) -> []
+  | Equiv.Quant _ -> []
 
 (*------------------------------------------------------------------*)
 let query_happens ~precise (s : t) (a : Term.timestamp) =

@@ -220,7 +220,7 @@ let assumption s =
   let in_hyp _ = function
     | Equiv.Atom at -> in_atom at
     | Equiv.Impl _ as f -> f = goal
-    | Equiv.ForAll _ as f -> f = goal
+    | Equiv.Quant _ as f -> f = goal
   in
 
   if Hyps.exists in_hyp s
@@ -293,7 +293,7 @@ let rec tautology f s = match f with
   | Equiv.Impl (f0,f1) ->
     let s = Hyps.add Args.AnyName f0 s in
     tautology f1 s
-  | Equiv.ForAll (vs, f) -> false
+  | Equiv.Quant _ -> false
   | Equiv.(Atom (Equiv e)) -> refl e s = `True
   | Equiv.(Atom (Reach _)) ->
     let s = ES.set_goal f s in
@@ -1027,7 +1027,7 @@ let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
     let rec mk_hyp_f = function
       | Equiv.Atom at       -> Equiv.Atom (mk_hyp_at at)
       | Equiv.Impl (f, f0)  -> Equiv.Impl (mk_hyp_f f, mk_hyp_f f0)
-      | Equiv.ForAll _ as f -> f
+      | Equiv.Quant _ as f -> f
 
     and mk_hyp_at hyp = match hyp with
       | Equiv.Equiv e ->
@@ -1107,6 +1107,19 @@ let () =
        usages_sorts = [];
        tactic_group = Logical}
     (pure_equiv_arg LT.exists_intro_tac)
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "destruct"
+    ~tactic_help:{
+      general_help = "Destruct an hypothesis. An optional And/Or \
+                      introduction pattern can be given.\n\n\
+                      Usages: destruct H.\n\
+                     \        destruct H as [A | [B C]]";
+      detailed_help = "";
+      usages_sorts = [];
+      tactic_group = Logical}
+    (pure_equiv_arg LT.destruct_tac)
 
 (*------------------------------------------------------------------*)
 let () =

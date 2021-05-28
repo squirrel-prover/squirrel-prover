@@ -37,8 +37,10 @@ val fv_atom : atom -> Vars.Sv.t
 (** {2 Equivalence formulas} *)
 (** We only support a small fragment for now *)
 
+type quant = ForAll | Exists
+
 type form = 
-  | ForAll of Vars.evar list * form
+  | Quant of quant * Vars.evar list * form
   | Atom   of atom
   | Impl   of (form * form)
 
