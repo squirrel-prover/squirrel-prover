@@ -32,7 +32,7 @@
 %token LARGE NAMEFIXEDLENGTH
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY SPLITSEQ CONSTSEQ
-%token BY INTRO AS DESTRUCT REMEMBER
+%token BY INTRO AS DESTRUCT REMEMBER INDUCTION
 %token PROOF QED UNDO ABORT HINT
 %token EOF
 
@@ -574,6 +574,9 @@ apply_arg:
 %inline generalize_dependent:
 | GENERALIZE DEPENDENT { }
 
+%inline dependent_induction:
+| DEPENDENT INDUCTION { }
+
 (*------------------------------------------------------------------*)
 tac:
   | LPAREN t=tac RPAREN                { t }
@@ -642,6 +645,12 @@ tac:
     { mk_abstract l "generalize dependent"
                   [TacticsArgs.Generalize (terms, n_ips_o)] }
 
+  | l=lloc(INDUCTION) t=tactic_params
+    { mk_abstract l "induction" t}
+
+  | l=lloc(dependent_induction) t=tactic_params
+    { mk_abstract l "dependent induction" t }
+
   | l=lloc(CLEAR) ids=slist1(lsymb, empty)     
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
       mk_abstract l "clear" ids }
@@ -704,6 +713,7 @@ help_tac_i:
 | EXISTS     { "exists"}    
 | REVERT     { "revert"}  
 | GENERALIZE { "generalize"}  
+| INDUCTION  { "induction"}  
 | CLEAR      { "clear"}      
 | ASSERT     { "assert"}   
 | USE        { "use"}      

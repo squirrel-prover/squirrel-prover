@@ -784,7 +784,7 @@ module LowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Induction} *)
   
-  let induction s  =
+  let induction s =
     let error () =
       soft_failure
         (Failure "conclusion must be an universal quantification \
@@ -828,4 +828,23 @@ module LowTac (S : Sequent.S) = struct
         [S.set_goal new_goal s]
       end
     | _ -> error ()
+
+  let induction_gen ~dependent (t : Term.timestamp) s : S.t list =
+    let s = generalize ~dependent [Term.ETerm t] [Args.AnyName] s in
+    induction s
+
+  let induction_args ~dependent args s = 
+    match args with
+    | [] -> induction s
+    | [Args.Theory t] -> 
+      begin
+        match convert_args s args (Args.Sort Args.Timestamp) with
+        | Args.Arg (Args.Timestamp t) -> induction_gen ~dependent t s
+        | _ -> hard_failure (Failure "expected a timestamp")
+      end
+    | _ -> bad_args ()
+
+  let induction_tac ~dependent args = 
+    wrap_fail (induction_args ~dependent args)
+
 end

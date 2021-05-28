@@ -673,12 +673,19 @@ let () =
 (*------------------------------------------------------------------*)
 (** Induction *)
 
-let () = T.register "induction"
+let () = T.register_general "induction"
     ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
-    LT.induction
+    (LT.induction_tac ~dependent:false)
+
+let () = T.register_general "dependent induction"
+    ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
+                  detailed_help = "";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    (LT.induction_tac ~dependent:true)
 
 (*------------------------------------------------------------------*)
 (** [assumption judge sk fk] proves the sequent using the axiom rule. *)

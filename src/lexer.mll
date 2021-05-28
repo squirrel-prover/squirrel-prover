@@ -137,6 +137,7 @@ rule token = parse
 | "apply"             { APPLY }
 | "revert"            { REVERT }
 | "generalize"        { GENERALIZE }
+| "induction"         { INDUCTION }
 | "depends"           { DEPENDS }
 | "clear"             { CLEAR }
 | "ddh"               { DDH }
