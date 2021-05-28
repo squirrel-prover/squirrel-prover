@@ -320,22 +320,6 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-let clear (hid : Ident.t) s = Hyps.remove hid s
-
-let clear_str (hyp_name : lsymb) s =
-  let hid,_ = Hyps.by_name hyp_name s in
-  clear hid s
-
-let clear_tac_args (args : Args.parser_arg list) s =
-  let s =
-    List.fold_left (fun s arg -> match arg with
-        | Args.String_name arg -> clear_str arg s
-        | _ -> bad_args ()
-      ) s args in
-  [s]
-
-let clear_tac args = LT.wrap_fail (clear_tac_args args)
-
 let () =
   T.register_general "clear"
     ~tactic_help:{
@@ -343,7 +327,7 @@ let () =
       detailed_help = "";
       tactic_group  = Logical;
       usages_sorts = []; }
-    clear_tac
+    LT.clear_tac
 
 
 (*------------------------------------------------------------------*)

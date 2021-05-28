@@ -533,6 +533,25 @@ module LowTac (S : Sequent.S) = struct
   let reduce_sequent s = S.map (S.reduce s) s        
 
   (*------------------------------------------------------------------*)
+  (** {3 Clear} *)
+
+  let clear (hid : Ident.t) s = Hyps.remove hid s
+
+  let clear_str (hyp_name : lsymb) s : S.t =
+    let hid,_ = Hyps.by_name hyp_name s in
+    clear hid s
+
+  let clear_tac_args (args : Args.parser_arg list) s : S.t list =
+    let s =
+      List.fold_left (fun s arg -> match arg with
+          | Args.String_name arg -> clear_str arg s
+          | _ -> bad_args ()
+        ) s args in
+    [s]
+
+  let clear_tac args = wrap_fail (clear_tac_args args)
+
+  (*------------------------------------------------------------------*)
   (** {3 Naming} *)
 
   let var_of_naming_pat 
@@ -542,6 +561,7 @@ module LowTac (S : Sequent.S) = struct
     | Args.AnyName     -> Vars.make `Approx env ty dflt_name
     | Args.Approx name -> Vars.make `Approx env ty name
     | Args.Named name  -> make_exact env ty name
+
 
   (*------------------------------------------------------------------*)
   (** {3 Revert} *)
@@ -853,5 +873,4 @@ module LowTac (S : Sequent.S) = struct
 
   let induction_tac ~dependent args = 
     wrap_fail (induction_args ~dependent args)
-
 end

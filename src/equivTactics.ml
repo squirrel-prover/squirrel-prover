@@ -189,6 +189,16 @@ let () =
     (pure_equiv_arg case_tac)
 
 (*------------------------------------------------------------------*)
+let () =
+  T.register_general "clear"
+    ~tactic_help:{
+      general_help = "Clear an hypothesis.";
+      detailed_help = "";
+      tactic_group  = Logical;
+      usages_sorts = []; }
+    (pure_equiv_arg LT.clear_tac)
+
+(*------------------------------------------------------------------*)
 (** For each element of the biframe, checks that it is a member of the
   * hypothesis biframe. If so, close the goal. *)
 let assumption s =
