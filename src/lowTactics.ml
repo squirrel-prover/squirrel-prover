@@ -664,6 +664,7 @@ module LowTac (S : Sequent.S) = struct
 
   (*------------------------------------------------------------------*)
   (** {3 Apply} *)
+
   let apply (pat : S.form Term.pat) (s : S.t) : S.t list =
     let subs, f = S.Smart.decompose_impls_last pat.pat_term in
 
@@ -780,4 +781,51 @@ module LowTac (S : Sequent.S) = struct
 
   let apply_tac args = wrap_fail (apply_tac_args args)
 
+  (*------------------------------------------------------------------*)
+  (** {3 Induction} *)
+  
+  let induction s  =
+    let error () =
+      soft_failure
+        (Failure "conclusion must be an universal quantification \
+                  over a timestamp")
+    in
+
+    let goal = S.goal s in
+    let vs0, f = S.Smart.decompose_forall goal in
+    let Vars.EVar v, vs = match vs0 with
+      | v :: vs -> v, vs
+      | _ -> error ()
+    in
+
+    match Vars.ty v with
+    | Type.Timestamp ->
+      begin
+        let env = Vars.of_list vs0 in
+        let _,v' = Vars.fresh env v in
+
+        let ih =
+          let atom_lt =
+            S.reach_to_form 
+              (Term.Atom (`Timestamp (`Lt, Term.Var v', Term.Var v)))
+          in
+          
+          S.Smart.mk_forall ~simpl:false
+            (Vars.EVar v' :: vs)
+            (S.Smart.mk_impl ~simpl:false
+               (atom_lt) 
+               (S.subst_hyp [Term.ESubst (Term.Var v,Term.Var v')] f))
+        in
+
+        let new_goal = 
+          S.Smart.mk_forall ~simpl:false
+            [Vars.EVar v]
+            (S.Smart.mk_impl ~simpl:false 
+               ih
+               (S.Smart.mk_forall ~simpl:false vs f))
+        in
+
+        [S.set_goal new_goal s]
+      end
+    | _ -> error ()
 end

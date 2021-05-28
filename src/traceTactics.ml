@@ -673,54 +673,12 @@ let () =
 (*------------------------------------------------------------------*)
 (** Induction *)
 
-let induction s  =
-  let error () =
-    Tactics.soft_failure
-      (Tactics.Failure
-         "conclusion must be an universal quantification over a timestamp")
-  in
-
-  match TS.goal s with
-  | ForAll ((Vars.EVar v)::vs,f) ->
-    begin
-      match Vars.ty v with
-        Type.Timestamp ->
-        (
-          (* We need two fresh variables in env,
-           * but one will not be kept in the final environment. *)
-          let env,v' = Vars.fresh (TS.env s) v in
-          let _,v'' = Vars.fresh env v in
-          (* Introduce v as v'. *)
-          let f' = match vs with
-            | [] -> f
-            | _ -> ForAll (vs,f) in
-          let f' = Term.subst [Term.ESubst (Term.Var v,Term.Var v')] f' in
-          (* Use v'' to form induction hypothesis. *)
-          let (-->) a b = mk_impl a b in
-          let ih =
-            ForAll ((Vars.EVar v'') :: vs,
-                    (Atom (`Timestamp (`Lt,Term.Var v'',Term.Var v)
-                           :> generic_atom) -->
-                     Term.subst
-                       [Term.ESubst (Term.Var v,Term.Var v'')] f)) in
-
-          let goal = Term.mk_impl ih f' in
-
-          let s = TS.set_env env s
-                  |> TS.set_goal goal in
-          [s]
-        )
-      | _ -> error ()
-    end
-
-  | _ -> error ()
-
 let () = T.register "induction"
     ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
-    induction
+    LT.induction
 
 (*------------------------------------------------------------------*)
 (** [assumption judge sk fk] proves the sequent using the axiom rule. *)
