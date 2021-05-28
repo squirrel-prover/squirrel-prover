@@ -634,6 +634,11 @@ module LowTac (S : Sequent.S) = struct
     let goal = S.Smart.mk_forall ~simpl:false new_vars (S.goal s) in
     S.set_goal goal s 
 
+  let naming_pat_of_eterm (Term.ETerm t) =
+    match t with
+    | Term.Var v -> Args.Approx (Vars.name v) (* use the same name *)
+    | _ -> Args.AnyName
+
   let generalize_tac_args ~dependent args s : S.t list =
     match args with
     | [Args.Generalize (terms, n_ips_opt)] ->
@@ -647,12 +652,7 @@ module LowTac (S : Sequent.S) = struct
       in
       let n_ips = 
         match n_ips_opt with 
-        | None -> 
-          List.map (fun (Term.ETerm t) -> 
-              match t with
-              | Term.Var v -> Args.Approx (Vars.name v) (* use the same name *)
-              | _ -> Args.AnyName
-            ) terms
+        | None -> List.map naming_pat_of_eterm terms
         | Some n_ips ->
           if List.length n_ips <> List.length terms then
             hard_failure (Failure "not the same number of arguments \
@@ -836,7 +836,8 @@ module LowTac (S : Sequent.S) = struct
     | _ -> error ()
 
   let induction_gen ~dependent (t : Term.timestamp) s : S.t list =
-    let s = generalize ~dependent [Term.ETerm t] [Args.AnyName] s in
+    let t = Term.ETerm t in
+    let s = generalize ~dependent [t] [naming_pat_of_eterm t] s in
     induction s
 
   let induction_args ~dependent args s = 

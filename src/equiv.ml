@@ -149,7 +149,7 @@ let rec subst s (f : form) =
     | ForAll ([], f) -> subst s f
     | ForAll (v :: evs, b) -> 
       let v, s = Term.subst_binding v s in
-      let f = subst s (ForAll (evs,f)) in
+      let f = subst s (ForAll (evs,b)) in
       mk_forall [v] f
 
 let tsubst_atom (ts : Type.tsubst) (at : atom) =  
