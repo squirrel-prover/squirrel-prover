@@ -29,6 +29,25 @@ module LowTac (S : Sequent.S) = struct
   module Hyps = S.Hyps
 
   (*------------------------------------------------------------------*)
+  (** Formulas of different types *)
+  type cform = 
+    | Cform  of S.form
+    | Ctform of Term.message
+
+  let pp_cform fmt = function
+    | Cform f  -> S.pp_form fmt f
+    | Ctform t -> Term.pp fmt t
+
+  (*------------------------------------------------------------------*)
+  let mk_form f  = Cform  f
+  let mk_tform f = Ctform f
+
+  (*------------------------------------------------------------------*)
+  let subst_cform subst = function
+    | Ctform f -> Ctform (Term.subst subst f)
+    | Cform  f -> Cform  (S.subst_hyp subst f)
+
+  (*------------------------------------------------------------------*)
   (** {3 Miscellaneous} *)
 
   (*------------------------------------------------------------------*)
@@ -91,6 +110,11 @@ module LowTac (S : Sequent.S) = struct
     | Some v' -> v'
 
   (*------------------------------------------------------------------*)
+  let happens_premise (s : S.t) (a : Term.timestamp) : S.t =
+    let form = Term.Atom (`Happens a) in
+    S.set_goal (S.reach_to_form form) s
+
+  (*------------------------------------------------------------------*)
   (** {3 Targets} *)
   type target = 
     | T_goal
@@ -124,20 +148,6 @@ module LowTac (S : Sequent.S) = struct
       List.map (fun symb -> make_single_target symb s) symbs, false
     | `All -> target_all s, true
     | `Goal -> [T_goal], false
-
-  (*------------------------------------------------------------------*)
-  (** Formulas of different types *)
-  type cform = 
-    | Cform  of S.form
-    | Ctform of Term.message
-
-  let mk_form f  = Cform  f
-  let mk_tform f = Ctform f
-
-  (*------------------------------------------------------------------*)
-  let subst_cform subst = function
-    | Ctform f -> Ctform (Term.subst subst f)
-    | Cform  f -> Cform  (S.subst_hyp subst f)
 
   (** Apply some function [doit] to a single target. *)
   let do_target 
@@ -304,6 +314,16 @@ module LowTac (S : Sequent.S) = struct
   let expands (args : Theory.term list) (s : S.t) : S.t =
     List.fold_left (fun s arg -> expand (target_all s) arg s) s args 
 
+  let expand_tac args s =
+    let args = List.map (function
+        | Args.Theory t -> t
+        | _ -> bad_args ()
+      ) args
+    in
+    [expands args s]
+
+  let expand_tac args = wrap_fail (expand_tac args)
+
   (*------------------------------------------------------------------*)
   (** {3 Rewriting types and functions}*)
 
@@ -460,6 +480,7 @@ module LowTac (S : Sequent.S) = struct
 
   (*------------------------------------------------------------------*)
   (** {3 Case tactic}*)
+
   (** Type for case and destruct tactics handlers *)
   type c_handler =
     | CHyp of Ident.t
@@ -552,18 +573,6 @@ module LowTac (S : Sequent.S) = struct
   let clear_tac args = wrap_fail (clear_tac_args args)
 
   (*------------------------------------------------------------------*)
-  (** {3 Naming} *)
-
-  let var_of_naming_pat 
-      n_ip ~dflt_name (ty : 'a Type.ty) env : Vars.env * 'a Vars.var = 
-    match n_ip with
-    | Args.Unnamed
-    | Args.AnyName     -> Vars.make `Approx env ty dflt_name
-    | Args.Approx name -> Vars.make `Approx env ty name
-    | Args.Named name  -> make_exact env ty name
-
-
-  (*------------------------------------------------------------------*)
   (** {3 Revert} *)
 
   let revert (hid : Ident.t) (s : S.t) : S.t =
@@ -584,6 +593,272 @@ module LowTac (S : Sequent.S) = struct
     [s]
 
   let revert_tac args s sk fk = wrap_fail (revert_args args) s sk fk
+
+  (*------------------------------------------------------------------*)
+  (** {3 Intro patterns} *)
+
+  let var_of_naming_pat 
+      n_ip ~dflt_name (ty : 'a Type.ty) env : Vars.env * 'a Vars.var = 
+    match n_ip with
+    | Args.Unnamed
+    | Args.AnyName     -> Vars.make `Approx env ty dflt_name
+    | Args.Approx name -> Vars.make `Approx env ty name
+    | Args.Named name  -> make_exact env ty name
+
+  (*------------------------------------------------------------------*)
+  (** Apply a naming pattern to a variable or hypothesis. *)
+  let do_naming_pat (ip_handler : Args.ip_handler) n_ip s : S.t =
+    match ip_handler with
+    | `Var Vars.EVar v ->
+      let env, v' = 
+        var_of_naming_pat n_ip ~dflt_name:(Vars.name v) (Vars.ty v) (S.env s)
+      in
+      let subst = [Term.ESubst (Term.Var v, Term.Var v')] in
+
+      (* FIXME: we substitute everywhere. This is inefficient. *)
+      S.subst subst (S.set_env env s)
+
+    | `Hyp hid ->
+      let f = Hyps.by_id hid s in
+      let s = Hyps.remove hid s in
+
+      Hyps.add n_ip f s
+
+  (*------------------------------------------------------------------*)
+  (** Apply a And pattern (this is a destruct) of length [l].
+      Note that variables in handlers have not been added to the env yet. *)
+  let do_and_pat (hid : Ident.t) len s : Args.ip_handler list * S.t =
+    let destr_fail s =
+      soft_failure (Tactics.Failure ("cannot destruct: " ^ s))
+    in
+    
+    let get_destr ~orig = function
+      | Some x -> x
+      | None -> destr_fail (Fmt.str "%a" pp_cform orig) 
+    in
+
+    assert (len > 0);
+    if len = 1 then ([`Hyp hid], s) else
+      let form = Hyps.by_id hid s in
+      let s = Hyps.remove hid s in
+
+      if S.Smart.is_matom form then 
+        begin
+          match S.Smart.destr_matom form with
+          | Some (`Eq,a,b) ->
+            let a1, a2 = get_destr ~orig:(Ctform a) (Term.destr_pair a)
+            and b1, b2 = get_destr ~orig:(Ctform b) (Term.destr_pair b) in
+
+            let f1 = Term.Atom (`Message (`Eq, a1, b1))
+            and f2 = Term.Atom (`Message (`Eq, a2, b2)) in
+
+            let forms = 
+              List.map (fun x -> Args.Unnamed, S.reach_to_form x) [f1;f2] 
+            in
+            let ids, s = Hyps.add_i_list forms s in
+            List.map (fun id -> `Hyp id) ids, s
+
+          | _ -> destr_fail (Fmt.str "%a" S.pp_form form)
+        end
+        
+      else if S.Smart.is_and form then 
+        begin
+          let ands = 
+            get_destr ~orig:(Cform form) (S.Smart.destr_ands len form) 
+          in
+          let ands = List.map (fun x -> Args.Unnamed, x) ands in
+          let ids, s = Hyps.add_i_list ands s in
+          List.map (fun id -> `Hyp id) ids, s
+        end
+
+      else if S.Smart.is_exists form then
+        begin
+          let vs, f = 
+            get_destr ~orig:(Cform form) (S.Smart.destr_exists form) 
+          in
+          
+          if List.length vs < len - 1 then
+            hard_failure (Tactics.PatNumError (len - 1, List.length vs));
+          
+          let vs, vs' = List.takedrop (len - 1) vs in
+          
+          let vs_fresh, subst = Term.erefresh_vars `Global vs in
+          
+          let f = S.Smart.mk_exists vs' f in
+          let f = S.subst_hyp subst f in
+          
+          let idf, s = Hyps.add_i Args.Unnamed f s in
+          
+          ( (List.map (fun x -> `Var x) vs_fresh) @ [`Hyp idf], s )
+        end
+
+      else destr_fail (Fmt.str "%a" S.pp_form form)
+
+  (** Apply an And/Or pattern to an ident hypothesis handler. *)
+  let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
+    : S.t list =
+    match pat with
+    | Args.And s_ip ->
+      (* Destruct the hypothesis *)
+      let handlers, s = do_and_pat hid (List.length s_ip) s in
+
+      if List.length handlers <> List.length s_ip then
+        hard_failure (Tactics.PatNumError (List.length s_ip, List.length handlers));
+
+      (* Apply, for left to right, the simple patterns, and collect everything *)
+      let ss = List.fold_left2 (fun ss handler ip ->
+          List.map (do_simpl_pat handler ip) ss
+          |> List.flatten
+        ) [s] handlers s_ip in
+      ss
+
+    | Args.Or s_ip ->
+      let ss = hypothesis_case ~nb:(`Some (List.length s_ip)) hid s in
+
+      if List.length ss <> List.length s_ip then
+        hard_failure (Tactics.PatNumError (List.length s_ip, List.length ss));
+
+      (* For each case, apply the corresponding simple pattern *)
+      List.map2 (fun (CHyp id, s) ip ->
+          do_simpl_pat (`Hyp id) ip s
+        ) ss s_ip
+
+      (* Collect all cases *)
+      |> List.flatten
+
+    | Args.Split ->
+      (* Destruct many Or *)
+      let ss = hypothesis_case ~nb:`Any hid s in
+
+      (* For each case, apply the corresponding simple pattern *)
+      List.map (fun (CHyp id, s) ->
+          revert id s
+        ) ss
+
+  (** Apply an simple pattern a handler. *)
+  and do_simpl_pat (h : Args.ip_handler) (ip : Args.simpl_pat) s : S.t list =
+    match h, ip with
+    | _, Args.SNamed n_ip -> [do_naming_pat h n_ip s]
+
+    | `Hyp id, Args.SAndOr ao_ip ->
+      do_and_or_pat id ao_ip s
+
+    | `Hyp id, Args.Srewrite dir ->
+      let loc = L.loc dir in
+      let f = S.form_to_reach ~loc (Hyps.by_id id s) in
+      let s = Hyps.remove id s in
+      let pat = Term.pat_of_form f in
+      let erule = Rewrite.pat_to_rw_erule ~loc (L.unloc dir) pat in
+      let s, subgoals = rewrite ~all:false [T_goal] (`Many, Some id, erule) s in
+      subgoals @ [s]
+
+    | `Var _, (Args.SAndOr _ | Args.Srewrite _) ->
+      hard_failure (Failure "intro pattern not applicable")
+
+
+  (*------------------------------------------------------------------*)
+  (** introduces the topmost variable of the goal. *)
+  let rec do_intro_var (s : S.t) : Args.ip_handler * S.t =
+    let form = S.goal s in
+
+    if S.Smart.is_forall form then
+      begin
+        match S.Smart.decompose_forall form with
+        | Vars.EVar x :: vs, f ->
+          let x' = Vars.make_new_from x in
+
+          let subst = [Term.ESubst (Term.Var x, Term.Var x')] in
+
+          let f = S.Smart.mk_forall ~simpl:false vs f in
+
+          let new_formula = S.subst_hyp subst f in
+          ( `Var (Vars.EVar x'),
+            S.set_goal new_formula s )
+
+        | [], f ->
+          (* FIXME: this case should never happen. *)
+          do_intro_var (S.set_goal f s)
+      end
+
+    else soft_failure Tactics.NothingToIntroduce
+
+  (** introduces the topmost element of the goal. *)
+  let rec do_intro (s : S.t) : Args.ip_handler * S.t =
+    let form = S.goal s in 
+    if S.Smart.is_forall form then
+      begin
+        match S.Smart.decompose_forall form with
+        | [], f ->
+          (* FIXME: this case should never happen. *)
+          do_intro (S.set_goal f s)
+
+        | _ -> do_intro_var s
+      end
+
+    else if S.Smart.is_impl form then
+      begin
+        let lhs, rhs = oget (S.Smart.destr_impl form) in
+        let id, s = Hyps.add_i Args.Unnamed lhs s in
+        let s = S.set_goal rhs s in
+        ( `Hyp id, s )
+      end
+      
+    else if S.Smart.is_not form then
+      begin
+        let f = oget (S.Smart.destr_not form) in
+        let id, s = Hyps.add_i Args.Unnamed f s in
+        let s = S.set_goal S.Smart.mk_false s in
+        ( `Hyp id, s )        
+      end
+
+    else if S.Smart.is_matom form then
+      begin
+        match oget (S.Smart.destr_matom form) with        
+        | `Neq, u, v ->
+          let h = Term.Atom (`Message (`Eq,u,v)) in
+          let id, s = Hyps.add_i Args.Unnamed (S.reach_to_form h) s in
+          let s = S.set_goal S.Smart.mk_false s in
+          ( `Hyp id, s )
+        | _ -> soft_failure Tactics.NothingToIntroduce
+      end
+      
+    else soft_failure Tactics.NothingToIntroduce
+
+  let do_intro_pat (ip : Args.simpl_pat) s : S.t list =
+    let handler, s = do_intro s in
+    do_simpl_pat handler ip s
+
+  (** Correponds to `intro *`, to use in automated tactics. *)
+  let rec intro_all (s : S.t) : S.t list =
+    try
+      let s_ip = Args.(SNamed AnyName) in
+      let ss = do_intro_pat s_ip s in
+      List.concat_map intro_all ss
+
+    with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> [s]
+
+  (*------------------------------------------------------------------*)
+  let do_destruct hid s =
+    (* Only destruct the top-most connective *)
+    let handlers, s = do_and_pat hid 2 s in
+    [List.fold_left (fun s handler ->
+         (* TODO: location errors *)
+         do_naming_pat handler Args.AnyName s
+       ) s handlers]
+
+  let destruct_tac_args args s =
+    match args with
+    | [Args.String_name h; Args.AndOrPat pat] ->
+      let hid, _ = Hyps.by_name h s in
+      do_and_or_pat hid pat s
+
+    | [Args.String_name h] ->
+      let hid, _ = Hyps.by_name h s in
+      do_destruct hid s
+
+    | _ -> bad_args ()
+
+  let destruct_tac args = wrap_fail (destruct_tac_args args)
 
   (*------------------------------------------------------------------*)
   (** {3 Generalize} *)
@@ -873,4 +1148,270 @@ module LowTac (S : Sequent.S) = struct
 
   let induction_tac ~dependent args = 
     wrap_fail (induction_args ~dependent args)
+
+  (*------------------------------------------------------------------*)
+  (** {3 Exists *)
+
+  (** [goal_exists_intro judge ths] introduces the existentially
+      quantified variables in the conclusion of the judgment,
+      using [ths] as existential witnesses. *)
+  let goal_exists_intro  ths (s : S.t) =
+    let vs, f = S.Smart.decompose_exists (S.goal s) in
+
+    if not (List.length ths = List.length vs) then
+      soft_failure (Tactics.Failure "cannot introduce exists");
+
+
+    let table = S.table s in
+    let nu = Theory.parse_subst table (S.ty_vars s) (S.env s) vs ths in
+    let new_formula = S.subst_hyp nu f in
+    [S.set_goal new_formula s]
+
+  let exists_intro_args args s =
+    let args = 
+      List.map (function
+          | Args.Theory tm -> tm
+          | _ -> bad_args ()
+        ) args 
+    in
+    goal_exists_intro args s 
+
+  let exists_intro_tac args = wrap_fail (exists_intro_args args)
+
+  (*------------------------------------------------------------------*)
+  (** {3 Use *)
+
+  (** [use ip name ths judge] applies the formula named [gp],
+    * eliminating its universally quantified variables using [ths],
+    * and eliminating implications (and negations) underneath.
+    * If given an introduction patterns, apply it to the generated hypothesis. *)
+  let use ip (name : lsymb) (ths : Theory.term list) (s : S.t) =
+    (* Get formula to apply. *)
+    let lem = S.get_k_hyp_or_lemma S.s_kind name s in
+
+    (* FIXME *)
+    if lem.gc_tyvars <> [] then
+      soft_failure (Failure "free type variables not supported with \
+                             use tactic") ;
+
+    (* Get universally quantified variables, verify that lengths match. *)
+    let uvars,f = S.Smart.decompose_forall lem.gc_concl in
+
+    if List.length uvars < List.length ths then
+      Tactics.(soft_failure (Failure "too many arguments")) ;
+
+    let uvars, uvars0 = List.takedrop (List.length ths) uvars in
+    let f = S.Smart.mk_forall ~simpl:false uvars0 f in
+
+    (* refresh *)
+    let uvars, subst = Term.erefresh_vars `Global uvars in
+    let f = S.subst_hyp subst f in
+
+    let subst = 
+      Theory.parse_subst (S.table s) (S.ty_vars s) (S.env s) uvars ths 
+    in
+
+    (* instantiate [f] *)
+    let f = S.subst_hyp subst f in
+
+    (* Compute subgoals by introducing implications on the left. *)
+    let rec aux subgoals form = 
+      if S.Smart.is_impl form then
+        begin
+          let h, c = oget (S.Smart.destr_impl form) in
+          let s' = S.set_goal h s in
+          aux (s'::subgoals) c
+        end
+
+      else if S.Smart.is_not form then
+        begin
+          let h = oget (S.Smart.destr_not form) in
+          let s' = S.set_goal h s in
+          List.rev (s'::subgoals)
+        end
+
+      else
+        begin
+          let idf, s0 = Hyps.add_i Args.AnyName form s in
+          let s0 = match ip with
+            | None -> [s0]
+            | Some ip -> do_simpl_pat (`Hyp idf) ip s0 in
+          s0 @ List.rev subgoals
+        end
+    in
+
+    aux [] f
+
+  let use_args args s =
+    let ip, args = match args with
+      | Args.SimplPat ip :: args -> Some ip, args
+      | args                     -> None, args in
+    match args with
+    | Args.String_name id :: th_terms ->
+      let th_terms =
+        List.map
+          (function
+            | Args.Theory th -> th
+            | _ -> bad_args ())
+          th_terms
+      in
+      use ip id th_terms s 
+    | _ -> bad_args ()
+
+  let use_tac args = wrap_fail (use_args args)
+
+  (*------------------------------------------------------------------*)
+  (** {3 Use *)
+
+  (** [tac_assert f j sk fk] generates two subgoals, one where [f] needs
+    * to be proved, and the other where [f] is assumed. *)
+  let my_assert (args : Args.parser_arg list) s : S.t list =
+    let ip, f = match args with
+      | [f] -> None, f
+      | [f; Args.SimplPat ip] -> Some ip, f
+      | _ -> bad_args () in
+
+    let f = match convert_args s [f] Args.(Sort Boolean) with
+      | Args.(Arg (Boolean f)) -> f
+      | _ -> bad_args () 
+    in
+    (* FIXME: allow reach and equiv formulas *)
+    let f = S.reach_to_form f in
+
+    let s1 = S.set_goal f s in
+    let id, s2 = Hyps.add_i Args.AnyName f s in
+    let s2 = match ip with
+      | Some ip -> do_simpl_pat (`Hyp id) ip s2
+      | None -> [s2] 
+    in
+    s1 :: s2
+
+  let assert_tac args = wrap_fail (my_assert args)
+
+
+  (*------------------------------------------------------------------*)
+  (** {3 Depends} *)
+
+  let depends Args.(Pair (Timestamp a1, Timestamp a2)) s =
+    match a1, a2 with
+    | Term.Action(n1, is1), Term.Action (n2, is2) ->
+      let table = S.table s in
+      if Action.(depends (of_term n1 is1 table) (of_term n2 is2 table)) then
+        let atom = S.reach_to_form (Atom (`Timestamp (`Lt,a1,a2))) in
+        let g = S.Smart.mk_impl ~simpl:false atom (S.goal s) in
+        [happens_premise s a2;
+         S.set_goal g s]
+
+      else
+        soft_failure
+          (Tactics.NotDepends (Fmt.strf "%a" Term.pp a1,
+                               Fmt.strf "%a" Term.pp a2))
+          
+    | _ -> soft_failure (Tactics.Failure "arguments must be actions")
+
+  (*------------------------------------------------------------------*)
+  (** {3 Remember} *)
+
+  let remember (id : Theory.lsymb) (term : Theory.term) s =
+    match econvert s term with
+    | None -> soft_failure ~loc:(L.loc term) (Failure "type error")
+    | Some (Theory.ETerm (ty, t, _)) ->
+      let env, x = make_exact ~loc:(L.loc id) (S.env s) ty (L.unloc id) in
+      let subst = [Term.ESubst (t, Term.Var x)] in
+
+      let s = S.subst subst (S.set_env env s) in
+      let eq = S.reach_to_form (Term.mk_atom `Eq (Term.Var x) t) in
+      S.set_goal (S.Smart.mk_impl ~simpl:false eq (S.goal s)) s
+
+  let remember_tac_args (args : Args.parser_arg list) s : S.t list =
+    match args with
+    | [Args.Remember (term, id)] -> [remember id term s]
+    | _ -> bad_args ()
+
+  let remember_tac args = wrap_fail (remember_tac_args args)
+
+  (*------------------------------------------------------------------*)
+  (** {3 Rewrite} *)
+
+  type f_simpl = strong:bool -> close:bool -> S.t Tactics.tac
+
+  let do_s_item (simpl : f_simpl) (s_item : Args.s_item) s : S.t list =
+    match s_item with
+    | Args.Simplify l ->
+      let tac = simpl ~strong:true ~close:false in
+      Tactics.run tac s
+
+    | Args.Tryauto l ->
+      let tac = Tactics.try_tac (simpl ~strong:true ~close:true) in
+      Tactics.run tac s
+
+  (** Applies a rewrite arg  *)
+  let do_rw_arg (simpl : f_simpl) rw_arg rw_in s : S.t list =
+    match rw_arg with
+    | Args.R_item rw_item  -> 
+      do_rw_item rw_item rw_in s
+    | Args.R_s_item s_item -> 
+      do_s_item simpl s_item s (* targets are ignored there *)
+
+  let rewrite_tac (simpl : f_simpl) args s =
+    match args with
+    | [Args.RewriteIn (rw_args, in_opt)] ->
+      List.fold_left (fun seqs rw_arg ->
+          List.concat_map (do_rw_arg simpl rw_arg in_opt) seqs
+        ) [s] rw_args
+
+    | _ -> bad_args ()
+
+  let rewrite_tac (simpl : f_simpl) args = wrap_fail (rewrite_tac simpl args)
+
+  (*------------------------------------------------------------------*)
+  (** {3 Intro} *)
+
+  let rec do_intros_ip (simpl : f_simpl) (intros : Args.intro_pattern list) s =
+    match intros with
+    | [] -> [s]
+
+    | (Args.SItem s_item) :: intros ->
+      do_intros_ip_list simpl intros (do_s_item simpl s_item s)
+
+    | (Args.Simpl s_ip) :: intros ->
+      let ss = do_intro_pat s_ip s in
+      do_intros_ip_list simpl intros ss
+
+    | (Args.SExpnd s_e) :: intros ->
+      let ss = do_rw_item (s_e :> Args.rw_item) `Goal s in
+      let ss = as_seq1 ss in (* we get exactly one new goal *)
+      do_intros_ip simpl intros ss
+
+    | (Args.StarV loc) :: intros0 ->
+      let repeat, s =
+        try
+          let handler, s = do_intro_var s in
+          true, do_naming_pat handler Args.AnyName s
+
+        with Tactics.Tactic_soft_failure (_,NothingToIntroduce) ->
+          false, s
+      in
+      let intros = if repeat then intros else intros0 in
+      do_intros_ip simpl intros s
+
+    | (Args.Star loc) :: intros ->
+      try
+        let handler, s = do_intro s in
+        let s = do_naming_pat handler Args.AnyName s in
+        do_intros_ip simpl [Args.Star loc] s
+
+      with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> [s]
+
+
+  and do_intros_ip_list (simpl : f_simpl) intros ss = 
+    List.concat_map (do_intros_ip simpl intros) ss
+
+  let intro_tac_args (simpl : f_simpl) args s =
+    match args with
+    | [Args.IntroPat intros] -> do_intros_ip simpl intros s
+    | _ -> bad_args ()
+
+  let intro_tac (simpl : f_simpl) args = wrap_fail (intro_tac_args simpl args)
+
 end

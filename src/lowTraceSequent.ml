@@ -15,8 +15,9 @@ let pp_form = Term.pp
 
 (*------------------------------------------------------------------*)
 (* For debugging *)
-let dbg s = Printer.prt `Ignore s
-(* let dbg s = Printer.prt `Dbg s *)
+let dbg ?(force=false) s =
+  let mode = if Config.debug_tactics () || force then `Dbg else `Ignore in
+  Printer.prt mode s
 
 (*------------------------------------------------------------------*)
 let get_ord (at : Term.generic_atom ) : Term.ord option = match at with

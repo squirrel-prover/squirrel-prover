@@ -377,12 +377,15 @@ module type SmartFO = sig
   val destr_impl  : form -> (form * form) option
 
   (*------------------------------------------------------------------*)
-  val is_false : form -> bool
-  val is_true  : form -> bool
-  val is_not   : form -> bool
-  val is_and   : form -> bool
-  val is_or    : form -> bool
-  val is_impl  : form -> bool
+  val is_false  : form -> bool
+  val is_true   : form -> bool
+  val is_not    : form -> bool
+  val is_and    : form -> bool
+  val is_or     : form -> bool
+  val is_impl   : form -> bool
+  val is_forall : form -> bool
+  val is_exists : form -> bool
+  val is_matom  : form -> bool
 
   (*------------------------------------------------------------------*)
   (** left-associative *)
@@ -390,6 +393,10 @@ module type SmartFO = sig
   val destr_ors   : int -> form -> form list option
   val destr_impls : int -> form -> form list option
 
+  (*------------------------------------------------------------------*)
+  val destr_matom : form -> (ord_eq * message * message) option 
+
+  (*------------------------------------------------------------------*)
   val decompose_forall : form -> Vars.evar list * form
   val decompose_exists : form -> Vars.evar list * form
 
@@ -399,7 +406,6 @@ module type SmartFO = sig
   val decompose_impls : form -> form list 
 
   val decompose_impls_last : form -> form list * form
-
 end
 
 module Smart : SmartFO with type form = message
@@ -448,9 +454,6 @@ val destr_action :
 
 (*------------------------------------------------------------------*)
 val destr_pair : message -> (message * message) option
-
-(*------------------------------------------------------------------*)
-val destr_matom : generic_atom -> (ord_eq * message * message) option 
 
 
 (*------------------------------------------------------------------*)

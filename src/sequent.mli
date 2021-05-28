@@ -13,6 +13,8 @@ module type S = sig
   val get_hyp_or_lemma       : lsymb -> t -> Goal.hyp_or_lemma
   val get_equiv_hyp_or_lemma : lsymb -> t -> Goal.equiv_hyp_or_lemma
   val get_reach_hyp_or_lemma : lsymb -> t -> Goal.reach_hyp_or_lemma
+  val get_k_hyp_or_lemma : 
+    'a LowSequent.s_kind -> lsymb -> t -> (Goal.ghyp, 'a) Goal.lemma_g 
 
   val reduce : t -> form -> form
 

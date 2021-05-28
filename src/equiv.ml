@@ -216,7 +216,7 @@ module Smart : Term.SmartFO with type form = _form = struct
     | ForAll (es, f) -> Some (es, f)
     | _ -> None
       
-  let destr_exists f = todo ()
+  let destr_exists f = None
 
   (*------------------------------------------------------------------*)
   let destr_false f = todo ()
@@ -231,10 +231,17 @@ module Smart : Term.SmartFO with type form = _form = struct
   (*------------------------------------------------------------------*)
   let is_false f = todo ()
   let is_true  f = todo ()
-  let is_not   f = todo ()
-  let is_and   f = todo ()
-  let is_or    f = todo ()
+  let is_not   f = false
+  let is_and   f = false
+  let is_or    f = false
   let is_impl = function Impl _ -> true | _ -> false
+
+  let is_forall = function ForAll _ -> true | _ -> false
+  let is_exists f = false
+
+  let is_matom = function
+    | Atom (Reach f) -> Term.is_matom f
+    | _ -> false
 
   (*------------------------------------------------------------------*)
   (** left-associative *)
@@ -250,6 +257,10 @@ module Smart : Term.SmartFO with type form = _form = struct
         | Some (f,g) -> omap (fun l -> f :: l) (destr (l-1) g)    
     in
     destr
+
+  let destr_matom = function
+    | Atom (Reach f) -> Term.destr_matom f
+    | _ -> None
 
   (*------------------------------------------------------------------*)
   let decompose_forall = function 

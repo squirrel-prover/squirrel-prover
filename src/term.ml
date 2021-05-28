@@ -448,18 +448,6 @@ module SmartDestructors = struct
   let destr_pair f = oas_seq2 (destr_fun ~fs:f_pair f)
 
   (*------------------------------------------------------------------*)
-  let is_false f = destr_false f <> None
-  let is_true  f = destr_true f <> None
-
-  let is_not f = destr_not f <> None
-
-  let is_or   f = destr_or   f <> None
-  let is_and  f = destr_and  f <> None
-  let is_impl f = destr_impl f <> None
-  let is_pair f = destr_pair f <> None
-
-
-  (*------------------------------------------------------------------*)
   (** for [fs] of arity 2, left associative *)
   let mk_destr_many_left fs =
     let rec destr l f =
@@ -487,6 +475,13 @@ module SmartDestructors = struct
   let destr_ors   = mk_destr_many_left  f_or
   let destr_ands  = mk_destr_many_left  f_and
   let destr_impls = mk_destr_many_right f_impl
+
+
+  (*------------------------------------------------------------------*)      
+  let destr_matom (form : message) : (ord_eq * message * message) option = 
+    match form with
+    | Atom (`Message (ord, a, b)) -> Some (ord, a, b)
+    | _ -> None               
 
   (*------------------------------------------------------------------*)
   (** for any associative [fs] *)
@@ -519,6 +514,21 @@ module SmartDestructors = struct
     in 
     last forms
 
+  (*------------------------------------------------------------------*)
+  let is_false f = destr_false f <> None
+  let is_true  f = destr_true f <> None
+
+  let is_not f = destr_not f <> None
+
+  let is_or   f = destr_or   f <> None
+  let is_and  f = destr_and  f <> None
+  let is_impl f = destr_impl f <> None
+  let is_pair f = destr_pair f <> None
+
+  let is_exists f = destr_exists f <> None
+  let is_forall f = destr_forall f <> None
+  let is_matom f  = destr_matom  f <> None
+
 end
 
 include SmartDestructors
@@ -538,11 +548,6 @@ let as_ord_eq (ord : ord) : ord_eq = match ord with
   | `Eq -> `Eq
   | `Neq -> `Neq
   | _ -> assert false
-      
-let destr_matom (at : generic_atom) : (ord_eq * message * message) option = 
-  match at with
-  | `Message (ord, a, b) -> Some (ord, a, b)
-  | _ -> None               
 
 (*------------------------------------------------------------------*)
 (** {2 Printing} *)
@@ -1238,12 +1243,15 @@ module type SmartFO = sig
   val destr_impl  : form -> (form * form) option
 
   (*------------------------------------------------------------------*)
-  val is_false : form -> bool
-  val is_true  : form -> bool
-  val is_not   : form -> bool
-  val is_and   : form -> bool
-  val is_or    : form -> bool
-  val is_impl  : form -> bool
+  val is_false  : form -> bool
+  val is_true   : form -> bool
+  val is_not    : form -> bool
+  val is_and    : form -> bool
+  val is_or     : form -> bool
+  val is_impl   : form -> bool
+  val is_forall : form -> bool
+  val is_exists : form -> bool
+  val is_matom  : form -> bool
 
   (*------------------------------------------------------------------*)
   (** left-associative *)
@@ -1251,6 +1259,10 @@ module type SmartFO = sig
   val destr_ors   : int -> form -> form list option
   val destr_impls : int -> form -> form list option
 
+  (*------------------------------------------------------------------*)
+  val destr_matom : form -> (ord_eq * message * message) option 
+
+  (*------------------------------------------------------------------*)
   val decompose_forall : form -> Vars.evar list * form
   val decompose_exists : form -> Vars.evar list * form
 

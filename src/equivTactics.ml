@@ -260,157 +260,24 @@ let () =
     (pure_equiv_arg LT.revert_tac)
 
 (*------------------------------------------------------------------*)
-(* TODO: factorize with corresponding, more general, trace tactics *)
-let do_naming_pat (ip_handler : Args.ip_handler) nip s : ES.sequent =
-  match ip_handler with
-  | `Var Vars.EVar v ->
-    let env = ref (ES.env s) in
-
-    let v' = match nip with
-      | Args.Unnamed
-      | Args.AnyName -> Vars.fresh_r env v
-      | Args.Approx name -> Vars.make_r `Approx env (Vars.ty v) name
-
-      | Args.Named name ->
-        match Vars.make_exact_r env (Vars.ty v) name with
-        | None ->
-          hard_failure
-            (Tactics.Failure ("variable name " ^ name ^ " already in use"))
-        | Some v' -> v'
-    in
-    let subst = [Term.ESubst (Term.Var v, Term.Var v')] in
-
-    (* FIXME: we substitute everywhere. This is inefficient. *)
-    ES.subst subst (ES.set_env !env s)
-
-  | `Hyp hid ->
-    let f = Hyps.by_id hid s in
-    let s = Hyps.remove hid s in
-
-    Hyps.add nip f s
-
-(*------------------------------------------------------------------*)
-(* TODO: factorize with corresponding, more general, trace tactics *)
-let do_and_pat (hid : Ident.t) s : Args.ip_handler list * ES.sequent =
-  soft_failure (Tactics.Failure ("cannot destruct " ^ Ident.name hid))
-
-(* TODO: factorize with corresponding, more general, trace tactics *)
-let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
-  : ES.sequent list =
-  soft_failure (Tactics.Failure ("cannot apply and_or_pat to " ^ Ident.name hid))
-
-and do_simpl_pat (h : Args.ip_handler) (ip : Args.simpl_pat) s
-  : ES.sequent list =
-  match h, ip with
-  | _, Args.SNamed n_ip -> [do_naming_pat h n_ip s]
-
-  | `Var _, Args.SAndOr ao_ip ->
-    hard_failure (Tactics.Failure "intro pattern not applicable")
-
-  | `Hyp id, Args.SAndOr ao_ip ->
-    do_and_or_pat id ao_ip s
-
-  | _, Args.Srewrite _ ->
-    (* TODO: implement after code factorization *)
-    hard_failure (Failure "not yet implemented for equiv sequents")
-
-(*------------------------------------------------------------------*)
-(* TODO: factorize with corresponding, more general, trace tactics *)
-let rec do_intro (s : ES.t) : Args.ip_handler * ES.sequent =
-  match ES.goal s with
-  | Equiv.Impl(lhs,rhs)->
-    let id, s = Hyps.add_i Args.Unnamed lhs s in
-    let s = ES.set_goal rhs s in
-    ( `Hyp id, s )
-
-  | _ -> soft_failure Tactics.NothingToIntroduce
-
-(* TODO: factorize with corresponding, more general, trace tactics *)
-let do_intro_pat (ip : Args.simpl_pat) s : ES.sequent list =
-  let handler, s = do_intro s in
-  do_simpl_pat handler ip s
-
-(* TODO: factorize with corresponding, more general, trace tactics *)
-let rec intro_all (s : ES.t) : ES.t list =
-  try
-    let s_ip = Args.(SNamed AnyName) in
-    let ss = do_intro_pat s_ip s in
-    List.concat_map intro_all ss
-
-  with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> [s]
-
-(* TODO: factorize with corresponding, more general, trace tactics *)
-let rec do_intros (intros : Args.intro_pattern list) s =
-  match intros with
-  | [] -> [s]
-
-  | Args.StarV _ :: intros
-  | Args.SItem _ :: intros
-  | Args.SExpnd _ :: intros ->
-    (* TODO: implement after code factorization *)
-    hard_failure (Failure "not yet implemented for equiv sequents")
-
-  | (Args.Simpl s_ip) :: intros ->
-    let ss = do_intro_pat s_ip s in
-    List.map (do_intros intros) ss
-    |> List.flatten
-
-  | (Args.Star loc) :: intros ->
-    try
-      let s_ip = Args.(SNamed AnyName) in
-      let ss = do_intro_pat s_ip s in
-      List.map (do_intros [Args.Star loc]) ss
-      |> List.flatten
-
-    with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> [s]
-
-(** Correponds to `intro *`, to use in automated tactics. *)
-let intro_all (s : ES.t) : ES.t list =
-  let star = Args.Star L._dummy in
-  do_intros [star] s
-
-let intro_tac args s sk fk =
-  try match args with
-    | [Args.IntroPat intros] -> sk (do_intros intros s) fk
-
-    | _ -> bad_args ()
-  with Tactics.Tactic_soft_failure e -> fk e
+(* TODO: simplification function does nothing for now. Use [auto] instead once 
+   types are compatible. *)
+let simpl_ident : LT.f_simpl = fun ~strong ~close s sk fk -> 
+  if close then fk (None, GoalNotClosed) else sk [s] fk
 
 let () =
   T.register_general "intro"
-    ~tactic_help:{general_help = "Introduce topmost connectives of conclusion \
-                                  formula, when it can be done in an invertible, \
-                                  non-branching fashion.\
-                                  \n\nUsage: intro a b _ c *";
-                  detailed_help = "";
-                  usages_sorts = [];
-                  tactic_group = Logical}
-    (pure_equiv_arg intro_tac)
-
+    ~tactic_help:{
+      general_help = "Introduce topmost connectives of conclusion \
+                      formula, when it can be done in an invertible, \
+                      non-branching fashion.\
+                      \n\nUsage: intro a b _ c *";
+      detailed_help = "";
+      usages_sorts = [];
+      tactic_group = Logical}
+    (pure_equiv_arg (LT.intro_tac simpl_ident))
 
 (*------------------------------------------------------------------*)
-(* TODO: factorize *)
-
-let remember (id : Theory.lsymb) (term : Theory.term) s =
-  match LT.econvert s term with
-  | None -> soft_failure ~loc:(L.loc term) (Failure "type error")
-  | Some (Theory.ETerm (ty, t, _)) ->
-    let env, x =
-      LT.make_exact ~loc:(L.loc id) (ES.env s) ty (L.unloc id)
-    in
-    let subst = [Term.ESubst (t, Term.Var x)] in
-
-    let s = ES.subst subst (ES.set_env env s) in
-    let eq = Term.mk_atom `Eq (Term.Var x) t in
-    ES.set_goal (Equiv.Impl (Equiv.mk_reach_atom eq, ES.goal s)) s
-
-let remember_tac_args (args : Args.parser_arg list) s : sequent list =
-  match args with
-  | [Args.Remember (term, id)] -> [remember id term s]
-  | _ -> bad_args ()
-
-let remember_tac args = LT.wrap_fail (remember_tac_args args)
-
 let () =
   T.register_general "remember"
     ~tactic_help:{
@@ -418,7 +285,7 @@ let () =
       detailed_help = "";
       tactic_group  = Logical;
       usages_sorts = []; }
-    (pure_equiv_arg remember_tac)
+    (pure_equiv_arg LT.remember_tac)
 
 (*------------------------------------------------------------------*)
 (** [tautology f s] tries to prove that [f] is always true in [s]. *)
@@ -506,7 +373,7 @@ let generalize (ts : Term.timestamp) s =
         let ip = Args.Named (Ident.name id) in
         Args.(Simpl (SNamed ip))
       ) gen_hyps in
-    Utils.as_seq1 (do_intros ips s) in
+    Utils.as_seq1 (LT.do_intros_ip simpl_ident ips s) in
 
   intro_back, s
 
@@ -537,7 +404,7 @@ let induction Args.(Timestamp ts) s =
     (* intro back generalized hyps *)
     let induc_s = intro_back induc_s in
     (* rename the inducition hypothesis *)
-    let induc_s = do_naming_pat (`Hyp id_ind) Args.AnyName induc_s in
+    let induc_s = LT.do_naming_pat (`Hyp id_ind) Args.AnyName induc_s in
 
     let init_goal = Equiv.subst [Term.ESubst(ts,Term.init)] goal in
     let init_s = ES.set_goal init_goal s in
@@ -638,6 +505,18 @@ let () =
 
 (*------------------------------------------------------------------*)
 (** {2 Structural Tactics} *)
+
+(* not very useful in equivalence mode *)
+let () =
+  T.register_typed "depends"
+    ~general_help:"If the second action depends on the first \
+                   action, and if the second \
+                   action happened, \
+                   add the corresponding timestamp inequality."
+    ~detailed_help:"Whenever action A1[i] must happen before A2[i], if A2[i] \
+                    occurs in the trace, we can add A1[i]. "
+    ~tactic_group:Structural
+    (pure_equiv_typed LT.depends) Args.(Pair (Timestamp, Timestamp))
 
 
 (*------------------------------------------------------------------*)
@@ -1172,28 +1051,16 @@ let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
 
 
 (*------------------------------------------------------------------*)
-(* TODO: factorize *)
-let expand_tac args s =
-    let args = List.map (function
-        | Args.Theory t -> t
-        | _ -> bad_args ()
-      ) args
-    in
-    [LT.expands args s]
-
-let expand_tac args = LT.wrap_fail (expand_tac args)
-
-(* Does not rely on the typed registration, as it parses a substitution. *)
-let () = T.register_general "expand"
-
-    ~tactic_help:{general_help = "Expand the given macro.";
-                  detailed_help = "The value of the macro is obtained by looking \
-                                   at the corresponding action in the \
-                                   protocol. It cannot be used on macros with \
-                                   unknown timestamp.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Structural}
-    (pure_equiv_arg expand_tac)
+let () = T.register_general "expand" 
+    ~tactic_help:
+      {general_help = "Expand the given macro.";
+       detailed_help = "The value of the macro is obtained by looking \
+                        at the corresponding action in the \
+                        protocol. It cannot be used on macros with \
+                        unknown timestamp.";
+       usages_sorts = [Sort None];
+       tactic_group = Structural}
+    (pure_equiv_arg LT.expand_tac)
 
 (*------------------------------------------------------------------*)
 let expand_seq args s =
@@ -1220,7 +1087,6 @@ let () = T.register_general "expandseq"
     (pure_equiv_arg expand_seq_tac)
 
 (*------------------------------------------------------------------*)
-(* TODO: factorize *)
 let () = T.register "expandall"
     ~tactic_help:{
       general_help  = "Expand all possible macros in the sequent.";
@@ -1228,6 +1094,47 @@ let () = T.register "expandall"
       tactic_group  = Structural;
       usages_sorts  = []; }
     (pure_equiv_typed LT.expand_all_l `All)
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "exists"
+    ~tactic_help:
+      {general_help = "Introduce the existentially quantified \
+                       variables in the conclusion of the judgment, \
+                       using the arguments as existential witnesses.\
+                       \n\nUsage: exists v1, v2, ...";
+       detailed_help = "";
+       usages_sorts = [];
+       tactic_group = Logical}
+    (pure_equiv_arg LT.exists_intro_tac)
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "use"
+    ~tactic_help:
+      {general_help = "Apply an hypothesis with its universally \
+                       quantified variables instantiated with the \
+                       arguments.\n\n\
+                       Usages: use H with v1, v2, ...\n\
+                      \        use H with ... as ...";
+       detailed_help = "";
+       usages_sorts = [];
+       tactic_group = Logical}
+    (pure_equiv_arg LT.use_tac)
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "assert"
+    ~tactic_help:
+      {general_help = "Add an assumption to the set of hypothesis, \
+                       and produce the goal for\
+                       \nthe proof of the assumption.\n\
+                       Usages: assert f.\n \
+                      \       assert f as intro_pat";
+       detailed_help = "";
+       usages_sorts = [];
+       tactic_group = Logical}
+    (pure_equiv_arg LT.assert_tac)
 
 (*------------------------------------------------------------------*)
 (** Replace all occurrences of [t1] by [t2] inside of [s],
