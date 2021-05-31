@@ -151,6 +151,21 @@ Proof.
  intro H; apply H.
 Qed.
 
+(* with a sequence *)
+name m : index -> message.
+equiv _ : seq(i->m(i)) -> seq(k->m(k)).
+Proof. 
+ intro H; apply H.
+Qed.
+
+(* with a sequence over two indices *)
+name n : index -> index -> message.
+equiv _ : seq(i,j->n(i,j)) -> seq(k,l->n(k,l)).
+Proof. 
+ intro H; apply H.
+Qed.
+
+
 (* equiv _ (y : message) :  *)
 (*   (forall (x : message), seq (i -> <ok(i), x>)) -> seq (j -> <ok(j), f(y)>). *)
 (* Proof.  *)

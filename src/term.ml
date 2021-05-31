@@ -1544,7 +1544,8 @@ module Match : MatchS with type t = message = struct
           match Type.equal_w (ty new_v) (Vars.ty v') with
           | None -> assert false
           | Some Type.Type_eq -> ESubst (Var v', new_v)
-        ) s vs'
+        ) (List.rev s)          (* reversed ! *)
+          vs'
       in
 
       (* update [bvs] *)

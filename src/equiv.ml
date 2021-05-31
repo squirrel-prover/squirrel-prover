@@ -374,7 +374,7 @@ module Match : Term.MatchS with type t = form = struct
     (** Greedily check entailment through an inclusion check of [terms] in
         [terms']. *)
     let rec tmatch_e_incl terms pat_terms st : Term.match_state =
-      List.fold_right (fun term st ->
+      List.fold_left (fun st term ->
           let st_opt = 
             List.find_map (fun pat ->
                 try Some (tmatch_seq_mem term pat st) with
@@ -384,7 +384,7 @@ module Match : Term.MatchS with type t = form = struct
           match st_opt with
           | Some st -> st
           | None -> raise NoMatch
-        ) terms st
+        ) st terms 
     in
    
     let rec tmatch_e_eq es pat_es st : Term.match_state =
