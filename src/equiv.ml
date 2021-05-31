@@ -161,7 +161,7 @@ let rec subst s (f : form) =
     | Quant (q, v :: evs, b) -> 
       let v, s = Term.subst_binding v s in
       let f = subst s (Quant (q, evs,b)) in
-      mk_forall [v] f
+      mk_quant q [v] f
 
 let tsubst_atom (ts : Type.tsubst) (at : atom) =  
   match at with
