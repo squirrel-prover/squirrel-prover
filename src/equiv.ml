@@ -352,8 +352,17 @@ module Match : Term.MatchS with type t = form = struct
       | _ -> raise NoMatch
     in
 
-    let tmatch_seq_mem term pat st =
-      (* match [term] and [term'] directly *)
+    (** Try to match [term] with [pat]: 
+        - directly
+        - if [pat] is a sequence, also tries to match [term] as a element of 
+          [pat]. *)
+    let match_seq_mem
+        (term : Term.message) 
+        (pat  : Term.message) 
+        (st   : Term.match_state) 
+      : Term.match_state 
+      =
+      (* match [term] and [pat] directly *)
       try term_match term pat st with
         NoMatch ->
         (* if it fails and [pat] is a sequence, tries to match [term] as an
@@ -371,49 +380,87 @@ module Match : Term.MatchS with type t = form = struct
         | _ -> raise NoMatch
     in
 
+    (** Check that [term] can be deduced from [pat_terms].
+        This check is modulo:
+        - Restr: all elements of [pat_terms] may not be used;
+        - Sequence expantion: sequences in [pat_terms] may be expanded;
+        - Function Application: [term] may be decomposed into smaller terms. *)
+    let rec match_term_incl 
+        (term      : Term.message) 
+        (pat_terms : Term.message list)
+        (st        : Term.match_state) :
+      Term.match_state 
+      =
+      (* try inclusion modulo (Restr + Seqence expantion) *)
+      let st_opt = 
+        List.find_map (fun pat ->
+            try Some (match_seq_mem term pat st) with
+              NoMatch -> None
+          ) pat_terms 
+      in
+
+      match st_opt with
+      | Some st -> st
+      | None -> 
+        (* if that fails, decompose [term] through the Function Application 
+           rule, and recurse. *)
+        match term with
+        | Term.Fun (_, _, terms) ->
+          List.fold_left (fun st term -> 
+              match_term_incl term pat_terms st
+            ) st terms
+        | _ -> raise NoMatch
+    in
+
     (** Greedily check entailment through an inclusion check of [terms] in
-        [terms']. *)
-    let rec tmatch_e_incl terms pat_terms st : Term.match_state =
+        [pat_terms]. *)
+    let match_equiv_incl
+        (terms     : Term.message list) 
+        (pat_terms : Term.message list)
+        (st        : Term.match_state) :
+      Term.match_state 
+      =
       List.fold_left (fun st term ->
-          let st_opt = 
-            List.find_map (fun pat ->
-                try Some (tmatch_seq_mem term pat st) with
-                  NoMatch -> None
-              ) pat_terms 
-          in
-          match st_opt with
-          | Some st -> st
-          | None -> raise NoMatch
+          match_term_incl term pat_terms st
         ) st terms 
     in
    
-    let rec tmatch_e_eq es pat_es st : Term.match_state =
-      if List.length es <> List.length pat_es then raise NoMatch;
+    let rec match_equiv_eq 
+        (terms     : Term.message list) 
+        (pat_terms : Term.message list)
+        (st        : Term.match_state)
+      : Term.match_state =
+      if List.length terms <> List.length pat_terms then raise NoMatch;
 
-      List.fold_right2 term_match es pat_es st
+      List.fold_right2 term_match terms pat_terms st
     in
 
     (** Check entailment between two equivalences.
         - [Covar]    : [pat_es] entails [es]
         - [Contravar]: [es] entails [pat_es] *)
-    let tmatch_e ~mode es pat_es st : Term.match_state =
+    let tmatch_e 
+        ~(mode     : [`Eq | `Covar | `Contravar])
+         (terms     : Term.message list) 
+         (pat_terms : Term.message list)
+         (st        : Term.match_state)
+      : Term.match_state =
       match mode with
-      | `Eq        -> tmatch_e_eq es pat_es st
-      | `Contravar -> tmatch_e_eq es pat_es st
+      | `Eq        -> match_equiv_eq terms pat_terms st
+      | `Contravar -> match_equiv_eq terms pat_terms st
       (* FIXME: in contravariant position, we cannot check for inclusion 
          because, in the seq case, this requires to infer the seq 
          variables for the *term* being matched. Consequently, this is no longer 
          a matching problem, but is a unification problem. *)
                         
-      | `Covar     -> tmatch_e_incl es pat_es st
+      | `Covar     -> match_equiv_incl terms pat_terms st
     in
 
-    let rec tmatch ~mode (t : form) (pat : form) (st : Term.match_state)
+    let rec fmatch ~mode (t : form) (pat : form) (st : Term.match_state)
       : Term.match_state =
       match t, pat with
       | Impl (t1, t2), Impl (pat1, pat2) -> 
-        let st = tmatch ~mode:(flip mode) t1 pat1 st in
-        tmatch ~mode t2 pat2 st
+        let st = fmatch ~mode:(flip mode) t1 pat1 st in
+        fmatch ~mode t2 pat2 st
 
       | Atom (Reach t), Atom (Reach pat) -> 
         term_match t pat st
@@ -440,7 +487,7 @@ module Match : Term.MatchS with type t = form = struct
         | `EntailRL -> `Covar
         | `EntailLR -> `Contravar
       in
-      let st = tmatch ~mode t pat st_init in
+      let st = fmatch ~mode t pat st_init in
 
       if not (Type.Infer.is_closed ty_env) 
       then `FreeTyv
@@ -456,6 +503,7 @@ module Match : Term.MatchS with type t = form = struct
     with NoMatch -> `NoMatch
     
   
+  (*------------------------------------------------------------------*)
   let rec find_map :
     type b. many:bool -> 
     Vars.env -> form -> b Term.term Term.pat -> 

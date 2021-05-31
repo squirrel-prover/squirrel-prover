@@ -151,6 +151,19 @@ Proof.
  intro H; apply H.
 Qed.
 
+(* TODO: commented out as we cannot (yet) parse general equivalence formulas. *)
+(* equiv _ (y : message) :  *)
+(*   (forall (x : message), seq (i -> <ok(i), x>)) -> seq (j -> <ok(j), f(y)>). *)
+(* Proof.  *)
+(*  intro H; apply H. *)
+(* Qed. *)
+
+(* equiv _ (y : message) :  *)
+(*   (forall (x : message), seq (i -> <ok(i), x>)) -> seq (j -> <ok(j), ok(i)>). *)
+(* Proof.  *)
+(*  checkfail intro H; try by apply H exn GoalNotClosed. *)
+(* Abort. *)
+
 (* with a sequence *)
 name m : index -> message.
 equiv _ : seq(i->m(i)) -> seq(k->m(k)).
@@ -165,15 +178,21 @@ Proof.
  intro H; apply H.
 Qed.
 
+(*------------------------------------------------------------------*)
+(* apply modulo FA *)
 
-(* equiv _ (y : message) :  *)
-(*   (forall (x : message), seq (i -> <ok(i), x>)) -> seq (j -> <ok(j), f(y)>). *)
-(* Proof.  *)
-(*  intro H; apply H. *)
-(* Qed. *)
+equiv _ (x, y : message) : x,y -> <x, y>.
+Proof.
+ intro H; apply H.
+Qed.
 
-(* equiv _ (y : message) :  *)
-(*   (forall (x : message), seq (i -> <ok(i), x>)) -> seq (j -> <ok(j), ok(i)>). *)
-(* Proof.  *)
-(*  checkfail intro H; try by apply H exn GoalNotClosed. *)
-(* Abort. *)
+abstract n0 : message.
+equiv _ (x, y : message) : x -> n0, y.
+Proof. 
+ checkfail (intro H; by try apply H) exn GoalNotClosed.
+Abort.
+
+equiv _ (x,y,z : message) : x,z -> <x, y>.
+Proof.
+ checkfail (intro H; by try apply H) exn GoalNotClosed.
+Abort.

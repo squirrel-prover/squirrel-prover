@@ -36,13 +36,7 @@ module Mk (S : LowSequent.S) = struct
     (** TODO: memoisation *)
     let rec reduce : type a. state -> a Term.term -> a Term.term * bool = 
       fun st t ->
-        (* REM *)
-        (* Fmt.epr "reduce %a@." Term.pp t; *)
-
         let t, has_red = reduce_head_once st t in
-
-        (* REM *)
-        (* Fmt.epr "reduce head %a@." Term.pp t; *)
 
         if has_red then fst (reduce st t), true
         else
