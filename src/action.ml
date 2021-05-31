@@ -253,3 +253,69 @@ let pp_actions ppf table =
 let rec dummy len =
   if len = 0 then [] else
      { par_choice = 0,[] ; sum_choice = 0,[] } :: dummy (len-1)
+
+(*------------------------------------------------------------------*)
+(** {2 FA-DUP } *)
+
+let is_dup_match
+    (is_match : Term.eterm -> Term.eterm -> 'a -> 'a option)
+    (st    : 'a)
+    (table : Symbols.table) 
+    (elem  : Term.message)
+    (elems : Term.message list) 
+  : 'a option =
+
+  (* try to match [t] and [t'] modulo ≤ *)
+  let is_dup_leq table st t t' : 'a option = 
+    let rec leq t t' = 
+      match is_match (ETerm t) (ETerm t') st with
+      | Some st -> Some st
+      | None ->
+        match t,t' with
+        | Pred t, Pred t' -> leq t t'
+        | Pred t,      t' -> leq t t'
+
+        | Action (n,is), Action (n',is') ->
+          (* FIXME: allow to match [is] with (a prefix of) [is'] *)
+          if depends (of_term n is table) (of_term n' is' table)
+          then Some st 
+          else None
+
+        | _ -> None
+    in
+    leq t t'
+  in
+
+  match List.find_map (fun t' -> 
+      is_match (ETerm elem) (ETerm t') st
+    ) elems 
+  with
+  | Some res -> Some res
+  | None ->
+    match elem with
+    | Macro (im,[],t) when im = Term.in_macro ->
+      List.find_map (function
+          | Term.Macro (fm,[],t')
+            when fm = Term.frame_macro -> is_dup_leq table st (Pred t) t' 
+          | _ -> None
+        ) elems
+
+    | Macro (em,[],t) when em = Term.exec_macro ->
+      List.find_map (function
+          | Term.Macro (fm,[],t')
+            when fm = Term.frame_macro -> is_dup_leq table st t t' 
+          | _ -> None
+        ) elems
+
+    | _ -> None
+
+let is_dup table t t' : bool =
+  let is_match (Term.ETerm t) (Term.ETerm t') () = 
+    match Type.equal_w (Term.ty t) (Term.ty t') with
+    | None -> None
+    | Some Type.Type_eq ->
+      if t = t' then Some () else None 
+  in
+  match is_dup_match is_match () table t t' with
+  | None    -> false
+  | Some () -> true

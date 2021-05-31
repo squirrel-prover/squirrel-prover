@@ -52,8 +52,8 @@ let pat_to_rw_erule ?loc dir (p : Term.message Term.pat) : rw_erule =
 exception NoRW
 
 let rewrite_head : 
-  rw_erule -> Term.message -> Term.message * Term.message list =
-  fun rule t ->
+  Symbols.table -> rw_erule -> Term.message -> Term.message * Term.message list 
+  = fun table rule t ->
   let tyvars, vars, subs, rule_subst = rule in
   let (l, r) : Term.message * Term.message = 
     match rule_subst with
@@ -68,7 +68,7 @@ let rewrite_head :
   in
 
   let mv = 
-    match Term.Match.try_match t pat with
+    match Term.Match.try_match table t pat with
     | `FreeTyv | `NoMatch -> raise NoRW
     | `Match mv -> mv
   in
@@ -78,11 +78,12 @@ let rewrite_head :
   r, subs
 
 let rewrite_head : type a.
-  rw_erule -> a Term.term -> (a Term.term * Term.message list) option =
-  fun rule t ->
+  Symbols.table -> rw_erule -> a Term.term -> 
+  (a Term.term * Term.message list) option =
+  fun table rule t ->
   match Type.equalk_w Type.KMessage (Term.kind t) with
   | None -> None
   | Some Type.Type_eq ->
-    try Some (rewrite_head rule t) with NoRW -> None
+    try Some (rewrite_head table rule t) with NoRW -> None
 
 

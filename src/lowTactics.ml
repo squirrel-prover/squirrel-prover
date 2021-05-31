@@ -379,11 +379,15 @@ module LowTac (S : Sequent.S) = struct
 
         let f_opt = match f with
           | Cform f -> 
-            let f_opt = S.Match.find_map ~many (S.env s) f pat rw_inst in
+            let f_opt = 
+              S.Match.find_map ~many (S.table s) (S.env s) f pat rw_inst 
+            in
             omap mk_form f_opt
 
           | Ctform f -> 
-            let f_opt = Term.Match.find_map ~many (S.env s) f pat rw_inst in
+            let f_opt = 
+              Term.Match.find_map ~many (S.table s) (S.env s) f pat rw_inst 
+            in
             omap mk_tform f_opt
         in
 
@@ -974,7 +978,7 @@ module LowTac (S : Sequent.S) = struct
     let pat = { pat with pat_term = f } in
 
     (* we check that [pat] entails [S.goal s] *)
-    match S.Match.try_match ~mode:`EntailRL (S.goal s) pat with
+    match S.Match.try_match ~mode:`EntailRL (S.table s) (S.goal s) pat with
     | `NoMatch | `FreeTyv -> soft_failure ApplyMatchFailure
     | `Match mv ->
       let subst = Term.Match.to_subst mv in
@@ -1003,7 +1007,7 @@ module LowTac (S : Sequent.S) = struct
         let pat = { pat with pat_term = fprem } in
 
         (* we check that [hconcl] entails [pat] *)
-        match S.Match.try_match ~mode:`EntailLR hconcl pat with
+        match S.Match.try_match ~mode:`EntailLR (S.table s) hconcl pat with
         | `NoMatch | `FreeTyv -> None
         | `Match mv -> Some mv
     in

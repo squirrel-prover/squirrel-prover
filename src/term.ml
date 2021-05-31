@@ -1409,12 +1409,17 @@ module type MatchS = sig
 
   val to_subst : mv -> subst
 
-  val try_match :
-    ?st:match_state -> ?mode:[`Eq | `EntailLR | `EntailRL] ->
-    t -> t pat -> [ `FreeTyv | `NoMatch | `Match of mv ] 
-                  
+  val try_match : 
+    ?st:match_state -> 
+    ?mode:[`Eq | `EntailLR | `EntailRL] ->
+    Symbols.table -> 
+    t -> t pat ->
+    [ `FreeTyv | `NoMatch | `Match of mv ] 
+
   val find_map :
-    many:bool -> Vars.env -> t -> 'a term pat -> 
+    many:bool ->     
+    Symbols.table -> Vars.env -> 
+    t -> 'a term pat -> 
     ('a term -> Vars.evars -> mv -> 'a term) -> 
     t option
 end
@@ -1436,9 +1441,12 @@ module Match : MatchS with type t = message = struct
       (Fmt.list ~sep:Fmt.sp Vars.pp_e) (Sv.elements p.pat_vars)
 
   let try_match : type a b. 
-    ?st:match_state -> ?mode:[`Eq | `EntailLR | `EntailRL] -> a term -> b term pat -> 
+    ?st:match_state -> 
+    ?mode:[`Eq | `EntailLR | `EntailRL] -> 
+    Symbols.table ->
+    a term -> b term pat -> 
     [`FreeTyv | `NoMatch | `Match of mv] = 
-    fun ?st ?mode t p -> 
+    fun ?st ?mode table t p -> 
     let exception NoMatch in
     
     (* Term matching ignores [mode]. Matching in [Equiv] does not. *)
@@ -1651,11 +1659,13 @@ module Match : MatchS with type t = message = struct
 
                         
   let find_map :
-    type a b. many:bool -> 
+    type a b. 
+    many:bool -> 
+    Symbols.table ->
     Vars.env -> a term -> b term pat -> 
     (b term -> Vars.evars -> mv -> b term) -> 
     a term option
-    = fun ~many env t p func ->
+    = fun ~many table env t p func ->
       let cut = ref false in
       let s_p = kind p.pat_term in     
        
@@ -1666,7 +1676,7 @@ module Match : MatchS with type t = message = struct
 
         (* otherwise, check if head matches *)
         else 
-          match try_match t p with
+          match try_match table t p with
           (* head matches *)
           | `Match mv -> 
             cut := not many;    (* we cut if [many = false] *)
@@ -1852,7 +1862,6 @@ let head_normal_biterm : type a. a term -> a term = fun t ->
 
 let make_bi_term  : type a. a term -> a term -> a term = fun t1 t2 ->
   head_normal_biterm (Diff (t1, t2))
-
 
 
 (*------------------------------------------------------------------*)

@@ -292,8 +292,11 @@ module type MatchS = sig
       - if [mode = `EntailLR] then [t = pθ] or [t ⇒ pθ] (boolean case).
       - if [mode = `EntailRL] then [t = pθ] or [pθ ⇒ t] (boolean case). *)
   val try_match : 
-    ?st:match_state -> ?mode:[`Eq | `EntailLR | `EntailRL] ->
-    t -> t pat -> [ `FreeTyv | `NoMatch | `Match of mv ] 
+    ?st:match_state -> 
+    ?mode:[`Eq | `EntailLR | `EntailRL] ->
+    Symbols.table -> 
+    t -> t pat ->
+    [ `FreeTyv | `NoMatch | `Match of mv ] 
 
   (** [find_map env t p func] looks for an occurence [t'] of [pat] in [t],
       where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
@@ -301,7 +304,9 @@ module type MatchS = sig
       - if [many = false], a *single* occurence of [pat] by [func t' θ]. 
       - if [many = true], all occurences found. *)
   val find_map :
-    many:bool -> Vars.env -> t -> 'a term pat -> 
+    many:bool ->     
+    Symbols.table -> Vars.env -> 
+    t -> 'a term pat -> 
     ('a term -> Vars.evars -> mv -> 'a term) -> 
     t option
 end

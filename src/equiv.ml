@@ -320,7 +320,12 @@ module Match : Term.MatchS with type t = form = struct
 
   type t = form
  
-  let try_match ?st ?(mode=`Eq) (t : form) (p : form Term.pat) = 
+  let try_match
+      ?st 
+      ?(mode=`Eq)
+      (table : Symbols.table) 
+      (t : form) 
+      (p : form Term.pat) = 
     let exception NoMatch in
 
     (* [ty_env] must be closed at the end of the matching *)
@@ -341,19 +346,24 @@ module Match : Term.MatchS with type t = form = struct
       | `Contravar -> `Covar
     in
 
-    let term_match ?(seq_vars=Sv.empty) term pat st : Term.match_state = 
-      let pat = 
-        Term.{ pat_tyvars = []; 
-               pat_vars = Sv.union seq_vars p.pat_vars; 
-               pat_term = pat; }
-      in
-      match TMatch.try_match ~st term pat with
-      | `Match mv -> { st with mv } 
-      | _ -> raise NoMatch
+    let term_match : type a.
+      ?seq_vars:Sv.t -> 
+      a Term.term -> a Term.term -> 
+      Term.match_state -> 
+      Term.match_state =
+      fun ?(seq_vars:Sv.empty) term pat st ->
+        let pat = 
+          Term.{ pat_tyvars = []; 
+                 pat_vars = Sv.union seq_vars p.pat_vars; 
+                 pat_term = pat; }
+        in
+        match TMatch.try_match ~st table term pat with
+        | `Match mv -> { st with mv } 
+        | _ -> raise NoMatch
     in
-
+    
     (** Try to match [term] with [pat]: 
-        - directly
+        - directly using [Action.fa_dup]
         - if [pat] is a sequence, also tries to match [term] as a element of 
           [pat]. *)
     let match_seq_mem
@@ -363,7 +373,7 @@ module Match : Term.MatchS with type t = form = struct
       : Term.match_state 
       =
       (* match [term] and [pat] directly *)
-      try term_match term pat st with
+      try Action.is_dup_match term_match term pat st with
         NoMatch ->
         (* if it fails and [pat] is a sequence, tries to match [term] as an
            element of the sequence. *)
@@ -505,20 +515,24 @@ module Match : Term.MatchS with type t = form = struct
   
   (*------------------------------------------------------------------*)
   let rec find_map :
-    type b. many:bool -> 
+    type b. 
+    many:bool -> 
+    Symbols.table ->
     Vars.env -> form -> b Term.term Term.pat -> 
     (b Term.term -> Vars.evars -> Term.mv -> b Term.term) -> 
     form option
-    = fun ~many env e p func ->
+    = fun ~many table env e p func ->
       match e with
       | Atom (Reach f) -> 
-        omap (fun x -> Atom (Reach (x))) (TMatch.find_map ~many env f p func)
+        omap
+          (fun x -> Atom (Reach (x))) 
+          (TMatch.find_map ~many table env f p func)
       | Atom (Equiv e) -> 
         let found = ref false in
 
         let e = List.fold_left (fun acc f ->
             if not !found || many then
-              match TMatch.find_map ~many env f p func with
+              match TMatch.find_map ~many table env f p func with
               | None -> f :: acc
               | Some f -> found := true; f :: acc
             else f :: acc
@@ -530,14 +544,14 @@ module Match : Term.MatchS with type t = form = struct
 
       | Impl (e1, e2) -> 
         let found, e1 = 
-          match find_map ~many env e1 p func with
+          match find_map ~many table env e1 p func with
           | Some e1 -> true, e1
           | None -> false, e1 
         in
         
         let found, e2 = 
           if not found || many then
-            match find_map ~many env e2 p func with
+            match find_map ~many table env e2 p func with
             | Some e2 -> true, e2
             | None -> false, e2
           else found, e2

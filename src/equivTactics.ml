@@ -558,6 +558,7 @@ exception No_FA
 
 let fa_expand t =
   let aux : type a. a Term.term -> Equiv.equiv = function
+    (* FIXME: this should be subsumed by reduce *)
     | Fun (f,_,[c;t;e]) when f = Term.f_ite && t = e ->
       ES.[ t ]
 
@@ -621,39 +622,6 @@ let () =
     (pure_equiv_typed fa) Args.Int
 
 (*------------------------------------------------------------------*)
-(** Check if an element appears twice in the biframe,
-  * or if it is [input\@t] with some [frame\@t'] appearing in the frame
-  * with [pred(t) <= t'] guaranteed,
-  * or if it is [exec\@t] with some [frame\@t'] appearing in the frame
-  * with [t <= t'] guaranteed. *)
-let is_dup table elem elems =
-  if List.mem elem elems then true
-  else
-    let rec leq t t' = let open Term in match t,t' with
-      | t,t' when t=t' -> true
-      | Pred t, Pred t'-> leq t t'
-      | Pred t, t' -> leq t t'
-      | Action (n,is), Action (n',is') ->
-          Action.(depends (of_term n is table) (of_term n' is' table))
-      | _ -> false
-    in
-    match elem with
-      | Term.Macro (im,[],t) when im = Term.in_macro ->
-          List.exists
-            (function
-               | Term.Macro (fm,[],t')
-                 when fm = Term.frame_macro && leq (Pred t) t' -> true
-               | _ -> false)
-            elems
-      | Term.Macro (em,[],t) when em = Term.exec_macro ->
-          List.exists
-            (function
-               | Term.Macro (fm,[],t')
-                 when fm = Term.frame_macro && leq t t' -> true
-               | _ -> false)
-            elems
-      | _ -> false
-
 (** This function goes over all elements inside elems.  All elements that can be
    seen as duplicates, or context of duplicates, are removed. All elements that
    can be seen as context of duplicates and assumptions are removed, but
@@ -661,7 +629,7 @@ let is_dup table elem elems =
 let rec filter_fa_dup table res assump (elems : Equiv.equiv) =
   let rec is_fa_dup acc elems e =
     (* if an element is a duplicate wrt. elems, we remove it directly *)
-    if is_dup table e elems then
+    if Action.is_dup table e elems then
       (true,[])
     (* if an element is an assumption, we succeed, but do not remove it *)
     else if List.mem e assump then
