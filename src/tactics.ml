@@ -18,7 +18,7 @@ type tac_error_i =
   | SEncRandomNotFresh
   | NameNotUnderEnc
   | NoRefl
-  | NoReflMacros
+  | NoReflMacroVar
   | TacTimeout
   | DidNotFail
   | FailWithUnexpected of tac_error_i
@@ -63,7 +63,7 @@ let tac_error_strings =
     (SEncRandomNotFresh , "SEncRandomNotFresh");
     (NameNotUnderEnc    , "NameNotUnderEnc");
     (NoRefl             , "NoRefl");
-    (NoReflMacros       , "NoReflMacros");
+    (NoReflMacroVar     , "NoReflMacroVar");
     (TacTimeout         , "TacTimeout");
     (CannotConvert      , "CannotConvert");
     (NotHypothesis      , "NotHypothesis");
@@ -92,7 +92,7 @@ let rec tac_error_to_string = function
   | SEncRandomNotFresh
   | NameNotUnderEnc
   | NoRefl
-  | NoReflMacros
+  | NoReflMacroVar
   | TacTimeout
   | CannotConvert
   | CongrFail
@@ -153,8 +153,8 @@ let rec pp_tac_error_i ppf = function
   | NoRefl  ->
     Fmt.string ppf "frames not identical"
 
-  | NoReflMacros ->
-    Fmt.string ppf "frames contain macros that may not be diff-equivalent"
+  | NoReflMacroVar ->
+    Fmt.string ppf "the frame contains macros or variables"
 
   | TacTimeout -> Fmt.pf ppf "time-out"
 

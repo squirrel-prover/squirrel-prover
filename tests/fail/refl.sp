@@ -16,10 +16,10 @@ system [macros] in(c,x);out(c,x).
 
 equiv e : if cond@A then ok.
 Proof.
-  checkfail refl exn NoReflMacros.
+  checkfail refl exn NoReflMacroVar.
 Abort.
 
 equiv e : input@A.
 Proof.
-  checkfail refl exn NoReflMacros.
+  checkfail refl exn NoReflMacroVar.
 Abort.

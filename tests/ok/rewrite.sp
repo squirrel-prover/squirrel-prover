@@ -322,12 +322,16 @@ Qed.
 (*------------------------------------------------------------------*)
 (* rewriting frame elements *)
 
+axiom diff_ax ['a] (x : 'a) : diff(x,x) = x.
+
 equiv _ (x,y,z : message) : 
+  x, z ->
   [forall (x,y : message), f(<x,y>) = x] ->
   diff(f(<x,y>),x), x, diff(f(<z,z>), z).
 Proof.
-  intro H.
-  by rewrite H in 0,2.
+  intro Hx H.
+  rewrite H diff_ax in 0,2. 
+  apply Hx.
 Qed.
 
 equiv _ (x : message) : 

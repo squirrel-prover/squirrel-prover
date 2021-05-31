@@ -12,24 +12,25 @@ axiom if_false  (x,y : message): if false then x else y = y.
 
 (*------------------------------------------------------------------*)
 equiv _ (x : message): 
-[forall (i : index), ok(i) = x] ->
+x -> [forall (i : index), ok(i) = x] ->
 seq (i -> diff(ok(i), x)).
 Proof.
-  intro H.
+  intro Hx H.
   constseq 0: x. 
   by project. 
-  refl.
+  assumption.
 Qed.  
 
 abstract even : index -> boolean.
 
 equiv _ (x,y : message): 
+x,y -> 
 [forall (i : index), even(i) => ok(i) = x] ->
 [forall (i : index), not (even(i)) => ok(i) = y] ->
 seq (i -> diff(ok(i), if even(i) then x else y)).
 Proof.
-  intro HE HO.
-  constseq 0: x y; 2: auto.
+  intro Hx HE HO.
+  constseq 0: x y; 2: assumption.
   intro i.
   project.
   case (even (i)) => He. 

@@ -114,36 +114,33 @@ let () =
 (*------------------------------------------------------------------*)
 exception NoReflMacros
 
-class exist_macros ~(cntxt:Constr.trace_cntxt) = object (self)
-  inherit Iter.iter ~cntxt as super
-  method visit_message t = match t with
-    | Term.Macro _ -> raise NoReflMacros
-    | _ -> super#visit_message t
-end
+let check_no_macro_or_var t = 
+  let exception Failed in
+  
+  let rec check (Term.ETerm t) = 
+    match t with
+    | Term.Var _ | Term.Macro _ -> raise Failed
+    | _ -> Term.titer check t
+  in
+  try check (Term.ETerm t); true with Failed -> false
 
-
-(** Tactic that succeeds (with no new subgoal) on equivalences
+(** Closes the goal if it is an equivalence
   * where the two frames are identical. *)
 let refl (e : Equiv.equiv) (s : ES.t) =
-  let iter =
-    new exist_macros ~cntxt:(ES.mk_trace_cntxt s) in
-  try
-    (* we check that the frame does not contain macro *)
-    List.iter iter#visit_message e;
-    if ES.get_frame PLeft s = ES.get_frame PRight s
-    then `True
-    else `NoRefl
-  with
-  | NoReflMacros -> `NoReflMacros
+  if not (List.for_all check_no_macro_or_var e) 
+  then `NoReflMacroVar
+  else if ES.get_frame PLeft s = ES.get_frame PRight s
+  then `True
+  else `NoRefl
 
 
 (** Tactic that succeeds (with no new subgoal) on equivalences
   * where the two frames are identical. *)
 let refl_tac (s : ES.t) =
   match refl (ES.goal_as_equiv s) s with
-    | `True         -> []
-    | `NoRefl       -> soft_failure (Tactics.NoRefl)
-    | `NoReflMacros -> soft_failure (Tactics.NoReflMacros)
+    | `True           -> []
+    | `NoRefl         -> soft_failure (Tactics.NoRefl)
+    | `NoReflMacroVar -> soft_failure (Tactics.NoReflMacroVar)
 
 let () =
   T.register "refl"

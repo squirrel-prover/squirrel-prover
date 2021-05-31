@@ -47,7 +47,7 @@ type tac_error_i =
   | SEncRandomNotFresh
   | NameNotUnderEnc
   | NoRefl
-  | NoReflMacros
+  | NoReflMacroVar
   | TacTimeout
   | DidNotFail
   | FailWithUnexpected of tac_error_i
