@@ -6,6 +6,8 @@
   * representations necessary for the front-end involving
   * processes, axioms, etc. *)
 
+module Sv = Vars.Sv
+              
 (*------------------------------------------------------------------*)
 (** {2 Symbols}
   *
@@ -192,7 +194,7 @@ val cast : 'a Type.kind -> 'b term -> 'a term
 val get_vars : 'a term -> Vars.evar list
 
 (** [fv t] returns the free variables of [t]. *)
-val fv : 'a term -> Vars.Sv.t
+val fv : 'a term -> Sv.t
 
 val f_triv : message -> bool
 
@@ -210,7 +212,7 @@ val pp_subst : Format.formatter -> subst -> unit
 
 val is_var_subst : subst -> bool
 
-val subst_support : subst -> Vars.Sv.t
+val subst_support : subst -> Sv.t
 
 val subst_binding : Vars.evar -> subst -> Vars.evar * subst 
 
@@ -251,7 +253,7 @@ val apply_ht : hterm -> 'a term list -> hterm
     The free type variables must be inferred. *)
 type 'a pat = { 
   pat_tyvars : Type.tvars; 
-  pat_vars : Vars.Sv.t; 
+  pat_vars : Sv.t; 
   pat_term : 'a; 
 }
 
@@ -261,6 +263,11 @@ val pat_of_form : message -> message pat
 
 (** Matching variable assignment (types must be compatible). *)
 type mv = eterm Vars.Mv.t
+
+type match_state = {
+  mv  : mv;                  (** inferred variable assignment *)
+  bvs : Sv.t;                (** bound variables "above" the current position *)
+}
 
 (** Module signature of matching. 
     We can only match a [Term.term] into a [Term.term] or a [Equiv.form].
@@ -285,7 +292,7 @@ module type MatchS = sig
       - if [mode = `EntailLR] then [t = pθ] or [t ⇒ pθ] (boolean case).
       - if [mode = `EntailRL] then [t = pθ] or [pθ ⇒ t] (boolean case). *)
   val try_match : 
-    ?mv:mv -> ?mode:[`Eq | `EntailLR | `EntailRL] ->
+    ?st:match_state -> ?mode:[`Eq | `EntailLR | `EntailRL] ->
     t -> t pat -> [ `FreeTyv | `NoMatch | `Match of mv ] 
 
   (** [find_map env t p func] looks for an occurence [t'] of [pat] in [t],

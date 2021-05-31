@@ -123,11 +123,42 @@ Proof.
 Qed.
 
 (* equiv _ (x, y : message) : [a = b] -> ([a = b] -> y, x) -> x. *)
-(* Proof.  *)
-(*  intro H0 H; apply H; assumption.  *)
+(* Proof. *)
+(*  intro H0 H; apply H; assumption. *)
 (* Qed. *)
 
 equiv _ (x, y : message) : x -> x, y.
 Proof. 
  checkfail intro H; try apply H; auto exn GoalNotClosed. 
 Abort.
+
+equiv _ (x : message) : seq (i -> <ok(i), x>) -> seq (i -> <ok(i), x>).
+Proof. 
+ intro H; apply H.
+Qed.
+
+(*------------------------------------------------------------------*)
+(* matching under binders *)
+
+equiv _ (x : message) : seq (i -> <ok(i), x>) -> seq (i -> <ok(i), x>).
+Proof. 
+ intro H; apply H.
+Qed.
+
+(* with alpha-renaming *)
+equiv _ (x : message) : seq (i -> <ok(i), x>) -> seq (j -> <ok(j), x>).
+Proof. 
+ intro H; apply H.
+Qed.
+
+(* equiv _ (y : message) :  *)
+(*   (forall (x : message), seq (i -> <ok(i), x>)) -> seq (j -> <ok(j), f(y)>). *)
+(* Proof.  *)
+(*  intro H; apply H. *)
+(* Qed. *)
+
+(* equiv _ (y : message) :  *)
+(*   (forall (x : message), seq (i -> <ok(i), x>)) -> seq (j -> <ok(j), ok(i)>). *)
+(* Proof.  *)
+(*  checkfail intro H; try by apply H exn GoalNotClosed. *)
+(* Abort. *)
