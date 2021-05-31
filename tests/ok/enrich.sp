@@ -15,28 +15,25 @@ equiv simp.
 Proof.
 enrich seq(i->h(ok,k(i))).
 
- induction t. 
+ dependent induction t => t Hind Hap. 
+ case t => H.
 
  auto.
 
- expand frame@A(i).
- expand output@A(i).
- expand exec@A(i).
+ destruct H as [i H].
+ expandall. 
+ fa 1.
+ fa 2. 
+ noif 2; 1: auto.
+ apply Hind; 1,2: by byequiv. 
+
+ destruct H as [i H].
+ expand frame, output, exec.
  fa 1.
  fa 2.
- equivalent cond@A(i), False.
- by expand cond@A(i); auto.
- by noif 2. 
-
- expand frame@A1(i).
- expand output@A1(i).
- expand exec@A1(i).
- fa 1.
- fa 2.
- equivalent cond@A1(i), True.
- expand cond@A1(i). 
- auto.
+ equivalent cond@t, True.
+ by expand cond. 
  fa 2.
 
- by expandseq seq(i->h(ok,k(i))),i.
+ apply Hind; 1,2: by byequiv.
 Qed.

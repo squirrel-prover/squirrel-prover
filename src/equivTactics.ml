@@ -445,15 +445,48 @@ let induction Args.(Timestamp ts) s =
     soft_failure
       (Tactics.Failure "expected a timestamp variable")
 
-let () =
-  T.register_typed "induction"
-    ~general_help:"Apply the induction scheme to the given timestamp."
-    ~detailed_help:"Given a timestamp ts, that does not occur in the hypothesis, \
-                    it creates two sub-goals, one where ts has been replaced by \
-                    init, and one where we assume that the goal holds on \
-                    pred(ts)."
-    ~tactic_group:Logical
-    (pure_equiv_typed induction) Args.Timestamp
+(*------------------------------------------------------------------*)
+(** Induction *)
+
+let old_or_new_induction args =
+  if Config.new_ind () then
+    (pure_equiv_arg (LT.induction_tac ~dependent:false)) args
+  else
+    (fun s sk fk ->
+       match s with
+       | Goal.Trace _ -> soft_failure (Tactics.Failure "equivalence goal expected")
+       | Goal.Equiv s -> 
+         match LT.convert_args s args (Args.Sort Args.Timestamp) with
+         | Args.Arg (Args.Timestamp ts) ->
+           let ss = induction (Args.Timestamp ts) s in
+           let ss = List.map (fun s -> Goal.Equiv s) ss in
+           sk ss fk
+         | _ -> hard_failure (Failure "ill-formed arguments")
+    )
+
+(* TODO: only use new induction principle *)
+let () = T.register_general "induction"
+    ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
+                  detailed_help = "";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    (old_or_new_induction)
+
+(* new induction principle *)
+(* let () = T.register_general "induction"
+ *     ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
+ *                   detailed_help = "";
+ *                   usages_sorts = [Sort None];
+ *                   tactic_group = Logical}
+ *     (pure_equiv_arg (LT.induction_tac ~dependent:false)) *)
+
+let () = T.register_general "dependent induction"
+    ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
+                  detailed_help = "";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    (pure_equiv_arg (LT.induction_tac ~dependent:true))
+
 
 (*------------------------------------------------------------------*)
 let enrich (arg : Theory.eterm Args.arg) (s : ES.t) =

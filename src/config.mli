@@ -46,6 +46,9 @@ val strict_alias_mode : unit -> bool
 (** Automatic introductions (in hypotheses and the conclusion). *)
 val auto_intro : unit -> bool
 
+(** New equivalence induction principle. *)
+val new_ind : unit -> bool
+
 (*------------------------------------------------------------------*)
 (** {2  set functions} *)
 

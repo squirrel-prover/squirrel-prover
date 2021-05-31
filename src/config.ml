@@ -82,6 +82,9 @@ let v_strict_alias_mode = Param_bool false
 let s_auto_into = "autoIntro"
 let v_auto_intro = Param_bool true
 
+let s_new_ind = "newInduction"
+let v_new_ind = Param_bool false
+
 (*------------------------------------------------------------------*)
 (** Default parameters values.
     Add one line for each new parameter. *)
@@ -92,7 +95,8 @@ let default_params =
   |>  decl s_debug_completion PBool v_debug_completion
   |>  decl s_debug_tactics PBool v_debug_tactics
   |>  decl s_strict_alias_mode PBool v_strict_alias_mode 
-  |>  decl s_auto_into PBool v_auto_intro 
+  |>  decl s_auto_into PBool v_auto_intro
+  |>  decl s_new_ind PBool v_new_ind
 
 (*------------------------------------------------------------------*)
 (** reference to the current parameters *)
@@ -117,7 +121,9 @@ let debug_tactics    () = get_bool (M.find s_debug_tactics !params)
 
 let strict_alias_mode () = get_bool (M.find s_strict_alias_mode !params)
 
-let auto_intro () = get_bool (M.find s_auto_into !params) 
+let auto_intro () = get_bool (M.find s_auto_into !params)
+
+let new_ind () = get_bool (M.find s_new_ind !params) 
 
 (*------------------------------------------------------------------*)
 (** {2 set functions} *)
