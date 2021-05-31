@@ -196,3 +196,55 @@ equiv _ (x,y,z : message) : x,z -> <x, y>.
 Proof.
  checkfail (intro H; by try apply H) exn GoalNotClosed.
 Abort.
+
+(*------------------------------------------------------------------*)
+(* apply modulo FA dup *)
+
+(* with input *)
+equiv _ (t : timestamp) : frame@t -> input@t.
+Proof.
+ intro H; apply H.
+Qed.
+
+equiv _ (t : timestamp) : frame@t -> input@pred(pred(t)).
+Proof.
+ intro H; apply H.
+Qed.
+
+equiv _ (t : timestamp) : frame@pred(t) -> input@t.
+Proof.
+ intro H; apply H.
+Qed.
+
+equiv _ (t, t' : timestamp) : frame@t -> input@t'.
+Proof.
+ checkfail (intro H; by try apply H) exn GoalNotClosed.
+Abort.
+
+equiv _ (t : timestamp) : input@t -> frame@t.
+Proof.
+ checkfail (intro H; by try apply H) exn GoalNotClosed.
+Abort.
+
+(* with exec *)
+equiv _ (t : timestamp) : frame@t -> exec@t.
+Proof.
+ intro H; apply H.
+Qed.
+
+equiv _ (t : timestamp) : frame@pred(t) -> exec@t.
+Proof.
+ checkfail (intro H; by try apply H) exn GoalNotClosed.
+Abort.
+
+(* with frame *)
+equiv _ (t : timestamp) : frame@t -> frame@t.
+Proof.
+ intro H; apply H.
+Qed.
+
+equiv _ (t : timestamp) : frame@pred(t) -> frame@t.
+Proof.
+ checkfail (intro H; by try apply H) exn GoalNotClosed.
+Abort.
+

@@ -264,7 +264,6 @@ let is_dup_match
     (elem  : Term.message)
     (elems : Term.message list) 
   : 'a option =
-
   (* try to match [t] and [t'] modulo ≤ *)
   let is_dup_leq table st t t' : 'a option = 
     let rec leq t t' = 
@@ -286,17 +285,26 @@ let is_dup_match
     leq t t'
   in
 
-  match List.find_map (fun t' -> 
-      is_match (ETerm elem) (ETerm t') st
-    ) elems 
-  with
+  let direct_match = 
+    List.find_map (fun t' -> 
+        is_match (ETerm elem) (ETerm t') st
+      ) elems 
+  in
+  match direct_match with
   | Some res -> Some res
   | None ->
     match elem with
     | Macro (im,[],t) when im = Term.in_macro ->
       List.find_map (function
+          | Term.Macro (fm,[],t') when fm = Term.frame_macro -> 
+            is_dup_leq table st (Pred t) t' 
+          | _ -> None
+        ) elems
+
+    | Macro (em,[],t) when em = Term.frame_macro ->
+      List.find_map (function
           | Term.Macro (fm,[],t')
-            when fm = Term.frame_macro -> is_dup_leq table st (Pred t) t' 
+            when fm = Term.frame_macro -> is_dup_leq table st t t' 
           | _ -> None
         ) elems
 

@@ -298,6 +298,14 @@ module type MatchS = sig
     t -> t pat ->
     [ `FreeTyv | `NoMatch | `Match of mv ] 
 
+  (** Same as [try_match], but specialized for terms. *)
+  val try_match_term : 
+    ?st:match_state -> 
+    ?mode:[`Eq | `EntailLR | `EntailRL] ->
+    Symbols.table -> 
+    'a term -> 'b term pat ->
+    [ `FreeTyv | `NoMatch | `Match of mv ] 
+
   (** [find_map env t p func] looks for an occurence [t'] of [pat] in [t],
       where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
       It then computes the term obtained from [t] by replacing:

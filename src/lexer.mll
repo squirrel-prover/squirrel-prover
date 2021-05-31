@@ -42,7 +42,6 @@ rule token = parse
 | ']'                 { RBRACKET }
 | '?'                 { QMARK }
 | ','                 { COMMA }
-| '~'                 { TILDE }
 | "!"                 { BANGU }
 | '.'                 { DOT }
 | ':'                 { COLON }

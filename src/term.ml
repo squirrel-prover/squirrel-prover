@@ -1416,6 +1416,13 @@ module type MatchS = sig
     t -> t pat ->
     [ `FreeTyv | `NoMatch | `Match of mv ] 
 
+  val try_match_term : 
+    ?st:match_state -> 
+    ?mode:[`Eq | `EntailLR | `EntailRL] ->
+    Symbols.table -> 
+    'a term -> 'b term pat ->
+    [ `FreeTyv | `NoMatch | `Match of mv ] 
+
   val find_map :
     many:bool ->     
     Symbols.table -> Vars.env -> 
@@ -1440,7 +1447,7 @@ module Match : MatchS with type t = message = struct
       (Fmt.list ~sep:Fmt.sp Type.pp_tvar) p.pat_tyvars
       (Fmt.list ~sep:Fmt.sp Vars.pp_e) (Sv.elements p.pat_vars)
 
-  let try_match : type a b. 
+  let try_match_term : type a b. 
     ?st:match_state -> 
     ?mode:[`Eq | `EntailLR | `EntailRL] -> 
     Symbols.table ->
@@ -1657,6 +1664,7 @@ module Match : MatchS with type t = message = struct
 
     with NoMatch -> `NoMatch
 
+  let try_match = try_match_term
                         
   let find_map :
     type a b. 

@@ -346,50 +346,79 @@ module Match : Term.MatchS with type t = form = struct
       | `Contravar -> `Covar
     in
 
-    let term_match : type a.
-      ?seq_vars:Sv.t -> 
-      a Term.term -> a Term.term -> 
-      Term.match_state -> 
-      Term.match_state =
-      fun ?(seq_vars:Sv.empty) term pat st ->
-        let pat = 
-          Term.{ pat_tyvars = []; 
-                 pat_vars = Sv.union seq_vars p.pat_vars; 
-                 pat_term = pat; }
-        in
-        match TMatch.try_match ~st table term pat with
-        | `Match mv -> { st with mv } 
-        | _ -> raise NoMatch
+    let term_match_opt : type a b.
+        ?seq_vars:Sv.t ->
+        a Term.term ->
+        b Term.term ->
+        Term.match_state ->
+        Term.match_state option 
+      = fun ?(seq_vars=Sv.empty) term elem st ->
+      let pat = 
+        Term.{ pat_tyvars = []; 
+               pat_vars = Sv.union seq_vars p.pat_vars; 
+               pat_term = elem; }
+      in
+      match TMatch.try_match_term ~st table term pat with
+      | `Match mv -> Some { st with mv } 
+      | `FreeTyv | `NoMatch -> None
+    in
+
+    let term_match ?seq_vars term pat st : Term.match_state = 
+      match term_match_opt ?seq_vars term pat st with
+      | None -> raise NoMatch
+      | Some st -> st
     in
     
-    (** Try to match [term] with [pat]: 
-        - directly using [Action.fa_dup]
-        - if [pat] is a sequence, also tries to match [term] as a element of 
-          [pat]. *)
-    let match_seq_mem
+    (*------------------------------------------------------------------*)
+    (** In case [pat] is a sequence, try to match [term] as an element 
+        of [pat]. *)
+    let seq_mem_one
         (term : Term.message) 
-        (pat  : Term.message) 
-        (st   : Term.match_state) 
-      : Term.match_state 
-      =
-      (* match [term] and [pat] directly *)
-      try Action.is_dup_match term_match term pat st with
-        NoMatch ->
-        (* if it fails and [pat] is a sequence, tries to match [term] as an
-           element of the sequence. *)
-        match pat with
-        | Seq (is, pat) ->
-          let is, s = Term.refresh_vars `Global is in
-          let pat = Term.subst s pat in
+        (elem : Term.message) 
+        (st   : Term.match_state) : Term.match_state option 
+      = 
+      match elem with
+      | Seq (is, elem) ->
+        let is, s = Term.refresh_vars `Global is in
+        let elem = Term.subst s elem in
 
-          let is_s = Sv.add_list Sv.empty is in
+        let is_s = Sv.add_list Sv.empty is in
 
-          let st = term_match ~seq_vars:is_s term pat st in
-          { st with mv = Mv.filter (fun v _ -> not (Sv.mem v is_s)) st.mv }
-            
-        | _ -> raise NoMatch
+        begin 
+            match term_match_opt ~seq_vars:is_s term elem st with
+            | None -> None
+            | Some st ->
+              let mv = Mv.filter (fun v _ -> not (Sv.mem v is_s)) st.mv in
+              Some { st with mv }
+        end
+
+      | _ -> None
     in
 
+    (** Try to match [term] as an element of a sequence in [elems]. *)
+    let seq_mem 
+        (term  : Term.message) 
+        (elems : Term.message list) 
+        (st    : Term.match_state) : Term.match_state option 
+      = 
+      List.find_map (fun elem -> seq_mem_one term elem st) elems      
+    in
+
+    (*------------------------------------------------------------------*)    
+    (** Duplicate checking: see [Action.is_dup_match] *)
+    let is_dup 
+        (term  : Term.message)
+        (elems : Term.message list)
+        (st    : Term.match_state) : Term.match_state option 
+      =
+      let eterm_match (Term.ETerm t1) (Term.ETerm t2) st =
+        term_match_opt t1 t2 st
+      in
+
+      Action.is_dup_match eterm_match st table term elems 
+    in
+
+    (*------------------------------------------------------------------*)
     (** Check that [term] can be deduced from [pat_terms].
         This check is modulo:
         - Restr: all elements of [pat_terms] may not be used;
@@ -398,53 +427,55 @@ module Match : Term.MatchS with type t = form = struct
     let rec match_term_incl 
         (term      : Term.message) 
         (pat_terms : Term.message list)
-        (st        : Term.match_state) :
-      Term.match_state 
+        (st        : Term.match_state) : Term.match_state 
       =
-      (* try inclusion modulo (Restr + Seqence expantion) *)
-      let st_opt = 
-        List.find_map (fun pat ->
-            try Some (match_seq_mem term pat st) with
-              NoMatch -> None
-          ) pat_terms 
-      in
-
-      match st_opt with
+      match is_dup term pat_terms st with
       | Some st -> st
       | None -> 
-        (* if that fails, decompose [term] through the Function Application 
-           rule, and recurse. *)
-        match term with
-        | Term.Fun (_, _, terms) ->
-          List.fold_left (fun st term -> 
-              match_term_incl term pat_terms st
-            ) st terms
-        | _ -> raise NoMatch
+        match seq_mem term pat_terms st with
+        | Some st -> st
+        | None -> 
+          (* if that fails, decompose [term] through the Function Application 
+             rule, and recurse. *)
+          match term with
+          | Term.Fun (_, _, terms) ->
+            List.fold_left (fun st term -> 
+                match_term_incl term pat_terms st
+              ) st terms
+
+          | Term.Atom (`Message (_, t1, t2)) ->
+            List.fold_left (fun st term -> 
+                match_term_incl term pat_terms st
+              ) st [t1; t2]
+
+          | _ -> raise NoMatch
     in
 
+    (*------------------------------------------------------------------*)
     (** Greedily check entailment through an inclusion check of [terms] in
         [pat_terms]. *)
     let match_equiv_incl
         (terms     : Term.message list) 
         (pat_terms : Term.message list)
-        (st        : Term.match_state) :
-      Term.match_state 
+        (st        : Term.match_state) : Term.match_state 
       =
       List.fold_left (fun st term ->
           match_term_incl term pat_terms st
         ) st terms 
     in
    
+    (*------------------------------------------------------------------*)
     let rec match_equiv_eq 
         (terms     : Term.message list) 
         (pat_terms : Term.message list)
-        (st        : Term.match_state)
-      : Term.match_state =
+        (st        : Term.match_state) : Term.match_state 
+      =
       if List.length terms <> List.length pat_terms then raise NoMatch;
 
       List.fold_right2 term_match terms pat_terms st
     in
 
+    (*------------------------------------------------------------------*)
     (** Check entailment between two equivalences.
         - [Covar]    : [pat_es] entails [es]
         - [Contravar]: [es] entails [pat_es] *)
