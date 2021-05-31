@@ -236,8 +236,9 @@ let () =
     (only_equiv assumption)
 
 (*------------------------------------------------------------------*)
-let byequiv s =
-  [Goal.Trace (ES.trace_seq_of_equiv_seq s)]
+let byequiv s = Goal.Trace (ES.trace_seq_of_equiv_seq s)
+
+let byequiv_tac s = [byequiv s]
 
 let () =
   T.register "byequiv"
@@ -246,7 +247,7 @@ let () =
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
-    (only_equiv byequiv)
+    (only_equiv byequiv_tac)
 
 (*------------------------------------------------------------------*)
 let () =
@@ -1498,9 +1499,21 @@ let () = T.register_typed "ifeq"
 (*------------------------------------------------------------------*)
 (** Automatic simplification *)
 
-let auto ~close ~strong s sk (fk : Tactics.fk) =
+let goal_is_reach s = 
+  match ES.goal s with
+  | Equiv.Atom (Reach _) -> true
+  | _ -> false
+
+let rec auto ~close ~strong s sk (fk : Tactics.fk) =
   let open Tactics in
   match s with
+  | Goal.Trace t ->
+    let sk l fk = sk (List.map (fun s -> Goal.Trace s) l) fk in
+    TraceTactics.simpl ~close ~strong t sk fk
+
+  | Goal.Equiv s when goal_is_reach s -> 
+    auto ~close ~strong (byequiv s) sk fk
+
   | Goal.Equiv s ->
     let sk l _ =
       if close && l <> []
@@ -1529,17 +1542,13 @@ let auto ~close ~strong s sk (fk : Tactics.fk) =
 
     andthen_list ~cut:true
       [try_tac reduce;
-       try_tac wfadup;       
+       try_tac wfadup; 
        try_tac
          (andthen_list ~cut:true
             [LT.wrap_fail (LT.expand_all_l `All);
              try_tac wfadup;
              conclude])]
       s sk fk
-
-  | Goal.Trace t ->
-    let sk l fk = sk (List.map (fun s -> Goal.Trace s) l) fk in
-    TraceTactics.simpl ~close ~strong t sk fk
 
 let tac_auto ~close ~strong args s sk (fk : Tactics.fk) =
    auto ~close ~strong s sk fk
@@ -1550,7 +1559,7 @@ let () =
                   detailed_help = "Same as simpl.";
                   usages_sorts = [Sort None];
                   tactic_group = Structural }
-    (tac_auto ~close:true  ~strong:true)
+    (tac_auto ~close:true ~strong:true)
 
 let () =
   T.register_general "simpl"

@@ -25,7 +25,7 @@ enrich seq(i->h(ok,k(i))).
  fa 1.
  fa 2. 
  noif 2; 1: auto.
- apply Hind; 1,2: by byequiv. 
+ by apply Hind.
 
  destruct H as [i H].
  expand frame, output, exec.
@@ -35,5 +35,5 @@ enrich seq(i->h(ok,k(i))).
  by expand cond. 
  fa 2.
 
- apply Hind; 1,2: by byequiv.
+ by apply Hind.
 Qed.
