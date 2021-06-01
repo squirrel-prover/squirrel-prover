@@ -1396,7 +1396,7 @@ let apply_yes_no_if b s =
       if b then (t, TS.set_goal c s)
       else (e, TS.set_goal (Term.mk_not c) s)
     in
-    let subst = [Term.ESubst (Term.mk_ite c t e,branch)] in
+    let subst = [Term.ESubst (Term.mk_ite ~simpl:false c t e,branch)] in
     [ trace_sequent; TS.subst subst s ]
 
 let yes_no_if b =
