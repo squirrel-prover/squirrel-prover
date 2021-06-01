@@ -1,5 +1,7 @@
 open Utils
 
+module SE = SystemExpr
+
 (*------------------------------------------------------------------*)
 (** {2 Macro definitions} *)
 
@@ -47,17 +49,19 @@ let is_defined name a table =
     | Symbols.Global _, _ -> assert false
 
 (*------------------------------------------------------------------*)
-let get_def :
-  SystemExpr.system_expr -> Symbols.table ->
-  Term.msymb -> Term.timestamp -> Term.message =
-  fun system table symb a ->
+let get_def 
+    (system : SE.system_expr)
+    (table  : Symbols.table)
+    (symb   : Term.msymb)
+    (a      : Term.timestamp) : Term.message 
+  =
   match Symbols.Macro.get_all symb.s_symb table with
   | Symbols.Input, _ -> assert false
   | Symbols.Output, _ ->
     let symb, indices = oget (Term.destr_action a) in
     let action = Action.of_term symb indices table in
     let descr = 
-      SystemExpr.descr_of_action table system action 
+      SE.descr_of_action table system action 
     in
     snd descr.Action.output
 
@@ -65,7 +69,7 @@ let get_def :
     let symb, indices = oget (Term.destr_action a) in
     let action = Action.of_term symb indices table in
     let descr = 
-      SystemExpr.descr_of_action table system action 
+      SE.descr_of_action table system action 
     in
     snd Action.(descr.condition)
 
@@ -98,27 +102,31 @@ let get_def :
   | Symbols.State _, _ ->
     let asymb, indices = oget (Term.destr_action a) in
     let action = Action.of_term asymb indices table in
-    let descr = 
-      SystemExpr.descr_of_action table system action 
-    in
+    let descr = SE.descr_of_action table system action in
     begin try
         (* Look for an update of the state macro [name] in the
            updates of [action] *)
-        let (ns,msg) = List.find
-            (fun (ns,_) -> 
-               ns.Term.s_symb = symb.s_symb && 
-               ns.Term.s_typ = symb.s_typ
-               && List.length symb.s_indices = List.length ns.Term.s_indices)
-            descr.Action.updates
+        let (ns, msg) : Term.state * Term.message = 
+          List.find (fun (ns,_) -> 
+              ns.Term.s_symb = symb.s_symb && 
+              ns.Term.s_typ  = symb.s_typ  &&
+              List.length ns.Term.s_indices = List.length symb.s_indices
+            ) descr.Action.updates
         in
-        (* update found:
-           - if indices [args] of the macro we want
+        (* init case: we substitute the indice by their definition *)
+        if a = Term.init then 
+          let s = List.map2 (fun i1 i2 -> 
+              Term.ESubst (Term.Var i1, Term.Var i2)
+              ) ns.s_indices symb.s_indices
+          in
+          Term.subst s msg
+          (* if indices [args] of the macro we want
              to expand are equal to indices [is] corresponding to this macro
              in the action description, then the macro expanded as defined
-             by the update term
-           - otherwise, we need to take into account the possibility that
-             [arg] and [is] might be equal, and generate a conditional *)
-        if symb.s_indices = ns.s_indices || a = Term.init then msg
+             by the update term *)
+        else if symb.s_indices = ns.s_indices then msg
+        (*  otherwise, we need to take into account the possibility that
+            [arg] and [is] might be equal, and generate a conditional.  *)
         else
           Term.mk_ite
             (Term.mk_indices_eq symb.s_indices ns.s_indices)
@@ -150,7 +158,7 @@ let get_def :
         (fun (subst,action) x ->
            let in_tm =
              Term.Macro (Term.in_macro,[],
-                         SystemExpr.action_to_term table system
+                         SE.action_to_term table system
                            (List.rev action))
            in
            Term.ESubst (Term.Var x,in_tm) :: subst,
@@ -166,7 +174,7 @@ let get_def :
       match system with
       (* the body of the macro is expanded by projecting
          according to the projection in case of single systems. *)
-      | Single (s) -> proj_t (SystemExpr.get_proj s)
+      | Single (s) -> proj_t (SE.get_proj s)
       (* For diff cases, if the system corresponds to a left and a right
          projection of systems we can simply project the macro as is. *)
       | SimplePair _
@@ -174,8 +182,8 @@ let get_def :
       (* If we do not have a left and right projection, we must
          reconstruct the body of the macros to have the correct
          definition on each side. *)
-      | Pair (s1, s2)  -> Term.Diff (proj_t (SystemExpr.get_proj s1),
-                                     proj_t (SystemExpr.get_proj s2))
+      | Pair (s1, s2)  -> Term.Diff (proj_t (SE.get_proj s1),
+                                     proj_t (SE.get_proj s2))
     end
 
   |  _ -> assert false
@@ -218,7 +226,7 @@ let get_dummy_definition :
     | Symbols.(Global _, Global_data (inputs,indices,ts,term)) ->
       let dummy_action = Action.dummy (List.length inputs) in
       let tdummy_action = 
-        SystemExpr.action_to_term cntxt.table cntxt.system dummy_action 
+        SE.action_to_term cntxt.table cntxt.system dummy_action 
       in
       get_definition cntxt symb tdummy_action
     | _ -> assert false

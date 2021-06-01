@@ -7,12 +7,13 @@ name n1: index -> message
 name n2: index -> message
 
 mutable kT(i:index,j:index): message = n0(i,j)
-mutable kR(ii:index): message = n1(ii)
+mutable kTbis(i:index,j:index): message = n0(j,i)
 
 name n: index -> index -> message
 
 process tag(i:index, j:index) =
-  kT(i,j) := n(i,j);
+  kT(i,j)    := n(i,j);
+  kTbis(j,i) := n(i,j);
   out(c, n(i,j))
 
 system (!_i !_j T: tag(i,j)).
@@ -29,8 +30,22 @@ Proof.
 by expand cond@init.
 Qed.
 
-(* set debugTactics=true. *)
-goal updateAtInit (i,j:index): kT(i,j)@init = n0(i,j).
+goal _ (i,j:index): kT(i,j)@init = n0(i,j).
 Proof.
- by expand kT.
+ auto.
+Qed.
+
+goal _ (i,j:index): kTbis(i,j)@init = n0(j,i).
+Proof. 
+ auto.
+Qed.
+
+goal _ (k,l:index): kT(k,l)@init = n0(k,l).
+Proof.
+ auto.
+Qed.
+
+goal _ (k,l:index): kTbis(k,l)@init = n0(l,k).
+Proof.
+ auto.
 Qed.
