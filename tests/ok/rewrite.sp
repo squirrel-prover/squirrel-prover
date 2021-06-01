@@ -238,10 +238,10 @@ Qed.
 
 (*------------------------------------------------------------------*)
 
-axiom mif_true (b : boolean, x,y : message):
+axiom mif_true ['a] (b : boolean, x,y : 'a):
  b => if b then x else y = x.
 
-axiom mif_false (b : boolean, x,y : message):
+axiom mif_false ['a] (b : boolean, x,y : 'a):
  (not b) => if b then x else y = y.
 
 goal _ (b,b' : boolean, x,y : message) : 
@@ -249,6 +249,22 @@ goal _ (b,b' : boolean, x,y : message) :
 Proof.
  intro Hb Hb'.
  by rewrite mif_true. 
+Qed.
+
+(* same with an type variable *)
+goal _ ['a] (b,b' : boolean, x,y : 'a) : 
+  b => b' => if (b && b') then x else y = x.
+Proof.
+ intro Hb Hb'.
+ by rewrite mif_true. 
+Qed.
+
+(* rewriting not at the root. *)
+goal _ ['a] (b,b' : boolean, x,y : 'a) : 
+  b => ((if b then x else y = x) || False).
+Proof.
+ intro Hb.
+ by rewrite mif_true.
 Qed.
 
 (* check simplification item /= *)
