@@ -339,8 +339,10 @@ module LowTac (S : Sequent.S) = struct
       If [all] is true, then does not fail if no rewriting occurs. *)
   let rewrite ~all 
       (targets: target list) 
-      (rw : Args.rw_count * Ident.t option * rw_erule) (s : S.sequent)
-    : S.sequent * S.sequent list =
+      (rw : Args.rw_count * Ident.t option * rw_erule) 
+      (s : S.sequent) 
+    : S.sequent * S.sequent list 
+    =
     let found1, cpt_occ = ref false, ref 0 in
 
     (* Return: (f, subs) *)

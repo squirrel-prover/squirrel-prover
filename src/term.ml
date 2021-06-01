@@ -1477,7 +1477,8 @@ module Match : MatchS with type t = message = struct
        - [bvars] must be disjoint from the free variables of the terms in the 
          co-domain of [mv]. *)
     let rec tmatch : type a b. a term -> b term -> match_state -> match_state =
-      fun t pat st -> match t, pat with
+      fun t pat st -> 
+        match t, pat with
         | _, Var v' -> 
           begin
             match cast (Vars.kind v') t with
@@ -1679,7 +1680,7 @@ module Match : MatchS with type t = message = struct
        
       (* the return boolean indicates whether a match was found in the subterm. *)
       let rec find : type a. Vars.env -> Vars.evars -> a term -> bool * a term = 
-        fun env vars t ->
+        fun env vars t ->            
         if !cut then false, t
 
         (* otherwise, check if head matches *)
