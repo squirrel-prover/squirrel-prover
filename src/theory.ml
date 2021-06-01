@@ -1362,7 +1362,8 @@ let get_init_states table : (Term.state * Term.message) list =
   Symbols.Macro.fold (fun s def data acc ->
       match (def,data) with
       | ( Symbols.State (arity,kind), StateInit_data (l,t) ) ->
-        let state = Term.mk_isymb s Type.Message l in
+        assert (Type.equal kind (Term.ty t));
+        let state = Term.mk_isymb s kind l in
         (state,t) :: acc
       | _ -> acc
     ) [] table

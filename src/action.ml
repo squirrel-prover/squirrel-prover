@@ -319,7 +319,7 @@ let is_dup_match
 
 let is_dup table t t' : bool =
   let is_match (Term.ETerm t) (Term.ETerm t') () = 
-    match Type.equal_w (Term.ty t) (Term.ty t') with
+    match Type.equalk_w (Term.kind t) (Term.kind t') with
     | None -> None
     | Some Type.Type_eq ->
       if t = t' then Some () else None 

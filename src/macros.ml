@@ -109,10 +109,11 @@ let get_def
         let (ns, msg) : Term.state * Term.message = 
           List.find (fun (ns,_) -> 
               ns.Term.s_symb = symb.s_symb && 
-              ns.Term.s_typ  = symb.s_typ  &&
               List.length ns.Term.s_indices = List.length symb.s_indices
             ) descr.Action.updates
         in
+        assert (ns.Term.s_typ = symb.s_typ);
+
         (* init case: we substitute the indice by their definition *)
         if a = Term.init then 
           let s = List.map2 (fun i1 i2 -> 
