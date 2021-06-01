@@ -103,6 +103,7 @@
   "project"
   "right"
   "simpl"
+  "reduce"
   "simpl_left"
   "split"
   "subst"

@@ -26,7 +26,7 @@ module type S = sig
   val get_k_hyp_or_lemma : 
     'a LowSequent.s_kind -> lsymb -> t -> (Goal.ghyp, 'a) Goal.lemma_g 
 
-  val reduce : t -> form -> form
+  val reduce : Reduction.red_param -> t -> form -> form
 
   val convert_pt_hol : 
     Theory.p_pt_hol -> 'a LowSequent.s_kind -> t -> Goal.ghyp * 'a Term.pat
@@ -140,5 +140,5 @@ module Mk (S : LowSequent.S) : S with type t = S.t and type form = S.form = stru
   (*------------------------------------------------------------------*)
   module Reduce = Reduction.Mk(S)
 
-  let reduce s t = Reduce.reduce s t
+  let reduce = Reduce.reduce 
 end

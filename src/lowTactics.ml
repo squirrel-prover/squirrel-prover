@@ -554,7 +554,14 @@ module LowTac (S : Sequent.S) = struct
 
   (*------------------------------------------------------------------*)
   (** {3 Reduce} *)
-  let reduce_sequent s = S.map (S.reduce s) s        
+  let reduce_sequent param s = S.map (S.reduce param s) s 
+
+  let reduce_args args s : S.t list =
+    match args with
+    | [] -> [reduce_sequent Reduction.rp_full s]
+    | _ -> bad_args ()
+
+  let reduce_tac args = wrap_fail (reduce_args args)
 
   (*------------------------------------------------------------------*)
   (** {3 Clear} *)

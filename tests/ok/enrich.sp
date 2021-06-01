@@ -28,7 +28,7 @@ enrich seq(i->h(ok,k(i))).
  by apply Hind.
 
  destruct H as [i H].
- expand frame, output, exec.
+ expandall.
  fa 1.
  fa 2.
  equivalent cond@t, True.

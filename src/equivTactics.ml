@@ -1277,6 +1277,16 @@ let () =
    (only_equiv_typed (yes_no_if true)) Args.Int
 
 (*------------------------------------------------------------------*)
+(** Reduce *)
+
+let () = T.register_general "reduce"
+    ~tactic_help:{general_help = "Reduce the sequent.";
+                  detailed_help = "";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    (pure_equiv_arg LT.reduce_tac)
+
+(*------------------------------------------------------------------*)
 exception Not_ifcond
 
 (** Push the formula [f] in the message [term].
@@ -1503,7 +1513,9 @@ let rec auto ~close ~strong s sk (fk : Tactics.fk) =
       else fk (None, GoalNotClosed)
     in
 
-    let reduce s sk fk = sk [LT.reduce_sequent s] fk in
+    let reduce s sk fk = 
+      sk [LT.reduce_sequent Reduction.{ delta = false } s] fk 
+    in
 
     andthen_list ~cut:true
       [try_tac reduce;

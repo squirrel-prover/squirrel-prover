@@ -10,7 +10,7 @@ let rev_subst subst =
   List.map (fun (Term.ESubst (u,v)) -> Term.ESubst (v,u)) subst
 
 (*------------------------------------------------------------------*)
-type reduce_param = { delta : bool; }
+type red_param = { delta : bool; }
 
 let rp_full = { delta = true; }
 
@@ -21,7 +21,7 @@ module Mk (S : LowSequent.S) = struct
      - trace literals not updated *)
   type state = { 
     table      : Symbols.table;
-    param      : reduce_param;
+    param      : red_param;
     hint_db    : Hint.hint_db;
     trace_lits : Constr.trace_literals;
     conds      : Term.message list;     (* accumulated conditions *)
@@ -29,7 +29,8 @@ module Mk (S : LowSequent.S) = struct
                  
   (** Reduce a term in a given context. 
       The sequent's hypotheses must be used sparsingly *)
-  let reduce_term : type a. S.t -> a Term.term -> a Term.term = fun s t ->
+  let reduce_term : type a. 
+    red_param -> S.t -> a Term.term -> a Term.term = fun param s t ->
     let exception NoExp in
     
     (** Invariant: we must ensure that fv(reduce(u)) ⊆ fv(t)
@@ -185,7 +186,7 @@ module Mk (S : LowSequent.S) = struct
     in
     let state = { 
       table      = S.table s; 
-      param      = { delta = false; };
+      param      = param;
       hint_db    = S.get_hint_db s;
       trace_lits = S.get_trace_literals s;
       conds      = []; 
@@ -194,30 +195,31 @@ module Mk (S : LowSequent.S) = struct
     t
 
 
-  let rec reduce_equiv s e : Equiv.form =
+  let rec reduce_equiv (param : red_param) s e : Equiv.form =
     match e with
     | Equiv.Quant (q, vs, e) -> 
       let _, subst = Term.erefresh_vars `Global vs in
       let e = Equiv.subst subst e in
-      let red_e = reduce_equiv s e in
+      let red_e = reduce_equiv param s e in
 
       let r_subst = rev_subst subst in
       let red_e = Equiv.subst r_subst red_e in
       Equiv.Quant (q, vs, red_e)
 
     | Equiv.Impl (e1, e2) ->
-      Equiv.Impl (reduce_equiv s e1, reduce_equiv s e2)
+      Equiv.Impl (reduce_equiv param s e1, reduce_equiv param s e2)
     
     | Equiv.Atom (Reach f) -> 
-      Equiv.Atom (Reach (reduce_term s f))
+      Equiv.Atom (Reach (reduce_term param s f))
 
     | Equiv.Atom (Equiv e) -> 
-      let e = List.map (reduce_term s) e in
+      let e = List.map (reduce_term param s) e in
       Equiv.Atom (Equiv.Equiv e)
 
   (** We need type introspection there *)
-  let reduce s (t : S.form) : S.form = match S.s_kind with
-    | LowSequent.KEquiv -> reduce_equiv s t
-    | LowSequent.KReach -> reduce_term  s t
+  let reduce (param : red_param) s (t : S.form) : S.form = 
+    match S.s_kind with
+    | LowSequent.KEquiv -> reduce_equiv param s t
+    | LowSequent.KReach -> reduce_term  param s t
 
 end

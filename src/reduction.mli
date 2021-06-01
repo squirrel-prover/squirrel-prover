@@ -1,12 +1,11 @@
 (*------------------------------------------------------------------*)
-type reduce_param = { delta : bool; }
+type red_param = { delta : bool; }
 
-val rp_full : reduce_param
+val rp_full : red_param
 
 (*------------------------------------------------------------------*)
 module Mk (S : LowSequent.S) : sig
-  val reduce_term  : S.t -> 'a Term.term -> 'a Term.term     
-  val reduce_equiv : S.t ->   Equiv.form ->   Equiv.form
-
-  val reduce : S.t -> S.form -> S.form
+  val reduce_term  : red_param -> S.t -> 'a Term.term -> 'a Term.term     
+  val reduce_equiv : red_param -> S.t ->   Equiv.form ->   Equiv.form
+  val reduce       : red_param -> S.t ->       S.form ->       S.form
 end

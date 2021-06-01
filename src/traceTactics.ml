@@ -409,6 +409,16 @@ let () = T.register_general "dependent induction"
     (LT.induction_tac ~dependent:true)
 
 (*------------------------------------------------------------------*)
+(** Reduce *)
+
+let () = T.register_general "reduce"
+    ~tactic_help:{general_help = "Reduce the sequent.";
+                  detailed_help = "";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    LT.reduce_tac
+
+(*------------------------------------------------------------------*)
 (** [assumption judge sk fk] proves the sequent using the axiom rule. *)
 let assumption (s : TS.t) =
   let goal = TS.goal s in
@@ -1153,7 +1163,7 @@ let () =
 (** New goal simplification *)
 
 let new_simpl ~congr ~constr s =
-  let s = LT.reduce_sequent s in
+  let s = LT.reduce_sequent Reduction.{ delta = false } s in
   let goals = Term.decompose_ands (TS.goal s) in
   let goals = List.filter_map (fun goal ->
       if Hyps.is_hyp goal s || Term.f_triv goal then None
