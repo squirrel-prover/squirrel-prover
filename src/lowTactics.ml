@@ -1167,7 +1167,7 @@ module LowTac (S : Sequent.S) = struct
     wrap_fail (induction_args ~dependent args)
 
   (*------------------------------------------------------------------*)
-  (** {3 Exists *)
+  (** {3 Exists} *)
 
   (** [goal_exists_intro judge ths] introduces the existentially
       quantified variables in the conclusion of the judgment,
@@ -1196,7 +1196,7 @@ module LowTac (S : Sequent.S) = struct
   let exists_intro_tac args = wrap_fail (exists_intro_args args)
 
   (*------------------------------------------------------------------*)
-  (** {3 Use *)
+  (** {3 Use} *)
 
   (** [use ip name ths judge] applies the formula named [gp],
     * eliminating its universally quantified variables using [ths],
@@ -1278,7 +1278,7 @@ module LowTac (S : Sequent.S) = struct
   let use_tac args = wrap_fail (use_args args)
 
   (*------------------------------------------------------------------*)
-  (** {3 Use *)
+  (** {3 Assert} *)
 
   (** [tac_assert f j sk fk] generates two subgoals, one where [f] needs
     * to be proved, and the other where [f] is assumed. *)

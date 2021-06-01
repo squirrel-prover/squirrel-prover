@@ -12,8 +12,6 @@ type trace_literals = trace_literal list
     atoms. *)
 val models_conjunct : trace_literals -> models Utils.timeout_r
 
-(** [models l] returns the list of minimal models of a constraint. *)
-
 val m_is_sat : models -> bool
 
 (** [query models at] returns [true] if the conjunction of the atoms in [ats]
@@ -42,7 +40,7 @@ val get_ind_equalities :
 val find_eq_action : models -> Term.timestamp -> Term.timestamp option
 
 (*------------------------------------------------------------------*)
-(** Context of an trace model *)
+(** Context of a trace model. *)
 type trace_cntxt = {
   table  : Symbols.table;
   system : SystemExpr.system_expr;

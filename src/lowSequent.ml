@@ -1,7 +1,7 @@
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
-type _ s_kind = 
+type _ s_kind =
   | KReach : Term.message s_kind
   | KEquiv :   Equiv.form s_kind
 
@@ -9,26 +9,21 @@ type _ s_kind =
 (** {2 Module type for sequents} *)
 
 module type S = sig
+
   type t
   type sequent = t
   type sequents = sequent list
-    
+
   val pp : Format.formatter -> t -> unit
 
-  (*------------------------------------------------------------------*)
-  (** type of hypotheses and goals *)
   type form
 
   val pp_form : Format.formatter -> form -> unit
 
-  (*------------------------------------------------------------------*)
-  (** The kind of the sequent: allows type introspection *)
   val s_kind : form s_kind
 
-  (*------------------------------------------------------------------*)
   module Hyps : Hyps.HypsSeq with type hyp = form and type sequent = t
 
-  (*------------------------------------------------------------------*)
   val reach_to_form :                    Term.message -> form
   val form_to_reach : ?loc:Location.t -> form -> Term.message
   val gform_of_form : form -> Equiv.gform
@@ -46,7 +41,7 @@ module type S = sig
   val table : t -> Symbols.table
   val set_table : Symbols.table -> t -> t
 
-  val ty_vars : t -> Type.tvars 
+  val ty_vars : t -> Type.tvars
 
   val mem_felem    : int -> t -> bool
   val change_felem : int -> Term.message list -> t -> t
@@ -65,18 +60,15 @@ module type S = sig
   val subst     : Term.subst ->   t ->   t
   val subst_hyp : Term.subst -> form -> form
 
+  val fv_form : form -> Vars.Sv.t
+  val fv      : t    -> Vars.Sv.t
+
   val get_terms : form -> Term.message list
 
   val map : (form -> form) -> t -> t
 
-  val fv_form : form -> Vars.Sv.t
-  val fv      : t    -> Vars.Sv.t
-
-  (*------------------------------------------------------------------*)
-  (** {3 Matching} *)
   module Match : Term.MatchS with type t = form
 
-  (*------------------------------------------------------------------*)
-  (** {3 Smart constructors and destructots} *)
-  module Smart : Term.SmartFO with type form = form  
+  module Smart : Term.SmartFO with type form = form
+
 end

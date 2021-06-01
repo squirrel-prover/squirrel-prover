@@ -1,13 +1,6 @@
-(** This module implement sequents used to prove trace properties.
-    A sequent is made of:
-    - a set of hypotheses;
-    - a goal formula;
-    - an environment containing the sequent free variables.
-*)
-
-module L = Location
-
-type lsymb = Theory.lsymb
+(** Sequents used to prove trace properties, aka reachability properties.
+  *
+  * This module implements {!LowSequent.S} with [type form = Term.message]. *)
 
 (*------------------------------------------------------------------*)  
 include LowSequent.S with type form = Term.message

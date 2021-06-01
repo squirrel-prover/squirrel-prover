@@ -16,6 +16,11 @@ Process
 Prover
 Puf
 Symbols
+Location
+LowSequent
+LowTraceSequent
+LowEquivSequent
+Sequent
 TraceSequent
 TraceTactics
 EquivSequent

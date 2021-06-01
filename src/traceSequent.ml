@@ -1,6 +1,6 @@
-(** Extends [LowTraceSequent] with function relying on the [Prover] module. *)
+(** Extends {!LowTraceSequent} with functions relying on the {!Prover} module
+  * to access proved goals. *)
 
 include LowTraceSequent
 
-module TS = Sequent.Mk(LowTraceSequent)
-include TS
+include Sequent.Mk(LowTraceSequent)
