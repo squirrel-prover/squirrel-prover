@@ -363,7 +363,7 @@ let ty : type a. ?ty_env:Type.Infer.env -> a term -> a Type.t =
       | Pred _               -> Type.Timestamp
       | Action _             -> Type.Timestamp
       | Diff (a, b)          -> ty a
-      | Find (a, b, c, d)    -> Type.Message
+      | Find (a, b, c, d)    -> ty c
       | Atom _               -> Type.Boolean
       | ForAll _             -> Type.Boolean
       | Exists _             -> Type.Boolean
