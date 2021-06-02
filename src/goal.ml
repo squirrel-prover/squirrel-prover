@@ -136,23 +136,18 @@ let make_equiv_goal ~table ~hint_db
 
   let gc = mk_goal_concl gname se [] (`Equiv (Equiv.mk_forall evs f)) in
   
-  gc, Equiv (ES.init se table hint_db env ES.H.empty f)
+  gc, Equiv (ES.init se table hint_db env f)
 
 
 let make_equiv_goal_process ~table ~hint_db gname system : lemma * t =
   let env, ts = Vars.make `Approx Vars.empty_env Type.Timestamp "t" in
   let term = Term.Macro (Term.frame_macro,[],Term.Var ts) in
   let goal = Equiv.(Atom (Equiv [term])) in
-
   let happens = Term.Atom (`Happens (Term.Var ts)) in
-  let hyp = Equiv.Atom (Reach happens) in
-
-  let hyps = ES.H.empty in
-  let id = ES.H.fresh_id "H" hyps in
-  let _, hyps = ES.H.add ~force:false id hyp hyps in
-
-  let gc = 
-    mk_goal_concl gname system [] (`Equiv (Equiv.mk_forall [Vars.EVar ts] goal)) 
+  let hyp = Equiv.(Atom (Reach happens)) in
+  let gc =
+    mk_goal_concl gname system []
+      (`Equiv
+         (Equiv.mk_forall [Vars.EVar ts] (Equiv.(Impl (hyp,goal)))))
   in
-  
-  ( gc, Equiv (ES.init system table hint_db env hyps goal) )
+  gc, Equiv (ES.init system table hint_db env ~hyp goal)

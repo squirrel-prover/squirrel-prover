@@ -26,7 +26,7 @@ type ('a,'b) lemma_g = {
 }
 
 (*------------------------------------------------------------------*)
-type       lemma = (string,   Equiv.gform) lemma_g
+type       lemma = (string,  Equiv.gform) lemma_g
 type equiv_lemma = (string,   Equiv.form) lemma_g
 type reach_lemma = (string, Term.message) lemma_g
 
@@ -75,6 +75,7 @@ val make_trace_goal :
   hint_db:Hint.hint_db ->
   string -> Decl.p_goal_reach_cnt -> lemma * t
 
+(** Create observational equivalence goal for the given biprocess. *)
 val make_equiv_goal_process :
   table:Symbols.table -> 
   hint_db:Hint.hint_db ->

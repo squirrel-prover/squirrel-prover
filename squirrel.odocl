@@ -7,6 +7,7 @@ Cca
 Decl
 Euf
 Fresh
+Hint
 Hyps
 Iter
 Main
@@ -17,6 +18,7 @@ Prover
 Puf
 Symbols
 Location
+Equiv
 LowSequent
 LowTraceSequent
 LowEquivSequent

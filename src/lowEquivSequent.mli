@@ -1,59 +1,56 @@
-module L = Location
-
-module TS = LowTraceSequent
-
-type lsymb = Theory.lsymb
-
-(*------------------------------------------------------------------*)
-(** As much as possible, hypotheses should be manipulated through the [Hyps] 
-    module below, not the [H] module. 
-    Ideally, this should not exported. *)
-module H : Hyps.S with type hyp = Equiv.form
-type hyps = H.hyps
+(** Equivalence sequents,
+  * or more accurately global sequents whose conclusion
+  * is a global meta-formula. *)
 
 (*------------------------------------------------------------------*)
 include LowSequent.S with type form = Equiv.form
 
 (*------------------------------------------------------------------*)
-(** {2 Equivalence sequent} *)
+(** {2 Creation of global sequents} *)
 
-(** Initialize a sequent for the diff-equivalence of the given system.  
-    Remark that if the projection of the system is not None, the goal will 
-    be trivial. *)
+(** Initialize a sequent with the given components.
+  * At most one hypothesis can be given, which will be named "H":
+  * this is intended to ease simple cases like observational
+  * equivalence goals.
+  * For more general cases, the global meta-formula used as conclusion
+  * can include implications. *)
 val init : 
   SystemExpr.system_expr -> Symbols.table -> Hint.hint_db ->
-  Vars.env -> hyps -> Equiv.form -> t
+  Vars.env -> ?hyp:Equiv.form -> Equiv.form -> t
 
+(** Special pretty-printer for initial sequents.
+  * It does not display hypotheses, which might be misleading. *)
 val pp_init : Format.formatter -> t -> unit
 
 (*------------------------------------------------------------------*)
-(** {2 Accessors and utils} *)
+(** {2 Utilities for equivalence sequents}
+  * Equivalence sequents are global sequents whose conclusion
+  * is an equivalence atom. *)
 
 val set_equiv_goal : Equiv.equiv -> t -> t
 
-val set_ty_vars : Type.tvars -> t -> t
-
-(** Get the list of biterms describing the hypothesis frames. *)
-val hyps : t -> hyps
-
-(** Return a new equivalence judgment with the given hypothesis biframe. *)
-val set_hyps : hyps -> t -> t
-
 (** Get one of the projections of the biframe,
   * as a list of terms where diff operators have been fully
-  * eliminated. *)
+  * eliminated.
+  * @return [None] if the conclusion is not an equivalence atom. *)
 val get_frame : Term.projection -> t -> Equiv.equiv option
 
 val goal_is_equiv : t -> bool
 
 val goal_as_equiv : t -> Equiv.equiv
 
+(*------------------------------------------------------------------*)
+(** {2 Trace sequents and reachability goals} *)
+
+(** Change sequent goal to some reachability atom. *)
 val set_reach_goal : Term.message -> t -> t
 
-(** Build a trace sequent from an equivalent sequent when its conclusion is 
-    a [Reach _]. *)
-val trace_seq_of_equiv_seq : ?goal:Term.message -> t -> TS.t
+(** Convert a global sequent whose conclusion is a reachability
+  * atom to a trace sequent.
+  * @raise Tactics.soft_failure if sequent conclusion is not well-formed. *)
+val to_trace_sequent : t -> LowTraceSequent.t
 
-val trace_seq_of_reach : Term.message -> t -> TS.t
+(*------------------------------------------------------------------*)
+(** {2 Automated reasoning} *)
 
 val query_happens : precise:bool -> t -> Term.timestamp -> bool

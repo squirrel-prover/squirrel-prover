@@ -90,7 +90,7 @@ let pure_equiv_typed t arg s =
 (*------------------------------------------------------------------*)
 (** Build the sequent showing that a timestamp happens. *)
 let happens_premise (s : ES.t) (a : Term.timestamp) =
-  let s = ES.trace_seq_of_equiv_seq ~goal:(Term.Atom (`Happens a)) s in
+  let s = ES.(to_trace_sequent (set_reach_goal (Term.Atom (`Happens a)) s)) in
   Goal.Trace s
 
 (*------------------------------------------------------------------*)
@@ -233,7 +233,7 @@ let () =
     (only_equiv assumption)
 
 (*------------------------------------------------------------------*)
-let byequiv s = Goal.Trace (ES.trace_seq_of_equiv_seq s)
+let byequiv s = Goal.Trace (ES.to_trace_sequent s)
 
 let byequiv_tac s = [byequiv s]
 
@@ -295,7 +295,7 @@ let rec tautology f s = match f with
   | Equiv.(Atom (Equiv e)) -> refl e s = `True
   | Equiv.(Atom (Reach _)) ->
     let s = ES.set_goal f s in
-    let trace_s = ES.trace_seq_of_equiv_seq s in
+    let trace_s = ES.to_trace_sequent s in
     (* TODO: improve automation by doing more than just constraint solving ? *)
     TraceTactics.constraints trace_s
 
@@ -1157,7 +1157,7 @@ let equiv_formula f1 f2 (s : ES.t) =
     Term.mk_and ~simpl:false
       (Term.mk_impl ~simpl:false f1 f2)
       (Term.mk_impl ~simpl:false f2 f1) in
-  let trace_sequent = ES.trace_seq_of_reach f s in
+  let trace_sequent = ES.(to_trace_sequent (set_reach_goal f s)) in
 
   let subgoals =
     [ Goal.Trace trace_sequent;
@@ -1171,7 +1171,8 @@ let equiv_formula f1 f2 (s : ES.t) =
 let equiv_message m1 m2 (s : ES.t) =
   (* goal for the equivalence of t1 and t2 *)
   let trace_sequent =
-    ES.trace_seq_of_reach (Term.Atom (`Message (`Eq,m1,m2))) s
+    ES.(to_trace_sequent
+         (set_reach_goal (Term.Atom (`Message (`Eq,m1,m2))) s))
   in
   let subgoals =
     [ Goal.Trace trace_sequent;
@@ -1213,12 +1214,14 @@ let simplify_ite b s cond positive_branch negative_branch =
   if b then
     (* replace in the biframe the ite by its positive branch *)
     (* ask to prove that the cond of the ite is True *)
-    let trace_s = ES.trace_seq_of_reach cond s in
+    let trace_s = ES.(to_trace_sequent (set_reach_goal cond s)) in
     (positive_branch, trace_s)
   else
     (* replace in the biframe the ite by its negative branch *)
     (* ask to prove that the cond of the ite implies False *)
-    let trace_s = ES.trace_seq_of_reach (Term.mk_impl cond Term.mk_false) s in
+    let trace_s =
+      ES.(to_trace_sequent
+            (set_reach_goal (Term.mk_impl cond Term.mk_false) s)) in
     (negative_branch, trace_s)
 
 
@@ -1364,7 +1367,8 @@ let ifcond Args.(Pair (Int i, Pair (Opt (Int, j), Boolean f))) s =
     in
     let biframe = List.rev_append before (new_elem :: after) in
     let trace_sequent = 
-      ES.trace_seq_of_reach Term.(mk_impl ~simpl:false cond f) s 
+      ES.(to_trace_sequent
+            (set_reach_goal Term.(mk_impl ~simpl:false cond f) s))
     in
 
     [ Goal.Trace trace_sequent;
@@ -1406,7 +1410,8 @@ let trivial_if (Args.Int i) (s : ES.sequent) =
           of an if then else term")
   | Some (c,t,e) ->
     let trace_seq = 
-      ES.trace_seq_of_reach (Term.Atom (`Message (`Eq,t,e))) s
+      ES.(to_trace_sequent
+           (set_reach_goal (Term.Atom (`Message (`Eq,t,e))) s))
     in
     let trace_goal  = Goal.Trace trace_seq in
 
@@ -1451,8 +1456,10 @@ let ifeq Args.(Pair (Int i, Pair (Message (t1,ty1), Message (t2,ty2)))) s =
   let biframe = List.rev_append before (new_elem :: after) in
 
   let trace_s = 
-    ES.trace_seq_of_reach 
-      (Term.mk_impl ~simpl:false cond Term.(Atom (`Message (`Eq,t1,t2)))) s
+    ES.(to_trace_sequent
+          (set_reach_goal
+             (Term.mk_impl ~simpl:false cond Term.(Atom (`Message (`Eq,t1,t2))))
+             s))
   in
 
   [ Goal.Trace trace_s;
@@ -2003,7 +2010,7 @@ let const_seq (li, terms) s : Goal.t list =
     Term.mk_forall ~simpl:true (List.map Vars.evar e_is)
       (Term.mk_ors ~simpl:true eqs)
   in
-  let s_reach = ES.trace_seq_of_reach cond s in
+  let s_reach = s |> ES.set_reach_goal cond |> ES.to_trace_sequent in
   
   let frame = List.rev_append before (terms @ after) in
   [ Goal.Trace s_reach;
@@ -2049,7 +2056,8 @@ let cca1 Args.(Int i) s =
       fresh_cond cntxt env (Term.Name r) biframe 
     in
 
-    let fresh_seq = ES.trace_seq_of_reach random_fresh_cond s in
+    let fresh_seq =
+      s |> ES.set_reach_goal random_fresh_cond |> ES.to_trace_sequent in
     let fresh_goal = Goal.Trace fresh_seq in
 
     let new_subst =
@@ -2311,7 +2319,8 @@ let enckp
         fresh_cond cntxt env (Term.Name r) (context@biframe)
       with Euf.Bad_ssc -> soft_failure Tactics.Bad_SSC
     in
-    let fresh_goal = ES.trace_seq_of_reach random_fresh_cond s in
+    let fresh_goal =
+      s |> ES.set_reach_goal random_fresh_cond |> ES.to_trace_sequent in
 
     (* Equivalence goal where [enc] is modified using [new_key]. *)
     let new_enc =

@@ -51,15 +51,14 @@ type t = {
   hint_db : Hint.hint_db;
 }
 
-let init system table hint env hyps f = {
-  env     = env ; 
-  table   = table ;
-  ty_vars = [];
-  goal    = f; 
-  hyps    = hyps;
-  system  = system;
-  hint_db = hint;
-}
+let init system table hint_db env ?hyp goal =
+  let hyps = H.empty in
+  let hyps = match hyp with
+    | None -> hyps
+    | Some h ->
+        snd (H.add ~force:false (H.fresh_id "H" hyps) h hyps)
+  in
+  { env; table; system; goal; hyps; hint_db; ty_vars = [] }
 
 type sequent = t
 
@@ -101,7 +100,7 @@ let pp_init ppf j =
 module Hyps
   : Hyps.HypsSeq with type hyp = Equiv.form and type sequent = t
  = struct
-  type hyp = Equiv.form 
+  type hyp = Equiv.form
 
   type ldecl = Ident.t * hyp 
 
@@ -114,7 +113,7 @@ module Hyps
   let fresh_id ?(approx=false) name s =
     let id = H.fresh_id name s.hyps in
     if (not approx) && Ident.name id <> name && name <> "_"
-    then Hyps.hyp_error ~loc:None (T.HypAlreadyExists name) 
+    then Tactics.soft_failure (T.HypAlreadyExists name)
     else id
 
   let fresh_ids ?(approx=false) names s =
@@ -124,7 +123,7 @@ module Hyps
       begin
         List.iter2 (fun id name ->
             if Ident.name id <> name && name <> "_"
-            then Hyps.hyp_error ~loc:None (T.HypAlreadyExists name)
+            then Tactics.soft_failure (T.HypAlreadyExists name)
           ) ids names;
         ids
       end
@@ -245,19 +244,18 @@ let form_to_reach ?loc (e : Equiv.form) =
     Tactics.soft_failure ?loc (Tactics.Failure "expected a reachability formula")
 
 (*------------------------------------------------------------------*)
-let trace_seq_of_equiv_seq ?goal s = 
+let to_trace_sequent s =
   let env     = env s in
   let system  = system s in
   let table   = table s in
   let ty_vars = ty_vars s in
   let hint_db = s.hint_db in
 
-  let goal = match goal, s.goal with
-    | Some g, _ -> g
-    | None, Equiv.Atom (Equiv.Reach f) -> f
-    | None, _ -> 
-      Tactics.soft_failure (Tactics.GoalBadShape "expected a reachability \
-                                                  formulas")
+  let goal = match s.goal with
+    | Equiv.Atom (Equiv.Reach f) -> f
+    | _ ->
+      Tactics.soft_failure
+        (Tactics.GoalBadShape "expected a reachability formula")
   in
 
   let trace_s = TS.init ~system ~table ~hint_db ~ty_vars ~env ~goal in
@@ -271,11 +269,11 @@ let trace_seq_of_equiv_seq ?goal s =
 
 (*------------------------------------------------------------------*)
 let get_trace_literals s = 
-  TS.get_trace_literals (trace_seq_of_equiv_seq ~goal:Term.mk_false s)
+  TS.get_trace_literals (to_trace_sequent (set_reach_goal Term.mk_false s))
 
 (*------------------------------------------------------------------*)
 let get_models (s : t) =
-  let s = trace_seq_of_equiv_seq ~goal:Term.mk_false s in
+  let s = to_trace_sequent (set_reach_goal Term.mk_false s) in
   TS.get_models s
 
 let mk_trace_cntxt (s : t) = 
@@ -284,8 +282,6 @@ let mk_trace_cntxt (s : t) =
     system = s.system;
     models = Some (get_models s);
   }
-
-let trace_seq_of_reach f s = trace_seq_of_equiv_seq (set_reach_goal f s)
 
 (*------------------------------------------------------------------*)
 let rec get_terms (f : Equiv.form) : Term.message list =
@@ -297,7 +293,7 @@ let rec get_terms (f : Equiv.form) : Term.message list =
 
 (*------------------------------------------------------------------*)
 let query_happens ~precise (s : t) (a : Term.timestamp) =
-  let s = trace_seq_of_equiv_seq ~goal:Term.mk_false s in
+  let s = to_trace_sequent (set_reach_goal Term.mk_false s) in
   TS.query_happens ~precise s a
 
 (*------------------------------------------------------------------*)
