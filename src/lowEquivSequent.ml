@@ -27,11 +27,11 @@ type hyps = H.hyps
 (*------------------------------------------------------------------*)
 (** {2 Equivalence sequent} *)
 
-type form = Equiv.form
+type hyp_form = Equiv.form
+type conc_form = Equiv.form
 
-let s_kind = LowSequent.KEquiv
-
-let pp_form = Equiv.pp
+let hyp_kind = Equiv.Global_t
+let conc_kind = Equiv.Global_t
 
 (** An equivalence sequent features:
   * - two frames given as a single [goal] containing bi-terms
@@ -284,14 +284,6 @@ let mk_trace_cntxt (s : t) =
   }
 
 (*------------------------------------------------------------------*)
-let rec get_terms (f : Equiv.form) : Term.message list =
-  match f with
-  | Equiv.Atom (Equiv.Reach f) -> [f]
-  | Equiv.Atom (Equiv.Equiv e) -> e
-  | Equiv.Impl (e1, e2) -> get_terms e1 @ get_terms e2
-  | Equiv.Quant _ -> []
-
-(*------------------------------------------------------------------*)
 let query_happens ~precise (s : t) (a : Term.timestamp) =
   let s = to_trace_sequent (set_reach_goal Term.mk_false s) in
   TS.query_happens ~precise s a
@@ -310,22 +302,20 @@ let get_felem i s = let _, t, _ = List.splitat i (goal_as_equiv s) in t
 let get_hint_db s = s.hint_db
 
 (*------------------------------------------------------------------*)
-let map f s : sequent = set_goal (f (goal s)) (Hyps.map f s)
-
-(*------------------------------------------------------------------*)
-let fv_form (f : form) = Equiv.fv f
+let map f s : sequent =
+  let f x = f.Equiv.Babel.call Equiv.Global_t x in
+  set_goal (f (goal s)) (Hyps.map f s)
 
 (*------------------------------------------------------------------*)
 let fv s : Vars.Sv.t = 
   let h_vars = 
     Hyps.fold (fun _ f vars -> 
-        Vars.Sv.union (fv_form f) vars
+        Vars.Sv.union (Equiv.fv f) vars
       ) s Vars.Sv.empty
   in
-  Vars.Sv.union h_vars (fv_form (goal s))
+  Vars.Sv.union h_vars (Equiv.fv (goal s))
 
 (*------------------------------------------------------------------*)
 module Match = Equiv.Match
-
-(*------------------------------------------------------------------*)
-module Smart = Equiv.Smart
+module Conc  = Equiv.Smart
+module Hyp   = Equiv.Smart

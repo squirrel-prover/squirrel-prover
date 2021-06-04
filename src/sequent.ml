@@ -20,19 +20,20 @@ module type S = sig
   val is_equiv_hyp_or_lemma  : lsymb -> t -> bool
   val is_reach_hyp_or_lemma  : lsymb -> t -> bool
 
-  val get_hyp_or_lemma       : lsymb -> t -> Goal.hyp_or_lemma
-  val get_equiv_hyp_or_lemma : lsymb -> t -> Goal.equiv_hyp_or_lemma
-  val get_reach_hyp_or_lemma : lsymb -> t -> Goal.reach_hyp_or_lemma
   val get_k_hyp_or_lemma : 
-    'a LowSequent.s_kind -> lsymb -> t -> (Goal.ghyp, 'a) Goal.lemma_g 
+    'a Equiv.f_kind -> Theory.lsymb -> t -> (Goal.ghyp, 'a) Goal.lemma_g
 
-  val reduce : Reduction.red_param -> t -> form -> form
+  val reduce : Reduction.red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
   val convert_pt_hol : 
-    Theory.p_pt_hol -> 'a LowSequent.s_kind -> t -> Goal.ghyp * 'a Term.pat
+    Theory.p_pt_hol -> 'a Equiv.f_kind -> t -> Goal.ghyp * 'a Term.pat
 end
 
-module Mk (S : LowSequent.S) : S with type t = S.t and type form = S.form = struct
+module Mk (S : LowSequent.S) : S with
+  type t = S.t                   and
+  type conc_form = S.conc_form   and
+  type hyp_form = S.hyp_form     =
+struct
   include S
 
   let is_hyp_or_lemma (name : lsymb) (s : S.t) =
@@ -44,63 +45,55 @@ module Mk (S : LowSequent.S) : S with type t = S.t and type form = S.form = stru
   let is_reach_hyp_or_lemma (name : lsymb) (s : sequent) =
     Hyps.mem_name (L.unloc name) s || Prover.is_reach_lemma (L.unloc name)
 
-  let get_hyp_or_lemma (name : lsymb) (s : sequent) : Goal.hyp_or_lemma =
-    let lem =
+  let get_k_hyp_or_lemma
+    : type a. a Equiv.f_kind -> lsymb -> t -> (Goal.ghyp, a) Goal.lemma_g
+    = fun k name s ->
+
       if Hyps.mem_name (L.unloc name) s then
         let id, f = Hyps.by_name name s in
         Goal.{ gc_name = `Hyp id;
                gc_system = system s;
                gc_tyvars = [];
-               gc_concl = S.gform_of_form f; }
+               gc_concl =
+                 Equiv.Babel.convert
+                   ~loc:(L.loc name)
+                   ~src:S.hyp_kind
+                   ~dst:k
+                   f }
       else
         let lem = Prover.get_lemma name in
-        { lem with gc_name = `Lemma lem.Goal.gc_name }
-    in
-
-    (* Verify that it applies to the current system. *)
-    if not (SE.systems_compatible (S.system s) lem.gc_system) then
-      Tactics.hard_failure Tactics.NoAssumpSystem;
-
-    lem
-
-  let get_reach_hyp_or_lemma name s =
-    Goal.to_reach_lemma ~loc:(L.loc name) (get_hyp_or_lemma name s)
-      
-  let get_equiv_hyp_or_lemma name s =
-    Goal.to_equiv_lemma ~loc:(L.loc name) (get_hyp_or_lemma name s)
+        (* Verify that it applies to the current system. *)
+        if not (SE.systems_compatible (S.system s) lem.gc_system) then
+          Tactics.hard_failure Tactics.NoAssumpSystem;
+        { Goal.gc_name = `Lemma lem.Goal.gc_name ;
+          gc_system = lem.gc_system ;
+          gc_tyvars = lem.gc_tyvars ;
+          gc_concl = Equiv.Babel.convert lem.gc_concl
+                       ~src:Equiv.Any_t ~dst:k ~loc:(L.loc name) }
 
   (*------------------------------------------------------------------*)
-  (** [s_kind] variants *)
-
-  let get_k_hyp_or_lemma : type a. 
-    a LS.s_kind -> lsymb -> t -> (Goal.ghyp, a) Goal.lemma_g = 
-    fun s_kind name s ->
-    match s_kind with
-    | LowSequent.KEquiv -> get_equiv_hyp_or_lemma name s
-    | LowSequent.KReach -> get_reach_hyp_or_lemma name s
-
-  let decompose_forall_k : type a. a LS.s_kind -> a -> Vars.evars * a = 
-    fun s_kind f ->
-    match s_kind with
-    | LowSequent.KReach ->  Term.Smart.decompose_forall f
-    | LowSequent.KEquiv -> Equiv.Smart.decompose_forall f
-
-  let subst_k : type a. a LS.s_kind -> Term.subst -> a -> a = 
-    fun s_kind subst f ->
-    match s_kind with
-    | LowSequent.KReach ->  Term.subst subst f
-    | LowSequent.KEquiv -> Equiv.subst subst f
+  let decompose_forall_k : type a. a Equiv.f_kind -> a -> Vars.evars * a =
+    fun f_kind f ->
+    match f_kind with
+    | Equiv.Local_t ->  Term.Smart.decompose_forall f
+    | Equiv.Global_t -> Equiv.Smart.decompose_forall f
+    | Equiv.Any_t ->
+       match f with
+         | `Reach f ->
+             let vs,f = Term.Smart.decompose_forall f in vs, `Reach f
+         | `Equiv f ->
+             let vs,f = Equiv.Smart.decompose_forall f in vs, `Equiv f
 
   (*------------------------------------------------------------------*)
   (** Parse a partially applied lemma or hypothesis as a pattern. *)
-  let convert_pt_hol : type a. 
-    Theory.p_pt_hol -> a LowSequent.s_kind -> S.t -> Goal.ghyp * a Term.pat = 
-    fun pt s_kind s ->
+  let convert_pt_hol : type a.
+    Theory.p_pt_hol -> a Equiv.f_kind -> S.t -> Goal.ghyp * a Term.pat =
+    fun pt f_kind s ->
 
-    let lem = get_k_hyp_or_lemma s_kind pt.p_pt_hid s in
-    let f_args, f = decompose_forall_k s_kind lem.gc_concl in
+    let lem = get_k_hyp_or_lemma f_kind pt.p_pt_hid s in
+    let f_args, f = decompose_forall_k f_kind lem.gc_concl in
     let f_args, subst = Term.erefresh_vars `Global f_args in
-    let f = subst_k s_kind subst f in
+    let f = Equiv.Babel.subst f_kind subst f in
 
     let pt_args_l = List.length pt.p_pt_args in
 
@@ -128,7 +121,7 @@ module Mk (S : LowSequent.S) : S with type t = S.t and type form = S.form = stru
     in
 
     (* instantiate [f_args0] by [args] *)
-    let f = subst_k s_kind subst f in
+    let f = Equiv.Babel.subst f_kind subst f in
 
     let pat = Term.{ 
         pat_tyvars = lem.gc_tyvars;

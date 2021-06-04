@@ -3,7 +3,9 @@
   * is a global meta-formula. *)
 
 (*------------------------------------------------------------------*)
-include LowSequent.S with type form = Equiv.form
+include LowSequent.S with
+  type  hyp_form = Equiv.global_form and
+  type conc_form = Equiv.global_form
 
 (*------------------------------------------------------------------*)
 (** {2 Creation of global sequents} *)

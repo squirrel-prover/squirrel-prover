@@ -3,7 +3,9 @@
   * This module implements {!LowSequent.S} with [type form = Term.message]. *)
 
 (*------------------------------------------------------------------*)  
-include LowSequent.S with type form = Term.message
+include LowSequent.S with
+  type  hyp_form = Equiv.local_form and
+  type conc_form = Equiv.local_form
 
 (*------------------------------------------------------------------*)
 (** {2 Sequent type and basic operations} *)

@@ -46,7 +46,7 @@ type ('a,'b) lemma_g = {
 }
 
 (*------------------------------------------------------------------*)
-type       lemma = (string,   Equiv.gform) lemma_g
+type       lemma = (string,  Equiv.gform) lemma_g
 type equiv_lemma = (string,   Equiv.form) lemma_g
 type reach_lemma = (string, Term.message) lemma_g
 
@@ -103,7 +103,7 @@ type p_goal_form =
 type p_goal = Decl.p_goal_name * p_goal_form
 
 (*------------------------------------------------------------------*)
-(** {2 Convert equivalence formulas and goals} *)
+(** {2 Create trace and equivalence goals} *)
 
 let make_trace_goal ~tbl ~hint_db gname (pg : Decl.p_goal_reach_cnt) 
   : lemma * t =
@@ -125,6 +125,7 @@ let make_trace_goal ~tbl ~hint_db gname (pg : Decl.p_goal_reach_cnt)
   
   (* final proved formula, current sequent *)
   gc, Trace s
+
 
 let make_equiv_goal ~table ~hint_db
     gname se (bnds : Theory.bnds) (p_form : Theory.equiv_form L.located) : lemma * t =

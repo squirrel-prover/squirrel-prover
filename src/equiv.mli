@@ -56,10 +56,9 @@ val titer      : (form -> unit) -> form -> unit
 val tfold      : (form -> 'a -> 'a) -> form -> 'a -> 'a
 val tmap_fold  : ('b -> form -> 'b * form) -> 'b -> form -> 'b * form 
 
-(*------------------------------------------------------------------*)
-(** {2 Generalized formuals} *)
-
-type gform = [`Equiv of form | `Reach of Term.message]
+(** Get (some) terms appearing in a formula.
+  * For instance, terms occurring under binders may not be included. *)
+val get_terms : form -> Term.message list
 
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
@@ -68,6 +67,49 @@ val subst : Term.subst -> form -> form
 
 (** Free variables *)
 val fv : form -> Vars.Sv.t
+
+(*------------------------------------------------------------------*)
+(** {2 Generalized formuals} *)
+
+(** A local meta-formula is a boolean term. *)
+type local_form = Term.message
+
+type global_form = form
+
+type gform = [`Equiv of form | `Reach of Term.message]
+type any_form = gform
+
+type _ f_kind =
+  | Local_t : local_form f_kind
+  | Global_t : global_form f_kind
+  | Any_t : any_form f_kind
+
+module Any : sig
+  type t = any_form
+  val pp : Format.formatter -> t -> unit
+  val subst : Term.subst -> t -> t
+
+  (** Convert any formula kind to [any_form]. *)
+  val convert_from : 'a f_kind -> 'a -> any_form
+
+  (** Convert [any_form] to any formula kind.
+    * Issue a soft failure (with the provided location, if any)
+    * when the input formula is not of the right kind. *)
+  val convert_to : ?loc:Location.t -> 'a f_kind -> any_form -> 'a
+end
+
+(** Conversions between formula kinds and generic functionalities
+  * over all formula kinds. *)
+module Babel : sig
+  type mapper = {
+    call : 'a. 'a f_kind -> 'a -> 'a
+  }
+  val convert : ?loc:Location.t -> src:'a f_kind -> dst:'b f_kind -> 'a -> 'b
+  val subst : 'a f_kind -> Term.subst -> 'a -> 'a
+  val fv    : 'a f_kind -> 'a -> Vars.Sv.t
+  val get_terms : 'a f_kind -> 'a -> Term.message list
+  val pp : 'a f_kind -> Format.formatter -> 'a -> unit
+end
 
 (*------------------------------------------------------------------*)
 (** {2 Matching} *)

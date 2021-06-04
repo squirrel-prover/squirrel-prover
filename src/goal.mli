@@ -62,7 +62,7 @@ type p_goal_form =
 type p_goal = Decl.p_goal_name * p_goal_form
 
 (*------------------------------------------------------------------*)
-(** {2 Convert equivalence formulas and goals} *)
+(** {2 Create trace and equivalence goals} *)
 
 val make_equiv_goal :
   table:Symbols.table ->

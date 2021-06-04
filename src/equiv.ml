@@ -132,10 +132,11 @@ let tfold : (form -> 'b -> 'b) -> form -> 'b -> 'b =
   titer fi t;
   !vref
 
-(*------------------------------------------------------------------*)
-(** {2 Generalized formuals} *)
-
-type gform = [`Equiv of form | `Reach of Term.message]
+let rec get_terms = function
+  | Atom (Reach f) -> [f]
+  | Atom (Equiv e) -> e
+  | Impl (e1, e2) -> get_terms e1 @ get_terms e2
+  | Quant _ -> []
 
 (*------------------------------------------------------------------*)
 (** {2 Substitution} *)
@@ -590,5 +591,111 @@ module Match : Term.MatchS with type t = form = struct
         if found then Some (Impl (e1, e2)) else None
 
       | Quant _ -> None  (* FIXME: match under binders *)
+
+end
+
+(*------------------------------------------------------------------*)
+(** {2 Generalized formulas} *)
+
+type gform = [`Equiv of form | `Reach of Term.message]
+
+type local_form = Term.message
+type global_form = form
+type any_form = gform
+
+type _ f_kind =
+  | Local_t : local_form f_kind
+  | Global_t : global_form f_kind
+  | Any_t : any_form f_kind
+
+(** Module Any without conversion functions. *)
+module PreAny = struct
+  type t = any_form
+  let pp fmt = function
+    | `Reach f -> Term.pp fmt f
+    | `Equiv f -> pp fmt f
+  let subst s = function
+    | `Reach f -> `Reach (Term.subst s f)
+    | `Equiv f -> `Equiv (subst s f)
+  let fv = function
+    | `Reach f -> Term.fv f
+    | `Equiv f -> fv f
+  let get_terms = function
+    | `Reach f -> [f]
+    | `Equiv f -> get_terms f
+end
+
+module Babel = struct
+
+  type mapper = {
+    call : 'a. 'a f_kind -> 'a -> 'a
+  }
+
+  let convert :
+    type a b. ?loc:Location.t ->
+              src:(a f_kind) ->
+              dst:(b f_kind) ->
+              a -> b
+    = fun ?loc ~src ~dst f ->
+    match src,dst with
+      (* Identity cases *)
+      | Local_t,Local_t -> f
+      | Global_t,Global_t -> f
+      | Any_t,Any_t -> f
+      (* Injections into gform *)
+      | Local_t,Any_t -> `Reach f
+      | Global_t,Any_t -> `Equiv f
+      (* Inverses of the injections. *)
+      | Any_t,Local_t ->
+          begin match f with
+            | `Reach f -> f
+            | _ -> Tactics.soft_failure ?loc CannotConvert
+          end
+      | Any_t,Global_t ->
+          begin match f with
+            | `Equiv f -> f
+            | `Reach f -> Atom (Reach f)
+          end
+      (* Conversions between local and global formulas. *)
+      | Local_t, Global_t -> Atom (Reach f)
+      | Global_t, Local_t ->
+         begin match f with
+           | Atom (Reach f) -> f
+           | _ -> Tactics.soft_failure ?loc CannotConvert
+         end
+
+  let subst : type a. a f_kind -> Term.subst -> a -> a = function
+    | Local_t -> Term.subst
+    | Global_t -> subst
+    | Any_t -> PreAny.subst
+
+  let fv : type a. a f_kind -> a -> Vars.Sv.t = function
+    | Local_t -> Term.fv
+    | Global_t -> fv
+    | Any_t -> PreAny.fv
+
+  let term_get_terms x = [x]
+
+  let get_terms : type a. a f_kind -> a -> Term.message list = function
+    | Local_t -> term_get_terms
+    | Global_t -> get_terms
+    | Any_t -> PreAny.get_terms
+
+  let pp : type a. a f_kind -> Format.formatter -> a -> unit = function
+    | Local_t -> Term.pp
+    | Global_t -> pp
+    | Any_t -> PreAny.pp
+
+end
+
+module Any = struct
+
+  include PreAny
+
+  let convert_from k f =
+    Babel.convert ~src:k ~dst:Any_t f
+
+  let convert_to ?loc k f =
+    Babel.convert ?loc ~dst:k ~src:Any_t f
 
 end

@@ -1,8 +1,5 @@
 open Utils
 
-module L = Location
-module Sv = Vars.Sv
-
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
@@ -217,9 +214,14 @@ module Mk (S : LowSequent.S) = struct
       Equiv.Atom (Equiv.Equiv e)
 
   (** We need type introspection there *)
-  let reduce (param : red_param) s (t : S.form) : S.form = 
-    match S.s_kind with
-    | LowSequent.KEquiv -> reduce_equiv param s t
-    | LowSequent.KReach -> reduce_term  param s t
+  let reduce : type a. red_param -> S.t -> a Equiv.f_kind -> a -> a
+   = fun param s k x ->
+    match k with
+    | Local_t  -> reduce_term  param s x
+    | Global_t -> reduce_equiv param s x
+    | Any_t ->
+       match x with
+         | `Reach x -> `Reach (reduce_term param  s x)
+         | `Equiv x -> `Equiv (reduce_equiv param s x)
 
 end

@@ -13,14 +13,11 @@ module SE = SystemExpr
 open LowTactics
 
 module ES = EquivSequent
-module TS = TraceSequent
-
 module Hyps = ES.Hyps
-
 type tac = ES.t Tactics.tac
+type sequent = ES.sequent
 
 type lsymb = Theory.lsymb
-type sequent = ES.sequent
 
 module LT = LowTactics.LowTac(EquivSequent)
 

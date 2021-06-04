@@ -1,11 +1,17 @@
-type lsymb = Theory.lsymb
+(** Definition of a general sequent data-type,
+  * which covers both reachability and general sequents
+  * (and thus equivalence sequents).
+  *
+  * A sequent is made of:
+  * - a set of hypotheses;
+  * - a goal formula;
+  * - an environment containing the sequent free variables.
+  *
+  * The signature defined here does not include functionalities
+  * relying on the list of the already proved goals, to avoid
+  * any dependency on {!Prover}. Such functionalities will be
+  * added in {!Sequent}. *)
 
-(*------------------------------------------------------------------*)
-type _ s_kind =
-  | KReach : Term.message s_kind
-  | KEquiv :   Equiv.form s_kind
-
-(*------------------------------------------------------------------*)
 (** {2 Module type for sequents} *)
 
 module type S = sig
@@ -16,24 +22,37 @@ module type S = sig
 
   val pp : Format.formatter -> t -> unit
 
-  type form
+  (*------------------------------------------------------------------*)
 
-  val pp_form : Format.formatter -> form -> unit
+  (** Type of formulas used for sequent hypotheses. *)
+  type hyp_form
 
-  val s_kind : form s_kind
+  (** Type of formulas used for sequent conclusions. *)
+  type conc_form
 
-  module Hyps : Hyps.HypsSeq with type hyp = form and type sequent = t
+  (** The kinds of hypothesis and conclusion formulas. *)
 
-  val reach_to_form :                    Term.message -> form
-  val form_to_reach : ?loc:Location.t -> form -> Term.message
-  val gform_of_form : form -> Equiv.gform
+  val hyp_kind : hyp_form Equiv.f_kind
+  val conc_kind : conc_form Equiv.f_kind
+
+  (* val pp_hyp  : Format.formatter -> hyp_form  -> unit
+  val pp_conc : Format.formatter -> conc_form -> unit *)
+
+  (*------------------------------------------------------------------*)
+  module Hyps : Hyps.HypsSeq with type hyp = hyp_form and type sequent = t
+
+  (** {2 Access to sequent components}
+    *
+    * Each sequent consist of
+    * a system, table, environment, type variables,
+    * goal formula, and hypotheses. *)
 
   val env : t -> Vars.env
   val set_env : Vars.env -> t -> t
 
-  val goal : t -> form
-  val set_goal : form -> t -> t
-  val set_reach_goal : Term.message -> t -> t
+  val goal : t -> conc_form
+  val set_goal : conc_form -> t -> t
+  val set_reach_goal : Equiv.local_form -> t -> t
 
   val system : t -> SystemExpr.system_expr
   val set_system : SystemExpr.system_expr -> t -> t
@@ -43,9 +62,15 @@ module type S = sig
 
   val ty_vars : t -> Type.tvars
 
+  (** {2 Manipulation of bi-frame elements}
+    *
+    * These functionalities only make sense for equivalence sequents. *)
+
   val mem_felem    : int -> t -> bool
   val change_felem : int -> Term.message list -> t -> t
   val get_felem    : int -> t -> Term.message
+
+  (** {2 Automated reasoning} *)
 
   val query_happens : precise:bool -> t -> Term.timestamp -> bool
 
@@ -55,20 +80,35 @@ module type S = sig
 
   val get_hint_db : t -> Hint.hint_db
 
+  (** [get_models s] returns a set of minimal models corresponding to the
+    * trace atoms in the sequent [s].
+    * See module {!Constr}.
+    * @raise Tactics.Tactic_hard_failure
+    *        with parameter {!Tactics.TacTimeout} in case of timeout. *)
   val get_models : t -> Constr.models
 
-  val subst     : Term.subst ->   t ->   t
-  val subst_hyp : Term.subst -> form -> form
+  (** {2 Substitution} *)
 
-  val fv_form : form -> Vars.Sv.t
-  val fv      : t    -> Vars.Sv.t
+  (** [subst subst s] returns the sequent [s] where the substitution has
+      been applied to all hypotheses and the goal.
+      It removes trivial equalities (e.g x=x). *)
+  val subst      : Term.subst -> t -> t
 
-  val get_terms : form -> Term.message list
+  (** {2 Free variables} *)
 
-  val map : (form -> form) -> t -> t
+  val fv : t -> Vars.Sv.t
 
-  module Match : Term.MatchS with type t = form
+  (** {2 Misc} *)
 
-  module Smart : Term.SmartFO with type form = form
+  val map : Equiv.Babel.mapper -> t -> t
+
+  (** Matching. *)
+  module Match : Term.MatchS with type t = conc_form
+
+  (** Smart constructors and destructors for hypotheses. *)
+  module Hyp : Term.SmartFO with type form = hyp_form
+
+  (** Smart constructors and destructors for conclusions. *)
+  module Conc : Term.SmartFO with type form = conc_form
 
 end

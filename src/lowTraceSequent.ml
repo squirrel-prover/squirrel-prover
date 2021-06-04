@@ -1,15 +1,12 @@
-open Utils
+module List = Utils.List
 
 module Args = TacticsArgs
 
-module L = Location
-module T = Tactics
+type hyp_form = Term.message
+type conc_form = Term.message
 
-type lsymb = Theory.lsymb
-
-type form = Term.message
-
-let s_kind = LowSequent.KReach
+let hyp_kind = Equiv.Local_t
+let conc_kind = Equiv.Local_t
 
 let pp_form = Term.pp
 
@@ -155,7 +152,7 @@ let pp ppf s =
   H.pps ppf s.hyps ;
 
   (* Print separation between hyps and conclusion *)
-  styled `Bold ident ppf (String.make 40 '-') ;
+  styled `Bold Utils.ident ppf (String.make 40 '-') ;
   (* Print conclusion formula and close box. *)
   pf ppf "@;%a@]" Term.pp s.conclusion
 
@@ -220,7 +217,7 @@ let get_eq_atoms (s : sequent) : Term.eq_atom list =
 (*------------------------------------------------------------------*)
 (** Prepare constraints or TRS query *)
 
-let get_models_t s : Constr.models timeout_r =
+let get_models_t s : Constr.models Utils.timeout_r =
   let trace_literals = get_trace_literals s in
   Constr.models_conjunct trace_literals 
 
@@ -278,7 +275,7 @@ module Hyps
   let fresh_id ?(approx=false) name s =
     let id = H.fresh_id name s.hyps in
     if (not approx) && Ident.name id <> name && name <> "_"
-    then Tactics.soft_failure (T.HypAlreadyExists name)
+    then Tactics.soft_failure (Tactics.HypAlreadyExists name)
     else id
 
   let fresh_ids ?(approx=false) names s =
@@ -288,7 +285,7 @@ module Hyps
       begin
         List.iter2 (fun id name ->
             if Ident.name id <> name && name <> "_"
-            then Tactics.soft_failure (T.HypAlreadyExists name)
+            then Tactics.soft_failure (Tactics.HypAlreadyExists name)
           ) ids names;
         ids
       end
@@ -505,7 +502,7 @@ let get_eqs_neqs s =
 
     ) ([],[]) (get_eq_atoms s)
 
-let get_trs_t s : Completion.state timeout_r =
+let get_trs_t s : Completion.state Utils.timeout_r =
   let eqs,_ = get_eqs_neqs s in
   Completion.complete s.table eqs 
 
@@ -548,10 +545,12 @@ let change_felem _ _ _ = assert false
 let get_felem _ _ = assert false
 
 (*------------------------------------------------------------------*)
-let map f s : sequent = set_goal (f (goal s)) (Hyps.map f s)
+let map f s : sequent =
+  let f x = f.Equiv.Babel.call Equiv.Local_t x in
+  set_goal (f (goal s)) (Hyps.map f s)
 
 (*------------------------------------------------------------------*)
-let fv_form (f : form) = Term.fv f
+let fv_form (f : Term.message) = Term.fv f
 
 (*------------------------------------------------------------------*)
 let fv s : Vars.Sv.t = 
@@ -564,6 +563,5 @@ let fv s : Vars.Sv.t =
 
 (*------------------------------------------------------------------*)
 module Match = Term.Match
-
-(*------------------------------------------------------------------*)
-module Smart = Term.Smart
+module Conc  = Term.Smart
+module Hyp   = Term.Smart
