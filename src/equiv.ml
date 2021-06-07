@@ -698,4 +698,187 @@ module Any = struct
   let convert_to ?loc k f =
     Babel.convert ?loc ~dst:k ~src:Any_t f
 
+  module Smart = struct
+    type form = any_form
+
+    let mk_true = `Reach Term.mk_true
+    let mk_false = `Reach Term.mk_false
+
+    let mk_not ?simpl f =
+      match f with
+        | `Reach f -> `Reach (Term.Smart.mk_not ?simpl f)
+        | `Equiv f -> `Equiv (Smart.mk_not ?simpl f)
+
+    let mk_and ?simpl f g =
+      match f,g with
+        | `Reach f, `Reach g -> `Reach (Term.Smart.mk_and ?simpl f g)
+        | `Equiv f, `Equiv g -> `Equiv (Smart.mk_and ?simpl f g)
+        | _ -> assert false
+    let mk_or ?simpl f g =
+      match f,g with
+        | `Reach f, `Reach g -> `Reach (Term.Smart.mk_or ?simpl f g)
+        | `Equiv f, `Equiv g -> `Equiv (Smart.mk_or ?simpl f g)
+        | _ -> assert false
+    let mk_impl ?simpl f g : any_form =
+      match f,g with
+        | `Reach f, `Reach g -> `Reach (Term.Smart.mk_impl ?simpl f g)
+        | `Equiv f, `Equiv g -> `Equiv (Smart.mk_impl ?simpl f g)
+        | _ -> assert false
+
+    let mk_ands ?simpl = function
+      | [] -> `Reach (Term.Smart.mk_ands ?simpl [])
+      | (`Reach _ :: _) as l ->
+          let l = List.map (function `Reach f -> f | _ -> assert false) l in
+          `Reach (Term.Smart.mk_ands ?simpl l)
+      | (`Equiv _ :: _) as l ->
+          let l = List.map (function `Equiv f -> f | _ -> assert false) l in
+          `Equiv (Smart.mk_ands ?simpl l)
+    let mk_ors ?simpl = function
+      | [] -> `Reach (Term.Smart.mk_ors ?simpl [])
+      | (`Reach _ :: _) as l ->
+          let l = List.map (function `Reach f -> f | _ -> assert false) l in
+          `Reach (Term.Smart.mk_ors ?simpl l)
+      | (`Equiv _ :: _) as l ->
+          let l = List.map (function `Equiv f -> f | _ -> assert false) l in
+          `Equiv (Smart.mk_ors ?simpl l)
+    let mk_impls ?simpl l f = match l,f with
+      | [],`Reach f -> `Reach (Term.Smart.mk_impls ?simpl [] f)
+      | [],`Equiv f -> `Equiv (Smart.mk_impls ?simpl [] f)
+      | (`Reach _ :: _) as l, `Reach f ->
+          let l = List.map (function `Reach f -> f | _ -> assert false) l in
+          `Reach (Term.Smart.mk_impls ?simpl l f)
+      | (`Equiv _ :: _) as l, `Equiv f ->
+          let l = List.map (function `Equiv f -> f | _ -> assert false) l in
+          `Equiv (Smart.mk_impls ?simpl l f)
+      | _ -> assert false
+
+    let mk_forall ?simpl vs = function
+      | `Reach f -> `Reach (Term.Smart.mk_forall ?simpl vs f)
+      | `Equiv f -> `Equiv (Smart.mk_forall ?simpl vs f)
+    let mk_exists ?simpl vs = function
+      | `Reach f -> `Reach (Term.Smart.mk_exists ?simpl vs f)
+      | `Equiv f -> `Equiv (Smart.mk_exists ?simpl vs f)
+
+    let destr_forall = function
+      | `Reach f -> omap (fun (vs,f) -> vs,`Reach f) (Term.Smart.destr_forall f)
+      | `Equiv f -> omap (fun (vs,f) -> vs,`Equiv f) (Smart.destr_forall f)
+    let destr_exists = function
+      | `Reach f -> omap (fun (vs,f) -> vs,`Reach f) (Term.Smart.destr_exists f)
+      | `Equiv f -> omap (fun (vs,f) -> vs,`Equiv f) (Smart.destr_exists f)
+
+    let destr_false = function
+      | `Reach f -> Term.Smart.destr_false f
+      | `Equiv f -> Smart.destr_false f
+    let destr_true = function
+      | `Reach f -> Term.Smart.destr_true f
+      | `Equiv f -> Smart.destr_true f
+
+    let destr_not = function
+      | `Reach f -> omap (fun f -> `Reach f) (Term.Smart.destr_not f)
+      | `Equiv f -> omap (fun f -> `Equiv f) (Smart.destr_not f)
+
+    let destr_and = function
+      | `Reach f ->
+          omap (fun (x,y) -> `Reach x, `Reach y) (Term.Smart.destr_and f)
+      | `Equiv f ->
+          omap (fun (x,y) -> `Equiv x, `Equiv y) (Smart.destr_and f)
+    let destr_or = function
+      | `Reach f ->
+          omap (fun (x,y) -> `Reach x, `Reach y) (Term.Smart.destr_or f)
+      | `Equiv f ->
+          omap (fun (x,y) -> `Equiv x, `Equiv y) (Smart.destr_or f)
+    let destr_impl = function
+      | `Reach f ->
+          omap (fun (x,y) -> `Reach x, `Reach y) (Term.Smart.destr_impl f)
+      | `Equiv f ->
+          omap (fun (x,y) -> `Equiv x, `Equiv y) (Smart.destr_impl f)
+
+    let is_false = function
+      | `Reach f -> Term.Smart.is_false f
+      | `Equiv f -> Smart.is_false f
+    let is_true = function
+      | `Reach f -> Term.Smart.is_true f
+      | `Equiv f -> Smart.is_true f
+    let is_not = function
+      | `Reach f -> Term.Smart.is_not f
+      | `Equiv f -> Smart.is_not f
+    let is_and = function
+      | `Reach f -> Term.Smart.is_and f
+      | `Equiv f -> Smart.is_and f
+    let is_or = function
+      | `Reach f -> Term.Smart.is_or f
+      | `Equiv f -> Smart.is_or f
+    let is_impl = function
+      | `Reach f -> Term.Smart.is_impl f
+      | `Equiv f -> Smart.is_impl f
+    let is_forall = function
+      | `Reach f -> Term.Smart.is_forall f
+      | `Equiv f -> Smart.is_forall f
+    let is_exists = function
+      | `Reach f -> Term.Smart.is_exists f
+      | `Equiv f -> Smart.is_exists f
+    let is_matom = function
+      | `Reach f -> Term.Smart.is_matom f
+      | `Equiv f -> Smart.is_matom f
+
+    let destr_ands i = function
+      | `Reach f ->
+          omap (fun l -> List.map (fun x -> `Reach x) l)
+            (Term.Smart.destr_ands i f)
+      | `Equiv f ->
+          omap (fun l -> List.map (fun x -> `Equiv x) l)
+            (Smart.destr_ands i f)
+    let destr_ors i = function
+      | `Reach f ->
+          omap (fun l -> List.map (fun x -> `Reach x) l)
+            (Term.Smart.destr_ors i f)
+      | `Equiv f ->
+          omap (fun l -> List.map (fun x -> `Equiv x) l)
+            (Smart.destr_ors i f)
+    let destr_impls i = function
+      | `Reach f ->
+          omap (fun l -> List.map (fun x -> `Reach x) l)
+            (Term.Smart.destr_impls i f)
+      | `Equiv f ->
+          omap (fun l -> List.map (fun x -> `Equiv x) l)
+            (Smart.destr_impls i f)
+
+    let destr_matom = function
+      | `Reach f -> Term.Smart.destr_matom f
+      | `Equiv f -> Smart.destr_matom f
+
+    let decompose_forall = function
+      | `Reach f ->
+          let vs,f = Term.Smart.decompose_forall f in
+            vs, `Reach f
+      | `Equiv f ->
+          let vs,f = Smart.decompose_forall f in
+            vs, `Equiv f
+    let decompose_exists = function
+      | `Reach f ->
+          let vs,f = Term.Smart.decompose_exists f in
+            vs, `Reach f
+      | `Equiv f ->
+          let vs,f = Smart.decompose_exists f in
+            vs, `Equiv f
+
+    let decompose_ands = function
+      | `Reach f -> List.map (fun x -> `Reach x) (Term.Smart.decompose_ands f)
+      | `Equiv f -> List.map (fun x -> `Equiv x) (Smart.decompose_ands f)
+    let decompose_ors = function
+      | `Reach f -> List.map (fun x -> `Reach x) (Term.Smart.decompose_ors f)
+      | `Equiv f -> List.map (fun x -> `Equiv x) (Smart.decompose_ors f)
+    let decompose_impls = function
+      | `Reach f -> List.map (fun x -> `Reach x) (Term.Smart.decompose_impls f)
+      | `Equiv f -> List.map (fun x -> `Equiv x) (Smart.decompose_impls f)
+
+    let decompose_impls_last = function
+      | `Reach f ->
+          let l,f = Term.Smart.decompose_impls_last f in
+            List.map (fun x -> `Reach x) l, `Reach f
+      | `Equiv f ->
+          let l,f = Smart.decompose_impls_last f in
+            List.map (fun x -> `Equiv x) l, `Equiv f
+  end
+
 end

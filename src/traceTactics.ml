@@ -16,7 +16,7 @@ open LowTactics
 
 module TS = TraceSequent
 
-module Hyps = TS.Hyps
+module Hyps = TS.LocalHyps
 
 type tac = TS.t Tactics.tac
 type lsymb = Theory.lsymb
@@ -1362,13 +1362,8 @@ let project s =
     soft_failure (Tactics.Failure "goal already deals with a \
                                            single process")
   | _ ->
-    let s1 = TS.set_system
-        SystemExpr.(project_system PLeft  system) s in
-    let s2 = TS.set_system
-        SystemExpr.(project_system PRight system) s in
-    let s1 = TS.pi PLeft s1 in
-    let s2 = TS.pi PRight s2 in
-    [s1;s2]
+    [TS.pi PLeft s;
+     TS.pi PRight s]
 
 let () =
   T.register "project"

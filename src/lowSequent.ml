@@ -52,7 +52,6 @@ module type S = sig
 
   val goal : t -> conc_form
   val set_goal : conc_form -> t -> t
-  val set_reach_goal : Equiv.local_form -> t -> t
 
   val system : t -> SystemExpr.system_expr
   val set_system : SystemExpr.system_expr -> t -> t

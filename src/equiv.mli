@@ -86,8 +86,10 @@ type _ f_kind =
 
 module Any : sig
   type t = any_form
+
   val pp : Format.formatter -> t -> unit
   val subst : Term.subst -> t -> t
+  val fv : t -> Vars.Sv.t
 
   (** Convert any formula kind to [any_form]. *)
   val convert_from : 'a f_kind -> 'a -> any_form
@@ -96,6 +98,8 @@ module Any : sig
     * Issue a soft failure (with the provided location, if any)
     * when the input formula is not of the right kind. *)
   val convert_to : ?loc:Location.t -> 'a f_kind -> any_form -> 'a
+
+  module Smart : Term.SmartFO with type form = any_form
 end
 
 (** Conversions between formula kinds and generic functionalities
@@ -117,5 +121,4 @@ module Match : Term.MatchS with type t = form
 
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructots} *)
-type _form = form
-module Smart : Term.SmartFO with type form = _form
+module Smart : Term.SmartFO with type form = global_form

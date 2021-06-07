@@ -155,7 +155,6 @@ module Hyps
       | Args.Named s  -> true, false, s 
       | Args.Approx s -> true, true, s 
     in
-
     let id = fresh_id ~approx name s in
     
     add_formula ~force id f s
@@ -220,8 +219,6 @@ let subst subst s =
   { s with goal = Equiv.subst subst s.goal;
            hyps = subst_hyps subst s.hyps; }
 
-let subst_hyp subst f = Equiv.subst subst f
-
 (*------------------------------------------------------------------*)
 let goal_is_equiv s = match goal s with
   | Atom (Equiv.Equiv e) -> true
@@ -233,15 +230,6 @@ let goal_as_equiv s = match goal s with
     Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
       
 let set_reach_goal f s = set_goal Equiv.(Atom (Reach f)) s
-
-let reach_to_form t = Equiv.Atom (Equiv.Reach t)
-let gform_of_form f = `Equiv f
-
-let form_to_reach ?loc (e : Equiv.form) = 
-  match e with
-  | Equiv.Atom (Equiv.Reach f) -> f
-  | _ ->     
-    Tactics.soft_failure ?loc (Tactics.Failure "expected a reachability formula")
 
 (*------------------------------------------------------------------*)
 let to_trace_sequent s =
@@ -260,12 +248,14 @@ let to_trace_sequent s =
 
   let trace_s = TS.init ~system ~table ~hint_db ~ty_vars ~env ~goal in
   
-  (* We add all relevant hypotheses *)
-  Hyps.fold (fun id hyp trace_s -> match hyp with
+  (* Add all relevant hypotheses. *)
+  Hyps.fold
+    (fun id hyp trace_s -> match hyp with
       | Equiv.Atom (Equiv.Reach h) -> 
-        TS.Hyps.add (Args.Named (Ident.name id)) h trace_s
-      | _ -> trace_s
-    ) s trace_s 
+        TS.LocalHyps.add (Args.Named (Ident.name id)) h trace_s
+      | h ->
+        TS.Hyps.add (Args.Named (Ident.name id)) (`Equiv h) trace_s)
+    s trace_s
 
 (*------------------------------------------------------------------*)
 let get_trace_literals s = 

@@ -2,16 +2,24 @@
   *
   * This module implements {!LowSequent.S} with [type form = Term.message]. *)
 
+type trace_sequent
+
+(** Wrapper for manipulating local hypotheses only. *)
+module LocalHyps : Hyps.HypsSeq
+  with type hyp = Equiv.local_form
+   and type sequent = trace_sequent
+
 (*------------------------------------------------------------------*)  
-include LowSequent.S with
-  type  hyp_form = Equiv.local_form and
-  type conc_form = Equiv.local_form
+include LowSequent.S
+  with type hyp_form = Equiv.any_form
+   and type conc_form = Equiv.local_form
+   and type t = trace_sequent
 
 (*------------------------------------------------------------------*)
 (** {2 Sequent type and basic operations} *)
 
-val init : 
-  system:SystemExpr.system_expr -> 
+val init :
+  system:SystemExpr.system_expr ->
   table:Symbols.table ->
   hint_db:Hint.hint_db ->
   ty_vars:Type.tvars ->
@@ -25,7 +33,10 @@ val init :
 val pi : Term.projection -> sequent -> sequent
  
 (*------------------------------------------------------------------*)
-(** {2 Automated reasoning} *)
+(** {2 Automated reasoning}
+  *
+  * All these functions only consider local formula hypotheses.
+  * It could make sense to extend some of them in the future. *)
 
 (** [get_trs s] returns a term rewriting system that corresponds to the set of
     equalities between messages. It can be used to check if an equality is
@@ -68,10 +79,6 @@ val maximal_elems :
   precise:bool -> sequent -> Term.timestamp list -> 
   Term.timestamp list 
 
-
-(*------------------------------------------------------------------*)
-(** {2 Misc} *)
-
-(** [get_all_terms s] returns all the messages appearing at toplevel
+(** [get_all_messages s] returns all the messages appearing at toplevel
   * in [s]. *)
 val get_all_messages : sequent -> Term.message list

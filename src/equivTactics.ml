@@ -347,10 +347,10 @@ let () =
 (*------------------------------------------------------------------*)
 (** [generalize ts s] reverts all hypotheses that talk about [ts] in [s],
     by introducing them in the goal.
-    Also returns a function that introduce back the generalized hypothesis.*)
+    Also returns a function that introduces back the generalized hypothesis.*)
 let generalize (ts : Term.timestamp) s =
   let ts = match ts with
-    | Var t -> (Vars.EVar t)
+    | Var t -> Vars.EVar t
     | _ -> hard_failure (Failure "timestamp is not a var") in
 
   let gen_hyps = Hyps.fold (fun id f gen_hyps ->
@@ -359,10 +359,10 @@ let generalize (ts : Term.timestamp) s =
       else gen_hyps
     ) s [] in
 
-  (* generalized sequent *)
+  (* Generalized sequent *)
   let s = List.fold_left (fun s id -> LT.revert id s) s gen_hyps in
 
-  (* function introducing back generalized hypotheses *)
+  (* Function introducing back generalized hypotheses *)
   let intro_back s =
     let ips = List.rev_map (fun id ->
         let ip = Args.Named (Ident.name id) in
@@ -395,11 +395,10 @@ let induction Args.(Timestamp ts) s =
     let goal = ES.goal s in
 
     let ind_hyp = Equiv.subst subst goal in
-    let id_ind, induc_s = Hyps.add_i Args.Unnamed ind_hyp s in
-    (* intro back generalized hyps *)
-    let induc_s = intro_back induc_s in
-    (* rename the inducition hypothesis *)
-    let induc_s = LT.do_naming_pat (`Hyp id_ind) Args.AnyName induc_s in
+    (* Introduce back generalized hypotheses. *)
+    let induc_s = intro_back s in
+    (* Introduce induction hypothesis. *)
+    let id_ind, induc_s = Hyps.add_i (Args.Named "IH") ind_hyp induc_s in
 
     let init_goal = Equiv.subst [Term.ESubst(ts,Term.init)] goal in
     let init_s = ES.set_goal init_goal s in

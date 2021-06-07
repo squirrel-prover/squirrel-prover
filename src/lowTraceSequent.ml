@@ -2,10 +2,10 @@ module List = Utils.List
 
 module Args = TacticsArgs
 
-type hyp_form = Term.message
-type conc_form = Term.message
+type hyp_form = Equiv.any_form
+type conc_form = Equiv.local_form
 
-let hyp_kind = Equiv.Local_t
+let hyp_kind = Equiv.Any_t
 let conc_kind = Equiv.Local_t
 
 let pp_form = Term.pp
@@ -27,8 +27,10 @@ let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
 
 (** Chooses a name for a formula, depending on an old name (if any), and the
     formula shape. *)
-let choose_name f = match f with
-  | Term.Atom at ->
+let choose_name = function
+  | `Equiv _ -> "G"
+  | `Reach (Term.Atom at) ->
+
     let sort = match at with
       | `Timestamp _ -> "C"
       | `Message _ -> "M"
@@ -50,10 +52,9 @@ let choose_name f = match f with
 
 (*------------------------------------------------------------------*)
 module FHyp = struct
-  type t = Term.message
-  let pp_hyp fmt f = Term.pp fmt f
-
-  let htrue = Term.mk_true
+  type t = hyp_form
+  let pp_hyp = Equiv.Any.pp
+  let htrue = `Reach Term.mk_true
 end
 
 module H = Hyps.Mk(FHyp)
@@ -158,14 +159,24 @@ let pp ppf s =
 
 
 (*------------------------------------------------------------------*)
+(** Collect specific local hypotheses *)
+
 let get_atoms (s : sequent) : Term.literal list =
-  let hyps = H.fold (fun _ f acc -> Term.decompose_ands f @ acc) s.hyps [] in
-  List.fold_left (fun atoms hyp -> match hyp with 
-      | Term.Atom at -> (`Pos, at) :: atoms
-      | _ -> match Term.destr_not hyp with
-        | Some (Term.Atom at) -> (`Neg, at) :: atoms
-        | _ -> atoms
-    ) [] hyps 
+  H.fold
+    (fun _ f acc ->
+       match f with
+         | `Equiv _ -> acc
+         | `Reach f ->
+             List.fold_left
+               (fun acc -> function
+                  | Term.Atom at -> (`Pos,at) :: acc
+                  | hyp ->
+                      match Term.destr_not hyp with
+                        | Some (Term.Atom at) -> (`Neg,at) :: acc
+                        | _ -> acc)
+               acc
+               (Term.decompose_ands f))
+    s.hyps []
 
 let get_message_atoms (s : sequent) : Term.message_atom list =
   let do1 (at : Term.literal) : Term.message_atom option =
@@ -213,6 +224,14 @@ let get_eq_atoms (s : sequent) : Term.eq_atom list =
   in
   List.filter_map do1 (get_atoms s) 
 
+let get_all_messages s =
+  let atoms = get_message_atoms s in
+  let atoms =
+    match s.conclusion with
+      | Term.Atom (`Message _ as atom) -> atom :: atoms
+      | _ -> atoms
+  in
+  List.fold_left (fun acc (`Message (_,a,b)) -> a :: b :: acc) [] atoms
 
 (*------------------------------------------------------------------*)
 (** Prepare constraints or TRS query *)
@@ -249,23 +268,12 @@ let constraints_valid s =
   let models = get_models s in
   not (Constr.m_is_sat models)
 
-(*------------------------------------------------------------------*)
-let get_all_messages s =
-  let atoms = get_message_atoms s in
-  let atoms =
-    match s.conclusion with
-      | Term.Atom (`Message _ as atom) -> atom :: atoms
-      | _ -> atoms
-  in
-  List.fold_left (fun acc (`Message (_,a,b)) -> a :: b :: acc) [] atoms
-
 (*------------------------------------------------------------------*)  
-module Hyps 
-  (* : Hyps.HypsSeq with type hyp = Term.message and type sequent = t *)
-= struct
+module Hyps = struct
+
   type sequent = t
 
-  type hyp = Term.message
+  type hyp = Equiv.any_form
 
   type ldecl = Ident.t * hyp
 
@@ -352,13 +360,14 @@ module Hyps
 
   and add_form_aux
       ?(force=false) (id : Ident.t option) (s : sequent) (f : Term.message) =
-    let recurse = (not (H.is_hyp f s.hyps)) && (Config.auto_intro ()) in
+    let recurse =
+      (not (H.is_hyp (`Reach f) s.hyps)) && (Config.auto_intro ()) in
 
     let id = match id with       
       | None -> H.fresh_id "D" s.hyps
       | Some id -> id in
 
-    let id, hyps = H.add ~force id f s.hyps in
+    let id, hyps = H.add ~force id (`Reach f) s.hyps in
     let s = S.update ~hyps s in
     
     (* [recurse] boolean to avoid looping *)
@@ -368,14 +377,14 @@ module Hyps
 
   let add_happens ?(force=false) id (s : sequent) ts =
     let f = Term.Atom (`Happens ts :> Term.generic_atom) in
-    let id, hyps = H.add ~force id f s.hyps in
+    let id, hyps = H.add ~force id (`Reach f) s.hyps in
     let s = S.update ~hyps s in
     id, s
 
   (** if [force], we add the formula to [Hyps] even if it already exists. *)
   let add_formula ?(force=false) id f (s : sequent) =
     match f with
-    | Term.Atom (`Happens ts)        -> add_happens ~force id s ts
+    | Term.Atom (`Happens ts) -> add_happens ~force id s ts
     | _ -> add_form_aux ~force (Some id) s f
 
   let add_i npat f s =
@@ -385,10 +394,12 @@ module Hyps
       | Args.Named s  -> true, false, s 
       | Args.Approx s -> true, true, s 
     in
-
     let id = fresh_id ~approx name s in
-    
-    add_formula ~force id f s
+    match f with
+      | `Reach f -> add_formula ~force id f s
+      | _ ->
+         let id,hyps = H.add ~force id f s.hyps in
+         id, S.update ~hyps s
 
   let add npat f s = snd (add_i npat f s)
 
@@ -413,14 +424,25 @@ module Hyps
      unrolled. *)
   (* FIXME: this seems very ineficient *)
   let reload s =
-    H.fold (fun id f s ->
-        let s = remove id s in        
-        snd (add_formula ~force:true id f s)) s.hyps s
+    H.fold
+      (fun id f s ->
+        let s = remove id s in
+        match f with
+          | `Reach f ->
+              snd (add_formula ~force:true id f s)
+          | _ ->
+              let _,hyps = H.add ~force:true id f s.hyps in
+              S.update ~hyps s)
+      s.hyps s
 
   (*------------------------------------------------------------------*)
-  let clear_triv s = 
+  let clear_triv s =
     let s = reload s in
-    S.update ~hyps:(H.filter (fun _ f -> not (Term.f_triv f)) s.hyps) s
+    let not_triv _ = function
+      | `Reach f -> not (Term.f_triv f)
+      | _ -> true
+    in
+    S.update ~hyps:(H.filter not_triv s.hyps) s
 
   let pp fmt s = H.pps fmt s.hyps
   let pp_dbg fmt s = H.pps ~dbg:true fmt s.hyps
@@ -442,20 +464,33 @@ let filter_map_hyps func hyps =
   H.map (fun f -> func f) hyps
     
 (*------------------------------------------------------------------*)
+(** [pi proj s] returns the projection of [s] along [proj].
+  *
+  * This is useful only when the two projections of the bi-system are
+  * different. In that case, global formulas cannot be kept in the
+  * projection: this will probably become possible in the future, but
+  * will require explicit (bi)system annotations for global hypotheses. *)
 let pi projection s =
-  let pi_term t = Term.pi_term ~projection t in
-
-  let hyps = filter_map_hyps pi_term s.hyps in
-  let s = 
+  let pi = function
+    | `Reach t -> `Reach (Term.pi_term ~projection t)
+    | h -> h
+  in
+  let hyps = filter_map_hyps pi s.hyps in
+  let s =
   S.update
-    ~conclusion:(pi_term s.conclusion)
+    ~system:(SystemExpr.project_system projection (system s))
+    ~conclusion:(Term.pi_term ~projection s.conclusion)
     ~hyps:H.empty
     s in
-
-  (* We add back manually all formulas, to ensure that definitions are 
+  (* We add back manually all formulas, to ensure that definitions are
      unrolled. *)
-  H.fold (fun id f s -> snd (Hyps.add_formula id f s)) hyps s
-  
+  H.fold
+    (fun id f s ->
+       match f with
+         | `Reach f -> snd (Hyps.add_formula id f s)
+         | `Equiv _ -> s)
+    hyps s
+
 let set_goal a s =
   let s = S.update ~conclusion:a s in
     match a with
@@ -471,7 +506,7 @@ let goal s = s.conclusion
 (*------------------------------------------------------------------*)
 let subst subst s =
   if subst = [] then s else
-    let hyps = filter_map_hyps (Term.subst subst) s.hyps in
+    let hyps = filter_map_hyps (Equiv.Any.subst subst) s.hyps in
     let s =
       S.update
         ~hyps:hyps
@@ -479,11 +514,6 @@ let subst subst s =
         s in
 
     Hyps.reload s
-
-let subst_hyp subst t = Term.subst subst t
-
-(*------------------------------------------------------------------*)
-let get_terms t = [t]
 
 (*------------------------------------------------------------------*)
 (** TRS *)
@@ -531,12 +561,6 @@ let mk_trace_cntxt s =
     models = Some (get_models s);
   }
 
-let set_reach_goal t s = set_goal t s
-
-let reach_to_form t = t
-let form_to_reach ?loc t = t
-let gform_of_form f = `Reach f
-
 let get_hint_db s = s.hint_db
 
 (*------------------------------------------------------------------*)
@@ -546,22 +570,92 @@ let get_felem _ _ = assert false
 
 (*------------------------------------------------------------------*)
 let map f s : sequent =
-  let f x = f.Equiv.Babel.call Equiv.Local_t x in
-  set_goal (f (goal s)) (Hyps.map f s)
-
-(*------------------------------------------------------------------*)
-let fv_form (f : Term.message) = Term.fv f
+  let f' x = f.Equiv.Babel.call Equiv.Any_t x in
+  set_goal (f.Equiv.Babel.call Equiv.Local_t (goal s)) (Hyps.map f' s)
 
 (*------------------------------------------------------------------*)
 let fv s : Vars.Sv.t = 
   let h_vars = 
     Hyps.fold (fun _ f vars -> 
-        Vars.Sv.union (fv_form f) vars
+        Vars.Sv.union (Equiv.Any.fv f) vars
       ) s Vars.Sv.empty
   in
-  Vars.Sv.union h_vars (fv_form (goal s))
+  Vars.Sv.union h_vars (Term.fv (goal s))
 
 (*------------------------------------------------------------------*)
 module Match = Term.Match
 module Conc  = Term.Smart
-module Hyp   = Term.Smart
+module Hyp   = Equiv.Any.Smart
+
+type trace_sequent = t
+
+module LocalHyps = struct
+  type hyp = Equiv.local_form
+  type ldecl = Ident.t * hyp
+  type sequent = trace_sequent
+
+  let (!!) = function
+    | `Reach h -> h
+    | `Equiv _ -> assert false
+
+  let add p h s = Hyps.add p (`Reach h) s
+  let add_i p h s = Hyps.add_i p (`Reach h) s
+  let add_i_list l s =
+    let l = List.map (fun (p,h) -> p,`Reach h) l in
+    Hyps.add_i_list l s
+  let add_list l s = snd (add_i_list l s)
+  let pp_hyp = Term.pp
+  let pp_ldecl ?dbg fmt (id,h) = Hyps.pp_ldecl ?dbg fmt (id,`Reach h)
+  let fresh_id = Hyps.fresh_id
+  let fresh_ids = Hyps.fresh_ids
+  let is_hyp h s = Hyps.is_hyp (`Reach h) s
+  let by_id id s = !!(Hyps.by_id id s)
+  let by_name name s =
+    let l,h = Hyps.by_name name s in
+    l,!!h
+  let mem_id = Hyps.mem_id
+  let mem_name = Hyps.mem_name
+  let to_list s =
+    List.filter_map
+      (function
+         | l, `Reach h -> Some (l,h)
+         | l, `Equiv _ -> None)
+      (Hyps.to_list s)
+  let find_opt f s =
+    let f id = function
+      | `Reach h -> f id h
+      | `Equiv _ -> false
+    in
+    match Hyps.find_opt f s with
+      | None -> None
+      | Some (id,`Reach h) -> Some (id,h)
+      | _ -> assert false
+  let find_map f s =
+    let f id = function
+      | `Reach h -> f id h
+      | `Equiv _ -> None
+    in
+    Hyps.find_map f s
+  let exists f s =
+    let f id = function
+      | `Reach h -> f id h
+      | `Equiv _ -> false
+    in
+    Hyps.exists f s
+  let map f s =
+    let f = function `Equiv h -> `Equiv h | `Reach h -> `Reach (f h) in
+    Hyps.map f s
+  let mapi f s =
+    let f i = function `Equiv h -> `Equiv h | `Reach h -> `Reach (f i h) in
+    Hyps.mapi f s
+  let remove = Hyps.remove
+  let fold f s =
+    let f id h acc = match h with
+      | `Equiv _ -> acc
+      | `Reach h -> f id h acc
+    in
+    Hyps.fold f s
+  let clear_triv = Hyps.clear_triv
+  let pp = Hyps.pp
+  let pp_dbg = Hyps.pp_dbg
+end
