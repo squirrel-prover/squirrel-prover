@@ -16,6 +16,9 @@ T -> R : h(ID)               if TS > TSlast
          TSlast := TS
 R -> T : h(ID,PIN)
          ID' := h(ID,PIN,TS)
+
+PROOFS
+- authentication (reader and tag)
 *******************************************************************************)
 
 set autoIntro = false.
@@ -77,29 +80,31 @@ process reader(jj:index) =
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
 
 goal auth_R1 :
-forall (jj,ii:index), happens(R1(jj,ii)) =>
-  (cond@R1(jj,ii)
-  =>
-  (exists (j:index), T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii))).
+forall (jj,ii:index), 
+  happens(R1(jj,ii)) =>
+    (cond@R1(jj,ii) =>
+      (exists (j:index), 
+        T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii))).
 Proof.
-intro jj ii Hap Hcond.
-expand cond@R1(jj,ii).
-euf Hcond.
-intro Ht Heq *.
-exists j.
-split; 1,2: by auto.
+  intro jj ii Hap Hcond.
+  expand cond@R1(jj,ii).
+  euf Hcond.
+  intro Ht Heq *.
+  exists j.
+  split; 1,2: by auto.
 Qed.
 
 goal auth_T1 :
-forall (i,j:index), happens(T1(i,j)) =>
-  (cond@T1(i,j)
-  =>
-  (exists (jj:index), R1(jj,i) < T1(i,j) && output@R1(jj,i) = input@T1(i,j))).
+forall (i,j:index), 
+  happens(T1(i,j)) =>
+    (cond@T1(i,j) =>
+      (exists (jj:index), 
+        R1(jj,i) < T1(i,j) && output@R1(jj,i) = input@T1(i,j))).
 Proof.
-intro i j Hap Hcond.
-expand cond@T1(i,j).
-euf Hcond.
-intro Ht Heq *.
-exists jj.
-split; 1,2: by auto.
+  intro i j Hap Hcond.
+  expand cond@T1(i,j).
+  euf Hcond.
+  intro Ht Heq *.
+  exists jj.
+  split; 1,2: by auto.
 Qed.

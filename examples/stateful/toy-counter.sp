@@ -17,7 +17,9 @@ P = ! A | ! B | out(d, 0) | ! in(d, i : nat); out(d, i)
 
 COMMENTS
 - In this model, we do not use private channels since actions (input/condition/
-   update/output) are atomic.
+  update/output) are atomic.
+- The goal is to prove that the secret s is never leaked because the B receives
+  only hashes with old values of the counter.
 
 PROOFS
 - monotonicity of the counter
@@ -74,43 +76,45 @@ axiom orderStrict : forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk.
 
 (* GOALS *)
 
-goal counterIncrease (t:timestamp): happens(t) => 
-    (t > init => order(d@pred(t),d@t) = orderOk).
+(* The counter increases strictly at each update. *)
+goal counterIncreasePred (t:timestamp): 
+  t > init => order(d@pred(t),d@t) = orderOk.
 Proof.
-intro Hap Hc.
-use orderSucc with d@pred(t).
-case t; 2,3,4: intro *; simpl_left; expand d@t; by congruence.
-by eqtrace.
+  intro Hc.
+  use orderSucc with d@pred(t).
+  case t; 2,3,4: intro *; simpl_left; expand d@t; by congruence.
+  by eqtrace.
 Qed.
 
-(* A more general result than counterIncrease *)
-goal counterIncreaseBis :
+(* A more general result than counterIncreasePred. *)
+goal counterIncrease :
   forall (t,t':timestamp), 
     (t' < t => order(d@t',d@t) = orderOk).
 Proof.
-induction.
-intro t Hind t' Ht.
-assert (t' < pred(t) || t' >= pred(t)) as H0; 1: by case t. 
-case H0.
+  induction.
+  intro t Hind t' Ht.
+  assert (t' < pred(t) || t' >= pred(t)) as H0; 1: by case t. 
+  case H0.
 
-  (* case t' < pred(t) *)
-  use Hind with pred(t),t' as H1; 2,3: by auto.
-  use counterIncrease with t; 2,3: by eqtrace.
-  by use orderTrans with d@t',d@pred(t),d@t.
+    (* case t' < pred(t) *)
+    use Hind with pred(t),t' as H1; 2,3: by eqtrace.
+    use counterIncreasePred with t; 2: by eqtrace.
+    by use orderTrans with d@t',d@pred(t),d@t.
 
-  (* case t' >= pred(t) *)
-  assert t' = pred(t). by eqtrace.
-  by use counterIncrease with t.
+    (* case t' >= pred(t) *)
+    assert t' = pred(t). by eqtrace.
+    by use counterIncreasePred with t.
 Qed.
 
-goal secretReach : forall (j:index), happens(B(j)) => (cond@B(j) => False).
+goal secretReach : 
+  forall (j:index), happens(B(j)) => (cond@B(j) => False).
 Proof.
-intro j Hap Hcond.
-expand cond@B(j).
-euf Hcond.
-intro Ht Heq.
-assert pred(A(i)) < pred(B(j)). by eqtrace.
-use counterIncreaseBis with pred(B(j)),pred(A(i)).
-use orderStrict with d@pred(A(i)),d@pred(B(j)); by congruence.
-by eqtrace.
+  intro j Hap Hcond.
+  expand cond@B(j).
+  euf Hcond.
+  intro Ht Heq.
+  assert pred(A(i)) < pred(B(j)). by eqtrace.
+  use counterIncrease with pred(B(j)),pred(A(i)).
+  use orderStrict with d@pred(A(i)),d@pred(B(j)); by congruence.
+  by eqtrace.
 Qed.
