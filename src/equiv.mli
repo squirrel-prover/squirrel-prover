@@ -65,6 +65,8 @@ val get_terms : form -> Term.message list
 
 val subst : Term.subst -> form -> form
 
+val tsubst : Type.tsubst -> form -> form
+  
 (** Free variables *)
 val fv : form -> Vars.Sv.t
 
@@ -114,10 +116,6 @@ module Babel : sig
   val get_terms : 'a f_kind -> 'a -> Term.message list
   val pp : 'a f_kind -> Format.formatter -> 'a -> unit
 end
-
-(*------------------------------------------------------------------*)
-(** {2 Matching} *)
-module Match : Term.MatchS with type t = form
 
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructots} *)

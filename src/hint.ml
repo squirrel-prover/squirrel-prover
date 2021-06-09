@@ -32,7 +32,7 @@ type p_hint =
   | Hint_rewrite of lsymb
 
 let add_hint_rewrite (s : lsymb) tyvars form db =
-  let pat = Term.pat_of_form form in
-  let pat = Term.{ pat with pat_tyvars = tyvars; } in      
+  let pat = Match.pat_of_form form in
+  let pat = Match.{ pat with pat_tyvars = tyvars; } in      
   let rule = Rewrite.pat_to_rw_erule ~loc:(L.loc s) `LeftToRight pat in
   { db_rewrite = add_rewrite_rule (L.unloc s, rule) db.db_rewrite; }

@@ -48,7 +48,8 @@ val ty : 'a var -> 'a Type.ty
 val norm_ty  : Type.Infer.env -> 'a var -> 'a var
 val enorm_ty : Type.Infer.env ->   evar ->   evar
 
-val tsubst : Type.tsubst -> 'a var -> 'a var
+val tsubst   : Type.tsubst -> 'a var -> 'a var
+val tsubst_e : Type.tsubst ->   evar ->   evar
 
 val kind : 'a var -> 'a Type.kind
 
@@ -62,6 +63,20 @@ val equal : 'a var -> 'b var -> bool
 (** Time-consistent: if [v] was created before [v'], then [compare v v' ≤ 0]. *)
 val compare : 'a var -> 'b var -> int
 
+
+(*------------------------------------------------------------------*)
+(** {2 Set and Maps} *)
+
+module Sv : sig 
+  include Set.S with type elt = evar
+
+  val add_list : t -> 'a var list -> t
+
+  val of_list1 : 'a var list -> t
+end
+
+module Mv : Map.S with type key = evar
+
 (*------------------------------------------------------------------*)
 (** {2 Environments} *)
 
@@ -74,8 +89,10 @@ val pp_env : Format.formatter -> env -> unit
 val empty_env : env
 
 val to_list : env -> evar list
+val to_set  : env -> Sv.t
 
 val of_list : evar list -> env
+val of_set  : Sv.t -> env
 
 val mem   : env -> 'a var -> bool
 val mem_e : env ->   evar -> bool
@@ -135,15 +152,4 @@ val fresh : env -> 'a var -> env * 'a var
 (** Stateful version of [refresh]. *)
 val fresh_r : env ref -> 'a var -> 'a var
 
-
-(*------------------------------------------------------------------*)
-(** {2 Set and Maps} *)
-
-module Sv : sig 
-  include Set.S with type elt = evar
-
-  val add_list : t -> 'a var list -> t
-end
-
-module Mv : Map.S with type key = evar
 

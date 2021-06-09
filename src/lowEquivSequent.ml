@@ -306,6 +306,9 @@ let fv s : Vars.Sv.t =
   Vars.Sv.union h_vars (Equiv.fv (goal s))
 
 (*------------------------------------------------------------------*)
-module Match = Equiv.Match
+module MatchF = Match.E
+
+(*------------------------------------------------------------------*)
 module Conc  = Equiv.Smart
 module Hyp   = Equiv.Smart
+

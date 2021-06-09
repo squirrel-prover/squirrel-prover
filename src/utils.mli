@@ -21,11 +21,6 @@ module List : sig
       Duplicates already in [l1] or [l2] may remains. *)
   val merge_uniq : ('a -> 'a -> int) -> 'a list -> 'a list -> 'a list
 
-  (** [split_pred f l] split [l] into the list of elements where [f] holds and
-      the list of elements where [f] does not hold, while respecting the
-      ordering in [l]. *)
-  val split_pred : ('a -> bool) -> 'a list -> 'a list * 'a list
-
   val inclusion : 'a list -> 'a list -> bool
  
   (** [take n l] returns up to the [n] first elements from list [l], if available. *)

@@ -103,9 +103,14 @@ and _ term =
 
 type 'a t = 'a term
 
-type message = Type.message term
-type timestamp = Type.timestamp term
+(*------------------------------------------------------------------*)
+type message  = Type.message term
+type messages = message list
 
+type timestamp  = Type.timestamp term
+type timestamps = timestamp list
+
+(*------------------------------------------------------------------*)
 type eterm = ETerm : 'a term -> eterm
 
 (** Does not recurse. *)
@@ -242,84 +247,14 @@ type refresh_arg = [`Global | `InEnv of Vars.env ref ]
 val refresh_vars  : refresh_arg -> 'a Vars.vars -> 'a Vars.vars * esubst list
 val erefresh_vars : refresh_arg ->   Vars.evars ->   Vars.evars * esubst list
 
+val refresh_vars_env :
+  Vars.env -> 'a Vars.var list -> Vars.env * 'a Vars.var list * esubst list
+
+val erefresh_vars_env :
+  Vars.env -> Vars.evar list -> Vars.env * Vars.evar list * esubst list
+ 
 (*------------------------------------------------------------------*)
 val apply_ht : hterm -> 'a term list -> hterm
-
-(*------------------------------------------------------------------*)
-(** {2 Matching and rewriting} *)
-
-(** A pattern is a list of free type variables, a term [t] and a subset
-    of [t]'s free variables that must be matched. 
-    The free type variables must be inferred. *)
-type 'a pat = { 
-  pat_tyvars : Type.tvars; 
-  pat_vars : Sv.t; 
-  pat_term : 'a; 
-}
-
-(** Make a pattern out of a formula: all universally quantified variables 
-    are added to [pat_vars]. *)
-val pat_of_form : message -> message pat
-
-(** Matching variable assignment (types must be compatible). *)
-type mv = eterm Vars.Mv.t
-
-type match_state = {
-  mv  : mv;                  (** inferred variable assignment *)
-  bvs : Sv.t;                (** bound variables "above" the current position *)
-}
-
-(** Module signature of matching. 
-    We can only match a [Term.term] into a [Term.term] or a [Equiv.form].
-    Hence, the type of term we match into is abstract.
-    The type we match from is fixed to Term.term. *)
-module type MatchS = sig
-  (** Abstract type of terms we are matching in. *)
-  type t
-
-  val pp_pat : 
-    (Format.formatter -> 'a -> unit) ->
-    Format.formatter -> 'a pat -> unit
-
-
-  val to_subst : mv -> subst
-
-  (** [try_match t p] tries to match [p] with [t] (at head position). 
-      If it succeeds, it returns a map [θ] instantiating the variables 
-      [p.pat_vars] as substerms of [t], and:
-
-      - if [mode = `Eq] then [t = pθ] (default mode);
-      - if [mode = `EntailLR] then [t = pθ] or [t ⇒ pθ] (boolean case).
-      - if [mode = `EntailRL] then [t = pθ] or [pθ ⇒ t] (boolean case). *)
-  val try_match : 
-    ?st:match_state -> 
-    ?mode:[`Eq | `EntailLR | `EntailRL] ->
-    Symbols.table -> 
-    t -> t pat ->
-    [ `FreeTyv | `NoMatch | `Match of mv ] 
-
-  (** Same as [try_match], but specialized for terms. *)
-  val try_match_term : 
-    ?st:match_state -> 
-    ?mode:[`Eq | `EntailLR | `EntailRL] ->
-    Symbols.table -> 
-    'a term -> 'b term pat ->
-    [ `FreeTyv | `NoMatch | `Match of mv ] 
-
-  (** [find_map env t p func] looks for an occurence [t'] of [pat] in [t],
-      where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
-      It then computes the term obtained from [t] by replacing:
-      - if [many = false], a *single* occurence of [pat] by [func t' θ]. 
-      - if [many = true], all occurences found. *)
-  val find_map :
-    many:bool ->     
-    Symbols.table -> Vars.env -> 
-    t -> 'a term pat -> 
-    ('a term -> Vars.evars -> mv -> 'a term) -> 
-    t option
-end
-
-module Match : MatchS with type t = message
 
 (*------------------------------------------------------------------*)
 (** {2 Builtins function symbols} *)
@@ -485,6 +420,9 @@ val not_trace_eq_atom : trace_eq_atom -> trace_eq_atom
 
 val not_simpl : message -> message
 
+(** Check if a formula is a FO formula over timestamps.*)
+val is_pure_timestamp : message -> bool
+  
 (*------------------------------------------------------------------*)
 (** {2 Sets and Maps } *)
 

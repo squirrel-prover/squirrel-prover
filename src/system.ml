@@ -49,7 +49,11 @@ let get_data table s_symb =
     | _ -> assert false
 
 let descrs table s = Msh.map Action.refresh_descr (fst (get_data table s))
-let symbs table s = snd (get_data table s)
+
+let symbs ~with_dummies table s = 
+  if with_dummies then
+    snd (get_data table s)
+  else Msh.map (fun d -> d.Action.name) (fst (get_data table s))
 
 let pp_system table fmt s =
   let descrs,symbs = get_data table s in

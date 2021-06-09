@@ -383,7 +383,7 @@ module LowTac (S : Sequent.S) = struct
           incr cpt_occ;
           found1 := true;
 
-          let subst = S.Match.to_subst mv in
+          let subst = Match.Mvar.to_subst ~mode:`Match mv in
           let right = Term.cast (Term.kind occ) (Term.subst subst right) in
           let rsubs = 
             List.map (fun rsub ->
@@ -395,8 +395,8 @@ module LowTac (S : Sequent.S) = struct
         in
 
         (* Attempt to find an occurrence of [left] and rewrite it. *)
-        let pat : a Term.term Term.pat = 
-          Term.{ pat_tyvars = tyvars; pat_vars = sv; pat_term = left }
+        let pat : a Term.term Match.pat = 
+          { pat_tyvars = tyvars; pat_vars = sv; pat_term = left }
         in
         let many = match mult with `Once -> false | `Any | `Many -> true in
 
@@ -404,7 +404,9 @@ module LowTac (S : Sequent.S) = struct
           | `Equiv _ -> assert false
           | `Reach f ->
             let f_opt =
-              Term.Match.find_map ~many (S.table s) (S.env s) f pat rw_inst 
+              Match.T.find_map ~many 
+                (S.table s) (S.system s) (S.env s) 
+                f pat rw_inst 
             in
             omap (fun x -> `Reach x) f_opt
         in
@@ -791,7 +793,7 @@ module LowTac (S : Sequent.S) = struct
           (Hyps.by_id id s)
       in
       let s = Hyps.remove id s in
-      let pat = Term.pat_of_form f in
+      let pat = Match.pat_of_form f in
       let erule = Rewrite.pat_to_rw_erule ~loc (L.unloc dir) pat in
       let s, subgoals = rewrite ~all:false [T_conc] (`Many, Some id, erule) s in
       subgoals @ [s]
@@ -1025,7 +1027,7 @@ module LowTac (S : Sequent.S) = struct
     * with other tactics that would have to generate global sequents
     * as premisses. *)
 
-  let apply (pat : S.conc_form Term.pat) (s : S.t) : S.t list =
+  let apply (pat : S.conc_form Match.pat) (s : S.t) : S.t list =
     let subs, f = S.Conc.decompose_impls_last pat.pat_term in
 
     if not (Vars.Sv.subset pat.pat_vars (S.fv_conc f)) then
@@ -1034,10 +1036,13 @@ module LowTac (S : Sequent.S) = struct
     let pat = { pat with pat_term = f } in
 
     (* Check that [pat] entails [S.goal s]. *)
-    match S.Match.try_match ~mode:`EntailRL (S.table s) (S.goal s) pat with
+    match S.MatchF.try_match ~mode:`EntailRL 
+            (S.table s) (S.system s) 
+            (S.goal s) pat 
+    with
     | `NoMatch | `FreeTyv -> soft_failure ApplyMatchFailure
     | `Match mv ->
-      let subst = Term.Match.to_subst mv in
+      let subst = Match.Mvar.to_subst ~mode:`Match mv in
 
       let goals = List.map (S.subst_conc subst) subs in
       List.map (fun g -> S.set_goal g s) goals
@@ -1049,7 +1054,7 @@ module LowTac (S : Sequent.S) = struct
 
       E.g., if `H1 : A -> B` and `H2 : A` then `apply H1 in H2` replaces
       `H2 : A` by `H2 : B`. *)
-  let apply_in (pat : S.conc_form Term.pat) (hyp : Ident.t) (s : S.t)
+  let apply_in (pat : S.conc_form Match.pat) (hyp : Ident.t) (s : S.t)
     : S.t list =
     let fprems, fconcl = S.Conc.decompose_impls_last pat.pat_term in
 
@@ -1063,7 +1068,9 @@ module LowTac (S : Sequent.S) = struct
         let pat = { pat with pat_term = fprem } in
 
         (* Check that [hconcl] entails [pat]. *)
-        match S.Match.try_match ~mode:`EntailLR (S.table s) hconcl pat with
+        match
+          S.MatchF.try_match ~mode:`EntailLR (S.table s) (S.system s) hconcl pat 
+        with
         | `NoMatch | `FreeTyv -> None
         | `Match mv -> Some mv
     in
@@ -1083,7 +1090,7 @@ module LowTac (S : Sequent.S) = struct
     match find_match [] fprems with
     | None -> soft_failure ApplyMatchFailure
     | Some (fsubgoals,mv) ->
-      let subst = Term.Match.to_subst mv in
+      let subst = Match.Mvar.to_subst ~mode:`Match mv in
 
       (* instantiate the inferred variables everywhere *)
       let fprems_other = List.map (S.subst_conc subst) fsubgoals in
@@ -1105,7 +1112,7 @@ module LowTac (S : Sequent.S) = struct
 
   (** Parse apply tactic arguments. *)
   let p_apply_args (args : Args.parser_arg list) (s : S.sequent) :
-    S.t list * S.conc_form Term.pat * target =
+    S.t list * S.conc_form Match.pat * target =
     let subgoals, pat, in_opt =
       match args with
       | [Args.ApplyIn (Theory.PT_hol pt,in_opt)] ->

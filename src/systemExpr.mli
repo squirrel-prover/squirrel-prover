@@ -72,6 +72,15 @@ val descr_of_shape :
 val descr_of_action : 
   Symbols.table -> system_expr -> Action.action -> Action.descr
 
+(** Get the action symbols table of a system expression.
+  * We rely on the invariant that the system systems involved in an expression
+  * must have the same such table. *)
+val symbs :
+  with_dummies:bool ->
+  Symbols.table -> 
+  system_expr -> 
+  Symbols.action Symbols.t System.Msh.t
+
 (** Iterate over all action descriptions in [system].
   * Only one representative of each action shape will be passed
   * to the function, with indices that are not guaranteed to be fresh. *)

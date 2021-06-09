@@ -13,11 +13,12 @@ val check_erule : rw_erule -> unit
 
 val pat_to_rw_erule : 
   ?loc:Location.t ->
-  [< `LeftToRight | `RightToLeft ] -> Term.message Term.pat -> rw_erule
+  [< `LeftToRight | `RightToLeft ] -> Term.message Match.pat -> rw_erule
 
 (*------------------------------------------------------------------*)
 val rewrite_head : 
-    Symbols.table -> 
-    rw_erule -> 
-    'a Term.term -> 
-    ('a Term.term * Term.message list) option 
+  Symbols.table ->
+  SystemExpr.system_expr -> 
+  rw_erule -> 
+  'a Term.term -> 
+  ('a Term.term * Term.message list) option 

@@ -28,14 +28,6 @@ module List = struct
       then h1 :: merge cmp t1 l2
       else h2 :: merge cmp l1 t2
 
-  let split_pred f l =
-    let rec aux t_l f_l = function
-      | [] -> (t_l, f_l)
-      | a :: l' ->
-        if f a then aux (a :: t_l) f_l l' else aux t_l (a :: f_l) l'
-    in
-    aux [] [] l
-
   let rec split3 = function
     | [] -> ([], [], [])
     | (x,y,z)::l ->

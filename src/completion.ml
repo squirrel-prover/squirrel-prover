@@ -1227,10 +1227,10 @@ let rec term_grnd_normalize (state : state) (u : cterm) : cterm =
        - then, we normalize only the fterms, and split the result (again) into
          constants and fterms.
        - finally, we normalize the two set of constants using the xor rules. *)
-    let csts0, fterms0 = List.split_pred is_cst ts in
+    let csts0, fterms0 = List.partition is_cst ts in
     let csts1, fterms1 = List.map (term_grnd_normalize state) fterms0
                          |> nilpotence_norm c_compare
-                         |> List.split_pred is_cst in
+                         |> List.partition is_cst in
 
     (* We only have to normalize the constants in [ts], i.e. [csts0 @ csts1]. *)
     let csts_norm = List.map get_cst (csts0 @ csts1)

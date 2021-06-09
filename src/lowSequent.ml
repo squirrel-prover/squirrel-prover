@@ -102,7 +102,7 @@ module type S = sig
   val map : Equiv.Babel.mapper -> t -> t
 
   (** Matching. *)
-  module Match : Term.MatchS with type t = conc_form
+  module MatchF : Match.S with type t = conc_form
 
   (** Smart constructors and destructors for hypotheses. *)
   module Hyp : Term.SmartFO with type form = hyp_form

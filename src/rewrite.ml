@@ -1,3 +1,6 @@
+module SE = SystemExpr
+
+(*------------------------------------------------------------------*)
 (** A rewrite rule is a tuple: 
     (type variables, term variables, premisses, left term, right term)
     Invariant: if (tyvars,sv,φ,l,r) is a rewrite rule, then
@@ -23,7 +26,7 @@ let check_erule ((_, sv, h, Term.ESubst (l,r)) : rw_erule) : unit =
   ()
 
 (** Make a rewrite rule from a formula *)
-let pat_to_rw_erule ?loc dir (p : Term.message Term.pat) : rw_erule = 
+let pat_to_rw_erule ?loc dir (p : Term.message Match.pat) : rw_erule = 
   let subs, f = Term.decompose_impls_last p.pat_term in
 
   let e = match f with
@@ -52,8 +55,11 @@ let pat_to_rw_erule ?loc dir (p : Term.message Term.pat) : rw_erule =
 exception NoRW
 
 let rewrite_head : 
-  Symbols.table -> rw_erule -> Term.message -> Term.message * Term.message list 
-  = fun table rule t ->
+  Symbols.table ->
+  SE.system_expr ->
+  rw_erule -> Term.message ->
+  Term.message * Term.message list 
+  = fun table system rule t ->
   let tyvars, vars, subs, rule_subst = rule in
   let (l, r) : Term.message * Term.message = 
     match rule_subst with
@@ -64,26 +70,28 @@ let rewrite_head :
   in
 
   let pat = 
-    Term.{ pat_tyvars = tyvars; pat_vars = vars; pat_term = l; } 
+    Match.{ pat_tyvars = tyvars; pat_vars = vars; pat_term = l; } 
   in
 
   let mv = 
-    match Term.Match.try_match table t pat with
+    match Match.T.try_match table system t pat with
     | `FreeTyv | `NoMatch -> raise NoRW
     | `Match mv -> mv
   in
-  let subst = Term.Match.to_subst mv in
+  let subst = Match.Mvar.to_subst ~mode:`Match mv in
   let r = Term.subst subst r in
   let subs = List.map (Term.subst subst) subs in
   r, subs
 
 let rewrite_head : type a.
-  Symbols.table -> rw_erule -> a Term.term -> 
+  Symbols.table ->
+  SE.system_expr ->
+  rw_erule -> a Term.term -> 
   (a Term.term * Term.message list) option =
-  fun table rule t ->
+  fun table system rule t ->
   match Type.equalk_w Type.KMessage (Term.kind t) with
   | None -> None
   | Some Type.Type_eq ->
-    try Some (rewrite_head table rule t) with NoRW -> None
+    try Some (rewrite_head table system rule t) with NoRW -> None
 
 

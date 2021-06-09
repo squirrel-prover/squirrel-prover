@@ -12,7 +12,7 @@ module type S = sig
   val reduce : Reduction.red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
   val convert_pt_hol :
-    Theory.p_pt_hol -> 'a Equiv.f_kind -> t -> Goal.ghyp * 'a Term.pat
+    Theory.p_pt_hol -> 'a Equiv.f_kind -> t -> Goal.ghyp * 'a Match.pat
 end
 
 (** Functor building a {!Sequent.S} from a {!LowSequent.S}. *)

@@ -42,6 +42,7 @@ let enorm_ty env (EVar v) = EVar (norm_ty env v)
 let kind v = Type.kind (v.var_type)
 
 let tsubst s v = { v with var_type = Type.tsubst s v.var_type }
+let tsubst_e s (EVar v) = EVar (tsubst s v)
 
 (*------------------------------------------------------------------*)
 let pp ppf v = 
@@ -95,6 +96,35 @@ let compare x y =
   if equal x y then 0
   else if x.i_suffix <= y.i_suffix then -1 else 1
 
+
+(*------------------------------------------------------------------*)
+(** {2 Set and Maps} *)
+
+module Sv = struct
+  include Set.Make(struct
+      type t = evar
+      let compare (EVar a) (EVar b) = 
+        Stdlib.compare 
+          (a.name, a.s_prefix, a.is_new, a.i_suffix) 
+          (b.name, b.s_prefix, b.is_new, b.i_suffix) 
+    end)
+
+  let add_list sv vars =
+    List.fold_left (fun sv v -> add (EVar v) sv) sv vars
+
+  let of_list1 vars = add_list empty vars
+end
+
+module Mv = struct
+  include Map.Make(struct
+      type t = evar
+      let compare (EVar a) (EVar b) = 
+        Stdlib.compare 
+          (a.name, a.s_prefix, a.is_new, a.i_suffix) 
+          (b.name, b.s_prefix, b.is_new, b.i_suffix) 
+    end)
+end
+
 (*------------------------------------------------------------------*)
 (** {2 Environments} *)
 
@@ -105,6 +135,8 @@ type env = evar M.t
 let to_list (env : env) =
   let _,r2 = M.bindings env |> List.split in
   r2
+
+let to_set (env : env) : Sv.t = Sv.of_list (to_list env)
 
 let pp_env ppf e =
   pp_typed_list ppf (to_list e)
@@ -136,15 +168,15 @@ let find : type a. env -> string -> a Type.kind -> a var =
   let EVar v = M.find name e in
   cast v k
 
-let of_list l =
-  let rec aux e (l : evar list) =
-    match l with
-    | [] -> e
-    | EVar v :: q ->
-      let e = M.add (name v) (EVar v) e in
-      aux e q
-  in
-  aux empty_env l
+let of_list l : env =
+  List.fold_left (fun e (EVar v) -> 
+      M.add (name v) (EVar v) e
+    ) empty_env l
+
+let of_set s : env = 
+  Sv.fold (fun (EVar v) e -> 
+      M.add (name v) (EVar v) e
+    ) s empty_env 
 
 let rm_var e v = M.remove (name v) e
 
@@ -252,31 +284,6 @@ let fresh env v = make `Approx env v.var_type (name v)
 
 let fresh_r env v = make_r `Approx env v.var_type (name v)
 
-
-(*------------------------------------------------------------------*)
-(** {2 Set and Maps} *)
-
-module Sv = struct
-  include Set.Make(struct
-      type t = evar
-      let compare (EVar a) (EVar b) = 
-        Stdlib.compare 
-          (a.name, a.s_prefix, a.is_new, a.i_suffix) 
-          (b.name, b.s_prefix, b.is_new, b.i_suffix) 
-    end)
-  let add_list sv vars =
-    List.fold_left (fun sv v -> add (EVar v) sv) sv vars
-end
-
-module Mv = struct
-  include Map.Make(struct
-      type t = evar
-      let compare (EVar a) (EVar b) = 
-        Stdlib.compare 
-          (a.name, a.s_prefix, a.is_new, a.i_suffix) 
-          (b.name, b.s_prefix, b.is_new, b.i_suffix) 
-    end)
-end
                                           
 (*------------------------------------------------------------------*)
 (** {2 Tests} *)

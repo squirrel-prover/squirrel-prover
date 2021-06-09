@@ -695,7 +695,7 @@ intro Ht M.
 assert pin(i) = pin(ii). by congruence.
 eqnames.
 exists jj.
-expand output@R1(jj,i). expand m(jj,i)@R1(jj,i).
+expand output@R1(jj,ii). expand m(jj,ii)@R1(jj,ii).
 split; 1,2: by auto.
 (* case euf 2/2 - A1(kk) coming from the process oracle *)
 intro Ht M.

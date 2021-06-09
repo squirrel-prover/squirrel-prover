@@ -1,4 +1,5 @@
 set autoIntro=false.
+set newInduction=true.
 
 hash h
 channel c

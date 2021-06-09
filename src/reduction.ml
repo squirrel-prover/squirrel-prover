@@ -18,6 +18,7 @@ module Mk (S : LowSequent.S) = struct
      - trace literals not updated *)
   type state = { 
     table      : Symbols.table;
+    system     : SystemExpr.system_expr;
     param      : red_param;
     hint_db    : Hint.hint_db;
     trace_lits : Constr.trace_literals;
@@ -80,7 +81,7 @@ module Mk (S : LowSequent.S) = struct
     and rewrite_head_once : type a. state -> a Term.term -> a Term.term * bool = 
       fun st t ->
         let rule = List.find_map (fun (_, rule) ->
-            match Rewrite.rewrite_head st.table rule t with
+            match Rewrite.rewrite_head st.table st.system rule t with
             | None -> None
             | Some (red_t, subs) ->
               let subs_valid =  
@@ -182,7 +183,8 @@ module Mk (S : LowSequent.S) = struct
 
     in
     let state = { 
-      table      = S.table s; 
+      table      = S.table s;
+      system     = S.system s; 
       param      = param;
       hint_db    = S.get_hint_db s;
       trace_lits = S.get_trace_literals s;

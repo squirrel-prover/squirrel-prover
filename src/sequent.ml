@@ -26,7 +26,7 @@ module type S = sig
   val reduce : Reduction.red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
   val convert_pt_hol : 
-    Theory.p_pt_hol -> 'a Equiv.f_kind -> t -> Goal.ghyp * 'a Term.pat
+    Theory.p_pt_hol -> 'a Equiv.f_kind -> t -> Goal.ghyp * 'a Match.pat
 end
 
 module Mk (S : LowSequent.S) : S with
@@ -87,7 +87,7 @@ struct
   (*------------------------------------------------------------------*)
   (** Parse a partially applied lemma or hypothesis as a pattern. *)
   let convert_pt_hol : type a.
-    Theory.p_pt_hol -> a Equiv.f_kind -> S.t -> Goal.ghyp * a Term.pat =
+    Theory.p_pt_hol -> a Equiv.f_kind -> S.t -> Goal.ghyp * a Match.pat =
     fun pt f_kind s ->
 
     let lem = get_k_hyp_or_lemma f_kind pt.p_pt_hid s in
@@ -123,7 +123,7 @@ struct
     (* instantiate [f_args0] by [args] *)
     let f = Equiv.Babel.subst f_kind subst f in
 
-    let pat = Term.{ 
+    let pat = Match.{ 
         pat_tyvars = lem.gc_tyvars;
         pat_vars = !pat_vars;
         pat_term = f; } 

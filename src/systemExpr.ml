@@ -252,17 +252,16 @@ let pair table a b =
 (*------------------------------------------------------------------*)
 (** {2 Misc } *)
 
-(** Get the action symbols table of a system expression.
-  * We rely on the invariant that the system systems involved in an expression
-  * must have the same such table. *)
-let symbs table = function
+let symbs ~with_dummies table = function
   | SimplePair s | Pair (Left s,_) | Pair (Right s,_)
-  | Single (Left s) | Single (Right s) -> System.symbs table s
+  | Single (Left s) | Single (Right s) -> System.symbs ~with_dummies table s
 
 let action_to_term table system a =
   let symbs = symbs table system in
-  let symb = System.Msh.find (Action.get_shape a) symbs in
-    Term.Action (symb, Action.get_indices a)
+  let symb = 
+    System.Msh.find (Action.get_shape a) (symbs ~with_dummies:true) 
+  in
+  Term.Action (symb, Action.get_indices a)
 
 (*------------------------------------------------------------------*)
 
