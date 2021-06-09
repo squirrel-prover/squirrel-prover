@@ -94,6 +94,26 @@ system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))
         | !_kk (in(c,m); out(c,h2(m,key2)))
         | !_kk (in(c,m); out(c,h3(m,key3)))).
 
+
+(* LIBRARIES *)
+(* A inclure dans une lib standard *)
+
+set autoIntro=false.
+
+goal if_false  (b : boolean, x,y : message):
+ (not b) => if b then x else y = y.
+Proof.
+ by intro *; noif. 
+Qed.
+
+goal if_true (b : boolean, x,y : message):
+ b => if b then x else y = x.
+Proof.
+  by intro *; yesif.
+Qed.
+
+(* PROOF *)
+
 goal lastUpdateTag_ :
   forall (t:timestamp), forall (i:index), happens(t) =>
     ( (kT(i)@t = kT(i)@init 
@@ -767,10 +787,10 @@ Proof.
   destruct H1 as [H2 H3].
   use IH0 with pred(R1(jj,ii0)),i,ii as H4; 2,3,4: by constraints.
   expand kR(ii)@R1(jj,ii0).
-  intro _.
+  intro E.
   assert kR(ii)@pred(R1(jj,ii0)) = idinit(i). 
-  admit. (* TODO - should be automatic from the hypothesis _ *)
-  by congruence.
+  by rewrite if_false in E.
+  congruence.
 Qed.
 
 goal stateInitTag :
@@ -815,10 +835,10 @@ Proof.
   destruct H1 as [H2 H3].
   use IH0 with pred(T1(i0,j)),i,ii as H4; 2,3,4: by constraints.
   expand kT(i)@T1(i0,j).
-  intro _.
+  intro E.
   assert fst(kT(i)@pred(T1(i0,j))) = idinit(ii).
-  admit. (* TODO - should be automatic from the hypothesis _ *) 
-  by congruence.
+  by rewrite if_false in E.
+  congruence.
 Qed.
 
 goal auth_R1 :
