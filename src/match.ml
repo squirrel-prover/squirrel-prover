@@ -1157,7 +1157,7 @@ module E : S with type t = Equiv.form = struct
 
     (** Return a list of speciablization of [cand] deducible from [terms] and
         [pseqs] using Function Application.
-        Does not include direct speciablization. *)
+        Does not include direct specialization. *)
     and deduce_fa
         (cand : cand_set)
         (terms : Term.messages)
