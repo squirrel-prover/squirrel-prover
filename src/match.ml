@@ -68,6 +68,7 @@ module Mvar = struct
 
 end
 (*------------------------------------------------------------------*)
+(** (Descending) state used in the matching algorithm. *)
 type match_state = {
   mv  : Mvar.t;          (** inferred variable assignment *)
   bvs : Sv.t;            (** bound variables "above" the current position *)
@@ -79,7 +80,7 @@ type match_state = {
 }
 
 (*------------------------------------------------------------------*)
-(** (Descending) state used in the unification algoritm. *)
+(** (Descending) state used in the unification algorithm. *)
 type unif_state = {
   mv       : Mvar.t;     (** inferred variable assignment *)
   bvs      : Sv.t;       (** bound variables "above" the current position *)
@@ -447,7 +448,7 @@ module T : S with type t = message = struct
        - [st.bvs] is the set of variables bound above [t].
        - [st.bvs] must be disjoint from the free variables of the terms in the
          co-domain of [mv]. *)
-    let rec tmatch : type a b. a term -> b term -> match_state -> match_state =
+    let rec tmatch : type a b. a term -> b term -> match_state -> Mvar.t =
       fun t pat st ->
         match t, pat with
         | _, Var v' ->
@@ -458,17 +459,18 @@ module T : S with type t = message = struct
           end
 
         | Fun (symb, fty, terms), Fun (symb', fty', terms') ->
-          let st = smatch symb symb' st in
-          tmatch_l terms terms' st
+          let mv = smatch symb symb' st in
+          tmatch_l terms terms' { st with mv }
 
         | Name s, Name s' -> isymb_match s s' st
 
         | Macro (s, terms, ts),
           Macro (s', terms', ts') ->
-          let st = isymb_match s s' st in
+          let mv = isymb_match s s' st in
           assert (Type.equal s.s_typ s'.s_typ);
 
-          tmatch ts ts' (tmatch_l terms terms' st)
+          let mv = tmatch_l terms terms' { st with mv } in
+          tmatch ts ts' { st with mv }
 
         | Pred ts, Pred ts' -> tmatch ts ts' st
 
@@ -541,18 +543,18 @@ module T : S with type t = message = struct
       s, s', st
 
     and tmatch_l : type a b.
-      a term list -> b term list -> match_state -> match_state =
+      a term list -> b term list -> match_state -> Mvar.t =
       fun tl patl st ->
-        List.fold_left2 (fun st t pat ->
-            tmatch t pat st
-          ) st tl patl
+        List.fold_left2 (fun mv t pat ->
+            tmatch t pat { st with mv }
+          ) st.mv tl patl
 
     (* match an [i_symb].
        Note: types are not checked. *)
     and isymb_match : type a b c.
       ((a Symbols.t, b) isymb) ->
       ((a Symbols.t, c) isymb) ->
-      match_state -> match_state =
+      match_state -> Mvar.t =
       fun s s' st ->
         smatch (s.s_symb,s.s_indices) (s'.s_symb, s'.s_indices) st
 
@@ -560,20 +562,23 @@ module T : S with type t = message = struct
     and smatch : type a.
       (a Symbols.t * Vars.index list) ->
       (a Symbols.t * Vars.index list) ->
-      match_state -> match_state =
+      match_state -> Mvar.t =
       fun (fn, is) (fn', is') st ->
         if fn <> fn' then raise NoMatch;
-
-        List.fold_left2 (fun st i i' -> vmatch (Var i) i' st) st is is'
+        
+        List.fold_left2 (fun mv i i' -> 
+            vmatch (Var i) i' { st with mv }
+          ) st.mv is is'
 
 
     (* Match a variable of the pattern with a term. *)
-    and vmatch : type a. a term -> a Vars.var -> match_state -> match_state =
+    and vmatch : type a. a term -> a Vars.var -> match_state -> Mvar.t =
       fun t v st ->
         let ev = Vars.EVar v in
 
         if not (Sv.mem ev p.pat_vars)
-        then if t = Var v then st else raise NoMatch (* [v] not in the pattern *)
+        then (* [v] not in the pattern *)
+          if t = Var v then st.mv else raise NoMatch 
 
         else (* [v] in the pattern *)
           match Mv.find ev st.mv with
@@ -587,17 +592,17 @@ module T : S with type t = message = struct
                variables. *)
             if not (Sv.disjoint (fv t) st.bvs) then raise NoMatch;
 
-            { st with mv = Mv.add ev (ETerm t) st.mv }
+            Mv.add ev (ETerm t) st.mv 
 
           (* If we already saw the variable, check that the subterms are
              identical. *)
           | ETerm t' -> match cast (kind t) t' with
             | exception Uncastable -> raise NoMatch
             (* TODO: alpha-equivalent *)
-            | t' -> if t <> t' then raise NoMatch else st
+            | t' -> if t <> t' then raise NoMatch else st.mv
 
     (* matches an atom *)
-    and atmatch (at : generic_atom) (at' : generic_atom) st : match_state =
+    and atmatch (at : generic_atom) (at' : generic_atom) st : Mvar.t =
       match at, at' with
       | `Message (ord, t1, t2), `Message (ord', t1', t2') ->
         if ord <> ord' then raise NoMatch;
@@ -621,7 +626,7 @@ module T : S with type t = message = struct
       let st_init : match_state =
         { bvs = Sv.empty; mv = mv_init; table; system; env; support; }
       in
-      let st = tmatch t pat st_init in
+      let mv = tmatch t pat st_init in
 
       if not (Type.Infer.is_closed ty_env)
       then `FreeTyv
@@ -630,7 +635,7 @@ module T : S with type t = message = struct
           Mv.fold (fun (Vars.EVar v) t mv ->
               let v = Vars.tsubst ty_subst_rev v in
               Mv.add (Vars.EVar v) t mv
-            ) st.mv Mv.empty
+            ) mv Mv.empty
         in
         `Match mv
 
