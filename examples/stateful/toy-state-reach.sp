@@ -11,6 +11,8 @@ PROOFS
 - authentication
 *******************************************************************************)
 
+set autoIntro = false.
+
 hash hMsg
 hash hState
 
@@ -49,8 +51,12 @@ forall (k,ii:index),
   (cond@R(k,ii) =>
     (exists (j:index), T(ii,j) < R(k,ii) && output@T(ii,j) = input@R(k,ii))).
 Proof.
-intro *.
+intro k ii Hap Hcond.
 expand cond@R(k,ii).
-euf H.
+euf Hcond.
+intro *.
 exists j.
+split.
+by assumption.
+by expand output@T(ii,j); congruence.
 Qed.

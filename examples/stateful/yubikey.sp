@@ -11,6 +11,9 @@ otp is an encryption of a triple (secret(i), cpt, npr(i,j)), and it is modelled 
 According to the specification in Robert's thesis, AES is used.
 I rely on intctxt ... not sure that this is legitimate.
 *******************************************************************************)
+
+set autoIntro = false.
+
 senc enc,dec
 
 abstract startplug: message
@@ -87,8 +90,16 @@ goal auth:
 Proof.
 intro ii i Hap Hcond.
 expand cond@S(ii,i).
+destruct Hcond as [Mneq Morder Meq].
 intctxt Mneq.
-by exists j.
+
+  intro Ht Meq' *.
+  exists j. split.
+  by eqtrace.
+  expand output@Press(i,j). by congruence.
+
+  intro Meq' *.
+  by congruence.
 Qed.
 
 (* injectivity version Stephanie *)
@@ -104,15 +115,26 @@ goal auth_injective_bis:
 Proof.
 intro ii i Hap Hcond.
 expand cond@S(ii,i).
+destruct Hcond as [Mneq Morder Meq].
 intctxt Mneq.
-exists j.
+
+intro Ht Meq' *.
+exists j. split. split.
+by eqtrace.
+expand output@Press(i,j). by congruence.
+intro j' [Ht' Meq''].
 expand output@Press(i,j').
 assert
- (enc(<secret(i),cpt(i,j)@Press(i,j)>,npr(i,j),k(i)) = enc(<secret(i),cpt(i,j')@Press(i,j')>,npr(i,j'),k(i)))  as H.
-assert
- (npr(i,j) = npr(i,j')) as H1.
-help.
+ (enc(<secret(i),cpt(i,j)@Press(i,j)>,npr(i,j),k(i)) = 
+  enc(<secret(i),cpt(i,j')@Press(i,j')>,npr(i,j'),k(i))) 
+ as H.
+by congruence.
+assert (npr(i,j) = npr(i,j')) as H1.
 admit.
+by eqnames.
+
+intro Meq' *.
+by congruence.
 Qed.
 
 
@@ -123,7 +145,10 @@ goal counterIncreaseStrictly:
     (cond@S(ii,i) => order(SCpt(i)@pred(S(ii,i)),SCpt(i)@S(ii,i)) = orderOk).
 Proof.
 intro ii i Hap Hcond.
-by expand cond@S(ii,i).
+expand cond@S(ii,i).
+destruct Hcond as [Mneq Morder Meq].
+expand SCpt(i)@S(ii,i).
+by assumption.
 Qed.
 
 
@@ -133,23 +158,29 @@ goal counterIncrease:
     (forall (i:index),
       (t > init && exec@t) =>
         (order(SCpt(i)@pred(t),SCpt(i)@t) = orderOk 
-        || SCpt(i)@pred(t) = SCpt(i)@t)).
+        || SCpt(i)@t = SCpt(i)@pred(t))).
 Proof.
-intro *.
-case t;
-1,2,3,4,6,7: by right.
+intro t Hap i [Ht Hexec].
+case t; 1,2,3,4,5,7,8: by auto.
 
-assert (i = i1 || i <> i1) as H1.
-case H1.
-(* i = i1 *)
+intro H. simpl_left.
+assert (i = i0 || i <> i0) as Hi. by auto.
+case Hi.
+(* i = i0 *)
 left.
 subst t, S(ii,i).
 expand exec@S(ii,i).
 by use counterIncreaseStrictly with ii, i.
-(* i <> i1 *)
+(* i <> i0 *)
 right.
-by case(if i = i1 then snd(dec(snd(snd(input@S(ii,i1))),k(i1))) else
-       SCpt(i)@pred(S(ii,i1))).
+subst t, S(ii,i0).
+case 
+  (if i = i0 then snd(dec(snd(snd(input@S(ii,i0))),k(i0))) 
+   else SCpt(i)@pred(S(ii,i0))).
+by auto.
+expand SCpt(i)@S(ii,i0).
+intro [Hi' M].
+by assumption.
 Qed.
 
 
@@ -159,31 +190,44 @@ goal counterIncreaseBis:
   forall (t:timestamp), forall (t':timestamp), forall (i:index),
     happens(t) =>
       ((exec@t && t' < t) =>
-        (order(SCpt(i)@t',SCpt(i)@t) = orderOk || SCpt(i)@t' = SCpt(i)@t)).
+        (order(SCpt(i)@t',SCpt(i)@t) = orderOk || SCpt(i)@t = SCpt(i)@t')).
 Proof.
-nosimpl(induction; intro IH0).
-intro t' i *.
-assert (t' = pred(t) || t' <pred(t)) as H0; 1: by case t. 
+induction.
+intro t IH0 t' i Hap [Hexec Ht'].
+assert (t' = pred(t) || t' < pred(t)) as H0; 1: by case t. 
 case H0.
 
 (* case t' = pred(t) *)
-use counterIncrease with t as H1. use H1 with i as H2.
-by subst pred(t), t'.
+use counterIncrease with t as H1; 2: by assumption.
+use H1 with i as H2; 2: by auto.
+subst pred(t), t'.
+by assumption.
 
 (* case t' < pred(t) *)
-use IH0 with pred(t),t',i as H0.
-executable t.
-use H1 with pred(t) as H2.
-use counterIncrease with t as H3. use H3 with i as H4. 
-case H0. case H4.
-(* 1/2 *)
+use IH0 with pred(t),t',i as H1.
+use counterIncrease with t as H2; 2: by assumption.
+use H2 with i as H3.
+case H1.
+(* case H1 - 1/2 *)
+case H3.
 left.
-by use orderTrans with SCpt(i)@t',SCpt(i)@pred(t),SCpt(i)@t.
-(* 2/2 *)
-by case H4.
+use orderTrans with SCpt(i)@t',SCpt(i)@pred(t),SCpt(i)@t.
+by congruence.
+split; 1,2: by assumption.
+by left; congruence.
+(* case H1 - 2/2 *)
+case H3.
+by left; congruence.
+by right; congruence.
 
-executable t.
-by use H0 with pred(t) as H1.
+split; 1,2: by auto.
+by auto.
+by auto.
+executable t; 1,2: by assumption.
+intro H1.
+use H1 with pred(t) as H2.
+split; 1,2: by auto.
+by auto.
 Qed.
 
 (* Solene: This is an injective version of the authentication property shown before.*)
@@ -196,38 +240,85 @@ goal auth_injective:
        && (forall (ii1:index), happens(S(ii1,i)) =>
             ( (exec@S(ii1,i)
               && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii1,i)))
-              && SCpt(i)@S(ii1,i) = SCpt(i)@S(ii,i))
+              && SCpt(i)@S(ii,i) = SCpt(i)@S(ii1,i))
               => ii1 = ii )))).
 Proof.
-intro ii i Hap H.
+intro ii i Hap Hexec.
 expand exec@S(ii,i).
 expand cond@S(ii,i).
-intctxt Mneq.
+destruct Hexec as [Hpred [Mneq M1 M2]].
+intctxt Mneq; 2: intro *; by congruence.
+intro Ht M3 *.
 exists j.
+split. split.
+by assumption.
+by expand output@Press(i,j); congruence.
+intro ii1 Hap' [Hexec' M4 M5].
 expand exec@S(ii1,i).
 expand cond@S(ii1,i).
+expand output@Press(i,j).
+destruct Hexec' as [Hpred' [Mneq' M6 M7]].
 assert
- ( S(ii,i) < S(ii1,i) || S(ii,i) = S(ii1,i) || S(ii,i) > S(ii1,i) ) as H2.
-case H2.
+ ( S(ii,i) < S(ii1,i) || S(ii,i) = S(ii1,i) || S(ii,i) > S(ii1,i) ) as H.
+by constraints.
+case H.
 
+(* case S(ii,i) < S(ii1,i) *)
 assert
- order(SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i)) = orderOk as M9.
+ order(SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i)) = orderOk as M8.
 assert
- ( S(ii,i) < pred(S(ii1,i)) || S(ii,i) = pred(S(ii1,i)) || S(ii,i) > pred(S(ii1,i)) ) as H2.
-case H2.
-use counterIncreaseBis with pred(S(ii1,i)),S(ii,i),i as H2.
-case H2.
-by use orderTrans with SCpt(i)@S(ii,i),SCpt(i)@pred(S(ii1,i)),SCpt(i)@S(ii1,i).
-by use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i).
+ ( S(ii,i) < pred(S(ii1,i)) || S(ii,i) = pred(S(ii1,i)) || S(ii,i) > pred(S(ii1,i)) ) as H'.
+by constraints.
+case H'.
+(* case S(ii,i) < pred(S(ii1,i)) *)
+use counterIncreaseBis with pred(S(ii1,i)),S(ii,i),i as Hcpt.
+case Hcpt.
+use orderTrans with SCpt(i)@S(ii,i),SCpt(i)@pred(S(ii1,i)),SCpt(i)@S(ii1,i) as M8.
+by assumption.
+split.
+by assumption.
+expand SCpt(i)@S(ii1,i); by congruence.
+expand SCpt(i)@S(ii1,i); by congruence.
+by constraints.
+split; 1,2: by assumption.
+(* S(ii,i) = pred(S(ii1,i)) *)
+by expand SCpt(i)@S(ii1,i); congruence.
+(* S(ii,i) > pred(S(ii1,i)) *)
+by constraints.
 
-assert order(SCpt(i)@S(ii1,i),SCpt(i)@S(ii,i)) = orderOk as _.
+use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i) as M8'.
+by congruence.
+by assumption.
+
+(* case S(ii,i) = S(ii1,i) *)
+by constraints.
+
+(* case S(ii,i) > S(ii1,i) *)
 assert
- ( S(ii1,i) < pred(S(ii,i)) || S(ii1,i) = pred(S(ii,i)) || S(ii1,i) > pred(S(ii,i)) ) as H2.
-case H2.
-use counterIncreaseBis with pred(S(ii,i)),S(ii1,i),i as H2.
-case H2.
-by use orderTrans with SCpt(i)@S(ii1,i),SCpt(i)@pred(S(ii,i)),SCpt(i)@S(ii,i).
-by use orderStrict with SCpt(i)@S(ii1,i),SCpt(i)@S(ii,i).
+ order(SCpt(i)@S(ii1,i),SCpt(i)@S(ii,i)) = orderOk as M8.
+assert
+ ( S(ii1,i) < pred(S(ii,i)) || S(ii1,i) = pred(S(ii,i)) || S(ii1,i) > pred(S(ii,i)) ) as H'.
+by constraints.
+case H'.
+(* case S(ii1,i) < pred(S(ii,i)) *)
+use counterIncreaseBis with pred(S(ii,i)),S(ii1,i),i as Hcpt.
+case Hcpt.
+use orderTrans with SCpt(i)@S(ii1,i),SCpt(i)@pred(S(ii,i)),SCpt(i)@S(ii,i) as M8.
+by assumption.
+split.
+by assumption.
+expand SCpt(i)@S(ii,i); by congruence.
+expand SCpt(i)@S(ii,i); by congruence.
+by constraints.
+split; 1,2: by assumption.
+(* S(ii1,i) = pred(S(ii,i)) *)
+by expand SCpt(i)@S(ii,i); by congruence.
+(* S(ii1,i) > pred(S(ii,i)) *)
+by constraints.
+
+use orderStrict with SCpt(i)@S(ii1,i),SCpt(i)@S(ii,i) as M8'.
+by congruence.
+by congruence.
 Qed.
 
 goal noreplayInv:
@@ -235,21 +326,35 @@ goal noreplayInv:
     (exec@S(ii1,i) && S(ii,i) < S(ii1,i)
       => order(SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i)) = orderOk).
 Proof.
-intro ii ii1 i Hap H.
+intro ii ii1 i Hap [Hexec Ht].
 use counterIncreaseStrictly with ii1, i as M0.
 assert (S(ii,i) = pred(S(ii1,i)) || S(ii,i) < pred(S(ii1,i))) as H1.
+by constraints.
 case H1.
-use counterIncreaseBis with pred(S(ii1,i)),S(ii,i),i as H1.
 
-nosimpl(executable S(ii1,i); 1: by auto).
-by auto.
-intro H2.
-case H1.
-by use orderTrans with SCpt(i)@S(ii,i), SCpt(i)@pred(S(ii1,i)),SCpt(i)@S(ii1,i).
-by expand exec@S(ii1,i). 
-by expand exec@S(ii1,i).
+(* case S(ii,i) = pred(S(ii1,i)) *)
+by congruence.
+
+(* case S(ii,i) < pred(S(ii1,i)) *)
+use counterIncreaseBis with pred(S(ii1,i)),S(ii,i),i as H2.
+case H2.
+use orderTrans with SCpt(i)@S(ii,i), SCpt(i)@pred(S(ii1,i)),SCpt(i)@S(ii1,i).
+by congruence.
+split; 1,2: by assumption.
+by congruence.
+by constraints.
+split.
+executable S(ii1,i); 1,2: by auto.
+intro H.
+use H with pred(S(ii1,i)) as Hexec'.
+by assumption.
+by constraints.
+by assumption.
+by constraints.
+expand exec@S(ii1,i).
+destruct Hexec as [Hpred Hcond].
+by assumption.
 Qed.
-
 
 
 goal noreplayNew:
@@ -257,11 +362,17 @@ goal noreplayNew:
     (exec@S(ii1,i) && S(ii,i) <= S(ii1,i)
      && SCpt(i)@S(ii,i)  =  SCpt(i)@S(ii1,i) => ii = ii1).
 Proof.
-intro ii ii1 i *.
+intro ii ii1 i Hap [Hexec Ht Meq].
 assert (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i)) as H1.
+by constraints.
 case H1.
+by constraints.
 use noreplayInv with ii, ii1, i as M1.
-by use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i).
+use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i).
+by congruence.
+by assumption.
+split; 1,2: by constraints.
+split; 1,2: by assumption.
 Qed.
 
 
@@ -271,21 +382,26 @@ goal monotonicity:
      order(SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i)) = orderOk
      => S(ii,i) < S(ii1,i)).
 Proof.
-intro ii ii1 i *.
+intro ii ii1 i Hap [Hexec H].
 assert
-  (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i) || S(ii,i) > S(ii1,i)) as H2.
-case H2.
-by use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii,i).
-
-use noreplayInv with ii1, ii, i as M1.
-
-use orderTrans with SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i), SCpt(i)@S(ii,i) as M2.
-
-use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii,i).
+  (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i) || S(ii,i) > S(ii1,i)) as Ht.
+by constraints.
+case Ht.
+(* case S(ii,i) = S(ii1,i) *)
+use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii,i); 1,2: by congruence.
+(* case S(ii,i) < S(ii1,i) *)
+by assumption.
+(* case S(ii,i) > S(ii1,i) *)
+use noreplayInv with ii1, ii, i as H'.
+use orderTrans with SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i), SCpt(i)@S(ii,i) as H''.
+use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii,i) as Mneq; 1,2: by congruence.
+split; 1,2: by assumption.
+split; 1,2: by constraints.
+split; 1,2: by auto.
 Qed.
 
 
-
+(* ********************************************
 
 (* I proved this lemma but I did not use it to prove the security properties given in Robert's thesis *)
 goal lastUpdateServer_:
@@ -416,3 +532,5 @@ by left.
 right.
 by exists jj.
 Qed.
+
+******************************************** *)

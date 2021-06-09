@@ -79,7 +79,7 @@ goal counterIncrease (t:timestamp): happens(t) =>
 Proof.
 intro Hap Hc.
 use orderSucc with d@pred(t).
-case t; 2,3,4: expand d@t; by congruence.
+case t; 2,3,4: intro *; simpl_left; expand d@t; by congruence.
 by eqtrace.
 Qed.
 
@@ -89,26 +89,26 @@ goal counterIncreaseBis :
     (t' < t => order(d@t',d@t) = orderOk).
 Proof.
 induction.
-intro *.
-assert (t' < pred(t) || t' >= pred(t)); 1: by case t. 
+intro t Hind t' Ht.
+assert (t' < pred(t) || t' >= pred(t)) as H0; 1: by case t. 
 case H0.
-use H with pred(t),t'.
-(* case t' < pred(t) *)
-use counterIncrease with t; 2,3: by eqtrace.
-by use orderTrans with d@t',d@pred(t),d@t.
-by constraints.
-by eqtrace.
-(* case t' >= pred(t) *)
-assert t' = pred(t). by eqtrace.
-by use counterIncrease with t.
+
+  (* case t' < pred(t) *)
+  use Hind with pred(t),t' as H1; 2,3: by auto.
+  use counterIncrease with t; 2,3: by eqtrace.
+  by use orderTrans with d@t',d@pred(t),d@t.
+
+  (* case t' >= pred(t) *)
+  assert t' = pred(t). by eqtrace.
+  by use counterIncrease with t.
 Qed.
 
 goal secretReach : forall (j:index), happens(B(j)) => (cond@B(j) => False).
 Proof.
-intro *.
+intro j Hap Hcond.
 expand cond@B(j).
-euf H.
-intro *.
+euf Hcond.
+intro Ht Heq.
 assert pred(A(i)) < pred(B(j)). by eqtrace.
 use counterIncreaseBis with pred(B(j)),pred(A(i)).
 use orderStrict with d@pred(A(i)),d@pred(B(j)); by congruence.
