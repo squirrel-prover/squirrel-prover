@@ -891,20 +891,20 @@ goal auth_T1 :
     (exists (jj:index), 
       R1(jj,i) < T1(i,j) && output@R1(jj,i) = input@T1(i,j))).
 Proof.
-  intro i j Hap Hcond.
-  expand cond@T1(i,j).
-  euf Hcond.
-  (* case euf 1/2 - honest case R1(jj,ii) *)
-  intro Ht M.
-  assert pin(i) = pin(ii). by congruence.
-  eqnames.
-  exists jj.
-  expand output@R1(jj,i). expand m(jj,i)@R1(jj,i).
-  split; 1,2: by auto.
-  (* case euf 2/2 - A1(kk) coming from the process oracle *)
-  intro Ht M.
-  use secretStateTag with A1(kk),i,j.
-  by congruence.
-  by assumption.
-  by assumption.
+intro i j Hap Hcond.
+expand cond@T1(i,j).
+euf Hcond.
+(* case euf 1/2 - honest case R1(jj,ii) *)
+intro Ht M.
+assert pin(i) = pin(ii). by congruence.
+eqnames.
+exists jj.
+expand output@R1(jj,ii). expand m(jj,ii)@R1(jj,ii).
+split; 1,2: by auto.
+(* case euf 2/2 - A1(kk) coming from the process oracle *)
+intro Ht M.
+use secretStateTag with A1(kk),i,j.
+by congruence.
+by assumption.
+by assumption.
 Qed.
