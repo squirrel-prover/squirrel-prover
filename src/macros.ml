@@ -50,7 +50,7 @@ let is_defined name a table =
 
 (*------------------------------------------------------------------*)
 let get_def 
-    (system : SE.system_expr)
+    (system : SE.t)
     (table  : Symbols.table)
     (symb   : Term.msymb)
     (a      : Term.timestamp) : Term.message 

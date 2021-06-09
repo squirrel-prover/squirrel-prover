@@ -15,7 +15,7 @@ let get_id = function
   | Left id | Right id -> id
 
 (*------------------------------------------------------------------*)
-type system_expr =
+type t =
   | Single     of single_system
   | SimplePair of Symbols.system Symbols.t
   | Pair       of single_system * single_system
@@ -144,7 +144,7 @@ let make_bi_descr s1 s2 (d1 : Action.descr) (d2 : Action.descr) : Action.descr =
     updates = updates; 
     output = output; }
 
-let descr_of_shape table (se : system_expr) shape =
+let descr_of_shape table (se : t) shape =
   let getd s_symb = System.descr_of_shape table s_symb shape in
 
   match se with
@@ -168,7 +168,7 @@ let descr_of_shape table (se : system_expr) shape =
       (Action.pi_descr (get_proj s1) left_a)
       (Action.pi_descr (get_proj s2) right_a)
 
-let descr_of_action table (system : system_expr) a =
+let descr_of_action table (system : t) a =
   let descr = descr_of_shape table system (Action.get_shape a) in
   let d_indices = descr.indices in
   let a_indices = Action.get_indices a in

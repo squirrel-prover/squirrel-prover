@@ -1,6 +1,5 @@
 (** A single system, that is a system without diff, is given by the name of a
    (bi)system , and either Left or Right. *)
-
 type single_system =
   | Left  of Symbols.system Symbols.t
   | Right of Symbols.system Symbols.t
@@ -15,18 +14,18 @@ val get_proj : single_system -> Term.projection
       as it was declared, considered with its diff terms;
     - a system obtained by
       combinaison of two single system, one for the left and one for the right. *)
-type system_expr = private
+type t = private
   | Single     of single_system
   | SimplePair of Symbols.system Symbols.t
   | Pair       of single_system * single_system
 
-val single      : Symbols.table -> single_system -> system_expr
-val simple_pair : Symbols.table -> Symbols.system Symbols.t -> system_expr
-val pair        : Symbols.table -> single_system -> single_system -> system_expr
+val single      : Symbols.table -> single_system -> t
+val simple_pair : Symbols.table -> Symbols.system Symbols.t -> t
+val pair        : Symbols.table -> single_system -> single_system -> t
 
-val systems_compatible : system_expr -> system_expr -> bool
+val systems_compatible : t -> t -> bool
 
-val pp_system : Format.formatter -> system_expr -> unit
+val pp_system : Format.formatter -> t -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
@@ -51,26 +50,26 @@ exception BiSystemError of system_expr_err
 (** Prject a system according to the given projection.  The pojection must not
    be None, and the system must be a bi system, i.e either SimplePair or Pair.
    *)
-val project_system : Term.projection -> system_expr -> system_expr
+val project_system : Term.projection -> t -> t
 
 (** Convert action to the corresponding [Action] timestamp term in
     a system expression.
     Remark that this requires both system to declare the action, 
     with the same name. *)
 val action_to_term : 
-  Symbols.table -> system_expr -> Action.action -> Term.timestamp
+  Symbols.table -> t -> Action.action -> Term.timestamp
 
 (*------------------------------------------------------------------*)
 (** {2 Action descriptions and iterators} *)
 
 val descr_of_shape :
-  Symbols.table -> system_expr -> Action.shape -> Action.descr
+  Symbols.table -> t -> Action.shape -> Action.descr
 
-(** [descr_of_action table system_expr a] returns the description corresponding 
-    to the action [a] in [system_expr].  
+(** [descr_of_action table t a] returns the description corresponding 
+    to the action [a] in [t].  
     @Raise Not_found if no action corresponds to [a]. *)
 val descr_of_action : 
-  Symbols.table -> system_expr -> Action.action -> Action.descr
+  Symbols.table -> t -> Action.action -> Action.descr
 
 (** Get the action symbols table of a system expression.
   * We rely on the invariant that the system systems involved in an expression
@@ -78,19 +77,19 @@ val descr_of_action :
 val symbs :
   with_dummies:bool ->
   Symbols.table -> 
-  system_expr -> 
+  t -> 
   Symbols.action Symbols.t System.Msh.t
 
 (** Iterate over all action descriptions in [system].
   * Only one representative of each action shape will be passed
   * to the function, with indices that are not guaranteed to be fresh. *)
 val iter_descrs : 
-  Symbols.table -> system_expr -> 
+  Symbols.table -> t -> 
   (Action.descr -> unit) -> 
   unit
 
 val map_descrs : 
-  Symbols.table -> system_expr -> 
+  Symbols.table -> t -> 
   (Action.descr -> 'a) -> 
   'a list
 
@@ -111,7 +110,7 @@ type subst_descr = esubst_descr list
 (** {2 Pretty-printing } *)
 
 (** Pretty-print all action descriptions. *)
-val pp_descrs : Symbols.table -> Format.formatter -> system_expr -> unit
+val pp_descrs : Symbols.table -> Format.formatter -> t -> unit
 
 
 (*------------------------------------------------------------------*)
@@ -131,6 +130,6 @@ type p_system_expr =
   | P_Pair       of p_single_system * p_single_system
 
 val parse_single : Symbols.table -> p_single_system -> single_system
-val parse_se     : Symbols.table -> p_system_expr   -> system_expr
+val parse_se     : Symbols.table -> p_system_expr   -> t
 
 val pp_p_system : Format.formatter -> p_system_expr -> unit

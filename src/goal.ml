@@ -41,7 +41,7 @@ type named_goals = named_goal list
 type ('a,'b) lemma_g = { 
   gc_name   : 'a; 
   gc_tyvars : Type.tvars;
-  gc_system : SE.system_expr;
+  gc_system : SE.t;
   gc_concl  : 'b;
 }
 

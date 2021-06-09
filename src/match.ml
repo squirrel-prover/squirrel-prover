@@ -75,7 +75,7 @@ type match_state = {
   support  : Sv.t;       (** free variable which we are trying to match *)
   env      : Sv.t;       (** rigid free variables (disjoint from [support]) *)
   table    : Symbols.table;
-  system   : SystemExpr.system_expr;
+  system   : SystemExpr.t;
 }
 
 (*------------------------------------------------------------------*)
@@ -118,7 +118,7 @@ module type S = sig
     ?mv:Mvar.t ->
     ?mode:[`Eq | `EntailLR | `EntailRL] ->
     Symbols.table ->
-    SystemExpr.system_expr ->
+    SystemExpr.t ->
     t -> t pat ->
     [ `FreeTyv | `NoMatch | `Match of Mvar.t ]
 
@@ -126,14 +126,14 @@ module type S = sig
     ?mv:Mvar.t ->
     ?mode:[`Eq | `EntailLR | `EntailRL] ->
     Symbols.table ->
-    SystemExpr.system_expr ->
+    SystemExpr.t ->
     'a term -> 'b term pat ->
     [ `FreeTyv | `NoMatch | `Match of Mvar.t ]
 
   val find_map :
     many:bool ->
     Symbols.table ->
-    SystemExpr.system_expr ->
+    SystemExpr.t ->
     Vars.env ->
     t -> 'a term pat ->
     ('a term -> Vars.evars -> Mvar.t -> 'a term) ->
@@ -419,7 +419,7 @@ module T : S with type t = message = struct
     ?mv:Mvar.t ->
     ?mode:[`Eq | `EntailLR | `EntailRL] ->
     Symbols.table ->
-    SystemExpr.system_expr ->
+    SystemExpr.t ->
     a term -> b term pat ->
     [`FreeTyv | `NoMatch | `Match of Mvar.t] =
     fun ?mv ?mode table system t p ->
@@ -642,7 +642,7 @@ module T : S with type t = message = struct
     type a b.
     many:bool ->
     Symbols.table ->
-    SystemExpr.system_expr ->
+    SystemExpr.t ->
     Vars.env -> a term -> b term pat ->
     (b term -> Vars.evars -> Mvar.t -> b term) ->
     a term option
@@ -972,7 +972,7 @@ module E : S with type t = Equiv.form = struct
       (∪ᵢ sᵢ) ∩ (∪ᵢ sᵢ) = ∪ᵢ,ⱼ (sᵢ∩sⱼ) *)
   let mset_list_inter
       (table : Symbols.table)
-      (system : SystemExpr.system_expr)
+      (system : SystemExpr.t)
       (env : Sv.t)
       (mset_l1 : Mset.t list)
       (mset_l2 : Mset.t list) : Mset.t list
@@ -1009,7 +1009,7 @@ module E : S with type t = Equiv.form = struct
       invariant on deducible messages which contains [terms]. *)
   let strengthen
       (table  : Symbols.table)
-      (system : SystemExpr.system_expr)
+      (system : SystemExpr.t)
       (env    : Sv.t)
       (init_terms  : Term.messages) : msets
     =
@@ -1364,7 +1364,7 @@ module E : S with type t = Equiv.form = struct
       ?mv
       ?(mode=`Eq)
       (table : Symbols.table)
-      (system : SystemExpr.system_expr)
+      (system : SystemExpr.t)
       (t : t)
       (p : t pat)
     : [ `FreeTyv | `NoMatch | `Match of Mvar.t ]
@@ -1666,7 +1666,7 @@ module E : S with type t = Equiv.form = struct
     type b.
     many:bool ->
     Symbols.table ->
-    SystemExpr.system_expr ->
+    SystemExpr.t ->
     Vars.env ->
     t -> b Term.term pat ->
     (b Term.term -> Vars.evars -> Mvar.t -> b Term.term) ->

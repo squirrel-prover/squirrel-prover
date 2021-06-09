@@ -43,7 +43,7 @@ val find_eq_action : models -> Term.timestamp -> Term.timestamp option
 (** Context of a trace model. *)
 type trace_cntxt = {
   table  : Symbols.table;
-  system : SystemExpr.system_expr;
+  system : SystemExpr.t;
 
   (* used to find an action occuring at a given timestamp *)
   models : models option;

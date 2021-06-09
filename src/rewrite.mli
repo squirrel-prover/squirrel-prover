@@ -18,7 +18,7 @@ val pat_to_rw_erule :
 (*------------------------------------------------------------------*)
 val rewrite_head : 
   Symbols.table ->
-  SystemExpr.system_expr -> 
+  SystemExpr.t -> 
   rw_erule -> 
   'a Term.term -> 
   ('a Term.term * Term.message list) option 

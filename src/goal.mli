@@ -21,7 +21,7 @@ type named_goal = string * t
 type ('a,'b) lemma_g = { 
   gc_name   : 'a; 
   gc_tyvars : Type.tvars;
-  gc_system : SE.system_expr;
+  gc_system : SE.t;
   gc_concl  : 'b;
 }
 
@@ -68,7 +68,7 @@ val make_equiv_goal :
   table:Symbols.table ->
   hint_db:Hint.hint_db ->
   string ->
-  SE.system_expr -> Theory.bnds -> Theory.equiv_form L.located -> lemma * t
+  SE.t -> Theory.bnds -> Theory.equiv_form L.located -> lemma * t
 
 val make_trace_goal :
   tbl:Symbols.table -> 
@@ -79,4 +79,4 @@ val make_trace_goal :
 val make_equiv_goal_process :
   table:Symbols.table -> 
   hint_db:Hint.hint_db ->
-  string -> SE.system_expr -> lemma * t
+  string -> SE.t -> lemma * t

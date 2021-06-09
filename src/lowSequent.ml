@@ -53,8 +53,8 @@ module type S = sig
   val goal : t -> conc_form
   val set_goal : conc_form -> t -> t
 
-  val system : t -> SystemExpr.system_expr
-  val set_system : SystemExpr.system_expr -> t -> t
+  val system : t -> SystemExpr.t
+  val set_system : SystemExpr.t -> t -> t
 
   val table : t -> Symbols.table
   val set_table : Symbols.table -> t -> t

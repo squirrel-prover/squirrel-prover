@@ -56,7 +56,7 @@ exception NoRW
 
 let rewrite_head : 
   Symbols.table ->
-  SE.system_expr ->
+  SE.t ->
   rw_erule -> Term.message ->
   Term.message * Term.message list 
   = fun table system rule t ->
@@ -85,7 +85,7 @@ let rewrite_head :
 
 let rewrite_head : type a.
   Symbols.table ->
-  SE.system_expr ->
+  SE.t ->
   rw_erule -> a Term.term -> 
   (a Term.term * Term.message list) option =
   fun table system rule t ->

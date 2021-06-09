@@ -62,7 +62,7 @@ module H = Hyps.Mk(FHyp)
 (*------------------------------------------------------------------*)
 module S : sig
   type t = private {
-    system : SystemExpr.system_expr ;
+    system : SystemExpr.t ;
     table : Symbols.table;
 
     hint_db : Hint.hint_db;
@@ -82,7 +82,7 @@ module S : sig
   }
 
   val init_sequent :
-    system:SystemExpr.system_expr ->
+    system:SystemExpr.t ->
     table:Symbols.table ->
     hint_db:Hint.hint_db ->
     ty_vars:Type.tvars ->
@@ -91,7 +91,7 @@ module S : sig
     t
 
   val update :
-    ?system:SystemExpr.system_expr ->
+    ?system:SystemExpr.t ->
     ?table:Symbols.table ->
     ?ty_vars:Type.tvars ->
     ?env:Vars.env ->
@@ -101,7 +101,7 @@ module S : sig
 
 end = struct
   type t = {
-    system     : SystemExpr.system_expr ;
+    system     : SystemExpr.t ;
     table      : Symbols.table;
     hint_db    : Hint.hint_db;
     ty_vars    : Type.tvars;

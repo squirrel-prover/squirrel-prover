@@ -47,7 +47,7 @@ type t = {
   ty_vars : Type.tvars;
   hyps    : H.hyps;
   goal    : Equiv.form;
-  system  : SystemExpr.system_expr;
+  system  : SystemExpr.t;
   hint_db : Hint.hint_db;
 }
 

@@ -18,7 +18,7 @@ module Mk (S : LowSequent.S) = struct
      - trace literals not updated *)
   type state = { 
     table      : Symbols.table;
-    system     : SystemExpr.system_expr;
+    system     : SystemExpr.t;
     param      : red_param;
     hint_db    : Hint.hint_db;
     trace_lits : Constr.trace_literals;

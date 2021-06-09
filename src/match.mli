@@ -78,7 +78,7 @@ module type S = sig
     ?mv:Mvar.t ->
     ?mode:[`Eq | `EntailLR | `EntailRL] ->
     Symbols.table ->
-    SystemExpr.system_expr ->
+    SystemExpr.t ->
     t -> t pat ->
     [ `FreeTyv | `NoMatch | `Match of Mvar.t ]
 
@@ -87,7 +87,7 @@ module type S = sig
     ?mv:Mvar.t ->
     ?mode:[`Eq | `EntailLR | `EntailRL] ->
     Symbols.table ->
-    SystemExpr.system_expr ->
+    SystemExpr.t ->
     'a Term.term -> 'b Term.term pat ->
     [ `FreeTyv | `NoMatch | `Match of Mvar.t ]
 
@@ -99,7 +99,7 @@ module type S = sig
   val find_map :
     many:bool ->
     Symbols.table ->
-    SystemExpr.system_expr ->
+    SystemExpr.t ->
     Vars.env ->
     t -> 'a Term.term pat ->
     ('a Term.term -> Vars.evars -> Mvar.t -> 'a Term.term) ->

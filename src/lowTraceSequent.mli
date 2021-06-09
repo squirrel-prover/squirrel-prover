@@ -19,7 +19,7 @@ include LowSequent.S
 (** {2 Sequent type and basic operations} *)
 
 val init :
-  system:SystemExpr.system_expr ->
+  system:SystemExpr.t ->
   table:Symbols.table ->
   hint_db:Hint.hint_db ->
   ty_vars:Type.tvars ->
