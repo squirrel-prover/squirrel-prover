@@ -134,12 +134,12 @@ Proof.
   split; 1,2: by auto.
 
   (* t = R(jj) *)
-  intro _; simpl_left; subst t,R(jj).
+  intro [jj _]; subst t,R(jj).
   use IH0 with pred(R(jj)),i as [[M1 H1] | H2].
   left. split.
   by expand kT(i)@R(jj); assumption.
   intro j' Hap'.
-  use H1 with j'; 1,2: by constraints.
+  use H1 with j'; 1,2: constraints.
   simpl_left.
   right; exists j; split.
   expand kT(i)@R(jj).
@@ -148,17 +148,17 @@ Proof.
   use H0 with j' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 
   (* t = R1(jj,ii) *)
-  intro _; simpl_left; subst t,R1(jj,ii).
+  intro [jj ii _]; subst t,R1(jj,ii).
   use IH0 with pred(R1(jj,ii)),i as [[M1 H1] | H2].
   left. split.
   by expand kT(i)@R1(jj,ii); assumption.
   intro j' Hap'.
-  use H1 with j'; 1,2: by constraints.
+  use H1 with j'; 1,2: constraints.
   simpl_left.
   right; exists j; split.
   expand kT(i)@R1(jj,ii).
@@ -167,17 +167,17 @@ Proof.
   use H0 with j' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 
   (* t = R2(jj) *)
-  intro _; simpl_left; subst t,R2(jj).
+  intro [jj _]; subst t,R2(jj).
   use IH0 with pred(R2(jj)),i as [[M1 H1] | H2].
   left. split.
   by expand kT(i)@R2(jj); assumption.
   intro j' Hap'.
-  use H1 with j'; 1,2: by constraints.
+  use H1 with j'; 1,2: constraints.
   simpl_left.
   right; exists j; split.
   expand kT(i)@R2(jj).
@@ -186,17 +186,17 @@ Proof.
   use H0 with j' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 
   (* t = T(i0,j) *)
-  intro _; simpl_left; subst t,T(i0,j).
+  intro [i0 j _]; subst t,T(i0,j).
   use IH0 with pred(T(i0,j)),i as [[M1 H1] | H2].
   left. split.
   by expand kT(i)@T(i0,j); assumption.
   intro j' Hap'.
-  use H1 with j'; 1,2: by constraints.
+  use H1 with j'; 1,2: constraints.
   simpl_left.
   right; exists j0; split.
   expand kT(i)@T(i0,j).
@@ -205,29 +205,29 @@ Proof.
   use H0 with j' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 
   (* t = T1(i0,j) - interesting case *)
-  intro _; simpl_left; subst t,T1(i0,j).
+  intro [i0 j _]; subst t,T1(i0,j).
   use IH0 with pred(T1(i0,j)),i as H.
   case H. 
 
   (* case H - 1/2 *)
   destruct H as [H1 H2].
   assert (i=i0 || i<>i0) as C.
-  by constraints.
+  constraints.
   case C.
   (* case i=i0 *)
   right.
   exists j.
   split. split.
-  by congruence. by constraints.
+  congruence. constraints.
   intro j' Hap'.
-  use H2 with j' as Ht; 2: by assumption.
+  use H2 with j' as Ht; 2: assumption.
   assert (j=j' || j<>j') as C'.
-  by constraints.
+  constraints.
   case C'.
   by left.
   by right; constraints.
@@ -241,42 +241,42 @@ Proof.
          else kT(i)@pred(T1(i0,j))).
   intro H3.
   destruct H3 as [H4 H5].
-  by constraints.
+  constraints.
   intro H3.
   destruct H3 as [H4 H5].
-  by assumption.
+  assumption.
   intro j' Hap'.
-  use H2 with j' as Ht; 2: by assumption.
+  use H2 with j' as Ht; 2: assumption.
   assert (j=j' || j<>j') as C'.
-  by constraints.
+  constraints.
   case C'.
-  by constraints.
-  by constraints.
+  constraints.
+  constraints.
 
   (* case H - 2/2 *)
   simpl_left.
   assert (i=i0 || i<>i0) as C.
-  by constraints.
+  constraints.
   case C.
   assert (j=j0 || j<>j0) as C'.
-  by constraints.
+  constraints.
   case C'.
 
   (* case i=i0 && j=j0 *)
-  by constraints.
+  constraints.
 
   (* case i=i0 && j<>j0 *)
   right.
   exists j.
   split. split.
-  by congruence.
-  by constraints.
+  congruence.
+  constraints.
   intro j' Hap'.
-  use H0 with j' as Ht; 2: by assumption.
+  use H0 with j' as Ht; 2: assumption.
   case Ht.
   by left; constraints.
   assert (j=j' || j<>j') as C.
-  by constraints.
+  constraints.
   case C.
   by left; constraints.
   by right; constraints.
@@ -292,69 +292,67 @@ Proof.
      else kT(i)@pred(T1(i0,j))).
   intro H2.
   destruct H2 as [H3 H4].
-  by constraints.
+  constraints.
   intro H2.
   destruct H2 as [H3 H4].
-  by assumption.
+  assumption.
 
-  by constraints.
+  constraints.
   intro j' Hap'.
-  use H0 with j' as Ht; 2: by assumption.
+  use H0 with j' as Ht; 2: assumption.
   case Ht.
   by left; constraints.
   assert (j=j' || j<>j') as C'.
-  by constraints.
+  constraints.
   case C'.
   by right; constraints.
   by right; constraints.
-  by constraints.
-  by constraints.
+  constraints.
+  constraints.
 
   (* t = T2(i0,j) *)
-  intro _; simpl_left; subst t,T2(i0,j).
+  intro [i0 j Eq]; rewrite Eq.
   use IH0 with pred(T2(i0,j)),i as [[M1 H1] | H2].
   left. split.
   by expand kT(i)@T2(i0,j); assumption.
   intro j' Hap'.
-  use H1 with j'; 1,2: by constraints.
+  use H1 with j'; 1,2: constraints.
   simpl_left.
   right; exists j0; split.
-  expand kT(i)@T2(i0,j).
-  split; 1,2: by auto.
+  auto.
   intro j' Hap'.
   use H0 with j' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 
   (* t = T3(i0,j) *)
-  intro _; simpl_left; subst t,T3(i0,j).
+  intro [i0 j Eq]; rewrite Eq.
   use IH0 with pred(T3(i0,j)),i as [[M1 H1] | H2].
   left. split.
   by expand kT(i)@T3(i0,j); assumption.
   intro j' Hap'.
-  use H1 with j'; 1,2: by constraints.
+  use H1 with j'; 1,2: constraints.
   simpl_left.
   right; exists j0; split.
-  expand kT(i)@T3(i0,j).
-  split; 1,2: by auto.
+  auto.
   intro j' Hap'.
   use H0 with j' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 
   (* t = A(kk) *)
-  intro _; simpl_left; subst t,A(kk).
+  intro [kk Eq]; rewrite Eq.
   use IH0 with pred(A(kk)),i as [[M1 H1] | H2].
   left. split.
   by expand kT(i)@A(kk); assumption.
   intro j' Hap'.
-  use H1 with j'; 1,2: by constraints.
+  use H1 with j'; 1,2: constraints.
   simpl_left.
   right; exists j; split.
   expand kT(i)@A(kk).
@@ -363,17 +361,17 @@ Proof.
   use H0 with j' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 
   (* t = A1(kk) *)
-  intro _; simpl_left; subst t,A1(kk).
+  intro [kk Eq]; rewrite Eq.
   use IH0 with pred(A1(kk)),i as [[M1 H1] | H2].
   left. split.
   by expand kT(i)@A1(kk); assumption.
   intro j' Hap'.
-  use H1 with j'; 1,2: by constraints.
+  use H1 with j'; 1,2: constraints.
   simpl_left.
   right; exists j; split.
   expand kT(i)@A1(kk).
@@ -382,17 +380,17 @@ Proof.
   use H0 with j' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 
   (* t = A2(kk) *)
-  intro _; simpl_left; subst t,A2(kk).
+  intro [kk Eq]; rewrite Eq.
   use IH0 with pred(A2(kk)),i as [[M1 H1] | H2].
   left. split.
   by expand kT(i)@A2(kk); assumption.
   intro j' Hap'.
-  use H1 with j'; 1,2: by constraints.
+  use H1 with j'; 1,2: constraints.
   simpl_left.
   right; exists j; split.
   expand kT(i)@A2(kk).
@@ -401,9 +399,9 @@ Proof.
   use H0 with j' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 Qed.
 
 goal lastUpdateT :
@@ -414,12 +412,12 @@ forall (i,j:index), happens(T(i,j)) =>
          snd(input@T(i,j')) >)).
 Proof.
   intro i j Hap.
-  use lastUpdateTag_ with T(i,j),i as H1; 2: by assumption.
+  use lastUpdateTag_ with T(i,j),i as H1; 2: assumption.
   case H1.
   by left.
-  right; simpl_left.
-  exists j0.
-  by expand kT(i)@T1(i,j0); assumption.
+  right.
+  destruct H1 as [j0 _].
+  by exists j0.
 Qed.
 
 goal lastUpdateReader_ :
@@ -447,7 +445,7 @@ Proof.
   left. split.
   by expand kR(ii)@R(jj); assumption.
   intro jj' Hap'.
-  use H1 with jj'; 1,2: by constraints.
+  use H1 with jj'; 1,2: constraints.
   simpl_left.
   right; exists jj0; split.
   expand kR(ii)@R(jj).
@@ -456,9 +454,9 @@ Proof.
   use H0 with jj' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 
   (* t = R1(jj,ii0) - interesting case *)
   intro _; simpl_left; subst t,R1(jj,ii0).
@@ -468,17 +466,17 @@ Proof.
   (* case H - 1/2 *)
   destruct H as [H1 H2].
   assert (ii=ii0 || ii<>ii0) as C.
-  by constraints.
+  constraints.
   case C.
   (* case ii=ii0 *)
   right.
   exists jj.
   split. split.
-  by congruence. by constraints.
+  congruence. constraints.
   intro jj' Hap'.
-  use H2 with jj' as Ht; 2: by assumption.
+  use H2 with jj' as Ht; 2: assumption.
   assert (jj=jj' || jj<>jj') as C'.
-  by constraints.
+  constraints.
   case C'.
   by left.
   by right; constraints.
@@ -491,42 +489,42 @@ Proof.
    kR(ii)@pred(R1(jj,ii0))).
   intro H3.
   destruct H3 as [H4 H5].
-  by constraints.
+  constraints.
   intro H3.
   destruct H3 as [H4 H5].
-  by assumption.
+  assumption.
   intro jj' Hap'.
-  use H2 with jj' as Ht; 2: by assumption.
+  use H2 with jj' as Ht; 2: assumption.
   assert (jj=jj' || jj<>jj') as C'.
-  by constraints.
+  constraints.
   case C'.
-  by constraints.
-  by constraints.
+  constraints.
+  constraints.
 
   (* case H - 2/2 *)
   simpl_left.
   assert (ii=ii0 || ii<>ii0) as C.
-  by constraints.
+  constraints.
   case C.
   assert (jj=jj0 || jj<>jj0) as C'.
-  by constraints.
+  constraints.
   case C'.
 
   (* case ii=ii0 && jj=jj0 *)
-  by constraints.
+  constraints.
 
   (* case ii=ii0 && jj<>jj0 *)
   right.
   exists jj.
   split. split.
-  by congruence.
-  by constraints.
+  congruence.
+  constraints.
   intro jj' Hap'.
-  use H0 with jj' as Ht; 2: by assumption.
+  use H0 with jj' as Ht; 2: assumption.
   case Ht.
   by left; constraints.
   assert (jj=jj' || jj<>jj') as C.
-  by constraints.
+  constraints.
   case C.
   by left; constraints.
   by right; constraints.
@@ -541,22 +539,22 @@ Proof.
    kR(ii)@pred(R1(jj,ii0))).
   intro H2.
   destruct H2 as [H3 H4].
-  by constraints.
+  constraints.
   intro H2.
   destruct H2 as [H3 H4].
-  by assumption.
-  by constraints.
+  assumption.
+  constraints.
   intro jj' Hap'.
-  use H0 with jj' as Ht; 2: by assumption.
+  use H0 with jj' as Ht; 2: assumption.
   case Ht.
   by left; constraints.
   assert (jj=jj' || jj<>jj') as C'.
-  by constraints.
+  constraints.
   case C'.
   by right; constraints.
   by right; constraints.
-  by constraints.
-  by constraints.
+  constraints.
+  constraints.
 
   (* t = R2(jj) *)
   intro _; simpl_left; subst t,R2(jj).
@@ -564,7 +562,7 @@ Proof.
   left. split.
   by expand kR(ii)@R2(jj); assumption.
   intro jj' Hap'.
-  use H1 with jj'; 1,2: by constraints.
+  use H1 with jj'; 1,2: constraints.
   simpl_left.
   right; exists jj0; split.
   expand kR(ii)@R2(jj).
@@ -573,9 +571,9 @@ Proof.
   use H0 with jj' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 
   (* t = T(i,j) *)
   intro _; simpl_left; subst t,T(i,j).
@@ -583,7 +581,7 @@ Proof.
   left. split.
   by expand kR(ii)@T(i,j); assumption.
   intro jj' Hap'.
-  use H1 with jj'; 1,2: by constraints.
+  use H1 with jj'; 1,2: constraints.
   simpl_left.
   right; exists jj; split.
   expand kR(ii)@T(i,j).
@@ -592,9 +590,9 @@ Proof.
   use H0 with jj' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 
   (* t = T1(i,j) *)
   intro _; simpl_left; subst t,T1(i,j).
@@ -602,7 +600,7 @@ Proof.
   left. split.
   by expand kR(ii)@T1(i,j); assumption.
   intro jj' Hap'.
-  use H1 with jj'; 1,2: by constraints.
+  use H1 with jj'; 1,2: constraints.
   simpl_left.
   right; exists jj; split.
   expand kR(ii)@T1(i,j).
@@ -611,9 +609,9 @@ Proof.
   use H0 with jj' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 
   (* t = T2(i,j) *)
   intro _; simpl_left; subst t,T2(i,j).
@@ -621,7 +619,7 @@ Proof.
   left. split.
   by expand kR(ii)@T2(i,j); assumption.
   intro jj' Hap'.
-  use H1 with jj'; 1,2: by constraints.
+  use H1 with jj'; 1,2: constraints.
   simpl_left.
   right; exists jj; split.
   expand kR(ii)@T2(i,j).
@@ -630,9 +628,9 @@ Proof.
   use H0 with jj' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 
   (* t = T(i,j) *)
   intro _; simpl_left; subst t,T3(i,j).
@@ -640,7 +638,7 @@ Proof.
   left. split.
   by expand kR(ii)@T3(i,j); assumption.
   intro jj' Hap'.
-  use H1 with jj'; 1,2: by constraints.
+  use H1 with jj'; 1,2: constraints.
   simpl_left.
   right; exists jj; split.
   expand kR(ii)@T3(i,j).
@@ -649,9 +647,9 @@ Proof.
   use H0 with jj' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 
   (* t = A(kk) *)
   intro _; simpl_left; subst t,A(kk).
@@ -659,7 +657,7 @@ Proof.
   left. split.
   by expand kR(ii)@A(kk); assumption.
   intro jj' Hap'.
-  use H1 with jj'; 1,2: by constraints.
+  use H1 with jj'; 1,2: constraints.
   simpl_left.
   right; exists jj; split.
   expand kR(ii)@A(kk).
@@ -668,9 +666,9 @@ Proof.
   use H0 with jj' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 
   (* t = A1(kk) *)
   intro _; simpl_left; subst t,A1(kk).
@@ -678,7 +676,7 @@ Proof.
   left. split.
   by expand kR(ii)@A1(kk); assumption.
   intro jj' Hap'.
-  use H1 with jj'; 1,2: by constraints.
+  use H1 with jj'; 1,2: constraints.
   simpl_left.
   right; exists jj; split.
   expand kR(ii)@A1(kk).
@@ -687,9 +685,9 @@ Proof.
   use H0 with jj' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 
   (* t = A2(kk) *)
   intro _; simpl_left; subst t,A2(kk).
@@ -697,7 +695,7 @@ Proof.
   left. split.
   by expand kR(ii)@A2(kk); assumption.
   intro jj' Hap'.
-  use H1 with jj'; 1,2: by constraints.
+  use H1 with jj'; 1,2: constraints.
   simpl_left.
   right; exists jj; split.
   expand kR(ii)@A2(kk).
@@ -706,9 +704,9 @@ Proof.
   use H0 with jj' as H1.
   case H1.
   by left. by right; constraints.
-  by assumption.
-  by constraints.
-  by constraints.
+  assumption.
+  constraints.
+  constraints.
 Qed.
 
 goal lastUpdatePredR1 :
@@ -719,13 +717,13 @@ forall (jj,ii:index), happens(pred(R1(jj,ii))) =>
          h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3))).
 Proof.
   intro jj ii Hap.
-  use lastUpdateReader_ with pred(R1(jj,ii)),ii as H1; 2: by assumption.
+  use lastUpdateReader_ with pred(R1(jj,ii)),ii as H1; 2: assumption.
   case H1.
   by left.
   right; simpl_left.
   exists jj0.
   split.
-  by assumption.
+  assumption.
   by expand kR(ii)@R1(jj0,ii); assumption.
 Qed.
 
@@ -767,25 +765,25 @@ Proof.
      h3(<<kR(ii0)@pred(R1(jj,ii0)),pin(ii0)>,TS@pred(R1(jj,ii0))>,key3) else
      kR(ii)@pred(R1(jj,ii0))).
   assert (ii=ii0 || ii<>ii0) as H.
-  by constraints.
+  constraints.
   case H.
   intro H1.
   destruct H1 as [H2 H3].
   expand kR(ii)@R1(jj,ii).
   intro M.
-  use IH0 with pred(R1(jj,ii)),i,ii as H4; 2,3,4: by constraints.
+  use IH0 with pred(R1(jj,ii)),i,ii as H4; 2,3,4: constraints.
   fresh M.
   admit. (* TODO - fresh tactic not precise enough *)
   intro _.
-  by constraints.
+  constraints.
   assert (ii=ii0 || ii<>ii0) as H.
-  by constraints.
+  constraints.
   case H.
   intro _.
-  by constraints.
+  constraints.
   intro H1.
   destruct H1 as [H2 H3].
-  use IH0 with pred(R1(jj,ii0)),i,ii as H4; 2,3,4: by constraints.
+  use IH0 with pred(R1(jj,ii0)),i,ii as H4; 2,3,4: constraints.
   expand kR(ii)@R1(jj,ii0).
   intro E.
   assert kR(ii)@pred(R1(jj,ii0)) = idinit(i). 
@@ -815,25 +813,25 @@ Proof.
        h3(<<fst(kT(i0)@pred(T1(i0,j))),pin(i0)>,snd(input@T(i0,j))>,key3)
        else kT(i)@pred(T1(i0,j))).
   assert (i=i0 || i<> i0) as H.
-  by constraints.
+  constraints.
   case H.
   intro H1.
   destruct H1 as [H2 H3].
   expand kT(i)@T1(i,j).
   intro M.
-  use IH0 with pred(T1(i,j)),i,ii as H4; 2,3,4: by constraints.
+  use IH0 with pred(T1(i,j)),i,ii as H4; 2,3,4: constraints.
   fresh M.
   admit. (* TODO - fresh tactic not precise enough *)
   intro _.
-  by constraints.
+  constraints.
   assert (i=i0 || i<>i0) as H.
-  by constraints.
+  constraints.
   case H.
   intro _.
-  by constraints.
+  constraints.
   intro H1.
   destruct H1 as [H2 H3].
-  use IH0 with pred(T1(i0,j)),i,ii as H4; 2,3,4: by constraints.
+  use IH0 with pred(T1(i0,j)),i,ii as H4; 2,3,4: constraints.
   expand kT(i)@T1(i0,j).
   intro E.
   assert fst(kT(i)@pred(T1(i0,j))) = idinit(ii).
@@ -854,7 +852,7 @@ Proof.
 
   (* case euf 1/2 - T(i,j) *)
   assert (i=ii || i<>ii) as H0.
-  by constraints.
+  constraints.
   case H0.
   (* case i=ii - honest case *)
   intro Ht M.
@@ -863,45 +861,45 @@ Proof.
   split; 1,2: by auto.
   (* case i<>ii - absurd, we derive a contradiction *)
   intro Ht M.
-  use lastUpdateT with i,j as H1; 2: by constraints.
-  use lastUpdatePredR1 with jj,ii as H2; 2: by constraints.
+  use lastUpdateT with i,j as H1; 2: constraints.
+  use lastUpdatePredR1 with jj,ii as H2; 2: constraints.
   case H1. case H2.
   (* kT(i)@T(i,j) = kT(i)@init && kR(ii)@pred(R1(jj,ii)) = kR(ii)@init  *)
   expand kT(i)@init.
   expand kR(ii)@init.
-  assert idinit(i) = idinit(ii). by congruence.
+  assert idinit(i) = idinit(ii). congruence.
   by eqnames.
   (* kT(i)@T(i,j) = kT(i)@init && kR(ii)@pred(R1(jj,ii)) = h3(...) *)
   simpl_left.
   expand kT(i)@init.
   use stateInitReader with pred(R1(jj,ii)),i,ii as H2; 2,3: by auto.
-  by congruence.
+  congruence.
 
   case H2.
   (* kT(i)@T(i,j) = <h3(...),...> && kR(ii)@pred(R1(jj,ii)) = kR(ii)@init *)
   simpl_left.
   expand kR(ii)@init.
   use stateInitTag with T(i,j),i,ii as H3; 2,3: by auto.
-  by congruence.
+  congruence.
   (* kT(i)@T(i,j) = <h3(...),...> && kR(ii)@pred(R1(jj,ii)) = h3(...) *)
   simpl_left.
   assert
     h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3) =
     h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3)
     as _.
-  by congruence.
+  congruence.
   collision.
   intro _.
   assert pin(i) = pin(ii).
-  by congruence.
+  congruence.
   by eqnames.
 
   (* case euf 2/2 - A(kk) *)
   intro Ht M.
   use secretStateReader with A(kk),jj,ii.
-  by congruence.
-  by constraints.
-  by assumption.
+  congruence.
+  constraints.
+  assumption.
 Qed.
 
 goal auth_T1 :
@@ -916,15 +914,15 @@ expand cond@T1(i,j).
 euf Hcond.
 (* case euf 1/2 - honest case R1(jj,ii) *)
 intro Ht M.
-assert pin(i) = pin(ii). by congruence.
+assert pin(i) = pin(ii). congruence.
 eqnames.
 exists jj.
-expand output@R1(jj,ii). expand m(jj,ii)@R1(jj,ii).
+expand output@R1(jj,i). expand m(jj,i)@R1(jj,i).
 split; 1,2: by auto.
 (* case euf 2/2 - A1(kk) coming from the process oracle *)
 intro Ht M.
 use secretStateTag with A1(kk),i,j.
-by congruence.
-by assumption.
-by assumption.
+congruence.
+assumption.
+assumption.
 Qed.
