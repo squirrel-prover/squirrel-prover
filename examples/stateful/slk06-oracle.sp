@@ -100,31 +100,69 @@ system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))
 
 set autoIntro=false.
 
-goal if_false  (b : boolean, x,y : message):
+goal if_false ['a] (b : boolean, x,y : 'a):
  (not b) => if b then x else y = y.
 Proof.
  by intro *; noif. 
 Qed.
 
-goal if_true (b : boolean, x,y : message):
+goal if_true ['a] (b : boolean, x,y : 'a):
  b => if b then x else y = x.
 Proof.
   by intro *; yesif.
 Qed.
 
+goal if_true0 ['a] (x,y : 'a):
+ if true then x else y = x.
+Proof.
+  by rewrite if_true. 
+Qed.
+hint rewrite if_true0.
+
+goal if_false0 ['a] (x,y : 'a):
+ if false then x else y = y.
+Proof.
+  by rewrite if_false.
+Qed.
+hint rewrite if_false0.
+
+axiom and_false_l (b : boolean) : (false && b) = false.
+hint rewrite and_false_l.
+
+axiom and_false_r (b : boolean) : (b && false) = false.
+hint rewrite and_false_l.
+
+axiom not_true : not(true) = false.
+hint rewrite not_true.
+
+axiom not_false : not(false) = true.
+hint rewrite not_false.
+
+goal fst_pair (x,y : message) : fst (<x,y>) = x.
+Proof. auto. Qed.
+hint rewrite fst_pair.
+
+goal snd_pair (x,y : message) : snd (<x,y>) = y.
+Proof. auto. Qed.
+hint rewrite snd_pair.
+
+goal eq_sym ['a] (x,y : 'a) : x = y => y = x.
+Proof. auto. Qed.
+
+
 (* PROOF *)
 
-goal lastUpdateTag_ :
-  forall (t:timestamp), forall (i:index), happens(t) =>
-    ( (kT(i)@t = kT(i)@init 
-        && forall (j':index), happens(T1(i,j')) => t < T1(i,j')) 
-      ||
-      (exists j:index,
-        kT(i)@t = kT(i)@T1(i,j) && T1(i,j) <= t &&
-        (forall (j':index), 
-          happens(T1(i,j')) => T1(i,j')<=T1(i,j) || t<T1(i,j')))).
+goal lastUpdateTag (t:timestamp, i:index) :
+  happens(t) =>
+  (kT(i)@t = kT(i)@init 
+   && forall (j':index), happens(T1(i,j')) => t < T1(i,j')) 
+   ||
+   exists j:index,
+    kT(i)@t = kT(i)@T1(i,j) && T1(i,j) <= t &&
+    forall (j':index), 
+     happens(T1(i,j')) => T1(i,j')<=T1(i,j) || t<T1(i,j').
 Proof.
-  induction.
+  generalize i; induction t.
   intro t IH0 i Hap.
   case t;
   try (
@@ -144,106 +182,54 @@ Proof.
   by intro _; left.
 
   (* t = T1(i0,j) - interesting case *)
-  intro [i0 j _]; subst t,T1(i0,j).
-  use IH0 with pred(T1(i0,j)),i as H.
+  intro [i0 j Eq];  subst t,T1(i0,j).
+  use IH0 with pred(T1(i0,j)),i as H => //.
   case H. 
 
   (* case H - 1/2 *)
   destruct H as [H1 H2].
-  assert (i=i0 || i<>i0) as C.
-  constraints.
-  case C.
+  case (i=i0) => C.
+
   (* case i=i0 *)
   right.
-  exists j.
-  split. split.
-  congruence. constraints.
+  exists j. 
+  simpl.
   intro j' Hap'.
   use H2 with j' as Ht; 2: assumption.
-  assert (j=j' || j<>j') as C'.
-  constraints.
-  case C'.
-  by left.
-  by right; constraints.
+  by case (j=j').
+
   (* case i<>i0 *)
   left.
   split.
-  expand kT(i)@T1(i0,j).
-  case (if i = i0 then
-         <h3(<<fst(kT(i0)@pred(T1(i0,j))),pin(i0)>,snd(input@T(i0,j))>,key3),
-          snd(input@T(i0,j))>
-         else kT(i)@pred(T1(i0,j))).
-  intro H3.
-  destruct H3 as [H4 H5].
-  constraints.
-  intro H3.
-  destruct H3 as [H4 H5].
-  assumption.
+  expand kT.
+  by case (i = i0).
   intro j' Hap'.
   use H2 with j' as Ht; 2: assumption.
-  assert (j=j' || j<>j') as C'.
-  constraints.
-  case C'.
-  constraints.
-  constraints.
+  by case (j=j'). 
 
   (* case H - 2/2 *)
-  simpl_left.
-  assert (i=i0 || i<>i0) as C.
-  constraints.
-  case C.
-  assert (j=j0 || j<>j0) as C'.
-  constraints.
-  case C'.
-
-  (* case i=i0 && j=j0 *)
-  constraints.
+  destruct H as [j0 [_ H0]].
+  case (i=i0) => C. 
+  case (j=j0) => C' //. 
 
   (* case i=i0 && j<>j0 *)
   right.
-  exists j.
-  split. split.
-  congruence.
-  constraints.
+  exists j. simpl.
   intro j' Hap'.
-  use H0 with j' as Ht; 2: assumption.
-  case Ht.
-  by left; constraints.
-  assert (j=j' || j<>j') as C.
-  constraints.
-  case C.
-  by left; constraints.
-  by right; constraints.
+  by use H0 with j' as Ht.
 
   (* case i<>i0 *)
   right.
   exists j0.
-  split. split.
-  expand kT(i)@T1(i0,j).
-  case (if i = i0 then
-     <h3(<<fst(kT(i0)@pred(T1(i0,j))),pin(i0)>,snd(input@T(i0,j))>,key3),
-      snd(input@T(i0,j))>
-     else kT(i)@pred(T1(i0,j))).
-  intro H2.
-  destruct H2 as [H3 H4].
-  constraints.
-  intro H2.
-  destruct H2 as [H3 H4].
-  assumption.
+  simpl.
+  split. 
+  expand kT. 
+  by case (i = i0).
 
-  constraints.
   intro j' Hap'.
-  use H0 with j' as Ht; 2: assumption.
-  case Ht.
-  by left; constraints.
-  assert (j=j' || j<>j') as C'.
-  constraints.
-  case C'.
-  by right; constraints.
-  by right; constraints.
-  constraints.
-  constraints.
+  by use H0 with j' as Ht; 1: case Ht.
 Qed.
+
 
 goal lastUpdateT :
 forall (i,j:index), happens(T(i,j)) =>
@@ -253,13 +239,14 @@ forall (i,j:index), happens(T(i,j)) =>
          snd(input@T(i,j')) >)).
 Proof.
   intro i j Hap.
-  use lastUpdateTag_ with T(i,j),i as H1; 2: assumption.
+  use lastUpdateTag with T(i,j),i as H1; 2: assumption.
   case H1.
   by left.
   right.
   destruct H1 as [j0 _].
   by exists j0.
 Qed.
+
 
 goal lastUpdateReader_ :
   forall (t:timestamp), forall (ii:index), happens(t) =>
@@ -273,83 +260,54 @@ goal lastUpdateReader_ :
 Proof.
   induction.
   intro t IH0 ii Hap.
-  case t.
+  case t;
+  try (
+  intro Eq; repeat destruct Eq as [_ Eq]; rewrite Eq; 
+  use IH0 with pred(t),ii as [[M1 H1] | [mj [_ H2]]] => //;
+  [ 1: left; 
+       (split; 1:auto); 
+       intro j' _;
+       by use H1 with j' |
+    2: right; exists mj; 
+       (split; 1: auto);
+       intro j' _;
+       by use H2 with j' as H1; 1: case H1]).
 
   (* t = init *)
-  intro _; subst t,init.
-  left. 
-  split; 1,2: by auto.
-
-  (* t = R(jj) *)
-  intro _; simpl_left; subst t,R(jj).
-  use IH0 with pred(R(jj)),ii as [[M1 H1] | H2].
-  left. split.
-  by expand kR(ii)@R(jj); assumption.
-  intro jj' Hap'.
-  use H1 with jj'; 1,2: constraints.
-  simpl_left.
-  right; exists jj0; split.
-  expand kR(ii)@R(jj).
-  split; 1,2: by auto.
-  intro jj' Hap'.
-  use H0 with jj' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
-  constraints.
-  constraints.
+  by intro _; left. 
 
   (* t = R1(jj,ii0) - interesting case *)
   intro _; simpl_left; subst t,R1(jj,ii0).
-  use IH0 with pred(R1(jj,ii0)),ii as H.
+  use IH0 with pred(R1(jj,ii0)),ii as H => //.
   case H. 
 
   (* case H - 1/2 *)
   destruct H as [H1 H2].
-  assert (ii=ii0 || ii<>ii0) as C.
-  constraints.
-  case C.
+  case (ii=ii0) => _.
+
   (* case ii=ii0 *)
   right.
   exists jj.
-  split. split.
-  congruence. constraints.
-  intro jj' Hap'.
+  simpl.
+  intro jj' _.
   use H2 with jj' as Ht; 2: assumption.
-  assert (jj=jj' || jj<>jj') as C'.
-  constraints.
-  case C'.
+  case (jj=jj') => _.
   by left.
-  by right; constraints.
+  by right.
+
   (* case i<>i0 *)
-  left.
+  left. 
   split.
-  expand kR(ii)@R1(jj,ii0).
-  case (if ii = ii0 then
-   h3(<<kR(ii0)@pred(R1(jj,ii0)),pin(ii0)>,TS@pred(R1(jj,ii0))>,key3) else
-   kR(ii)@pred(R1(jj,ii0))).
-  intro H3.
-  destruct H3 as [H4 H5].
-  constraints.
-  intro H3.
-  destruct H3 as [H4 H5].
-  assumption.
+  expand kR.
+  by case (ii = ii0). 
   intro jj' Hap'.
   use H2 with jj' as Ht; 2: assumption.
-  assert (jj=jj' || jj<>jj') as C'.
-  constraints.
-  case C'.
-  constraints.
-  constraints.
+  by case (jj=jj').
 
   (* case H - 2/2 *)
-  simpl_left.
-  assert (ii=ii0 || ii<>ii0) as C.
-  constraints.
-  case C.
-  assert (jj=jj0 || jj<>jj0) as C'.
-  constraints.
-  case C'.
+  destruct H as [jj0 [_ _ H0]].
+  case (ii=ii0) => C.
+  case (jj=jj0) => C'.
 
   (* case ii=ii0 && jj=jj0 *)
   constraints.
@@ -357,413 +315,180 @@ Proof.
   (* case ii=ii0 && jj<>jj0 *)
   right.
   exists jj.
-  split. split.
-  congruence.
-  constraints.
+  simpl.
   intro jj' Hap'.
   use H0 with jj' as Ht; 2: assumption.
   case Ht.
-  by left; constraints.
-  assert (jj=jj' || jj<>jj') as C.
-  constraints.
-  case C.
-  by left; constraints.
-  by right; constraints.
+  by left.
+  by case (jj=jj').
 
   (* case ii<>ii0 *)
   right.
   exists jj0.
-  split. split.
-  expand kR(ii)@R1(jj,ii0).
-  case (if ii = ii0 then
-   h3(<<kR(ii0)@pred(R1(jj,ii0)),pin(ii0)>,TS@pred(R1(jj,ii0))>,key3) else
-   kR(ii)@pred(R1(jj,ii0))).
-  intro H2.
-  destruct H2 as [H3 H4].
-  constraints.
-  intro H2.
-  destruct H2 as [H3 H4].
-  assumption.
-  constraints.
+  simpl.
+  split.
+  expand kR.
+  by case (ii = ii0). 
+
   intro jj' Hap'.
   use H0 with jj' as Ht; 2: assumption.
   case Ht.
-  by left; constraints.
-  assert (jj=jj' || jj<>jj') as C'.
-  constraints.
-  case C'.
-  by right; constraints.
-  by right; constraints.
-  constraints.
-  constraints.
-
-  (* t = R2(jj) *)
-  intro _; simpl_left; subst t,R2(jj).
-  use IH0 with pred(R2(jj)),ii as [[M1 H1] | H2].
-  left. split.
-  by expand kR(ii)@R2(jj); assumption.
-  intro jj' Hap'.
-  use H1 with jj'; 1,2: constraints.
-  simpl_left.
-  right; exists jj0; split.
-  expand kR(ii)@R2(jj).
-  split; 1,2: by auto.
-  intro jj' Hap'.
-  use H0 with jj' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
-  constraints.
-  constraints.
-
-  (* t = T(i,j) *)
-  intro _; simpl_left; subst t,T(i,j).
-  use IH0 with pred(T(i,j)),ii as [[M1 H1] | H2].
-  left. split.
-  by expand kR(ii)@T(i,j); assumption.
-  intro jj' Hap'.
-  use H1 with jj'; 1,2: constraints.
-  simpl_left.
-  right; exists jj; split.
-  expand kR(ii)@T(i,j).
-  split; 1,2: by auto.
-  intro jj' Hap'.
-  use H0 with jj' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
-  constraints.
-  constraints.
-
-  (* t = T1(i,j) *)
-  intro _; simpl_left; subst t,T1(i,j).
-  use IH0 with pred(T1(i,j)),ii as [[M1 H1] | H2].
-  left. split.
-  by expand kR(ii)@T1(i,j); assumption.
-  intro jj' Hap'.
-  use H1 with jj'; 1,2: constraints.
-  simpl_left.
-  right; exists jj; split.
-  expand kR(ii)@T1(i,j).
-  split; 1,2: by auto.
-  intro jj' Hap'.
-  use H0 with jj' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
-  constraints.
-  constraints.
-
-  (* t = T2(i,j) *)
-  intro _; simpl_left; subst t,T2(i,j).
-  use IH0 with pred(T2(i,j)),ii as [[M1 H1] | H2].
-  left. split.
-  by expand kR(ii)@T2(i,j); assumption.
-  intro jj' Hap'.
-  use H1 with jj'; 1,2: constraints.
-  simpl_left.
-  right; exists jj; split.
-  expand kR(ii)@T2(i,j).
-  split; 1,2: by auto.
-  intro jj' Hap'.
-  use H0 with jj' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
-  constraints.
-  constraints.
-
-  (* t = T(i,j) *)
-  intro _; simpl_left; subst t,T3(i,j).
-  use IH0 with pred(T3(i,j)),ii as [[M1 H1] | H2].
-  left. split.
-  by expand kR(ii)@T3(i,j); assumption.
-  intro jj' Hap'.
-  use H1 with jj'; 1,2: constraints.
-  simpl_left.
-  right; exists jj; split.
-  expand kR(ii)@T3(i,j).
-  split; 1,2: by auto.
-  intro jj' Hap'.
-  use H0 with jj' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
-  constraints.
-  constraints.
-
-  (* t = A(kk) *)
-  intro _; simpl_left; subst t,A(kk).
-  use IH0 with pred(A(kk)),ii as [[M1 H1] | H2].
-  left. split.
-  by expand kR(ii)@A(kk); assumption.
-  intro jj' Hap'.
-  use H1 with jj'; 1,2: constraints.
-  simpl_left.
-  right; exists jj; split.
-  expand kR(ii)@A(kk).
-  split; 1,2: by auto.
-  intro jj' Hap'.
-  use H0 with jj' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
-  constraints.
-  constraints.
-
-  (* t = A1(kk) *)
-  intro _; simpl_left; subst t,A1(kk).
-  use IH0 with pred(A1(kk)),ii as [[M1 H1] | H2].
-  left. split.
-  by expand kR(ii)@A1(kk); assumption.
-  intro jj' Hap'.
-  use H1 with jj'; 1,2: constraints.
-  simpl_left.
-  right; exists jj; split.
-  expand kR(ii)@A1(kk).
-  split; 1,2: by auto.
-  intro jj' Hap'.
-  use H0 with jj' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
-  constraints.
-  constraints.
-
-  (* t = A2(kk) *)
-  intro _; simpl_left; subst t,A2(kk).
-  use IH0 with pred(A2(kk)),ii as [[M1 H1] | H2].
-  left. split.
-  by expand kR(ii)@A2(kk); assumption.
-  intro jj' Hap'.
-  use H1 with jj'; 1,2: constraints.
-  simpl_left.
-  right; exists jj; split.
-  expand kR(ii)@A2(kk).
-  split; 1,2: by auto.
-  intro jj' Hap'.
-  use H0 with jj' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
-  constraints.
-  constraints.
+  by left.
+  by case (jj=jj').
 Qed.
 
-goal lastUpdatePredR1 :
-forall (jj,ii:index), happens(pred(R1(jj,ii))) =>
-  (kR(ii)@pred(R1(jj,ii)) = kR(ii)@init
-   || (exists (jj':index), R1(jj',ii) <= pred(R1(jj,ii)) &&
-       kR(ii)@pred(R1(jj,ii)) =
-         h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3))).
+
+goal lastUpdatePredR1 (jj,ii:index) :
+  happens(pred(R1(jj,ii))) =>
+ (kR(ii)@pred(R1(jj,ii)) = kR(ii)@init
+   || 
+   exists (jj':index), 
+     R1(jj',ii) <= pred(R1(jj,ii)) &&
+     kR(ii)@pred(R1(jj,ii)) =
+         h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3)).
 Proof.
-  intro jj ii Hap.
+  intro Hap.
   use lastUpdateReader_ with pred(R1(jj,ii)),ii as H1; 2: assumption.
   case H1.
   by left.
-  right; simpl_left.
-  exists jj0.
-  split.
-  assumption.
-  by expand kR(ii)@R1(jj0,ii); assumption.
+  right. 
+  destruct H1 as [jj0 _]. 
+  by exists jj0.
 Qed.
 
-goal secretStateReader :
-forall (t:timestamp), forall (jj,ii:index), happens(R1(jj,ii)) =>
-  (t < R1(jj,ii) => input@t <> kR(ii)@pred(R1(jj,ii))).
+goal secretStateReader (t:timestamp, jj,ii:index):
+  happens(R1(jj,ii)) =>
+  t < R1(jj,ii) => 
+  input@t = kR(ii)@pred(R1(jj,ii)) =>
+  False.
 Proof.
-admit.
+  admit.
 Qed.
 
-goal secretStateTag :
-forall (t:timestamp), forall (i,j:index), happens(T1(i,j)) =>
-  (t < T1(i,j) =>
-    ( input@t <> <fst(kT(i)@pred(T1(i,j))),pin(i)>
-      && input@t <> <<fst(kT(i)@pred(T1(i,j))),pin(i)>,snd(input@T(i,j))> )).
+goal secretStateTag (t:timestamp, i,j:index):
+  happens(T1(i,j)) =>
+  t < T1(i,j) =>
+  ( input@t <> <fst(kT(i)@pred(T1(i,j))),pin(i)> && 
+    input@t <> <<fst(kT(i)@pred(T1(i,j))),pin(i)>,snd(input@T(i,j))> ).
 Proof.
-admit.
+  admit.
 Qed.
 
-goal stateInitReader :
-  forall (t:timestamp), forall (i,ii:index), happens(t) =>
-    (i <> ii => kR(ii)@t <> idinit(i)).
+goal stateInitReader (t:timestamp, i,ii:index):
+  happens(t) => i <> ii => kR(ii)@t <> idinit(i).
 Proof.
-  induction.
+  generalize i ii.
+  induction t.
   intro t IH0 i ii Hap Hi.
   case t;
-    2,4,5,6,7,8,9,10,11: 
-      intro _; simpl_left;
-      expand kR(ii)@t;
-      use IH0 with pred(t),i,ii as H; 1,2,3,4: by auto.
+  intro A;
+  repeat destruct A as [_ A];
+  try (by expand kR; apply IH0).
 
-  intro _; subst t,init.
-  expand kR(ii)@init.
-  by eqnames.
+  (* init *)
+  auto.
 
   (* case t = R1(jj,ii0) - interesting case *)
-  intro _; simpl_left; subst t,R1(jj,ii0).
-  case (if ii = ii0 then
-     h3(<<kR(ii0)@pred(R1(jj,ii0)),pin(ii0)>,TS@pred(R1(jj,ii0))>,key3) else
-     kR(ii)@pred(R1(jj,ii0))).
-  assert (ii=ii0 || ii<>ii0) as H.
-  constraints.
-  case H.
-  intro H1.
-  destruct H1 as [H2 H3].
-  expand kR(ii)@R1(jj,ii).
+  case (ii = ii0) => _. 
+  expand kR.
   intro M.
-  use IH0 with pred(R1(jj,ii)),i,ii as H4; 2,3,4: constraints.
+  use IH0 with pred(R1(jj,ii)),i,ii as H4 => //.
   fresh M.
   admit. (* TODO - fresh tactic not precise enough *)
-  intro _.
-  constraints.
-  assert (ii=ii0 || ii<>ii0) as H.
-  constraints.
-  case H.
-  intro _.
-  constraints.
-  intro H1.
-  destruct H1 as [H2 H3].
-  use IH0 with pred(R1(jj,ii0)),i,ii as H4; 2,3,4: constraints.
-  expand kR(ii)@R1(jj,ii0).
-  intro E.
-  assert kR(ii)@pred(R1(jj,ii0)) = idinit(i). 
-  by rewrite if_false in E.
-  congruence.
+
+  case (ii=ii0) => _ //. 
+  expand kR. 
+  rewrite if_false => //. 
+  by apply IH0.
 Qed.
 
-goal stateInitTag :
-forall (t:timestamp), forall (i,ii:index), happens(t) =>
+
+goal stateInitTag (t:timestamp, i,ii:index):
+  happens(t) =>
   (i <> ii => fst(kT(i)@t) <> idinit(ii)).
 Proof.
-  induction.
+  generalize i ii.
+  induction t.
   intro t IH0 i ii Hap Hi.
   case t;
-    2,3,4,5,7,8,9,10,11: 
-      intro _; simpl_left;
-      expand kT(i)@t;
-      use IH0 with pred(t),i,ii as H; 1,2,3,4: by auto.
+  intro A;
+  repeat destruct A as [_ A];
+  try (by expand kT; apply IH0).
 
-  intro _; subst t,init.
-  expand kT(i)@init.
-  by eqnames.
+  auto.
 
   (* case t = T1(i0,j) - interesting case *)
-  intro _; simpl_left; subst t,T1(i0,j).
-  case (if i = i0 then
-       h3(<<fst(kT(i0)@pred(T1(i0,j))),pin(i0)>,snd(input@T(i0,j))>,key3)
-       else kT(i)@pred(T1(i0,j))).
-  assert (i=i0 || i<> i0) as H.
-  constraints.
-  case H.
-  intro H1.
-  destruct H1 as [H2 H3].
-  expand kT(i)@T1(i,j).
+  case (i = i0) => _.
   intro M.
-  use IH0 with pred(T1(i,j)),i,ii as H4; 2,3,4: constraints.
+  use IH0 with pred(T1(i,j)),i,ii as _ => //. 
   fresh M.
   admit. (* TODO - fresh tactic not precise enough *)
-  intro _.
-  constraints.
-  assert (i=i0 || i<>i0) as H.
-  constraints.
-  case H.
-  intro _.
-  constraints.
-  intro H1.
-  destruct H1 as [H2 H3].
-  use IH0 with pred(T1(i0,j)),i,ii as H4; 2,3,4: constraints.
-  expand kT(i)@T1(i0,j).
-  intro E.
-  assert fst(kT(i)@pred(T1(i0,j))) = idinit(ii).
-  by rewrite if_false in E.
-  congruence.
+
+  case (i=i0) => _ // /=. 
+  expand kT. 
+  rewrite if_false => //. 
+  by apply IH0.
 Qed.
 
-goal auth_R1 :
-  forall (jj,ii:index), happens(R1(jj,ii)) =>
-    (cond@R1(jj,ii)
-    =>
-    (exists (j:index), 
-      T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii))).
+
+goal auth_R1 (jj,ii:index):
+  happens(R1(jj,ii)) =>
+  cond@R1(jj,ii) =>
+  exists (j:index), 
+   T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii).
 Proof.
-  intro jj ii Hap Hcond.
-  expand cond@R1(jj,ii).
+  intro Hap Hcond.
+  expand cond.
   euf Hcond.
 
   (* case euf 1/2 - T(i,j) *)
-  assert (i=ii || i<>ii) as H0.
-  constraints.
-  case H0.
-  (* case i=ii - honest case *)
-  intro Ht M.
-  exists j.
-  expand output@T(i,j).
-  split; 1,2: by auto.
+  case (i=ii) => _; 1: by intro *; exists j. 
+
   (* case i<>ii - absurd, we derive a contradiction *)
   intro Ht M.
   use lastUpdateT with i,j as H1; 2: constraints.
   use lastUpdatePredR1 with jj,ii as H2; 2: constraints.
   case H1. case H2.
   (* kT(i)@T(i,j) = kT(i)@init && kR(ii)@pred(R1(jj,ii)) = kR(ii)@init  *)
-  expand kT(i)@init.
-  expand kR(ii)@init.
-  assert idinit(i) = idinit(ii). congruence.
-  by eqnames.
+  auto.
   (* kT(i)@T(i,j) = kT(i)@init && kR(ii)@pred(R1(jj,ii)) = h3(...) *)
-  simpl_left.
-  expand kT(i)@init.
-  use stateInitReader with pred(R1(jj,ii)),i,ii as H2; 2,3: by auto.
-  congruence.
+  expand kT.
+  by use stateInitReader with pred(R1(jj,ii)),i,ii.
 
+  destruct H1 as [j' H1]. 
   case H2.
   (* kT(i)@T(i,j) = <h3(...),...> && kR(ii)@pred(R1(jj,ii)) = kR(ii)@init *)
-  simpl_left.
-  expand kR(ii)@init.
-  use stateInitTag with T(i,j),i,ii as H3; 2,3: by auto.
-  congruence.
+  expand kR.
+  by use stateInitTag with T(i,j),i,ii.
+
   (* kT(i)@T(i,j) = <h3(...),...> && kR(ii)@pred(R1(jj,ii)) = h3(...) *)
-  simpl_left.
+  destruct H2 as [jj' H2].
   assert
     h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3) =
     h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3)
-    as _.
-  congruence.
-  collision.
-  intro _.
-  assert pin(i) = pin(ii).
-  congruence.
-  by eqnames.
+    as _. 
+  congruence.  
+  clear H1 H2 M Hcond.
+  by collision.
 
   (* case euf 2/2 - A(kk) *)
-  intro Ht M.
-  use secretStateReader with A(kk),jj,ii.
-  congruence.
-  constraints.
-  assumption.
+  by intro *; use secretStateReader with A(kk),jj,ii.
 Qed.
 
-goal auth_T1 :
-  forall (i,j:index), happens(T1(i,j)) =>
-    (cond@T1(i,j)
-    =>
-    (exists (jj:index), 
-      R1(jj,i) < T1(i,j) && output@R1(jj,i) = input@T1(i,j))).
+
+goal auth_T1 (i,j:index):
+  happens(T1(i,j)) =>
+  cond@T1(i,j) =>
+  exists (jj:index), 
+   R1(jj,i) < T1(i,j) && output@R1(jj,i) = input@T1(i,j).
 Proof.
-intro i j Hap Hcond.
-expand cond@T1(i,j).
+intro Hap Hcond.
+expand cond.
 euf Hcond.
 (* case euf 1/2 - honest case R1(jj,ii) *)
-intro Ht M.
-assert pin(i) = pin(ii). congruence.
-eqnames.
-exists jj.
-expand output@R1(jj,i). expand m(jj,i)@R1(jj,i).
-split; 1,2: by auto.
+intro Ht [_ M].
+by exists jj.
+
 (* case euf 2/2 - A1(kk) coming from the process oracle *)
-intro Ht M.
-use secretStateTag with A1(kk),i,j.
-congruence.
-assumption.
-assumption.
+by intro *; use secretStateTag with A1(kk),i,j.
 Qed.
