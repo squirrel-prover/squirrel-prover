@@ -126,88 +126,22 @@ goal lastUpdateTag_ :
 Proof.
   induction.
   intro t IH0 i Hap.
-  case t.
+  case t;
+  try (
+  intro Eq; repeat destruct Eq as [_ Eq]; rewrite Eq; 
+  use IH0 with pred(t),i as [[M1 H1] | [mj [_ H2]]] => //;
+  [ 1: left; 
+       (split; 1:auto); 
+       intro j' _;
+       by use H1 with j' |
+    2: right; exists mj; 
+       (split; 1: auto);
+       intro j' _;
+       by use H2 with j' as H1; 1: case H1]).
+
 
   (* t = init *)
-  intro _; subst t,init.
-  left. 
-  split; 1,2: by auto.
-
-  (* t = R(jj) *)
-  intro [jj _]; subst t,R(jj).
-  use IH0 with pred(R(jj)),i as [[M1 H1] | H2].
-  left. split.
-  by expand kT(i)@R(jj); assumption.
-  intro j' Hap'.
-  use H1 with j'; 1,2: constraints.
-  simpl_left.
-  right; exists j; split.
-  expand kT(i)@R(jj).
-  split; 1,2: by auto.
-  intro j' Hap'.
-  use H0 with j' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
-  constraints.
-  constraints.
-
-  (* t = R1(jj,ii) *)
-  intro [jj ii _]; subst t,R1(jj,ii).
-  use IH0 with pred(R1(jj,ii)),i as [[M1 H1] | H2].
-  left. split.
-  by expand kT(i)@R1(jj,ii); assumption.
-  intro j' Hap'.
-  use H1 with j'; 1,2: constraints.
-  simpl_left.
-  right; exists j; split.
-  expand kT(i)@R1(jj,ii).
-  split; 1,2: by auto.
-  intro j' Hap'.
-  use H0 with j' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
-  constraints.
-  constraints.
-
-  (* t = R2(jj) *)
-  intro [jj _]; subst t,R2(jj).
-  use IH0 with pred(R2(jj)),i as [[M1 H1] | H2].
-  left. split.
-  by expand kT(i)@R2(jj); assumption.
-  intro j' Hap'.
-  use H1 with j'; 1,2: constraints.
-  simpl_left.
-  right; exists j; split.
-  expand kT(i)@R2(jj).
-  split; 1,2: by auto.
-  intro j' Hap'.
-  use H0 with j' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
-  constraints.
-  constraints.
-
-  (* t = T(i0,j) *)
-  intro [i0 j _]; subst t,T(i0,j).
-  use IH0 with pred(T(i0,j)),i as [[M1 H1] | H2].
-  left. split.
-  by expand kT(i)@T(i0,j); assumption.
-  intro j' Hap'.
-  use H1 with j'; 1,2: constraints.
-  simpl_left.
-  right; exists j0; split.
-  expand kT(i)@T(i0,j).
-  split; 1,2: by auto.
-  intro j' Hap'.
-  use H0 with j' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
-  constraints.
-  constraints.
+  by intro _; left.
 
   (* t = T1(i0,j) - interesting case *)
   intro [i0 j _]; subst t,T1(i0,j).
@@ -307,99 +241,6 @@ Proof.
   case C'.
   by right; constraints.
   by right; constraints.
-  constraints.
-  constraints.
-
-  (* t = T2(i0,j) *)
-  intro [i0 j Eq]; rewrite Eq.
-  use IH0 with pred(T2(i0,j)),i as [[M1 H1] | H2].
-  left. split.
-  by expand kT(i)@T2(i0,j); assumption.
-  intro j' Hap'.
-  use H1 with j'; 1,2: constraints.
-  simpl_left.
-  right; exists j0; split.
-  auto.
-  intro j' Hap'.
-  use H0 with j' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
-  constraints.
-  constraints.
-
-  (* t = T3(i0,j) *)
-  intro [i0 j Eq]; rewrite Eq.
-  use IH0 with pred(T3(i0,j)),i as [[M1 H1] | H2].
-  left. split.
-  by expand kT(i)@T3(i0,j); assumption.
-  intro j' Hap'.
-  use H1 with j'; 1,2: constraints.
-  simpl_left.
-  right; exists j0; split.
-  auto.
-  intro j' Hap'.
-  use H0 with j' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
-  constraints.
-  constraints.
-
-  (* t = A(kk) *)
-  intro [kk Eq]; rewrite Eq.
-  use IH0 with pred(A(kk)),i as [[M1 H1] | H2].
-  left. split.
-  by expand kT(i)@A(kk); assumption.
-  intro j' Hap'.
-  use H1 with j'; 1,2: constraints.
-  simpl_left.
-  right; exists j; split.
-  expand kT(i)@A(kk).
-  split; 1,2: by auto.
-  intro j' Hap'.
-  use H0 with j' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
-  constraints.
-  constraints.
-
-  (* t = A1(kk) *)
-  intro [kk Eq]; rewrite Eq.
-  use IH0 with pred(A1(kk)),i as [[M1 H1] | H2].
-  left. split.
-  by expand kT(i)@A1(kk); assumption.
-  intro j' Hap'.
-  use H1 with j'; 1,2: constraints.
-  simpl_left.
-  right; exists j; split.
-  expand kT(i)@A1(kk).
-  split; 1,2: by auto.
-  intro j' Hap'.
-  use H0 with j' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
-  constraints.
-  constraints.
-
-  (* t = A2(kk) *)
-  intro [kk Eq]; rewrite Eq.
-  use IH0 with pred(A2(kk)),i as [[M1 H1] | H2].
-  left. split.
-  by expand kT(i)@A2(kk); assumption.
-  intro j' Hap'.
-  use H1 with j'; 1,2: constraints.
-  simpl_left.
-  right; exists j; split.
-  expand kT(i)@A2(kk).
-  split; 1,2: by auto.
-  intro j' Hap'.
-  use H0 with j' as H1.
-  case H1.
-  by left. by right; constraints.
-  assumption.
   constraints.
   constraints.
 Qed.
