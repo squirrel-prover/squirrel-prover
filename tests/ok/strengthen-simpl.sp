@@ -4,8 +4,6 @@ channel c.
 
 name na : message
 name nb : message
-name n : index -> message
-name m : index -> message
 
 abstract f : message -> message.
 
