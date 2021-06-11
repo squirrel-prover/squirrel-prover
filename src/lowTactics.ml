@@ -401,7 +401,14 @@ module LowTac (S : Sequent.S) = struct
         let many = match mult with `Once -> false | `Any | `Many -> true in
 
         let f_opt = match f with
-          | `Equiv _ -> assert false
+          | `Equiv f -> 
+            let f_opt =
+              Match.E.find_map ~many 
+                (S.table s) (S.system s) (S.env s) 
+                f pat rw_inst 
+            in
+            omap (fun x -> `Equiv x) f_opt
+
           | `Reach f ->
             let f_opt =
               Match.T.find_map ~many 
