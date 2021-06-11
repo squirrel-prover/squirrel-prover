@@ -161,16 +161,9 @@ let () =
   * This can be used with [vars = []] if orig is an [if-then-else] term. *)
 let case_cond orig vars c t e s : sequent list =
   let env = ref (TS.env s) in
-  let vars' = List.map (Vars.fresh_r env) vars in
-  let subst =
-    List.map2
-      (fun i i' -> ESubst (Term.Var i, Term.Var i'))
-      vars vars'
-  in
+  let vars, subst = Term.refresh_vars (`InEnv env) vars in
   let then_c = Term.subst subst c in
-  let else_c =
-    Term.mk_forall (List.map (fun i -> Vars.EVar i) vars) (Term.mk_not c)
-  in
+  let else_c = Term.mk_forall (List.map Vars.evar vars) (Term.mk_not c) in
 
   let then_t = Term.subst subst t in
   let else_t = e in
@@ -182,7 +175,7 @@ let case_cond orig vars c t e s : sequent list =
 
     let prem =
       Term.mk_exists
-        (List.map (fun x -> Vars.EVar x) case_vars)
+        (List.map Vars.evar case_vars)
         (Term.mk_and ~simpl:false
            case_cond
            (Term.Atom (`Message (`Eq, orig, case_t))))
@@ -196,7 +189,7 @@ let case_cond orig vars c t e s : sequent list =
     TS.set_goal case_goal s
   in
 
-  [ mk_case vars' then_t then_c;
+  [ mk_case vars then_t then_c;
     mk_case    [] else_t else_c]
 
 let conditional_case (m : Term.message) s : sequent list =
@@ -735,19 +728,13 @@ let mk_fresh_direct (cntxt : Constr.trace_cntxt) env ns t =
     (* select bound variables *)
     let bv = List.filter (fun i -> not (Vars.mem env i)) js in
 
-    let env_local = ref env in
-    let bv' = List.map (Vars.fresh_r env_local) bv in
-
-    let subst =
-      List.map2
-        (fun i i' -> ESubst (Term.Var i, Term.Var i'))
-        bv bv'
-    in
+    let env = ref env in
+    let bv, subst = Term.refresh_vars (`InEnv env) bv in
 
     let js = List.map (Term.subst_var subst) js in
 
     Term.mk_exists
-      (List.map (fun i -> Vars.EVar i) bv')
+      (List.map (fun i -> Vars.EVar i) bv)
       (Term.mk_indices_eq ns.s_indices js)
   in
 
@@ -1062,18 +1049,12 @@ let fa s =
           | Term.Seq (vars,t),
             Term.Seq (vars',t') when vars = vars' ->
             let env = ref (TS.env s) in
-            let vars' = List.map (Vars.fresh_r env) vars in
+            let vars, subst = Term.refresh_vars (`InEnv env) vars in
             let s = TS.set_env !env s in
-            let subst =
-              List.map2
-                (fun i i' -> ESubst (Term.Var i, Term.Var i'))
-                vars vars'
-            in
             let t = Term.subst subst t in
             let t' = Term.subst subst t' in
             let subgoals =
-              [ TS.set_goal
-                  (Term.Atom (`Message (`Eq,t,t'))) s ]
+              [ TS.set_goal (Term.Atom (`Message (`Eq,t,t'))) s ]
             in
             subgoals
 
@@ -1097,13 +1078,8 @@ let fa s =
 
             (* Refresh bound variables. *)
             let env = ref (TS.env s) in
-            let vars' = List.map (Vars.fresh_r env) vars in
+            let vars, subst = Term.refresh_vars (`InEnv env) vars in
             let s = TS.set_env !env s in
-            let subst =
-              List.map2
-                (fun i i' -> ESubst (Term.Var i, Term.Var i'))
-                vars vars'
-            in
             let c  = Term.subst subst c in
             let c' = Term.subst subst c' in
             let t  = Term.subst subst t in
@@ -1112,7 +1088,7 @@ let fa s =
             (* Extract unused variables. *)
             let used,unused =
               let occ_vars = Term.get_vars c @ Term.get_vars t in
-              let vars = List.map (fun i -> Vars.EVar i) vars' in
+              let vars = List.map Vars.evar vars in
               List.partition
                 (fun v -> List.mem v occ_vars)
                 vars
@@ -1120,8 +1096,7 @@ let fa s =
 
             let subgoals =
               let open TraceSequent in
-              [ set_goal
-                  (Term.mk_impl c (Term.mk_exists unused c')) s ;
+              [ set_goal (Term.mk_impl c (Term.mk_exists unused c')) s ;
 
                 set_goal (Term.mk_impl c' c) s;
 

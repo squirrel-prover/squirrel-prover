@@ -805,133 +805,124 @@ let () =
 (*------------------------------------------------------------------*)
 (** Fresh *)
 
+let fresh_mk_direct 
+    (env : Vars.env)
+    (n : Term.nsymb)
+    (j : Vars.index list) : Term.message
+  =
+  (* select bound variables, to quantify universally over them *)
+  let bv = List.filter (fun i -> not (Vars.mem env i)) j in
+  let env = ref env in
+  let bv, subst = Term.refresh_vars (`InEnv env) bv in
+  let j = List.map (Term.subst_var subst) j in
+  Term.mk_forall
+    (List.map Vars.evar bv)
+    (Term.mk_indices_neq n.s_indices j) 
+
+let fresh_mk_indirect 
+    (cntxt : Constr.trace_cntxt)
+    (env : Vars.env)
+    (n : Term.nsymb)
+    (frame_actions : Term.timestamp list)
+    (a : Action.descr)
+    (indices_a : Vars.index list list) : Term.message
+  =
+  (* for each action [a] in which [name] occurs with indices from [indices_a] *)
+  let env = ref env in
+  let bv =
+    List.filter
+      (fun i -> not (List.mem i a.indices))
+      (List.sort_uniq Stdlib.compare (List.concat indices_a))
+  in
+
+  let action_indices, subst1 = Term.refresh_vars (`InEnv env) a.indices in
+
+  let bv, subst2 = Term.refresh_vars (`InEnv env) bv in
+  let subst = subst1 @ subst2 in
+
+  (* apply [subst] to the action and to the list of
+   * indices of our name's occurrences *)
+  let new_action =
+    SystemExpr.action_to_term cntxt.table cntxt.system
+      (Action.subst_action subst a.Action.action)
+  in
+
+  let indices_a =
+    List.map (List.map (Term.subst_var subst)) indices_a
+  in
+
+  (* if new_action occurs before an action of the frame *)
+  let disj =
+    Term.mk_ors
+      (List.map (fun t ->
+           Term.Atom (Term.mk_timestamp_leq new_action t)
+         ) frame_actions)
+
+  (* then indices of name in new_action and of [name] differ *)
+  and conj =
+    Term.mk_ands
+      (List.map (fun is -> 
+           Term.mk_indices_neq is n.s_indices
+         ) indices_a)
+  in
+  let forall_var = List.map Vars.evar (action_indices @ bv) in
+  Term.mk_forall forall_var (Term.mk_impl disj conj)
+
+
 (** Construct the formula expressing freshness for some projection. *)
-let mk_phi_proj cntxt env (n : Term.nsymb) proj biframe =
+let mk_phi_proj
+    (cntxt : Constr.trace_cntxt)
+    (env : Vars.env)
+    (n : Term.nsymb) 
+    (proj : Term.projection) 
+    (biframe : Term.message list) : Term.message list
+  =
   let proj_frame = List.map (Equiv.pi_term proj) biframe in
-  begin try
-    let list_of_indices_from_frame =
+  try
+    let indices_from_frame : Vars.index list list =
       let iter = new Fresh.get_name_indices ~cntxt false n.s_symb in
-        List.iter iter#visit_message proj_frame ;
-        iter#get_indices
-    and list_of_actions_from_frame =
+      List.iter iter#visit_message proj_frame ;
+      iter#get_indices
+
+    and frame_actions : Term.timestamp list =
       let iter = new Fresh.get_actions ~cntxt in
       List.iter iter#visit_message proj_frame ;
       iter#get_actions
+
     and tbl_of_action_indices = Hashtbl.create 10 in
 
-    SystemExpr.(iter_descrs cntxt.table cntxt.system
-      (fun action_descr ->
-        let iter = new Fresh.get_name_indices ~cntxt true n.s_symb in
-        let descr_proj = Action.pi_descr proj action_descr in
-        iter#visit_message (snd descr_proj.condition) ;
-        iter#visit_message (snd descr_proj.output) ;
-        List.iter (fun (_,t) -> iter#visit_message t) descr_proj.updates;
-        (* we add only actions in which name occurs *)
-        let action_indices = iter#get_indices in
-        if List.length action_indices > 0 then
-          Hashtbl.add tbl_of_action_indices descr_proj action_indices));
+    SystemExpr.iter_descrs 
+      cntxt.table cntxt.system
+      (fun descr ->
+         let iter = new Fresh.get_name_indices ~cntxt true n.s_symb in
+         let descr = Action.pi_descr proj descr in
+         iter#visit_message (snd descr.condition) ;
+         iter#visit_message (snd descr.output) ;
+         List.iter (fun (_,t) -> iter#visit_message t) descr.updates;
+         (* we add only actions in which name occurs *)
+         let action_indices = iter#get_indices in
+         if List.length action_indices > 0 then
+           Hashtbl.add tbl_of_action_indices descr action_indices);
 
     (* direct cases (for explicit occurrences of [name] in the frame) *)
-    let phi_frame =
-        (List.map
-           (fun j ->
-              (* select bound variables,
-               * to quantify universally over them *)
-              let bv =
-                List.filter
-                  (fun i -> not (Vars.mem env i))
-                  j
-              in
-              let env = ref env in
-              let bv' =
-                List.map (Vars.fresh_r env) bv in
-              let subst =
-                List.map2
-                  (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
-                  bv bv'
-              in
-              let j = List.map (Term.subst_var subst) j in
-              Term.mk_forall
-                (List.map (fun i -> Vars.EVar i) bv')
-                (Term.mk_indices_neq n.s_indices j))
-           list_of_indices_from_frame)
+    let phi_frame = List.map (fresh_mk_direct env n) indices_from_frame in
 
     (* indirect cases (occurrences of [name] in actions of the system) *)
-    and phi_actions =
-      Hashtbl.fold
-        (fun a indices_a formulas ->
-            (* for each action [a] in which [name] occurs
-             * with indices from [indices_a] *)
-            let env = ref env in
-            let new_action_indices =
-              List.map
-                (fun i -> Vars.fresh_r env i)
-                a.Action.indices
-            in
-
-            let bv =
-              List.filter
-                (fun i -> not (List.mem i a.Action.indices))
-                (List.sort_uniq Stdlib.compare (List.concat indices_a))
-            in
-
-            let bv' =
-              List.map
-                (fun i -> Vars.fresh_r env i)
-                bv
-            in
-
-            let subst =
-              List.map2
-                (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
-                a.Action.indices new_action_indices @
-              List.map2
-                (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
-                bv bv'
-            in
-            (* apply [subst] to the action and to the list of
-             * indices of our name's occurrences *)
-            let new_action =
-              SystemExpr.action_to_term cntxt.table cntxt.system
-                (Action.subst_action subst a.Action.action)
-            in
-
-            let indices_a =
-              List.map
-                (List.map (Term.subst_var subst))
-                indices_a
-            in
-
-            (* if new_action occurs before an action of the frame *)
-            let disj =
-              Term.mk_ors
-                  (List.map
-                    (fun t ->
-                      Term.Atom (Term.mk_timestamp_leq new_action t)
-                    ) list_of_actions_from_frame)
-
-            (* then indices of name in new_action and of [name] differ *)
-            and conj =
-              Term.mk_ands
-                (List.map
-                   (fun is -> Term.mk_indices_neq is n.s_indices)
-                   indices_a)
-            in
-            let forall_var =
-              List.map (fun i -> Vars.EVar i) (new_action_indices @ bv') in
-            (Term.mk_forall
-               forall_var (Term.mk_impl disj conj))::formulas)
-        tbl_of_action_indices
-        []
+    let phi_actions =
+      Hashtbl.fold (fun a indices_a forms ->
+          let case = fresh_mk_indirect cntxt env n frame_actions a indices_a in
+          case :: forms
+        ) tbl_of_action_indices []
     in
+
     phi_frame @ phi_actions
+
   with
   | Fresh.Name_found ->
-      soft_failure (Tactics.Failure "Name not fresh")
+    soft_failure (Tactics.Failure "name not fresh")
   | Fresh.Var_found ->
-      soft_failure
-        (Tactics.Failure "Variable found, unsound to apply fresh")
-  end
+    soft_failure
+      (Failure "cannot apply fresh: the formula contains a term variable")
 
 let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe : Term.message =
   let n_left, n_right =
@@ -940,11 +931,11 @@ let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe : Term.message =
     | _ -> raise Fresh.Not_name
   in
 
-  let system_left = SystemExpr.(project_system PLeft cntxt.system) in
+  let system_left = SE.project_system PLeft cntxt.system in
   let cntxt_left = { cntxt with system = system_left } in
   let phi_left = mk_phi_proj cntxt_left env n_left PLeft biframe in
 
-  let system_right = SystemExpr.(project_system PRight cntxt.system) in
+  let system_right = SE.project_system PRight cntxt.system in
   let cntxt_right = { cntxt with system = system_right } in
   let phi_right = mk_phi_proj cntxt_right env n_right PRight biframe in
 
@@ -956,7 +947,7 @@ let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe : Term.message =
 
 
 (** Returns the term [if (phi_left && phi_right) then 0 else diff(nL,nR)]. *)
-let mk_if_term cntxt env t biframe =
+let fresh_mk_if_term cntxt env t biframe =
   let ty = Term.ty t in
   if not Symbols.(check_bty_info cntxt.Constr.table ty Ty_large) then
     soft_failure
@@ -975,12 +966,12 @@ let fresh Args.(Int i) s =
   let biframe = List.rev_append before after in
   let cntxt   = ES.mk_trace_cntxt s in
   let env     = ES.env s in
-  match mk_if_term cntxt env e biframe with
-  | if_term ->
+  try
+    let if_term = fresh_mk_if_term cntxt env e biframe in
     let biframe = List.rev_append before (if_term :: after) in
     [ES.set_equiv_goal biframe s]
-
-  | exception Fresh.Not_name ->
+    
+  with Fresh.Not_name ->
     soft_failure
       (Tactics.Failure "Can only apply fresh tactic on names")
 

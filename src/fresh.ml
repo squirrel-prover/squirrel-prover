@@ -54,7 +54,7 @@ type ts_occ = Term.timestamp Iter.occ
 type ts_occs = ts_occ list
 
 (** remove duplicates from occs for some subsuming relation. *)
-let clear_dup_mtso_le occs = 
+let clear_dup_mtso_le (occs : ts_occs) : ts_occs = 
   let subsumes (occ1 : ts_occ) (occ2 : ts_occ) =
     (* TODO: alpha-renaming *)
     Sv.equal occ1.occ_vars occ2.occ_vars &&
