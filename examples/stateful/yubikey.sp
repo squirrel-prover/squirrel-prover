@@ -11,9 +11,9 @@ COMMENTS
 - The last message is unclear and not modelled at all and replaced by "accept".
 It was also not modelled in the Tamarin/Sapic file provided in Robert's thesis.
 - otp is an encryption of a triple (secret(i), cpt, npr(i,j)).
-It is modelled here as a randomized encryptio of a pair (secret(i), cpt).
+It is modelled here as a randomized encryption of a pair (secret(i), cpt).
 According to the specification in Robert's thesis, AES is used.
-The proof relies on intctxt... not sure that this is legitimate.
+WARNING The proof relies on intctxt... not sure that this is legitimate.
 
 PROOFS 
 - counterIncrease
@@ -73,7 +73,7 @@ If so, the value inside the otp is used to update the database.
 Now, the counter value associated to this token is this new value. *)
 (* WARNING - If the non-failure test "dec(snd(snd(y1)),k(i)) <> fail" is
 replaced by "fst(dec(snd(snd(y1)),k(i))) = secret(i)",
-we are unable to use intctxt and prove the goal auth. *)
+we are unable to use intctxt and thus to prove the goal auth. *)
 process server(ii:index) =
   in(cR,y1);
   try find i such that fst(y1) = pid(i) in
