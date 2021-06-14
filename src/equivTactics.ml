@@ -808,16 +808,14 @@ let () =
 let fresh_mk_direct 
     (env : Vars.env)
     (n : Term.nsymb)
-    (j : Vars.index list) : Term.message
+    (occ : Fresh.name_occ) : Term.message
   =
   (* select bound variables, to quantify universally over them *)
-  let bv = List.filter (fun i -> not (Vars.mem env i)) j in
+  let bv = Sv.elements occ.occ_vars in
   let env = ref env in
-  let bv, subst = Term.refresh_vars (`InEnv env) bv in
-  let j = List.map (Term.subst_var subst) j in
-  Term.mk_forall
-    (List.map Vars.evar bv)
-    (Term.mk_indices_neq n.s_indices j) 
+  let bv, subst = Term.erefresh_vars (`InEnv env) bv in
+  let j = List.map (Term.subst_var subst) occ.occ_cnt in
+  Term.mk_forall bv (Term.mk_indices_neq n.s_indices j) 
 
 let fresh_mk_indirect 
     (cntxt : Constr.trace_cntxt)
@@ -877,42 +875,45 @@ let mk_phi_proj
     (proj : Term.projection) 
     (biframe : Term.message list) : Term.message list
   =
-  let proj_frame = List.map (Equiv.pi_term proj) biframe in
+  let frame = List.map (Equiv.pi_term proj) biframe in
   try
-    let indices_from_frame : Vars.index list list =
-      let iter = new Fresh.get_name_indices ~cntxt false n.s_symb in
-      List.iter iter#visit_message proj_frame ;
-      iter#get_indices
+    let frame_indices : Fresh.name_occs =
+      List.fold_left (fun acc t ->
+          Fresh.get_name_indices_ext cntxt n.s_symb t @ acc
+        ) [] frame
+    in
+    let frame_indices = List.sort_uniq Stdlib.compare frame_indices
 
     and frame_actions : Term.timestamp list =
       let iter = new Fresh.get_actions ~cntxt in
-      List.iter iter#visit_message proj_frame ;
+      List.iter iter#visit_message frame ;
       iter#get_actions
-
-    and tbl_of_action_indices = Hashtbl.create 10 in
-
-    SystemExpr.iter_descrs 
-      cntxt.table cntxt.system
-      (fun descr ->
-         let iter = new Fresh.get_name_indices ~cntxt true n.s_symb in
-         let descr = Action.pi_descr proj descr in
-         iter#visit_message (snd descr.condition) ;
-         iter#visit_message (snd descr.output) ;
-         List.iter (fun (_,t) -> iter#visit_message t) descr.updates;
-         (* we add only actions in which name occurs *)
-         let action_indices = iter#get_indices in
-         if List.length action_indices > 0 then
-           Hashtbl.add tbl_of_action_indices descr action_indices);
+    in
+    
+    let action_indices : (Action.descr * Vars.index list list) list =
+      SE.fold_descrs (fun descr acc ->
+          let iter = new Fresh.get_name_indices ~cntxt true n.s_symb in
+          let () = Action.fold_descr (fun _ _ t () ->            
+              iter#visit_message t;
+            ) descr ()
+          in
+          (* we add only actions in which name occurs *)
+          let a_indices = iter#get_indices in
+          if List.length a_indices > 0 then
+            (descr, a_indices) :: acc
+          else acc
+        ) cntxt.table cntxt.system []
+    in
 
     (* direct cases (for explicit occurrences of [name] in the frame) *)
-    let phi_frame = List.map (fresh_mk_direct env n) indices_from_frame in
+    let phi_frame = List.map (fresh_mk_direct env n) frame_indices in
 
     (* indirect cases (occurrences of [name] in actions of the system) *)
     let phi_actions =
-      Hashtbl.fold (fun a indices_a forms ->
+      List.fold_left (fun forms (a, indices_a) ->
           let case = fresh_mk_indirect cntxt env n frame_actions a indices_a in
           case :: forms
-        ) tbl_of_action_indices []
+        ) [] action_indices 
     in
 
     phi_frame @ phi_actions
@@ -931,11 +932,11 @@ let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe : Term.message =
     | _ -> raise Fresh.Not_name
   in
 
-  let system_left = SE.project_system PLeft cntxt.system in
+  let system_left = SE.project PLeft cntxt.system in
   let cntxt_left = { cntxt with system = system_left } in
   let phi_left = mk_phi_proj cntxt_left env n_left PLeft biframe in
 
-  let system_right = SE.project_system PRight cntxt.system in
+  let system_right = SE.project PRight cntxt.system in
   let cntxt_right = { cntxt with system = system_right } in
   let phi_right = mk_phi_proj cntxt_right env n_right PRight biframe in
 
@@ -947,16 +948,13 @@ let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe : Term.message =
 
 
 (** Returns the term [if (phi_left && phi_right) then 0 else diff(nL,nR)]. *)
-let fresh_mk_if_term cntxt env t biframe =
-  let ty = Term.ty t in
-  if not Symbols.(check_bty_info cntxt.Constr.table ty Ty_large) then
+let fresh_mk_if_term (cntxt : Constr.trace_cntxt) env t biframe =
+  if not Symbols.(check_bty_info cntxt.table (Term.ty t) Ty_large) then
     soft_failure
       (Failure "name is of a type that is not [large]");
 
   let phi = fresh_cond cntxt env t biframe in
-  let then_branch = Term.mk_zero in
-  let else_branch = t in
-  Term.(mk_ite phi then_branch else_branch)
+  Term.mk_ite phi Term.mk_zero t
 
 
 let fresh Args.(Int i) s =
@@ -964,10 +962,13 @@ let fresh Args.(Int i) s =
 
   (* the biframe to consider when checking the freshness *)
   let biframe = List.rev_append before after in
+  (* expand the biframe to improve precision when computing the freshness 
+     condition *)
+  let biframe_exp = List.map (fun t -> LT.expand_all_term t s) biframe in
   let cntxt   = ES.mk_trace_cntxt s in
   let env     = ES.env s in
   try
-    let if_term = fresh_mk_if_term cntxt env e biframe in
+    let if_term = fresh_mk_if_term cntxt env e biframe_exp in
     let biframe = List.rev_append before (if_term :: after) in
     [ES.set_equiv_goal biframe s]
     
@@ -1728,7 +1729,7 @@ let prf_mk_indirect env cntxt (param : prf_param)
 
 
 let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
-  let system = SystemExpr.(project_system proj cntxt.system) in
+  let system = SystemExpr.(project proj cntxt.system) in
   let cntxt = { cntxt with system = system } in
   let param = prf_param (Term.pi_term proj hash) in
 
@@ -2295,8 +2296,8 @@ let enckp
       try
         (* For each key we actually only need to verify the SSC
          * wrt. the appropriate projection of the system. *)
-        let sysl = SystemExpr.(project_system PLeft cntxt.system) in
-        let sysr = SystemExpr.(project_system PRight cntxt.system) in
+        let sysl = SystemExpr.(project PLeft cntxt.system) in
+        let sysr = SystemExpr.(project PRight cntxt.system) in
         List.iter ssc
           (List.sort_uniq Stdlib.compare
              [(skl, sysl); (skr, sysr); (new_skl, sysl); (new_skr, sysr)]) ;
@@ -2403,11 +2404,11 @@ let mk_xor_if_term_base (cntxt : Constr.trace_cntxt) env biframe
     (Term.Diff (l_left, l_right)) :: biframe
   in
 
-  let system_left = SystemExpr.(project_system PLeft cntxt.system) in
+  let system_left = SystemExpr.(project PLeft cntxt.system) in
   let cntxt_left = { cntxt with system = system_left } in
   let phi_left = mk_phi_proj cntxt_left env n_left PLeft biframe in
 
-  let system_right = SystemExpr.(project_system PRight cntxt.system) in
+  let system_right = SystemExpr.(project PRight cntxt.system) in
   let cntxt_right = { cntxt with system = system_right } in
   let phi_right = mk_phi_proj cntxt_right env n_right PRight biframe in
 

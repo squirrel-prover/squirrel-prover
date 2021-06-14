@@ -72,7 +72,7 @@ let systems_compatible s1 s2 =
   | _ -> false
 
 (*------------------------------------------------------------------*)
-let project_system proj = function
+let project proj = function
   | Single s -> bisystem_error (SE_NotABiProcess (get_id s))
 
   | SimplePair id ->
@@ -222,11 +222,13 @@ let iter_descrs
   let f _ a = f a in
   System.Msh.iter f (descrs table system)
 
-let map_descrs 
-    table system 
-    (f : Action.descr -> 'a) =
+let map_descrs (f : Action.descr -> 'a) table system =
   let m = System.Msh.map f (descrs table system) in
   List.map snd (System.Msh.bindings m)
+
+let fold_descrs (f : Action.descr -> 'a -> 'a) table system init =
+  let f _ a = f a in
+  System.Msh.fold f (descrs table system) init
 
 
 (** Check that a system expression is valid. This is not obvious only 

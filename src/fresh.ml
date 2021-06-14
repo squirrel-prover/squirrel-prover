@@ -47,6 +47,41 @@ class get_actions ~(cntxt:Constr.trace_cntxt) = object (self)
       actions <- List.filter (fun a0 -> a0 <> a) actions
  end
 
+(*------------------------------------------------------------------*)
+(** occurrence of a name [n(i,...,j)] *)
+type name_occ = Vars.index list Iter.occ
+
+type name_occs = name_occ list
+
+(** Looks for indices at which a name occurs.
+    Does not remove duplicates. 
+    Raise @Var_found if a term variable occurs in the term. *)
+let get_name_indices_ext : type a. 
+  Constr.trace_cntxt -> Symbols.name Symbols.t -> a Term.term -> name_occs = 
+  fun constr nsymb t ->
+
+  let rec get : 
+    type a. a Term.term -> fv:Sv.t -> cond:Term.message -> name_occs =
+    fun t ~fv ~cond ->
+      match t with
+      | Term.Var v when Type.equalk (Vars.kind v) Type.KMessage -> 
+        raise Var_found
+
+      | Term.Name ns when ns.s_symb = nsymb ->
+        let occ = Iter.{ 
+            occ_cnt  = ns.s_indices;
+            occ_vars = fv; 
+            occ_cond = cond; } 
+        in
+        [occ]
+
+      | _ -> 
+        Iter.tfold_occ ~mode:(`Delta constr)
+          (fun ~fv ~cond (Term.ETerm t) occs -> 
+             get t ~fv ~cond @ occs
+          ) ~fv ~cond t []
+  in
+  get t ~fv:Sv.empty ~cond:Term.mk_true
 
 (*------------------------------------------------------------------*)
 type ts_occ = Term.timestamp Iter.occ
@@ -72,9 +107,7 @@ let clear_dup_mtso_le (occs : ts_occs) : ts_occs =
   List.rev occs
 
 (** Looks for timestamps at which macros occur in a term.
-    Does not remove duplicates. 
-    Over-approximation: we try to expand macros, even if they are at a timestamp 
-    that may not happen. *)
+    Does not remove duplicates. *)
 let get_actions_ext : 
   type a. Constr.trace_cntxt -> a Term.term -> ts_occs = 
   fun constr t ->
@@ -108,8 +141,11 @@ let get_actions_ext :
         else get_macro_default ()
 
       | _ -> 
-        Iter.tfold_occ (fun ~fv ~cond (Term.ETerm t) occs -> 
-            get t ~fv ~cond @ occs
+        (* Remark: we use [`NoDelta] because we want to have a different 
+           behavior depending on whether the macro can be expended or not. *)
+        Iter.tfold_occ ~mode:`NoDelta
+          (fun ~fv ~cond (Term.ETerm t) occs -> 
+             get t ~fv ~cond @ occs
           ) ~fv ~cond t []
   in
   get t ~fv:Sv.empty ~cond:Term.mk_true

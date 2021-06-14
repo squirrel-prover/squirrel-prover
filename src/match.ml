@@ -1288,7 +1288,7 @@ module E : S with type t = Equiv.form = struct
       =
       (* FIXME: dont compute the full description map, just the name map *)
       (* let descrs = SystemExpr.symbs ~with_dummies:false tbl system in *)
-      let descrs = SystemExpr.map_descrs table system (fun x -> x) in
+      let descrs = SystemExpr.map_descrs (fun x -> x) table system in
       List.fold_left (fun cands descr ->
           let name = descr.Action.name in
           filter_deduce_action_list name cands terms known_sets

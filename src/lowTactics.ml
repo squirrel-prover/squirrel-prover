@@ -537,7 +537,7 @@ module LowTac (S : Sequent.S) = struct
       List.map (fun x -> Vars.EVar x) indices, name
     in
 
-    let cases = SystemExpr.map_descrs table system mk_case in
+    let cases = SystemExpr.map_descrs mk_case table system in
 
     List.map (fun (indices, ts_case) ->
         let ts_subst =

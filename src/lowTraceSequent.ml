@@ -478,7 +478,7 @@ let pi projection s =
   let hyps = filter_map_hyps pi s.hyps in
   let s =
   S.update
-    ~system:(SystemExpr.project_system projection (system s))
+    ~system:(SystemExpr.project projection (system s))
     ~conclusion:(Term.pi_term ~projection s.conclusion)
     ~hyps:H.empty
     s in

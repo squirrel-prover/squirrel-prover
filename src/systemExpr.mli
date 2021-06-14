@@ -50,7 +50,7 @@ exception BiSystemError of system_expr_err
 (** Prject a system according to the given projection.  The pojection must not
    be None, and the system must be a bi system, i.e either SimplePair or Pair.
    *)
-val project_system : Term.projection -> t -> t
+val project : Term.projection -> t -> t
 
 (** Convert action to the corresponding [Action] timestamp term in
     a system expression.
@@ -82,16 +82,11 @@ val symbs :
 
 (** Iterate over all action descriptions in [system].
   * Only one representative of each action shape will be passed
-  * to the function, with indices that are not guaranteed to be fresh. *)
-val iter_descrs : 
-  Symbols.table -> t -> 
-  (Action.descr -> unit) -> 
-  unit
+  * to the function, with indices that are guaranteed to be fresh. *)
+val iter_descrs : Symbols.table -> t -> (Action.descr -> unit)     -> unit
 
-val map_descrs : 
-  Symbols.table -> t -> 
-  (Action.descr -> 'a) -> 
-  'a list
+val fold_descrs : (Action.descr -> 'a -> 'a) -> Symbols.table -> t -> 'a -> 'a
+val map_descrs  : (Action.descr -> 'a)       -> Symbols.table -> t -> 'a list
 
 
 (*------------------------------------------------------------------*)

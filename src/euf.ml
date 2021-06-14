@@ -219,7 +219,7 @@ let mk_rule ?(elems=[]) ?(drop_head=true) ~fun_wrap_key
 
   (* indirect cases *)
   let case_schemata =
-    SystemExpr.map_descrs cntxt.table cntxt.system mk_case_schema
+    SystemExpr.map_descrs mk_case_schema cntxt.table cntxt.system 
   in
 
   (* direct cases *)

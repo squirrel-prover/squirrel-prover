@@ -169,11 +169,15 @@ type 'a occ = {
 type 'a occs = 'a occ list  
 
 (** Like [Term.tfold], but also propagate downward (globally refreshed) 
-    binded variables and conditions. *)
+    binded variables and conditions. 
+    If [Mode = `Delta _], try to expand macros.
+    Over-approximation: we try to expand macros, even if they are at a timestamp 
+    that may not happen. *)
 let tfold_occ : type b.
+  mode:[`Delta of Constr.trace_cntxt | `NoDelta ] ->
   (fv:Sv.t -> cond:Term.message -> Term.eterm -> 'a -> 'a) -> 
   fv:Sv.t -> cond:Term.message -> b Term.term -> 'a -> 'a = 
-  fun func ~fv ~cond t acc ->
+  fun ~mode func ~fv ~cond t acc ->
   match t with
   | Term.ForAll (evs, t)
   | Term.Exists (evs, t) -> 
@@ -202,7 +206,26 @@ let tfold_occ : type b.
     func ~fv:fv1 ~cond:(Term.mk_and cond c) (Term.ETerm t)              |>
     func ~fv:fv  ~cond:(Term.mk_and cond (Term.mk_not c)) (Term.ETerm e)  
 
-  | Term.Macro  _
+  | Term.Macro (m, l, ts) ->
+    if l <> [] then failwith "Not implemented" ;
+
+    let default () = func ~fv ~cond (Term.ETerm ts) acc in
+
+    begin
+      match mode with
+      | `NoDelta -> default ()
+      | `Delta constr ->
+
+        if Macros.is_defined m.s_symb ts constr.table then
+          try
+            let t = Macros.get_definition constr m ts in
+            func ~fv ~cond (Term.ETerm t) acc
+          with Tactics.Tactic_soft_failure _ -> default ()
+            
+
+        else default ()
+    end
+
   | Term.Name   _
   | Term.Fun    _
   | Term.Pred   _
@@ -235,7 +258,7 @@ let get_ftypes : type a.
     type a. a Term.term -> fv:Sv.t -> cond:Term.message -> mess_occs =
     fun t ~fv ~cond ->
       let occs () =       
-        tfold_occ (fun ~fv ~cond (Term.ETerm t) occs -> 
+        tfold_occ ~mode:`NoDelta (fun ~fv ~cond (Term.ETerm t) occs -> 
             get t ~fv ~cond @ occs
           ) ~fv ~cond t []
       in
@@ -278,7 +301,7 @@ let get_ite_term : type a. Constr.trace_cntxt -> a Term.term -> ite_occs =
     type a. a Term.term -> fv:Sv.t -> cond:Term.message -> ite_occs =
     fun t ~fv ~cond ->
       let occs =       
-        tfold_occ (fun ~fv ~cond (Term.ETerm t) occs -> 
+        tfold_occ ~mode:`NoDelta (fun ~fv ~cond (Term.ETerm t) occs -> 
             get t ~fv ~cond @ occs
           ) ~fv ~cond t []
       in

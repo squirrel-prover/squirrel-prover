@@ -135,6 +135,14 @@ val pi_descr : Term.projection -> descr -> descr
 (** Refresh (globally) binded variables in a description. *)
 val refresh_descr : descr -> descr
 
+val fold_descr :
+  ( Symbols.macro Symbols.t -> 
+    Symbols.macro_def -> 
+    Term.message -> 
+    'a -> 'a ) ->
+  descr ->
+  'a -> 'a
+
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printing} *)
 

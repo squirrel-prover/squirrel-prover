@@ -83,7 +83,7 @@ let arity s table =
   let l,_ = of_symbol s table in
   List.length l
 
-let iter f table =
+let iter_table f table =
   Symbols.Action.iter
     (fun s _ -> function
        | Data (args,action) -> f s args action
@@ -229,12 +229,32 @@ let refresh_descr descr =
   subst_descr s descr
 
 (*------------------------------------------------------------------*)
+let fold_descr
+    (f : 
+     Symbols.macro Symbols.t -> 
+     Symbols.macro_def -> 
+     Term.message -> 
+     'a -> 'a) 
+    (descr : descr) 
+    (init : 'a) : 'a
+  =
+  let mval = f Symbols.out Symbols.Output (snd descr.output) init in
+  let mval = f Symbols.cond Symbols.Cond (snd descr.condition) mval in
+
+  List.fold_left (fun mval (st, t) ->
+      let mdef = 
+        Symbols.State (List.length st.Term.s_indices, st.Term.s_typ) 
+      in
+      f st.Term.s_symb mdef t mval
+    ) mval descr.updates
+
+(*------------------------------------------------------------------*)
 let debug = false
 
 let pp_actions ppf table =
   Fmt.pf ppf "@[<v 2>Available action shapes:@;@;@[" ;
   let comma = ref false in
-  iter
+  iter_table
     (fun symbol indices action ->
        if !comma then Fmt.pf ppf ",@;" ;
        comma := true ;
