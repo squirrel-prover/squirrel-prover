@@ -98,8 +98,6 @@ system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))
 (* LIBRARIES *)
 (* A inclure dans une lib standard *)
 
-set autoIntro=false.
-
 goal if_false ['a] (b : boolean, x,y : 'a):
  (not b) => if b then x else y = y.
 Proof.
@@ -398,7 +396,7 @@ Proof.
 
   case (ii=ii0) => _ //. 
   expand kR. 
-  rewrite if_false => //. 
+  rewrite if_false //. 
   by apply IH0.
 Qed.
 
@@ -426,7 +424,7 @@ Proof.
 
   case (i=i0) => _ // /=. 
   expand kT. 
-  rewrite if_false => //. 
+  rewrite if_false //. 
   by apply IH0.
 Qed.
 
@@ -453,12 +451,18 @@ Proof.
   auto.
   (* kT(i)@T(i,j) = kT(i)@init && kR(ii)@pred(R1(jj,ii)) = h3(...) *)
   expand kT.
+  (* TODO: Adrien: instead of stateInitReader, we can do *)
+  (* rewrite H1 /= in M. *)
+  (* and use the fact that kR is strongly secret at time 
+     kR(ii)@pred(R1(jj,ii)) *)
   by use stateInitReader with pred(R1(jj,ii)),i,ii.
 
   destruct H1 as [j' H1]. 
   case H2.
   (* kT(i)@T(i,j) = <h3(...),...> && kR(ii)@pred(R1(jj,ii)) = kR(ii)@init *)
   expand kR.
+  (* TODO: Adrien: instead of stateInitTag, we can use the fact that kR is
+     strongly secret at time kR(ii)@pred(R1(jj,ii)) in hypothesis H2*)
   by use stateInitTag with T(i,j),i,ii.
 
   (* kT(i)@T(i,j) = <h3(...),...> && kR(ii)@pred(R1(jj,ii)) = h3(...) *)
