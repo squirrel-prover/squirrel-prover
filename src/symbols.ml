@@ -651,3 +651,12 @@ let ftype table f =
   | fty, _ -> fty
 
 let ftype_builtin f = ftype builtins_table f
+
+(*------------------------------------------------------------------*)
+type 'a _t = 'a t
+
+module Ss (S : Namespace) : Set.S with type elt := S.ns t = 
+  Set.Make(struct
+    type t = S.ns _t
+    let compare = Stdlib.compare
+  end)

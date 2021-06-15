@@ -49,7 +49,7 @@ system [sharedrnd] !_i
 equiv  [sharedrnd] test.
 Proof.
 enrich diff(n,m); induction t. 
-by expandall; fresh 0; yesif 0. 
+by expandall; fresh 0. 
 
 expandall. 
 fa 1; fa 2; fa 2; fa 2.
@@ -62,8 +62,7 @@ Abort.
 system  [sharedrndframe] !_i (out(c,<diff(n,m), enc(n,r1(i),diff(k,kbis))>)).
 equiv  [sharedrndframe] test2.
 Proof.
-enrich diff(n,m). induction t. expandall. fresh 0. 
-by yesif 0. 
+enrich diff(n,m). induction t. expandall. by fresh 0. 
 enrich enc(m,r1(i),k). expandall. fa 2; fa 3; fa 3; fa 3.
  checkfail enckp 3 exn SEncSharedRandom.
 Abort.
@@ -75,8 +74,7 @@ system [nornd] !_i (out(c,<n, enc(n,r1(i),diff(k,kbis))>) | out(c,enc(n,ok,k))).
 
 equiv [nornd] test3.
 Proof.
-enrich diff(n,m). induction t. expandall. fresh 0. 
-by yesif 0. 
+enrich diff(n,m). induction t. expandall. by fresh 0. 
 expandall. fa 1; fa 2; fa 2; fa 2.
 checkfail enckp 3 exn SEncNoRandom.
 Abort.

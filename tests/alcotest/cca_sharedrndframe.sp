@@ -20,8 +20,7 @@ enrich diff(n,m).
 
 induction t.
 expandall.
-fresh 0.
-by yesif 0.
+by fresh 0.
 
 enrich enc(m,r(i),sk).
 expandall.

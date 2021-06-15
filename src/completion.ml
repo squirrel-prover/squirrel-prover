@@ -1281,9 +1281,9 @@ let rec term_e_normalize state u = match u.cnt with
 (* [normalize_cterm state u]
     Preconditions: [u] must be ground. *)
 let normalize state u =
-  fpt (fun x -> term_uf_normalize state.uf x
-                |> term_grnd_normalize state
-                |> term_e_normalize state) u
+  fpt (=) (fun x -> term_uf_normalize state.uf x
+                    |> term_grnd_normalize state
+                    |> term_e_normalize state) u
 
 (* [normalize_cterm state u]
     Preconditions: [u] must be ground. *)

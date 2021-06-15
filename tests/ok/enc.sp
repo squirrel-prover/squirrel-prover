@@ -21,7 +21,7 @@ induction t.
 
 expandall.
 fresh 1.
-by yesif 1.
+auto.
 
 expandall.
 fa 2; fa 3; fa 3; fa 3.  

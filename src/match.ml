@@ -1321,9 +1321,6 @@ module E : S with type t = Equiv.form = struct
       =
       let cands' = filter_deduce_all_actions cands terms cands in
 
-      (* REM *)
-      (* Fmt.epr "next:@.@[<v>%a@]@." pp_msets cands'; *)
-
       (* check if [cands] is included in [cands'] *)
       if List.for_all (fun (mname, cand_l) ->
           let cand_l' = List.assoc_opt mname cands' in
@@ -1357,9 +1354,6 @@ module E : S with type t = Equiv.form = struct
           msets_add mset msets
         ) [] table
     in
-
-    (* REM *)
-    (* Fmt.epr "init_fp:@.@[<v>%a@]@." pp_msets init_fixpoint; *)
 
     deduce_fixpoint init_fixpoint init_terms
 
@@ -1555,9 +1549,6 @@ module E : S with type t = Equiv.form = struct
     =
     let msets = strengthen st.table st.system st.env pat_terms in
     let mset_l = msets_to_list msets in
-
-    (* REM *)
-    (* Fmt.epr "final result:@.@[<v>%a@]@." pp_msets msets; *)
 
     List.fold_left (fun st term ->
         match_term_incl term pat_terms mset_l st

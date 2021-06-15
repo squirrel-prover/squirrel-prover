@@ -33,6 +33,10 @@ module List : sig
   (** Update in an associative list *)
   val assoc_up : 'a -> ('b -> 'b) -> ('a * 'b) list -> ('a * 'b) list
 
+  val assoc_up_dflt : 'a -> 'b -> ('b -> 'b) -> ('a * 'b) list -> ('a * 'b) list
+
+  val assoc_dflt : 'b -> 'a -> ('a * 'b) list -> 'b
+
   (** [takedrop n l] returns the a result equal to [take n l, drop n l]. *)
   val takedrop : int -> 'a list -> 'a list * 'a list
 
@@ -104,7 +108,7 @@ module Uf (Ord: Ordered) : sig
 end
 
 (*------------------------------------------------------------------*)
-val fpt : ('a -> 'a) -> 'a -> 'a
+val fpt : ('a -> 'a -> bool) -> ('a -> 'a) -> 'a -> 'a
 
 
 (*------------------------------------------------------------------*)

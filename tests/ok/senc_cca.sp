@@ -19,8 +19,7 @@ enrich diff(n,m).
 induction t.
 
 expandall.
-fresh 0.
-by yesif 0. 
+by fresh 0.
 
 expandall.
 fa 1; fa 2; fa 2; fa 2.  cca1 2.

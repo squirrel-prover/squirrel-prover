@@ -189,8 +189,8 @@ Proof.
   fa 0; fa 1; fa 1.
   fresh 1; yesif 1.
   repeat split => // j0 H1. 
-  by depends R(j0),R1(j0).
   by depends R(j0),R2(j0).
+  by depends R(j0),R1(j0).
   auto.
 
   (* Case R1 *)

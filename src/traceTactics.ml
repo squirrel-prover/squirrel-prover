@@ -743,31 +743,26 @@ let mk_fresh_direct (cntxt : Constr.trace_cntxt) env ns t =
 
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
 let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
-  let list_of_actions_from_term =
+  let term_actions =
     let iter = new Fresh.get_actions ~cntxt in
     iter#visit_message t ;
-    iter#get_actions in
-
-  let tbl_of_action_indices = ref [] in
-
-  let () = SystemExpr.(iter_descrs cntxt.table cntxt.system
-    (fun action_descr ->
-      let iter = new Fresh.get_name_indices ~cntxt true ns.s_symb in
-      iter#visit_message (snd action_descr.condition) ;
-      iter#visit_message (snd action_descr.output) ;
-      List.iter (fun (_,t) -> iter#visit_message t) action_descr.updates;
-      (* we add only actions in which name [n] occurs *)
-      let action_indices = iter#get_indices in
-      if List.length action_indices > 0 then
-        tbl_of_action_indices :=
-          (action_descr, action_indices)
-          :: !tbl_of_action_indices))
+    iter#get_actions 
   in
+
+  let macro_cases =
+    Iter.fold_macro_support (fun descr t macro_cases ->
+        let fv = Sv.of_list1 descr.Action.indices in
+        let new_idx = Fresh.get_name_indices_ext ~fv cntxt ns.s_symb t in
+        List.assoc_up_dflt descr [] (fun l -> new_idx @ l) macro_cases
+      ) cntxt [t] []
+  in
+  (* we keep only actions in which the name occurs *)
+  let macro_cases = List.filter (fun (_, occs) -> occs <> []) macro_cases in
 
   (* the one case occuring in [a] with indices [is_a].'
      For n[is] to be equal to n[is_a], we must have is=is_a.
      Hence we substitute is_a by is. *)
-  let mk_case a is_a =
+  let mk_case (a : Action.descr) is_a : Term.message =
     let env_local = ref env in
 
     (* We only quantify over indices that are not in is_a *)
@@ -795,7 +790,7 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
              Term.Atom (Term.mk_timestamp_leq
                           new_action
                           action_from_term)
-           ) list_of_actions_from_term)
+           ) term_actions)
     in
 
     (* Remark that the equations below are not redundant.
@@ -816,11 +811,16 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
   in
 
   (* Do all cases of action [a] *)
-  let mk_cases_descr (a, indices_a) =
+  let mk_cases_descr (a, indices_a) = 
+    let indices_a = List.map (fun is_a -> is_a.Iter.occ_cnt) indices_a
+                    |> List.sort_uniq Stdlib.compare 
+    in
     List.map (mk_case a) indices_a in
 
-  let cases = List.map mk_cases_descr !tbl_of_action_indices
-              |> List.flatten in
+  let cases = List.map mk_cases_descr macro_cases
+              |> List.flatten 
+              |> List.sort_uniq Stdlib.compare 
+  in
 
   mk_ors cases
 

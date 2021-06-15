@@ -337,3 +337,6 @@ val fs_empty  : fname t
 
 val fs_len    : fname t
 val fs_zeroes : fname t
+
+(*------------------------------------------------------------------*)
+module Ss (S : Namespace) : Set.S with type elt := S.ns t 

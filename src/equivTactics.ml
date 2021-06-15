@@ -805,17 +805,15 @@ let () =
 (*------------------------------------------------------------------*)
 (** Fresh *)
 
-let fresh_mk_direct 
+let fresh_mk_direct
     (env : Vars.env)
     (n : Term.nsymb)
     (occ : Fresh.name_occ) : Term.message
   =
-  (* select bound variables, to quantify universally over them *)
-  let bv = Sv.elements occ.occ_vars in
   let env = ref env in
-  let bv, subst = Term.erefresh_vars (`InEnv env) bv in
+  let bv, subst = Term.erefresh_vars (`InEnv env) (Sv.elements occ.occ_vars) in
   let j = List.map (Term.subst_var subst) occ.occ_cnt in
-  Term.mk_forall bv (Term.mk_indices_neq n.s_indices j) 
+  Term.mk_forall ~simpl:true bv (Term.mk_indices_neq n.s_indices j) 
 
 let fresh_mk_indirect 
     (cntxt : Constr.trace_cntxt)
@@ -823,20 +821,16 @@ let fresh_mk_indirect
     (n : Term.nsymb)
     (frame_actions : Term.timestamp list)
     (a : Action.descr)
-    (indices_a : Vars.index list list) : Term.message
+    (indices_a : Fresh.name_occs) : Term.message
   =
   (* for each action [a] in which [name] occurs with indices from [indices_a] *)
-  let env = ref env in
-  let bv =
-    List.filter
-      (fun i -> not (List.mem i a.indices))
-      (List.sort_uniq Stdlib.compare (List.concat indices_a))
+  let bv = List.fold_left (fun bv occ ->
+      Sv.union bv occ.Iter.occ_vars 
+    ) Sv.empty indices_a
   in
 
-  let action_indices, subst1 = Term.refresh_vars (`InEnv env) a.indices in
-
-  let bv, subst2 = Term.refresh_vars (`InEnv env) bv in
-  let subst = subst1 @ subst2 in
+  let env = ref env in
+  let bv, subst = Term.erefresh_vars (`InEnv env) (Sv.elements bv) in
 
   (* apply [subst] to the action and to the list of
    * indices of our name's occurrences *)
@@ -846,8 +840,11 @@ let fresh_mk_indirect
   in
 
   let indices_a =
-    List.map (List.map (Term.subst_var subst)) indices_a
+    List.map (fun occ -> 
+        List.map (Term.subst_var subst) occ.Iter.occ_cnt
+      ) indices_a
   in
+  let indices_a = List.sort_uniq Stdlib.compare indices_a in
 
   (* if new_action occurs before an action of the frame *)
   let disj =
@@ -863,8 +860,7 @@ let fresh_mk_indirect
            Term.mk_indices_neq is n.s_indices
          ) indices_a)
   in
-  let forall_var = List.map Vars.evar (action_indices @ bv) in
-  Term.mk_forall forall_var (Term.mk_impl disj conj)
+  Term.mk_forall ~simpl:true bv (Term.mk_impl disj conj)
 
 
 (** Construct the formula expressing freshness for some projection. *)
@@ -890,20 +886,15 @@ let mk_phi_proj
       iter#get_actions
     in
     
-    let action_indices : (Action.descr * Vars.index list list) list =
-      SE.fold_descrs (fun descr acc ->
-          let iter = new Fresh.get_name_indices ~cntxt true n.s_symb in
-          let () = Action.fold_descr (fun _ _ t () ->            
-              iter#visit_message t;
-            ) descr ()
-          in
-          (* we add only actions in which name occurs *)
-          let a_indices = iter#get_indices in
-          if List.length a_indices > 0 then
-            (descr, a_indices) :: acc
-          else acc
-        ) cntxt.table cntxt.system []
+    let macro_cases =
+      Iter.fold_macro_support (fun descr t macro_cases ->
+          let fv = Sv.of_list1 descr.Action.indices in
+          let new_idx = Fresh.get_name_indices_ext ~fv cntxt n.s_symb t in
+          List.assoc_up_dflt descr [] (fun l -> new_idx @ l) macro_cases
+        ) cntxt frame []
     in
+    (* we keep only actions in which the name occurs *)
+    let macro_cases = List.filter (fun (_, occs) -> occs <> []) macro_cases in
 
     (* direct cases (for explicit occurrences of [name] in the frame) *)
     let phi_frame = List.map (fresh_mk_direct env n) frame_indices in
@@ -913,7 +904,7 @@ let mk_phi_proj
       List.fold_left (fun forms (a, indices_a) ->
           let case = fresh_mk_indirect cntxt env n frame_actions a indices_a in
           case :: forms
-        ) [] action_indices 
+        ) [] macro_cases
     in
 
     phi_frame @ phi_actions

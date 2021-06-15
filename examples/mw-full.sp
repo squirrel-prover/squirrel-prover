@@ -92,13 +92,13 @@ Proof.
   exists i,t0; simpl.
   assert (input@T(i,t0) = nr(r)) as F; 1: auto.
   fresh F => C.
-  by case C; 1: depends R(r), R2(r).
+  by case C; 3: depends R(r), R2(r).
   (* right *)
   euf Meq => _ _ _; 1:auto.
   exists i,t; simpl.
   assert (input@T(i,t) = nr(r)) as F; 1: auto.
   fresh F => C.
-  by case C; 1: depends R(r), R2(r).
+  by case C; 3: depends R(r), R2(r).
 
   (* WA => Cond *)
   by intro [i t _]; expand output; exists i,t.
@@ -124,7 +124,7 @@ Proof.
   exists t; simpl.
   assert input@T(i,t) = nr(r) as F; 1: auto.
   fresh F => C.
-  by case C; 1:depends R(r), R2(r).
+  by case C; 3:depends R(r), R2(r).
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
@@ -142,7 +142,7 @@ Proof.
   intro Meq; euf Meq => _ _ _; 1: auto.
   assert input@T(i,t) = nr(r) as F; 1: auto.
   fresh F => C.
-  by case C; 1:depends R(r), R2(r).  
+  by case C; 3:depends R(r), R2(r).  
 Qed.
 
 equiv unlinkability.
@@ -370,7 +370,7 @@ equivalent exec@pred(T1(i,t)) && cond@T1(i,t),
   assert R(r) < T(i,t) as _.
     assert nr(r) = input@T(i,t) as HF; 1:auto.
     fresh HF => C.
-    by case C; [1: depends R(r),R2(r) |
+    by case C; [3: depends R(r),R2(r) |
                 2: depends R(r),R1(r)].
   simpl.
   case output@R1(r) => Meq1.
@@ -443,7 +443,7 @@ split; intro [_ H1]; simpl.
   assert R(r) < T(i,t).
     assert nr(r) = input@T(i,t) as HF; 1: auto.
     fresh HF => C.
-    by case C; 1: depends R(r),R2(r). 
+    by case C; 3: depends R(r),R2(r). 
   simpl.
   case output@R1(r) => Meq1.
     destruct Meq1 as [_ _ [Meq1 ->]]. 
@@ -467,7 +467,7 @@ split; intro [_ H1]; simpl.
   assert R(r) < T(i,t) as _.
     assert nr(r) = input@T(i,t) as HF; 1: auto.
     fresh HF => C.
-    by case C; 1: depends R(r),R2(r).
+    by case C; 3: depends R(r),R2(r).
   simpl.
 
   case output@R1(r) => Meq1.

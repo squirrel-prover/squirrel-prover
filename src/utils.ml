@@ -42,6 +42,16 @@ module List = struct
       if a = s then (a, f b) :: t
       else (a,b) :: assoc_up s f t
 
+  let rec assoc_up_dflt s dflt f = function
+    | [] -> [s, f dflt]
+    | (a,b) :: t ->
+      if a = s then (a, f b) :: t
+      else (a,b) :: assoc_up_dflt s dflt f t
+
+  let rec assoc_dflt dflt x = function
+    | [] -> dflt
+    | (a,b)::l -> if compare a x = 0 then b else assoc_dflt dflt x l
+
   (*------------------------------------------------------------------*)
   let rec drop0 i l =
     if i = 0 then l else
@@ -362,9 +372,9 @@ end
 
 
 (*------------------------------------------------------------------*)
-let rec fpt f a =
+let rec fpt eq f a =
   let b = f a in
-  if b = a then b else fpt f b
+  if eq b a then b else fpt eq f b
 
 (*------------------------------------------------------------------*)
 let classes (f_eq : 'a -> 'a -> bool) (l : 'a list) : 'a list list =

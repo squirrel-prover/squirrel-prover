@@ -166,6 +166,12 @@ type 'a occ = {
   occ_cond : Term.message;     (* conditions above the occurrence *)
 }
 
+let pp_occ pp_cnt fmt occ =
+  Fmt.pf fmt "[%a | ∃%a, %a]" 
+    pp_cnt occ.occ_cnt
+    (Fmt.list ~sep:Fmt.comma Vars.pp_e) (Sv.elements occ.occ_vars)
+    Term.pp occ.occ_cond
+
 type 'a occs = 'a occ list  
 
 (** Like [Term.tfold], but also propagate downward (globally refreshed) 
@@ -320,3 +326,114 @@ let get_ite_term : type a. Constr.trace_cntxt -> a Term.term -> ite_occs =
   
   get t ~fv:Sv.empty ~cond:Term.mk_true
     
+(*------------------------------------------------------------------*)
+(** occurrence of a macro [n(i,...,j)] *)
+type macro_occ = Term.msymb occ
+
+type macro_occs = macro_occ list
+
+exception Var_found
+
+(** Looks for macro occurrences in a term.
+    Macros that can be expanded are ignored.
+    Raise @Var_found if a term variable occurs in the term. *)
+let get_macro_occs : type a. 
+  mode:[`Delta of Constr.trace_cntxt | `NoDelta ] ->
+  Constr.trace_cntxt -> 
+  a Term.term -> 
+  macro_occs 
+  = 
+  fun ~mode constr t ->
+
+  let rec get : 
+    type a. a Term.term -> fv:Sv.t -> cond:Term.message -> macro_occs =
+    fun t ~fv ~cond ->
+      match t with
+      | Term.Var v when Type.equalk (Vars.kind v) Type.KMessage -> 
+        raise Var_found
+
+      | Term.Macro (ms, l, ts) ->
+        assert (l = []);
+        let occ = { 
+            occ_cnt  = ms;
+            occ_vars = fv; 
+            occ_cond = cond; } 
+        in
+        [occ]
+
+      | _ -> 
+        tfold_occ ~mode
+          (fun ~fv ~cond (Term.ETerm t) occs -> 
+             get t ~fv ~cond @ occs
+          ) ~fv ~cond t []
+  in
+  get t ~fv:Sv.empty ~cond:Term.mk_true
+
+(*------------------------------------------------------------------*)
+module Sm = Symbols.Ss(Symbols.Macro)
+
+(** Return the macro symbols reachable from a term in any trace model. *)
+let macro_support : type a. 
+  Constr.trace_cntxt -> 
+  a Term.term list -> 
+  Sm.t
+  = 
+  fun cntxt terms ->
+  let get_msymbs : type a.
+    mode:[`Delta of Constr.trace_cntxt | `NoDelta ] -> 
+    a Term.term -> 
+    Sm.t 
+    = 
+    fun ~mode term ->
+    let occs = get_macro_occs ~mode cntxt term in
+    let msymbs = List.map (fun occ -> occ.occ_cnt.Term.s_symb) occs in
+    Sm.of_list msymbs
+  in
+
+  let init = List.fold_left (fun init term ->
+      Sm.union (get_msymbs ~mode:(`Delta cntxt) term) init
+    ) Sm.empty terms
+  in
+
+  let do1 (sm : Sm.t) = 
+    (* special cases for Input, Frame and Exec, since they do not appear in the 
+       action descriptions. *)
+    let sm = if Sm.mem Symbols.inp sm then Sm.add Symbols.frame sm else sm in
+    let sm = 
+      if Sm.mem Symbols.frame sm 
+      then Sm.add Symbols.exec (Sm.add Symbols.out sm)
+      else sm 
+    in
+    let sm = 
+      if Sm.mem Symbols.exec sm 
+      then Sm.add Symbols.cond (Sm.add Symbols.out sm) 
+      else sm 
+    in
+
+    SystemExpr.fold_descrs (fun descr sm ->
+        Action.fold_descr (fun msymb _ t sm ->
+            if Sm.mem msymb sm 
+            then Sm.union (get_msymbs ~mode:`NoDelta t) sm 
+            else sm
+          ) descr sm
+      ) cntxt.table cntxt.system sm
+  in
+
+  Utils.fpt Sm.equal do1 init 
+
+
+(** Folding over all macro descriptions reachable from some terms. *)    
+let fold_macro_support : type a. 
+  (Action.descr -> Term.message -> 'b -> 'b) ->
+  Constr.trace_cntxt -> 
+  a Term.term list -> 
+  'b ->
+  'b
+  = 
+  fun func cntxt terms init ->
+  let sm = macro_support cntxt terms in
+  SystemExpr.fold_descrs (fun descr acc ->
+      Action.fold_descr (fun msymb _ t acc ->
+          if Sm.mem msymb sm then func descr t acc else acc
+        ) descr acc
+    ) cntxt.table cntxt.system init

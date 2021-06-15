@@ -54,11 +54,15 @@ type name_occ = Vars.index list Iter.occ
 type name_occs = name_occ list
 
 (** Looks for indices at which a name occurs.
-    Does not remove duplicates. 
     Raise @Var_found if a term variable occurs in the term. *)
 let get_name_indices_ext : type a. 
-  Constr.trace_cntxt -> Symbols.name Symbols.t -> a Term.term -> name_occs = 
-  fun constr nsymb t ->
+  ?fv:Sv.t -> 
+  Constr.trace_cntxt -> 
+  Symbols.name Symbols.t -> 
+  a Term.term -> 
+  name_occs 
+  = 
+  fun ?(fv=Sv.empty) constr nsymb t ->
 
   let rec get : 
     type a. a Term.term -> fv:Sv.t -> cond:Term.message -> name_occs =
@@ -81,7 +85,7 @@ let get_name_indices_ext : type a.
              get t ~fv ~cond @ occs
           ) ~fv ~cond t []
   in
-  get t ~fv:Sv.empty ~cond:Term.mk_true
+  get t ~fv ~cond:Term.mk_true
 
 (*------------------------------------------------------------------*)
 type ts_occ = Term.timestamp Iter.occ
@@ -106,8 +110,7 @@ let clear_dup_mtso_le (occs : ts_occs) : ts_occs =
   in
   List.rev occs
 
-(** Looks for timestamps at which macros occur in a term.
-    Does not remove duplicates. *)
+(** Looks for timestamps at which macros occur in a term. *)
 let get_actions_ext : 
   type a. Constr.trace_cntxt -> a Term.term -> ts_occs = 
   fun constr t ->
