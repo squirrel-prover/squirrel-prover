@@ -23,8 +23,9 @@ let int = ['0'-'9'] ['0'-'9']*
 
 
 (* Hard-coded in Symbols.ml ! Do not change. *)
-let infix_char = ['^' '+' '-' '*' '|' '&']
-let infix_symb = infix_char ( infix_char* | (['0'-'9']* infix_char+) )
+let infix_char_first = ['^' '+' '-' '*' '|' '&' '~']
+let infix_char = infix_char_first | ['<' '>']
+let infix_symb = infix_char_first ( infix_char* | (['0'-'9']* infix_char+) )
 
 rule token = parse
 | [' ' '\t']              { token lexbuf }

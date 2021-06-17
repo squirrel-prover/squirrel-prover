@@ -515,7 +515,7 @@ let check_bty_info table (ty : Type.tmessage) (info : bty_info) : bool =
   let infos = get_bty_info table ty in
   List.mem info infos 
 
-let infix_fist_chars =  ['^'; '+'; '-'; '*'; '|'; '&'; '=']
+let infix_fist_chars =  ['^'; '+'; '-'; '*'; '|'; '&'; '='; '>'; '<'; '~']
 
 let is_infix_str (s : string) : bool =
   let first = String.get s 0  in

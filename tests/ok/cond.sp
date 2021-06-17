@@ -11,17 +11,13 @@ name n : index -> message
 system O:
  in(ch,x); if x=k then out(ch,x).
 
-set debugCompletion=true.
-set debugTactics=true.
-goal _ :
-happens(O1) => cond@O1 => input@O1 <>k.
+goal _ : happens(O1) => cond@O1 => input@O1 <>k.
 Proof.
-intro Hap Hc. 
-by expand cond@O1.
+  intro Hap Hc. 
+  by expand cond@O1.
 Qed.
 
-goal _:
-happens(O) => exec@O => output@O = k.
+goal _: happens(O) => exec@O => output@O = k.
 Proof.
  intro _ _. 
 
