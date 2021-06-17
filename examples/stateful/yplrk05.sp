@@ -75,149 +75,160 @@ process reader(jj:index) =
 
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
 
-(* Minimal sequentiality assumption needed for the proofs *)
-axiom sequentiality:
-  forall (t:timestamp) forall (i,j:index),
-    happens(T(i,j),t,T1(i,j)) =>
-    (T(i,j) < t && t < T1(i,j) => not(exists (j':index), t = T1(i,j') && j <> j')).
 
-goal lastUpdateTag :
-  forall (t:timestamp), forall (i,j:index), 
+(* LIBRARIES *)
+(* A inclure dans une lib standard *)
+
+goal eq_sym ['a] (x,y : 'a) : x = y => y = x.
+Proof. auto. Qed.
+
+goal if_false ['a] (b : boolean, x,y : 'a):
+ (not b) => if b then x else y = y.
+Proof.
+ by intro *; noif. 
+Qed.
+
+goal if_true ['a] (b : boolean, x,y : 'a):
+ b => if b then x else y = x.
+Proof.
+  by intro *; yesif.
+Qed.
+
+goal if_true0 ['a] (x,y : 'a):
+ if true then x else y = x.
+Proof.
+  by rewrite if_true. 
+Qed.
+hint rewrite if_true0.
+
+goal if_false0 ['a] (x,y : 'a):
+ if false then x else y = y.
+Proof.
+  by rewrite if_false.
+Qed.
+hint rewrite if_false0.
+
+(* PROOF *)
+
+(* Minimal sequentiality assumption needed for the proofs *)
+axiom sequentiality (t:timestamp, i,j:index):
+  happens(T(i,j),t,T1(i,j)) =>
+  T(i,j) < t =>
+  t < T1(i,j) => 
+  not(exists (j':index), t = T1(i,j') && j <> j').
+
+goal lastUpdateTag (t:timestamp, i,j:index):
     happens(T(i,j),t,T1(i,j)) =>
       (t >= T(i,j) && t < T1(i,j)) => kT(i)@T(i,j) = kT(i)@t.
 Proof.
+  generalize t i j.
   induction.
   intro t IH0 i j Hap [H1 H2].
-  case t; intro He; simpl_left.
-  by auto.
-  by use IH0 with pred(R(jj)),i,j as H0.
-  by use IH0 with pred(R1(jj,ii)),i,j as H0.
-  by use IH0 with pred(R2(jj)),i,j as H0.
+  case t; intro He; 
+  try by (simpl_left; expand kT(i)@t; apply IH0 (pred(t))).
 
-  subst t,T(i0,j0).
+  auto.
+
+  destruct He as [i0 j0 He].
   assert T(i0,j0) = T(i,j) || T(i0,j0) > T(i,j) as H0.
   by eqtrace.
-  case H0.
-  by auto.
-  by use IH0 with pred(T(i0,j0)),i,j.
+  case H0; 1: auto.
+  expand kT(i)@t; by apply IH0 (pred(t)).
 
-  subst t,T1(i0,j0).
-  assert i=i0 || i<>i0 as H0.
-  by eqtrace.
-  case H0.
-  assert j=j0 || j<>j0 as H0.
-  by eqtrace.
-  case H0.
+  destruct He as [i0 j0 He].
+  rewrite He.
+  case (i=i0) => Hc0.
+  case (j=j0) => Hc1.
   (* case i=i0 && j=j0 *)
-  by auto.
+  auto.
   (* case i=i0 && j<>j0 *)
-  use sequentiality with T1(i,j0),i,j; 1,2: by auto.
-  exists j0; by auto.
+  use sequentiality with T1(i,j0),i,j => //.
+  by exists j0.
   (* case i<>i0 *)
-  use IH0 with pred(T1(i0,j0)),i,j as Meq; 2,3,4: by auto.
-  assert kT(i)@T1(i0,j0) = kT(i)@pred(T1(i0,j0)).
-  by case (if i = i0 then
-         <xor(fst(kT(i0)@pred(T1(i0,j0))),
-              h2(snd(kT(i0)@pred(T1(i0,j0))),key2(i0))),
-          xor(snd(kT(i0)@pred(T1(i0,j0))),
-              h1(xor(xor(fst(kT(i0)@pred(T1(i0,j0))),input@T(i0,j0)),k(i0)),
-                 key1(i0)))>
-         else kT(i)@pred(T1(i0,j0))).
-  by congruence.
-
-  subst t,T2(i0,j0).
-  by use IH0 with pred(T2(i0,j0)),i,j as H0.
+  use IH0 with pred(T1(i0,j0)),i,j as Meq; 2,3,4: auto. 
+  assert kT(i)@T1(i0,j0) = kT(i)@pred(T1(i0,j0));
+  1: by expand kT; rewrite if_false. 
+  congruence.
 Qed.
 
-goal auth_R1_induction :
-  forall (t:timestamp), forall (jj,ii:index),
+goal auth_R1_induction (t:timestamp, jj,ii:index):
     happens(R1(jj,ii)) =>
-      ((t = R1(jj,ii) && exec@t) (* exec@t (not only cond@t) is needed *)
-      =>
-      (exists (j:index), T(ii,j) < t && output@T(ii,j) = input@t)).
+    t = R1(jj,ii) && exec@t (* exec@t (not only cond@t) is needed *)
+    =>
+    exists (j:index), T(ii,j) < t && output@T(ii,j) = input@t.
 Proof.
+  generalize t jj ii.
   induction. 
-  intro t IH0 jj ii Hap [Ht Hexec].
+  intro t IH0 jj ii Hap [Ht0 Hexec].
   subst t,R1(jj,ii).
-  expand exec@R1(jj,ii). expand cond@R1(jj,ii).
+  expand exec, cond.
   destruct Hexec as [H1 Meq].
   euf Meq.
 
     (* case 1/3: equality with hashed message in update@R1 *)
     intro Ht Heq *.
-    executable pred(R1(jj,ii)); 1,2: by auto.
-    intro H.
-    use H with R1(jj0,ii) as Ht1; 2: by auto.
-    expand exec@R1(jj0,ii). expand cond@R1(jj0,ii).
-    destruct Ht1 as [H2 Meq'].
-    use IH0 with R1(jj0,ii),jj0,ii; 2,3,4: by auto.
-    simpl_left.
-    exists j.
-    split.
-    by auto.
-    by congruence.  
+    executable pred(R1(jj,ii)) => // H.
+    use H with R1(jj0,ii) as Ht1; 2: auto.
+    expand exec, cond.
+    destruct Ht1 as [_ _].
+    use IH0 with R1(jj0,ii),jj0,ii as [j _]; 2,3,4: auto.
+    by exists j.
 
     (* case 2/3: equality with hashed message in output@T *)
     (* honest case *)
-    intro Ht Heq *.
-    by exists j.
+    by intro *; exists j.
 
     (* case 3/3: equality with hashed message in update@T1 *)
     (* if there is an update@T1, then action T happened before *)
-    intro Ht Heq *.
-    use lastUpdateTag with pred(T1(ii,j)),ii,j as H2; 
-      2,3: depends T(ii,j),T1(ii,j); by auto; intro Ht'; by auto.
-    depends T(ii,j),T1(ii,j); 1: by auto.
-    intro Ht'.
-    by exists j.
+    intro Ht Heq *. 
+    exists j.
+    depends T(ii,j),T1(ii,j) => // _. 
+    by rewrite /output (lastUpdateTag (pred(T1(ii,j)))). 
 Qed.
 
-goal auth_T1_induction :
-  forall (t:timestamp), forall (i,j:index),
+goal auth_T1_induction (t:timestamp, i,j:index):
     happens(t) =>
-      ((t = T1(i,j) && exec@t) (* exec@t (not only cond@t) is needed *)
-      =>
-      (exists (jj:index), R1(jj,i) < t && output@R1(jj,i) = input@t)).
+    t = T1(i,j) && exec@t (* exec@t (not only cond@t) is needed *)
+    =>
+    exists (jj:index), R1(jj,i) < t && output@R1(jj,i) = input@t.
 Proof.
+  generalize t i j.
   induction.
   intro t IH0 i j Hap [Ht Hexec].
   subst t,T1(i,j).
-  expand exec@T1(i,j). expand cond@T1(i,j).
+  expand exec, cond.
   destruct Hexec as [H1 Meq].
-  euf Meq.
+  euf Meq => * /=.
 
     (* case 1/2: equality with hashed message in output@R1 *)
     (* honest case *)
-    intro Ht Heq *.
     by exists jj.
 
     (* case 2/2: equality with hashed message in update@T1 *)
-    intro Ht Heq *.
-    use IH0 with T1(i,j0),i,j0; 2,3: by auto.
-    executable pred(T1(i,j)); 1,2: by auto.
-    simpl_left.
-    intro H.
-    use H with T1(i,j0) as H'; 2: by auto.
-    expand exec@T1(i,j0). expand cond@T1(i,j0).
-    destruct H' as [H2 Meq'].
-    by exists jj.
-    split; 1: by auto.
-    executable pred(T1(i,j)); 1,2: by auto.
-    intro H.  by use H with T1(i,j0).
+    use IH0 with T1(i,j0),i,j0 as [jj _] => //.
+    exists jj => /=. 
+    executable pred(T1(i,j)) => // H.
+    by use H with T1(i,j0) as H'.
+
+    simpl.
+    executable pred(T1(i,j)) => // H. 
+    by apply H.
 Qed.
 
+
+goal xor_inj_l (x, y, z : message) : x XOR y = z XOR y => x = z.
+Proof. auto. Qed.
+
 (* Tentative without induction, seems not doable. *)
-goal auth_R1 :
-  forall (jj,ii:index), 
+goal auth_R1 (jj,ii:index):
     happens(R1(jj,ii)) =>
-      (cond@R1(jj,ii) 
-      =>
-      (exists (j:index), 
-        T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii))).
+    cond@R1(jj,ii) =>
+    exists (j:index), 
+      T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii).
 Proof.
-  intro jj ii Hap Hcond.
-  expand cond@R1(jj,ii).
-  euf Hcond.
+  intro Hap Hcond.
+  expand cond.
+  euf Hcond => Ht M1 *.
 
     (* case 1/3: equality with hashed message in update@R1 *)
     (* this case is easily handled in the version with induction
@@ -226,46 +237,30 @@ Proof.
     we do not have to exploit the equality hypothesis generated by the
     euf tactic *)
     (* here, without the induction, we have to find another way to conclude *)
-    intro Ht M1 *.
-    assert
-      input@R1(jj,ii) =
-        h1(xor(xor(fst(kR(ii)@pred(R1(jj0,ii))),r1(jj0)),k(ii)),key1(ii))
-      as Hcond'.
-    by congruence.
-    euf Hcond'. (* here again, we have 3 different cases *)
+    rewrite -M1 in Hcond. 
+    clear M1.
+    euf Hcond => Ht' M2 *. (* here again, we have 3 different cases *)
 
       (* case 1/3: equality with hashed message in update@R1 *)
       admit. (* ??? *)
 
       (* case 2/3: equality with hashed message in output@T *)
       (* honest case *)
-      intro Ht' M2 *.
-      exists j. split.
-      case Ht'; 1,2: by eqtrace.
-      case Ht'; 1,2: by expand output@T(ii,j); congruence.
+      by exists j; case Ht'. 
 
       (* case 3/3: equality with hashed message in update@T1 *)
       (* if there is an update@T1, then action T happened before *)
-      intro Ht' M2 *.
-      use lastUpdateTag with pred(T1(ii,j)),ii,j as M3;
-        2,3: by depends T(ii,j),T1(ii,j); case Ht'; 1,2: auto; intro Hdep; auto. 
-      depends T(ii,j),T1(ii,j). case Ht'; 1,2: by auto.
-      intro Hdep.
-      exists j. split.
-      case Ht'; 1,2: by eqtrace. 
-      case Ht'; 1,2: by expand output@T(ii,j); congruence. 
+      exists j. 
+      depends T(ii,j),T1(ii,j); 1: by case Ht' => _.
+      by rewrite /output (lastUpdateTag (pred(T1(ii,j)))); case Ht'.
 
     (* case 2/3: equality with hashed message in output@T *)
     (* honest case *)
-    intro Ht M1 *.
-    exists j. split; 1,2: by auto.
+    by exists j. 
 
     (* case 3/3: equality with hashed message in update@T1 *)
     (* if there is an update@T1, then action T happened before *)
-    intro Ht M1 *.
-    use lastUpdateTag with pred(T1(ii,j)),ii,j as M2;
-      2,3: by depends T(ii,j),T1(ii,j); auto.
-    depends T(ii,j),T1(ii,j); 1: by auto.
-    intro Hdep.
-    exists j. split; 1,2: by auto.
+    exists j.
+    depends T(ii,j),T1(ii,j) => // _.
+    by rewrite /output (lastUpdateTag (pred(T1(ii,j)))). 
 Qed.

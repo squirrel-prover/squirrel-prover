@@ -38,8 +38,7 @@ abstract ok : message
 abstract error : message
 
 abstract TSinit : message
-abstract TSorderOk : message
-abstract (~<) : message->message->message
+abstract (~<) : message -> message -> boolean
 abstract TSnext : message->message
 
 name k : message
@@ -66,7 +65,7 @@ channel c
 (* i = tag's identity, j = tag's session for identity i *)
 process tag(i:index,j:index) =
   in(cR, x1);
-  if fst(x1) = h(snd(x1),k) && snd(kT(i)) ~< snd(x1) = TSorderOk then
+  if fst(x1) = h(snd(x1),k) && snd(kT(i)) ~< snd(x1) then
     out(cT, h1(fst(kT(i)),key1));
     in(cR, x3);
     if x3 = h2(<fst(kT(i)),pin(i)>,key2) then
@@ -275,7 +274,7 @@ Proof.
   by intro _; left. 
 
   (* t = R1(jj,ii0) - interesting case *)
-  intro _; simpl_left; subst t,R1(jj,ii0).
+  intro [jj ii0 Eq]; rewrite Eq.
   use IH0 with pred(R1(jj,ii0)),ii as H => //.
   case H. 
 
