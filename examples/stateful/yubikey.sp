@@ -300,7 +300,7 @@ Proof.
   intro j' [Ht' Meq''].
   expand output => /=.
   rewrite -Meq' in Meq''.
-  assert (npr(i,j) = npr(i,j')) as H1.
+  assert (npr(i,j) = npr(i,j')) as H1. 
   admit.
   by eqnames.
 Qed.
@@ -308,15 +308,15 @@ Qed.
 (* Another injective version for authentication. *)
 goal auth_injective (ii,i:index):
    happens(S(ii,i)) =>
-     (exec@S(ii,i) =>
-       (exists (j:index),
-       Press(i,j) < S(ii,i)
-       && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i)))
-       && (forall (ii1:index), happens(S(ii1,i)) =>
-            ( (exec@S(ii1,i)
-              && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii1,i)))
-              && SCpt(i)@S(ii,i) = SCpt(i)@S(ii1,i))
-              => ii1 = ii )))).
+   exec@S(ii,i) =>
+     exists (j:index),
+       Press(i,j) < S(ii,i) && 
+       snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i))) && 
+       forall (ii1:index), happens(S(ii1,i)) =>
+            exec@S(ii1,i) =>
+            snd(snd(output@Press(i,j))) = snd(snd(input@S(ii1,i))) =>
+            SCpt(i)@S(ii,i) = SCpt(i)@S(ii1,i) => 
+            ii1 = ii.
 Proof.
   intro Hap Hexec.
   expand exec, cond.
@@ -325,7 +325,7 @@ Proof.
   intro Ht M3 *.
   exists j.
   split; 1: auto. 
-  intro ii1 Hap' [Hexec' M4 M5].
+  intro ii1 Hap' Hexec' M4 M5.
   expand exec, cond, output.
   destruct Hexec' as [Hpred' [Mneq' M6 M7]].
   assert
