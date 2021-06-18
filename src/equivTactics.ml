@@ -1488,14 +1488,19 @@ let rec auto ~close ~strong s sk (fk : Tactics.fk) =
     in
 
     let wfadup s sk fk =
-      let fk _ = sk [s] fk in
-      LT.wrap_fail (fadup (Args.Opt (Args.Int, None))) s sk fk 
+      if strong || (Config.auto_fadup ()) then
+        let fk _ = sk [s] fk in
+        LT.wrap_fail (fadup (Args.Opt (Args.Int, None))) s sk fk 
+      else sk [s] fk
     in
 
     let conclude s sk fk  =
       if close || Config.auto_intro () then
-        orelse_list [LT.wrap_fail refl_tac;
-                     LT.wrap_fail assumption] s sk fk
+        andthen_list ~cut:true
+          [LT.wrap_fail (LT.expand_all_l `All);
+           try_tac wfadup;
+           orelse_list [LT.wrap_fail refl_tac;
+                        LT.wrap_fail assumption]] s sk fk
       else fk (None, GoalNotClosed)
     in
 
@@ -1506,11 +1511,7 @@ let rec auto ~close ~strong s sk (fk : Tactics.fk) =
     andthen_list ~cut:true
       [try_tac reduce;
        try_tac wfadup; 
-       try_tac
-         (andthen_list ~cut:true
-            [LT.wrap_fail (LT.expand_all_l `All);
-             try_tac wfadup;
-             conclude])]
+       try_tac conclude]
       s sk fk
 
 let tac_auto ~close ~strong args s sk (fk : Tactics.fk) =

@@ -82,6 +82,9 @@ let v_strict_alias_mode = Param_bool false
 let s_auto_into = "autoIntro"
 let v_auto_intro = Param_bool true
 
+let s_auto_fadup = "autoFADup"
+let v_auto_fadup = Param_bool true
+
 let s_new_ind = "newInduction"
 let v_new_ind = Param_bool false
 
@@ -96,6 +99,7 @@ let default_params =
   |>  decl s_debug_tactics PBool v_debug_tactics
   |>  decl s_strict_alias_mode PBool v_strict_alias_mode 
   |>  decl s_auto_into PBool v_auto_intro
+  |>  decl s_auto_fadup PBool v_auto_fadup
   |>  decl s_new_ind PBool v_new_ind
 
 (*------------------------------------------------------------------*)
@@ -122,6 +126,8 @@ let debug_tactics    () = get_bool (M.find s_debug_tactics !params)
 let strict_alias_mode () = get_bool (M.find s_strict_alias_mode !params)
 
 let auto_intro () = get_bool (M.find s_auto_into !params)
+
+let auto_fadup () = get_bool (M.find s_auto_fadup !params)
 
 let new_ind () = get_bool (M.find s_new_ind !params) 
 
