@@ -550,6 +550,7 @@ let constraints (s : TS.t) =
 
 (** [constraints s] proves the sequent using its trace formulas. *)
 let constraints_tac (s : TS.t) =
+  let s = as_seq1 (LT.intro_all s) in
   match constraints s with
   | true ->
     let () = dbg "closed by constraints" in

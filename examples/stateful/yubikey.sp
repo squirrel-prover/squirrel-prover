@@ -174,7 +174,8 @@ goal counterIncreaseBis:
 Proof.
   induction.
   intro t IH0 t' i Hap [Hexec Ht'].
-  assert (t' = pred(t) || t' < pred(t)) as H0; 1: by case t. 
+  assert (t' = pred(t) || t' < pred(t)) as H0; 
+  1: case t; constraints. 
   case H0.
 
   (* case t' = pred(t) *)
@@ -204,7 +205,8 @@ goal noreplayInv (ii, ii1, i:index):
 Proof.
   intro Hap [Hexec Ht].
   use counterIncreaseStrictly with ii1, i as M0 => //.
-  assert (S(ii,i) = pred(S(ii1,i)) || S(ii,i) < pred(S(ii1,i))) as H1; 1: auto.
+  assert (S(ii,i) = pred(S(ii1,i)) || S(ii,i) < pred(S(ii1,i))) as H1; 
+  1: constraints.
   case H1.
 
   (* case S(ii,i) = pred(S(ii1,i)) *)
@@ -226,7 +228,7 @@ goal noreplayNew (ii, ii1, i:index):
   ii = ii1.
 Proof.
   intro Hap [Hexec Ht Meq].
-  assert (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i)) as H1; 1: auto.
+  assert (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i)) as H1; 1: constraints.
   case H1 => //.
 
   use noreplayInv with ii, ii1, i as M1 => //. 
@@ -242,8 +244,8 @@ goal monotonicity (ii, ii1, i:index):
 Proof.
   intro Hap [Hexec H].
   assert
-    (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i) || S(ii,i) > S(ii1,i)) as Ht.
-  constraints.
+    (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i) || S(ii,i) > S(ii1,i)) as Ht;
+  1: constraints.
   case Ht.
 
   (* case S(ii,i) = S(ii1,i) *)
@@ -331,7 +333,7 @@ Proof.
   assert
    ( S(ii,i) < S(ii1,i) || S(ii,i) = S(ii1,i) || S(ii,i) > S(ii1,i) ) as H;
   1: constraints.
-  case H => //.
+  case H; 2: auto.
 
   (* A: case S(ii,i) < S(ii1,i) *)
   assert SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk as M8.
@@ -340,7 +342,7 @@ Proof.
      S(ii,i) = pred(S(ii1,i)) || 
      S(ii,i) > pred(S(ii1,i)) ) as H'; 1: constraints.
 
-  case H' => //.
+  case H'; 2,3: auto. 
   (* case S(ii,i) < pred(S(ii1,i)) *)
   use counterIncreaseBis with pred(S(ii1,i)),S(ii,i),i as Hcpt => //.
   case Hcpt => //.
@@ -355,8 +357,8 @@ Proof.
   assert
    ( S(ii1,i) < pred(S(ii,i)) || 
      S(ii1,i) = pred(S(ii,i)) || 
-     S(ii1,i) > pred(S(ii,i)) ) as H'; 1: auto.
-  case H' => //.
+     S(ii1,i) > pred(S(ii,i)) ) as H'; 1: constraints.
+  case H'; 2,3: auto. 
   (* case S(ii1,i) < pred(S(ii,i)) *)
   use counterIncreaseBis with pred(S(ii,i)),S(ii1,i),i as Hcpt => //.
   case Hcpt; 
