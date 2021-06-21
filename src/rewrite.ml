@@ -33,7 +33,7 @@ let pat_to_rw_erule ?loc dir (p : Term.message Match.pat) : rw_erule =
     | Term.Atom (`Message   (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
     | Term.Atom (`Timestamp (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
     | Term.Atom (`Index     (`Eq, t1, t2)) -> 
-      Term.ESubst (Term.Var t1,Term.Var t2)
+      Term.ESubst (Term.mk_var t1,Term.mk_var t2)
     | _ -> Tactics.hard_failure ?loc (Tactics.Failure "not an equality") 
   in
 

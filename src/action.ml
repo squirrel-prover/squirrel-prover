@@ -49,9 +49,11 @@ let same_shape a b : Term.subst option =
        s = s' && List.length ls = List.length ls'
     then
       let acc' =
-        List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i')) lp lp' in
+        List.map2 (fun i i' -> Term.ESubst (Term.mk_var i,Term.mk_var i')) lp lp' 
+      in
       let acc'' =
-        List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i')) ls ls' in
+        List.map2 (fun i i' -> Term.ESubst (Term.mk_var i,Term.mk_var i')) ls ls' 
+      in
       same (acc'' @ acc' @ acc) l l'
     else None in
   same [] a b
@@ -147,7 +149,8 @@ let rec subst_action (s : Term.subst) (a : action) : action =
 let of_term (s:Symbols.action Symbols.t) (l:Vars.index list) table : action =
   let l',a = of_symbol s table in
   let subst =
-    List.map2 (fun x y -> Term.ESubst (Term.Var x,Term.Var y)) l' l in
+    List.map2 (fun x y -> Term.ESubst (Term.mk_var x,Term.mk_var y)) l' l 
+  in
   subst_action subst a
 
 let pp_parsed_action ppf a = pp_action_f pp_strings (0,[]) ppf a
@@ -173,7 +176,7 @@ type descr = {
 }
 
 let pp_descr_short ppf descr =
-  let t = Term.Action (descr.name, descr.indices) in
+  let t = Term.mk_action descr.name descr.indices in
   Term.pp ppf t
 
 let pp_descr ppf descr =
@@ -317,7 +320,7 @@ let is_dup_match
     | Macro (im,[],t) when im = Term.in_macro ->
       List.find_map (function
           | Term.Macro (fm,[],t') when fm = Term.frame_macro -> 
-            is_dup_leq table st (Pred t) t' 
+            is_dup_leq table st (Term.mk_pred t) t' 
           | _ -> None
         ) elems
 

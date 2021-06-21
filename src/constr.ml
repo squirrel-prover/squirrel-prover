@@ -178,10 +178,10 @@ end = struct
   let rec ut_to_term : type a. a Type.kind -> ut -> a Term.term = 
     fun s ut ->
     match ut.cnt with
-    | UVar tv -> Term.Var (utv_to_var s tv)
+    | UVar tv -> Term.mk_var (utv_to_var s tv)
     | UName (a, is) -> 
-      Term.cast s (Term.Action (a, List.map (ut_to_var Type.KIndex) is))
-    | UPred ut -> Term.cast s (Term.Pred (ut_to_term Type.KTimestamp ut))
+      Term.cast s (Term.mk_action a (List.map (ut_to_var Type.KIndex) is))
+    | UPred ut -> Term.cast s (Term.mk_pred (ut_to_term Type.KTimestamp ut))
     | UInit  -> Term.cast s Term.init
     | UUndef -> assert false
 end
@@ -1451,14 +1451,14 @@ open Term
     
 let env = ref Vars.empty_env 
 
-let mk_var   v = Vars.make_r `Approx env Timestamp v 
+let mk_var   v = Term.mk_var (Vars.make_r `Approx env Timestamp v) 
 let mk_var_i v = Vars.make_r `Approx env Index     v 
 
-let tau = Var (mk_var "tau")
-and tau' = Var (mk_var "tau")
-and tau'' = Var (mk_var "tau")
-and tau3 = Var (mk_var "tau")
-and tau4 = Var (mk_var "tau")        
+let tau = mk_var "tau"
+and tau' = mk_var "tau"
+and tau'' = mk_var "tau"
+and tau3 = mk_var "tau"
+and tau4 = mk_var "tau"
 and i =  mk_var_i "i"
 and i' = mk_var_i "i"
 
@@ -1466,36 +1466,36 @@ let table = Symbols.builtins_table
               
 let table, a = Symbols.Action.declare table (L.mk_loc L._dummy "a") 1
 
-let pb_eq1 = (`Timestamp (`Eq,tau, Pred tau'))
-             :: (`Timestamp (`Eq,tau', Pred tau''))
-             :: (`Timestamp (`Eq,tau, Action (a,[i])))
-             :: [`Timestamp (`Eq,tau'', Action (a,[i']))]
-and pb_eq2 = [`Timestamp (`Eq,tau, Pred tau)]
-and pb_eq3 = (`Timestamp (`Eq,tau, Pred tau'))
-             :: (`Timestamp (`Eq,tau', Pred tau''))
+let pb_eq1 = (`Timestamp (`Eq,tau, mk_pred tau'))
+             :: (`Timestamp (`Eq,tau', mk_pred tau''))
+             :: (`Timestamp (`Eq,tau, mk_action a [i]))
+             :: [`Timestamp (`Eq,tau'', mk_action a [i'])]
+and pb_eq2 = [`Timestamp (`Eq,tau, mk_pred tau)]
+and pb_eq3 = (`Timestamp (`Eq,tau, mk_pred tau'))
+             :: (`Timestamp (`Eq,tau', mk_pred tau''))
              :: [`Timestamp (`Eq,tau'', tau)]
-and pb_eq4 = (`Timestamp (`Eq,Term.init, Pred tau))
-             :: (`Timestamp (`Eq,tau, Pred tau'))
-             :: (`Timestamp (`Eq,tau', Pred tau''))
-             :: (`Timestamp (`Eq,tau, Action (a,[i])))
-             :: [`Timestamp (`Eq,tau'', Action (a,[i]))]
-and pb_eq5 = (`Timestamp (`Eq,Term.init, Pred tau))
-             :: (`Timestamp (`Eq,tau, Pred tau'))
-             :: (`Timestamp (`Eq,tau', Action (a,[i'])))
-             :: (`Timestamp (`Eq,tau, Action (a,[i])))                 
-             :: (`Timestamp (`Eq,tau'', Action (a,[i])))
-             :: [`Timestamp (`Eq,tau'', Action (a,[i']))]
-and pb_eq6 = (`Timestamp (`Eq,tau, Pred tau'))
-             :: (`Timestamp (`Eq,tau', Action (a,[i'])))
-             :: (`Timestamp (`Eq,tau, Action (a,[i])))
-             :: (`Timestamp (`Eq,tau3, Action (a,[i])))
-             :: [`Timestamp (`Eq,tau'', Action (a,[i']))]
-and pb_eq7 = (`Timestamp (`Eq,tau, Pred tau'))
-             :: (`Timestamp (`Eq,tau', Pred tau''))
-             :: (`Timestamp (`Eq,tau, Action (a,[i])))
-             :: [`Timestamp (`Eq,tau'', Action (a,[i']))]
-and pb_eq8 = (`Timestamp (`Eq,tau, Pred tau'))
-             :: (`Timestamp (`Eq,tau', Pred tau''))
+and pb_eq4 = (`Timestamp (`Eq,Term.init, mk_pred tau))
+             :: (`Timestamp (`Eq,tau, mk_pred tau'))
+             :: (`Timestamp (`Eq,tau', mk_pred tau''))
+             :: (`Timestamp (`Eq,tau, mk_action a [i]))
+             :: [`Timestamp (`Eq,tau'', mk_action a [i])]
+and pb_eq5 = (`Timestamp (`Eq,Term.init, mk_pred tau))
+             :: (`Timestamp (`Eq,tau, mk_pred tau'))
+             :: (`Timestamp (`Eq,tau', mk_action a [i']))
+             :: (`Timestamp (`Eq,tau, mk_action a [i]))                 
+             :: (`Timestamp (`Eq,tau'', mk_action a [i]))
+             :: [`Timestamp (`Eq,tau'', mk_action a [i'])]
+and pb_eq6 = (`Timestamp (`Eq,tau, mk_pred tau'))
+             :: (`Timestamp (`Eq,tau', mk_action a [i']))
+             :: (`Timestamp (`Eq,tau, mk_action a [i]))
+             :: (`Timestamp (`Eq,tau3, mk_action a [i]))
+             :: [`Timestamp (`Eq,tau'', mk_action a [i'])]
+and pb_eq7 = (`Timestamp (`Eq,tau, mk_pred tau'))
+             :: (`Timestamp (`Eq,tau', mk_pred tau''))
+             :: (`Timestamp (`Eq,tau, mk_action a [i]))
+             :: [`Timestamp (`Eq,tau'', mk_action a [i'])]
+and pb_eq8 = (`Timestamp (`Eq,tau, mk_pred tau'))
+             :: (`Timestamp (`Eq,tau', mk_pred tau''))
              :: [`Timestamp (`Eq,tau'', tau3)]
 
 (* let () = Printexc.record_backtrace true *)

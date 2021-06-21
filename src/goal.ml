@@ -142,9 +142,9 @@ let make_equiv_goal ~table ~hint_db
 
 let make_equiv_goal_process ~table ~hint_db gname system : lemma * t =
   let env, ts = Vars.make `Approx Vars.empty_env Type.Timestamp "t" in
-  let term = Term.Macro (Term.frame_macro,[],Term.Var ts) in
+  let term = Term.mk_macro Term.frame_macro [] (Term.mk_var ts) in
   let goal = Equiv.(Atom (Equiv [term])) in
-  let happens = Term.Atom (`Happens (Term.Var ts)) in
+  let happens = Term.mk_happens (Term.mk_var ts) in
   let hyp = Equiv.(Atom (Reach happens)) in
   let gc =
     mk_goal_concl gname system []

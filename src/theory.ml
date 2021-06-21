@@ -720,7 +720,7 @@ let convert_var :
 
       check_ty_leq state ~of_t (Vars.ty v) ty;
 
-      Term.Var v
+      Term.mk_var v
     with
     | Not_found -> conv_err (L.loc st) (Undefined (L.unloc st))
     | Vars.CastError ->
@@ -789,7 +789,7 @@ and convert0 :
       conv_err (L.loc tm) PatNotAllowed;
 
     let env, p = Vars.make ~allow_pat:true `Approx state.env ty "_" in
-    Term.Var p
+    Term.mk_var p
 
   | App   (f,terms) ->
     if terms = [] && Vars.mem_s state.env (L.unloc f)
@@ -813,41 +813,38 @@ and convert0 :
 
   | Tinit ->
       begin match ty with
-        | Type.Timestamp -> Term.Action (Symbols.init_action,[])
+        | Type.Timestamp -> Term.mk_action Symbols.init_action []
         | _ -> type_error ()
       end
 
   | Tpred t ->
       begin match ty with
-        | Type.Timestamp -> Term.Pred (conv Type.Timestamp t)
+        | Type.Timestamp -> Term.mk_pred (conv Type.Timestamp t)
         | _ -> type_error ()
       end
 
-  | Diff (l,r) -> Term.Diff (conv ty l, conv ty r)
+  | Diff (l,r) -> Term.mk_diff (conv ty l) (conv ty r)
 
   | Compare (o,u,v) ->
     begin match Type.kind ty with
       | Type.KMessage ->
         begin try
-            Term.Atom
-              (`Timestamp (o,
-                           conv Type.Timestamp u,
-                           conv Type.Timestamp v))
+            Term.mk_atom o (conv Type.Timestamp u) (conv Type.Timestamp v)
           with Conv (_,Type_error _ ) ->
 
           match o with
           | #Term.ord_eq as o ->
             begin try
-                Term.Atom (`Index (o,
-                                   conv_index state u,
-                                   conv_index state v))
+                Term.mk_atom o
+                  (Term.mk_var (conv_index state u))
+                  (Term.mk_var (conv_index state v))
               with Conv (_,Type_error _ ) ->
 
                 let tyv = Type.Infer.mk_univar state.ty_env in
 
-                Term.Atom (`Message (o,
-                                     conv (Type.TUnivar tyv) u,
-                                     conv (Type.TUnivar tyv) v))
+                Term.mk_atom o
+                  (conv (Type.TUnivar tyv) u)
+                  (conv (Type.TUnivar tyv) v)
             end
 
           | _ -> conv_err (L.loc tm) (Unsupported_ord (L.unloc tm))
@@ -859,7 +856,7 @@ and convert0 :
     begin match Type.kind ty with
       | Type.KMessage ->
         let atoms = List.map (fun t ->
-            Term.Atom (`Happens (conv Type.Timestamp t))
+            Term.mk_happens (conv Type.Timestamp t)
           ) ts in
         Term.mk_ands atoms
       | _ -> type_error ()
@@ -880,7 +877,7 @@ and convert0 :
         let c = conv ~env Type.Boolean c in
         let t = conv ~env ty t in
         let e = conv ty e in
-        Term.Find (is,c,t,e)
+        Term.mk_find is c t e
       | _ -> type_error ()
     end
 
@@ -912,7 +909,7 @@ and convert0 :
     in
 
     begin match Type.kind ty with
-      | Type.KMessage -> Term.Seq (vs, t)
+      | Type.KMessage -> Term.mk_seq0 vs t
       | _ -> type_error ()
     end
 
@@ -971,7 +968,7 @@ and conv_app :
         in
         let messages = List.rev rmessages in
 
-        let t = Term.Fun ((symb,indices),fty,messages) in
+        let t = Term.mk_fun0 (symb,indices) fty messages in
 
         (* additional type check between the type of [t] and the output
            type in [fty].
@@ -993,18 +990,18 @@ and conv_app :
             assert (List.for_all (fun x -> x = Type.eindex) ty_args);
             let indices = List.map (conv_index state) l in
             let ms = Term.mk_isymb s ty_out indices in
-            Term.Macro (ms,[],get_at ts_opt)
+            Term.mk_macro ms [] (get_at ts_opt)
 
           | Input | Output | Frame ->
             check_arity_i (L.loc f) "input" (List.length l) 0 ;
             (* TODO: subtypes *)
             let ms = Term.mk_isymb s ty_out [] in
-            Term.Macro (ms, [], get_at ts_opt)
+            Term.mk_macro ms [] (get_at ts_opt)
 
           | Cond | Exec ->
             check_arity_i (L.loc f) "cond" (List.length l) 0 ;
             let ms = Term.mk_isymb s ty_out [] in
-            Term.Macro (ms, [], get_at ts_opt)
+            Term.mk_macro ms [] (get_at ts_opt)
 
         end
 
@@ -1034,7 +1031,7 @@ and conv_app :
       begin match Type.kind ty with
         | Type.KMessage ->
           let ms = Term.mk_isymb s k is in
-          Term.Macro (ms,[],ts)
+          Term.mk_macro ms [] ts
 
         | _ -> type_error ()
       end
@@ -1045,7 +1042,7 @@ and conv_app :
         | Type.KMessage ->
           let is = List.map (conv_index state) is in
           let ns = Term.mk_isymb (get_name state.table s) sty is in
-          Term.Name ns
+          Term.mk_name ns
         | _ -> type_error ()
       end
 
@@ -1053,8 +1050,9 @@ and conv_app :
       check_action state.table a (List.length is) ;
       begin match Type.kind ty with
         | Type.KTimestamp ->
-          Term.Action ( get_action state.table a,
-                        List.map (conv_index state) is )
+          Term.mk_action
+            (get_action state.table a) 
+            (List.map (conv_index state) is)
         | _ -> type_error ()
       end
 
@@ -1213,7 +1211,7 @@ let check
     table ?(local=false) ?(pat=false) (ty_env : Type.Infer.env)
     (env : Vars.env) t (Type.ETy s) : unit =
   let dummy_var s =
-    Term.Var (snd (Vars.make `Approx Vars.empty_env s "#dummy"))
+    Term.mk_var (snd (Vars.make `Approx Vars.empty_env s "#dummy"))
   in
   let cntxt = if local then InProc (dummy_var Type.Timestamp) else InGoal in
   let state = mk_state table cntxt [] env pat ty_env in
@@ -1324,7 +1322,7 @@ let parse_subst table ty_vars env (uvars : Vars.evar list) (ts : term list)
   : Term.subst =
   let conv_env = { table = table; cntxt = InGoal; } in
   let f t (Vars.EVar u) =
-    Term.ESubst (Term.Var u, convert conv_env ty_vars env t (Vars.ty u))
+    Term.ESubst (Term.mk_var u, convert conv_env ty_vars env t (Vars.ty u))
   in
   List.map2 f ts uvars
 
@@ -1332,7 +1330,7 @@ type Symbols.data += Local_data of Vars.evar list * Vars.evar * Term.message
 type Symbols.data += StateInit_data of Vars.index list * Term.message
 
 let declare_state table s (typed_args : bnds) (pty : p_ty) t =
-  let ts_init = Term.Action (Symbols.init_action, []) in
+  let ts_init = Term.mk_action Symbols.init_action [] in
   let conv_env = { table = table; cntxt = InProc ts_init; } in
 
   let env, evs = convert_p_bnds table [] Vars.empty_env typed_args in

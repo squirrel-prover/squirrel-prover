@@ -78,8 +78,8 @@ let get_def
       | Term.Action (s,_) when s = Symbols.init_action -> Term.mk_true
       | Term.Action _ ->
         Term.mk_and
-          (Macro (symb,[], Term.Pred a))
-          (Macro (Term.cond_macro, [], a))
+          (Term.mk_macro symb [] (Term.mk_pred a))
+          (Term.mk_macro Term.cond_macro [] a)
       | _ -> assert false
     end
 
@@ -88,12 +88,12 @@ let get_def
       | Term.Action (s,_) when s = Symbols.init_action -> Term.mk_zero
       | Term.Action _ ->
         Term.mk_pair
-          (Term.Macro (symb, [], Term.Pred a))
+          (Term.mk_macro symb [] (Term.mk_pred a))
           (Term.mk_pair
-             (Term.mk_of_bool (Term.Macro (Term.exec_macro, [], a)))
+             (Term.mk_of_bool (Term.mk_macro Term.exec_macro [] a))
              (Term.mk_ite
-                (Term.Macro (Term.exec_macro, [], a))
-                (Term.Macro (Term.out_macro, [], a))
+                (Term.mk_macro Term.exec_macro [] a)
+                (Term.mk_macro Term.out_macro [] a)
                 Term.mk_zero))
 
       | _ -> assert false
@@ -117,7 +117,7 @@ let get_def
         (* init case: we substitute the indice by their definition *)
         if a = Term.init then 
           let s = List.map2 (fun i1 i2 -> 
-              Term.ESubst (Term.Var i1, Term.Var i2)
+              Term.ESubst (Term.mk_var i1, Term.mk_var i2)
               ) ns.s_indices symb.s_indices
           in
           Term.subst s msg
@@ -132,9 +132,9 @@ let get_def
           Term.mk_ite
             (Term.mk_indices_eq symb.s_indices ns.s_indices)
             msg
-            (Term.Macro (symb, [], Term.Pred a))
+            (Term.mk_macro symb [] (Term.mk_pred a))
       with Not_found ->
-        Term.Macro (symb, [], Term.Pred a)
+        Term.mk_macro symb [] (Term.mk_pred a)
     end
 
   | Symbols.Global _, Global_data (inputs,indices,ts,body) ->
@@ -143,11 +143,11 @@ let get_def
     assert (List.length inputs <= List.length action) ;
     let idx_subst =
       List.map2
-        (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
+        (fun i i' -> Term.ESubst (Term.mk_var i,Term.mk_var i'))
         indices
         symb.s_indices
     in
-    let ts_subst = Term.ESubst (Term.Var ts, a) in
+    let ts_subst = Term.ESubst (Term.mk_var ts, a) in
     (* Compute the relevant part of the action, i.e. the
          * prefix of length [length inputs], reversed. *)
     let rev_action =
@@ -158,11 +158,11 @@ let get_def
       List.fold_left
         (fun (subst,action) x ->
            let in_tm =
-             Term.Macro (Term.in_macro,[],
-                         SE.action_to_term table system
-                           (List.rev action))
+             Term.mk_macro 
+               Term.in_macro []
+               (SE.action_to_term table system (List.rev action))
            in
-           Term.ESubst (Term.Var x,in_tm) :: subst,
+           Term.ESubst (Term.mk_var x,in_tm) :: subst,
            List.tl action)
         (ts_subst::idx_subst,rev_action)
         inputs
@@ -183,8 +183,8 @@ let get_def
       (* If we do not have a left and right projection, we must
          reconstruct the body of the macros to have the correct
          definition on each side. *)
-      | Pair (s1, s2)  -> Term.Diff (proj_t (SE.get_proj s1),
-                                     proj_t (SE.get_proj s2))
+      | Pair (s1, s2)  -> 
+        Term.mk_diff (proj_t (SE.get_proj s1)) (proj_t (SE.get_proj s2))
     end
 
   |  _ -> assert false

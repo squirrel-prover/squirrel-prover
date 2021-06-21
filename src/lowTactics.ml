@@ -119,7 +119,7 @@ module LowTac (S : Sequent.S) = struct
 
   (*------------------------------------------------------------------*)
   let happens_premise (s : S.t) (a : Term.timestamp) : S.t =
-    let form = Term.Atom (`Happens a) in
+    let form = Term.mk_happens a in
     S.set_goal (S.unwrap_conc (`Reach form)) s
 
   (*------------------------------------------------------------------*)
@@ -213,7 +213,7 @@ module LowTac (S : Sequent.S) = struct
 
       let mdef = Macros.get_definition (S.mk_trace_cntxt s) ms a in
 
-      [Term.ESubst (Macro (ms,l,a), mdef)]
+      [Term.ESubst (Term.mk_macro ms l a, mdef)]
 
     | _ -> 
       soft_failure (Tactics.Failure "can only expand macros")
@@ -546,7 +546,7 @@ module LowTac (S : Sequent.S) = struct
         let goal = S.subst_conc ts_subst (S.goal s) in
         let prem =
           S.Conc.mk_exists ~simpl:false indices
-            (S.unwrap_conc (`Reach (Term.Atom (`Timestamp (`Eq,ts, ts_case)))))
+            (S.unwrap_conc (`Reach (Term.mk_atom `Eq ts ts_case)))
         in
         S.set_goal (S.Conc.mk_impl ~simpl:false prem goal) s
       ) cases
@@ -661,7 +661,7 @@ module LowTac (S : Sequent.S) = struct
       let env, v' = 
         var_of_naming_pat n_ip ~dflt_name:(Vars.name v) (Vars.ty v) (S.env s)
       in
-      let subst = [Term.ESubst (Term.Var v, Term.Var v')] in
+      let subst = [Term.ESubst (Term.mk_var v, Term.mk_var v')] in
 
       (* FIXME: we substitute everywhere. This is inefficient. *)
       S.subst subst (S.set_env env s)
@@ -697,8 +697,8 @@ module LowTac (S : Sequent.S) = struct
             let a1, a2 = get_destr ~orig:(`Reach a) (Term.destr_pair a)
             and b1, b2 = get_destr ~orig:(`Reach b) (Term.destr_pair b) in
 
-            let f1 = Term.Atom (`Message (`Eq, a1, b1))
-            and f2 = Term.Atom (`Message (`Eq, a2, b2)) in
+            let f1 = Term.mk_atom `Eq a1 b1
+            and f2 = Term.mk_atom `Eq a2 b2 in
 
             let forms = 
               List.map (fun x -> Args.Unnamed, S.unwrap_hyp (`Reach x)) [f1;f2]
@@ -820,7 +820,7 @@ module LowTac (S : Sequent.S) = struct
         | Vars.EVar x :: vs, f ->
           let x' = Vars.make_new_from x in
 
-          let subst = [Term.ESubst (Term.Var x, Term.Var x')] in
+          let subst = [Term.ESubst (Term.mk_var x, Term.mk_var x')] in
 
           let f = S.Conc.mk_forall ~simpl:false vs f in
 
@@ -870,7 +870,7 @@ module LowTac (S : Sequent.S) = struct
       begin
         match oget (S.Conc.destr_matom form) with
         | `Neq, u, v ->
-          let h = Term.Atom (`Message (`Eq,u,v)) in
+          let h = Term.mk_atom `Eq u v in
           let h = S.unwrap_hyp (`Reach h) in
           let id, s = Hyps.add_i Args.Unnamed h s in
           let s = S.set_goal S.Conc.mk_false s in
@@ -928,7 +928,7 @@ module LowTac (S : Sequent.S) = struct
   let _generalize ~dependent (Term.ETerm t) s : Vars.evar * S.t =
     let v = Vars.make_new (Term.ty t) "_x" in
 
-    let subst = [Term.ESubst (t, Term.Var v)] in
+    let subst = [Term.ESubst (t, Term.mk_var v)] in
 
     let s = 
       if not dependent 
@@ -975,7 +975,7 @@ module LowTac (S : Sequent.S) = struct
           in
           env, 
           Vars.EVar v' :: new_vars,
-          Term.ESubst (Term.Var v, Term.Var v') :: subst
+          Term.ESubst (Term.mk_var v, Term.mk_var v') :: subst
         ) (S.env s, [], []) vars n_ips
     in
     let s = S.subst subst s in
@@ -1184,14 +1184,14 @@ module LowTac (S : Sequent.S) = struct
             Equiv.Babel.convert
               ~dst:S.conc_kind
               ~src:Equiv.Local_t
-              (Term.Atom (`Timestamp (`Lt, Term.Var v', Term.Var v)))
+              (Term.mk_atom `Lt (Term.mk_var v') (Term.mk_var v))
           in
           
           S.Conc.mk_forall ~simpl:false
             (Vars.EVar v' :: vs)
             (S.Conc.mk_impl ~simpl:false
                (atom_lt) 
-               (S.subst_conc [Term.ESubst (Term.Var v,Term.Var v')] f))
+               (S.subst_conc [Term.ESubst (Term.mk_var v,Term.mk_var v')] f))
         in
 
         let new_goal = 
@@ -1382,7 +1382,7 @@ module LowTac (S : Sequent.S) = struct
       if Action.(depends (of_term n1 is1 table) (of_term n2 is2 table)) then
         let atom =
           Equiv.Babel.convert
-            (Atom (`Timestamp (`Lt,a1,a2)))
+            (Term.mk_atom `Lt a1 a2)
             ~src:Equiv.Local_t ~dst:S.conc_kind in
         let g = S.Conc.mk_impl ~simpl:false atom (S.goal s) in
         [happens_premise s a2;
@@ -1403,12 +1403,12 @@ module LowTac (S : Sequent.S) = struct
     | None -> soft_failure ~loc:(L.loc term) (Failure "type error")
     | Some (Theory.ETerm (ty, t, _)) ->
       let env, x = make_exact ~loc:(L.loc id) (S.env s) ty (L.unloc id) in
-      let subst = [Term.ESubst (t, Term.Var x)] in
+      let subst = [Term.ESubst (t, Term.mk_var x)] in
 
       let s = S.subst subst (S.set_env env s) in
       let eq =
         Equiv.Babel.convert
-          (Term.mk_atom `Eq (Term.Var x) t)
+          (Term.mk_atom `Eq (Term.mk_var x) t)
           ~src:Equiv.Local_t ~dst:S.conc_kind in
       S.set_goal (S.Conc.mk_impl ~simpl:false eq (S.goal s)) s
 

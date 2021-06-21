@@ -36,7 +36,7 @@ class get_actions ~(cntxt:Constr.trace_cntxt) = object (self)
 
   method visit_macro mn a =     
     let cleara, a' = match Symbols.Macro.get_def mn.s_symb cntxt.table with
-      | Symbols.Input -> true,  Term.Pred a
+      | Symbols.Input -> true,  Term.mk_pred a
       | _             -> false, a
     in
     if not (List.mem a' actions) then
@@ -98,7 +98,7 @@ let clear_dup_mtso_le (occs : ts_occs) : ts_occs =
     (* TODO: alpha-renaming *)
     Sv.equal occ1.occ_vars occ2.occ_vars &&
     occ1.occ_cond = occ2.occ_cond &&
-    (occ1.occ_cnt = occ2.occ_cnt || occ1.occ_cnt = Term.Pred occ2.occ_cnt)
+    (occ1.occ_cnt = occ2.occ_cnt || occ1.occ_cnt = Term.mk_pred occ2.occ_cnt)
   in
   let occs = 
     List.fold_left (fun acc occ -> 
@@ -124,7 +124,7 @@ let get_actions_ext :
 
         let get_macro_default () =
           let ts = match Symbols.Macro.get_def m.s_symb constr.table with
-            | Symbols.Input -> Term.Pred ts
+            | Symbols.Input -> Term.mk_pred ts
             | _             -> ts
           in
           let occ = Iter.{ 

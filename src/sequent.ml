@@ -116,7 +116,7 @@ struct
           in
           pat_vars := Vars.Sv.union (!pat_vars) new_p_vs;
 
-          Term.ESubst (Term.Var f_arg, t)
+          Term.ESubst (Term.mk_var f_arg, t)
         ) pt.p_pt_args f_args0
     in
 

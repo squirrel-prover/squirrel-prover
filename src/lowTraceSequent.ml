@@ -347,7 +347,7 @@ module Hyps = struct
         (fun a el -> match el with
            |`Message (t,t') ->
              if Term.ty t <> Type.Boolean then
-               macro_eqs := (a, Term.Atom (`Message (`Eq,t,t'))) :: !macro_eqs
+               macro_eqs := (a, Term.mk_atom `Eq t t') :: !macro_eqs
         ) in
     
     iter#visit_message f ;
@@ -376,7 +376,7 @@ module Hyps = struct
     id, s
 
   let add_happens ?(force=false) id (s : sequent) ts =
-    let f = Term.Atom (`Happens ts :> Term.generic_atom) in
+    let f = Term.mk_happens ts in
     let id, hyps = H.add ~force id (`Reach f) s.hyps in
     let s = S.update ~hyps s in
     id, s
@@ -523,12 +523,12 @@ let get_eqs_neqs s =
       | `Message   (`Eq,  a, b) -> Term.ESubst (a,b) :: eqs, neqs
       | `Timestamp (`Eq,  a, b) -> Term.ESubst (a,b) :: eqs, neqs
       | `Index     (`Eq,  a, b) -> 
-        Term.ESubst (Term.Var a,Term.Var b) :: eqs, neqs
+        Term.ESubst (Term.mk_var a, Term.mk_var b) :: eqs, neqs
 
       | `Message   (`Neq, a, b) -> eqs, Term.ESubst (a,b) :: neqs
       | `Timestamp (`Neq, a, b) -> eqs, Term.ESubst (a,b) :: neqs
       | `Index     (`Neq, a, b) -> 
-        eqs, Term.ESubst (Term.Var a,Term.Var b) :: neqs
+        eqs, Term.ESubst (Term.mk_var a,Term.mk_var b) :: neqs
 
     ) ([],[]) (get_eq_atoms s)
 

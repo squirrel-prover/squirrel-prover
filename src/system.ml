@@ -129,14 +129,14 @@ let register_action table system_symb symb indices action descr =
 
   | Some (symb2, is) ->
     let subst_action =
-      [Term.ESubst (Term.Action (symb,indices), Term.Action (symb2,is))]
+      [Term.ESubst (Term.mk_action symb indices, Term.mk_action symb2 is)]
     in
     (* Careful, the substitution does not substitute the action symbol
        [symb] by [symb2], nor the indices. We must do it manually. *)
     let descr = Action.subst_descr subst_action descr in 
 
     let subst_is =
-      List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
+      List.map2 (fun i i' -> Term.ESubst (Term.mk_var i,Term.mk_var i'))
         indices is
     in
     let descr = Action.subst_descr subst_is descr in

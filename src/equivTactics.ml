@@ -87,7 +87,7 @@ let pure_equiv_typed t arg s =
 (*------------------------------------------------------------------*)
 (** Build the sequent showing that a timestamp happens. *)
 let happens_premise (s : ES.t) (a : Term.timestamp) =
-  let s = ES.(to_trace_sequent (set_reach_goal (Term.Atom (`Happens a)) s)) in
+  let s = ES.(to_trace_sequent (set_reach_goal (Term.mk_happens a) s)) in
   Goal.Trace s
 
 (*------------------------------------------------------------------*)
@@ -391,7 +391,7 @@ let induction Args.(Timestamp ts) s =
     let s = ES.set_env (Vars.rm_var env t) s in
     let table  = ES.table s in
     let system = ES.system s in
-    let subst = [Term.ESubst (ts, Pred ts)] in
+    let subst = [Term.ESubst (ts, Term.mk_pred ts)] in
     let goal = ES.goal s in
 
     let ind_hyp = Equiv.subst subst goal in
@@ -417,7 +417,7 @@ let induction Args.(Timestamp ts) s =
             List.map
               (fun i ->
                  let i' = Vars.fresh_r env i in
-                 Term.ESubst (Term.Var i, Term.Var i'))
+                 Term.ESubst (Term.mk_var i, Term.mk_var i'))
               descr.Action.indices
           in
           let name =
@@ -588,10 +588,10 @@ let fa Args.(Int i) s =
       let vars' = List.map (Vars.fresh_r env) vars in
       let subst =
         List.map2
-          (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
+          (fun i i' -> Term.ESubst (Term.mk_var i, Term.mk_var i'))
           vars vars'
       in
-      let c' = Term.(Seq (vars, c)) in
+      let c' = Term.mk_seq0 vars c in
       let t' = Term.subst subst t in
       let biframe =
         List.rev_append before
@@ -675,7 +675,7 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
 
   inherit [Term.timestamp list] Iter.fold ~cntxt as super
 
-  method check_formula f = ignore (self#fold_message [Term.Pred tau] f)
+  method check_formula f = ignore (self#fold_message [Term.mk_pred tau] f)
 
   method extract_ts_atoms phi =
     List.partition
@@ -690,7 +690,7 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
           then tau_1::acc
           else acc
         | Atom (`Timestamp (`Lt,tau_1,tau_2)) ->
-          if (List.mem (Term.Pred tau_2) acc || List.mem tau_2 acc)
+          if (List.mem (Term.mk_pred tau_2) acc || List.mem tau_2 acc)
           then tau_1::acc
           else acc
         | _ -> raise Not_FADUP_iter)
@@ -760,8 +760,8 @@ let fa_dup_int i s =
       | _ -> raise Not_FADUP_formula
     in
 
-    let frame_at_pred_tau =
-      Term.Macro (Term.frame_macro,[],Term.Pred tau)
+    let frame_at_pred_tau = 
+      Term.mk_macro Term.frame_macro [] (Term.mk_pred tau)
     in
     (* we first check that frame@pred(tau) is in the biframe *)
     if not (List.mem frame_at_pred_tau biframe_without_e) then
@@ -772,7 +772,7 @@ let fa_dup_int i s =
     let iter = new check_fadup ~cntxt tau in
     iter#check_formula phi ;
     (* on success, we keep only exec@pred(tau) *)
-    let new_elem = Term.Macro (Term.exec_macro,[],Term.Pred tau) in
+    let new_elem = Term.mk_macro Term.exec_macro [] (Term.mk_pred tau) in
 
     [ES.set_equiv_goal (List.rev_append before (new_elem::after)) s]
 
@@ -850,7 +850,7 @@ let fresh_mk_indirect
   let disj =
     Term.mk_ors
       (List.map (fun t ->
-           Term.Atom (Term.mk_timestamp_leq new_action t)
+           (Term.mk_timestamp_leq new_action t)
          ) frame_actions)
 
   (* then indices of name in new_action and of [name] differ *)
@@ -1151,7 +1151,7 @@ let equiv_message m1 m2 (s : ES.t) =
   (* goal for the equivalence of t1 and t2 *)
   let trace_sequent =
     ES.(to_trace_sequent
-         (set_reach_goal (Term.Atom (`Message (`Eq,m1,m2))) s))
+         (set_reach_goal (Term.mk_atom `Eq m1 m2) s))
   in
   let subgoals =
     [ Goal.Trace trace_sequent;
@@ -1301,10 +1301,11 @@ let push_formula (j: 'a option) f term =
 
   | Term.Fun (f, fty, terms) ->
     begin match j with
-      | None -> Fun (f, fty, List.map mk_ite terms)
+      | None -> Term.mk_fun0 f fty (List.map mk_ite terms)
       | Some (Args.Int jj) ->
         if jj < List.length terms then
-          Fun (f, fty, List.mapi (fun i t -> if i=jj then mk_ite t else t) terms)
+          Term.mk_fun0 f fty 
+            (List.mapi (fun i t -> if i=jj then mk_ite t else t) terms)
         else
           soft_failure
             (Tactics.Failure "subterm at position j does not exists")
@@ -1312,19 +1313,18 @@ let push_formula (j: 'a option) f term =
 
   | Term.Diff (a, b) ->
     begin match j with
-      | None -> Diff (mk_ite a, mk_ite b)
-      | Some (Args.Int 0) -> Diff (mk_ite a, b)
-      | Some (Args.Int 1) -> Diff (a, mk_ite b)
-      | _ ->  soft_failure
-                (Tactics.Failure "expected j is 0 or 1 for diff terms")
+      | None -> Term.mk_diff (mk_ite a) (mk_ite b)
+      | Some (Args.Int 0) -> Term.mk_diff (mk_ite a) b
+      | Some (Args.Int 1) -> Term.mk_diff a (mk_ite b)
+      | _ ->  soft_failure (Failure "expected j is 0 or 1 for diff terms")
     end
 
   | Term.Seq (vs, t) ->
-    if not_in_f_vars vs then Seq (vs, mk_ite t)
+    if not_in_f_vars vs then Term.mk_seq0 vs (mk_ite t)
     else raise Not_ifcond
 
   | Term.Find (vs, b, t, e) ->
-    if not_in_f_vars vs then Find (vs, b, mk_ite t, mk_ite e)
+    if not_in_f_vars vs then Term.mk_find vs b (mk_ite t) (mk_ite e)
     else raise Not_ifcond
 
   | _ -> mk_ite term
@@ -1390,7 +1390,7 @@ let trivial_if (Args.Int i) (s : ES.sequent) =
   | Some (c,t,e) ->
     let trace_seq = 
       ES.(to_trace_sequent
-           (set_reach_goal (Term.Atom (`Message (`Eq,t,e))) s))
+           (set_reach_goal (Term.mk_atom `Eq t e) s))
     in
     let trace_goal  = Goal.Trace trace_seq in
 
@@ -1437,7 +1437,7 @@ let ifeq Args.(Pair (Int i, Pair (Message (t1,ty1), Message (t2,ty2)))) s =
   let trace_s = 
     ES.(to_trace_sequent
           (set_reach_goal
-             (Term.mk_impl ~simpl:false cond Term.(Atom (`Message (`Eq,t1,t2))))
+             (Term.mk_impl ~simpl:false cond (Term.mk_atom `Eq t1 t2))
              s))
   in
 
@@ -1664,7 +1664,7 @@ let prf_mk_direct env (param : prf_param) (is, m) =
     vars'
     (Term.mk_impl
        (Term.mk_indices_eq param.h_key.s_indices is)
-       (Term.Atom (`Message (`Neq, param.h_cnt, m))))
+       (Term.mk_atom `Neq param.h_cnt m))
 
 (** indirect cases: occurences of hashes in actions of the system *)
 let prf_mk_indirect env cntxt (param : prf_param)
@@ -1704,7 +1704,7 @@ let prf_mk_indirect env cntxt (param : prf_param)
     let cond = Term.subst subst mts_occ.occ_cond in
     Term.mk_exists ~simpl:true occ_vars
       (Term.mk_and
-         (Term.Atom (Term.mk_timestamp_leq new_action ts))
+         (Term.mk_timestamp_leq new_action ts)
          cond)
   in
   let disj = Term.mk_ors (List.map do1 frame_actions) in
@@ -1715,7 +1715,7 @@ let prf_mk_indirect env cntxt (param : prf_param)
       (List.map (fun (is,m) ->
            Term.mk_impl
              (Term.mk_indices_eq param.h_key.s_indices is)
-             (Term.Atom (`Message (`Neq, param.h_cnt, m))))
+             (Term.mk_atom `Neq param.h_cnt m))
           list_of_is_m)
   in
 
@@ -1809,8 +1809,8 @@ let combine_conj_formulas p q =
      new_p the remainder of p *)
   Term.mk_and
     (Term.mk_ands common)
-    (Term.head_normal_biterm (Term.Diff(Term.mk_ands new_p,
-                                        Term.mk_ands !aux_q)))
+    (Term.head_normal_biterm 
+       (Term.mk_diff (Term.mk_ands new_p) (Term.mk_ands !aux_q)))
 
 let prf Args.(Int i) s =
   let before, e, after = split_equiv_goal i s in
@@ -1874,8 +1874,8 @@ let prf Args.(Int i) s =
       | Type.(Message, Message) -> 
         let f = 
           Term.subst [
-            ESubst (Term.Var uvarm, m);
-            ESubst (Term.Var uvarkey, key);] f 
+            ESubst (Term.mk_var uvarm, m);
+            ESubst (Term.mk_var uvarkey, key);] f 
         in
 
         Term.mk_and
@@ -1885,7 +1885,7 @@ let prf Args.(Int i) s =
       | _ -> assert false
   in
 
-  let if_term = Term.mk_ite final_if_formula (Term.Name ns) hash in
+  let if_term = Term.mk_ite final_if_formula (Term.mk_name ns) hash in
   let new_elem =
     Equiv.subst_equiv [Term.ESubst (hash,if_term)] [e] 
   in
@@ -1927,7 +1927,7 @@ let split_seq (li, ht) s : ES.sequent =
   let is, subst = Term.refresh_vars `Global is in
   let ti = Term.subst subst ti in
 
-  let cond = match Term.apply_ht ht (List.map (fun v -> Term.Var v) is) with
+  let cond = match Term.apply_ht ht (List.map (fun v -> Term.mk_var v) is) with
     | Term.Lambda ([], cond) -> cond
     | _ -> assert false
   in
@@ -2035,7 +2035,7 @@ let cca1 Args.(Int i) s =
 
     (* we create the fresh cond reachability goal *)
     let random_fresh_cond = 
-      fresh_cond cntxt env (Term.Name r) biframe 
+      fresh_cond cntxt env (Term.mk_name r) biframe 
     in
 
     let fresh_seq =
@@ -2050,11 +2050,11 @@ let cca1 Args.(Int i) s =
         let new_term = match fnpk with
           | Some (fnpk,pkis) ->
             Term.mk_fun table fnenc eis
-              [new_m; Term.Name r;
-               Term.mk_fun table fnpk pkis [Term.Name sk]]
+              [new_m; Term.mk_name r;
+               Term.mk_fun table fnpk pkis [Term.mk_name sk]]
 
           | None ->
-            Term.mk_fun table fnenc eis [new_m; Term.Name r; Term.Name sk]
+            Term.mk_fun table fnenc eis [new_m; Term.mk_name r; Term.mk_name sk]
         in
         Term.ESubst (enc, new_term)
     in
@@ -2107,7 +2107,7 @@ let cca1 Args.(Int i) s =
                   ~cntxt fndec sk.s_symb;
 
                 if not (List.mem
-                          (Term.mk_fun table fnpk is [Term.Name sk])
+                          (Term.mk_fun table fnpk is [Term.mk_name sk])
                           biframe) then
                   soft_failure
                     (Tactics.Failure
@@ -2279,7 +2279,7 @@ let enckp
     let (new_skl, new_skr), new_key =
       match new_key with
       | Some k -> project k, k
-      | None -> (skl, skl), Term.Name skl
+      | None -> (skl, skl), Term.mk_name skl
     in
 
     LT.check_ty_eq (Term.ty new_key) (Term.ty sk);
@@ -2298,7 +2298,7 @@ let enckp
         let context =
           Equiv.subst_equiv [Term.ESubst (enc,Term.empty)] [e]
         in
-        fresh_cond cntxt env (Term.Name r) (context@biframe)
+        fresh_cond cntxt env (Term.mk_name r) (context@biframe)
       with Euf.Bad_ssc -> soft_failure Tactics.Bad_SSC
     in
     let fresh_goal =
@@ -2306,7 +2306,7 @@ let enckp
 
     (* Equivalence goal where [enc] is modified using [new_key]. *)
     let new_enc =
-      Term.mk_fun table fnenc indices [m; Term.Name r; wrap_pk new_key]
+      Term.mk_fun table fnenc indices [m; Term.mk_name r; wrap_pk new_key]
     in
     let new_elem =
       Equiv.subst_equiv [Term.ESubst (enc,new_enc)] [e]
@@ -2394,9 +2394,7 @@ let rec remove_name_occ ns l = match l with
 
 let mk_xor_if_term_base (cntxt : Constr.trace_cntxt) env biframe
     (n_left, l_left, n_right, l_right, term) =
-  let biframe =
-    (Term.Diff (l_left, l_right)) :: biframe
-  in
+  let biframe = Term.mk_diff l_left l_right :: biframe in
 
   let system_left = SystemExpr.(project PLeft cntxt.system) in
   let cntxt_left = { cntxt with system = system_left } in
@@ -2406,15 +2404,13 @@ let mk_xor_if_term_base (cntxt : Constr.trace_cntxt) env biframe
   let cntxt_right = { cntxt with system = system_right } in
   let phi_right = mk_phi_proj cntxt_right env n_right PRight biframe in
 
-  let len_left =
-    Term.(Atom (`Message (`Eq,
-                          mk_len l_left,
-                          mk_len (Name n_left)))) in
+  let len_left = 
+    Term.(mk_atom `Eq (mk_len l_left) (mk_len (mk_name n_left))) 
+  in
 
-  let len_right =
-    Term.(Atom (`Message (`Eq,
-                          mk_len l_right,
-                          mk_len (Name n_right)))) in
+  let len_right = 
+    Term.(mk_atom `Eq (mk_len l_right) (mk_len (mk_name n_right))) 
+  in
 
   let len = if len_left = len_right then [len_left] else [len_left;len_right] in
 

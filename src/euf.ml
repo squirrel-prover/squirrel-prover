@@ -156,15 +156,15 @@ let mk_rule ?(elems=[]) ?(drop_head=true) ~fun_wrap_key
       List.fold_left2 (fun (safe_is,subst) i j ->
           if multiple i then safe_is,subst else
             i::safe_is,
-            Term.(ESubst (Var i, Var j))::subst
+            Term.(ESubst (mk_var i, mk_var j))::subst
         ) ([],[]) is key_is
     in
 
     (* Refresh action indices other than [safe_is] indices. *)
     let subst_fresh =
       List.map (fun i ->
-          Term.(ESubst (Var i,
-                        Var (Vars.fresh_r env i))))
+          Term.(ESubst (mk_var i,
+                        mk_var (Vars.fresh_r env i))))
         (List.filter
            (fun x -> not (List.mem x safe_is))
            action_descr.Action.indices)
@@ -196,8 +196,8 @@ let mk_rule ?(elems=[]) ?(drop_head=true) ~fun_wrap_key
       let vars = List.filter not_seen vars in
       List.map
         (function Vars.EVar v ->
-           Term.(ESubst (Var v,
-                         Var (Vars.fresh_r env v))))
+           Term.(ESubst (mk_var v,
+                         mk_var (Vars.fresh_r env v))))
         vars
     in
 

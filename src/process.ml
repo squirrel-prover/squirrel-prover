@@ -387,12 +387,12 @@ let parse_proc (system_name : System.system_name) init_table proc =
   let create_subst env isubst msubst =
     List.map (fun (x,_,tm) -> 
         let v = Vars.find env x Type.KIndex in
-        Term.ESubst (Term.Var v, Term.Var tm)
+        Term.ESubst (Term.mk_var v, Term.mk_var tm)
       ) isubst
     @
     List.map (fun (x,_,tm) -> 
         let v = Vars.find env x Type.KMessage in
-        Term.ESubst (Term.Var v, tm)
+        Term.ESubst (Term.mk_var v, tm)
       ) msubst
   in
 
@@ -434,13 +434,13 @@ let parse_proc (system_name : System.system_name) init_table proc =
     | _ -> assert false
     in
     let indices = List.rev env.indices in
-    let action_term = Term.Action (a', indices) in
+    let action_term = Term.mk_action a' indices in
     let in_th = Theory.var_i dum in_var in
-    let in_tm = Term.Macro (Term.in_macro, [], action_term) in
+    let in_tm = Term.mk_macro Term.in_macro [] action_term in
 
     (* substitute the special timestamp variable [ts], since at this point
      * we know the action *)
-    let subst_ts = [ Term.ESubst (Term.Var ts, action_term) ] in
+    let subst_ts = [ Term.ESubst (Term.mk_var ts, action_term) ] in
 
     (* override previous term substitution for input variable
     * to use the known action *)
@@ -520,8 +520,8 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
     debug "descr = %a@." Action.pp_descr action_descr ;
     let new_indices = action_descr.indices in
-    let new_action_term = Term.Action (new_a, new_indices) in
-    let new_in_tm = Term.Macro (Term.in_macro, [], new_action_term) in
+    let new_action_term = Term.mk_action new_a new_indices in
+    let new_in_tm = Term.mk_macro Term.in_macro [] new_action_term in
     let env =
       { env with
         (* override previous term substitutions for input variable
@@ -553,14 +553,14 @@ let parse_proc (system_name : System.system_name) init_table proc =
              | Type.KMessage ->
                let v'_th = Theory.subst v tsubst in
                let v'_tm : Term.message =
-                 conv_term table env (Term.Var ts) v ty in
+                 conv_term table env (Term.mk_var ts) v ty in
 
                new_env, iacc, (x, L.unloc v'_th, v'_tm) :: macc
 
              | Type.KIndex ->
                let v'_th = Theory.subst v tsubst in
                let v'_tm : Type.index Term.term =
-                 conv_term table env (Term.Var ts) v ty in
+                 conv_term table env (Term.mk_var ts) v ty in
                let v'_tm = Utils.oget (Term.destr_var v'_tm) in
 
                new_env, (x, L.unloc v'_th, v'_tm) :: iacc, macc
@@ -594,7 +594,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
           List.rev_map (fun i -> Theory.var dum (Vars.name i)) env.indices )
     in    
     let n'_s = Term.mk_isymb n' ty (List.rev env.indices) in
-    let n'_tm = Term.Name n'_s in
+    let n'_tm = Term.mk_name n'_s in
 
     let vars_env, _ = Vars.make `Shadow env.vars_env ty (L.unloc n) in
 
@@ -631,8 +631,8 @@ let parse_proc (system_name : System.system_name) init_table proc =
     in
 
     let body : Term.message =
-      Term.subst_macros_ts table updated_states (Term.Var ts)
-        (conv_term table env (Term.Var ts) t ty)
+      Term.subst_macros_ts table updated_states (Term.mk_var ts)
+        (conv_term table env (Term.mk_var ts) t ty)
     in
 
     (* We check that we could infer ty by parsing [t] *)
@@ -662,7 +662,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
     in
 
     let n'_s = Term.mk_isymb x' ty (List.rev env.indices) in
-    let x'_tm = Term.Macro (n'_s, [], Term.Var ts) in
+    let x'_tm = Term.mk_macro n'_s [] (Term.mk_var ts) in
 
     let vars_env, _ = Vars.make `Shadow env.vars_env ty (L.unloc x) in
     
@@ -727,7 +727,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       (* TODO: subtypes*)
       let env,x' = make_fresh `Shadow env Type.Message (L.unloc x) in
       let in_th = Theory.var_i dum (Vars.name x') in
-      let in_tm = Term.Var x' in
+      let in_tm = Term.mk_var x' in
       let env = { env with
                   inputs = (ch,x')::env.inputs ;
                   msubst = (L.unloc x, in_th, in_tm) :: env.msubst }
@@ -798,14 +798,15 @@ let parse_proc (system_name : System.system_name) init_table proc =
        * macros appearing in [t]. This is why we call [Term.subst_macros_ts]
        * with the empty list. *)
       let fact =
-        Term.subst_macros_ts table [] (Term.Var ts)
-          (conv_term table env_p (Term.Var ts) cond Type.Boolean)
+        Term.subst_macros_ts table [] (Term.mk_var ts)
+          (conv_term table env_p (Term.mk_var ts) cond Type.Boolean)
       in
       let facts_p = fact :: env.facts in
       let facts_q =
         match evars' with
         | [] -> (Term.mk_not fact) :: env.facts
-        | qvars -> (Term.ForAll (qvars, Term.mk_not fact)) :: env.facts
+        | qvars -> 
+          Term.mk_forall ~simpl:false qvars (Term.mk_not fact) :: env.facts
       in
       let env_p =
         { env_p with
@@ -882,8 +883,8 @@ let parse_proc (system_name : System.system_name) init_table proc =
       in
       let ty = Theory.check_state table s (List.length l) in
       let t'_tm =
-        Term.subst_macros_ts table updated_states (Term.Var ts)
-          (conv_term table env (Term.Var ts) t ty)
+        Term.subst_macros_ts table updated_states (Term.mk_var ts)
+          (conv_term table env (Term.mk_var ts) t ty)
       in
       let env =
         { env with updates = (s,l',ty,t'_tm) :: env.updates }

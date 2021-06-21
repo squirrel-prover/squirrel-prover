@@ -130,7 +130,7 @@ module Mk (S : LowSequent.S) = struct
           else
             let r_subst = rev_subst subst in
             let red_t0 = Term.subst r_subst red_t0 in
-            let red_t = Term.Seq (is, red_t0) in
+            let red_t = Term.mk_seq0 is red_t0 in
             Term.cast (Term.kind t) red_t, true
 
         | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite -> 
@@ -162,7 +162,7 @@ module Mk (S : LowSequent.S) = struct
           let r_subst = rev_subst subst in
           let c, t = Term.subst r_subst c, Term.subst r_subst t in
           
-          Term.Find (is, c, t, e),
+          Term.mk_find is c t e,
           has_red0 || has_red1 || has_red2
 
         | Term.Macro  _

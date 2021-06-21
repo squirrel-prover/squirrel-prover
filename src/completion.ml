@@ -301,37 +301,37 @@ let term_of_cterm : type a. Symbols.table -> a Type.kind -> cterm -> a Term.term
         let cis, cts = List.takedrop ari cterms in
         let cts = as_seq1 cts in
         let m = Term.mk_isymb m ek (indices_of_cterms cis) in
-        let tm = Term.Macro (m, [], term_of_cterm Type.KTimestamp cts) in
+        let tm = Term.mk_macro m [] (term_of_cterm Type.KTimestamp cts) in
         Term.cast kind tm
 
       | Cfun (A a, ari, is) -> 
         assert (ari = List.length is);
         let is = indices_of_cterms is in 
-        Term.cast kind (Action (a, is))
+        Term.cast kind (Term.mk_action a is)
 
       | Cfun (N (n,nty), ari, is) -> 
         assert (ari = List.length is);
         let is = indices_of_cterms is in
         let ns = Term.mk_isymb n nty is in
-        Term.cast kind (Name ns)
+        Term.cast kind (Term.mk_name ns)
 
       | Cfun (GPred, ari, ts) ->
         assert (ari = 0);
         let ts = as_seq1 ts in
-        let pred_ts = Term.Pred (term_of_cterm Type.KTimestamp ts) in
+        let pred_ts = Term.mk_pred (term_of_cterm Type.KTimestamp ts) in
         Term.cast kind pred_ts   
 
-      | Ccst (Cst.Cmvar (Vars.EVar m)) -> Var (Vars.cast m kind)
+      | Ccst (Cst.Cmvar (Vars.EVar m)) -> Term.mk_var (Vars.cast m kind)
 
       | Ccst (Cst.Cgfuncst (`F f)) ->
         Term.cast kind (Term.mk_fun table f [] [])
           
       | Ccst (Cst.Cgfuncst (`A a)) ->
-        Term.cast kind (Term.Action (a,[]))
+        Term.cast kind (Term.mk_action a [])
                                         
       | Ccst (Cst.Cgfuncst (`N (n,nty))) ->
         let ns = Term.mk_isymb n nty [] in
-        Term.cast kind (Term.Name ns)
+        Term.cast kind (Term.mk_name ns)
 
       | (Ccst (Cflat _|Csucc _)|Cvar _|Cxor _) -> assert false
 
@@ -1598,7 +1598,9 @@ let name_index_cnstrs table state l =
       else begin
         assert (ari = ari');
         List.map2 (fun x y -> 
-            Term.Atom (`Index (`Eq, index_of_cterm x, index_of_cterm y))
+            Term.mk_atom `Eq 
+              (Term.mk_var (index_of_cterm x))
+              (Term.mk_var (index_of_cterm y))
           ) is is'
       end
 
@@ -1632,14 +1634,15 @@ let name_indep_cnstrs table state l =
       let rec mk_disjunction l =
         match l with
         | [] -> Term.mk_false
-        | [p] -> Term.Atom (`Message (`Eq, 
-                                 term_of_cterm table Type.KMessage p, 
-                                 term_of_cterm table Type.KMessage name))
+        | [p] -> 
+          Term.mk_atom `Eq
+            (term_of_cterm table Type.KMessage p)
+            (term_of_cterm table Type.KMessage name)
         | p::q ->
           Term.mk_or
-            (Atom (`Message (`Eq, 
-                             term_of_cterm table Type.KMessage p, 
-                             term_of_cterm table Type.KMessage name)))
+            (Term.mk_atom `Eq 
+               (term_of_cterm table Type.KMessage p)
+               (term_of_cterm table Type.KMessage name))
             (mk_disjunction q)
       in
       [mk_disjunction sub_names]

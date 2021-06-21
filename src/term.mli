@@ -76,7 +76,7 @@ type generic_atom = [
   | `Index of (ord_eq,Vars.index) _atom
   | `Happens of Type.timestamp term
 ]
-and _ term =
+and _ term = private
   | Fun    : fsymb * Type.ftype * Type.message term list -> Type.message term
   | Name   : nsymb -> Type.message term
 
@@ -370,12 +370,25 @@ include module type of Smart
 (*------------------------------------------------------------------*)
 (** {3 Smart constructors: terms} *)
 
+val mk_pred   : timestamp -> timestamp
+val mk_var    : 'a Vars.var -> 'a term
+val mk_action : Symbols.action Symbols.t -> Vars.index list -> timestamp
+val mk_name   : nsymb -> message
+val mk_macro  : msymb -> message list -> timestamp -> message
+val mk_diff   : 'a term -> 'a term -> 'a term
+
+val mk_find : Vars.index list -> message -> message -> message -> message
+
+
+(*------------------------------------------------------------------*)
+val mk_fun0 : fsymb -> Type.ftype -> message list -> message
+
 val mk_fun :
   Symbols.table ->
   fname ->
   Vars.index list ->
-  Type.message term list ->
-  Type.message term
+  message list ->
+  message
     
 val mk_zero    : message
 val mk_fail    : message
@@ -389,13 +402,18 @@ val mk_pair    : message -> message -> message
 
 val mk_ite : ?simpl:bool -> message -> message -> message -> message
   
-val mk_timestamp_leq : timestamp -> timestamp -> generic_atom
+val mk_timestamp_leq : timestamp -> timestamp -> message
 
 val mk_indices_neq : Vars.index list -> Vars.index list -> message
 val mk_indices_eq  : Vars.index list -> Vars.index list -> message
 
 val mk_atom : ord -> 'a term -> 'b term -> message 
+val mk_happens : timestamp -> message 
+val mk_atom1 : generic_atom -> message 
 
+val mk_seq0 : Vars.index list -> message -> message
+
+(** Refresh variables *)
 val mk_seq : Vars.env -> Vars.index list -> message -> message
 
 (*------------------------------------------------------------------*)

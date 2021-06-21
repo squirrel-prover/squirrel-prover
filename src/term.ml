@@ -211,6 +211,23 @@ let init = Action(Symbols.init_action,[])
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors} *)
 
+let mk_pred t = Pred t
+
+let mk_var : type a. a Vars.var -> a term = fun v -> Var v
+
+let mk_action a is = Action (a,is)
+
+let mk_name n = Name n
+
+let mk_macro ms l t = Macro (ms, l, t)
+
+let mk_diff : type a. a term -> a term -> a term = fun a b -> Diff (a,b)
+
+let mk_find is c t e = Find (is, c, t, e)
+
+(*------------------------------------------------------------------*)
+let mk_fun0 fs fty terms = Fun (fs, fty, terms)
+
 let mk_fun table fname indices terms =
   let fty = Symbols.ftype table fname in
   Fun ((fname,indices), fty, terms)
@@ -297,8 +314,8 @@ let mk_of_bool t = mk_fbuiltin Symbols.fs_of_bool [] [t]
 (** {3 For formulas} *)
 
 let mk_timestamp_leq t1 t2 = match t1,t2 with
-  | _, Pred t2' -> `Timestamp (`Lt, t1, t2')
-  | _ -> `Timestamp (`Leq, t1, t2)
+  | _, Pred t2' -> Atom(`Timestamp (`Lt, t1, t2'))
+  | _ -> Atom(`Timestamp (`Leq, t1, t2))
 
 (** Operations on vectors of indices of the same length. *)
 let mk_indices_neq vect_i vect_j =
@@ -1327,6 +1344,12 @@ let mk_atom : type a b. ord -> a term -> b term -> message =
     Atom (`Timestamp (ord, t1, t2))
 
   | _ -> assert false
+
+let mk_happens t = Atom (`Happens t)
+
+let mk_atom1 at = Atom at
+
+let mk_seq0 is term = Seq (is, term)
 
 (* only refresh necessary vars, hence we need an environment *)
 let mk_seq env is term =

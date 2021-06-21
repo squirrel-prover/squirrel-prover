@@ -99,7 +99,7 @@ let make_bi_descr s1 s2 (d1 : Action.descr) (d2 : Action.descr) : Action.descr =
 
   (* Note: d1 and d2 must have globally refreshed indices *)
   let subst = List.map2 (fun i1 i2 -> 
-      Term.ESubst (Term.Var i1, Term.Var i2)
+      Term.ESubst (Term.mk_var i1, Term.mk_var i2)
     ) d2.indices d1.indices 
   in
   let d2 = Action.subst_descr subst d2 in
@@ -173,7 +173,9 @@ let descr_of_action table (system : t) a =
   let d_indices = descr.indices in
   let a_indices = Action.get_indices a in
   let subst = 
-    List.map2 (fun v v' -> Term.ESubst (Var v, Var v')) d_indices a_indices 
+    List.map2 (fun v v' -> 
+        Term.ESubst (Term.mk_var v, Term.mk_var v')
+      ) d_indices a_indices 
   in
 
   Action.subst_descr subst descr 
@@ -263,7 +265,7 @@ let action_to_term table system a =
   let symb = 
     System.Msh.find (Action.get_shape a) (symbs ~with_dummies:true) 
   in
-  Term.Action (symb, Action.get_indices a)
+  Term.mk_action symb (Action.get_indices a)
 
 (*------------------------------------------------------------------*)
 
