@@ -928,9 +928,14 @@ let subst_support s =
   List.fold_left (fun supp (ESubst (t,_)) -> 
     Sv.union supp (fv t)) Sv.empty s
 
+let is_binder : type a. a term -> bool = function
+  | Seq _ | ForAll _ | Exists _ | Find _ -> true
+  | _ -> false
+
 let rec subst : type a. subst -> a term -> a term = fun s t ->
   if s = [] ||
-     (is_var_subst s && 
+     (is_binder t && 
+      is_var_subst s && 
       Sv.disjoint (subst_support s) (fv t))
   then t
   else

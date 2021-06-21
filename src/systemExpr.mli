@@ -72,8 +72,8 @@ val descr_of_action :
   Symbols.table -> t -> Action.action -> Action.descr
 
 (** Get the action symbols table of a system expression.
-  * We rely on the invariant that the system systems involved in an expression
-  * must have the same such table. *)
+  * We rely on the invariant that the systems of a system expression
+  * must have the same action names. *)
 val symbs :
   with_dummies:bool ->
   Symbols.table -> 

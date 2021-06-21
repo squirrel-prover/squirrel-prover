@@ -26,47 +26,102 @@ let pat_of_form (t : 'a term) =
     pat_term = t; }
 
 (*------------------------------------------------------------------*)
-(** Matching variable assignment (types must be compatible). *)
-module Mvar = struct
-  type t = eterm Mv.t
+(** Matching variable assignment. *)
+module Mvar : sig
+  type t
 
-  let empty = Mv.empty
+  val make : eterm Mv.t -> t
 
-  let union mv1 mv2 = Mv.union (fun _ _ _ -> assert false) mv1 mv2
+  val empty : t
 
-  let add (v : Vars.evar) (t : eterm) (m : t) : t = Mv.add v t m
+  val union : t -> t -> t
 
-  let remove (v : Vars.evar) (m : t) : t = Mv.remove v m
+  val add : Vars.evar -> eterm -> t -> t
 
-  let mem (v : Vars.evar) (m : t) : bool = Mv.mem v m
+  val remove : Vars.evar -> t -> t 
 
-  let is_empty (m : t) = Mv.is_empty m
+  val mem : Vars.evar -> t -> bool
+    
+  val find : Vars.evar -> t -> eterm
 
-  let filter f (m : t) : t = Mv.filter f m
+  val is_empty : t -> bool
 
-  let fold f (m : t) (init : 'b) : 'b = Mv.fold f m init
+  val filter : (Vars.evar -> eterm -> bool) -> t -> t
 
-  let to_subst ~(mode:[`Match|`Unif]) (mv : t) : subst =
+  val fold : (Vars.evar -> eterm -> 'b -> 'b) -> t -> 'b -> 'b
+
+  val to_subst : mode:[`Match|`Unif] -> t -> subst 
+
+end = struct
+  (** [id] is a unique identifier used to do memoisation. *)
+  type t = { id    : int;
+             subst : eterm Mv.t; }
+
+  let cpt = ref 0
+  let make subst = { id = (incr cpt; !cpt); subst }
+
+  let empty = make (Mv.empty)
+
+  let union mv1 mv2 = 
+    make (Mv.union (fun _ _ _ -> assert false) mv1.subst mv2.subst)
+
+  let add (v : Vars.evar) (t : eterm) (m : t) : t = 
+    make (Mv.add v t m.subst)
+
+  let remove (v : Vars.evar) (m : t) : t = 
+    make (Mv.remove v m.subst)
+
+  let mem (v : Vars.evar) (m : t) : bool = Mv.mem v m.subst
+
+  let find (v : Vars.evar) (m : t) = Mv.find v m.subst
+
+  let is_empty (m : t) = Mv.is_empty m.subst
+
+  let filter f (m : t) : t = make (Mv.filter f m.subst)
+
+  let fold f (m : t) (init : 'b) : 'b = Mv.fold f m.subst init
+
+  let to_subst ~(mode:[`Match|`Unif]) (mv : t) : subst =   
     let s =
       Mv.fold (fun v t subst ->
           match v, t with
           | Vars.EVar v, ETerm t ->
             ESubst (Var v, cast (Vars.kind v) t) :: subst
-        ) mv []
+        ) mv.subst []
     in
 
     match mode with
     | `Match -> s
     | `Unif ->
       (* We need to substitute until we reach a fixpoint *)
-      let support = Mv.fold (fun v _ supp -> Sv.add v supp) mv Sv.empty in
+      let support = Mv.fold (fun v _ supp -> Sv.add v supp) mv.subst Sv.empty in
       let rec fp_subst t =
         if Sv.disjoint (fv t) support then t
         else fp_subst (subst s t)
       in
       List.map (fun (ESubst (v, t)) -> ESubst (v, fp_subst t)) s
 
+  
+  (* with memoisation *)
+  let to_subst =
+    let module U = struct
+      type _t = t
+      type t = _t * [`Match|`Unif]
+      let hash (t,mode) = 
+        Utils.hcombine t.id (match mode with `Match -> 1 | `Unif -> 0) 
+      let equal (t,mode) (t',mode') = t.id = t'.id && mode = mode'
+    end in 
+    let module Memo = Ephemeron.K1.Make (U) in
+    let memo = Memo.create 256 in
+    fun ~mode t ->
+      try Memo.find memo (t,mode) with
+      | Not_found -> 
+        let r = to_subst ~mode t in
+        Memo.add memo (t,mode) r;
+        r
+
 end
+
 (*------------------------------------------------------------------*)
 (** (Descending) state used in the matching algorithm. *)
 type match_state = {
@@ -275,7 +330,7 @@ module T : S with type t = message = struct
     then if t = Var v then st.mv else raise NoMgu
 
     else (* [v] in the support, and [v] smaller than [v'] if [t = Var v'] *)
-      match Mv.find ev st.mv with
+      match Mvar.find ev st.mv with
       (* first time we see [v]: store the substitution and add the
          type information. *)
       | exception Not_found ->
@@ -286,7 +341,7 @@ module T : S with type t = message = struct
            bound variables. *)
         if not (Sv.disjoint (fv t) st.bvs) then raise NoMgu;
 
-        (Mv.add ev (ETerm t) st.mv)
+        (Mvar.add ev (ETerm t) st.mv)
 
       (* If we already saw the variable, check that there is no cycle, and
          call back [unif]. *)
@@ -382,7 +437,7 @@ module T : S with type t = message = struct
 
     let env = Sv.diff (Sv.union (Term.fv term1) (Term.fv term2)) support in
 
-    let mv_init = odflt Mv.empty mv in
+    let mv_init = odflt Mvar.empty mv in
     let st_init = {
       subst_vs = Sv.empty; bvs = Sv.empty; mv = mv_init ;
       support; env; ty_env; table; } 
@@ -395,10 +450,10 @@ module T : S with type t = message = struct
       then `FreeTyv
       else
         let mv =
-          Mv.fold (fun (Vars.EVar v) t mv ->
+          Mvar.fold (fun (Vars.EVar v) t mv ->
               let v = Vars.tsubst ty_subst_rev v in
-              Mv.add (Vars.EVar v) t mv
-            ) mv Mv.empty
+              Mvar.add (Vars.EVar v) t mv
+            ) mv Mvar.empty
         in
         `Mgu mv
 
@@ -560,7 +615,7 @@ module T : S with type t = message = struct
       if t = Var v then st.mv else raise NoMatch 
 
     else (* [v] in the pattern *)
-      match Mv.find ev st.mv with
+      match Mvar.find ev st.mv with
       (* If this is the first time we see the variable, store the subterm
          and add the type information. *)
       | exception Not_found ->
@@ -571,7 +626,7 @@ module T : S with type t = message = struct
            variables. *)
         if not (Sv.disjoint (fv t) st.bvs) then raise NoMatch;
 
-        Mv.add ev (ETerm t) st.mv 
+        Mvar.add ev (ETerm t) st.mv 
 
       (* If we already saw the variable, check that the subterms are
          identical. *)
@@ -627,7 +682,7 @@ module T : S with type t = message = struct
     let support = Sv.map (Vars.tsubst_e ty_subst) p.pat_vars in
     let env = Sv.diff (Sv.union (Term.fv t) (Term.fv pat)) support in
 
-    let mv_init = odflt Mv.empty mv in
+    let mv_init = odflt Mvar.empty mv in
     let st_init : match_state =
       { bvs = Sv.empty; mv = mv_init; table; system; env; support; ty_env;}
     in
@@ -639,10 +694,10 @@ module T : S with type t = message = struct
       then `FreeTyv
       else
         let mv =
-          Mv.fold (fun (Vars.EVar v) t mv ->
+          Mvar.fold (fun (Vars.EVar v) t mv ->
               let v = Vars.tsubst ty_subst_rev v in
-              Mv.add (Vars.EVar v) t mv
-            ) mv Mv.empty
+              Mvar.add (Vars.EVar v) t mv
+            ) mv Mvar.empty
         in
         `Match mv
 
@@ -1286,13 +1341,10 @@ module E : S with type t = Equiv.form = struct
         (terms : Term.message list)
         (known_sets : Term.timestamp -> known_sets) : msets
       =
-      (* FIXME: dont compute the full description map, just the name map *)
-      (* let descrs = SystemExpr.symbs ~with_dummies:false tbl system in *)
-      let descrs = SystemExpr.map_descrs (fun x -> x) table system in
-      List.fold_left (fun cands descr ->
-          let name = descr.Action.name in
+      let names = SystemExpr.symbs ~with_dummies:false table system in
+      System.Msh.fold (fun _ name cands ->
           filter_deduce_action_list name cands terms known_sets
-        ) cands descrs
+        ) names cands
     in
 
     let filter_deduce_all_actions
@@ -1634,7 +1686,7 @@ module E : S with type t = Equiv.form = struct
     let support = Sv.map (Vars.tsubst_e ty_subst) p.pat_vars in
     let env = Sv.diff (Sv.union (Equiv.fv t) (Equiv.fv pat)) support in
 
-    let mv_init = odflt Mv.empty mv in
+    let mv_init = odflt Mvar.empty mv in
     let st_init : match_state =
       { bvs = Sv.empty; mv = mv_init; table; system; support; env; ty_env; }
     in
