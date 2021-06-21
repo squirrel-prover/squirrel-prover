@@ -1392,6 +1392,34 @@ module E : S with type t = Equiv.form = struct
 
     deduce_fixpoint init_fixpoint init_terms
 
+  (* memoisation *)
+  let strengthen =
+    let module M = struct
+      type t = Symbols.table * SystemExpr.t * Sv.t * Term.messages
+
+      let hash (tbl, s, e, terms) = 
+        hcombine_list Term.hash 
+          (hcombine (Symbols.tag tbl)
+             (hcombine (SystemExpr.hash s)
+                (Sv.hash e)))
+          terms
+
+      let equal (tbl, s, e, terms) (tbl', s', e', terms') = 
+        Symbols.tag tbl = Symbols.tag tbl' &&
+        s = s' && Sv.equal e e' &&
+        List.length terms = List.length terms' &&
+        List.for_all2 (=) terms terms' (* FIXME: term hashconsing *)
+
+    end in
+    let module Memo = Hashtbl.Make(M) in 
+    let memo = Memo.create 256 in
+    fun tbl s e terms ->
+      try Memo.find memo (tbl, s, e, terms) with
+      | Not_found -> 
+        let r = strengthen tbl s e terms in
+        Memo.add memo (tbl, s, e, terms) r;
+        r
+
   (*------------------------------------------------------------------*)
   let unify ?mv table t1 t2  = `NoMgu      (* TODO *)
 
