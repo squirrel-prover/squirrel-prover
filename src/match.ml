@@ -1411,6 +1411,7 @@ module E : S with type t = Equiv.form = struct
         List.for_all2 (=) terms terms' (* FIXME: term hashconsing *)
 
     end in
+    (* FIXME: memory leaks *)
     let module Memo = Hashtbl.Make(M) in 
     let memo = Memo.create 256 in
     fun tbl s e terms ->

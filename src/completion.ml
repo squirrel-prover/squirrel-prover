@@ -1427,6 +1427,7 @@ let complete_cterms table (l : (cterm * cterm) list) : state =
 let tot = ref 0.
 let cptd = ref 0
 
+(* FIXME: memory leaks *)
 module Memo = Hashtbl.Make2
     (struct 
       type t = Symbols.table
