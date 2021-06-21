@@ -1222,7 +1222,7 @@ module E : S with type t = Equiv.form = struct
       | _ -> []
     in
 
-    (** Retrun a list of specialization of [cand] deducible from
+    (** Return a list of specialization of [cand] deducible from
         [terms, known_sets] for action [a] at time [a]. *)
     let filter_deduce_action
         (a : Symbols.action Symbols.t)
@@ -1551,8 +1551,9 @@ module E : S with type t = Equiv.form = struct
     let mset_l = msets_to_list msets in
 
     List.fold_left (fun st term ->
-        match_term_incl term pat_terms mset_l st
+        match_term_incl term pat_terms mset_l st 
       ) st terms
+
 
   (*------------------------------------------------------------------*)
   let rec match_equiv_eq

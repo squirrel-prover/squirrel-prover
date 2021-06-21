@@ -1505,7 +1505,9 @@ let rec auto ~close ~strong s sk (fk : Tactics.fk) =
     in
 
     let reduce s sk fk = 
-      sk [LT.reduce_sequent Reduction.{ delta = false } s] fk 
+      if strong 
+      then sk [LT.reduce_sequent Reduction.{ delta = false } s] fk 
+      else sk [s] fk
     in
 
     andthen_list ~cut:true
