@@ -1,3 +1,12 @@
+
+let hcombine acc n = acc * 65599 + n
+
+let hcombine_list fhash hash l =
+  List.fold_left (fun hash x -> 
+      hcombine hash (fhash x)
+    ) hash l
+
+(* -------------------------------------------------------------------- *)
 module Hashtbl = struct
   include Hashtbl
 
@@ -6,6 +15,19 @@ module Hashtbl = struct
       (fun x y acc -> (x,y) :: acc)
       tbl
       []
+
+  module Make2
+      (H1:HashedType)
+      (H2:HashedType) : S with type key = H1.t * H2.t = struct
+    module H = struct
+      type t = H1.t * H2.t
+
+      let hash (t1,t2) = hcombine (H1.hash t1) (H2.hash t2)
+      let equal (t1,t2) (t1',t2') = H1.equal t1 t1' && H2.equal t2 t2'
+    end
+
+    include Make (H)
+  end
 end
 
 module List = struct
@@ -453,10 +475,3 @@ let as_seq3 = function [x1; x2; x3] -> (x1, x2, x3) | _ -> assert false
 let as_seq4 = function [x1; x2; x3; x4] -> (x1, x2, x3, x4)
   | _ -> assert false
 
-(* -------------------------------------------------------------------- *)
-let hcombine acc n = acc * 65599 + n
-
-let hcombine_list fhash hash l =
-  List.fold_left (fun hash x -> 
-      hcombine hash (fhash x)
-    ) hash l

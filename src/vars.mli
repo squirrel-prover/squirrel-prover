@@ -41,6 +41,9 @@ val pp_typed_list : Format.formatter -> evar list -> unit
 (*------------------------------------------------------------------*)
 (** {2 Functions on variables} *)
 
+val hash : 'a var -> int
+val ehash : evar -> int
+
 val name : 'a var -> string
 
 val ty : 'a var -> 'a Type.ty
@@ -70,6 +73,8 @@ val compare : 'a var -> 'b var -> int
 module Sv : sig 
   include Set.S with type elt = evar
 
+  val hash : t -> int
+
   val add_list : t -> 'a var list -> t
 
   val of_list1 : 'a var list -> t
@@ -82,6 +87,8 @@ module Mv : Map.S with type key = evar
 
 (** Local environment containg a set of variables of arbitrary sorts. *)
 type env
+
+val hash_env : env -> int
 
 (** Print an environment, showing variables names and sorts. *)
 val pp_env : Format.formatter -> env -> unit

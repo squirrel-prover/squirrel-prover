@@ -19,6 +19,8 @@ type t = private
   | SimplePair of Symbols.system Symbols.t
   | Pair       of single_system * single_system
 
+val hash : t -> int
+
 val single      : Symbols.table -> single_system -> t
 val simple_pair : Symbols.table -> Symbols.system Symbols.t -> t
 val pair        : Symbols.table -> single_system -> single_system -> t

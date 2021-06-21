@@ -1013,11 +1013,11 @@ module Unify = struct
   (** memoisation *)
   let unify_normed = 
     let module U = struct
-      type t = cterm * cterm
-      let hash (t,t') = Utils.hcombine (c_hash t) (c_hash t')
-      let equal (s,t) (s',t') = c_equal s s' && c_equal t t'
+      type t = cterm 
+      let hash t = c_hash t
+      let equal t t' = c_equal t t'
     end in 
-    let module Memo = Ephemeron.K1.Make (U) in
+    let module Memo = Ephemeron.K2.Make (U) (U) in
     let memo = Memo.create 256 in
     fun u v ->
       try Memo.find memo (u,v) with
@@ -1427,7 +1427,7 @@ let complete_cterms table (l : (cterm * cterm) list) : state =
 let tot = ref 0.
 let cptd = ref 0
 
-module Memo = Ephemeron.K2.Make
+module Memo = Hashtbl.Make2
     (struct 
       type t = Symbols.table
       let equal t t' = Symbols.tag t = Symbols.tag t'
@@ -1452,7 +1452,7 @@ module Memo = Ephemeron.K2.Make
     end)
 
 let complete table (l : Term.esubst list) 
-  : state timeout_r=
+  : state timeout_r =
   let l =
     List.fold_left
       (fun l (Term.ESubst (u,v)) ->

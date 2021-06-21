@@ -104,14 +104,18 @@ end = struct
   
   (* with memoisation *)
   let to_subst =
-    let module U = struct
+    let module H1 = struct
       type _t = t
-      type t = _t * [`Match|`Unif]
-      let hash (t,mode) = 
-        Utils.hcombine t.id (match mode with `Match -> 1 | `Unif -> 0) 
-      let equal (t,mode) (t',mode') = t.id = t'.id && mode = mode'
+      type t = _t
+      let hash t = t.id
+      let equal t t' = t.id = t'.id
     end in 
-    let module Memo = Ephemeron.K1.Make (U) in
+    let module H2 = struct
+      type t = [`Match|`Unif]
+      let hash = function `Match -> 1 | `Unif -> 0
+      let equal x y = x == y
+    end in 
+    let module Memo = Ephemeron.K2.Make (H1) (H2) in
     let memo = Memo.create 256 in
     fun ~mode t ->
       try Memo.find memo (t,mode) with

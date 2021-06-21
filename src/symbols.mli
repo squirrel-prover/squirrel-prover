@@ -16,6 +16,8 @@ val infix_fist_chars : char list
 (** ['a t] is the type of symbols of namespace ['a]. *)
 type 'a t
 
+val hash : 'a t -> int
+
 (** Symbol groups:
   * symbols with the same name can exist in different groups.
   * Groups are usually called namespaces, but what we (improperly)

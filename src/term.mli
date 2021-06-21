@@ -103,6 +103,8 @@ and _ term = private
 
 type 'a t = 'a term
 
+val hash : 'a term -> int
+
 (*------------------------------------------------------------------*)
 type message  = Type.message term
 type messages = message list

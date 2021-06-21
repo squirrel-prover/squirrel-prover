@@ -111,6 +111,74 @@ and _ term =
 type 'a t = 'a term
 
 (*------------------------------------------------------------------*)
+let hash_ord : ord -> int = function
+  | `Eq -> 1
+  | `Neq -> 2
+  | `Leq -> 3
+  | `Geq -> 4
+  | `Lt -> 5
+  | `Gt -> 6
+
+let rec hash : type a. a term -> int = function
+  | Name n -> hcombine 0 (hash_isymb n)
+      
+  | Fun ((f, is),_,terms) -> 
+    let h = Symbols.hash f in
+    let h = hcombine_list Vars.hash h is in
+    hcombine 1 (hash_l terms h)
+
+  | Macro (m, l, ts)  -> 
+    let h = hcombine_list hash (hash_isymb m) l in
+    hcombine 2 (hcombine h (hash ts))
+
+  | Seq (vs, b)       -> 
+    let h = hcombine_list Vars.hash (hash b) vs in
+    hcombine 3 h
+
+  | Pred ts -> hcombine 4 (hash ts)
+
+  | Diff (bl, br) -> hcombine 5 (hash_l [bl; br] 3)
+
+  | Find (b, c, d, e) -> 
+    let h = hcombine_list Vars.hash 6 b in
+    hash_l [c;d;e] h
+        
+  | ForAll (vs, b) -> 
+    let h = hcombine_list Vars.ehash (hash b) vs in
+    hcombine 7 h
+
+  | Exists (vs, b) -> 
+    let h = hcombine_list Vars.ehash (hash b) vs in
+    hcombine 8 h
+
+  | Atom at -> hcombine 9 (hash_atom at)
+
+  | Var v -> hcombine 10 (Vars.hash v)
+
+  | Action (s, is) -> 
+    let h = hcombine_list Vars.hash (Symbols.hash s) is in
+    hcombine 11 h
+
+and hash_l : type a. a term list -> int -> int = fun l h ->
+    hcombine_list hash h l
+
+and hash_atom : generic_atom -> int = function
+  | `Message (eq, t1, t2) -> 
+    hcombine 12 (hash_l [t1;t2] (hash_ord (eq :> ord)))
+  | `Timestamp (eq, t1, t2) -> 
+    hcombine 13 (hash_l [t1;t2] (hash_ord eq))
+  | `Index (eq, t1, t2) -> 
+    hcombine 14 (hcombine_list Vars.hash (hash_ord (eq :> ord)) [t1;t2])
+  | `Happens t ->
+    hcombine 15 (hash t)
+
+(* ignore the type *)      
+and hash_isymb : type a. (a Symbols.t, Type.tmessage) isymb -> int = 
+  fun symb ->
+  let h = Symbols.hash symb.s_symb in
+  hcombine_list Vars.hash h symb.s_indices
+
+(*------------------------------------------------------------------*)
 type message  = Type.message term
 type messages = message list
 

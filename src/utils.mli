@@ -4,6 +4,10 @@ module Hashtbl : sig
   include module type of Hashtbl
 
   val to_list : ('a, 'b) t -> ('a * 'b) list
+
+  module Make2
+      (H1:HashedType)
+      (H2:HashedType) : S with type key = H1.t * H2.t
 end
 
 (*------------------------------------------------------------------*)

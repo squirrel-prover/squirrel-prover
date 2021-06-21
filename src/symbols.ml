@@ -42,6 +42,8 @@ type 'a t = symb
 type group = string
 let default_group = ""
 
+let hash s = hcombine (Hashtbl.hash s.group) (Hashtbl.hash s.name)
+
 (*------------------------------------------------------------------*)
 type function_def =
   | Hash

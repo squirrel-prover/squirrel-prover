@@ -31,6 +31,9 @@ let is_pat v = String.sub v.name 0 1 = "_"
 (*------------------------------------------------------------------*)
 let name v = (if v.is_new then "#" else "") ^ v.name
 
+let hash v  = Hashtbl.hash (name v)
+let ehash (EVar v) = hash v
+
 let ty v = v.var_type
 
 let norm_ty : type a. Type.Infer.env -> a var -> a var =
@@ -109,6 +112,9 @@ module Sv = struct
           (b.name, b.s_prefix, b.is_new, b.i_suffix) 
     end)
 
+  let hash (set : t) : int =
+    fold (fun v h -> hcombine (ehash v) h) set 0
+
   let add_list sv vars =
     List.fold_left (fun sv v -> add (EVar v) sv) sv vars
 
@@ -131,6 +137,9 @@ end
 module M = Utils.Ms
 
 type env = evar M.t
+
+let hash_env (e : env) : int =
+  M.fold (fun s _ h -> hcombine (Hashtbl.hash s) h) e 0
 
 let to_list (env : env) =
   let _,r2 = M.bindings env |> List.split in

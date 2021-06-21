@@ -1,3 +1,4 @@
+open Utils
 module L = Location
 
 type lsymb = Symbols.lsymb
@@ -14,11 +15,20 @@ let get_proj = function
 let get_id = function
   | Left id | Right id -> id
 
+let hash_single = function
+  | Left t  -> hcombine 0 (Symbols.hash t)
+  | Right t -> hcombine 1 (Symbols.hash t)
+
 (*------------------------------------------------------------------*)
 type t =
   | Single     of single_system
   | SimplePair of Symbols.system Symbols.t
   | Pair       of single_system * single_system
+
+let hash = function
+  | Single s -> hash_single s
+  | SimplePair str -> hcombine 2 (Symbols.hash str)
+  | Pair (s1, s2) -> hcombine (hash_single s1) (hash_single s2)
 
 let pp_single fmt = function
   | Left id  -> Fmt.pf fmt "%s/left"  (Symbols.to_string id)

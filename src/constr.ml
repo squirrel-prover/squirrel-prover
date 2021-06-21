@@ -23,40 +23,33 @@ type trace_literals = trace_literal list
 
 (*------------------------------------------------------------------*)
 module TraceLits : sig 
-  type t = private C of trace_literal list
+  type t = trace_literal 
 
-  val mk : trace_literal list -> t
+  val mk : trace_literal list -> t array
 
   val compare : t -> t -> int
   val equal : t -> t -> bool
   val hash : t -> int
 
-  module Memo : Ephemeron.S with type key = t
+  module Memo : Ephemeron.S with type key = t array
 end = struct
-  type t = C of trace_literal list
+  type t = trace_literal 
  
-  let mk l = C (List.sort_uniq Stdlib.compare l)
+  let mk l = Array.of_list (List.sort_uniq Stdlib.compare l)
 
-  let compare (C l) (C l') = 
-    let ll, ll' = List.length l, List.length l' in
-    if ll <> ll' then Stdlib.compare ll ll' 
-    else
-      let exception Done of int in
-      try 
-        List.iter2 (fun lit lit' ->
-            (* FIXME: if we add hash-consing, update *)
-            let c = Stdlib.compare lit lit' in
-            if c <> 0 then raise (Done c) 
-          ) l l';
-        0
-      with Done c -> c
+  let compare = Stdlib.compare
 
-  let equal t t' = compare t t' = 0
+  let equal t t' = t = t'
 
-  (* FIXME: if we add hash-consing, change [Hashtbl.hash] to the literal tag *)
-  let hash (C l) = Utils.hcombine_list Hashtbl.hash 0 l
+  (* FIXME: term hashconsing *)
+  let hash ((l,t) : trace_literal) = 
+    let h = match l with
+        | `Neg -> 0
+        | `Pos -> 1
+    in
+    hcombine h (Term.hash (Term.mk_atom1 (t :> Term.generic_atom)))
 
-  module Memo = Ephemeron.K1.Make(struct 
+  module Memo = Ephemeron.Kn.Make(struct 
       type _t = t
       type t = _t
       let equal = equal
@@ -1285,7 +1278,7 @@ let models_conjunct (l : trace_literal list) : models =
 let models_conjunct =
   let memo = TraceLits.Memo.create 256 in
   fun (l : trace_literal list) -> 
-    let (C l) as lits = TraceLits.mk l in
+    let lits = TraceLits.mk l in
     try TraceLits.Memo.find memo lits with
     | Not_found ->
       let res = models_conjunct l in
