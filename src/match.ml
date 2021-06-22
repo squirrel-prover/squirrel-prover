@@ -1445,7 +1445,7 @@ module E : S with type t = Equiv.form = struct
     a Term.term ->
     b Term.term ->
     match_state ->
-    match_state option
+    Mvar.t option
     = fun ?(vars=Sv.empty) term elem st ->
       let pat =
         { pat_tyvars = [];
@@ -1453,12 +1453,12 @@ module E : S with type t = Equiv.form = struct
           pat_term = elem; }
       in
       match TMatch.try_match_term ~mv:st.mv st.table st.system term pat with
-      | `Match mv -> Some { st with mv }
+      | `Match mv -> Some mv
       | `FreeTyv | `NoMatch -> None
 
 
   (** Variant of [term_match_opt]. *)
-  let term_match ?vars term pat st : match_state =
+  let term_match ?vars term pat st : Mvar.t =
     match term_match_opt ?vars term pat st with
     | None -> raise NoMatch
     | Some st -> st
@@ -1469,7 +1469,7 @@ module E : S with type t = Equiv.form = struct
   let seq_mem_one
       (term : Term.message)
       (elem : Term.message)
-      (st   : match_state) : match_state option
+      (st   : match_state) : Mvar.t option
     =
     match elem with
     | Seq (is, elem) ->
@@ -1481,9 +1481,9 @@ module E : S with type t = Equiv.form = struct
       begin
         match term_match_opt ~vars:is_s term elem st with
         | None -> None
-        | Some st ->
-          let mv = Mvar.filter (fun v _ -> not (Sv.mem v is_s)) st.mv in
-          Some { st with mv }
+        | Some mv ->
+          let mv = Mvar.filter (fun v _ -> not (Sv.mem v is_s)) mv in
+          Some mv
       end
 
     | _ -> None
@@ -1492,7 +1492,7 @@ module E : S with type t = Equiv.form = struct
   let seq_mem
       (term  : Term.message)
       (elems : Term.message list)
-      (st    : match_state) : match_state option
+      (st    : match_state) : Mvar.t option
     =
     List.find_map (fun elem -> seq_mem_one term elem st) elems
 
@@ -1501,7 +1501,7 @@ module E : S with type t = Equiv.form = struct
   let mset_mem_one
       (term : Term.message)
       (mset : Mset.t)
-      (st   : match_state) : match_state option
+      (st   : match_state) : Mvar.t option
     =
     let tv = Vars.make_new Type.Timestamp "t" in
     let pat = Term.mk_macro mset.msymb [] (Term.mk_var tv) in
@@ -1510,15 +1510,15 @@ module E : S with type t = Equiv.form = struct
 
     match term_match_opt ~vars term pat st with
     | None -> None
-    | Some st ->
-      let mv = Mvar.filter (fun v _ -> not (Sv.mem v vars)) st.mv in
-      Some { st with mv }
+    | Some mv ->
+      let mv = Mvar.filter (fun v _ -> not (Sv.mem v vars)) mv in
+      Some mv
 
   (** Try to match [term] as an element of [msets]. *)
   let mset_mem
       (term   : Term.message)
       (mset_l : Mset.t list)
-      (st     : match_state) : match_state option
+      (st     : match_state) : Mvar.t option
     =
     List.find_map (fun elem -> mset_mem_one term elem st) mset_l
 
@@ -1527,13 +1527,16 @@ module E : S with type t = Equiv.form = struct
   let is_dup
       (term  : Term.message)
       (elems : Term.message list)
-      (st    : match_state) : match_state option
+      (st    : match_state) : Mvar.t option
     =
-    let eterm_match (Term.ETerm t1) (Term.ETerm t2) st =
-      term_match_opt t1 t2 st
+    let eterm_match (Term.ETerm t1) (Term.ETerm t2) (st : match_state) =
+      match term_match_opt t1 t2 st with
+      | Some mv -> Some { st with mv } 
+      | None -> None
     in
 
-    Action.is_dup_match eterm_match st st.table term elems
+    let st = Action.is_dup_match eterm_match st st.table term elems in
+    omap (fun (x : match_state) -> x.mv) st
 
   (*------------------------------------------------------------------*)
   (** Check that [term] can be deduced from [pat_terms].
@@ -1545,63 +1548,70 @@ module E : S with type t = Equiv.form = struct
       (term      : Term.message)
       (pat_terms : Term.message list)
       (mset_l    : Mset.t list)
-      (st        : match_state) : match_state
+      (st        : match_state) : Mvar.t
     =
     match is_dup term pat_terms st with
-    | Some st -> st
+    | Some mv -> mv
     | None ->
       match seq_mem term pat_terms st with
-      | Some st -> st
+    | Some mv -> mv
       | None ->
         match mset_mem term mset_l st with
-        | Some st -> st
-        | None ->
-          (* if that fails, decompose [term] through the Function Application
-             rule, and recurse. *)
-          match term with
-          | Term.Fun (_, _, terms) ->
-            List.fold_left (fun st term ->
-                match_term_incl term pat_terms mset_l st
-              ) st terms
+        | Some mv -> mv
+        | None -> fa_match_term_incl term pat_terms mset_l st
 
-          | Term.Atom (`Message (_, t1, t2)) ->
-            List.fold_left (fun st term ->
-                match_term_incl term pat_terms mset_l st
-              ) st [t1; t2]
+  (** Check that [term] can be deduced from [pat_terms] through the 
+      Function Application rule *) 
+  and fa_match_term_incl
+      (term      : Term.message)
+      (pat_terms : Term.message list)
+      (mset_l    : Mset.t list)
+      (st        : match_state) : Mvar.t
+    =
+    (* if that fails, decompose [term] through the Function Application
+       rule, and recurse. *)
+    match term with
+    | Term.Fun (_, _, terms) ->
+      List.fold_left (fun mv term ->
+          match_term_incl term pat_terms mset_l { st with mv }
+        ) st.mv terms
 
-          | Term.Seq (is, term) ->
-            let is, subst = Term.refresh_vars `Global is in
-            let term = Term.subst subst term in
+    | Term.Atom (`Message (_, t1, t2)) ->
+      List.fold_left (fun mv term ->
+          match_term_incl term pat_terms mset_l { st with mv }
+        ) st.mv [t1; t2]
 
-            let st = { st with bvs = Sv.add_list st.bvs is; } in
-            match_term_incl term pat_terms mset_l st
+    | Term.Seq (is, term) ->
+      let is, subst = Term.refresh_vars `Global is in
+      let term = Term.subst subst term in
 
-          | Term.Exists (es, term)
-          | Term.ForAll (es, term)
-            when List.for_all (fun (Vars.EVar v) ->
-                let k = Vars.kind v in
-                Type.equalk k Type.KIndex || Type.equalk k Type.KTimestamp
-              ) es
-            ->
-            let es, subst = Term.erefresh_vars `Global es in
-            let term = Term.subst subst term in
+      let st = { st with bvs = Sv.add_list st.bvs is; } in
+      match_term_incl term pat_terms mset_l st
 
-            let st = { st with bvs = Sv.union st.bvs (Sv.of_list es); } in
-            match_term_incl term pat_terms mset_l st
+    | Term.Exists (es, term)
+    | Term.ForAll (es, term)
+      when List.for_all (fun (Vars.EVar v) ->
+          let k = Vars.kind v in
+          Type.equalk k Type.KIndex || Type.equalk k Type.KTimestamp
+        ) es
+      ->
+      let es, subst = Term.erefresh_vars `Global es in
+      let term = Term.subst subst term in
 
-          | Find (is, c, d, e) ->
-            let is, subst = Term.refresh_vars `Global is in
-            let c, d = Term.subst subst c, Term.subst subst d in
+      let st = { st with bvs = Sv.union st.bvs (Sv.of_list es); } in
+      match_term_incl term pat_terms mset_l st
 
-            let st1 = { st with bvs = Sv.add_list st.bvs is; } in
+    | Find (is, c, d, e) ->
+      let is, subst = Term.refresh_vars `Global is in
+      let c, d = Term.subst subst c, Term.subst subst d in
 
-            let st1 =
-              match_term_incl c pat_terms mset_l st1 |>
-              match_term_incl d pat_terms mset_l
-            in
-            match_term_incl d pat_terms mset_l { st1 with bvs = st.bvs }
+      let st1 = { st with bvs = Sv.add_list st.bvs is; } in
 
-          | _ -> raise NoMatch
+      let mv = match_term_incl c pat_terms mset_l st1 in
+      let mv = match_term_incl d pat_terms mset_l { st1 with mv } in
+      match_term_incl e pat_terms mset_l { st with mv }
+
+    | _ -> raise NoMatch
 
   (*------------------------------------------------------------------*)
   (** Greedily check entailment through an inclusion check of [terms] in
@@ -1609,25 +1619,27 @@ module E : S with type t = Equiv.form = struct
   let match_equiv_incl
       (terms     : Term.message list)
       (pat_terms : Term.message list)
-      (st        : match_state) : match_state
+      (st        : match_state) : Mvar.t
     =
     let msets = strengthen st.table st.system st.env pat_terms in
     let mset_l = msets_to_list msets in
 
-    List.fold_left (fun st term ->
-        match_term_incl term pat_terms mset_l st 
-      ) st terms
+    List.fold_left (fun mv term ->
+        match_term_incl term pat_terms mset_l { st with mv }
+      ) st.mv terms
 
 
   (*------------------------------------------------------------------*)
   let rec match_equiv_eq
       (terms     : Term.message list)
       (pat_terms : Term.message list)
-      (st        : match_state) : match_state
+      (st        : match_state) : Mvar.t 
     =
     if List.length terms <> List.length pat_terms then raise NoMatch;
 
-    List.fold_right2 term_match terms pat_terms st
+    List.fold_right2 (fun t1 t2 mv ->
+        term_match t1 t2 { st with mv }
+      ) terms pat_terms st.mv
 
   (*------------------------------------------------------------------*)
   (** Check entailment between two equivalences.
@@ -1637,8 +1649,8 @@ module E : S with type t = Equiv.form = struct
       ~(mode     : [`Eq | `Covar | `Contravar])
       (terms     : Term.messages)
       (pat_terms : Term.messages)
-      (st        : match_state)
-    : match_state =
+      (st        : match_state) : Mvar.t 
+    =
     match mode with
     | `Eq        -> match_equiv_eq terms pat_terms st
     | `Contravar -> match_equiv_eq terms pat_terms st
@@ -1652,11 +1664,11 @@ module E : S with type t = Equiv.form = struct
   (*------------------------------------------------------------------*)
   (** Match two [Equiv.form] *)
   let rec fmatch ~mode (t : Equiv.form) (pat : Equiv.form) (st : match_state)
-    : match_state =
+    : Mvar.t =
     match t, pat with
     | Impl (t1, t2), Impl (pat1, pat2) ->
-      let st = fmatch ~mode:(flip mode) t1 pat1 st in
-      fmatch ~mode t2 pat2 st
+      let mv = fmatch ~mode:(flip mode) t1 pat1 st in
+      fmatch ~mode t2 pat2 { st with mv }
 
     | Atom (Reach t), Atom (Reach pat) ->
       term_match t pat st
@@ -1667,7 +1679,7 @@ module E : S with type t = Equiv.form = struct
     | Quant (q,es,t), Quant (q',es',t') ->
       (* TODO: match under binders (see Term.ml)  *)
       if q = q' && es = es' && t = t'
-      then st
+      then st.mv
       else raise NoMatch
 
     | _ -> raise NoMatch
@@ -1709,7 +1721,7 @@ module E : S with type t = Equiv.form = struct
     in
 
     try
-      let st = fmatch ~mode t pat st_init in
+      let mv = fmatch ~mode t pat st_init in
 
       if not (Type.Infer.is_closed ty_env)
       then `FreeTyv
@@ -1718,7 +1730,7 @@ module E : S with type t = Equiv.form = struct
           Mvar.fold (fun (Vars.EVar v) t mv ->
               let v = Vars.tsubst ty_subst_rev v in
               Mvar.add (Vars.EVar v) t mv
-            ) st.mv Mvar.empty
+            ) mv Mvar.empty
         in
         `Match mv
 
