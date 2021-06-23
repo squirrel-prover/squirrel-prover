@@ -55,7 +55,7 @@ abstract (~<) : message->message->message
 (* When the key is plugged, its counter is incremented *)
 process yubikeyplug(i:index,j:index) =
   in(cT, x1);
-  if x1 = startplug then YCpt(i) := succ(YCpt(i)); out(cT,endplug)
+  if x1 = startplug then YCpt(i) := mySucc(YCpt(i)); out(cT,endplug)
 
 (* When the key is pressed, an otp is sent with the current value of the counter,
 and the counter is imcremented *)
@@ -129,6 +129,11 @@ goal snd_pair (x,y : message) : snd (<x,y>) = y.
 Proof. auto. Qed.
 hint rewrite snd_pair.
 
+goal dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
+Proof. auto. Qed.
+hint rewrite dec_enc.
+
+
 (* PROOF *)
 
 axiom orderTrans (n1,n2,n3:message):
@@ -137,6 +142,9 @@ axiom orderTrans (n1,n2,n3:message):
 axiom orderStrict (n1,n2:message):
    n1 = n2 => n1 ~< n2 <> orderOk.
   
+axiom orderSucc (n1:message):
+n1 ~< mySucc(n1) = orderOk.
+
 (* The counter SCpt(i) strictly increases when t is an action S performed by 
 the server with tag i. *)
 goal counterIncreaseStrictly (ii,i:index):
@@ -197,6 +205,190 @@ Proof.
       executable t => // H1. 
       by apply H1.
 Qed.
+
+
+(* Counters on the Yubikey side *)
+
+goal YPresscounterIncreaseStrictly (i,j:index):
+   happens(Press(i,j)) =>
+   cond@Press(i,j) => 
+   YCpt(i)@pred(Press(i,j)) ~< YCpt(i)@Press(i,j) = orderOk.
+Proof.
+intro Hap Hcond.
+expand YCpt(i)@Press(i,j).
+apply orderSucc.
+Qed.
+
+goal YPlugcounterIncreaseStrictly (i,j:index):
+   happens(Plug(i,j)) =>
+   cond@Plug(i,j) => 
+   YCpt(i)@pred(Plug(i,j)) ~< YCpt(i)@Plug(i,j) = orderOk.
+Proof.
+intro Hap Hcond.
+expand YCpt(i)@Plug(i,j).
+apply orderSucc.
+Qed.
+
+goal YcounterIncrease (t:timestamp, i : index) :
+  happens(t) =>
+  t > init && exec@t =>
+    YCpt(i)@pred(t) ~< YCpt(i)@t = orderOk ||
+    YCpt(i)@t = YCpt(i)@pred(t).
+Proof.
+  intro Hap [Ht Hexec].
+  case t => //.
+
+   (* Plug *)
+  intro [i0 j _].
+  case (i = i0) => _.
+    (* i = i0 *)
+   left.
+   use YPlugcounterIncreaseStrictly with i, j as H1 => //.
+    (* i <> i0 *)
+    right. 
+    by rewrite /YCpt if_false.
+
+   (* Press *)
+   intro [i0 j _].
+   case (i = i0) => _.
+    (* i = i0 *)
+   left.
+   use YPresscounterIncreaseStrictly with i, j as H1 => //.
+    (* i <> i0 *)
+    right. 
+    by rewrite /YCpt if_false.
+
+Qed.
+
+
+
+goal YcounterIncreaseBis:
+  forall (t:timestamp), forall (t':timestamp), forall (i:index),
+    happens(t) =>
+    exec@t && t' < t =>
+    ( YCpt(i)@t' ~< YCpt(i)@t = orderOk || 
+      YCpt(i)@t = YCpt(i)@t').
+Proof.
+  induction.
+  intro t IH0 t' i Hap [Hexec Ht'].
+  assert (t' = pred(t) || t' < pred(t)) as H0; 
+  1: case t; constraints. 
+  case H0.
+
+  (* case t' = pred(t) *)
+  rewrite !H0. 
+
+  by apply YcounterIncrease.
+
+  (* case t' < pred(t) *)
+  use IH0 with pred(t),t',i as H1 => //.
+
+  use YcounterIncrease with t,i as H3 => //.
+  case H1 => //.
+    (* case H1 - 1/2 *)
+    case H3 => //.
+      by left; apply orderTrans _ (YCpt(i)@pred(t)) _.
+      (* case H1 - 2/2 *)
+      by case H3; [1: left | 2 : right].
+  
+      simpl.
+      executable t => //.
+      intro H1.
+      by apply H1.
+Qed.
+
+(* Authentication following a suggestion of Adrien *)
+
+goal auth_injective_ter (ii,i:index):
+  happens(S(ii,i)) =>
+  exec@S(ii,i) =>
+    exists (j:index), 
+     (Press(i,j) < S(ii,i) && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i))))
+     && forall (j':index), 
+       (Press(i,j') < S(ii,i) && 
+       snd(snd(output@Press(i,j'))) = snd(snd(input@S(ii,i)))) => 
+         j=j'.
+Proof.
+intro Hap Hexec.
+executable S(ii,i) => //.
+intro exec.
+expand exec, cond.
+destruct Hexec as [Hexecpred [Mneq Hcpt Hpid]].
+intctxt Mneq => //.
+intro Ht M1 *.
+exists j.
+split => //.
+intro j'.
+intro [Hyp Meq].
+expand output@Press(i,j').
+rewrite snd_pair in Meq.
+rewrite snd_pair in Meq.
+
+
+expand cpt.
+assert(snd(dec(enc(<secret(i),YCpt(i)@pred(Press(i,j))>,npr(i,j),k(i)),k(i))) = snd(dec(enc(<secret(i),YCpt(i)@pred(Press(i,j'))>,npr(i,j),k(i)),k(i)))) => //.
+rewrite dec_enc in Meq0.
+rewrite dec_enc in Meq0.
+rewrite snd_pair in Meq0.
+rewrite snd_pair in Meq0.
+
+assert(YCpt(i)@Press(i,j) = YCpt(i)@Press(i,j')).
+expand YCpt => //.
+
+
+assert
+   ( Press(i,j) = Press(i,j') || Press(i,j) < Press(i,j') || Press(i,j) > Press(i,j') ) as H => //.
+case H => //.
+
+
+
+(* Press(i,j) < Press(i,j') *)
+use exec with Press(i,j') as H0' => //.
+expand exec.
+use YPresscounterIncreaseStrictly with i, j' as HP' => //.
+
+assert(pred(Press(i,j')) = Press(i,j) || pred(Press(i,j')) > Press(i,j)) => //.
+case H0.
+ 
+ (* pred(Press(i,j')) = Press(i,j)  *)
+ use orderStrict with YCpt(i)@Press(i,j), YCpt(i)@Press(i,j') => //.
+ (* pred(Press(i,j')) > Press(i,j) *)
+use YcounterIncreaseBis with pred(Press(i,j')), Press(i,j), i as HI => //.
+case HI => //.
+use orderTrans with  YCpt(i)@Press(i,j), YCpt(i)@pred(Press(i,j')), YCpt(i)@Press(i,j') => //.
+use orderStrict with YCpt(i)@Press(i,j), YCpt(i)@Press(i,j') => //.
+rewrite HI in Meq0 =>//.
+expand YCpt(i)@Press(i,j).
+use orderSucc with YCpt(i)@pred(Press(i,j)) => //.
+use orderStrict with YCpt(i)@pred(Press(i,j)), mySucc(YCpt(i)@pred(Press(i,j))) => //.
+
+
+(* Press(i,j) > Press(i,j') *)
+use exec with Press(i,j) as H0 => //.
+expand exec.
+use YPresscounterIncreaseStrictly with i, j as HP => //.
+
+assert(pred(Press(i,j)) = Press(i,j') || pred(Press(i,j)) > Press(i,j')) => //.
+case H1.
+
+ (* pred(Press(i,j)) = Press(i,j')  *)
+ use orderStrict with YCpt(i)@Press(i,j'), YCpt(i)@Press(i,j) => //.
+ (* pred(Press(i,j)) > Press(i,j') *)
+use YcounterIncreaseBis with pred(Press(i,j)), Press(i,j'), i as HI => //.
+case HI => //.
+use orderTrans with  YCpt(i)@Press(i,j'), YCpt(i)@pred(Press(i,j)), YCpt(i)@Press(i,j) => //.
+use orderStrict with YCpt(i)@Press(i,j'), YCpt(i)@Press(i,j) => //.
+rewrite HI in Meq0 =>//.
+expand YCpt(i)@Press(i,j').
+use orderSucc with YCpt(i)@pred(Press(i,j')) => //.
+use orderStrict with YCpt(i)@pred(Press(i,j')), mySucc(YCpt(i)@pred(Press(i,j'))) => //.
+Qed.
+
+
+
+
+(* Some security properties *)
+
 
 goal noreplayInv (ii, ii1, i:index):
    happens(S(ii1,i),S(ii,i)) =>
