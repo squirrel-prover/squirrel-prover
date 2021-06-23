@@ -156,3 +156,52 @@ Proof.
   fresh 1. 
   yesif 1; by auto.
 Qed.
+
+(* Another attempt at proving stateInequality using only collision
+resistance, and not euf, but the tactic fresh is not yet precise enough *)
+goal stateInequalityBis :
+  forall (t,t':timestamp), forall (i,j,j':index)
+     happens(t) =>
+     (t = T(i,j) && (t' = T(i,j') || t' = init) && t' < t => kT(i)@t <> kT(i)@t').
+Proof.
+  induction.
+  intro t Hind t' i j j' Hap [H1 H2] Mneq.
+  destruct H1 as [H1 H1'].
+  case H1'.  subst t, T(i,j). subst t', T(i,j').
+  expand kT(i)@T(i,j). expand kT(i)@T(i,j').
+  collision.
+  intro Meq.
+  use lastUpdate with pred(T(i,j)),i as H3; 2: auto.
+  use lastUpdate with pred(T(i,j')),i as H4; 2: auto.
+  
+  case H3.
+  
+  case H4.
+  destruct H3 as [H H'].
+  use H' with j'; 1,2: auto.
+  destruct H3 as [H H'].
+  use H' with j'; 1,2: auto.
+
+  case H4.
+  destruct H3 as [j0 [H H']].
+  use Hind with T(i,j0),init,i,j0,j'; 2,3,4: auto.
+  congruence.
+  destruct H3 as [j0 [H H']].
+  destruct H4 as [j1 [H0 H0']].
+  use Hind with T(i,j0),T(i,j1),i,j0,j1.
+  congruence.
+  auto.
+  auto.
+  split.
+  auto.
+  use H' with j'.
+  case H1.
+  constraints.
+  constraints.
+  auto.
+  subst t, T(i,j). subst t', init.
+  expand kT(i)@T(i,j).
+  expand kT(i)@init.
+  fresh Mneq.
+  admit. (* Rule Fresh not precise enough *)
+Qed.
