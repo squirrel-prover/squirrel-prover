@@ -36,7 +36,7 @@ type tac_error_i =
   | MustHappen of Term.timestamp
   | NotHypothesis
 
-  | ApplyMatchFailure
+  | ApplyMatchFailure of (Term.messages * Term.match_infos) option
   | ApplyBadInst
 
   | NoCollision
@@ -50,69 +50,44 @@ type tac_error_i =
 
 type tac_error = L.t option * tac_error_i
 
-let tac_error_strings =
-  [ (More               , "More");
-    (NotEqualArguments  , "NotEqualArguments");
-    (Bad_SSC            , "BadSSC");
-    (NoSSC              , "NoSSC");
-    (NoAssumpSystem     , "NoAssumpSystem");
-    (NotDDHContext      , "NotDDHContext");
-    (SEncNoRandom       , "SEncNoRandom");
-    (CongrFail          , "CongrFail");
-    (SEncSharedRandom   , "SEncSharedRandom");
-    (SEncRandomNotFresh , "SEncRandomNotFresh");
-    (NameNotUnderEnc    , "NameNotUnderEnc");
-    (NoRefl             , "NoRefl");
-    (NoReflMacroVar     , "NoReflMacroVar");
-    (TacTimeout         , "TacTimeout");
-    (CannotConvert      , "CannotConvert");
-    (NotHypothesis      , "NotHypothesis");
-    (NoCollision        , "NoCollision");
-    (GoalNotClosed      , "GoalNotClosed");
-    (DidNotFail         , "DidNotFail");
-    (NothingToIntroduce , "NothingToIntroduce");
-    (NothingToRewrite   , "NothingToRewrite");
-    (BadRewriteRule     , "BadRewriteRule");
-    (InvalidVarName     , "InvalidVarName");
-    (ApplyMatchFailure  , "ApplyMatchFailure");
-    (ApplyBadInst       , "ApplyBadInst") ]
-
 let rec tac_error_to_string = function
-  | Failure s -> Format.sprintf "Failure %S" s
-  | NotDepends (s1, s2) -> "NotDepends, "^s1^", "^s2
+  | More               -> "More"
+  | NotEqualArguments  -> "NotEqualArguments"
+  | Bad_SSC            -> "BadSSC"
+  | NoSSC              -> "NoSSC"
+  | NoAssumpSystem     -> "NoAssumpSystem"
+  | NotDDHContext      -> "NotDDHContext"
+  | SEncNoRandom       -> "SEncNoRandom"
+  | CongrFail          -> "CongrFail"
+  | SEncSharedRandom   -> "SEncSharedRandom"
+  | SEncRandomNotFresh -> "SEncRandomNotFresh"
+  | NameNotUnderEnc    -> "NameNotUnderEnc"
+  | NoRefl             -> "NoRefl"
+  | NoReflMacroVar     -> "NoReflMacroVar"
+  | TacTimeout         -> "TacTimeout"
+  | CannotConvert      -> "CannotConvert"
+  | NotHypothesis      -> "NotHypothesis"
+  | NoCollision        -> "NoCollision"
+  | GoalNotClosed      -> "GoalNotClosed"
+  | DidNotFail         -> "DidNotFail"
+  | NothingToIntroduce -> "NothingToIntroduce"
+  | NothingToRewrite   -> "NothingToRewrite"
+  | BadRewriteRule     -> "BadRewriteRule"
+  | InvalidVarName     -> "InvalidVarName"
+  | ApplyBadInst       -> "ApplyBadInst"
+
+  | Failure s             -> Format.sprintf "Failure %S" s
+  | NotDepends (s1, s2)   -> "NotDepends, "^s1^", "^s2
   | FailWithUnexpected te -> "FailWithUnexpected, "^(tac_error_to_string te)
-  | More
-  | NotEqualArguments
-  | Bad_SSC
-  | NoSSC
-  | NoAssumpSystem
-  | NotDDHContext
-  | SEncNoRandom
-  | SEncSharedRandom
-  | SEncRandomNotFresh
-  | NameNotUnderEnc
-  | NoRefl
-  | NoReflMacroVar
-  | TacTimeout
-  | CannotConvert
-  | CongrFail
-  | NothingToIntroduce
-  | NothingToRewrite
-  | BadRewriteRule
-  | GoalNotClosed
-  | NotHypothesis
-  | NoCollision
-  | ApplyMatchFailure
-  | ApplyBadInst
-  | InvalidVarName
-  | DidNotFail as e -> List.assoc e tac_error_strings
-  | HypAlreadyExists _ -> "HypAlreadyExists"
-  | HypUnknown       _ -> "HypUnknown"
-  | SystemExprError  _ -> "SystemExpr_Error"
-  | GoalBadShape     _ -> "GoalBadShape"
-  | SystemError      _ -> "System_Error"
-  | PatNumError      _ -> "PatNumError"
-  | MustHappen       _ -> "MustHappen"
+  | ApplyMatchFailure _   -> "ApplyMatchFailure"
+  | HypAlreadyExists _    -> "HypAlreadyExists"
+  | HypUnknown       _    -> "HypUnknown"
+  | SystemExprError  _    -> "SystemExpr_Error"
+  | GoalBadShape     _    -> "GoalBadShape"
+  | SystemError      _    -> "System_Error"
+  | PatNumError      _    -> "PatNumError"
+  | MustHappen       _    -> "MustHappen"
+
 
 let rec pp_tac_error_i ppf = function
   | More -> Fmt.string ppf "more results required"
@@ -200,28 +175,21 @@ let rec pp_tac_error_i ppf = function
   | NoCollision ->
     Fmt.pf ppf "no collision found"
 
-  | ApplyMatchFailure ->
-    Fmt.pf ppf "apply failed: no match found"
+  | ApplyMatchFailure None ->
+    Fmt.pf ppf "apply failed: no match found" 
+
+  | ApplyMatchFailure (Some (terms, minfos)) ->
+    let pp fmt t = 
+      Fmt.pf fmt "@[%a@]" 
+        (Term.pp_with_info (Term.match_infos_to_pp_info minfos)) t 
+    in
+    Fmt.pf ppf "apply failed: no match found:@;  @[<v 0>%a@]" 
+      (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt "@;") pp) terms
 
   | ApplyBadInst ->
     Fmt.pf ppf "apply failed: rhs variables are not all bound by the lhs"
 
   | InvalidVarName -> Fmt.pf ppf "invalid variable name"
-
-let strings_tac_error =
-  let (a,b) = List.split tac_error_strings in
-  List.combine b a
-
-let rec tac_error_of_strings = function
-  | [] -> raise (Failure "exception name expected")
-  | ["Failure"] -> Failure ""
-  | [s] ->
-    (match List.assoc_opt s strings_tac_error with
-      | None -> raise (Failure "exception name unknown")
-      | Some e -> e
-    )
-  | ["NotDepends"; s1; s2] -> NotDepends (s1, s2)
-  | _ ->  raise (Failure "exception name unknown")
 
 exception Tactic_soft_failure of tac_error
 
@@ -370,21 +338,20 @@ let try_tac t j sk fk =
   let fk' e = if !succeeded then fk e else sk [j] fk in
   t j sk' fk'
 
-let checkfail_tac exc t j (sk : 'a sk) (fk : fk) =
+let checkfail_tac (exc : string) t j (sk : 'a sk) (fk : fk) =
   try
     let sk l fk = soft_failure DidNotFail in
     t j sk fk
   with
-  | (Tactic_soft_failure (_,e) | Tactic_hard_failure (_,e)) when e = exc ->
+  | (Tactic_soft_failure (_,e) | Tactic_hard_failure (_,e)) when 
+      tac_error_to_string e = exc ->
     sk [j] fk
 
   | (Tactic_soft_failure (_, Failure _) | Tactic_hard_failure (_, Failure _) )
-    when exc=Failure "" -> sk [j] fk
+    when exc="Failure" -> sk [j] fk
 
   | Tactic_soft_failure (l,e) | Tactic_hard_failure (l,e) ->
     raise (Tactic_hard_failure (l, FailWithUnexpected e))
-
-  | _ -> assert false
 
 let check_time t j sk fk =
   let time = Sys.time () in
@@ -586,7 +553,7 @@ type 'a ast =
   | Repeat     : 'a ast -> 'a ast
   | Ident      : 'a ast
   | Modifier   : string * 'a ast -> 'a ast
-  | CheckFail  : tac_error_i * 'a ast -> 'a ast
+  | CheckFail  : string * 'a ast -> 'a ast
   | By         : 'a ast * L.t -> 'a ast
   | Time       : 'a ast -> 'a ast
 
@@ -679,14 +646,11 @@ module AST (M:S) = struct
 
     | Ident -> Fmt.pf ppf "id"
 
-    | Try t ->
-      Fmt.pf ppf "(try @[%a@])" pp t
+    | Try t -> Fmt.pf ppf "(try @[%a@])" pp t
 
-    | Repeat t ->
-      Fmt.pf ppf "(repeat @[%a@])" pp t
+    | Repeat t -> Fmt.pf ppf "(repeat @[%a@])" pp t
 
-    | CheckFail (e, t) ->
-        Fmt.pf ppf "(checkfail %s @[%a@])" (tac_error_to_string e) pp t
+    | CheckFail (e, t) -> Fmt.pf ppf "(checkfail %s @[%a@])" e pp t
 
     | Time t -> Fmt.pf ppf "(time %a)" pp t
 

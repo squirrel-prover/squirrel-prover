@@ -5,7 +5,7 @@ module Sv = Vars.Sv
 module Mv = Vars.Mv
 
 (*------------------------------------------------------------------*)
-(** {2 Matching and rewriting} *)
+(** {2 Patterns} *)
 
 (** A pattern is a list of free type variables, a term [t] and a subset
     of [t]'s free variables that must be matched.
@@ -26,7 +26,8 @@ let pat_of_form (t : 'a term) =
     pat_term = t; }
 
 (*------------------------------------------------------------------*)
-(** Matching variable assignment. *)
+(** {2 Matching variable assignment} *)
+
 module Mvar : sig
   type t
 
@@ -126,7 +127,63 @@ end = struct
 
 end
 
+
 (*------------------------------------------------------------------*)
+(** {2 Matching information for error messages} *)
+
+let minfos_ok : type a. a term -> match_infos -> match_infos =
+  fun term minfos ->
+  Mt.add (Term.ETerm term) MR_ok minfos
+
+let minfos_failed : type a. a term -> match_infos -> match_infos =
+  fun term minfos ->
+  Mt.add (Term.ETerm term) MR_failed minfos
+
+let minfos_check_st : type a. 
+  a term -> message list -> match_infos -> match_infos 
+  =
+  fun term subterms minfos ->
+  Mt.add (Term.ETerm term) (MR_check_st subterms) minfos   
+
+(*------------------------------------------------------------------*)
+(** Normalize a match information map, by making a term tagged 
+    [MR_check_st] only if:
+    -     at least one of its subterms is tagged [MR_ok] 
+    - and at least one of its subterms is tagged [MR_fail]. *)
+let minfos_norm (minit : match_infos) : match_infos =
+  let rec norm (ETerm t as et) mfinal : match_info * match_infos =
+    if Mt.mem et mfinal 
+    then Mt.find et mfinal, mfinal
+    else match Mt.find et minit with
+      | MR_ok | MR_failed as r -> r, Mt.add et r mfinal
+      | MR_check_st st -> 
+        let infos, mfinal = 
+          List.fold_left (fun (infos, mfinal) t ->
+              let i, mfinal = norm (ETerm t) mfinal in
+              i :: infos, mfinal
+            ) ([], mfinal) st
+        in
+        (* special case for binders, because alpha-renamed subterms
+           cannot be checked later *)
+        if List.for_all (fun x -> x = MR_ok) infos
+        then MR_ok, Mt.add et MR_ok mfinal
+        else if Term.is_binder t
+        then MR_failed, Mt.add et MR_failed mfinal
+        else MR_check_st st, Mt.add et (MR_check_st st) mfinal
+  in
+
+  Mt.fold (fun et _ mfinal -> 
+      let _, mfinal = norm et mfinal in
+      mfinal) minit Mt.empty
+
+(*------------------------------------------------------------------*)
+exception NoMatch of (message list * match_infos) option
+
+let no_match ?infos () = raise (NoMatch infos)   
+
+(*------------------------------------------------------------------*)
+(** {2 Matching and unification internal states} *)
+
 (** (Descending) state used in the matching algorithm. *)
 type match_state = {
   mv  : Mvar.t;          (** inferred variable assignment *)
@@ -155,8 +212,14 @@ type unif_state = {
   table    : Symbols.table;
 }
 
-
 (*------------------------------------------------------------------*)
+(** {2 Module signature of matching} *)
+
+type match_res = 
+  | FreeTyv
+  | NoMatch of (messages * match_infos) option 
+  | Match   of Mvar.t 
+
 (** Module signature of matching.
     The type of term we match into is abstract. *)
 module type S = sig
@@ -184,7 +247,7 @@ module type S = sig
     Symbols.table ->
     SystemExpr.t ->
     t -> t pat ->
-    [ `FreeTyv | `NoMatch | `Match of Mvar.t ]
+    match_res
 
   val try_match_term :
     ?mv:Mvar.t ->
@@ -192,7 +255,7 @@ module type S = sig
     Symbols.table ->
     SystemExpr.t ->
     'a term -> 'b term pat ->
-    [ `FreeTyv | `NoMatch | `Match of Mvar.t ]
+    match_res
 
   val find_map :
     many:bool ->
@@ -205,6 +268,11 @@ module type S = sig
 end
 
 (*------------------------------------------------------------------*)
+(** {2 Matching and unification} *)
+
+(*------------------------------------------------------------------*)
+(** {3 Term matching and unification} *)
+
 module T : S with type t = message = struct
   type t = message
 
@@ -476,11 +544,7 @@ module T : S with type t = message = struct
     | `FreeTyv | `NoMgu -> None
     | `Mgu mv -> Some mv
 
-
   (*------------------------------------------------------------------*)
-  
-  exception NoMatch 
-
   (* Invariants:
      - [st.mv] supports in included in [p.pat_vars].
      - [st.bvs] is the set of variables bound above [t].
@@ -492,7 +556,7 @@ module T : S with type t = message = struct
     | _, Var v' ->
       begin
         match cast (Vars.kind v') t with
-        | exception Uncastable -> raise NoMatch
+        | exception Uncastable -> no_match ()
         | t -> vmatch t v' st
       end
 
@@ -545,22 +609,22 @@ module T : S with type t = message = struct
       let pat = subst s' pat in
       tmatch t pat st
 
-    | _, _ -> raise NoMatch
+    | _, _ -> no_match ()
 
   (* Return: left subst, right subst, match state *)
   and match_bnds (vs : Vars.evars) (vs' : Vars.evars) st :
     esubst list * esubst list * match_state =
     if List.length vs <> List.length vs' then
-      raise NoMatch;
+      no_match ();
 
     (* check that types are compatible *)
     List.iter2 (fun (Vars.EVar v) (Vars.EVar v') ->
         let ty, ty' = Vars.ty v, Vars.ty v' in
         match Type.equal_w ty ty' with
-        | None -> raise NoMatch
+        | None -> no_match ()
         | Some Type.Type_eq ->
           if Type.Infer.unify_eq st.ty_env ty ty' = `Fail then
-            raise NoMatch;
+            no_match ();
       ) vs vs';
 
     (* refresh [vs] *)
@@ -602,7 +666,7 @@ module T : S with type t = message = struct
     (a Symbols.t * Vars.index list) ->
     match_state -> Mvar.t =
     fun (fn, is) (fn', is') st ->
-    if fn <> fn' then raise NoMatch;
+    if fn <> fn' then no_match ();
 
     List.fold_left2 (fun mv i i' -> 
         vmatch (mk_var i) i' { st with mv }
@@ -616,7 +680,7 @@ module T : S with type t = message = struct
 
     if not (Sv.mem ev st.support)
     then (* [v] not in the pattern *)
-      if t = mk_var v then st.mv else raise NoMatch 
+      if t = mk_var v then st.mv else no_match () 
 
     else (* [v] in the pattern *)
       match Mvar.find ev st.mv with
@@ -624,39 +688,39 @@ module T : S with type t = message = struct
          and add the type information. *)
       | exception Not_found ->
         if Type.Infer.unify_eq st.ty_env (ty t) (Vars.ty v) = `Fail then
-          raise NoMatch;
+          no_match ();
 
         (* check that we are not trying to match [v] with a term free bound
            variables. *)
-        if not (Sv.disjoint (fv t) st.bvs) then raise NoMatch;
+        if not (Sv.disjoint (fv t) st.bvs) then no_match ();
 
         Mvar.add ev (ETerm t) st.mv 
 
       (* If we already saw the variable, check that the subterms are
          identical. *)
       | ETerm t' -> match cast (kind t) t' with
-        | exception Uncastable -> raise NoMatch
+        | exception Uncastable -> no_match ()
         (* TODO: alpha-equivalent *)
-        | t' -> if t <> t' then raise NoMatch else st.mv
+        | t' -> if t <> t' then no_match () else st.mv
 
   (* matches an atom *)
   and atmatch (at : generic_atom) (at' : generic_atom) st : Mvar.t =
     match at, at' with
     | `Message (ord, t1, t2), `Message (ord', t1', t2') ->
-      if ord <> ord' then raise NoMatch;
+      if ord <> ord' then no_match ();
       tmatch_l [t1;t2] [t1';t2'] st
 
     | `Timestamp (ord, t1, t2), `Timestamp (ord', t1', t2') ->
-      if ord <> ord' then raise NoMatch;
+      if ord <> ord' then no_match ();
       tmatch_l [t1;t2] [t1';t2'] st
 
     | `Index (ord, t1, t2), `Index (ord', t1', t2') ->
-      if ord <> ord' then raise NoMatch;
+      if ord <> ord' then no_match ();
       tmatch_l [mk_var t1; mk_var t2] [mk_var t1'; mk_var t2'] st
 
     | `Happens ts, `Happens ts' -> tmatch ts ts' st
 
-    | _, _ -> raise NoMatch
+    | _, _ -> no_match ()
 
   (*------------------------------------------------------------------*)
   (** Exported *)
@@ -665,8 +729,9 @@ module T : S with type t = message = struct
     ?mode:[`Eq | `EntailLR | `EntailRL] ->
     Symbols.table ->
     SystemExpr.t ->
-    a term -> b term pat ->
-    [`FreeTyv | `NoMatch | `Match of Mvar.t] =
+    a term -> b term pat -> 
+    match_res
+    =
     fun ?mv ?mode table system t p ->
 
     (* Term matching ignores [mode]. Matching in [Equiv] does not. *)
@@ -695,7 +760,7 @@ module T : S with type t = message = struct
       let mv = tmatch t pat st_init in
 
       if not (Type.Infer.is_closed ty_env)
-      then `FreeTyv
+      then FreeTyv
       else
         let mv =
           Mvar.fold (fun (Vars.EVar v) t mv ->
@@ -703,9 +768,10 @@ module T : S with type t = message = struct
               Mvar.add (Vars.EVar v) t mv
             ) mv Mvar.empty
         in
-        `Match mv
+        Match mv
 
-    with NoMatch -> `NoMatch
+    with 
+    | NoMatch minfos -> NoMatch minfos
 
   let try_match = try_match_term
 
@@ -730,13 +796,13 @@ module T : S with type t = message = struct
         else
           match try_match table system t p with
           (* head matches *)
-          | `Match mv ->
+          | Match mv ->
             cut := not many;    (* we cut if [many = false] *)
             let t' = func (cast s_p t) vars mv in
             true, cast (kind t) t'
 
           (* head does not match, recurse with a special handling of binders *)
-          | `NoMatch | `FreeTyv ->
+          | NoMatch _ | FreeTyv ->
             match t with
             | ForAll (vs, b) ->
               let env, vs, s = erefresh_vars_env env vs in
@@ -789,7 +855,7 @@ module T : S with type t = message = struct
 end
 
 (*------------------------------------------------------------------*)
-(** {2 Equiv Matching} *)
+(** {3 Equiv matching and unification} *)
 
 
 module E : S with type t = Equiv.form = struct
@@ -959,8 +1025,8 @@ module E : S with type t = Equiv.form = struct
         pat_vars = Sv.of_list1 s2.indices;}
     in
     match TMatch.try_match table system term1 pat2 with
-    | `Match _ -> true
-    | `FreeTyv | `NoMatch -> false
+    | Match _ -> true
+    | FreeTyv | NoMatch _ -> false
 
 
   (** remove any set which is subsumed by some other set. *)
@@ -1436,7 +1502,6 @@ module E : S with type t = Equiv.form = struct
     | `Contravar -> `Covar
 
   (*------------------------------------------------------------------*)
-  exception NoMatch 
 
   (** [term_match ?vars term pat st] match [term] with [pat] w.r.t. 
       variables [vars]. *)
@@ -1453,14 +1518,14 @@ module E : S with type t = Equiv.form = struct
           pat_term = elem; }
       in
       match TMatch.try_match_term ~mv:st.mv st.table st.system term pat with
-      | `Match mv -> Some mv
-      | `FreeTyv | `NoMatch -> None
+      | Match mv -> Some mv
+      | FreeTyv | NoMatch _ -> None
 
 
   (** Variant of [term_match_opt]. *)
   let term_match ?vars term pat st : Mvar.t =
     match term_match_opt ?vars term pat st with
-    | None -> raise NoMatch
+    | None -> no_match ()
     | Some st -> st
 
   (*------------------------------------------------------------------*)
@@ -1537,56 +1602,28 @@ module E : S with type t = Equiv.form = struct
 
     let st = Action.is_dup_match eterm_match st st.table term elems in
     omap (fun (x : match_state) -> x.mv) st
-
+ 
   (*------------------------------------------------------------------*)
-  (** Check that [term] can be deduced from [pat_terms].
-      This check is modulo:
-      - Restr: all elements may not be used;
-      - Sequence expantion: sequences may be expanded;
-      - Function Application: [term] may be decomposed into smaller terms. *)
-  let rec match_term_incl
+  (** [fa_decompose term st] return a list of matching conditions that must be 
+      met for [term] to be deducible starting from [st].
+      Return [None] if Function Application fails on [term] *) 
+  let fa_decompose
       (term      : Term.message)
-      (pat_terms : Term.message list)
-      (mset_l    : Mset.t list)
-      (st        : match_state) : Mvar.t
+      (st        : match_state) : (match_state * Term.message) list option
     =
-    match is_dup term pat_terms st with
-    | Some mv -> mv
-    | None ->
-      match seq_mem term pat_terms st with
-    | Some mv -> mv
-      | None ->
-        match mset_mem term mset_l st with
-        | Some mv -> mv
-        | None -> fa_match_term_incl term pat_terms mset_l st
-
-  (** Check that [term] can be deduced from [pat_terms] through the 
-      Function Application rule *) 
-  and fa_match_term_incl
-      (term      : Term.message)
-      (pat_terms : Term.message list)
-      (mset_l    : Mset.t list)
-      (st        : match_state) : Mvar.t
-    =
-    (* if that fails, decompose [term] through the Function Application
-       rule, and recurse. *)
     match term with
-    | Term.Fun (_, _, terms) ->
-      List.fold_left (fun mv term ->
-          match_term_incl term pat_terms mset_l { st with mv }
-        ) st.mv terms
+    | Term.Fun (_, _, terms) -> 
+      Some (List.map (fun t -> st, t) terms)
 
     | Term.Atom (`Message (_, t1, t2)) ->
-      List.fold_left (fun mv term ->
-          match_term_incl term pat_terms mset_l { st with mv }
-        ) st.mv [t1; t2]
+      Some (List.map (fun t -> st, t) [t1; t2])
 
     | Term.Seq (is, term) ->
       let is, subst = Term.refresh_vars `Global is in
       let term = Term.subst subst term in
 
       let st = { st with bvs = Sv.add_list st.bvs is; } in
-      match_term_incl term pat_terms mset_l st
+      Some [(st, term)]
 
     | Term.Exists (es, term)
     | Term.ForAll (es, term)
@@ -1599,7 +1636,7 @@ module E : S with type t = Equiv.form = struct
       let term = Term.subst subst term in
 
       let st = { st with bvs = Sv.union st.bvs (Sv.of_list es); } in
-      match_term_incl term pat_terms mset_l st
+      Some [(st, term)]
 
     | Find (is, c, d, e) ->
       let is, subst = Term.refresh_vars `Global is in
@@ -1607,11 +1644,56 @@ module E : S with type t = Equiv.form = struct
 
       let st1 = { st with bvs = Sv.add_list st.bvs is; } in
 
-      let mv = match_term_incl c pat_terms mset_l st1 in
-      let mv = match_term_incl d pat_terms mset_l { st1 with mv } in
-      match_term_incl e pat_terms mset_l { st with mv }
+      Some [(st1, c); (st1, d); (st, e)]
 
-    | _ -> raise NoMatch
+    | _ -> None
+
+  (*------------------------------------------------------------------*)
+  (** Check that [term] can be deduced from [pat_terms].
+      This check is modulo:
+      - Restr: all elements may not be used;
+      - Sequence expantion: sequences may be expanded;
+      - Function Application: [term] may be decomposed into smaller terms. *)
+  let rec match_term_incl
+      (term      : Term.message)
+      (pat_terms : Term.message list)
+      (mset_l    : Mset.t list)
+      (st        : match_state) 
+      (minfos    : match_infos) : Mvar.t * match_infos
+    =
+    match is_dup term pat_terms st with
+    | Some mv -> mv, minfos_ok term minfos
+    | None ->
+      match seq_mem term pat_terms st with
+    | Some mv -> mv, minfos_ok term minfos
+      | None ->
+        match mset_mem term mset_l st with
+        | Some mv -> mv, minfos_ok term minfos
+        | None ->
+          (* if that fails, decompose [term] through the Function Application
+             rule, and recurse. *)
+          fa_match_term_incl term pat_terms mset_l st minfos
+
+  (** Check that [term] can be deduced from [pat_terms] through the 
+      Function Application rule *) 
+  and fa_match_term_incl
+      (term      : Term.message)
+      (pat_terms : Term.message list)
+      (mset_l    : Mset.t list)
+      (st        : match_state) 
+      (minfos    : match_infos) : Mvar.t * match_infos
+    =
+    match fa_decompose term st with
+    | None -> st.mv, minfos_failed term minfos
+
+    | Some fa_conds ->
+      let minfos = minfos_check_st term (List.map snd fa_conds) minfos in
+      List.fold_left (fun (mv, minfos) (st, t) ->
+          let mv, minfos = 
+            match_term_incl t pat_terms mset_l { st with mv } minfos 
+          in
+          mv, minfos
+        ) (st.mv, minfos) fa_conds
 
   (*------------------------------------------------------------------*)
   (** Greedily check entailment through an inclusion check of [terms] in
@@ -1624,9 +1706,15 @@ module E : S with type t = Equiv.form = struct
     let msets = strengthen st.table st.system st.env pat_terms in
     let mset_l = msets_to_list msets in
 
-    List.fold_left (fun mv term ->
-        match_term_incl term pat_terms mset_l { st with mv }
-      ) st.mv terms
+    let mv, minfos = 
+      List.fold_left (fun (mv, minfos) term ->
+          match_term_incl term pat_terms mset_l { st with mv } minfos 
+        ) (st.mv, Mt.empty) terms
+    in
+
+    if Mt.for_all (fun _ r -> r <> MR_failed) minfos
+    then mv
+    else no_match ~infos:(terms, minfos_norm minfos) ()
 
 
   (*------------------------------------------------------------------*)
@@ -1635,7 +1723,7 @@ module E : S with type t = Equiv.form = struct
       (pat_terms : Term.message list)
       (st        : match_state) : Mvar.t 
     =
-    if List.length terms <> List.length pat_terms then raise NoMatch;
+    if List.length terms <> List.length pat_terms then no_match ();
 
     List.fold_right2 (fun t1 t2 mv ->
         term_match t1 t2 { st with mv }
@@ -1680,9 +1768,9 @@ module E : S with type t = Equiv.form = struct
       (* TODO: match under binders (see Term.ml)  *)
       if q = q' && es = es' && t = t'
       then st.mv
-      else raise NoMatch
+      else no_match ()
 
-    | _ -> raise NoMatch
+    | _ -> no_match ()
 
   (*------------------------------------------------------------------*)
   (** Exported *)
@@ -1692,8 +1780,7 @@ module E : S with type t = Equiv.form = struct
       (table : Symbols.table)
       (system : SystemExpr.t)
       (t : t)
-      (p : t pat)
-    : [ `FreeTyv | `NoMatch | `Match of Mvar.t ]
+      (p : t pat) : match_res
     =
     (* [ty_env] must be closed at the end of the matching *)
     let ty_env = Type.Infer.mk_env () in
@@ -1724,7 +1811,7 @@ module E : S with type t = Equiv.form = struct
       let mv = fmatch ~mode t pat st_init in
 
       if not (Type.Infer.is_closed ty_env)
-      then `FreeTyv
+      then FreeTyv
       else
         let mv =
           Mvar.fold (fun (Vars.EVar v) t mv ->
@@ -1732,9 +1819,9 @@ module E : S with type t = Equiv.form = struct
               Mvar.add (Vars.EVar v) t mv
             ) mv Mvar.empty
         in
-        `Match mv
+        Match mv
 
-    with NoMatch -> `NoMatch
+    with NoMatch infos -> NoMatch infos
 
 
   (*------------------------------------------------------------------*)

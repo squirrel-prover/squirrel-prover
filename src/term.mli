@@ -146,9 +146,6 @@ type eq_atom = [
   | `Index     of (ord_eq, Vars.index) _atom
 ]
 
-val pp_eq_atom    : Format.formatter -> eq_atom    -> unit
-val pp_trace_atom : Format.formatter -> trace_atom -> unit
-
 (*------------------------------------------------------------------*)
 (** Literals. *)
 
@@ -181,8 +178,16 @@ val pp_hterm : Format.formatter -> hterm -> unit
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printer and cast} *)
 
+(** Additional printing information *)
+type pp_info = { styler : eterm -> Fmt.style list; }
+
+val default_pp_info : pp_info
+
 val pp : Format.formatter -> 'a term -> unit
 
+val pp_with_info : pp_info -> Format.formatter -> 'a term -> unit
+
+(*------------------------------------------------------------------*)
 val kind : 'a term -> 'a Type.kind
     
 val ty  : ?ty_env:Type.Infer.env -> 'a term -> 'a Type.ty
@@ -421,6 +426,8 @@ val mk_seq : Vars.env -> Vars.index list -> message -> message
 (*------------------------------------------------------------------*)
 (** {3 Destructors} *)
 
+val is_binder : 'a term -> bool
+
 val destr_var : 'a term -> 'a Vars.var option
     
 (*------------------------------------------------------------------*)
@@ -489,3 +496,19 @@ val head_pi_term : projection -> 'a term -> 'a term
 val head_normal_biterm : 'a term -> 'a term
 
 val make_bi_term : 'a term -> 'a term -> 'a term
+
+(*------------------------------------------------------------------*)
+(** {2 Matching information for error messages} *)
+
+type match_info = 
+  | MR_ok                         (* term matches *)
+  | MR_check_st of message list   (* need to look at subterms *)
+  | MR_failed                     (* term does not match *)
+
+type match_infos = match_info Mt.t
+
+val pp_match_info : Format.formatter -> match_info -> unit 
+
+val pp_match_infos : Format.formatter -> match_infos -> unit 
+
+val match_infos_to_pp_info : match_infos -> pp_info 

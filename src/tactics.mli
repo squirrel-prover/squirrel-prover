@@ -61,7 +61,7 @@ type tac_error_i =
   | BadRewriteRule
   | MustHappen of Term.timestamp
   | NotHypothesis
-  | ApplyMatchFailure
+  | ApplyMatchFailure of (Term.messages * Term.match_infos) option
   | ApplyBadInst
   | NoCollision
   | HypAlreadyExists of string
@@ -79,9 +79,6 @@ exception Tactic_soft_failure of tac_error
 exception Tactic_hard_failure of tac_error
 
 val pp_tac_error_i : Format.formatter -> tac_error_i -> unit
-
-(** A basic way to parse some expected tactic errors *)
-val tac_error_of_strings : string list -> tac_error_i
 
 (** Purely abstract type "returned" by continuations and tactics *)
 type a
@@ -153,7 +150,7 @@ type 'a ast =
   | Repeat     : 'a ast -> 'a ast
   | Ident      : 'a ast
   | Modifier   : string * 'a ast -> 'a ast
-  | CheckFail  : tac_error_i * 'a ast -> 'a ast
+  | CheckFail  : string * 'a ast -> 'a ast
   | By         : 'a ast * L.t -> 'a ast
   | Time       : 'a ast -> 'a ast
 

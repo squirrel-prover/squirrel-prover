@@ -110,6 +110,8 @@ and _ term =
 
 type 'a t = 'a term
 
+type eterm = ETerm : 'a term -> eterm
+
 (*------------------------------------------------------------------*)
 let hash_ord : ord -> int = function
   | `Eq -> 1
@@ -632,6 +634,11 @@ let destr_action = function
   | _ -> None
 
 (*------------------------------------------------------------------*)
+let is_binder : type a. a term -> bool = function 
+  | ForAll _ | Exists _ | Find _ | Seq _ -> true
+  | _ -> false
+
+(*------------------------------------------------------------------*)
 let as_ord_eq (ord : ord) : ord_eq = match ord with
   | `Eq -> `Eq
   | `Neq -> `Neq
@@ -656,7 +663,39 @@ let rec is_and_happens = function
     | Some (l,r) -> is_and_happens l && is_and_happens r                        
     | _ -> false
 
-let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
+(*------------------------------------------------------------------*)
+(** Additional printing information *)
+type pp_info = { styler : eterm -> Fmt.style list; }
+
+let default_pp_info = { styler = fun _ -> []; }
+
+let rec styled_list (styles : Fmt.style list) printer = 
+  match styles with
+  | [] -> printer
+  | style :: styles -> styled_list styles (Fmt.styled style printer)
+
+(*------------------------------------------------------------------*)
+
+(** Applies the styling info in [info] *)
+let rec pp : type a.
+  pp_info ->
+  Format.formatter -> a term -> unit 
+  =
+  fun info ppf t ->
+  let styles = info.styler (ETerm t) in
+  styled_list styles (_pp info) ppf t
+
+(** Core printing function *) 
+and _pp : type a.
+  pp_info ->
+  Format.formatter -> a term -> unit 
+  =
+  fun info ppf t -> 
+  let pp : type a. Format.formatter -> a term -> unit = 
+    fun fmt t -> pp info fmt t
+  in
+  
+  match t with
   | Var m -> Fmt.pf ppf "%a" Vars.pp m
 
   | Fun (s,_,[b;c; Fun (f,_,[])])
@@ -673,10 +712,10 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
       pp a pp b pp c
 
   | Fun (s,_,terms) when s = f_pair ->
-      Fmt.pf ppf "%a"
-        (Utils.pp_ne_list
-           "<@[<hov>%a@]>"
-           (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp)) terms
+    Fmt.pf ppf "%a"
+      (Utils.pp_ne_list
+         "<@[<hov>%a@]>"
+         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp)) terms
 
 
   | Fun (fa,_,[Fun (fi1,_,[bl1;br1]);
@@ -687,113 +726,123 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
       pp bl1 pp br1
 
   | Fun _ as f when is_and_happens f -> 
-    pp_and_happens ppf f
+    pp_and_happens info ppf f
 
   (* only right-associate symbol we have *)
   | Fun ((s,is),_,[bl;br]) as t when (s = Symbols.fs_impl) ->
     assert (is = []);
-    Fmt.pf ppf "@[<1>(%a)@]" (pp_chained_infix_right s) t
-                                     
+    Fmt.pf ppf "@[<1>(%a)@]" (pp_chained_infix_right info s) t
+
   | Fun ((s,is),_,[bl;br]) as t when Symbols.is_infix s ->
     assert (is = []);
-    Fmt.pf ppf "@[<1>(%a)@]" (pp_chained_infix_left s) t
+    Fmt.pf ppf "@[<1>(%a)@]" (pp_chained_infix_left info s) t
 
   | Fun (s,_,[b]) when s = f_not ->
     Fmt.pf ppf "not(@[%a@])" pp b
-                     
+
   | Fun _ as tt  when tt = mk_true ->  Fmt.pf ppf "true"             
   | Fun _  as tf when tf = mk_false -> Fmt.pf ppf "false"
-              
+
   | Fun (f,_,terms) ->
-      Fmt.pf ppf "%a%a"
-        pp_fsymb f
-        (Utils.pp_ne_list
-           "(@[<hov>%a@])"
-           (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp)) terms
-        
+    Fmt.pf ppf "%a%a"
+      pp_fsymb f
+      (Utils.pp_ne_list
+         "(@[<hov>%a@])"
+         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp)) terms
+
   | Name n -> pp_nsymb ppf n
-                
+
   | Macro (m, l, ts) ->
-      Fmt.pf ppf "@[%a%a@%a@]"
-        pp_msymb m
-        (Utils.pp_ne_list
-           "(@[<hov>%a@])"
-           (Fmt.list ~sep:Fmt.comma pp)) l
-        pp ts
-        
+    Fmt.pf ppf "@[%a%a@%a@]"
+      pp_msymb m
+      (Utils.pp_ne_list
+         "(@[<hov>%a@])"
+         (Fmt.list ~sep:Fmt.comma pp)) l
+      pp ts
+
   | Seq (vs, b) ->
     Fmt.pf ppf "@[seq(@[%a->%a@])@]"
       Vars.pp_list vs pp b
-      
+
   | Pred ts -> Fmt.pf ppf "@[<hov>pred(%a)@]" pp ts
-                 
+
   | Action (symb,indices) ->
-      Fmt.styled `Green
-        (fun ppf () ->
-           Fmt.pf ppf "%s%a" (Symbols.to_string symb) pp_indices indices)
-        ppf ()
+    Fmt.styled `Green
+      (fun ppf () ->
+         Fmt.pf ppf "%s%a" (Symbols.to_string symb) pp_indices indices)
+      ppf ()
 
   | Diff (bl, br) ->
     Fmt.pf ppf "@[<1>diff(%a,@,%a)@]"
       pp bl pp br
-           
+
   | Find (b, c, d, Fun (f,_,[])) when f = f_zero ->
     Fmt.pf ppf "@[<3>(try find %a such that@ %a@ in@ %a)@]"
       Vars.pp_list b pp c pp d
 
   | Find (b, c, d, e) ->
-      Fmt.pf ppf "@[<3>(try find %a such that@ %a@ in@ %a@ else@ %a)@]"
-        Vars.pp_list b pp c pp d pp e
-        
+    Fmt.pf ppf "@[<3>(try find %a such that@ %a@ in@ %a@ else@ %a)@]"
+      Vars.pp_list b pp c pp d pp e
+
   | ForAll (vs, b) ->
     Fmt.pf ppf "@[forall (@[%a@]),@ %a@]"
       Vars.pp_typed_list vs pp b
-      
+
   | Exists (vs, b) ->
     Fmt.pf ppf "@[exists (@[%a@]),@ %a@]"
       Vars.pp_typed_list vs pp b
 
-  | Atom a -> pp_generic_atom ppf a
+  | Atom a -> pp_generic_atom info ppf a
 
 (** for left-associative symbols *)
-and pp_chained_infix_left symb ppf = function
+and pp_chained_infix_left info symb ppf = function
   | Fun ((s,is),_,[bl;br]) when s = symb ->
     Fmt.pf ppf "%a@ %s@ %a"
-      (pp_chained_infix_left symb) bl (Symbols.to_string s) pp br
+      (pp_chained_infix_left info symb) bl 
+      (Symbols.to_string s) 
+      (pp info) br
 
-  | _ as t -> pp ppf t
+  | _ as t -> pp info ppf t
 
 (** for right-associative symbols *)
-and pp_chained_infix_right symb ppf = function
+and pp_chained_infix_right info symb ppf = function
   | Fun ((s,is),_,[bl;br]) when s = symb ->
     Fmt.pf ppf "%a@ %s@ %a"
-      pp bl (Symbols.to_string s) (pp_chained_infix_right symb) br
+      (pp info) bl
+      (Symbols.to_string s)
+      (pp_chained_infix_right info symb) br
 
-  | _ as t -> pp ppf t
+  | _ as t -> pp info ppf t
                
-and pp_message_atom ppf (`Message (o,tl,tr)) =
-  Fmt.pf ppf "@[%a@ %a@ %a@]" pp tl pp_ord o pp tr
+and pp_message_atom info ppf (`Message (o,tl,tr)) =
+  Fmt.pf ppf "@[%a@ %a@ %a@]" 
+    (pp info) tl
+    pp_ord o
+    (pp info) tr
     
-and pp_trace_atom ppf : trace_atom -> unit = function
+and pp_trace_atom info ppf : trace_atom -> unit = function
   | `Timestamp (o,tl,tr) ->
-    Fmt.pf ppf "@[<hv>%a@ %a@ %a@]" pp tl pp_ord o pp tr
+    Fmt.pf ppf "@[<hv>%a@ %a@ %a@]" 
+      (pp info) tl 
+      pp_ord o
+      (pp info) tr
       
   | `Index (o,il,ir) ->
     Fmt.pf ppf "@[<hv>%a@ %a@ %a@]" Vars.pp il pp_ord o Vars.pp ir
 
-  | `Happens a -> pp_happens ppf [a]
+  | `Happens a -> pp_happens info ppf [a]
 
-and pp_generic_atom ppf = function                   
-  | #message_atom as a -> pp_message_atom ppf a
+and pp_generic_atom info ppf = function                   
+  | #message_atom as a -> pp_message_atom info ppf a
                             
-  | #trace_atom as a -> pp_trace_atom ppf a
+  | #trace_atom as a -> pp_trace_atom info ppf a
 
-and pp_happens ppf (ts : timestamp list) =
+and pp_happens info ppf (ts : timestamp list) =
   Fmt.pf ppf "@[<hv 2>%a(%a)@]"
     pp_mname_s "happens"
-    (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ") pp) ts
+    (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ") (pp info)) ts
   
-and pp_and_happens ppf f =
+and pp_and_happens info ppf f =
   let rec collect acc = function
     | Atom (`Happens ts) -> ts :: acc
     | _ as f -> 
@@ -801,10 +850,18 @@ and pp_and_happens ppf f =
       collect (collect acc l) r
   in
 
-  pp_happens ppf (collect [] f)
+  pp_happens info ppf (collect [] f)
 
-let pp_eq_atom ppf at = pp_generic_atom ppf (at :> generic_atom)
+(*------------------------------------------------------------------*)
+let pp_with_info : type a. pp_info -> Format.formatter -> a term -> unit = 
+  fun info fmt t ->
+  pp info fmt t
 
+let pp : type a. Format.formatter -> a term -> unit = 
+  fun fmt t ->
+  pp default_pp_info fmt t
+
+(*------------------------------------------------------------------*)
 
 let pp_hterm fmt = function
   | Lambda (evs, t) -> 
@@ -822,8 +879,8 @@ type trace_literal = [`Pos | `Neg] * trace_atom
 
 let pp_literal fmt ((pn,at) : literal) =
   match pn with
-  | `Pos -> Fmt.pf fmt "%a"    pp_generic_atom at
-  | `Neg -> Fmt.pf fmt "¬(%a)" pp_generic_atom at
+  | `Pos -> Fmt.pf fmt "%a"    (pp_generic_atom default_pp_info) at
+  | `Neg -> Fmt.pf fmt "¬(%a)" (pp_generic_atom default_pp_info) at
 
 let pp_literals fmt (l : literal list) = 
   let sep fmt () = Fmt.pf fmt " ∧ " in
@@ -1211,7 +1268,6 @@ let erefresh_vars_env env vs =
   !env, vs, s
 
 (*------------------------------------------------------------------*)
-type eterm = ETerm : 'a term -> eterm
 
 (** [app func t] applies [func] to [t]. [func] must preserve types. *)
 let app : type a. (eterm -> eterm) -> a term -> a term = 
@@ -1627,7 +1683,36 @@ module Mt = Map.Make (T)
 module St = Set.Make (T)
 
 
+(*------------------------------------------------------------------*)
+(** {2 Matching information for error messages} *)
 
+(* TODO: this should'nt be here *)
+
+type match_info = 
+  | MR_ok                         (* term matches *)
+  | MR_check_st of message list   (* need to look at subterms *)
+  | MR_failed                     (* term does not match *)
+
+type match_infos = match_info Mt.t
+
+let pp_match_info fmt = function
+  | MR_ok              -> Fmt.pf fmt "ok"
+  | MR_check_st terms  -> Fmt.pf fmt "check subterms %a" (Fmt.list pp) terms
+  | MR_failed          -> Fmt.pf fmt "failed"
+
+let pp_match_infos fmt minfos = 
+  let pp_one fmt (ETerm t, mi) = Fmt.pf fmt "%a → %a" pp t pp_match_info mi in
+  Fmt.pf fmt "@[<v 0>%a@]" (Fmt.list pp_one) (Mt.bindings minfos)
+
+let match_infos_to_pp_info (minfos : match_infos) : pp_info = 
+  let styler (t : eterm) : Fmt.style list = 
+    match Mt.find_opt t minfos with
+    | None               -> []
+    | Some MR_ok         -> [] (* [Fmt.(`Bg `Green)] *)
+    | Some MR_check_st _ -> [] (* [Fmt.(`Bg `Yellow)] *)
+    | Some MR_failed     -> [Fmt.(`Bg `Red)]
+  in
+  { styler }
 
 (*------------------------------------------------------------------*)
 (** {2 Tests} *)

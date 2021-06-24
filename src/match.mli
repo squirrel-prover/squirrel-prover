@@ -1,7 +1,7 @@
 module Sv = Vars.Sv
 
 (*------------------------------------------------------------------*)
-(** {2 Matching and rewriting} *)
+(** {2 Patterns} *)
 
 (** A pattern is a list of free type variables, a term [t] and a subset
     of [t]'s free variables that must be matched.
@@ -17,6 +17,8 @@ type 'a pat = {
 val pat_of_form : Term.message -> Term.message pat
 
 (*------------------------------------------------------------------*)
+(** {2 Matching variable assignment} *)
+
 module Mvar : sig
   (** Unification and matching variable assignment. *)
   type t
@@ -43,6 +45,13 @@ module Mvar : sig
 end
 
 (*------------------------------------------------------------------*)
+(** {2 Module signature of matching} *)
+
+type match_res = 
+  | FreeTyv
+  | NoMatch of (Term.messages * Term.match_infos) option 
+  | Match   of Mvar.t 
+
 (** Module signature of matching.
     We can only match a [Term.term] into a [Term.term] or a [Equiv.form].
     Hence, the type of term we match into is abstract.
@@ -80,7 +89,7 @@ module type S = sig
     Symbols.table ->
     SystemExpr.t ->
     t -> t pat ->
-    [ `FreeTyv | `NoMatch | `Match of Mvar.t ]
+    match_res
 
   (** Same as [try_match], but specialized for terms. *)
   val try_match_term :
@@ -89,7 +98,8 @@ module type S = sig
     Symbols.table ->
     SystemExpr.t ->
     'a Term.term -> 'b Term.term pat ->
-    [ `FreeTyv | `NoMatch | `Match of Mvar.t ]
+    match_res
+
 
   (** [find_map env t p func] looks for an occurence [t'] of [pat] in [t],
       where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
@@ -106,6 +116,8 @@ module type S = sig
     t option
 end
 
+(*------------------------------------------------------------------*)
+(** {2 Matching and unification} *)
 module T : S with type t = Term.message
 
 module E : S with type t = Equiv.form

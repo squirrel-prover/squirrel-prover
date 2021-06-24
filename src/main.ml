@@ -225,16 +225,18 @@ let rec main_loop ~test ?(save=true) (state : loop_state) =
 
   | exception (Tactic_soft_failure (l,e)) when not test ->
     let pp_e fmt = 
-      Fmt.pf fmt "%aTactic failed: %a."
+      Fmt.pf fmt "%aTactic failed: %a"
         pp_loc_error_opt l
-        Tactics.pp_tac_error_i e in
+        Tactics.pp_tac_error_i e 
+    in
     error ~test state pp_e
 
   | exception (Tactic_hard_failure (l,e)) when not test ->
     let pp_e fmt = 
-      Fmt.pf fmt "%aTactic ill-formed or unapplicable: %a."  
+      Fmt.pf fmt "%aTactic ill-formed or unapplicable: %a" 
         pp_loc_error_opt l 
-        Tactics.pp_tac_error_i e in
+        Tactics.pp_tac_error_i e 
+    in
     
     error ~test state pp_e
 

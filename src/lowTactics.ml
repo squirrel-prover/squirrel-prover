@@ -1047,8 +1047,9 @@ module LowTac (S : Sequent.S) = struct
             (S.table s) (S.system s) 
             (S.goal s) pat 
     with
-    | `NoMatch | `FreeTyv -> soft_failure ApplyMatchFailure
-    | `Match mv ->
+    | NoMatch minfos  -> soft_failure (ApplyMatchFailure minfos)
+    | FreeTyv         -> soft_failure (ApplyMatchFailure None)
+    | Match mv ->
       let subst = Match.Mvar.to_subst ~mode:`Match mv in
 
       let goals = List.map (S.subst_conc subst) subs in
@@ -1078,8 +1079,8 @@ module LowTac (S : Sequent.S) = struct
         match
           S.MatchF.try_match ~mode:`EntailLR (S.table s) (S.system s) hconcl pat 
         with
-        | `NoMatch | `FreeTyv -> None
-        | `Match mv -> Some mv
+        | NoMatch _ | FreeTyv -> None
+        | Match mv -> Some mv
     in
 
     (* try to match a premise of [form] with [hconcl] *)
@@ -1095,7 +1096,7 @@ module LowTac (S : Sequent.S) = struct
     in
 
     match find_match [] fprems with
-    | None -> soft_failure ApplyMatchFailure
+    | None -> soft_failure (ApplyMatchFailure None)
     | Some (fsubgoals,mv) ->
       let subst = Match.Mvar.to_subst ~mode:`Match mv in
 

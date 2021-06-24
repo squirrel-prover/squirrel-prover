@@ -492,12 +492,6 @@ apply_in:
 | IN id=lsymb { Some id }
 
 (*------------------------------------------------------------------*)
-tac_errors:
-|                         { [] }
-| i=ID                    { [i] }
-| i=ID COMMA t=tac_errors { i::t }
-
-(*------------------------------------------------------------------*)
 naming_pat:
 | UNDERSCORE  { TacticsArgs.Unnamed }
 | QMARK       { TacticsArgs.AnyName }
@@ -631,8 +625,7 @@ tac:
   | l=lloc(CYCLE) MINUS i=INT
     { mk_abstract l "cycle" [TacticsArgs.Int_parsed (-i)] }
 
-  | CHECKFAIL t=tac EXN ts=tac_errors  { T.CheckFail
-                                         (T.tac_error_of_strings  ts,t) }
+  | CHECKFAIL t=tac EXN ts=ID  { T.CheckFail (ts, t) }
 
   | l=lloc(REVERT) ids=slist1(lsymb, empty)     
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in

@@ -75,8 +75,8 @@ let rewrite_head :
 
   let mv = 
     match Match.T.try_match table system t pat with
-    | `FreeTyv | `NoMatch -> raise NoRW
-    | `Match mv -> mv
+    | FreeTyv | NoMatch _ -> raise NoRW
+    | Match mv -> mv
   in
   let subst = Match.Mvar.to_subst ~mode:`Match mv in
   let r = Term.subst subst r in

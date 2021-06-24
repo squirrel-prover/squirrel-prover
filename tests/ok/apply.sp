@@ -33,7 +33,7 @@ goal _ (x, y : message, i : index) :
   gg(f(f0(<x,y>)),<y,y>) = f0(<x,y>).
 Proof.
   intro H Hyp.
-  checkfail (apply Hyp) exn ApplyMatchFailure.
+  checkfail (by apply Hyp) exn ApplyMatchFailure.
 Abort.
 
 (* all variables of the lemma are not bound by the lemma application  *)
