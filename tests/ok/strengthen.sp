@@ -145,8 +145,7 @@ Qed.
 
 (* we cannot deduce any value of [s4] *)
 equiv _ (t : timestamp, J : index) :
-  na, m(J), seq(j -> n(j)) -> 
-  f(nb), m(J), seq(j -> n(j)), seq (i -> s4(i)@t).
+  na, m(J), seq(j -> n(j)) -> seq (i -> s4(i)@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.

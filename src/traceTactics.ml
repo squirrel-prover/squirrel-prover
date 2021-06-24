@@ -1135,7 +1135,9 @@ let () =
 
 let new_simpl ~congr ~constr s =
   let s = LT.reduce_sequent Reduction.{ delta = false } s in
+
   let goals = Term.decompose_ands (TS.goal s) in
+  let s = TS.set_goal Term.mk_false s in
   let goals = List.filter_map (fun goal ->
       if Hyps.is_hyp goal s || Term.f_triv goal then None
       else match goal with

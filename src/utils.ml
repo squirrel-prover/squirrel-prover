@@ -214,13 +214,22 @@ end = struct
       size = n;
       max_size = 2 * n }
 
+  let print ppf t =
+    for i = 0 to t.max_size - 1 do
+      let ri = Puf.find t.uf i in
+      Fmt.pf ppf "@[%d->%d @]"
+        i ri           
+    done
+
   let extend t =
     if t.size < t.max_size then (t.size, { t with size = t.size + 1 })
     else
       begin
         let uf' = ref (Puf.create (t.max_size * 2)) in
         for i = 0 to t.size - 1 do
-          uf' := Puf.union !uf' i (Puf.find t.uf i);
+          (* ignore_rank ensure that thi right element is choosen as
+             a representent of the set. *)
+          uf' := Puf.union ~ignore_rank:true !uf' i (Puf.find t.uf i);
         done;
         (t.size, { uf = !uf'; size = t.size + 1; max_size = t.max_size * 2 } )
       end
@@ -229,8 +238,6 @@ end = struct
     if i >= t.size then raise (Failure "Vuf: out of range")
     else Puf.find t.uf i
 
-  (** [union t u v] always uses the representent of [v], i.e.
-      [find [union t u v] u] = [find t v] *)
   let union t i j =
     if i >= t.size || j >= t.size then raise (Failure "Vuf: out of range")
     else { t with uf = Puf.union t.uf i j }
