@@ -414,7 +414,7 @@ Proof.
 Qed.
 
 
-goal noreplayNew (ii, ii1, i:index):
+goal noreplay (ii, ii1, i:index):
   happens(S(ii1,i)) =>
   exec@S(ii1,i) && S(ii,i) <= S(ii1,i) && SCpt(i)@S(ii,i) = SCpt(i)@S(ii1,i) => 
   ii = ii1.
