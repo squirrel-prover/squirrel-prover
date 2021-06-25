@@ -34,7 +34,7 @@ let pp_single fmt = function
   | Left id  -> Fmt.pf fmt "%s/left"  (Symbols.to_string id)
   | Right id -> Fmt.pf fmt "%s/right" (Symbols.to_string id)
 
-let pp_system fmt = function
+let pp fmt = function
   | Single s      -> Fmt.pf fmt "%a" pp_single s
   | SimplePair id -> Fmt.pf fmt "%s/both" (Symbols.to_string id)
   | Pair (s1, s2) -> Fmt.pf fmt "%a|%a" pp_single s1 pp_single s2
@@ -74,12 +74,27 @@ let incompatible_error s1 s2 s =
 
 
 (*------------------------------------------------------------------*)
+
+(** [single_compatible s s'] checks that the single system [s]
+  * is one of the projections of the system [s']. *)
+let rec single_compatible s s' = match s,s' with
+  | s, Single s' -> s = s'
+  | Left s, SimplePair s' -> s = s'
+  | Right s, SimplePair s' -> s = s'
+  | s, Pair (s1,s2) -> s = s1 || s = s2
+
+(** [systems_compatible s1 s2] checks that all projections of [s1]
+  * are projections of [s2]. *)
 let systems_compatible s1 s2 =
-  match s1, s2 with
-  | s1, s2 when s1 = s2 -> true
-  | Single (Left s1),  SimplePair s2 when s1 = s2 -> true
-  | Single (Right s1), SimplePair s2 when s1 = s2 -> true
-  | _ -> false
+  if s1 = s2 then true else
+    match s1 with
+      | Single s -> single_compatible s s2
+      | SimplePair s ->
+          single_compatible (Left s) s2 &&
+          single_compatible (Right s) s2
+      | Pair (s',s'') ->
+          single_compatible s' s2 &&
+          single_compatible s'' s2
 
 (*------------------------------------------------------------------*)
 let project proj = function
@@ -260,8 +275,10 @@ let simple_pair _table s = SimplePair s
 (* This is the only case where we have to check that the system are 
    compatible. *)
 let pair table a b =  
-  let se = if a = b then Single a else Pair(a,b) in
-  check_system_expr table se; se
+  if a = b then Pair (a,a) else
+    let se = Pair (a,b) in
+    check_system_expr table se;
+    se
 
 (*------------------------------------------------------------------*)
 (** {2 Misc } *)

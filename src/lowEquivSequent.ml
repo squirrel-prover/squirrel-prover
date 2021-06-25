@@ -72,7 +72,7 @@ let pp_goal fmt = function
 let pp ppf j =
   Fmt.pf ppf "@[<v 0>" ;
   Fmt.pf ppf "@[System: %a@]@;"
-    SystemExpr.pp_system j.system;
+    SystemExpr.pp j.system;
 
   if j.ty_vars <> [] then
     Fmt.pf ppf "@[Type variables: %a@]@;" 
@@ -234,7 +234,14 @@ let set_reach_goal f s = set_goal Equiv.(Atom (Reach f)) s
 (*------------------------------------------------------------------*)
 let to_trace_sequent s =
   let env     = env s in
-  let system  = system s in
+  let system  =
+    let se = system s in
+    let l,r =
+      SystemExpr.project Term.PLeft se,
+      SystemExpr.project Term.PRight se
+    in
+      if l=r then l else se
+  in
   let table   = table s in
   let ty_vars = ty_vars s in
   let hint_db = s.hint_db in

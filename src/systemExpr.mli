@@ -25,9 +25,12 @@ val single      : Symbols.table -> single_system -> t
 val simple_pair : Symbols.table -> Symbols.system Symbols.t -> t
 val pair        : Symbols.table -> single_system -> single_system -> t
 
+(** [systems_compatible s1 s2] holds if all projections
+  * of [s1] are projections of [s2]: this allows to use a lemma
+  * proved for [s2] when reasoning about [s1]. *)
 val systems_compatible : t -> t -> bool
 
-val pp_system : Format.formatter -> t -> unit
+val pp : Format.formatter -> t -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)

@@ -140,7 +140,7 @@ let pp ppf s =
   let open Fmt in
   pf ppf "@[<v 0>" ;
   pf ppf "@[System: %a@]@;"
-    SystemExpr.pp_system s.system;
+    SystemExpr.pp s.system;
 
   if s.ty_vars <> [] then
     pf ppf "@[Type variables: %a@]@;" 
