@@ -221,7 +221,7 @@ let descrs table se =
       fds
 
   | Single s ->
-    (* we must projet before iterating *)
+    (* we must project before iterating *)
     let sname = get_id s in
     let shapes = System.descrs table sname in
     System.Msh.mapi

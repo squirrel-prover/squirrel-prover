@@ -128,7 +128,9 @@ let make_trace_goal ~tbl ~hint_db gname (pg : Decl.p_goal_reach_cnt)
 
 
 let make_equiv_goal ~table ~hint_db
-    gname se (bnds : Theory.bnds) (p_form : Theory.equiv_form L.located) : lemma * t =
+      gname se (bnds : Theory.bnds) (p_form : Theory.equiv_form L.located)
+    : lemma * t
+=
   let env, evs = Theory.convert_p_bnds table [] Vars.empty_env bnds in
 
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
@@ -136,7 +138,7 @@ let make_equiv_goal ~table ~hint_db
   let f = Theory.convert_equiv_form conv_env [] env (L.unloc p_form) in
 
   let gc = mk_goal_concl gname se [] (`Equiv (Equiv.mk_forall evs f)) in
-  
+
   gc, Equiv (ES.init se table hint_db env f)
 
 
