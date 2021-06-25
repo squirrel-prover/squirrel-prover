@@ -157,3 +157,11 @@ equiv _ (t : timestamp, J : index) :
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
+
+equiv _ (t : timestamp, J : index) :
+  na, m(J), seq(j -> n(j)) -> na, m(J), seq(j -> n(j)), f(<na,seq (i -> s4(i)@t)>).
+Proof.
+ intro H; apply H.
+ checkfail (intro H; apply H) exn ApplyMatchFailure.
+Abort.
+

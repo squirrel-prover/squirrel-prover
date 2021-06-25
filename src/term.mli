@@ -179,7 +179,7 @@ val pp_hterm : Format.formatter -> hterm -> unit
 (** {2 Pretty-printer and cast} *)
 
 (** Additional printing information *)
-type pp_info = { styler : eterm -> Fmt.style list; }
+type pp_info
 
 val default_pp_info : pp_info
 

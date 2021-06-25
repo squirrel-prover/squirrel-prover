@@ -665,9 +665,9 @@ let rec is_and_happens = function
 
 (*------------------------------------------------------------------*)
 (** Additional printing information *)
-type pp_info = { styler : eterm -> Fmt.style list; }
+type pp_info = { styler : pp_info -> eterm -> Fmt.style list * pp_info; }
 
-let default_pp_info = { styler = fun _ -> []; }
+let default_pp_info = { styler = fun info _ -> [], info; }
 
 let rec styled_list (styles : Fmt.style list) printer = 
   match styles with
@@ -682,7 +682,7 @@ let rec pp : type a.
   Format.formatter -> a term -> unit 
   =
   fun info ppf t ->
-  let styles = info.styler (ETerm t) in
+  let styles, info = info.styler info (ETerm t) in
   styled_list styles (_pp info) ppf t
 
 (** Core printing function *) 
@@ -1705,12 +1705,12 @@ let pp_match_infos fmt minfos =
   Fmt.pf fmt "@[<v 0>%a@]" (Fmt.list pp_one) (Mt.bindings minfos)
 
 let match_infos_to_pp_info (minfos : match_infos) : pp_info = 
-  let styler (t : eterm) : Fmt.style list = 
+  let styler info (t : eterm) : Fmt.style list * pp_info = 
     match Mt.find_opt t minfos with
-    | None               -> []
-    | Some MR_ok         -> [] (* [Fmt.(`Bg `Green)] *)
-    | Some MR_check_st _ -> [] (* [Fmt.(`Bg `Yellow)] *)
-    | Some MR_failed     -> [Fmt.(`Bg `Red)]
+    | None               -> [], info
+    | Some MR_ok         -> [(* Fmt.(`Bg `Green) *)],  default_pp_info
+    | Some MR_check_st _ -> [(* Fmt.(`Bg `Yellow) *)], info
+    | Some MR_failed     -> [Fmt.(`Bg `Red)],    info
   in
   { styler }
 
