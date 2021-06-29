@@ -1476,15 +1476,12 @@ let rec auto ~close ~strong s sk (fk : Tactics.fk) =
     auto ~close ~strong (byequiv s) sk fk
 
   | Goal.Equiv s ->
-    let sk l _ =
-      if close && l <> []
-      then fk (None, GoalNotClosed)
-      else sk (List.map (fun s -> Goal.Equiv s) l) fk
-    in
-    let fk _ =
+    let sk l _ = 
+      sk (List.map (fun s -> Goal.Equiv s) l) fk
+    and fk _ =
       if close
       then fk (None, GoalNotClosed)
-      else sk [s] fk
+      else sk [Equiv s] fk
     in
 
     let wfadup s sk fk =
@@ -1496,12 +1493,13 @@ let rec auto ~close ~strong s sk (fk : Tactics.fk) =
 
     let conclude s sk fk  =
       if close || Config.auto_intro () then
+        let fk = if Config.auto_intro () then fun _ -> sk [s] fk else fk in
         andthen_list ~cut:true
           [LT.wrap_fail (LT.expand_all_l `All);
            try_tac wfadup;
            orelse_list [LT.wrap_fail refl_tac;
                         LT.wrap_fail assumption]] s sk fk
-      else fk (None, GoalNotClosed)
+      else sk [s] fk
     in
 
     let reduce s sk fk =
@@ -1513,7 +1511,7 @@ let rec auto ~close ~strong s sk (fk : Tactics.fk) =
     andthen_list ~cut:true
       [try_tac reduce;
        try_tac wfadup;
-       try_tac conclude]
+       conclude]
       s sk fk
 
 let tac_auto ~close ~strong args s sk (fk : Tactics.fk) =

@@ -86,7 +86,7 @@ Proof.
        fst(output@T(i,k))=fst(input@R(j)) &&
        snd(output@T(i,k))=snd(input@R(j))).
   by use wa_R with j.
-  by fadup 1.
+  by fadup 1. 
 
   (* Case R1 *)
   expand frame. fa 0. fa 1.
