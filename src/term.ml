@@ -700,7 +700,7 @@ and _pp : type a.
 
   | Fun (s,_,[b;c; Fun (f,_,[])])
     when s = f_ite && f = f_zero ->
-    Fmt.pf ppf "@[<3>(if@ %a@ then@ %a)@]"
+    Fmt.pf ppf "@[(@[<hov 2>if %a@ then@ %a@])@]"
       pp b pp c
 
   | Fun (s,_,[b;Fun (f1,_,[]);Fun (f2,_,[])]) 
@@ -708,7 +708,7 @@ and _pp : type a.
     Fmt.pf ppf "%a" pp b
 
   | Fun (s,_,[a;b;c]) when s = f_ite ->
-    Fmt.pf ppf "@[<3>(if@ %a@ then@ %a@ else@ %a)@]"
+    Fmt.pf ppf "@[(@[<hov 2>if %a@ then@ %a@]@ @[<hov 2>else@ %a@])@]"
       pp a pp b pp c
 
   | Fun (s,_,terms) when s = f_pair ->
@@ -761,7 +761,7 @@ and _pp : type a.
       pp ts
 
   | Seq (vs, b) ->
-    Fmt.pf ppf "@[seq(@[%a->%a@])@]"
+    Fmt.pf ppf "@[<hov 2>seq(%a->@,%a)@]"
       Vars.pp_list vs pp b
 
   | Pred ts -> Fmt.pf ppf "@[<hov>pred(%a)@]" pp ts
@@ -773,15 +773,21 @@ and _pp : type a.
       ppf ()
 
   | Diff (bl, br) ->
-    Fmt.pf ppf "@[<1>diff(%a,@,%a)@]"
+    Fmt.pf ppf "@[<hov 2>@[<hov 2>diff(@,%a@],@,%a)@]"
       pp bl pp br
 
   | Find (b, c, d, Fun (f,_,[])) when f = f_zero ->
-    Fmt.pf ppf "@[<3>(try find %a such that@ %a@ in@ %a)@]"
+    Fmt.pf ppf "@[<hov 0>(\
+                @[<hov 2>try find %a such that@ %a@]@;<1 0>\
+                @[<hov 2>in@ %a@])@]"
       Vars.pp_list b pp c pp d
 
   | Find (b, c, d, e) ->
-    Fmt.pf ppf "@[<3>(try find %a such that@ %a@ in@ %a@ else@ %a)@]"
+    Fmt.pf ppf "@[<hov 0>(\
+                @[<hov 2>try find %a such that@ %a@]@;<1 0>\
+                @[<hov 0>\
+                @[<hov 2>in@ %a@]@;<1 0>\
+                @[<hov 2>else@ %a@]@])@]"
       Vars.pp_list b pp c pp d pp e
 
   | ForAll (vs, b) ->
@@ -797,7 +803,7 @@ and _pp : type a.
 (** for left-associative symbols *)
 and pp_chained_infix_left info symb ppf = function
   | Fun ((s,is),_,[bl;br]) when s = symb ->
-    Fmt.pf ppf "%a@ %s@ %a"
+    Fmt.pf ppf "%a %s@ %a"
       (pp_chained_infix_left info symb) bl 
       (Symbols.to_string s) 
       (pp info) br
@@ -807,7 +813,7 @@ and pp_chained_infix_left info symb ppf = function
 (** for right-associative symbols *)
 and pp_chained_infix_right info symb ppf = function
   | Fun ((s,is),_,[bl;br]) when s = symb ->
-    Fmt.pf ppf "%a@ %s@ %a"
+    Fmt.pf ppf "%a %s@ %a"
       (pp info) bl
       (Symbols.to_string s)
       (pp_chained_infix_right info symb) br
@@ -815,20 +821,20 @@ and pp_chained_infix_right info symb ppf = function
   | _ as t -> pp info ppf t
                
 and pp_message_atom info ppf (`Message (o,tl,tr)) =
-  Fmt.pf ppf "@[%a@ %a@ %a@]" 
+  Fmt.pf ppf "@[%a %a@ %a@]" 
     (pp info) tl
     pp_ord o
     (pp info) tr
     
 and pp_trace_atom info ppf : trace_atom -> unit = function
   | `Timestamp (o,tl,tr) ->
-    Fmt.pf ppf "@[<hv>%a@ %a@ %a@]" 
+    Fmt.pf ppf "@[<hv>%a %a@ %a@]" 
       (pp info) tl 
       pp_ord o
       (pp info) tr
       
   | `Index (o,il,ir) ->
-    Fmt.pf ppf "@[<hv>%a@ %a@ %a@]" Vars.pp il pp_ord o Vars.pp ir
+    Fmt.pf ppf "@[<hv>%a %a@ %a@]" Vars.pp il pp_ord o Vars.pp ir
 
   | `Happens a -> pp_happens info ppf [a]
 
