@@ -765,7 +765,7 @@ and _pp : type a.
 
   | Fun (s,_,[a;b;c]) when s = f_ite ->
     let pp fmt () =
-      Fmt.pf ppf "@[<hov 2>if %a@ then@ %a@]@ @[<hov 2>else@ %a@]"
+      Fmt.pf ppf "@[<hov 0>@[<hov 2>if %a@ then@ %a@]@ @[<hov 2>else@ %a@]@]"
         (pp (ite_fixity, `NonAssoc)) a 
         (pp (ite_fixity, `NonAssoc)) b 
         (pp (ite_fixity, `Right)) c

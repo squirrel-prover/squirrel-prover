@@ -19,14 +19,9 @@ let pp_equiv ppf (l : equiv) =
     l
 
 let pp_equiv_numbered ppf (l : equiv) =
-  let max_i = List.length l - 1 in
   List.iteri (fun i elem ->
-      if i < max_i then
-        Fmt.pf ppf "%i: %a,@ " i Term.pp elem
-      else
-        Fmt.pf ppf "%i: %a" i Term.pp elem
-    )
-    l
+      Fmt.pf ppf "%i: @[%a@]@;" i Term.pp elem
+    ) l
 
 let subst_equiv (subst : Term.subst) (e : equiv) : equiv =
   List.map (Term.subst subst) e
