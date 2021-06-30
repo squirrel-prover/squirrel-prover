@@ -674,25 +674,76 @@ let rec styled_list (styles : Fmt.style list) printer =
   | [] -> printer
   | style :: styles -> styled_list styles (Fmt.styled style printer)
 
+
+(* -------------------------------------------------------------------- *)
+type assoc  = [`Left | `Right | `NonAssoc]
+type fixity = [`Prefix | `Postfix | `Infix of assoc | `NonAssoc | `NoParens]
+
+(* -------------------------------------------------------------------- *)
+let pp_maybe_paren (c : bool) (pp : 'a Fmt.t) : 'a Fmt.t =
+  if c then Fmt.parens pp else pp
+
+let maybe_paren
+    ~(inner : 'a * fixity) 
+    ~(outer : 'a * fixity)
+    ~(side  : assoc) 
+    (pp : 'b Fmt.t) : 'b Fmt.t 
+  =
+  let noparens (pi, fi) (po, fo) side =
+    match fo with
+    | `NoParens -> true
+    | _ ->
+      match fi, side with
+      | `Postfix     , `Left     -> true
+      | `Prefix      , `Right    -> true
+      | `Infix `Left , `Left     -> (pi = po) && (fo = `Infix `Left )
+      | `Infix `Right, `Right    -> (pi = po) && (fo = `Infix `Right)
+      | _            , `NonAssoc -> (pi = po) && (fi = fo)
+      | _            , _         -> false
+  in
+  pp_maybe_paren (not (noparens inner outer side)) pp
+
+let ite_fixity     = `F Symbols.fs_ite  , `Prefix
+let pair_fixity    = `F Symbols.fs_pair , `NoParens
+let iff_fixity     = `Iff               , `Infix `Right
+let impl_fixity    = `F Symbols.fs_impl , `Infix `Right 
+let or_fixity      = `F Symbols.fs_or   , `Infix `Left 
+let and_fixity     = `F Symbols.fs_and  , `Infix `Left 
+let not_fixity     = `F Symbols.fs_not  , `Prefix
+let seq_fixity     = `Seq               , `Prefix
+let find_fixity    = `Find              , `Prefix
+let quant_fixity   = `Quant             , `Prefix
+let macro_fixity   = `Macro             , `NoParens
+let pred_fixity    = `Pred              , `NoParens
+let diff_fixity    = `Diff              , `NoParens
+let fun_fixity     = `Fun               , `NoParens
+let happens_fixity = `Happens           , `NoParens
+let ord_fixity ord = `Ord ord           , `NonAssoc
+
 (*------------------------------------------------------------------*)
 
 (** Applies the styling info in [info] *)
 let rec pp : type a.
   pp_info ->
-  Format.formatter -> a term -> unit 
+  (('b * fixity) * assoc) ->
+  a term Fmt.t
   =
-  fun info ppf t ->
+  fun info (outer,side) ppf t ->
   let styles, info = info.styler info (ETerm t) in
-  styled_list styles (_pp info) ppf t
+  styled_list styles (_pp info (outer, side)) ppf t
 
 (** Core printing function *) 
 and _pp : type a.
   pp_info ->
-  Format.formatter -> a term -> unit 
+  (('b * fixity) * assoc) ->
+  a term Fmt.t
   =
-  fun info ppf t -> 
-  let pp : type a. Format.formatter -> a term -> unit = 
-    fun fmt t -> pp info fmt t
+  fun info (outer, side) ppf t -> 
+  let pp : type a. 
+    (('b * fixity) * assoc)-> 
+    a term Fmt.t 
+    = 
+    fun (outer,side) fmt t -> pp info (outer, side) fmt t
   in
   
   match t with
@@ -700,30 +751,46 @@ and _pp : type a.
 
   | Fun (s,_,[b;c; Fun (f,_,[])])
     when s = f_ite && f = f_zero ->
-    Fmt.pf ppf "@[(@[<hov 2>if %a@ then@ %a@])@]"
-      pp b pp c
+    let pp fmt () = 
+      Fmt.pf ppf "@[<hov 2>if %a@ then@ %a@]"
+        (pp (ite_fixity, `NonAssoc)) b 
+        (pp (ite_fixity, `Right)) c
+    in
+    maybe_paren ~outer ~side ~inner:ite_fixity pp ppf ()
 
   | Fun (s,_,[b;Fun (f1,_,[]);Fun (f2,_,[])]) 
     when s = f_ite && f1 = f_true && f2 = f_false ->
-    Fmt.pf ppf "%a" pp b
+    Fmt.pf ppf "%a" 
+      (pp (ite_fixity, `NonAssoc)) b
 
   | Fun (s,_,[a;b;c]) when s = f_ite ->
-    Fmt.pf ppf "@[(@[<hov 2>if %a@ then@ %a@]@ @[<hov 2>else@ %a@])@]"
-      pp a pp b pp c
+    let pp fmt () =
+      Fmt.pf ppf "@[<hov 2>if %a@ then@ %a@]@ @[<hov 2>else@ %a@]"
+        (pp (ite_fixity, `NonAssoc)) a 
+        (pp (ite_fixity, `NonAssoc)) b 
+        (pp (ite_fixity, `Right)) c
+    in
+    maybe_paren ~outer ~side ~inner:ite_fixity pp ppf ()
 
   | Fun (s,_,terms) when s = f_pair ->
     Fmt.pf ppf "%a"
       (Utils.pp_ne_list
          "<@[<hov>%a@]>"
-         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp)) terms
+         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,")
+            (pp (pair_fixity, `NonAssoc))))
+      terms
 
 
   | Fun (fa,_,[Fun (fi1,_,[bl1;br1]);
                Fun (fi2,_,[br2;bl2])]) 
     when fa = f_and && fi1 = f_impl && fi1 = f_impl &&
          bl1 = bl2 && br1 = br2 ->
-    Fmt.pf ppf "@[<1>(%a@ <=>@ %a)@]"
-      pp bl1 pp br1
+    let pp fmt () = 
+      Fmt.pf ppf "%a@ <=>@ %a]"
+        (pp (iff_fixity, `Left)) bl1
+        (pp (iff_fixity, `Right)) br1
+    in
+    maybe_paren ~outer ~side ~inner:iff_fixity pp ppf ()
 
   | Fun _ as f when is_and_happens f -> 
     pp_and_happens info ppf f
@@ -731,24 +798,40 @@ and _pp : type a.
   (* only right-associate symbol we have *)
   | Fun ((s,is),_,[bl;br]) as t when (s = Symbols.fs_impl) ->
     assert (is = []);
-    Fmt.pf ppf "@[<1>(%a)@]" (pp_chained_infix_right info s) t
+    let pp fmt () = 
+      Fmt.pf ppf "@[<0>%a@]" (pp_chained_infix_right info s) t
+    in
+    maybe_paren ~outer ~side ~inner:(`F s, `Infix `Right) pp ppf ()
 
   | Fun ((s,is),_,[bl;br]) as t when Symbols.is_infix s ->
     assert (is = []);
-    Fmt.pf ppf "@[<1>(%a)@]" (pp_chained_infix_left info s) t
+    let pp fmt () = 
+      Fmt.pf ppf "@[<0>%a@]" (pp_chained_infix_left info s) t
+    in
+    maybe_paren ~outer ~side ~inner:(`F s, `Infix `Left) pp ppf ()
 
   | Fun (s,_,[b]) when s = f_not ->
-    Fmt.pf ppf "not(@[%a@])" pp b
+    Fmt.pf ppf "@[<hov 2>not@ %a@]" (pp (not_fixity, `Right)) b
 
   | Fun _ as tt  when tt = mk_true ->  Fmt.pf ppf "true"             
   | Fun _  as tf when tf = mk_false -> Fmt.pf ppf "false"
 
+  | Fun (f,_,[]) ->
+    Fmt.pf ppf "%a" pp_fsymb f
+
+  | Fun (f,_,[a]) ->
+    Fmt.pf ppf "@[<hov 2>%a(@,%a)@]" 
+      pp_fsymb f
+      (pp (fun_fixity, `NonAssoc)) a
+
   | Fun (f,_,terms) ->
-    Fmt.pf ppf "%a%a"
+    Fmt.pf ppf "@[<hov>%a(%a)@]"
       pp_fsymb f
       (Utils.pp_ne_list
-         "(@[<hov>%a@])"
-         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp)) terms
+         "%a"
+         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,")
+            (pp (fun_fixity, `NonAssoc))))
+      terms
 
   | Name n -> pp_nsymb ppf n
 
@@ -757,14 +840,16 @@ and _pp : type a.
       pp_msymb m
       (Utils.pp_ne_list
          "(@[<hov>%a@])"
-         (Fmt.list ~sep:Fmt.comma pp)) l
-      pp ts
+         (Fmt.list ~sep:Fmt.comma (pp (macro_fixity, `NonAssoc)))) l
+      (pp (macro_fixity, `NonAssoc)) ts
 
   | Seq (vs, b) ->
     Fmt.pf ppf "@[<hov 2>seq(%a->@,%a)@]"
-      Vars.pp_list vs pp b
+      Vars.pp_list vs (pp (seq_fixity, `NonAssoc)) b
 
-  | Pred ts -> Fmt.pf ppf "@[<hov>pred(%a)@]" pp ts
+  | Pred ts -> 
+    Fmt.pf ppf "pred(%a)" 
+      (pp (pred_fixity, `NonAssoc)) ts
 
   | Action (symb,indices) ->
     Fmt.styled `Green
@@ -774,29 +859,43 @@ and _pp : type a.
 
   | Diff (bl, br) ->
     Fmt.pf ppf "@[<hov 2>@[<hov 2>diff(@,%a@],@,%a)@]"
-      pp bl pp br
+      (pp (diff_fixity, `NonAssoc)) bl
+      (pp (diff_fixity, `NonAssoc)) br
 
   | Find (b, c, d, Fun (f,_,[])) when f = f_zero ->
-    Fmt.pf ppf "@[<hov 0>(\
-                @[<hov 2>try find %a such that@ %a@]@;<1 0>\
-                @[<hov 2>in@ %a@])@]"
-      Vars.pp_list b pp c pp d
+    let pp fmt () = 
+      Fmt.pf ppf "@[<hov 0>\
+                  @[<hov 2>try find %a such that@ %a@]@;<1 0>\
+                  @[<hov 2>in@ %a@]@]"
+        Vars.pp_list b
+        (pp (find_fixity, `NonAssoc)) c
+        (pp (find_fixity, `Right)) d
+    in
+    maybe_paren ~outer ~side ~inner:find_fixity pp ppf ()
 
   | Find (b, c, d, e) ->
-    Fmt.pf ppf "@[<hov 0>(\
-                @[<hov 2>try find %a such that@ %a@]@;<1 0>\
-                @[<hov 0>\
-                @[<hov 2>in@ %a@]@;<1 0>\
-                @[<hov 2>else@ %a@]@])@]"
-      Vars.pp_list b pp c pp d pp e
+    let pp fmt () = 
+      Fmt.pf ppf "@[<hov 0>\
+                  @[<hov 2>try find %a such that@ %a@]@;<1 0>\
+                  @[<hov 0>\
+                  @[<hov 2>in@ %a@]@;<1 0>\
+                  @[<hov 2>else@ %a@]@]@]"
+        Vars.pp_list b 
+        (pp (find_fixity, `NonAssoc)) c
+        (pp (find_fixity, `NonAssoc)) d
+        (pp (find_fixity, `Right)) e
+    in
+    maybe_paren ~outer ~side ~inner:find_fixity pp ppf ()
 
   | ForAll (vs, b) ->
-    Fmt.pf ppf "@[forall (@[%a@]),@ %a@]"
-      Vars.pp_typed_list vs pp b
+    Fmt.pf ppf "@[<2>forall (@[%a@]),@ %a@]"
+      Vars.pp_typed_list vs 
+      (pp (quant_fixity, `Right))  b
 
   | Exists (vs, b) ->
-    Fmt.pf ppf "@[exists (@[%a@]),@ %a@]"
-      Vars.pp_typed_list vs pp b
+    Fmt.pf ppf "@[<2>exists (@[%a@]),@ %a@]"
+      Vars.pp_typed_list vs 
+      (pp (quant_fixity, `Right)) b
 
   | Atom a -> pp_generic_atom info ppf a
 
@@ -806,32 +905,32 @@ and pp_chained_infix_left info symb ppf = function
     Fmt.pf ppf "%a %s@ %a"
       (pp_chained_infix_left info symb) bl 
       (Symbols.to_string s) 
-      (pp info) br
+      (pp info ((`F symb, `Infix `Left), `Right)) br
 
-  | _ as t -> pp info ppf t
+  | _ as t -> pp info ((`F symb, `Infix `Left), `Left) ppf t
 
 (** for right-associative symbols *)
 and pp_chained_infix_right info symb ppf = function
   | Fun ((s,is),_,[bl;br]) when s = symb ->
     Fmt.pf ppf "%a %s@ %a"
-      (pp info) bl
+      (pp info ((`F symb, `Infix `Right), `Left)) bl
       (Symbols.to_string s)
       (pp_chained_infix_right info symb) br
 
-  | _ as t -> pp info ppf t
+  | _ as t -> pp info ((`F symb, `Infix `Right), `Right) ppf t
                
-and pp_message_atom info ppf (`Message (o,tl,tr)) =
+and pp_message_atom info ppf (`Message (o,tl,tr) : message_atom) =
   Fmt.pf ppf "@[%a %a@ %a@]" 
-    (pp info) tl
+    (pp info (ord_fixity (o :> ord), `Left)) tl
     pp_ord o
-    (pp info) tr
+    (pp info (ord_fixity (o :> ord), `Right)) tr
     
 and pp_trace_atom info ppf : trace_atom -> unit = function
   | `Timestamp (o,tl,tr) ->
     Fmt.pf ppf "@[<hv>%a %a@ %a@]" 
-      (pp info) tl 
+      (pp info (ord_fixity o, `Left)) tl 
       pp_ord o
-      (pp info) tr
+      (pp info (ord_fixity o, `Right)) tr
       
   | `Index (o,il,ir) ->
     Fmt.pf ppf "@[<hv>%a %a@ %a@]" Vars.pp il pp_ord o Vars.pp ir
@@ -846,7 +945,8 @@ and pp_generic_atom info ppf = function
 and pp_happens info ppf (ts : timestamp list) =
   Fmt.pf ppf "@[<hv 2>%a(%a)@]"
     pp_mname_s "happens"
-    (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ") (pp info)) ts
+    (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ") 
+       (pp info (happens_fixity, `NonAssoc))) ts
   
 and pp_and_happens info ppf f =
   let rec collect acc = function
@@ -861,11 +961,11 @@ and pp_and_happens info ppf f =
 (*------------------------------------------------------------------*)
 let pp_with_info : type a. pp_info -> Format.formatter -> a term -> unit = 
   fun info fmt t ->
-  pp info fmt t
+  pp info ((`Toplevel, `NoParens), `NonAssoc) fmt t
 
 let pp : type a. Format.formatter -> a term -> unit = 
   fun fmt t ->
-  pp default_pp_info fmt t
+  pp default_pp_info ((`Toplevel, `NoParens), `NonAssoc) fmt t
 
 (*------------------------------------------------------------------*)
 
