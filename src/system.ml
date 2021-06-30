@@ -56,11 +56,12 @@ let symbs ~with_dummies table s =
   else Msh.map (fun d -> d.Action.name) (fst (get_data table s))
 
 let pp_system table fmt s =
-  let descrs,symbs = get_data table s in
+  let descrs, symbs = get_data table s in
   let descrs = Msh.bindings descrs in
     Format.printf "System %a registered with actions %a.@."
       Symbols.pp s
       (Utils.pp_list (fun fmt (_,d) -> Symbols.pp fmt d.Action.name)) descrs
+
 
 let pp_systems fmt table =
   Symbols.System.iter (fun sys _ _ -> pp_system table fmt sys) table
@@ -94,14 +95,36 @@ let find_shape table shape =
   try Symbols.System.iter (fun system () data ->
       let descrs = match data with
         | System_data (descrs,_) -> descrs
-        | _ -> assert false in
+        | _ -> assert false
+      in
+
       if Msh.mem shape descrs then 
         let descr = Msh.find shape descrs in
         raise (Found (descr.name, descr.indices))
       else ()
     ) table; 
+
     None
   with Found (x,y) -> Some (x,y)
+
+(** We look whether the dummy shape already has a name in another system.
+    If that is the case, use the same symbol. *)
+let find_dum_shape table shape =
+  let exception Found of Symbols.action Symbols.t in
+  try Symbols.System.iter (fun system () data ->
+      let symbs = match data with
+        | System_data (_,symbs) -> symbs
+        | _ -> assert false
+      in
+
+      if Msh.mem shape symbs then 
+        let symb = Msh.find shape symbs in
+        raise (Found symb)
+      else ()
+    ) table; 
+
+    None
+  with Found x -> Some x
 
 (*------------------------------------------------------------------*)
 
@@ -113,13 +136,36 @@ let rec define_dummies table symbs len =
   in
   let dummy = Action.dummy len in
   let dum_shape = Action.get_shape dummy in
-  if Msh.mem dum_shape symbs then table,symbs else
-  let table,dum_symb = 
-    Action.fresh_symbol ~exact:false table (L.mk_loc Location._dummy "_Dummy") 
-  in
-  let table = Action.define_symbol table dum_symb [] dummy in
-  let symbs = Msh.add dum_shape dum_symb symbs in
-  table,symbs
+  (* re-use the same dummy action if it has been defined in another system *)
+  match find_dum_shape table dum_shape with
+  | None ->
+    if Msh.mem dum_shape symbs then table,symbs 
+    else
+      let table,dum_symb = 
+        Action.fresh_symbol ~exact:false table (L.mk_loc L._dummy "_Dummy") 
+      in
+      let table = Action.define_symbol table dum_symb [] dummy in
+      let symbs = Msh.add dum_shape dum_symb symbs in
+      table,symbs
+
+  | Some symb2 ->
+    if Msh.mem dum_shape symbs then table,symbs 
+    else
+      let symbs = Msh.add dum_shape symb2 symbs in
+      table, symbs
+
+
+(** Add dummy action symbols if needed. *)
+let add_dummies_if_needed
+    (table : Symbols.table) 
+    (system_symb : Symbols.system Symbols.t) 
+    (len : int) : Symbols.table 
+  =
+  let descrs,symbs = get_data table system_symb in
+  let table,symbs = define_dummies table symbs len in
+  let data = System_data (descrs,symbs) in
+  Symbols.System.redefine table system_symb ~data () 
+
 
 let register_action table system_symb symb indices action descr =
   let shape = Action.get_shape action in
@@ -142,6 +188,10 @@ let register_action table system_symb symb indices action descr =
     let descr = Action.subst_descr subst_is descr in
     let descr = { descr with name = symb2 } in
     let table = add_action table system_symb shape symb2 descr in
+
+    (* Define dummy action symbol if needed. *)
+    let table = add_dummies_if_needed table system_symb (List.length action) in
+
     table, symb2, descr
 
   | None ->
@@ -149,9 +199,8 @@ let register_action table system_symb symb indices action descr =
     let table = Action.define_symbol table symb indices action in
     (* Add action description to system. *)
     let table = add_action table system_symb shape symb descr in
+
     (* Define dummy action symbol if needed. *)
-    let descrs,symbs = get_data table system_symb in
-    let table,symbs = define_dummies table symbs (List.length action) in
-    let data = System_data (descrs,symbs) in
-    let table = Symbols.System.redefine table system_symb ~data () in
+    let table = add_dummies_if_needed table system_symb (List.length action) in
+
     table, symb, descr

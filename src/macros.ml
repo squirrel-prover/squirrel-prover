@@ -220,14 +220,15 @@ let get_definition_opt cntxt symb ts =
 
 
 (*------------------------------------------------------------------*)
-let get_dummy_definition :
-  type a. Constr.trace_cntxt -> Term.msymb -> Term.message =
-  fun cntxt symb ->
+let get_dummy_definition 
+    (cntxt : Constr.trace_cntxt) 
+    (symb : Term.msymb) : Term.message 
+  =
   match Symbols.Macro.get_all symb.s_symb cntxt.table with
-    | Symbols.(Global _, Global_data (inputs,indices,ts,term)) ->
-      let dummy_action = Action.dummy (List.length inputs) in
-      let tdummy_action = 
-        SE.action_to_term cntxt.table cntxt.system dummy_action 
-      in
-      get_definition cntxt symb tdummy_action
-    | _ -> assert false
+  | Symbols.(Global _, Global_data (inputs,indices,ts,term)) ->
+    let dummy_action = Action.dummy (List.length inputs) in
+    let tdummy_action = 
+      SE.action_to_term cntxt.table cntxt.system dummy_action 
+    in
+    get_definition cntxt symb tdummy_action
+  | _ -> assert false

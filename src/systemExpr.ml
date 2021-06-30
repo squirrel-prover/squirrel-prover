@@ -288,10 +288,8 @@ let symbs ~with_dummies table = function
   | Single (Left s) | Single (Right s) -> System.symbs ~with_dummies table s
 
 let action_to_term table system a =
-  let symbs = symbs table system in
-  let symb = 
-    System.Msh.find (Action.get_shape a) (symbs ~with_dummies:true) 
-  in
+  let msymbs = symbs ~with_dummies:true table system in
+  let symb = System.Msh.find (Action.get_shape a) msymbs in
   Term.mk_action symb (Action.get_indices a)
 
 (*------------------------------------------------------------------*)
