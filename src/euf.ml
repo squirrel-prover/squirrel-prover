@@ -211,7 +211,9 @@ let mk_rule ?(elems=[]) ?(drop_head=true) ~fun_wrap_key
 
   let mk_case_schema action_descr =
     let hashes =
-      hashes_of_action_descr ~fun_wrap_key ~drop_head ~cntxt action_descr head_fn key_n
+      hashes_of_action_descr
+        ~fun_wrap_key ~drop_head ~cntxt
+        action_descr head_fn key_n
     in
 
     List.map (mk_of_hash action_descr) hashes

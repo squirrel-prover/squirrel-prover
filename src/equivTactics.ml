@@ -1625,17 +1625,6 @@ let prf_param hash : prf_param =
 
   | _ -> raise Not_hash
 
-
-(** [occurrences_of_action_descr ~cntxt action_descr hash_fn key_n]
-  * returns the list of pairs [is,m] such that [hash_fn(m,key_n[is])]
-  * occurs in [action_descr]. *)
-let occurrences_of_action_descr ~cntxt action_descr hash_fn key_n =
-  let iter = new Iter.get_f_messages ~cntxt hash_fn key_n in
-  iter#visit_message (snd action_descr.Action.output) ;
-  List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates ;
-  iter#visit_message (snd action_descr.Action.condition) ;
-  List.sort_uniq Stdlib.compare iter#get_occurrences
-
 (** direct cases: explicit occurence of the hash in the frame *)
 let prf_mk_direct env (param : prf_param) (occ : Iter.hash_occ) =
   (* select bound variables in key indices [is] and in message [m]
