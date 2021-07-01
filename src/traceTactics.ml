@@ -1894,3 +1894,73 @@ let () = T.register_typed "collision"
                     the attacker."
     ~tactic_group:Cryptographic
     collision_resistance Args.(Opt String)
+
+(*------------------------------------------------------------------*)
+
+exception Invalid
+
+let reach_equiv_transform biframe term =
+  let assoc : Term.message -> Term.message = fun t ->
+    match List.find (fun e -> Term.(pi_term PLeft e) = t) biframe with
+      | e -> Term.(pi_term PRight e)
+      | exception Not_found -> raise Invalid
+  in
+  let rec aux : type a. a term -> a term = fun t ->
+    match Term.kind t with
+      (* TODO is it costly to check the type at each step? *)
+      | Type.KTimestamp | Type.KIndex -> t
+      | Type.KMessage ->
+          match t with
+            | Fun (fsymb,ftype,args) ->
+                let args = List.map aux args in
+                Term.mk_fun0 fsymb ftype args
+            | Atom (`Happens _) -> t
+            | Atom (`Message (ord,t1,t2)) ->
+                let t1 = aux t1 in
+                let t2 = aux t2 in
+                Term.mk_atom (ord:>Term.ord) t1 t2
+            | Macro (msymb,messages,timestamp) ->
+                begin try assoc t with
+                  | Invalid ->
+                      let open Term in
+                      if msymb = in_macro then
+                        assoc
+                          (mk_macro frame_macro [] (mk_pred timestamp))
+                      else raise Invalid
+                end
+            | _ -> raise Invalid
+  in
+  aux term
+
+let reach_equiv Args.(String id) (s : TS.t) =
+  match TS.get_k_hyp_or_lemma Equiv.Global_t id s with
+    | { gc_concl = Atom (Equiv biframe) } ->
+        let sys = TS.system s in
+        begin match sys with
+          | SystemExpr.Single _ -> ()
+          | _ ->
+              Tactics.(soft_failure (Failure "bi-system not supported"))
+        end;
+        let rewrite h =
+          try reach_equiv_transform biframe h with
+            | Invalid -> Term.mk_true
+        in
+        [TS.LocalHyps.map rewrite s
+         |> TS.set_goal
+              (try reach_equiv_transform biframe (TS.goal s) with
+                 | Invalid -> Term.mk_false)]
+    | _ ->
+      Tactics.(soft_failure (Failure "assumption must be an equivalence"))
+
+let () =
+  T.register_typed "reach_equiv"
+    ~general_help:"Use an equivalence to rewrite a reachability goal."
+    ~detailed_help:
+      "The argument should identify a (global) assumption that is \
+       restricted to an equivalence. All occurrences of macros in the \
+       current goal must be found as left projections of some biframe \
+       element of that equivalence, and will be replaced by the corresponding \
+       right projection. Currently the equivalence should be relative to \
+       the same system on each side."
+    ~tactic_group:Structural
+    reach_equiv Args.String
