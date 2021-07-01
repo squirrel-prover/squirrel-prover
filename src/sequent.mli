@@ -1,18 +1,25 @@
+(** Extending sequents with functionalities based on proved goals. *)
+
+(** Generalized hypothesis: hypothesis or lemma identifier. *)
+type ghyp = [ `Hyp of Ident.t | `Lemma of string ]
+
 (** Sequents with functionalities based on proved goals. *)
 module type S = sig
   include LowSequent.S
 
-  val is_hyp_or_lemma        : Theory.lsymb -> t -> bool
-  val is_equiv_hyp_or_lemma  : Theory.lsymb -> t -> bool
-  val is_reach_hyp_or_lemma  : Theory.lsymb -> t -> bool
+  (** An assumption can be an hypothesis, an axiom, or a proved goal. *)
+  val is_assumption       : Theory.lsymb -> t -> bool
+  val is_equiv_assumption : Theory.lsymb -> t -> bool
+  val is_reach_assumption : Theory.lsymb -> t -> bool
 
-  val get_k_hyp_or_lemma :
-    'a Equiv.f_kind -> Theory.lsymb -> t -> (Goal.ghyp, 'a) Goal.lemma_g
+  (** Get statement associated to an assumption. *)
+  val get_assumption :
+    'a Equiv.f_kind -> Theory.lsymb -> t -> (ghyp, 'a) Goal.abstract_statement
 
   val reduce : Reduction.red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
   val convert_pt_hol :
-    Theory.p_pt_hol -> 'a Equiv.f_kind -> t -> Goal.ghyp * 'a Match.pat
+    Theory.p_pt_hol -> 'a Equiv.f_kind -> t -> ghyp * 'a Match.pat
 end
 
 (** Functor building a {!Sequent.S} from a {!LowSequent.S}. *)

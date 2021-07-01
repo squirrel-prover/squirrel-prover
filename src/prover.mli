@@ -9,9 +9,8 @@ module TS = LowTraceSequent
 
 type lsymb = Theory.lsymb
 
-(** [current_goal] returns the current (sub)goal of the prover,
-  * if any. *)
-val current_goal : unit -> Goal.named_goal option
+(** Return the name of the goal currently being proved, if any. *)
+val current_goal_name : unit -> string option
 
 (** Current mode of the prover:
     - [GoalMode] : waiting for the next goal.
@@ -23,18 +22,6 @@ type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
 val current_hint_db : unit -> Hint.hint_db
 val set_hint_db : Hint.hint_db -> unit
-
-(*------------------------------------------------------------------*)
-(** {2 Parser types} *)
-
-(** Goal mode input types:
-    - [Gm_goal f] : declare a new goal f.
-    - [Gm_proof]  : start a proof. *)
-type gm_input_i =
-  | Gm_goal of Goal.p_goal
-  | Gm_proof
-
-type gm_input = gm_input_i L.located
 
 
 (*------------------------------------------------------------------*)
@@ -144,13 +131,14 @@ module EquivTactics : Tactics_sig with type judgment = Goal.t
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
 
-val get_lemma       : lsymb -> Goal.lemma
-val get_reach_lemma : lsymb -> Goal.reach_lemma
-val get_equiv_lemma : lsymb -> Goal.equiv_lemma
+(** Get proved or assumed statement. *)
+val get_assumption       : lsymb -> Goal.statement
+val get_reach_assumption : lsymb -> Goal.reach_statement
+val get_equiv_assumption : lsymb -> Goal.equiv_statement
 
-val is_lemma       : string -> bool
-val is_reach_lemma : string -> bool
-val is_equiv_lemma : string -> bool
+val is_assumption       : string -> bool
+val is_reach_assumption : string -> bool
+val is_equiv_assumption : string -> bool
 
 (*------------------------------------------------------------------*)
 (** {2 Utilities for parsing} *)
@@ -159,18 +147,22 @@ exception ParseError of string
 
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
-  | ParsedQed
-  | ParsedAbort
   | ParsedSetOption  of Config.p_set_param
   | ParsedTactic     of TacticsArgs.parser_arg Tactics.ast
   | ParsedUndo       of int
-  | ParsedGoal       of gm_input
+  | ParsedGoal       of Goal.Parsed.t Location.located
+  | ParsedProof
+  | ParsedQed
+  | ParsedAbort
   | ParsedHint       of Hint.p_hint
   | EOF
 
 (** Declare a new goal to the current goals, and returns it *)
-val declare_new_goal : 
-  Symbols.table -> Hint.hint_db -> L.t -> Goal.p_goal -> Goal.named_goal
+val declare_new_goal :
+  Symbols.table ->
+  Hint.hint_db ->
+  Goal.Parsed.t Location.located ->
+  string * Goal.t
 
 (** From the name of the function, returns the corresponding formula. If no tag
    formula was defined, returns False. *)

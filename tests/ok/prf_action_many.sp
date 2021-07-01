@@ -10,8 +10,9 @@ name n : index->message
 name m : index->message
 system !_i !_j out(c,h(<n(i),n(j)>,k)).
 
-equiv test (i:index) : 
-[happens(A(i,i))] -> output@A(i,i), diff(h(n(i),k),h(m(i),k)).
+global goal test (i:index) : 
+  [happens(A(i,i))] ->
+  equiv(output@A(i,i), diff(h(n(i),k),h(m(i),k))).
 Proof.
   intro Hap.
   prf 1.

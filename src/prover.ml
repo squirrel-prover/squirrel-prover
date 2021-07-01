@@ -76,22 +76,12 @@ let error_handler loc k f a =
 (*------------------------------------------------------------------*)
 (** {2 Prover state} *)
 
-let goals        : (Goal.lemma * Goal.t) list   ref = ref []
-let current_goal : (Goal.lemma * Goal.t) option ref = ref None
+let goals        : (Goal.statement * Goal.t) list   ref = ref []
+let current_goal : (Goal.statement * Goal.t) option ref = ref None
 let subgoals     : Goal.t list ref = ref []
-let goals_proved : Goal.lemmas ref = ref []
+let goals_proved : Goal.statement list ref = ref []
 
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
-
-
-(*------------------------------------------------------------------*)
-(** {2 Parsed goals} *)
-
-type gm_input_i =
-  | Gm_goal of Goal.p_goal
-  | Gm_proof
-
-type gm_input = gm_input_i L.located
 
 (*------------------------------------------------------------------*)
 (** {2 Options} *)
@@ -109,15 +99,14 @@ let option_defs : option_def list ref= ref []
 let hint_db : Hint.hint_db ref = ref Hint.empty_hint_db
 
 type proof_state = { 
-  goals        : (Goal.lemma * Goal.t) list;
+  goals        : (Goal.statement * Goal.t) list;
   table        : Symbols.table;
-  current_goal : (Goal.lemma * Goal.t) option;
+  current_goal : (Goal.statement * Goal.t) option;
   subgoals     : Goal.t list;
-  goals_proved : Goal.lemmas;
+  goals_proved : Goal.statement list;
   option_defs  : option_def list;
   params       : Config.params;
   prover_mode  : prover_mode;
-
   hint_db      : Hint.hint_db;
 }
 
@@ -625,111 +614,92 @@ let () =
     (fun _ -> Tactics.id)
 
 (*------------------------------------------------------------------*)
-let get_lemma_opt gname : Goal.lemma option =
-  match List.find_opt (fun g -> g.Goal.gc_name = gname) !goals_proved with
+let get_assumption_opt gname : Goal.statement option =
+  match List.find_opt (fun s -> s.Goal.name = gname) !goals_proved with
   | None -> None
-  | Some gconcl -> Some gconcl
+  | Some s -> Some s
 
 (*------------------------------------------------------------------*)
-let is_lemma gname : bool = get_lemma_opt gname <> None 
+let is_assumption gname : bool = get_assumption_opt gname <> None
 
-let is_reach_lemma gname : bool =
-  match get_lemma_opt gname with
+let is_reach_assumption gname : bool =
+  match get_assumption_opt gname with
   | None -> false
-  | Some gconcl -> Goal.is_reach_lemma gconcl
+  | Some s -> Goal.is_reach_statement s
 
-let is_equiv_lemma gname : bool =
-  match get_lemma_opt gname with
+let is_equiv_assumption gname : bool =
+  match get_assumption_opt gname with
   | None -> false
-  | Some gconcl -> Goal.is_equiv_lemma gconcl
+  | Some s -> Goal.is_equiv_statement s
 
 (*------------------------------------------------------------------*)
-let get_lemma gname : Goal.lemma = match get_lemma_opt (L.unloc gname) with
-  | None -> 
+let get_assumption gname : Goal.statement =
+  match get_assumption_opt (L.unloc gname) with
+  | Some s -> s
+  | None ->
     soft_failure ~loc:(L.loc gname)
-      (Failure ("no proved goal named " ^ (L.unloc gname)))
+      (Failure ("no proved goal named " ^ L.unloc gname))
 
-  | Some gc -> gc
+let get_reach_assumption gname =
+  Goal.to_reach_statement ~loc:(L.loc gname) (get_assumption gname)
 
-let get_reach_lemma (gname : lsymb) : Goal.reach_lemma =
-  Goal.to_reach_lemma ~loc:(L.loc gname) (get_lemma gname) 
-
-let get_equiv_lemma (gname : lsymb) : Goal.equiv_lemma =
-  Goal.to_equiv_lemma ~loc:(L.loc gname) (get_lemma gname) 
+let get_equiv_assumption gname =
+  Goal.to_equiv_statement ~loc:(L.loc gname) (get_assumption gname)
 
 
 (*------------------------------------------------------------------*)
 (** {2 Declare Goals And Proofs} *)
 
-
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
-  | ParsedQed
-  | ParsedAbort
   | ParsedSetOption  of Config.p_set_param
   | ParsedTactic     of TacticsArgs.parser_arg Tactics.ast
   | ParsedUndo       of int
-  | ParsedGoal       of gm_input
+  | ParsedGoal       of Goal.Parsed.t Location.located
+  | ParsedProof
+  | ParsedQed
+  | ParsedAbort
   | ParsedHint       of Hint.p_hint
   | EOF
 
 let unnamed_goal () = 
-  L.mk_loc L._dummy ("unnamedgoal"^(string_of_int (List.length (!goals_proved))))
+  L.mk_loc L._dummy ("unnamedgoal" ^ string_of_int (List.length !goals_proved))
 
-let declare_new_goal_i table ~hint_db (gname,g) =
-  let gname = match gname with
-    | Decl.P_unknown -> unnamed_goal ()
-    | Decl.P_named s -> s 
+let declare_new_goal_i table hint_db parsed_goal =
+  let name = match parsed_goal.Goal.Parsed.name with
+    | None -> unnamed_goal ()
+    | Some s -> s
   in
-  let gn = L.unloc gname in
+  if is_assumption (L.unloc name) then
+    raise (ParseError "a goal or axiom with this name already exists");
+  let parsed_goal = { parsed_goal with Goal.Parsed.name = Some name } in
+  let statement,goal = Goal.make table hint_db parsed_goal in
+  goals :=  (statement,goal) :: !goals;
+  L.unloc name, goal
 
-  let c, g = match g with
-    | Goal.P_equiv_goal (p_system, env,f) ->
-      let system = SE.parse_se table p_system in
-      let c, g = Goal.make_equiv_goal ~table ~hint_db gn system env f in
-      c, g
-
-    | Goal.P_equiv_goal_process p_system ->
-      let system = SE.parse_se table p_system in
-      let c, g = Goal.make_equiv_goal_process ~hint_db ~table gn system in
-      c, g
-
-    | Goal.P_trace_goal reach -> 
-      let c, g = Goal.make_trace_goal ~hint_db ~tbl:table gn reach in
-      c, g
-  in
-
-  if is_lemma gn then
-    raise (ParseError "a goal with this name already exists");
-
-  goals :=  (c,g) :: !goals;
-
-  (L.unloc gname,g)
-
-let declare_new_goal table hint_db loc (n, g) =
-  error_handler loc KGoal (declare_new_goal_i table ~hint_db) (n, g)
+let declare_new_goal table hint_db parsed_goal =
+  let loc = L.loc parsed_goal in
+  let parsed_goal = L.unloc parsed_goal in
+  error_handler loc KGoal (declare_new_goal_i table hint_db) parsed_goal
 
 let add_proved_goal gconcl =
-  if is_lemma gconcl.Goal.gc_name then
+  if is_assumption gconcl.Goal.name then
     raise (ParseError "a formula with this name alread exists");
-
   goals_proved := gconcl :: !goals_proved
 
 let define_oracle_tag_formula table (h : lsymb) f =
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
   let formula = Theory.convert conv_env [] Vars.empty_env f Type.Boolean in
-    (match formula with
+    match formula with
      |  Term.ForAll ([Vars.EVar uvarm;Vars.EVar uvarkey],f) ->
-       (
-         match Vars.ty uvarm,Vars.ty uvarkey with
+         begin match Vars.ty uvarm,Vars.ty uvarkey with
          | Type.(Message, Message) ->
            add_option (Oracle_for_symbol (L.unloc h), Oracle_formula formula)
-         | _ ->  raise @@ ParseError "The tag formula must be of \
-                           the form forall (m:message,sk:message)"
-       )
-     | _ ->  raise @@ ParseError "The tag formula must be of \
-                           the form forall (m:message,sk:message)"
-    )
+         | _ -> raise @@ ParseError "The tag formula must be of \
+                                     the form forall (m:message,sk:message)"
+         end
+     | _ -> raise @@ ParseError "The tag formula must be of \
+                                 the form forall (m:message,sk:message)"
 
 
 let get_oracle_tag_formula h =
@@ -799,7 +769,8 @@ let start_proof () = match !current_goal, !goals with
   | _, [] ->
     Some "Cannot start a new proof (no goal remaining to prove)."
 
-let current_goal () = omap (fun (gc, goal) -> gc.Goal.gc_name, goal) !current_goal
+let current_goal_name () =
+  omap (fun (stmt,_) -> stmt.Goal.name) !current_goal
 
 let current_hint_db () = !hint_db
 
@@ -877,8 +848,13 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
     ) ctys
 
 (*------------------------------------------------------------------*)
-(** {2 Declaration processing} *)
-    
+(** {2 Declaration processing}
+  *
+  * TODO We should probably either merge Prover.parsed_input and
+  *   Decl.declaration or, if we decide that declarations have nothing
+  *   to do with the prover, move Decl_axiom to Prover.parsed_input and
+  *   process declarations somewhere else than Prover. *)
+
 let declare_i table hint_db decl = match L.unloc decl with
   | Decl.Decl_channel s            -> Channel.declare table s
   | Decl.Decl_process (id,pkind,p) ->
@@ -888,12 +864,14 @@ let declare_i table hint_db decl = match L.unloc decl with
       ) pkind in
     Process.declare table id pkind p
 
-  | Decl.Decl_axiom (gname,gdecl) ->
-    let name = match gname with
-      | Decl.P_unknown -> unnamed_goal ()
-      | Decl.P_named n -> n
+  | Decl.Decl_axiom parsed_goal ->
+    let parsed_goal =
+      match parsed_goal.Goal.Parsed.name with
+        | Some n -> parsed_goal
+        | None ->
+            { parsed_goal with Goal.Parsed.name = Some (unnamed_goal ()) }
     in
-    let gc, _ = Goal.make_trace_goal ~tbl:table ~hint_db (L.unloc name) gdecl in
+    let gc,_ = Goal.make table hint_db parsed_goal in
     add_proved_goal gc;
     table
 
@@ -973,7 +951,6 @@ let declare_i table hint_db decl = match L.unloc decl with
     in 
     table
 
-
 let declare table hint_db decl =
   let loc = L.loc decl in
   error_handler loc KDecl (declare_i table hint_db) decl
@@ -983,5 +960,5 @@ let declare_list table hint_db decls =
 
 (*------------------------------------------------------------------*)
 let add_hint_rewrite (s : lsymb) db =
-  let lem = get_reach_lemma s in
-  Hint.add_hint_rewrite s lem.Goal.gc_tyvars lem.Goal.gc_concl db
+  let lem = get_reach_assumption s in
+  Hint.add_hint_rewrite s lem.Goal.ty_vars lem.Goal.formula db

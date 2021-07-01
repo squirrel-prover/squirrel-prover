@@ -19,6 +19,8 @@
   "aenc"
   "axiom"
   "goal"
+  "global"
+  "local"
   "system"
   "set"
   "signature"

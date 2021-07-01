@@ -1266,15 +1266,15 @@ module LowTac (S : Sequent.S) = struct
     * that we cannot use a global hypothesis or lemma. *)
   let use ip (name : lsymb) (ths : Theory.term list) (s : S.t) =
     (* Get formula to apply. *)
-    let lem = S.get_k_hyp_or_lemma S.conc_kind name s in
+    let stmt = S.get_assumption S.conc_kind name s in
 
     (* FIXME *)
-    if lem.gc_tyvars <> [] then
+    if stmt.ty_vars <> [] then
       soft_failure (Failure "free type variables not supported with \
                              use tactic") ;
 
     (* Get universally quantified variables, verify that lengths match. *)
-    let uvars,f = S.Conc.decompose_forall lem.gc_concl in
+    let uvars,f = S.Conc.decompose_forall stmt.formula in
 
     if List.length uvars < List.length ths then
       Tactics.(soft_failure (Failure "too many arguments")) ;

@@ -35,17 +35,6 @@ type bty_decl = { bty_name  : lsymb ;
                   bty_infos : Symbols.bty_info list ; }
 
 (*------------------------------------------------------------------*)
-(** Information for a goal or axiom declaration *)
-type p_goal_name = P_unknown | P_named of lsymb
-                     
-type p_goal_reach_cnt = { g_system : SystemExpr.p_system_expr ;
-                          g_tyvars : lsymb list;
-                          g_vars   : Theory.bnds;
-                          g_form   : Theory.formula ; }
-
-type p_goal_reach = p_goal_name * p_goal_reach_cnt
-
-(*------------------------------------------------------------------*)
 (** Information for a system declaration *)
 type system_decl = { sname    : Theory.lsymb option;
                      sprocess : Process.process; }
@@ -68,7 +57,7 @@ val pp_orcl_tag_info : Format.formatter -> orcl_tag_info -> unit
 type declaration_i =
   | Decl_channel of lsymb
   | Decl_process of lsymb * Theory.bnds * Process.process
-  | Decl_axiom   of p_goal_reach
+  | Decl_axiom   of Goal.Parsed.t
   | Decl_system  of system_decl
 
   | Decl_ddh of lsymb * (lsymb * Symbols.symb_type) * c_tys 

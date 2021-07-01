@@ -1,5 +1,5 @@
 open Utils
-    
+
 module L = Location
 
 module TS = LowTraceSequent
@@ -31,126 +31,102 @@ let pp_init ch = function
   | Equiv j -> ES.pp_init ch j
 
 (*------------------------------------------------------------------*)
-
-(** An open named goal *)
-type named_goal = string * t
-
-type named_goals = named_goal list
-
-(*------------------------------------------------------------------*)
-type ('a,'b) lemma_g = { 
-  gc_name   : 'a; 
-  gc_tyvars : Type.tvars;
-  gc_system : SE.t;
-  gc_concl  : 'b;
+type ('a,'b) abstract_statement = {
+  name    : 'a;
+  ty_vars : Type.tvars;
+  system  : SystemExpr.t;
+  formula : 'b;
 }
 
 (*------------------------------------------------------------------*)
-type       lemma = (string,  Equiv.gform) lemma_g
-type equiv_lemma = (string,   Equiv.form) lemma_g
-type reach_lemma = (string, Term.message) lemma_g
-
-type lemmas = lemma list
-
+type       statement = (string,  Equiv.gform) abstract_statement
+type equiv_statement = (string,   Equiv.form) abstract_statement
+type reach_statement = (string, Term.message) abstract_statement
 
 (*------------------------------------------------------------------*)
+(** Generalized hypothesis: hypothesis or lemma identifier. *)
 type ghyp = [ `Hyp of Ident.t | `Lemma of string ]
 
-type       hyp_or_lemma = (ghyp,   Equiv.gform) lemma_g
-type equiv_hyp_or_lemma = (ghyp,   Equiv.form) lemma_g
-type reach_hyp_or_lemma = (ghyp, Term.message) lemma_g
-
 (*------------------------------------------------------------------*)
-let mk_goal_concl gc_name gc_system gc_tyvars gc_concl =
-  { gc_name; gc_system; gc_tyvars; gc_concl }
 
-let is_reach_lemma gconcl : bool =
-  match gconcl.gc_concl with
+let is_reach_statement stmt : bool =
+  match stmt.formula with
   | `Equiv _ -> false
-  | `Reach _ -> true    
+  | `Reach _ -> true
 
-let is_equiv_lemma gconcl : bool =
-  match gconcl.gc_concl with
+let is_equiv_statement stmt : bool =
+  match stmt.formula with
   | `Equiv _ -> true
-  | `Reach _ -> false    
+  | `Reach _ -> false
 
-let to_reach_lemma ?loc gconcl = 
-  match gconcl.gc_concl with
-  | `Reach f -> { gconcl with gc_concl = f }
+let to_reach_statement ?loc stmt =
+  { stmt with formula = Equiv.Any.convert_to ?loc Equiv.Local_t stmt.formula }
 
-  | `Equiv (Equiv.Atom (Reach f)) -> { gconcl with gc_concl = f }
-
-  | `Equiv _ ->
-    Tactics.soft_failure ?loc (Failure "expected a reachability formula")
-
-let to_equiv_lemma ?loc gconcl = 
-  match gconcl.gc_concl with
-  | `Equiv f -> { gconcl with gc_concl = f }
-
-  | `Reach _ -> 
-    Tactics.soft_failure ?loc (Failure "expected an equivalence formula")
+let to_equiv_statement ?loc stmt =
+  { stmt with formula = Equiv.Any.convert_to ?loc Equiv.Global_t stmt.formula }
 
 (*------------------------------------------------------------------*)
 (** {2 Parsed goals} *)
 
-type p_goal_form =
-  | P_trace_goal of Decl.p_goal_reach_cnt
+module Parsed = struct
 
-  | P_equiv_goal of SE.p_system_expr * Theory.bnds * Theory.equiv_form L.located
+  type contents =
+  | Local     of Theory.formula
+  | Global    of Theory.global_formula
+  | Obs_equiv   (** All the information is in the system expression. *)
 
-  | P_equiv_goal_process of SE.p_system_expr
+  type t = {
+    name    : Theory.lsymb option;
+    ty_vars : Theory.lsymb list;
+    vars    : Theory.bnds;
+    system  : SystemExpr.parsed;
+    formula : contents
+  }
 
-type p_goal = Decl.p_goal_name * p_goal_form
+end
 
 (*------------------------------------------------------------------*)
 (** {2 Create trace and equivalence goals} *)
 
-let make_trace_goal ~tbl ~hint_db gname (pg : Decl.p_goal_reach_cnt) 
-  : lemma * t =
-  let system = SE.parse_se tbl pg.g_system in
+let make table hint_db parsed_goal : statement*t =
 
-  let ty_vars = List.map (fun ls -> Type.mk_tvar (L.unloc ls)) pg.g_tyvars in  
+  let {Parsed.name;system;ty_vars;vars;formula} = parsed_goal in
 
-  let conv_env = Theory.{ table = tbl; cntxt = InGoal; } in
-
-  let env, evs = Theory.convert_p_bnds tbl ty_vars Vars.empty_env pg.g_vars in
-
-  let g = Theory.convert conv_env ty_vars env pg.g_form Type.Boolean in
-
-  let s = TS.init ~system ~table:tbl ~hint_db ~ty_vars ~env ~goal:g in
-
-  let gc = 
-    mk_goal_concl gname system ty_vars (`Reach (Term.mk_forall evs g)) 
+  let name = match name with
+    | Some n -> L.unloc n
+    | None -> assert false
   in
-  
-  (* final proved formula, current sequent *)
-  gc, Trace s
 
+  let system = SE.parse_se table system in
+  let ty_vars = List.map (fun ls -> Type.mk_tvar (L.unloc ls)) ty_vars in
+  let env,vars = Theory.convert_p_bnds table ty_vars Vars.empty_env vars in
 
-let make_equiv_goal ~table ~hint_db
-      gname se (bnds : Theory.bnds) (p_form : Theory.equiv_form L.located)
-    : lemma * t
-=
-  let env, evs = Theory.convert_p_bnds table [] Vars.empty_env bnds in
-
-  let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-
-  let f = Theory.convert_equiv_form conv_env [] env (L.unloc p_form) in
-
-  let gc = mk_goal_concl gname se [] (`Equiv (Equiv.mk_forall evs f)) in
-
-  gc, Equiv (ES.init se table hint_db env f)
-
-
-let make_equiv_goal_process ~table ~hint_db gname system : lemma * t =
-  let env, ts = Vars.make `Approx Vars.empty_env Type.Timestamp "t" in
-  let term = Term.mk_macro Term.frame_macro [] (Term.mk_var ts) in
-  let goal = Equiv.(Atom (Equiv [term])) in
-  let happens = Term.mk_happens (Term.mk_var ts) in
-  let hyp = Equiv.(Atom (Reach happens)) in
-  let gc =
-    mk_goal_concl gname system []
-      (`Equiv
-         (Equiv.mk_forall [Vars.EVar ts] (Equiv.(Impl (hyp,goal)))))
+  let conv_env = Theory.{ table; cntxt = InGoal } in
+  let formula,goal =
+    match formula with
+      | Local f ->
+          let f = Theory.convert conv_env ty_vars env f Type.Boolean in
+          let s = TS.init ~system ~table ~hint_db ~ty_vars ~env f in
+          `Reach (Term.mk_forall vars f), Trace s
+      | Global f ->
+          (* TODO ty_vars are not passed, I'm not sure it makes sense:
+           * assuming them to be empty, just in case, for now. *)
+          assert (ty_vars = []) ;
+          let f = Theory.convert_global_formula conv_env [] env f in
+          let s = ES.init ~system ~table ~hint_db ~ty_vars ~env f in
+          `Equiv (Equiv.mk_forall vars f), Equiv s
+      | Obs_equiv ->
+          assert (vars = [] && ty_vars = []) ;
+          let env,ts = Vars.make `Approx env Type.Timestamp "t" in
+          let term = Term.mk_macro Term.frame_macro [] (Term.mk_var ts) in
+          let goal = Equiv.(Atom (Equiv [term])) in
+          let happens = Term.mk_happens (Term.mk_var ts) in
+          let hyp = Equiv.(Atom (Reach happens)) in
+          let s = ES.init ~system ~table ~hint_db ~ty_vars ~env ~hyp goal in
+          `Equiv
+            (Equiv.mk_forall [Vars.EVar ts] (Equiv.(Impl (hyp,goal)))),
+          Equiv s
   in
-  gc, Equiv (ES.init system table hint_db env ~hyp goal)
+
+  { name; system; ty_vars; formula },
+  goal

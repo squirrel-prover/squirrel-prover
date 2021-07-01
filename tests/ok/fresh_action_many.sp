@@ -8,8 +8,10 @@ name n : index->message
 name m : index->message
 system !_i !_j out(c,<n(i),n(j)>).
 
-equiv test (k:index) : 
-[happens(A(k,k))] -> frame@A(k,k) -> frame@A(k,k), diff(n(k),m(k)).
+global goal test (k:index) :
+  [happens(A(k,k))] ->
+  equiv(frame@A(k,k)) ->
+  equiv(frame@A(k,k), diff(n(k),m(k))).
 Proof.
   intro Hap H. 
   fresh 1. 

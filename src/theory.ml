@@ -257,11 +257,12 @@ type hterm = hterm_i L.located
 
 type equiv = term list 
 
-type equiv_form = 
+type global_formula = global_formula_i Location.located
+and global_formula_i =
   | PEquiv  of equiv
   | PReach  of formula
-  | PImpl   of equiv_form * equiv_form
-  | PForAll of bnds * equiv_form
+  | PImpl   of global_formula * global_formula
+  | PForAll of bnds * global_formula
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
@@ -1290,13 +1291,13 @@ let convert_el cenv ty_vars (env : Vars.env) el : Term.message =
 let convert_equiv cenv ty_vars (env : Vars.env) (e : equiv) =
   List.map (convert_el cenv ty_vars env) e
 
-let convert_equiv_form cenv ty_vars env (p : equiv_form) =
+let convert_global_formula cenv ty_vars env (p : global_formula) =
   let rec conve cenv ty_vars env p =
     let conve ?(cenv=cenv) ?(ty_vars=ty_vars) ?(env=env) p = 
        conve cenv ty_vars env p 
     in
 
-    match p with
+    match L.unloc p with
     | PImpl (f,f0) -> Equiv.Impl (conve f, conve f0)
 
     | PEquiv e -> 

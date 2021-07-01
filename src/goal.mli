@@ -1,13 +1,9 @@
-module L = Location
-module SE = SystemExpr
-
-module TS = LowTraceSequent
-module ES = LowEquivSequent
 
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
-type t = Trace of TS.t | Equiv of ES.t
+(** A goal consists of one of our two kinds of sequents. *)
+type t = Trace of LowTraceSequent.t | Equiv of LowEquivSequent.t
 
 val pp : Format.formatter -> t -> unit
 val pp_init : Format.formatter -> t -> unit
@@ -15,68 +11,54 @@ val pp_init : Format.formatter -> t -> unit
 val get_env : t -> Vars.env
 
 (*------------------------------------------------------------------*)
-type named_goal = string * t
-
-(*------------------------------------------------------------------*)
-type ('a,'b) lemma_g = { 
-  gc_name   : 'a; 
-  gc_tyvars : Type.tvars;
-  gc_system : SE.t;
-  gc_concl  : 'b;
+(** Statements are formulas in context.
+  * They may be used to generate initial goals, or to represent
+  * hypotheses extracted from a goal.
+  * TODO currently free variables used in axioms and lemmas are
+  * quantified in the formula, but this will break when we
+  * properly forbid quantification over messages in local meta-formulas. *)
+type ('a,'b) abstract_statement = {
+  name    : 'a;
+  ty_vars : Type.tvars;
+  system  : SystemExpr.t;
+  formula : 'b;
 }
 
 (*------------------------------------------------------------------*)
-type       lemma = (string,  Equiv.gform) lemma_g
-type equiv_lemma = (string,   Equiv.form) lemma_g
-type reach_lemma = (string, Term.message) lemma_g
-
-type lemmas = lemma list
-
+type       statement = (string,  Equiv.gform) abstract_statement
+type equiv_statement = (string,   Equiv.form) abstract_statement
+type reach_statement = (string, Term.message) abstract_statement
 
 (*------------------------------------------------------------------*)
-type ghyp = [ `Hyp of Ident.t | `Lemma of string ]
+val is_reach_statement : statement -> bool
+val is_equiv_statement : statement -> bool
 
-type       hyp_or_lemma = (ghyp,   Equiv.gform) lemma_g
-type equiv_hyp_or_lemma = (ghyp,   Equiv.form) lemma_g
-type reach_hyp_or_lemma = (ghyp, Term.message) lemma_g
-
-(*------------------------------------------------------------------*)
-val is_reach_lemma : ('a, Equiv.gform) lemma_g -> bool
-val is_equiv_lemma : ('a, Equiv.gform) lemma_g -> bool
-
-val to_reach_lemma : 
-  ?loc:L.t -> ('a, Equiv.gform) lemma_g -> ('a, Term.message) lemma_g
-val to_equiv_lemma : 
-  ?loc:L.t -> ('a, Equiv.gform) lemma_g -> ('a, Equiv.form)   lemma_g
+val to_reach_statement : ?loc:Location.t -> statement -> reach_statement
+val to_equiv_statement : ?loc:Location.t -> statement -> equiv_statement
 
 (*------------------------------------------------------------------*)
-(** {2 Type of parsed goals} *)
+(** {2 Parsed goals} *)
 
-type p_goal_form =
-  | P_trace_goal of Decl.p_goal_reach_cnt
+module Parsed : sig
 
-  | P_equiv_goal of SE.p_system_expr * Theory.bnds * Theory.equiv_form L.located
+  type contents =
+  | Local     of Theory.formula
+  | Global    of Theory.global_formula
+  | Obs_equiv   (** All the information is in the system expression. *)
 
-  | P_equiv_goal_process of SE.p_system_expr
+  type t = {
+    name    : Theory.lsymb option;
+    ty_vars : Theory.lsymb list;
+    vars    : Theory.bnds;
+    system  : SystemExpr.parsed;
+    formula : contents
+  }
 
-type p_goal = Decl.p_goal_name * p_goal_form
+end
 
 (*------------------------------------------------------------------*)
 (** {2 Create trace and equivalence goals} *)
 
-val make_equiv_goal :
-  table:Symbols.table ->
-  hint_db:Hint.hint_db ->
-  string ->
-  SE.t -> Theory.bnds -> Theory.equiv_form L.located -> lemma * t
-
-val make_trace_goal :
-  tbl:Symbols.table -> 
-  hint_db:Hint.hint_db ->
-  string -> Decl.p_goal_reach_cnt -> lemma * t
-
-(** Create observational equivalence goal for the given biprocess. *)
-val make_equiv_goal_process :
-  table:Symbols.table -> 
-  hint_db:Hint.hint_db ->
-  string -> SE.t -> lemma * t
+val make :
+  Symbols.table -> Hint.hint_db -> Parsed.t ->
+  statement * t

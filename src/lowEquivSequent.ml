@@ -51,14 +51,14 @@ type t = {
   hint_db : Hint.hint_db;
 }
 
-let init system table hint_db env ?hyp goal =
+let init ~system ~table ~hint_db ~ty_vars ~env ?hyp goal =
   let hyps = H.empty in
   let hyps = match hyp with
     | None -> hyps
     | Some h ->
         snd (H.add ~force:false (H.fresh_id "H" hyps) h hyps)
   in
-  { env; table; system; goal; hyps; hint_db; ty_vars = [] }
+  { table; hint_db; system; ty_vars; env; hyps; goal }
 
 type sequent = t
 
@@ -253,7 +253,7 @@ let to_trace_sequent s =
         (Tactics.GoalBadShape "expected a reachability formula")
   in
 
-  let trace_s = TS.init ~system ~table ~hint_db ~ty_vars ~env ~goal in
+  let trace_s = TS.init ~system ~table ~hint_db ~ty_vars ~env goal in
   
   (* Add all relevant hypotheses. *)
   Hyps.fold

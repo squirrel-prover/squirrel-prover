@@ -340,36 +340,36 @@ Qed.
 
 axiom diff_ax ['a] (x : 'a) : diff(x,x) = x.
 
-equiv _ (x,y,z : message) : 
-  x, z ->
+global goal _ (x,y,z : message) : 
+  equiv(x, z) ->
   [forall (x,y : message), f(<x,y>) = x] ->
-  diff(f(<x,y>),x), x, diff(f(<z,z>), z).
+  equiv(diff(f(<x,y>),x), x, diff(f(<z,z>), z)).
 Proof.
   intro Hx H.
   rewrite H diff_ax in 0,2. 
   apply Hx.
 Qed.
 
-equiv _ (x : message) : 
+global goal _ (x : message) : 
   [forall (x,y : message), f(<x,y>) = x] ->
-  x.
+  equiv(x).
 Proof.
   intro H.
   checkfail try(rewrite H in 0); auto exn GoalNotClosed.
 Abort.
 
 
-equiv _ (x : message) : 
+global goal _ (x : message) : 
   [forall (x,y : message), f(<x,y>) = x] ->
-  x.
+  equiv(x).
 Proof.
   intro H.
   checkfail try(rewrite H in 1); auto exn GoalNotClosed.
 Abort.
 
-equiv _ (x : message) : 
+global goal _ (x : message) : 
   [forall (x,y : message), f(<x,y>) = x] ->
-  x.
+  equiv(x).
 Proof.
   intro H.
   checkfail try(rewrite H in 0,1); auto exn GoalNotClosed.

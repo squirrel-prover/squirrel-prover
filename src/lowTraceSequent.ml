@@ -498,8 +498,8 @@ let set_goal a s =
         when Config.auto_intro () -> Hyps.add_macro_defs s a
       | _ -> s
 
-let init ~system ~table ~hint_db ~ty_vars ~env ~goal =
-  init_sequent ~system ~table ~hint_db ~ty_vars ~env ~conclusion:goal
+let init ~system ~table ~hint_db ~ty_vars ~env conclusion =
+  init_sequent ~system ~table ~hint_db ~ty_vars ~env ~conclusion
 
 let goal s = s.conclusion
 

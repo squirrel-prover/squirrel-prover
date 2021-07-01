@@ -16,9 +16,10 @@ system !_j tag(j).
 
 axiom no_repeat (i, j:timestamp): i < j => kT@j <> kT@i.
 
-equiv foo (t: timestamp) : 
-[forall (j, j0:index), (T(j0) < T(j) => kT@pred(T(j)) <> kT@T(j0))] ->
-[happens(t)] -> frame@t.
+global goal foo (t: timestamp) :
+  [forall (j, j0:index), (T(j0) < T(j) => kT@pred(T(j)) <> kT@T(j0))] ->
+  [happens(t)] ->
+  equiv(frame@t).
 Proof.
 intro H.
 induction t.

@@ -21,12 +21,13 @@
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS
 %token XOR STAR UNDERSCORE QMARK TICK 
 %token LET IN IF THEN ELSE FIND SUCHTHAT
-%token DIFF LEFT RIGHT SEQ 
+%token TILDE DIFF LEFT RIGHT SEQ
 %token NEW OUT PARALLEL NULL
 %token CHANNEL PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT TYPE FUN
 %token MUTABLE SYSTEM SET
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW RARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
+%token LOCAL GLOBAL
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH ATSLASH
 %token TIME WHERE WITH ORACLE EXN
 %token LARGE NAMEFIXEDLENGTH
@@ -75,7 +76,7 @@
 
 %%
 
-(* Ls *)
+(* Locations *)
 %inline loc(X):
 | x=X {
     { L.pl_desc = x;
@@ -95,7 +96,6 @@
 
 %inline slist1(X, S):
 | l=separated_nonempty_list(S, X) { l }
-
 
 (* Terms *)
 lsymb:
@@ -408,13 +408,12 @@ declaration_i:
 
 | CHANNEL e=lsymb         { Decl.Decl_channel e }
 
-/* | TERM e=lsymb args=opt_arg_list COLON typ=p_ty EQ t=term */
-/*                           { Decl.Decl_macro (e, args, typ, t) } */
-
 | PROCESS e=lsymb args=opt_arg_list EQ p=process
                           { Decl.Decl_process (e, args, p) }
 
-| AXIOM g=goal_reach { Decl.Decl_axiom g }
+|        AXIOM s=local_statement  { Decl.Decl_axiom s }
+|  LOCAL AXIOM s=local_statement  { Decl.Decl_axiom s }
+| GLOBAL AXIOM s=global_statement { Decl.Decl_axiom s }
 
 | SYSTEM p=process
                           { Decl.(Decl_system { sname = None;
@@ -720,35 +719,32 @@ help_tac_i:
 help_tac:
 | l=loc(help_tac_i) { l }
 
-qed:
-| QED                                 { () }
-
-abort:
-| ABORT                               { () }
-
-
 undo:
 | UNDO i=INT DOT                      { i }
 
 tactic:
 | t=tac DOT                           { t }
 
-equiv:
-| ei=term                 { [ei] }
-| ei=term COMMA eis=equiv { ei::eis }
+biframe:
+| ei=term                   { [ei] }
+| ei=term COMMA eis=biframe { ei::eis }
 
-equiv_form:
+global_formula_i:
 | LBRACKET f=term RBRACKET         { Theory.PReach f }
-| /* TILDE LPAREN */ e=equiv /* RPAREN */      { Theory.PEquiv e }
-/* | LPAREN f=equiv_form RPAREN       { f } */
-| f=equiv_form ARROW f0=equiv_form { Theory.PImpl (f,f0) }
-/* | FORALL LPAREN vs=arg_list RPAREN sep f=equiv_form %prec QUANTIF */
-/*                                    { Theory.PForAll (vs,f)  } */
+| TILDE LPAREN e=biframe RPAREN    { Theory.PEquiv e }
+| EQUIV LPAREN e=biframe RPAREN    { Theory.PEquiv e }
+| LPAREN f=global_formula_i RPAREN   { f }
+| f=global_formula ARROW f0=global_formula { Theory.PImpl (f,f0) }
+| FORALL LPAREN vs=arg_list RPAREN sep f=global_formula %prec QUANTIF
+                                   { Theory.PForAll (vs,f)  }
+
+global_formula:
+| f=loc(global_formula_i) { f }
 
 
-args:
-|                                    { [] }
-| LPAREN vs0=arg_list RPAREN vs=args { vs0 @ vs }
+/* -----------------------------------------------------------------------
+ * Systems
+ * ----------------------------------------------------------------------- */
 
 system_proj:
 | LEFT                { SystemExpr.(P_Left  default_system_name) }
@@ -758,7 +754,8 @@ system_proj:
 
 /* A single or bi-system */
 system:
-|                                  { SystemExpr.(P_SimplePair default_system_name) }
+|                                  { SystemExpr.P_SimplePair
+                                       SystemExpr.default_system_name }
 | LBRACKET i=lsymb        RBRACKET { SystemExpr. P_SimplePair i }
 | LBRACKET sp=system_proj RBRACKET { SystemExpr. P_Single sp }
 
@@ -769,31 +766,65 @@ bisystem:
 | LBRACKET s1=system_proj COMMA s2=system_proj RBRACKET
                                    { SystemExpr. P_Pair (s1, s2) }
 
-gname:
-| i=lsymb    { P_named i }
-| UNDERSCORE { P_unknown }
 
-goal_reach:
-| s=system n=gname tyvs=ty_args args=args COLON f=term 
-    { let goal_cnt = Decl.{ g_system = s; 
-                            g_tyvars = tyvs; 
-                            g_vars = args; 
-                            g_form = f; } 
-      in
-      n, goal_cnt }
+/* -----------------------------------------------------------------------
+ * Statements and goals
+ * ----------------------------------------------------------------------- */
+
+args:
+|                                    { [] }
+| LPAREN vs0=arg_list RPAREN vs=args { vs0 @ vs }
+
+/* We use brackets to delimitate system expression and type variables,
+   which creates a conflict if statement names can be empty, which
+   we use in many examples.
+   This use of brackets for both constructs may be reconsidered in
+   the future; until then, we treat the case with an empty name
+   separately and with limitations. */
+
+statement_name:
+| i=lsymb    { Some i }
+| UNDERSCORE { None }
+
+local_statement:
+| system=system name=statement_name ty_vars=ty_args vars=args
+  COLON f=term
+   { let formula = Goal.Parsed.Local f in
+     Goal.Parsed.{ name; ty_vars; vars; system; formula } }
+| vars=args
+  COLON f=term
+   { let formula = Goal.Parsed.Local f in
+     let name = None in
+     let system = SystemExpr.P_SimplePair
+                    SystemExpr.default_system_name in
+     Goal.Parsed.{ name; ty_vars=[]; vars; system; formula } }
+
+global_statement:
+| system=system name=statement_name ty_vars=ty_args vars=args
+  COLON f=global_formula
+   { let formula = Goal.Parsed.Global f in
+     Goal.Parsed.{ name; ty_vars; vars; system; formula } }
+| vars=args
+  COLON f=global_formula
+   { let formula = Goal.Parsed.Global f in
+     let name = None in
+     let system = SystemExpr.P_SimplePair
+                    SystemExpr.default_system_name in
+     Goal.Parsed.{ name; ty_vars=[]; vars; system; formula } }
+
+obs_equiv_statement:
+| s=bisystem n=statement_name
+   { Goal.Parsed.{ name = n; system = s; ty_vars = []; vars = [];
+                   formula = Goal.Parsed.Obs_equiv } }
 
 goal_i:
-| GOAL g=goal_reach DOT
-    { let n, goal_cnt = g in
-      Prover.Gm_goal (n, Goal.P_trace_goal goal_cnt) }
-
-| EQUIV s=bisystem n=gname env=args COLON f=loc(equiv_form) DOT
-                 { Prover.Gm_goal (n, Goal.P_equiv_goal (s, env, f)) }
-
-| EQUIV s=bisystem n=gname DOT
-                 { Prover.Gm_goal (n, Goal.P_equiv_goal_process s) }
-
-| PROOF          { Prover.Gm_proof }
+|        GOAL s=local_statement  DOT { s }
+|  LOCAL GOAL s=local_statement  DOT { s }
+| GLOBAL GOAL s=global_statement DOT { s }
+| EQUIV  s=obs_equiv_statement   DOT { s }
+| EQUIV system=bisystem name=statement_name vars=args COLON b=loc(biframe) DOT
+    { let f = L.mk_loc (L.loc b) (Theory.PEquiv (L.unloc b)) in
+      Goal.Parsed.{ name; system; ty_vars = []; vars; formula = Global f } }
 
 goal:
 | goal=loc(goal_i) { goal }
@@ -818,8 +849,9 @@ interactive:
 | decls=declarations { Prover.ParsedInputDescr decls }
 | u=undo             { Prover.ParsedUndo u }
 | tac=tactic         { Prover.ParsedTactic tac }
-| qed                { Prover.ParsedQed }
-| abort              { Prover.ParsedAbort }
+| PROOF              { Prover.ParsedProof }
+| QED                { Prover.ParsedQed }
+| ABORT              { Prover.ParsedAbort }
 | g=goal             { Prover.ParsedGoal g }
 | h=hint             { Prover.ParsedHint h }
 | EOF                { Prover.EOF }

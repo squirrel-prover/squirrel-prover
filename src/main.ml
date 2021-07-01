@@ -111,8 +111,8 @@ let main_loop_body ~test state =
       begin match Prover.eval_tactic utac with
       | true ->
           Printer.prt `Goal "Goal %s is proved"
-            (match Prover.current_goal () with
-               | Some (i, _) -> i
+            (match Prover.current_goal_name () with
+               | Some i -> i
                | None -> assert false);
           Prover.complete_proof ();
           { state with mode = WaitQed }
@@ -138,26 +138,22 @@ let main_loop_body ~test state =
       Config.set_param sp;
       state
 
-    | GoalMode, ParsedGoal goal ->
-      begin
-        match L.unloc goal with
-        | Prover.Gm_proof ->
-          begin
-            match Prover.start_proof () with
-            | None ->
-              Printer.pr "%a" Prover.pp_goal ();
-              { state with mode = ProofMode }
-            | Some es -> cmd_error (StartProofError es)
-          end
-        | Prover.Gm_goal g ->
-          let hint_db = Prover.current_hint_db () in
-          let i,f = 
-            Prover.declare_new_goal state.table hint_db (L.loc goal) g 
-          in
-          Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
-            i
-            Goal.pp_init f;
-          { state with mode = GoalMode; }
+    | GoalMode, ParsedGoal g ->
+      let hint_db = Prover.current_hint_db () in
+      let i,f =
+        Prover.declare_new_goal state.table hint_db g
+      in
+      Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
+        i
+        Goal.pp_init f;
+      state
+
+    | GoalMode, ParsedProof ->
+      begin match Prover.start_proof () with
+        | None ->
+            Printer.pr "%a" Prover.pp_goal ();
+            { state with mode = ProofMode }
+        | Some es -> cmd_error (StartProofError es)
       end
 
     | GoalMode, EOF -> { state with mode = AllDone; }
@@ -266,7 +262,10 @@ let interactive_prover () =
 let run ?(test=false) filename =
   (* TODO: I am forcing the usage of ANSI escape sequence. We probably want an
      option to remove it. *)
-  if test then Printer.printer_mode := Printer.Test;
+  if test then begin
+    Printer.printer_mode := Printer.Test;
+    Format.eprintf "Running %S...@." filename
+  end;
   Printer.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
   setup_lexbuf filename;
   start_main_loop ~test ()

@@ -18,8 +18,8 @@ process P (i : index) =
 system !_i P (i).
 
 (* starting from [frame], [n] is fresh *)
-equiv _ (t : timestamp) :
- [happens(t)] -> frame@t -> frame@t, diff(n,m).
+global goal _ (t : timestamp) :
+ [happens(t)] -> equiv(frame@t) -> equiv(frame@t, diff(n,m)).
 Proof.
  intro Hap H.
 
@@ -27,8 +27,8 @@ Proof.
 Qed.
 
 (* starting from [s], [n] is *not* fresh *)
-equiv _ (t : timestamp) :
- [happens(t)] -> s@t -> s@t, diff(n,m).
+global goal _ (t : timestamp) :
+ [happens(t)] -> equiv(s@t) -> equiv(s@t, diff(n,m)).
 Proof.
  intro Hap H. 
 
@@ -37,8 +37,8 @@ Abort.
 
 
 (* same as the first goal, but without any premise by induction *)
-equiv _ (t : timestamp) :
- [happens(t)] -> frame@t, diff(n,m).
+global goal _ (t : timestamp) :
+ [happens(t)] -> equiv(frame@t, diff(n,m)).
 Proof.
  induction t.
  intro t Ind Hap.
@@ -96,8 +96,8 @@ process R (i : index) =
 system [second] (!_i Q: Q (i) | !_i R: R (i)).
 
 (* starting from [frame, s3], [n] is fresh *)
-equiv [second] _ (t : timestamp) :
- [happens(t)] -> frame@t, s3@t -> frame@t, s3@t, diff(n,m).
+global goal [second] _ (t : timestamp) :
+ [happens(t)] -> equiv(frame@t, s3@t) -> equiv(frame@t, s3@t, diff(n,m)).
 Proof.
  intro Hap H.
 
@@ -106,8 +106,8 @@ Qed.
 
 (* starting from [s2], [n] is *not* fresh because it can be reached through:
   s2 -> s1 -> s -> n *)
-equiv [second] _ (t : timestamp) :
- [happens(t)] -> s2@t -> s2@t, diff(n,m).
+global goal [second] _ (t : timestamp) :
+ [happens(t)] -> equiv(s2@t) -> equiv(s2@t, diff(n,m)).
 Proof.
  intro Hap H. 
 

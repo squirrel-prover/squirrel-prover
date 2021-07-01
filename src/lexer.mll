@@ -67,6 +67,11 @@ rule token = parse
 | ":="                { ASSIGN }
 | "-"                 { MINUS }
 | "@"                 { AT }
+| '~'                 { TILDE }
+| '+'                 { PLUS }
+| '\''                { TICK }
+| infix_symb as s     { INFIXSYMB s }
+| int as i            { INT (int_of_string i) }
 | "happens"           { HAPPENS }
 | "if"                { IF }
 | "then"              { THEN }
@@ -119,6 +124,8 @@ rule token = parse
 | "remember"          { REMEMBER }
 | "dependent"         { DEPENDENT }
 | "goal"              { GOAL }
+| "local"             { LOCAL }
+| "global"            { GLOBAL }
 | "equiv"             { EQUIV }
 | "axiom"             { AXIOM }
 | "Proof."            { PROOF }
@@ -143,11 +150,7 @@ rule token = parse
 | "ddh"               { DDH }
 | "nosimpl"           { NOSIMPL }
 | "checkfail"         { CHECKFAIL }
-| '+'                 { PLUS }
-| '\''                { TICK }
 | name as n           { ID n }
-| infix_symb as s     { INFIXSYMB s }
-| int as i            { INT (int_of_string i) }
 | eof                 { EOF }
 
 and comment = parse

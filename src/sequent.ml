@@ -13,20 +13,22 @@ let soft_failure = Tactics.soft_failure
 (*------------------------------------------------------------------*)
 (** {2 Module type for sequents -- after Prover} *)
 
+type ghyp = [ `Hyp of Ident.t | `Lemma of string ]
+
 module type S = sig
   include LowSequent.S
 
-  val is_hyp_or_lemma        : lsymb -> t -> bool
-  val is_equiv_hyp_or_lemma  : lsymb -> t -> bool
-  val is_reach_hyp_or_lemma  : lsymb -> t -> bool
+  val is_assumption       : lsymb -> t -> bool
+  val is_equiv_assumption : lsymb -> t -> bool
+  val is_reach_assumption : lsymb -> t -> bool
 
-  val get_k_hyp_or_lemma : 
-    'a Equiv.f_kind -> Theory.lsymb -> t -> (Goal.ghyp, 'a) Goal.lemma_g
+  val get_assumption :
+    'a Equiv.f_kind -> Theory.lsymb -> t -> (ghyp, 'a) Goal.abstract_statement
 
   val reduce : Reduction.red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
-  val convert_pt_hol : 
-    Theory.p_pt_hol -> 'a Equiv.f_kind -> t -> Goal.ghyp * 'a Match.pat
+  val convert_pt_hol :
+    Theory.p_pt_hol -> 'a Equiv.f_kind -> t -> ghyp * 'a Match.pat
 end
 
 module Mk (S : LowSequent.S) : S with
@@ -36,40 +38,41 @@ module Mk (S : LowSequent.S) : S with
 struct
   include S
 
-  let is_hyp_or_lemma (name : lsymb) (s : S.t) =
-    Hyps.mem_name (L.unloc name) s || Prover.is_lemma (L.unloc name)
+  let is_assumption (name : lsymb) (s : S.t) =
+    Hyps.mem_name (L.unloc name) s || Prover.is_assumption (L.unloc name)
 
-  let is_equiv_hyp_or_lemma (name : lsymb) (s : sequent) =
-    Hyps.mem_name (L.unloc name) s || Prover.is_equiv_lemma (L.unloc name)
+  let is_equiv_assumption (name : lsymb) (s : sequent) =
+    Hyps.mem_name (L.unloc name) s || Prover.is_equiv_assumption (L.unloc name)
 
-  let is_reach_hyp_or_lemma (name : lsymb) (s : sequent) =
-    Hyps.mem_name (L.unloc name) s || Prover.is_reach_lemma (L.unloc name)
+  let is_reach_assumption (name : lsymb) (s : sequent) =
+    Hyps.mem_name (L.unloc name) s || Prover.is_reach_assumption (L.unloc name)
 
-  let get_k_hyp_or_lemma
-    : type a. a Equiv.f_kind -> lsymb -> t -> (Goal.ghyp, a) Goal.lemma_g
+  let get_assumption
+    : type a. a Equiv.f_kind -> lsymb -> t ->
+              (ghyp, a) Goal.abstract_statement
     = fun k name s ->
 
       if Hyps.mem_name (L.unloc name) s then
         let id, f = Hyps.by_name name s in
-        Goal.{ gc_name = `Hyp id;
-               gc_system = system s;
-               gc_tyvars = [];
-               gc_concl =
+        Goal.{ name = `Hyp id;
+               system = system s;
+               ty_vars = [];
+               formula =
                  Equiv.Babel.convert
                    ~loc:(L.loc name)
                    ~src:S.hyp_kind
                    ~dst:k
                    f }
       else
-        let lem = Prover.get_lemma name in
+        let lem = Prover.get_assumption name in
         (* Verify that it applies to the current system. *)
-        if not (SE.systems_compatible (S.system s) lem.gc_system) then
+        if not (SE.systems_compatible (S.system s) lem.system) then
           Tactics.hard_failure Tactics.NoAssumpSystem;
-        { Goal.gc_name = `Lemma lem.Goal.gc_name ;
-          gc_system = lem.gc_system ;
-          gc_tyvars = lem.gc_tyvars ;
-          gc_concl = Equiv.Babel.convert lem.gc_concl
-                       ~src:Equiv.Any_t ~dst:k ~loc:(L.loc name) }
+        { Goal.name = `Lemma lem.Goal.name ;
+          system = lem.system ;
+          ty_vars = lem.ty_vars ;
+          formula = Equiv.Babel.convert lem.formula
+                      ~src:Equiv.Any_t ~dst:k ~loc:(L.loc name) }
 
   (*------------------------------------------------------------------*)
   let decompose_forall_k : type a. a Equiv.f_kind -> a -> Vars.evars * a =
@@ -87,11 +90,11 @@ struct
   (*------------------------------------------------------------------*)
   (** Parse a partially applied lemma or hypothesis as a pattern. *)
   let convert_pt_hol : type a.
-    Theory.p_pt_hol -> a Equiv.f_kind -> S.t -> Goal.ghyp * a Match.pat =
+    Theory.p_pt_hol -> a Equiv.f_kind -> S.t -> ghyp * a Match.pat =
     fun pt f_kind s ->
 
-    let lem = get_k_hyp_or_lemma f_kind pt.p_pt_hid s in
-    let f_args, f = decompose_forall_k f_kind lem.gc_concl in
+    let lem = get_assumption f_kind pt.p_pt_hid s in
+    let f_args, f = decompose_forall_k f_kind lem.formula in
     let f_args, subst = Term.erefresh_vars `Global f_args in
     let f = Equiv.Babel.subst f_kind subst f in
 
@@ -124,11 +127,11 @@ struct
     let f = Equiv.Babel.subst f_kind subst f in
 
     let pat = Match.{ 
-        pat_tyvars = lem.gc_tyvars;
+        pat_tyvars = lem.ty_vars;
         pat_vars = !pat_vars;
         pat_term = f; } 
     in      
-    lem.gc_name, pat
+    lem.name, pat
 
   (*------------------------------------------------------------------*)
   module Reduce = Reduction.Mk(S)

@@ -24,7 +24,7 @@ val init :
   hint_db:Hint.hint_db ->
   ty_vars:Type.tvars ->
   env:Vars.env ->
-  goal:Term.message ->
+  Term.message ->
   sequent
   
 (** Project diff-operators occurring in a sequent;

@@ -1933,8 +1933,8 @@ let reach_equiv_transform biframe term =
   aux term
 
 let reach_equiv Args.(String id) (s : TS.t) =
-  match TS.get_k_hyp_or_lemma Equiv.Global_t id s with
-    | { gc_concl = Atom (Equiv biframe) } ->
+  match TS.get_assumption Equiv.Global_t id s with
+    | { formula = Atom (Equiv biframe) } ->
         let sys = TS.system s in
         begin match sys with
           | SystemExpr.Single _ -> ()

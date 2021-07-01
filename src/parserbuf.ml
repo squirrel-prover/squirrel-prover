@@ -34,9 +34,9 @@ let pp_error pp_loc pp_pref_loc e = match e with
   | _ -> None
 
 let pp_loc interactive filename lexbuf ppf () =
-  if not(interactive) then
+  if not interactive then
     Fmt.pf ppf
-      " in %s @,\
+      "in %s @,\
        at line %d char %d @,\
        before %S"
       filename
@@ -55,7 +55,7 @@ let pp_loc interactive filename lexbuf ppf () =
 
 let pp_pref_loc interactive lexbuf ppf () =
   if interactive then
-        Fmt.pf ppf
+    Fmt.pf ppf
       "[error-%d-%d]"
       (Lexing.lexeme_start_p lexbuf).pos_cnum
       (Lexing.lexeme_end_p lexbuf).pos_cnum

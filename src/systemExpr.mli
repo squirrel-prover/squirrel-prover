@@ -129,6 +129,8 @@ type p_system_expr =
   | P_SimplePair of lsymb
   | P_Pair       of p_single_system * p_single_system
 
+type parsed = p_system_expr
+
 val parse_single : Symbols.table -> p_single_system -> single_system
 val parse_se     : Symbols.table -> p_system_expr   -> t
 

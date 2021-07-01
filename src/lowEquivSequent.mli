@@ -17,8 +17,14 @@ include LowSequent.S with
   * For more general cases, the global meta-formula used as conclusion
   * can include implications. *)
 val init : 
-  SystemExpr.t -> Symbols.table -> Hint.hint_db ->
-  Vars.env -> ?hyp:Equiv.form -> Equiv.form -> t
+  system:SystemExpr.t ->
+  table:Symbols.table ->
+  hint_db:Hint.hint_db ->
+  ty_vars:Type.tvars ->
+  env:Vars.env ->
+  ?hyp:Equiv.form ->
+  Equiv.form ->
+  t
 
 (** Special pretty-printer for initial sequents.
   * It does not display hypotheses, which might be misleading. *)

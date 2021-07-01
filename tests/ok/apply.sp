@@ -110,70 +110,77 @@ Proof.
 Qed.
 
 (*==================================================================*)
-(* test equiv apply *)
+(* test global apply *)
 
-equiv _ (x, y : message) : x, y -> x.
+global goal _ (x, y : message) : equiv(x, y) -> equiv(x).
 Proof. 
  intro H; apply H. 
 Qed.
 
-equiv _ (x, y : message) : y, x -> x.
+global goal _ (x, y : message) : equiv(y, x) -> equiv(x).
 Proof. 
  intro H; apply H. 
 Qed.
 
-(* equiv _ (x, y : message) : [a = b] -> ([a = b] -> y, x) -> x. *)
+(* equiv _ (x, y : message) : [a = b] -> ([a = b] -> equiv(y, x)) -> equiv(x). *)
 (* Proof. *)
 (*  intro H0 H; apply H; assumption. *)
 (* Qed. *)
 
-equiv _ (x, y : message) : x -> x, y.
+global goal _ (x, y : message) : equiv(x) -> equiv(x, y).
 Proof. 
  checkfail intro H; try apply H; auto exn GoalNotClosed. 
 Abort.
 
-equiv _ (x : message) : seq (i -> <ok(i), x>) -> seq (i -> <ok(i), x>).
-Proof. 
+global goal _ (x : message) :
+  equiv(seq (i -> <ok(i), x>)) ->
+  equiv(seq (i -> <ok(i), x>)).
+Proof.
  intro H; apply H.
 Qed.
 
 (*------------------------------------------------------------------*)
 (* matching under binders *)
 
-equiv _ (x : message) : seq (i -> <ok(i), x>) -> seq (i -> <ok(i), x>).
+global goal _ (x : message) :
+  equiv(seq (i -> <ok(i), x>)) ->
+  equiv(seq (i -> <ok(i), x>)).
 Proof. 
  intro H; apply H.
 Qed.
 
 (* with alpha-renaming *)
-equiv _ (x : message) : seq (i -> <ok(i), x>) -> seq (j -> <ok(j), x>).
-Proof. 
+global goal _ (x : message) :
+  equiv(seq (i -> <ok(i), x>)) ->
+  equiv(seq (j -> <ok(j), x>)).
+Proof.
  intro H; apply H.
 Qed.
 
-(* TODO: commented out as we cannot (yet) parse general equivalence formulas. *)
-(* equiv _ (y : message) :  *)
-(*   (forall (x : message), seq (i -> <ok(i), x>)) -> seq (j -> <ok(j), f(y)>). *)
-(* Proof.  *)
-(*  intro H; apply H. *)
-(* Qed. *)
+global goal _ (y : message) :
+  (forall (x : message), equiv(seq (i -> <ok(i), x>))) ->
+  equiv(seq (j -> <ok(j), f(y)>)).
+Proof.
+ intro H; apply H.
+Qed.
 
-(* equiv _ (y : message) :  *)
-(*   (forall (x : message), seq (i -> <ok(i), x>)) -> seq (j -> <ok(j), ok(i)>). *)
-(* Proof.  *)
-(*  checkfail intro H; try by apply H exn GoalNotClosed. *)
-(* Abort. *)
+global goal _ (y : message) :
+ (forall (x : message), equiv(seq (i -> <ok(i), x>))) ->
+ equiv(seq (j -> <ok(j), ok(j)>)).
+Proof.
+ checkfail intro H; try by apply H exn GoalNotClosed.
+Abort.
 
 (* with a sequence *)
 name m : index -> message.
-equiv _ : seq(i->m(i)) -> seq(k->m(k)).
+global goal _ : equiv(seq(i->m(i))) -> equiv(seq(k->m(k))).
 Proof. 
  intro H; apply H.
 Qed.
 
 (* with a sequence over two indices *)
 name n : index -> index -> message.
-equiv _ : seq(i,j->n(i,j)) -> seq(k,l->n(k,l)).
+global goal _ : equiv(seq(i,j->n(i,j))) -> equiv(seq(k,l->n(k,l))).
 Proof. 
  intro H; apply H.
 Qed.
@@ -181,18 +188,18 @@ Qed.
 (*------------------------------------------------------------------*)
 (* apply modulo FA *)
 
-equiv _ (x, y : message) : x,y -> <x, y>.
+global goal _ (x, y : message) : equiv(x,y) -> equiv(<x, y>).
 Proof.
  intro H; apply H.
 Qed.
 
 abstract n0 : message.
-equiv _ (x, y : message) : x -> n0, y.
+global goal _ (x, y : message) : equiv(x) -> equiv(n0, y).
 Proof. 
  checkfail (intro H; by try apply H) exn GoalNotClosed.
 Abort.
 
-equiv _ (x,y,z : message) : x,z -> <x, y>.
+global goal _ (x,y,z : message) : equiv(x,z) -> equiv(<x, y>).
 Proof.
  checkfail (intro H; by try apply H) exn GoalNotClosed.
 Abort.
@@ -201,50 +208,49 @@ Abort.
 (* apply modulo FA dup *)
 
 (* with input *)
-equiv _ (t : timestamp) : frame@t -> input@t.
+global goal _ (t : timestamp) : equiv(frame@t) -> equiv(input@t).
 Proof.
  intro H; apply H.
 Qed.
 
-equiv _ (t : timestamp) : frame@t -> input@pred(pred(t)).
+global goal _ (t : timestamp) : equiv(frame@t) -> equiv(input@pred(pred(t))).
 Proof.
  intro H; apply H.
 Qed.
 
-equiv _ (t : timestamp) : frame@pred(t) -> input@t.
+global goal _ (t : timestamp) : equiv(frame@pred(t)) -> equiv(input@t).
 Proof.
  intro H; apply H.
 Qed.
 
-equiv _ (t, t' : timestamp) : frame@t -> input@t'.
+global goal _ (t, t' : timestamp) : equiv(frame@t) -> equiv(input@t').
 Proof.
  checkfail (intro H; by try apply H) exn GoalNotClosed.
 Abort.
 
-equiv _ (t : timestamp) : input@t -> frame@t.
+global goal _ (t : timestamp) : equiv(input@t) -> equiv(frame@t).
 Proof.
  checkfail (intro H; by try apply H) exn GoalNotClosed.
 Abort.
 
 (* with exec *)
-equiv _ (t : timestamp) : frame@t -> exec@t.
+global goal _ (t : timestamp) : equiv(frame@t) -> equiv(exec@t).
 Proof.
  intro H; apply H.
 Qed.
 
-equiv _ (t : timestamp) : frame@pred(t) -> exec@t.
+global goal _ (t : timestamp) : equiv(frame@pred(t)) -> equiv(exec@t).
 Proof.
  checkfail (intro H; by try apply H) exn GoalNotClosed.
 Abort.
 
 (* with frame *)
-equiv _ (t : timestamp) : frame@t -> frame@t.
+global goal _ (t : timestamp) : equiv(frame@t) -> equiv(frame@t).
 Proof.
  intro H; apply H.
 Qed.
 
-equiv _ (t : timestamp) : frame@pred(t) -> frame@t.
+global goal _ (t : timestamp) : equiv(frame@pred(t)) -> equiv(frame@t).
 Proof.
  checkfail (intro H; by try apply H) exn GoalNotClosed.
 Abort.
-

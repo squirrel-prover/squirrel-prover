@@ -3,15 +3,18 @@ set autoIntro=false.
 abstract foo : message
 system null.
 
-equiv one (tau:timestamp) : frame@pred(tau) -> frame@pred(tau), input@tau.
+global goal one (tau:timestamp) :
+  equiv(frame@pred(tau)) ->
+  equiv(frame@pred(tau), input@tau).
 Proof.
   nosimpl(intro H).
   nosimpl(fadup).
   assumption.
 Qed.
 
-equiv two (tau:timestamp) : frame@pred(tau) ->
-                            frame@pred(tau), exec@pred(tau) && output@pred(tau) = foo.
+global goal two (tau:timestamp) :
+  equiv(frame@pred(tau)) ->
+  equiv(frame@pred(tau), exec@pred(tau) && output@pred(tau) = foo).
 Proof.
   nosimpl(intro H).
   checkfail (fadup;assumption) exn NotHypothesis.
@@ -19,8 +22,9 @@ Proof.
   fadup; assumption.
 Qed.
 
-equiv three (tau:timestamp) : frame@pred(tau) ->
-                              frame@pred(tau), output@pred(tau) = foo.
+global goal three (tau:timestamp) :
+  equiv(frame@pred(tau)) ->
+  equiv(frame@pred(tau), output@pred(tau) = foo).
 Proof.
   nosimpl(intro H).
   checkfail fadup 1 exn Failure.

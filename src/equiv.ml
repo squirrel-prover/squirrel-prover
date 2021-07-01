@@ -74,11 +74,11 @@ let rec pp fmt = function
     Fmt.pf fmt "@[<v 2>%a ->@ %a@]" pp f0 pp f
 
   | Quant (ForAll, vs, f) -> 
-    Fmt.pf fmt "@[<v 2>forall (@[%a@]),@ %a@]"
+    Fmt.pf fmt "@[<v 2>Forall (@[%a@]),@ %a@]"
       Vars.pp_typed_list vs pp f
 
   | Quant (Exists, vs, f) -> 
-    Fmt.pf fmt "@[<v 2>exists (@[%a@]),@ %a@]"
+    Fmt.pf fmt "@[<v 2>Exists (@[%a@]),@ %a@]"
       Vars.pp_typed_list vs pp f
 
 let mk_quant q evs f = match evs, f with

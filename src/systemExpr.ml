@@ -344,6 +344,8 @@ type p_system_expr =
   | P_SimplePair of lsymb
   | P_Pair       of p_single_system * p_single_system
 
+type parsed = p_system_expr
+
 let pp_p_single fmt = function
   | P_Left id  -> Fmt.pf fmt "%s/left"  (L.unloc id)
   | P_Right id -> Fmt.pf fmt "%s/right" (L.unloc id)

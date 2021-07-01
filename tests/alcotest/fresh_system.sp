@@ -6,9 +6,8 @@ name n : message
 
 system A : !_i new a; out(c,diff(a,n)).
 
-equiv test (i, j:index) :
-  [happens(A(i), A(j))] -> output@A(i), output@A(j).
-
+global goal test (i, j:index) :
+  [happens(A(i), A(j))] -> equiv(output@A(i),output@A(j)).
 Proof.
   intro Hap.  
   rewrite /output.
