@@ -291,166 +291,167 @@ let () =
   Checks.add_suite "Tactics" [
     "Exists Intro", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/existsintro_fail.sp" with
            | Theory.(Conv (_, Undefined "a1")) -> raise Ok)
     end ;
     "TS not leq", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/ts_leq_not_lt.sp" with
            | Unfinished -> raise Ok)
     end ;
     "SEnc Bad SSC - INTCTXT 1", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/intctxt_nornd.sp" with
            | Tactic_soft_failure (_,SEncNoRandom) -> raise Ok)
     end ;
     "SEnc Bad SSC - INTCTXT 2", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/intctxt_rndnotfresh.sp" with
            | Tactic_soft_failure (_,SEncRandomNotFresh) -> raise Ok)
     end ;
     "Senc Bad SSC - INTCTXT 3", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/intctxt_sharedrnd.sp" with
            | Tactic_soft_failure (_,SEncSharedRandom) -> raise Ok)
     end ;
     "Senc Bad SSC - INTCTXT 4", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/intctxt_sharedrndind.sp" with
            | Tactic_soft_failure (_,SEncSharedRandom) -> raise Ok)
     end ;
     "Senc Bad SSC - CCA 1", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/cca_sharedrnd.sp" with
            | Tactic_soft_failure (_,SEncSharedRandom) -> raise Ok)
     end ;
     "Senc Bad SSC - CCA 2", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/cca_sharedrndframe.sp" with
            | Tactic_soft_failure (_,SEncSharedRandom) -> raise Ok)
     end ;
     "Senc Bad SSC - CCA 3", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/cca_nornd.sp" with
            | Tactic_soft_failure (_,SEncNoRandom) -> raise Ok)
     end ;
     "Axiom Systems - 0", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/axiom2.sp" with
            | Tactic_hard_failure (_,NoAssumpSystem) -> raise Ok)
     end ;
     "Axiom Systems - 1", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/axiom3.sp" with
            | Symbols.SymbError (_, Symbols.Unbound_identifier "test") ->
              raise Ok)
     end ;
     "Substitution no capture", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/capture.sp" with
            | Unfinished -> raise Ok)
     end ;
     "Not Depends", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok        
-        (fun () -> 
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
            try run ~test "tests/alcotest/depends.sp" with
            | Tactic_soft_failure (_, Tactics.NotDepends ("A1(i)","A1(i)"))
              -> raise Ok)
     end ;
     "Fresh Not Ground", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/fresh_reach_var.sp" with
            | Tactic_soft_failure
-               (_, Tactics.Failure "can only be applied on ground terms") -> 
+               (_, Tactics.Failure "can only be applied on ground terms") ->
              raise Ok)
     end ;
     "Check equalities false if unsupported terms", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok       
-        (fun () -> 
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
            try run ~test "tests/alcotest/completion_unsupported_term.sp" with
            | Unfinished -> raise Ok)
     end ;
     "Indexed abstract", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/idx_abs.sp" with
            | Tactic_soft_failure (_,Tactics.GoalNotClosed) -> raise Ok)
     end ;
     "Indexed collision", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok        
-        (fun () -> 
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
            try run ~test "tests/alcotest/idx_collision.sp" with
            | Unfinished -> raise Ok)
     end ;
     "Find equality", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/try.sp" with
            | Tactic_soft_failure (_,CongrFail) -> raise Ok)
     end ;
     "Undo does not maintain old truth", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/undo.sp" with
            | Unfinished -> raise Ok)
     end ;
   ] ;
   Checks.add_suite "Equivalence" [
     "Fresh Frame", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok     
-        (fun () -> 
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
            try run ~test "tests/alcotest/fresh_frame.sp" with
            | Unfinished -> raise Ok)
     end ;
     "Fresh System", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/fresh_system.sp" with
-           | Tactics.Tactic_soft_failure (_,Tactics.GoalNotClosed) -> 
+           | Tactics.Tactic_soft_failure (_,Tactics.GoalNotClosed) ->
              raise Ok)
     end ;
     "DDH", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/ddh.sp" with
            | Tactic_soft_failure (_,Tactics.NotDDHContext) -> raise Ok)
     end ;
 
     "FA Dup Input", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/fadup_input.sp" with
            | Tactic_soft_failure (_,Tactics.NoReflMacroVar) -> raise Ok)
     end ;
     "XOR", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/xor.sp" with
            | Unfinished -> raise Ok)
     end ;
     "XOR2", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/xor2.sp" with
-           | Tactic_soft_failure (_, Failure "name is not XORed on both sides") -> 
+           | Tactic_soft_failure
+               (_, Failure "name is not XORed on both sides") ->
              raise Ok)
     end ;
     "Not XOR", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/notxor.sp" with
            | Tactic_soft_failure
                (_, Failure "Can only apply xor tactic on terms of the form u XOR v")  ->
@@ -458,7 +459,7 @@ let () =
     end ;
     "Pred Init", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try run ~test "tests/alcotest/pred.sp" with
            | Unfinished -> raise Ok)
     end ;
