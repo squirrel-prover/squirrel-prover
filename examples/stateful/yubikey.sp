@@ -16,12 +16,14 @@ According to the specification in Robert's thesis, AES is used.
 WARNING The proof relies on intctxt... not sure that this is legitimate.
 
 PROOFS 
-- counterIncrease
-- noreplay
-- monotonicity
-- authentication (non-injective and injective)
-- lastUpdate (but not useful)
+The 3 security properties as stated in the PhD thesis of R. Kunneman
+- Property 1: no replaycounter
+- Property 2: injective correspondance
+- Property 3: monotonicity
 
+We start by establishing that counters are increasing on the Server side.
+
+Several lemmas are stated and proved at the end of the file
 *******************************************************************************)
 
 set autoIntro = false.
@@ -134,8 +136,6 @@ Proof. auto. Qed.
 hint rewrite dec_enc.
 
 
-(* PROOF *)
-
 axiom orderTrans (n1,n2,n3:message):
   n1 ~< n2 = orderOk && n2 ~< n3 = orderOk => n1 ~< n3 = orderOk.
 
@@ -144,6 +144,9 @@ axiom orderStrict (n1,n2:message):
   
 axiom orderSucc (n1:message):
 n1 ~< mySucc(n1) = orderOk.
+
+
+(* Some properties on the counter on the server side *)
 
 (* The counter SCpt(i) strictly increases when t is an action S performed by 
 the server with tag i. *)
@@ -204,6 +207,342 @@ Proof.
       simpl.
       executable t => // H1. 
       by apply H1.
+Qed.
+
+
+(* Property 1 - No replay relying on an invariant *)
+
+goal noreplayInv (ii, ii1, i:index):
+   happens(S(ii1,i),S(ii,i)) =>
+   exec@S(ii1,i) && S(ii,i) < S(ii1,i) => 
+   SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk.
+Proof.
+  intro Hap [Hexec Ht].
+  use counterIncreaseStrictly with ii1, i as M0 => //.
+  assert (S(ii,i) = pred(S(ii1,i)) || S(ii,i) < pred(S(ii1,i))) as H1; 
+  1: constraints.
+  case H1.
+
+  (* case S(ii,i) = pred(S(ii1,i)) *)
+  congruence.
+
+  (* case S(ii,i) < pred(S(ii1,i)) *)
+  use counterIncreaseBis with pred(S(ii1,i)),S(ii,i),i as H2 => //.
+  case H2 => //; 1: by apply orderTrans _ (SCpt(i)@pred(S(ii1,i))) _.
+
+  simpl.
+  executable S(ii1,i) => // H.
+  by apply H.
+Qed.
+
+
+goal noreplay (ii, ii1, i:index):
+  happens(S(ii1,i)) =>
+  exec@S(ii1,i) && S(ii,i) <= S(ii1,i) && SCpt(i)@S(ii,i) = SCpt(i)@S(ii1,i) => 
+  ii = ii1.
+Proof.
+  intro Hap [Hexec Ht Meq].
+  assert (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i)) as H1; 1: constraints.
+  case H1 => //.
+
+  use noreplayInv with ii, ii1, i as M1 => //. 
+  by apply orderStrict in Meq.
+Qed.
+
+
+(* Property 2 *)
+(* injective correspondance as stated in the PhD thesis of R. Kunneman *)
+
+goal injective_correspondance (ii,i:index):
+   happens(S(ii,i)) =>
+   exec@S(ii,i) =>
+     exists (j:index),
+       Press(i,j) < S(ii,i) && cpt(i,j)@Press(i,j) = SCpt(i)@S(ii,i)
+&& 
+       forall (ii1:index), happens(S(ii1,i)) =>
+            exec@S(ii1,i) =>
+            cpt(i,j)@Press(i,j) = SCpt(i)@S(ii1,i) => ii1 = ii.
+
+Proof.
+intro Hap Hexec.
+executable S(ii,i) => //.
+intro exec.
+expand exec, cond.
+destruct Hexec as [Hexecpred [Mneq Hcpt Hpid]].
+intctxt Mneq => //.
+intro Ht M1 *.
+exists j.
+split => //.
+assert (cpt(i,j)@Press(i,j) = SCpt(i)@S(ii,i)) => //.
+
+
+intro ii' Hap' Hexec'.
+intro Eq => //. 
+assert (SCpt(i)@S(ii,i) = SCpt(i)@S(ii',i)) => //.
+assert (S(ii,i) = S(ii',i) || S(ii,i) < S(ii',i) || S(ii,i) > S(ii',i)) => //.
+case H => //.
+
+(* 1st case: S(ii,i) < S(ii',i) *)
+assert (S(ii,i) = pred(S(ii',i)) || S(ii,i) < pred(S(ii',i))) => //.
+case H0 => //.
+
+
+(* S(ii,i) = pred(S(ii',i) < S(ii',i) *)
+use counterIncreaseStrictly with ii',i => //.
+subst  S(ii,i), pred(S(ii',i)) => //.
+by use orderStrict with SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //.
+
+
+(* S(ii,i) < pred(S(ii',i))  < S(ii',i) *)
+use counterIncreaseStrictly with ii',i => //.
+use counterIncreaseBis with pred(S(ii',i)), S(ii,i), i => //.
+case H1.
+
+use orderTrans with SCpt(i)@S(ii,i), SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //.
+by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //.
+
+subst SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii,i).
+by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //.
+split=> //.
+by expand exec => //.
+
+(* 2nd case: S(ii,i) > S(ii',i) *)
+assert (pred(S(ii,i)) = S(ii',i) || pred(S(ii,i)) > S(ii',i)) => //.
+case H0 => //.
+
+(* S(ii,i) > pred(S(ii,i)) = S(ii',i) *)
+use counterIncreaseStrictly with ii,i => //.
+subst S(ii',i), pred(S(ii,i)).
+by use orderStrict with SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //.
+
+(* S(ii,i) > pred(S(ii,i)) >  S(ii',i) *)
+use counterIncreaseStrictly with ii,i => //.
+use counterIncreaseBis with pred(S(ii,i)), S(ii',i), i => //.
+case H1.
+
+use orderTrans with SCpt(i)@S(ii',i), SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //.
+by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //.
+
+
+subst SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii',i).
+by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //.
+Qed.
+
+
+(* Property 3 *)
+(* Monotonicity *)
+
+goal monotonicity (ii, ii1, i:index):
+  happens(S(ii1,i),S(ii,i)) =>
+  exec@S(ii1,i) && exec@S(ii,i) && 
+  SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk => 
+  S(ii,i) < S(ii1,i).
+Proof.
+  intro Hap [Hexec H].
+  assert
+    (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i) || S(ii,i) > S(ii1,i)) as Ht;
+  1: constraints.
+  case Ht.
+
+  (* case S(ii,i) = S(ii1,i) *)
+  by use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii,i).
+
+  (* case S(ii,i) < S(ii1,i) *)
+  assumption.
+
+  (* case S(ii,i) > S(ii1,i) *)
+  use noreplayInv with ii1, ii, i as Meq => //.
+  (* apply orderTrans _ (SCpt(i)@S(ii1,i)) in H => //. *)
+  use orderTrans with SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i), SCpt(i)@S(ii,i) => //.
+  by use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii,i).
+Qed.
+
+
+
+(******************************************************************************)
+(******************************************************************************)
+
+(* Non-injective version of authentication but, since the encryption outputted
+by the yubikey contains a random number, this property should imply 
+the injective one. *)
+goal auth (ii,i:index):
+  happens(S(ii,i)) =>
+  cond@S(ii,i) =>
+  exists (j:index), 
+    Press(i,j) < S(ii,i) 
+    && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i))).
+Proof.
+  intro Hap Hcond.
+  expand cond.
+  destruct Hcond as [Mneq Morder Meq].
+  intctxt Mneq => *; 1: by exists j.
+  auto.
+Qed.
+
+
+(* A first injective version for authentication. *)
+(* WARNING - There is an admit which is true in the symbolic setting,
+but we need an hypothesis in the computational model. *)
+goal auth_injective_bis (ii,i:index):
+  happens(S(ii,i)) =>
+  cond@S(ii,i) =>
+    exists (j:index), 
+     (Press(i,j) < S(ii,i) && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i))))
+     && forall (j':index), 
+       (Press(i,j') < S(ii,i) && 
+       snd(snd(output@Press(i,j'))) = snd(snd(input@S(ii,i)))) => 
+         j=j'.
+Proof.
+  intro Hap Hcond.
+  expand cond.
+  destruct Hcond as [Mneq Morder Meq].
+  intctxt Mneq => // Ht Meq' *.
+
+  exists j. 
+  simpl. 
+  split; 1: auto.
+  intro j' [Ht' Meq''].
+  expand output => /=.
+  rewrite -Meq' in Meq''.
+  assert (npr(i,j) = npr(i,j')) as H1. 
+  admit.
+  by eqnames.
+Qed.
+
+(* Another injective version for authentication. *)
+goal auth_injective (ii,i:index):
+   happens(S(ii,i)) =>
+   exec@S(ii,i) =>
+     exists (j:index),
+       Press(i,j) < S(ii,i) && 
+       snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i))) && 
+       forall (ii1:index), happens(S(ii1,i)) =>
+            exec@S(ii1,i) =>
+            snd(snd(output@Press(i,j))) = snd(snd(input@S(ii1,i))) =>
+            SCpt(i)@S(ii,i) = SCpt(i)@S(ii1,i) => 
+            ii1 = ii.
+Proof.
+  intro Hap Hexec.
+  expand exec, cond.
+  destruct Hexec as [Hpred [Mneq M1 M2]].
+  intctxt Mneq; 2: intro *; congruence.
+  intro Ht M3 *.
+  exists j.
+  split; 1: auto. 
+  intro ii1 Hap' Hexec' M4 M5.
+  expand exec, cond, output.
+  destruct Hexec' as [Hpred' [Mneq' M6 M7]].
+  assert
+   ( S(ii,i) < S(ii1,i) || S(ii,i) = S(ii1,i) || S(ii,i) > S(ii1,i) ) as H;
+  1: constraints.
+  case H; 2: auto.
+
+  (* A: case S(ii,i) < S(ii1,i) *)
+  assert SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk as M8.
+  assert
+   ( S(ii,i) < pred(S(ii1,i)) || 
+     S(ii,i) = pred(S(ii1,i)) || 
+     S(ii,i) > pred(S(ii1,i)) ) as H'; 1: constraints.
+
+  case H'; 2,3: auto. 
+  (* case S(ii,i) < pred(S(ii1,i)) *)
+  use counterIncreaseBis with pred(S(ii1,i)),S(ii,i),i as Hcpt => //.
+  case Hcpt => //.
+  by apply orderTrans _ (SCpt(i)@pred(S(ii1,i))).
+
+  (* S(ii,i) = pred(S(ii1,i)) *)
+  by apply orderStrict in M5. 
+
+
+  (* B: case S(ii,i) > S(ii1,i) *)
+  assert SCpt(i)@S(ii1,i) ~< SCpt(i)@S(ii,i) = orderOk as M8.
+  assert
+   ( S(ii1,i) < pred(S(ii,i)) || 
+     S(ii1,i) = pred(S(ii,i)) || 
+     S(ii1,i) > pred(S(ii,i)) ) as H'; 1: constraints.
+  case H'; 2,3: auto. 
+  (* case S(ii1,i) < pred(S(ii,i)) *)
+  use counterIncreaseBis with pred(S(ii,i)),S(ii1,i),i as Hcpt => //.
+  case Hcpt; 
+  [ 1: by apply orderTrans _ (SCpt(i)@pred(S(ii,i))) |
+    2: auto].
+
+  by apply orderStrict in M5. 
+Qed.
+
+
+
+(* This lemma is not useful for the previous proofs. *)
+goal lastUpdateServer_ (t:timestamp, i:index):
+  happens(t) =>
+  (SCpt(i)@t = SCpt(i)@init && 
+   forall (ii:index), happens(S(ii,i)) => t<S(ii,i))
+   ||
+   exists (ii:index), 
+     SCpt(i)@t = SCpt(i)@S(ii,i) && S(ii,i) <= t &&
+     forall (ii':index), 
+        happens(S(ii',i)) => S(ii',i) <= S(ii,i) || t < S(ii',i).
+Proof.
+  generalize t i.
+  induction => t IH0 i Hap.
+  case t;
+  try (
+    intro Eq; repeat destruct Eq as [_ Eq];
+    use IH0 with pred(t),i as H1 => //;
+    clear IH0;
+    expand SCpt;
+    destruct H1 as [[_ H3] | [mi [_ _ H1]]];
+    [ 1: left => /= mi *;
+         by use H3 with mi |
+      2: right;
+         exists mi => /= jj' Hap';
+         use H1 with jj' as H2 => //;
+         by case H2; [ 1: left | 2 : right]]).
+
+  (* init *)
+  by intro *; left.
+
+  (* interesting case *)
+  intro [ii i0 _].
+  use IH0 with pred(t),i as H1; 2,3: auto.
+  case H1.
+
+    (**)
+    destruct H1 as [H2 H3].
+    case (i=i0) => H4.
+    (* i = i0 *)
+    right.
+    exists ii => /= ii' _. 
+    by use H3 with ii'.
+
+    (* i <> i0 *)
+    left. 
+    expand SCpt.
+    rewrite if_false => // /=.
+    intro ii0 _.
+    by use H3 with ii0.
+
+    (**)
+    simpl_left.
+    case (i=i0) => H2.
+    case (ii=ii0) => H3.
+
+    (* i = i0 && ii = i0 *)
+    constraints.
+    (* i = i0 && ii <> i0 *)
+    right.
+    exists ii. 
+    simpl.
+    auto.
+
+    (* i <> i0 *)
+    right.
+    exists ii0. 
+    simpl.
+    split; 1: by rewrite /SCpt if_false.
+    intro ii' _.
+    use H0 with ii' as Ht; 2: assumption.
+    by case Ht.
 Qed.
 
 
@@ -297,6 +636,7 @@ Proof.
       by apply H1.
 Qed.
 
+
 (* Authentication following a suggestion of Adrien *)
 
 goal auth_injective_ter (ii,i:index):
@@ -384,253 +724,3 @@ use orderSucc with YCpt(i)@pred(Press(i,j')) => //.
 use orderStrict with YCpt(i)@pred(Press(i,j')), mySucc(YCpt(i)@pred(Press(i,j'))) => //.
 Qed.
 
-
-
-
-(* Some security properties *)
-
-
-goal noreplayInv (ii, ii1, i:index):
-   happens(S(ii1,i),S(ii,i)) =>
-   exec@S(ii1,i) && S(ii,i) < S(ii1,i) => 
-   SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk.
-Proof.
-  intro Hap [Hexec Ht].
-  use counterIncreaseStrictly with ii1, i as M0 => //.
-  assert (S(ii,i) = pred(S(ii1,i)) || S(ii,i) < pred(S(ii1,i))) as H1; 
-  1: constraints.
-  case H1.
-
-  (* case S(ii,i) = pred(S(ii1,i)) *)
-  congruence.
-
-  (* case S(ii,i) < pred(S(ii1,i)) *)
-  use counterIncreaseBis with pred(S(ii1,i)),S(ii,i),i as H2 => //.
-  case H2 => //; 1: by apply orderTrans _ (SCpt(i)@pred(S(ii1,i))) _.
-
-  simpl.
-  executable S(ii1,i) => // H.
-  by apply H.
-Qed.
-
-
-goal noreplay (ii, ii1, i:index):
-  happens(S(ii1,i)) =>
-  exec@S(ii1,i) && S(ii,i) <= S(ii1,i) && SCpt(i)@S(ii,i) = SCpt(i)@S(ii1,i) => 
-  ii = ii1.
-Proof.
-  intro Hap [Hexec Ht Meq].
-  assert (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i)) as H1; 1: constraints.
-  case H1 => //.
-
-  use noreplayInv with ii, ii1, i as M1 => //. 
-  by apply orderStrict in Meq.
-Qed.
-
-
-goal monotonicity (ii, ii1, i:index):
-  happens(S(ii1,i),S(ii,i)) =>
-  exec@S(ii1,i) && exec@S(ii,i) && 
-  SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk => 
-  S(ii,i) < S(ii1,i).
-Proof.
-  intro Hap [Hexec H].
-  assert
-    (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i) || S(ii,i) > S(ii1,i)) as Ht;
-  1: constraints.
-  case Ht.
-
-  (* case S(ii,i) = S(ii1,i) *)
-  by use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii,i).
-
-  (* case S(ii,i) < S(ii1,i) *)
-  assumption.
-
-  (* case S(ii,i) > S(ii1,i) *)
-  use noreplayInv with ii1, ii, i as Meq => //.
-  (* apply orderTrans _ (SCpt(i)@S(ii1,i)) in H => //. *)
-  use orderTrans with SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i), SCpt(i)@S(ii,i) => //.
-  by use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii,i).
-Qed.
-
-(* Non-injective version of authentication but, since the encryption outputted
-by the yubikey contains a random number, this property should imply 
-the injective one. *)
-goal auth (ii,i:index):
-  happens(S(ii,i)) =>
-  cond@S(ii,i) =>
-  exists (j:index), 
-    Press(i,j) < S(ii,i) 
-    && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i))).
-Proof.
-  intro Hap Hcond.
-  expand cond.
-  destruct Hcond as [Mneq Morder Meq].
-  intctxt Mneq => *; 1: by exists j.
-  auto.
-Qed.
-
-(* A first injective version for authentication. *)
-(* WARNING - There is an admit which is true in the symbolic setting,
-but we need an hypothesis in the computational model. *)
-goal auth_injective_bis (ii,i:index):
-  happens(S(ii,i)) =>
-  cond@S(ii,i) =>
-    exists (j:index), 
-     (Press(i,j) < S(ii,i) && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i))))
-     && forall (j':index), 
-       (Press(i,j') < S(ii,i) && 
-       snd(snd(output@Press(i,j'))) = snd(snd(input@S(ii,i)))) => 
-         j=j'.
-Proof.
-  intro Hap Hcond.
-  expand cond.
-  destruct Hcond as [Mneq Morder Meq].
-  intctxt Mneq => // Ht Meq' *.
-
-  exists j. 
-  simpl. 
-  split; 1: auto.
-  intro j' [Ht' Meq''].
-  expand output => /=.
-  rewrite -Meq' in Meq''.
-  assert (npr(i,j) = npr(i,j')) as H1. 
-  admit.
-  by eqnames.
-Qed.
-
-(* Another injective version for authentication. *)
-goal auth_injective (ii,i:index):
-   happens(S(ii,i)) =>
-   exec@S(ii,i) =>
-     exists (j:index),
-       Press(i,j) < S(ii,i) && 
-       snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i))) && 
-       forall (ii1:index), happens(S(ii1,i)) =>
-            exec@S(ii1,i) =>
-            snd(snd(output@Press(i,j))) = snd(snd(input@S(ii1,i))) =>
-            SCpt(i)@S(ii,i) = SCpt(i)@S(ii1,i) => 
-            ii1 = ii.
-Proof.
-  intro Hap Hexec.
-  expand exec, cond.
-  destruct Hexec as [Hpred [Mneq M1 M2]].
-  intctxt Mneq; 2: intro *; congruence.
-  intro Ht M3 *.
-  exists j.
-  split; 1: auto. 
-  intro ii1 Hap' Hexec' M4 M5.
-  expand exec, cond, output.
-  destruct Hexec' as [Hpred' [Mneq' M6 M7]].
-  assert
-   ( S(ii,i) < S(ii1,i) || S(ii,i) = S(ii1,i) || S(ii,i) > S(ii1,i) ) as H;
-  1: constraints.
-  case H; 2: auto.
-
-  (* A: case S(ii,i) < S(ii1,i) *)
-  assert SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk as M8.
-  assert
-   ( S(ii,i) < pred(S(ii1,i)) || 
-     S(ii,i) = pred(S(ii1,i)) || 
-     S(ii,i) > pred(S(ii1,i)) ) as H'; 1: constraints.
-
-  case H'; 2,3: auto. 
-  (* case S(ii,i) < pred(S(ii1,i)) *)
-  use counterIncreaseBis with pred(S(ii1,i)),S(ii,i),i as Hcpt => //.
-  case Hcpt => //.
-  by apply orderTrans _ (SCpt(i)@pred(S(ii1,i))).
-
-  (* S(ii,i) = pred(S(ii1,i)) *)
-  by apply orderStrict in M5. 
-
-
-  (* B: case S(ii,i) > S(ii1,i) *)
-  assert SCpt(i)@S(ii1,i) ~< SCpt(i)@S(ii,i) = orderOk as M8.
-  assert
-   ( S(ii1,i) < pred(S(ii,i)) || 
-     S(ii1,i) = pred(S(ii,i)) || 
-     S(ii1,i) > pred(S(ii,i)) ) as H'; 1: constraints.
-  case H'; 2,3: auto. 
-  (* case S(ii1,i) < pred(S(ii,i)) *)
-  use counterIncreaseBis with pred(S(ii,i)),S(ii1,i),i as Hcpt => //.
-  case Hcpt; 
-  [ 1: by apply orderTrans _ (SCpt(i)@pred(S(ii,i))) |
-    2: auto].
-
-  by apply orderStrict in M5. 
-Qed.
-
-(******************************************************************************)
-
-(* This lemma is not useful for the previous proofs. *)
-goal lastUpdateServer_ (t:timestamp, i:index):
-  happens(t) =>
-  (SCpt(i)@t = SCpt(i)@init && 
-   forall (ii:index), happens(S(ii,i)) => t<S(ii,i))
-   ||
-   exists (ii:index), 
-     SCpt(i)@t = SCpt(i)@S(ii,i) && S(ii,i) <= t &&
-     forall (ii':index), 
-        happens(S(ii',i)) => S(ii',i) <= S(ii,i) || t < S(ii',i).
-Proof.
-  generalize t i.
-  induction => t IH0 i Hap.
-  case t;
-  try (
-    intro Eq; repeat destruct Eq as [_ Eq];
-    use IH0 with pred(t),i as H1 => //;
-    clear IH0;
-    expand SCpt;
-    destruct H1 as [[_ H3] | [mi [_ _ H1]]];
-    [ 1: left => /= mi *;
-         by use H3 with mi |
-      2: right;
-         exists mi => /= jj' Hap';
-         use H1 with jj' as H2 => //;
-         by case H2; [ 1: left | 2 : right]]).
-
-  (* init *)
-  by intro *; left.
-
-  (* interesting case *)
-  intro [ii i0 _].
-  use IH0 with pred(t),i as H1; 2,3: auto.
-  case H1.
-
-    (**)
-    destruct H1 as [H2 H3].
-    case (i=i0) => H4.
-    (* i = i0 *)
-    right.
-    exists ii => /= ii' _. 
-    by use H3 with ii'.
-
-    (* i <> i0 *)
-    left. 
-    expand SCpt.
-    rewrite if_false => // /=.
-    intro ii0 _.
-    by use H3 with ii0.
-
-    (**)
-    simpl_left.
-    case (i=i0) => H2.
-    case (ii=ii0) => H3.
-
-    (* i = i0 && ii = i0 *)
-    constraints.
-    (* i = i0 && ii <> i0 *)
-    right.
-    exists ii. 
-    simpl.
-    auto.
-
-    (* i <> i0 *)
-    right.
-    exists ii0. 
-    simpl.
-    split; 1: by rewrite /SCpt if_false.
-    intro ii' _.
-    use H0 with ii' as Ht; 2: assumption.
-    by case Ht.
-Qed.
