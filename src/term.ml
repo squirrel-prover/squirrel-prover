@@ -712,7 +712,7 @@ let and_fixity     = `F Symbols.fs_and  , `Infix `Left
 let not_fixity     = `F Symbols.fs_not  , `Prefix
 let seq_fixity     = `Seq               , `Prefix
 let find_fixity    = `Find              , `Prefix
-let quant_fixity   = `Quant             , `Prefix
+let quant_fixity   = `Quant             , `NonAssoc
 let macro_fixity   = `Macro             , `NoParens
 let pred_fixity    = `Pred              , `NoParens
 let diff_fixity    = `Diff              , `NoParens
@@ -796,17 +796,23 @@ and _pp : type a.
     pp_and_happens info ppf f
 
   (* only right-associate symbol we have *)
-  | Fun ((s,is),_,[bl;br]) as t when (s = Symbols.fs_impl) ->
+  | Fun ((s,is),_,[bl;br]) when (s = Symbols.fs_impl) ->
     assert (is = []);
     let pp fmt () = 
-      Fmt.pf ppf "@[<0>%a@]" (pp_chained_infix_right info s) t
+      Fmt.pf ppf "@[<0>%a %s@ %a@]"
+        (pp ((`F s, `Infix `Right), `Left)) bl
+        (Symbols.to_string s) 
+        (pp ((`F s, `Infix `Right), `Right)) br
     in
     maybe_paren ~outer ~side ~inner:(`F s, `Infix `Right) pp ppf ()
 
-  | Fun ((s,is),_,[bl;br]) as t when Symbols.is_infix s ->
+  | Fun ((s,is),_,[bl;br]) when Symbols.is_infix s ->
     assert (is = []);
     let pp fmt () = 
-      Fmt.pf ppf "@[<0>%a@]" (pp_chained_infix_left info s) t
+      Fmt.pf ppf "@[<0>%a %s@ %a@]"
+        (pp ((`F s, `Infix `Left), `Left)) bl
+        (Symbols.to_string s) 
+        (pp ((`F s, `Infix `Left), `Right)) br
     in
     maybe_paren ~outer ~side ~inner:(`F s, `Infix `Left) pp ppf ()
 
@@ -888,36 +894,22 @@ and _pp : type a.
     maybe_paren ~outer ~side ~inner:find_fixity pp ppf ()
 
   | ForAll (vs, b) ->
-    Fmt.pf ppf "@[<2>forall (@[%a@]),@ %a@]"
-      Vars.pp_typed_list vs 
-      (pp (quant_fixity, `Right))  b
+    let pp fmt () =
+      Fmt.pf ppf "@[<2>forall (@[%a@]),@ %a@]"
+        Vars.pp_typed_list vs 
+        (pp (quant_fixity, `Right))  b
+    in
+    maybe_paren ~outer ~side ~inner:(`Quant, `Prefix) pp ppf ()
 
   | Exists (vs, b) ->
-    Fmt.pf ppf "@[<2>exists (@[%a@]),@ %a@]"
-      Vars.pp_typed_list vs 
-      (pp (quant_fixity, `Right)) b
+    let pp fmt () =
+      Fmt.pf ppf "@[<2>exists (@[%a@]),@ %a@]"
+        Vars.pp_typed_list vs 
+        (pp (quant_fixity, `Right)) b
+    in
+    maybe_paren ~outer ~side ~inner:(`Quant, `Prefix) pp ppf ()
 
   | Atom a -> pp_generic_atom info ppf a
-
-(** for left-associative symbols *)
-and pp_chained_infix_left info symb ppf = function
-  | Fun ((s,is),_,[bl;br]) when s = symb ->
-    Fmt.pf ppf "%a %s@ %a"
-      (pp_chained_infix_left info symb) bl 
-      (Symbols.to_string s) 
-      (pp info ((`F symb, `Infix `Left), `Right)) br
-
-  | _ as t -> pp info ((`F symb, `Infix `Left), `Left) ppf t
-
-(** for right-associative symbols *)
-and pp_chained_infix_right info symb ppf = function
-  | Fun ((s,is),_,[bl;br]) when s = symb ->
-    Fmt.pf ppf "%a %s@ %a"
-      (pp info ((`F symb, `Infix `Right), `Left)) bl
-      (Symbols.to_string s)
-      (pp_chained_infix_right info symb) br
-
-  | _ as t -> pp info ((`F symb, `Infix `Right), `Right) ppf t
                
 and pp_message_atom info ppf (`Message (o,tl,tr) : message_atom) =
   Fmt.pf ppf "@[%a %a@ %a@]" 
