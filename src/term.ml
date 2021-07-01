@@ -864,7 +864,7 @@ and _pp : type a.
       ppf ()
 
   | Diff (bl, br) ->
-    Fmt.pf ppf "@[<hov 2>@[<hov 2>diff(@,%a@],@,%a)@]"
+    Fmt.pf ppf "@[<hv 2>diff(@,%a,@,%a)@]"
       (pp (diff_fixity, `NonAssoc)) bl
       (pp (diff_fixity, `NonAssoc)) br
 

@@ -1135,7 +1135,8 @@ let equiv_formula f1 f2 (s : ES.t) =
   let f =
     Term.mk_and ~simpl:false
       (Term.mk_impl ~simpl:false f1 f2)
-      (Term.mk_impl ~simpl:false f2 f1) in
+      (Term.mk_impl ~simpl:false f2 f1) 
+  in
   let trace_sequent = ES.(to_trace_sequent (set_reach_goal f s)) in
 
   let subgoals =
@@ -1624,13 +1625,6 @@ let prf_param hash : prf_param =
 
   | _ -> raise Not_hash
 
-(** [occurrences_of_frame ~cntxt frame hash_fn key_n]
-  * returns the list of pairs [is,m] such that [f(m,key_n[is])]
-  * occurs in [frame]. Does not explore macros. *)
-let occurrences_of_frame ~cntxt frame hash_fn key_n =
-  let iter = new Iter.get_f_messages ~cntxt hash_fn key_n in
-  List.iter iter#visit_message frame ;
-  List.sort_uniq Stdlib.compare iter#get_occurrences
 
 (** [occurrences_of_action_descr ~cntxt action_descr hash_fn key_n]
   * returns the list of pairs [is,m] such that [hash_fn(m,key_n[is])]
@@ -1643,38 +1637,43 @@ let occurrences_of_action_descr ~cntxt action_descr hash_fn key_n =
   List.sort_uniq Stdlib.compare iter#get_occurrences
 
 (** direct cases: explicit occurence of the hash in the frame *)
-let prf_mk_direct env (param : prf_param) (is, m) =
+let prf_mk_direct env (param : prf_param) (occ : Iter.hash_occ) =
   (* select bound variables in key indices [is] and in message [m]
      to quantify universally over them *)
   let env = ref env in
 
-  let vars = Term.fv m in
-  let vars = Sv.add_list vars is in
+  let vars = occ.occ_vars in
 
-  (* we remove the free variables already in [env] from [vars] *)
-  let vars = Sv.diff vars (Sv.of_list (Vars.to_list !env)) in
+  let vars, subst = Term.erefresh_vars (`InEnv env) (Sv.elements vars) in
 
-  let vars', subst = Term.erefresh_vars (`InEnv env) (Sv.elements vars) in
-
+  let is, m = occ.occ_cnt in
   let is = List.map (Term.subst_var subst) is in
   let m = Term.subst subst m in
-  Term.mk_forall
-    vars'
+  (* let cond = Term.subst subst occ.occ_cond in *)
+  let cond = Term.mk_true in
+  Term.mk_forall ~simpl:true
+    vars
     (Term.mk_impl
-       (Term.mk_indices_eq param.h_key.s_indices is)
+       (Term.mk_and ~simpl:true
+          cond
+          (Term.mk_indices_eq param.h_key.s_indices is))
        (Term.mk_atom `Neq param.h_cnt m))
 
 (** indirect cases: occurences of hashes in actions of the system *)
-let prf_mk_indirect env cntxt (param : prf_param)
-    (frame_actions : Fresh.ts_occs) (a, is_m_l) =
-
+let prf_mk_indirect 
+    (env           : Vars.env)
+    (cntxt         : Constr.trace_cntxt)
+    (param         : prf_param)
+    (frame_actions : Fresh.ts_occs) 
+    (a             : Action.descr) 
+    (hash_occs     : Iter.hash_occs) : Term.message
+  =
   let env = ref env in
 
-  let vars = List.fold_left (fun vars (is, m) ->
-      Sv.union (Sv.add_list vars is) (Term.fv m)
-    ) Sv.empty is_m_l
+  let vars = List.fold_left (fun vars hash_occ ->
+      Sv.union vars hash_occ.Iter.occ_vars
+    ) Sv.empty hash_occs
   in
-  let vars = Sv.union vars (Sv.of_list (List.map Vars.evar a.Action.indices)) in
   let vars = Sv.elements vars in
 
   let vars, subst = Term.erefresh_vars (`InEnv env) vars in
@@ -1682,14 +1681,19 @@ let prf_mk_indirect env cntxt (param : prf_param)
   (* apply [subst] to the action and to the list of
    * key indices with the hashed messages *)
   let new_action =
-    SystemExpr.action_to_term
-      cntxt.Constr.table cntxt.system
+    SE.action_to_term cntxt.table cntxt.system
       (Action.subst_action subst a.Action.action)
   in
-  let list_of_is_m =
-    List.map (fun (is,m) ->
-        (List.map (Term.subst_var subst) is,Term.subst subst m))
-      is_m_l in
+  let hash_list =
+    List.map (fun hash_occ ->
+        let is, m = hash_occ.Iter.occ_cnt in
+        let cond = hash_occ.Iter.occ_cond in
+        ( List.map (Term.subst_var subst) is,
+          Term.subst subst cond,
+          Term.subst subst m)
+      ) hash_occs
+  in
+  let hash_list = List.sort_uniq Stdlib.compare hash_list in
 
   (* save the environment after having renamed all free variables until now. *)
   let env0 = !env in
@@ -1710,14 +1714,16 @@ let prf_mk_indirect env cntxt (param : prf_param)
   (* then if key indices are equal then hashed messages differ *)
   let conj =
     Term.mk_ands
-      (List.map (fun (is,m) ->
+      (List.map (fun (is, cond, m) ->
            Term.mk_impl
-             (Term.mk_indices_eq param.h_key.s_indices is)
-             (Term.mk_atom `Neq param.h_cnt m))
-          list_of_is_m)
+             (Term.mk_and ~simpl:true
+                cond
+                (Term.mk_indices_eq param.h_key.s_indices is))
+             (Term.mk_atom `Neq param.h_cnt m)
+         ) hash_list)
   in
 
-  Term.mk_forall vars (Term.mk_impl disj conj)
+  Term.mk_forall ~simpl:true vars (Term.mk_impl disj conj)
 
 
 let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
@@ -1743,11 +1749,14 @@ let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
     ~cntxt param.h_fn param.h_key.s_symb;
 
   (* we compute the list of hashes from the frame *)
-  let frame_hashes =
-    occurrences_of_frame ~cntxt frame param.h_fn param.h_key.s_symb
+  let frame_hashes : Iter.hash_occs =
+    List.fold_left (fun acc t ->
+        Iter.get_f_messages_ext ~cntxt param.h_fn param.h_key.s_symb t @ acc
+      ) [] frame
   in
+  let frame_hashes =  List.sort_uniq Stdlib.compare frame_hashes in
 
-  let frame_actions =
+  let frame_actions : Fresh.ts_occs =
     let actions =
       List.fold_left (fun acc t ->
           Fresh.get_actions_ext cntxt t @ acc
@@ -1756,35 +1765,37 @@ let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
     Fresh.clear_dup_mtso_le actions
   in
 
-  (* we iterate over all the actions of the (single) system *)
-  let tbl_of_action_hashes = Hashtbl.create 10 in
-  SystemExpr.(iter_descrs cntxt.table cntxt.system (fun action_descr ->
-      (* we add only actions in which a hash occurs *)
-      let descr_proj = Action.pi_descr proj action_descr in
-      let action_hashes =
-        occurrences_of_action_descr ~cntxt descr_proj param.h_fn param.h_key.s_symb
-      in
-
-      if List.length action_hashes > 0 then
-        Hashtbl.add tbl_of_action_hashes descr_proj action_hashes)
-    );
-
   let phi_frame =
     List.map (prf_mk_direct env param) frame_hashes
   in
 
-  let indirect_hashes = Hashtbl.to_list tbl_of_action_hashes in
-  let phi_actions =
-    List.rev_map
-      (prf_mk_indirect env cntxt param frame_actions)
-      indirect_hashes
+  let macro_cases =
+    Iter.fold_macro_support (fun descr t macro_cases ->
+        let fv = Sv.of_list1 descr.Action.indices in
+        let new_cases = 
+          Iter.get_f_messages_ext ~fv ~cntxt param.h_fn param.h_key.s_symb t 
+        in
+        List.assoc_up_dflt descr [] (fun l -> new_cases @ l) macro_cases
+      ) cntxt frame []
   in
-  Term.mk_ands (phi_frame @ phi_actions)
+  (* we keep only actions in which there is at least one occurrence *)
+  let macro_cases = List.filter (fun (_, occs) -> occs <> []) macro_cases in
+
+  (* indirect cases (occurrences of [name] in actions of the system) *)
+  let macro_cases =
+    List.fold_left (fun forms (a, occs) ->
+        let occs = List.rev occs in
+        let case = prf_mk_indirect env cntxt param frame_actions a occs in
+        case :: forms
+      ) [] macro_cases
+  in
+
+  Term.mk_ands ~simpl:true phi_frame, Term.mk_ands ~simpl:true macro_cases
 
 let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
   try _mk_prf_phi_proj proj cntxt env biframe e hash
   with
-  | Not_hash -> Term.mk_true
+  | Not_hash -> Term.mk_true, Term.mk_true
   | Euf.Bad_ssc ->
     soft_failure (Tactics.Failure "key syntactic side condition violated")
 
@@ -1841,8 +1852,17 @@ let prf Args.(Int i) s =
     | _ -> assert false
   in
 
-  let phi_left  = mk_prf_phi_proj PLeft  cntxt env biframe e hash in
-  let phi_right = mk_prf_phi_proj PRight cntxt env biframe e hash in
+  let f_direct_l, f_indirect_l = 
+    mk_prf_phi_proj PLeft  cntxt env biframe e hash 
+  and f_direct_r, f_indirect_r =
+    mk_prf_phi_proj PRight cntxt env biframe e hash 
+  in
+  (* the formula, without the oracle condition *)
+  let formula = 
+      Term.mk_and ~simpl:false 
+        (combine_conj_formulas f_direct_l f_direct_r)
+        (combine_conj_formulas f_indirect_l f_indirect_r)
+  in
 
   (* check that there are no type variables*)
   assert (ftyp.fty_vars = []);
@@ -1861,7 +1881,7 @@ let prf Args.(Int i) s =
 
   let final_if_formula =
     if Term.is_false oracle_formula
-    then combine_conj_formulas phi_left phi_right
+    then formula
     else
       let (Vars.EVar uvarm),(Vars.EVar uvarkey),f =
         match oracle_formula with
@@ -1876,9 +1896,7 @@ let prf Args.(Int i) s =
             ESubst (Term.mk_var uvarkey, key);] f
         in
 
-        Term.mk_and
-          (Term.mk_not f)
-          (combine_conj_formulas phi_left phi_right)
+        Term.mk_and (Term.mk_not f) formula
 
       | _ -> assert false
   in

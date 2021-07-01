@@ -150,7 +150,7 @@ Proof.
   fa 1. fa 1.
   expand output@T(i,j). expand kT(i)@T(i,j).
   prf 1.
-  yesif 1.
+  yesif 1; simpl.
   intro i0 j0 *.
   use stateInequalityHelpful with i,j,j0; 1,2,3: by auto.
   fresh 1. 

@@ -154,7 +154,7 @@ Proof.
   (* Case T *)
   expand frame, exec, cond, output.
   fa 0. fa 1. fa 1. fa 1.
-  prf 2. yesif 2.
+  prf 2. yesif 2; simpl.
   project;
   repeat split => > _ _ [_ Meq0]; (try fresh Meq0); auto.
 

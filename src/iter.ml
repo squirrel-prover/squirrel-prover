@@ -292,6 +292,79 @@ let get_ftypes : type a.
   get t ~fv:Sv.empty ~cond:Term.mk_true
 
 (*------------------------------------------------------------------*)
+(** {2 Find [h(_, k)]} *)
+
+(* pair of the key indices and the term *)
+type hash_occ = (Vars.index list * Term.message) occ
+
+type hash_occs = hash_occ list
+
+(** Collect direct occurrences of [f(_,k(_))] or [f(_,_,k(_))] where [f] is a
+    function name [f] and [k] a name [k].
+    Over-approximation: we try to expand macros, even if they are at a timestamp 
+    that may not happen. *)
+let get_f_messages_ext : type a.
+  ?drop_head:bool ->
+  ?fun_wrap_key:'b ->
+  ?fv:Sv.t ->
+  cntxt:Constr.trace_cntxt ->
+  Term.fname -> 
+  Term.name ->
+  a Term.term -> hash_occs
+  = 
+  fun ?(drop_head=true) ?(fun_wrap_key=None) ?(fv=Sv.empty) ~cntxt f k t ->
+  
+    let rec get : 
+    type a. a Term.term -> fv:Sv.t -> cond:Term.message -> hash_occs =
+    fun t ~fv ~cond ->
+      let occs () =       
+        tfold_occ ~mode:(`Delta cntxt) (fun ~fv ~cond (Term.ETerm t) occs -> 
+            get t ~fv ~cond @ occs
+          ) ~fv ~cond t []
+      in
+
+      match t with
+      | Term.Fun ((f',_),_, [m;k']) as m_full when f' = f ->
+        let occs =
+          match k' with
+          | Term.Name s' when s'.s_symb = k ->
+            let ret_m = if drop_head then m else m_full in
+            [{ occ_cnt  = s'.s_indices,ret_m;
+               occ_vars = fv; 
+               occ_cond = cond; }]
+          | _ -> []
+        in
+        occs @ get m ~fv ~cond @ get k' ~fv ~cond
+
+      | Term.Fun ((f',_), _, [m;r;k']) as m_full when f' = f ->
+        let occs = 
+          match k', fun_wrap_key with
+          | Term.Name s', None when s'.s_symb = k ->
+            let ret_m = if drop_head then m else m_full in
+            [{ occ_cnt  = s'.s_indices,ret_m;
+               occ_vars = fv; 
+               occ_cond = cond; }]
+
+          |Term.Fun ((f',_), _, [Term.Name s']), Some is_pk
+            when is_pk f' && s'.s_symb = k ->
+            let ret_m = if drop_head then m else m_full in
+            [{ occ_cnt  = s'.s_indices,ret_m;
+               occ_vars = fv; 
+               occ_cond = cond; }]
+          | _ -> []
+        in
+        occs @ get m ~fv ~cond @ get k' ~fv ~cond
+
+      | Term.Var m when Type.equalk (Vars.kind m) Type.KMessage -> assert false
+      (* SSC must have been checked first *)
+        
+      | _ -> occs ()
+  in
+  
+  get t ~fv ~cond:Term.mk_true
+
+
+(*------------------------------------------------------------------*)
 (** {2 If-Then-Else} *)
 
 type ite_occ = (Term.message * Term.message * Term.message) occ

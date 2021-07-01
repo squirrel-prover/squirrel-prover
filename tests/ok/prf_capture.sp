@@ -35,7 +35,7 @@ fa 0.
 fa 1.
 fa 1.
 prf 1. 
-yesif 1. 
+yesif 1; simpl.
 by intro > _; apply H. 
 fresh 1. 
 admit 0.

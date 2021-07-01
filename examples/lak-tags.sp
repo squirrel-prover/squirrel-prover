@@ -283,7 +283,7 @@ Proof.
   expand m2(i,k)@T(i,k).
   fa 0. fa 1. fa 1. fa 1.
   prf 2.
-  yesif 2.
+  yesif 2; simpl.
   use tags_neq. 
   project.
   split.

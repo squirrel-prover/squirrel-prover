@@ -309,7 +309,7 @@ prf 2. (* we use PRF under XOR to be able with use XOR tactic later on *)
 yesif 2.
 use tags_neq.
 
-project;
+simpl; project;
 by (repeat split => > _;
     repeat split => > _ [_ [_ Meq]];
     fresh Meq).

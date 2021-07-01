@@ -11,7 +11,6 @@ name n:message
 name m:message
 system null.
 
-set debugTactics=true.
 (* Test direct case *)
 equiv test : h(diff(m,n),k),h(diff(n,m),k) .
 Proof.
@@ -43,16 +42,14 @@ by fresh 1.
 expandall.
 fa 0; fa 1; fa 1. 
 prf 1. 
-yesif 1. 
-project.
+yesif 1; simpl. 
+split.
+split; 1: auto.
 
 (* Here, if the macros are not correclty projected, we cannot prove the goal,
 else it is automatically simplified. *)
-split; 1: auto. 
-by split; intro H0; case H0; depends A, A1. 
-
-split; 1: auto. 
-by split; intro H0; case H0; depends A, A1. 
+by project; intro H0; case H0; depends A, A1. 
+by project; intro H0; case H0; depends A, A1. 
 
 by fresh 1.
 Qed.

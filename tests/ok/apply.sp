@@ -168,8 +168,8 @@ global goal _ (y : message) :
  (forall (x : message), equiv(seq (i -> <ok(i), x>))) ->
  equiv(seq (j -> <ok(j), ok(j)>)).
 Proof.
- checkfail intro H; try by apply H exn GoalNotClosed.
-Abort.
+ intro H; apply H.
+Qed.
 
 (* with a sequence *)
 name m : index -> message.
