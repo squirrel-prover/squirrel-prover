@@ -445,7 +445,7 @@ module Theories = struct
     ( cfun dec 0 [cfun enc 0 [m; r; k]; k], m )
 
   let t_true  = cfun (F Symbols.fs_true) 0 []
-  let t_false = cfun (F Symbols.fs_true) 0 []
+  let t_false = cfun (F Symbols.fs_false) 0 []
 
   (** Signature.
       mcheck(msig(m, k), pk(k)) -> true *)
@@ -454,26 +454,29 @@ module Theories = struct
     let t_pk = cfun pk 0 [k] in
     ( cfun mcheck 0 [cfun msig 0 [m; k]; t_pk], t_true )
 
-  (** Simple Boolean rules to allow for some boolean reasonnig. *)
-  let mk_simpl_bool () =
+
+  (** Simple And Boolean rules. *)
+  let mk_simpl_and () =
     let u, v, t = mk_var (), mk_var (), mk_var () in
-    let and_rules = [( cfun (F Symbols.fs_and) 0 [t_true; u]), u;
-                     ( cfun (F Symbols.fs_and) 0 [v; t_true]), v;
-                     ( cfun (F Symbols.fs_and) 0 [t_false; mk_var ()]), t_false;
-                     ( cfun (F Symbols.fs_and) 0 [mk_var (); t_false]), t_false;
-                     ( cfun (F Symbols.fs_and) 0 [t; t]), t] in
+    [( cfun (F Symbols.fs_and) 0 [t_true; u]), u;
+     ( cfun (F Symbols.fs_and) 0 [v; t_true]), v;
+     ( cfun (F Symbols.fs_and) 0 [t_false; mk_var ()]), t_false;
+     ( cfun (F Symbols.fs_and) 0 [mk_var (); t_false]), t_false;
+     ( cfun (F Symbols.fs_and) 0 [t; t]), t] 
 
-    let not_rules = [( cfun (F Symbols.fs_not) 0 [t_true], t_false);
-                     ( cfun (F Symbols.fs_not) 0 [t_false], t_true)] in
-
+  (** Simple Or Boolean rules. *)
+  let mk_simpl_or () =
     let u, v, t = mk_var (), mk_var (), mk_var () in
-    let or_rules = [ ( cfun (F Symbols.fs_or) 0 [t_true; mk_var ()], t_true);
-                     ( cfun (F Symbols.fs_or) 0 [mk_var (); t_true], t_true);
-                     ( cfun (F Symbols.fs_or) 0 [t_false; u], u);
-                     ( cfun (F Symbols.fs_or) 0 [v; t_false], v);
-                     ( cfun (F Symbols.fs_or) 0 [t; t], t)] in
+    [ ( cfun (F Symbols.fs_or) 0 [t_true; mk_var ()], t_true);
+      ( cfun (F Symbols.fs_or) 0 [mk_var (); t_true], t_true);
+      ( cfun (F Symbols.fs_or) 0 [t_false; u], u);
+      ( cfun (F Symbols.fs_or) 0 [v; t_false], v);
+      ( cfun (F Symbols.fs_or) 0 [t; t], t)] 
 
-    not_rules @ and_rules @ or_rules
+  (** Simple Not Boolean rules. *)
+  let mk_simpl_not () =
+    [( cfun (F Symbols.fs_not) 0 [t_true], t_false);
+     ( cfun (F Symbols.fs_not) 0 [t_false], t_true)] 
 
   (* (\** Some simple IfThenElse rules. A lot of rules are missing. *\)
    * let mk_simpl_ite () =
