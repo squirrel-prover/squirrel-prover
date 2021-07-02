@@ -36,8 +36,8 @@ let pp_single fmt = function
 
 let pp fmt = function
   | Single s      -> Fmt.pf fmt "%a" pp_single s
-  | SimplePair id -> Fmt.pf fmt "%s/both" (Symbols.to_string id)
-  | Pair (s1, s2) -> Fmt.pf fmt "%a|%a" pp_single s1 pp_single s2
+  | SimplePair id -> Fmt.pf fmt "%s" (Symbols.to_string id)
+  | Pair (s1, s2) -> Fmt.pf fmt "%a,%a" pp_single s1 pp_single s2
 
 (*------------------------------------------------------------------*)
 type ssymb_pair = System.system_name * 
@@ -352,8 +352,8 @@ let pp_p_single fmt = function
 
 let pp_p_system fmt = function
   | P_Single s      -> Fmt.pf fmt "%a" pp_p_single s
-  | P_SimplePair id -> Fmt.pf fmt "%s/both" (L.unloc id)
-  | P_Pair (s1, s2) -> Fmt.pf fmt "%a|%a" pp_p_single s1 pp_p_single s2
+  | P_SimplePair id -> Fmt.pf fmt "%s" (L.unloc id)
+  | P_Pair (s1, s2) -> Fmt.pf fmt "%a,%a" pp_p_single s1 pp_p_single s2
 
 let parse_single table = function
   | P_Left a  -> Left  (System.of_lsymb a table)

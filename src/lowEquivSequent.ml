@@ -71,7 +71,7 @@ let pp_goal fmt = function
   
 let pp ppf j =
   Fmt.pf ppf "@[<v 0>" ;
-  Fmt.pf ppf "@[System: %a@]@;"
+  Fmt.pf ppf "@[Systems: %a@]@;"
     SystemExpr.pp j.system;
 
   if j.ty_vars <> [] then

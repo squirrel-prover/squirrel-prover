@@ -757,8 +757,8 @@ global_formula:
 system_proj:
 | LEFT                { SystemExpr.(P_Left  default_system_name) }
 | RIGHT               { SystemExpr.(P_Right default_system_name) }
-| LEFT  COLON i=lsymb { SystemExpr. P_Left                    i }
-| RIGHT COLON i=lsymb { SystemExpr. P_Right                   i }
+| i=lsymb SLASH LEFT  { SystemExpr. P_Left                    i  }
+| i=lsymb SLASH RIGHT { SystemExpr. P_Right                   i  }
 
 /* A single or bi-system */
 system:
@@ -808,7 +808,7 @@ local_statement:
      Goal.Parsed.{ name; ty_vars=[]; vars; system; formula } }
 
 global_statement:
-| system=system name=statement_name ty_vars=ty_args vars=args
+| system=bisystem name=statement_name ty_vars=ty_args vars=args
   COLON f=global_formula
    { let formula = Goal.Parsed.Global f in
      Goal.Parsed.{ name; ty_vars; vars; system; formula } }

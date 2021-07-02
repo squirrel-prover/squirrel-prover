@@ -9,7 +9,7 @@ system [s1] in(c,x); let S=diff(<x,ok>,x) in A : out(c,S).
 
 system [s2] in(c,x); let St=diff(x,<x,ok>) in A : out(c,St).
 
-equiv [left:s1, right:s2] test.
+equiv [s1/left,s2/right] test.
 Proof.
 nosimpl(induction t).
 
@@ -24,7 +24,7 @@ fa 0; fa 1.
 by fadup.
 Qed.
 
-equiv [left:s1, left:s1] test2.
+equiv [s1/left,s1/left] test2.
 Proof.
 induction t.
 auto.
@@ -35,7 +35,7 @@ fa 0; fa 1; fa 2; fa 3.
 by fadup.
 Qed.
 
-equiv [right:s2, left:s1] test3.
+equiv [s2/right,s1/left] test3.
 Proof.
 induction t. 
 auto.
@@ -46,7 +46,7 @@ fa 0; fa 1; fa 2; fa 2; fa 3; fa 4.
 by fadup.
 Qed.
 
-equiv [right:s1, right:s1] test4.
+equiv [s1/right, s1/right] test4.
 Proof.
 induction t.
 auto.

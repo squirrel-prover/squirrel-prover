@@ -9,7 +9,7 @@ Proof.
   admit.
 Qed.
 
-goal [left:default] test_ground :
+goal [default/left] test_ground :
   input@A = s@B => False.
 Proof.
   reach_equiv ax_ground.
