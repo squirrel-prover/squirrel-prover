@@ -1,13 +1,8 @@
+(* Full model of LAK with pairs and tags, for authentication only. *)
+
 (* R --> T: nr                                    *)
 (* T --> R: nT, h(<nR, nT, tag1>, k)              *)
-(* R --> T: h(<h(<nR, nT, tag2>, k), nr, ** nt **, tag2>,k) *)
-
-
-(* Attention !! j'ai simplifie les raisonnement en ajoutant nt dans le dernier message *)
-(* S.D.: je n'ai pas encore bien compris pourquoi ca m'aide mais sans cet ajout, *)
-(* je me retrouve avec nt(i,k) et aussi nt(i,k1) car pour deduire que 2 hash egaux ont *)
-(* leur composantes egales, je n'ai pas d'autres choix que euf, et du coup cela ne me *)
-(* permet pas dedure facilement l'egalite que j'ai ici *)
+(* R --> T: h(<h(<nR, nT, tag2>, k), nr, tag2>,k) *)
 
 hash h
 
@@ -16,7 +11,6 @@ abstract ko:message
 
 abstract tag1:message
 abstract tag2:message
-axiom tags_neq : tag1 <> tag2
 
 name key : index->message
 
@@ -28,7 +22,7 @@ process tag(i:index,k:index) =
   in(cR,nR);
   out(cT,<nT,h(<<nR,nT>,tag1>,key(i))>);
   in(cR,m3);
-  if m3 = h(<<h(<<nR,nT>,tag1>,key(i)),<nR,nT>>,tag2>,key(i)) then
+  if m3 = h(<<h(<<nR,nT>,tag1>,key(i)),nR>,tag2>,key(i)) then
     out(cT,ok)
   else
     out(cT,ko)
@@ -38,15 +32,17 @@ process reader(j:index) =
   out(cR,nR);
   in(cT,x);
   try find i such that snd(x) = h(<<nR,fst(x)>,tag1>,key(i)) in
-    out(cR,h(<<snd(x),<nR,fst(x)>>,tag2>,key(i)))
+    out(cR,h(<<snd(x),nR>,tag2>,key(i)))
   else
     out(cR,ko)
 
 system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
+axiom tags_neq : tag1 <> tag2.
 
 goal wa_R:
   forall (j:index, i:index),
+  happens(R1(j,i)) =>
   cond@R1(j,i) =>
   exists (k:index),
   T(i,k) < R1(j,i) &&
@@ -55,20 +51,28 @@ goal wa_R:
 Proof.
 simpl.
 expand cond@R1(j,i).
-euf M0.
+euf H.
 use tags_neq.
 exists k.
 assert (nR(j) = input@T(i,k)).
-fresh M2.
+fresh Meq0.
+case H0.
 depends R(j), R2(j).
-depends R(j), R1(j,i1).
+depends R(j), R1(j,i0).
 Qed.
 
-
+goal executable_R1 (t:timestamp) (j,i:index) :
+  happens(t) => exec@t => R1(j,i)<=t => exec@R1(j,i) && cond@R1(j,i).
+Proof.
+  intro *.
+  executable t.
+  use H0 with R1(j,i).
+  expand exec@R1(j,i).
+Qed.
 
 goal wa_T:
  forall (i:index, k:index),
- exec@T1(i,k) =>
+ happens(T1(i,k)) => exec@T1(i,k) =>
  exists (j:index),
  R1(j,i) < T1(i,k) &&
  output@R1(j,i) = input@T1(i,k) &&
@@ -77,30 +81,23 @@ goal wa_T:
  R(j) < T(i,k) &&
  output@R(j) = input@T(i,k).
 Proof.
-intros.
-assert cond@T1(i,k).
-expand exec@T1(i,k).
-expand cond@T1(i,k).
-use tags_neq.
-euf M0.
-exists j.
-case H1.
-repeat split.
-
-assert (fst(input@R1(j,i)) = nT(i,k)).
-fresh M3.
-depends T(i,k), T2(i,k).
-
-assert (input@T(i,k) = nR(j)).
-fresh M3.
-depends R(j), R2(j).
-depends R(j), R1(j,i1).
-
-repeat split.
-depends T(i,k), T1(i,k).
-assert (fst(input@R1(j,i)) = nT(i,k)).
-fresh M3.
-depends T(i,k), T1(i,k).
-depends T(i,k), T2(i,k).
-depends R(j), R1(j,i).
+  intro *.
+  assert cond@T1(i,k).
+  expand exec@T1(i,k).
+  expand cond@T1(i,k).
+  use tags_neq.
+  euf H0.
+  assert (snd(input@R1(j,i)) = h(<<input@T(i,k),nT(i,k)>,tag1>,key(i))).
+  euf Meq0.
+  case H2.
+  case H1.
+  nosimpl(exists j).
+  use executable_R1 with T1(i,k),j,i.
+  expand cond@R1(j,i).
+  collision.
+  assert (input@T(i,k) = nR(j)) as Hfresh.
+  fresh Hfresh.
+  case H5.
+  by depends R(j), R2(j).
+  by depends R(j), R1(j,i0).
 Qed.

@@ -1,3 +1,6 @@
+(* This is a full model of LAK with pairs and tags, ie. it includes the last conditional
+ * and message of tags. It contains admits and is broken due to the changes in the prover. *)
+
 hash h
 
 abstract ok:message
@@ -5,7 +8,6 @@ abstract ko:message
 
 abstract tag1:message
 abstract tag2:message
-axiom tags_neq : tag1 <> tag2
 
 name key : index->message
 name key': index->index->message
@@ -40,6 +42,8 @@ process reader(j:index) =
 
 system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
+axiom tags_neq : tag1 <> tag2.
+
 goal wa_R1: forall j:index,
   (exists (i,k:index),
    snd(input@R1(j)) =
@@ -50,9 +54,8 @@ goal wa_R1: forall j:index,
    snd(output@T(i,k)) = snd(input@R1(j)) &&
    fst(output@T(i,k)) = fst(input@R1(j)) &&
    R(j) < T(i,k) && input@T(i,k) = output@R(j)).
-
 Proof.
-intros; split.
+intro *; split.
 (* cond => wa *)
 use tags_neq; project.
 (* LEFT *)
