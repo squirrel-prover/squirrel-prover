@@ -5,10 +5,10 @@ module L = Location
 
 type lsymb = Theory.lsymb
 
-
 type s_item =
-  | Tryauto   of Location.t    (** '//' *)
-  | Simplify  of Location.t    (** '/=' *)
+  | Tryauto      of Location.t    (** '//' *)
+  | Tryautosimpl of Location.t    (** '//' *)
+  | Simplify     of Location.t    (** '//=' *)
 
 (** Tactic target. *)
 type in_target = [`Goal | `All | `Hyps of lsymb list] 

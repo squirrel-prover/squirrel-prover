@@ -51,6 +51,7 @@ rule token = parse
 | '_'                 { UNDERSCORE }
 | "//"                { SLASHSLASH }
 | "/="                { SLASHEQUAL }
+| "//="               { SLASHSLASHEQUAL }
 | '/'                 { SLASH }
 | "@/"                { ATSLASH }
 | "="                 { EQ }

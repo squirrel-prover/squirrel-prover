@@ -518,7 +518,7 @@ Proof.
     (* i <> i0 *)
     left. 
     expand SCpt.
-    rewrite if_false => // /=.
+    rewrite if_false => //=.
     intro ii0 _.
     by use H3 with ii0.
 
@@ -666,11 +666,7 @@ rewrite snd_pair in Meq.
 
 
 expand cpt.
-assert(snd(dec(enc(<secret(i),YCpt(i)@pred(Press(i,j))>,npr(i,j),k(i)),k(i))) = snd(dec(enc(<secret(i),YCpt(i)@pred(Press(i,j'))>,npr(i,j),k(i)),k(i)))) => //.
-rewrite dec_enc in Meq0.
-rewrite dec_enc in Meq0.
-rewrite snd_pair in Meq0.
-rewrite snd_pair in Meq0.
+assert(snd(dec(enc(<secret(i),YCpt(i)@pred(Press(i,j))>,npr(i,j),k(i)),k(i))) = snd(dec(enc(<secret(i),YCpt(i)@pred(Press(i,j'))>,npr(i,j),k(i)),k(i)))) => //=. 
 
 assert(YCpt(i)@Press(i,j) = YCpt(i)@Press(i,j')).
 expand YCpt => //.

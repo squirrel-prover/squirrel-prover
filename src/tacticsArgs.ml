@@ -3,12 +3,14 @@ module L = Location
 type lsymb = Theory.lsymb
 
 type s_item =
-  | Tryauto   of Location.t    (** '//' *)
-  | Simplify  of Location.t    (** '/=' *)
+  | Tryauto      of Location.t    (** '//' *)
+  | Tryautosimpl of Location.t    (** '//' *)
+  | Simplify     of Location.t    (** '//=' *)
 
 let rec pp_s_item fmt = function
-  | Simplify _    -> Fmt.pf fmt "/="
-  | Tryauto  _    -> Fmt.pf fmt "//"
+  | Simplify      _ -> Fmt.pf fmt "/="
+  | Tryauto       _ -> Fmt.pf fmt "//"
+  | Tryautosimpl  _ -> Fmt.pf fmt "//="
 
 (** Tactic target. *)
 type in_target = [

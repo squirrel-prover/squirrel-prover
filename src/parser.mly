@@ -28,7 +28,7 @@
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW RARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token LOCAL GLOBAL
-%token DOT SLASH BANGU SLASHEQUAL SLASHSLASH ATSLASH
+%token DOT SLASH BANGU SLASHEQUAL SLASHSLASH SLASHSLASHEQUAL ATSLASH
 %token TIME WHERE WITH ORACLE EXN
 %token LARGE NAMEFIXEDLENGTH
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
@@ -513,8 +513,9 @@ simpl_pat:
 | d=loc(ip_rw_dir) { TacticsArgs.Srewrite d }
 
 s_item:
-| l=loc(SLASHSLASH) { TacticsArgs.Tryauto  (L.loc l)}
-| l=loc(SLASHEQUAL) { TacticsArgs.Simplify (L.loc l)}
+| l=loc(SLASHSLASH)      { TacticsArgs.Tryauto      (L.loc l)}
+| l=loc(SLASHEQUAL)      { TacticsArgs.Simplify     (L.loc l)}
+| l=loc(SLASHSLASHEQUAL) { TacticsArgs.Tryautosimpl (L.loc l)}
 
 intro_pat:
 | s=s_item      { TacticsArgs.SItem (s) }

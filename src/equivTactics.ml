@@ -1559,6 +1559,15 @@ let do_s_item (s_item : Args.s_item) s : Goal.t list =
     let tac = Tactics.try_tac (auto ~strong:true ~close:true) in
     Tactics.run tac s
 
+  | Args.Tryautosimpl l ->
+    let tac = 
+      Tactics.andthen         (* FIXME: inneficient *)
+        (Tactics.try_tac (auto ~strong:true ~close:true))
+        (auto ~strong:true ~close:false)
+    in
+    Tactics.run tac s
+
+
 (* TODO: factorize *)
 (** Applies a rewrite arg  *)
 let do_rw_arg rw_arg rw_in (s : Goal.t) : Goal.t list =

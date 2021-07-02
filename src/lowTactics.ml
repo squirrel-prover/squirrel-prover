@@ -1435,6 +1435,14 @@ module LowTac (S : Sequent.S) = struct
       let tac = Tactics.try_tac (simpl ~strong:true ~close:true) in
       Tactics.run tac s
 
+    | Args.Tryautosimpl l ->
+      let tac = 
+        Tactics.andthen         (* FIXME: inneficient *)
+          (Tactics.try_tac (simpl ~strong:true ~close:true))
+          (simpl ~strong:true ~close:false)
+      in
+      Tactics.run tac s
+
   (** Applies a rewrite arg  *)
   let do_rw_arg (simpl : f_simpl) rw_arg rw_in s : S.t list =
     match rw_arg with
