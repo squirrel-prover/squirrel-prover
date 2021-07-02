@@ -6,10 +6,12 @@ abstract c : message
 abstract d : message
 abstract e : message
 
+name n1 : index -> message
+
 abstract ok : index   -> message
 abstract f  : message -> message
-abstract gg  : message -> message -> message
-abstract f0  : message -> message
+abstract gg : message -> message -> message
+abstract f0 : message -> message
 channel ch
 
 system A: !_i in(ch,x);out(ch,<ok(i),x>).
@@ -122,14 +124,16 @@ Proof.
  intro H; apply H. 
 Qed.
 
-(* equiv _ (x, y : message) : [a = b] -> ([a = b] -> equiv(y, x)) -> equiv(x). *)
-(* Proof. *)
-(*  intro H0 H; apply H; assumption. *)
-(* Qed. *)
+global goal _ (x, y : message) : 
+  [a = b] -> ([a = b] -> equiv(y, x)) -> equiv(x).
+Proof.
+ intro H0 H; apply H. 
+ assumption.
+Qed.
 
 global goal _ (x, y : message) : equiv(x) -> equiv(x, y).
 Proof. 
- checkfail intro H; try apply H; auto exn GoalNotClosed. 
+ checkfail intro H; apply H exn ApplyMatchFailure. 
 Abort.
 
 global goal _ (x : message) :
@@ -142,34 +146,53 @@ Qed.
 (*------------------------------------------------------------------*)
 (* matching under binders *)
 
+(* The term `ok(j)` can be computed by the adversary for any index `j`, since
+   `ok` is an abstract function. *)
+global goal _ (y : message) :
+ equiv(empty) ->
+ equiv(seq (j -> <ok(j), ok(j)>)).
+Proof.
+ intro H; apply H.
+Qed.
+
+(* From now one, we use a name `n1` to test the matching algorithm, since it 
+   cannot be deduce. *)
+global goal _ (y : message) :
+ equiv(empty) ->
+ equiv(seq (j -> <n1(j), n1(j)>)).
+Proof.
+ checkfail (intro H; apply H) exn ApplyMatchFailure.
+Abort.
+
 global goal _ (x : message) :
-  equiv(seq (i -> <ok(i), x>)) ->
-  equiv(seq (i -> <ok(i), x>)).
+  equiv(seq (i -> <n1(i), x>)) ->
+  equiv(seq (i -> <n1(i), x>)).
 Proof. 
  intro H; apply H.
 Qed.
 
 (* with alpha-renaming *)
 global goal _ (x : message) :
-  equiv(seq (i -> <ok(i), x>)) ->
-  equiv(seq (j -> <ok(j), x>)).
+  equiv(seq (i -> <n1(i), x>)) ->
+  equiv(seq (j -> <n1(j), x>)).
 Proof.
  intro H; apply H.
 Qed.
 
 global goal _ (y : message) :
-  (forall (x : message), equiv(seq (i -> <ok(i), x>))) ->
-  equiv(seq (j -> <ok(j), f(y)>)).
+  (forall (x : message), equiv(seq (i -> <n1(i), x>))) ->
+  equiv(seq (j -> <n1(j), f(y)>)).
 Proof.
  intro H; apply H.
 Qed.
-
+ 
+(* we cannot match `x` with `n1(j)` since `j` is bound in the conclusion. *)
 global goal _ (y : message) :
- (forall (x : message), equiv(seq (i -> <ok(i), x>))) ->
- equiv(seq (j -> <ok(j), ok(j)>)).
+ (forall (x : message), equiv(seq (i -> <n1(i), x>))) ->
+ equiv(seq (j -> <n1(j), n1(j)>)).
 Proof.
- intro H; apply H.
-Qed.
+ checkfail (intro H; apply H) exn ApplyMatchFailure.
+Abort.
 
 (* with a sequence *)
 name m : index -> message.
@@ -196,12 +219,12 @@ Qed.
 abstract n0 : message.
 global goal _ (x, y : message) : equiv(x) -> equiv(n0, y).
 Proof. 
- checkfail (intro H; by try apply H) exn GoalNotClosed.
+ checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
 
 global goal _ (x,y,z : message) : equiv(x,z) -> equiv(<x, y>).
 Proof.
- checkfail (intro H; by try apply H) exn GoalNotClosed.
+ checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
 
 (*------------------------------------------------------------------*)
@@ -225,12 +248,12 @@ Qed.
 
 global goal _ (t, t' : timestamp) : equiv(frame@t) -> equiv(input@t').
 Proof.
- checkfail (intro H; by try apply H) exn GoalNotClosed.
+ checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
 
 global goal _ (t : timestamp) : equiv(input@t) -> equiv(frame@t).
 Proof.
- checkfail (intro H; by try apply H) exn GoalNotClosed.
+ checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
 
 (* with exec *)
@@ -241,7 +264,7 @@ Qed.
 
 global goal _ (t : timestamp) : equiv(frame@pred(t)) -> equiv(exec@t).
 Proof.
- checkfail (intro H; by try apply H) exn GoalNotClosed.
+ checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
 
 (* with frame *)
@@ -252,5 +275,5 @@ Qed.
 
 global goal _ (t : timestamp) : equiv(frame@pred(t)) -> equiv(frame@t).
 Proof.
- checkfail (intro H; by try apply H) exn GoalNotClosed.
+ checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.

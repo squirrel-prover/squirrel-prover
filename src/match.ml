@@ -273,7 +273,7 @@ end
 (*------------------------------------------------------------------*)
 (** {3 Term matching and unification} *)
 
-module T : S with type t = message = struct
+module T (* : S with type t = message *) = struct
   type t = message
 
   let pp_pat pp_t fmt p =
@@ -286,7 +286,7 @@ module T : S with type t = message = struct
   exception NoMgu 
     
   (* Invariants:
-     - [st.mv] supports in included in [unif_support].
+     - [st.mv] supports in included in [support].
      - [st.bvs] is the set of variables bound above [t].
      - [st.bvs] must be disjoint from the free variables of the terms in the
        co-domain of [mv]. *)
@@ -859,10 +859,8 @@ end
 
 
 module E : S with type t = Equiv.form = struct
-  module TMatch = T
-
   (* We include Term.Match, and redefine any necessary function *)
-  include TMatch
+  include T
 
   type t = Equiv.form
 
@@ -1024,7 +1022,7 @@ module E : S with type t = Equiv.form = struct
         pat_tyvars = [];
         pat_vars = Sv.of_list1 s2.indices;}
     in
-    match TMatch.try_match table system term1 pat2 with
+    match T.try_match table system term1 pat2 with
     | Match _ -> true
     | FreeTyv | NoMatch _ -> false
 
@@ -1074,7 +1072,7 @@ module E : S with type t = Equiv.form = struct
         pat_tyvars = [];
         pat_vars = Sv.of_list1 s2.indices;}
     in
-    match TMatch.unify_opt table pat1 pat2 with
+    match T.unify_opt table pat1 pat2 with
     | Some mv ->
       let subst = Mvar.to_subst ~mode:`Unif mv in
       let mset = mset_subst env subst s1 in
@@ -1512,15 +1510,9 @@ module E : S with type t = Equiv.form = struct
     match_state ->
     Mvar.t option
     = fun ?(vars=Sv.empty) term elem st ->
-      let pat =
-        { pat_tyvars = [];
-          pat_vars = Sv.union vars st.support;
-          pat_term = elem; }
-      in
-      match TMatch.try_match_term ~mv:st.mv st.table st.system term pat with
-      | Match mv -> Some mv
-      | FreeTyv | NoMatch _ -> None
-
+    let st = { st with support = Sv.union vars st.support; } in
+    try Some (T.tmatch term elem st) 
+    with NoMatch _ -> None
 
   (** Variant of [term_match_opt]. *)
   let term_match ?vars term pat st : Mvar.t =
@@ -1529,8 +1521,8 @@ module E : S with type t = Equiv.form = struct
     | Some st -> st
 
   (*------------------------------------------------------------------*)
-  (** In case [pat] is a sequence, try to match [term] as an element
-      of [pat]. *)
+  (** In case [elem] is a sequence, try to match [term] as an element
+      of [elem]. *)
   let seq_mem_one
       (term : Term.message)
       (elem : Term.message)
@@ -1573,10 +1565,33 @@ module E : S with type t = Equiv.form = struct
 
     let vars = Sv.add (Vars.EVar tv) (Sv.of_list1 mset.indices) in
 
+    (* if [st.support] is not empty, then we need to find [mv] such that:
+       - [mv] represents a substitution θ whose support is included in
+         [st.support] ∪ [vars]
+       - for any v ∈ [st.support], (fv(θ(v)) ∩ st.bvs = ∅)
+       
+       The issue is that the matching algorithm will ensure that the latter
+       condition holds for ([st.support] ∪ [vars]), and not just 
+       for [st.support]. This makes us reject valid instance that appear in
+       practice.
+       
+       To allow [st.support] to be empty, we would have to modify the
+       matching algorithm to account for that. 
+
+       Instead, for now, we ensure that this issue never arise by using 
+       strenghtening only is [st.support] = ∅.
+    *)
+    assert (Sv.is_empty st.support);
+    let st = { st with bvs = Sv.empty; } in
+
     match term_match_opt ~vars term pat st with
     | None -> None
     | Some mv ->
-      let mv = Mvar.filter (fun v _ -> not (Sv.mem v vars)) mv in
+      let mv = 
+        Mvar.filter (fun v _ -> 
+            v <> Vars.EVar tv && not (Sv.mem v vars)
+          ) mv 
+      in
       Some mv
 
   (** Try to match [term] as an element of [msets]. *)
@@ -1672,7 +1687,7 @@ module E : S with type t = Equiv.form = struct
         | None ->
           (* if that fails, decompose [term] through the Function Application
              rule, and recurse. *)
-          fa_match_term_incl term pat_terms mset_l st minfos
+          fa_match_term_incl term pat_terms mset_l st minfos 
 
   (** Check that [term] can be deduced from [pat_terms] through the 
       Function Application rule *) 
@@ -1703,8 +1718,18 @@ module E : S with type t = Equiv.form = struct
       (pat_terms : Term.message list)
       (st        : match_state) : Mvar.t
     =
-    let msets = strengthen st.table st.system st.env pat_terms in
-    let mset_l = msets_to_list msets in
+    (* if [st.support] is not empty, we cannot strengthen the invariant.
+       See explanation in [mset_mem_one]. *)
+    let mset_l =       
+      if not (Sv.is_empty st.support)
+      then []
+      else 
+        let msets = strengthen st.table st.system st.env pat_terms in
+        msets_to_list msets
+    in
+
+    (* (* REM *)
+     * Fmt.epr "strenghten: %a@." pp_mset_l mset_l; *)
 
     let mv, minfos = 
       List.fold_left (fun (mv, minfos) term ->
@@ -1839,13 +1864,13 @@ module E : S with type t = Equiv.form = struct
       | Atom (Reach f) ->
         omap
           (fun x -> Equiv.Atom (Reach (x)))
-          (TMatch.find_map ~many table system env f p func)
+          (T.find_map ~many table system env f p func)
       | Atom (Equiv e) ->
         let found = ref false in
 
         let e = List.fold_left (fun acc f ->
             if not !found || many then
-              match TMatch.find_map ~many table system env f p func with
+              match T.find_map ~many table system env f p func with
               | None -> f :: acc
               | Some f -> found := true; f :: acc
             else f :: acc

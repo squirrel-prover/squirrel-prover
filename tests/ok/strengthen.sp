@@ -46,7 +46,7 @@ Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
 
-(* using [na] and the sequence of all [n(j)], we can deduce [s1] and [s2] *)
+(* using [na] and the sequence of all [n(j)], we can deduce [s0], [s1] and [s2] *)
 global goal _ (t : timestamp, i : index) :
   equiv(na, seq(j -> n(j))) ->
   equiv(s0(i)@t, s1(i)@t, s2(i)@t).
