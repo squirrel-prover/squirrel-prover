@@ -14,7 +14,7 @@ PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $
 
 test: squirrel alcotest okfail_test
 
-.PHONY: ok_test ok_test_end alcotest
+.PHONY: ok_test ok_test_end alcotest test.byte squirrel squirrel.byte
 
 # Directory for logging test runs
 RUNLOGDIR=_build/log
@@ -48,8 +48,10 @@ tests/test_prologue.ok:
 	 ; then echo -n . ; \
 	 else echo "[FAIL] $(@:.ok=.sp)" >> tests/tests.ko ; echo -n '!' ; fi
 
-alcotest: version sanity
+test.byte: version sanity
 	$(OCB) test.byte
+
+alcotest: test.byte
 	@mkdir -p ./_build/_tests
 	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
 	./test.byte --compact
@@ -60,8 +62,10 @@ clean:
 	rm -f *.coverage
 	rm -rf _coverage
 
-squirrel: version sanity
+squirrel.byte: version sanity
 	$(OCB) squirrel.byte
+
+squirrel: squirrel.byte
 	@ln -s -f squirrel.byte squirrel
 
 makecoverage: version sanity
@@ -79,18 +83,6 @@ coverage: makecoverage ok_test
 
 %.cmo: sanity
 	$(OCB) $@
-
-native: version sanity
-	$(OCB) test.native
-
-byte: version sanity
-	$(OCB) test.byte
-
-profile: version sanity
-	$(OCB) -tag profile test.native
-
-debug: version sanity
-	$(OCB) -tag debug test.byte
 
 install: version squirrel
 	cp squirrel.byte ~/.local/bin/squirrel.byte
@@ -120,4 +112,4 @@ _build/requirements: Makefile
 	mkdir -p _build
 	touch _build/requirements
 
-.PHONY: version clean byte native profile debug sanity
+.PHONY: version clean sanity
