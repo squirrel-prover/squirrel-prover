@@ -1135,7 +1135,7 @@ let equiv_formula f1 f2 (s : ES.t) =
   let f =
     Term.mk_and ~simpl:false
       (Term.mk_impl ~simpl:false f1 f2)
-      (Term.mk_impl ~simpl:false f2 f1) 
+      (Term.mk_impl ~simpl:false f2 f1)
   in
   let trace_sequent = ES.(to_trace_sequent (set_reach_goal f s)) in
 
@@ -1477,7 +1477,7 @@ let rec auto ~close ~strong s sk (fk : Tactics.fk) =
     auto ~close ~strong (byequiv s) sk fk
 
   | Goal.Equiv s ->
-    let sk l _ = 
+    let sk l _ =
       sk (List.map (fun s -> Goal.Equiv s) l) fk
     and fk _ =
       if close
@@ -1560,7 +1560,7 @@ let do_s_item (s_item : Args.s_item) s : Goal.t list =
     Tactics.run tac s
 
   | Args.Tryautosimpl l ->
-    let tac = 
+    let tac =
       Tactics.andthen         (* FIXME: inneficient *)
         (Tactics.try_tac (auto ~strong:true ~close:true))
         (auto ~strong:true ~close:false)
@@ -1658,12 +1658,12 @@ let prf_mk_direct env (param : prf_param) (occ : Iter.hash_occ) =
        (Term.mk_atom `Neq param.h_cnt m))
 
 (** indirect cases: occurences of hashes in actions of the system *)
-let prf_mk_indirect 
+let prf_mk_indirect
     (env           : Vars.env)
     (cntxt         : Constr.trace_cntxt)
     (param         : prf_param)
-    (frame_actions : Fresh.ts_occs) 
-    (a             : Action.descr) 
+    (frame_actions : Fresh.ts_occs)
+    (a             : Action.descr)
     (hash_occs     : Iter.hash_occs) : Term.message
   =
   let env = ref env in
@@ -1770,8 +1770,8 @@ let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
   let macro_cases =
     Iter.fold_macro_support (fun descr t macro_cases ->
         let fv = Sv.of_list1 descr.Action.indices in
-        let new_cases = 
-          Iter.get_f_messages_ext ~fv ~cntxt param.h_fn param.h_key.s_symb t 
+        let new_cases =
+          Iter.get_f_messages_ext ~fv ~cntxt param.h_fn param.h_key.s_symb t
         in
         List.assoc_up_dflt descr [] (fun l -> new_cases @ l) macro_cases
       ) cntxt frame []
@@ -1793,7 +1793,7 @@ let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
 let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
   try _mk_prf_phi_proj proj cntxt env biframe e hash
   with
-  | Not_hash -> Term.mk_true, Term.mk_true
+  | Not_hash -> soft_failure Tactics.Bad_SSC
   | Euf.Bad_ssc ->
     soft_failure (Tactics.Failure "key syntactic side condition violated")
 
@@ -1850,14 +1850,14 @@ let prf Args.(Int i) s =
     | _ -> assert false
   in
 
-  let f_direct_l, f_indirect_l = 
-    mk_prf_phi_proj PLeft  cntxt env biframe e hash 
+  let f_direct_l, f_indirect_l =
+    mk_prf_phi_proj PLeft  cntxt env biframe e hash
   and f_direct_r, f_indirect_r =
-    mk_prf_phi_proj PRight cntxt env biframe e hash 
+    mk_prf_phi_proj PRight cntxt env biframe e hash
   in
   (* the formula, without the oracle condition *)
-  let formula = 
-      Term.mk_and ~simpl:false 
+  let formula =
+      Term.mk_and ~simpl:false
         (combine_conj_formulas f_direct_l f_direct_r)
         (combine_conj_formulas f_indirect_l f_indirect_r)
   in
