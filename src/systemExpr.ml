@@ -40,36 +40,36 @@ let pp fmt = function
   | Pair (s1, s2) -> Fmt.pf fmt "%a,%a" pp_single s1 pp_single s2
 
 (*------------------------------------------------------------------*)
-type ssymb_pair = System.system_name * 
+type ssymb_pair = System.system_name *
                   System.system_name
 
-type system_expr_err = 
+type system_expr_err =
   | SE_NotABiProcess of System.system_name
   | SE_NoneProject
   | SE_IncompatibleAction   of ssymb_pair * string
   | SE_DifferentControlFlow of ssymb_pair
 
 let pp_system_expr_err fmt = function
-  | SE_NotABiProcess s -> 
+  | SE_NotABiProcess s ->
     Fmt.pf fmt "cannot project system [%s], which is not a bi-process"
       (Symbols.to_string s)
 
-  | SE_NoneProject -> 
+  | SE_NoneProject ->
     Fmt.pf fmt "cannot project a system with None"
 
   | SE_IncompatibleAction ((s1,s2),s) ->
-    Fmt.pf fmt "systems [%s] and [%s] are not compatible: %s" 
+    Fmt.pf fmt "systems [%s] and [%s] are not compatible: %s"
       (Symbols.to_string s1) (Symbols.to_string s2) s
-      
+
   | SE_DifferentControlFlow (s1,s2) ->
-    Fmt.pf fmt "systems [%s] and [%s] have distinct control flow" 
-      (Symbols.to_string s1) (Symbols.to_string s2) 
+    Fmt.pf fmt "systems [%s] and [%s] have distinct control flow"
+      (Symbols.to_string s1) (Symbols.to_string s2)
 
 exception BiSystemError of system_expr_err
 
 let bisystem_error e = raise (BiSystemError e)
 
-let incompatible_error s1 s2 s = 
+let incompatible_error s1 s2 s =
   raise (BiSystemError (SE_IncompatibleAction ((s1,s2),s)))
 
 
@@ -123,30 +123,30 @@ let make_bi_descr s1 s2 (d1 : Action.descr) (d2 : Action.descr) : Action.descr =
     incompatible "cannot merge two actions with different number of indices";
 
   (* Note: d1 and d2 must have globally refreshed indices *)
-  let subst = List.map2 (fun i1 i2 -> 
+  let subst = List.map2 (fun i1 i2 ->
       Term.ESubst (Term.mk_var i1, Term.mk_var i2)
-    ) d2.indices d1.indices 
+    ) d2.indices d1.indices
   in
   let d2 = Action.subst_descr subst d2 in
-  
+
   if not ( d1.name = d2.name ) then
     incompatible "cannot merge two actions with disctinct names";
 
   if not ( d1.input = d2.input ) then
     incompatible "cannot merge two actions with disctinct inputs";
 
-  if Action.same_shape d1.action d2.action = None then 
+  if Action.same_shape d1.action d2.action = None then
     incompatible "cannot merge two actions with different shapes";
 
   let condition =
-    let is1,t1 = d1.condition 
+    let is1,t1 = d1.condition
     and is2,t2 = d2.condition in
     if is1 <> is2 then
       incompatible "cannot merge two actions with disctinct \
                     condition indexes";
     is1, Term.make_bi_term t1 t2 in
-  
-  let updates = 
+
+  let updates =
     List.map2 (fun (st1, m1) (st2, m2) ->
         if st1 <> st2 then
           incompatible "cannot merge two actions with disctinct \
@@ -154,7 +154,7 @@ let make_bi_descr s1 s2 (d1 : Action.descr) (d2 : Action.descr) : Action.descr =
         st1,Term.make_bi_term m1 m2)
       d1.updates d2.updates in
 
-  let output = 
+  let output =
     let c1,m1 = d1.output and c2,m2 = d2.output in
     if c1 <> c2 then
       incompatible "cannot merge two actions with disctinct \
@@ -164,9 +164,9 @@ let make_bi_descr s1 s2 (d1 : Action.descr) (d2 : Action.descr) : Action.descr =
   { name = d1.name;
     action = d1.action;
     input = d1.input;
-    indices = d1.indices; 
-    condition = condition; 
-    updates = updates; 
+    indices = d1.indices;
+    condition = condition;
+    updates = updates;
     output = output; }
 
 let descr_of_shape table (se : t) shape =
@@ -197,16 +197,16 @@ let descr_of_action table (system : t) a =
   let descr = descr_of_shape table system (Action.get_shape a) in
   let d_indices = descr.indices in
   let a_indices = Action.get_indices a in
-  let subst = 
-    List.map2 (fun v v' -> 
+  let subst =
+    List.map2 (fun v v' ->
         Term.ESubst (Term.mk_var v, Term.mk_var v')
-      ) d_indices a_indices 
+      ) d_indices a_indices
   in
 
-  Action.subst_descr subst descr 
+  Action.subst_descr subst descr
 
-let descrs table se = 
-  let same_shapes descrs1 descrs2 = 
+let descrs table se =
+  let same_shapes descrs1 descrs2 =
     System.Msh.for_all (fun shape d1 ->
         System.Msh.mem shape descrs2) descrs1 &&
     System.Msh.for_all (fun shape _ ->
@@ -243,8 +243,8 @@ let descrs table se =
       (fun shape descr -> Action.pi_descr (get_proj s) descr)
       shapes
 
-let iter_descrs 
-    table system 
+let iter_descrs
+    table system
     (f : Action.descr -> unit) =
   let f _ a = f a in
   System.Msh.iter f (descrs table system)
@@ -258,11 +258,11 @@ let fold_descrs (f : Action.descr -> 'a -> 'a) table system init =
   System.Msh.fold f (descrs table system) init
 
 
-(** Check that a system expression is valid. This is not obvious only 
-    in the [Pair _] case, in which case we check that the two single 
+(** Check that a system expression is valid. This is not obvious only
+    in the [Pair _] case, in which case we check that the two single
     systems are compatible. *)
 let check_system_expr table se = iter_descrs table se (fun _ -> ())
-(* computing the system description has the side-effect of checking that 
+(* computing the system description has the side-effect of checking that
    the systems are compatible *)
 
 (*------------------------------------------------------------------*)
@@ -272,9 +272,9 @@ let single _table a = Single a
 
 let simple_pair _table s = SimplePair s
 
-(* This is the only case where we have to check that the system are 
+(* This is the only case where we have to check that the system are
    compatible. *)
-let pair table a b =  
+let pair table a b =
   if a = b then Pair (a,a) else
     let se = Pair (a,b) in
     check_system_expr table se;
@@ -360,7 +360,7 @@ let parse_single table = function
   | P_Right a -> Right (System.of_lsymb a table)
 
 let parse_se table p_se = match p_se with
-    | P_Single s       -> single table (parse_single table s)
-    | P_SimplePair str -> simple_pair table (System.of_lsymb str table)
-    | P_Pair (a,b)     -> 
-      pair table (parse_single table a) (parse_single table b) 
+  | P_Single s       -> single table (parse_single table s)
+  | P_SimplePair str -> simple_pair table (System.of_lsymb str table)
+  | P_Pair (a,b)     ->
+    pair table (parse_single table a) (parse_single table b)
