@@ -35,10 +35,6 @@ process reader(j:index) =
 
 system ((!_j R: reader(j)) | (!_i !_k T: tag(i))).
 
-(* This should be builtin and automatic: TODO.
-axiom happens_le (t:timestamp,tt:timestamp):
-  t <= tt && t <> init && happens(tt) => happens(t) *)
-
 goal executable_R1 (t:timestamp) (j,i:index) :
   happens(t) => exec@t => R1(j,i)<=t => exec@R1(j,i) && cond@R1(j,i).
 Proof.
