@@ -415,9 +415,14 @@ let () = T.register_general "reduce"
 (** [assumption judge sk fk] proves the sequent using the axiom rule. *)
 let assumption (s : TS.t) =
   let goal = TS.goal s in
+  let assumption_entails _ f = 
+    goal = f ||
+    List.exists (fun f -> 
+        goal = f || f = Term.mk_false
+      ) (decompose_ands f)
+  in
   if goal = Term.mk_true ||
-     Hyps.is_hyp goal s ||
-     Hyps.is_hyp Term.mk_false s then
+     (Hyps.exists assumption_entails s) then
     let () = dbg "assumption %a" Term.pp goal in
     []
 

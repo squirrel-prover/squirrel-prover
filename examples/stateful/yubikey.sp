@@ -235,8 +235,8 @@ goal noreplayInv (ii, ii1, i:index):
 Proof.
   intro Hap [Hexec Ht].
   use counterIncreaseStrictly with ii1, i as M0 => //.
-  assert (S(ii,i) = pred(S(ii1,i)) || S(ii,i) < pred(S(ii1,i))) as H1; 
-  1: constraints.
+  assert (S(ii,i) = pred(S(ii1,i)) || S(ii,i) < pred(S(ii1,i))) as H1
+  by constraints.
   case H1.
 
   (* case S(ii,i) = pred(S(ii1,i)) *)
@@ -244,11 +244,8 @@ Proof.
 
   (* case S(ii,i) < pred(S(ii1,i)) *)
   use counterIncreaseBis with pred(S(ii1,i)),S(ii,i),i as H2 => //.
-  case H2 => //; 1: by apply orderTrans _ (SCpt(i)@pred(S(ii1,i))) _.
-
-  simpl.
-  executable S(ii1,i) => // H.
-  by apply H.
+  case H2 => //.
+  by apply orderTrans _ (SCpt(i)@pred(S(ii1,i))) _.
 Qed.
 
 
@@ -319,8 +316,6 @@ by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //.
 
 subst SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii,i).
 by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //.
-split=> //.
-by expand exec => //.
 
 (* 2nd case: S(ii,i) > S(ii',i) *)
 assert (pred(S(ii,i)) = S(ii',i) || pred(S(ii,i)) > S(ii',i)) => //.

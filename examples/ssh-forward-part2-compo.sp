@@ -492,7 +492,6 @@ Proof.
   depends Sok, Sfail => // _.
   executable Sfail; 1,2: auto.  
   by intro H0; use H0 with Sok.
-  by expand exec.
 
   by fa 17; fa 18; noif 18.
   (* A3 *)
@@ -525,7 +524,6 @@ Proof.
   depends PDIS5, Pfail => // _.
   executable Pfail; 1,2: auto.  
   by intro H0; use H0 with PDIS5.
-  by expand exec.
 
   by fa 17; fa 18; noif 18.
  (* A4 *)
