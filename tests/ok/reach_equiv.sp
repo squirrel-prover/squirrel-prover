@@ -71,11 +71,3 @@ Proof.
   fresh Meq.
 Qed.
 
-global goal [default/left,default/right] _ :
-  equiv(frame@pred(A),diff(s@B,m)) -> [not(input@A = s@B)].
-Proof.
-  intro H.
-  checkfail reach_equiv H exn NoAssumpSystem.
-  (* This time we can't project to complete the proof,
-   * as projections currently drops all global hypotheses. *)
-Abort.

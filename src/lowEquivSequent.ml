@@ -232,15 +232,24 @@ let goal_as_equiv s = match goal s with
 let set_reach_goal f s = set_goal Equiv.(Atom (Reach f)) s
 
 (*------------------------------------------------------------------*)
+(** Convert global sequent to local sequent.
+  * Assume that the conclusion of the input sequent is a local formula.
+  * The semantics of the system expression differs from global and
+  * local sequents: for the former we need two systems to make sense
+  * of equivalences; for the latter we are checking that a local
+  * formula holds for all projections of the system expression.
+  * For now (without system annotations in global formulas) we can
+  * only keep global formula hypotheses in a restricted case: the two
+  * projections are the same. *)
 let to_trace_sequent s =
   let env     = env s in
-  let system  =
+  let system,keep_global_hyps =
     let se = system s in
     let l,r =
       SystemExpr.project Term.PLeft se,
       SystemExpr.project Term.PRight se
     in
-      if l=r then l else se
+      if l=r then l,true else se,false
   in
   let table   = table s in
   let ty_vars = ty_vars s in
@@ -261,7 +270,10 @@ let to_trace_sequent s =
       | Equiv.Atom (Equiv.Reach h) -> 
         TS.LocalHyps.add (Args.Named (Ident.name id)) h trace_s
       | h ->
-        TS.Hyps.add (Args.Named (Ident.name id)) (`Equiv h) trace_s)
+        if keep_global_hyps then
+          TS.Hyps.add (Args.Named (Ident.name id)) (`Equiv h) trace_s
+        else
+          trace_s)
     s trace_s
 
 (*------------------------------------------------------------------*)
