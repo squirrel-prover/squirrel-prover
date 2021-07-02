@@ -135,15 +135,31 @@ goal dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
 Proof. auto. Qed.
 hint rewrite dec_enc.
 
+(* f_apply *)
+
+goal fst_apply (x,y : message) : x = y => fst(x) = fst(y).
+Proof. auto. Qed.
+
+goal snd_apply (x,y : message) : x = y => snd(x) = snd(y).
+Proof. auto. Qed.
+
+goal dec_apply (x,y,x1,y1 : message) : 
+ x = y => x1 = y1 => dec(x,x1) = dec(y,y1).
+Proof. auto. Qed.
+
+
+(* PROTOCOL SPECIFIC AXIOMS  *)
+(* A inclure dans une lib standard *)
+
 
 axiom orderTrans (n1,n2,n3:message):
-  n1 ~< n2 = orderOk && n2 ~< n3 = orderOk => n1 ~< n3 = orderOk.
+  n1 ~< n2 = orderOk => n2 ~< n3 = orderOk => n1 ~< n3 = orderOk.
 
 axiom orderStrict (n1,n2:message):
-   n1 = n2 => n1 ~< n2 <> orderOk.
+  n1 = n2 => n1 ~< n2 <> orderOk.
   
-axiom orderSucc (n1:message):
-n1 ~< mySucc(n1) = orderOk.
+axiom orderSucc (n1,n2:message):
+  n1 = n2 => n1 ~< mySucc(n2) = orderOk.
 
 
 (* Some properties on the counter on the server side *)
@@ -555,7 +571,7 @@ goal YPresscounterIncreaseStrictly (i,j:index):
 Proof.
 intro Hap Hcond.
 expand YCpt(i)@Press(i,j).
-apply orderSucc.
+by apply orderSucc.
 Qed.
 
 goal YPlugcounterIncreaseStrictly (i,j:index):
@@ -565,7 +581,7 @@ goal YPlugcounterIncreaseStrictly (i,j:index):
 Proof.
 intro Hap Hcond.
 expand YCpt(i)@Plug(i,j).
-apply orderSucc.
+by apply orderSucc.
 Qed.
 
 goal YcounterIncrease (t:timestamp, i : index) :
@@ -642,81 +658,96 @@ Qed.
 goal auth_injective_ter (ii,i:index):
   happens(S(ii,i)) =>
   exec@S(ii,i) =>
-    exists (j:index), 
-     (Press(i,j) < S(ii,i) && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i))))
-     && forall (j':index), 
-       (Press(i,j') < S(ii,i) && 
-       snd(snd(output@Press(i,j'))) = snd(snd(input@S(ii,i)))) => 
-         j=j'.
+  exists (j:index), 
+   (Press(i,j) < S(ii,i) && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i))))
+   && forall (j':index), 
+     (Press(i,j') < S(ii,i) && 
+     snd(snd(output@Press(i,j'))) = snd(snd(input@S(ii,i)))) => 
+       j=j'.
 Proof.
 intro Hap Hexec.
-executable S(ii,i) => //.
-intro exec.
+executable S(ii,i) => // exec.
 expand exec, cond.
 destruct Hexec as [Hexecpred [Mneq Hcpt Hpid]].
-intctxt Mneq => //.
-intro Ht M1 *.
+intctxt Mneq => // Ht M1 *.
 exists j.
 split => //.
 intro j'.
 intro [Hyp Meq].
-expand output@Press(i,j').
-rewrite snd_pair in Meq.
-rewrite snd_pair in Meq.
-
+rewrite /output /= in Meq.
 
 expand cpt.
-assert(snd(dec(enc(<secret(i),YCpt(i)@pred(Press(i,j))>,npr(i,j),k(i)),k(i))) = snd(dec(enc(<secret(i),YCpt(i)@pred(Press(i,j'))>,npr(i,j),k(i)),k(i)))) => //=. 
+rewrite -M1 in Meq.
+apply dec_apply _ _ (k(i)) (k(i)) in Meq => //=.
+destruct Meq as [_ Meq].
 
-assert(YCpt(i)@Press(i,j) = YCpt(i)@Press(i,j')).
-expand YCpt => //.
-
+assert(YCpt(i)@Press(i,j) = YCpt(i)@Press(i,j')) as Meq0 
+by expand YCpt => //.
 
 assert
-   ( Press(i,j) = Press(i,j') || Press(i,j) < Press(i,j') || Press(i,j) > Press(i,j') ) as H => //.
+ (Press(i,j) = Press(i,j') ||
+  Press(i,j) < Press(i,j') || 
+  Press(i,j) > Press(i,j')) as H by auto.
 case H => //.
-
-
 
 (* Press(i,j) < Press(i,j') *)
 use exec with Press(i,j') as H0' => //.
 expand exec.
 use YPresscounterIncreaseStrictly with i, j' as HP' => //.
 
-assert(pred(Press(i,j')) = Press(i,j) || pred(Press(i,j')) > Press(i,j)) => //.
+assert(pred(Press(i,j')) = Press(i,j) || 
+       pred(Press(i,j')) > Press(i,j)) as H0 by auto.
 case H0.
  
- (* pred(Press(i,j')) = Press(i,j)  *)
- use orderStrict with YCpt(i)@Press(i,j), YCpt(i)@Press(i,j') => //.
- (* pred(Press(i,j')) > Press(i,j) *)
+(* pred(Press(i,j')) = Press(i,j)  *)
+(* NEW: *)
+by apply orderStrict in Meq0.
+(* OLD: *)
+(* by use orderStrict with YCpt(i)@Press(i,j), YCpt(i)@Press(i,j') => //. *)
+
+(* pred(Press(i,j')) > Press(i,j) *)
 use YcounterIncreaseBis with pred(Press(i,j')), Press(i,j), i as HI => //.
 case HI => //.
-use orderTrans with  YCpt(i)@Press(i,j), YCpt(i)@pred(Press(i,j')), YCpt(i)@Press(i,j') => //.
-use orderStrict with YCpt(i)@Press(i,j), YCpt(i)@Press(i,j') => //.
-rewrite HI in Meq0 =>//.
-expand YCpt(i)@Press(i,j).
-use orderSucc with YCpt(i)@pred(Press(i,j)) => //.
-use orderStrict with YCpt(i)@pred(Press(i,j)), mySucc(YCpt(i)@pred(Press(i,j))) => //.
 
+(* NEW *)
+apply orderTrans _ _ (YCpt(i)@Press(i,j')) in HI => //.
+(* OLD *)
+(* use orderTrans with  YCpt(i)@Press(i,j), YCpt(i)@pred(Press(i,j')), YCpt(i)@Press(i,j') => //. *)
+
+(* NEW: *)
+by apply orderStrict in Meq0.
+(* OLD: *)
+(* by use orderStrict with YCpt(i)@Press(i,j), YCpt(i)@Press(i,j') => //. *)
+
+rewrite HI in Meq => //.
+expand YCpt.
+by use orderStrict with YCpt(i)@pred(Press(i,j)), mySucc(YCpt(i)@pred(Press(i,j))) => //.
 
 (* Press(i,j) > Press(i,j') *)
 use exec with Press(i,j) as H0 => //.
 expand exec.
 use YPresscounterIncreaseStrictly with i, j as HP => //.
 
-assert(pred(Press(i,j)) = Press(i,j') || pred(Press(i,j)) > Press(i,j')) => //.
-case H1.
+assert(pred(Press(i,j)) = Press(i,j') || 
+       pred(Press(i,j)) > Press(i,j')) as [H1 | H1] by auto.
 
- (* pred(Press(i,j)) = Press(i,j')  *)
- use orderStrict with YCpt(i)@Press(i,j'), YCpt(i)@Press(i,j) => //.
- (* pred(Press(i,j)) > Press(i,j') *)
+(* pred(Press(i,j)) = Press(i,j')  *)
+by apply orderStrict in Meq0.
+
+(* pred(Press(i,j)) > Press(i,j') *)
 use YcounterIncreaseBis with pred(Press(i,j)), Press(i,j'), i as HI => //.
 case HI => //.
-use orderTrans with  YCpt(i)@Press(i,j'), YCpt(i)@pred(Press(i,j)), YCpt(i)@Press(i,j) => //.
-use orderStrict with YCpt(i)@Press(i,j'), YCpt(i)@Press(i,j) => //.
-rewrite HI in Meq0 =>//.
+
+(* NEW *)
+apply orderTrans _ _ (YCpt(i)@Press(i,j)) in HI => //.
+(* OLD *)
+(* use orderTrans with  YCpt(i)@Press(i,j'), YCpt(i)@pred(Press(i,j)), YCpt(i)@Press(i,j) => //. *)
+
+by apply orderStrict in Meq0. 
+
+clear exec Mneq Hpid Hexecpred Hcpt H0 M1.
+rewrite HI in Meq =>//.
 expand YCpt(i)@Press(i,j').
-use orderSucc with YCpt(i)@pred(Press(i,j')) => //.
 use orderStrict with YCpt(i)@pred(Press(i,j')), mySucc(YCpt(i)@pred(Press(i,j'))) => //.
 Qed.
 
