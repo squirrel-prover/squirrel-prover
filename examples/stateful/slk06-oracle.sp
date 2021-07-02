@@ -421,7 +421,7 @@ Proof.
   fresh M.
   admit. (* TODO - fresh tactic not precise enough *)
 
-  case (i=i0) => _ // /=. 
+  case (i=i0) => _ //=. 
   expand kT. 
   rewrite if_false //. 
   by apply IH0.
