@@ -571,6 +571,14 @@ apply_arg:
 %inline dependent_induction:
 | DEPENDENT INDUCTION { }
 
+
+%inline assert_tac:
+| l=lloc(ASSERT) p=tac_formula ip=as_ip?
+    { let ip = match ip with
+        | None -> []
+        | Some ip -> [TacticsArgs.SimplPat ip] in
+      mk_abstract l "assert" (TacticsArgs.Theory p :: ip) }
+
 (*------------------------------------------------------------------*)
 tac:
   | LPAREN t=tac RPAREN                { t }
@@ -648,11 +656,10 @@ tac:
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
       mk_abstract l "clear" ids }
 
-  | l=lloc(ASSERT) p=tac_formula ip=as_ip?
-    { let ip = match ip with
-        | None -> []
-        | Some ip -> [TacticsArgs.SimplPat ip] in
-      mk_abstract l "assert" (TacticsArgs.Theory p :: ip) }
+  | t=assert_tac { t }
+
+  | t=assert_tac BY t1=tac
+    { T.AndThenSel (t, [[1], t1]) }
 
   | l=lloc(USE) i=lsymb ip=as_ip?
     { let ip = match ip with
