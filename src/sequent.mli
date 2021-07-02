@@ -12,8 +12,11 @@ module type S = sig
   val is_equiv_assumption : Theory.lsymb -> t -> bool
   val is_reach_assumption : Theory.lsymb -> t -> bool
 
-  (** Get statement associated to an assumption. *)
+  (** Get statement associated to an assumption.
+    * By default it checks for compatibility: this means system inclusion
+    * for local assumptions, and system equality otherwise. *)
   val get_assumption :
+    ?check_compatibility:bool ->
     'a Equiv.f_kind -> Theory.lsymb -> t -> (ghyp, 'a) Goal.abstract_statement
 
   val reduce : Reduction.red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a

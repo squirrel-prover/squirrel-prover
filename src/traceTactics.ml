@@ -1346,9 +1346,10 @@ let project s =
 let () =
   T.register "project"
      ~tactic_help:{
-       general_help = "Turn a goal on a bi-system into one goal for each system.";
-       detailed_help = "Essentially, this is a function application on the \
-                        diff operator.";
+       general_help = "Turn a goal on a bi-system into \
+                       one goal for each projection of the bi-system.";
+       detailed_help = "This tactic will project all occurrences of \
+                        diff operators in local formulas.";
        usages_sorts = [Sort None];
        tactic_group = Structural}
      project
@@ -1938,19 +1939,39 @@ let reach_equiv_transform biframe term =
   aux term
 
 let reach_equiv Args.(String id) (s : TS.t) =
-  match TS.get_assumption Equiv.Global_t id s with
-    | { formula = Atom (Equiv biframe) } ->
-        let sys = TS.system s in
-        begin match sys with
-          | SystemExpr.Single _ -> ()
+  match TS.get_assumption ~check_compatibility:false Equiv.Global_t id s with
+    | { system = ass_sys ; formula = Atom (Equiv biframe) } ->
+        let table = TS.table s in
+        let cur_sys = TS.system s in
+        (* If assumption is a hypothesis from current trace sequent,
+         * it will come attached to the sequent's system expression,
+         * which can be a single system S.
+         * In that case (cf. LowEquivSequent.to_trace_sequent) the
+         * convention is that the global formula in assumption holds
+         * for the pair (S,S).
+         * This will be clarified when system specifications can be
+         * embedded in global formulas. *)
+        let ass_sys = match ass_sys with
+          | SystemExpr.Single s -> SystemExpr.pair table s s
+          | s -> s
+        in
+        let new_sys = match cur_sys with
+          | SystemExpr.Single _ ->
+              if SystemExpr.project Term.PLeft ass_sys = cur_sys then
+                SystemExpr.project Term.PRight ass_sys
+              else if SystemExpr.project Term.PRight ass_sys = cur_sys then
+                SystemExpr.project Term.PLeft ass_sys
+              else
+                Tactics.(soft_failure NoAssumpSystem)
           | _ ->
-              Tactics.(soft_failure (Failure "bi-system not supported"))
-        end;
+              Tactics.(soft_failure NoAssumpSystem)
+        in
         let rewrite h =
           try reach_equiv_transform biframe h with
             | Invalid -> Term.mk_true
         in
         [TS.LocalHyps.map rewrite s
+         |> TS.set_system new_sys
          |> TS.set_goal
               (try reach_equiv_transform biframe (TS.goal s) with
                  | Invalid -> Term.mk_false)]

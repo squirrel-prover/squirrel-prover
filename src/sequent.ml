@@ -23,6 +23,7 @@ module type S = sig
   val is_reach_assumption : lsymb -> t -> bool
 
   val get_assumption :
+    ?check_compatibility:bool ->
     'a Equiv.f_kind -> Theory.lsymb -> t -> (ghyp, 'a) Goal.abstract_statement
 
   val reduce : Reduction.red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
@@ -48,9 +49,10 @@ struct
     Hyps.mem_name (L.unloc name) s || Prover.is_reach_assumption (L.unloc name)
 
   let get_assumption
-    : type a. a Equiv.f_kind -> lsymb -> t ->
+    : type a. ?check_compatibility:bool ->
+              a Equiv.f_kind -> lsymb -> t ->
               (ghyp, a) Goal.abstract_statement
-    = fun k name s ->
+    = fun ?(check_compatibility=true) k name s ->
 
       if Hyps.mem_name (L.unloc name) s then
         let id, f = Hyps.by_name name s in
@@ -66,8 +68,15 @@ struct
       else
         let lem = Prover.get_assumption name in
         (* Verify that it applies to the current system. *)
-        if not (SE.systems_compatible (S.system s) lem.system) then
-          Tactics.hard_failure Tactics.NoAssumpSystem;
+        if check_compatibility then begin
+          match k with
+            | Equiv.Local_t ->
+                if not (SE.systems_compatible (S.system s) lem.system) then
+                  Tactics.hard_failure Tactics.NoAssumpSystem;
+            | _ ->
+                if S.system s <> lem.system then
+                  Tactics.hard_failure Tactics.NoAssumpSystem
+        end;
         { Goal.name = `Lemma lem.Goal.name ;
           system = lem.system ;
           ty_vars = lem.ty_vars ;
