@@ -602,21 +602,32 @@ module LocalHyps = struct
     | `Equiv _ -> assert false
 
   let add p h s = Hyps.add p (`Reach h) s
+
   let add_i p h s = Hyps.add_i p (`Reach h) s
+
   let add_i_list l s =
     let l = List.map (fun (p,h) -> p,`Reach h) l in
     Hyps.add_i_list l s
+
   let add_list l s = snd (add_i_list l s)
+
   let pp_hyp = Term.pp
+
   let pp_ldecl ?dbg fmt (id,h) = Hyps.pp_ldecl ?dbg fmt (id,`Reach h)
+
   let fresh_id = Hyps.fresh_id
   let fresh_ids = Hyps.fresh_ids
+
   let is_hyp h s = Hyps.is_hyp (`Reach h) s
+
   let by_id id s = !!(Hyps.by_id id s)
+
   let by_name name s =
     let l,h = Hyps.by_name name s in
     l,!!h
+
   let mem_id = Hyps.mem_id
+
   let mem_name = Hyps.mem_name
   let to_list s =
     List.filter_map
@@ -624,6 +635,7 @@ module LocalHyps = struct
          | l, `Reach h -> Some (l,h)
          | l, `Equiv _ -> None)
       (Hyps.to_list s)
+
   let find_opt f s =
     let f id = function
       | `Reach h -> f id h
@@ -633,32 +645,40 @@ module LocalHyps = struct
       | None -> None
       | Some (id,`Reach h) -> Some (id,h)
       | _ -> assert false
+
   let find_map f s =
     let f id = function
       | `Reach h -> f id h
       | `Equiv _ -> None
     in
     Hyps.find_map f s
+
   let exists f s =
     let f id = function
       | `Reach h -> f id h
       | `Equiv _ -> false
     in
     Hyps.exists f s
+
   let map f s =
     let f = function `Equiv h -> `Equiv h | `Reach h -> `Reach (f h) in
     Hyps.map f s
+
   let mapi f s =
     let f i = function `Equiv h -> `Equiv h | `Reach h -> `Reach (f i h) in
     Hyps.mapi f s
+
   let remove = Hyps.remove
+
   let fold f s =
     let f id h acc = match h with
       | `Equiv _ -> acc
       | `Reach h -> f id h acc
     in
     Hyps.fold f s
+
   let clear_triv = Hyps.clear_triv
+
   let pp = Hyps.pp
   let pp_dbg = Hyps.pp_dbg
 end
