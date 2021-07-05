@@ -1819,7 +1819,7 @@ let combine_conj_formulas p q =
     (Term.head_normal_biterm
        (Term.mk_diff (Term.mk_ands new_p) (Term.mk_ands !aux_q)))
 
-let prf Args.(Int i) s =
+let prf Args.(Pair (Int i, Opt (Message, m1))) s =
   let before, e, after = split_equiv_goal i s in
 
   let biframe = List.rev_append before after in
@@ -1827,23 +1827,28 @@ let prf Args.(Int i) s =
   let env = ES.env s in
 
   let e = Term.head_normal_biterm e in
-
   (* search for the first occurrence of a hash in [e] *)
   let hash_occ =
-    match Iter.get_ftypes (ES.table s) Symbols.Hash e with
-    | [] ->
+    match Iter.get_ftypes (ES.table s) Symbols.Hash e, m1 with
+    | [], _ ->
       soft_failure
         (Tactics.Failure
            "PRF can only be applied on a term with at least one occurrence \
             of a hash term h(t,k)")
 
-    | occ :: _ ->
+    | occ :: occs, None ->
       if not (Sv.is_empty occ.Iter.occ_vars) then
         soft_failure
           (Tactics.Failure "application below a binder is not supported");
       occ
+    | occs, Some (Message (hash, _)) ->
+      begin
+      match List.find_opt (fun hash_occ -> hash_occ.Iter.occ_cnt = hash) occs  with
+      | None -> soft_failure
+                         (Tactics.Failure "the given hash does not occur in the term")
+      | Some occ -> occ
+      end
   in
-
   let fn, ftyp, m, key, hash = match hash_occ.Iter.occ_cnt with
     | Term.Fun ((fn,_), ftyp, [m; key]) as hash ->
       fn, ftyp, m, key, hash
@@ -1914,7 +1919,7 @@ let () =
                     was never hashed using key k before. Behaves similarly to \
                     the fresh tactic."
     ~tactic_group:Cryptographic
-    (pure_equiv_typed prf) Args.Int
+    (pure_equiv_typed prf) Args.(Pair(Int, Opt Message))
 
 
 (*------------------------------------------------------------------*)
