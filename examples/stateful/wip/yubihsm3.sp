@@ -72,8 +72,10 @@ name mkey: message
 
 (* working key k(pid) of yubikey `pid`, stored inside the AEAD *)
 name k: index -> message
-(* key used in AEAD idealized so that the key does not occur in plaintext anymore in the idealized system *)
-name kideal: index -> message
+(* Dummy key used in AEAD idealized so that the key does not occur in 
+   plaintext anymore in the idealized system *)
+name k_dummy: index -> message
+
 (* fully ideal version of `ki(pid)`, different for each session *)
 name k': index -> index -> message
 
@@ -85,7 +87,8 @@ mutable SCtr(i:index) : message = cinit
 (* random samplings used to initialized AEAD  *)
 name rinit : index -> message
 (* authentication server's database for each pid *)
-mutable AEAD(pid:index) : message = enc(<diff(k(pid),kideal(pid)), sid(pid)>, rinit(pid), mkey).
+mutable AEAD(pid:index) : message = 
+  enc(<diff(k(pid),k_dummy(pid)), sid(pid)>, rinit(pid), mkey).
 
 channel cY
 channel cS
@@ -233,23 +236,6 @@ axiom  orderTrans (n1,n2,n3:message): n1 ~< n2 => n2 ~< n3 => n1 ~< n3.
 (* TODO: allow to have axioms for all systems *)
 axiom  orderStrict(n1,n2:message): n1 = n2 => n1 ~< n2 => False.
 
-
-
-(* Authentication goal for the fully idealized system *)
-(* goal [right] auth (pid,j0,j1:index):
-  happens(Server1(pid,j0),Decode(pid,j1)) =>
-  cond@Server1(pid,j0) => cond@Decode(pid,j1) =>
-  exists (j2:index),
-  Press(pid,j2) < Decode(pid,j1)
-  && snd(snd(output@Press(pid,j2))) = snd(snd(input@Decode(pid,j1))).
-Proof.
-intro Hap @/cond HcS [HcD1 [j3 [HcD3 HcD4]] HcD5].
-expandall.
-intctxt HcD3 => // _ H [_ _].
-by exists j3. 
-Qed.
-*)
-
 (* The counter SCtr(j) strictly increases when t is an action Server performed by 
 the server with tag j. *)
 
@@ -268,63 +254,13 @@ goal [right] counterIncrease (t:timestamp, pid : index) :
     SCtr(pid)@t = SCtr(pid)@pred(t).
 Proof.
   intro Hap [Ht Hexec].
-  case t => //.
+  case t;
+  try (intro *; by right).
 
-  intro [pid0 j0 _].
-  case (pid = pid0).
-  intro Eq.  by right.
-  intro Neq. by right.
+  intro [pid0 j0 E].
+  case (pid = pid0) => Eq; 1: by left.
 
-  intro [pid0 j0 _].
-  case (pid = pid0).
-  intro Eq.  by right.
-  intro Neq. by right.
-
-  intro [pid0 j0 _].
-  case (pid = pid0).
-  intro Eq.  left.
- subst t, Server(pid,j0).
-expand SCtr.
-expand exec.
-destruct Hexec as [Hexec' Hcond].
-expand cond.
-destruct Hcond as [H1 H2].
-auto.
-
-  intro Neq. right. expand SCtr. noif => //.
-
-  intro [pid0 j0 _].
-  case (pid = pid0).
-  intro Eq.  by right.
-  intro Neq. by right.
-
-  intro [pid0 j0 _].
-  case (pid = pid0).
-  intro Eq.  by right.
-  intro Neq. by right.
-
-
-  intro [pid0 j0 _].
-  case (pid = pid0).
-  intro Eq.  by right.
-  intro Neq. by right.
-
-
-intro [pid0 j0 _].
-  case (pid = pid0).
-  intro Eq.  by right.
-  intro Neq. by right.
-
-intro [pid0 j0 _].
-  case (pid = pid0).
-  intro Eq.  by right.
-  intro Neq. by right.
-
-intro [pid0 j0 _].
-  case (pid = pid0).
-  intro Eq.  by right.
-  intro Neq. by right. 
-
+  by right; expand SCtr; noif.
 Qed.
 
 
@@ -348,28 +284,24 @@ Proof.
   by apply counterIncrease.
 
   (* case t' < pred(t) *)
-  use IH0 with pred(t),t',pid as H1 => //.
+  use IH0 with pred(t),t',pid as H1 => //=.
   use counterIncrease with t,pid as H3 => //.
   case H1 => //.
     (* case H1 - 1/2 *)
     case H3 => //.
       by left; apply orderTrans _ (SCtr(pid)@pred(t)) _.
       (* case H1 - 2/2 *)
-  left.
-subst SCtr(pid)@pred(t), SCtr(pid)@t.
-auto.
+      left. 
+      by rewrite -H3 in H1.
 
-case H3 => //.
-left.
-subst SCtr(pid)@pred(t), SCtr(pid)@t'.
-auto.
+    case H3 => //=. 
+    left.
+    by rewrite H1 in H3.
+    
+    by right.
 
-right.
-auto.
-      executable t => // H1. 
-split => //.
-apply H1.
-auto.
+  executable t => // H1. 
+  by apply H1.
 Qed.
 
 
@@ -382,22 +314,20 @@ goal [right] noreplayInv (j, j', pid:index):
 Proof.
   intro Hap [Hexec Ht].
   use counterIncreaseStrictly  with pid, j' as H0 => //.
-  assert (Server(pid,j) = pred(Server(pid,j')) ||Server(pid,j) < pred(Server(pid,j'))) as H1
+  assert (Server(pid,j) = pred(Server(pid,j')) ||
+          Server(pid,j) < pred(Server(pid,j'))) as H1
   by constraints.
   case H1.
 
   (* case Server(pid,j) = pred(Server(pid,j')) *)
-subst   pred(Server(pid,j')), Server(pid,j).
-auto.
+  by rewrite H1 in *.
 
   (* case Server(pid,j) < pred(Server(pid,j')) *)
   use counterIncreaseBis with pred(Server(pid,j')),Server(pid,j),pid as H2 => //.
-  case H2 => //.
-  by apply orderTrans _ (SCtr(pid)@pred(Server(pid,j'))) _.
-subst SCtr(pid)@pred(Server(pid,j')),SCtr(pid)@Server(pid,j).
+  case H2; 
+  1: by apply orderTrans _ (SCtr(pid)@pred(Server(pid,j'))) _.
 
-auto.
-
+  by rewrite H2 in *.
 Qed.
 
 
@@ -407,7 +337,9 @@ goal [right] noreplay (j, j', pid:index):
   j = j'.
 Proof.
   intro Hap [Hexec Ht Meq].
-  assert (Server(pid,j) = Server(pid,j') || Server(pid,j) < Server(pid,j')) as H1; 1: constraints.
+  assert (Server(pid,j) = Server(pid,j') ||
+          Server(pid,j) < Server(pid,j')) as H1 
+  by constraints.
   case H1 => //.
 
   use noreplayInv with j, j', pid as M1 => //. 
@@ -424,11 +356,12 @@ goal [right] injective_correspondance (j, pid:index):
    happens(Server(pid,j)) =>
    exec@Server(pid,j) =>
      exists (i:index),
-       Press(pid,i) < Server(pid,j) && ctr(pid,i)@Press(pid,i) = SCtr(pid)@Server(pid,j)
-&& 
+       Press(pid,i) < Server(pid,j) && 
+       ctr(pid,i)@Press(pid,i) = SCtr(pid)@Server(pid,j) && 
        forall (j':index), happens(Server(pid,j')) =>
-            exec@Server(pid,j') =>
-            ctr(pid,i)@Press(pid,i) = SCtr(pid)@Server(pid,j') => j = j'.
+         exec@Server(pid,j') =>
+         ctr(pid,i)@Press(pid,i) = SCtr(pid)@Server(pid,j') => 
+         j = j'.
 
 Proof.
 intro Hap Hexec.
@@ -510,12 +443,14 @@ goal [right] monotonicity (j, j', pid:index):
 Proof.
   intro Hap [Hexec H].
   assert
-    (Server(pid,j) = Server(pid,j') || Server(pid,j)< Server(pid,j') || Server(pid,j) > Server(pid,j')) as Ht;
+    (Server(pid,j) = Server(pid,j') || 
+     Server(pid,j)< Server(pid,j') || 
+     Server(pid,j) > Server(pid,j')) as Ht;
   1: constraints.
   case Ht.
 
   (* case Server(pid,j) = Server(pid,j') *)
-  by use orderStrict with SCtr(pid)@Server(pid,j),SCtr(pid)@Server(pid,j').
+  by apply orderStrict in H.
 
   (* case Server(pid,j) < Server(pid,j') *)
   assumption.
@@ -523,8 +458,11 @@ Proof.
   (* case Server(pid,j) > Server(pid,j') *)
   use noreplayInv with j', j, pid  as Meq => //.
   (* apply orderTrans _ (SCtr(pid)@Server(pid,j')) in H => //. *)
-  use orderTrans with SCtr(pid)@Server(pid,j),SCtr(pid)@Server(pid,j'), SCtr(pid)@Server(pid,j) => //.
-  by use orderStrict with SCtr(pid)@Server(pid,j),SCtr(pid)@Server(pid,j).
+  use orderTrans with 
+      SCtr(pid)@Server(pid,j),
+      SCtr(pid)@Server(pid,j'), 
+      SCtr(pid)@Server(pid,j) => //.
+  by apply orderStrict in H0.
 Qed.
 
 
