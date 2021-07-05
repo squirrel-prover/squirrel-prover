@@ -333,10 +333,12 @@ Qed.
 
 goal [right] noreplay (j, j', pid:index):
   happens(Server(pid,j')) =>
-  exec@Server(pid,j') && Server(pid,j) <= Server(pid,j')&& SCtr(pid)@Server(pid,j)= SCtr(pid)@Server(pid,j')=> 
+  exec@Server(pid,j') =>
+  Server(pid,j) <= Server(pid,j') =>
+  SCtr(pid)@Server(pid,j)= SCtr(pid)@Server(pid,j')=> 
   j = j'.
 Proof.
-  intro Hap [Hexec Ht Meq].
+  intro Hap Hexec Ht Meq.
   assert (Server(pid,j) = Server(pid,j') ||
           Server(pid,j) < Server(pid,j')) as H1 
   by constraints.
