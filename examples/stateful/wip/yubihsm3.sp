@@ -403,63 +403,64 @@ executable Server(pid,j) => //.
 intro exec.
 expand exec, cond.
 destruct Hexec as [Hexecpred [[Mneq1 Mneq2] Hcpt Hpid]].
-
 expand deccipher.
-intctxt Mneq2.  (*  key does not satisfy the syntactic side condition. Exact ! *)
-(* intro Ht M1 *. *)
-(* exists j. *)
-(* split => //. *)
-(* assert (cpt(i,j)@Press(i,j) = SCpt(i)@S(ii,i)) => //. *)
+intctxt Mneq2 => //.   
+
+intro Ht M1 Eq.
+exists j0.
+split => //. 
 
 
-(* intro ii' Hap' Hexec'. *)
-(* intro Eq => //.  *)
-(* assert (SCpt(i)@S(ii,i) = SCpt(i)@S(ii',i)) => //. *)
-(* assert (S(ii,i) = S(ii',i) || S(ii,i) < S(ii',i) || S(ii,i) > S(ii',i)) => //. *)
-(* case H => //. *)
+intro j' Hap' Hexec'. 
 
-(* (* 1st case: S(ii,i) < S(ii',i) *) *)
-(* assert (S(ii,i) = pred(S(ii',i)) || S(ii,i) < pred(S(ii',i))) => //. *)
-(* case H0 => //. *)
+intro Eq => //.  
+assert (SCtr(pid)@Server(pid,j) = SCtr(pid)@Server(pid,j')) => //. 
 
+assert (Server(pid,j) = Server(pid,j') || Server(pid,j) < Server(pid,j') || Server(pid,j) > Server(pid,j')) => //. 
+case H => //. 
 
-(* (* S(ii,i) = pred(S(ii',i) < S(ii',i) *) *)
-(* use counterIncreaseStrictly with ii',i => //. *)
-(* subst  S(ii,i), pred(S(ii',i)) => //. *)
-(* by use orderStrict with SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //. *)
+(* 1st case: Server(pid,j) < Server(pid,j') *) 
+assert (Server(pid,j) = pred(Server(pid,j')) || Server(pid,j) < pred(Server(pid,j'))) => //.
+case H0 => //. 
 
 
-(* (* S(ii,i) < pred(S(ii',i))  < S(ii',i) *) *)
-(* use counterIncreaseStrictly with ii',i => //. *)
-(* use counterIncreaseBis with pred(S(ii',i)), S(ii,i), i => //. *)
-(* case H1. *)
-
-(* use orderTrans with SCpt(i)@S(ii,i), SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //. *)
-(* by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //. *)
-
-(* subst SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii,i). *)
-(* by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //. *)
-
-(* (* 2nd case: S(ii,i) > S(ii',i) *) *)
-(* assert (pred(S(ii,i)) = S(ii',i) || pred(S(ii,i)) > S(ii',i)) => //. *)
-(* case H0 => //. *)
-
-(* (* S(ii,i) > pred(S(ii,i)) = S(ii',i) *) *)
-(* use counterIncreaseStrictly with ii,i => //. *)
-(* subst S(ii',i), pred(S(ii,i)). *)
-(* by use orderStrict with SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //. *)
-
-(* (* S(ii,i) > pred(S(ii,i)) >  S(ii',i) *) *)
-(* use counterIncreaseStrictly with ii,i => //. *)
-(* use counterIncreaseBis with pred(S(ii,i)), S(ii',i), i => //. *)
-(* case H1. *)
-
-(* use orderTrans with SCpt(i)@S(ii',i), SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //. *)
-(* by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //. *)
+(* Server(pid,j) = pred(Server(pid,j') < Server(pid,j') *)
+use counterIncreaseStrictly with pid, j' => //.
+subst  Server(pid,j), pred(Server(pid,j')) => //.
+by use orderStrict with SCtr(pid)@pred(Server(pid,j')), SCtr(pid)@Server(pid,j') => //. 
 
 
-(* subst SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii',i). *)
-(* by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //. *)
+(* Server(pid,j) < pred(Server(pid,j'))  < Server(pid,j') *) 
+use counterIncreaseStrictly with pid, j' => //. 
+use counterIncreaseBis with pred(Server(pid,j')), Server(pid,j), pid => //. 
+case H2.
+
+use orderTrans with SCtr(pid)@Server(pid,j), SCtr(pid)@pred(Server(pid,j')), SCtr(pid)@Server(pid,j') => //. 
+by use orderStrict with SCtr(pid)@Server(pid,j), SCtr(pid)@Server(pid,j') => //. 
+
+subst SCtr(pid)@pred(Server(pid,j')), SCtr(pid)@Server(pid,j).
+by use orderStrict with SCtr(pid)@Server(pid,j), SCtr(pid)@Server(pid,j') => //. 
+
+(* 2nd case: Server(pid,j) > Server(pid,j')  *)
+assert (pred(Server(pid,j)) = Server(pid,j') || pred(Server(pid,j)) > Server(pid,j')) => //.
+case H0 => //. 
+
+(* Server(pid,j) > pred(Server(pid,j)) = Server(pid,j') *)
+use counterIncreaseStrictly with pid, j => //.
+subst Server(pid,j'), pred(Server(pid,j)).
+by use orderStrict with SCtr(pid)@pred(Server(pid,j)), SCtr(pid)@Server(pid,j) => //.
+
+(* Server(pid,j)  > pred(Server(pid,j)) >  Server(pid,j') *) 
+use counterIncreaseStrictly with pid, j => //.
+use counterIncreaseBis with pred(Server(pid,j)), Server(pid,j'), pid  => //. 
+case H2. 
+
+use orderTrans with SCtr(pid)@Server(pid,j'),  SCtr(pid)@pred(Server(pid,j)), SCtr(pid)@Server(pid,j) => //. 
+by use orderStrict with SCtr(pid)@Server(pid,j'), SCtr(pid)@Server(pid,j) => //. 
+
+
+subst SCtr(pid)@pred(Server(pid,j)), SCtr(pid)@Server(pid,j').
+by use orderStrict with SCtr(pid)@Server(pid,j'), SCtr(pid)@Server(pid,j) => //. 
 Qed.
 
 
