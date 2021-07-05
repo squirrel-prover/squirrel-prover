@@ -94,8 +94,12 @@ Proof.
   nosimpl(exists j).
   use executable_R1 with T1(i,k),j,i.
   expand cond@R1(j,i).
-  collision.
-  assert (input@T(i,k) = nR(j)) as Hfresh.
+  assert h(<<nR(j),fst(input@R1(j,i))>,tag1>,key(i)) =
+         h(<<input@T(i,k),nT(i,k)>,tag1>,key(i)) as Hcoll;
+    [0: congruence].
+  collision Hcoll.
+  assert (input@T(i,k) = nR(j)) as Hfresh;
+    [0: congruence].
   fresh Hfresh.
   case H5.
   by depends R(j), R2(j).
