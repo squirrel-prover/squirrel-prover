@@ -176,10 +176,9 @@ process YSM_AEAD_YUBIKEY_OTP_DECODE (pid:index) =
     let otp = snd(snd(xdata)) in
 
     let aead_dec = dec(aead,mkey) in    
-    let k_pid   = diff(fst(aead_dec), k(pid)) in
     let sid_pid = diff(snd(aead_dec), sid(pid)) in
 
-    let otp_dec = dec(otp,k_pid) in
+    let otp_dec = dec(otp,diff(fst(aead_dec), k(pid))) in
 
     if aead_dec <> fail && otp_dec <> fail && fst(otp_dec) = sid_pid
     then
@@ -349,91 +348,6 @@ Proof.
 Qed.
 
 
-
-
-(* Property 2 *)
-(* injective correspondance as stated in the PhD thesis of R. Kunneman *)
-
-goal [right] injective_correspondance (j, pid:index):
-   happens(Server(pid,j)) =>
-   exec@Server(pid,j) =>
-     exists (i:index),
-       Press(pid,i) < Server(pid,j) && 
-       ctr(pid,i)@Press(pid,i) = SCtr(pid)@Server(pid,j) && 
-       forall (j':index), happens(Server(pid,j')) =>
-         exec@Server(pid,j') =>
-         ctr(pid,i)@Press(pid,i) = SCtr(pid)@Server(pid,j') => 
-         j = j'.
-
-Proof.
-intro Hap Hexec.
-executable Server(pid,j) => //.
-intro exec.
-expand exec, cond.
-destruct Hexec as [Hexecpred [[Mneq1 Mneq2] Hcpt Hpid]].
-
-expand deccipher.
-admit.
-(* intctxt Mneq2.  (*  key does not satisfy the syntactic side condition. Exact ! *)
-intro Ht M1 *.
-exists j.
-split => //.
-assert (cpt(i,j)@Press(i,j) = SCpt(i)@S(ii,i)) => //.
-
-
-intro ii' Hap' Hexec'.
-intro Eq => //. 
-assert (SCpt(i)@S(ii,i) = SCpt(i)@S(ii',i)) => //.
-assert (S(ii,i) = S(ii',i) || S(ii,i) < S(ii',i) || S(ii,i) > S(ii',i)) => //.
-case H => //.
-
-(* 1st case: S(ii,i) < S(ii',i) *)
-assert (S(ii,i) = pred(S(ii',i)) || S(ii,i) < pred(S(ii',i))) => //.
-case H0 => //.
-
-
-(* S(ii,i) = pred(S(ii',i) < S(ii',i) *)
-use counterIncreaseStrictly with ii',i => //.
-subst  S(ii,i), pred(S(ii',i)) => //.
-by use orderStrict with SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //.
-
-
-(* S(ii,i) < pred(S(ii',i))  < S(ii',i) *)
-use counterIncreaseStrictly with ii',i => //.
-use counterIncreaseBis with pred(S(ii',i)), S(ii,i), i => //.
-case H1.
-
-use orderTrans with SCpt(i)@S(ii,i), SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //.
-by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //.
-
-subst SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii,i).
-by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //.
-
-(* 2nd case: S(ii,i) > S(ii',i) *)
-assert (pred(S(ii,i)) = S(ii',i) || pred(S(ii,i)) > S(ii',i)) => //.
-case H0 => //.
-
-(* S(ii,i) > pred(S(ii,i)) = S(ii',i) *)
-use counterIncreaseStrictly with ii,i => //.
-subst S(ii',i), pred(S(ii,i)).
-by use orderStrict with SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //.
-
-(* S(ii,i) > pred(S(ii,i)) >  S(ii',i) *)
-use counterIncreaseStrictly with ii,i => //.
-use counterIncreaseBis with pred(S(ii,i)), S(ii',i), i => //.
-case H1.
-
-use orderTrans with SCpt(i)@S(ii',i), SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //.
-by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //.
-
-
-subst SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii',i).
-by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //.
-*)
-Qed.
-
-
-
 (* Property 3 *)
 (* Monotonicity *)
 
@@ -469,5 +383,83 @@ Qed.
 
 
 
+(* Property 2 *)
+(* injective correspondance as stated in the PhD thesis of R. Kunneman *)
+
+goal [right] injective_correspondance (j, pid:index):
+   happens(Server(pid,j)) =>
+   exec@Server(pid,j) =>
+     exists (i:index),
+       Press(pid,i) < Server(pid,j) && 
+       ctr(pid,i)@Press(pid,i) = SCtr(pid)@Server(pid,j) && 
+       forall (j':index), happens(Server(pid,j')) =>
+         exec@Server(pid,j') =>
+         ctr(pid,i)@Press(pid,i) = SCtr(pid)@Server(pid,j') => 
+         j = j'.
+
+Proof.
+intro Hap Hexec.
+executable Server(pid,j) => //.
+intro exec.
+expand exec, cond.
+destruct Hexec as [Hexecpred [[Mneq1 Mneq2] Hcpt Hpid]].
+
+expand deccipher.
+intctxt Mneq2.  (*  key does not satisfy the syntactic side condition. Exact ! *)
+(* intro Ht M1 *. *)
+(* exists j. *)
+(* split => //. *)
+(* assert (cpt(i,j)@Press(i,j) = SCpt(i)@S(ii,i)) => //. *)
+
+
+(* intro ii' Hap' Hexec'. *)
+(* intro Eq => //.  *)
+(* assert (SCpt(i)@S(ii,i) = SCpt(i)@S(ii',i)) => //. *)
+(* assert (S(ii,i) = S(ii',i) || S(ii,i) < S(ii',i) || S(ii,i) > S(ii',i)) => //. *)
+(* case H => //. *)
+
+(* (* 1st case: S(ii,i) < S(ii',i) *) *)
+(* assert (S(ii,i) = pred(S(ii',i)) || S(ii,i) < pred(S(ii',i))) => //. *)
+(* case H0 => //. *)
+
+
+(* (* S(ii,i) = pred(S(ii',i) < S(ii',i) *) *)
+(* use counterIncreaseStrictly with ii',i => //. *)
+(* subst  S(ii,i), pred(S(ii',i)) => //. *)
+(* by use orderStrict with SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //. *)
+
+
+(* (* S(ii,i) < pred(S(ii',i))  < S(ii',i) *) *)
+(* use counterIncreaseStrictly with ii',i => //. *)
+(* use counterIncreaseBis with pred(S(ii',i)), S(ii,i), i => //. *)
+(* case H1. *)
+
+(* use orderTrans with SCpt(i)@S(ii,i), SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //. *)
+(* by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //. *)
+
+(* subst SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii,i). *)
+(* by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //. *)
+
+(* (* 2nd case: S(ii,i) > S(ii',i) *) *)
+(* assert (pred(S(ii,i)) = S(ii',i) || pred(S(ii,i)) > S(ii',i)) => //. *)
+(* case H0 => //. *)
+
+(* (* S(ii,i) > pred(S(ii,i)) = S(ii',i) *) *)
+(* use counterIncreaseStrictly with ii,i => //. *)
+(* subst S(ii',i), pred(S(ii,i)). *)
+(* by use orderStrict with SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //. *)
+
+(* (* S(ii,i) > pred(S(ii,i)) >  S(ii',i) *) *)
+(* use counterIncreaseStrictly with ii,i => //. *)
+(* use counterIncreaseBis with pred(S(ii,i)), S(ii',i), i => //. *)
+(* case H1. *)
+
+(* use orderTrans with SCpt(i)@S(ii',i), SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //. *)
+(* by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //. *)
+
+
+(* subst SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii',i). *)
+(* by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //. *)
+Qed.
 
 
