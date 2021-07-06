@@ -54,12 +54,12 @@ let pat_to_rw_erule ?loc dir (p : Term.message Match.pat) : rw_erule =
 (*------------------------------------------------------------------*)
 exception NoRW
 
-let rewrite_head : 
-  Symbols.table ->
-  SE.t ->
-  rw_erule -> Term.message ->
-  Term.message * Term.message list 
-  = fun table system rule t ->
+let rewrite_head 
+    (table  : Symbols.table)
+    (system : SE.t)
+    (rule   : rw_erule)
+    (t      : Term.message) : Term.message * Term.message list
+  =
   let tyvars, vars, subs, rule_subst = rule in
   let (l, r) : Term.message * Term.message = 
     match rule_subst with
@@ -87,7 +87,8 @@ let rewrite_head : type a.
   Symbols.table ->
   SE.t ->
   rw_erule -> a Term.term -> 
-  (a Term.term * Term.message list) option =
+  (a Term.term * Term.message list) option
+  =
   fun table system rule t ->
   match Type.equalk_w Type.KMessage (Term.kind t) with
   | None -> None

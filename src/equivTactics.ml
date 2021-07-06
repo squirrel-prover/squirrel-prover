@@ -1549,53 +1549,17 @@ let () =
 
 (*------------------------------------------------------------------*)
 (* TODO: factorize *)
-let do_s_item (s_item : Args.s_item) s : Goal.t list =
-  match s_item with
-  | Args.Simplify l ->
-    let tac = auto ~strong:true ~close:false in
-    Tactics.run tac s
+let rewrite_tac args s sk fk =
+  match s with
+  | Goal.Equiv s ->
+    let sk s fk = sk (List.map (fun x -> Goal.Equiv x) s) fk in
+    LT.rewrite_tac simpl_ident args s sk fk
 
-  | Args.Tryauto l ->
-    let tac = Tactics.try_tac (auto ~strong:true ~close:true) in
-    Tactics.run tac s
+  | Goal.Trace s ->
+    let sk s fk = sk (List.map (fun x -> Goal.Trace x) s) fk in
+    TraceTactics.LT.rewrite_tac TraceTactics.simpl args s sk fk
 
-  | Args.Tryautosimpl l ->
-    let tac =
-      Tactics.andthen         (* FIXME: inneficient *)
-        (Tactics.try_tac (auto ~strong:true ~close:true))
-        (auto ~strong:true ~close:false)
-    in
-    Tactics.run tac s
-
-
-(* TODO: factorize *)
-(** Applies a rewrite arg  *)
-let do_rw_arg rw_arg rw_in (s : Goal.t) : Goal.t list =
-  match rw_arg with
-  | Args.R_item rw_item  ->
-    begin match s with
-      | Goal.Equiv s ->
-        let es = LT.do_rw_item rw_item rw_in s in
-        List.map (fun x -> Goal.Equiv x) es
-      | Goal.Trace s ->
-        let ts = TraceTactics.LT.do_rw_item rw_item rw_in s in
-        List.map (fun x -> Goal.Trace x) ts
-    end
-  | Args.R_s_item s_item -> do_s_item s_item s (* targets are ignored there *)
-
-(* TODO: factorize *)
-let rewrite_tac args s =
-  match args with
-  | [Args.RewriteIn (rw_args, in_opt)] ->
-    List.fold_left (fun seqs rw_arg ->
-        List.concat_map (do_rw_arg rw_arg in_opt) seqs
-      ) [s] rw_args
-
-  | _ -> bad_args ()
-
-(* TODO: factorize *)
-let rewrite_tac args = wrap_fail (rewrite_tac args)
-
+    
 (* TODO: factorize *)
 let () =
   T.register_general "rewrite"
