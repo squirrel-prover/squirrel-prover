@@ -1913,10 +1913,7 @@ module E : S with type t = Equiv.form = struct
 
       | Atom (Equiv frame) ->
         let found, frame = List.fold_left (fun (found,acc) f ->
-            Fmt.epr "map: %a@." Term.pp f;
-            
             let found0, f = T._map func env ~subst ~vars ~conds f in
-            Fmt.epr "map res: %a@." Term.pp f;
             found0 || found, f :: acc
           ) (false,[]) frame
         in
