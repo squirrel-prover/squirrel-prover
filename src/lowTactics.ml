@@ -365,56 +365,75 @@ module LowTac (S : Sequent.S) = struct
     : S.sequent * S.sequent list 
     =
     let found1, cpt_occ = ref false, ref 0 in
+    let check_max_rewriting () =
+        if !cpt_occ > 1000 then   (* hard-coded *)
+          hard_failure (Failure "max nested rewriting reached (1000)");
+        incr cpt_occ;
+        found1 := true;
+    in
 
-    (* Return: (f, subs) *)
+    let table, system = S.table s, S.system s in
+    
+    (* Attempt to find an instance of [left], and rewrites all occurrences of
+       this instance.
+       Return: (f, subs) *)
     let rec doit
       : type a. Args.rw_count -> a rw_rule -> cform -> cform * Term.form list = 
       fun mult (tyvars, sv, rsubs, left, right) f ->
-
+        check_max_rewriting ();
+        
         let subs_r = ref [] in
-
-        (* Substitute [occ] by [right] where free variables
-           are instantiated according to [mv], and variables bound above the
-           matched occurrences are universally quantified in the generated 
-           sub-goals. *)
-        let rw_inst occ vars mv =
-          if !cpt_occ > 1000 then   (* hard-coded *)
-            hard_failure (Failure "max nested rewriting reached (1000)");
-          incr cpt_occ;
-          found1 := true;
-
-          let subst = Match.Mvar.to_subst ~mode:`Match mv in
-          let right = Term.cast (Term.kind occ) (Term.subst subst right) in
-          let rsubs = 
-            List.map (fun rsub ->
-                Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
-              ) rsubs 
-          in
-          subs_r := rsubs;
-          right
+        let found_instance = ref false in
+        
+        (* This is a reference, so that it can be over-written later
+           after we found an instance of [left]. *)
+        let pat : a Term.term Match.pat ref = 
+          ref Match.{ pat_tyvars = tyvars; pat_vars = sv; pat_term = left }
         in
+        let right_instance = ref None in
 
-        (* Attempt to find an occurrence of [left] and rewrite it. *)
-        let pat : a Term.term Match.pat = 
-          { pat_tyvars = tyvars; pat_vars = sv; pat_term = left }
+        (* If there is a match (with [mv]), substitute [occ] by [right] where 
+           free variables are instantiated according to [mv], and variables
+           bound above the matched occurrences are universally quantified in 
+           the generated sub-goals. *)
+        let rw_inst (Term.ETerm occ) subst vars conds =
+          let occ = Term.subst subst occ in (* TODO: match with pending subst *)
+          match Match.T.try_match_term table system occ !pat with
+          | NoMatch _ | FreeTyv -> `Continue
+
+          (* head matches *)
+          | Match mv ->
+            if !found_instance then
+              (* we already found the rewrite instance earlier *)
+              `Map (oget !right_instance)
+                
+            else begin (* we found the rewrite instance *)
+              found_instance := true;
+              let subst = Match.Mvar.to_subst ~mode:`Match mv in
+              let left = Term.subst subst left in
+              let right = Term.subst subst right in
+
+              right_instance := Some (Term.ETerm right);
+              subs_r :=
+                List.map (fun rsub ->
+                    Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
+                  ) rsubs;
+
+              pat := Match.{ pat_term   = left;
+                             pat_tyvars = [];
+                             pat_vars   = Sv.empty; };
+              
+              `Map (Term.ETerm right)
+            end
         in
-        let many = match mult with `Once -> false | `Any | `Many -> true in
 
         let f_opt = match f with
           | `Equiv f -> 
-            let f_opt =
-              Match.E.find_map ~many 
-                (S.table s) (S.system s) (S.env s) 
-                f pat rw_inst 
-            in
+            let f_opt = Match.E.map rw_inst (S.env s) f in
             omap (fun x -> `Equiv x) f_opt
 
           | `Reach f ->
-            let f_opt =
-              Match.T.find_map ~many 
-                (S.table s) (S.system s) (S.env s) 
-                f pat rw_inst 
-            in
+            let f_opt = Match.T.map rw_inst (S.env s) f in
             omap (fun x -> `Reach x) f_opt
         in
 

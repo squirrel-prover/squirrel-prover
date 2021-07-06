@@ -218,7 +218,12 @@ type unif_state = {
 type match_res = 
   | FreeTyv
   | NoMatch of (messages * match_infos) option 
-  | Match   of Mvar.t 
+  | Match   of Mvar.t
+
+type f_map =
+  eterm ->
+  Term.subst -> Vars.evars -> Term.message list ->
+  [`Map of eterm | `Continue] 
 
 (** Module signature of matching.
     The type of term we match into is abstract. *)
@@ -257,14 +262,7 @@ module type S = sig
     'a term -> 'b term pat ->
     match_res
 
-  val find_map :
-    many:bool ->
-    Symbols.table ->
-    SystemExpr.t ->
-    Vars.env ->
-    t -> 'a term pat ->
-    ('a term -> Vars.evars -> Mvar.t -> 'a term) ->
-    t option
+  val map : f_map -> Vars.env -> t -> t option
 end
 
 (*------------------------------------------------------------------*)
@@ -775,83 +773,100 @@ module T (* : S with type t = message *) = struct
 
   let try_match = try_match_term
 
-  let find_map :
-    type a b.
-    many:bool ->
-    Symbols.table ->
-    SystemExpr.t ->
-    Vars.env -> a term -> b term pat ->
-    (b term -> Vars.evars -> Mvar.t -> b term) ->
-    a term option
-    = fun ~many table system env t p func ->
-      let cut = ref false in
-      let s_p = kind p.pat_term in
+  let _map : type a.
+    f_map ->
+    Vars.env ->
+    subst:Term.subst ->
+    vars:Vars.evars ->
+    conds:Term.message list ->
+    a term -> bool * a term
+    =
+    fun func env ~subst ~vars ~conds t ->
+    
+    (* the return boolean indicates whether a match was found in the subterm. *)
+    let rec map : type a.
+      Vars.env ->
+      Term.subst ->
+      Vars.evars ->
+      Term.message list -> 
+      a term ->
+      bool * a term
+      =
+      fun env subst vars conds t ->
+        match func (ETerm t) subst vars conds with
+        (* head matches *)
+        | `Map (ETerm t') ->
+          true, cast (kind t) t'
 
-      (* the return boolean indicates whether a match was found in the subterm. *)
-      let rec find : type a. Vars.env -> Vars.evars -> a term -> bool * a term =
-        fun env vars t ->
-        if !cut then false, t
+        (* head does not match, recurse with a special handling of binders and if *)
+        | `Continue ->
+          match t with
+          | ForAll (vs, b) ->
+            let env, vs, s = erefresh_vars_env env vs in
+            let vars = List.rev_append vs vars in
+            let found, b = map env (s @ subst) vars conds b in
+            let t' = Term.mk_forall ~simpl:false vs b in
 
-        (* otherwise, check if head matches *)
-        else
-          match try_match table system t p with
-          (* head matches *)
-          | Match mv ->
-            cut := not many;    (* we cut if [many = false] *)
-            let t' = func (cast s_p t) vars mv in
-            true, cast (kind t) t'
+            if found then true, t' else false, t
 
-          (* head does not match, recurse with a special handling of binders *)
-          | NoMatch _ | FreeTyv ->
-            match t with
-            | ForAll (vs, b) ->
-              let env, vs, s = erefresh_vars_env env vs in
-              let b = subst s b in
-              let found, b = find env (vars @ vs) b in
-              let t' = cast (kind t) (Term.mk_forall ~simpl:false vs b) in
+          | Exists (vs, b) ->
+            let env, vs, s = erefresh_vars_env env vs in
+            let vars = List.rev_append vs vars in
+            let found, b = map env (s @ subst) vars conds b in
+            let t' = Term.mk_exists ~simpl:false vs b in
 
-              if found then true, t' else false, t
+            if found then true, t' else false, t
 
-            | Exists (vs, b) ->
-              let env, vs, s = erefresh_vars_env env vs in
-              let b = subst s b in
-              let found, b = find env (vars @ vs) b in
-              let t' = cast (kind t) (Term.mk_exists ~simpl:false vs b) in
+          | Find (b, c, d, e) ->
+            let env1, vs, s = refresh_vars_env env b in
+            let subst1 = s @ subst in
+            let vars1 = List.rev_append (List.map Vars.evar b) vars in
+            let dconds = Term.subst subst1 c :: conds in
+            let found0, c = map env1 subst1 vars1 conds  c in
+            let found1, d = map env1 subst1 vars1 dconds d in
+            let found2, e = map env  subst  vars  conds  e in
+            let t' = Term.mk_find b c d e in
+            let found = found0 || found1 || found2 in
 
-              if found then true, t' else false, t
+            if found then true, t' else false, t
 
-            | Find (b, c, d, e) ->
-              let env1, vs, s = refresh_vars_env env b in
-              let c, d = subst s c, subst s e in
-              let vars1 = vars @ (List.map Vars.evar b) in
-              let found0, c = find env1 vars1 c in
-              let found1, d = find env1 vars1 d in
-              let found2, e = find env  vars  e in
-              let t' = cast (kind t) (Term.mk_find b c d e) in
-              let found = found0 || found1 || found2 in
+          | Seq (vs, b) ->
+            let env, vs, s = refresh_vars_env env vs in
+            let vars = List.rev_append (List.map Vars.evar vs) vars in
+            let found, b = map env subst vars conds b in
+            let t' = Term.mk_seq0 vs b in
 
-              if found then true, t' else false, t
+            if found then true, t' else false, t
 
-            | Seq (vs, b) ->
-              let env1, vs, s = refresh_vars_env env vs in
-              let b = subst s b in
-              let vars = vars @ (List.map Vars.evar vs) in
-              let found, b = find env vars b in
-              let t' = cast (kind t) (Term.mk_seq0 vs b) in
+          | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite ->
+            let s_c = Term.subst subst c in
+            let tconds = s_c :: conds in
+            let econds = Term.mk_not ~simpl:false s_c :: conds in
+            let found0, c = map env subst vars conds  c in
+            let found1, t = map env subst vars tconds t in
+            let found2, e = map env subst vars econds e in
+            let t' = Term.mk_ite ~simpl:false c t e in
+            let found = found0 || found1 || found2 in
 
-              if found then true, t' else false, t
+            if found then true, t' else false, t            
+            
+          | _ ->
+            tmap_fold (fun found (ETerm t) ->
+                let found', t = map env subst vars conds t in
+                found || found', ETerm t
+              ) false t
+    in
 
-            | _ ->
-              tmap_fold (fun found (ETerm t) ->
-                  let found', t = find env vars t in
-                  found || found', ETerm t
-                ) false t
-      in
-
-      let found, t = find env [] t in
-      match found with
-      | false -> None
-      | true  -> Some t
+    map env subst vars conds t 
+                 
+  (** Exported *)
+  let map : type a. f_map -> Vars.env -> a term -> a term option
+    =
+    fun func env t ->
+    let found, t = _map func env ~vars:[] ~subst:[] ~conds:[] t in
+    match found with
+    | false -> None
+    | true  -> Some t
 end
 
 (*------------------------------------------------------------------*)
@@ -1850,52 +1865,55 @@ module E : S with type t = Equiv.form = struct
 
 
   (*------------------------------------------------------------------*)
-  let rec find_map :
-    type b.
-    many:bool ->
-    Symbols.table ->
-    SystemExpr.t ->
-    Vars.env ->
-    t -> b Term.term pat ->
-    (b Term.term -> Vars.evars -> Mvar.t -> b Term.term) ->
-    t option
-    = fun ~many table system env (e : Equiv.form) p func ->
+  let map (func : f_map) (env : Vars.env) (e : Equiv.form) : Equiv.form option =
+    
+    let rec map
+        (env : Vars.env)
+        (subst : Term.subst)
+        (vars : Vars.evars)
+        (conds : Term.message list)
+        (e : Equiv.form) : bool * Equiv.form
+      =
       match e with
       | Atom (Reach f) ->
-        omap
-          (fun x -> Equiv.Atom (Reach (x)))
-          (T.find_map ~many table system env f p func)
-      | Atom (Equiv e) ->
-        let found = ref false in
+        let found, f = T._map func env ~subst ~vars ~conds f in
+        let e' = Equiv.Atom (Reach f) in
 
-        let e = List.fold_left (fun acc f ->
-            if not !found || many then
-              match T.find_map ~many table system env f p func with
-              | None -> f :: acc
-              | Some f -> found := true; f :: acc
-            else f :: acc
-          ) [] e
+        if found then true, e' else false, e
+
+      | Atom (Equiv frame) ->
+        let found, frame = List.fold_left (fun (found,acc) f ->
+            Fmt.epr "map: %a@." Term.pp f;
+            
+            let found0, f = T._map func env ~subst ~vars ~conds f in
+            Fmt.epr "map res: %a@." Term.pp f;
+            found0 || found, f :: acc
+          ) (false,[]) frame
         in
-        let e = List.rev e in
+        let frame = List.rev frame in
+        let e' = Equiv.Atom (Equiv frame) in
 
-        if !found then Some (Atom (Equiv e)) else None
+        if found then true, e' else false, e
 
       | Impl (e1, e2) ->
-        let found, e1 =
-          match find_map ~many table system env e1 p func with
-          | Some e1 -> true, e1
-          | None -> false, e1
-        in
+        let found1, e1 = map env subst vars conds e1
+        and found2, e2 = map env subst vars conds e2 in
+        let e' = Equiv.Impl (e1, e2) in
+        let found = found1 || found2 in
 
-        let found, e2 =
-          if not found || many then
-            match find_map ~many table system env e2 p func with
-            | Some e2 -> true, e2
-            | None -> false, e2
-          else found, e2
-        in
-        if found then Some (Impl (e1, e2)) else None
+        if found then true, e' else false, e
 
-      | Quant _ -> None  (* FIXME: match under binders *)
+      | Quant (q,vs,e0) ->
+        let env, vs, s = erefresh_vars_env env vs in
+        let vars = List.rev_append vs vars in
+        let found, b = map env (s @ subst) vars conds e0 in
+        let e' = Equiv.Quant (q,vs,b) in
 
+        if found then true, e' else false, e
+    in
+
+    let found, e = map env [] [] [] e in
+    match found with
+    | false -> None
+    | true  -> Some e
 end

@@ -50,7 +50,12 @@ end
 type match_res = 
   | FreeTyv
   | NoMatch of (Term.messages * Term.match_infos) option 
-  | Match   of Mvar.t 
+  | Match   of Mvar.t
+
+type f_map =
+  Term.eterm ->
+  Term.subst -> Vars.evars -> Term.message list ->
+  [`Map of Term.eterm | `Continue] 
 
 (** Module signature of matching.
     We can only match a [Term.term] into a [Term.term] or a [Equiv.form].
@@ -101,19 +106,8 @@ module type S = sig
     match_res
 
 
-  (** [find_map env t p func] looks for an occurence [t'] of [pat] in [t],
-      where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
-      It then computes the term obtained from [t] by replacing:
-      - if [many = false], a *single* occurence of [pat] by [func t' θ].
-      - if [many = true], all occurences found. *)
-  val find_map :
-    many:bool ->
-    Symbols.table ->
-    SystemExpr.t ->
-    Vars.env ->
-    t -> 'a Term.term pat ->
-    ('a Term.term -> Vars.evars -> Mvar.t -> 'a Term.term) ->
-    t option
+  (** [map func env t] applies [func] at all position in [t]. *)
+  val map : f_map -> Vars.env -> t -> t option
 end
 
 (*------------------------------------------------------------------*)

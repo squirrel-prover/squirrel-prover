@@ -20,16 +20,15 @@ axiom foo (x : message) : f(x) = a.
 axiom foog (x : message) : gg(x,b) = c.
 
 (*------------------------------------------------------------------*)
-(* (* rewrite all instances of only the first occurrence found. *) *)
-(* goal _ (x, y, z : message) :  *)
-(* ((a = z && a = y) && (f(z) = z || z = y)) => *)
-(* (f(x) = z && f(x) = y && (f(z) = z || z = y)). *)
-(* Proof. *)
-(*   intro H. *)
-(*   rewrite foo; *)
-(*   1: by intro x1; apply foo. *)
-(*   assumption. *)
-(* Qed. *)
+(* rewrite all instances of only the first occurrence found. *)
+goal _ (x, y, z : message) :
+((a = z && a = y) && (f(z) = z || z = y)) =>
+(f(x) = z && f(x) = y && (f(z) = z || z = y)).
+Proof.
+  intro H.
+  rewrite foo.
+  assumption.
+Qed.
 
 (* rewrite the first occurrence found. *)
 goal _ (x, y, z : message) : 
@@ -114,7 +113,7 @@ Qed.
 (* rewrite fails if no instances to rewrite *)
 goal _ (x, y, z : message) : 
 (gg(x,c) = z && gg(x,c) = y && (gg(z,c) = z || z = y)).
-Proof.
+Proof. 
   checkfail rewrite foog exn NothingToRewrite.
 Abort.
 
@@ -350,6 +349,28 @@ Proof.
   apply Hx.
 Qed.
 
+(* same renaming variables *)
+global goal _ (u,v,z : message) : 
+  equiv(u, z) ->
+  [forall (x,y : message), f(<x,y>) = x] ->
+  equiv(diff(f(<u,v>),u), u, diff(f(<z,z>), z)).
+Proof.
+  intro Hx H.
+  rewrite H diff_ax in 0,2. 
+  apply Hx.
+Qed.
+
+(* same with variable conflict *)
+global goal _ (x,v,z : message) : 
+  equiv(x, z) ->
+  [forall (x,y : message), f(<x,y>) = x] ->
+  equiv(diff(f(<x,v>),x), x, diff(f(<z,z>), z)).
+Proof.
+  intro Hx H.
+  rewrite H diff_ax in 0,2. 
+  apply Hx.
+Qed.
+
 global goal _ (x : message) : 
   [forall (x,y : message), f(<x,y>) = x] ->
   equiv(x).
@@ -374,3 +395,64 @@ Proof.
   intro H.
   checkfail try(rewrite H in 0,1); auto exn GoalNotClosed.
 Abort.
+
+
+global goal _ (x,y,z : message) :
+  equiv(x, y) ->
+  [forall (x,y : message), f(<x,y>) = x] ->
+  equiv(f(<x,f(z)>), y).
+Proof. 
+  intro Hx H.
+  rewrite H.
+  apply Hx.
+Qed.
+
+(*------------------------------------------------------------------*)
+(* test failures when rewriting in global formulas *)
+
+(* rewrite fails if no instances to rewrite *)
+global goal _ (x, y, z : message) : 
+[gg(x,c) = z && gg(x,c) = y && (gg(z,c) = z || z = y)].
+Proof. 
+  checkfail rewrite foog exn NothingToRewrite.
+Abort.
+
+(* idem with an equiv *)
+global goal _ (x, y, z : message) : 
+equiv(x, gg(x,c)).
+Proof. 
+  checkfail rewrite foog exn NothingToRewrite.
+Abort.
+
+(* ! fails if no instances to rewrite *)
+global goal _ (x, y, z : message) : 
+[gg(x,c) = z && gg(x,c) = y && (gg(z,c) = z || z = y)].
+Proof.
+  checkfail rewrite !foog exn NothingToRewrite.
+Abort.
+
+(* idem with an equiv *)
+global goal _ (x, y, z : message) : 
+equiv(x, gg(x,c)).
+Proof. 
+  checkfail rewrite !foog exn NothingToRewrite.
+Abort.
+
+(* ? does not fails if no instances to rewrite *)
+global goal _ (x, y, z : message) : 
+[gg(x,c) = z && gg(x,c) = y && (gg(z,c) = z || z = y)] ->
+[gg(x,c) = z && gg(x,c) = y && (gg(z,c) = z || z = y)].
+Proof.
+  intro H.
+  rewrite ?foog.
+  assumption.
+Qed.
+
+(* idem with an equiv *)
+global goal _ (x, y, z : message) : 
+equiv(x, gg(x,c)) -> equiv(gg(x,c)).
+Proof. 
+  intro H.
+  rewrite ?foog.
+  assumption.
+Qed.

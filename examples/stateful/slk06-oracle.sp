@@ -163,7 +163,7 @@ Proof.
   intro t IH0 i Hap.
   case t;
   try (
-  intro Eq; repeat destruct Eq as [_ Eq]; rewrite Eq; 
+  intro Eq; repeat destruct Eq as [_ Eq]; 
   use IH0 with pred(t),i as [[M1 H1] | [mj [_ H2]]] => //;
   [ 1: left; 
        (split; 1:auto); 
@@ -179,7 +179,7 @@ Proof.
   by intro _; left.
 
   (* t = T1(i0,j) - interesting case *)
-  intro [i0 j Eq];  subst t,T1(i0,j).
+  intro [i0 j Eq]; subst t,T1(i0,j).
   use IH0 with pred(T1(i0,j)),i as H => //.
   case H. 
 
@@ -259,7 +259,7 @@ Proof.
   intro t IH0 ii Hap.
   case t;
   try (
-  intro Eq; repeat destruct Eq as [_ Eq]; rewrite Eq; 
+  intro Eq; repeat destruct Eq as [_ Eq];
   use IH0 with pred(t),ii as [[M1 H1] | [mj [_ H2]]] => //;
   [ 1: left; 
        (split; 1:auto); 
@@ -274,7 +274,7 @@ Proof.
   by intro _; left. 
 
   (* t = R1(jj,ii0) - interesting case *)
-  intro [jj ii0 Eq]; rewrite Eq.
+  intro [jj ii0 Eq].
   use IH0 with pred(R1(jj,ii0)),ii as H => //.
   case H. 
 
