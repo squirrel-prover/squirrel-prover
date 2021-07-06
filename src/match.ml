@@ -259,6 +259,7 @@ module type S = sig
     ?mode:[`Eq | `EntailLR | `EntailRL] ->
     Symbols.table ->
     SystemExpr.t ->
+    ?subst:Term.subst ->
     'a term -> 'b term pat ->
     match_res
 
@@ -548,64 +549,81 @@ module T (* : S with type t = message *) = struct
      - [st.bvs] is the set of variables bound above [t].
      - [st.bvs] must be disjoint from the free variables of the terms in the
        co-domain of [mv]. *)
-  let rec tmatch : type a b. a term -> b term -> match_state -> Mvar.t =
-    fun t pat st ->
+  let rec tmatch : type a b.
+    Term.subst -> a term -> b term -> match_state -> Mvar.t
+    =
+    fun subst t pat st ->
     match t, pat with
     | _, Var v' ->
       begin
         match cast (Vars.kind v') t with
         | exception Uncastable -> no_match ()
-        | t -> vmatch t v' st
+        | t -> vmatch subst t v' st
       end
 
-    | Fun (symb, fty, terms), Fun (symb', fty', terms') ->
-      let mv = smatch symb symb' st in
-      tmatch_l terms terms' { st with mv }
+    | Var v, _ ->
+      let mem_subst : bool =
+        List.exists (fun (Term.ESubst (u,_)) ->
+            match u with
+            | Term.Var v0 -> Vars.equal v v0
+            | _ -> false
+          ) subst
+      in
+      if not mem_subst then no_match ()
+      else
+        let t0 = Term.subst subst t in
+        if t = t0               (* TODO: Term.equal *)
+        then no_match ()
+        else tmatch subst t pat st
 
-    | Name s, Name s' -> isymb_match s s' st
+    | Fun (symb, fty, terms), Fun (symb', fty', terms') ->
+      let mv = smatch subst symb symb' st in
+      tmatch_l subst terms terms' { st with mv }
+
+    | Name s, Name s' -> isymb_match subst s s' st
 
     | Macro (s, terms, ts),
       Macro (s', terms', ts') ->
-      let mv = isymb_match s s' st in
+      let mv = isymb_match subst s s' st in
       assert (Type.equal s.s_typ s'.s_typ);
 
-      let mv = tmatch_l terms terms' { st with mv } in
-      tmatch ts ts' { st with mv }
+      let mv = tmatch_l subst terms terms' { st with mv } in
+      tmatch subst ts ts' { st with mv }
 
-    | Pred ts, Pred ts' -> tmatch ts ts' st
+    | Pred ts, Pred ts' -> tmatch subst ts ts' st
 
-    | Action (s,is), Action (s',is') -> smatch (s,is) (s',is') st
+    | Action (s,is), Action (s',is') -> smatch subst (s,is) (s',is') st
 
     | Diff (a,b), Diff (a', b') ->
-      tmatch_l [a;b] [a';b'] st
+      tmatch_l subst [a;b] [a';b'] st
 
-    | Atom at, Atom at' -> atmatch at at' st
+    | Atom at, Atom at' -> atmatch subst at at' st
 
     | Find (is, c, t, e), Find (is', pat_c, pat_t, pat_e) ->
       let is  = List.map Vars.evar is
       and is' = List.map Vars.evar is' in
       let s, s', st = match_bnds is is' st in
 
-      let c    ,     t = subst s      c, subst s      t
-      and pat_c, pat_t = subst s' pat_c, subst s' pat_t in
-      tmatch_l [c; t; e] [pat_c; pat_t; pat_e] st
+      let subst1 = s @ subst in
+      let pat_c, pat_t = Term.subst s' pat_c, Term.subst s' pat_t in
+      
+      let mv = tmatch_l subst1 [c; t; e] [pat_c; pat_t; pat_e] st in
+      tmatch subst e pat_e { st with mv }
 
     | Seq (is, t), Seq (is', pat) ->
       let is  = List.map Vars.evar is  in
       let is' = List.map Vars.evar is' in
       let s, s', st = match_bnds is is' st in
 
-      let t   = subst s    t in
-      let pat = subst s' pat in
+      let pat = Term.subst s' pat in
 
-      tmatch t pat st
+      tmatch (s @ subst) t pat st
 
     | Exists (vs,t), Exists (vs', pat)
     | ForAll (vs,t), ForAll (vs', pat) ->
       let s, s', st = match_bnds vs vs' st in
-      let t   = subst s    t in
-      let pat = subst s' pat in
-      tmatch t pat st
+      let pat = Term.subst s' pat in
+      tmatch (s @ subst) t pat st
 
     | _, _ -> no_match ()
 
@@ -643,38 +661,43 @@ module T (* : S with type t = message *) = struct
     s, s', st
 
   and tmatch_l : type a b.
-    a term list -> b term list -> match_state -> Mvar.t =
-    fun tl patl st ->
+    Term.subst -> a term list -> b term list -> match_state -> Mvar.t
+    =
+    fun subst tl patl st ->
     List.fold_left2 (fun mv t pat ->
-        tmatch t pat { st with mv }
+        tmatch subst t pat { st with mv }
       ) st.mv tl patl
 
   (* match an [i_symb].
      Note: types are not checked. *)
   and isymb_match : type a b c.
+    Term.subst ->
     ((a Symbols.t, b) isymb) ->
     ((a Symbols.t, c) isymb) ->
     match_state -> Mvar.t =
-    fun s s' st ->
-    smatch (s.s_symb,s.s_indices) (s'.s_symb, s'.s_indices) st
+    fun subst s s' st ->
+    smatch subst (s.s_symb,s.s_indices) (s'.s_symb, s'.s_indices) st
 
   (* match a symbol (with some indices) *)
   and smatch : type a.
+    Term.subst ->
     (a Symbols.t * Vars.index list) ->
     (a Symbols.t * Vars.index list) ->
     match_state -> Mvar.t =
-    fun (fn, is) (fn', is') st ->
+    fun subst (fn, is) (fn', is') st ->
     if fn <> fn' then no_match ();
 
     List.fold_left2 (fun mv i i' -> 
-        vmatch (mk_var i) i' { st with mv }
+        vmatch subst (mk_var i) i' { st with mv }
       ) st.mv is is'
 
-
   (* Match a variable of the pattern with a term. *)
-  and vmatch : type a. a term -> a Vars.var -> match_state -> Mvar.t =
-    fun t v st ->
+  and vmatch : type a.
+    Term.subst -> a term -> a Vars.var -> match_state -> Mvar.t
+    =
+    fun subst t v st ->
     let ev = Vars.EVar v in
+    let t = Term.subst subst t in
 
     if not (Sv.mem ev st.support)
     then (* [v] not in the pattern *)
@@ -702,21 +725,21 @@ module T (* : S with type t = message *) = struct
         | t' -> if t <> t' then no_match () else st.mv
 
   (* matches an atom *)
-  and atmatch (at : generic_atom) (at' : generic_atom) st : Mvar.t =
+  and atmatch subst (at : generic_atom) (at' : generic_atom) st : Mvar.t =
     match at, at' with
     | `Message (ord, t1, t2), `Message (ord', t1', t2') ->
       if ord <> ord' then no_match ();
-      tmatch_l [t1;t2] [t1';t2'] st
+      tmatch_l subst [t1;t2] [t1';t2'] st
 
     | `Timestamp (ord, t1, t2), `Timestamp (ord', t1', t2') ->
       if ord <> ord' then no_match ();
-      tmatch_l [t1;t2] [t1';t2'] st
+      tmatch_l subst [t1;t2] [t1';t2'] st
 
     | `Index (ord, t1, t2), `Index (ord', t1', t2') ->
       if ord <> ord' then no_match ();
-      tmatch_l [mk_var t1; mk_var t2] [mk_var t1'; mk_var t2'] st
+      tmatch_l subst [mk_var t1; mk_var t2] [mk_var t1'; mk_var t2'] st
 
-    | `Happens ts, `Happens ts' -> tmatch ts ts' st
+    | `Happens ts, `Happens ts' -> tmatch subst ts ts' st
 
     | _, _ -> no_match ()
 
@@ -727,10 +750,11 @@ module T (* : S with type t = message *) = struct
     ?mode:[`Eq | `EntailLR | `EntailRL] ->
     Symbols.table ->
     SystemExpr.t ->
+    ?subst:Term.subst ->
     a term -> b term pat -> 
     match_res
     =
-    fun ?mv ?mode table system t p ->
+    fun ?mv ?mode table system ?(subst=[]) t p ->
 
     (* Term matching ignores [mode]. Matching in [Equiv] does not. *)
 
@@ -755,7 +779,7 @@ module T (* : S with type t = message *) = struct
     in
 
     try
-      let mv = tmatch t pat st_init in
+      let mv = tmatch subst t pat st_init in
 
       if not (Type.Infer.is_closed ty_env)
       then FreeTyv
@@ -771,7 +795,7 @@ module T (* : S with type t = message *) = struct
     with 
     | NoMatch minfos -> NoMatch minfos
 
-  let try_match = try_match_term
+  let try_match = try_match_term ~subst:[]
 
   let _map : type a.
     f_map ->
@@ -1526,7 +1550,7 @@ module E : S with type t = Equiv.form = struct
     Mvar.t option
     = fun ?(vars=Sv.empty) term elem st ->
     let st = { st with support = Sv.union vars st.support; } in
-    try Some (T.tmatch term elem st) 
+    try Some (T.tmatch [] term elem st) 
     with NoMatch _ -> None
 
   (** Variant of [term_match_opt]. *)
@@ -1805,7 +1829,7 @@ module E : S with type t = Equiv.form = struct
       tmatch_e ~mode es pat_es st
 
     | Quant (q,es,t), Quant (q',es',t') ->
-      (* TODO: match under binders (see Term.ml)  *)
+      (* TODO: match under binders  *)
       if q = q' && es = es' && t = t'
       then st.mv
       else no_match ()

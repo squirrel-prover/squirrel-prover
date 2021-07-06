@@ -397,8 +397,7 @@ module LowTac (S : Sequent.S) = struct
            bound above the matched occurrences are universally quantified in 
            the generated sub-goals. *)
         let rw_inst (Term.ETerm occ) subst vars conds =
-          let occ = Term.subst subst occ in (* TODO: match with pending subst *)
-          match Match.T.try_match_term table system occ !pat with
+          match Match.T.try_match_term table system ~subst occ !pat with
           | NoMatch _ | FreeTyv -> `Continue
 
           (* head matches *)

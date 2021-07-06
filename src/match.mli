@@ -96,12 +96,14 @@ module type S = sig
     t -> t pat ->
     match_res
 
-  (** Same as [try_match], but specialized for terms. *)
+  (** Same as [try_match], but specialized for terms. 
+      Also, allow to give a pending substitution [subst] (for the left term). *)
   val try_match_term :
     ?mv:Mvar.t ->
     ?mode:[`Eq | `EntailLR | `EntailRL] ->
     Symbols.table ->
     SystemExpr.t ->
+    ?subst:Term.subst ->
     'a Term.term -> 'b Term.term pat ->
     match_res
 
