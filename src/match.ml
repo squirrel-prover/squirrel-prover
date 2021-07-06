@@ -831,7 +831,7 @@ module T (* : S with type t = message *) = struct
             let found, b = map env (s @ subst) vars conds b in
             let t' = Term.mk_forall ~simpl:false vs b in
 
-            if found then true, t' else false, t
+            if found then true, t' else false, Term.subst subst t
 
           | Exists (vs, b) ->
             let env, vs, s = erefresh_vars_env env vs in
@@ -839,7 +839,7 @@ module T (* : S with type t = message *) = struct
             let found, b = map env (s @ subst) vars conds b in
             let t' = Term.mk_exists ~simpl:false vs b in
 
-            if found then true, t' else false, t
+            if found then true, t' else false, Term.subst subst t
 
           | Find (b, c, d, e) ->
             let env1, vs, s = refresh_vars_env env b in
@@ -852,7 +852,7 @@ module T (* : S with type t = message *) = struct
             let t' = Term.mk_find b c d e in
             let found = found0 || found1 || found2 in
 
-            if found then true, t' else false, t
+            if found then true, t' else false, Term.subst subst t
 
           | Seq (vs, b) ->
             let env, vs, s = refresh_vars_env env vs in
@@ -860,7 +860,7 @@ module T (* : S with type t = message *) = struct
             let found, b = map env (s @ subst) vars conds b in
             let t' = Term.mk_seq0 vs b in
 
-            if found then true, t' else false, t
+            if found then true, t' else false, Term.subst subst t
 
           | Term.Fun (fs, _, [c;ft;fe]) when fs = Term.f_ite ->            
             let s_c = Term.subst subst c in
@@ -872,7 +872,7 @@ module T (* : S with type t = message *) = struct
             let t' = Term.mk_ite ~simpl:false c ft fe in
             let found = found0 || found1 || found2 in
 
-            if found then true, t' else false, t
+            if found then true, t' else false, Term.subst subst t
 
           (* base cases: substitute *)
           | Action _ -> false, Term.subst subst t
@@ -1909,7 +1909,7 @@ module E : S with type t = Equiv.form = struct
         let found, f = T._map func env ~subst ~vars ~conds f in
         let e' = Equiv.Atom (Reach f) in
 
-        if found then true, e' else false, e
+        if found then true, e' else false, Equiv.subst subst e
 
       | Atom (Equiv frame) ->
         let found, frame = List.fold_left (fun (found,acc) f ->
@@ -1920,7 +1920,7 @@ module E : S with type t = Equiv.form = struct
         let frame = List.rev frame in
         let e' = Equiv.Atom (Equiv frame) in
 
-        if found then true, e' else false, e
+        if found then true, e' else false, Equiv.subst subst e
 
       | Impl (e1, e2) ->
         let found1, e1 = map env subst vars conds e1
@@ -1928,7 +1928,7 @@ module E : S with type t = Equiv.form = struct
         let e' = Equiv.Impl (e1, e2) in
         let found = found1 || found2 in
 
-        if found then true, e' else false, e
+        if found then true, e' else false, Equiv.subst subst e
 
       | Quant (q,vs,e0) ->
         let env, vs, s = erefresh_vars_env env vs in
@@ -1936,7 +1936,7 @@ module E : S with type t = Equiv.form = struct
         let found, b = map env (s @ subst) vars conds e0 in
         let e' = Equiv.Quant (q,vs,b) in
 
-        if found then true, e' else false, e
+        if found then true, e' else false, Equiv.subst subst e
     in
 
     let found, e = map env [] [] [] e in
