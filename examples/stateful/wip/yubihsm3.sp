@@ -76,10 +76,6 @@ name k: index -> message
    plaintext anymore in the idealized system *)
 name k_dummy: index -> message
 
-(* fully ideal version of `ki(pid)`, different for each session *)
-name k': index -> index -> message
-
-name kstef: index -> message
 (* counters *)
 mutable YCtr(i:index) : message = cinit
 mutable SCtr(i:index) : message = cinit
@@ -234,6 +230,221 @@ axiom  orderTrans (n1,n2,n3:message): n1 ~< n2 => n2 ~< n3 => n1 ~< n3.
 
 (* TODO: allow to have axioms for all systems *)
 axiom  orderStrict(n1,n2:message): n1 = n2 => n1 ~< n2 => False.
+
+(* LIBRAIRIES *)
+
+axiom eq_iff (x, y : boolean) : (x = y) = (x <=> y).
+
+goal eq_refl ['a] (x : 'a) : (x = x) = true. 
+Proof.
+  by rewrite eq_iff. 
+Qed.
+hint rewrite eq_refl.
+
+(* SP: merge with eq_refl *)
+goal eq_refl_i (x : index) : (x = x) = true.
+Proof.
+  by rewrite eq_iff. 
+Qed.
+hint rewrite eq_refl_i.
+
+(* SP: merge with eq_refl *)
+goal eq_refl_t (x : timestamp) : (x = x) = true.
+Proof.
+  by rewrite eq_iff. 
+Qed.
+hint rewrite eq_refl_t.
+
+
+axiom not_true : not(true) = false.
+hint rewrite not_true.
+
+axiom not_false : not(false) = true.
+hint rewrite not_false.
+
+
+goal not_not (b : boolean): not (not b) = b. 
+Proof.
+  by case b.
+Qed.
+hint rewrite not_not.
+
+goal not_eq ['a] (x, y : 'a): not (x = y) = (x <> y).
+Proof. 
+by rewrite eq_iff. 
+Qed.
+hint rewrite not_eq.
+
+(* new *)
+goal not_eq_i (x, y : index): not (x = y) = (x <> y).
+Proof. 
+by rewrite eq_iff. 
+Qed.
+hint rewrite not_eq_i.
+
+(* new *)
+goal not_eq_t (x, y : timestamp): not (x = y) = (x <> y).
+Proof. 
+by rewrite eq_iff. 
+Qed.
+hint rewrite not_eq_t.
+
+goal not_neq ['a] (x, y : 'a): not (x <> y) = (x = y).
+Proof. 
+by rewrite eq_iff. 
+Qed.
+hint rewrite not_neq.
+
+(* new *)
+goal not_neq_i (x, y : index): not (x <> y) = (x = y).
+Proof. 
+by rewrite eq_iff. 
+Qed.
+hint rewrite not_neq_i.
+
+(* new *)
+goal not_neq_t (x, y : timestamp): not (x <> y) = (x = y).
+Proof. 
+by rewrite eq_iff. 
+Qed.
+hint rewrite not_neq_t.
+
+
+
+goal if_true ['a] (b : boolean, x,y : 'a):
+ b => if b then x else y = x.
+Proof.
+  by intro *; yesif.
+Qed.
+
+goal if_true0 ['a] (x,y : 'a):
+ if true then x else y = x.
+Proof.
+  by rewrite if_true. 
+Qed.
+hint rewrite if_true0.
+
+goal if_false ['a] (b : boolean, x,y : 'a):
+ (not b) => if b then x else y = y.
+Proof.
+  by intro *; noif.
+Qed.
+
+goal if_false0 ['a] (x,y : 'a):
+ if false then x else y = y.
+Proof.
+  by rewrite if_false.
+Qed.
+hint rewrite if_false0.
+
+(* new *)
+goal if_then ['a] (b,b' : boolean, x,y,z : 'a):
+ b = b' => 
+ if b then (if b' then x else y) else z = 
+ if b then x else z.
+Proof.
+  by intro ->; case b'.
+Qed.
+hint rewrite if_then.
+
+(* new *)
+goal if_else ['a] (b,b' : boolean, x,y,z : 'a):
+ b = b' => 
+ if b then x else (if b' then y else z) = 
+ if b then x else z.
+Proof.
+  by intro ->; case b'.
+Qed.
+hint rewrite if_else.
+
+(* new *)
+goal if_then_not ['a] (b,b' : boolean, x,y,z : 'a):
+ b = not b' => 
+ if b then (if b' then x else y) else z = 
+ if b then y else z.
+Proof.
+  by intro ->; case b'.
+Qed.
+hint rewrite if_then_not.
+
+(* new *)
+goal if_else_not ['a] (b,b' : boolean, x,y,z : 'a):
+  b = not b' => 
+ if b then x else (if b' then y else z) = 
+ if b then x else y.
+Proof.  
+  by intro ->; case b'.
+Qed.
+hint rewrite if_else_not.
+
+
+axiom or_comm (b,b' : boolean) : (b || b') = (b' || b).
+
+axiom or_false_l (b : boolean) : (false || b) = b.
+hint rewrite or_false_l.
+
+goal or_false_r (b : boolean) : (b || false) = b.
+Proof. by rewrite or_comm or_false_l. Qed.
+hint rewrite or_false_r.
+
+axiom or_true_l (b : boolean) : (true || b) = true.
+hint rewrite or_true_l.
+
+goal or_true_r (b : boolean) : (b || true) = true.
+Proof. by rewrite or_comm or_true_l. Qed.
+hint rewrite or_true_r.
+
+(* PROOF *)
+
+equiv atomic_keys.
+Proof.
+  enrich seq(pid,j -> npr(pid,j)). 
+  enrich seq(pid,j -> nonce(pid,j)). 
+  enrich seq(pid -> k(pid)).
+  enrich seq(pid -> k_dummy(pid)).
+  enrich seq(pid -> sid(pid)).
+  enrich seq(pid -> AEAD(pid)@t).
+  dependent induction t => t Hind Hap.
+  case t => Eq;
+  try (
+    repeat destruct Eq as [_ Eq];
+    expandall;
+    by apply Hind (pred(t))).
+
+  (* init *)
+  admit. (* need to prove that all AEADs are indistinguishable *)
+
+  (* Write(pid,j) *)
+  repeat destruct Eq as [_ Eq]. 
+  expandall.
+  fa 6; fa 7; fa 7. 
+  
+  splitseq 0: (fun (pid0:index) -> pid0 = pid); simpl.
+  constseq 0: (input@t) zero. 
+  by intro * /=; case (pid0 = pid). 
+
+  (* TODO: almost done *)
+  (* by apply Hind (pred(t)).   *)
+  admit.
+
+  (* Decode(pid,j) *)
+  repeat destruct Eq as [_ Eq]. 
+  expandall.
+  fa 6; fa 7; fa 7; fa 8.
+
+  (* by apply Hind (pred(t)). *)
+  admit.
+
+
+  (* Decode1(pid,j) *)
+  repeat destruct Eq as [_ Eq]. 
+  expandall.
+  fa 6; fa 7; fa 7; fa 8; fa 8.
+
+  (* by apply Hind (pred(t)). *)
+  admit.
+Qed.
+  
 
 (* The counter SCtr(j) strictly increases when t is an action Server performed by 
 the server with tag j. *)
@@ -462,5 +673,3 @@ by use orderStrict with SCtr(pid)@Server(pid,j'), SCtr(pid)@Server(pid,j) => //.
 subst SCtr(pid)@pred(Server(pid,j)), SCtr(pid)@Server(pid,j').
 by use orderStrict with SCtr(pid)@Server(pid,j'), SCtr(pid)@Server(pid,j) => //. 
 Qed.
-
-
