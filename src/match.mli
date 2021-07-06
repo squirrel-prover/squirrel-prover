@@ -53,8 +53,7 @@ type match_res =
   | Match   of Mvar.t
 
 type f_map =
-  Term.eterm ->
-  Term.subst -> Vars.evars -> Term.message list ->
+  Term.eterm -> Vars.evars -> Term.message list ->
   [`Map of Term.eterm | `Continue] 
 
 (** Module signature of matching.
@@ -96,14 +95,12 @@ module type S = sig
     t -> t pat ->
     match_res
 
-  (** Same as [try_match], but specialized for terms. 
-      Also, allow to give a pending substitution [subst] (for the left term). *)
+  (** Same as [try_match], but specialized for terms. *)
   val try_match_term :
     ?mv:Mvar.t ->
     ?mode:[`Eq | `EntailLR | `EntailRL] ->
     Symbols.table ->
     SystemExpr.t ->
-    ?subst:Term.subst ->
     'a Term.term -> 'b Term.term pat ->
     match_res
 

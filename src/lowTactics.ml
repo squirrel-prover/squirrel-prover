@@ -231,10 +231,10 @@ module LowTac (S : Sequent.S) = struct
     =
     let found1 = ref false in
 
-    let found_occ subst ms occ =
+    let found_occ ms occ =
       match macro with
       | `Msymb mname -> ms.Term.s_symb = mname
-      | `Mterm t -> Term.subst subst occ = t
+      | `Mterm t -> occ = t
       | `Any -> true
     in
     (* unfold_macro is not allowed to fail if we try to expand a specific term *)
@@ -247,16 +247,11 @@ module LowTac (S : Sequent.S) = struct
     (* applies [doit] to all subterms of the target [f] *)
     let rec doit ((f,_) : cform * Ident.t option) : cform * S.conc_form list =
 
-      let expand_inst (Term.ETerm occ) subst vars conds =
-        let occ = match occ with
-          | Term.Var _ -> Term.subst subst occ
-          | _ -> occ
-        in
-                          
+      let expand_inst (Term.ETerm occ) vars conds =                          
         match occ with
         | Term.Macro (ms, l, _) ->
-          if found_occ subst ms occ then
-            match unfold_macro ~strict (Term.subst subst occ) s with
+          if found_occ ms occ then
+            match unfold_macro ~strict occ s with
             | None -> `Continue
             | Some t ->
               found1 := true;
@@ -283,16 +278,11 @@ module LowTac (S : Sequent.S) = struct
 
   (** expand all macros in a term *)
   let rec expand_all_term (f : Term.message) (s : S.t) : Term.message =
-    let expand_inst (Term.ETerm occ) subst vars conds =
-      let occ = match occ with
-        | Term.Var _ -> Term.subst subst occ
-        | _ -> occ
-      in
-
+    let expand_inst (Term.ETerm occ) vars conds =
       match occ with
       | Term.Macro (ms, l, _) ->
         begin
-          match unfold_macro ~strict:false (Term.subst subst occ) s with
+          match unfold_macro ~strict:false occ s with
           | None -> `Continue
           | Some t -> `Map (Term.ETerm t)
         end
@@ -399,8 +389,8 @@ module LowTac (S : Sequent.S) = struct
            free variables are instantiated according to [mv], and variables
            bound above the matched occurrences are universally quantified in 
            the generated sub-goals. *)
-        let rw_inst (Term.ETerm occ) subst vars conds =
-          match Match.T.try_match_term table system ~subst occ !pat with
+        let rw_inst (Term.ETerm occ) vars conds =
+          match Match.T.try_match_term table system occ !pat with
           | NoMatch _ | FreeTyv -> `Continue
 
           (* head matches *)
