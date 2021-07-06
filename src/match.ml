@@ -862,14 +862,14 @@ module T (* : S with type t = message *) = struct
 
             if found then true, t' else false, t
 
-          | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite ->
+          | Term.Fun (fs, _, [c;ft;fe]) when fs = Term.f_ite ->            
             let s_c = Term.subst subst c in
             let tconds = s_c :: conds in
             let econds = Term.mk_not ~simpl:false s_c :: conds in
             let found0, c = map env subst vars conds  c in
-            let found1, t = map env subst vars tconds t in
-            let found2, e = map env subst vars econds e in
-            let t' = Term.mk_ite ~simpl:false c t e in
+            let found1, ft = map env subst vars tconds ft in
+            let found2, fe = map env subst vars econds fe in
+            let t' = Term.mk_ite ~simpl:false c ft fe in
             let found = found0 || found1 || found2 in
 
             if found then true, t' else false, t

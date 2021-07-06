@@ -31,6 +31,6 @@ goal _:
 happens(O) => 
 frame@O = <frame@pred(O),<of_bool(exec@O),if exec@O then output@O else zero>>.
 Proof. 
-  intro *.
+  intro *. 
   by expand frame.
 Qed.

@@ -204,136 +204,139 @@ module LowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Macro unfolding} *)
 
-  let unfold_macro : type a. a Term.term -> S.sequent -> Term.esubst list = 
+  let _unfold_macro : type a. a Term.term -> S.sequent -> a Term.term = 
     fun t s ->
     match t with
     | Macro (ms,l,a) ->
       if not (S.query_happens ~precise:true s a) then
         soft_failure (Tactics.MustHappen a);
 
-      let mdef = Macros.get_definition (S.mk_trace_cntxt s) ms a in
-
-      [Term.ESubst (Term.mk_macro ms l a, mdef)]
+      Macros.get_definition (S.mk_trace_cntxt s) ms a 
 
     | _ -> 
       soft_failure (Tactics.Failure "can only expand macros")
 
   let unfold_macro : type a. 
-    canfail:bool -> a Term.term -> S.sequent -> Term.esubst list = 
-    fun ~canfail t s ->
-    try unfold_macro t s with
-    | Tactics.Tactic_soft_failure _ when not canfail -> []
+    strict:bool -> a Term.term -> S.sequent -> a Term.term option = 
+    fun ~strict t s ->
+    try Some (_unfold_macro t s) with
+    | Tactics.Tactic_soft_failure _ when not strict -> None
 
+  let expand 
+      (targets: target list) 
+      (macro : [ `Msymb of Symbols.macro Symbols.t 
+               | `Mterm of Term.message
+               | `Any])
+      (s : S.sequent) : bool * S.sequent
+    =
+    let found1 = ref false in
 
-  let expand_macro (targets : targets) (t : 'a Term.term) (s : S.t) : S.t =
-    let subst = unfold_macro ~canfail:true t s in
-    if subst = [] then soft_failure (Failure "nothing to expand");
+    let found_occ subst ms occ =
+      match macro with
+      | `Msymb mname -> ms.Term.s_symb = mname
+      | `Mterm t -> Term.subst subst occ = t
+      | `Any -> true
+    in
+    (* unfold_macro is not allowed to fail if we try to expand a specific term *)
+    let strict =
+      match macro with
+      | `Mterm _ -> true
+      | `Msymb _ | `Any -> false
+    in      
 
-    let doit (f,_) = Equiv.Any.subst subst f, [] in
+    (* applies [doit] to all subterms of the target [f] *)
+    let rec doit ((f,_) : cform * Ident.t option) : cform * S.conc_form list =
+
+      let expand_inst (Term.ETerm occ) subst vars conds =
+        let occ = match occ with
+          | Term.Var _ -> Term.subst subst occ
+          | _ -> occ
+        in
+                          
+        match occ with
+        | Term.Macro (ms, l, _) ->
+          if found_occ subst ms occ then
+            match unfold_macro ~strict (Term.subst subst occ) s with
+            | None -> `Continue
+            | Some t ->
+              found1 := true;
+              `Map (Term.ETerm t)
+          else `Continue
+
+        | _ -> `Continue
+      in
+
+      match f with
+      | `Equiv f -> 
+        let f = odflt f (Match.E.map expand_inst (S.env s) f) in
+        `Equiv f, []
+          
+      | `Reach f ->
+        let f = odflt f (Match.T.map expand_inst (S.env s) f) in
+        `Reach f, []
+    in
+
     let s, subs = do_targets doit s targets in
     assert (subs = []);
-    s
 
-  (** find occurrences of a macro in a formula *)
-  let find_occs_macro_term : type a. 
-    ?st:St.t ->
-    [`Any | `MSymb of Symbols.macro Symbols.t] ->
-    a Term.term -> Term.St.t =
-    fun ?(st=Term.St.empty) m t -> 
-
-    let cond ms = m = `MSymb ms.Term.s_symb || m = `Any in
-
-    let rec find st (Term.ETerm t) = 
-      let st = match t with
-        | Macro (ms, _, _) when cond ms -> 
-          Term.St.add (Term.ETerm t) st
-        | _ -> st in
-
-      (* we do not recurse under binders *)
-      (* FIXME: expand under binders *)
-      match t with
-      | ForAll _ | Exists _ | Find _ | Seq _ -> st
-      | _ -> Term.tfold (fun t st -> find st t) t st
-    in
-
-    find st (ETerm t)
-
-  let find_occs_macro_terms ~st m terms =
-    List.fold_left (fun occs t -> find_occs_macro_term ~st:occs m t) st terms
-
-  (** find occurrences of a macro in a sequent *)
-  let find_occs_macro 
-      (m : [`Any | `MSymb of Symbols.macro Symbols.t])
-      (targets : targets) (s : S.t) : Term.St.t =
-    List.fold_left (fun occs target ->
-        let terms = match target with
-          | T_conc    -> S.terms_of_conc (S.goal s)
-          | T_hyp id  -> S.terms_of_hyp (Hyps.by_id id s)
-          | T_felem i -> [S.get_felem i s]
-        in
-        find_occs_macro_terms ~st:occs m terms
-      ) St.empty targets
-
-  let subst_of_occs_macro ~(canfail : bool) (occs : Term.St.t) s : Term.subst =
-    Term.St.fold (fun (ETerm t) subst -> 
-        unfold_macro ~canfail t s @ subst
-      ) occs [] 
+    !found1, s
 
   (** expand all macros in a term *)
-  let expand_all_term : type a. a Term.term -> S.sequent -> a Term.term =   
-    fun term s ->
+  let rec expand_all_term (f : Term.message) (s : S.t) : Term.message =
+    let expand_inst (Term.ETerm occ) subst vars conds =
+      let occ = match occ with
+        | Term.Var _ -> Term.subst subst occ
+        | _ -> occ
+      in
 
-    let rec expand_rec term =
-      let occs = find_occs_macro_term `Any term in
-      let subst = subst_of_occs_macro ~canfail:false occs s in
-      if subst = [] then term else expand_rec (Term.subst subst term) 
+      match occ with
+      | Term.Macro (ms, l, _) ->
+        begin
+          match unfold_macro ~strict:false (Term.subst subst occ) s with
+          | None -> `Continue
+          | Some t -> `Map (Term.ETerm t)
+        end
+
+      | _ -> `Continue
     in
-
-    expand_rec term
+    match Match.T.map expand_inst (S.env s) f with
+    | None -> f
+    | Some f -> expand_all_term f s 
 
   (** expand all macro of some targets in a sequent *)
   let expand_all targets (s : S.sequent) : S.sequent = 
-    let targets, all = make_in_targets targets s in
-    let canfail = not all in
-
-    let rec expand_rec s =
-      let occs = find_occs_macro `Any targets s in
-      let subst = subst_of_occs_macro ~canfail occs s in
-      if subst = [] then s else expand_rec (S.subst subst s)
+    let rec aux_rec s =
+      let targets, all = make_in_targets targets s in
+      let found, s = expand targets `Any s in
+      if found then aux_rec s else s
     in
-
-    expand_rec s
-
+    aux_rec s
+      
   let expand_all_l tgts s : S.sequent list = [expand_all tgts s]
-
-  let expand (targets : target list) (arg : Theory.term) (s : S.t) : S.t = 
+                                             
+  let expand_arg (targets : target list) (arg : Theory.term) (s : S.t) : S.t =
+    let expand targs macro s =
+      let found, s = expand targets macro s in
+      if not found then soft_failure (Failure "nothing to expand");      
+      s
+    in
+    
     let tbl = S.table s in
     match Args.convert_as_lsymb [Args.Theory arg] with
     | Some m ->
       let m = Symbols.Macro.of_lsymb m tbl in
-      let occs = find_occs_macro (`MSymb m) targets s in
-      let subst = 
-        Term.St.fold (fun (ETerm t) subst -> 
-            unfold_macro ~canfail:false t s @ subst
-          ) occs [] in
-
-      if subst = [] then soft_failure (Failure "nothing to expand");
-
-      let doit (f,_) = Equiv.Any.subst subst f, [] in
-      let s, subs = do_targets doit s targets in
-      assert (subs = []);
-      s
+      expand targets (`Msymb m) s 
 
     | _ ->
       match convert_args s [Args.Theory arg] Args.(Sort Message) with
       | Args.Arg (Args.Message (f, _)) ->
-        expand_macro targets f s
+        expand targets (`Mterm f) s 
 
       | _ ->
         hard_failure (Tactics.Failure "expected a message term")
 
   let expands (args : Theory.term list) (s : S.t) : S.t =
-    List.fold_left (fun s arg -> expand (target_all s) arg s) s args 
+    List.fold_left (fun s arg -> expand_arg (target_all s) arg s) s args 
 
   let expand_tac args s =
     let args = List.map (function
@@ -524,7 +527,7 @@ module LowTac (S : Sequent.S) = struct
       subs @                      (* prove instances premisses *)
       [s]                         (* final sequent *)
 
-    | Rw_expand arg -> [expand targets arg s]
+    | Rw_expand arg -> [expand_arg targets arg s]
 
 
   (*------------------------------------------------------------------*)

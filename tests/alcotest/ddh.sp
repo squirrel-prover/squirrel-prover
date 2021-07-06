@@ -20,7 +20,6 @@ Proof.
  fadup; try (expandall; refl + assumption).
  fadup; try (expandall; refl + assumption).
  cycle 1.
- expand exec@A1(j). 
  nosimpl(expandall).
 
  fadup; try (expandall; refl + assumption).

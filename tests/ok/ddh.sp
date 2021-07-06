@@ -17,7 +17,7 @@ induction t.
 
 auto.
 
-expand frame@init; expand exec@init.
+expand frame; expand exec.
 
 by ddh g, a, b, k.
 Qed.
