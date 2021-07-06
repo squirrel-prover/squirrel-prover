@@ -857,7 +857,7 @@ module T (* : S with type t = message *) = struct
           | Seq (vs, b) ->
             let env, vs, s = refresh_vars_env env vs in
             let vars = List.rev_append (List.map Vars.evar vs) vars in
-            let found, b = map env subst vars conds b in
+            let found, b = map env (s @ subst) vars conds b in
             let t' = Term.mk_seq0 vs b in
 
             if found then true, t' else false, t
@@ -872,12 +872,18 @@ module T (* : S with type t = message *) = struct
             let t' = Term.mk_ite ~simpl:false c t e in
             let found = found0 || found1 || found2 in
 
-            if found then true, t' else false, t            
-            
-          | _ ->
+            if found then true, t' else false, t
+
+          (* base cases: substitute *)
+          | Action _ -> false, Term.subst subst t
+          | Name   _ -> false, Term.subst subst t
+          | Var    _ -> false, Term.subst subst t
+
+          (* cases that are not base case: recurse *)
+          | Pred _ | Diff _ | Fun _ | Macro _ | Atom _ ->
             tmap_fold (fun found (ETerm t) ->
                 let found', t = map env subst vars conds t in
-                found || found', ETerm t
+                found || found', Term.ETerm t
               ) false t
     in
 
