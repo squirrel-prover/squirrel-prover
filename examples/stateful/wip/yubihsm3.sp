@@ -394,8 +394,71 @@ goal or_true_r (b : boolean) : (b || true) = true.
 Proof. by rewrite or_comm or_true_l. Qed.
 hint rewrite or_true_r.
 
+(* new *)
+goal dec_enc (x,r,k : message): dec(enc(x,r,k),k) = x.
+Proof. auto. Qed.
+hint rewrite dec_enc.
+
+goal fst_pair (x,y : message) : fst (<x,y>) = x.
+Proof. auto. Qed.
+hint rewrite fst_pair.
+
+goal snd_pair (x,y : message) : snd (<x,y>) = y.
+Proof. auto. Qed.
+hint rewrite snd_pair.
+
 (* PROOF *)
 
+goal [left] valid_decode (t : timestamp) (pid,j : index):
+  t = Decode(pid,j) =>
+  happens(t) => 
+  aead_dec(pid,j)@t <> fail && 
+  otp_dec(pid,j)@t <> fail &&
+  fst(otp_dec(pid,j)@t) = sid_pid(pid,j)@t && 
+  fst(input@t) = <mpid(pid),kh> =>
+  snd(otp_dec(pid,j)@t) = k(pid).
+Proof.
+  intro Eq Hap [AEAD_dec OTP_dec Sid_eq U].
+  clear U.
+  expand aead_dec.
+  intctxt AEAD_dec => H; 2: congruence.
+
+  clear H; intro AEAD_eq.
+  rewrite /otp_dec /sid_pid /aead_dec -AEAD_eq /= in *.
+  clear AEAD_dec. 
+  
+  (* TODO: to apply intctxt, we probably need an additional intermediate system *)
+  admit.
+  (* intctxt OTP_dec. *)
+Qed.  
+
+(* TODO: factorize both lemmas *)
+goal [right] valid_decode_r (t : timestamp) (pid,j : index):
+  t = Decode(pid,j) =>
+  happens(t) => 
+  aead_dec(pid,j)@t <> fail && 
+  otp_dec(pid,j)@t <> fail &&
+  fst(otp_dec(pid,j)@t) = sid_pid(pid,j)@t && 
+  fst(input@t) = <mpid(pid),kh> =>
+  snd(otp_dec(pid,j)@t) = k(pid).
+Proof.
+  intro Eq Hap [AEAD_dec OTP_dec Sid_eq U].
+  clear U.
+  expand aead_dec.
+  intctxt AEAD_dec => H; 2: congruence.
+
+  clear H; intro AEAD_eq.
+  rewrite /otp_dec /sid_pid -AEAD_eq /= in *.
+  clear AEAD_dec. 
+  
+  intctxt OTP_dec; 2:auto. 
+  intro Hc EncEq _.
+  rewrite -EncEq /=.
+  admit.
+  (* TODO: the conclusion of the lemma is not correct. *)
+Qed.  
+
+set showStrengthenedHyp=true.
 equiv atomic_keys.
 Proof.
   enrich seq(pid,j -> npr(pid,j)). 
@@ -419,18 +482,19 @@ Proof.
   expandall.
   fa 6; fa 7; fa 7. 
   
+  (* TODO: faseq 0 would allow to conclude there *)
   splitseq 0: (fun (pid0:index) -> pid0 = pid); simpl.
   constseq 0: (input@t) zero. 
   by intro * /=; case (pid0 = pid). 
 
   (* TODO: almost done *)
-  (* by apply Hind (pred(t)).   *)
+  (* by apply Hind (pred(t)). *)
   admit.
 
   (* Decode(pid,j) *)
-  repeat destruct Eq as [_ Eq]. 
-  expandall.
-  fa 6; fa 7; fa 7; fa 8.
+  repeat destruct Eq as [_ Eq].
+  expand frame, exec, output, cond. 
+  fa 6. fa 7. fa 7.
 
   (* by apply Hind (pred(t)). *)
   admit.
@@ -625,20 +689,24 @@ split => //.
 intro j' Hap' Hexec'. 
 
 intro Eq => //.  
-assert (SCtr(pid)@Server(pid,j) = SCtr(pid)@Server(pid,j')) => //. 
+assert (SCtr(pid)@Server(pid,j) = SCtr(pid)@Server(pid,j')) by auto.
 
-assert (Server(pid,j) = Server(pid,j') || Server(pid,j) < Server(pid,j') || Server(pid,j) > Server(pid,j')) => //. 
+assert (Server(pid,j) = Server(pid,j') || 
+        Server(pid,j) < Server(pid,j') || 
+        Server(pid,j) > Server(pid,j')) => //. 
 case H => //. 
 
 (* 1st case: Server(pid,j) < Server(pid,j') *) 
-assert (Server(pid,j) = pred(Server(pid,j')) || Server(pid,j) < pred(Server(pid,j'))) => //.
+assert (Server(pid,j) = pred(Server(pid,j')) || 
+        Server(pid,j) < pred(Server(pid,j'))) by constraints.
 case H0 => //. 
 
 
 (* Server(pid,j) = pred(Server(pid,j') < Server(pid,j') *)
 use counterIncreaseStrictly with pid, j' => //.
-subst  Server(pid,j), pred(Server(pid,j')) => //.
-by use orderStrict with SCtr(pid)@pred(Server(pid,j')), SCtr(pid)@Server(pid,j') => //. 
+rewrite H0 in *.
+by use orderStrict with 
+  SCtr(pid)@pred(Server(pid,j')), SCtr(pid)@Server(pid,j'). 
 
 
 (* Server(pid,j) < pred(Server(pid,j'))  < Server(pid,j') *) 
@@ -646,30 +714,36 @@ use counterIncreaseStrictly with pid, j' => //.
 use counterIncreaseBis with pred(Server(pid,j')), Server(pid,j), pid => //. 
 case H2.
 
-use orderTrans with SCtr(pid)@Server(pid,j), SCtr(pid)@pred(Server(pid,j')), SCtr(pid)@Server(pid,j') => //. 
-by use orderStrict with SCtr(pid)@Server(pid,j), SCtr(pid)@Server(pid,j') => //. 
+use orderTrans with 
+   SCtr(pid)@Server(pid,j), 
+   SCtr(pid)@pred(Server(pid,j')), 
+   SCtr(pid)@Server(pid,j') => //. 
+by use orderStrict with SCtr(pid)@Server(pid,j), SCtr(pid)@Server(pid,j').
 
-subst SCtr(pid)@pred(Server(pid,j')), SCtr(pid)@Server(pid,j).
-by use orderStrict with SCtr(pid)@Server(pid,j), SCtr(pid)@Server(pid,j') => //. 
+rewrite H2 in *. 
+by use orderStrict with SCtr(pid)@Server(pid,j), SCtr(pid)@Server(pid,j').
 
 (* 2nd case: Server(pid,j) > Server(pid,j')  *)
-assert (pred(Server(pid,j)) = Server(pid,j') || pred(Server(pid,j)) > Server(pid,j')) => //.
+assert (pred(Server(pid,j)) = Server(pid,j') 
+        || pred(Server(pid,j)) > Server(pid,j')) by constraints.
 case H0 => //. 
 
 (* Server(pid,j) > pred(Server(pid,j)) = Server(pid,j') *)
 use counterIncreaseStrictly with pid, j => //.
 subst Server(pid,j'), pred(Server(pid,j)).
-by use orderStrict with SCtr(pid)@pred(Server(pid,j)), SCtr(pid)@Server(pid,j) => //.
+by use orderStrict with SCtr(pid)@pred(Server(pid,j)), SCtr(pid)@Server(pid,j).
 
 (* Server(pid,j)  > pred(Server(pid,j)) >  Server(pid,j') *) 
 use counterIncreaseStrictly with pid, j => //.
 use counterIncreaseBis with pred(Server(pid,j)), Server(pid,j'), pid  => //. 
 case H2. 
 
-use orderTrans with SCtr(pid)@Server(pid,j'),  SCtr(pid)@pred(Server(pid,j)), SCtr(pid)@Server(pid,j) => //. 
-by use orderStrict with SCtr(pid)@Server(pid,j'), SCtr(pid)@Server(pid,j) => //. 
+use orderTrans with 
+  SCtr(pid)@Server(pid,j'),  
+  SCtr(pid)@pred(Server(pid,j)), 
+  SCtr(pid)@Server(pid,j) => //. 
+by use orderStrict with SCtr(pid)@Server(pid,j'), SCtr(pid)@Server(pid,j). 
 
-
-subst SCtr(pid)@pred(Server(pid,j)), SCtr(pid)@Server(pid,j').
-by use orderStrict with SCtr(pid)@Server(pid,j'), SCtr(pid)@Server(pid,j) => //. 
+rewrite H2 in *.
+by use orderStrict with SCtr(pid)@Server(pid,j'), SCtr(pid)@Server(pid,j). 
 Qed.
