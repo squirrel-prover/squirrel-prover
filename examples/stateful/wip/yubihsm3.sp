@@ -113,15 +113,6 @@ process yubikeypress (pid:index,j:index) =
   let menc = enc(<sid(pid),ctr>,npr(pid,j),k(pid)) in
   out(cY,<mpid(pid), <nonce(pid,j), menc>>).
 
-(* fully idealized version of `yubikeypress`. *)
-(* process yubikeypress_ideal (pid:index,j:index) =
-  in(cY,x2);  
-  let ctr = YCtr(pid) in
-  YCtr(pid) := mySucc(YCtr(pid));
-  let menc = enc(<sid(pid),ctr>,npr(pid,j),diff(k(pid),k'(pid,j))) in
-  out(cY,<mpid(pid), <nonce(pid,j), menc>>).
-*)
-
 (* When the server receives a message for pid:
    - it checks whether it corresponds to a pid in its database,
    - it retrieves the AEAD and kh associated to this pid and asks the HSM to
@@ -140,20 +131,6 @@ process server (pid:index) =
   && deccipher<>fail && fst(deccipher) = sid(pid) && SCtr(pid) ~< xcpt then
   SCtr(pid) := xcpt;
   out(cS,accept).
-
-(*
-process server_ideal(pid,j:index) = 
-  in(cS,x); (*x = <pid,<nonce, cipher>> with cipher = senc(<sid,cpt>,r, k)*)
-  let cipher = snd(snd(x)) in
-  let deccipher = dec(cipher,k(pid)) in
-  let xcpt = snd(deccipher) in 
-  if fst(x) = mpid(pid) &&  
-    diff(SCtr(pid) ~< xcpt  &&deccipher<>fail && fst(deccipher) = sid(pid), 
-exists (j':index), dec(cipher,k'(pid,j')) <> fail && fst(dec(cipher,k'(pid,j'))) = sid(pid) && SCtr(pid) ~< snd(dec(cipher,k'(pid,j'))))  
- then
-  SCtr(pid) := diff(xcpt, try find j' such that dec(cipher,k'(pid,j')) <> fail && fst(dec(cipher,k'(pid,j'))) = sid(pid) in snd(dec(cipher,k'(pid,j'))));
-  out(cS,accept).
-*)
 
 
 (* The attacker can read/write AEAD stored in the server's database. *)
@@ -180,31 +157,6 @@ process YSM_AEAD_YUBIKEY_OTP_DECODE (pid:index) =
     then
       out(cHSM, snd(otp_dec)).
 
-(* fully idealized version of `YSM_AEAD_YUBIKEY_OTP_DECODE`. *)
-(* process YSM_AEAD_YUBIKEY_OTP_DECODE_ideal (pid:index) =
-  in(cHSM,xdata);
-  if fst(xdata) = <mpid(pid),kh> then
-    let aead = fst(snd(xdata)) in
-    let otp = snd(snd(xdata)) in
-
-    let aead_dec = dec(aead,mkey) in    
-    let otp_dec = dec(otp,k(pid)) in
-
-    if aead_dec <> fail && 
-       diff( otp_dec <> fail && fst(otp_dec) = sid(pid),
-             exists (j:index),
-             dec(otp,k'(pid,j)) <> fail &&
-             fst(dec(otp,k'(pid,j))) = sid(pid))
-    then
-      out(cHSM, 
-          diff( snd(otp_dec),
-                try find j such that 
-                  dec(otp,k'(pid,j)) <> fail && 
-                  fst(dec(otp,k'(pid,j))) = sid(pid)
-                in
-                snd(dec(otp,k'(pid,j))))).
-*)
-
 (* base system with middle system *)
  system (* [BtoM] *)
   ( (!_pid !_j Plug   : yubikeyplug(pid)                 ) |
@@ -213,17 +165,6 @@ process YSM_AEAD_YUBIKEY_OTP_DECODE (pid:index) =
     (!_pid !_j Read   : read_AEAD(pid)                   ) |
     (!_pid !_j Write  : write_AEAD(pid)                  ) | 
     (!_pid !_j Decode : YSM_AEAD_YUBIKEY_OTP_DECODE(pid) )).
-
-
-(* middle system with ideal system *)
-(* system (* [MtoI] *)
-  ( (!_pid !_j Plug   : yubikeyplug(pid)                       ) |
-    (!_pid !_j Press  : yubikeypress_ideal(pid,j)              ) |
-    (!_pid !_j Server : server_ideal(pid,j)                            ) |
-   (!_pid !_j Read   : read_AEAD(pid)                         ) |
-    (!_pid !_j Write  : write_AEAD(pid)                        ) | 
-    (!_pid !_j Decode : YSM_AEAD_YUBIKEY_OTP_DECODE_ideal(pid) )).
-*)
 
 (* TODO: allow to have axioms for all systems *)
 axiom  orderTrans (n1,n2,n3:message): n1 ~< n2 => n2 ~< n3 => n1 ~< n3.
