@@ -30,6 +30,21 @@ type lsymb = string L.located
   *
   * We allow tactics to not make progress and not fail. *)
 
+(*------------------------------------------------------------------*)
+(** Errors returned when the axiom syntactic side-conditions do not hold. *)
+type ssc_error_c =
+  | E_message 
+  | E_elem 
+  | E_indirect of
+      Symbols.action Symbols.t *
+      [`Cond | `Output | `Update of Symbols.macro Symbols.t]
+
+type ssc_error = Term.message * ssc_error_c
+
+val pp_ssc_error  : Format.formatter -> ssc_error      -> unit
+val pp_ssc_errors : Format.formatter -> ssc_error list -> unit
+
+(*------------------------------------------------------------------*)
 (** The multiple types of tactics error. Specific ones are defined so that they
     may be caught for unit testing. *)
 type tac_error_i =
@@ -38,6 +53,7 @@ type tac_error_i =
   | CannotConvert
   | NotEqualArguments
   | Bad_SSC
+  | BadSSCDetailed of ssc_error list 
   | NoSSC
   | NoAssumpSystem
   | NotDepends of string * string

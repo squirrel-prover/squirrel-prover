@@ -1704,11 +1704,16 @@ let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
   let frame =
     param.h_cnt :: (List.map (Equiv.pi_term proj) (e_without_hash @ biframe))
   in
-
+  
   (* check syntactic side condition *)
-  Euf.key_ssc
-    ~elems:frame ~allow_functions:(fun x -> false)
-    ~cntxt param.h_fn param.h_key.s_symb;
+  let errors =
+    Euf.key_ssc
+      ~elems:frame ~allow_functions:(fun x -> false)
+      ~cntxt param.h_fn param.h_key.s_symb
+  in
+  if errors <> [] then 
+    soft_failure (Tactics.BadSSCDetailed errors);
+
 
   (* we compute the list of hashes from the frame *)
   let frame_hashes : Iter.hash_occs =
@@ -1758,8 +1763,6 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
   try _mk_prf_phi_proj proj cntxt env biframe e hash
   with
   | Not_hash -> soft_failure Tactics.Bad_SSC
-  | Euf.Bad_ssc ->
-    soft_failure (Tactics.Failure "key syntactic side condition violated")
 
 (* from two conjonction formula p and q, produce its minimal diff(p, q), of the
    form (p inter q) && diff (p minus q, q minus p) *)
@@ -2085,27 +2088,28 @@ let cca1 Args.(Int i) s =
           | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk
             ->
             begin
-              try
+              let errors =
                 Euf.key_ssc ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
-                  ~cntxt fndec sk.s_symb;
+                  ~cntxt fndec sk.s_symb
+              in
+              if errors <> [] then 
+                soft_failure (Tactics.BadSSCDetailed errors);
 
-                if not (List.mem
-                          (Term.mk_fun table fnpk is [Term.mk_name sk])
-                          biframe) then
-                  soft_failure
-                    (Tactics.Failure
-                       "The public key must be inside the frame in order to \
-                        use CCA1");
+              if not (List.mem
+                        (Term.mk_fun table fnpk is [Term.mk_name sk])
+                        biframe) then
+                soft_failure
+                  (Tactics.Failure
+                     "The public key must be inside the frame in order to \
+                      use CCA1");
 
-                let (fgoals, substs) = hide_all_encs occs in
-                let fgoal,subst =
-                  get_subst_hide_enc
-                    enc fnenc m (Some (fnpk,is))
-                    sk fndec r eis is_top_level
-                in
-                (fgoal :: fgoals,subst :: substs)
-
-              with Euf.Bad_ssc ->  soft_failure Tactics.Bad_SSC
+              let (fgoals, substs) = hide_all_encs occs in
+              let fgoal,subst =
+                get_subst_hide_enc
+                  enc fnenc m (Some (fnpk,is))
+                  sk fndec r eis is_top_level
+              in
+              (fgoal :: fgoals,subst :: substs)
             end
 
           | _ ->
@@ -2137,7 +2141,7 @@ let cca1 Args.(Int i) s =
                   get_subst_hide_enc enc fnenc m (None) sk fndec r eis is_top_level
                 in
                 (fgoal :: fgoals,subst :: substs)
-              with Euf.Bad_ssc ->  soft_failure Tactics.Bad_SSC
+              with Cca.Bad_ssc ->  soft_failure Tactics.Bad_SSC
             end
           | _ ->
             soft_failure
@@ -2235,8 +2239,12 @@ let enckp
         | Symbols.AssociatedFunctions [fndec;fnpk] ->
           (fun (sk,system) ->
              let cntxt = Constr.{ cntxt with system } in
-             Euf.key_ssc ~cntxt ~elems:(ES.goal_as_equiv s)
-               ~allow_functions:(fun x -> x = fnpk) fndec sk.s_symb),
+             let errors = 
+               Euf.key_ssc ~cntxt ~elems:(ES.goal_as_equiv s)
+                 ~allow_functions:(fun x -> x = fnpk) fndec sk.s_symb
+             in
+             if errors <> [] then 
+               soft_failure (Tactics.BadSSCDetailed errors)),
           (fun x -> Term.mk_fun table fnpk indices [x]),
           begin match k with
             | Term.Fun ((fnpk',indices'), _, [sk])
@@ -2282,7 +2290,7 @@ let enckp
           Equiv.subst_equiv [Term.ESubst (enc,Term.empty)] [e]
         in
         fresh_cond cntxt env (Term.mk_name r) (context@biframe)
-      with Euf.Bad_ssc -> soft_failure Tactics.Bad_SSC
+      with Cca.Bad_ssc -> soft_failure Tactics.Bad_SSC
     in
     let fresh_goal =
       s |> ES.set_reach_goal random_fresh_cond |> ES.to_trace_sequent in

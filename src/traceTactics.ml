@@ -1606,7 +1606,12 @@ let euf_apply_facts drop_head s
   let cntxt = TS.mk_trace_cntxt s in
 
   (* check that the SSCs hold *)
-  Euf.key_ssc ~messages:[mess;sign] ~allow_functions ~cntxt head_fn key.s_symb;
+  let errors =
+    Euf.key_ssc ~messages:[mess;sign]
+      ~allow_functions ~cntxt head_fn key.s_symb
+  in
+  if errors <> [] then 
+    soft_failure (Tactics.BadSSCDetailed errors);
 
   (* build the rule *)
   let rule =
@@ -1668,10 +1673,8 @@ let euf_apply
       | _ -> assert false in
 
   (* we create the honest sources using the classical eufcma tactic *)
-  try
-    let honest_s = euf_apply_facts drop_head s p in
-    (tag_s @ honest_s @ extra_goals)
-  with Euf.Bad_ssc -> soft_failure Tactics.Bad_SSC
+  let honest_s = euf_apply_facts drop_head s p in
+  (tag_s @ honest_s @ extra_goals)
 
 let () =
   T.register_typed "euf"
@@ -1811,9 +1814,10 @@ let valid_hash (cntxt : Constr.trace_cntxt) (t : Term.message) =
   match t with
   | Fun ((hash, _), _, [m; Name key]) ->
     Symbols.is_ftype hash Symbols.Hash cntxt.table
-    && Euf.check_key_ssc
-      ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false)
-      ~cntxt hash key.s_symb
+    && (Euf.key_ssc
+          ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false)
+          ~cntxt hash key.s_symb
+        = [])
 
   | _ -> false
 

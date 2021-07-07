@@ -1,5 +1,8 @@
 open Term
 
+(* TODO: better error message, see [Euf] *)
+exception Bad_ssc
+  
 class check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)
   inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
   method visit_message t = match t with
@@ -17,8 +20,8 @@ class check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)
       when fn = dec_fn ->
       self#visit_message m
 
-    | Term.Name ns when ns.s_symb = key_n -> raise Euf.Bad_ssc
-    | Term.Var m -> raise Euf.Bad_ssc
+    | Term.Name ns when ns.s_symb = key_n -> raise Bad_ssc
+    | Term.Var m -> raise Bad_ssc
     | _ -> super#visit_message t
 end
 
@@ -42,7 +45,7 @@ class check_rand ~allow_vars ~cntxt enc_fn randoms = object (self)
       self#visit_message m1; self#visit_message m2
 
     | Term.Fun ((fn,_), _, [m1; _; m2]) when fn = enc_fn ->
-      raise Euf.Bad_ssc
+      raise Bad_ssc
 
     | Term.Name ns when List.mem ns.s_symb randoms ->
       Tactics.soft_failure (Tactics.SEncRandomNotFresh)

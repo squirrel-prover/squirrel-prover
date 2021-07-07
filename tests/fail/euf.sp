@@ -33,8 +33,8 @@ system null.
 goal key_in_mess:
   h(k,k) = k => False.
 Proof.
-  intro Heq.
-  checkfail euf Heq exn BadSSC.
+  intro Heq. 
+  checkfail euf Heq exn BadSSCDetailed.
 Abort.
 (** END TEST **)
 
@@ -43,7 +43,7 @@ goal message_var :
   h(m3,k) = m1 => m3 <> m2  .
 Proof.
   intro m1 m2 m3 Heq.
-  checkfail euf Heq exn BadSSC.
+  checkfail euf Heq exn BadSSCDetailed.
 Abort.
 
 (** BEGIN TEST -- AUTOMATICALLY INCLUDED IN MANUAL **)
@@ -55,7 +55,7 @@ goal [condSSC] _ (tau:timestamp) :
   (if cond@tau then ok else zero) <> h(ok,k).
 Proof.
   intro Hap Heq.
-  checkfail euf Heq exn BadSSC.
+  checkfail euf Heq exn BadSSCDetailed.
 Abort.
 (** END TEST **)
 (* k occurs in the context *)
@@ -63,7 +63,7 @@ Abort.
 goal _: (k = h(u,k)) => False.
 Proof.
   nosimpl(intro Heq).
-  checkfail euf Heq exn BadSSC.
+  checkfail euf Heq exn BadSSCDetailed.
 Abort.
 
 (* euf should not allow to conclude here, and only yeld zero=zero *)
@@ -81,14 +81,14 @@ goal [ joint] _ (tau:timestamp): happens(A3) => cond@A3 => False.
 Proof.
   intro Hap Hcond.
   expand cond@A3.
-  checkfail euf Hcond exn BadSSC.
+  checkfail euf Hcond exn BadSSCDetailed.
 Abort.
 
 
 goal [ joint] _ (tau:timestamp): output@A4<>h(m,k).
 Proof.
   intro Heq.
-  checkfail euf Heq exn BadSSC.
+  checkfail euf Heq exn BadSSCDetailed.
 Abort.
 
 (**********************************************)

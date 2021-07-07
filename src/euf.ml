@@ -1,7 +1,7 @@
 (** {2 SSCs checking} *)
 
-(** Exception thrown when the axiom syntactic side-conditions do not hold. *)
-exception Bad_ssc
+(** Internal exception *)
+exception Bad_ssc_
 
 (** Iterate on terms, raise Bad_ssc if the hash key occurs other than
   * in key position or if a message variable is used.
@@ -13,19 +13,26 @@ exception Bad_ssc
 class check_key
     ~allow_vars ~allow_functions
     ~cntxt head_fn key_n = object (self)
+                                  
   inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
+    
   method visit_message t = match t with
     | Term.Fun ((fn,_), _, [m;Term.Name _]) when fn = head_fn ->
       self#visit_message m
+        
     | Term.Fun ((fn,_), _, [m1;m2;Term.Name _]) when fn = head_fn ->
       self#visit_message m1; self#visit_message m2
+        
     | Term.Fun ((fn,_), _, [Term.Name _])
     | Term.Fun ((fn,_), _, [Term.Diff (Term.Name _, Term.Name _)])
     | Term.Fun ((fn,_), _, [_; Term.Name _])
     | Term.Fun ((fn,_), _, [_; Term.Diff (Term.Name _, Term.Name _)])
       when allow_functions fn -> ()
-    | Term.Name n when n.s_symb = key_n -> raise Bad_ssc
-    | Term.Var m -> if not(allow_vars) then raise Bad_ssc
+                                 
+    | Term.Name n when n.s_symb = key_n -> raise Bad_ssc_
+                                             
+    | Term.Var m -> if not(allow_vars) then raise Bad_ssc_
+          
     | _ -> super#visit_message t
 end
 
@@ -38,6 +45,9 @@ class get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n = object (sel
     if Term.ty t = Type.Boolean then () else super#visit_message t
 end
 
+(*------------------------------------------------------------------*)
+  
+(*------------------------------------------------------------------*) 
 (** Check the key syntactic side-condition in the given list of messages
   * and in the outputs, conditions and updates of all system actions:
   * [key_n] must appear only in key position of [head_fn].
@@ -48,26 +58,31 @@ let key_ssc
   let ssc =
     new check_key ~allow_vars ~allow_functions ~cntxt head_fn key_n
   in
-  List.iter ssc#visit_message messages ;
-  List.iter ssc#visit_message elems ;
-  SystemExpr.(iter_descrs cntxt.table cntxt.system
-    (fun action_descr ->
-       ssc#visit_message (snd action_descr.condition) ;
-       ssc#visit_message (snd action_descr.output) ;
-       List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
 
-(** Same as [hash_key_ssc] but returning a boolean.
-  * This is used in the collision tactic, which looks for all h(_,k)
-  * such that k satisfies the SSC. *)
-let check_key_ssc
-    ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~allow_functions
-    ~cntxt head_fn key_n =
-  try
-    key_ssc
-      ~allow_vars ~messages ~elems ~allow_functions
-      ~cntxt head_fn key_n ;
-    true
-  with Bad_ssc -> false
+  (* [e_case] is the error message to be thrown in case of error *)
+  let check e_case t : Tactics.ssc_error option=
+    try ssc#visit_message t; None
+    with Bad_ssc_ -> Some (t, e_case)
+  in
+      
+  let errors1 = List.filter_map (check E_message) messages in
+  let errors2 = List.filter_map (check E_elem) elems in
+
+  let errors3 =
+    SystemExpr.fold_descrs 
+      (fun descr acc ->
+         let name = descr.name in
+
+         let errors = 
+           check (E_indirect (name, `Cond)) (snd descr.condition) ::
+           check (E_indirect (name, `Output)) (snd descr.output) ::
+           List.map (fun (update,t) ->
+               check (E_indirect (name, `Update update.Term.s_symb)) t
+             ) descr.updates in
+         (List.filter_map (fun x -> x) errors) @ acc       
+      ) cntxt.table cntxt.system []
+  in
+  errors1 @ errors2 @ errors3
 
 (*------------------------------------------------------------------*)
 (** [hashes_of_action_descr ~system action_descr head_fn key_n]

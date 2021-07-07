@@ -35,9 +35,6 @@ type euf_rule = { hash : Term.fname;
 
 val pp_euf_rule : Format.formatter -> euf_rule -> unit
 
-(** Exception thrown when the axiom syntactic side-conditions do not hold. *)
-exception Bad_ssc
-
 
 (** Raises Bad_ssc if the syntactic side condition of the key is not met inside
 the protocol and the messages. All occurences of the key must either be inside
@@ -47,16 +44,9 @@ val key_ssc :
   ?messages:(Term.message list) -> ?elems:Equiv.equiv ->
   allow_functions:(Symbols.fname Symbols.t -> bool) ->
   cntxt:Constr.trace_cntxt ->
-  Term.fname -> Term.name -> unit
+  Term.fname -> Term.name -> Tactics.ssc_error list
 
-(** Same as [key_ssc] but returns a boolean. *)
-val check_key_ssc :
-  ?allow_vars : bool ->
-  ?messages:(Term.message list) -> ?elems:Equiv.equiv ->
-  allow_functions:(Symbols.fname Symbols.t -> bool) ->
-  cntxt:Constr.trace_cntxt ->
-  Term.fname -> Term.name -> bool
-
+(*------------------------------------------------------------------*)
 (** [mk_rule proc head_fn key_n] create the euf rule associated to an given head
    function and key in a process.  If drop_head is true, the message stored do
    not contain anymore the head_fn function, else they still do. *)

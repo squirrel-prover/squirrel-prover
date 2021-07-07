@@ -3,12 +3,42 @@ module L = Location
 type lsymb = string L.located
 
 (*------------------------------------------------------------------*)
+type ssc_error_c =
+  | E_message 
+  | E_elem 
+  | E_indirect of
+      Symbols.action Symbols.t *
+      [`Cond | `Output | `Update of Symbols.macro Symbols.t]
+
+type ssc_error = Term.message * ssc_error_c
+
+let pp_ssc_error fmt (t, e) =
+  let pp_ssc_error_c fmt = function
+  | E_message -> Fmt.pf fmt "message"
+  | E_elem    -> Fmt.pf fmt "frame element"
+  | E_indirect (a, case) ->
+    match case with
+    | `Cond      -> Fmt.pf fmt "%a condition" Symbols.pp a
+    | `Output    -> Fmt.pf fmt "%a output" Symbols.pp a
+    | `Update st -> Fmt.pf fmt "%a, state update: %a" Symbols.pp a Symbols.pp st
+  in
+  Fmt.pf fmt "%a %a" pp_ssc_error_c e Term.pp t
+
+let pp_ssc_errors fmt errors =
+  let pp_one fmt te =
+    Fmt.pf fmt "@[%a@]" pp_ssc_error te
+  in
+  Fmt.pf fmt "@[<v 0>%a@]"
+    (Fmt.list ~sep:Fmt.cut pp_one) errors
+
+(*------------------------------------------------------------------*)
 type tac_error_i =
   | More
   | Failure of string
   | CannotConvert
   | NotEqualArguments
   | Bad_SSC
+  | BadSSCDetailed of ssc_error list 
   | NoSSC
   | NoAssumpSystem
   | NotDepends of string * string
@@ -80,13 +110,14 @@ let rec tac_error_to_string = function
   | NotDepends (s1, s2)   -> "NotDepends, "^s1^", "^s2
   | FailWithUnexpected te -> "FailWithUnexpected, "^(tac_error_to_string te)
   | ApplyMatchFailure _   -> "ApplyMatchFailure"
-  | HypAlreadyExists _    -> "HypAlreadyExists"
-  | HypUnknown       _    -> "HypUnknown"
-  | SystemExprError  _    -> "SystemExpr_Error"
-  | GoalBadShape     _    -> "GoalBadShape"
-  | SystemError      _    -> "System_Error"
-  | PatNumError      _    -> "PatNumError"
-  | MustHappen       _    -> "MustHappen"
+  | HypAlreadyExists  _    -> "HypAlreadyExists"
+  | HypUnknown        _    -> "HypUnknown"
+  | SystemExprError   _    -> "SystemExpr_Error"
+  | GoalBadShape      _    -> "GoalBadShape"
+  | SystemError       _    -> "System_Error"
+  | PatNumError       _    -> "PatNumError"
+  | MustHappen        _    -> "MustHappen"
+  | BadSSCDetailed    _    -> "BadSSCDetailed"
 
 
 let rec pp_tac_error_i ppf = function
@@ -94,6 +125,12 @@ let rec pp_tac_error_i ppf = function
   | Failure s -> Fmt.pf ppf "%s" s
   | NotEqualArguments -> Fmt.pf ppf "arguments not equals"
   | Bad_SSC -> Fmt.pf ppf "key does not satisfy the syntactic side condition"
+
+  | BadSSCDetailed errors ->
+    Fmt.pf ppf "the key does not satisfy the syntactic \
+                side conditions:@;\
+                %a"
+      pp_ssc_errors errors
 
   | NoSSC ->
       Fmt.pf ppf
