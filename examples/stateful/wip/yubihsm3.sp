@@ -86,6 +86,12 @@ name rinit : index -> message
 mutable AEAD(pid:index) : message = 
   enc(<diff(k(pid),k_dummy(pid)), sid(pid)>, rinit(pid), mkey).
 
+(* (* random samplings used to initialized AEADi  *) *)
+(* name rinitp : index -> message *)
+(* (* authentication server's database for each pid, ideal system *) *)
+(* mutable AEADi(pid:index) : message = *)
+(*   enc(<k_dummy(pid), sid(pid)>, rinitp(pid), mkey). *)
+
 channel cY
 channel cS
 channel cHSM
@@ -141,6 +147,14 @@ process write_AEAD (pid:index)=
   in(cS,x);
   AEAD(pid) := x.
 
+(* (* AEAD in the ideal system *) *)
+(* process read_AEAD_ideal (pid:index) = *)
+(*   out(cS,AEADi(pid)). *)
+
+(* process write_AEAD_ideal (pid:index)= *)
+(*   in(cS,x); *)
+(*   AEADi(pid) := x. *)
+
 (* Model for the rule YSM_AEAD_YUBIKEY_OTP_DECODE of the HSM. *)
 process YSM_AEAD_YUBIKEY_OTP_DECODE (pid:index) =
   in(cHSM,xdata); (* xdata = <<pid,kh>, <aead, otp>> with otp = senc(<sid,cpt>,r,k)*)
@@ -148,23 +162,57 @@ process YSM_AEAD_YUBIKEY_OTP_DECODE (pid:index) =
     let aead = fst(snd(xdata)) in
     let otp = snd(snd(xdata)) in
 
+
     let aead_dec = dec(aead,mkey) in    
-    let sid_pid = diff(snd(aead_dec), sid(pid)) in
 
     let otp_dec = dec(otp,diff(fst(aead_dec), k(pid))) in
 
-    if aead_dec <> fail && otp_dec <> fail && fst(otp_dec) = sid_pid
+    if aead_dec <> fail && otp_dec <> fail && fst(otp_dec) = snd(aead_dec)
     then
       out(cHSM, snd(otp_dec)).
 
-(* base system with middle system *)
- system (* [BtoM] *)
+(* intermediate process *)
+process YSM_AEAD_YUBIKEY_OTP_DECODE_middle (pid:index) =
+  in(cHSM,xdata); (* xdata = <<pid,kh>, <aead, otp>> with otp = senc(<sid,cpt>,r,k)*)
+   if fst(xdata) = <mpid(pid),kh> then
+    let aead = fst(snd(xdata)) in
+    let otp = snd(snd(xdata)) in
+
+    let aead_dec =
+     diff(dec(aead,mkey),
+           try find pid' such that
+             aead =
+             enc(<k_dummy(pid), sid(pid')>, rinit(pid'), mkey)
+           in
+             <k(pid'), sid(pid')>
+           else fail)
+    in
+
+    let otp_dec = dec(otp,fst(aead_dec)) in
+
+    if aead_dec <> fail && otp_dec <> fail && fst(otp_dec) = snd(aead_dec)
+    then
+      out(cHSM, snd(otp_dec)).
+
+process Yubikey0 =
   ( (!_pid !_j Plug   : yubikeyplug(pid)                 ) |
     (!_pid !_j Press  : yubikeypress(pid,j)              ) |
     (!_pid !_j Server : server(pid)                      ) |
     (!_pid !_j Read   : read_AEAD(pid)                   ) |
-    (!_pid !_j Write  : write_AEAD(pid)                  ) | 
-    (!_pid !_j Decode : YSM_AEAD_YUBIKEY_OTP_DECODE(pid) )).
+    (!_pid !_j Write  : write_AEAD(pid)                  )).
+
+(* TODO: we do not want to state [base ~ ideal], but [middle ~ ideal]. 
+     The problem is that, to do this, we need *)
+(* base system with ideal system *)
+system
+  (Yubikey0 | 
+  (!_pid !_j Decode : YSM_AEAD_YUBIKEY_OTP_DECODE(pid))).
+
+(* base system with middle system *)
+system [middle]
+  (Yubikey0 |
+  (!_pid !_j Decode : YSM_AEAD_YUBIKEY_OTP_DECODE_middle(pid))).
+
 
 (* TODO: allow to have axioms for all systems *)
 axiom  orderTrans (n1,n2,n3:message): n1 ~< n2 => n2 ~< n3 => n1 ~< n3.
@@ -348,58 +396,93 @@ goal snd_pair (x,y : message) : snd (<x,y>) = y.
 Proof. auto. Qed.
 hint rewrite snd_pair.
 
+goal diff_eq ['a] (x,y : 'a) : x = y => diff(x,y) = x.
+Proof. by project. Qed.
+hint rewrite diff_eq.
+
 (* PROOF *)
 
 goal [left] valid_decode (t : timestamp) (pid,j : index):
   t = Decode(pid,j) =>
   happens(t) => 
-  aead_dec(pid,j)@t <> fail && 
-  otp_dec(pid,j)@t <> fail &&
-  fst(otp_dec(pid,j)@t) = sid_pid(pid,j)@t && 
-  fst(input@t) = <mpid(pid),kh> =>
-  snd(otp_dec(pid,j)@t) = k(pid).
+  aead_dec(pid,j)@t <> fail <=>
+  exists(pid0 : index), 
+  AEAD(pid0)@init = aead(pid,j)@t.
 Proof.
-  intro Eq Hap [AEAD_dec OTP_dec Sid_eq U].
-  clear U.
+  intro Eq Hap.
+  split.
+
+  (* Left => Right *)
+  intro AEAD_dec.
   expand aead_dec.
   intctxt AEAD_dec => H; 2: congruence.
 
   clear H; intro AEAD_eq.
-  rewrite /otp_dec /sid_pid /aead_dec -AEAD_eq /= in *.
-  clear AEAD_dec. 
-  
-  (* TODO: to apply intctxt, we probably need an additional intermediate system *)
+  by exists pid0.
+
+  (* Right => Left *) 
+  intro [pid0 H].
+  expand aead_dec.
+  rewrite -H /AEAD /=.
   admit.
-  (* intctxt OTP_dec. *)
+  (* TODO: axiom? *)
 Qed.  
 
-(* TODO: factorize both lemmas *)
-goal [right] valid_decode_r (t : timestamp) (pid,j : index):
+goal [left] valid_decode_tf (t : timestamp) (pid,j : index):
   t = Decode(pid,j) =>
   happens(t) => 
-  aead_dec(pid,j)@t <> fail && 
-  otp_dec(pid,j)@t <> fail &&
-  fst(otp_dec(pid,j)@t) = sid_pid(pid,j)@t && 
-  fst(input@t) = <mpid(pid),kh> =>
-  snd(otp_dec(pid,j)@t) = k(pid).
+  ( aead_dec(pid,j)@t <> fail &&
+    otp_dec(pid,j)@t <> fail &&
+    fst(otp_dec(pid,j)@t) = snd(aead_dec(pid,j)@t)) =>
+  aead_dec(pid,j)@t = 
+  try find pid' such that 
+      aead(pid,j)@t = AEAD(pid')@init
+    in 
+      <k(pid'), sid(pid')>
+    else aead_dec(pid,j)@t.
 Proof.
-  intro Eq Hap [AEAD_dec OTP_dec Sid_eq U].
-  clear U.
+  intro Eq Hap [AEAD_dec OTP_dec Sid_eq].
   expand aead_dec.
   intctxt AEAD_dec => H; 2: congruence.
 
   clear H; intro AEAD_eq.
-  rewrite /otp_dec /sid_pid -AEAD_eq /= in *.
+  rewrite /otp_dec /aead_dec -AEAD_eq /= in *.
   clear AEAD_dec. 
-  
-  intctxt OTP_dec; 2:auto. 
-  intro Hc EncEq _.
-  rewrite -EncEq /=.
-  admit.
-  (* TODO: the conclusion of the lemma is not correct. *)
-Qed.  
+  case (
+   try find pid' such that
+    enc(<k(pid0),sid(pid0)>,rinit(pid0),mkey) = AEAD(pid')@init
+   in <k(pid'),sid(pid')> else <k(pid0),sid(pid0)>); 
+  2:auto.
+  by intro [pid' [Tc ->]].
+Qed.
 
-set showStrengthenedHyp=true.
+ (*  (* Right => Left *) *)
+ (*  intro [Hnfail Heq].  *)
+ (*  case ( *)
+ (*   try find pid' such that aead(pid,j)@t = AEAD(pid')@init *)
+ (*   in <k(pid'),sid(pid')> else aead_dec(pid,j)@t). *)
+ (*  intro [pid' [Tc Teq]]. *)
+ (*  rewrite Teq in Heq.  *)
+ (*  clear Teq. *)
+ (*  (* rewrite Heq /=. *) *)
+ (*  rewrite /otp_dec Heq /=. rewrite /otp. *)
+ (*  expand otp, aead, AEAD.  *)
+ (*  rewrite Tc. *)
+ (*  rewrite /aead_dec Tc /AEAD in Heq.  *)
+ (*  clear Teq.  *)
+ (*  split.   *)
+ (*  split; 1:admit.   (* TODO: axiom? *) *)
+ (*  expand AEAD.  *)
+
+ (*  intro [A B] /=.   *)
+ (*  clear B.  *)
+ (*  admit. *)
+ (*  (* A + intctxt Hnfail implies false.  *)
+ (*    I think this means that we can change the else branch of the  *)
+ (*    try find to anything we want. *) *)
+ (* Qed.   *)
+
+(* set showStrengthenedHyp=true. *)
 equiv atomic_keys.
 Proof.
   enrich seq(pid,j -> npr(pid,j)). 
@@ -434,7 +517,7 @@ Proof.
 
   (* Decode(pid,j) *)
   repeat destruct Eq as [_ Eq].
-  expand frame, exec, output, cond. 
+  expand frame, exec, output, cond, AEAD. 
   fa 6. fa 7. fa 7.
 
   (* by apply Hind (pred(t)). *)
