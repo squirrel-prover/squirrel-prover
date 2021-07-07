@@ -79,7 +79,10 @@ let v_debug_tactics = Param_bool false
 let s_strict_alias_mode = "processStrictAliasMode"
 let v_strict_alias_mode = Param_bool false
 
-let s_auto_into = "autoIntro"
+let s_show_strengthened_hyp = "showStrengthenedHyp"
+let v_show_strengthened_hyp = Param_bool false
+
+let s_auto_intro = "autoIntro"
 let v_auto_intro = Param_bool true
 
 let s_auto_fadup = "autoFADup"
@@ -97,8 +100,9 @@ let default_params =
   |>  decl s_debug_constr PBool v_debug_constr 
   |>  decl s_debug_completion PBool v_debug_completion
   |>  decl s_debug_tactics PBool v_debug_tactics
-  |>  decl s_strict_alias_mode PBool v_strict_alias_mode 
-  |>  decl s_auto_into PBool v_auto_intro
+  |>  decl s_strict_alias_mode PBool v_strict_alias_mode
+  |>  decl s_show_strengthened_hyp PBool v_show_strengthened_hyp
+  |>  decl s_auto_intro PBool v_auto_intro
   |>  decl s_auto_fadup PBool v_auto_fadup
   |>  decl s_new_ind PBool v_new_ind
 
@@ -125,7 +129,9 @@ let debug_tactics    () = get_bool (M.find s_debug_tactics !params)
 
 let strict_alias_mode () = get_bool (M.find s_strict_alias_mode !params)
 
-let auto_intro () = get_bool (M.find s_auto_into !params)
+let show_strengthened_hyp () = get_bool (M.find s_show_strengthened_hyp !params)
+    
+let auto_intro () = get_bool (M.find s_auto_intro !params)
 
 let auto_fadup () = get_bool (M.find s_auto_fadup !params)
 

@@ -4,6 +4,10 @@ open Term
 module Sv = Vars.Sv
 module Mv = Vars.Mv
 
+let dbg ?(force=false) s =
+  if force then Printer.prt `Dbg s
+  else Printer.prt `Ignore s
+
 (*------------------------------------------------------------------*)
 (** {2 Patterns} *)
 
@@ -1741,8 +1745,8 @@ module E : S with type t = Equiv.form = struct
         msets_to_list msets
     in
 
-    (* (* REM *)
-     * Fmt.epr "strenghten: %a@." pp_mset_l mset_l; *)
+    if mset_l <> [] && Config.show_strengthened_hyp () then     
+      (dbg ~force:true) "strengthened hypothesis:@;%a@;" pp_mset_l mset_l; 
 
     let mv, minfos = 
       List.fold_left (fun (mv, minfos) term ->

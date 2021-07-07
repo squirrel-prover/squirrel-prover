@@ -43,6 +43,9 @@ val debug_tactics : unit -> bool
 (** Strict alias mode for processus. *)
 val strict_alias_mode : unit -> bool
 
+(** Show hypothesis after strengthening *)
+val show_strengthened_hyp : unit -> bool
+    
 (** Automatic introductions (in hypotheses and the conclusion). *)
 val auto_intro : unit -> bool
 
