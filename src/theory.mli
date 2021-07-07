@@ -237,7 +237,8 @@ type conversion_error_i =
   | BadPty               of Type.ekind list
   | BadInfixDecl
   | PatNotAllowed
-      
+  | ExplicitTSInProc 
+    
 type conversion_error = L.t * conversion_error_i
 
 exception Conv of conversion_error

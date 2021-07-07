@@ -289,6 +289,7 @@ type conversion_error_i =
   | BadPty               of Type.ekind list
   | BadInfixDecl
   | PatNotAllowed
+  | ExplicitTSInProc 
 
 type conversion_error = L.t * conversion_error_i
 
@@ -363,6 +364,9 @@ let pp_error_i ppf = function
   | BadInfixDecl -> Fmt.pf ppf "bad infix symbol declaration"
 
   | PatNotAllowed -> Fmt.pf ppf "pattern not allowed"
+
+  | ExplicitTSInProc -> Fmt.pf ppf "macros cannot be written at explicit \
+                                    timestamps in procedure"
 
 let pp_error pp_loc_err ppf (loc,e) =
   Fmt.pf ppf "%a%a"
@@ -634,18 +638,18 @@ let subst t (s : (string * term_i) list) =
           ti
         with Not_found -> t
       end
-    | Tpat -> Tpat
-    | Tinit -> Tinit
-    | Tpred t -> Tpred (aux t)
-    | Happens t -> Happens (List.map aux t)
-    | App (s,l) -> App (s, List.map aux l)
-    | AppAt _-> assert false
-    | Seq (vs,t) -> Seq (vs, aux t)
+    | Tpat              -> Tpat
+    | Tinit             -> Tinit
+    | Tpred t           -> Tpred (aux t)
+    | Happens t         -> Happens (List.map aux t)
+    | App (s,l)         -> App (s, List.map aux l)
+    | AppAt (s,l,ts)    -> AppAt (s, List.map aux l, aux ts)
+    | Seq (vs,t)        -> Seq (vs, aux t)
     | Compare (o,t1,t2) -> Compare (o, aux t1, aux t2)
-    | ForAll (vs,f) -> ForAll (vs, aux f)
-    | Exists (vs,f) -> Exists (vs, aux f)
-    | Diff (l,r) -> Diff (aux l, aux r)
-    | Find (is,c,t,e) -> Find (is, aux c, aux t, aux e)
+    | ForAll (vs,f)     -> ForAll (vs, aux f)
+    | Exists (vs,f)     -> Exists (vs, aux f)
+    | Diff (l,r)        -> Diff (aux l, aux r)
+    | Find (is,c,t,e)   -> Find (is, aux c, aux t, aux e)
 
   and aux t = L.mk_loc (L.loc t) (aux_i (L.unloc t))
 
@@ -663,6 +667,8 @@ type conv_cntxt =
   | InProc of Term.timestamp
   | InGoal
 
+let is_in_proc = function InProc _ -> true | InGoal -> false
+  
 (** Exported conversion environments. *)
 type conv_env = {
   table : Symbols.table;
@@ -807,6 +813,8 @@ and convert0 :
         ty
 
   | AppAt (f,terms,ts) ->
+    if is_in_proc state.cntxt then conv_err loc ExplicitTSInProc;
+
     let app_cntxt = At (conv Type.Timestamp ts) in
     conv_app state app_cntxt
       (tm, make_app loc state.table app_cntxt f terms)

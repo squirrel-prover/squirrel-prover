@@ -310,9 +310,18 @@ let () =
            with
              Theory.Conv
                (_,
-                Theory.Type_error (
-                  App (L.{ pl_desc = "n" },[]),
-                  Type.(ETy Timestamp))) ->
+                Theory.ExplicitTSInProc) ->
+             raise Ok)
+    end ;
+    "Local Process", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
+           try ignore (parse_theory_test ~test "tests/alcotest/proc_local2.sp"
+                       : Symbols.table )
+           with
+             Theory.Conv
+               (_,
+                Theory.ExplicitTSInProc) ->
              raise Ok)
     end ;
     "Apply Proc - 0", `Quick, begin fun () ->
