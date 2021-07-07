@@ -97,7 +97,7 @@ abstract (~<): message -> message -> boolean.
 (* When the key is plugged for yubikey `pid`, the counter is incremented. *)
 process yubikeyplug (pid:index) =
   in(cY,x1);
-  YCtr(pid) := succ(YCtr(pid));
+  YCtr(pid) := mySucc(YCtr(pid));
   out(cY,endplug).
 
 name nonce : index -> index -> message
