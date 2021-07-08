@@ -222,7 +222,9 @@ module LowTac (S : Sequent.S) = struct
     try Some (_unfold_macro t s) with
     | Tactics.Tactic_soft_failure _ when not strict -> None
 
-  let expand 
+  (** If [m_rec = true], recurse on expanded sub-terms. *)
+  let expand
+      ?m_rec
       (targets: target list) 
       (macro : [ `Msymb of Symbols.macro Symbols.t 
                | `Mterm of Term.message
@@ -263,11 +265,11 @@ module LowTac (S : Sequent.S) = struct
 
       match f with
       | `Equiv f -> 
-        let f = odflt f (Match.E.map expand_inst (S.env s) f) in
+        let f = odflt f (Match.E.map ?m_rec expand_inst (S.env s) f) in
         `Equiv f, []
           
       | `Reach f ->
-        let f = odflt f (Match.T.map expand_inst (S.env s) f) in
+        let f = odflt f (Match.T.map ?m_rec expand_inst (S.env s) f) in
         `Reach f, []
     in
 
@@ -277,7 +279,7 @@ module LowTac (S : Sequent.S) = struct
     !found1, s
 
   (** expand all macros in a term *)
-  let rec expand_all_term (f : Term.message) (s : S.t) : Term.message =
+  let expand_all_term (f : Term.message) (s : S.t) : Term.message =
     let expand_inst (Term.ETerm occ) vars conds =
       match occ with
       | Term.Macro (ms, l, _) ->
@@ -289,20 +291,18 @@ module LowTac (S : Sequent.S) = struct
 
       | _ -> `Continue
     in
-    match Match.T.map expand_inst (S.env s) f with
-    | None -> f
-    | Some f -> expand_all_term f s 
+    let f_opt = Match.T.map ~m_rec:true expand_inst (S.env s) f in
+    odflt f f_opt
 
   (** expand all macro of some targets in a sequent *)
-  let expand_all targets (s : S.sequent) : S.sequent = 
-    let rec aux_rec s =
-      let targets, all = make_in_targets targets s in
-      let found, s = expand targets `Any s in
-      if found then aux_rec s else s
-    in
-    aux_rec s
-      
-  let expand_all_l tgts s : S.sequent list = [expand_all tgts s]
+  let expand_all targets (s : S.sequent) : S.sequent =
+    let _, s = expand ~m_rec:true targets `Any s in
+    s
+
+  (** exported *)
+  let expand_all_l targets s : S.sequent list =
+    let targets, _all = make_in_targets targets s in
+    [expand_all targets s]
                                              
   let expand_arg (targets : target list) (arg : Theory.term) (s : S.t) : S.t =
     let expand targs macro s =
@@ -345,7 +345,8 @@ module LowTac (S : Sequent.S) = struct
     | Rw_rw of Ident.t option * rw_erule
     (* The ident is the ident of the hyp the rule came from (if any) *)
 
-    | Rw_expand of Theory.term
+    | Rw_expand    of Theory.term
+    | Rw_expandall of Location.t
 
   type rw_earg = Args.rw_count * rw_arg
   
@@ -497,6 +498,9 @@ module LowTac (S : Sequent.S) = struct
               (Failure "expand cannot take a direction");
 
           Rw_expand t, []
+
+        | `ExpandAll loc -> Rw_expandall loc, []
+
       in
       (rw_arg.rw_mult, rw), subgoals
     in
@@ -518,6 +522,8 @@ module LowTac (S : Sequent.S) = struct
       [s]                         (* final sequent *)
 
     | Rw_expand arg -> [expand_arg targets arg s]
+
+    | Rw_expandall _ -> [expand_all targets s]
 
 
   (*------------------------------------------------------------------*)

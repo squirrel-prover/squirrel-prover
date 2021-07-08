@@ -264,7 +264,7 @@ module type S = sig
     'a term -> 'b term pat ->
     match_res
 
-  val map : f_map -> Vars.env -> t -> t option
+  val map : ?m_rec:bool -> f_map -> Vars.env -> t -> t option
 end
 
 (*------------------------------------------------------------------*)
@@ -776,13 +776,14 @@ module T (* : S with type t = message *) = struct
   let try_match = try_match_term 
 
   let _map : type a.
-    f_map ->
+    m_rec:bool ->
+    f_map ->    
     Vars.env ->
     vars:Vars.evars ->
     conds:Term.message list ->
     a term -> bool * a term
     =
-    fun func env ~vars ~conds t ->
+    fun ~m_rec func env ~vars ~conds t ->
     
     (* the return boolean indicates whether a match was found in the subterm. *)
     let rec map : type a.
@@ -796,7 +797,11 @@ module T (* : S with type t = message *) = struct
         match func (ETerm t) vars conds with
         (* head matches *)
         | `Map (ETerm t') ->
-          true, cast (kind t) t'
+          let t' =
+            let t' = cast (kind t) t' in
+            if m_rec then snd (map env vars conds t') else t'
+          in
+          true, t'
 
         (* head does not match, recurse with a special handling of binders and if *)
         | `Continue ->
@@ -862,10 +867,11 @@ module T (* : S with type t = message *) = struct
     map env vars conds t 
                  
   (** Exported *)
-  let map : type a. f_map -> Vars.env -> a term -> a term option
+  let map : type a.
+    ?m_rec:bool -> f_map -> Vars.env -> a term -> a term option
     =
-    fun func env t ->
-    let found, t = _map func env ~vars:[] ~conds:[] t in
+    fun ?(m_rec=false) func env t ->
+    let found, t = _map ~m_rec func env ~vars:[] ~conds:[] t in
     match found with
     | false -> None
     | true  -> Some t
@@ -1867,7 +1873,12 @@ module E : S with type t = Equiv.form = struct
 
 
   (*------------------------------------------------------------------*)
-  let map (func : f_map) (env : Vars.env) (e : Equiv.form) : Equiv.form option =
+  let map
+      ?(m_rec=false)
+      (func : f_map)
+      (env : Vars.env)
+      (e : Equiv.form) : Equiv.form option
+    =
     
     let rec map
         (env : Vars.env)
@@ -1877,14 +1888,14 @@ module E : S with type t = Equiv.form = struct
       =
       match e with
       | Atom (Reach f) ->
-        let found, f = T._map func env ~vars ~conds f in
+        let found, f = T._map ~m_rec func env ~vars ~conds f in
         let e' = Equiv.Atom (Reach f) in
 
         if found then true, e' else false, e
 
       | Atom (Equiv frame) ->
         let found, frame = List.fold_left (fun (found,acc) f ->
-            let found0, f = T._map func env ~vars ~conds f in
+            let found0, f = T._map ~m_rec func env ~vars ~conds f in
             found0 || found, f :: acc
           ) (false,[]) frame
         in

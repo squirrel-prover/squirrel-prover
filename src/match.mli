@@ -105,8 +105,10 @@ module type S = sig
     match_res
 
 
-  (** [map func env t] applies [func] at all position in [t]. *)
-  val map : f_map -> Vars.env -> t -> t option
+  (** [map ?m_rec func env t] applies [func] at all position in [t]. 
+      If [m_rec] is true, recurse after applying [func].
+      [m_rec] default to [false].*)
+  val map : ?m_rec:bool -> f_map -> Vars.env -> t -> t option
 end
 
 (*------------------------------------------------------------------*)

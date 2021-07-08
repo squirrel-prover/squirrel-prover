@@ -453,11 +453,13 @@ rw_dir:
 | MINUS { `RightToLeft }
 
 rw_type:
-| pt=spt         { `Rw pt }  
-| SLASH t=sterm  { `Expand t }
+| pt=spt             { `Rw pt }  
+| SLASH t=sterm      { `Expand t }
+| SLASH l=lloc(STAR)  { `ExpandAll l }
 
 expnd_type:
-| ATSLASH t=sterm  { `Expand t }
+| ATSLASH t=sterm      { `Expand t }
+| ATSLASH l=lloc(STAR)  { `ExpandAll l }
 
 rw_item:
 | m=rw_mult d=loc(rw_dir) t=rw_type  { TacticsArgs.{ rw_mult = m; 

@@ -412,7 +412,7 @@ Proof.
   case t => Eq;
   try (
     repeat destruct Eq as [_ Eq];
-    expandall;
+    rewrite /*;
     by apply Hind (pred(t))).
 
   (* init *)
