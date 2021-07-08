@@ -1,5 +1,7 @@
 (** {2 SSCs checking} *)
 
+open Utils
+    
 (** Internal exception *)
 exception Bad_ssc_
 
@@ -223,22 +225,36 @@ let mk_rule ?(elems=[]) ?(drop_head=true) ~fun_wrap_key
       action_descr = new_action_descr;
       env = !env }
   in
-
-  let mk_case_schema action_descr =
-    let hashes =
-      hashes_of_action_descr
-        ~fun_wrap_key ~drop_head ~cntxt
-        action_descr head_fn key_n
-    in
-
-    List.map (mk_of_hash action_descr) hashes
+  
+  let hash_cases =
+    Iter.fold_macro_support (fun descr t hash_cases ->
+        (* let fv = Vars.Sv.of_list1 descr.Action.indices in *)
+        (* TODO: use get_f_messages_ext ? *)
+        let iter =
+          new get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n
+        in
+        iter#visit_message t;
+        let new_hashes = iter#get_occurrences in
+        
+        List.assoc_up_dflt descr [] (fun l -> new_hashes @ l) hash_cases
+      ) cntxt (mess :: sign :: elems) []
+  in
+  
+  (* we keep only actions in which the name occurs *)
+  let hash_cases =
+    List.filter_map (fun (descr, occs) ->
+        if occs = [] then None
+        else Some (descr, List.sort_uniq Stdlib.compare occs)
+      ) hash_cases
   in
 
   (* indirect cases *)
   let case_schemata =
-    SystemExpr.map_descrs mk_case_schema cntxt.table cntxt.system 
+    List.map (fun (descr, hashes) ->
+        List.map (mk_of_hash descr) hashes
+      ) hash_cases
   in
-
+  
   (* direct cases *)
   let cases_direct =
     let hashes =

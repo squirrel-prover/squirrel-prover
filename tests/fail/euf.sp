@@ -99,7 +99,7 @@ system [boundvars] out(c,seq(i,j -> h(n2(i,j),k1(i)))).
 
 goal [ boundvars] _ (tau:timestamp, j,j1,j2:index):
   happens(tau) =>
-  (if cond@tau then ok else ok) = h(n2(j1,j2),k1(j)) => j1=j2.
+  (if frame@tau = zero then ok else ok) = h(n2(j1,j2),k1(j)) => j1=j2.
 Proof.
   intro Hap Heq.
   nosimpl(euf Heq). nosimpl(intro Hle Hn Hj).
