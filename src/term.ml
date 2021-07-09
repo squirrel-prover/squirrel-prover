@@ -554,7 +554,7 @@ module SmartDestructors = struct
   (** for [fs] of arity 2, right associative *)
   let mk_destr_many_right fs =
     let rec destr l f =
-      if l < 0 then assert false;
+      assert (l > 0);
       if l = 1 then Some [f]
       else match destr_fun ~fs f with
         | None -> None

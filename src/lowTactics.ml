@@ -1275,10 +1275,11 @@ module LowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Use} *)
 
-  (** [use ip name ths judge] applies the formula named [gp],
+  (** [use ip name ths s] applies the formula named [name] in sequent [s],
     * eliminating its universally quantified variables using [ths],
-    * and eliminating implications (and negations) underneath.
-    * If given an introduction patterns, apply it to the generated hypothesis.
+    * eliminating implications (and negations) underneath.
+    * If given an introduction pattern [ip], applies it to the generated
+    * hypothesis.
     * As with apply, we require that the hypothesis (or lemma) is
     * of the kind of conclusion formulas: for local sequents this means
     * that we cannot use a global hypothesis or lemma. *)

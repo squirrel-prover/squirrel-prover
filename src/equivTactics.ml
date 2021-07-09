@@ -1559,7 +1559,7 @@ let rewrite_tac args s sk fk =
     let sk s fk = sk (List.map (fun x -> Goal.Trace x) s) fk in
     TraceTactics.LT.rewrite_tac TraceTactics.simpl args s sk fk
 
-    
+
 (* TODO: factorize *)
 let () =
   T.register_general "rewrite"
@@ -1586,9 +1586,9 @@ let () =
 exception Not_hash
 
 type prf_param = {
-  h_fn  : Term.fname;
-  h_cnt : Term.message;
-  h_key : Term.nsymb;
+  h_fn  : Term.fname;   (** function name *)
+  h_cnt : Term.message; (** contents, i.e. hashed message *)
+  h_key : Term.nsymb;   (** key *)
 }
 
 let prf_param hash : prf_param =
@@ -1598,7 +1598,8 @@ let prf_param hash : prf_param =
 
   | _ -> raise Not_hash
 
-(** direct cases: explicit occurence of the hash in the frame *)
+(** Compute conjunct of PRF condition for a direct case,
+  * that is an explicit occurrence of the hash in the frame. *)
 let prf_mk_direct env (param : prf_param) (occ : Iter.hash_occ) =
   (* select bound variables in key indices [is] and in message [m]
      to quantify universally over them *)
@@ -1621,7 +1622,8 @@ let prf_mk_direct env (param : prf_param) (occ : Iter.hash_occ) =
           (Term.mk_indices_eq param.h_key.s_indices is))
        (Term.mk_atom `Neq param.h_cnt m))
 
-(** indirect cases: occurences of hashes in actions of the system *)
+(** Compute conjunct of PRF condition for an indirect case,
+  * that is an occurence of the hash in actions of the system. *)
 let prf_mk_indirect
     (env           : Vars.env)
     (cntxt         : Constr.trace_cntxt)
@@ -1693,35 +1695,40 @@ let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
   let cntxt = { cntxt with system = system } in
   let param = prf_param (Term.pi_term proj hash) in
 
-  (* create the frame on which we will iterate to compute phi_proj
+  (* Create the frame on which we will iterate to compute phi_proj:
      - e_without_hash is the context where all occurrences of [hash] have
-        been replaced by zero
-     - we also add the hashed message [t] *)
+        been replaced by zero;
+     - also add the hashed message [h_cnt]. *)
   let e_without_hash =
     Equiv.subst_equiv [Term.ESubst (hash,Term.mk_zero)] [e]
   in
 
   let frame =
-    param.h_cnt :: (List.map (Equiv.pi_term proj) (e_without_hash @ biframe))
+    param.h_cnt :: List.map (Equiv.pi_term proj) (e_without_hash @ biframe)
   in
-  
-  (* check syntactic side condition *)
+
+  (* Check syntactic side condition. *)
   let errors =
     Euf.key_ssc
       ~elems:frame ~allow_functions:(fun x -> false)
       ~cntxt param.h_fn param.h_key.s_symb
   in
-  if errors <> [] then 
+  if errors <> [] then
     soft_failure (Tactics.BadSSCDetailed errors);
 
+  (* Direct cases: hashes from the frame. *)
 
-  (* we compute the list of hashes from the frame *)
   let frame_hashes : Iter.hash_occs =
     List.fold_left (fun acc t ->
         Iter.get_f_messages_ext ~cntxt param.h_fn param.h_key.s_symb t @ acc
       ) [] frame
   in
-  let frame_hashes =  List.sort_uniq Stdlib.compare frame_hashes in
+  let frame_hashes = List.sort_uniq Stdlib.compare frame_hashes in
+  let phi_direct =
+    List.map (prf_mk_direct env param) frame_hashes
+  in
+
+  (* Indirect cases: potential occurrences through macro expansions. *)
 
   let frame_actions : Fresh.ts_occs =
     let actions =
@@ -1732,10 +1739,13 @@ let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
     Fresh.clear_dup_mtso_le actions
   in
 
-  let phi_frame =
-    List.map (prf_mk_direct env param) frame_hashes
-  in
-
+  (** Compute association list from action descriptions to hash occurrences,
+    * but ignoring actions/macros which are not in the support of the original
+    * frame.
+    * TODO it seems that the support filtering could be done at the macro
+    *   level but Iter.fold_macro_support does it at the action level:
+    *   if an action features one macro that is in the support then all
+    *   macros from the action are considered. *)
   let macro_cases =
     Iter.fold_macro_support (fun descr t macro_cases ->
         let fv = Sv.of_list1 descr.Action.indices in
@@ -1745,11 +1755,10 @@ let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
         List.assoc_up_dflt descr [] (fun l -> new_cases @ l) macro_cases
       ) cntxt frame []
   in
-  (* we keep only actions in which there is at least one occurrence *)
+  (* Keep only actions in which there is at least one occurrence. *)
   let macro_cases = List.filter (fun (_, occs) -> occs <> []) macro_cases in
 
-  (* indirect cases (occurrences of [name] in actions of the system) *)
-  let macro_cases =
+  let phi_indirect =
     List.fold_left (fun forms (a, occs) ->
         let occs = List.rev occs in
         let case = prf_mk_indirect env cntxt param frame_actions a occs in
@@ -1757,35 +1766,38 @@ let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
       ) [] macro_cases
   in
 
-  Term.mk_ands ~simpl:true phi_frame, Term.mk_ands ~simpl:true macro_cases
+  Term.mk_ands ~simpl:true phi_direct, Term.mk_ands ~simpl:true phi_indirect
 
 let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
   try _mk_prf_phi_proj proj cntxt env biframe e hash
   with
   | Not_hash -> soft_failure Tactics.Bad_SSC
 
-(* from two conjonction formula p and q, produce its minimal diff(p, q), of the
-   form (p inter q) && diff (p minus q, q minus p) *)
+(* From two conjunction formulas p and q, produce a minimal diff(p, q),
+ * of the form (p inter q) && diff (p minus q, q minus p). *)
 let combine_conj_formulas p q =
-  (* we turn the conjonctions into list *)
+  (* Turn the conjunctions into lists. *)
   let p, q = Term.decompose_ands p, Term.decompose_ands q in
   let aux_q = ref q in
   let (common, new_p) = List.fold_left (fun (common, r_p) p ->
-      (* if an element of p is inside aux_q, we remove it from aux_q and add it
-         to common, else add it to r_p *)
+      (* If an element of p is inside aux_q, remove it from aux_q and
+       * add it to common, else add it to r_p. *)
       if List.mem p !aux_q then
         (aux_q := List.filter (fun e -> e <> p) !aux_q; (p::common, r_p))
       else
         (common, p::r_p))
       ([], []) p
   in
-  (* common is the intersection of p and q, aux_q is the remainder of q and
-     new_p the remainder of p *)
+  (* [common] is the intersection of p and q,
+   * [aux_q] is the remainder of q and
+   * [new_p] the remainder of p. *)
   Term.mk_and
     (Term.mk_ands common)
     (Term.head_normal_biterm
        (Term.mk_diff (Term.mk_ands new_p) (Term.mk_ands !aux_q)))
 
+(** Application of PRF tactic on biframe element number i,
+  * optionally specifying which subterm m1 should be considered. *)
 let prf Args.(Pair (Int i, Opt (Message, m1))) s =
   let before, e, after = split_equiv_goal i s in
 
@@ -1803,17 +1815,20 @@ let prf Args.(Pair (Int i, Opt (Message, m1))) s =
            "PRF can only be applied on a term with at least one occurrence \
             of a hash term h(t,k)")
 
-    | occ :: occs, None ->
+    | occ :: _, None ->
       if not (Sv.is_empty occ.Iter.occ_vars) then
         soft_failure
           (Tactics.Failure "application below a binder is not supported");
       occ
+
     | occs, Some (Message (hash, _)) ->
-      begin
-      match List.find_opt (fun hash_occ -> hash_occ.Iter.occ_cnt = hash) occs  with
-      | None -> soft_failure
-                         (Tactics.Failure "the given hash does not occur in the term")
-      | Some occ -> occ
+      begin match
+        List.find (fun hash_occ -> hash_occ.Iter.occ_cnt = hash) occs
+      with
+        | occ -> occ
+        | exception Not_found ->
+          soft_failure
+            (Tactics.Failure "the given hash does not occur in the term")
       end
   in
   let fn, ftyp, m, key, hash = match hash_occ.Iter.occ_cnt with
@@ -1827,14 +1842,14 @@ let prf Args.(Pair (Int i, Opt (Message, m1))) s =
   and f_direct_r, f_indirect_r =
     mk_prf_phi_proj PRight cntxt env biframe e hash
   in
-  (* the formula, without the oracle condition *)
+  (* The formula, without the oracle condition. *)
   let formula =
-      Term.mk_and ~simpl:false
-        (combine_conj_formulas f_direct_l f_direct_r)
-        (combine_conj_formulas f_indirect_l f_indirect_r)
+    Term.mk_and ~simpl:false
+      (combine_conj_formulas f_direct_l f_direct_r)
+      (combine_conj_formulas f_indirect_l f_indirect_r)
   in
 
-  (* check that there are no type variables*)
+  (* Check that there are no type variables. *)
   assert (ftyp.fty_vars = []);
 
   let nty = ftyp.fty_out in
@@ -1850,9 +1865,7 @@ let prf Args.(Pair (Int i, Opt (Message, m1))) s =
   in
 
   let final_if_formula =
-    if Term.is_false oracle_formula
-    then formula
-    else
+    if Term.is_false oracle_formula then formula else
       let (Vars.EVar uvarm),(Vars.EVar uvarkey),f =
         match oracle_formula with
         | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
@@ -2092,7 +2105,7 @@ let cca1 Args.(Int i) s =
                 Euf.key_ssc ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
                   ~cntxt fndec sk.s_symb
               in
-              if errors <> [] then 
+              if errors <> [] then
                 soft_failure (Tactics.BadSSCDetailed errors);
 
               if not (List.mem
@@ -2239,11 +2252,11 @@ let enckp
         | Symbols.AssociatedFunctions [fndec;fnpk] ->
           (fun (sk,system) ->
              let cntxt = Constr.{ cntxt with system } in
-             let errors = 
+             let errors =
                Euf.key_ssc ~cntxt ~elems:(ES.goal_as_equiv s)
                  ~allow_functions:(fun x -> x = fnpk) fndec sk.s_symb
              in
-             if errors <> [] then 
+             if errors <> [] then
                soft_failure (Tactics.BadSSCDetailed errors)),
           (fun x -> Term.mk_fun table fnpk indices [x]),
           begin match k with
