@@ -38,7 +38,7 @@ auto.
 
 expandall.
 fa 0.
-fa 1. fa 1. prf 1.
+fa 1. fa 1. prf 1. 
 (* easy case, it is the firt produced hash. *)
 yesif 1.
 by project.

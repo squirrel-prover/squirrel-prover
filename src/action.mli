@@ -122,7 +122,8 @@ type descr = {
   indices   : Vars.index list ;
   condition : Vars.index list * Term.message ;
   updates   : (Term.state * Term.message) list ;
-  output    : Channel.t * Term.message
+  output    : Channel.t * Term.message;
+  globals : Symbols.macro Symbols.t list;
 }
 
 (** [pi_descr s a] returns the projection of the description. As descriptions
@@ -134,14 +135,6 @@ val pi_descr : Term.projection -> descr -> descr
 
 (** Refresh (globally) binded variables in a description. *)
 val refresh_descr : descr -> descr
-
-val fold_descr :
-  ( Symbols.macro Symbols.t -> 
-    Symbols.macro_def -> 
-    Term.message -> 
-    'a -> 'a ) ->
-  descr ->
-  'a -> 'a
 
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printing} *)

@@ -2,6 +2,8 @@ open Utils
 
 module SE = SystemExpr
 
+let soft_failure = Tactics.soft_failure
+
 (*------------------------------------------------------------------*)
 (** {2 Macro definitions} *)
 
@@ -288,22 +290,21 @@ let get_definition_exn
   =
   match get_definition cntxt symb ts with
   | `Undef ->
-    Tactics.soft_failure (Tactics.Failure "cannot expand this macro: \
-                                           macro is undefined");
+    soft_failure (Failure "cannot expand this macro: macro is undefined");
 
   | `MaybeDef ->
-    Tactics.soft_failure (Tactics.Failure "cannot expand this macro: \
-                                           undetermined action")
+    soft_failure (Failure "cannot expand this macro: undetermined action")
 
   | `Def mdef -> mdef
 
 
 (*------------------------------------------------------------------*)
 let get_dummy_definition 
-    (cntxt : Constr.trace_cntxt) 
+    (table  : Symbols.table)
+    (system : SE.t)
     (symb : Term.msymb) : Term.message 
   =
-  match Symbols.Macro.get_all symb.s_symb cntxt.table with
+  match Symbols.Macro.get_all symb.s_symb table with
   | Symbols.Global _,
     Global_data ({action = (strict,action); inputs} as gdata) ->
     (* [dummy_action] is a dummy strict suffix of [action] *)
@@ -321,12 +322,11 @@ let get_dummy_definition
     let tvar = Vars.make_new Type.Timestamp "dummy" in
     let ts = Term.mk_var tvar in
 
+    let def = 
+      get_def_glob ~allow_dummy:true system table symb ts dummy_action gdata
+    in
     begin
-      match get_def_glob
-              ~allow_dummy:true
-              cntxt.system cntxt.table symb ts
-              dummy_action gdata
-      with
+      match def with
       | `Def def -> def
       | _ -> assert false
     end

@@ -96,6 +96,19 @@ let systems_compatible s1 s2 =
           single_compatible s' s2 &&
           single_compatible s'' s2
 
+
+(*------------------------------------------------------------------*)
+(** {2 Misc } *)
+
+let symbs table = function
+  | SimplePair s | Pair (Left s,_) | Pair (Right s,_)
+  | Single (Left s) | Single (Right s) -> System.symbs table s
+
+let action_to_term table system a =
+  let msymbs = symbs table system in
+  let symb = System.Msh.find (Action.get_shape a) msymbs in
+  Term.mk_action symb (Action.get_indices a)
+
 (*------------------------------------------------------------------*)
 let project proj = function
   | Single s -> bisystem_error (SE_NotABiProcess (get_id s))
@@ -165,9 +178,10 @@ let make_bi_descr s1 s2 (d1 : Action.descr) (d2 : Action.descr) : Action.descr =
     action = d1.action;
     input = d1.input;
     indices = d1.indices;
-    condition = condition;
-    updates = updates;
-    output = output; }
+    globals = List.sort_uniq Stdlib.compare (d1.globals @ d2.globals);
+    condition;
+    updates;
+    output; }
 
 let descr_of_shape table (se : t) shape =
   let getd s_symb = System.descr_of_shape table s_symb shape in
@@ -243,6 +257,7 @@ let descrs table se =
       (fun shape descr -> Action.pi_descr (get_proj s) descr)
       shapes
 
+(*------------------------------------------------------------------*)
 let iter_descrs
     table system
     (f : Action.descr -> unit) =
@@ -258,6 +273,7 @@ let fold_descrs (f : Action.descr -> 'a -> 'a) table system init =
   System.Msh.fold f (descrs table system) init
 
 
+(*------------------------------------------------------------------*)
 (** Check that a system expression is valid. This is not obvious only
     in the [Pair _] case, in which case we check that the two single
     systems are compatible. *)
@@ -281,18 +297,7 @@ let pair table a b =
     se
 
 (*------------------------------------------------------------------*)
-(** {2 Misc } *)
-
-let symbs table = function
-  | SimplePair s | Pair (Left s,_) | Pair (Right s,_)
-  | Single (Left s) | Single (Right s) -> System.symbs table s
-
-let action_to_term table system a =
-  let msymbs = symbs table system in
-  let symb = System.Msh.find (Action.get_shape a) msymbs in
-  Term.mk_action symb (Action.get_indices a)
-
-(*------------------------------------------------------------------*)
+(** {2 Substitution } *)
 
 (** A substition over a description that allows to either substitute the condition
    or the output of the descr, for a given shape. *)

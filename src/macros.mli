@@ -34,4 +34,4 @@ val get_definition_exn :
   * would be obtained with [get_definition m li ts] for some [ts],
   * except that it will feature meaningless action names in some places. *)
 val get_dummy_definition :
-  Constr.trace_cntxt -> Term.msymb -> Term.message
+  Symbols.table -> SystemExpr.t -> Term.msymb -> Term.message

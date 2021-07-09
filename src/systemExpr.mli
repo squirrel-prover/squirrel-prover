@@ -92,7 +92,6 @@ val iter_descrs : Symbols.table -> t -> (Action.descr -> unit)     -> unit
 val fold_descrs : (Action.descr -> 'a -> 'a) -> Symbols.table -> t -> 'a -> 'a
 val map_descrs  : (Action.descr -> 'a)       -> Symbols.table -> t -> 'a list
 
-
 (*------------------------------------------------------------------*)
 (** {2 Cloning } *)
 

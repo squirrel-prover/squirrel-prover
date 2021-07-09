@@ -173,6 +173,8 @@ type descr = {
   condition : Vars.index list * Term.message ;
   updates   : (Term.state * Term.message) list ;
   output    : Channel.t * Term.message;
+  globals   : Symbols.macro Symbols.t list;
+  (** list of global macros declared at [action] *)
 }
 
 let pp_descr_short ppf descr =
@@ -209,8 +211,6 @@ let pi_descr s d =
   * occurring in the description. *)
 let subst_descr subst descr =
   let action = subst_action subst descr.action in
-  let input = descr.input in
-  let name = descr.name in
   let subst_term = Term.subst subst in
   let indices = List.map (Term.subst_var subst) descr.indices  in
   let condition =
@@ -224,32 +224,15 @@ let subst_descr subst descr =
       ) descr.updates
   in
   let output = fst descr.output, subst_term (snd descr.output) in
-  {name; action; input; indices; condition; updates; output }
+  { name = descr.name;
+    input = descr.input;
+    globals = descr.globals;
+    action; indices; condition; updates; output;  }
 
 
 let refresh_descr descr =
   let indices, s = Term.refresh_vars `Global descr.indices in
   subst_descr s descr
-
-(*------------------------------------------------------------------*)
-let fold_descr
-    (f : 
-     Symbols.macro Symbols.t -> 
-     Symbols.macro_def -> 
-     Term.message -> 
-     'a -> 'a) 
-    (descr : descr) 
-    (init : 'a) : 'a
-  =
-  let mval = f Symbols.out Symbols.Output (snd descr.output) init in
-  let mval = f Symbols.cond Symbols.Cond (snd descr.condition) mval in
-
-  List.fold_left (fun mval (st, t) ->
-      let mdef = 
-        Symbols.State (List.length st.Term.s_indices, st.Term.s_typ) 
-      in
-      f st.Term.s_symb mdef t mval
-    ) mval descr.updates
 
 (*------------------------------------------------------------------*)
 let debug = false

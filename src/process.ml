@@ -320,46 +320,50 @@ type p_env = {
   ty_env : Type.Infer.env;
 
   alias : lsymb ;
-    (* current alias used for action names in the process *)
+  (* current alias used for action names in the process *)
 
   indices : Vars.index list ;
-    (* current list of bound indices (coming from Repl or Exists constructs) *)
+  (* current list of bound indices (coming from Repl or Exists constructs) *)
 
   vars_env : Vars.env ;
-    (* local variables environment *)
+  (* local variables environment *)
 
   isubst : (string * Theory.term_i * Vars.index) list ;
-    (* substitution for index variables (Repl, Exists, Apply)
-     * mapping each variable from the original process (before refresh)
-     * to the associated refreshed variables
-     * as Theory.term and as a Vars.index suitable for use in Term.term
-     * TODO items are always of the form (i, Theory.Var (Vars.name i'), i')
-     *      why not keep (i,i') for simplicity? *)
+  (* substitution for index variables (Repl, Exists, Apply)
+   * mapping each variable from the original process (before refresh)
+   * to the associated refreshed variables
+   * as Theory.term and as a Vars.index suitable for use in Term.term
+   * TODO items are always of the form (i, Theory.Var (Vars.name i'), i')
+   *      why not keep (i,i') for simplicity? *)
 
   msubst : (string * Theory.term_i * Term.message) list ;
-    (* substitution for message variables (New, Let, In, Apply)
-     * each variable from the original process (before refresh)
-     * is mapped to the associated refreshed variable
-     * as a Theory.term and as a Term.message
-     * (the third component is also used to map input variables to
-     * input macros) *)
+  (* substitution for message variables (New, Let, In, Apply)
+   * each variable from the original process (before refresh)
+   * is mapped to the associated refreshed variable
+   * as a Theory.term and as a Term.message
+   * (the third component is also used to map input variables to
+   * input macros) *)
 
   inputs : (Channel.t * Vars.message) list ;
-    (* bound input variables *)
+  (* bound input variables *)
 
   (* RELATED TO THE CURRENT ACTION *)
   evars : Vars.index list ;
-    (* variables bound by existential quantification *)
+  (* variables bound by existential quantification *)
 
   action : Action.action ;
-    (* the type [Action.action] describes the execution point in the protocol *)
+  (* the type [Action.action] describes the execution point in the protocol
+     stored reversed *)
 
   facts : Term.message list ;
-    (* list of formulas to create the condition term of the action *)
+  (* list of formulas to create the condition term of the action *)
 
   updates : (lsymb * Vars.index list * Type.tmessage * Term.message) list ;
-    (* list of updates performed in the action.
-     * The type can be a type unification variables. *)
+  (* list of updates performed in the action.
+   * The type can be a type unification variables. *)
+
+  globals : Symbols.macro Symbols.t list;
+  (* list of global macros declared at [action] *)
 
 }
 
@@ -506,12 +510,13 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
     debug "output = %a,%a.@."
       Channel.pp_channel (fst output) Term.pp (snd output) ;
-    let action_descr =
-      Action.{ name = a';
-               action;
-               input = (in_ch, in_var);
-               indices = indices;
-               condition; updates; output }
+    let action_descr = Action.{ 
+        name    = a';
+        action;
+        input   = (in_ch, in_var);
+        indices = indices;
+        globals = env.globals; 
+        condition; updates; output; } 
     in
 
     let table, new_a, action_descr =
@@ -526,7 +531,10 @@ let parse_proc (system_name : System.system_name) init_table proc =
       { env with
         (* override previous term substitutions for input variable
          * to use possibly new action *)
-        msubst = (in_var, in_th, new_in_tm) :: env.msubst }
+        msubst = (in_var, in_th, new_in_tm) :: env.msubst;
+
+        (* pending globals have been registered with the previous action. *)
+        globals = []; }
     in
     (table, env, new_a)
   in
@@ -667,7 +675,8 @@ let parse_proc (system_name : System.system_name) init_table proc =
     
     let env =
       { env with vars_env; 
-                 msubst = (L.unloc x,x'_th,x'_tm) :: env.msubst }
+                 msubst = (L.unloc x,x'_th,x'_tm) :: env.msubst;
+                 globals = x' :: env.globals; }
     in
     (x',t',table,env,p)
 
@@ -950,17 +959,18 @@ let parse_proc (system_name : System.system_name) init_table proc =
   in
 
   let env =
-    { ty_env = Type.Infer.mk_env ();
-      alias = L.mk_loc L._dummy "A" ;
-      indices = [] ;
+    { ty_env   = Type.Infer.mk_env ();
+      alias    = L.mk_loc L._dummy "A" ;
+      indices  = [] ;
       vars_env = env_ts ;
-      isubst = [] ;
-      msubst = [] ;
-      inputs = [] ;
-      evars = [] ;
-      action = [] ;
-      facts = [] ;
-      updates = [] }
+      isubst   = [] ;
+      msubst   = [] ;
+      inputs   = [] ;
+      evars    = [] ;
+      action   = [] ;
+      facts    = [] ;
+      updates  = [];
+      globals  = []; }
   in
 
   let proc,_,table = p_in ~table:init_table ~env ~pos:0 ~pos_indices:[] proc in
@@ -980,14 +990,15 @@ let declare_system table (system_name : lsymb) proc =
   a mutable construct *)
   let a' = Symbols.init_action in
   let updates = Theory.get_init_states table in
-  let action_descr =
-    Action.{ name = a';
-             action = [];
-             input = (Symbols.dummy_channel,"$dummyInp");
-             indices = [];
-             condition = ([], Term.mk_true);
-             updates;
-             output = (Symbols.dummy_channel, Term.empty) }
+  let action_descr = Action.{ 
+      name      = a';
+      action    = [];
+      input     = (Symbols.dummy_channel,"$dummyInp");
+      indices   = [];
+      condition = ([], Term.mk_true);
+      updates;
+      output    = (Symbols.dummy_channel, Term.empty);
+      globals   = []; }
   in
   let table, _, _ =
     System.register_action table system_name a' [] [] action_descr

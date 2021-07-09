@@ -120,12 +120,14 @@ let check_encryption_randomness
                | _ -> false)) vars
       | _ -> assert false) encryptions then
     Tactics.soft_failure (Tactics.SEncSharedRandom);
-
+    
   (* we check that no encryption is shared between multiple encryptions *)
   let enc_classes = Utils.classes (fun m1 m2 ->
       match m1, m2 with
-      | (Fun ((_, _), _, [_; Name r; _]),_),
-        (Fun ((_, _), _, [_; Name r2; _]),_) -> r.s_symb = r2.s_symb
+      | (Fun ((_, _), _, [m1; Name r; k1]),_),
+        (Fun ((_, _), _, [m2; Name r2; k2]),_) -> 
+        r.s_symb = r2.s_symb &&
+        (m1 <> m2 || k1 <> k2)
       (* the patterns should match, if they match inside the declaration
          of randoms *)
       | _ -> assert false
