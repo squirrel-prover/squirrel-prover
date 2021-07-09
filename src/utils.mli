@@ -120,11 +120,12 @@ val fpt : ('a -> 'a -> bool) -> ('a -> 'a) -> 'a -> 'a
 
 val some : 'a -> 'a option
 
-val oget  : 'a option -> 'a
-val odflt : 'a -> 'a option -> 'a
-val obind : ('a -> 'b option) -> 'a option -> 'b option
-val omap  : ('a -> 'b) -> 'a option -> 'b option
-val oiter : ('a -> unit) -> 'a option -> unit
+val oget      : 'a option -> 'a
+val odflt     : 'a -> 'a option -> 'a
+val obind     : ('a -> 'b option) -> 'a option -> 'b option
+val omap      : ('a -> 'b) -> 'a option -> 'b option
+val omap_dflt : 'b -> ('a -> 'b) -> 'a option -> 'b
+val oiter     : ('a -> unit) -> 'a option -> unit
 
 (*------------------------------------------------------------------*)
 (** [classes f_eq l] returns the equivalence classes of [l] modulo [f_eq],

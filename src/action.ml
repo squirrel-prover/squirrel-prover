@@ -172,7 +172,7 @@ type descr = {
   indices   : Vars.index list ;
   condition : Vars.index list * Term.message ;
   updates   : (Term.state * Term.message) list ;
-  output    : Channel.t * Term.message
+  output    : Channel.t * Term.message;
 }
 
 let pp_descr_short ppf descr =
@@ -273,9 +273,13 @@ let pp_actions ppf table =
     table;
   Fmt.pf ppf "@]@]@."
 
-let rec dummy len =
-  if len = 0 then [] else
-     { par_choice = 0,[] ; sum_choice = 0,[] } :: dummy (len-1)
+let rec dummy (shape : shape) : action =
+  match shape with
+  | [] -> []
+  | { par_choice = (p,lp) ; sum_choice = (s,ls) } :: l ->
+    { par_choice = (p, List.init lp (fun _ -> Vars.make_new Type.Index "i")) ;
+      sum_choice = (s, List.init ls (fun _ -> Vars.make_new Type.Index "i")) }
+    :: dummy l
 
 (*------------------------------------------------------------------*)
 (** {2 FA-DUP } *)

@@ -204,22 +204,23 @@ module LowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Macro unfolding} *)
 
-  let _unfold_macro : type a. a Term.term -> S.sequent -> a Term.term = 
-    fun t s ->
+  let unfold_macro_exn (t: Term.message) (s : S.sequent) : Term.message = 
     match t with
     | Macro (ms,l,a) ->
       if not (S.query_happens ~precise:true s a) then
         soft_failure (Tactics.MustHappen a);
 
-      Macros.get_definition (S.mk_trace_cntxt s) ms a 
+      Macros.get_definition_exn (S.mk_trace_cntxt s) ms a
 
     | _ -> 
       soft_failure (Tactics.Failure "can only expand macros")
 
-  let unfold_macro : type a. 
-    strict:bool -> a Term.term -> S.sequent -> a Term.term option = 
-    fun ~strict t s ->
-    try Some (_unfold_macro t s) with
+  let unfold_macro
+      ~(strict:bool)
+      (t: Term.message)
+      (s : S.sequent) : Term.message option
+    = 
+    try Some (unfold_macro_exn t s) with
     | Tactics.Tactic_soft_failure _ when not strict -> None
 
   (** If [m_rec = true], recurse on expanded sub-terms. *)

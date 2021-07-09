@@ -299,7 +299,7 @@ let debug_on fmt =
   Format.printf "[DEBUG] " ;
   Format.printf fmt
 
-let debug = debug_off
+let debug = debug_on
 
 let print_isubst isubst =
   debug "will print isubst@." ;
@@ -612,9 +612,10 @@ let parse_proc (system_name : System.system_name) init_table proc =
   in
 
   (* treatment of Let(x,t,p) constructs
-   * the boolean [search_dep] indicates whether we have to search in [t] if
-   * there are some get terms for state macros that have already been updated *)
-  let p_let ?(search_dep=false) ~table ~env proc = match L.unloc proc with
+   * the boolean [in_update] indicates whether we are in the update phase:
+   * In that case, we have to search in [t] if there are some get terms for 
+   * state macros that have already been updated *)
+  let p_let ?(in_update=false) ~table ~env proc = match L.unloc proc with
 
   | Let (x,t,ptyo,p) ->
     let ty : Type.tmessage = match ptyo with
@@ -624,7 +625,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
     let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
     let updated_states =
-      if search_dep then
+      if in_update then
         let apps = List.map (fun (s,_,_,_) -> L.unloc s) env.updates in
         Theory.find_app_terms t' apps 
       else []
@@ -642,8 +643,12 @@ let parse_proc (system_name : System.system_name) init_table proc =
     in
 
     let invars = List.map snd env.inputs in
+    let shape = Action.get_shape (List.rev env.action) in
     let table,x' =
-      Macros.declare_global table x ~inputs:invars
+      let suffix = if in_update then `Large else `Strict in
+      Macros.declare_global table x
+        ~suffix
+        ~action:shape ~inputs:invars
         ~indices:(List.rev env.indices) ~ts body ty
     in
 
@@ -653,12 +658,6 @@ let parse_proc (system_name : System.system_name) init_table proc =
         List.rev_map (fun i -> Theory.var dum (Vars.name i)) env.indices
       in
       Theory.App (x', is)
-    in
-
-    (* We check that we could infer ty by parsing [t] *)
-    let ty = match Type.Infer.norm env.ty_env ty with
-      | Type.TUnivar _ -> proc_err (L.loc proc) Freetyunivar
-      | _ as ty -> ty
     in
 
     let n'_s = Term.mk_isymb x' ty (List.rev env.indices) in
@@ -853,7 +852,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       p_update_i ~table ~env p
 
     | Let (x,t,ty,p) ->
-      let x',t',table,env,p = p_let ~search_dep:true ~table ~env proc in
+      let x',t',table,env,p = p_let ~in_update:true ~table ~env proc in
       let p',pos',table = p_update ~table ~env p in
       let x' = L.mk_loc (L.loc x) (Symbols.to_string x') in
 

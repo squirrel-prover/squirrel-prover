@@ -198,15 +198,13 @@ let conditional_case (m : Term.message) s : sequent list =
   | Term.Fun (f,_,[c;t;e]) when f = Term.f_ite ->
     case_cond m [] c t e s
 
-  | Term.Macro (ms,[],ts)
-    when Macros.is_defined ms.s_symb ts (TS.table s) ->
+  | Term.Macro (ms,[],ts) ->
 
     if not (TS.query_happens ~precise:true s ts) then
       soft_failure (Tactics.MustHappen ts);
 
-
     begin
-      match Macros.get_definition (TS.mk_trace_cntxt s) ms ts with
+      match Macros.get_definition_exn (TS.mk_trace_cntxt s) ms ts with
       | Term.Find (vars,c,t,e) -> case_cond m vars c t e s
       | Term.Fun (f,_,[c;t;e]) when f = Term.f_ite -> case_cond m [] c t e s
       | _ -> Tactics.(soft_failure (Failure "message is not a conditional"))

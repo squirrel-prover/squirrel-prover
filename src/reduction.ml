@@ -70,9 +70,9 @@ module Mk (S : LowSequent.S) = struct
           in 
           
           if Constr.query ~precise:true models [`Pos, `Happens ts] then
-            match Macros.get_definition_opt (S.mk_trace_cntxt s) ms ts with
-            | None -> raise NoExp
-            | Some mdef -> mdef, true
+            match Macros.get_definition (S.mk_trace_cntxt s) ms ts with
+            | `Def mdef -> mdef, true
+            | _ -> raise NoExp
           else raise NoExp
 
         | _ -> raise NoExp

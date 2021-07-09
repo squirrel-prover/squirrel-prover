@@ -321,12 +321,14 @@ module Hyps = struct
       | Term.Macro (ms,[],a) ->
         if List.for_all
             Vars.(function EVar v -> not (is_new v))
-            (Term.get_vars t) &&
-           Macros.is_defined ms.s_symb a cntxt.table
-        then
-          let def = Macros.get_definition cntxt ms a in
-          f a (`Message (t, def)) ;
-          self#visit_message def
+            (Term.get_vars t) 
+        then begin
+          match Macros.get_definition cntxt ms a with
+          | `Def def ->
+            f a (`Message (t, def)) ;
+            self#visit_message def
+          | _ -> ()
+        end
 
       | t -> super#visit_message t
   end

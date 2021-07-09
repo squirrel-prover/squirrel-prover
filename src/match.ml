@@ -1362,10 +1362,10 @@ module E : S with type t = Equiv.form = struct
 
       (* we unroll the definition of [cand] at time [ts] *)
       let cntxt = Constr.{ system; table; models = None; } in
-      match Macros.get_definition_opt cntxt cand.msymb ts with
-      | None -> []
+      match Macros.get_definition cntxt cand.msymb ts with
+      | `Undef | `MaybeDef -> []
 
-      | Some body ->
+      | `Def body ->
         let cand_set = {
           term = body;
           indices = cand.indices @ is;

@@ -9,9 +9,13 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
     | Fun (_, _,l) -> List.iter self#visit_message l
 
     | Macro (ms,l,a) ->
-        if l <> [] then failwith "Not implemented" ;
-        self#visit_message (Macros.get_definition cntxt ms a)
-
+      if l <> [] then failwith "Not implemented" ;
+      let t = match Macros.get_definition cntxt ms a with
+        | `Undef | `MaybeDef -> assert false (* must be defined *)
+        | `Def t -> t
+      in
+      self#visit_message t
+        
     | Name _ | Var _ -> ()
 
     | Diff(a, b) -> self#visit_message a; self#visit_message b
@@ -50,8 +54,12 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
     | Fun (_, _,l) -> List.fold_left self#fold_message x l
 
     | Macro (ms,l,a) ->
-        if l<>[] then failwith "Not implemented" ;
-        self#fold_message x (Macros.get_definition cntxt ms a)
+      if l<>[] then failwith "Not implemented" ;
+      let t = match Macros.get_definition cntxt ms a with
+        | `Undef | `MaybeDef -> assert false
+        | `Def t -> t
+      in
+      self#fold_message x t
 
     | Name _ | Var _ -> x
 
@@ -100,17 +108,16 @@ class iter_approx_macros ~exact ~(cntxt:Constr.trace_cntxt) = object (self)
     match Symbols.Macro.get_def ms.s_symb cntxt.table with
       | Symbols.(Input | Output | State _ | Cond | Exec | Frame) -> ()
       | Symbols.Global _ ->
-          if exact then
-            if Macros.is_defined ms.s_symb a cntxt.table then
-              self#visit_message
-                (Macros.get_definition cntxt ms a)
-            else ()
-
-          else if not (List.mem ms.s_symb checked_macros) then begin
-            checked_macros <- ms.s_symb :: checked_macros ;
-            self#visit_message
-              (Macros.get_dummy_definition cntxt ms)
-          end
+        if exact then
+          match Macros.get_definition cntxt ms a with
+          | `Def def -> self#visit_message def
+          | `Undef | `MaybeDef -> () (* TODO: shouldn't this be assert false ? *)
+                                  
+        else if not (List.mem ms.s_symb checked_macros) then begin
+          checked_macros <- ms.s_symb :: checked_macros ;
+          self#visit_message
+            (Macros.get_dummy_definition cntxt ms)
+        end
 
   method visit_message = function
     | Macro (ms,[],a) -> self#visit_macro ms a
@@ -221,15 +228,9 @@ let tfold_occ : type b.
       match mode with
       | `NoDelta -> default ()
       | `Delta constr ->
-
-        if Macros.is_defined m.s_symb ts constr.table then
-          try
-            let t = Macros.get_definition constr m ts in
-            func ~fv ~cond (Term.ETerm t) acc
-          with Tactics.Tactic_soft_failure _ -> default ()
-            
-
-        else default ()
+        match Macros.get_definition constr m ts with
+        | `Def t -> func ~fv ~cond (Term.ETerm t) acc
+        | `Undef | `MaybeDef -> default ()           
     end
 
   | Term.Name   _

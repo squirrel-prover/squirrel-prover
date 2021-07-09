@@ -25,7 +25,7 @@ Qed.
 
 goal def_S1 : forall (i,j:index)
   happens(S1(i,j)) =>  def(i)@S1(i,j) = <input@S(i),input@S(i)>.
-Proof.
+Proof. 
   auto.
 Qed.
 

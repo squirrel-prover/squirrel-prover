@@ -56,9 +56,10 @@ auto.
 Qed.
 
 goal stateSemantics3 (i,j:index):
-    happens(T2(i,j)) => 
-  output@T2(i,j) = <h(k1(i)@pred(T2(i,j)),key(i)),k2(i)@pred(T2(i,j))>.
-Proof.
+  happens(T2(i,j)) => 
+  output@T2(i,j) = 
+  <h(k1(i)@pred(T2(i,j)),key(i)),k2(i)@pred(T2(i,j))>.
+Proof. 
 auto.
 Qed.
 

@@ -135,13 +135,10 @@ let get_actions_ext :
           [occ] @ get ~fv ~cond ts          
         in
 
-        if Macros.is_defined m.s_symb ts constr.table then
-          try
-            let t = Macros.get_definition constr m ts in
-            get ~fv ~cond t
-          with Tactics.Tactic_soft_failure _ -> get_macro_default ()
-
-        else get_macro_default ()
+        begin match Macros.get_definition constr m ts with
+          | `Def t -> get ~fv ~cond t
+          |`Undef | `MaybeDef -> get_macro_default ()
+        end
 
       | _ -> 
         (* Remark: we use [`NoDelta] because we want to have a different 

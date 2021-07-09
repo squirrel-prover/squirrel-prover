@@ -22,7 +22,7 @@ goal _ (t, t', t'' : timestamp, i, j: index) :
   output@t'' = b => 
   output@t = ok(i).
 Proof.
-  intro H Teq Teq1 Assum H0.
+  intro H Teq Teq1 Assum H0. 
   expand output.
   revert H0.
   assumption.

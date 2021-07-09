@@ -7,6 +7,8 @@
 val declare_global :
   Symbols.table ->
   Symbols.lsymb ->
+  suffix:[`Large | `Strict] ->
+  action:Action.shape ->
   inputs:Vars.message list ->
   indices:Vars.index list ->
   ts:Vars.timestamp ->
@@ -16,19 +18,16 @@ val declare_global :
 
 (** {2 Macro expansions} *)
 
-(** Tells whether a macro symbol can be expanded when applied
-  * at a particular timestamp. *)
-val is_defined : 
-  Symbols.macro Symbols.t -> Term.timestamp -> Symbols.table -> bool
-
+type def_result = [ `Def of Term.message | `Undef | `MaybeDef ]
+                  
 (** Return the term corresponding to the declared macro,
     if the macro can be expanded.
     Does *not* check that the timestamp happens ! *)
 val get_definition :
-  Constr.trace_cntxt -> Term.msymb -> Term.timestamp -> Term.message
+  Constr.trace_cntxt -> Term.msymb -> Term.timestamp -> def_result
 
-val get_definition_opt :
-  Constr.trace_cntxt -> Term.msymb -> Term.timestamp -> Term.message option
+val get_definition_exn :
+  Constr.trace_cntxt -> Term.msymb -> Term.timestamp -> Term.message
 
 (** When [m] is a global macro symbol,
   * [get_definition se table m li] return a term which resembles the one that
