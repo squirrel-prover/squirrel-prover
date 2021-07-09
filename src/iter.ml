@@ -12,11 +12,11 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
 
     | Macro (ms,l,a) ->
       if l <> [] then failwith "Not implemented" ;
-      let t = match Macros.get_definition cntxt ms a with
-        | `Undef | `MaybeDef -> assert false (* must be defined *)
-        | `Def t -> t
-      in
-      self#visit_message t
+      begin
+        match Macros.get_definition cntxt ms a with
+        | `Undef | `MaybeDef -> assert false
+        | `Def t -> self#visit_message t
+      end
 
     | Name _ | Var _ -> ()
 
@@ -113,8 +113,9 @@ class iter_approx_macros ~exact ~(cntxt:Constr.trace_cntxt) = object (self)
       if exact then
         match Macros.get_definition cntxt ms a with
         | `Def def -> self#visit_message def
-        | `Undef | `MaybeDef -> 
-          assert false
+        | `Undef | `MaybeDef -> ()
+        (* TODO: this may not always be the correct behavior. Check that
+           all callees respect this convention *)
 
       else if not (List.mem ms.s_symb checked_macros) then begin
         checked_macros <- ms.s_symb :: checked_macros ;
@@ -411,11 +412,17 @@ type macro_occs = macro_occ list
 
 exception Var_found
 
+let is_global ms table =
+  match Symbols.Macro.get_def ms.Term.s_symb table with
+  | Symbols.Global _ -> true
+  | _ -> false
+  
 (** Looks for macro occurrences in a term.
-    Macros that can be expanded are ignored.
+    - [mode = `FullDelta]: all macros that can be expanded are ignored.
+    - [mode = `Delta]: only Global macros are expanded (and ignored)
     Raise @Var_found if a term variable occurs in the term. *)
 let get_macro_occs : type a. 
-  mode:[`Delta of Constr.trace_cntxt | `NoDelta ] ->
+  mode:[`FullDelta | `Delta ] ->
   Constr.trace_cntxt -> 
   a Term.term -> 
   macro_occs 
@@ -431,15 +438,20 @@ let get_macro_occs : type a.
 
       | Term.Macro (ms, l, ts) ->
         assert (l = []);
-        let occ = { 
-          occ_cnt  = ms;
-          occ_vars = fv; 
-          occ_cond = cond; } 
+        let default () =
+          [{ occ_cnt  = ms;
+             occ_vars = fv; 
+             occ_cond = cond; }]
         in
-        [occ]
 
+        if mode = `FullDelta || is_global ms constr.table then
+          match Macros.get_definition constr ms ts with
+          | `Def t -> get t ~fv ~cond
+          | `Undef | `MaybeDef -> default ()
+        else default ()
+        
       | _ -> 
-        tfold_occ ~mode
+        tfold_occ ~mode:`NoDelta
           (fun ~fv ~cond (Term.ETerm t) occs -> 
              get t ~fv ~cond @ occs
           ) ~fv ~cond t []
@@ -496,6 +508,11 @@ let fold_descr
 (*------------------------------------------------------------------*)
 module Ss = Symbols.Ss(Symbols.Macro)
 
+let is_glob table ms =
+  match Symbols.Macro.get_def ms table with
+  | Symbols.Global _ -> true
+  | _ -> false
+
 (** Return the macro symbols reachable from a term in any trace model. *)
 let macro_support : type a. 
   Constr.trace_cntxt -> 
@@ -503,11 +520,8 @@ let macro_support : type a.
   Ss.t
   = 
   fun cntxt terms ->
-  let get_msymbs : type a.
-    mode:[`Delta of Constr.trace_cntxt | `NoDelta ] -> 
-    a Term.term -> 
-    Ss.t 
-    = 
+
+  let get_msymbs : type a. mode:[`Delta | `FullDelta ] -> a Term.term -> Ss.t = 
     fun ~mode term ->
       let occs = get_macro_occs ~mode cntxt term in
       let msymbs = List.map (fun occ -> occ.occ_cnt.Term.s_symb) occs in
@@ -515,7 +529,7 @@ let macro_support : type a.
   in
 
   let init = List.fold_left (fun init term ->
-      Ss.union (get_msymbs ~mode:(`Delta cntxt) term) init
+      Ss.union (get_msymbs ~mode:`FullDelta term) init
     ) Ss.empty terms
   in
 
@@ -537,13 +551,34 @@ let macro_support : type a.
     SystemExpr.fold_descrs (fun descr sm ->
         fold_descr ~globals:true (fun msymb _ t sm ->
             if Ss.mem msymb sm 
-            then Ss.union (get_msymbs ~mode:`NoDelta t) sm 
+            then Ss.union (get_msymbs ~mode:`Delta t) sm 
             else sm
           ) cntxt.table cntxt.system descr sm
       ) cntxt.table cntxt.system sm
   in
 
-  Utils.fpt Ss.equal do1 init 
+  (* reachable macros from [init] *)
+  let s_reach = Utils.fpt Ss.equal do1 init in
+
+  (* we now try to minimize [s_reach], by removing as many global macros as 
+     possible *)
+
+  let s_reach_no_globs = 
+    Ss.filter (fun ms -> not (is_glob cntxt.table ms)) s_reach
+  in
+  (* [s_reach'] are macros reachable from non-global macros in [s_reach] *)
+  let s_reach' = Utils.fpt Ss.equal do1 s_reach_no_globs in
+  
+  assert (Ss.subset s_reach' s_reach);
+
+  (* macros reachable from s_reach' *)
+  let s_reach'_glob = 
+    Ss.filter (fun ms -> is_glob cntxt.table ms) s_reach
+  in
+
+  (* we remove from [s_reach] all global macros reachable from non-global 
+     macros in *)
+  Ss.diff s_reach (s_reach'_glob)
 
 
 (** Folding over all macro descriptions reachable from some terms. *)    
@@ -557,7 +592,7 @@ let fold_macro_support : type a.
   fun func cntxt terms init ->
   let sm = macro_support cntxt terms in
   SystemExpr.fold_descrs (fun descr acc ->
-      fold_descr ~globals:false (fun msymb _ t acc ->
+      fold_descr ~globals:true (fun msymb _ t acc ->
           if Ss.mem msymb sm then func descr t acc else acc
         ) cntxt.table cntxt.system descr acc
     ) cntxt.table cntxt.system init

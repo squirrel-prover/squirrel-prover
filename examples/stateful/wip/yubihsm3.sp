@@ -86,11 +86,11 @@ name rinit : index -> message
 mutable AEAD(pid:index) : message = 
   enc(<diff(k(pid),k_dummy(pid)), sid(pid)>, rinit(pid), mkey).
 
-(* (* random samplings used to initialized AEADi  *) *)
-(* name rinitp : index -> message *)
-(* (* authentication server's database for each pid, ideal system *) *)
-(* mutable AEADi(pid:index) : message = *)
-(*   enc(<k_dummy(pid), sid(pid)>, rinitp(pid), mkey). *)
+(* random samplings used to initialized AEADi  *)
+name rinitp : index -> message
+(* authentication server's database for each pid, ideal system *)
+mutable AEADi(pid:index) : message =
+  enc(<k_dummy(pid), sid(pid)>, rinitp(pid), mkey).
 
 channel cY
 channel cS
@@ -147,15 +147,15 @@ process write_AEAD (pid:index)=
   in(cS,x);
   AEAD(pid) := x.
 
-(* (* AEAD in the ideal system *) *)
-(* process read_AEAD_ideal (pid:index) = *)
-(*   out(cS,AEADi(pid)). *)
+(* AEAD in the ideal system *)
+process read_AEAD_ideal (pid:index) =
+  out(cS,AEADi(pid)).
 
-(* process write_AEAD_ideal (pid:index)= *)
-(*   in(cS,x); *)
-(*   AEADi(pid) := x. *)
+process write_AEAD_ideal (pid:index)=
+  in(cS,x);
+  AEADi(pid) := x.
 
-(* Model for the rule YSM_AEAD_YUBIKEY_OTP_DECODE of the HSM. *)
+(* model for the rule YSM_AEAD_YUBIKEY_OTP_DECODE of the HSM. *)
 process YSM_AEAD_YUBIKEY_OTP_DECODE (pid:index) =
   in(cHSM,xdata); (* xdata = <<pid,kh>, <aead, otp>> with otp = senc(<sid,cpt>,r,k)*)
    if fst(xdata) = <mpid(pid),kh> then
@@ -197,20 +197,22 @@ process YSM_AEAD_YUBIKEY_OTP_DECODE_middle (pid:index) =
 process Yubikey0 =
   ( (!_pid !_j Plug   : yubikeyplug(pid)                 ) |
     (!_pid !_j Press  : yubikeypress(pid,j)              ) |
-    (!_pid !_j Server : server(pid)                      ) |
-    (!_pid !_j Read   : read_AEAD(pid)                   ) |
-    (!_pid !_j Write  : write_AEAD(pid)                  )).
+    (!_pid !_j Server : server(pid)                      )).
 
 (* TODO: we do not want to state [base ~ ideal], but [middle ~ ideal]. 
      The problem is that, to do this, we need *)
 (* base system with ideal system *)
 system
   (Yubikey0 | 
+  (!_pid !_j Read   : read_AEAD(pid)                   ) |
+  (!_pid !_j Write  : write_AEAD(pid)                  ) |
   (!_pid !_j Decode : YSM_AEAD_YUBIKEY_OTP_DECODE(pid))).
 
 (* base system with middle system *)
 system [middle]
   (Yubikey0 |
+  (!_pid !_j Read   : read_AEAD_ideal(pid)                   ) |
+  (!_pid !_j Write  : write_AEAD_ideal(pid)                  ) |
   (!_pid !_j Decode : YSM_AEAD_YUBIKEY_OTP_DECODE_middle(pid))).
 
 

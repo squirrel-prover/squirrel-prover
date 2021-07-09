@@ -228,13 +228,23 @@ let mk_rule ?(elems=[]) ?(drop_head=true) ~fun_wrap_key
   
   let hash_cases =
     Iter.fold_macro_support (fun descr t hash_cases ->
-        (* let fv = Vars.Sv.of_list1 descr.Action.indices in *)
-        (* TODO: use get_f_messages_ext ? *)
+        (* TODO: use get_f_messages_ext and use conditons to improve precision *)
+        (* let fv = Vars.Sv.of_list1 descr.Action.indices in
+         * let new_hashes =
+         *   Iter.get_f_messages_ext
+         *     ~fv ~fun_wrap_key ~drop_head ~cntxt head_fn key_n t
+         * in *)
+        (* REM *)
+        (* Fmt.epr "hash: %a@." Term.pp t; *)
+
         let iter =
           new get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n
         in
         iter#visit_message t;
         let new_hashes = iter#get_occurrences in
+
+        (* let pp fmt (_,t) = Term.pp fmt t in
+         * Fmt.epr "new hash: %a@." (Fmt.list pp) new_hashes; *)
         
         List.assoc_up_dflt descr [] (fun l -> new_hashes @ l) hash_cases
       ) cntxt (mess :: sign :: elems) []

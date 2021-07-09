@@ -11,7 +11,6 @@ hash h
 
 mutable s : message = n.
 
-
 process P (i : index) =
   in(c,x);
   s := h(s,k);
@@ -43,3 +42,38 @@ Proof.
  euf H => H1 H2.
  by exists i.
 Qed.
+
+(*------------------------------------------------------------------*)
+name nonce : index -> message.
+mutable s1(i : index) : message = h(nonce(i),k).
+mutable s2(i : index) : message = s1(i).
+
+process Q(i:index) =
+  out(c, s2(i)).
+
+system [second] (!_i Q(i)).
+
+goal [second] _ (t : timestamp) (j : index):
+ happens(t) => output@t = h(nonce(j),k) => false.
+Proof.
+ intro Hap H. 
+ checkfail by euf H exn GoalNotClosed. 
+Abort.
+
+(*------------------------------------------------------------------*)
+
+mutable s3(i : index) : message = h(nonce(i),k).
+mutable s4(i : index) : message = s3(i).
+
+process R(i:index) =
+  let x = s4(i) in
+  out(c, x).
+
+system [third] (!_i R(i)).
+
+goal [third] _ (t : timestamp) (j : index):
+ happens(t) => output@t = h(nonce(j),k) => false.
+Proof.
+ intro Hap H. 
+ checkfail by euf H exn GoalNotClosed. 
+Abort.
