@@ -1907,11 +1907,14 @@ let () = T.register_typed "collision"
 
 exception Invalid
 
-(** Transform a term according to some equivalence given as a biframe. *)
-let reach_equiv_transform biframe term =
+(** Transform a term according to some equivalence given as a biframe.
+  * Macros in the term occurring (at toplevel) on the [src] projection
+  * of some biframe element are replaced by the corresponding [dst]
+  * projection. *)
+let reach_equiv_transform ~src ~dst biframe term =
   let assoc : Term.message -> Term.message = fun t ->
-    match List.find (fun e -> Term.(pi_term PLeft e) = t) biframe with
-      | e -> Term.(pi_term PRight e)
+    match List.find (fun e -> Term.(pi_term src e) = t) biframe with
+      | e -> Term.(pi_term dst e)
       | exception Not_found -> raise Invalid
   in
   let rec aux : type a. a term -> a term = fun t ->
@@ -1958,11 +1961,16 @@ let reach_equiv Args.(String id) (s : TS.t) =
           | SystemExpr.Single s -> SystemExpr.pair table s s
           | s -> s
         in
-        let new_sys = match cur_sys with
+        (* Identify which projection of the assumptions conclusion
+         * corresponds to the current goal (projection [src]) and
+         * what will be the new system after the transformation. *)
+        let src,new_sys = match cur_sys with
           | SystemExpr.Single _ ->
               if SystemExpr.project Term.PLeft ass_sys = cur_sys then
+                PLeft,
                 SystemExpr.project Term.PRight ass_sys
               else if SystemExpr.project Term.PRight ass_sys = cur_sys then
+                PRight,
                 SystemExpr.project Term.PLeft ass_sys
               else
                 Tactics.(soft_failure NoAssumpSystem)
@@ -1977,16 +1985,21 @@ let reach_equiv Args.(String id) (s : TS.t) =
                 Tactics.(soft_failure NoAssumpSystem);
               if SE.project Term.PLeft se <> SE.project Term.PRight se then
                 Tactics.(soft_failure NoAssumpSystem);
-              se
+              (* TODO the user might want the reverse direction *)
+              PLeft, se
         in
+        let dst = if src = PLeft then PRight else PLeft in
         let rewrite h =
-          try reach_equiv_transform biframe h with
+          (* Attempt to transform. If the transformation can't
+           * be applied we can simply drop the hypothesis rather
+           * than failing completely. *)
+          try reach_equiv_transform ~src ~dst biframe h with
             | Invalid -> Term.mk_true
         in
         [TS.LocalHyps.map rewrite s
          |> TS.set_system new_sys
          |> TS.set_goal
-              (try reach_equiv_transform biframe (TS.goal s) with
+              (try reach_equiv_transform ~src ~dst biframe (TS.goal s) with
                  | Invalid -> Term.mk_false)]
     | _ ->
       Tactics.(soft_failure (Failure "assumption must be an equivalence"))
