@@ -1907,6 +1907,7 @@ let () = T.register_typed "collision"
 
 exception Invalid
 
+(** Transform a term according to some equivalence given as a biframe. *)
 let reach_equiv_transform biframe term =
   let assoc : Term.message -> Term.message = fun t ->
     match List.find (fun e -> Term.(pi_term PLeft e) = t) biframe with
@@ -1965,8 +1966,18 @@ let reach_equiv Args.(String id) (s : TS.t) =
                 SystemExpr.project Term.PLeft ass_sys
               else
                 Tactics.(soft_failure NoAssumpSystem)
-          | _ ->
-              Tactics.(soft_failure NoAssumpSystem)
+          | se ->
+              (* Support only a useful particular case for now.
+               * This could be generalized, e.g. to use an equivalence
+               * that is not between the current system and itself.
+               * I'm leaving this for when we have system annotations
+               * in global meta formulas, and perhaps more general system
+               * expressions. *)
+              if se <> ass_sys then
+                Tactics.(soft_failure NoAssumpSystem);
+              if SE.project Term.PLeft se <> SE.project Term.PRight se then
+                Tactics.(soft_failure NoAssumpSystem);
+              se
         in
         let rewrite h =
           try reach_equiv_transform biframe h with

@@ -140,7 +140,7 @@ let rec pp_tac_error_i ppf = function
       Fmt.pf ppf "action %s does not depend on action %s" a b
 
   | NoAssumpSystem ->
-      Fmt.pf ppf "lemma does not apply to the current system"
+      Fmt.pf ppf "assumption does not apply to the current system"
 
   | NotDDHContext ->
       Fmt.pf ppf "the current system cannot be seen as a context \

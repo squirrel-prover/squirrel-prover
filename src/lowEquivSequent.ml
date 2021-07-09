@@ -242,14 +242,11 @@ let set_reach_goal f s = set_goal Equiv.(Atom (Reach f)) s
   * only keep global formula hypotheses in a restricted case: the two
   * projections are the same. *)
 let to_trace_sequent s =
-  let env     = env s in
-  let system,keep_global_hyps =
-    let se = system s in
-    let l,r =
-      SystemExpr.project Term.PLeft se,
-      SystemExpr.project Term.PRight se
-    in
-      if l=r then l,true else se,false
+  let env = env s in
+  let system = system s in
+  let keep_global_hyps =
+    SystemExpr.project Term.PLeft  system =
+    SystemExpr.project Term.PRight system
   in
   let table   = table s in
   let ty_vars = ty_vars s in
