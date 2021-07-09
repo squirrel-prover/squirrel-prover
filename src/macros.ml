@@ -317,8 +317,10 @@ let get_dummy_definition
         in
         prefix @ [dummy_end]
     in
+
     let tvar = Vars.make_new Type.Timestamp "dummy" in
     let ts = Term.mk_var tvar in
+
     begin
       match get_def_glob
               ~allow_dummy:true

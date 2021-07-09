@@ -47,7 +47,6 @@ val descrs :
 
 (** Return all the action symbols of a system. *)
 val symbs :
-  with_dummies:bool ->
   Symbols.table ->
   Symbols.system Symbols.t ->
   Symbols.action Symbols.t Msh.t

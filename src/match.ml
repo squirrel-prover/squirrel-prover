@@ -1411,7 +1411,7 @@ module E : S with type t = Equiv.form = struct
         (terms : Term.message list)
         (known_sets : Term.timestamp -> known_sets) : msets
       =
-      let names = SystemExpr.symbs ~with_dummies:false table system in
+      let names = SystemExpr.symbs table system in
       System.Msh.fold (fun _ name cands ->
           filter_deduce_action_list name cands terms known_sets
         ) names cands

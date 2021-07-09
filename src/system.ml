@@ -28,11 +28,10 @@ module Msh = Map.Make (ShapeCmp)
 (** For each system we maintain two tables:
   * the first one associates to each valid shape the corresponding
   * action description;
-  * the second one maps each shapes of valid or dummy actions to
-  * their corresponding symbols.
-  * There is some redundancy: the symbol of a dummy action can also
-  * be obtained through the first map, but this avoids a double lookup. *)
-type Symbols.data += System_data of Action.descr Msh.t * Symbols.action Symbols.t Msh.t
+  * the second one maps each shapes of valid actions to
+  * their corresponding symbols. *)
+type Symbols.data += System_data of Action.descr Msh.t * 
+                                    Symbols.action Symbols.t Msh.t
 
 let of_string (name : lsymb) (table : Symbols.table) =
   Symbols.System.of_lsymb name table 
@@ -50,10 +49,8 @@ let get_data table s_symb =
 
 let descrs table s = Msh.map Action.refresh_descr (fst (get_data table s))
 
-let symbs ~with_dummies table s = 
-  if with_dummies then
-    snd (get_data table s)
-  else Msh.map (fun d -> d.Action.name) (fst (get_data table s))
+let symbs table s = 
+  Msh.map (fun d -> d.Action.name) (fst (get_data table s))
 
 let pp_system table fmt s =
   let descrs, symbs = get_data table s in
@@ -127,46 +124,6 @@ let find_dum_shape table shape =
   with Found x -> Some x
 
 (*------------------------------------------------------------------*)
-
-(* (\** Define dummy action symbols in table and register them
- *   * in the map symbs from shapes to symbols. *\)
- * let rec define_dummies table symbs len =
- *   let table,symbs =
- *     if len>0 then define_dummies table symbs (len-1) else table,symbs
- *   in
- *   let dummy = Action.dummy len in
- *   let dum_shape = Action.get_shape dummy in
- *   (\* re-use the same dummy action if it has been defined in another system *\)
- *   match find_dum_shape table dum_shape with
- *   | None ->
- *     if Msh.mem dum_shape symbs then table,symbs 
- *     else
- *       let table,dum_symb = 
- *         Action.fresh_symbol ~exact:false table (L.mk_loc L._dummy "_Dummy") 
- *       in
- *       let table = Action.define_symbol table dum_symb [] dummy in
- *       let symbs = Msh.add dum_shape dum_symb symbs in
- *       table,symbs
- * 
- *   | Some symb2 ->
- *     if Msh.mem dum_shape symbs then table,symbs 
- *     else
- *       let symbs = Msh.add dum_shape symb2 symbs in
- *       table, symbs
- * 
- * 
- * (\** Add dummy action symbols if needed. *\)
- * let add_dummies_if_needed
- *     (table : Symbols.table) 
- *     (system_symb : Symbols.system Symbols.t) 
- *     (len : int) : Symbols.table 
- *   =
- *   let descrs,symbs = get_data table system_symb in
- *   let table,symbs = define_dummies table symbs len in
- *   let data = System_data (descrs,symbs) in
- *   Symbols.System.redefine table system_symb ~data ()  *)
-
-
 let register_action table system_symb symb indices action descr =
   let shape = Action.get_shape action in
   match find_shape table shape with
@@ -189,9 +146,6 @@ let register_action table system_symb symb indices action descr =
     let descr = { descr with name = symb2 } in
     let table = add_action table system_symb shape symb2 descr in
 
-    (* (\* Define dummy action symbol if needed. *\)
-     * let table = add_dummies_if_needed table system_symb (List.length action) in *)
-
     table, symb2, descr
 
   | None ->
@@ -199,8 +153,5 @@ let register_action table system_symb symb indices action descr =
     let table = Action.define_symbol table symb indices action in
     (* Add action description to system. *)
     let table = add_action table system_symb shape symb descr in
-
-    (* (\* Define dummy action symbol if needed. *\)
-     * let table = add_dummies_if_needed table system_symb (List.length action) in *)
 
     table, symb, descr

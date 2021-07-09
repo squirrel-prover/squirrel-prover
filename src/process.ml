@@ -299,7 +299,7 @@ let debug_on fmt =
   Format.printf "[DEBUG] " ;
   Format.printf fmt
 
-let debug = debug_on
+let debug = debug_off
 
 let print_isubst isubst =
   debug "will print isubst@." ;

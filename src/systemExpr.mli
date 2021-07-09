@@ -80,7 +80,6 @@ val descr_of_action :
   * We rely on the invariant that the systems of a system expression
   * must have the same action names. *)
 val symbs :
-  with_dummies:bool ->
   Symbols.table -> 
   t -> 
   Symbols.action Symbols.t System.Msh.t

@@ -283,12 +283,12 @@ let pair table a b =
 (*------------------------------------------------------------------*)
 (** {2 Misc } *)
 
-let symbs ~with_dummies table = function
+let symbs table = function
   | SimplePair s | Pair (Left s,_) | Pair (Right s,_)
-  | Single (Left s) | Single (Right s) -> System.symbs ~with_dummies table s
+  | Single (Left s) | Single (Right s) -> System.symbs table s
 
 let action_to_term table system a =
-  let msymbs = symbs ~with_dummies:true table system in
+  let msymbs = symbs table system in
   let symb = System.Msh.find (Action.get_shape a) msymbs in
   Term.mk_action symb (Action.get_indices a)
 
