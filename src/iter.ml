@@ -111,7 +111,8 @@ class iter_approx_macros ~exact ~(cntxt:Constr.trace_cntxt) = object (self)
         if exact then
           match Macros.get_definition cntxt ms a with
           | `Def def -> self#visit_message def
-          | `Undef | `MaybeDef -> () (* TODO: shouldn't this be assert false ? *)
+          | `Undef | `MaybeDef -> 
+            assert false
                                   
         else if not (List.mem ms.s_symb checked_macros) then begin
           checked_macros <- ms.s_symb :: checked_macros ;
