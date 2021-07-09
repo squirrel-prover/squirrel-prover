@@ -70,7 +70,8 @@ struct
         (* Verify that it applies to the current system. *)
         if check_compatibility then begin
           match k with
-            | Equiv.Local_t ->
+            | Equiv.Local_t
+            | _ when Goal.is_reach_statement lem ->
                 if not (SE.systems_compatible (S.system s) lem.system) then
                   Tactics.hard_failure Tactics.NoAssumpSystem;
             | _ ->

@@ -467,30 +467,38 @@ let filter_map_hyps func hyps =
     
 (*------------------------------------------------------------------*)
 (** [pi proj s] returns the projection of [s] along [proj].
-  *
-  * This is useful only when the two projections of the bi-system are
-  * different. In that case, global formulas cannot be kept in the
-  * projection: this will probably become possible in the future, but
-  * will require explicit (bi)system annotations for global hypotheses. *)
+  * Global hypotheses can only be kept in the projection if we are
+  * projecting from pair(s,s) to single(s), if we adopt the convention
+  * that global formula hypotheses are for pair(s,s) when the system
+  * is single(s). We'll do better when global formulas have system
+  * annotations. *)
 let pi projection s =
   let pi = function
     | `Reach t -> `Reach (Term.pi_term ~projection t)
     | h -> h
   in
   let hyps = filter_map_hyps pi s.hyps in
+  let system = system s in
   let s =
   S.update
-    ~system:(SystemExpr.project projection (system s))
+    ~system:(SystemExpr.project projection system)
     ~conclusion:(Term.pi_term ~projection s.conclusion)
     ~hyps:H.empty
     s in
+  let keep_global =
+    SystemExpr.project Term.PLeft  system =
+    SystemExpr.project Term.PRight system
+  in
   (* We add back manually all formulas, to ensure that definitions are
      unrolled. *)
   H.fold
     (fun id f s ->
        match f with
          | `Reach f -> snd (Hyps.add_formula id f s)
-         | `Equiv _ -> s)
+         | _ ->
+             if not keep_global then s else
+             let _,hyps = H.add ~force:true id f s.hyps in
+               S.update ~hyps s)
     hyps s
 
 let set_goal a s =

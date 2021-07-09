@@ -1671,6 +1671,7 @@ let rec not_simpl = function
 let is_pure_timestamp (t : message) =
   let rec pure_ts = function
     | Atom (`Index _) 
+    | Atom (`Happens _)
     | Atom (`Timestamp _) -> true
 
     | Fun (fs, _, [t1; t2])

@@ -222,6 +222,11 @@ module Smart : Term.SmartFO with type form = _form = struct
 
   let destr_quant q = function
     | Quant (q', es, f) when q = q' -> Some (es, f)
+    | Atom (Reach f) when Term.is_pure_timestamp f && q = Exists ->
+        begin match Term.Smart.destr_exists f with
+          | Some (es,f) -> Some (es, Atom (Reach f))
+          | None -> None
+        end
     | _ -> None
 
   let destr_forall = destr_quant ForAll
@@ -235,6 +240,13 @@ module Smart : Term.SmartFO with type form = _form = struct
   let destr_or    f = todo ()
   let destr_impl = function 
     | Impl (f1, f2) -> Some (f1, f2)
+    | Atom (Reach f) ->
+        begin match Term.Smart.destr_impl f with
+          | Some (f1,f2)
+            when Term.is_pure_timestamp f1 || Term.is_pure_timestamp f2 ->
+              Some (Atom (Reach f1), Atom (Reach f2))
+          | _ -> None
+        end
     | _ -> None
 
   (*------------------------------------------------------------------*)
@@ -243,10 +255,15 @@ module Smart : Term.SmartFO with type form = _form = struct
   let is_not   f = false
   let is_and   f = false
   let is_or    f = false
-  let is_impl = function Impl _ -> true | _ -> false
+  let is_impl f = destr_impl f <> None
 
   let is_forall = function Quant (ForAll, _, _) -> true | _ -> false
-  let is_exists = function Quant (Exists, _, _) -> true | _ -> false
+  let is_exists = function
+    | Quant (Exists, _, _) -> true
+    | Atom (Reach f) ->
+        Term.Smart.is_exists f &&
+        Term.is_pure_timestamp f
+    | _ -> false
 
   let is_matom = function
     | Atom (Reach f) -> Term.is_matom f
@@ -254,8 +271,23 @@ module Smart : Term.SmartFO with type form = _form = struct
 
   (*------------------------------------------------------------------*)
   (** left-associative *)
-  let destr_ands  i f = todo ()
-  let destr_ors   i f = todo ()
+  let destr_ands i f = todo ()
+  let destr_ors i f =
+    match f with
+      | Atom (Reach f) ->
+          begin match Term.Smart.destr_ors i f with
+            | None -> None
+            | Some l ->
+                let exception Impure in
+                  try
+                    let check_and_convert f =
+                      if not (Term.is_pure_timestamp f) then raise Impure;
+                      Atom (Reach f)
+                    in
+                      Some (List.map check_and_convert l)
+                  with Impure -> None
+          end
+      | _ -> None
 
   let destr_impls =
     let rec destr l f =
@@ -276,6 +308,12 @@ module Smart : Term.SmartFO with type form = _form = struct
     | Quant (q', es, f) when q = q' -> 
       let es', f = decompose_quant q f in
       es @ es', f
+
+    (** For a local meta-formula f,
+      * (Forall x. [f]) is equivalent to [forall x. f]. *)
+    | Atom (Reach f) when q = ForAll ->
+      let es,f = Term.Smart.decompose_forall f in
+      es, Atom (Reach f)
 
     | _ as f -> [], f
 
