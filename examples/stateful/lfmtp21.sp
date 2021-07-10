@@ -121,20 +121,29 @@ Proof.
   expandall. fa 0. fa 1. fa 1. fa 1.
   prf 1; yesif 1; 2: fresh 1.
   simpl; split; project; intro i' H; try destruct H as [H|H];
-  try by apply unique_queries.
+    try by apply unique_queries.
     admit. (* TODO le raffinement de PRF ne suffit pas: l'oracle ne peut venir de s@tau *)
     reach_equiv IH,pred(A(i')) => //.
-      intro H; by fresh H.
+      intro Hf; by fresh Hf.
     admit. (* TODO as above *)
-    reach_equiv IH,pred(A(i')) => // H; by fresh H.
-  prf 1; yesif 1; 2: fresh 1; [1: apply IH; auto]. (* TODO last 1 should be 2 *)
+    reach_equiv IH,pred(A(i')) => // Hf; by fresh Hf.
+  prf 1; yesif 1; 2: fresh 1; by apply IH.
   simpl; split; project; intro i' H; try destruct H as [H|H];
-    try (apply unique_queries; auto).
+    try by apply unique_queries.
     admit. (* TODO as above *)
-    reach_equiv IH,A(i') => // H; by fresh H.
+    reach_equiv IH,A(i') => // Hf; by fresh Hf.
     admit. (* TODO as above *)
-    reach_equiv IH,A(i') => // H; by fresh H.
+    reach_equiv IH,A(i') => // Hf; by fresh Hf.
 
   (* Tag *)
-  admit. (* TODO *)
+  expand frame@A(i). expand exec@A(i). expand cond@A(i). expand output@A(i).
+  fa 0. fa 1. fa 1.
+  prf 1; yesif 1; 2: fresh 1; by apply IH.
+  simpl; split; project; intro i' H; try destruct H as [H|H].
+    admit. (* TODO as above *)
+    reach_equiv IH,A(i) => // Hf; by fresh Hf.
+    use non_repeating with A(i),A(i') => //; by exists i.
+    admit. (* TODO as above *)
+    use non_repeating with A(i),A(i') => //; by exists i.
+    reach_equiv IH,A(i) => // Hf; by fresh Hf.
 Qed.

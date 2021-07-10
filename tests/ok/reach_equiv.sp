@@ -1,3 +1,5 @@
+set autoIntro = false.
+
 name s0 : message.
 mutable s : message = s0.
 channel c.
@@ -13,55 +15,71 @@ global axiom [default/left,default/left] ax_ground_left : equiv(frame@pred(A),di
 axiom [default/left] check_left : True.
 axiom [default/right] check_right : True.
 
-goal [default] _ : input@A = s@B => False.
+goal m_fresh (tau:timestamp) : input@tau <> m.
+Proof.
+  intro H; by fresh H.
+Qed.
+
+goal [default] _ : happens(A) => input@A = s@B => False.
 Proof.
   checkfail reach_equiv ax_ground exn NoAssumpSystem.
   checkfail reach_equiv ax_ground_left exn NoAssumpSystem.
   checkfail reach_equiv ax_ground_rev exn NoAssumpSystem.
 Abort.
 
-goal [default/left] _ : input@A = s@B => False.
-Proof.
-  reach_equiv ax_ground_left.
-  use check_left.
-  fresh Meq.
-Qed.
-
-goal [default/left] _ : input@A = s@B => False.
+(* Check that timestamp atoms are not dropped by reach_equiv. *)
+goal [default/left] _ (tau,tau':timestamp) : tau <= tau' => tau <= tau'.
 Proof.
   reach_equiv ax_ground.
-  use check_right.
-  fresh Meq.
+  intro H; assumption.
 Qed.
 
-goal [default/left] _ : input@A = s@B => False.
+goal [default/left] _ : happens(A) => input@A = s@B => False.
 Proof.
+  intro H.
+  reach_equiv ax_ground_left.
+  by use m_fresh with A.
+Qed.
+
+goal [default/left] _ : happens(A) => input@A = s@B => False.
+Proof.
+  intro H.
+  reach_equiv ax_ground.
+  use check_right.
+  by use m_fresh with A.
+Qed.
+
+goal [default/left] _ : happens(A) => input@A = s@B => False.
+Proof.
+  intro H.
   reach_equiv ax_ground_rev.
   use check_right.
-  fresh Meq.
+  by use m_fresh with A.
 Qed.
 
-goal [default/right] _ : input@A = s@B => False.
+goal [default/right] _ : happens(A) => input@A = s@B => False.
 Proof.
+  intro H.
   checkfail reach_equiv ax_ground_left exn NoAssumpSystem.
   reach_equiv ax_ground_ver.
   use check_left.
-  fresh Meq.
+  by use m_fresh with A.
 Qed.
 
-goal [default] _ : input@A = s@B => False.
+goal [default] _ : happens(A) => input@A = s@B => False.
 Proof.
+  intro H.
   checkfail reach_equiv ax_ground_left exn NoAssumpSystem.
-  project; [1: reach_equiv ax_ground | 2: reach_equiv ax_ground_ver]; fresh Meq.
+  project; [1: reach_equiv ax_ground | 2: reach_equiv ax_ground_ver];
+  by use m_fresh with A.
 Qed.
 
 (* Same as above but without an axiom. *)
 
 global goal [default/left,default/left] _ :
-  equiv(frame@pred(A),diff(s@B,m)) -> [not(input@A = s@B)].
+  [happens(A)] -> equiv(frame@pred(A),diff(s@B,m)) -> [not(input@A = s@B)].
 Proof.
-  intro H.
+  intro Hap H.
   reach_equiv H.
-  fresh Meq.
+  by use m_fresh with A.
 Qed.
-
