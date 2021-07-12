@@ -26,6 +26,8 @@ This is a "light" model without the last check of T.
 *******************************************************************************)
 set autoIntro=false.
 set timeout=4.
+set postQuantumSound=true.
+
 
 channel cR
 channel cT
@@ -79,7 +81,7 @@ axiom tags_neq : tagR <> tagT
 axiom fail_not_pair (x,y:message): fail <> <x,y>.
 
 goal wa_Reader1 (k:index):
-  happens(Reader1(k)) => 
+  happens(Reader1(k)) =>
     (exec@Reader1(k)
      <=>
      exec@pred(Reader1(k)) && (exists (i,j:index),
@@ -90,11 +92,11 @@ Proof.
   intro *.
   depends Reader(k), Reader1(k); 1: auto.
   intro C.
-  expand exec, cond. 
+  expand exec, cond.
   split => [_ [i j [[H _] _]]].
 
   project; use tags_neq as _.
-  
+
   (* First projection. *)
   intctxt H => // _ _ _ /=.
   by exists i, j0.
@@ -105,8 +107,8 @@ Proof.
 
   (* Direction <= *)
   simpl.
-  exists i,j. 
-  by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>. 
+  exists i,j.
+  by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
 Qed.
 
 (* Action Reader2 is the empty else branch of the reader. *)
@@ -128,11 +130,11 @@ Proof.
   (* Direction => is the obvious one *)
   intro [_ H0] => /= [i j [[H1 _] _]].
   notleft H0.
-  use H0 with i,j; case H1. 
+  use H0 with i,j; case H1.
   clear H0.
   expand output, cipher.
   use fail_not_pair with tagT, <input@Tag(i,j), nt(i,j)>.
-  by case H. 
+  by case H.
 
   (* Direction <= *)
   intro [_ H0] => /= [i j [[H1 _] _]].
@@ -143,21 +145,21 @@ Proof.
   intctxt H1 => // _ _ _.
   use H0 with i,j0 as C1.
   clear H0.
-  by expand output, cipher; case C1.   
+  by expand output, cipher; case C1.
 
   intctxt H1 => // _ _ _.
   use H0 with i,j as C1.
   clear H0.
-  by expand output, cipher; case C1.   
+  by expand output, cipher; case C1.
 Qed.
 
 goal lemma (i,j,i0,j0:index):
-  happens(Tag(i,j),Tag(i0,j0)) => 
+  happens(Tag(i,j),Tag(i0,j0)) =>
      output@Tag(i,j) = output@Tag(i0,j0) => i = i0 && j = j0.
 Proof.
   intro H Meq.
-  project. 
-  
+  project.
+
   assert dec(output@Tag(i,j),kE(i0)) = <tagT,<input@Tag(i0,j0),nt(i0,j0)>> as Meq0;
   1: by expand output, cipher.
   intctxt Meq0 => C //.
@@ -169,14 +171,14 @@ Proof.
   by use fail_not_pair with tagT,<input@Tag(i,j),nt(i,j)>.
   by use fail_not_pair with tagT,<input@Tag(i0,j0),nt(i0,j0)>.
 
-  assert dec(output@Tag(i,j),kbE(i0,j0)) = <tagT,<input@Tag(i0,j0),nt(i0,j0)>> 
+  assert dec(output@Tag(i,j),kbE(i0,j0)) = <tagT,<input@Tag(i0,j0),nt(i0,j0)>>
   as Meq0;
   1: by expand output, cipher.
   intctxt Meq0 => C //.
   case C => //.
   assert dec(output@Tag(i0,j0),kbE(i,j)) = <tagT,<input@Tag(i,j),nt(i,j)>> as Meq2;
   1: by expand output, cipher.
-  intctxt Meq2 => C1 //. 
+  intctxt Meq2 => C1 //.
   by case C1.
   by use fail_not_pair with tagT,<input@Tag(i,j),nt(i,j)>.
   by use fail_not_pair with tagT,<input@Tag(i0,j0),nt(i0,j0)>.
@@ -249,11 +251,11 @@ Proof.
               diff(kE(i),kbE(i,j))))).
   fa.
   intro *; auto.
-  by intro [_ [i j _]] /=; exists i,j. 
+  by intro [_ [i j _]] /=; exists i,j.
   intro [_ [i j _]] /=.
   project.
 
-  fa => //. 
+  fa => //.
   (* find condA => condB *)
   intro [Mneq _ _].
   intctxt Mneq => // _ _ _;
@@ -262,11 +264,11 @@ Proof.
 
   (* find condB => condA *)
   intro _.
-  use lemma with i,j,i0,j0 as [_ _]; 2,3: auto. 
-  use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>. 
+  use lemma with i,j,i0,j0 as [_ _]; 2,3: auto.
+  use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
   by expand output, cipher.
 
-  fa => //. 
+  fa => //.
   (* find condA => condB *)
   intro [Mneq _ _].
   intctxt Mneq => // _ _ [_ _].
@@ -274,8 +276,8 @@ Proof.
 
   (* find condB => condA *)
   intro _.
-  use lemma with i,j,i0,j0 as [_ _]; 2,3: auto. 
-  use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>. 
+  use lemma with i,j,i0,j0 as [_ _]; 2,3: auto.
+  use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
   by expand output, cipher.
 
   auto.
@@ -310,10 +312,10 @@ Proof.
   expandall.
   fa 2. fa 3.  fa 3.
 
-  enckp 3, k_fresh; 1: auto. 
+  enckp 3, k_fresh; 1: auto.
 
   expandseq seq(i,j->nt(i,j)),i,j.
   fa 4.
   fresh 5.
-  by fresh 4; yesif 4. 
+  by fresh 4; yesif 4.
 Qed.
