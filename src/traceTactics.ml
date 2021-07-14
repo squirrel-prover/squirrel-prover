@@ -413,9 +413,9 @@ let () = T.register_general "reduce"
 (** [assumption judge sk fk] proves the sequent using the axiom rule. *)
 let assumption (s : TS.t) =
   let goal = TS.goal s in
-  let assumption_entails _ f = 
+  let assumption_entails _ f =
     goal = f ||
-    List.exists (fun f -> 
+    List.exists (fun f ->
         goal = f || f = Term.mk_false
       ) (decompose_ands f)
   in
@@ -682,7 +682,7 @@ let eq_trace (s : TS.t) =
     List.fold_left
       (fun acc t ->
          let normt : Term.message = Term.subst (ts_subst @ ind_subst) t in
-         if normt = t 
+         if normt = t
          then acc
          else Term.mk_atom `Eq t normt ::acc)
       [] terms
@@ -747,7 +747,7 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
   let term_actions =
     let iter = new Fresh.get_actions ~cntxt in
     iter#visit_message t ;
-    iter#get_actions 
+    iter#get_actions
   in
 
   let macro_cases =
@@ -810,15 +810,15 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
   in
 
   (* Do all cases of action [a] *)
-  let mk_cases_descr (a, indices_a) = 
+  let mk_cases_descr (a, indices_a) =
     let indices_a = List.map (fun is_a -> is_a.Iter.occ_cnt) indices_a
-                    |> List.sort_uniq Stdlib.compare 
+                    |> List.sort_uniq Stdlib.compare
     in
     List.map (mk_case a) indices_a in
 
   let cases = List.map mk_cases_descr macro_cases
-              |> List.flatten 
-              |> List.sort_uniq Stdlib.compare 
+              |> List.flatten
+              |> List.sort_uniq Stdlib.compare
   in
 
   mk_ors cases
@@ -989,7 +989,7 @@ let autosubst s =
 let exec (Args.Timestamp a) s =
   let _,var = Vars.make `Approx (TS.env s) Type.Timestamp "t" in
   let formula =
-    Term.mk_forall ~simpl:false 
+    Term.mk_forall ~simpl:false
       [Vars.EVar var]
       (Term.mk_impl
          (Term.mk_timestamp_leq (mk_var var) a)
@@ -1608,7 +1608,7 @@ let euf_apply_facts drop_head s
     Euf.key_ssc ~messages:[mess;sign]
       ~allow_functions ~cntxt head_fn key.s_symb
   in
-  if errors <> [] then 
+  if errors <> [] then
     soft_failure (Tactics.BadSSCDetailed errors);
 
   (* build the rule *)
@@ -1734,7 +1734,6 @@ class name_under_enc (cntxt:Constr.trace_cntxt) enc is_pk target_n key_n
  inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
 
  method visit_message t =
-    Printer.pr "test: %a" Term.pp t;
     match t with
     (* any name n can occur as enc(_,_,pk(k)) *)
     | Term.Fun ((f, _), _, [_; m; Term.Fun ((g,_), _ , [Term.Name k]) ])
