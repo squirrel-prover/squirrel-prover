@@ -28,7 +28,6 @@ set autoIntro=false.
 set timeout=4.
 set postQuantumSound=true.
 
-
 channel cR
 channel cT
 

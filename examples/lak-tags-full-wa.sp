@@ -3,8 +3,8 @@
 (* R --> T: nr                                    *)
 (* T --> R: nT, h(<nR, nT, tag1>, k)              *)
 (* R --> T: h(<h(<nR, nT, tag2>, k), nr, tag2>,k) *)
-
-set timeout=4. 
+set postQuantumSound=true.
+set timeout=4.
 
 hash h
 

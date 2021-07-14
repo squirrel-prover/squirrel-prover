@@ -99,6 +99,7 @@ let () =
                   detailed_help = "This tactic, of course, is not sound";
                   usages_sorts = [Sort Args.Int];
                   tactic_group = Logical}
+    ~pq_sound:true
     (function
        | [] -> only_equiv (fun _ sk fk -> sk [] fk)
        | [Args.Int_parsed i] ->
@@ -148,6 +149,7 @@ let () =
                                    case also for macros expansions.";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
+    ~pq_sound:true
     (only_equiv refl_tac)
 
 (*------------------------------------------------------------------*)
@@ -180,6 +182,7 @@ let () =
        usages_sorts = [Sort Args.Timestamp;
                        Sort Args.String;];
        tactic_group = Logical}
+    ~pq_sound:true
     (pure_equiv_arg case_tac)
 
 (*------------------------------------------------------------------*)
@@ -190,6 +193,7 @@ let () =
       detailed_help = "";
       tactic_group  = Logical;
       usages_sorts = []; }
+    ~pq_sound:true
     (pure_equiv_arg LT.clear_tac)
 
 (*------------------------------------------------------------------*)
@@ -227,6 +231,7 @@ let () =
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
+    ~pq_sound:true
     (only_equiv assumption)
 
 (*------------------------------------------------------------------*)
@@ -241,6 +246,7 @@ let () =
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
+    ~pq_sound:true
     (only_equiv byequiv_tac)
 
 (*------------------------------------------------------------------*)
@@ -252,6 +258,7 @@ let () =
       detailed_help = "";
       tactic_group  = Logical;
       usages_sorts = []; }
+    ~pq_sound:true
     (pure_equiv_arg LT.revert_tac)
 
 (*------------------------------------------------------------------*)
@@ -270,6 +277,7 @@ let () =
       detailed_help = "";
       usages_sorts = [];
       tactic_group = Logical}
+    ~pq_sound:true
     (pure_equiv_arg (LT.intro_tac simpl_ident))
 
 (*------------------------------------------------------------------*)
@@ -342,6 +350,7 @@ let () =
       detailed_help="";
       usages_sorts=[];
       tactic_group=Structural}
+    ~pq_sound:true
     (pure_equiv_arg LT.apply_tac)
 
 (*------------------------------------------------------------------*)
@@ -464,6 +473,7 @@ let () = T.register_general "induction"
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
+    ~pq_sound:true
     (old_or_new_induction)
 
 (* new induction principle *)
@@ -515,6 +525,7 @@ let () =
                        more simply.";
       tactic_group  = Logical;
       usages_sorts  = [Sort Args.Message; Sort Args.Boolean]; }
+    ~pq_sound:true
     (pure_equiv_arg enrich_tac)
 
 
@@ -527,6 +538,7 @@ let () =
   T.register_typed "print" ~general_help:"Shows the current system."
     ~detailed_help:""
     ~tactic_group:Logical
+    ~pq_sound:true
     (pure_equiv_typed print_tac) Args.None
 
 
@@ -543,6 +555,7 @@ let () =
     ~detailed_help:"Whenever action A1[i] must happen before A2[i], if A2[i] \
                     occurs in the trace, we can add A1[i]. "
     ~tactic_group:Structural
+    ~pq_sound:true
     (pure_equiv_typed LT.depends) Args.(Pair (Timestamp, Timestamp))
 
 
@@ -615,6 +628,7 @@ let () =
                     diff-equivalent, one can prove that the goal containing the \
                     sequence u1,...,un is diff-equivalent."
     ~tactic_group:Structural
+    ~pq_sound:true
     (pure_equiv_typed fa) Args.Int
 
 (*------------------------------------------------------------------*)
@@ -800,6 +814,7 @@ let () =
                     phi), with frame@pred(tau) in the biframe, tries to remove \
                     phi if it contains only subterms allowed by the FA-DUP rule."
    ~tactic_group:Structural
+   ~pq_sound:true
    (pure_equiv_typed fadup) Args.(Opt Int)
 
 (*------------------------------------------------------------------*)
@@ -975,6 +990,7 @@ let () =
                     instance of the name cannot have been produced by another \
                     action.'"
     ~tactic_group:Structural
+    ~pq_sound:true
     (pure_equiv_typed fresh) Args.Int
 
 
@@ -1038,6 +1054,7 @@ let () = T.register_general "expand"
                         unknown timestamp.";
        usages_sorts = [Sort None];
        tactic_group = Structural}
+    ~pq_sound:true
     (pure_equiv_arg LT.expand_tac)
 
 (*------------------------------------------------------------------*)
@@ -1062,6 +1079,7 @@ let () = T.register_general "expandseq"
                   detailed_help = "";
                   usages_sorts = [];
                   tactic_group = Structural}
+    ~pq_sound:true
     (pure_equiv_arg expand_seq_tac)
 
 (*------------------------------------------------------------------*)
@@ -1071,6 +1089,7 @@ let () = T.register "expandall"
       detailed_help = "";
       tactic_group  = Structural;
       usages_sorts  = []; }
+    ~pq_sound:true
     (pure_equiv_typed LT.expand_all_l `All)
 
 (*------------------------------------------------------------------*)
@@ -1084,6 +1103,7 @@ let () =
        detailed_help = "";
        usages_sorts = [];
        tactic_group = Logical}
+    ~pq_sound:true
     (pure_equiv_arg LT.exists_intro_tac)
 
 (*------------------------------------------------------------------*)
@@ -1097,6 +1117,7 @@ let () =
       detailed_help = "";
       usages_sorts = [];
       tactic_group = Logical}
+    ~pq_sound:true
     (pure_equiv_arg LT.destruct_tac)
 
 (*------------------------------------------------------------------*)
@@ -1111,6 +1132,7 @@ let () =
        detailed_help = "";
        usages_sorts = [];
        tactic_group = Logical}
+    ~pq_sound:true
     (pure_equiv_arg LT.use_tac)
 
 (*------------------------------------------------------------------*)
@@ -1125,6 +1147,7 @@ let () =
        detailed_help = "";
        usages_sorts = [];
        tactic_group = Logical}
+    ~pq_sound:true
     (pure_equiv_arg LT.assert_tac)
 
 (*------------------------------------------------------------------*)
@@ -1183,6 +1206,7 @@ let () = T.register_typed "equivalent"
     ~detailed_help:"This can be used on messages equality or formulas \
                     equivalence."
     ~tactic_group:Structural
+    ~pq_sound:true
     ~usages_sorts:[Args.(Sort (Pair (Message, Message)));
                    Args.(Sort (Pair (Boolean, Boolean)))]
     (only_equiv_typed equivalent)
@@ -1247,6 +1271,7 @@ let () =
                    The tactic will replace this item by `v` and \
                    generate 'phi => False' as a (reachability) subgoal."
    ~tactic_group:Structural
+   ~pq_sound:true
    (only_equiv_typed (yes_no_if false)) Args.Int
 
 let () =
@@ -1257,6 +1282,7 @@ let () =
                    The tactic will replace this item by `u` and \
                    generate 'phi' as a (reachability) subgoal."
    ~tactic_group:Structural
+   ~pq_sound:true
    (only_equiv_typed (yes_no_if true)) Args.Int
 
 (*------------------------------------------------------------------*)
@@ -1370,7 +1396,8 @@ let () =
                     `if f then m else 0`. If the int parameter j is given, will \
                     push the formula only in the jth subterm of the then branch \
                     (zero-based)."
-   ~tactic_group:Structural
+    ~tactic_group:Structural
+    ~pq_sound:true
    (only_equiv_typed ifcond) Args.(Pair (Int, Pair( Opt Int, Boolean)))
 
 
@@ -1409,6 +1436,7 @@ let () =
    ~general_help:"Simplify a conditional when the two branches are equal."
    ~detailed_help:""
    ~tactic_group:Structural
+   ~pq_sound:true
    (only_equiv_typed trivial_if) Args.Int
 
 
@@ -1455,6 +1483,7 @@ let () = T.register_typed "ifeq"
                     term (with over-whelming probability) in the positive \
                     brannch."
     ~tactic_group:Structural
+    ~pq_sound:true
     (only_equiv_typed ifeq) Args.(Pair (Int, Pair (Message, Message)))
 
 
@@ -1524,6 +1553,7 @@ let () =
                   detailed_help = "Same as simpl.";
                   usages_sorts = [Sort None];
                   tactic_group = Structural }
+    ~pq_sound:true
     (tac_auto ~close:true ~strong:true)
 
 let () =
@@ -1534,6 +1564,7 @@ let () =
                                    refl or assumption.";
                   usages_sorts = [Sort None];
                   tactic_group = Structural }
+    ~pq_sound:true
     (tac_auto ~close:false ~strong:true)
 
 
@@ -1545,6 +1576,7 @@ let () =
                                    refl or assumption.";
                   usages_sorts = [Sort None];
                   tactic_group = Structural }
+    ~pq_sound:true
     (tac_auto ~close:false ~strong:false)
 
 (*------------------------------------------------------------------*)
@@ -1573,6 +1605,7 @@ let () =
       detailed_help = "";
       usages_sorts  = [];
       tactic_group  = Structural;}
+    ~pq_sound:true
     rewrite_tac
 
 
@@ -1899,6 +1932,7 @@ let () =
                     was never hashed using key k before. Behaves similarly to \
                     the fresh tactic."
     ~tactic_group:Cryptographic
+    ~pq_sound:true
     (pure_equiv_typed prf) Args.(Pair(Int, Opt Message))
 
 
@@ -2198,6 +2232,7 @@ let () =
                    plaintext. Encryption not at toplevel are replaced by the \
                    encryption of the length of the plaintexts."
    ~tactic_group:Cryptographic
+   ~pq_sound:true
    (only_equiv_typed cca1) Args.Int
 
 (*------------------------------------------------------------------*)
@@ -2381,6 +2416,7 @@ let () =
                     otherwise the tactic applies to the first subterm of the form \
                     enc(_,r,k) where r is a name and k features a diff operator."
     ~tactic_group:Cryptographic
+    ~pq_sound:true
     (only_equiv_typed enckp)
     Args.(Pair (Int, Pair (Opt Message,Opt Message)))
 
@@ -2545,6 +2581,7 @@ let () =
    ~detailed_help:"This yields the same freshness condition on the name as the \
                    fresh tactic."
    ~tactic_group:Cryptographic
+   ~pq_sound:true
    (pure_equiv_typed xor) Args.(Pair (Int, Pair (Opt Message, Opt Message)))
 
 

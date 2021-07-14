@@ -470,5 +470,11 @@ let () =
            try run ~test "tests/alcotest/equiv_to_trace.sp" with
            | Tactic_soft_failure
                (_, HypUnknown "H") -> raise Ok)
-    end
+    end;
+    "DDH not PQ Sound", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
+           try run ~test "tests/alcotest/pqsound.sp" with
+           | Tactic_hard_failure (_,Tactics.TacticNotPQSound) -> raise Ok)
+    end ;
   ]

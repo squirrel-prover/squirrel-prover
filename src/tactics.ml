@@ -53,7 +53,8 @@ type tac_error_i =
   | DidNotFail
   | FailWithUnexpected of tac_error_i
   | GoalBadShape of string
-  | NotPQSound
+  | GoalNotPQSound
+  | TacticNotPQSound
 
   (* TODO: remove these errors, catch directly at top-level *)
   | SystemError     of System.system_error
@@ -115,7 +116,8 @@ let rec tac_error_to_string = function
   | HypUnknown        _    -> "HypUnknown"
   | SystemExprError   _    -> "SystemExpr_Error"
   | GoalBadShape      _    -> "GoalBadShape"
-  | NotPQSound             -> "NotPQSound"
+  | GoalNotPQSound         -> "GoalNotPQSound"
+  | TacticNotPQSound       -> "TacticNotPQSound"
   | SystemError       _    -> "System_Error"
   | PatNumError       _    -> "PatNumError"
   | MustHappen        _    -> "MustHappen"
@@ -196,8 +198,12 @@ let rec pp_tac_error_i ppf = function
   | GoalBadShape s ->
     Fmt.pf ppf "goal has the wrong shape: %s" s
 
-  | NotPQSound ->
+  | GoalNotPQSound ->
     Fmt.pf ppf "the goal is not Post-Quantum Sound"
+
+  | TacticNotPQSound ->
+    Fmt.pf ppf "the tactic is not Post-Quantum Sound"
+
   | PatNumError (give, need) ->
     Fmt.pf ppf "invalid number of patterns (%d given, %d needed)" give need
 

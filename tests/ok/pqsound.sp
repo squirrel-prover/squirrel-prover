@@ -9,13 +9,21 @@ name k : index -> message
 name ok : message
 name ko : message
 
+ddh g, (^) where group:message exposants:message.
+
+name a : message
+
+name b : message
+
+name d : message
+
 system
 !_i (if False then out(c,diff(ok,ko)) else out(c,ok)).
 
 global goal _ (i:index) :
  [happens(A(i))] -> equiv(diff(cond@A(i),False)).
 Proof.
-  checkfail intro t exn NotPQSound.
+  checkfail intro t exn GoalNotPQSound.
 Abort.
 
 global goal _ (i:index) :

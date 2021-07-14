@@ -17,6 +17,7 @@ induction over sequences to complete the proof.
 *******************************************************************************)
 (* set debugTactics=true. *)
 set autoIntro=false.
+set postQuantumSound=true.
 
 hash H
 
@@ -39,7 +40,7 @@ process tag(i:index, t:index)=
   new nt;
   out(c,<nt,xor(diff(id(i),id'(i,t)),H(<tag0,<x,nt>>,diff(key(i),key'(i,t))))>);
   in(c,y);
-  if y = xor(diff(id(i),id'(i,t)),H(<tag1,<x,nt>>,diff(key(i),key'(i,t)))) 
+  if y = xor(diff(id(i),id'(i,t)),H(<tag1,<x,nt>>,diff(key(i),key'(i,t))))
   then out(c,ok)
   else out(c,ko)
 
@@ -63,9 +64,9 @@ process reader =
 system (!_r R: reader | !_i !_t T: tag(i,t)).
 
 axiom tags_neq : tag0 <> tag1.
-goal tags_neq0 : tag0 = tag1 => False. 
-Proof. 
- use tags_neq; auto. 
+goal tags_neq0 : tag0 = tag1 => False.
+Proof.
+ use tags_neq; auto.
 Qed.
 
 (* Well-authentication for R1's condition, formulated in an imprecise
@@ -81,12 +82,12 @@ goal wa_R1 (r:index) :
    fst(output@T(i,t)) = fst(input@R1(r)) &&
    R(r) < T(i,t) &&
    output@R(r) = input@T(i,t)).
-Proof. 
+Proof.
   split.
 
   (* Cond => WA *)
   intro [i t Meq].
-  project. 
+  project.
   (* left *)
   euf Meq => _ _ _; 1: auto.
   exists i,t0; simpl.
@@ -118,7 +119,7 @@ goal [left] wa_R1_left (i,r:index):
   fst(output@T(i,t)) = fst(input@R1(r)) &&
   R(r) < T(i,t) &&
   output@R(r) = input@T(i,t).
-Proof. 
+Proof.
   split; 2: by intro [_ _]; expand output.
   intro Meq; euf Meq => _ _ _; 1: auto.
   exists t; simpl.
@@ -142,7 +143,7 @@ Proof.
   intro Meq; euf Meq => _ _ _; 1: auto.
   assert input@T(i,t) = nr(r) as F; 1: auto.
   fresh F => C.
-  by case C; 3:depends R(r), R2(r).  
+  by case C; 3:depends R(r), R2(r).
 Qed.
 
 equiv unlinkability.
@@ -245,9 +246,9 @@ fa; [1,2: by intro [_ [i t _]]; simpl; exists i,t |
 intro [_ [i t _]].
 fa; 2,3,4: intro *; expand output; auto.
 intro Meq.
-use wa_R1_left with i0,r as [H1 H2]. 
+use wa_R1_left with i0,r as [H1 H2].
 use H1 as [_ _]; 2: expand output; auto.
-by expand output; exists t. 
+by expand output; exists t.
 (* Right *)
 fa; [1,2: by intro [_ [i t _]]; simpl; exists i,t |
      4: auto].
@@ -347,9 +348,9 @@ equivalent exec@pred(T1(i,t)) && cond@T1(i,t),
   assert R(r) < T(i,t) as _.
     admit.
   simpl.
-  case output@R1(r) => Meq1. 
+  case output@R1(r) => Meq1.
   destruct Meq1 as [_ _ [Meq1 ->]].
-  by euf Meq1. 
+  by euf Meq1.
 
   destruct Meq1 as [H0 _].
   by use H0 with i,t.
@@ -378,17 +379,17 @@ equivalent exec@pred(T1(i,t)) && cond@T1(i,t),
     by euf Meq1 => A0 [A1 _] [_ _].
 
     destruct Meq1 as [H0 _].
-    by use H0 with i,t. 
+    by use H0 with i,t.
 
   (* Honest => Cond *)
-  intro [_ [r H1]]; simpl. 
+  intro [_ [r H1]]; simpl.
   case output@R1(r) => Meq1.
     destruct Meq1 as [_ _ [Meq1 Meq2]].
     rewrite Meq2 in H1.
     by project; euf Meq1.
 
     destruct Meq1 as [H0 _].
-    by use H0 with i,t. 
+    by use H0 with i,t.
 
 fa 6.
 by fadup 5.
@@ -419,7 +420,7 @@ split; intro [_ H1]; simpl.
     by project; euf Meq1.
 
     destruct Meq1 as [H0 _].
-    by use H0 with i,t. 
+    by use H0 with i,t.
 
   (* Cond => Honest *)
   intro Meq.
@@ -434,23 +435,23 @@ split; intro [_ H1]; simpl.
     by case Ct; try depends T(i,t),T2(i,t).
   clear Ct.
   assert cond@R1(r) as Hcond.
-    executable pred(T2(i,t)); 1,2: auto.    
+    executable pred(T2(i,t)); 1,2: auto.
     by intro He; use He with R1(r); 1: expand exec.
   expand cond.
-  destruct Hcond as [i1 t1 Hcond]. 
+  destruct Hcond as [i1 t1 Hcond].
   euf Hcond => _ _ _; 1: auto.
   exists r; simpl.
   assert R(r) < T(i,t).
     assert nr(r) = input@T(i,t) as HF; 1: auto.
     fresh HF => C.
-    by case C; 3: depends R(r),R2(r). 
+    by case C; 3: depends R(r),R2(r).
   simpl.
   case output@R1(r) => Meq1.
-    destruct Meq1 as [_ _ [Meq1 ->]]. 
+    destruct Meq1 as [_ _ [Meq1 ->]].
     by euf Meq1.
 
     destruct Meq1 as [H0 _].
-    by use H0 with i,t. 
+    by use H0 with i,t.
 
   (* Right *)
   euf Meq0 => Ct _ [_ _]; 2:auto.
@@ -471,13 +472,13 @@ split; intro [_ H1]; simpl.
   simpl.
 
   case output@R1(r) => Meq1.
-    destruct Meq1 as [_ _ [Meq1 ->]]. 
+    destruct Meq1 as [_ _ [Meq1 ->]].
     by euf Meq1.
 
     destruct Meq1 as [H0 _].
-    by use H0 with i,t. 
+    by use H0 with i,t.
 
-fa 6. 
+fa 6.
 by fadup 5.
 
 Qed.

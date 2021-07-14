@@ -294,7 +294,7 @@ let check_pq_sound_sequent s =
       let models = get_models s in
       let cntxt = mk_trace_cntxt s in
       if not (PostQuantum.is_attacker_call_synchronized cntxt models e) then
-        Tactics.hard_failure Tactics.NotPQSound
+        Tactics.hard_failure Tactics.GoalNotPQSound
       else
         s
   | _ -> s

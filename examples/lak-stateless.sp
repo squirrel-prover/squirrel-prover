@@ -2,6 +2,7 @@
  * It is a rare case where the authentication proof involves an induction.
  * Note that this model is unsuitable for proving unlinkability as the
  * reader action R1(j,i) reveals which tag i has been identified. *)
+set postQuantumSound=true.
 
 hash h
 

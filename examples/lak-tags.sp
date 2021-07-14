@@ -14,6 +14,7 @@ We consider tags in the messages (tag1 and tag2) to ease the proof.
 This is a "light" model without the last check of T.
 *******************************************************************************)
 set autoIntro=false.
+set postQuantumSound=true.
 
 hash h
 
@@ -74,8 +75,8 @@ Proof.
   euf H => _ _ _ //.
   exists i,k0.
   assert input@T(i,k0)=nR(j) as Meq1; 1: auto.
-  fresh Meq1 => C /=. 
-  case C => //. 
+  fresh Meq1 => C /=.
+  case C => //.
   by depends R(j),R2(j).
 
   (* RIGHT *)
@@ -83,12 +84,12 @@ Proof.
   exists i,k.
   assert input@T(i,k)=nR(j) as Meq1; 1: by auto.
   fresh Meq1 => C /=.
-  case C => //. 
+  case C => //.
   by depends R(j),R2(j).
 
   (* WA => COND *)
-  intro [i k _]; exists i,k. 
-  by expand output, m2. 
+  intro [i k _]; exists i,k.
+  by expand output, m2.
 Qed.
 
 goal wa_R2 (j:index):
@@ -110,17 +111,17 @@ Proof.
   use H.
   exists i,k.
   by expand output, m2.
-  
+
   (* COND => WA *)
   intro H [i k Meq].
   use H.
-  use tags_neq; project. 
-  (* LEFT *) 
+  use tags_neq; project.
+  (* LEFT *)
   euf Meq => _ _ _ //.
   exists i,k0.
   assert input@T(i,k0)=nR(j) as Meq1; 1: auto.
   fresh Meq1 => C /=.
-  case C => //. 
+  case C => //.
   by depends R(j),R1(j).
 
   (* RIGHT *)
@@ -128,7 +129,7 @@ Proof.
   exists i,k.
   assert input@T(i,k)=nR(j) as Meq1; 1: auto.
   fresh Meq1 => C /=.
-  case C => //. 
+  case C => //.
   by depends R(j),R1(j).
 Qed.
 
@@ -151,7 +152,7 @@ Proof.
   exists k.
   assert input@T(i,k)=nR(j) as Meq1; 1: auto.
   fresh Meq1 => C /=.
-  case C => //. 
+  case C => //.
   by depends R(j),R2(j).
 Qed.
 
@@ -172,7 +173,7 @@ Proof.
   euf Meq => _ _ _ //.
   assert input@T(i,k)=nR(j) as Meq1; 1: auto.
   fresh Meq1 => C /=.
-  case C => //. 
+  case C => //.
   by depends R(j),R2(j).
 Qed.
 
@@ -188,7 +189,7 @@ Proof.
   expand frame, exec, cond, output.
   fa 0; fa 1; fa 1.
   fresh 1; yesif 1.
-  repeat split => // j0 H1. 
+  repeat split => // j0 H1.
   by depends R(j0),R2(j0).
   by depends R(j0),R1(j0).
   auto.
@@ -232,8 +233,8 @@ Proof.
   	   then h(<<snd(input@R1(j)),nR(j)>,tag2>,diff(key(i),key'(i,k))))).
   fa; 1,4: intro *; auto.
   intro [_ [i k _]] /=.
-  by exists i,k. 
-  intro [_ [i k _]] /=. 
+  by exists i,k.
+  intro [_ [i k _]] /=.
   project.
 
   (* LEFT *)
@@ -241,18 +242,18 @@ Proof.
   exists k => /=.
   use wa_R1_left with i0,j as [H1 H2]; 2: auto.
   clear H2.
-  use H1 as [k1 _]; 2: auto. 
-  clear H1. 
-  by expand output, m2. 
+  use H1 as [k1 _]; 2: auto.
+  clear H1.
+  by expand output, m2.
   by yesif.
 
   (* RIGHT *)
   fa => // _.
   use wa_R1_right with i0,j,k0 as [H1 H2]; 2: auto.
   clear H2.
-  use H1 as [k1 _]; 2: auto. 
-  clear H1. 
-  by expand output, m2. 
+  use H1 as [k1 _]; 2: auto.
+  clear H1.
+  by expand output, m2.
   by yesif.
 
 
@@ -261,7 +262,7 @@ Proof.
   prf 1.
   ifcond 1, exec@pred(R1(j)); 1: auto.
   fa 1.
-  yesif 1. 
+  yesif 1.
   by use tags_neq; project.
   by fresh 1.
 
@@ -284,14 +285,14 @@ Proof.
   fa 0. fa 1. fa 1. fa 1.
   prf 2.
   yesif 2; simpl.
-  use tags_neq. 
+  use tags_neq.
   project.
   split.
-  by (split; intro > _; repeat split; intro _ [[_ Meq] _]; fresh Meq). 
-  by intro > _ _ [[_ Meq] _]; fresh Meq.  
+  by (split; intro > _; repeat split; intro _ [[_ Meq] _]; fresh Meq).
+  by intro > _ _ [[_ Meq] _]; fresh Meq.
 
   repeat split => > _; try (by intro > _ [[_ Meq] _]; fresh Meq).
-  by (repeat split => > _ [[_ Meq] _]; fresh Meq). 
+  by (repeat split => > _ [[_ Meq] _]; fresh Meq).
 
   fresh 2.
   by fresh 1; yesif 1.

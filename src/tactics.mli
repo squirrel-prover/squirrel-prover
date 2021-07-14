@@ -68,7 +68,8 @@ type tac_error_i =
   | DidNotFail
   | FailWithUnexpected of tac_error_i
   | GoalBadShape of string
-  | NotPQSound
+  | GoalNotPQSound
+  | TacticNotPQSound
   | SystemError     of System.system_error
   | SystemExprError of SystemExpr.system_expr_err
   | CongrFail

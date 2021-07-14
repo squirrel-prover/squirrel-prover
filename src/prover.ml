@@ -1,6 +1,6 @@
 (** State in proof mode. *)
 open Utils
-    
+
 module L    = Location
 module Args = TacticsArgs
 module SE   = SystemExpr
@@ -21,7 +21,7 @@ let soft_failure = Tactics.soft_failure
 (** {Error handling} *)
 
 type decl_error_i =
-  | BadEquivForm 
+  | BadEquivForm
   | InvalidAbsType
   | InvalidCtySpace of string list
   | DuplicateCty of string
@@ -98,7 +98,7 @@ let option_defs : option_def list ref= ref []
 
 let hint_db : Hint.hint_db ref = ref Hint.empty_hint_db
 
-type proof_state = { 
+type proof_state = {
   goals        : (Goal.statement * Goal.t) list;
   table        : Symbols.table;
   current_goal : (Goal.statement * Goal.t) option;
@@ -188,10 +188,12 @@ type tactic_groups =
 type tactic_help = { general_help : string;
                      detailed_help : string;
                      usages_sorts : TacticsArgs.esort list;
-                     tactic_group : tactic_groups}
+                     tactic_group : tactic_groups;
+                   }
 
 type 'a tac_infos = {
   maker : TacticsArgs.parser_arg list -> 'a Tactics.tac ;
+  pq_sound : bool;
   help : tactic_help ;
 }
 
@@ -256,7 +258,12 @@ module EquivTable : Table_sig with type judgment = Goal.t = struct
 
   (* TODO:location *)
   let get id =
-    try (Hashtbl.find table id).maker with
+    try let tac = (Hashtbl.find table id) in
+      if not(tac.pq_sound) && Config.post_quantum () then
+        Tactics.hard_failure Tactics.TacticNotPQSound
+      else
+        tac.maker
+    with
       | Not_found -> hard_failure
              (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
   let to_goal j = j
@@ -271,8 +278,8 @@ end
 
 (** Functor building AST evaluators for our judgment types. *)
 module Make_AST (T : Table_sig) :
-  (Tactics.AST_sig 
-   with type arg = TacticsArgs.parser_arg 
+  (Tactics.AST_sig
+   with type arg = TacticsArgs.parser_arg
    with type judgment = T.judgment)
 = Tactics.AST(struct
 
@@ -339,19 +346,23 @@ module type Tactics_sig = sig
 
   val register_general :
     string -> tactic_help:tactic_help ->
+    ?pq_sound:bool ->
     (TacticsArgs.parser_arg list -> tac) -> unit
 
   val register_macro :
     string -> ?modifiers:string list -> tactic_help:tactic_help ->
+    ?pq_sound:bool ->
     TacticsArgs.parser_arg Tactics.ast -> unit
 
 
   val register : string ->  tactic_help:tactic_help ->
+    ?pq_sound:bool ->
     (judgment -> judgment list) -> unit
 
   val register_typed :
     string ->  general_help:string ->  detailed_help:string ->
     tactic_group:tactic_groups ->
+    ?pq_sound:bool ->
     ?usages_sorts : TacticsArgs.esort list ->
     ('a TacticsArgs.arg -> judgment -> judgment list) ->
     'a TacticsArgs.sort  -> unit
@@ -378,17 +389,19 @@ struct
 
   let register_general id
       ~tactic_help
+      ?(pq_sound=false)
       f =
     assert (not (Hashtbl.mem table id)) ;
 
-    let f args s sk fk = 
-      dbg "@[<hov>%s table: calling tactic %s on@ @[%a@]@]" 
+    let f args s sk fk =
+      dbg "@[<hov>%s table: calling tactic %s on@ @[%a@]@]"
         table_name
         id M.pp_goal_concl s;
-      f args s sk fk in 
+      f args s sk fk in
 
     Hashtbl.add table id { maker = f ;
-                           help = tactic_help}
+                           help = tactic_help;
+                           pq_sound}
 
   let convert_args j parser_args tactic_type =
     let table, env, ty_vars =
@@ -398,8 +411,8 @@ struct
     in
     TacticsArgs.convert_args table ty_vars env parser_args tactic_type
 
-  let register id ~tactic_help f =
-    register_general id ~tactic_help
+  let register id ~tactic_help ?(pq_sound=false) f =
+    register_general id ~tactic_help ~pq_sound
       (function
         | [] ->
           fun s sk fk -> begin match f s with
@@ -413,7 +426,7 @@ struct
         | _ -> hard_failure (Tactics.Failure "no argument allowed"))
 
   let register_typed id
-      ~general_help ~detailed_help  ~tactic_group ?(usages_sorts)
+      ~general_help ~detailed_help  ~tactic_group ?(pq_sound=false) ?(usages_sorts)
       f sort =
     let usages_sorts = match usages_sorts with
       | None -> [TacticsArgs.Sort sort]
@@ -421,6 +434,7 @@ struct
 
     register_general id
       ~tactic_help:({general_help; detailed_help; usages_sorts; tactic_group})
+      ~pq_sound
       (fun args s sk fk ->
          match convert_args s args (TacticsArgs.Sort sort) with
          | TacticsArgs.Arg (th)  ->
@@ -439,8 +453,8 @@ struct
              hard_failure (Tactics.Failure "ill-formed arguments")
       )
 
-  let register_macro id ?(modifiers=["nosimpl"])  ~tactic_help m =
-    register_general id ~tactic_help
+  let register_macro id ?(modifiers=["nosimpl"])  ~tactic_help ?(pq_sound=false) m =
+    register_general id ~tactic_help ~pq_sound
       (fun args s sk fk ->
          if args = [] then AST.eval modifiers m s sk fk else
            hard_failure
@@ -480,8 +494,8 @@ struct
        structural, that rely on properties of protocols and equality;\n - \
        cryptographic, that rely on some cryptographic assumption that must be \
        explicitly stated.\n";
-    let filter_cat helps cat = 
-      List.filter (fun (y,x) -> x.tactic_group = cat) helps 
+    let filter_cat helps cat =
+      List.filter (fun (y,x) -> x.tactic_group = cat) helps
     in
     let str_cat = function
       | Logical -> "Logical"
@@ -555,7 +569,9 @@ let () =
     ~tactic_help:{general_help = "Closes the current goal.";
                   detailed_help = "";
                   usages_sorts = [Sort None];
-                  tactic_group = Logical}
+                  tactic_group = Logical
+                 }
+    ~pq_sound:true
     (fun _ _ sk fk -> sk [] fk) ;
 
   TraceTactics.register_general "prof"
@@ -563,7 +579,8 @@ let () =
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
-    (fun _ s sk fk -> 
+    ~pq_sound:true
+    (fun _ s sk fk ->
        Printer.prt `Dbg "%a" Prof.print ();
       sk [s] fk) ;
 
@@ -572,7 +589,7 @@ let () =
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
-    (fun _ s sk fk -> 
+    (fun _ s sk fk ->
        Printer.prt `Dbg "%a" Prof.print ();
       sk [s] fk) ;
 
@@ -662,7 +679,7 @@ type parsed_input =
   | ParsedHint       of Hint.p_hint
   | EOF
 
-let unnamed_goal () = 
+let unnamed_goal () =
   L.mk_loc L._dummy ("unnamedgoal" ^ string_of_int (List.length !goals_proved))
 
 let declare_new_goal_i table hint_db parsed_goal =
@@ -753,7 +770,7 @@ let cycle i l =
   else cyc [] i l
 
 let eval_tactic utac = match utac with
-  | Tactics.Abstract (L.{ pl_desc = "cycle"}, [TacticsArgs.Int_parsed i]) -> 
+  | Tactics.Abstract (L.{ pl_desc = "cycle"}, [TacticsArgs.Int_parsed i]) ->
     subgoals := cycle i !subgoals; false
   | _ -> eval_tactic_focus utac
 
@@ -796,7 +813,7 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
         ) in_tys
     in
 
-    let rec parse_in_tys p_tys : Type.message Type.ty list  =      
+    let rec parse_in_tys p_tys : Type.message Type.ty list  =
       match p_tys with
       | [] -> []
       | (loc, Type.ETy ty) :: in_tys -> match Type.kind ty with
@@ -804,7 +821,7 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
         | Type.KIndex     -> decl_error loc KDecl InvalidAbsType
         | Type.KTimestamp -> decl_error loc KDecl InvalidAbsType
     in
-          
+
     let rec parse_index_prefix iarr in_tys = match in_tys with
       | [] -> iarr, []
       | (_, Type.ETy ty) :: in_tys as in_tys0 ->
@@ -816,15 +833,15 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
     let iarr, in_tys = parse_index_prefix 0 in_tys in
 
     let out_ty : Type.message Type.ty =
-      Theory.parse_p_ty table ty_args out_ty Type.KMessage 
+      Theory.parse_p_ty table ty_args out_ty Type.KMessage
     in
-    
+
     Theory.declare_abstract
-      table 
+      table
       ~index_arity:iarr
       ~ty_args
       ~in_tys
-      ~out_ty      
+      ~out_ty
       decl.name
       decl.symb_type
 
@@ -833,7 +850,7 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
   let _ : string list = List.fold_left (fun acc cty ->
       let sp = L.unloc cty.Decl.cty_space in
       if List.mem sp acc then
-        decl_error (L.loc cty.Decl.cty_space) KDecl (DuplicateCty sp);      
+        decl_error (L.loc cty.Decl.cty_space) KDecl (DuplicateCty sp);
       sp :: acc
     ) [] ctys in
 
@@ -884,7 +901,7 @@ let declare_i table hint_db decl = match L.unloc decl with
 
   | Decl.Decl_ddh (g, (exp, f_info), ctys) ->
     let ctys = parse_ctys table ctys ["group"; "exposants"] in
-    let group_ty = List.assoc_opt "group"     ctys 
+    let group_ty = List.assoc_opt "group"     ctys
     and exp_ty   = List.assoc_opt "exposants" ctys in
 
     Theory.declare_ddh table ?group_ty ?exp_ty g exp f_info
@@ -893,33 +910,33 @@ let declare_i table hint_db decl = match L.unloc decl with
     let () = Utils.oiter (define_oracle_tag_formula table n) tagi in
 
     let ctys = parse_ctys table ctys ["m"; "h"; "k"] in
-    let m_ty = List.assoc_opt  "m" ctys 
-    and h_ty = List.assoc_opt  "h" ctys 
+    let m_ty = List.assoc_opt  "m" ctys
+    and h_ty = List.assoc_opt  "h" ctys
     and k_ty  = List.assoc_opt "k" ctys in
 
     Theory.declare_hash table ?m_ty ?h_ty ?k_ty ?index_arity:a n
 
-  | Decl.Decl_aenc (enc, dec, pk, ctys) ->  
-    let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "rnd"; "sk"; "pk"] in 
-    let ptxt_ty = List.assoc_opt "ptxt" ctys 
-    and ctxt_ty = List.assoc_opt "ctxt" ctys 
-    and rnd_ty  = List.assoc_opt "rnd"  ctys 
-    and sk_ty   = List.assoc_opt "sk"   ctys 
+  | Decl.Decl_aenc (enc, dec, pk, ctys) ->
+    let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "rnd"; "sk"; "pk"] in
+    let ptxt_ty = List.assoc_opt "ptxt" ctys
+    and ctxt_ty = List.assoc_opt "ctxt" ctys
+    and rnd_ty  = List.assoc_opt "rnd"  ctys
+    and sk_ty   = List.assoc_opt "sk"   ctys
     and pk_ty   = List.assoc_opt "pk"   ctys in
 
     Theory.declare_aenc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?sk_ty ?pk_ty enc dec pk
 
-  | Decl.Decl_senc (senc, sdec, ctys) -> 
-    let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "rnd"; "k"] in 
-    let ptxt_ty = List.assoc_opt "ptxt" ctys 
-    and ctxt_ty = List.assoc_opt "ctxt" ctys 
-    and rnd_ty  = List.assoc_opt "rnd"  ctys 
+  | Decl.Decl_senc (senc, sdec, ctys) ->
+    let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "rnd"; "k"] in
+    let ptxt_ty = List.assoc_opt "ptxt" ctys
+    and ctxt_ty = List.assoc_opt "ctxt" ctys
+    and rnd_ty  = List.assoc_opt "rnd"  ctys
     and k_ty   = List.assoc_opt  "k"    ctys in
 
     Theory.declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty senc sdec
 
   | Decl.Decl_name (s, a, pty) ->
-    let ty = Theory.parse_p_ty table [] pty Type.KMessage in    
+    let ty = Theory.parse_p_ty table [] pty Type.KMessage in
     Theory.declare_name table s Symbols.{ n_iarr = a; n_ty = ty; }
 
   | Decl.Decl_state (s, args, k, t) ->
@@ -931,24 +948,24 @@ let declare_i table hint_db decl = match L.unloc decl with
   | Decl.Decl_sign (sign, checksign, pk, tagi, ctys) ->
     let () = Utils.oiter (define_oracle_tag_formula table sign) tagi in
 
-    let ctys = parse_ctys table ctys ["m"; "sig"; "check"; "sk"; "pk"] in 
-    let m_ty     = List.assoc_opt "m"     ctys 
-    and sig_ty   = List.assoc_opt "sig"   ctys 
-    and check_ty = List.assoc_opt "check" ctys 
-    and sk_ty    = List.assoc_opt "sk"    ctys 
+    let ctys = parse_ctys table ctys ["m"; "sig"; "check"; "sk"; "pk"] in
+    let m_ty     = List.assoc_opt "m"     ctys
+    and sig_ty   = List.assoc_opt "sig"   ctys
+    and check_ty = List.assoc_opt "check" ctys
+    and sk_ty    = List.assoc_opt "sk"    ctys
     and pk_ty    = List.assoc_opt "pk"    ctys in
 
-    Theory.declare_signature table 
+    Theory.declare_signature table
       ?m_ty ?sig_ty ?check_ty ?sk_ty ?pk_ty sign checksign pk
 
   | Decl.Decl_abstract decl -> parse_abstract_decl table decl
-  | Decl.Decl_bty bty_decl -> 
+  | Decl.Decl_bty bty_decl ->
     let table, _ =
       Symbols.BType.declare_exact
         table
         bty_decl.bty_name
         bty_decl.bty_infos
-    in 
+    in
     table
 
 let declare table hint_db decl =

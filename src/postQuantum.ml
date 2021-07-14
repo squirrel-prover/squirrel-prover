@@ -68,11 +68,9 @@ let is_attacker_call_synchronized cntxt models biframe =
      List.fold_left (fun (max_ts,_) t-> iter#fold_message (max_ts, Sts.empty) t)
        (Sts.empty, Sts.empty) biframe
    in
-   Printer.pr "ts: %a" (Utils.pp_list Term.pp) (Sts.elements max_ts);
    let maximal_elems =
      Constr.maximal_elems ~precise:false models (Sts.elements max_ts)
    in
-   Printer.pr "bif: %a" (Utils.pp_list Term.pp) (biframe);
    let has_frame_or_input biframe tau =
      let frame_at =
        Term.mk_macro Term.frame_macro [] tau
@@ -96,7 +94,6 @@ let is_attacker_call_synchronized cntxt models biframe =
        ) biframe
    in
    if not (List.for_all (fun tau -> has_frame_or_input biframe tau) maximal_elems) then
-     (Printer.pr "bif: %a" (Utils.pp_list Term.pp) (biframe);
-     false)
+     false
    else
      true
