@@ -5,6 +5,8 @@ name n1 : message
 abstract ok : message
 abstract ko : message
 
+abstract f : message -> message
+
 name dummy : message
 
 system null.
@@ -36,6 +38,18 @@ equiv test : diff(xor(n1,ok),xor(n1,ko)).
 Proof.
   xor 0.
   yesif 0.
-  by use len_ok; use len_ko; namelength n1,dummy. 
+  by use len_ok; use len_ko; namelength n1,dummy.
+  auto.
+Qed.
+
+
+equiv testf : diff(f(xor(n1,ok)),f(xor(n1,ko))).
+Proof.
+  xor 0, n1.
+  yesif 0.
+  by use len_ko;  namelength n1,dummy.
+  xor 0, xor(n1,ok), n1.
+  yesif 0.
+  by use len_ok;  namelength n1,dummy.
   auto.
 Qed.

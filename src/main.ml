@@ -53,8 +53,8 @@ let pp_loc_error_opt ppf = function
   | None -> ()
   | Some l -> pp_loc_error ppf l
 
-type cmd_error = 
-  | Unexpected_command 
+type cmd_error =
+  | Unexpected_command
   | StartProofError of string
   | AbortIncompleteProof
 
@@ -71,13 +71,13 @@ let cmd_error e = raise (Cmd_error e)
 (*------------------------------------------------------------------*)
 open Tactics
 
-exception Unfinished 
+exception Unfinished
 
 (* State of the main loop.
    TODO: include everything currently handled statefully in Prover.ml *)
-type loop_state = { 
+type loop_state = {
   mode : Prover.prover_mode;
-  table : Symbols.table;  
+  table : Symbols.table;
 }
 
 (** The main loop body. *)
@@ -126,8 +126,8 @@ let main_loop_body ~test state =
       { state with mode = GoalMode }
 
     | GoalMode, ParsedHint h ->
-      let db = Prover.current_hint_db () in 
-      let db = 
+      let db = Prover.current_hint_db () in
+      let db =
         match h with
         | Hint.Hint_rewrite id -> Prover.add_hint_rewrite id db
       in
@@ -168,7 +168,7 @@ let main_loop_body ~test state =
       { state with mode = GoalMode; }
 
     | _, ParsedQed ->
-      if test then raise Unfinished else 
+      if test then raise Unfinished else
         cmd_error Unexpected_command
 
     | _, _ -> cmd_error Unexpected_command
@@ -195,12 +195,12 @@ let rec main_loop ~test ?(save=true) (state : loop_state) =
   | new_state, _ -> (main_loop[@tailrec]) ~test new_state
 
   (* exception handling *)
-  | exception (Parserbuf.Error s) -> 
+  | exception (Parserbuf.Error s) ->
     error ~test state (fun fmt -> Fmt.string fmt s)
-      
-  | exception (Prover.ParseError s) -> 
+
+  | exception (Prover.ParseError s) ->
     error ~test state (fun fmt -> Fmt.string fmt s)
-      
+
   | exception (Cmd_error e) ->
     error ~test state (fun fmt -> pp_cmd_error fmt e)
 
@@ -209,10 +209,10 @@ let rec main_loop ~test ?(save=true) (state : loop_state) =
 
   | exception (Prover.Decl_error e) when not test ->
     error ~test state (fun fmt -> Prover.pp_decl_error pp_loc_error fmt e)
-      
+
   | exception (Theory.Conv e) when not test ->
     error ~test state (fun fmt -> Theory.pp_error pp_loc_error fmt e)
-      
+
   | exception (Symbols.SymbError e) when not test ->
     error ~test state (fun fmt -> Symbols.pp_symb_error pp_loc_error fmt e)
 
@@ -220,31 +220,31 @@ let rec main_loop ~test ?(save=true) (state : loop_state) =
     error ~test state (fun fmt -> TacticsArgs.pp_tac_arg_error pp_loc_error fmt e)
 
   | exception (Tactic_soft_failure (l,e)) when not test ->
-    let pp_e fmt = 
+    let pp_e fmt =
       Fmt.pf fmt "%aTactic failed: %a"
         pp_loc_error_opt l
-        Tactics.pp_tac_error_i e 
+        Tactics.pp_tac_error_i e
     in
     error ~test state pp_e
 
   | exception (Tactic_hard_failure (l,e)) when not test ->
-    let pp_e fmt = 
-      Fmt.pf fmt "%aTactic ill-formed or unapplicable: %a" 
-        pp_loc_error_opt l 
-        Tactics.pp_tac_error_i e 
+    let pp_e fmt =
+      Fmt.pf fmt "%aTactic ill-formed or unapplicable: %a"
+        pp_loc_error_opt l
+        Tactics.pp_tac_error_i e
     in
-    
+
     error ~test state pp_e
 
 and error ~test state e =
   Printer.prt `Error "%t" e;
-  if !interactive 
+  if !interactive
   then (main_loop[@tailrec]) ~test ~save:false state
   else if not test then exit 1
 
 
 
-let start_main_loop ?(test=false) () = 
+let start_main_loop ?(test=false) () =
   (* Initialize definitions before parsing system description.
    * TODO this is not doable anymore (with refactoring this code)
    * concerning definitions of functions, names, ... symbols;
@@ -454,7 +454,8 @@ let () =
         (fun () ->
            try run ~test "tests/alcotest/notxor.sp" with
            | Tactic_soft_failure
-               (_, Failure "Can only apply xor tactic on terms of the form u XOR v")  ->
+               (_, Failure "Xor can only be applied on a term with at least one \
+                            occurrence of a term xor(t,k)")  ->
              raise Ok)
     end ;
     "Pred Init", `Quick, begin fun () ->

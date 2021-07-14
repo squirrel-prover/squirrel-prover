@@ -2430,60 +2430,104 @@ let mk_xor_if_term_base (cntxt : Constr.trace_cntxt) env biframe
   let else_branch = term in
   Term.mk_ite phi then_branch else_branch
 
-let mk_xor_if_term cntxt env t biframe =
-  let (n_left, l_left, n_right, l_right, term) =
-    match Term.pi_term PLeft t, Term.pi_term PRight t with
-    | (Fun (fl, _, [Term.Name nl;ll]),
-       Fun (fr, _, [Term.Name nr;lr]))
-      when (fl = Term.f_xor && fr = Term.f_xor) ->
-      (nl,ll,nr,lr,t)
+let is_xored_diff t =
+  match Term.pi_term PLeft t, Term.pi_term PRight t with
+  | (Fun (fl,_,ll),Fun (fr,_,lr))
+    when (fl = Term.f_xor && fr = Term.f_xor) -> true
+  | _ -> false
 
-    | _ -> raise Not_xor
+let is_name_diff mess_name =
+  match Term.pi_term PLeft mess_name, Term.pi_term PRight mess_name with
+  | Name nl, Name nr -> true
+  | _ -> false
+
+let xor Args.(Pair (Int i, Pair (Opt (Message, m1), Opt (Message, m2)))) s =
+  (* We allow the optional arguments to be in any order, we just match them
+     however we can. *)
+  let opt_m, opt_n =  match m1, m2 with
+    | None, None -> None, None
+    | Some Message (t, _), None
+    | None, Some Message (t, _)
+      when is_name_diff t -> None, Some t
+    | Some Message (t, _), None
+    | None, Some Message (t, _)
+      when is_xored_diff t -> Some t, None
+    | Some Message (t1, _), Some Message (t2, _)
+      when is_name_diff t1 && is_xored_diff t2 -> Some t2, Some t1
+    | Some Message (t1, _), Some Message (t2, _)
+      when is_name_diff t2 && is_xored_diff t1 -> Some t1, Some t2
+    | _ ->       soft_failure
+        (Tactics.Failure
+           "The optional arguments of xor can only be a name and/or the target \
+            xored term.")
   in
-
-  mk_xor_if_term_base cntxt env biframe (n_left, l_left, n_right, l_right, term)
-
-
-let mk_xor_if_term_name cntxt env t mess_name biframe =
-  let n_left, l_left, n_right, l_right, term =
-    match Term.pi_term PLeft mess_name, Term.pi_term PRight mess_name with
-    | Name nl, Name nr ->
-      begin match Term.pi_term PLeft t, Term.pi_term PRight t with
-        | (Fun (fl,_,ll),Fun (fr,_,lr))
-          when (fl = Term.f_xor && fr = Term.f_xor) ->
-          (nl,remove_name_occ nl ll,
-               nr,remove_name_occ nr lr,
-           t)
-        | _ -> raise Not_xor
-      end
-
-    | _ -> soft_failure (Tactics.Failure "Expected a name")
-  in
-  mk_xor_if_term_base cntxt env biframe (n_left, l_left, n_right, l_right, term)
-
-
-let xor Args.(Pair (Int i, Opt (Message, opt_m))) s =
   let before, e, after = split_equiv_goal i s in
 
   (* the biframe to consider when checking the freshness *)
   let biframe = List.rev_append before after in
   let cntxt = ES.mk_trace_cntxt s in
   let env = ES.env s in
-  let res =
-    try
-      match opt_m with
-      | None -> mk_xor_if_term cntxt env e biframe
-      | Some (Args.Message (m,ty)) ->
-        (* for now, we only allow the xor rule on message type. *)
-        LT.check_ty_eq ty Type.Message;
 
-        mk_xor_if_term_name cntxt env e m biframe
-    with Not_xor ->
+  let xor_occ =
+    match (Iter.get_fsymb ~allow_diff:true (ES.table s) Term.f_xor e), opt_m with
+    | [], _ ->
       soft_failure
         (Tactics.Failure
-           "Can only apply xor tactic on terms of the form u XOR v")
+           "Xor can only be applied on a term with at least one occurrence \
+            of a term xor(t,k)")
+
+    | occ :: _, None ->
+      if not (Sv.is_empty occ.Iter.occ_vars) then
+        soft_failure
+          (Tactics.Failure "application below a binder is not supported");
+      occ
+
+    | occs, Some xor ->
+      begin match
+        List.find (fun xor_occ -> xor_occ.Iter.occ_cnt = xor) occs
+      with
+        | occ -> occ
+        | exception Not_found ->
+          soft_failure
+            (Tactics.Failure "the given xor does not occur in the term")
+      end
   in
-  let biframe = List.rev_append before (res :: after) in
+  let t =  xor_occ.Iter.occ_cnt in
+
+  let n_left, l_left, n_right, l_right, term =
+    match opt_n with
+    | None ->
+      begin
+        match Term.pi_term PLeft t, Term.pi_term PRight t with
+        | (Fun (fl, _, [Term.Name nl;ll]),
+           Fun (fr, _, [Term.Name nr;lr]))
+          when (fl = Term.f_xor && fr = Term.f_xor) ->
+          (nl,ll,nr,lr,t)
+
+        | _ -> assert false
+      end
+    | Some mess_name ->
+      begin
+        match Term.pi_term PLeft mess_name, Term.pi_term PRight mess_name with
+        | Name nl, Name nr ->
+          begin match Term.pi_term PLeft t, Term.pi_term PRight t with
+            | (Fun (fl,_,ll),Fun (fr,_,lr))
+              when (fl = Term.f_xor && fr = Term.f_xor) ->
+              (nl,remove_name_occ nl ll,
+               nr,remove_name_occ nr lr,
+               t)
+            | _ -> assert false
+          end
+        | _ -> assert false
+      end
+  in
+  let if_term =
+    mk_xor_if_term_base cntxt env biframe (n_left, l_left, n_right, l_right, term)
+  in
+  let new_elem =
+    Equiv.subst_equiv [Term.ESubst (t,if_term)] [e]
+  in
+  let biframe = List.rev_append before (new_elem @ after) in
   [ES.set_equiv_goal biframe s]
 
 
@@ -2493,7 +2537,7 @@ let () =
    ~detailed_help:"This yields the same freshness condition on the name as the \
                    fresh tactic."
    ~tactic_group:Cryptographic
-   (pure_equiv_typed xor) Args.(Pair (Int, Opt Message))
+   (pure_equiv_typed xor) Args.(Pair (Int, Pair (Opt Message, Opt Message)))
 
 
 (*------------------------------------------------------------------*)
