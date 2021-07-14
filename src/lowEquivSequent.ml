@@ -51,14 +51,7 @@ type t = {
   hint_db : Hint.hint_db;
 }
 
-let init ~system ~table ~hint_db ~ty_vars ~env ?hyp goal =
-  let hyps = H.empty in
-  let hyps = match hyp with
-    | None -> hyps
-    | Some h ->
-        snd (H.add ~force:false (H.fresh_id "H" hyps) h hyps)
-  in
-  { table; hint_db; system; ty_vars; env; hyps; goal }
+
 
 type sequent = t
 
@@ -294,17 +287,38 @@ let query_happens ~precise (s : t) (a : Term.timestamp) =
   let s = to_trace_sequent (set_reach_goal Term.mk_false s) in
   TS.query_happens ~precise s a
 
+
+let check_pq_sound_sequent s =
+  match goal s with
+  | Atom (Equiv.Equiv e) ->
+      let models = get_models s in
+      let cntxt = mk_trace_cntxt s in
+      if not (PostQuantum.is_attacker_call_synchronized cntxt models e) then
+        Tactics.hard_failure Tactics.NotPQSound
+      else
+        s
+  | _ -> s
+
 (*------------------------------------------------------------------*)
 let set_equiv_goal e j =
   let new_sequent = set_goal Equiv.(Atom (Equiv e)) j in
   if Config.post_quantum () then
-    let models = get_models new_sequent in
-    if not (PostQuantum.is_attacker_call_synchronized models e) then
-    Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
-    else
-      new_sequent
-  else
-    new_sequent
+   check_pq_sound_sequent new_sequent
+  else new_sequent
+
+
+let init ~system ~table ~hint_db ~ty_vars ~env ?hyp goal =
+  let hyps = H.empty in
+  let hyps = match hyp with
+    | None -> hyps
+    | Some h ->
+        snd (H.add ~force:false (H.fresh_id "H" hyps) h hyps)
+  in
+  let new_sequent = { table; hint_db; system; ty_vars; env; hyps; goal } in
+  if Config.post_quantum () then
+   check_pq_sound_sequent new_sequent
+  else new_sequent
+
 
 let mem_felem i s =
   goal_is_equiv s &&

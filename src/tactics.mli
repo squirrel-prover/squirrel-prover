@@ -33,8 +33,8 @@ type lsymb = string L.located
 (*------------------------------------------------------------------*)
 (** Errors returned when the axiom syntactic side-conditions do not hold. *)
 type ssc_error_c =
-  | E_message 
-  | E_elem 
+  | E_message
+  | E_elem
   | E_indirect of
       Symbols.action Symbols.t *
       [`Cond | `Output | `Update of Symbols.macro Symbols.t]
@@ -53,7 +53,7 @@ type tac_error_i =
   | CannotConvert
   | NotEqualArguments
   | Bad_SSC
-  | BadSSCDetailed of ssc_error list 
+  | BadSSCDetailed of ssc_error list
   | NoSSC
   | NoAssumpSystem
   | NotDepends of string * string
@@ -68,6 +68,7 @@ type tac_error_i =
   | DidNotFail
   | FailWithUnexpected of tac_error_i
   | GoalBadShape of string
+  | NotPQSound
   | SystemError     of System.system_error
   | SystemExprError of SystemExpr.system_expr_err
   | CongrFail

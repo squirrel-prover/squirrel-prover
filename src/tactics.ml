@@ -4,8 +4,8 @@ type lsymb = string L.located
 
 (*------------------------------------------------------------------*)
 type ssc_error_c =
-  | E_message 
-  | E_elem 
+  | E_message
+  | E_elem
   | E_indirect of
       Symbols.action Symbols.t *
       [`Cond | `Output | `Update of Symbols.macro Symbols.t]
@@ -38,7 +38,7 @@ type tac_error_i =
   | CannotConvert
   | NotEqualArguments
   | Bad_SSC
-  | BadSSCDetailed of ssc_error list 
+  | BadSSCDetailed of ssc_error list
   | NoSSC
   | NoAssumpSystem
   | NotDepends of string * string
@@ -53,6 +53,7 @@ type tac_error_i =
   | DidNotFail
   | FailWithUnexpected of tac_error_i
   | GoalBadShape of string
+  | NotPQSound
 
   (* TODO: remove these errors, catch directly at top-level *)
   | SystemError     of System.system_error
@@ -114,6 +115,7 @@ let rec tac_error_to_string = function
   | HypUnknown        _    -> "HypUnknown"
   | SystemExprError   _    -> "SystemExpr_Error"
   | GoalBadShape      _    -> "GoalBadShape"
+  | NotPQSound             -> "NotPQSound"
   | SystemError       _    -> "System_Error"
   | PatNumError       _    -> "PatNumError"
   | MustHappen        _    -> "MustHappen"
@@ -194,6 +196,8 @@ let rec pp_tac_error_i ppf = function
   | GoalBadShape s ->
     Fmt.pf ppf "goal has the wrong shape: %s" s
 
+  | NotPQSound ->
+    Fmt.pf ppf "the goal is not Post-Quantum Sound"
   | PatNumError (give, need) ->
     Fmt.pf ppf "invalid number of patterns (%d given, %d needed)" give need
 
@@ -213,14 +217,14 @@ let rec pp_tac_error_i ppf = function
     Fmt.pf ppf "no collision found"
 
   | ApplyMatchFailure None ->
-    Fmt.pf ppf "apply failed: no match found" 
+    Fmt.pf ppf "apply failed: no match found"
 
   | ApplyMatchFailure (Some (terms, minfos)) ->
-    let pp fmt t = 
-      Fmt.pf fmt "@[%a@]" 
-        (Term.pp_with_info (Term.match_infos_to_pp_info minfos)) t 
+    let pp fmt t =
+      Fmt.pf fmt "@[%a@]"
+        (Term.pp_with_info (Term.match_infos_to_pp_info minfos)) t
     in
-    Fmt.pf ppf "apply failed: no match found:@;  @[<v 0>%a@]" 
+    Fmt.pf ppf "apply failed: no match found:@;  @[<v 0>%a@]"
       (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt "@;") pp) terms
 
   | ApplyBadInst ->
@@ -319,7 +323,7 @@ let map ?(cut=true) t l sk fk0 =
              let fk = if cut then fk0 else fk in
              aux (List.rev_append r acc) l fk)
           fk
-  in 
+  in
   aux [] l fk0
 
 (** Like [map], but only apply the tactic to selected judgements. *)
@@ -361,7 +365,7 @@ let rec andthen_list ?(cut=true) = function
   | t::l -> andthen ~cut t (andthen_list ~cut l)
 
 let andthen_sel ?(cut=true) tac1 sel_tacs judge sk (fk : fk) : a =
-  let sk l fk' = 
+  let sk l fk' =
     let fk = if cut then fk else fk' in
     map_sel ~cut sel_tacs l sk fk
   in
@@ -380,7 +384,7 @@ let checkfail_tac (exc : string) t j (sk : 'a sk) (fk : fk) =
     let sk l fk = soft_failure DidNotFail in
     t j sk fk
   with
-  | (Tactic_soft_failure (_,e) | Tactic_hard_failure (_,e)) when 
+  | (Tactic_soft_failure (_,e) | Tactic_hard_failure (_,e)) when
       tac_error_to_string e = exc ->
     sk [j] fk
 
