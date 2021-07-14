@@ -76,7 +76,7 @@ Proof.
 
   (* Cond => WA *)
   intro [i t Meq].
-  project. 
+  project.
   (* left *)
   euf Meq => _ _ _; 1: auto.
   exists i,t0; simpl.
@@ -107,10 +107,10 @@ goal wa_R2 (r:index):
    R(r) < T(i,t) &&
    output@R(r) = input@T(i,t)).
 Proof.
-  use tags_neq; split. 
+  use tags_neq; split.
 
   intro [i t Meq].
-  project. 
+  project.
   (* left *)
   euf Meq => _ _ _; 1: auto.
   exists i,t0; simpl.
@@ -165,7 +165,7 @@ Proof.
   intro Meq; euf Meq => _ _ _; 1: auto.
   assert input@T(i,t) = nr(r) as F; 1: auto.
   fresh F => C.
-  by case C; 3:depends R(r), R2(r).  
+  by case C; 3:depends R(r), R2(r).
 Qed.
 
 equiv unlinkability.
@@ -179,10 +179,10 @@ fa 1.
 fa 1.
 fresh 1.
 yesif 1.
-by (repeat split => r0 _; 
+by (repeat split => r0 _;
     try (depends R(r0), R1(r0) by auto);
     try (depends R(r0), R2(r0) by auto)).
-auto. 
+auto.
 
 (* Case R1 *)
 expand frame, exec, cond, output.
@@ -236,8 +236,8 @@ equivalent
 
 (* IF-THEN-ELSE *)
 nosimpl(fa); try auto.
-by intro [_ [i t _]] /=; exists i,t. 
-by intro [_ [i t _]] /=; exists i,t. 
+by intro [_ [i t _]] /=; exists i,t.
+by intro [_ [i t _]] /=; exists i,t.
 
 (* TRY-FIND *)
 (* We have index variables corresponding to the existentials from
@@ -247,10 +247,10 @@ project => // [_ [i t G]].
 
 (* LEFT *)
 fa; 2: intro *; expand output; auto.
-intro Meq. 
-use wa_R1_left with i0,r as [H1 H2]. 
+intro Meq.
+use wa_R1_left with i0,r as [H1 H2].
 use H1 as [_ _]; 2: expand output; auto.
-by expand output; exists t. 
+by expand output; exists t.
 
 intro *.
 yesif; 1: auto.
@@ -259,8 +259,8 @@ auto.
 
 (* RIGHT *)
 fa; 2: intro *; expand output; auto.
-intro Meq. 
-use wa_R1_right with i0,t0,r as [H1 H2]. 
+intro Meq.
+use wa_R1_right with i0,t0,r as [H1 H2].
 use H1 as [_ _]; 2: expand output; auto.
 by expand output.
 
@@ -277,8 +277,9 @@ fa 1.
 yesif 1.
 use tags_neq; project; auto.
 xor 1,n_PRF.
-yesif 1. 
+yesif 1.
 by use len_id with i; use len_id' with i,t; namelength n_PRF, dummy.
+fresh 1.
 auto.
 
 (* Case R2 *)
@@ -314,10 +315,11 @@ by (repeat split => > _;
     repeat split => > _ [_ [_ Meq]];
     fresh Meq).
 
-fresh 1. 
+fresh 1.
 yesif 1; 1: auto.
 xor 1, n_PRF.
 yesif 1.
 by use len_id with i; use len_id' with i,t; namelength n_PRF,dummy.
+fresh 1.
 auto.
 Qed.

@@ -2396,7 +2396,7 @@ let rec remove_name_occ ns l = match l with
   | _ ->
     Tactics.(soft_failure (Failure "name is not XORed on both sides"))
 
-let mk_xor_if_term_base (cntxt : Constr.trace_cntxt) env biframe
+let mk_xor_phi_base (cntxt : Constr.trace_cntxt) env biframe
     (n_left, l_left, n_right, l_right, term) =
   let biframe = Term.mk_diff l_left l_right :: biframe in
 
@@ -2425,10 +2425,7 @@ let mk_xor_if_term_base (cntxt : Constr.trace_cntxt) env biframe
        List.filter (fun x -> not (List.mem x phi_right)) phi_left @
        phi_right)
   in
-
-  let then_branch = Term.mk_zero in
-  let else_branch = term in
-  Term.mk_ite phi then_branch else_branch
+  phi
 
 let is_xored_diff t =
   match Term.pi_term PLeft t, Term.pi_term PRight t with
@@ -2521,9 +2518,20 @@ let xor Args.(Pair (Int i, Pair (Opt (Message, m1), Opt (Message, m2)))) s =
         | _ -> assert false
       end
   in
-  let if_term =
-    mk_xor_if_term_base cntxt env biframe (n_left, l_left, n_right, l_right, term)
+  let phi =
+    mk_xor_phi_base cntxt env biframe (n_left, l_left, n_right, l_right, term)
   in
+  let ndef = Symbols.{ n_iarr = 0; n_ty = Message ; } in
+  let table,n =
+    Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_XOR") ndef
+  in
+  let ns = Term.mk_isymb n Message [] in
+  let s = ES.set_table table s in
+
+  let then_branch = Term.mk_name ns in
+  let else_branch = term in
+  let if_term = Term.mk_ite phi then_branch else_branch in
+
   let new_elem =
     Equiv.subst_equiv [Term.ESubst (t,if_term)] [e]
   in

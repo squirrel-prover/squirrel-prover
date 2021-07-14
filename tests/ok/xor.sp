@@ -51,5 +51,7 @@ Proof.
   xor 0, xor(n1,ok), n1.
   yesif 0.
   by use len_ok;  namelength n1,dummy.
+  fa 0.
+  fresh 0.
   auto.
 Qed.

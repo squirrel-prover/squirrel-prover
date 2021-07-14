@@ -21,5 +21,6 @@ Proof.
   yesif 1.
   simpl.
   by use len_ok.
+  fresh 1.
   auto.
 Qed.

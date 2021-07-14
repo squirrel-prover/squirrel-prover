@@ -28,10 +28,9 @@ Proof.
     True.
   admit.
   nosimpl(yesif 1).
- 
-  by namelength n(i),m(i); use len_ok with i.
 
-  fa 1.
+  by namelength n(i),m(i); use len_ok with i.
+  fresh 1.
   admit. (* Ignore final equivalence goal. *)
 Qed.
 
@@ -48,6 +47,6 @@ Proof.
   admit.
   nosimpl(yesif 1).
   by use len_ko_ok with i; use len_ko with i.
-  fa 1.
+  fresh 1.
   admit. (* Ignore final equivalence goal. *)
 Qed.
