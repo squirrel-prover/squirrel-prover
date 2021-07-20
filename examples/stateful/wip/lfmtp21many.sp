@@ -1,7 +1,7 @@
 (* LMFTP'21 example with many tags,
  * i.e. OSK protocol without readers and with unique_queries axiom. *)
 
-set autoIntro = false.
+set autoIntro  = false.
 
 hash H.
 hash G.
