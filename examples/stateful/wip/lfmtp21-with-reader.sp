@@ -31,6 +31,48 @@ Proof.
 admit. (* ok - en fait je ne sais pas trop comment faire une telle preuve - Doit-on mettre une hyp Happens?*)
 Qed.
 
+
+goal lastupdateT_pure_bis : forall tau:timestamp, happens(tau) => (
+  (forall j:index, happens(T(j)) => T(j)>tau) ||
+  (exists i:index, happens(T(i)) && T(i)<=tau && forall j:index, happens(T(j)) => (T(j)<=tau => T(j)<=T(i)))).
+Proof.
+induction.
+intro tau IH Hp.
+
+case tau.
+
+(* init *)
+intro Eq.
+left.
+intro j Hpj.
+auto.
+
+(* O(i) *)
+intro [i Eq].
+subst tau, O(i).
+use IH with pred(O(i)) => //.
+destruct H as [H1 | [i0 H2]].
+left.
+intro j Hpj.
+use H1 with j => //.
+right.
+exists i0.
+repeat split =>//.
+destruct H2 as [H21 H22 H23].
+intro j Hpj Ord.
+case (T(j) <= pred( O(i))) => //.
+use H23 with j => //.
+
+(* T(i) *)
+admit. 
+
+(* R(i) *)
+admit.
+
+(* R1(i) *)
+admit.
+Qed.
+
 goal lastupdateT_init :
   forall tau:timestamp, happens(tau) => (forall j:index, T(j)>tau) => sT@tau = sT@init.
 Proof.
