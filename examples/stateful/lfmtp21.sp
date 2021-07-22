@@ -77,17 +77,17 @@ goal non_repeating :
   s@alpha <> s@beta.
 Proof.
   induction => beta IH alpha _ [i [_ _]] Meq.
-  use lastupdate with beta as [[_ Habs] | [j [[_ _] Hsup]]]; 1: by use Habs with i.
+  use lastupdate with beta as [[_ Habs] | [j [[_ _] Hsup]]] => //;
+    1: by use Habs with i.
 
   use Hsup with i as _; 2: assumption.
-  (* We now have alpha < A(i) <= A(j) < beta and no A(_) between A(j) and tau'. *)
+  (* We now have alpha < A(i) <= A(j) < beta
+   * and no A(_) between A(j) and beta. *)
 
   assert s@alpha = s@A(j) as Meuf => //; expand s@A(j); euf Meuf => Heuf.
 
   use IH with pred(A(j)),pred(A(i0)) => //.
   by case Heuf; exists i0.
-
-  assumption. (* TODO get rid of it earlier; also happens(beta) is consequence of _ <= beta *)
 Qed.
 
 
@@ -125,14 +125,14 @@ Proof.
     admit. (* TODO le raffinement de PRF ne suffit pas: l'oracle ne peut venir de s@tau *)
     reach_equiv IH,pred(A(i')) => //.
       intro Hf; by fresh Hf.
-    admit. (* TODO as above *)
+    reach_equiv IH,pred(A(i')) => // Hf; by fresh Hf.
     reach_equiv IH,pred(A(i')) => // Hf; by fresh Hf.
   prf 1; yesif 1; 2: fresh 1; by apply IH.
   simpl; split; project; intro i' H; try destruct H as [H|H];
     try by apply unique_queries.
     admit. (* TODO as above *)
     reach_equiv IH,A(i') => // Hf; by fresh Hf.
-    admit. (* TODO as above *)
+    reach_equiv IH,A(i') => // Hf; by fresh Hf.
     reach_equiv IH,A(i') => // Hf; by fresh Hf.
 
   (* Tag *)
