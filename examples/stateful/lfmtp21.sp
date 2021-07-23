@@ -20,12 +20,38 @@ system (
   * Here we decompose the usual lastupdate lemma to separate the "pure" part
   * from the part that involves message equalities. *)
 
-axiom lastupdate_pure : forall tau:timestamp,
-  (forall j:index, A(j)>tau) ||
-  (exists i:index, A(i)<=tau && forall j:index, A(j)<=tau => A(j)<=A(i)).
+goal lastupdate_pure : forall tau:timestamp, happens(tau) => (
+  (forall j:index, happens(A(j)) => A(j)>tau) ||
+  (exists i:index, happens(A(i)) && A(i) <=tau && forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i))).
+Proof.
+induction.
+intro tau IH Hp.
+case tau.
+
+(* init *)
+intro Eq; left; intro j Hpj; by auto.
+
+(* O(i) *)
+intro [i Eq]; subst tau, O(i); use IH with pred(O(i)) => //.
+destruct H as [H1 | [i0 H2]].
+left; intro j Hpj; by use H1 with j => //.
+right; exists i0; repeat split =>//.
+destruct H2 as [H21 H22 H23].
+intro j [Hpj Ord].
+case (A(j) <= pred( O(i))) => //.
+use H23 with j => //.
+
+(* A(i) *)
+intro [i Eq]; subst tau, A(i); use IH with pred(A(i)) => //.
+destruct H as [H1 | [i0 H2]];
+try (right;
+exists i;
+repeat split => //).
+Qed.
+
 
 goal lastupdate_init :
-  forall tau:timestamp, happens(tau) => (forall j:index, A(j)>tau) => s@tau = s@init.
+  forall tau:timestamp, happens(tau) => (forall j:index, happens(A(j)) => A(j)>tau)  => s@tau = s@init.
 Proof.
   induction => tau IH _ Htau.
   case tau.
@@ -34,18 +60,20 @@ Proof.
 
   intro [i Hi]; rewrite Hi in *; expand s@O(i).
   apply IH => //.
-  intro j; by use Htau with j.
+  intro j Hp; by use Htau with j.
 
   intro [i Hi]; rewrite Hi in *.
   by use Htau with i.
 Qed.
 
 goal lastupdate_A :
-  forall (tau:timestamp,i:index)
-  (A(i)<=tau && forall j:index, A(j)<=tau => A(j)<=A(i)) =>
+  forall (tau:timestamp,i:index),
+  happens(A(i)) && A(i)<=tau && (forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i)) =>
   s@tau = s@A(i).
 Proof.
-  induction => tau IH _ [Hinf Hsup].
+  induction.
+  intro tau IH i [Hap Hinf Hsup].
+
   case tau.
 
   intro H; rewrite H in Hinf; auto.
@@ -59,12 +87,14 @@ Proof.
 Qed.
 
 goal lastupdate : forall tau:timestamp, happens(tau) =>
-  (s@tau = s@init && forall j:index, A(j)>tau) ||
-  (exists i:index, s@tau = s@A(i) && A(i)<=tau && forall j:index, A(j)<=tau => A(j)<=A(i)).
+  (s@tau = s@init && forall j:index, happens(A(j)) => A(j)>tau) ||
+  (exists i:index, s@tau = s@A(i) && happens(A(i)) && A(i)<=tau && forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i)).
 Proof.
   intro tau Htau.
   use lastupdate_pure with tau as [Hinit|[i HAi]] => //.
-  left; split => //; by apply lastupdate_init.
+  left.
+ split => //.
+ by apply lastupdate_init.
   right; exists i; repeat split => //; by apply lastupdate_A.
 Qed.
 
@@ -80,7 +110,7 @@ Proof.
   use lastupdate with beta as [[_ Habs] | [j [[_ _] Hsup]]] => //;
     1: by use Habs with i.
 
-  use Hsup with i as _; 2: assumption.
+  use Hsup with i => //.
   (* We now have alpha < A(i) <= A(j) < beta
    * and no A(_) between A(j) and beta. *)
 
@@ -116,7 +146,8 @@ Proof.
     simpl. intro i' HAi'.
     use non_repeating with pred(A(i)),pred(A(i')) => //.
     by exists i'.
-
+    by assumption.
+    
   (* Oracle *)
   expandall. fa 0. fa 1. fa 1. fa 1.
   prf 1; yesif 1; 2: fresh 1.
