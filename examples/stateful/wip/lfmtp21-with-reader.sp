@@ -24,64 +24,66 @@ system (
   * Here we decompose the usual lastupdate lemma to separate the "pure" part
   * from the part that involves message equalities. *)
 
-goal lastupdateT_pure : forall tau:timestamp,
-  (forall j:index, T(j)>tau) ||
-  (exists i:index, T(i)<=tau && forall j:index, T(j)<=tau => T(j)<=T(i)).
-Proof.
-admit. (* ok - en fait je ne sais pas trop comment faire une telle preuve - Doit-on mettre une hyp Happens?*)
-Qed.
-
-
-goal lastupdateT_pure_bis : forall tau:timestamp, happens(tau) => (
+goal lastupdateT_pure : forall tau:timestamp, happens(tau) => (
   (forall j:index, happens(T(j)) => T(j)>tau) ||
-  (exists i:index, happens(T(i)) && T(i)<=tau && forall j:index, happens(T(j)) => (T(j)<=tau => T(j)<=T(i)))).
+  (exists i:index, happens(T(i)) && T(i) <=tau && forall j:index, happens(T(j)) && T(j)<=tau => T(j)<=T(i))).
 Proof.
 induction.
 intro tau IH Hp.
-
 case tau.
 
 (* init *)
-intro Eq.
-left.
-intro j Hpj.
-auto.
+intro Eq; left; intro j Hpj; by auto.
 
 (* O(i) *)
-intro [i Eq].
-subst tau, O(i).
-use IH with pred(O(i)) => //.
+intro [i Eq]; subst tau, O(i); use IH with pred(O(i)) => //.
 destruct H as [H1 | [i0 H2]].
-left.
-intro j Hpj.
-use H1 with j => //.
-right.
-exists i0.
-repeat split =>//.
+left; intro j Hpj; by use H1 with j => //.
+right; exists i0; repeat split =>//.
 destruct H2 as [H21 H22 H23].
-intro j Hpj Ord.
+intro j [Hpj Ord].
 case (T(j) <= pred( O(i))) => //.
 use H23 with j => //.
 
 (* T(i) *)
-admit. 
+intro [i Eq]; subst tau, T(i); use IH with pred(T(i)) => //.
+destruct H as [H1 | [i0 H2]];
+try (right;
+exists i;
+repeat split => //).
 
 (* R(i) *)
-admit.
+intro [i Eq]; subst tau, R(i); use IH with pred(R(i)) => //.
+destruct H as [H1 | [i0 H2]].
+left; intro j Hpj; by use H1 with j => //.
+right; exists i0; repeat split =>//.
+destruct H2 as [H21 H22 H23].
+intro j [Hpj Ord].
+case (T(j) <= pred( R(i))) => //.
+use H23 with j => //.
 
 (* R1(i) *)
-admit.
+intro [i Eq]; subst tau, R1(i); use IH with pred(R1(i)) => //.
+destruct H as [H1 | [i0 H2]].
+left; intro j Hpj; by use H1 with j => //.
+right; exists i0; repeat split =>//.
+destruct H2 as [H21 H22 H23].
+intro j [Hpj Ord].
+case (T(j) <= pred( R1(i))) => //.
+use H23 with j => //.
 Qed.
 
+
 goal lastupdateT_init :
-  forall tau:timestamp, happens(tau) => (forall j:index, T(j)>tau) => sT@tau = sT@init.
+  forall tau:timestamp, happens(tau) => (forall j:index, happens(T(j)) => T(j)>tau)  => sT@tau = sT@init.
 Proof.
   induction => tau IH _ Htau.
-  case tau; 
+  case tau;
+
   try(
   intro [i Hi]; rewrite Hi in *; expand sT;
   apply IH => //;
-  intro j; by use Htau with j).
+  intro j Hp; by use Htau with j).
 
   auto.
 
@@ -90,8 +92,8 @@ Proof.
 Qed.
 
 goal lastupdate_T :
-  forall (tau:timestamp,i:index)
-  (T(i)<=tau && forall j:index, T(j)<=tau => T(j)<=T(i)) =>
+  forall (tau:timestamp,i:index),
+  happens(T(i)) && T(i)<=tau && (forall j:index, happens(T(j)) && T(j)<=tau => T(j)<=T(i)) =>
   sT@tau = sT@T(i).
 Proof.
   induction => tau IH _ [Hinf Hsup].
@@ -122,8 +124,8 @@ Qed.
 
 
 goal lastupdateT : forall tau:timestamp, happens(tau) =>
-  (sT@tau = sT@init && forall j:index, T(j)>tau) ||
-  (exists i:index, sT@tau = sT@T(i) && T(i)<=tau && forall j:index, T(j)<=tau => T(j)<=T(i)).
+  (sT@tau = sT@init && forall j:index, happens(T(j)) => T(j)>tau) ||
+  (exists i:index, sT@tau = sT@T(i) && happens(T(i)) && T(i)<=tau && forall j:index, happens(T(j)) && T(j)<=tau => T(j)<=T(i)).
 Proof.
   intro tau Htau.
   use lastupdateT_pure with tau as [Hinit|[i HAi]] => //.
@@ -133,32 +135,76 @@ Qed.
 
 (* Reader *)
 
-goal lastupdateR_pure : forall tau:timestamp,
-  (forall j:index, R(j)>tau) ||
-  (exists i:index, R(i)<=tau && forall j:index, R(j)<=tau => R(j)<=R(i)).
+goal lastupdateR_pure : forall tau:timestamp, happens(tau) => (
+  (forall j:index, happens(R(j)) => R(j)>tau) ||
+  (exists i:index, happens(R(i)) && R(i)<=tau && forall j:index, happens(R(j)) && R(j)<=tau => R(j)<=R(i))).
 Proof.
-admit. (* ok - en fait je ne sais pas trop comment faire une telle preuve - Doit-on mettre une hyp Happens?*)
+induction.
+intro tau IH Hp.
+case tau.
+
+(* init *)
+intro Eq; left; intro j Hpj; by auto.
+
+(* O(i) *)
+intro [i Eq]; subst tau, O(i); use IH with pred(O(i)) => //.
+destruct H as [H1 | [i0 H2]].
+left; intro j Hpj; by use H1 with j => //.
+right; exists i0; repeat split =>//.
+destruct H2 as [H21 H22 H23].
+intro j [Hpj Ord].
+case (R(j) <= pred( O(i))) => //.
+use H23 with j => //.
+
+(* T(i) *)
+intro [i Eq]; subst tau, T(i); use IH with pred(T(i)) => //.
+destruct H as [H1 | [i0 H2]].
+left; intro j Hpj; by use H1 with j => //.
+right; exists i0; repeat split =>//.
+destruct H2 as [H21 H22 H23].
+intro j [Hpj Ord].
+case (R(j) <= pred( T(i))) => //.
+use H23 with j => //.
+
+(* R(i) *)
+intro [i Eq]; subst tau, R(i); use IH with pred(R(i)) => //.
+destruct H as [H1 | [i0 H2]];
+try (right;
+exists i;
+repeat split => //).
+
+
+(* R1(i) *)
+intro [i Eq]; subst tau, R1(i); use IH with pred(R1(i)) => //.
+destruct H as [H1 | [i0 H2]].
+left; intro j Hpj; by use H1 with j => //.
+right; exists i0; repeat split =>//.
+destruct H2 as [H21 H22 H23].
+intro j [Hpj Ord].
+case (R(j) <= pred( R1(i))) => //.
+use H23 with j => //.
 Qed.
 
+
 goal lastupdateR_init :
-  forall tau:timestamp, happens(tau) => (forall j:index, R(j)>tau) => sR@tau = sR@init.
+  forall tau:timestamp, happens(tau) => (forall j:index, happens(R(j)) => R(j)>tau) => sR@tau = sR@init.
 Proof.
   induction => tau IH _ Htau.
-  case tau; 
+  case tau;
   try(
   intro [i Hi]; rewrite Hi in *; expand sR;
   apply IH => //;
-  intro j; by use Htau with j).
+  intro j Hp; by use Htau with j).
 
   auto.
 
   intro [i Hi]; rewrite Hi in *.
-  by use Htau with i.
+  use Htau with i => //.
 Qed.
 
 goal lastupdate_R :
-  forall (tau:timestamp,i:index)
-  (R(i)<=tau && forall j:index, R(j)<=tau => R(j)<=R(i)) =>
+  forall (tau:timestamp,i:index),
+  happens(R(i)) && R(i)<=tau && (forall j:index, happens(R(j)) && R(j)<=tau => R(j)<=R(i)) =>
   sR@tau = sR@R(i).
 Proof.
   induction => tau IH _ [Hinf Hsup].
@@ -190,12 +236,13 @@ Qed.
 
 
 goal lastupdateR : forall tau:timestamp, happens(tau) =>
-  (sR@tau = sR@init && forall j:index, R(j)>tau) ||
-  (exists i:index, sR@tau = sR@R(i) && R(i)<=tau && forall j:index, R(j)<=tau => R(j)<=R(i)).
+  (sR@tau = sR@init && forall j:index, happens(R(j)) => R(j)>tau) ||
+  (exists i:index, sR@tau = sR@R(i) && happens(R(i)) && R(i)<=tau && forall j:index, happens(R(j)) && R(j)<=tau => R(j)<=R(i)).
 Proof.
   intro tau Htau.
   use lastupdateR_pure with tau as [Hinit|[i HAi]] => //.
-  left; split => //; by apply lastupdateR_init.
+  left. split => //. by apply lastupdateR_init => //.
+  
   right. exists i. repeat split => //. by apply lastupdate_R.
 Qed.
 
@@ -209,7 +256,7 @@ Proof.
   induction => beta IH alpha _ [i [_ _]] Meq.
   use lastupdateT with beta as [[_ Habs] | [j [[_ _] Hsup]]]; 1: by use Habs with i.
 
-  use Hsup with i as _; 2: assumption.
+  use Hsup with i => //.
   (* We now have alpha < T(i) <= T(j) < beta and no T(_) between T(j) and tau'. *)
 
   assert sT@alpha = sT@T(j) as Meuf => //; expand sT@T(j).
@@ -230,7 +277,7 @@ Proof.
   induction => beta IH alpha _ [i [_ _]] Meq.
   use lastupdateR with beta as [[_ Habs] | [j [[_ _] Hsup]]]; 1: by use Habs with i.
 
-  use Hsup with i as _; 2: assumption.
+  use Hsup with i => //.
   (* We now have alpha < R(i) <= R(j) < beta and no R(_) between R(j) and tau'. *)
 
   assert sR@alpha = sR@R(j) as Meuf => //; expand sR@R(j).
@@ -248,6 +295,41 @@ Qed.
 axiom unique_queries : forall (i,j:index) i <> j => input@O(i) <> input@O(j).
 
 
+name m : message.
+
+(* a well-authentication goal with strong secrecy as an hypothesis *)
+
+global goal wa : 
+   forall (i:index), [happens(R(i))] -> (forall (tau:timestamp), equiv(frame@pred(R(i)),diff(sT@tau,m))) ->  
+[exec@R(i) <=> 
+(exec@pred(R(i)) &&
+(exists j:index, T(j)<R(i) && input@R(i) = output@T(j) && sT@T(j) = sR@R(i)))].
+
+Proof.
+intro i.
+intro Hp.
+intro BIZARRE.
+
+split.
+(* => *) 
+expand exec@R(i). expand cond@R(i).
+intro [H1 Meq].
+euf Meq.
+(* cas de l'oracle *)
+intro *.
+split => //.
+admit. (* il faudrait pouvoir invoquer le secrecy de l'état du reader *)
+(* cas du tag *)
+intro *.
+split => //.
+exists i0.
+auto.
+
+(* <= *)
+intro [j [H1 H2]].
+expandall.
+auto.
+Qed.
 
 goal well_auth :
   forall (i:index) happens(R(i)) => 
@@ -280,8 +362,6 @@ expandall.
 auto.
 Qed.
 
-
-name m : message.
 
 global goal [default/left,default/left]
   strong_secrecy (tau:timestamp) : forall (tau':timestamp),
