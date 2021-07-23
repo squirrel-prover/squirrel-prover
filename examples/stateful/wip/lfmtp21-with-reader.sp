@@ -363,6 +363,78 @@ auto.
 Qed.
 
 
+goal sR_implies_sT:
+  forall (tau:timestamp), happens(tau) => exec@tau  => exists (tau':timestamp), tau' <= tau && sR@tau = sT@tau'.
+Proof.
+induction.
+intro tau IH.
+intro Hp exec.
+case tau.
+
+(* init *)
+intro Eq.
+exists init.
+auto.
+
+(* O(i) *)
+intro [i Eq].
+subst tau, O(i).
+expand exec@O(i).
+destruct exec as [Hexec Hcond].
+use IH with pred(O(i)) => //.
+destruct H as [tau' [Hpred Eq]].
+exists tau'.
+split.
+auto.
+expand sR.
+by assumption.
+
+
+(* T(i) *)
+intro [i Eq].
+subst tau, T(i).
+expand exec@T(i).
+destruct exec as [Hexec Hcond].
+use IH with pred(T(i)) => //.
+destruct H as [tau' [Hpred Eq]].
+exists tau'.
+split.
+auto.
+expand sR.
+by assumption.
+
+
+(* R(i) *)
+intro [i Eq].
+subst tau, R(i).
+expand exec@R(i).
+destruct exec as [Hexec Hcond].
+expand cond@R(i).
+euf Hcond.
+
+(* cas de l'oracle *)
+admit.
+(* cas du tag *)
+intro Ord.
+intro Eq.
+exists T(i0).
+auto.
+
+(* R1(i) *)
+intro [i Eq].
+subst tau, R1(i).
+expand exec@R1(i).
+destruct exec as [Hexec Hcond].
+use IH with pred(R1(i)) => //.
+destruct H as [tau' [Hpred Eq]].
+exists tau'.
+split.
+auto.
+expand sR.
+by assumption.
+Qed.
+
+
 global goal [default/left,default/left]
   strong_secrecy (tau:timestamp) : forall (tau':timestamp),
     [happens(tau)] -> [happens(tau')] -> equiv(frame@tau, diff(sT@tau',m)).
@@ -383,6 +455,7 @@ Proof.
     simpl. intro i' HAi'.
     use non_repeatingT with pred(T(i)),pred(T(i')) => //.
     by exists i'.
+  by assumption.
 
   (* Oracle *)
   expandall. fa 0. fa 1. fa 1. fa 1.
