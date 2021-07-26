@@ -297,79 +297,18 @@ axiom unique_queries : forall (i,j:index) i <> j => input@O(i) <> input@O(j).
 
 name m : message.
 
-(* a well-authentication goal with strong secrecy as an hypothesis *)
-
-global goal wa : 
-   forall (i:index), [happens(R(i))] -> (forall (tau:timestamp), equiv(frame@pred(R(i)),diff(sT@tau,m))) ->  
-[exec@R(i) <=> 
-(exec@pred(R(i)) &&
-(exists j:index, T(j)<R(i) && input@R(i) = output@T(j) && sT@T(j) = sR@R(i)))].
-
+(* la valeur de l'etat du reader apparait dans l'etat du tag avant. Pour montrer cela, je suppose strong secrecy de l'etat du reader - c'est pour traiter le cas de l'oracle *)
+global goal [default/left,default/left] GsR_implies_sT:
+(* (forall (tau, tau': timestamp), [happens(tau)] -> [happens(tau')] -> equiv(frame@tau,diff(sT@tau',m))) 
+-> *)
+(forall (tau, tau': timestamp), [happens(tau)] -> [happens(tau')] -> equiv(frame@tau,diff(sR@tau',m))) 
+->  [forall (tau1:timestamp), happens(tau1) => exec@tau1 => exists (tau2:timestamp), tau2 <= tau1 && sR@tau1 = sT@tau2].
 Proof.
-intro i.
-intro Hp.
-intro BIZARRE.
-
-split.
-(* => *) 
-expand exec@R(i). expand cond@R(i).
-intro [H1 Meq].
-euf Meq.
-(* cas de l'oracle *)
-intro *.
-split => //.
-admit. (* il faudrait pouvoir invoquer le secrecy de l'état du reader *)
-(* cas du tag *)
-intro *.
-split => //.
-exists i0.
-auto.
-
-(* <= *)
-intro [j [H1 H2]].
-expandall.
-auto.
-Qed.
-
-goal well_auth :
-  forall (i:index) happens(R(i)) => 
-(exec@R(i) <=> 
-(exec@pred(R(i)) &&
-(exists j:index, T(j)<R(i) && input@R(i) = output@T(j) && sT@T(j) = sR@R(i)))).
-
-Proof.
-intro *.
-
-split.
-
-(* => *) 
-expand exec@R(i). expand cond@R(i).
-intro [H1 Meq].
-euf Meq.
-(* cas de l'oracle *)
-intro *.
-split => //.
-admit. (* il faudrait pouvoir invoquer le secrecy de l'état du reader *)
-(* cas du tag *)
-intro *.
-split => //.
-exists i0.
-auto.
-
-(* <= *)
-intro [j [H1 H2]].
-expandall.
-auto.
-Qed.
-
-
-goal sR_implies_sT:
-  forall (tau:timestamp), happens(tau) => exec@tau  => exists (tau':timestamp), tau' <= tau && sR@tau = sT@tau'.
-Proof.
+intro  HR.
 induction.
-intro tau IH.
+intro tau1 IH.
 intro Hp exec.
-case tau.
+case tau1.
 
 (* init *)
 intro Eq.
@@ -378,7 +317,7 @@ auto.
 
 (* O(i) *)
 intro [i Eq].
-subst tau, O(i).
+subst tau1, O(i).
 expand exec@O(i).
 destruct exec as [Hexec Hcond].
 use IH with pred(O(i)) => //.
@@ -389,10 +328,9 @@ auto.
 expand sR.
 by assumption.
 
-
 (* T(i) *)
 intro [i Eq].
-subst tau, T(i).
+subst tau1, T(i).
 expand exec@T(i).
 destruct exec as [Hexec Hcond].
 use IH with pred(T(i)) => //.
@@ -406,23 +344,45 @@ by assumption.
 
 (* R(i) *)
 intro [i Eq].
-subst tau, R(i).
+subst tau1, R(i).
 expand exec@R(i).
 destruct exec as [Hexec Hcond].
 expand cond@R(i).
 euf Hcond.
 
-(* cas de l'oracle *)
-admit.
-(* cas du tag *)
+(* R(i) -cas de l'oracle *)
+intro Ord.
+assert(input@O(i0) <> H(sR@pred(R(i)),k)) =>//.
+intro Eq.
+assert(sR@R(i) = H(sR@pred(R(i)),k)).
+expand sR@R(i).
+auto.
+assert( input@O(i0) <> sR@R(i)).
+clear Hcond.
+clear Hexec.
+clear IH.
+clear Eq.
+clear Meq.
+reach_equiv HR, R(i), R(i) => //.
+intro Eq.
+fresh Eq.
+auto.
+expand sR@R(i).
+auto.
+
+
+(* cas de l'etat du tag *)
 intro Ord.
 intro Eq.
+expand sR@R(i).
 exists T(i0).
+split.
+auto.
 auto.
 
 (* R1(i) *)
 intro [i Eq].
-subst tau, R1(i).
+subst tau1, R1(i).
 expand exec@R1(i).
 destruct exec as [Hexec Hcond].
 use IH with pred(R1(i)) => //.
@@ -433,6 +393,60 @@ auto.
 expand sR.
 by assumption.
 Qed.
+
+
+
+(* a well-authentication goal with strong secrecy as an hypothesis *)
+
+global goal [default/left,default/left] wa: 
+(forall (tau, tau': timestamp), [happens(tau)] -> [happens(tau')] -> equiv(frame@tau,diff(sR@tau',m))) ->
+[forall (i:index), happens(R(i)) => (exec@R(i) <=> 
+(exec@pred(R(i)) &&
+(exists j:index, T(j)<R(i) && input@R(i) = output@T(j) && sT@T(j) = sR@R(i))))].
+
+Proof.
+intro HR.
+intro i.
+intro Hp.
+
+split.
+
+(* => *) 
+expand exec@R(i). expand cond@R(i).
+intro [H1 Meq].
+euf Meq.
+(* cas de l'oracle *)
+intro *.
+split => //.
+assert (H(sR@pred(R(i)),k) = sR@R(i)).
+admit. (* c'est trivial mais je n'arrive pas a lui faire garder cette egalite en hypothese *)
+assert (input@O(i0) = sR@R(i)).
+auto.
+assert (input@O(i0) <> sR@R(i)).
+clear Meq1.
+clear Meq0.
+clear Meq.
+clear H1.
+reach_equiv HR, R(i), R(i) => //.
+intro Eq.
+fresh Eq.
+auto.
+auto.
+
+(* cas du tag *)
+intro *.
+split => //.
+exists i0.
+auto.
+
+(* <= *)
+intro [j [H1 H2]].
+expandall.
+auto.
+Qed.
+
+
+
 
 
 global goal [default/left,default/left]
