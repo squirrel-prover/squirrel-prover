@@ -25,24 +25,22 @@ system (
 
 axiom lastupdate_pure : forall (i:index,tau:timestamp), happens(tau) => (
   (forall j:index, happens(A(i,j)) => A(i,j)>tau) ||
-  (exists j:index, 
-    happens(A(i,j)) && A(i,j)<=tau 
-    && forall jj:index, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))).
+  (exists j:index, A(i,j)<=tau 
+    && forall jj:index, A(i,jj)<=tau => A(i,jj)<=A(i,j))).
 
 axiom lastupdate_init : forall (i:index,tau:timestamp), happens(tau) => (
   (forall j:index, happens(A(i,j)) => A(i,j)>tau) 
   => s(i)@tau = s(i)@init).
 
 axiom lastupdate_A : forall (i:index,j:index,tau:timestamp), happens(tau) => (
-  (happens(A(i,j)) && A(i,j)<=tau 
-    && forall jj:index, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))
+  (A(i,j)<=tau && forall jj:index, A(i,jj)<=tau => A(i,jj)<=A(i,j))
   => s(i)@tau = s(i)@A(i,j)).
 
 axiom lastupdate : forall (i:index,tau:timestamp), happens(tau) => (
   (s(i)@tau = s(i)@init && forall j:index, happens(A(i,j)) => A(i,j)>tau) ||
   (exists j:index, 
-    happens(A(i,j)) && s(i)@tau = s(i)@A(i,j) && A(i,j)<=tau 
-    && forall jj:index, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))).
+    s(i)@tau = s(i)@A(i,j) && A(i,j)<=tau 
+    && forall jj:index, A(i,jj)<=tau => A(i,jj)<=A(i,j))).
 
 
 (** The contents of the memory cell never repeats. *)
@@ -68,22 +66,35 @@ admit. (* TODO s0(i') <> s(i)@A(i,j) *)
   use IH with pred(A(i',j')),pred(A(i,j)),i',i => //.
 Qed.
 
+(** Values do not repeat inside the same chain of hashes. *)
 goal monotonic_chain :
-  forall (tau,tau':timestamp,i,j:index) happens(tau) =>
-    tau = A(i,j) && tau' < tau => s(i)@tau' <> s(i)@tau.
+  forall (tau,tau':timestamp,i,j:index) happens(tau,A(i,j)) => (
+    (s(i)@tau = s(i)@A(i,j) && tau' < A(i,j) && A(i,j) <= tau)
+    => s(i)@tau' <> s(i)@tau).
 Proof.
-  induction => tau IH tau' i j Hap [H1 H2] Meq.
-  subst tau, A(i,j).
+  induction => tau IH tau' i j Hap [H1 H2 H3] Meq.
+  assert s(i)@tau' = s(i)@A(i,j) as Meq'; 1: auto.
   expand s(i)@A(i,j).
-  euf Meq.
+  euf Meq'.
   intro Heuf Meuf *.
-  use lastupdate with i0,pred(A(i,j)) as H1; 2: by auto.
-  case H1.
-    (* case H1 - init *)
-    destruct H1 as [H1 H1'].
-    use H1' with j0; 1,2: case Heuf; auto.
+  assert i=i0 || i<>i0 as H0; 1: auto.
+  (* case i=i0 *)
+  case H0.
+  use lastupdate with i,pred(A(i,j)) as H4; 2: by auto.
+  case H4.
+    (* case H4 - init *)
+    destruct H4 as [H4 H4'].
+    use H4' with j0; 1,2: case Heuf; auto.
     (* case H1 - general *)
-    admit. (* TODO *)
+    destruct H4 as [j1 [Meq1 H4 H5]].
+    use IH with pred(A(i,j)),pred(A(i,j0)),i,j1 as H; try auto.
+    repeat split.
+    auto. 
+    use H5 with j0; 1,2: case Heuf; auto.
+    auto.
+  (* case i<>i0 *)
+  use disjoint_chains with pred(A(i0,j0)),pred(A(i,j)),i0,i as Mneq;
+    case Heuf; auto.
 Qed.
 
 goal non_repeating :
@@ -135,7 +146,12 @@ Proof.
     simpl. intro i0 j0 HAi0.
     assert i'=i0 || i'<>i0; try auto.
     case H0.
-    admit. (* use monotonic_chain with pred(A(i',j)),pred(A(i0,j0)),i',i0 => //. *)
+    use lastupdate with i',pred(A(i',j)) as [[H1 H2] | H1]; try auto.
+    use H2 with j0 as H3; try auto.
+    destruct H1 as [j1 [H1 H2 H3]].
+    use monotonic_chain with pred(A(i',j)),pred(A(i',j0)),i',j1 => //.
+    repeat split; try auto.
+    use H3 with j0 as H4; try auto.
     use disjoint_chains with pred(A(i',j)),pred(A(i0,j0)),i',i0 => //.
 
   (* Oracle *)
@@ -179,10 +195,7 @@ Proof.
     use monotonic_chain with A(i,j),A(i,j0),i,j => //.
     use disjoint_chains with A(i,j),A(i0,j0),i,i0 => //.
     intro i0 j0 H; try destruct H as [H|H].
-    assert i=i0 || i<>i0; try auto.
-    case H0.
-    admit. (* use monotonic_chain with A(i,j),A(i0,j0),i',i0 => //. *)
-    use disjoint_chains with A(i,j),A(i0,j0),i,i0 => //.
+    admit. (* TODO as above *)
     assert i=i0 || i<>i0; try auto.
     case H0.
     use monotonic_chain with A(i,j),A(i,j0),i,j => //.
