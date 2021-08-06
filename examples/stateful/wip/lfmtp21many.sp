@@ -97,6 +97,7 @@ Proof.
     case Heuf; auto.
 Qed.
 
+(* NOT USED 
 goal non_repeating :
   forall (tau',tau:timestamp,i',i:index) happens(tau') =>
   (exists j:index, tau < A(i',j) && A(i',j) <= tau') =>
@@ -120,6 +121,7 @@ Proof.
        Avec un seul tag on était en gros dans la situation où i0=i'
        et j0 convenait. *)
 Qed.
+*)
 
 (** Strong secrecy *)
 
