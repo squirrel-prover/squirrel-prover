@@ -1,13 +1,13 @@
 # Squirrel Prover Examples
 
-This folder contains the examples and case studies of the Squirrel Prover paper.
+This folder contains the examples and case studies of the Squirrel Prover.
 
 ## Running Examples
 
-The running examples of the paper correspond to the files:
+The running examples of the original paper [1] correspond to the files:
 - `running-ex-auth.sp` for the authentication property
 - `basic-hash.sp` for the complete proof of unlinkability
-They are well suited to get a first feel of the tool.
+They are well suited to get a first feel of the tool, as well as the tutorial files in `tutorial/`.
 
 ## Comparison with CryptoVerif and EasyCrypt
 To help comparing Squirrel to existing approaches in the computational model, we conduct the security analysis of the same protocol (Basic Hash) in three different tools: Squirrel, CryptoVerif and EasyCrypt.
@@ -65,6 +65,14 @@ SSH protocol with forwarding agent [H]
  - `ssh-forward-part1-compo.sp`
  - `ssh-forward-part2-compo.sp`
 
+### KEM based
+
+Generic construction from [I]:
+ - `kemKE_BCGNP.sp`
+
+Generic construction (more complex) from [J]:
+ - `kemKE_FSXY.sp`
+
 
 ### Composition
 
@@ -72,6 +80,17 @@ The case studies that end with the `-compo` suffix leverage the composition
 result of [H]. They correspond to proofs that are performed for a single
 session, but that allow to derive thanks to the theorems of [H] a security
 guarantee for an unbounded number of sessions.
+
+## Post-quantum soundness
+
+An option allows to check if a proof is sound for quantum attackers. It is enabled inside a file with:
+`set postQuantumSound = true.`
+
+All but the DDH based examples in this repository are post-quantum sound.
+
+## BC Bibliography
+
+ - [1] David Baelde, Stéphanie Delaune, Adrien Koutsos, Charlie Jacomme, Solène Moreau (2021). An interactive prover for protocol verification in the computational model. IEEE Symposium on Security and Privacy (S&P'21).
 
 ## Bibliography
 
@@ -104,4 +123,6 @@ Part 3: Mechanisms using digital signature techniques.
 simulation: a technique for protocol composition with long term shared secrets.
 In Jonathan Katz and Giovanni Vigna, editors, Proceedings of the 27st
 ACM Conference on Computer and Communications Security (CCS’20),
-Orlando, USA, November 2020. ACM Press. To appear
+Orlando, USA, November 2020. ACM Press.
+ - [I] Boyd, Colin and Cliff, Yvonne and Nieto, Juan M. Gonzalez and Paterson, Kenneth G. One-round key exchange in the standard model.
+ - [J] Fujioka, Atsushi and Suzuki, Koutarou and Xagawa, Keita and Yoneyama, Kazuki. Strongly Secure Authenticated Key Exchange from Factoring, Codes, and Lattices
