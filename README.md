@@ -41,6 +41,9 @@ We recommend installing ProofGeneral from the git repository.
 Examples of developments in Squirrel can be found in:
 - `examples/`
 
+Those include classical and post-quantum sound proofs of protocols.
+See `examples/README.md` for details.
+
 ## Quick guide
 
 For a first introduction to the syntax, we recommend to open with ProofGeneral
