@@ -82,16 +82,13 @@ let is_attacker_call_synchronized cntxt models biframe =
        Term.mk_macro Term.in_macro [] tau
      in
      let ok_list = [frame_at; frame_at_pred; input_at] in
-     List.exists (fun t ->
-         List.mem t ok_list
-         ||
-         begin
-           match t with
+     let rec is_in = function
            | Term.Fun (fs,_,[l1; l2]) when
-               fs = Term.f_pair && (List.mem l1 ok_list || List.mem l2 ok_list) -> true
+               fs = Term.f_pair -> is_in l1 || is_in l2
+           | t2 when List.mem t2 ok_list -> true
            | _ -> false
-         end
-       ) biframe
+     in
+     List.exists is_in biframe
    in
    if not (List.for_all (fun tau -> has_frame_or_input biframe tau) maximal_elems) then
      false
