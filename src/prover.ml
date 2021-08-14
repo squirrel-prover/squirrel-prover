@@ -618,6 +618,7 @@ let () =
                                    list of tactics.";
                   usages_sorts = [];
                   tactic_group = Logical}
+    ~pq_sound:true
     (function
       | [] -> get_equiv_help (L.mk_loc L._dummy "")
       | [String_name tac_name]-> get_equiv_help tac_name
@@ -628,6 +629,7 @@ let () =
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
+    ~pq_sound:true
     (fun _ -> Tactics.id)
 
 (*------------------------------------------------------------------*)
