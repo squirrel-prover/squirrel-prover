@@ -221,7 +221,7 @@ let tfold_occ : type b.
 
     func ~fv:fv1 ~cond (Term.ETerm c) acc                               |>
     func ~fv:fv1 ~cond:(Term.mk_and cond c) (Term.ETerm t)              |>
-    func ~fv:fv1  ~cond:(Term.mk_and cond (Term.mk_not c)) (Term.ETerm e)
+    func ~fv:fv  ~cond:(Term.mk_and cond (Term.(mk_not (mk_exists (List.map (fun i -> Vars.EVar i) is)  c)))) (Term.ETerm e)
 
   | Term.Macro (m, l, ts) ->
     if l <> [] then failwith "Not implemented" ;
