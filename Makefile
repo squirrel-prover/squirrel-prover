@@ -65,6 +65,10 @@ clean:
 squirrel.byte: version sanity
 	$(OCB) squirrel.byte
 
+debug: version sanity
+	$(OCB) -tags debug squirrel.native
+
+
 squirrel: squirrel.byte
 	@ln -s -f squirrel.byte squirrel
 

@@ -20,38 +20,12 @@ system (
   * Here we decompose the usual lastupdate lemma to separate the "pure" part
   * from the part that involves message equalities. *)
 
-goal lastupdate_pure : forall tau:timestamp, happens(tau) => (
-  (forall j:index, happens(A(j)) => A(j)>tau) ||
-  (exists i:index, happens(A(i)) && A(i) <=tau && forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i))).
-Proof.
-induction.
-intro tau IH Hp.
-case tau.
-
-(* init *)
-intro Eq; left; intro j Hpj; by auto.
-
-(* O(i) *)
-intro [i Eq]; subst tau, O(i); use IH with pred(O(i)) => //.
-destruct H as [H1 | [i0 H2]].
-left; intro j Hpj; by use H1 with j => //.
-right; exists i0; repeat split =>//.
-destruct H2 as [H21 H22 H23].
-intro j [Hpj Ord].
-case (A(j) <= pred( O(i))) => //.
-use H23 with j => //.
-
-(* A(i) *)
-intro [i Eq]; subst tau, A(i); use IH with pred(A(i)) => //.
-destruct H as [H1 | [i0 H2]];
-try (right;
-exists i;
-repeat split => //).
-Qed.
-
+axiom lastupdate_pure : forall tau:timestamp,
+  (forall j:index, A(j)>tau) ||
+  (exists i:index, A(i)<=tau && forall j:index, A(j)<=tau => A(j)<=A(i)).
 
 goal lastupdate_init :
-  forall tau:timestamp, happens(tau) => (forall j:index, happens(A(j)) => A(j)>tau)  => s@tau = s@init.
+  forall tau:timestamp, happens(tau) => (forall j:index, A(j)>tau) => s@tau = s@init.
 Proof.
   induction => tau IH _ Htau.
   case tau.
@@ -60,20 +34,18 @@ Proof.
 
   intro [i Hi]; rewrite Hi in *; expand s@O(i).
   apply IH => //.
-  intro j Hp; by use Htau with j.
+  intro j; by use Htau with j.
 
   intro [i Hi]; rewrite Hi in *.
   by use Htau with i.
 Qed.
 
 goal lastupdate_A :
-  forall (tau:timestamp,i:index),
-  happens(A(i)) && A(i)<=tau && (forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i)) =>
+  forall (tau:timestamp,i:index)
+  (A(i)<=tau && forall j:index, A(j)<=tau => A(j)<=A(i)) =>
   s@tau = s@A(i).
 Proof.
-  induction.
-  intro tau IH i [Hap Hinf Hsup].
-
+  induction => tau IH _ [Hinf Hsup].
   case tau.
 
   intro H; rewrite H in Hinf; auto.
@@ -87,14 +59,12 @@ Proof.
 Qed.
 
 goal lastupdate : forall tau:timestamp, happens(tau) =>
-  (s@tau = s@init && forall j:index, happens(A(j)) => A(j)>tau) ||
-  (exists i:index, s@tau = s@A(i) && happens(A(i)) && A(i)<=tau && forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i)).
+  (s@tau = s@init && forall j:index, A(j)>tau) ||
+  (exists i:index, s@tau = s@A(i) && A(i)<=tau && forall j:index, A(j)<=tau => A(j)<=A(i)).
 Proof.
   intro tau Htau.
   use lastupdate_pure with tau as [Hinit|[i HAi]] => //.
-  left.
- split => //.
- by apply lastupdate_init.
+  left; split => //; by apply lastupdate_init.
   right; exists i; repeat split => //; by apply lastupdate_A.
 Qed.
 
@@ -107,17 +77,16 @@ goal non_repeating :
   s@alpha <> s@beta.
 Proof.
   induction => beta IH alpha _ [i [_ _]] Meq.
-  use lastupdate with beta as [[_ Habs] | [j [[_ _] Hsup]]] => //;
-    1: by use Habs with i.
+  use lastupdate with beta as [[_ Habs] | [j [[_ _] Hsup]]]=> //; 1: by use Habs with i.
 
-  use Hsup with i => //.
-  (* We now have alpha < A(i) <= A(j) < beta
-   * and no A(_) between A(j) and beta. *)
+  use Hsup with i as _; 2: assumption.
+  (* We now have alpha < A(i) <= A(j) < beta and no A(_) between A(j) and tau'. *)
 
   assert s@alpha = s@A(j) as Meuf => //; expand s@A(j); euf Meuf => Heuf.
 
   use IH with pred(A(j)),pred(A(i0)) => //.
   by case Heuf; exists i0.
+
 Qed.
 
 
@@ -146,35 +115,46 @@ Proof.
     simpl. intro i' HAi'.
     use non_repeating with pred(A(i)),pred(A(i')) => //.
     by exists i'.
-    by assumption.
-    
+
   (* Oracle *)
   expandall. fa 0. fa 1. fa 1. fa 1.
+  
+  (* Oracle H *)
   prf 1; yesif 1; 2: fresh 1.
-  simpl; split; project; intro i' H; try destruct H as [H|H];
-    try by apply unique_queries.
-    admit. (* TODO le raffinement de PRF ne suffit pas: l'oracle ne peut venir de s@tau *)
-    reach_equiv IH,pred(A(i')) => //.
-      intro Hf; by fresh Hf.
-    reach_equiv IH,pred(A(i')) => // Hf; by fresh Hf.
-    reach_equiv IH,pred(A(i')) => // Hf; by fresh Hf.
-  prf 1; yesif 1; 2: fresh 1; by apply IH.
-  simpl; split; project; intro i' H; try destruct H as [H|H];
-    try by apply unique_queries.
-    admit. (* TODO as above *)
-    reach_equiv IH,A(i') => // Hf; by fresh Hf.
-    reach_equiv IH,A(i') => // Hf; by fresh Hf.
-    reach_equiv IH,A(i') => // Hf; by fresh Hf.
+  simpl; split; project; intro i' H; try destruct H as [H|H].
+  admit. (* TODO le raffinement de PRF ne suffit pas: l'oracle ne peut venir de s@tau *)
+  by apply unique_queries.
+  reach_equiv IH,pred(A(i')) => //; intro Hf; by fresh Hf.
+  reach_equiv IH,pred(A(i')) => //; intro Hf; by fresh Hf.
+  reach_equiv IH,pred(A(i')) => //; intro Hf; by fresh Hf.
+  by apply unique_queries.
+
+  (* Oracle G *)
+  prf 1. yesif 1; 2: fresh 1.
+  simpl; split; project; intro i' H; try destruct H as [H|H].
+   admit.  (* TODO le raffinement de PRF ne suffit pas: l'oracle ne peut venir de s@tau *)
+   by apply unique_queries.
+   reach_equiv IH,A(i') => //; intro Hf; by fresh Hf.
+   reach_equiv IH,A(i') => //; intro Hf; by fresh Hf.
+   reach_equiv IH,A(i') => //; intro Hf; by fresh Hf.
+   by apply unique_queries.
+
+   by apply IH.
 
   (* Tag *)
   expand frame@A(i). expand exec@A(i). expand cond@A(i). expand output@A(i).
   fa 0. fa 1. fa 1.
-  prf 1; yesif 1; 2: fresh 1; by apply IH.
+  prf 1; yesif 1; 2: fresh 1.
   simpl; split; project; intro i' H; try destruct H as [H|H].
-    admit. (* TODO as above *)
-    reach_equiv IH,A(i) => // Hf; by fresh Hf.
-    use non_repeating with A(i),A(i') => //; by exists i.
-    admit. (* TODO as above *)
-    use non_repeating with A(i),A(i') => //; by exists i.
-    reach_equiv IH,A(i) => // Hf; by fresh Hf.
+
+  admit.  (* TODO le raffinement de PRF ne suffit pas: l'oracle ne peut venir de s@tau *)
+  (* Ok mais pourquoi je ne peux pas faire reach_equiv IH,A(i) => //.*)
+  reach_equiv IH,A(i) => // Hf; by fresh Hf.
+  use non_repeating with A(i),A(i') => //; by exists i.
+  admit.  (* TODO le raffinement de PRF ne suffit pas: l'oracle ne peut venir de s@tau *)
+  use non_repeating with A(i),A(i') => //; by exists i.
+  reach_equiv IH,A(i) => // Hf; by fresh Hf.
+
+  by apply IH.
+
 Qed.
