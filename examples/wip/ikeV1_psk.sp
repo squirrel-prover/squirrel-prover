@@ -78,40 +78,144 @@ process Initiator(i:index) =
 
   in(cI, m);
   let gB = fst(m) in
+
+  let RIdR = fst(snd(snd(m))) in
+  let HashR = snd(snd(snd(m))) in
+  (* find the preshared key in the database corresponding to the identity *)
+  try find j such that RIdR = IdR(j) in
+    if HashR =  h(<gB, < exp(g,a(i))  , IdR(j)> > , h(<Ni(i), fst(snd(m)) > ,psk(i,j))) then
+       let finalkey = h( exp(gB,a(i)),  h(<Ni(i), fst(snd(m)) > ,psk(i,j))) in
+       out(cI,  h(<exp(g,a(i)), <gB, IdI(i)> > , h(<Ni(i), fst(snd(m)) > ,psk(i,j)))  )
+
+process Responder(j:index) =
+  in(cI, m);
+  let gA  = fst(m) in
+
+  let RIdI = snd(snd(m)) in
+  (* find the preshared key in the database corresponding to the identity *)
+  try find i such that RIdI = IdI(i) in
+
+    out(cR, <exp(g,b(j)), <Nr(j), < IdR(j)  ,  h(<exp(g,b(j)), <gA, IdR(j)> > , h(< fst(snd(m)),Nr(j) > ,psk(i,j)))   >  >  > );
+
+    in(cR, m2);
+    if m2 =  h(<gA, <exp(g,b(j)), IdI(i)> > , h(< fst(snd(m)),Nr(j) > ,psk(i,j))) then
+       out(cR, diff(h(ok,sk),ko))
+
+
+
+system [Main] ((!_j R: Responder(j)) | (!_i I: Initiator(i))).
+
+
+name Ininr : index -> index ->  index -> index -> message
+
+name IgarbI : index -> index ->  index -> index -> message
+name IgarbR : index -> index ->  index -> index -> message
+
+
+process InitiatorI(i:index) =
+  out(cI, <exp(g,a(i)), < Ni(i), IdI(i) >>);
+
+  in(cI, m);
+  let gB = fst(m) in
   let RNr = fst(snd(m)) in
   let RIdR = fst(snd(snd(m))) in
   let HashR = snd(snd(snd(m))) in
   (* find the preshared key in the database corresponding to the identity *)
   try find j such that RIdR = IdR(j) in
-    let skeyid = h(<Ni(i),RNr > ,psk(i,j)) in
+    let skeyid =
+         try find jl,il such that  <Ni(i),RNr > = <Ni(il),Nr(jl) > && il = i && jl=j in
+              Ininr(jl,il,i,j)
+             (* glob I psk:
+                  Collect set of hashes h(m1,psk), h(m2,psk). (fail if more than two)
+                  h(m1,sk) ->   if m1=m2 then nS else n1
+                  h(m2,sk) ->   if m1=m2 then nS else n2
+              *)
+         else
+             IgarbI(j,i,i,j)
+ in
     if HashR =  h(<gB, < exp(g,a(i))  , IdR(j)> > ,skeyid) then
        let finalkey = h( exp(gB,a(i)), skeyid) in
-       out(cI,  h(<exp(g,a(i)), <gB, IdI(i)> > ,skeyid)  )
+       out(cI,  h(<exp(g,a(i)), <gB, IdI(i)> > ,skeyid)  ).
 
-process Responder(j:index) =
+process ResponderI(j:index) =
   in(cI, m);
   let gA  = fst(m) in
   let RNi = fst(snd(m)) in
   let RIdI = snd(snd(m)) in
   (* find the preshared key in the database corresponding to the identity *)
   try find i such that RIdI = IdI(i) in
-    let skeyid = h(<RNi,Nr(j) > ,psk(i,j)) in
+    let skeyid =
+      try find jl, il such that <RNi,Nr(j) > = <Ni(il),Nr(jl) >  && il=i && jl=j in
+          Ininr(jl,il,i,j)
+      else
+          IgarbR(j,i,i,j)
+
+     in
     out(cR, <exp(g,b(j)), <Nr(j), < IdR(j)  ,  h(<exp(g,b(j)), <gA, IdR(j)> > ,skeyid)   >  >  > );
 
     in(cR, m2);
     if m2 =  h(<gA, <exp(g,b(j)), IdI(i)> > ,skeyid) then
-       out(cR, diff(h(ok,sk),ko))
+       out(cR, ok)
 
 
 
-system ((!_j R: Responder(j)) | (!_i I: Initiator(i))).
+system [Ideal1] ((!_j R: ResponderI(j)) | (!_i I: InitiatorI(i))).
 
-
-equiv test.
+equiv [Main/left,Ideal1/right] test.
 Proof.
 print.
-globalprf h(ok,sk), news.
+globalprf seq(il,jl->  h(<Ni(il), Nr(jl) > ,psk(il,jl))), news.
 print.
+globalprf seq(il2,jl2->  h(<Ni(il2), fst(snd(input@I1(il2,jl2))) > ,psk(il2,jl2))), newss.
+print.
+globalprf seq(il2,jl2->  h(<fst(snd(input@R(jl2,il2))),Nr(jl2) > ,psk(il2,jl2))), newss2.
+
+enrich seq(i-> b(i)). enrich seq(i-> a(i)). enrich seq(i-> IdI(i)).  enrich seq(i-> IdR(i)).  enrich seq(i-> Ni(i)).  enrich seq(i-> Nr(i)).
+induction t.
+
+cycle 5.
+expandall.
+
+
+
+equivalent   try find jl,il such that
+            (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> &&
+             (il = i && jl = j))
+          in n_PRF(jl,il,i,j)
+          else
+            try find jl2,il2 such that
+              (<Ni(i),fst(snd(input@I1(i,j)))> =
+               <Ni(il2),fst(snd(input@I1(il2,jl2)))> && (il2 = i && jl2 = j))
+            in n_PRF1(jl2,il2,i,j)
+            else
+              try find jl2,il2 such that
+                (<Ni(i),fst(snd(input@I1(i,j)))> =
+                 <fst(snd(input@R(jl2,il2))),Nr(jl2)> && (il2 = i && jl2 = j))
+              in n_PRF2(jl2,il2,i,j)
+              else h(<Ni(i),fst(snd(input@I1(i,j)))>,psk(i,j)),
+  try find jl,il such that
+            (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> &&
+             (il = i && jl = j))
+          in n_PRF(jl,il,i,j)
+          else
+           n_PRF1(j,i,i,j).
+
+fa.
+case (try find jl2,il2 such that
+   (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il2),fst(snd(input@I1(il2,jl2)))> &&
+    (il2 = i && jl2 = j))
+ in n_PRF1(jl2,il2,i,j)
+ else
+   try find jl2,il2 such that
+     (<Ni(i),fst(snd(input@I1(i,j)))> = <fst(snd(input@R(jl2,il2))),Nr(jl2)> &&
+      (il2 = i && jl2 = j))
+   in n_PRF2(jl2,il2,i,j) else h(<Ni(i),fst(snd(input@I1(i,j)))>,psk(i,j))).
+
+use H0 with j,i as T.
+
+
+
+
 
 name PRFninr : index -> index -> message
 

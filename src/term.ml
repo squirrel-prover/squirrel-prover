@@ -1332,6 +1332,58 @@ let rec subst_ht s ht = match ht with
     mk_lambda [ev] (subst_ht s (Lambda (evs, t)))
   | Lambda ([], t) -> Lambda ([], subst s t)
 
+
+
+let rec subst_sym : type a. nsymb -> nsymb  -> a term -> a term
+  = fun nns ons t ->
+      match t with
+      | Fun ((fs,is), fty, lt) ->
+        Fun ((fs, is), fty, List.map (subst_sym nns ons) lt)
+      | Name symb when symb.s_symb = ons.s_symb ->
+        Name { symb with s_symb = nns.s_symb}
+      | Name n -> Printer.pr "oname:%a, currname:%a" pp_name ons.s_symb pp_name n.s_symb ; Name n
+      | Macro (m, l, ts) ->
+        Macro (m, List.map (subst_sym nns ons) l, subst_sym nns ons ts)
+
+      (* Seq in annoying to do *)
+      | Seq ([], f) -> Seq ([], subst_sym nns ons f)
+
+      | Seq ([a], f) ->
+        let f = subst_sym nns ons f in
+        Seq ([a],f)
+
+      | Seq (a :: vs, f) ->
+        let f = subst_sym nns ons (Seq (vs,f)) in
+        Seq (a :: vs,f)
+
+      | Var m -> Var m
+      | Pred ts -> Pred (subst_sym nns ons ts)
+      | Action (a,indices) -> Action (a, indices)
+      | Diff (a, b) -> Diff (subst_sym nns ons a, subst_sym nns ons b)
+      | Atom a-> Atom (subst_sym_generic_atom nns ons a)
+
+      | ForAll ([], f) -> subst_sym nns ons f
+
+      | ForAll (a :: vs, f) ->
+        let f = subst_sym nns ons (ForAll (vs,f)) in
+        mk_forall [a] f
+
+      | Exists ([], f) -> subst_sym nns ons f
+
+      | Exists (a :: vs, f) ->
+        let f = subst_sym nns ons (Exists (vs,f)) in
+        mk_exists [a] f
+
+      | Find (v, b, c, d) -> Find (v, subst_sym nns ons b, subst_sym nns ons c, subst_sym nns ons d)
+
+and subst_sym_message_atom nns ons (`Message (ord, a1, a2)) =
+  `Message (ord, subst_sym nns ons a1, subst_sym nns ons a2)
+
+and subst_sym_generic_atom nns ons = function
+  | #message_atom as a -> (subst_sym_message_atom nns ons a :> generic_atom)
+  | #trace_atom   as a -> a
+
+
 (*------------------------------------------------------------------*)
 type refresh_arg = [`Global | `InEnv of Vars.env ref ]
 

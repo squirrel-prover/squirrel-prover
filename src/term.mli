@@ -7,7 +7,7 @@
   * processes, axioms, etc. *)
 
 module Sv = Vars.Sv
-              
+
 (*------------------------------------------------------------------*)
 (** {2 Symbols}
   *
@@ -16,10 +16,10 @@ module Sv = Vars.Sv
 
 (** Ocaml type of a typed index symbol.
     Invariant: [s_typ] do not contain tvar or univars *)
-type ('a,'b) isymb = private { 
+type ('a,'b) isymb = private {
   s_symb    : 'a;
   s_indices : Vars.index list;
-  s_typ     : 'b; 
+  s_typ     : 'b;
 }
 
 val mk_isymb : 'a -> Type.tmessage -> Vars.index list -> ('a,Type.tmessage) isymb
@@ -67,7 +67,7 @@ type ord = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
 type ord_eq = [ `Eq | `Neq ]
 
 val pp_ord   : Format.formatter -> ord -> unit
-  
+
 type ('a,'b) _atom = 'a * 'b * 'b
 
 type generic_atom = [
@@ -116,10 +116,10 @@ type timestamps = timestamp list
 type eterm = ETerm : 'a term -> eterm
 
 (** Does not recurse. *)
-val tmap       : (eterm -> eterm) -> 'a term -> 'a term 
+val tmap       : (eterm -> eterm) -> 'a term -> 'a term
 val titer      : (eterm -> unit) -> 'a term -> unit
 val tfold      : (eterm -> 'a -> 'a) -> 'b term -> 'a -> 'a
-val tmap_fold  : ('b -> eterm -> 'b * eterm) -> 'b -> 'a term -> 'b * 'a term 
+val tmap_fold  : ('b -> eterm -> 'b * eterm) -> 'b -> 'a term -> 'b * 'a term
 
 (*------------------------------------------------------------------*)
 (** {2 Subset of all atoms} *)
@@ -128,7 +128,7 @@ val tmap_fold  : ('b -> eterm -> 'b * eterm) -> 'b -> 'a term -> 'b * 'a term
 type message_atom = [ `Message of (ord_eq,Type.message term) _atom]
 
 type index_atom = [ `Index of (ord_eq,Vars.index) _atom]
-                    
+
 type trace_atom = [
   | `Timestamp of (ord,timestamp) _atom
   | `Index     of (ord_eq,Vars.index) _atom
@@ -161,16 +161,16 @@ val pp_literals : Format.formatter -> literal list -> unit
 val pp_trace_literal  : Format.formatter -> trace_literal      -> unit
 val pp_trace_literals : Format.formatter -> trace_literal list -> unit
 
-val neg_lit : literal -> literal 
+val neg_lit : literal -> literal
 
-val neg_trace_lit : trace_literal -> trace_literal 
+val neg_trace_lit : trace_literal -> trace_literal
 
 val disjunction_to_literals : message -> literal list option
 
 (*------------------------------------------------------------------*)
 (** {2 Higher-order terms} *)
 
-type hterm = 
+type hterm =
   | Lambda of Vars.evars * message
 
 val pp_hterm : Format.formatter -> hterm -> unit
@@ -189,7 +189,7 @@ val pp_with_info : pp_info -> Format.formatter -> 'a term -> unit
 
 (*------------------------------------------------------------------*)
 val kind : 'a term -> 'a Type.kind
-    
+
 val ty  : ?ty_env:Type.Infer.env -> 'a term -> 'a Type.ty
 val ety : ?ty_env:Type.Infer.env -> 'a term -> Type.ety
 
@@ -226,7 +226,7 @@ val is_var_subst : subst -> bool
 
 val subst_support : subst -> Sv.t
 
-val subst_binding : Vars.evar -> subst -> Vars.evar * subst 
+val subst_binding : Vars.evar -> subst -> Vars.evar * subst
 
 (** term substitution *)
 val subst : subst -> 'a term -> 'a term
@@ -234,6 +234,8 @@ val subst : subst -> 'a term -> 'a term
 (** substitute type variables *)
 val tsubst : Type.tsubst -> 'a term -> 'a term
 
+(** name symbol substitution *)
+val subst_sym : nsymb -> nsymb -> 'a term -> 'a term
 (** [subst_var s v] returns [v'] if substitution [s] maps [v] to [Var v'],
   * and [v] if the variable is not in the domain of the substitution.
   * @raise Substitution_error if [v] is mapped to a non-variable term in [s]. *)
@@ -244,8 +246,8 @@ val subst_isymb : subst -> ('a,'b) isymb -> ('a,'b) isymb
 
 (** [subst_macros_ts table l ts t] replaces [ts] by [pred(ts)] in the term [t]
   * if [ts] is applied to a state macro whose name is NOT in [l]. *)
-val subst_macros_ts : 
-  Symbols.table -> 
+val subst_macros_ts :
+  Symbols.table ->
   string list -> Type.timestamp term -> 'a term -> 'a term
 
 (*------------------------------------------------------------------*)
@@ -259,14 +261,14 @@ val refresh_vars_env :
 
 val erefresh_vars_env :
   Vars.env -> Vars.evar list -> Vars.env * Vars.evar list * esubst list
- 
+
 (*------------------------------------------------------------------*)
 val apply_ht : hterm -> 'a term list -> hterm
 
 (*------------------------------------------------------------------*)
 (** {2 Builtins function symbols} *)
 
-val empty : message 
+val empty : message
 val init : timestamp
 
 val in_macro    : msymb
@@ -300,7 +302,7 @@ val f_of_bool   : fsymb
 
 val f_len    : fsymb
 val f_zeroes : fsymb
-  
+
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructors} *)
 
@@ -356,16 +358,16 @@ module type SmartFO = sig
   val destr_impls : int -> form -> form list option
 
   (*------------------------------------------------------------------*)
-  val destr_matom : form -> (ord_eq * message * message) option 
+  val destr_matom : form -> (ord_eq * message * message) option
 
   (*------------------------------------------------------------------*)
   val decompose_forall : form -> Vars.evar list * form
   val decompose_exists : form -> Vars.evar list * form
 
   (*------------------------------------------------------------------*)
-  val decompose_ands  : form -> form list 
-  val decompose_ors   : form -> form list 
-  val decompose_impls : form -> form list 
+  val decompose_ands  : form -> form list
+  val decompose_ors   : form -> form list
+  val decompose_impls : form -> form list
 
   val decompose_impls_last : form -> form list * form
 end
@@ -396,27 +398,27 @@ val mk_fun :
   Vars.index list ->
   message list ->
   message
-    
+
 val mk_zero    : message
 val mk_fail    : message
 val mk_len     : message -> message
 val mk_zeroes  : message -> message
 val mk_of_bool : message -> message
 val mk_pair    : message -> message -> message
- 
+
 (*------------------------------------------------------------------*)
 (** {3 Smart constructors: messages} *)
 
 val mk_ite : ?simpl:bool -> message -> message -> message -> message
-  
+
 val mk_timestamp_leq : timestamp -> timestamp -> message
 
 val mk_indices_neq : Vars.index list -> Vars.index list -> message
 val mk_indices_eq  : Vars.index list -> Vars.index list -> message
 
-val mk_atom : ord -> 'a term -> 'b term -> message 
-val mk_happens : timestamp -> message 
-val mk_atom1 : generic_atom -> message 
+val mk_atom : ord -> 'a term -> 'b term -> message
+val mk_happens : timestamp -> message
+val mk_atom1 : generic_atom -> message
 
 val mk_seq0 : Vars.index list -> message -> message
 
@@ -429,9 +431,9 @@ val mk_seq : Vars.env -> Vars.index list -> message -> message
 val is_binder : 'a term -> bool
 
 val destr_var : 'a term -> 'a Vars.var option
-    
+
 (*------------------------------------------------------------------*)
-val destr_action : 
+val destr_action :
   timestamp -> (Symbols.action Symbols.t * Vars.index list) option
 
 (*------------------------------------------------------------------*)
@@ -449,7 +451,7 @@ val not_simpl : message -> message
 
 (** Check if a formula is a FO formula over timestamps.*)
 val is_pure_timestamp : message -> bool
-  
+
 (*------------------------------------------------------------------*)
 (** {2 Sets and Maps } *)
 
@@ -500,15 +502,15 @@ val make_bi_term : 'a term -> 'a term -> 'a term
 (*------------------------------------------------------------------*)
 (** {2 Matching information for error messages} *)
 
-type match_info = 
+type match_info =
   | MR_ok                         (* term matches *)
   | MR_check_st of message list   (* need to look at subterms *)
   | MR_failed                     (* term does not match *)
 
 type match_infos = match_info Mt.t
 
-val pp_match_info : Format.formatter -> match_info -> unit 
+val pp_match_info : Format.formatter -> match_info -> unit
 
-val pp_match_infos : Format.formatter -> match_infos -> unit 
+val pp_match_infos : Format.formatter -> match_infos -> unit
 
-val match_infos_to_pp_info : match_infos -> pp_info 
+val match_infos_to_pp_info : match_infos -> pp_info
