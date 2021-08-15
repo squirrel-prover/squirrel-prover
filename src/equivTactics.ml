@@ -1135,6 +1135,22 @@ let () =
     ~pq_sound:true
     (pure_equiv_arg LT.use_tac)
 
+(* TODO -> dirty hack to clean up *)
+let () =
+  T.register_general "forceuse"
+    ~tactic_help:
+      {general_help = "Apply an hypothesis with its universally \
+                       quantified variables instantiated with the \
+                       arguments.\n\n\
+                       Usages: use H with v1, v2, ...\n\
+                      \        use H with ... as ...";
+       detailed_help = "";
+       usages_sorts = [];
+       tactic_group = Logical}
+    ~pq_sound:true
+    (pure_equiv_arg LT.forceuse_tac)
+
+
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "assert"
@@ -1934,6 +1950,153 @@ let () =
     ~tactic_group:Cryptographic
     ~pq_sound:true
     (pure_equiv_typed prf) Args.(Pair(Int, Opt Message))
+
+
+let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
+  let cntxt = ES.mk_trace_cntxt s in
+
+  let system_left = SE.project PLeft cntxt.system in
+
+  let system_right = match  SE.project PRight cntxt.system with
+    | Single sys_right -> sys_right
+    | _ -> assert false
+  in
+
+  let param = prf_param hash in
+  let frame = ES.goal_as_equiv s in
+
+  (* Check syntactic side condition. *)
+  let errors =
+    Euf.key_ssc
+      ~elems:frame ~allow_functions:(fun x -> false)
+      ~cntxt param.h_fn param.h_key.s_symb
+  in
+  if errors <> [] then
+    soft_failure (Tactics.BadSSCDetailed errors);
+
+  (* We create a fresh copy of the message *)
+  let term_iv = List.fold_left (fun acc (Vars.EVar x) ->
+      (*      if Type.equalk (Vars.kind x) Type.KIndex then *)
+      try let v = (Vars.cast x Type.KIndex) in v :: acc
+      with Vars.CastError -> acc )
+      [] (Term.get_vars param.h_cnt) in
+
+  let is, subst = Term.refresh_vars (`Global) term_iv in
+  let fresh_mess = Term.subst subst param.h_cnt in
+
+  (* Instantiation of the fresh name *)
+  let ndef = Symbols.{ n_iarr = List.length is; n_ty = Message ; } in
+  let table,n =
+    Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
+  in
+  let ns = Term.mk_isymb n Message is in
+  let s = ES.set_table table s in
+
+  (* We now collect All hash occurences. *)
+(*  let iter = new Iter.get_f_messages ~fun_wrap_key:None ~drop_head:false
+    ~cntxt param.h_fn param.h_key.s_symb in
+  List.iter iter#visit_message frame;
+  SystemExpr.iter_descrs cntxt_left.table cntxt_left.system (
+    fun action_descr ->
+    iter#visit_message (snd action_descr.Action.output) ;
+    List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates) ;
+  let hash_occs =  List.sort_uniq Stdlib.compare iter#get_occurrences in
+
+*)
+
+  (* the hash h of a message m will be replaced by tryfind is s.t = fresh mess
+     in fresh else h *)
+  let mk_tryfind hash =
+    match hash with
+    | Term.Fun ((h_fn, _), _, [h_cnt; Name h_key]) ->
+      Term.mk_find is (Term.mk_atom `Eq h_cnt fresh_mess) (Term.mk_name ns) hash
+    | _ -> assert false
+  in
+
+  let iterator t =
+     let iter = new Iter.get_f_messages ~fun_wrap_key:None ~drop_head:false
+       ~cntxt param.h_fn param.h_key.s_symb in
+     iter#visit_message t;
+     let hash_occs =  List.sort_uniq Stdlib.compare iter#get_occurrences in
+     let subst = List.map (fun (is,m) -> Term.ESubst (m, mk_tryfind hash)) hash_occs in
+         Term.subst subst t
+     in
+ try
+    let table, new_system =
+      SystemExpr.clone_system_iter
+        (ES.table s) system_left
+        new_system (Action.apply_descr iterator) in
+    let new_leftsystem = match system_left with
+      | Single (Left s) -> SE.Left new_system
+      | Single (Right s) -> SE.Right new_system
+      |  _ -> assert false
+    in
+    let new_system_e = SystemExpr.pair table new_leftsystem system_right in
+
+    let new_goal = ES.set_table table s
+                   |> ES.set_system new_system_e in
+
+    [new_goal]
+ with SystemExpr.SystemNotFresh ->
+    hard_failure
+      (Tactics.Failure "System name already defined for another system.")
+
+let () =
+  T.register_typed "globalprf"
+    ~general_help:"Apply the global PRF axiom."
+    ~detailed_help:""
+    ~tactic_group:Cryptographic
+    ~pq_sound:true
+    (pure_equiv_typed global_prf) Args.(Pair(Message, String))
+
+let global_rename Args.(Pair (Message (n1,ty1), Pair(Message (n2,ty2),
+                                                     String new_system))) s =
+  let cntxt = ES.mk_trace_cntxt s in
+  let nsymb2 = match n1,n2 with
+  | Term.Name n1, Term.Name n2 -> n2
+  | _ -> assert false
+  in
+  (* TODO, check n2 not in left system. *)
+  let system_left = SE.project PLeft cntxt.system in
+
+  let system_right = match  SE.project PRight cntxt.system with
+    | Single sys_right -> sys_right
+    | _ -> assert false
+  in
+  (* TODO replace in frame *)
+  let frame = ES.goal_as_equiv s in
+
+  let iterator t = Term.subst [Term.ESubst (n1, n2)] t
+     in
+ try
+    let table, new_system =
+      SystemExpr.clone_system_iter
+        (ES.table s) system_left
+        new_system (Action.apply_descr iterator) in
+    let new_leftsystem = match system_left with
+      | Single (Left s) -> SE.Left new_system
+      | Single (Right s) -> SE.Right new_system
+      |  _ -> assert false
+    in
+    let new_system_e = SystemExpr.pair table new_leftsystem system_right in
+
+    let new_goal = ES.set_table table s
+                   |> ES.set_system new_system_e in
+
+    [new_goal]
+ with SystemExpr.SystemNotFresh ->
+    hard_failure
+      (Tactics.Failure "System name already defined for another system.")
+
+
+let () =
+  T.register_typed "rename"
+    ~general_help:"Rename one name by another in the left system."
+    ~detailed_help:""
+    ~tactic_group:Cryptographic
+    ~pq_sound:true
+    (pure_equiv_typed global_rename) Args.(Pair(Message, Pair(Message, String)))
+
 
 
 (*------------------------------------------------------------------*)

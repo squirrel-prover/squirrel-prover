@@ -141,6 +141,7 @@ rule token = parse
 | "assert"            { ASSERT }
 | "exn"               { EXN }
 | "use"               { USE }
+| "forceuse"          { FORCEUSE }
 | "rewrite"           { REWRITE }
 | "apply"             { APPLY }
 | "revert"            { REVERT }

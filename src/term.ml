@@ -1019,7 +1019,10 @@ let disjunction_to_literals f =
 
 (*------------------------------------------------------------------*)
 let atom_triv = function
-  | `Message   (`Eq,t1,t2) when t1=t2 -> true
+  | `Message   (`Eq,t1,t2) when t1=t2 ->
+    (match t1 with
+      Find _ -> false
+    | _ -> true)
   | `Timestamp (`Eq,t1,t2) when t1=t2 -> true
   | `Index     (`Eq,i1,i2) when i1=i2 -> true
   | _ -> false

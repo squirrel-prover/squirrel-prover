@@ -49,10 +49,10 @@ let same_shape a b : Term.subst option =
        s = s' && List.length ls = List.length ls'
     then
       let acc' =
-        List.map2 (fun i i' -> Term.ESubst (Term.mk_var i,Term.mk_var i')) lp lp' 
+        List.map2 (fun i i' -> Term.ESubst (Term.mk_var i,Term.mk_var i')) lp lp'
       in
       let acc'' =
-        List.map2 (fun i i' -> Term.ESubst (Term.mk_var i,Term.mk_var i')) ls ls' 
+        List.map2 (fun i i' -> Term.ESubst (Term.mk_var i,Term.mk_var i')) ls ls'
       in
       same (acc'' @ acc' @ acc) l l'
     else None in
@@ -81,7 +81,7 @@ let of_symbol s table =
     | Data (x,y) -> x,y
     | _ -> assert false
 
-let arity s table = 
+let arity s table =
   let l,_ = of_symbol s table in
   List.length l
 
@@ -149,7 +149,7 @@ let rec subst_action (s : Term.subst) (a : action) : action =
 let of_term (s:Symbols.action Symbols.t) (l:Vars.index list) table : action =
   let l',a = of_symbol s table in
   let subst =
-    List.map2 (fun x y -> Term.ESubst (Term.mk_var x,Term.mk_var y)) l' l 
+    List.map2 (fun x y -> Term.ESubst (Term.mk_var x,Term.mk_var y)) l' l
   in
   subst_action subst a
 
@@ -219,7 +219,7 @@ let subst_descr subst descr =
      (* List.map (Term.subst_var subst) (fst descr.condition), *)
      Term.subst subst (snd descr.condition) in
   let updates =
-    List.map (fun (ss,t) -> 
+    List.map (fun (ss,t) ->
         Term.subst_isymb subst ss, subst_term t
       ) descr.updates
   in
@@ -228,6 +228,26 @@ let subst_descr subst descr =
     input = descr.input;
     globals = descr.globals;
     action; indices; condition; updates; output;  }
+
+
+(* Apply an iterator to all terms of the descr. *)
+let apply_descr iter descr =
+  let condition =
+     fst descr.condition,
+     iter (snd descr.condition) in
+  let updates =
+    List.map (fun (ss,t) ->
+        ss, iter t
+      ) descr.updates
+  in
+  let output = fst descr.output, iter (snd descr.output) in
+  { name = descr.name;
+    input = descr.input;
+    globals = descr.globals;
+    action = descr.action;
+    indices = descr.indices;
+    condition; updates; output;  }
+
 
 
 let refresh_descr descr =
@@ -270,13 +290,13 @@ let rec dummy (shape : shape) : action =
 let is_dup_match
     (is_match : Term.eterm -> Term.eterm -> 'a -> 'a option)
     (st    : 'a)
-    (table : Symbols.table) 
+    (table : Symbols.table)
     (elem  : Term.message)
-    (elems : Term.message list) 
+    (elems : Term.message list)
   : 'a option =
   (* try to match [t] and [t'] modulo ≤ *)
-  let is_dup_leq table st t t' : 'a option = 
-    let rec leq t t' = 
+  let is_dup_leq table st t t' : 'a option =
+    let rec leq t t' =
       match is_match (ETerm t) (ETerm t') st with
       | Some st -> Some st
       | None ->
@@ -287,7 +307,7 @@ let is_dup_match
         | Action (n,is), Action (n',is') ->
           (* FIXME: allow to match [is] with (a prefix of) [is'] *)
           if depends (of_term n is table) (of_term n' is' table)
-          then Some st 
+          then Some st
           else None
 
         | _ -> None
@@ -295,10 +315,10 @@ let is_dup_match
     leq t t'
   in
 
-  let direct_match = 
-    List.find_map (fun t' -> 
+  let direct_match =
+    List.find_map (fun t' ->
         is_match (ETerm elem) (ETerm t') st
-      ) elems 
+      ) elems
   in
   match direct_match with
   | Some res -> Some res
@@ -306,33 +326,33 @@ let is_dup_match
     match elem with
     | Macro (im,[],t) when im = Term.in_macro ->
       List.find_map (function
-          | Term.Macro (fm,[],t') when fm = Term.frame_macro -> 
-            is_dup_leq table st (Term.mk_pred t) t' 
+          | Term.Macro (fm,[],t') when fm = Term.frame_macro ->
+            is_dup_leq table st (Term.mk_pred t) t'
           | _ -> None
         ) elems
 
     | Macro (em,[],t) when em = Term.frame_macro ->
       List.find_map (function
           | Term.Macro (fm,[],t')
-            when fm = Term.frame_macro -> is_dup_leq table st t t' 
+            when fm = Term.frame_macro -> is_dup_leq table st t t'
           | _ -> None
         ) elems
 
     | Macro (em,[],t) when em = Term.exec_macro ->
       List.find_map (function
           | Term.Macro (fm,[],t')
-            when fm = Term.frame_macro -> is_dup_leq table st t t' 
+            when fm = Term.frame_macro -> is_dup_leq table st t t'
           | _ -> None
         ) elems
 
     | _ -> None
 
 let is_dup table t t' : bool =
-  let is_match (Term.ETerm t) (Term.ETerm t') () = 
+  let is_match (Term.ETerm t) (Term.ETerm t') () =
     match Type.equalk_w (Term.kind t) (Term.kind t') with
     | None -> None
     | Some Type.Type_eq ->
-      if t = t' then Some () else None 
+      if t = t' then Some () else None
   in
   match is_dup_match is_match () table t t' with
   | None    -> false

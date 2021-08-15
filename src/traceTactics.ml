@@ -449,6 +449,19 @@ let () =
        tactic_group = Logical}
     LT.use_tac
 
+let () =
+  T.register_general "forceuse"
+    ~tactic_help:
+      {general_help = "Apply an hypothesis with its universally \
+                       quantified variables instantiated with the \
+                       arguments.\n\n\
+                       Usages: use H with v1, v2, ...\n\
+                      \        use H with ... as ...";
+       detailed_help = "";
+       usages_sorts = [];
+       tactic_group = Logical}
+    LT.forceuse_tac
+
 (*------------------------------------------------------------------*)
 let () =
   T.register_general "assert"
@@ -942,6 +955,40 @@ let () =
                    Args.(Sort (Pair (Timestamp, Timestamp)));
                    Args.(Sort (Pair (Message, Message)))]
     substitute_tac Args.(Pair (ETerm, ETerm))
+
+
+
+let eqsubst arg s =
+  let open Args in
+  let subst,f = match arg with
+  | Pair (ETerm (Type.Message, f1, _), ETerm (Type.Message, f2, _)) ->
+    [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
+
+  | Pair (ETerm (Type.Timestamp, f1, _), ETerm (Type.Timestamp, f2, _)) ->
+    [Term.ESubst (f1,f2)],   Term.mk_atom `Eq f1 f2
+
+  | Pair (ETerm (Type.Index, f1, _), ETerm (Type.Index, f2, _)) ->
+    [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
+
+  | _ ->
+    hard_failure
+      (Tactics.Failure "expected a pair of messages, booleans or a pair of \
+                        index variables")
+  in
+   TS.set_goal f s :: apply_substitute subst s
+
+let () =
+  T.register_typed "substeq"
+    ~general_help:"Given an equality i=t, substitute all occurences \
+                   of i by t and remove i from the context variables,\
+                   and asks to prove the equality."
+    ~detailed_help:""
+    ~tactic_group:Structural
+    ~usages_sorts:[Args.(Sort (Pair (Index, Index)));
+                   Args.(Sort (Pair (Timestamp, Timestamp)));
+                   Args.(Sort (Pair (Message, Message)))]
+    eqsubst Args.(Pair (ETerm, ETerm))
+
 
 
 

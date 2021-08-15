@@ -325,6 +325,13 @@ let rec subst s d =
           subst q {d with output = (fst(d.output), Term.subst s t)}
     end
 
+let clone_system_iter table original_system new_system iterdescr =
+  let odescrs = descrs table original_system in
+  let symbs = symbs table original_system in
+  let ndescrs = System.Msh.map iterdescr odescrs in
+  let data = System.System_data (ndescrs,symbs) in
+  Symbols.System.declare_exact table new_system ~data ()
+
 exception SystemNotFresh
 
 let pp_descrs table ppf system =
