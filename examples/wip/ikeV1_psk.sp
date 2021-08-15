@@ -161,6 +161,12 @@ process ResponderI(j:index) =
 
 system [Ideal1] ((!_j R: ResponderI(j)) | (!_i I: InitiatorI(i))).
 
+axiom [Main] redseq : forall (m:message), seq(jl,il->m) = m.
+axiom [Main] redseqnoj : forall (m:message), seq(jl,il->m) = seq(il->m).
+axiom [Main] redseqnoi : forall (m:message), seq(jl,il->m) = seq(jl->m).
+axiom [Main] redseqil : forall (i1:index), seq(jl,il->il=i1) = empty.
+axiom [Main] redseqjl : forall (i1:index), seq(jl,il->jl=i1) = empty.
+
 equiv [Main/left,Ideal1/right] test.
 Proof.
 print.
@@ -169,50 +175,72 @@ print.
 globalprf seq(il2,jl2->  h(<Ni(il2), fst(snd(input@I1(il2,jl2))) > ,psk(il2,jl2))), newss.
 print.
 globalprf seq(il2,jl2->  h(<fst(snd(input@R(jl2,il2))),Nr(jl2) > ,psk(il2,jl2))), newss2.
+print.
 
-enrich seq(i-> b(i)). enrich seq(i-> a(i)). enrich seq(i-> IdI(i)).  enrich seq(i-> IdR(i)).  enrich seq(i-> Ni(i)).  enrich seq(i-> Nr(i)).
+rename seq(i,j,k,l ->  n_PRF(i,j,k,l)), seq(i,j,k,l ->  Ininr(i,j,k,l)), tk.
+rename seq(i,j,k,l ->  n_PRF1(i,j,k,l)), seq(i,j,k,l ->  IgarbI(i,j,k,l)), tk2.
+rename seq(i,j,k,l ->  n_PRF2(i,j,k,l)), seq(i,j,k,l ->  IgarbR(i,j,k,l)), tk3.
+print.
+
+enrich seq(i-> b(i)). enrich seq(i-> a(i)). enrich seq(i-> IdI(i)).  enrich seq(i-> IdR(i)).  enrich seq(i-> Ni(i)).  enrich seq(i-> Nr(i)). enrich seq(i,j,k,l -> Ininr(i,j,k,l)). enrich seq(i,j,k,l -> IgarbI(i,j,k,l)). enrich seq(i,j,k,l -> IgarbR(i,j,k,l)).
 induction t.
 
 cycle 5.
 expandall.
 
-
-
 equivalent   try find jl,il such that
             (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> &&
              (il = i && jl = j))
-          in n_PRF(jl,il,i,j)
+          in Ininr(jl,il,i,j)
           else
             try find jl2,il2 such that
               (<Ni(i),fst(snd(input@I1(i,j)))> =
                <Ni(il2),fst(snd(input@I1(il2,jl2)))> && (il2 = i && jl2 = j))
-            in n_PRF1(jl2,il2,i,j)
+            in IgarbI(jl2,il2,i,j)
             else
               try find jl2,il2 such that
                 (<Ni(i),fst(snd(input@I1(i,j)))> =
                  <fst(snd(input@R(jl2,il2))),Nr(jl2)> && (il2 = i && jl2 = j))
-              in n_PRF2(jl2,il2,i,j)
+              in IgarbR(jl2,il2,i,j)
               else h(<Ni(i),fst(snd(input@I1(i,j)))>,psk(i,j)),
   try find jl,il such that
             (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> &&
              (il = i && jl = j))
-          in n_PRF(jl,il,i,j)
+          in Ininr(jl,il,i,j)
           else
-           n_PRF1(j,i,i,j).
+ IgarbI(j,i,i,j)
+           .
 
 fa.
-case (try find jl2,il2 such that
+case  (try find jl2,il2 such that
    (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il2),fst(snd(input@I1(il2,jl2)))> &&
     (il2 = i && jl2 = j))
- in n_PRF1(jl2,il2,i,j)
+ in IgarbI(jl2,il2,i,j)
  else
    try find jl2,il2 such that
      (<Ni(i),fst(snd(input@I1(i,j)))> = <fst(snd(input@R(jl2,il2))),Nr(jl2)> &&
       (il2 = i && jl2 = j))
-   in n_PRF2(jl2,il2,i,j) else h(<Ni(i),fst(snd(input@I1(i,j)))>,psk(i,j))).
+   in IgarbR(jl2,il2,i,j) else h(<Ni(i),fst(snd(input@I1(i,j)))>,psk(i,j))).
+use H0 with j,i.
 
-use H0 with j,i as T.
+fa 9. fa 10. fa 10. fa 11. fa 10. fa 10. fa 10. fa 13.
+equivalent diff(
+     try find jl,il such that
+       (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> &&
+        (il = i && jl = j)) in Ininr(jl,il,i,j) else IgarbI(j,i,i,j),
+     try find jl,il such that
+       (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> && il = i && jl = j)
+     in Ininr(jl,il,i,j) else IgarbI(j,i,i,j)),      try find jl,il such that
+       (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> && il = i && jl = j)
+     in Ininr(jl,il,i,j) else IgarbI(j,i,i,j).
+project. fa. fa.
 
+fa 10. fa 10. fa 10. fa 13. fa 13. fa 12. fa 12. repeat fa 12. fa 14.
+
+(* TODO seqdup tactic *)
+
+
+help.
 
 
 

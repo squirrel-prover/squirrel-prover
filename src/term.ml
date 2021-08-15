@@ -1341,7 +1341,7 @@ let rec subst_sym : type a. nsymb -> nsymb  -> a term -> a term
         Fun ((fs, is), fty, List.map (subst_sym nns ons) lt)
       | Name symb when symb.s_symb = ons.s_symb ->
         Name { symb with s_symb = nns.s_symb}
-      | Name n -> Printer.pr "oname:%a, currname:%a" pp_name ons.s_symb pp_name n.s_symb ; Name n
+      | Name n -> Name n
       | Macro (m, l, ts) ->
         Macro (m, List.map (subst_sym nns ons) l, subst_sym nns ons ts)
 

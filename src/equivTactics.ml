@@ -611,6 +611,10 @@ let fa Args.(Int i) s =
           (Equiv.[ c' ; t' ; e ] @ after)
       in
       [ ES.set_env !env (ES.set_equiv_goal biframe s) ]
+    | Seq (is,t) ->
+      let biframe =
+        List.rev_append before ((List.map (fun m -> Term.mk_seq0 is m) (fa_expand t)) @ after) in
+      [ ES.set_equiv_goal biframe s ]
     | _ ->
       let biframe =
         List.rev_append before (fa_expand e @ after) in
