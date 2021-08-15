@@ -53,3 +53,47 @@ equivalent diff(n,n),n.
 project; auto.
 auto.
 Qed.
+
+
+name key : index -> message
+name idn : index -> message
+name msg : index -> message
+
+system [testi] (!_i A: out(c, <ok,h(msg(i),key(i))>) | !_i B: out(c, h(msg(i),key(i)))).
+
+system [testi2] (!_i A: out(c, <ok, idn(i)>) | !_i B: out(c,  idn(i))).
+
+axiom tf2 :  (forall (c:boolean, p, n:message, i:index), exists i:index, c =>  try find i such that c in p else n =p ).
+
+equiv [testi/left,testi2/right] test3.
+Proof.
+
+globalprf seq(i->h(msg(i),key(i))), ntest.
+
+enrich seq(i-> idn(i)).
+induction t.
+
+expandall.
+auto.
+
+expandall.
+fa 1. repeat fa 2.
+
+equivalent  try find i45 such that msg(i) = msg(i45)
+     in n_PRF(i45) else h(msg(i),key(i)),
+ try find i45 such that msg(i) = msg(i45)
+     in n_PRF(i) else h(msg(i),key(i)).
+fa. auto. auto.  auto. auto.
+
+equivalent  try find i45 such that msg(i) = msg(i45)
+     in n_PRF(i) else h(msg(i),key(i)),
+   n_PRF(i).
+
+admit.  (* requires a small reasoning over try find *)
+
+
+(* TODO extend rename tactic. *)
+admit.
+
+admit.
+Qed.

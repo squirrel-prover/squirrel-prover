@@ -1951,6 +1951,10 @@ let () =
     ~pq_sound:true
     (pure_equiv_typed prf) Args.(Pair(Int, Opt Message))
 
+let global_prf_param hash : prf_param =
+  match hash with
+  | Term.Seq (is,t) -> prf_param t
+  | _ -> prf_param hash
 
 let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
   let cntxt = ES.mk_trace_cntxt s in
@@ -1962,9 +1966,9 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
     | _ -> assert false
   in
 
-  let param = prf_param hash in
+  let param = global_prf_param hash in
   let frame = ES.goal_as_equiv s in
-
+  let env = ref (ES.env s) in
   (* Check syntactic side condition. *)
   let errors =
     Euf.key_ssc
@@ -1981,7 +1985,7 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
       with Vars.CastError -> acc )
       [] (Term.get_vars param.h_cnt) in
 
-  let is, subst = Term.refresh_vars (`Global) term_iv in
+  let is, subst = Term.refresh_vars (`InEnv env) term_iv in
   let fresh_mess = Term.subst subst param.h_cnt in
 
   (* Instantiation of the fresh name *)
@@ -2006,11 +2010,11 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
 
   (* the hash h of a message m will be replaced by tryfind is s.t = fresh mess
      in fresh else h *)
-  let mk_tryfind hash =
-    match hash with
-    | Term.Fun ((h_fn, _), _, [h_cnt; Name h_key]) ->
-      Term.mk_find is (Term.mk_atom `Eq h_cnt fresh_mess) (Term.mk_name ns) hash
-    | _ -> assert false
+  let mk_tryfind nhash =
+    match nhash with
+    | Term.Fun ((h_fn, _), _, [h_cnt; Name s]) when s.s_symb = param.h_key.s_symb ->
+      Term.mk_find is (Term.mk_atom `Eq h_cnt fresh_mess) (Term.mk_name ns) nhash
+    | _ -> Printer.pr "%a" Term.pp nhash;  assert false
   in
 
   let iterator t =
@@ -2018,7 +2022,7 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
        ~cntxt param.h_fn param.h_key.s_symb in
      iter#visit_message t;
      let hash_occs =  List.sort_uniq Stdlib.compare iter#get_occurrences in
-     let subst = List.map (fun (is,m) -> Term.ESubst (m, mk_tryfind hash)) hash_occs in
+     let subst = List.map (fun (is,m) -> Term.ESubst (m, mk_tryfind m)) hash_occs in
          Term.subst subst t
      in
  try
