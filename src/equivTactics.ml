@@ -1985,7 +1985,6 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
 
   (* We create a fresh copy of the message *)
   let term_iv = List.fold_left (fun acc (Vars.EVar x) ->
-      (*      if Type.equalk (Vars.kind x) Type.KIndex then *)
       try let v = (Vars.cast x Type.KIndex) in v :: acc
       with Vars.CastError -> acc )
       [] (Term.get_vars (Term.mk_pair param.h_cnt (Term.mk_name param.h_key))) in
@@ -1997,6 +1996,7 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
     | Term.Name s -> s.s_indices
     | _ -> assert false
   in
+
   (* We first have an extra goal where one needs to prove that the message we
      are using leads to bijective mapping with names. *)
   let is2, subst = Term.refresh_vars (`InEnv env) term_iv in
@@ -2011,25 +2011,16 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
 
   in
   let reach_goal = Goal.Trace ES.(to_trace_sequent
-                         (set_reach_goal goalf s)) in
+                                    (set_reach_goal goalf s)) in
+
+
+  (* We will now instantiate the new system. *)
   (* Instantiation of the fresh name *)
   let ndef = Symbols.{ n_iarr = List.length is; n_ty = Message ; } in
   let table,n =
     Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
   in
   let s = ES.set_table table s in
-
-  (* We now collect All hash occurences. *)
-(*  let iter = new Iter.get_f_messages ~fun_wrap_key:None ~drop_head:false
-    ~cntxt param.h_fn param.h_key.s_symb in
-  List.iter iter#visit_message frame;
-  SystemExpr.iter_descrs cntxt_left.table cntxt_left.system (
-    fun action_descr ->
-    iter#visit_message (snd action_descr.Action.output) ;
-    List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates) ;
-  let hash_occs =  List.sort_uniq Stdlib.compare iter#get_occurrences in
-
-*)
 
   (* the hash h of a message m will be replaced by tryfind is s.t = fresh mess
      in fresh else h *)
@@ -2043,8 +2034,6 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
               (mk_indices_eq fresh_key_ids s.s_indices)
           ) (Term.mk_name ns) nhash
     | _ -> Printer.pr "%a" Term.pp nhash;  assert false
-    (* We need to add the check that the condition of the try find on two fresh
-       occursence m(u) and m(v) => ns(u) = ns(v), i.e. u=v *)
   in
 
   let iterator t =
@@ -2055,7 +2044,7 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
      let subst = List.map (fun (_,m) -> Term.ESubst (m, mk_tryfind m)) hash_occs in
          Term.subst subst t
   in
-  (* TODO replace in frame. *)
+
  try
     let table, new_system =
       SystemExpr.clone_system_iter
@@ -2083,124 +2072,15 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
 let () =
   T.register_typed "globalprf"
     ~general_help:"Apply the global PRF axiom."
-    ~detailed_help:""
+    ~detailed_help:"Given h(m,sk) or seq(i,..-> h(m,sk)),
+     it replaces all occurences of h(x,sk1) by `try find i such that x =m & sk = \
+                    sk1 in n_PRF(i) else h(x,sk1)`, under the condition that \
+                    forall i, i', m=m' & sk = sk' => i=i'.
+
+"
     ~tactic_group:Cryptographic
     ~pq_sound:true
     (only_equiv_typed global_prf) Args.(Pair(Message, String))
-(*
-let global_prf_secret Args.(Pair (Message (hash,ty),String new_system)) s =
-  let cntxt = ES.mk_trace_cntxt s in
-
-  let system_left = SE.project PLeft cntxt.system in
-  let cntxt_left = { cntxt with system = system_left } in
-
-  let system_right = match  SE.project PRight cntxt.system with
-    | Single sys_right -> sys_right
-    | _ -> assert false
-  in
-
-  let param = global_prf_param hash in
-  let frame = ES.goal_as_equiv s in
-  let env = ref (ES.env s) in
-  (* Check syntactic side condition. *)
-  let errors =
-    Euf.key_ssc
-      ~elems:frame ~allow_functions:(fun x -> false)
-      ~cntxt param.h_fn param.h_key.s_symb
-  in
-  if errors <> [] then
-    soft_failure (Tactics.BadSSCDetailed errors);
-
-  (* We create a fresh copy of the message *)
-  let term_iv = List.fold_left (fun acc (Vars.EVar x) ->
-      (*      if Type.equalk (Vars.kind x) Type.KIndex then *)
-      try let v = (Vars.cast x Type.KIndex) in v :: acc
-      with Vars.CastError -> acc )
-      [] (Term.get_vars param.h_cnt) in
-
-  let is, subst = Term.refresh_vars (`InEnv env) term_iv in
-  let fresh_mess = Term.subst subst param.h_cnt in
-  let key_ids = param.h_key.s_indices in
-  (* Instantiation of the fresh name *)
-  let ndef = Symbols.{ n_iarr = List.length is + List.length key_ids; n_ty = Message ; } in
-  let table,n =
-    Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
-  in
-  let s = ES.set_table table s in
-
-  (* We now collect All hash occurences. *)
-  let ocs = ref [] in
-  let iter t = ocs := (Iter.get_f_messages_ext ~fun_wrap_key:None ~drop_head:false
-    ~cntxt param.h_fn param.h_key.s_symb t @ !ocs) in
-  List.iter iter frame;
-  SystemExpr.iter_descrs cntxt_left.table cntxt_left.system (
-    fun action_descr ->
-      iter (snd action_descr.Action.output) ;
-    iter (snd action_descr.Action.condition) ;
-    List.iter (fun (_,m) -> iter m) action_descr.Action.updates) ;
-  let hash_occs =  List.sort_uniq Stdlib.compare !ocs in
-  Printer.pr "test: %a"     (Fmt.list ~sep:Fmt.comma Term.pp)
-    (List.map (fun oc -> snd oc.Iter.occ_cnt) hash_occs);
-  Printer.pr "test: %a"     (Fmt.list ~sep:Fmt.comma Vars.pp_list)
-    (List.map (fun oc -> fst oc.Iter.occ_cnt) hash_occs);
-   let tempsubst = List.map (fun occ ->  Term.ESubst (snd occ.Iter.occ_cnt,Term.mk_fail )) hash_occs
-  in
- try
-    let table, new_system =
-      SystemExpr.clone_system_iter
-        (ES.table s) system_left
-        new_system (Action.apply_descr (Term.subst tempsubst)) in
-    let new_leftsystem = match system_left with
-      | Single (Left s) -> SE.Left new_system
-      | Single (Right s) -> SE.Right new_system
-      |  _ -> assert false
-    in
-    let new_system_e = SystemExpr.pair table new_leftsystem system_right in
-
-    let new_goal = ES.set_table table s
-                   |> ES.set_system new_system_e in
-
-    [new_goal]
- with SystemExpr.SystemNotFresh ->
-    hard_failure
-      (Tactics.Failure "System name already defined for another system.")
-
-
-
-
-let () =
-  T.register_typed "globalprfbis"
-    ~general_help:"Apply the global PRF axiom."
-    ~detailed_help:""
-    ~tactic_group:Cryptographic
-    ~pq_sound:true
-    (pure_equiv_typed global_prf_secret) Args.(Pair(Message, String))
-
-
-*)
-
-(* class get_names ~(cntxt:Constr.trace_cntxt) a
- *   = object (self)
- *
- *  inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
- *  val mutable names = []
- *  method get_occurrences = names
- *   (\* we check if the only diff are over g^ab and g^c, and that a, b and c
- *      appears only as g^a, g^b and g^c. *\)
- *  method visit_message t =
- *    match t with
- *    (\* if a name a, b, c appear anywhere else, fail *\)
- *    | Term.Name n when  n.s_symb = a -> (names <- n :: names)
- *    | Find (a, b, c, d) ->
- *      (\* we don't refresh *\)
- *       self#visit_message b; self#visit_message c; self#visit_message d
- *     | Seq (a, b) ->
- *       self#visit_message b
- *     | ForAll (vs,l) | Exists (vs,l) ->
- *       self#visit_message l
- *     | _ -> super#visit_message t
- *
- * end *)
 
 let global_rename Args.(Pair (Message (n1,ty1), Pair(Message (n2,ty2),
                                                      String new_system))) s =
@@ -2211,31 +2091,37 @@ let global_rename Args.(Pair (Message (n1,ty1), Pair(Message (n2,ty2),
       when List.length is = List.length is2-> nn1, nn2
     | _ -> assert false
   in
-  (* TODO, check n2 not in left system. *)
+  let frame = ES.goal_as_equiv s in
+
+  (* We check that n2 does not occur in the left system using fresh. *)
+  let frame_left = List.map (Equiv.pi_term PLeft) frame in
   let system_left = SE.project PLeft cntxt.system in
+  let cntxt_left = { cntxt with system = system_left } in
+  let iter = new  Fresh.find_name ~cntxt true ns2.s_symb in
+  List.iter iter#visit_message frame_left;
+  SystemExpr.iter_descrs cntxt_left.table cntxt_left.system (
+    fun action_descr ->
+      iter#visit_message (snd action_descr.Action.output) ;
+      iter#visit_message (snd action_descr.Action.condition) ;
+    List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates) ;
 
   let system_right = match  SE.project PRight cntxt.system with
     | Single sys_right -> sys_right
     | _ -> assert false
   in
-  (* TODO replace in frame *)
-  (*  let frame = ES.goal_as_equiv s in *)
+  (* We check that n1 does not occur in the right system using fresh. *)
+  let frame_right = List.map (Equiv.pi_term PRight) frame in
+  let cntxt_right = { cntxt with system = SE.single cntxt_left.table  system_right } in
+  let iter2 = new  Fresh.find_name ~cntxt true ns1.s_symb in
+  List.iter iter2#visit_message frame_right;
+  SystemExpr.iter_descrs cntxt_right.table cntxt_right.system (
+    fun action_descr ->
+      iter2#visit_message (snd action_descr.Action.output) ;
+      iter2#visit_message (snd action_descr.Action.condition) ;
+    List.iter (fun (_,m) -> iter2#visit_message m) action_descr.Action.updates) ;
 
-  (* let mk_subst newname current_name =
-   *   Term.ESubst (Term.mk_name current_name,
-   *               Term.(mk_name (mk_isymb newname.s_symb current_name.s_typ current_name.s_indices)))
-   * in *)
   let iterator t =
-    (* Printer.pr "Test:%a" Term.pp t;
-     * let iter = new get_names
-     *    ~cntxt ns1.s_symb in
-     *  iter#visit_message t;
-     *  let name_occs =  List.sort_uniq Stdlib.compare iter#get_occurrences in
-     *      Printer.pr "Test:%a" (Fmt.list ~sep:Fmt.comma Term.pp_nsymb) name_occs;
-     *      let subst = List.map (mk_subst ns2) name_occs  in
-     *      Printer.pr "Test:%a" Term.pp_subst subst; *)
          Term.subst_sym ns2 ns1 t
-
      in
  try
     let table, new_system =
@@ -2248,9 +2134,10 @@ let global_rename Args.(Pair (Message (n1,ty1), Pair(Message (n2,ty2),
       |  _ -> assert false
     in
     let new_system_e = SystemExpr.pair table new_leftsystem system_right in
-
+    let new_frame = List.map iterator frame in
     let new_goal = ES.set_table table s
-                   |> ES.set_system new_system_e in
+                   |> ES.set_system new_system_e
+                   |> ES.set_equiv_goal new_frame in
 
     [new_goal]
  with SystemExpr.SystemNotFresh ->
@@ -2260,14 +2147,12 @@ let global_rename Args.(Pair (Message (n1,ty1), Pair(Message (n2,ty2),
 
 let () =
   T.register_typed "rename"
-    ~general_help:"Rename one name by another in the left system."
+    ~general_help:"Rename one name by another one in the left system if the new \
+                   name is fresh."
     ~detailed_help:""
-    ~tactic_group:Cryptographic
+    ~tactic_group:Structural
     ~pq_sound:true
     (pure_equiv_typed global_rename) Args.(Pair(Message, Pair(Message, String)))
-
-
-
 
 let global_diff_eq (s : ES.t) =
   let frame = ES.goal_as_equiv s in
@@ -2280,21 +2165,12 @@ let global_diff_eq (s : ES.t) =
   List.iter (iter [] []) frame;
   SystemExpr.iter_descrs cntxt.table cntxt.system (
     fun action_descr ->
-      iter [action_descr.Action.name]  action_descr.Action.indices (snd action_descr.Action.output) ;
-    iter  [action_descr.Action.name]  action_descr.Action.indices (snd action_descr.Action.condition) ;
-    List.iter (fun (_,m) -> iter  [action_descr.Action.name]  action_descr.Action.indices m) action_descr.Action.updates) ;
-  (* Instantiate a goal with an equality for each. *)
-  (* List.iter
-   *   (fun t ->
-   *      match t.Iter.occ_cnt with
-   *      | Term.ETerm t-> Printer.pr "test: %a" Term.pp t) !ocs; *)
-  (* TODO -> one day add the occurences inside of it *)
+      let miter =   iter [action_descr.Action.name]  action_descr.Action.indices in
+     miter (snd action_descr.Action.output) ;
+     miter (snd action_descr.Action.condition) ;
+     List.iter (fun (_,m) -> miter m) action_descr.Action.updates) ;
   List.map (fun (vs,is,t) -> match t.Iter.occ_cnt with
       | Term.ETerm (Diff(s1,s2) as subt)->
-(*        Printer.pr "term: %a\n" Term.pp  subt;
-        Printer.pr "cond: %a\n" Term.pp  t.Iter.occ_cond;
-        Printer.pr "occvars: %a\n" Vars.pp_typed_list (Vars.Sv.elements t.Iter.occ_vars);
-          Printer.pr "fvars: %a\n" Vars.pp_typed_list  (Vars.Sv.elements (Term.fv subt)); *)
         let fvars =  Vars.Sv.elements (Vars.Sv.union t.Iter.occ_vars (Term.fv subt)) in
         let pred_ts_list =
           let iter = new Fresh.get_actions ~cntxt in
@@ -2307,8 +2183,10 @@ let global_diff_eq (s : ES.t) =
                                 s1 :: s2 :: iter#get_actions)
           | _ -> []
         in
-        let ts_list = (List.map (fun v -> Term.mk_action v is) vs) @ List.map (function Term.Pred (x) -> x | t -> t) pred_ts_list in
-        (*        Printer.pr "ts: %a\n" (Fmt.list ~sep:Fmt.comma Term.pp) ts_list; *)
+        (* Remark that the get_actions add pred to all timestamps, to simplify. *)
+        let ts_list = (List.map (fun v -> Term.mk_action v is) vs)
+                      @ List.map
+                        (function Term.Pred (x) -> x | t -> t) pred_ts_list in
         Goal.Trace ES.(to_trace_sequent
                          (set_reach_goal
                             Term.(
@@ -2322,16 +2200,15 @@ let global_diff_eq (s : ES.t) =
       | _ -> assert false
     ) !ocs
 
-
 let () =
   T.register "diffeq"
-        ~tactic_help:{general_help = "Closes a reflexive goal";
-                  detailed_help = "A goal is reflexive when the left and right \
-                                   frame corresponding to the bi-terms are \
-                                   identical. This of course needs to be the \
-                                   case also for macros expansions.";
+        ~tactic_help:{general_help = "Closes a reflexive goal up to equalirt";
+                      detailed_help = "A goal is reflexive when the left and \
+                                       right frame corresponding to the bi-terms \
+                                       are identical. For all diff(s1,s2), one \
+                                       needs to prove that s1=s2 holds";
                   usages_sorts = [Sort None];
-                  tactic_group = Logical}
+                  tactic_group = Structural}
     ~pq_sound:true
     (only_equiv global_diff_eq)
 
