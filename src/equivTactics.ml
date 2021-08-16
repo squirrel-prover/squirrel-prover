@@ -2067,9 +2067,11 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
       |  _ -> assert false
     in
     let new_system_e = SystemExpr.pair table new_leftsystem system_right in
-
+    let new_frame = List.map iterator frame in
     let new_goal = ES.set_table table s
-                   |> ES.set_system new_system_e in
+                   |> ES.set_system new_system_e
+                   |> ES.set_equiv_goal new_frame
+    in
 
 
 
