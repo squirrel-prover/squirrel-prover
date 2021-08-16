@@ -202,7 +202,7 @@ case (try find jl2,il2 such that
      (<Ni(i),fst(snd(input@I2(i,j)))> = <fst(snd(input@R(jl3,il3))),Nr(jl3)> &&
       (il3 = i && jl3 = j))
    in IgarbR(jl3,il3) else h(<Ni(i),fst(snd(input@I2(i,j)))>,psk(i,j))).
-use H1 with j,i.
+use H4 with j,i.
 by forceuse tryfind with i,j.
 
 case (try find jl2,il2 such that
@@ -214,7 +214,7 @@ case (try find jl2,il2 such that
      (<Ni(i),fst(snd(input@I1(i,j)))> = <fst(snd(input@R(jl3,il3))),Nr(jl3)> &&
       (il3 = i && jl3 = j))
    in IgarbR(jl3,il3) else h(<Ni(i),fst(snd(input@I1(i,j)))>,psk(i,j))).
-by use H1 with j,i.
+by use H4 with j,i.
 
 case (try find jl2,il2 such that
    (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il2),fst(snd(input@I1(il2,jl2)))> &&
@@ -225,7 +225,7 @@ case (try find jl2,il2 such that
      (<Ni(i),fst(snd(input@I1(i,j)))> = <fst(snd(input@R(jl3,il3))),Nr(jl3)> &&
       (il3 = i && jl3 = j))
    in IgarbR(jl3,il3) else h(<Ni(i),fst(snd(input@I1(i,j)))>,psk(i,j))).
-by use H1 with j,i.
+by use H4 with j,i.
 
 case (try find jl2,il2 such that
    (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il2),fst(snd(input@I1(il2,jl2)))> &&
@@ -237,13 +237,13 @@ case (try find jl2,il2 such that
       (il3 = i && jl3 = j))
    in IgarbR(jl3,il3) else h(<fst(snd(input@R(j,i))),Nr(j)>,psk(i,j))).
 notleft H0. use H0 with j,i.
-by case H1.
+by case H5.
 
 case (try find jl3,il3 such that
    (<fst(snd(input@R(j,i))),Nr(j)> = <fst(snd(input@R(jl3,il3))),Nr(jl3)> &&
     (il3 = i && jl3 = j))
  in IgarbR(jl3,il3) else h(<fst(snd(input@R(j,i))),Nr(j)>,psk(i,j))).
-by use H2 with j,i.
+by use H6 with j,i.
 
 
 case try find jl,il such that
@@ -282,7 +282,7 @@ substeq (try find jl0,il0 such that
          (<fst(snd(input@R(jl,il))),Nr(jl)> = <Ni(il0),Nr(jl0)> &&
           (il0 = il && jl0 = jl)) in Ininr(jl,il) else IgarbR(jl,il)),
       Ininr(jl,il).
-by use H0 with jl,il.
+by use H4 with jl,il.
 
 substeq  (try find jl,il such that
         (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il),Nr(jl)> &&
@@ -317,7 +317,7 @@ else
     (<fst(snd(input@R(j,i))),Nr(j)> = <fst(snd(input@R(jl3,il3))),Nr(jl3)> &&
      (il3 = i && jl3 = j))
   in IgarbR(jl3,il3) else h(<fst(snd(input@R(j,i))),Nr(j)>,psk(i,j)).
-by use H0 with j,i.
+by use H4 with j,i.
 
 case try find jl3,il3 such that
   (<fst(snd(input@R(j,i))),Nr(j)> = <fst(snd(input@R(jl3,il3))),Nr(jl3)> &&
@@ -336,9 +336,9 @@ substeq (try find jl0,il0 such that
          (<fst(snd(input@R(jl,il))),Nr(jl)> = <Ni(il0),Nr(jl0)> &&
           (il0 = il && jl0 = jl)) in Ininr(jl,il) else IgarbR(jl,il)),
       Ininr(jl,il).
-by use H0 with jl,il.
+by use H4 with jl,il.
 
-by use H2 with j,i.
+by use H6 with j,i.
 
 case (try find jl2,il2 such that
    (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il2),fst(snd(input@I1(il2,jl2)))> &&
@@ -349,13 +349,13 @@ case (try find jl2,il2 such that
      (<fst(snd(input@R(j,i))),Nr(j)> = <fst(snd(input@R(jl3,il3))),Nr(jl3)> &&
       (il3 = i && jl3 = j))
    in IgarbR(jl3,il3) else h(<fst(snd(input@R(j,i))),Nr(j)>,psk(i,j))).
-notleft H0. use H0 with j,i. by case H1.
+notleft H0. use H0 with j,i. by case H4.
 
 case (try find jl3,il3 such that
    (<fst(snd(input@R(j,i))),Nr(j)> = <fst(snd(input@R(jl3,il3))),Nr(jl3)> &&
     (il3 = i && jl3 = j))
  in IgarbR(jl3,il3) else h(<fst(snd(input@R(j,i))),Nr(j)>,psk(i,j))).
-use H2 with j,i.
+use H5 with j,i.
 Qed.
 
 (* In this next game, we just push one level up the tryfinds, with a syntactic manipulation. *)
@@ -484,6 +484,7 @@ goal [Ideal2] wa_2 :
   forall (i,j:index),
     happens(R1(j,i)) =>
     exec@R1(j,i) =>
+     happens(I(i)) &&
   fst(input@R(j,i)) = fst(output@I(i)) &&
     fst(snd(input@R(j,i))) = fst(snd(output@I(i))) &&
    snd(snd(input@R(j,i))) = snd(snd(output@I(i))).
@@ -527,496 +528,297 @@ Qed.
 
 
 
-(***** OLD ****)
+name idealkeys : index -> index -> message
 
-
-
-
-process InitiatorPRF(i:index) =
+process InitiatorRoR(i:index) =
   out(cI, <exp(g,a(i)), < Ni(i), IdI(i) >>);
 
   in(cI, m);
-  let gB = fst(m) in
-  let RNr = fst(snd(m)) in
-  let RIdR = fst(snd(snd(m))) in
-  let HashR = snd(snd(snd(m))) in
   (* find the preshared key in the database corresponding to the identity *)
-  try find j such that RIdR = IdR(j) in
-    let skeyid =
-         try find i2,j2 such that  <Ni(i),RNr > = <Ni(i2),Nr(j2) > in
-              PRFninr( i2, j2)
-             (* glob PRF psk:
-                  Collect set of hashes h(m1,psk), h(m2,psk). (fail if more than two)
-                  h(m1,sk) ->   if m1=m2 then nS else n1
-                  h(m2,sk) ->   if m1=m2 then nS else n2
-              *)
-         else
-             PRFgarbI(i)
- in
-    if HashR =  h(<gB, < exp(g,a(i))  , IdR(j)> > ,skeyid) then
-       let finalkey = h( exp(gB,a(i)), skeyid) in
-       out(cI,  h(<exp(g,a(i)), <gB, IdI(i)> > ,skeyid)  )
-
-process ResponderPRF(j:index) =
-  in(cI, m);
-  let gA  = fst(m) in
-  let RNi = fst(snd(m)) in
-  let RIdI = snd(snd(m)) in
-  (* find the preshared key in the database corresponding to the identity *)
-  try find i such that RIdI = IdI(i) in
-    let skeyid =
-      try find i2, j2 such that <RNi,Nr(j) > = <Ni(i2),Nr(j2) > in
-          PRFninr(i2,j2)
-      else
-          PRFgarbR(j)
-
-     in
-    out(cR, <exp(g,b(j)), <Nr(j), < IdR(j)  ,  h(<exp(g,b(j)), <gA, IdR(j)> > ,skeyid)   >  >  > );
-
-    in(cR, m2);
-    if m2 =  h(<gA, <exp(g,b(j)), IdI(i)> > ,skeyid) then
-       out(cR, ok)
-
-
-
-system [PRF] ((!_j R: ResponderPRF(j)) | (!_i I: InitiatorPRF(i))).
-
-
-
-
-process InitiatorPRF2(i:index) =
-  out(cI, <exp(g,a(i)), < Ni(i), IdI(i) >>);
-
-  in(cI, m);
-  let gB = fst(m) in
-  let RNr = fst(snd(m)) in
-  let RIdR = fst(snd(snd(m))) in
-  let HashR = snd(snd(snd(m))) in
-  (* find the preshared key in the database corresponding to the identity *)
-  try find j such that RIdR = IdR(j) in
-    let skeyid =
-         try find i2,j2 such that  <Ni(i),RNr > = <Ni(i2),Nr(j2) > in
-              PRFninr( i2, j2)
-         else
-             PRFgarbI(i)
- in
-    if HashR=
-         try find i2,j2 such that  <Ni(i),RNr > = <Ni(i2),Nr(j2) > in
-h(<gB, < exp(g,a(i))  , IdR(j)> > ,               PRFninr(i, j2))
-         else
-h(<gB, < exp(g,a(i))  , IdR(j)> > ,              PRFgarbI(i))
-
-then
-       let finalkey = h( exp(gB,a(i)), skeyid) in
+  try find j such that fst(snd(snd(m)))(*RIdR*) = IdR(j) in
+    if  snd(snd(snd(m)))(*HashR*) =
+        (* idealized key computation *)
+        try find jl, il such that   (<Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
+         (il = i && jl = j)) in
+         h(<  fst(m)(*gB*), < exp(g,a(i))  , IdR(j)> > ,    Ininr(j,i))
+        else
+           h(<  fst(m)(*gB*), < exp(g,a(i))  , IdR(j)> > ,  IgarbI(j,i))
+           then
        out(cI,
-         try find i2,j2 such that  <Ni(i),RNr > = <Ni(i2),Nr(j2) > in
-h(<exp(g,a(i)), <gB, IdI(i)> > ,               PRFninr(i, j2))
-         else
-h(<exp(g,a(i)), <gB, IdI(i)> > ,              PRFgarbI(i))
+        (* idealized key computation *)
+        try find jl, il such that   (<Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
+         (il = i && jl = j)) in
+             h(<exp(g,a(i)), < fst(m)(*gB*) , IdI(i)> > ,Ininr(j,i))
+        else
+            h(<exp(g,a(i)), < fst(m)(*gB*) , IdI(i)> > , IgarbI(j,i)));
+
+       out(cI,diff(      try find jl, il such that   (<Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
+         (il = i && jl = j)) in
+             h( exp(fst(m),a(i)), Ininr(j,i))
+        else
+             h( exp(fst(m),a(i)),  IgarbI(j,i)), idealkeys(j,i))).
 
 
- )
-
-process ResponderPRF2(j:index) =
+process ResponderRoR(j:index) =
   in(cI, m);
-  let gA  = fst(m) in
-  let RNi = fst(snd(m)) in
-  let RIdI = snd(snd(m)) in
   (* find the preshared key in the database corresponding to the identity *)
-  try find i such that RIdI = IdI(i) in
-    let skeyid =
-      try find i2, j2 such that <RNi,Nr(j) > = <Ni(i2),Nr(j2) > in
-          PRFninr(i2,j2)
-      else
-          PRFgarbR(j)
-
-     in
+  try find i such that snd(snd(m))(*RIdi*) = IdI(i) in
     out(cR, <exp(g,b(j)), <Nr(j), < IdR(j)  ,
-
-      try find i2, j2 such that <RNi,Nr(j) > = <Ni(i2),Nr(j2) > in
-h(<exp(g,b(j)), <gA, IdR(j)> > ,             PRFninr(i2,j))
-      else
-h(<exp(g,b(j)), <gA, IdR(j)> > ,             PRFgarbR(j))
-
->  >  > );
+        (* idealized key computation *)
+        try find jl, il such that   (< fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
+         (il = i && jl = j)) in
+            h(<exp(g,b(j)), <fst(m)(*gA*), IdR(j)> > ,   Ininr(j,i))
+        else
+          h(<exp(g,b(j)), <fst(m)(*gA*), IdR(j)> > ,     IgarbR(j,i))
+           >  >  > );
 
     in(cR, m2);
     if m2 =
-     try find i2, j2 such that <RNi,Nr(j) > = <Ni(i2),Nr(j2) > in
-     h(<gA, <exp(g,b(j)), IdI(i)> > ,          PRFninr(i2,j))
-      else
-     h(<gA, <exp(g,b(j)), IdI(i)> > ,          PRFgarbR(j))
+        (* idealized key computation *)
+        try find jl, il such that   (< fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
+         (il = i && jl = j)) in
+            h(<fst(m)(*gA*), <exp(g,b(j)), IdI(i)> > ,  Ininr(j,i))
+        else
+            h(<fst(m)(*gA*), <exp(g,b(j)), IdI(i)> > ,  IgarbR(j,i))
+         then
+       out(cR,diff(
+        try find jl, il such that   (< fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
+         (il = i && jl = j)) in
+              h( exp(fst(m),b(j)), Ininr(j,i))
+        else
+               h( exp(fst(m),b(j)),  IgarbR(j,i))
+, idealkeys(j,i))).
 
- then
-       out(cR, ok)
-
-
-
-system [PRF2] ((!_j R: ResponderPRF2(j)) | (!_i I: InitiatorPRF2(i))).
-
-
-(*
-goal fst_pair (x,y : message) : fst (<x, seq(i -> y) >) = x.
-Proof. auto. Qed.
-
-goal fst_pair (x,y : message) : fst (<x, of_bool(forall i: index, y=x) >) = x.
-Proof. auto. Qed.
-goal fst_pair (x,y : message) : fst (<x,try find i such that y = IdI(i) in y else y>) = x.
-Proof. auto. Qed.
-*)
+system [Ror] ((!_j R: ResponderRoR(j)) | (!_i I: InitiatorRoR(i))).
 
 
-goal [PRF2] wa_1 :
+axiom [Ror] ddhcommu : forall (i,j:index), exp(exp(g,a(i)),b(j)) =  exp(exp(g,b(j)),a(i)) .
+axiom [Ror] ddhnotuple : forall (m1,m2,m3,m4:message), exp(m3,m4) <> <m1,m2>.
+
+(* we first prove two small authentication lemmas, so that if we reach the ideal key computation, we know we have the correct parameters. *)
+
+goal [Ror] helper_wa :
+  forall (i,j:index),
+    happens(R1(j,i)) =>
+    exec@R1(j,i) =>
+    fst(snd(input@R(j,i))) = Ni(i) &&
+    fst(input@R(j,i)) = exp(g,a(i))
+.
+
+Proof.
+ intro i j.
+ expand exec.
+ expand cond.
+ case try find jl,il such that
+      (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il),Nr(jl)> && (il = i && jl = j))
+    in h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i))
+    else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i)).
+
+
+substeq  (try find jl0,il0 such that
+        (<fst(snd(input@R(jl,il))),Nr(jl)> = <Ni(il0),Nr(jl0)> &&
+         (il0 = il && jl0 = jl))
+      in h(<fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>>,Ininr(jl,il))
+      else h(<fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>>,IgarbR(jl,il))),
+     h(<fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>>,Ininr(jl,il)).
+euf H0.
+case H1.
+depends R(jl,il), R1(jl,il).
+
+use ddhnotuple with  fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>, fst(input@I1(il,jl)),a(il).
+
+substeq (try find jl,il such that
+        (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il),Nr(jl)> &&
+         (il = i && jl = j))
+      in h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i))
+      else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i))),
+     h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i)).
+euf H0.
+case H2.
+depends R(j,i), R1(j,i).
+Qed.
+
+goal [Ror] helper_wa2 :
   forall (i,j:index),
     happens(I1(i,j)) =>
     cond@I1(i,j) =>
-    (exists (i0:index), happens(R(j,i0)) && R(j,i0) < I1(i,j) &&
 
-      fst(output@R(j,i0)) = fst(input@I1(i,j)) &&
-      fst(snd(output@R(j,i0))) = fst(snd(input@I1(i,j))) &&
-      fst(snd(snd(output@R(j,i0)))) = fst(snd(snd(input@I1(i,j)))) &&
-(*      snd(snd(snd(output@R(j,i0)))) = snd(snd(snd(input@I1(i,j)))) && *)
-
-     fst(input@R(j,i0)) = fst(output@I(i))
-(*     fst(snd(input@R(j,i0))) = fst(snd(output@I(i))) && -> we don't prove that the Ni are equal, cause we don't get with euf the key from the top. *)
-(*     snd(snd(input@R(j,i0))) = snd(snd(output@I(i))) ->  *)
-     ).
+      Nr(j) = fst(snd(input@I1(i,j))) &&
+      exp(g,b(j)) = fst(input@I1(i,j))
+     .
 Proof.
  intro i j.
-
  expand cond.
- help.
- nosimpl(case  try find i2,j2 such that <Ni(i),RNr2(i)@I1(i,j)> = <Ni(i2),Nr(j2)>
-     in h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFninr(i,j2))
-     else h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFgarbI(i))).
 
- (* Case 1 -> honnest skeyid *)
- intro Ex.
+ case    try find jl,il such that
+       (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> &&
+        (il = i && jl = j))
+     in h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,Ininr(j,i))
+     else h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,IgarbI(j,i)).
+substeq  (try find jl0,il0 such that
+         (<Ni(il),fst(snd(input@I1(il,jl)))> = <Ni(il0),Nr(jl0)> &&
+          (il0 = il && jl0 = jl))
+       in h(<fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>>,Ininr(jl,il))
+       else h(<fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>>,IgarbI(jl,il))),
+      h(<fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>>,Ininr(jl,il)).
+euf Meq.
+use ddhnotuple with fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>, fst(input@R(jl,il)),b(jl).
 
-substeq   (try find i2,j2 such that <Ni(i),RNr2(i)@I1(i,j)> = <Ni(i2),Nr(j2)>
-       in h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFninr(i,j2))
-       else h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFgarbI(i))),    h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFninr(i,j2)); substeq  (try find i2,j3 such that <Ni(i),RNr2(i)@I1(i,j)> = <Ni(i2),Nr(j3)>
-      in h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFninr(i,j3))
-      else h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFgarbI(i))),
-     h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFninr(i,j2)).
- euf Meq.
+depends I1(il,jl),I14(il,jl).
 
-exists i0.
-expand output. repeat split.
-expand gB2.
-rewrite fst_pair.
-rewrite snd_pair fst_pair.
-rewrite snd_pair snd_pair fst_pair.
-
-depends I(i), I1(i,j).
-depends I(i), I1(i,j).
-expand output.
-
- (* Case 2 -> dishonnest skeyid, trivial as no one else computes this key *)
-
-substeq  (try find i2,j2 such that <Ni(i),RNr2(i)@I1(i,j)> = <Ni(i2),Nr(j2)>
-       in h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFninr(i,j2))
-       else h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFgarbI(i))),
-      h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFgarbI(i)).
- euf Meq.
+substeq  (try find jl,il such that
+         (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> &&
+          (il = i && jl = j))
+       in h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,Ininr(j,i))
+       else h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,IgarbI(j,i))),
+      h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,IgarbI(j,i)).
+euf Meq.
+use ddhnotuple with fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>, fst(input@I1(i,j)),a(i).
 Qed.
 
 
 
-goal [PRF2] wa_2 :
-  forall (i,j:index),
-    happens(R1(j,i)) =>
-    exec@R1(j,i) =>
-  exists j0:index,
-  fst(input@R(j,i)) = fst(output@I(i)) &&
-    fst(snd(input@R(j,i))) = fst(snd(output@I(i))) &&
-   snd(snd(input@R(j,i))) = snd(snd(output@I(i))).
 
+equiv [Ror] final.
 Proof.
- intro i j.
-expand exec.
- expand cond.
- case    try find i2,j2 such that <RNi2(j)@R1(j,i),Nr(j)> = <Ni(i2),Nr(j2)>
-   in h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFninr(i2,j))
-   else h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFgarbR(j)).
- substeq  (try find i2,j2 such that <RNi2(j)@R1(j,i),Nr(j)> = <Ni(i2),Nr(j2)>
-       in h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFninr(i2,j))
-       else h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFgarbR(j))),
-      h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFninr(i2,j)).
-substeq  (try find i3,j2 such that <RNi2(j)@R1(j,i),Nr(j)> = <Ni(i3),Nr(j2)>
-       in h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFninr(i3,j))
-       else h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFgarbR(j))),
-      h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFninr(i2,j)).
 
-  (* honest case *)
-  euf H0.
-  exists i.
-  depends I(i), I1(i,j0).
-  case H1.
+globalprf seq(il,jl->  h( exp(exp(g,a(il)),b(jl)), Ininr(jl,il))  )  , news.
+print.
 
-  executable pred(R1(j,i)).
-  depends R(j,i), R1(j,i).
-  use H2 with R(j,i).
-  expand exec. expand cond.
+rename seq(i,j ->  n_PRF(i,j)), seq(i,j ->  idealkeys(i,j)), tk.
 
- (* dishonest case *)
- substeq (try find i2,j2 such that <RNi2(j)@R1(j,i),Nr(j)> = <Ni(i2),Nr(j2)>
-      in h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFninr(i2,j))
-      else h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFgarbR(j))),
-     h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFgarbR(j)).
- euf H0.
-Qed.
+diffeq.
+case (try find jl0,il0 such that
+   (<fst(input@I2(il,jl)),<exp(g,a(il)),IdR(jl)>> = exp(exp(g,a(il0)),b(jl0)) &&
+    (jl0 = jl && il0 = il))
+ in idealkeys(jl0,il0)
+ else h(<fst(input@I2(il,jl)),<exp(g,a(il)),IdR(jl)>>,Ininr(jl,il))).
+by forceuse ddhnotuple with  fst(input@I2(il,jl)),<exp(g,a(il)),IdR(jl)>, exp(g,a(il)),b(jl).
 
 
-
-(*
-
-goal [PRF2] was_1 :
-  forall (i,j:index),
-    happens(I1(i,j)) =>
-    exec@I1(i,j) <=>
-    exec@pred(I1(i,j)) &&
-    (exists (i0:index), happens(R(j,i0)) && R(j,i0) < I1(i,j) &&
-
-      fst(output@R(j,i0)) = fst(input@I1(i,j)) &&
-      fst(snd(output@R(j,i0))) = fst(snd(input@I1(i,j))) &&
-      fst(snd(snd(output@R(j,i0)))) = fst(snd(snd(input@I1(i,j)))) &&
-      snd(snd(snd(output@R(j,i0)))) = snd(snd(snd(input@I1(i,j)))) &&
-
-     fst(input@R(j,i0)) = fst(output@I(i))
-(*     fst(snd(input@R(j,i0))) = fst(snd(output@I(i))) && -> we don't prove that the Ni are equal, cause we don't get with euf the key from the top. *)
-(*     snd(snd(input@R(j,i0))) = snd(snd(output@I(i))) ->  *)
-     ).
-Proof.
- intro i j.
-
- split.
- expand exec.
- expand cond.
- help.
- nosimpl(case  try find i2,j2 such that <Ni(i),RNr2(i)@I1(i,j)> = <Ni(i2),Nr(j2)>
-     in h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFninr(i,j2))
-     else h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFgarbI(i))).
-
- (* Case 1 -> honnest skeyid *)
- intro Ex.
-
-substeq   (try find i2,j2 such that <Ni(i),RNr2(i)@I1(i,j)> = <Ni(i2),Nr(j2)>
-       in h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFninr(i,j2))
-       else h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFgarbI(i))),    h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFninr(i,j2)); substeq  (try find i2,j3 such that <Ni(i),RNr2(i)@I1(i,j)> = <Ni(i2),Nr(j3)>
-      in h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFninr(i,j3))
-      else h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFgarbI(i))),
-     h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFninr(i,j2)).
- euf Meq.
-
-exists i0.
-expand output. repeat split.
-expand gB2.
-rewrite fst_pair.
-rewrite snd_pair fst_pair.
-rewrite snd_pair snd_pair fst_pair.
-
-depends I(i), I1(i,j).
-depends I(i), I1(i,j).
-
-rewrite snd_pair snd_pair snd_pair.
-
-
-case (try find i2,j2 such that <RNi2(j)@R(j,i0),Nr(j)> = <Ni(i2),Nr(j2)>
- in h(<exp(g,b(j)),<gA2(j)@R(j,i0),IdR(j)>>,PRFninr(i2,j))
- else h(<exp(g,b(j)),<gA2(j)@R(j,i0),IdR(j)>>,PRFgarbR(j))) .
-
-substeq  (try find i2,j2 such that <RNi2(j)@R(j,i0),Nr(j)> = <Ni(i2),Nr(j2)>
-       in h(<exp(g,b(j)),<gA2(j)@R(j,i0),IdR(j)>>,PRFninr(i2,j))
-       else h(<exp(g,b(j)),<gA2(j)@R(j,i0),IdR(j)>>,PRFgarbR(j))),
-      h(<exp(g,b(j)),<gA2(j)@R(j,i0),IdR(j)>>,PRFninr(i2,j)).
-substeq  (try find i3,j2 such that <RNi2(j)@R(j,i0),Nr(j)> = <Ni(i3),Nr(j2)>
-       in h(<exp(g,b(j)),<gA2(j)@R(j,i0),IdR(j)>>,PRFninr(i3,j))
-       else h(<exp(g,b(j)),<gA2(j)@R(j,i0),IdR(j)>>,PRFgarbR(j))),
-      h(<exp(g,b(j)),<gA2(j)@R(j,i0),IdR(j)>>,PRFninr(i2,j)).
-
-
-(*expand output.
-
- (* Case 2 -> dishonnest skeyid, trivial as no one else computes this key *)
-
-substeq  (try find i2,j2 such that <Ni(i),RNr2(i)@I1(i,j)> = <Ni(i2),Nr(j2)>
-       in h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFninr(i,j2))
-       else h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFgarbI(i))),
-      h(<gB2(i)@I1(i,j),<exp(g,a(i)),IdR(j)>>,PRFgarbI(i)).
- euf Meq.
-
-
-expand exec.
-expand cond.
-*)
-cycle 3.
-expandall.
-rewrite snd_pair snd_pair snd_pair in Meq0.
-rewrite snd_pair snd_pair fst_pair in Meq1.
-rewrite snd_pair fst_pair in Meq2.
-rewrite fst_pair in Meq3.
-
-
-
-Qed.
-
-*)
-
-
-
-goal [PRF2] wa_2 :
-  forall (i,j:index),
-    happens(R1(j,i)) =>
-    exec@R1(j,i) =>
-  exists j0:index,
-  fst(input@R(j,i)) = fst(output@I(i)) &&
-    fst(snd(input@R(j,i))) = fst(snd(output@I(i))) &&
-   snd(snd(input@R(j,i))) = snd(snd(output@I(i))).
-
-Proof.
- intro i j.
-expand exec.
- expand cond.
- case    try find i2,j2 such that <RNi2(j)@R1(j,i),Nr(j)> = <Ni(i2),Nr(j2)>
-   in h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFninr(i2,j))
-   else h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFgarbR(j)).
- substeq  (try find i2,j2 such that <RNi2(j)@R1(j,i),Nr(j)> = <Ni(i2),Nr(j2)>
-       in h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFninr(i2,j))
-       else h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFgarbR(j))),
-      h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFninr(i2,j)).
-substeq  (try find i3,j2 such that <RNi2(j)@R1(j,i),Nr(j)> = <Ni(i3),Nr(j2)>
-       in h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFninr(i3,j))
-       else h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFgarbR(j))),
-      h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFninr(i2,j)).
-
-  (* honest case *)
-  euf H0.
-  exists i.
-  depends I(i), I1(i,j0).
-  case H1.
-
-  executable pred(R1(j,i)).
-  depends R(j,i), R1(j,i).
-  use H2 with R(j,i).
-  expand exec. expand cond.
-
- (* dishonest case *)
- substeq (try find i2,j2 such that <RNi2(j)@R1(j,i),Nr(j)> = <Ni(i2),Nr(j2)>
-      in h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFninr(i2,j))
-      else h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFgarbR(j))),
-     h(<gA2(j)@R1(j,i),<exp(g,b(j)),IdI(i)>>,PRFgarbR(j)).
- euf H0.
-Qed.
-
-
-
-(* ROR *)
-name idealkey : index -> message
-
-process InitiatorPRFROR(i:index) =
-  out(cI, <exp(g,a(i)), < Ni(i), IdI(i) >>);
-
-  in(cI, m);
-  let gB = fst(m) in
-  let RNr = fst(snd(m)) in
-  let RIdR = fst(snd(snd(m))) in
-  let HashR = snd(snd(snd(m))) in
-  (* find the preshared key in the database corresponding to the identity *)
-  try find j such that RIdR = IdR(j) in
-    let skeyid =
-         try find i2,j2 such that  <Ni(i),RNr > = <Ni(i2),Nr(j2) > in
-              PRFninr( i2, j2)
-         else
-             PRFgarbI(i)
+forceuse helper_wa2 with i,j.
+case (try find jl,il such that
+   (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> && (il = i && jl = j))
  in
-    if HashR=
-         try find i2,j2 such that  <Ni(i),RNr > = <Ni(i2),Nr(j2) > in
-h(<gB, < exp(g,a(i))  , IdR(j)> > ,               PRFninr(i, j2))
-         else
-h(<gB, < exp(g,a(i))  , IdR(j)> > ,              PRFgarbI(i))
+   try find jl,il such that
+     (exp(fst(input@I1(i,j)),a(i)) = exp(exp(g,a(il)),b(jl)) &&
+      (jl = j && il = i))
+   in idealkeys(jl,il) else h(exp(fst(input@I1(i,j)),a(i)),Ininr(j,i))
+ else h(exp(fst(input@I1(i,j)),a(i)),IgarbI(j,i))).
+substeq (try find jl0,il0 such that
+         (<Ni(il),fst(snd(input@I1(il,jl)))> = <Ni(il0),Nr(jl0)> &&
+          (il0 = il && jl0 = jl))
+       in
+         try find jl0,il0 such that
+           (exp(fst(input@I1(il,jl)),a(il)) = exp(exp(g,a(il0)),b(jl0)) &&
+            (jl0 = jl && il0 = il))
+         in idealkeys(jl0,il0)
+         else h(exp(fst(input@I1(il,jl)),a(il)),Ininr(jl,il))
+       else h(exp(fst(input@I1(il,jl)),a(il)),IgarbI(jl,il))),
+      try find jl0,il0 such that
+        (exp(fst(input@I1(il,jl)),a(il)) = exp(exp(g,a(il0)),b(jl0)) &&
+         (jl0 = jl && il0 = il))
+      in idealkeys(jl0,il0)
+      else h(exp(fst(input@I1(il,jl)),a(il)),Ininr(jl,il)).
 
-then
-       out(cI,
-         try find i2,j2 such that  <Ni(i),RNr > = <Ni(i2),Nr(j2) > in
-h(<exp(g,a(i)), <gB, IdI(i)> > ,               PRFninr(i, j2))
-         else
-h(<exp(g,a(i)), <gB, IdI(i)> > ,              PRFgarbI(i))
+case (try find jl0,il0 such that
+   (exp(fst(input@I1(il,jl)),a(il)) = exp(exp(g,a(il0)),b(jl0)) &&
+    (jl0 = jl && il0 = il))
+ in idealkeys(jl0,il0) else h(exp(fst(input@I1(il,jl)),a(il)),Ininr(jl,il))).
 
+use H2 with jl,il.
 
- );
-       let finalkey =
-   try find i2,j2 such that  <Ni(i),RNr > = <Ni(i2),Nr(j2) > in
-h( exp(gB,a(i)),             PRFninr(i, j2))
-         else
-h( exp(gB,a(i)),            PRFgarbI(i))
+by forceuse ddhcommu with il,jl.
 
+by use H2 with j,i.
 
-in
+by expand exec.
 
-out(cI, diff(finalkey,idealkey(i))).
+case (try find jl0,il0 such that
+   (<fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>> = exp(exp(g,a(il0)),b(jl0)) &&
+    (jl0 = jl && il0 = il))
+ in idealkeys(jl0,il0)
+ else h(<fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>>,Ininr(jl,il))) .
+by forceuse ddhnotuple with fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>,exp(g,a(il)),b(jl).
 
-
-process ResponderPRFROR(j:index) =
-  in(cI, m);
-  let gA  = fst(m) in
-  let RNi = fst(snd(m)) in
-  let RIdI = snd(snd(m)) in
-  (* find the preshared key in the database corresponding to the identity *)
-  try find i such that RIdI = IdI(i) in
-    let skeyid =
-      try find i2, j2 such that <RNi,Nr(j) > = <Ni(i2),Nr(j2) > in
-          PRFninr(i2,j2)
-      else
-          PRFgarbR(j)
-
-     in
-    out(cR, <exp(g,b(j)), <Nr(j), < IdR(j)  ,
-
-      try find i2, j2 such that <RNi,Nr(j) > = <Ni(i2),Nr(j2) > in
-h(<exp(g,b(j)), <gA, IdR(j)> > ,             PRFninr(i2,j))
-      else
-h(<exp(g,b(j)), <gA, IdR(j)> > ,             PRFgarbR(j))
-
->  >  > );
-
-    in(cR, m2);
-    if m2 =
-     try find i2, j2 such that <RNi,Nr(j) > = <Ni(i2),Nr(j2) > in
-     h(<gA, <exp(g,b(j)), IdI(i)> > ,          PRFninr(i2,j))
-      else
-     h(<gA, <exp(g,b(j)), IdI(i)> > ,          PRFgarbR(j))
-
- then
-      let finalkey =
-     try find i2, j2 such that <RNi,Nr(j) > = <Ni(i2),Nr(j2) > in
- h( exp(gA,b(j)),                PRFninr(i2,j))
-      else
- h( exp(gA,b(j)),                PRFgarbR(j))
-
-in
-  out(cR, diff(finalkey,idealkey(i))).
+case (try find jl0,il0 such that
+   (<exp(g,a(il)),<fst(input@I1(il,jl)),IdI(il)>> = exp(exp(g,a(il0)),b(jl0)) &&
+    (jl0 = jl && il0 = il))
+ in idealkeys(jl0,il0)
+ else h(<exp(g,a(il)),<fst(input@I1(il,jl)),IdI(il)>>,Ininr(jl,il))) .
+by forceuse ddhnotuple with exp(g,a(il)),<fst(input@I1(il,jl)),IdI(il)>, exp(g,a(il)),b(jl).
 
 
-(*
-another call to PRF glob, with the message this time.
 
-So, the tactic we want is:
-
-globalprf h(m,sk):
-   all hashes h(x,sk) --> if x =m then n else h(x,sk).
-
-
-uniqprf h(m[vi],sk):
-  collect set of other hashes h(x_i,sk). If
-    1) all i x_i <> m;
-    2)  vi <> vj => m[vi] <> m[vj]
+case (try find jl0,il0 such that
+   (<fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>> = exp(exp(g,a(il0)),b(jl0)) &&
+    (jl0 = jl && il0 = il))
+ in idealkeys(jl0,il0)
+ else h(<fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>>,Ininr(jl,il))).
+by forceuse ddhnotuple with fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>, exp(g,a(il)),b(jl).
 
 
-globalprf psk:
-      Collect set of hashes h(m1,psk), h(m2,psk). (fail if more than two)
-        h(m1,sk) ->   if m1=m2 then nS else n1
-        h(m2,sk) ->   if m1=m2 then nS else n2
 
 
- *)
+
+case try find jl,il such that
+     (<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>> = exp(exp(g,a(il)),b(jl)) &&
+      (jl = j && il = i))
+   in idealkeys(jl,il)
+   else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i)).
+by forceuse ddhnotuple with fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>, exp(g,a(il)),b(jl).
+
+
+
+
+substeq (try find jl,il such that
+        (<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>> = exp(exp(g,a(il)),b(jl)) &&
+         (jl = j && il = i))
+      in idealkeys(jl,il)
+      else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i))),
+     h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i)).
+by fa.
+
+
+(* R1 case *)
+forceuse helper_wa with i,j.
+case (try find jl,il such that
+   (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il),Nr(jl)> && (il = i && jl = j))
+ in
+   try find jl,il such that
+     (exp(fst(input@R(j,i)),b(j)) = exp(exp(g,a(il)),b(jl)) &&
+      (jl = j && il = i))
+   in idealkeys(jl,il) else h(exp(fst(input@R(j,i)),b(j)),Ininr(j,i))
+ else h(exp(fst(input@R(j,i)),b(j)),IgarbR(j,i))).
+
+substeq  (try find jl0,il0 such that
+         (<fst(snd(input@R(jl,il))),Nr(jl)> = <Ni(il0),Nr(jl0)> &&
+          (il0 = il && jl0 = jl))
+       in
+         try find jl0,il0 such that
+           (exp(fst(input@R(jl,il)),b(jl)) = exp(exp(g,a(il0)),b(jl0)) &&
+            (jl0 = jl && il0 = il))
+         in idealkeys(jl0,il0)
+         else h(exp(fst(input@R(jl,il)),b(jl)),Ininr(jl,il))
+       else h(exp(fst(input@R(jl,il)),b(jl)),IgarbR(jl,il))),
+      try find jl0,il0 such that
+        (exp(fst(input@R(jl,il)),b(jl)) = exp(exp(g,a(il0)),b(jl0)) &&
+         (jl0 = jl && il0 = il))
+      in idealkeys(jl0,il0)
+      else h(exp(fst(input@R(jl,il)),b(jl)),Ininr(jl,il)).
+case (try find jl0,il0 such that
+   (exp(fst(input@R(jl,il)),b(jl)) = exp(exp(g,a(il0)),b(jl0)) &&
+    (jl0 = jl && il0 = il))
+ in idealkeys(jl0,il0) else h(exp(fst(input@R(jl,il)),b(jl)),Ininr(jl,il))).
+by use H2 with jl,il.
+
+by use H2 with j,i.
+case (try find jl0,il0 such that
+   (<exp(g,b(jl)),<fst(input@R(jl,il)),IdR(jl)>> = exp(exp(g,a(il0)),b(jl0)) &&
+    (jl0 = jl && il0 = il))
+ in idealkeys(jl0,il0)
+ else h(<exp(g,b(jl)),<fst(input@R(jl,il)),IdR(jl)>>,Ininr(jl,il))).
+
+
+by forceuse ddhnotuple with exp(g,b(jl)),<fst(input@R(jl,il)),IdR(jl)>,exp(g,a(il)),b(jl).
+Qed.

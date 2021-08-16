@@ -2256,25 +2256,27 @@ let global_diff_eq (s : ES.t) =
   let cntxt = ES.mk_trace_cntxt s in
   (* collect all Diff *)
   let ocs = ref [] in
-  let iter t = ocs := (Iter.get_diff ~cntxt (Term.simple_bi_term t) @ !ocs) in
-  List.iter iter frame;
+  let iter x y t = ocs := ( List.map (fun u -> (x,y,u))
+                            (Iter.get_diff ~cntxt (Term.simple_bi_term t)))
+                        @ !ocs in
+  List.iter (iter [] []) frame;
   SystemExpr.iter_descrs cntxt.table cntxt.system (
     fun action_descr ->
-      iter (snd action_descr.Action.output) ;
-    iter (snd action_descr.Action.condition) ;
-    List.iter (fun (_,m) -> iter m) action_descr.Action.updates) ;
+      iter [action_descr.Action.name]  action_descr.Action.indices (snd action_descr.Action.output) ;
+    iter  [action_descr.Action.name]  action_descr.Action.indices (snd action_descr.Action.condition) ;
+    List.iter (fun (_,m) -> iter  [action_descr.Action.name]  action_descr.Action.indices m) action_descr.Action.updates) ;
   (* Instantiate a goal with an equality for each. *)
   (* List.iter
    *   (fun t ->
    *      match t.Iter.occ_cnt with
    *      | Term.ETerm t-> Printer.pr "test: %a" Term.pp t) !ocs; *)
   (* TODO -> one day add the occurences inside of it *)
-  List.map (fun t -> match t.Iter.occ_cnt with
+  List.map (fun (vs,is,t) -> match t.Iter.occ_cnt with
       | Term.ETerm (Diff(s1,s2) as subt)->
-        Printer.pr "term: %a\n" Term.pp  subt;
+(*        Printer.pr "term: %a\n" Term.pp  subt;
         Printer.pr "cond: %a\n" Term.pp  t.Iter.occ_cond;
         Printer.pr "occvars: %a\n" Vars.pp_typed_list (Vars.Sv.elements t.Iter.occ_vars);
-        Printer.pr "fvars: %a\n" Vars.pp_typed_list  (Vars.Sv.elements (Term.fv subt));
+          Printer.pr "fvars: %a\n" Vars.pp_typed_list  (Vars.Sv.elements (Term.fv subt)); *)
         let fvars =  Vars.Sv.elements (Vars.Sv.union t.Iter.occ_vars (Term.fv subt)) in
         let pred_ts_list =
           let iter = new Fresh.get_actions ~cntxt in
@@ -2287,13 +2289,15 @@ let global_diff_eq (s : ES.t) =
                                 s1 :: s2 :: iter#get_actions)
           | _ -> []
         in
-        let ts_list = List.map (function Term.Pred (x) -> x | t -> t) pred_ts_list in
-        Printer.pr "ts: %a\n" (Fmt.list ~sep:Fmt.comma Term.pp) ts_list;
+        let ts_list = (List.map (fun v -> Term.mk_action v is) vs) @ List.map (function Term.Pred (x) -> x | t -> t) pred_ts_list in
+        (*        Printer.pr "ts: %a\n" (Fmt.list ~sep:Fmt.comma Term.pp) ts_list; *)
         Goal.Trace ES.(to_trace_sequent
                          (set_reach_goal
                             Term.(
                               mk_forall fvars
-                              (mk_impls (List.map mk_happens ts_list @ [t.Iter.occ_cond])
+                                (mk_impls (List.map mk_happens ts_list
+                                           @ List.map (fun t -> mk_macro exec_macro [] t) ts_list
+                                           @ [t.Iter.occ_cond])
                               (mk_atom `Eq s1 s2))
                             )
                             s))
