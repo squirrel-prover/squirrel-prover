@@ -504,9 +504,9 @@ let fold_descr
     ~(globals:bool)
     (f :
        Symbols.macro Symbols.t ->
-     Symbols.macro_def ->
-     Term.message ->
-     'a -> 'a)
+       Symbols.macro_def ->
+       Term.message ->
+       'a -> 'a)
     (table  : Symbols.table)
     (system : SystemExpr.t)
     (descr : Action.descr)
@@ -598,7 +598,7 @@ let macro_support : type a.
 
   (* reachable macros from [init] *)
   let s_reach = Utils.fpt Ss.equal do1 init in
-
+  
   (* we now try to minimize [s_reach], by removing as many global macros as
      possible *)
 
@@ -607,16 +607,16 @@ let macro_support : type a.
   in
   (* [s_reach'] are macros reachable from non-global macros in [s_reach] *)
   let s_reach' = Utils.fpt Ss.equal do1 s_reach_no_globs in
-
+  
   assert (Ss.subset s_reach' s_reach);
 
-  (* macros reachable from s_reach' *)
+  (* global macros reachable from s_reach' *)
   let s_reach'_glob =
     Ss.filter (fun ms -> is_glob cntxt.table ms) s_reach'
   in
 
   (* we remove from [s_reach] all global macros reachable from non-global
-     macros in *)
+     macros in [s_reach] *)
   Ss.diff s_reach (s_reach'_glob)
 
 
@@ -629,7 +629,9 @@ let fold_macro_support : type a.
   'b
   =
   fun func cntxt terms init ->
+
   let sm = macro_support cntxt terms in
+  
   SystemExpr.fold_descrs (fun descr acc ->
       fold_descr ~globals:true (fun msymb _ t acc ->
           if Ss.mem msymb sm then func descr t acc else acc
