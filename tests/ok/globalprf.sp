@@ -22,7 +22,6 @@ axiom tf :  (forall ( p, n:message),try find such that true in p else n =p ).
 equiv [test/left,test2/right] test2.
 Proof.
 globalprf h(ok,k), ntest.
-auto.
 
 rename n_PRF,n, ntest2.
 
@@ -71,7 +70,7 @@ equiv [testi/left,testi2/right] test3.
 Proof.
 
 globalprf seq(i->h(msg(i),key(i))), ntest.
-auto.
+
 rename seq(i -> n_PRF(i)),seq(i -> idn(i)), news.
 print.
 
@@ -85,11 +84,11 @@ expandall.
 fa 1. repeat fa 2.
 
 (* TODO, the name i45 is not stable under redo operations. *)
-equivalent   try find i67 such that (msg(i) = msg(i67) && i67 = i)
-     in idn(i67) else h(msg(i),key(i)),
+equivalent   try find i63 such that (msg(i) = msg(i63) && i63 = i)
+     in idn(i63) else h(msg(i),key(i)),
      idn(i).
-case (try find i67 such that (msg(i) = msg(i67) && i67 = i)
- in idn(i67) else h(msg(i),key(i))).
+case (try find i63 such that (msg(i) = msg(i63) && i63 = i)
+ in idn(i63) else h(msg(i),key(i))).
 
 intro H2.
 destruct H2.
@@ -107,11 +106,11 @@ auto.
 
 
 expandall.
-equivalent  try find i79 such that (msg(i) = msg(i79) && i79 = i)
-         in idn(i79) else h(msg(i),key(i)),
+equivalent  try find i75 such that (msg(i) = msg(i75) && i75 = i)
+         in idn(i75) else h(msg(i),key(i)),
          idn(i).
-case (try find i79 such that (msg(i) = msg(i79) && i79 = i)
- in idn(i79) else h(msg(i),key(i))).
+case (try find i75 such that (msg(i) = msg(i75) && i75 = i)
+ in idn(i75) else h(msg(i),key(i))).
 
 intro H2.
 destruct H2.

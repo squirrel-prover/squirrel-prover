@@ -1997,23 +1997,6 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
     | _ -> assert false
   in
 
-  (* We first have an extra goal where one needs to prove that the message we
-     are using leads to bijective mapping with names. *)
-  let is2, subst = Term.refresh_vars (`InEnv env) term_iv in
-  let fresh_mess2 = Term.subst subst param.h_cnt in
-  let fresh_key2 = Term.subst subst (Term.mk_name param.h_key) in
-  let goalf = Term.(mk_forall (List.map Vars.evar (is@is2))
-                     (mk_impls [mk_atom `Eq fresh_mess2 fresh_mess;
-                                mk_atom `Eq fresh_key2 fresh_key]
-                     (mk_indices_eq is is2))
-                  )
-
-
-  in
-  let reach_goal = Goal.Trace ES.(to_trace_sequent
-                                    (set_reach_goal goalf s)) in
-
-
   (* We will now instantiate the new system. *)
   (* Instantiation of the fresh name *)
   let ndef = Symbols.{ n_iarr = List.length is; n_ty = Message ; } in
@@ -2064,7 +2047,7 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
 
 
 
-    [reach_goal; Goal.Equiv new_goal]
+    [new_goal]
  with SystemExpr.SystemNotFresh ->
     hard_failure
       (Tactics.Failure "System name already defined for another system.")
@@ -2080,7 +2063,7 @@ let () =
 "
     ~tactic_group:Cryptographic
     ~pq_sound:true
-    (only_equiv_typed global_prf) Args.(Pair(Message, String))
+    (pure_equiv_typed global_prf) Args.(Pair(Message, String))
 
 let global_rename Args.(Pair (Message (n1,ty1), Pair(Message (n2,ty2),
                                                      String new_system))) s =
