@@ -1858,10 +1858,10 @@ let valid_hash (cntxt : Constr.trace_cntxt) (t : Term.message) =
   match t with
   | Fun ((hash, _), _, [m; Name key]) ->
     Symbols.is_ftype hash Symbols.Hash cntxt.table
-    && (Euf.key_ssc
-          ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false)
-          ~cntxt hash key.s_symb
-        = [])
+    (* && (Euf.key_ssc
+     *       ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false)
+     *       ~cntxt hash key.s_symb
+     *     = []) *)
 
   | _ -> false
 
