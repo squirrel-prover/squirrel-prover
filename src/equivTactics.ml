@@ -1961,7 +1961,6 @@ let global_prf_param hash : prf_param =
   | _ -> prf_param hash
 
 let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
-  (* TODO, forbid macros inside the hash, otherwise unsound tactic. *)
   let cntxt = ES.mk_trace_cntxt s in
 
   let system_left = SE.project PLeft cntxt.system in
@@ -1998,6 +1997,21 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
     | Term.Name s -> s.s_indices
     | _ -> assert false
   in
+  (* We first have an extra goal where one needs to prove that the message we
+     are using leads to bijective mapping with names. *)
+  let is2, subst = Term.refresh_vars (`InEnv env) term_iv in
+  let fresh_mess2 = Term.subst subst param.h_cnt in
+  let fresh_key2 = Term.subst subst (Term.mk_name param.h_key) in
+  let goalf = Term.(mk_forall (List.map Vars.evar (is@is2))
+                     (mk_impls [mk_atom `Eq fresh_mess2 fresh_mess;
+                                mk_atom `Eq fresh_key2 fresh_key]
+                     (mk_indices_eq is is2))
+                  )
+
+
+  in
+  let reach_goal = Goal.Trace ES.(to_trace_sequent
+                         (set_reach_goal goalf s)) in
   (* Instantiation of the fresh name *)
   let ndef = Symbols.{ n_iarr = List.length is; n_ty = Message ; } in
   let table,n =
@@ -2057,7 +2071,9 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
     let new_goal = ES.set_table table s
                    |> ES.set_system new_system_e in
 
-    [new_goal]
+
+
+    [reach_goal; Goal.Equiv new_goal]
  with SystemExpr.SystemNotFresh ->
     hard_failure
       (Tactics.Failure "System name already defined for another system.")
@@ -2068,7 +2084,7 @@ let () =
     ~detailed_help:""
     ~tactic_group:Cryptographic
     ~pq_sound:true
-    (pure_equiv_typed global_prf) Args.(Pair(Message, String))
+    (only_equiv_typed global_prf) Args.(Pair(Message, String))
 (*
 let global_prf_secret Args.(Pair (Message (hash,ty),String new_system)) s =
   let cntxt = ES.mk_trace_cntxt s in
