@@ -73,6 +73,10 @@ Generic construction from [I]:
 Generic construction (more complex) from [J]:
  - `kemKE_FSXY.sp`
 
+### PRF based
+
+IkeV1 with pre-shared keys for authentication [L]:
+ - `ikeV1_psk.sp`
 
 ### Composition
 
@@ -126,3 +130,4 @@ ACM Conference on Computer and Communications Security (CCS’20),
 Orlando, USA, November 2020. ACM Press.
  - [I] Boyd, Colin and Cliff, Yvonne and Nieto, Juan M. Gonzalez and Paterson, Kenneth G. One-round key exchange in the standard model.
  - [J] Fujioka, Atsushi and Suzuki, Koutarou and Xagawa, Keita and Yoneyama, Kazuki. Strongly Secure Authenticated Key Exchange from Factoring, Codes, and Lattices
+ - [L] Internet Key Exchange Version 1, RFC2409 https://datatracker.ietf.org/doc/html/rfc2409
