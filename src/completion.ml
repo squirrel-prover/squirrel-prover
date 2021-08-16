@@ -1134,7 +1134,7 @@ end = struct
     aux state [] l (fun x -> x)
 
 
-  let rec select_erule (r_open : e_rules) = 
+  let rec select_erule (r_open : e_rules) : ((cterm * cterm) * e_rules) option = 
     if Mct.is_empty r_open then None
     else 
       let t, s = Mct.choose r_open in
@@ -1148,7 +1148,7 @@ end = struct
   (** [deduce_aux state r_open r_closed]. Invariant:
       - [r_closed]: e_rules already superposed with all other rules.
       - [r_open]: e_rules to superpose. *)
-  let rec deduce_aux state (r_open : e_rules) (r_closed : e_rules) = 
+  let rec deduce_aux state (r_open : e_rules) (r_closed : e_rules) : state = 
     match select_erule r_open with
     | None -> { state with e_rules = r_closed }
 
@@ -1158,11 +1158,6 @@ end = struct
             let (state, new_rs) = grnd_superpose state rule rule' in
             ( state, add_erules r_open' new_rs)
           ) state.grnd_rules ( state, r_open') 
-      in
-
-      let state = fold_erules (fun rule' state ->
-          head_superpose state rule rule'
-        ) r_closed state
       in
 
       let state = fold_erules (fun rule' state ->
