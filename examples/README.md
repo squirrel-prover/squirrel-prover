@@ -77,6 +77,8 @@ Generic construction (more complex) from [J]:
 
 IkeV1 with pre-shared keys for authentication [L]:
  - `ikeV1_psk.sp`
+ IkeV2 signed with pre-shared keys [M,N]:
+ - `ikeV2_sign.sp`
 
 ### Composition
 
@@ -131,3 +133,5 @@ Orlando, USA, November 2020. ACM Press.
  - [I] Boyd, Colin and Cliff, Yvonne and Nieto, Juan M. Gonzalez and Paterson, Kenneth G. One-round key exchange in the standard model.
  - [J] Fujioka, Atsushi and Suzuki, Koutarou and Xagawa, Keita and Yoneyama, Kazuki. Strongly Secure Authenticated Key Exchange from Factoring, Codes, and Lattices
  - [L] Internet Key Exchange Version 1, RFC2409 https://datatracker.ietf.org/doc/html/rfc2409
+ - [M] Internet Key Exchange Version 2, RFC7296 https://datatracker.ietf.org/doc/html/rfc7296
+ - [N] Mixing Preshared Keys in (IKEv2) for Post-quantum Security, RFC8784 https://datatracker.ietf.org/doc/html/rfc8784
