@@ -612,7 +612,7 @@ let macro_support : type a.
 
   (* macros reachable from s_reach' *)
   let s_reach'_glob =
-    Ss.filter (fun ms -> is_glob cntxt.table ms) s_reach
+    Ss.filter (fun ms -> is_glob cntxt.table ms) s_reach'
   in
 
   (* we remove from [s_reach] all global macros reachable from non-global
