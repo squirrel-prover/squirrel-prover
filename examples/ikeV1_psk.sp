@@ -43,7 +43,7 @@ The final pre-key is SKEYID := prf(psk, Ni_b | Nr_b),
 
 *******************************************************************************)
 
-(* set postQuantumSound = true. *)
+set postQuantumSound = true.
 
 hash h
 
@@ -73,6 +73,9 @@ channel cR.
 
 name sk : message.
 
+(***********************************)
+(* Main expression of the protocol *)
+
 process Initiator(i:index) =
   out(cI, <exp(g,a(i)), < Ni(i), IdI(i) >>);
 
@@ -98,10 +101,15 @@ process Responder(j:index) =
 system [Main] ((!_j R: Responder(j)) | (!_i I: Initiator(i))).
 
 
+(***********************************)
+(*       Idealized version 1       *)
+
+(* The keys obtained with the first prf application are all randoms. Some are
+honest and shared by the two parties, and some correspond to garbage keys. *)
+
 name Ininr : index -> index  -> message
 name IgarbI : index -> index -> message
 name IgarbR : index -> index -> message
-
 
 process InitiatorI(i:index) =
   out(cI, <exp(g,a(i)), < Ni(i), IdI(i) >>);
@@ -166,13 +174,7 @@ system [Ideal1] ((!_j R: ResponderI(j)) | (!_i I: InitiatorI(i))).
 
 
 axiom [Main] tryfind : forall (i,j:index), input@I1(i,j) = input@I2(i,j).
-(*
-axiom [Main] redseq : forall (m:message), seq(jl,il->m) = m.
-axiom [Main] redseqnoj : forall (m:message), seq(jl,il->m) = seq(il->m).
-axiom [Main] redseqnoi : forall (m:message), seq(jl,il->m) = seq(jl->m).
-axiom [Main] redseqil : forall (i1:index), seq(jl,il->il=i1) = empty.
-axiom [Main] redseqjl : forall (i1:index), seq(jl,il->jl=i1) = empty.
-*)
+(* We prove that the main expression and the ideal 1 are equivalent. *)
 equiv [Main/left,Ideal1/right] test.
 Proof.
 print.
@@ -358,6 +360,9 @@ case (try find jl3,il3 such that
 use H5 with j,i.
 Qed.
 
+(***********************************)
+(*       Idealized version 2       *)
+
 (* In this next game, we just push one level up the tryfinds, with a syntactic manipulation. *)
 
 process InitiatorI2(i:index) =
@@ -413,8 +418,6 @@ process ResponderI2(j:index) =
 system [Ideal2] ((!_j R: ResponderI2(j)) | (!_i I: InitiatorI2(i))).
 
 
-
-
 (* We now prove the authentication on this ideal system. *)
 goal [Ideal2] fst_pair (x,y : message) : fst (<x, y >) = x.
 Proof. auto. Qed.
@@ -432,11 +435,7 @@ goal [Ideal2] wa_1 :
       fst(output@R(j,i0)) = fst(input@I1(i,j)) &&
       fst(snd(output@R(j,i0))) = fst(snd(input@I1(i,j))) &&
       fst(snd(snd(output@R(j,i0)))) = fst(snd(snd(input@I1(i,j)))) &&
-(*      snd(snd(snd(output@R(j,i0)))) = snd(snd(snd(input@I1(i,j)))) && *)
-
      fst(input@R(j,i0)) = fst(output@I(i))
-(*     fst(snd(input@R(j,i0))) = fst(snd(output@I(i))) && -> we don't prove that the Ni are equal, cause we don't get with euf the key from the top. *)
-(*     snd(snd(input@R(j,i0))) = snd(snd(output@I(i))) ->  *)
      ).
 Proof.
  intro i j.
@@ -476,9 +475,6 @@ substeq  (try find jl,il such that
 
  euf Meq.
 Qed.
-
-
-
 
 goal [Ideal2] wa_2 :
   forall (i,j:index),
@@ -527,6 +523,10 @@ substeq  (try find jl0,il0 such that
 Qed.
 
 
+(*********************************)
+(* Final game for Real or Random *)
+
+(* this is ideal 2, where in addition each party IdI(i) in the end either outputs the derived key, or an idealied key ideal(i,j) if it thinks it is talking to party IdR(j). *)
 
 name idealkeys : index -> index -> message
 
@@ -595,7 +595,7 @@ system [Ror] ((!_j R: ResponderRoR(j)) | (!_i I: InitiatorRoR(i))).
 axiom [Ror] ddhcommu : forall (i,j:index), exp(exp(g,a(i)),b(j)) =  exp(exp(g,b(j)),a(i)) .
 axiom [Ror] ddhnotuple : forall (m1,m2,m3,m4:message), exp(m3,m4) <> <m1,m2>.
 
-(* we first prove two small authentication lemmas, so that if we reach the ideal key computation, we know we have the correct parameters. *)
+(* we first prove two small authentication lemmas, so that if we reach the ideal key computation, we now we have the correct parameters. *)
 
 goal [Ror] helper_wa :
   forall (i,j:index),
@@ -675,8 +675,6 @@ substeq  (try find jl,il such that
 euf Meq.
 use ddhnotuple with fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>, fst(input@I1(i,j)),a(i).
 Qed.
-
-
 
 
 equiv [Ror] final.
