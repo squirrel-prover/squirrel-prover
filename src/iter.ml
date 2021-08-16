@@ -335,6 +335,43 @@ let get_fsymb : type a.
   a Term.term -> mess_occs = fun ?excludesymtype ?allow_diff table symtype t ->
   get_f  ?excludesymtype ?allow_diff table (Symbol symtype) t
 
+
+(*------------------------------------------------------------------*)
+(** {2 get_ftype} *)
+
+
+
+type diff_occ = Term.eterm occ
+
+type diff_occs = diff_occ list
+
+
+(** Looks for occurrences of diff operator.  *)
+let get_diff : type a.
+  cntxt:Constr.trace_cntxt ->
+  a Term.term -> diff_occs =
+  fun ~cntxt t ->
+
+  let rec get :
+    type a. a Term.term -> fv:Sv.t -> cond:Term.message -> diff_occs =
+    fun t ~fv ~cond ->
+      let occs () =
+        tfold_occ ~mode:(`Delta cntxt) (fun ~fv ~cond (Term.ETerm t) occs ->
+            get t ~fv ~cond @ occs
+          ) ~fv ~cond t []
+      in
+        match t with
+        | Term.Diff (s1, s2) ->
+          [{ occ_cnt  = Term.ETerm t;
+             occ_vars = fv;
+             occ_cond = cond; }]
+
+        | _ -> occs ()
+  in
+
+  get t ~fv:Sv.empty ~cond:Term.mk_true
+
+
 (*------------------------------------------------------------------*)
 (** {2 Find [h(_, k)]} *)
 

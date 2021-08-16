@@ -1989,7 +1989,7 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
       (*      if Type.equalk (Vars.kind x) Type.KIndex then *)
       try let v = (Vars.cast x Type.KIndex) in v :: acc
       with Vars.CastError -> acc )
-      [] (Term.get_vars param.h_cnt) in
+      [] (Term.get_vars (Term.mk_pair param.h_cnt (Term.mk_name param.h_key))) in
 
   let is, subst = Term.refresh_vars (`InEnv env) term_iv in
   let fresh_mess = Term.subst subst param.h_cnt in
@@ -1998,9 +1998,8 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
     | Term.Name s -> s.s_indices
     | _ -> assert false
   in
-  let key_ids = param.h_key.s_indices in
   (* Instantiation of the fresh name *)
-  let ndef = Symbols.{ n_iarr = List.length is + List.length key_ids; n_ty = Message ; } in
+  let ndef = Symbols.{ n_iarr = List.length is; n_ty = Message ; } in
   let table,n =
     Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
   in
@@ -2023,13 +2022,15 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
   let mk_tryfind nhash =
     match nhash with
     | Term.Fun ((h_fn, _), _, [h_cnt; Name s]) when s.s_symb = param.h_key.s_symb ->
-        let ns = Term.mk_isymb n Message (is @ s.s_indices) in
+        let ns = Term.mk_isymb n Message (is) in
         Term.mk_find is Term.(
             mk_and
               (mk_atom `Eq h_cnt fresh_mess)
               (mk_indices_eq fresh_key_ids s.s_indices)
           ) (Term.mk_name ns) nhash
     | _ -> Printer.pr "%a" Term.pp nhash;  assert false
+    (* We need to add the check that the condition of the try find on two fresh
+       occursence m(u) and m(v) => ns(u) = ns(v), i.e. u=v *)
   in
 
   let iterator t =
@@ -2039,7 +2040,8 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
      let hash_occs =  List.sort_uniq Stdlib.compare iter#get_occurrences in
      let subst = List.map (fun (_,m) -> Term.ESubst (m, mk_tryfind m)) hash_occs in
          Term.subst subst t
-     in
+  in
+  (* TODO replace in frame. *)
  try
     let table, new_system =
       SystemExpr.clone_system_iter
@@ -2199,7 +2201,7 @@ let global_rename Args.(Pair (Message (n1,ty1), Pair(Message (n2,ty2),
     | _ -> assert false
   in
   (* TODO replace in frame *)
-  let frame = ES.goal_as_equiv s in
+  (*  let frame = ES.goal_as_equiv s in *)
 
   (* let mk_subst newname current_name =
    *   Term.ESubst (Term.mk_name current_name,
@@ -2246,6 +2248,70 @@ let () =
     ~pq_sound:true
     (pure_equiv_typed global_rename) Args.(Pair(Message, Pair(Message, String)))
 
+
+
+
+let global_diff_eq (s : ES.t) =
+  let frame = ES.goal_as_equiv s in
+  let cntxt = ES.mk_trace_cntxt s in
+  (* collect all Diff *)
+  let ocs = ref [] in
+  let iter t = ocs := (Iter.get_diff ~cntxt (Term.simple_bi_term t) @ !ocs) in
+  List.iter iter frame;
+  SystemExpr.iter_descrs cntxt.table cntxt.system (
+    fun action_descr ->
+      iter (snd action_descr.Action.output) ;
+    iter (snd action_descr.Action.condition) ;
+    List.iter (fun (_,m) -> iter m) action_descr.Action.updates) ;
+  (* Instantiate a goal with an equality for each. *)
+  (* List.iter
+   *   (fun t ->
+   *      match t.Iter.occ_cnt with
+   *      | Term.ETerm t-> Printer.pr "test: %a" Term.pp t) !ocs; *)
+  (* TODO -> one day add the occurences inside of it *)
+  List.map (fun t -> match t.Iter.occ_cnt with
+      | Term.ETerm (Diff(s1,s2) as subt)->
+        Printer.pr "term: %a\n" Term.pp  subt;
+        Printer.pr "cond: %a\n" Term.pp  t.Iter.occ_cond;
+        Printer.pr "occvars: %a\n" Vars.pp_typed_list (Vars.Sv.elements t.Iter.occ_vars);
+        Printer.pr "fvars: %a\n" Vars.pp_typed_list  (Vars.Sv.elements (Term.fv subt));
+        let fvars =  Vars.Sv.elements (Vars.Sv.union t.Iter.occ_vars (Term.fv subt)) in
+        let pred_ts_list =
+          let iter = new Fresh.get_actions ~cntxt in
+          match Term.kind subt with
+          | Type.KMessage ->
+            (iter#visit_message subt;
+             iter#visit_message t.Iter.occ_cond;
+             iter#get_actions)
+          | Type.KTimestamp -> (iter#visit_message t.Iter.occ_cond;
+                                s1 :: s2 :: iter#get_actions)
+          | _ -> []
+        in
+        let ts_list = List.map (function Term.Pred (x) -> x | t -> t) pred_ts_list in
+        Printer.pr "ts: %a\n" (Fmt.list ~sep:Fmt.comma Term.pp) ts_list;
+        Goal.Trace ES.(to_trace_sequent
+                         (set_reach_goal
+                            Term.(
+                              mk_forall fvars
+                              (mk_impls (List.map mk_happens ts_list @ [t.Iter.occ_cond])
+                              (mk_atom `Eq s1 s2))
+                            )
+                            s))
+      | _ -> assert false
+    ) !ocs
+
+
+let () =
+  T.register "diffeq"
+        ~tactic_help:{general_help = "Closes a reflexive goal";
+                  detailed_help = "A goal is reflexive when the left and right \
+                                   frame corresponding to the bi-terms are \
+                                   identical. This of course needs to be the \
+                                   case also for macros expansions.";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    ~pq_sound:true
+    (only_equiv global_diff_eq)
 
 
 (*------------------------------------------------------------------*)

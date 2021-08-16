@@ -1781,6 +1781,7 @@ let pi_term ~projection term =
 
   in pi_term projection term
 
+(* Go through a term and removes all diff occurences according to the projection. *)
 let rec head_pi_term : type a. projection -> a term -> a term =
   fun s t ->
   match t,s with
@@ -1793,38 +1794,47 @@ let diff a b =
   let b = match b with Diff (_,b) | b -> b in
   if a = b then a else Diff (a,b)
 
-let head_normal_biterm : type a. a term -> a term = fun t ->
+let rec make_normal_biterm : type a. bool -> a term -> a term = fun dorec t ->
+  let mdiff : type a. a term -> a term -> a term = fun t t' ->
+    if dorec then make_normal_biterm dorec (diff t t')
+    else diff t t'
+  in
   match head_pi_term PLeft t, head_pi_term PRight t with
   | Fun (f,fty,l), Fun (f',fty',l') when f = f' ->
-    Fun (f, fty, List.map2 diff l l')
+    Fun (f, fty, List.map2 mdiff l l')
 
   | Name n, Name n' when n=n' -> Name n
 
   | Macro (m,l,ts), Macro (m',l',ts') when m=m' && ts=ts' ->
-      Macro (m, List.map2 diff l l', ts)
+      Macro (m, List.map2 mdiff l l', ts)
 
-  | Pred t, Pred t' -> Pred (diff t t')
+  | Pred t, Pred t' -> Pred (mdiff t t')
 
   | Action (a,is), Action (a',is') when a=a' && is=is' -> Action (a,is)
 
   | Var x, Var x' when x=x' -> Var x
 
   | Find (is,c,t,e), Find (is',c',t',e') when is=is' ->
-      Find (is, diff c c', diff t t', diff e e')
+      Find (is, mdiff c c', mdiff t t', mdiff e e')
 
   | Atom a, Atom a' when a = a' -> Atom a
 
   | Atom (`Message (o,u,v)), Atom (`Message (o',u',v')) when o = o' ->
-    Atom (`Message (o, diff u u', diff v v'))
+    Atom (`Message (o, mdiff u u', mdiff v v'))
 
-  | ForAll (vs,f), ForAll (vs',f') when vs=vs' -> ForAll (vs, diff f f')
-  | Exists (vs,f), Exists (vs',f') when vs=vs' -> Exists (vs, diff f f')
+  | ForAll (vs,f), ForAll (vs',f') when vs=vs' -> ForAll (vs, mdiff f f')
+  | Exists (vs,f), Exists (vs',f') when vs=vs' -> Exists (vs, mdiff f f')
 
-  | t    ,t'      -> diff t t'
+  | t1    ,t2      -> diff t1 t2
+
+let head_normal_biterm : type a. a term -> a term = fun t ->
+  make_normal_biterm false t
 
 let make_bi_term  : type a. a term -> a term -> a term = fun t1 t2 ->
   head_normal_biterm (Diff (t1, t2))
 
+let simple_bi_term : type a. a term -> a term = fun t ->
+  make_normal_biterm true t
 
 (*------------------------------------------------------------------*)
 (** {2 Sets and Maps } *)

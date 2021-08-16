@@ -499,6 +499,8 @@ val head_normal_biterm : 'a term -> 'a term
 
 val make_bi_term : 'a term -> 'a term -> 'a term
 
+val simple_bi_term : 'a term -> 'a term
+
 (*------------------------------------------------------------------*)
 (** {2 Matching information for error messages} *)
 
