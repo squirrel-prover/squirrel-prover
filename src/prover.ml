@@ -218,39 +218,17 @@ let pp_help fmt (th, tac_name) =
 (** Basic tactic tables, without registration *)
 
 module type Table_sig = sig
-  type judgment
+  type judgment = Goal.t
 
   val table : judgment table
 
   val get : string -> TacticsArgs.parser_arg list -> judgment Tactics.tac
 
-  val to_goal : judgment -> Goal.t
-  val from_trace : TS.t -> judgment
-  val from_equiv : Goal.t -> judgment
-
   val table_name : string
   val pp_goal_concl : Format.formatter -> judgment -> unit
 end
 
-module TraceTable : Table_sig with type judgment = TS.t = struct
-  type judgment = TS.t
-  let table = Hashtbl.create 97
-
-  (* TODO:location *)
-  let get id =
-    try (Hashtbl.find table id).maker with
-      | Not_found -> hard_failure
-             (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
-
-  let to_goal j = Goal.Trace j
-  let from_trace j = j
-  let from_equiv e = assert false
-
-  let table_name = "Trace"
-  let pp_goal_concl ppf j = Term.pp ppf (TS.goal j)
-end
-
-module EquivTable : Table_sig with type judgment = Goal.t = struct
+module TraceTable : Table_sig = struct
   type judgment = Goal.t
   let table = Hashtbl.create 97
 
@@ -259,13 +237,28 @@ module EquivTable : Table_sig with type judgment = Goal.t = struct
     try (Hashtbl.find table id).maker with
       | Not_found -> hard_failure
              (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
-  let to_goal j = j
-  let from_trace j = Goal.Trace j
-  let from_equiv j = j
+
+  let table_name = "Trace"
+
+  let pp_goal_concl ppf j = match j with
+    | Goal.Trace j -> Term.pp  ppf (TS.goal j)
+    | Goal.Equiv j -> Equiv.pp ppf (ES.goal j)
+end
+
+module EquivTable : Table_sig = struct
+  type judgment = Goal.t
+  let table = Hashtbl.create 97
+
+  (* TODO:location *)
+  let get id =
+    try (Hashtbl.find table id).maker with
+      | Not_found -> hard_failure
+             (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
 
   let table_name = "Equiv"
+    
   let pp_goal_concl ppf j = match j with
-    | Goal.Trace j -> Term.pp ppf (TS.goal j)
+    | Goal.Trace j -> Term.pp  ppf (TS.goal j)
     | Goal.Equiv j -> Equiv.pp ppf (ES.goal j)
 end
 
@@ -288,12 +281,13 @@ module Make_AST (T : Table_sig) :
     let eautosimpl = EquivTable.get "autosimpl" [] in
 
     fun s sk fk ->
-      match T.to_goal s with
+      match s with
       | Goal.Trace t ->
-        let sk l fk = sk (List.map T.from_trace l) fk in
-        tautosimpl t sk fk
+        let sk l fk = sk l fk in
+        tautosimpl (Goal.Trace t) sk fk
+          
       | Goal.Equiv e ->
-        let sk l fk = sk (List.map T.from_equiv l) fk in
+        let sk l fk = sk l fk in
         eautosimpl (Goal.Equiv e) sk fk
 
   let autosimpl = Lazy.from_fun autosimpl
@@ -392,7 +386,7 @@ struct
 
   let convert_args j parser_args tactic_type =
     let table, env, ty_vars =
-      match M.to_goal j with
+      match j with
       | Goal.Trace t -> TS.table t, TS.env t, TS.ty_vars t
       | Goal.Equiv e -> ES.table e, ES.env e, ES.ty_vars e
     in
@@ -523,7 +517,7 @@ struct
 
 end
 
-module rec TraceTactics : Tactics_sig with type judgment = TS.t =
+module rec TraceTactics : Tactics_sig with type judgment = Goal.t =
   Prover_tactics(TraceTable)(TraceAST)
 
 module rec EquivTactics : Tactics_sig with type judgment = Goal.t =
@@ -734,9 +728,10 @@ let pp_goal ppf () = match !current_goal, !subgoals with
 let eval_tactic_focus tac = match !subgoals with
   | [] -> assert false
   | Goal.Trace judge :: ejs' ->
-    let new_j = TraceAST.eval_judgment tac judge in
-    subgoals := List.map (fun j -> Goal.Trace j) new_j @ ejs';
+    let new_j = TraceAST.eval_judgment tac (Goal.Trace judge) in
+    subgoals := new_j @ ejs';
     is_proof_completed ()
+      
   | Goal.Equiv judge :: ejs' ->
     let new_j = EquivAST.eval_judgment tac (Goal.Equiv judge) in
     subgoals := new_j @ ejs';

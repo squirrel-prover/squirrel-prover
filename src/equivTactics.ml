@@ -43,6 +43,8 @@ let wrap_fail f (s: Goal.t) sk fk =
 (*------------------------------------------------------------------*)
 (** {2 Wrapper lifting sequence functions or tactics to general tactics} *)
 
+(* TODO: factorize with corresponding code in EquivTactics. *)
+                                       
 (** Function over a [Goal.t], returning an arbitrary value. *)
 type 'a genfun = Goal.t -> 'a
 
@@ -55,7 +57,7 @@ type 'a seqfun = EquivSequent.t -> 'a
 let genfun_of_seqfun (t : 'a seqfun) : 'a genfun = fun s ->
   match s with
   | Goal.Equiv s -> t s
-  | _ -> soft_failure (Tactics.Failure "equivalence goal expected")
+  | _ -> soft_failure (Tactics.Failure "global sequent expected")
 
 (** As [genfun_of_seqfun], but with an extra argument. *)
 let genfun_of_seqfun_arg
@@ -65,7 +67,7 @@ let genfun_of_seqfun_arg
   =
   match s with
   | Goal.Equiv s -> t arg s
-  | _ -> soft_failure (Tactics.Failure "equivalence goal expected")
+  | _ -> soft_failure (Tactics.Failure "global sequent expected")
 
 (*------------------------------------------------------------------*)
 (** Function expecting and returning equivalence sequents. *)

@@ -125,7 +125,7 @@ end
 
 val pp_ast : Format.formatter -> TacticsArgs.parser_arg Tactics.ast -> unit
 
-module TraceTactics : Tactics_sig with type judgment = TS.t
+module TraceTactics : Tactics_sig with type judgment = Goal.t
 module EquivTactics : Tactics_sig with type judgment = Goal.t
 
 (*------------------------------------------------------------------*)
