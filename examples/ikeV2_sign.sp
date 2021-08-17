@@ -263,25 +263,16 @@ case (try find jl,il such that
    prfd(hseed(<<Ni(i),snd(input@SI(i))>,exp(fst(input@SI(i)),xi(i))>,
         seedpubkey),psk)).
 collision.
-substeq  (try find jl,il0 such that
-         hseed(<<Ni(il),snd(input@SI(il))>,exp(fst(input@SI(il)),xi(il))>,
-         seedpubkey) =
-         hseed(<<Ni(il0),Nr(jl)>,exp(exp(g,xr(jl)),xi(il0))>,seedpubkey)
-       in idealkeys(jl,il0)
-       else
-         prfd(hseed(<<Ni(il),snd(input@SI(il))>,exp(fst(input@SI(il)),xi(il))>,
-              seedpubkey),psk)),
-      idealkeys(j,il).
+substeq Meq2.
+
 case try find jf such that snd(input@SI(il)) = Nr(jf)
 in idealkeys(jf,il) else fail.
 
-substeq  (try find jf such that snd(input@SI(il)) = Nr(jf)
-       in idealkeys(jf,il) else fail),
-      idealkeys(j,il).
+substeq Meq4.
 
-use H2 with j.
+by use H2 with j.
 
-use H2 with j,i.
+by use H2 with j,i.
 
 
 (* R part *)
@@ -294,33 +285,12 @@ case (try find jl,il such that
  else
    prfd(hseed(<<snd(input@R(j)),Nr(j)>,exp(fst(input@R(j)),xr(j))>,
         seedpubkey),psk)) .
-substeq  (try find jl,il such that
-         hseed(<<snd(input@R(j)),Nr(j)>,exp(fst(input@R(j)),xr(j))>,
-         seedpubkey) =
-         hseed(<<Ni(il),Nr(jl)>,exp(exp(g,xr(jl)),xi(il))>,seedpubkey)
-       in idealkeys(jl,il)
-       else
-         prfd(hseed(<<snd(input@R(j)),Nr(j)>,exp(fst(input@R(j)),xr(j))>,
-              seedpubkey),psk)),
-      idealkeys(jl,il).
-substeq  (try find jl0,il0 such that
-         hseed(<<snd(input@R(j)),Nr(j)>,exp(fst(input@R(j)),xr(j))>,
-         seedpubkey) =
-         hseed(<<Ni(il0),Nr(jl0)>,exp(exp(g,xr(jl0)),xi(il0))>,seedpubkey)
-       in idealkeys(jl0,il0)
-       else
-         prfd(hseed(<<snd(input@R(j)),Nr(j)>,exp(fst(input@R(j)),xr(j))>,
-              seedpubkey),psk)),
-      idealkeys(jl,il).
+substeq Meq2. substeq Meq2.
+
 collision.
 
 case try find jf such that snd(input@R(jl)) = Ni(jf) in idealkeys(jl,jf) else fail.
-substeq  (try find jf such that snd(input@R(jl)) = Ni(jf)
-       in idealkeys(jl,jf) else fail),
-      idealkeys(jl,jf).
-substeq  (try find jf0 such that snd(input@R(jl)) = Ni(jf0)
-       in idealkeys(jl,jf0) else fail),
-      idealkeys(jl,jf).
+substeq Meq4. substeq Meq4.
 
 by use H2 with il.
 

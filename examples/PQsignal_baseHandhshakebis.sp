@@ -37,7 +37,7 @@ s <- c + k
 verify(sid, dkj)
 fkey =k
 
-*******************************************************************************)
+*********************************************split**********************************)
 set timeout = 10.
 set postQuantumSound = true.
 
@@ -89,6 +89,8 @@ channel cI.
 channel cR.
 
 (* Main protocol Model *)
+
+
 
 process Initiator(i,j,l:index) =
 (* Initiator i who wants to talk to Responder j *)
@@ -179,7 +181,7 @@ axiom [Ideal] xorconcel : forall (m1,m2,m3:message) m1=m2 => xor(m1,xor(m2,m3)) 
 
 axiom [Ideal] rcheck : forall (m1,m2,sk:message), m1=m2 => checksign(sign(m1,sk),spk(sk)) = m2.
 
-goal [Ideal] auth :  forall (i,j,l:index) ,
+axiom [Ideal] auth :  forall (i,j,l:index) ,
    happens(FI(i,j,l)) =>
         exec@FI(i,j,l) <=>
       exec@pred(FI(i,j,l)) &&
@@ -191,168 +193,6 @@ goal [Ideal] auth :  forall (i,j,l:index) ,
           fst(snd(output@SR(j,i,l2))) = fst(snd(input@FI(i,j,l))) &&
           snd(snd(output@SR(j,i,l2))) = snd(snd(input@FI(i,j,l)))
 .
-Proof.
-intro i j l.
-split.
-expand exec.
-expand cond.
-euf H0.
-assert ( SR(j,i0,l0) <= FI(i,j,l) || SR(j,i0,l0) < FI(i,j,l)) <=>  SR(j,i0,l0) < FI(i,j,l).
-case H1.
-use H2.
-
-project.
-use uniqepk with vkI(i),vkI(i0).
-exists l0.
-depends I(i,j,l), FI(i,j,l).
-by use sufcma with xor(ktilde3(i,j,l)@FI(i,j,l),snd(snd(input@FI(i,j,l)))), sid3(i,j,l)@FI(i,j,l), skR(j).
-
-case    try find i2,j2,l2 such that KT1(i,j,l)@FI(i,j,l) = kt(j2,i2,l2)
-    in k(j2,i2,l2) else decap(fst(snd(input@FI(i,j,l))),vkI(i)).
-substeq Meq1.
- use uniqepk with vkI(i),vkI(i0).
-
-exists l0.
-depends I(i,j,l), FI(i,j,l).
-by use sufcma with xor(ktilde3(i,j,l)@FI(i,j,l),snd(snd(input@FI(i,j,l)))), sid3(i,j,l)@FI(i,j,l), skR(j).
-
-use uniqepk with vkI(i),vkI(i0).
-by use H4 with i,j,l0.
-
-
-project.
-expand exec. expand cond.
-depends I(i,j,l), FI(i,j,l).
-
-
-assert ktilde2(j,i,l2)@SR(j,i,l2) = ktilde3(i,j,l)@FI(i,j,l).
-expand output.
-substeq snd(snd(input@FI(i,j,l))),   xor(ktilde2(j,i,l2)@SR(j,i,l2),
-           sign(sid2(j,i,l2)@SR(j,i,l2),skR(j))).
-assert sid2(j,i,l2)@SR(j,i,l2) = sid3(i,j,l)@FI(i,j,l).
-
-use xorconcel with ktilde3(i,j,l)@FI(i,j,l), ktilde2(j,i,l2)@SR(j,i,l2),  sign(sid2(j,i,l2)@SR(j,i,l2),skR(j)).
-
-substeq xor(ktilde3(i,j,l)@FI(i,j,l),
-      xor(ktilde2(j,i,l2)@SR(j,i,l2),sign(sid2(j,i,l2)@SR(j,i,l2),skR(j)))),
-      sign(sid2(j,i,l2)@SR(j,i,l2),skR(j)).
-use rcheck with  sid2(j,i,l2)@SR(j,i,l2), sid3(i,j,l)@FI(i,j,l)   ,skR(j).
-
-
-expand exec. expand cond.
-depends I(i,j,l), FI(i,j,l).
-
-case    try find i2,j2,l2 such that KT1(i,j,l)@FI(i,j,l) = kt(j2,i2,l2)
-    in k(j2,i2,l2) else decap(fst(snd(input@FI(i,j,l))),vkI(i)).
-substeq Meq4. substeq Meq4.
-
-
-assert ktilde2(j,i,l2)@SR(j,i,l2) = ktilde3(i,j,l)@FI(i,j,l).
-expand output.
-substeq snd(snd(input@FI(i,j,l))),   xor(ktilde2(j,i,l2)@SR(j,i,l2),
-           sign(sid2(j,i,l2)@SR(j,i,l2),skR(j))).
-assert sid2(j,i,l2)@SR(j,i,l2) = sid3(i,j,l)@FI(i,j,l).
-
-use xorconcel with ktilde3(i,j,l)@FI(i,j,l), ktilde2(j,i,l2)@SR(j,i,l2),  sign(sid2(j,i,l2)@SR(j,i,l2),skR(j)).
-
-substeq xor(ktilde3(i,j,l)@FI(i,j,l),
-      xor(ktilde2(j,i,l2)@SR(j,i,l2),sign(sid2(j,i,l2)@SR(j,i,l2),skR(j)))),
-      sign(sid2(j,i,l2)@SR(j,i,l2),skR(j)).
-use rcheck with  sid2(j,i,l2)@SR(j,i,l2), sid3(i,j,l)@FI(i,j,l)   ,skR(j).
-
-
-use H0 with i,j,l.
-Qed.
-
-(* As I1 is the converse of FI, we also have freely that *)
-axiom [Ideal] auth2 :  forall (i,j,l:index) ,
-   happens(I1(i,j,l)) =>
-        exec@I1(i,j,l) <=>
-      exec@pred(I1(i,j,l)) &&
-        not(exists (l2:index),
-          I(i,j,l) < I1(i,j,l) &&
-          SR(j,i,l2) < I1(i,j,l) &&
-          input@SR(j,i,l2) =  output@I(i,j,l) &&
-          fst(output@SR(j,i,l2)) = fst(input@I1(i,j,l)) &&
-          fst(snd(output@SR(j,i,l2))) = fst(snd(input@I1(i,j,l))) &&
-          snd(snd(output@SR(j,i,l2))) = snd(snd(input@I1(i,j,l))))
-.
-
-
-equiv [Ideal] step1.
-Proof.
-enrich skex. enrich seq(i->epk(vkI(i))).
-enrich seq(i,j,l -> kt(j,i,l)).
-enrich seq(i,j,l -> rkt(j,i,l)).
-enrich seq(j-> vkR(j)).
-enrich seq(i,j,l->k(j,i,l)).
-enrich seq(j-> skR(j)).
-enrich seq(i,j,l-> epk(dkt(i,j,l))).
-induction t.
-
-expandall.
-
-
-expandall. fa 8.
-
-expandall. fa 8. repeat fa 9.
-expandseq seq(i->epk(vkI(i))), i.
-fa 12. repeat fa 13. repeat fa 15.
-
-cca1 12.
-equivalent len(diff(k(j,i,l),rnd(j,i,l))), len(skex).
-project.
-help.
-namelength k(j,i,l), skex.
-namelength rnd(j,i,l), skex.
-expandseq seq(i,j,l->k(j,i,l)),i,j,l.
-expandseq seq(i,j,l->kt(j,i,l)),i,j,l.
-expandseq seq(i,j,l->rkt(j,i,l)),i,j,l.
-expandseq seq(j->vkR(j)),j.
-expandseq seq(j->skR(j)),j.
-
-
-expandall.
-fa 8. fa 9. fa 9.
-expandseq seq(i,j,l-> epk(dkt(i,j,l))),i,j,l.
-
-
-expand frame.
-equivalent         exec@FI(i,j,l),
-      exec@pred(FI(i,j,l)) &&
-        exists (l2:index),
-          I(i,j,l) < FI(i,j,l) &&
-          SR(j,i,l2) < FI(i,j,l) &&
-          input@SR(j,i,l2) =  output@I(i,j,l) &&
-          fst(output@SR(j,i,l2)) = fst(input@FI(i,j,l)) &&
-          fst(snd(output@SR(j,i,l2))) = fst(snd(input@FI(i,j,l))) &&
-          snd(snd(output@SR(j,i,l2))) = snd(snd(input@FI(i,j,l))).
-
-nosimpl(use auth with i,j,l).
-assumption.
-assumption.
-fa 8.
-fa 9.
-fa 10.
-expand output.
-fadup 9.
-
-expand frame.
-equivalent        exec@I1(i,j,l),
-      exec@pred(I1(i,j,l)) &&
-        not(exists (l2:index),
-          I(i,j,l) < I1(i,j,l) &&
-          SR(j,i,l2) < I1(i,j,l) &&
-          input@SR(j,i,l2) =  output@I(i,j,l) &&
-          fst(output@SR(j,i,l2)) = fst(input@I1(i,j,l)) &&
-          fst(snd(output@SR(j,i,l2))) = fst(snd(input@I1(i,j,l))) &&
-          snd(snd(output@SR(j,i,l2))) = snd(snd(input@I1(i,j,l)))).
-nosimpl(use auth2 with i,j,l); assumption.
-
-fa 8. fa 9.
- fa 10. fadup 9.
-Qed.
-
 (*******************************************)
 (************ One more step with PRF *******)
 
@@ -418,10 +258,18 @@ diffeq.
 
 case (try find kl,kj,ki such that (skex = skex && (kj = j && ki = i && kl = l))
  in rndp(kl,kj,ki) else exct(skex,k(j,i,l))).
-substeq Meq0.
+substeq (try find kl,kj,ki such that
+         (skex = skex && (kj = j && ki = i && kl = l))
+       in rndp(kl,kj,ki) else exct(skex,k(j,i,l))),
+      exct(skex,k(j,i,l)).
+
 case (try find kl,kj,ki such that (skex = skex && (kj = j && ki = i && kl = l))
  in rndp(kl,kj,ki) else exct(skex,k(j,i,l))).
 
+substeq (try find kl0,kj0,ki0 such that
+         (skex = skex && (kj0 = kj && ki0 = ki && kl0 = kl))
+       in rndp(kl0,kj0,ki0) else exct(skex,k(kj,ki,kl))),
+      rndp(kl,kj,ki).
 by use H1 with kl,kj,ki.
 by use H1 with l,j,i.
 
@@ -432,18 +280,42 @@ case    try find i2,j2,l2 such that
                       (skex = skex && (kj = j2 && ki = i2 && kl = l2))
                     in rndp(kl,kj,ki) else exct(skex,k(j2,i2,l2))
                   else exct(skex,decap(fst(snd(input@FI(i,j,l))),vkI(i))).
-substeq Meq0. substeq Meq0.
+substeq  (try find i2,j2,l2 such that KT2(i,j,l)@FI(i,j,l) = kt(j2,i2,l2)
+       in
+         try find kl,kj,ki such that
+           (skex = skex && (kj = j2 && ki = i2 && kl = l2))
+         in rndp(kl,kj,ki) else exct(skex,k(j2,i2,l2))
+       else exct(skex,decap(fst(snd(input@FI(i,j,l))),vkI(i)))),
+      try find kl,kj,ki such that
+        (skex = skex && (kj = j2 && ki = i2 && kl = l2))
+      in rndp(kl,kj,ki) else exct(skex,k(j2,i2,l2)).
+substeq (try find i3,j3,l3 such that KT2(i,j,l)@FI(i,j,l) = kt(j3,i3,l3)
+       in
+         try find kl,kj,ki such that
+           (skex = skex && (kj = j3 && ki = i3 && kl = l3))
+         in rndp(kl,kj,ki) else exct(skex,k(j3,i3,l3))
+       else exct(skex,decap(fst(snd(input@FI(i,j,l))),vkI(i)))),
+      try find kl,kj,ki such that
+        (skex = skex && (kj = j2 && ki = i2 && kl = l2))
+      in rndp(kl,kj,ki) else exct(skex,k(j2,i2,l2)).
 
 case   try find kl,kj,ki such that
                     (skex = skex && (kj = j2 && ki = i2 && kl = l2))
                   in rndp(kl,kj,ki) else exct(skex,k(j2,i2,l2)).
-substeq Meq1.
+
+substeq  (try find kl0,kj0,ki0 such that
+         (skex = skex && (kj0 = kj && ki0 = ki && kl0 = kl))
+       in rndp(kl0,kj0,ki0) else exct(skex,k(kj,ki,kl))),
+      rndp(kl,kj,ki).
 
 case  try find i3,j3,l3 such that
                     KT2(i,j,l)@FI(i,j,l) = kt(j3,i3,l3)
                   in rndp(l3,j3,i3)
                   else exct(skex,decap(fst(snd(input@FI(i,j,l))),vkI(i))).
-substeq Meq1.
+substeq  (try find i3,j3,l3 such that KT2(i,j,l)@FI(i,j,l) = kt(j3,i3,l3)
+       in rndp(l3,j3,i3)
+       else exct(skex,decap(fst(snd(input@FI(i,j,l))),vkI(i)))),
+      rndp(kl,kj,ki).
 by use H1 with ki,kj,kl.
 by use H1 with l2,j2,i2.
 
@@ -466,7 +338,22 @@ forceuse fstpair with CT2(j,i,l2)@SR(j,i,l2),
             xor(xor(F2(sid4(j,i,l2)@SR(j,i,l2),rndp(l2,j,i)),
                 F2(sid4(j,i,l2)@SR(j,i,l2),K10(j,i,l2)@SR(j,i,l2))),
             sign(sid4(j,i,l2)@SR(j,i,l2),skR(j)))>).
-substeq Meq2.
+substeq fst(
+        <CT2(j,i,l2)@SR(j,i,l2),
+         diff(
+           <C2(j,i,l2)@SR(j,i,l2),
+            xor(xor(F2(sid4(j,i,l2)@SR(j,i,l2),
+                    try find kl,kj,ki such that
+                      (skex = skex && (kj = j && ki = i && kl = l2))
+                    in rndp(kl,kj,ki) else exct(skex,k(j,i,l2))),
+                F2(sid4(j,i,l2)@SR(j,i,l2),K10(j,i,l2)@SR(j,i,l2))),
+            sign(sid4(j,i,l2)@SR(j,i,l2),skR(j)))>,
+           <C2(j,i,l2)@SR(j,i,l2),
+            xor(xor(F2(sid4(j,i,l2)@SR(j,i,l2),rndp(l2,j,i)),
+                F2(sid4(j,i,l2)@SR(j,i,l2),K10(j,i,l2)@SR(j,i,l2))),
+            sign(sid4(j,i,l2)@SR(j,i,l2),skR(j)))>)>),
+      CT2(j,i,l2)@SR(j,i,l2).
+
 case (try find kl,kj,ki such that (skex = skex && (kj = j && ki = i && kl = l))
  in rndp(kl,kj,ki) else exct(skex,k(j,i,l))).
 by use H1 with l,j,i.
@@ -559,12 +446,38 @@ case (try find ml2,ml3,mj,mi such that
         encap(kt(mj,mi,ml3),rkt(mj,mi,ml3),epk(dkt(mi,mj,ml2)))>>>> &&
     (ml3 = l0 && mj = j0 && mi = i0))
  in ideal(ml2,ml3,mj,mi) else F1(sid7(i,j,l)@FI(i,j,l),rndp(l0,j0,i0))).
-substeq Meq0. substeq Meq0.
+
+substeq  (try find ml2,ml3,mj0,mi0 such that
+         (sid7(i,j,l)@FI(i,j,l) =
+          <epk(vkI(mi0)),
+           <epk(vkR(mj0)),
+            <epk(dkt(mi0,mj0,ml2)),
+             <encap(rnd(mj0,mi0,ml3),rk(mj0,mi0,ml3),epk(vkI(mi0))),
+              encap(kt(mj0,mi0,ml3),rkt(mj0,mi0,ml3),epk(dkt(mi0,mj0,ml2)))>>>> &&
+          (ml3 = l0 && mj0 = mj && mi0 = mi))
+       in ideal(ml2,ml3,mj0,mi0)
+       else F1(sid7(i,j,l)@FI(i,j,l),rndp(l0,mj,mi))),
+      ideal(ml2,l0,mj,mi).
+
+substeq  (try find ml3,ml4,mj0,mi0 such that
+         (sid7(i,j,l)@FI(i,j,l) =
+          <epk(vkI(mi0)),
+           <epk(vkR(mj0)),
+            <epk(dkt(mi0,mj0,ml3)),
+             <encap(rnd(mj0,mi0,ml4),rk(mj0,mi0,ml4),epk(vkI(mi0))),
+              encap(kt(mj0,mi0,ml4),rkt(mj0,mi0,ml4),epk(dkt(mi0,mj0,ml3)))>>>> &&
+          (ml4 = l0 && mj0 = mj && mi0 = mi))
+       in ideal(ml3,ml4,mj0,mi0)
+       else F1(sid7(i,j,l)@FI(i,j,l),rndp(l0,mj,mi))),
+      ideal(ml2,l0,mj,mi).
+
+
 nosimpl(forceuse auth with i,j,l).
 use H1.  use H1.
-by forceuse uniqepk with dkt(i,j,l), dkt(i,j,ml2).
 
-auto.
+
+forceuse uniqepk with dkt(i,j,l), dkt(i,j,ml2).
+simpl.
 
 nosimpl(forceuse auth with i,j,l).
 use H2. use H2.
@@ -583,11 +496,37 @@ case  (try find ml2,ml3,mj,mi such that
         encap(kt(mj,mi,ml3),rkt(mj,mi,ml3),epk(dkt(mi,mj,ml2)))>>>> &&
     (ml3 = l && mj = j && mi = i))
  in ideal(ml2,ml3,mj,mi) else F1(sid6(j,i,l)@FR(j,i,l),rndp(l,j,i))) .
-substeq Meq. substeq Meq.
+substeq (try find ml2,ml3,mj0,mi0 such that
+        (sid6(mj,mi,l)@FR(mj,mi,l) =
+         <epk(vkI(mi0)),
+          <epk(vkR(mj0)),
+           <epk(dkt(mi0,mj0,ml2)),
+            <encap(rnd(mj0,mi0,ml3),rk(mj0,mi0,ml3),epk(vkI(mi0))),
+             encap(kt(mj0,mi0,ml3),rkt(mj0,mi0,ml3),epk(dkt(mi0,mj0,ml2)))>>>> &&
+         (ml3 = l && mj0 = mj && mi0 = mi))
+      in ideal(ml2,ml3,mj0,mi0)
+      else F1(sid6(mj,mi,l)@FR(mj,mi,l),rndp(l,mj,mi))),
+     ideal(ml2,l,mj,mi).
+substeq  (try find ml3,ml4,mj0,mi0 such that
+        (sid6(mj,mi,l)@FR(mj,mi,l) =
+         <epk(vkI(mi0)),
+          <epk(vkR(mj0)),
+           <epk(dkt(mi0,mj0,ml3)),
+            <encap(rnd(mj0,mi0,ml4),rk(mj0,mi0,ml4),epk(vkI(mi0))),
+             encap(kt(mj0,mi0,ml4),rkt(mj0,mi0,ml4),epk(dkt(mi0,mj0,ml3)))>>>> &&
+         (ml4 = l && mj0 = mj && mi0 = mi))
+      in ideal(ml3,ml4,mj0,mi0)
+      else F1(sid6(mj,mi,l)@FR(mj,mi,l),rndp(l,mj,mi))),
+     ideal(ml2,l,mj,mi).
 
 case try find l2 such that input@SR(mj,mi,l) = epk(dkt(mi,mj,l2))
 in ideal(l2,l,mj,mi) else F1(sid6(mj,mi,l)@FR(mj,mi,l),rndp(l,mj,mi)).
-substeq Meq1. substeq Meq1.
+substeq  (try find l2 such that input@SR(mj,mi,l) = epk(dkt(mi,mj,l2))
+       in ideal(l2,l,mj,mi) else F1(sid6(mj,mi,l)@FR(mj,mi,l),rndp(l,mj,mi))),
+      ideal(l2,l,mj,mi).
+substeq  (try find l3 such that input@SR(mj,mi,l) = epk(dkt(mi,mj,l3))
+       in ideal(l3,l,mj,mi) else F1(sid6(mj,mi,l)@FR(mj,mi,l),rndp(l,mj,mi))),
+      ideal(l2,l,mj,mi).
 by forceuse uniqepk with dkt(mi,mj,ml2), dkt(mi,mj,l2).
 
 by use H2 with ml2.

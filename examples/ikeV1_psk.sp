@@ -96,8 +96,6 @@ process Responder(j:index) =
     if m2 =  h(<fst(m)(*gA*), <exp(g,b(j)), IdI(i)> > , h(< fst(snd(m)),Nr(j) > ,psk(i,j))) then
        out(cR, ok)
 
-
-
 system [Main] ((!_j R: Responder(j)) | (!_i I: Initiator(i))).
 
 
@@ -167,11 +165,7 @@ process ResponderI(j:index) =
         ) then
        out(cR, ok)
 
-
-
 system [Ideal1] ((!_j R: ResponderI(j)) | (!_i I: InitiatorI(i))).
-
-
 
 axiom [Main] tryfind : forall (i,j:index), input@I1(i,j) = input@I2(i,j).
 (* We prove that the main expression and the ideal 1 are equivalent. *)
@@ -264,52 +258,11 @@ else
 case try find jl0,il0 such that
   (<fst(snd(input@R(jl,il))),Nr(jl)> = <Ni(il0),Nr(jl0)> &&
    (il0 = il && jl0 = jl)) in Ininr(jl,il) else IgarbR(jl,il).
-substeq  (try find jl0,il0 such that
-        (<fst(snd(input@R(jl,il))),Nr(jl)> = <Ni(il0),Nr(jl0)> &&
-         (il0 = il && jl0 = jl))
-      in Ininr(jl0,il0)
-      else
-        try find jl2,il2 such that
-          (<fst(snd(input@R(jl,il))),Nr(jl)> =
-           <Ni(il2),fst(snd(input@I1(il2,jl2)))> && (il2 = il && jl2 = jl))
-        in IgarbI(jl2,il2)
-        else
-          try find jl3,il3 such that
-            (<fst(snd(input@R(jl,il))),Nr(jl)> =
-             <fst(snd(input@R(jl3,il3))),Nr(jl3)> && (il3 = il && jl3 = jl))
-          in IgarbR(jl3,il3)
-          else h(<fst(snd(input@R(jl,il))),Nr(jl)>,psk(il,jl))),
-     Ininr(jl,il).
-substeq (try find jl0,il0 such that
-         (<fst(snd(input@R(jl,il))),Nr(jl)> = <Ni(il0),Nr(jl0)> &&
-          (il0 = il && jl0 = jl)) in Ininr(jl,il) else IgarbR(jl,il)),
-      Ininr(jl,il).
+substeq Meq.
+substeq Meq1.
 by use H4 with jl,il.
 
-substeq  (try find jl,il such that
-        (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il),Nr(jl)> &&
-         (il = i && jl = j))
-      in Ininr(jl,il)
-      else
-        try find jl2,il2 such that
-          (<fst(snd(input@R(j,i))),Nr(j)> =
-           <Ni(il2),fst(snd(input@I1(il2,jl2)))> && (il2 = i && jl2 = j))
-        in IgarbI(jl2,il2)
-        else
-          try find jl3,il3 such that
-            (<fst(snd(input@R(j,i))),Nr(j)> =
-             <fst(snd(input@R(jl3,il3))),Nr(jl3)> && (il3 = i && jl3 = j))
-          in IgarbR(jl3,il3) else h(<fst(snd(input@R(j,i))),Nr(j)>,psk(i,j))),
-     try find jl2,il2 such that
-       (<fst(snd(input@R(j,i))),Nr(j)> =
-        <Ni(il2),fst(snd(input@I1(il2,jl2)))> && (il2 = i && jl2 = j))
-     in IgarbI(jl2,il2)
-     else
-       try find jl3,il3 such that
-         (<fst(snd(input@R(j,i))),Nr(j)> =
-          <fst(snd(input@R(jl3,il3))),Nr(jl3)> && (il3 = i && jl3 = j))
-       in IgarbR(jl3,il3) else h(<fst(snd(input@R(j,i))),Nr(j)>,psk(i,j)).
-
+substeq Meq.
 case try find jl2,il2 such that
   (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il2),fst(snd(input@I1(il2,jl2)))> &&
    (il2 = i && jl2 = j))
@@ -325,21 +278,15 @@ case try find jl3,il3 such that
   (<fst(snd(input@R(j,i))),Nr(j)> = <fst(snd(input@R(jl3,il3))),Nr(jl3)> &&
    (il3 = i && jl3 = j))
 in IgarbR(jl3,il3) else h(<fst(snd(input@R(j,i))),Nr(j)>,psk(i,j)).
-substeq (try find jl3,il3 such that
-         (<fst(snd(input@R(j,i))),Nr(j)> =
-          <fst(snd(input@R(jl3,il3))),Nr(jl3)> && (il3 = i && jl3 = j))
-       in IgarbR(jl3,il3) else h(<fst(snd(input@R(j,i))),Nr(j)>,psk(i,j))),
-      IgarbR(j,i).
+substeq Meq.
 
 case try find jl,il such that
   (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il),Nr(jl)> && (il = i && jl = j))
 in Ininr(j,i) else IgarbR(j,i).
-substeq (try find jl0,il0 such that
-         (<fst(snd(input@R(jl,il))),Nr(jl)> = <Ni(il0),Nr(jl0)> &&
-          (il0 = il && jl0 = jl)) in Ininr(jl,il) else IgarbR(jl,il)),
-      Ininr(jl,il).
+substeq Meq.
 by use H4 with jl,il.
 
+by substeq Meq1.
 by use H6 with j,i.
 
 case (try find jl2,il2 such that
@@ -413,10 +360,7 @@ process ResponderI2(j:index) =
          then
        out(cR, ok)
 
-
-
 system [Ideal2] ((!_j R: ResponderI2(j)) | (!_i I: InitiatorI2(i))).
-
 
 (* We now prove the authentication on this ideal system. *)
 goal [Ideal2] fst_pair (x,y : message) : fst (<x, y >) = x.
@@ -449,31 +393,19 @@ case  try find jl,il such that
      else h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,IgarbI(j,i)).
 
  (* Case 1 -> honnest skeyid *)
-substeq (try find jl0,il0 such that
-         (<Ni(il),fst(snd(input@I1(il,jl)))> = <Ni(il0),Nr(jl0)> &&
-          (il0 = il && jl0 = jl))
-       in h(<fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>>,Ininr(jl,il))
-       else h(<fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>>,IgarbI(jl,il))),
-      h(<fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>>,Ininr(jl,il)).
+substeq Meq1.
 euf Meq.
 
 exists il.
 expand output. repeat split.
-rewrite fst_pair.
-rewrite snd_pair fst_pair.
-rewrite snd_pair snd_pair fst_pair.
-
-depends I(il), I1(il,jl).
+by rewrite fst_pair.
+by rewrite snd_pair fst_pair.
+by rewrite snd_pair snd_pair fst_pair.
+by depends I(il), I1(il,jl).
 
  (* Case 2 -> dishonnest skeyid, trivial as no one else computes this key *)
-substeq  (try find jl,il such that
-         (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> &&
-          (il = i && jl = j))
-       in h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,Ininr(j,i))
-       else h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,IgarbI(j,i))),
-      h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,IgarbI(j,i)).
-
- euf Meq.
+substeq Meq1.
+euf Meq.
 Qed.
 
 goal [Ideal2] wa_2 :
@@ -490,35 +422,24 @@ Proof.
 expand exec.
  expand cond.
 
-
 case  try find jl,il such that
       (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il),Nr(jl)> && (il = i && jl = j))
     in h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i))
     else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i)).
-substeq  (try find jl0,il0 such that
-        (<fst(snd(input@R(jl,il))),Nr(jl)> = <Ni(il0),Nr(jl0)> &&
-         (il0 = il && jl0 = jl))
-      in h(<fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>>,Ininr(jl,il))
-      else h(<fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>>,IgarbR(jl,il))),
-     h(<fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>>,Ininr(jl,il)).
+substeq Meq.
 
   (* honest case *)
   euf H0.
 
   depends I(il), I1(il,jl).
-  case H1.
+  by case H1.
 
   executable pred(R1(jl,il)).
   depends R(jl,il), R1(jl,il).
   use H2 with R(jl,il).
   expand exec. expand cond.
 
- substeq (try find jl,il such that
-        (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il),Nr(jl)> &&
-         (il = i && jl = j))
-      in h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i))
-      else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i))),
-     h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i)).
+substeq Meq.
  euf H0.
 Qed.
 
@@ -614,25 +535,14 @@ Proof.
     in h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i))
     else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i)).
 
-
-substeq  (try find jl0,il0 such that
-        (<fst(snd(input@R(jl,il))),Nr(jl)> = <Ni(il0),Nr(jl0)> &&
-         (il0 = il && jl0 = jl))
-      in h(<fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>>,Ininr(jl,il))
-      else h(<fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>>,IgarbR(jl,il))),
-     h(<fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>>,Ininr(jl,il)).
+substeq Meq.
 euf H0.
 case H1.
 depends R(jl,il), R1(jl,il).
 
-use ddhnotuple with  fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>, fst(input@I1(il,jl)),a(il).
+by use ddhnotuple with  fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>, fst(input@I1(il,jl)),a(il).
 
-substeq (try find jl,il such that
-        (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il),Nr(jl)> &&
-         (il = i && jl = j))
-      in h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i))
-      else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i))),
-     h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i)).
+substeq Meq.
 euf H0.
 case H2.
 depends R(j,i), R1(j,i).
@@ -655,25 +565,14 @@ Proof.
         (il = i && jl = j))
      in h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,Ininr(j,i))
      else h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,IgarbI(j,i)).
-substeq  (try find jl0,il0 such that
-         (<Ni(il),fst(snd(input@I1(il,jl)))> = <Ni(il0),Nr(jl0)> &&
-          (il0 = il && jl0 = jl))
-       in h(<fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>>,Ininr(jl,il))
-       else h(<fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>>,IgarbI(jl,il))),
-      h(<fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>>,Ininr(jl,il)).
+substeq Meq1.
 euf Meq.
-use ddhnotuple with fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>, fst(input@R(jl,il)),b(jl).
+by use ddhnotuple with fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>, fst(input@R(jl,il)),b(jl).
+by depends I1(il,jl),I14(il,jl).
 
-depends I1(il,jl),I14(il,jl).
-
-substeq  (try find jl,il such that
-         (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> &&
-          (il = i && jl = j))
-       in h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,Ininr(j,i))
-       else h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,IgarbI(j,i))),
-      h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,IgarbI(j,i)).
+substeq Meq1.
 euf Meq.
-use ddhnotuple with fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>, fst(input@I1(i,j)),a(i).
+by use ddhnotuple with fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>, fst(input@I1(i,j)),a(i).
 Qed.
 
 
@@ -681,7 +580,6 @@ equiv [Ror] final.
 Proof.
 
 globalprf seq(il,jl->  h( exp(exp(g,a(il)),b(jl)), Ininr(jl,il))  )  , news.
-print.
 
 rename seq(i,j ->  n_PRF(i,j)), seq(i,j ->  idealkeys(i,j)), tk.
 
@@ -703,21 +601,7 @@ case (try find jl,il such that
       (jl = j && il = i))
    in idealkeys(jl,il) else h(exp(fst(input@I1(i,j)),a(i)),Ininr(j,i))
  else h(exp(fst(input@I1(i,j)),a(i)),IgarbI(j,i))).
-substeq (try find jl0,il0 such that
-         (<Ni(il),fst(snd(input@I1(il,jl)))> = <Ni(il0),Nr(jl0)> &&
-          (il0 = il && jl0 = jl))
-       in
-         try find jl0,il0 such that
-           (exp(fst(input@I1(il,jl)),a(il)) = exp(exp(g,a(il0)),b(jl0)) &&
-            (jl0 = jl && il0 = il))
-         in idealkeys(jl0,il0)
-         else h(exp(fst(input@I1(il,jl)),a(il)),Ininr(jl,il))
-       else h(exp(fst(input@I1(il,jl)),a(il)),IgarbI(jl,il))),
-      try find jl0,il0 such that
-        (exp(fst(input@I1(il,jl)),a(il)) = exp(exp(g,a(il0)),b(jl0)) &&
-         (jl0 = jl && il0 = il))
-      in idealkeys(jl0,il0)
-      else h(exp(fst(input@I1(il,jl)),a(il)),Ininr(jl,il)).
+substeq Meq1.
 
 case (try find jl0,il0 such that
    (exp(fst(input@I1(il,jl)),a(il)) = exp(exp(g,a(il0)),b(jl0)) &&
@@ -746,18 +630,12 @@ case (try find jl0,il0 such that
  else h(<exp(g,a(il)),<fst(input@I1(il,jl)),IdI(il)>>,Ininr(jl,il))) .
 by forceuse ddhnotuple with exp(g,a(il)),<fst(input@I1(il,jl)),IdI(il)>, exp(g,a(il)),b(jl).
 
-
-
 case (try find jl0,il0 such that
    (<fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>> = exp(exp(g,a(il0)),b(jl0)) &&
     (jl0 = jl && il0 = il))
  in idealkeys(jl0,il0)
  else h(<fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>>,Ininr(jl,il))).
 by forceuse ddhnotuple with fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>, exp(g,a(il)),b(jl).
-
-
-
-
 
 case try find jl,il such that
      (<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>> = exp(exp(g,a(il)),b(jl)) &&
@@ -766,17 +644,8 @@ case try find jl,il such that
    else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i)).
 by forceuse ddhnotuple with fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>, exp(g,a(il)),b(jl).
 
-
-
-
-substeq (try find jl,il such that
-        (<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>> = exp(exp(g,a(il)),b(jl)) &&
-         (jl = j && il = i))
-      in idealkeys(jl,il)
-      else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i))),
-     h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i)).
+substeq Meq.
 by fa.
-
 
 (* R1 case *)
 forceuse helper_wa with i,j.
@@ -788,22 +657,8 @@ case (try find jl,il such that
       (jl = j && il = i))
    in idealkeys(jl,il) else h(exp(fst(input@R(j,i)),b(j)),Ininr(j,i))
  else h(exp(fst(input@R(j,i)),b(j)),IgarbR(j,i))).
+substeq Meq1.
 
-substeq  (try find jl0,il0 such that
-         (<fst(snd(input@R(jl,il))),Nr(jl)> = <Ni(il0),Nr(jl0)> &&
-          (il0 = il && jl0 = jl))
-       in
-         try find jl0,il0 such that
-           (exp(fst(input@R(jl,il)),b(jl)) = exp(exp(g,a(il0)),b(jl0)) &&
-            (jl0 = jl && il0 = il))
-         in idealkeys(jl0,il0)
-         else h(exp(fst(input@R(jl,il)),b(jl)),Ininr(jl,il))
-       else h(exp(fst(input@R(jl,il)),b(jl)),IgarbR(jl,il))),
-      try find jl0,il0 such that
-        (exp(fst(input@R(jl,il)),b(jl)) = exp(exp(g,a(il0)),b(jl0)) &&
-         (jl0 = jl && il0 = il))
-      in idealkeys(jl0,il0)
-      else h(exp(fst(input@R(jl,il)),b(jl)),Ininr(jl,il)).
 case (try find jl0,il0 such that
    (exp(fst(input@R(jl,il)),b(jl)) = exp(exp(g,a(il0)),b(jl0)) &&
     (jl0 = jl && il0 = il))
@@ -816,7 +671,6 @@ case (try find jl0,il0 such that
     (jl0 = jl && il0 = il))
  in idealkeys(jl0,il0)
  else h(<exp(g,b(jl)),<fst(input@R(jl,il)),IdR(jl)>>,Ininr(jl,il))).
-
 
 by forceuse ddhnotuple with exp(g,b(jl)),<fst(input@R(jl,il)),IdR(jl)>,exp(g,a(il)),b(jl).
 Qed.
