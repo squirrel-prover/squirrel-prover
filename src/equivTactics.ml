@@ -1960,13 +1960,13 @@ let global_prf_param hash : prf_param =
   | Term.Seq (is,t) -> prf_param t
   | _ -> prf_param hash
 
-let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
+let global_prf (p1,p2) Args.(Pair (Message (hash,ty),String new_system)) s =
   let cntxt = ES.mk_trace_cntxt s in
 
-  let system_left = SE.project PLeft cntxt.system in
+  let system_left = SE.project p1 cntxt.system in
   let cntxt_left = { cntxt with system = system_left } in
 
-  let system_right = match  SE.project PRight cntxt.system with
+  let system_right = match  SE.project p2 cntxt.system with
     | Single sys_right -> sys_right
     | _ -> assert false
   in
@@ -2024,7 +2024,6 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
        ~cntxt param.h_fn param.h_key.s_symb in
      iter#visit_message t;
      let hash_occs =  List.sort_uniq Stdlib.compare iter#get_occurrences in
-     Printer.pr "Test:%a Fin" (Fmt.list ~sep:Fmt.comma Term.pp) (List.map snd hash_occs);
      let subst = List.map (fun (_,m) -> Term.ESubst (m, mk_tryfind m)) hash_occs in
          Term.subst_no_refresh subst t
   in
@@ -2064,7 +2063,20 @@ let () =
 "
     ~tactic_group:Cryptographic
     ~pq_sound:true
-    (pure_equiv_typed global_prf) Args.(Pair(Message, String))
+    (pure_equiv_typed (global_prf (PLeft, PRight))) Args.(Pair(Message, String))
+
+let () =
+  T.register_typed "globalprfswap"
+    ~general_help:"Apply the global PRF axiom."
+    ~detailed_help:"Given h(m,sk) or seq(i,..-> h(m,sk)),
+     it replaces all occurences of h(x,sk1) by `try find i such that x =m & sk = \
+                    sk1 in n_PRF(i) else h(x,sk1)`, under the condition that \
+                    forall i, i', m=m' & sk = sk' => i=i'.
+
+"
+    ~tactic_group:Cryptographic
+    ~pq_sound:true
+    (pure_equiv_typed (global_prf (PRight, PLeft))) Args.(Pair(Message, String))
 
 let global_rename Args.(Pair (Message (n1,ty1), Pair(Message (n2,ty2),
                                                      String new_system))) s =
