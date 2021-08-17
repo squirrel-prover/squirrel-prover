@@ -31,6 +31,15 @@ let pp_init ch = function
   | Equiv j -> ES.pp_init ch j
 
 (*------------------------------------------------------------------*)
+let map ft fe = function
+  | Trace t -> Trace (ft t)
+  | Equiv e -> Equiv (fe e)
+
+let bind ft fe = function
+  | Trace t -> ft t
+  | Equiv e -> fe e
+
+(*------------------------------------------------------------------*)
 type ('a,'b) abstract_statement = {
   name    : 'a;
   ty_vars : Type.tvars;

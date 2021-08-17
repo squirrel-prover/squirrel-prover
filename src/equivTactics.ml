@@ -282,24 +282,6 @@ let () =
     (gentac_of_seqtac_arg LT.revert_tac)
 
 (*------------------------------------------------------------------*)
-(* TODO: simplification function does nothing for now. Use [auto] instead once
-   types are compatible. *)
-let simpl_ident : LT.f_simpl = fun ~strong ~close s sk fk ->
-  if close then fk (None, GoalNotClosed) else sk [s] fk
-
-let () =
-  T.register_general "intro"
-    ~tactic_help:{
-      general_help = "Introduce topmost connectives of conclusion \
-                      formula, when it can be done in an invertible, \
-                      non-branching fashion.\
-                      \n\nUsage: intro a b _ c *";
-      detailed_help = "";
-      usages_sorts = [];
-      tactic_group = Logical}
-    (gentac_of_seqtac_arg (LT.intro_tac simpl_ident))
-
-(*------------------------------------------------------------------*)
 let () =
   T.register_general "remember"
     ~tactic_help:{
@@ -370,6 +352,12 @@ let () =
       usages_sorts=[];
       tactic_group=Structural}
     (gentac_of_seqtac_arg LT.apply_tac)
+
+(*------------------------------------------------------------------*)
+(* TODO: simplification function does nothing for now. Use [auto] instead once
+   types are compatible. *)
+let simpl_ident : LT.f_simpl = fun ~strong ~close s sk fk ->
+  if close then fk (None, GoalNotClosed) else sk [s] fk
 
 (*------------------------------------------------------------------*)
 (** [generalize ts s] reverts all hypotheses that talk about [ts] in [s],
@@ -1493,7 +1481,7 @@ let goal_is_reach s =
   | Equiv.Atom (Reach _) -> true
   | _ -> false
 
-let rec auto ~close ~strong s sk (fk : Tactics.fk) =
+let rec auto ~strong ~close s sk (fk : Tactics.fk) =
   let open Tactics in
   match s with
   | Goal.Trace t ->
@@ -1573,6 +1561,19 @@ let () =
                   usages_sorts = [Sort None];
                   tactic_group = Structural }
     (tac_auto ~close:false ~strong:false)
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "intro"
+    ~tactic_help:{
+      general_help = "Introduce topmost connectives of conclusion \
+                      formula, when it can be done in an invertible, \
+                      non-branching fashion.\
+                      \n\nUsage: intro a b _ c *";
+      detailed_help = "";
+      usages_sorts = [];
+      tactic_group = Logical}
+    (gentac_of_seqtac_arg (LT.intro_tac simpl_ident))
 
 (*------------------------------------------------------------------*)
 (* TODO: factorize *)

@@ -510,8 +510,10 @@ module LowTac (S : Sequent.S) = struct
 
   (** Applies a rewrite item *)
   let do_rw_item 
-      (rw_item : Args.rw_item) (rw_in : Args.in_target) (s : S.sequent) 
-    : S.sequent list =
+      (rw_item : Args.rw_item)
+      (rw_in : Args.in_target)
+      (s : S.sequent) : S.sequent list
+    =
     let targets, all = make_in_targets rw_in s in
     let (rw_c,rw_arg), subgoals = p_rw_item rw_item s in
 
@@ -1444,7 +1446,11 @@ module LowTac (S : Sequent.S) = struct
 
   type f_simpl = strong:bool -> close:bool -> S.t Tactics.tac
 
-  let do_s_item (simpl : f_simpl) (s_item : Args.s_item) s : S.t list =
+  let do_s_item
+      (simpl : f_simpl)
+      (s_item : Args.s_item)
+      (s : S.t) : S.t list
+    =
     match s_item with
     | Args.Simplify l ->
       let tac = simpl ~strong:true ~close:false in
@@ -1463,14 +1469,23 @@ module LowTac (S : Sequent.S) = struct
       Tactics.run tac s
 
   (** Applies a rewrite arg  *)
-  let do_rw_arg (simpl : f_simpl) rw_arg rw_in s : S.t list =
+  let do_rw_arg
+      (simpl : f_simpl)
+      (rw_arg : Args.rw_arg)
+      (rw_in : Args.in_target)
+      (s : S.t) : S.t list
+    =
     match rw_arg with
     | Args.R_item rw_item  -> 
       do_rw_item rw_item rw_in s
-    | Args.R_s_item s_item -> 
+    | Args.R_s_item s_item ->
       do_s_item simpl s_item s (* targets are ignored there *)
 
-  let rewrite_tac (simpl : f_simpl) args s =
+  let rewrite_tac
+      (simpl : f_simpl)
+      (args : Args.parser_args)
+      (s : S.t) : S.t list
+    =
     match args with
     | [Args.RewriteIn (rw_args, in_opt)] ->
       List.fold_left (fun seqs rw_arg ->
@@ -1484,7 +1499,11 @@ module LowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Intro} *)
 
-  let rec do_intros_ip (simpl : f_simpl) (intros : Args.intro_pattern list) s =
+  let rec do_intros_ip
+      (simpl : f_simpl)
+      (intros : Args.intro_pattern list)
+      (s : S.t) : S.t list
+    =
     match intros with
     | [] -> [s]
 
@@ -1520,11 +1539,15 @@ module LowTac (S : Sequent.S) = struct
 
       with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> [s]
 
-
-  and do_intros_ip_list (simpl : f_simpl) intros ss = 
+  and do_intros_ip_list
+      (simpl : f_simpl)
+      (intros : Args.intro_pattern list)
+      (ss : S.t list) : S.t list
+    =
     List.concat_map (do_intros_ip simpl intros) ss
 
-  let intro_tac_args (simpl : f_simpl) args s =
+  
+  let intro_tac_args (simpl : f_simpl) args (s : S.t) : S.t list =
     match args with
     | [Args.IntroPat intros] -> do_intros_ip simpl intros s
     | _ -> bad_args ()

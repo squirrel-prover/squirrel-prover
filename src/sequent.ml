@@ -17,11 +17,13 @@ type ghyp = [ `Hyp of Ident.t | `Lemma of string ]
 
 module type S = sig
   include LowSequent.S
-
+                 
   val is_assumption       : lsymb -> t -> bool
   val is_equiv_assumption : lsymb -> t -> bool
   val is_reach_assumption : lsymb -> t -> bool
 
+  val to_general_sequent : t -> Goal.t
+    
   val get_assumption :
     ?check_compatibility:bool ->
     'a Equiv.f_kind -> Theory.lsymb -> t -> (ghyp, 'a) Goal.abstract_statement
@@ -32,12 +34,22 @@ module type S = sig
     Theory.p_pt_hol -> 'a Equiv.f_kind -> t -> ghyp * 'a Match.pat
 end
 
-module Mk (S : LowSequent.S) : S with
-  type t = S.t                   and
-  type conc_form = S.conc_form   and
-  type hyp_form = S.hyp_form     =
-struct
+(*------------------------------------------------------------------*)
+module type MkArgs = sig
+  module S : LowSequent.S
+  val to_general_sequent : S.t -> Goal.t
+end
+
+
+module Mk (Args : MkArgs) : S with
+  type t         = Args.S.t         and
+  type conc_form = Args.S.conc_form and
+  type hyp_form  = Args.S.hyp_form
+= struct
+  module S = Args.S
   include S
+
+  let to_general_sequent = Args.to_general_sequent
 
   let is_assumption (name : lsymb) (s : S.t) =
     Hyps.mem_name (L.unloc name) s || Prover.is_assumption (L.unloc name)

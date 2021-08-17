@@ -1,5 +1,5 @@
 (** Definition of a general sequent data-type,
-  * which covers both reachability and general sequents
+  * which covers both local and global sequents
   * (and thus equivalence sequents).
   *
   * A sequent is made of:
