@@ -289,8 +289,7 @@ module ProverTactics = struct
   type tac = judgment Tactics.tac
 
   let register_general id ~tactic_help f =
-    
-    assert (not (Hashtbl.mem table id)) ;
+    let () = assert (not (Hashtbl.mem table id)) in
 
     let f args s sk fk = 
       dbg "@[<hov>calling tactic %s on@ @[%a@]@]" 
@@ -444,14 +443,6 @@ let get_help (tac_name : lsymb) =
   else
     Printer.prt `Result "%a." (ProverTactics.pp true) tac_name;
   Tactics.id
-
-let () =
-  ProverTactics.register_general "admit"
-    ~tactic_help:{general_help = "Closes the current goal.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
-    (fun _ _ sk fk -> sk [] fk) 
 
 let () = 
   ProverTactics.register_general "prof"

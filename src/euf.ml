@@ -234,8 +234,6 @@ let mk_rule ?(elems=[]) ?(drop_head=true) ~fun_wrap_key
          *   Iter.get_f_messages_ext
          *     ~fv ~fun_wrap_key ~drop_head ~cntxt head_fn key_n t
          * in *)
-        (* REM *)
-        (* Fmt.epr "hash: %a@." Term.pp t; *)
 
         let iter =
           new get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n

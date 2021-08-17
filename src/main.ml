@@ -5,8 +5,10 @@ module L = Location
 module Initialization = struct
   (* Opening these modules is only useful for their side effects,
    * e.g. registering tactics. *)
+  open LowTactics
   open TraceTactics
   open EquivTactics
+  open HighTactics
 end
 
 let usage = Printer.strf "Usage: %s filename" (Filename.basename Sys.argv.(0))

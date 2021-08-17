@@ -4,6 +4,8 @@ open Rewrite
 module Args = TacticsArgs
 module L = Location
 
+module T = Prover.ProverTactics
+             
 module St = Term.St
 module Sv = Vars.Sv
 
@@ -22,9 +24,9 @@ let soft_failure = Tactics.soft_failure
 let bad_args () = hard_failure (Failure "improper arguments")
 
 (*------------------------------------------------------------------*)
-(** {2 Functor building tactics from a Sequent module} *)
+(** {2 Functor building common tactics code from a Sequent module} *)
 
-module LowTac (S : Sequent.S) = struct
+module MkCommonLowTac (S : Sequent.S) = struct
 
   module Hyps = S.Hyps
 
@@ -338,6 +340,13 @@ module LowTac (S : Sequent.S) = struct
     [expands args s]
 
   let expand_tac args = wrap_fail (expand_tac args)
+
+  (*------------------------------------------------------------------*)
+  (** {3 Print} *)
+
+  let print_tac s =
+    Tactics.print_system (S.table s) (S.system s);
+    [s]
 
   (*------------------------------------------------------------------*)
   (** {3 Rewriting types and functions} *)
@@ -1553,5 +1562,422 @@ module LowTac (S : Sequent.S) = struct
     | _ -> bad_args ()
 
   let intro_tac (simpl : f_simpl) args = wrap_fail (intro_tac_args simpl args)
-
 end
+
+(*------------------------------------------------------------------*)
+(** {2 Wrapper lifting sequence functions or tactics to general tactics} *)
+
+module TS = TraceSequent
+module ES = EquivSequent
+
+                                       
+(** Function over a [Goal.t], returning an arbitrary value. *)
+type 'a genfun = Goal.t -> 'a
+
+(** Function over an trace sequent, returning an arbitrary value. *)
+type 'a tfun = TS.t -> 'a
+
+(** Function over an equivalence sequent, returning an arbitrary value. *)
+type 'a efun = ES.t -> 'a
+
+(*------------------------------------------------------------------*)
+(** Lift a [tfun] to a [genfun].
+  * (user-level failure when the goal is not a trace sequent). *)
+let genfun_of_tfun (t : 'a tfun) : 'a genfun = fun s ->
+  match s with
+  | Goal.Trace s -> t s
+  | _ -> soft_failure (Tactics.Failure "local sequent expected")
+
+(** As [genfun_of_tfun], but with an extra argument. *)
+let genfun_of_tfun_arg
+    (t : 'b -> TS.t -> 'a)
+    (arg : 'b)
+    (s : Goal.t) : 'a
+  =
+  match s with
+  | Goal.Trace s -> t arg s
+  | _ -> soft_failure (Tactics.Failure "local sequent expected")
+
+(*------------------------------------------------------------------*)
+(** Lift an [efun] to a [genfun].
+  * (user-level failure when the goal is not an equivalence sequent). *)
+let genfun_of_efun (t : 'a efun) : 'a genfun = fun s ->
+  match s with
+  | Goal.Equiv s -> t s
+  | _ -> soft_failure (Tactics.Failure "global sequent expected")
+
+(** As [genfun_of_efun], but with an extra argument. *)
+let genfun_of_efun_arg
+    (t : 'b -> ES.t -> 'a)
+    (arg : 'b)
+    (s : Goal.t) : 'a
+  =
+  match s with
+  | Goal.Equiv s -> t arg s
+  | _ -> soft_failure (Tactics.Failure "global sequent expected")
+
+(*------------------------------------------------------------------*)
+let genfun_of_any_fun (tt : 'a tfun) (et : 'a efun) : 'a genfun = fun s ->
+  match s with
+  | Goal.Trace s -> tt s
+  | Goal.Equiv s -> et s
+
+let genfun_of_any_fun_arg
+    (tt : 'b -> 'a tfun)
+    (et : 'b -> 'a efun)
+    (arg : 'b)
+    (s : Goal.t) : 'a
+  =
+  match s with
+  | Goal.Trace s -> tt arg s
+  | Goal.Equiv s -> et arg s
+
+(*------------------------------------------------------------------*)
+(** Function expecting and returning trace sequents. *)
+type pure_tfun = TS.t -> TS.t list
+
+let genfun_of_pure_tfun
+    (t : pure_tfun)
+    (s : Goal.t) : Goal.t list
+  =
+  let res = genfun_of_tfun t s in
+  List.map (fun s -> Goal.Trace s) res
+
+let genfun_of_pure_tfun_arg
+    (t : 'a -> pure_tfun)
+    (arg : 'a)
+    (s : Goal.t) : Goal.t list
+  =
+  let res = genfun_of_tfun_arg t arg s in
+  List.map (fun s -> Goal.Trace s) res
+
+(*------------------------------------------------------------------*)
+(** Function expecting and returning equivalence sequents. *)
+type pure_efun = ES.t -> ES.t list
+
+let genfun_of_pure_efun
+    (t : pure_efun)
+    (s : Goal.t) : Goal.t list
+  =
+  let res = genfun_of_efun t s in
+  List.map (fun s -> Goal.Equiv s) res
+
+let genfun_of_pure_efun_arg
+    (t : 'a -> pure_efun)
+    (arg : 'a)
+    (s : Goal.t) : Goal.t list
+  =
+  let res = genfun_of_efun_arg t arg s in
+  List.map (fun s -> Goal.Equiv s) res
+
+(*------------------------------------------------------------------*)
+let genfun_of_any_pure_fun
+    (tt : pure_tfun)
+    (et : pure_efun) : Goal.t list genfun
+  =
+  fun s ->
+  match s with
+  | Goal.Trace s -> List.map (fun s -> Goal.Trace s) (tt s)
+  | Goal.Equiv s -> List.map (fun s -> Goal.Equiv s) (et s)
+
+let genfun_of_any_pure_fun_arg
+    (tt : 'a -> pure_tfun)
+    (et : 'a -> pure_efun)
+    (arg : 'a)
+    (s : Goal.t) : Goal.t list
+  =
+  match s with
+  | Goal.Trace s -> List.map (fun s -> Goal.Trace s) (tt arg s)
+  | Goal.Equiv s -> List.map (fun s -> Goal.Equiv s) (et arg s)
+
+(*------------------------------------------------------------------*)
+(** General tactic *)
+type gentac = Goal.t Tactics.tac
+
+(** Tactic acting and returning trace goals *)
+type ttac = TS.t Tactics.tac
+
+(** Tactic acting and returning equivalence goals *)
+type etac = ES.t Tactics.tac
+
+(*------------------------------------------------------------------*)
+(** Lift a [ttac] to a [gentac]. *)
+let gentac_of_ttac (t : ttac) : gentac = fun s sk fk ->
+  let t' s sk fk =
+    t s (fun l fk -> sk (List.map (fun s -> Goal.Trace s) l) fk) fk
+  in
+  genfun_of_tfun t' s sk fk
+
+(** As [gentac_of_etac], but with an extra arguments. *)
+let gentac_of_ttac_arg t a s sk fk =
+  let t' s sk fk =
+    t a s (fun l fk -> sk (List.map (fun s -> Goal.Trace s) l) fk) fk
+  in
+  genfun_of_tfun t' s sk fk
+
+(*------------------------------------------------------------------*)
+(** Lift an [etac] to a [gentac]. *)
+let gentac_of_etac (t : etac) : gentac = fun s sk fk ->
+  let t' s sk fk =
+    t s (fun l fk -> sk (List.map (fun s -> Goal.Equiv s) l) fk) fk
+  in
+  genfun_of_efun t' s sk fk
+
+(** As [gentac_of_etac], but with an extra arguments. *)
+let gentac_of_etac_arg t a s sk fk =
+  let t' s sk fk =
+    t a s (fun l fk -> sk (List.map (fun s -> Goal.Equiv s) l) fk) fk
+  in
+  genfun_of_efun t' s sk fk
+
+(*------------------------------------------------------------------*)
+let gentac_of_any_tac (tt : ttac) (et : etac) : gentac = fun s sk fk ->
+  match s with
+  | Goal.Trace s -> 
+    tt s (fun l fk -> sk (List.map (fun s -> Goal.Trace s) l) fk) fk
+
+  | Goal.Equiv s -> 
+    et s (fun l fk -> sk (List.map (fun s -> Goal.Equiv s) l) fk) fk
+
+let gentac_of_any_tac_arg
+    (tt : 'a -> ttac)
+    (et : 'a -> etac)
+    (arg : 'a) : gentac
+  =
+  fun s sk fk ->
+  match s with
+  | Goal.Trace s -> 
+    tt arg s (fun l fk -> sk (List.map (fun s -> Goal.Trace s) l) fk) fk
+
+  | Goal.Equiv s -> 
+    et arg s (fun l fk -> sk (List.map (fun s -> Goal.Equiv s) l) fk) fk
+
+(*------------------------------------------------------------------*)
+(** {2 Utilities} *)
+
+(* same as [CommonLT.wrap_fail], but for goals *)
+let wrap_fail f s sk fk =
+  try sk (f s) fk with
+  | Tactics.Tactic_soft_failure e -> fk e
+
+let split_equiv_goal i s =
+  try List.splitat i (ES.goal_as_equiv s)
+  with List.Out_of_range ->
+    soft_failure (Tactics.Failure "out of range position")
+
+(*------------------------------------------------------------------*)
+(** {2 Basic tactics} *)
+ 
+module TraceLT = MkCommonLowTac (TS)
+module EquivLT = MkCommonLowTac (ES)
+
+(*------------------------------------------------------------------*)
+(** Admit tactic *)
+let () =
+  T.register_general "admit"
+    ~tactic_help:{
+      general_help = "Admit the current goal, or admit an element \
+                      from a  bi-frame.";
+      detailed_help = "This tactic, of course, is not sound";
+      usages_sorts = [Sort Args.Int];
+      tactic_group = Logical}
+    (function
+      | [] -> fun _ sk fk -> sk [] fk
+      | [Args.Int_parsed i] ->
+        begin
+          fun s sk fk ->
+            match s with
+            | Goal.Trace _ -> bad_args ()
+            | Goal.Equiv s ->
+              sk [Goal.Equiv (ES.change_felem i [] s)] fk
+        end
+      | _ -> bad_args ())
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "clear"
+    ~tactic_help:{
+      general_help = "Clear an hypothesis.";
+      detailed_help = "";
+      tactic_group  = Logical;
+      usages_sorts = []; }
+    (gentac_of_any_tac_arg TraceLT.clear_tac EquivLT.clear_tac)
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "revert"
+    ~tactic_help:{
+      general_help = "Take an hypothesis H, and turns the conclusion C into \
+                      the implication H => C.";
+      detailed_help = "";
+      tactic_group  = Logical;
+      usages_sorts = []; }
+    (gentac_of_any_tac_arg TraceLT.revert_tac EquivLT.revert_tac)
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "remember"
+    ~tactic_help:{
+      general_help = "substitute a term by a fresh variable";
+      detailed_help = "";
+      tactic_group  = Logical;
+      usages_sorts = []; }
+    (gentac_of_any_tac_arg TraceLT.remember_tac EquivLT.remember_tac)
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "generalize"
+    ~tactic_help:{
+      general_help = "Generalize the goal on some terms";
+      detailed_help = "";
+      tactic_group  = Logical;
+      usages_sorts = []; }
+    (gentac_of_any_tac_arg
+       (TraceLT.generalize_tac ~dependent:false)
+       (EquivLT.generalize_tac ~dependent:false))
+
+let () =
+  T.register_general "generalize dependent"
+    ~tactic_help:{
+      general_help = "Generalize the goal and hypotheses on some terms";
+      detailed_help = "";
+      tactic_group  = Logical;
+      usages_sorts = []; }
+    (gentac_of_any_tac_arg
+       (TraceLT.generalize_tac ~dependent:true)
+       (EquivLT.generalize_tac ~dependent:true))
+
+(*------------------------------------------------------------------*)
+let () = T.register_general "reduce"
+    ~tactic_help:{general_help = "Reduce the sequent.";
+                  detailed_help = "";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    (gentac_of_any_tac_arg TraceLT.reduce_tac EquivLT.reduce_tac)
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "destruct"
+    ~tactic_help:{
+      general_help = "Destruct an hypothesis. An optional And/Or \
+                      introduction pattern can be given.\n\n\
+                      Usages: destruct H.\n\
+                     \        destruct H as [A | [B C]]";
+      detailed_help = "";
+      usages_sorts = [];
+      tactic_group = Logical}
+    (gentac_of_any_tac_arg TraceLT.destruct_tac EquivLT.destruct_tac)
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "exists"
+    ~tactic_help:{
+      general_help = "Introduce the existentially quantified \
+                      variables in the conclusion of the judgment, \
+                      using the arguments as existential witnesses.\
+                      \n\nUsage: exists v1, v2, ...";
+      detailed_help = "";
+      usages_sorts = [];
+      tactic_group = Logical}
+    (gentac_of_any_tac_arg TraceLT.exists_intro_tac EquivLT.exists_intro_tac)
+
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "use"
+    ~tactic_help:
+      {general_help = "Apply an hypothesis with its universally \
+                       quantified variables instantiated with the \
+                       arguments.\n\n\
+                       Usages: use H with v1, v2, ...\n\
+                      \        use H with ... as ...";
+       detailed_help = "";
+       usages_sorts = [];
+       tactic_group = Logical}
+    (gentac_of_any_tac_arg TraceLT.use_tac EquivLT.use_tac)
+
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "assert"
+    ~tactic_help:
+      {general_help = "Add an assumption to the set of hypothesis, \
+                       and produce the goal for\
+                       \nthe proof of the assumption.\n\
+                       Usages: assert f.\n \
+                      \       assert f as intro_pat";
+       detailed_help = "";
+       usages_sorts = [];
+       tactic_group = Logical}
+    (gentac_of_any_tac_arg TraceLT.assert_tac EquivLT.assert_tac)
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "apply"
+    ~tactic_help:{
+      general_help=
+        "Matches the goal with the conclusion of the formula F provided \
+         (directly, using lemma, or using an axiom), trying to instantiate \
+         F variables. Creates one subgoal for each premises of F.\n\
+         Usage: apply my_lem.\n       \
+         apply my_axiom.\n       \
+         apply (forall (x:message), F => G).";
+      detailed_help="";
+      usages_sorts=[];
+      tactic_group=Structural}
+    (gentac_of_any_tac_arg TraceLT.apply_tac EquivLT.apply_tac)
+
+(*------------------------------------------------------------------*)
+let () = T.register_general "dependent induction"
+    ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
+                  detailed_help = "";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    (gentac_of_any_tac_arg
+       (TraceLT.induction_tac ~dependent:true)
+       (EquivLT.induction_tac ~dependent:true))
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register "print"
+    ~tactic_help:{general_help = "Shows the current system.";
+                  detailed_help = "";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    (genfun_of_any_pure_fun TraceLT.print_tac EquivLT.print_tac)
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_typed "depends"
+    ~general_help:"If the second action depends on the first \
+                   action, and if the second \
+                   action happened, \
+                   add the corresponding timestamp inequality."
+    ~detailed_help:"Whenever action A1[i] must happen before A2[i], if A2[i] \
+                    occurs in the trace, we can add A1[i]. "
+    ~tactic_group:Structural
+    (genfun_of_any_pure_fun_arg TraceLT.depends EquivLT.depends)
+    Args.(Pair (Timestamp, Timestamp))
+
+(*------------------------------------------------------------------*)
+let () = T.register_general "expand"
+    ~tactic_help:{
+      general_help  = "Expand all occurences of the given macro inside the \
+                       goal.";
+      detailed_help = "Can only be called over macros with fully defined \
+                       timestamps.";
+      tactic_group  = Structural;
+      usages_sorts  = [Sort Args.String; Sort Args.Message; Sort Args.Boolean]; }
+    (gentac_of_any_tac_arg TraceLT.expand_tac EquivLT.expand_tac)
+
+(*------------------------------------------------------------------*)
+let () = T.register "expandall"
+    ~tactic_help:{
+      general_help  = "Expand all possible macros in the sequent.";
+      detailed_help = "";
+      tactic_group  = Structural;
+      usages_sorts  = []; }
+    (genfun_of_any_pure_fun
+       (TraceLT.expand_all_l `All)
+       (EquivLT.expand_all_l `All))
+(* FIXME: allow user to specify targets *)

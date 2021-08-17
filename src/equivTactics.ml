@@ -23,22 +23,15 @@ type sequent = ES.sequent
 
 type lsymb = Theory.lsymb
 
-module LT = LowTactics.LowTac(EquivSequent)
+module LT = LowTactics.MkCommonLowTac(EquivSequent)
 
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
 
-let split_equiv_goal i s =
-  try List.splitat i (ES.goal_as_equiv s)
-  with List.Out_of_range ->
-    soft_failure (Tactics.Failure "out of range position")
-
-
+let split_equiv_goal = LowTactics.split_equiv_goal
+                         
 (*------------------------------------------------------------------*)
-(* same as [LT.wrap_fail], but for goals *)
-let wrap_fail f (s: Goal.t) sk fk =
-  try sk (f s) fk with
-  | Tactics.Tactic_soft_failure e -> fk e
+let wrap_fail = LT.wrap_fail
 
 (*------------------------------------------------------------------*)
 (** {2 Wrapper lifting sequence functions or tactics to general tactics} *)
@@ -78,7 +71,7 @@ let genfun_of_pure_seqfun
     (s : Goal.t) : Goal.t list
   =
   let res = genfun_of_seqfun t s in
- List.map (fun s -> Goal.Equiv s) res
+  List.map (fun s -> Goal.Equiv s) res
 
 let genfun_of_pure_seqfun_arg
     (t : 'a -> EquivSequent.t -> EquivSequent.t list)
@@ -86,7 +79,7 @@ let genfun_of_pure_seqfun_arg
     (s : Goal.t) : Goal.t list
   =
   let res = genfun_of_seqfun_arg t arg s in
- List.map (fun s -> Goal.Equiv s) res
+  List.map (fun s -> Goal.Equiv s) res
 
 (*------------------------------------------------------------------*)
 (** General tactic *)
@@ -95,7 +88,7 @@ type gentac = Goal.t Tactics.tac
 (** Tactic acting and returning equivalence goals *)
 type seqtac = EquivSequent.t Tactics.tac
     
-(** Lift a [gentac] to a [seqtac]. *)
+(** Lift a [seqtac] to a [gentac]. *)
 let gentac_of_seqtac (t : seqtac) : gentac = fun s sk fk ->
   let t' s sk fk =
     t s (fun l fk -> sk (List.map (fun s -> Goal.Equiv s) l) fk) fk
@@ -116,23 +109,6 @@ let gentac_of_seqtac_arg t a s sk fk =
 let happens_premise (s : ES.t) (a : Term.timestamp) =
   let s = ES.(to_trace_sequent (set_reach_goal (Term.mk_happens a) s)) in
   Goal.Trace s
-
-(*------------------------------------------------------------------*)
-(** Admit tactic *)
-let () =
-  T.register_general "admit"
-    ~tactic_help:{general_help = "Admit the current goal, or admit an element \
-                                  from a  bi-frame.";
-                  detailed_help = "This tactic, of course, is not sound";
-                  usages_sorts = [Sort Args.Int];
-                  tactic_group = Logical}
-    (function
-       | [] -> genfun_of_seqfun (fun _ sk fk -> sk [] fk)
-       | [Args.Int_parsed i] ->
-           gentac_of_seqtac begin fun s sk fk ->
-             sk [ES.change_felem i [] s] fk
-           end
-       | _ -> bad_args ())
 
 
 (*------------------------------------------------------------------*)
@@ -199,26 +175,6 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
 
 let case_tac args = LT.wrap_fail (do_case_tac args)
 
-let () =
-  T.register_general "case"
-    ~tactic_help:
-      {general_help = "Perform a case analysis.";
-       detailed_help = "";
-       usages_sorts = [Sort Args.Timestamp;
-                       Sort Args.String;];
-       tactic_group = Logical}
-    (gentac_of_seqtac_arg case_tac)
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "clear"
-    ~tactic_help:{
-      general_help = "Clear an hypothesis.";
-      detailed_help = "";
-      tactic_group  = Logical;
-      usages_sorts = []; }
-    (gentac_of_seqtac_arg LT.clear_tac)
-
 (*------------------------------------------------------------------*)
 (** For each element of the biframe, checks that it is a member of the
   * hypothesis biframe. If so, close the goal. *)
@@ -248,14 +204,6 @@ let assumption s =
   then []
   else Tactics.soft_failure Tactics.NotHypothesis
 
-let () =
-  T.register "assumption"
-    ~tactic_help:{general_help = "look for the goal in the hypotheses.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
-    (genfun_of_seqfun assumption)
-
 (*------------------------------------------------------------------*)
 let byequiv s = Goal.Trace (ES.to_trace_sequent s)
 
@@ -270,26 +218,6 @@ let () =
                   tactic_group = Logical}
     (genfun_of_seqfun byequiv_tac)
 
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "revert"
-    ~tactic_help:{
-      general_help = "Take an hypothesis H, and turns the conclusion C into the \
-                      implication H => C.";
-      detailed_help = "";
-      tactic_group  = Logical;
-      usages_sorts = []; }
-    (gentac_of_seqtac_arg LT.revert_tac)
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "remember"
-    ~tactic_help:{
-      general_help = "substitute a term by a fresh variable";
-      detailed_help = "";
-      tactic_group  = Logical;
-      usages_sorts = []; }
-    (gentac_of_seqtac_arg LT.remember_tac)
 
 (*------------------------------------------------------------------*)
 (** [tautology f s] tries to prove that [f] is always true in [s]. *)
@@ -318,40 +246,6 @@ let simpl_impl s =
       form_simpl_impl f s_minus
     ) s
 
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "generalize"
-    ~tactic_help:{
-      general_help = "Generalize the goal on some terms";
-      detailed_help = "";
-      tactic_group  = Logical;
-      usages_sorts = []; }
-    (gentac_of_seqtac_arg (LT.generalize_tac ~dependent:false))
-
-let () =
-  T.register_general "generalize dependent"
-    ~tactic_help:{
-      general_help = "Generalize the goal and hypotheses on some terms";
-      detailed_help = "";
-      tactic_group  = Logical;
-      usages_sorts = []; }
-    (gentac_of_seqtac_arg (LT.generalize_tac ~dependent:true))
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "apply"
-    ~tactic_help:{
-      general_help=
-        "Matches the goal with the conclusion of the formula F provided \
-         (directly, using lemma, or using an axiom), trying to instantiate \
-         F variables. Creates one subgoal for each premises of F.\n\
-         Usage: apply my_lem.\n       \
-         apply my_axiom.\n       \
-         apply (forall (x:message), F => G).";
-      detailed_help="";
-      usages_sorts=[];
-      tactic_group=Structural}
-    (gentac_of_seqtac_arg LT.apply_tac)
 
 (*------------------------------------------------------------------*)
 (* TODO: simplification function does nothing for now. Use [auto] instead once
@@ -459,43 +353,15 @@ let induction Args.(Timestamp ts) s =
 
 let old_or_new_induction args =
   if Config.new_ind () then
-    (gentac_of_seqtac_arg (LT.induction_tac ~dependent:false)) args
+    (LT.induction_tac ~dependent:false) args
   else
     (fun s sk fk ->
-       match s with
-       | Goal.Trace _ -> soft_failure (Tactics.Failure "equivalence goal expected")
-       | Goal.Equiv s ->
-         match LT.convert_args s args (Args.Sort Args.Timestamp) with
-         | Args.Arg (Args.Timestamp ts) ->
-           let ss = induction (Args.Timestamp ts) s in
-           let ss = List.map (fun s -> Goal.Equiv s) ss in
-           sk ss fk
-         | _ -> hard_failure (Failure "ill-formed arguments")
+       match LT.convert_args s args (Args.Sort Args.Timestamp) with
+       | Args.Arg (Args.Timestamp ts) ->
+         let ss = induction (Args.Timestamp ts) s in
+         sk ss fk
+       | _ -> hard_failure (Failure "ill-formed arguments")
     )
-
-(* TODO: only use new induction principle *)
-let () = T.register_general "induction"
-    ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
-    (old_or_new_induction)
-
-(* new induction principle *)
-(* let () = T.register_general "induction"
- *     ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
- *                   detailed_help = "";
- *                   usages_sorts = [Sort None];
- *                   tactic_group = Logical}
- *     (gentac_of_seqtac_arg (LT.induction_tac ~dependent:false)) *)
-
-let () = T.register_general "dependent induction"
-    ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
-    (gentac_of_seqtac_arg (LT.induction_tac ~dependent:true))
-
 
 (*------------------------------------------------------------------*)
 let enrich (arg : Theory.eterm Args.arg) (s : ES.t) =
@@ -534,32 +400,7 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-let print_tac Args.None s =
-  Tactics.print_system (ES.table s) (ES.system s);
-  [s]
-
-let () =
-  T.register_typed "print" ~general_help:"Shows the current system."
-    ~detailed_help:""
-    ~tactic_group:Logical
-    (genfun_of_pure_seqfun_arg print_tac) Args.None
-
-
-(*------------------------------------------------------------------*)
 (** {2 Structural Tactics} *)
-
-(* not very useful in equivalence mode *)
-let () =
-  T.register_typed "depends"
-    ~general_help:"If the second action depends on the first \
-                   action, and if the second \
-                   action happened, \
-                   add the corresponding timestamp inequality."
-    ~detailed_help:"Whenever action A1[i] must happen before A2[i], if A2[i] \
-                    occurs in the trace, we can add A1[i]. "
-    ~tactic_group:Structural
-    (genfun_of_pure_seqfun_arg LT.depends) Args.(Pair (Timestamp, Timestamp))
-
 
 (*------------------------------------------------------------------*)
 (** Function application *)
@@ -593,7 +434,7 @@ let fa_expand t =
   in
   filterBoolAsMsg (aux (Term.head_normal_biterm t))
 
-let fa Args.(Int i) s =
+let fa i s =
   let before, e, after = split_equiv_goal i s in
   try
     (* Special case for try find, otherwise we use fa_expand *)
@@ -623,14 +464,10 @@ let fa Args.(Int i) s =
   | No_FA ->
     soft_failure (Tactics.Failure "FA not applicable")
 
-let () =
-  T.register_typed "fa"
-    ~general_help:"Break function applications on the nth term of the sequence."
-    ~detailed_help:"To prove that a goal containing f(u1,...,un) is \
-                    diff-equivalent, one can prove that the goal containing the \
-                    sequence u1,...,un is diff-equivalent."
-    ~tactic_group:Structural
-    (genfun_of_pure_seqfun_arg fa) Args.Int
+let fa_tac args = match args with
+  | [Args.Int_parsed i] -> LT.wrap_fail (fa i)
+  | _ -> bad_args ()
+
 
 (*------------------------------------------------------------------*)
 (** This function goes over all elements inside elems.  All elements that can be
@@ -963,7 +800,7 @@ let fresh_mk_if_term (cntxt : Constr.trace_cntxt) env t biframe =
   Term.mk_ite phi Term.mk_zero t
 
 
-let fresh Args.(Int i) s =
+let fresh i s =
   let before, e, after = split_equiv_goal i s in
 
   (* the biframe to consider when checking the freshness *)
@@ -982,16 +819,9 @@ let fresh Args.(Int i) s =
     soft_failure
       (Tactics.Failure "Can only apply fresh tactic on names")
 
-let () =
-  T.register_typed "fresh"
-    ~general_help:"Removes a name if fresh."
-    ~detailed_help:"This replaces a name n by the term 'if fresh(n) then zero \
-                    else n, where fresh(n) captures the fact that this specific \
-                    instance of the name cannot have been produced by another \
-                    action.'"
-    ~tactic_group:Structural
-    (genfun_of_pure_seqfun_arg fresh) Args.Int
-
+let fresh_tac args = match args with
+  | [Args.Int_parsed i] -> LT.wrap_fail (fresh i)
+  | _ -> bad_args ()
 
 
 (*------------------------------------------------------------------*)
@@ -1044,18 +874,6 @@ let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
 
 
 (*------------------------------------------------------------------*)
-let () = T.register_general "expand"
-    ~tactic_help:
-      {general_help = "Expand the given macro.";
-       detailed_help = "The value of the macro is obtained by looking \
-                        at the corresponding action in the \
-                        protocol. It cannot be used on macros with \
-                        unknown timestamp.";
-       usages_sorts = [Sort None];
-       tactic_group = Structural}
-    (gentac_of_seqtac_arg LT.expand_tac)
-
-(*------------------------------------------------------------------*)
 let expand_seq args s =
   match args with
   | (Args.Theory v) :: ids ->
@@ -1079,68 +897,6 @@ let () = T.register_general "expandseq"
                   tactic_group = Structural}
     (gentac_of_seqtac_arg expand_seq_tac)
 
-(*------------------------------------------------------------------*)
-let () = T.register "expandall"
-    ~tactic_help:{
-      general_help  = "Expand all possible macros in the sequent.";
-      detailed_help = "";
-      tactic_group  = Structural;
-      usages_sorts  = []; }
-    (genfun_of_pure_seqfun_arg LT.expand_all_l `All)
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "exists"
-    ~tactic_help:
-      {general_help = "Introduce the existentially quantified \
-                       variables in the conclusion of the judgment, \
-                       using the arguments as existential witnesses.\
-                       \n\nUsage: exists v1, v2, ...";
-       detailed_help = "";
-       usages_sorts = [];
-       tactic_group = Logical}
-    (gentac_of_seqtac_arg LT.exists_intro_tac)
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "destruct"
-    ~tactic_help:{
-      general_help = "Destruct an hypothesis. An optional And/Or \
-                      introduction pattern can be given.\n\n\
-                      Usages: destruct H.\n\
-                     \        destruct H as [A | [B C]]";
-      detailed_help = "";
-      usages_sorts = [];
-      tactic_group = Logical}
-    (gentac_of_seqtac_arg LT.destruct_tac)
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "use"
-    ~tactic_help:
-      {general_help = "Apply an hypothesis with its universally \
-                       quantified variables instantiated with the \
-                       arguments.\n\n\
-                       Usages: use H with v1, v2, ...\n\
-                      \        use H with ... as ...";
-       detailed_help = "";
-       usages_sorts = [];
-       tactic_group = Logical}
-    (gentac_of_seqtac_arg LT.use_tac)
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "assert"
-    ~tactic_help:
-      {general_help = "Add an assumption to the set of hypothesis, \
-                       and produce the goal for\
-                       \nthe proof of the assumption.\n\
-                       Usages: assert f.\n \
-                      \       assert f as intro_pat";
-       detailed_help = "";
-       usages_sorts = [];
-       tactic_group = Logical}
-    (gentac_of_seqtac_arg LT.assert_tac)
 
 (*------------------------------------------------------------------*)
 (** Replace all occurrences of [t1] by [t2] inside of [s],
@@ -1230,7 +986,7 @@ let get_ite ~cntxt elem =
 
     Some (occ.Iter.occ_cnt)
 
-let yes_no_if b Args.(Int i) s =
+let yes_no_if b i s =
   let cntxt = ES.mk_trace_cntxt s in
 
   let before, elem, after = split_equiv_goal i s in
@@ -1254,35 +1010,10 @@ let yes_no_if b Args.(Int i) s =
     [ Goal.Trace trace_sequent;
       Goal.Equiv (ES.set_equiv_goal biframe s) ]
 
-let () =
- T.register_typed "noif"
-   ~general_help:"Simplify conditional by showing that its condition is Frue."
-   ~detailed_help:"The current goal must be an equivalence, with the \
-                   designated biframe item of the form `if phi then u else v`. \
-                   The tactic will replace this item by `v` and \
-                   generate 'phi => False' as a (reachability) subgoal."
-   ~tactic_group:Structural
-   (genfun_of_seqfun_arg (yes_no_if false)) Args.Int
-
-let () =
- T.register_typed "yesif"
-   ~general_help:"Simplify conditional by showing that its condition is True."
-   ~detailed_help:"The current goal must be an equivalence, with the \
-                   designated biframe item of the form `if phi then u else v`. \
-                   The tactic will replace this item by `u` and \
-                   generate 'phi' as a (reachability) subgoal."
-   ~tactic_group:Structural
-   (genfun_of_seqfun_arg (yes_no_if true)) Args.Int
-
-(*------------------------------------------------------------------*)
-(** Reduce *)
-
-let () = T.register_general "reduce"
-    ~tactic_help:{general_help = "Reduce the sequent.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
-    (gentac_of_seqtac_arg LT.reduce_tac)
+let yes_no_if_args b args s : Goal.t list =
+    match args with
+    | [Args.Int_parsed arg] -> yes_no_if b arg s
+    | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)
 exception Not_ifcond
@@ -1531,79 +1262,12 @@ let rec auto ~strong ~close s sk (fk : Tactics.fk) =
       s sk fk
 
 let tac_auto ~close ~strong args s sk (fk : Tactics.fk) =
-   auto ~close ~strong s sk fk
+  match args with
+  | [] -> auto ~close ~strong s sk fk
+  | _ -> hard_failure (Tactics.Failure "no argument allowed")
 
-let () =
-  T.register_general "auto"
-    ~tactic_help:{general_help = "Automatically proves the goal.";
-                  detailed_help = "Same as simpl.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Structural }
-    (tac_auto ~close:true ~strong:true)
-
-let () =
-  T.register_general "simpl"
-    ~tactic_help:{general_help = "Automatically simplify the goal.";
-                  detailed_help = "This tactics automatically calls fadup, \
-                                   expands the macros, and closes goals using \
-                                   refl or assumption.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Structural }
-    (tac_auto ~close:false ~strong:true)
-
-
-let () =
-  T.register_general "autosimpl"
-    ~tactic_help:{general_help = "Automatically simplify the goal.";
-                  detailed_help = "This tactics automatically calls fadup, \
-                                   expands the macros, and closes goals using \
-                                   refl or assumption.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Structural }
-    (tac_auto ~close:false ~strong:false)
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "intro"
-    ~tactic_help:{
-      general_help = "Introduce topmost connectives of conclusion \
-                      formula, when it can be done in an invertible, \
-                      non-branching fashion.\
-                      \n\nUsage: intro a b _ c *";
-      detailed_help = "";
-      usages_sorts = [];
-      tactic_group = Logical}
-    (gentac_of_seqtac_arg (LT.intro_tac simpl_ident))
-
-(*------------------------------------------------------------------*)
-(* TODO: factorize *)
-let rewrite_tac args s sk fk =
-  match s with
-  | Goal.Equiv s ->
-    let sk s fk = sk (List.map (fun x -> Goal.Equiv x) s) fk in
-    LT.rewrite_tac simpl_ident args s sk fk
-
-  | Goal.Trace s ->
-    let sk s fk = sk (List.map (fun x -> Goal.Trace x) s) fk in
-    TraceTactics.LT.rewrite_tac TraceTactics.simpl args s sk fk
-
-
-(* TODO: factorize *)
-let () =
-  T.register_general "rewrite"
-    ~tactic_help:{
-      general_help =
-        "If t1 = t2, rewrite all occurences of t1 into t2 in the goal.\n\
-         Usage: rewrite Hyp Lemma Axiom (forall (x:message), t = t').\n       \
-         rewrite Lemma Axiom (t=t').\n       \
-         rewrite (forall (x:message), t = t').\n       \
-         rewrite (t = t') Lemma in H.";
-      detailed_help = "";
-      usages_sorts  = [];
-      tactic_group  = Structural;}
-    rewrite_tac
-
-
+let tac_autosimpl s = tac_auto ~close:false ~strong:false s
+  
 
 (*------------------------------------------------------------------*)
 (** {2 Cryptographic Tactics} *)

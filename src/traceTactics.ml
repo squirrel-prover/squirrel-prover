@@ -25,7 +25,7 @@ type tac = TS.t Tactics.tac
 type lsymb = Theory.lsymb
 type sequent = TS.sequent
 
-module LT = LowTactics.LowTac(TraceSequent)
+module LT = LowTactics.MkCommonLowTac(TraceSequent)
 
 
 (*------------------------------------------------------------------*)
@@ -147,18 +147,6 @@ let () =
                   tactic_group = Logical}
     (genfun_of_pure_seqfun goal_true_intro)
 
-(*------------------------------------------------------------------*)
-let print_tac s =
-  Tactics.print_system (TS.table s) (TS.system s);
-  [s]
-
-let () =
-  T.register "print"
-    ~tactic_help:{general_help = "Shows the current system.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
-    (genfun_of_pure_seqfun print_tac)
 
 (*------------------------------------------------------------------*)
 (** Split a conjunction conclusion,
@@ -197,39 +185,6 @@ let () =
                     logical connectors."
     ~tactic_group:Logical
     (genfun_of_pure_seqfun_arg left_not_intro) Args.String
-
-(*------------------------------------------------------------------*)
-let () = T.register_general "expand"
-    ~tactic_help:{
-      general_help  = "Expand all occurences of the given macro inside the \
-                       goal.";
-      detailed_help = "Can only be called over macros with fully defined \
-                       timestamps.";
-      tactic_group  = Structural;
-      usages_sorts  = [Sort Args.String; Sort Args.Message; Sort Args.Boolean]; }
-    (gentac_of_seqtac_arg LT.expand_tac)
-
-(*------------------------------------------------------------------*)
-(* cannot fail, so we don't need to catch soft errors *)
-let () = T.register "expandall"
-    ~tactic_help:{
-      general_help  = "Expand all possible macros in the sequent.";
-      detailed_help = "";
-      tactic_group  = Structural;
-      usages_sorts  = []; }
-    (genfun_of_pure_seqfun (LT.expand_all_l `All))         (* FIXME: allow user to specify targets *)
-
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "revert"
-    ~tactic_help:{
-      general_help = "Take an hypothesis H, and turns the conclusion C into the \
-                      implication H => C.";
-      detailed_help = "";
-      tactic_group  = Logical;
-      usages_sorts = []; }
-    (gentac_of_seqtac_arg LT.revert_tac)
 
 (*------------------------------------------------------------------*)
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
@@ -325,21 +280,6 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
 
 let case_tac args = LT.wrap_fail (do_case_tac args)
 
-let () =
-  T.register_general "case"
-    ~tactic_help:
-      {general_help = "Perform case analysis on a timestamp, a message built \
-                       using a conditional, or a disjunction hypothesis.";
-       detailed_help = "A timestamp will be instantiated by all \
-                        possible actions, and a message with a conditional will \
-                        be split into the two branches.";
-       usages_sorts = [Sort Args.Timestamp;
-                       Sort Args.String;
-                       Sort Args.Message];
-       tactic_group = Logical}
-    (gentac_of_seqtac_arg case_tac)
-
-
 (*------------------------------------------------------------------*)
 (* TODO: remove, as it is subsumed by the tactic `assumption` ? *)
 let false_left s =
@@ -356,41 +296,7 @@ let () =
     (genfun_of_pure_seqfun false_left)
 
 
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "clear"
-    ~tactic_help:{
-      general_help = "Clear an hypothesis.";
-      detailed_help = "";
-      tactic_group  = Logical;
-      usages_sorts = []; }
-    (gentac_of_seqtac_arg LT.clear_tac)
 
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "destruct"
-    ~tactic_help:{
-      general_help = "Destruct an hypothesis. An optional And/Or \
-                      introduction pattern can be given.\n\n\
-                      Usages: destruct H.\n\
-                     \        destruct H as [A | [B C]]";
-      detailed_help = "";
-      usages_sorts = [];
-      tactic_group = Logical}
-    (gentac_of_seqtac_arg LT.destruct_tac)
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "exists"
-    ~tactic_help:{general_help = "Introduce the existentially quantified \
-                                  variables in the conclusion of the judgment, \
-                                  using the arguments as existential witnesses.\
-                                  \n\nUsage: exists v1, v2, ...";
-                  detailed_help = "";
-                  usages_sorts = [];
-                  tactic_group = Logical}
-    (gentac_of_seqtac_arg LT.exists_intro_tac)
 
 (*------------------------------------------------------------------*)
 
@@ -439,52 +345,6 @@ let () =
     (genfun_of_pure_seqfun simpl_left_tac)
 
 (*------------------------------------------------------------------*)
-let () =
-  T.register_general "generalize"
-    ~tactic_help:{
-      general_help = "Generalize the goal on some terms";
-      detailed_help = "";
-      tactic_group  = Logical;
-      usages_sorts = []; }
-    (gentac_of_seqtac_arg (LT.generalize_tac ~dependent:false))
-
-let () =
-  T.register_general "generalize dependent"
-    ~tactic_help:{
-      general_help = "Generalize the goal and hypotheses on some terms";
-      detailed_help = "";
-      tactic_group  = Logical;
-      usages_sorts = []; }
-    (gentac_of_seqtac_arg (LT.generalize_tac ~dependent:true))
-
-(*------------------------------------------------------------------*)
-(** Induction *)
-
-let () = T.register_general "induction"
-    ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
-    (gentac_of_seqtac_arg (LT.induction_tac ~dependent:false))
-
-let () = T.register_general "dependent induction"
-    ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
-    (gentac_of_seqtac_arg (LT.induction_tac ~dependent:true))
-
-(*------------------------------------------------------------------*)
-(** Reduce *)
-
-let () = T.register_general "reduce"
-    ~tactic_help:{general_help = "Reduce the sequent.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
-    (gentac_of_seqtac_arg LT.reduce_tac)
-
-(*------------------------------------------------------------------*)
 (** [assumption judge sk fk] proves the sequent using the axiom rule. *)
 let assumption (s : TS.t) =
   let goal = TS.goal s in
@@ -501,57 +361,9 @@ let assumption (s : TS.t) =
 
   else soft_failure Tactics.NotHypothesis
 
-let () = T.register "assumption"
-    ~tactic_help:{
-      general_help = "Search for the conclusion inside the hypothesis.";
-      detailed_help = "";
-      usages_sorts = [Sort None];
-      tactic_group = Logical }
-    (genfun_of_pure_seqfun assumption)
-
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "use"
-    ~tactic_help:
-      {general_help = "Apply an hypothesis with its universally \
-                       quantified variables instantiated with the \
-                       arguments.\n\n\
-                       Usages: use H with v1, v2, ...\n\
-                      \        use H with ... as ...";
-       detailed_help = "";
-       usages_sorts = [];
-       tactic_group = Logical}
-    (gentac_of_seqtac_arg LT.use_tac)
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "assert"
-    ~tactic_help:
-      {general_help = "Add an assumption to the set of hypothesis, \
-                       and produce the goal for\
-                       \nthe proof of the assumption.\n\
-                       Usages: assert f.\n \
-                      \       assert f as intro_pat";
-       detailed_help = "";
-       usages_sorts = [];
-       tactic_group = Logical}
-    (gentac_of_seqtac_arg LT.assert_tac)
 
 (*------------------------------------------------------------------*)
 (** {2 Structural Tactics} *)
-
-let () =
-  T.register_typed "depends"
-    ~general_help:"If the second action depends on the first \
-                   action, and if the second \
-                   action happened, \
-                   add the corresponding timestamp inequality."
-    ~detailed_help:"Whenever action A1[i] must happen before A2[i], if A2[i] \
-                    occurs in the trace, we can add A1[i]. "
-    ~tactic_group:Structural
-    (genfun_of_pure_seqfun_arg LT.depends) Args.(Pair (Timestamp, Timestamp))
-
 
 (*------------------------------------------------------------------*)
 (** [congruence judge sk fk] try to close the goal using congruence, else
@@ -901,7 +713,7 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
   mk_ors cases
 
 
-let fresh (Args.String m) s =
+let fresh (m : lsymb) s =
   try
     let id,hyp = Hyps.by_name m s in
     let hyp = LT.expand_all_term hyp s in
@@ -934,15 +746,9 @@ let fresh (Args.String m) s =
     soft_failure
       (Tactics.Failure "can only be applied on ground terms")
 
-let () =
-  T.register_typed "fresh"
-    ~general_help:"Given a message equality M of the form t=n, \
-                   add an hypothesis expressing that n is a subterm of t."
-    ~detailed_help:"This condition checks that all occurences of the same name \
-                    in other actions cannot have happened before this action."
-    ~tactic_group:Structural
-    (genfun_of_pure_seqfun_arg fresh)
-    Args.String
+let fresh_tac args s = match LT.convert_args s args (Args.Sort Args.String) with
+  | Args.Arg (Args.String str) -> LT.wrap_fail (fresh str) s
+  | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)
 let apply_substitute subst s =
@@ -1189,28 +995,9 @@ let fa s =
         end
     | _ -> unsupported ()
 
-let () =
-  T.register "fa"
-    ~tactic_help:{general_help = "Break down some conclusion equalities into the \
-                                  equalities of their subterms.";
-                  detailed_help = "When we have G => f(u) = f(v), produces the \
-                                   goal G => u=v. Produces as many subgoals as \
-                                   arugment of the head function symbol. Recall \
-                                   that everything is a function, notably, if \
-                                   then else and try find construct are.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Structural}
-    (genfun_of_pure_seqfun fa)
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "remember"
-    ~tactic_help:{
-      general_help = "substitute a term by a fresh variable";
-      detailed_help = "";
-      tactic_group  = Logical;
-      usages_sorts = []; }
-    (gentac_of_seqtac_arg LT.remember_tac)
+let fa_tac args = match args with
+  | [] -> LT.wrap_fail fa
+  | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)
 (** New goal simplification *)
@@ -1331,83 +1118,12 @@ let rec simpl ~strong ~close : TS.t Tactics.tac =
          | _ -> assert false)
       fk
 
-let () =
-  T.register_general "autosimpl"
-    ~tactic_help:{general_help = "Simplify a goal, without closing \
-                                  it. Automatically called after each tactic.";
-                  detailed_help = "Performs introductions, eqtrace and eqnames.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Structural}
-    (function
-      | [] -> gentac_of_seqtac (simpl ~strong:(Config.auto_intro ()) ~close:false)
-      | _ -> hard_failure (Tactics.Failure "no argument allowed"))
+let tac_auto ~close ~strong args s sk (fk : Tactics.fk) =
+  match args with
+  | [] -> simpl ~close ~strong s sk fk
+  | _ -> hard_failure (Tactics.Failure "no argument allowed")
 
-let () = 
-  T.register_general "simpl"
-    ~tactic_help:{general_help = "Simplifies a goal.";
-                  detailed_help = "Performs introductions, eqtrace and eqnames.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Structural}
-    (function
-      | [] -> gentac_of_seqtac (simpl ~strong:true ~close:false)
-      | _ -> hard_failure (Tactics.Failure "no argument allowed"))
-    
-let () =
-  T.register_general "auto"
-    ~tactic_help:{general_help = "Closes a goal.";
-                  detailed_help = "Behaves like simpl, but also calls \
-                                   congruence, constraints and assumption.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Structural}
-    (function
-      | [] -> gentac_of_seqtac (simpl ~strong:true ~close:true)
-      | _ -> hard_failure (Tactics.Failure "no argument allowed"))
-
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "rewrite"
-    ~tactic_help:{
-      general_help =
-        "If t1 = t2, rewrite all occurences of t1 into t2 in the goal.\n\
-         Usage: rewrite Hyp Lemma Axiom (forall (x:message), t = t').\n       \
-         rewrite Lemma Axiom (t=t').\n       \
-         rewrite (forall (x:message), t = t').\n       \
-         rewrite (t = t') Lemma in H.";
-      detailed_help = "";
-      usages_sorts  = [];
-      tactic_group  = Structural;}
-    (gentac_of_seqtac_arg (LT.rewrite_tac simpl))
-
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "apply"
-    ~tactic_help:{
-      general_help=
-        "Matches the goal with the conclusion of the formula F provided \
-         (directly, using lemma, or using an axiom), trying to instantiate \
-         F variables. Creates one subgoal for each premises of F.\n\
-         Usage: apply my_lem.\n       \
-         apply my_axiom.\n       \
-         apply (forall (x:message), F => G).";
-      detailed_help="";
-      usages_sorts=[];
-      tactic_group=Structural}
-    (gentac_of_seqtac_arg LT.apply_tac)
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "intro"
-    ~tactic_help:{
-      general_help = "Introduce topmost connectives of conclusion \
-                      formula, when it can be done in an invertible, \
-                      non-branching fashion.\
-                      \n\nUsage: intro a b _ c *";
-      detailed_help = "";
-      usages_sorts = [];
-      tactic_group = Logical}
-    (gentac_of_seqtac_arg (LT.intro_tac simpl))
+let tac_autosimpl s = tac_auto ~close:false ~strong:(Config.auto_intro ()) s
 
 (*------------------------------------------------------------------*)
 (** Projecting a goal on a bi-system
@@ -1438,7 +1154,7 @@ let () =
 (** Replacing a conditional by the then branch (resp. the else branch) if the
  * condition is true (resp. false). *)
 
-let apply_yes_no_if b s =
+let yes_no_if b s =
   let cntxt = TS.mk_trace_cntxt s in
   let conclusion = TS.goal s in
   (* search for the first occurrence of an if-then-else in [elem] *)
@@ -1461,45 +1177,12 @@ let apply_yes_no_if b s =
       else (e, TS.set_goal (Term.mk_not c) s)
     in
     let subst = [Term.ESubst (Term.mk_ite ~simpl:false c t e,branch)] in
-    [ trace_sequent; TS.subst subst s ]
+    [ Goal.Trace trace_sequent; Goal.Trace (TS.subst subst s) ]
 
-let yes_no_if b =
-  (function
-    | [] ->
-      fun s sk fk -> begin match apply_yes_no_if b s with
-        | subgoals -> sk subgoals fk
-        | exception Tactics.Tactic_soft_failure e -> fk e
-      end
-    | _ -> hard_failure (Tactics.Failure "no argument allowed"))
-
-let () =
-  T.register "yesif"
-    ~tactic_help:{
-      general_help = "Replaces the first conditional in \
-                      the conclusion by its then branch if the \
-                      condition is true.";
-      detailed_help = "Replaces a proof goal with conclusion `if phi \
-                       then u else v` by the goals 'phi <=> true' \
-                       and the original goal now with u instead of \
-                       the conditional.";
-      usages_sorts = [Sort None];
-      tactic_group = Structural}
-    (genfun_of_pure_seqfun (apply_yes_no_if true))
-
-let () =
-  T.register "noif"
-    ~tactic_help:{
-      general_help = "Replaces the first conditional in \
-                      the conclusion by its else branch if the \
-                      condition is false.";
-      detailed_help = "Replaces a proof goal with condition `if phi \
-                       then u else v` by the goals 'phi <=> false' \
-                       and the original goal now with v instead of \
-                       the conditional.";
-      usages_sorts = [Sort None];
-      tactic_group = Structural}
-    (genfun_of_pure_seqfun (apply_yes_no_if false))
-
+let yes_no_if_args b args s : Goal.t list =
+    match args with
+    | [] -> yes_no_if b s
+    | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)
 (** {2 Cryptographic Tactics} *)
