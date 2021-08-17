@@ -14,8 +14,6 @@ module Args = TacticsArgs
 module L    = Location
 module SE   = SystemExpr
 
-open LowTactics
-
 module ES   = EquivSequent
 module Hyps = ES.Hyps
  
@@ -23,7 +21,8 @@ type sequent = ES.sequent
 
 type lsymb = Theory.lsymb
 
-module LT = LowTactics.MkCommonLowTac(EquivSequent)
+(*------------------------------------------------------------------*)
+open LowTactics
 
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
@@ -31,76 +30,7 @@ module LT = LowTactics.MkCommonLowTac(EquivSequent)
 let split_equiv_goal = LowTactics.split_equiv_goal
                          
 (*------------------------------------------------------------------*)
-let wrap_fail = LT.wrap_fail
-
-(*------------------------------------------------------------------*)
-(** {2 Wrapper lifting sequence functions or tactics to general tactics} *)
-
-(* TODO: factorize with corresponding code in EquivTactics. *)
-                                       
-(** Function over a [Goal.t], returning an arbitrary value. *)
-type 'a genfun = Goal.t -> 'a
-
-(** Function over an equivalence sequent, returning an arbitrary value. *)
-type 'a seqfun = EquivSequent.t -> 'a
-
-(** Lift a function expecting and returning equivalence sequents to
-  * a function expecting and returning [Goal.t].
-  * (user-level failure when that goal is not an equivalence). *)
-let genfun_of_seqfun (t : 'a seqfun) : 'a genfun = fun s ->
-  match s with
-  | Goal.Equiv s -> t s
-  | _ -> soft_failure (Tactics.Failure "global sequent expected")
-
-(** As [genfun_of_seqfun], but with an extra argument. *)
-let genfun_of_seqfun_arg
-    (t : 'b -> EquivSequent.t -> 'a)
-    (arg : 'b)
-    (s : Goal.t) : 'a
-  =
-  match s with
-  | Goal.Equiv s -> t arg s
-  | _ -> soft_failure (Tactics.Failure "global sequent expected")
-
-(*------------------------------------------------------------------*)
-(** Function expecting and returning equivalence sequents. *)
-type pure_seqfun = EquivSequent.t -> EquivSequent.t list
-
-let genfun_of_pure_seqfun
-    (t : EquivSequent.t -> EquivSequent.t list)
-    (s : Goal.t) : Goal.t list
-  =
-  let res = genfun_of_seqfun t s in
-  List.map (fun s -> Goal.Equiv s) res
-
-let genfun_of_pure_seqfun_arg
-    (t : 'a -> EquivSequent.t -> EquivSequent.t list)
-    (arg : 'a)
-    (s : Goal.t) : Goal.t list
-  =
-  let res = genfun_of_seqfun_arg t arg s in
-  List.map (fun s -> Goal.Equiv s) res
-
-(*------------------------------------------------------------------*)
-(** General tactic *)
-type gentac = Goal.t Tactics.tac
-
-(** Tactic acting and returning equivalence goals *)
-type seqtac = EquivSequent.t Tactics.tac
-    
-(** Lift a [seqtac] to a [gentac]. *)
-let gentac_of_seqtac (t : seqtac) : gentac = fun s sk fk ->
-  let t' s sk fk =
-    t s (fun l fk -> sk (List.map (fun s -> Goal.Equiv s) l) fk) fk
-  in
-  genfun_of_seqfun t' s sk fk
-
-(** As [gentac_of_seqtac], but with an extra arguments. *)
-let gentac_of_seqtac_arg t a s sk fk =
-  let t' s sk fk =
-    t a s (fun l fk -> sk (List.map (fun s -> Goal.Equiv s) l) fk) fk
-  in
-  genfun_of_seqfun t' s sk fk
+let wrap_fail = EquivLT.wrap_fail
 
 (*------------------------------------------------------------------*)
 (** {2 Logical Tactics} *)
@@ -151,21 +81,23 @@ let () =
                                    case also for macros expansions.";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
-    (genfun_of_seqfun refl_tac)
+    (LowTactics.genfun_of_efun refl_tac)
 
 (*------------------------------------------------------------------*)
 let do_case_tac (args : Args.parser_arg list) s : sequent list =
   match Args.convert_as_lsymb args with
   | Some str when Hyps.mem_name (L.unloc str) s ->
     let id, _ = Hyps.by_name str s in
-    List.map (fun (LT.CHyp _, ss) -> ss) (LT.hypothesis_case ~nb:`Any id s)
+    List.map
+      (fun (EquivLT.CHyp _, ss) -> ss)
+      (EquivLT.hypothesis_case ~nb:`Any id s)
 
   | _ ->
-    match LT.convert_args s args Args.(Sort ETerm) with
+    match EquivLT.convert_args s args Args.(Sort ETerm) with
     | Args.Arg (ETerm (ty, f, _)) ->
       begin
         match Type.kind ty with
-        | Type.KTimestamp -> LT.timestamp_case f s
+        | Type.KTimestamp -> EquivLT.timestamp_case f s
 
         | Type.KMessage -> bad_args ()
         | Type.KIndex -> bad_args ()
@@ -173,7 +105,7 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
     | _ -> bad_args ()
 
 
-let case_tac args = LT.wrap_fail (do_case_tac args)
+let case_tac args = wrap_fail (do_case_tac args)
 
 (*------------------------------------------------------------------*)
 (** For each element of the biframe, checks that it is a member of the
@@ -216,7 +148,7 @@ let () =
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
-    (genfun_of_seqfun byequiv_tac)
+    (LowTactics.genfun_of_efun byequiv_tac)
 
 
 (*------------------------------------------------------------------*)
@@ -268,7 +200,7 @@ let generalize (ts : Term.timestamp) s =
     ) s [] in
 
   (* Generalized sequent *)
-  let s = List.fold_left (fun s id -> LT.revert id s) s gen_hyps in
+  let s = List.fold_left (fun s id -> EquivLT.revert id s) s gen_hyps in
 
   (* Function introducing back generalized hypotheses *)
   let intro_back (s : ES.t) : ES.t =
@@ -356,10 +288,10 @@ let induction Args.(Timestamp ts) s =
 
 let old_or_new_induction args =
   if Config.new_ind () then
-    (LT.induction_tac ~dependent:false) args
+    (EquivLT.induction_tac ~dependent:false) args
   else
     (fun s sk fk ->
-       match LT.convert_args s args (Args.Sort Args.Timestamp) with
+       match EquivLT.convert_args s args (Args.Sort Args.Timestamp) with
        | Args.Arg (Args.Timestamp ts) ->
          let ss = induction (Args.Timestamp ts) s in
          sk ss fk
@@ -399,7 +331,7 @@ let () =
                        more simply.";
       tactic_group  = Logical;
       usages_sorts  = [Sort Args.Message; Sort Args.Boolean]; }
-    (gentac_of_seqtac_arg enrich_tac)
+    (LowTactics.gentac_of_etac_arg enrich_tac)
 
 
 (*------------------------------------------------------------------*)
@@ -468,7 +400,7 @@ let fa i s =
     soft_failure (Tactics.Failure "FA not applicable")
 
 let fa_tac args = match args with
-  | [Args.Int_parsed i] -> LT.wrap_fail (fa i)
+  | [Args.Int_parsed i] -> wrap_fail (fa i)
   | _ -> bad_args ()
 
 
@@ -655,7 +587,7 @@ let () =
                     phi), with frame@pred(tau) in the biframe, tries to remove \
                     phi if it contains only subterms allowed by the FA-DUP rule."
    ~tactic_group:Structural
-   (genfun_of_pure_seqfun_arg fadup) Args.(Opt Int)
+   (LowTactics.genfun_of_pure_efun_arg fadup) Args.(Opt Int)
 
 (*------------------------------------------------------------------*)
 (** Fresh *)
@@ -810,7 +742,7 @@ let fresh i s =
   let biframe = List.rev_append before after in
   (* expand the biframe to improve precision when computing the freshness
      condition *)
-  let biframe_exp = List.map (fun t -> LT.expand_all_term t s) biframe in
+  let biframe_exp = List.map (fun t -> EquivLT.expand_all_term t s) biframe in
   let cntxt   = ES.mk_trace_cntxt s in
   let env     = ES.env s in
   try
@@ -823,7 +755,7 @@ let fresh i s =
       (Tactics.Failure "Can only apply fresh tactic on names")
 
 let fresh_tac args = match args with
-  | [Args.Int_parsed i] -> LT.wrap_fail (fresh i)
+  | [Args.Int_parsed i] -> wrap_fail (fresh i)
   | _ -> bad_args ()
 
 
@@ -832,7 +764,7 @@ let fresh_tac args = match args with
 let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
   let env = ES.env s in
   let table = ES.table s in
-  match LT.convert_i s term with
+  match EquivLT.convert_i s term with
   (* we expect term to be a sequence *)
   | (Seq (vs, t) as term_seq), ty ->
     let vs = List.map (fun x -> Vars.EVar x) vs in
@@ -889,7 +821,7 @@ let expand_seq args s =
     expand_seq v ids s
   | _ -> bad_args ()
 
-let expand_seq_tac args = LT.wrap_fail (expand_seq args)
+let expand_seq_tac args = wrap_fail (expand_seq args)
 
 (* Does not rely on the typed registration, as it parses a substitution. *)
 let () = T.register_general "expandseq"
@@ -898,7 +830,7 @@ let () = T.register_general "expandseq"
                   detailed_help = "";
                   usages_sorts = [];
                   tactic_group = Structural}
-    (gentac_of_seqtac_arg expand_seq_tac)
+    (LowTactics.gentac_of_etac_arg expand_seq_tac)
 
 
 (*------------------------------------------------------------------*)
@@ -959,7 +891,7 @@ let () = T.register_typed "equivalent"
     ~tactic_group:Structural
     ~usages_sorts:[Args.(Sort (Pair (Message, Message)));
                    Args.(Sort (Pair (Boolean, Boolean)))]
-    (genfun_of_seqfun_arg equivalent)
+    (LowTactics.genfun_of_efun_arg equivalent)
     Args.(Pair (ETerm, ETerm))
 
 
@@ -1120,7 +1052,7 @@ let () =
                     push the formula only in the jth subterm of the then branch \
                     (zero-based)."
    ~tactic_group:Structural
-   (genfun_of_seqfun_arg ifcond) Args.(Pair (Int, Pair( Opt Int, Boolean)))
+   (LowTactics.genfun_of_efun_arg ifcond) Args.(Pair (Int, Pair( Opt Int, Boolean)))
 
 
 (*------------------------------------------------------------------*)
@@ -1158,7 +1090,7 @@ let () =
    ~general_help:"Simplify a conditional when the two branches are equal."
    ~detailed_help:""
    ~tactic_group:Structural
-   (genfun_of_seqfun_arg trivial_if) Args.Int
+   (LowTactics.genfun_of_efun_arg trivial_if) Args.Int
 
 
 (*------------------------------------------------------------------*)
@@ -1166,7 +1098,7 @@ let () =
 let ifeq Args.(Pair (Int i, Pair (Message (t1,ty1), Message (t2,ty2)))) s =
 
   (* check that types are equal *)
-  LT.check_ty_eq ty1 ty2;
+  EquivLT.check_ty_eq ty1 ty2;
 
   let before, e, after = split_equiv_goal i s in
 
@@ -1204,7 +1136,7 @@ let () = T.register_typed "ifeq"
                     term (with over-whelming probability) in the positive \
                     brannch."
     ~tactic_group:Structural
-    (genfun_of_seqfun_arg ifeq) Args.(Pair (Int, Pair (Message, Message)))
+    (LowTactics.genfun_of_efun_arg ifeq) Args.(Pair (Int, Pair (Message, Message)))
 
 
 (*------------------------------------------------------------------*)
@@ -1237,7 +1169,7 @@ let rec auto ~strong ~close s sk (fk : Tactics.fk) =
     let wfadup s sk fk =
       if strong || (Config.auto_fadup ()) then
         let fk _ = sk [s] fk in
-        LT.wrap_fail (fadup (Args.Opt (Args.Int, None))) s sk fk
+        wrap_fail (fadup (Args.Opt (Args.Int, None))) s sk fk
       else sk [s] fk
     in
 
@@ -1245,16 +1177,16 @@ let rec auto ~strong ~close s sk (fk : Tactics.fk) =
       if close || Config.auto_intro () then
         let fk = if Config.auto_intro () then fun _ -> sk [s] fk else fk in
         andthen_list ~cut:true
-          [LT.wrap_fail (LT.expand_all_l `All);
+          [wrap_fail (EquivLT.expand_all_l `All);
            try_tac wfadup;
-           orelse_list [LT.wrap_fail refl_tac;
-                        LT.wrap_fail assumption]] s sk fk
+           orelse_list [wrap_fail refl_tac;
+                        wrap_fail assumption]] s sk fk
       else sk [s] fk
     in
 
     let reduce s sk fk =
       if strong
-      then sk [LT.reduce_sequent Reduction.{ delta = false } s] fk
+      then sk [EquivLT.reduce_sequent Reduction.{ delta = false } s] fk
       else sk [s] fk
     in
 
@@ -1594,7 +1526,8 @@ let () =
                     was never hashed using key k before. Behaves similarly to \
                     the fresh tactic."
     ~tactic_group:Cryptographic
-    (genfun_of_pure_seqfun_arg prf) Args.(Pair(Int, Opt Message))
+    (LowTactics.genfun_of_pure_efun_arg prf)
+    Args.(Pair(Int, Opt Message))
 
 
 (*------------------------------------------------------------------*)
@@ -1613,9 +1546,9 @@ let split_seq (li, ht) s : ES.sequent =
     Type.Lambda (List.map (fun v -> Type.ETy (Vars.ty v)) is, Type.Boolean)
   in
 
-  let hty, ht = LT.convert_ht s ht in
+  let hty, ht = EquivLT.convert_ht s ht in
 
-  LT.check_hty_eq hty seq_hty;
+  EquivLT.check_hty_eq hty seq_hty;
 
   (* compute the new sequent *)
   let is, subst = Term.refresh_vars `Global is in
@@ -1639,7 +1572,7 @@ let split_seq_args args s : ES.sequent list =
   | [Args.SplitSeq (i, ht)] -> [split_seq (i, ht) s]
   | _ -> bad_args ()
 
-let split_seq_tac args s sk fk = LT.wrap_fail (split_seq_args args) s sk fk
+let split_seq_tac args s sk fk = wrap_fail (split_seq_args args) s sk fk
 
 let () =
   T.register_general "splitseq"
@@ -1647,7 +1580,7 @@ let () =
                   detailed_help = "";
                   usages_sorts = [];
                   tactic_group = Logical}
-    (gentac_of_seqtac_arg split_seq_tac)
+    (LowTactics.gentac_of_etac_arg split_seq_tac)
 
 (*------------------------------------------------------------------*)
 let const_seq (li, terms) s : Goal.t list =
@@ -1656,7 +1589,7 @@ let const_seq (li, terms) s : Goal.t list =
   let terms, term_tys =
     List.split @@
     List.map (fun p_term ->
-        let term, term_ty = LT.convert_i s p_term in
+        let term, term_ty = EquivLT.convert_i s p_term in
         term, (term_ty, L.loc p_term)
       ) terms
   in
@@ -1670,7 +1603,7 @@ let const_seq (li, terms) s : Goal.t list =
 
   (* check that types are compatible *)
   List.iter (fun (term_ty, loc) ->
-      LT.check_ty_eq ~loc term_ty (Term.ty e_ti)
+      EquivLT.check_ty_eq ~loc term_ty (Term.ty e_ti)
     ) term_tys;
 
   (* refresh variables *)
@@ -1697,7 +1630,7 @@ let const_seq_args args s : Goal.t list =
   | [Args.ConstSeq (i, t)] -> const_seq (i, t) s
   | _ -> bad_args ()
 
-let const_seq_tac args s sk fk = LT.wrap_fail (const_seq_args args) s sk fk
+let const_seq_tac args s sk fk = wrap_fail (const_seq_args args) s sk fk
 
 let () =
   T.register_general "constseq"
@@ -1705,7 +1638,7 @@ let () =
                   detailed_help = "";
                   usages_sorts = [];
                   tactic_group = Logical}
-    (genfun_of_seqfun_arg const_seq_tac)
+    (LowTactics.genfun_of_efun_arg const_seq_tac)
 
 (*------------------------------------------------------------------*)
 (** Symmetric encryption **)
@@ -1893,7 +1826,7 @@ let () =
                    plaintext. Encryption not at toplevel are replaced by the \
                    encryption of the length of the plaintexts."
    ~tactic_group:Cryptographic
-   (genfun_of_seqfun_arg cca1) Args.Int
+   (LowTactics.genfun_of_efun_arg cca1) Args.Int
 
 (*------------------------------------------------------------------*)
 (** Encryption key privacy  *)
@@ -1981,7 +1914,7 @@ let enckp
       | None -> (skl, skl), Term.mk_name skl
     in
 
-    LT.check_ty_eq (Term.ty new_key) (Term.ty sk);
+    EquivLT.check_ty_eq (Term.ty new_key) (Term.ty sk);
 
     (* Verify all side conditions, and create the reachability goal
      * for the freshness of [r]. *)
@@ -2076,7 +2009,7 @@ let () =
                     otherwise the tactic applies to the first subterm of the form \
                     enc(_,r,k) where r is a name and k features a diff operator."
     ~tactic_group:Cryptographic
-    (genfun_of_seqfun_arg enckp)
+    (LowTactics.genfun_of_efun_arg enckp)
     Args.(Pair (Int, Pair (Opt Message,Opt Message)))
 
 (*------------------------------------------------------------------*)
@@ -2240,7 +2173,7 @@ let () =
    ~detailed_help:"This yields the same freshness condition on the name as the \
                    fresh tactic."
    ~tactic_group:Cryptographic
-   (genfun_of_pure_seqfun_arg xor)
+   (LowTactics.genfun_of_pure_efun_arg xor)
    Args.(Pair (Int, Pair (Opt Message, Opt Message)))
 
 
@@ -2374,5 +2307,5 @@ let () = T.register_general "ddh"
           Args.String_name v1;
           Args.String_name v2;
           Args.String_name v3] ->
-         gentac_of_seqtac (ddh gen v1 v2 v3)
+         LowTactics.gentac_of_etac (ddh gen v1 v2 v3)
        | _ -> hard_failure (Tactics.Failure "improper arguments"))

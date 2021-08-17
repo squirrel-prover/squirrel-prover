@@ -15,8 +15,6 @@ module Args = TacticsArgs
 module L = Location
 module SE = SystemExpr
 
-open LowTactics
-
 module TS = TraceSequent
 
 module Hyps = TS.LocalHyps
@@ -25,78 +23,11 @@ type tac = TS.t Tactics.tac
 type lsymb = Theory.lsymb
 type sequent = TS.sequent
 
-module LT = LowTactics.MkCommonLowTac(TraceSequent)
-
+(*------------------------------------------------------------------*)
+open LowTactics
 
 (*------------------------------------------------------------------*)
-(** {2 Wrapper lifting sequence functions or tactics to general tactics} *)
-
-(* TODO: factorize with corresponding code in EquivTactics. *)
-
-(** Function over a [Goal.t], returning an arbitrary value. *)
-type 'a genfun = Goal.t -> 'a
-
-(** Function over an equivalence sequent, returning an arbitrary value. *)
-type 'a seqfun = TraceSequent.t -> 'a
-
-(** Lift a function expecting and returning reachability sequents to
-  * a function expecting and returning [Goal.t].
-  * (user-level failure when that goal is not an reachability). *)
-let genfun_of_seqfun (t : 'a seqfun) : 'a genfun = fun s ->
-  match s with
-  | Goal.Trace s -> t s
-  | _ -> soft_failure (Tactics.Failure "local sequent expected")
-
-(** As [genfun_of_seqfun], but with an extra argument. *)
-let genfun_of_seqfun_arg
-    (t : 'b -> TraceSequent.t -> 'a)
-    (arg : 'b)
-    (s : Goal.t) : 'a
-  =
-  match s with
-  | Goal.Trace s -> t arg s
-  | _ -> soft_failure (Tactics.Failure "local sequent expected")
-
-(*------------------------------------------------------------------*)
-(** Function expecting and returning reachability sequents. *)
-type pure_seqfun = TraceSequent.t -> TraceSequent.t list
-
-let genfun_of_pure_seqfun
-    (t : TraceSequent.t -> TraceSequent.t list)
-    (s : Goal.t) : Goal.t list
-  =
-  let res = genfun_of_seqfun t s in
- List.map (fun s -> Goal.Trace s) res
-
-let genfun_of_pure_seqfun_arg
-    (t : 'a -> TraceSequent.t -> TraceSequent.t list)
-    (arg : 'a)
-    (s : Goal.t) : Goal.t list
-  =
-  let res = genfun_of_seqfun_arg t arg s in
- List.map (fun s -> Goal.Trace s) res
-
-(*------------------------------------------------------------------*)
-(** General tactic *)
-type gentac = Goal.t Tactics.tac
-
-(** Tactic acting and returning reachability goals *)
-type seqtac = TraceSequent.t Tactics.tac
-    
-(** Lift a [gentac] to a [seqtac]. *)
-let gentac_of_seqtac (t : seqtac) : gentac = fun s sk fk ->
-  let t' s sk fk =
-    t s (fun l fk -> sk (List.map (fun s -> Goal.Trace s) l) fk) fk
-  in
-  genfun_of_seqfun t' s sk fk
-
-(** As [gentac_of_seqtac], but with an extra arguments. *)
-let gentac_of_seqtac_arg t a s sk fk =
-  let t' s sk fk =
-    t a s (fun l fk -> sk (List.map (fun s -> Goal.Trace s) l) fk) fk
-  in
-  genfun_of_seqfun t' s sk fk
-
+let wrap_fail = TraceLT.wrap_fail
 
 (*------------------------------------------------------------------*)
 (** {2 Logical Tactics} *)
@@ -121,7 +52,7 @@ let () =
                   detailed_help = "G => A v B yields G => A";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
-    (genfun_of_pure_seqfun goal_or_right_1)
+    (LowTactics.genfun_of_pure_tfun goal_or_right_1)
 
 let () =
   T.register "right"
@@ -131,7 +62,7 @@ let () =
                   detailed_help = "G => A v B yields G => B";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
-    (genfun_of_pure_seqfun goal_or_right_2)
+    (LowTactics.genfun_of_pure_tfun goal_or_right_2)
 
 (*------------------------------------------------------------------*)
 let goal_true_intro (s : TS.t) =
@@ -145,7 +76,7 @@ let () =
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
-    (genfun_of_pure_seqfun goal_true_intro)
+    (LowTactics.genfun_of_pure_tfun goal_true_intro)
 
 
 (*------------------------------------------------------------------*)
@@ -165,7 +96,7 @@ let () =
                   detailed_help = "G=> A & B is replaced by G=>A and goal G=>B.";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
-    (genfun_of_pure_seqfun goal_and_right)
+    (LowTactics.genfun_of_pure_tfun goal_and_right)
 
 
 (*------------------------------------------------------------------*)
@@ -184,7 +115,7 @@ let () =
     ~detailed_help:"Normalize the formula according to the negation rules over \
                     logical connectors."
     ~tactic_group:Logical
-    (genfun_of_pure_seqfun_arg left_not_intro) Args.String
+    (LowTactics.genfun_of_pure_tfun_arg left_not_intro) Args.String
 
 (*------------------------------------------------------------------*)
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
@@ -262,14 +193,16 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
   match Args.convert_as_lsymb args with
   | Some str when Hyps.mem_name (L.unloc str) s ->
     let id, _ = Hyps.by_name str s in
-    List.map (fun (LT.CHyp _, ss) -> ss) (LT.hypothesis_case ~nb:`Any id s)
+    List.map
+      (fun (TraceLT.CHyp _, ss) -> ss)
+      (TraceLT.hypothesis_case ~nb:`Any id s)
 
   | _ ->
-    match LT.convert_args s args Args.(Sort ETerm) with
+    match TraceLT.convert_args s args Args.(Sort ETerm) with
     | Args.Arg (ETerm (ty, f, _)) ->
       begin
         match Type.kind ty with
-        | Type.KTimestamp -> LT.timestamp_case f s
+        | Type.KTimestamp -> TraceLT.timestamp_case f s
 
         | Type.KMessage -> message_case f ty s
 
@@ -278,7 +211,7 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
     | _ -> bad_args ()
 
 
-let case_tac args = LT.wrap_fail (do_case_tac args)
+let case_tac args = wrap_fail (do_case_tac args)
 
 (*------------------------------------------------------------------*)
 (* TODO: remove, as it is subsumed by the tactic `assumption` ? *)
@@ -293,9 +226,7 @@ let () =
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
-    (genfun_of_pure_seqfun false_left)
-
-
+    (LowTactics.genfun_of_pure_tfun false_left)
 
 
 (*------------------------------------------------------------------*)
@@ -342,7 +273,7 @@ let () =
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
-    (genfun_of_pure_seqfun simpl_left_tac)
+    (LowTactics.genfun_of_pure_tfun simpl_left_tac)
 
 (*------------------------------------------------------------------*)
 (** [assumption judge sk fk] proves the sequent using the axiom rule. *)
@@ -412,7 +343,7 @@ let () =
                         (f(u)=f(v) <=> u=v).";
        usages_sorts = [Sort None];
        tactic_group = Structural}
-    (genfun_of_pure_seqfun congruence_tac)
+    (LowTactics.genfun_of_pure_tfun congruence_tac)
 
 (*------------------------------------------------------------------*)
 let constraints (s : TS.t) =
@@ -441,7 +372,7 @@ let constraints (s : TS.t) =
 
 (** [constraints s] proves the sequent using its trace formulas. *)
 let constraints_tac (s : TS.t) =
-  let s = as_seq1 (LT.intro_all s) in
+  let s = as_seq1 (TraceLT.intro_all s) in
   match constraints s with
   | true ->
     let () = dbg "closed by constraints" in
@@ -459,7 +390,7 @@ let () = T.register "constraints"
                         them, i.e., if they are a possible trace.";
        usages_sorts = [Sort None];
        tactic_group = Structural}
-    (genfun_of_pure_seqfun constraints_tac)
+    (LowTactics.genfun_of_pure_tfun constraints_tac)
 
 
 
@@ -491,7 +422,7 @@ let () =
     ~general_help:"Adds the fact that two names have the same length."
     ~detailed_help:""
     ~tactic_group:Structural
-    (genfun_of_pure_seqfun_arg namelength)
+    (LowTactics.genfun_of_pure_tfun_arg namelength)
     Args.(Pair (Message, Message))
 
 (*------------------------------------------------------------------*)
@@ -539,7 +470,7 @@ let () = T.register "eqnames"
                         by the current context.";
        usages_sorts = [Sort None];
        tactic_group = Structural}
-    (genfun_of_pure_seqfun eq_names)
+    (LowTactics.genfun_of_pure_tfun eq_names)
 
 (*------------------------------------------------------------------*)
 (** Add terms constraints resulting from timestamp and index equalities. *)
@@ -592,7 +523,7 @@ let () = T.register "eqtrace"
                         by another in the other terms.";
        usages_sorts = [Sort None];
        tactic_group = Structural}
-    (genfun_of_pure_seqfun eq_trace)
+    (LowTactics.genfun_of_pure_tfun eq_trace)
 
 (*------------------------------------------------------------------*)
 let fresh_param m1 m2 = match m1,m2 with
@@ -716,7 +647,7 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
 let fresh (m : lsymb) s =
   try
     let id,hyp = Hyps.by_name m s in
-    let hyp = LT.expand_all_term hyp s in
+    let hyp = TraceLT.expand_all_term hyp s in
     let table = TS.table s in
     let env   = TS.env s in
 
@@ -746,8 +677,9 @@ let fresh (m : lsymb) s =
     soft_failure
       (Tactics.Failure "can only be applied on ground terms")
 
-let fresh_tac args s = match LT.convert_args s args (Args.Sort Args.String) with
-  | Args.Arg (Args.String str) -> LT.wrap_fail (fresh str) s
+let fresh_tac args s =
+  match TraceLT.convert_args s args (Args.Sort Args.String) with
+  | Args.Arg (Args.String str) -> wrap_fail (fresh str) s
   | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)
@@ -825,7 +757,7 @@ let () =
     ~usages_sorts:[Args.(Sort (Pair (Index, Index)));
                    Args.(Sort (Pair (Timestamp, Timestamp)));
                    Args.(Sort (Pair (Message, Message)))]
-    (genfun_of_pure_seqfun_arg substitute_tac)
+    (LowTactics.genfun_of_pure_tfun_arg substitute_tac)
     Args.(Pair (ETerm, ETerm))
 
 
@@ -879,7 +811,7 @@ let exec (Args.Timestamp a) s =
          (Term.mk_timestamp_leq (mk_var var) a)
          (mk_macro Term.exec_macro [] (mk_var var)))
   in
-  [LT.happens_premise s a ;
+  [TraceLT.happens_premise s a ;
 
    TS.set_goal (Term.mk_macro exec_macro [] a) s;
 
@@ -893,7 +825,7 @@ let () =
     ~detailed_help:"This is by definition of exec, which is the conjunction of \
                     all conditions before this timestamp."
     ~tactic_group:Structural
-    (genfun_of_pure_seqfun_arg exec)
+    (LowTactics.genfun_of_pure_tfun_arg exec)
     Args.Timestamp
 
 
@@ -996,14 +928,14 @@ let fa s =
     | _ -> unsupported ()
 
 let fa_tac args = match args with
-  | [] -> LT.wrap_fail fa
+  | [] -> wrap_fail fa
   | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)
 (** New goal simplification *)
 
 let new_simpl ~congr ~constr s =
-  let s = LT.reduce_sequent Reduction.{ delta = false } s in
+  let s = TraceLT.reduce_sequent Reduction.{ delta = false } s in
 
   let goals = Term.decompose_ands (TS.goal s) in
   let s = TS.set_goal Term.mk_false s in
@@ -1036,17 +968,17 @@ let _simpl ~close ~strong =
   let open Tactics in
   let intro = Config.auto_intro () in
 
-  let assumption = if close then [try_tac (LT.wrap_fail assumption)] else [] in
+  let assumption = if close then [try_tac (wrap_fail assumption)] else [] in
 
   let new_simpl ~congr ~constr =
     if strong && not intro
-    then [LT.wrap_fail (new_simpl ~congr ~constr)] @ assumption
+    then [wrap_fail (new_simpl ~congr ~constr)] @ assumption
     else []
   in
 
   let expand_all =
     (if strong && close && not intro
-     then [LT.wrap_fail (LT.expand_all_l `All)] @ assumption
+     then [wrap_fail (TraceLT.expand_all_l `All)] @ assumption
      else [])
   in
 
@@ -1056,17 +988,17 @@ let _simpl ~close ~strong =
        * of doing it after introductions. *)
     assumption @
     (new_simpl ~congr:false ~constr:false) @
-    (if close || intro then [LT.wrap_fail LT.intro_all;
-                             LT.wrap_fail simpl_left_tac] else []) @
+    (if close || intro then [wrap_fail TraceLT.intro_all;
+                             wrap_fail simpl_left_tac] else []) @
     assumption @
     expand_all @
     (* Learn new term equalities from constraints before
      * learning new index equalities from term equalities,
      * otherwise this creates e.g. n(j)=n(i) from n(i)=n(j). *)
     (* (if intro then [wrap eq_trace] else []) @ *)
-    (if strong then [LT.wrap_fail eq_names] else []) @
+    (if strong then [wrap_fail eq_names] else []) @
     (* Simplify equalities using substitution. *)
-    (repeat ~cut:true (LT.wrap_fail autosubst)) ::
+    (repeat ~cut:true (wrap_fail autosubst)) ::
     expand_all @
     assumption @ (new_simpl ~congr:true ~constr:true) @
     [clear_triv]
@@ -1075,9 +1007,9 @@ let _simpl ~close ~strong =
 (*------------------------------------------------------------------*)
 (* Attempt to close a goal. *)
 let do_conclude =
-  Tactics.orelse_list [LT.wrap_fail congruence_tac;
-                       LT.wrap_fail constraints_tac;
-                       LT.wrap_fail assumption]
+  Tactics.orelse_list [wrap_fail congruence_tac;
+                       wrap_fail constraints_tac;
+                       wrap_fail assumption]
 
 
 
@@ -1103,7 +1035,7 @@ let rec simpl ~strong ~close : TS.t Tactics.tac =
       then fun _ -> fk (None, GoalNotClosed)
       else fun _ -> sk [g] fk
     in
-    (LT.wrap_fail goal_and_right) g
+    (wrap_fail goal_and_right) g
       (fun l _ -> match l with
          | [g1;g2] ->
            simpl ~strong ~close g1
@@ -1148,7 +1080,7 @@ let () =
                         diff operators in local formulas.";
        usages_sorts = [Sort None];
        tactic_group = Structural}
-     (genfun_of_pure_seqfun project)
+     (LowTactics.genfun_of_pure_tfun project)
 
 (*------------------------------------------------------------------*)
 (** Replacing a conditional by the then branch (resp. the else branch) if the
@@ -1449,7 +1381,7 @@ let () =
                     produced. The tag T must refer to a previously defined axiom \
                     f(mess,sk), of the form forall (m:message,sk:message)."
     ~tactic_group:Cryptographic
-    (genfun_of_pure_seqfun_arg (euf_apply euf_param))
+    (LowTactics.genfun_of_pure_tfun_arg (euf_apply euf_param))
     Args.String
 
 let () =
@@ -1457,7 +1389,7 @@ let () =
     ~general_help:"Apply the intctxt axiom to the given hypothesis name."
     ~detailed_help:"Conditions are similar to euf."
     ~tactic_group:Cryptographic
-    (genfun_of_pure_seqfun_arg (euf_apply intctxt_param))
+    (LowTactics.genfun_of_pure_tfun_arg (euf_apply intctxt_param))
     Args.String
 
 
@@ -1570,7 +1502,7 @@ let () =
     ~general_help:"Apply the NM axiom to the given hypothesis name."
     ~detailed_help:"Can be applied to any hypothesis of the form dec(m,sk) = t(n)."
     ~tactic_group:Cryptographic
-    (genfun_of_pure_seqfun_arg non_malleability)
+    (LowTactics.genfun_of_pure_tfun_arg non_malleability)
     Args.(Pair (String, Opt Message))
 
 (*------------------------------------------------------------------*)
@@ -1667,7 +1599,7 @@ let () = T.register_typed "collision"
                     as CR holds for any valid key, even known to \
                     the attacker."
     ~tactic_group:Cryptographic
-    (genfun_of_pure_seqfun_arg collision_resistance)
+    (LowTactics.genfun_of_pure_tfun_arg collision_resistance)
     Args.(Opt String)
 
 (*------------------------------------------------------------------*)
@@ -1851,4 +1783,4 @@ let () =
          applies, and is left-to-right by default.";
       tactic_group = Structural;
       usages_sorts = [] }
-    (gentac_of_seqtac_arg reach_equiv)
+    (LowTactics.gentac_of_ttac_arg reach_equiv)
