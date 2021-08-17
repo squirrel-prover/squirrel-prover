@@ -217,79 +217,42 @@ let pp_help fmt (th, tac_name) =
 
 (** Basic tactic tables, without registration *)
 
-module type Table_sig = sig
-  type judgment = Goal.t
+module Table : sig
+  val table : Goal.t table
 
-  val table : judgment table
+  val get : string -> TacticsArgs.parser_arg list -> Goal.t Tactics.tac
 
-  val get : string -> TacticsArgs.parser_arg list -> judgment Tactics.tac
-
-  val table_name : string
-  val pp_goal_concl : Format.formatter -> judgment -> unit
-end
-
-module TraceTable : Table_sig = struct
+  val pp_goal_concl : Format.formatter -> Goal.t -> unit
+end = struct
   type judgment = Goal.t
   let table = Hashtbl.create 97
 
   (* TODO:location *)
   let get id =
     try (Hashtbl.find table id).maker with
-      | Not_found -> hard_failure
-             (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
-
-  let table_name = "Trace"
+    | Not_found ->
+      hard_failure
+        (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
 
   let pp_goal_concl ppf j = match j with
     | Goal.Trace j -> Term.pp  ppf (TS.goal j)
     | Goal.Equiv j -> Equiv.pp ppf (ES.goal j)
 end
 
-module EquivTable : Table_sig = struct
-  type judgment = Goal.t
-  let table = Hashtbl.create 97
-
-  (* TODO:location *)
-  let get id =
-    try (Hashtbl.find table id).maker with
-      | Not_found -> hard_failure
-             (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
-
-  let table_name = "Equiv"
-    
-  let pp_goal_concl ppf j = match j with
-    | Goal.Trace j -> Term.pp  ppf (TS.goal j)
-    | Goal.Equiv j -> Equiv.pp ppf (ES.goal j)
-end
-
-(** Functor building AST evaluators for our judgment types. *)
-module Make_AST (T : Table_sig) :
-  (Tactics.AST_sig 
+(** AST evaluators for general judgment. *)
+module AST :
+  (Tactics.AST_sig
    with type arg = TacticsArgs.parser_arg 
-   with type judgment = T.judgment)
+   with type judgment = Goal.t)
 = Tactics.AST(struct
 
   type arg = TacticsArgs.parser_arg
 
-  type judgment = T.judgment
+  type judgment = Goal.t
 
   let pp_arg = TacticsArgs.pp_parser_arg
 
-  let autosimpl () =
-    let tautosimpl = TraceTable.get "autosimpl" [] in
-
-    let eautosimpl = EquivTable.get "autosimpl" [] in
-
-    fun s sk fk ->
-      match s with
-      | Goal.Trace t ->
-        let sk l fk = sk l fk in
-        tautosimpl (Goal.Trace t) sk fk
-          
-      | Goal.Equiv e ->
-        let sk l fk = sk l fk in
-        eautosimpl (Goal.Equiv e) sk fk
-
+  let autosimpl () = Table.get "autosimpl" [] 
   let autosimpl = Lazy.from_fun autosimpl
 
   let re_raise_tac loc tac s sk fk : Tactics.a =
@@ -299,7 +262,7 @@ module Make_AST (T : Table_sig) :
 
   let eval_abstract mods (id : lsymb) args : judgment Tactics.tac =
     let loc, id = L.loc id, L.unloc id in
-    let tac = re_raise_tac loc (T.get id args) in
+    let tac = re_raise_tac loc (Table.get id args) in
     match mods with
       | "nosimpl" :: _ -> tac
       | [] -> Tactics.andthen tac (Lazy.force autosimpl)
@@ -318,68 +281,22 @@ module Make_AST (T : Table_sig) :
 
 end)
 
-module TraceAST = Make_AST(TraceTable)
+module ProverTactics = struct
+  include Table
 
-module EquivAST = Make_AST(EquivTable)
-
-(** Signature for tactic table with registration capabilities.
-  * Registering macros relies on previous AST modules,
-  * hence the definition in multiple steps. *)
-module type Tactics_sig = sig
-
-  type judgment
+  type judgment = Goal.t
 
   type tac = judgment Tactics.tac
 
-  val register_general :
-    string -> tactic_help:tactic_help ->
-    (TacticsArgs.parser_arg list -> tac) -> unit
-
-  val register_macro :
-    string -> ?modifiers:string list -> tactic_help:tactic_help ->
-    TacticsArgs.parser_arg Tactics.ast -> unit
-
-
-  val register : string ->  tactic_help:tactic_help ->
-    (judgment -> judgment list) -> unit
-
-  val register_typed :
-    string ->  general_help:string ->  detailed_help:string ->
-    tactic_group:tactic_groups ->
-    ?usages_sorts : TacticsArgs.esort list ->
-    ('a TacticsArgs.arg -> judgment -> judgment list) ->
-    'a TacticsArgs.sort  -> unit
-
-  val get : string -> TacticsArgs.parser_arg list -> tac
-
-  val pp : bool -> Format.formatter -> lsymb -> unit
-  val pps : Format.formatter -> unit -> unit
-  val pp_list : Format.formatter -> unit -> unit
-
-end
-
-module Prover_tactics
-  (M : Table_sig)
-  (AST : Tactics.AST_sig
-           with type judgment = M.judgment
-           with type arg = TacticsArgs.parser_arg) :
-  Tactics_sig with type judgment = M.judgment =
-struct
-
-  include M
-
-  type tac = judgment Tactics.tac
-
-  let register_general id
-      ~tactic_help
-      f =
+  let register_general id ~tactic_help f =
+    
     assert (not (Hashtbl.mem table id)) ;
 
     let f args s sk fk = 
-      dbg "@[<hov>%s table: calling tactic %s on@ @[%a@]@]" 
-        table_name
-        id M.pp_goal_concl s;
-      f args s sk fk in 
+      dbg "@[<hov>calling tactic %s on@ @[%a@]@]" 
+        id Table.pp_goal_concl s;
+      f args s sk fk
+    in 
 
     Hashtbl.add table id { maker = f ;
                            help = tactic_help}
@@ -517,60 +434,37 @@ struct
 
 end
 
-module rec TraceTactics : Tactics_sig with type judgment = Goal.t =
-  Prover_tactics(TraceTable)(TraceAST)
+let pp_ast fmt t = AST.pp fmt t
 
-module rec EquivTactics : Tactics_sig with type judgment = Goal.t =
-  Prover_tactics(EquivTable)(EquivAST)
-
-let pp_ast fmt t = TraceAST.pp fmt t
-
-let get_trace_help (tac_name : lsymb) =
+let get_help (tac_name : lsymb) =
   if L.unloc tac_name = "" then
-    Printer.prt `Result "%a" TraceTactics.pps ()
+    Printer.prt `Result "%a" ProverTactics.pps ()
   else if L.unloc tac_name = "concise" then
-    Printer.prt `Result "%a" TraceTactics.pp_list ()
+    Printer.prt `Result "%a" ProverTactics.pp_list ()
   else
-    Printer.prt `Result "%a." (TraceTactics.pp true) tac_name;
-  Tactics.id
-
-let get_equiv_help (tac_name : lsymb) =
-  if L.unloc tac_name = "" then
-    Printer.prt `Result "%a" EquivTactics.pps ()
-  else if L.unloc tac_name = "concise" then
-    Printer.prt `Result "%a" TraceTactics.pp_list ()
-  else
-    Printer.prt `Result "%a." (EquivTactics.pp true) tac_name;
+    Printer.prt `Result "%a." (ProverTactics.pp true) tac_name;
   Tactics.id
 
 let () =
-
-  TraceTactics.register_general "admit"
+  ProverTactics.register_general "admit"
     ~tactic_help:{general_help = "Closes the current goal.";
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
-    (fun _ _ sk fk -> sk [] fk) ;
+    (fun _ _ sk fk -> sk [] fk) 
 
-  TraceTactics.register_general "prof"
+let () = 
+  ProverTactics.register_general "prof"
     ~tactic_help:{general_help = "Print profiling information.";
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
     (fun _ s sk fk -> 
        Printer.prt `Dbg "%a" Prof.print ();
-      sk [s] fk) ;
+       sk [s] fk) 
 
-  EquivTactics.register_general "prof"
-    ~tactic_help:{general_help = "Print profiling information.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
-    (fun _ s sk fk -> 
-       Printer.prt `Dbg "%a" Prof.print ();
-      sk [s] fk) ;
-
-  TraceTactics.register_general "help"
+let () =
+  ProverTactics.register_general "help"
     ~tactic_help:{general_help = "Display all available commands.\n\n\
                                   Usages: help\n\
                                  \        help tacname\n\
@@ -581,26 +475,12 @@ let () =
                   usages_sorts = [];
                   tactic_group = Logical}
     (function
-      | [] -> get_trace_help (L.mk_loc L._dummy "")
-      | [String_name tac_name]-> get_trace_help tac_name
-      | _ ->  hard_failure (Tactics.Failure"improper arguments")) ;
+      | [] -> get_help (L.mk_loc L._dummy "")
+      | [String_name tac_name]-> get_help tac_name
+      | _ ->  hard_failure (Tactics.Failure "improper arguments")) 
 
-  EquivTactics.register_general "help"
-    ~tactic_help:{general_help = "Display all available commands.\n\n\
-                                  Usages: help\n\
-                                 \        help tacname\n\
-                                 \        help concise";
-                  detailed_help = "`help tacname` gives more details about a \
-                                   tactic and `help concise` juste gives the \
-                                   list of tactics.";
-                  usages_sorts = [];
-                  tactic_group = Logical}
-    (function
-      | [] -> get_equiv_help (L.mk_loc L._dummy "")
-      | [String_name tac_name]-> get_equiv_help tac_name
-      | _ ->  hard_failure (Tactics.Failure"improper arguments")) ;
-
-  TraceTactics.register_general "id"
+let () =
+  ProverTactics.register_general "id"
     ~tactic_help:{general_help = "Identity.";
                   detailed_help = "";
                   usages_sorts = [Sort None];
@@ -727,13 +607,8 @@ let pp_goal ppf () = match !current_goal, !subgoals with
   * @return [true] if there are no subgoals remaining. *)
 let eval_tactic_focus tac = match !subgoals with
   | [] -> assert false
-  | Goal.Trace judge :: ejs' ->
-    let new_j = TraceAST.eval_judgment tac (Goal.Trace judge) in
-    subgoals := new_j @ ejs';
-    is_proof_completed ()
-      
-  | Goal.Equiv judge :: ejs' ->
-    let new_j = EquivAST.eval_judgment tac (Goal.Equiv judge) in
+  | judge :: ejs' ->
+    let new_j = AST.eval_judgment tac judge in
     subgoals := new_j @ ejs';
     is_proof_completed ()
 

@@ -9,7 +9,7 @@
  
 open Utils
 
-module T    = Prover.EquivTactics
+module T    = Prover.ProverTactics
 module Args = TacticsArgs
 module L    = Location
 module SE   = SystemExpr

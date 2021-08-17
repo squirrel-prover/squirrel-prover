@@ -10,7 +10,7 @@
 open Term
 open Utils
 
-module T = Prover.TraceTactics
+module T = Prover.ProverTactics
 module Args = TacticsArgs
 module L = Location
 module SE = SystemExpr

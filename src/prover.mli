@@ -84,8 +84,8 @@ type tactic_help = { general_help : string;
 
 
 (** Registry for tactics on some kind of judgment *)
-module type Tactics_sig = sig
-  type judgment
+module ProverTactics : sig
+  type judgment = Goal.t
   type tac = judgment Tactics.tac
 
   (* Allows to register a general tactic. Used when the arguments of the tactic
@@ -124,9 +124,6 @@ module type Tactics_sig = sig
 end
 
 val pp_ast : Format.formatter -> TacticsArgs.parser_arg Tactics.ast -> unit
-
-module TraceTactics : Tactics_sig with type judgment = Goal.t
-module EquivTactics : Tactics_sig with type judgment = Goal.t
 
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
