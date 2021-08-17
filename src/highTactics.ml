@@ -133,7 +133,7 @@ let tac_autosimpl args s sk fk = match s with
     TraceTactics.tac_autosimpl args s sk fk
   | Goal.Equiv _ -> EquivTactics.tac_autosimpl args s sk fk
 
-let tac_auto ~close ~strong args s sk fk = match s with
+let tac_auto ~strong ~close args s sk fk = match s with
   | Goal.Trace s ->
     let sk l fk =
       sk (List.map (fun s -> Goal.Trace s) l) fk
@@ -179,9 +179,7 @@ let () =
       detailed_help = "";
       usages_sorts  = [];
       tactic_group  = Structural;}
-    (LT.gentac_of_any_tac_arg
-       (LT.TraceLT.rewrite_tac TraceTactics.simpl)
-       (LT.EquivLT.rewrite_tac EquivTactics.simpl_ident)) (* TODO: use auto here *)
+    (LT.rewrite_tac (tac_auto []))
 
 (*------------------------------------------------------------------*)
 let () =
@@ -194,6 +192,4 @@ let () =
       detailed_help = "";
       usages_sorts = [];
       tactic_group = Logical}
-    (LT.gentac_of_any_tac_arg
-       (LT.TraceLT.intro_tac TraceTactics.simpl)
-       (LT.EquivLT.intro_tac EquivTactics.simpl_ident)) (* TODO: use auto here *)
+    (LT.intro_tac (tac_auto []))

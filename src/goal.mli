@@ -13,8 +13,9 @@ val pp_init : Format.formatter -> t -> unit
 val get_env : t -> Vars.env
 
 (*------------------------------------------------------------------*)
-val map  : (TS.t -> TS.t) -> (ES.t -> ES.t) -> t -> t
-val bind : (TS.t -> 'a)   -> (ES.t -> 'a)   -> t -> 'a
+val map      : (TS.t -> TS.t)      -> (ES.t -> ES.t)      -> t -> t
+val map_list : (TS.t -> TS.t list) -> (ES.t -> ES.t list) -> t -> t list
+val bind     : (TS.t -> 'a)        -> (ES.t -> 'a)        -> t -> 'a
   
 (*------------------------------------------------------------------*)
 (** Statements are formulas in context.

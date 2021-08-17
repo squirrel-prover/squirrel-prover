@@ -684,7 +684,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (*------------------------------------------------------------------*)
   (** Apply a naming pattern to a variable or hypothesis. *)
-  let do_naming_pat (ip_handler : Args.ip_handler) n_ip s : S.t =
+  let do_naming_pat
+      (ip_handler : Args.ip_handler)
+      (n_ip : Args.naming_pat)
+      (s : S.t) : S.t
+    =
     match ip_handler with
     | `Var Vars.EVar v ->
       let env, v' = 
@@ -1449,119 +1453,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | _ -> bad_args ()
 
   let remember_tac args = wrap_fail (remember_tac_args args)
-
-  (*------------------------------------------------------------------*)
-  (** {3 Rewrite} *)
-
-  type f_simpl = strong:bool -> close:bool -> S.t Tactics.tac
-
-  let do_s_item
-      (simpl : f_simpl)
-      (s_item : Args.s_item)
-      (s : S.t) : S.t list
-    =
-    match s_item with
-    | Args.Simplify l ->
-      let tac = simpl ~strong:true ~close:false in
-      Tactics.run tac s
-
-    | Args.Tryauto l ->
-      let tac = Tactics.try_tac (simpl ~strong:true ~close:true) in
-      Tactics.run tac s
-
-    | Args.Tryautosimpl l ->
-      let tac = 
-        Tactics.andthen         (* FIXME: inneficient *)
-          (Tactics.try_tac (simpl ~strong:true ~close:true))
-          (simpl ~strong:true ~close:false)
-      in
-      Tactics.run tac s
-
-  (** Applies a rewrite arg  *)
-  let do_rw_arg
-      (simpl : f_simpl)
-      (rw_arg : Args.rw_arg)
-      (rw_in : Args.in_target)
-      (s : S.t) : S.t list
-    =
-    match rw_arg with
-    | Args.R_item rw_item  -> 
-      do_rw_item rw_item rw_in s
-    | Args.R_s_item s_item ->
-      do_s_item simpl s_item s (* targets are ignored there *)
-
-  let rewrite_tac
-      (simpl : f_simpl)
-      (args : Args.parser_args)
-      (s : S.t) : S.t list
-    =
-    match args with
-    | [Args.RewriteIn (rw_args, in_opt)] ->
-      List.fold_left (fun seqs rw_arg ->
-          List.concat_map (do_rw_arg simpl rw_arg in_opt) seqs
-        ) [s] rw_args
-
-    | _ -> bad_args ()
-
-  let rewrite_tac (simpl : f_simpl) args = wrap_fail (rewrite_tac simpl args)
-
-  (*------------------------------------------------------------------*)
-  (** {3 Intro} *)
-
-  let rec do_intros_ip
-      (simpl : f_simpl)
-      (intros : Args.intro_pattern list)
-      (s : S.t) : S.t list
-    =
-    match intros with
-    | [] -> [s]
-
-    | (Args.SItem s_item) :: intros ->
-      do_intros_ip_list simpl intros (do_s_item simpl s_item s)
-
-    | (Args.Simpl s_ip) :: intros ->
-      let ss = do_intro_pat s_ip s in
-      do_intros_ip_list simpl intros ss
-
-    | (Args.SExpnd s_e) :: intros ->
-      let ss = do_rw_item (s_e :> Args.rw_item) `Goal s in
-      let ss = as_seq1 ss in (* we get exactly one new goal *)
-      do_intros_ip simpl intros ss
-
-    | (Args.StarV loc) :: intros0 ->
-      let repeat, s =
-        try
-          let handler, s = do_intro_var s in
-          true, do_naming_pat handler Args.AnyName s
-
-        with Tactics.Tactic_soft_failure (_,NothingToIntroduce) ->
-          false, s
-      in
-      let intros = if repeat then intros else intros0 in
-      do_intros_ip simpl intros s
-
-    | (Args.Star loc) :: intros ->
-      try
-        let handler, s = do_intro s in
-        let s = do_naming_pat handler Args.AnyName s in
-        do_intros_ip simpl [Args.Star loc] s
-
-      with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> [s]
-
-  and do_intros_ip_list
-      (simpl : f_simpl)
-      (intros : Args.intro_pattern list)
-      (ss : S.t list) : S.t list
-    =
-    List.concat_map (do_intros_ip simpl intros) ss
-
-  
-  let intro_tac_args (simpl : f_simpl) args (s : S.t) : S.t list =
-    match args with
-    | [Args.IntroPat intros] -> do_intros_ip simpl intros s
-    | _ -> bad_args ()
-
-  let intro_tac (simpl : f_simpl) args = wrap_fail (intro_tac_args simpl args)
 end
 
 (*------------------------------------------------------------------*)
@@ -1767,12 +1658,169 @@ let split_equiv_goal i s =
 
 (*------------------------------------------------------------------*)
 (** {2 Basic tactics} *)
- 
+
 module TraceLT = MkCommonLowTac (TS)
 module EquivLT = MkCommonLowTac (ES)
 
+
+(*------------------------------------------------------------------*)
+(** {3 Rewrite} *)
+
+type f_simpl = strong:bool -> close:bool -> Goal.t Tactics.tac
+
+let do_s_item
+    (simpl : f_simpl)
+    (s_item : Args.s_item)
+    (s : Goal.t) : Goal.t list
+  =
+  match s_item with
+  | Args.Simplify l ->
+    let tac = simpl ~strong:true ~close:false in
+    Tactics.run tac s
+
+  | Args.Tryauto l ->
+    let tac = Tactics.try_tac (simpl ~strong:true ~close:true) in
+    Tactics.run tac s
+
+  | Args.Tryautosimpl l ->
+    let tac = 
+      Tactics.andthen         (* FIXME: inneficient *)
+        (Tactics.try_tac (simpl ~strong:true ~close:true))
+        (simpl ~strong:true ~close:false)
+    in
+    Tactics.run tac s
+
+(* lifting to [Goal.t] *)
+let do_rw_item
+    (rw_item : Args.rw_item)
+    (rw_in : Args.in_target) : Goal.t -> Goal.t list
+  =
+  Goal.map_list
+    (TraceLT.do_rw_item rw_item rw_in)
+    (EquivLT.do_rw_item rw_item rw_in)
+
+(** Applies a rewrite arg  *)
+let do_rw_arg
+    (simpl : f_simpl)
+    (rw_arg : Args.rw_arg)
+    (rw_in : Args.in_target)
+    (s : Goal.t) : Goal.t list
+  =
+  match rw_arg with
+  | Args.R_item rw_item  -> 
+    do_rw_item rw_item rw_in s
+  | Args.R_s_item s_item ->
+    do_s_item simpl s_item s (* targets are ignored there *)
+
+let rewrite_tac
+    (simpl : f_simpl)
+    (args : Args.parser_args)
+    (s : Goal.t) : Goal.t list
+  =
+  match args with
+  | [Args.RewriteIn (rw_args, in_opt)] ->
+    List.fold_left (fun seqs rw_arg ->
+        List.concat_map (do_rw_arg simpl rw_arg in_opt) seqs
+      ) [s] rw_args
+
+  | _ -> bad_args ()
+
+let rewrite_tac (simpl : f_simpl) args = wrap_fail (rewrite_tac simpl args)
+
+(*------------------------------------------------------------------*)
+(** {3 Intro} *)
+
+(* lifting to [Goal.t] *)
+let do_intro_pat (ip : Args.simpl_pat) : Goal.t -> Goal.t list =
+  Goal.map_list (TraceLT.do_intro_pat ip) (EquivLT.do_intro_pat ip)
+
+(* lifting to [Goal.t] *)
+let do_intro (s : Goal.t) : Args.ip_handler * Goal.t =
+  match s with
+  | Goal.Trace s ->
+    let handler, s = TraceLT.do_intro s in
+    handler, Goal.Trace s
+  | Goal.Equiv s ->
+    let handler, s = EquivLT.do_intro s in
+    handler, Goal.Equiv s
+
+(* lifting to [Goal.t] *)
+let do_intro_var (s : Goal.t) : Args.ip_handler * Goal.t =
+  match s with
+  | Goal.Trace s ->
+    let handler, s = TraceLT.do_intro_var s in
+    handler, Goal.Trace s
+  | Goal.Equiv s ->
+    let handler, s = EquivLT.do_intro_var s in
+    handler, Goal.Equiv s
+
+(* lifting to [Goal.t] *)
+let do_naming_pat
+    (ip_handler : Args.ip_handler)
+    (n_ip : Args.naming_pat) : Goal.t -> Goal.t
+  =
+  Goal.map
+    (TraceLT.do_naming_pat ip_handler n_ip)
+    (EquivLT.do_naming_pat ip_handler n_ip)
+
+let rec do_intros_ip
+    (simpl : f_simpl)
+    (intros : Args.intro_pattern list)
+    (s : Goal.t) : Goal.t list
+  =
+  match intros with
+  | [] -> [s]
+
+  | (Args.SItem s_item) :: intros ->
+    do_intros_ip_list simpl intros (do_s_item simpl s_item s)
+
+  | (Args.Simpl s_ip) :: intros ->
+    let ss = do_intro_pat s_ip s in
+    do_intros_ip_list simpl intros ss
+
+  | (Args.SExpnd s_e) :: intros ->
+    let ss = do_rw_item (s_e :> Args.rw_item) `Goal s in
+    let ss = as_seq1 ss in (* we get exactly one new goal *)
+    do_intros_ip simpl intros ss
+
+  | (Args.StarV loc) :: intros0 ->
+    let repeat, s =
+      try
+        let handler, s = do_intro_var s in
+        true, do_naming_pat handler Args.AnyName s
+
+      with Tactics.Tactic_soft_failure (_,NothingToIntroduce) ->
+        false, s
+    in
+    let intros = if repeat then intros else intros0 in
+    do_intros_ip simpl intros s
+
+  | (Args.Star loc) :: intros ->
+    try
+      let handler, s = do_intro s in
+      let s = do_naming_pat handler Args.AnyName s in
+      do_intros_ip simpl [Args.Star loc] s
+
+    with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> [s]
+
+and do_intros_ip_list
+    (simpl : f_simpl)
+    (intros : Args.intro_pattern list)
+    (ss : Goal.t list) : Goal.t list
+  =
+  List.concat_map (do_intros_ip simpl intros) ss
+
+
+let intro_tac_args (simpl : f_simpl) args (s : Goal.t) : Goal.t list =
+  match args with
+  | [Args.IntroPat intros] -> do_intros_ip simpl intros s
+  | _ -> bad_args ()
+
+let intro_tac (simpl : f_simpl) args = wrap_fail (intro_tac_args simpl args)
+
 (*------------------------------------------------------------------*)
 (** Admit tactic *)
+    
 let () =
   T.register_general "admit"
     ~tactic_help:{
@@ -1792,6 +1840,9 @@ let () =
               sk [Goal.Equiv (ES.change_felem i [] s)] fk
         end
       | _ -> bad_args ())
+
+(*------------------------------------------------------------------*)
+(** {3 Fully factorized tactics} *)
 
 (*------------------------------------------------------------------*)
 let () =
@@ -1981,3 +2032,4 @@ let () = T.register "expandall"
        (TraceLT.expand_all_l `All)
        (EquivLT.expand_all_l `All))
 (* FIXME: allow user to specify targets *)
+

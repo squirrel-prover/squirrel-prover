@@ -35,6 +35,12 @@ let map ft fe = function
   | Trace t -> Trace (ft t)
   | Equiv e -> Equiv (fe e)
 
+let map_list ft fe = function
+  | Trace s ->
+    List.map (fun s -> Trace s) (ft s)
+  | Equiv s ->
+    List.map (fun s -> Equiv s) (fe s)
+
 let bind ft fe = function
   | Trace t -> ft t
   | Equiv e -> fe e

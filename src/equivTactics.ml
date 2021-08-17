@@ -248,9 +248,8 @@ let simpl_impl s =
 
 
 (*------------------------------------------------------------------*)
-(* TODO: simplification function does nothing for now. Use [auto] instead once
-   types are compatible. *)
-let simpl_ident : LT.f_simpl = fun ~strong ~close s sk fk ->
+(* Simplification function doing nothing. *)
+let simpl_ident : LowTactics.f_simpl = fun ~strong ~close s sk fk ->
   if close then fk (None, GoalNotClosed) else sk [s] fk
 
 (*------------------------------------------------------------------*)
@@ -272,12 +271,16 @@ let generalize (ts : Term.timestamp) s =
   let s = List.fold_left (fun s id -> LT.revert id s) s gen_hyps in
 
   (* Function introducing back generalized hypotheses *)
-  let intro_back s =
+  let intro_back (s : ES.t) : ES.t =
     let ips = List.rev_map (fun id ->
         let ip = Args.Named (Ident.name id) in
         Args.(Simpl (SNamed ip))
-      ) gen_hyps in
-    Utils.as_seq1 (LT.do_intros_ip simpl_ident ips s) in
+      ) gen_hyps
+    in
+    match LowTactics.do_intros_ip simpl_ident ips (Goal.Equiv s) with
+    | [Goal.Equiv s] -> s
+    | _ -> assert false
+  in
 
   intro_back, s
 
