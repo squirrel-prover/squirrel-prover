@@ -2020,12 +2020,13 @@ let global_prf Args.(Pair (Message (hash,ty),String new_system)) s =
   in
 
   let iterator t =
-     let iter = new Iter.get_f_messages ~fun_wrap_key:None ~drop_head:false
+     let iter = new Iter.get_f_messages_no_refresh ~fun_wrap_key:None ~drop_head:false
        ~cntxt param.h_fn param.h_key.s_symb in
      iter#visit_message t;
      let hash_occs =  List.sort_uniq Stdlib.compare iter#get_occurrences in
+     Printer.pr "Test:%a Fin" (Fmt.list ~sep:Fmt.comma Term.pp) (List.map snd hash_occs);
      let subst = List.map (fun (_,m) -> Term.ESubst (m, mk_tryfind m)) hash_occs in
-         Term.subst subst t
+         Term.subst_no_refresh subst t
   in
 
  try

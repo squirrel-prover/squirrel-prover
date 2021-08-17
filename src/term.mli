@@ -231,6 +231,8 @@ val subst_binding : Vars.evar -> subst -> Vars.evar * subst
 (** term substitution *)
 val subst : subst -> 'a term -> 'a term
 
+val subst_no_refresh : subst -> 'a term -> 'a term
+
 (** substitute type variables *)
 val tsubst : Type.tsubst -> 'a term -> 'a term
 

@@ -169,6 +169,47 @@ class get_f_messages ?(drop_head=true)
     | m -> super#visit_message m
 end
 
+class get_f_messages_no_refresh ?(drop_head=true)
+    ?(fun_wrap_key=None)
+    ~(cntxt:Constr.trace_cntxt) f k = object (self)
+  inherit iter_approx_macros ~exact:true ~cntxt as super
+  val mutable occurrences : (Vars.index list * Term.message) list = []
+  method get_occurrences = occurrences
+  method visit_message = function
+  | Seq (a, b) ->
+      self#visit_message b
+
+    | Find (a, b, c, d) ->
+      self#visit_message b; self#visit_message c; self#visit_message d
+
+    | ForAll (vs,l) | Exists (vs,l) ->
+      self#visit_message l
+
+    | Term.Fun ((f',_),_, [m;k']) as m_full when f' = f ->
+      begin match k' with
+        | Term.Name s' when s'.s_symb = k ->
+          let ret_m = if drop_head then m else m_full in
+          occurrences <- (s'.s_indices,ret_m) :: occurrences
+        | _ -> ()
+      end ;
+      self#visit_message m ; self#visit_message k'
+
+    | Term.Fun ((f',_), _,[m;r;k']) as m_full when f' = f ->
+      begin match k', fun_wrap_key with
+        | Term.Name s', None when s'.s_symb = k ->
+          let ret_m = if drop_head then m else m_full in
+          occurrences <- (s'.s_indices,ret_m) :: occurrences
+        |Term.Fun ((f',_), _, [Term.Name s']), Some is_pk
+          when is_pk f' && s'.s_symb = k ->
+          let ret_m = if drop_head then m else m_full in
+          occurrences <- (s'.s_indices,ret_m) :: occurrences
+        | _ -> ()
+      end ;
+      self#visit_message m ; self#visit_message k'
+    | Term.Var m -> assert false (* SSC must have been checked first *)
+    | m -> super#visit_message m
+end
+
 (*------------------------------------------------------------------*)
 (** {2 Occurrences} *)
 type 'a occ = {
