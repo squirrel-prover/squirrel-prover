@@ -958,36 +958,92 @@ let () =
 
 
 
-let eqsubst arg s =
-  let open Args in
-  let subst,f = match arg with
-  | Pair (ETerm (Type.Message, f1, _), ETerm (Type.Message, f2, _)) ->
-    [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
+(* let eqsubst arg s =
+ *   let open Args in
+ *   let subst,f = match arg with
+ *   | Pair (ETerm (Type.Message, f1, _), ETerm (Type.Message, f2, _)) ->
+ *     [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
+ *
+ *   | Pair (ETerm (Type.Timestamp, f1, _), ETerm (Type.Timestamp, f2, _)) ->
+ *     [Term.ESubst (f1,f2)],   Term.mk_atom `Eq f1 f2
+ *
+ *   | Pair (ETerm (Type.Index, f1, _), ETerm (Type.Index, f2, _)) ->
+ *     [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
+ *
+ *   | _ ->
+ *     hard_failure
+ *       (Tactics.Failure "expected a pair of messages, booleans or a pair of \
+ *                         index variables")
+ *   in
+ *    TS.set_goal f s :: apply_substitute subst s
+ *
+ * let () =
+ *   T.register_typed "substeq"
+ *     ~general_help:"Given an equality i=t, substitute all occurences \
+ *                    of i by t and remove i from the context variables,\
+ *                    and asks to prove the equality."
+ *     ~detailed_help:""
+ *     ~tactic_group:Structural
+ *     ~usages_sorts:[Args.(Sort (Pair (Index, Index)));
+ *                    Args.(Sort (Pair (Timestamp, Timestamp)));
+ *                    Args.(Sort (Pair (Message, Message)))]
+ *     eqsubst Args.(Pair (ETerm, ETerm)) *)
 
-  | Pair (ETerm (Type.Timestamp, f1, _), ETerm (Type.Timestamp, f2, _)) ->
-    [Term.ESubst (f1,f2)],   Term.mk_atom `Eq f1 f2
 
-  | Pair (ETerm (Type.Index, f1, _), ETerm (Type.Index, f2, _)) ->
-    [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
+let do_subst_eq (args : Args.parser_arg list) s : sequent list =
+  let subst, f =
+    match args with
+    | [arg] ->
+      (match Args.convert_as_lsymb args with
+      | Some str when Hyps.mem_name (L.unloc str) s ->
+        let id, at = Hyps.by_name str s in
+        (match at with
+         | Atom (`Message (`Eq, t1, t2)) -> [Term.ESubst (t1,t2)],  Term.mk_atom `Eq t1 t2
+         | Atom (`Timestamp (`Eq, f1, f2)) -> [Term.ESubst (f1,f2)],   Term.mk_atom `Eq f1 f2
+         | Atom (`Index (`Eq, f1, f2)) ->
+           let f1, f2 = Term.mk_var f1, Term.mk_var f2 in
+         [Term.ESubst (f1,f2)],   Term.mk_atom `Eq f1 f2
+         | _ -> hard_failure
+                  (Tactics.Failure "expected an equality hypothesis"))
+       | _ -> hard_failure
+                (Tactics.Failure "expected an hypothesis name")
+      )
+    | _ ->
+        match LT.convert_args s args Args.(Sort (Pair (ETerm, ETerm))) with
+        | Args.Arg Pair (ETerm (Type.Message, f1, _), ETerm (Type.Message, f2, _)) ->
+          [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
 
-  | _ ->
-    hard_failure
-      (Tactics.Failure "expected a pair of messages, booleans or a pair of \
-                        index variables")
+        |  Args.Arg Pair (ETerm (Type.Timestamp, f1, _), ETerm (Type.Timestamp, f2, _)) ->
+          [Term.ESubst (f1,f2)],   Term.mk_atom `Eq f1 f2
+
+        |  Args.Arg Pair (ETerm (Type.Index, f1, _), ETerm (Type.Index, f2, _)) ->
+          [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
+
+        | _ ->
+          hard_failure
+            (Tactics.Failure "expected a pair of messages, booleans or a pair of \
+                              index variables")
   in
    TS.set_goal f s :: apply_substitute subst s
 
+
+
+
+let subst_eq_tac args = LT.wrap_fail (do_subst_eq args)
+
 let () =
-  T.register_typed "substeq"
-    ~general_help:"Given an equality i=t, substitute all occurences \
+  T.register_general "substeq"
+    ~tactic_help:
+      {general_help = "Given an equality i=t, substitute all occurences \
                    of i by t and remove i from the context variables,\
-                   and asks to prove the equality."
-    ~detailed_help:""
-    ~tactic_group:Structural
-    ~usages_sorts:[Args.(Sort (Pair (Index, Index)));
+                   and asks to prove the equality.";
+       detailed_help = "";
+       usages_sorts = [Args.(Sort (Pair (Index, Index)));
                    Args.(Sort (Pair (Timestamp, Timestamp)));
-                   Args.(Sort (Pair (Message, Message)))]
-    eqsubst Args.(Pair (ETerm, ETerm))
+                       Args.(Sort (Pair (Message, Message)));
+                      Sort Args.String];
+       tactic_group = Logical}
+    subst_eq_tac
 
 
 
