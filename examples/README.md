@@ -73,6 +73,9 @@ Generic construction from [I]:
 Generic construction (more complex) from [J]:
  - `kemKE_FSXY.sp`
 
+Generic PQ construction of X3DH like [O] :
+ - `PQ-xrdh-like.sp`
+
 ### PRF based
 
 IkeV1 with pre-shared keys for authentication [L]:
@@ -135,3 +138,4 @@ Orlando, USA, November 2020. ACM Press.
  - [L] Internet Key Exchange Version 1, RFC2409 https://datatracker.ietf.org/doc/html/rfc2409
  - [M] Internet Key Exchange Version 2, RFC7296 https://datatracker.ietf.org/doc/html/rfc7296
  - [N] Mixing Preshared Keys in (IKEv2) for Post-quantum Security, RFC8784 https://datatracker.ietf.org/doc/html/rfc8784
+ - [O] Keitaro Hashimoto,Shuichi Katsumata, Kris Kwiatkowski, Thomas Prest. An Efficient and Generic Construction for Signal’s Handshake (X3DH): Post-Quantum, State Leakage Secure, and Deniable.

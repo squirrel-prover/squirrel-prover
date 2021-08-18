@@ -2,9 +2,10 @@
 
 Internet Key Exchange (IKE) Version 2, with Signatures
 
-Defined in RFC7296 -> https://datatracker.ietf.org/doc/html/rfc7296
+Defined in RFC7296: https://datatracker.ietf.org/doc/html/rfc7296
 
-Extended with an additional pre-shared key for PQ soundness as described in https://datatracker.ietf.org/doc/html/rfc8784
+Extended with an additional pre-shared key for PQ soundness as described in
+https://datatracker.ietf.org/doc/html/rfc8784
 
 
 # Protocol Description
@@ -14,8 +15,8 @@ We consider the phase 1 with digital signatures.
 
             Initiator                        Responder
            -----------                      -----------
-            HDR,  g^xi, Ni        -->
-                                  <--       HDR, g^xr, Nr
+              g^xi, Ni        -->
+                                  <--        g^xr, Nr
             HDR, enc(Idi,Authi,k} -->
                                   <--       HDR, enc(IdR,Authr,k}
 

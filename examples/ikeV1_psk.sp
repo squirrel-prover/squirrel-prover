@@ -2,44 +2,46 @@
 
 Internet Key Exchange (IKE) Version 1, with Pre-Shared Key.
 
-Defined in RFC2409 -> https://datatracker.ietf.org/doc/html/rfc2409
+Defined in RFC2409: https://datatracker.ietf.org/doc/html/rfc2409
 
 Claimed to be Post-Quantum secure in https://datatracker.ietf.org/doc/html/rfc8784
-
 
 # Protocol Description
 
 We consider the phase 1 of the aggressive mode.
 
-Each pairing as a pre-shared key, psk.
+Each pairing of agents as a pre-shared key, psk, that will be used only once.
 
-(CKY = cookie)
 
 The key exchange is given as
 
-            Initiator                        Responder
+            Initiator(i)                      Responder(j)
            -----------                      -----------
-            HDR, SA, g^a, Ni, IDii -->
-                                  <--    HDR, SA, g^b, Nr, IDir, HASH_R
-            HDR, HASH_I           -->
+             g^ai, Nii, IDi -->
+                                  <--    g^bj, Nrj, IDj, HASH_R
+             HASH_I           -->
 
 
 where
-    HASH_I = prf(SKEYID, g^xi | g^xr | CKY-I | CKY-R | SAi_b | IDii_b )
-    HASH_R = prf(SKEYID, g^xr | g^xi | CKY-R | CKY-I | SAi_b | IDir_b )
-The final pre-key is SKEYID := prf(psk, Ni_b | Nr_b),
- a final key is       SKEYID_d = prf(SKEYID, g^xy | CKY-I | CKY-R | 0)
+    SKEYID := prf(psk(i,j), Nii | Nrj),
+    HASH_I = prf(SKEYID, g^ai | g^bj | Idi )
+    HASH_R = prf(SKEYID, g^bj | g^ar | IDij )
+
+The final derived key is
+        SKEYID_d = prf(SKEYID, g^aibj)
 
 
- We abstract away from implementation details, and model the key exchange as:
+Remark that we abstract away from some implementation details, and do not model the
+cookies or the headers.
 
 
-            Initiator                        Responder
-           -----------                      -----------
-            g^a, Ni, IDii -->
-                                  <--    g^b, Nr, IDir, HASH_R
-            HASH_I           -->
+# Threat Model
 
+We consider a set of pre-shared keys psk(i,j) between a set of i distinct Initiator and j Responder.
+We consider the system `((!_j R: ResponderI(j)) | (!_i I: InitiatorI(i)))`
+Where responder j is willing to talk to any of the initiators.
+
+The attacker does not have any pre-shared key.
 
 *******************************************************************************)
 
