@@ -20,9 +20,11 @@ system (
   * Here we decompose the usual lastupdate lemma to separate the "pure" part
   * from the part that involves message equalities. *)
 
-goal lastupdate_pure : forall tau:timestamp, happens(tau) => (
-  (forall j:index, happens(A(j)) => A(j)>tau) ||
-  (exists i:index, happens(A(i)) && A(i) <=tau && forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i))).
+goal lastupdate_pure : forall tau:timestamp, 
+  happens(tau) => (
+    (forall j:index, happens(A(j)) => A(j)>tau) ||
+    (exists i:index, happens(A(i)) && A(i) <=tau && 
+     forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i))).
 Proof.
 induction.
 intro tau IH Hp.
@@ -51,7 +53,10 @@ Qed.
 
 
 goal lastupdate_init :
-  forall tau:timestamp, happens(tau) => (forall j:index, happens(A(j)) => A(j)>tau)  => s@tau = s@init.
+  forall tau:timestamp, 
+  happens(tau) => 
+  (forall j:index, happens(A(j)) => A(j)>tau) => 
+  s@tau = s@init.
 Proof.
   induction => tau IH _ Htau.
   case tau.
@@ -68,7 +73,8 @@ Qed.
 
 goal lastupdate_A :
   forall (tau:timestamp,i:index),
-  happens(A(i)) && A(i)<=tau && (forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i)) =>
+  happens(A(i)) && A(i)<=tau && 
+  (forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i)) =>
   s@tau = s@A(i).
 Proof.
   induction.
@@ -86,15 +92,19 @@ Proof.
   assert i=j; [2: auto | 1: by use Hsup with j].
 Qed.
 
-goal lastupdate : forall tau:timestamp, happens(tau) =>
-  (s@tau = s@init && forall j:index, happens(A(j)) => A(j)>tau) ||
-  (exists i:index, s@tau = s@A(i) && happens(A(i)) && A(i)<=tau && forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i)).
+goal lastupdate : 
+  forall tau:timestamp, 
+  happens(tau) =>
+    (s@tau = s@init && forall j:index, happens(A(j)) => A(j)>tau) ||
+    (exists i:index, s@tau = s@A(i) && 
+     happens(A(i)) && A(i)<=tau && 
+     forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i)).
 Proof.
   intro tau Htau.
   use lastupdate_pure with tau as [Hinit|[i HAi]] => //.
   left.
- split => //.
- by apply lastupdate_init.
+  split => //.
+  by apply lastupdate_init.
   right; exists i; repeat split => //; by apply lastupdate_A.
 Qed.
 
