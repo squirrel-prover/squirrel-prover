@@ -1081,7 +1081,6 @@ let conv_ht : conv_state -> hterm -> Type.hty * Term.hterm =
 
     let bnd_tys = List.map (fun (Vars.EVar v) -> Type.ETy (Vars.ty v)) evs in
     let hty = Type.Lambda (bnd_tys, ty) in
-    let hty = Type.Infer.htnorm state.ty_env hty in
 
     hty, ht
 
@@ -1202,7 +1201,7 @@ let convert_ht : type s.
   ?pat:bool ->
   conv_env -> Type.tvars -> Vars.env -> hterm -> Type.hty * Term.hterm =
   fun ?ty_env ?(pat=false) cenv ty_vars env ht0 ->
-  let must_clost, ty_env = match ty_env with
+  let must_close, ty_env = match ty_env with
     | None -> true, Type.Infer.mk_env ()
     | Some ty_env -> false, ty_env
   in
@@ -1210,10 +1209,17 @@ let convert_ht : type s.
   let state = mk_state cenv.table cenv.cntxt ty_vars env pat ty_env in
   let hty, ht = conv_ht state ht0 in
 
-  if must_clost && not (Type.Infer.is_closed state.ty_env) then
-    conv_err (L.loc ht0) Freetyunivar;
+  if must_close then
+    begin
+      if not (Type.Infer.is_closed state.ty_env) then
+        conv_err (L.loc ht0) Freetyunivar;
+      
+      let tysubst = Type.Infer.close ty_env in     
+      Type.tsubst_ht tysubst hty, Term.tsubst_ht tysubst ht
+    end
+  else
+    Type.Infer.htnorm state.ty_env hty, ht
 
-  hty, ht
 
 (*------------------------------------------------------------------*)
 let check
@@ -1230,7 +1236,7 @@ let check
     exported outside to Theory.ml *)
 let convert_i ?ty_env ?(pat=false) (cenv : conv_env) ty_vars env tm
   : Term.message * Type.tmessage =
-  let must_clost, ty_env = match ty_env with
+  let must_close, ty_env = match ty_env with
     | None -> true, Type.Infer.mk_env ()
     | Some ty_env -> false, ty_env
   in
@@ -1238,11 +1244,16 @@ let convert_i ?ty_env ?(pat=false) (cenv : conv_env) ty_vars env tm
   let state = mk_state cenv.table cenv.cntxt ty_vars env pat ty_env in
   let t = convert state tm ty in
 
-  if must_clost && not (Type.Infer.is_closed state.ty_env) then
-    conv_err (L.loc tm) Freetyunivar;
-
-  let ty = Type.tsubst (Type.Infer.close ty_env) ty in
-  t, ty
+  if must_close then
+    begin
+      if not (Type.Infer.is_closed state.ty_env) then
+        conv_err (L.loc tm) Freetyunivar;
+      
+      let tysubst = Type.Infer.close ty_env in     
+      Term.tsubst tysubst t, Type.tsubst tysubst ty
+    end
+  else
+    t, Type.Infer.norm ty_env ty
 
 (** exported outside Theory.ml *)
 let convert : type s.
@@ -1250,7 +1261,7 @@ let convert : type s.
   ?pat:bool ->
   conv_env -> Type.tvars -> Vars.env -> term -> s Type.ty -> s Term.term =
   fun ?ty_env ?(pat=false) cenv ty_vars env tm ty ->
-  let must_clost, ty_env = match ty_env with
+  let must_close, ty_env = match ty_env with
     | None -> true, Type.Infer.mk_env ()
     | Some ty_env -> false, ty_env
   in
@@ -1258,10 +1269,14 @@ let convert : type s.
   let state = mk_state cenv.table cenv.cntxt ty_vars env pat ty_env in
   let t = convert state tm ty in
 
-  if must_clost && not (Type.Infer.is_closed state.ty_env) then
-    conv_err (L.loc tm) Freetyunivar;
+  if must_close then
+    begin
+      if not (Type.Infer.is_closed state.ty_env) then
+        conv_err (L.loc tm) Freetyunivar;
 
-  t
+      Term.tsubst (Type.Infer.close ty_env) t
+    end
+  else t
 
 (** exported outside Theory.ml *)
 let econvert (cenv : conv_env) ty_vars subst t : eterm option =

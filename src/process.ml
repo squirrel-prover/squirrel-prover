@@ -975,6 +975,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
   let proc,_,table = p_in ~table:init_table ~env ~pos:0 ~pos_indices:[] proc in
 
+  (* I believe this test is not useful *)
   if not (Type.Infer.is_closed env.ty_env) then 
     proc_err (L.loc proc) Freetyunivar;
 

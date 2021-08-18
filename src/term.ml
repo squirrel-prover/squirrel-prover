@@ -1617,10 +1617,16 @@ let tsubst : type a. Type.tsubst -> a term -> a term =
   (* no need to substitute in the types of [Name], [Macro], [Fun] *)
   let rec tsubst : type a. a term -> a term = function
     | Var v -> Var (Vars.tsubst ts v)
+    | ForAll (vs, f) -> ForAll (List.map (Vars.tsubst_e ts) vs, tsubst f)
+    | Exists (vs, f) -> Exists (List.map (Vars.tsubst_e ts) vs, tsubst f)
     | _ as term -> tmap (fun (ETerm t) -> ETerm (tsubst t)) term
   in
 
   tsubst t
+
+let tsubst_ht (ts : Type.tsubst) (ht : hterm) : hterm =
+  match ht with
+  | Lambda (vs, f) -> Lambda (List.map (Vars.tsubst_e ts) vs, tsubst ts f)
 
 (*------------------------------------------------------------------*)
 (** {2 Simplification} *)

@@ -1160,17 +1160,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
         let _, pat = S.convert_pt_hol pt S.conc_kind s in
         [], pat, in_opt
 
-      (* | [Args.ApplyIn (Theory.PT_form f,in_opt)] ->
-       *   begin
-       *     match convert_args s args Args.(Sort Boolean) with
-       *     | Args.Arg (Boolean f) ->
-       *       let subgoal = S.set_goal f s in
-       *       let pat = Term.pat_of_form f in
-       *       [subgoal], pat, in_opt
-       * 
-       *     | _ -> bad_args ()
-       *   end *)
-
       | _ -> bad_args ()
     in
 

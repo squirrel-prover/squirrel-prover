@@ -243,6 +243,8 @@ type conversion_error = L.t * conversion_error_i
 
 exception Conv of conversion_error
 
+val conv_err : L.t -> conversion_error_i -> 'a
+    
 val pp_error :
   (Format.formatter -> L.t -> unit) ->
   Format.formatter -> conversion_error -> unit

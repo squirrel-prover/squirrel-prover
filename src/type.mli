@@ -119,6 +119,8 @@ type tsubst
 val tsubst   : tsubst -> 'a ty -> 'a ty
 val tsubst_e : tsubst ->   ety ->   ety
 
+val tsubst_ht : tsubst -> hty -> hty
+                                         
 val tsubst_add_tvar   : tsubst -> tvar   -> tmessage -> tsubst
 val tsubst_add_univar : tsubst -> univar -> tmessage -> tsubst
 

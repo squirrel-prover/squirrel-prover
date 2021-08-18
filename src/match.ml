@@ -518,6 +518,7 @@ module T (* : S with type t = message *) = struct
     try
       let mv = unif term1 term2 st_init in
 
+      (* FIXME: shouldn't we substitute type variables in Mv co-domain ? *)
       if not (Type.Infer.is_closed ty_env)
       then `FreeTyv
       else
@@ -759,6 +760,7 @@ module T (* : S with type t = message *) = struct
     try
       let mv = tmatch t pat st_init in
 
+      (* FIXME: shouldn't we substitute type variables in Mv co-domain ? *)
       if not (Type.Infer.is_closed ty_env)
       then FreeTyv
       else
@@ -1858,6 +1860,7 @@ module E : S with type t = Equiv.form = struct
     try
       let mv = fmatch ~mode t pat st_init in
 
+      (* FIXME: shouldn't we substitute type variables in Mv co-domain ? *)
       if not (Type.Infer.is_closed ty_env)
       then FreeTyv
       else

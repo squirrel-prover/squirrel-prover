@@ -166,8 +166,9 @@ let tsubst_atom (ts : Type.tsubst) (at : atom) =
 
 (** Type substitution *)
 let tsubst (ts : Type.tsubst) (t : form) =  
-  (* no need to substitute in the types of [Name], [Macro], [Fun] *)
+
   let rec tsubst = function
+    | Quant (q, vs, f) -> Quant (q, List.map (Vars.tsubst_e ts) vs, tsubst f)
     | Atom at -> Atom (tsubst_atom ts at)
     | _ as term -> tmap tsubst term
   in
@@ -363,12 +364,19 @@ module PreAny = struct
   let pp fmt = function
     | `Reach f -> Term.pp fmt f
     | `Equiv f -> pp fmt f
+                    
   let subst s = function
     | `Reach f -> `Reach (Term.subst s f)
     | `Equiv f -> `Equiv (subst s f)
+
+  let tsubst s = function
+    | `Reach f -> `Reach (Term.tsubst s f)
+    | `Equiv f -> `Equiv (tsubst s f)
+
   let fv = function
     | `Reach f -> Term.fv f
     | `Equiv f -> fv f
+                    
   let get_terms = function
     | `Reach f -> [f]
     | `Equiv f -> get_terms f
@@ -417,6 +425,11 @@ module Babel = struct
     | Local_t -> Term.subst
     | Global_t -> subst
     | Any_t -> PreAny.subst
+
+  let tsubst : type a. a f_kind -> Type.tsubst -> a -> a = function
+    | Local_t -> Term.tsubst
+    | Global_t -> tsubst
+    | Any_t -> PreAny.tsubst
 
   let fv : type a. a f_kind -> a -> Vars.Sv.t = function
     | Local_t -> Term.fv

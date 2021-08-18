@@ -234,6 +234,8 @@ val subst : subst -> 'a term -> 'a term
 (** substitute type variables *)
 val tsubst : Type.tsubst -> 'a term -> 'a term
 
+val tsubst_ht : Type.tsubst -> hterm -> hterm
+
 (** [subst_var s v] returns [v'] if substitution [s] maps [v] to [Var v'],
   * and [v] if the variable is not in the domain of the substitution.
   * @raise Substitution_error if [v] is mapped to a non-variable term in [s]. *)
