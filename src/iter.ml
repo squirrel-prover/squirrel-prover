@@ -583,7 +583,7 @@ let macro_support : type a.
     in
     let sm =
       if Ss.mem Symbols.exec sm
-      then Ss.add Symbols.cond (Ss.add Symbols.out sm)
+      then Ss.add Symbols.cond sm
       else sm
     in
 
