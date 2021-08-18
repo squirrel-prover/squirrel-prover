@@ -22,46 +22,43 @@ We abstract this with, pk, encap and decap function symbols, where
  * k is a name, ct=encap(k,r,pk(dk)).
  * decap(encap(k,r,pk(dk)),dk) = k
 
-# Protocol parameters
 
-Two KEMs Pk Encap DeCap, and wPk wEncap wDeCap
+# Protocol description
+
+There are two KEMs (Pk, Encap, DeCap) and (wPk, wEncap, wDeCap)
 
 PRFs : F, F' and G
 KDF: KDF with public random salt s
 
 Two parties I (initiator) and R (responder)
 
-Public identities I and R
 Static keys for party X := dkX, skX, sk2X
 Public keys for party X : ekX = pk(dkX)
 
 
-# Protocol description
-
-I:
+Initiator                                  Responder
 new kI; new rI, rI2.
 ctI := Encap(kI, F(rI,skI) XOR F(skI2,rI2)  ,pk(dkR))
 new dkT; ekT := wpk(dkT);
 
-I --(I,R,ctI,ekT)-> R
+                 I --(I,R,ctI,ekT)-> R
 
 R:
-new kR; new rR, rR2, rTI.
-ctR := Encap(kR, F(rR,skR) XOR F(sk2R, rR2) , pk(dkI))
-new kT;
-ctT := wEncap(kT, rTI, ekT )
+                                       new kR; new rR, rR2, rTI.
+                                       ctR := Encap(kR, F(rR,skR) XOR F(sk2R, rR2) , pk(dkI))
+                                       new kT;
+                                       ctT := wEncap(kT, rTI, ekT )
 
-I <--(I,R,ctR,ctT)-- R
+                 I <--(I,R,ctR,ctT)-- R
 
 
-I:
+
 kR := Decap(ctR,dkI)
 kT := wDecap(ctT,dkT)
 
-R:
-kI := Decap(ctI,dkI)
+                                       kI := Decap(ctI,dkI)
 
-Boths:
+Final key derivation:
 
 K1 := KDF(s,kI); K2 := KDF(s,kR); K3 := KDF(s,kT)
 
