@@ -47,7 +47,7 @@ so we don't model multiple interactions between them.
 In the following model, we remove multiple layers of integrity and encryption, keeping the minimal required for the authentication and real or random.
 
 *******************************************************************************)
-set timeout=4.
+set timeout=10.
 set postQuantumSound = true.
 
 hash h

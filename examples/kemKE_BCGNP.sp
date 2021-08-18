@@ -53,6 +53,17 @@ s := (I,ctI,R,ctR)
 KIR := expd(s,kI2) XOR expd(s,kR2)
 
 
+# Model
+
+We model two agents that may initiate multiple sessions. See PQ-x3dh-like for a devellopment with multiple keys.
+
+We prove some weak authentication: if an agent obtained some honest parameter,
+it was sent out by an honest agent.
+
+We prove also separately for each agent that the computed key is real or random,
+which implies the implicit authentication of the scheme: only the other trusted
+party could potentially compute the key.
+
 
 
 *******************************************************************************)
@@ -158,7 +169,10 @@ Qed.
 (*******************************************)
 
 
-(* Intermediate system where the kI is hidden. *)
+(* Intermediate system where the kI is hidden.  *)
+(* NOTE: this transformation breaks the correctness
+of the key computation of R. But we only want to prove
+on this system that the key computed by I is real or random. *)
 process InitiatorRoR1(i:index) =
 
  let ctI = encap(diff(kI(i),skex), rI(i) ,pk(skR)) in
