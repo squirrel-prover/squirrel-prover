@@ -80,13 +80,13 @@ name k_dummy: index -> message
 mutable YCtr(i:index) : message = cinit
 mutable SCtr(i:index) : message = cinit
 
-(* random samplings used to initialized AEAD  *)
+(* random samplings used to initialize AEAD  *)
 name rinit : index -> message
 (* authentication server's database for each pid *)
 mutable AEAD(pid:index) : message = 
   enc(<diff(k(pid),k_dummy(pid)), sid(pid)>, rinit(pid), mkey).
 
-(* random samplings used to initialized AEADi  *)
+(* random samplings used to initialize AEADi  *)
 name rinitp : index -> message
 (* authentication server's database for each pid, ideal system *)
 mutable AEADi(pid:index) : message =
@@ -162,7 +162,6 @@ process YSM_AEAD_YUBIKEY_OTP_DECODE (pid:index) =
     let aead = fst(snd(xdata)) in
     let otp = snd(snd(xdata)) in
 
-
     let aead_dec = dec(aead,mkey) in    
 
     let otp_dec = dec(otp,diff(fst(aead_dec), k(pid))) in
@@ -199,8 +198,8 @@ process Yubikey0 =
     (!_pid !_j Press  : yubikeypress(pid,j)              ) |
     (!_pid !_j Server : server(pid)                      )).
 
-(* TODO: we do not want to state [base ~ ideal], but [middle ~ ideal]. 
-     The problem is that, to do this, we need *)
+(* TODO: we do not want to state [base ~ ideal], but [middle ~ ideal]. *)
+
 (* base system with ideal system *)
 system
   (Yubikey0 | 
@@ -217,10 +216,10 @@ system [middle]
 
 
 (* TODO: allow to have axioms for all systems *)
-axiom  orderTrans (n1,n2,n3:message): n1 ~< n2 => n2 ~< n3 => n1 ~< n3.
+axiom orderTrans (n1,n2,n3:message): n1 ~< n2 => n2 ~< n3 => n1 ~< n3.
 
 (* TODO: allow to have axioms for all systems *)
-axiom  orderStrict(n1,n2:message): n1 = n2 => n1 ~< n2 => False.
+axiom orderStrict(n1,n2:message): n1 = n2 => n1 ~< n2 => False.
 
 (* LIBRAIRIES *)
 
@@ -404,15 +403,16 @@ hint rewrite diff_eq.
 
 (* PROOF *)
 
+(* First, we characterize when the AEAD decryption goes through *)
 goal [left] valid_decode (t : timestamp) (pid,j : index):
   t = Decode(pid,j) =>
   happens(t) => 
-  aead_dec(pid,j)@t <> fail <=>
-  exists(pid0 : index), 
-  AEAD(pid0)@init = aead(pid,j)@t.
+  (aead_dec(pid,j)@t <> fail) =
+  (exists(pid0 : index), 
+   AEAD(pid0)@init = aead(pid,j)@t).
 Proof.
   intro Eq Hap.
-  split.
+  rewrite eq_iff; split.
 
   (* Left => Right *)
   intro AEAD_dec.
@@ -430,59 +430,82 @@ Proof.
   (* TODO: axiom? *)
 Qed.  
 
-goal [left] valid_decode_tf (t : timestamp) (pid,j : index):
+(* using the `valid_decode` lemma, we can characterize when the full
+   decoding check goes through *)
+goal [left] valid_decode_charac (t : timestamp) (pid,j : index):
   t = Decode(pid,j) =>
   happens(t) => 
   ( aead_dec(pid,j)@t <> fail &&
     otp_dec(pid,j)@t <> fail &&
-    fst(otp_dec(pid,j)@t) = snd(aead_dec(pid,j)@t)) =>
+    fst(otp_dec(pid,j)@t) = snd(aead_dec(pid,j)@t)) =
+  ( exists(pid0 : index), 
+    AEAD(pid0)@init = aead(pid,j)@t &&
+    dec(otp(pid,j)@t,k(pid0)) <> fail &&
+    fst(dec(otp(pid,j)@t,k(pid0))) = sid(pid0)).
+Proof.
+  intro Eq Hap.
+  rewrite eq_iff; split.
+ 
+  (* => case *)
+  intro [AEAD_dec OTP_dec Sid_eq]. 
+  rewrite valid_decode // in AEAD_dec.
+  destruct AEAD_dec as [pid0 AEAD_dec]. 
+  by exists pid0.
+
+  (* <= case *)
+  intro [pid0 [AEAD_dec OTP_dec Sid_eq]]. 
+  simpl.
+  rewrite valid_decode //. 
+  by exists pid0.
+Qed.
+
+
+(* arbitrary constant, assumed different from fail. Only used for proof purposes. *)
+abstract notFail : message. 
+axiom notFail_ax : notFail <> fail.
+
+(* alternative formulation of `valid_decode`, using a try find *)
+goal [left] valid_decode_tf (t : timestamp) (pid,j : index):
+  t = Decode(pid,j) =>
+  happens(t) => 
+  aead_dec(pid,j)@t <> fail <=>
   aead_dec(pid,j)@t = 
   try find pid' such that 
       aead(pid,j)@t = AEAD(pid')@init
     in 
       <k(pid'), sid(pid')>
-    else aead_dec(pid,j)@t.
+    else notFail. 
+  (* note: we can replace `notFail` by anything there, as the test 
+     of the try find always goes through  *)
 Proof.
-  intro Eq Hap [AEAD_dec OTP_dec Sid_eq].
-  expand aead_dec.
+  intro Eq Hap.
+  split. 
+  
+  (* => case *)
+  intro  @/aead_dec AEAD_dec. 
   intctxt AEAD_dec => H; 2: congruence.
 
   clear H; intro AEAD_eq.
-  rewrite /otp_dec /aead_dec -AEAD_eq /= in *.
-  clear AEAD_dec. 
+  rewrite -AEAD_eq /= in *.
+  clear AEAD_dec.
   case (
    try find pid' such that
     enc(<k(pid0),sid(pid0)>,rinit(pid0),mkey) = AEAD(pid')@init
-   in <k(pid'),sid(pid')> else <k(pid0),sid(pid0)>); 
-  2:auto.
+   in <k(pid'),sid(pid')> else notFail).
   by intro [pid' [Tc ->]].
+  intro [A A0]. 
+  by use A with pid0.
+
+  (* <= case *)
+  intro ->.
+  case (
+   try find pid' such that aead(pid,j)@t = AEAD(pid')@init in
+     <k(pid'),sid(pid')> 
+   else notFail).   
+  intro [pid' [_ ->]].
+  admit. (* TODO: axiom on pairs and fail ? *)
+  by intro _; apply notFail_ax.
 Qed.
-
- (*  (* Right => Left *) *)
- (*  intro [Hnfail Heq].  *)
- (*  case ( *)
- (*   try find pid' such that aead(pid,j)@t = AEAD(pid')@init *)
- (*   in <k(pid'),sid(pid')> else aead_dec(pid,j)@t). *)
- (*  intro [pid' [Tc Teq]]. *)
- (*  rewrite Teq in Heq.  *)
- (*  clear Teq. *)
- (*  (* rewrite Heq /=. *) *)
- (*  rewrite /otp_dec Heq /=. rewrite /otp. *)
- (*  expand otp, aead, AEAD.  *)
- (*  rewrite Tc. *)
- (*  rewrite /aead_dec Tc /AEAD in Heq.  *)
- (*  clear Teq.  *)
- (*  split.   *)
- (*  split; 1:admit.   (* TODO: axiom? *) *)
- (*  expand AEAD.  *)
-
- (*  intro [A B] /=.   *)
- (*  clear B.  *)
- (*  admit. *)
- (*  (* A + intctxt Hnfail implies false.  *)
- (*    I think this means that we can change the else branch of the  *)
- (*    try find to anything we want. *) *)
- (* Qed.   *)
 
 (* set showStrengthenedHyp=true. *)
 equiv atomic_keys.
@@ -513,7 +536,7 @@ Proof.
   constseq 0: (input@t) zero. 
   by intro * /=; case (pid0 = pid). 
 
-  (* TODO: almost done *)
+  (* TODO: almost done, use faseq *)
   (* by apply Hind (pred(t)). *)
   admit.
 
