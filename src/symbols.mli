@@ -342,3 +342,4 @@ val fs_zeroes : fname t
 
 (*------------------------------------------------------------------*)
 module Ss (S : Namespace) : Set.S with type elt := S.ns t 
+module Ms (S : Namespace) : Map.S with type key := S.ns t 

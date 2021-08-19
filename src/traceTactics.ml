@@ -570,8 +570,9 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
     iter#get_actions
   in
 
+  (* TODO: we are using the less precise version of [fold_macro_support] *)
   let macro_cases =
-    Iter.fold_macro_support (fun descr t macro_cases ->
+    Iter.fold_macro_support0 (fun descr t macro_cases ->
         let fv = Sv.of_list1 descr.Action.indices in
         let new_idx = Fresh.get_name_indices_ext ~fv cntxt ns.s_symb t in
         List.assoc_up_dflt descr [] (fun l -> new_idx @ l) macro_cases

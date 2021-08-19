@@ -159,11 +159,10 @@ Proof.
     by assumption.
     
   (* Oracle *)
-  expandall. fa 0. fa 1. fa 1. fa 1.
+  expandall. fa 0. fa 1. fa 1. fa 1. 
   prf 1; yesif 1; 2: fresh 1.
   simpl; split; project; intro i' H; try destruct H as [H|H];
     try by apply unique_queries.
-    admit. (* TODO le raffinement de PRF ne suffit pas: l'oracle ne peut venir de s@tau *)
     reach_equiv IH,pred(A(i')) => //.
       intro Hf; by fresh Hf.
     reach_equiv IH,pred(A(i')) => // Hf; by fresh Hf.
@@ -171,8 +170,6 @@ Proof.
   prf 1; yesif 1; 2: fresh 1; by apply IH.
   simpl; split; project; intro i' H; try destruct H as [H|H];
     try by apply unique_queries.
-    admit. (* TODO as above *)
-    reach_equiv IH,A(i') => // Hf; by fresh Hf.
     reach_equiv IH,A(i') => // Hf; by fresh Hf.
     reach_equiv IH,A(i') => // Hf; by fresh Hf.
 
@@ -181,10 +178,8 @@ Proof.
   fa 0. fa 1. fa 1.
   prf 1; yesif 1; 2: fresh 1; by apply IH.
   simpl; split; project; intro i' H; try destruct H as [H|H].
-    admit. (* TODO as above *)
+    reach_equiv IH,A(i) => // Hf; by fresh Hf.
     reach_equiv IH,A(i) => // Hf; by fresh Hf.
     use non_repeating with A(i),A(i') => //; by exists i.
-    admit. (* TODO as above *)
     use non_repeating with A(i),A(i') => //; by exists i.
-    reach_equiv IH,A(i) => // Hf; by fresh Hf.
 Qed.

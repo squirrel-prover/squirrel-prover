@@ -673,8 +673,9 @@ let mk_phi_proj
       iter#get_actions
     in
 
+    (* TODO: we are using the less precise version of [fold_macro_support] *)
     let macro_cases =
-      Iter.fold_macro_support (fun descr t macro_cases ->
+      Iter.fold_macro_support0 (fun descr t macro_cases ->
           let fv = Sv.of_list1 descr.Action.indices in
           let new_idx = Fresh.get_name_indices_ext ~fv cntxt n.s_symb t in
           List.assoc_up_dflt descr [] (fun l -> new_idx @ l) macro_cases
@@ -1357,39 +1358,61 @@ let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
 
   (* Indirect cases: potential occurrences through macro expansions. *)
 
-  let frame_actions : Fresh.ts_occs =
-    let actions =
-      List.fold_left (fun acc t ->
-          Fresh.get_actions_ext cntxt t @ acc
-        ) [] frame
-    in
-    Fresh.clear_dup_mtso_le actions
-  in
-
-  (** Compute association list from action descriptions to hash occurrences,
-    * but ignoring actions/macros which are not in the support of the original
-    * frame.
+  (** Compute association list from action descriptions to list of pairs of
+    * hash occurrence and source terms (i.e. terms whose translation in a 
+    * trace model can contain the hash occurrence)
+    * This computation tris to be precise, by ignoring actions/macros
+    * which are not in the support of the original frame.
+      
     * TODO it seems that the support filtering could be done at the macro
     *   level but Iter.fold_macro_support does it at the action level:
     *   if an action features one macro that is in the support then all
     *   macros from the action are considered. *)
-  let macro_cases =
-    Iter.fold_macro_support (fun descr t macro_cases ->
+  let macro_cases : (Action.descr * (Iter.hash_occ * Term.messages) list) list =
+    Iter.fold_macro_support (fun iocc macro_cases ->
+        let descr = iocc.iocc_descr in
+        let t = iocc.iocc_cnt in
         let fv = Sv.of_list1 descr.Action.indices in
+        
+        assert (Sv.subset (Term.fv t) (Sv.union fv (Vars.to_set env)));
+
         let new_cases =
           Iter.get_f_messages_ext ~fv ~cntxt param.h_fn param.h_key.s_symb t
         in
-        List.assoc_up_dflt descr [] (fun l -> new_cases @ l) macro_cases
+        List.assoc_up_dflt descr [] (fun l -> 
+            (* for each new case, we add it to [l] (if not already there),
+               and update the sources. *)
+            List.fold_left (fun l new_case ->
+                let new_srcs = iocc.iocc_sources in
+                List.assoc_up_dflt new_case new_srcs (fun srcs ->
+                    new_srcs @ srcs) l
+              ) l new_cases
+          ) macro_cases
       ) cntxt frame []
   in
   (* Keep only actions in which there is at least one occurrence. *)
   let macro_cases = List.filter (fun (_, occs) -> occs <> []) macro_cases in
 
   let phi_indirect =
-    List.fold_left (fun forms (a, occs) ->
-        let occs = List.rev occs in
-        let case = prf_mk_indirect env cntxt param frame_actions a occs in
-        case :: forms
+    List.fold_left (fun forms (a, cases) ->
+        (* cases is a list of pairs of hash occurrence and their 
+           possible sources *)
+        let cases = List.rev cases in
+
+        List.fold_left (fun forms (occ, srcs) -> 
+            let frame_actions : Fresh.ts_occs =
+              let actions =
+                List.fold_left (fun acc t ->
+                    Fresh.get_actions_ext cntxt t @ acc
+                  ) [] srcs
+              in
+              Fresh.clear_dup_mtso_le actions
+            in
+
+            let case = prf_mk_indirect env cntxt param frame_actions a [occ] in
+            case :: forms
+          ) forms cases
+
       ) [] macro_cases
   in
 

@@ -226,8 +226,9 @@ let mk_rule ?(elems=[]) ?(drop_head=true) ~fun_wrap_key
       env = !env }
   in
   
+  (* TODO: we are using the less precise version of [fold_macro_support] *)
   let hash_cases =
-    Iter.fold_macro_support (fun descr t hash_cases ->
+    Iter.fold_macro_support0 (fun descr t hash_cases ->
         (* TODO: use get_f_messages_ext and use conditons to improve precision *)
         (* let fv = Vars.Sv.of_list1 descr.Action.indices in
          * let new_hashes =

@@ -546,6 +546,7 @@ let fold_descr
 
 (*------------------------------------------------------------------*)
 module Ss = Symbols.Ss(Symbols.Macro)
+module Ms = Symbols.Ms(Symbols.Macro)
 
 let is_glob table ms =
   match Symbols.Macro.get_def ms table with
@@ -620,20 +621,68 @@ let macro_support : type a.
   Ss.diff s_reach (s_reach'_glob)
 
 
-(** Folding over all macro descriptions reachable from some terms. *)
-let fold_macro_support : type a.
-  (Action.descr -> Term.message -> 'b -> 'b) ->
-  Constr.trace_cntxt ->
-  a Term.term list ->
-  'b ->
-  'b
-  =
-  fun func cntxt terms init ->
+(** An indirect occurrence of a macro term, used as return type of 
+    [fold_macro_support]. The record:
 
-  let sm = macro_support cntxt terms in
-  
+      [ { iocc_cnt = t; iocc_descr = d; iocc_sources = srcs; } ]
+
+    states that [t] is the body of a macro of action [d], and that
+    action [d] can appear in the translation of any of the terms in [srcs]
+    in some trace model.
+
+    Invariant: if [fold_macro_support] has been called on a set of terms [terms]
+    such that fv(terms) = env, then: fv(t) ⊆ env ∪ d.indices.
+}*)
+type iocc = { 
+  iocc_cnt     : Term.message;
+  iocc_descr   : Action.descr;
+  iocc_sources : Term.message list; 
+}
+
+(** Folding over all macro descriptions reachable from some terms. *)
+let fold_macro_support 
+    (func : (iocc -> 'a -> 'a)) 
+    (cntxt : Constr.trace_cntxt)
+    (terms : Term.message list) 
+    (init : 'a) : 'a 
+  =
+  (* association list of terms and their macro support *)
+  let sm = List.map (fun src -> (src, macro_support cntxt [src])) terms in
+
+  (* reversing the association map: we want to map macros to possible sources *)
+  let macro_occs : Term.message list Ms.t = 
+    List.fold_left (fun macro_occs (src, src_macros) ->
+        Ss.fold (fun src_macro macro_occs -> 
+            if Ms.mem src_macro macro_occs 
+            then
+              let srcs = Ms.find src_macro macro_occs in
+              Ms.add src_macro (src :: srcs) macro_occs
+            else Ms.add src_macro [src] macro_occs
+          ) src_macros macro_occs
+      ) Ms.empty sm
+  in
+
   SystemExpr.fold_descrs (fun descr acc ->
       fold_descr ~globals:true (fun msymb _ t acc ->
-          if Ss.mem msymb sm then func descr t acc else acc
+          if Ms.mem msymb macro_occs then
+            let srcs = Ms.find msymb macro_occs in
+            let iocc = { 
+              iocc_descr   = descr; 
+              iocc_cnt     = t; 
+              iocc_sources = srcs; 
+            } in
+            func iocc acc 
+          else acc
         ) cntxt.table cntxt.system descr acc
     ) cntxt.table cntxt.system init
+
+(** Less precise version of [fold_macro_support], which does not track sources. *)
+let fold_macro_support0 
+    (func : (Action.descr -> Term.message -> 'a -> 'a)) 
+    (cntxt : Constr.trace_cntxt)
+    (terms : Term.message list) 
+    (init : 'a) : 'a 
+  =
+  fold_macro_support (fun iocc acc ->
+      func iocc.iocc_descr iocc.iocc_cnt acc
+    ) cntxt terms init
