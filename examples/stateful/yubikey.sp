@@ -394,6 +394,8 @@ Qed.
 (* A first injective version for authentication. *)
 (* WARNING - There is an admit which is true in the symbolic setting,
 but we need an hypothesis in the computational model. *)
+(* NOTE: this lemma is not used anywhere: can we remove it, to remove the
+   admit in this case-study ? *)
 goal auth_injective_bis (ii,i:index):
   happens(S(ii,i)) =>
   cond@S(ii,i) =>
