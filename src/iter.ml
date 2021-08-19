@@ -632,7 +632,7 @@ let macro_support : type a.
 
     Invariant: if [fold_macro_support] has been called on a set of terms [terms]
     such that fv(terms) = env, then: fv(t) ⊆ env ∪ d.indices.
-}*)
+*)
 type iocc = { 
   iocc_cnt     : Term.message;
   iocc_descr   : Action.descr;
