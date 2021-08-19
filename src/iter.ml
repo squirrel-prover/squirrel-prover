@@ -629,9 +629,6 @@ let macro_support : type a.
     states that [t] is the body of a macro of action [d], and that
     action [d] can appear in the translation of any of the terms in [srcs]
     in some trace model.
-
-    Invariant: if [fold_macro_support] has been called on a set of terms [terms]
-    such that fv(terms) = env, then: fv(t) ⊆ env ∪ d.indices.
 *)
 type iocc = { 
   iocc_cnt     : Term.message;
