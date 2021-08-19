@@ -1373,8 +1373,8 @@ let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
         let descr = iocc.iocc_descr in
         let t = iocc.iocc_cnt in
         let fv = Sv.of_list1 descr.Action.indices in
-        
-        assert (Sv.subset (Term.fv t) (Sv.union fv (Vars.to_set env)));
+
+        (* assert (Sv.subset (Term.fv t) (Sv.union fv (Vars.to_set env))); *)
 
         let new_cases =
           Iter.get_f_messages_ext ~fv ~cntxt param.h_fn param.h_key.s_symb t
