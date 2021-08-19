@@ -1444,7 +1444,7 @@ let combine_conj_formulas p q =
   Term.mk_and
     (Term.mk_ands common)
     (Term.head_normal_biterm
-       (Term.mk_diff (Term.mk_ands new_p) (Term.mk_ands !aux_q)))
+       (Term.mk_diff (Term.mk_ands new_p) (Term.mk_ands (List.rev !aux_q))))
 
 (** Application of PRF tactic on biframe element number i,
   * optionally specifying which subterm m1 should be considered. *)
