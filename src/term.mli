@@ -346,6 +346,7 @@ module type SmartFO = sig
   val is_false  : form -> bool
   val is_true   : form -> bool
   val is_not    : form -> bool
+  val is_zero   : form -> bool
   val is_and    : form -> bool
   val is_or     : form -> bool
   val is_impl   : form -> bool

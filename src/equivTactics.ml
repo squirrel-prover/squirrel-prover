@@ -721,10 +721,12 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
            (ms = Term.out_macro && List.mem a timestamps) ->
       timestamps
 
-    | Fun (f,_, [Macro (ms,[],a);then_branch; _])
-      when f = Term.f_ite && ms = Term.exec_macro && List.mem a timestamps ->
+    | Fun (f,_, [Macro (ms,[],a);then_branch; else_branch])
+      when f = Term.f_ite && ms = Term.exec_macro && List.mem a timestamps
+           && Term.Smart.is_zero else_branch ->
       self#fold_message timestamps then_branch
-
+    (* Remark: the condition that the else_branch is zero is for the post-quantum condition.
+       It could probably be removed if needed, cf the issue of the CS rule in the PQ paper.*)
     | Fun (f, _, [phi_1;phi_2]) when f = Term.f_impl ->
       let atoms,l = self#extract_ts_atoms phi_1 in
       let ts' = self#add_atoms atoms timestamps in

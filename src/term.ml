@@ -531,6 +531,8 @@ module SmartDestructors = struct
   let destr_false f = oas_seq0 (destr_fun ~fs:f_false f)
   let destr_true  f = oas_seq0 (destr_fun ~fs:f_true  f)
 
+  let destr_zero f = oas_seq0 (destr_fun ~fs:f_zero f)
+
   let destr_not  f = oas_seq1 (destr_fun ~fs:f_not f)
 
   let destr_or   f = oas_seq2 (destr_fun ~fs:f_or   f)
@@ -610,6 +612,8 @@ module SmartDestructors = struct
   let is_true  f = destr_true f <> None
 
   let is_not f = destr_not f <> None
+
+  let is_zero f = destr_zero f <> None
 
   let is_or   f = destr_or   f <> None
   let is_and  f = destr_and  f <> None
@@ -1561,6 +1565,7 @@ module type SmartFO = sig
   val is_false  : form -> bool
   val is_true   : form -> bool
   val is_not    : form -> bool
+  val is_zero   : form -> bool
   val is_and    : form -> bool
   val is_or     : form -> bool
   val is_impl   : form -> bool
