@@ -55,11 +55,15 @@ goal disjoint_chains :
   i<>i' =>
   s(i)@tau <> s(i')@tau'.
 Proof.
-  induction => tau' IH tau i' i _ _ Meq.
-  use lastupdate with i,tau as [[_ Hinit] | [j [[_ _] Hsup]]] => //;
-  use lastupdate with i',tau' as [[_ Hinit'] | [j' [[_ _] Hsup']]] => //.
-admit. (* TODO s0(i) <> s(i')@A(i',j') *)
-admit. (* TODO s0(i') <> s(i)@A(i,j) *)
+  induction => tau' IH tau i' i D E Meq.
+  use lastupdate with i,tau as [[A0 Hinit] | [j [[A0 A1] Hsup]]] => //;
+  use lastupdate with i',tau' as [[A Hinit'] | [j' [[B C] Hsup']]] => //.
+  rewrite -Meq A0 /s in B. 
+  admit. (* by fresh B. *) (* TODO: improve fresh precision *)  
+
+  rewrite Meq A /s in A0. 
+  admit. (* by fresh B. *) (* TODO: improve fresh precision *)  
+
   assert H(s(i)@pred(A(i,j)),k) = H(s(i')@pred(A(i',j')),k) as Hcoll;
     1: by expandall.
   collision Hcoll => H.
