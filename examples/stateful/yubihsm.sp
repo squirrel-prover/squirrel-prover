@@ -235,6 +235,9 @@ Proof.
 Qed.
 hint rewrite eq_refl.
 
+goal eq_sym ['a] (x,y : 'a) : x = y => y = x.
+Proof. auto. Qed.
+
 (* SP: merge with eq_refl *)
 goal eq_refl_i (x : index) : (x = x) = true.
 Proof.
@@ -757,7 +760,7 @@ split => //.
 intro j' Hap' Hexec'. 
 
 intro Eq => //.  
-assert (SCtr(pid)@Server(pid,j) = SCtr(pid)@Server(pid,j')) by auto.
+assert (SCtr(pid)@Server(pid,j) = SCtr(pid)@Server(pid,j')) as Meq by auto.
 
 assert (Server(pid,j) = Server(pid,j') || 
         Server(pid,j) < Server(pid,j') || 
@@ -773,9 +776,7 @@ case H0 => //.
 (* Server(pid,j) = pred(Server(pid,j') < Server(pid,j') *)
 use counterIncreaseStrictly with pid, j' => //.
 rewrite H0 in *.
-by use orderStrict with 
-  SCtr(pid)@pred(Server(pid,j')), SCtr(pid)@Server(pid,j'). 
-
+by apply orderStrict in Meq.
 
 (* Server(pid,j) < pred(Server(pid,j'))  < Server(pid,j') *) 
 use counterIncreaseStrictly with pid, j' => //. 
@@ -785,11 +786,11 @@ case H2.
 use orderTrans with 
    SCtr(pid)@Server(pid,j), 
    SCtr(pid)@pred(Server(pid,j')), 
-   SCtr(pid)@Server(pid,j') => //. 
-by use orderStrict with SCtr(pid)@Server(pid,j), SCtr(pid)@Server(pid,j').
+   SCtr(pid)@Server(pid,j') => //.
+by apply orderStrict in Meq.
 
 rewrite H2 in *. 
-by use orderStrict with SCtr(pid)@Server(pid,j), SCtr(pid)@Server(pid,j').
+by apply orderStrict in Meq.
 
 (* 2nd case: Server(pid,j) > Server(pid,j')  *)
 assert (pred(Server(pid,j)) = Server(pid,j') 
@@ -797,21 +798,17 @@ assert (pred(Server(pid,j)) = Server(pid,j')
 case H0 => //. 
 
 (* Server(pid,j) > pred(Server(pid,j)) = Server(pid,j') *)
-use counterIncreaseStrictly with pid, j => //.
-subst Server(pid,j'), pred(Server(pid,j)).
-by use orderStrict with SCtr(pid)@pred(Server(pid,j)), SCtr(pid)@Server(pid,j).
+use counterIncreaseStrictly with pid, j as H1 => //.
+by apply orderStrict in H1.
 
 (* Server(pid,j)  > pred(Server(pid,j)) >  Server(pid,j') *) 
 use counterIncreaseStrictly with pid, j => //.
 use counterIncreaseBis with pred(Server(pid,j)), Server(pid,j'), pid  => //. 
 case H2. 
 
-use orderTrans with 
-  SCtr(pid)@Server(pid,j'),  
-  SCtr(pid)@pred(Server(pid,j)), 
-  SCtr(pid)@Server(pid,j) => //. 
-by use orderStrict with SCtr(pid)@Server(pid,j'), SCtr(pid)@Server(pid,j). 
+apply orderTrans _ _ (SCtr(pid)@Server(pid,j)) in H2; 1: auto.
+apply eq_sym in Meq. 
+by apply orderStrict in Meq.
 
-rewrite H2 in *.
-by use orderStrict with SCtr(pid)@Server(pid,j'), SCtr(pid)@Server(pid,j). 
+by apply orderStrict in H1.
 Qed.
