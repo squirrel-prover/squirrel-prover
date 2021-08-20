@@ -101,31 +101,6 @@ Proof.
     case Heuf; auto.
 Qed.
 
-(* NOT USED 
-goal non_repeating :
-  forall (tau',tau:timestamp,i',i:index) happens(tau') =>
-  (exists j:index, tau < A(i',j) && A(i',j) <= tau') =>
-  s(i)@tau <> s(i')@tau'.
-Proof.
-  induction => tau' IH tau i' i _ [j [_ _]] Meq.
-  use lastupdate with i',tau' as [[_ Habs] | [j' [[_ _] Hsup]]] => //; 
-    1: by use Habs with j.
-
-  use Hsup with j as _ => //.
-  (* We now have tau < A(i',j) <= A(i',j') <= tau' 
-     and no A(i',_) between A(i',j') and tau'. *)
-
-  assert s(i)@tau = s(i')@A(i',j') as Meuf => //; expand s(i')@A(i',j');
-    euf Meuf => Heuf_ts Heuf_msg.
-
-  use IH with pred(A(i',j')),pred(A(i0,j0)),i',i0 => //.
-  admit.
-  (* TODO coincé: on ne peut pas forcément trouver d'action A(i',_) entre
-       pred(A(i0,j0)) et pred(A(i',j')).
-       Avec un seul tag on était en gros dans la situation où i0=i'
-       et j0 convenait. *)
-Qed.
-*)
 
 (** Strong secrecy *)
 
@@ -163,49 +138,34 @@ Proof.
   (* Oracle *)
   expandall. fa 0. fa 1. fa 1. fa 1.
   prf 1; yesif 1; 2: fresh 1.
-  simpl; split; project. 
+  simpl; split.
     intro j0 H; try destruct H as [H|H].
-    admit.(* TODO le raffinement de PRF ne suffit pas: l'oracle ne peut venir de s@tau *)
     apply unique_queries; auto.
-    intro i0 j0 H.
+    intro i0 j0.
+    project.
+    intro H; destruct H as [H1|H2].
     reach_equiv IH,i0,pred(A(i0,j0)) => // Hf; by fresh Hf.
-    intro i0 j0 H; try destruct H as [H|H].
     reach_equiv IH,i0,pred(A(i0,j0)) => // Hf; by fresh Hf.
+    intro  H.
     reach_equiv IH,i0,pred(A(i0,j0)) => // Hf; by fresh Hf.
+
+    prf 1; yesif 1; 2: fresh 1; by apply IH.
+    simpl; split.
     intro j0 H.
     apply unique_queries; auto.
-  prf 1; yesif 1; 2: fresh 1; by apply IH.
-  simpl; split; project.
-    intro j0 H; try destruct H as [H|H].
-    admit. (* TODO as above *)
-    apply unique_queries; auto.
     intro i0 j0 H.
     reach_equiv IH,i0,A(i0,j0) => // Hf; by fresh Hf.
-    intro i0 j0 H; try destruct H as [H|H].
-    reach_equiv IH,i0,A(i0,j0) => // Hf; by fresh Hf.
-    reach_equiv IH,i0,A(i0,j0) => // Hf; by fresh Hf.
-    intro j0 H.
-    apply unique_queries; auto.
 
   (* Tag *)
   expand frame@A(i,j). expand exec@A(i,j). expand cond@A(i,j). expand output@A(i,j).
   fa 0. fa 1. fa 1.
   prf 1; yesif 1; 2: fresh 1; by apply IH.
-  simpl; split; project.
-    intro j0 H; try destruct H as [H|H].
-    admit. (* TODO as above *)
+  simpl; split.
+    intro j0 H.
     reach_equiv IH,i,A(i,j) => // Hf; by fresh Hf.
     intro i0 j0 H.
     assert i=i0 || i<>i0; try auto.
     case H0.
     use monotonic_chain with A(i,j),A(i,j0),i,j => //.
     use disjoint_chains with A(i,j),A(i0,j0),i,i0 => //.
-    intro i0 j0 H; try destruct H as [H|H].
-    admit. (* TODO as above *)
-    assert i=i0 || i<>i0; try auto.
-    case H0.
-    use monotonic_chain with A(i,j),A(i,j0),i,j => //.
-    use disjoint_chains with A(i,j),A(i0,j0),i,i0 => //.
-    intro j0 H.
-    reach_equiv IH,i,A(i,j) => // Hf; by fresh Hf.
 Qed.
