@@ -74,7 +74,7 @@ goal lastupdate_init : forall (i:index,tau:timestamp), happens(tau) => (
 
 Proof.
 intro i.
-induction => tau IH.
+induction => tau IH Htau.
 case tau.
 
 (* init *)
@@ -82,20 +82,21 @@ by auto.
 
 (* O(j) *)
 intro [j Hj]; rewrite Hj in *.
-intro Hp; expand s(i)@O(j).
+expand s(i)@O(j).
 intro Hyp.
 use IH with pred(O(j)) => //.
 intro j0 HpA.
 by use Hyp with j0.
 
+
 (* A(i0,j) *)
 intro [i0 j HA]; rewrite HA in *.
-intro HpA.
-case (i = i0 || i <> i0).
-intro [Heq | HNeq].
+case (i = i0) => //.
+intro Eq.
 intro H0.
 use H0 with j => //.
 
+intro Neq.
 intro H0.
 use IH with pred(A(i0,j)) => //.
 expand s(i)@A(i0,j).
@@ -103,20 +104,66 @@ noif => //.
 intro j0.
 intro Hp.
 use H0 with j0 => //.
-intro H.
-admit. (* constraints. Help Adrien *)
 Qed.
 
-axiom lastupdate_A : forall (i:index,j:index,tau:timestamp), happens(tau) => (
-  (A(i,j)<=tau && forall jj:index, A(i,jj)<=tau => A(i,jj)<=A(i,j))
-  => s(i)@tau = s(i)@A(i,j)).
 
-axiom lastupdate : forall (i:index,tau:timestamp), happens(tau) => (
+goal lastupdate_A: forall (i:index, j:index, tau:timestamp), (happens(tau) &&
+  A(i,j)<=tau && forall jj:index, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))
+  => s(i)@tau = s(i)@A(i,j).
+
+Proof.
+intro i j.
+induction => tau IH [Hp Ord Hyp].
+case tau.
+
+(* init *)
+by auto.
+
+(* O(j0 *)
+intro [j0 Hj]; rewrite Hj in *.
+expand s(i)@O(j0).
+use IH with pred(O(j0)) => //.
+repeat split => //.
+intro jj H.
+use Hyp with jj => //.
+
+(* A(i0,j0) *)
+intro [i0 j0 H]; rewrite H in *.
+case (i=i0) => //.
+intro Eqi.
+
+use Hyp with j0.
+case (j=j0) => //.
+auto.
+
+intro Neqi.
+expand s(i)@A(i0,j0).
+noif.
+auto.
+use IH with pred(A(i0,j0)) => //.
+repeat split => //.
+intro jj H0.
+use Hyp with jj => //.
+Qed.
+
+
+goal lastupdate : forall (i:index,tau:timestamp), happens(tau) => (
   (s(i)@tau = s(i)@init && forall j:index, happens(A(i,j)) => A(i,j)>tau) ||
   (exists j:index, 
     s(i)@tau = s(i)@A(i,j) && A(i,j)<=tau 
-    && forall jj:index, A(i,jj)<=tau => A(i,jj)<=A(i,j))).
+    && forall jj:index, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))).
+Proof.
+intro i tau Htau.
+use lastupdate_pure with i, tau as [Hinit | [j [HAj1 HAj2 HAj3]]] => //.
+left.
+split => //.
+by apply lastupdate_init.
+right.
+exists j.
+repeat split => //.
 
+use lastupdate_A with i, j, tau => //.
+Qed.
 
 (** The contents of the memory cell never repeats. *)
 
