@@ -3,6 +3,7 @@
 
 set autoIntro  = false.
 
+
 hash H.
 hash G.
 name k : message.
@@ -23,14 +24,88 @@ system (
   * Here we decompose the usual lastupdate lemma to separate the "pure" part
   * from the part that involves message equalities. *)
 
-axiom lastupdate_pure : forall (i:index,tau:timestamp), happens(tau) => (
+goal lastupdate_pure : forall (i:index,tau:timestamp), happens(tau) => (
   (forall j:index, happens(A(i,j)) => A(i,j)>tau) ||
-  (exists j:index, A(i,j)<=tau 
-    && forall jj:index, A(i,jj)<=tau => A(i,jj)<=A(i,j))).
+  (exists j:index, happens(A(i,j)) && A(i,j)<=tau 
+    && forall jj:index, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))).
 
-axiom lastupdate_init : forall (i:index,tau:timestamp), happens(tau) => (
-  (forall j:index, happens(A(i,j)) => A(i,j)>tau) 
-  => s(i)@tau = s(i)@init).
+Proof.
+intro i.
+induction => tau IH Hp.
+case tau.
+
+(* init *)
+intro Eq; left; intro j HpA; by auto.
+
+(* O(i) *)
+intro [j Eq]; subst tau, O(j).
+use IH with pred(O(j)) => //.
+destruct H as [H1 | [j0 H2]].
+left; intro j0 HpA; by use H1 with j0 => //.
+right. destruct H2 as [H21 H22].
+exists j0.
+split => //.
+intro jj.
+intro Hyp.
+use H22 with jj => //.
+
+(* A(i0,j) *)
+intro [i0 j Eq]; subst tau, A(i0,j).
+ (* 1st case: i<>i0 *)
+case (i<>i0) => //.
+intro Neq.
+use IH with pred(A(i0,j)) => //.
+destruct H as [H1 | [j0 H2]].
+left; intro j0 HpA; by use H1 with j0 => //.
+right; destruct H2 as [H21 H22]; exists j0.
+split => //.
+intro jj.
+intro Hyp.
+use H22 with jj => //.
+
+ (* 2nd case: i<>i0 *)
+intro Eq; subst i0, i.
+right; exists j; split => //.
+Qed.
+
+goal lastupdate_init : forall (i:index,tau:timestamp), happens(tau) => (
+  (forall j:index, happens(A(i,j)) => A(i,j)>tau)) 
+  => s(i)@tau = s(i)@init.
+
+Proof.
+intro i.
+induction => tau IH.
+case tau.
+
+(* init *)
+by auto.
+
+(* O(j) *)
+intro [j Hj]; rewrite Hj in *.
+intro Hp; expand s(i)@O(j).
+intro Hyp.
+use IH with pred(O(j)) => //.
+intro j0 HpA.
+by use Hyp with j0.
+
+(* A(i0,j) *)
+intro [i0 j HA]; rewrite HA in *.
+intro HpA.
+case (i = i0 || i <> i0).
+intro [Heq | HNeq].
+intro H0.
+use H0 with j => //.
+
+intro H0.
+use IH with pred(A(i0,j)) => //.
+expand s(i)@A(i0,j).
+noif => //.
+intro j0.
+intro Hp.
+use H0 with j0 => //.
+intro H.
+admit. (* constraints. Help Adrien *)
+Qed.
 
 axiom lastupdate_A : forall (i:index,j:index,tau:timestamp), happens(tau) => (
   (A(i,j)<=tau && forall jj:index, A(i,jj)<=tau => A(i,jj)<=A(i,j))
