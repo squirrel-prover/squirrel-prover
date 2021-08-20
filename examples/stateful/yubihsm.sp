@@ -10,8 +10,8 @@ HSM -> S   : ctr
 S   -> Y   : accept
 
 with
-- aead = senc(<k,sid>,mkey)
-- otp = senc(<sid,ctr>,npr,k)
+- aead = enc(<k,pid,sid>,mkey)
+- otp = enc(<sid,ctr>,npr,k)
 
 PUBLIC DATA
 - kh, pid
@@ -29,7 +29,7 @@ It was also not modelled in [1].
 - The otp is an encryption of a triple (sid, ctr, npr).
 It is modelled here as a randomized encryption of a pair (sid, ctr).
 
-- senc is assumed to be AEAD (we do not use the associated data)
+- enc is assumed to be AEAD (we do not use the associated data)
 
 - In [1], they "over-approximate in the case that the Yubikey increases the
 session token by allowing the adversary to instantiate the rule for any counter
@@ -38,6 +38,13 @@ Here, we model the incrementation by 1 of the counter.
 
 - As in [1], we model the two counters (session and token counters) as a single
 counter.
+
+- In [1], the server keeps in memory the mapping between public and
+  secret identities of the Yubikeys. As far as we understand, this
+  does not reflect the YubiHSM specification: secret identities are to
+  be protected by the YubiHSM.  Instead, we choose to keep the
+  necessary information to map public to private indentities in the
+  AEADs (we simply add the public identity to the AEADs plaintext).  
 
 - Diff terms are here to model a real system and two ideal systems.
   - the first intermediate ideal system replace key look-up in the 
@@ -48,50 +55,62 @@ counter.
 *******************************************************************************)
 set autoIntro=false.
 
+(* AEAD symmetric encryption scheme: IND-CCA + INT-CTXT *)
 senc enc,dec
 
-abstract startplug: message
+(*------------------------------------------------------------------*)
+(* protocol constants *)
 abstract endplug: message
-abstract startpress: message
 abstract accept:message
 
+(*------------------------------------------------------------------*)
 (* counters initial value *)
 abstract cinit : message
 (* counter successor *)
 abstract mySucc : message -> message
 
-(* encoding of a public identity as a message *)
+(*------------------------------------------------------------------*)
+(* Encoding of a public identity as a message.
+   This encoding is injective (this is axiomatized later). *)
 abstract mpid: index -> message
 
 (* secret identity *)
 name sid: index -> message
 
+(*------------------------------------------------------------------*)
 (* public key handle kh to reference the AES master key mkey *)
 abstract kh: message
 name mkey: message
 
+(*------------------------------------------------------------------*)
 (* working key k(pid) of yubikey `pid`, stored inside the AEAD *)
 name k: index -> message
 (* Dummy key used in AEAD idealized so that the key does not occur in 
    plaintext anymore in the idealized system *)
 name k_dummy: index -> message
 
+(*------------------------------------------------------------------*)
 (* counters *)
 mutable YCtr(i:index) : message = cinit
 mutable SCtr(i:index) : message = cinit
 
+(*------------------------------------------------------------------*)
 (* random samplings used to initialize AEAD  *)
 name rinit : index -> message
+
 (* authentication server's database for each pid *)
 mutable AEAD(pid:index) : message = 
-  enc(<diff(k(pid),k_dummy(pid)), sid(pid)>, rinit(pid), mkey).
+  enc(<diff(k(pid),k_dummy(pid)), <mpid(pid), sid(pid)>>, rinit(pid), mkey).
 
+(*------------------------------------------------------------------*)
 (* random samplings used to initialize AEADi  *)
 name rinitp : index -> message
+
 (* authentication server's database for each pid, ideal system *)
 mutable AEADi(pid:index) : message =
-  enc(<k_dummy(pid), sid(pid)>, rinitp(pid), mkey).
+  enc(<k_dummy(pid), <mpid(pid), sid(pid)>>, rinitp(pid), mkey).
 
+(*------------------------------------------------------------------*)
 channel cY
 channel cS
 channel cHSM
@@ -126,19 +145,23 @@ process yubikeypress (pid:index,j:index) =
    - it checks that the counter inside the otp (received from the HSM) is strictly
    greater than the counter associated to the token,
    - if so, this counter value is used to update the database.
-In this modelling, the server role does not ask anything to the HSM.
+
+   In our modelling, the server request to the HSM (to retrieve k(pid) 
+   and sid(pid)) has been inlined.
  *)
 process server (pid:index) =
-  in(cS,x); (*x = <pid,<nonce, cipher>> with cipher = senc(<sid,cpt>,r, k)*)
+  in(cS,x); (*x = <pid,<nonce, cipher>> with cipher = enc(<sid,cpt>,r, k)*)
   let cipher = snd(snd(x)) in
   let deccipher = dec(cipher,k(pid)) in
   let xcpt = snd(deccipher) in
-  if fst(x) = mpid(pid) 
-  && deccipher<>fail && fst(deccipher) = sid(pid) && SCtr(pid) ~< xcpt then
+  if fst(x) = mpid(pid) &&
+     deccipher<>fail && 
+     fst(deccipher) = sid(pid) && 
+     SCtr(pid) ~< xcpt then
   SCtr(pid) := xcpt;
   out(cS,accept).
 
-
+(*------------------------------------------------------------------*)
 (* The attacker can read/write AEAD stored in the server's database. *)
 process read_AEAD (pid:index) =
   out(cS,AEAD(pid)).
@@ -147,6 +170,7 @@ process write_AEAD (pid:index)=
   in(cS,x);
   AEAD(pid) := x.
 
+(*------------------------------------------------------------------*)
 (* AEAD in the ideal system *)
 process read_AEAD_ideal (pid:index) =
   out(cS,AEADi(pid)).
@@ -155,9 +179,13 @@ process write_AEAD_ideal (pid:index)=
   in(cS,x);
   AEADi(pid) := x.
 
+(*------------------------------------------------------------------*)
 (* model for the rule YSM_AEAD_YUBIKEY_OTP_DECODE of the HSM. *)
 process YSM_AEAD_YUBIKEY_OTP_DECODE (pid:index) =
-  in(cHSM,xdata); (* xdata = <<pid,kh>, <aead, otp>> with otp = senc(<sid,cpt>,r,k)*)
+  in(cHSM,xdata); 
+  (* xdata = <<pid,kh>, <aead, otp>> with 
+       otp  = enc(<sid,cpt>,k) 
+       aead = enc(<k,<pid,sid>>,mkey)*)
    if fst(xdata) = <mpid(pid),kh> then
     let aead = fst(snd(xdata)) in
     let otp = snd(snd(xdata)) in
@@ -166,60 +194,36 @@ process YSM_AEAD_YUBIKEY_OTP_DECODE (pid:index) =
 
     let otp_dec = dec(otp,diff(fst(aead_dec), k(pid))) in
 
-    if aead_dec <> fail && otp_dec <> fail && fst(otp_dec) = snd(aead_dec)
+    if aead_dec <> fail && 
+       otp_dec <> fail && 
+       fst(otp_dec) = snd(snd(aead_dec)) &&
+       mpid(pid) = fst(snd(aead_dec))
     then
       out(cHSM, snd(otp_dec)).
 
-(* intermediate process *)
-process YSM_AEAD_YUBIKEY_OTP_DECODE_middle (pid:index) =
-  in(cHSM,xdata); (* xdata = <<pid,kh>, <aead, otp>> with otp = senc(<sid,cpt>,r,k)*)
-   if fst(xdata) = <mpid(pid),kh> then
-    let aead = fst(snd(xdata)) in
-    let otp = snd(snd(xdata)) in
 
-    let aead_dec =
-     diff(dec(aead,mkey),
-           try find pid' such that
-             aead =
-             enc(<k_dummy(pid), sid(pid')>, rinit(pid'), mkey)
-           in
-             <k(pid'), sid(pid')>
-           else fail)
-    in
-
-    let otp_dec = dec(otp,fst(aead_dec)) in
-
-    if aead_dec <> fail && otp_dec <> fail && fst(otp_dec) = snd(aead_dec)
-    then
-      out(cHSM, snd(otp_dec)).
-
+(*------------------------------------------------------------------*)
 process Yubikey0 =
   ( (!_pid !_j Plug   : yubikeyplug(pid)                 ) |
     (!_pid !_j Press  : yubikeypress(pid,j)              ) |
     (!_pid !_j Server : server(pid)                      )).
 
-(* TODO: we do not want to state [base ~ ideal], but [middle ~ ideal]. *)
-
 (* base system with ideal system *)
 system
-  (Yubikey0 | 
+  (Yubikey0 |
   (!_pid !_j Read   : read_AEAD(pid)                   ) |
   (!_pid !_j Write  : write_AEAD(pid)                  ) |
   (!_pid !_j Decode : YSM_AEAD_YUBIKEY_OTP_DECODE(pid))).
-
-(* base system with middle system *)
-system [middle]
-  (Yubikey0 |
-  (!_pid !_j Read   : read_AEAD_ideal(pid)                   ) |
-  (!_pid !_j Write  : write_AEAD_ideal(pid)                  ) |
-  (!_pid !_j Decode : YSM_AEAD_YUBIKEY_OTP_DECODE_middle(pid))).
 
 
 (* TODO: allow to have axioms for all systems *)
 axiom orderTrans (n1,n2,n3:message): n1 ~< n2 => n2 ~< n3 => n1 ~< n3.
 
-(* TODO: allow to have axioms for all systems *)
 axiom orderStrict(n1,n2:message): n1 = n2 => n1 ~< n2 => False.
+
+axiom mpid_inj (pid, pid':index): mpid(pid) = mpid(pid') => pid = pid'.
+
+axiom pair_ne_fail (x,y: message) : <x,y> <> fail.
 
 (* LIBRAIRIES *)
 
@@ -230,6 +234,9 @@ Proof.
   by rewrite eq_iff. 
 Qed.
 hint rewrite eq_refl.
+
+goal eq_sym ['a] (x,y : 'a) : x = y => y = x.
+Proof. auto. Qed.
 
 (* SP: merge with eq_refl *)
 goal eq_refl_i (x : index) : (x = x) = true.
@@ -368,6 +375,26 @@ Qed.
 hint rewrite if_else_not.
 
 
+(*------------------------------------------------------------------*)
+(* and *)
+
+axiom and_comm (b,b' : boolean) : (b && b') = (b' && b).
+
+axiom and_true_l (b : boolean) : (true && b) = b.
+hint rewrite and_true_l.
+
+goal and_true_r (b : boolean) : (b && true) = b.
+Proof. by rewrite and_comm and_true_l. Qed.
+hint rewrite and_true_r.
+
+axiom and_false_l (b : boolean) : (false && b) = false.
+hint rewrite and_false_l.
+
+goal and_false_r (b : boolean) : (b && false) = false.
+Proof. by rewrite and_comm and_false_l. Qed.
+hint rewrite and_false_r.
+
+(* or *)
 axiom or_comm (b,b' : boolean) : (b || b') = (b' || b).
 
 axiom or_false_l (b : boolean) : (false || b) = b.
@@ -401,11 +428,23 @@ goal diff_eq ['a] (x,y : 'a) : x = y => diff(x,y) = x.
 Proof. by project. Qed.
 hint rewrite diff_eq.
 
+goal diff_diff_l ['a] (x,y,z: 'a): diff(diff(x,y),z) = diff(x,z).
+Proof. by project. Qed.
+hint rewrite diff_diff_l.
+
+goal diff_diff_r ['a] (x,y,z: 'a): diff(x,diff(y,z)) = diff(x,z).
+Proof. by project. Qed.
+hint rewrite diff_diff_r.
+
+(* instances of f_apply *)
+goal dec_apply (x,x',k : message): x = x' => dec(x,k) = dec(x',k).
+Proof. auto. Qed.
+
 (* PROOF *)
 
-(* First, we characterize when the AEAD decryption goes through *)
-goal [left] valid_decode (t : timestamp) (pid,j : index):
-  t = Decode(pid,j) =>
+(* First property of AEAD decoding *)
+goal valid_decode (t : timestamp) (pid,j : index):
+  (t = Decode(pid,j) || t = Decode1(pid,j)) =>
   happens(t) => 
   (aead_dec(pid,j)@t <> fail) =
   (exists(pid0 : index), 
@@ -416,97 +455,72 @@ Proof.
 
   (* Left => Right *)
   intro AEAD_dec.
-  expand aead_dec.
-  intctxt AEAD_dec => H; 2: congruence.
 
-  clear H; intro AEAD_eq.
+  case Eq; 
+  expand aead_dec;
+  (intctxt AEAD_dec => H; 2: congruence);
+  clear H; intro AEAD_eq;
   by exists pid0.
 
   (* Right => Left *) 
   intro [pid0 H].
-  expand aead_dec.
-  rewrite -H /AEAD /=.
-  admit.
-  (* TODO: axiom? *)
+  case Eq; 
+  expand aead_dec;
+  rewrite -H /AEAD /=;
+  apply pair_ne_fail.
 Qed.  
 
 (* using the `valid_decode` lemma, we can characterize when the full
    decoding check goes through *)
-goal [left] valid_decode_charac (t : timestamp) (pid,j : index):
-  t = Decode(pid,j) =>
+goal valid_decode_charac (t : timestamp) (pid,j : index):
+  (t = Decode(pid,j) || t = Decode1(pid,j)) =>
   happens(t) => 
   ( aead_dec(pid,j)@t <> fail &&
     otp_dec(pid,j)@t <> fail &&
-    fst(otp_dec(pid,j)@t) = snd(aead_dec(pid,j)@t)) =
-  ( exists(pid0 : index), 
-    AEAD(pid0)@init = aead(pid,j)@t &&
-    dec(otp(pid,j)@t,k(pid0)) <> fail &&
-    fst(dec(otp(pid,j)@t,k(pid0))) = sid(pid0)).
+    fst(otp_dec(pid,j)@t) = snd(snd(aead_dec(pid,j)@t)) &&
+    mpid(pid) = fst(snd(aead_dec(pid,j)@t)) ) 
+  =
+  ( AEAD(pid)@init = aead(pid,j)@t &&
+    dec(otp(pid,j)@t,k(pid)) <> fail &&
+    fst(dec(otp(pid,j)@t,k(pid))) = sid(pid) ).
 Proof.
   intro Eq Hap.
   rewrite eq_iff; split.
- 
+
   (* => case *)
-  intro [AEAD_dec OTP_dec Sid_eq]. 
+  intro [AEAD_dec OTP_dec Sid_eq Pid_eq]. 
   rewrite valid_decode // in AEAD_dec.
   destruct AEAD_dec as [pid0 AEAD_dec]. 
-  by exists pid0.
-
-  (* <= case *)
-  intro [pid0 [AEAD_dec OTP_dec Sid_eq]]. 
-  simpl.
-  rewrite valid_decode //. 
-  by exists pid0.
-Qed.
-
-
-(* arbitrary constant, assumed different from fail. Only used for proof purposes. *)
-abstract notFail : message. 
-axiom notFail_ax : notFail <> fail.
-
-(* alternative formulation of `valid_decode`, using a try find *)
-goal [left] valid_decode_tf (t : timestamp) (pid,j : index):
-  t = Decode(pid,j) =>
-  happens(t) => 
-  aead_dec(pid,j)@t <> fail <=>
-  aead_dec(pid,j)@t = 
-  try find pid' such that 
-      aead(pid,j)@t = AEAD(pid')@init
-    in 
-      <k(pid'), sid(pid')>
-    else notFail. 
-  (* note: we can replace `notFail` by anything there, as the test 
-     of the try find always goes through  *)
-Proof.
-  intro Eq Hap.
-  split. 
   
-  (* => case *)
-  intro  @/aead_dec AEAD_dec. 
-  intctxt AEAD_dec => H; 2: congruence.
-
-  clear H; intro AEAD_eq.
-  rewrite -AEAD_eq /= in *.
-  clear AEAD_dec.
-  case (
-   try find pid' such that
-    enc(<k(pid0),sid(pid0)>,rinit(pid0),mkey) = AEAD(pid')@init
-   in <k(pid'),sid(pid')> else notFail).
-  by intro [pid' [Tc ->]].
-  intro [A A0]. 
-  by use A with pid0.
+  assert (pid0 = pid).
+  by case Eq; use mpid_inj with pid, pid0.
+  case Eq; project; auto.
 
   (* <= case *)
-  intro ->.
-  case (
-   try find pid' such that aead(pid,j)@t = AEAD(pid')@init in
-     <k(pid'),sid(pid')> 
-   else notFail).   
-  intro [pid' [_ ->]].
-  admit. (* TODO: axiom on pairs and fail ? *)
-  by intro _; apply notFail_ax.
+  intro [AEAD_dec OTP_dec Sid_eq].
+  rewrite valid_decode //.   
+  by project; case Eq; simpl; exists pid.
 Qed.
 
+
+(*------------------------------------------------------------------*)
+(* auxilliary simple lemma, used to rewrite one of the conditional
+   equality in the then branch. *)
+goal if_aux (b,b0,b1,b2 : boolean) (x,y,z,u,v:message):
+   if (b && (x = y && b0 && b1 && b2)) then
+     snd(dec(z,diff(fst(dec(y,u)),v))) =
+   if (b && (x = y && b0 && b1 && b2)) then 
+    snd(dec(z,diff(fst(dec(x,u)),v))). 
+Proof.
+  intro >. 
+  case b => _ //. 
+  case b0 => _ //. 
+  case b1 => _ //.
+  case b2 => _ //. 
+  case (x = y) => U //.
+Qed.
+
+(*------------------------------------------------------------------*)
 (* set showStrengthenedHyp=true. *)
 equiv atomic_keys.
 Proof.
@@ -515,12 +529,14 @@ Proof.
   enrich seq(pid -> k(pid)).
   enrich seq(pid -> k_dummy(pid)).
   enrich seq(pid -> sid(pid)).
+  enrich seq(pid -> AEAD(pid)@init).
   enrich seq(pid -> AEAD(pid)@t).
   dependent induction t => t Hind Hap.
   case t => Eq;
   try (
     repeat destruct Eq as [_ Eq];
     rewrite /*;
+    rewrite /AEAD in Hind;
     by apply Hind (pred(t))).
 
   (* init *)
@@ -529,7 +545,7 @@ Proof.
   (* Write(pid,j) *)
   repeat destruct Eq as [_ Eq]. 
   expandall.
-  fa 6; fa 7; fa 7. 
+  fa 7; fa 8; fa 8. 
   
   (* TODO: faseq 0 would allow to conclude there *)
   splitseq 0: (fun (pid0:index) -> pid0 = pid); simpl.
@@ -543,19 +559,25 @@ Proof.
   (* Decode(pid,j) *)
   repeat destruct Eq as [_ Eq].
   expand frame, exec, output, cond, AEAD. 
-  fa 6. fa 7. fa 7.
+  fa 7. fa 8. fa 8.
 
-  (* by apply Hind (pred(t)). *)
-  admit.
-
+  rewrite valid_decode_charac //. 
+  (* rewrite the content of the then branch *)
+  rewrite /otp_dec /aead_dec if_aux /AEAD /= in 9.
+  fa 9.
+  expandall.
+  fa 8; fa 8; fa 8; fa 8.
+  by apply Hind (pred(t)).
 
   (* Decode1(pid,j) *)
-  repeat destruct Eq as [_ Eq]. 
-  expandall.
-  fa 6; fa 7; fa 7; fa 8; fa 8.
+  repeat destruct Eq as [_ Eq].
+  expand frame, exec, output, cond, AEAD. 
+  fa 7. fa 8. fa 8.
 
-  (* by apply Hind (pred(t)). *)
-  admit.
+  rewrite valid_decode_charac //. 
+  expandall.
+  fa 8; fa 8; fa 8; fa 8.
+  by apply Hind (pred(t)).
 Qed.
   
 
@@ -738,7 +760,7 @@ split => //.
 intro j' Hap' Hexec'. 
 
 intro Eq => //.  
-assert (SCtr(pid)@Server(pid,j) = SCtr(pid)@Server(pid,j')) by auto.
+assert (SCtr(pid)@Server(pid,j) = SCtr(pid)@Server(pid,j')) as Meq by auto.
 
 assert (Server(pid,j) = Server(pid,j') || 
         Server(pid,j) < Server(pid,j') || 
@@ -754,9 +776,7 @@ case H0 => //.
 (* Server(pid,j) = pred(Server(pid,j') < Server(pid,j') *)
 use counterIncreaseStrictly with pid, j' => //.
 rewrite H0 in *.
-by use orderStrict with 
-  SCtr(pid)@pred(Server(pid,j')), SCtr(pid)@Server(pid,j'). 
-
+by apply orderStrict in Meq.
 
 (* Server(pid,j) < pred(Server(pid,j'))  < Server(pid,j') *) 
 use counterIncreaseStrictly with pid, j' => //. 
@@ -766,11 +786,11 @@ case H2.
 use orderTrans with 
    SCtr(pid)@Server(pid,j), 
    SCtr(pid)@pred(Server(pid,j')), 
-   SCtr(pid)@Server(pid,j') => //. 
-by use orderStrict with SCtr(pid)@Server(pid,j), SCtr(pid)@Server(pid,j').
+   SCtr(pid)@Server(pid,j') => //.
+by apply orderStrict in Meq.
 
 rewrite H2 in *. 
-by use orderStrict with SCtr(pid)@Server(pid,j), SCtr(pid)@Server(pid,j').
+by apply orderStrict in Meq.
 
 (* 2nd case: Server(pid,j) > Server(pid,j')  *)
 assert (pred(Server(pid,j)) = Server(pid,j') 
@@ -778,21 +798,17 @@ assert (pred(Server(pid,j)) = Server(pid,j')
 case H0 => //. 
 
 (* Server(pid,j) > pred(Server(pid,j)) = Server(pid,j') *)
-use counterIncreaseStrictly with pid, j => //.
-subst Server(pid,j'), pred(Server(pid,j)).
-by use orderStrict with SCtr(pid)@pred(Server(pid,j)), SCtr(pid)@Server(pid,j).
+use counterIncreaseStrictly with pid, j as H1 => //.
+by apply orderStrict in H1.
 
 (* Server(pid,j)  > pred(Server(pid,j)) >  Server(pid,j') *) 
 use counterIncreaseStrictly with pid, j => //.
 use counterIncreaseBis with pred(Server(pid,j)), Server(pid,j'), pid  => //. 
 case H2. 
 
-use orderTrans with 
-  SCtr(pid)@Server(pid,j'),  
-  SCtr(pid)@pred(Server(pid,j)), 
-  SCtr(pid)@Server(pid,j) => //. 
-by use orderStrict with SCtr(pid)@Server(pid,j'), SCtr(pid)@Server(pid,j). 
+apply orderTrans _ _ (SCtr(pid)@Server(pid,j)) in H2; 1: auto.
+apply eq_sym in Meq. 
+by apply orderStrict in Meq.
 
-rewrite H2 in *.
-by use orderStrict with SCtr(pid)@Server(pid,j'), SCtr(pid)@Server(pid,j). 
+by apply orderStrict in H1.
 Qed.

@@ -676,7 +676,7 @@ let mk_phi_proj
     (* TODO: we are using the less precise version of [fold_macro_support] *)
     let macro_cases =
       Iter.fold_macro_support0 (fun descr t macro_cases ->
-          let fv = Sv.of_list1 descr.Action.indices in
+          let fv = Sv.diff (Term.fv t) (Vars.to_set env) in
           let new_idx = Fresh.get_name_indices_ext ~fv cntxt n.s_symb t in
           List.assoc_up_dflt descr [] (fun l -> new_idx @ l) macro_cases
         ) cntxt frame []
@@ -1372,9 +1372,7 @@ let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
     Iter.fold_macro_support (fun iocc macro_cases ->
         let descr = iocc.iocc_descr in
         let t = iocc.iocc_cnt in
-        let fv = Sv.of_list1 descr.Action.indices in
-
-        (* assert (Sv.subset (Term.fv t) (Sv.union fv (Vars.to_set env))); *)
+        let fv = Sv.diff (Term.fv t) (Vars.to_set env) in
 
         let new_cases =
           Iter.get_f_messages_ext ~fv ~cntxt param.h_fn param.h_key.s_symb t
