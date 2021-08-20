@@ -202,29 +202,6 @@ process YSM_AEAD_YUBIKEY_OTP_DECODE (pid:index) =
       out(cHSM, snd(otp_dec)).
 
 
-(* intermediate process *)
-process YSM_AEAD_YUBIKEY_OTP_DECODE_middle (pid:index) =
-  in(cHSM,xdata); (* xdata = <<pid,kh>, <aead, otp>> with otp = enc(<sid,cpt>,r,k)*)
-   if fst(xdata) = <mpid(pid),kh> then
-    let aead = fst(snd(xdata)) in
-    let otp = snd(snd(xdata)) in
-
-    let aead_dec =
-     diff(dec(aead,mkey),
-           try find pid' such that
-             aead =
-             enc(<k_dummy(pid), sid(pid')>, rinit(pid'), mkey)
-           in
-             <k(pid'), sid(pid')>
-           else fail)
-    in
-
-    let otp_dec = dec(otp,fst(aead_dec)) in
-
-    if aead_dec <> fail && otp_dec <> fail && fst(otp_dec) = snd(aead_dec)
-    then
-      out(cHSM, snd(otp_dec)).
-
 (*------------------------------------------------------------------*)
 process Yubikey0 =
   ( (!_pid !_j Plug   : yubikeyplug(pid)                 ) |
@@ -238,23 +215,15 @@ system
   (!_pid !_j Write  : write_AEAD(pid)                  ) |
   (!_pid !_j Decode : YSM_AEAD_YUBIKEY_OTP_DECODE(pid))).
 
-(* middle system with ideal system *)
-(* TODO: this is not correct *)
-system [middle]
-  (Yubikey0 | 
-  (!_pid !_j Read   : read_AEAD_ideal(pid)                   ) |
-  (!_pid !_j Write  : write_AEAD_ideal(pid)                  ) |
-  (!_pid !_j Decode : YSM_AEAD_YUBIKEY_OTP_DECODE_middle(pid))).
-
 
 (* TODO: allow to have axioms for all systems *)
 axiom orderTrans (n1,n2,n3:message): n1 ~< n2 => n2 ~< n3 => n1 ~< n3.
 
-(* TODO: allow to have axioms for all systems *)
 axiom orderStrict(n1,n2:message): n1 = n2 => n1 ~< n2 => False.
 
-(* TODO: allow to have axioms for all systems *)
 axiom mpid_inj (pid, pid':index): mpid(pid) = mpid(pid') => pid = pid'.
+
+axiom pair_ne_fail (x,y: message) : <x,y> <> fail.
 
 (* LIBRAIRIES *)
 
@@ -403,6 +372,26 @@ Qed.
 hint rewrite if_else_not.
 
 
+(*------------------------------------------------------------------*)
+(* and *)
+
+axiom and_comm (b,b' : boolean) : (b && b') = (b' && b).
+
+axiom and_true_l (b : boolean) : (true && b) = b.
+hint rewrite and_true_l.
+
+goal and_true_r (b : boolean) : (b && true) = b.
+Proof. by rewrite and_comm and_true_l. Qed.
+hint rewrite and_true_r.
+
+axiom and_false_l (b : boolean) : (false && b) = false.
+hint rewrite and_false_l.
+
+goal and_false_r (b : boolean) : (b && false) = false.
+Proof. by rewrite and_comm and_false_l. Qed.
+hint rewrite and_false_r.
+
+(* or *)
 axiom or_comm (b,b' : boolean) : (b || b') = (b' || b).
 
 axiom or_false_l (b : boolean) : (false || b) = b.
@@ -436,6 +425,14 @@ goal diff_eq ['a] (x,y : 'a) : x = y => diff(x,y) = x.
 Proof. by project. Qed.
 hint rewrite diff_eq.
 
+goal diff_diff_l ['a] (x,y,z: 'a): diff(diff(x,y),z) = diff(x,z).
+Proof. by project. Qed.
+hint rewrite diff_diff_l.
+
+goal diff_diff_r ['a] (x,y,z: 'a): diff(x,diff(y,z)) = diff(x,z).
+Proof. by project. Qed.
+hint rewrite diff_diff_r.
+
 (* instances of f_apply *)
 goal dec_apply (x,x',k : message): x = x' => dec(x,k) = dec(x',k).
 Proof. auto. Qed.
@@ -443,8 +440,8 @@ Proof. auto. Qed.
 (* PROOF *)
 
 (* First property of AEAD decoding *)
-goal [left] valid_decode (t : timestamp) (pid,j : index):
-  t = Decode(pid,j) =>
+goal valid_decode (t : timestamp) (pid,j : index):
+  (t = Decode(pid,j) || t = Decode1(pid,j)) =>
   happens(t) => 
   (aead_dec(pid,j)@t <> fail) =
   (exists(pid0 : index), 
@@ -455,24 +452,25 @@ Proof.
 
   (* Left => Right *)
   intro AEAD_dec.
-  expand aead_dec.
-  intctxt AEAD_dec => H; 2: congruence.
 
-  clear H; intro AEAD_eq.
+  case Eq; 
+  expand aead_dec;
+  (intctxt AEAD_dec => H; 2: congruence);
+  clear H; intro AEAD_eq;
   by exists pid0.
 
   (* Right => Left *) 
   intro [pid0 H].
-  expand aead_dec.
-  rewrite -H /AEAD /=.
-  admit.
-  (* TODO: axiom? *)
+  case Eq; 
+  expand aead_dec;
+  rewrite -H /AEAD /=;
+  apply pair_ne_fail.
 Qed.  
 
 (* using the `valid_decode` lemma, we can characterize when the full
    decoding check goes through *)
-goal [left] valid_decode_charac (t : timestamp) (pid,j : index):
-  t = Decode(pid,j) =>
+goal valid_decode_charac (t : timestamp) (pid,j : index):
+  (t = Decode(pid,j) || t = Decode1(pid,j)) =>
   happens(t) => 
   ( aead_dec(pid,j)@t <> fail &&
     otp_dec(pid,j)@t <> fail &&
@@ -492,64 +490,31 @@ Proof.
   destruct AEAD_dec as [pid0 AEAD_dec]. 
   
   assert (pid0 = pid).
-  by use mpid_inj with pid, pid0.
-  auto.
+  by case Eq; use mpid_inj with pid, pid0.
+  case Eq; project; auto.
 
   (* <= case *)
-  intro [AEAD_dec OTP_dec Sid_eq]. 
-  simpl.
-  rewrite valid_decode //. 
-  by exists pid.
+  intro [AEAD_dec OTP_dec Sid_eq].
+  rewrite valid_decode //.   
+  by project; case Eq; simpl; exists pid.
 Qed.
 
+
 (*------------------------------------------------------------------*)
-(* Adrien: the following devlopment is probably no longer useful. *)
-
-(* arbitrary constant, assumed different from fail. Only used for proof purposes. *)
-abstract notFail : message. 
-axiom notFail_ax : notFail <> fail.
-
-(* alternative formulation of `valid_decode`, using a try find *)
-goal [left] valid_decode_tf (t : timestamp) (pid,j : index):
-  t = Decode(pid,j) =>
-  happens(t) => 
-  aead_dec(pid,j)@t <> fail <=>
-  aead_dec(pid,j)@t = 
-  try find pid' such that 
-      aead(pid,j)@t = AEAD(pid')@init
-    in 
-      <k(pid'), <mpid(pid'),sid(pid')>>
-    else notFail. 
-  (* note: we can replace `notFail` by anything there, as the test 
-     of the try find always goes through  *)
+(* auxilliary simple lemma, used to rewrite one of the conditional
+   equality in the then branch. *)
+goal if_aux (b,b0,b1,b2 : boolean) (x,y,z,u,v:message):
+   if (b && (x = y && b0 && b1 && b2)) then
+     snd(dec(z,diff(fst(dec(y,u)),v))) =
+   if (b && (x = y && b0 && b1 && b2)) then 
+    snd(dec(z,diff(fst(dec(x,u)),v))). 
 Proof.
-  intro Eq Hap.
-  split. 
-  
-  (* => case *)
-  intro  @/aead_dec AEAD_dec. 
-  intctxt AEAD_dec => H; 2: congruence.
-
-  clear H; intro AEAD_eq.
-  rewrite -AEAD_eq /= in *.
-  clear AEAD_dec.
-  case (
-   try find pid' such that
-    enc(<k(pid0),<mpid(pid0),sid(pid0)>>,rinit(pid0),mkey) = AEAD(pid')@init
-   in <k(pid'), <mpid(pid'),sid(pid')>> else notFail).
-  by intro [pid' [Tc ->]].
-  intro [A A0]. 
-  by use A with pid0.
-
-  (* <= case *)
-  intro ->.
-  case (
-   try find pid' such that aead(pid,j)@t = AEAD(pid')@init in
-     <k(pid'),<mpid(pid'),sid(pid')>>
-   else notFail).   
-  intro [pid' [_ ->]].
-  admit. (* TODO: axiom on pairs and fail ? *)
-  by intro _; apply notFail_ax.
+  intro >. 
+  case b => _ //. 
+  case b0 => _ //. 
+  case b1 => _ //.
+  case b2 => _ //. 
+  case (x = y) => U //.
 Qed.
 
 (*------------------------------------------------------------------*)
@@ -561,12 +526,14 @@ Proof.
   enrich seq(pid -> k(pid)).
   enrich seq(pid -> k_dummy(pid)).
   enrich seq(pid -> sid(pid)).
+  enrich seq(pid -> AEAD(pid)@init).
   enrich seq(pid -> AEAD(pid)@t).
   dependent induction t => t Hind Hap.
   case t => Eq;
   try (
     repeat destruct Eq as [_ Eq];
     rewrite /*;
+    rewrite /AEAD in Hind;
     by apply Hind (pred(t))).
 
   (* init *)
@@ -575,7 +542,7 @@ Proof.
   (* Write(pid,j) *)
   repeat destruct Eq as [_ Eq]. 
   expandall.
-  fa 6; fa 7; fa 7. 
+  fa 7; fa 8; fa 8. 
   
   (* TODO: faseq 0 would allow to conclude there *)
   splitseq 0: (fun (pid0:index) -> pid0 = pid); simpl.
@@ -589,19 +556,25 @@ Proof.
   (* Decode(pid,j) *)
   repeat destruct Eq as [_ Eq].
   expand frame, exec, output, cond, AEAD. 
-  fa 6. fa 7. fa 7.
+  fa 7. fa 8. fa 8.
 
-  (* by apply Hind (pred(t)). *)
-  admit.
-
+  rewrite valid_decode_charac //. 
+  (* rewrite the content of the then branch *)
+  rewrite /otp_dec /aead_dec if_aux /AEAD /= in 9.
+  fa 9.
+  expandall.
+  fa 8; fa 8; fa 8; fa 8.
+  by apply Hind (pred(t)).
 
   (* Decode1(pid,j) *)
-  repeat destruct Eq as [_ Eq]. 
-  expandall.
-  fa 6; fa 7; fa 7; fa 8; fa 8.
+  repeat destruct Eq as [_ Eq].
+  expand frame, exec, output, cond, AEAD. 
+  fa 7. fa 8. fa 8.
 
-  (* by apply Hind (pred(t)). *)
-  admit.
+  rewrite valid_decode_charac //. 
+  expandall.
+  fa 8; fa 8; fa 8; fa 8.
+  by apply Hind (pred(t)).
 Qed.
   
 
