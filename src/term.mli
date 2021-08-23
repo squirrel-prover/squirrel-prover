@@ -84,7 +84,7 @@ and _ term = private
       msymb * Type.message term list * Type.timestamp term
       -> Type.message term
 
-  | Seq    : Vars.index list * Type.message term -> Type.message term
+  | Seq    : Vars.evar list * Type.message term -> Type.message term
   | Pred   : Type.timestamp term -> Type.timestamp term
   | Action : Symbols.action Symbols.t * Vars.index list -> Type.timestamp term
   | Var    : 'a Vars.var -> 'a term
@@ -263,7 +263,7 @@ val erefresh_vars_env :
   Vars.env -> Vars.evar list -> Vars.env * Vars.evar list * esubst list
  
 (*------------------------------------------------------------------*)
-val apply_ht : hterm -> 'a term list -> hterm
+val apply_ht : hterm -> eterm list -> hterm
 
 (*------------------------------------------------------------------*)
 (** {2 Builtins function symbols} *)
@@ -420,10 +420,10 @@ val mk_atom : ord -> 'a term -> 'b term -> message
 val mk_happens : timestamp -> message 
 val mk_atom1 : generic_atom -> message 
 
-val mk_seq0 : ?simpl:bool -> Vars.index list -> message -> message
+val mk_seq0 : ?simpl:bool -> Vars.evars -> message -> message
 
 (** Refresh variables *)
-val mk_seq : Vars.env -> Vars.index list -> message -> message
+val mk_seq : Vars.env -> Vars.evars -> message -> message
 
 (*------------------------------------------------------------------*)
 (** {3 Destructors} *)

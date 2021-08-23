@@ -866,7 +866,7 @@ let fa s =
           | Term.Seq (vars,t),
             Term.Seq (vars',t') when vars = vars' ->
             let env = ref (TS.env s) in
-            let vars, subst = Term.refresh_vars (`InEnv env) vars in
+            let vars, subst = Term.erefresh_vars (`InEnv env) vars in
             let s = TS.set_env !env s in
             let t = Term.subst subst t in
             let t' = Term.subst subst t' in

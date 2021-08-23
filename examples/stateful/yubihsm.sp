@@ -582,14 +582,14 @@ Qed.
 (* set showStrengthenedHyp=true. *)
 equiv atomic_keys.
 Proof.
-  enrich seq(pid,j -> npr(pid,j)). 
-  enrich seq(pid,j -> nonce(pid,j)). 
-  enrich seq(pid -> k(pid)).
-  enrich seq(pid -> k_dummy(pid)).
-  enrich seq(pid -> sid(pid)).
-  enrich seq(pid -> if Setup(pid) <= t then AEAD(pid)@Setup(pid)).
+  enrich seq(pid,j:index -> npr(pid,j)). 
+  enrich seq(pid,j:index -> nonce(pid,j)). 
+  enrich seq(pid:index -> k(pid)).
+  enrich seq(pid:index -> k_dummy(pid)).
+  enrich seq(pid:index -> sid(pid)).
+  enrich seq(pid:index -> if Setup(pid) <= t then AEAD(pid)@Setup(pid)).
 
-  enrich seq(pid -> if Setup(pid) <= t then AEAD(pid)@t).
+  enrich seq(pid:index -> if Setup(pid) <= t then AEAD(pid)@t).
  (* (†) TODO: this last sequence must be changed to: *)
   (* enrich seq(ts -> if ts <= t then AEAD(pid)@ts). *)
 

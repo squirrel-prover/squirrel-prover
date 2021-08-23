@@ -35,6 +35,7 @@ let hash v  = Hashtbl.hash (name v)
 let ehash (EVar v) = hash v
 
 let ty v = v.var_type
+let ety (EVar v) = Type.ETy v.var_type
 
 let norm_ty : type a. Type.Infer.env -> a var -> a var =
   fun env v ->

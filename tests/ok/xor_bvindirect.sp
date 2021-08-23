@@ -10,7 +10,7 @@ abstract ko : message
 
 channel c
 
-system !_i out(c,<n(i),seq(i->n(i))>).
+system !_i out(c,<n(i),seq(i:index ->n(i))>).
 
 
 axiom len_ok (i:index): len(ok) = len(n(i))

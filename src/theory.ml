@@ -42,7 +42,7 @@ type term_i =
   | Tpat
   | Tpred of term
   | Diff  of term * term
-  | Seq   of lsymb list * term
+  | Seq   of bnds * term
   | Find  of lsymb list * term * term * term
 
   | App of lsymb * term list
@@ -96,13 +96,7 @@ let rec equal t t' = match L.unloc t, L.unloc t' with
   | Compare (ord, a, b), Compare (ord', a', b') ->
     ord = ord' && equal a a' && equal b b'
 
-  | Seq (l, a), Seq (l', a') ->
-    List.length l = List.length l' &&
-    List. for_all2 (fun (s) (s') ->
-        L.unloc s = L.unloc s'
-      ) l l'
-      && equal a a'
-
+  | Seq (l, a),    Seq (l', a') 
   | ForAll (l, a), ForAll (l', a')
   | Exists (l, a), Exists (l', a') ->
     List.length l = List.length l' &&
@@ -177,10 +171,6 @@ let rec pp_term_i ppf t = match t with
   | Diff (l,r) ->
       Fmt.pf ppf "diff(%a,%a)" pp_term l pp_term r
 
-  | Seq (vs, b) ->
-    Fmt.pf ppf "@[seq(@[%a->%a@])@]"
-      (Utils.pp_list Fmt.string) (L.unlocs vs) pp_term b
-
   | App (f,[t1;t2]) when L.unloc f = "exp" ->
     Fmt.pf ppf "%a^%a" pp_term t1 pp_term t2
 
@@ -222,6 +212,11 @@ let rec pp_term_i ppf t = match t with
     Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Term.pp_ord ord pp_term tr
 
   | Happens t -> Fmt.pf ppf "happens(%a)" (Utils.pp_list pp_term) t
+
+
+  | Seq (vs, b) ->
+    Fmt.pf ppf "@[seq(@[%a->%a@])@]"
+      pp_var_list vs pp_term b
 
   | ForAll (vs, b) ->
     Fmt.pf ppf "@[forall (@[%a@]),@ %a@]"
@@ -903,22 +898,24 @@ and convert0 :
 
   | Seq (vs,t) ->
     let env, evs =
-      convert_bnds state.env (List.map (fun x -> x, Type.eindex) vs)
+      convert_p_bnds state.table state.ty_vars state.env vs
     in
 
     let tyv = Type.Infer.mk_univar state.ty_env in
 
     let t = conv ~env (Type.TUnivar tyv) t in
 
-    let vs : Type.index Vars.var list =
-      List.map (function (Vars.EVar v) ->
-        try Vars.cast v Type.KIndex
-        with Vars.CastError -> type_error ()
+    let () =
+      List.iter (function (Vars.EVar v) ->
+          match Vars.kind v with
+          | Type.KIndex -> ()
+          | Type.KTimestamp -> ()
+          | _ -> type_error ()
         ) evs
     in
 
     begin match Type.kind ty with
-      | Type.KMessage -> Term.mk_seq0 vs t
+      | Type.KMessage -> Term.mk_seq0 ~simpl:false evs t
       | _ -> type_error ()
     end
 

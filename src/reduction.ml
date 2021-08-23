@@ -121,7 +121,7 @@ module Mk (S : LowSequent.S) = struct
             Term.cast (Term.kind t) red_t, true
 
         | Term.Seq (is, t0) ->
-          let _, subst = Term.refresh_vars `Global is in
+          let _, subst = Term.erefresh_vars `Global is in
           let t0 = Term.subst subst t0 in
           (* let st = { st with subst = subst @ st.subst; } in *)
           let red_t0, has_red = reduce st t0 in

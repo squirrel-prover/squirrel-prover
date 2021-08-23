@@ -251,7 +251,7 @@ some simple enriching of the induction hypothesis, and then dup applications. *)
 
 equiv [auth] auth.
 Proof.
-   enrich a1, b1, seq(i-> g^b(i)), seq(i-> g^a(i)), kP, kS, hKey.
+   enrich a1, b1, seq(i:index -> g^b(i)), seq(i:index -> g^a(i)), kP, kS, hKey.
 
    induction t.
 
@@ -265,7 +265,7 @@ Proof.
    by expandall; fa 7.
    (* Pauth3 *)
    expandall; fa 7.
-   by expandseq seq(i->g^b(i)),i. 
+   by expandseq seq(i:index ->g^b(i)),i. 
    (* Pfail *)
    expand frame.
 
@@ -296,7 +296,7 @@ Proof.
 
    (* Sauth3 *)
    expandall; fa 7.
-   by expandseq seq(i->g^a(i)),i.
+   by expandseq seq(i:index ->g^a(i)),i.
    (* Safil *)
    expand frame.
 

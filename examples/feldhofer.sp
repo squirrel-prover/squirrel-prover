@@ -184,7 +184,7 @@ Qed.
 
 equiv unlinkability.
 Proof.
-  enrich seq(k->nr(k)), seq(i,j->nt(i,j)).
+  enrich seq(k:index ->nr(k)), seq(i,j:index ->nt(i,j)).
 
   induction t.
 
@@ -193,7 +193,7 @@ Proof.
 
   (* Action 1/4: Reader *)
 
-  expandseq seq(k->nr(k)),k.
+  expandseq seq(k:index ->nr(k)),k.
   expandall.
   by fa 3.
 
@@ -283,8 +283,8 @@ Proof.
   fa 3; fadup 3.
   fa 3; fadup 3.
   enckp 3, k_fresh; 1: auto.
-  expandseq seq(k->nr(k)),k.
-  expandseq seq(i,j->nt(i,j)),i,j.
+  expandseq seq(k:index ->nr(k)),k.
+  expandseq seq(i,j:index ->nt(i,j)),i,j.
   fa 5.
   fresh 6.
   by fresh 5; yesif 5.
@@ -312,7 +312,7 @@ Proof.
 
   enckp 3, k_fresh; 1: auto. 
 
-  expandseq seq(i,j->nt(i,j)),i,j.
+  expandseq seq(i,j:index ->nt(i,j)),i,j.
   fa 4.
   fresh 5.
   by fresh 4; yesif 4. 

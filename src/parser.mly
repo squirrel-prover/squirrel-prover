@@ -114,7 +114,8 @@ sterm_i:
 /* formula */
 
 | DIFF LPAREN t=term COMMA t0=term RPAREN { Theory.Diff (t,t0) }
-| SEQ LPAREN i=ids ARROW t=term RPAREN    { Theory.Seq (i,t) }
+
+| SEQ LPAREN vs=arg_list ARROW t=term RPAREN    { Theory.Seq (vs,t) }
 
 | l=loc(NOT) f=sterm 
     { let fsymb = L.mk_loc (L.loc l) "not" in

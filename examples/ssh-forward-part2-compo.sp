@@ -452,9 +452,9 @@ Qed.
 
 equiv [auth] auth.
 Proof.
-  enrich a1, b1, seq(i-> b(i)), seq(i-> a(i)), kP, kS;
-  enrich ake11, bke11, seq(i-> bke1(i)), seq(i-> ake1(i)), k11, hKey, r, 
-   seq(i->r2(i)), r3, r4, r5.
+  enrich a1, b1, seq(i:index -> b(i)), seq(i:index -> a(i)), kP, kS;
+  enrich ake11, bke11, seq(i:index -> bke1(i)), seq(i:index -> ake1(i)), k11, hKey, r, 
+   seq(i:index ->r2(i)), r3, r4, r5.
 
   induction t.
 
@@ -466,7 +466,7 @@ Proof.
   by expandall; fa 17.
  (* P3 *)
   expandall; fa 17.
-  by expandseq seq(i -> r2(i)),i.
+  by expandseq seq(i:index -> r2(i)),i.
  (* A *)
   by expandall; fa 17.
   (* A1 *)
@@ -481,7 +481,7 @@ Proof.
   by expandall; fa 17.
   (* SDISauth3 *)
   expandall; fa 17.
-  by expandseq seq(i -> a(i)),i.
+  by expandseq seq(i:index -> a(i)),i.
   (* Sfail *)
   expand frame.
 
@@ -512,8 +512,8 @@ Proof.
   by expandall; fa 17.
   (* PDISauth7 *)
   expandall; fa 17.
-  expandseq seq(i -> b(i)),i. 
-  by expandseq seq(i -> bke1(i)),i.
+  expandseq seq(i:index -> b(i)),i. 
+  by expandseq seq(i:index -> bke1(i)),i.
   (* Pfail *)
   expand frame.
 

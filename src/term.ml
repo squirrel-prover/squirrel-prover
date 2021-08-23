@@ -89,7 +89,7 @@ and _ term =
       msymb * Type.message term list * Type.timestamp term ->
       Type.message term
 
-  | Seq    : Vars.index list * Type.message term -> Type.message term
+  | Seq    : Vars.evar list * Type.message term -> Type.message term
   | Pred   : Type.timestamp term -> Type.timestamp term        
   | Action :
       Symbols.action Symbols.t * Vars.index list ->
@@ -133,8 +133,8 @@ let rec hash : type a. a term -> int = function
     let h = hcombine_list hash (hash_isymb m) l in
     hcombine 2 (hcombine h (hash ts))
 
-  | Seq (vs, b)       -> 
-    let h = hcombine_list Vars.hash (hash b) vs in
+  | Seq (vars, b) -> 
+    let h = hcombine_list Vars.ehash (hash b) vars in
     hcombine 3 h
 
   | Pred ts -> hcombine 4 (hash ts)
@@ -852,7 +852,7 @@ and _pp : type a.
 
   | Seq (vs, b) ->
     Fmt.pf ppf "@[<hov 2>seq(%a->@,%a)@]"
-      Vars.pp_list vs (pp (seq_fixity, `NonAssoc)) b
+      Vars.pp_typed_list vs (pp (seq_fixity, `NonAssoc)) b
 
   | Pred ts -> 
     Fmt.pf ppf "pred(%a)" 
@@ -1105,8 +1105,6 @@ let fv : 'a term -> Sv.t = fun term ->
         (of_list s.s_indices)
         (Sv.union (fv ts) (fvs l))
 
-    | Seq (a, b) -> Sv.diff (fv b) (of_list a)
-
     | Name s -> of_list s.s_indices
 
     | Diff (a, b) -> fvs [a;b]
@@ -1118,6 +1116,7 @@ let fv : 'a term -> Sv.t = fun term ->
 
     | Atom a -> generic_atom_vars a 
 
+    | Seq    (a, b)
     | ForAll (a, b)
     | Exists (a, b) -> Sv.diff (fv b) (Sv.of_list a)
 
@@ -1191,29 +1190,26 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
       | Macro (m, l, ts) ->
         Macro (subst_macro s m, List.map (subst s) l, subst s ts)
 
-      (* Seq in annoying to do *)
-      | Seq ([], f) -> Seq ([], subst s f)
-
-      | Seq ([a], f) -> 
-        let a, s = subst_binding (Vars.EVar a) s in
-        let f = subst s f in
-        let a = Vars.ecast a Type.KIndex in
-        Seq ([a],f)
-
-      | Seq (a :: vs, f) -> 
-        let a, s = subst_binding (Vars.EVar a) s in
-        let f = subst s (Seq (vs,f)) in
-        let a = Vars.ecast a Type.KIndex in
-        let vs, f = match f with
-          | Seq (vs, f) -> vs, f
-          | _ -> assert false in
-        Seq (a :: vs,f)
-
       | Var m -> Var m
       | Pred ts -> Pred (subst s ts)
       | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
       | Diff (a, b) -> Diff (subst s a, subst s b)
       | Atom a-> Atom (subst_generic_atom s a)
+
+      | Seq ([], f) -> Seq ([], subst s f)
+
+      | Seq ([a], f) -> 
+        let a, s = subst_binding a s in
+        let f = subst s f in
+        Seq ([a],f)
+
+      | Seq (a :: vs, f) -> 
+        let a, s = subst_binding a s in
+        let f = subst s (Seq (vs,f)) in
+        let vs, f = match f with
+          | Seq (vs, f) -> vs, f
+          | _ -> assert false in
+        Seq (a :: vs,f)
 
       | ForAll ([], f) -> subst s f
 
@@ -1572,12 +1568,12 @@ let mk_happens t = Atom (`Happens t)
 
 let mk_atom1 at = Atom at
 
-let mk_seq0 ?(simpl=false) is term = 
+let mk_seq0 ?(simpl=false) (is : Vars.evars) term = 
   let is = 
     if simpl then
       let term_fv = fv term in
       List.filter (fun i ->
-          Sv.mem (Vars.EVar i) term_fv
+          Sv.mem i term_fv
         ) is
     else is
   in
@@ -1586,7 +1582,7 @@ let mk_seq0 ?(simpl=false) is term =
   | _ -> Seq (is, term)
 
 (* only refresh necessary vars, hence we need an environment *)
-let mk_seq env is term =
+let mk_seq env (is : Vars.evars) term =
   let env =
     let env_vars = Sv.of_list (Vars.to_list env) in
     let term_vars = fv term in
@@ -1594,7 +1590,7 @@ let mk_seq env is term =
     ref (Vars.of_list vars)
   in
 
-  let is, s = refresh_vars (`InEnv env) is in
+  let is, s = erefresh_vars (`InEnv env) is in
   let term = subst s term in
 
   match is with
@@ -1605,7 +1601,7 @@ let mk_seq env is term =
 (*------------------------------------------------------------------*)
 (** {2 Apply} *)
 
-let apply_ht (ht : hterm) terms = match ht with
+let apply_ht (ht : hterm) (terms : eterm list) = match ht with
   | Lambda (evs, t) ->
     assert (List.length terms <= List.length evs);
     let evs0, evs1 = List.takedrop (List.length terms) evs in
@@ -1614,7 +1610,7 @@ let apply_ht (ht : hterm) terms = match ht with
     let ht = subst_ht s (Lambda (evs1, t)) in
 
     let s_app = 
-      List.map2 (fun (Vars.EVar v) t -> 
+      List.map2 (fun (Vars.EVar v) (ETerm t) -> 
           ESubst (Var v, cast (Vars.kind v) t)
         ) evs0 terms 
     in

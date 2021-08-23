@@ -50,7 +50,7 @@ type term_i =
   | Tpat  
   | Tpred of term
   | Diff  of term * term
-  | Seq   of lsymb list * term
+  | Seq   of bnds * term
   | Find  of lsymb list * term * term * term
 
   | App of lsymb * term list

@@ -47,6 +47,7 @@ val ehash : evar -> int
 val name : 'a var -> string
 
 val ty : 'a var -> 'a Type.ty
+val ety : evar -> Type.ety
 
 val norm_ty  : Type.Infer.env -> 'a var -> 'a var
 val enorm_ty : Type.Infer.env ->   evar ->   evar

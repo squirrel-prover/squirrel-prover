@@ -8,7 +8,7 @@ name n : index->index->message
 
 channel c
 
-system out(c,seq(a,b -> h(n(a,a),k(b,b)))).
+system out(c,seq(a,b:index -> h(n(a,a),k(b,b)))).
 
 (* Here, there should be single direct case in euf tactic,
  * where the same variable v is introduced to represent the bound

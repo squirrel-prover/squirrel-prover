@@ -10,7 +10,7 @@ name m : index->message
 
 channel c
 
-system !_i out(c,<h(n(i),k),seq(i->h(n(i),k))>).
+system !_i out(c,<h(n(i),k),seq(i:index ->h(n(i),k))>).
 
 (* The main test, with a non-empty list of bound variables. *)
 global goal nonempty (tau:timestamp,i:index) : 

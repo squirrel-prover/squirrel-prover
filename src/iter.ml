@@ -23,7 +23,7 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
     | Diff(a, b) -> self#visit_message a; self#visit_message b
 
     | Seq (a, b) ->
-      let _, s = Term.refresh_vars `Global a in
+      let _, s = Term.erefresh_vars `Global a in
       let b = Term.subst s b in
       self#visit_message b
 
@@ -68,7 +68,7 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
     | Diff (a, b) -> self#fold_message (self#fold_message x a) b
 
     | Seq (a, b) ->
-      let _, s = Term.refresh_vars `Global a in
+      let _, s = Term.erefresh_vars `Global a in
       let b = Term.subst s b in
       self#fold_message x b
 
@@ -204,9 +204,9 @@ let tfold_occ : type b.
     func ~fv ~cond (Term.ETerm t) acc
 
   | Term.Seq (is, t) ->
-    let is, subst = Term.refresh_vars `Global is in
+    let is, subst = Term.erefresh_vars `Global is in
     let t = Term.subst subst t in
-    let fv = Sv.add_list fv is in
+    let fv = Sv.union fv (Sv.of_list is) in
     func ~fv ~cond (Term.ETerm t) acc
 
   | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite ->

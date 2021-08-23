@@ -8,7 +8,7 @@ name m : index->message
 system null.
 
 (* The main test, with a non-empty list of bound variables. *)
-equiv nonempty (i:index) : seq(i->n(i)), diff(n(i),m(i)).
+equiv nonempty (i:index) : seq(i:index ->n(i)), diff(n(i),m(i)).
 Proof.
   fresh 1.
   (* Check that the right formula has been produced,

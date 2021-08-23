@@ -137,8 +137,8 @@ Proof.
 Abort.
 
 global goal _ (x : message) :
-  equiv(seq (i -> <ok(i), x>)) ->
-  equiv(seq (i -> <ok(i), x>)).
+  equiv(seq (i:index -> <ok(i), x>)) ->
+  equiv(seq (i:index -> <ok(i), x>)).
 Proof.
  intro H; apply H.
 Qed.
@@ -150,7 +150,7 @@ Qed.
    `ok` is an abstract function. *)
 global goal _ (y : message) :
  equiv(empty) ->
- equiv(seq (j -> <ok(j), ok(j)>)).
+ equiv(seq (j:index -> <ok(j), ok(j)>)).
 Proof.
  intro H; apply H.
 Qed.
@@ -159,51 +159,52 @@ Qed.
    cannot be deduce. *)
 global goal _ (y : message) :
  equiv(empty) ->
- equiv(seq (j -> <n1(j), n1(j)>)).
+ equiv(seq (j:index -> <n1(j), n1(j)>)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
 
 global goal _ (x : message) :
-  equiv(seq (i -> <n1(i), x>)) ->
-  equiv(seq (i -> <n1(i), x>)).
+  equiv(seq (i:index -> <n1(i), x>)) ->
+  equiv(seq (i:index -> <n1(i), x>)).
 Proof. 
  intro H; apply H.
 Qed.
 
 (* with alpha-renaming *)
 global goal _ (x : message) :
-  equiv(seq (i -> <n1(i), x>)) ->
-  equiv(seq (j -> <n1(j), x>)).
+  equiv(seq (i:index -> <n1(i), x>)) ->
+  equiv(seq (j:index -> <n1(j), x>)).
 Proof.
  intro H; apply H.
 Qed.
 
 global goal _ (y : message) :
-  (forall (x : message), equiv(seq (i -> <n1(i), x>))) ->
-  equiv(seq (j -> <n1(j), f(y)>)).
+  (forall (x : message), equiv(seq (i:index -> <n1(i), x>))) ->
+  equiv(seq (j:index -> <n1(j), f(y)>)).
 Proof.
  intro H; apply H.
 Qed.
  
 (* we cannot match `x` with `n1(j)` since `j` is bound in the conclusion. *)
 global goal _ (y : message) :
- (forall (x : message), equiv(seq (i -> <n1(i), x>))) ->
- equiv(seq (j -> <n1(j), n1(j)>)).
+ (forall (x : message), equiv(seq (i:index -> <n1(i), x>))) ->
+ equiv(seq (j:index -> <n1(j), n1(j)>)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
 
 (* with a sequence *)
 name m : index -> message.
-global goal _ : equiv(seq(i->m(i))) -> equiv(seq(k->m(k))).
+global goal _ : equiv(seq(i:index ->m(i))) -> equiv(seq(k:index -> m(k))).
 Proof. 
  intro H; apply H.
 Qed.
 
 (* with a sequence over two indices *)
 name n : index -> index -> message.
-global goal _ : equiv(seq(i,j->n(i,j))) -> equiv(seq(k,l->n(k,l))).
+global goal _ : 
+  equiv(seq(i,j:index -> n(i,j))) -> equiv(seq(k,l:index -> n(k,l))).
 Proof. 
  intro H; apply H.
 Qed.

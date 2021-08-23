@@ -382,7 +382,7 @@ let fa i s =
           (fun i i' -> Term.ESubst (Term.mk_var i, Term.mk_var i'))
           vars vars'
       in
-      let c' = Term.mk_seq0 vars c in
+      let c' = Term.mk_seq0 (List.map Vars.evar vars) c in
       let t' = Term.subst subst t in
       let biframe =
         List.rev_append before
@@ -542,7 +542,7 @@ let fa_dup_int i s =
         | Term.Fun (fs,_, [f;g]) when fs = Term.f_and -> f,g
 
         | Term.Seq (vars, Term.Fun (fs,_, [f;g])) when fs = Term.f_and ->
-          let _, subst = Term.refresh_vars `Global vars in
+          let _, subst = Term.erefresh_vars `Global vars in
           Term.subst subst f,
           Term.subst subst g
 
@@ -778,8 +778,6 @@ let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
   match EquivLT.convert_i s term with
   (* we expect term to be a sequence *)
   | (Seq (vs, t) as term_seq), ty ->
-    let vs = List.map (fun x -> Vars.EVar x) vs in
-
     (* we parse the arguments ths, to create a substution for variables vs *)
     let subst = Theory.parse_subst table (ES.ty_vars s) env vs ths in
 
@@ -969,16 +967,8 @@ exception Not_ifcond
   * the formula only in the jth subterm of the then branch (if it exists,
   * otherwise raise an error). *)
 let push_formula (j: 'a option) f term =
-  let f_vars = Term.get_vars f in
-  let not_in_f_vars vs =
-    List.fold_left
-      (fun acc v ->
-         if List.mem (Vars.EVar v) f_vars
-         then false
-         else acc)
-      true
-      vs
-  in
+  let f_vars = Term.fv f in
+  let not_in_f_vars vs = Sv.disjoint vs f_vars in
 
   let rec mk_ite m = match m with
     (* if c then t else e becomes if (f => c) then t else e *)
@@ -1013,11 +1003,11 @@ let push_formula (j: 'a option) f term =
     end
 
   | Term.Seq (vs, t) ->
-    if not_in_f_vars vs then Term.mk_seq0 vs (mk_ite t)
+    if not_in_f_vars (Sv.of_list vs) then Term.mk_seq0 vs (mk_ite t)
     else raise Not_ifcond
 
   | Term.Find (vs, b, t, e) ->
-    if not_in_f_vars vs then Term.mk_find vs b (mk_ite t) (mk_ite e)
+    if not_in_f_vars (Sv.of_list1 vs) then Term.mk_find vs b (mk_ite t) (mk_ite e)
     else raise Not_ifcond
 
   | _ -> mk_ite term
@@ -1574,7 +1564,7 @@ let split_seq (li, ht) s : ES.sequent =
 
   (* check that types are compatible *)
   let seq_hty =
-    Type.Lambda (List.map (fun v -> Type.ETy (Vars.ty v)) is, Type.Boolean)
+    Type.Lambda (List.map (fun v -> Vars.ety v) is, Type.Boolean)
   in
 
   let hty, ht = EquivLT.convert_ht s ht in
@@ -1582,10 +1572,15 @@ let split_seq (li, ht) s : ES.sequent =
   EquivLT.check_hty_eq hty seq_hty;
 
   (* compute the new sequent *)
-  let is, subst = Term.refresh_vars `Global is in
+  let is, subst = Term.erefresh_vars `Global is in
   let ti = Term.subst subst ti in
 
-  let cond = match Term.apply_ht ht (List.map (fun v -> Term.mk_var v) is) with
+  let is_terms = 
+    List.map (fun (Vars.EVar v) -> Term.ETerm (Term.mk_var v)) is 
+  in
+
+  let cond = 
+    match Term.apply_ht ht is_terms with
     | Term.Lambda ([], cond) -> cond
     | _ -> assert false
   in
@@ -1639,7 +1634,7 @@ let const_seq (li, terms) s : Goal.t list =
 
   (* refresh variables *)
   let env = ref (ES.env s) in
-  let e_is, subst = Term.refresh_vars (`InEnv env) e_is in
+  let e_is, subst = Term.erefresh_vars (`InEnv env) e_is in
   let e_ti = Term.subst subst e_ti in
 
   let eqs = List.map (fun term ->
@@ -1647,8 +1642,7 @@ let const_seq (li, terms) s : Goal.t list =
     ) terms
   in
   let cond =
-    Term.mk_forall ~simpl:true (List.map Vars.evar e_is)
-      (Term.mk_ors ~simpl:true eqs)
+    Term.mk_forall ~simpl:true e_is (Term.mk_ors ~simpl:true eqs)
   in
   let s_reach = s |> ES.set_reach_goal cond |> ES.to_trace_sequent in
 

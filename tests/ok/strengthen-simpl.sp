@@ -42,7 +42,7 @@ Proof.
 Qed.
 
 (* we can also deduce the sequence of all s1(i) *)
-global goal _ (t : timestamp) : equiv(na) -> equiv(seq(i -> s1(i)@t)).
+global goal _ (t : timestamp) : equiv(na) -> equiv(seq(i:index -> s1(i)@t)).
 Proof.
  intro H; apply H.
 Qed.
