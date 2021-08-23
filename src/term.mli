@@ -420,7 +420,7 @@ val mk_atom : ord -> 'a term -> 'b term -> message
 val mk_happens : timestamp -> message 
 val mk_atom1 : generic_atom -> message 
 
-val mk_seq0 : Vars.index list -> message -> message
+val mk_seq0 : ?simpl:bool -> Vars.index list -> message -> message
 
 (** Refresh variables *)
 val mk_seq : Vars.env -> Vars.index list -> message -> message

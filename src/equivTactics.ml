@@ -389,6 +389,16 @@ let fa i s =
           (Equiv.[ c' ; t' ; e ] @ after)
       in
       [ ES.set_env !env (ES.set_equiv_goal biframe s) ]
+
+    | Seq(vars,t) -> 
+      let terms = fa_expand t in
+      let biframe = 
+        List.rev_append 
+          before 
+          ((List.map (fun t' -> Term.mk_seq0 ~simpl:true vars t') terms) @ after)
+      in
+      [ ES.set_equiv_goal biframe s ]
+
     | _ ->
       let biframe =
         List.rev_append before (fa_expand e @ after) in

@@ -239,6 +239,22 @@ hint rewrite not_true.
 axiom not_false : not(false) = true.
 hint rewrite not_false.
 
+(* new *)
+axiom true_false : (true = false) = false.
+hint rewrite true_false.
+
+(* new *)
+goal false_true : (false = true) = false.
+Proof. 
+  (* TODO: work-around until we have a better type inference *)
+  (* rewrite (eq_sym false true). *)
+  assert (forall (x,y : boolean), (x = y) = (y = x)) as H .
+    intro _ _. 
+    by rewrite eq_iff. 
+  rewrite (H false true).
+  auto.
+Qed.
+hint rewrite false_true.
 
 goal not_not (b : boolean): not (not b) = b. 
 Proof.
@@ -286,6 +302,29 @@ by rewrite eq_iff.
 Qed.
 hint rewrite not_neq_t.
 
+(* new *)
+goal eq_false ['a] (x, y : 'a): ((x = y) = false) = (x <> y).
+Proof. 
+rewrite -not_eq. case (x = y) => _. simpl. auto.
+by rewrite eq_iff. 
+Qed.
+hint rewrite eq_false.
+
+(* new *)
+goal eq_false_i (x, y : index): ((x = y) = false) = (x <> y).
+Proof. 
+rewrite -not_eq_i. case (x = y) => _. simpl. auto.
+by rewrite eq_iff. 
+Qed.
+hint rewrite eq_false_i.
+
+(* new *)
+goal eq_false_t (x, y : timestamp): ((x = y) = false) = (x <> y).
+Proof. 
+rewrite -not_eq_t. case (x = y) => _. simpl. auto.
+by rewrite eq_iff. 
+Qed.
+hint rewrite eq_false_t.
 
 
 goal if_true ['a] (b : boolean, x,y : 'a):
@@ -527,14 +566,9 @@ Proof.
   expandall.
   fa 7; fa 8; fa 8. 
   
-  (* TODO: faseq 0 would allow to conclude there *)
-  splitseq 0: (fun (pid0:index) -> pid0 = pid); simpl.
-  constseq 0: (input@t) zero. 
-  by intro * /=; case (pid0 = pid). 
-
-  (* TODO: almost done, use faseq *)
-  (* by apply Hind (pred(t)). *)
-  admit.
+  fa 0.
+  constseq 0: true false; 1: by intro pid0; case (pid = pid0). 
+  by apply Hind (pred(t)).
 
   (* Decode(pid,j) *)
   repeat destruct Eq as [_ Eq].

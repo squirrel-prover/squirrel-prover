@@ -1572,7 +1572,18 @@ let mk_happens t = Atom (`Happens t)
 
 let mk_atom1 at = Atom at
 
-let mk_seq0 is term = Seq (is, term)
+let mk_seq0 ?(simpl=false) is term = 
+  let is = 
+    if simpl then
+      let term_fv = fv term in
+      List.filter (fun i ->
+          Sv.mem (Vars.EVar i) term_fv
+        ) is
+    else is
+  in
+  match is with
+  | [] -> term
+  | _ -> Seq (is, term)
 
 (* only refresh necessary vars, hence we need an environment *)
 let mk_seq env is term =
@@ -1586,7 +1597,10 @@ let mk_seq env is term =
   let is, s = refresh_vars (`InEnv env) is in
   let term = subst s term in
 
-  Seq (is, term)
+  match is with
+  | [] -> term
+  | _ -> Seq (is, term)
+
 
 (*------------------------------------------------------------------*)
 (** {2 Apply} *)
