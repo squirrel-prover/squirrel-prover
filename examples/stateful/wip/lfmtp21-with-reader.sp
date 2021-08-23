@@ -26,11 +26,13 @@ axiom statebis : forall tau:timestamp, happens(tau) => (exists tau':timestamp, t
   * Here we decompose the usual lastupdate lemma to separate the "pure" part
   * from the part that involves message equalities. *)
 
-goal lastupdateT_pure : forall tau:timestamp, happens(tau) => (
-  (forall j:index, happens(T(j)) => T(j)>tau) ||
-  (exists i:index, happens(T(i)) && T(i) <=tau && forall j:index, happens(T(j)) && T(j)<=tau => T(j)<=T(i))).
+goal lastupdateT_pure (tau:timestamp): 
+  happens(tau) => (
+    (forall j:index, happens(T(j)) => T(j)>tau) ||
+    (exists i:index, happens(T(i)) && T(i) <=tau && 
+     forall j:index, happens(T(j)) && T(j)<=tau => T(j)<=T(i))).
 Proof.
-induction.
+induction tau.
 intro tau IH Hp.
 case tau.
 
@@ -76,10 +78,12 @@ use H23 with j => //.
 Qed.
 
 
-goal lastupdateT_init :
-  forall tau:timestamp, happens(tau) => (forall j:index, happens(T(j)) => T(j)>tau)  => sT@tau = sT@init.
+goal lastupdateT_init (tau:timestamp):
+  happens(tau) => 
+  (forall j:index, happens(T(j)) => T(j)>tau) => 
+  sT@tau = sT@init.
 Proof.
-  induction => tau IH _ Htau.
+  induction tau => tau IH _ Htau.
   case tau;
 
   try(
@@ -93,12 +97,13 @@ Proof.
   by use Htau with i.
 Qed.
 
-goal lastupdate_T :
-  forall (tau:timestamp,i:index),
-  happens(T(i)) && T(i)<=tau && (forall j:index, happens(T(j)) && T(j)<=tau => T(j)<=T(i)) =>
+goal lastupdate_T (tau:timestamp,i:index):
+  happens(T(i)) && 
+  T(i)<=tau && 
+  (forall j:index, happens(T(j)) && T(j)<=tau => T(j)<=T(i)) =>
   sT@tau = sT@T(i).
 Proof.
-  induction => tau IH _ [Hinf Hsup].
+  dependent induction tau => tau IH [Hinf Hsup].
   case tau.
  
   (* init *)
@@ -125,11 +130,14 @@ Proof.
 Qed.
 
 
-goal lastupdateT : forall tau:timestamp, happens(tau) =>
+goal lastupdateT (tau:timestamp):
+  happens(tau) =>
   (sT@tau = sT@init && forall j:index, happens(T(j)) => T(j)>tau) ||
-  (exists i:index, sT@tau = sT@T(i) && happens(T(i)) && T(i)<=tau && forall j:index, happens(T(j)) && T(j)<=tau => T(j)<=T(i)).
+  (exists i:index, sT@tau = sT@T(i) && 
+   happens(T(i)) && T(i)<=tau && 
+   forall j:index, happens(T(j)) && T(j)<=tau => T(j)<=T(i)).
 Proof.
-  intro tau Htau.
+  intro Htau.
   use lastupdateT_pure with tau as [Hinit|[i HAi]] => //.
   left; split => //; by apply lastupdateT_init.
   right; exists i; repeat split => //; by apply lastupdate_T.
@@ -137,11 +145,13 @@ Qed.
 
 (* Reader *)
 
-goal lastupdateR_pure : forall tau:timestamp, happens(tau) => (
+goal lastupdateR_pure (tau:timestamp):
+  happens(tau) => (
   (forall j:index, happens(R(j)) => R(j)>tau) ||
-  (exists i:index, happens(R(i)) && R(i)<=tau && forall j:index, happens(R(j)) && R(j)<=tau => R(j)<=R(i))).
+  (exists i:index, happens(R(i)) && R(i)<=tau && 
+   forall j:index, happens(R(j)) && R(j)<=tau => R(j)<=R(i))).
 Proof.
-induction.
+induction tau.
 intro tau IH Hp.
 case tau.
 
@@ -188,10 +198,12 @@ use H23 with j => //.
 Qed.
 
 
-goal lastupdateR_init :
-  forall tau:timestamp, happens(tau) => (forall j:index, happens(R(j)) => R(j)>tau) => sR@tau = sR@init.
+goal lastupdateR_init (tau:timestamp):
+  happens(tau) => 
+  (forall j:index, happens(R(j)) => R(j)>tau) => 
+  sR@tau = sR@init.
 Proof.
-  induction => tau IH _ Htau.
+  induction tau => tau IH _ Htau.
   case tau;
   try(
   intro [i Hi]; rewrite Hi in *; expand sR;
@@ -204,12 +216,13 @@ Proof.
   use Htau with i => //.
 Qed.
 
-goal lastupdate_R :
-  forall (tau:timestamp,i:index),
-  happens(R(i)) && R(i)<=tau && (forall j:index, happens(R(j)) && R(j)<=tau => R(j)<=R(i)) =>
+goal lastupdate_R (tau:timestamp,i:index):
+  happens(R(i)) && 
+  R(i)<=tau && 
+  (forall j:index, happens(R(j)) && R(j)<=tau => R(j)<=R(i)) =>
   sR@tau = sR@R(i).
 Proof.
-  induction => tau IH _ [Hinf Hsup].
+  dependent induction tau => tau IH [Hinf Hsup].
   case tau.
  
   (* init *)
