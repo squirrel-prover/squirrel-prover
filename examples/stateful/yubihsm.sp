@@ -60,8 +60,9 @@ senc enc,dec
 
 (*------------------------------------------------------------------*)
 (* protocol constants *)
-abstract endplug: message
-abstract accept:message
+abstract endplug  : message
+abstract accept   : message
+abstract setup_ok : message
 
 (*------------------------------------------------------------------*)
 (* counters initial value *)
@@ -95,12 +96,9 @@ mutable YCtr(i:index) : message = cinit
 mutable SCtr(i:index) : message = cinit
 
 (*------------------------------------------------------------------*)
-(* random samplings used to initialize AEAD  *)
-name rinit : index -> message
-
 (* authentication server's database for each pid *)
-mutable AEAD(pid:index) : message = 
-  enc(<diff(k(pid),k_dummy(pid)), <mpid(pid), sid(pid)>>, rinit(pid), mkey).
+mutable AEAD(pid:index) : message = zero.
+
 
 (*------------------------------------------------------------------*)
 channel cY
@@ -184,16 +182,19 @@ process YSM_AEAD_YUBIKEY_OTP_DECODE (pid:index) =
     then
       out(cHSM, snd(otp_dec)).
 
-
 (*------------------------------------------------------------------*)
 (* base system with ideal system *)
-system ( 
-  (!_pid !_j Plug   : yubikeyplug(pid)                 ) |
-  (!_pid !_j Press  : yubikeypress(pid,j)              ) |
-  (!_pid !_j Server : server(pid)                      ) |
-  (!_pid !_j Read   : read_AEAD(pid)                   ) |
-  (!_pid !_j Write  : write_AEAD(pid)                  ) |
-  (!_pid !_j Decode : YSM_AEAD_YUBIKEY_OTP_DECODE(pid))).
+system !_pid 
+  new rinit;
+  AEAD(pid) := 
+    enc(<diff(k(pid),k_dummy(pid)), <mpid(pid), sid(pid)>>, rinit, mkey); 
+  Setup: out(cS, accept); ( 
+  (!_j Plug   : yubikeyplug(pid)                 ) |
+  (!_j Press  : yubikeypress(pid,j)              ) |
+  (!_j Server : server(pid)                      ) |
+  (!_j Read   : read_AEAD(pid)                   ) |
+  (!_j Write  : write_AEAD(pid)                  ) |
+  (!_j Decode : YSM_AEAD_YUBIKEY_OTP_DECODE(pid))).
 
 
 (* TODO: allow to have axioms for all systems *)
@@ -210,7 +211,7 @@ axiom pair_ne_fail (x,y: message) : <x,y> <> fail.
 axiom eq_iff (x, y : boolean) : (x = y) = (x <=> y).
 
 goal eq_refl ['a] (x : 'a) : (x = x) = true. 
-Proof.
+Proof. print.
   by rewrite eq_iff. 
 Qed.
 hint rewrite eq_refl.
@@ -459,6 +460,36 @@ hint rewrite diff_diff_r.
 goal dec_apply (x,x',k : message): x = x' => dec(x,k) = dec(x',k).
 Proof. auto. Qed.
 
+(* Others *)
+
+goal le_pred_lt (t, t' : timestamp): (t <= pred(t')) = (t < t').
+Proof. 
+  by rewrite eq_iff.
+Qed.
+
+goal le_not_lt (t, t' : timestamp): 
+  t <= t' => not (t < t') => t = t'.
+Proof.
+  by case t' = init. 
+Qed.
+
+goal le_not_lt_charac (t, t' : timestamp):
+ (not (t < t') && t <= t') = (happens(t) && t = t').
+Proof.
+ by rewrite eq_iff.
+Qed.
+
+goal lt_impl_le (t, t' : timestamp): 
+  t < t' => t <= t'.
+Proof. auto. Qed.
+
+goal le_lt (t, t' : timestamp): 
+  t <> t' => (t <= t') = (t < t').
+Proof. 
+  by intro *; rewrite eq_iff. 
+Qed.
+
+
 (* PROOF *)
 
 (* First property of AEAD decoding *)
@@ -467,7 +498,8 @@ goal valid_decode (t : timestamp) (pid,j : index):
   happens(t) => 
   (aead_dec(pid,j)@t <> fail) =
   (exists(pid0 : index), 
-   AEAD(pid0)@init = aead(pid,j)@t).
+   Setup(pid0) < t &&
+   AEAD(pid0)@Setup(pid0) = aead(pid,j)@t).
 Proof.
   intro Eq Hap.
   rewrite eq_iff; split.
@@ -477,12 +509,12 @@ Proof.
 
   case Eq; 
   expand aead_dec;
-  (intctxt AEAD_dec => H; 2: congruence);
-  clear H; intro AEAD_eq;
-  by exists pid0.
+  intctxt AEAD_dec => H //;
+  intro AEAD_eq;
+  by exists pid0. 
 
   (* Right => Left *) 
-  intro [pid0 H].
+  intro [pid0 [Clt H]].
   case Eq; 
   expand aead_dec;
   rewrite -H /AEAD /=;
@@ -499,7 +531,7 @@ goal valid_decode_charac (t : timestamp) (pid,j : index):
     fst(otp_dec(pid,j)@t) = snd(snd(aead_dec(pid,j)@t)) &&
     mpid(pid) = fst(snd(aead_dec(pid,j)@t)) ) 
   =
-  ( AEAD(pid)@init = aead(pid,j)@t &&
+  ( AEAD(pid)@Setup(pid) = aead(pid,j)@t &&
     dec(otp(pid,j)@t,k(pid)) <> fail &&
     fst(dec(otp(pid,j)@t,k(pid))) = sid(pid) ).
 Proof.
@@ -509,7 +541,7 @@ Proof.
   (* => case *)
   intro [AEAD_dec OTP_dec Sid_eq Pid_eq]. 
   rewrite valid_decode // in AEAD_dec.
-  destruct AEAD_dec as [pid0 AEAD_dec]. 
+  destruct AEAD_dec as [pid0 [Clt AEAD_dec]]. 
   
   assert (pid0 = pid).
   by case Eq; use mpid_inj with pid, pid0.
@@ -517,8 +549,15 @@ Proof.
 
   (* <= case *)
   intro [AEAD_dec OTP_dec Sid_eq].
-  rewrite valid_decode //.   
-  by project; case Eq; simpl; exists pid.
+  rewrite valid_decode //. 
+  case Eq.
+    depends Setup(pid), Decode(pid,j) by auto.
+    intro Clt.
+    by project; simpl; exists pid.
+
+    depends Setup(pid), Decode1(pid,j) by auto.
+    intro Clt.
+    by project; simpl; exists pid.
 Qed.
 
 
@@ -548,49 +587,69 @@ Proof.
   enrich seq(pid -> k(pid)).
   enrich seq(pid -> k_dummy(pid)).
   enrich seq(pid -> sid(pid)).
-  enrich seq(pid -> AEAD(pid)@init).
-  enrich seq(pid -> AEAD(pid)@t).
+  enrich seq(pid -> if Setup(pid) <= t then AEAD(pid)@Setup(pid)).
+
+  enrich seq(pid -> if Setup(pid) <= t then AEAD(pid)@t).
+ (* (†) TODO: this last sequence must be changed to: *)
+  (* enrich seq(ts -> if ts <= t then AEAD(pid)@ts). *)
+
   dependent induction t => t Hind Hap.
   case t => Eq;
   try (
     repeat destruct Eq as [_ Eq];
-    rewrite /*;
-    rewrite /AEAD in Hind;
+    (rewrite le_lt; 1:auto);
+    rewrite !-le_pred_lt;
+    expandall;
     by apply Hind (pred(t))).
 
   (* init *)
-  admit. (* need to prove that all AEADs are indistinguishable *)
+  admit. (* TODO: constseq *)
+
+  (* Setup *)
+  repeat destruct Eq as [_ Eq]. 
+  rewrite /* in 7.
+  (* TODO: split sequences *)
+  (* by apply Hind (pred(t)). *)
+  admit.
 
   (* Write(pid,j) *)
   repeat destruct Eq as [_ Eq]. 
-  expandall.
+  rewrite le_lt; 1:auto.
+  rewrite !-le_pred_lt.
+  rewrite /* in 7.
   fa 7; fa 8; fa 8. 
-  
-  fa 0.
-  constseq 0: true false; 1: by intro pid0; case (pid = pid0). 
-  by apply Hind (pred(t)).
+  admit. (* Cf † *)
+  (* by apply Hind (pred(t)). *)
+  (* constseq 0: true false; 1: by intro pid0; case (pid = pid0).  *)
+  (* by apply Hind (pred(t)). *)
 
   (* Decode(pid,j) *)
   repeat destruct Eq as [_ Eq].
-  expand frame, exec, output, cond, AEAD. 
+  rewrite le_lt; 1:auto.
+  rewrite !-le_pred_lt.
+  depends Setup(pid), Decode(pid,j) by auto => H.
+  rewrite /frame /exec /output /cond in 7. 
   fa 7. fa 8. fa 8.
 
   rewrite valid_decode_charac //. 
   (* rewrite the content of the then branch *)
-  rewrite /otp_dec /aead_dec if_aux /AEAD /= in 9.
+  rewrite /otp_dec /aead_dec if_aux /= in 9.
   fa 9.
-  expandall.
-  fa 8; fa 8; fa 8; fa 8.
+  rewrite /AEAD /= in 9.
+  rewrite /aead /otp in 8,9.
+  admit 0.                      (* TODO: need to unroll the definition *)
   by apply Hind (pred(t)).
 
   (* Decode1(pid,j) *)
   repeat destruct Eq as [_ Eq].
-  expand frame, exec, output, cond, AEAD. 
+  rewrite le_lt; 1:auto.
+  rewrite !-le_pred_lt.
+  depends Setup(pid), Decode1(pid,j) by auto => H.
+  rewrite /frame /exec /output /cond in 7. 
   fa 7. fa 8. fa 8.
-
   rewrite valid_decode_charac //. 
-  expandall.
-  fa 8; fa 8; fa 8; fa 8.
+  rewrite /otp /aead.
+  admit 0.                      (* TODO: need to unroll the definition *)
   by apply Hind (pred(t)).
 Qed.
   
