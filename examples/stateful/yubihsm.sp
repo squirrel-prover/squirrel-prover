@@ -103,14 +103,6 @@ mutable AEAD(pid:index) : message =
   enc(<diff(k(pid),k_dummy(pid)), <mpid(pid), sid(pid)>>, rinit(pid), mkey).
 
 (*------------------------------------------------------------------*)
-(* random samplings used to initialize AEADi  *)
-name rinitp : index -> message
-
-(* authentication server's database for each pid, ideal system *)
-mutable AEADi(pid:index) : message =
-  enc(<k_dummy(pid), <mpid(pid), sid(pid)>>, rinitp(pid), mkey).
-
-(*------------------------------------------------------------------*)
 channel cY
 channel cS
 channel cHSM
@@ -171,15 +163,6 @@ process write_AEAD (pid:index)=
   AEAD(pid) := x.
 
 (*------------------------------------------------------------------*)
-(* AEAD in the ideal system *)
-process read_AEAD_ideal (pid:index) =
-  out(cS,AEADi(pid)).
-
-process write_AEAD_ideal (pid:index)=
-  in(cS,x);
-  AEADi(pid) := x.
-
-(*------------------------------------------------------------------*)
 (* model for the rule YSM_AEAD_YUBIKEY_OTP_DECODE of the HSM. *)
 process YSM_AEAD_YUBIKEY_OTP_DECODE (pid:index) =
   in(cHSM,xdata); 
@@ -203,14 +186,11 @@ process YSM_AEAD_YUBIKEY_OTP_DECODE (pid:index) =
 
 
 (*------------------------------------------------------------------*)
-process Yubikey0 =
-  ( (!_pid !_j Plug   : yubikeyplug(pid)                 ) |
-    (!_pid !_j Press  : yubikeypress(pid,j)              ) |
-    (!_pid !_j Server : server(pid)                      )).
-
 (* base system with ideal system *)
-system
-  (Yubikey0 |
+system ( 
+  (!_pid !_j Plug   : yubikeyplug(pid)                 ) |
+  (!_pid !_j Press  : yubikeypress(pid,j)              ) |
+  (!_pid !_j Server : server(pid)                      ) |
   (!_pid !_j Read   : read_AEAD(pid)                   ) |
   (!_pid !_j Write  : write_AEAD(pid)                  ) |
   (!_pid !_j Decode : YSM_AEAD_YUBIKEY_OTP_DECODE(pid))).
