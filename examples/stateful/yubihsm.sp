@@ -591,130 +591,51 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-(* set showStrengthenedHyp=true. *)
-equiv atomic_keys.
+global goal stef_atomic_keys (t : timestamp):
+  [happens(t)] -> 
+  equiv(
+    frame@t,
+    exec@t,
+    seq(pid:index -> AEAD(pid)@t),
+    seq(pid:index -> YCtr(pid)@t),
+    seq(pid:index -> SCtr(pid)@t),
+    seq(pid:index -> sid(pid)),
+    seq(pid,j:index -> npr(pid,j)),
+    seq(pid,j:index -> nonce(pid,j)),
+    seq(pid:index -> k(pid)),
+    seq(pid:index -> k_dummy(pid))
+  ).
 Proof.
-  enrich seq(pid,j:index -> npr(pid,j)). 
-  enrich seq(pid,j:index -> nonce(pid,j)). 
-  enrich seq(pid:index -> k(pid)).
-  enrich seq(pid:index -> k_dummy(pid)).
-  enrich seq(pid:index -> sid(pid)).
-  enrich seq(pid:index -> if Setup(pid) <= t then AEAD(pid)@Setup(pid)).
-  enrich seq(pid:index -> AEAD(pid)@t).
-
-  dependent induction t => t Hind Hap.
-  case t => Eq;
-  try (
-    repeat destruct Eq as [_ Eq];
-    (rewrite le_lt; 1:auto);
-    rewrite !-le_pred_lt;
-    expandall;
-    by apply Hind (pred(t))).
-
-  (* init *)
-  rewrite /*. 
-  constseq 1: zero; 1: by rewrite if_false. 
-  auto.
-
-  (* Setup *)
-  repeat destruct Eq as [_ Eq]. 
-  rewrite /* in 7.
-  splitseq 1: (fun (pid : index) -> Setup(pid) < t).
-  rewrite !if_then_then in 1,2.
-
-  assert (forall (t, t' : timestamp), 
-   (t < t' && t <= t') = (t < t')) as lt_le_eq_lt.
-  by rewrite eq_iff.
-  rewrite lt_le_eq_lt in 1.
-
-  (* le_not_lt_charac *)
-  rewrite le_not_lt_charac in 2.
-
-  constseq 2: (AEAD(pid)@t) zero. 
-    intro pid0.
-    case pid0 = pid => _; 
-      [1: by left; rewrite if_true |
-       2: by right; by rewrite if_false].
-  
-  rewrite !-le_pred_lt.
-  by apply Hind (pred(t)).
-
-  (* Write(pid,j) *)
-  repeat destruct Eq as [_ Eq]. 
-  rewrite le_lt; 1:auto.
-  rewrite !-le_pred_lt.
-  rewrite /* in 7.
-  by apply Hind (pred(t)).
-
-  (* Decode(pid,j) *)
-  repeat destruct Eq as [_ Eq].
-  rewrite le_lt; 1:auto.
-  rewrite !-le_pred_lt.
-  depends Setup(pid), t by auto => H.
-  rewrite /frame /exec /output /cond in 7. 
-  fa 7; fa 8; fa 8.
-
-  rewrite valid_decode_charac //. 
-  (* rewrite the content of the then branch *)
-  rewrite /otp_dec /aead_dec if_aux /= in 9.
-  fa 9.
-  rewrite /AEAD /= in 9.
-  rewrite /aead /otp in 8,9.
-  by apply Hind (pred(t)).
-
-  (* Decode1(pid,j) *)
-  repeat destruct Eq as [_ Eq].
-  rewrite le_lt; 1:auto.
-  rewrite !-le_pred_lt.
-  depends Setup(pid), t by auto => H.
-  rewrite /frame /exec /output /cond in 7. 
-  fa 7; fa 8; fa 8.
-  rewrite valid_decode_charac //. 
-  rewrite /otp /aead.
-  by apply Hind (pred(t)).
-Qed.
-  
-
-(* Preuve alternative plus courte *)
-
-equiv stef_atomic_keys.
-Proof.
-  enrich seq(pid,j:index -> npr(pid,j)). 
-  enrich seq(pid,j:index -> nonce(pid,j)). 
-  enrich seq(pid:index -> k(pid)).
-  enrich seq(pid:index -> k_dummy(pid)).
-  enrich seq(pid:index -> sid(pid)).
-  enrich seq(pid:index -> AEAD(pid)@t).
-
   dependent induction t => t Hind Hap.
   case t => Eq; 
    try (repeat destruct Eq as [_ Eq]; 
-  rewrite /* in 6;
-  fa 6;
+  rewrite /* in 0;
+  fa 0;
   by apply Hind (pred(t)) => //).
 
   (* init *)
   rewrite /*. 
   auto.
+
   (* Decode(pid,j) *)
   repeat destruct Eq as [_ Eq].
   depends Setup(pid), t by auto => H.
-  rewrite /frame /exec /output /cond in 6. 
-  fa 6; fa 7; fa 7.
+  rewrite /frame /exec /output /cond in 0. 
+  fa 0; fa 1; fa 1.
 
   rewrite valid_decode_charac //. 
   (* rewrite the content of the then branch *)
-  rewrite /otp_dec /aead_dec if_aux /= in 8.
-  fa 8.
-  rewrite /AEAD /= in 8.
-  rewrite /aead /otp in 7,8.
+  rewrite /otp_dec /aead_dec if_aux /= in 2.
+  fa 2.
+  rewrite /AEAD /= in 2.
+  rewrite /aead /otp in 1,2.
   by apply Hind (pred(t)).
 
   (* Decode1(pid,j) *)
   repeat destruct Eq as [_ Eq].
   depends Setup(pid), t by auto => H.
-  rewrite /frame /exec /output /cond in 6. 
-  fa 6; fa 7; fa 7.
+  rewrite /frame /exec /output /cond in 0. 
+  fa 0; fa 1; fa 1.
   rewrite valid_decode_charac //. 
   rewrite /otp /aead.
   by apply Hind (pred(t)).
