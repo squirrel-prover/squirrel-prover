@@ -186,9 +186,8 @@ Proof.
   rewrite Meq A /s in A0. 
   admit. (* by fresh B. *) (* TODO: improve fresh precision *)  
 
-  assert H(s(i)@pred(A(i,j)),k) = H(s(i')@pred(A(i',j')),k) as Hcoll;
-    1: by expandall.
-  collision Hcoll => H.
+  rewrite Meq B /s in A0.
+  collision A0 => H.
   use IH with pred(A(i',j')),pred(A(i,j)),i',i => //.
 Qed.
 
@@ -219,8 +218,8 @@ Proof.
     use H5 with j0; 1,2: case Heuf; auto.
     auto.
   (* case i<>i0 *)
-  use disjoint_chains with pred(A(i0,j0)),pred(A(i,j)),i0,i as Mneq;
-    case Heuf; auto.
+  use disjoint_chains with pred(A(i0,j0)),pred(A(i,j)),i0,i => //.  
+  by case Heuf.
 Qed.
 
 
@@ -255,7 +254,7 @@ Proof.
     use monotonic_chain with pred(A(i',j)),pred(A(i',j0)),i',j1 => //.
     repeat split; try auto.
     use H3 with j0 as H4; try auto.
-    use disjoint_chains with pred(A(i',j)),pred(A(i0,j0)),i',i0 => //.
+    by use disjoint_chains with pred(A(i',j)),pred(A(i0,j0)),i',i0.
 
   (* Oracle *)
   expandall. fa 0. fa 1. fa 1. fa 1.
@@ -276,7 +275,8 @@ Proof.
     intro j0 H.
     apply unique_queries; auto.
     intro i0 j0 H.
-    reach_equiv IH,i0,A(i0,j0) => // Hf; by fresh Hf.
+    reach_equiv IH,i0,A(i0,j0) => // Hf.
+    by fresh Hf.
 
   (* Tag *)
   expand frame@A(i,j). expand exec@A(i,j). expand cond@A(i,j). expand output@A(i,j).
@@ -289,5 +289,5 @@ Proof.
     assert i=i0 || i<>i0; try auto.
     case H0.
     use monotonic_chain with A(i,j),A(i,j0),i,j => //.
-    use disjoint_chains with A(i,j),A(i0,j0),i,i0 => //.
+    by use disjoint_chains with A(i,j),A(i0,j0),i,i0.
 Qed.
