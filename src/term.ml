@@ -244,6 +244,10 @@ let f_ite    = mk Symbols.fs_ite
 
 (** Fail *)
 
+let f_witness = mk Symbols.fs_witness
+
+(** Fail *)
+
 let f_fail   = mk Symbols.fs_fail
 
 (** Xor and its unit *)
@@ -381,6 +385,11 @@ let mk_ite ?(simpl=true) c t e =
 
 let mk_of_bool t = mk_fbuiltin Symbols.fs_of_bool [] [t]
 
+let mk_witness ty = 
+  let fty = Type.mk_ftype 0 [] [] ty in
+  Fun ((Symbols.fs_witness,[]), fty, [])
+
+
 (*------------------------------------------------------------------*)
 (** {3 For formulas} *)
 
@@ -395,12 +404,12 @@ let mk_indices_neq vect_i vect_j =
     mk_false
     (List.map2 (fun i j -> Atom (`Index (`Neq, i, j))) vect_i vect_j)
 
-let mk_indices_eq vect_i vect_j =
+let mk_indices_eq ?(simpl=true) vect_i vect_j =
   List.fold_left
     (fun acc e -> mk_and acc e)
     mk_true
     (List.map2 (fun i j ->
-         if i = j then mk_true else Atom (`Index (`Eq, i, j))
+         if i = j && simpl then mk_true else Atom (`Index (`Eq, i, j))
        ) vect_i vect_j)
 
 let mk_lambda evs ht = match ht with
@@ -1710,6 +1719,11 @@ let is_pure_timestamp (t : message) =
 (** {2 Projection} *)
 
 type projection = PLeft | PRight | PNone
+
+let pp_projection fmt = function
+  | PLeft  -> Fmt.pf fmt "Left"
+  | PRight -> Fmt.pf fmt "Right"
+  | PNone  -> Fmt.pf fmt "None"
 
 let pi_term ~projection term =
 

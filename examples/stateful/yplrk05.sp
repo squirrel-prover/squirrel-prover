@@ -210,9 +210,9 @@ Proof.
     executable pred(T1(i,j)) => // H.
     by use H with T1(i,j0) as H'.
 
-    simpl.
-    executable pred(T1(i,j)) => // H. 
-    by apply H.
+  simpl.
+  executable pred(T1(i,j)) => // H. 
+  by apply H.
 Qed.
 
 

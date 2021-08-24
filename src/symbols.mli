@@ -309,6 +309,10 @@ val fs_impl   : fname t
 val fs_not    : fname t
 val fs_ite    : fname t
 
+(** Witness *)
+
+val fs_witness : fname t
+
 (** Successor over natural numbers *)
 
 val fs_succ   : fname t

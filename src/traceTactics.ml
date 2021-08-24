@@ -562,7 +562,95 @@ let mk_fresh_direct (cntxt : Constr.trace_cntxt) env ns t =
   let cases = List.map mk_case list_of_indices in
   Term.mk_ors (List.sort_uniq Stdlib.compare cases)
 
+(*------------------------------------------------------------------*)
+(** triple of the action and the name indices *)
+type fresh_occ = (Action.action * Vars.index list) Iter.occ
+
+(** check if all instances of [o1] are instances of [o2].
+    [o1] and [o2] actions must have the same action name *)
+let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool = 
+  let a1, is1 = o1.occ_cnt in
+  let a2, is2 = o2.occ_cnt in
+
+  let cond1, cond2 = o1.occ_cond, o2.occ_cond in
+
+  (* build a dummy term, which we used to match in one go all elements of
+     the two occurrences *)
+  let mk_dum a is cond =
+    let action = SE.action_to_term table system a in
+    Term.mk_ands ~simpl:false
+      ((Term.mk_atom `Eq Term.init action) ::
+       (Term.mk_indices_eq ~simpl:false is is) ::
+       [cond])
+  in
+  let pat2 = Match.{
+      pat_tyvars = [];
+      pat_vars   = o2.occ_vars;
+      pat_term   = mk_dum a2 is2 cond2;
+    }
+  in
+
+  match Match.T.try_match_term table system (mk_dum a1 is1 cond1) pat2 with
+  | Match.FreeTyv | Match.NoMatch _ -> false
+  | Match.Match _ -> true
+
+(** Add a new fresh rule case, if it is not redundant. *)
+let add_fresh_case
+    table system
+    (c : fresh_occ)
+    (l : fresh_occ list) : fresh_occ list
+  =
+  if List.exists (fun c' -> fresh_occ_incl table system c c') l 
+  then l 
+  else
+    (* remove any old case which is subsumed by [c] *)
+    let l' =
+      List.filter (fun c' -> 
+          not (fresh_occ_incl table system c' c)
+        ) l
+    in
+    c :: l'
+
+(** Add many new fresh rule cases, if they are not redundant. *)
+let add_fresh_cases 
+    table system
+    (l1 : fresh_occ list)
+    (l2 : fresh_occ list) : fresh_occ list
+  =
+  List.fold_left (fun l2 c -> add_fresh_case table system c l2) l2 l1
+
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
+let mk_fresh_indirect_cases
+    (cntxt : Constr.trace_cntxt) 
+    (env : Vars.env) 
+    (ns : Term.nsymb) 
+    (terms : Term.message list) 
+  =
+  let macro_cases =
+    Iter.fold_macro_support0 (fun action_name a t macro_cases ->
+        let fv = Sv.diff (Term.fv t) (Vars.to_set env) in
+
+        let new_cases = Fresh.get_name_indices_ext ~fv:fv cntxt ns.s_symb t in
+        let new_cases = 
+          List.map (fun case -> 
+              Iter.{ case with
+                     occ_cnt = a, case.occ_cnt;
+                     occ_cond = Term.mk_true; }
+                     (* cond is not used, so we set it to true here. *)
+
+            ) new_cases 
+        in
+
+        List.assoc_up_dflt action_name [] 
+          (fun l -> 
+             add_fresh_cases cntxt.table cntxt.system new_cases l
+          ) macro_cases
+      ) cntxt env terms []
+  in
+  (* we keep only action names in which the name occurs *)
+  List.filter (fun (_, occs) -> occs <> []) macro_cases 
+ 
+
 let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
   let term_actions =
     let iter = new Fresh.get_actions ~cntxt in
@@ -570,29 +658,20 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
     iter#get_actions
   in
 
-  (* TODO: we are using the less precise version of [fold_macro_support] *)
-  let macro_cases =
-    Iter.fold_macro_support0 (fun descr t macro_cases ->
-        let fv = Sv.diff (Term.fv t) (Vars.to_set env) in
-        let new_idx = Fresh.get_name_indices_ext ~fv cntxt ns.s_symb t in
-        List.assoc_up_dflt descr [] (fun l -> new_idx @ l) macro_cases
-      ) cntxt [t] []
-  in
-  (* we keep only actions in which the name occurs *)
-  let macro_cases = List.filter (fun (_, occs) -> occs <> []) macro_cases in
+  let macro_cases = mk_fresh_indirect_cases cntxt env ns [t] in
 
   (* the one case occuring in [a] with indices [is_a].'
      For n[is] to be equal to n[is_a], we must have is=is_a.
      Hence we substitute is_a by is. *)
-  let mk_case (a : Action.descr) is_a : Term.message =
+  let mk_case (a, is_a) : Term.message =
     let env_local = ref env in
 
     (* We only quantify over indices that are not in is_a *)
-    let eindices =
-      List.filter (fun v -> not (List.mem v is_a)) a.Action.indices in
+    let eindices = 
+      List.filter (fun v -> not (List.mem v is_a)) (Action.get_indices a)
+    in
 
-    let eindices' =
-      List.map (Vars.fresh_r env_local) eindices in
+    let eindices' = List.map (Vars.fresh_r env_local) eindices in
 
     (* refresh existantially quant. indices, and subst is_a by is. *)
     let subst =
@@ -604,7 +683,7 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
     (* we apply [subst] to the action [a] *)
     let new_action =
       SystemExpr.action_to_term cntxt.table cntxt.system
-        (Action.subst_action subst a.Action.action) in
+        (Action.subst_action subst a) in
 
     let timestamp_inequalities =
       Term.mk_ors
@@ -623,7 +702,7 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
       Term.mk_indices_eq ns.s_indices (List.map (Term.subst_var subst) is_a)
     in
 
-    Term.mk_exists
+    Term.mk_exists ~simpl:true
       (List.map (fun i -> Vars.EVar i) eindices')
       (Term.mk_and
          timestamp_inequalities
@@ -631,11 +710,9 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
   in
 
   (* Do all cases of action [a] *)
-  let mk_cases_descr (a, indices_a) =
-    let indices_a = List.map (fun is_a -> is_a.Iter.occ_cnt) indices_a
-                    |> List.sort_uniq Stdlib.compare
-    in
-    List.map (mk_case a) indices_a in
+  let mk_cases_descr (_, cases) =
+    List.map (fun case -> mk_case case.Iter.occ_cnt) (List.rev cases)
+  in
 
   let cases = List.map mk_cases_descr macro_cases
               |> List.flatten
@@ -1230,7 +1307,7 @@ let euf_apply_schema sequent (_, key, m, s, _, _, _, _) case =
   (* Now, we need to add the timestamp constraints. *)
   (* The action name and the action timestamp variable are equal. *)
   let action_descr_ts =
-    SystemExpr.action_to_term table system case.action_descr.Action.action
+    SystemExpr.action_to_term table system case.action
   in
  let ts_list =
     let iter = new Fresh.get_actions ~cntxt:(TS.mk_trace_cntxt sequent) in
@@ -1336,7 +1413,8 @@ let euf_apply_facts drop_head s
 let euf_apply
     (get_params : Symbols.table -> Term.message -> unforgeabiliy_param)
     (Args.String hyp_name)
-    (s : TS.t) =
+    (s : TS.t) 
+  =
   let table = TS.table s in
   let id, at = Hyps.by_name hyp_name s in
 

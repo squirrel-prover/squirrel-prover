@@ -602,6 +602,14 @@ let fs_ite =
       tyvar in
   mk_fsymb ~fty "if" (-1)
 
+(** Witness *)
+
+let fs_witness =
+  let tyv = Type.mk_tvar "t" in
+  let tyvar = Type.TVar tyv in
+  let fty = Type.mk_ftype 0 [tyv] [] tyvar in
+  mk_fsymb ~fty "witness" (-1)
+
 (** Fail *)
 
 let fs_fail = mk_fsymb "fail" 0

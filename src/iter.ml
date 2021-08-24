@@ -284,37 +284,38 @@ let get_f : type a.
           ) ~fv ~cond t []
       in
 
-        match t with
-        | Term.Fun ((fn,vs),_,l)  ->
-          let head_occ =
-            if matching table (fn,vs) symtype
-            then [{ occ_cnt  = t;
-                    occ_vars = fv;
-                    occ_cond = cond; }]
-            else []
-          in
+      match t with
+      | Term.Fun ((fn,vs),_,l)  ->
+        let head_occ =
+          if matching table (fn,vs) symtype
+          then [{ occ_cnt  = t;
+                  occ_vars = fv;
+                  occ_cond = cond; }]
+          else []
+        in
 
-          let rec_occs = match excludesymtype with
-            | Some ex when Symbols.is_ftype fn ex table -> []
-            | _ -> occs ()
-          in
+        let rec_occs = match excludesymtype with
+          | Some ex when Symbols.is_ftype fn ex table -> []
+          | _ -> occs ()
+        in
 
-          head_occ @ rec_occs
+        head_occ @ rec_occs
 
-        | Term.Diff (Term.Fun _, Term. Fun _) when allow_diff ->
-          let head_occ =
-            if (match Term.pi_term PLeft t, Term.pi_term PRight t with
-                 | (Fun (fl,_,ll),Fun (fr,_,lr))
-                   when (matching table fl symtype
-                         && matching table fr symtype ) -> true
-                 | _ -> false )
-            then [{ occ_cnt  = t;
-                    occ_vars = fv;
-                    occ_cond = cond; }]
-            else []
-          in
-          head_occ @ (occs ())
-        | _ -> occs ()
+      | Term.Diff (Term.Fun _, Term. Fun _) when allow_diff ->
+        let head_occ =
+          if (match Term.pi_term PLeft t, Term.pi_term PRight t with
+              | (Fun (fl,_,ll),Fun (fr,_,lr))
+                when (matching table fl symtype
+                      && matching table fr symtype ) -> true
+              | _ -> false )
+          then [{ occ_cnt  = t;
+                  occ_vars = fv;
+                  occ_cond = cond; }]
+          else []
+        in
+        head_occ @ (occs ())
+
+      | _ -> occs ()
   in
 
   get t ~fv:Sv.empty ~cond:Term.mk_true
@@ -338,7 +339,7 @@ let get_fsymb : type a.
 (*------------------------------------------------------------------*)
 (** {2 Find [h(_, k)]} *)
 
-(* pair of the key indices and the term *)
+(** pair of the key indices and the term *)
 type hash_occ = (Vars.index list * Term.message) occ
 
 type hash_occs = hash_occ list
@@ -503,25 +504,27 @@ let get_macro_occs : type a.
 let fold_descr
     ~(globals:bool)
     (f :
-       Symbols.macro Symbols.t ->
-       Symbols.macro_def ->
-       Term.message ->
+       Symbols.macro Symbols.t -> (* macro symbol [ms] *)
+       Vars.index list ->         (* indices [is] of [ms] *)
+       Symbols.macro_def ->       (* macro definition *)
+       Term.message ->            (* term [t] defining [ms(is)] *)
        'a -> 'a)
     (table  : Symbols.table)
     (system : SystemExpr.t)
     (descr : Action.descr)
     (init : 'a) : 'a
   =
-  let mval = f Symbols.out Symbols.Output (snd descr.output) init in
-  let mval = f Symbols.cond Symbols.Cond (snd descr.condition) mval in
+  let mval = f Symbols.out [] Symbols.Output (snd descr.output) init in
+  let mval = f Symbols.cond [] Symbols.Cond (snd descr.condition) mval in
 
   (* fold over state macros *)
   let mval =
     List.fold_left (fun mval (st, t) ->
+        let is = st.Term.s_indices in
         let mdef =
-          Symbols.State (List.length st.Term.s_indices, st.Term.s_typ)
+          Symbols.State (List.length is, st.Term.s_typ)
         in
-        f st.Term.s_symb mdef t mval
+        f st.Term.s_symb is mdef t mval
       ) mval descr.updates
   in
 
@@ -541,7 +544,7 @@ let fold_descr
           | `Def t -> t
           | _ -> assert false
         in
-        f mg mdef t mval
+        f mg is mdef t mval
       ) mval descr.globals
 
 (*------------------------------------------------------------------*)
@@ -553,133 +556,279 @@ let is_glob table ms =
   | Symbols.Global _ -> true
   | _ -> false
 
-(** Return the macro symbols reachable from a term in any trace model. *)
-let macro_support : type a.
-  Constr.trace_cntxt ->
-  a Term.term list ->
-  Ss.t
+(*------------------------------------------------------------------*)
+module Mset = Match.Mset
+
+(** simpl mset builder, when the macro symbol is not indexed. *)
+let simple_mset (m : Symbols.macro Symbols.t) ty : Mset.t = 
+  let msymb = Term.mk_isymb m ty [] in
+  Mset.mk ~env:Sv.empty ~msymb ~indices:[]
+
+let mset_join = Match.mset_join
+
+let mset_incl = Match.mset_incl
+
+(** abstract value containing one mset per macro symbol. *)
+type msets_abs = (Term.mname * Mset.t) list
+
+(** join a single [mset] into an full abstract value. *)
+let msets_abs_join_single (mset : Mset.t) (msets : msets_abs) : msets_abs =
+  let name = mset.msymb.s_symb in 
+  if List.mem_assoc name msets then
+    List.assoc_up name (fun b -> mset_join mset b) msets
+  else (name, mset) :: msets
+
+(** join operator. *)
+let msets_abs_join (abs1 : msets_abs) (abs2 : msets_abs) : msets_abs =
+  List.fold_left (fun abs (_, mset) -> msets_abs_join_single mset abs) abs1 abs2
+
+(** [msets_abs_incl abs1 abs2] checks if [abs1 ⊆ abs2]. *)
+let msets_abs_incl 
+    (table : Symbols.table)
+    (system : SystemExpr.t)
+    (abs1 : msets_abs) 
+    (abs2 : msets_abs) : bool
   =
-  fun cntxt terms ->
+  List.for_all (fun (mn, m1) ->
+      try 
+        let m2 = List.assoc mn abs2 in
+        mset_incl table system m1 m2
+      with Not_found -> false
+    ) abs1
 
-  let get_msymbs : type a. mode:[`Delta | `FullDelta ] -> a Term.term -> Ss.t =
-    fun ~mode term ->
+(** [msets_abs_incl abs1 abs2] over-approximates [abs1 \ abs2]. *)
+let msets_abs_diff
+    (table : Symbols.table)
+    (system : SystemExpr.t)
+    (abs1 : msets_abs) 
+    (abs2 : msets_abs) : msets_abs
+  =
+  List.filter (fun (mn, m1) ->
+      try 
+        let m2 = List.assoc mn abs2 in
+        not (mset_incl table system m1 m2)
+      with Not_found -> true
+    ) abs1
+  
+
+(*------------------------------------------------------------------*)
+(** Return an over-approximation of the the macros reachable from a term
+    in any trace model. *)
+let macro_support : type a.
+  env:Sv.t ->
+  Constr.trace_cntxt ->
+  a Term.term ->
+  msets_abs
+  =
+  fun ~env cntxt term ->
+  let get_msymbs : type a. 
+    mode:[`Delta | `FullDelta ] -> a Term.term -> msets_abs
+    = fun ~mode term ->
       let occs = get_macro_occs ~mode cntxt term in
-      let msymbs = List.map (fun occ -> occ.occ_cnt.Term.s_symb) occs in
-      Ss.of_list msymbs
+      let msets = List.map (fun occ -> 
+          let indices = occ.occ_cnt.Term.s_indices in
+          Mset.mk ~env ~msymb:occ.occ_cnt ~indices) occs 
+      in
+      List.fold_left (fun abs mset -> msets_abs_join_single mset abs) [] msets 
   in
 
-  let init = List.fold_left (fun init term ->
-      Ss.union (get_msymbs ~mode:`FullDelta term) init
-    ) Ss.empty terms
-  in
-
-  let do1 (sm : Ss.t) =
+  let init = get_msymbs ~mode:`FullDelta term in
+  
+  let do1 (sm : msets_abs) =
     (* special cases for Input, Frame and Exec, since they do not appear in the
        action descriptions. *)
-    let sm = if Ss.mem Symbols.inp sm then Ss.add Symbols.frame sm else sm in
+    let sm = 
+      if List.mem_assoc Symbols.inp sm 
+      then msets_abs_join_single (simple_mset Symbols.frame Type.Message) sm 
+      else sm 
+    in
     let sm =
-      if Ss.mem Symbols.frame sm
-      then Ss.add Symbols.exec (Ss.add Symbols.out sm)
+      if List.mem_assoc Symbols.frame sm
+      then 
+        msets_abs_join_single (simple_mset Symbols.exec Type.Boolean)
+          (msets_abs_join_single (simple_mset Symbols.out Type.Message) sm)
       else sm
     in
     let sm =
-      if Ss.mem Symbols.exec sm
-      then Ss.add Symbols.cond sm
+      if List.mem_assoc Symbols.exec sm
+      then msets_abs_join_single (simple_mset Symbols.cond Type.Boolean) sm
       else sm
     in
 
     SystemExpr.fold_descrs (fun descr sm ->
-        fold_descr ~globals:true (fun msymb _ t sm ->
-            if Ss.mem msymb sm
-            then Ss.union (get_msymbs ~mode:`Delta t) sm
+        fold_descr ~globals:true (fun msymb is _ t sm ->
+            if List.mem_assoc msymb sm then
+              (* we compute the substitution which we will use to instantiate 
+                 [t] on the indices of the macro set in [sm]. *)
+              let subst = 
+                let mset = List.assoc msymb sm in
+                List.map2 (fun i j -> 
+                    Term.ESubst (Term.mk_var i, Term.mk_var j)
+                  ) is mset.Mset.msymb.Term.s_indices                 
+              in
+              let t = Term.subst subst t in
+
+              msets_abs_join (get_msymbs ~mode:`Delta t) sm
+
             else sm
           ) cntxt.table cntxt.system descr sm
       ) cntxt.table cntxt.system sm
   in
 
+  let abs_incl = msets_abs_incl cntxt.table cntxt.system in
+
   (* reachable macros from [init] *)
-  let s_reach = Utils.fpt Ss.equal do1 init in
+  let s_reach = Utils.fpt abs_incl do1 init in
   
   (* we now try to minimize [s_reach], by removing as many global macros as
      possible *)
 
   let s_reach_no_globs =
-    Ss.filter (fun ms -> not (is_glob cntxt.table ms)) s_reach
+    List.filter (fun (ms,_) -> not (is_glob cntxt.table ms)) s_reach
   in
   (* [s_reach'] are macros reachable from non-global macros in [s_reach] *)
-  let s_reach' = Utils.fpt Ss.equal do1 s_reach_no_globs in
+  let s_reach' = Utils.fpt abs_incl do1 s_reach_no_globs in
   
-  assert (Ss.subset s_reach' s_reach);
+  assert (abs_incl s_reach' s_reach);
 
   (* global macros reachable from s_reach' *)
   let s_reach'_glob =
-    Ss.filter (fun ms -> is_glob cntxt.table ms) s_reach'
+    List.filter (fun (ms, _) -> is_glob cntxt.table ms) s_reach'
   in
 
   (* we remove from [s_reach] all global macros reachable from non-global
      macros in [s_reach] *)
-  Ss.diff s_reach (s_reach'_glob)
+  msets_abs_diff cntxt.table cntxt.system s_reach s_reach'_glob
 
 
 (** An indirect occurrence of a macro term, used as return type of 
     [fold_macro_support]. The record:
 
-      [ { iocc_cnt = t; iocc_descr = d; iocc_sources = srcs; } ]
+      [ { iocc_aname = n;
+          iocc_vars = is; 
+          iocc_cnt = t; 
+          iocc_action = a;
+          iocc_sources = srcs; } ]
 
-    states that [t] is the body of a macro of action [d], and that
-    action [d] can appear in the translation of any of the terms in [srcs]
+    states that, for all indices [is], [t] is the body of a macro of action [a], 
+    and that this macro may appear in the translation of any of the terms in [srcs]
     in some trace model.
+    Notes: 
+    - [env ∩ is = ∅]
+    - if [env] are the free index variables of [srcs], then the free index
+      variables of [t] and [a] are included in [env ∪ is].
 *)
 type iocc = { 
+  iocc_aname   : Symbols.action Symbols.t;
+  iocc_vars    : Vars.index list;
   iocc_cnt     : Term.message;
-  iocc_descr   : Action.descr;
+  iocc_action  : Action.action;
   iocc_sources : Term.message list; 
 }
 
-(** Folding over all macro descriptions reachable from some terms. *)
-let fold_macro_support 
-    (func : (iocc -> 'a -> 'a)) 
+(** Folding over all macro descriptions reachable from some terms.
+    [env] must contain the free variables of [terms].  *)
+let _fold_macro_support 
+    (func : ((unit -> Action.descr) -> iocc -> 'a -> 'a)) 
     (cntxt : Constr.trace_cntxt)
+    (env : Vars.env)
     (terms : Term.message list) 
     (init : 'a) : 'a 
   =
-  (* association list of terms and their macro support *)
-  let sm = List.map (fun src -> (src, macro_support cntxt [src])) terms in
+  let env = Vars.to_set env in
 
-  (* reversing the association map: we want to map macros to possible sources *)
-  let macro_occs : Term.message list Ms.t = 
-    List.fold_left (fun macro_occs (src, src_macros) ->
-        Ss.fold (fun src_macro macro_occs -> 
+  (* association list of terms and their macro support *)
+  let sm : (Term.message * msets_abs) list = 
+    List.map (fun src -> (src, macro_support ~env cntxt src)) terms 
+  in
+
+  (* reversing the association map: we want to map macros to 
+     pairs of possible sources and macro set *)
+  let macro_occs : (Term.message list * Mset.t) Ms.t = 
+    List.fold_left (fun macro_occs ((src, src_macros) : Term.message * msets_abs) ->
+        List.fold_left (fun macro_occs (src_macro, mset) -> 
             if Ms.mem src_macro macro_occs 
             then
-              let srcs = Ms.find src_macro macro_occs in
-              Ms.add src_macro (src :: srcs) macro_occs
-            else Ms.add src_macro [src] macro_occs
-          ) src_macros macro_occs
+              let srcs, mset' = Ms.find src_macro macro_occs in
+              let new_mset = mset_join mset mset' in
+              Ms.add src_macro (src :: srcs, new_mset) macro_occs
+            else Ms.add src_macro ([src], mset) macro_occs
+          ) macro_occs src_macros 
       ) Ms.empty sm
   in
 
   SystemExpr.fold_descrs (fun descr acc ->
-      fold_descr ~globals:true (fun msymb _ t acc ->
+      fold_descr ~globals:true (fun msymb is _ t acc ->
           if Ms.mem msymb macro_occs then
-            let srcs = Ms.find msymb macro_occs in
+            let srcs, mset = Ms.find msymb macro_occs in
+
+            let is' = mset.Mset.msymb.Term.s_indices in
+            (* we compute the substitution which we will use to instantiate 
+               [t] on the indices of the macro set in [mset]. *)
+            let subst = 
+              List.map2 (fun i j -> 
+                  Term.ESubst (Term.mk_var i, Term.mk_var j)
+                ) is is'
+            in
+
+            let fv = Sv.diff (Sv.of_list1 is') env in
+            let fv = 
+              List.map (fun (Vars.EVar v) -> 
+                  Vars.cast v Type.KIndex
+                ) (Sv.elements fv) 
+            in
+
             let iocc = { 
-              iocc_descr   = descr; 
-              iocc_cnt     = t; 
+              iocc_aname   = descr.name;
+              iocc_vars    = fv;
+              iocc_action  = Action.subst_action subst descr.action;
+              iocc_cnt     = Term.subst subst t; 
               iocc_sources = srcs; 
             } in
-            func iocc acc 
+
+            let descr () = Action.subst_descr subst descr in
+
+            func descr iocc acc 
           else acc
         ) cntxt.table cntxt.system descr acc
     ) cntxt.table cntxt.system init
 
-(** Less precise version of [fold_macro_support], which does not track sources. *)
-let fold_macro_support0 
-    (func : (Action.descr -> Term.message -> 'a -> 'a)) 
+
+(** Same as [fold_macro_support], but without passing the description to [func] *)
+let fold_macro_support 
+    (func : (iocc -> 'a -> 'a)) 
     (cntxt : Constr.trace_cntxt)
+    (env : Vars.env)
     (terms : Term.message list) 
     (init : 'a) : 'a 
   =
-  fold_macro_support (fun iocc acc ->
-      func iocc.iocc_descr iocc.iocc_cnt acc
-    ) cntxt terms init
+  _fold_macro_support (fun _ -> func) cntxt env terms init
+
+(** Less precise version of [fold_macro_support], which does not track sources. *)
+let fold_macro_support0 
+    (func : (
+        Symbols.action Symbols.t -> (* action name *)
+        Action.action ->            (* action *)
+        Term.message ->             (* term *)
+        'a -> 'a)) 
+    (cntxt : Constr.trace_cntxt)
+    (env : Vars.env)
+    (terms : Term.message list) 
+    (init : 'a) : 'a 
+  =
+  _fold_macro_support (fun _ iocc acc ->
+      func iocc.iocc_aname iocc.iocc_action iocc.iocc_cnt acc
+    ) cntxt env terms init
+
+
+(** Less precise version of [fold_macro_support], which does not track sources. *)
+let fold_macro_support1
+    (func : (Action.descr -> Term.message -> 'a -> 'a)) 
+    (cntxt : Constr.trace_cntxt)
+    (env : Vars.env)
+    (terms : Term.message list) 
+    (init : 'a) : 'a 
+  =
+  _fold_macro_support (fun descr iocc acc ->
+      func (descr ()) iocc.iocc_cnt acc
+    ) cntxt env terms init

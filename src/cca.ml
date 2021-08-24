@@ -91,7 +91,7 @@ let check_encryption_randomness
   let encryptions : (Term.message * Vars.index list) list =
     List.map (fun case ->
         case.Euf.message,
-        case.Euf.action_descr.indices
+        Action.get_indices case.Euf.action
       ) case_schemata
     @
     List.map (fun case -> case.Euf.d_message, []) cases_direct

@@ -100,22 +100,27 @@ let hashes_of_action_descr
 (*------------------------------------------------------------------*)
 (** {2 Euf rules datatypes} *)
 
-type euf_schema = { message : Term.message;
-                    key_indices : Vars.index list;
-                    action_descr : Action.descr;
-                    env : Vars.env }
+type euf_schema = {
+  action_name  : Symbols.action Symbols.t;
+  action       : Action.action;
+  message      : Term.message;
+  key_indices  : Vars.index list;
+  env          : Vars.env;
+}
 
 let pp_euf_schema ppf case =
   Fmt.pf ppf "@[<v>@[<hv 2>*action:@ @[<hov>%a@]@]@;\
               @[<hv 2>*message:@ @[<hov>%a@]@]"
-    Action.pp_descr_short case.action_descr
+    Symbols.pp case.action_name
     Term.pp case.message
 
 (** Type of a direct euf axiom case.
     [e] of type [euf_case] represents the fact that the message [e.m]
     has been hashed, and the key indices were [e.eindices]. *)
-type euf_direct = { d_key_indices : Vars.index list;
-                    d_message : Term.message }
+type euf_direct = { 
+  d_key_indices : Vars.index list;
+  d_message     : Term.message 
+}
 
 let pp_euf_direct ppf case =
   Fmt.pf ppf "@[<v>@[<hv 2>*key indices:@ @[<hov>%a@]@]@;\
@@ -219,16 +224,17 @@ let mk_rule ?(elems=[]) ?(drop_head=true) ~fun_wrap_key
     in
 
     let subst = subst_fresh @ subst_is @ subst_bv in
-    let new_action_descr = Action.subst_descr subst action_descr in
-    { message = Term.subst subst m ;
-      key_indices = List.map (Term.subst_var subst) is ;
-      action_descr = new_action_descr;
+    let action = Action.subst_action subst action_descr.action in
+    { action_name = action_descr.name;     
+      action;
+      message = Term.subst subst m ;
+      key_indices = List.map (Term.subst_var subst) is ; 
       env = !env }
   in
   
   (* TODO: we are using the less precise version of [fold_macro_support] *)
   let hash_cases =
-    Iter.fold_macro_support0 (fun descr t hash_cases ->
+    Iter.fold_macro_support1 (fun descr t hash_cases ->
         (* TODO: use get_f_messages_ext and use conditons to improve precision *)
         (* let fv = Vars.Sv.of_list1 descr.Action.indices in
          * let new_hashes =
@@ -246,7 +252,7 @@ let mk_rule ?(elems=[]) ?(drop_head=true) ~fun_wrap_key
          * Fmt.epr "new hash: %a@." (Fmt.list pp) new_hashes; *)
         
         List.assoc_up_dflt descr [] (fun l -> new_hashes @ l) hash_cases
-      ) cntxt (mess :: sign :: elems) []
+      ) cntxt env (mess :: sign :: elems) []
   in
   
   (* we keep only actions in which the name occurs *)
@@ -259,11 +265,18 @@ let mk_rule ?(elems=[]) ?(drop_head=true) ~fun_wrap_key
 
   (* indirect cases *)
   let case_schemata =
-    List.map (fun (descr, hashes) ->
+    List.concat_map (fun (descr, hashes) ->
         List.map (mk_of_hash descr) hashes
       ) hash_cases
   in
-  
+
+  (* remove duplicate cases *)
+  let case_schemata = List.fold_right (fun case acc ->
+      (* FIXME: use a better redundancy check *)
+      if List.mem case acc then acc else case :: acc
+    ) case_schemata [] 
+  in
+
   (* direct cases *)
   let cases_direct =
     let hashes =
@@ -282,5 +295,5 @@ let mk_rule ?(elems=[]) ?(drop_head=true) ~fun_wrap_key
 
   { hash          = head_fn;
     key           = key_n;
-    case_schemata = List.flatten case_schemata;
-    cases_direct  = cases_direct; }
+    case_schemata;
+    cases_direct; }
