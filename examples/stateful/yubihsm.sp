@@ -327,6 +327,45 @@ by rewrite eq_iff.
 Qed.
 hint rewrite eq_false_t.
 
+(*------------------------------------------------------------------*)
+(* and *)
+
+axiom and_comm (b,b' : boolean) : (b && b') = (b' && b).
+
+axiom and_true_l (b : boolean) : (true && b) = b.
+hint rewrite and_true_l.
+
+goal and_true_r (b : boolean) : (b && true) = b.
+Proof. by rewrite and_comm and_true_l. Qed.
+hint rewrite and_true_r.
+
+axiom and_false_l (b : boolean) : (false && b) = false.
+hint rewrite and_false_l.
+
+goal and_false_r (b : boolean) : (b && false) = false.
+Proof. by rewrite and_comm and_false_l. Qed.
+hint rewrite and_false_r.
+
+(*------------------------------------------------------------------*)
+(* or *)
+axiom or_comm (b,b' : boolean) : (b || b') = (b' || b).
+
+axiom or_false_l (b : boolean) : (false || b) = b.
+hint rewrite or_false_l.
+
+goal or_false_r (b : boolean) : (b || false) = b.
+Proof. by rewrite or_comm or_false_l. Qed.
+hint rewrite or_false_r.
+
+axiom or_true_l (b : boolean) : (true || b) = true.
+hint rewrite or_true_l.
+
+goal or_true_r (b : boolean) : (b || true) = true.
+Proof. by rewrite or_comm or_true_l. Qed.
+hint rewrite or_true_r.
+
+(*------------------------------------------------------------------*)
+(* if *)
 
 goal if_true ['a] (b : boolean, x,y : 'a):
  b => if b then x else y = x.
@@ -353,6 +392,19 @@ Proof.
   by rewrite if_false.
 Qed.
 hint rewrite if_false0.
+
+goal if_then_then ['a] (b,b' : boolean, x,y : 'a):
+  if b then (if b' then x else y) else y = if (b && b') then x else y.
+Proof.  
+  by case b; case b'.
+Qed.
+
+goal if_same ['a] (b : boolean, x : 'a):
+  if b then x else x = x.
+Proof.
+  by case b.
+Qed.
+hint rewrite if_same.
 
 (* new *)
 goal if_then ['a] (b,b' : boolean, x,y,z : 'a):
@@ -394,43 +446,7 @@ Proof.
 Qed.
 hint rewrite if_else_not.
 
-
 (*------------------------------------------------------------------*)
-(* and *)
-
-axiom and_comm (b,b' : boolean) : (b && b') = (b' && b).
-
-axiom and_true_l (b : boolean) : (true && b) = b.
-hint rewrite and_true_l.
-
-goal and_true_r (b : boolean) : (b && true) = b.
-Proof. by rewrite and_comm and_true_l. Qed.
-hint rewrite and_true_r.
-
-axiom and_false_l (b : boolean) : (false && b) = false.
-hint rewrite and_false_l.
-
-goal and_false_r (b : boolean) : (b && false) = false.
-Proof. by rewrite and_comm and_false_l. Qed.
-hint rewrite and_false_r.
-
-(* or *)
-axiom or_comm (b,b' : boolean) : (b || b') = (b' || b).
-
-axiom or_false_l (b : boolean) : (false || b) = b.
-hint rewrite or_false_l.
-
-goal or_false_r (b : boolean) : (b || false) = b.
-Proof. by rewrite or_comm or_false_l. Qed.
-hint rewrite or_false_r.
-
-axiom or_true_l (b : boolean) : (true || b) = true.
-hint rewrite or_true_l.
-
-goal or_true_r (b : boolean) : (b || true) = true.
-Proof. by rewrite or_comm or_true_l. Qed.
-hint rewrite or_true_r.
-
 (* new *)
 goal dec_enc (x,r,k : message): dec(enc(x,r,k),k) = x.
 Proof. auto. Qed.
@@ -550,14 +566,10 @@ Proof.
   (* <= case *)
   intro [AEAD_dec OTP_dec Sid_eq].
   rewrite valid_decode //. 
-  case Eq.
-    depends Setup(pid), Decode(pid,j) by auto.
-    intro Clt.
-    by project; simpl; exists pid.
-
-    depends Setup(pid), Decode1(pid,j) by auto.
-    intro Clt.
-    by project; simpl; exists pid.
+  case Eq;
+  depends Setup(pid), t by auto;
+  intro Clt;
+  by project; simpl; exists pid.
 Qed.
 
 
@@ -588,10 +600,7 @@ Proof.
   enrich seq(pid:index -> k_dummy(pid)).
   enrich seq(pid:index -> sid(pid)).
   enrich seq(pid:index -> if Setup(pid) <= t then AEAD(pid)@Setup(pid)).
-
-  enrich seq(pid:index -> if Setup(pid) <= t then AEAD(pid)@t).
- (* (†) TODO: this last sequence must be changed to: *)
-  (* enrich seq(ts -> if ts <= t then AEAD(pid)@ts). *)
+  enrich seq(pid:index -> AEAD(pid)@t).
 
   dependent induction t => t Hind Hap.
   case t => Eq;
@@ -603,33 +612,47 @@ Proof.
     by apply Hind (pred(t))).
 
   (* init *)
-  admit. (* TODO: constseq *)
+  rewrite /*. 
+  constseq 1: zero; 1: by rewrite if_false. 
+  auto.
 
   (* Setup *)
   repeat destruct Eq as [_ Eq]. 
   rewrite /* in 7.
-  (* TODO: split sequences *)
-  (* by apply Hind (pred(t)). *)
-  admit.
+  splitseq 1: (fun (pid : index) -> Setup(pid) < t).
+  rewrite !if_then_then in 1,2.
+
+  assert (forall (t, t' : timestamp), 
+   (t < t' && t <= t') = (t < t')) as lt_le_eq_lt.
+  by rewrite eq_iff.
+  rewrite lt_le_eq_lt in 1.
+
+  (* le_not_lt_charac *)
+  rewrite le_not_lt_charac in 2.
+
+  constseq 2: (AEAD(pid)@t) zero. 
+    intro pid0.
+    case pid0 = pid => _; 
+      [1: by left; rewrite if_true |
+       2: by right; by rewrite if_false].
+  
+  rewrite !-le_pred_lt.
+  by apply Hind (pred(t)).
 
   (* Write(pid,j) *)
   repeat destruct Eq as [_ Eq]. 
   rewrite le_lt; 1:auto.
   rewrite !-le_pred_lt.
   rewrite /* in 7.
-  fa 7; fa 8; fa 8. 
-  admit. (* Cf † *)
-  (* by apply Hind (pred(t)). *)
-  (* constseq 0: true false; 1: by intro pid0; case (pid = pid0).  *)
-  (* by apply Hind (pred(t)). *)
+  by apply Hind (pred(t)).
 
   (* Decode(pid,j) *)
   repeat destruct Eq as [_ Eq].
   rewrite le_lt; 1:auto.
   rewrite !-le_pred_lt.
-  depends Setup(pid), Decode(pid,j) by auto => H.
+  depends Setup(pid), t by auto => H.
   rewrite /frame /exec /output /cond in 7. 
-  fa 7. fa 8. fa 8.
+  fa 7; fa 8; fa 8.
 
   rewrite valid_decode_charac //. 
   (* rewrite the content of the then branch *)
@@ -637,19 +660,17 @@ Proof.
   fa 9.
   rewrite /AEAD /= in 9.
   rewrite /aead /otp in 8,9.
-  admit 0.                      (* TODO: need to unroll the definition *)
   by apply Hind (pred(t)).
 
   (* Decode1(pid,j) *)
   repeat destruct Eq as [_ Eq].
   rewrite le_lt; 1:auto.
   rewrite !-le_pred_lt.
-  depends Setup(pid), Decode1(pid,j) by auto => H.
+  depends Setup(pid), t by auto => H.
   rewrite /frame /exec /output /cond in 7. 
-  fa 7. fa 8. fa 8.
+  fa 7; fa 8; fa 8.
   rewrite valid_decode_charac //. 
   rewrite /otp /aead.
-  admit 0.                      (* TODO: need to unroll the definition *)
   by apply Hind (pred(t)).
 Qed.
   
