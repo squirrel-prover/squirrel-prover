@@ -675,6 +675,51 @@ Proof.
 Qed.
   
 
+(* Preuve alternative plus courte *)
+
+equiv stef_atomic_keys.
+Proof.
+  enrich seq(pid,j:index -> npr(pid,j)). 
+  enrich seq(pid,j:index -> nonce(pid,j)). 
+  enrich seq(pid:index -> k(pid)).
+  enrich seq(pid:index -> k_dummy(pid)).
+  enrich seq(pid:index -> sid(pid)).
+  enrich seq(pid:index -> AEAD(pid)@t).
+
+  dependent induction t => t Hind Hap.
+  case t => Eq; 
+   try (repeat destruct Eq as [_ Eq]; 
+  rewrite /* in 6;
+  fa 6;
+  by apply Hind (pred(t)) => //).
+
+  (* init *)
+  rewrite /*. 
+  auto.
+  (* Decode(pid,j) *)
+  repeat destruct Eq as [_ Eq].
+  depends Setup(pid), t by auto => H.
+  rewrite /frame /exec /output /cond in 6. 
+  fa 6; fa 7; fa 7.
+
+  rewrite valid_decode_charac //. 
+  (* rewrite the content of the then branch *)
+  rewrite /otp_dec /aead_dec if_aux /= in 8.
+  fa 8.
+  rewrite /AEAD /= in 8.
+  rewrite /aead /otp in 7,8.
+  by apply Hind (pred(t)).
+
+  (* Decode1(pid,j) *)
+  repeat destruct Eq as [_ Eq].
+  depends Setup(pid), t by auto => H.
+  rewrite /frame /exec /output /cond in 6. 
+  fa 6; fa 7; fa 7.
+  rewrite valid_decode_charac //. 
+  rewrite /otp /aead.
+  by apply Hind (pred(t)).
+Qed.
+
 (* The counter SCtr(j) strictly increases when t is an action Server performed by 
 the server with tag j. *)
 
