@@ -1400,7 +1400,16 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Depends} *)
 
   let depends Args.(Pair (Timestamp a1, Timestamp a2)) s =
-    match a1, a2 with
+    let models = S.get_models s in    
+    let get_action ts =
+      match Constr.find_eq_action models ts with
+      | Some ts -> ts
+      | None ->
+        soft_failure 
+          (Failure (Fmt.str "cannot find a action equal to %a" Term.pp ts))
+    in
+
+    match get_action a1, get_action a2 with
     | Term.Action(n1, is1), Term.Action (n2, is2) ->
       let table = S.table s in
       if Action.(depends (of_term n1 is1 table) (of_term n2 is2 table)) then
@@ -1417,7 +1426,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           (Tactics.NotDepends (Fmt.strf "%a" Term.pp a1,
                                Fmt.strf "%a" Term.pp a2))
           
-    | _ -> soft_failure (Tactics.Failure "arguments must be actions")
+    | _ -> assert false
 
   (*------------------------------------------------------------------*)
   (** {3 Remember} *)
