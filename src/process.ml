@@ -188,6 +188,9 @@ let find_process_lsymb table (lsymb : lsymb) =
   let name = Symbols.Process.of_lsymb lsymb table in
   find_process table name
 
+let check_channel table (s : lsymb) =
+  ignore(Channel.of_lsymb s table : Channel.t)
+
 (*------------------------------------------------------------------*)
 (** Type checking for processes *)
 let check_proc table (env : Vars.env) p =
@@ -201,14 +204,18 @@ let check_proc table (env : Vars.env) p =
       let env, _ = Vars.make `Shadow env ty (L.unloc x) in
       check_p ty_env env p
 
-    | In (_,x,p) -> 
+    | In (c,x,p) -> 
+      check_channel table c;
+
       (* TODO: subtypes*)
       let env, _ = Vars.make `Shadow env (Type.Message) (L.unloc x) in
       check_p ty_env env p
 
-    | Out (_,m,p)
+    | Out (c,m,p)
 
-    | Alias (L.{ pl_desc = Out (_,m,p) },_) ->
+    | Alias (L.{ pl_desc = Out (c,m,p) },_) ->
+      check_channel table c;
+
       (* raise an error if we are in strict alias mode *)
       if is_out proc && (Config.strict_alias_mode ())
       then proc_err loc (StrictAliasError "missing alias")
