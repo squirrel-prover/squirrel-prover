@@ -597,8 +597,8 @@ global goal stef_atomic_keys (t : timestamp):
     frame@t,
     exec@t,
     seq(pid:index -> AEAD(pid)@t),
-    seq(pid:index -> YCtr(pid)@t),
-    seq(pid:index -> SCtr(pid)@t),
+    (* seq(pid:index -> YCtr(pid)@t), *)
+    (* seq(pid:index -> SCtr(pid)@t), *)
     seq(pid:index -> sid(pid)),
     seq(pid,j:index -> npr(pid,j)),
     seq(pid,j:index -> nonce(pid,j)),
