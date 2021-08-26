@@ -636,7 +636,8 @@ let mk_fresh_indirect_cases
               Iter.{ case with
                      occ_cnt = a, case.occ_cnt;
                      occ_cond = Term.mk_true; }
-                     (* cond is not used, so we set it to true here. *)
+              (* cond is not used, so we set it to true here. 
+                 This helps remove redundant cases later. *)
 
             ) new_cases 
         in
@@ -658,37 +659,48 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
     iter#get_actions
   in
 
+  let sv_env = Vars.to_set env in
+
   let macro_cases = mk_fresh_indirect_cases cntxt env ns [t] in
 
-  (* the one case occuring in [a] with indices [is_a].'
-     For n[is] to be equal to n[is_a], we must have is=is_a.
-     Hence we substitute is_a by is. *)
-  let mk_case (a, is_a) : Term.message =
-    let env_local = ref env in
-
-    (* We only quantify over indices that are not in is_a *)
-    let eindices = 
-      List.filter (fun v -> not (List.mem v is_a)) (Action.get_indices a)
+  (* the one case occuring in [a] with indices [is_a].
+     For [n(is)] to be equal to [n(is_a)], we must have [is=is_a]. *)
+  let mk_case ((a, is_a) : Action.action * Vars.index list) : Term.message =
+    let fv = 
+      Sv.diff (Sv.union (Action.fv_action a) (Sv.of_list1 is_a)) sv_env 
     in
+    let fv = 
+      List.map (fun (Vars.EVar v) -> 
+          Vars.cast v Type.KIndex
+        ) (Sv.elements fv) 
+    in
+    
+    (* refresh existantially quantified variables. *)
+    let fv, subst = Term.refresh_vars (`InEnv (ref env)) fv in
+    let a = Action.subst_action subst a in
+    let is_a = List.map (Term.subst_var subst) is_a in
 
-    let eindices' = List.map (Vars.fresh_r env_local) eindices in
-
-    (* refresh existantially quant. indices, and subst is_a by is. *)
+    (* now, since [is_a = is], we substitute free indices of [is_a]
+       by the corresponding indices in [is].
+       we do this after refresh, to avoid shadowing issues etc. *)
     let subst =
       List.map2
-        (fun i i' -> ESubst (Term.mk_var i, Term.mk_var i'))
-        (eindices @ is_a) (eindices' @ ns.s_indices)
+        (fun i i' -> 
+           if List.mem i fv 
+           then Some (ESubst (Term.mk_var i, Term.mk_var i')) 
+           else None
+        ) is_a ns.s_indices
     in
+    let subst = List.filter_map (fun x -> x) subst in
 
-    (* we apply [subst] to the action [a] *)
-    let new_action =
-      SystemExpr.action_to_term cntxt.table cntxt.system
-        (Action.subst_action subst a) in
-
+    let a = Action.subst_action subst a in
+    
+    (* we now built the freshness condition *)
+    let a_term = SystemExpr.action_to_term cntxt.table cntxt.system a in    
     let timestamp_inequalities =
       Term.mk_ors
         (List.map (fun action_from_term ->
-             (Term.mk_timestamp_leq new_action action_from_term)
+             (Term.mk_timestamp_leq a_term action_from_term)
            ) term_actions)
     in
 
@@ -703,7 +715,7 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
     in
 
     Term.mk_exists ~simpl:true
-      (List.map (fun i -> Vars.EVar i) eindices')
+      (List.map (fun i -> Vars.EVar i) fv)
       (Term.mk_and
          timestamp_inequalities
          idx_eqs)

@@ -571,6 +571,12 @@ let mset_incl = Match.mset_incl
 (** abstract value containing one mset per macro symbol. *)
 type msets_abs = (Term.mname * Mset.t) list
 
+let pp_msets_abs fmt (abs : msets_abs) : unit =
+  let pp_one fmt (mname, mset) = 
+    Fmt.pf fmt "@[<h>%a: %a@]" Symbols.pp mname Match.pp_mset mset
+  in
+  Fmt.pf fmt "@[<v 0>%a@]" (Fmt.list ~sep:Fmt.cut pp_one) abs
+
 (** join a single [mset] into an full abstract value. *)
 let msets_abs_join_single (mset : Mset.t) (msets : msets_abs) : msets_abs =
   let name = mset.msymb.s_symb in 
@@ -720,11 +726,19 @@ let macro_support : type a.
 *)
 type iocc = { 
   iocc_aname   : Symbols.action Symbols.t;
+  iocc_action  : Action.action;
   iocc_vars    : Vars.index list;
   iocc_cnt     : Term.message;
-  iocc_action  : Action.action;
   iocc_sources : Term.message list; 
 }
+
+let pp_iocc fmt (o : iocc) : unit = 
+  Fmt.pf fmt "@[<v 2>[%a(%a):@;cnt: @[%a@]@;sources: @[%a@]@;fv: @[%a@]]@]"
+    Symbols.pp o.iocc_aname
+    Vars.pp_list (Action.get_indices o.iocc_action)
+    Term.pp o.iocc_cnt
+    (Fmt.list ~sep:Fmt.comma Term.pp) o.iocc_sources
+    (Fmt.list ~sep:Fmt.comma Vars.pp) o.iocc_vars
 
 (** Folding over all macro descriptions reachable from some terms.
     [env] must contain the free variables of [terms].  *)
