@@ -405,7 +405,9 @@ val mk_len     : message -> message
 val mk_zeroes  : message -> message
 val mk_of_bool : message -> message
 val mk_pair    : message -> message -> message
- 
+
+val mk_witness : Type.tmessage -> message
+
 (*------------------------------------------------------------------*)
 (** {3 Smart constructors: messages} *)
 
@@ -414,7 +416,7 @@ val mk_ite : ?simpl:bool -> message -> message -> message -> message
 val mk_timestamp_leq : timestamp -> timestamp -> message
 
 val mk_indices_neq : Vars.index list -> Vars.index list -> message
-val mk_indices_eq  : Vars.index list -> Vars.index list -> message
+val mk_indices_eq  : ?simpl:bool -> Vars.index list -> Vars.index list -> message
 
 val mk_atom : ord -> 'a term -> 'b term -> message 
 val mk_happens : timestamp -> message 
@@ -466,6 +468,9 @@ module Mt : Map.S with type key = eterm
   * without diff operators)? *)
 
 type projection = PLeft | PRight | PNone
+
+val pp_projection : Format.formatter -> projection -> unit
+
 
 (** Evaluate all diff operators wrt a projection.
   * If the projection is [None], the input term is returned unchanged.

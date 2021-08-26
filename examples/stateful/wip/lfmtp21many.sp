@@ -181,10 +181,10 @@ Proof.
   use lastupdate with i,tau as [[A0 Hinit] | [j [[A0 A1] Hsup]]] => //;
   use lastupdate with i',tau' as [[A Hinit'] | [j' [[B C] Hsup']]] => //.
   rewrite -Meq A0 /s in B. 
-  admit. (* by fresh B. *) (* TODO: improve fresh precision *)  
+  by fresh B.
 
   rewrite Meq A /s in A0. 
-  admit. (* by fresh B. *) (* TODO: improve fresh precision *)  
+  by fresh A0.
 
   rewrite Meq B /s in A0.
   collision A0 => H.

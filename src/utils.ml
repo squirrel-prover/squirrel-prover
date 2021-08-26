@@ -75,6 +75,15 @@ module List = struct
     | (a,b)::l -> if compare a x = 0 then b else assoc_dflt dflt x l
 
   (*------------------------------------------------------------------*)
+  let rec iteri2 i f l1 l2 =
+    match (l1, l2) with
+      ([], []) -> ()
+    | (a1::l1, a2::l2) -> f i a1 a2; iteri2 (i+1) f l1 l2
+    | (_, _) -> invalid_arg "List.iteri2"
+
+  let iteri2 f l1 l2 = iteri2 0 f l1 l2
+
+  (*------------------------------------------------------------------*)
   let rec drop0 i l =
     if i = 0 then l else
       match l with

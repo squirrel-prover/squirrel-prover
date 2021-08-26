@@ -44,6 +44,8 @@ module List : sig
   (** [takedrop n l] returns the a result equal to [take n l, drop n l]. *)
   val takedrop : int -> 'a list -> 'a list * 'a list
 
+  val iteri2 : (int -> 'a -> 'b -> unit) -> 'a list -> 'b list -> unit
+
   exception Out_of_range
 
   (** When [0 <= i < List.length l], [splitat i l] returns [before,e,after]
@@ -112,8 +114,11 @@ module Uf (Ord: Ordered) : sig
 end
 
 (*------------------------------------------------------------------*)
+(** [fpt comp f x] iters [f] untils it reachs a value [y] such that 
+    [comp (f y) y] holds (in which case it returns [f y]). 
+    - if [comp] is a reflexive relation, computes a fix-point of [f]. 
+    - if [f] is monotonic w.r.t. [comp], computes a post-fixpoint of [f]. *)
 val fpt : ('a -> 'a -> bool) -> ('a -> 'a) -> 'a -> 'a
-
 
 (*------------------------------------------------------------------*)
 (* Option type functions *)

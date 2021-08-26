@@ -38,6 +38,8 @@ let rec get_indices = function
   | a :: l ->
     snd a.par_choice @ snd a.sum_choice @ get_indices l
 
+let fv_action a = Vars.Sv.of_list1 (get_indices a)
+
 let same_shape a b : Term.subst option =
   let rec same acc a b = match a,b with
   | [],[] -> Some acc

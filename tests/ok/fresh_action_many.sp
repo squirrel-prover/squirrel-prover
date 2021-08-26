@@ -9,10 +9,12 @@ name m : index->message
 system !_i !_j out(c,<n(i),n(j)>).
 
 global goal test (k:index) : 
-[(k <> k && (forall (i,j:index), A(i,j)<A(k,k) => i<>k && j<>k)) = true] ->
-[happens(A(k,k))] -> 
-equiv(frame@A(k,k)) -> 
-equiv(frame@A(k,k), diff(n(k),m(k))).
+  [(k <> k && 
+    (forall (i,j:index), A(i,j)<A(k,k) => i<>k) &&
+    (forall (i,j:index), A(i,j)<A(k,k) => j<>k)) = true] ->
+  [happens(A(k,k))] -> 
+  equiv(frame@A(k,k)) -> 
+  equiv(frame@A(k,k), diff(n(k),m(k))).
 Proof.
   intro Heq Hap H. 
   fresh 1. 

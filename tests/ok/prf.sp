@@ -65,7 +65,7 @@ system [failing]
   let key=x in
   let surp = diff(m,n) in
   let mac = h(k,key) in
-  out(c,diff(mac,n)).
+  out(c,<mac, diff(m,n)>).
 
 equiv [failing] testfail.
 Proof.
@@ -74,8 +74,6 @@ induction t.
 auto.
 
 expandall.
-fa 0.
-fa 1.
-fa 1.
+fa 0; fa 1; fa 1; fa 1.
 checkfail prf 1 exn BadSSC.
 Abort.
