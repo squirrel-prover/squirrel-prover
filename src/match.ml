@@ -57,6 +57,7 @@ module Mvar : sig
 
   val to_subst : mode:[`Match|`Unif] -> t -> subst 
 
+  val pp : Format.formatter -> t -> unit
 end = struct
   (** [id] is a unique identifier used to do memoisation. *)
   type t = { id    : int;
@@ -64,6 +65,14 @@ end = struct
 
   let cpt = ref 0
   let make subst = { id = (incr cpt; !cpt); subst }
+
+  let pp fmt (mv : t) : unit =
+    let pp_binding fmt (Vars.EVar v, Term.ETerm t) =
+      Fmt.pf fmt "@[%a → %a@]" Vars.pp v Term.pp t
+    in
+
+    Fmt.pf fmt "@[<v 2>{id:%d@;%a}@]" mv.id
+      (Fmt.list ~sep:Fmt.cut pp_binding) (Mv.bindings mv.subst)
 
   let empty = make (Mv.empty)
 
@@ -118,7 +127,7 @@ end = struct
     let module H2 = struct
       type t = [`Match|`Unif]
       let hash = function `Match -> 1 | `Unif -> 0
-      let equal x y = x == y
+      let equal x y = x = y
     end in 
     let module Memo = Ephemeron.K2.Make (H1) (H2) in
     let memo = Memo.create 256 in
@@ -497,6 +506,8 @@ module T (* : S with type t = message *) = struct
     let supp1 = Sv.map (Vars.tsubst_e ty_subst1) t1.pat_vars in
     let supp2 = Sv.map (Vars.tsubst_e ty_subst2) t2.pat_vars in
     let support = Sv.union supp1 supp2 in
+
+    assert (Sv.disjoint supp1 supp2);
 
     let env = Sv.diff (Sv.union (Term.fv term1) (Term.fv term2)) support in
 
@@ -995,13 +1006,27 @@ let pat_of_known_set (known : known_set) : Term.message pat =
   let vars =
     let tvs = match known.tvar with
       | None -> []
-      | Some tv -> [tv]
+      | Some tv -> [Vars.EVar tv]
     in
-    Sv.add_list (Sv.of_list known.vars) tvs
+    tvs @ known.vars
   in
   { pat_term   = known.term;
-    pat_vars   = vars;
+    pat_vars   = Sv.of_list vars;
     pat_tyvars = []; }
+
+(*------------------------------------------------------------------*)
+let refresh_known_set (known : known_set) : known_set =
+  let vars, subst = Term.erefresh_vars `Global known.vars in
+  let tvar, subst = 
+    match known.tvar with
+    | None -> None, subst
+    | Some tv -> 
+      let tv, subst' = Term.refresh_vars `Global [tv] in
+      Some (as_seq1 tv), subst' @ subst
+  in     
+  { vars; tvar; 
+    term = Term.subst subst known.term;
+    cond = Term.subst subst known.cond; }
 
 (*------------------------------------------------------------------*)
 let msets_add (mset : Mset.t) (msets : msets) : msets =
@@ -1225,8 +1250,10 @@ module E : S with type t = Equiv.form = struct
         (cand  : cand_set)
         (known : known_set) : cand_set option
       =
-      let mv, c_pat = pat_of_cand_set cand
-      and e_pat = pat_of_known_set known in
+      let known = refresh_known_set known in
+
+      let mv, c_pat = pat_of_cand_set cand in
+      let e_pat = pat_of_known_set known in
 
       match T.unify_opt ~mv table c_pat e_pat with
       | None -> None
@@ -1254,7 +1281,8 @@ module E : S with type t = Equiv.form = struct
             { term = cand.term;
               subst = mv;
               (* Note: variables must *not* be cleared yet,
-                 because we must not forget the instantiation of any variable. *)
+                 because we must not forget the instantiation by [mv] of any
+                 variable. *)
               vars = cand.vars @ known.vars; }
           in
           Some cand
@@ -1321,7 +1349,7 @@ module E : S with type t = Equiv.form = struct
         ) cands
     in
 
-    (** Return a list of speciablization of [cand] deducible from [terms] and
+    (** Return a list of specialization of [cand] deducible from [terms] and
         [known].
         This includes both direct specialization, and specialization relying on
         the Function Application rule. *)
@@ -1345,13 +1373,13 @@ module E : S with type t = Equiv.form = struct
       match cand.term with
       | [] -> [cand]
       | t :: tail ->
-        (* find deducible speciablization of the first term of the tuple. *)
+        (* find deducible specialization of the first term of the tuple. *)
         let t_deds = deduce { cand with term = t } terms known_sets in
 
         (* for each such specialization, complete it into a specialization of
            the full tuple. *)
         List.concat_map (fun t_ded ->
-            (* find a deducible speciablization of the tail of the tuple,
+            (* find a deducible specialization of the tail of the tuple,
                starting from the  specialization of [t]. *)
             let cand_tail : cand_tuple_set = { t_ded with term = tail } in
             let tail_deds = deduce_list cand_tail terms known_sets in
@@ -1362,7 +1390,7 @@ module E : S with type t = Equiv.form = struct
               ) tail_deds
           ) t_deds
 
-    (** Return a list of speciablization of [cand] deducible from [terms] and
+    (** Return a list of specialization of [cand] deducible from [terms] and
         [pseqs] using Function Application.
         Does not include direct specialization. *)
     and deduce_fa
@@ -1372,29 +1400,29 @@ module E : S with type t = Equiv.form = struct
       =
       (* decompose the term using Function Application,
          find a deducible specialization of its tuple of arguments,
-         and build the deducible speciablization of the initial term. *)
+         and build the deducible specialization of the initial term. *)
       match cand.term with
       (* special case for pure timestamps *)
       | _ as f when Term.is_pure_timestamp f -> [cand]
 
-      (* special case for the if_then_else function symbol. *)
-      | Term.Fun (fs, fty, [cond; t1; t2]) when fs = Term.f_ite ->
-
-        (* then branch *)
-        let f_terms_cand1 = { cand with term = [cond; t1] } in
-        let f_terms_deds1 = deduce_list f_terms_cand1 terms known_sets in
-
-        (* else branch *)
-        let f_terms_cand2 = { cand with term = [cond; t2] } in
-        let f_terms_deds2 = deduce_list f_terms_cand2 terms known_sets in
-
-        (* union of terms deducible from both branch *)
-        let f_terms_deds = f_terms_deds1 @ f_terms_deds2 in
-
-        List.map (fun (f_terms_ded : cand_tuple_set) ->
-            { f_terms_ded with
-              term = Term.mk_fun0 fs fty (f_terms_ded.term) }
-          ) f_terms_deds
+      (* (* special case for the if_then_else function symbol. *)
+       * | Term.Fun (fs, fty, [cond; t1; t2]) when fs = Term.f_ite ->
+       * 
+       *   (* then branch *)
+       *   let f_terms_cand1 = { cand with term = [cond; t1] } in
+       *   let f_terms_deds1 = deduce_list f_terms_cand1 terms known_sets in
+       * 
+       *   (* else branch *)
+       *   let f_terms_cand2 = { cand with term = [cond; t2] } in
+       *   let f_terms_deds2 = deduce_list f_terms_cand2 terms known_sets in
+       * 
+       *   (* union of terms deducible from both branch *)
+       *   let f_terms_deds = f_terms_deds1 @ f_terms_deds2 in
+       * 
+       *   List.map (fun (f_terms_ded : cand_tuple_set) ->
+       *       { f_terms_ded with
+       *         term = Term.mk_fun0 fs fty (f_terms_ded.term) }
+       *     ) f_terms_deds *)
 
       | Term.Fun (fs, fty, f_terms) ->
         let f_terms_cand = { cand with term = f_terms } in

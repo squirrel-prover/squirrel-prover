@@ -19,18 +19,19 @@ system !_i P(i).
 
 (* check that frame strenghtening does not deduce cond@t from frame@t *)
 global goal _ (t :timestamp) :
-[happens(t)] -> 
-equiv(frame@t) -> equiv(frame@t, cond@t).
+  [happens(t)] -> 
+  equiv(frame@t) -> equiv(frame@t, cond@t).
 Proof. 
- checkfail (intro _ H; apply H) exn ApplyMatchFailure.
+  checkfail (intro _ H; apply H) exn ApplyMatchFailure.
 Abort.
 
 (*------------------------------------------------------------------*)
 (* check that frame@t -> exec@t *)
 
 global goal _ (t :timestamp) :
-[happens(t)] ->
-equiv(frame@t) -> equiv(frame@t, exec@t).
+  [happens(t)] ->
+  equiv(frame@t) -> equiv(frame@t, exec@t).
 Proof. 
- intro _ H; apply H.
+  intro _ H; apply H.
 Qed.
+
