@@ -390,8 +390,7 @@ Proof.
   expand kR.
   intro M.
   use IH0 with pred(R1(jj,ii)),i,ii as H4 => //.
-  fresh M.
-  admit. (* TODO - fresh tactic not precise enough *)
+  by fresh M.
 
   case (ii=ii0) => _ //. 
   expand kR. 
@@ -419,7 +418,10 @@ Proof.
   intro M.
   use IH0 with pred(T1(i,j)),i,ii as _ => //. 
   fresh M.
-  admit. (* TODO - fresh tactic not precise enough *)
+  admit. 
+   (* TODO - fresh tactic not precise enough *)
+   (* Adrien: I believe this is not true: kT depends on `input`, 
+              hence even a precise fresh does not allow to conclude here. *)
 
   case (i=i0) => _ //=. 
   expand kT. 
