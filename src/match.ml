@@ -870,7 +870,7 @@ end
       [{ term  = [t1; ...; tn];
          subst = θ;
          vars  = vars; }]
-    represents the set of tuples of terms [\{(t1, ..., tn)θ | ∃ vars \}].
+    represents the set of tuples of terms [\{(t1, ..., tn)θ | ∀ vars \}].
 
     The case ['a = Term.message] is identical to the case where
     ['a = Term.message list] and the list is of length 1.
@@ -895,7 +895,7 @@ type cand_tuple_sets = cand_tuple_set list
          vars    = vars;
          tvar    = τ;
          cond    = ψ; }]
-    represents the set of terms [\{t | ∃ vars, τ. ψ \}]. *)
+    represents the set of terms [\{t | ∀ vars, τ. ψ \}]. *)
 type known_set = {
   term    : Term.message;
   vars    : Vars.evars;
@@ -910,7 +910,7 @@ module Mset : sig
   (** Set of macros over some indices.
         [{ msymb   = m;
            indices = vars; }]
-      represents the set of terms [\{m@τ | ∃ vars \}] (for any τ). *)
+      represents the set of terms [\{m@τ | ∀ vars, τ \}]. *)
   type t = private {
     msymb   : Term.msymb;
     indices : Vars.index list;
@@ -1106,7 +1106,32 @@ let mset_list_inter
 
 
 (** Compute the lub of two msets (w.r.t set inclusion).
-    Must be called on sets with the macro symbol. *)
+    Must be called on sets with the macro symbol. 
+
+    A mset is a set of terms of the form:
+       [\{m(i₁, ..., iₙ)@τ | ∀ vars, τ \}]
+    where [m] is a macro symbol, [τ] is a timestamp variable, and
+    [i₁,...,iₙ] are not necessarily distinct index variables that can appear
+    in [vars], but don't have to.
+
+    Alternatively, a mset is a set of terms of the form:
+       [\{m(j₁, ..., jₖ)@τ | ∀ j₁, ..., jₖ s.t. j₁, ..., jₖ ⊢ E₁, ..., Eₙ ∧
+                             ∀ τ \}]
+    where [j₁, ..., jₖ] are *distinct* index variables, and [E₁, ..., Eₙ]
+    are equalities between index variables (not necessarily all in [j₁, ..., jₖ]).
+    Such a set is fully characterized by the symbol [m] (which fixes the  
+    arity [k]), and by the equalities [E₁, ..., Eₙ].
+
+    Hence, given two such sets [S] and [S'] characterized by ([m], [E₁, ..., Eₙ])
+    and ([m], [F₁, ..., Fₘ]) (note the same macro symbol), the least upper bound
+    (among msets, w.r.t. set inclusion) [Sₗ] of [S ∪ S'] is the macro set
+    characterized by [G₁, ..., Gₗ] where: 
+    [\{G₁, ..., Gₗ\} = \{ G | E₁, ..., Eₙ ⊢ G ∧ F₁, ..., Fₘ ⊢ G\}]
+
+    The algorithm below is based on that observation. Of course, we do not test 
+    all equalities [G] (there are too many of them). Essentially, we check a 
+    complete base of such equalities, which fully characterize [Sₗ].
+*)
 let mset_join (a : Mset.t) (b : Mset.t) : Mset.t = 
   let a_ms, b_ms = a.msymb, b.msymb in
   assert (a_ms.s_symb = b_ms.s_symb);
