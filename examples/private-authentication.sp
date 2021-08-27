@@ -78,7 +78,7 @@ Proof.
   fa 3. fresh 3. yesif 3.
   fresh 3. yesif 3.
   (* Case B *)
-  expandall.
+  expand frame, output, exec, cond, dmess.
   fa 2. fa 3. fa 3.
   enckp 3. cca1 3.
 

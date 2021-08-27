@@ -159,7 +159,8 @@ Proof.
     by assumption.
     
   (* Oracle *)
-  expandall. fa 0. fa 1. fa 1. fa 1. 
+  expand frame, output, exec, cond.
+  fa 0. fa 1. fa 1. fa 1. 
   prf 1; yesif 1; 2: fresh 1.
   simpl; split; project; intro i' H; try destruct H as [H|H];
     try by apply unique_queries.

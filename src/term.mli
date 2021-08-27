@@ -289,6 +289,8 @@ val f_diff   : fsymb
 
 val f_succ   : fsymb
 
+val f_att    : fsymb
+
 val f_fail   : fsymb
 
 val f_xor    : fsymb

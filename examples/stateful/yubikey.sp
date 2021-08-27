@@ -457,7 +457,7 @@ Proof.
      S(ii,i) = pred(S(ii1,i)) || 
      S(ii,i) > pred(S(ii1,i)) ) as H'; 1: constraints.
 
-  case H'; 2,3: auto. 
+  case H'; [2: by rewrite H'| 3: auto]. 
   (* case S(ii,i) < pred(S(ii1,i)) *)
   use counterIncreaseBis with pred(S(ii1,i)),S(ii,i),i as Hcpt => //.
   case Hcpt => //.
@@ -473,7 +473,7 @@ Proof.
    ( S(ii1,i) < pred(S(ii,i)) || 
      S(ii1,i) = pred(S(ii,i)) || 
      S(ii1,i) > pred(S(ii,i)) ) as H'; 1: constraints.
-  case H'; 2,3: auto. 
+  case H'; [2: by rewrite H'| 3: auto]. 
   (* case S(ii1,i) < pred(S(ii,i)) *)
   use counterIncreaseBis with pred(S(ii,i)),S(ii1,i),i as Hcpt => //.
   case Hcpt; 

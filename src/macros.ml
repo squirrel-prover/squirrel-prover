@@ -58,11 +58,10 @@ let is_prefix ~strict a b =
     Not exported. *)
 let is_defined name a table =
   match Symbols.Macro.get_all name table with
-    | Symbols.Input, _ -> false
-    | Symbols.(Output | Cond | State _), _ ->
-      (* We can expand the definitions of output@A, cond@A and state@A
-       * when A is an action name. We cannot do so for a variable
-       * or a predecessor. *)
+    | Symbols.(Input | Output | Cond | State _), _ ->
+      (* We can expand the definitions of input@A, output@A, cond@A and 
+         state@A when A is an action name. We cannot do so for a variable
+         or a predecessor. *)
       is_action a
 
     | Symbols.(Exec | Frame), _ ->
@@ -159,7 +158,18 @@ let _get_definition
     (a      : Term.timestamp) : [ `Def of Term.message | `Undef | `MaybeDef ]
   =
   match Symbols.Macro.get_all symb.s_symb table with
-  | Symbols.Input, _ -> `Undef
+  | Symbols.Input, _ -> 
+    begin match a with
+      | Term.Action (s,_) when s = Symbols.init_action -> `Def Term.empty
+      | Term.Action _ ->
+        let d =
+          Term.mk_fun table Symbols.fs_att []
+            [Term.mk_macro Term.frame_macro [] (Term.mk_pred a)]
+        in
+        `Def d
+      | _ -> `MaybeDef
+    end
+
   | Symbols.Output, _ ->
     let symb, indices = oget (Term.destr_action a) in
     let action = Action.of_term symb indices table in

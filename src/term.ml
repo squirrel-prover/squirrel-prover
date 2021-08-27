@@ -259,6 +259,10 @@ let f_zero   = mk Symbols.fs_zero
 
 let f_succ   = mk Symbols.fs_succ
 
+(** Adversary function *)
+
+let f_att    = mk Symbols.fs_att
+
 (** Pairing *)
 
 let f_pair   = mk Symbols.fs_pair

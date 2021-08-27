@@ -623,6 +623,10 @@ let fs_zero = mk_fsymb "zero" 0
 
 let fs_succ = mk_fsymb "succ" 1
 
+(** Adversary function *)
+
+let fs_att = mk_fsymb "att" 1
+
 (** Pairing *)
 
 let fs_pair = mk_fsymb "pair" 2

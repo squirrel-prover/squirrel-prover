@@ -317,6 +317,10 @@ val fs_witness : fname t
 
 val fs_succ   : fname t
 
+(** Adversary function *)
+
+val fs_att    : fname t
+
 (** Fail *)
 
 val fs_fail   : fname t
