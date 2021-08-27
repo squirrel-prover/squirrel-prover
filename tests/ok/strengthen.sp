@@ -169,3 +169,30 @@ global goal _ (t : timestamp, J : index) :
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
+
+(*------------------------------------------------------------------*)
+(* pure trace model formulas are always deducible by the adversary *)
+
+global goal _ (i, j : index):
+  equiv(zero) ->
+  equiv (i = j).
+Proof.
+  intro H.
+  apply H.
+Qed.
+
+global goal _ :
+  equiv(zero) ->
+  equiv (seq(i,j:index -> i = j)).
+Proof.
+  intro H.
+  apply H.
+Qed.
+
+global goal _ :
+  equiv(zero) ->
+  equiv (seq(i,j:index -> if (i = j) && (j = j) then zero else empty)).
+Proof.
+  intro H.
+  apply H.
+Qed.

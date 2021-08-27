@@ -1748,6 +1748,8 @@ module E : S with type t = Equiv.form = struct
       (st        : match_state) : (match_state * Term.message) list option
     =
     match term with
+    | _ when is_pure_timestamp term -> Some []
+    
     | Term.Fun (_, _, terms) -> 
       Some (List.map (fun t -> st, t) terms)
 

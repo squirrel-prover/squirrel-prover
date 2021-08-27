@@ -1708,8 +1708,6 @@ let is_pure_timestamp (t : message) =
     | ForAll (_, t)
     | Exists (_, t) -> pure_ts t
 
-    | Diff (t1, t2) -> pure_ts t1 && pure_ts t2
-
     | _ -> false
   in
   pure_ts t
