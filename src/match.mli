@@ -117,32 +117,3 @@ module T : S with type t = Term.message
 
 module E : S with type t = Equiv.form
 
-(*------------------------------------------------------------------*)
-(** {2 Miscellaneous data-structure} *)
-
-module Mset : sig
-  (** Set of macros over some indices.
-        [{ msymb   = m;
-           indices = vars; }]
-      represents the set of terms [\{m@τ | ∃ vars \}] (for any τ). *)
-  type t = private {
-    msymb   : Term.msymb;
-    indices : Vars.index list;
-  }
-
-  val mk :
-    env:Sv.t ->
-    msymb:Term.msymb ->
-    indices:(Vars.index list) ->
-    t 
-end
-
-val pp_mset   : Format.formatter -> Mset.t      -> unit
-val pp_mset_l : Format.formatter -> Mset.t list -> unit
-
-(** Must be called on sets with the macro symbol. *)
-val mset_join : Mset.t -> Mset.t -> Mset.t
-
-(** [mset_incl tbl system s1 s2] check if all terms in [s1] are
-    members of [s2], i.e. [s1 ⊆ s2]. *)
-val mset_incl : Symbols.table -> SystemExpr.t -> Mset.t -> Mset.t -> bool

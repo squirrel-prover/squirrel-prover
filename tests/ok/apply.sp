@@ -264,10 +264,17 @@ Proof.
  intro H; apply H.
 Qed.
 
+set showStrengthenedHyp=true.
+
 (* cond can be deduce (hence exec), because it is trivial *)
-global goal _ (t : timestamp) : equiv(frame@pred(t)) -> equiv(exec@t).
+global goal _ (t : timestamp) : 
+  [happens(t)] -> equiv(frame@pred(t)) -> equiv(exec@t).
 Proof.
- intro H; apply H.
+ intro Hap H.
+ case t => Eq; 
+ repeat destruct Eq as [_ Eq]; 
+ rewrite /*; 
+ apply H. 
 Qed.
 
 system [three] !_i in(ch,x); new l; if x = l then out(ch,<ok(i),<x,l>>).

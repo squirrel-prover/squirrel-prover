@@ -20,6 +20,8 @@ process P(i : index) =
 
 system !_i P(i).
 
+set showStrengthenedHyp=true.
+
 global goal _ (t : timestamp) : equiv(empty) -> equiv(s0@t).
 Proof.
  intro H; apply H.
@@ -78,5 +80,6 @@ Qed.
 global goal _ (t : timestamp) : 
   [happens(t)] -> equiv(frame@pred(pred(t))) -> equiv(input@t).
 Proof. 
- checkfail (intro Hap H; apply H) exn ApplyMatchFailure.
+ intro Hap H.
+ checkfail (apply H) exn ApplyMatchFailure.
 Abort.

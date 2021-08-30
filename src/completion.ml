@@ -1038,7 +1038,7 @@ module Unify = struct
     unify_normed u v
 
   (** profiling *)
-  let unify = Prof.mk_ternary "unify" unify
+  let unify = Prof.mk_ternary "Completion.unify" unify
 end
 
 

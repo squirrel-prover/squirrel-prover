@@ -31,7 +31,14 @@ process server (i:index) =
   SCtr(i) := xcpt;
   out(cS,accept).
 
-system !_i !_j server(j).
+(* note: U's cannot be computed by the adversary if he does not already
+   know it (e.g. by giving him the frame *)
+process U = new m; out(cS, m).
+
+system !_i (U | !_j server(j)).
+
+(*------------------------------------------------------------------*)
+set showStrengthenedHyp=true.
 
 (*------------------------------------------------------------------*)
 global goal _ (t : timestamp):
@@ -46,8 +53,6 @@ Proof.
   apply H.
 Qed.
 
-
-set showStrengthenedHyp=true.
 global goal _ (t : timestamp):
   [happens(t)] -> 
   equiv(
@@ -61,10 +66,21 @@ Proof.
 
   case t => Eq; 
   try (repeat destruct Eq as [_ Eq]; 
-       rewrite /* in 1;
+       rewrite /*;
        by apply Hind (pred(t))).
   
   by rewrite /* in 1. 
+
+  (* case `t = U(i)`, which cannot be proved because of `m(i)` *)
+  repeat destruct Eq as [i Eq].
+  rewrite /*.
+  fa 1. fa 2. fa 2.
+  (* check that `t = U(i)` *)
+  assert (t = U(i)) as _ by auto.
+  (* remove the undeducible term m(i) and check that we can conclude 
+     without it. *)
+  assert (m(i) = zero) as -> by admit.
+  by apply Hind (pred(t)).
 Qed.
 
 global goal _ (t : timestamp):
