@@ -924,6 +924,27 @@ type known_set = {
 
 type known_sets = known_set list
 
+(** Given a term, return a known_set. 
+    Special treatment of `frame`, to account for the fact
+    that it contains all its predecessors. *)
+let known_set_of_term ~vars (term : Term.message) : known_set =
+  match term with
+  | Term.Macro (ms, l, ts) when ms = Term.frame_macro ->
+    assert (l = []);
+    let tv' = Vars.make_new Type.Timestamp "t" in
+    let ts' = Term.mk_var tv' in
+    let term' = Term.mk_macro ms [] ts' in
+    { term = term';
+      vars;
+      tvar = Some tv';
+      cond = Term.mk_atom `Leq ts' ts; }
+
+  | _ -> 
+    { term = term;
+      vars;
+      tvar = None;
+      cond = Term.mk_true; }
+
 (*------------------------------------------------------------------*)
 module Mset : sig
   (** Set of macros over some indices.
@@ -1198,6 +1219,7 @@ let mset_list_inter
   mset_list_simplify table system mset_l
 
 
+
 (*------------------------------------------------------------------*)
 (** {3 Equiv matching and unification} *)
 
@@ -1225,20 +1247,54 @@ module E : S with type t = Equiv.form = struct
     in
     leq t t'
 
+  type term_head =
+    | HExists 
+    | HForAll 
+    | HSeq 
+    | HFind 
+    | HFun of Term.fname
+    | HMacro of Symbols.macro Symbols.t
+    | HName of Symbols.name Symbols.t
+    | HDiff
+    | HVar
+    | HPred 
+    | HAction 
+    | HAtom of Term.ord   
+    | HHappens
+
+  let get_head : type a. a term -> term_head = function
+    | Term.Exists _        -> HExists
+    | Term.ForAll _        -> HForAll
+    | Term.Seq _           -> HSeq
+    | Term.Fun ((f,_),_,_) -> HFun f
+    | Term.Find _          -> HFind
+    | Term.Macro (m1,_,_)  -> HMacro m1.Term.s_symb
+    | Term.Name n1         -> HName n1.Term.s_symb
+    | Term.Diff _          -> HDiff
+    | Term.Var _           -> HVar
+    | Term.Pred _          -> HPred
+    | Term.Action _        -> HAction
+    | Term.Atom (`Message   (ord, _, _)) -> HAtom (ord :> Term.ord)
+    | Term.Atom (`Timestamp (ord, _, _)) -> HAtom (ord :> Term.ord)
+    | Term.Atom (`Index     (ord, _, _)) -> HAtom (ord :> Term.ord)
+    | Term.Atom (`Happens _) -> HHappens
+
   (*------------------------------------------------------------------*)
-  (** [strenghten tbl system terms] strenghten [terms] by finding an inductive
-      invariant on deducible messages which contains [terms]. *)
-  let strengthen
-      (table  : Symbols.table)
-      (system : SystemExpr.t)
-      (env    : Sv.t)
-      (init_terms : Term.messages) : msets
+  (** quickly checks if [specialize] will fail *)
+  let specialize_quick_check
+      (cand  : cand_set)
+      (known : known_set) : bool =
+    match get_head cand.term, get_head known.term with
+    | HVar, _ | _, HVar -> true
+    | x, y -> x = y
+
+  (** Return a specialization of [cand] that is a subset of [known]. *)
+  let specialize
+    (table : Symbols.table)
+    (cand  : cand_set)
+    (known : known_set) : cand_set option
     =
-    (** Return a specialization of [cand] that is a subset of [known]. *)
-    let specialize
-        (cand  : cand_set)
-        (known : known_set) : cand_set option
-      =
+    if not (specialize_quick_check cand known) then None else
       let known = refresh_known_set known in
 
       let mv, c_cond, c_pat = pat_of_cand_set cand in
@@ -1257,7 +1313,7 @@ module E : S with type t = Equiv.form = struct
               | `Lt -> Term.mk_pred t2 
               | `Leq -> t2
             in
-            
+
             let check_direct = leq_tauto table t1 t2' in
             let check_indirect = 
               match c_cond with
@@ -1272,7 +1328,7 @@ module E : S with type t = Equiv.form = struct
               | _ -> assert false
             in
             check_direct || check_indirect
-            
+
           | Term.Fun (fs,_,_) when fs = Term.f_true -> true
 
           | _ -> assert false
@@ -1295,158 +1351,161 @@ module E : S with type t = Equiv.form = struct
               cond = cand.cond; }
           in
           Some cand
+
+     
+  (* profiling *)
+  let specialize = Prof.mk_ternary "specialize" specialize
+
+  (*------------------------------------------------------------------*)
+  (** Return a specialization of [cand] that is a subset of [term]. *)
+  let specialize_from_term
+      (table  : Symbols.table)
+      (cand : cand_set)
+      (term : Term.message) : cand_set option
+    =
+    let vars, term = match term with
+      | Seq (vars, term) ->
+        let vars, s = Term.erefresh_vars `Global vars in
+        let term = Term.subst s term in
+        vars, term
+
+      | _ -> [], term
     in
+    let known = known_set_of_term ~vars term in
 
-    (** Given a term, return a known_set. 
-        Special treatment of `frame`, to account for the fact
-        that it contains all its predecessors. *)
-    let known_set_of_term ~vars (term : Term.message) : known_set =
-      match term with
-      | Term.Macro (ms, l, ts) when ms = Term.frame_macro ->
-        assert (l = []);
-        let tv' = Vars.make_new Type.Timestamp "t" in
-        let ts' = Term.mk_var tv' in
-        let term' = Term.mk_macro ms [] ts' in
-        { term = term';
-          vars;
-          tvar = Some tv';
-          cond = Term.mk_atom `Leq ts' ts; }
+    specialize table cand known
 
-      | _ -> 
-        { term = term;
-          vars;
-          tvar = None;
-          cond = Term.mk_true; }
+  let specialize_all
+      (table  : Symbols.table)
+      (cand : cand_set)
+      (terms : Term.message list)
+      (known_sets : known_sets) : cand_sets
+    =
+    let cands =
+      List.fold_left (fun acc term ->
+          specialize_from_term table cand term ::
+          acc
+        ) [] terms
     in
+    let cands =
+      List.fold_left (fun acc known ->
+          specialize table cand known :: acc
+        ) cands known_sets
+    in
+    List.concat_map (function
+        | None -> []
+        | Some x -> [x]
+      ) cands
 
-    (** Return a specialization of [cand] that is a subset of [term]. *)
-    let specialize_from_term
-        (cand : cand_set)
-        (term : Term.message) : cand_set option
-      =
-      let vars, term = match term with
-        | Seq (vars, term) ->
-          let vars, s = Term.erefresh_vars `Global vars in
-          let term = Term.subst s term in
-          vars, term
+  (*------------------------------------------------------------------*)
+  (** Return a list of specialization of [cand] deducible from [terms] and
+      [known].
+      This includes both direct specialization, and specialization relying on
+      the Function Application rule. *)
+  let rec deduce
+      (table  : Symbols.table)
+      (system : SystemExpr.t)
+      (cand : cand_set)
+      (terms : Term.message list)
+      (known_sets : known_sets) : cand_sets
+    =
+    let direct_deds = specialize_all table cand terms known_sets in
+    let fa_deds = deduce_fa table system cand terms known_sets in
 
-        | _ -> [], term
+    direct_deds @ fa_deds
+
+  (** Return a list of specialization of the tuples in [cand] deducible from
+      [terms] and [pseqs]. *)
+  and deduce_list
+      (table  : Symbols.table)
+      (system : SystemExpr.t)
+      (cand : cand_tuple_set)
+      (terms : Term.messages)
+      (known_sets : known_sets) : cand_tuple_sets
+    =
+    match cand.term with
+    | [] -> [cand]
+    | t :: tail ->
+      (* find deducible specialization of the first term of the tuple. *)
+      let t_deds = 
+        deduce table system { cand with term = t } terms known_sets 
       in
-      let known = known_set_of_term ~vars term in
 
-      specialize cand known
-    in
+      (* for each such specialization, complete it into a specialization of
+         the full tuple. *)
+      List.concat_map (fun t_ded ->
+          (* find a deducible specialization of the tail of the tuple,
+             starting from the  specialization of [t]. *)
+          let cand_tail : cand_tuple_set = { t_ded with term = tail } in
+          let tail_deds = deduce_list table system cand_tail terms known_sets in
 
-    let specialize_all
-        (cand : cand_set)
-        (terms : Term.message list)
-        (known_sets : known_sets) : cand_sets
-      =
-      let cands =
-        List.fold_left (fun acc term ->
-            specialize_from_term cand term ::
-            acc
-          ) [] terms
+          (* build the deducible specialization of the full tuple. *)
+          List.map (fun (tail_ded : cand_tuple_set) ->
+              { tail_ded with term = t_ded.term :: tail_ded.term }
+            ) tail_deds
+        ) t_deds
+
+  (** Return a list of specialization of [cand] deducible from [terms] and
+      [pseqs] using Function Application.
+      Does not include direct specialization. *)
+  and deduce_fa
+      (table  : Symbols.table)
+      (system : SystemExpr.t)
+      (cand : cand_set)
+      (terms : Term.messages)
+      (known_sets : known_sets) : cand_sets
+    =
+    (* decompose the term using Function Application,
+       find a deducible specialization of its tuple of arguments,
+       and build the deducible specialization of the initial term. *)
+    match cand.term with
+    (* special case for pure timestamps *)
+    | _ as f when Term.is_pure_timestamp f -> [cand]
+
+    | Term.Macro (ms, l, a) ->
+      assert (l = []);      
+      begin
+        let cntxt = Constr.{ system; table; models = None; } in
+        match Macros.get_definition cntxt ms a with
+        | `Undef | `MaybeDef -> []
+        | `Def body ->
+          deduce table system { cand with term = body } terms known_sets
+      end
+
+
+    | Term.Fun (fs, fty, f_terms) ->
+      let f_terms_cand = { cand with term = f_terms } in
+      let f_terms_deds = 
+        deduce_list table system f_terms_cand terms known_sets 
       in
-      let cands =
-        List.fold_left (fun acc known ->
-            specialize cand known :: acc
-          ) cands known_sets
+      List.map (fun (f_terms_ded : cand_tuple_set) ->
+          { f_terms_ded with
+            term = Term.mk_fun0 fs fty (f_terms_ded.term) }
+        ) f_terms_deds
+
+    (* similar to the [Fun _] case *)
+    | Term.Atom (`Message (ord, t1, t2)) ->
+      let f_terms_cand = { cand with term = [t1;t2] } in
+      let f_terms_deds = 
+        deduce_list table system f_terms_cand terms known_sets 
       in
-      List.concat_map (function
-          | None -> []
-          | Some x -> [x]
-        ) cands
-    in
+      List.map (fun (f_terms_ded : cand_tuple_set) ->
+          let t1, t2 = Utils.as_seq2 f_terms_ded.term in
+          { f_terms_ded with
+            term = Term.mk_atom (ord :> Term.ord) t1 t2 }
+        ) f_terms_deds
 
-    (** Return a list of specialization of [cand] deducible from [terms] and
-        [known].
-        This includes both direct specialization, and specialization relying on
-        the Function Application rule. *)
-    let rec deduce
-        (cand : cand_set)
-        (terms : Term.message list)
-        (known_sets : known_sets) : cand_sets
-      =
-      let direct_deds = specialize_all cand terms known_sets in
-      let fa_deds = deduce_fa cand terms known_sets in
+    | _ -> []
 
-      direct_deds @ fa_deds
-
-    (** Return a list of specialization of the tuples in [cand] deducible from
-        [terms] and [pseqs]. *)
-    and deduce_list
-        (cand : cand_tuple_set)
-        (terms : Term.messages)
-        (known_sets : known_sets) : cand_tuple_sets
-      =
-      match cand.term with
-      | [] -> [cand]
-      | t :: tail ->
-        (* find deducible specialization of the first term of the tuple. *)
-        let t_deds = deduce { cand with term = t } terms known_sets in
-
-        (* for each such specialization, complete it into a specialization of
-           the full tuple. *)
-        List.concat_map (fun t_ded ->
-            (* find a deducible specialization of the tail of the tuple,
-               starting from the  specialization of [t]. *)
-            let cand_tail : cand_tuple_set = { t_ded with term = tail } in
-            let tail_deds = deduce_list cand_tail terms known_sets in
-
-            (* build the deducible specialization of the full tuple. *)
-            List.map (fun (tail_ded : cand_tuple_set) ->
-                { tail_ded with term = t_ded.term :: tail_ded.term }
-              ) tail_deds
-          ) t_deds
-
-    (** Return a list of specialization of [cand] deducible from [terms] and
-        [pseqs] using Function Application.
-        Does not include direct specialization. *)
-    and deduce_fa
-        (cand : cand_set)
-        (terms : Term.messages)
-        (known_sets : known_sets) : cand_sets
-      =
-      (* decompose the term using Function Application,
-         find a deducible specialization of its tuple of arguments,
-         and build the deducible specialization of the initial term. *)
-      match cand.term with
-      (* special case for pure timestamps *)
-      | _ as f when Term.is_pure_timestamp f -> [cand]
-
-      | Term.Macro (ms, l, a) ->
-        assert (l = []);      
-        begin
-          let cntxt = Constr.{ system; table; models = None; } in
-          match Macros.get_definition cntxt ms a with
-          | `Undef | `MaybeDef -> []
-          | `Def body ->
-            deduce { cand with term = body } terms known_sets
-        end
-
-        
-      | Term.Fun (fs, fty, f_terms) ->
-        let f_terms_cand = { cand with term = f_terms } in
-        let f_terms_deds = deduce_list f_terms_cand terms known_sets in
-        List.map (fun (f_terms_ded : cand_tuple_set) ->
-            { f_terms_ded with
-              term = Term.mk_fun0 fs fty (f_terms_ded.term) }
-          ) f_terms_deds
-
-      (* similar to the [Fun _] case *)
-      | Term.Atom (`Message (ord, t1, t2)) ->
-        let f_terms_cand = { cand with term = [t1;t2] } in
-        let f_terms_deds = deduce_list f_terms_cand terms known_sets in
-        List.map (fun (f_terms_ded : cand_tuple_set) ->
-            let t1, t2 = Utils.as_seq2 f_terms_ded.term in
-            { f_terms_ded with
-              term = Term.mk_atom (ord :> Term.ord) t1 t2 }
-          ) f_terms_deds
-
-      | _ -> []
-    in
-
+  (*------------------------------------------------------------------*)
+  (** [strenghten tbl system terms] strenghten [terms] by finding an inductive
+      invariant on deducible messages which contains [terms]. *)
+  let strengthen
+      (table  : Symbols.table)
+      (system : SystemExpr.t)
+      (env    : Sv.t)
+      (init_terms : Term.messages) : msets
+    =
     (** Return a list of specialization of [cand] deducible from
         [terms, known_sets] for action [a] at time [a]. *)
     let filter_deduce_action
@@ -1480,7 +1539,7 @@ module E : S with type t = Equiv.form = struct
         in
         (* we instantiate the known terms at time [ts] *)
         let known_sets = known_sets ts in
-        let ded_sets = deduce cand_set terms known_sets in
+        let ded_sets = deduce table system cand_set terms known_sets in
 
         let mset_l =
           List.fold_left (fun msets ded_set ->
