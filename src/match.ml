@@ -11,6 +11,56 @@ let dbg ?(force=false) s =
 (*------------------------------------------------------------------*)
 (** {2 Patterns} *)
 
+type term_head =
+  | HExists 
+  | HForAll 
+  | HSeq 
+  | HFind 
+  | HFun   of Symbols.fname Symbols.t
+  | HMacro of Symbols.macro Symbols.t
+  | HName  of Symbols.name  Symbols.t
+  | HDiff
+  | HVar
+  | HPred 
+  | HAction 
+  | HAtom of Term.ord   
+  | HHappens
+
+let pp_term_head fmt = function
+  | HExists   -> Fmt.pf fmt "Exists"
+  | HForAll   -> Fmt.pf fmt "Forall" 
+  | HSeq      -> Fmt.pf fmt "Seq"
+  | HFind     -> Fmt.pf fmt "Find"
+  | HFun   f  -> Fmt.pf fmt "Fun %a"   Symbols.pp f
+  | HMacro m  -> Fmt.pf fmt "Macro %a" Symbols.pp m
+  | HName  n  -> Fmt.pf fmt "Name %a"  Symbols.pp n
+  | HDiff     -> Fmt.pf fmt "Diff"
+  | HVar      -> Fmt.pf fmt "Var"
+  | HPred     -> Fmt.pf fmt "Pred"
+  | HAction   -> Fmt.pf fmt "Action"
+  | HAtom ord -> Fmt.pf fmt "Atom %a" Term.pp_ord ord
+  | HHappens  -> Fmt.pf fmt "Happens"
+
+let get_head : type a. a term -> term_head = function
+  | Term.Exists _        -> HExists
+  | Term.ForAll _        -> HForAll
+  | Term.Seq _           -> HSeq
+  | Term.Fun ((f,_),_,_) -> HFun f
+  | Term.Find _          -> HFind
+  | Term.Macro (m1,_,_)  -> HMacro m1.Term.s_symb
+  | Term.Name n1         -> HName n1.Term.s_symb
+  | Term.Diff _          -> HDiff
+  | Term.Var _           -> HVar
+  | Term.Pred _          -> HPred
+  | Term.Action _        -> HAction
+  | Term.Atom (`Message   (ord, _, _)) -> HAtom (ord :> Term.ord)
+  | Term.Atom (`Timestamp (ord, _, _)) -> HAtom (ord :> Term.ord)
+  | Term.Atom (`Index     (ord, _, _)) -> HAtom (ord :> Term.ord)
+  | Term.Atom (`Happens _) -> HHappens
+
+(*------------------------------------------------------------------*)
+(** {2 Patterns} *)
+
 (** A pattern is a list of free type variables, a term [t] and a subset
     of [t]'s free variables that must be matched.
     The free type variables must be inferred. *)
@@ -922,7 +972,8 @@ type known_set = {
   cond    : Term.message;
 }
 
-type known_sets = known_set list
+(** association list sorting [known_sets] by the head of the term *)
+type known_sets = (term_head * known_set list) list
 
 (** Given a term, return a known_set. 
     Special treatment of `frame`, to account for the fact
@@ -1063,6 +1114,28 @@ let pp_known_set fmt (known : known_set) =
     Term.pp known.term
     (Fmt.list ~sep:Fmt.comma Vars.pp_e) vars
     Term.pp known.cond
+
+let pp_known_sets fmt (ks : known_sets) =
+  Fmt.pf fmt "@[<v>";
+  List.iter (fun (head, k_l) ->
+      Fmt.pf fmt "head: %a@;@[<v>%a@]"
+        pp_term_head head
+        (Fmt.list ~sep:Fmt.cut pp_known_set) k_l;
+      Fmt.cut fmt ();
+    ) ks;
+  Fmt.pf fmt "@]"
+
+
+let known_sets_union (s1 : known_sets) (s2 : known_sets) : known_sets =
+  let s = List.fold_left (fun s (head, k_l) ->
+      let k_l' = List.assoc_dflt [] head s2 in
+      (head, k_l' @ k_l) :: s
+    ) [] s1
+  in
+  List.fold_left (fun s (head', k_l') ->
+      if List.mem_assoc head' s1 then s
+      else (head', k_l') :: s
+    ) s s2
 
 (*------------------------------------------------------------------*)
 (* return: substitution, condition, pattern *)
@@ -1259,46 +1332,6 @@ module E : S with type t = Equiv.form = struct
     in
     leq t t'
 
-  type term_head =
-    | HExists 
-    | HForAll 
-    | HSeq 
-    | HFind 
-    | HFun of Term.fname
-    | HMacro of Symbols.macro Symbols.t
-    | HName of Symbols.name Symbols.t
-    | HDiff
-    | HVar
-    | HPred 
-    | HAction 
-    | HAtom of Term.ord   
-    | HHappens
-
-  let get_head : type a. a term -> term_head = function
-    | Term.Exists _        -> HExists
-    | Term.ForAll _        -> HForAll
-    | Term.Seq _           -> HSeq
-    | Term.Fun ((f,_),_,_) -> HFun f
-    | Term.Find _          -> HFind
-    | Term.Macro (m1,_,_)  -> HMacro m1.Term.s_symb
-    | Term.Name n1         -> HName n1.Term.s_symb
-    | Term.Diff _          -> HDiff
-    | Term.Var _           -> HVar
-    | Term.Pred _          -> HPred
-    | Term.Action _        -> HAction
-    | Term.Atom (`Message   (ord, _, _)) -> HAtom (ord :> Term.ord)
-    | Term.Atom (`Timestamp (ord, _, _)) -> HAtom (ord :> Term.ord)
-    | Term.Atom (`Index     (ord, _, _)) -> HAtom (ord :> Term.ord)
-    | Term.Atom (`Happens _) -> HHappens
-
-  (*------------------------------------------------------------------*)
-  (** quickly checks if [specialize] will fail *)
-  let specialize_quick_check
-      (cand  : cand_set)
-      (known : known_set) : bool =
-    match get_head cand.term, get_head known.term with
-    | HVar, _ | _, HVar -> true
-    | x, y -> x = y
 
   (** Return a specialization of [cand] that is a subset of [known]. *)
   let specialize
@@ -1306,65 +1339,65 @@ module E : S with type t = Equiv.form = struct
     (cand  : cand_set)
     (known : known_set) : cand_set option
     =
-    if not (specialize_quick_check cand known) then None else
-      let known = refresh_known_set known in
+    (* if not (specialize_quick_check cand known) then None else *)
+    let known = refresh_known_set known in
 
-      let mv, c_cond, c_pat = pat_of_cand_set cand in
-      let known_cond, e_pat = pat_of_known_set known in
+    let mv, c_cond, c_pat = pat_of_cand_set cand in
+    let known_cond, e_pat = pat_of_known_set known in
 
-      match T.unify_opt ~mv table c_pat e_pat with
-      | None -> None
-      | Some mv -> (* [mv] represents substitution [θ] *)
-        (* check that [c_cond θ] implies [known_cond θ] holds *)
-        let check_cond = match known_cond with
-          | Term.Atom (`Timestamp ((`Lt | `Leq as ord), t1, t2)) ->
-            let subst = Mvar.to_subst ~mode:`Unif mv in
-            let t1, t2 = Term.subst subst t1, Term.subst subst t2 in
-            let t2' = 
-              match ord with
-              | `Lt -> Term.mk_pred t2 
-              | `Leq -> t2
-            in
+    match T.unify_opt ~mv table c_pat e_pat with
+    | None -> None
+    | Some mv -> (* [mv] represents substitution [θ] *)
+      (* check that [c_cond θ] implies [known_cond θ] holds *)
+      let check_cond = match known_cond with
+        | Term.Atom (`Timestamp ((`Lt | `Leq as ord), t1, t2)) ->
+          let subst = Mvar.to_subst ~mode:`Unif mv in
+          let t1, t2 = Term.subst subst t1, Term.subst subst t2 in
+          let t2' = 
+            match ord with
+            | `Lt -> Term.mk_pred t2 
+            | `Leq -> t2
+          in
 
-            let check_direct = leq_tauto table t1 t2' in
-            let check_indirect = 
-              match c_cond with
-              | Term.Atom (`Timestamp (`Leq, ta, tb)) -> (* ≤ *)
-                let ta, tb = Term.subst subst ta, Term.subst subst tb in
+          let check_direct = leq_tauto table t1 t2' in
+          let check_indirect = 
+            match c_cond with
+            | Term.Atom (`Timestamp (`Leq, ta, tb)) -> (* ≤ *)
+              let ta, tb = Term.subst subst ta, Term.subst subst tb in
 
-                (* checks whether [ta ≤ tb] implies [t1 ≤ t2'] *)
-                leq_tauto table t1 ta && leq_tauto table tb t2'
+              (* checks whether [ta ≤ tb] implies [t1 ≤ t2'] *)
+              leq_tauto table t1 ta && leq_tauto table tb t2'
 
-              | Term.Fun (fs,_,_) when fs = Term.f_true -> false
+            | Term.Fun (fs,_,_) when fs = Term.f_true -> false
 
-              | _ -> assert false
-            in
-            check_direct || check_indirect
+            | _ -> assert false
+          in
+          check_direct || check_indirect
 
-          | Term.Fun (fs,_,_) when fs = Term.f_true -> true
+        | Term.Fun (fs,_,_) when fs = Term.f_true -> true
 
-          | _ -> assert false
+        | _ -> assert false
+      in
+
+      if not check_cond then None
+      else
+        let mv =
+          match known.tvar with
+          | None -> mv
+          | Some tv -> Mvar.remove (Vars.evar tv) mv
         in
+        let cand =
+          { term = cand.term;
+            subst = mv;
+            (* Note: variables must *not* be cleared yet,
+               because we must not forget the instantiation by [mv] of any
+               variable. *)
+            vars = cand.vars @ known.vars; 
+            cond = cand.cond; }
+        in
+        Some cand
 
-        if not check_cond then None
-        else
-          let mv =
-            match known.tvar with
-            | None -> mv
-            | Some tv -> Mvar.remove (Vars.evar tv) mv
-          in
-          let cand =
-            { term = cand.term;
-              subst = mv;
-              (* Note: variables must *not* be cleared yet,
-                 because we must not forget the instantiation by [mv] of any
-                 variable. *)
-              vars = cand.vars @ known.vars; 
-              cond = cand.cond; }
-          in
-          Some cand
 
-     
   (* profiling *)
   let specialize = Prof.mk_ternary "specialize" specialize
 
@@ -1374,9 +1407,14 @@ module E : S with type t = Equiv.form = struct
       (cand : cand_set)
       (known_sets : known_sets) : cand_sets
     =
+    let cand_head = get_head cand.term in
     let cands =
-      List.fold_left (fun acc known ->
-          specialize table cand known :: acc
+      List.fold_left (fun acc (head, known_list) ->
+          if cand_head = HVar || head = HVar || cand_head = head then 
+            List.fold_left (fun acc known ->
+                specialize table cand known :: acc
+              ) acc known_list
+          else acc
         ) [] known_sets
     in
     List.concat_map (function
@@ -1518,7 +1556,9 @@ module E : S with type t = Equiv.form = struct
         in
         (* we instantiate the known terms at time [ts] *)
         let known_sets = known_sets ts in       
-        let ded_sets = deduce table system cand_set (init_terms @ known_sets) in
+        let all_known_sets = known_sets_union init_terms known_sets in
+        (* let all_known_sets = init_terms @ known_sets in *)
+        let ded_sets = deduce table system cand_set all_known_sets in
 
         let mset_l =
           List.fold_left (fun msets ded_set ->
@@ -1583,15 +1623,22 @@ module E : S with type t = Equiv.form = struct
       let known : Mset.t list = msets_to_list known in
 
       let known_sets (ts' : Term.timestamp) =
-        List.map (fun (mset : Mset.t) ->
-          let t = Vars.make_new Type.Timestamp "t" in
-          let term = Term.mk_macro mset.msymb [] (Term.mk_var t) in
-          { term = term;
-            vars = List.map Vars.evar mset.indices;
-            tvar = Some t;
-            cond = Term.mk_atom `Lt (Term.mk_var t) ts'; }
-        ) known
+        List.fold_left (fun (known_sets : known_sets) (mset : Mset.t) ->
+            let t = Vars.make_new Type.Timestamp "t" in
+            let term = Term.mk_macro mset.msymb [] (Term.mk_var t) in
+            let new_ks = 
+              { term = term;
+                vars = List.map Vars.evar mset.indices;
+                tvar = Some t;
+                cond = Term.mk_atom `Lt (Term.mk_var t) ts'; }
+            in
+
+            List.assoc_up_dflt
+              (get_head term) [] 
+              (fun ks_l -> new_ks :: ks_l) known_sets
+          ) [] known
       in
+
       filter_deduce_all_actions0 cands init_terms known_sets
     in
 
@@ -1642,7 +1689,15 @@ module E : S with type t = Equiv.form = struct
         ) [] table
     in
 
-    let init_terms = List.map known_set_of_term init_terms in
+    (* initially known terms *)
+    let init_terms = 
+      List.fold_left (fun known_sets term ->
+          let new_ks = known_set_of_term term in
+            List.assoc_up_dflt
+              (get_head new_ks.term) [] 
+              (fun ks_l -> new_ks :: ks_l) known_sets
+        ) [] init_terms
+    in
 
     deduce_fixpoint init_fixpoint init_terms
 
