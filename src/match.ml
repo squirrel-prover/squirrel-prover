@@ -927,7 +927,16 @@ type known_sets = known_set list
 (** Given a term, return a known_set. 
     Special treatment of `frame`, to account for the fact
     that it contains all its predecessors. *)
-let known_set_of_term ~vars (term : Term.message) : known_set =
+let known_set_of_term (term : Term.message) : known_set =
+  let vars, term = match term with
+    | Seq (vars, term) ->
+      let vars, s = Term.erefresh_vars `Global vars in
+      let term = Term.subst s term in
+      vars, term
+
+    | _ -> [], term
+  in
+
   match term with
   | Term.Macro (ms, l, ts) when ms = Term.frame_macro ->
     assert (l = []);
@@ -944,6 +953,9 @@ let known_set_of_term ~vars (term : Term.message) : known_set =
       vars;
       tvar = None;
       cond = Term.mk_true; }
+
+
+let known_set_of_term = Prof.mk_unary "known_set_of_term" known_set_of_term
 
 (*------------------------------------------------------------------*)
 module Mset : sig
@@ -1356,41 +1368,16 @@ module E : S with type t = Equiv.form = struct
   (* profiling *)
   let specialize = Prof.mk_ternary "specialize" specialize
 
-  (*------------------------------------------------------------------*)
-  (** Return a specialization of [cand] that is a subset of [term]. *)
-  let specialize_from_term
-      (table  : Symbols.table)
-      (cand : cand_set)
-      (term : Term.message) : cand_set option
-    =
-    let vars, term = match term with
-      | Seq (vars, term) ->
-        let vars, s = Term.erefresh_vars `Global vars in
-        let term = Term.subst s term in
-        vars, term
-
-      | _ -> [], term
-    in
-    let known = known_set_of_term ~vars term in
-
-    specialize table cand known
-
+  (*------------------------------------------------------------------*)     
   let specialize_all
       (table  : Symbols.table)
       (cand : cand_set)
-      (terms : Term.message list)
       (known_sets : known_sets) : cand_sets
     =
     let cands =
-      List.fold_left (fun acc term ->
-          specialize_from_term table cand term ::
-          acc
-        ) [] terms
-    in
-    let cands =
       List.fold_left (fun acc known ->
           specialize table cand known :: acc
-        ) cands known_sets
+        ) [] known_sets
     in
     List.concat_map (function
         | None -> []
@@ -1406,11 +1393,10 @@ module E : S with type t = Equiv.form = struct
       (table  : Symbols.table)
       (system : SystemExpr.t)
       (cand : cand_set)
-      (terms : Term.message list)
       (known_sets : known_sets) : cand_sets
     =
-    let direct_deds = specialize_all table cand terms known_sets in
-    let fa_deds = deduce_fa table system cand terms known_sets in
+    let direct_deds = specialize_all table cand known_sets in
+    let fa_deds = deduce_fa table system cand known_sets in
 
     direct_deds @ fa_deds
 
@@ -1420,16 +1406,13 @@ module E : S with type t = Equiv.form = struct
       (table  : Symbols.table)
       (system : SystemExpr.t)
       (cand : cand_tuple_set)
-      (terms : Term.messages)
       (known_sets : known_sets) : cand_tuple_sets
     =
     match cand.term with
     | [] -> [cand]
     | t :: tail ->
       (* find deducible specialization of the first term of the tuple. *)
-      let t_deds = 
-        deduce table system { cand with term = t } terms known_sets 
-      in
+      let t_deds = deduce table system { cand with term = t } known_sets in
 
       (* for each such specialization, complete it into a specialization of
          the full tuple. *)
@@ -1437,7 +1420,7 @@ module E : S with type t = Equiv.form = struct
           (* find a deducible specialization of the tail of the tuple,
              starting from the  specialization of [t]. *)
           let cand_tail : cand_tuple_set = { t_ded with term = tail } in
-          let tail_deds = deduce_list table system cand_tail terms known_sets in
+          let tail_deds = deduce_list table system cand_tail known_sets in
 
           (* build the deducible specialization of the full tuple. *)
           List.map (fun (tail_ded : cand_tuple_set) ->
@@ -1452,7 +1435,6 @@ module E : S with type t = Equiv.form = struct
       (table  : Symbols.table)
       (system : SystemExpr.t)
       (cand : cand_set)
-      (terms : Term.messages)
       (known_sets : known_sets) : cand_sets
     =
     (* decompose the term using Function Application,
@@ -1469,15 +1451,13 @@ module E : S with type t = Equiv.form = struct
         match Macros.get_definition cntxt ms a with
         | `Undef | `MaybeDef -> []
         | `Def body ->
-          deduce table system { cand with term = body } terms known_sets
+          deduce table system { cand with term = body } known_sets
       end
 
 
     | Term.Fun (fs, fty, f_terms) ->
       let f_terms_cand = { cand with term = f_terms } in
-      let f_terms_deds = 
-        deduce_list table system f_terms_cand terms known_sets 
-      in
+      let f_terms_deds = deduce_list table system f_terms_cand known_sets in
       List.map (fun (f_terms_ded : cand_tuple_set) ->
           { f_terms_ded with
             term = Term.mk_fun0 fs fty (f_terms_ded.term) }
@@ -1486,9 +1466,7 @@ module E : S with type t = Equiv.form = struct
     (* similar to the [Fun _] case *)
     | Term.Atom (`Message (ord, t1, t2)) ->
       let f_terms_cand = { cand with term = [t1;t2] } in
-      let f_terms_deds = 
-        deduce_list table system f_terms_cand terms known_sets 
-      in
+      let f_terms_deds = deduce_list table system f_terms_cand known_sets in
       List.map (fun (f_terms_ded : cand_tuple_set) ->
           let t1, t2 = Utils.as_seq2 f_terms_ded.term in
           { f_terms_ded with
@@ -1511,8 +1489,9 @@ module E : S with type t = Equiv.form = struct
     let filter_deduce_action
         (a : Symbols.action Symbols.t)
         (cand : Mset.t)
-        (terms : Term.message list)
-        (known_sets : Term.timestamp -> known_sets) : Mset.t list
+        (init_terms : known_sets)                   (* initial terms *)
+        (known_sets : Term.timestamp -> known_sets) (* induction *)
+      : Mset.t list
       =
       (* we create the timestamp at which we are *)
       let i = Action.arity a table in
@@ -1538,8 +1517,8 @@ module E : S with type t = Equiv.form = struct
           cond; }
         in
         (* we instantiate the known terms at time [ts] *)
-        let known_sets = known_sets ts in
-        let ded_sets = deduce table system cand_set terms known_sets in
+        let known_sets = known_sets ts in       
+        let ded_sets = deduce table system cand_set (init_terms @ known_sets) in
 
         let mset_l =
           List.fold_left (fun msets ded_set ->
@@ -1564,14 +1543,15 @@ module E : S with type t = Equiv.form = struct
     let filter_deduce_action_list
         (a : Symbols.action Symbols.t)
         (cands : msets)
-        (terms : Term.message list)
-        (known_sets : Term.timestamp -> known_sets) : msets
+        (init_terms : known_sets)                   (* initial terms *)
+        (known_sets : Term.timestamp -> known_sets) (* induction *)
+      : msets
       =
       let msets =
         List.map (fun (mname, cand_l) ->
             let mset_l =
               List.concat_map (fun cand ->
-                  filter_deduce_action a cand terms known_sets
+                  filter_deduce_action a cand init_terms known_sets
                 ) cand_l
             in
             (mname, mset_list_inter table system env cand_l mset_l)
@@ -1584,19 +1564,21 @@ module E : S with type t = Equiv.form = struct
        [cands] stable by each action. *)
     let filter_deduce_all_actions0
         (cands : msets)
-        (terms : Term.message list)
-        (known_sets : Term.timestamp -> known_sets) : msets
+        (init_terms : known_sets)                   (* initial terms *)
+        (known_sets : Term.timestamp -> known_sets) (* induction *)
+      : msets
       =
       let names = SystemExpr.symbs table system in
       System.Msh.fold (fun _ name cands ->
-          filter_deduce_action_list name cands terms known_sets
+          filter_deduce_action_list name cands init_terms known_sets
         ) names cands
     in
 
     let filter_deduce_all_actions
         (cands : msets)
-        (terms : Term.message list)
-        (known : msets) : msets
+        (init_terms : known_sets) (* initial terms *)
+        (known : msets)           (* induction *)
+      : msets
       =
       let known : Mset.t list = msets_to_list known in
 
@@ -1610,21 +1592,20 @@ module E : S with type t = Equiv.form = struct
             cond = Term.mk_atom `Lt (Term.mk_var t) ts'; }
         ) known
       in
-      filter_deduce_all_actions0 cands terms known_sets
+      filter_deduce_all_actions0 cands init_terms known_sets
     in
 
     let rec deduce_fixpoint
-        (cands : msets)
-        (terms : Term.message list) : msets
+        (cands : msets) 
+        (init_terms : known_sets) (* initial terms *)
+      : msets
       =
-      let cands' = filter_deduce_all_actions cands terms cands in
-
-      Fmt.epr "deduce_fp: %a@." pp_msets cands';
+      let cands' = filter_deduce_all_actions cands init_terms cands in
 
       (* check if [cands] is included in [cands'] *)
       if msets_incl table system cands cands'
       then cands'
-      else deduce_fixpoint cands' terms
+      else deduce_fixpoint cands' init_terms
     in
 
     (* we use as maximal timestamp the first timestamp appearing in a
@@ -1661,7 +1642,7 @@ module E : S with type t = Equiv.form = struct
         ) [] table
     in
 
-    Fmt.epr "init_fp: %a@." pp_msets init_fixpoint;
+    let init_terms = List.map known_set_of_term init_terms in
 
     deduce_fixpoint init_fixpoint init_terms
 
