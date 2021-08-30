@@ -274,8 +274,8 @@ let is_dup_match
     (st    : 'a)
     (table : Symbols.table) 
     (elem  : Term.message)
-    (elems : Term.message list) 
-  : 'a option =
+    (elems : Term.message list) : 'a option 
+  =
   (* try to match [t] and [t'] modulo ≤ *)
   let is_dup_leq table st t t' : 'a option = 
     let rec leq t t' = 

@@ -10,11 +10,13 @@ abstract f : message -> message.
 mutable s0 : message = zero.
 mutable s1 (i : index) : message = na.
 
+name n : index -> message.
+
 process P(i : index) = 
   in(c,x);
   s0 := f(s0);
   s1(i) := f(s1(i));
-  out(c,zero).
+  out(c,n(i)).
 
 system !_i P(i).
 
@@ -62,4 +64,19 @@ global goal _ (t : timestamp) :
   equiv(try find i such that s1(i)@t=zero in s1(i)@t else s0@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
+Abort.
+
+(*------------------------------------------------------------------*)
+(* from [frame@pred(t)], we can deduce [input@t] *)
+
+global goal _ (t : timestamp) : 
+  [happens(t)] -> equiv(frame@pred(t)) -> equiv(input@t).
+Proof. 
+ intro Hap H; apply H.
+Qed.
+
+global goal _ (t : timestamp) : 
+  [happens(t)] -> equiv(frame@pred(pred(t))) -> equiv(input@t).
+Proof. 
+ checkfail (intro Hap H; apply H) exn ApplyMatchFailure.
 Abort.

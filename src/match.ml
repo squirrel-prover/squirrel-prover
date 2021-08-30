@@ -398,9 +398,12 @@ module T (* : S with type t = message *) = struct
     in
     let ev = Vars.EVar v in
 
-    if not (Sv.mem ev st.support)
-    then if t = mk_var v then st.mv else raise NoMgu
-
+    if t = mk_var v then
+      st.mv 
+ 
+    else if not (Sv.mem ev st.support) then
+      raise NoMgu 
+ 
     else (* [v] in the support, and [v] smaller than [v'] if [t = Var v'] *)
       match Mvar.find ev st.mv with
       (* first time we see [v]: store the substitution and add the
@@ -896,7 +899,7 @@ type 'a cand_set_g = {
 type cand_set       = Term.message  cand_set_g
 type cand_tuple_set = Term.messages cand_set_g
 
-type cand_sets   = cand_set   list
+type cand_sets       = cand_set       list 
 type cand_tuple_sets = cand_tuple_set list
 
 (*------------------------------------------------------------------*)
@@ -1052,6 +1055,19 @@ let mset_incl table system (s1 : Mset.t) (s2 : Mset.t) : bool
   | Match _ -> true
   | FreeTyv | NoMatch _ -> false
 
+(** [msets_incl tbl system s1 s2] check if [msets] is included in [msets2] *)
+let msets_incl table system (msets1 : msets) (msets2 : msets) : bool =
+  List.for_all (fun (mname, mset1_l) ->
+      let mset2_l = List.assoc_opt mname msets2 in
+      let mset2_l = odflt [] mset2_l in
+
+      List.for_all (fun mset1 ->
+          List.exists (fun mset2 ->
+              mset_incl table system mset1 mset2
+            ) mset2_l
+        ) mset1_l
+    ) msets1
+
 
 (** remove any set which is subsumed by some other set. *)
 let mset_list_simplify table system (msets : Mset.t list) : Mset.t list =
@@ -1131,7 +1147,7 @@ let mset_list_inter
 
 
 (** Compute the lub of two msets (w.r.t set inclusion).
-    Must be called on sets with the macro symbol. 
+    Must be called on sets with the same macro symbol. 
 
     A mset is a set of terms of the form:
        [\{m(i₁, ..., iₙ)@τ | ∀ vars, τ \}]
@@ -1405,25 +1421,17 @@ module E : S with type t = Equiv.form = struct
       (* special case for pure timestamps *)
       | _ as f when Term.is_pure_timestamp f -> [cand]
 
-      (* (* special case for the if_then_else function symbol. *)
-       * | Term.Fun (fs, fty, [cond; t1; t2]) when fs = Term.f_ite ->
-       * 
-       *   (* then branch *)
-       *   let f_terms_cand1 = { cand with term = [cond; t1] } in
-       *   let f_terms_deds1 = deduce_list f_terms_cand1 terms known_sets in
-       * 
-       *   (* else branch *)
-       *   let f_terms_cand2 = { cand with term = [cond; t2] } in
-       *   let f_terms_deds2 = deduce_list f_terms_cand2 terms known_sets in
-       * 
-       *   (* union of terms deducible from both branch *)
-       *   let f_terms_deds = f_terms_deds1 @ f_terms_deds2 in
-       * 
-       *   List.map (fun (f_terms_ded : cand_tuple_set) ->
-       *       { f_terms_ded with
-       *         term = Term.mk_fun0 fs fty (f_terms_ded.term) }
-       *     ) f_terms_deds *)
+      | Term.Macro (ms, l, a) ->
+        assert (l = []);      
+        begin
+          let cntxt = Constr.{ system; table; models = None; } in
+          match Macros.get_definition cntxt ms a with
+          | `Undef | `MaybeDef -> []
+          | `Def body ->
+            deduce { cand with term = body } terms known_sets
+        end
 
+        
       | Term.Fun (fs, fty, f_terms) ->
         let f_terms_cand = { cand with term = f_terms } in
         let f_terms_deds = deduce_list f_terms_cand terms known_sets in
@@ -1504,6 +1512,8 @@ module E : S with type t = Equiv.form = struct
       msets
     in
 
+    (* fold over all actions of the protocol, to find a specialization of 
+       [cands] stable by each action. *)
     let filter_deduce_all_actions0
         (cands : msets)
         (terms : Term.message list)
@@ -1542,16 +1552,7 @@ module E : S with type t = Equiv.form = struct
       let cands' = filter_deduce_all_actions cands terms cands in
 
       (* check if [cands] is included in [cands'] *)
-      if List.for_all (fun (mname, cand_l) ->
-          let cand_l' = List.assoc_opt mname cands' in
-          let cand_l' = odflt [] cand_l' in
-
-          List.for_all (fun cand ->
-              List.exists (fun cand' ->
-                  mset_incl table system cand cand'
-                ) cand_l'
-            ) cand_l
-        ) cands
+      if msets_incl table system cands cands'
       then cands'
       else deduce_fixpoint cands' terms
     in
@@ -1700,7 +1701,7 @@ module E : S with type t = Equiv.form = struct
        matching algorithm to account for that. 
 
        Instead, for now, we ensure that this issue never arise by using 
-       strenghtening only is [st.support] = ∅.
+       strenghtening only if [st.support] = ∅.
     *)
     assert (Sv.is_empty st.support);
     let st = { st with bvs = Sv.empty; } in

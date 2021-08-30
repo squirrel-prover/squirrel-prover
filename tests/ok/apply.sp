@@ -14,9 +14,9 @@ abstract gg : message -> message -> message
 abstract f0 : message -> message
 channel ch
 
-system A: !_i in(ch,x);out(ch,<ok(i),x>).
+system A: !_i in(ch,x); new l; out(ch,<ok(i),<x,l>>).
 
-system [bis] !_i in(ch,x);if x = a then out(ch,<ok(i),x>).
+system [bis] !_i in(ch,x); new l; if x = a then out(ch,<ok(i),<x,l>>).
 
 goal _ (x, y : message, i : index) : 
   f0(<x,y>) = ok(i) =>
@@ -257,17 +257,28 @@ Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
 
+(*------------------------------------------------------------------*)
 (* with exec *)
 global goal _ (t : timestamp) : equiv(frame@t) -> equiv(exec@t).
 Proof.
  intro H; apply H.
 Qed.
 
+(* cond can be deduce (hence exec), because it is trivial *)
 global goal _ (t : timestamp) : equiv(frame@pred(t)) -> equiv(exec@t).
+Proof.
+ intro H; apply H.
+Qed.
+
+system [three] !_i in(ch,x); new l; if x = l then out(ch,<ok(i),<x,l>>).
+
+(* cond cannot be deduce in system [three], because of the new name `l` *)
+global goal [three] _ (t : timestamp) : equiv(frame@pred(t)) -> equiv(exec@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
 
+(*------------------------------------------------------------------*)
 (* with frame *)
 global goal _ (t : timestamp) : equiv(frame@t) -> equiv(frame@t).
 Proof.

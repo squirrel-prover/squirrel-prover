@@ -590,12 +590,13 @@ Proof.
   case (x = y) => U //.
 Qed.
 
+set showStrengthenedHyp=true.
+
 (*------------------------------------------------------------------*)
 global goal stef_atomic_keys (t : timestamp):
   [happens(t)] -> 
   equiv(
     frame@t,
-    exec@t,
     seq(pid:index -> AEAD(pid)@t),
     (* seq(pid:index -> YCtr(pid)@t), *)
     (* seq(pid:index -> SCtr(pid)@t), *)
@@ -608,10 +609,10 @@ global goal stef_atomic_keys (t : timestamp):
 Proof.
   dependent induction t => t Hind Hap.
   case t => Eq; 
-   try (repeat destruct Eq as [_ Eq]; 
-  rewrite /* in 0;
-  fa 0;
-  by apply Hind (pred(t)) => //).
+  try (repeat destruct Eq as [_ Eq]; 
+       rewrite /* in 0;
+       rewrite /AEAD in 1;
+       by apply Hind (pred(t))).
 
   (* init *)
   rewrite /*. 
