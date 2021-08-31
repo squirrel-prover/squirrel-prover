@@ -171,7 +171,7 @@ type ip_handler = [
 (** A parser tactic argument *)
 type parser_arg =
   | String_name of lsymb
-  | Int_parsed  of int
+  | Int_parsed  of int L.located
   | Theory      of Theory.term
   | IntroPat    of intro_pattern list
   | AndOrPat    of and_or_pat
@@ -180,13 +180,14 @@ type parser_arg =
   | ApplyIn     of Theory.p_pt * apply_in
   | SplitSeq    of int L.located * Theory.hterm
   | ConstSeq    of int L.located * Theory.term list
+  | MemSeq      of int L.located * int L.located
   | Remember    of Theory.term * lsymb
   | Generalize  of Theory.term list * naming_pat list option
 
 type parser_args = parser_arg list
 
 let pp_parser_arg ppf = function
-  | Int_parsed i  -> Fmt.int ppf i
+  | Int_parsed i  -> Fmt.int ppf (L.unloc i)
   | String_name s -> Fmt.string ppf (L.unloc s)
   | Theory th     -> Theory.pp ppf th
   | IntroPat args -> pp_intro_pats ppf args
@@ -207,6 +208,8 @@ let pp_parser_arg ppf = function
       (Fmt.list ~sep:Fmt.sp Theory.pp) t
 
   | SplitSeq (i, ht) -> Fmt.pf ppf "%d ..." (L.unloc i)
+
+  | MemSeq (i, j) -> Fmt.pf ppf "%d %d" (L.unloc i) (L.unloc j)
 
   | Remember (t, id) ->
     Fmt.pf ppf "%a as %s" Theory.pp t (L.unloc id) 
@@ -236,7 +239,7 @@ type _ sort =
   | ETerm     : Theory.eterm    sort
   (** Boolean, timestamp or message *)
         
-  | Int       : int sort
+  | Int       : int L.located sort
   | String    : lsymb sort
   | Pair      : ('a sort * 'b sort) -> ('a * 'b) sort
   | Opt       : 'a sort -> ('a option) sort
@@ -253,7 +256,7 @@ type _ arg =
 
   | ETerm     : 'a Type.ty * 'a Term.term * Location.t -> Theory.eterm arg
 
-  | Int       : int -> int arg
+  | Int       : int L.located -> int L.located arg
   | String    : lsymb -> lsymb arg
   | Pair      : 'a arg * 'b arg -> ('a * 'b) arg
   | Opt       : ('a sort * 'a arg option) -> ('a option) arg

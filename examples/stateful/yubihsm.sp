@@ -616,7 +616,7 @@ global goal stef_atomic_keys (t : timestamp):
     seq(pid:index -> k(pid)),
     seq(pid:index -> k_dummy(pid))
   ).
-Proof.
+Proof. 
   dependent induction t => t Hind Hap.
   case t => Eq;
   (try (repeat destruct Eq as [_ Eq];
@@ -676,8 +676,7 @@ Proof.
   rewrite /AEAD /= in 2.
   rewrite /aead /otp in 1,2.
   fa 1. fa 1. fa 1. fa 1.
-  admit 1. (* TODO: is included is the sequence. 
-              Can this be found automatically ? *)
+  memseq 1 6; 1: by exists pid; rewrite if_true.
   by apply Hind (pred(t)).
 
   (* Decode1(pid,j) *)
@@ -690,7 +689,7 @@ Proof.
   rewrite valid_decode_charac //. 
   rewrite /otp /aead.
   fa 1. fa 1. fa 1. fa 1. fa 1.
-  admit 1. (* TODO: idem*)
+  memseq 1 5; 1: by exists pid; rewrite if_true.
   by apply Hind (pred(t)).
 Qed.
 

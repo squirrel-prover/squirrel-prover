@@ -101,7 +101,7 @@ type boolean = [`Boolean]
     type, even to parse strings. *)
 type parser_arg =
   | String_name of lsymb
-  | Int_parsed  of int
+  | Int_parsed  of int L.located
   | Theory      of Theory.term
   | IntroPat    of intro_pattern list
   | AndOrPat    of and_or_pat
@@ -110,6 +110,7 @@ type parser_arg =
   | ApplyIn     of Theory.p_pt * apply_in
   | SplitSeq    of int L.located * Theory.hterm
   | ConstSeq    of int L.located * Theory.term list
+  | MemSeq      of int L.located * int L.located
   | Remember    of Theory.term * lsymb
   | Generalize  of Theory.term list * naming_pat list option
 
@@ -127,7 +128,7 @@ type _ sort =
   | ETerm     : Theory.eterm    sort
   (** Boolean, timestamp or message *)
 
-  | Int       : int sort
+  | Int       : int L.located sort
   | String    : lsymb sort
   | Pair      : ('a sort * 'b sort) -> ('a * 'b) sort
   | Opt       : 'a sort -> ('a option) sort
@@ -145,7 +146,7 @@ type _ arg =
   | ETerm     : 'a Type.ty * 'a Term.term * Location.t -> Theory.eterm arg
   (** A [Term.term] with its sorts. *)
         
-  | Int       : int -> int arg
+  | Int       : int L.located -> int L.located arg
   | String    : lsymb -> lsymb arg
   | Pair      : 'a arg * 'b arg -> ('a * 'b) arg
   | Opt       : ('a sort * 'a arg option) -> ('a option) arg

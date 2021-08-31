@@ -603,9 +603,10 @@ let eval_tactic_focus tac = match !subgoals with
     subgoals := new_j @ ejs';
     is_proof_completed ()
 
-let cycle i l =
+let cycle i_l l =
+  let i, loc = L.unloc i_l, L.loc i_l in
   let rec cyc acc i = function
-    | [] -> hard_failure (Tactics.Failure "cycle error")
+    | [] -> hard_failure ~loc (Tactics.Failure "cycle error")
     | a :: l ->
       if i = 1 then l @ (List.rev (a :: acc))
       else cyc (a :: acc) (i - 1) l in

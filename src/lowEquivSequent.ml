@@ -299,19 +299,19 @@ let mem_felem i s =
   goal_is_equiv s && 
   i < List.length (goal_as_equiv s)
   
-let change_felem i elems s =
+let change_felem ?loc i elems s =
   try
     let before, _, after = List.splitat i (goal_as_equiv s) in
     set_equiv_goal (List.rev_append before (elems @ after)) s
   with List.Out_of_range ->
-    Tactics.soft_failure (Tactics.Failure "out of range position")
+    Tactics.soft_failure ?loc (Tactics.Failure "out of range position")
 
 
-let get_felem i s = 
+let get_felem ?loc i s = 
   try
     let _, t, _ = List.splitat i (goal_as_equiv s) in t
   with List.Out_of_range ->
-    Tactics.soft_failure (Tactics.Failure "out of range position")
+    Tactics.soft_failure ?loc (Tactics.Failure "out of range position")
 
 let get_hint_db s = s.hint_db
 

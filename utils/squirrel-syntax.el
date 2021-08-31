@@ -131,6 +131,7 @@
   "intctxt"
   "splitseq"
   "constseq"
+  "memseq"
   "byequiv"
 ))
 

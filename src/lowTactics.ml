@@ -1680,10 +1680,10 @@ let wrap_fail f s sk fk =
   try sk (f s) fk with
   | Tactics.Tactic_soft_failure e -> fk e
 
-let split_equiv_goal i s =
-  try List.splitat i (ES.goal_as_equiv s)
+let split_equiv_goal (i : int L.located) s =
+  try List.splitat (L.unloc i) (ES.goal_as_equiv s)
   with List.Out_of_range ->
-    soft_failure (Tactics.Failure "out of range position")
+    soft_failure ~loc:(L.loc i) (Tactics.Failure "out of range position")
 
 (*------------------------------------------------------------------*)
 (** {2 Basic tactics} *)
@@ -1866,7 +1866,8 @@ let () =
             match s with
             | Goal.Trace _ -> bad_args ()
             | Goal.Equiv s ->
-              sk [Goal.Equiv (ES.change_felem i [] s)] fk
+              let e = ES.change_felem ~loc:(L.loc i) (L.unloc i) [] s in
+              sk [Goal.Equiv e] fk
         end
       | _ -> bad_args ())
 

@@ -122,6 +122,7 @@ rule token = parse
 | "exists"            { EXISTS }
 | "splitseq"          { SPLITSEQ }
 | "constseq"          { CONSTSEQ }
+| "memseq"            { MEMSEQ }
 | "remember"          { REMEMBER }
 | "dependent"         { DEPENDENT }
 | "goal"              { GOAL }

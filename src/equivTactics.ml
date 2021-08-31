@@ -530,7 +530,7 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
     | Atom (`Happens _) -> raise Not_FADUP_iter
 end
 
-let fa_dup_int i s =
+let fa_dup_int (i : int L.located) s =
   let before, e, after = split_equiv_goal i s in
 
   let biframe_without_e = List.rev_append before after in
@@ -598,6 +598,8 @@ let () =
                     phi if it contains only subterms allowed by the FA-DUP rule."
    ~tactic_group:Structural
    (LowTactics.genfun_of_pure_efun_arg fadup) Args.(Opt Int)
+
+
 
 (*------------------------------------------------------------------*)
 (** Macro occurrence utility functions *)
@@ -1007,21 +1009,24 @@ let push_formula (j: 'a option) f term =
   | Term.Fun (f, fty, terms) ->
     begin match j with
       | None -> Term.mk_fun0 f fty (List.map mk_ite terms)
-      | Some (Args.Int jj) ->
-        if jj < List.length terms then
+      | Some (Args.Int j) ->
+        let loc, j = L.loc j, L.unloc j in
+        if j < List.length terms then
           Term.mk_fun0 f fty
-            (List.mapi (fun i t -> if i=jj then mk_ite t else t) terms)
+            (List.mapi (fun i t -> if i=j then mk_ite t else t) terms)
         else
-          soft_failure
-            (Tactics.Failure "subterm at position j does not exists")
+          soft_failure ~loc
+            (Tactics.Failure "out-of-bound position")
     end
 
   | Term.Diff (a, b) ->
     begin match j with
       | None -> Term.mk_diff (mk_ite a) (mk_ite b)
-      | Some (Args.Int 0) -> Term.mk_diff (mk_ite a) b
-      | Some (Args.Int 1) -> Term.mk_diff a (mk_ite b)
-      | _ ->  soft_failure (Failure "expected j is 0 or 1 for diff terms")
+      | Some (Args.Int { L.pl_desc = 0}) -> Term.mk_diff (mk_ite a) b
+      | Some (Args.Int { L.pl_desc = 1}) -> Term.mk_diff a (mk_ite b)
+      | Some (Args.Int j) ->  
+        soft_failure ~loc:(L.loc j)
+          (Failure "expected value of 0 or 1 for diff terms")
     end
 
   | Term.Seq (vs, t) ->
@@ -1629,9 +1634,9 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-let split_seq (li, ht) s : ES.sequent =
+let split_seq (li : int L.located) ht s : ES.sequent =
+  let before, t, after = split_equiv_goal li s in
   let i = L.unloc li in
-  let before, t, after = split_equiv_goal i s in
 
   let is, ti = match t with
     | Seq (is, ti) -> is, ti
@@ -1672,7 +1677,7 @@ let split_seq (li, ht) s : ES.sequent =
 
 let split_seq_args args s : ES.sequent list =
   match args with
-  | [Args.SplitSeq (i, ht)] -> [split_seq (i, ht) s]
+  | [Args.SplitSeq (i, ht)] -> [split_seq i ht s]
   | _ -> bad_args ()
 
 let split_seq_tac args s sk fk = wrap_fail (split_seq_args args) s sk fk
@@ -1686,9 +1691,54 @@ let () =
     (LowTactics.gentac_of_etac_arg split_seq_tac)
 
 (*------------------------------------------------------------------*)
-let const_seq (li, terms) s : Goal.t list =
-  let i = L.unloc li in
+let mem_seq (i_l : int L.located) (j_l : int L.located) s : Goal.t list =  
+  let before, t, after = split_equiv_goal i_l s in
+  let _, seq, _ = split_equiv_goal j_l s in
 
+  let seq_vars, seq_term = match seq with
+    | Seq (vs, t) -> vs, t
+    | _ ->
+      soft_failure ~loc:(L.loc j_l)
+        (Failure (string_of_int (L.unloc j_l) ^ " is not a seq"))
+  in
+
+  EquivLT.check_ty_eq (Term.ty t) (Term.ty seq_term);
+
+  (* refresh the sequence *)
+  let env = ref (ES.env s) in
+  let seq_vars, subst = Term.erefresh_vars (`InEnv env) seq_vars in
+  let seq_term = Term.subst subst seq_term in
+
+  let subgoal = 
+    let form = 
+      Term.mk_exists ~simpl:true seq_vars
+        (Term.mk_atom `Eq t seq_term) 
+    in
+    let trace_s = ES.to_trace_sequent (ES.set_reach_goal form s) in
+    Goal.Trace trace_s
+  in
+
+  let frame = List.rev_append before after in
+  [subgoal; Goal.Equiv (ES.set_equiv_goal frame s)]
+
+let mem_seq_args args s : Goal.t list =
+  match args with
+  | [Args.MemSeq (i, j)] -> mem_seq i j s
+  | _ -> bad_args ()
+
+let mem_seq_tac args s sk fk = wrap_fail (mem_seq_args args) s sk fk
+
+let () =
+  T.register_general "memseq"
+    ~tactic_help:{general_help = "prove that an biframe element appears in a \
+                                 sequence of the biframe.";
+                  detailed_help = "";
+                  usages_sorts = [];
+                  tactic_group = Logical}
+    (LowTactics.genfun_of_efun_arg mem_seq_tac)
+
+(*------------------------------------------------------------------*)
+let const_seq (li, terms) s : Goal.t list =
   let terms, term_tys =
     List.split @@
     List.map (fun p_term ->
@@ -1697,7 +1747,9 @@ let const_seq (li, terms) s : Goal.t list =
       ) terms
   in
 
-  let before, e, after = split_equiv_goal i s in
+  let before, e, after = split_equiv_goal li s in
+  let i = L.unloc li in
+
   let e_is, e_ti = match e with
     | Seq (is, ti) -> is, ti
     | _ ->

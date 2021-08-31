@@ -575,8 +575,8 @@ let get_hint_db s = s.hint_db
 
 (*------------------------------------------------------------------*)
 let mem_felem _ _ = false
-let change_felem _ _ _ = assert false
-let get_felem _ _ = assert false
+let change_felem ?loc _ _ _ = assert false
+let get_felem ?loc _ _ = assert false
 
 (*------------------------------------------------------------------*)
 let map f s : sequent =

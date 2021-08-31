@@ -32,7 +32,8 @@
 %token TIME WHERE WITH ORACLE EXN
 %token LARGE NAMEFIXEDLENGTH
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
-%token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY SPLITSEQ CONSTSEQ
+%token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY 
+%token SPLITSEQ CONSTSEQ MEMSEQ
 %token BY INTRO AS DESTRUCT REMEMBER INDUCTION
 %token PROOF QED UNDO ABORT HINT
 %token EOF
@@ -436,7 +437,7 @@ declarations:
 
 tactic_param:
 | f=term %prec tac_prec  { TacticsArgs.Theory f }
-| i=INT                  { TacticsArgs.Int_parsed i }
+| i=loc(INT)             { TacticsArgs.Int_parsed i }
 
 tactic_params:
 |                                       { [] }
@@ -630,11 +631,12 @@ tac:
   | NOSIMPL t=tac                      { T.Modifier ("nosimpl", t) }
   | TIME t=tac  %prec tac_prec         { T.Time t }
 
-  | l=lloc(CYCLE) i=INT
+  | l=lloc(CYCLE) i=loc(INT)
     { mk_abstract l "cycle" [TacticsArgs.Int_parsed i] }
 
-  | l=lloc(CYCLE) MINUS i=INT
-    { mk_abstract l "cycle" [TacticsArgs.Int_parsed (-i)] }
+  | l=lloc(CYCLE) MINUS i=loc(INT)
+    { let im = L.mk_loc (L.loc i) (- (L.unloc i)) in
+      mk_abstract l "cycle" [TacticsArgs.Int_parsed im] }
 
   | CHECKFAIL t=tac EXN ts=ID  { T.CheckFail (ts, t) }
 
@@ -688,6 +690,9 @@ tac:
   | l=lloc(CONSTSEQ) i=loc(INT) COLON terms=slist1(sterm, empty)
     { mk_abstract l "constseq" [TacticsArgs.ConstSeq (i, terms)] }
 
+  | l=lloc(MEMSEQ) i=loc(INT) j=loc(INT)
+    { mk_abstract l "memseq" [TacticsArgs.MemSeq (i, j)] }
+
   | l=lloc(DDH) g=lsymb COMMA i1=lsymb COMMA i2=lsymb COMMA i3=lsymb 
     { mk_abstract l "ddh"
          [TacticsArgs.String_name g;
@@ -712,7 +717,7 @@ help_tac_i:
 | INTRO      { "intro"} 
 | DESTRUCT   { "destruct"} 
 | DEPENDS    { "depends"}
-| REMEMBER   { "REMEMBER"}
+| REMEMBER   { "remember"}
 | EXISTS     { "exists"}    
 | REVERT     { "revert"}  
 | GENERALIZE { "generalize"}  
@@ -724,6 +729,7 @@ help_tac_i:
 | APPLY      { "apply"}  
 | SPLITSEQ   { "splitseq"}  
 | CONSTSEQ   { "constseq"}  
+| MEMSEQ     { "memseq"}  
 | DDH        { "ddh"}      
 
 
