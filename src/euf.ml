@@ -247,9 +247,6 @@ let mk_rule ?(elems=[]) ?(drop_head=true) ~fun_wrap_key
         in
         iter#visit_message t;
         let new_hashes = iter#get_occurrences in
-
-        (* let pp fmt (_,t) = Term.pp fmt t in
-         * Fmt.epr "new hash: %a@." (Fmt.list pp) new_hashes; *)
         
         List.assoc_up_dflt descr [] (fun l -> new_hashes @ l) hash_cases
       ) cntxt env (mess :: sign :: elems) []

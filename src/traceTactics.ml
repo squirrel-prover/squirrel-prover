@@ -594,9 +594,22 @@ let mk_fresh_indirect_cases
     (ns : Term.nsymb) 
     (terms : Term.message list) 
   =
+  (* sanity check: free variables in [ns] and [terms] are included in [env] *)
+  assert (
+    let all_fv = 
+      List.fold_left (fun s t -> 
+          Sv.union s (Term.fv t)
+        ) (Sv.of_list1 ns.Term.s_indices) terms
+    in
+    Sv.subset all_fv (Vars.to_set env));
+
   let macro_cases =
     Iter.fold_macro_support0 (fun action_name a t macro_cases ->
-        let fv = Sv.diff (Term.fv t) (Vars.to_set env) in
+        let fv = 
+          Sv.diff
+            (Sv.union (Action.fv_action a) (Term.fv t)) 
+            (Vars.to_set env) 
+        in
 
         let new_cases = Fresh.get_name_indices_ext ~fv:fv cntxt ns.s_symb t in
         let new_cases = 
@@ -621,6 +634,7 @@ let mk_fresh_indirect_cases
  
 
 let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
+  (* TODO: bug, handle free variables *)
   let term_actions =
     let iter = new Fresh.get_actions ~cntxt in
     iter#visit_message t ;
