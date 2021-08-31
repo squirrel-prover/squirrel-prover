@@ -600,6 +600,44 @@ let () =
    (LowTactics.genfun_of_pure_efun_arg fadup) Args.(Opt Int)
 
 (*------------------------------------------------------------------*)
+(** Macro occurrence utility functions *)
+
+(** Return timestamps occuring in macros in a set of terms *)
+let get_macro_actions
+    (cntxt : Constr.trace_cntxt)
+    (sources : Term.messages) : Fresh.ts_occs 
+  =
+  let actions = 
+    List.concat_map (Fresh.get_actions_ext cntxt) sources
+  in
+  Fresh.clear_dup_mtso_le actions
+
+(** [mk_le_ts_occ env ts0 occ] build a condition stating that [ts0] occurs 
+    before the macro timestamp occurrence [occ]. *)
+let mk_le_ts_occ
+    (env : Vars.env)
+    (ts0 : Term.timestamp) 
+    (occ : Fresh.ts_occ) : Term.message
+  =
+  let occ_vars = Sv.elements occ.Iter.occ_vars in
+  let occ_vars, occ_subst = Term.erefresh_vars (`InEnv (ref env)) occ_vars in
+  let subst = occ_subst in
+  let ts   = Term.subst subst occ.occ_cnt  in
+  let cond = Term.subst subst occ.occ_cond in
+  Term.mk_exists ~simpl:true occ_vars
+    (Term.mk_and
+       (Term.mk_timestamp_leq ts0 ts)
+       cond)
+
+let mk_le_ts_occs
+    (env : Vars.env)
+    (ts0 : Term.timestamp) 
+    (occs : Fresh.ts_occs) : Term.messages 
+  =
+  List.map (mk_le_ts_occ env ts0) occs |> 
+  List.remove_duplicate (=)
+
+(*------------------------------------------------------------------*)
 (** Fresh *)
 
 let fresh_mk_direct
@@ -609,14 +647,16 @@ let fresh_mk_direct
   =
   let env = ref env in
   let bv, subst = Term.erefresh_vars (`InEnv env) (Sv.elements occ.occ_vars) in
+  let cond = Term.subst subst occ.occ_cond in
   let j = List.map (Term.subst_var subst) occ.occ_cnt in
-  Term.mk_forall ~simpl:true bv (Term.mk_indices_neq n.s_indices j)
+  Term.mk_forall ~simpl:true bv 
+    (Term.mk_impl cond (Term.mk_indices_neq n.s_indices j))
 
 let fresh_mk_indirect
     (cntxt : Constr.trace_cntxt)
     (env : Vars.env)
     (n : Term.nsymb)
-    (frame_actions : Term.timestamp list)
+    (frame_actions : Fresh.ts_occs)
     (occ : TraceTactics.fresh_occ) : Term.message
   =
   (* for each action [a] in which [name] occurs with indices from [occ] *)
@@ -630,22 +670,21 @@ let fresh_mk_indirect
 
   (* apply [subst] to the action and to the list of
    * indices of our name's occurrences *)
-  let new_action =
+  let action =
     SystemExpr.action_to_term cntxt.table cntxt.system
       (Action.subst_action subst action)
   in
 
   let occ = List.map (Term.subst_var subst) occ in
 
-  (* if new_action occurs before an action of the frame *)
-  let disj =
-    Term.mk_ors
-      (List.map (fun t ->
-           (Term.mk_timestamp_leq new_action t)
-         ) frame_actions)
+  (* environement with all new variables *)
+  let env0 = !env in
+  (* condition stating that [action] occurs before a macro timestamp 
+     occurencing in the frame *)
+  let disj = Term.mk_ors (mk_le_ts_occs env0 action frame_actions) in
 
-  (* then indices of name in new_action and of [name] differ *)
-  and form = Term.mk_indices_neq occ n.s_indices in
+  (* condition stating that indices of name in [action] and [name] differ *)
+  let form = Term.mk_indices_neq occ n.s_indices in
 
   Term.mk_forall ~simpl:true bv (Term.mk_impl disj form)
 
@@ -670,26 +709,25 @@ let mk_phi_proj
     (* direct cases (for explicit occurrences of [name] in the frame) *)
     let phi_frame = List.map (fresh_mk_direct env n) frame_indices in
 
-    (* TODO: bug, handle free variables *)
-    let frame_actions : Term.timestamp list =
-      let iter = new Fresh.get_actions ~cntxt in
-      List.iter iter#visit_message frame ;
-      iter#get_actions
-    in
+    let frame_actions : Fresh.ts_occs = get_macro_actions cntxt frame in
 
-    let macro_cases = TraceTactics.mk_fresh_indirect_cases cntxt env n biframe in
+    let macro_cases = 
+      TraceTactics.mk_fresh_indirect_cases cntxt env n biframe 
+    in
 
     (* indirect cases (occurrences of [name] in actions of the system) *)
     let phi_actions =
       List.fold_left (fun forms (_, cases) ->
           let cases = 
-            List.map (fresh_mk_indirect cntxt env n frame_actions) cases 
+            List.map 
+              (fresh_mk_indirect cntxt env n frame_actions) 
+              cases 
           in
           cases @ forms
         ) [] macro_cases
     in
 
-    phi_frame @ phi_actions
+    List.remove_duplicate (=) (phi_frame @ phi_actions)
 
   with
   | Fresh.Name_found ->
@@ -1281,6 +1319,7 @@ let prf_mk_indirect
   let vars, subst = Term.erefresh_vars (`InEnv env) vars in
 
   let action, hash_is, hash_m = hash_occ.Iter.occ_cnt in
+
   (* apply [subst] to the action and to the list of
    * key indices with the hashed messages *)
   let action =
@@ -1293,19 +1332,9 @@ let prf_mk_indirect
 
   (* save the environment after having renamed all free variables until now. *)
   let env0 = !env in
-  (* if new_action occurs before a macro timestamp occurence of the frame *)
-  let do1 mts_occ =
-    let occ_vars = Sv.elements mts_occ.Iter.occ_vars in
-    let occ_vars, occ_subst = Term.erefresh_vars (`InEnv (ref env0)) occ_vars in
-    let subst = occ_subst @ subst in
-    let ts   = Term.subst subst mts_occ.occ_cnt   in
-    let cond = Term.subst subst mts_occ.occ_cond in
-    Term.mk_exists ~simpl:true occ_vars
-      (Term.mk_and
-         (Term.mk_timestamp_leq action ts)
-         cond)
-  in
-  let disj = Term.mk_ors (List.map do1 frame_actions) in
+  (* condition stating that [action] occurs before a macro timestamp 
+     occurencing in the frame *)
+  let disj = Term.mk_ors (mk_le_ts_occs env0 action frame_actions) in
 
   (* then if key indices are equal then hashed messages differ *)
   let form =
@@ -1406,19 +1435,10 @@ let mk_prf_phi_proj cntxt env param frame hash =
   (* Keep only actions in which there is at least one occurrence. *)
   let macro_cases = List.filter (fun (_, occs) -> occs <> []) macro_cases in
 
-  let get_actions (sources : Term.messages) : Fresh.ts_occs =
-    let actions = 
-      List.fold_left (fun acc t ->
-          Fresh.get_actions_ext cntxt t @ acc
-        ) [] sources
-    in
-    Fresh.clear_dup_mtso_le actions
-  in
-
   let phi_indirect =
     List.map (fun (action, hash_occs) ->
         List.map (fun (hash_occ, srcs) -> 
-            let frame_actions = get_actions srcs in
+            let frame_actions = get_macro_actions cntxt srcs in
             prf_mk_indirect env cntxt param frame_actions hash_occ 
           ) (List.rev hash_occs)
       ) (List.rev macro_cases)

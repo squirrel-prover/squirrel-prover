@@ -612,14 +612,11 @@ let mk_fresh_indirect_cases
         in
 
         let new_cases = Fresh.get_name_indices_ext ~fv:fv cntxt ns.s_symb t in
-        let new_cases = 
-          List.map (fun case -> 
-              Iter.{ case with
-                     occ_cnt = a, case.occ_cnt;
-                     occ_cond = Term.mk_true; }
-              (* cond is not used, so we set it to true here. 
-                 This helps remove redundant cases later. *)
-
+        let new_cases =           
+          List.map (fun (case : Fresh.name_occ) -> 
+              { case with
+                occ_cnt = (a, case.occ_cnt);
+                occ_cond = case.occ_cond; }
             ) new_cases 
         in
 

@@ -124,6 +124,15 @@ module List = struct
       | [] -> raise Out_of_range
       | e::tl -> if i=0 then acc,e,tl else aux (i-1) (e::acc) tl
     in aux i [] l
+
+  (*------------------------------------------------------------------*)
+  let remove_duplicate cmp l =
+    let l_rev = 
+      List.fold_left (fun l el ->
+          if List.exists (cmp el) l then l else el :: l
+        ) [] l
+    in
+    List.rev l_rev  
 end
 
 (*------------------------------------------------------------------*)

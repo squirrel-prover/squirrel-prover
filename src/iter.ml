@@ -178,7 +178,7 @@ type 'a occ = {
 }
 
 let pp_occ pp_cnt fmt occ =
-  Fmt.pf fmt "[%a | ∃%a, %a]"
+  Fmt.pf fmt "[@[%a@] | ∃@[%a@], @[%a@]]"
     pp_cnt occ.occ_cnt
     (Fmt.list ~sep:Fmt.comma Vars.pp_e) (Sv.elements occ.occ_vars)
     Term.pp occ.occ_cond

@@ -25,6 +25,8 @@ module List : sig
       Duplicates already in [l1] or [l2] may remains. *)
   val merge_uniq : ('a -> 'a -> int) -> 'a list -> 'a list -> 'a list
 
+  val remove_duplicate : ('a -> 'a -> bool) -> 'a list -> 'a list
+
   val inclusion : 'a list -> 'a list -> bool
  
   (** [take n l] returns up to the [n] first elements from list [l], if available. *)
@@ -34,6 +36,15 @@ module List : sig
       if [l]  have less than n elements. *)
   val drop : int -> 'a list -> 'a list
 
+  (** [takedrop n l] returns the a result equal to [take n l, drop n l]. *)
+  val takedrop : int -> 'a list -> 'a list * 'a list
+
+  (** When [0 <= i < List.length l], [splitat i l] returns [before,e,after]
+   * such that [List.rev_append before (e::after) = l] and
+   * [List.length before = i].
+   * @raise Out_of_range when [i] is out of range. *)
+  val splitat : int -> 'a list -> 'a list * 'a * 'a list
+
   (** Update in an associative list *)
   val assoc_up : 'a -> ('b -> 'b) -> ('a * 'b) list -> ('a * 'b) list
 
@@ -41,18 +52,10 @@ module List : sig
 
   val assoc_dflt : 'b -> 'a -> ('a * 'b) list -> 'b
 
-  (** [takedrop n l] returns the a result equal to [take n l, drop n l]. *)
-  val takedrop : int -> 'a list -> 'a list * 'a list
-
   val iteri2 : (int -> 'a -> 'b -> unit) -> 'a list -> 'b list -> unit
 
   exception Out_of_range
 
-  (** When [0 <= i < List.length l], [splitat i l] returns [before,e,after]
-   * such that [List.rev_append before (e::after) = l] and
-   * [List.length before = i].
-   * @raise Out_of_range when [i] is out of range. *)
-  val splitat : int -> 'a list -> 'a list * 'a * 'a list
 end
 
 (*------------------------------------------------------------------*)

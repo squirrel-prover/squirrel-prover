@@ -647,7 +647,7 @@ Proof.
   fa 1.
   rewrite /AEAD in 4.
   rewrite /* in 0.
-  cca1 2; 2:admit.              (* TODO !*)
+  cca1 2; 2:auto.
   rewrite !len_pair len_diff in 2.
   namelength k(pid), k_dummy(pid) => -> /=.
   rewrite /* in 0.    
