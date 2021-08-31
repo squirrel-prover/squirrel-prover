@@ -206,6 +206,11 @@ axiom mpid_inj (pid, pid':index): mpid(pid) = mpid(pid') => pid = pid'.
 
 axiom pair_ne_fail (x,y: message) : <x,y> <> fail.
 
+abstract c_pair : message.
+abstract (++) : message -> message -> message.
+axiom len_pair (x, y : message) : len(<x,y>) = (len(x) ++ len(y) ++ c_pair).
+
+
 (* LIBRAIRIES *)
 
 axiom eq_iff (x, y : boolean) : (x = y) = (x <=> y).
@@ -472,6 +477,10 @@ goal diff_diff_r ['a] (x,y,z: 'a): diff(x,diff(y,z)) = diff(x,z).
 Proof. by project. Qed.
 hint rewrite diff_diff_r.
 
+goal len_diff (x, y : message) : len(diff(x,y)) = diff(len(x), len(y)).
+Proof. by project. Qed.
+
+(*------------------------------------------------------------------*)
 (* instances of f_apply *)
 goal dec_apply (x,x',k : message): x = x' => dec(x,k) = dec(x',k).
 Proof. auto. Qed.
@@ -598,6 +607,7 @@ global goal stef_atomic_keys (t : timestamp):
   equiv(
     frame@t,
     seq(pid:index -> AEAD(pid)@t),
+    seq(pid:index -> if Setup(pid) <= t then AEAD(pid)@Setup(pid)),
     (* seq(pid:index -> YCtr(pid)@t), *)
     (* seq(pid:index -> SCtr(pid)@t), *)
     seq(pid:index -> sid(pid)),
@@ -608,18 +618,53 @@ global goal stef_atomic_keys (t : timestamp):
   ).
 Proof.
   dependent induction t => t Hind Hap.
-  case t => Eq; 
-  try (repeat destruct Eq as [_ Eq]; 
+  case t => Eq;
+  (try (repeat destruct Eq as [_ Eq];
        rewrite /* in 0;
        rewrite /AEAD in 1;
-       by apply Hind (pred(t))).
+       rewrite le_lt // -le_pred_lt in 2;
+       by apply Hind (pred(t)))).
 
   (* init *)
-  rewrite /*. 
-  auto.
+  rewrite /*.
+  by rewrite if_false in 1.
+
+  (* Setup(pid) *)
+  repeat destruct Eq as [_ Eq].
+  splitseq 2: (fun (pid0 : index) -> pid = pid0).
+  constseq 2: (AEAD(pid)@t) zero. 
+    intro pid0; case (pid = pid0) => //= _. 
+    by left; rewrite if_true.
+  rewrite if_then_then in 3. 
+  assert (forall(pid0 : index), 
+    (not (pid = pid0) && Setup(pid0) <= t) = 
+    (Setup(pid0) < t)) as H.
+    intro pid0; case pid = pid0 => _ /=. 
+    by rewrite eq_iff. 
+    by rewrite le_lt. 
+  rewrite H -le_pred_lt in 3.
+  rewrite /AEAD in 1.
+  fa 1.
+  rewrite /AEAD in 4.
+  rewrite /* in 0.
+  cca1 2; 2:admit.              (* TODO !*)
+  rewrite !len_pair len_diff in 2.
+  namelength k(pid), k_dummy(pid) => -> /=.
+  rewrite /* in 0.    
+  by apply Hind (pred(t)).
+
+  (* Write(pid, j) *)
+  repeat destruct Eq as [_ Eq].
+  rewrite le_lt // -le_pred_lt in 2.
+  rewrite /AEAD in 1.
+  fa 1.
+  rewrite /* in 0. 
+  by apply Hind (pred(t)).
 
   (* Decode(pid,j) *)
   repeat destruct Eq as [_ Eq].
+  rewrite /AEAD in 1.
+  rewrite le_lt // -le_pred_lt in 2.
   depends Setup(pid), t by auto => H.
   rewrite /frame /exec /output /cond in 0. 
   fa 0; fa 1; fa 1.
@@ -630,15 +675,22 @@ Proof.
   fa 2.
   rewrite /AEAD /= in 2.
   rewrite /aead /otp in 1,2.
+  fa 1. fa 1. fa 1. fa 1.
+  admit 1. (* TODO: is included is the sequence. 
+              Can this be found automatically ? *)
   by apply Hind (pred(t)).
 
   (* Decode1(pid,j) *)
   repeat destruct Eq as [_ Eq].
+  rewrite /AEAD in 1.
+  rewrite le_lt // -le_pred_lt in 2.
   depends Setup(pid), t by auto => H.
   rewrite /frame /exec /output /cond in 0. 
   fa 0; fa 1; fa 1.
   rewrite valid_decode_charac //. 
   rewrite /otp /aead.
+  fa 1. fa 1. fa 1. fa 1. fa 1.
+  admit 1. (* TODO: idem*)
   by apply Hind (pred(t)).
 Qed.
 
@@ -812,7 +864,6 @@ expand exec, cond.
 destruct Hexec as [Hexecpred [[Mneq1 Mneq2] Hcpt Hpid]].
 expand deccipher.
 intctxt Mneq2 => //.   
-
 intro Ht M1 Eq.
 exists j0.
 split => //. 
@@ -860,6 +911,7 @@ case H0 => //.
 
 (* Server(pid,j) > pred(Server(pid,j)) = Server(pid,j') *)
 use counterIncreaseStrictly with pid, j as H1 => //.
+clear Eq Hexec' Mneq1 Mneq2 exec M1 Hpid Hexecpred Hcpt Hap' Hap Ht H.
 by apply orderStrict in H1.
 
 (* Server(pid,j)  > pred(Server(pid,j)) >  Server(pid,j') *) 
