@@ -1429,6 +1429,37 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | _ -> assert false
 
   (*------------------------------------------------------------------*)
+  (** {3 Namelength} *)
+
+
+  let namelength
+      Args.(Pair (Message (tn, tyn), Message (tm, tym))) 
+      (s : S.t) : S.t list
+    =
+    match tn, tm with
+    | Name n, Name m ->
+      let table = S.table s in
+
+      (* TODO: subtypes *)
+      if not (tyn = tym) then
+        Tactics.soft_failure (Failure "names are not of the same types");
+
+      if not Symbols.(check_bty_info table n.s_typ Ty_name_fixed_length) then
+        Tactics.soft_failure
+          (Failure "names are of a type that is not [name_fixed_length]");
+
+      let f = 
+        Term.mk_atom `Eq
+          (Term.mk_len (Term.mk_name n)) 
+          (Term.mk_len (Term.mk_name m)) 
+      in
+      let f = Equiv.Babel.convert f ~src:Equiv.Local_t ~dst:S.conc_kind in
+
+      [S.set_goal (S.Conc.mk_impl ~simpl:false f (S.goal s)) s]
+
+    | _ -> Tactics.(soft_failure (Failure "expected names"))
+
+  (*------------------------------------------------------------------*)
   (** {3 Remember} *)
 
   let remember (id : Theory.lsymb) (term : Theory.term) s =
@@ -2007,6 +2038,16 @@ let () =
     ~tactic_group:Structural
     (genfun_of_any_pure_fun_arg TraceLT.depends EquivLT.depends)
     Args.(Pair (Timestamp, Timestamp))
+
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_typed "namelength"
+    ~general_help:"Adds the fact that two names have the same length."
+    ~detailed_help:""
+    ~tactic_group:Structural
+    (genfun_of_any_pure_fun_arg TraceLT.namelength EquivLT.namelength)
+    Args.(Pair (Message, Message))
 
 (*------------------------------------------------------------------*)
 let () = T.register_general "expand"

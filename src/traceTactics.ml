@@ -393,38 +393,6 @@ let () = T.register "constraints"
     (LowTactics.genfun_of_pure_tfun constraints_tac)
 
 
-
-(*------------------------------------------------------------------*)
-(** Length *)
-
-let namelength Args.(Pair (Message (tn, tyn), Message (tm, tym))) s =
-  match tn, tm with
-  | Name n, Name m ->
-    let table = TS.table s in
-
-    (* TODO: subtypes *)
-    if not (tyn = tym) then
-      Tactics.soft_failure (Failure "names are not of the same types");
-
-    if not Symbols.(check_bty_info table n.s_typ Ty_name_fixed_length) then
-      Tactics.soft_failure
-        (Failure "names are of a type that is not [name_fixed_length]");
-
-    let f = Term.mk_atom `Eq (Term.mk_len (mk_name n)) (Term.mk_len (mk_name m)) in
-
-    [TS.set_goal
-       (Term.mk_impl ~simpl:false f (TS.goal s)) s]
-
-  | _ -> Tactics.(soft_failure (Failure "expected names"))
-
-let () =
-  T.register_typed "namelength"
-    ~general_help:"Adds the fact that two names have the same length."
-    ~detailed_help:""
-    ~tactic_group:Structural
-    (LowTactics.genfun_of_pure_tfun_arg namelength)
-    Args.(Pair (Message, Message))
-
 (*------------------------------------------------------------------*)
 (** Eq-Indep Axioms *)
 

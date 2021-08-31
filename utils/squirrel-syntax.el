@@ -69,6 +69,7 @@
 (defvar squirrel-tactic-keywords '(
   "anyintro"
   "use"
+  "namelength"
   "with"
   "assert"
   "case"
