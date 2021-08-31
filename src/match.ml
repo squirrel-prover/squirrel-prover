@@ -1030,6 +1030,11 @@ module Mset : sig
     indices:(Vars.index list) ->
     cond_le:(Term.timestamp option) ->
     t 
+
+  val pp       : Format.formatter -> t      -> unit
+  val pp_dbg   : Format.formatter -> t      -> unit
+  val pp_l     : Format.formatter -> t list -> unit
+  val pp_l_dbg : Format.formatter -> t list -> unit
 end = struct
   type t = {
     msymb   : Term.msymb;
@@ -1048,6 +1053,58 @@ end = struct
       List.map (fun ev -> Vars.ecast ev Type.KIndex) (Sv.elements indices)
     in
     { msymb; indices; cond_le; }
+
+  let _pp ~dbg fmt (mset : t) =
+    (* when [dbg] is [false], we refresh variables in [mset.indices] *)
+    let mset = 
+      if dbg then mset 
+      else
+        let env_vars = 
+          Sv.diff 
+            (Sv.union
+               (omap_dflt Sv.empty Term.fv mset.cond_le) 
+               (Sv.of_list1 mset.msymb.Term.s_indices))
+            (Sv.of_list1 mset.indices)
+        in
+        let env = Vars.of_set env_vars in
+        let _, indices, s = Term.refresh_vars_env env mset.indices in
+        { msymb = Term.subst_isymb s mset.msymb; 
+          indices; 
+          cond_le = omap (Term.subst s) mset.cond_le; }
+    in
+
+    let pp_cond fmt = function
+      | None -> Fmt.pf fmt "⊤"
+      | Some cond_le ->
+        Fmt.pf fmt "@[τ ≤ %a@]"
+          Term.pp cond_le
+    in
+
+    let vars = List.map Vars.evar mset.indices in
+    match vars with
+    | [] ->
+      Fmt.pf fmt "@[<hv 2>{ @[%a@]@τ |@ %a}@]"
+        Term.pp_msymb mset.msymb
+        pp_cond mset.cond_le
+
+    | _ ->
+      Fmt.pf fmt "@[<hv 2>{ @[%a@]@τ |@ ∀@[%a@]@ s.t. %a}@]"
+        Term.pp_msymb mset.msymb
+        (Fmt.list ~sep:Fmt.comma Vars.pp_e) vars
+        pp_cond mset.cond_le
+
+  let pp_dbg = _pp ~dbg:true
+
+  let pp = _pp ~dbg:false
+
+  let _pp_l ~dbg fmt (mset_l : t list) =
+    Fmt.pf fmt "@[<v 0>%a@]"
+      (Fmt.list ~sep:Fmt.sp (_pp ~dbg)) mset_l
+
+  let pp_l_dbg = _pp_l ~dbg:true
+
+  let pp_l = _pp_l ~dbg:false
+
 end    
 
 (** msets sorted in an association list *)
@@ -1057,34 +1114,9 @@ let msets_to_list (msets : msets) : Mset.t list =
   List.concat_map (fun (_, l) -> l) msets
 
 (*------------------------------------------------------------------*)
-let pp_mset fmt (mset : Mset.t) =
-  let pp_cond fmt = function
-    | None -> Fmt.pf fmt "⊤"
-    | Some cond_le ->
-      Fmt.pf fmt "@[τ ≤ %a@]"
-        Term.pp cond_le
-  in
-
-  let vars = List.map Vars.evar mset.indices in
-  match vars with
-  | [] ->
-    Fmt.pf fmt "@[<hv 2>{ @[%a@]@τ |@ %a}@]"
-      Term.pp_msymb mset.msymb
-      pp_cond mset.cond_le
-
-  | _ ->
-    Fmt.pf fmt "@[<hv 2>{ @[%a@]@τ |@ ∀@[%a@]@ s.t. %a}@]"
-      Term.pp_msymb mset.msymb
-      (Fmt.list ~sep:Fmt.comma Vars.pp_e) vars
-      pp_cond mset.cond_le
-
-let pp_mset_l fmt (mset_l : Mset.t list) =
-  Fmt.pf fmt "@[<v 0>%a@]"
-    (Fmt.list ~sep:Fmt.sp pp_mset) mset_l
-
 let pp_msets fmt (msets : msets) =
   let mset_l = msets_to_list msets in
-  pp_mset_l fmt mset_l
+  Mset.pp_l fmt mset_l
 
 (*------------------------------------------------------------------*)
 let pp_cand_set pp_term fmt (cand : 'a cand_set_g) =
@@ -1989,7 +2021,7 @@ module E : S with type t = Equiv.form = struct
     in
 
     if mset_l <> [] && Config.show_strengthened_hyp () then     
-      (dbg ~force:true) "strengthened hypothesis:@;%a@;" pp_mset_l mset_l; 
+      (dbg ~force:true) "strengthened hypothesis:@;%a@;" Mset.pp_l mset_l; 
 
     let mv, minfos = 
       List.fold_left (fun (mv, minfos) term ->
