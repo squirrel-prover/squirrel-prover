@@ -462,7 +462,7 @@ let convert_args table tyvars env parser_args tactic_type =
       Arg et
 
     | [Theory (L.{ pl_desc = App (p,[]) } )], Sort String ->
-      Arg (String p) (* TODO: location *)
+      Arg (String p)
 
     | [Int_parsed i], Sort Int ->
       Arg (Int i)
@@ -475,8 +475,6 @@ let convert_args table tyvars env parser_args tactic_type =
 
     | [Theory p], Sort Index ->
       Arg (Index (Theory.convert_index table tyvars env p))
-    (* old code: *)
-    (* Arg (Index (Theory.convert_index table tsubst (Theory.var p))) *)
 
     | th1::q, Sort (Pair (Opt s1, s2)) ->
       begin match conv_args [th1] (Sort (Opt s1)) env with
