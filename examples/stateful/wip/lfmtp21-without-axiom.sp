@@ -16,6 +16,307 @@ system (
 ).
 
 
+
+(* LIBRAIRIES *)
+
+axiom eq_iff (x, y : boolean) : (x = y) = (x <=> y).
+
+goal eq_refl ['a] (x : 'a) : (x = x) = true. 
+Proof. print.
+  by rewrite eq_iff. 
+Qed.
+hint rewrite eq_refl.
+
+goal eq_sym ['a] (x,y : 'a) : x = y => y = x.
+Proof. auto. Qed.
+
+(* SP: merge with eq_refl *)
+goal eq_refl_i (x : index) : (x = x) = true.
+Proof.
+  by rewrite eq_iff. 
+Qed.
+hint rewrite eq_refl_i.
+
+(* SP: merge with eq_refl *)
+goal eq_refl_t (x : timestamp) : (x = x) = true.
+Proof.
+  by rewrite eq_iff. 
+Qed.
+hint rewrite eq_refl_t.
+
+
+axiom not_true : not(true) = false.
+hint rewrite not_true.
+
+axiom not_false : not(false) = true.
+hint rewrite not_false.
+
+(* new *)
+axiom true_false : (true = false) = false.
+hint rewrite true_false.
+
+(* new *)
+goal false_true : (false = true) = false.
+Proof. 
+  (* TODO: work-around until we have a better type inference *)
+  (* rewrite (eq_sym false true). *)
+  assert (forall (x,y : boolean), (x = y) = (y = x)) as H .
+    intro _ _. 
+    by rewrite eq_iff. 
+  rewrite (H false true).
+  auto.
+Qed.
+hint rewrite false_true.
+
+goal not_not (b : boolean): not (not b) = b. 
+Proof.
+  by case b.
+Qed.
+hint rewrite not_not.
+
+goal not_eq ['a] (x, y : 'a): not (x = y) = (x <> y).
+Proof. 
+by rewrite eq_iff. 
+Qed.
+hint rewrite not_eq.
+
+(* new *)
+goal not_eq_i (x, y : index): not (x = y) = (x <> y).
+Proof. 
+by rewrite eq_iff. 
+Qed.
+hint rewrite not_eq_i.
+
+(* new *)
+goal not_eq_t (x, y : timestamp): not (x = y) = (x <> y).
+Proof. 
+by rewrite eq_iff. 
+Qed.
+hint rewrite not_eq_t.
+
+goal not_neq ['a] (x, y : 'a): not (x <> y) = (x = y).
+Proof. 
+by rewrite eq_iff. 
+Qed.
+hint rewrite not_neq.
+
+(* new *)
+goal not_neq_i (x, y : index): not (x <> y) = (x = y).
+Proof. 
+by rewrite eq_iff. 
+Qed.
+hint rewrite not_neq_i.
+
+(* new *)
+goal not_neq_t (x, y : timestamp): not (x <> y) = (x = y).
+Proof. 
+by rewrite eq_iff. 
+Qed.
+hint rewrite not_neq_t.
+
+(* new *)
+goal eq_false ['a] (x, y : 'a): ((x = y) = false) = (x <> y).
+Proof. 
+rewrite -not_eq. case (x = y) => _. simpl. auto.
+by rewrite eq_iff. 
+Qed.
+hint rewrite eq_false.
+
+(* new *)
+goal eq_false_i (x, y : index): ((x = y) = false) = (x <> y).
+Proof. 
+rewrite -not_eq_i. case (x = y) => _. simpl. auto.
+by rewrite eq_iff. 
+Qed.
+hint rewrite eq_false_i.
+
+(* new *)
+goal eq_false_t (x, y : timestamp): ((x = y) = false) = (x <> y).
+Proof. 
+rewrite -not_eq_t. case (x = y) => _. simpl. auto.
+by rewrite eq_iff. 
+Qed.
+hint rewrite eq_false_t.
+
+
+(*------------------------------------------------------------------*)
+(* and *)
+axiom and_comm (b,b' : boolean) : (b && b') = (b' && b).
+
+axiom and_true_l (b : boolean) : (true && b) = b.
+hint rewrite and_true_l.
+
+goal and_true_r (b : boolean) : (b && true) = b.
+Proof. by rewrite and_comm and_true_l. Qed.
+hint rewrite and_true_r.
+
+axiom and_false_l (b : boolean) : (false && b) = false.
+hint rewrite and_false_l.
+
+goal and_false_r (b : boolean) : (b && false) = false.
+Proof. by rewrite and_comm and_false_l. Qed.
+hint rewrite and_false_r.
+
+(*------------------------------------------------------------------*)
+(* or *)
+axiom or_comm (b,b' : boolean) : (b || b') = (b' || b).
+
+axiom or_false_l (b : boolean) : (false || b) = b.
+hint rewrite or_false_l.
+
+goal or_false_r (b : boolean) : (b || false) = b.
+Proof. by rewrite or_comm or_false_l. Qed.
+hint rewrite or_false_r.
+
+axiom or_true_l (b : boolean) : (true || b) = true.
+hint rewrite or_true_l.
+
+goal or_true_r (b : boolean) : (b || true) = true.
+Proof. by rewrite or_comm or_true_l. Qed.
+hint rewrite or_true_r.
+
+(*------------------------------------------------------------------*)
+(* if *)
+
+
+goal if_true ['a] (b : boolean, x,y : 'a):
+ b => if b then x else y = x.
+Proof.
+  by intro *; yesif.
+Qed.
+
+goal if_true0 ['a] (x,y : 'a):
+ if true then x else y = x.
+Proof.
+  by rewrite if_true. 
+Qed.
+hint rewrite if_true0.
+
+goal if_false ['a] (b : boolean, x,y : 'a):
+ (not b) => if b then x else y = y.
+Proof.
+  by intro *; noif.
+Qed.
+
+goal if_false0 ['a] (x,y : 'a):
+ if false then x else y = y.
+Proof.
+  by rewrite if_false.
+Qed.
+hint rewrite if_false0.
+
+goal if_then_then ['a] (b,b' : boolean, x,y : 'a):
+  if b then (if b' then x else y) else y = if (b && b') then x else y.
+Proof.  
+  by case b; case b'.
+Qed.
+
+goal if_same ['a] (b : boolean, x : 'a):
+  if b then x else x = x.
+Proof.
+  by case b.
+Qed.
+hint rewrite if_same.
+
+(* new *)
+goal if_then ['a] (b,b' : boolean, x,y,z : 'a):
+ b = b' => 
+ if b then (if b' then x else y) else z = 
+ if b then x else z.
+Proof.
+  by intro ->; case b'.
+Qed.
+hint rewrite if_then.
+
+(* new *)
+goal if_else ['a] (b,b' : boolean, x,y,z : 'a):
+ b = b' => 
+ if b then x else (if b' then y else z) = 
+ if b then x else z.
+Proof.
+  by intro ->; case b'.
+Qed.
+hint rewrite if_else.
+
+(* new *)
+goal if_then_not ['a] (b,b' : boolean, x,y,z : 'a):
+ b = not b' => 
+ if b then (if b' then x else y) else z = 
+ if b then y else z.
+Proof.
+  by intro ->; case b'.
+Qed.
+hint rewrite if_then_not.
+
+(* new *)
+goal if_else_not ['a] (b,b' : boolean, x,y,z : 'a):
+  b = not b' => 
+ if b then x else (if b' then y else z) = 
+ if b then x else y.
+Proof.  
+  by intro ->; case b'.
+Qed.
+hint rewrite if_else_not.
+
+(*------------------------------------------------------------------*)
+(* new *)
+
+goal fst_pair (x,y : message) : fst (<x,y>) = x.
+Proof. auto. Qed.
+hint rewrite fst_pair.
+
+goal snd_pair (x,y : message) : snd (<x,y>) = y.
+Proof. auto. Qed.
+hint rewrite snd_pair.
+
+goal diff_eq ['a] (x,y : 'a) : x = y => diff(x,y) = x.
+Proof. by project. Qed.
+hint rewrite diff_eq.
+
+goal diff_diff_l ['a] (x,y,z: 'a): diff(diff(x,y),z) = diff(x,z).
+Proof. by project. Qed.
+hint rewrite diff_diff_l.
+
+goal diff_diff_r ['a] (x,y,z: 'a): diff(x,diff(y,z)) = diff(x,z).
+Proof. by project. Qed.
+hint rewrite diff_diff_r.
+
+goal len_diff (x, y : message) : len(diff(x,y)) = diff(len(x), len(y)).
+Proof. by project. Qed.
+
+(*------------------------------------------------------------------*)
+
+(* Others *)
+
+goal le_pred_lt (t, t' : timestamp): (t <= pred(t')) = (t < t').
+Proof. 
+  by rewrite eq_iff.
+Qed.
+
+goal le_not_lt (t, t' : timestamp): 
+  t <= t' => not (t < t') => t = t'.
+Proof.
+  by case t' = init. 
+Qed.
+
+goal le_not_lt_charac (t, t' : timestamp):
+ (not (t < t') && t <= t') = (happens(t) && t = t').
+Proof.
+ by rewrite eq_iff.
+Qed.
+
+goal lt_impl_le (t, t' : timestamp): 
+  t < t' => t <= t'.
+Proof. auto. Qed.
+
+goal le_lt (t, t' : timestamp): 
+  t <> t' => (t <= t') = (t < t').
+Proof. 
+  by intro *; rewrite eq_iff. 
+Qed.
+
+
+(* PROOF *)
 (** Last update lemmas: basic reasoning about the memory cell.
   * Here we decompose the usual lastupdate lemma to separate the "pure" part
   * from the part that involves message equalities. *)
@@ -130,6 +431,23 @@ Proof.
   by case Heuf; exists i0.
 Qed.
 
+(*
+goal charac :
+forall (i: index, tau': timestamp) (happens(O(i)) && happens(tau')) =>
+( condA  = condB )
+).
+Proof.
+intro i tau' Hap.
+rewrite eq_iff; split.
+
+(* => case *)
+intro H.
+
+(* <= case *)
+
+Qed.
+*)
+
 
 (** Strong secrecy *)
 
@@ -146,145 +464,97 @@ Proof.
   induction tau => tau' Htau Htau'.
 
   (* Init *)
-admit.
+  expand frame@init.
+  rewrite if_false  in 0 => //.
+  fa 0.  
 
-(*  expand frame@init.
-  assert (seq(i:index->(if O(i) <= init then output@O(i))) = seq(i:index -> zero )) as Hseq.
-  admit. (* a priori ok mais je ne sais pas le dire proprement *)
-  rewrite Hseq in *.
-  fa 0.
   use lastupdate_pure with tau' as [Hinit | [i HA]].
+  
+  use lastupdate_init with tau' as H; try auto.
+  rewrite H. expand s@init. fresh 0. auto.
 
-
-    use lastupdate_init with tau' as H; try auto.
-    rewrite H. expand s@init. fresh 0. auto.
-
-    use lastupdate_A with tau',i as H; try auto.
-    rewrite H in *; expand s@A(i).
-    prf 0; yesif 0; [2: by fresh 0].
-    simpl. intro i' HAi'.
-    use non_repeating with pred(A(i)),pred(A(i')) => //.
-    by exists i'.
-    by assumption.
-    *)
+  use lastupdate_A with tau',i as H; try auto.
+  rewrite H in *; expand s@A(i).
+  prf 0; yesif 0; [2: by fresh 0].
+  simpl. intro i' HAi'.
+  use non_repeating with pred(A(i)),pred(A(i')) => //.
+  by exists i'.
+  by assumption.
 
   (* Oracle *)
-(*
-assert ((exists (i0:index), O(i0) <= pred(O(i)) && (input@O(i) = input@O(i0)))) as HnotUnique.
-admit.
-  expand frame. fa 0. fa 1. fa 2. expand exec. fa 1. expand cond.
+  expand frame@O(i); fa 0; fa 1; fa 2. expand exec. fa 1. expand cond.
+  splitseq 2: (fun(i0:index) -> O(i0) = O(i)).
+  rewrite if_then_then in 2. 
+  rewrite if_then_then in 3.
+ 
+  assert (forall (i0:index), (O(i0) = O(i) && O(i0) <= O(i)) = (O(i0) =O(i))) as H1.
+  intro i0.
+  by rewrite eq_iff. 
+  rewrite H1 in 2.
 
-assert(seq(i0:index->(if O(i0) <= O(i) then output@O(i0))) = seq(i0:index->(if O(i0) <= pred(O(i)) then output@O(i0)))).
+  assert (forall (i0:index), (not (O(i0) = O(i)) && O(i0) <= O(i)) = (O(i0) < O(i))) as H2.
+  intro i0.
+  by rewrite eq_iff. 
+  rewrite H2 in 3.
 
-destruct HnotUnique as [i' Hnot].
+  rewrite -le_pred_lt in 3.
+  help.
+  admit 2. (* Help. Je peux retirer cet element grace a l'element 1 *)
+ 
 
-admit. (* vrai car output@O(i) est donne dans 1 *)
-rewrite H in 2.
-
-use IH with tau' => //.
-(* on doit pouvoir supprimer 1 car il exists O(i0) dans la sequence qui donne le meme output *)
-admit.
-
-*)
-
-(* assert ((forall (i0:index), O(i0) < O(i) => (input@O(i) <> input@O(i0)))) as Hunique.
-admit. *)
-expand frame@O(i).
-fa 0.
-fa 1. fa 2. expand exec. fa 1.  expand cond. 
 expand output@O(i).
 fa 1.
-assert (exists i0: index, O(i0) < O(i) && input@O(i) = input@O(i0) ).
-admit.
+prf 1. (* Help. J'imagine qu'ici je dois faire prf pour m'en sortir mais alors la condition generee est toujours fause - a cause du premier element venant de l'imprecision dans le traiterement de la sequence - et du coup ne m'aide pas beaucoup. *)
+admit 1. (* Du coup, j'admets ce point car je ne crois pas que je vais pouvoir m'en sortir *)
 
 prf 1.
+admit 1. (* Help. Meme probleme que ci-dessus *)
 
-admit.
-
-(*
-expand output@O(i).
-fa 1.
+ 
+by apply IH.
 
 
-prf 1. 
-yesif 1; 2: fresh 1.
-simpl; split; project. split. intro i' H.
-by use Hunique with i'.
-by use Hunique with i'.
- intro i' H; try destruct H as [H|H].
-by use Hunique with i'.
-by use Hunique with i'.
- intro i' H. 
-destruct H as [H|H].
-destruct H as [H|H].
-destruct H as [H|H].
-destruct H as [H|H].
-    reach_equiv IH,pred(A(i')) => //.
-      intro Hf; by fresh Hf.
-    reach_equiv IH,pred(A(i')) => //.
-      intro Hf; by fresh Hf.
-    reach_equiv IH,pred(A(i')) => //.
-      intro Hf; by fresh Hf.
-    reach_equiv IH,pred(A(i')) => //.
-      intro Hf; by fresh Hf.
-    reach_equiv IH,pred(A(i')) => //.
-      intro Hf; by fresh Hf.
-intro i' H; try destruct H as [H|H].
-destruct H as [H|H].
-destruct H as [H|H].
-  reach_equiv IH,pred(A(i')) => //.
-      intro Hf; by fresh Hf.
-  reach_equiv IH,pred(A(i')) => //.
-      intro Hf; by fresh Hf.
-  reach_equiv IH,pred(A(i')) => //.
-      intro Hf; by fresh Hf.   
- reach_equiv IH,pred(A(i')) => //.
-      intro Hf; by fresh Hf.yesif 1.
-
-*)
   (* Tag *)
   expand frame@A(i). expand exec@A(i). expand cond@A(i). expand output@A(i).
   fa 0. fa 1. fa 1.
-   assert(seq(i0:index->(if O(i0) <= A(i) then output@O(i0))) = seq(i0:index->(if O(i0) <= pred(A(i)) then output@O(i0)))) as Hseq.
-admit. (* c'est ok car O(i0) = A(i) est impossible *)
-rewrite Hseq in *.
-  prf 1.
- yesif 1. 
+  rewrite le_lt in 2 => //.
+  rewrite -le_pred_lt in 2.
+  
+ prf 1.
+ yesif 1.
 repeat split; project; repeat split. 
-reach_equiv IH, A(i) => //.
-admit.
-admit.
+admit. (* J'ai l'impression que je pourrai faire "reach_equiv IH, A(i) => //." si O(i0) < A(i) ... bref si on avait la condition perdue dans le seq *)
+admit. (* comme ci-dessus - en fait c'est la meme chose - a cause du project *)
 
 intro i0 H.
 destruct H as [H|H].
-destruct H as [H|H].
-admit. 
+destruct H as [i1 H].
+destruct H as [H1 H2].
 reach_equiv IH, A(i) => //. intro Hf; by fresh Hf.
-admit.
-
-intro i0 H.
-destruct H as [H|H].
-destruct H as [H|H].
-admit. 
 reach_equiv IH, A(i) => //. intro Hf; by fresh Hf.
-admit.
 
 intro i0 H.
 destruct H as [H|H].
+destruct H as [i1 H].
+destruct H as [H1 H2].
+reach_equiv IH, A(i) => //. intro Hf; by fresh Hf.
+reach_equiv IH, A(i) => //. intro Hf; by fresh Hf.
+
+intro i0 H.
 destruct H as [H|H].
+destruct H as [i1 H].
+destruct H as [H1 H2].
 
     use non_repeating with A(i),A(i0) => //. by exists i.
     use non_repeating with A(i),A(i0) => //; by exists i.
 
-    use non_repeating with A(i),A(i0) => //. by exists i.
-
 intro i0 H.
 destruct H as [H|H].
-destruct H as [H|H].
+destruct H as [i1 H].
+destruct H as [H1 H2].
 
     use non_repeating with A(i),A(i0) => //; by exists i.
 
-    use non_repeating with A(i),A(i0) => //; by exists i.
     use non_repeating with A(i),A(i0) => //; by exists i.
 fresh 1.
 apply IH => //.
