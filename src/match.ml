@@ -258,6 +258,8 @@ type match_state = {
   ty_env   : Type.Infer.env;
   table    : Symbols.table;
   system   : SystemExpr.t;
+
+  use_fadup : bool;
 }
 
 (*------------------------------------------------------------------*)
@@ -286,6 +288,14 @@ type match_res =
 type f_map =
   eterm -> Vars.evars -> Term.message list -> [`Map of eterm | `Continue] 
 
+(** matching algorithm options *)
+type match_option = {
+  mode      : [`Eq | `EntailLR | `EntailRL];
+  use_fadup : bool;
+}
+
+let default_match_option = { mode = `Eq; use_fadup = false; }
+
 (** Module signature of matching.
     The type of term we match into is abstract. *)
 module type S = sig
@@ -309,7 +319,7 @@ module type S = sig
 
   val try_match :
     ?mv:Mvar.t ->
-    ?mode:[`Eq | `EntailLR | `EntailRL] ->
+    ?option:match_option ->
     Symbols.table ->
     SystemExpr.t ->
     t -> t pat ->
@@ -317,7 +327,7 @@ module type S = sig
 
   val try_match_term :
     ?mv:Mvar.t ->
-    ?mode:[`Eq | `EntailLR | `EntailRL] ->
+    ?option:match_option ->
     Symbols.table ->
     SystemExpr.t ->
     'a term -> 'b term pat ->
@@ -776,13 +786,13 @@ module T (* : S with type t = message *) = struct
   (** Exported *)
   let try_match_term : type a b.
     ?mv:Mvar.t ->
-    ?mode:[`Eq | `EntailLR | `EntailRL] ->
+    ?option:match_option ->
     Symbols.table ->
     SystemExpr.t ->
     a term -> b term pat -> 
     match_res
     =
-    fun ?mv ?mode table system t p ->
+    fun ?mv ?(option=default_match_option) table system t p ->
 
     (* Term matching ignores [mode]. Matching in [Equiv] does not. *)
 
@@ -803,7 +813,11 @@ module T (* : S with type t = message *) = struct
 
     let mv_init = odflt Mvar.empty mv in
     let st_init : match_state =
-      { bvs = Sv.empty; mv = mv_init; table; system; env; support; ty_env;}
+      { bvs = Sv.empty; 
+        mv = mv_init; 
+        table; system; env; support; ty_env; 
+        use_fadup = option.use_fadup; 
+      }
     in
 
     try
@@ -2013,11 +2027,10 @@ module E : S with type t = Equiv.form = struct
     (* if [st.support] is not empty, we cannot strengthen the invariant.
        See explanation in [mset_mem_one]. *)
     let mset_l =       
-      if not (Sv.is_empty st.support)
-      then []
-      else 
+      if Sv.is_empty st.support && st.use_fadup then                                  
         let msets = strengthen st.table st.system st.env pat_terms in
         msets_to_list msets
+      else []
     in
 
     if mset_l <> [] && Config.show_strengthened_hyp () then     
@@ -2093,7 +2106,7 @@ module E : S with type t = Equiv.form = struct
   (** Exported *)
   let try_match
       ?mv
-      ?(mode=`Eq)
+      ?(option=default_match_option)
       (table : Symbols.table)
       (system : SystemExpr.t)
       (t : t)
@@ -2116,9 +2129,12 @@ module E : S with type t = Equiv.form = struct
 
     let mv_init = odflt Mvar.empty mv in
     let st_init : match_state =
-      { bvs = Sv.empty; mv = mv_init; table; system; support; env; ty_env; }
+      { bvs = Sv.empty; 
+        mv = mv_init; 
+        table; system; support; env; ty_env; 
+        use_fadup = option.use_fadup; }
     in
-    let mode = match mode with
+    let mode = match option.mode with
       | `Eq -> `Eq
       | `EntailRL -> `Covar
       | `EntailLR -> `Contravar

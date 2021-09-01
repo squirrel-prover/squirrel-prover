@@ -1057,7 +1057,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     *
     * In local and global sequents, we can apply an hypothesis
     * to derive the goal or to derive the conclusion of an hypothesis.
-    * The former corresponds to [apply] below and the latter corresponds
+    * The former corresponds to [apply] below and the latter corresponds
     * to [apply_in].
     *
     * We impose in both that the hypotheses involved here are of the same
@@ -1067,16 +1067,17 @@ module MkCommonLowTac (S : Sequent.S) = struct
     * with other tactics that would have to generate global sequents
     * as premisses. *)
 
-  let apply (pat : S.conc_form Match.pat) (s : S.t) : S.t list =
+  let apply ~use_fadup (pat : S.conc_form Match.pat) (s : S.t) : S.t list =
     let subs, f = S.Conc.decompose_impls_last pat.pat_term in
 
     if not (Vars.Sv.subset pat.pat_vars (S.fv_conc f)) then
       soft_failure ApplyBadInst;
 
     let pat = { pat with pat_term = f } in
+    let option = Match.{ mode = `EntailRL; use_fadup } in
 
     (* Check that [pat] entails [S.goal s]. *)
-    match S.MatchF.try_match ~mode:`EntailRL 
+    match S.MatchF.try_match ~option
             (S.table s) (S.system s) 
             (S.goal s) pat 
     with
@@ -1095,8 +1096,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       E.g., if `H1 : A -> B` and `H2 : A` then `apply H1 in H2` replaces
       `H2 : A` by `H2 : B`. *)
-  let apply_in (pat : S.conc_form Match.pat) (hyp : Ident.t) (s : S.t)
-    : S.t list =
+  let apply_in
+      ~use_fadup
+      (pat : S.conc_form Match.pat) 
+      (hyp : Ident.t) 
+      (s : S.t) : S.t list 
+    =
     let fprems, fconcl = S.Conc.decompose_impls_last pat.pat_term in
 
     let h = Hyps.by_id hyp s in
@@ -1107,10 +1112,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
       if not (Vars.Sv.subset pat.pat_vars (S.fv_conc fprem)) then None
       else
         let pat = { pat with pat_term = fprem } in
-
+        let option = Match.{ 
+          mode = `EntailLR; 
+          use_fadup; } 
+        in
+        
         (* Check that [hconcl] entails [pat]. *)
         match
-          S.MatchF.try_match ~mode:`EntailLR (S.table s) (S.system s) hconcl pat 
+          S.MatchF.try_match ~option (S.table s) (S.system s) hconcl pat 
         with
         | NoMatch _ | FreeTyv -> None
         | Match mv -> Some mv
@@ -1151,30 +1160,42 @@ module MkCommonLowTac (S : Sequent.S) = struct
       [goal1]
 
 
+  (** for now, there is only one named optional arguments to `apply` *)
+  let p_apply_fadup_arg (nargs : Args.named_args) : bool =
+    match nargs with
+    | [Args.NArg L.{ pl_desc = "fadup" }] -> true
+    | (Args.NArg l) :: _ ->
+      hard_failure ~loc:(L.loc l) (Failure "unknown argument")
+    | [] -> false
+
   (** Parse apply tactic arguments. *)
-  let p_apply_args (args : Args.parser_arg list) (s : S.sequent) :
-    S.t list * S.conc_form Match.pat * target =
-    let subgoals, pat, in_opt =
+  let p_apply_args
+      (args : Args.parser_arg list) 
+      (s : S.sequent) : bool * S.conc_form Match.pat * target 
+    =
+    let nargs, pat, in_opt =
       match args with
-      | [Args.ApplyIn (Theory.PT_hol pt,in_opt)] ->
+      | [Args.ApplyIn (nargs, Theory.PT_hol pt,in_opt)] ->
         let _, pat = S.convert_pt_hol pt S.conc_kind s in
-        [], pat, in_opt
+        nargs, pat, in_opt
 
       | _ -> bad_args ()
     in
+
+    let use_fadup = p_apply_fadup_arg nargs in
 
     let target = match in_opt with
       | Some lsymb -> T_hyp (fst (Hyps.by_name lsymb s))
       | None       -> T_conc
     in
-    subgoals, pat, target
+    use_fadup, pat, target
 
 
   let apply_tac_args (args : Args.parser_arg list) s : S.t list =
-    let subgoals, pat, target = p_apply_args args s in
+    let use_fadup, pat, target = p_apply_args args s in
     match target with
-    | T_conc    -> subgoals @ apply pat s
-    | T_hyp id  -> subgoals @ apply_in pat id s 
+    | T_conc    -> apply    ~use_fadup pat s
+    | T_hyp id  -> apply_in ~use_fadup pat id s 
     | T_felem _ -> assert false
 
   let apply_tac args = wrap_fail (apply_tac_args args)

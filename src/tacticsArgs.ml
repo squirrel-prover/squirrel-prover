@@ -164,7 +164,15 @@ type ip_handler = [
   | `Var of Vars.evar (* Careful, the variable is not added to the env  *)
   | `Hyp of Ident.t
 ]
-  
+
+(*------------------------------------------------------------------*)
+(** {2 Tactics named args} *)
+
+type named_arg =
+  | NArg of lsymb               (** '~id' *)
+
+type named_args = named_arg list
+
 (*------------------------------------------------------------------*)
 (** {2 Tactics args} *)
 
@@ -177,7 +185,7 @@ type parser_arg =
   | AndOrPat    of and_or_pat
   | SimplPat    of simpl_pat
   | RewriteIn   of rw_arg list * in_target
-  | ApplyIn     of Theory.p_pt * apply_in
+  | ApplyIn     of named_args * Theory.p_pt * apply_in
   | SplitSeq    of int L.located * Theory.hterm
   | ConstSeq    of int L.located * Theory.term list
   | MemSeq      of int L.located * int L.located
@@ -199,7 +207,7 @@ let pp_parser_arg ppf = function
       (Fmt.list ~sep:Fmt.sp pp_rw_arg) rw_args
       pp_in_target in_opt
 
-  | ApplyIn (t, in_opt) ->
+  | ApplyIn (_, _, in_opt) ->
     Fmt.pf ppf "... %a" pp_apply_in in_opt
 
   | ConstSeq (i, t) -> 

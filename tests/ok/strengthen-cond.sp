@@ -50,7 +50,9 @@ global goal _ (t : timestamp):
     seq(pid:index -> SCtr(pid)@t)).
 Proof.
   intro Hap H.
-  apply H.
+
+ checkfail (apply H) exn ApplyMatchFailure.
+  apply ~fadup H.
 Qed.
 
 global goal _ (t : timestamp):
@@ -67,7 +69,7 @@ Proof.
   case t => Eq; 
   try (repeat destruct Eq as [_ Eq]; 
        rewrite /*;
-       by apply Hind (pred(t))).
+       by apply ~fadup Hind (pred(t))).
   
   by rewrite /* in 1. 
 
@@ -80,7 +82,7 @@ Proof.
   (* remove the undeducible term m(i) and check that we can conclude 
      without it. *)
   assert (m(i) = zero) as -> by admit.
-  by apply Hind (pred(t)).
+  by apply ~fadup Hind (pred(t)).
 Qed.
 
 global goal _ (t : timestamp):

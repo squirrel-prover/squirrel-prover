@@ -584,6 +584,15 @@ apply_arg:
       mk_abstract l "assert" (TacticsArgs.Theory p :: ip) }
 
 (*------------------------------------------------------------------*)
+/* tactics named arguments */
+
+named_arg:
+| TILDE l=lsymb { TacticsArgs.NArg l }
+
+named_args:
+| args=slist(named_arg, empty) { args }
+
+(*------------------------------------------------------------------*)
 tac:
   | LPAREN t=tac RPAREN                { t }
   | l=tac SEMICOLON r=tac              { T.AndThen [l;r] }
@@ -681,8 +690,8 @@ tac:
   | l=lloc(REWRITE) p=rw_args w=in_target
     { mk_abstract l "rewrite" [TacticsArgs.RewriteIn (p, w)] }
 
-  | l=lloc(APPLY) t=apply_arg w=apply_in
-    { mk_abstract l "apply" [TacticsArgs.ApplyIn (t, w)] }
+  | l=lloc(APPLY) a=named_args t=apply_arg w=apply_in
+    { mk_abstract l "apply" [TacticsArgs.ApplyIn (a, t, w)] }
 
   | l=lloc(SPLITSEQ) i=loc(INT) COLON LPAREN ht=hterm RPAREN 
     { mk_abstract l "splitseq" [TacticsArgs.SplitSeq (i, ht)] }

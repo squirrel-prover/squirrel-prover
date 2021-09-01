@@ -170,6 +170,8 @@
           "\\|" squirrel-operator-char-4
           "\\)"))
 
+(defvar squirrel-named-args "~[a-z][a-zA-Z_1-9]*\\|~[a-z][a-zA-Z_1-9]*:")
+
 (defface squirrel-tactics-closing-face
   (proof-face-specs
    (:foreground "red")
@@ -182,6 +184,7 @@
 
 (defvar squirrel-font-lock-keywords
   (list
+    (cons (concat squirrel-named-args)                    'font-lock-type-face)
     (cons (proof-ids-to-regexp squirrel-prog-keywords)    'font-lock-keyword-face)
     (cons (concat squirrel-operator-char-1234 "+")        'font-lock-type-face)
     (cons (concat squirrel-tactical-char "+")             'proof-tacticals-name-face)
@@ -195,7 +198,6 @@
     (cons (concat squirrel-operator-type-var)             'font-lock-variable-name-face)
 	)
 )
-
 
 (provide 'squirrel-syntax)
 

@@ -56,6 +56,14 @@ type f_map =
   Term.eterm -> Vars.evars -> Term.message list ->
   [`Map of Term.eterm | `Continue] 
 
+(** matching algorithm options *)
+type match_option = {
+  mode      : [`Eq | `EntailLR | `EntailRL];
+  use_fadup : bool;
+}
+
+val default_match_option : match_option
+
 (** Module signature of matching.
     We can only match a [Term.term] into a [Term.term] or a [Equiv.form].
     Hence, the type of term we match into is abstract.
@@ -89,7 +97,7 @@ module type S = sig
       - if [mode = `EntailRL] then [t = pθ] or [pθ ⇒ t] (boolean case). *)
   val try_match :
     ?mv:Mvar.t ->
-    ?mode:[`Eq | `EntailLR | `EntailRL] ->
+    ?option:match_option ->
     Symbols.table ->
     SystemExpr.t ->
     t -> t pat ->
@@ -98,7 +106,7 @@ module type S = sig
   (** Same as [try_match], but specialized for terms. *)
   val try_match_term :
     ?mv:Mvar.t ->
-    ?mode:[`Eq | `EntailLR | `EntailRL] ->
+    ?option:match_option ->
     Symbols.table ->
     SystemExpr.t ->
     'a Term.term -> 'b Term.term pat ->

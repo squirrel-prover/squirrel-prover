@@ -623,7 +623,7 @@ Proof.
        rewrite /* in 0;
        rewrite /AEAD in 1;
        rewrite le_lt // -le_pred_lt in 2;
-       by apply Hind (pred(t)))).
+       by apply ~fadup Hind (pred(t)))).
 
   (* init *)
   rewrite /*.
@@ -651,7 +651,7 @@ Proof.
   rewrite !len_pair len_diff in 2.
   namelength k(pid), k_dummy(pid) => -> /=.
   rewrite /* in 0.    
-  by apply Hind (pred(t)).
+  by apply ~fadup Hind (pred(t)).
 
   (* Write(pid, j) *)
   repeat destruct Eq as [_ Eq].
@@ -659,7 +659,7 @@ Proof.
   rewrite /AEAD in 1.
   fa 1.
   rewrite /* in 0. 
-  by apply Hind (pred(t)).
+  by apply ~fadup Hind (pred(t)).
 
   (* Decode(pid,j) *)
   repeat destruct Eq as [_ Eq].
@@ -677,7 +677,7 @@ Proof.
   rewrite /aead /otp in 1,2.
   fa 1. fa 1. fa 1. fa 1.
   memseq 1 6; 1: by exists pid; rewrite if_true.
-  by apply Hind (pred(t)).
+  by apply ~fadup Hind (pred(t)).
 
   (* Decode1(pid,j) *)
   repeat destruct Eq as [_ Eq].
@@ -690,7 +690,7 @@ Proof.
   rewrite /otp /aead.
   fa 1. fa 1. fa 1. fa 1. fa 1.
   memseq 1 5; 1: by exists pid; rewrite if_true.
-  by apply Hind (pred(t)).
+  by apply ~fadup Hind (pred(t)).
 Qed.
 
 (* The counter SCtr(j) strictly increases when t is an action Server performed by 
