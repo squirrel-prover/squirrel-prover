@@ -498,13 +498,15 @@ Proof.
   rewrite H2 in 3.
 
   rewrite -le_pred_lt in 3.
-  help.
-  admit 2. (* Help. Je peux retirer cet element grace a l'element 1 *)
+  constseq 2: (output@O(i)) zero.
+  intro i0.
+  case O(i) = O(i0).
+  intro Eq; left; by yesif. 
+  intro Neq; right; by noif.
  
-
-expand output@O(i).
-fa 1.
-prf 1. (* Help. J'imagine qu'ici je dois faire prf pour m'en sortir mais alors la condition generee est toujours fause - a cause du premier element venant de l'imprecision dans le traiterement de la sequence - et du coup ne m'aide pas beaucoup. *)
+  expand output@O(i).
+  fa 1.
+  prf 1. (* Help. J'imagine qu'ici je dois faire prf pour m'en sortir mais alors la condition generee est toujours fause - a cause du premier element venant de l'imprecision dans le traiterement de la sequence - et du coup ne m'aide pas beaucoup. *)
 admit 1. (* Du coup, j'admets ce point car je ne crois pas que je vais pouvoir m'en sortir *)
 
 prf 1.
@@ -522,9 +524,16 @@ by apply IH.
   
  prf 1.
  yesif 1.
-repeat split; project; repeat split. 
-admit. (* J'ai l'impression que je pourrai faire "reach_equiv IH, A(i) => //." si O(i0) < A(i) ... bref si on avait la condition perdue dans le seq *)
-admit. (* comme ci-dessus - en fait c'est la meme chose - a cause du project *)
+repeat split; project; repeat split.
+intro i0 H. 
+
+ (* Les deux admits ci-dessous pourraient disparaitre si on ameliore prf en presence du seq *)
+ 
+assert (O(i0) < A(i)) by admit.
+reach_equiv IH, A(i) => //. by fresh H.
+intro i0 H. 
+assert (O(i0) < A(i)) by admit.
+reach_equiv IH, A(i) => //. by fresh H.
 
 intro i0 H.
 destruct H as [H|H].
