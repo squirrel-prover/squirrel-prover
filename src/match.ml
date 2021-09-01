@@ -760,7 +760,7 @@ module T (* : S with type t = message *) = struct
          identical. *)
       | ETerm t' -> match cast (kind t) t' with
         | exception Uncastable -> no_match ()
-        (* TODO: alpha-equivalent *)
+        (* TODO: check convertible *) 
         | t' -> if t <> t' then no_match () else st.mv
 
   (* matches an atom *)
@@ -2094,11 +2094,11 @@ module E : S with type t = Equiv.form = struct
     | Atom (Equiv es), Atom (Equiv pat_es) ->
       tmatch_e ~mode es pat_es st
 
-    | Quant (q,es,t), Quant (q',es',t') ->
-      (* TODO: match under binders  *)
-      if q = q' && es = es' && t = t'
-      then st.mv
-      else no_match ()
+    | Quant (q,es,t), Quant (q',es',t') when q = q' ->
+      let s, s', st = match_bnds es es' st in
+      let t  = Equiv.subst s  t  in
+      let t' = Equiv.subst s' t' in
+      fmatch ~mode t t' st
 
     | _ -> no_match ()
 

@@ -1,5 +1,4 @@
-(** Extends {!LowTraceSequent} with functions relying on the {!Prover} module
-  * to access proved goals. *)
+(** Extends {!LowTraceSequent} with functions relying on the {!Prover} module. *)
 
 include LowTraceSequent
 
