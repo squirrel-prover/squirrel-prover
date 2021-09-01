@@ -167,11 +167,6 @@ Qed.
 
 (** The contents of the memory cell never repeats. *)
 
-
-(** An attempt at something simpler than non_repeating,
-    where we don't need to maintain the assumption (tau < A(i',_) <= tau')
-    when using the induction hypothesis. This allows to conclude
-    using collision in one case... but I'm stuck with the init cases. *)
 goal disjoint_chains :
   forall (tau',tau:timestamp,i',i:index) happens(tau',tau) =>
   i<>i' =>
@@ -245,22 +240,23 @@ Proof.
     use lastupdate_A with i',j,tau' as H; try auto.
     rewrite H in *; expand s(i')@A(i',j).
     prf 0; yesif 0; [2: by fresh 0].
-    simpl. intro i0 j0 HAi0.
-    assert i'=i0 || i'<>i0; try auto.
-    case H0.
+    simpl. intro j0 HAi0.
+(*    assert i'=i0 || i'<>i0; try auto.
+    case H0. *)
     use lastupdate with i',pred(A(i',j)) as [[H1 H2] | H1]; try auto.
     use H2 with j0 as H3; try auto.
     destruct H1 as [j1 [H1 H2 H3]].
     use monotonic_chain with pred(A(i',j)),pred(A(i',j0)),i',j1 => //.
     repeat split; try auto.
     use H3 with j0 as H4; try auto.
-    by use disjoint_chains with pred(A(i',j)),pred(A(i0,j0)),i',i0.
+    (*by use disjoint_chains with pred(A(i',j)),pred(A(i0,j0)),i',i0.*)
 
   (* Oracle *)
-  expandall. fa 0. fa 1. fa 1. fa 1.
+  expand frame.  fa 0. fa 1. fa 2. expand exec.  fa 1. expand cond. expand output. fa 1.
   prf 1; yesif 1; 2: fresh 1.
   simpl; split.
     intro j0 H; try destruct H as [H|H].
+
     apply unique_queries; auto.
     intro i0 j0.
     project.
@@ -278,6 +274,7 @@ Proof.
     reach_equiv IH,i0,A(i0,j0) => // Hf.
     by fresh Hf.
 
+
   (* Tag *)
   expand frame@A(i,j). expand exec@A(i,j). expand cond@A(i,j). expand output@A(i,j).
   fa 0. fa 1. fa 1.
@@ -287,7 +284,7 @@ Proof.
     reach_equiv IH,i,A(i,j) => // Hf; by fresh Hf.
     intro i0 j0 H.
     assert i=i0 || i<>i0; try auto.
-    case H0.
-    use monotonic_chain with A(i,j),A(i,j0),i,j => //.
+    case H0. 
+    by use monotonic_chain with A(i,j),A(i,j0),i,j => //.
     by use disjoint_chains with A(i,j),A(i0,j0),i,i0.
 Qed.
