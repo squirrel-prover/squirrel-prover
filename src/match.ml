@@ -1023,8 +1023,8 @@ let known_set_of_term (term : Term.message) : known_set =
 let known_set_of_term = Prof.mk_unary "known_set_of_term" known_set_of_term
 
 (*------------------------------------------------------------------*)
-module Mset : sig
-  (** Set of macros over some indices.
+module MCset : sig
+  (** Set of macros over some indices, with a conditional.
         [{ msymb   = m;
            indices = vars;
            cond_le = τ₀; }]
@@ -1122,15 +1122,15 @@ end = struct
 end    
 
 (** msets sorted in an association list *)
-type msets = (Term.mname * Mset.t list) list
+type msets = (Term.mname * MCset.t list) list
 
-let msets_to_list (msets : msets) : Mset.t list =
+let msets_to_list (msets : msets) : MCset.t list =
   List.concat_map (fun (_, l) -> l) msets
 
 (*------------------------------------------------------------------*)
 let pp_msets fmt (msets : msets) =
   let mset_l = msets_to_list msets in
-  Mset.pp_l fmt mset_l
+  MCset.pp_l fmt mset_l
 
 (*------------------------------------------------------------------*)
 let pp_cand_set pp_term fmt (cand : 'a cand_set_g) =
@@ -1223,7 +1223,7 @@ let refresh_known_set (known : known_set) : known_set =
     cond = Term.subst subst known.cond; }
 
 (*------------------------------------------------------------------*)
-let msets_add (mset : Mset.t) (msets : msets) : msets =
+let msets_add (mset : MCset.t) (msets : msets) : msets =
   let name = mset.msymb.s_symb in
   if List.mem_assoc name msets then
     List.assoc_up name (fun b -> mset :: b) msets
@@ -1231,7 +1231,7 @@ let msets_add (mset : Mset.t) (msets : msets) : msets =
 
 (** [mset_incl tbl system s1 s2] check if all terms in [s1] are
     members of [s2]. *)
-let mset_incl table system (s1 : Mset.t) (s2 : Mset.t) : bool
+let mset_incl table system (s1 : MCset.t) (s2 : MCset.t) : bool
   =
   let tv = Vars.make_new Type.Timestamp "t" in
   let term1 = Term.mk_macro s1.msymb [] (Term.mk_var tv) in
@@ -1265,7 +1265,7 @@ let msets_incl table system (msets1 : msets) (msets2 : msets) : bool =
 
 
 (** remove any set which is subsumed by some other set. *)
-let mset_list_simplify table system (msets : Mset.t list) : Mset.t list =
+let mset_list_simplify table system (msets : MCset.t list) : MCset.t list =
   let rec clear_entailed before after =
     match after with
     | [] -> List.rev before
@@ -1282,23 +1282,23 @@ let mset_list_simplify table system (msets : Mset.t list) : Mset.t list =
   in
   clear_entailed [] msets
 
-let mset_refresh env (mset : Mset.t) : Mset.t =
+let mset_refresh env (mset : MCset.t) : MCset.t =
   let indices, subst = Term.refresh_vars `Global mset.indices in
 
   let msymb = Term.subst_isymb subst mset.msymb in
   let cond_le = omap (Term.subst subst) mset.cond_le in
-  Mset.mk ~env ~msymb ~indices ~cond_le
+  MCset.mk ~env ~msymb ~indices ~cond_le
 
 (** applies a substitution `θ` to a mset, where `θ` can bind
     index variables which used to be universally quantified. *)
-let mset_subst env subst (mset : Mset.t) : Mset.t =
+let mset_subst env subst (mset : MCset.t) : MCset.t =
   let msymb = Term.subst_isymb subst mset.msymb in
   let indices = List.map (Term.subst_var subst) mset.indices in
   let cond_le = omap (Term.subst subst) mset.cond_le in
-  Mset.mk ~env ~msymb ~indices ~cond_le
+  MCset.mk ~env ~msymb ~indices ~cond_le
 
 (** Compute the intersection of two msets with the same condition. Exact. *)
-let mset_inter table env (s1 : Mset.t) (s2 : Mset.t) : Mset.t option =
+let mset_inter table env (s1 : MCset.t) (s2 : MCset.t) : MCset.t option =
   let s1, s2 = mset_refresh env s1, mset_refresh env s2 in
 
   let tv = Vars.make_new Type.Timestamp "t" in
@@ -1335,8 +1335,8 @@ let mset_list_inter
     (table : Symbols.table)
     (system : SystemExpr.t)
     (env : Sv.t)
-    (mset_l1 : Mset.t list)
-    (mset_l2 : Mset.t list) : Mset.t list
+    (mset_l1 : MCset.t list)
+    (mset_l2 : MCset.t list) : MCset.t list
   =
   let mset_l =
     List.fold_left (fun acc mset1 ->
@@ -1572,10 +1572,10 @@ module E : S with type t = Equiv.form = struct
         [terms, known_sets] for action [a] at time [a]. *)
     let filter_deduce_action
         (a : Symbols.action Symbols.t)
-        (cand : Mset.t)
+        (cand : MCset.t)
         (init_terms : known_sets)                   (* initial terms *)
         (known_sets : Term.timestamp -> known_sets) (* induction *)
-      : Mset.t list
+      : MCset.t list
       =
       (* we create the timestamp at which we are *)
       let i = Action.arity a table in
@@ -1611,14 +1611,16 @@ module E : S with type t = Equiv.form = struct
               let subst = Mvar.to_subst ~mode:`Unif ded_set.subst in
               let msymb = Term.subst_isymb subst cand.msymb in
               let indices = List.map (Term.subst_var subst) cand.indices in
-              let mset = Mset.mk ~env ~msymb ~indices ~cond_le:cand.cond_le in
+              let mset = MCset.mk ~env ~msymb ~indices ~cond_le:cand.cond_le in
 
               (* sanity check *)
-              assert (match ded_set.cond with 
-                  | Term.Atom (`Timestamp (`Leq, _, c)) ->
-                    Some c = cand.cond_le
-                  | Term.Fun (fs,_,_) -> None = cand.cond_le
-                  | _ -> false);
+              let () =
+                assert (match ded_set.cond with 
+                    | Term.Atom (`Timestamp (`Leq, _, c)) ->
+                      Some c = cand.cond_le
+                    | Term.Fun (fs,_,_) -> None = cand.cond_le
+                    | _ -> false)
+              in
 
               mset :: msets
             ) [] ded_sets
@@ -1666,10 +1668,10 @@ module E : S with type t = Equiv.form = struct
         (known : msets)           (* induction *)
       : msets
       =
-      let known : Mset.t list = msets_to_list known in
+      let known : MCset.t list = msets_to_list known in
 
       let known_sets (ts' : Term.timestamp) =
-        List.fold_left (fun (known_sets : known_sets) (mset : Mset.t) ->
+        List.fold_left (fun (known_sets : known_sets) (mset : MCset.t) ->
             let t = Vars.make_new Type.Timestamp "t" in
             let term = Term.mk_macro mset.msymb [] (Term.mk_var t) in
             let new_ks = 
@@ -1730,7 +1732,7 @@ module E : S with type t = Equiv.form = struct
                 Type.Boolean, []
             in
             let ms = Term.mk_isymb mn ty indices in
-            let mset = Mset.mk ~env ~msymb:ms ~indices ~cond_le in
+            let mset = MCset.mk ~env ~msymb:ms ~indices ~cond_le in
             msets_add mset msets
         ) [] table
     in
@@ -1848,7 +1850,7 @@ module E : S with type t = Equiv.form = struct
   (** Try to match [term] as an element the mset [mset]. *)
   let mset_mem_one
       (term : Term.message)
-      (mset : Mset.t)
+      (mset : MCset.t)
       (st   : match_state) : Mvar.t option
     =
     let ts = Vars.make_new Type.Timestamp "t" in
@@ -1901,7 +1903,7 @@ module E : S with type t = Equiv.form = struct
   (** Try to match [term] as an element of [msets]. *)
   let mset_mem
       (term   : Term.message)
-      (mset_l : Mset.t list)
+      (mset_l : MCset.t list)
       (st     : match_state) : Mvar.t option
     =
     List.find_map (fun elem -> mset_mem_one term elem st) mset_l
@@ -1978,7 +1980,7 @@ module E : S with type t = Equiv.form = struct
   let rec match_term_incl
       (term      : Term.message)
       (pat_terms : Term.message list)
-      (mset_l    : Mset.t list)
+      (mset_l    : MCset.t list)
       (st        : match_state) 
       (minfos    : match_infos) : Mvar.t * match_infos
     =
@@ -2000,7 +2002,7 @@ module E : S with type t = Equiv.form = struct
   and fa_match_term_incl
       (term      : Term.message)
       (pat_terms : Term.message list)
-      (mset_l    : Mset.t list)
+      (mset_l    : MCset.t list)
       (st        : match_state) 
       (minfos    : match_infos) : Mvar.t * match_infos
     =
@@ -2034,7 +2036,7 @@ module E : S with type t = Equiv.form = struct
     in
 
     if mset_l <> [] && Config.show_strengthened_hyp () then     
-      (dbg ~force:true) "strengthened hypothesis:@;%a@;" Mset.pp_l mset_l; 
+      (dbg ~force:true) "strengthened hypothesis:@;%a@;" MCset.pp_l mset_l; 
 
     let mv, minfos = 
       List.fold_left (fun (mv, minfos) term ->
