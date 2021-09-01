@@ -241,15 +241,12 @@ Proof.
     rewrite H in *; expand s(i')@A(i',j).
     prf 0; yesif 0; [2: by fresh 0].
     simpl. intro j0 HAi0.
-(*    assert i'=i0 || i'<>i0; try auto.
-    case H0. *)
     use lastupdate with i',pred(A(i',j)) as [[H1 H2] | H1]; try auto.
     use H2 with j0 as H3; try auto.
     destruct H1 as [j1 [H1 H2 H3]].
     use monotonic_chain with pred(A(i',j)),pred(A(i',j0)),i',j1 => //.
     repeat split; try auto.
     use H3 with j0 as H4; try auto.
-    (*by use disjoint_chains with pred(A(i',j)),pred(A(i0,j0)),i',i0.*)
 
   (* Oracle *)
   expand frame.  fa 0. fa 1. fa 2. expand exec.  fa 1. expand cond. expand output. fa 1.
