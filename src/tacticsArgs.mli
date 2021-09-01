@@ -35,7 +35,10 @@ type rw_item = [
 ] rw_item_g
 
 (** Expand item*)
-type expnd_item = [`Expand of Theory.term | `ExpandAll of Location.t] rw_item_g
+type expnd_item = [
+    `Expand of Theory.term
+  | `ExpandAll of Location.t
+] rw_item_g
 
 (** Rewrite argument, which is a rewrite or simplification item*)
 type rw_arg =

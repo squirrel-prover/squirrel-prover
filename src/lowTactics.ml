@@ -310,7 +310,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let expand_arg (targets : target list) (arg : Theory.term) (s : S.t) : S.t =
     let expand targs macro s =
       let found, s = expand targets macro s in
-      if not found then soft_failure (Failure "nothing to expand");      
+      if not found then
+        soft_failure ~loc:(L.loc arg) (Failure "nothing to expand");      
       s
     in
     
@@ -326,7 +327,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
         expand targets (`Mterm f) s 
 
       | _ ->
-        hard_failure (Tactics.Failure "expected a message term")
+        hard_failure ~loc:(L.loc arg)
+          (Tactics.Failure "expected a term of sort message")
 
   let expands (args : Theory.term list) (s : S.t) : S.t =
     List.fold_left (fun s arg -> expand_arg (target_all s) arg s) s args 
@@ -352,7 +354,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Rewriting types and functions} *)
 
   type rw_arg = 
-    | Rw_rw of Ident.t option * rw_erule
+    | Rw_rw of L.t * Ident.t option * rw_erule
     (* The ident is the ident of the hyp the rule came from (if any) *)
 
     | Rw_expand    of Theory.term
@@ -362,7 +364,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   
   (** [rewrite ~all tgt rw_args] rewrites [rw_arg] in [tgt].
       If [all] is true, then does not fail if no rewriting occurs. *)
-  let rewrite ~all 
+  let rewrite ~loc ~all 
       (targets: target list) 
       (rw : Args.rw_count * Ident.t option * rw_erule) 
       (s : S.sequent) 
@@ -371,7 +373,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let found1, cpt_occ = ref false, ref 0 in
     let check_max_rewriting () =
         if !cpt_occ > 1000 then   (* hard-coded *)
-          hard_failure (Failure "max nested rewriting reached (1000)");
+          hard_failure ~loc (Failure "max nested rewriting reached (1000)");
         incr cpt_occ;
         found1 := true;
     in
@@ -445,7 +447,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
         | (`Once | `Many), None -> 
           if not all 
-          then soft_failure Tactics.NothingToRewrite 
+          then soft_failure ~loc Tactics.NothingToRewrite 
           else f, !subs_r
 
         | (`Many | `Any), Some f -> 
@@ -476,21 +478,22 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     let s, subs = do_targets doit_tgt s targets in
 
-    if all && not !found1 then soft_failure Tactics.NothingToRewrite;
+    if all && not !found1 then soft_failure ~loc Tactics.NothingToRewrite;
 
     s, subs
 
   (** Parse rewrite tactic arguments as rewrite rules with possible subgoals 
       showing the rule validity. *)
   let p_rw_item (rw_arg : Args.rw_item) (s : S.t) : rw_earg * S.sequent list =
-    let p_rw_rule dir (p_pt : Theory.p_pt_hol) :
-      rw_erule * S.sequent list * Ident.t option = 
+    let p_rw_rule dir (p_pt : Theory.p_pt_hol) 
+      : rw_erule * S.sequent list * Ident.t option 
+      = 
       let ghyp, pat = S.convert_pt_hol p_pt Equiv.Local_t s in
       let id_opt = match ghyp with `Hyp id -> Some id | _ -> None in
-
+      
       (* We are using an hypothesis, hence no new sub-goals *)
       let premise = [] in
-
+      
       pat_to_rw_erule dir pat, premise, id_opt
     in
 
@@ -500,7 +503,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let dir = L.unloc rw_arg.rw_dir in
           (* (rewrite rule, subgols, hyp id) if applicable *)
           let rule, subgoals, id_opt = p_rw_rule dir f in
-          Rw_rw (id_opt, rule), subgoals
+          Rw_rw (f.p_pt_loc, id_opt, rule), subgoals
 
         | `Expand t -> 
           if L.unloc rw_arg.rw_dir <> `LeftToRight then
@@ -527,8 +530,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let (rw_c,rw_arg), subgoals = p_rw_item rw_item s in
 
     match rw_arg with
-    | Rw_rw (id, erule) -> 
-      let s, subs = rewrite ~all targets (rw_c, id, erule) s in
+    | Rw_rw (loc, id, erule) -> 
+      let s, subs = rewrite ~loc ~all targets (rw_c, id, erule) s in
       subgoals @                  (* prove rule *)
       subs @                      (* prove instances premisses *)
       [s]                         (* final sequent *)
@@ -835,7 +838,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
       let s = Hyps.remove id s in
       let pat = Match.pat_of_form f in
       let erule = Rewrite.pat_to_rw_erule ~loc (L.unloc dir) pat in
-      let s, subgoals = rewrite ~all:false [T_conc] (`Many, Some id, erule) s in
+      let s, subgoals = 
+        rewrite ~loc ~all:false [T_conc] (`Many, Some id, erule) s 
+      in
       subgoals @ [s]
 
     | `Var _, (Args.SAndOr _ | Args.Srewrite _) ->

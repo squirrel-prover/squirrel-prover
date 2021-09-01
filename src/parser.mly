@@ -555,12 +555,13 @@ sel_tacs:
 
 pt:
 | hid=lsymb args=slist(sterm,empty)
-    { { p_pt_hid = hid; p_pt_args = args} }
+    { let p_pt_loc = L.make $startpos $endpos in
+      { p_pt_hid = hid; p_pt_args = args; p_pt_loc; } }
 
 /* non-ambiguous pt */
 spt:
 | hid=lsymb
-    { Theory.{ p_pt_hid = hid; p_pt_args = []} }
+    { Theory.{ p_pt_hid = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
 | LPAREN pt=pt RPAREN
     { pt }
 
