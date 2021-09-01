@@ -253,7 +253,7 @@ let rec cterm_of_term : type a. a Term.term -> cterm = fun c ->
     cfun (F f) (List.length is) (is @ terms)
 
   | Macro (ms,l,ts) -> 
-    assert (l = []); (* TODO *)
+    assert (l = []); 
     let is = List.map cterm_of_var ms.s_indices in
     cfun
       (M (ms.s_symb, ms.s_typ))
@@ -1029,8 +1029,6 @@ module Unify = struct
         Memo.add memo (u,v) r;
         r
 
-  (* let unify_normed = Prof.mk_binary "unify_normed" unify_normed *)
-
   (* We normalize by constant equality rules before unifying.
       This is *not* modulo ACUN. *)
   let unify uf u v =
@@ -1251,7 +1249,6 @@ let rec term_grnd_normalize (state : state) (u : cterm) : cterm =
         | None -> u'
     else u'
 
-
 (** [term_e_normalize state u]
     Precondition: [u] must be ground and its xors grouped. *)
 let rec term_e_normalize state u = match u.cnt with
@@ -1282,6 +1279,7 @@ let normalize state u =
   fpt (=) (fun x -> term_uf_normalize state.uf x
                     |> term_grnd_normalize state
                     |> term_e_normalize state) u
+
 
 (* [normalize_cterm state u]
     Preconditions: [u] must be ground. *)

@@ -337,9 +337,10 @@ val find_app_terms : term -> string list -> string list
 
 (** Parser type for a formula built by partially applying an hypothesis 
     or a lemma *)
-type p_pt_hol = { 
-  p_pt_hid : lsymb;
-  p_pt_args : term list; 
+type p_pt_hol = {
+  p_pt_hid  : lsymb;
+  p_pt_args : term list;
+  p_pt_loc  : L.t;
 }
 
 (** Parser type for `apply` arguments *)

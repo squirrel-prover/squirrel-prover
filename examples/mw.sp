@@ -15,6 +15,7 @@ R --> T: id + H(<c1, nr, nt>,k)
 This is a "light" model without the last check of T.
 *******************************************************************************)
 set autoIntro=false.
+set timeout=4.
 
 hash H
 

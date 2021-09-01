@@ -35,7 +35,10 @@ type rw_item = [
 ] rw_item_g
 
 (** Expand item*)
-type expnd_item = [`Expand of Theory.term | `ExpandAll of Location.t] rw_item_g
+type expnd_item = [
+    `Expand of Theory.term
+  | `ExpandAll of Location.t
+] rw_item_g
 
 (** Rewrite argument, which is a rewrite or simplification item*)
 type rw_arg =
@@ -92,6 +95,14 @@ type ip_handler = [
 ]
 
 (*------------------------------------------------------------------*)
+(** {2 Tactics named arguments} *)
+
+type named_arg =
+  | NArg of lsymb               (** '~id' *)
+
+type named_args = named_arg list
+
+(*------------------------------------------------------------------*)
 (** {2 Tactic arguments types} *)
 
 type boolean = [`Boolean]
@@ -107,7 +118,7 @@ type parser_arg =
   | AndOrPat    of and_or_pat
   | SimplPat    of simpl_pat
   | RewriteIn   of rw_arg list * in_target
-  | ApplyIn     of Theory.p_pt * apply_in
+  | ApplyIn     of named_args * Theory.p_pt * apply_in
   | SplitSeq    of int L.located * Theory.hterm
   | ConstSeq    of int L.located * Theory.term list
   | MemSeq      of int L.located * int L.located

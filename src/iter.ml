@@ -572,6 +572,20 @@ module Mset : sig
     msymb:Term.msymb ->
     indices:(Vars.index list) ->
     t 
+
+  val pp   : Format.formatter -> t      -> unit
+  val pp_l : Format.formatter -> t list -> unit
+
+  (** Compute the lub of two msets (w.r.t set inclusion).
+      Must be called on sets with the same macro symbol. *)
+  val join : t -> t -> t
+
+  (** [mset_incl tbl system s1 s2] check if all terms in [s1] are
+      members of [s2]. *)
+  val incl : Symbols.table -> SystemExpr.t -> t -> t -> bool
+
+  (** simpl mset builder, when the macro symbol is not indexed. *)
+  val mk_simple : Symbols.macro Symbols.t -> Type.tmessage -> t 
 end = struct
   type t = {
     msymb   : Term.msymb;
@@ -584,170 +598,184 @@ end = struct
       List.map (fun ev -> Vars.ecast ev Type.KIndex) (Sv.elements indices)
     in
     { msymb; indices }
+
+
+  let pp fmt (mset : t) =
+    let vars = List.map Vars.evar mset.indices in
+
+    Fmt.pf fmt "@[<hv 2>{ @[%a@]@@_ |@ %a}@]"
+      Term.pp_msymb mset.msymb
+      (Fmt.list ~sep:Fmt.comma Vars.pp_e) vars
+
+  let pp_l fmt (mset_l : t list) =
+    Fmt.pf fmt "@[<v 0>%a@]"
+      (Fmt.list ~sep:Fmt.sp pp) mset_l
+
+
+  (** Compute the lub of two msets (w.r.t set inclusion).
+      Must be called on sets with the same macro symbol. 
+
+      A mset is a set of terms of the form:
+         [\{m(i₁, ..., iₙ)@τ | ∀ vars, τ \}]
+      where [m] is a macro symbol, [τ] is a timestamp variable, and
+      [i₁,...,iₙ] are not necessarily distinct index variables that can appear
+      in [vars], but don't have to.
+
+      Alternatively, a mset is a set of terms of the form:
+
+         [\{m(j₁, ..., jₖ)@τ | ∀ j₁, ..., jₖ s.t. 
+                                j₁, ..., jₖ ⊢ E₁, ..., Eₙ ∧ ∀ τ \}]
+
+      where [j₁, ..., jₖ] are *distinct* index variables, and [E₁, ..., Eₙ]
+      are equalities between index variables (not necessarily all in
+      [j₁, ..., jₖ]).
+      Such a set is fully characterized by the symbol [m] (which fixes the  
+      arity [k]), and by the equalities [E₁, ..., Eₙ].
+
+      Hence, given two such sets [S] and [S'] characterized by
+      ([m], [E₁, ..., Eₙ]) and ([m], [F₁, ..., Fₘ]) (note the same macro symbol), 
+      the least upper bound (among msets, w.r.t. set inclusion) [Sₗ] of 
+      [S ∪ S'] is the macro set characterized by [G₁, ..., Gₗ] where: 
+
+      [\{G₁, ..., Gₗ\} = \{ G | E₁, ..., Eₙ ⊢ G ∧ F₁, ..., Fₘ ⊢ G\}]
+
+      The algorithm below is based on that observation. Of course, we do not 
+      test all equalities [G] (there are too many of them). Essentially, we 
+      check a complete base of such equalities, which fully characterize [Sₗ].
+  *)
+  let join (a : t) (b : t) : t = 
+    let a_ms, b_ms = a.msymb, b.msymb in
+    assert (a_ms.s_symb = b_ms.s_symb);
+
+    let l = List.length a_ms.s_indices in
+    (* [arr] will be the vector of indices of the macro symbol we 
+       are building *)
+    let arr = Array.make l None in
+
+    (* index variable universally quantified in the final set *)
+    let indices_r = ref [] in
+
+    (* we fill [arr], while keeping [indices_r] updated *)
+    Array.iteri (fun i cnt ->
+        match cnt with
+        | Some _ -> ()        (* already filled, nothing to do *)
+        | None ->
+          let v_a = List.nth a_ms.s_indices i in
+          let v_b = List.nth b_ms.s_indices i in
+
+          let univ_var, v = 
+            match List.mem v_a a.indices, List.mem v_b b.indices with
+            | false, false ->   
+              (* [v_a] and [v_b] are constant w.r.t., resp., [a] and [b]
+                 In that case: 
+                 - if [v_a] = [v_b] then we use [v_a] 
+                 - otherwise, we must use a fresh universally quantified var. *)
+              if v_a = v_b
+              then false, v_a
+              else true, Vars.make_new Type.Index "i" 
+
+            (* [v_a] or [v_b] is not a constant.
+               In that case, use a universally quantified variable. *)
+            | true, _ -> true, Vars.make_new_from v_a 
+            | _, true -> true, Vars.make_new_from v_b
+          in
+
+          (* update [indices_r] *)
+          indices_r := if univ_var then v :: !indices_r else !indices_r;
+
+          List.iteri2 (fun j u_a u_b -> 
+              if u_a = v_a && u_b = v_b then begin
+                assert (Array.get arr j = None);
+                Array.set arr j (Some v)
+              end
+            ) a_ms.s_indices b_ms.s_indices
+      ) arr;
+
+    let join_is = Array.fold_right (fun a acc -> oget a :: acc) arr [] in
+    let join_ms = Term.mk_isymb a_ms.s_symb a_ms.s_typ join_is in
+    mk ~env:Sv.empty ~msymb:join_ms ~indices:(!indices_r)
+
+  let incl table system (s1 : t) (s2 : t) : bool
+    =
+    let tv = Vars.make_new Type.Timestamp "t" in
+    let term1 = Term.mk_macro s1.msymb [] (Term.mk_var tv) in
+    let term2 = Term.mk_macro s2.msymb [] (Term.mk_var tv) in
+
+    let pat2 =
+      Match.{ pat_term = term2;
+              pat_tyvars = [];
+              pat_vars = Sv.of_list1 s2.indices;}
+    in
+    match Match.T.try_match table system term1 pat2 with
+    | Match _ -> true
+    | FreeTyv | NoMatch _ -> false
+
+  let mk_simple (m : Symbols.macro Symbols.t) ty : t = 
+    let msymb = Term.mk_isymb m ty [] in
+    mk ~env:Sv.empty ~msymb ~indices:[]
 end    
 
-let pp_mset fmt (mset : Mset.t) =
-  let vars = List.map Vars.evar mset.indices in
+module MsetAbs : sig
+  (** abstract value containing one mset per macro symbol. *)
+  type t = (Term.mname * Mset.t) list
 
-  Fmt.pf fmt "@[<hv 2>{ @[%a@]@@_ |@ %a}@]"
-    Term.pp_msymb mset.msymb
-    (Fmt.list ~sep:Fmt.comma Vars.pp_e) vars
+  val pp : Format.formatter -> t -> unit
 
-let pp_mset_l fmt (mset_l : Mset.t list) =
-  Fmt.pf fmt "@[<v 0>%a@]"
-    (Fmt.list ~sep:Fmt.sp pp_mset) mset_l
+  (** join a single [mset] into an full abstract value. *)
+  val join_single : Mset.t -> t -> t
 
+  (** join operator. *)
+  val join : t -> t -> t
 
-(** Compute the lub of two msets (w.r.t set inclusion).
-    Must be called on sets with the same macro symbol. 
+  (** [incl abs1 abs2] checks if [abs1 ⊆ abs2]. *)
+  val incl : Symbols.table -> SystemExpr.t -> t -> t -> bool
 
-    A mset is a set of terms of the form:
-       [\{m(i₁, ..., iₙ)@τ | ∀ vars, τ \}]
-    where [m] is a macro symbol, [τ] is a timestamp variable, and
-    [i₁,...,iₙ] are not necessarily distinct index variables that can appear
-    in [vars], but don't have to.
+  (** [diff abs1 abs2] over-approximates [abs1 \ abs2]. *)
+  val diff : Symbols.table -> SystemExpr.t -> t -> t -> t
+end = struct
+  type t = (Term.mname * Mset.t) list
 
-    Alternatively, a mset is a set of terms of the form:
-       [\{m(j₁, ..., jₖ)@τ | ∀ j₁, ..., jₖ s.t. j₁, ..., jₖ ⊢ E₁, ..., Eₙ ∧
-                             ∀ τ \}]
-    where [j₁, ..., jₖ] are *distinct* index variables, and [E₁, ..., Eₙ]
-    are equalities between index variables (not necessarily all in [j₁, ..., jₖ]).
-    Such a set is fully characterized by the symbol [m] (which fixes the  
-    arity [k]), and by the equalities [E₁, ..., Eₙ].
+  let pp fmt (abs : t) : unit =
+    let pp_one fmt (mname, mset) = 
+      Fmt.pf fmt "@[<h>%a: %a@]" Symbols.pp mname Mset.pp mset
+    in
+    Fmt.pf fmt "@[<v 0>%a@]" (Fmt.list ~sep:Fmt.cut pp_one) abs
 
-    Hence, given two such sets [S] and [S'] characterized by ([m], [E₁, ..., Eₙ])
-    and ([m], [F₁, ..., Fₘ]) (note the same macro symbol), the least upper bound
-    (among msets, w.r.t. set inclusion) [Sₗ] of [S ∪ S'] is the macro set
-    characterized by [G₁, ..., Gₗ] where: 
-    [\{G₁, ..., Gₗ\} = \{ G | E₁, ..., Eₙ ⊢ G ∧ F₁, ..., Fₘ ⊢ G\}]
+  let join_single (mset : Mset.t) (msets : t) : t =
+    let name = mset.msymb.s_symb in 
+    if List.mem_assoc name msets then
+      List.assoc_up name (fun b -> Mset.join mset b) msets
+    else (name, mset) :: msets
 
-    The algorithm below is based on that observation. Of course, we do not test 
-    all equalities [G] (there are too many of them). Essentially, we check a 
-    complete base of such equalities, which fully characterize [Sₗ].
-*)
-let mset_join (a : Mset.t) (b : Mset.t) : Mset.t = 
-  let a_ms, b_ms = a.msymb, b.msymb in
-  assert (a_ms.s_symb = b_ms.s_symb);
+  let join (abs1 : t) (abs2 : t) : t =
+    List.fold_left (fun abs (_, mset) -> join_single mset abs) abs1 abs2
 
-  let l = List.length a_ms.s_indices in
-  (* [arr] will be the vector of indices of the macro symbol we 
-     are building *)
-  let arr = Array.make l None in
+  let incl 
+      (table  : Symbols.table)
+      (system : SystemExpr.t)
+      (abs1   : t) 
+      (abs2   : t) : bool
+    =
+    List.for_all (fun (mn, m1) ->
+        try 
+          let m2 = List.assoc mn abs2 in
+          Mset.incl table system m1 m2
+        with Not_found -> false
+      ) abs1
 
-  (* index variable universally quantified in the final set *)
-  let indices_r = ref [] in
-
-  (* we fill [arr], while keeping [indices_r] updated *)
-  Array.iteri (fun i cnt ->
-      match cnt with
-      | Some _ -> ()        (* already filled, nothing to do *)
-      | None ->
-        let v_a = List.nth a_ms.s_indices i in
-        let v_b = List.nth b_ms.s_indices i in
-
-        let univ_var, v = 
-          match List.mem v_a a.indices, List.mem v_b b.indices with
-          | false, false ->   
-            (* [v_a] and [v_b] are constant w.r.t., resp., [a] and [b]
-               In that case: 
-               - if [v_a] = [v_b] then we use [v_a] 
-               - otherwise, we must use a fresh universally quantified var. *)
-            if v_a = v_b
-            then false, v_a
-            else true, Vars.make_new Type.Index "i" 
-
-          (* [v_a] or [v_b] is not a constant.
-             In that case, use a universally quantified variable. *)
-          | true, _ -> true, Vars.make_new_from v_a 
-          | _, true -> true, Vars.make_new_from v_b
-        in
-
-        (* update [indices_r] *)
-        indices_r := if univ_var then v :: !indices_r else !indices_r;
-
-        List.iteri2 (fun j u_a u_b -> 
-            if u_a = v_a && u_b = v_b then begin
-              assert (Array.get arr j = None);
-              Array.set arr j (Some v)
-            end
-          ) a_ms.s_indices b_ms.s_indices
-    ) arr;
-
-  let join_is = Array.fold_right (fun a acc -> oget a :: acc) arr [] in
-  let join_ms = Term.mk_isymb a_ms.s_symb a_ms.s_typ join_is in
-  Mset.mk ~env:Sv.empty ~msymb:join_ms ~indices:(!indices_r)
-
-(** [mset_incl tbl system s1 s2] check if all terms in [s1] are
-    members of [s2]. *)
-let mset_incl table system (s1 : Mset.t) (s2 : Mset.t) : bool
-  =
-  let tv = Vars.make_new Type.Timestamp "t" in
-  let term1 = Term.mk_macro s1.msymb [] (Term.mk_var tv) in
-  let term2 = Term.mk_macro s2.msymb [] (Term.mk_var tv) in
-
-  let pat2 =
-    Match.{ pat_term = term2;
-            pat_tyvars = [];
-            pat_vars = Sv.of_list1 s2.indices;}
-  in
-  match Match.T.try_match table system term1 pat2 with
-  | Match _ -> true
-  | FreeTyv | NoMatch _ -> false
-
-
-(** simpl mset builder, when the macro symbol is not indexed. *)
-let simple_mset (m : Symbols.macro Symbols.t) ty : Mset.t = 
-  let msymb = Term.mk_isymb m ty [] in
-  Mset.mk ~env:Sv.empty ~msymb ~indices:[]
-
-(** abstract value containing one mset per macro symbol. *)
-type msets_abs = (Term.mname * Mset.t) list
-
-let pp_msets_abs fmt (abs : msets_abs) : unit =
-  let pp_one fmt (mname, mset) = 
-    Fmt.pf fmt "@[<h>%a: %a@]" Symbols.pp mname pp_mset mset
-  in
-  Fmt.pf fmt "@[<v 0>%a@]" (Fmt.list ~sep:Fmt.cut pp_one) abs
-
-(** join a single [mset] into an full abstract value. *)
-let msets_abs_join_single (mset : Mset.t) (msets : msets_abs) : msets_abs =
-  let name = mset.msymb.s_symb in 
-  if List.mem_assoc name msets then
-    List.assoc_up name (fun b -> mset_join mset b) msets
-  else (name, mset) :: msets
-
-(** join operator. *)
-let msets_abs_join (abs1 : msets_abs) (abs2 : msets_abs) : msets_abs =
-  List.fold_left (fun abs (_, mset) -> msets_abs_join_single mset abs) abs1 abs2
-
-(** [msets_abs_incl abs1 abs2] checks if [abs1 ⊆ abs2]. *)
-let msets_abs_incl 
-    (table : Symbols.table)
-    (system : SystemExpr.t)
-    (abs1 : msets_abs) 
-    (abs2 : msets_abs) : bool
-  =
-  List.for_all (fun (mn, m1) ->
-      try 
-        let m2 = List.assoc mn abs2 in
-        mset_incl table system m1 m2
-      with Not_found -> false
-    ) abs1
-
-(** [msets_abs_incl abs1 abs2] over-approximates [abs1 \ abs2]. *)
-let msets_abs_diff
-    (table : Symbols.table)
-    (system : SystemExpr.t)
-    (abs1 : msets_abs) 
-    (abs2 : msets_abs) : msets_abs
-  =
-  List.filter (fun (mn, m1) ->
-      try 
-        let m2 = List.assoc mn abs2 in
-        not (mset_incl table system m1 m2)
-      with Not_found -> true
-    ) abs1
-  
+  let diff
+      (table  : Symbols.table)
+      (system : SystemExpr.t)
+      (abs1   : t) 
+      (abs2   : t) : t
+    =
+    List.filter (fun (mn, m1) ->
+        try 
+          let m2 = List.assoc mn abs2 in
+          not (Mset.incl table system m1 m2)
+        with Not_found -> true
+      ) abs1
+end
 
 (*------------------------------------------------------------------*)
 (** Return an over-approximation of the the macros reachable from a term
@@ -756,40 +784,40 @@ let macro_support : type a.
   env:Sv.t ->
   Constr.trace_cntxt ->
   a Term.term ->
-  msets_abs
+  MsetAbs.t
   =
   fun ~env cntxt term ->
   let get_msymbs : type a. 
-    mode:[`Delta | `FullDelta ] -> a Term.term -> msets_abs
+    mode:[`Delta | `FullDelta ] -> a Term.term -> MsetAbs.t
     = fun ~mode term ->
       let occs = get_macro_occs ~mode cntxt term in
       let msets = List.map (fun occ -> 
           let indices = occ.occ_cnt.Term.s_indices in
           Mset.mk ~env ~msymb:occ.occ_cnt ~indices) occs 
       in
-      List.fold_left (fun abs mset -> msets_abs_join_single mset abs) [] msets 
+      List.fold_left (fun abs mset -> MsetAbs.join_single mset abs) [] msets 
   in
 
   let init = get_msymbs ~mode:`FullDelta term in
   
-  let do1 (sm : msets_abs) =
+  let do1 (sm : MsetAbs.t) =
     (* special cases for Input, Frame and Exec, since they do not appear in the
        action descriptions. *)
     let sm = 
       if List.mem_assoc Symbols.inp sm 
-      then msets_abs_join_single (simple_mset Symbols.frame Type.Message) sm 
+      then MsetAbs.join_single (Mset.mk_simple Symbols.frame Type.Message) sm 
       else sm 
     in
     let sm =
       if List.mem_assoc Symbols.frame sm
       then 
-        msets_abs_join_single (simple_mset Symbols.exec Type.Boolean)
-          (msets_abs_join_single (simple_mset Symbols.out Type.Message) sm)
+        MsetAbs.join_single (Mset.mk_simple Symbols.exec Type.Boolean)
+          (MsetAbs.join_single (Mset.mk_simple Symbols.out Type.Message) sm)
       else sm
     in
     let sm =
       if List.mem_assoc Symbols.exec sm
-      then msets_abs_join_single (simple_mset Symbols.cond Type.Boolean) sm
+      then MsetAbs.join_single (Mset.mk_simple Symbols.cond Type.Boolean) sm
       else sm
     in
 
@@ -806,14 +834,14 @@ let macro_support : type a.
               in
               let t = Term.subst subst t in
 
-              msets_abs_join (get_msymbs ~mode:`Delta t) sm
+              MsetAbs.join (get_msymbs ~mode:`Delta t) sm
 
             else sm
           ) cntxt.table cntxt.system descr sm
       ) cntxt.table cntxt.system sm
   in
 
-  let abs_incl = msets_abs_incl cntxt.table cntxt.system in
+  let abs_incl = MsetAbs.incl cntxt.table cntxt.system in
 
   (* reachable macros from [init] *)
   let s_reach = Utils.fpt abs_incl do1 init in
@@ -836,7 +864,7 @@ let macro_support : type a.
 
   (* we remove from [s_reach] all global macros reachable from non-global
      macros in [s_reach] *)
-  msets_abs_diff cntxt.table cntxt.system s_reach s_reach'_glob
+  MsetAbs.diff cntxt.table cntxt.system s_reach s_reach'_glob
 
 
 (** An indirect occurrence of a macro term, used as return type of 
@@ -884,19 +912,19 @@ let _fold_macro_support
   let env = Vars.to_set env in
 
   (* association list of terms and their macro support *)
-  let sm : (Term.message * msets_abs) list = 
+  let sm : (Term.message * MsetAbs.t) list = 
     List.map (fun src -> (src, macro_support ~env cntxt src)) terms 
   in
 
   (* reversing the association map: we want to map macros to 
      pairs of possible sources and macro set *)
   let macro_occs : (Term.message list * Mset.t) Ms.t = 
-    List.fold_left (fun macro_occs ((src, src_macros) : Term.message * msets_abs) ->
+    List.fold_left (fun macro_occs ((src, src_macros) : Term.message * MsetAbs.t) ->
         List.fold_left (fun macro_occs (src_macro, mset) -> 
             if Ms.mem src_macro macro_occs 
             then
               let srcs, mset' = Ms.find src_macro macro_occs in
-              let new_mset = mset_join mset mset' in
+              let new_mset = Mset.join mset mset' in
               Ms.add src_macro (src :: srcs, new_mset) macro_occs
             else Ms.add src_macro ([src], mset) macro_occs
           ) macro_occs src_macros 

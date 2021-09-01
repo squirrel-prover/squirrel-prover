@@ -156,7 +156,7 @@ let rec reset_state n =
     ( p.prover_mode, p.table )
   | _::q, n -> proof_states_history := q; reset_state (n-1)
 
-
+(*------------------------------------------------------------------*)
 (** Options Management **)
 
 exception Option_already_defined
@@ -215,6 +215,7 @@ let pp_help fmt (th, tac_name) =
  in
   Format.pp_print_text fmt res_string
 
+(*------------------------------------------------------------------*)
 (** Basic tactic tables, without registration *)
 
 module Table : sig

@@ -17,6 +17,7 @@ induction over sequences to complete the proof.
 *******************************************************************************)
 (* set debugTactics=true. *)
 set autoIntro=false.
+set timeout=4.
 
 hash H
 

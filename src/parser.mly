@@ -555,12 +555,13 @@ sel_tacs:
 
 pt:
 | hid=lsymb args=slist(sterm,empty)
-    { { p_pt_hid = hid; p_pt_args = args} }
+    { let p_pt_loc = L.make $startpos $endpos in
+      { p_pt_hid = hid; p_pt_args = args; p_pt_loc; } }
 
 /* non-ambiguous pt */
 spt:
 | hid=lsymb
-    { Theory.{ p_pt_hid = hid; p_pt_args = []} }
+    { Theory.{ p_pt_hid = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
 | LPAREN pt=pt RPAREN
     { pt }
 
@@ -582,6 +583,15 @@ apply_arg:
         | None -> []
         | Some ip -> [TacticsArgs.SimplPat ip] in
       mk_abstract l "assert" (TacticsArgs.Theory p :: ip) }
+
+(*------------------------------------------------------------------*)
+/* tactics named arguments */
+
+named_arg:
+| TILDE l=lsymb { TacticsArgs.NArg l }
+
+named_args:
+| args=slist(named_arg, empty) { args }
 
 (*------------------------------------------------------------------*)
 tac:
@@ -681,8 +691,8 @@ tac:
   | l=lloc(REWRITE) p=rw_args w=in_target
     { mk_abstract l "rewrite" [TacticsArgs.RewriteIn (p, w)] }
 
-  | l=lloc(APPLY) t=apply_arg w=apply_in
-    { mk_abstract l "apply" [TacticsArgs.ApplyIn (t, w)] }
+  | l=lloc(APPLY) a=named_args t=apply_arg w=apply_in
+    { mk_abstract l "apply" [TacticsArgs.ApplyIn (a, t, w)] }
 
   | l=lloc(SPLITSEQ) i=loc(INT) COLON LPAREN ht=hterm RPAREN 
     { mk_abstract l "splitseq" [TacticsArgs.SplitSeq (i, ht)] }

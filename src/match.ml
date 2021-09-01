@@ -258,6 +258,8 @@ type match_state = {
   ty_env   : Type.Infer.env;
   table    : Symbols.table;
   system   : SystemExpr.t;
+
+  use_fadup : bool;
 }
 
 (*------------------------------------------------------------------*)
@@ -286,6 +288,14 @@ type match_res =
 type f_map =
   eterm -> Vars.evars -> Term.message list -> [`Map of eterm | `Continue] 
 
+(** matching algorithm options *)
+type match_option = {
+  mode      : [`Eq | `EntailLR | `EntailRL];
+  use_fadup : bool;
+}
+
+let default_match_option = { mode = `Eq; use_fadup = false; }
+
 (** Module signature of matching.
     The type of term we match into is abstract. *)
 module type S = sig
@@ -309,7 +319,7 @@ module type S = sig
 
   val try_match :
     ?mv:Mvar.t ->
-    ?mode:[`Eq | `EntailLR | `EntailRL] ->
+    ?option:match_option ->
     Symbols.table ->
     SystemExpr.t ->
     t -> t pat ->
@@ -317,7 +327,7 @@ module type S = sig
 
   val try_match_term :
     ?mv:Mvar.t ->
-    ?mode:[`Eq | `EntailLR | `EntailRL] ->
+    ?option:match_option ->
     Symbols.table ->
     SystemExpr.t ->
     'a term -> 'b term pat ->
@@ -750,7 +760,7 @@ module T (* : S with type t = message *) = struct
          identical. *)
       | ETerm t' -> match cast (kind t) t' with
         | exception Uncastable -> no_match ()
-        (* TODO: alpha-equivalent *)
+        (* TODO: check convertible *) 
         | t' -> if t <> t' then no_match () else st.mv
 
   (* matches an atom *)
@@ -776,13 +786,13 @@ module T (* : S with type t = message *) = struct
   (** Exported *)
   let try_match_term : type a b.
     ?mv:Mvar.t ->
-    ?mode:[`Eq | `EntailLR | `EntailRL] ->
+    ?option:match_option ->
     Symbols.table ->
     SystemExpr.t ->
     a term -> b term pat -> 
     match_res
     =
-    fun ?mv ?mode table system t p ->
+    fun ?mv ?(option=default_match_option) table system t p ->
 
     (* Term matching ignores [mode]. Matching in [Equiv] does not. *)
 
@@ -803,7 +813,11 @@ module T (* : S with type t = message *) = struct
 
     let mv_init = odflt Mvar.empty mv in
     let st_init : match_state =
-      { bvs = Sv.empty; mv = mv_init; table; system; env; support; ty_env;}
+      { bvs = Sv.empty; 
+        mv = mv_init; 
+        table; system; env; support; ty_env; 
+        use_fadup = option.use_fadup; 
+      }
     in
 
     try
@@ -1009,8 +1023,8 @@ let known_set_of_term (term : Term.message) : known_set =
 let known_set_of_term = Prof.mk_unary "known_set_of_term" known_set_of_term
 
 (*------------------------------------------------------------------*)
-module Mset : sig
-  (** Set of macros over some indices.
+module MCset : sig
+  (** Set of macros over some indices, with a conditional.
         [{ msymb   = m;
            indices = vars;
            cond_le = τ₀; }]
@@ -1108,15 +1122,15 @@ end = struct
 end    
 
 (** msets sorted in an association list *)
-type msets = (Term.mname * Mset.t list) list
+type msets = (Term.mname * MCset.t list) list
 
-let msets_to_list (msets : msets) : Mset.t list =
+let msets_to_list (msets : msets) : MCset.t list =
   List.concat_map (fun (_, l) -> l) msets
 
 (*------------------------------------------------------------------*)
 let pp_msets fmt (msets : msets) =
   let mset_l = msets_to_list msets in
-  Mset.pp_l fmt mset_l
+  MCset.pp_l fmt mset_l
 
 (*------------------------------------------------------------------*)
 let pp_cand_set pp_term fmt (cand : 'a cand_set_g) =
@@ -1209,7 +1223,7 @@ let refresh_known_set (known : known_set) : known_set =
     cond = Term.subst subst known.cond; }
 
 (*------------------------------------------------------------------*)
-let msets_add (mset : Mset.t) (msets : msets) : msets =
+let msets_add (mset : MCset.t) (msets : msets) : msets =
   let name = mset.msymb.s_symb in
   if List.mem_assoc name msets then
     List.assoc_up name (fun b -> mset :: b) msets
@@ -1217,7 +1231,7 @@ let msets_add (mset : Mset.t) (msets : msets) : msets =
 
 (** [mset_incl tbl system s1 s2] check if all terms in [s1] are
     members of [s2]. *)
-let mset_incl table system (s1 : Mset.t) (s2 : Mset.t) : bool
+let mset_incl table system (s1 : MCset.t) (s2 : MCset.t) : bool
   =
   let tv = Vars.make_new Type.Timestamp "t" in
   let term1 = Term.mk_macro s1.msymb [] (Term.mk_var tv) in
@@ -1251,7 +1265,7 @@ let msets_incl table system (msets1 : msets) (msets2 : msets) : bool =
 
 
 (** remove any set which is subsumed by some other set. *)
-let mset_list_simplify table system (msets : Mset.t list) : Mset.t list =
+let mset_list_simplify table system (msets : MCset.t list) : MCset.t list =
   let rec clear_entailed before after =
     match after with
     | [] -> List.rev before
@@ -1268,23 +1282,23 @@ let mset_list_simplify table system (msets : Mset.t list) : Mset.t list =
   in
   clear_entailed [] msets
 
-let mset_refresh env (mset : Mset.t) : Mset.t =
+let mset_refresh env (mset : MCset.t) : MCset.t =
   let indices, subst = Term.refresh_vars `Global mset.indices in
 
   let msymb = Term.subst_isymb subst mset.msymb in
   let cond_le = omap (Term.subst subst) mset.cond_le in
-  Mset.mk ~env ~msymb ~indices ~cond_le
+  MCset.mk ~env ~msymb ~indices ~cond_le
 
 (** applies a substitution `θ` to a mset, where `θ` can bind
     index variables which used to be universally quantified. *)
-let mset_subst env subst (mset : Mset.t) : Mset.t =
+let mset_subst env subst (mset : MCset.t) : MCset.t =
   let msymb = Term.subst_isymb subst mset.msymb in
   let indices = List.map (Term.subst_var subst) mset.indices in
   let cond_le = omap (Term.subst subst) mset.cond_le in
-  Mset.mk ~env ~msymb ~indices ~cond_le
+  MCset.mk ~env ~msymb ~indices ~cond_le
 
 (** Compute the intersection of two msets with the same condition. Exact. *)
-let mset_inter table env (s1 : Mset.t) (s2 : Mset.t) : Mset.t option =
+let mset_inter table env (s1 : MCset.t) (s2 : MCset.t) : MCset.t option =
   let s1, s2 = mset_refresh env s1, mset_refresh env s2 in
 
   let tv = Vars.make_new Type.Timestamp "t" in
@@ -1321,8 +1335,8 @@ let mset_list_inter
     (table : Symbols.table)
     (system : SystemExpr.t)
     (env : Sv.t)
-    (mset_l1 : Mset.t list)
-    (mset_l2 : Mset.t list) : Mset.t list
+    (mset_l1 : MCset.t list)
+    (mset_l2 : MCset.t list) : MCset.t list
   =
   let mset_l =
     List.fold_left (fun acc mset1 ->
@@ -1558,10 +1572,10 @@ module E : S with type t = Equiv.form = struct
         [terms, known_sets] for action [a] at time [a]. *)
     let filter_deduce_action
         (a : Symbols.action Symbols.t)
-        (cand : Mset.t)
+        (cand : MCset.t)
         (init_terms : known_sets)                   (* initial terms *)
         (known_sets : Term.timestamp -> known_sets) (* induction *)
-      : Mset.t list
+      : MCset.t list
       =
       (* we create the timestamp at which we are *)
       let i = Action.arity a table in
@@ -1597,14 +1611,16 @@ module E : S with type t = Equiv.form = struct
               let subst = Mvar.to_subst ~mode:`Unif ded_set.subst in
               let msymb = Term.subst_isymb subst cand.msymb in
               let indices = List.map (Term.subst_var subst) cand.indices in
-              let mset = Mset.mk ~env ~msymb ~indices ~cond_le:cand.cond_le in
+              let mset = MCset.mk ~env ~msymb ~indices ~cond_le:cand.cond_le in
 
               (* sanity check *)
-              assert (match ded_set.cond with 
-                  | Term.Atom (`Timestamp (`Leq, _, c)) ->
-                    Some c = cand.cond_le
-                  | Term.Fun (fs,_,_) -> None = cand.cond_le
-                  | _ -> false);
+              let () =
+                assert (match ded_set.cond with 
+                    | Term.Atom (`Timestamp (`Leq, _, c)) ->
+                      Some c = cand.cond_le
+                    | Term.Fun (fs,_,_) -> None = cand.cond_le
+                    | _ -> false)
+              in
 
               mset :: msets
             ) [] ded_sets
@@ -1652,10 +1668,10 @@ module E : S with type t = Equiv.form = struct
         (known : msets)           (* induction *)
       : msets
       =
-      let known : Mset.t list = msets_to_list known in
+      let known : MCset.t list = msets_to_list known in
 
       let known_sets (ts' : Term.timestamp) =
-        List.fold_left (fun (known_sets : known_sets) (mset : Mset.t) ->
+        List.fold_left (fun (known_sets : known_sets) (mset : MCset.t) ->
             let t = Vars.make_new Type.Timestamp "t" in
             let term = Term.mk_macro mset.msymb [] (Term.mk_var t) in
             let new_ks = 
@@ -1716,7 +1732,7 @@ module E : S with type t = Equiv.form = struct
                 Type.Boolean, []
             in
             let ms = Term.mk_isymb mn ty indices in
-            let mset = Mset.mk ~env ~msymb:ms ~indices ~cond_le in
+            let mset = MCset.mk ~env ~msymb:ms ~indices ~cond_le in
             msets_add mset msets
         ) [] table
     in
@@ -1834,7 +1850,7 @@ module E : S with type t = Equiv.form = struct
   (** Try to match [term] as an element the mset [mset]. *)
   let mset_mem_one
       (term : Term.message)
-      (mset : Mset.t)
+      (mset : MCset.t)
       (st   : match_state) : Mvar.t option
     =
     let ts = Vars.make_new Type.Timestamp "t" in
@@ -1887,7 +1903,7 @@ module E : S with type t = Equiv.form = struct
   (** Try to match [term] as an element of [msets]. *)
   let mset_mem
       (term   : Term.message)
-      (mset_l : Mset.t list)
+      (mset_l : MCset.t list)
       (st     : match_state) : Mvar.t option
     =
     List.find_map (fun elem -> mset_mem_one term elem st) mset_l
@@ -1964,7 +1980,7 @@ module E : S with type t = Equiv.form = struct
   let rec match_term_incl
       (term      : Term.message)
       (pat_terms : Term.message list)
-      (mset_l    : Mset.t list)
+      (mset_l    : MCset.t list)
       (st        : match_state) 
       (minfos    : match_infos) : Mvar.t * match_infos
     =
@@ -1986,7 +2002,7 @@ module E : S with type t = Equiv.form = struct
   and fa_match_term_incl
       (term      : Term.message)
       (pat_terms : Term.message list)
-      (mset_l    : Mset.t list)
+      (mset_l    : MCset.t list)
       (st        : match_state) 
       (minfos    : match_infos) : Mvar.t * match_infos
     =
@@ -2013,15 +2029,14 @@ module E : S with type t = Equiv.form = struct
     (* if [st.support] is not empty, we cannot strengthen the invariant.
        See explanation in [mset_mem_one]. *)
     let mset_l =       
-      if not (Sv.is_empty st.support)
-      then []
-      else 
+      if Sv.is_empty st.support && st.use_fadup then                                  
         let msets = strengthen st.table st.system st.env pat_terms in
         msets_to_list msets
+      else []
     in
 
     if mset_l <> [] && Config.show_strengthened_hyp () then     
-      (dbg ~force:true) "strengthened hypothesis:@;%a@;" Mset.pp_l mset_l; 
+      (dbg ~force:true) "strengthened hypothesis:@;%a@;" MCset.pp_l mset_l; 
 
     let mv, minfos = 
       List.fold_left (fun (mv, minfos) term ->
@@ -2081,11 +2096,11 @@ module E : S with type t = Equiv.form = struct
     | Atom (Equiv es), Atom (Equiv pat_es) ->
       tmatch_e ~mode es pat_es st
 
-    | Quant (q,es,t), Quant (q',es',t') ->
-      (* TODO: match under binders  *)
-      if q = q' && es = es' && t = t'
-      then st.mv
-      else no_match ()
+    | Quant (q,es,t), Quant (q',es',t') when q = q' ->
+      let s, s', st = match_bnds es es' st in
+      let t  = Equiv.subst s  t  in
+      let t' = Equiv.subst s' t' in
+      fmatch ~mode t t' st
 
     | _ -> no_match ()
 
@@ -2093,7 +2108,7 @@ module E : S with type t = Equiv.form = struct
   (** Exported *)
   let try_match
       ?mv
-      ?(mode=`Eq)
+      ?(option=default_match_option)
       (table : Symbols.table)
       (system : SystemExpr.t)
       (t : t)
@@ -2116,9 +2131,12 @@ module E : S with type t = Equiv.form = struct
 
     let mv_init = odflt Mvar.empty mv in
     let st_init : match_state =
-      { bvs = Sv.empty; mv = mv_init; table; system; support; env; ty_env; }
+      { bvs = Sv.empty; 
+        mv = mv_init; 
+        table; system; support; env; ty_env; 
+        use_fadup = option.use_fadup; }
     in
-    let mode = match mode with
+    let mode = match option.mode with
       | `Eq -> `Eq
       | `EntailRL -> `Covar
       | `EntailLR -> `Contravar
