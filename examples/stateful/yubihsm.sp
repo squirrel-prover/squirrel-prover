@@ -55,6 +55,7 @@ counter.
 *******************************************************************************)
 set autoIntro=false.
 
+
 (* AEAD symmetric encryption scheme: IND-CCA + INT-CTXT *)
 senc enc,dec
 
@@ -216,7 +217,7 @@ axiom len_pair (x, y : message) : len(<x,y>) = (len(x) ++ len(y) ++ c_pair).
 axiom eq_iff (x, y : boolean) : (x = y) = (x <=> y).
 
 goal eq_refl ['a] (x : 'a) : (x = x) = true. 
-Proof. print.
+Proof. 
   by rewrite eq_iff. 
 Qed.
 hint rewrite eq_refl.
@@ -237,7 +238,6 @@ Proof.
   by rewrite eq_iff. 
 Qed.
 hint rewrite eq_refl_t.
-
 
 axiom not_true : not(true) = false.
 hint rewrite not_true.

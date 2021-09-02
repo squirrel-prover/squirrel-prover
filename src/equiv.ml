@@ -64,8 +64,8 @@ type quant = ForAll | Exists
 
 type form = 
   | Quant of quant * Vars.evar list * form
-  | Atom   of atom
-  | Impl   of (form * form)
+  | Atom  of atom
+  | Impl  of (form * form)
 
 let rec pp fmt = function
   | Atom at -> pp_atom fmt at
