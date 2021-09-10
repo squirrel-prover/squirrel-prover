@@ -987,37 +987,6 @@ type known_set = {
 (** association list sorting [known_sets] by the head of the term *)
 type known_sets = (term_head * known_set list) list
 
-(** Given a term, return a known_set. 
-    Special treatment of `frame`, to account for the fact
-    that it contains all its predecessors. *)
-let known_set_of_term (term : Term.message) : known_set =
-  let vars, term = match term with
-    | Seq (vars, term) ->
-      let vars, s = Term.erefresh_vars `Global vars in
-      let term = Term.subst s term in
-      vars, term
-
-    | _ -> [], term
-  in
-
-  match term with
-  | Term.Macro (ms, l, ts) when ms = Term.frame_macro ->
-    assert (l = []);
-    let tv' = Vars.make_new Type.Timestamp "t" in
-    let ts' = Term.mk_var tv' in
-    let term' = Term.mk_macro ms [] ts' in
-    { term = term';
-      vars = (Vars.EVar tv') :: vars;
-      cond = Term.mk_atom `Leq ts' ts; }
-
-  | _ -> 
-    { term = term;
-      vars;
-      cond = Term.mk_true; }
-
-
-let known_set_of_term = Prof.mk_unary "known_set_of_term" known_set_of_term
-
 (*------------------------------------------------------------------*)
 module MCset : sig
   (** Set of macros over some indices, with a conditional.
@@ -1146,7 +1115,7 @@ let pp_cand_set pp_term fmt (cand : 'a cand_set_g) =
 
 (*------------------------------------------------------------------*)
 let pp_known_set fmt (known : known_set) =
-  Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ @[%a@]@ @[%a@]}@]"
+  Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ ∀@[%a@].@ @[%a@]}@]"
     Term.pp known.term
     (Fmt.list ~sep:Fmt.comma Vars.pp_e) known.vars
     Term.pp known.cond
@@ -1161,6 +1130,8 @@ let pp_known_sets fmt (ks : known_sets) =
     ) ks;
   Fmt.pf fmt "@]"
 
+let known_sets_add (k : known_set) (ks : known_sets) : known_sets =
+  List.assoc_up_dflt (get_head k.term) [] (fun ks_l -> k :: ks_l) ks
 
 let known_sets_union (s1 : known_sets) (s2 : known_sets) : known_sets =
   let s = List.fold_left (fun s (head, k_l) ->
@@ -1173,26 +1144,107 @@ let known_sets_union (s1 : known_sets) (s2 : known_sets) : known_sets =
       else (head', k_l') :: s
     ) s s2
 
+(*------------------------------------------------------------------*)
+let known_set_of_term (term : Term.message) : known_set =
+  let vars, term = match term with
+    | Seq (vars, term) ->
+      let vars, s = Term.erefresh_vars `Global vars in
+      let term = Term.subst s term in
+      vars, term
 
+    | _ -> [], term
+  in
+  { term = term;
+    vars;
+    cond = Term.mk_true; } 
+
+(** Special treatment of `frame`, to account for the fact
+    that it contains all its prefix frame and exec, and inputs.
+    Remark: this is correct even if [ts] does not happens. Indeed, in that case,
+    the condition [ts' ≤ ts] is never satisfied. *)
+let known_set_add_frame (k : known_set) : known_set list =
+  match k.term with
+  | Term.Macro (ms, l, ts) when ms = Term.frame_macro ->
+    assert (l = []);
+    let tv' = Vars.make_new Type.Timestamp "t" in
+    let ts' = Term.mk_var tv' in
+    let vars = Vars.EVar tv' :: k.vars in
+    
+    let term_frame = Term.mk_macro ms [] ts' in
+    let term_exec  = Term.mk_macro Term.exec_macro [] ts' in
+    let term_input = Term.mk_macro Term.in_macro [] ts' in
+
+    let mk_and = Term.mk_and ~simpl:true in
+    
+    { term = term_frame;
+      vars;
+      cond = mk_and (Term.mk_atom `Leq ts' ts) k.cond; } ::
+    { term = term_exec;
+      vars;
+      cond = mk_and (Term.mk_atom `Leq ts' ts) k.cond; } ::
+    [{ term = term_input;       (* input is know one step further *)
+       vars;
+       cond = mk_and (Term.mk_atom `Leq (Term.mk_pred ts') ts) k.cond; }]
+
+  | _ -> []
+
+(** Exploit the pair symbol injectivity. 
+    If [k] is a pair, we can replace [k] by its left and right 
+    composants w.l.o.g. *)
+let known_set_process_pair_inj (k : known_set) : known_set list =
+  match k.term with
+  | Term.Fun (fs, _, [a;b]) when fs = Term.f_pair ->
+    let kl = { k with term = a; }
+    and kr = { k with term = b; } in
+    kl :: [kr]
+
+  | _ -> [k]
+
+(** Given a term, return some corresponding known_sets. 
+    Special treatment of `frame`, to account for the fact
+    that it contains all its predecessors. *)
+let known_set_list_of_term (term : Term.message) : known_set list =
+  let k = known_set_of_term term in
+  let k_seq = known_set_add_frame k in
+  List.concat_map known_set_process_pair_inj (k :: k_seq)
+
+let known_sets_of_terms (terms : Term.message list) : known_sets =
+  let ks_l = List.concat_map known_set_list_of_term terms in
+  List.fold_left (fun ks k -> known_sets_add k ks) [] ks_l
+
+(*------------------------------------------------------------------*)
+(** Assume that we know all terms in [mset]. If [extra_cond_le = Some ts'], add 
+    an additional constraint [t ≤ ts']. *)
 let known_set_of_mset
-    (ts' : Term.timestamp)
+    ?extra_cond_le
     (mset : MCset.t) : known_set
   =
   let t = Vars.make_new Type.Timestamp "t" in
   let term = Term.mk_macro mset.msymb [] (Term.mk_var t) in
+  let cond =
+    let cond_le = match mset.cond_le with
+      | None -> Term.mk_true
+      | Some cond_le ->
+        Term.mk_atom `Lt (Term.mk_var t) cond_le
+    in
+    let extra_cond_le = match extra_cond_le with
+      | None -> Term.mk_true
+      | Some ts' ->
+        (Term.mk_atom `Lt (Term.mk_var t) ts')
+    in      
+    Term.mk_and ~simpl:true cond_le extra_cond_le
+  in
   { term = term;
     vars = Vars.EVar t :: List.map Vars.evar mset.indices;
-    cond = Term.mk_atom `Lt (Term.mk_var t) ts'; }
-
-let known_sets_of_msets
-    (ts' : Term.timestamp)
+    cond; }
+    
+let known_sets_of_mset_l
+    ?extra_cond_le
     (msets : MCset.t list) : known_sets
   =
   List.fold_left (fun (known_sets : known_sets) (mset : MCset.t) ->
-      let new_ks = known_set_of_mset ts' mset in
-      List.assoc_up_dflt
-        (get_head new_ks.term) [] 
-        (fun ks_l -> new_ks :: ks_l) known_sets
+      let new_ks = known_set_of_mset ?extra_cond_le mset in
+      known_sets_add new_ks known_sets
     ) [] msets
 
 (*------------------------------------------------------------------*)
@@ -1376,6 +1428,42 @@ module E : S with type t = Equiv.form = struct
     in
     leq t t'
 
+  (** Check that [hyp] implies [cond].
+      We only support a restricted set of possible known sets conditions 
+      for now. *)
+  let known_set_check_impl
+      (table : Symbols.table)
+      (hyp : Term.message)
+      (cond : Term.message) : bool
+    =
+    let check_one cond =
+      match cond with
+      | Term.Atom (`Timestamp ((`Lt | `Leq as ord), t1, t2)) ->
+        let t2' = 
+          match ord with
+          | `Lt -> Term.mk_pred t2 
+          | `Leq -> t2
+        in
+
+        let check_direct = leq_tauto table t1 t2' in
+        let check_indirect = 
+          match hyp with
+          | Term.Atom (`Timestamp (`Leq, ta, tb)) -> (* ≤ *)
+
+            (* checks whether [ta ≤ tb] implies [t1 ≤ t2'] *)
+            leq_tauto table t1 ta && leq_tauto table tb t2'
+
+          | Term.Fun (fs,_,_) when fs = Term.f_true -> false
+
+          | _ -> assert false
+        in
+        check_direct || check_indirect
+
+      | Term.Fun (fs,_,_) when fs = Term.f_true -> true
+
+      | _ -> assert false
+    in
+    List.for_all check_one (Term.decompose_ands cond)
 
   (** Return a specialization of [cand] that is a subset of [known]. *)
   let specialize
@@ -1383,7 +1471,6 @@ module E : S with type t = Equiv.form = struct
     (cand  : cand_set)
     (known : known_set) : cand_set option
     =
-    (* if not (specialize_quick_check cand known) then None else *)
     let known = refresh_known_set known in
 
     let mv, c_cond, c_pat = pat_of_cand_set cand in
@@ -1392,39 +1479,13 @@ module E : S with type t = Equiv.form = struct
     match T.unify_opt ~mv table c_pat e_pat with
     | None -> None
     | Some mv -> (* [mv] represents substitution [θ] *)
+      let subst = Mvar.to_subst ~mode:`Unif mv in
+
       (* check that [c_cond θ] implies [known_cond θ] holds *)
-      let check_cond = match known_cond with
-        | Term.Atom (`Timestamp ((`Lt | `Leq as ord), t1, t2)) ->
-          let subst = Mvar.to_subst ~mode:`Unif mv in
-          let t1, t2 = Term.subst subst t1, Term.subst subst t2 in
-          let t2' = 
-            match ord with
-            | `Lt -> Term.mk_pred t2 
-            | `Leq -> t2
-          in
-
-          let check_direct = leq_tauto table t1 t2' in
-          let check_indirect = 
-            match c_cond with
-            | Term.Atom (`Timestamp (`Leq, ta, tb)) -> (* ≤ *)
-              let ta, tb = Term.subst subst ta, Term.subst subst tb in
-
-              (* checks whether [ta ≤ tb] implies [t1 ≤ t2'] *)
-              leq_tauto table t1 ta && leq_tauto table tb t2'
-
-            | Term.Fun (fs,_,_) when fs = Term.f_true -> false
-
-            | _ -> assert false
-          in
-          check_direct || check_indirect
-
-        | Term.Fun (fs,_,_) when fs = Term.f_true -> true
-
-        | _ -> assert false
-        (* we only support a restricted set of possible condtions for now *)
-      in
-
-      if not check_cond then None
+      let known_cond = Term.subst subst known_cond
+      and c_cond     = Term.subst subst c_cond in
+      
+      if not (known_set_check_impl table c_cond known_cond) then None
       else
         let cand =
           { term = cand.term;
@@ -1563,7 +1624,7 @@ module E : S with type t = Equiv.form = struct
       (init_terms : Term.messages) : msets
     =
     (** Return a list of specialization of [cand] deducible from
-        [terms, known_sets] for action [a] at time [a]. *)
+        [init_terms, known_sets] for action [a] at time [a]. *)
     let filter_deduce_action
         (a : Symbols.action Symbols.t)
         (cand : MCset.t)
@@ -1596,7 +1657,8 @@ module E : S with type t = Equiv.form = struct
         in
         (* we instantiate the known terms at time [ts] *)
         let all_known_sets =
-          let known_sets = known_sets_of_msets ts known_sets in
+          (* we assume we know all terms in [known_sets] at time [ts] *)
+          let known_sets = known_sets_of_mset_l ~extra_cond_le:ts known_sets in
           known_sets_union init_terms known_sets
         in
         (* let all_known_sets = init_terms @ known_sets in *)
@@ -1707,14 +1769,7 @@ module E : S with type t = Equiv.form = struct
     in
 
     (* initially known terms *)
-    let init_terms = 
-      List.fold_left (fun known_sets term ->
-          let new_ks = known_set_of_term term in
-            List.assoc_up_dflt
-              (get_head new_ks.term) [] 
-              (fun ks_l -> new_ks :: ks_l) known_sets
-        ) [] init_terms
-    in
+    let init_terms = known_sets_of_terms init_terms in
 
     deduce_fixpoint init_fixpoint init_terms
 
@@ -1783,115 +1838,69 @@ module E : S with type t = Equiv.form = struct
     | Some st -> st
 
   (*------------------------------------------------------------------*)
-  (** In case [elem] is a sequence, try to match [term] as an element
-      of [elem]. *)
-  let seq_mem_one
-      (term : Term.message)
-      (elem : Term.message)
-      (st   : match_state) : Mvar.t option
-    =
-    match elem with
-    | Seq (is, elem) ->
-      let is, s = Term.erefresh_vars `Global is in
-      let elem = Term.subst s elem in
-
-      let is_s = Sv.of_list is in
-
-      begin
-        match term_match_opt ~vars:is_s term elem st with
-        | None -> None
-        | Some mv ->
-          let mv = Mvar.filter (fun v _ -> not (Sv.mem v is_s)) mv in
-          Some mv
-      end
-
-    | _ -> None
-
-  (** Try to match [term] as an element of a sequence in [elems]. *)
-  let seq_mem
+  (** Try to match [term] as an element of [known]. *)
+  let _deduce_mem_one
       (term  : Term.message)
-      (elems : Term.message list)
+      (known : known_set)
       (st    : match_state) : Mvar.t option
     =
-    List.find_map (fun elem -> seq_mem_one term elem st) elems
+    let known = refresh_known_set known in
 
-  (*------------------------------------------------------------------*)
-  (** Try to match [term] as an element the mset [mset]. *)
-  let mset_mem_one
-      (term : Term.message)
-      (mset : MCset.t)
-      (st   : match_state) : Mvar.t option
+    let known_cond, e_pat = pat_of_known_set known in
+
+    let vars = Sv.of_list known.vars in
+    let st = { st with support = Sv.union vars st.support; } in
+    
+    try (* FIXME: use [try_match] *)
+      let mv = T.tmatch term e_pat.pat_term st in
+
+      let subst = Mvar.to_subst ~mode:`Unif mv in
+      let known_cond = Term.subst subst known_cond in
+      
+      (* check that [known_cond θ] holds *)
+      if not (known_set_check_impl st.table Term.mk_true known_cond) then
+        None
+      else                      (* clear [known.var] from the binding *)
+        Some (Mvar.filter (fun v _ -> not (Sv.mem v vars)) mv)
+    with NoMatch _ -> None
+
+  (** FIXME *)
+  let deduce_mem_one
+      (term  : Term.message)
+      (known : known_set)
+      (st    : match_state) : Mvar.t option
     =
-    let ts = Vars.make_new Type.Timestamp "t" in
-    let tv = Term.mk_var ts in
-    let pat = Term.mk_macro mset.msymb [] tv in
-
-    let vars = Sv.add (Vars.EVar ts) (Sv.of_list1 mset.indices) in
-
     (* if [st.support] is not empty, then we need to find [mv] such that:
        - [mv] represents a substitution θ whose support is included in
-         [st.support] ∪ [vars]
+         [st.support] ∪ [known.vars]
        - for any v ∈ [st.support], (fv(θ(v)) ∩ st.bvs = ∅)
        
        The issue is that the matching algorithm will ensure that the latter
-       condition holds for ([st.support] ∪ [vars]), and not just 
+       condition holds for ([st.support] ∪ [known.vars]), and not just 
        for [st.support]. This makes us reject valid instance that appear in
        practice.
        
-       To allow [st.support] to be empty, we would have to modify the
-       matching algorithm to account for that. 
+       We need to modify the matching algorithm to account for that. 
 
-       Instead, for now, we ensure that this issue never arise by using 
-       strenghtening only if [st.support] = ∅.
+       Instead, for now, we try either a normal matching, or a matching where we
+       cleared both [st.bvs] and [st.support] (i.e. we do not try to infer the
+       arguments of the lemma being applied).
     *)
-    assert (Sv.is_empty st.support);
-    let st = { st with bvs = Sv.empty; } in
-
-    match term_match_opt ~vars term pat st with
-    | None -> None
-    | Some mv ->
-      (* check that [mset]'s condition holds *)
-      let subst = Mvar.to_subst ~mode:`Unif mv in
-      let check = match mset.cond_le with
-        | None -> true
-        | Some cond_le ->
-          let ts_le = Term.subst subst cond_le in
-          leq_tauto st.table (Term.subst subst tv) ts_le 
-      in
-
-      if not check then 
-        None 
-      else
-        let mv = 
-          Mvar.filter (fun v _ -> 
-              v <> Vars.EVar ts && not (Sv.mem v vars)
-            ) mv 
-        in
-        Some mv
-
-  (** Try to match [term] as an element of [msets]. *)
-  let mset_mem
-      (term   : Term.message)
-      (mset_l : MCset.t list)
-      (st     : match_state) : Mvar.t option
-    =
-    List.find_map (fun elem -> mset_mem_one term elem st) mset_l
-
-  (*------------------------------------------------------------------*)
-  (** Duplicate checking: see [Action.is_dup_match] *)
-  let is_dup
+    match _deduce_mem_one term known st with
+    | Some mv -> Some mv
+    | None -> (* try again, with empty support and bvs *)
+      let st = { st with bvs = Sv.empty; support = Sv.empty; } in
+      _deduce_mem_one term known st
+        
+  
+  (** Try to match [term] as an element of a sequence in [elems]. *)
+  let deduce_mem
       (term  : Term.message)
-      (elems : Term.message list)
+      (elems : known_sets)
       (st    : match_state) : Mvar.t option
     =
-    let eterm_match (Term.ETerm t1) (Term.ETerm t2) (st : match_state) =
-      match term_match_opt t1 t2 st with
-      | Some mv -> Some { st with mv } 
-      | None -> None
-    in
-
-    let st = Action.is_dup_match eterm_match st st.table term elems in
-    omap (fun (x : match_state) -> x.mv) st
+    let elems_head = List.assoc_dflt [] (get_head term) elems in
+    List.find_map (fun elem -> deduce_mem_one term elem st) elems_head
  
   (*------------------------------------------------------------------*)
   (** [fa_decompose term st] return a list of matching conditions that must be 
@@ -1948,30 +1957,21 @@ module E : S with type t = Equiv.form = struct
       - Function Application: [term] may be decomposed into smaller terms. *)
   let rec match_term_incl
       (term      : Term.message)
-      (pat_terms : Term.message list)
-      (mset_l    : MCset.t list)
+      (pat_terms : known_sets)
       (st        : match_state) 
       (minfos    : match_infos) : Mvar.t * match_infos
     =
-    match is_dup term pat_terms st with
+    match deduce_mem term pat_terms st with
     | Some mv -> mv, minfos_ok term minfos
     | None ->
-      match seq_mem term pat_terms st with
-    | Some mv -> mv, minfos_ok term minfos
-      | None ->
-        match mset_mem term mset_l st with
-        | Some mv -> mv, minfos_ok term minfos
-        | None ->
-          (* if that fails, decompose [term] through the Function Application
-             rule, and recurse. *)
-          fa_match_term_incl term pat_terms mset_l st minfos 
+      (* if that fails, decompose [term] through the Function Application
+         rule, and recurse. *)
+      fa_match_term_incl term pat_terms st minfos 
 
-  (** Check that [term] can be deduced from [pat_terms] through the 
-      Function Application rule *) 
+  (** Check that [term] can be deduced from [pat_terms] and [mset_l]. *) 
   and fa_match_term_incl
       (term      : Term.message)
-      (pat_terms : Term.message list)
-      (mset_l    : MCset.t list)
+      (pat_terms : known_sets)
       (st        : match_state) 
       (minfos    : match_infos) : Mvar.t * match_infos
     =
@@ -1982,7 +1982,7 @@ module E : S with type t = Equiv.form = struct
       let minfos = minfos_check_st term (List.map snd fa_conds) minfos in
       List.fold_left (fun (mv, minfos) (st, t) ->
           let mv, minfos = 
-            match_term_incl t pat_terms mset_l { st with mv } minfos 
+            match_term_incl t pat_terms { st with mv } minfos 
           in
           mv, minfos
         ) (st.mv, minfos) fa_conds
@@ -1998,7 +1998,7 @@ module E : S with type t = Equiv.form = struct
     (* if [st.support] is not empty, we cannot strengthen the invariant.
        See explanation in [mset_mem_one]. *)
     let mset_l =       
-      if Sv.is_empty st.support && st.use_fadup then                                  
+      if Sv.is_empty st.support && st.use_fadup then 
         let msets = strengthen st.table st.system st.env pat_terms in
         msets_to_list msets
       else []
@@ -2007,9 +2007,15 @@ module E : S with type t = Equiv.form = struct
     if mset_l <> [] && Config.show_strengthened_hyp () then     
       (dbg ~force:true) "strengthened hypothesis:@;%a@;" MCset.pp_l mset_l; 
 
+    let pat_terms =
+      known_sets_union
+        (known_sets_of_mset_l mset_l)
+        (known_sets_of_terms pat_terms)
+    in
+    
     let mv, minfos = 
       List.fold_left (fun (mv, minfos) term ->
-          match_term_incl term pat_terms mset_l { st with mv } minfos 
+          match_term_incl term pat_terms { st with mv } minfos 
         ) (st.mv, Mt.empty) terms
     in
 

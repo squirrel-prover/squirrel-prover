@@ -186,12 +186,15 @@ Proof.
  intro H; apply H.
 Qed.
  
-(* we cannot match `x` with `n1(j)` since `j` is bound in the conclusion. *)
-global goal _ (y : message) :
+name nj : index -> message.
+
+(* we cannot match `x` with `nj(j)` since `j` is bound in the conclusion. *)
+global goal _ :
  (forall (x : message), equiv(seq (i:index -> <n1(i), x>))) ->
- equiv(seq (j:index -> <n1(j), n1(j)>)).
+ equiv(seq (j:index -> <n1(j), nj(j)>)).
 Proof.
- checkfail (intro H; apply H) exn ApplyMatchFailure.
+ intro H.
+ checkfail (apply H) exn ApplyMatchFailure.
 Abort.
 
 (* with a sequence *)

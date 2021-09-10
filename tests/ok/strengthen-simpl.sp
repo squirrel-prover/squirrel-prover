@@ -96,11 +96,11 @@ Proof.
  checkfail (apply ~fadup H) exn ApplyMatchFailure.
 Abort.
 
-(*------------------------------------------------------------------*)
-(* global goal _ (t : timestamp) :  *)
-(*   [happens(t)] ->  *)
-(*   equiv(frame@t) ->  *)
+(* (* ------------------------------------------------------------------ *) *)
+(* global goal _ (t : timestamp) : *)
+(*   [happens(t)] -> *)
+(*   equiv(frame@t) -> *)
 (*   equiv(seq(t':timestamp -> if t' <= t then frame@t')). *)
-(* Proof.  *)
+(* Proof. *)
 (*  intro Hap H; apply H. *)
 (* Qed. *)
