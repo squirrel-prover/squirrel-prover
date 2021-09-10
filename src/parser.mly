@@ -756,14 +756,18 @@ biframe:
 | ei=term                   { [ei] }
 | ei=term COMMA eis=biframe { ei::eis }
 
+%inline quant:
+| FORALL { Theory.PForAll }
+| EXISTS { Theory.PExists }
+      
 global_formula_i:
 | LBRACKET f=term RBRACKET         { Theory.PReach f }
 | TILDE LPAREN e=biframe RPAREN    { Theory.PEquiv e }
 | EQUIV LPAREN e=biframe RPAREN    { Theory.PEquiv e }
 | LPAREN f=global_formula_i RPAREN   { f }
 | f=global_formula ARROW f0=global_formula { Theory.PImpl (f,f0) }
-| FORALL LPAREN vs=arg_list RPAREN sep f=global_formula %prec QUANTIF
-                                   { Theory.PForAll (vs,f)  }
+| q=quant LPAREN vs=arg_list RPAREN sep f=global_formula %prec QUANTIF
+                                   { Theory.PQuant (q,vs,f)  }
 
 global_formula:
 | f=loc(global_formula_i) { f }

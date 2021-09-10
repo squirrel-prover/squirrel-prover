@@ -46,7 +46,9 @@ type form =
 
 val pp : Format.formatter -> form -> unit
 
-val mk_forall : Vars.evar list -> form -> form
+val mk_quant  : quant -> Vars.evar list -> form -> form
+val mk_forall :          Vars.evar list -> form -> form
+val mk_exists :          Vars.evar list -> form -> form
 
 val mk_reach_atom : Term.message -> form
 
