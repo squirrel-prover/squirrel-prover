@@ -1062,12 +1062,12 @@ end = struct
     let vars = List.map Vars.evar mset.indices in
     match vars with
     | [] ->
-      Fmt.pf fmt "@[<hv 2>{ @[%a@]@τ |@ %a}@]"
+      Fmt.pf fmt "@[<hv 2>{ @[%a@]@τ |@ ∀ τ. %a}@]"
         Term.pp_msymb mset.msymb
         pp_cond mset.cond_le
 
     | _ ->
-      Fmt.pf fmt "@[<hv 2>{ @[%a@]@τ |@ ∀@[%a@]@ s.t. %a}@]"
+      Fmt.pf fmt "@[<hv 2>{ @[%a@]@τ |@ ∀ @[τ,%a@]. s.t. %a}@]"
         Term.pp_msymb mset.msymb
         (Fmt.list ~sep:Fmt.comma Vars.pp_e) vars
         pp_cond mset.cond_le
@@ -1115,9 +1115,15 @@ let pp_cand_set pp_term fmt (cand : 'a cand_set_g) =
 
 (*------------------------------------------------------------------*)
 let pp_known_set fmt (known : known_set) =
-  Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ ∀@[%a@].@ @[%a@]}@]"
+  let pp_vars fmt vars = match vars with
+    | [] -> ()
+    | _ ->
+      Fmt.pf fmt "∀@[%a@].@ "
+        (Fmt.list ~sep:Fmt.comma Vars.pp_e) vars
+  in
+  Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ %a@[%a@]}@]"
     Term.pp known.term
-    (Fmt.list ~sep:Fmt.comma Vars.pp_e) known.vars
+    pp_vars known.vars
     Term.pp known.cond
 
 let pp_known_sets fmt (ks : known_sets) =
