@@ -167,6 +167,11 @@ val neg_trace_lit : trace_literal -> trace_literal
 
 val disjunction_to_literals : message -> literal list option
 
+(** Given a formula, return a list of literals which is either
+    entailed by the formula, or equivalent to the formula. *)
+val form_to_literals :
+  message -> [`Entails of literal list | `Equiv of literal list]
+    
 (*------------------------------------------------------------------*)
 (** {2 Higher-order terms} *)
 
