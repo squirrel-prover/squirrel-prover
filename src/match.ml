@@ -972,18 +972,16 @@ type cand_sets       = cand_set       list
 type cand_tuple_sets = cand_tuple_set list
 
 (*------------------------------------------------------------------*)
-(** Set of terms over some variables of sort index or timestamp, and at most
-    one dedicated timestamp variable (used in the set condition).
+(** Set of terms over some variables of sort index or timestamp, 
+    under a condition.
       [{ term    = t;
          vars    = vars;
-         tvar    = τ;
          cond    = ψ; }]
-    represents the set of terms [\{t | ∀ vars, τ s.t. ψ \}]. *)
+    represents the set of terms [\{t | ∀ vars, s.t. ψ \}]. *)
 type known_set = {
-  term    : Term.message;
-  vars    : Vars.evars;
-  tvar    : Vars.timestamp option;
-  cond    : Term.message;
+  term : Term.message;
+  vars : Vars.evars;            (* sort index or timestamp *)
+  cond : Term.message;
 }
 
 (** association list sorting [known_sets] by the head of the term *)
@@ -1009,14 +1007,12 @@ let known_set_of_term (term : Term.message) : known_set =
     let ts' = Term.mk_var tv' in
     let term' = Term.mk_macro ms [] ts' in
     { term = term';
-      vars;
-      tvar = Some tv';
+      vars = (Vars.EVar tv') :: vars;
       cond = Term.mk_atom `Leq ts' ts; }
 
   | _ -> 
     { term = term;
       vars;
-      tvar = None;
       cond = Term.mk_true; }
 
 
@@ -1150,15 +1146,9 @@ let pp_cand_set pp_term fmt (cand : 'a cand_set_g) =
 
 (*------------------------------------------------------------------*)
 let pp_known_set fmt (known : known_set) =
-  let tvs = match known.tvar with
-    | None -> []
-    | Some tv -> [Vars.evar tv]
-  in
-  let vars = tvs @ known.vars in
-
   Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ @[%a@]@ @[%a@]}@]"
     Term.pp known.term
-    (Fmt.list ~sep:Fmt.comma Vars.pp_e) vars
+    (Fmt.list ~sep:Fmt.comma Vars.pp_e) known.vars
     Term.pp known.cond
 
 let pp_known_sets fmt (ks : known_sets) =
@@ -1191,8 +1181,7 @@ let known_set_of_mset
   let t = Vars.make_new Type.Timestamp "t" in
   let term = Term.mk_macro mset.msymb [] (Term.mk_var t) in
   { term = term;
-    vars = List.map Vars.evar mset.indices;
-    tvar = Some t;
+    vars = Vars.EVar t :: List.map Vars.evar mset.indices;
     cond = Term.mk_atom `Lt (Term.mk_var t) ts'; }
 
 let known_sets_of_msets
@@ -1219,29 +1208,15 @@ let pat_of_cand_set
 
 (* return: condition, pattern *)
 let pat_of_known_set (known : known_set) : Term.message * Term.message pat =
-  let vars =
-    let tvs = match known.tvar with
-      | None -> []
-      | Some tv -> [Vars.EVar tv]
-    in
-    tvs @ known.vars
-  in
   known.cond, 
   { pat_term   = known.term;
-    pat_vars   = Sv.of_list vars;
+    pat_vars   = Sv.of_list known.vars;
     pat_tyvars = []; }
 
 (*------------------------------------------------------------------*)
 let refresh_known_set (known : known_set) : known_set =
   let vars, subst = Term.erefresh_vars `Global known.vars in
-  let tvar, subst = 
-    match known.tvar with
-    | None -> None, subst
-    | Some tv -> 
-      let tv, subst' = Term.refresh_vars `Global [tv] in
-      Some (as_seq1 tv), subst' @ subst
-  in     
-  { vars; tvar; 
+  { vars; 
     term = Term.subst subst known.term;
     cond = Term.subst subst known.cond; }
 
@@ -1451,11 +1426,6 @@ module E : S with type t = Equiv.form = struct
 
       if not check_cond then None
       else
-        let mv =
-          match known.tvar with
-          | None -> mv
-          | Some tv -> Mvar.remove (Vars.evar tv) mv
-        in
         let cand =
           { term = cand.term;
             subst = mv;
