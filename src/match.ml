@@ -1183,6 +1183,29 @@ let known_sets_union (s1 : known_sets) (s2 : known_sets) : known_sets =
       else (head', k_l') :: s
     ) s s2
 
+
+let known_set_of_mset
+    (ts' : Term.timestamp)
+    (mset : MCset.t) : known_set
+  =
+  let t = Vars.make_new Type.Timestamp "t" in
+  let term = Term.mk_macro mset.msymb [] (Term.mk_var t) in
+  { term = term;
+    vars = List.map Vars.evar mset.indices;
+    tvar = Some t;
+    cond = Term.mk_atom `Lt (Term.mk_var t) ts'; }
+
+let known_sets_of_msets
+    (ts' : Term.timestamp)
+    (msets : MCset.t list) : known_sets
+  =
+  List.fold_left (fun (known_sets : known_sets) (mset : MCset.t) ->
+      let new_ks = known_set_of_mset ts' mset in
+      List.assoc_up_dflt
+        (get_head new_ks.term) [] 
+        (fun ks_l -> new_ks :: ks_l) known_sets
+    ) [] msets
+
 (*------------------------------------------------------------------*)
 (* return: substitution, condition, pattern *)
 let pat_of_cand_set
@@ -1423,6 +1446,7 @@ module E : S with type t = Equiv.form = struct
         | Term.Fun (fs,_,_) when fs = Term.f_true -> true
 
         | _ -> assert false
+        (* we only support a restricted set of possible condtions for now *)
       in
 
       if not check_cond then None
@@ -1573,8 +1597,8 @@ module E : S with type t = Equiv.form = struct
     let filter_deduce_action
         (a : Symbols.action Symbols.t)
         (cand : MCset.t)
-        (init_terms : known_sets)                   (* initial terms *)
-        (known_sets : Term.timestamp -> known_sets) (* induction *)
+        (init_terms : known_sets)              (* initial terms *)
+        (known_sets : MCset.t list)            (* induction *)
       : MCset.t list
       =
       (* we create the timestamp at which we are *)
@@ -1601,8 +1625,10 @@ module E : S with type t = Equiv.form = struct
           cond; }
         in
         (* we instantiate the known terms at time [ts] *)
-        let known_sets = known_sets ts in       
-        let all_known_sets = known_sets_union init_terms known_sets in
+        let all_known_sets =
+          let known_sets = known_sets_of_msets ts known_sets in
+          known_sets_union init_terms known_sets
+        in
         (* let all_known_sets = init_terms @ known_sets in *)
         let ded_sets = deduce table system cand_set all_known_sets in
 
@@ -1631,8 +1657,8 @@ module E : S with type t = Equiv.form = struct
     let filter_deduce_action_list
         (a : Symbols.action Symbols.t)
         (cands : msets)
-        (init_terms : known_sets)                   (* initial terms *)
-        (known_sets : Term.timestamp -> known_sets) (* induction *)
+        (init_terms : known_sets)              (* initial terms *)
+        (known_sets : MCset.t list)            (* induction *)
       : msets
       =
       let msets =
@@ -1650,10 +1676,10 @@ module E : S with type t = Equiv.form = struct
 
     (* fold over all actions of the protocol, to find a specialization of 
        [cands] stable by each action. *)
-    let filter_deduce_all_actions0
+    let filter_deduce_all_actions
         (cands : msets)
-        (init_terms : known_sets)                   (* initial terms *)
-        (known_sets : Term.timestamp -> known_sets) (* induction *)
+        (init_terms : known_sets)              (* initial terms *)
+        (known_sets : MCset.t list)            (* induction *)
       : msets
       =
       let names = SystemExpr.symbs table system in
@@ -1662,40 +1688,13 @@ module E : S with type t = Equiv.form = struct
         ) names cands
     in
 
-    let filter_deduce_all_actions
-        (cands : msets)
-        (init_terms : known_sets) (* initial terms *)
-        (known : msets)           (* induction *)
-      : msets
-      =
-      let known : MCset.t list = msets_to_list known in
-
-      let known_sets (ts' : Term.timestamp) =
-        List.fold_left (fun (known_sets : known_sets) (mset : MCset.t) ->
-            let t = Vars.make_new Type.Timestamp "t" in
-            let term = Term.mk_macro mset.msymb [] (Term.mk_var t) in
-            let new_ks = 
-              { term = term;
-                vars = List.map Vars.evar mset.indices;
-                tvar = Some t;
-                cond = Term.mk_atom `Lt (Term.mk_var t) ts'; }
-            in
-
-            List.assoc_up_dflt
-              (get_head term) [] 
-              (fun ks_l -> new_ks :: ks_l) known_sets
-          ) [] known
-      in
-
-      filter_deduce_all_actions0 cands init_terms known_sets
-    in
-
     let rec deduce_fixpoint
         (cands : msets) 
         (init_terms : known_sets) (* initial terms *)
       : msets
       =
-      let cands' = filter_deduce_all_actions cands init_terms cands in
+      let init_known : MCset.t list = msets_to_list cands in
+      let cands' = filter_deduce_all_actions cands init_terms init_known in
 
       (* check if [cands] is included in [cands'] *)
       if msets_incl table system cands cands'
@@ -1972,7 +1971,7 @@ module E : S with type t = Equiv.form = struct
     | _ -> None
 
   (*------------------------------------------------------------------*)
-  (** Check that [term] can be deduced from [pat_terms].
+  (** Check that [term] can be deduced from [pat_terms] and [mset_mem].
       This check is modulo:
       - Restr: all elements may not be used;
       - Sequence expantion: sequences may be expanded;
