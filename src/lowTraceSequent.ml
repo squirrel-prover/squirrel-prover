@@ -160,23 +160,19 @@ let pp ppf s =
 
 (*------------------------------------------------------------------*)
 (** Collect specific local hypotheses *)
+  
+let get_atoms_of_fhyps (forms : FHyp.t list) : Term.literal list =
+  List.fold_left (fun acc f ->
+      match f with
+      | `Equiv _ -> acc
+      | `Reach f ->
+        match Term.form_to_literals f with
+        | `Entails lits | `Equiv lits -> lits @ acc
+    ) [] forms 
 
-let get_atoms (s : sequent) : Term.literal list =
-  H.fold
-    (fun _ f acc ->
-       match f with
-         | `Equiv _ -> acc
-         | `Reach f ->
-             List.fold_left
-               (fun acc -> function
-                  | Term.Atom at -> (`Pos,at) :: acc
-                  | hyp ->
-                      match Term.destr_not hyp with
-                        | Some (Term.Atom at) -> (`Neg,at) :: acc
-                        | _ -> acc)
-               acc
-               (Term.decompose_ands f))
-    s.hyps []
+let get_atoms_from_s (s : sequent) : Term.literal list =
+  let fhyps = H.fold (fun _ f acc -> f :: acc) s.hyps [] in
+  get_atoms_of_fhyps fhyps
 
 let get_message_atoms (s : sequent) : Term.message_atom list =
   let do1 (at : Term.literal) : Term.message_atom option =
@@ -185,7 +181,7 @@ let get_message_atoms (s : sequent) : Term.message_atom list =
     | `Neg, (`Message _ as at) -> Some (Term.not_message_atom at)
     | _ -> None
   in
-  List.filter_map do1 (get_atoms s)
+  List.filter_map do1 (get_atoms_from_s s)
 
 let get_trace_literals (s : sequent) : Term.trace_literal list =
   let do1 (at : Term.literal) : Term.trace_literal option =
@@ -193,7 +189,7 @@ let get_trace_literals (s : sequent) : Term.trace_literal list =
     | x, Term.(#trace_atom as at) -> Some (x, at)
     | _ -> None
   in
-  List.filter_map do1 (get_atoms s)
+  List.filter_map do1 (get_atoms_from_s s)
 
 let get_eq_atoms (s : sequent) : Term.eq_atom list =
   let do1 (at : Term.literal) : Term.eq_atom option =
@@ -222,7 +218,7 @@ let get_eq_atoms (s : sequent) : Term.eq_atom list =
     | _, `Happens _ 
     | _, `Timestamp ((`Leq | `Geq | `Lt | `Gt), _, _) -> None
   in
-  List.filter_map do1 (get_atoms s) 
+  List.filter_map do1 (get_atoms_from_s s) 
 
 let get_all_messages s =
   let atoms = get_message_atoms s in
