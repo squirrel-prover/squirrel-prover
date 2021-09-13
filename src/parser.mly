@@ -17,7 +17,7 @@
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
 %token LANGLE RANGLE
-%token AND OR NOT TRUE FALSE HAPPENS
+%token GAND GOR AND OR NOT TRUE FALSE HAPPENS
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS
 %token XOR STAR UNDERSCORE QMARK TICK 
 %token LET IN IF THEN ELSE FIND SUCHTHAT
@@ -43,6 +43,7 @@
 %right DARROW
 %right DEQUIVARROW
 %left AND OR
+%left GAND GOR
 
 %nonassoc TRUE SEQ PRED NOT LPAREN INIT ID UNDERSCORE HAPPENS FALSE DIFF
 
@@ -764,10 +765,17 @@ global_formula_i:
 | LBRACKET f=term RBRACKET         { Theory.PReach f }
 | TILDE LPAREN e=biframe RPAREN    { Theory.PEquiv e }
 | EQUIV LPAREN e=biframe RPAREN    { Theory.PEquiv e }
-| LPAREN f=global_formula_i RPAREN   { f }
+| LPAREN f=global_formula_i RPAREN { f }
+
 | f=global_formula ARROW f0=global_formula { Theory.PImpl (f,f0) }
+
 | q=quant LPAREN vs=arg_list RPAREN sep f=global_formula %prec QUANTIF
                                    { Theory.PQuant (q,vs,f)  }
+
+| f1=global_formula GAND f2=global_formula 
+                                   { Theory.PAnd (f1, f2) }
+| f1=global_formula GOR f2=global_formula 
+                                   { Theory.POr (f1, f2) }
 
 global_formula:
 | f=loc(global_formula_i) { f }

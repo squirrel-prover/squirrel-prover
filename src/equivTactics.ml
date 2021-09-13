@@ -128,8 +128,7 @@ let assumption s =
 
   let in_hyp _ = function
     | Equiv.Atom at -> in_atom at
-    | Equiv.Impl _ as f -> f = goal
-    | Equiv.Quant _ as f -> f = goal
+    | _ as f -> f = goal
   in
 
   if Hyps.exists in_hyp s
@@ -157,6 +156,13 @@ let rec tautology f s = match f with
   | Equiv.Impl (f0,f1) ->
     let s = Hyps.add Args.AnyName f0 s in
     tautology f1 s
+
+  | Equiv.And (f0,f1) ->
+    tautology f0 s && tautology f1 s
+
+  | Equiv.Or (f0,f1) ->
+    tautology f0 s || tautology f1 s
+
   | Equiv.Quant _ -> false
   | Equiv.(Atom (Equiv e)) -> refl e s = `True
   | Equiv.(Atom (Reach _)) ->
@@ -818,7 +824,7 @@ let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
     let rec mk_hyp_f = function
       | Equiv.Atom at       -> Equiv.Atom (mk_hyp_at at)
       | Equiv.Impl (f, f0)  -> Equiv.Impl (mk_hyp_f f, mk_hyp_f f0)
-      | Equiv.Quant _ as f -> f
+      | _ as f -> f
 
     and mk_hyp_at hyp = match hyp with
       | Equiv.Equiv e ->

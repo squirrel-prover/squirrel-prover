@@ -101,6 +101,8 @@ and global_formula_i =
   | PEquiv  of equiv
   | PReach  of formula
   | PImpl   of global_formula * global_formula
+  | PAnd    of global_formula * global_formula
+  | POr     of global_formula * global_formula
   | PQuant  of pquant * bnds * global_formula
 
 (*------------------------------------------------------------------*)

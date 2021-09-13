@@ -80,26 +80,6 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-(** Split a conjunction conclusion,
-  * creating one subgoal per conjunct. *)
-let goal_and_right (s : TS.t) =
-  match Term.destr_and (TS.goal s) with
-  | Some (lformula, rformula) ->
-    [ TS.set_goal lformula s ;
-      TS.set_goal rformula s ]
-  | None -> soft_failure (Tactics.Failure "not a conjunction")
-
-let () =
-  T.register "split"
-    ~tactic_help:{general_help = "Split a conjunction conclusion, creating one \
-                                  subgoal per conjunct.";
-                  detailed_help = "G=> A & B is replaced by G=>A and goal G=>B.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
-    (LowTactics.genfun_of_pure_tfun goal_and_right)
-
-
-(*------------------------------------------------------------------*)
 let left_not_intro (Args.String hyp_name) s =
   let id, formula = Hyps.by_name hyp_name s in
   let s = Hyps.remove id s in
@@ -1104,7 +1084,7 @@ let rec simpl ~strong ~close : TS.t Tactics.tac =
       then fun _ -> fk (None, GoalNotClosed)
       else fun _ -> sk [g] fk
     in
-    (wrap_fail goal_and_right) g
+    (wrap_fail TraceLT.goal_and_right) g
       (fun l _ -> match l with
          | [g1;g2] ->
            simpl ~strong ~close g1

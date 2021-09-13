@@ -205,6 +205,12 @@ module Mk (S : LowSequent.S) = struct
       let red_e = Equiv.subst r_subst red_e in
       Equiv.Quant (q, vs, red_e)
 
+    | Equiv.And (e1, e2) ->
+      Equiv.And (reduce_equiv param s e1, reduce_equiv param s e2)
+
+    | Equiv.Or (e1, e2) ->
+      Equiv.Or (reduce_equiv param s e1, reduce_equiv param s e2)
+
     | Equiv.Impl (e1, e2) ->
       Equiv.Impl (reduce_equiv param s e1, reduce_equiv param s e2)
     

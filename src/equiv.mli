@@ -41,8 +41,10 @@ type quant = ForAll | Exists
 
 type form = 
   | Quant of quant * Vars.evar list * form
-  | Atom   of atom
-  | Impl   of (form * form)
+  | Atom  of atom
+  | Impl  of form * form
+  | And   of form * form
+  | Or    of form * form
 
 val pp : Format.formatter -> form -> unit
 

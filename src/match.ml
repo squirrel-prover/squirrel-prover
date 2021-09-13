@@ -194,19 +194,37 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Matching information for error messages} *)
 
-let minfos_ok : type a. a term -> match_infos -> match_infos =
-  fun term minfos ->
-  Mt.add (Term.ETerm term) MR_ok minfos
+(** update with the greatest value, where [MR_failed > MR_check_st > MR_ok] *)
+let minfos_update new_v old_v = 
+  match old_v with
+  | None -> Some new_v
+  | Some old_v -> 
+    match new_v, old_v with
+    | _, MR_failed | MR_failed, _ -> Some MR_failed
 
-let minfos_failed : type a. a term -> match_infos -> match_infos =
-  fun term minfos ->
-  Mt.add (Term.ETerm term) MR_failed minfos
+    | MR_check_st t1, MR_check_st t2 -> 
+      (* They may not be equal, but are alpha-equal *)
+      (* assert (List.for_all2 (=) t1 t2); *)
+      Some (MR_check_st t1)
 
-let minfos_check_st : type a. 
-  a term -> message list -> match_infos -> match_infos 
+    | MR_ok, MR_check_st t | MR_check_st t, MR_ok -> 
+      Some (MR_check_st t)
+
+    | MR_ok, MR_ok -> Some MR_ok
+
+let minfos_ok (term : Term.message) (minfos : match_infos) : match_infos =
+  Mt.update (Term.ETerm term) (minfos_update MR_ok) minfos
+
+let minfos_failed (term : Term.message) (minfos : match_infos) : match_infos =
+  Mt.update (Term.ETerm term) (minfos_update MR_failed) minfos
+
+let minfos_check_st
+    (term : Term.message) 
+    (st : message list)
+    (minfos : match_infos) 
+  : match_infos 
   =
-  fun term subterms minfos ->
-  Mt.add (Term.ETerm term) (MR_check_st subterms) minfos   
+  Mt.update (Term.ETerm term) (minfos_update (MR_check_st st)) minfos   
 
 (*------------------------------------------------------------------*)
 (** Normalize a match information map, by making a term tagged 
@@ -228,6 +246,7 @@ let minfos_norm (minit : match_infos) : match_infos =
         in
         (* special case for binders, because alpha-renamed subterms
            cannot be checked later *)
+        (* TODO: fix it to have an improved printing *)
         if List.for_all (fun x -> x = MR_ok) infos
         then MR_ok, Mt.add et MR_ok mfinal
         else if Term.is_binder t
@@ -1406,6 +1425,9 @@ let mset_list_inter
   in
   mset_list_simplify table system mset_l
 
+(*------------------------------------------------------------------*)
+(** [{term; cond;}] is the term [term] whenever [cond] holds. *)
+type cond_term = { term : Term.message; cond : Term.message }
 
 
 (*------------------------------------------------------------------*)
@@ -1443,6 +1465,8 @@ module E : S with type t = Equiv.form = struct
       (hyp : Term.message)
       (cond : Term.message) : bool
     =
+    let hyps = Term.decompose_ands hyp in
+
     let check_one cond =
       match cond with
       | Term.Atom (`Timestamp ((`Lt | `Leq as ord), t1, t2)) ->
@@ -1454,15 +1478,17 @@ module E : S with type t = Equiv.form = struct
 
         let check_direct = leq_tauto table t1 t2' in
         let check_indirect = 
-          match hyp with
-          | Term.Atom (`Timestamp (`Leq, ta, tb)) -> (* ≤ *)
+          List.exists (fun hyp -> 
+              match hyp with
+              | Term.Atom (`Timestamp (`Leq, ta, tb)) -> (* ≤ *)
 
-            (* checks whether [ta ≤ tb] implies [t1 ≤ t2'] *)
-            leq_tauto table t1 ta && leq_tauto table tb t2'
+                (* checks whether [ta ≤ tb] implies [t1 ≤ t2'] *)
+                leq_tauto table t1 ta && leq_tauto table tb t2'
 
-          | Term.Fun (fs,_,_) when fs = Term.f_true -> false
+              | Term.Fun (fs,_,_) when fs = Term.f_true -> false
 
-          | _ -> assert false
+              | _ -> false
+            ) hyps
         in
         check_direct || check_indirect
 
@@ -1848,9 +1874,9 @@ module E : S with type t = Equiv.form = struct
     | Some st -> st
 
   (*------------------------------------------------------------------*)
-  (** Try to match [term] as an element of [known]. *)
+  (** Try to match [cterm] as an element of [known]. *)
   let _deduce_mem_one
-      (term  : Term.message)
+      (cterm : cond_term)
       (known : known_set)
       (st    : match_state) : Mvar.t option
     =
@@ -1862,20 +1888,20 @@ module E : S with type t = Equiv.form = struct
     let st = { st with support = Sv.union vars st.support; } in
     
     try (* FIXME: use [try_match] *)
-      let mv = T.tmatch term e_pat.pat_term st in
+      let mv = T.tmatch cterm.term e_pat.pat_term st in
 
       let subst = Mvar.to_subst ~mode:`Unif mv in
       let known_cond = Term.subst subst known_cond in
       
-      (* check that [hyp] imples [known_cond θ] holds *)
-      if not (known_set_check_impl st.table Term.mk_true known_cond) then None
+      (* check that [cterm.cond] imples [known_cond θ] holds *)
+      if not (known_set_check_impl st.table cterm.cond known_cond) then None
       else                      (* clear [known.var] from the binding *)
         Some (Mvar.filter (fun v _ -> not (Sv.mem v vars)) mv)
     with NoMatch _ -> None
 
   (** FIXME *)
   let deduce_mem_one
-      (term  : Term.message)
+      (cterm : cond_term)
       (known : known_set)
       (st    : match_state) : Mvar.t option
     =
@@ -1895,45 +1921,53 @@ module E : S with type t = Equiv.form = struct
        cleared both [st.bvs] and [st.support] (i.e. we do not try to infer the
        arguments of the lemma being applied).
     *)
-    match _deduce_mem_one term known st with
+    match _deduce_mem_one cterm known st with
     | Some mv -> Some mv
     | None -> (* try again, with empty support and bvs *)
       let st = { st with bvs = Sv.empty; support = Sv.empty; } in
-      _deduce_mem_one term known st
+      _deduce_mem_one cterm known st
         
   
   (** Try to match [term] as an element of a sequence in [elems]. *)
   let deduce_mem
-      (term  : Term.message)
+      (cterm : cond_term)
       (elems : known_sets)
       (st    : match_state) : Mvar.t option
     =
-    let elems_head = List.assoc_dflt [] (get_head term) elems in
-    List.find_map (fun elem -> deduce_mem_one term elem st) elems_head
+    let elems_head = List.assoc_dflt [] (get_head cterm.term) elems in
+    List.find_map (fun elem -> deduce_mem_one cterm elem st) elems_head
  
   (*------------------------------------------------------------------*)
   (** [fa_decompose term st] return a list of matching conditions that must be 
       met for [term] to be deducible starting from [st].
       Return [None] if Function Application fails on [term] *) 
   let fa_decompose
-      (term      : Term.message)
-      (st        : match_state) : (match_state * Term.message) list option
+      (cterm : cond_term)
+      (st    : match_state) : (match_state * cond_term) list option
     =
-    match term with
-    | _ when is_pure_timestamp term -> Some []
+    match cterm.term with
+    | t when is_pure_timestamp t -> Some []
+
+    | Term.Fun (f, _, [b; t1; t2] ) when f = Term.f_ite -> 
+      let cond1 = Term.mk_and b cterm.cond
+      and cond2 = Term.mk_and b (Term.mk_not cterm.cond) in
+
+      Some (List.map (fun t -> st, t) [{ term = t1; cond = cond1; };
+                                       { term = t2; cond = cond2; }])
     
     | Term.Fun (_, _, terms) -> 
-      Some (List.map (fun t -> st, t) terms)
+      Some (List.map (fun term -> st, { cterm with term } ) terms)
 
     | Term.Atom (`Message (_, t1, t2)) ->
-      Some (List.map (fun t -> st, t) [t1; t2])
+      Some (List.map (fun t -> st, t) [{ cterm with term = t1; }; 
+                                       { cterm with term = t2; }])
 
     | Term.Seq (is, term) ->
       let is, subst = Term.erefresh_vars `Global is in
       let term = Term.subst subst term in
 
       let st = { st with bvs = Sv.union st.bvs (Sv.of_list is); } in
-      Some [(st, term)]
+      Some [(st, { cterm with term; } )]
 
     | Term.Exists (es, term)
     | Term.ForAll (es, term)
@@ -1946,13 +1980,25 @@ module E : S with type t = Equiv.form = struct
       let term = Term.subst subst term in
 
       let st = { st with bvs = Sv.union st.bvs (Sv.of_list es); } in
-      Some [(st, term)]
+      Some [(st, { cterm with term; })]
 
     | Find (is, c, d, e) ->
       let is, subst = Term.refresh_vars `Global is in
       let c, d = Term.subst subst c, Term.subst subst d in
 
       let st1 = { st with bvs = Sv.add_list st.bvs is; } in
+
+      let d_cond = Term.mk_and cterm.cond c in
+      let e_cond = 
+        Term.mk_and
+          cterm.cond
+          (Term.mk_forall (List.map Vars.evar is) (Term.mk_not c))
+      in
+
+      let c = { term = c; cond = cterm.cond; }
+      and d = { term = d; cond = d_cond; }
+      and e = { term = c; cond = e_cond; } in
+      
 
       Some [(st1, c); (st1, d); (st, e)]
 
@@ -1965,30 +2011,34 @@ module E : S with type t = Equiv.form = struct
       - Sequence expantion: sequences may be expanded;
       - Function Application: [term] may be decomposed into smaller terms. *)
   let rec match_term_incl
-      (term      : Term.message)
+      (cterm     : cond_term)
       (pat_terms : known_sets)
       (st        : match_state) 
       (minfos    : match_infos) : Mvar.t * match_infos
     =
-    match deduce_mem term pat_terms st with
-    | Some mv -> mv, minfos_ok term minfos
+    match deduce_mem cterm pat_terms st with
+    | Some mv -> mv, minfos_ok cterm.term minfos
     | None ->
       (* if that fails, decompose [term] through the Function Application
          rule, and recurse. *)
-      fa_match_term_incl term pat_terms st minfos 
+      fa_match_term_incl cterm pat_terms st minfos 
 
   (** Check that [term] can be deduced from [pat_terms] and [mset_l]. *) 
   and fa_match_term_incl
-      (term      : Term.message)
+      (cterm     : cond_term)
       (pat_terms : known_sets)
       (st        : match_state) 
       (minfos    : match_infos) : Mvar.t * match_infos
     =
-    match fa_decompose term st with
-    | None -> st.mv, minfos_failed term minfos
+    match fa_decompose cterm st with
+    | None -> st.mv, minfos_failed cterm.term minfos
 
     | Some fa_conds ->
-      let minfos = minfos_check_st term (List.map snd fa_conds) minfos in
+      let minfos = 
+        let st = List.map (fun x -> (snd x).term) fa_conds in
+        minfos_check_st cterm.term st minfos 
+      in
+
       List.fold_left (fun (mv, minfos) (st, t) ->
           let mv, minfos = 
             match_term_incl t pat_terms { st with mv } minfos 
@@ -2024,7 +2074,8 @@ module E : S with type t = Equiv.form = struct
     
     let mv, minfos = 
       List.fold_left (fun (mv, minfos) term ->
-          match_term_incl term pat_terms { st with mv } minfos 
+          let cterm = { term; cond = Term.mk_true; } in
+          match_term_incl cterm pat_terms { st with mv } minfos 
         ) (st.mv, Mt.empty) terms
     in
 
@@ -2176,10 +2227,17 @@ module E : S with type t = Equiv.form = struct
 
         if found then true, e' else false, e
 
+      | Or   (e1, e2) 
+      | And  (e1, e2)
       | Impl (e1, e2) ->
         let found1, e1 = map env vars conds e1
         and found2, e2 = map env vars conds e2 in
-        let e' = Equiv.Impl (e1, e2) in
+        let e' = match e with
+          | Or  _  -> Equiv.Or (e1, e2)
+          | And  _ -> Equiv.And (e1, e2)
+          | Impl _ -> Equiv.Impl (e1, e2) 
+          | _ -> assert false 
+        in
         let found = found1 || found2 in
 
         if found then true, e' else false, e
