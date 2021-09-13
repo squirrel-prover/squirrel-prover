@@ -653,14 +653,6 @@ Proof.
   rewrite /* in 0.    
   by apply ~fadup Hind (pred(t)).
 
-  (* Write(pid, j) *)
-  repeat destruct Eq as [_ Eq].
-  rewrite le_lt // -le_pred_lt in 2.
-  rewrite /AEAD in 1.
-  fa 1.
-  rewrite /* in 0. 
-  by apply ~fadup Hind (pred(t)).
-
   (* Decode(pid,j) *)
   repeat destruct Eq as [_ Eq].
   rewrite /AEAD in 1.

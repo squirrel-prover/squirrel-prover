@@ -1206,16 +1206,17 @@ let known_set_process_pair_inj (k : known_set) : known_set list =
 
   | _ -> [k]
 
-(** Given a term, return some corresponding known_sets. 
-    Special treatment of `frame`, to account for the fact
-    that it contains all its predecessors. *)
-let known_set_list_of_term (term : Term.message) : known_set list =
+(** Given a term, return some corresponding known_sets.  *)
+let known_set_list_of_term ~strong (term : Term.message) : known_set list =
   let k = known_set_of_term term in
   let k_seq = known_set_add_frame k in
-  List.concat_map known_set_process_pair_inj (k :: k_seq)
+  if strong then
+    k :: k_seq
+  else
+    List.concat_map known_set_process_pair_inj (k :: k_seq)
 
-let known_sets_of_terms (terms : Term.message list) : known_sets =
-  let ks_l = List.concat_map known_set_list_of_term terms in
+let known_sets_of_terms ~strong (terms : Term.message list) : known_sets =
+  let ks_l = List.concat_map (known_set_list_of_term ~strong) terms in
   List.fold_left (fun ks k -> known_sets_add k ks) [] ks_l
 
 (*------------------------------------------------------------------*)
@@ -1231,7 +1232,7 @@ let known_set_of_mset
     let cond_le = match mset.cond_le with
       | None -> Term.mk_true
       | Some cond_le ->
-        Term.mk_atom `Lt (Term.mk_var t) cond_le
+        Term.mk_atom `Leq (Term.mk_var t) cond_le
     in
     let extra_cond_le = match extra_cond_le with
       | None -> Term.mk_true
@@ -1667,11 +1668,10 @@ module E : S with type t = Equiv.form = struct
           let known_sets = known_sets_of_mset_l ~extra_cond_le:ts known_sets in
           known_sets_union init_terms known_sets
         in
-        (* let all_known_sets = init_terms @ known_sets in *)
         let ded_sets = deduce table system cand_set all_known_sets in
-
+        
         let mset_l =
-          List.fold_left (fun msets ded_set ->
+          List.fold_left (fun mset_l ded_set ->
               let subst = Mvar.to_subst ~mode:`Unif ded_set.subst in
               let msymb = Term.subst_isymb subst cand.msymb in
               let indices = List.map (Term.subst_var subst) cand.indices in
@@ -1686,7 +1686,7 @@ module E : S with type t = Equiv.form = struct
                     | _ -> false)
               in
 
-              mset :: msets
+              mset :: mset_l
             ) [] ded_sets
         in
         mset_list_simplify table system mset_l
@@ -1699,18 +1699,15 @@ module E : S with type t = Equiv.form = struct
         (known_sets : MCset.t list)            (* induction *)
       : msets
       =
-      let msets =
-        List.map (fun (mname, cand_l) ->
-            let mset_l =
-              List.concat_map (fun cand ->
-                  filter_deduce_action a cand init_terms known_sets
-                ) cand_l
-            in
-            (mname, mset_list_inter table system env cand_l mset_l)
-          ) cands
-      in
-      msets
-    in
+      List.map (fun (mname, cand_l) ->
+          let mset_l =
+            List.concat_map (fun cand ->                
+                filter_deduce_action a cand init_terms known_sets
+              ) cand_l
+          in          
+          (mname, mset_list_inter table system env cand_l mset_l)
+        ) cands
+  in
 
     (* fold over all actions of the protocol, to find a specialization of 
        [cands] stable by each action. *)
@@ -1734,6 +1731,8 @@ module E : S with type t = Equiv.form = struct
       let init_known : MCset.t list = msets_to_list cands in
       let cands' = filter_deduce_all_actions cands init_terms init_known in
 
+      dbg "deduce_fixpoint:@.%a@." pp_msets cands';
+      
       (* check if [cands] is included in [cands'] *)
       if msets_incl table system cands cands'
       then cands'
@@ -1752,20 +1751,21 @@ module E : S with type t = Equiv.form = struct
     let init_fixpoint : msets =
       Symbols.Macro.fold (fun mn def _ msets ->
           match def with
-          | Symbols.Global _ -> msets
+          | Symbols.Global _ 
+          | Symbols.Input | Symbols.Output | Symbols.Frame | Symbols.Exec -> msets
+
           (* ignore global macros, as they are (usually) not defined at
              all timestamps, so we won't find a deduction invariant with
              them. *)
           | _ -> 
             let ty, indices = match def with
-              | Symbols.Global (i, ty) -> assert false
+              | Symbols.Input | Symbols.Output | Symbols.Frame | Symbols.Exec
+              | Symbols.Global _ -> assert false
+                
               | Symbols.State (i, ty) ->
                 ty, List.init i (fun _ -> Vars.make_new Type.Index "i")
 
-              | Symbols.Input | Symbols.Output | Symbols.Frame ->
-                Type.Message, []
-
-              | Symbols.Cond | Symbols.Exec ->
+              | Symbols.Cond ->
                 Type.Boolean, []
             in
             let ms = Term.mk_isymb mn ty indices in
@@ -1774,9 +1774,13 @@ module E : S with type t = Equiv.form = struct
         ) [] table
     in
 
+    dbg "init_fixpoint:@.%a@." pp_msets init_fixpoint;
+    
     (* initially known terms *)
-    let init_terms = known_sets_of_terms init_terms in
+    let init_terms = known_sets_of_terms ~strong:false init_terms in
 
+    dbg "init_terms:@.%a@." pp_known_sets init_terms;
+    
     deduce_fixpoint init_fixpoint init_terms
 
   (* memoisation *)
@@ -1863,9 +1867,8 @@ module E : S with type t = Equiv.form = struct
       let subst = Mvar.to_subst ~mode:`Unif mv in
       let known_cond = Term.subst subst known_cond in
       
-      (* check that [known_cond θ] holds *)
-      if not (known_set_check_impl st.table Term.mk_true known_cond) then
-        None
+      (* check that [hyp] imples [known_cond θ] holds *)
+      if not (known_set_check_impl st.table Term.mk_true known_cond) then None
       else                      (* clear [known.var] from the binding *)
         Some (Mvar.filter (fun v _ -> not (Sv.mem v vars)) mv)
     with NoMatch _ -> None
@@ -2016,7 +2019,7 @@ module E : S with type t = Equiv.form = struct
     let pat_terms =
       known_sets_union
         (known_sets_of_mset_l mset_l)
-        (known_sets_of_terms pat_terms)
+        (known_sets_of_terms ~strong:true pat_terms)
     in
     
     let mv, minfos = 
