@@ -18,14 +18,14 @@
 %token LBRACKET RBRACKET
 %token LANGLE RANGLE
 %token GAND GOR AND OR NOT TRUE FALSE HAPPENS
-%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS
+%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS COLONEQ
 %token XOR STAR UNDERSCORE QMARK TICK 
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token TILDE DIFF LEFT RIGHT SEQ
 %token NEW OUT PARALLEL NULL
 %token CHANNEL PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT TYPE FUN
 %token MUTABLE SYSTEM SET
-%token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW RARROW ASSIGN
+%token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW RARROW 
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token LOCAL GLOBAL
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH SLASHSLASHEQUAL ATSLASH
@@ -277,7 +277,7 @@ process_i:
 | LET id=lsymb ty=colon_ty? EQ t=term IN p=process
     { Process.Let (id,t,ty,p) }
 
-| id=lsymb terms=term_list ASSIGN t=term p=process_cont
+| id=lsymb terms=term_list COLONEQ t=term p=process_cont
     { let to_idx t = match L.unloc t with
         | Theory.App(x,[]) -> x
         | ti -> raise @@ Theory.Conv (L.loc t, Theory.Index_not_var ti)
@@ -539,7 +539,7 @@ int:
 selector:
 | l=slist1(int,COMMA) { l }
 
-tac_formula:
+tac_term:
 | f=term  %prec tac_prec { f }
 
 as_ip:
@@ -558,6 +558,14 @@ pt:
 | hid=lsymb args=slist(sterm,empty)
     { let p_pt_loc = L.make $startpos $endpos in
       { p_pt_hid = hid; p_pt_args = args; p_pt_loc; } }
+
+/* legacy syntax for use tactic */
+pt_use_tac:
+| hid=lsymb
+    { Theory.{ p_pt_hid = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
+| hid=lsymb WITH args=slist1(tac_term,COMMA) 
+    { let p_pt_loc = L.make $startpos $endpos in
+      Theory.{ p_pt_hid = hid; p_pt_args = args; p_pt_loc; } }
 
 /* non-ambiguous pt */
 spt:
@@ -579,7 +587,7 @@ apply_arg:
 
 
 %inline assert_tac:
-| l=lloc(ASSERT) p=tac_formula ip=as_ip?
+| l=lloc(ASSERT) p=tac_term ip=as_ip?
     { let ip = match ip with
         | None -> []
         | Some ip -> [TacticsArgs.SimplPat ip] in
@@ -677,17 +685,11 @@ tac:
   | t=assert_tac BY t1=tac
     { T.AndThenSel (t, [[1], t1]) }
 
-  | l=lloc(USE) i=lsymb ip=as_ip?
-    { let ip = match ip with
-        | None -> []
-        | Some ip -> [TacticsArgs.SimplPat ip] in
-      mk_abstract l "use" (ip @ [TacticsArgs.String_name i]) }
+  | l=lloc(USE) pt=pt_use_tac ip=as_ip? 
+    { mk_abstract l "assert" [TacticsArgs.AssertPt (pt, ip, `IntroImpl)] }
 
-  | l=lloc(USE) i=lsymb WITH t=tactic_params ip=as_ip?
-    { let ip : TacticsArgs.parser_arg list = match ip with
-        | None -> []
-        | Some ip -> [TacticsArgs.SimplPat ip] in
-      mk_abstract l "use" (ip @ [TacticsArgs.String_name i] @ t) }
+  | l=lloc(ASSERT) LPAREN ip=simpl_pat? COLONEQ pt=pt RPAREN
+    { mk_abstract l "assert" [TacticsArgs.AssertPt (pt, ip, `None)] }
 
   | l=lloc(REWRITE) p=rw_args w=in_target
     { mk_abstract l "rewrite" [TacticsArgs.RewriteIn (p, w)] }

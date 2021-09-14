@@ -119,6 +119,7 @@ type parser_arg =
   | SimplPat    of simpl_pat
   | RewriteIn   of rw_arg list * in_target
   | ApplyIn     of named_args * Theory.p_pt * apply_in
+  | AssertPt    of Theory.p_pt_hol * simpl_pat option * [`IntroImpl | `None]
   | SplitSeq    of int L.located * Theory.hterm
   | ConstSeq    of int L.located * Theory.term list
   | MemSeq      of int L.located * int L.located

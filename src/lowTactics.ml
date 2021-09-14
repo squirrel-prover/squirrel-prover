@@ -1313,45 +1313,32 @@ module MkCommonLowTac (S : Sequent.S) = struct
     * As with apply, we require that the hypothesis (or lemma) is
     * of the kind of conclusion formulas: for local sequents this means
     * that we cannot use a global hypothesis or lemma. *)
-  let use ip (name : lsymb) (ths : Theory.term list) (s : S.t) =
-    (* Get formula to apply. *)
-    let stmt = S.get_assumption S.conc_kind name s in
+  let use ~(mode:[`IntroImpl | `None]) ip (pt : Theory.p_pt_hol) (s : S.t) =
+    let _, pat = S.convert_pt_hol pt S.conc_kind s in
 
-    (* FIXME *)
-    if stmt.ty_vars <> [] then
-      soft_failure (Failure "free type variables not supported with \
-                             use tactic") ;
+    if pat.pat_tyvars <> [] then
+      soft_failure (Failure "free type variables remaining") ;
 
-    (* Get universally quantified variables, verify that lengths match. *)
-    let uvars,f = S.Conc.decompose_forall stmt.formula in
-
-    if List.length uvars < List.length ths then
-      Tactics.(soft_failure (Failure "too many arguments")) ;
-
-    let uvars, uvars0 = List.takedrop (List.length ths) uvars in
-    let f = S.Conc.mk_forall ~simpl:false uvars0 f in
-
-    (* refresh *)
-    let uvars, subst = Term.erefresh_vars `Global uvars in
-    let f = S.subst_conc subst f in
-
-    let subst = 
-      Theory.parse_subst (S.table s) (S.ty_vars s) (S.env s) uvars ths 
+   (* rename cleanly the variables *)
+    let vars, subst = 
+      Term.erefresh_vars (`InEnv (ref (S.env s))) (Sv.elements pat.pat_vars) 
+    in
+    let f = S.subst_conc subst pat.pat_term in
+    let f = 
+      S.Conc.mk_forall ~simpl:true vars f
     in
 
-    (* instantiate [f] *)
-    let f = S.subst_conc subst f in
-
-    (* Compute subgoals by introducing implications on the left. *)
+    (* If [mode=`IntroImpl], compute subgoals by introducing implications
+       on the left. *)
     let rec aux subgoals form = 
-      if S.Conc.is_impl form then
+      if S.Conc.is_impl form && mode = `IntroImpl then
         begin
           let h, c = oget (S.Conc.destr_impl form) in
           let s' = S.set_goal h s in
           aux (s'::subgoals) c
         end
 
-      else if S.Conc.is_not form then
+      else if S.Conc.is_not form && mode = `IntroImpl then
         begin
           let h = oget (S.Conc.destr_not form) in
           let s' = S.set_goal h s in
@@ -1363,30 +1350,16 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let idf, s0 = Hyps.add_i Args.AnyName (S.hyp_of_conc form) s in
           let s0 = match ip with
             | None -> [s0]
-            | Some ip -> do_simpl_pat (`Hyp idf) ip s0 in
-          s0 @ List.rev subgoals
+            | Some ip -> do_simpl_pat (`Hyp idf) ip s0 
+          in
+          
+          match mode with
+          | `None -> (List.rev subgoals) @ s0
+          | `IntroImpl -> s0 @ List.rev subgoals (* legacy behavior *)
         end
     in
 
-    aux [] f
-
-  let use_args args s =
-    let ip, args = match args with
-      | Args.SimplPat ip :: args -> Some ip, args
-      | args                     -> None, args in
-    match args with
-    | Args.String_name id :: th_terms ->
-      let th_terms =
-        List.map
-          (function
-            | Args.Theory th -> th
-            | _ -> bad_args ())
-          th_terms
-      in
-      use ip id th_terms s 
-    | _ -> bad_args ()
-
-  let use_tac args = wrap_fail (use_args args)
+    aux [] f 
 
   (*------------------------------------------------------------------*)
   (** {3 Assert} *)
@@ -1396,7 +1369,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     * We only consider the case here where [f] is a local formula
     * (which is then converted to conclusion and hypothesis formulae)
     * more general forms should be allowed here or elsewhere. *)
-  let my_assert (args : Args.parser_arg list) s : S.t list =
+  let assert_form (args : Args.parser_arg list) s : S.t list =
     let ip, f = match args with
       | [f] -> None, f
       | [f; Args.SimplPat ip] -> Some ip, f
@@ -1419,7 +1392,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
     s1 :: s2
 
-  let assert_tac args = wrap_fail (my_assert args)
+  let assert_args = function
+    | [Args.AssertPt (pt, ip, mode)] -> use ~mode ip pt
+    | _ as args -> assert_form args 
+
+  let assert_tac args = wrap_fail (assert_args args)
 
 
   (*------------------------------------------------------------------*)
@@ -2003,29 +1980,20 @@ let () =
 
 (*------------------------------------------------------------------*)
 let () =
-  T.register_general "use"
-    ~tactic_help:
-      {general_help = "Apply an hypothesis with its universally \
-                       quantified variables instantiated with the \
-                       arguments.\n\n\
-                       Usages: use H with v1, v2, ...\n\
-                      \        use H with ... as ...";
-       detailed_help = "";
-       usages_sorts = [];
-       tactic_group = Logical}
-    (gentac_of_any_tac_arg TraceLT.use_tac EquivLT.use_tac)
-
-
-(*------------------------------------------------------------------*)
-let () =
   T.register_general "assert"
     ~tactic_help:
-      {general_help = "Add an assumption to the set of hypothesis, \
-                       and produce the goal for\
-                       \nthe proof of the assumption.\n\
-                       Usages: assert f.\n \
-                      \       assert f as intro_pat";
-       detailed_help = "";
+      {general_help = "Add a new hypothesis.";
+       detailed_help = 
+         "- assert form:\n\
+         \  Add `form` to the hypotheses, and produce a subgoal to prove \
+          `form`. \n\
+          - assert form as intro_pat:\n\
+         \  Idem, except that `intro_pat` is applied to `form`.\n\
+          - assert (intro_pat := proof_term):\n\
+         \  Compute the formula corresponding to `proof_term`, and\n\
+         \  apply `intro_pat` to it.\n\
+         \  Exemples: * `assert (H := H0 i i2)`\n\
+         \            * `assert (H := H0 _ i2)`";
        usages_sorts = [];
        tactic_group = Logical}
     (gentac_of_any_tac_arg TraceLT.assert_tac EquivLT.assert_tac)

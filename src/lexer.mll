@@ -48,6 +48,7 @@ rule token = parse
 | "!"                 { BANGU }
 | '.'                 { DOT }
 | ':'                 { COLON }
+| ":="                { COLONEQ }
 | ';'                 { SEMICOLON }
 | '*'                 { STAR }
 | '_'                 { UNDERSCORE }
@@ -67,7 +68,6 @@ rule token = parse
 | "<-"                { RARROW }
 | "=>"                { DARROW }
 | "<=>"               { DEQUIVARROW }
-| ":="                { ASSIGN }
 | "-"                 { MINUS }
 | "@"                 { AT }
 | '~'                 { TILDE }
