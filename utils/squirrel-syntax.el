@@ -111,6 +111,7 @@
   "split"
   "subst"
   "rewrite"
+  "reach_equiv"
   "systemsubstitute"
   "true"
   "cca1"

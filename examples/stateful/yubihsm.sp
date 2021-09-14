@@ -55,6 +55,7 @@ counter.
 *******************************************************************************)
 set autoIntro=false.
 
+
 (* AEAD symmetric encryption scheme: IND-CCA + INT-CTXT *)
 senc enc,dec
 
@@ -216,7 +217,7 @@ axiom len_pair (x, y : message) : len(<x,y>) = (len(x) ++ len(y) ++ c_pair).
 axiom eq_iff (x, y : boolean) : (x = y) = (x <=> y).
 
 goal eq_refl ['a] (x : 'a) : (x = x) = true. 
-Proof. print.
+Proof. 
   by rewrite eq_iff. 
 Qed.
 hint rewrite eq_refl.
@@ -237,7 +238,6 @@ Proof.
   by rewrite eq_iff. 
 Qed.
 hint rewrite eq_refl_t.
-
 
 axiom not_true : not(true) = false.
 hint rewrite not_true.
@@ -653,14 +653,6 @@ Proof.
   rewrite /* in 0.    
   by apply ~fadup Hind (pred(t)).
 
-  (* Write(pid, j) *)
-  repeat destruct Eq as [_ Eq].
-  rewrite le_lt // -le_pred_lt in 2.
-  rewrite /AEAD in 1.
-  fa 1.
-  rewrite /* in 0. 
-  by apply ~fadup Hind (pred(t)).
-
   (* Decode(pid,j) *)
   repeat destruct Eq as [_ Eq].
   rewrite /AEAD in 1.
@@ -840,7 +832,105 @@ Proof.
 Qed.
 
 
+(*------------------------------------------------------------------*)
 
+axiom max_ts : 
+  exists (tmax : timestamp), 
+  happens(tmax) &&
+  (forall (t : timestamp), happens(t) => t <= tmax).
+
+global goal david_atomic_key0 :
+  exists (t : timestamp),
+  ([happens(t)] /\
+   [forall (t' : timestamp), happens(t') => t' <= t] /\
+    equiv(
+     frame@t,
+     seq(t':timestamp -> if t' <= t then exec@t' else false),
+     seq(i:index, t':timestamp -> if t' <= t then YCtr(i)@t'),
+     seq(i:index, t':timestamp -> if t' <= t then SCtr(i)@t')
+  )).
+Proof.
+  use max_ts as [tmax [_ U]].
+  exists tmax.
+  use stef_atomic_keys with tmax as H; 2: auto. 
+  split. 
+  by (split; intro *); 2: apply U.
+  by apply ~fadup H.
+Qed.
+
+
+axiom sctr_nhap (i : index, t' : timestamp) : 
+   not happens(t') => SCtr(i)@t' = empty.
+
+axiom yctr_nhap (i : index, t' : timestamp) : 
+   not happens(t') => YCtr(i)@t' = empty.
+
+(* default value of `exec` at timestamp not in the trace. Left arbitrary. *)
+abstract exec_dflt : boolean.
+
+axiom exec_nhap (t' : timestamp) : 
+   not happens(t') => exec@t' = exec_dflt.
+
+global goal david_atomic_key :
+  exists (t : timestamp),
+  ([happens(t)] /\
+   [forall (t' : timestamp), happens(t') => t' <= t] /\
+    equiv(
+      frame@t,
+      seq(t':timestamp -> exec@t'),
+      seq(i:index, t':timestamp -> YCtr(i)@t'),
+      seq(i:index, t':timestamp -> SCtr(i)@t')
+  )).
+Proof.
+  use david_atomic_key0 as [tmax [[Hap C] U]].
+  exists tmax. 
+  split; 1: by split. 
+  assert (forall (t' : timestamp), (t' <= tmax) = happens(t')) as Eq.
+    intro t'; rewrite eq_iff. 
+    by split; 2: intro _; apply C. 
+  rewrite Eq in U.  
+
+  splitseq 3: (fun (i : index, t' : timestamp) -> happens(t')).
+  splitseq 2: (fun (i : index, t' : timestamp) -> happens(t')).
+  splitseq 1: (fun (t' : timestamp) -> happens(t')).
+
+  constseq 6 : empty zero.
+  intro i t'.
+    case happens(t') => _ //=. 
+    by rewrite sctr_nhap.
+
+  constseq 4 : empty zero.
+  intro i t'.
+    case happens(t') => _ //=. 
+    by rewrite yctr_nhap.
+
+  constseq 2 : exec_dflt false.
+  intro t'.
+    case happens(t') => _ //=. 
+    by rewrite exec_nhap.
+
+  by apply ~fadup U.
+Qed.
+ 
+global goal injective_correspondance_equiv (pid, j:index):
+   [happens(Server(pid,j))] ->
+   equiv(
+     exec@Server(pid,j) =>
+     exists (i:index),
+       Press(pid,i) < Server(pid,j) &&
+       YCtr(pid)@pred(Press(pid,i)) = SCtr(pid)@Server(pid,j) &&
+       forall (j':index), happens(Server(pid,j')) =>
+         exec@Server(pid,j') =>
+         YCtr(pid)@pred(Press(pid,i)) = SCtr(pid)@Server(pid,j') =>
+         j = j').
+Proof.
+  intro Hap.
+  use david_atomic_key as [tmax [_ H]].
+  apply ~fadup H.
+Qed.
+
+(*------------------------------------------------------------------*)
+ 
 (* Property 2 *)
 (* injective correspondance as stated in the PhD thesis of R. Kunneman *)
 
@@ -849,14 +939,14 @@ goal [right] injective_correspondance (j, pid:index):
    exec@Server(pid,j) =>
      exists (i:index),
        Press(pid,i) < Server(pid,j) && 
-       ctr(pid,i)@Press(pid,i) = SCtr(pid)@Server(pid,j) && 
+       YCtr(pid)@pred(Press(pid,i)) = SCtr(pid)@Server(pid,j) && 
        forall (j':index), happens(Server(pid,j')) =>
          exec@Server(pid,j') =>
-         ctr(pid,i)@Press(pid,i) = SCtr(pid)@Server(pid,j') => 
+         YCtr(pid)@pred(Press(pid,i)) = SCtr(pid)@Server(pid,j') => 
          j = j'.
-
 Proof.
-intro Hap Hexec.
+intro Hap.
+intro Hexec.
 executable Server(pid,j) => //.
 intro exec.
 expand exec, cond.

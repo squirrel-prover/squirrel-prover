@@ -93,12 +93,17 @@ type hterm = hterm_i L.located
 
 type equiv = term list 
 
+type pquant = PForAll | PExists
+              
 type global_formula = global_formula_i Location.located
+
 and global_formula_i =
   | PEquiv  of equiv
   | PReach  of formula
   | PImpl   of global_formula * global_formula
-  | PForAll of bnds * global_formula
+  | PAnd    of global_formula * global_formula
+  | POr     of global_formula * global_formula
+  | PQuant  of pquant * bnds * global_formula
 
 (*------------------------------------------------------------------*)
 (** {2 Declaration of new symbols} *)

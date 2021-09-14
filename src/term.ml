@@ -1104,6 +1104,9 @@ let subst_var : type a. subst -> a Vars.var -> a Vars.var =
     | _ -> raise @@ Substitution_error
         "Must map the given variable to another variable"
 
+let subst_evar (s : subst) (Vars.EVar v) : Vars.evar =
+  Vars.EVar (subst_var s v)
+  
 let subst_isymb (s : subst) (symb : ('a,'b) isymb) : ('a,'b) isymb =
   { symb with s_indices = List.map (subst_var s) symb.s_indices }
 

@@ -1508,6 +1508,18 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | _ -> bad_args ()
 
   let remember_tac args = wrap_fail (remember_tac_args args)
+
+  (*------------------------------------------------------------------*)
+  (** Split a conjunction conclusion,
+    * creating one subgoal per conjunct. *)
+  let goal_and_right (s : S.t) : S.t list =
+    match S.Conc.destr_and (S.goal s) with
+    | Some (lformula, rformula) ->
+      [ S.set_goal lformula s ;
+        S.set_goal rformula s ]
+
+    | None -> soft_failure (Failure "not a conjunction")
+
 end
 
 (*------------------------------------------------------------------*)
@@ -2098,4 +2110,15 @@ let () = T.register "expandall"
        (TraceLT.expand_all_l `All)
        (EquivLT.expand_all_l `All))
 (* FIXME: allow user to specify targets *)
+
+(*------------------------------------------------------------------*)
+let () = T.register "split"
+    ~tactic_help:{general_help = "Split a conjunction conclusion, creating one \
+                                  subgoal per conjunct.";
+                  detailed_help = "G=> A & B is replaced by G=>A and goal G=>B.";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    (genfun_of_any_pure_fun
+       TraceLT.goal_and_right
+       EquivLT.goal_and_right)
 

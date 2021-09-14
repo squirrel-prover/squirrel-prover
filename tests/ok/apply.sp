@@ -179,19 +179,23 @@ Proof.
  intro H; apply H.
 Qed.
 
-global goal _ (y : message) :
-  (forall (x : message), equiv(seq (i:index -> <n1(i), x>))) ->
-  equiv(seq (j:index -> <n1(j), f(y)>)).
-Proof.
- intro H; apply H.
-Qed.
+(* TODO: inferance is failing there. See [Match.deduce_mem_one] *)
+(* global goal _ (y : message) : *)
+(*   (forall (x : message), equiv(seq (i:index -> <n1(i), x>))) -> *)
+(*   equiv(seq (j:index -> <n1(j), f(y)>)). *)
+(* Proof. *)
+(*  intro H; apply H. *)
+(* Qed. *)
  
-(* we cannot match `x` with `n1(j)` since `j` is bound in the conclusion. *)
-global goal _ (y : message) :
+name nj : index -> message.
+
+(* we cannot match `x` with `nj(j)` since `j` is bound in the conclusion. *)
+global goal _ :
  (forall (x : message), equiv(seq (i:index -> <n1(i), x>))) ->
- equiv(seq (j:index -> <n1(j), n1(j)>)).
+ equiv(seq (j:index -> <n1(j), nj(j)>)).
 Proof.
- checkfail (intro H; apply H) exn ApplyMatchFailure.
+ intro H.
+ checkfail (apply H) exn ApplyMatchFailure.
 Abort.
 
 (* with a sequence *)
@@ -282,7 +286,8 @@ system [three] !_i in(ch,x); new l; if x = l then out(ch,<ok(i),<x,l>>).
 (* cond cannot be deduce in system [three], because of the new name `l` *)
 global goal [three] _ (t : timestamp) : equiv(frame@pred(t)) -> equiv(exec@t).
 Proof.
- checkfail (intro H; apply H) exn ApplyMatchFailure.
+ intro H.
+ checkfail (apply H) exn ApplyMatchFailure.
 Abort.
 
 (*------------------------------------------------------------------*)

@@ -252,12 +252,17 @@ type hterm = hterm_i L.located
 
 type equiv = term list 
 
+type pquant = PForAll | PExists
+              
 type global_formula = global_formula_i Location.located
+
 and global_formula_i =
   | PEquiv  of equiv
   | PReach  of formula
   | PImpl   of global_formula * global_formula
-  | PForAll of bnds * global_formula
+  | PAnd    of global_formula * global_formula
+  | POr     of global_formula * global_formula
+  | PQuant  of pquant * bnds * global_formula
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
@@ -1318,7 +1323,9 @@ let convert_global_formula cenv ty_vars env (p : global_formula) =
     in
 
     match L.unloc p with
-    | PImpl (f,f0) -> Equiv.Impl (conve f, conve f0)
+    | PImpl (f1, f2) -> Equiv.Impl (conve f1, conve f2)
+    | PAnd  (f1, f2) -> Equiv.And  (conve f1, conve f2)
+    | POr   (f1, f2) -> Equiv.Or   (conve f1, conve f2)
 
     | PEquiv e -> 
       Equiv.Atom (Equiv.Equiv (convert_equiv cenv ty_vars env e))
@@ -1326,12 +1333,17 @@ let convert_global_formula cenv ty_vars env (p : global_formula) =
     | PReach f -> 
       Equiv.Atom (Equiv.Reach (convert cenv ty_vars env f Type.Boolean))
 
-    | PForAll (bnds, e) ->
+
+    | PQuant (q, bnds, e) ->
       let env, evs =
         convert_p_bnds cenv.table ty_vars env bnds 
       in
       let e = conve ~env e in
-      Equiv.mk_forall evs e
+      let q = match q with
+        | PForAll -> Equiv.ForAll
+        | PExists -> Equiv.Exists
+      in
+      Equiv.mk_quant q evs e
   in      
 
   conve cenv ty_vars env p

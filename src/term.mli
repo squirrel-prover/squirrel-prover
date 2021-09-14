@@ -244,7 +244,9 @@ val tsubst_ht : Type.tsubst -> hterm -> hterm
 (** [subst_var s v] returns [v'] if substitution [s] maps [v] to [Var v'],
   * and [v] if the variable is not in the domain of the substitution.
   * @raise Substitution_error if [v] is mapped to a non-variable term in [s]. *)
-val subst_var : subst -> 'a Vars.var -> 'a Vars.var
+val subst_var  : subst -> 'a Vars.var -> 'a Vars.var
+
+val subst_evar : subst -> Vars.evar   -> Vars.evar
 
 (** Substitute indices in an indexed symbols. *)
 val subst_isymb : subst -> ('a,'b) isymb -> ('a,'b) isymb

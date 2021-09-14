@@ -52,7 +52,7 @@ Proof.
   intro Hap H.
 
  checkfail (apply H) exn ApplyMatchFailure.
-  apply ~fadup H.
+ by apply ~fadup H.
 Qed.
 
 global goal _ (t : timestamp):
