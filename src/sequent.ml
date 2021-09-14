@@ -60,10 +60,10 @@ module Mk (Args : MkArgs) : S with
   let is_reach_assumption (name : lsymb) (s : sequent) =
     Hyps.mem_name (L.unloc name) s || Prover.is_reach_assumption (L.unloc name)
 
-  let get_assumption
-    : type a. ?check_compatibility:bool ->
-              a Equiv.f_kind -> lsymb -> t ->
-              (ghyp, a) Goal.abstract_statement
+  let get_assumption : type a.
+    ?check_compatibility:bool ->
+    a Equiv.f_kind -> lsymb -> t ->
+    (ghyp, a) Goal.abstract_statement
     = fun ?(check_compatibility=true) k name s ->
 
       if Hyps.mem_name (L.unloc name) s then
@@ -82,19 +82,20 @@ module Mk (Args : MkArgs) : S with
         (* Verify that it applies to the current system. *)
         if check_compatibility then begin
           match k with
-            | Equiv.Local_t
-            | _ when Goal.is_reach_statement lem ->
-                if not (SE.systems_compatible (S.system s) lem.system) then
-                  Tactics.hard_failure Tactics.NoAssumpSystem;
-            | _ ->
-                if S.system s <> lem.system then
-                  Tactics.hard_failure Tactics.NoAssumpSystem
+          | Equiv.Local_t
+          | _ when Goal.is_reach_statement lem ->
+            if not (SE.systems_compatible (S.system s) lem.system) then
+              Tactics.hard_failure Tactics.NoAssumpSystem;
+          | _ ->
+            if S.system s <> lem.system then
+              Tactics.hard_failure Tactics.NoAssumpSystem
         end;
         { Goal.name = `Lemma lem.Goal.name ;
           system = lem.system ;
           ty_vars = lem.ty_vars ;
-          formula = Equiv.Babel.convert lem.formula
-                      ~src:Equiv.Any_t ~dst:k ~loc:(L.loc name) }
+          formula = 
+            Equiv.Babel.convert lem.formula
+              ~src:Equiv.Any_t ~dst:k ~loc:(L.loc name) }
 
   (*------------------------------------------------------------------*)
   let decompose_forall_k : type a. a Equiv.f_kind -> a -> Vars.evars * a =
