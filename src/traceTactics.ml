@@ -1663,65 +1663,72 @@ exception Invalid
 let reach_equiv_transform ~src ~dst ~s biframe term =
   let assoc : Term.message -> Term.message = fun t ->
     match List.find (fun e -> Term.(pi_term src e) = t) biframe with
-      | e -> Term.(pi_term dst e)
-      | exception Not_found -> raise Invalid
+    | e -> Term.(pi_term dst e)
+    | exception Not_found -> raise Invalid
   in
   let rec aux : type a. a term -> a term = fun t ->
     match Term.kind t with
-      (* TODO is it costly to check the type at each step? *)
-      | Type.KTimestamp | Type.KIndex -> t
-      | Type.KMessage ->
-          match t with
-            | Fun (fsymb,ftype,args) ->
-                let args = List.map aux args in
-                Term.mk_fun0 fsymb ftype args
-            | Atom (`Happens _) -> t
-            | Atom (`Message (ord,t1,t2)) ->
-                let t1 = aux t1 in
-                let t2 = aux t2 in
-                Term.mk_atom (ord:>Term.ord) t1 t2
-            | Atom (`Timestamp (ord,t1,t2)) ->
-                let t1 = aux t1 in
-                let t2 = aux t2 in
-                Term.mk_atom ord t1 t2
-            | Macro (msymb,messages,ts) ->
-                begin try assoc t with
-                  | Invalid when msymb = Term.in_macro ->
-                      (* We can support input@ts (and keep it unchanged) if
-                       * for some ts' such that ts'>=pred(ts),
-                       * frame@ts' is a biframe element, i.e. the two
-                       * projections are frame@ts'.
-                       * Note that this requires that ts' and pred(ts)
-                       * happen, which is necessary to have input@ts =
-                       * att(frame@pred(ts)) and frame@pred(ts) a sublist
-                       * of frame@ts'. *)
-                      let ok_frame = function
-                        | Macro (msymb',[],ts') ->
-                          msymb' = Term.frame_macro &&
-                          TS.query ~precise:true s
-                            [`Pos,`Timestamp (`Leq, mk_pred ts, ts')]
-                        | _ -> false
-                      in
-                      if List.exists ok_frame biframe then t else
-                        raise Invalid
-                end
-            | _ ->
-                raise Invalid
+    | Type.KTimestamp | Type.KIndex -> t
+
+    | Type.KMessage ->
+      match t with
+      | Fun (fsymb,ftype,args) ->
+        let args = List.map aux args in
+        Term.mk_fun0 fsymb ftype args
+
+      | Atom (`Happens _) -> t
+      | Atom (`Message (ord,t1,t2)) ->
+        let t1 = aux t1 in
+        let t2 = aux t2 in
+        Term.mk_atom (ord:>Term.ord) t1 t2
+
+      | Atom (`Timestamp (ord,t1,t2)) ->
+        let t1 = aux t1 in
+        let t2 = aux t2 in
+        Term.mk_atom ord t1 t2
+
+      | Macro (msymb,messages,ts) ->
+        begin try assoc t with
+          | Invalid when msymb = Term.in_macro ->
+            (* We can support input@ts (and keep it unchanged) if
+             * for some ts' such that ts'>=pred(ts),
+             * frame@ts' is a biframe element, i.e. the two
+             * projections are frame@ts'.
+             * Note that this requires that ts' and pred(ts)
+             * happen, which is necessary to have input@ts =
+             * att(frame@pred(ts)) and frame@pred(ts) a sublist
+             * of frame@ts'. *)
+            let ok_frame = function
+              | Macro (msymb',[],ts') ->
+                msymb' = Term.frame_macro &&
+                TS.query ~precise:true s
+                  [`Pos,`Timestamp (`Leq, mk_pred ts, ts')]
+              | _ -> false
+            in
+            if List.exists ok_frame biframe then t else
+              raise Invalid
+        end
+
+      | _ -> raise Invalid
   in
   aux term
 
-let reach_equiv (id : lsymb) (ths : Theory.term list) (s : TS.t) =
+let reach_equiv (id : lsymb) (ths : Theory.term list) (s : TS.t) : TS.t list =
   let ass = TS.get_assumption ~check_compatibility:false Equiv.Global_t id s in
   let ass_sys = ass.system in
 
   (* Introduce universal quantifications and implications in assumption. *)
   let uvars,ass = Equiv.Smart.decompose_forall ass.formula in
+
   if List.length uvars <> List.length ths then
     Tactics.(soft_failure (Failure "incorrect number of arguments"));
+
   let subst =
-    Theory.parse_subst (TS.table s) (TS.ty_vars s) (TS.env s) uvars ths in
-  let ass =
-    Equiv.subst subst ass in
+    Theory.parse_subst (TS.table s) (TS.ty_vars s) (TS.env s) uvars ths 
+  in
+
+  let ass = Equiv.subst subst ass in
+
   let subgoals,biframe =
     let rec aux = function
       | Equiv.(Atom (Equiv bf)) -> [],bf
@@ -1732,6 +1739,7 @@ let reach_equiv (id : lsymb) (ths : Theory.term list) (s : TS.t) =
 
   let table = TS.table s in
   let cur_sys = TS.system s in
+
   (* If assumption is a hypothesis from current trace sequent,
    * it will come attached to the sequent's system expression,
    * which can be a single system S.
@@ -1744,36 +1752,39 @@ let reach_equiv (id : lsymb) (ths : Theory.term list) (s : TS.t) =
     | SystemExpr.Single s -> SystemExpr.pair table s s
     | s -> s
   in
+
   (* Identify which projection of the assumptions conclusion
    * corresponds to the current goal (projection [src]) and
    * what will be the new system after the transformation. *)
-  let src,new_sys = match cur_sys with
+  let src, new_sys = match cur_sys with
     | SystemExpr.Single _ ->
-        if SystemExpr.project Term.PLeft ass_sys = cur_sys then
-          PLeft,
-          SystemExpr.project Term.PRight ass_sys
-        else if SystemExpr.project Term.PRight ass_sys = cur_sys then
-          PRight,
-          SystemExpr.project Term.PLeft ass_sys
-        else
-          Tactics.(soft_failure NoAssumpSystem)
+      if SystemExpr.project Term.PLeft ass_sys = cur_sys then
+        PLeft,
+        SystemExpr.project Term.PRight ass_sys
+      else if SystemExpr.project Term.PRight ass_sys = cur_sys then
+        PRight,
+        SystemExpr.project Term.PLeft ass_sys
+      else
+        Tactics.(soft_failure NoAssumpSystem)
     | se ->
-        (* Support only a useful particular case for now.
-         * This could be generalized, e.g. to use an equivalence
-         * that is not between the current system and itself.
-         * I'm leaving this for when we have system annotations
-         * in global meta formulas, and perhaps more general system
-         * expressions. *)
-        if se <> ass_sys then
-          Tactics.(soft_failure NoAssumpSystem);
-        if SE.project Term.PLeft se <> SE.project Term.PRight se then
-          Tactics.(soft_failure NoAssumpSystem);
-        (* TODO the user might want the reverse direction *)
-        PLeft, se
+      (* Support only a useful particular case for now.
+       * This could be generalized, e.g. to use an equivalence
+       * that is not between the current system and itself.
+       * I'm leaving this for when we have system annotations
+       * in global meta formulas, and perhaps more general system
+       * expressions. *)
+      if se <> ass_sys then
+        Tactics.(soft_failure NoAssumpSystem);
+
+      if SE.project Term.PLeft se <> SE.project Term.PRight se then
+        Tactics.(soft_failure NoAssumpSystem);
+
+      (* TODO the user might want the reverse direction *)
+      PLeft, se
   in
   let dst = if src = PLeft then PRight else PLeft in
   let warn_unsupported t =
-    Format.eprintf
+    Printer.prt `Warning
       "Cannot transform %a: it will be dropped.@." Term.pp t
   in
   let rewrite h =
@@ -1781,36 +1792,36 @@ let reach_equiv (id : lsymb) (ths : Theory.term list) (s : TS.t) =
      * be applied we can simply drop the hypothesis rather
      * than failing completely. *)
     try reach_equiv_transform ~src ~dst ~s biframe h with
-      | Invalid -> warn_unsupported h; Term.mk_true
+    | Invalid -> warn_unsupported h; Term.mk_true
   in
 
   let subgoal =
     TS.LocalHyps.map rewrite s
     |> TS.set_system new_sys
     |> TS.set_goal
-         (try reach_equiv_transform ~src ~dst ~s biframe (TS.goal s) with
-            | Invalid -> warn_unsupported (TS.goal s); Term.mk_false)
+      (try reach_equiv_transform ~src ~dst ~s biframe (TS.goal s) with
+       | Invalid -> warn_unsupported (TS.goal s); Term.mk_false)
   in
-    subgoal ::
-    (List.map (fun f -> TS.set_goal f s) subgoals)
+  subgoal ::
+  (List.map (fun f -> TS.set_goal f s) subgoals)
 
 let invalid_arguments () =
   Tactics.hard_failure (Tactics.Failure "invalid arguments")
 
 let reach_equiv args s sk fk =
   match args with
-    | TacticsArgs.Theory {L.pl_desc=Theory.App (hyp,[])} :: terms ->
-        let convert =
-          function TacticsArgs.Theory t -> t | _ -> invalid_arguments ()
-        in
-        begin match
-          let terms = List.map convert terms in
-          reach_equiv hyp terms s
-        with
-          | subgoals -> sk subgoals fk
-          | exception Tactics.Tactic_soft_failure e -> fk e
-        end
-    | _ -> invalid_arguments ()
+  | TacticsArgs.Theory {L.pl_desc=Theory.App (hyp,[])} :: terms ->
+    let convert =
+      function TacticsArgs.Theory t -> t | _ -> invalid_arguments ()
+    in
+    begin match
+        let terms = List.map convert terms in
+        reach_equiv hyp terms s
+      with
+      | subgoals -> sk subgoals fk
+      | exception Tactics.Tactic_soft_failure e -> fk e
+    end
+  | _ -> invalid_arguments ()
 
 let () =
   T.register_general "reach_equiv"
