@@ -934,7 +934,7 @@ Qed.
 (* Property 2 *)
 (* injective correspondance as stated in the PhD thesis of R. Kunneman *)
 
-goal [right] injective_correspondance (j, pid:index):
+goal [left] injective_correspondance (j, pid:index):
    happens(Server(pid,j)) =>
    exec@Server(pid,j) =>
      exists (i:index),
@@ -945,72 +945,71 @@ goal [right] injective_correspondance (j, pid:index):
          YCtr(pid)@pred(Press(pid,i)) = SCtr(pid)@Server(pid,j') => 
          j = j'.
 Proof.
-intro Hap.
-intro Hexec.
-executable Server(pid,j) => //.
-intro exec.
-expand exec, cond.
-destruct Hexec as [Hexecpred [[Mneq1 Mneq2] Hcpt Hpid]].
-expand deccipher.
-intctxt Mneq2 => //.   
-intro Ht M1 Eq.
-exists j0.
-split => //. 
-
-
-intro j' Hap' Hexec'. 
-
-intro Eq => //.  
-assert (SCtr(pid)@Server(pid,j) = SCtr(pid)@Server(pid,j')) as Meq by auto.
-
-assert (Server(pid,j) = Server(pid,j') || 
-        Server(pid,j) < Server(pid,j') || 
-        Server(pid,j) > Server(pid,j')) => //. 
-case H => //. 
-
-(* 1st case: Server(pid,j) < Server(pid,j') *) 
-assert (Server(pid,j) = pred(Server(pid,j')) || 
-        Server(pid,j) < pred(Server(pid,j'))) by constraints.
-case H0 => //. 
-
-
-(* Server(pid,j) = pred(Server(pid,j') < Server(pid,j') *)
-use counterIncreaseStrictly with pid, j' => //.
-rewrite H0 in *.
-by apply orderStrict in Meq.
-
-(* Server(pid,j) < pred(Server(pid,j'))  < Server(pid,j') *) 
-use counterIncreaseStrictly with pid, j' => //. 
-use counterIncreaseBis with pred(Server(pid,j')), Server(pid,j), pid => //. 
-case H2.
-
-use orderTrans with 
-   SCtr(pid)@Server(pid,j), 
-   SCtr(pid)@pred(Server(pid,j')), 
-   SCtr(pid)@Server(pid,j') => //.
-by apply orderStrict in Meq.
-
-rewrite H2 in *. 
-by apply orderStrict in Meq.
-
-(* 2nd case: Server(pid,j) > Server(pid,j')  *)
-assert (pred(Server(pid,j)) = Server(pid,j') 
-        || pred(Server(pid,j)) > Server(pid,j')) by constraints.
-case H0 => //. 
-
-(* Server(pid,j) > pred(Server(pid,j)) = Server(pid,j') *)
-use counterIncreaseStrictly with pid, j as H1 => //.
-clear Eq Hexec' Mneq1 Mneq2 exec M1 Hpid Hexecpred Hcpt Hap' Hap Ht H.
-by apply orderStrict in H1.
-
-(* Server(pid,j)  > pred(Server(pid,j)) >  Server(pid,j') *) 
-use counterIncreaseStrictly with pid, j => //.
-use counterIncreaseBis with pred(Server(pid,j)), Server(pid,j'), pid  => //. 
-case H2. 
-
-apply orderTrans _ _ (SCtr(pid)@Server(pid,j)) in H2; 1: auto.
-apply eq_sym in Meq. 
-by apply orderStrict in Meq.
-
-by apply orderStrict in H1.
+  intro Hap.
+  reach_equiv injective_correspondance_equiv, pid, j => // Hexec.
+  executable Server(pid,j) => //.
+  intro exec.
+  expand exec, cond.
+  destruct Hexec as [Hexecpred [[Mneq1 Mneq2] Hcpt Hpid]].
+  expand deccipher.
+  intctxt Mneq2 => //.   
+  intro Ht M1 Eq.
+  exists j0.
+  split => //. 
+  
+  intro j' Hap' Hexec'. 
+  
+  intro Eq => //.  
+  assert (SCtr(pid)@Server(pid,j) = SCtr(pid)@Server(pid,j')) as Meq by auto.
+  
+  assert (Server(pid,j) = Server(pid,j') || 
+          Server(pid,j) < Server(pid,j') || 
+          Server(pid,j) > Server(pid,j')) => //. 
+  case H => //. 
+  
+  (* 1st case: Server(pid,j) < Server(pid,j') *) 
+  assert (Server(pid,j) = pred(Server(pid,j')) || 
+          Server(pid,j) < pred(Server(pid,j'))) by constraints.
+  case H0 => //. 
+  
+  
+  (* Server(pid,j) = pred(Server(pid,j') < Server(pid,j') *)
+  use counterIncreaseStrictly with pid, j' => //.
+  rewrite H0 in *.
+  by apply orderStrict in Meq.
+  
+  (* Server(pid,j) < pred(Server(pid,j'))  < Server(pid,j') *) 
+  use counterIncreaseStrictly with pid, j' => //. 
+  use counterIncreaseBis with pred(Server(pid,j')), Server(pid,j), pid => //. 
+  case H2.
+  
+  use orderTrans with 
+     SCtr(pid)@Server(pid,j), 
+     SCtr(pid)@pred(Server(pid,j')), 
+     SCtr(pid)@Server(pid,j') => //.
+  by apply orderStrict in Meq.
+  
+  rewrite H2 in *. 
+  by apply orderStrict in Meq.
+  
+  (* 2nd case: Server(pid,j) > Server(pid,j')  *)
+  assert (pred(Server(pid,j)) = Server(pid,j') 
+          || pred(Server(pid,j)) > Server(pid,j')) by constraints.
+  case H0 => //. 
+  
+  (* Server(pid,j) > pred(Server(pid,j)) = Server(pid,j') *)
+  use counterIncreaseStrictly with pid, j as H1 => //.
+  clear Eq Hexec' Mneq1 Mneq2 exec M1 Hpid Hexecpred Hcpt Hap' Hap Ht H.
+  by apply orderStrict in H1.
+  
+  (* Server(pid,j)  > pred(Server(pid,j)) >  Server(pid,j') *) 
+  use counterIncreaseStrictly with pid, j => //.
+  use counterIncreaseBis with pred(Server(pid,j)), Server(pid,j'), pid  => //. 
+  case H2. 
+  
+  apply orderTrans _ _ (SCtr(pid)@Server(pid,j)) in H2; 1: auto.
+  apply eq_sym in Meq. 
+  by apply orderStrict in Meq.
+  
+  by apply orderStrict in H1.
 Qed.

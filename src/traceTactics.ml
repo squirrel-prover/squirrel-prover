@@ -1660,56 +1660,58 @@ exception Invalid
   * Macros in the term occurring (at toplevel) on the [src] projection
   * of some biframe element are replaced by the corresponding [dst]
   * projection. *)
-let reach_equiv_transform ~src ~dst ~s biframe term =
-  let assoc : Term.message -> Term.message = fun t ->
-    match List.find (fun e -> Term.(pi_term src e) = t) biframe with
-    | e -> Term.(pi_term dst e)
-    | exception Not_found -> raise Invalid
+let reach_equiv_transform 
+    ~(src:Term.projection)
+    ~(dst:Term.projection)
+    ~(s:TS.t)
+    (biframe : Term.message list) 
+    (term : Term.message) : Term.message
+  =
+  let assoc (t : Term.message) : Term.message option =
+    match List.find_opt (fun e -> (Term.pi_term src e) = t) biframe with
+    | Some e -> Some (Term.pi_term dst e)
+    | None -> None
   in
   let rec aux : type a. a term -> a term = fun t ->
     match Term.kind t with
     | Type.KTimestamp | Type.KIndex -> t
-
     | Type.KMessage ->
-      match t with
-      | Fun (fsymb,ftype,args) ->
-        let args = List.map aux args in
-        Term.mk_fun0 fsymb ftype args
+      match assoc t with
+      | None -> aux_rec t
+      | Some t' -> t'
 
-      | Atom (`Happens _) -> t
-      | Atom (`Message (ord,t1,t2)) ->
-        let t1 = aux t1 in
-        let t2 = aux t2 in
-        Term.mk_atom (ord:>Term.ord) t1 t2
+  and aux_rec : Term.message -> Term.message = fun t ->
+    match t with
+    | t when is_pure_timestamp t -> t
 
-      | Atom (`Timestamp (ord,t1,t2)) ->
-        let t1 = aux t1 in
-        let t2 = aux t2 in
-        Term.mk_atom ord t1 t2
+    | Fun (fsymb,ftype,args) ->
+      let args = List.map aux args in
+      Term.mk_fun0 fsymb ftype args
 
-      | Macro (msymb,messages,ts) ->
-        begin try assoc t with
-          | Invalid when msymb = Term.in_macro ->
-            (* We can support input@ts (and keep it unchanged) if
-             * for some ts' such that ts'>=pred(ts),
-             * frame@ts' is a biframe element, i.e. the two
-             * projections are frame@ts'.
-             * Note that this requires that ts' and pred(ts)
-             * happen, which is necessary to have input@ts =
-             * att(frame@pred(ts)) and frame@pred(ts) a sublist
-             * of frame@ts'. *)
-            let ok_frame = function
-              | Macro (msymb',[],ts') ->
-                msymb' = Term.frame_macro &&
-                TS.query ~precise:true s
-                  [`Pos,`Timestamp (`Leq, mk_pred ts, ts')]
-              | _ -> false
-            in
-            if List.exists ok_frame biframe then t else
-              raise Invalid
-        end
+    | Atom (`Message (ord,t1,t2)) ->
+      let t1 = aux t1 in
+      let t2 = aux t2 in
+      Term.mk_atom (ord:>Term.ord) t1 t2
 
-      | _ -> raise Invalid
+    (* We can support input@ts (and keep it unchanged) if
+     * for some ts' such that ts'>=pred(ts),
+     * frame@ts' is a biframe element, i.e. the two
+     * projections are frame@ts'.
+     * Note that this requires that ts' and pred(ts)
+     * happen, which is necessary to have input@ts =
+     * att(frame@pred(ts)) and frame@pred(ts) a sublist
+     * of frame@ts'. *)
+    | Macro (msymb,messages,ts) when msymb = Term.in_macro ->
+      let ok_frame = function
+        | Macro (msymb',[],ts') ->
+          msymb' = Term.frame_macro &&
+          TS.query ~precise:true s
+            [`Pos,`Timestamp (`Leq, mk_pred ts, ts')]
+        | _ -> false
+      in
+      if List.exists ok_frame biframe then t else raise Invalid
+
+    | _ -> raise Invalid
   in
   aux term
 
@@ -1788,7 +1790,8 @@ let reach_equiv (id : lsymb) (ths : Theory.term list) (s : TS.t) : TS.t list =
     Printer.prt `Warning
       "Cannot transform %a: it will be dropped.@." Term.pp t
   in
-  let rewrite h =
+
+  let rewrite (h : Term.message) : Term.message =
     (* Attempt to transform. If the transformation can't
      * be applied we can simply drop the hypothesis rather
      * than failing completely. *)
