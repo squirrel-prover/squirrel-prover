@@ -445,26 +445,30 @@ module Babel = struct
     = fun ?loc ~src ~dst f ->
     match src,dst with
       (* Identity cases *)
-      | Local_t,Local_t -> f
-      | Global_t,Global_t -> f
-      | Any_t,Any_t -> f
+      | Local_t,  Local_t  -> f
+      | Global_t, Global_t -> f
+      | Any_t,    Any_t    -> f
+
       (* Injections into gform *)
-      | Local_t,Any_t -> `Reach f
-      | Global_t,Any_t -> `Equiv f
+      | Local_t,  Any_t -> `Reach f
+      | Global_t, Any_t -> `Equiv f
+
       (* Inverses of the injections. *)
-      | Any_t,Local_t ->
+      | Any_t, Local_t ->
           begin match f with
             | `Reach f -> f
             | _ -> Tactics.soft_failure ?loc CannotConvert
           end
-      | Any_t,Global_t ->
+
+      | Any_t, Global_t ->
           begin match f with
             | `Equiv f -> f
             | `Reach f -> Atom (Reach f)
           end
+
       (* Conversions between local and global formulas. *)
-      | Local_t, Global_t -> Atom (Reach f)
-      | Global_t, Local_t ->
+      | Local_t,  Global_t -> Atom (Reach f)
+      | Global_t, Local_t  ->
          begin match f with
            | Atom (Reach f) -> f
            | _ -> Tactics.soft_failure ?loc CannotConvert

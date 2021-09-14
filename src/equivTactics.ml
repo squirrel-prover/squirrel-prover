@@ -1673,8 +1673,15 @@ let split_seq (li : int L.located) ht s : ES.sequent =
     | _ -> assert false
   in
 
-  let ti_t = Term.mk_ite cond               ti Term.mk_zero in
-  let ti_f = Term.mk_ite (Term.mk_not cond) ti Term.mk_zero in
+  (* The value of the else branch is choosen depending on the type *)
+  let else_branch = match Term.ty ti with
+    | Type.Message -> Term.mk_zero
+    | Type.Boolean -> Term.mk_false
+    | ty -> Term.mk_witness ty
+  in
+
+  let ti_t = Term.mk_ite cond               ti else_branch in
+  let ti_f = Term.mk_ite (Term.mk_not cond) ti else_branch in
 
   let env = ES.env s in
   let frame = List.rev_append before ([Term.mk_seq env is ti_t;
