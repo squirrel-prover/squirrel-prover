@@ -13,36 +13,32 @@ end
 
 let usage = Printer.strf "Usage: %s filename" (Filename.basename Sys.argv.(0))
 
-let args  = ref []
-let verbose = ref false
-let interactive = ref false
+(*------------------------------------------------------------------*)
+(* State of the main loop.
+   TODO: include everything currently handled statefully in Prover.ml *)
+type main_state = {
+  mode            : Prover.prover_mode;
+  table           : Symbols.table;
+  interactive     : bool;
+  current_file    : [`Stdin | `File of string];
+  current_channel : Lexing.lexbuf;
+}
 
-let speclist = [
-  ("-i", Arg.Set interactive, "interactive mode (e.g, for proof general)");
-  ("-v", Arg.Set verbose, "display more informations");
-]
-
-(** Lexbuf used in non-interactive mode. *)
-let lexbuf : Lexing.lexbuf option ref = ref None
-let filename = ref "No file opened"
-
-let setup_lexbuf fname =
-  lexbuf := some @@ Lexing.from_channel (Stdlib.open_in fname);
-  filename := fname;;
-
-(** [parse_next parser_fun] parse the next line of the input (or a filename)
-    according to the given parsing function [parser_fun]. Used in interactive
+(*------------------------------------------------------------------*)
+(** [parse_next parser_fun] parse the next line of the input according to
+    the given parsing function [parser_fun]. Used in interactive
     mode, depending on what is the type of the next expected input. *)
-let parse_next parser_fun =
-  if !interactive then
-    parser_fun (Lexing.from_channel stdin) "new input"
-  else
-    parser_fun (Utils.oget !lexbuf) !filename
+let parse_next (state : main_state) parser_fun =
+  let channel_name = match state.current_file with
+    | `Stdin  -> "new input"
+    | `File f -> f
+  in
+  parser_fun state.current_channel channel_name
 
 (*------------------------------------------------------------------*)
 (** Print precise location error (to be caught by emacs) *)
-let pp_loc_error ppf loc =
-  if !interactive then
+let pp_loc_error state ppf loc =
+  if state.interactive then
     let lexbuf = Lexing.from_channel stdin in
     (* Not sure startpos does anything *)
     let startpos = lexbuf.Lexing.lex_curr_p.pos_cnum in
@@ -51,9 +47,9 @@ let pp_loc_error ppf loc =
       (max 0 (loc.L.loc_bchar - startpos))
       (max 0 (loc.L.loc_echar - startpos))
 
-let pp_loc_error_opt ppf = function
+let pp_loc_error_opt state ppf = function
   | None -> ()
-  | Some l -> pp_loc_error ppf l
+  | Some l -> pp_loc_error state ppf l
 
 type cmd_error =
   | Unexpected_command
@@ -75,22 +71,15 @@ open Tactics
 
 exception Unfinished
 
-(* State of the main loop.
-   TODO: include everything currently handled statefully in Prover.ml *)
-type loop_state = {
-  mode : Prover.prover_mode;
-  table : Symbols.table;
-}
-
 (** The main loop body. *)
-let main_loop_body ~test state =
+let main_loop_body ~(test : bool) (state : main_state) : main_state =
   match
     let parse_buf =
       Parserbuf.parse_from_buf
-        ~test ~interactive:!interactive
+        ~test ~interactive:state.interactive
         Parser.interactive
     in
-    state.mode, parse_next parse_buf
+    state.mode, parse_next state parse_buf
   with
     | mode, ParsedUndo nb_undo ->
       let new_mode, new_table = Prover.reset_state nb_undo in
@@ -99,16 +88,16 @@ let main_loop_body ~test state =
         | GoalMode -> Printer.pr "%a" Action.pp_actions new_table
         | WaitQed -> ()
         | AllDone -> assert false in
-      { mode = new_mode; table = new_table; }
+      { state with mode = new_mode; table = new_table; }
 
     | GoalMode, ParsedInputDescr decls ->
       let hint_db = Prover.current_hint_db () in
       let table = Prover.declare_list state.table hint_db decls in
       Printer.pr "%a" System.pp_systems table;
-      { mode = GoalMode; table = table; }
+      { state with mode = GoalMode; table = table; }
 
     | ProofMode, ParsedTactic utac ->
-      if not !interactive then
+      if not state.interactive then
         Printer.prt `Prompt "%a" Prover.pp_ast utac ;
       begin match Prover.eval_tactic utac with
       | true ->
@@ -181,15 +170,20 @@ let main_loop_body ~test state =
     [save] allows to specify is the current state must be saved, so that
     one can backtrack.
 *)
-let rec main_loop ~test ?(save=true) (state : loop_state) =
-  if !interactive then Printer.prt `Prompt "";
+let rec main_loop ~test ?(save=true) (state : main_state) =
+  if state.interactive then Printer.prt `Prompt "";
+
   (* Save the state if instructed to do so.
    * In practice we save except after errors and the first call. *)
   if save then Prover.save_state state.mode state.table ;
 
+  let pp_loc_error     = pp_loc_error     state in
+  let pp_loc_error_opt = pp_loc_error_opt state in
+
   match
     let new_state = main_loop_body ~test state in
-    new_state, new_state.mode with
+    new_state, new_state.mode 
+  with
   (* exit prover *)
   | _, AllDone -> Printer.pr "Goodbye!@." ; if not test then exit 0
 
@@ -240,39 +234,61 @@ let rec main_loop ~test ?(save=true) (state : loop_state) =
 
 and error ~test state e =
   Printer.prt `Error "%t" e;
-  if !interactive
+  if state.interactive
   then (main_loop[@tailrec]) ~test ~save:false state
   else if not test then exit 1
 
 
-
-let start_main_loop ?(test=false) () =
+let start_main_loop
+    ?(test=false) 
+    ~interactive
+    ~current_channel
+    ~current_file () 
+  =
   (* Initialize definitions before parsing system description.
    * TODO this is not doable anymore (with refactoring this code)
    * concerning definitions of functions, names, ... symbols;
    * it should not matter if we do not undo the initial definitions *)
   Prover.reset ();
-  main_loop ~test { mode = GoalMode; table = Symbols.builtins_table; }
+  let state = {
+    mode = GoalMode; 
+    table = Symbols.builtins_table; 
+    current_channel;
+    current_file;
+    interactive;
+  } in
+  main_loop ~test state
 
 let interactive_prover () =
   Printer.prt `Start "Squirrel Prover interactive mode.";
   Printer.prt `Start "Git commit: %s" Commit.hash_commit;
   Printer.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
-  try start_main_loop ()
+  let current_channel = Lexing.from_channel stdin in
+  let current_file = `Stdin in
+  try start_main_loop ~interactive:true ~current_channel ~current_file ()
   with End_of_file -> Printer.prt `Error "End of file, exiting."
 
 let run ?(test=false) filename =
-  (* TODO: I am forcing the usage of ANSI escape sequence. We probably want an
-     option to remove it. *)
   if test then begin
     Printer.printer_mode := Printer.Test;
     Format.eprintf "Running %S...@." filename
   end;
   Printer.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
-  setup_lexbuf filename;
-  start_main_loop ~test ()
+  let current_channel = Lexing.from_channel (Stdlib.open_in filename) in
+  let current_file = `File filename in
+  start_main_loop ~test ~interactive:false ~current_channel ~current_file ()
+
 
 let main () =
+  let args = ref [] in
+  let verbose = ref false in
+  let interactive = ref false in
+  
+  let speclist = [
+    ("-i", Arg.Set interactive, "interactive mode (e.g, for proof general)");
+    ("-v", Arg.Set verbose, "display more informations");
+  ] in
+
   let collect arg = args := !args @ [arg] in
   let _ = Arg.parse speclist collect usage in
   if List.length !args = 0 && not !interactive then
