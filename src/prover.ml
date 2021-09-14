@@ -17,6 +17,8 @@ let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
 let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
 
+let bad_args () = hard_failure (Failure "improper arguments")
+
 (*------------------------------------------------------------------*)
 (** {Error handling} *)
 
@@ -442,7 +444,7 @@ let get_help (tac_name : lsymb) =
   else if L.unloc tac_name = "concise" then
     Printer.prt `Result "%a" ProverTactics.pp_list ()
   else
-    Printer.prt `Result "%a." (ProverTactics.pp true) tac_name;
+    Printer.prt `Result "%a" (ProverTactics.pp true) tac_name;
   Tactics.id
 
 let () = 
@@ -469,7 +471,7 @@ let () =
     (function
       | [] -> get_help (L.mk_loc L._dummy "")
       | [String_name tac_name]-> get_help tac_name
-      | _ ->  hard_failure (Tactics.Failure "improper arguments")) 
+      | _ ->  bad_args ()) 
 
 let () =
   ProverTactics.register_general "id"

@@ -469,6 +469,11 @@ rw_item:
                                                      rw_dir = d; 
                                                      rw_type = t; } }
 
+rw_equiv_item:
+| d=loc(rw_dir) pt=pt  { TacticsArgs.{ rw_mult = `Once; 
+                                       rw_dir = d; 
+                                       rw_type = `Rw pt; } }
+
 expnd_item:
 | d=loc(rw_dir) t=expnd_type  { TacticsArgs.{ rw_mult = `Once; 
                                               rw_dir = d; 
@@ -585,6 +590,8 @@ apply_arg:
 %inline dependent_induction:
 | DEPENDENT INDUCTION { }
 
+%inline rewrite_equiv:
+| REWRITE EQUIV { }
 
 %inline assert_tac:
 | l=lloc(ASSERT) p=tac_term ip=as_ip?
@@ -694,6 +701,9 @@ tac:
   | l=lloc(REWRITE) p=rw_args w=in_target
     { mk_abstract l "rewrite" [TacticsArgs.RewriteIn (p, w)] }
 
+  | l=lloc(rewrite_equiv) p=rw_equiv_item
+    { mk_abstract l "rewrite equiv" [TacticsArgs.RewriteEquiv (p)] }
+
   | l=lloc(APPLY) a=named_args t=apply_arg w=apply_in
     { mk_abstract l "apply" [TacticsArgs.ApplyIn (a, t, w)] }
 
@@ -745,6 +755,9 @@ help_tac_i:
 | MEMSEQ     { "memseq"}  
 | DDH        { "ddh"}      
 
+| DEPENDENT INDUCTION  { "dependent induction"}  
+| GENERALIZE DEPENDENT { "generalize dependent"}  
+| REWRITE EQUIV        { "rewrite equiv"}  
 
 help_tac:
 | l=loc(help_tac_i) { l }

@@ -324,7 +324,7 @@ let enrich_a arg s =
 let enrichs args s =
   List.fold_left (fun s arg -> enrich_a arg s) s args
 
-let enrich_tac args s sk fk =
+let enrich_tac args s sk fk = 
   try sk [enrichs args s] fk with
   | Tactics.Tactic_soft_failure e -> fk e
 
@@ -1693,7 +1693,7 @@ let split_seq_args args s : ES.sequent list =
   | [Args.SplitSeq (i, ht)] -> [split_seq i ht s]
   | _ -> bad_args ()
 
-let split_seq_tac args s sk fk = wrap_fail (split_seq_args args) s sk fk
+let split_seq_tac args = wrap_fail (split_seq_args args) 
 
 let () =
   T.register_general "splitseq"
@@ -1739,7 +1739,7 @@ let mem_seq_args args s : Goal.t list =
   | [Args.MemSeq (i, j)] -> mem_seq i j s
   | _ -> bad_args ()
 
-let mem_seq_tac args s sk fk = wrap_fail (mem_seq_args args) s sk fk
+let mem_seq_tac args = wrap_fail (mem_seq_args args) 
 
 let () =
   T.register_general "memseq"
@@ -1797,7 +1797,7 @@ let const_seq_args args s : Goal.t list =
   | [Args.ConstSeq (i, t)] -> const_seq (i, t) s
   | _ -> bad_args ()
 
-let const_seq_tac args s sk fk = wrap_fail (const_seq_args args) s sk fk
+let const_seq_tac args = wrap_fail (const_seq_args args) 
 
 let () =
   T.register_general "constseq"
@@ -2477,4 +2477,4 @@ let () = T.register_general "ddh"
           Args.String_name v2;
           Args.String_name v3] ->
          LowTactics.gentac_of_etac (ddh gen v1 v2 v3)
-       | _ -> hard_failure (Tactics.Failure "improper arguments"))
+       | _ -> bad_args ())

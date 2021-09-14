@@ -27,17 +27,22 @@ type 'a rw_item_g = {
   rw_type : 'a;
 }
 
-(** Rewrite or expand item*)
+(** Rewrite or expand item *)
 type rw_item = [
   | `Rw        of Theory.p_pt_hol
   | `Expand    of Theory.term
   | `ExpandAll of Location.t
 ] rw_item_g
 
-(** Expand item*)
+(** Expand item *)
 type expnd_item = [
-    `Expand of Theory.term
+  | `Expand    of Theory.term
   | `ExpandAll of Location.t
+] rw_item_g
+
+(** Rewrite equiv item *)
+type rw_equiv_item = [
+  | `Rw of Theory.p_pt_hol
 ] rw_item_g
 
 (** Rewrite argument, which is a rewrite or simplification item*)
@@ -111,20 +116,21 @@ type boolean = [`Boolean]
     Note that all tactics not defined in the parser must rely on the Theory 
     type, even to parse strings. *)
 type parser_arg =
-  | String_name of lsymb
-  | Int_parsed  of int L.located
-  | Theory      of Theory.term
-  | IntroPat    of intro_pattern list
-  | AndOrPat    of and_or_pat
-  | SimplPat    of simpl_pat
-  | RewriteIn   of rw_arg list * in_target
-  | ApplyIn     of named_args * Theory.p_pt * apply_in
-  | AssertPt    of Theory.p_pt_hol * simpl_pat option * [`IntroImpl | `None]
-  | SplitSeq    of int L.located * Theory.hterm
-  | ConstSeq    of int L.located * Theory.term list
-  | MemSeq      of int L.located * int L.located
-  | Remember    of Theory.term * lsymb
-  | Generalize  of Theory.term list * naming_pat list option
+  | String_name  of lsymb
+  | Int_parsed   of int L.located
+  | Theory       of Theory.term
+  | IntroPat     of intro_pattern list
+  | AndOrPat     of and_or_pat
+  | SimplPat     of simpl_pat
+  | RewriteIn    of rw_arg list * in_target
+  | RewriteEquiv of rw_equiv_item
+  | ApplyIn      of named_args * Theory.p_pt * apply_in
+  | AssertPt     of Theory.p_pt_hol * simpl_pat option * [`IntroImpl | `None]
+  | SplitSeq     of int L.located * Theory.hterm
+  | ConstSeq     of int L.located * Theory.term list
+  | MemSeq       of int L.located * int L.located
+  | Remember     of Theory.term * lsymb
+  | Generalize   of Theory.term list * naming_pat list option
 
 type parser_args = parser_arg list
                                

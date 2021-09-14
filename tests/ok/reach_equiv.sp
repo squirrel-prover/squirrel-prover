@@ -22,29 +22,29 @@ Qed.
 
 goal [default] _ : happens(A) => input@A = s@B => False.
 Proof.
-  checkfail reach_equiv ax_ground exn NoAssumpSystem.
-  checkfail reach_equiv ax_ground_left exn NoAssumpSystem.
-  checkfail reach_equiv ax_ground_rev exn NoAssumpSystem.
+  checkfail rewrite equiv ax_ground exn NoAssumpSystem.
+  checkfail rewrite equiv ax_ground_left exn NoAssumpSystem.
+  checkfail rewrite equiv ax_ground_rev exn NoAssumpSystem.
 Abort.
 
-(* Check that timestamp atoms are not dropped by reach_equiv. *)
+(* Check that timestamp atoms are not dropped by rewrite equiv. *)
 goal [default/left] _ (tau,tau':timestamp) : tau <= tau' => tau <= tau'.
 Proof.
-  reach_equiv ax_ground.
+  rewrite equiv ax_ground.
   intro H; assumption.
 Qed.
 
 goal [default/left] _ : happens(A) => input@A = s@B => False.
 Proof.
   intro H.
-  reach_equiv ax_ground_left.
+  rewrite equiv ax_ground_left.
   by use m_fresh with A.
 Qed.
 
 goal [default/left] _ : happens(A) => input@A = s@B => False.
 Proof.
   intro H.
-  reach_equiv ax_ground.
+  rewrite equiv ax_ground.
   use check_right.
   by use m_fresh with A.
 Qed.
@@ -52,7 +52,7 @@ Qed.
 goal [default/left] _ : happens(A) => input@A = s@B => False.
 Proof.
   intro H.
-  reach_equiv ax_ground_rev.
+  rewrite equiv ax_ground_rev.
   use check_right.
   by use m_fresh with A.
 Qed.
@@ -60,8 +60,8 @@ Qed.
 goal [default/right] _ : happens(A) => input@A = s@B => False.
 Proof.
   intro H.
-  checkfail reach_equiv ax_ground_left exn NoAssumpSystem.
-  reach_equiv ax_ground_ver.
+  checkfail rewrite equiv ax_ground_left exn NoAssumpSystem.
+  rewrite equiv ax_ground_ver.
   use check_left.
   by use m_fresh with A.
 Qed.
@@ -69,8 +69,8 @@ Qed.
 goal [default] _ : happens(A) => input@A = s@B => False.
 Proof.
   intro H.
-  checkfail reach_equiv ax_ground_left exn NoAssumpSystem.
-  project; [1: reach_equiv ax_ground | 2: reach_equiv ax_ground_ver];
+  checkfail rewrite equiv ax_ground_left exn NoAssumpSystem.
+  project; [1: rewrite equiv ax_ground | 2: rewrite equiv ax_ground_ver];
   by use m_fresh with A.
 Qed.
 
@@ -80,6 +80,6 @@ global goal [default/left,default/left] _ :
   [happens(A)] -> equiv(frame@pred(A),diff(s@B,m)) -> [not(input@A = s@B)].
 Proof.
   intro Hap H.
-  reach_equiv H.
+  rewrite equiv H.
   by use m_fresh with A.
 Qed.

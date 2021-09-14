@@ -5,7 +5,9 @@ module Args = TacticsArgs
 module L = Location
 
 module T = Prover.ProverTactics
-             
+
+module SE = SystemExpr
+
 module St = Term.St
 module Sv = Vars.Sv
 
@@ -540,6 +542,62 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     | Rw_expandall _ -> [expand_all targets s]
 
+  (*------------------------------------------------------------------*)
+  (** {3 Rewrite Equiv} *)
+
+  (** Rewrite a sequent using an equivalence.
+      Correspond to the ReachEquiv rule of CSF'21. *)
+  type rw_equiv =  SystemExpr.t * Equiv.global_form
+
+  let p_rw_equiv (rw_arg : Args.rw_equiv_item) (s : S.t) : rw_equiv =
+    match rw_arg.rw_type with
+    | `Rw f -> 
+      let dir = L.unloc rw_arg.rw_dir in
+
+      let _, system, pat = 
+        S.convert_pt_hol_gen ~check_compatibility:false f Equiv.Global_t s 
+      in
+
+      if pat.pat_tyvars <> [] then
+        soft_failure (Failure "free type variables remaining") ;
+
+      if not (Sv.is_empty pat.pat_vars) then
+        soft_failure (Failure "universally quantified variables remaining") ;
+
+      if rw_arg.rw_mult <> `Once then
+        hard_failure (Failure "multiplicity information not allowed for \
+                               rewrite equiv") ;
+
+      let f = pat.pat_term in
+
+
+      (* If assumption is a hypothesis from current trace sequent,
+       * it will come attached to the sequent's system expression,
+       * which can be a single system S.
+       * In that case (cf. LowEquivSequent.to_trace_sequent) the
+       * convention is that the global formula in assumption holds
+       * for the pair (S,S).
+       * This will be clarified when system specifications can be
+       * embedded in global formulas. *)
+      let system = match system with
+        | SystemExpr.Single st -> SystemExpr.pair (S.table s) st st
+        | st -> st
+      in
+
+      let system = match dir, system with
+        | `LeftToRight, _ -> system
+        | `RightToLeft, SE.Pair (s1, s2) -> 
+          SE.pair (S.table s) s2 s1
+
+        | `RightToLeft, SE.SimplePair st -> 
+          SE.pair (S.table s) (SE.Right st) (SE.Left st)
+
+        | `RightToLeft, SE.Single s ->
+          soft_failure ~loc:(L.loc rw_arg.rw_dir)
+            (Failure "cannot swap the systems: lemma applies to a \
+                      single system)")
+      in
+      system, f
 
   (*------------------------------------------------------------------*)
   (** {3 Case tactic} *)
@@ -1751,10 +1809,8 @@ let do_rw_arg
     (s : Goal.t) : Goal.t list
   =
   match rw_arg with
-  | Args.R_item rw_item  -> 
-    do_rw_item rw_item rw_in s
-  | Args.R_s_item s_item ->
-    do_s_item simpl s_item s (* targets are ignored there *)
+  | Args.R_item rw_item  -> do_rw_item rw_item rw_in s
+  | Args.R_s_item s_item -> do_s_item simpl s_item s (* targets ignored *)
 
 let rewrite_tac
     (simpl : f_simpl)

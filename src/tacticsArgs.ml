@@ -41,15 +41,23 @@ type 'a rw_item_g = {
   rw_type : 'a;
 }
 
-(** Rewrite or expand item*)
+(** Rewrite or expand item *)
 type rw_item = [
   | `Rw        of Theory.p_pt_hol
   | `Expand    of Theory.term
   | `ExpandAll of Location.t
 ] rw_item_g
 
-(** Expand item*)
-type expnd_item = [`Expand of Theory.term | `ExpandAll of Location.t] rw_item_g
+(** Expand item *)
+type expnd_item = [
+  | `Expand    of Theory.term
+  | `ExpandAll of Location.t
+] rw_item_g
+
+(** Rewrite equiv item *)
+type rw_equiv_item = [
+  | `Rw of Theory.p_pt_hol
+] rw_item_g
 
 (** Rewrite argument, which is a rewrite or simplification item*)
 type rw_arg =
@@ -178,20 +186,21 @@ type named_args = named_arg list
 
 (** A parser tactic argument *)
 type parser_arg =
-  | String_name of lsymb
-  | Int_parsed  of int L.located
-  | Theory      of Theory.term
-  | IntroPat    of intro_pattern list
-  | AndOrPat    of and_or_pat
-  | SimplPat    of simpl_pat
-  | RewriteIn   of rw_arg list * in_target
-  | ApplyIn     of named_args * Theory.p_pt * apply_in
-  | AssertPt    of Theory.p_pt_hol * simpl_pat option * [`IntroImpl | `None]
-  | SplitSeq    of int L.located * Theory.hterm
-  | ConstSeq    of int L.located * Theory.term list
-  | MemSeq      of int L.located * int L.located
-  | Remember    of Theory.term * lsymb
-  | Generalize  of Theory.term list * naming_pat list option
+  | String_name  of lsymb
+  | Int_parsed   of int L.located
+  | Theory       of Theory.term
+  | IntroPat     of intro_pattern list
+  | AndOrPat     of and_or_pat
+  | SimplPat     of simpl_pat
+  | RewriteIn    of rw_arg list * in_target
+  | RewriteEquiv of rw_equiv_item
+  | ApplyIn      of named_args * Theory.p_pt * apply_in
+  | AssertPt     of Theory.p_pt_hol * simpl_pat option * [`IntroImpl | `None]
+  | SplitSeq     of int L.located * Theory.hterm
+  | ConstSeq     of int L.located * Theory.term list
+  | MemSeq       of int L.located * int L.located
+  | Remember     of Theory.term * lsymb
+  | Generalize   of Theory.term list * naming_pat list option
 
 type parser_args = parser_arg list
 
@@ -208,15 +217,18 @@ let pp_parser_arg ppf = function
       (Fmt.list ~sep:Fmt.sp pp_rw_arg) rw_args
       pp_in_target in_opt
 
+  | RewriteEquiv rw_arg ->
+    Fmt.pf ppf "..."
+
   | ApplyIn (_, _, in_opt) ->
     Fmt.pf ppf "... %a" pp_apply_in in_opt
 
   | AssertPt (_, ip, `IntroImpl) ->
-    Fmt.pf ppf "use ... as %a"
+    Fmt.pf ppf "... as %a"
       (Fmt.option ~none:Fmt.nop pp_simpl_pat) ip
 
   | AssertPt (_, ip, `None) ->
-    Fmt.pf ppf "assert (%a := ...)"
+    Fmt.pf ppf "(%a := ...)"
       (Fmt.option ~none:Fmt.nop pp_simpl_pat) ip
 
   | ConstSeq (i, t) -> 

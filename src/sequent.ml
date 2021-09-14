@@ -30,8 +30,16 @@ module type S = sig
 
   val reduce : Reduction.red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
+  val convert_pt_hol_gen :
+    ?check_compatibility:bool -> 
+    Theory.p_pt_hol -> 
+    'a Equiv.f_kind -> t -> 
+    ghyp * SE.t * 'a Match.pat
+
   val convert_pt_hol :
-    Theory.p_pt_hol -> 'a Equiv.f_kind -> t -> ghyp * 'a Match.pat
+    Theory.p_pt_hol ->
+    'a Equiv.f_kind -> t -> 
+    ghyp * 'a Match.pat
 end
 
 (*------------------------------------------------------------------*)
@@ -114,11 +122,15 @@ module Mk (Args : MkArgs) : S with
   (** Parse a partially applied lemma or hypothesis as a pattern. *)
   (* FIXME: convert_pt_hol will not allow the user to instantiate a variable 
      when its type is a type variable of the lemma. *)
-  let convert_pt_hol : type a.
-    Theory.p_pt_hol -> a Equiv.f_kind -> S.t -> ghyp * a Match.pat =
-    fun pt f_kind s ->
+  let convert_pt_hol_gen : type a.
+    ?check_compatibility:bool -> 
+    Theory.p_pt_hol -> 
+    a Equiv.f_kind -> 
+    S.t -> 
+    ghyp * SE.t * a Match.pat 
+    = fun ?(check_compatibility=true) pt f_kind s ->
 
-    let lem = get_assumption f_kind pt.p_pt_hid s in
+    let lem = get_assumption ~check_compatibility f_kind pt.p_pt_hid s in
     let f_args, f = decompose_forall_k f_kind lem.formula in
     let f_args, subst = Term.erefresh_vars `Global f_args in
     let f = Equiv.Babel.subst f_kind subst f in
@@ -156,7 +168,19 @@ module Mk (Args : MkArgs) : S with
         pat_vars = !pat_vars;
         pat_term = f; } 
     in      
-    lem.name, pat
+    lem.name, lem.system, pat
+
+  let convert_pt_hol : type a.
+    Theory.p_pt_hol -> 
+    a Equiv.f_kind -> 
+    S.t -> 
+    ghyp * a Match.pat 
+    = fun pt f_kind s ->
+      let name, se, pat = 
+        convert_pt_hol_gen ~check_compatibility:true pt f_kind s 
+      in
+      name, pat
+
 
   (*------------------------------------------------------------------*)
   module Reduce = Reduction.Mk(S)

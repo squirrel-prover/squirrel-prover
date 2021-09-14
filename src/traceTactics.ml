@@ -1660,7 +1660,7 @@ exception Invalid
   * Macros in the term occurring (at toplevel) on the [src] projection
   * of some biframe element are replaced by the corresponding [dst]
   * projection. *)
-let reach_equiv_transform 
+let rewrite_equiv_transform 
     ~(src:Term.projection)
     ~(dst:Term.projection)
     ~(s:TS.t)
@@ -1715,22 +1715,7 @@ let reach_equiv_transform
   in
   aux term
 
-let reach_equiv (id : lsymb) (ths : Theory.term list) (s : TS.t) : TS.t list =
-  let ass = TS.get_assumption ~check_compatibility:false Equiv.Global_t id s in
-  let ass_sys = ass.system in
-
-  (* Introduce universal quantifications and implications in assumption. *)
-  let uvars,ass = Equiv.Smart.decompose_forall ass.formula in
-
-  if List.length uvars <> List.length ths then
-    Tactics.(soft_failure (Failure "incorrect number of arguments"));
-
-  let subst =
-    Theory.parse_subst (TS.table s) (TS.ty_vars s) (TS.env s) uvars ths 
-  in
-
-  let ass = Equiv.subst subst ass in
-
+let rewrite_equiv (ass_sys, ass) (s : TS.t) : TS.t list =
   let subgoals, biframe =
     let rec aux = function
       | Equiv.(Atom (Equiv bf)) -> [],bf
@@ -1740,21 +1725,7 @@ let reach_equiv (id : lsymb) (ths : Theory.term list) (s : TS.t) : TS.t list =
   in
   let subgoals = List.map (fun f -> TS.set_goal f s) subgoals in
 
-  let table = TS.table s in
   let cur_sys = TS.system s in
-
-  (* If assumption is a hypothesis from current trace sequent,
-   * it will come attached to the sequent's system expression,
-   * which can be a single system S.
-   * In that case (cf. LowEquivSequent.to_trace_sequent) the
-   * convention is that the global formula in assumption holds
-   * for the pair (S,S).
-   * This will be clarified when system specifications can be
-   * embedded in global formulas. *)
-  let ass_sys = match ass_sys with
-    | SystemExpr.Single s -> SystemExpr.pair table s s
-    | s -> s
-  in
 
   (* Identify which projection of the assumptions conclusion
    * corresponds to the current goal (projection [src]) and
@@ -1795,7 +1766,7 @@ let reach_equiv (id : lsymb) (ths : Theory.term list) (s : TS.t) : TS.t list =
     (* Attempt to transform. If the transformation can't
      * be applied we can simply drop the hypothesis rather
      * than failing completely. *)
-    try reach_equiv_transform ~src ~dst ~s biframe h with
+    try rewrite_equiv_transform ~src ~dst ~s biframe h with
     | Invalid -> warn_unsupported h; Term.mk_true
   in
 
@@ -1803,48 +1774,34 @@ let reach_equiv (id : lsymb) (ths : Theory.term list) (s : TS.t) : TS.t list =
     TS.LocalHyps.map rewrite s
     |> TS.set_system new_sys
     |> TS.set_goal
-      (try reach_equiv_transform ~src ~dst ~s biframe (TS.goal s) with
+      (try rewrite_equiv_transform ~src ~dst ~s biframe (TS.goal s) with
        | Invalid -> warn_unsupported (TS.goal s); Term.mk_false)
   in
   subgoals @ [goal]
 
-let invalid_arguments () =
-  Tactics.hard_failure (Tactics.Failure "invalid arguments")
-
-let reach_equiv args s sk fk =
+let rewrite_equiv_args args s =
   match args with
-  | TacticsArgs.Theory {L.pl_desc=Theory.App (hyp,[])} :: terms ->
-    let convert =
-      function TacticsArgs.Theory t -> t | _ -> invalid_arguments ()
-    in
-    begin match
-        let terms = List.map convert terms in
-        reach_equiv hyp terms s
-      with
-      | subgoals -> sk subgoals fk
-      | exception Tactics.Tactic_soft_failure e -> fk e
-    end
-  | _ -> invalid_arguments ()
+  | [TacticsArgs.RewriteEquiv rw] ->
+    let rw_equiv = TraceLT.p_rw_equiv rw s in
+    rewrite_equiv rw_equiv s
+  | _ -> bad_args ()
+
+let rewrite_equiv_tac args = wrap_fail (rewrite_equiv_args args)
 
 let () =
-  T.register_general "reach_equiv"
+  T.register_general "rewrite equiv"
     ~tactic_help:{
       general_help =
         "Use an equivalence to rewrite a reachability goal.";
       detailed_help =
-        "The first argument should identify an assumption that \
-         concludes with an equivalence atom, i.e. a biframe. \
-         The next arguments are terms used to instantiate universal \
-         quantifications in that assumption. \
-         If the assumption features implications, their antecedents are \
-         introduced as subgoals.\
+        "The tactic argument should be a proof term corresponding to an \
+         assumption which concludes with an equivalence atom, i.e. a biframe. \
+         If the assumption has premises, new subgoals are created.\
          \n\n\
-         When applied left-to-right, all occurrences of macros in the current \
-         goal must be found as left projections of element of the provided \
-         biframe, and will be replaced by the corresponding right \
-         projections. The tactic can also be applied right-to-left. The \
-         direction is determined from the systems to which the equivalence \
-         applies, and is left-to-right by default.";
+         When applied, all occurrences of left elements of the biframe \
+         are rewritten by their corresponding right elements. \
+         All macros in the goal must be rewritten, or the tactic fails.\
+         Default direction is left-to-right (can be changed using `-`).";
       tactic_group = Structural;
       usages_sorts = [] }
-    (LowTactics.gentac_of_ttac_arg reach_equiv)
+    (LowTactics.gentac_of_ttac_arg rewrite_equiv_tac)

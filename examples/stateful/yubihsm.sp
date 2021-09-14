@@ -946,7 +946,7 @@ goal [left] injective_correspondance (j, pid:index):
          j = j'.
 Proof.
   intro Hap.
-  reach_equiv injective_correspondance_equiv, pid, j => // Hexec.
+  rewrite equiv injective_correspondance_equiv pid j => // Hexec.
   executable Server(pid,j) => //.
   intro exec.
   expand exec, cond.
