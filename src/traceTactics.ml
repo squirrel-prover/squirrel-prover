@@ -1729,13 +1729,14 @@ let reach_equiv (id : lsymb) (ths : Theory.term list) (s : TS.t) : TS.t list =
 
   let ass = Equiv.subst subst ass in
 
-  let subgoals,biframe =
+  let subgoals, biframe =
     let rec aux = function
       | Equiv.(Atom (Equiv bf)) -> [],bf
       | Impl (Atom (Reach f),g) -> let s,bf = aux g in f::s,bf
       | _ -> Tactics.(soft_failure (Failure "invalid assumption"))
     in aux ass
   in
+  let subgoals = List.map (fun f -> TS.set_goal f s) subgoals in
 
   let table = TS.table s in
   let cur_sys = TS.system s in
@@ -1795,15 +1796,14 @@ let reach_equiv (id : lsymb) (ths : Theory.term list) (s : TS.t) : TS.t list =
     | Invalid -> warn_unsupported h; Term.mk_true
   in
 
-  let subgoal =
+  let goal =
     TS.LocalHyps.map rewrite s
     |> TS.set_system new_sys
     |> TS.set_goal
       (try reach_equiv_transform ~src ~dst ~s biframe (TS.goal s) with
        | Invalid -> warn_unsupported (TS.goal s); Term.mk_false)
   in
-  subgoal ::
-  (List.map (fun f -> TS.set_goal f s) subgoals)
+  subgoals @ [goal]
 
 let invalid_arguments () =
   Tactics.hard_failure (Tactics.Failure "invalid arguments")
