@@ -688,7 +688,7 @@ Qed.
 (* The counter SCtr(j) strictly increases when t is an action Server performed by 
 the server with tag j. *)
 
-goal [right] counterIncreaseStrictly (pid,j:index):
+goal counterIncreaseStrictly (pid,j:index):
    happens(Server(pid,j)) =>
    cond@Server(pid,j) => 
    SCtr(pid)@pred(Server(pid,j)) ~< SCtr(pid)@Server(pid,j).
@@ -696,7 +696,7 @@ Proof.
 auto.
 Qed.
 
-goal [right] counterIncrease (t:timestamp, pid : index) :
+goal counterIncrease (t:timestamp, pid : index) :
   happens(t) =>
   t > init && exec@t =>
     SCtr(pid)@pred(t) ~< SCtr(pid)@t ||
@@ -714,7 +714,7 @@ Qed.
 
 
 (* The counter SCpt(ped) increases (not strictly) between t' and t when t' < t *)
-goal [right] counterIncreaseBis:
+goal counterIncreaseBis:
   forall (t:timestamp), forall (t':timestamp), forall (pid:index),
     happens(t) =>
     exec@t && t' < t =>
@@ -756,7 +756,7 @@ Qed.
 
 (* Property 1 - No replay relying on an invariant *)
 
-goal [right] noreplayInv (j, j', pid:index):
+goal noreplayInv (j, j', pid:index):
    happens(Server(pid,j),Server(pid,j')) =>
    exec@Server(pid,j') && Server(pid,j) < Server(pid,j') => 
    SCtr(pid)@Server(pid,j) ~< SCtr(pid)@Server(pid,j').
@@ -780,7 +780,7 @@ Proof.
 Qed.
 
 
-goal [right] noreplay (j, j', pid:index):
+goal noreplay (j, j', pid:index):
   happens(Server(pid,j')) =>
   exec@Server(pid,j') =>
   Server(pid,j) <= Server(pid,j') =>
@@ -801,7 +801,7 @@ Qed.
 (* Property 3 *)
 (* Monotonicity *)
 
-goal [right] monotonicity (j, j', pid:index):
+goal monotonicity (j, j', pid:index):
   happens(Server(pid,j'),Server(pid,j)) =>
   exec@Server(pid,j') && exec@Server(pid,j) && 
   SCtr(pid)@Server(pid,j) ~< SCtr(pid)@Server(pid,j') =>
