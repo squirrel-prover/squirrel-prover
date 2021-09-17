@@ -909,7 +909,7 @@ Proof.
     case happens(t') => _ //=. 
     by rewrite exec_nhap.
 
-  by apply ~fadup U.
+  by apply U.
 Qed.
  
 global goal injective_correspondance_equiv (pid, j:index):
@@ -926,7 +926,7 @@ global goal injective_correspondance_equiv (pid, j:index):
 Proof.
   intro Hap.
   use david_atomic_key as [tmax [_ H]].
-  apply ~fadup H.
+  apply H.
 Qed.
 
 (*------------------------------------------------------------------*)
