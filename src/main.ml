@@ -33,7 +33,13 @@ let parse_next (state : main_state) parser_fun =
     | `Stdin  -> "new input"
     | `File f -> f
   in
-  parser_fun state.current_channel channel_name
+  let channel = match state.current_file with
+    | `Stdin -> Lexing.from_channel stdin
+    (* we need to re-compute the lexer buffer from the input channel, or error
+       messages are not acurate afterward. I do not understand why exactly (the
+       lexer buffer positions must not be properly updated somewhere). *)
+    | _ -> state.current_channel in
+  parser_fun channel channel_name
 
 (*------------------------------------------------------------------*)
 (** Print precise location error (to be caught by emacs) *)
