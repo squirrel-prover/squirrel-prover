@@ -23,8 +23,6 @@ let get_ord (at : Term.generic_atom ) : Term.ord option = match at with
   | `Index     (ord,_,_) -> Some (ord :> Term.ord)
   | `Happens _           -> None
 
-let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
-
 (** Chooses a name for a formula, depending on an old name (if any), and the
     formula shape. *)
 let choose_name = function

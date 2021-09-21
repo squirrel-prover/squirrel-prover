@@ -14,44 +14,65 @@ end
 let usage = Printer.strf "Usage: %s filename" (Filename.basename Sys.argv.(0))
 
 (*------------------------------------------------------------------*)
-(* State of the main loop.
-   TODO: include everything currently handled statefully in Prover.ml *)
+(** A loading path: directory to lookup during includes *)
+type load_path = 
+  | LP_dir of string 
+  | LP_none
+
+type load_paths = load_path list
+
+type file = { 
+  f_name   : string;                     (** short name, no extention *)
+  f_path   : [`Stdin | `File of string]; (** file path *)
+  f_lexbuf : Lexing.lexbuf;
+}
+
+(** State of the main loop. *)
+(* TODO: include everything currently handled statefully in Prover.ml *)
 type main_state = {
-  mode            : Prover.prover_mode;
-  table           : Symbols.table;
-  interactive     : bool;
-  current_file    : [`Stdin | `File of string];
-  current_channel : Lexing.lexbuf;
+  mode  : Prover.prover_mode;
+  table : Symbols.table;
+
+  interactive : bool;
+
+  load_paths : load_paths;
+  (** load paths *)
+
+  file : file;
+  (** current file *) 
+
+  file_stack : file list;
+  (** stack of nested opened files *)
 }
 
 (*------------------------------------------------------------------*)
-(** [parse_next parser_fun] parse the next line of the input according to
-    the given parsing function [parser_fun]. Used in interactive
-    mode, depending on what is the type of the next expected input. *)
-let parse_next (state : main_state) parser_fun =
-  let channel_name = match state.current_file with
-    | `Stdin  -> "new input"
-    | `File f -> f
-  in
-  let channel = match state.current_file with
+let get_lexbuf (state : main_state) : string * Lexing.lexbuf =
+  let lexbuf = match state.file.f_path with
     | `Stdin -> Lexing.from_channel stdin
     (* we need to re-compute the lexer buffer from the input channel, or error
        messages are not acurate afterward. I do not understand why exactly (the
        lexer buffer positions must not be properly updated somewhere). *)
-    | _ -> state.current_channel in
-  parser_fun channel channel_name
+
+    | `File f -> state.file.f_lexbuf 
+  in
+  state.file.f_name ^ ".sp", lexbuf
 
 (*------------------------------------------------------------------*)
 (** Print precise location error (to be caught by emacs) *)
 let pp_loc_error state ppf loc =
   if state.interactive then
-    let lexbuf = Lexing.from_channel stdin in
-    (* Not sure startpos does anything *)
-    let startpos = lexbuf.Lexing.lex_curr_p.pos_cnum in
-    Fmt.pf ppf
-      "[error-%d-%d]"
-      (max 0 (loc.L.loc_bchar - startpos))
-      (max 0 (loc.L.loc_echar - startpos))
+    match state.file.f_path with
+    | `Stdin ->
+      let lexbuf = Lexing.from_channel stdin in
+      let startpos = lexbuf.Lexing.lex_curr_p.pos_cnum in
+      Fmt.pf ppf
+        "[error-%d-%d]"
+        (max 0 (loc.L.loc_bchar - startpos))
+        (max 0 (loc.L.loc_echar - startpos))
+    | `File f ->
+      let loc = { loc with L.loc_fname = f; } in
+      Fmt.pf ppf "%s:@;" (L.tostring loc)
+ 
 
 let pp_loc_error_opt state ppf = function
   | None -> ()
@@ -59,34 +80,174 @@ let pp_loc_error_opt state ppf = function
 
 type cmd_error =
   | Unexpected_command
-  | StartProofError of string
   | AbortIncompleteProof
+  | InvalidExtention  of string
+  | StartProofError   of string
+  | InvalidTheoryName of string
+  | IncludeCycle      of string
+  | IncludeNotFound   of string
+  | IncludeFailed     of (Format.formatter -> unit)
 
 exception Cmd_error of cmd_error
 
 let pp_cmd_error fmt = function
-  | Unexpected_command -> Fmt.pf fmt "Unexpected command."
-  | StartProofError s -> Fmt.pf fmt "%s" s
+  | Unexpected_command   -> Fmt.pf fmt "Unexpected command."
+
+  | StartProofError s    -> Fmt.pf fmt "%s" s
+
   | AbortIncompleteProof -> Fmt.pf fmt "Trying to abort a completed proof."
+
+  | InvalidTheoryName s  -> Fmt.pf fmt "invalid theory name %s" s
+
+  | IncludeCycle s       -> Fmt.pf fmt "include cycle: %s" s
+
+  | IncludeNotFound s    -> Fmt.pf fmt "could not locate theory: %s" s
+
+  | InvalidExtention s   -> Fmt.pf fmt "invalid extention (not a .sp): %s" s
+
+  | IncludeFailed err    -> Fmt.pf fmt "include failed:@;%t" err
 
 let cmd_error e = raise (Cmd_error e)
 
 
 (*------------------------------------------------------------------*)
+let valid_theory_regexp = Pcre.regexp "[a-zA-Z][[a-zA-Z0-9]*"
+
+let check_cycle (state : main_state) (name : string) : unit =  
+  let has_cycle =
+    List.exists (fun file -> file.f_name = name) state.file_stack 
+  in
+  if has_cycle then cmd_error (IncludeCycle name)
+
+let file_from_stdin () : file =
+  { f_name = "#stdin";
+    f_path = `Stdin;
+    f_lexbuf = Lexing.from_channel stdin; }
+
+let file_from_path (dir : load_path) (name : string) : file option =
+  let filename = name ^ ".sp" in
+
+  try
+    let path = match dir with
+      | LP_none    -> filename
+      | LP_dir dir -> Filename.concat dir filename
+    in
+    let chan = Stdlib.open_in path in
+    let lexbuf = Lexing.from_channel chan in
+
+    Some { f_name   = name;
+           f_path   = `File filename;
+           f_lexbuf = lexbuf; }
+  with
+  | Sys_error _ -> None
+
+(** try to locate a file according to some loading paths *)
+let locate (lds : load_paths) (name : string) : file =
+  if not (Pcre.pmatch ~rex:valid_theory_regexp name) then    
+    cmd_error (InvalidTheoryName name);  (* FIXME: location *)
+ 
+  let rec try_dirs (dirs : load_paths) : file =
+    match dirs with
+    | [] -> cmd_error (IncludeNotFound name)
+    | dir :: dirs -> match file_from_path dir name with
+      | Some file -> file
+      | None -> try_dirs dirs
+  in
+
+  try_dirs lds
+
+
+let include_get_file (state : main_state) (name : Theory.lsymb) : file =
+  check_cycle state (L.unloc name);
+
+  locate state.load_paths (L.unloc name)
+ 
+(*------------------------------------------------------------------*)
+(** {2 Error handling} *)
+
 open Tactics
+
+(** check if an exception is handled *)
+let is_toplevel_error ~test (e : exn) : bool = 
+  match e with
+  | Parserbuf.Error   _
+  | Prover.ParseError _ 
+  | Cmd_error         _
+  | Process.ProcError _ -> true
+
+  | Prover.Decl_error       _ 
+  | Theory.Conv             _  
+  | Symbols.SymbError       _  
+  | TacticsArgs.TacArgError _  
+  | Tactic_soft_failure     _  
+  | Tactic_hard_failure     _ -> not test 
+
+  | _ -> false
+
+let pp_toplevel_error 
+    ~test
+    (state : main_state) 
+    (fmt : Format.formatter) 
+    (e : exn) : unit 
+  =
+  let pp_loc_error     = pp_loc_error     state in
+  let pp_loc_error_opt = pp_loc_error_opt state in
+
+  match e with
+  | Parserbuf.Error s ->
+    Fmt.string fmt s
+
+  | Prover.ParseError s ->
+    Fmt.string fmt s
+
+  | Cmd_error e ->
+    pp_cmd_error fmt e
+
+  | Process.ProcError e ->
+    (Process.pp_proc_error pp_loc_error) fmt e
+
+  | Prover.Decl_error e when not test ->
+    (Prover.pp_decl_error pp_loc_error) fmt e
+
+  | Theory.Conv e when not test ->
+    (Theory.pp_error pp_loc_error) fmt e
+
+  | Symbols.SymbError e when not test ->
+    (Symbols.pp_symb_error pp_loc_error) fmt e
+
+  | TacticsArgs.TacArgError e when not test ->
+    (TacticsArgs.pp_tac_arg_error pp_loc_error) fmt e
+
+  | Tactic_soft_failure (l,e) when not test ->
+    Fmt.pf fmt "%aTactic failed: %a"
+      pp_loc_error_opt l
+      Tactics.pp_tac_error_i e
+
+  | Tactic_hard_failure (l,e) when not test ->
+    Fmt.pf fmt "%aTactic ill-formed or unapplicable: %a"
+      pp_loc_error_opt l
+      Tactics.pp_tac_error_i e
+      
+  | _ -> assert false
+
+(*------------------------------------------------------------------*)
 
 exception Unfinished
 
-(** The main loop body. *)
-let main_loop_body ~(test : bool) (state : main_state) : main_state =
-  match
-    let parse_buf =
-      Parserbuf.parse_from_buf
-        ~test ~interactive:state.interactive
-        Parser.interactive
-    in
-    state.mode, parse_next state parse_buf
-  with
+(** Get the next input from the current file. *)
+let next_input ~test (state : main_state) : Prover.parsed_input =
+  let filename, lexbuf = get_lexbuf state in
+  Parserbuf.parse_from_buf
+    ~test ~interactive:state.interactive
+    Parser.interactive lexbuf ~filename
+
+(** The main loop body: do one command *)
+let rec do_command
+    ~(test : bool) 
+    (state : main_state) 
+    (command : Prover.parsed_input) : main_state 
+  =
+  match state.mode, command with
     | mode, ParsedUndo nb_undo ->
       let new_mode, new_table = Prover.reset_state nb_undo in
       let () = match new_mode with
@@ -99,12 +260,12 @@ let main_loop_body ~(test : bool) (state : main_state) : main_state =
     | GoalMode, ParsedInputDescr decls ->
       let hint_db = Prover.current_hint_db () in
       let table = Prover.declare_list state.table hint_db decls in
-      Printer.pr "%a" System.pp_systems table;
       { state with mode = GoalMode; table = table; }
 
     | ProofMode, ParsedTactic utac ->
       if not state.interactive then
         Printer.prt `Prompt "%a" Prover.pp_ast utac ;
+
       begin match Prover.eval_tactic utac with
       | true ->
           Printer.prt `Goal "Goal %s is proved"
@@ -153,7 +314,42 @@ let main_loop_body ~(test : bool) (state : main_state) : main_state =
         | Some es -> cmd_error (StartProofError es)
       end
 
-    | GoalMode, EOF -> { state with mode = AllDone; }
+    | GoalMode, ParsedInclude fn -> 
+      (* save prover state, in case the include fails *)
+      let prover_state = Prover.get_state state.mode state.table in
+
+      let file = include_get_file state fn in
+      let file_stack = state.file :: state.file_stack in
+
+      Prover.push_pt_history ();
+
+      let incl_state = { state with file; file_stack; } in
+
+      (* try to do the include *)
+      begin try
+          let final_state = do_all_commands ~test incl_state in
+          Printer.pr "loaded: %s.sp@;" final_state.file.f_name;
+
+          Prover.pop_pt_history (); 
+
+          { final_state with file = state.file; file_stack = state.file_stack; }
+
+        (* include failed, revert state *)
+        with e when is_toplevel_error ~test e -> 
+          let err_mess fmt =
+            pp_toplevel_error ~test incl_state fmt e
+          in
+          
+          let _ : Prover.prover_mode * Symbols.table =
+            Prover.reset_from_state prover_state 
+          in
+          
+          cmd_error (IncludeFailed err_mess)
+      end
+
+    | GoalMode, EOF ->
+      assert (state.file_stack = []);
+      { state with mode = AllDone; }
 
     | WaitQed, ParsedAbort ->
       if test then raise @@ Failure "Trying to abort a completed proof." else
@@ -170,6 +366,12 @@ let main_loop_body ~(test : bool) (state : main_state) : main_state =
 
     | _, _ -> cmd_error Unexpected_command
 
+(** Do all command from a file until EOF is reached *)
+and do_all_commands ~(test : bool) (state : main_state) : main_state =
+  match next_input ~test state with
+  | EOF -> state
+  | cmd -> do_all_commands ~test (do_command ~test state cmd)
+
 
 (** The main loop of the prover. The mode defines in what state the prover is,
     e.g is it waiting for a proof script, or a system description, etc.
@@ -183,11 +385,9 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
    * In practice we save except after errors and the first call. *)
   if save then Prover.save_state state.mode state.table ;
 
-  let pp_loc_error     = pp_loc_error     state in
-  let pp_loc_error_opt = pp_loc_error_opt state in
-
   match
-    let new_state = main_loop_body ~test state in
+    let cmd = next_input ~test state in
+    let new_state = do_command ~test state cmd in
     new_state, new_state.mode 
   with
   (* exit prover *)
@@ -196,93 +396,89 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
   (* loop *)
   | new_state, _ -> (main_loop[@tailrec]) ~test new_state
 
-  (* exception handling *)
-  | exception (Parserbuf.Error s) ->
-    error ~test state (fun fmt -> Fmt.string fmt s)
+  (* error handling *)
+  | exception e when is_toplevel_error ~test e -> 
+    Printer.prt `Error "%a" (pp_toplevel_error ~test state) e;
+    main_loop_error ~test state
 
-  | exception (Prover.ParseError s) ->
-    error ~test state (fun fmt -> Fmt.string fmt s)
-
-  | exception (Cmd_error e) ->
-    error ~test state (fun fmt -> pp_cmd_error fmt e)
-
-  | exception (Process.ProcError e) ->
-    error ~test state (fun fmt -> Process.pp_proc_error pp_loc_error fmt e)
-
-  | exception (Prover.Decl_error e) when not test ->
-    error ~test state (fun fmt -> Prover.pp_decl_error pp_loc_error fmt e)
-
-  | exception (Theory.Conv e) when not test ->
-    error ~test state (fun fmt -> Theory.pp_error pp_loc_error fmt e)
-
-  | exception (Symbols.SymbError e) when not test ->
-    error ~test state (fun fmt -> Symbols.pp_symb_error pp_loc_error fmt e)
-
-  | exception (TacticsArgs.TacArgError e) when not test ->
-    error ~test state (fun fmt -> TacticsArgs.pp_tac_arg_error pp_loc_error fmt e)
-
-  | exception (Tactic_soft_failure (l,e)) when not test ->
-    let pp_e fmt =
-      Fmt.pf fmt "%aTactic failed: %a"
-        pp_loc_error_opt l
-        Tactics.pp_tac_error_i e
-    in
-    error ~test state pp_e
-
-  | exception (Tactic_hard_failure (l,e)) when not test ->
-    let pp_e fmt =
-      Fmt.pf fmt "%aTactic ill-formed or unapplicable: %a"
-        pp_loc_error_opt l
-        Tactics.pp_tac_error_i e
-    in
-
-    error ~test state pp_e
-
-and error ~test state e =
-  Printer.prt `Error "%t" e;
+and main_loop_error ~test (state : main_state) : unit =
   if state.interactive
-  then (main_loop[@tailrec]) ~test ~save:false state
+  then begin (* at top-level, query again *)
+    assert (state.file.f_path = `Stdin);    
+    (main_loop[@tailrec]) ~test ~save:false state
+    (* REM *)
+    (* | `File f -> (* not at top-level, include failed *)
+     *   Prover.pop_all_pt_history ();
+     *   let mode, table = Prover.reset_to_pt_history_head () in
+     *   let file = List.last state.file_stack in
+     *   let state = { state with mode; table; file; } in
+     *   (main_loop[@tailrec]) ~test ~save:false state *)
+  end
   else if not test then exit 1
 
 
+let mk_load_paths ~main_mode () : load_paths =
+  let exec_dir = Sys.executable_name in
+  (* let exec_dir = Filename.dirname (Sys.argv.(0)) in *)
+  let theory_dir = 
+    Filename.(concat 
+                (concat exec_dir Filename.parent_dir_name) 
+                "theories")
+  in
+  let theory_load_path = LP_dir theory_dir in
+  let top_load_path =
+    match main_mode with
+    | `Stdin     -> LP_dir (Sys.getcwd ())
+    | `File path -> LP_dir (Filename.dirname path)
+  in
+  [top_load_path; theory_load_path] 
+
 let start_main_loop
     ?(test=false) 
-    ~interactive
-    ~current_channel
-    ~current_file () 
+    ~(main_mode : [`Stdin | `File of string]) 
+    () : unit
   =
-  (* Initialize definitions before parsing system description.
-   * TODO this is not doable anymore (with refactoring this code)
-   * concerning definitions of functions, names, ... symbols;
-   * it should not matter if we do not undo the initial definitions *)
+  let interactive = main_mode = `Stdin in  
+  let file = match main_mode with
+    | `Stdin -> file_from_stdin ()
+    | `File fname -> locate [LP_none] fname
+  in
+
   Prover.reset ();
   let state = {
     mode = GoalMode; 
     table = Symbols.builtins_table; 
-    current_channel;
-    current_file;
     interactive;
-  } in
+
+    load_paths = mk_load_paths ~main_mode ();
+
+    file;
+
+    file_stack = []; } 
+  in
+
   main_loop ~test state
 
-let interactive_prover () =
+let interactive_prover () : unit =
   Printer.prt `Start "Squirrel Prover interactive mode.";
   Printer.prt `Start "Git commit: %s" Commit.hash_commit;
   Printer.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
-  let current_channel = Lexing.from_channel stdin in
-  let current_file = `Stdin in
-  try start_main_loop ~interactive:true ~current_channel ~current_file ()
+  try start_main_loop ~main_mode:`Stdin ()
   with End_of_file -> Printer.prt `Error "End of file, exiting."
 
-let run ?(test=false) filename =
+let run ?(test=false) (filename : string) : unit =
   if test then begin
     Printer.printer_mode := Printer.Test;
     Format.eprintf "Running %S...@." filename
   end;
   Printer.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
-  let current_channel = Lexing.from_channel (Stdlib.open_in filename) in
-  let current_file = `File filename in
-  start_main_loop ~test ~interactive:false ~current_channel ~current_file ()
+
+  if Filename.extension filename <> ".sp" then
+    cmd_error (InvalidExtention filename);
+
+  let name = Filename.chop_extension filename in
+
+  start_main_loop ~test ~main_mode:(`File name) ()
 
 
 let main () =

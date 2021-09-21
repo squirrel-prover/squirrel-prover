@@ -154,6 +154,7 @@ rule token = parse
 | "ddh"               { DDH }
 | "nosimpl"           { NOSIMPL }
 | "checkfail"         { CHECKFAIL }
+| "include"           { INCLUDE }
 | name as n           { ID n }
 | eof                 { EOF }
 

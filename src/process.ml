@@ -1014,4 +1014,5 @@ let declare_system table (system_name : lsymb) proc =
 
   let proc,table = parse_proc system_name table proc in
   Printer.pr "@[<v 2>Processed system:@;@;@[%a@]@]@.@." pp_process proc ;
+  Printer.pr "%a" System.pp_systems table;
   table

@@ -40,18 +40,11 @@
 (proof-easy-config 'squirrel "squirrel"
 
  proof-prog-name		     "squirrel.byte -i"  ;; or your program
- proof-terminal-string                 "."        ;; end of commands
- ;; proof-script-command-start-regexp "Proof\\|goal\\|hash[ \n\t\r]"
-;; proof-script-command-end-regexp       "[^\\.]\\.\\(\\s \\|\n\\|$\\)"
+ proof-terminal-string                 "."   ;; end of commands
 
-
-;; cannot get comments to be ignored :(
-
- proof-script-comment-start             "(*"	;; for inserting comments
+ proof-script-comment-start             "(*"	;; comments
  proof-script-comment-end               "*)"
-;; proof-script-comment-start-regexp	 "\#[ \t\n\f]" ;; recognizing
-;; proof-script-comment-end-regexp	 "\n"      ;; comments
- ;; proof-script-syntax-table-entries '(?\# "<" ?\n ">")
+
  proof-shell-strip-crs-from-input       nil
  proof-script-syntax-table-entries
  	'(?\* ". 23"
@@ -62,12 +55,13 @@
  comment-quote-nested nil
  proof-shell-truncate-before-error      nil
 
-proof-save-command-regexp proof-no-regexp
+ proof-save-command-regexp proof-no-regexp
  proof-tree-external-display nil
-;; proof-shell-strip-crs-from-input nil
+ ;; proof-shell-strip-crs-from-input nil
 
  proof-shell-error-regexp "\\[error>"
  ;; proof-shell-result-regexp "\\[result>"
+ 
  proof-shell-annotated-prompt-regexp "\\[>"
  proof-shell-eager-annotation-start "\\[start>\\|\\[dbg>\\|\\[warning>"
  proof-shell-eager-annotation-end "<\\]"

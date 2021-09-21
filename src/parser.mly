@@ -36,6 +36,7 @@
 %token SPLITSEQ CONSTSEQ MEMSEQ
 %token BY INTRO AS DESTRUCT REMEMBER INDUCTION
 %token PROOF QED UNDO ABORT HINT
+%token INCLUDE
 %token EOF
 
 %nonassoc QUANTIF
@@ -898,12 +899,16 @@ set_option:
 hint:
 | HINT REWRITE id=lsymb DOT { Hint.Hint_rewrite id }
 
+p_include:
+| INCLUDE file=lsymb  { file }
+
 interactive:
 | set=set_option     { Prover.ParsedSetOption set }
 | decls=declarations { Prover.ParsedInputDescr decls }
 | u=undo             { Prover.ParsedUndo u }
 | tac=tactic         { Prover.ParsedTactic tac }
 | PROOF              { Prover.ParsedProof }
+| i=p_include        { Prover.ParsedInclude i }
 | QED                { Prover.ParsedQed }
 | ABORT              { Prover.ParsedAbort }
 | g=goal             { Prover.ParsedGoal g }
