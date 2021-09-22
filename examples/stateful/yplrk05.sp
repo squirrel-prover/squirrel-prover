@@ -77,36 +77,8 @@ system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
 
 
 (* LIBRARIES *)
-(* A inclure dans une lib standard *)
 
-goal eq_sym ['a] (x,y : 'a) : x = y => y = x.
-Proof. auto. Qed.
-
-goal if_false ['a] (b : boolean, x,y : 'a):
- (not b) => if b then x else y = y.
-Proof.
- by intro *; noif. 
-Qed.
-
-goal if_true ['a] (b : boolean, x,y : 'a):
- b => if b then x else y = x.
-Proof.
-  by intro *; yesif.
-Qed.
-
-goal if_true0 ['a] (x,y : 'a):
- if true then x else y = x.
-Proof.
-  by rewrite if_true. 
-Qed.
-hint rewrite if_true0.
-
-goal if_false0 ['a] (x,y : 'a):
- if false then x else y = y.
-Proof.
-  by rewrite if_false.
-Qed.
-hint rewrite if_false0.
+include Basic.
 
 (* PROOF *)
 

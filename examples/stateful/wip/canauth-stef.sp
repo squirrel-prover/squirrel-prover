@@ -77,44 +77,8 @@ system ((!_i !_j ReceiverA(i,j)) | (!_i !_j SenderA(i,j)) |
         (!_i !_j ReceiverB(i,j)) | (!_i !_j SenderB(i,j))).
 
 (* LIBRARIES *)
-(* A inclure dans une lib standard *)
 
-goal eq_sym ['a] (x,y : 'a) : x = y => y = x.
-Proof. auto. Qed.
-
-goal if_false ['a] (b : boolean, x,y : 'a):
- (not b) => if b then x else y = y.
-Proof.
- by intro *; noif. 
-Qed.
-
-goal if_true ['a] (b : boolean, x,y : 'a):
- b => if b then x else y = x.
-Proof.
-  by intro *; yesif.
-Qed.
-
-goal if_true0 ['a] (x,y : 'a):
- if true then x else y = x.
-Proof.
-  by rewrite if_true. 
-Qed.
-hint rewrite if_true0.
-
-goal if_false0 ['a] (x,y : 'a):
- if false then x else y = y.
-Proof.
-  by rewrite if_false.
-Qed.
-hint rewrite if_false0.
-
-goal fst_pair (x,y : message) : fst (<x,y>) = x.
-Proof. auto. Qed.
-hint rewrite fst_pair.
-
-goal snd_pair (x,y : message) : snd (<x,y>) = y.
-Proof. auto. Qed.
-hint rewrite snd_pair.
+include Basic.
 
 (* f_apply *)
 

@@ -132,6 +132,9 @@ let file_from_path (dir : load_path) (name : string) : file option =
       | LP_none    -> filename
       | LP_dir dir -> Filename.concat dir filename
     in
+    
+    Fmt.epr "trying: %s@." path;
+
     let chan = Stdlib.open_in path in
     let lexbuf = Lexing.from_channel chan in
 
@@ -418,12 +421,10 @@ and main_loop_error ~test (state : main_state) : unit =
 
 
 let mk_load_paths ~main_mode () : load_paths =
-  let exec_dir = Sys.executable_name in
+  let exec_dir = Filename.dirname Sys.executable_name in
   (* let exec_dir = Filename.dirname (Sys.argv.(0)) in *)
   let theory_dir = 
-    Filename.(concat 
-                (concat exec_dir Filename.parent_dir_name) 
-                "theories")
+    Filename.(concat exec_dir "theories")
   in
   let theory_load_path = LP_dir theory_dir in
   let top_load_path =
