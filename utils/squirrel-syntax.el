@@ -15,26 +15,34 @@
   "such that"
 ))
 
-(defvar squirrel-decl-keywords '(
-  "aenc"
+(defvar squirrel-global-keywords '(
+  "include"
+  "set"
   "axiom"
   "goal"
   "global"
   "local"
-  "system"
-  "set"
-  "signature"
   "Proof"
   "Qed"
+  "equiv"
+))
+
+(defvar squirrel-dangerous-keywords '(
   "Abort"
+  "admit"
+))
+
+(defvar squirrel-decl-keywords '(
+  "aenc"
+  "signature"
   "hash"
   "senc"
   "abstract"
+  "system"
   "type"
   "name"
   "channel"
   "mutable"
-  "equiv"
   "process"
   "with oracle"
   "with hash"
@@ -138,7 +146,6 @@
 
 (defvar squirrel-closing-keywords '(
   "by"
-  "admit"
   "assumption"
   "congruence"
   "constraints"
@@ -155,6 +162,16 @@
   "checkfail"
   "exn"
 ))
+
+(defface squirrel-tactics-dangerous-face
+  (proof-face-specs
+   (:background "red")
+   (:background "red")
+   ())
+  "Face for names of dangerous tactics in proof scripts."
+  :group 'proof-faces)
+
+(defconst squirrel-tactics-dangerous-face 'squirrel-tactics-dangerous-face)
 
 
 (defvar squirrel-tactical-char "\\(;\\|\\+\\)")
@@ -185,18 +202,23 @@
 
 (defvar squirrel-font-lock-keywords
   (list
-    (cons (concat squirrel-named-args)                    'font-lock-type-face)
-    (cons (proof-ids-to-regexp squirrel-prog-keywords)    'font-lock-keyword-face)
-    (cons (concat squirrel-operator-char-1234 "+")        'font-lock-type-face)
-    (cons (concat squirrel-tactical-char "+")             'proof-tacticals-name-face)
-    (cons (proof-ids-to-regexp squirrel-tacticals-keywords)
-                                                          'proof-tacticals-name-face)
-    (cons (proof-ids-to-regexp squirrel-tactic-keywords)  'proof-tactics-name-face)
-    (cons (proof-ids-to-regexp squirrel-decl-keywords)    'font-lock-constant-face)
-    (cons (proof-ids-to-regexp squirrel-closing-keywords) 'squirrel-tactics-closing-face)
-    (cons (proof-ids-to-regexp squirrel-fun-keywords)     'font-lock-preprocessor-face)
-    (cons (proof-ids-to-regexp squirrel-type-keywords)    'font-lock-variable-name-face)
-    (cons (concat squirrel-operator-type-var)             'font-lock-variable-name-face)
+    (cons (concat squirrel-named-args)                      'font-lock-type-face)
+    (cons (proof-ids-to-regexp squirrel-prog-keywords)      'font-lock-keyword-face)
+
+    (cons (concat squirrel-operator-char-1234 "+")          'font-lock-type-face)
+    (cons (concat squirrel-tactical-char "+")               'proof-tacticals-name-face)
+
+    (cons (proof-ids-to-regexp squirrel-tacticals-keywords) 'proof-tacticals-name-face)
+    (cons (proof-ids-to-regexp squirrel-tactic-keywords)    'proof-tactics-name-face)
+
+    (cons (proof-ids-to-regexp squirrel-decl-keywords)      'font-lock-constant-face)
+    (cons (proof-ids-to-regexp squirrel-global-keywords)    'font-lock-builtin-face)
+    (cons (proof-ids-to-regexp squirrel-closing-keywords)   'squirrel-tactics-closing-face)
+    (cons (proof-ids-to-regexp squirrel-dangerous-keywords) 'squirrel-tactics-dangerous-face)
+    (cons (proof-ids-to-regexp squirrel-fun-keywords)       'font-lock-preprocessor-face)
+
+    (cons (proof-ids-to-regexp squirrel-type-keywords)      'font-lock-variable-name-face)
+    (cons (concat squirrel-operator-type-var)               'font-lock-variable-name-face)
 	)
 )
 
