@@ -900,7 +900,7 @@ hint:
 | HINT REWRITE id=lsymb DOT { Hint.Hint_rewrite id }
 
 p_include:
-| INCLUDE file=lsymb  { file }
+| INCLUDE file=lsymb DOT  { file }
 
 interactive:
 | set=set_option     { Prover.ParsedSetOption set }

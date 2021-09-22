@@ -99,13 +99,13 @@ let pp_cmd_error fmt = function
 
   | InvalidTheoryName s  -> Fmt.pf fmt "invalid theory name %s" s
 
-  | IncludeCycle s       -> Fmt.pf fmt "include cycle: %s" s
+  | IncludeCycle s       -> Fmt.pf fmt "include cycle (%s)" s
 
   | IncludeNotFound s    -> Fmt.pf fmt "could not locate theory: %s" s
 
   | InvalidExtention s   -> Fmt.pf fmt "invalid extention (not a .sp): %s" s
 
-  | IncludeFailed err    -> Fmt.pf fmt "include failed:@;%t" err
+  | IncludeFailed err    -> Fmt.pf fmt "%t" err
 
 let cmd_error e = raise (Cmd_error e)
 
@@ -170,11 +170,10 @@ open Tactics
 (** check if an exception is handled *)
 let is_toplevel_error ~test (e : exn) : bool = 
   match e with
-  | Parserbuf.Error   _
-  | Prover.ParseError _ 
-  | Cmd_error         _
-  | Process.ProcError _ -> true
-
+  | Parserbuf.Error         _
+  | Prover.ParseError       _ 
+  | Cmd_error               _
+  | Process.ProcError       _ 
   | Prover.Decl_error       _ 
   | Theory.Conv             _  
   | Symbols.SymbError       _  
@@ -328,7 +327,7 @@ let rec do_command
       (* try to do the include *)
       begin try
           let final_state = do_all_commands ~test incl_state in
-          Printer.pr "loaded: %s.sp@;" final_state.file.f_name;
+          Printer.prt `Warning "loaded: %s.sp@;" final_state.file.f_name;
 
           Prover.pop_pt_history (); 
 
@@ -337,13 +336,14 @@ let rec do_command
         (* include failed, revert state *)
         with e when is_toplevel_error ~test e -> 
           let err_mess fmt =
-            pp_toplevel_error ~test incl_state fmt e
+            Fmt.pf fmt "@[<v 0>include %s failed:@;@[%a@]@]" 
+              (L.unloc fn)
+            (pp_toplevel_error ~test incl_state) e
           in
           
           let _ : Prover.prover_mode * Symbols.table =
             Prover.reset_from_state prover_state 
           in
-          
           cmd_error (IncludeFailed err_mess)
       end
 
@@ -628,6 +628,8 @@ let () =
            | Unfinished -> raise Ok)
     end ;
   ] ;
+
+  (*------------------------------------------------------------------*)
   Checks.add_suite "Equivalence" [
     "Fresh Frame", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
@@ -691,4 +693,37 @@ let () =
            | Tactic_soft_failure
                (_, HypUnknown "H") -> raise Ok)
     end
+  ];
+
+  (*------------------------------------------------------------------*)
+  Checks.add_suite "Include" [
+    "Cycle", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
+           try run ~test "tests/alcotest/IncludeCycle.sp" with
+           | Cmd_error (IncludeCycle _) -> raise Ok)
+    end ;
+    "Theory not found", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
+           try run ~test "tests/alcotest/include-unknown.sp" with
+           | Cmd_error (IncludeNotFound _) -> raise Ok)
+    end ;
+    (* Not that in test mode, errors during an include are not wrapped 
+       into a IncludeError.  *)
+    "Re-define", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
+           try run ~test "tests/alcotest/include-rebind.sp" with
+           | Symbols.(SymbError (_, Multiple_declarations _)) ->
+             raise Ok)
+    end ;
+    "Re-define", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
+           try run ~test "tests/alcotest/include-rebind2.sp" with
+           | Symbols.(SymbError (_, Multiple_declarations _)) ->
+             raise Ok)
+    end ;
   ]
+
