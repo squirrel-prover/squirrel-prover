@@ -18,7 +18,7 @@ PROOFS
 - authentication
 - injectivity
 *******************************************************************************)
-
+set timeout=4.
 set autoIntro = false.
 
 hash hmac
