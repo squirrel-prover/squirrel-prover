@@ -409,13 +409,6 @@ and main_loop_error ~test (state : main_state) : unit =
   then begin (* at top-level, query again *)
     assert (state.file.f_path = `Stdin);    
     (main_loop[@tailrec]) ~test ~save:false state
-    (* REM *)
-    (* | `File f -> (* not at top-level, include failed *)
-     *   Prover.pop_all_pt_history ();
-     *   let mode, table = Prover.reset_to_pt_history_head () in
-     *   let file = List.last state.file_stack in
-     *   let state = { state with mode; table; file; } in
-     *   (main_loop[@tailrec]) ~test ~save:false state *)
   end
   else if not test then exit 1
 
