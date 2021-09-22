@@ -646,8 +646,8 @@ tac:
   | l=lloc(DEPENDS) args=tactic_params
     { mk_abstract l "depends" args }
 
-  | l=lloc(DEPENDS) args=tactic_params BY t=tac
-    { T.AndThenSel (mk_abstract l "depends" args, [[1], t]) }
+  | l=lloc(DEPENDS) args=tactic_params l1=lloc(BY) t=tac
+    { T.AndThenSel (mk_abstract l "depends" args, [[1], T.By (t,l1)]) }
 
   | l=lloc(REMEMBER) t=term AS id=lsymb
     { mk_abstract l "remember" [TacticsArgs.Remember (t, id)] }
@@ -690,8 +690,8 @@ tac:
 
   | t=assert_tac { t }
 
-  | t=assert_tac BY t1=tac
-    { T.AndThenSel (t, [[1], t1]) }
+  | t=assert_tac l=lloc(BY) t1=tac
+    { T.AndThenSel (t, [[1], T.By (t1,l)]) }
 
   | l=lloc(USE) pt=pt_use_tac ip=as_ip? 
     { mk_abstract l "assert" [TacticsArgs.AssertPt (pt, ip, `IntroImpl)] }
