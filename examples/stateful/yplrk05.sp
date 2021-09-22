@@ -35,13 +35,13 @@ hash h2
 abstract ok : message
 abstract error : message
 
-name key1 : index->message
-name key2 : index->message
-name k : index->message
-name r1 : index->message
+name key1 : index -> message
+name key2 : index -> message
+name k : index -> message
+name r1 : index -> message
 
-name k1init : index->message
-name k2init : index->message
+name k1init : index -> message
+name k2init : index -> message
 
 mutable kT(i:index) : message = <k1init(i),k2init(i)>
 mutable kR(ii:index) : message = <k1init(ii),k2init(ii)>
@@ -93,34 +93,34 @@ goal lastUpdateTag (t:timestamp, i,j:index):
     happens(T(i,j),t,T1(i,j)) =>
       (t >= T(i,j) && t < T1(i,j)) => kT(i)@T(i,j) = kT(i)@t.
 Proof.
-  generalize t i j.
-  induction.
-  intro t IH0 i j Hap [H1 H2].
-  case t; intro He; 
-  try by (simpl_left; expand kT(i)@t; apply IH0 (pred(t))).
+  generalize i j.
+  induction t => t IH0 i j Hap [H1 H2].
+  case t => He; 
+  try by (simpl_left; expand kT(i)@t; apply IH0).
 
   auto.
 
   destruct He as [i0 j0 He].
-  assert T(i0,j0) = T(i,j) || T(i0,j0) > T(i,j) as H0.
-  by eqtrace.
+  assert T(i0,j0) = T(i,j) || T(i0,j0) > T(i,j) as H0 by constraints.
+
   case H0; 1: auto.
-  expand kT(i)@t; by apply IH0 (pred(t)).
+  expand kT(i)@t; by apply IH0.
 
   destruct He as [i0 j0 He].
   rewrite He.
-  case (i=i0) => Hc0.
-  case (j=j0) => Hc1.
-  (* case i=i0 && j=j0 *)
-  auto.
-  (* case i=i0 && j<>j0 *)
-  use sequentiality with T1(i,j0),i,j => //.
-  by exists j0.
-  (* case i<>i0 *)
-  use IH0 with pred(T1(i0,j0)),i,j as Meq; 2,3,4: auto. 
-  assert kT(i)@T1(i0,j0) = kT(i)@pred(T1(i0,j0));
-  1: by expand kT; rewrite if_false. 
-  congruence.
+  case (i=i0) => _.
+  case (j=j0) => _.
+  
+    (* case i=i0 && j=j0 *)
+    auto.
+  
+    (* case i=i0 && j<>j0 *)
+    use sequentiality with T1(i,j0),i,j => //.
+    by exists j0.
+  
+    (* case i<>i0 *)
+    use IH0 with pred(T1(i0,j0)),i,j as Meq; 2,3,4: auto. 
+    by rewrite /kT if_false //.
 Qed.
 
 goal auth_R1_induction (t:timestamp, jj,ii:index):
@@ -129,10 +129,10 @@ goal auth_R1_induction (t:timestamp, jj,ii:index):
     =>
     exists (j:index), T(ii,j) < t && output@T(ii,j) = input@t.
 Proof.
-  generalize t jj ii.
-  induction. 
-  intro t IH0 jj ii Hap [Ht0 Hexec].
-  subst t,R1(jj,ii).
+  generalize jj ii.
+  induction t => t IH0 jj ii Hap [Ht0 Hexec].
+  rewrite Ht0 in *; clear Ht0.
+
   expand exec, cond.
   destruct Hexec as [H1 Meq].
   euf Meq.
@@ -142,7 +142,7 @@ Proof.
     executable pred(R1(jj,ii)) => // H.
     use H with R1(jj0,ii) as Ht1; 2: auto.
     expand exec, cond.
-    destruct Ht1 as [_ _].
+    destruct Ht1 as [_ _]. 
     use IH0 with R1(jj0,ii),jj0,ii as [j _]; 2,3,4: auto.
     by exists j.
 
@@ -154,7 +154,7 @@ Proof.
     (* if there is an update@T1, then action T happened before *)
     intro Ht Heq *. 
     exists j.
-    depends T(ii,j),T1(ii,j) => // _. 
+    depends T(ii,j),T1(ii,j) by auto => _. 
     by rewrite /output (lastUpdateTag (pred(T1(ii,j)))). 
 Qed.
 
@@ -164,13 +164,13 @@ goal auth_T1_induction (t:timestamp, i,j:index):
     =>
     exists (jj:index), R1(jj,i) < t && output@R1(jj,i) = input@t.
 Proof.
-  generalize t i j.
-  induction.
-  intro t IH0 i j Hap [Ht Hexec].
-  subst t,T1(i,j).
+  generalize i j.
+  induction t => t IH0 i j Hap [Ht Hexec].
+  rewrite Ht in *; clear Ht.
+
   expand exec, cond.
   destruct Hexec as [H1 Meq].
-  euf Meq => * /=.
+  euf Meq => Clt * /=.
 
     (* case 1/2: equality with hashed message in output@R1 *)
     (* honest case *)
@@ -180,13 +180,12 @@ Proof.
     use IH0 with T1(i,j0),i,j0 as [jj _] => //.
     exists jj => /=. 
     executable pred(T1(i,j)) => // H.
-    by use H with T1(i,j0) as H'.
+    by apply H in Clt.
 
   simpl.
   executable pred(T1(i,j)) => // H. 
   by apply H.
 Qed.
-
 
 goal xor_inj_l (x, y, z : message) : x XOR y = z XOR y => x = z.
 Proof. auto. Qed.
