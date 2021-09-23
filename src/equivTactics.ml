@@ -1751,15 +1751,11 @@ let () =
     (LowTactics.genfun_of_efun_arg mem_seq_tac)
 
 (*------------------------------------------------------------------*)
-let const_seq (li, terms) s : Goal.t list =
-  let terms, term_tys =
-    List.split @@
-    List.map (fun p_term ->
-        let term, term_ty = EquivLT.convert_i s p_term in
-        term, (term_ty, L.loc p_term)
-      ) terms
-  in
-
+(** implement the ConstSeq rule of CSF'21 *)
+let const_seq
+    ((li, b_t_terms) : int L.located * (Theory.hterm * Theory.term) list)
+    (s : ES.t) : Goal.t list 
+  =
   let before, e, after = split_equiv_goal li s in
   let i = L.unloc li in
 
@@ -1768,28 +1764,73 @@ let const_seq (li, terms) s : Goal.t list =
     | _ ->
       soft_failure ~loc:(L.loc li) (Failure (string_of_int i ^ " is not a seq"))
   in
+  let b_t_terms =
+    List.map (fun (p_bool, p_term) ->
+        let b_ty,  t_bool = EquivLT.convert_ht s p_bool in
+        let term, term_ty = EquivLT.convert_i s p_term in
+        let p_bool_loc = L.loc p_bool in
 
-  (* check that types are compatible *)
-  List.iter (fun (term_ty, loc) ->
-      EquivLT.check_ty_eq ~loc term_ty (Term.ty e_ti)
-    ) term_tys;
+        (* check that types are compatible *)
+        let seq_hty =
+          Type.Lambda (List.map (fun v -> Vars.ety v) e_is, Type.Boolean)
+        in
+        EquivLT.check_hty_eq ~loc:p_bool_loc b_ty seq_hty;
+ 
+        EquivLT.check_ty_eq ~loc:(L.loc p_term) term_ty (Term.ty e_ti);
+
+        (* check that [p_bool] is a pure timestamp formula *)
+        let t_bool_body = match t_bool with
+          | Term.Lambda (_, body) -> body
+        in
+        if not (Term.is_pure_timestamp t_bool_body) then
+          hard_failure ~loc:p_bool_loc (Failure "not a pure timestamp formula");
+
+        t_bool, term
+      ) b_t_terms
+  in
 
   (* refresh variables *)
   let env = ref (ES.env s) in
   let e_is, subst = Term.erefresh_vars (`InEnv env) e_is in
   let e_ti = Term.subst subst e_ti in
 
-  let eqs = List.map (fun term ->
-      Term.mk_atom `Eq e_ti term
-    ) terms
+  (* instantiate all boolean [hterms] in [b_t_terms] using [e_is] *)
+  let e_is_terms = 
+    List.map (fun (Vars.EVar v) -> Term.ETerm (Term.mk_var v)) e_is 
   in
-  let cond =
-    Term.mk_forall ~simpl:true e_is (Term.mk_ors ~simpl:true eqs)
+  let b_t_terms : (Term.message * Term.message) list =
+    List.map (fun (t_bool, term) ->
+        let t_bool = 
+          match Term.apply_ht t_bool e_is_terms with
+          | Term.Lambda ([], cond) -> cond
+          | _ -> assert false
+        in
+        t_bool, term
+      ) b_t_terms
   in
-  let s_reach = s |> ES.set_reach_goal cond |> ES.to_trace_sequent in
 
+  (* first sub-goal: (∀ e_is, ∨ᵢ bᵢ *)
+  let cases = Term.mk_ors ~simpl:true (List.map fst b_t_terms) in
+  let cond1 =
+    Term.mk_forall ~simpl:true e_is cases
+  in
+  let subg1 = ES.set_reach_goal cond1 s |> ES.to_trace_sequent in
+  
+  (* second sub-goal: (∧ᵢ (∀ e_is, bᵢ → tᵢ = e_ti) *)
+  let eqs = List.map (fun (t_bool, term) ->
+      Term.mk_forall ~simpl:true e_is
+        (Term.mk_impl t_bool (Term.mk_atom `Eq e_ti term))
+    ) b_t_terms
+  in
+  let cond2 = Term.mk_ands ~simpl:true eqs in
+  let subg2 = ES.set_reach_goal cond2 s |> ES.to_trace_sequent in
+
+  (* third sub-goal *)
+  let terms = List.map snd b_t_terms in
   let frame = List.rev_append before (terms @ after) in
-  [ Goal.Trace s_reach;
+
+  [ Goal.Trace subg1;
+    Goal.Trace subg2;
     Goal.Equiv (ES.set_equiv_goal frame s) ]
 
 let const_seq_args args s : Goal.t list =

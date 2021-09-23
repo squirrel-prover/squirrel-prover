@@ -583,8 +583,10 @@ spt:
 apply_arg:
 | pt=pt                  { Theory.PT_hol pt }
 
-/* | LPAREN f=term RPAREN   { Theory.PT_form f } */
+constseq_arg:
+| LPAREN b=hterm RPAREN t=sterm { (b,t) }
 
+(*------------------------------------------------------------------*)
 %inline generalize_dependent:
 | GENERALIZE DEPENDENT { }
 
@@ -711,7 +713,7 @@ tac:
   | l=lloc(SPLITSEQ) i=loc(INT) COLON LPAREN ht=hterm RPAREN 
     { mk_abstract l "splitseq" [TacticsArgs.SplitSeq (i, ht)] }
 
-  | l=lloc(CONSTSEQ) i=loc(INT) COLON terms=slist1(sterm, empty)
+  | l=lloc(CONSTSEQ) i=loc(INT) COLON terms=slist1(constseq_arg, empty)
     { mk_abstract l "constseq" [TacticsArgs.ConstSeq (i, terms)] }
 
   | l=lloc(MEMSEQ) i=loc(INT) j=loc(INT)

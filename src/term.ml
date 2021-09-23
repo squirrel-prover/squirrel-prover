@@ -1727,6 +1727,8 @@ let is_pure_timestamp (t : message) =
 
     | Fun (fs, _, [t]) when fs = f_not -> pure_ts t
 
+    | Fun (fs, _, []) -> true
+
     | ForAll (_, t)
     | Exists (_, t) -> pure_ts t
 

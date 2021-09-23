@@ -498,11 +498,11 @@ Proof.
   rewrite H2 in 3.
 
   rewrite -le_pred_lt in 3.
-  constseq 2: (output@O(i)) zero.
-  intro i0.
-  case O(i) = O(i0).
-  intro Eq; left; by yesif. 
-  intro Neq; right; by noif.
+  constseq 2: 
+    (fun (i0:index) -> O(i0) = O(i)) (output@O(i)) 
+    (fun (i0:index) -> O(i0) <> O(i)) zero.
+  auto.
+  split => i0 _; [1: by yesif | 2: by noif].
  
   expand output@O(i).
   fa 1.

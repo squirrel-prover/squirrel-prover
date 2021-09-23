@@ -460,7 +460,7 @@ val not_trace_eq_atom : trace_eq_atom -> trace_eq_atom
 
 val not_simpl : message -> message
 
-(** Check if a formula is a FO formula over timestamps.*)
+(** Check if a formula only depends on the trace model. *)
 val is_pure_timestamp : message -> bool
   
 (*------------------------------------------------------------------*)

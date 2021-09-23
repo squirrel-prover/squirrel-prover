@@ -127,7 +127,7 @@ type parser_arg =
   | ApplyIn      of named_args * Theory.p_pt * apply_in
   | AssertPt     of Theory.p_pt_hol * simpl_pat option * [`IntroImpl | `None]
   | SplitSeq     of int L.located * Theory.hterm
-  | ConstSeq     of int L.located * Theory.term list
+  | ConstSeq     of int L.located * (Theory.hterm * Theory.term) list
   | MemSeq       of int L.located * int L.located
   | Remember     of Theory.term * lsymb
   | Generalize   of Theory.term list * naming_pat list option

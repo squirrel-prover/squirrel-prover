@@ -170,6 +170,21 @@ hint rewrite or_true_r.
 
 
 (*------------------------------------------------------------------*)
+(* not: more lemmas *)
+
+goal not_and (a, b : boolean): not (a && b) = (not a || not b).
+Proof. 
+  rewrite eq_iff. 
+  case a; case b => //=.
+Qed.
+
+goal not_or (a, b : boolean): not (a || b) = (not a && not b).
+Proof. 
+  rewrite eq_iff. 
+  case a; case b => //=.
+Qed.
+
+(*------------------------------------------------------------------*)
 (* if *)
 
 goal if_true ['a] (b : boolean, x,y : 'a):

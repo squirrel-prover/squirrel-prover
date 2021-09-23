@@ -371,9 +371,18 @@ Proof.
   (* Setup(pid) *)
   repeat destruct Eq as [_ Eq].
   splitseq 2: (fun (pid0 : index) -> pid = pid0).
-  constseq 2: (AEAD(pid)@t) zero. 
-    intro pid0; case (pid = pid0) => //= _. 
-    by left; rewrite if_true.
+  constseq 2: 
+    (fun (pid0 : index) -> pid = pid0 && Setup(pid0) <= t) (AEAD(pid)@t) 
+    (fun (pid0 : index) -> pid <> pid0 || 
+                          (pid = pid0 && not (Setup(pid0) <= t))) zero. 
+  by intro pid0; case (pid=pid0).
+    split => pid0 /= U.
+    by rewrite !if_true.
+
+    case U.
+    by rewrite if_false.
+    by destruct U as [_ _].
+
   rewrite if_then_then in 3. 
   assert (forall(pid0 : index), 
     (not (pid = pid0) && Setup(pid0) <= t) = 
@@ -633,20 +642,29 @@ Proof.
   splitseq 2: (fun (i : index, t' : timestamp) -> happens(t')).
   splitseq 1: (fun (t' : timestamp) -> happens(t')).
 
-  constseq 6 : empty zero.
-  intro i t'.
-    case happens(t') => _ //=. 
-    by rewrite sctr_nhap.
+  constseq 6 : 
+    (fun (i : index, t' : timestamp) -> happens(t')) zero
+    (fun (i : index, t' : timestamp) -> not happens(t')) empty.
+    auto.
+    split; intro i t' _. 
+      by rewrite if_false.     
+      by rewrite if_true // sctr_nhap. 
 
-  constseq 4 : empty zero.
-  intro i t'.
-    case happens(t') => _ //=. 
-    by rewrite yctr_nhap.
+  constseq 4 : 
+    (fun (i : index, t' : timestamp) -> happens(t')) zero
+    (fun (i : index, t' : timestamp) -> not happens(t')) empty.
+    auto.
+    split; intro i t' _. 
+      by rewrite if_false.     
+      by rewrite if_true // yctr_nhap. 
 
-  constseq 2 : exec_dflt false.
-  intro t'.
-    case happens(t') => _ //=. 
-    by rewrite exec_nhap.
+  constseq 2 : 
+    (fun (t' : timestamp) -> happens(t')) false
+    (fun (t' : timestamp) -> not happens(t')) exec_dflt.
+    auto.
+    split; intro t' _. 
+      by rewrite if_false.     
+      by rewrite if_true // exec_nhap. 
 
   by apply U.
 Qed.
