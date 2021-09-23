@@ -167,6 +167,11 @@ val neg_trace_lit : trace_literal -> trace_literal
 
 val disjunction_to_literals : message -> literal list option
 
+(** Given a formula, return a list of literals which is either
+    entailed by the formula, or equivalent to the formula. *)
+val form_to_literals :
+  message -> [`Entails of literal list | `Equiv of literal list]
+    
 (*------------------------------------------------------------------*)
 (** {2 Higher-order terms} *)
 
@@ -239,7 +244,9 @@ val tsubst_ht : Type.tsubst -> hterm -> hterm
 (** [subst_var s v] returns [v'] if substitution [s] maps [v] to [Var v'],
   * and [v] if the variable is not in the domain of the substitution.
   * @raise Substitution_error if [v] is mapped to a non-variable term in [s]. *)
-val subst_var : subst -> 'a Vars.var -> 'a Vars.var
+val subst_var  : subst -> 'a Vars.var -> 'a Vars.var
+
+val subst_evar : subst -> Vars.evar   -> Vars.evar
 
 (** Substitute indices in an indexed symbols. *)
 val subst_isymb : subst -> ('a,'b) isymb -> ('a,'b) isymb
@@ -453,7 +460,7 @@ val not_trace_eq_atom : trace_eq_atom -> trace_eq_atom
 
 val not_simpl : message -> message
 
-(** Check if a formula is a FO formula over timestamps.*)
+(** Check if a formula only depends on the trace model. *)
 val is_pure_timestamp : message -> bool
   
 (*------------------------------------------------------------------*)

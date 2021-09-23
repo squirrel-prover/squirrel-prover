@@ -33,6 +33,8 @@ rule token = parse
 | "(*" { comment lexbuf; token lexbuf }
 | "!_" (name as i)  { BANG i }
 | "&&"                { AND }
+| "/\\"                { GAND }
+| "\\/"                { GOR }
 | "||"                { OR }
 | "not"               { NOT }
 | "True"              { TRUE }
@@ -46,6 +48,7 @@ rule token = parse
 | "!"                 { BANGU }
 | '.'                 { DOT }
 | ':'                 { COLON }
+| ":="                { COLONEQ }
 | ';'                 { SEMICOLON }
 | '*'                 { STAR }
 | '_'                 { UNDERSCORE }
@@ -65,7 +68,6 @@ rule token = parse
 | "<-"                { RARROW }
 | "=>"                { DARROW }
 | "<=>"               { DEQUIVARROW }
-| ":="                { ASSIGN }
 | "-"                 { MINUS }
 | "@"                 { AT }
 | '~'                 { TILDE }
@@ -152,6 +154,7 @@ rule token = parse
 | "ddh"               { DDH }
 | "nosimpl"           { NOSIMPL }
 | "checkfail"         { CHECKFAIL }
+| "include"           { INCLUDE }
 | name as n           { ID n }
 | eof                 { EOF }
 

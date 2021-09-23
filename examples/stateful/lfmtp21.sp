@@ -164,23 +164,23 @@ Proof.
   prf 1; yesif 1; 2: fresh 1.
   simpl; split; project; intro i' H; try destruct H as [H|H];
     try by apply unique_queries.
-    reach_equiv IH,pred(A(i')) => //.
+    rewrite equiv IH (pred(A(i'))) => //.
       intro Hf; by fresh Hf.
-    reach_equiv IH,pred(A(i')) => // Hf; by fresh Hf.
-    reach_equiv IH,pred(A(i')) => // Hf; by fresh Hf.
+    rewrite equiv IH (pred(A(i'))) => // Hf; by fresh Hf.
+    rewrite equiv IH (pred(A(i'))) => // Hf; by fresh Hf.
   prf 1; yesif 1; 2: fresh 1; by apply IH.
   simpl; split; project; intro i' H; try destruct H as [H|H];
     try by apply unique_queries.
-    reach_equiv IH,A(i') => // Hf; by fresh Hf.
-    reach_equiv IH,A(i') => // Hf; by fresh Hf.
+    rewrite equiv IH (A(i')) => // Hf; by fresh Hf.
+    rewrite equiv IH (A(i')) => // Hf; by fresh Hf.
 
   (* Tag *)
-  expand frame@A(i). expand exec@A(i). expand cond@A(i). expand output@A(i).
+  expand frame, exec, cond, output.
   fa 0. fa 1. fa 1.
   prf 1; yesif 1; 2: fresh 1; by apply IH.
   simpl; split; project; intro i' H; try destruct H as [H|H].
-    reach_equiv IH,A(i) => // Hf; by fresh Hf.
-    reach_equiv IH,A(i) => // Hf; by fresh Hf.
+    rewrite equiv IH (A(i)) => // Hf; by fresh Hf.
+    rewrite equiv IH (A(i)) => // Hf; by fresh Hf.
     use non_repeating with A(i),A(i') => //; by exists i.
     use non_repeating with A(i),A(i') => //; by exists i.
 Qed.

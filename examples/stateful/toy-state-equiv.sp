@@ -202,6 +202,6 @@ Proof.
   subst t, T(i,j). subst t', init.
   expand kT(i)@T(i,j).
   expand kT(i)@init.
-  fresh Mneq.
+  fresh Mneq. 
   admit. (* Rule Fresh not precise enough *)
 Qed.

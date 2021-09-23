@@ -258,17 +258,17 @@ Proof.
     intro i0 j0.
     project.
     intro H; destruct H as [H1|H2].
-    reach_equiv IH,i0,pred(A(i0,j0)) => // Hf; by fresh Hf.
-    reach_equiv IH,i0,pred(A(i0,j0)) => // Hf; by fresh Hf.
+    rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
+    rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
     intro  H.
-    reach_equiv IH,i0,pred(A(i0,j0)) => // Hf; by fresh Hf.
+    rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
 
     prf 1; yesif 1; 2: fresh 1; by apply IH.
     simpl; split.
     intro j0 H.
     apply unique_queries; auto.
     intro i0 j0 H.
-    reach_equiv IH,i0,A(i0,j0) => // Hf.
+    rewrite equiv IH i0 (A(i0,j0)) => // Hf.
     by fresh Hf.
 
 
@@ -278,7 +278,7 @@ Proof.
   prf 1; yesif 1; 2: fresh 1; by apply IH.
   simpl; split.
     intro j0 H.
-    reach_equiv IH,i,A(i,j) => // Hf; by fresh Hf.
+    rewrite equiv IH i (A(i,j)) => // Hf; by fresh Hf.
     intro i0 j0 H.
     assert i=i0 || i<>i0; try auto.
     case H0. 

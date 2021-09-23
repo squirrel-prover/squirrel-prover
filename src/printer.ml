@@ -188,7 +188,7 @@ let pp_pref (ty : pp) =
   match ty with
   | `Prompt  -> pr "@[[> "
   | `Start   -> pr "@[[start> "
-  | `Result  -> pr "@[[result> "
+  | `Result  -> pr "@["
   | `Error   -> pr "@[[error> "
   | `Dbg     -> pr "@[[dbg> "
   | `Warning -> pr "@[[warning> "

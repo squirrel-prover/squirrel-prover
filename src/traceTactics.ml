@@ -80,26 +80,6 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-(** Split a conjunction conclusion,
-  * creating one subgoal per conjunct. *)
-let goal_and_right (s : TS.t) =
-  match Term.destr_and (TS.goal s) with
-  | Some (lformula, rformula) ->
-    [ TS.set_goal lformula s ;
-      TS.set_goal rformula s ]
-  | None -> soft_failure (Tactics.Failure "not a conjunction")
-
-let () =
-  T.register "split"
-    ~tactic_help:{general_help = "Split a conjunction conclusion, creating one \
-                                  subgoal per conjunct.";
-                  detailed_help = "G=> A & B is replaced by G=>A and goal G=>B.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
-    (LowTactics.genfun_of_pure_tfun goal_and_right)
-
-
-(*------------------------------------------------------------------*)
 let left_not_intro (Args.String hyp_name) s =
   let id, formula = Hyps.by_name hyp_name s in
   let s = Hyps.remove id s in
@@ -1104,7 +1084,7 @@ let rec simpl ~strong ~close : TS.t Tactics.tac =
       then fun _ -> fk (None, GoalNotClosed)
       else fun _ -> sk [g] fk
     in
-    (wrap_fail goal_and_right) g
+    (wrap_fail TraceLT.goal_and_right) g
       (fun l _ -> match l with
          | [g1;g2] ->
            simpl ~strong ~close g1
@@ -1680,177 +1660,148 @@ exception Invalid
   * Macros in the term occurring (at toplevel) on the [src] projection
   * of some biframe element are replaced by the corresponding [dst]
   * projection. *)
-let reach_equiv_transform ~src ~dst ~s biframe term =
-  let assoc : Term.message -> Term.message = fun t ->
-    match List.find (fun e -> Term.(pi_term src e) = t) biframe with
-      | e -> Term.(pi_term dst e)
-      | exception Not_found -> raise Invalid
+let rewrite_equiv_transform 
+    ~(src:Term.projection)
+    ~(dst:Term.projection)
+    ~(s:TS.t)
+    (biframe : Term.message list) 
+    (term : Term.message) : Term.message
+  =
+  let assoc (t : Term.message) : Term.message option =
+    match List.find_opt (fun e -> (Term.pi_term src e) = t) biframe with
+    | Some e -> Some (Term.pi_term dst e)
+    | None -> None
   in
   let rec aux : type a. a term -> a term = fun t ->
     match Term.kind t with
-      (* TODO is it costly to check the type at each step? *)
-      | Type.KTimestamp | Type.KIndex -> t
-      | Type.KMessage ->
-          match t with
-            | Fun (fsymb,ftype,args) ->
-                let args = List.map aux args in
-                Term.mk_fun0 fsymb ftype args
-            | Atom (`Happens _) -> t
-            | Atom (`Message (ord,t1,t2)) ->
-                let t1 = aux t1 in
-                let t2 = aux t2 in
-                Term.mk_atom (ord:>Term.ord) t1 t2
-            | Atom (`Timestamp (ord,t1,t2)) ->
-                let t1 = aux t1 in
-                let t2 = aux t2 in
-                Term.mk_atom ord t1 t2
-            | Macro (msymb,messages,ts) ->
-                begin try assoc t with
-                  | Invalid when msymb = Term.in_macro ->
-                      (* We can support input@ts (and keep it unchanged) if
-                       * for some ts' such that ts'>=pred(ts),
-                       * frame@ts' is a biframe element, i.e. the two
-                       * projections are frame@ts'.
-                       * Note that this requires that ts' and pred(ts)
-                       * happen, which is necessary to have input@ts =
-                       * att(frame@pred(ts)) and frame@pred(ts) a sublist
-                       * of frame@ts'. *)
-                      let ok_frame = function
-                        | Macro (msymb',[],ts') ->
-                          msymb' = Term.frame_macro &&
-                          TS.query ~precise:true s
-                            [`Pos,`Timestamp (`Leq, mk_pred ts, ts')]
-                        | _ -> false
-                      in
-                      if List.exists ok_frame biframe then t else
-                        raise Invalid
-                end
-            | _ ->
-                raise Invalid
+    | Type.KTimestamp | Type.KIndex -> t
+    | Type.KMessage ->
+      match assoc t with
+      | None -> aux_rec t
+      | Some t' -> t'
+
+  and aux_rec : Term.message -> Term.message = fun t ->
+    match t with
+    | t when is_pure_timestamp t -> t
+
+    | Fun (fsymb,ftype,args) ->
+      let args = List.map aux args in
+      Term.mk_fun0 fsymb ftype args
+
+    | Atom (`Message (ord,t1,t2)) ->
+      let t1 = aux t1 in
+      let t2 = aux t2 in
+      Term.mk_atom (ord:>Term.ord) t1 t2
+
+    (* We can support input@ts (and keep it unchanged) if
+     * for some ts' such that ts'>=pred(ts),
+     * frame@ts' is a biframe element, i.e. the two
+     * projections are frame@ts'.
+     * Note that this requires that ts' and pred(ts)
+     * happen, which is necessary to have input@ts =
+     * att(frame@pred(ts)) and frame@pred(ts) a sublist
+     * of frame@ts'. *)
+    | Macro (msymb,messages,ts) when msymb = Term.in_macro ->
+      let ok_frame = function
+        | Macro (msymb',[],ts') ->
+          msymb' = Term.frame_macro &&
+          TS.query ~precise:true s
+            [`Pos,`Timestamp (`Leq, mk_pred ts, ts')]
+        | _ -> false
+      in
+      if List.exists ok_frame biframe then t else raise Invalid
+
+    | _ -> raise Invalid
   in
   aux term
 
-let reach_equiv (id : lsymb) (ths : Theory.term list) (s : TS.t) =
-  let ass = TS.get_assumption ~check_compatibility:false Equiv.Global_t id s in
-  let ass_sys = ass.system in
-
-  (* Introduce universal quantifications and implications in assumption. *)
-  let uvars,ass = Equiv.Smart.decompose_forall ass.formula in
-  if List.length uvars <> List.length ths then
-    Tactics.(soft_failure (Failure "incorrect number of arguments"));
-  let subst =
-    Theory.parse_subst (TS.table s) (TS.ty_vars s) (TS.env s) uvars ths in
-  let ass =
-    Equiv.subst subst ass in
-  let subgoals,biframe =
+let rewrite_equiv (ass_sys, ass) (s : TS.t) : TS.t list =
+  let subgoals, biframe =
     let rec aux = function
       | Equiv.(Atom (Equiv bf)) -> [],bf
       | Impl (Atom (Reach f),g) -> let s,bf = aux g in f::s,bf
       | _ -> Tactics.(soft_failure (Failure "invalid assumption"))
     in aux ass
   in
+  let subgoals = List.map (fun f -> TS.set_goal f s) subgoals in
 
-  let table = TS.table s in
   let cur_sys = TS.system s in
-  (* If assumption is a hypothesis from current trace sequent,
-   * it will come attached to the sequent's system expression,
-   * which can be a single system S.
-   * In that case (cf. LowEquivSequent.to_trace_sequent) the
-   * convention is that the global formula in assumption holds
-   * for the pair (S,S).
-   * This will be clarified when system specifications can be
-   * embedded in global formulas. *)
-  let ass_sys = match ass_sys with
-    | SystemExpr.Single s -> SystemExpr.pair table s s
-    | s -> s
-  in
+
   (* Identify which projection of the assumptions conclusion
    * corresponds to the current goal (projection [src]) and
    * what will be the new system after the transformation. *)
-  let src,new_sys = match cur_sys with
+  let src, new_sys = match cur_sys with
     | SystemExpr.Single _ ->
-        if SystemExpr.project Term.PLeft ass_sys = cur_sys then
-          PLeft,
-          SystemExpr.project Term.PRight ass_sys
-        else if SystemExpr.project Term.PRight ass_sys = cur_sys then
-          PRight,
-          SystemExpr.project Term.PLeft ass_sys
-        else
-          Tactics.(soft_failure NoAssumpSystem)
+      if SystemExpr.project Term.PLeft ass_sys = cur_sys then
+        PLeft,
+        SystemExpr.project Term.PRight ass_sys
+      else if SystemExpr.project Term.PRight ass_sys = cur_sys then
+        PRight,
+        SystemExpr.project Term.PLeft ass_sys
+      else
+        Tactics.(soft_failure NoAssumpSystem)
     | se ->
-        (* Support only a useful particular case for now.
-         * This could be generalized, e.g. to use an equivalence
-         * that is not between the current system and itself.
-         * I'm leaving this for when we have system annotations
-         * in global meta formulas, and perhaps more general system
-         * expressions. *)
-        if se <> ass_sys then
-          Tactics.(soft_failure NoAssumpSystem);
-        if SE.project Term.PLeft se <> SE.project Term.PRight se then
-          Tactics.(soft_failure NoAssumpSystem);
-        (* TODO the user might want the reverse direction *)
-        PLeft, se
+      (* Support only a useful particular case for now.
+       * This could be generalized, e.g. to use an equivalence
+       * that is not between the current system and itself.
+       * I'm leaving this for when we have system annotations
+       * in global meta formulas, and perhaps more general system
+       * expressions. *)
+      if se <> ass_sys then
+        Tactics.(soft_failure NoAssumpSystem);
+
+      if SE.project Term.PLeft se <> SE.project Term.PRight se then
+        Tactics.(soft_failure NoAssumpSystem);
+
+      (* TODO the user might want the reverse direction *)
+      PLeft, se
   in
   let dst = if src = PLeft then PRight else PLeft in
   let warn_unsupported t =
-    Format.eprintf
+    Printer.prt `Warning
       "Cannot transform %a: it will be dropped.@." Term.pp t
   in
-  let rewrite h =
+
+  let rewrite (h : Term.message) : Term.message =
     (* Attempt to transform. If the transformation can't
      * be applied we can simply drop the hypothesis rather
      * than failing completely. *)
-    try reach_equiv_transform ~src ~dst ~s biframe h with
-      | Invalid -> warn_unsupported h; Term.mk_true
+    try rewrite_equiv_transform ~src ~dst ~s biframe h with
+    | Invalid -> warn_unsupported h; Term.mk_true
   in
 
-  let subgoal =
+  let goal =
     TS.LocalHyps.map rewrite s
     |> TS.set_system new_sys
     |> TS.set_goal
-         (try reach_equiv_transform ~src ~dst ~s biframe (TS.goal s) with
-            | Invalid -> warn_unsupported (TS.goal s); Term.mk_false)
+      (try rewrite_equiv_transform ~src ~dst ~s biframe (TS.goal s) with
+       | Invalid -> warn_unsupported (TS.goal s); Term.mk_false)
   in
-    subgoal ::
-    (List.map (fun f -> TS.set_goal f s) subgoals)
+  subgoals @ [goal]
 
-let invalid_arguments () =
-  Tactics.hard_failure (Tactics.Failure "invalid arguments")
-
-let reach_equiv args s sk fk =
+let rewrite_equiv_args args s =
   match args with
-    | TacticsArgs.Theory {L.pl_desc=Theory.App (hyp,[])} :: terms ->
-        let convert =
-          function TacticsArgs.Theory t -> t | _ -> invalid_arguments ()
-        in
-        begin match
-          let terms = List.map convert terms in
-          reach_equiv hyp terms s
-        with
-          | subgoals -> sk subgoals fk
-          | exception Tactics.Tactic_soft_failure e -> fk e
-        end
-    | _ -> invalid_arguments ()
+  | [TacticsArgs.RewriteEquiv rw] ->
+    let rw_equiv = TraceLT.p_rw_equiv rw s in
+    rewrite_equiv rw_equiv s
+  | _ -> bad_args ()
+
+let rewrite_equiv_tac args = wrap_fail (rewrite_equiv_args args)
 
 let () =
-  T.register_general "reach_equiv"
+  T.register_general "rewrite equiv"
     ~tactic_help:{
       general_help =
         "Use an equivalence to rewrite a reachability goal.";
       detailed_help =
-        "The first argument should identify an assumption that \
-         concludes with an equivalence atom, i.e. a biframe. \
-         The next arguments are terms used to instantiate universal \
-         quantifications in that assumption. \
-         If the assumption features implications, their antecedents are \
-         introduced as subgoals.\
+        "The tactic argument should be a proof term corresponding to an \
+         assumption which concludes with an equivalence atom, i.e. a biframe. \
+         If the assumption has premises, new subgoals are created.\
          \n\n\
-         When applied left-to-right, all occurrences of macros in the current \
-         goal must be found as left projections of element of the provided \
-         biframe, and will be replaced by the corresponding right \
-         projections. The tactic can also be applied right-to-left. The \
-         direction is determined from the systems to which the equivalence \
-         applies, and is left-to-right by default.";
+         When applied, all occurrences of left elements of the biframe \
+         are rewritten by their corresponding right elements. \
+         All macros in the goal must be rewritten, or the tactic fails.\
+         Default direction is left-to-right (can be changed using `-`).";
       tactic_group = Structural;
       usages_sorts = [] }
-    (LowTactics.gentac_of_ttac_arg reach_equiv)
+    (LowTactics.gentac_of_ttac_arg rewrite_equiv_tac)

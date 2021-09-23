@@ -5,7 +5,9 @@ module Args = TacticsArgs
 module L = Location
 
 module T = Prover.ProverTactics
-             
+
+module SE = SystemExpr
+
 module St = Term.St
 module Sv = Vars.Sv
 
@@ -540,6 +542,62 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     | Rw_expandall _ -> [expand_all targets s]
 
+  (*------------------------------------------------------------------*)
+  (** {3 Rewrite Equiv} *)
+
+  (** Rewrite a sequent using an equivalence.
+      Correspond to the ReachEquiv rule of CSF'21. *)
+  type rw_equiv =  SystemExpr.t * Equiv.global_form
+
+  let p_rw_equiv (rw_arg : Args.rw_equiv_item) (s : S.t) : rw_equiv =
+    match rw_arg.rw_type with
+    | `Rw f -> 
+      let dir = L.unloc rw_arg.rw_dir in
+
+      let _, system, pat = 
+        S.convert_pt_hol_gen ~check_compatibility:false f Equiv.Global_t s 
+      in
+
+      if pat.pat_tyvars <> [] then
+        soft_failure (Failure "free type variables remaining") ;
+
+      if not (Sv.is_empty pat.pat_vars) then
+        soft_failure (Failure "universally quantified variables remaining") ;
+
+      if rw_arg.rw_mult <> `Once then
+        hard_failure (Failure "multiplicity information not allowed for \
+                               rewrite equiv") ;
+
+      let f = pat.pat_term in
+
+
+      (* If assumption is a hypothesis from current trace sequent,
+       * it will come attached to the sequent's system expression,
+       * which can be a single system S.
+       * In that case (cf. LowEquivSequent.to_trace_sequent) the
+       * convention is that the global formula in assumption holds
+       * for the pair (S,S).
+       * This will be clarified when system specifications can be
+       * embedded in global formulas. *)
+      let system = match system with
+        | SystemExpr.Single st -> SystemExpr.pair (S.table s) st st
+        | st -> st
+      in
+
+      let system = match dir, system with
+        | `LeftToRight, _ -> system
+        | `RightToLeft, SE.Pair (s1, s2) -> 
+          SE.pair (S.table s) s2 s1
+
+        | `RightToLeft, SE.SimplePair st -> 
+          SE.pair (S.table s) (SE.Right st) (SE.Left st)
+
+        | `RightToLeft, SE.Single s ->
+          soft_failure ~loc:(L.loc rw_arg.rw_dir)
+            (Failure "cannot swap the systems: lemma applies to a \
+                      single system)")
+      in
+      system, f
 
   (*------------------------------------------------------------------*)
   (** {3 Case tactic} *)
@@ -1313,45 +1371,32 @@ module MkCommonLowTac (S : Sequent.S) = struct
     * As with apply, we require that the hypothesis (or lemma) is
     * of the kind of conclusion formulas: for local sequents this means
     * that we cannot use a global hypothesis or lemma. *)
-  let use ip (name : lsymb) (ths : Theory.term list) (s : S.t) =
-    (* Get formula to apply. *)
-    let stmt = S.get_assumption S.conc_kind name s in
+  let use ~(mode:[`IntroImpl | `None]) ip (pt : Theory.p_pt_hol) (s : S.t) =
+    let _, pat = S.convert_pt_hol pt S.conc_kind s in
 
-    (* FIXME *)
-    if stmt.ty_vars <> [] then
-      soft_failure (Failure "free type variables not supported with \
-                             use tactic") ;
+    if pat.pat_tyvars <> [] then
+      soft_failure (Failure "free type variables remaining") ;
 
-    (* Get universally quantified variables, verify that lengths match. *)
-    let uvars,f = S.Conc.decompose_forall stmt.formula in
-
-    if List.length uvars < List.length ths then
-      Tactics.(soft_failure (Failure "too many arguments")) ;
-
-    let uvars, uvars0 = List.takedrop (List.length ths) uvars in
-    let f = S.Conc.mk_forall ~simpl:false uvars0 f in
-
-    (* refresh *)
-    let uvars, subst = Term.erefresh_vars `Global uvars in
-    let f = S.subst_conc subst f in
-
-    let subst = 
-      Theory.parse_subst (S.table s) (S.ty_vars s) (S.env s) uvars ths 
+   (* rename cleanly the variables *)
+    let vars, subst = 
+      Term.erefresh_vars (`InEnv (ref (S.env s))) (Sv.elements pat.pat_vars) 
+    in
+    let f = S.subst_conc subst pat.pat_term in
+    let f = 
+      S.Conc.mk_forall ~simpl:true vars f
     in
 
-    (* instantiate [f] *)
-    let f = S.subst_conc subst f in
-
-    (* Compute subgoals by introducing implications on the left. *)
+    (* If [mode=`IntroImpl], compute subgoals by introducing implications
+       on the left. *)
     let rec aux subgoals form = 
-      if S.Conc.is_impl form then
+      if S.Conc.is_impl form && mode = `IntroImpl then
         begin
           let h, c = oget (S.Conc.destr_impl form) in
           let s' = S.set_goal h s in
           aux (s'::subgoals) c
         end
 
-      else if S.Conc.is_not form then
+      else if S.Conc.is_not form && mode = `IntroImpl then
         begin
           let h = oget (S.Conc.destr_not form) in
           let s' = S.set_goal h s in
@@ -1363,30 +1408,16 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let idf, s0 = Hyps.add_i Args.AnyName (S.hyp_of_conc form) s in
           let s0 = match ip with
             | None -> [s0]
-            | Some ip -> do_simpl_pat (`Hyp idf) ip s0 in
-          s0 @ List.rev subgoals
+            | Some ip -> do_simpl_pat (`Hyp idf) ip s0 
+          in
+          
+          match mode with
+          | `None -> (List.rev subgoals) @ s0
+          | `IntroImpl -> s0 @ List.rev subgoals (* legacy behavior *)
         end
     in
 
-    aux [] f
-
-  let use_args args s =
-    let ip, args = match args with
-      | Args.SimplPat ip :: args -> Some ip, args
-      | args                     -> None, args in
-    match args with
-    | Args.String_name id :: th_terms ->
-      let th_terms =
-        List.map
-          (function
-            | Args.Theory th -> th
-            | _ -> bad_args ())
-          th_terms
-      in
-      use ip id th_terms s 
-    | _ -> bad_args ()
-
-  let use_tac args = wrap_fail (use_args args)
+    aux [] f 
 
   (*------------------------------------------------------------------*)
   (** {3 Assert} *)
@@ -1396,7 +1427,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     * We only consider the case here where [f] is a local formula
     * (which is then converted to conclusion and hypothesis formulae)
     * more general forms should be allowed here or elsewhere. *)
-  let my_assert (args : Args.parser_arg list) s : S.t list =
+  let assert_form (args : Args.parser_arg list) s : S.t list =
     let ip, f = match args with
       | [f] -> None, f
       | [f; Args.SimplPat ip] -> Some ip, f
@@ -1419,7 +1450,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
     s1 :: s2
 
-  let assert_tac args = wrap_fail (my_assert args)
+  let assert_args = function
+    | [Args.AssertPt (pt, ip, mode)] -> use ~mode ip pt
+    | _ as args -> assert_form args 
+
+  let assert_tac args = wrap_fail (assert_args args)
 
 
   (*------------------------------------------------------------------*)
@@ -1508,6 +1543,18 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | _ -> bad_args ()
 
   let remember_tac args = wrap_fail (remember_tac_args args)
+
+  (*------------------------------------------------------------------*)
+  (** Split a conjunction conclusion,
+    * creating one subgoal per conjunct. *)
+  let goal_and_right (s : S.t) : S.t list =
+    match S.Conc.destr_and (S.goal s) with
+    | Some (lformula, rformula) ->
+      [ S.set_goal lformula s ;
+        S.set_goal rformula s ]
+
+    | None -> soft_failure (Failure "not a conjunction")
+
 end
 
 (*------------------------------------------------------------------*)
@@ -1762,10 +1809,8 @@ let do_rw_arg
     (s : Goal.t) : Goal.t list
   =
   match rw_arg with
-  | Args.R_item rw_item  -> 
-    do_rw_item rw_item rw_in s
-  | Args.R_s_item s_item ->
-    do_s_item simpl s_item s (* targets are ignored there *)
+  | Args.R_item rw_item  -> do_rw_item rw_item rw_in s
+  | Args.R_s_item s_item -> do_s_item simpl s_item s (* targets ignored *)
 
 let rewrite_tac
     (simpl : f_simpl)
@@ -1991,29 +2036,20 @@ let () =
 
 (*------------------------------------------------------------------*)
 let () =
-  T.register_general "use"
-    ~tactic_help:
-      {general_help = "Apply an hypothesis with its universally \
-                       quantified variables instantiated with the \
-                       arguments.\n\n\
-                       Usages: use H with v1, v2, ...\n\
-                      \        use H with ... as ...";
-       detailed_help = "";
-       usages_sorts = [];
-       tactic_group = Logical}
-    (gentac_of_any_tac_arg TraceLT.use_tac EquivLT.use_tac)
-
-
-(*------------------------------------------------------------------*)
-let () =
   T.register_general "assert"
     ~tactic_help:
-      {general_help = "Add an assumption to the set of hypothesis, \
-                       and produce the goal for\
-                       \nthe proof of the assumption.\n\
-                       Usages: assert f.\n \
-                      \       assert f as intro_pat";
-       detailed_help = "";
+      {general_help = "Add a new hypothesis.";
+       detailed_help = 
+         "- assert form:\n\
+         \  Add `form` to the hypotheses, and produce a subgoal to prove \
+          `form`. \n\
+          - assert form as intro_pat:\n\
+         \  Idem, except that `intro_pat` is applied to `form`.\n\
+          - assert (intro_pat := proof_term):\n\
+         \  Compute the formula corresponding to `proof_term`, and\n\
+         \  apply `intro_pat` to it.\n\
+         \  Exemples: * `assert (H := H0 i i2)`\n\
+         \            * `assert (H := H0 _ i2)`";
        usages_sorts = [];
        tactic_group = Logical}
     (gentac_of_any_tac_arg TraceLT.assert_tac EquivLT.assert_tac)
@@ -2098,4 +2134,15 @@ let () = T.register "expandall"
        (TraceLT.expand_all_l `All)
        (EquivLT.expand_all_l `All))
 (* FIXME: allow user to specify targets *)
+
+(*------------------------------------------------------------------*)
+let () = T.register "split"
+    ~tactic_help:{general_help = "Split a conjunction conclusion, creating one \
+                                  subgoal per conjunct.";
+                  detailed_help = "G=> A & B is replaced by G=>A and goal G=>B.";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    (genfun_of_any_pure_fun
+       TraceLT.goal_and_right
+       EquivLT.goal_and_right)
 

@@ -17,6 +17,8 @@ let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
 let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
 
+let bad_args () = hard_failure (Failure "improper arguments")
+
 (*------------------------------------------------------------------*)
 (** {Error handling} *)
 
@@ -110,14 +112,19 @@ type proof_state = {
   hint_db      : Hint.hint_db;
 }
 
-let proof_states_history : proof_state list ref = ref []
+type proof_history = proof_state list
+
+let pt_history : proof_history ref = ref []
+
+(** stack of proof histories, for nested included *)
+let pt_history_stack : proof_history list ref = ref []
 
 let abort () =
     current_goal := None;
     subgoals := []
 
 let reset () =
-    proof_states_history := [];
+    pt_history := [];
     goals := [];
     current_goal := None;
     subgoals := [];
@@ -125,36 +132,66 @@ let reset () =
     option_defs := [];
     Config.reset_params ()
 
+let get_state mode table =
+  { goals        = !goals;
+    table        = table;
+    current_goal = !current_goal;
+    subgoals     = !subgoals;
+    goals_proved = !goals_proved;
+    option_defs  = !option_defs;
+    params       = Config.get_params ();
+    prover_mode  = mode;
+    hint_db      = !hint_db; }
+
 let save_state mode table =
-  proof_states_history :=
-    { goals        = !goals;
-      table        = table;
-      current_goal = !current_goal;
-      subgoals     = !subgoals;
-      goals_proved = !goals_proved;
-      option_defs  = !option_defs;
-      params       = Config.get_params ();
-      prover_mode  = mode;
-      hint_db      = !hint_db; }
-    :: (!proof_states_history)
+  pt_history := get_state mode table :: (!pt_history)
+
+let reset_from_state (p : proof_state) =
+  goals := p.goals;
+  current_goal := p.current_goal;
+  subgoals := p.subgoals;
+  goals_proved := p.goals_proved;
+  option_defs := p.option_defs;
+  Config.set_params p.params;
+
+  hint_db := p.hint_db;
+
+  ( p.prover_mode, p.table )
 
 let rec reset_state n =
-  match (!proof_states_history,n) with
+  match (!pt_history,n) with
   | [],_ -> (GoalMode, Symbols.builtins_table)
-  | p::q,0 ->
-    proof_states_history := q;
+  | p :: q, 0 ->
+    pt_history := q;
 
-    goals := p.goals;
-    current_goal := p.current_goal;
-    subgoals := p.subgoals;
-    goals_proved := p.goals_proved;
-    option_defs := p.option_defs;
-    Config.set_params p.params;
+    reset_from_state p
 
-    hint_db := p.hint_db;
+  | _ :: q, n -> pt_history := q; reset_state (n-1)
 
-    ( p.prover_mode, p.table )
-  | _::q, n -> proof_states_history := q; reset_state (n-1)
+let reset_to_pt_history_head () =
+  match !pt_history with
+  | [] -> 
+    reset (); 
+    (GoalMode, Symbols.builtins_table)
+  | p :: q -> reset_from_state p
+
+let push_pt_history () : unit =
+  pt_history_stack := !pt_history :: !pt_history_stack;
+  pt_history := []
+
+let pop_pt_history () : unit =
+  match !pt_history_stack with
+  | [] -> assert false
+  | h :: l ->
+    pt_history := h;
+    pt_history_stack := l
+
+let pop_all_pt_history () : unit =
+  match !pt_history_stack with
+  | [] -> assert false    (* cannot be empty *)
+  | l -> 
+    pt_history := List.last l;
+    pt_history_stack := []
 
 (*------------------------------------------------------------------*)
 (** Options Management **)
@@ -272,13 +309,13 @@ module AST :
   (* a printer for tactics that follows a specific syntax.
      TODO: tactics with "as" for intro pattern are not printed correctly.*)
   let pp_abstract ~pp_args s args ppf =
-    match s,args with
-      | "use", TacticsArgs.String_name id :: l ->
-          let l = List.map (function
-            | TacticsArgs.Theory t -> t
-            | _ -> assert false) l in
-          Fmt.pf ppf "use %s with %a" (L.unloc id) (Utils.pp_list Theory.pp) l
-      | _ -> raise Not_found
+    (* match s,args with
+     *   | "use", TacticsArgs.String_name id :: l ->
+     *       let l = List.map (function
+     *         | TacticsArgs.Theory t -> t
+     *         | _ -> assert false) l in
+     *       Fmt.pf ppf "use %s with %a" (L.unloc id) (Utils.pp_list Theory.pp) l
+     *   | _ ->  *)raise Not_found
 
 end)
 
@@ -441,7 +478,7 @@ let get_help (tac_name : lsymb) =
   else if L.unloc tac_name = "concise" then
     Printer.prt `Result "%a" ProverTactics.pp_list ()
   else
-    Printer.prt `Result "%a." (ProverTactics.pp true) tac_name;
+    Printer.prt `Result "%a" (ProverTactics.pp true) tac_name;
   Tactics.id
 
 let () = 
@@ -468,7 +505,7 @@ let () =
     (function
       | [] -> get_help (L.mk_loc L._dummy "")
       | [String_name tac_name]-> get_help tac_name
-      | _ ->  hard_failure (Tactics.Failure "improper arguments")) 
+      | _ ->  bad_args ()) 
 
 let () =
   ProverTactics.register_general "id"
@@ -521,6 +558,7 @@ type parsed_input =
   | ParsedTactic     of TacticsArgs.parser_arg Tactics.ast
   | ParsedUndo       of int
   | ParsedGoal       of Goal.Parsed.t Location.located
+  | ParsedInclude    of lsymb
   | ParsedProof
   | ParsedQed
   | ParsedAbort
@@ -743,13 +781,13 @@ let declare_i table hint_db decl = match L.unloc decl with
       | Some n -> n
     in
     Process.declare_system table name sdecl.sprocess
-
+      
   | Decl.Decl_ddh (g, (exp, f_info), ctys) ->
     let ctys = parse_ctys table ctys ["group"; "exposants"] in
     let group_ty = List.assoc_opt "group"     ctys 
     and exp_ty   = List.assoc_opt "exposants" ctys in
 
-    Theory.declare_ddh table ?group_ty ?exp_ty g exp f_info
+    Theory.declare_ddh table ?group_ty ?exp_ty g exp f_info 
 
   | Decl.Decl_hash (a, n, tagi, ctys) ->
     let () = Utils.oiter (define_oracle_tag_formula table n) tagi in

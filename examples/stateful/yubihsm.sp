@@ -55,6 +55,7 @@ counter.
 *******************************************************************************)
 set autoIntro=false.
 
+
 (* AEAD symmetric encryption scheme: IND-CCA + INT-CTXT *)
 senc enc,dec
 
@@ -213,274 +214,12 @@ axiom len_pair (x, y : message) : len(<x,y>) = (len(x) ++ len(y) ++ c_pair).
 
 (* LIBRAIRIES *)
 
-axiom eq_iff (x, y : boolean) : (x = y) = (x <=> y).
+include Basic.
 
-goal eq_refl ['a] (x : 'a) : (x = x) = true. 
-Proof. print.
-  by rewrite eq_iff. 
-Qed.
-hint rewrite eq_refl.
-
-goal eq_sym ['a] (x,y : 'a) : x = y => y = x.
-Proof. auto. Qed.
-
-(* SP: merge with eq_refl *)
-goal eq_refl_i (x : index) : (x = x) = true.
-Proof.
-  by rewrite eq_iff. 
-Qed.
-hint rewrite eq_refl_i.
-
-(* SP: merge with eq_refl *)
-goal eq_refl_t (x : timestamp) : (x = x) = true.
-Proof.
-  by rewrite eq_iff. 
-Qed.
-hint rewrite eq_refl_t.
-
-
-axiom not_true : not(true) = false.
-hint rewrite not_true.
-
-axiom not_false : not(false) = true.
-hint rewrite not_false.
-
-(* new *)
-axiom true_false : (true = false) = false.
-hint rewrite true_false.
-
-(* new *)
-goal false_true : (false = true) = false.
-Proof. 
-  (* TODO: work-around until we have a better type inference *)
-  (* rewrite (eq_sym false true). *)
-  assert (forall (x,y : boolean), (x = y) = (y = x)) as H .
-    intro _ _. 
-    by rewrite eq_iff. 
-  rewrite (H false true).
-  auto.
-Qed.
-hint rewrite false_true.
-
-goal not_not (b : boolean): not (not b) = b. 
-Proof.
-  by case b.
-Qed.
-hint rewrite not_not.
-
-goal not_eq ['a] (x, y : 'a): not (x = y) = (x <> y).
-Proof. 
-by rewrite eq_iff. 
-Qed.
-hint rewrite not_eq.
-
-(* new *)
-goal not_eq_i (x, y : index): not (x = y) = (x <> y).
-Proof. 
-by rewrite eq_iff. 
-Qed.
-hint rewrite not_eq_i.
-
-(* new *)
-goal not_eq_t (x, y : timestamp): not (x = y) = (x <> y).
-Proof. 
-by rewrite eq_iff. 
-Qed.
-hint rewrite not_eq_t.
-
-goal not_neq ['a] (x, y : 'a): not (x <> y) = (x = y).
-Proof. 
-by rewrite eq_iff. 
-Qed.
-hint rewrite not_neq.
-
-(* new *)
-goal not_neq_i (x, y : index): not (x <> y) = (x = y).
-Proof. 
-by rewrite eq_iff. 
-Qed.
-hint rewrite not_neq_i.
-
-(* new *)
-goal not_neq_t (x, y : timestamp): not (x <> y) = (x = y).
-Proof. 
-by rewrite eq_iff. 
-Qed.
-hint rewrite not_neq_t.
-
-(* new *)
-goal eq_false ['a] (x, y : 'a): ((x = y) = false) = (x <> y).
-Proof. 
-rewrite -not_eq. case (x = y) => _. simpl. auto.
-by rewrite eq_iff. 
-Qed.
-hint rewrite eq_false.
-
-(* new *)
-goal eq_false_i (x, y : index): ((x = y) = false) = (x <> y).
-Proof. 
-rewrite -not_eq_i. case (x = y) => _. simpl. auto.
-by rewrite eq_iff. 
-Qed.
-hint rewrite eq_false_i.
-
-(* new *)
-goal eq_false_t (x, y : timestamp): ((x = y) = false) = (x <> y).
-Proof. 
-rewrite -not_eq_t. case (x = y) => _. simpl. auto.
-by rewrite eq_iff. 
-Qed.
-hint rewrite eq_false_t.
-
-(*------------------------------------------------------------------*)
-(* and *)
-
-axiom and_comm (b,b' : boolean) : (b && b') = (b' && b).
-
-axiom and_true_l (b : boolean) : (true && b) = b.
-hint rewrite and_true_l.
-
-goal and_true_r (b : boolean) : (b && true) = b.
-Proof. by rewrite and_comm and_true_l. Qed.
-hint rewrite and_true_r.
-
-axiom and_false_l (b : boolean) : (false && b) = false.
-hint rewrite and_false_l.
-
-goal and_false_r (b : boolean) : (b && false) = false.
-Proof. by rewrite and_comm and_false_l. Qed.
-hint rewrite and_false_r.
-
-(*------------------------------------------------------------------*)
-(* or *)
-axiom or_comm (b,b' : boolean) : (b || b') = (b' || b).
-
-axiom or_false_l (b : boolean) : (false || b) = b.
-hint rewrite or_false_l.
-
-goal or_false_r (b : boolean) : (b || false) = b.
-Proof. by rewrite or_comm or_false_l. Qed.
-hint rewrite or_false_r.
-
-axiom or_true_l (b : boolean) : (true || b) = true.
-hint rewrite or_true_l.
-
-goal or_true_r (b : boolean) : (b || true) = true.
-Proof. by rewrite or_comm or_true_l. Qed.
-hint rewrite or_true_r.
-
-(*------------------------------------------------------------------*)
-(* if *)
-
-goal if_true ['a] (b : boolean, x,y : 'a):
- b => if b then x else y = x.
-Proof.
-  by intro *; yesif.
-Qed.
-
-goal if_true0 ['a] (x,y : 'a):
- if true then x else y = x.
-Proof.
-  by rewrite if_true. 
-Qed.
-hint rewrite if_true0.
-
-goal if_false ['a] (b : boolean, x,y : 'a):
- (not b) => if b then x else y = y.
-Proof.
-  by intro *; noif.
-Qed.
-
-goal if_false0 ['a] (x,y : 'a):
- if false then x else y = y.
-Proof.
-  by rewrite if_false.
-Qed.
-hint rewrite if_false0.
-
-goal if_then_then ['a] (b,b' : boolean, x,y : 'a):
-  if b then (if b' then x else y) else y = if (b && b') then x else y.
-Proof.  
-  by case b; case b'.
-Qed.
-
-goal if_same ['a] (b : boolean, x : 'a):
-  if b then x else x = x.
-Proof.
-  by case b.
-Qed.
-hint rewrite if_same.
-
-(* new *)
-goal if_then ['a] (b,b' : boolean, x,y,z : 'a):
- b = b' => 
- if b then (if b' then x else y) else z = 
- if b then x else z.
-Proof.
-  by intro ->; case b'.
-Qed.
-hint rewrite if_then.
-
-(* new *)
-goal if_else ['a] (b,b' : boolean, x,y,z : 'a):
- b = b' => 
- if b then x else (if b' then y else z) = 
- if b then x else z.
-Proof.
-  by intro ->; case b'.
-Qed.
-hint rewrite if_else.
-
-(* new *)
-goal if_then_not ['a] (b,b' : boolean, x,y,z : 'a):
- b = not b' => 
- if b then (if b' then x else y) else z = 
- if b then y else z.
-Proof.
-  by intro ->; case b'.
-Qed.
-hint rewrite if_then_not.
-
-(* new *)
-goal if_else_not ['a] (b,b' : boolean, x,y,z : 'a):
-  b = not b' => 
- if b then x else (if b' then y else z) = 
- if b then x else y.
-Proof.  
-  by intro ->; case b'.
-Qed.
-hint rewrite if_else_not.
-
-(*------------------------------------------------------------------*)
-(* new *)
-goal dec_enc (x,r,k : message): dec(enc(x,r,k),k) = x.
+goal dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
 Proof. auto. Qed.
 hint rewrite dec_enc.
 
-goal fst_pair (x,y : message) : fst (<x,y>) = x.
-Proof. auto. Qed.
-hint rewrite fst_pair.
-
-goal snd_pair (x,y : message) : snd (<x,y>) = y.
-Proof. auto. Qed.
-hint rewrite snd_pair.
-
-goal diff_eq ['a] (x,y : 'a) : x = y => diff(x,y) = x.
-Proof. by project. Qed.
-hint rewrite diff_eq.
-
-goal diff_diff_l ['a] (x,y,z: 'a): diff(diff(x,y),z) = diff(x,z).
-Proof. by project. Qed.
-hint rewrite diff_diff_l.
-
-goal diff_diff_r ['a] (x,y,z: 'a): diff(x,diff(y,z)) = diff(x,z).
-Proof. by project. Qed.
-hint rewrite diff_diff_r.
-
-goal len_diff (x, y : message) : len(diff(x,y)) = diff(len(x), len(y)).
-Proof. by project. Qed.
-
-(*------------------------------------------------------------------*)
 (* instances of f_apply *)
 goal dec_apply (x,x',k : message): x = x' => dec(x,k) = dec(x',k).
 Proof. auto. Qed.
@@ -632,9 +371,18 @@ Proof.
   (* Setup(pid) *)
   repeat destruct Eq as [_ Eq].
   splitseq 2: (fun (pid0 : index) -> pid = pid0).
-  constseq 2: (AEAD(pid)@t) zero. 
-    intro pid0; case (pid = pid0) => //= _. 
-    by left; rewrite if_true.
+  constseq 2: 
+    (fun (pid0 : index) -> pid = pid0 && Setup(pid0) <= t) (AEAD(pid)@t) 
+    (fun (pid0 : index) -> pid <> pid0 || 
+                          (pid = pid0 && not (Setup(pid0) <= t))) zero. 
+  by intro pid0; case (pid=pid0).
+    split => pid0 /= U.
+    by rewrite !if_true.
+
+    case U.
+    by rewrite if_false.
+    by destruct U as [_ _].
+
   rewrite if_then_then in 3. 
   assert (forall(pid0 : index), 
     (not (pid = pid0) && Setup(pid0) <= t) = 
@@ -651,14 +399,6 @@ Proof.
   rewrite !len_pair len_diff in 2.
   namelength k(pid), k_dummy(pid) => -> /=.
   rewrite /* in 0.    
-  by apply ~fadup Hind (pred(t)).
-
-  (* Write(pid, j) *)
-  repeat destruct Eq as [_ Eq].
-  rewrite le_lt // -le_pred_lt in 2.
-  rewrite /AEAD in 1.
-  fa 1.
-  rewrite /* in 0. 
   by apply ~fadup Hind (pred(t)).
 
   (* Decode(pid,j) *)
@@ -696,7 +436,7 @@ Qed.
 (* The counter SCtr(j) strictly increases when t is an action Server performed by 
 the server with tag j. *)
 
-goal [right] counterIncreaseStrictly (pid,j:index):
+goal counterIncreaseStrictly (pid,j:index):
    happens(Server(pid,j)) =>
    cond@Server(pid,j) => 
    SCtr(pid)@pred(Server(pid,j)) ~< SCtr(pid)@Server(pid,j).
@@ -704,7 +444,7 @@ Proof.
 auto.
 Qed.
 
-goal [right] counterIncrease (t:timestamp, pid : index) :
+goal counterIncrease (t:timestamp, pid : index) :
   happens(t) =>
   t > init && exec@t =>
     SCtr(pid)@pred(t) ~< SCtr(pid)@t ||
@@ -722,7 +462,7 @@ Qed.
 
 
 (* The counter SCpt(ped) increases (not strictly) between t' and t when t' < t *)
-goal [right] counterIncreaseBis:
+goal counterIncreaseBis:
   forall (t:timestamp), forall (t':timestamp), forall (pid:index),
     happens(t) =>
     exec@t && t' < t =>
@@ -764,7 +504,7 @@ Qed.
 
 (* Property 1 - No replay relying on an invariant *)
 
-goal [right] noreplayInv (j, j', pid:index):
+goal noreplayInv (j, j', pid:index):
    happens(Server(pid,j),Server(pid,j')) =>
    exec@Server(pid,j') && Server(pid,j) < Server(pid,j') => 
    SCtr(pid)@Server(pid,j) ~< SCtr(pid)@Server(pid,j').
@@ -788,7 +528,7 @@ Proof.
 Qed.
 
 
-goal [right] noreplay (j, j', pid:index):
+goal noreplay (j, j', pid:index):
   happens(Server(pid,j')) =>
   exec@Server(pid,j') =>
   Server(pid,j) <= Server(pid,j') =>
@@ -809,7 +549,7 @@ Qed.
 (* Property 3 *)
 (* Monotonicity *)
 
-goal [right] monotonicity (j, j', pid:index):
+goal monotonicity (j, j', pid:index):
   happens(Server(pid,j'),Server(pid,j)) =>
   exec@Server(pid,j') && exec@Server(pid,j) && 
   SCtr(pid)@Server(pid,j) ~< SCtr(pid)@Server(pid,j') =>
@@ -840,87 +580,193 @@ Proof.
 Qed.
 
 
+(*------------------------------------------------------------------*)
 
+axiom max_ts : 
+  exists (tmax : timestamp), 
+  happens(tmax) &&
+  (forall (t : timestamp), happens(t) => t <= tmax).
+
+global goal david_atomic_key0 :
+  exists (t : timestamp),
+  ([happens(t)] /\
+   [forall (t' : timestamp), happens(t') => t' <= t] /\
+    equiv(
+     frame@t,
+     seq(t':timestamp -> if t' <= t then exec@t' else false),
+     seq(i:index, t':timestamp -> if t' <= t then YCtr(i)@t'),
+     seq(i:index, t':timestamp -> if t' <= t then SCtr(i)@t')
+  )).
+Proof.
+  use max_ts as [tmax [_ U]].
+  exists tmax.
+  use stef_atomic_keys with tmax as H; 2: auto. 
+  split. 
+  by (split; intro *); 2: apply U.
+  by apply ~fadup H.
+Qed.
+
+
+axiom sctr_nhap (i : index, t' : timestamp) : 
+   not happens(t') => SCtr(i)@t' = empty.
+
+axiom yctr_nhap (i : index, t' : timestamp) : 
+   not happens(t') => YCtr(i)@t' = empty.
+
+(* default value of `exec` at timestamp not in the trace. Left arbitrary. *)
+abstract exec_dflt : boolean.
+
+axiom exec_nhap (t' : timestamp) : 
+   not happens(t') => exec@t' = exec_dflt.
+
+global goal david_atomic_key :
+  exists (t : timestamp),
+  ([happens(t)] /\
+   [forall (t' : timestamp), happens(t') => t' <= t] /\
+    equiv(
+      frame@t,
+      seq(t':timestamp -> exec@t'),
+      seq(i:index, t':timestamp -> YCtr(i)@t'),
+      seq(i:index, t':timestamp -> SCtr(i)@t')
+  )).
+Proof.
+  use david_atomic_key0 as [tmax [[Hap C] U]].
+  exists tmax. 
+  split; 1: by split. 
+  assert (forall (t' : timestamp), (t' <= tmax) = happens(t')) as Eq.
+    intro t'; rewrite eq_iff. 
+    by split; 2: intro _; apply C. 
+  rewrite Eq in U.  
+
+  splitseq 3: (fun (i : index, t' : timestamp) -> happens(t')).
+  splitseq 2: (fun (i : index, t' : timestamp) -> happens(t')).
+  splitseq 1: (fun (t' : timestamp) -> happens(t')).
+
+  constseq 6 : 
+    (fun (i : index, t' : timestamp) -> happens(t')) zero
+    (fun (i : index, t' : timestamp) -> not happens(t')) empty.
+    auto.
+    split; intro i t' _. 
+      by rewrite if_false.     
+      by rewrite if_true // sctr_nhap. 
+
+  constseq 4 : 
+    (fun (i : index, t' : timestamp) -> happens(t')) zero
+    (fun (i : index, t' : timestamp) -> not happens(t')) empty.
+    auto.
+    split; intro i t' _. 
+      by rewrite if_false.     
+      by rewrite if_true // yctr_nhap. 
+
+  constseq 2 : 
+    (fun (t' : timestamp) -> happens(t')) false
+    (fun (t' : timestamp) -> not happens(t')) exec_dflt.
+    auto.
+    split; intro t' _. 
+      by rewrite if_false.     
+      by rewrite if_true // exec_nhap. 
+
+  by apply U.
+Qed.
+ 
+global goal injective_correspondance_equiv (pid, j:index):
+   [happens(Server(pid,j))] ->
+   equiv(
+     exec@Server(pid,j) =>
+     exists (i:index),
+       Press(pid,i) < Server(pid,j) &&
+       YCtr(pid)@pred(Press(pid,i)) = SCtr(pid)@Server(pid,j) &&
+       forall (j':index), happens(Server(pid,j')) =>
+         exec@Server(pid,j') =>
+         YCtr(pid)@pred(Press(pid,i)) = SCtr(pid)@Server(pid,j') =>
+         j = j').
+Proof.
+  intro Hap.
+  use david_atomic_key as [tmax [_ H]].
+  apply H.
+Qed.
+
+(*------------------------------------------------------------------*)
+ 
 (* Property 2 *)
 (* injective correspondance as stated in the PhD thesis of R. Kunneman *)
 
-goal [right] injective_correspondance (j, pid:index):
+goal [left] injective_correspondance (j, pid:index):
    happens(Server(pid,j)) =>
    exec@Server(pid,j) =>
      exists (i:index),
        Press(pid,i) < Server(pid,j) && 
-       ctr(pid,i)@Press(pid,i) = SCtr(pid)@Server(pid,j) && 
+       YCtr(pid)@pred(Press(pid,i)) = SCtr(pid)@Server(pid,j) && 
        forall (j':index), happens(Server(pid,j')) =>
          exec@Server(pid,j') =>
-         ctr(pid,i)@Press(pid,i) = SCtr(pid)@Server(pid,j') => 
+         YCtr(pid)@pred(Press(pid,i)) = SCtr(pid)@Server(pid,j') => 
          j = j'.
-
 Proof.
-intro Hap Hexec.
-executable Server(pid,j) => //.
-intro exec.
-expand exec, cond.
-destruct Hexec as [Hexecpred [[Mneq1 Mneq2] Hcpt Hpid]].
-expand deccipher.
-intctxt Mneq2 => //.   
-intro Ht M1 Eq.
-exists j0.
-split => //. 
-
-
-intro j' Hap' Hexec'. 
-
-intro Eq => //.  
-assert (SCtr(pid)@Server(pid,j) = SCtr(pid)@Server(pid,j')) as Meq by auto.
-
-assert (Server(pid,j) = Server(pid,j') || 
-        Server(pid,j) < Server(pid,j') || 
-        Server(pid,j) > Server(pid,j')) => //. 
-case H => //. 
-
-(* 1st case: Server(pid,j) < Server(pid,j') *) 
-assert (Server(pid,j) = pred(Server(pid,j')) || 
-        Server(pid,j) < pred(Server(pid,j'))) by constraints.
-case H0 => //. 
-
-
-(* Server(pid,j) = pred(Server(pid,j') < Server(pid,j') *)
-use counterIncreaseStrictly with pid, j' => //.
-rewrite H0 in *.
-by apply orderStrict in Meq.
-
-(* Server(pid,j) < pred(Server(pid,j'))  < Server(pid,j') *) 
-use counterIncreaseStrictly with pid, j' => //. 
-use counterIncreaseBis with pred(Server(pid,j')), Server(pid,j), pid => //. 
-case H2.
-
-use orderTrans with 
-   SCtr(pid)@Server(pid,j), 
-   SCtr(pid)@pred(Server(pid,j')), 
-   SCtr(pid)@Server(pid,j') => //.
-by apply orderStrict in Meq.
-
-rewrite H2 in *. 
-by apply orderStrict in Meq.
-
-(* 2nd case: Server(pid,j) > Server(pid,j')  *)
-assert (pred(Server(pid,j)) = Server(pid,j') 
-        || pred(Server(pid,j)) > Server(pid,j')) by constraints.
-case H0 => //. 
-
-(* Server(pid,j) > pred(Server(pid,j)) = Server(pid,j') *)
-use counterIncreaseStrictly with pid, j as H1 => //.
-clear Eq Hexec' Mneq1 Mneq2 exec M1 Hpid Hexecpred Hcpt Hap' Hap Ht H.
-by apply orderStrict in H1.
-
-(* Server(pid,j)  > pred(Server(pid,j)) >  Server(pid,j') *) 
-use counterIncreaseStrictly with pid, j => //.
-use counterIncreaseBis with pred(Server(pid,j)), Server(pid,j'), pid  => //. 
-case H2. 
-
-apply orderTrans _ _ (SCtr(pid)@Server(pid,j)) in H2; 1: auto.
-apply eq_sym in Meq. 
-by apply orderStrict in Meq.
-
-by apply orderStrict in H1.
+  intro Hap.
+  rewrite equiv injective_correspondance_equiv pid j => // Hexec.
+  executable Server(pid,j) => //.
+  intro exec.
+  expand exec, cond.
+  destruct Hexec as [Hexecpred [[Mneq1 Mneq2] Hcpt Hpid]].
+  expand deccipher.
+  intctxt Mneq2 => //.   
+  intro Ht M1 Eq.
+  exists j0.
+  split => //. 
+  
+  intro j' Hap' Hexec'. 
+  
+  intro Eq => //.  
+  assert (SCtr(pid)@Server(pid,j) = SCtr(pid)@Server(pid,j')) as Meq by auto.
+  
+  assert (Server(pid,j) = Server(pid,j') || 
+          Server(pid,j) < Server(pid,j') || 
+          Server(pid,j) > Server(pid,j')) => //. 
+  case H => //. 
+  
+  (* 1st case: Server(pid,j) < Server(pid,j') *) 
+  assert (Server(pid,j) = pred(Server(pid,j')) || 
+          Server(pid,j) < pred(Server(pid,j'))) by constraints.
+  case H0 => //. 
+  
+  
+  (* Server(pid,j) = pred(Server(pid,j') < Server(pid,j') *)
+  use counterIncreaseStrictly with pid, j' => //.
+  rewrite H0 in *.
+  by apply orderStrict in Meq.
+  
+  (* Server(pid,j) < pred(Server(pid,j'))  < Server(pid,j') *) 
+  use counterIncreaseStrictly with pid, j' => //. 
+  use counterIncreaseBis with pred(Server(pid,j')), Server(pid,j), pid => //. 
+  case H2.
+  
+  use orderTrans with 
+     SCtr(pid)@Server(pid,j), 
+     SCtr(pid)@pred(Server(pid,j')), 
+     SCtr(pid)@Server(pid,j') => //.
+  by apply orderStrict in Meq.
+  
+  rewrite H2 in *. 
+  by apply orderStrict in Meq.
+  
+  (* 2nd case: Server(pid,j) > Server(pid,j')  *)
+  assert (pred(Server(pid,j)) = Server(pid,j') 
+          || pred(Server(pid,j)) > Server(pid,j')) by constraints.
+  case H0 => //. 
+  
+  (* Server(pid,j) > pred(Server(pid,j)) = Server(pid,j') *)
+  use counterIncreaseStrictly with pid, j as H1 => //.
+  clear Eq Hexec' Mneq1 Mneq2 exec M1 Hpid Hexecpred Hcpt Hap' Hap Ht H.
+  by apply orderStrict in H1.
+  
+  (* Server(pid,j)  > pred(Server(pid,j)) >  Server(pid,j') *) 
+  use counterIncreaseStrictly with pid, j => //.
+  use counterIncreaseBis with pred(Server(pid,j)), Server(pid,j'), pid  => //. 
+  case H2. 
+  
+  apply orderTrans _ _ (SCtr(pid)@Server(pid,j)) in H2; 1: auto.
+  apply eq_sym in Meq. 
+  by apply orderStrict in Meq.
+  
+  by apply orderStrict in H1.
 Qed.

@@ -54,6 +54,8 @@ module List : sig
 
   val iteri2 : (int -> 'a -> 'b -> unit) -> 'a list -> 'b list -> unit
 
+  val last : 'a list -> 'a
+
   exception Out_of_range
 
 end

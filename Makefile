@@ -21,7 +21,7 @@ RUNLOGDIR=_build/log
 okfail_test:
 	rm -rf $(RUNLOGDIR)
 	@$(MAKE) -j8 okfail_test_end
-	@$(MAKE) -j8 examples_end
+	@$(MAKE) -j4 examples_end
 
 okfail_test_end: $(PROVER_TESTS:.sp=.ok)
 	@echo

@@ -128,8 +128,7 @@ let assumption s =
 
   let in_hyp _ = function
     | Equiv.Atom at -> in_atom at
-    | Equiv.Impl _ as f -> f = goal
-    | Equiv.Quant _ as f -> f = goal
+    | _ as f -> f = goal
   in
 
   if Hyps.exists in_hyp s
@@ -157,6 +156,13 @@ let rec tautology f s = match f with
   | Equiv.Impl (f0,f1) ->
     let s = Hyps.add Args.AnyName f0 s in
     tautology f1 s
+
+  | Equiv.And (f0,f1) ->
+    tautology f0 s && tautology f1 s
+
+  | Equiv.Or (f0,f1) ->
+    tautology f0 s || tautology f1 s
+
   | Equiv.Quant _ -> false
   | Equiv.(Atom (Equiv e)) -> refl e s = `True
   | Equiv.(Atom (Reach _)) ->
@@ -318,7 +324,7 @@ let enrich_a arg s =
 let enrichs args s =
   List.fold_left (fun s arg -> enrich_a arg s) s args
 
-let enrich_tac args s sk fk =
+let enrich_tac args s sk fk = 
   try sk [enrichs args s] fk with
   | Tactics.Tactic_soft_failure e -> fk e
 
@@ -818,7 +824,7 @@ let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
     let rec mk_hyp_f = function
       | Equiv.Atom at       -> Equiv.Atom (mk_hyp_at at)
       | Equiv.Impl (f, f0)  -> Equiv.Impl (mk_hyp_f f, mk_hyp_f f0)
-      | Equiv.Quant _ as f -> f
+      | _ as f -> f
 
     and mk_hyp_at hyp = match hyp with
       | Equiv.Equiv e ->
@@ -1667,8 +1673,15 @@ let split_seq (li : int L.located) ht s : ES.sequent =
     | _ -> assert false
   in
 
-  let ti_t = Term.mk_ite cond               ti Term.mk_zero in
-  let ti_f = Term.mk_ite (Term.mk_not cond) ti Term.mk_zero in
+  (* The value of the else branch is choosen depending on the type *)
+  let else_branch = match Term.ty ti with
+    | Type.Message -> Term.mk_zero
+    | Type.Boolean -> Term.mk_false
+    | ty -> Term.mk_witness ty
+  in
+
+  let ti_t = Term.mk_ite cond               ti else_branch in
+  let ti_f = Term.mk_ite (Term.mk_not cond) ti else_branch in
 
   let env = ES.env s in
   let frame = List.rev_append before ([Term.mk_seq env is ti_t;
@@ -1680,7 +1693,7 @@ let split_seq_args args s : ES.sequent list =
   | [Args.SplitSeq (i, ht)] -> [split_seq i ht s]
   | _ -> bad_args ()
 
-let split_seq_tac args s sk fk = wrap_fail (split_seq_args args) s sk fk
+let split_seq_tac args = wrap_fail (split_seq_args args) 
 
 let () =
   T.register_general "splitseq"
@@ -1726,7 +1739,7 @@ let mem_seq_args args s : Goal.t list =
   | [Args.MemSeq (i, j)] -> mem_seq i j s
   | _ -> bad_args ()
 
-let mem_seq_tac args s sk fk = wrap_fail (mem_seq_args args) s sk fk
+let mem_seq_tac args = wrap_fail (mem_seq_args args) 
 
 let () =
   T.register_general "memseq"
@@ -1738,15 +1751,11 @@ let () =
     (LowTactics.genfun_of_efun_arg mem_seq_tac)
 
 (*------------------------------------------------------------------*)
-let const_seq (li, terms) s : Goal.t list =
-  let terms, term_tys =
-    List.split @@
-    List.map (fun p_term ->
-        let term, term_ty = EquivLT.convert_i s p_term in
-        term, (term_ty, L.loc p_term)
-      ) terms
-  in
-
+(** implement the ConstSeq rule of CSF'21 *)
+let const_seq
+    ((li, b_t_terms) : int L.located * (Theory.hterm * Theory.term) list)
+    (s : ES.t) : Goal.t list 
+  =
   let before, e, after = split_equiv_goal li s in
   let i = L.unloc li in
 
@@ -1755,28 +1764,73 @@ let const_seq (li, terms) s : Goal.t list =
     | _ ->
       soft_failure ~loc:(L.loc li) (Failure (string_of_int i ^ " is not a seq"))
   in
+  let b_t_terms =
+    List.map (fun (p_bool, p_term) ->
+        let b_ty,  t_bool = EquivLT.convert_ht s p_bool in
+        let term, term_ty = EquivLT.convert_i s p_term in
+        let p_bool_loc = L.loc p_bool in
 
-  (* check that types are compatible *)
-  List.iter (fun (term_ty, loc) ->
-      EquivLT.check_ty_eq ~loc term_ty (Term.ty e_ti)
-    ) term_tys;
+        (* check that types are compatible *)
+        let seq_hty =
+          Type.Lambda (List.map (fun v -> Vars.ety v) e_is, Type.Boolean)
+        in
+        EquivLT.check_hty_eq ~loc:p_bool_loc b_ty seq_hty;
+ 
+        EquivLT.check_ty_eq ~loc:(L.loc p_term) term_ty (Term.ty e_ti);
+
+        (* check that [p_bool] is a pure timestamp formula *)
+        let t_bool_body = match t_bool with
+          | Term.Lambda (_, body) -> body
+        in
+        if not (Term.is_pure_timestamp t_bool_body) then
+          hard_failure ~loc:p_bool_loc (Failure "not a pure timestamp formula");
+
+        t_bool, term
+      ) b_t_terms
+  in
 
   (* refresh variables *)
   let env = ref (ES.env s) in
   let e_is, subst = Term.erefresh_vars (`InEnv env) e_is in
   let e_ti = Term.subst subst e_ti in
 
-  let eqs = List.map (fun term ->
-      Term.mk_atom `Eq e_ti term
-    ) terms
+  (* instantiate all boolean [hterms] in [b_t_terms] using [e_is] *)
+  let e_is_terms = 
+    List.map (fun (Vars.EVar v) -> Term.ETerm (Term.mk_var v)) e_is 
   in
-  let cond =
-    Term.mk_forall ~simpl:true e_is (Term.mk_ors ~simpl:true eqs)
+  let b_t_terms : (Term.message * Term.message) list =
+    List.map (fun (t_bool, term) ->
+        let t_bool = 
+          match Term.apply_ht t_bool e_is_terms with
+          | Term.Lambda ([], cond) -> cond
+          | _ -> assert false
+        in
+        t_bool, term
+      ) b_t_terms
   in
-  let s_reach = s |> ES.set_reach_goal cond |> ES.to_trace_sequent in
 
+  (* first sub-goal: (∀ e_is, ∨ᵢ bᵢ *)
+  let cases = Term.mk_ors ~simpl:true (List.map fst b_t_terms) in
+  let cond1 =
+    Term.mk_forall ~simpl:true e_is cases
+  in
+  let subg1 = ES.set_reach_goal cond1 s |> ES.to_trace_sequent in
+  
+  (* second sub-goal: (∧ᵢ (∀ e_is, bᵢ → tᵢ = e_ti) *)
+  let eqs = List.map (fun (t_bool, term) ->
+      Term.mk_forall ~simpl:true e_is
+        (Term.mk_impl t_bool (Term.mk_atom `Eq e_ti term))
+    ) b_t_terms
+  in
+  let cond2 = Term.mk_ands ~simpl:true eqs in
+  let subg2 = ES.set_reach_goal cond2 s |> ES.to_trace_sequent in
+
+  (* third sub-goal *)
+  let terms = List.map snd b_t_terms in
   let frame = List.rev_append before (terms @ after) in
-  [ Goal.Trace s_reach;
+
+  [ Goal.Trace subg1;
+    Goal.Trace subg2;
     Goal.Equiv (ES.set_equiv_goal frame s) ]
 
 let const_seq_args args s : Goal.t list =
@@ -1784,7 +1838,7 @@ let const_seq_args args s : Goal.t list =
   | [Args.ConstSeq (i, t)] -> const_seq (i, t) s
   | _ -> bad_args ()
 
-let const_seq_tac args s sk fk = wrap_fail (const_seq_args args) s sk fk
+let const_seq_tac args = wrap_fail (const_seq_args args) 
 
 let () =
   T.register_general "constseq"
@@ -2464,4 +2518,4 @@ let () = T.register_general "ddh"
           Args.String_name v2;
           Args.String_name v3] ->
          LowTactics.gentac_of_etac (ddh gen v1 v2 v3)
-       | _ -> hard_failure (Tactics.Failure "improper arguments"))
+       | _ -> bad_args ())

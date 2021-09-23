@@ -113,6 +113,13 @@ type 'a t = 'a term
 type eterm = ETerm : 'a term -> eterm
 
 (*------------------------------------------------------------------*)
+type message  = Type.message term
+type messages = message list
+
+type timestamp  = Type.timestamp term
+type timestamps = timestamp list
+
+(*------------------------------------------------------------------*)
 let hash_ord : ord -> int = function
   | `Eq -> 1
   | `Neq -> 2
@@ -180,12 +187,6 @@ and hash_isymb : type a. (a Symbols.t, Type.tmessage) isymb -> int =
   let h = Symbols.hash symb.s_symb in
   hcombine_list Vars.hash h symb.s_indices
 
-(*------------------------------------------------------------------*)
-type message  = Type.message term
-type messages = message list
-
-type timestamp  = Type.timestamp term
-type timestamps = timestamp list
 
 (*------------------------------------------------------------------*)
 (** Subset of all atoms (the subsets are not disjoint). *)
@@ -1013,7 +1014,6 @@ let neg_trace_lit ((pn, at) : trace_literal) : trace_literal =
     | `Neg -> `Pos in
   (pn, at)
 
-
 let disjunction_to_literals f =
   let exception Not_a_disjunction in
 
@@ -1025,6 +1025,21 @@ let disjunction_to_literals f =
   | _ -> raise Not_a_disjunction in
 
   try Some (aux f) with Not_a_disjunction -> None
+
+(*------------------------------------------------------------------*)
+let form_to_literals (form : message) =
+  let partial = ref false in
+  let lits = 
+    List.fold_left (fun acc -> function
+        | Atom at -> (`Pos,at) :: acc
+        | hyp ->
+          match destr_not hyp with
+          | Some (Atom at) -> (`Neg,at) :: acc
+          | _ -> partial := true; acc
+      ) [] (decompose_ands form)
+  in
+  if !partial then `Entails lits else `Equiv lits
+
 
 
 (*------------------------------------------------------------------*)
@@ -1086,6 +1101,9 @@ let subst_var : type a. subst -> a Vars.var -> a Vars.var =
     | _ -> raise @@ Substitution_error
         "Must map the given variable to another variable"
 
+let subst_evar (s : subst) (Vars.EVar v) : Vars.evar =
+  Vars.EVar (subst_var s v)
+  
 let subst_isymb (s : subst) (symb : ('a,'b) isymb) : ('a,'b) isymb =
   { symb with s_indices = List.map (subst_var s) symb.s_indices }
 
@@ -1705,6 +1723,8 @@ let is_pure_timestamp (t : message) =
       pure_ts t1 && pure_ts t2
 
     | Fun (fs, _, [t]) when fs = f_not -> pure_ts t
+
+    | Fun (fs, _, []) -> true
 
     | ForAll (_, t)
     | Exists (_, t) -> pure_ts t
