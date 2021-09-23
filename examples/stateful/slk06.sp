@@ -79,32 +79,26 @@ process reader(jj:index) =
 
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
 
-goal auth_R1 :
-forall (jj,ii:index), 
+goal auth_R1 (jj,ii:index):
   happens(R1(jj,ii)) =>
-    (cond@R1(jj,ii) =>
-      (exists (j:index), 
-        T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii))).
+  cond@R1(jj,ii) =>
+  exists (j:index), 
+    T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii).
 Proof.
-  intro jj ii Hap Hcond.
-  expand cond@R1(jj,ii).
+  intro Hap @/cond Hcond.
   euf Hcond.
-  intro Ht Heq *.
-  exists j.
-  split; 1,2: by auto.
+  intro *.
+  by exists j.
 Qed.
 
-goal auth_T1 :
-forall (i,j:index), 
+goal auth_T1 (i,j:index):
   happens(T1(i,j)) =>
-    (cond@T1(i,j) =>
-      (exists (jj:index), 
-        R1(jj,i) < T1(i,j) && output@R1(jj,i) = input@T1(i,j))).
+  cond@T1(i,j) =>
+  exists (jj:index), 
+    R1(jj,i) < T1(i,j) && output@R1(jj,i) = input@T1(i,j).
 Proof.
-  intro i j Hap Hcond.
-  expand cond@T1(i,j).
+  intro Hap @/cond Hcond.
   euf Hcond.
-  intro Ht Heq *.
-  exists jj.
-  split; 1,2: by auto.
+  intro *.
+  by exists jj.
 Qed.
