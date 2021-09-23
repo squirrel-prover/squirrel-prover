@@ -42,14 +42,14 @@ type msymb = (mname, Type.tmessage) isymb
 type state = msymb
 
 (*------------------------------------------------------------------*)
-let pp_name ppf s = (Utils.kw `Yellow) ppf (Symbols.to_string s)
+let pp_name ppf s = (Printer.kws `Name) ppf (Symbols.to_string s)
 
 let pp_nsymb ppf (ns : nsymb) =
   if ns.s_indices <> [] 
   then Fmt.pf ppf "%a(%a)" pp_name ns.s_symb Vars.pp_list ns.s_indices
   else Fmt.pf ppf "%a" pp_name ns.s_symb
 
-let pp_fname ppf s = (Utils.kw `Bold) ppf (Symbols.to_string s)
+let pp_fname ppf s = (Printer.kws `Function) ppf (Symbols.to_string s)
 
 let pp_fsymb ppf (fn,is) = match is with
   | [] -> Fmt.pf ppf "%a" pp_fname fn
@@ -57,7 +57,7 @@ let pp_fsymb ppf (fn,is) = match is with
 
 let pp_mname_s ppf s =
   let open Fmt in
-  (styled `Bold (styled `Magenta Utils.ident)) ppf s
+  (Printer.kws `Macro) ppf s
 
 let pp_mname ppf s =
   pp_mname_s ppf (Symbols.to_string s)
@@ -872,10 +872,7 @@ and _pp : type a.
       (pp (pred_fixity, `NonAssoc)) ts
 
   | Action (symb,indices) ->
-    Fmt.styled `Green
-      (fun ppf () ->
-         Fmt.pf ppf "%s%a" (Symbols.to_string symb) pp_indices indices)
-      ppf ()
+    Printer.kw `Action ppf "%s%a" (Symbols.to_string symb) pp_indices indices
 
   | Diff (bl, br) ->
     Fmt.pf ppf "@[<hv 2>diff(@,%a,@,%a)@]"

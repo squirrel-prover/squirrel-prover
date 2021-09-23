@@ -153,7 +153,7 @@ let pp ppf s =
   H.pps ppf s.hyps ;
 
   (* Print separation between hyps and conclusion *)
-  styled `Bold Utils.ident ppf (String.make 40 '-') ;
+  Printer.kws `Separation ppf (String.make 40 '-') ;
   (* Print conclusion formula and close box. *)
   pf ppf "@;%a@]" Term.pp s.conclusion
 

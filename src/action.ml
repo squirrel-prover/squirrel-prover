@@ -134,7 +134,7 @@ let pp_action_f f d ppf a =
     a
 
 let pp_action_structure ppf a =
-  Fmt.styled `Green (pp_action_f pp_indices (0,[])) ppf a
+  Printer.kw `Action ppf "%a" (pp_action_f pp_indices (0,[])) a
 
 let pp_shape ppf a = pp_action_f pp_int (0,0) ppf a
 
