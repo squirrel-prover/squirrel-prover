@@ -16,9 +16,11 @@ let usage = Printer.strf "Usage: %s filename" (Filename.basename Sys.argv.(0))
 let args  = ref []
 let verbose = ref false
 let interactive = ref false
+let html = ref false
 
 let speclist = [
   ("-i", Arg.Set interactive, "interactive mode (e.g, for proof general)");
+  ("-h", Arg.Set html, "html mode. Incompatible with option -i");
   ("-v", Arg.Set verbose, "display more informations");
 ]
 
@@ -253,11 +255,17 @@ let start_main_loop ?(test=false) () =
    * it should not matter if we do not undo the initial definitions *)
   Prover.reset ();
   main_loop ~test { mode = GoalMode; table = Symbols.builtins_table; }
+  
+let generate_html filename html_file =
+  Printer.init Printer.Html;
+  Printer.pr "The process is ";
+  Printer.kw `Channel (Printer.get_std()) "null %d" 1;
+  Printer.pr ".@."
 
 let interactive_prover () =
   Printer.prt `Start "Squirrel Prover interactive mode.";
   Printer.prt `Start "Git commit: %s" Commit.hash_commit;
-  Printer.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
+  Printer.init Printer.Interactive;
   try start_main_loop ()
   with End_of_file -> Printer.prt `Error "End of file, exiting."
 
@@ -265,22 +273,31 @@ let run ?(test=false) filename =
   (* TODO: I am forcing the usage of ANSI escape sequence. We probably want an
      option to remove it. *)
   if test then begin
-    Printer.printer_mode := Printer.Test;
+    Printer.init Printer.Test;
     Format.eprintf "Running %S...@." filename
-  end;
-  Printer.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
+  end
+  else
+    Printer.init Printer.Html;
   setup_lexbuf filename;
   start_main_loop ~test ()
 
 let main () =
   let collect arg = args := !args @ [arg] in
   let _ = Arg.parse speclist collect usage in
-  if List.length !args = 0 && not !interactive then
+  if !interactive && !html then
+    Arg.usage speclist usage
+  else if List.length !args = 0 && not !interactive && not !html then
     Arg.usage speclist usage
   else if List.length !args > 0 && !interactive then
     Printer.pr "No file arguments accepted when running in interactive mode.@."
+  else if List.length !args != 2 && !html then
+    Printer.pr "Html mode require a squirrel file and an html file.@."
   else if !interactive then
     interactive_prover ()
+  else if !html then
+    let filename = List.hd !args in
+    let html_file = List.nth !args 1 in
+    generate_html filename html_file
   else
     let filename = List.hd !args in
     run filename
