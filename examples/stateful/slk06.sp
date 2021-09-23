@@ -17,6 +17,10 @@ T -> R : h(ID)               if TS > TSlast
 R -> T : h(ID,PIN)
          ID' := h(ID,PIN,TS)
 
+COMMENTS
+- In this model we use 3 different keyed hash functions, instead of a single 
+(not keyed) hash function as in the specification.
+
 PROOFS
 - authentication (reader and tag)
 *******************************************************************************)
