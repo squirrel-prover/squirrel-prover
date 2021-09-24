@@ -1,5 +1,30 @@
-(* LMFTP'21 example with many tags,
- * i.e. OSK protocol without readers and with unique_queries axiom. *)
+(*******************************************************************************
+RUNNING EXAMPLE
+
+This protocol is a variant of the OSK protocol described in:
+M. Ohkubo, K. Suzuki, S. Kinoshita et al., 
+“Cryptographic approach to “privacy-friendly” tags,” 
+RFID privacy workshop, vol. 82. Cambridge, USA, 2003.
+
+Each tag is associated to a mutable state sT initialized with s0.
+Readers have access to a database containing an entry sR for each authorized 
+tag.
+
+         sT := H(sT,k)
+T -> R : G(sT,k')
+
+         input x; sR := H(sR,k) if x = G(H(sR,k),k') with sR in DB
+R -> T : ok
+
+COMMENTS
+- In this model we add in parallel a process in order to provide the attacker 
+the ability to compute hashes with their respective keys (without knowing these 
+keys).
+- The reader process is not modelled here, this is left for future work.
+
+PROOFS
+- strong secrecy 
+*******************************************************************************)
 
 set autoIntro  = false.
 
