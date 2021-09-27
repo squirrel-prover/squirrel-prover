@@ -22,7 +22,10 @@ COMMENTS
 - In this model we use 2 different keyed hash functions, instead of a single 
 (not keyed) hash function as in the specification.
 
-PROOFS 
+HELPING LEMMAS 
+- last update
+
+SECURITY PROPERTIES 
 - authentication
 *******************************************************************************)
 
@@ -86,7 +89,7 @@ axiom sequentiality (t:timestamp, i,j:index):
 
 include Basic.
 
-(* PROOF *)
+(* HELPING LEMMAS *)
 
 goal lastUpdateTag (t:timestamp, i,j:index):
     happens(T(i,j),t,T1(i,j)) =>
@@ -121,6 +124,8 @@ Proof.
     use IH0 with pred(T1(i0,j0)),i,j as Meq; 2,3,4: auto. 
     by rewrite /kT if_false //.
 Qed.
+
+(* SECURITY PROPERTIES *)
 
 goal auth_R1_induction (t:timestamp, jj,ii:index):
   happens(R1(jj,ii)) =>

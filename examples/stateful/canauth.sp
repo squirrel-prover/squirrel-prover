@@ -14,7 +14,10 @@ Receiver -> Sender : input x, check x
 An agent has a cell which is used to store a counter. 
 This counter is incremented at each action (receive or send).
 
-PROOFS
+HELPING LEMMAS 
+- counter increase
+
+SECURITY PROPERTIES
 - authentication
 - injectivity
 *******************************************************************************)
@@ -378,7 +381,7 @@ Proof.
 Qed.
 
 
-(* GOALS *)
+(* SECURITY PROPERTIES *)
 
 (* 1st property w.r.t. A *)
 (* This security property is actually stronger than the one stated in

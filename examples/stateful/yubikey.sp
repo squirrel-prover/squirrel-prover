@@ -9,27 +9,25 @@ S -> C : otp || nonce || hmac || status
 
 COMMENTS
 - The last message is unclear and not modelled at all and replaced by "accept".
-It was also not modelled in the Tamarin/Sapic file provided in Robert's thesis.
+It was also not modelled in the Tamarin/Sapic file provided in [1].
+
 - otp is an encryption of a triple (secret(i), cpt, npr(i,j)).
 It is modelled here as a randomized encryption of a pair (secret(i), cpt).
-According to the specification in Robert's thesis, AES is used.
-WARNING The proof relies on intctxt... not sure that this is legitimate.
-
+According to the specification in [1], AES is used.
 
 - In [1], they "over-approximate in the case that the Yubikey increases the
 session token by allowing the adversary to instantiate the rule for any counter
 value that is higher than the previous one".
 Here, we model the incrementation by 1 of the counter.
 
+HELPING LEMMAS
+- counter increase
 
-PROOFS 
-The 3 security properties as stated in the PhD thesis of R. Kunneman
-- Property 1: no replaycounter
+SECURITY PROPERTIES 
+The 3 security properties as stated in [1].
+- Property 1: no replay counter
 - Property 2: injective correspondance
 - Property 3: monotonicity
-
-We start by establishing that counters are increasing on the Server side.
-
 *******************************************************************************)
 
 set autoIntro = false.
@@ -46,6 +44,7 @@ abstract myone: message
 abstract mySucc : message->message
 
 abstract pid : index -> message
+
 name k: index -> message
 name secret: index -> message
 name nonce: index->index->message
@@ -60,13 +59,15 @@ channel cR
 abstract orderOk : message
 abstract (~<) : message->message->message
 
-(* When the key is plugged, its counter is incremented *)
+(* When the key is plugged, its counter is incremented. *)
+
 process yubikeyplug(i:index,j:index) =
   in(cT, x1);
   if x1 = startplug then YCpt(i) := mySucc(YCpt(i)); out(cT,endplug)
 
-(* When the key is pressed, an otp is sent with the current value of the counter,
-and the counter is imcremented *)
+(* When the key is pressed, an otp is sent with the current value of the 
+counter and the counter is imcremented. *)
+
 process yubikeypress(i:index,j:index) =
   in(cT,x2);
   if x2 = startpress then
@@ -79,6 +80,7 @@ in its database, and checks also that the counter inside the otp is strictly
 greater than the counter associated to the token. 
 If so, the value inside the otp is used to update the database.
 Now, the counter value associated to this token is this new value. *)
+
 process server(ii:index) =
   in(cR,y1);
   try find i such that fst(y1) = pid(i) in
@@ -115,9 +117,7 @@ goal dec_apply (x,y,x1,y1 : message) :
 Proof. auto. Qed.
 
 
-(* PROTOCOL SPECIFIC AXIOMS  *)
-(* A inclure dans une lib standard *)
-
+(* AXIOMS *)
 
 axiom orderTrans (n1,n2,n3:message):
   n1 ~< n2 = orderOk => n2 ~< n3 = orderOk => n1 ~< n3 = orderOk.
@@ -128,8 +128,9 @@ axiom orderStrict (n1,n2:message):
 axiom orderSucc (n1,n2:message):
   n1 = n2 => n1 ~< mySucc(n2) = orderOk.
 
+(* HELPING LEMMAS *)
 
-(* Some properties on the counter on the server side *)
+(* Some properties on the counter on the server side. *)
 
 (* The counter SCpt(i) strictly increases when t is an action S performed by 
 the server with tag i. *)
@@ -158,7 +159,7 @@ Proof.
     by rewrite /SCpt if_false.
 Qed.
 
-(* The counter SCpt(i) increases (not strictly) between t' and t when t' < t *)
+(* The counter SCpt(i) increases (not strictly) between t' and t when t' < t. *)
 goal counterIncreaseBis:
   forall (t:timestamp), forall (t':timestamp), forall (i:index),
     happens(t) =>
@@ -192,8 +193,9 @@ Proof.
       by apply H1.
 Qed.
 
+(* SECURITY PROPERTIES *)
 
-(* Property 1 - No replay relying on an invariant *)
+(* Property 1: no replay, relying on an invariant. *)
 
 goal noreplayInv (ii, ii1, i:index):
    happens(S(ii1,i),S(ii,i)) =>
@@ -230,8 +232,7 @@ Proof.
 Qed.
 
 
-(* Property 2 *)
-(* injective correspondance as stated in the PhD thesis of R. Kunneman *)
+(* Property 2: injective correspondance as stated in [1]. *)
 
 goal injective_correspondance (ii,i:index):
    happens(S(ii,i)) =>
@@ -244,71 +245,65 @@ goal injective_correspondance (ii,i:index):
             cpt(i,j)@Press(i,j) = SCpt(i)@S(ii1,i) => ii1 = ii.
 
 Proof.
-intro Hap Hexec.
-executable S(ii,i) => //.
-intro exec.
-expand exec, cond.
-destruct Hexec as [Hexecpred [Mneq Hcpt Hpid]].
-intctxt Mneq => //.
-intro Ht M1 *.
-exists j.
-split => //.
-assert (cpt(i,j)@Press(i,j) = SCpt(i)@S(ii,i)) => //.
+  intro Hap Hexec.
+  executable S(ii,i) => //.
+  intro exec.
+  expand exec, cond.
+  destruct Hexec as [Hexecpred [Mneq Hcpt Hpid]].
+  intctxt Mneq => //.
+  intro Ht M1 *.
+  exists j.
+  split => //.
+  assert (cpt(i,j)@Press(i,j) = SCpt(i)@S(ii,i)) => //.
+
+  intro ii' Hap' Hexec'.
+  intro Eq => //. 
+  assert (SCpt(i)@S(ii,i) = SCpt(i)@S(ii',i)) => //.
+  assert (S(ii,i) = S(ii',i) || S(ii,i) < S(ii',i) || S(ii,i) > S(ii',i)) => //.
+  case H => //.
+
+    (* 1st case: S(ii,i) < S(ii',i) *)
+    assert (S(ii,i) = pred(S(ii',i)) || S(ii,i) < pred(S(ii',i))) => //.
+    case H0 => //.
+
+      (* S(ii,i) = pred(S(ii',i) < S(ii',i) *)
+      use counterIncreaseStrictly with ii',i => //.
+      subst  S(ii,i), pred(S(ii',i)) => //.
+      by use orderStrict with SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //.
+
+      (* S(ii,i) < pred(S(ii',i))  < S(ii',i) *)
+      use counterIncreaseStrictly with ii',i => //.
+      use counterIncreaseBis with pred(S(ii',i)), S(ii,i), i => //.
+      case H1.
+        use orderTrans with SCpt(i)@S(ii,i), SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //.
+        by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //.
+
+        subst SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii,i).
+        by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //.
+
+    (* 2nd case: S(ii,i) > S(ii',i) *)
+    assert (pred(S(ii,i)) = S(ii',i) || pred(S(ii,i)) > S(ii',i)) => //.
+    case H0 => //.
+
+      (* S(ii,i) > pred(S(ii,i)) = S(ii',i) *)
+      use counterIncreaseStrictly with ii,i => //.
+      subst S(ii',i), pred(S(ii,i)).
+      by use orderStrict with SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //.
+
+      (* S(ii,i) > pred(S(ii,i)) >  S(ii',i) *)
+      use counterIncreaseStrictly with ii,i => //.
+      use counterIncreaseBis with pred(S(ii,i)), S(ii',i), i => //.
+      case H1.
+        use orderTrans with SCpt(i)@S(ii',i), SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //.
+        by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //.
 
 
-intro ii' Hap' Hexec'.
-intro Eq => //. 
-assert (SCpt(i)@S(ii,i) = SCpt(i)@S(ii',i)) => //.
-assert (S(ii,i) = S(ii',i) || S(ii,i) < S(ii',i) || S(ii,i) > S(ii',i)) => //.
-case H => //.
-
-(* 1st case: S(ii,i) < S(ii',i) *)
-assert (S(ii,i) = pred(S(ii',i)) || S(ii,i) < pred(S(ii',i))) => //.
-case H0 => //.
-
-
-(* S(ii,i) = pred(S(ii',i) < S(ii',i) *)
-use counterIncreaseStrictly with ii',i => //.
-subst  S(ii,i), pred(S(ii',i)) => //.
-by use orderStrict with SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //.
-
-
-(* S(ii,i) < pred(S(ii',i))  < S(ii',i) *)
-use counterIncreaseStrictly with ii',i => //.
-use counterIncreaseBis with pred(S(ii',i)), S(ii,i), i => //.
-case H1.
-
-use orderTrans with SCpt(i)@S(ii,i), SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //.
-by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //.
-
-subst SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii,i).
-by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //.
-
-(* 2nd case: S(ii,i) > S(ii',i) *)
-assert (pred(S(ii,i)) = S(ii',i) || pred(S(ii,i)) > S(ii',i)) => //.
-case H0 => //.
-
-(* S(ii,i) > pred(S(ii,i)) = S(ii',i) *)
-use counterIncreaseStrictly with ii,i => //.
-subst S(ii',i), pred(S(ii,i)).
-by use orderStrict with SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //.
-
-(* S(ii,i) > pred(S(ii,i)) >  S(ii',i) *)
-use counterIncreaseStrictly with ii,i => //.
-use counterIncreaseBis with pred(S(ii,i)), S(ii',i), i => //.
-case H1.
-
-use orderTrans with SCpt(i)@S(ii',i), SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //.
-by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //.
-
-
-subst SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii',i).
-by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //.
+        subst SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii',i).
+        by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //.
 Qed.
 
 
-(* Property 3 *)
-(* Monotonicity *)
+(* Property 3: monotonicity. *)
 
 goal monotonicity (ii, ii1, i:index):
   happens(S(ii1,i),S(ii,i)) =>

@@ -21,7 +21,7 @@ COMMENTS
 - In this model we use 3 different keyed hash functions, instead of a single 
 (not keyed) hash function as in the specification.
 
-PROOFS
+SECURITY PROPERTIES
 - authentication (reader and tag)
 *******************************************************************************)
 
@@ -82,6 +82,8 @@ process reader(jj:index) =
     out(cR, error)
 
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
+
+(* SECURITY PROPERTIES *)
 
 goal auth_R1 (jj,ii:index):
   happens(R1(jj,ii)) =>
