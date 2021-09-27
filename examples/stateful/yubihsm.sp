@@ -49,6 +49,16 @@ COMMENTS
   The purpose of the ideal system is to replace the key inside the AEAD by a 
   dummy one, in order to being able to use the intctxt tactic for the third
   security property (injective correspondance).
+
+HELPING LEMMAS
+- counter increase
+- valid decode
+
+SECURITY PROPERTIES 
+The 3 security properties as stated in [1].
+- Property 1: no replay counter
+- Property 2: injective correspondance
+- Property 3: monotonicity
 *******************************************************************************)
 set autoIntro=false.
 
