@@ -91,7 +91,7 @@ include Basic.
 
 (* HELPING LEMMAS *)
 
-goal lastUpdateTag (t:timestamp, i,j:index):
+goal noUpdateTag (t:timestamp, i,j:index):
     happens(T(i,j),t,T1(i,j)) =>
       (t >= T(i,j) && t < T1(i,j)) => kT(i)@T(i,j) = kT(i)@t.
 Proof.
@@ -159,7 +159,7 @@ Proof.
     intro Ht Heq *. 
     exists j.
     depends T(ii,j),T1(ii,j) by auto => _. 
-    by rewrite /output (lastUpdateTag (pred(T1(ii,j)))). 
+    by rewrite /output (noUpdateTag (pred(T1(ii,j)))). 
 Qed.
 
 goal auth_T1_induction (t:timestamp, i,j:index):
