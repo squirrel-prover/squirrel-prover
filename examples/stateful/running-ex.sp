@@ -67,8 +67,8 @@ We describe below the tag's lemmas, the reader's lemmas are similar. *)
 This lemmas reasons on the order of actions in the execution trace (i.e. pure 
 trace formulas). It states that a timestamp tau either happens before any 
 action T(i,j), or there exists an action T(i,j) such that T(i,j) is the last 
-action of the form T(i,_) that happens before tau (i.e. any other T(i,j') 
-happens before T(i,j)). *)
+action of the form T(i,_) that happens before tau (i.e. any other T(i,j') that
+happens before tau actually happens before T(i,j)). *)
 
 (* lastupdate_init_tag 
 This lemma states that, for any timestamp tau, if no tag T(i,j) has yet played, 
