@@ -2063,7 +2063,7 @@ module E : S with type t = Equiv.form = struct
       else []
     in
 
-    if mset_l <> [] && Config.show_strengthened_hyp () then     
+    if Sv.is_empty st.support && st.use_fadup && Config.show_strengthened_hyp () then     
       (dbg ~force:true) "strengthened hypothesis:@;%a@;" MCset.pp_l mset_l; 
 
     let pat_terms =
