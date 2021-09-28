@@ -40,14 +40,14 @@ COMMENTS
 
 - In [1], the server keeps in memory the mapping between public and
   secret identities of the Yubikeys. As far as we understand, this
-  does not reflect the YubiHSM specification: secret identities are to
+  does not reflect the YubiHSM specification: secret identities have  to
   be protected by the YubiHSM.  Instead, we choose to keep the
   necessary information to map public to private indentities in the
   AEADs (we simply add the public identity to the AEADs plaintext).  
 
 - Diff terms are here to model a real system and an ideal system.
   The purpose of the ideal system is to replace the key inside the AEAD by a 
-  dummy one, in order to being able to use the intctxt tactic for the third
+  dummy one, in order to be able to use the intctxt tactic for the third
   security property (injective correspondance).
 
 HELPING LEMMAS
@@ -59,6 +59,12 @@ The 3 security properties as stated in [1].
 - Property 1: no replay counter
 - Property 2: injective correspondance
 - Property 3: monotonicity
+
+Properties 1 and 3 are established directly on the real system. 
+Property 2 is proved in 2 steps: first an equivalence is established 
+between the real system and the ideal one, and then the property 
+is proved on the ideal system. The reach equiv 
+tactic allows one to combine these two steps, and to conclude.
 *******************************************************************************)
 set autoIntro=false.
 
@@ -203,7 +209,6 @@ system !_pid
 (*------------------------------------------------------------------*)
 (* AXIOMS *)
 
-(* TODO: allow to have axioms for all systems *)
 axiom orderTrans (n1,n2,n3:message): n1 ~< n2 => n2 ~< n3 => n1 ~< n3.
 
 axiom orderStrict(n1,n2:message): n1 = n2 => n1 ~< n2 => False.
@@ -384,9 +389,7 @@ goal monotonicity (j, j', pid:index):
 Proof.
   intro Hap [Hexec H].
   assert
-    (Server(pid,j) = Server(pid,j') || 
-     Server(pid,j)< Server(pid,j') || 
-     Server(pid,j) > Server(pid,j')) as Ht;
+    (Server(pid,j) = Server(pid,j') || Server(pid,j)< Server(pid,j') || Server(pid,j) > Server(pid,j')) as Ht;
   1: constraints.
   case Ht.
 
@@ -398,11 +401,7 @@ Proof.
 
   (* case Server(pid,j) > Server(pid,j') *)
   use noreplayInv with j', j, pid  as Meq => //.
-  (* apply orderTrans _ (SCtr(pid)@Server(pid,j')) in H => //. *)
-  use orderTrans with 
-      SCtr(pid)@Server(pid,j),
-      SCtr(pid)@Server(pid,j'), 
-      SCtr(pid)@Server(pid,j) => //.
+  use orderTrans with SCtr(pid)@Server(pid,j), SCtr(pid)@Server(pid,j'), SCtr(pid)@Server(pid,j) => //.
   by apply orderStrict in H0.
 Qed.
 
@@ -500,7 +499,6 @@ goal if_aux (b,b0,b1,b2 : boolean) (x,y,z,u,v:message):
    if (b && (x = y && b0 && b1 && b2)) then 
     snd(dec(z,diff(fst(dec(x,u)),v))). 
 Proof.
-  intro >. 
   case b => _ //. 
   case b0 => _ //. 
   case b1 => _ //.
@@ -517,8 +515,6 @@ global goal equiv_real_ideal_enrich (t : timestamp):
     frame@t,
     seq(pid:index -> AEAD(pid)@t),
     seq(pid:index -> if Setup(pid) <= t then AEAD(pid)@Setup(pid)),
-    (* seq(pid:index -> YCtr(pid)@t), *)
-    (* seq(pid:index -> SCtr(pid)@t), *)
     seq(pid:index -> sid(pid)),
     seq(pid,j:index -> npr(pid,j)),
     seq(pid,j:index -> nonce(pid,j)),
@@ -554,9 +550,7 @@ Proof.
     by destruct U as [_ _].
 
   rewrite if_then_then in 3. 
-  assert (forall(pid0 : index), 
-    (not (pid = pid0) && Setup(pid0) <= t) = 
-    (Setup(pid0) < t)) as H.
+  assert (forall(pid0 : index), (not (pid = pid0) && Setup(pid0) <= t) = (Setup(pid0) < t)) as H.
     intro pid0; case pid = pid0 => _ /=. 
     by rewrite eq_iff. 
     by rewrite le_lt. 
@@ -567,9 +561,9 @@ Proof.
   rewrite /* in 0.
   cca1 2; 2:auto.
   rewrite !len_pair len_diff in 2.
-  namelength k(pid), k_dummy(pid) => -> /=.
+  namelength k(pid), k_dummy(pid)=> -> /=.
   rewrite /* in 0.    
-  by apply ~fadup Hind (pred(t)).
+  by apply  Hind (pred(t)).
 
   (* Decode(pid,j) *)
   repeat destruct Eq as [_ Eq].
@@ -587,7 +581,7 @@ Proof.
   rewrite /aead /otp in 1,2.
   fa 1. fa 1. fa 1. fa 1.
   memseq 1 6; 1: by exists pid; rewrite if_true.
-  by apply ~fadup Hind (pred(t)).
+  by apply Hind (pred(t)).
 
   (* Decode1(pid,j) *)
   repeat destruct Eq as [_ Eq].
@@ -600,7 +594,7 @@ Proof.
   rewrite /otp /aead.
   fa 1. fa 1. fa 1. fa 1. fa 1.
   memseq 1 5; 1: by exists pid; rewrite if_true.
-  by apply ~fadup Hind (pred(t)).
+  by apply  Hind (pred(t)).
 Qed.
 
 
