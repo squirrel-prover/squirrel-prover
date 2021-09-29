@@ -26,7 +26,7 @@ HELPING LEMMAS
 SECURITY PROPERTIES 
 The 3 security properties as stated in [1].
 - Property 1: no replay counter
-- Property 2: injective correspondance
+- Property 2: injective correspondence
 - Property 3: monotonicity
 *******************************************************************************)
 
@@ -232,9 +232,9 @@ Proof.
 Qed.
 
 
-(* Property 2: injective correspondance as stated in [1]. *)
+(* Property 2: injective correspondence as stated in [1]. *)
 
-goal injective_correspondance (ii,i:index):
+goal injective_correspondence (ii,i:index):
    happens(S(ii,i)) =>
    exec@S(ii,i) =>
      exists (j:index),

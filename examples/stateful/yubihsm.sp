@@ -48,7 +48,7 @@ COMMENTS
 - Diff terms are here to model a real system and an ideal system.
   The purpose of the ideal system is to replace the key inside the AEAD by a 
   dummy one, in order to be able to use the intctxt tactic for the third
-  security property (injective correspondance).
+  security property (injective correspondence).
 
 HELPING LEMMAS
 - counter increase
@@ -57,7 +57,7 @@ HELPING LEMMAS
 SECURITY PROPERTIES 
 The 3 security properties as stated in [1].
 - Property 1: no replay counter
-- Property 2: injective correspondance
+- Property 2: injective correspondence
 - Property 3: monotonicity
 
 Properties 1 and 3 are established directly on the real system. 
@@ -407,15 +407,15 @@ Qed.
 
 
 (*------------------------------------------------------------------------------
-SECURITY PROPERTY 2 (injective correspondance)
+SECURITY PROPERTY 2 (injective correspondence)
 The proof of this property is done in 2 steps.
 - We first establish the equivalence between the real system and the ideal one 
   (in which the key inside the AEAD are replaced by a dummy one).
-  This corresponds to the goal injective_correspondance_equiv.
+  This corresponds to the goal injective_correspondence_equiv.
 - Then, we use the rule REACH-EQUIV (through the tactic rewrite equiv) in order 
   to replace the real system by the ideal one, so that we only have to prove the 
   security property on the ideal system.
-  This corresponds to the goal injective_correspondance.
+  This corresponds to the goal injective_correspondence.
   
 Beforehand, we prove some helping lemmas:
 - valid_decode, in order to characterize when the AEAD decoding process is valid;
@@ -491,7 +491,7 @@ Qed.
 
 
 (*------------------------------------------------------------------*)
-(* Auxilliary simple lemma, used to rewrite one of the conditional
+(* Auxiliary simple lemma, used to rewrite one of the conditional
    equality in the then branch. *)
 goal if_aux (b,b0,b1,b2 : boolean) (x,y,z,u,v:message):
    if (b && (x = y && b0 && b1 && b2)) then
@@ -686,7 +686,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-global goal injective_correspondance_equiv (pid, j:index):
+global goal injective_correspondence_equiv (pid, j:index):
    [happens(Server(pid,j))] ->
    equiv(
      exec@Server(pid,j) =>
@@ -704,8 +704,8 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-(* The final proof of injective correspondance. *)
-goal [left] injective_correspondance (j, pid:index):
+(* The final proof of injective correspondence. *)
+goal [left] injective_correspondence (j, pid:index):
    happens(Server(pid,j)) =>
    exec@Server(pid,j) =>
      exists (i:index),
@@ -717,7 +717,7 @@ goal [left] injective_correspondance (j, pid:index):
          j = j'.
 Proof.
   intro Hap.
-  rewrite equiv injective_correspondance_equiv pid j => // Hexec.
+  rewrite equiv injective_correspondence_equiv pid j => // Hexec.
   executable Server(pid,j) => //.
   intro exec.
   expand exec, cond.
