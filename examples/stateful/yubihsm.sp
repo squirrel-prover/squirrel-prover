@@ -617,10 +617,9 @@ global goal equiv_real_ideal_enrich_tmax0 :
 Proof.
   use max_ts as [tmax [_ U]].
   exists tmax.
-  use equiv_real_ideal_enrich with tmax as H; 2: auto. 
-  split. 
-  by (split; intro *); 2: apply U.
-  by apply ~fadup H.
+  split.
+  by (split; intro*); 2: apply U.
+  by apply ~fadup equiv_real_ideal_enrich tmax.
 Qed.
 
 
