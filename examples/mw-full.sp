@@ -300,9 +300,7 @@ by intro [i t _]; expand output; exists i,t.
 by fadup 5.
 
 (* Case T *)
-expandseq seq(i,t:index ->xor((diff(id(i),id'(i,t))),
-                H(<tag0,<input@T(i,t),nt(i,t)>>,(diff(key(i),key'(i,t)))))),i,t.
-by expandall; apply IH.
+expand frame, output, exec, cond; apply IH.
 
 (* Case T1 *)
 expand frame, exec.
