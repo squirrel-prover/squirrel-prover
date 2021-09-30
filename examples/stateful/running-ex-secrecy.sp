@@ -19,8 +19,8 @@ global goal [default/left,default/left] secrecy (i:index,tau,tau':timestamp):
     -> equiv(frame@tau, diff(s(i)@tau',m))
     -> [input@tau <> s(i)@tau'].
 Proof.
-intro Hap  H.
-rewrite equiv H.
-intro H'.
-by fresh H'.
+  intro Hap  H.
+  rewrite equiv H.
+  intro H'.
+  by fresh H'.
 Qed.
