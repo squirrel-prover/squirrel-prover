@@ -23,7 +23,7 @@ COMMENTS
 (not keyed) hash function as in the specification.
 
 HELPING LEMMAS 
-- last update
+- no update
 
 SECURITY PROPERTIES 
 - authentication

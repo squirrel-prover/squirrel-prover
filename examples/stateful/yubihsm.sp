@@ -5,7 +5,7 @@ YUBIHSM
 computational model", 2014.
 
 Y   -> S   : <pid,<nonce,otp>>
-S   -> HSM : <pid,kh>,<aead,otp>>
+S   -> HSM : <<pid,kh>,<aead,otp>>
 HSM -> S   : ctr
 S   -> Y   : accept
 
@@ -42,7 +42,7 @@ COMMENTS
   secret identities of the Yubikeys. As far as we understand, this
   does not reflect the YubiHSM specification: secret identities have  to
   be protected by the YubiHSM.  Instead, we choose to keep the
-  necessary information to map public to private indentities in the
+  necessary information to map public to private identities in the
   AEADs (we simply add the public identity to the AEADs plaintext).  
 
 - Diff terms are here to model a real system and an ideal system.
