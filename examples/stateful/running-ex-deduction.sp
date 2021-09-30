@@ -94,7 +94,7 @@ global goal deduce_state (t : timestamp):
   equiv(seq(i:index -> sT(i)@t), seq(i:index -> sR(i)@t)).
 Proof.
   intro H.
-  apply ~fadup H.
+  apply ~inductive H.  
 Qed.
 
 (* We can even go further, and show that the value of the state variables
@@ -111,5 +111,5 @@ Proof.
   checkfail apply H exn ApplyMatchFailure.
 
   (* using our improvement with inductive, we conclude directly *)
-  apply ~fadup H.
+  apply ~inductive H.  
 Qed.

@@ -1226,7 +1226,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** for now, there is only one named optional arguments to `apply` *)
   let p_apply_fadup_arg (nargs : Args.named_args) : bool =
     match nargs with
-    | [Args.NArg L.{ pl_desc = "fadup" }] -> true
+    | [Args.NArg L.{ pl_desc = "inductive" }] -> true
     | (Args.NArg l) :: _ ->
       hard_failure ~loc:(L.loc l) (Failure "unknown argument")
     | [] -> false

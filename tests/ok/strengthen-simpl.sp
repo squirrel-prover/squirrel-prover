@@ -26,7 +26,7 @@ global goal _ (t : timestamp) : equiv(empty) -> equiv(s0@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
- intro H; apply ~fadup H.
+ intro H; apply ~inductive H.
 Qed.
 
 (* using [na], we can deduce [s1] *)
@@ -34,14 +34,14 @@ global goal _ (t : timestamp, i : index) : equiv(na) -> equiv(s1(i)@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
- intro H; apply ~fadup H.
+ intro H; apply ~inductive H.
 Qed.
 
 (* [nb] does not allow to conclude *)
 global goal _ (t : timestamp, i : index) : equiv(nb) -> equiv(s0@t, s1(i)@t).
 Proof. 
  checkfail (intro H; apply H) exn ApplyMatchFailure.
- checkfail (intro H; apply ~fadup H) exn ApplyMatchFailure.
+ checkfail (intro H; apply ~inductive H) exn ApplyMatchFailure.
 Abort.
 
 (* of course, both are simultaneously deducible *)
@@ -49,7 +49,7 @@ global goal _ (t : timestamp, i : index) : equiv(na) -> equiv(s0@t, s1(i)@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
- intro H; apply ~fadup H.
+ intro H; apply ~inductive H.
 Qed.
 
 (* we can also deduce the sequence of all s1(i) *)
@@ -57,7 +57,7 @@ global goal _ (t : timestamp) : equiv(na) -> equiv(seq(i:index -> s1(i)@t)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
- intro H; apply ~fadup H.
+ intro H; apply ~inductive H.
 Qed.
 
 (* or even a try-find, since we can deduce all the tests, the then branches 
@@ -68,7 +68,7 @@ global goal _ (t : timestamp) :
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
- intro H; apply ~fadup H.
+ intro H; apply ~inductive H.
 Qed.
 
 (* this fails if we give `nb` instead of `na` *)
@@ -77,7 +77,7 @@ global goal _ (t : timestamp) :
   equiv(try find i such that s1(i)@t=zero in s1(i)@t else s0@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
- checkfail (intro H; apply ~fadup H) exn ApplyMatchFailure.
+ checkfail (intro H; apply ~inductive H) exn ApplyMatchFailure.
 Abort.
 
 (*------------------------------------------------------------------*)
@@ -86,14 +86,14 @@ Abort.
 global goal _ (t : timestamp) : 
   [happens(t)] -> equiv(frame@pred(t)) -> equiv(input@t).
 Proof. 
- intro Hap H; apply ~fadup H.
+ intro Hap H; apply ~inductive H.
 Qed.
 
 global goal _ (t : timestamp) : 
   [happens(t)] -> equiv(frame@pred(pred(t))) -> equiv(input@t).
 Proof. 
  intro Hap H.
- checkfail (apply ~fadup H) exn ApplyMatchFailure.
+ checkfail (apply ~inductive H) exn ApplyMatchFailure.
 Abort.
 
 (* (* ------------------------------------------------------------------ *) *)

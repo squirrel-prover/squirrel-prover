@@ -528,11 +528,11 @@ Proof.
        rewrite /* in 0;
        rewrite /AEAD in 1;
        rewrite le_lt // -le_pred_lt in 2;
-       by apply ~fadup Hind (pred(t)))).
+       by apply ~inductive Hind (pred(t)))).
 
   (* init *)
   rewrite /*.
-  by rewrite if_false in 1.
+  by rewrite if_false in 1. 
 
   (* Setup(pid) *)
   repeat destruct Eq as [_ Eq].
@@ -619,7 +619,7 @@ Proof.
   exists tmax.
   split.
   by (split; intro*); 2: apply U.
-  by apply ~fadup equiv_real_ideal_enrich tmax.
+  by apply ~inductive equiv_real_ideal_enrich tmax.
 Qed.
 
 
