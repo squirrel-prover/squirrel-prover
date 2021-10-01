@@ -18,7 +18,7 @@ R -> T : ok
 
 COMMENTS
 - In this model we only consider tags (no hash oracles, no readers)
-  the goal is to illustrate a realistic use of apply ~inductive
+  the goal is to illustrate a realistic use of `apply ~inductive`
   on a minimal example.
 
 *******************************************************************************)
@@ -50,7 +50,7 @@ set showStrengthenedHyp=true.
 
 (* Uniqueness of states:
    it is easily proved in other similar examples, we leave it out here. *)
-axiom h_unique : forall (i,i',j,j':index),
+axiom h_unique (i,i',j,j':index):
   sT(i)@T(i,j) = sT(i')@T(i',j') => (i = i' && j = j').
 
 (* Indistinguishability between the sequences of initial states,
@@ -101,11 +101,16 @@ Proof.
 Qed.
 
 (* We now illustrate how the proof could go without the use of
-   apply ~inductive. *)
+   `apply ~inductive`. *)
 
-(* We need some basic utilities, and will make use of an obvious axiom. *)
+(* We need some basic utilities. *)
 include Basic.
-axiom neq_leq_lemma : forall (t,t':timestamp), ((not(t=t')) && t<=t') = (t<=pred(t')).
+
+goal neq_leq_lemma (t,t':timestamp): ((not(t=t')) && t<=t') = (t<=pred(t')).
+Proof.
+ rewrite eq_iff. 
+ by case t.
+Qed.
 
 global goal equiv_with_states_manual (t : timestamp):
   [happens(t)] ->
@@ -132,14 +137,14 @@ Proof.
      This is done using splitseq to single out some elements,
      and then perform some rewriting inside the sequences. *)
   splitseq 2: (fun (i0:index,t':timestamp) -> t'=T(i,j)).
-  repeat rewrite if_then_then.
+  rewrite !if_then_then.
   rewrite neq_leq_lemma in 3.
   (* We still can't conclude by IH. The sequence in position 2 is bi-deducible
      but to show it one needs to do a case analysis on i=i0 since the value
      of sT(i0)@T(i,j) depends on it. *)
   checkfail apply IH exn ApplyMatchFailure.
   splitseq 2: (fun (i0:index,t':timestamp) -> i0=i).
-  repeat rewrite if_then_then.
+  rewrite !if_then_then.
   (* More rewriting inside sequences. *)
   equivalent
     seq(i0:index,t':timestamp-> if i0=i && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@t'),
