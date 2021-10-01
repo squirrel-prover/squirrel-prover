@@ -17,10 +17,9 @@ T -> R : G(sT,k')
 R -> T : ok
 
 COMMENTS
-- In this model we add in parallel a process in order to provide the attacker
-the ability to compute hashes with their respective keys (without knowing these
-keys).
-- The reader process is not modelled here, this is left for future work.
+- In this model we only consider tags (no hash oracles, no readers)
+  the goal is to illustrate a realistic use of apply ~inductive
+  on a minimal example.
 
 *******************************************************************************)
 
@@ -35,81 +34,124 @@ name s0  : index -> message
 name s0b : index -> message     (* renamed identities *)
 
 mutable sT(i:index) : message = diff(s0(i),s0b(i))
-mutable sR(i:index) : message = diff(s0(i),s0b(i))
 
 abstract ok : message
 channel cT
-channel cR
 
 process tag(i:index) =
   sT(i):=H(sT(i),k);
   out(cT,G(sT(i),k'))
 
-process reader =
-  in(cT,x);
-  try find ii such that x = G(H(sR(ii),k),k') in
-    sR(ii):=H(sR(ii),k);
-    out(cR,ok)
-
-system (!_i !_j T: tag(i) | !_jj R: reader).
+system !_i !_j T: tag(i).
 
 set showStrengthenedHyp=true.
 
-(* Assuming the secret keys and secret identities are indistinguishable,
-   we prove that the state variables `sT` and `sR` are indistinguishable. *)
-global goal deduce_state_ind (t : timestamp):
+(* AXIOMS *)
+
+(* Uniqueness of states:
+   it is easily proved in other similar examples, we leave it out here. *)
+axiom h_unique : forall (i,i',j,j':index),
+  sT(i)@T(i,j) = sT(i')@T(i',j') => (i = i' && j = j').
+
+(* Indistinguishability between the sequences of initial states,
+   before and after renaming. This is essentially an instance of the
+   "fresh" tactic, but to do it within the tool we miss an induction
+   principle over sequences. *)
+global axiom fresh_names :
+  equiv(seq(i:index->diff(s0(i),s0b(i)))).
+
+global goal fresh_names_k :
+  equiv(k, seq(i:index->diff(s0(i),s0b(i)))).
+Proof.
+  fresh 0. apply fresh_names.
+Qed.
+
+(* PROOFS *)
+
+(* Observational equivalence with seeds and k as extra data:
+   the proof would be the same without the extra data (except for the easy base case)
+   which does not depend on t. *)
+global goal equiv_with_seed (t : timestamp):
   [happens(t)] ->
-  equiv(k, k', seq(i:index -> diff(s0(i),s0b(i)))) ->
-  equiv(k, k', seq(i:index -> sT(i)@t), seq(i:index -> sR(i)@t)).
+  equiv(frame@t, k, seq(i:index->diff(s0(i),s0b(i)))).
 Proof.
-  intro Hap H.
+  intro Hap.
+  induction t.
 
-  (* a simple application of `H` fails, since proving that `sT` (resp. `sR`)
-     can be bi-deduce from `H` require some form of inductive reasoning. *)
-  checkfail apply H exn ApplyMatchFailure.
+  fresh 1.
+  expand frame; apply fresh_names.
 
-  (* with user input, we are able to do the proof, by induction over `tau` *)
-  dependent induction t => t HI Hap.
-  case t => Eq;
-  repeat destruct Eq as [_ Eq].
-
-  expandall.
-  by apply H.
-
-  expandall.
-  by apply HI (pred(t)).
-
-  expandall.
-  by apply HI (pred(t)).
-
-  expandall.
-  by apply HI (pred(t)).
+  expandall. fa 0. fa 1. fa 1.
+  prf 1; yesif 1.
+    split; 1: auto.
+    intro i0 j0 H Heq. use h_unique with i0, i, j0, j; 2: auto.
+    destruct H0; auto.
+  fresh 1.
+  apply IH.
 Qed.
 
-(* Using our improvement of the bi-deduction checker with inductive
-   reasoning, we can conclude directly without further user interaction.
-   Note that timestamp t does not need to happen. *)
-global goal deduce_state (t : timestamp):
-  equiv(k, k', seq(i:index -> diff(s0(i),s0b(i)))) ->
-  equiv(seq(i:index -> sT(i)@t), seq(i:index -> sR(i)@t)).
+(* With apply ~inductive we easily obtain all the past values of sT
+   from the seeds and k. *)
+global goal equiv_with_states_inductive (t : timestamp):
+  [happens(t)] ->
+  equiv(frame@t, k, seq(i:index,t':timestamp -> if t'<=t then sT(i)@t')).
 Proof.
-  intro H.
-  apply ~inductive H.  
+  intro Hap.
+  apply ~inductive equiv_with_seed t; assumption.
 Qed.
 
-(* We can even go further, and show that the value of the state variables
-   `sT` and `sR` can be simultaneously deduced at all times. *)
-global goal deduce_state_gen :
-  equiv(k, k', seq(i:index -> diff(s0(i),s0b(i)))) ->
-  equiv(
-    seq(i:index, t':timestamp -> sT(i)@t'),
-    seq(i:index, t':timestamp -> sR(i)@t')).
+(* We now illustrate how the proof could go without the use of
+   apply ~inductive. *)
+
+(* We need some basic utilities, and will make use of an obvious axiom. *)
+include Basic.
+axiom neq_leq_lemma : forall (t,t':timestamp), ((not(t=t')) && t<=t') = (t<=pred(t')).
+
+global goal equiv_with_states_manual (t : timestamp):
+  [happens(t)] ->
+  equiv(frame@t, k, seq(i:index,t':timestamp -> if t'<=t then sT(i)@t')).
 Proof.
-  intro H.
+  intro Hap.
+  induction t.
 
-  (* a simple application of `H` fails. *)
-  checkfail apply H exn ApplyMatchFailure.
+  (* The base case requires rewriting inside the sequence. *)
+  equivalent seq(i:index,t':timestamp -> if t'<=init then sT(i)@t'),
+             seq(i:index,t':timestamp -> if t'<=init then diff(s0(i),s0b(i))).
+    by fa; fa.
+  expand frame; apply fresh_names_k.
 
-  (* using our improvement with inductive, we conclude directly *)
-  apply ~inductive H.  
+  expandall.
+  fa 0. fa 1. fa 1.
+  (* Get rid of item 1 using PRF, as before. *)
+  prf 1; yesif 1.
+    split; 1: auto.
+    intro i0 j0 H Heq. use h_unique with i0, i, j0, j; 2: auto.
+    destruct H0; auto.
+  fresh 1.
+  (* We now have to work on our sequence to remove the last element.
+     This is done using splitseq to single out some elements,
+     and then perform some rewriting inside the sequences. *)
+  splitseq 2: (fun (i0:index,t':timestamp) -> t'=T(i,j)).
+  repeat rewrite if_then_then.
+  rewrite neq_leq_lemma in 3.
+  (* We still can't conclude by IH. The sequence in position 2 is bi-deducible
+     but to show it one needs to do a case analysis on i=i0 since the value
+     of sT(i0)@T(i,j) depends on it. *)
+  checkfail apply IH exn ApplyMatchFailure.
+  splitseq 2: (fun (i0:index,t':timestamp) -> i0=i).
+  repeat rewrite if_then_then.
+  (* More rewriting inside sequences. *)
+  equivalent
+    seq(i0:index,t':timestamp-> if i0=i && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@t'),
+    seq(i0:index,t':timestamp-> if i0=i && (t'=T(i,j) && t'<=T(i,j)) then H(sT(i0)@pred(t'),k));
+  1: by fa; fa.
+  equivalent
+    seq(i0:index,t':timestamp-> if not(i0=i) && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@t'),
+    seq(i0:index,t':timestamp-> if not(i0=i) && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@pred(t')).
+    fa. fa; try auto. intro [H1 [H2 H3]]. rewrite H2. expand sT.
+    by noif.
+  (* At this point our automatic bi-deduction checker cannot verify that
+     items 2 and 3 are bi-deducible. Its implementation could be improved
+     to complete this tedious proof. *)
+  admit.
 Qed.
