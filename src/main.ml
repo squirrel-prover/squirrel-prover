@@ -455,9 +455,8 @@ let start_main_loop
   
 let generate_html filename html_file =
   Printer.init Printer.Html;
-  Printer.pr "The process is ";
-  Printer.kw `Channel (Printer.get_std()) "null %d" 1;
-  Printer.pr ".@."
+  (* TODO *)
+  ()
 
 let interactive_prover () =
   Printer.prt `Start "Squirrel Prover interactive mode.";

@@ -41,11 +41,11 @@ let rec pp_process ppf process =
   let open Fmt in
   let open Utils in
   match L.unloc process with
-  | Null ->  (styled `Blue (styled `Bold ident)) ppf "null"
+  | Null -> Printer.kws `ProcessName ppf "null"
 
   | Apply (s,l) ->
       pf ppf "@[<hov>%a@ %a@]"
-        (styled `Bold (styled `Blue ident)) (L.unloc s)
+        (Printer.kws `ProcessName) (L.unloc s)
         (Fmt.list ~sep:(fun ppf () -> pf ppf "@ ") Theory.pp) l
 
   | Alias (p,a) ->
@@ -79,16 +79,16 @@ let rec pp_process ppf process =
       pp_process p
 
   | In (c, s, p) ->
-    pf ppf "@[<hov>%a(%s,@,%a);@ %a@]"
-      (kw `Bold) "in"
-      (L.unloc c)
-      (styled `Magenta (styled `Bold ident)) (L.unloc s)
+    pf ppf "@[<hov>%a(%a,@,%a);@ %a@]"
+      (Printer.kws `ProcessInOut) "in"
+      (Printer.kws `ProcessChannel) (L.unloc c)
+      (Printer.kws `ProcessVariable) (L.unloc s)
       pp_process p
 
   | Out (c, t, p) ->
-    pf ppf "@[<hov>%a(%s,@,%a);@ %a@]"
-      (kw `Bold) "out"
-      (L.unloc c)
+    pf ppf "@[<hov>%a(%a,@,%a);@ %a@]"
+      (Printer.kws `ProcessInOut) "out"
+      (Printer.kws `ProcessChannel) (L.unloc c)
       Theory.pp t
       pp_process p
 
@@ -114,21 +114,21 @@ let rec pp_process ppf process =
   | Exists (ss, f, p1, p2) ->
     if ss = [] then
       pf ppf "@[<hov>%a %a %a@;<1 2>%a"
-        (styled `Red (styled `Underline ident)) "if"
+        (Printer.kws `ProcessCondition) "if"
         Theory.pp f
-        (styled `Red (styled `Underline ident)) "then"
+        (Printer.kws `ProcessCondition) "then"
         pp_process p1
     else
       pf ppf "@[<hov>%a %a %a %a %a@;<1 2>%a"
-        (styled `Red (styled `Underline ident)) "find"
+        (Printer.kws `ProcessCondition) "find"
         (Utils.pp_list Fmt.string) (L.unlocs ss)
-        (styled `Red (styled `Underline ident)) "such that"
+        (Printer.kws `ProcessCondition) "such that"
         Theory.pp f
-        (styled `Red (styled `Underline ident)) "in"
+        (Printer.kws `ProcessCondition) "in"
         pp_process p1 ;
     if L.unloc p2 <> Null then
       pf ppf "@ %a@;<1 2>%a@]"
-      (styled `Red (styled `Underline ident)) "else"
+      (Printer.kws `ProcessCondition) "else"
       pp_process p2
     else
       pf ppf "@]"

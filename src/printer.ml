@@ -4,63 +4,36 @@
 
 open Format
 open Fmt
- 
+
+
 (** Keyword type **)
 
 type keyword = [
   | `ProcessName      (* [reader], [tag], [null] *)
   | `ProcessVariable  (* [x] in [in(cT,x)] *)
-  | `ProcessCondition (* [if], [then], [else] *)
+  | `ProcessCondition (* [if], [find], [else] *)
   | `ProcessInOut     (* [in], [out] *)
-  | `Macro            (* [cond], [happens] *)
-  | `Action           (* [R(j)], [T(i,k)] *)
-  | `Function         (* [h], [fst], [snd] *)
-  | `Name             (* [key], [nT] *)
-  | `Channel          (* [cT] *)
+  | `ProcessChannel   (* [cT] *)
+  | `GoalMacro        (* [cond], [happens] *)
+  | `GoalAction       (* [R(j)], [T(i,k)] *)
+  | `GoalFunction     (* [h], [fst], [snd] *)
+  | `GoalName         (* [key], [nT] *)
   | `Separation       (* [------------] *)
   | `HelpType         (* [Logical tactics:] *)
   | `HelpFunction     (* [admit], [euf] *)
-  | `Test
+  | `Test             (* Used to debug *)
 ]
-
-(* Each keyword is associated to a unique string
-   to be used in semantic tags *)
-let kw_id (keyword : keyword) : string = 
-  match keyword with
-  | `ProcessName -> "pn"
-  | `ProcessVariable -> "pv"
-  | `ProcessCondition -> "pc"
-  | `ProcessInOut -> "pio"
-  | `Macro -> "m"
-  | `Action -> "a"
-  | `Function -> "f"
-  | `Name -> "n"
-  | `Channel -> "c"
-  | `Separation -> "sep"
-  | `HelpType -> "ht"
-  | `HelpFunction -> "hf"
-  | `Test -> "t"
-
-let kw_stag_to_t (stag : stag) : keyword =
-  match stag with
-  | String_tag("pn") -> `ProcessName
-  | String_tag("pv") -> `ProcessVariable
-  | String_tag("pc") -> `ProcessCondition
-  | String_tag("pio") -> `ProcessInOut
-  | String_tag("m") -> `Macro
-  | String_tag("a") -> `Action
-  | String_tag("f") -> `Function
-  | String_tag("n") -> `Name
-  | String_tag("c") -> `Channel
-  | String_tag("sep") -> `Separation
-  | String_tag("ht") -> `HelpType
-  | String_tag("hf") -> `HelpFunction
-  | String_tag("t") -> `Test
-  | _ -> raise Not_found
 
 
 (** Semantic tag functions **)
 (* These functions are used to initialize the printer *)
+
+(*Define new types of semantic tags*)
+type stag +=
+  | Keyword_tag of keyword
+  | Input_tag
+  | Output_tag
+
 
   (** ANSI **)
 
@@ -71,11 +44,11 @@ let kw_ansi (keyword : keyword) : string =
   | `ProcessVariable -> "1;35"
   | `ProcessCondition -> "4;31"
   | `ProcessInOut -> "1"
-  | `Macro -> "1;35"
-  | `Action -> "32"
-  | `Function -> "1"
-  | `Name -> "33"
-  | `Channel -> ""
+  | `ProcessChannel -> ""
+  | `GoalMacro -> "1;35"
+  | `GoalAction -> "32"
+  | `GoalFunction -> "1"
+  | `GoalName -> "33"
   | `Separation -> "1"
   | `HelpType -> "1;31"
   | `HelpFunction -> "1;35"
@@ -83,11 +56,21 @@ let kw_ansi (keyword : keyword) : string =
 
 (* Defines the string that will be outputed when a semantic tag is opened *)
 let kw_ansi_pref (stag : Format.stag) : string =
-  "\x1B[" ^ (kw_ansi @@ kw_stag_to_t stag) ^ "m"
+  match stag with
+  | Keyword_tag keyword ->
+    "\x1B[" ^ (kw_ansi keyword) ^ "m"
+  | Input_tag -> ""
+  | Output_tag -> ""
+  | _ -> failwith "Semantic tag not implemented"
 
 (* Defines the string that will be outputed when a semantic tag is closed *)
 let kw_ansi_suf (stag : Format.stag) : string =
-  "\x1B[0m"
+  match stag with
+  | Keyword_tag keyword ->
+    "\x1B[0m"
+  | Input_tag -> ""
+  | Output_tag -> ""
+  | _ -> failwith "Semantic tag not implemented"
 
 let kw_ansi_stag_funs : Format.formatter_stag_functions = 
   { mark_open_stag = kw_ansi_pref;
@@ -95,40 +78,51 @@ let kw_ansi_stag_funs : Format.formatter_stag_functions =
     print_open_stag = (fun _ -> ());
     print_close_stag = (fun _ -> ()); }
 
+
   (** HTML **)
 
 (* Each keyword is associated to HTML attributes *)
 let kw_html_attributes (keyword : keyword) : string =
   match keyword with
-  | `ProcessName -> " style=\"font-weight:bold; color: #0000AA\""
-  | `ProcessVariable -> " style=\"font-weight: bold; color: #AA00AA\""
-  | `ProcessCondition -> " style=\"text-decoration: underline; color: #AA0000\""
-  | `ProcessInOut -> " style=\"font-weight: bold\""
-  | `Macro -> " style=\"font-weight: bold; color: #AA00AA\""
-  | `Action -> " style=\"color: #00AA00\""
-  | `Function -> " style=\"font-weight: bold\""
-  | `Name -> " style=\"color: #AA5500\""
-  | `Channel -> ""
-  | `Separation -> " style=\"font-weight: bold\""
-  | `HelpType -> " style=\"font-weight: bold; color: #AA0000\""
-  | `HelpFunction -> " style=\"font-weight: bold; color: #AA00AA\""
+  | `ProcessName -> " class=\"pn\" style=\"font-weight:bold; color: #0000AA\""
+  | `ProcessVariable -> " class=\"pv\" style=\"font-weight: bold; color: #AA00AA\""
+  | `ProcessCondition -> " class=\"pc\" style=\"text-decoration: underline; color: #AA0000\""
+  | `ProcessInOut -> " class=\"pio\" style=\"font-weight: bold\""
+  | `ProcessChannel -> " class=\"pc\""
+  | `GoalMacro -> " class=\"gm\" style=\"font-weight: bold; color: #AA00AA\""
+  | `GoalAction -> " class=\"ga\" style=\"color: #00AA00\""
+  | `GoalFunction -> " class=\"gf\" style=\"font-weight: bold\""
+  | `GoalName -> " class=\"gn\" style=\"color: #AA5500\""
+  | `Separation -> " class=\"sep\" style=\"font-weight: bold\""
+  | `HelpType -> " class=\"ht\" style=\"font-weight: bold; color: #AA0000\""
+  | `HelpFunction -> " class=\"hf\" style=\"font-weight: bold; color: #AA00AA\""
   | `Test -> ""
 
 (* Defines the string that will be outputed when a semantic tag is opened *)
 let kw_html_pref (stag : Format.stag) : string =
-  let ty = kw_stag_to_t stag in
-  "<span class=\"" ^ (kw_id ty) ^ "\"" ^ (kw_html_attributes ty) ^ ">"
+  match stag with
+  | Keyword_tag keyword ->
+    "<span" ^ (kw_html_attributes keyword) ^ ">"
+  | Input_tag -> ""
+  | Output_tag -> ""
+  | _ -> failwith "Semantic tag not implemented"
+  
 
 (* Defines the string that will be outputed when a semantic tag is closed *)
 let kw_html_suf (stag : Format.stag) : string =
-  "</span>"
+  match stag with
+  | Keyword_tag keyword ->
+    "</span>"
+  | Input_tag -> ""
+  | Output_tag -> ""
+  | _ -> failwith "Semantic tag not implemented"
 
+(* Object containing all semantic tag functions for html output *)
 let kw_html_stag_funs : Format.formatter_stag_functions = 
   { mark_open_stag = kw_html_pref;
     mark_close_stag = kw_html_suf;
     print_open_stag = (fun _ -> ());
     print_close_stag = (fun _ -> ()); }
-  
 
 (** Set printer **)
 
@@ -151,7 +145,7 @@ let init (mode : printer_mode) : unit =
   | Html -> 
       Fmt.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
       Format.pp_set_mark_tags Fmt.stdout true;
-      pp_set_formatter_stag_functions Fmt.stdout kw_html_stag_funs ;
+      pp_set_formatter_stag_functions Fmt.stdout kw_html_stag_funs
   | Test -> ()
 
 
@@ -217,8 +211,8 @@ let prt ty fmt =
 let pr fmt = prt `Default fmt
 
 let kw (keyword : keyword) ppf fmt =
-  Fmt.pf ppf "@{<%s>" (kw_id keyword);
-  Fmt.kpf (fun fmt -> Fmt.pf ppf "@}") ppf fmt
+  Format.pp_open_stag ppf (Keyword_tag keyword);
+  Fmt.kpf (fun ppf -> Format.pp_close_stag ppf ()) ppf fmt
 
 let kws (keyword : keyword) ppf (s : string) =
   kw keyword ppf "%s" s
