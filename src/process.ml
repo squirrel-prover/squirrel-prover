@@ -61,20 +61,20 @@ let rec pp_process ppf process =
     pf ppf "@[<hov>%s%a %a@ %a;@ @[%a@]@]"
       (L.unloc s)
       (Utils.pp_list Fmt.string) (L.unlocs indices)
-      (kw `Bold) ":="
+      (Printer.kws `ProcessKeyword) ":="
       Theory.pp t
       pp_process p
 
   | New (s, t, p) when L.unloc t = Theory.P_message ->
     pf ppf "@[<hov>%a %a;@ @[%a@]@]"
-      (kw `Red) "new"
-      (kw `Magenta) (L.unloc s)
+      (Printer.kws `ProcessKeyword) "new"
+      (Printer.kws `ProcessVariable) (L.unloc s)
       pp_process p
 
   | New (s, t, p) ->
     pf ppf "@[<hov>%a %a : %a;@ @[%a@]@]"
-      (kw `Red) "new"
-      (kw `Magenta) (L.unloc s)
+      (Printer.kws `ProcessKeyword) "new"
+      (Printer.kws `ProcessVariable) (L.unloc s)
       Theory.pp_p_ty t
       pp_process p
 
@@ -104,11 +104,11 @@ let rec pp_process ppf process =
     in
     
     pf ppf "@[<v>@[<2>%a %a%a =@ @[%a@] %a@]@ %a@]"
-      (kw `Bold) "let"
-      (styled `Magenta (styled `Bold ident)) (L.unloc s)
+      (Printer.kws `ProcessKeyword) "let"
+      (Printer.kws `ProcessVariable) (L.unloc s)
       pp_tyo tyo
       Theory.pp t
-      (styled `Bold ident) "in"
+      (Printer.kws `ProcessKeyword) "in"
       pp_process p
 
   | Exists (ss, f, p1, p2) ->

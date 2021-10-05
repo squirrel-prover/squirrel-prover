@@ -9,11 +9,19 @@ open Fmt
 (** Keyword type **)
 
 type keyword = [
+  | `TermCondition    (* [if], [try find], [else] *)
+  | `TermDiff         (* [diff] *)
+  | `TermSeq          (* [seq] *)
+  | `TermHappens      (* [happens] *)
+  | `TermBool         (* [true], [false] *)
+  | `TermQuantif      (* [forall], [exists] *)
+  | `TermAction       (* [init], [pred] *)
   | `ProcessName      (* [reader], [tag], [null] *)
   | `ProcessVariable  (* [x] in [in(cT,x)] *)
   | `ProcessCondition (* [if], [find], [else] *)
   | `ProcessInOut     (* [in], [out] *)
   | `ProcessChannel   (* [cT] *)
+  | `ProcessKeyword   (* [let], [set], [new] *)
   | `GoalMacro        (* [cond], [happens] *)
   | `GoalAction       (* [R(j)], [T(i,k)] *)
   | `GoalFunction     (* [h], [fst], [snd] *)
@@ -24,6 +32,10 @@ type keyword = [
   | `Test             (* Used to debug *)
 ]
 
+type error_keyword = [
+  | `Error
+]
+
 
 (** Semantic tag functions **)
 (* These functions are used to initialize the printer *)
@@ -31,6 +43,7 @@ type keyword = [
 (*Define new types of semantic tags*)
 type stag +=
   | Keyword_tag of keyword
+  | Error_tag of error_keyword
   | Input_tag
   | Output_tag
 
@@ -40,11 +53,19 @@ type stag +=
 (* Each keyword is associated to an ANSI code *)
 let kw_ansi (keyword : keyword) : string =
   match keyword with
+  | `TermCondition -> "31"
+  | `TermDiff -> "31"
+  | `TermSeq -> "31"
+  | `TermHappens -> "31"
+  | `TermBool -> "31"
+  | `TermQuantif -> "31"
+  | `TermAction -> "31"
   | `ProcessName -> "1;34"
   | `ProcessVariable -> "1;35"
   | `ProcessCondition -> "4;31"
   | `ProcessInOut -> "1"
   | `ProcessChannel -> ""
+  | `ProcessKeyword -> "1"
   | `GoalMacro -> "1;35"
   | `GoalAction -> "32"
   | `GoalFunction -> "1"
@@ -54,11 +75,17 @@ let kw_ansi (keyword : keyword) : string =
   | `HelpFunction -> "1;35"
   | `Test -> "1;3;4;35"
 
+let error_ansi (error_kw : error_keyword) : string =
+  match error_kw with
+  | `Error -> "41"
+
 (* Defines the string that will be outputed when a semantic tag is opened *)
 let kw_ansi_pref (stag : Format.stag) : string =
   match stag with
   | Keyword_tag keyword ->
     "\x1B[" ^ (kw_ansi keyword) ^ "m"
+  | Error_tag error_kw -> 
+    "\x1B[" ^ (error_ansi error_kw) ^ "m"
   | Input_tag -> ""
   | Output_tag -> ""
   | _ -> failwith "Semantic tag not implemented"
@@ -66,8 +93,9 @@ let kw_ansi_pref (stag : Format.stag) : string =
 (* Defines the string that will be outputed when a semantic tag is closed *)
 let kw_ansi_suf (stag : Format.stag) : string =
   match stag with
-  | Keyword_tag keyword ->
+  | Keyword_tag _ ->
     "\x1B[0m"
+  | Error_tag _ -> "\x1B[49m"
   | Input_tag -> ""
   | Output_tag -> ""
   | _ -> failwith "Semantic tag not implemented"
@@ -84,11 +112,19 @@ let kw_ansi_stag_funs : Format.formatter_stag_functions =
 (* Each keyword is associated to HTML attributes *)
 let kw_html_attributes (keyword : keyword) : string =
   match keyword with
+  | `TermCondition -> ""
+  | `TermDiff -> ""
+  | `TermSeq -> ""
+  | `TermHappens -> ""
+  | `TermBool -> ""
+  | `TermQuantif -> ""
+  | `TermAction -> ""
   | `ProcessName -> " class=\"pn\" style=\"font-weight:bold; color: #0000AA\""
   | `ProcessVariable -> " class=\"pv\" style=\"font-weight: bold; color: #AA00AA\""
   | `ProcessCondition -> " class=\"pc\" style=\"text-decoration: underline; color: #AA0000\""
   | `ProcessInOut -> " class=\"pio\" style=\"font-weight: bold\""
   | `ProcessChannel -> " class=\"pc\""
+  | `ProcessKeyword -> " class=\"pk\" style=\"font-weight: bold\""
   | `GoalMacro -> " class=\"gm\" style=\"font-weight: bold; color: #AA00AA\""
   | `GoalAction -> " class=\"ga\" style=\"color: #00AA00\""
   | `GoalFunction -> " class=\"gf\" style=\"font-weight: bold\""
@@ -98,11 +134,17 @@ let kw_html_attributes (keyword : keyword) : string =
   | `HelpFunction -> " class=\"hf\" style=\"font-weight: bold; color: #AA00AA\""
   | `Test -> ""
 
+let error_html_attributes (error_kw : error_keyword) : string =
+  match error_kw with
+  | `Error -> " class=\"err\" style=\"background-color: red\""
+
 (* Defines the string that will be outputed when a semantic tag is opened *)
 let kw_html_pref (stag : Format.stag) : string =
   match stag with
   | Keyword_tag keyword ->
     "<span" ^ (kw_html_attributes keyword) ^ ">"
+  | Error_tag error_kw -> 
+    "<span" ^ (error_html_attributes error_kw) ^ ">"
   | Input_tag -> ""
   | Output_tag -> ""
   | _ -> failwith "Semantic tag not implemented"
@@ -111,7 +153,7 @@ let kw_html_pref (stag : Format.stag) : string =
 (* Defines the string that will be outputed when a semantic tag is closed *)
 let kw_html_suf (stag : Format.stag) : string =
   match stag with
-  | Keyword_tag keyword ->
+  | Keyword_tag _ | Error_tag _ ->
     "</span>"
   | Input_tag -> ""
   | Output_tag -> ""
@@ -123,6 +165,7 @@ let kw_html_stag_funs : Format.formatter_stag_functions =
     mark_close_stag = kw_html_suf;
     print_open_stag = (fun _ -> ());
     print_close_stag = (fun _ -> ()); }
+
 
 (** Set printer **)
 
@@ -145,7 +188,8 @@ let init (mode : printer_mode) : unit =
   | Html -> 
       Fmt.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
       Format.pp_set_mark_tags Fmt.stdout true;
-      pp_set_formatter_stag_functions Fmt.stdout kw_html_stag_funs
+      pp_set_formatter_stag_functions
+        Fmt.stdout kw_html_stag_funs
   | Test -> ()
 
 
@@ -216,3 +260,7 @@ let kw (keyword : keyword) ppf fmt =
 
 let kws (keyword : keyword) ppf (s : string) =
   kw keyword ppf "%s" s
+
+let err_kw error_kw ppf fmt =
+  Format.pp_open_stag ppf (Error_tag error_kw);
+  Fmt.kpf (fun ppf -> Format.pp_close_stag ppf ()) ppf fmt
