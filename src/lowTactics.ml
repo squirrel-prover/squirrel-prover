@@ -2055,6 +2055,20 @@ let () =
     (gentac_of_any_tac_arg TraceLT.assert_tac EquivLT.assert_tac)
 
 (*------------------------------------------------------------------*)
+(* The `use` tacitcs now rely on the same code as the `assert` tactic.
+   We still register a tactic to have the tactic help working correctly. *)
+let () =
+  T.register_general "use"
+    ~tactic_help:
+      {general_help = "Instantiate a lemma or hypothesis on some arguments.\n\n\
+                       Usages: use H with v1, ..., vn\n\
+                      \        use H with v1 as intro_pat";
+       detailed_help = "";
+       usages_sorts = [];
+       tactic_group = Logical}
+    (fun _ _ _ -> assert false)
+
+(*------------------------------------------------------------------*)
 let () =
   T.register_general "apply"
     ~tactic_help:{
