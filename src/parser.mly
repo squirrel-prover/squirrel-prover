@@ -603,6 +603,10 @@ constseq_arg:
         | Some ip -> [TacticsArgs.SimplPat ip] in
       mk_abstract l "assert" (TacticsArgs.Theory p :: ip) }
 
+| l=lloc(ASSERT) LPAREN ip=simpl_pat COLON p=tac_term RPAREN
+    { let ip = [TacticsArgs.SimplPat ip] in
+      mk_abstract l "assert" (TacticsArgs.Theory p :: ip) }
+
 (*------------------------------------------------------------------*)
 /* tactics named arguments */
 
@@ -690,6 +694,8 @@ tac:
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
       mk_abstract l "clear" ids }
 
+  (*------------------------------------------------------------------*)
+  /* assert a formula */
   | t=assert_tac { t }
 
   | t=assert_tac l=lloc(BY) t1=tac
@@ -698,9 +704,12 @@ tac:
   | l=lloc(USE) pt=pt_use_tac ip=as_ip? 
     { mk_abstract l "assert" [TacticsArgs.AssertPt (pt, ip, `IntroImpl)] }
 
+  (*------------------------------------------------------------------*)
+  /* assert a proof term */
   | l=lloc(ASSERT) LPAREN ip=simpl_pat? COLONEQ pt=pt RPAREN
     { mk_abstract l "assert" [TacticsArgs.AssertPt (pt, ip, `None)] }
 
+  (*------------------------------------------------------------------*)
   | l=lloc(REWRITE) p=rw_args w=in_target
     { mk_abstract l "rewrite" [TacticsArgs.RewriteIn (p, w)] }
 
