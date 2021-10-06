@@ -680,14 +680,14 @@ let rec is_and_happens = function
 
 (*------------------------------------------------------------------*)
 (** Additional printing information *)
-type pp_info = { styler : pp_info -> eterm -> Fmt.style list * pp_info; }
+type pp_info = { styler : pp_info -> eterm -> Printer.error_keyword option * pp_info; }
 
-let default_pp_info = { styler = fun info _ -> [], info; }
+let default_pp_info = { styler = fun info _ -> None, info; }
 
-let rec styled_list (styles : Fmt.style list) printer = 
-  match styles with
-  | [] -> printer
-  | style :: styles -> styled_list styles (Fmt.styled style printer)
+let styled_opt (err : Printer.error_keyword option) printer = 
+  match err with
+  | None -> printer
+  | Some kw -> fun ppf t -> (Printer.err_kw kw ppf "%a" printer t)
 
 
 (* -------------------------------------------------------------------- *)
@@ -744,8 +744,8 @@ let rec pp : type a.
   a term Fmt.t
   =
   fun info (outer,side) ppf t ->
-  let styles, info = info.styler info (ETerm t) in
-  styled_list styles (_pp info (outer, side)) ppf t
+  let err_opt, info = info.styler info (ETerm t) in
+  styled_opt err_opt (_pp info (outer, side)) ppf t
 
 (** Core printing function *) 
 and _pp : type a.
@@ -1854,12 +1854,12 @@ let pp_match_infos fmt minfos =
   Fmt.pf fmt "@[<v 0>%a@]" (Fmt.list pp_one) (Mt.bindings minfos)
 
 let match_infos_to_pp_info (minfos : match_infos) : pp_info = 
-  let styler info (t : eterm) : Fmt.style list * pp_info = 
+  let styler info (t : eterm) : Printer.error_keyword option * pp_info = 
     match Mt.find_opt t minfos with
-    | None               -> [], info
-    | Some MR_ok         -> [(* Fmt.(`Bg `Green) *)],  default_pp_info
-    | Some MR_check_st _ -> [(* Fmt.(`Bg `Yellow) *)], info
-    | Some MR_failed     -> [Fmt.(`Bg `Red)],    info
+    | None               -> None, info
+    | Some MR_ok         -> None,  default_pp_info
+    | Some MR_check_st _ -> None, info
+    | Some MR_failed     -> Some `Error,    info
   in
   { styler }
 

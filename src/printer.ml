@@ -77,7 +77,7 @@ let kw_ansi (keyword : keyword) : string =
 
 let error_ansi (error_kw : error_keyword) : string =
   match error_kw with
-  | `Error -> "41"
+  | `Error -> "101"
 
 (* Defines the string that will be outputed when a semantic tag is opened *)
 let kw_ansi_pref (stag : Format.stag) : string =
