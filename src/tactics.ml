@@ -659,10 +659,10 @@ module AST (M:S) = struct
         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ";@,") pp) ts
 
     | AndThenSel (t,l) ->
-      let pp_sel_tac fmt (sel,s) =
+      let pp_sel_tac fmt (sel,t) =
         Fmt.pf ppf "@[%a: %a@]"
-          pp t
           (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") Fmt.int) sel
+          pp t
       in
       let pp_sel_tacs fmt l = match l with
         | [(sel,s)] -> pp_sel_tac fmt (sel, s)

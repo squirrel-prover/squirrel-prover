@@ -61,9 +61,9 @@
 
 %nonassoc tac_prec
 
+%nonassoc BY
 %left PLUS
 %right SEMICOLON
-%nonassoc BY
 %nonassoc REPEAT
 %nonassoc TRY
 %nonassoc NOSIMPL
@@ -620,7 +620,7 @@ tac:
                                        { T.AndThenSel (l,sls) }
   | l=tac SEMICOLON sl=sel_tac %prec tac_prec
                                        { T.AndThenSel (l,[sl]) }
-  | l=lloc(BY) t=tac %prec tac_prec    { T.By (t,l) }
+  | l=lloc(BY) t=tac                   { T.By (t,l) }
   | l=tac PLUS r=tac                   { T.OrElse [l;r] }
   | TRY l=tac                          { T.Try l }
   | REPEAT t=tac                       { T.Repeat t }

@@ -484,7 +484,7 @@ Proof.
   intro [AEAD_dec OTP_dec Sid_eq].
   rewrite valid_decode //. 
   case Eq;
-  depends Setup(pid), t by auto;
+  (depends Setup(pid), t by auto);
   intro Clt;
   by project; simpl; exists pid.
 Qed.
