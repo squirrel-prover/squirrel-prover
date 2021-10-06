@@ -34,6 +34,7 @@ type keyword = [
 
 type error_keyword = [
   | `Error
+  | `Test
 ]
 
 
@@ -49,6 +50,8 @@ type stag +=
 
 
   (** ANSI **)
+
+let bg_pile = ref ["0"]
 
 (* Each keyword is associated to an ANSI code *)
 let kw_ansi (keyword : keyword) : string =
@@ -78,14 +81,17 @@ let kw_ansi (keyword : keyword) : string =
 let error_ansi (error_kw : error_keyword) : string =
   match error_kw with
   | `Error -> "101"
+  | `Test -> "103"
 
 (* Defines the string that will be outputed when a semantic tag is opened *)
 let kw_ansi_pref (stag : Format.stag) : string =
   match stag with
   | Keyword_tag keyword ->
     "\x1B[" ^ (kw_ansi keyword) ^ "m"
-  | Error_tag error_kw -> 
-    "\x1B[" ^ (error_ansi error_kw) ^ "m"
+  | Error_tag error_kw ->
+    let ansi_code = error_ansi error_kw in
+    bg_pile := ansi_code :: !bg_pile ;
+    "\x1B[" ^ ansi_code ^ "m"
   | Input_tag -> ""
   | Output_tag -> ""
   | _ -> failwith "Semantic tag not implemented"
@@ -94,8 +100,10 @@ let kw_ansi_pref (stag : Format.stag) : string =
 let kw_ansi_suf (stag : Format.stag) : string =
   match stag with
   | Keyword_tag _ ->
-    "\x1B[0m"
-  | Error_tag _ -> "\x1B[49m"
+    "\x1B[22;24;39m"
+  | Error_tag _ -> 
+    bg_pile := List.tl !bg_pile;
+    "\x1B[" ^ (List.hd !bg_pile) ^ "m"
   | Input_tag -> ""
   | Output_tag -> ""
   | _ -> failwith "Semantic tag not implemented"
@@ -137,6 +145,7 @@ let kw_html_attributes (keyword : keyword) : string =
 let error_html_attributes (error_kw : error_keyword) : string =
   match error_kw with
   | `Error -> " class=\"err\" style=\"background-color: red\""
+  | `Test -> ""
 
 (* Defines the string that will be outputed when a semantic tag is opened *)
 let kw_html_pref (stag : Format.stag) : string =
@@ -167,6 +176,21 @@ let kw_html_stag_funs : Format.formatter_stag_functions =
     print_close_stag = (fun _ -> ()); }
 
 
+(** Formatter out functions **)
+
+  (** ANSI **)
+
+let ansi_out_funs =
+  let base_funs = get_formatter_out_functions () in
+  { out_string = base_funs.out_string ;
+    out_flush = (fun () ->
+      base_funs.out_string "\x1B[0m" 0 4;
+      base_funs.out_flush ()) ;
+    out_newline = base_funs.out_newline ;
+    out_spaces = base_funs.out_spaces ;
+    out_indent = base_funs.out_indent ; }
+
+
 (** Set printer **)
 
 type printer_mode =
@@ -185,6 +209,7 @@ let init (mode : printer_mode) : unit =
       Fmt.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
       Format.pp_set_mark_tags Fmt.stdout true;
       pp_set_formatter_stag_functions Fmt.stdout kw_ansi_stag_funs ;
+      pp_set_formatter_out_functions Fmt.stdout ansi_out_funs
   | Html -> 
       Fmt.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
       Format.pp_set_mark_tags Fmt.stdout true;
