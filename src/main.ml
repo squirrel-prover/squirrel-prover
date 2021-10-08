@@ -35,6 +35,9 @@ type main_state = {
 
   interactive : bool;
 
+  html : bool;
+  line_counter : int;
+
   load_paths : load_paths;
   (** load paths *)
 
@@ -383,6 +386,8 @@ and do_all_commands ~(test : bool) (state : main_state) : main_state =
 *)
 let rec main_loop ~test ?(save=true) (state : main_state) =
   if state.interactive then Printer.prt `Prompt "";
+  if state.html then
+    Printer.open_line "output-line" "id" state.line_counter;
 
   (* Save the state if instructed to do so.
    * In practice we save except after errors and the first call. *)
@@ -390,14 +395,22 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
 
   match
     let cmd = next_input ~test state in
-    let new_state = do_command ~test state cmd in
+    let new_state = 
+      { (do_command ~test state cmd) with 
+        line_counter = state.line_counter + 1 }
+    in
     new_state, new_state.mode 
   with
   (* exit prover *)
-  | _, AllDone -> Printer.pr "Goodbye!@." ; if not test then exit 0
+  | _, AllDone -> Printer.pr "Goodbye!@." ;
+    if state.html then Printer.close_line ();
+    if not test then exit 0; 
 
   (* loop *)
-  | new_state, _ -> (main_loop[@tailrec]) ~test new_state
+  | new_state, _ -> 
+    if state.html then
+      Printer.close_line ();
+    (main_loop[@tailrec]) ~test new_state
 
   (* error handling *)
   | exception e when is_toplevel_error ~test e -> 
@@ -410,7 +423,11 @@ and main_loop_error ~test (state : main_state) : unit =
     assert (state.file.f_path = `Stdin);    
     (main_loop[@tailrec]) ~test ~save:false state
   end
-  else if not test then exit 1
+  else begin
+  if state.html then
+    Printer.close_line ();
+  if not test then exit 1
+  end
 
 
 let mk_load_paths ~main_mode () : load_paths =
@@ -424,18 +441,24 @@ let mk_load_paths ~main_mode () : load_paths =
     match main_mode with
     | `Stdin     -> LP_dir (Sys.getcwd ())
     | `File path -> LP_dir (Filename.dirname path)
+    | `Html path -> LP_dir (Filename.dirname path)
   in
   [top_load_path; theory_load_path] 
 
 let start_main_loop
     ?(test=false) 
-    ~(main_mode : [`Stdin | `File of string]) 
+    ~(main_mode : [`Stdin | `File of string | `Html of string]) 
     () : unit
   =
-  let interactive = main_mode = `Stdin in  
+  let interactive = main_mode = `Stdin in 
+  let html = match main_mode with
+    | `Html fname -> true
+    | _ -> false
+  in
   let file = match main_mode with
     | `Stdin -> file_from_stdin ()
     | `File fname -> locate [LP_none] fname
+    | `Html fname -> locate [LP_none] fname
   in
 
   Prover.reset ();
@@ -443,6 +466,8 @@ let start_main_loop
     mode = GoalMode; 
     table = Symbols.builtins_table; 
     interactive;
+    html;
+    line_counter = 1;
 
     load_paths = mk_load_paths ~main_mode ();
 
@@ -453,10 +478,12 @@ let start_main_loop
 
   main_loop ~test state
   
-let generate_html filename html_file =
-  Printer.init Printer.Html;
-  (* TODO *)
-  ()
+let generate_html ?(test=false) (filename : string) (html_file : string) =
+  Printer.init Printer.File;
+  if Filename.extension filename <> ".sp" then
+    cmd_error (InvalidExtention filename);
+  let name = Filename.chop_extension filename in
+  start_main_loop ~test ~main_mode:(`Html name) ()
 
 let interactive_prover () =
   Printer.prt `Start "Squirrel Prover interactive mode.";

@@ -45,8 +45,6 @@ type error_keyword = [
 type stag +=
   | Keyword_tag of keyword
   | Error_tag of error_keyword
-  | Input_tag
-  | Output_tag
 
 
   (** ANSI **)
@@ -56,13 +54,13 @@ let bg_pile = ref ["0"]
 (* Each keyword is associated to an ANSI code *)
 let kw_ansi (keyword : keyword) : string =
   match keyword with
-  | `TermCondition -> "31"
-  | `TermDiff -> "31"
-  | `TermSeq -> "31"
-  | `TermHappens -> "31"
-  | `TermBool -> "31"
-  | `TermQuantif -> "31"
-  | `TermAction -> "31"
+  | `TermCondition -> ""
+  | `TermDiff -> ""
+  | `TermSeq -> ""
+  | `TermHappens -> ""
+  | `TermBool -> ""
+  | `TermQuantif -> ""
+  | `TermAction -> ""
   | `ProcessName -> "1;34"
   | `ProcessVariable -> "1;35"
   | `ProcessCondition -> "4;31"
@@ -92,8 +90,6 @@ let kw_ansi_pref (stag : Format.stag) : string =
     let ansi_code = error_ansi error_kw in
     bg_pile := ansi_code :: !bg_pile ;
     "\x1B[" ^ ansi_code ^ "m"
-  | Input_tag -> ""
-  | Output_tag -> ""
   | _ -> failwith "Semantic tag not implemented"
 
 (* Defines the string that will be outputed when a semantic tag is closed *)
@@ -104,8 +100,6 @@ let kw_ansi_suf (stag : Format.stag) : string =
   | Error_tag _ -> 
     bg_pile := List.tl !bg_pile;
     "\x1B[" ^ (List.hd !bg_pile) ^ "m"
-  | Input_tag -> ""
-  | Output_tag -> ""
   | _ -> failwith "Semantic tag not implemented"
 
 let kw_ansi_stag_funs : Format.formatter_stag_functions = 
@@ -154,8 +148,6 @@ let kw_html_pref (stag : Format.stag) : string =
     "<span" ^ (kw_html_attributes keyword) ^ ">"
   | Error_tag error_kw -> 
     "<span" ^ (error_html_attributes error_kw) ^ ">"
-  | Input_tag -> ""
-  | Output_tag -> ""
   | _ -> failwith "Semantic tag not implemented"
   
 
@@ -164,8 +156,6 @@ let kw_html_suf (stag : Format.stag) : string =
   match stag with
   | Keyword_tag _ | Error_tag _ ->
     "</span>"
-  | Input_tag -> ""
-  | Output_tag -> ""
   | _ -> failwith "Semantic tag not implemented"
 
 (* Object containing all semantic tag functions for html output *)
@@ -289,3 +279,15 @@ let kws (keyword : keyword) ppf (s : string) =
 let err_kw error_kw ppf fmt =
   Format.pp_open_stag ppf (Error_tag error_kw);
   Fmt.kpf (fun ppf -> Format.pp_close_stag ppf ()) ppf fmt
+
+(* Open the semantic tag that will print in html mode:
+     <span class="[class_name]" id="[id_name][id_counter]"> *)
+let open_line class_name id_name id_counter =
+  pp_print_as (get_std ()) 0 (Format.asprintf
+    "<span class=\"%s\" id=\"%s%d\">" 
+    class_name id_name id_counter)
+
+(* Close the last semantic tag.
+   Used to close the semantic tag [Line_tag]*)
+let close_line () =
+  pp_print_as (get_std ()) 0 "</span>"
