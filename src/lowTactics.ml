@@ -2077,8 +2077,7 @@ let () =
          (directly, using lemma, or using an axiom), trying to instantiate \
          F variables. Creates one subgoal for each premises of F.\n\
          Usage: apply my_lem.\n       \
-         apply my_axiom.\n       \
-         apply (forall (x:message), F => G).";
+         apply my_axiom.";
       detailed_help="";
       usages_sorts=[];
       tactic_group=Structural}
