@@ -18,9 +18,26 @@ val pat_to_rw_erule :
   rw_erule
 
 (*------------------------------------------------------------------*)
+(** Try to do a rewrite at head position in a term.  *)
 val rewrite_head : 
   Symbols.table ->
   SystemExpr.t -> 
   rw_erule -> 
   'a Term.term -> 
   ('a Term.term * Term.message list) option 
+
+(*------------------------------------------------------------------*)
+type rw_res = [
+  | `Result of Equiv.any_form * Term.message list 
+  | `NothingToRewrite
+  | `MaxNestedRewriting 
+]
+
+(*------------------------------------------------------------------*)
+val rewrite :
+  Symbols.table ->
+  SystemExpr.t ->
+  Vars.env ->
+  TacticsArgs.rw_count ->
+  rw_erule -> 
+  Equiv.any_form -> rw_res

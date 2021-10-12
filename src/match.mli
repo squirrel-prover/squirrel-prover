@@ -52,6 +52,13 @@ type match_res =
   | NoMatch of (Term.messages * Term.match_infos) option 
   | Match   of Mvar.t
 
+(** [f] of type [fmap] is a function that, given [t vars conds] where:
+    - [t] is sub-term of the term we are mapping one
+    - [vars] are the free variable bound above [t]'s occurrence
+    - [conds] are conditions above [t]'s occurrence
+
+    If [f t vars conds = `Continue], we keep looking for an occurrence.
+    If [f t vars conds = `Map t'], we replace [t] by [t']. *)
 type f_map =
   Term.eterm -> Vars.evars -> Term.message list ->
   [`Map of Term.eterm | `Continue] 

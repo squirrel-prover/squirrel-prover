@@ -199,7 +199,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let s, subs = 
       List.fold_left (fun (s,subs) target ->
           let s, subs' = do_target doit s target in
-          s, (List.rev subs') @ subs
+          s, List.rev_append subs' subs
         ) (s,[]) targets
     in
     s, List.rev subs
@@ -366,99 +366,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
   
   (** [rewrite ~all tgt rw_args] rewrites [rw_arg] in [tgt].
       If [all] is true, then does not fail if no rewriting occurs. *)
-  let rewrite ~loc ~all 
+  let rewrite 
+      ~(loc:L.t) 
+      ~(all:bool)
       (targets: target list) 
       (rw : Args.rw_count * Ident.t option * rw_erule) 
       (s : S.sequent) 
     : S.sequent * S.sequent list 
     =
-    let found1, cpt_occ = ref false, ref 0 in
-    let check_max_rewriting () =
-        if !cpt_occ > 1000 then   (* hard-coded *)
-          hard_failure ~loc (Failure "max nested rewriting reached (1000)");
-        incr cpt_occ;
-        found1 := true;
-    in
-
-    let table, system = S.table s, S.system s in
-    
-    (* Attempt to find an instance of [left], and rewrites all occurrences of
-       this instance.
-       Return: (f, subs) *)
-    let rec doit
-      : type a. Args.rw_count -> a rw_rule -> cform -> cform * Term.form list = 
-      fun mult (tyvars, sv, rsubs, left, right) f ->
-        check_max_rewriting ();
-        
-        let subs_r = ref [] in
-        let found_instance = ref false in
-        
-        (* This is a reference, so that it can be over-written later
-           after we found an instance of [left]. *)
-        let pat : a Term.term Match.pat ref = 
-          ref Match.{ pat_tyvars = tyvars; pat_vars = sv; pat_term = left }
-        in
-        let right_instance = ref None in
-
-        (* If there is a match (with [mv]), substitute [occ] by [right] where 
-           free variables are instantiated according to [mv], and variables
-           bound above the matched occurrences are universally quantified in 
-           the generated sub-goals. *)
-        let rw_inst (Term.ETerm occ) vars conds =
-          match Match.T.try_match_term table system occ !pat with
-          | NoMatch _ | FreeTyv -> `Continue
-
-          (* head matches *)
-          | Match mv ->
-            if !found_instance then
-              (* we already found the rewrite instance earlier *)
-              `Map (oget !right_instance)
-                
-            else begin (* we found the rewrite instance *)
-              found_instance := true;
-              let subst = Match.Mvar.to_subst ~mode:`Match mv in
-              let left = Term.subst subst left in
-              let right = Term.subst subst right in
-
-              right_instance := Some (Term.ETerm right);
-              subs_r :=
-                List.map (fun rsub ->
-                    Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
-                  ) rsubs;
-
-              pat := Match.{ pat_term   = left;
-                             pat_tyvars = [];
-                             pat_vars   = Sv.empty; };
-              
-              `Map (Term.ETerm right)
-            end
-        in
-
-        let f_opt = match f with
-          | `Equiv f -> 
-            let f_opt = Match.E.map rw_inst (S.env s) f in
-            omap (fun x -> `Equiv x) f_opt
-
-          | `Reach f ->
-            let f_opt = Match.T.map rw_inst (S.env s) f in
-            omap (fun x -> `Reach x) f_opt
-        in
-
-        match mult, f_opt with
-        | `Any, None -> f, !subs_r
-
-        | (`Once | `Many), None -> 
-          if not all 
-          then soft_failure ~loc Tactics.NothingToRewrite 
-          else f, !subs_r
-
-        | (`Many | `Any), Some f -> 
-          let f, rsubs' = doit `Any (tyvars, sv, rsubs, left, right) f in
-          f, List.rev_append (!subs_r) rsubs'
-
-        | `Once, Some f -> f, !subs_r
-    in
-
     let is_same (hyp_id : Ident.t option) (target_id : Ident.t option) = 
       match hyp_id, target_id with
       | None, _ | _, None -> false
@@ -467,20 +382,35 @@ module MkCommonLowTac (S : Sequent.S) = struct
         Ident.name hyp_id <> "_" 
     in
 
+    (* set to true if at least one rewriting occured in any of the targets *)
+    let found = ref false in
+
     let doit_tgt (f,tgt_id : cform * Ident.t option) : cform * S.conc_form list =
-      match rw with
-      | mult,  id_opt, (tyvars, sv, subs, Term.ESubst (l,r)) ->
-        if is_same id_opt tgt_id 
-        then f, []
-        else
-          let f, subs = doit mult (tyvars, sv, subs, l, r) f in
-          let subs = List.rev subs in
+      let mult, id_opt, rw_erule = rw in
+      if is_same id_opt tgt_id 
+      then f, []
+      else
+        let rw_res =
+          Rewrite.rewrite
+            (S.table s) (S.system s) (S.env s)
+            mult rw_erule f 
+        in
+        match rw_res with
+        | `Result (f, subs) ->
+          found := true;
           f, List.map (fun l -> S.unwrap_conc (`Reach l)) subs
+
+        | `NothingToRewrite ->
+          if all then f, [] 
+          else soft_failure ~loc Tactics.NothingToRewrite  
+
+        | `MaxNestedRewriting ->
+          hard_failure ~loc (Failure "max nested rewriting reached (1000)")
     in
 
     let s, subs = do_targets doit_tgt s targets in
 
-    if all && not !found1 then soft_failure ~loc Tactics.NothingToRewrite;
+    if all && not !found then soft_failure ~loc Tactics.NothingToRewrite;
 
     s, subs
 
