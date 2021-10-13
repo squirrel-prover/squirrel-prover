@@ -36,7 +36,7 @@ type main_state = {
   interactive : bool;
 
   html : bool;
-  char_counter : int;
+  prev_pos : Lexing.position;
   line_counter : int;
   in_chan : in_channel;
 
@@ -270,8 +270,11 @@ let rec do_command
       { state with mode = GoalMode; table = table; }
 
     | ProofMode, ParsedTactic utac ->
-      if not state.interactive then
-        Printer.prt `Prompt "%a" Prover.pp_ast utac ;
+      if not state.interactive then begin
+        let l1 = state.prev_pos.pos_lnum in
+        let l2 = state.file.f_lexbuf.lex_curr_p.pos_lnum in
+        Printer.prt `Prompt "Lines %d-%d: %a" l1 l2 Prover.pp_ast utac
+      end;
 
       begin match Prover.eval_tactic utac with
       | true ->
@@ -381,6 +384,21 @@ and do_all_commands ~(test : bool) (state : main_state) : main_state =
   | cmd -> do_all_commands ~test (do_command ~test state cmd)
 
 
+(** Printing of html output **)
+let html_print ppf state =
+  (*Print input lines*)
+  let p1 = state.file.f_lexbuf.lex_curr_pos in
+  let p2 = state.prev_pos.pos_cnum in
+  let input_line = really_input_string state.in_chan (p1-p2) in
+  Printer.open_line ppf "input-line" "in" state.line_counter;
+  Fmt.pf ppf "%s" input_line;
+  Printer.close_line ppf;
+  (*Print output lines*)
+  Printer.open_line ppf "output-line" "out" state.line_counter;
+  Fmt.pf ppf "%s" (Format.flush_str_formatter ());
+  Printer.close_line ppf
+
+
 (** The main loop of the prover. The mode defines in what state the prover is,
     e.g is it waiting for a proof script, or a system description, etc.
     [save] allows to specify is the current state must be saved, so that
@@ -388,8 +406,6 @@ and do_all_commands ~(test : bool) (state : main_state) : main_state =
 *)
 let rec main_loop ~test ?(save=true) (state : main_state) =
   if state.interactive then Printer.prt `Prompt "";
-  if state.html then
-    Printer.open_line "output-line" "out" state.line_counter;
 
   (* Save the state if instructed to do so.
    * In practice we save except after errors and the first call. *)
@@ -398,29 +414,23 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
   match
     let position = state.file.f_lexbuf.lex_curr_p in
     let cmd = next_input ~test state in
-    let new_state = 
-      { (do_command ~test state cmd) with 
+    let new_state = do_command 
+      ~test 
+      { state with 
         line_counter = state.line_counter + 1;
-        char_counter = position.pos_cnum }
+        prev_pos = position }
+      cmd
     in
     new_state, new_state.mode 
   with
   (* exit prover *)
   | new_state, AllDone -> Printer.pr "Goodbye!@." ;
-    if state.html then Printer.close_line ();
     if not test then exit 0; 
 
   (* loop *)
   | new_state, _ -> 
-    if state.html then begin
-      Printer.close_line ();
-      let p1 = new_state.file.f_lexbuf.lex_curr_pos in
-      let p2 = new_state.char_counter in
-      let input_line = really_input_string state.in_chan (p1-p2) in
-      Printer.open_line "input-line" "in" state.line_counter;
-      Printer.pr "%s" input_line;
-      Printer.close_line ();
-    end;
+    if state.html then
+      html_print Fmt.stdout new_state;
     (main_loop[@tailrec]) ~test new_state
 
   (* error handling *)
@@ -434,11 +444,7 @@ and main_loop_error ~test (state : main_state) : unit =
     assert (state.file.f_path = `Stdin);    
     (main_loop[@tailrec]) ~test ~save:false state
   end
-  else begin
-  if state.html then
-    Printer.close_line ();
-  if not test then exit 1
-  end
+  else if not test then exit 1
 
 
 let mk_load_paths ~main_mode () : load_paths =
@@ -482,7 +488,7 @@ let start_main_loop
     interactive;
 
     html;
-    char_counter = 0;
+    prev_pos = file.f_lexbuf.lex_curr_p;
     line_counter = 1;
     in_chan;
     
@@ -496,11 +502,12 @@ let start_main_loop
   main_loop ~test state
   
 let generate_html ?(test=false) (filename : string) (html_file : string) =
-  Printer.init Printer.File;
+  Printer.init Printer.Html;
   if Filename.extension filename <> ".sp" then
     cmd_error (InvalidExtention filename);
   let name = Filename.chop_extension filename in
   start_main_loop ~test ~html:true ~main_mode:(`File name) ()
+  
 
 let interactive_prover () =
   Printer.prt `Start "Squirrel Prover interactive mode.";

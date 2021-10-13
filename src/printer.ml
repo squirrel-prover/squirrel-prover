@@ -149,7 +149,7 @@ let kw_html_pref (stag : Format.stag) : string =
   | Error_tag error_kw -> 
     "<span" ^ (error_html_attributes error_kw) ^ ">"
   | _ -> failwith "Semantic tag not implemented"
-  
+
 
 (* Defines the string that will be outputed when a semantic tag is closed *)
 let kw_html_suf (stag : Format.stag) : string =
@@ -181,6 +181,8 @@ let ansi_out_funs =
     out_indent = base_funs.out_indent ; }
 
 
+  (** HTML **)
+
 (** Set printer **)
 
 type printer_mode =
@@ -191,20 +193,30 @@ type printer_mode =
 
 let printer_mode = ref File
 
+let get_std () =
+  match !printer_mode with
+  | File -> Fmt.stdout
+  | Interactive -> Fmt.stdout
+  | Html -> Format.str_formatter
+  | Test -> Fmt.stdout
+
 (* Initialisation of the printer giving it a mode *)
 let init (mode : printer_mode) : unit =
   printer_mode := mode;
   match mode with
   | File | Interactive ->
-      Fmt.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
-      Format.pp_set_mark_tags Fmt.stdout true;
-      pp_set_formatter_stag_functions Fmt.stdout kw_ansi_stag_funs ;
-      pp_set_formatter_out_functions Fmt.stdout ansi_out_funs
-  | Html -> 
-      Fmt.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
-      Format.pp_set_mark_tags Fmt.stdout true;
+      Fmt.set_style_renderer
+        (get_std ()) Fmt.(`Ansi_tty);
+      Format.pp_set_mark_tags
+        (get_std ()) true;
       pp_set_formatter_stag_functions
-        Fmt.stdout kw_html_stag_funs
+        (get_std ()) kw_ansi_stag_funs ;
+      pp_set_formatter_out_functions
+        (get_std ()) ansi_out_funs
+  | Html ->
+      Format.pp_set_mark_tags (get_std ()) true;
+      pp_set_formatter_stag_functions
+        (get_std ()) kw_html_stag_funs
   | Test -> ()
 
 
@@ -213,15 +225,6 @@ let init (mode : printer_mode) : unit =
 let strf = Fmt.strf
 
 let dummy_fmt = Format.make_formatter (fun _ _ _ -> ()) (fun () -> ())
-
-(* while not currently used, this part provides support for multiple kind
-   of outputs *)
-let get_std () =
-  match !printer_mode with
-  | File -> Fmt.stdout
-  | Interactive -> Fmt.stdout
-  | Html -> Fmt.stdout
-  | Test -> Fmt.stdout
 
 let pr x = Fmt.pf (get_std ()) x
 
@@ -282,12 +285,12 @@ let err_kw error_kw ppf fmt =
 
 (* Open the semantic tag that will print in html mode:
      <span class="[class_name]" id="[id_name][id_counter]"> *)
-let open_line class_name id_name id_counter =
-  pp_print_as (get_std ()) 0 (Format.asprintf
+let open_line ppf class_name id_name id_counter =
+  pp_print_as ppf 0 (Format.asprintf
     "<span class=\"%s\" id=\"%s%d\">" 
     class_name id_name id_counter)
 
 (* Close the last semantic tag.
    Used to close the semantic tag [Line_tag]*)
-let close_line () =
-  pp_print_as (get_std ()) 0 "</span>"
+let close_line ppf =
+  pp_print_as ppf 0 "</span>"
