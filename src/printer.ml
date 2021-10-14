@@ -5,9 +5,9 @@
 open Format
 open Fmt
 
+(** Keywords **)
 
-(** Keyword type **)
-
+(* Keyword type *)
 type keyword = [
   | `TermCondition    (* [if], [try find], [else] *)
   | `TermDiff         (* [diff] *)
@@ -29,26 +29,24 @@ type keyword = [
   | `Separation       (* [------------] *)
   | `HelpType         (* [Logical tactics:] *)
   | `HelpFunction     (* [admit], [euf] *)
-  | `Test             (* Used to debug *)
-]
-
-type error_keyword = [
-  | `Error
-  | `Test
+  | `Test             (* May be used to debug *)
+  | `Error            (* Used by Match module *)
 ]
 
 
 (** Semantic tag functions **)
 (* These functions are used to initialize the printer *)
 
-(*Define new types of semantic tags*)
+(* Define new types of semantic tags *)
 type stag +=
   | Keyword_tag of keyword
-  | Error_tag of error_keyword
 
 
   (** ANSI **)
 
+(* Store a pile of ansi_code.
+   Used if several styling are intertwined.
+   Currently, only used for background color *)
 let bg_pile = ref ["0"]
 
 (* Each keyword is associated to an ANSI code *)
@@ -75,31 +73,30 @@ let kw_ansi (keyword : keyword) : string =
   | `HelpType -> "1;31"
   | `HelpFunction -> "1;35"
   | `Test -> "1;3;4;35"
-
-let error_ansi (error_kw : error_keyword) : string =
-  match error_kw with
   | `Error -> "101"
-  | `Test -> "103"
 
 (* Defines the string that will be outputed when a semantic tag is opened *)
 let kw_ansi_pref (stag : Format.stag) : string =
   match stag with
   | Keyword_tag keyword ->
-    "\x1B[" ^ (kw_ansi keyword) ^ "m"
-  | Error_tag error_kw ->
-    let ansi_code = error_ansi error_kw in
-    bg_pile := ansi_code :: !bg_pile ;
+    let ansi_code = kw_ansi keyword in
+    let () = match keyword with
+    | `Error -> bg_pile := ansi_code :: !bg_pile
+    | _ -> ()
+    in
     "\x1B[" ^ ansi_code ^ "m"
   | _ -> failwith "Semantic tag not implemented"
 
 (* Defines the string that will be outputed when a semantic tag is closed *)
 let kw_ansi_suf (stag : Format.stag) : string =
   match stag with
-  | Keyword_tag _ ->
-    "\x1B[22;24;39m"
-  | Error_tag _ -> 
+  | Keyword_tag `Error -> 
     bg_pile := List.tl !bg_pile;
     "\x1B[" ^ (List.hd !bg_pile) ^ "m"
+    (* Return to the previous background color *)
+  | Keyword_tag _ ->
+    "\x1B[22;24;39m"
+    (* Remove all styling except background color *)
   | _ -> failwith "Semantic tag not implemented"
 
 let kw_ansi_stag_funs : Format.formatter_stag_functions = 
@@ -135,26 +132,20 @@ let kw_html_attributes (keyword : keyword) : string =
   | `HelpType -> " class=\"ht\" style=\"font-weight: bold; color: #AA0000\""
   | `HelpFunction -> " class=\"hf\" style=\"font-weight: bold; color: #AA00AA\""
   | `Test -> ""
-
-let error_html_attributes (error_kw : error_keyword) : string =
-  match error_kw with
   | `Error -> " class=\"err\" style=\"background-color: red\""
-  | `Test -> ""
 
 (* Defines the string that will be outputed when a semantic tag is opened *)
 let kw_html_pref (stag : Format.stag) : string =
   match stag with
   | Keyword_tag keyword ->
     "<span" ^ (kw_html_attributes keyword) ^ ">"
-  | Error_tag error_kw -> 
-    "<span" ^ (error_html_attributes error_kw) ^ ">"
   | _ -> failwith "Semantic tag not implemented"
 
 
 (* Defines the string that will be outputed when a semantic tag is closed *)
 let kw_html_suf (stag : Format.stag) : string =
   match stag with
-  | Keyword_tag _ | Error_tag _ ->
+  | Keyword_tag _ ->
     "</span>"
   | _ -> failwith "Semantic tag not implemented"
 
@@ -170,6 +161,7 @@ let kw_html_stag_funs : Format.formatter_stag_functions =
 
   (** ANSI **)
 
+(* Another function to assure that all styling stops if the formatter is flushed *)
 let ansi_out_funs =
   let base_funs = get_formatter_out_functions () in
   { out_string = base_funs.out_string ;
@@ -181,17 +173,17 @@ let ansi_out_funs =
     out_indent = base_funs.out_indent ; }
 
 
-  (** HTML **)
-
-(** Set printer **)
+(** Printer initialization **)
 
 type printer_mode =
   | Test
-  | Html
   | Interactive
   | File
+  | Html
 
 let printer_mode = ref File
+
+let dummy_fmt = Format.make_formatter (fun _ _ _ -> ()) (fun () -> ())
 
 let get_std () =
   match !printer_mode with
@@ -220,11 +212,9 @@ let init (mode : printer_mode) : unit =
   | Test -> ()
 
 
-(** Printing functions **)
+(** {2 Printing functions} **)
 
 let strf = Fmt.strf
-
-let dummy_fmt = Format.make_formatter (fun _ _ _ -> ()) (fun () -> ())
 
 let pr x = Fmt.pf (get_std ()) x
 
@@ -278,10 +268,6 @@ let kw (keyword : keyword) ppf fmt =
 
 let kws (keyword : keyword) ppf (s : string) =
   kw keyword ppf "%s" s
-
-let err_kw error_kw ppf fmt =
-  Format.pp_open_stag ppf (Error_tag error_kw);
-  Fmt.kpf (fun ppf -> Format.pp_close_stag ppf ()) ppf fmt
 
 (* Open the semantic tag that will print in html mode:
      <span class="[class_name]" id="[id_name][id_counter]"> *)

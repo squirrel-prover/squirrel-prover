@@ -36,9 +36,13 @@ type main_state = {
   interactive : bool;
 
   html : bool;
+  counter : int;
+  (* Count the number of instructions *)
   prev_pos : Lexing.position;
-  line_counter : int;
-  in_chan : in_channel;
+  (* Keep track of the previous postion of the lexer *)
+  in_chan_opt : in_channel option;
+  (* Channel for the .sp file. Only used in html mode *)
+  (** fields used in html mode **)
 
   load_paths : load_paths;
   (** load paths *)
@@ -271,9 +275,8 @@ let rec do_command
 
     | ProofMode, ParsedTactic utac ->
       if not state.interactive then begin
-        let l1 = state.prev_pos.pos_lnum in
-        let l2 = state.file.f_lexbuf.lex_curr_p.pos_lnum in
-        Printer.prt `Prompt "Lines %d-%d: %a" l1 l2 Prover.pp_ast utac
+        let lnum = state.file.f_lexbuf.lex_curr_p.pos_lnum in
+        Printer.prt `Prompt "Lines %d: %a" lnum Prover.pp_ast utac
       end;
 
       begin match Prover.eval_tactic utac with
@@ -389,12 +392,13 @@ let html_print ppf state =
   (*Print input lines*)
   let p1 = state.file.f_lexbuf.lex_curr_pos in
   let p2 = state.prev_pos.pos_cnum in
-  let input_line = really_input_string state.in_chan (p1-p2) in
-  Printer.open_line ppf "input-line" "in" state.line_counter;
+  let in_chan = Utils.oget state.in_chan_opt in
+  let input_line = really_input_string in_chan (p1-p2) in
+  Printer.open_line ppf "input-line" "in" state.counter;
   Fmt.pf ppf "%s" input_line;
   Printer.close_line ppf;
   (*Print output lines*)
-  Printer.open_line ppf "output-line" "out" state.line_counter;
+  Printer.open_line ppf "output-line" "out" state.counter;
   Fmt.pf ppf "%s" (Format.flush_str_formatter ());
   Printer.close_line ppf
 
@@ -417,7 +421,6 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
     let new_state = do_command 
       ~test 
       { state with 
-        line_counter = state.line_counter + 1;
         prev_pos = position }
       cmd
     in
@@ -431,7 +434,10 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
   | new_state, _ -> 
     if state.html then
       html_print Fmt.stdout new_state;
-    (main_loop[@tailrec]) ~test new_state
+    (main_loop[@tailrec]) 
+      ~test
+      { new_state with
+        counter = state.counter + 1 ; }
 
   (* error handling *)
   | exception e when is_toplevel_error ~test e -> 
@@ -468,13 +474,13 @@ let start_main_loop
     () : unit
   =
   let interactive = main_mode = `Stdin in 
-  let in_chan = match main_mode with
-    | `Stdin -> stdin
+  let in_chan_opt = match main_mode with
+    | `Stdin -> None
     | `File fname ->
       if html then
-        open_in (fname ^ ".sp")
+        Some (open_in (fname ^ ".sp"))
       else
-        stdin
+        None
   in
   let file = match main_mode with
     | `Stdin -> file_from_stdin ()
@@ -488,9 +494,9 @@ let start_main_loop
     interactive;
 
     html;
+    counter = 0;
     prev_pos = file.f_lexbuf.lex_curr_p;
-    line_counter = 1;
-    in_chan;
+    in_chan_opt;
     
     load_paths = mk_load_paths ~main_mode ();
 
@@ -536,30 +542,28 @@ let main () =
   let args = ref [] in
   let verbose = ref false in
   let interactive = ref false in
-  let html = ref false in
+  let html_file = ref "" in
   
   let speclist = [
     ("-i", Arg.Set interactive, "interactive mode (e.g, for proof general)");
-    ("-h", Arg.Set html, "html mode. Incompatible with option -i");
+    ("--html", Arg.Set_string html_file, "html mode (take a html file); Incompatible with -i");
     ("-v", Arg.Set verbose, "display more informations");
   ] in
 
   let collect arg = args := !args @ [arg] in
   let _ = Arg.parse speclist collect usage in
-  if !interactive && !html then
+  let html = !html_file <> "" in
+  if !interactive && html then
     Arg.usage speclist usage
-  else if List.length !args = 0 && not !interactive && not !html then
+  else if List.length !args = 0 && not !interactive then
     Arg.usage speclist usage
   else if List.length !args > 0 && !interactive then
     Printer.pr "No file arguments accepted when running in interactive mode.@."
-  else if List.length !args != 2 && !html then
-    Printer.pr "Html mode require a squirrel file and an html file.@."
   else if !interactive then
     interactive_prover ()
-  else if !html then
+  else if html then
     let filename = List.hd !args in
-    let html_file = List.nth !args 1 in
-    generate_html filename html_file
+    generate_html filename !html_file
   else
     let filename = List.hd !args in
     run filename

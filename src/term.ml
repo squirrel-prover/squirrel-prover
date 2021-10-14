@@ -680,14 +680,14 @@ let rec is_and_happens = function
 
 (*------------------------------------------------------------------*)
 (** Additional printing information *)
-type pp_info = { styler : pp_info -> eterm -> Printer.error_keyword option * pp_info; }
+type pp_info = { styler : pp_info -> eterm -> Printer.keyword option * pp_info; }
 
 let default_pp_info = { styler = fun info _ -> None, info; }
 
-let styled_opt (err : Printer.error_keyword option) printer = 
+let styled_opt (err : Printer.keyword option) printer = 
   match err with
   | None -> printer
-  | Some kw -> fun ppf t -> (Printer.err_kw kw ppf "%a" printer t)
+  | Some kw -> fun ppf t -> (Printer.kw kw ppf "%a" printer t)
 
 
 (* -------------------------------------------------------------------- *)
@@ -1854,7 +1854,7 @@ let pp_match_infos fmt minfos =
   Fmt.pf fmt "@[<v 0>%a@]" (Fmt.list pp_one) (Mt.bindings minfos)
 
 let match_infos_to_pp_info (minfos : match_infos) : pp_info = 
-  let styler info (t : eterm) : Printer.error_keyword option * pp_info = 
+  let styler info (t : eterm) : Printer.keyword option * pp_info = 
     match Mt.find_opt t minfos with
     | None               -> None, info
     | Some MR_ok         -> None,  default_pp_info
