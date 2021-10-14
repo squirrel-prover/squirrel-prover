@@ -276,7 +276,7 @@ let rec do_command
     | ProofMode, ParsedTactic utac ->
       if not state.interactive then begin
         let lnum = state.file.f_lexbuf.lex_curr_p.pos_lnum in
-        Printer.prt `Prompt "Lines %d: %a" lnum Prover.pp_ast utac
+        Printer.prt `Prompt "Line %d: %a" lnum Prover.pp_ast utac
       end;
 
       begin match Prover.eval_tactic utac with
@@ -387,11 +387,12 @@ and do_all_commands ~(test : bool) (state : main_state) : main_state =
   | cmd -> do_all_commands ~test (do_command ~test state cmd)
 
 
-(** Printing of html output **)
+(** Printing of html output *)
 let html_print ppf state =
   (*Print input lines*)
-  let p1 = state.file.f_lexbuf.lex_curr_pos in
+  let p1 = state.file.f_lexbuf.lex_curr_p.pos_cnum in
   let p2 = state.prev_pos.pos_cnum in
+  Fmt.pf ppf "\n\n%d - %d\n\n" p2 p1;
   let in_chan = Utils.oget state.in_chan_opt in
   let input_line = really_input_string in_chan (p1-p2) in
   Printer.open_line ppf "input-line" "in" state.counter;
