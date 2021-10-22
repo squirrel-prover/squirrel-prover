@@ -5,6 +5,25 @@
 open Format
 open Fmt
 
+(** Printer modes *)
+
+type printer_mode =
+  | Test
+  | Interactive
+  | File
+  | Html
+
+let printer_mode = ref File
+
+let dummy_fmt = Format.make_formatter (fun _ _ _ -> ()) (fun () -> ())
+
+let get_std () =
+  match !printer_mode with
+  | File -> Fmt.stdout
+  | Interactive -> Fmt.stdout
+  | Html -> Format.str_formatter
+  | Test -> Fmt.stdout
+
 (** Keywords **)
 
 (* Keyword type *)
@@ -99,7 +118,7 @@ let kw_ansi_suf (stag : Format.stag) : string =
     (* Remove all styling except background color *)
   | _ -> failwith "Semantic tag not implemented"
 
-let kw_ansi_stag_funs : Format.formatter_stag_functions = 
+let kw_ansi_stag_funs : Format.formatter_stag_functions =
   { mark_open_stag = kw_ansi_pref;
     mark_close_stag = kw_ansi_suf;
     print_open_stag = (fun _ -> ());
@@ -118,27 +137,27 @@ let kw_html_attributes (keyword : keyword) : string =
   | `TermBool -> ""
   | `TermQuantif -> ""
   | `TermAction -> ""
-  | `ProcessName -> " class=\"pn\" style=\"font-weight:bold; color: #0000AA\""
-  | `ProcessVariable -> " class=\"pv\" style=\"font-weight: bold; color: #AA00AA\""
-  | `ProcessCondition -> " class=\"pc\" style=\"text-decoration: underline; color: #AA0000\""
-  | `ProcessInOut -> " class=\"pio\" style=\"font-weight: bold\""
-  | `ProcessChannel -> " class=\"pc\""
-  | `ProcessKeyword -> " class=\"pk\" style=\"font-weight: bold\""
-  | `GoalMacro -> " class=\"gm\" style=\"font-weight: bold; color: #AA00AA\""
-  | `GoalAction -> " class=\"ga\" style=\"color: #00AA00\""
-  | `GoalFunction -> " class=\"gf\" style=\"font-weight: bold\""
-  | `GoalName -> " class=\"gn\" style=\"color: #AA5500\""
-  | `Separation -> " class=\"sep\" style=\"font-weight: bold\""
-  | `HelpType -> " class=\"ht\" style=\"font-weight: bold; color: #AA0000\""
-  | `HelpFunction -> " class=\"hf\" style=\"font-weight: bold; color: #AA00AA\""
+  | `ProcessName -> " class=\x1B\"pn\x1B\" style=\x1B\"font-weight:bold; color: #0000AA\x1B\""
+  | `ProcessVariable -> " class=\x1B\"pv\x1B\" style=\x1B\"font-weight: bold; color: #AA00AA\x1B\""
+  | `ProcessCondition -> " class=\x1B\"pc\x1B\" style=\x1B\"text-decoration: underline; color: #AA0000\x1B\""
+  | `ProcessInOut -> " class=\x1B\"pio\x1B\" style=\x1B\"font-weight: bold\x1B\""
+  | `ProcessChannel -> " class=\x1B\"pc\x1B\""
+  | `ProcessKeyword -> " class=\x1B\"pk\x1B\" style=\x1B\"font-weight: bold\x1B\""
+  | `GoalMacro -> " class=\x1B\"gm\x1B\" style=\x1B\"font-weight: bold; color: #AA00AA\x1B\""
+  | `GoalAction -> " class=\x1B\"ga\x1B\" style=\x1B\"color: #00AA00\x1B\""
+  | `GoalFunction -> " class=\x1B\"gf\x1B\" style=\x1B\"font-weight: bold\x1B\""
+  | `GoalName -> " class=\x1B\"gn\x1B\" style=\x1B\"color: #AA5500\x1B\""
+  | `Separation -> " class=\x1B\"sep\x1B\" style=\x1B\"font-weight: bold\x1B\""
+  | `HelpType -> " class=\x1B\"ht\x1B\" style=\x1B\"font-weight: bold; color: #AA0000\x1B\""
+  | `HelpFunction -> " class=\x1B\"hf\x1B\" style=\x1B\"font-weight: bold; color: #AA00AA\x1B\""
   | `Test -> ""
-  | `Error -> " class=\"err\" style=\"background-color: red\""
+  | `Error -> " class=\x1B\"err\x1B\" style=\x1B\"background-color: red\x1B\""
 
 (* Defines the string that will be outputed when a semantic tag is opened *)
 let kw_html_pref (stag : Format.stag) : string =
   match stag with
   | Keyword_tag keyword ->
-    "<span" ^ (kw_html_attributes keyword) ^ ">"
+    "\x1B<span" ^ (kw_html_attributes keyword) ^ "\x1B>"
   | _ -> failwith "Semantic tag not implemented"
 
 
@@ -146,11 +165,11 @@ let kw_html_pref (stag : Format.stag) : string =
 let kw_html_suf (stag : Format.stag) : string =
   match stag with
   | Keyword_tag _ ->
-    "</span>"
+    "\x1B</span\x1B>"
   | _ -> failwith "Semantic tag not implemented"
 
 (* Object containing all semantic tag functions for html output *)
-let kw_html_stag_funs : Format.formatter_stag_functions = 
+let kw_html_stag_funs : Format.formatter_stag_functions =
   { mark_open_stag = kw_html_pref;
     mark_close_stag = kw_html_suf;
     print_open_stag = (fun _ -> ());
@@ -163,7 +182,7 @@ let kw_html_stag_funs : Format.formatter_stag_functions =
 
 (* Another function to assure that all styling stops if the formatter is flushed *)
 let ansi_out_funs =
-  let base_funs = get_formatter_out_functions () in
+  let base_funs = pp_get_formatter_out_functions (get_std ()) () in
   { out_string = base_funs.out_string ;
     out_flush = (fun () ->
       base_funs.out_string "\x1B[0m" 0 4;
@@ -175,22 +194,6 @@ let ansi_out_funs =
 
 (** Printer initialization **)
 
-type printer_mode =
-  | Test
-  | Interactive
-  | File
-  | Html
-
-let printer_mode = ref File
-
-let dummy_fmt = Format.make_formatter (fun _ _ _ -> ()) (fun () -> ())
-
-let get_std () =
-  match !printer_mode with
-  | File -> Fmt.stdout
-  | Interactive -> Fmt.stdout
-  | Html -> Format.str_formatter
-  | Test -> Fmt.stdout
 
 (* Initialisation of the printer giving it a mode *)
 let init (mode : printer_mode) : unit =
@@ -268,15 +271,3 @@ let kw (keyword : keyword) ppf fmt =
 
 let kws (keyword : keyword) ppf (s : string) =
   kw keyword ppf "%s" s
-
-(* Open the semantic tag that will print in html mode:
-     <span class="[class_name]" id="[id_name][id_counter]"> *)
-let open_line ppf class_name id_name id_counter =
-  pp_print_as ppf 0 (Format.asprintf
-    "<span class=\"%s\" id=\"%s%d\">" 
-    class_name id_name id_counter)
-
-(* Close the last semantic tag.
-   Used to close the semantic tag [Line_tag]*)
-let close_line ppf =
-  pp_print_as ppf 0 "</span>"

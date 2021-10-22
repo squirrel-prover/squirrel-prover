@@ -389,19 +389,39 @@ and do_all_commands ~(test : bool) (state : main_state) : main_state =
 
 (** Printing of html output *)
 let html_print ppf state =
+  let escape = ref true in
+  let print_html_esc_char c =
+    if !escape then begin
+      match c with
+      | '\x1B' -> escape := false;
+      | '<' -> Fmt.pf ppf "&lt;"
+      | '>' -> Fmt.pf ppf "&gt;"
+      | '"' -> Fmt.pf ppf "&quot;"
+      | '&' -> Fmt.pf ppf "&amp;"
+      | _ -> Fmt.pf ppf "%c" c
+    end
+    else begin
+      escape := true;
+      Fmt.pf ppf "%c" c
+    end
+  in
+
   (*Print input lines*)
   let p1 = state.file.f_lexbuf.lex_curr_p.pos_cnum in
   let p2 = state.prev_pos.pos_cnum in
-  Fmt.pf ppf "\n\n%d - %d\n\n" p2 p1;
   let in_chan = Utils.oget state.in_chan_opt in
   let input_line = really_input_string in_chan (p1-p2) in
-  Printer.open_line ppf "input-line" "in" state.counter;
+  Format.pp_print_as ppf 0 (Format.asprintf
+    "<span class=\"input-line\" id=\"in%d\">" state.counter);
   Fmt.pf ppf "%s" input_line;
-  Printer.close_line ppf;
+  Format.pp_print_as ppf 0 "</span>";
+
   (*Print output lines*)
-  Printer.open_line ppf "output-line" "out" state.counter;
-  Fmt.pf ppf "%s" (Format.flush_str_formatter ());
-  Printer.close_line ppf
+  Format.pp_print_as ppf 0 (Format.asprintf
+    "<span class=\"output-line\" id=\"out%d\">" state.counter);
+  String.iter (print_html_esc_char)
+    (Format.flush_str_formatter ());
+  Format.pp_print_as ppf 0 "</span>"
 
 
 (** The main loop of the prover. The mode defines in what state the prover is,
