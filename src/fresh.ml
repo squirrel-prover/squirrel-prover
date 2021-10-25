@@ -53,6 +53,9 @@ type name_occ = Vars.index list Iter.occ
 
 type name_occs = name_occ list
 
+let pp_name_occ fmt (occ : name_occ) : unit = 
+  Iter.pp_occ (Fmt.list ~sep:Fmt.comma Vars.pp) fmt occ
+
 (** Looks for indices at which a name occurs.
     Raise @Var_found if a term variable occurs in the term. *)
 let get_name_indices_ext : type a. 
@@ -91,6 +94,9 @@ let get_name_indices_ext : type a.
 type ts_occ = Term.timestamp Iter.occ
 
 type ts_occs = ts_occ list
+
+let pp_ts_occ fmt (occ : ts_occ) : unit = Iter.pp_occ Term.pp fmt occ
+
 
 (** remove duplicates from occs for some subsuming relation. *)
 let clear_dup_mtso_le (occs : ts_occs) : ts_occs = 
@@ -137,7 +143,7 @@ let get_actions_ext :
 
         begin match Macros.get_definition constr m ts with
           | `Def t -> get ~fv ~cond t
-          |`Undef | `MaybeDef -> get_macro_default ()
+          | `Undef | `MaybeDef -> get_macro_default ()
         end
 
       | _ -> 

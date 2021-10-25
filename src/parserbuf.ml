@@ -62,35 +62,40 @@ let pp_pref_loc interactive lexbuf ppf () =
 
 
 let parse_from_buf
-      ?(test=false) ?(interactive=false) parse_fun lexbuf filename =
+    ?(test=false)
+    ?(interactive=false) 
+    (parse_fun : (Lexing.lexbuf -> Parser.token) -> Lexing.lexbuf -> 'a)
+    (lexbuf    : Lexing.lexbuf)
+    ~(filename  : string) : 'a 
+  =
   try parse_fun Lexer.token lexbuf with e ->
     let pp_loc = pp_loc interactive filename lexbuf in
     let pp_pref_loc = pp_pref_loc interactive lexbuf in
-      match pp_error pp_loc pp_pref_loc e with
-        | Some pp_error ->
-            if test then raise e else
-            if interactive then
-              let msg = Fmt.strf "%a" pp_error () in
-                raise (Error msg)
-            else begin
-              Printer.prt `Error "%a" pp_error () ;
-              exit 1
-            end
-        | None ->
-            if test || interactive then raise e else begin
-              Printer.prt `Error
-                "@[Exception %a: @,%s.@]@.@.\
-                 %s@."
-                pp_loc ()
-                (Printexc.to_string e)
-                (Printexc.get_backtrace ()) ;
-              exit 1
-            end
+    match pp_error pp_loc pp_pref_loc e with
+    | Some pp_error ->
+      if test then raise e else
+      if interactive then
+        let msg = Fmt.strf "%a" pp_error () in
+        raise (Error msg)
+      else begin
+        Printer.prt `Error "%a" pp_error () ;
+        exit 1
+      end
+    | None ->
+      if test || interactive then raise e else begin
+        Printer.prt `Error
+          "@[Exception %a: @,%s.@]@.@.\
+           %s@."
+          pp_loc ()
+          (Printexc.to_string e)
+          (Printexc.get_backtrace ()) ;
+        exit 1
+      end
 
 (** Testing *)
 
 let parse_theory_buf ?(test=false) lexbuf filename =
-  parse_from_buf ~test Parser.declarations lexbuf filename
+  parse_from_buf ~test Parser.declarations lexbuf ~filename
 
 let parse_theory_test ?(test=false) filename =
   let lexbuf = Lexing.from_channel (Stdlib.open_in filename) in

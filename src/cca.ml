@@ -91,7 +91,7 @@ let check_encryption_randomness
   let encryptions : (Term.message * Vars.index list) list =
     List.map (fun case ->
         case.Euf.message,
-        case.Euf.action_descr.indices
+        Action.get_indices case.Euf.action
       ) case_schemata
     @
     List.map (fun case -> case.Euf.d_message, []) cases_direct
@@ -139,7 +139,10 @@ let check_encryption_randomness
 
 let symenc_rnd_ssc ~cntxt env head_fn key elems =
   let rule =
-    Euf.mk_rule ~fun_wrap_key:None ~elems ~drop_head:false ~allow_functions:(fun x -> false)
+    Euf.mk_rule 
+      ~fun_wrap_key:None
+      ~elems ~drop_head:false
+      ~allow_functions:(fun x -> false)
       ~cntxt ~env ~mess:Term.empty ~sign:Term.empty
       ~head_fn ~key_n:key.s_symb ~key_is:key.s_indices
   in

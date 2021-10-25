@@ -50,7 +50,7 @@ type term_i =
   | Tpat  
   | Tpred of term
   | Diff  of term * term
-  | Seq   of lsymb list * term
+  | Seq   of bnds * term
   | Find  of lsymb list * term * term * term
 
   | App of lsymb * term list
@@ -93,12 +93,17 @@ type hterm = hterm_i L.located
 
 type equiv = term list 
 
+type pquant = PForAll | PExists
+              
 type global_formula = global_formula_i Location.located
+
 and global_formula_i =
   | PEquiv  of equiv
   | PReach  of formula
   | PImpl   of global_formula * global_formula
-  | PForAll of bnds * global_formula
+  | PAnd    of global_formula * global_formula
+  | POr     of global_formula * global_formula
+  | PQuant  of pquant * bnds * global_formula
 
 (*------------------------------------------------------------------*)
 (** {2 Declaration of new symbols} *)
@@ -243,6 +248,8 @@ type conversion_error = L.t * conversion_error_i
 
 exception Conv of conversion_error
 
+val conv_err : L.t -> conversion_error_i -> 'a
+    
 val pp_error :
   (Format.formatter -> L.t -> unit) ->
   Format.formatter -> conversion_error -> unit
@@ -335,9 +342,10 @@ val find_app_terms : term -> string list -> string list
 
 (** Parser type for a formula built by partially applying an hypothesis 
     or a lemma *)
-type p_pt_hol = { 
-  p_pt_hid : lsymb;
-  p_pt_args : term list; 
+type p_pt_hol = {
+  p_pt_hid  : lsymb;
+  p_pt_args : term list;
+  p_pt_loc  : L.t;
 }
 
 (** Parser type for `apply` arguments *)

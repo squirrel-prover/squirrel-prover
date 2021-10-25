@@ -16,6 +16,7 @@ This is a "light" model without the last check of T.
 *******************************************************************************)
 set autoIntro=false.
 set postQuantumSound=true.
+set timeout=4.
 
 hash H
 

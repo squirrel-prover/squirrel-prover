@@ -51,6 +51,8 @@ type shape = int t
 
 val get_indices : action -> Vars.index list
 
+val fv_action : action -> Vars.Sv.t
+
 (** [depends a b] test if [a] must occur before [b] as far
     as the control-flow is concerned -- it does not (cannot)
     take messages into account. It is not reflexive. *)

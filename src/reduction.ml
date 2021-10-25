@@ -121,7 +121,7 @@ module Mk (S : LowSequent.S) = struct
             Term.cast (Term.kind t) red_t, true
 
         | Term.Seq (is, t0) ->
-          let _, subst = Term.refresh_vars `Global is in
+          let _, subst = Term.erefresh_vars `Global is in
           let t0 = Term.subst subst t0 in
           (* let st = { st with subst = subst @ st.subst; } in *)
           let red_t0, has_red = reduce st t0 in
@@ -204,6 +204,12 @@ module Mk (S : LowSequent.S) = struct
       let r_subst = rev_subst subst in
       let red_e = Equiv.subst r_subst red_e in
       Equiv.Quant (q, vs, red_e)
+
+    | Equiv.And (e1, e2) ->
+      Equiv.And (reduce_equiv param s e1, reduce_equiv param s e2)
+
+    | Equiv.Or (e1, e2) ->
+      Equiv.Or (reduce_equiv param s e1, reduce_equiv param s e2)
 
     | Equiv.Impl (e1, e2) ->
       Equiv.Impl (reduce_equiv param s e1, reduce_equiv param s e2)

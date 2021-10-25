@@ -95,7 +95,7 @@ Abort.
 (** Check about variables naming and renaming *)
 (**********************************************)
 
-system [boundvars] out(c,seq(i,j -> h(n2(i,j),k1(i)))).
+system [boundvars] out(c,seq(i,j:index -> h(n2(i,j),k1(i)))).
 
 goal [ boundvars] _ (tau:timestamp, j,j1,j2:index):
   happens(tau) =>
@@ -109,7 +109,7 @@ Proof.
 Abort.
 
 goal _ (j,j1,j2:index):
-  seq(i,j -> h(n2(i,j),k1(i))) = h(n2(j1,j2),k1(j)) => j1=j2.
+  seq(i,j:index -> h(n2(i,j),k1(i))) = h(n2(j1,j2),k1(j)) => j1=j2.
 Proof.
   intro Hseq.
   euf Hseq. intro Hn Hieq.

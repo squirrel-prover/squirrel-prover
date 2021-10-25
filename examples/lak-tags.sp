@@ -286,13 +286,7 @@ Proof.
   prf 2.
   yesif 2; simpl.
   use tags_neq.
-  project.
-  split.
-  by (split; intro > _; repeat split; intro _ [[_ Meq] _]; fresh Meq).
-  by intro > _ _ [[_ Meq] _]; fresh Meq.
-
-  repeat split => > _; try (by intro > _ [[_ Meq] _]; fresh Meq).
-  by (repeat split => > _ [[_ Meq] _]; fresh Meq).
+  by project; repeat split; intro > _ _ [[_ Meq] _]; fresh Meq.
 
   fresh 2.
   by fresh 1; yesif 1.

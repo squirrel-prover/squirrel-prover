@@ -13,7 +13,7 @@ induction t.
 
 auto. 
 
-expandall.
+expand frame, output, exec, cond.
 fa 0; fa 1.
 nosimpl(ifeq 1,input@A,ok). 
 auto.

@@ -19,16 +19,20 @@ system (
 ).
 
 
+axiom state : forall tau:timestamp, happens(tau) => (exists tau':timestamp, tau' < tau && sR@tau = sT@tau').
+axiom statebis : forall tau:timestamp, happens(tau) => (exists tau':timestamp, tau' < tau && H(sR@tau,k) = sT@tau').
 
 (** Last update lemmas: basic reasoning about the memory cell.
   * Here we decompose the usual lastupdate lemma to separate the "pure" part
   * from the part that involves message equalities. *)
 
-goal lastupdateT_pure : forall tau:timestamp, happens(tau) => (
-  (forall j:index, happens(T(j)) => T(j)>tau) ||
-  (exists i:index, happens(T(i)) && T(i) <=tau && forall j:index, happens(T(j)) && T(j)<=tau => T(j)<=T(i))).
+goal lastupdateT_pure (tau:timestamp): 
+  happens(tau) => (
+    (forall j:index, happens(T(j)) => T(j)>tau) ||
+    (exists i:index, happens(T(i)) && T(i) <=tau && 
+     forall j:index, happens(T(j)) && T(j)<=tau => T(j)<=T(i))).
 Proof.
-induction.
+induction tau.
 intro tau IH Hp.
 case tau.
 
@@ -74,10 +78,12 @@ use H23 with j => //.
 Qed.
 
 
-goal lastupdateT_init :
-  forall tau:timestamp, happens(tau) => (forall j:index, happens(T(j)) => T(j)>tau)  => sT@tau = sT@init.
+goal lastupdateT_init (tau:timestamp):
+  happens(tau) => 
+  (forall j:index, happens(T(j)) => T(j)>tau) => 
+  sT@tau = sT@init.
 Proof.
-  induction => tau IH _ Htau.
+  induction tau => tau IH _ Htau.
   case tau;
 
   try(
@@ -91,12 +97,13 @@ Proof.
   by use Htau with i.
 Qed.
 
-goal lastupdate_T :
-  forall (tau:timestamp,i:index),
-  happens(T(i)) && T(i)<=tau && (forall j:index, happens(T(j)) && T(j)<=tau => T(j)<=T(i)) =>
+goal lastupdate_T (tau:timestamp,i:index):
+  happens(T(i)) && 
+  T(i)<=tau && 
+  (forall j:index, happens(T(j)) && T(j)<=tau => T(j)<=T(i)) =>
   sT@tau = sT@T(i).
 Proof.
-  induction => tau IH _ [Hinf Hsup].
+  dependent induction tau => tau IH [Hinf Hsup].
   case tau.
  
   (* init *)
@@ -123,11 +130,14 @@ Proof.
 Qed.
 
 
-goal lastupdateT : forall tau:timestamp, happens(tau) =>
+goal lastupdateT (tau:timestamp):
+  happens(tau) =>
   (sT@tau = sT@init && forall j:index, happens(T(j)) => T(j)>tau) ||
-  (exists i:index, sT@tau = sT@T(i) && happens(T(i)) && T(i)<=tau && forall j:index, happens(T(j)) && T(j)<=tau => T(j)<=T(i)).
+  (exists i:index, sT@tau = sT@T(i) && 
+   happens(T(i)) && T(i)<=tau && 
+   forall j:index, happens(T(j)) && T(j)<=tau => T(j)<=T(i)).
 Proof.
-  intro tau Htau.
+  intro Htau.
   use lastupdateT_pure with tau as [Hinit|[i HAi]] => //.
   left; split => //; by apply lastupdateT_init.
   right; exists i; repeat split => //; by apply lastupdate_T.
@@ -135,11 +145,13 @@ Qed.
 
 (* Reader *)
 
-goal lastupdateR_pure : forall tau:timestamp, happens(tau) => (
+goal lastupdateR_pure (tau:timestamp):
+  happens(tau) => (
   (forall j:index, happens(R(j)) => R(j)>tau) ||
-  (exists i:index, happens(R(i)) && R(i)<=tau && forall j:index, happens(R(j)) && R(j)<=tau => R(j)<=R(i))).
+  (exists i:index, happens(R(i)) && R(i)<=tau && 
+   forall j:index, happens(R(j)) && R(j)<=tau => R(j)<=R(i))).
 Proof.
-induction.
+induction tau.
 intro tau IH Hp.
 case tau.
 
@@ -186,10 +198,12 @@ use H23 with j => //.
 Qed.
 
 
-goal lastupdateR_init :
-  forall tau:timestamp, happens(tau) => (forall j:index, happens(R(j)) => R(j)>tau) => sR@tau = sR@init.
+goal lastupdateR_init (tau:timestamp):
+  happens(tau) => 
+  (forall j:index, happens(R(j)) => R(j)>tau) => 
+  sR@tau = sR@init.
 Proof.
-  induction => tau IH _ Htau.
+  induction tau => tau IH _ Htau.
   case tau;
   try(
   intro [i Hi]; rewrite Hi in *; expand sR;
@@ -202,12 +216,13 @@ Proof.
   use Htau with i => //.
 Qed.
 
-goal lastupdate_R :
-  forall (tau:timestamp,i:index),
-  happens(R(i)) && R(i)<=tau && (forall j:index, happens(R(j)) && R(j)<=tau => R(j)<=R(i)) =>
+goal lastupdate_R (tau:timestamp,i:index):
+  happens(R(i)) && 
+  R(i)<=tau && 
+  (forall j:index, happens(R(j)) && R(j)<=tau => R(j)<=R(i)) =>
   sR@tau = sR@R(i).
 Proof.
-  induction => tau IH _ [Hinf Hsup].
+  dependent induction tau => tau IH [Hinf Hsup].
   case tau.
  
   (* init *)
@@ -296,6 +311,144 @@ axiom unique_queries : forall (i,j:index) i <> j => input@O(i) <> input@O(j).
 
 
 name m : message.
+
+
+
+
+global goal [default/left,default/left]
+  strong_secrecy (tau:timestamp) : forall (tau':timestamp),
+    [happens(tau)] -> [happens(tau')] -> equiv(frame@tau, diff(sT@tau',m)).
+
+Proof.
+  induction tau => tau' Htau Htau'.
+
+  (* Init *)
+  expand frame@init.
+  use lastupdateT_pure with tau' as [Hinit | [i HA]].
+
+    use lastupdateT_init with tau' as H; try auto.
+    rewrite H; expand sT@init; fresh 0; auto.
+
+    use lastupdate_T with tau',i as H; try auto.
+    rewrite H in *; expand sT@T(i).
+    prf 0; yesif 0; [2: by fresh 0].
+    simpl. intro i' HAi'.
+    use non_repeatingT with pred(T(i)),pred(T(i')) => //.
+    by exists i'.
+  by assumption.
+
+  (* Oracle *)
+  expandall. fa 0. fa 1. fa 1. fa 1.
+  
+  (* Oracle H *)
+  prf 1; yesif 1; 2: fresh 1.
+  simpl; repeat split.
+  intro i' H;   by apply unique_queries.
+
+  intro i' H.     
+  use state with  pred(R(i')) as [tau1 [H1 H2]].
+  rewrite H2 in *.
+  reach_equiv IH, tau1 => //; intro Hf; by fresh Hf; by auto.
+  auto.
+  
+  intro i' H.     
+  use state with  pred(R1(i')) as [tau1 [H1 H2]].
+  rewrite H2 in *.
+  reach_equiv IH, tau1 => //; intro Hf; by fresh Hf; by auto.
+  auto.
+  
+  project.
+  intro i' [H | H].
+  reach_equiv IH,pred(T(i')) => //; intro Hf; by fresh Hf.
+  reach_equiv IH,pred(T(i')) => //; intro Hf; by fresh Hf.
+  intro i' H;  reach_equiv IH,pred(T(i')) => //; intro Hf; by fresh Hf.
+
+
+  (* Oracle G *)
+  prf 1. yesif 1; 2: fresh 1.
+  simpl; repeat split.
+   intro i' H; by apply unique_queries.
+   intro i' H; reach_equiv IH,T(i') => //; intro Hf; by fresh Hf.
+
+   intro i' H.
+   assert (H(sR@pred(R(i')),k) = sR@R(i')).
+   auto.
+   rewrite Meq in *.
+   use state with  R(i') as [tau1 [H1 H2]].
+   rewrite H2 in *.
+   reach_equiv IH, tau1 => //; intro Hf; by fresh Hf; by auto.
+    auto.
+
+   intro i' H.
+   use statebis with pred(R1(i')) as [tau1 [H1 H2]]. 
+   rewrite H2 in *.
+   reach_equiv IH, tau1 => //; intro Hf; by fresh Hf; by auto.
+   auto.
+
+   by apply IH.
+
+  (* Tag *)
+  expand frame@T(i). expand exec@T(i). expand cond@T(i). expand output@T(i).
+  fa 0. fa 1. fa 1.
+
+  prf 1; yesif 1; 2: fresh 1.
+  simpl;  repeat split.
+
+  intro i' H; reach_equiv IH,T(i) => // Hf; by fresh Hf.
+  intro i' H; use non_repeatingT with T(i),T(i') => //; by exists i.
+
+    intro i' H.
+   assert (H(sR@pred(R(i')),k) = sR@R(i')).
+   auto.
+   rewrite Meq in *.
+  use state with  R(i') as [tau1 [H1 H2]] => //.
+   rewrite H2 in *.
+ use non_repeatingT with T(i),tau1 => //. exists i.
+  by auto.
+
+
+  intro i' H.
+   use statebis with pred(R1(i')) as [tau1 [H1 H2]] => //. 
+   rewrite H2 in *.
+use non_repeatingT with T(i),tau1 => //. exists i.
+  by auto.
+
+  by apply IH.
+
+(* Reader R(i) *)
+ expand frame@R(i). 
+  fa 0. fa 1.
+  fa 2.
+ expand output@R(i).
+expand exec@R(i).
+fa 1.
+expand cond@R(i).
+project.
+
+equivalent
+  exec@R(i),
+exec@pred(R(i)) && exists j:index, T(j)<R(i) && input@R(i) = output@T(j).
+admit. (* GAP entre le lemme prouve et celui qui permet d'utiliser fadup *)
+expand output.
+fadup 1.
+by apply IH.
+
+(* Reader R1(i) *)
+expand frame@R1(i).
+fa 0. fa 1.
+
+equivalent
+  exec@R1(i),
+exec@pred(R1(i)) && not(exists j:index, T(j)<R1(i) && input@R1(i) = output@T(j)).
+admit. (* GAP entre le lemme prouve et celui qui permet d'utiliser fadup *)
+expand output.
+fadup 1.
+by apply IH.
+Qed.
+
+
+
+
 
 (* la valeur de l'etat du reader apparait dans l'etat du tag avant. Pour montrer cela, je suppose strong secrecy de l'etat du reader - c'est pour traiter le cas de l'oracle *)
 global goal [default/left,default/left] GsR_implies_sT:
@@ -446,119 +599,4 @@ auto.
 Qed.
 
 
-
-
-
-global goal [default/left,default/left]
-  strong_secrecy (tau:timestamp) : forall (tau':timestamp),
-    [happens(tau)] -> [happens(tau')] -> equiv(frame@tau, diff(sT@tau',m)).
-
-Proof.
-  induction tau => tau' Htau Htau'.
-
-  (* Init *)
-  expand frame@init.
-  use lastupdateT_pure with tau' as [Hinit | [i HA]].
-
-    use lastupdateT_init with tau' as H; try auto.
-    rewrite H; expand sT@init; fresh 0; auto.
-
-    use lastupdate_T with tau',i as H; try auto.
-    rewrite H in *; expand sT@T(i).
-    prf 0; yesif 0; [2: by fresh 0].
-    simpl. intro i' HAi'.
-    use non_repeatingT with pred(T(i)),pred(T(i')) => //.
-    by exists i'.
-  by assumption.
-
-  (* Oracle *)
-  expandall. fa 0. fa 1. fa 1. fa 1.
-  
-  (* Oracle H *)
-  prf 1; yesif 1; 2: fresh 1.
-  simpl; split; project; repeat split; intro i' H; try destruct H as [H|H].
-  admit. (* TODO le raffinement de PRF ne suffit pas: l'oracle ne peut venir de s@tau *)
-  by apply unique_queries.
-  reach_equiv IH,pred(T(i')) => //; intro Hf; by fresh Hf.
-  reach_equiv IH,pred(T(i')) => //; intro Hf; by fresh Hf.
-  admit. (* sR ?*)
-admit. (* sR ?*)
-    admit. (* sR ?*)
-  admit. (* sR ?*)
-  
-reach_equiv IH,pred(T(i')) => //; intro Hf; by fresh Hf.
-  admit. (* sR ?*)
- admit. (* sR ?*)
-  by apply unique_queries.
-
-  (* Oracle G *)
-  prf 1. yesif 1; 2: fresh 1.
-  simpl; split; project; repeat split; intro i' H; try destruct H as [H|H].
-
-
-   admit.  (* TODO le raffinement de PRF ne suffit pas: l'oracle ne peut venir de s@tau *)
-   by apply unique_queries.
-   reach_equiv IH,T(i') => //; intro Hf; by fresh Hf.
-   reach_equiv IH,T(i') => //; intro Hf; by fresh Hf.
-admit. (* sR ?*)
-admit. (* sR ?*)
-admit. (* sR ?*)
-admit. (* sR ?*)
-   reach_equiv IH,T(i') => //; intro Hf; by fresh Hf.
-admit. (* sR ?*)
-admit. (* sR ?*)
-
-   by apply unique_queries.
-
-   by apply IH.
-
-  (* Tag *)
-  expand frame@T(i). expand exec@T(i). expand cond@T(i). expand output@T(i).
-  fa 0. fa 1. fa 1.
-
-  prf 1; yesif 1; 2: fresh 1.
-  simpl; split; project; repeat split; intro i' H; try destruct H as [H|H].
-
-
-  admit.  (* TODO le raffinement de PRF ne suffit pas: l'oracle ne peut venir de s@tau *)
-  (* Ok mais pourquoi je ne peux pas faire reach_equiv IH,A(i) => //.*)
-  reach_equiv IH,T(i) => // Hf; by fresh Hf.
-  admit. (* ok si PRF plus fin *)
-  use non_repeatingT with T(i),T(i') => //; by exists i.
-  admit.  (* TODO le raffinement de PRF ne suffit pas: l'oracle ne peut venir de s@tau *)
-  admit. (* sR *)  
-  admit. (* sR *)  
-admit. (* sR *)  
-
-use non_repeatingT with T(i),T(i') => //; by exists i.
-admit. (* prf plus fin *)
-admit. (* sR *)
-  reach_equiv IH,T(i) => // Hf; by fresh Hf.
-
-  by apply IH.
-
-(* Reader R(i) *)
- expand frame@R(i). 
-  fa 0. fa 1.
-
-equivalent
-  exec@R(i),
-exec@pred(R(i)) && exists j:index, T(j)<R(i) && input@R(i) = output@T(j).
-admit. (* GAP entre le lemme prouve et celui qui permet d'utiliser fadup *)
-expand output.
-fadup 1.
-by apply IH.
-
-(* Reader R1(i) *)
-expand frame@R1(i).
-fa 0. fa 1.
-
-equivalent
-  exec@R1(i),
-exec@pred(R1(i)) && not(exists j:index, T(j)<R1(i) && input@R1(i) = output@T(j)).
-admit. (* GAP entre le lemme prouve et celui qui permet d'utiliser fadup *)
-expand output.
-fadup 1.
-by apply IH.
-Qed.
 

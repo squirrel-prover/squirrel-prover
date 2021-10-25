@@ -18,6 +18,7 @@ induction over sequences to complete the proof.
 (* set debugTactics=true. *)
 set autoIntro=false.
 set postQuantumSound=true.
+set timeout=4.
 
 hash H
 
@@ -175,11 +176,11 @@ Proof.
    - we can finally get rid of the nonces nr and nt in the first
      two sequences using fresh. *)
 
-enrich seq(r -> nr(r)),
-       seq(i,t -> nt(i,t)),
-       seq(i,t -> diff(id(i),id'(i,t)) XOR
+enrich seq(r:index -> nr(r)),
+       seq(i,t:index -> nt(i,t)),
+       seq(i,t:index -> diff(id(i),id'(i,t)) XOR
                   H(<tag0,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t)))),
-       seq(i,r,t -> diff(id(i),id'(i,t)) XOR
+       seq(i,r,t:index -> diff(id(i),id'(i,t)) XOR
                     H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))).
 induction t.
 
@@ -187,8 +188,7 @@ induction t.
 by admit. (* see comment above *)
 
 (* Case R - Done *)
-expand frame. fa 4.
-by expandseq seq(r->nr(r)), r.
+by expandall; apply IH.
 
 (* Case R1  WIP *)
 expand frame, exec, cond, output.
@@ -258,13 +258,9 @@ intro Meq; simpl.
 use wa_R1_right with i0,t0,r as [H1 H2].
 by use H1.
 
-fa 5.
-fadup 5.
-fa 5.
-expandseq seq(i,r,t->xor((diff(id(i),id'(i,t))),
-                  H(<tag1,<nr(r),nt(i,t)>>,(diff(key(i),key'(i,t)))))),
-       i,r,t.
-by fadup 5.
+fa 5; fadup 5.
+fa 5; fadup 5.
+apply IH.
 
 (* Case R2 *)
 expand frame, exec, cond, output.
@@ -305,11 +301,7 @@ by intro [i t _]; expand output; exists i,t.
 by fadup 5.
 
 (* Case T *)
-expand frame. fa 4.
-expandseq seq(i,t->nt(i,t)),i,t.
-by expandseq seq(i,t->xor((diff(id(i),id'(i,t))),
-                H(<tag0,<input@T(i,t),nt(i,t)>>,(diff(key(i),key'(i,t)))))),i,t.
-
+expand frame, output, exec, cond; apply IH.
 
 (* Case T1 *)
 expand frame, exec.

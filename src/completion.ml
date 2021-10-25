@@ -253,7 +253,7 @@ let rec cterm_of_term : type a. a Term.term -> cterm = fun c ->
     cfun (F f) (List.length is) (is @ terms)
 
   | Macro (ms,l,ts) -> 
-    assert (l = []); (* TODO *)
+    assert (l = []); 
     let is = List.map cterm_of_var ms.s_indices in
     cfun
       (M (ms.s_symb, ms.s_typ))
@@ -1029,8 +1029,6 @@ module Unify = struct
         Memo.add memo (u,v) r;
         r
 
-  (* let unify_normed = Prof.mk_binary "unify_normed" unify_normed *)
-
   (* We normalize by constant equality rules before unifying.
       This is *not* modulo ACUN. *)
   let unify uf u v =
@@ -1038,7 +1036,7 @@ module Unify = struct
     unify_normed u v
 
   (** profiling *)
-  let unify = Prof.mk_ternary "unify" unify
+  let unify = Prof.mk_ternary "Completion.unify" unify
 end
 
 
@@ -1134,7 +1132,7 @@ end = struct
     aux state [] l (fun x -> x)
 
 
-  let rec select_erule (r_open : e_rules) = 
+  let rec select_erule (r_open : e_rules) : ((cterm * cterm) * e_rules) option = 
     if Mct.is_empty r_open then None
     else 
       let t, s = Mct.choose r_open in
@@ -1148,7 +1146,7 @@ end = struct
   (** [deduce_aux state r_open r_closed]. Invariant:
       - [r_closed]: e_rules already superposed with all other rules.
       - [r_open]: e_rules to superpose. *)
-  let rec deduce_aux state (r_open : e_rules) (r_closed : e_rules) = 
+  let rec deduce_aux state (r_open : e_rules) (r_closed : e_rules) : state = 
     match select_erule r_open with
     | None -> { state with e_rules = r_closed }
 
@@ -1158,11 +1156,6 @@ end = struct
             let (state, new_rs) = grnd_superpose state rule rule' in
             ( state, add_erules r_open' new_rs)
           ) state.grnd_rules ( state, r_open') 
-      in
-
-      let state = fold_erules (fun rule' state ->
-          head_superpose state rule rule'
-        ) r_closed state
       in
 
       let state = fold_erules (fun rule' state ->
@@ -1256,7 +1249,6 @@ let rec term_grnd_normalize (state : state) (u : cterm) : cterm =
         | None -> u'
     else u'
 
-
 (** [term_e_normalize state u]
     Precondition: [u] must be ground and its xors grouped. *)
 let rec term_e_normalize state u = match u.cnt with
@@ -1287,6 +1279,7 @@ let normalize state u =
   fpt (=) (fun x -> term_uf_normalize state.uf x
                     |> term_grnd_normalize state
                     |> term_e_normalize state) u
+
 
 (* [normalize_cterm state u]
     Preconditions: [u] must be ground. *)

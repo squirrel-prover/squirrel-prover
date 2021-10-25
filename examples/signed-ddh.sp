@@ -117,40 +117,15 @@ Qed.
 
 equiv [secretS] strongSecS.
 Proof.
-    enrich skP, skS, seq(i->g^a(i)), seq(i->g^b(i)),
-           seq(i,j->diff(g^a(i)^b(j),g^k(i,j))).
+    enrich skP, skS, seq(i:index ->g^a(i)), seq(i:index ->g^b(i)),
+           seq(i,j:index ->diff(g^a(i)^b(j),g^k(i,j))).
 
-    induction t.
+    induction t; try (by expandall; apply IH).
 
     (* init *)
     expandall.
     by ddh g,a,b,k.
-    (* Pchall *)
-    expandall.
-    expandseq seq(i->g^a(i)), i.
-    by fa 6.
-    (* Pchall1 *)
-    expandall.
-    expandseq seq(i->g^a(i)), i.
-    by fa 6.
-    (* A *)
-    expandall.
-    expandseq  seq(i->g^a(i)), i.
-    by fa 6.
-    (* S *)
-    expandall.
-    expandseq  seq(i->g^b(i)), j.
-    by fa 6.
-    (* S1 *)
-    expandall.
-    expandseq  seq(i->g^b(i)), j.
-    by fa 6.
-    (* Case Schall2 *)
-    expandall.
-    expandseq  seq(i->g^a(i)), l.
-    expandseq seq(i->g^b(i)), j.
-    expandseq seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), l, j.
-    by fa 8.
+
     (* Schall3 *)
     expand frame, exec, output.
 
@@ -166,44 +141,21 @@ Proof.
     fa 5.
     fa 6.
     by noif 6.
-    (* A1 *)
-    expandall.
-    expandseq  seq(i->g^b(i)), j.
-    fa 6.
-    (* A2 *)
-     expandall.
-     fa 5.
 Qed.
-
-
-
 
 
 
 equiv [secretP] strongSecP.
 Proof.
-    enrich skP, skS, seq(i->g^a(i)), seq(i->g^b(i)),
-           seq(i,j->diff(g^a(i)^b(j),g^k(i,j))).
+    enrich skP, skS, seq(i:index ->g^a(i)), seq(i:index ->g^b(i)),
+           seq(i,j:index ->diff(g^a(i)^b(j),g^k(i,j))).
 
-    induction t.
+    induction t; try (by expandall; apply IH).
 
     (* init *)
     expandall.
     by ddh g,a,b,k.
-    (* Pchall *)
-    expandall.
-    expandseq seq(i->g^a(i)), i.
-    by fa 6.
-    (* Pchall1 *)
-    expandall.
-    expandseq seq(i->g^a(i)), i.
-    by fa 6.
-    (* Case Pchall2 *)
-    expandall.
-    expandseq seq(i->g^a(i)), i.
-    expandseq seq(i->g^b(i)), j.
-    expandseq seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), i, j.
-    by fa 8.
+
     (* Pchall3 *)
     expand frame, exec, output.
 
@@ -219,28 +171,5 @@ Proof.
 
     fa 5.
     fa 6.
-    noif 6.
-    (* A *)
-    expandall.
-    expandseq seq(i->g^a(i)), i.
-    by fa 6.
-
-    (* S *)
-    expandall.
-    expandseq seq(i->g^b(i)), j.
-    by fa 6.
-
-    (* S1 *)
-    expandall.
-    expandseq seq(i->g^b(i)), j.
-    by fa 6.
-
-    (* A1 *)
-    expandall.
-    expandseq seq(i->g^b(i)), j.
-    by fa 6.
-
-    (* A2 *)
-     expandall.
-     by fa 5.
+    by noif 6.
 Qed.

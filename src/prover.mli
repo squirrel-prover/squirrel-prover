@@ -25,23 +25,44 @@ val set_hint_db : Hint.hint_db -> unit
 
 
 (*------------------------------------------------------------------*)
-(** {2 History management.} *)
+(** {2 History management} *)
 
 type proof_state
 
 (** Abort the current proof. *)
 val abort : unit -> unit
 
+(** Get the current prover state. *)
+val get_state : prover_mode -> Symbols.table -> proof_state
+
+(** Restore a proof state. *)
+val reset_from_state : proof_state -> prover_mode * Symbols.table
+
+(*------------------------------------------------------------------*)
+(** {3 Stateful interface} *)
+
 (** Set the proof_state to its initial state. *)
 val reset : unit -> unit
 
-(** Save the current prover state. The prover mode is the only external
-    information required. *)
+(** Save the current prover state. *)
 val save_state : prover_mode -> Symbols.table -> unit
 
 (** Restore the n-th previous prover state and return the
   * corresponding prover mode. *)
 val reset_state : int -> prover_mode * Symbols.table
+
+(** Push a new empty proof state history in the stack, to enter an `include` *)
+val push_pt_history : unit -> unit
+
+(** Pop a proof state history from the stack, to exit an `include` *)
+val pop_pt_history : unit -> unit
+
+(** Pop all proof state history from the stack, when an `include` fails *)
+val pop_all_pt_history : unit -> unit
+
+(** Reset the state to the top of the proof state history (leaving the
+    history unchanged). *)
+val reset_to_pt_history_head : unit -> prover_mode * Symbols.table
 
 (** Option management **)
 type option_name =
@@ -84,8 +105,8 @@ type tactic_help = { general_help : string;
 
 
 (** Registry for tactics on some kind of judgment *)
-module type Tactics_sig = sig
-  type judgment
+module ProverTactics : sig
+  type judgment = Goal.t
   type tac = judgment Tactics.tac
 
   (* Allows to register a general tactic. Used when the arguments of the tactic
@@ -129,9 +150,6 @@ end
 
 val pp_ast : Format.formatter -> TacticsArgs.parser_arg Tactics.ast -> unit
 
-module TraceTactics : Tactics_sig with type judgment = TS.t
-module EquivTactics : Tactics_sig with type judgment = Goal.t
-
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
 
@@ -155,6 +173,7 @@ type parsed_input =
   | ParsedTactic     of TacticsArgs.parser_arg Tactics.ast
   | ParsedUndo       of int
   | ParsedGoal       of Goal.Parsed.t Location.located
+  | ParsedInclude    of lsymb
   | ParsedProof
   | ParsedQed
   | ParsedAbort

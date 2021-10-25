@@ -37,11 +37,11 @@ Qed.
 
 
 
-system [att]
+system [attT]
  (out(c, h(k,sk)); in(c,x); if snd(x) = h(fst(x),sk) && not(fst(x)=k) then O : out(c,diff(ok,ko)) else out(c,ok)).
 
 
-global goal [att] _  :
+global goal [attT] _  :
  [happens(O)] -> equiv(diff(cond@O,False)).
 Proof.
   checkfail intro t exn GoalNotPQSound.
@@ -49,7 +49,7 @@ Abort.
 
 
 
-global goal [att] _  :
+global goal [attT] _  :
  [happens(O)] -> equiv(frame@pred(O))-> equiv(frame@pred(O), diff(cond@O, False)).
 Proof.
   intro t Ind.

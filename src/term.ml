@@ -89,7 +89,7 @@ and _ term =
       msymb * Type.message term list * Type.timestamp term ->
       Type.message term
 
-  | Seq    : Vars.index list * Type.message term -> Type.message term
+  | Seq    : Vars.evar list * Type.message term -> Type.message term
   | Pred   : Type.timestamp term -> Type.timestamp term
   | Action :
       Symbols.action Symbols.t * Vars.index list ->
@@ -113,6 +113,13 @@ type 'a t = 'a term
 type eterm = ETerm : 'a term -> eterm
 
 (*------------------------------------------------------------------*)
+type message  = Type.message term
+type messages = message list
+
+type timestamp  = Type.timestamp term
+type timestamps = timestamp list
+
+(*------------------------------------------------------------------*)
 let hash_ord : ord -> int = function
   | `Eq -> 1
   | `Neq -> 2
@@ -133,8 +140,8 @@ let rec hash : type a. a term -> int = function
     let h = hcombine_list hash (hash_isymb m) l in
     hcombine 2 (hcombine h (hash ts))
 
-  | Seq (vs, b)       ->
-    let h = hcombine_list Vars.hash (hash b) vs in
+  | Seq (vars, b) ->
+    let h = hcombine_list Vars.ehash (hash b) vars in
     hcombine 3 h
 
   | Pred ts -> hcombine 4 (hash ts)
@@ -180,12 +187,6 @@ and hash_isymb : type a. (a Symbols.t, Type.tmessage) isymb -> int =
   let h = Symbols.hash symb.s_symb in
   hcombine_list Vars.hash h symb.s_indices
 
-(*------------------------------------------------------------------*)
-type message  = Type.message term
-type messages = message list
-
-type timestamp  = Type.timestamp term
-type timestamps = timestamp list
 
 (*------------------------------------------------------------------*)
 (** Subset of all atoms (the subsets are not disjoint). *)
@@ -244,6 +245,10 @@ let f_ite    = mk Symbols.fs_ite
 
 (** Fail *)
 
+let f_witness = mk Symbols.fs_witness
+
+(** Fail *)
+
 let f_fail   = mk Symbols.fs_fail
 
 (** Xor and its unit *)
@@ -254,6 +259,10 @@ let f_zero   = mk Symbols.fs_zero
 (** Successor over natural numbers *)
 
 let f_succ   = mk Symbols.fs_succ
+
+(** Adversary function *)
+
+let f_att    = mk Symbols.fs_att
 
 (** Pairing *)
 
@@ -381,6 +390,11 @@ let mk_ite ?(simpl=true) c t e =
 
 let mk_of_bool t = mk_fbuiltin Symbols.fs_of_bool [] [t]
 
+let mk_witness ty =
+  let fty = Type.mk_ftype 0 [] [] ty in
+  Fun ((Symbols.fs_witness,[]), fty, [])
+
+
 (*------------------------------------------------------------------*)
 (** {3 For formulas} *)
 
@@ -395,12 +409,12 @@ let mk_indices_neq vect_i vect_j =
     mk_false
     (List.map2 (fun i j -> Atom (`Index (`Neq, i, j))) vect_i vect_j)
 
-let mk_indices_eq vect_i vect_j =
+let mk_indices_eq ?(simpl=true) vect_i vect_j =
   List.fold_left
     (fun acc e -> mk_and acc e)
     mk_true
     (List.map2 (fun i j ->
-         if i = j then mk_true else Atom (`Index (`Eq, i, j))
+         if i = j && simpl then mk_true else Atom (`Index (`Eq, i, j))
        ) vect_i vect_j)
 
 let mk_lambda evs ht = match ht with
@@ -856,7 +870,7 @@ and _pp : type a.
 
   | Seq (vs, b) ->
     Fmt.pf ppf "@[<hov 2>seq(%a->@,%a)@]"
-      Vars.pp_list vs (pp (seq_fixity, `NonAssoc)) b
+      Vars.pp_typed_list vs (pp (seq_fixity, `NonAssoc)) b
 
   | Pred ts ->
     Fmt.pf ppf "pred(%a)"
@@ -1007,7 +1021,6 @@ let neg_trace_lit ((pn, at) : trace_literal) : trace_literal =
     | `Neg -> `Pos in
   (pn, at)
 
-
 let disjunction_to_literals f =
   let exception Not_a_disjunction in
 
@@ -1019,6 +1032,21 @@ let disjunction_to_literals f =
   | _ -> raise Not_a_disjunction in
 
   try Some (aux f) with Not_a_disjunction -> None
+
+(*------------------------------------------------------------------*)
+let form_to_literals (form : message) =
+  let partial = ref false in
+  let lits =
+    List.fold_left (fun acc -> function
+        | Atom at -> (`Pos,at) :: acc
+        | hyp ->
+          match destr_not hyp with
+          | Some (Atom at) -> (`Neg,at) :: acc
+          | _ -> partial := true; acc
+      ) [] (decompose_ands form)
+  in
+  if !partial then `Entails lits else `Equiv lits
+
 
 
 (*------------------------------------------------------------------*)
@@ -1083,6 +1111,9 @@ let subst_var : type a. subst -> a Vars.var -> a Vars.var =
     | _ -> raise @@ Substitution_error
         "Must map the given variable to another variable"
 
+let subst_evar (s : subst) (Vars.EVar v) : Vars.evar =
+  Vars.EVar (subst_var s v)
+
 let subst_isymb (s : subst) (symb : ('a,'b) isymb) : ('a,'b) isymb =
   { symb with s_indices = List.map (subst_var s) symb.s_indices }
 
@@ -1112,8 +1143,6 @@ let fv : 'a term -> Sv.t = fun term ->
         (of_list s.s_indices)
         (Sv.union (fv ts) (fvs l))
 
-    | Seq (a, b) -> Sv.diff (fv b) (of_list a)
-
     | Name s -> of_list s.s_indices
 
     | Diff (a, b) -> fvs [a;b]
@@ -1125,6 +1154,7 @@ let fv : 'a term -> Sv.t = fun term ->
 
     | Atom a -> generic_atom_vars a
 
+    | Seq    (a, b)
     | ForAll (a, b)
     | Exists (a, b) -> Sv.diff (fv b) (Sv.of_list a)
 
@@ -1180,8 +1210,7 @@ let is_binder : type a. a term -> bool = function
   | Seq _ | ForAll _ | Exists _ | Find _ -> true
   | _ -> false
 
-let rec subst_aux : type a. refresh:bool -> subst -> a term -> a term =
-  fun ~refresh s t ->
+let rec subst : type a. subst -> a term -> a term = fun s t ->
   if s = [] ||
      (is_binder t &&
       is_var_subst s &&
@@ -1191,69 +1220,60 @@ let rec subst_aux : type a. refresh:bool -> subst -> a term -> a term =
     let new_term : a term =
       match t with
       | Fun ((fs,is), fty, lt) ->
-        Fun ((fs, List.map (subst_var s) is), fty, List.map (subst_aux ~refresh s) lt)
+        Fun ((fs, List.map (subst_var s) is), fty, List.map (subst s) lt)
 
       | Name symb ->
         Name { symb with s_indices = List.map (subst_var s) symb.s_indices}
 
       | Macro (m, l, ts) ->
-        Macro (subst_macro s m, List.map (subst_aux ~refresh s) l, subst_aux ~refresh s ts)
+        Macro (subst_macro s m, List.map (subst s) l, subst s ts)
 
-      (* Seq in annoying to do *)
-      | Seq ([], f) -> Seq ([], subst_aux ~refresh s f)
+      | Var m -> Var m
+      | Pred ts -> Pred (subst s ts)
+      | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
+      | Diff (a, b) -> Diff (subst s a, subst s b)
+      | Atom a-> Atom (subst_generic_atom s a)
+
+      | Seq ([], f) -> Seq ([], subst s f)
 
       | Seq ([a], f) ->
-        let a, s = subst_binding (Vars.EVar a) s in
-        let f = subst_aux ~refresh s f in
-        let a = Vars.ecast a Type.KIndex in
+        let a, s = subst_binding a s in
+        let f = subst s f in
         Seq ([a],f)
 
       | Seq (a :: vs, f) ->
-        let a, s = subst_binding (Vars.EVar a) s in
-        let f = subst_aux ~refresh s (Seq (vs,f)) in
-        let a = Vars.ecast a Type.KIndex in
+        let a, s = subst_binding a s in
+        let f = subst s (Seq (vs,f)) in
         let vs, f = match f with
           | Seq (vs, f) -> vs, f
           | _ -> assert false in
         Seq (a :: vs,f)
 
-      | Var m -> Var m
-      | Pred ts -> Pred (subst_aux ~refresh s ts)
-      | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
-      | Diff (a, b) -> Diff (subst_aux ~refresh s a, subst_aux ~refresh s b)
-      | Atom a-> Atom (subst_generic_atom ~refresh s a)
-
-      | ForAll ([], f) -> subst_aux ~refresh s f
+      | ForAll ([], f) -> subst s f
 
       | ForAll (a :: vs, f) ->
-        let a, s =
-          if refresh then subst_binding a s else a, s
-        in
-        let f = subst_aux ~refresh s (ForAll (vs,f)) in
+        let a, s = subst_binding a s in
+        let f = subst s (ForAll (vs,f)) in
         mk_forall [a] f
 
-      | Exists ([], f) -> subst_aux ~refresh s f
+      | Exists ([], f) -> subst s f
 
       | Exists (a :: vs, f) ->
-        let a, s =
-          if refresh then subst_binding a s else a, s
-        in
-        let f = subst_aux ~refresh s (Exists (vs,f)) in
+        let a, s = subst_binding a s in
+        let f = subst s (Exists (vs,f)) in
         mk_exists [a] f
 
-      | Find ([], b, c, d) -> Find ([], subst_aux ~refresh s b, subst_aux ~refresh s c, subst_aux ~refresh s d)
+      | Find ([], b, c, d) -> Find ([], subst s b, subst s c, subst s d)
 
       | Find (v :: vs, b, c, d) ->
         (* used because [v :: vs] are not bound in [d]  *)
         let dummy = mk_zero in
 
-        let v, s =
-          if refresh then subst_binding (Vars.EVar v) s else (Vars.EVar v), s
-        in
-        let f = subst_aux ~refresh s (Find (vs, b, c, dummy)) in
+        let v, s = subst_binding (Vars.EVar v) s in
+        let f = subst s (Find (vs, b, c, dummy)) in
         let v = Vars.ecast v Type.KIndex in
         match f with
-        | Find (vs, b, c, _) -> Find (v :: vs,   b,  c, subst_aux ~refresh s d)
+        | Find (vs, b, c, _) -> Find (v :: vs, b, c, subst s d)
         | _ -> assert false
     in
     assoc s new_term
@@ -1288,28 +1308,22 @@ and subst_binding : Vars.evar -> subst -> Vars.evar * subst =
 
   var, s
 
-and subst_message_atom ~refresh (s : subst) (`Message (ord, a1, a2)) =
-  `Message (ord, subst_aux ~refresh s a1, subst_aux ~refresh s a2)
+and subst_message_atom (s : subst) (`Message (ord, a1, a2)) =
+  `Message (ord, subst s a1, subst s a2)
 
-and subst_trace_atom ~refresh (s:subst) = function
-  | `Happens a -> `Happens (subst_aux ~refresh s a)
+and subst_trace_atom (s:subst) = function
+  | `Happens a -> `Happens (subst s a)
 
   | `Timestamp (ord, ts, ts') ->
-    `Timestamp (ord, subst_aux ~refresh s ts, subst_aux ~refresh s ts')
+    `Timestamp (ord, subst s ts, subst s ts')
 
   | `Index (ord, i, i') ->
     `Index(ord, subst_var s i,subst_var s i')
 
-and subst_generic_atom ~refresh s = function
-  | #message_atom as a -> (subst_message_atom ~refresh s a :> generic_atom)
-  | #trace_atom   as a -> (subst_trace_atom ~refresh s a :> generic_atom)
+and subst_generic_atom s = function
+  | #message_atom as a -> (subst_message_atom s a :> generic_atom)
+  | #trace_atom   as a -> (subst_trace_atom s a :> generic_atom)
 
-
-let subst : type a. subst -> a term -> a term =
-  fun s t -> subst_aux ~refresh:true s t
-
-let subst_no_refresh : type a. subst -> a term -> a term =
-  fun s t -> subst_aux ~refresh:false s t
 
 let subst_macros_ts table l ts t =
   let rec subst_term : type a. a term -> a term = fun t -> match t with
@@ -1348,56 +1362,6 @@ let rec subst_ht s ht = match ht with
     let ev, s = subst_binding ev s in
     mk_lambda [ev] (subst_ht s (Lambda (evs, t)))
   | Lambda ([], t) -> Lambda ([], subst s t)
-
-
-let rec subst_sym : type a. nsymb -> nsymb  -> a term -> a term
-  = fun nns ons t ->
-      match t with
-      | Fun ((fs,is), fty, lt) ->
-        Fun ((fs, is), fty, List.map (subst_sym nns ons) lt)
-      | Name symb when symb.s_symb = ons.s_symb ->
-        Name { symb with s_symb = nns.s_symb}
-      | Name n -> Name n
-      | Macro (m, l, ts) ->
-        Macro (m, List.map (subst_sym nns ons) l, subst_sym nns ons ts)
-
-      (* Seq in annoying to do *)
-      | Seq ([], f) -> Seq ([], subst_sym nns ons f)
-
-      | Seq ([a], f) ->
-        let f = subst_sym nns ons f in
-        Seq ([a],f)
-
-      | Seq (a :: vs, f) ->
-        let f = subst_sym nns ons (Seq (vs,f)) in
-        Seq (a :: vs,f)
-
-      | Var m -> Var m
-      | Pred ts -> Pred (subst_sym nns ons ts)
-      | Action (a,indices) -> Action (a, indices)
-      | Diff (a, b) -> Diff (subst_sym nns ons a, subst_sym nns ons b)
-      | Atom a-> Atom (subst_sym_generic_atom nns ons a)
-
-      | ForAll ([], f) -> subst_sym nns ons f
-
-      | ForAll (a :: vs, f) ->
-        let f = subst_sym nns ons (ForAll (vs,f)) in
-        mk_forall [a] f
-
-      | Exists ([], f) -> subst_sym nns ons f
-
-      | Exists (a :: vs, f) ->
-        let f = subst_sym nns ons (Exists (vs,f)) in
-        mk_exists [a] f
-
-      | Find (v, b, c, d) -> Find (v, subst_sym nns ons b, subst_sym nns ons c, subst_sym nns ons d)
-
-and subst_sym_message_atom nns ons (`Message (ord, a1, a2)) =
-  `Message (ord, subst_sym nns ons a1, subst_sym nns ons a2)
-
-and subst_sym_generic_atom nns ons = function
-  | #message_atom as a -> (subst_sym_message_atom nns ons a :> generic_atom)
-  | #trace_atom   as a -> a
 
 
 (*------------------------------------------------------------------*)
@@ -1644,10 +1608,21 @@ let mk_happens t = Atom (`Happens t)
 
 let mk_atom1 at = Atom at
 
-let mk_seq0 is term = Seq (is, term)
+let mk_seq0 ?(simpl=false) (is : Vars.evars) term =
+  let is =
+    if simpl then
+      let term_fv = fv term in
+      List.filter (fun i ->
+          Sv.mem i term_fv
+        ) is
+    else is
+  in
+  match is with
+  | [] -> term
+  | _ -> Seq (is, term)
 
 (* only refresh necessary vars, hence we need an environment *)
-let mk_seq env is term =
+let mk_seq env (is : Vars.evars) term =
   let env =
     let env_vars = Sv.of_list (Vars.to_list env) in
     let term_vars = fv term in
@@ -1655,15 +1630,18 @@ let mk_seq env is term =
     ref (Vars.of_list vars)
   in
 
-  let is, s = refresh_vars (`InEnv env) is in
+  let is, s = erefresh_vars (`InEnv env) is in
   let term = subst s term in
 
-  Seq (is, term)
+  match is with
+  | [] -> term
+  | _ -> Seq (is, term)
+
 
 (*------------------------------------------------------------------*)
 (** {2 Apply} *)
 
-let apply_ht (ht : hterm) terms = match ht with
+let apply_ht (ht : hterm) (terms : eterm list) = match ht with
   | Lambda (evs, t) ->
     assert (List.length terms <= List.length evs);
     let evs0, evs1 = List.takedrop (List.length terms) evs in
@@ -1672,7 +1650,7 @@ let apply_ht (ht : hterm) terms = match ht with
     let ht = subst_ht s (Lambda (evs1, t)) in
 
     let s_app =
-      List.map2 (fun (Vars.EVar v) t ->
+      List.map2 (fun (Vars.EVar v) (ETerm t) ->
           ESubst (Var v, cast (Vars.kind v) t)
         ) evs0 terms
     in
@@ -1689,10 +1667,16 @@ let tsubst : type a. Type.tsubst -> a term -> a term =
   (* no need to substitute in the types of [Name], [Macro], [Fun] *)
   let rec tsubst : type a. a term -> a term = function
     | Var v -> Var (Vars.tsubst ts v)
+    | ForAll (vs, f) -> ForAll (List.map (Vars.tsubst_e ts) vs, tsubst f)
+    | Exists (vs, f) -> Exists (List.map (Vars.tsubst_e ts) vs, tsubst f)
     | _ as term -> tmap (fun (ETerm t) -> ETerm (tsubst t)) term
   in
 
   tsubst t
+
+let tsubst_ht (ts : Type.tsubst) (ht : hterm) : hterm =
+  match ht with
+  | Lambda (vs, f) -> Lambda (List.map (Vars.tsubst_e ts) vs, tsubst ts f)
 
 (*------------------------------------------------------------------*)
 (** {2 Simplification} *)
@@ -1752,10 +1736,10 @@ let is_pure_timestamp (t : message) =
 
     | Fun (fs, _, [t]) when fs = f_not -> pure_ts t
 
+    | Fun (fs, _, []) -> true
+
     | ForAll (_, t)
     | Exists (_, t) -> pure_ts t
-
-    | Diff (t1, t2) -> pure_ts t1 && pure_ts t2
 
     | _ -> false
   in
@@ -1766,6 +1750,11 @@ let is_pure_timestamp (t : message) =
 (** {2 Projection} *)
 
 type projection = PLeft | PRight | PNone
+
+let pp_projection fmt = function
+  | PLeft  -> Fmt.pf fmt "Left"
+  | PRight -> Fmt.pf fmt "Right"
+  | PNone  -> Fmt.pf fmt "None"
 
 let pi_term ~projection term =
 

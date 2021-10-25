@@ -22,8 +22,10 @@ COMMENTS
 - In this model we use 2 different keyed hash functions, instead of a single 
 (not keyed) hash function as in the specification.
 
-PROOFS 
-- lastUpdateTag
+HELPING LEMMAS 
+- no update
+
+SECURITY PROPERTIES 
 - authentication
 *******************************************************************************)
 
@@ -35,13 +37,13 @@ hash h2
 abstract ok : message
 abstract error : message
 
-name key1 : index->message
-name key2 : index->message
-name k : index->message
-name r1 : index->message
+name key1 : index -> message
+name key2 : index -> message
+name k : index -> message
+name r1 : index -> message
 
-name k1init : index->message
-name k2init : index->message
+name k1init : index -> message
+name k2init : index -> message
 
 mutable kT(i:index) : message = <k1init(i),k2init(i)>
 mutable kR(ii:index) : message = <k1init(ii),k2init(ii)>
@@ -75,92 +77,66 @@ process reader(jj:index) =
 
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
 
-
-(* LIBRARIES *)
-(* A inclure dans une lib standard *)
-
-goal eq_sym ['a] (x,y : 'a) : x = y => y = x.
-Proof. auto. Qed.
-
-goal if_false ['a] (b : boolean, x,y : 'a):
- (not b) => if b then x else y = y.
-Proof.
- by intro *; noif. 
-Qed.
-
-goal if_true ['a] (b : boolean, x,y : 'a):
- b => if b then x else y = x.
-Proof.
-  by intro *; yesif.
-Qed.
-
-goal if_true0 ['a] (x,y : 'a):
- if true then x else y = x.
-Proof.
-  by rewrite if_true. 
-Qed.
-hint rewrite if_true0.
-
-goal if_false0 ['a] (x,y : 'a):
- if false then x else y = y.
-Proof.
-  by rewrite if_false.
-Qed.
-hint rewrite if_false0.
-
-(* PROOF *)
+(* AXIOMS *)
 
 (* Minimal sequentiality assumption needed for the proofs *)
 axiom sequentiality (t:timestamp, i,j:index):
   happens(T(i,j),t,T1(i,j)) =>
-  T(i,j) < t =>
-  t < T1(i,j) => 
-  not(exists (j':index), t = T1(i,j') && j <> j').
+    T(i,j) < t => t < T1(i,j) => 
+      not(exists (j':index), t = T1(i,j') && j <> j').
 
-goal lastUpdateTag (t:timestamp, i,j:index):
+(* LIBRARIES *)
+
+include Basic.
+
+(* HELPING LEMMAS *)
+
+goal noUpdateTag (t:timestamp, i,j:index):
     happens(T(i,j),t,T1(i,j)) =>
       (t >= T(i,j) && t < T1(i,j)) => kT(i)@T(i,j) = kT(i)@t.
 Proof.
-  generalize t i j.
-  induction.
-  intro t IH0 i j Hap [H1 H2].
-  case t; intro He; 
-  try by (simpl_left; expand kT(i)@t; apply IH0 (pred(t))).
+  generalize i j.
+  induction t => t IH0 i j Hap [H1 H2].
+  case t => He; 
+  try by (simpl_left; expand kT(i)@t; apply IH0).
 
   auto.
 
   destruct He as [i0 j0 He].
-  assert T(i0,j0) = T(i,j) || T(i0,j0) > T(i,j) as H0.
-  by eqtrace.
+  assert T(i0,j0) = T(i,j) || T(i0,j0) > T(i,j) as H0 by constraints.
+
   case H0; 1: auto.
-  expand kT(i)@t; by apply IH0 (pred(t)).
+  expand kT(i)@t; by apply IH0.
 
   destruct He as [i0 j0 He].
   rewrite He.
-  case (i=i0) => Hc0.
-  case (j=j0) => Hc1.
-  (* case i=i0 && j=j0 *)
-  auto.
-  (* case i=i0 && j<>j0 *)
-  use sequentiality with T1(i,j0),i,j => //.
-  by exists j0.
-  (* case i<>i0 *)
-  use IH0 with pred(T1(i0,j0)),i,j as Meq; 2,3,4: auto. 
-  assert kT(i)@T1(i0,j0) = kT(i)@pred(T1(i0,j0));
-  1: by expand kT; rewrite if_false. 
-  congruence.
+  case (i=i0) => _.
+  case (j=j0) => _.
+  
+    (* case i=i0 && j=j0 *)
+    auto.
+  
+    (* case i=i0 && j<>j0 *)
+    use sequentiality with T1(i,j0),i,j => //.
+    by exists j0.
+  
+    (* case i<>i0 *)
+    use IH0 with pred(T1(i0,j0)),i,j as Meq; 2,3,4: auto. 
+    by rewrite /kT if_false //.
 Qed.
 
+(* SECURITY PROPERTIES *)
+
 goal auth_R1_induction (t:timestamp, jj,ii:index):
-    happens(R1(jj,ii)) =>
+  happens(R1(jj,ii)) =>
     t = R1(jj,ii) && exec@t (* exec@t (not only cond@t) is needed *)
     =>
     exists (j:index), T(ii,j) < t && output@T(ii,j) = input@t.
 Proof.
-  generalize t jj ii.
-  induction. 
-  intro t IH0 jj ii Hap [Ht0 Hexec].
-  subst t,R1(jj,ii).
+  generalize jj ii.
+  induction t => t IH0 jj ii Hap [Ht0 Hexec].
+  rewrite Ht0 in *; clear Ht0.
+
   expand exec, cond.
   destruct Hexec as [H1 Meq].
   euf Meq.
@@ -170,7 +146,7 @@ Proof.
     executable pred(R1(jj,ii)) => // H.
     use H with R1(jj0,ii) as Ht1; 2: auto.
     expand exec, cond.
-    destruct Ht1 as [_ _].
+    destruct Ht1 as [_ _]. 
     use IH0 with R1(jj0,ii),jj0,ii as [j _]; 2,3,4: auto.
     by exists j.
 
@@ -182,23 +158,23 @@ Proof.
     (* if there is an update@T1, then action T happened before *)
     intro Ht Heq *. 
     exists j.
-    depends T(ii,j),T1(ii,j) => // _. 
-    by rewrite /output (lastUpdateTag (pred(T1(ii,j)))). 
+    depends T(ii,j),T1(ii,j) by auto => _. 
+    by rewrite /output (noUpdateTag (pred(T1(ii,j)))). 
 Qed.
 
 goal auth_T1_induction (t:timestamp, i,j:index):
-    happens(t) =>
+  happens(t) =>
     t = T1(i,j) && exec@t (* exec@t (not only cond@t) is needed *)
     =>
     exists (jj:index), R1(jj,i) < t && output@R1(jj,i) = input@t.
 Proof.
-  generalize t i j.
-  induction.
-  intro t IH0 i j Hap [Ht Hexec].
-  subst t,T1(i,j).
+  generalize i j.
+  induction t => t IH0 i j Hap [Ht Hexec].
+  rewrite Ht in *; clear Ht.
+
   expand exec, cond.
   destruct Hexec as [H1 Meq].
-  euf Meq => * /=.
+  euf Meq => Clt * /=.
 
     (* case 1/2: equality with hashed message in output@R1 *)
     (* honest case *)
@@ -208,59 +184,9 @@ Proof.
     use IH0 with T1(i,j0),i,j0 as [jj _] => //.
     exists jj => /=. 
     executable pred(T1(i,j)) => // H.
-    by use H with T1(i,j0) as H'.
+    by apply H in Clt.
 
-    simpl.
-    executable pred(T1(i,j)) => // H. 
-    by apply H.
-Qed.
-
-
-goal xor_inj_l (x, y, z : message) : x XOR y = z XOR y => x = z.
-Proof. auto. Qed.
-
-(* Tentative without induction, seems not doable. *)
-goal auth_R1 (jj,ii:index):
-    happens(R1(jj,ii)) =>
-    cond@R1(jj,ii) =>
-    exists (j:index), 
-      T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii).
-Proof.
-  intro Hap Hcond.
-  expand cond.
-  euf Hcond => Ht M1 *.
-
-    (* case 1/3: equality with hashed message in update@R1 *)
-    (* this case is easily handled in the version with induction
-    (see auth_R1_induction) because the induction hypothesis
-    allows to conclude using only the fact that R1(jj1,ii) < R1(jj,ii),
-    we do not have to exploit the equality hypothesis generated by the
-    euf tactic *)
-    (* here, without the induction, we have to find another way to conclude *)
-    rewrite -M1 in Hcond. 
-    clear M1.
-    euf Hcond => Ht' M2 *. (* here again, we have 3 different cases *)
-
-      (* case 1/3: equality with hashed message in update@R1 *)
-      admit. (* ??? *)
-
-      (* case 2/3: equality with hashed message in output@T *)
-      (* honest case *)
-      by exists j; case Ht'. 
-
-      (* case 3/3: equality with hashed message in update@T1 *)
-      (* if there is an update@T1, then action T happened before *)
-      exists j. 
-      depends T(ii,j),T1(ii,j); 1: by case Ht' => _.
-      by rewrite /output (lastUpdateTag (pred(T1(ii,j)))); case Ht'.
-
-    (* case 2/3: equality with hashed message in output@T *)
-    (* honest case *)
-    by exists j. 
-
-    (* case 3/3: equality with hashed message in update@T1 *)
-    (* if there is an update@T1, then action T happened before *)
-    exists j.
-    depends T(ii,j),T1(ii,j) => // _.
-    by rewrite /output (lastUpdateTag (pred(T1(ii,j)))). 
+  simpl.
+  executable pred(T1(i,j)) => // H. 
+  by apply H.
 Qed.

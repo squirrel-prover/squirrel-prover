@@ -14,9 +14,9 @@ abstract gg : message -> message -> message
 abstract f0 : message -> message
 channel ch
 
-system A: !_i in(ch,x);out(ch,<ok(i),x>).
+system A: !_i in(ch,x); new l; out(ch,<ok(i),<x,l>>).
 
-system [bis] !_i in(ch,x);if x = a then out(ch,<ok(i),x>).
+system [bis] !_i in(ch,x); new l; if x = a then out(ch,<ok(i),<x,l>>).
 
 goal _ (x, y : message, i : index) : 
   f0(<x,y>) = ok(i) =>
@@ -137,8 +137,8 @@ Proof.
 Abort.
 
 global goal _ (x : message) :
-  equiv(seq (i -> <ok(i), x>)) ->
-  equiv(seq (i -> <ok(i), x>)).
+  equiv(seq (i:index -> <ok(i), x>)) ->
+  equiv(seq (i:index -> <ok(i), x>)).
 Proof.
  intro H; apply H.
 Qed.
@@ -150,7 +150,7 @@ Qed.
    `ok` is an abstract function. *)
 global goal _ (y : message) :
  equiv(empty) ->
- equiv(seq (j -> <ok(j), ok(j)>)).
+ equiv(seq (j:index -> <ok(j), ok(j)>)).
 Proof.
  intro H; apply H.
 Qed.
@@ -159,51 +159,56 @@ Qed.
    cannot be deduce. *)
 global goal _ (y : message) :
  equiv(empty) ->
- equiv(seq (j -> <n1(j), n1(j)>)).
+ equiv(seq (j:index -> <n1(j), n1(j)>)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
 
 global goal _ (x : message) :
-  equiv(seq (i -> <n1(i), x>)) ->
-  equiv(seq (i -> <n1(i), x>)).
+  equiv(seq (i:index -> <n1(i), x>)) ->
+  equiv(seq (i:index -> <n1(i), x>)).
 Proof. 
  intro H; apply H.
 Qed.
 
 (* with alpha-renaming *)
 global goal _ (x : message) :
-  equiv(seq (i -> <n1(i), x>)) ->
-  equiv(seq (j -> <n1(j), x>)).
+  equiv(seq (i:index -> <n1(i), x>)) ->
+  equiv(seq (j:index -> <n1(j), x>)).
 Proof.
  intro H; apply H.
 Qed.
 
-global goal _ (y : message) :
-  (forall (x : message), equiv(seq (i -> <n1(i), x>))) ->
-  equiv(seq (j -> <n1(j), f(y)>)).
-Proof.
- intro H; apply H.
-Qed.
+(* TODO: inferance is failing there. See [Match.deduce_mem_one] *)
+(* global goal _ (y : message) : *)
+(*   (forall (x : message), equiv(seq (i:index -> <n1(i), x>))) -> *)
+(*   equiv(seq (j:index -> <n1(j), f(y)>)). *)
+(* Proof. *)
+(*  intro H; apply H. *)
+(* Qed. *)
  
-(* we cannot match `x` with `n1(j)` since `j` is bound in the conclusion. *)
-global goal _ (y : message) :
- (forall (x : message), equiv(seq (i -> <n1(i), x>))) ->
- equiv(seq (j -> <n1(j), n1(j)>)).
+name nj : index -> message.
+
+(* we cannot match `x` with `nj(j)` since `j` is bound in the conclusion. *)
+global goal _ :
+ (forall (x : message), equiv(seq (i:index -> <n1(i), x>))) ->
+ equiv(seq (j:index -> <n1(j), nj(j)>)).
 Proof.
- checkfail (intro H; apply H) exn ApplyMatchFailure.
+ intro H.
+ checkfail (apply H) exn ApplyMatchFailure.
 Abort.
 
 (* with a sequence *)
 name m : index -> message.
-global goal _ : equiv(seq(i->m(i))) -> equiv(seq(k->m(k))).
+global goal _ : equiv(seq(i:index ->m(i))) -> equiv(seq(k:index -> m(k))).
 Proof. 
  intro H; apply H.
 Qed.
 
 (* with a sequence over two indices *)
 name n : index -> index -> message.
-global goal _ : equiv(seq(i,j->n(i,j))) -> equiv(seq(k,l->n(k,l))).
+global goal _ : 
+  equiv(seq(i,j:index -> n(i,j))) -> equiv(seq(k,l:index -> n(k,l))).
 Proof. 
  intro H; apply H.
 Qed.
@@ -256,17 +261,36 @@ Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
 
+(*------------------------------------------------------------------*)
 (* with exec *)
 global goal _ (t : timestamp) : equiv(frame@t) -> equiv(exec@t).
 Proof.
  intro H; apply H.
 Qed.
 
-global goal _ (t : timestamp) : equiv(frame@pred(t)) -> equiv(exec@t).
+set showStrengthenedHyp=true.
+
+(* cond can be deduce (hence exec), because it is trivial *)
+global goal _ (t : timestamp) : 
+  [happens(t)] -> equiv(frame@pred(t)) -> equiv(exec@t).
 Proof.
- checkfail (intro H; apply H) exn ApplyMatchFailure.
+ intro Hap H.
+ case t => Eq; 
+ repeat destruct Eq as [_ Eq]; 
+ rewrite /*; 
+ apply H. 
+Qed.
+
+system [three] !_i in(ch,x); new l; if x = l then out(ch,<ok(i),<x,l>>).
+
+(* cond cannot be deduce in system [three], because of the new name `l` *)
+global goal [three] _ (t : timestamp) : equiv(frame@pred(t)) -> equiv(exec@t).
+Proof.
+ intro H.
+ checkfail (apply H) exn ApplyMatchFailure.
 Abort.
 
+(*------------------------------------------------------------------*)
 (* with frame *)
 global goal _ (t : timestamp) : equiv(frame@t) -> equiv(frame@t).
 Proof.

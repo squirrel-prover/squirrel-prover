@@ -309,9 +309,17 @@ val fs_impl   : fname t
 val fs_not    : fname t
 val fs_ite    : fname t
 
+(** Witness *)
+
+val fs_witness : fname t
+
 (** Successor over natural numbers *)
 
 val fs_succ   : fname t
+
+(** Adversary function *)
+
+val fs_att    : fname t
 
 (** Fail *)
 
@@ -342,3 +350,4 @@ val fs_zeroes : fname t
 
 (*------------------------------------------------------------------*)
 module Ss (S : Namespace) : Set.S with type elt := S.ns t 
+module Ms (S : Namespace) : Map.S with type key := S.ns t 

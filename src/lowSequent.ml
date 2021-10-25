@@ -1,5 +1,5 @@
 (** Definition of a general sequent data-type,
-  * which covers both reachability and general sequents
+  * which covers both local and global sequents
   * (and thus equivalence sequents).
   *
   * A sequent is made of:
@@ -13,6 +13,8 @@
   * added in {!Sequent}. *)
 
 (** {2 Module type for sequents} *)
+
+module L = Location
 
 module type S = sig
 
@@ -66,8 +68,8 @@ module type S = sig
     * These functionalities only make sense for equivalence sequents. *)
 
   val mem_felem    : int -> t -> bool
-  val change_felem : int -> Term.message list -> t -> t
-  val get_felem    : int -> t -> Term.message
+  val change_felem : ?loc:L.t -> int -> Term.message list -> t -> t
+  val get_felem    : ?loc:L.t -> int -> t -> Term.message
 
   (** {2 Automated reasoning} *)
 

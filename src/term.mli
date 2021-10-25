@@ -84,7 +84,7 @@ and _ term = private
       msymb * Type.message term list * Type.timestamp term
       -> Type.message term
 
-  | Seq    : Vars.index list * Type.message term -> Type.message term
+  | Seq    : Vars.evar list * Type.message term -> Type.message term
   | Pred   : Type.timestamp term -> Type.timestamp term
   | Action : Symbols.action Symbols.t * Vars.index list -> Type.timestamp term
   | Var    : 'a Vars.var -> 'a term
@@ -167,6 +167,11 @@ val neg_trace_lit : trace_literal -> trace_literal
 
 val disjunction_to_literals : message -> literal list option
 
+(** Given a formula, return a list of literals which is either
+    entailed by the formula, or equivalent to the formula. *)
+val form_to_literals :
+  message -> [`Entails of literal list | `Equiv of literal list]
+
 (*------------------------------------------------------------------*)
 (** {2 Higher-order terms} *)
 
@@ -231,17 +236,17 @@ val subst_binding : Vars.evar -> subst -> Vars.evar * subst
 (** term substitution *)
 val subst : subst -> 'a term -> 'a term
 
-val subst_no_refresh : subst -> 'a term -> 'a term
-
 (** substitute type variables *)
 val tsubst : Type.tsubst -> 'a term -> 'a term
 
-(** name symbol substitution *)
-val subst_sym : nsymb -> nsymb -> 'a term -> 'a term
+val tsubst_ht : Type.tsubst -> hterm -> hterm
+
 (** [subst_var s v] returns [v'] if substitution [s] maps [v] to [Var v'],
   * and [v] if the variable is not in the domain of the substitution.
   * @raise Substitution_error if [v] is mapped to a non-variable term in [s]. *)
-val subst_var : subst -> 'a Vars.var -> 'a Vars.var
+val subst_var  : subst -> 'a Vars.var -> 'a Vars.var
+
+val subst_evar : subst -> Vars.evar   -> Vars.evar
 
 (** Substitute indices in an indexed symbols. *)
 val subst_isymb : subst -> ('a,'b) isymb -> ('a,'b) isymb
@@ -265,7 +270,7 @@ val erefresh_vars_env :
   Vars.env -> Vars.evar list -> Vars.env * Vars.evar list * esubst list
 
 (*------------------------------------------------------------------*)
-val apply_ht : hterm -> 'a term list -> hterm
+val apply_ht : hterm -> eterm list -> hterm
 
 (*------------------------------------------------------------------*)
 (** {2 Builtins function symbols} *)
@@ -290,6 +295,8 @@ val f_ite    : fsymb
 val f_diff   : fsymb
 
 val f_succ   : fsymb
+
+val f_att    : fsymb
 
 val f_fail   : fsymb
 
@@ -409,6 +416,8 @@ val mk_zeroes  : message -> message
 val mk_of_bool : message -> message
 val mk_pair    : message -> message -> message
 
+val mk_witness : Type.tmessage -> message
+
 (*------------------------------------------------------------------*)
 (** {3 Smart constructors: messages} *)
 
@@ -417,16 +426,16 @@ val mk_ite : ?simpl:bool -> message -> message -> message -> message
 val mk_timestamp_leq : timestamp -> timestamp -> message
 
 val mk_indices_neq : Vars.index list -> Vars.index list -> message
-val mk_indices_eq  : Vars.index list -> Vars.index list -> message
+val mk_indices_eq  : ?simpl:bool -> Vars.index list -> Vars.index list -> message
 
 val mk_atom : ord -> 'a term -> 'b term -> message
 val mk_happens : timestamp -> message
 val mk_atom1 : generic_atom -> message
 
-val mk_seq0 : Vars.index list -> message -> message
+val mk_seq0 : ?simpl:bool -> Vars.evars -> message -> message
 
 (** Refresh variables *)
-val mk_seq : Vars.env -> Vars.index list -> message -> message
+val mk_seq : Vars.env -> Vars.evars -> message -> message
 
 (*------------------------------------------------------------------*)
 (** {3 Destructors} *)
@@ -452,7 +461,7 @@ val not_trace_eq_atom : trace_eq_atom -> trace_eq_atom
 
 val not_simpl : message -> message
 
-(** Check if a formula is a FO formula over timestamps.*)
+(** Check if a formula only depends on the trace model. *)
 val is_pure_timestamp : message -> bool
 
 (*------------------------------------------------------------------*)
@@ -469,6 +478,9 @@ module Mt : Map.S with type key = eterm
   * without diff operators)? *)
 
 type projection = PLeft | PRight | PNone
+
+val pp_projection : Format.formatter -> projection -> unit
+
 
 (** Evaluate all diff operators wrt a projection.
   * If the projection is [None], the input term is returned unchanged.

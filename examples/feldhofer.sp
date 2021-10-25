@@ -152,7 +152,10 @@ Proof.
   by expand output, cipher; case C1.
 Qed.
 
-goal lemma (i,j,i0,j0:index):
+(** This lemma about unique outputs will be useful for both sides of our system.
+  * Unfortunately the proof argument involves intctxt and thus requires a projection.
+  * The two subproofs are almost identical. *)
+goal unique_outputs (i,j,i0,j0:index):
   happens(Tag(i,j),Tag(i0,j0)) =>
      output@Tag(i,j) = output@Tag(i0,j0) => i = i0 && j = j0.
 Proof.
@@ -185,7 +188,7 @@ Qed.
 
 equiv unlinkability.
 Proof.
-  enrich seq(k->nr(k)), seq(i,j->nt(i,j)).
+  enrich seq(k:index -> nr(k)), seq(i,j:index -> nt(i,j)).
 
   induction t.
 
@@ -194,9 +197,7 @@ Proof.
 
   (* Action 1/4: Reader *)
 
-  expandseq seq(k->nr(k)),k.
-  expandall.
-  by fa 3.
+  by expandall; apply IH.
 
   (* Action 2/4: Reader1 *)
 
@@ -207,8 +208,8 @@ Proof.
     exists (i,j:index),
       Tag(i,j) < Reader1(k) && Reader(k) < Reader1(k)  &&
       output@Tag(i,j) = input@Reader1(k) &&
-      input@Tag(i,j) = output@Reader(k).
-  by use wa_Reader1 with k.
+      input@Tag(i,j) = output@Reader(k);
+  1: by use wa_Reader1 with k.
 
   expand output.
   fa 2. fa 3. fadup 3.
@@ -263,7 +264,7 @@ Proof.
 
   (* find condB => condA *)
   intro _.
-  use lemma with i,j,i0,j0 as [_ _]; 2,3: auto.
+  use unique_outputs with i,j,i0,j0 as [_ _]; 2,3: auto.
   use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
   by expand output, cipher.
 
@@ -275,7 +276,7 @@ Proof.
 
   (* find condB => condA *)
   intro _.
-  use lemma with i,j,i0,j0 as [_ _]; 2,3: auto.
+  use unique_outputs with i,j,i0,j0 as [_ _]; 2,3: auto.
   use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
   by expand output, cipher.
 
@@ -284,11 +285,8 @@ Proof.
   fa 3; fadup 3.
   fa 3; fadup 3.
   enckp 3, k_fresh; 1: auto.
-  expandseq seq(k->nr(k)),k.
-  expandseq seq(i,j->nt(i,j)),i,j.
-  fa 5.
-  fresh 6.
-  by fresh 5; yesif 5.
+  fa 3. fresh 4; yesif 4; 1: auto. fresh 4.
+  apply IH.
 
   (* Action 3/4: Reader2 *)
 
@@ -309,12 +307,12 @@ Proof.
   (* Action 4/4: Tag *)
 
   expandall.
-  fa 2. fa 3.  fa 3.
+  fa 2. fa 3. fa 3.
 
   enckp 3, k_fresh; 1: auto.
 
-  expandseq seq(i,j->nt(i,j)),i,j.
-  fa 4.
+  fa 3.
   fresh 5.
-  by fresh 4; yesif 4.
+  fresh 4; yesif 4; 1: auto.
+  apply IH.
 Qed.

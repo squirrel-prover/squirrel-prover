@@ -2,5 +2,8 @@
 
 include LowEquivSequent
 
-module ES = Sequent.Mk(LowEquivSequent)
-include ES
+include Sequent.Mk(struct
+    module S = LowEquivSequent
+
+    let to_general_sequent s = Goal.Equiv s
+  end)

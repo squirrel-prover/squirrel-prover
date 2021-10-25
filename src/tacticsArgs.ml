@@ -41,15 +41,23 @@ type 'a rw_item_g = {
   rw_type : 'a;
 }
 
-(** Rewrite or expand item*)
+(** Rewrite or expand item *)
 type rw_item = [
   | `Rw        of Theory.p_pt_hol
   | `Expand    of Theory.term
   | `ExpandAll of Location.t
 ] rw_item_g
 
-(** Expand item*)
-type expnd_item = [`Expand of Theory.term | `ExpandAll of Location.t] rw_item_g
+(** Expand item *)
+type expnd_item = [
+  | `Expand    of Theory.term
+  | `ExpandAll of Location.t
+] rw_item_g
+
+(** Rewrite equiv item *)
+type rw_equiv_item = [
+  | `Rw of Theory.p_pt_hol
+] rw_item_g
 
 (** Rewrite argument, which is a rewrite or simplification item*)
 type rw_arg =
@@ -164,29 +172,40 @@ type ip_handler = [
   | `Var of Vars.evar (* Careful, the variable is not added to the env  *)
   | `Hyp of Ident.t
 ]
-  
+
+(*------------------------------------------------------------------*)
+(** {2 Tactics named args} *)
+
+type named_arg =
+  | NArg of lsymb               (** '~id' *)
+
+type named_args = named_arg list
+
 (*------------------------------------------------------------------*)
 (** {2 Tactics args} *)
 
 (** A parser tactic argument *)
 type parser_arg =
-  | String_name of lsymb
-  | Int_parsed  of int
-  | Theory      of Theory.term
-  | IntroPat    of intro_pattern list
-  | AndOrPat    of and_or_pat
-  | SimplPat    of simpl_pat
-  | RewriteIn   of rw_arg list * in_target
-  | ApplyIn     of Theory.p_pt * apply_in
-  | SplitSeq    of int L.located * Theory.hterm
-  | ConstSeq    of int L.located * Theory.term list
-  | Remember    of Theory.term * lsymb
-  | Generalize  of Theory.term list * naming_pat list option
+  | String_name  of lsymb
+  | Int_parsed   of int L.located
+  | Theory       of Theory.term
+  | IntroPat     of intro_pattern list
+  | AndOrPat     of and_or_pat
+  | SimplPat     of simpl_pat
+  | RewriteIn    of rw_arg list * in_target
+  | RewriteEquiv of rw_equiv_item
+  | ApplyIn      of named_args * Theory.p_pt * apply_in
+  | AssertPt     of Theory.p_pt_hol * simpl_pat option * [`IntroImpl | `None]
+  | SplitSeq     of int L.located * Theory.hterm
+  | ConstSeq     of int L.located * (Theory.hterm * Theory.term) list
+  | MemSeq       of int L.located * int L.located
+  | Remember     of Theory.term * lsymb
+  | Generalize   of Theory.term list * naming_pat list option
 
 type parser_args = parser_arg list
 
 let pp_parser_arg ppf = function
-  | Int_parsed i  -> Fmt.int ppf i
+  | Int_parsed i  -> Fmt.int ppf (L.unloc i)
   | String_name s -> Fmt.string ppf (L.unloc s)
   | Theory th     -> Theory.pp ppf th
   | IntroPat args -> pp_intro_pats ppf args
@@ -198,15 +217,25 @@ let pp_parser_arg ppf = function
       (Fmt.list ~sep:Fmt.sp pp_rw_arg) rw_args
       pp_in_target in_opt
 
-  | ApplyIn (t, in_opt) ->
+  | RewriteEquiv rw_arg ->
+    Fmt.pf ppf "..."
+
+  | ApplyIn (_, _, in_opt) ->
     Fmt.pf ppf "... %a" pp_apply_in in_opt
 
-  | ConstSeq (i, t) -> 
-    Fmt.pf ppf "%d %a" 
-      (L.unloc i)
-      (Fmt.list ~sep:Fmt.sp Theory.pp) t
+  | AssertPt (_, ip, `IntroImpl) ->
+    Fmt.pf ppf "... as %a"
+      (Fmt.option ~none:Fmt.nop pp_simpl_pat) ip
+
+  | AssertPt (_, ip, `None) ->
+    Fmt.pf ppf "(%a := ...)"
+      (Fmt.option ~none:Fmt.nop pp_simpl_pat) ip
+
+  | ConstSeq (i, t) -> Fmt.pf ppf "%d: ..." (L.unloc i)
 
   | SplitSeq (i, ht) -> Fmt.pf ppf "%d ..." (L.unloc i)
+
+  | MemSeq (i, j) -> Fmt.pf ppf "%d %d" (L.unloc i) (L.unloc j)
 
   | Remember (t, id) ->
     Fmt.pf ppf "%a as %s" Theory.pp t (L.unloc id) 
@@ -236,7 +265,7 @@ type _ sort =
   | ETerm     : Theory.eterm    sort
   (** Boolean, timestamp or message *)
         
-  | Int       : int sort
+  | Int       : int L.located sort
   | String    : lsymb sort
   | Pair      : ('a sort * 'b sort) -> ('a * 'b) sort
   | Opt       : 'a sort -> ('a option) sort
@@ -253,7 +282,7 @@ type _ arg =
 
   | ETerm     : 'a Type.ty * 'a Term.term * Location.t -> Theory.eterm arg
 
-  | Int       : int -> int arg
+  | Int       : int L.located -> int L.located arg
   | String    : lsymb -> lsymb arg
   | Pair      : 'a arg * 'b arg -> ('a * 'b) arg
   | Opt       : ('a sort * 'a arg option) -> ('a option) arg
@@ -451,7 +480,7 @@ let convert_args table tyvars env parser_args tactic_type =
       Arg et
 
     | [Theory (L.{ pl_desc = App (p,[]) } )], Sort String ->
-      Arg (String p) (* TODO: location *)
+      Arg (String p)
 
     | [Int_parsed i], Sort Int ->
       Arg (Int i)
@@ -464,8 +493,6 @@ let convert_args table tyvars env parser_args tactic_type =
 
     | [Theory p], Sort Index ->
       Arg (Index (Theory.convert_index table tyvars env p))
-    (* old code: *)
-    (* Arg (Index (Theory.convert_index table tsubst (Theory.var p))) *)
 
     | th1::q, Sort (Pair (Opt s1, s2)) ->
       begin match conv_args [th1] (Sort (Opt s1)) env with

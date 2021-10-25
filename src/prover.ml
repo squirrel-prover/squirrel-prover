@@ -17,6 +17,8 @@ let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
 let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
 
+let bad_args () = hard_failure (Failure "improper arguments")
+
 (*------------------------------------------------------------------*)
 (** {Error handling} *)
 
@@ -110,14 +112,19 @@ type proof_state = {
   hint_db      : Hint.hint_db;
 }
 
-let proof_states_history : proof_state list ref = ref []
+type proof_history = proof_state list
+
+let pt_history : proof_history ref = ref []
+
+(** stack of proof histories, for nested included *)
+let pt_history_stack : proof_history list ref = ref []
 
 let abort () =
     current_goal := None;
     subgoals := []
 
 let reset () =
-    proof_states_history := [];
+    pt_history := [];
     goals := [];
     current_goal := None;
     subgoals := [];
@@ -125,38 +132,68 @@ let reset () =
     option_defs := [];
     Config.reset_params ()
 
+let get_state mode table =
+  { goals        = !goals;
+    table        = table;
+    current_goal = !current_goal;
+    subgoals     = !subgoals;
+    goals_proved = !goals_proved;
+    option_defs  = !option_defs;
+    params       = Config.get_params ();
+    prover_mode  = mode;
+    hint_db      = !hint_db; }
+
 let save_state mode table =
-  proof_states_history :=
-    { goals        = !goals;
-      table        = table;
-      current_goal = !current_goal;
-      subgoals     = !subgoals;
-      goals_proved = !goals_proved;
-      option_defs  = !option_defs;
-      params       = Config.get_params ();
-      prover_mode  = mode;
-      hint_db      = !hint_db; }
-    :: (!proof_states_history)
+  pt_history := get_state mode table :: (!pt_history)
+
+let reset_from_state (p : proof_state) =
+  goals := p.goals;
+  current_goal := p.current_goal;
+  subgoals := p.subgoals;
+  goals_proved := p.goals_proved;
+  option_defs := p.option_defs;
+  Config.set_params p.params;
+
+  hint_db := p.hint_db;
+
+  ( p.prover_mode, p.table )
 
 let rec reset_state n =
-  match (!proof_states_history,n) with
+  match (!pt_history,n) with
   | [],_ -> (GoalMode, Symbols.builtins_table)
-  | p::q,0 ->
-    proof_states_history := q;
+  | p :: q, 0 ->
+    pt_history := q;
 
-    goals := p.goals;
-    current_goal := p.current_goal;
-    subgoals := p.subgoals;
-    goals_proved := p.goals_proved;
-    option_defs := p.option_defs;
-    Config.set_params p.params;
+    reset_from_state p
 
-    hint_db := p.hint_db;
+  | _ :: q, n -> pt_history := q; reset_state (n-1)
 
-    ( p.prover_mode, p.table )
-  | _::q, n -> proof_states_history := q; reset_state (n-1)
+let reset_to_pt_history_head () =
+  match !pt_history with
+  | [] ->
+    reset ();
+    (GoalMode, Symbols.builtins_table)
+  | p :: q -> reset_from_state p
 
+let push_pt_history () : unit =
+  pt_history_stack := !pt_history :: !pt_history_stack;
+  pt_history := []
 
+let pop_pt_history () : unit =
+  match !pt_history_stack with
+  | [] -> assert false
+  | h :: l ->
+    pt_history := h;
+    pt_history_stack := l
+
+let pop_all_pt_history () : unit =
+  match !pt_history_stack with
+  | [] -> assert false    (* cannot be empty *)
+  | l ->
+    pt_history := List.last l;
+    pt_history_stack := []
+
+(*------------------------------------------------------------------*)
 (** Options Management **)
 
 exception Option_already_defined
@@ -217,42 +254,16 @@ let pp_help fmt (th, tac_name) =
  in
   Format.pp_print_text fmt res_string
 
+(*------------------------------------------------------------------*)
 (** Basic tactic tables, without registration *)
 
-module type Table_sig = sig
-  type judgment
+module Table : sig
+  val table : Goal.t table
 
-  val table : judgment table
+  val get : string -> TacticsArgs.parser_arg list -> Goal.t Tactics.tac
 
-  val get : string -> TacticsArgs.parser_arg list -> judgment Tactics.tac
-
-  val to_goal : judgment -> Goal.t
-  val from_trace : TS.t -> judgment
-  val from_equiv : Goal.t -> judgment
-
-  val table_name : string
-  val pp_goal_concl : Format.formatter -> judgment -> unit
-end
-
-module TraceTable : Table_sig with type judgment = TS.t = struct
-  type judgment = TS.t
-  let table = Hashtbl.create 97
-
-  (* TODO:location *)
-  let get id =
-    try (Hashtbl.find table id).maker with
-      | Not_found -> hard_failure
-             (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
-
-  let to_goal j = Goal.Trace j
-  let from_trace j = j
-  let from_equiv e = assert false
-
-  let table_name = "Trace"
-  let pp_goal_concl ppf j = Term.pp ppf (TS.goal j)
-end
-
-module EquivTable : Table_sig with type judgment = Goal.t = struct
+  val pp_goal_concl : Format.formatter -> Goal.t -> unit
+end = struct
   type judgment = Goal.t
   let table = Hashtbl.create 97
 
@@ -266,43 +277,26 @@ module EquivTable : Table_sig with type judgment = Goal.t = struct
     with
       | Not_found -> hard_failure
              (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
-  let to_goal j = j
-  let from_trace j = Goal.Trace j
-  let from_equiv j = j
 
-  let table_name = "Equiv"
   let pp_goal_concl ppf j = match j with
-    | Goal.Trace j -> Term.pp ppf (TS.goal j)
+    | Goal.Trace j -> Term.pp  ppf (TS.goal j)
     | Goal.Equiv j -> Equiv.pp ppf (ES.goal j)
 end
 
-(** Functor building AST evaluators for our judgment types. *)
-module Make_AST (T : Table_sig) :
+(** AST evaluators for general judgment. *)
+module AST :
   (Tactics.AST_sig
    with type arg = TacticsArgs.parser_arg
-   with type judgment = T.judgment)
+   with type judgment = Goal.t)
 = Tactics.AST(struct
 
   type arg = TacticsArgs.parser_arg
 
-  type judgment = T.judgment
+  type judgment = Goal.t
 
   let pp_arg = TacticsArgs.pp_parser_arg
 
-  let autosimpl () =
-    let tautosimpl = TraceTable.get "autosimpl" [] in
-
-    let eautosimpl = EquivTable.get "autosimpl" [] in
-
-    fun s sk fk ->
-      match T.to_goal s with
-      | Goal.Trace t ->
-        let sk l fk = sk (List.map T.from_trace l) fk in
-        tautosimpl t sk fk
-      | Goal.Equiv e ->
-        let sk l fk = sk (List.map T.from_equiv l) fk in
-        eautosimpl (Goal.Equiv e) sk fk
-
+  let autosimpl () = Table.get "autosimpl" []
   let autosimpl = Lazy.from_fun autosimpl
 
   let re_raise_tac loc tac s sk fk : Tactics.a =
@@ -312,7 +306,7 @@ module Make_AST (T : Table_sig) :
 
   let eval_abstract mods (id : lsymb) args : judgment Tactics.tac =
     let loc, id = L.loc id, L.unloc id in
-    let tac = re_raise_tac loc (T.get id args) in
+    let tac = re_raise_tac loc (Table.get id args) in
     match mods with
       | "nosimpl" :: _ -> tac
       | [] -> Tactics.andthen tac (Lazy.force autosimpl)
@@ -321,83 +315,31 @@ module Make_AST (T : Table_sig) :
   (* a printer for tactics that follows a specific syntax.
      TODO: tactics with "as" for intro pattern are not printed correctly.*)
   let pp_abstract ~pp_args s args ppf =
-    match s,args with
-      | "use", TacticsArgs.String_name id :: l ->
-          let l = List.map (function
-            | TacticsArgs.Theory t -> t
-            | _ -> assert false) l in
-          Fmt.pf ppf "use %s with %a" (L.unloc id) (Utils.pp_list Theory.pp) l
-      | _ -> raise Not_found
+    (* match s,args with
+     *   | "use", TacticsArgs.String_name id :: l ->
+     *       let l = List.map (function
+     *         | TacticsArgs.Theory t -> t
+     *         | _ -> assert false) l in
+     *       Fmt.pf ppf "use %s with %a" (L.unloc id) (Utils.pp_list Theory.pp) l
+     *   | _ ->  *)raise Not_found
 
 end)
 
-module TraceAST = Make_AST(TraceTable)
+module ProverTactics = struct
+  include Table
 
-module EquivAST = Make_AST(EquivTable)
-
-(** Signature for tactic table with registration capabilities.
-  * Registering macros relies on previous AST modules,
-  * hence the definition in multiple steps. *)
-module type Tactics_sig = sig
-
-  type judgment
+  type judgment = Goal.t
 
   type tac = judgment Tactics.tac
 
-  val register_general :
-    string -> tactic_help:tactic_help ->
-    ?pq_sound:bool ->
-    (TacticsArgs.parser_arg list -> tac) -> unit
-
-  val register_macro :
-    string -> ?modifiers:string list -> tactic_help:tactic_help ->
-    ?pq_sound:bool ->
-    TacticsArgs.parser_arg Tactics.ast -> unit
-
-
-  val register : string ->  tactic_help:tactic_help ->
-    ?pq_sound:bool ->
-    (judgment -> judgment list) -> unit
-
-  val register_typed :
-    string ->  general_help:string ->  detailed_help:string ->
-    tactic_group:tactic_groups ->
-    ?pq_sound:bool ->
-    ?usages_sorts : TacticsArgs.esort list ->
-    ('a TacticsArgs.arg -> judgment -> judgment list) ->
-    'a TacticsArgs.sort  -> unit
-
-  val get : string -> TacticsArgs.parser_arg list -> tac
-
-  val pp : bool -> Format.formatter -> lsymb -> unit
-  val pps : Format.formatter -> unit -> unit
-  val pp_list : Format.formatter -> unit -> unit
-
-end
-
-module Prover_tactics
-  (M : Table_sig)
-  (AST : Tactics.AST_sig
-           with type judgment = M.judgment
-           with type arg = TacticsArgs.parser_arg) :
-  Tactics_sig with type judgment = M.judgment =
-struct
-
-  include M
-
-  type tac = judgment Tactics.tac
-
-  let register_general id
-      ~tactic_help
-      ?(pq_sound=false)
-      f =
-    assert (not (Hashtbl.mem table id)) ;
+  let register_general id ~tactic_help ?(pq_sound=false) f =
+    let () = assert (not (Hashtbl.mem table id)) in
 
     let f args s sk fk =
-      dbg "@[<hov>%s table: calling tactic %s on@ @[%a@]@]"
-        table_name
-        id M.pp_goal_concl s;
-      f args s sk fk in
+      dbg "@[<hov>calling tactic %s on@ @[%a@]@]"
+        id Table.pp_goal_concl s;
+      f args s sk fk
+    in
 
     Hashtbl.add table id { maker = f ;
                            help = tactic_help;
@@ -405,7 +347,7 @@ struct
 
   let convert_args j parser_args tactic_type =
     let table, env, ty_vars =
-      match M.to_goal j with
+      match j with
       | Goal.Trace t -> TS.table t, TS.env t, TS.ty_vars t
       | Goal.Equiv e -> ES.table e, ES.env e, ES.ty_vars e
     in
@@ -537,44 +479,19 @@ struct
 
 end
 
-module rec TraceTactics : Tactics_sig with type judgment = TS.t =
-  Prover_tactics(TraceTable)(TraceAST)
+let pp_ast fmt t = AST.pp fmt t
 
-module rec EquivTactics : Tactics_sig with type judgment = Goal.t =
-  Prover_tactics(EquivTable)(EquivAST)
-
-let pp_ast fmt t = TraceAST.pp fmt t
-
-let get_trace_help (tac_name : lsymb) =
+let get_help (tac_name : lsymb) =
   if L.unloc tac_name = "" then
-    Printer.prt `Result "%a" TraceTactics.pps ()
+    Printer.prt `Result "%a" ProverTactics.pps ()
   else if L.unloc tac_name = "concise" then
-    Printer.prt `Result "%a" TraceTactics.pp_list ()
+    Printer.prt `Result "%a" ProverTactics.pp_list ()
   else
-    Printer.prt `Result "%a." (TraceTactics.pp true) tac_name;
-  Tactics.id
-
-let get_equiv_help (tac_name : lsymb) =
-  if L.unloc tac_name = "" then
-    Printer.prt `Result "%a" EquivTactics.pps ()
-  else if L.unloc tac_name = "concise" then
-    Printer.prt `Result "%a" TraceTactics.pp_list ()
-  else
-    Printer.prt `Result "%a." (EquivTactics.pp true) tac_name;
+    Printer.prt `Result "%a" (ProverTactics.pp true) tac_name;
   Tactics.id
 
 let () =
-
-  TraceTactics.register_general "admit"
-    ~tactic_help:{general_help = "Closes the current goal.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical
-                 }
-    ~pq_sound:true
-    (fun _ _ sk fk -> sk [] fk) ;
-
-  TraceTactics.register_general "prof"
+  ProverTactics.register_general "prof"
     ~tactic_help:{general_help = "Print profiling information.";
                   detailed_help = "";
                   usages_sorts = [Sort None];
@@ -582,33 +499,10 @@ let () =
     ~pq_sound:true
     (fun _ s sk fk ->
        Printer.prt `Dbg "%a" Prof.print ();
-      sk [s] fk) ;
+       sk [s] fk)
 
-  EquivTactics.register_general "prof"
-    ~tactic_help:{general_help = "Print profiling information.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
-    (fun _ s sk fk ->
-       Printer.prt `Dbg "%a" Prof.print ();
-      sk [s] fk) ;
-
-  TraceTactics.register_general "help"
-    ~tactic_help:{general_help = "Display all available commands.\n\n\
-                                  Usages: help\n\
-                                 \        help tacname\n\
-                                 \        help concise";
-                  detailed_help = "`help tacname` gives more details about a \
-                                   tactic and `help concise` juste gives the \
-                                   list of tactics.";
-                  usages_sorts = [];
-                  tactic_group = Logical}
-    (function
-      | [] -> get_trace_help (L.mk_loc L._dummy "")
-      | [String_name tac_name]-> get_trace_help tac_name
-      | _ ->  hard_failure (Tactics.Failure"improper arguments")) ;
-
-  EquivTactics.register_general "help"
+let () =
+  ProverTactics.register_general "help"
     ~tactic_help:{general_help = "Display all available commands.\n\n\
                                   Usages: help\n\
                                  \        help tacname\n\
@@ -620,11 +514,12 @@ let () =
                   tactic_group = Logical}
     ~pq_sound:true
     (function
-      | [] -> get_equiv_help (L.mk_loc L._dummy "")
-      | [String_name tac_name]-> get_equiv_help tac_name
-      | _ ->  hard_failure (Tactics.Failure"improper arguments")) ;
+      | [] -> get_help (L.mk_loc L._dummy "")
+      | [String_name tac_name]-> get_help tac_name
+      | _ ->  bad_args ())
 
-  TraceTactics.register_general "id"
+let () =
+  ProverTactics.register_general "id"
     ~tactic_help:{general_help = "Identity.";
                   detailed_help = "";
                   usages_sorts = [Sort None];
@@ -675,6 +570,7 @@ type parsed_input =
   | ParsedTactic     of TacticsArgs.parser_arg Tactics.ast
   | ParsedUndo       of int
   | ParsedGoal       of Goal.Parsed.t Location.located
+  | ParsedInclude    of lsymb
   | ParsedProof
   | ParsedQed
   | ParsedAbort
@@ -752,18 +648,15 @@ let pp_goal ppf () = match !current_goal, !subgoals with
   * @return [true] if there are no subgoals remaining. *)
 let eval_tactic_focus tac = match !subgoals with
   | [] -> assert false
-  | Goal.Trace judge :: ejs' ->
-    let new_j = TraceAST.eval_judgment tac judge in
-    subgoals := List.map (fun j -> Goal.Trace j) new_j @ ejs';
-    is_proof_completed ()
-  | Goal.Equiv judge :: ejs' ->
-    let new_j = EquivAST.eval_judgment tac (Goal.Equiv judge) in
+  | judge :: ejs' ->
+    let new_j = AST.eval_judgment tac judge in
     subgoals := new_j @ ejs';
     is_proof_completed ()
 
-let cycle i l =
+let cycle i_l l =
+  let i, loc = L.unloc i_l, L.loc i_l in
   let rec cyc acc i = function
-    | [] -> hard_failure (Tactics.Failure "cycle error")
+    | [] -> hard_failure ~loc (Tactics.Failure "cycle error")
     | a :: l ->
       if i = 1 then l @ (List.rev (a :: acc))
       else cyc (a :: acc) (i - 1) l in

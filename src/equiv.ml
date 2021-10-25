@@ -64,14 +64,22 @@ type quant = ForAll | Exists
 
 type form =
   | Quant of quant * Vars.evar list * form
-  | Atom   of atom
-  | Impl   of (form * form)
+  | Atom  of atom
+  | Impl  of form * form
+  | And   of form * form
+  | Or    of form * form
 
 let rec pp fmt = function
   | Atom at -> pp_atom fmt at
 
   | Impl (f0, f) ->
     Fmt.pf fmt "@[<v 2>%a ->@ %a@]" pp f0 pp f
+
+  | And (f0, f) ->
+    Fmt.pf fmt "@[<v 2>%a /\\@ %a@]" pp f0 pp f
+
+  | Or (f0, f) ->
+    Fmt.pf fmt "@[<v 2>%a \\/@ %a@]" pp f0 pp f
 
   | Quant (ForAll, vs, f) ->
     Fmt.pf fmt "@[<v 2>Forall (@[%a@]),@ %a@]"
@@ -100,8 +108,10 @@ let tmap (func : form -> form) (t : form) : form =
 
   let rec tmap = function
     | Quant (q, vs, b) -> Quant (q, vs, func b)
-    | Impl (f1, f2) -> Impl (tmap f1, tmap f2)
-    | Atom at -> Atom at
+    | Impl (f1, f2)    -> Impl (tmap f1, tmap f2)
+    | And (f1, f2)     -> And (tmap f1, tmap f2)
+    | Or (f1, f2)      -> Or (tmap f1, tmap f2)
+    | Atom at          -> Atom at
   in
   tmap t
 
@@ -130,6 +140,8 @@ let tfold : (form -> 'b -> 'b) -> form -> 'b -> 'b =
 let rec get_terms = function
   | Atom (Reach f) -> [f]
   | Atom (Equiv e) -> e
+  | And  (e1, e2)
+  | Or   (e1, e2)
   | Impl (e1, e2) -> get_terms e1 @ get_terms e2
   | Quant _ -> []
 
@@ -139,6 +151,8 @@ let rec get_terms = function
 (** Free variables. *)
 let rec fv = function
   | Atom at -> fv_atom at
+  | And  (f, f0)
+  | Or   (f, f0)
   | Impl (f,f0) -> Sv.union (fv f) (fv f0)
   | Quant (_, evs, b) -> Sv.diff (fv b) (Sv.of_list evs)
 
@@ -151,6 +165,8 @@ let rec subst s (f : form) =
     match f with
     | Atom at -> Atom (subst_atom s at)
 
+    | And  (f0, f) -> And  (subst s f0, subst s f)
+    | Or   (f0, f) -> Or   (subst s f0, subst s f)
     | Impl (f0, f) -> Impl (subst s f0, subst s f)
 
     | Quant (_, [], f) -> subst s f
@@ -166,8 +182,8 @@ let tsubst_atom (ts : Type.tsubst) (at : atom) =
 
 (** Type substitution *)
 let tsubst (ts : Type.tsubst) (t : form) =
-  (* no need to substitute in the types of [Name], [Macro], [Fun] *)
   let rec tsubst = function
+    | Quant (q, vs, f) -> Quant (q, List.map (Vars.tsubst_e ts) vs, tsubst f)
     | Atom at -> Atom (tsubst_atom ts at)
     | _ as term -> tmap tsubst term
   in
@@ -188,13 +204,21 @@ module Smart : Term.SmartFO with type form = _form = struct
   let mk_true  = Atom (Reach Term.mk_true)
   let mk_false = Atom (Reach Term.mk_false)
 
-  let mk_not   ?simpl f = todo ()
-  let mk_and   ?simpl f1 f2 = todo ()
-  let mk_ands  ?simpl forms = todo ()
-  let mk_or    ?simpl f1 f2 = todo ()
-  let mk_ors   ?simpl forms = todo ()
+  let mk_not ?simpl f = todo ()
 
-  let mk_impl  ?simpl f1 f2 = Impl (f1, f2)
+  let mk_and ?simpl f1 f2 = And (f1, f2)
+  let rec mk_ands ?simpl forms = match forms with
+    | [] -> mk_true
+    | [f0] -> f0
+    | f0 :: forms -> And (f0, mk_ands forms)
+
+  let mk_or ?simpl f1 f2 = Or (f1, f2)
+  let rec mk_ors ?simpl forms = match forms with
+    | [] -> mk_false
+    | [f0] -> f0
+    | f0 :: forms -> Or (f0, mk_ors forms)
+
+  let mk_impl ?simpl f1 f2 = Impl (f1, f2)
   let rec mk_impls ?simpl l f = match l with
     | [] -> f
     | f0 :: impls -> Impl (f0, mk_impls impls f)
@@ -236,17 +260,28 @@ module Smart : Term.SmartFO with type form = _form = struct
   let destr_false f = todo ()
   let destr_true  f = todo ()
   let destr_not   f = todo ()
-  let destr_and   f = todo ()
-  let destr_or    f = todo ()
+
+  (** Lifts a destructor over [Impl], [And] or [Or] when one of the
+      two formulas is a pure trace model formula. *)
+  let destr_lift = function
+    | Some (f1,f2)
+      when Term.is_pure_timestamp f1 || Term.is_pure_timestamp f2 ->
+      Some (Atom (Reach f1), Atom (Reach f2))
+    | _ -> None
+
+  let destr_and = function
+    | And (f1, f2) -> Some (f1, f2)
+    | Atom (Reach f) -> destr_lift (Term.Smart.destr_and f)
+    | _ -> None
+
+  let destr_or = function
+    | Or (f1, f2) -> Some (f1, f2)
+    | Atom (Reach f) -> destr_lift (Term.Smart.destr_or f)
+    | _ -> None
+
   let destr_impl = function
     | Impl (f1, f2) -> Some (f1, f2)
-    | Atom (Reach f) ->
-        begin match Term.Smart.destr_impl f with
-          | Some (f1,f2)
-            when Term.is_pure_timestamp f1 || Term.is_pure_timestamp f2 ->
-              Some (Atom (Reach f1), Atom (Reach f2))
-          | _ -> None
-        end
+    | Atom (Reach f) -> destr_lift (Term.Smart.destr_impl f)
     | _ -> None
 
   (*------------------------------------------------------------------*)
@@ -254,9 +289,9 @@ module Smart : Term.SmartFO with type form = _form = struct
   let is_true  f = todo ()
   let is_zero  f = todo ()
   let is_not   f = false
-  let is_and   f = false
-  let is_or    f = false
-  let is_impl f = destr_impl f <> None
+  let is_and   f = destr_and  f <> None
+  let is_or    f = destr_or   f <> None
+  let is_impl  f = destr_impl f <> None
 
   let is_forall = function Quant (ForAll, _, _) -> true | _ -> false
   let is_exists = function
@@ -271,24 +306,38 @@ module Smart : Term.SmartFO with type form = _form = struct
     | _ -> false
 
   (*------------------------------------------------------------------*)
+
+  (** Lifts a (many) destructor over [Impl], [And] or [Or] when one of the
+      two formulas is a pure trace model formula. *)
+  let destr_lift_many = function
+    | None -> None
+    | Some l ->
+      if not (List.for_all Term.is_pure_timestamp l)
+      then None
+      else Some (List.map (fun f -> Atom (Reach f)) l)
+
+  let rec mk_destr_left f_destr =
+    let rec destr l f =
+      if l < 0 then assert false;
+      if l = 1 then Some [f]
+      else match f_destr f with
+        | None -> None
+        | Some (f,g) -> omap (fun l -> l @ [g]) (destr (l-1) f)
+    in
+    destr
+
   (** left-associative *)
-  let destr_ands i f = todo ()
+  let destr_ands i f =
+    match f with
+    | Atom (Reach f) ->
+      destr_lift_many (Term.Smart.destr_ands i f)
+    | _ -> mk_destr_left destr_and i f
+
   let destr_ors i f =
     match f with
-      | Atom (Reach f) ->
-          begin match Term.Smart.destr_ors i f with
-            | None -> None
-            | Some l ->
-                let exception Impure in
-                  try
-                    let check_and_convert f =
-                      if not (Term.is_pure_timestamp f) then raise Impure;
-                      Atom (Reach f)
-                    in
-                      Some (List.map check_and_convert l)
-                  with Impure -> None
-          end
-      | _ -> None
+    | Atom (Reach f) ->
+      destr_lift_many (Term.Smart.destr_ors i f)
+    | _ -> mk_destr_left destr_or i f
 
   let destr_impls =
     let rec destr l f =
@@ -364,12 +413,19 @@ module PreAny = struct
   let pp fmt = function
     | `Reach f -> Term.pp fmt f
     | `Equiv f -> pp fmt f
+
   let subst s = function
     | `Reach f -> `Reach (Term.subst s f)
     | `Equiv f -> `Equiv (subst s f)
+
+  let tsubst s = function
+    | `Reach f -> `Reach (Term.tsubst s f)
+    | `Equiv f -> `Equiv (tsubst s f)
+
   let fv = function
     | `Reach f -> Term.fv f
     | `Equiv f -> fv f
+
   let get_terms = function
     | `Reach f -> [f]
     | `Equiv f -> get_terms f
@@ -389,26 +445,30 @@ module Babel = struct
     = fun ?loc ~src ~dst f ->
     match src,dst with
       (* Identity cases *)
-      | Local_t,Local_t -> f
-      | Global_t,Global_t -> f
-      | Any_t,Any_t -> f
+      | Local_t,  Local_t  -> f
+      | Global_t, Global_t -> f
+      | Any_t,    Any_t    -> f
+
       (* Injections into gform *)
-      | Local_t,Any_t -> `Reach f
-      | Global_t,Any_t -> `Equiv f
+      | Local_t,  Any_t -> `Reach f
+      | Global_t, Any_t -> `Equiv f
+
       (* Inverses of the injections. *)
-      | Any_t,Local_t ->
+      | Any_t, Local_t ->
           begin match f with
             | `Reach f -> f
             | _ -> Tactics.soft_failure ?loc CannotConvert
           end
-      | Any_t,Global_t ->
+
+      | Any_t, Global_t ->
           begin match f with
             | `Equiv f -> f
             | `Reach f -> Atom (Reach f)
           end
+
       (* Conversions between local and global formulas. *)
-      | Local_t, Global_t -> Atom (Reach f)
-      | Global_t, Local_t ->
+      | Local_t,  Global_t -> Atom (Reach f)
+      | Global_t, Local_t  ->
          begin match f with
            | Atom (Reach f) -> f
            | _ -> Tactics.soft_failure ?loc CannotConvert
@@ -418,6 +478,11 @@ module Babel = struct
     | Local_t -> Term.subst
     | Global_t -> subst
     | Any_t -> PreAny.subst
+
+  let tsubst : type a. a f_kind -> Type.tsubst -> a -> a = function
+    | Local_t -> Term.tsubst
+    | Global_t -> tsubst
+    | Any_t -> PreAny.tsubst
 
   let fv : type a. a f_kind -> a -> Vars.Sv.t = function
     | Local_t -> Term.fv

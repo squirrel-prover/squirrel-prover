@@ -52,21 +52,18 @@ system out(cA,<pk(kA),pk(kB)>); (!_i A(i) | !_j B(j)).
 
 axiom length (m1:message, m2:message): len(<m1,m2>) = plus(len(m1),len(m2)).
 
-(* Helper lemma for pushing conditionals. Such reasoning should soon be automatic.
- * Note that the lemma would be simpler (and more general) if we could quantify
- * over boolean messages. *)
-goal if_len : forall (x,x1,x2,x3,y,z:message),
-  len(if x=x1 && x2=x3 then y else z) =
-  (if x=x1 && x2=x3 then len(y) else len(z)).
-Proof.
-  intro x x1 x2 x3 y z.
-  assert (x=x1 || x<>x1) as H; case H;
-  assert (x2=x3 || x2<>x3) as H0; case H0;
+(* Helper lemma for pushing conditionals. Such reasoning should
+   be automatic once we can include a standard library. *)
+goal if_len (b : boolean, y,z:message):
+  len(if b then y else z) =
+  (if b then len(y) else len(z)).
+Proof. 
+  case b;
   try ((yesif; yesif) + (noif; noif)).
 Qed.
 
 equiv anonymity.
-Proof.
+Proof. 
   enrich pk(kA), pk(kB).
 
   induction t.
@@ -82,38 +79,16 @@ Proof.
   fa 3. fresh 3. yesif 3.
   fresh 3. yesif 3.
   (* Case B *)
-  expandall.
+  expand frame, output, exec, cond, dmess.
   fa 2. fa 3. fa 3.
   enckp 3. cca1 3.
 
-  (* Pushing conditional underneath len(_):
-   * tool must be improved to ease such transformations. *)
-  equivalent
-    len(
-     if
-       fst(dec(input@B(j),kB)) = diff(pk(kA),pk(kAbis)) &&
-       len(snd(dec(input@B(j),kB))) = len(n(j))
-     then <snd(dec(input@B(j),kB)),n(j)>
-     else <n(j),n(j)>),
-    (if
-      fst(dec(input@B(j),kB)) = diff(pk(kA),pk(kAbis)) &&
-      len(snd(dec(input@B(j),kB))) = len(n(j))
-     then len(<snd(dec(input@B(j),kB)),n(j)>)
-     else len(<n(j),n(j)>)).
-   use if_len with fst(dec(input@B(j),kB)),diff(pk(kA),pk(kAbis)),
-                   len(snd(dec(input@B(j),kB))),len(n(j)),
-                   <snd(dec(input@B(j),kB)),n(j)>,
-                   <n(j),n(j)>.
+  (* Pushing conditional underneath len(_) *)
+  rewrite if_len length.
 
-  (* length reasoning *)
-  equivalent
-    len(<snd(dec(input@B(j),kB)),n(j)>),
-    plus(len(snd(dec(input@B(j),kB))),len(n(j))).
-  use length with snd(dec(input@B(j),kB)),n(j).
-
-  ifeq 3, len(snd(dec(input@B(j),kB))), len(n(j)).
-  trivialif 3.
-  use length with n(j),n(j).
+  ifeq 3, len(snd(dec(input@B(j),kB))), len(n(j)). 
+  trivialif 3. 
+  by rewrite length.
   fa 3. fa 3.
   fresh 3. yesif 3.
 Qed.

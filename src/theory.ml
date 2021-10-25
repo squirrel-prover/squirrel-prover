@@ -42,7 +42,7 @@ type term_i =
   | Tpat
   | Tpred of term
   | Diff  of term * term
-  | Seq   of lsymb list * term
+  | Seq   of bnds * term
   | Find  of lsymb list * term * term * term
 
   | App of lsymb * term list
@@ -96,13 +96,7 @@ let rec equal t t' = match L.unloc t, L.unloc t' with
   | Compare (ord, a, b), Compare (ord', a', b') ->
     ord = ord' && equal a a' && equal b b'
 
-  | Seq (l, a), Seq (l', a') ->
-    List.length l = List.length l' &&
-    List. for_all2 (fun (s) (s') ->
-        L.unloc s = L.unloc s'
-      ) l l'
-      && equal a a'
-
+  | Seq (l, a),    Seq (l', a') 
   | ForAll (l, a), ForAll (l', a')
   | Exists (l, a), Exists (l', a') ->
     List.length l = List.length l' &&
@@ -177,10 +171,6 @@ let rec pp_term_i ppf t = match t with
   | Diff (l,r) ->
       Fmt.pf ppf "diff(%a,%a)" pp_term l pp_term r
 
-  | Seq (vs, b) ->
-    Fmt.pf ppf "@[seq(@[%a->%a@])@]"
-      (Utils.pp_list Fmt.string) (L.unlocs vs) pp_term b
-
   | App (f,[t1;t2]) when L.unloc f = "exp" ->
     Fmt.pf ppf "%a^%a" pp_term t1 pp_term t2
 
@@ -223,6 +213,11 @@ let rec pp_term_i ppf t = match t with
 
   | Happens t -> Fmt.pf ppf "happens(%a)" (Utils.pp_list pp_term) t
 
+
+  | Seq (vs, b) ->
+    Fmt.pf ppf "@[seq(@[%a->%a@])@]"
+      pp_var_list vs pp_term b
+
   | ForAll (vs, b) ->
     Fmt.pf ppf "@[forall (@[%a@]),@ %a@]"
       pp_var_list vs pp_term b
@@ -257,12 +252,17 @@ type hterm = hterm_i L.located
 
 type equiv = term list 
 
+type pquant = PForAll | PExists
+              
 type global_formula = global_formula_i Location.located
+
 and global_formula_i =
   | PEquiv  of equiv
   | PReach  of formula
   | PImpl   of global_formula * global_formula
-  | PForAll of bnds * global_formula
+  | PAnd    of global_formula * global_formula
+  | POr     of global_formula * global_formula
+  | PQuant  of pquant * bnds * global_formula
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
@@ -903,22 +903,24 @@ and convert0 :
 
   | Seq (vs,t) ->
     let env, evs =
-      convert_bnds state.env (List.map (fun x -> x, Type.eindex) vs)
+      convert_p_bnds state.table state.ty_vars state.env vs
     in
 
     let tyv = Type.Infer.mk_univar state.ty_env in
 
     let t = conv ~env (Type.TUnivar tyv) t in
 
-    let vs : Type.index Vars.var list =
-      List.map (function (Vars.EVar v) ->
-        try Vars.cast v Type.KIndex
-        with Vars.CastError -> type_error ()
+    let () =
+      List.iter (function (Vars.EVar v) ->
+          match Vars.kind v with
+          | Type.KIndex -> ()
+          | Type.KTimestamp -> ()
+          | _ -> type_error ()
         ) evs
     in
 
     begin match Type.kind ty with
-      | Type.KMessage -> Term.mk_seq0 vs t
+      | Type.KMessage -> Term.mk_seq0 ~simpl:false evs t
       | _ -> type_error ()
     end
 
@@ -1081,7 +1083,6 @@ let conv_ht : conv_state -> hterm -> Type.hty * Term.hterm =
 
     let bnd_tys = List.map (fun (Vars.EVar v) -> Type.ETy (Vars.ty v)) evs in
     let hty = Type.Lambda (bnd_tys, ty) in
-    let hty = Type.Infer.htnorm state.ty_env hty in
 
     hty, ht
 
@@ -1202,7 +1203,7 @@ let convert_ht : type s.
   ?pat:bool ->
   conv_env -> Type.tvars -> Vars.env -> hterm -> Type.hty * Term.hterm =
   fun ?ty_env ?(pat=false) cenv ty_vars env ht0 ->
-  let must_clost, ty_env = match ty_env with
+  let must_close, ty_env = match ty_env with
     | None -> true, Type.Infer.mk_env ()
     | Some ty_env -> false, ty_env
   in
@@ -1210,10 +1211,17 @@ let convert_ht : type s.
   let state = mk_state cenv.table cenv.cntxt ty_vars env pat ty_env in
   let hty, ht = conv_ht state ht0 in
 
-  if must_clost && not (Type.Infer.is_closed state.ty_env) then
-    conv_err (L.loc ht0) Freetyunivar;
+  if must_close then
+    begin
+      if not (Type.Infer.is_closed state.ty_env) then
+        conv_err (L.loc ht0) Freetyunivar;
+      
+      let tysubst = Type.Infer.close ty_env in     
+      Type.tsubst_ht tysubst hty, Term.tsubst_ht tysubst ht
+    end
+  else
+    Type.Infer.htnorm state.ty_env hty, ht
 
-  hty, ht
 
 (*------------------------------------------------------------------*)
 let check
@@ -1230,7 +1238,7 @@ let check
     exported outside to Theory.ml *)
 let convert_i ?ty_env ?(pat=false) (cenv : conv_env) ty_vars env tm
   : Term.message * Type.tmessage =
-  let must_clost, ty_env = match ty_env with
+  let must_close, ty_env = match ty_env with
     | None -> true, Type.Infer.mk_env ()
     | Some ty_env -> false, ty_env
   in
@@ -1238,11 +1246,16 @@ let convert_i ?ty_env ?(pat=false) (cenv : conv_env) ty_vars env tm
   let state = mk_state cenv.table cenv.cntxt ty_vars env pat ty_env in
   let t = convert state tm ty in
 
-  if must_clost && not (Type.Infer.is_closed state.ty_env) then
-    conv_err (L.loc tm) Freetyunivar;
-
-  let ty = Type.tsubst (Type.Infer.close ty_env) ty in
-  t, ty
+  if must_close then
+    begin
+      if not (Type.Infer.is_closed state.ty_env) then
+        conv_err (L.loc tm) Freetyunivar;
+      
+      let tysubst = Type.Infer.close ty_env in     
+      Term.tsubst tysubst t, Type.tsubst tysubst ty
+    end
+  else
+    t, Type.Infer.norm ty_env ty
 
 (** exported outside Theory.ml *)
 let convert : type s.
@@ -1250,7 +1263,7 @@ let convert : type s.
   ?pat:bool ->
   conv_env -> Type.tvars -> Vars.env -> term -> s Type.ty -> s Term.term =
   fun ?ty_env ?(pat=false) cenv ty_vars env tm ty ->
-  let must_clost, ty_env = match ty_env with
+  let must_close, ty_env = match ty_env with
     | None -> true, Type.Infer.mk_env ()
     | Some ty_env -> false, ty_env
   in
@@ -1258,10 +1271,14 @@ let convert : type s.
   let state = mk_state cenv.table cenv.cntxt ty_vars env pat ty_env in
   let t = convert state tm ty in
 
-  if must_clost && not (Type.Infer.is_closed state.ty_env) then
-    conv_err (L.loc tm) Freetyunivar;
+  if must_close then
+    begin
+      if not (Type.Infer.is_closed state.ty_env) then
+        conv_err (L.loc tm) Freetyunivar;
 
-  t
+      Term.tsubst (Type.Infer.close ty_env) t
+    end
+  else t
 
 (** exported outside Theory.ml *)
 let econvert (cenv : conv_env) ty_vars subst t : eterm option =
@@ -1306,7 +1323,9 @@ let convert_global_formula cenv ty_vars env (p : global_formula) =
     in
 
     match L.unloc p with
-    | PImpl (f,f0) -> Equiv.Impl (conve f, conve f0)
+    | PImpl (f1, f2) -> Equiv.Impl (conve f1, conve f2)
+    | PAnd  (f1, f2) -> Equiv.And  (conve f1, conve f2)
+    | POr   (f1, f2) -> Equiv.Or   (conve f1, conve f2)
 
     | PEquiv e -> 
       Equiv.Atom (Equiv.Equiv (convert_equiv cenv ty_vars env e))
@@ -1314,12 +1333,17 @@ let convert_global_formula cenv ty_vars env (p : global_formula) =
     | PReach f -> 
       Equiv.Atom (Equiv.Reach (convert cenv ty_vars env f Type.Boolean))
 
-    | PForAll (bnds, e) ->
+
+    | PQuant (q, bnds, e) ->
       let env, evs =
         convert_p_bnds cenv.table ty_vars env bnds 
       in
       let e = conve ~env e in
-      Equiv.mk_forall evs e
+      let q = match q with
+        | PForAll -> Equiv.ForAll
+        | PExists -> Equiv.Exists
+      in
+      Equiv.mk_quant q evs e
   in      
 
   conve cenv ty_vars env p
@@ -1408,8 +1432,9 @@ let find_app_terms t (names : string list) =
 (** Parser type for a formula built by partially applying an hypothesis
     or a lemma *)
 type p_pt_hol = {
-  p_pt_hid : lsymb;
+  p_pt_hid  : lsymb;
   p_pt_args : term list;
+  p_pt_loc  : L.t;
 }
 
 (** Parser type for `apply` arguments *)

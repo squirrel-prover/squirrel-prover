@@ -21,7 +21,7 @@ COMMENTS
 - The goal is to prove that the secret s is never leaked because the B receives
   only hashes with old values of the counter.
 
-PROOFS
+SECURITY PROPERTIES
 - monotonicity of the counter
 - secrecy (as a reachability property)
 *******************************************************************************)
@@ -45,8 +45,7 @@ channel cB
 abstract mySucc : message->message
 
 (* order relation for counter *)
-abstract orderOk : message
-abstract order : message->message->message
+abstract (~<) : message -> message -> boolean
 
 (* processes *)
 process A =
@@ -67,54 +66,50 @@ system ((!_i A) | (!_j B)).
 
 (* AXIOMS *)
 
-axiom orderSucc : forall (n:message), order(n,mySucc(n)) = orderOk.
-axiom orderTrans :
-  forall (n1,n2,n3:message),
-    (order(n1,n2) = orderOk && order(n2,n3) = orderOk)
-    => order(n1,n3) = orderOk.
-axiom orderStrict : forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk.
+axiom orderSucc (n:message): n ~< mySucc(n).
 
-(* GOALS *)
+axiom orderTrans (n1,n2,n3:message): n1 ~< n2 && n2 ~< n3 => n1 ~< n3.
+
+axiom orderStrict (n1,n2:message): n1 = n2 => n1 ~< n2 => false.
+
+(* SECURITY PROPERTIES *)
 
 (* The counter increases strictly at each update. *)
 goal counterIncreasePred (t:timestamp): 
-  t > init => order(d@pred(t),d@t) = orderOk.
+  t > init => d@pred(t) ~< d@t.
 Proof.
-  intro Hc.
+  intro Hc. 
   use orderSucc with d@pred(t).
-  case t; 2,3,4: intro *; simpl_left; expand d@t; by congruence.
-  by eqtrace.
+  case t; 2,3,4: auto. 
+  constraints.
 Qed.
 
 (* A more general result than counterIncreasePred. *)
-goal counterIncrease :
-  forall (t,t':timestamp), 
-    (t' < t => order(d@t',d@t) = orderOk).
+goal counterIncrease (t,t':timestamp):
+   t' < t => d@t' ~< d@t.
 Proof.
-  induction.
-  intro t Hind t' Ht.
-  assert (t' < pred(t) || t' >= pred(t)) as H0; 1: by case t. 
+  induction t => t Hind Ht.
+  assert (t' < pred(t) || t' >= pred(t)) as H0 by case t. 
   case H0.
 
     (* case t' < pred(t) *)
-    use Hind with pred(t),t' as H1; 2,3: by eqtrace.
-    use counterIncreasePred with t; 2: by eqtrace.
-    by use orderTrans with d@t',d@pred(t),d@t.
+    apply Hind in H0 => //.
+    use counterIncreasePred with t; 2: by constraints.
+    by apply orderTrans _ (d@pred(t)).
 
     (* case t' >= pred(t) *)
-    assert t' = pred(t). by eqtrace.
-    by use counterIncreasePred with t.
+    assert t' = pred(t) as Ceq by constraints.
+    use counterIncreasePred with t; 2: auto.
+    by rewrite Ceq; use counterIncreasePred with t.
 Qed.
 
-goal secretReach : 
-  forall (j:index), happens(B(j)) => (cond@B(j) => False).
+goal secretReach (j:index):
+  happens(B(j)) => cond@B(j) => false.
 Proof.
-  intro j Hap Hcond.
-  expand cond@B(j).
-  euf Hcond.
-  intro Ht Heq.
-  assert pred(A(i)) < pred(B(j)). by eqtrace.
-  use counterIncrease with pred(B(j)),pred(A(i)).
-  use orderStrict with d@pred(A(i)),d@pred(B(j)); by congruence.
-  by eqtrace.
+  intro Hap Hcond.
+  expand cond.
+  euf Hcond => Ht Heq. 
+  assert pred(A(i)) < pred(B(j)) as H by constraints.
+  apply counterIncrease in H.
+  by apply orderStrict in H. 
 Qed.

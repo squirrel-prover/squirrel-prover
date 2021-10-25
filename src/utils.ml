@@ -33,6 +33,11 @@ end
 module List = struct
   include List
 
+  let rec last = function
+    | [] -> raise (Failure "List.last")
+    | [x] -> x
+    | _ :: l -> last l
+
   let init n f =
     if n < 0 then raise (Failure "List.init")
     else
@@ -75,6 +80,15 @@ module List = struct
     | (a,b)::l -> if compare a x = 0 then b else assoc_dflt dflt x l
 
   (*------------------------------------------------------------------*)
+  let rec iteri2 i f l1 l2 =
+    match (l1, l2) with
+      ([], []) -> ()
+    | (a1::l1, a2::l2) -> f i a1 a2; iteri2 (i+1) f l1 l2
+    | (_, _) -> invalid_arg "List.iteri2"
+
+  let iteri2 f l1 l2 = iteri2 0 f l1 l2
+
+  (*------------------------------------------------------------------*)
   let rec drop0 i l =
     if i = 0 then l else
       match l with
@@ -115,6 +129,15 @@ module List = struct
       | [] -> raise Out_of_range
       | e::tl -> if i=0 then acc,e,tl else aux (i-1) (e::acc) tl
     in aux i [] l
+
+  (*------------------------------------------------------------------*)
+  let remove_duplicate cmp l =
+    let l_rev = 
+      List.fold_left (fun l el ->
+          if List.exists (cmp el) l then l else el :: l
+        ) [] l
+    in
+    List.rev l_rev  
 end
 
 (*------------------------------------------------------------------*)

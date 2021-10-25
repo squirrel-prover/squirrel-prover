@@ -41,12 +41,16 @@ type quant = ForAll | Exists
 
 type form = 
   | Quant of quant * Vars.evar list * form
-  | Atom   of atom
-  | Impl   of (form * form)
+  | Atom  of atom
+  | Impl  of form * form
+  | And   of form * form
+  | Or    of form * form
 
 val pp : Format.formatter -> form -> unit
 
-val mk_forall : Vars.evar list -> form -> form
+val mk_quant  : quant -> Vars.evar list -> form -> form
+val mk_forall :          Vars.evar list -> form -> form
+val mk_exists :          Vars.evar list -> form -> form
 
 val mk_reach_atom : Term.message -> form
 
@@ -111,8 +115,9 @@ module Babel : sig
     call : 'a. 'a f_kind -> 'a -> 'a
   }
   val convert : ?loc:Location.t -> src:'a f_kind -> dst:'b f_kind -> 'a -> 'b
-  val subst : 'a f_kind -> Term.subst -> 'a -> 'a
-  val fv    : 'a f_kind -> 'a -> Vars.Sv.t
+  val subst  : 'a f_kind -> Term.subst -> 'a -> 'a
+  val tsubst : 'a f_kind -> Type.tsubst -> 'a -> 'a
+  val fv     : 'a f_kind -> 'a -> Vars.Sv.t
   val get_terms : 'a f_kind -> 'a -> Term.message list
   val pp : 'a f_kind -> Format.formatter -> 'a -> unit
 end

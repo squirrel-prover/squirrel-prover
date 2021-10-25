@@ -205,19 +205,19 @@ Proof.
   destruct HcOk as [Hpk HcOk].
   rewrite !Hpk in HcOk.
   euf HcOk => Euf.
-  destruct Euf as [H [_|[i x1 x2 H1]]]; 1: by auto.  
+  destruct Euf as [H [_|[i x1 x2 H1]]]; 1: by auto.
   expand sidP1; destruct H1 as [_|[x3 H1]].
-  
+
   collision => _; use HcFail with i.
   by auto.
 
   by use hashnotfor with <<g^a1,input@P1>,input@P1^a1>, x3.
-  
-  intro Heq. 
+
+  intro Heq.
   expand sidP1; case Euf; expand sidS1; collision => _;
   use freshindex as [l _];
-  use HcFail with l. 
-  by auto. 
+  use HcFail with l.
+  by auto.
   by auto.
 Qed.
 
@@ -240,7 +240,7 @@ Proof.
 
   intro _; case Euf; expand sidP1; collision => _;
   use freshindex as [l _];
-  use HcFail with l; 
+  use HcFail with l;
   auto.
 Qed.
 
@@ -251,68 +251,41 @@ some simple enriching of the induction hypothesis, and then dup applications. *)
 
 equiv [auth] auth.
 Proof.
-   enrich a1, b1, seq(i-> g^b(i)), seq(i-> g^a(i)), kP, kS, hKey.
+   enrich a1, b1, seq(i:index -> g^b(i)), seq(i:index -> g^a(i)), kP, kS, hKey.
 
-   induction t.
+   induction t; try (by expandall; apply IH).
 
+   (* init *)
    auto.
 
-   (* P *)
-   by expandall; fa 7.
-   (* P1 *)
-   by expandall; fa 7.
-   (* Pok *)
-   by expandall; fa 7.
-   (* Pauth3 *)
-   expandall; fa 7.
-   by expandseq seq(i->g^b(i)),i. 
    (* Pfail *)
    expand frame.
 
    equivalent exec@Pfail, False.
-     expand exec. 
+     expand exec.
      split; 2: by auto => _.
      depends Pok, Pfail => // _.
      executable pred(Pfail); 1,2: by auto.
      intro He; use He with Pok; 2: by auto.
-   
+
      expand exec.
      by use P_charac.
 
-   fa 7; fa 8.
-   by noif 8.
+   by noif 7.
 
-   (* A *)
-   by expandall; fa 7.
-
-   (* S *)
-   by expandall; fa 7.
-
-   (* S1 *)
-   by expandall; fa 7.
-
-   (* Sok *)
-   by expandall; fa 7.
-
-   (* Sauth3 *)
-   expandall; fa 7.
-   by expandseq seq(i->g^a(i)),i.
-   (* Safil *)
+   (* Sfail *)
    expand frame.
 
    equivalent exec@Sfail, False.
-     expand exec. 
+     expand exec.
      split; 2: by auto => _.
      depends Sok, Sfail => // _.
      executable pred(Sfail); 1,2: by auto.
      intro He; use He with Sok; 2: by auto.
-   
+
      expand exec.
      by use S_charac.
 
-   fa 7; fa 8.
-   by noif 8.
+   by noif 7.
 
-   (* A1 *)
-   by expandall; fa 7.
 Qed.

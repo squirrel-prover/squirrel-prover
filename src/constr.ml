@@ -1417,15 +1417,18 @@ let find_eq_action (models : models) (t : Term.timestamp) =
       ) classe
   in
 
-  (* compute an action equal to [t] in one model. *)
-  match List.find_map action_model models with
-  | None -> None
-  | Some term ->
-  (* check that [t] = [term] in all models. *)
-    if query ~precise:true models [`Pos, `Timestamp (`Eq,t,term)] 
-    then Some term 
-    else None
-    
+  match t with
+  | Term.Action _ -> Some t     (* already an action *)
+  | _ ->
+    (* compute an action equal to [t] in one model. *)
+    match List.find_map action_model models with
+    | None -> None
+    | Some term ->
+      (* check that [t] = [term] in all models. *)
+      if query ~precise:true models [`Pos, `Timestamp (`Eq,t,term)] 
+      then Some term 
+      else None
+
 
 (*------------------------------------------------------------------*)
 (** Context of an trace model *)

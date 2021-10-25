@@ -112,11 +112,11 @@ let to_string s = s.name
 
 let pp fmt symb = Format.pp_print_string fmt symb.name
 
-module Ms = Map.Make (struct type t = symb let compare = Stdlib.compare end)
+module Msymb = Map.Make (struct type t = symb let compare = Stdlib.compare end)
 
 (*------------------------------------------------------------------*)
 module Table : sig
-  type table_c = (edef * data) Ms.t
+  type table_c = (edef * data) Msymb.t
 
   type table = private {
     cnt : table_c;
@@ -126,7 +126,7 @@ module Table : sig
   val mk : table_c -> table
   val tag : table -> int
 end = struct
-  type table_c = (edef * data) Ms.t
+  type table_c = (edef * data) Msymb.t
 
   type table = {
     cnt : table_c;
@@ -144,11 +144,11 @@ end
 include Table
 
 (*------------------------------------------------------------------*)
-let empty_table : table = mk Ms.empty
+let empty_table : table = mk Msymb.empty
 
 let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
 
-let table_add table name d = Ms.add name d table
+let table_add table name d = Msymb.add name d table
 
 let fresh ?(group=default_group) prefix table =
   let substrings = Pcre.exec ~rex:prefix_count_regexp prefix in
@@ -158,7 +158,7 @@ let fresh ?(group=default_group) prefix table =
   let rec find i =
     let s = if i=0 then prefix else prefix ^ string_of_int i in
     let symb = {group;name=s} in
-    if Ms.mem symb table then find (i+1) else symb
+    if Msymb.mem symb table then find (i+1) else symb
   in
   find i0
 
@@ -178,7 +178,7 @@ let edef_namespace : edef -> namespace = fun e ->
 let get_namespace ?(group=default_group) (table : table) s =
   let s = { group; name=s } in
   let f (x,_) = edef_namespace x in
-  omap f (Ms.find_opt s table.cnt)
+  omap f (Msymb.find_opt s table.cnt)
 
 (*------------------------------------------------------------------*)
 (** {2 Error Handling} *)
@@ -213,17 +213,17 @@ let symb_err l e = raise (SymbError (l,e))
 
 let def_of_lsymb ?(group=default_group) (s : lsymb) (table : table) =
   let t = { group; name = L.unloc s } in
-  try fst (Ms.find t table.cnt) with Not_found ->
+  try fst (Msymb.find t table.cnt) with Not_found ->
     symb_err (L.loc s) (Unbound_identifier (L.unloc s))
 
 let is_defined ?(group=default_group) name (table : table) =
-  Ms.mem {group;name} table.cnt
+  Msymb.mem {group;name} table.cnt
 
 type wrapped = Wrapped : 'a t * 'a def -> wrapped
 
 let of_lsymb ?(group=default_group) (s : lsymb) (table : table) =
   let t = { group ; name = L.unloc s } in
-  match Ms.find t table.cnt with
+  match Msymb.find t table.cnt with
   | Exists d, _ -> Wrapped (t,d)
   | exception Not_found
   | Reserved _, _ ->
@@ -231,7 +231,7 @@ let of_lsymb ?(group=default_group) (s : lsymb) (table : table) =
 
 let of_lsymb_opt ?(group=default_group) (s : lsymb) (table : table) =
   let t = { group; name = L.unloc s } in
-  try match Ms.find t table.cnt with
+  try match Msymb.find t table.cnt with
     | Exists d, _ -> Some (Wrapped (t,d))
     | Reserved _, _ -> None
   with Not_found -> None
@@ -282,25 +282,25 @@ module Make (N:S) : Namespace
 
   let reserve (table : table) (name : lsymb) =
     let symb = fresh ~group (L.unloc name) table.cnt in
-    let table_c = Ms.add symb (Reserved N.namespace,Empty) table.cnt in
+    let table_c = Msymb.add symb (Reserved N.namespace,Empty) table.cnt in
     mk table_c, symb
 
   let reserve_exact (table : table) (name : lsymb) =
     let symb = { group; name = L.unloc name } in
-    if Ms.mem symb table.cnt then
+    if Msymb.mem symb table.cnt then
       symb_err (L.loc name) (Multiple_declarations (L.unloc name));
 
-    let table_c = Ms.add symb (Reserved N.namespace,Empty) table.cnt in
+    let table_c = Msymb.add symb (Reserved N.namespace,Empty) table.cnt in
     mk table_c, symb
 
   let define (table : table) symb ?(data=Empty) value =
-    assert (fst (Ms.find symb table.cnt) = Reserved N.namespace) ;
-    let table_c = Ms.add symb (Exists (N.construct value), data) table.cnt in
+    assert (fst (Msymb.find symb table.cnt) = Reserved N.namespace) ;
+    let table_c = Msymb.add symb (Exists (N.construct value), data) table.cnt in
     mk table_c
 
   let redefine (table : table) symb ?(data=Empty) value =
-    assert (Ms.mem symb table.cnt) ;
-    let table_c = Ms.add symb (Exists (N.construct value), data) table.cnt in
+    assert (Msymb.mem symb table.cnt) ;
+    let table_c = Msymb.add symb (Exists (N.construct value), data) table.cnt in
     mk table_c
 
   let declare (table : table) (name : lsymb) ?(data=Empty) value =
@@ -312,7 +312,7 @@ module Make (N:S) : Namespace
 
   let declare_exact (table : table) (name : lsymb) ?(data=Empty) value =
     let symb = { group; name = L.unloc name } in
-    if Ms.mem symb table.cnt then
+    if Msymb.mem symb table.cnt then
       symb_err (L.loc name) (Multiple_declarations (L.unloc name));
     let table_c =
       table_add table.cnt symb (Exists (N.construct value), data)
@@ -321,7 +321,7 @@ module Make (N:S) : Namespace
 
   let get_all (name:ns t) (table : table) =
     (* We know that [name] is bound in [table]. *)
-    let def,data = Ms.find name table.cnt in
+    let def,data = Msymb.find name table.cnt in
     N.deconstruct ~loc:None def, data
 
   let get_def name (table : table) = fst (get_all name table)
@@ -334,7 +334,7 @@ module Make (N:S) : Namespace
     try
       ignore (N.deconstruct
                 ~loc:(Some (L.loc name))
-                (fst (Ms.find symb table.cnt))) ;
+                (fst (Msymb.find symb table.cnt))) ;
       symb
     with Not_found ->
       symb_err (L.loc name) (Unbound_identifier (L.unloc name))
@@ -344,20 +344,20 @@ module Make (N:S) : Namespace
     try
       ignore (N.deconstruct
                 ~loc:(Some (L.loc name))
-                (fst (Ms.find symb table.cnt))) ;
+                (fst (Msymb.find symb table.cnt))) ;
       Some symb
     with Not_found -> None
 
   let def_of_lsymb (name : lsymb) (table : table) =
     try
       N.deconstruct ~loc:(Some (L.loc name))
-        (fst (Ms.find { group; name = L.unloc name } table.cnt))
+        (fst (Msymb.find { group; name = L.unloc name } table.cnt))
     with Not_found ->
       symb_err (L.loc name) (Unbound_identifier (L.unloc name))
 
   let data_of_lsymb (name : lsymb) (table : table) =
     try
-      let def,data = Ms.find { group; name = L.unloc name } table.cnt in
+      let def,data = Msymb.find { group; name = L.unloc name } table.cnt in
         (* Check that we are in the current namespace
          * before returning the associated data. *)
         ignore (N.deconstruct ~loc:(Some (L.loc name)) def) ;
@@ -366,14 +366,14 @@ module Make (N:S) : Namespace
       symb_err (L.loc name) (Unbound_identifier (L.unloc name))
 
   let iter f (table : table) =
-    Ms.iter
+    Msymb.iter
       (fun s (def,data) ->
          try f s (N.deconstruct ~loc:None def) data with
            | SymbError (_,Incorrect_namespace _) -> ())
       table.cnt
 
   let fold f acc (table : table) =
-    Ms.fold
+    Msymb.fold
       (fun s (def,data) acc ->
          try
            let def = N.deconstruct ~loc:None def in
@@ -602,6 +602,14 @@ let fs_ite =
       tyvar in
   mk_fsymb ~fty "if" (-1)
 
+(** Witness *)
+
+let fs_witness =
+  let tyv = Type.mk_tvar "t" in
+  let tyvar = Type.TVar tyv in
+  let fty = Type.mk_ftype 0 [tyv] [] tyvar in
+  mk_fsymb ~fty "witness" (-1)
+
 (** Fail *)
 
 let fs_fail = mk_fsymb "fail" 0
@@ -614,6 +622,10 @@ let fs_zero = mk_fsymb "zero" 0
 (** Successor over natural numbers *)
 
 let fs_succ = mk_fsymb "succ" 1
+
+(** Adversary function *)
+
+let fs_att = mk_fsymb "att" 1
 
 (** Pairing *)
 
@@ -659,6 +671,12 @@ type 'a _t = 'a t
 
 module Ss (S : Namespace) : Set.S with type elt := S.ns t =
   Set.Make(struct
+    type t = S.ns _t
+    let compare = Stdlib.compare
+  end)
+
+module Ms (S : Namespace) : Map.S with type key := S.ns t =
+  Map.Make(struct
     type t = S.ns _t
     let compare = Stdlib.compare
   end)

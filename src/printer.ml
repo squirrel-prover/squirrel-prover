@@ -40,6 +40,7 @@ type pp = [
   | `Result
   | `Error
   | `Dbg
+  | `Warning
   | `Ignore (* do not print *)
   | `Goal
   | `Default
@@ -49,9 +50,10 @@ let pp_pref (ty : pp) =
   match ty with
   | `Prompt  -> pr "@[[> "
   | `Start   -> pr "@[[start> "
-  | `Result  -> pr "@[[result> "
+  | `Result  -> pr "@["
   | `Error   -> pr "@[[error> "
   | `Dbg     -> pr "@[[dbg> "
+  | `Warning -> pr "@[[warning> "
   | `Ignore  -> ()
   | `Goal    -> pr "@[[goal> "
   | `Default -> ()
@@ -63,6 +65,7 @@ let pp_suf (ty : pp) =
   | `Result  -> pr "@;@]@."
   | `Error   -> pr "@;@]@."
   | `Dbg     -> pr "@;<]@]@."
+  | `Warning -> pr "@;<]@]@."
   | `Ignore  -> ()
   | `Goal    -> pr "@;@]@."
   | `Default -> ()

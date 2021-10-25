@@ -38,6 +38,8 @@ let rec get_indices = function
   | a :: l ->
     snd a.par_choice @ snd a.sum_choice @ get_indices l
 
+let fv_action a = Vars.Sv.of_list1 (get_indices a)
+
 let same_shape a b : Term.subst option =
   let rec same acc a b = match a,b with
   | [],[] -> Some acc
@@ -177,34 +179,6 @@ type descr = {
   (** list of global macros declared at [action] *)
 }
 
-let pp_descr_short ppf descr =
-  let t = Term.mk_action descr.name descr.indices in
-  Term.pp ppf t
-
-let pp_descr ppf descr =
-  Fmt.pf ppf "@[<v 0>name: @[<hov>%a@]@;\
-              %a\
-              @[<hv 2>condition:@ @[<hov>%a@]@]@;\
-              %a\
-              @[<hv 2>output:@ @[<hov>%a@]@]@]"
-    pp_descr_short descr
-    (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" Vars.pp_list)
-    descr.indices
-    Term.pp (snd descr.condition)
-    (Utils.pp_ne_list "@[<hv 2>updates:@ @[<hov>%a@]@]@;"
-       (Fmt.list
-          ~sep:(fun ppf () -> Fmt.pf ppf ";@ ")
-          (fun ppf (s, t) ->
-             Fmt.pf ppf "%a :=@ %a" Term.pp_msymb s Term.pp t)))
-    descr.updates
-    Term.pp (snd descr.output)
-
-let pi_descr s d =
-  let pi_term t = Term.pi_term ~projection:s t in
-  { d with
-    condition = (let is,t = d.condition in is, pi_term t);
-    updates = List.map (fun (st, m) -> st, pi_term m) d.updates;
-    output = (let c,m = d.output in c, pi_term m) }
 
 (** Apply a substitution to an action description.
   * The domain of the substitution must contain all indices
@@ -216,7 +190,6 @@ let subst_descr subst descr =
   let condition =
     (* FIXME: do we need to substitute ? *)
      fst descr.condition,
-     (* List.map (Term.subst_var subst) (fst descr.condition), *)
      Term.subst subst (snd descr.condition) in
   let updates =
     List.map (fun (ss,t) ->
@@ -251,8 +224,41 @@ let apply_descr iter descr =
 
 
 let refresh_descr descr =
-  let indices, s = Term.refresh_vars `Global descr.indices in
+  let _, s = Term.refresh_vars `Global descr.indices in
   subst_descr s descr
+
+let pp_descr_short ppf descr =
+  let t = Term.mk_action descr.name descr.indices in
+  Term.pp ppf t
+
+let pp_descr ppf descr =
+  let e = ref (Vars.of_list []) in
+  let _, s = Term.refresh_vars (`InEnv e) descr.indices in
+  let descr = subst_descr s descr in
+
+  Fmt.pf ppf "@[<v 0>name: @[<hov>%a@]@;\
+              %a\
+              @[<hv 2>condition:@ @[<hov>%a@]@]@;\
+              %a\
+              @[<hv 2>output:@ @[<hov>%a@]@]@]"
+    pp_descr_short descr
+    (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" Vars.pp_list)
+    descr.indices
+    Term.pp (snd descr.condition)
+    (Utils.pp_ne_list "@[<hv 2>updates:@ @[<hv>%a@]@]@;"
+       (Fmt.list
+          ~sep:(fun ppf () -> Fmt.pf ppf ";@ ")
+          (fun ppf (s, t) ->
+             Fmt.pf ppf "@[%a :=@ %a@]" Term.pp_msymb s Term.pp t)))
+    descr.updates
+    Term.pp (snd descr.output)
+
+let pi_descr s d =
+  let pi_term t = Term.pi_term ~projection:s t in
+  { d with
+    condition = (let is,t = d.condition in is, pi_term t);
+    updates = List.map (fun (st, m) -> st, pi_term m) d.updates;
+    output = (let c,m = d.output in c, pi_term m) }
 
 (*------------------------------------------------------------------*)
 let debug = false
@@ -292,8 +298,8 @@ let is_dup_match
     (st    : 'a)
     (table : Symbols.table)
     (elem  : Term.message)
-    (elems : Term.message list)
-  : 'a option =
+    (elems : Term.message list) : 'a option
+  =
   (* try to match [t] and [t'] modulo ≤ *)
   let is_dup_leq table st t t' : 'a option =
     let rec leq t t' =

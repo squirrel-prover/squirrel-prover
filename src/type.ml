@@ -256,6 +256,10 @@ let tsubst : type a. tsubst -> a ty -> a ty = fun s t ->
 
 let tsubst_e s (ETy ty) = ETy (tsubst s ty)
 
+let tsubst_ht (ts : tsubst) (ht : hty) : hty =
+  match ht with
+  | Lambda (vs, f) -> Lambda (List.map (tsubst_e ts) vs, tsubst ts f)
+
 (*------------------------------------------------------------------*)
 (** {2 Type inference } *)
 
