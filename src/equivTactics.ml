@@ -1648,13 +1648,13 @@ let () =
     (LowTactics.genfun_of_pure_efun_arg prf)
     Args.(Pair(Int, Opt Message))
 
-let global_prf_param hash : prf_param =
-  match hash with
-  | Term.Seq (is,t) -> prf_param t
-  | _ -> prf_param hash
-
 let global_prf (p1,p2) Args.(Pair (Message (hash,ty),String new_system)) s =
   let cntxt = ES.mk_trace_cntxt s in
+
+  let is, hash =   match hash with
+  | Term.Seq (is,t) -> (List.map (fun x -> Vars.ecast x Type.KIndex) is),t
+  | _ -> [], hash
+  in
 
   let system_left = SE.project p1 cntxt.system in
   let cntxt_left = { cntxt with system = system_left } in
@@ -1664,7 +1664,7 @@ let global_prf (p1,p2) Args.(Pair (Message (hash,ty),String new_system)) s =
     | _ -> assert false
   in
 
-  let param = global_prf_param hash in
+  let param = prf_param hash in
   let frame = ES.goal_as_equiv s in
   let env = ref (ES.env s) in
   (* Check syntactic side condition. *)
@@ -1676,13 +1676,9 @@ let global_prf (p1,p2) Args.(Pair (Message (hash,ty),String new_system)) s =
   if errors <> [] then
     soft_failure (Tactics.BadSSCDetailed errors);
 
-  (* We create a fresh copy of the message *)
-  let term_iv = List.fold_left (fun acc (Vars.EVar x) ->
-      try let v = (Vars.cast x Type.KIndex) in v :: acc
-      with Vars.CastError -> acc )
-      [] (Term.get_vars (Term.mk_pair param.h_cnt (Term.mk_name param.h_key))) in
-
-  let is, subst = Term.refresh_vars (`InEnv env) term_iv in
+  let is, left_subst = Term.refresh_vars (`InEnv env) is in
+  let left_hash = Term.subst left_subst hash in
+  let nis, subst = Term.refresh_vars (`InEnv env) is in
   let fresh_mess = Term.subst subst param.h_cnt in
   let fresh_key = Term.subst subst (Term.mk_name param.h_key) in
   let fresh_key_ids = match fresh_key with
@@ -1692,35 +1688,38 @@ let global_prf (p1,p2) Args.(Pair (Message (hash,ty),String new_system)) s =
 
   (* We will now instantiate the new system. *)
   (* Instantiation of the fresh name *)
-  let ndef = Symbols.{ n_iarr = List.length is; n_ty = Message ; } in
+  let ndef = Symbols.{ n_iarr = List.length nis; n_ty = Message ; } in
   let table,n =
     Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
   in
   let s = ES.set_table table s in
-
   (* the hash h of a message m will be replaced by tryfind is s.t = fresh mess
      in fresh else h *)
   let mk_tryfind nhash =
     match nhash with
     | Term.Fun ((h_fn, _), _, [h_cnt; Name s]) when s.s_symb = param.h_key.s_symb ->
-        let ns = Term.mk_isymb n Message (is) in
-        Term.mk_find is Term.(
+        let ns = Term.mk_isymb n Message (nis) in
+        Term.mk_find nis Term.(
             mk_and
               (mk_atom `Eq h_cnt fresh_mess)
               (mk_indices_eq fresh_key_ids s.s_indices)
           ) (Term.mk_name ns) nhash
     | _ -> Printer.pr "%a" Term.pp nhash;  assert false
   in
-
+  let rw_rule = Rewrite.{
+    rw_tyvars = [];
+    rw_vars = Vars.Sv.of_list (List.map Vars.evar is);
+    rw_conds = [];
+    rw_rw = Term.ESubst (left_hash, mk_tryfind left_hash);
+  }
+  in
   let iterator t =
-     let iter = new Iter.get_f_messages_no_refresh ~fun_wrap_key:None ~drop_head:false
-       ~cntxt param.h_fn param.h_key.s_symb in
-     iter#visit_message t;
-     let hash_occs =  List.sort_uniq Stdlib.compare iter#get_occurrences in
-     let subst = List.map (fun (_,m) -> Term.ESubst (m, mk_tryfind m)) hash_occs in
-     t
-       (* BROKEN WIP
-          Term.subst_no_refresh subst t *)
+    match
+      Rewrite.rewrite (ES.table s) (ES.system s) (ES.env s) TacticsArgs.(`Once)
+        rw_rule (`Reach t)
+    with
+    | `Result (`Reach res, ls) -> res
+    | _ -> t
   in
 
  try
@@ -1817,7 +1816,6 @@ let global_rename Args.(Pair (Message (n1,ty1), Pair(Message (n2,ty2),
   let evars = Term.get_vars n1 in
   let vs, subs = Term.erefresh_vars `Global evars in
   let (n1', n2') = (Term.subst subs n1, Term.subst subs n2) in
-  Printer.prt `Result "%a,%a" Term.pp n1' Term.pp n2';
   let rw_rule = Rewrite.{
     rw_tyvars = [];
     rw_vars = Vars.Sv.of_list vs;

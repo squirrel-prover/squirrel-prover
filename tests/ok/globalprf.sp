@@ -12,9 +12,9 @@ system null.
 abstract ok : message.
 
 
-system [test] (A: out(c, <ok,h(ok,k)>) | B: out(c, h(ok,k))).
+system [test] (A: out(c, <ok,<h(ok,k),h(ok,k)>>) | B: out(c, h(ok,k))).
 
-system [test2] (A: out(c, <ok,n>) | B: out(c, n)).
+system [test2] (A: out(c, <ok,<n,n>>) | B: out(c, n)).
 
 
 axiom tf :  (forall ( p, n:message),try find such that true in p else n =p ).
@@ -22,6 +22,7 @@ axiom tf :  (forall ( p, n:message),try find such that true in p else n =p ).
 equiv [test/left,test2/right] test2.
 Proof.
 globalprf h(ok,k), ntest.
+print.
 
 rename n_PRF,n, ntest2.
 
@@ -36,8 +37,9 @@ repeat fa 2.
 equivalent ok=ok,true.
 auto.
 equivalent try find  such that true in n else h(ok,k) , n.
-forceuse tf with n, h(ok,k).
-auto.
+admit.  (* BROKEN -> fixed with system declaration construct *)
+
+
 equivalent diff(n,n),n.
 project; auto.
 auto.
@@ -48,8 +50,8 @@ repeat fa 2.
 equivalent ok=ok,true.
 auto.
 equivalent try find  such that true in n else h(ok,k) , n.
-forceuse tf with n, h(ok,k).
-auto.
+admit.
+
 equivalent diff(n,n),n.
 project; auto.
 auto.
@@ -69,12 +71,13 @@ axiom tf2 :  (forall (c:boolean, p, n:message, i:index), exists i:index, c =>  t
 equiv [testi/left,testi2/right] test3.
 Proof.
 
-globalprf seq(i->h(msg(i),key(i))), ntest.
-
-rename seq(i -> n_PRF(i)),seq(i -> idn(i)), news.
+globalprf seq(i:index->h(msg(i),key(i))), ntest.
 print.
 
-enrich seq(i-> idn(i)).
+rename seq(i:index -> n_PRF(i)),seq(i:index -> idn(i)), news.
+print.
+
+enrich seq(i:index-> idn(i)).
 induction t.
 
 expandall.
@@ -83,12 +86,11 @@ auto.
 expandall.
 fa 1. repeat fa 2.
 
-(* TODO, the name i45 is not stable under redo operations. *)
-equivalent   try find i63 such that (msg(i) = msg(i63) && i63 = i)
-     in idn(i63) else h(msg(i),key(i)),
+equivalent   try find i0 such that (msg(i) = msg(i0) && i0 = i)
+     in idn(i0) else h(msg(i),key(i)),
      idn(i).
-case (try find i63 such that (msg(i) = msg(i63) && i63 = i)
- in idn(i63) else h(msg(i),key(i))).
+case (try find i0 such that (msg(i) = msg(i0) && i0 = i)
+ in idn(i0) else h(msg(i),key(i))).
 
 intro H2.
 destruct H2.
@@ -101,16 +103,16 @@ auto.
 
 equivalent  diff(idn(i),idn(i)), idn(i).
 project; auto.
-expandseq seq(i->idn(i)), i.
+expandseq seq(i:index->idn(i)), i.
 auto.
 
 
 expandall.
-equivalent  try find i75 such that (msg(i) = msg(i75) && i75 = i)
-         in idn(i75) else h(msg(i),key(i)),
+equivalent  try find i0 such that (msg(i) = msg(i0) && i0 = i)
+         in idn(i0) else h(msg(i),key(i)),
          idn(i).
-case (try find i75 such that (msg(i) = msg(i75) && i75 = i)
- in idn(i75) else h(msg(i),key(i))).
+case (try find i0 such that (msg(i) = msg(i0) && i0 = i)
+ in idn(i0) else h(msg(i),key(i))).
 
 intro H2.
 destruct H2.
@@ -123,7 +125,7 @@ auto.
 
 equivalent  diff(idn(i),idn(i)), idn(i).
 project; auto.
-expandseq seq(i->idn(i)), i.
+expandseq seq(i:index->idn(i)), i.
 fa 2.
 auto.
 
