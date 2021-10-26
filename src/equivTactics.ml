@@ -1778,10 +1778,10 @@ let () =
 let global_rename Args.(Pair (Message (n1,ty1), Pair(Message (n2,ty2),
                                                      String new_system))) s =
   let cntxt = ES.mk_trace_cntxt s in
-  let ns1, ns2 = match n1,n2 with
-    | Term.Name n1, Term.Name n2 -> n1, n2
+  let ns1, ns2, n1, n2 = match n1,n2 with
+    | Term.Name ns1, Term.Name ns2 -> ns1, ns2, n1, n2
     | Term.(Seq (is,Name nn1)), Term.(Seq (is2,Name nn2))
-      when List.length is = List.length is2-> nn1, nn2
+      when List.length is = List.length is2-> nn1, nn2, Term.mk_name nn1, Term.mk_name nn2
     | _ -> assert false
   in
   let frame = ES.goal_as_equiv s in
@@ -1813,11 +1813,26 @@ let global_rename Args.(Pair (Message (n1,ty1), Pair(Message (n2,ty2),
       iter2#visit_message (snd action_descr.Action.condition) ;
     List.iter (fun (_,m) -> iter2#visit_message m) action_descr.Action.updates) ;
 
-  let iterator t = t
-    (*
-         BROKEN WIP
-         Term.subst_sym ns2 ns1 t
-       *)
+  (* We now build the rewrite rule *)
+  let evars = Term.get_vars n1 in
+  let vs, subs = Term.erefresh_vars `Global evars in
+  let (n1', n2') = (Term.subst subs n1, Term.subst subs n2) in
+  Printer.prt `Result "%a,%a" Term.pp n1' Term.pp n2';
+  let rw_rule = Rewrite.{
+    rw_tyvars = [];
+    rw_vars = Vars.Sv.of_list vs;
+    rw_conds = [];
+    rw_rw = Term.ESubst (n1', n2');
+  }
+  in
+
+  let iterator t =
+    match
+      Rewrite.rewrite (ES.table s) (ES.system s) (ES.env s) TacticsArgs.(`Any)
+        rw_rule (`Reach t)
+    with
+    | `Result (`Reach res, ls) -> res
+    | _ -> t
      in
  try
     let table, new_system =
