@@ -40,6 +40,16 @@ let pp_system_decl fmt sys =
     Process.pp_process sys.sprocess
 
 (*------------------------------------------------------------------*)
+type system_modifier =
+  | Rename of Theory.global_formula
+  | PRF
+
+type system_decl_modifier = { from_sys    : SystemExpr.parsed;
+                              modifier : system_modifier;
+                              name : Theory.lsymb
+                            }
+
+(*------------------------------------------------------------------*)
 type orcl_tag_info = Theory.formula
 
 let pp_orcl_tag_info = Theory.pp
@@ -50,17 +60,18 @@ type declaration_i =
   | Decl_process of lsymb * Theory.bnds * Process.process
   | Decl_axiom   of Goal.Parsed.t
   | Decl_system  of system_decl
+  | Decl_system_modifier  of system_decl_modifier
 
-  | Decl_ddh of lsymb * (lsymb * Symbols.symb_type) * c_tys 
+  | Decl_ddh of lsymb * (lsymb * Symbols.symb_type) * c_tys
 
-  | Decl_hash of int option * lsymb * orcl_tag_info option * c_tys 
+  | Decl_hash of int option * lsymb * orcl_tag_info option * c_tys
 
-  | Decl_aenc of lsymb * lsymb * lsymb * c_tys 
+  | Decl_aenc of lsymb * lsymb * lsymb * c_tys
 
-  | Decl_senc             of lsymb * lsymb * c_tys 
+  | Decl_senc             of lsymb * lsymb * c_tys
   | Decl_senc_w_join_hash of lsymb * lsymb * lsymb
 
-  | Decl_sign of lsymb * lsymb * lsymb * orcl_tag_info option * c_tys 
+  | Decl_sign of lsymb * lsymb * lsymb * orcl_tag_info option * c_tys
 
   | Decl_name     of lsymb * int * Theory.p_ty
   | Decl_state    of macro_decl

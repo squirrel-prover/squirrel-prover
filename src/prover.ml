@@ -794,6 +794,10 @@ let declare_i table hint_db decl = match L.unloc decl with
     in
     Process.declare_system table name sdecl.sprocess
 
+  | Decl.Decl_system_modifier sdecl ->
+    SystemModifiers.declare_system table sdecl
+
+
   | Decl.Decl_ddh (g, (exp, f_info), ctys) ->
     let ctys = parse_ctys table ctys ["group"; "exposants"] in
     let group_ty = List.assoc_opt "group"     ctys

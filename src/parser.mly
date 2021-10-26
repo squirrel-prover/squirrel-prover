@@ -36,6 +36,7 @@
 %token SPLITSEQ CONSTSEQ MEMSEQ
 %token BY INTRO AS DESTRUCT REMEMBER INDUCTION
 %token PROOF QED UNDO ABORT HINT
+%token RENAME
 %token INCLUDE
 %token EOF
 
@@ -433,6 +434,12 @@ declaration_i:
 | SYSTEM LBRACKET id=lsymb RBRACKET p=process
                           { Decl.(Decl_system { sname = Some id;
                                                 sprocess = p}) }
+
+| SYSTEM id=lsymb EQ from_sys=system WITH RENAME gf=global_formula
+                          { Decl.(Decl_system_modifier { from_sys = from_sys;
+                                                         modifier = Rename gf;
+			                                 name = id}) }
+
 
 declaration:
 | ldecl=loc(declaration_i)                  { ldecl }
