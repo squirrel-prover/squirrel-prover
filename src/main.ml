@@ -387,43 +387,6 @@ and do_all_commands ~(test : bool) (state : main_state) : main_state =
   | cmd -> do_all_commands ~test (do_command ~test state cmd)
 
 
-(** Printing of html output *)
-let html_print ppf state =
-  let escape = ref true in
-  let print_html_esc_char c =
-    if !escape then begin
-      match c with
-      | '\x1B' -> escape := false;
-      | '<' -> Fmt.pf ppf "&lt;"
-      | '>' -> Fmt.pf ppf "&gt;"
-      | '"' -> Fmt.pf ppf "&quot;"
-      | '&' -> Fmt.pf ppf "&amp;"
-      | _ -> Fmt.pf ppf "%c" c
-    end
-    else begin
-      escape := true;
-      Fmt.pf ppf "%c" c
-    end
-  in
-
-  (*Print input lines*)
-  let p1 = state.file.f_lexbuf.lex_curr_p.pos_cnum in
-  let p2 = state.prev_pos.pos_cnum in
-  let in_chan = Utils.oget state.in_chan_opt in
-  let input_line = really_input_string in_chan (p1-p2) in
-  Format.pp_print_as ppf 0 (Format.asprintf
-    "<span class=\"input-line\" id=\"in%d\">" state.counter);
-  Fmt.pf ppf "%s" input_line;
-  Format.pp_print_as ppf 0 "</span>";
-
-  (*Print output lines*)
-  Format.pp_print_as ppf 0 (Format.asprintf
-    "<span class=\"output-line\" id=\"out%d\">" state.counter);
-  String.iter (print_html_esc_char)
-    (Format.flush_str_formatter ());
-  Format.pp_print_as ppf 0 "</span>"
-
-
 (** The main loop of the prover. The mode defines in what state the prover is,
     e.g is it waiting for a proof script, or a system description, etc.
     [save] allows to specify is the current state must be saved, so that
@@ -449,12 +412,16 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
   with
   (* exit prover *)
   | new_state, AllDone -> Printer.pr "Goodbye!@." ;
-    if not test then exit 0; 
+    if not test && not new_state.html then exit 0; 
 
   (* loop *)
   | new_state, _ -> 
-    if state.html then
-      html_print Fmt.stdout new_state;
+    if new_state.html then
+      let in_chan = Utils.oget new_state.in_chan_opt in
+      let p1 = new_state.prev_pos.pos_cnum in
+      let p2 = new_state.file.f_lexbuf.lex_curr_pos in
+      let counter = new_state.counter in
+      Html.pp in_chan p1 p2 counter;
     (main_loop[@tailrec]) 
       ~test
       { new_state with
@@ -527,13 +494,18 @@ let start_main_loop
   in
 
   main_loop ~test state
-  
-let generate_html ?(test=false) (filename : string) (html_file : string) =
+
+let f s = String.length s >= 13 && (String.sub s 2 11) = "<!--HERE-->"
+
+let generate_html (filename : string) (html_filename : string) =
   Printer.init Printer.Html;
   if Filename.extension filename <> ".sp" then
     cmd_error (InvalidExtention filename);
+  let (out_c, html_pos) = Html.create_out_channel filename html_filename in
   let name = Filename.chop_extension filename in
-  start_main_loop ~test ~html:true ~main_mode:(`File name) ()
+  start_main_loop ~test:false ~html:true ~main_mode:(`File name) ();
+  Html.close out_c html_filename html_pos
+
   
 
 let interactive_prover () =
@@ -563,17 +535,17 @@ let main () =
   let args = ref [] in
   let verbose = ref false in
   let interactive = ref false in
-  let html_file = ref "" in
+  let html_filename = ref "" in
   
   let speclist = [
     ("-i", Arg.Set interactive, "interactive mode (e.g, for proof general)");
-    ("--html", Arg.Set_string html_file, "html mode (take a html file); Incompatible with -i");
+    ("--html", Arg.Set_string html_filename, "html mode (take a html file); Incompatible with -i");
     ("-v", Arg.Set verbose, "display more informations");
   ] in
 
   let collect arg = args := !args @ [arg] in
   let _ = Arg.parse speclist collect usage in
-  let html = !html_file <> "" in
+  let html = !html_filename <> "" in
   if !interactive && html then
     Arg.usage speclist usage
   else if List.length !args = 0 && not !interactive then
@@ -584,7 +556,7 @@ let main () =
     interactive_prover ()
   else if html then
     let filename = List.hd !args in
-    generate_html filename !html_file
+    generate_html filename !html_filename
   else
     let filename = List.hd !args in
     run filename
