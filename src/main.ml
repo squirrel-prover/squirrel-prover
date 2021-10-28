@@ -416,12 +416,13 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
 
   (* loop *)
   | new_state, _ -> 
-    if new_state.html then
+    if new_state.html then begin
       let in_chan = Utils.oget new_state.in_chan_opt in
       let p1 = new_state.prev_pos.pos_cnum in
-      let p2 = new_state.file.f_lexbuf.lex_curr_pos in
+      let p2 = new_state.file.f_lexbuf.lex_curr_p.pos_cnum in
       let counter = new_state.counter in
-      Html.pp in_chan p1 p2 counter;
+      Html.pp in_chan p1 p2 counter
+    end ;
     (main_loop[@tailrec]) 
       ~test
       { new_state with
@@ -493,6 +494,7 @@ let start_main_loop
     file_stack = []; } 
   in
 
+  Printer.pr "%b\n" state.html;
   main_loop ~test state
 
 let f s = String.length s >= 13 && (String.sub s 2 11) = "<!--HERE-->"
