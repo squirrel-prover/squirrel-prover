@@ -1,5 +1,4 @@
 set autoIntro=false.
-(* set debugConstr=true. *)
 
 hash h
 name k:message
@@ -14,24 +13,13 @@ abstract ok : message.
 
 system [test] (!_i A: out(c, diff(n(i),m(i)) ) | (!_i B: out(c, diff(n(i),m(i)) ) )).
 
-equiv [test] tutu.
+system newTest = [test/left] with rename forall (i:index), equiv(diff(n(i),m(i))).
+
+equiv [newTest/left,test/right] tutu.
 Proof.
 help.
-rename seq(i:index->n(i)), seq(i:index->m(i)), newSystem.
-
 print.
-enrich seq(i:index->m(i)).
-induction t.
-expandall. auto.
-
-expandall.
-fa 1. fa 2. fa 2.
-
-expandseq seq(i:index->m(i)),i.
-auto.
-
-expandall.
-fa 1. fa 2. fa 2.
-expandseq seq(i:index->m(i)),i.
-auto.
+diffeq.
 Qed.
+
+(* TODO: clean transitivity for the full equiv proof of test *)

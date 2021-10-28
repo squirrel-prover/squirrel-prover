@@ -16,7 +16,7 @@ val get_env : t -> Vars.env
 val map      : (TS.t -> TS.t)      -> (ES.t -> ES.t)      -> t -> t
 val map_list : (TS.t -> TS.t list) -> (ES.t -> ES.t list) -> t -> t list
 val bind     : (TS.t -> 'a)        -> (ES.t -> 'a)        -> t -> 'a
-  
+
 (*------------------------------------------------------------------*)
 (** Statements are formulas in context.
   * They may be used to generate initial goals, or to represent
@@ -65,6 +65,10 @@ end
 
 (*------------------------------------------------------------------*)
 (** {2 Create trace and equivalence goals} *)
+
+val make_obs_equiv : Symbols.table ->
+Hint.hint_db -> 'a -> SystemExpr.t -> [> `Equiv of Equiv.form ] * t
+
 
 val make :
   Symbols.table -> Hint.hint_db -> Parsed.t ->
