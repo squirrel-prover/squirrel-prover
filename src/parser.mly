@@ -36,7 +36,7 @@
 %token SPLITSEQ CONSTSEQ MEMSEQ
 %token BY INTRO AS DESTRUCT REMEMBER INDUCTION
 %token PROOF QED UNDO ABORT HINT
-%token RENAME
+%token RENAME GPRF
 %token INCLUDE
 %token EOF
 
@@ -440,6 +440,10 @@ declaration_i:
                                                          modifier = Rename gf;
 			                                 name = id}) }
 
+| SYSTEM id=lsymb EQ from_sys=system WITH GPRF args=opt_arg_list COMMA hash=term
+                          { Decl.(Decl_system_modifier { from_sys = from_sys;
+                                                         modifier = PRF (args, hash);
+			                                 name = id}) }
 
 declaration:
 | ldecl=loc(declaration_i)                  { ldecl }
@@ -838,6 +842,9 @@ system:
                                        SystemExpr.default_system_name }
 | LBRACKET i=lsymb        RBRACKET { SystemExpr. P_SimplePair i }
 | LBRACKET sp=system_proj RBRACKET { SystemExpr. P_Single sp }
+| LBRACKET s1=system_proj COMMA s2=system_proj RBRACKET
+                                   { SystemExpr. P_Pair (s1, s2) }
+
 
 /* A bi-system */
 bisystem:

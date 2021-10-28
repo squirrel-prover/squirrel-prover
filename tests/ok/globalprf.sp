@@ -17,14 +17,23 @@ system [test] (A: out(c, <ok,<h(ok,k),h(ok,k)>>) | B: out(c, h(ok,k))).
 system [test2] (A: out(c, <ok,<n,n>>) | B: out(c, n)).
 
 
-axiom tf :  (forall ( p, n:message),try find such that true in p else n =p ).
+(*  We should have  [test/left,test2/right] *)
 
-equiv [test/left,test2/right] test2.
+(* we start with a first transitivity, from test/left to testPrf *)
+system testPrf = [test/left] with gprf, h(ok,k).
+
+(* Then, second transitivity, from testprf to testRenamed *)
+system testRenamed = [testPrf/left] with rename equiv(diff(n_PRF,n)).
+
+
+axiom [testRenamed/left,test2/right] tf : forall ( p, n:message), try find such that true in p else n =p .
+
+axiom [testRenamed/left,test2/right] ref : forall ( n:message), diff(n,n)=n .
+
+
+
+equiv [testRenamed/left,test2/right] test2.
 Proof.
-globalprf h(ok,k), ntest.
-print.
-
-rename n_PRF,n, ntest2.
 
 enrich n.
 induction t.
@@ -34,27 +43,30 @@ auto.
 expandall.
 fa 1.
 repeat fa 2.
-equivalent ok=ok,true.
-auto.
-equivalent try find  such that true in n else h(ok,k) , n.
-admit.  (* BROKEN -> fixed with system declaration construct *)
+equivalent  diff(try find  such that ok = ok in n else h(ok,k),n), n.
+project.
 
-
-equivalent diff(n,n),n.
-project; auto.
+case (try find  such that ok = ok in n else h(ok,k)); auto.
 auto.
+auto.
+
 
 expandall.
 fa 1.
 repeat fa 2.
+
+
 equivalent ok=ok,true.
 auto.
-equivalent try find  such that true in n else h(ok,k) , n.
-admit.
+rewrite tf in 2.
+rewrite ref in 2.
+equivalent  diff(try find  such that ok = ok in n else h(ok,k),n), n.
+project.
 
-equivalent diff(n,n),n.
-project; auto.
+case (try find  such that ok = ok in n else h(ok,k)); auto.
 auto.
+auto.
+
 Qed.
 
 
@@ -66,17 +78,16 @@ system [testi] (!_i A: out(c, <ok,h(msg(i),key(i))>) | !_i B: out(c, h(msg(i),ke
 
 system [testi2] (!_i A: out(c, <ok, idn(i)>) | !_i B: out(c,  idn(i))).
 
-axiom tf2 :  (forall (c:boolean, p, n:message, i:index), exists i:index, c =>  try find i such that c in p else n =p ).
+(*  We should have  [testi/left,testi2/right] *)
 
-equiv [testi/left,testi2/right] test3.
+(* we start with a first transitivity, from testi/left to testiPrf *)
+system testiPrf = [testi/left] with gprf (i:index), h(msg(i),key(i)).
+
+(* Then, second transitivity, from testiPrf to testiRenamed *)
+system testiRenamed = [testiPrf/left] with rename forall (i:index), equiv(diff(n_PRF1(i),idn(i))).
+
+equiv [testiRenamed/left,testi2/right] test3.
 Proof.
-
-globalprf seq(i:index->h(msg(i),key(i))), ntest.
-print.
-
-rename seq(i:index -> n_PRF(i)),seq(i:index -> idn(i)), news.
-print.
-
 enrich seq(i:index-> idn(i)).
 induction t.
 
