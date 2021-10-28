@@ -133,8 +133,6 @@ let file_from_path (dir : load_path) (name : string) : file option =
       | LP_dir dir -> Filename.concat dir filename
     in
 
-    Fmt.epr "trying: %s@." path;
-
     let chan = Stdlib.open_in path in
     let lexbuf = Lexing.from_channel chan in
 
