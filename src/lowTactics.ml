@@ -2040,6 +2040,7 @@ let () =
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
+    ~pq_sound:true
     (genfun_of_any_pure_fun TraceLT.print_tac EquivLT.print_tac)
 
 (*------------------------------------------------------------------*)

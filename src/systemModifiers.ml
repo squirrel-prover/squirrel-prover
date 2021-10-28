@@ -129,7 +129,10 @@ let global_prf table sdecl ty_vars hash =
     | _ -> assert false
   in
 
-  (* We will now instantiate the new system. *)
+  (* We create the pattern for the hash *)
+  let fresh_x_var = Vars.make_r `Approx env Type.Message "hole" in
+  let hash_pattern = Term.mk_fun table param.h_fn [] [Term.mk_var fresh_x_var;
+                                                   Term.mk_name param.h_key ] in
 
   (* Instantiation of the fresh name *)
   let ndef = Symbols.{ n_iarr = List.length is; n_ty = Message ; } in
@@ -138,24 +141,22 @@ let global_prf table sdecl ty_vars hash =
   in
   (* the hash h of a message m will be replaced by tryfind is s.t = fresh mess
      in fresh else h *)
-  let mk_tryfind nhash =
-    match nhash with
-    | Term.Fun ((h_fn, _), _, [h_cnt; Name s]) when s.s_symb = param.h_key.s_symb ->
+  let mk_tryfind =
         let ns = Term.mk_isymb n Message (is2) in
         Term.mk_find is2 Term.(
             mk_and
-              (mk_atom `Eq h_cnt fresh_mess)
-              (mk_indices_eq fresh_key_ids s.s_indices)
-          ) (Term.mk_name ns) nhash
-    | _ -> Printer.pr "%a" Term.pp nhash;  assert false
+              (mk_atom `Eq param.h_cnt fresh_mess)
+              (mk_indices_eq fresh_key_ids param.h_key.s_indices)
+          ) (Term.mk_name ns) hash
   in
   let rw_rule = Rewrite.{
     rw_tyvars = [];
-    rw_vars = Vars.Sv.of_list (List.map Vars.evar is);
+    rw_vars = Vars.Sv.of_list ((Vars.evar fresh_x_var)::(List.map Vars.evar is));
     rw_conds = [];
-    rw_rw = Term.ESubst (hash, mk_tryfind hash);
+    rw_rw = Term.ESubst (hash_pattern, mk_tryfind);
   }
   in
+  Printer.prt `Result "patt %a" Term.pp hash_pattern;
   let iterator t =
     match
       Rewrite.rewrite table old_system (!env) TacticsArgs.(`Once)
