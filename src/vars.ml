@@ -230,8 +230,14 @@ let make_pat typ =
 
 (*------------------------------------------------------------------*)
 (** {2 Create variables} *)
+
+let mem_i_suffix (e : env) (i : int) (prefix : string) : bool =
+  assert (prefix <> "_");
+  M.exists (fun _ (EVar v') ->      
+      prefix = v'.s_prefix && i = v'.i_suffix
+    ) e
                         
-let max_suffix (e : env) prefix =
+let max_suffix (e : env) (prefix : string) : int option=
   assert (prefix <> "_");
   M.fold (fun _ (EVar v') m ->      
       if prefix = v'.s_prefix then
@@ -249,10 +255,14 @@ let check_prefix ~allow_pat s =
 let _make opt env s_prefix s_suffix = 
   let i = if s_suffix = "" then -1 else int_of_string s_suffix in
   
-  match opt, max_suffix env s_prefix with
-    | `Shadow, _ -> i (* if `Shadow, we can reuse the suffix *)
-    | _, None -> i
-    | _, Some m -> max i (m + 1)
+  if opt = `Shadow then
+    i (* if `Shadow, we can reuse the suffix *)
+  else if not (mem_i_suffix env i s_prefix) then
+    i (* [s_prefix ^ i] not in use *)
+  else
+    match max_suffix env s_prefix with
+    | None -> assert false      (* impossible *)
+    | Some m -> max i (m + 1)
   
 
 let make ?(allow_pat=false) opt (env : env) typ s_name =

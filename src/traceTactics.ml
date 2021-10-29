@@ -1026,9 +1026,9 @@ let fa s =
             in
             subgoals
 
-          | Term.Find (vars,c,t,e),
-            Term.Find (vars',c',t',e') when vars = vars' ->
-            (* We could simply verify that [e = e'],
+          | Term.Find (vs,c,t,e),
+            Term.Find (vars',c',t',e') when List.length vs = List.length vars' ->
+            (* We verify that [e = e'],
              * and that [t = t'] and [c <=> c'] for fresh index variables.
              *
              * We do something more general for the conditions,
@@ -1044,14 +1044,29 @@ let fa s =
              * except for the [unused] indices on the left, which does
              * not matter since they do not appear in [t]. *)
 
-            (* Refresh bound variables. *)
+            (* Refresh bound variables in c and t*)
             let env = ref (TS.env s) in
-            let vars, subst = Term.refresh_vars (`InEnv env) vars in
-            let s = TS.set_env !env s in
+            let vars, subst = Term.refresh_vars (`InEnv env) vs in
             let c  = Term.subst subst c in
-            let c' = Term.subst subst c' in
             let t  = Term.subst subst t in
-            let t' = Term.subst subst t' in
+
+
+
+            (* Create substitution from vars' to fresh_var *)
+            (* We avoid relying on the fact that currently, subst is preserving
+               the order of vars, and rather create a substitution vs -> vars',
+               that we apply on the lhs of vs -> vars *)
+
+            let subst_aux = List.map2 (fun x y ->
+                Term.(ESubst (mk_var x,mk_var y))) vs vars' in
+            let subst' = List.map (function ESubst (x, y) ->
+                Term.(ESubst (subst subst_aux x,y))) subst in
+
+            let s = TS.set_env !env s in
+
+            let c' = Term.subst subst' c' in
+
+            let t' = Term.subst subst' t' in
 
             (* Extract unused variables. *)
             let used,unused =
