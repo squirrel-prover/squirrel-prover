@@ -516,7 +516,7 @@ type fresh_occ = (Action.action * Vars.index list) Iter.occ
 
 (** check if all instances of [o1] are instances of [o2].
     [o1] and [o2] actions must have the same action name *)
-let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool = 
+let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool =
   let a1, is1 = o1.occ_cnt in
   let a2, is2 = o2.occ_cnt in
 
@@ -548,19 +548,19 @@ let add_fresh_case
     (c : fresh_occ)
     (l : fresh_occ list) : fresh_occ list
   =
-  if List.exists (fun c' -> fresh_occ_incl table system c c') l 
-  then l 
+  if List.exists (fun c' -> fresh_occ_incl table system c c') l
+  then l
   else
     (* remove any old case which is subsumed by [c] *)
     let l' =
-      List.filter (fun c' -> 
+      List.filter (fun c' ->
           not (fresh_occ_incl table system c' c)
         ) l
     in
     c :: l'
 
 (** Add many new fresh rule cases, if they are not redundant. *)
-let add_fresh_cases 
+let add_fresh_cases
     table system
     (l1 : fresh_occ list)
     (l2 : fresh_occ list) : fresh_occ list
@@ -569,15 +569,15 @@ let add_fresh_cases
 
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
 let mk_fresh_indirect_cases
-    (cntxt : Constr.trace_cntxt) 
-    (env : Vars.env) 
-    (ns : Term.nsymb) 
-    (terms : Term.message list) 
+    (cntxt : Constr.trace_cntxt)
+    (env : Vars.env)
+    (ns : Term.nsymb)
+    (terms : Term.message list)
   =
   (* sanity check: free variables in [ns] and [terms] are included in [env] *)
   assert (
-    let all_fv = 
-      List.fold_left (fun s t -> 
+    let all_fv =
+      List.fold_left (fun s t ->
           Sv.union s (Term.fv t)
         ) (Sv.of_list1 ns.Term.s_indices) terms
     in
@@ -585,30 +585,30 @@ let mk_fresh_indirect_cases
 
   let macro_cases =
     Iter.fold_macro_support0 (fun action_name a t macro_cases ->
-        let fv = 
+        let fv =
           Sv.diff
-            (Sv.union (Action.fv_action a) (Term.fv t)) 
-            (Vars.to_set env) 
+            (Sv.union (Action.fv_action a) (Term.fv t))
+            (Vars.to_set env)
         in
 
         let new_cases = Fresh.get_name_indices_ext ~fv:fv cntxt ns.s_symb t in
-        let new_cases =           
-          List.map (fun (case : Fresh.name_occ) -> 
+        let new_cases =
+          List.map (fun (case : Fresh.name_occ) ->
               { case with
                 occ_cnt = (a, case.occ_cnt);
                 occ_cond = case.occ_cond; }
-            ) new_cases 
+            ) new_cases
         in
 
-        List.assoc_up_dflt action_name [] 
-          (fun l -> 
+        List.assoc_up_dflt action_name []
+          (fun l ->
              add_fresh_cases cntxt.table cntxt.system new_cases l
           ) macro_cases
       ) cntxt env terms []
   in
   (* we keep only action names in which the name occurs *)
-  List.filter (fun (_, occs) -> occs <> []) macro_cases 
- 
+  List.filter (fun (_, occs) -> occs <> []) macro_cases
+
 
 let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
   (* TODO: bug, handle free variables *)
@@ -625,15 +625,15 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
   (* the one case occuring in [a] with indices [is_a].
      For [n(is)] to be equal to [n(is_a)], we must have [is=is_a]. *)
   let mk_case ((a, is_a) : Action.action * Vars.index list) : Term.message =
-    let fv = 
-      Sv.diff (Sv.union (Action.fv_action a) (Sv.of_list1 is_a)) sv_env 
+    let fv =
+      Sv.diff (Sv.union (Action.fv_action a) (Sv.of_list1 is_a)) sv_env
     in
-    let fv = 
-      List.map (fun (Vars.EVar v) -> 
+    let fv =
+      List.map (fun (Vars.EVar v) ->
           Vars.cast v Type.KIndex
-        ) (Sv.elements fv) 
+        ) (Sv.elements fv)
     in
-    
+
     (* refresh existantially quantified variables. *)
     let fv, subst = Term.refresh_vars (`InEnv (ref env)) fv in
     let a = Action.subst_action subst a in
@@ -644,18 +644,18 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
        we do this after refresh, to avoid shadowing issues etc. *)
     let subst =
       List.map2
-        (fun i i' -> 
-           if List.mem i fv 
-           then Some (ESubst (Term.mk_var i, Term.mk_var i')) 
+        (fun i i' ->
+           if List.mem i fv
+           then Some (ESubst (Term.mk_var i, Term.mk_var i'))
            else None
         ) is_a ns.s_indices
     in
     let subst = List.filter_map (fun x -> x) subst in
 
     let a = Action.subst_action subst a in
-    
+
     (* we now built the freshness condition *)
-    let a_term = SystemExpr.action_to_term cntxt.table cntxt.system a in    
+    let a_term = SystemExpr.action_to_term cntxt.table cntxt.system a in
     let timestamp_inequalities =
       Term.mk_ors
         (List.map (fun action_from_term ->
@@ -923,9 +923,9 @@ let fa s =
             in
             subgoals
 
-          | Term.Find (vars,c,t,e),
-            Term.Find (vars',c',t',e') when vars = vars' ->
-            (* We could simply verify that [e = e'],
+          | Term.Find (vs,c,t,e),
+            Term.Find (vars',c',t',e') when List.length vs = List.length vars' ->
+            (* We verify that [e = e'],
              * and that [t = t'] and [c <=> c'] for fresh index variables.
              *
              * We do something more general for the conditions,
@@ -941,14 +941,29 @@ let fa s =
              * except for the [unused] indices on the left, which does
              * not matter since they do not appear in [t]. *)
 
-            (* Refresh bound variables. *)
+            (* Refresh bound variables in c and t*)
             let env = ref (TS.env s) in
-            let vars, subst = Term.refresh_vars (`InEnv env) vars in
-            let s = TS.set_env !env s in
+            let vars, subst = Term.refresh_vars (`InEnv env) vs in
             let c  = Term.subst subst c in
-            let c' = Term.subst subst c' in
             let t  = Term.subst subst t in
-            let t' = Term.subst subst t' in
+
+
+
+            (* Create substitution from vars' to fresh_var *)
+            (* We avoid relying on the fact that currently, subst is preserving
+               the order of vars, and rather create a substitution vs -> vars',
+               that we apply on the lhs of vs -> vars *)
+
+            let subst_aux = List.map2 (fun x y ->
+                Term.(ESubst (mk_var x,mk_var y))) vs vars' in
+            let subst' = List.map (function ESubst (x, y) ->
+                Term.(ESubst (subst subst_aux x,y))) subst in
+
+            let s = TS.set_env !env s in
+
+            let c' = Term.subst subst' c' in
+
+            let t' = Term.subst subst' t' in
 
             (* Extract unused variables. *)
             let used,unused =
@@ -1384,7 +1399,7 @@ let euf_apply_facts drop_head s
 let euf_apply
     (get_params : Symbols.table -> Term.message -> unforgeabiliy_param)
     (Args.String hyp_name)
-    (s : TS.t) 
+    (s : TS.t)
   =
   let table = TS.table s in
   let id, at = Hyps.by_name hyp_name s in
@@ -1660,11 +1675,11 @@ exception Invalid
   * Macros in the term occurring (at toplevel) on the [src] projection
   * of some biframe element are replaced by the corresponding [dst]
   * projection. *)
-let rewrite_equiv_transform 
+let rewrite_equiv_transform
     ~(src:Term.projection)
     ~(dst:Term.projection)
     ~(s:TS.t)
-    (biframe : Term.message list) 
+    (biframe : Term.message list)
     (term : Term.message) : Term.message
   =
   let assoc (t : Term.message) : Term.message option =
