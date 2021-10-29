@@ -205,6 +205,8 @@ let subst_descr subst descr =
 
 (* Apply an iterator to all terms of the descr. *)
 let apply_descr iter descr =
+  let env = Vars.of_list (List.map Vars.evar descr.indices) in
+  let iter = iter env in
   let condition =
      fst descr.condition,
      iter (snd descr.condition) in

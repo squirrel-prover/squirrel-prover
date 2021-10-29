@@ -81,10 +81,13 @@ system [testi2] (!_i A: out(c, <ok, idn(i)>) | !_i B: out(c,  idn(i))).
 (*  We should have  [testi/left,testi2/right] *)
 
 (* we start with a first transitivity, from testi/left to testiPrf *)
-system testiPrf = [testi/left] with gprf (i:index), h(msg(i),key(i)).
+system testiPrf = [testi/left] with gprf (j:index), h(msg(j),key(j)).
+
 
 (* Then, second transitivity, from testiPrf to testiRenamed *)
 system testiRenamed = [testiPrf/left] with rename forall (i:index), equiv(diff(n_PRF1(i),idn(i))).
+(* equiv [testiPrf] t. Proof. print. admit. Qed *)
+
 
 equiv [testiRenamed/left,testi2/right] test3.
 Proof.
@@ -97,11 +100,12 @@ auto.
 expandall.
 fa 1. repeat fa 2.
 
-equivalent   try find i0 such that (msg(i) = msg(i0) && i0 = i)
-     in idn(i0) else h(msg(i),key(i)),
+
+equivalent      try find j such that (msg(i) = msg(j) && i = j)
+     in idn(j) else h(msg(i),key(i)),
      idn(i).
-case (try find i0 such that (msg(i) = msg(i0) && i0 = i)
- in idn(i0) else h(msg(i),key(i))).
+case      try find j such that (msg(i) = msg(j) && i = j)
+     in idn(j) else h(msg(i),key(i)).
 
 intro H2.
 destruct H2.
@@ -119,11 +123,11 @@ auto.
 
 
 expandall.
-equivalent  try find i0 such that (msg(i) = msg(i0) && i0 = i)
-         in idn(i0) else h(msg(i),key(i)),
+equivalent   try find j such that (msg(i) = msg(j) && i = j)
+         in idn(j) else h(msg(i),key(i)),
          idn(i).
-case (try find i0 such that (msg(i) = msg(i0) && i0 = i)
- in idn(i0) else h(msg(i),key(i))).
+case  try find j such that (msg(i) = msg(j) && i = j)
+         in idn(j) else h(msg(i),key(i)).
 
 intro H2.
 destruct H2.

@@ -170,7 +170,7 @@ val subst_action : Term.subst -> action -> action
 val subst_descr : Term.subst -> descr -> descr
 
 (** Apply an iterator to the terms of a description. *)
-val apply_descr : (Term.message -> Term.message) -> descr -> descr
+val apply_descr : (Vars.env -> Term.message -> Term.message) -> descr -> descr
 
 
 (*------------------------------------------------------------------*)

@@ -25,7 +25,6 @@ let global_rename table sdecl gf =
     | _ -> assert false
   in
 
-
   (* We check that n2 does not occur in the old system using fresh. *)
   let cntxt = Constr.{table=table;
                           system= old_system;
@@ -39,9 +38,6 @@ let global_rename table sdecl gf =
         iter#visit_message (snd action_descr.Action.condition) ;
         List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates);
 
-
-
-
     (* We now build the rewrite rule *)
     let evars = Term.get_vars n1 in
     let vs, subs = Term.erefresh_vars `Global evars in
@@ -53,10 +49,9 @@ let global_rename table sdecl gf =
         rw_rw = Term.ESubst (n1', n2');
       }
     in
-
-    let iterator t =
+    let iterator cenv t =
       match
-        Rewrite.rewrite table old_system env TacticsArgs.(`Any)
+        Rewrite.rewrite table old_system env TacticsArgs.(`Once)
           rw_rule (`Reach t)
       with
       | `Result (`Reach res, ls) -> res
@@ -117,22 +112,18 @@ let global_prf table sdecl ty_vars hash =
   if errors <> [] then
     Tactics.soft_failure (Tactics.BadSSCDetailed errors);
 
+  (* We first refresh globably the indices to create the left pattern*)
+  let is1, left_subst = Term.refresh_vars (`Global) is in
 
-  (* let is1, left_subst = Term.refresh_vars (`InEnv env) is in
-   * let left_hash = Term.subst left_subst hash in *)
-
-  let is2, subst = Term.refresh_vars (`InEnv env) is in
-  let fresh_mess = Term.subst subst param.h_cnt in
-  let fresh_key = Term.subst subst (Term.mk_name param.h_key) in
-  let fresh_key_ids = match fresh_key with
+  let left_key =  Term.subst left_subst (Term.mk_name param.h_key) in
+  let left_key_ids = match left_key with
     | Term.Name s -> s.s_indices
     | _ -> assert false
   in
-
   (* We create the pattern for the hash *)
-  let fresh_x_var = Vars.make_r `Approx env Type.Message "hole" in
+  let fresh_x_var = Vars.make_new Type.Message "x" in
   let hash_pattern = Term.mk_fun table param.h_fn [] [Term.mk_var fresh_x_var;
-                                                   Term.mk_name param.h_key ] in
+                                                   left_key ] in
 
   (* Instantiation of the fresh name *)
   let ndef = Symbols.{ n_iarr = List.length is; n_ty = Message ; } in
@@ -142,22 +133,22 @@ let global_prf table sdecl ty_vars hash =
   (* the hash h of a message m will be replaced by tryfind is s.t = fresh mess
      in fresh else h *)
   let mk_tryfind =
-        let ns = Term.mk_isymb n Message (is2) in
-        Term.mk_find is2 Term.(
+        let ns = Term.mk_isymb n Message (is) in
+        Term.mk_find is Term.(
             mk_and
-              (mk_atom `Eq param.h_cnt fresh_mess)
-              (mk_indices_eq fresh_key_ids param.h_key.s_indices)
-          ) (Term.mk_name ns) hash
+              (mk_atom `Eq (Term.mk_var fresh_x_var) param.h_cnt)
+              (mk_indices_eq left_key_ids param.h_key.s_indices)
+          ) (Term.mk_name ns) hash_pattern
   in
   let rw_rule = Rewrite.{
     rw_tyvars = [];
-    rw_vars = Vars.Sv.of_list ((Vars.evar fresh_x_var)::(List.map Vars.evar is));
+    rw_vars = Vars.Sv.of_list ((Vars.evar fresh_x_var)::(List.map Vars.evar is1));
     rw_conds = [];
     rw_rw = Term.ESubst (hash_pattern, mk_tryfind);
   }
   in
-  Printer.prt `Result "patt %a" Term.pp hash_pattern;
-  let iterator t =
+
+  let iterator cenv t =
     match
       Rewrite.rewrite table old_system (!env) TacticsArgs.(`Once)
         rw_rule (`Reach t)
@@ -180,7 +171,7 @@ let global_prf table sdecl ty_vars hash =
       in
 
       let new_system_e = SystemExpr.pair table old_system_expr new_system_expr in
-      let axiom_name = "rename_from_"^(Symbols.to_string old_system_name)
+      let axiom_name = "prf_from_"^(Symbols.to_string old_system_name)
                        ^"_to_"^(Location.unloc sdecl.name)
       in
       (axiom_name, new_system_e, table)

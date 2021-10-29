@@ -34,7 +34,9 @@ equivalent diff(try find j,j2 such that (j = i && j = j2) in <mess(i),mess(j2)>,
      try find l,l2 such that (l = i && l2 = i) in <mess(i),mess(l2)>),
 try find j,j2 such that (j = i && j = j2) in <mess(i),mess(j2)>.
 project.
-auto.
+
+fa; auto.
+
 fa; auto.
 equivalent  try find j,j2 such that (j = i && j = j2) in <mess(i),mess(j2)>, <mess(i),mess(i)>.
 case  try find j,j2 such that (j = i && j = j2) in <mess(i),mess(j2)>.

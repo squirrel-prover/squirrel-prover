@@ -10,7 +10,7 @@ default: squirrel
 all: squirrel test
 
 PROVER_TESTS = $(wildcard tests/ok/*.sp) $(wildcard tests/fail/*.sp)
-PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $(wildcard examples/stateful/*.sp)
+PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $(wildcard examples/stateful/*.sp)  $(wildcard examples/postQuantumKE/*.sp)
 
 test: squirrel alcotest okfail_test
 
@@ -39,7 +39,7 @@ examples_end: $(PROVER_EXAMPLES:.sp=.ok)
 	 else echo All tests passed successfully. ; fi
 
 tests/test_prologue.ok:
-	@echo "Running tests/ok/*.sp, tests/fail/*.sp, examples/*.sp, examples/tutorial/*.sp and examples/stateful/*.sp."
+	@echo "Running tests/ok/*.sp, tests/fail/*.sp, examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 %.ok: tests/test_prologue.ok %.sp
 	@mkdir -p `dirname $(RUNLOGDIR)/$(@:.ok=.sp)`
 	@if ./squirrel $(@:.ok=.sp) \
