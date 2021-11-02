@@ -11,9 +11,9 @@ Be aware that such constructs may ease proof writing sometime at the cost of rea
 
 
 channel c
-abstract ok:message
-abstract f : boolean
-abstract g : boolean
+abstract ok : message
+abstract f  : boolean
+abstract g  : boolean
 system if f && g then out(c,ok).
 
 
@@ -35,43 +35,43 @@ abstract h : message -> boolean.
 
 
 goal _ : f => false.
-Proof. intro *.   (* select names automaticaly *)
+Proof. intro *.   (* names can be given automaticaly *)
 Abort.
 
 goal _ : f => false.
-Proof. intro H.   (* use given name *)
+Proof. intro H.   (* hypotheses can be named manually *)
 Abort.
 
 goal _ : forall x:message, h(x) => false.
-Proof. intro y H.   (* use given name also for variables *)
+Proof. intro y. (* variables can be named manually *)
 Abort.
 
 
 goal _ : f => g => (forall x:message, h(x) => false).
-Proof. intro Hf Hg y *.   (* the introduction is chained *)
+Proof. intro Hf Hg y *.   (* the introductions are chained *)
 Abort.
 (* Patterns also allow to directly split more complex formulas. *)
 
 
-goal _ : f && g =>false.
-Proof. intro Hconj.   (* Here, without further infos, we obtain two hypothesis named by default *)
+goal _ : (f && g) => false.
+Proof. intro Hconj.  (* Here, without further infos, we obtain two hypothesis named by default *)
 Abort.
 
-goal _ : f && g =>false.
-Proof. intro [Hf Hg].   (* the pattern [f1 fs] allows to name hypothesis for f1 && ... && fs *)
+goal _ : (f && g) =>false.
+Proof. intro [Hf Hg].   (* the pattern [f1 ... fs] allows to name hypotheses for a formula f1 && ... && fs *)
 Abort.
 
 
-goal _ : f || g =>false.
-Proof. intro [Hf | Hg].   (* the pattern [f1 | ... | fs] allows to name hypothesis for all the subgoals created by splitting f1 || ... || fs *)
+goal _ : (f || g) =>false.
+Proof. intro [Hf | Hg].   (* the pattern [f1 | ... | fs] allows to name hypotheses for all the subgoals created by splitting f1 || ... || fs *)
 Abort.
 
-goal _ : (f || g) && f =>false.
-Proof. intro [[Hf | Hg] Hf2].   (* patterns can be combined in any ways *)
+goal _ : ((f || g) && f) =>false.
+Proof. intro [[Hf | Hg] Hf2].   (* patterns can be nested *)
 Abort.
 
-goal _ : (f || g) && f =>false.
-Proof. intro [[Hf | Hg] _].   (* names can be droped if useless, with _ *)
+goal _ : ((f || g) && f) => false.
+Proof. intro [[Hf | Hg] _].   (* names can be dropped if useless, with _ *)
 Abort.
 
 
@@ -84,8 +84,12 @@ yesif.
 Qed.
 
 
-(* While this allows to efficiently close many trivial goals, advanced users may prefer to control this behabiour themselves. It can be disabled with the following command. *)
+(* While this allows to efficiently close many trivial goals, advanced users may prefer to control introduction and naming manually. It can be disabled with the following command. *)
 set autoIntro=false.
+
+(*
+This removes automatic introduction.
+*)
 goal _ (x,y:message): if true then x else y=x.
 Proof.
 yesif; auto.
@@ -99,7 +103,7 @@ Some syntactic sugar allow to quickly combine intros, rewrites and macro expansi
 
 ## Intro after a tactic
 
-For instance, `tactic; intros PAT`, where the intro pattern is performed on every subgoal can be written with `tactic => PAT`.
+For instance, `tactic; intros PAT`, applies the intro pattern `PAT` to every subgoal created by `tactic`. This can be written more concisely using `tactic => PAT`.
 *)
 
 set autoIntro=false.
@@ -111,7 +115,7 @@ by left.
 Qed.
 
 
-(* Tactics can be applied only to a subgroup of the subgoals, using their number to identify them. *)
+(* Tactics can be applied only to a subset of the new subgoals, by selecting subgoals using their number. *)
 
 goal _ (x,y:message): (x=y => false) || (x<> y => false) .
 Proof.
@@ -122,10 +126,10 @@ Qed.
 
 
 (*
-
 Additionally, special symbols in pattern allow to perform automatic simplifications.
  - `//` applies `try auto` in all subgoals (leaving the one not closed without any simplifcations)
  - `/=` applies `simpl` in all subgoals, simplifying all as much as possible without closing any.
+ - `//=` combines `//` and `/=`.
 *)
 
 goal _ (x,y,z:message): true => true .
@@ -134,32 +138,31 @@ intro _ => //.
 Qed.
 
 (*
-
-Those symbols can also be followed by intro patterns.
-
+These simplification patterns can be chained and combined with introduction patterns.
 *)
 
 abstract m : message->message.
 
 goal _ (x,y:message): m(x) = x => if true then x else y= m(x).
 Proof.
-yesif => // => /= t.
+yesif => //= t.
 Qed.
 
 (*
 
 ## Rewrites inside patterns
 
-Sometimes, instead of introducing an equation, we want to apply it instantly to the conclusion and then forget about it. *)
+Sometimes, instead of introducing an equation, we want to apply it instantly to the conclusion and then clear it (i.e. forget it). *)
 
-(* Typically, in the following example, we would want to forget about Hxy. *)
+(* Typically, in the following example, we do not need Hxy after the rewriting. *)
 goal _ (x,y:message): h(x)=h(y) => h(x) = g.
 Proof.
 intro Hxy.
 rewrite Hxy.
+clear Hxy.
 Abort.
 
-(* This is achieved by using -> instead of a name for an hypothesis. *)
+(* This is achieved more concisely using ->. *)
 goal _ (x,y:message): h(x)=h(y) => h(x) = g.
 Proof.
 intro ->.
@@ -168,21 +171,22 @@ Abort.
 (*
 ## Macro expansion inside patterns
 
- During an intro pattern, it can be useful to expand a macro before continuing the introduction. E.g., in the following example, expanding cond in the middle of intro would allow to also introduce what is inside the condition.  *)
+ During an intro pattern, it can be useful to expand a macro before continuing the introduction. E.g., in the following example, expanding cond in the middle of intro allow to detruct directly the condition.  *)
 abstract ko:message.
+
 goal unforgeable:
   happens(A) =>  cond@A => ko <> ok => output@A <> ko.
 Proof.
-  nosimpl(intro Hap Hcond Hdiff).
-  nosimpl(expand cond).
-  nosimpl(destruct Hcond as [Hf Hg]).
+  intro Hap Hcond Hdiff.
+  expand cond.
+  destruct Hcond as [Hf Hg].
 Abort.
 
-(* All those operations can be expressed in a single one by inserting inside the intro pattern @/sym, that will expand sym in the current state of the intro, and then carry on with the introduction. *)
+(* All those operations can be done using a single intro pattern, using the intro pattern @/sym, which expands the sym macro in the goal. Note that sym is only expanded in the goal, not the hypotheses. *)
 goal unforgeable:
   happens(A) =>  cond@A => ko <> ok => output@A <> ko.
 Proof.
-  nosimpl(intro Hap @/cond [Hf Hg] Hdiff).
+  intro Hap @/cond [Hf Hg] Hdiff.
 Abort.
 
 
@@ -192,14 +196,14 @@ Abort.
 
 # Rewrite
 
-By default, and as seen before, rewrites are performed over the conclusion by giving the name of an hypothesis.
-`rewrite H1 ... Hn` will rewrite according to the equations given by `H1` to `Hn` the first occurence matching in the conclusion.
-By default, equations are interpreted from left to right. But the direction can be reversed with `-H`.
-`rewrite H in C1,...,C2` allows to rewrite in hypothesis instead of conclusion.
+By default, and as seen before, rewrites are done in the goal, selecting rewrite rules using the hypotheses' names.
+`rewrite H1 ... Hn` rewrites the goal according to the equations given by `H1` to `Hn`. Each time, we rewrite all occurrences of the first the occurence matching `Hi` the conclusion.
+By default, rewriting are from left to right. The direction can be reversed with `-H`.
+By default, rewrite acts on the goal. The syntax `rewrite H in C1,...,C2` allows to rewrite in the hypotheses instead of conclusion. To rewrite in the whole judgement (hypotheses + goal), we can use `rewrite H in *`.
 
 ```*)
 
-goal _ (x,y:message): h(x)=h(y) => h(x) = g => false.
+goal _ (x,y:message): h(x) = h(y) => h(x) = g => false.
 Proof.
 intro eq.
 rewrite eq.
@@ -212,16 +216,17 @@ Abort.
 
 (*
 
+Rewrite rule can have universally quantified variables, which must be automatically inferred (by matching).
+
 Rewrites can also be performed in the equivalence context by giving the frame element identifers.
 
-Rewrites will fail if there is nothing to rewrite. `rewrite !H` allows to rewrite all occurences found. `rewrite ?H` is the same but does not fail if there is nothing to rewrite.
+A rewrite will fail if there is nothing to rewrite. `rewrite !H` rewrites `H` as much as possible, but at least once. `rewrite ?H` is identical to `rewrite !H`, but does not fail if there is nothing to rewrite.
 
-Rewrites can be used to expand in place macros, with for instance `rewrite /cond`.
+Rewrites can be used to expand macros, using the syntax `rewrite /cond`.
 
-If the hypothesis is an implication, the rewrite will rewrite in the current goal and add the subgoal for the premice.
+If the hypothesis `H` is a rewrite rule with premises, `rewrite H` will add the premises (instantiated using the arguments infered during the matching) as subgoals.
 
-Finally, rewrites can be over a quantified formula that we may partially instantiate with some variables.
-
+Finally, universally quantified variables in rewrite rules can be partially instantiated.
 
 *)
 
@@ -235,7 +240,7 @@ goal _ (z : message) :
 Proof.
   intro H Assum.
   rewrite (H a).
-  (* Here, (H a) produces the equation foral y, P(a,y) => k(y)=a *)
+  (* Here, (H a) produces the equation forall y, P(a,y) => k(y)=a *)
   assumption.
   congruence.
 Qed.
@@ -259,6 +264,7 @@ Qed.
 ## Automatic solver
 
 Rewrite tactics can be added to the automatic constraint solving procedure by using the `hint` keyword outside of the context of a proof, followed by the rewrite rule.
+Always make sure that the resulting Term Rewriting System is terminating.
 
  *)
 
