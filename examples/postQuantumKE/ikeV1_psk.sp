@@ -190,27 +190,17 @@ axiom  [Main6/left,Ideal1/right] tryfind : forall (i,j:index), input@I1(i,j) = i
 
 equiv [Main6/left,Ideal1/right] test.
 Proof.
-print.
 
 diffeq.
 (* From here, we need to prove that we indede get ideal keys everywhere. Mostly dumb manipulations of all the conditions introduced by the prf tactic, that are all contractory.
-TODO : need a better way to refer to the try find. Copy-pasting is dumb.
  *)
-
-
-
-
-print.
 
 case  try find il0,jl0 such that
      (<Ni(i),fst(snd(input@I2(i,j)))> = <Ni(il0),fst(snd(input@I1(il0,jl0)))> &&
       (i = il0 && j = jl0))
    in IgarbI(il0,jl0)
    else
-     try find il,jl such that
-       (<Ni(i),fst(snd(input@I2(i,j)))> = <fst(snd(input@R(jl,il))),Nr(jl)> &&
-        (i = il && j = jl))
-     in IgarbR(il,jl) else h(<Ni(i),fst(snd(input@I2(i,j)))>,psk(i,j)).
+    _.
 rewrite Meq.
 fa.
 use H3 with i,j.

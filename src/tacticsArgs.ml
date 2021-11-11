@@ -481,6 +481,13 @@ let convert_pat_arg sel sexpr conv_cntxt tyvars env p conc =
   in
   let message = match List.nth res (sel-1) with
     | Term.ETerm et -> Term.cast (Term.kind t) et
+    | exception _ -> raise Theory.(Conv (L._dummy,
+                                         Tactic_type
+                                           ("Could not extract the element "
+                                            ^string_of_int (sel)
+                                            ^" out of "^string_of_int (List.length res)
+                                            ^" matches found")))
+
   in
   (message, ty)
 
