@@ -62,35 +62,61 @@ class collect_max_ts ~(cntxt:Constr.trace_cntxt) = object (self)
 
 end
 
+class check_att ~(cntxt:Constr.trace_cntxt) = object (self)
+  (* We fold over the terms, collecting all the timestamps, and maintaining a
+     list of timestamps that are smaller than another timestamp. *)
+  inherit [bool] Iter.fold ~cntxt as super
+
+  (* We collect all the macro timestamps occuring inside terms, that are not
+     explitely smaller than other timestamps. *)
+  method fold_message aux t = match t with
+    | Fun ((sf,_), _, [Macro (ms,_,_)]) when sf = Symbols.fs_att ->
+      ms = Term.frame_macro
+    | Fun ((sf,_), _, _) when sf = Symbols.fs_att -> false
+    | Macro (ms,l,a) ->
+      if l<>[] then failwith "Not implemented" ;
+      (match Macros.get_definition cntxt ms a with
+        | `Undef | `MaybeDef -> true
+        | `Def t -> super#fold_message aux t
+      )
+    | _ -> super#fold_message aux t
+end
+
+
 let is_attacker_call_synchronized cntxt models biframe =
-   let iter = new collect_max_ts ~cntxt in
-   let (max_ts, _) =
-     List.fold_left (fun (max_ts,_) t-> iter#fold_message (max_ts, Sts.empty) t)
-       (Sts.empty, Sts.empty) biframe
-   in
-   let maximal_elems =
-     Constr.maximal_elems ~precise:false models (Sts.elements max_ts)
-   in
-   let has_frame_or_input biframe tau =
-     let frame_at =
-       Term.mk_macro Term.frame_macro [] tau
-     in
-     let frame_at_pred =
-       Term.mk_macro Term.frame_macro [] (Term.mk_pred tau)
-     in
-     let input_at  =
-       Term.mk_macro Term.in_macro [] tau
-     in
-     let ok_list = [frame_at; frame_at_pred; input_at] in
-     let rec is_in = function
-           | Term.Fun (fs,_,[l1; l2]) when
-               fs = Term.f_pair -> is_in l1 || is_in l2
-           | t2 when List.mem t2 ok_list -> true
-           | _ -> false
-     in
-     List.exists is_in biframe
-   in
-   if not (List.for_all (fun tau -> has_frame_or_input biframe tau) maximal_elems) then
-     false
-   else
-     true
+  let iter_att = new check_att ~cntxt in
+  if List.fold_left (fun acc t -> iter_att#fold_message true t && acc) true biframe then
+    begin
+      let iter = new collect_max_ts ~cntxt in
+      let (max_ts, _) =
+        List.fold_left (fun (max_ts,_) t-> iter#fold_message (max_ts, Sts.empty) t)
+          (Sts.empty, Sts.empty) biframe
+      in
+      let maximal_elems =
+        Constr.maximal_elems ~precise:false models (Sts.elements max_ts)
+      in
+      let has_frame_or_input biframe tau =
+        let frame_at =
+          Term.mk_macro Term.frame_macro [] tau
+        in
+        let frame_at_pred =
+          Term.mk_macro Term.frame_macro [] (Term.mk_pred tau)
+        in
+        let input_at  =
+          Term.mk_macro Term.in_macro [] tau
+        in
+        let ok_list = [frame_at; frame_at_pred; input_at] in
+        let rec is_in = function
+          | Term.Fun (fs,_,[l1; l2]) when
+              fs = Term.f_pair -> is_in l1 || is_in l2
+          | t2 when List.mem t2 ok_list -> true
+          | _ -> false
+        in
+        List.exists is_in biframe
+      in
+      if not (List.for_all (fun tau -> has_frame_or_input biframe tau) maximal_elems) then
+        false
+      else
+        true
+    end
+ else false
