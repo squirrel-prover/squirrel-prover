@@ -317,7 +317,7 @@ let enrich (arg : Theory.eterm Args.arg) (s : ES.t) =
 
 let enrich_a arg s =
   let tbl, env = ES.table s, ES.env s in
-  match Args.convert_args tbl (ES.ty_vars s) env [arg] Args.(Sort ETerm) with
+  match Args.convert_args (ES.system s) tbl (ES.ty_vars s) env [arg] Args.(Sort ETerm) (`Equiv (ES.goal s)) with
   | Args.Arg (ETerm _ as arg) -> enrich arg s
   | _ -> bad_args ()
 

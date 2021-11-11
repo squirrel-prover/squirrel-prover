@@ -346,12 +346,12 @@ module ProverTactics = struct
                            pq_sound}
 
   let convert_args j parser_args tactic_type =
-    let table, env, ty_vars =
+    let table, env, ty_vars, conc, sexpr =
       match j with
-      | Goal.Trace t -> TS.table t, TS.env t, TS.ty_vars t
-      | Goal.Equiv e -> ES.table e, ES.env e, ES.ty_vars e
+      | Goal.Trace t -> TS.table t, TS.env t, TS.ty_vars t, `Reach (TS.goal t), TS.system t
+      | Goal.Equiv e -> ES.table e, ES.env e, ES.ty_vars e, `Equiv (ES.goal e), ES.system e
     in
-    TacticsArgs.convert_args table ty_vars env parser_args tactic_type
+    TacticsArgs.convert_args sexpr table ty_vars env parser_args tactic_type conc
 
   let register id ~tactic_help ?(pq_sound=false) f =
     register_general id ~tactic_help ~pq_sound
@@ -801,7 +801,6 @@ let declare_i table hint_db decl = match L.unloc decl with
             ,  goal in
     goals :=  (statement,goal) :: !goals;
     table
-
 
   | Decl.Decl_ddh (g, (exp, f_info), ctys) ->
     let ctys = parse_ctys table ctys ["group"; "exposants"] in

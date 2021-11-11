@@ -199,6 +199,7 @@ let set_hyps hyps j = { j with hyps }
 
 let set_goal goal j = { j with goal }
 
+
 let set_reach_goal f s = set_goal Equiv.(Atom (Reach f)) s
 
 let set_ty_vars ty_vars j = { j with ty_vars }
@@ -221,8 +222,6 @@ let goal_as_equiv s = match goal s with
   | Atom (Equiv.Equiv e) -> e
   | _ ->
     Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
-
-
 
 (*------------------------------------------------------------------*)
 (** Convert global sequent to local sequent.
@@ -318,7 +317,6 @@ let init ~system ~table ~hint_db ~ty_vars ~env ?hyp goal =
   if Config.post_quantum () then
    check_pq_sound_sequent new_sequent
   else new_sequent
-
 
 let mem_felem i s =
   goal_is_equiv s &&

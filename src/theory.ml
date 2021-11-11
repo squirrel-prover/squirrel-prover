@@ -96,7 +96,7 @@ let rec equal t t' = match L.unloc t, L.unloc t' with
   | Compare (ord, a, b), Compare (ord', a', b') ->
     ord = ord' && equal a a' && equal b b'
 
-  | Seq (l, a),    Seq (l', a') 
+  | Seq (l, a),    Seq (l', a')
   | ForAll (l, a), ForAll (l', a')
   | Exists (l, a), Exists (l', a') ->
     List.length l = List.length l' &&
@@ -250,10 +250,10 @@ type hterm = hterm_i L.located
 (*------------------------------------------------------------------*)
 (** {2 Equivalence formulas} *)
 
-type equiv = term list 
+type equiv = term list
 
 type pquant = PForAll | PExists
-              
+
 type global_formula = global_formula_i Location.located
 
 and global_formula_i =
@@ -289,7 +289,7 @@ type conversion_error_i =
   | BadPty               of Type.ekind list
   | BadInfixDecl
   | PatNotAllowed
-  | ExplicitTSInProc 
+  | ExplicitTSInProc
 
 type conversion_error = L.t * conversion_error_i
 
@@ -668,7 +668,7 @@ type conv_cntxt =
   | InGoal
 
 let is_in_proc = function InProc _ -> true | InGoal -> false
-  
+
 (** Exported conversion environments. *)
 type conv_env = {
   table : Symbols.table;
@@ -1062,7 +1062,7 @@ and conv_app :
       begin match Type.kind ty with
         | Type.KTimestamp ->
           Term.mk_action
-            (get_action state.table a) 
+            (get_action state.table a)
             (List.map (conv_index state) is)
         | _ -> type_error ()
       end
@@ -1215,8 +1215,8 @@ let convert_ht : type s.
     begin
       if not (Type.Infer.is_closed state.ty_env) then
         conv_err (L.loc ht0) Freetyunivar;
-      
-      let tysubst = Type.Infer.close ty_env in     
+
+      let tysubst = Type.Infer.close ty_env in
       Type.tsubst_ht tysubst hty, Term.tsubst_ht tysubst ht
     end
   else
@@ -1250,8 +1250,8 @@ let convert_i ?ty_env ?(pat=false) (cenv : conv_env) ty_vars env tm
     begin
       if not (Type.Infer.is_closed state.ty_env) then
         conv_err (L.loc tm) Freetyunivar;
-      
-      let tysubst = Type.Infer.close ty_env in     
+
+      let tysubst = Type.Infer.close ty_env in
       Term.tsubst tysubst t, Type.tsubst tysubst ty
     end
   else
@@ -1297,7 +1297,9 @@ let econvert (cenv : conv_env) ty_vars subst t : eterm option =
   (* Type is inferred for sort Message *)
   try let tt, ty = convert_i cenv ty_vars subst t in
     Some (ETerm (ty, tt, loc))
-  with Conv e -> None
+  with
+    Conv (_, PatNotAllowed) as e -> raise e
+  | Conv e -> None
 
 (** exported outside Theory.ml *)
 let convert_index table ty_vars env t =
@@ -1309,17 +1311,17 @@ let convert_index table ty_vars env t =
 (*------------------------------------------------------------------*)
 (** {2 Convert equiv formulas} *)
 
-let convert_el cenv ty_vars (env : Vars.env) el : Term.message =   
+let convert_el cenv ty_vars (env : Vars.env) el : Term.message =
   let t, _ = convert_i cenv ty_vars env el in
-  t  
+  t
 
 let convert_equiv cenv ty_vars (env : Vars.env) (e : equiv) =
   List.map (convert_el cenv ty_vars env) e
 
 let convert_global_formula cenv ty_vars env (p : global_formula) =
   let rec conve cenv ty_vars env p =
-    let conve ?(cenv=cenv) ?(ty_vars=ty_vars) ?(env=env) p = 
-       conve cenv ty_vars env p 
+    let conve ?(cenv=cenv) ?(ty_vars=ty_vars) ?(env=env) p =
+       conve cenv ty_vars env p
     in
 
     match L.unloc p with
@@ -1327,16 +1329,16 @@ let convert_global_formula cenv ty_vars env (p : global_formula) =
     | PAnd  (f1, f2) -> Equiv.And  (conve f1, conve f2)
     | POr   (f1, f2) -> Equiv.Or   (conve f1, conve f2)
 
-    | PEquiv e -> 
+    | PEquiv e ->
       Equiv.Atom (Equiv.Equiv (convert_equiv cenv ty_vars env e))
 
-    | PReach f -> 
+    | PReach f ->
       Equiv.Atom (Equiv.Reach (convert cenv ty_vars env f Type.Boolean))
 
 
     | PQuant (q, bnds, e) ->
       let env, evs =
-        convert_p_bnds cenv.table ty_vars env bnds 
+        convert_p_bnds cenv.table ty_vars env bnds
       in
       let e = conve ~env e in
       let q = match q with
@@ -1344,7 +1346,7 @@ let convert_global_formula cenv ty_vars env (p : global_formula) =
         | PExists -> Equiv.Exists
       in
       Equiv.mk_quant q evs e
-  in      
+  in
 
   conve cenv ty_vars env p
 

@@ -90,7 +90,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Conversion} *)
 
   let convert_args (s : S.sequent) args sort =
-    Args.convert_args (S.table s) (S.ty_vars s) (S.env s) args sort
+    Args.convert_args (S.system s) (S.table s) (S.ty_vars s) (S.env s) args sort (S.wrap_conc (S.goal s))
 
   let convert_i ?pat (s : S.sequent) term =
     let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in
@@ -352,6 +352,29 @@ module MkCommonLowTac (S : Sequent.S) = struct
     Tactics.print_system (S.table s) (S.system s);
     [s]
 
+  let print_messages args s =
+    let messages = List.map (fun arg ->
+        match convert_args s [Args.Theory arg] Args.(Sort Message) with
+        | Args.Arg (Args.Message (f, _)) -> f
+        | _ ->
+          hard_failure ~loc:(L.loc arg)
+            (Tactics.Failure "expected a term of sort message")
+      ) args in
+    let pp_messages ppf messages = List.iteri
+        (fun i m -> Fmt.pf ppf "@.%i:%a@." i Term.pp m)
+        messages in
+    Printer.prt `Result "%a" pp_messages messages;
+    s
+
+  let print_messages_tac args s =
+    let args = List.map (function
+        | Args.Theory t -> t
+        | _ -> bad_args ()
+      ) args
+    in
+    [print_messages args s]
+
+  let print_messages_tac args = wrap_fail (print_messages_tac args)
   (*------------------------------------------------------------------*)
   (** {3 Rewriting types and functions} *)
 
@@ -2042,6 +2065,17 @@ let () =
                   tactic_group = Logical}
     ~pq_sound:true
     (genfun_of_any_pure_fun TraceLT.print_tac EquivLT.print_tac)
+
+(*------------------------------------------------------------------*)
+let () = T.register_general "printmessages"
+    ~tactic_help:{
+      general_help  = "Print the messages given as argument. Can be used to \
+                       print the values matching a pattern.";
+      detailed_help = "";
+      tactic_group  = Logical;
+      usages_sorts  = [Sort Args.Message]; }
+    (gentac_of_any_tac_arg TraceLT.print_messages_tac EquivLT.print_messages_tac)
+
 
 (*------------------------------------------------------------------*)
 let () =
