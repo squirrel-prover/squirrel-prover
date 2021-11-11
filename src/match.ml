@@ -353,6 +353,11 @@ module type S = sig
     match_res
 
   val map : ?m_rec:bool -> f_map -> Vars.env -> t -> t option
+
+  val find : Symbols.table ->
+    SystemExpr.t ->
+    Vars.env ->
+    ('a Term.term pat) -> t -> Term.eterm list
 end
 
 (*------------------------------------------------------------------*)
@@ -959,6 +964,14 @@ module T (* : S with type t = message *) = struct
     match found with
     | false -> None
     | true  -> Some t
+
+  let find table expr env pat t =
+    let acc = ref [] in
+    ignore (map (fun (ETerm e) v conds -> match try_match table expr e pat with
+        | Match _ -> acc := ETerm e ::!acc ; `Continue
+        | _ -> `Continue
+      ) env t);
+    !acc
 end
 
 (*------------------------------------------------------------------*)
@@ -2256,4 +2269,12 @@ module E : S with type t = Equiv.form = struct
     match found with
     | false -> None
     | true  -> Some e
+
+  let find table expr env pat t =
+    let acc = ref [] in
+    ignore (map (fun (ETerm e) v conds -> match try_match_term table expr e pat with
+        | Match _ -> acc := ETerm e ::!acc ; `Continue
+        | _ -> `Continue
+      ) env t);
+    !acc
 end

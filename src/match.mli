@@ -47,9 +47,9 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Module signature of matching} *)
 
-type match_res = 
+type match_res =
   | FreeTyv
-  | NoMatch of (Term.messages * Term.match_infos) option 
+  | NoMatch of (Term.messages * Term.match_infos) option
   | Match   of Mvar.t
 
 (** [f] of type [fmap] is a function that, given [t vars conds] where:
@@ -61,7 +61,7 @@ type match_res =
     If [f t vars conds = `Map t'], we replace [t] by [t']. *)
 type f_map =
   Term.eterm -> Vars.evars -> Term.message list ->
-  [`Map of Term.eterm | `Continue] 
+  [`Map of Term.eterm | `Continue]
 
 (** matching algorithm options *)
 type match_option = {
@@ -120,10 +120,17 @@ module type S = sig
     match_res
 
 
-  (** [map ?m_rec func env t] applies [func] at all position in [t]. 
+  (** [map ?m_rec func env t] applies [func] at all position in [t].
       If [m_rec] is true, recurse after applying [func].
       [m_rec] default to [false].*)
   val map : ?m_rec:bool -> f_map -> Vars.env -> t -> t option
+
+  (** [find pat t] returns the list of occurences in t that match the
+     pattern. *)
+  val find : Symbols.table ->
+    SystemExpr.t ->
+    Vars.env ->
+    ('a Term.term pat) -> t -> Term.eterm list
 end
 
 (*------------------------------------------------------------------*)
@@ -131,4 +138,3 @@ end
 module T : S with type t = Term.message
 
 module E : S with type t = Equiv.form
-

@@ -6,7 +6,7 @@
     let loc = L.make startpos endpos in
     L.mk_loc loc s
 
-  let mk_abstract loc s args = T.Abstract (L.mk_loc loc s, args) 
+  let mk_abstract loc s args = T.Abstract (L.mk_loc loc s, args)
 %}
 
 %token <int> INT
@@ -19,20 +19,20 @@
 %token LANGLE RANGLE
 %token GAND GOR AND OR NOT TRUE FALSE HAPPENS
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS COLONEQ
-%token XOR STAR UNDERSCORE QMARK TICK 
+%token XOR STAR UNDERSCORE QMARK TICK
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token TILDE DIFF LEFT RIGHT SEQ
 %token NEW OUT PARALLEL NULL
 %token CHANNEL PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT TYPE FUN
 %token MUTABLE SYSTEM SET
-%token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW RARROW 
+%token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW RARROW
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token LOCAL GLOBAL
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH SLASHSLASHEQUAL ATSLASH
 %token TIME WHERE WITH ORACLE EXN
 %token LARGE NAMEFIXEDLENGTH
-%token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
-%token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY 
+%token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE
+%token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY
 %token SPLITSEQ CONSTSEQ MEMSEQ
 %token BY INTRO AS DESTRUCT REMEMBER INDUCTION
 %token PROOF QED UNDO ABORT HINT
@@ -53,7 +53,7 @@
 %nonassoc empty_else
 %nonassoc ELSE
 
-%left INFIXSYMB 
+%left INFIXSYMB
 
 %left XOR
 
@@ -120,7 +120,7 @@ sterm_i:
 
 | SEQ LPAREN vs=arg_list ARROW t=term RPAREN    { Theory.Seq (vs,t) }
 
-| l=loc(NOT) f=sterm 
+| l=loc(NOT) f=sterm
     { let fsymb = L.mk_loc (L.loc l) "not" in
       Theory.App (fsymb,[f]) }
 
@@ -158,7 +158,7 @@ term_i:
       let fa = L.mk_loc l "&&"  in
       Theory.App (fa, [L.mk_loc loc (Theory.App (fi, [f;f0]));
                        L.mk_loc loc (Theory.App (fi, [f0;f]))]) }
- 
+
 | IF b=term THEN t=term t0=else_term
     { let fsymb = sloc $startpos $endpos "if" in
       Theory.App (fsymb,  [b;t;t0]) }
@@ -259,7 +259,7 @@ process_i:
 | NEW id=lsymb ty=colon_ty? SEMICOLON p=process
     { let ty = match ty with
         | Some ty -> ty
-        | None -> L.mk_loc (L.loc id) Theory.P_message 
+        | None -> L.mk_loc (L.loc id) Theory.P_message
       in
       Process.New (id,ty,p) }
 
@@ -341,7 +341,7 @@ fun_ty:
 
 /* crypto assumption typed space */
 c_ty:
-| l=lsymb COLON ty=p_ty { Decl.{ cty_space = l; 
+| l=lsymb COLON ty=p_ty { Decl.{ cty_space = l;
                                  cty_ty    = ty; } }
 
 /* crypto assumption typed space */
@@ -385,7 +385,7 @@ declaration_i:
                           { Decl.Decl_sign (s, c, p, None, ctys) }
 
 | SIGNATURE s=lsymb COMMA c=lsymb COMMA p=lsymb
-  WITH ORACLE f=term       
+  WITH ORACLE f=term
                           { Decl.Decl_sign (s, c, p, Some f, []) }
 
 | DDH g=lsymb COMMA ei=lsymb_decl ctys=c_tys
@@ -393,10 +393,10 @@ declaration_i:
       Decl.Decl_ddh (g,(f_info,e), ctys) }
 
 | NAME e=lsymb COLON t=name_type
-                          { let a,ty = t in 
+                          { let a,ty = t in
                             Decl.Decl_name (e, a, ty) }
 
-| TYPE e=lsymb infos=bty_infos 
+| TYPE e=lsymb infos=bty_infos
                           { Decl.Decl_bty { bty_name = e; bty_infos = infos; } }
 
 | ABSTRACT e=lsymb_decl a=ty_args COLON t=fun_ty
@@ -457,7 +457,7 @@ rw_dir:
 | MINUS { `RightToLeft }
 
 rw_type:
-| pt=spt             { `Rw pt }  
+| pt=spt             { `Rw pt }
 | SLASH t=sterm      { `Expand t }
 | SLASH l=lloc(STAR)  { `ExpandAll l }
 
@@ -466,18 +466,18 @@ expnd_type:
 | ATSLASH l=lloc(STAR)  { `ExpandAll l }
 
 rw_item:
-| m=rw_mult d=loc(rw_dir) t=rw_type  { TacticsArgs.{ rw_mult = m; 
-                                                     rw_dir = d; 
+| m=rw_mult d=loc(rw_dir) t=rw_type  { TacticsArgs.{ rw_mult = m;
+                                                     rw_dir = d;
                                                      rw_type = t; } }
 
 rw_equiv_item:
-| d=loc(rw_dir) pt=pt  { TacticsArgs.{ rw_mult = `Once; 
-                                       rw_dir = d; 
+| d=loc(rw_dir) pt=pt  { TacticsArgs.{ rw_mult = `Once;
+                                       rw_dir = d;
                                        rw_type = `Rw pt; } }
 
 expnd_item:
-| d=loc(rw_dir) t=expnd_type  { TacticsArgs.{ rw_mult = `Once; 
-                                              rw_dir = d; 
+| d=loc(rw_dir) t=expnd_type  { TacticsArgs.{ rw_mult = `Once;
+                                              rw_dir = d;
                                               rw_type = t; } }
 
 
@@ -569,7 +569,7 @@ pt:
 pt_use_tac:
 | hid=lsymb
     { Theory.{ p_pt_hid = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
-| hid=lsymb WITH args=slist1(tac_term,COMMA) 
+| hid=lsymb WITH args=slist1(tac_term,COMMA)
     { let p_pt_loc = L.make $startpos $endpos in
       Theory.{ p_pt_hid = hid; p_pt_args = args; p_pt_loc; } }
 
@@ -645,8 +645,8 @@ tac:
   | l=lloc(DESTRUCT) i=lsymb
     { mk_abstract l "destruct" [TacticsArgs.String_name i] }
 
-  | l=lloc(DESTRUCT) i=lsymb AS p=and_or_pat   
-    { mk_abstract l "destruct" [TacticsArgs.String_name i; 
+  | l=lloc(DESTRUCT) i=lsymb AS p=and_or_pat
+    { mk_abstract l "destruct" [TacticsArgs.String_name i;
                                 TacticsArgs.AndOrPat p] }
 
   | l=lloc(DEPENDS) args=tactic_params
@@ -673,7 +673,7 @@ tac:
 
   | CHECKFAIL t=tac EXN ts=ID  { T.CheckFail (ts, t) }
 
-  | l=lloc(REVERT) ids=slist1(lsymb, empty)     
+  | l=lloc(REVERT) ids=slist1(lsymb, empty)
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
       mk_abstract l "revert" ids }
 
@@ -690,7 +690,7 @@ tac:
   | l=lloc(dependent_induction) t=tactic_params
     { mk_abstract l "dependent induction" t }
 
-  | l=lloc(CLEAR) ids=slist1(lsymb, empty)     
+  | l=lloc(CLEAR) ids=slist1(lsymb, empty)
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
       mk_abstract l "clear" ids }
 
@@ -701,7 +701,7 @@ tac:
   | t=assert_tac l=lloc(BY) t1=tac
     { T.AndThenSel (t, [[1], T.By (t1,l)]) }
 
-  | l=lloc(USE) pt=pt_use_tac ip=as_ip? 
+  | l=lloc(USE) pt=pt_use_tac ip=as_ip?
     { mk_abstract l "assert" [TacticsArgs.AssertPt (pt, ip, `IntroImpl)] }
 
   (*------------------------------------------------------------------*)
@@ -719,7 +719,7 @@ tac:
   | l=lloc(APPLY) a=named_args t=apply_arg w=apply_in
     { mk_abstract l "apply" [TacticsArgs.ApplyIn (a, t, w)] }
 
-  | l=lloc(SPLITSEQ) i=loc(INT) COLON LPAREN ht=hterm RPAREN 
+  | l=lloc(SPLITSEQ) i=loc(INT) COLON LPAREN ht=hterm RPAREN
     { mk_abstract l "splitseq" [TacticsArgs.SplitSeq (i, ht)] }
 
   | l=lloc(CONSTSEQ) i=loc(INT) COLON terms=slist1(constseq_arg, empty)
@@ -728,7 +728,7 @@ tac:
   | l=lloc(MEMSEQ) i=loc(INT) j=loc(INT)
     { mk_abstract l "memseq" [TacticsArgs.MemSeq (i, j)] }
 
-  | l=lloc(DDH) g=lsymb COMMA i1=lsymb COMMA i2=lsymb COMMA i3=lsymb 
+  | l=lloc(DDH) g=lsymb COMMA i1=lsymb COMMA i2=lsymb COMMA i3=lsymb
     { mk_abstract l "ddh"
          [TacticsArgs.String_name g;
           TacticsArgs.String_name i1;
@@ -747,29 +747,29 @@ tac:
 (* A few special cases for tactics whose names are not parsed as ID
  * because they are reserved. *)
 help_tac_i:
-| LEFT       { "left"}     
-| RIGHT      { "right"}    
-| INTRO      { "intro"} 
-| DESTRUCT   { "destruct"} 
+| LEFT       { "left"}
+| RIGHT      { "right"}
+| INTRO      { "intro"}
+| DESTRUCT   { "destruct"}
 | DEPENDS    { "depends"}
 | REMEMBER   { "remember"}
-| EXISTS     { "exists"}    
-| REVERT     { "revert"}  
-| GENERALIZE { "generalize"}  
-| INDUCTION  { "induction"}  
-| CLEAR      { "clear"}      
-| ASSERT     { "assert"}   
-| USE        { "use"}      
-| REWRITE    { "rewrite"}  
-| APPLY      { "apply"}  
-| SPLITSEQ   { "splitseq"}  
-| CONSTSEQ   { "constseq"}  
-| MEMSEQ     { "memseq"}  
-| DDH        { "ddh"}      
+| EXISTS     { "exists"}
+| REVERT     { "revert"}
+| GENERALIZE { "generalize"}
+| INDUCTION  { "induction"}
+| CLEAR      { "clear"}
+| ASSERT     { "assert"}
+| USE        { "use"}
+| REWRITE    { "rewrite"}
+| APPLY      { "apply"}
+| SPLITSEQ   { "splitseq"}
+| CONSTSEQ   { "constseq"}
+| MEMSEQ     { "memseq"}
+| DDH        { "ddh"}
 
-| DEPENDENT INDUCTION  { "dependent induction"}  
-| GENERALIZE DEPENDENT { "generalize dependent"}  
-| REWRITE EQUIV        { "rewrite equiv"}  
+| DEPENDENT INDUCTION  { "dependent induction"}
+| GENERALIZE DEPENDENT { "generalize dependent"}
+| REWRITE EQUIV        { "rewrite equiv"}
 
 help_tac:
 | l=loc(help_tac_i) { l }
@@ -787,7 +787,7 @@ biframe:
 %inline quant:
 | FORALL { Theory.PForAll }
 | EXISTS { Theory.PExists }
-      
+
 global_formula_i:
 | LBRACKET f=term RBRACKET         { Theory.PReach f }
 | TILDE LPAREN e=biframe RPAREN    { Theory.PEquiv e }
@@ -799,9 +799,9 @@ global_formula_i:
 | q=quant LPAREN vs=arg_list RPAREN sep f=global_formula %prec QUANTIF
                                    { Theory.PQuant (q,vs,f)  }
 
-| f1=global_formula GAND f2=global_formula 
+| f1=global_formula GAND f2=global_formula
                                    { Theory.PAnd (f1, f2) }
-| f1=global_formula GOR f2=global_formula 
+| f1=global_formula GOR f2=global_formula
                                    { Theory.POr (f1, f2) }
 
 global_formula:
