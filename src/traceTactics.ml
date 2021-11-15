@@ -1927,4 +1927,5 @@ let () =
          Default direction is left-to-right (can be changed using `-`).";
       tactic_group = Structural;
       usages_sorts = [] }
+    ~pq_sound:true
     (LowTactics.gentac_of_ttac_arg rewrite_equiv_tac)
