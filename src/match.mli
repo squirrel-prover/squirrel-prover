@@ -127,10 +127,12 @@ module type S = sig
 
   (** [find pat t] returns the list of occurences in t that match the
      pattern. *)
-  val find : Symbols.table ->
+  val find : 
+    Symbols.table ->
     SystemExpr.t ->
     Vars.env ->
-    ('a Term.term pat) -> t -> Term.eterm list
+    'a Term.term pat -> t -> 
+    Term.eterm list
 end
 
 (*------------------------------------------------------------------*)

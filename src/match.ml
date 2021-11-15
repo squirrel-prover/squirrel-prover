@@ -774,7 +774,7 @@ module T (* : S with type t = message *) = struct
         if Type.Infer.unify_eq st.ty_env (ty t) (Vars.ty v) = `Fail then
           no_match ();
 
-        (* check that we are not trying to match [v] with a term free bound
+        (* check that we are not trying to match [v] with a term bound
            variables. *)
         if not (Sv.disjoint (fv t) st.bvs) then no_match ();
 
@@ -920,7 +920,7 @@ module T (* : S with type t = message *) = struct
             let dconds = c :: conds in
             let found0, c = map env1 vars1 conds  c in
             let found1, d = map env1 vars1 dconds d in
-            let found2, e = map env   vars  conds  e in
+            let found2, e = map env  vars  conds  e in
             let t' = Term.mk_find vs c d e in
             let found = found0 || found1 || found2 in
 
@@ -965,9 +965,16 @@ module T (* : S with type t = message *) = struct
     | false -> None
     | true  -> Some t
 
-  let find table expr env pat t =
+  let find
+      (table : Symbols.table) 
+      (expr  : SystemExpr.t) 
+      (env   : Vars.env)
+      (pat   : 'a term pat) 
+      (t     : 'a term) 
+    =
     let acc = ref [] in
-    ignore (map (fun (ETerm e) v conds -> match try_match table expr e pat with
+    ignore (map (fun (ETerm e) v conds -> 
+        match try_match table expr e pat with
         | Match _ -> acc := ETerm e ::!acc ; `Continue
         | _ -> `Continue
       ) env t);
@@ -2270,10 +2277,17 @@ module E : S with type t = Equiv.form = struct
     | false -> None
     | true  -> Some e
 
-  let find table expr env pat t =
+  let find
+      (table : Symbols.table) 
+      (expr  : SystemExpr.t) 
+      (env   : Vars.env)
+      (pat   : 'a term pat) 
+      (t     : Equiv.form) 
+    =
     let acc = ref [] in
-    ignore (map (fun (ETerm e) v conds -> match try_match_term table expr e pat with
-        | Match _ -> acc := ETerm e ::!acc ; `Continue
+    ignore (map (fun (ETerm e) v conds -> 
+        match try_match_term table expr e pat with
+        | Match _ -> acc := ETerm e :: !acc ; `Continue
         | _ -> `Continue
       ) env t);
     !acc
