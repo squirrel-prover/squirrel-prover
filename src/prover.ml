@@ -490,6 +490,23 @@ let get_help (tac_name : lsymb) =
     Printer.prt `Result "%a" (ProverTactics.pp true) tac_name;
   Tactics.id
 
+  let print_lemmas fmt () =
+    let goals = !goals_proved in
+    List.iter (fun g -> Fmt.pf fmt "%s: %a@;" g.Goal.name Equiv.Any.pp g.Goal.formula) goals
+
+
+
+let () =
+  ProverTactics.register_general "lemmas"
+    ~tactic_help:{general_help = "Print all proved lemmas.";
+                  detailed_help = "";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    ~pq_sound:true
+    (fun _ s sk fk ->
+       Printer.prt `Result "%a" print_lemmas ();
+       sk [s] fk)
+
 let () =
   ProverTactics.register_general "prof"
     ~tactic_help:{general_help = "Print profiling information.";
