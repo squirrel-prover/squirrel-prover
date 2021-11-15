@@ -472,12 +472,13 @@ let convert_pat_arg sel sexpr conv_cntxt tyvars env p conc =
   in
   let pat = Match.{
       pat_tyvars = [];
-      pat_vars = pat_vars;
+      pat_vars;
       pat_term = t; }
   in
+  let option = { Match.default_match_option with allow_capture = true; } in
   let res = match conc with
-    | `Reach form -> Match.T.find  (conv_cntxt.table) sexpr env pat form
-    | `Equiv form -> Match.E.find  (conv_cntxt.table) sexpr env pat form
+    | `Reach form -> Match.T.find ~option (conv_cntxt.table) sexpr env pat form
+    | `Equiv form -> Match.E.find ~option (conv_cntxt.table) sexpr env pat form
   in
   let message = match List.nth res (sel-1) with
     | Term.ETerm et -> Term.cast (Term.kind t) et

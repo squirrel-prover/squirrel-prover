@@ -1090,7 +1090,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
       soft_failure ApplyBadInst;
 
     let pat = { pat with pat_term = f } in
-    let option = Match.{ mode = `EntailRL; use_fadup } in
+    let option = 
+      { Match.default_match_option with mode = `EntailRL; use_fadup } 
+    in
 
     (* Check that [pat] entails [S.goal s]. *)
     match S.MatchF.try_match ~option
@@ -1128,9 +1130,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
       if not (Vars.Sv.subset pat.pat_vars (S.fv_conc fprem)) then None
       else
         let pat = { pat with pat_term = fprem } in
-        let option = Match.{
-          mode = `EntailLR;
-          use_fadup; }
+        let option = 
+          Match.{ default_match_option with mode = `EntailLR; use_fadup; }
         in
 
         (* Check that [hconcl] entails [pat]. *)

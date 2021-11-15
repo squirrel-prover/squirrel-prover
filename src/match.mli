@@ -65,8 +65,12 @@ type f_map =
 
 (** matching algorithm options *)
 type match_option = {
-  mode      : [`Eq | `EntailLR | `EntailRL];
-  use_fadup : bool;
+  mode          : [`Eq | `EntailLR | `EntailRL];
+  use_fadup     : bool;
+  allow_capture : bool;
+  (** allow pattern variables to capture bound variables (i.e. to be
+      instantiated by terms using bound variables). 
+      When doing rewriting, lemma application, etc, must be false. *)
 }
 
 val default_match_option : match_option
@@ -127,10 +131,13 @@ module type S = sig
 
   (** [find pat t] returns the list of occurences in t that match the
      pattern. *)
-  val find : Symbols.table ->
+  val find : 
+    ?option:match_option ->
+    Symbols.table ->
     SystemExpr.t ->
     Vars.env ->
-    ('a Term.term pat) -> t -> Term.eterm list
+    'a Term.term pat -> t -> 
+    Term.eterm list
 end
 
 (*------------------------------------------------------------------*)

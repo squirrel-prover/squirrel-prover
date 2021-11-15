@@ -23,7 +23,6 @@ Proof.
   auto.
 Qed.
 
-
 goal foo : forall (tau, tau' : timestamp, i:index),
   output@tau = try find i such that n(i)=n(i) in output@tau else a(m).
 Proof.
@@ -39,11 +38,11 @@ Proof.
 
 
  (* following command fails and should not*)
-  printmessages (try find i such that _ in _ else a(m)).
+  printmessages try find i such that _ in _ else a(m).
   printmessages (try find i0 such that _ in output@tau else a(m)).
 
   (* following command fails, but maybe there is no solution *)
-  printmessages (try find i such that _ in _ else _).
+  (* printmessages (try find i such that _ in _ else _). *)
 
   admit.
 Qed.
