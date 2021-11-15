@@ -1090,8 +1090,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
       soft_failure ApplyBadInst;
 
     let pat = { pat with pat_term = f } in
-    let option = 
-      { Match.default_match_option with mode = `EntailRL; use_fadup } 
+    let option =
+      { Match.default_match_option with mode = `EntailRL; use_fadup }
     in
 
     (* Check that [pat] entails [S.goal s]. *)
@@ -1130,7 +1130,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       if not (Vars.Sv.subset pat.pat_vars (S.fv_conc fprem)) then None
       else
         let pat = { pat with pat_term = fprem } in
-        let option = 
+        let option =
           Match.{ default_match_option with mode = `EntailLR; use_fadup; }
         in
 
@@ -2068,7 +2068,7 @@ let () =
     (genfun_of_any_pure_fun TraceLT.print_tac EquivLT.print_tac)
 
 (*------------------------------------------------------------------*)
-let () = T.register_general "printmessages"
+let () = T.register_general "show"
     ~tactic_help:{
       general_help  = "Print the messages given as argument. Can be used to \
                        print the values matching a pattern.";

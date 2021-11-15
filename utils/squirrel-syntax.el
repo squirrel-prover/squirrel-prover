@@ -66,7 +66,7 @@
   "index"
   "message"
   "boolean"
-  "timestamp"  
+  "timestamp"
 
   "large"
   "name_fixed_length"
@@ -129,6 +129,7 @@
   "equivalent"
   "expandall"
   "fa"
+  "show"
   "fadup"
   "fresh"
   "ifeq"
