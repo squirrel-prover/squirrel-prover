@@ -278,7 +278,8 @@ type match_state = {
   table    : Symbols.table;
   system   : SystemExpr.t;
 
-  use_fadup : bool;
+  use_fadup     : bool;
+  allow_capture : bool;
 }
 
 (*------------------------------------------------------------------*)
@@ -309,11 +310,19 @@ type f_map =
 
 (** matching algorithm options *)
 type match_option = {
-  mode      : [`Eq | `EntailLR | `EntailRL];
-  use_fadup : bool;
+  mode          : [`Eq | `EntailLR | `EntailRL];
+  use_fadup     : bool;
+  allow_capture : bool;
+  (** allow pattern variables to capture bound variables (i.e. to be
+      instantiated by terms using bound variables). 
+      When doing rewriting, lemma application, etc, must be false. *)
 }
 
-let default_match_option = { mode = `Eq; use_fadup = false; }
+let default_match_option = { 
+  mode          = `Eq; 
+  use_fadup     = false; 
+  allow_capture = false; 
+}
 
 (** Module signature of matching.
     The type of term we match into is abstract. *)
@@ -354,10 +363,13 @@ module type S = sig
 
   val map : ?m_rec:bool -> f_map -> Vars.env -> t -> t option
 
-  val find : Symbols.table ->
+  val find : 
+    ?option:match_option ->
+    Symbols.table ->
     SystemExpr.t ->
     Vars.env ->
-    ('a Term.term pat) -> t -> Term.eterm list
+    ('a Term.term pat) -> t -> 
+    Term.eterm list
 end
 
 (*------------------------------------------------------------------*)
@@ -774,9 +786,10 @@ module T (* : S with type t = message *) = struct
         if Type.Infer.unify_eq st.ty_env (ty t) (Vars.ty v) = `Fail then
           no_match ();
 
-        (* check that we are not trying to match [v] with a term bound
-           variables. *)
-        if not (Sv.disjoint (fv t) st.bvs) then no_match ();
+        (* When [st.allow_capture] is false (which is the default), check that we
+           are not trying to match [v] with a term bound variables. *)
+        if not (Sv.disjoint (fv t) st.bvs) && not st.allow_capture then 
+          no_match ();
 
         Mvar.add ev (ETerm t) st.mv
 
@@ -836,13 +849,15 @@ module T (* : S with type t = message *) = struct
     let env = Sv.diff (Sv.union (Term.fv t) (Term.fv pat)) support in
 
     let mv_init = odflt Mvar.empty mv in
-    let st_init : match_state =
-      { bvs = Sv.empty;
-        mv = mv_init;
-        table; system; env; support; ty_env;
-        use_fadup = option.use_fadup;
-      }
-    in
+    let st_init : match_state = { 
+      bvs = Sv.empty;
+      mv = mv_init;
+
+      table; system; env; support; ty_env;
+
+      use_fadup     = option.use_fadup;
+      allow_capture = option.allow_capture; 
+    } in
 
     try
       let mv = tmatch t pat st_init in
@@ -966,15 +981,16 @@ module T (* : S with type t = message *) = struct
     | true  -> Some t
 
   let find
+      ?option
       (table : Symbols.table) 
       (expr  : SystemExpr.t) 
       (env   : Vars.env)
       (pat   : 'a term pat) 
-      (t     : 'a term) 
+      (t     : t) 
     =
-    let acc = ref [] in
+    let acc = ref [] in 
     ignore (map (fun (ETerm e) v conds -> 
-        match try_match table expr e pat with
+        match try_match ?option table expr e pat with
         | Match _ -> acc := ETerm e ::!acc ; `Continue
         | _ -> `Continue
       ) env t);
@@ -2185,12 +2201,15 @@ module E : S with type t = Equiv.form = struct
     let env = Sv.diff (Sv.union (Equiv.fv t) (Equiv.fv pat)) support in
 
     let mv_init = odflt Mvar.empty mv in
-    let st_init : match_state =
-      { bvs = Sv.empty;
-        mv = mv_init;
-        table; system; support; env; ty_env;
-        use_fadup = option.use_fadup; }
-    in
+    let st_init : match_state = {
+      bvs = Sv.empty;
+      mv = mv_init;
+      
+      table; system; support; env; ty_env;
+      
+      use_fadup     = option.use_fadup; 
+      allow_capture = option.allow_capture; 
+    } in
     let mode = match option.mode with
       | `Eq -> `Eq
       | `EntailRL -> `Covar
@@ -2278,6 +2297,7 @@ module E : S with type t = Equiv.form = struct
     | true  -> Some e
 
   let find
+      ?option
       (table : Symbols.table) 
       (expr  : SystemExpr.t) 
       (env   : Vars.env)
