@@ -375,6 +375,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     [print_messages args s]
 
   let print_messages_tac args = wrap_fail (print_messages_tac args)
+
   (*------------------------------------------------------------------*)
   (** {3 Rewriting types and functions} *)
 

@@ -66,7 +66,9 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Create trace and equivalence goals} *)
 
-val make_obs_equiv : Symbols.table ->
+val make_obs_equiv :
+  ?enrich:Term.message list ->
+  Symbols.table ->
 Hint.hint_db -> 'a -> SystemExpr.t -> [> `Equiv of Equiv.form ] * t
 
 

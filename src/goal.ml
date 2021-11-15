@@ -104,10 +104,10 @@ end
 (** {2 Create trace and equivalence goals} *)
 
 
-let make_obs_equiv table hint_db name system =
+let make_obs_equiv ?(enrich=[]) table hint_db name system =
   let env,ts = Vars.make `Approx Vars.empty_env Type.Timestamp "t" in
   let term = Term.mk_macro Term.frame_macro [] (Term.mk_var ts) in
-  let goal = Equiv.(Atom (Equiv [term])) in
+  let goal = Equiv.(Atom (Equiv (term :: enrich))) in
   let happens = Term.mk_happens (Term.mk_var ts) in
   let hyp = Equiv.(Atom (Reach happens)) in
   let s = ES.init ~system ~table ~hint_db ~ty_vars:[] ~env ~hyp goal in

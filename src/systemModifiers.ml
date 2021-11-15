@@ -73,9 +73,24 @@ let global_rename table sdecl gf =
 
       let new_system_e = SystemExpr.pair table old_system_expr new_system_expr in
       let axiom_name = "rename_from_"^(Symbols.to_string old_system_name)
-                       ^"_to_"^(Location.unloc sdecl.name)
+                       ^"_to_"^(Location.unloc sdecl.name) in
+
+      (* we now create the lhs of the obtained conclusion *)
+      let fresh_x_var = Vars.make_new Type.Message "mess" in
+      let enrich = [Term.mk_var fresh_x_var] in
+      let make_conclusion equiv = `Equiv
+          Equiv.(Quant (ForAll, [EVar fresh_x_var],
+                        Impl(
+                          Quant (ForAll, evars,
+                                 Atom (
+                                   Equiv [Term.mk_var fresh_x_var; Term.mk_diff n1 n2]
+                                 )
+                                )
+                        , equiv)
+                       )
+                       )
       in
-      (axiom_name, new_system_e, table)
+      (axiom_name, enrich, make_conclusion, new_system_e, table)
     with SystemExpr.SystemNotFresh ->
       Tactics.hard_failure
         (Tactics.Failure "System name already defined for another system.")
@@ -174,7 +189,25 @@ let global_prf table sdecl ty_vars hash =
       let axiom_name = "prf_from_"^(Symbols.to_string old_system_name)
                        ^"_to_"^(Location.unloc sdecl.name)
       in
-      (axiom_name, new_system_e, table)
+
+      (* we now create the lhs of the obtained conclusion *)
+      let fresh_x_var = Vars.make_new Type.Message "mess" in
+      let enrich = [Term.mk_var fresh_x_var] in
+      let make_conclusion equiv = `Equiv
+          Equiv.(Quant (ForAll, [EVar fresh_x_var],
+                        Impl(
+                          Quant (ForAll, List.map (fun x -> Vars.EVar x) is,
+                                 Atom (
+                                   Equiv [Term.mk_var fresh_x_var; Term.mk_diff
+                                            (Term.mk_name param.h_key)
+                                            (Term.mk_name @@ Term.mk_isymb n Message (is))]
+                                 )
+                                )
+                        , equiv)
+                       )
+                       )
+      in
+      (axiom_name, enrich, make_conclusion, new_system_e, table)
 
  with SystemExpr.SystemNotFresh ->
     Tactics.hard_failure

@@ -812,11 +812,11 @@ let declare_i table hint_db decl = match L.unloc decl with
     Process.declare_system table name sdecl.sprocess
 
   | Decl.Decl_system_modifier sdecl ->
-    let new_axiom_name, new_system, table = SystemModifiers.declare_system table sdecl in
-    let formula, goal = Goal.make_obs_equiv table hint_db new_axiom_name new_system in
-    let statement, goal = Goal.{ name=new_axiom_name; system=new_system; ty_vars=[]; formula}
-            ,  goal in
-    goals :=  (statement,goal) :: !goals;
+    let new_axiom_name, enrich, make_conclusion, new_system, table = SystemModifiers.declare_system table sdecl in
+    let `Equiv formula, _ = Goal.make_obs_equiv ~enrich table hint_db new_axiom_name new_system in
+    let formula = make_conclusion formula in
+    let statement = Goal.{ name=new_axiom_name; system=new_system; ty_vars=[]; formula} in
+    goals_proved :=  statement :: !goals_proved;
     table
 
   | Decl.Decl_ddh (g, (exp, f_info), ctys) ->
