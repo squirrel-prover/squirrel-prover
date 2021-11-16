@@ -1262,16 +1262,13 @@ let known_set_process_pair_inj (k : known_set) : known_set list =
   | _ -> [k]
 
 (** Given a term, return some corresponding known_sets.  *)
-let known_set_list_of_term ~strong (term : Term.message) : known_set list =
+let known_set_list_of_term (term : Term.message) : known_set list =
   let k = known_set_of_term term in
   let k_seq = known_set_add_frame k in
-  if strong then
-    k :: k_seq
-  else
-    List.concat_map known_set_process_pair_inj (k :: k_seq)
+  List.concat_map known_set_process_pair_inj (k :: k_seq)
 
-let known_sets_of_terms ~strong (terms : Term.message list) : known_sets =
-  let ks_l = List.concat_map (known_set_list_of_term ~strong) terms in
+let known_sets_of_terms (terms : Term.message list) : known_sets =
+  let ks_l = List.concat_map known_set_list_of_term terms in
   List.fold_left (fun ks k -> known_sets_add k ks) [] ks_l
 
 (*------------------------------------------------------------------*)
@@ -1839,7 +1836,7 @@ module E : S with type t = Equiv.form = struct
     dbg "init_fixpoint:@.%a@." pp_msets init_fixpoint;
 
     (* initially known terms *)
-    let init_terms = known_sets_of_terms ~strong:false init_terms in
+    let init_terms = known_sets_of_terms init_terms in
 
     dbg "init_terms:@.%a@." pp_known_sets init_terms;
 
@@ -2105,7 +2102,7 @@ module E : S with type t = Equiv.form = struct
     let pat_terms =
       known_sets_union
         (known_sets_of_mset_l mset_l)
-        (known_sets_of_terms ~strong:true pat_terms)
+        (known_sets_of_terms pat_terms)
     in
 
     let mv, minfos =
