@@ -204,7 +204,7 @@ process ResponderRor(i,j:index) =
 
  FR : out(cR, diff( prfd(  hseed(<  <snd(m)(*Ni*),Nr(i,j)>,  exp(fst(m),xr(i,j))>,seedpubkey)(* SKEYSEED *), psk(j,i))
               ,        try find jf,kf such that  snd(m) = Ni(jf,kf) in
-                    idealkeys(j,i,kf,jf)
+                    idealkeys(j,kf,i,jf)
                         else fail
 )).
 
@@ -212,8 +212,31 @@ process ResponderRor(i,j:index) =
 
 system [core]  out(cI, seedpubkey); ((!_k !_l R: ResponderRor(k,l)) | (!_i !_j I: InitiatorRoR(i,j))).
 
+system core2 = [core/left] with gprf (il,jl,kl,ll:index),
+ prfd(  hseed( < <Ni(il,jl),Nr(kl,ll)>,  exp(exp(g,xr(kl,ll)),xi(il,jl))>, seedpubkey  )(* SKEYSEED *), psk(ll,kl)).
 
-goal [core] authI : forall (i,j:index),
+system core3 =  [core2/left] with rename forall (l,k,i,j:index), equiv(diff( n_PRF(l,k,j,i),  idealkeys(l,k,j,i))).
+
+
+
+goal [core3/left,core/right] authR : forall (i,j:index),
+       happens(FR(i,j)) => exec@FR(i,j) =>
+           exists (l:index), SI(j,l) < FR(i,j) &&
+                      fst(input@R(i,j)) = exp(g,xi(j,l)) &&
+                      snd(input@R(i,j)) = Ni(j,l).
+Proof.
+intro i j.
+expand exec.
+executable  pred(FR(i,j)).
+depends  SR(i,j),FR(i,j).
+use H1 with SR(i,j).
+expand exec. expand cond.
+euf H3.
+exists j0.
+case H0. depends R(i,j),FR(i,j).
+Qed.
+
+goal [core3/left,core/right] authI : forall (i,j:index),
        happens(FI(i,j)) => exec@FI(i,j) =>
                       SR(j,i) < FI(i,j) &&
                       fst(input@SI(i,j)) = exp(g,xr(j,i)) &&
@@ -234,94 +257,51 @@ expand cond.
 by euf H4.
 Qed.
 
-goal [core] authR : forall (i,j:index),
-       happens(FR(i,j)) => exec@FR(i,j) =>
-           exists (l:index), SI(j,l) < FR(i,j) &&
-                      fst(input@R(i,j)) = exp(g,xi(j,l)) &&
-                      snd(input@R(i,j)) = Ni(j,l).
+
+axiom [core3/left,core/right] ddhcommu : forall (i,j,k,l:index), exp(exp(g,xi(i,j)),xr(k,l)) =  exp(exp(g,xr(k,l)),xi(i,j)) .
+
+equiv [core3/left,core/right] final.
 Proof.
-intro i j.
-expand exec.
-executable  pred(FR(i,j)).
-depends  SR(i,j),FR(i,j).
-use H1 with SR(i,j).
-expand exec. expand cond.
-euf H3.
-exists j0.
-case H0. depends R(i,j),FR(i,j).
-Qed.
-
-axiom [core] ddhcommu : forall (i,j,k,l:index), exp(exp(g,xi(i,j)),xr(k,l)) =  exp(exp(g,xr(k,l)),xi(i,j)) .
-
-equiv [core] final.
-Proof.
-
-globalprf seq(il,jl,kl,ll->  prfd(  hseed( < <Ni(il,jl),Nr(kl,ll)>,  exp(exp(g,xr(kl,ll)),xi(il,jl))>, seedpubkey  )(* SKEYSEED *), psk(ll,kl))), news.
-
-
-print.
-rename seq(l,k,j,i -> n_PRF(l,k,j,i)), seq(l,k,j,i -> idealkeys(k,l,j,i)), ness.
-print.
 
 diffeq.
 
+
+
 (* I part *)
-forceuse authI with i,j.
+use authI with i,j.
 
-
-case (try find ll,kl,jl,il such that
-   (hseed(<<Ni(i,j),snd(input@SI(i,j))>,exp(fst(input@SI(i,j)),xi(i,j))>,
-    seedpubkey) =
-    hseed(<<Ni(il,jl),Nr(kl,ll)>,exp(exp(g,xr(kl,ll)),xi(il,jl))>,seedpubkey) &&
-    (ll = i && kl = j))
- in idealkeys(ll,kl,jl,il)
- else
-   prfd(hseed(<<Ni(i,j),snd(input@SI(i,j))>,exp(fst(input@SI(i,j)),xi(i,j))>,
-        seedpubkey),psk(i,j))).
-
+case try find il,jl,kl,ll such that _ in idealkeys(il,jl,kl,ll) else _.
+rewrite Meq1.
 collision.
-substeq Meq1.
 
-case try find jf,kf such that snd(input@SI(ll,kl)) = Nr(jf,kf)
-in idealkeys(kf,jf,kl,ll) else fail.
+case try find jf,kf such that _
+in _ else fail.
+rewrite Meq5.
 
-substeq Meq4.
-
-by use H2 with kl,ll.
+by use H2 with jl,il.
 
 by use H2 with i,j,j,i.
 
 
 (* R part *)
+use authR with k,l.
+case try find il,jl,kl,ll such that _
+ in  idealkeys(il,jl,kl,ll)
+ else _.
 
-forceuse authR with k,l.
-case (try find ll,kl,jl,il such that
-   (hseed(<<snd(input@R(k,l)),Nr(k,l)>,exp(fst(input@R(k,l)),xr(k,l))>,
-    seedpubkey) =
-    hseed(<<Ni(il,jl),Nr(kl,ll)>,exp(exp(g,xr(kl,ll)),xi(il,jl))>,seedpubkey) &&
-    (ll = l && kl = k))
- in idealkeys(ll,kl,jl,il)
- else
-   prfd(hseed(<<snd(input@R(k,l)),Nr(k,l)>,exp(fst(input@R(k,l)),xr(k,l))>,
-        seedpubkey),psk(l,k)))  .
-
-substeq Meq1. substeq Meq1.
-
+rewrite Meq1.
 collision.
 
-case try find jf,kf such that snd(input@R(kl,ll)) = Ni(jf,kf)
-in idealkeys(ll,kl,kf,jf) else fail
+case try find jf,kf such that _ in _ else fail.
+rewrite Meq5.
 
-.
-substeq Meq4.
+by use H2 with l,jl.
 
-by use H2 with ll,jl.
+rewrite Meq in H2.
+rewrite Meq0 in H2.
 
-substeq snd(input@R(k,l)), Ni(l,l0).
-substeq  fst(input@R(k,l)), exp(g,xi(l,l0)).
-
-use H2 with l,k,l0 ,l.
+use H2 with l,l0,k ,l.
 
 
-forceuse ddhcommu with l,l0,k,l.
+use ddhcommu with l,l0,k,l.
 Qed.
