@@ -7,6 +7,8 @@ abstract d : message
 abstract e : message
 
 name n1 : index -> message
+name m1 : message
+name m2 : message
 
 abstract ok : index   -> message
 abstract f  : message -> message
@@ -301,3 +303,16 @@ global goal _ (t : timestamp) : equiv(frame@pred(t)) -> equiv(frame@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
+
+(*------------------------------------------------------------------*)
+(* with pairs *)
+
+global goal _ : equiv(<m1, m2>) -> equiv(m1, m2).
+Proof.
+ intro H; apply H.
+Qed.
+
+global goal _ (i : index) : equiv(n1(i), <m1, m2>) -> equiv(n1(i), m1, m2).
+Proof.
+ intro H; apply H.
+Qed.
