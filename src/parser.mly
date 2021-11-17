@@ -36,7 +36,7 @@
 %token SPLITSEQ CONSTSEQ MEMSEQ
 %token BY INTRO AS DESTRUCT REMEMBER INDUCTION
 %token PROOF QED UNDO ABORT HINT
-%token RENAME GPRF
+%token RENAME GPRF GCCA
 %token INCLUDE
 %token EOF
 
@@ -443,6 +443,11 @@ declaration_i:
 | SYSTEM id=lsymb EQ from_sys=system WITH GPRF args=opt_arg_list COMMA hash=term
                           { Decl.(Decl_system_modifier { from_sys = from_sys;
                                                          modifier = PRF (args, hash);
+			                                 name = id}) }
+
+| SYSTEM id=lsymb EQ from_sys=system WITH GCCA args=opt_arg_list COMMA enc=term
+                          { Decl.(Decl_system_modifier { from_sys = from_sys;
+                                                         modifier = CCA (args, enc);
 			                                 name = id}) }
 
 declaration:

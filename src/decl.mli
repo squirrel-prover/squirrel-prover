@@ -46,6 +46,7 @@ val pp_system_decl : Format.formatter -> system_decl -> unit
 type system_modifier =
   | Rename of Theory.global_formula
   | PRF of Theory.bnds * Theory.term
+  | CCA of Theory.bnds * Theory.term
 
 type system_decl_modifier = { from_sys    : SystemExpr.parsed;
                               modifier : system_modifier;
