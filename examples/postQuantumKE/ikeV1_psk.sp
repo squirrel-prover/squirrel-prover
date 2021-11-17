@@ -520,13 +520,14 @@ Qed.
 goal [Ror] helper_wa2 :
   forall (i,j:index),
     happens(I1(i,j)) =>
-    cond@I1(i,j) =>
+    exec@I1(i,j) =>
 
       Nr(j) = fst(snd(input@I1(i,j))) &&
       exp(g,b(j)) = fst(input@I1(i,j))
      .
 Proof.
  intro i j.
+ expand exec.
  expand cond.
 
  case    try find il,jl such that
@@ -570,13 +571,14 @@ cycle 1.
 intro i0 j0.
 fresh 1.
 use H with R(j,i) => //.
+use H with R1(j,i) => //.
 fa 0.
 enrich frame@R(j,i).
+enrich frame@R1(j,i).
 repeat fa 1.
 repeat fa 2.
 repeat fa 3.
-help.
-admit.
+apply H1.
 
 depends R(j,i), R1(j,i).
 Qed.
@@ -615,11 +617,13 @@ cycle 1.
 intro i0 j0.
 fresh 1.
 use H with R(j,i) => //.
+use H with R1(j,i) => //.
 fa 0.
 enrich frame@R(j,i).
+enrich frame@R1(j,i).
 repeat fa 1.
 repeat fa 2.
-admit.
+apply H1.
 
 depends R(j,i), R1(j,i).
 Qed.
@@ -665,7 +669,7 @@ global goal [Ror/left,Ror2/left] helper_wa_equiv_2 :
   forall (i,j:index),
     [happens(I1(i,j))] ->
    equiv(
-    cond@I1(i,j) =>
+    exec@I1(i,j) =>
 
       Nr(j) = fst(snd(input@I1(i,j))) &&
       exp(g,b(j)) = fst(input@I1(i,j))
@@ -682,14 +686,17 @@ fa 0.
 repeat fa 1.
 repeat fa 2.
 repeat fa 3.
-admit.
+
+enrich frame@I1(i,j).
+
+apply H0.
 Qed.
 
 
 goal [Ror2/left] helper_wa_aux2 :
   forall (i,j:index),
     happens(I1(i,j)) =>
-    cond@I1(i,j) =>
+    exec@I1(i,j) =>
 
       Nr(j) = fst(snd(input@I1(i,j))) &&
       exp(g,b(j)) = fst(input@I1(i,j))
@@ -701,12 +708,11 @@ rewrite equiv helper_wa_equiv_2  i j.
 use helper_wa2 with i, j.
 Qed.
 
-
 global goal [Ror2/left,Ror3/left] helper_wa_equiv_3 :
   forall (i,j:index),
     [happens(I1(i,j))] ->
    equiv(
-    cond@I1(i,j) =>
+    exec@I1(i,j) =>
 
       Nr(j) = fst(snd(input@I1(i,j))) &&
       exp(g,b(j)) = fst(input@I1(i,j))
@@ -723,13 +729,15 @@ fa 0.
 repeat fa 1.
 repeat fa 2.
 repeat fa 3.
-admit.
+
+enrich frame@I1(i,j).
+apply H0.
 Qed.
 
 goal [Ror3/left] helper_wa_aux5 :
   forall (i,j:index),
     happens(I1(i,j)) =>
-    cond@I1(i,j) =>
+    exec@I1(i,j) =>
 
       Nr(j) = fst(snd(input@I1(i,j))) &&
       exp(g,b(j)) = fst(input@I1(i,j))
@@ -745,7 +753,7 @@ Qed.
 goal [Ror3/left, Ror/right] helper_wa4 :
   forall (i,j:index),
     happens(I1(i,j)) =>
-    cond@I1(i,j) =>
+    exec@I1(i,j) =>
 
       Nr(j) = fst(snd(input@I1(i,j))) &&
       exp(g,b(j)) = fst(input@I1(i,j))
