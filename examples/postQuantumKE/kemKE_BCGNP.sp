@@ -55,15 +55,12 @@ KIR := expd(s,kI2) XOR expd(s,kR2)
 
 # Model
 
-We model two agents that may initiate multiple sessions. See PQ-x3dh-like for a devellopment with multiple keys.
+We model an unbounded number of agents, each capable of initiating multiple sessions. The responder is willing to talk to anybody.
 
-We prove some weak authentication: if an agent obtained some honest parameter,
-it was sent out by an honest agent.
 
-We prove also separately for each agent that the computed key is real or random,
+We prove for each agent that the computed key is real or random,
 which implies the implicit authentication of the scheme: only the other trusted
 party could potentially compute the key.
-
 
 
 *******************************************************************************)
