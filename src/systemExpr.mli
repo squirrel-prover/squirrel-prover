@@ -30,6 +30,8 @@ val pair        : Symbols.table -> single_system -> single_system -> t
   * proved for [s2] when reasoning about [s1]. *)
 val systems_compatible : t -> t -> bool
 
+
+val pp_single : Format.formatter -> single_system -> unit
 val pp : Format.formatter -> t -> unit
 
 (*------------------------------------------------------------------*)
