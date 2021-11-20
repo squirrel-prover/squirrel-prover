@@ -73,21 +73,7 @@ rewrite Meq => //.
 intro [ex [Eq Eq2 Ord]].
 expand exec,cond.
 split => //.
-expand output.
 
-rewrite fst_pair in Eq2.
-rewrite snd_pair in Ord.
-
-case      try find  such that n = n
-     in enc(n_CCA,r,pk(kenc)) else enc(n,r,pk(kenc)).
-intro [_ A].
-rewrite A in Eq2.
-rewrite A in Ord.
-auto.
-
-intro [Neg A].
-notleft Neg.
-auto.
 
 fadup 5.
 expand output.
@@ -110,12 +96,10 @@ intro Ord.
 
 expand output.
 rewrite fst_pair.
-case try find such that _ in _ else enc(n,r,pk(kenc)).
-intro [_ Meq].
 case try find such that _ in n else _.
+intro [_ Meq].
 auto.
 intro [Neg _] => //.
-auto.
 
 fa 5. fadup 5.
 fa 5. fadup 5.
