@@ -19,7 +19,7 @@ val declare_global :
 (** {2 Macro expansions} *)
 
 type def_result = [ `Def of Term.message | `Undef | `MaybeDef ]
-                  
+
 (** Return the term corresponding to the declared macro,
     if the macro can be expanded.
     Does *not* check that the timestamp happens ! *)
@@ -35,3 +35,8 @@ val get_definition_exn :
   * except that it will feature meaningless action names in some places. *)
 val get_dummy_definition :
   Symbols.table -> SystemExpr.t -> Term.msymb -> Term.message
+
+val apply_global_data :
+  Symbols.table -> Symbols.macro Symbols.t -> Symbols.macro_def -> SystemExpr.single_system ->
+   SystemExpr.single_system ->
+  'a -> ([ `Message ] Term.term -> [ `Message ] Term.term) -> Symbols.table
