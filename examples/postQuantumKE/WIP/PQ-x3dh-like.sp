@@ -91,116 +91,211 @@ name k : index  -> index  -> index -> message
 name rkt : index  -> index  -> index ->message
 name rk : index  -> index  -> index -> message
 
+(* session randomess of R with dishonnest I *)
+name Dkt :  index  -> index ->message
+name Dk :  index  -> index -> message
+name Drkt :  index  -> index ->message
+name Drk :  index  -> index -> message
+
+(* key derivation storage *)
+mutable sIR(i,j,k:index) : message =  zero
+mutable sRI(i,j,k:index) : message =  zero
+mutable DsRI(j,k:index) : message =  zero
+
 (* ideal keys *)
+name ikIR : index -> index -> index -> message
 
 
-abstract ok:message.
+abstract ok:message
 
-channel cI.
+channel cI
 channel cR.
 
 (* Main protocol Model *)
 
-process Initiator(i,j,l:index) =
-(* Initiator i who wants to talk to Responder j *)
+(* Initiator vkI(i) who wants to talk to Responder spk(skR(j)) *)
+process Initiator(i,j,k:index) =
+   out(cI, epk(dkt(i,j,k)) );
 
- out(cI, epk(dkt(i,j,l)) );
+   in(cR,m);
 
- in(cR,m);
+   let KT = decap( fst(m),dkt(i,j,k) ) in
 
- let KT = decap( fst(m),dkt(i,j,l) ) in
-  let K = decap( fst(snd(m)), vkI(i) ) in
-
-   let sid = < epk(vkI(i)), <epk(vkR(j)), <m , <fst(snd(m)), fst(m)>>>> in
-   let K1 = exct(skex,K) in
+   let sid = < epk(vkI(i)), <epk(vkR(j)), <epk(dkt(i,j,k)) , <fst(snd(m)), fst(m)>>>> in
+   let K1 = exct(skex,decap( fst(snd(m)), vkI(i) )) in
    let K2 = exct(skex,KT) in
    let kj = F1(sid,K1) XOR F1(sid,K2) in
    let ktilde = F2(sid,K1) XOR F2(sid,K2) in
    if checksign( ktilde XOR snd(snd(m)), spk(skR(j))) = sid then
-      FI : out(cR,ok).
+    FI :  sIR(i,j,k) := kj.
 
-process Responder(j,i,l:index) =
+process Responder(j,k:index) =
 (* Responder j who is willing to talk to initator i *)
+   in(cR, epkI);
     in(cR, m);
-
-   let CT = encap(kt(j,i,l), rkt(j,i,l), m) in
-   let C = encap(k(j,i,l), rk(j,i,l), epk(vkI(i))) in
+  try find i such that epkI = epk(vkI(i)) in
+   let CT = encap(kt(i,j,k), rkt(i,j,k), m) in
+   let C = encap(k(i,j,k), rk(i,j,k), epk(vkI(i))) in
    let sid = < epk(vkI(i)), <epk(vkR(j)), <m , <C, CT>>>> in
-   let K1 = exct(skex,k(j,i,l)) in
-   let K2 = exct(skex,kt(j,i,l)) in
+   let K1 = exct(skex,k(i,j,k)) in
+   let K2 = exct(skex,kt(i,j,k)) in
    let kj = F1(sid,K1) XOR F1(sid,K2) in
    let ktilde = F2(sid,K1) XOR F2(sid,K2) in
-   SR : out(cR,<CT,<C, ktilde XOR sign(sid, skR(j))   >>).
-
-system [Main]  out(cI,skex); ((!_j !_i !_l R: Responder(j,i,l)) | (!_i !_j !_l I: Initiator(i,j,l))).
-
-
-(***************************************)
-(************ Hidding the share ********)
-
-(* We prove the authentication on this system, and use it to prove that we can
-indeed hide the key over the network. *)
-
-process InitiatorIdeal(i,j,l:index) =
-(* Initiator i who wants to talk to Responder j *)
-
- out(cI, epk(dkt(i,j,l)) );
-
- in(cR,m);
-
- let KT = decap( fst(m),dkt(i,j,l) ) in
-  let K = diff(decap( fst(snd(m)), vkI(i)),
-try find i2,j2,l2 such that KT= kt(j2,i2,l2)  in
-   k(j2,i2,l2)
+    sRI(i,j,k) := kj;
+   SR : out(cR,<CT,<C, ktilde XOR sign(sid, skR(j))   >>)
 else
-decap( fst(snd(m)), vkI(i)))
+   let CT = encap(Dkt(j,k), Drkt(j,k), m) in
+   let C = encap(Dk(j,k), Drk(j,k), epkI) in
+   let sid = < epkI, <epk(vkR(j)), <m , <C, CT>>>> in
+   let K1 = exct(skex,Dk(j,k)) in
+   let K2 = exct(skex,Dkt(j,k)) in
+   let kj = F1(sid,K1) XOR F1(sid,K2) in
+   let ktilde = F2(sid,K1) XOR F2(sid,K2) in
+    DsRI(j,k) := kj;
+   DSR : out(cR,<CT,<C, ktilde XOR sign(sid, skR(j))   >>)
+.
 
- in
+system [main]  out(cI,skex); ((!_j !_k R: Responder(j,k)) | (!_i !_j !_k I: Initiator(i,j,k))).
 
-   let sid = < epk(vkI(i)), <epk(vkR(j)), <  epk(dkt(i,j,l)), <fst(snd(m)), fst(m)>>>> in
-   let K1 = exct(skex,K) in
+
+system mainCCAkR = [main/left] with gcca (il,jl,kl:index),  encap(k(il,jl,kl), rk(il,jl,kl), epk(vkI(il))).
+
+(* System with hidden k(i,j,k). *)
+
+
+(* Initiator vkI(i) who wants to talk to Responder spk(skR(j)) *)
+process Initiator2(i,j,k:index) =
+   out(cI, epk(dkt(i,j,k)) );
+
+   in(cR,m);
+
+   let KT = decap( fst(m),dkt(i,j,k) ) in
+
+   let sid = < epk(vkI(i)), <epk(vkR(j)), <epk(dkt(i,j,k)) , <fst(snd(m)), fst(m)>>>> in
+   let K1 =
+    try find il,jl,kl such that
+     fst(snd(m)) =  encap(n_CCA(il,jl,kl), rk(il,jl,kl), epk(vkI(il)))
+     in
+       exct(skex,k(il,jl,kl))
+     else
+       exct(skex,decap( fst(snd(m)), vkI(i) ))
+   in
    let K2 = exct(skex,KT) in
    let kj = F1(sid,K1) XOR F1(sid,K2) in
    let ktilde = F2(sid,K1) XOR F2(sid,K2) in
    if checksign( ktilde XOR snd(snd(m)), spk(skR(j))) = sid then
-      FI : out(cR,ok).
+     FI:  sIR(i,j,k) := kj.
 
-name rnd : index -> index -> index -> message.
-
-process ResponderIdeal(j,i,l:index) =
+process Responder2(j,k:index) =
 (* Responder j who is willing to talk to initator i *)
+   in(cR, epkI);
     in(cR, m);
-
-   let CT = encap(kt(j,i,l), rkt(j,i,l), m) in
-   let C = encap(diff(k(j,i,l),rnd(j,i,l)), rk(j,i,l), epk(vkI(i))) in
+  try find i such that epkI = epk(vkI(i)) in
+   let CT = encap(kt(i,j,k), rkt(i,j,k), m) in
+   let C = encap(n_CCA(i,j,k), rk(i,j,k), epk(vkI(i))) in
    let sid = < epk(vkI(i)), <epk(vkR(j)), <m , <C, CT>>>> in
-   let K1 = exct(skex,k(j,i,l)) in
-   let K2 = exct(skex,kt(j,i,l)) in
+   let K1 = exct(skex,k(i,j,k)) in
+   let K2 = exct(skex,kt(i,j,k)) in
    let kj = F1(sid,K1) XOR F1(sid,K2) in
    let ktilde = F2(sid,K1) XOR F2(sid,K2) in
-   SR : out(cR,<CT,<C, ktilde XOR sign(sid, skR(j))   >>).
+    sRI(i,j,k) := kj;
+   SR : out(cR,<CT,<C, ktilde XOR sign(sid, skR(j))   >>)
+else
+   let CT = encap(Dkt(j,k), Drkt(j,k), m) in
+   let C = encap(Dk(j,k), Drk(j,k), epkI) in
+   let sid = < epkI, <epk(vkR(j)), <m , <C, CT>>>> in
+   let K1 = exct(skex,Dk(j,k)) in
+   let K2 = exct(skex,Dkt(j,k)) in
+   let kj = F1(sid,K1) XOR F1(sid,K2) in
+   let ktilde = F2(sid,K1) XOR F2(sid,K2) in
+    DsRI(j,k) := kj;
+   DSR : out(cR,<CT,<C, ktilde XOR sign(sid, skR(j))   >>)
+.
 
-system [Ideal]  out(cI,skex); ((!_j !_i !_l R: ResponderIdeal(j,i,l)) | (!_i !_j !_l I: InitiatorIdeal(i,j,l))).
+system [idealized]  out(cI,skex); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k))).
 
-axiom [Ideal] uniqepk : forall (m1,m2:message), epk(m1) =epk(m2) => m1=m2.
+axiom [mainCCAkR/left,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,epk(z)),z)=x.
 
-axiom [Ideal] sufcma : forall (m1,m2,sk:message), checksign(m1,spk(sk)) = m2 => m1 =sign(m2,sk).
+(* We prove that the original game, after transitivity to mainCCAkI, is equivalent to idealized. *)
+equiv [mainCCAkR/left,idealized/left] test.
+Proof.
 
-axiom [Ideal] xorconcel : forall (m1,m2,m3:message) m1=m2 => xor(m1,xor(m2,m3)) = m3.
+diffeq.
 
-axiom [Ideal] rcheck : forall (m1,m2,sk:message), m1=m2 => checksign(sign(m1,sk),spk(sk)) = m2.
+case try find il,jl,kl such that _ in k(il,jl,kl) else _.
+rewrite Meq0.
 
-goal [Ideal] auth :  forall (i,j,l:index) ,
+case try find il,jl,kl such that _ in exct(skex, k(il,jl,kl)) else _.
+rewrite Meq2.
+
+assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
+
+case H1.
+case H2.
+
+use H1 with il,jl,kl.
+
+
+case try find il,jl,kl such that _ in  exct(skex,k(il,jl,kl)) else _.
+use H1 with il,jl,kl.
+
+case try find il,jl,kl such that _ in  k(il,jl,kl) else _.
+rewrite Meq0.
+case try find il,jl,kl such that _ in exct(skex, k(il,jl,kl)) else _.
+rewrite Meq2.
+
+
+
+assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
+
+case H1.
+case H2.
+
+use H1 with il,jl,kl.
+
+case try find il,jl,kl such that _ in exct(skex,k(il,jl,kl)) else _.
+use H1 with il,jl,kl.
+
+case try find il,jl,kl such that _ in  k(il,jl,kl) else _.
+rewrite Meq0.
+case try find il,jl,kl such that _ in exct(skex, k(il,jl,kl)) else _.
+rewrite Meq2.
+
+
+assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
+case H1.
+case H2.
+
+use H1 with il,jl,kl.
+
+case try find il,jl,kl such that _ in exct(skex,k(il,jl,kl)) else _.
+use H1 with il,jl,kl.
+Qed.
+
+
+
+axiom [idealized] uniqepk : forall (m1,m2:message), epk(m1) =epk(m2) => m1=m2.
+
+axiom [idealized] sufcma : forall (m1,m2,sk:message), checksign(m1,spk(sk)) = m2 => m1 =sign(m2,sk).
+
+axiom [idealized] xorconcel : forall (m1,m2,m3:message) m1=m2 => xor(m1,xor(m2,m3)) = m3.
+
+axiom [idealized] rcheck : forall (m1,m2,sk:message), m1=m2 => checksign(sign(m1,sk),spk(sk)) = m2.
+
+axiom [idealized] snd_pair (x,y : message) : snd (<x, y >) = y.
+
+
+goal [idealized] auth :  forall (i,j,l:index) ,
    happens(FI(i,j,l)) =>
         exec@FI(i,j,l) <=>
       exec@pred(FI(i,j,l)) &&
-        exists (l2:index),
+        exists (k:index),
           I(i,j,l) < FI(i,j,l) &&
-          SR(j,i,l2) < FI(i,j,l) &&
-          input@SR(j,i,l2) =  output@I(i,j,l) &&
-          fst(output@SR(j,i,l2)) = fst(input@FI(i,j,l)) &&
-          fst(snd(output@SR(j,i,l2))) = fst(snd(input@FI(i,j,l))) &&
-          snd(snd(output@SR(j,i,l2))) = snd(snd(input@FI(i,j,l)))
+          SR(j,k,i) < FI(i,j,l) &&
+          input@SR(j,k,i) =  output@I(i,j,l) &&
+          fst(output@SR(j,k,i)) = fst(input@FI(i,j,l)) &&
+          fst(snd(output@SR(j,k,i))) = fst(snd(input@FI(i,j,l))) &&
+          snd(snd(output@SR(j,k,i))) = snd(snd(input@FI(i,j,l)))
 .
 Proof.
 intro i j l.
@@ -208,89 +303,99 @@ split.
 expand exec.
 expand cond.
 euf H0.
-assert ( SR(j,i0,l0) <= FI(i,j,l) || SR(j,i0,l0) < FI(i,j,l)) <=>  SR(j,i0,l0) < FI(i,j,l).
+assert ( SR(j,k,i0) <= FI(i,j,l) || SR(j,k,i0) < FI(i,j,l)) <=>  SR(j,k,i0) < FI(i,j,l).
 case H1.
 use H2.
 
-project.
 use uniqepk with vkI(i),vkI(i0).
-exists l0.
+exists k.
 depends I(i,j,l), FI(i,j,l).
-by use sufcma with xor(ktilde3(i,j,l)@FI(i,j,l),snd(snd(input@FI(i,j,l)))), sid3(i,j,l)@FI(i,j,l), skR(j).
-
-case    try find i2,j2,l2 such that KT1(i,j,l)@FI(i,j,l) = kt(j2,i2,l2)
-    in k(j2,i2,l2) else decap(fst(snd(input@FI(i,j,l))),vkI(i)).
-substeq Meq1.
- use uniqepk with vkI(i),vkI(i0).
-
-exists l0.
-depends I(i,j,l), FI(i,j,l).
-by use sufcma with xor(ktilde3(i,j,l)@FI(i,j,l),snd(snd(input@FI(i,j,l)))), sid3(i,j,l)@FI(i,j,l), skR(j).
-
-use uniqepk with vkI(i),vkI(i0).
-by use H4 with i,j,l0.
 
 
-project.
+use sufcma with  (xor(ktilde5(i,j,l)@FI(i,j,l),snd(snd(input@FI(i,j,l))))),  sid5(i,j,l)@FI(i,j,l)  ,  skR(j) .
+
+case try find il,jl,kl such that
+      fst(snd(input@FI(i,j,l))) =
+      encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
+    in exct(skex,k(il,jl,kl))
+    else exct(skex,decap(fst(snd(input@FI(i,j,l))),vkI(i))).
+
+
+
+assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))), vkI(il)) =
+decap( encap(n_CCA(i,j,k),rk(i,j,k),epk(vkI(i))), vkI(il)).
+case H4.
+case H5.
+case H4.
+case H6.
+
+rewrite Meq2 in D3.
+
+use H4 with i,j,k.
+
+
+executable pred(FI(i,j,l)).
+use H2 with DSR(j,k).
+assert happens(DSR(j,k)).
+case H1.
+expand  exec@DSR(j,k).
+expand cond.
+use H4 with i.
+
+case H1.
+
 expand exec. expand cond.
 depends I(i,j,l), FI(i,j,l).
 
+case try find il,jl,kl such that
+      fst(snd(input@FI(i,j,l))) =
+      encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
+    in exct(skex,k(il,jl,kl))
+    else exct(skex,decap(fst(snd(input@FI(i,j,l))),vkI(i))).
 
-assert ktilde2(j,i,l2)@SR(j,i,l2) = ktilde3(i,j,l)@FI(i,j,l).
+
+
+assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))), vkI(il)) =
+decap( encap(n_CCA(i,j,k),rk(i,j,k),epk(vkI(i))), vkI(il)).
+case H0.
+case H1.
+case H0.
+case H2.
+rewrite Meq4 in D12.
+
+rewrite -Meq.
 expand output.
-substeq snd(snd(input@FI(i,j,l))),   xor(ktilde2(j,i,l2)@SR(j,i,l2),
-           sign(sid2(j,i,l2)@SR(j,i,l2),skR(j))).
-assert sid2(j,i,l2)@SR(j,i,l2) = sid3(i,j,l)@FI(i,j,l).
+rewrite snd_pair.
+rewrite snd_pair.
 
-use xorconcel with ktilde3(i,j,l)@FI(i,j,l), ktilde2(j,i,l2)@SR(j,i,l2),  sign(sid2(j,i,l2)@SR(j,i,l2),skR(j)).
+assert ktilde5(i,j,l)@FI(i,j,l) = ktilde3(j,k,i)@SR(j,k,i).
+rewrite Meq5.
 
-substeq xor(ktilde3(i,j,l)@FI(i,j,l),
-      xor(ktilde2(j,i,l2)@SR(j,i,l2),sign(sid2(j,i,l2)@SR(j,i,l2),skR(j)))),
-      sign(sid2(j,i,l2)@SR(j,i,l2),skR(j)).
-use rcheck with  sid2(j,i,l2)@SR(j,i,l2), sid3(i,j,l)@FI(i,j,l)   ,skR(j).
+use xorconcel with ktilde3(j,k,i)@SR(j,k,i), ktilde3(j,k,i)@SR(j,k,i), sign(sid3(j,k,i)@SR(j,k,i),skR(j)).
+rewrite Meq6.
 
-
-expand exec. expand cond.
-depends I(i,j,l), FI(i,j,l).
-
-case    try find i2,j2,l2 such that KT1(i,j,l)@FI(i,j,l) = kt(j2,i2,l2)
-    in k(j2,i2,l2) else decap(fst(snd(input@FI(i,j,l))),vkI(i)).
-substeq Meq4. substeq Meq4.
-
-
-assert ktilde2(j,i,l2)@SR(j,i,l2) = ktilde3(i,j,l)@FI(i,j,l).
-expand output.
-substeq snd(snd(input@FI(i,j,l))),   xor(ktilde2(j,i,l2)@SR(j,i,l2),
-           sign(sid2(j,i,l2)@SR(j,i,l2),skR(j))).
-assert sid2(j,i,l2)@SR(j,i,l2) = sid3(i,j,l)@FI(i,j,l).
-
-use xorconcel with ktilde3(i,j,l)@FI(i,j,l), ktilde2(j,i,l2)@SR(j,i,l2),  sign(sid2(j,i,l2)@SR(j,i,l2),skR(j)).
-
-substeq xor(ktilde3(i,j,l)@FI(i,j,l),
-      xor(ktilde2(j,i,l2)@SR(j,i,l2),sign(sid2(j,i,l2)@SR(j,i,l2),skR(j)))),
-      sign(sid2(j,i,l2)@SR(j,i,l2),skR(j)).
-use rcheck with  sid2(j,i,l2)@SR(j,i,l2), sid3(i,j,l)@FI(i,j,l)   ,skR(j).
-
+use rcheck with sid3(j,k,i)@SR(j,k,i), sid5(i,j,l)@FI(i,j,l), skR(j).
 
 use H0 with i,j,l.
+
 Qed.
 
 (* As I1 is the converse of FI, we also have freely that *)
-axiom [Ideal] auth2 :  forall (i,j,l:index) ,
+axiom [idealized] auth2 :  forall (i,j,l:index) ,
    happens(I1(i,j,l)) =>
         exec@I1(i,j,l) <=>
       exec@pred(I1(i,j,l)) &&
         not(exists (l2:index),
           I(i,j,l) < I1(i,j,l) &&
-          SR(j,i,l2) < I1(i,j,l) &&
-          input@SR(j,i,l2) =  output@I(i,j,l) &&
-          fst(output@SR(j,i,l2)) = fst(input@I1(i,j,l)) &&
-          fst(snd(output@SR(j,i,l2))) = fst(snd(input@I1(i,j,l))) &&
-          snd(snd(output@SR(j,i,l2))) = snd(snd(input@I1(i,j,l))))
+          SR(j,k,i) < I1(i,j,l) &&
+          input@SR(j,k,i) =  output@I(i,j,l) &&
+          fst(output@SR(j,k,i)) = fst(input@I1(i,j,l)) &&
+          fst(snd(output@SR(j,k,i))) = fst(snd(input@I1(i,j,l))) &&
+          snd(snd(output@SR(j,k,i))) = snd(snd(input@I1(i,j,l))))
 .
 
 
-equiv [Ideal] step1.
+equiv [idealized] step1.
 Proof.
 enrich skex. enrich seq(i->epk(vkI(i))).
 enrich seq(i,j,l -> kt(j,i,l)).
@@ -333,11 +438,11 @@ equivalent         exec@FI(i,j,l),
       exec@pred(FI(i,j,l)) &&
         exists (l2:index),
           I(i,j,l) < FI(i,j,l) &&
-          SR(j,i,l2) < FI(i,j,l) &&
-          input@SR(j,i,l2) =  output@I(i,j,l) &&
-          fst(output@SR(j,i,l2)) = fst(input@FI(i,j,l)) &&
-          fst(snd(output@SR(j,i,l2))) = fst(snd(input@FI(i,j,l))) &&
-          snd(snd(output@SR(j,i,l2))) = snd(snd(input@FI(i,j,l))).
+          SR(j,k,i) < FI(i,j,l) &&
+          input@SR(j,k,i) =  output@I(i,j,l) &&
+          fst(output@SR(j,k,i)) = fst(input@FI(i,j,l)) &&
+          fst(snd(output@SR(j,k,i))) = fst(snd(input@FI(i,j,l))) &&
+          snd(snd(output@SR(j,k,i))) = snd(snd(input@FI(i,j,l))).
 
 nosimpl(use auth with i,j,l).
 assumption.
@@ -353,11 +458,11 @@ equivalent        exec@I1(i,j,l),
       exec@pred(I1(i,j,l)) &&
         not(exists (l2:index),
           I(i,j,l) < I1(i,j,l) &&
-          SR(j,i,l2) < I1(i,j,l) &&
-          input@SR(j,i,l2) =  output@I(i,j,l) &&
-          fst(output@SR(j,i,l2)) = fst(input@I1(i,j,l)) &&
-          fst(snd(output@SR(j,i,l2))) = fst(snd(input@I1(i,j,l))) &&
-          snd(snd(output@SR(j,i,l2))) = snd(snd(input@I1(i,j,l)))).
+          SR(j,k,i) < I1(i,j,l) &&
+          input@SR(j,k,i) =  output@I(i,j,l) &&
+          fst(output@SR(j,k,i)) = fst(input@I1(i,j,l)) &&
+          fst(snd(output@SR(j,k,i))) = fst(snd(input@I1(i,j,l))) &&
+          snd(snd(output@SR(j,k,i))) = snd(snd(input@I1(i,j,l)))).
 nosimpl(use auth2 with i,j,l); assumption.
 
 fa 8. fa 9.
@@ -463,20 +568,20 @@ forceuse auth with i,j,l. use H2.
 use H1 with i,j,l2.
 expand output.
 
-substeq fst(input@FI(i,j,l)), CT2(j,i,l2)@SR(j,i,l2).
-forceuse fstpair with CT2(j,i,l2)@SR(j,i,l2),
+substeq fst(input@FI(i,j,l)), CT2(j,k,i)@SR(j,k,i).
+forceuse fstpair with CT2(j,k,i)@SR(j,k,i),
          diff(
-           <C2(j,i,l2)@SR(j,i,l2),
-            xor(xor(F2(sid4(j,i,l2)@SR(j,i,l2),
+           <C2(j,k,i)@SR(j,k,i),
+            xor(xor(F2(sid4(j,k,i)@SR(j,k,i),
                     try find kl,kj,ki such that
                       (skex = skex && (kj = j && ki = i && kl = l2))
-                    in rndp(kl,kj,ki) else exct(skex,k(j,i,l2))),
-                F2(sid4(j,i,l2)@SR(j,i,l2),K10(j,i,l2)@SR(j,i,l2))),
-            sign(sid4(j,i,l2)@SR(j,i,l2),skR(j)))>,
-           <C2(j,i,l2)@SR(j,i,l2),
-            xor(xor(F2(sid4(j,i,l2)@SR(j,i,l2),rndp(l2,j,i)),
-                F2(sid4(j,i,l2)@SR(j,i,l2),K10(j,i,l2)@SR(j,i,l2))),
-            sign(sid4(j,i,l2)@SR(j,i,l2),skR(j)))>).
+                    in rndp(kl,kj,ki) else exct(skex,k(j,k,i))),
+                F2(sid4(j,k,i)@SR(j,k,i),K10(j,k,i)@SR(j,k,i))),
+            sign(sid4(j,k,i)@SR(j,k,i),skR(j)))>,
+           <C2(j,k,i)@SR(j,k,i),
+            xor(xor(F2(sid4(j,k,i)@SR(j,k,i),rndp(l2,j,i)),
+                F2(sid4(j,k,i)@SR(j,k,i),K10(j,k,i)@SR(j,k,i))),
+            sign(sid4(j,k,i)@SR(j,k,i),skR(j)))>).
 substeq Meq2.
 case (try find kl,kj,ki such that (skex = skex && (kj = j && ki = i && kl = l))
  in rndp(kl,kj,ki) else exct(skex,k(j,i,l))).
