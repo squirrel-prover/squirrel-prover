@@ -186,7 +186,7 @@ system Main5 = [Main4/left] with gprf (il,jl:index),  h(<fst(snd(input@R(jl,il))
 system Main6 = [Main5/left] with rename forall (i,j:index), equiv(diff(n_PRF2(i,j), IgarbR(i,j))).
 
 
-axiom  [Main6/left,Ideal1/right] tryfind : forall (i,j:index), input@I1(i,j) = input@I2(i,j).
+axiom  [Main6/left,Ideal1/right] tryfind : forall (i,j:index), pred(I1(i,j)) = pred(I2(i,j)).
 
 equiv [Main6/left,Ideal1/right] test.
 Proof.
@@ -774,10 +774,9 @@ Proof.
 diffeq.
 
 case    try find il,jl such that
-     (<fst(input@I2(i,j)),<exp(g,a(i)),IdR(j)>> = exp(exp(g,a(il)),b(jl)) &&
-      (j = jl && i = il))
+_
    in idealkeys(il,jl)
-   else h(<fst(input@I2(i,j)),<exp(g,a(i)),IdR(j)>>,Ininr(j,i)).
+   else _.
 by use ddhnotuple1 with  fst(input@I2(i,j)),<exp(g,a(i)),IdR(j)>, exp(g,a(i)),b(j).
 
 fa.
@@ -791,7 +790,7 @@ rewrite Meq1.
 case try find il0,jl0 such that _ in idealkeys(i,j) else _.
 use H2 with i,j.
 
-case try find il0,jl0 such that _ in h(exp(fst(input@I1(i,j)),a(i)),Ininr(j,i))
+case try find il0,jl0 such that _ in  h(exp(fst(att(frame@pred(I1(i,j)))),a(i)),Ininr(j,i))
  else _.
 
 use H2 with i,j.
@@ -832,7 +831,7 @@ case try find il0,jl0 such that
    _
  in
    _
- else h(exp(fst(input@R(j,i)),b(j)),IgarbR(j,i)).
+ else  h(exp(fst(att(frame@pred(R(j,i)))),b(j)),IgarbR(j,i)).
 rewrite Meq1.
 
 case (try find il,jl such that _

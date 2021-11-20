@@ -1362,6 +1362,10 @@ let global_diff_eq (s : ES.t) =
         let ts_list = (List.map (fun v -> Term.mk_action v is) vs)
                       @ List.map
                         (function Term.Pred (x) -> x | t -> t) pred_ts_list in
+        let s1,s2 = Term.cast Type.KMessage s1, Term.cast Type.KMessage s2
+        in
+        let s1 = Term.pi_term ~projection:PLeft @@ EquivLT.expand_all_term ~force_happens:true s1 s in
+        let s2 = Term.pi_term ~projection:PRight @@ EquivLT.expand_all_term ~force_happens:true s2 s in
         Goal.Trace ES.(to_trace_sequent
                          (set_reach_goal
                             Term.(

@@ -208,10 +208,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Macro unfolding} *)
 
-  let unfold_macro_exn (t: Term.message) (s : S.sequent) : Term.message =
+  let unfold_macro_exn ?(force_happens=false) (t: Term.message) (s : S.sequent) : Term.message =
     match t with
     | Macro (ms,l,a) ->
-      if not (S.query_happens ~precise:true s a) then
+      if not (force_happens) && not (S.query_happens ~precise:true s a) then
         soft_failure (Tactics.MustHappen a);
 
       Macros.get_definition_exn (S.mk_trace_cntxt s) ms a
@@ -220,11 +220,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
       soft_failure (Tactics.Failure "can only expand macros")
 
   let unfold_macro
+      ?(force_happens=false)
       ~(strict:bool)
       (t: Term.message)
       (s : S.sequent) : Term.message option
     =
-    try Some (unfold_macro_exn t s) with
+    try Some (unfold_macro_exn ~force_happens t s) with
     | Tactics.Tactic_soft_failure _ when not strict -> None
 
   (** If [m_rec = true], recurse on expanded sub-terms. *)
@@ -284,12 +285,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
     !found1, s
 
   (** expand all macros in a term *)
-  let expand_all_term (f : Term.message) (s : S.t) : Term.message =
+  let expand_all_term ?(force_happens=false) (f : Term.message) (s : S.t) : Term.message =
     let expand_inst (Term.ETerm occ) vars conds =
       match occ with
       | Term.Macro (ms, l, _) ->
         begin
-          match unfold_macro ~strict:false occ s with
+          match unfold_macro ~strict:false ~force_happens occ s with
           | None -> `Continue
           | Some t -> `Map (Term.ETerm t)
         end

@@ -297,6 +297,7 @@ rewrite Meq5.
 
 by use H2 with l,jl.
 
+expand input .
 rewrite Meq in H2.
 rewrite Meq0 in H2.
 
