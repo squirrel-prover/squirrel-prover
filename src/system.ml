@@ -7,12 +7,12 @@ include Symbols.System
 type system_name = Symbols.system Symbols.t
 
 (*------------------------------------------------------------------*)
-type system_error = 
+type system_error =
   | SE_ShapeError
 
 let pp_system_error fmt = function
-  | SE_ShapeError -> 
-    Fmt.pf fmt "cannot register a shape twice with distinct indices" 
+  | SE_ShapeError ->
+    Fmt.pf fmt "cannot register a shape twice with distinct indices"
 
 exception SystemError of system_error
 
@@ -30,16 +30,16 @@ module Msh = Map.Make (ShapeCmp)
   * action description;
   * the second one maps each shapes of valid actions to
   * their corresponding symbols. *)
-type Symbols.data += System_data of Action.descr Msh.t * 
+type Symbols.data += System_data of Action.descr Msh.t *
                                     Symbols.action Symbols.t Msh.t
 
 let of_string (name : lsymb) (table : Symbols.table) =
-  Symbols.System.of_lsymb name table 
+  Symbols.System.of_lsymb name table
 
 let declare_empty table system_name =
   let def = () in
   let data = System_data (Msh.empty,Msh.empty) in
-  Symbols.System.declare_exact table system_name ~data def 
+  Symbols.System.declare_exact table system_name ~data def
 
 (*------------------------------------------------------------------*)
 let get_data table s_symb =
@@ -49,7 +49,7 @@ let get_data table s_symb =
 
 let descrs table s = Msh.map Action.refresh_descr (fst (get_data table s))
 
-let symbs table s = 
+let symbs table s =
   Msh.map (fun d -> d.Action.name) (fst (get_data table s))
 
 let pp_system table fmt s =
@@ -95,11 +95,11 @@ let find_shape table shape =
         | _ -> assert false
       in
 
-      if Msh.mem shape descrs then 
+      if Msh.mem shape descrs then
         let descr = Msh.find shape descrs in
         raise (Found (descr.name, descr.indices))
       else ()
-    ) table; 
+    ) table;
 
     None
   with Found (x,y) -> Some (x,y)
@@ -114,14 +114,16 @@ let find_dum_shape table shape =
         | _ -> assert false
       in
 
-      if Msh.mem shape symbs then 
+      if Msh.mem shape symbs then
         let symb = Msh.find shape symbs in
         raise (Found symb)
       else ()
-    ) table; 
+    ) table;
 
     None
   with Found x -> Some x
+
+
 
 (*------------------------------------------------------------------*)
 let register_action table system_symb symb indices action descr =
@@ -136,7 +138,7 @@ let register_action table system_symb symb indices action descr =
     in
     (* Careful, the substitution does not substitute the action symbol
        [symb] by [symb2], nor the indices. We must do it manually. *)
-    let descr = Action.subst_descr subst_action descr in 
+    let descr = Action.subst_descr subst_action descr in
 
     let subst_is =
       List.map2 (fun i i' -> Term.ESubst (Term.mk_var i,Term.mk_var i'))

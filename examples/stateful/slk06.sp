@@ -17,7 +17,11 @@ T -> R : h(ID)               if TS > TSlast
 R -> T : h(ID,PIN)
          ID' := h(ID,PIN,TS)
 
-PROOFS
+COMMENTS
+- In this model we use 3 different keyed hash functions, instead of a single 
+(not keyed) hash function as in the specification.
+
+SECURITY PROPERTIES
 - authentication (reader and tag)
 *******************************************************************************)
 
@@ -78,6 +82,8 @@ process reader(jj:index) =
     out(cR, error)
 
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
+
+(* SECURITY PROPERTIES *)
 
 goal auth_R1 (jj,ii:index):
   happens(R1(jj,ii)) =>

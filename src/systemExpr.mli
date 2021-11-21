@@ -30,16 +30,18 @@ val pair        : Symbols.table -> single_system -> single_system -> t
   * proved for [s2] when reasoning about [s1]. *)
 val systems_compatible : t -> t -> bool
 
+
+val pp_single : Format.formatter -> single_system -> unit
 val pp : Format.formatter -> t -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
 (*------------------------------------------------------------------*)
-type ssymb_pair = System.system_name * 
+type ssymb_pair = System.system_name *
                   System.system_name
 
-type system_expr_err = 
+type system_expr_err =
   | SE_NotABiProcess of System.system_name
   | SE_NoneProject
   | SE_IncompatibleAction   of ssymb_pair * string
@@ -59,9 +61,9 @@ val project : Term.projection -> t -> t
 
 (** Convert action to the corresponding [Action] timestamp term in
     a system expression.
-    Remark that this requires both system to declare the action, 
+    Remark that this requires both system to declare the action,
     with the same name. *)
-val action_to_term : 
+val action_to_term :
   Symbols.table -> t -> Action.action -> Term.timestamp
 
 (*------------------------------------------------------------------*)
@@ -70,18 +72,18 @@ val action_to_term :
 val descr_of_shape :
   Symbols.table -> t -> Action.shape -> Action.descr
 
-(** [descr_of_action table t a] returns the description corresponding 
-    to the action [a] in [t].  
+(** [descr_of_action table t a] returns the description corresponding
+    to the action [a] in [t].
     @Raise Not_found if no action corresponds to [a]. *)
-val descr_of_action : 
+val descr_of_action :
   Symbols.table -> t -> Action.action -> Action.descr
 
 (** Get the action symbols table of a system expression.
   * We rely on the invariant that the systems of a system expression
   * must have the same action names. *)
 val symbs :
-  Symbols.table -> 
-  t -> 
+  Symbols.table ->
+  t ->
   Symbols.action Symbols.t System.Msh.t
 
 (** Iterate over all action descriptions in [system].
@@ -103,6 +105,9 @@ type esubst_descr =
 
 type subst_descr = esubst_descr list
 
+val clone_system_iter : Symbols.table -> t ->
+           Symbols.lsymb ->
+           (Action.descr -> Action.descr) -> Symbols.table * Symbols.System.ns Symbols.t
 
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printing } *)

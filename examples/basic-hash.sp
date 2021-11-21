@@ -7,6 +7,7 @@ Verification of Privacy for RFID Systems. pages 75–88, July 2010.
 T --> R : <nT, h(nT,kT)>
 R --> T : ok
 *******************************************************************************)
+set postQuantumSound=true.
 
 hash h
 
@@ -68,7 +69,7 @@ Proof.
   use H.
   project.
   (* LEFT *) by euf Meq; exists i, k0.
-  (* RIGHT *) by euf Meq; exists i,k. 
+  (* RIGHT *) by euf Meq; exists i,k.
 Qed.
 
 (* Equivalence goal expressing unlinkability *)
@@ -86,7 +87,7 @@ Proof.
        fst(output@T(i,k))=fst(input@R(j)) &&
        snd(output@T(i,k))=snd(input@R(j))).
   by use wa_R with j.
-  by fadup 1. 
+  by fadup 1.
 
   (* Case R1 *)
   expand frame. fa 0. fa 1.
@@ -103,7 +104,7 @@ Proof.
   expand frame, exec, cond, output.
   fa 0; fa 1; fa 1; fa 1.
   prf 2.
-  yesif 2. 
+  yesif 2.
   project.
   split; by fresh Meq.
   split; by fresh Meq.

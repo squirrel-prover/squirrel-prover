@@ -32,7 +32,7 @@ global goal _ (t : timestamp, i : index) : equiv(zero) -> equiv(s0(i)@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
- intro H; apply ~fadup H.
+ intro H; apply ~inductive H.
 Qed.
 
 (* using [na], we can deduce [s1] *)
@@ -40,14 +40,14 @@ global goal _ (t : timestamp, i : index) : equiv(na) -> equiv(s0(i)@t, s1(i)@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
- intro H; apply ~fadup H.
+ intro H; apply ~inductive H.
 Qed.
 
 (* [nb] does not allow to conclude *)
 global goal _ (t : timestamp, i : index) :
   equiv(nb) -> equiv(s0(i)@t, s1(i)@t).
 Proof.
- checkfail (intro H; apply ~fadup H) exn ApplyMatchFailure.
+ checkfail (intro H; apply ~inductive H) exn ApplyMatchFailure.
 Abort.
 
 (* using [na] and the sequence of all [n(j)], we can deduce [s0], [s1] and [s2] *)
@@ -57,7 +57,7 @@ global goal _ (t : timestamp, i : index) :
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
- intro H; apply ~fadup H.
+ intro H; apply ~inductive H.
 Qed.
 
 (* idem, but with some seqs *)
@@ -70,7 +70,7 @@ global goal _ (t : timestamp) :
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
- intro H; apply ~fadup H.
+ intro H; apply ~inductive H.
 Qed.
 
 (* idem, but with a single seq and some pairs *)
@@ -80,7 +80,7 @@ global goal _ (t : timestamp) :
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
- intro H; apply ~fadup H.
+ intro H; apply ~inductive H.
 Qed.
 
 (*------------------------------------------------------------------*)
@@ -92,7 +92,7 @@ global goal _ (t : timestamp, i, j : index) :
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
- intro H; apply ~fadup H.
+ intro H; apply ~inductive H.
 Qed.
 
 (* idem but putting everybody together *)
@@ -101,7 +101,7 @@ global goal _ (t : timestamp, i, j : index) :
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
- intro H; apply ~fadup H.
+ intro H; apply ~inductive H.
 Qed.
 
 (* idem but with a seq *)
@@ -115,7 +115,7 @@ global goal _ (t : timestamp) :
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
- intro H; apply ~fadup H.
+ intro H; apply ~inductive H.
 Qed.
 
 (* with spurious indices in sequences *)
@@ -129,7 +129,7 @@ global goal _ (t : timestamp) :
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
- intro H; apply ~fadup H.
+ intro H; apply ~inductive H.
 Qed.
 
 (*------------------------------------------------------------------*)
@@ -148,7 +148,7 @@ global goal _ (t : timestamp) :
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
- intro H; apply ~fadup H.
+ intro H; apply ~inductive H.
 Qed.
 
 
@@ -160,7 +160,7 @@ global goal _ (t : timestamp, J : index) :
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
- intro H; apply ~fadup H.
+ intro H; apply ~inductive H.
 Qed.
 
 global goal _ (t : timestamp, J : index) :
@@ -169,7 +169,7 @@ global goal _ (t : timestamp, J : index) :
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
- intro H; apply ~fadup H.
+ intro H; apply ~inductive H.
 Qed.
 
 (* we cannot deduce any value of [s4] *)
@@ -177,7 +177,7 @@ global goal _ (t : timestamp, J : index) :
   equiv(na, m(J), seq(j:index -> n(j))) -> equiv(seq (i:index -> s4(i)@t)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
- checkfail (intro H; apply ~fadup H) exn ApplyMatchFailure.
+ checkfail (intro H; apply ~inductive H) exn ApplyMatchFailure.
 Abort.
 
 (* idem for [s5] *)
@@ -186,7 +186,7 @@ global goal _ (t : timestamp, J : index) :
   equiv(seq (i,j:index -> s5(i,j)@t)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
- checkfail (intro H; apply ~fadup H) exn ApplyMatchFailure.
+ checkfail (intro H; apply ~inductive H) exn ApplyMatchFailure.
 Abort.
 
 global goal _ (t : timestamp, J : index) :
@@ -194,7 +194,7 @@ global goal _ (t : timestamp, J : index) :
   equiv(na, m(J), seq(j:index -> n(j)), f(<na,seq (i:index -> s4(i)@t)>)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
- checkfail (intro H; apply ~fadup H) exn ApplyMatchFailure.
+ checkfail (intro H; apply ~inductive H) exn ApplyMatchFailure.
 Abort.
 
 (*------------------------------------------------------------------*)

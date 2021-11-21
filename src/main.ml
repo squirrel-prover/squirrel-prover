@@ -15,13 +15,13 @@ let usage = Printer.strf "Usage: %s filename" (Filename.basename Sys.argv.(0))
 
 (*------------------------------------------------------------------*)
 (** A loading path: directory to lookup during includes *)
-type load_path = 
-  | LP_dir of string 
+type load_path =
+  | LP_dir of string
   | LP_none
 
 type load_paths = load_path list
 
-type file = { 
+type file = {
   f_name   : string;                     (** short name, no extention *)
   f_path   : [`Stdin | `File of string]; (** file path *)
   f_lexbuf : Lexing.lexbuf;
@@ -48,7 +48,7 @@ type main_state = {
   (** load paths *)
 
   file : file;
-  (** current file *) 
+  (** current file *)
 
   file_stack : file list;
   (** stack of nested opened files *)
@@ -62,7 +62,7 @@ let get_lexbuf (state : main_state) : string * Lexing.lexbuf =
        messages are not acurate afterward. I do not understand why exactly (the
        lexer buffer positions must not be properly updated somewhere). *)
 
-    | `File f -> state.file.f_lexbuf 
+    | `File f -> state.file.f_lexbuf
   in
   state.file.f_name ^ ".sp", lexbuf
 
@@ -81,7 +81,7 @@ let pp_loc_error state ppf loc =
     | `File f ->
       let loc = { loc with L.loc_fname = f; } in
       Fmt.pf ppf "%s:@;" (L.tostring loc)
- 
+
 
 let pp_loc_error_opt state ppf = function
   | None -> ()
@@ -122,9 +122,9 @@ let cmd_error e = raise (Cmd_error e)
 (*------------------------------------------------------------------*)
 let valid_theory_regexp = Pcre.regexp "[a-zA-Z][[a-zA-Z0-9]*"
 
-let check_cycle (state : main_state) (name : string) : unit =  
+let check_cycle (state : main_state) (name : string) : unit =
   let has_cycle =
-    List.exists (fun file -> file.f_name = name) state.file_stack 
+    List.exists (fun file -> file.f_name = name) state.file_stack
   in
   if has_cycle then cmd_error (IncludeCycle name)
 
@@ -141,8 +141,6 @@ let file_from_path (dir : load_path) (name : string) : file option =
       | LP_none    -> filename
       | LP_dir dir -> Filename.concat dir filename
     in
-    
-    Fmt.epr "trying: %s@." path;
 
     let chan = Stdlib.open_in path in
     let lexbuf = Lexing.from_channel chan in
@@ -155,9 +153,9 @@ let file_from_path (dir : load_path) (name : string) : file option =
 
 (** try to locate a file according to some loading paths *)
 let locate (lds : load_paths) (name : string) : file =
-  if not (Pcre.pmatch ~rex:valid_theory_regexp name) then    
+  if not (Pcre.pmatch ~rex:valid_theory_regexp name) then
     cmd_error (InvalidTheoryName name);  (* FIXME: location *)
- 
+
   let rec try_dirs (dirs : load_paths) : file =
     match dirs with
     | [] -> cmd_error (IncludeNotFound name)
@@ -173,33 +171,33 @@ let include_get_file (state : main_state) (name : Theory.lsymb) : file =
   check_cycle state (L.unloc name);
 
   locate state.load_paths (L.unloc name)
- 
+
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
 open Tactics
 
 (** check if an exception is handled *)
-let is_toplevel_error ~test (e : exn) : bool = 
+let is_toplevel_error ~test (e : exn) : bool =
   match e with
   | Parserbuf.Error         _
-  | Prover.ParseError       _ 
+  | Prover.ParseError       _
   | Cmd_error               _
-  | Process.ProcError       _ 
-  | Prover.Decl_error       _ 
-  | Theory.Conv             _  
-  | Symbols.SymbError       _  
-  | TacticsArgs.TacArgError _  
-  | Tactic_soft_failure     _  
-  | Tactic_hard_failure     _ -> not test 
+  | Process.ProcError       _
+  | Prover.Decl_error       _
+  | Theory.Conv             _
+  | Symbols.SymbError       _
+  | TacticsArgs.TacArgError _
+  | Tactic_soft_failure     _
+  | Tactic_hard_failure     _ -> not test
 
   | _ -> false
 
-let pp_toplevel_error 
+let pp_toplevel_error
     ~test
-    (state : main_state) 
-    (fmt : Format.formatter) 
-    (e : exn) : unit 
+    (state : main_state)
+    (fmt : Format.formatter)
+    (e : exn) : unit
   =
   let pp_loc_error     = pp_loc_error     state in
   let pp_loc_error_opt = pp_loc_error_opt state in
@@ -238,7 +236,7 @@ let pp_toplevel_error
     Fmt.pf fmt "%aTactic ill-formed or unapplicable: %a"
       pp_loc_error_opt l
       Tactics.pp_tac_error_i e
-      
+
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
@@ -254,9 +252,9 @@ let next_input ~test (state : main_state) : Prover.parsed_input =
 
 (** The main loop body: do one command *)
 let rec do_command
-    ~(test : bool) 
-    (state : main_state) 
-    (command : Prover.parsed_input) : main_state 
+    ~(test : bool)
+    (state : main_state)
+    (command : Prover.parsed_input) : main_state
   =
   match state.mode, command with
     | mode, ParsedUndo nb_undo ->
@@ -327,7 +325,7 @@ let rec do_command
         | Some es -> cmd_error (StartProofError es)
       end
 
-    | GoalMode, ParsedInclude fn -> 
+    | GoalMode, ParsedInclude fn ->
       (* save prover state, in case the include fails *)
       let prover_state = Prover.get_state state.mode state.table in
 
@@ -343,20 +341,20 @@ let rec do_command
           let final_state = do_all_commands ~test incl_state in
           Printer.prt `Warning "loaded: %s.sp@;" final_state.file.f_name;
 
-          Prover.pop_pt_history (); 
+          Prover.pop_pt_history ();
 
           { final_state with file = state.file; file_stack = state.file_stack; }
 
         (* include failed, revert state *)
-        with e when is_toplevel_error ~test e -> 
+        with e when is_toplevel_error ~test e ->
           let err_mess fmt =
-            Fmt.pf fmt "@[<v 0>include %s failed:@;@[%a@]@]" 
+            Fmt.pf fmt "@[<v 0>include %s failed:@;@[%a@]@]"
               (L.unloc fn)
             (pp_toplevel_error ~test incl_state) e
           in
-          
+
           let _ : Prover.prover_mode * Symbols.table =
-            Prover.reset_from_state prover_state 
+            Prover.reset_from_state prover_state
           in
           cmd_error (IncludeFailed err_mess)
       end
@@ -402,20 +400,20 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
   match
     let position = state.file.f_lexbuf.lex_curr_p in
     let cmd = next_input ~test state in
-    let new_state = do_command 
-      ~test 
-      { state with 
+    let new_state = do_command
+      ~test
+      { state with
         prev_pos = position }
       cmd
     in
-    new_state, new_state.mode 
+    new_state, new_state.mode
   with
   (* exit prover *)
   | new_state, AllDone -> Printer.pr "Goodbye!@." ;
-    if not test && not new_state.html then exit 0; 
+    if not test && not new_state.html then exit 0;
 
   (* loop *)
-  | new_state, _ -> 
+  | new_state, _ ->
     if new_state.html then begin
       let in_chan = Utils.oget new_state.in_chan_opt in
       let p1 = new_state.prev_pos.pos_cnum in
@@ -423,20 +421,20 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
       let counter = new_state.counter in
       Html.pp in_chan p1 p2 counter
     end ;
-    (main_loop[@tailrec]) 
+    (main_loop[@tailrec])
       ~test
       { new_state with
         counter = state.counter + 1 ; }
 
   (* error handling *)
-  | exception e when is_toplevel_error ~test e -> 
+  | exception e when is_toplevel_error ~test e ->
     Printer.prt `Error "%a" (pp_toplevel_error ~test state) e;
     main_loop_error ~test state
 
 and main_loop_error ~test (state : main_state) : unit =
   if state.interactive
   then begin (* at top-level, query again *)
-    assert (state.file.f_path = `Stdin);    
+    assert (state.file.f_path = `Stdin);
     (main_loop[@tailrec]) ~test ~save:false state
   end
   else if not test then exit 1
@@ -445,7 +443,7 @@ and main_loop_error ~test (state : main_state) : unit =
 let mk_load_paths ~main_mode () : load_paths =
   let exec_dir = Filename.dirname Sys.executable_name in
   (* let exec_dir = Filename.dirname (Sys.argv.(0)) in *)
-  let theory_dir = 
+  let theory_dir =
     Filename.(concat exec_dir "theories")
   in
   let theory_load_path = LP_dir theory_dir in
@@ -454,15 +452,15 @@ let mk_load_paths ~main_mode () : load_paths =
     | `Stdin     -> LP_dir (Sys.getcwd ())
     | `File path -> LP_dir (Filename.dirname path)
   in
-  [top_load_path; theory_load_path] 
+  [top_load_path; theory_load_path]
 
 let start_main_loop
-    ?(test=false) 
-    ?(html=false) 
+    ?(test=false)
+    ?(html=false)
     ~(main_mode : [`Stdin | `File of string])
     () : unit
   =
-  let interactive = main_mode = `Stdin in 
+  let interactive = main_mode = `Stdin in
   let in_chan_opt = match main_mode with
     | `Stdin -> None
     | `File fname ->
@@ -478,20 +476,20 @@ let start_main_loop
 
   Prover.reset ();
   let state = {
-    mode = GoalMode; 
-    table = Symbols.builtins_table; 
+    mode = GoalMode;
+    table = Symbols.builtins_table;
     interactive;
 
     html;
     counter = 0;
     prev_pos = file.f_lexbuf.lex_curr_p;
     in_chan_opt;
-    
+
     load_paths = mk_load_paths ~main_mode ();
 
     file;
 
-    file_stack = []; } 
+    file_stack = []; }
   in
 
   Printer.pr "%b\n" state.html;
@@ -508,7 +506,7 @@ let generate_html (filename : string) (html_filename : string) =
   start_main_loop ~test:false ~html:true ~main_mode:(`File name) ();
   Html.close out_c html_filename html_pos
 
-  
+
 
 let interactive_prover () =
   Printer.prt `Start "Squirrel Prover interactive mode.";
@@ -538,7 +536,6 @@ let main () =
   let verbose = ref false in
   let interactive = ref false in
   let html_filename = ref "" in
-  
   let speclist = [
     ("-i", Arg.Set interactive, "interactive mode (e.g, for proof general)");
     ("--html", Arg.Set_string html_filename, "html mode (take a html file); Incompatible with -i");
@@ -752,6 +749,12 @@ let () =
            try run ~test "tests/alcotest/equiv_to_trace.sp" with
            | Tactic_soft_failure
                (_, HypUnknown "H") -> raise Ok)
+    end;
+    "DDH not PQ Sound", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
+           try run ~test "tests/alcotest/pqsound.sp" with
+           | Tactic_hard_failure (_,Tactics.TacticNotPQSound) -> raise Ok)
     end
   ];
 
@@ -769,7 +772,7 @@ let () =
            try run ~test "tests/alcotest/include-unknown.sp" with
            | Cmd_error (IncludeNotFound _) -> raise Ok)
     end ;
-    (* Not that in test mode, errors during an include are not wrapped 
+    (* Not that in test mode, errors during an include are not wrapped
        into a IncludeError.  *)
     "Re-define", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
@@ -786,4 +789,3 @@ let () =
              raise Ok)
     end ;
   ]
-

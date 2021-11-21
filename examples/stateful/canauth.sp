@@ -11,13 +11,17 @@ Sender -> Receiver : <<msg,<SIGN,ctr>>,hmac(<ctr,msg>,sk)>
 Receiver -> Sender : input x, check x
                      ctr := ctr+1
 
-An agent has a cell which is used to strore a counter. This counter is
-incremented at each action (receive or send).
+An agent has a cell which is used to store a counter. 
+This counter is incremented at each action (receive or send).
 
-PROOFS
+HELPING LEMMAS 
+- counter increase
+
+SECURITY PROPERTIES
 - authentication
 - injectivity
 *******************************************************************************)
+
 set timeout=4.
 set autoIntro = false.
 
@@ -67,11 +71,9 @@ process SenderA(i,j:index) =
   cellA(i) := mySucc(cellA(i));
   out(cR,<<msgA(i,j),<SIGN,cellA(i)>>,hmac(<cellA(i),msgA(i,j)>,sk(i))>)
 
-
 process SenderB(i,j:index) =
   cellB(i) := mySucc(cellB(i));
   out(cR,<<msgB(i,j),<SIGN,cellB(i)>>,hmac(<cellB(i),msgB(i,j)>,sk(i))>)
-
 
 system ((!_i !_j ReceiverA(i,j)) | (!_i !_j SenderA(i,j)) |
         (!_i !_j ReceiverB(i,j)) | (!_i !_j SenderB(i,j))).
@@ -97,9 +99,10 @@ axiom orderTrans (n1,n2,n3:message): (n1 ~< n2 && n2 ~< n3) => n1 ~< n3.
 
 axiom orderStrict (n1,n2:message): n1 = n2 => n1 ~< n2 => false.
 
-axiom orderEqSucc (n1,n2:message): (n1 ~< mySucc(n2)) => ((n1 = n2) || n1 ~< n2).
+axiom orderEqSucc (n1,n2:message): 
+  (n1 ~< mySucc(n2)) => ((n1 = n2) || n1 ~< n2).
 
-(** HELPING LEMMAS *)
+(* HELPING LEMMAS *)
 
 goal orderBetween (n1,n2:message) :
  (n1 ~< n2) => (n2 ~< mySucc(n1)) => false.
@@ -113,9 +116,8 @@ Proof.
   auto.
 Qed.
 
-
-(* The counter cellA(i) strictly increases at each
-   action SenderA(i,j) / ReceiveA(i,j). *)
+(* The counter cellA(i) strictly increases 
+   at each action SenderA(i,j) / ReceiverA(i,j). *)
 
 goal counterIncreaseUpdateSA(i,j:index):
   happens(SenderA(i,j)) =>
@@ -135,9 +137,8 @@ Proof.
   by apply orderSucc.
 Qed.
 
-
-(* The counter cellB(i) strictly increases at each action 
-   SenderB(i,j) / ReceiveB(i,j). *)
+(* The counter cellB(i) strictly increases 
+   at each action SenderB(i,j) / ReceiveB(i,j). *)
 
 goal counterIncreaseUpdateSB(i,j:index):
   happens(SenderB(i,j)) =>
@@ -158,14 +159,14 @@ Proof.
 Qed.
 
 
-(* The counter cellB(i)/cellA(i) at t is either equal to cellB(i)@pred(t) or +1 *)
+(* The counter cellB(i) at t is either equal to cellB(i)@pred(t) or +1,
+   and similarly for cellA(i). *)
 
 goal ScounterIncreasePredB(t:timestamp, i:index):
   happens(t) =>
   t > init =>
   exec@t =>
-  (cellB(i)@t = mySucc(cellB(i)@pred(t))
-   || cellB(i)@t= cellB(i)@pred(t)).
+  (cellB(i)@t = mySucc(cellB(i)@pred(t)) || cellB(i)@t= cellB(i)@pred(t)).
 Proof.
   intro Hap Ht Hexec.
   case t => // [i0 j _].
@@ -174,7 +175,6 @@ Proof.
     (* i = i0 *)
     left.
     by use orderSucc with cellB(i)@pred(t).
-
     (* i <> i0 *)
     right.
     by rewrite /cellB if_false.
@@ -184,19 +184,16 @@ Proof.
     (* i = i0 *)
     left.
     by use orderSucc with cellB(i)@pred(t).
-
     (* i <> i0 *)
     right.
     by rewrite /cellB if_false.
 Qed.
-
 
 goal ScounterIncreasePredA(t:timestamp, i:index):
   happens(t) =>
   t > init =>
   exec@t =>
-  (cellA(i)@t = mySucc(cellA(i)@pred(t))
-   || cellA(i)@t= cellA(i)@pred(t)).
+  (cellA(i)@t = mySucc(cellA(i)@pred(t)) || cellA(i)@t= cellA(i)@pred(t)).
 Proof.
   intro Hap Ht Hexec.
   case t => // [i0 j _].
@@ -205,7 +202,6 @@ Proof.
     (* i = i0 *)
     left.
     by use orderSucc with cellA(i)@pred(t).
-
     (* i <> i0 *)
     right.
     by rewrite /cellA if_false.
@@ -215,15 +211,12 @@ Proof.
     (* i = i0 *)
     left.
     by use orderSucc with cellA(i)@pred(t).
-
     (* i <> i0 *)
     right.
     by rewrite /cellA if_false.
 Qed.
 
-
-(* The counter cellA(i)/cellB(i) increases (not strictly) between t and pred(t) *)
-
+(* The counter increases (not strictly) between t and pred(t). *)
 
 goal counterIncreasePredA(t:timestamp, i:index):
   happens(t) => (t > init && exec@t) =>
@@ -237,7 +230,6 @@ Proof.
   by right.
 Qed.
 
-
 goal counterIncreasePredB(t:timestamp, i:index):
   happens(t) => (t > init && exec@t) =>
     ( cellB(i)@pred(t) ~< cellB(i)@t
@@ -250,9 +242,7 @@ Proof.
   by right.
 Qed.
 
-
-(* The counter cellA(i)/CellB(i) increases (not strictly) between t' and 
-   t when t' < t. *)
+(* The counter increases (not strictly) between t' and t when t' < t. *)
 
 goal counterIncreaseA (t, t':timestamp, i:index):
   happens(t) =>
@@ -316,10 +306,8 @@ Proof.
       by case H3; [1: left | 2 : right].
 Qed.
 
-
 (* The counter cellA(i) strictly increases between t and t'
    when t < t' and (t' = SenderA(i,j1) or t' = ReceiverA(i,j1)). *)
-
 
 goal counterIncreaseStrictSA(i,j1:index, t:timestamp):
   happens(SenderA(i,j1)) =>
@@ -338,7 +326,6 @@ Proof.
  by apply orderTrans _ (cellA(i)@pred(SenderA(i,j1))).
 Qed.
 
-
 goal counterIncreaseStrictRA (i,j1:index, t:timestamp):
   happens(ReceiverA(i,j1)) =>
     (t < ReceiverA(i,j1) && exec@ReceiverA(i,j1)) =>
@@ -356,10 +343,8 @@ Proof.
   by apply orderTrans _ (cellA(i)@pred(ReceiverA(i,j1))).
 Qed.
 
-
 (* The counter cellB(i) strictly increases between t and t'
    when t < t' and (t' = SenderB(i,j1) or t' = ReceiverB(i,j1)). *)
-
 
 goal counterIncreaseStrictSB (i,j1:index, t:timestamp):
   happens(SenderB(i,j1)) =>
@@ -377,7 +362,6 @@ Proof.
  case H0; 2: by rewrite H0.
  by apply orderTrans _ (cellB(i)@pred(SenderB(i,j1))).
 Qed.
-
 
 goal counterIncreaseStrictRB (i,j1:index, t:timestamp):
   happens(ReceiverB(i,j1)) =>
@@ -397,13 +381,14 @@ Proof.
 Qed.
 
 
-(* GOALS *)
+(* SECURITY PROPERTIES *)
 
 (* 1st property w.r.t. A *)
 (* This security property is actually stronger than the one stated in
-   the GSVerif paper.  The send action has been done by agent B, and we
-   also proved a property regarding counters.  This extra property is
-   used to prove the other property. *)
+   the GSVerif paper. The send action has been done by agent B, and we
+   also proved a lemma regarding counters.
+   Moreover, we use this 1st property (authentication) to prove the 
+   2nd property (injectivity). *)
 
 goal authA (i,j:index) :
   happens(ReceiverA(i,j)) => exec@ReceiverA(i,j) =>
@@ -490,13 +475,13 @@ Proof.
           SenderB(i,j1') < SenderB(i,j1)) as H0 by auto.
   case H0.
 
-  (* SenderB(i,j1) <SenderB(i,j1') *)
+  (* SenderB(i,j1) < SenderB(i,j1') *)
   use counterIncreaseStrictSB with i, j1', SenderB(i,j1) => //=.
     intro U; by apply orderStrict in U.
     executable ReceiverA(i,j') => // HexecPred'.
     by apply HexecPred'.
 
-  (*  SenderB(i,j1') <SenderB(i,j1) *)
+  (* SenderB(i,j1') < SenderB(i,j1) *)
   use counterIncreaseStrictSB with i, j1, SenderB(i,j1') => //=.
     intro U; apply eq_sym in U; by apply orderStrict in U.
     executable ReceiverA(i,j) => // HexecPred.
@@ -548,7 +533,7 @@ Proof.
     [1: by intro U; apply orderStrict in U |
      2: auto].
 
-(* ReceiverB(i,j') <  SenderB(i,j1) *)
+  (* ReceiverB(i,j') <  SenderB(i,j1) *)
   assert (SenderA(i,j1') <ReceiverA(i,j) ||
           ReceiverA(i,j) <SenderA(i,j1')) as H0 by auto.
   case H0.

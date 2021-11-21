@@ -1,5 +1,4 @@
-# Squirrel Prover
-
+# Squirrel Prover - Post-Quantum Sound
 
 ## Build
 
@@ -40,6 +39,9 @@ We recommend installing ProofGeneral from the git repository.
 ## Examples
 Examples of developments in Squirrel can be found in:
 - `examples/`
+
+Those include classical and post-quantum sound proofs of protocols.
+See `examples/README.md` for details.
 
 ## Quick guide
 

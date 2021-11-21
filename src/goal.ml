@@ -103,6 +103,19 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Create trace and equivalence goals} *)
 
+
+let make_obs_equiv ?(enrich=[]) table hint_db name system =
+  let env,ts = Vars.make `Approx Vars.empty_env Type.Timestamp "t" in
+  let term = Term.mk_macro Term.frame_macro [] (Term.mk_var ts) in
+  let goal = Equiv.(Atom (Equiv (term :: enrich))) in
+  let happens = Term.mk_happens (Term.mk_var ts) in
+  let hyp = Equiv.(Atom (Reach happens)) in
+  let s = ES.init ~system ~table ~hint_db ~ty_vars:[] ~env ~hyp goal in
+  `Equiv
+    (Equiv.mk_forall [Vars.EVar ts] (Equiv.(Impl (hyp,goal)))),
+          Equiv s
+
+
 let make table hint_db parsed_goal : statement*t =
 
   let {Parsed.name;system;ty_vars;vars;formula} = parsed_goal in
@@ -131,16 +144,8 @@ let make table hint_db parsed_goal : statement*t =
           let s = ES.init ~system ~table ~hint_db ~ty_vars ~env f in
           `Equiv (Equiv.mk_forall vars f), Equiv s
       | Obs_equiv ->
-          assert (vars = [] && ty_vars = []) ;
-          let env,ts = Vars.make `Approx env Type.Timestamp "t" in
-          let term = Term.mk_macro Term.frame_macro [] (Term.mk_var ts) in
-          let goal = Equiv.(Atom (Equiv [term])) in
-          let happens = Term.mk_happens (Term.mk_var ts) in
-          let hyp = Equiv.(Atom (Reach happens)) in
-          let s = ES.init ~system ~table ~hint_db ~ty_vars ~env ~hyp goal in
-          `Equiv
-            (Equiv.mk_forall [Vars.EVar ts] (Equiv.(Impl (hyp,goal)))),
-          Equiv s
+        assert (vars = [] && ty_vars = []) ;
+        make_obs_equiv table hint_db name system
   in
 
   { name; system; ty_vars; formula },

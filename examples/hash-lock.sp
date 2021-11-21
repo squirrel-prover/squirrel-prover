@@ -9,6 +9,7 @@ T --> R : < nT, h(<nR,nT>,kT) >
 R --> T : ok
 *******************************************************************************)
 set autoIntro=false.
+set postQuantumSound=true.
 
 hash h
 
@@ -55,8 +56,8 @@ Proof.
   euf H => _ _ _ //.
   exists i,k0.
   assert input@T(i,k0)=nR(j) as Meq1; 1: auto.
-  fresh Meq1 => C /=. 
-  case C => //. 
+  fresh Meq1 => C /=.
+  case C => //.
   by depends R(j),R2(j).
 
   (* RIGHT *)
@@ -64,12 +65,12 @@ Proof.
   exists i,k.
   assert input@T(i,k)=nR(j) as Meq1; 1: by auto.
   fresh Meq1 => C /=.
-  case C => //. 
+  case C => //.
   by depends R(j),R2(j).
 
   (* WA => COND *)
-  intro [i k _]; exists i,k. 
-  by expand output. 
+  intro [i k _]; exists i,k.
+  by expand output.
 Qed.
 
 goal wa_R2 (j:index):
@@ -89,17 +90,17 @@ Proof.
   use H.
   exists i,k.
   by expand output.
-  
+
   (* COND => WA *)
   intro H [i k Meq].
   use H.
   project.
-  (* LEFT *) 
+  (* LEFT *)
   euf Meq => _ _ _ //.
   exists i,k0.
   assert input@T(i,k0)=nR(j) as Meq1; 1: auto.
   fresh Meq1 => C /=.
-  case C => //. 
+  case C => //.
   by depends R(j),R1(j).
 
   (* RIGHT *)
@@ -107,7 +108,7 @@ Proof.
   exists i,k.
   assert input@T(i,k)=nR(j) as Meq1; 1: auto.
   fresh Meq1 => C /=.
-  case C => //. 
+  case C => //.
   by depends R(j),R1(j).
 Qed.
 
@@ -159,5 +160,5 @@ Proof.
   repeat split => > _ _ [_ Meq0]; (try fresh Meq0); auto.
 
   fresh 2.
-  by fresh 1; yesif 1. 
+  by fresh 1; yesif 1.
 Qed.

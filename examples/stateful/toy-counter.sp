@@ -21,7 +21,7 @@ COMMENTS
 - The goal is to prove that the secret s is never leaked because the B receives
   only hashes with old values of the counter.
 
-PROOFS
+SECURITY PROPERTIES
 - monotonicity of the counter
 - secrecy (as a reachability property)
 *******************************************************************************)
@@ -72,7 +72,7 @@ axiom orderTrans (n1,n2,n3:message): n1 ~< n2 && n2 ~< n3 => n1 ~< n3.
 
 axiom orderStrict (n1,n2:message): n1 = n2 => n1 ~< n2 => false.
 
-(* GOALS *)
+(* SECURITY PROPERTIES *)
 
 (* The counter increases strictly at each update. *)
 goal counterIncreasePred (t:timestamp): 

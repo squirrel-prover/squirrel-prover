@@ -42,6 +42,18 @@ type system_decl = { sname    : Theory.lsymb option;
 val pp_system_decl : Format.formatter -> system_decl -> unit
 
 (*------------------------------------------------------------------*)
+(** Information for a system declaration using a globla modifier    *)
+type system_modifier =
+  | Rename of Theory.global_formula
+  | PRF of Theory.bnds * Theory.term
+  | CCA of Theory.bnds * Theory.term
+
+type system_decl_modifier = { from_sys    : SystemExpr.parsed;
+                              modifier : system_modifier;
+                              name : Theory.lsymb
+                            }
+
+(*------------------------------------------------------------------*)
 (** Additional oracle tagging information
     Allows to define the tag formula corresponding to some function.
     Defining a function with such a tag, is equivalent to giving to the
@@ -53,23 +65,24 @@ val pp_orcl_tag_info : Format.formatter -> orcl_tag_info -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Declarations} *)
-  
+
 type declaration_i =
   | Decl_channel of lsymb
   | Decl_process of lsymb * Theory.bnds * Process.process
   | Decl_axiom   of Goal.Parsed.t
   | Decl_system  of system_decl
+  | Decl_system_modifier  of system_decl_modifier
 
-  | Decl_ddh of lsymb * (lsymb * Symbols.symb_type) * c_tys 
+  | Decl_ddh of lsymb * (lsymb * Symbols.symb_type) * c_tys
 
-  | Decl_hash of int option * lsymb * orcl_tag_info option * c_tys 
+  | Decl_hash of int option * lsymb * orcl_tag_info option * c_tys
 
-  | Decl_aenc of lsymb * lsymb * lsymb * c_tys 
+  | Decl_aenc of lsymb * lsymb * lsymb * c_tys
 
-  | Decl_senc             of lsymb * lsymb * c_tys 
+  | Decl_senc             of lsymb * lsymb * c_tys
   | Decl_senc_w_join_hash of lsymb * lsymb * lsymb
 
-  | Decl_sign of lsymb * lsymb * lsymb * orcl_tag_info option * c_tys 
+  | Decl_sign of lsymb * lsymb * lsymb * orcl_tag_info option * c_tys
 
   | Decl_name     of lsymb * int * Theory.p_ty
   | Decl_state    of macro_decl

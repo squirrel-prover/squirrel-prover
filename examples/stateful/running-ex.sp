@@ -1,3 +1,36 @@
+(*******************************************************************************
+RUNNING EXAMPLE
+
+This protocol is a variant of the OSK protocol described in:
+M. Ohkubo, K. Suzuki, S. Kinoshita et al., 
+“Cryptographic approach to “privacy-friendly” tags,” 
+RFID privacy workshop, vol. 82. Cambridge, USA, 2003.
+
+Each tag is associated to a mutable state sT initialized with s0.
+Readers have access to a database containing an entry sR for each authorized 
+tag.
+
+         sT := H(sT,k)
+T -> R : G(sT,k')
+
+         input x; sR := H(sR,k) if x = G(H(sR,k),k') with sR in DB
+R -> T : ok
+
+COMMENTS
+- In this model we use two keyed hash functions H and G with fixed keys k and 
+k', instead of two not keyed hash functions as in the specification.
+We address this issue in the file `running-ex-oracle.sp` by adding a process in
+order to provide the attacker the ability to compute hashes with their
+respective keys (without knowing these keys).
+
+HELPING LEMMAS 
+- last update 
+- disjoint chains
+
+SECURITY PROPERTIES
+- authentication
+*******************************************************************************)
+
 set autoIntro = false.
 
 hash H
@@ -23,6 +56,33 @@ process reader =
     out(cR,ok) 
 
 system (!_i !_j T: tag(i) | !_jj R: reader).
+
+(* HELPING LEMMAS *)
+
+(* Last update lemmas: basic reasoning about the memory cells.
+Each lemma has two versions, one for the tag and one for the reader.
+We describe below the tag's lemmas, the reader's lemmas are similar. *)
+
+(* lastupdate_pure_tag
+This lemmas reasons on the order of actions in the execution trace (i.e. pure 
+trace formulas). It states that a timestamp tau either happens before any 
+action T(i,j), or there exists an action T(i,j) such that T(i,j) is the last 
+action of the form T(i,_) that happens before tau (i.e. any other T(i,j') that
+happens before tau actually happens before T(i,j)). *)
+
+(* lastupdate_init_tag 
+This lemma states that, for any timestamp tau, if no tag T(i,j) has yet played, 
+then sT(i)@tau = sT(i)@init. *)
+
+(* lastupdate_T 
+This lemma states that, for any timestamp tau, if T(i,j) is the last action of 
+the form T(i,_) that happens before tau, then sT(i)@tau = sT(i)@T(i,j). *)
+
+(* lastupdateTag 
+This lemma brings together all previous lemmas. For any timestamp tau:
+- either no tag T(i,j) has played before, in that case sT(i)@tau = sT(i)@init;
+- or there exists an action T(i,j) such that T(i,j) is the last action of the 
+form T(i,_) that happens before tau, in that case sT(i)@tau = sT(i)@T(i,j). *)
 
 goal lastupdate_pure_tag (i:index,tau:timestamp):
    happens(tau) => (
@@ -336,6 +396,9 @@ Proof.
     by apply lastupdate_R.
 Qed.
 
+(* The following lemma states that values of different memory cells do not 
+overlap, relying on the collision resistance of the hash function. *)
+
 goal disjoint_chains (tau',tau:timestamp,i',i:index) :
   happens(tau',tau) =>
     i<>i' => sT(i)@tau <> sR(i')@tau'.
@@ -355,6 +418,8 @@ Proof.
   collision A0 => H.
   by use IH with pred(R(j',i')),pred(T(i,j)).
 Qed.
+
+(* SECURITY PROPERTIES *)
 
 goal authentication (jj,ii:index):
    happens(R(jj,ii)) =>

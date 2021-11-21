@@ -1,8 +1,37 @@
-(* LMFTP'21 example with many tags,
- * i.e. OSK protocol without readers and with unique_queries axiom. *)
+(*******************************************************************************
+RUNNING EXAMPLE
+
+This protocol is a variant of the OSK protocol described in:
+M. Ohkubo, K. Suzuki, S. Kinoshita et al., 
+“Cryptographic approach to “privacy-friendly” tags,” 
+RFID privacy workshop, vol. 82. Cambridge, USA, 2003.
+
+Each tag is associated to a mutable state sT initialized with s0.
+Readers have access to a database containing an entry sR for each authorized 
+tag.
+
+         sT := H(sT,k)
+T -> R : G(sT,k')
+
+         input x; sR := H(sR,k) if x = G(H(sR,k),k') with sR in DB
+R -> T : ok
+
+COMMENTS
+- In this model we add in parallel a process in order to provide the attacker 
+the ability to compute hashes with their respective keys (without knowing these 
+keys).
+- The reader process is not modelled here, this is left for future work.
+
+HELPING LEMMAS 
+- last update 
+- disjoint chains 
+- monotonic chain
+
+SECURITY PROPERTIES
+- strong secrecy 
+*******************************************************************************)
 
 set autoIntro  = false.
-
 
 hash H.
 hash G.
@@ -19,10 +48,15 @@ system (
    (A: !_i !_j s(i):=H(s(i),k); out(o,G(s(i),k')))
 ).
 
+(* AXIOMS *)
 
-(** Last update lemmas: basic reasoning about the memory cell.
-  * Here we decompose the usual lastupdate lemma to separate the "pure" part
-  * from the part that involves message equalities. *)
+(* We assume that the attacker never repeats a query to the oracle. *)
+
+axiom unique_queries : forall (i,j:index) i <> j => input@O(i) <> input@O(j).
+
+(* HELPING LEMMAS *)
+
+(* See `running-ex.sp` for more details about lastupdate_XXX lemmas. *)
 
 goal lastupdate_pure : forall (i:index,tau:timestamp), happens(tau) => (
   (forall j:index, happens(A(i,j)) => A(i,j)>tau) ||
@@ -30,42 +64,42 @@ goal lastupdate_pure : forall (i:index,tau:timestamp), happens(tau) => (
     && forall jj:index, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))).
 
 Proof.
-intro i.
-induction => tau IH Hp.
-case tau.
+  intro i.
+  induction => tau IH Hp.
+  case tau.
 
-(* init *)
-intro Eq; left; intro j HpA; by auto.
+  (* init *)
+  intro Eq; left; intro j HpA; by auto.
 
-(* O(i) *)
-intro [j Eq]; subst tau, O(j).
-use IH with pred(O(j)) => //.
-destruct H as [H1 | [j0 H2]].
-left; intro j0 HpA; by use H1 with j0 => //.
-right. destruct H2 as [H21 H22].
-exists j0.
-split => //.
-intro jj.
-intro Hyp.
-use H22 with jj => //.
+  (* O(i) *)
+  intro [j Eq]; subst tau, O(j).
+  use IH with pred(O(j)) => //.
+  destruct H as [H1 | [j0 H2]].
+  left; intro j0 HpA; by use H1 with j0 => //.
+  right. destruct H2 as [H21 H22].
+  exists j0.
+  split => //.
+  intro jj.
+  intro Hyp.
+  use H22 with jj => //.
 
-(* A(i0,j) *)
-intro [i0 j Eq]; subst tau, A(i0,j).
- (* 1st case: i<>i0 *)
-case (i<>i0) => //.
-intro Neq.
-use IH with pred(A(i0,j)) => //.
-destruct H as [H1 | [j0 H2]].
-left; intro j0 HpA; by use H1 with j0 => //.
-right; destruct H2 as [H21 H22]; exists j0.
-split => //.
-intro jj.
-intro Hyp.
-use H22 with jj => //.
+  (* A(i0,j) *)
+  intro [i0 j Eq]; subst tau, A(i0,j).
+    (* 1st case: i<>i0 *)
+    case (i<>i0) => //.
+    intro Neq.
+    use IH with pred(A(i0,j)) => //.
+    destruct H as [H1 | [j0 H2]].
+    left; intro j0 HpA; by use H1 with j0 => //.
+    right; destruct H2 as [H21 H22]; exists j0.
+    split => //.
+    intro jj.
+    intro Hyp.
+    use H22 with jj => //.
 
- (* 2nd case: i<>i0 *)
-intro Eq; subst i0, i.
-right; exists j; split => //.
+    (* 2nd case: i<>i0 *)
+    intro Eq; subst i0, i.
+    right; exists j; split => //.
 Qed.
 
 goal lastupdate_init : forall (i:index,tau:timestamp), happens(tau) => (
@@ -73,37 +107,37 @@ goal lastupdate_init : forall (i:index,tau:timestamp), happens(tau) => (
   => s(i)@tau = s(i)@init.
 
 Proof.
-intro i.
-induction => tau IH Htau.
-case tau.
+  intro i.
+  induction => tau IH Htau.
+  case tau.
 
-(* init *)
-by auto.
+  (* init *)
+  by auto.
 
-(* O(j) *)
-intro [j Hj]; rewrite Hj in *.
-expand s(i)@O(j).
-intro Hyp.
-use IH with pred(O(j)) => //.
-intro j0 HpA.
-by use Hyp with j0.
+  (* O(j) *)
+  intro [j Hj]; rewrite Hj in *.
+  expand s(i)@O(j).
+  intro Hyp.
+  use IH with pred(O(j)) => //.
+  intro j0 HpA.
+  by use Hyp with j0.
 
 
-(* A(i0,j) *)
-intro [i0 j HA]; rewrite HA in *.
-case (i = i0) => //.
-intro Eq.
-intro H0.
-use H0 with j => //.
+  (* A(i0,j) *)
+  intro [i0 j HA]; rewrite HA in *.
+  case (i = i0) => //.
+  intro Eq.
+  intro H0.
+  use H0 with j => //.
 
-intro Neq.
-intro H0.
-use IH with pred(A(i0,j)) => //.
-expand s(i)@A(i0,j).
-noif => //.
-intro j0.
-intro Hp.
-use H0 with j0 => //.
+  intro Neq.
+  intro H0.
+  use IH with pred(A(i0,j)) => //.
+  expand s(i)@A(i0,j).
+  noif => //.
+  intro j0.
+  intro Hp.
+  use H0 with j0 => //.
 Qed.
 
 
@@ -112,38 +146,38 @@ goal lastupdate_A: forall (i:index, j:index, tau:timestamp), (happens(tau) &&
   => s(i)@tau = s(i)@A(i,j).
 
 Proof.
-intro i j.
-induction => tau IH [Hp Ord Hyp].
-case tau.
+  intro i j.
+  induction => tau IH [Hp Ord Hyp].
+  case tau.
 
-(* init *)
-by auto.
+  (* init *)
+  by auto.
 
-(* O(j0 *)
-intro [j0 Hj]; rewrite Hj in *.
-expand s(i)@O(j0).
-use IH with pred(O(j0)) => //.
-repeat split => //.
-intro jj H.
-use Hyp with jj => //.
+  (* O(j0 *)
+  intro [j0 Hj]; rewrite Hj in *.
+  expand s(i)@O(j0).
+  use IH with pred(O(j0)) => //.
+  repeat split => //.
+  intro jj H.
+  use Hyp with jj => //.
 
-(* A(i0,j0) *)
-intro [i0 j0 H]; rewrite H in *.
-case (i=i0) => //.
-intro Eqi.
+  (* A(i0,j0) *)
+  intro [i0 j0 H]; rewrite H in *.
+  case (i=i0) => //.
+  intro Eqi.
 
-use Hyp with j0.
-case (j=j0) => //.
-auto.
+  use Hyp with j0.
+  case (j=j0) => //.
+  auto.
 
-intro Neqi.
-expand s(i)@A(i0,j0).
-noif.
-auto.
-use IH with pred(A(i0,j0)) => //.
-repeat split => //.
-intro jj H0.
-use Hyp with jj => //.
+  intro Neqi.
+  expand s(i)@A(i0,j0).
+  noif.
+  auto.
+  use IH with pred(A(i0,j0)) => //.
+  repeat split => //.
+  intro jj H0.
+  use Hyp with jj => //.
 Qed.
 
 
@@ -153,16 +187,15 @@ goal lastupdate : forall (i:index,tau:timestamp), happens(tau) => (
     s(i)@tau = s(i)@A(i,j) && A(i,j)<=tau 
     && forall jj:index, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))).
 Proof.
-intro i tau Htau.
-use lastupdate_pure with i, tau as [Hinit | [j [HAj1 HAj2 HAj3]]] => //.
-left.
-split => //.
-by apply lastupdate_init.
-right.
-exists j.
-repeat split => //.
-
-use lastupdate_A with i, j, tau => //.
+  intro i tau Htau.
+  use lastupdate_pure with i, tau as [Hinit | [j [HAj1 HAj2 HAj3]]] => //.
+  left.
+  split => //.
+  by apply lastupdate_init.
+  right.
+  exists j.
+  repeat split => //.
+  use lastupdate_A with i, j, tau => //.
 Qed.
 
 (** The contents of the memory cell never repeats. *)
@@ -187,6 +220,7 @@ Proof.
 Qed.
 
 (** Values do not repeat inside the same chain of hashes. *)
+
 goal monotonic_chain :
   forall (tau,tau':timestamp,i,j:index) happens(tau,A(i,j)) => (
     (s(i)@tau = s(i)@A(i,j) && tau' < A(i,j) && A(i,j) <= tau)
@@ -218,9 +252,7 @@ Proof.
 Qed.
 
 
-(** Strong secrecy *)
-
-axiom unique_queries : forall (i,j:index) i <> j => input@O(i) <> input@O(j).
+(* SECURITY PROPERTIES *)
 
 name m : message.
 

@@ -5,7 +5,7 @@ YUBIHSM
 computational model", 2014.
 
 Y   -> S   : <pid,<nonce,otp>>
-S   -> HSM : <pid,kh>,<aead,otp>>
+S   -> HSM : <<pid,kh>,<aead,otp>>
 HSM -> S   : ctr
 S   -> Y   : accept
 
@@ -21,40 +21,52 @@ SECRET DATA KNOWN BY EACH PARTY
 - HSM: mkey, { k(pid), sid(pid) | pid }
 
 COMMENTS
-
-- The last message "otp || nonce || hmac || status" is unclear and not modelled
-at all and replaced by "accept".
-It was also not modelled in [1].
+- The last message "otp || nonce || hmac || status" is unclear and 
+  not modelled at all and replaced by "accept".
+  It was also not modelled in [1].
 
 - The otp is an encryption of a triple (sid, ctr, npr).
-It is modelled here as a randomized encryption of a pair (sid, ctr).
+  It is modelled here as a randomized encryption of a pair (sid, ctr).
 
-- enc is assumed to be AEAD (we do not use the associated data)
+- enc is assumed to be AEAD (we do not use the associated data).
 
 - In [1], they "over-approximate in the case that the Yubikey increases the
-session token by allowing the adversary to instantiate the rule for any counter
-value that is higher than the previous one".
-Here, we model the incrementation by 1 of the counter.
+  session token by allowing the adversary to instantiate the rule for any 
+  counter value that is higher than the previous one".
+  Here, we model the incrementation by 1 of the counter.
 
 - As in [1], we model the two counters (session and token counters) as a single
-counter.
+  counter.
 
 - In [1], the server keeps in memory the mapping between public and
   secret identities of the Yubikeys. As far as we understand, this
-  does not reflect the YubiHSM specification: secret identities are to
+  does not reflect the YubiHSM specification: secret identities have  to
   be protected by the YubiHSM.  Instead, we choose to keep the
-  necessary information to map public to private indentities in the
+  necessary information to map public to private identities in the
   AEADs (we simply add the public identity to the AEADs plaintext).  
 
-- Diff terms are here to model a real system and two ideal systems.
-  - the first intermediate ideal system replace key look-up in the 
-    server database by the honest keys;
-  - the fully ideal system uses a different key k2'(i,j) for each 
-    generated otp. The goal is to being able to use the intctxt tactic for 
-    the auth goal.
+- Diff terms are here to model a real system and an ideal system.
+  The purpose of the ideal system is to replace the key inside the AEAD by a 
+  dummy one, in order to be able to use the intctxt tactic for the third
+  security property (injective correspondence).
+
+HELPING LEMMAS
+- counter increase
+- valid decode
+
+SECURITY PROPERTIES 
+The 3 security properties as stated in [1].
+- Property 1: no replay counter
+- Property 2: injective correspondence
+- Property 3: monotonicity
+
+Properties 1 and 3 are established directly on the real system. 
+Property 2 is proved in 2 steps: first an equivalence is established 
+between the real system and the ideal one, and then the property 
+is proved on the ideal system. The reach equiv 
+tactic allows one to combine these two steps, and to conclude.
 *******************************************************************************)
 set autoIntro=false.
-
 
 (* AEAD symmetric encryption scheme: IND-CCA + INT-CTXT *)
 senc enc,dec
@@ -100,14 +112,12 @@ mutable SCtr(i:index) : message = cinit
 (* authentication server's database for each pid *)
 mutable AEAD(pid:index) : message = zero.
 
-
 (*------------------------------------------------------------------*)
 channel cY
 channel cS
 channel cHSM
 
-(* Order over counters.
-   Assumed transitive and strict later through axioms. *)
+(* Order over counters. Assumed transitive and strict later through axioms. *)
 abstract (~<): message -> message -> boolean.
 
 (* When the key is plugged for yubikey `pid`, the counter is incremented. *)
@@ -133,11 +143,10 @@ process yubikeypress (pid:index,j:index) =
    - it checks whether it corresponds to a pid in its database,
    - it retrieves the AEAD and kh associated to this pid and asks the HSM to
    decode the received otp,
-   - it checks that the counter inside the otp (received from the HSM) is strictly
-   greater than the counter associated to the token,
+   - it checks that the counter inside the otp (received from the HSM) is 
+   strictly greater than the counter associated to the token,
    - if so, this counter value is used to update the database.
-
-   In our modelling, the server request to the HSM (to retrieve k(pid) 
+   In our modelling, the server's request to the HSM (to retrieve k(pid) 
    and sid(pid)) has been inlined.
  *)
 process server (pid:index) =
@@ -184,7 +193,7 @@ process YSM_AEAD_YUBIKEY_OTP_DECODE (pid:index) =
       out(cHSM, snd(otp_dec)).
 
 (*------------------------------------------------------------------*)
-(* base system with ideal system *)
+(* real system with ideal system *)
 system !_pid 
   new rinit;
   AEAD(pid) := 
@@ -197,8 +206,9 @@ system !_pid
   (!_j Write  : write_AEAD(pid)                  ) |
   (!_j Decode : YSM_AEAD_YUBIKEY_OTP_DECODE(pid))).
 
+(*------------------------------------------------------------------*)
+(* AXIOMS *)
 
-(* TODO: allow to have axioms for all systems *)
 axiom orderTrans (n1,n2,n3:message): n1 ~< n2 => n2 ~< n3 => n1 ~< n3.
 
 axiom orderStrict(n1,n2:message): n1 = n2 => n1 ~< n2 => False.
@@ -211,7 +221,7 @@ abstract c_pair : message.
 abstract (++) : message -> message -> message.
 axiom len_pair (x, y : message) : len(<x,y>) = (len(x) ++ len(y) ++ c_pair).
 
-
+(*------------------------------------------------------------------*)
 (* LIBRAIRIES *)
 
 include Basic.
@@ -253,195 +263,18 @@ Proof.
   by intro *; rewrite eq_iff. 
 Qed.
 
-
-(* PROOF *)
-
-(* First property of AEAD decoding *)
-goal valid_decode (t : timestamp) (pid,j : index):
-  (t = Decode(pid,j) || t = Decode1(pid,j)) =>
-  happens(t) => 
-  (aead_dec(pid,j)@t <> fail) =
-  (exists(pid0 : index), 
-   Setup(pid0) < t &&
-   AEAD(pid0)@Setup(pid0) = aead(pid,j)@t).
-Proof.
-  intro Eq Hap.
-  rewrite eq_iff; split.
-
-  (* Left => Right *)
-  intro AEAD_dec.
-
-  case Eq; 
-  expand aead_dec;
-  intctxt AEAD_dec => H //;
-  intro AEAD_eq;
-  by exists pid0. 
-
-  (* Right => Left *) 
-  intro [pid0 [Clt H]].
-  case Eq; 
-  expand aead_dec;
-  rewrite -H /AEAD /=;
-  apply pair_ne_fail.
-Qed.  
-
-(* using the `valid_decode` lemma, we can characterize when the full
-   decoding check goes through *)
-goal valid_decode_charac (t : timestamp) (pid,j : index):
-  (t = Decode(pid,j) || t = Decode1(pid,j)) =>
-  happens(t) => 
-  ( aead_dec(pid,j)@t <> fail &&
-    otp_dec(pid,j)@t <> fail &&
-    fst(otp_dec(pid,j)@t) = snd(snd(aead_dec(pid,j)@t)) &&
-    mpid(pid) = fst(snd(aead_dec(pid,j)@t)) ) 
-  =
-  ( AEAD(pid)@Setup(pid) = aead(pid,j)@t &&
-    dec(otp(pid,j)@t,k(pid)) <> fail &&
-    fst(dec(otp(pid,j)@t,k(pid))) = sid(pid) ).
-Proof.
-  intro Eq Hap.
-  rewrite eq_iff; split.
-
-  (* => case *)
-  intro [AEAD_dec OTP_dec Sid_eq Pid_eq]. 
-  rewrite valid_decode // in AEAD_dec.
-  destruct AEAD_dec as [pid0 [Clt AEAD_dec]]. 
-  
-  assert (pid0 = pid).
-  by case Eq; use mpid_inj with pid, pid0.
-  case Eq; project; auto.
-
-  (* <= case *)
-  intro [AEAD_dec OTP_dec Sid_eq].
-  rewrite valid_decode //. 
-  case Eq;
-  depends Setup(pid), t by auto;
-  intro Clt;
-  by project; simpl; exists pid.
-Qed.
-
-
 (*------------------------------------------------------------------*)
-(* auxilliary simple lemma, used to rewrite one of the conditional
-   equality in the then branch. *)
-goal if_aux (b,b0,b1,b2 : boolean) (x,y,z,u,v:message):
-   if (b && (x = y && b0 && b1 && b2)) then
-     snd(dec(z,diff(fst(dec(y,u)),v))) =
-   if (b && (x = y && b0 && b1 && b2)) then 
-    snd(dec(z,diff(fst(dec(x,u)),v))). 
-Proof.
-  intro >. 
-  case b => _ //. 
-  case b0 => _ //. 
-  case b1 => _ //.
-  case b2 => _ //. 
-  case (x = y) => U //.
-Qed.
+(* HELPING LEMMAS - counter increase *)
 
-set showStrengthenedHyp=true.
-
-(*------------------------------------------------------------------*)
-global goal stef_atomic_keys (t : timestamp):
-  [happens(t)] -> 
-  equiv(
-    frame@t,
-    seq(pid:index -> AEAD(pid)@t),
-    seq(pid:index -> if Setup(pid) <= t then AEAD(pid)@Setup(pid)),
-    (* seq(pid:index -> YCtr(pid)@t), *)
-    (* seq(pid:index -> SCtr(pid)@t), *)
-    seq(pid:index -> sid(pid)),
-    seq(pid,j:index -> npr(pid,j)),
-    seq(pid,j:index -> nonce(pid,j)),
-    seq(pid:index -> k(pid)),
-    seq(pid:index -> k_dummy(pid))
-  ).
-Proof. 
-  dependent induction t => t Hind Hap.
-  case t => Eq;
-  (try (repeat destruct Eq as [_ Eq];
-       rewrite /* in 0;
-       rewrite /AEAD in 1;
-       rewrite le_lt // -le_pred_lt in 2;
-       by apply ~fadup Hind (pred(t)))).
-
-  (* init *)
-  rewrite /*.
-  by rewrite if_false in 1.
-
-  (* Setup(pid) *)
-  repeat destruct Eq as [_ Eq].
-  splitseq 2: (fun (pid0 : index) -> pid = pid0).
-  constseq 2: 
-    (fun (pid0 : index) -> pid = pid0 && Setup(pid0) <= t) (AEAD(pid)@t) 
-    (fun (pid0 : index) -> pid <> pid0 || 
-                          (pid = pid0 && not (Setup(pid0) <= t))) zero. 
-  by intro pid0; case (pid=pid0).
-    split => pid0 /= U.
-    by rewrite !if_true.
-
-    case U.
-    by rewrite if_false.
-    by destruct U as [_ _].
-
-  rewrite if_then_then in 3. 
-  assert (forall(pid0 : index), 
-    (not (pid = pid0) && Setup(pid0) <= t) = 
-    (Setup(pid0) < t)) as H.
-    intro pid0; case pid = pid0 => _ /=. 
-    by rewrite eq_iff. 
-    by rewrite le_lt. 
-  rewrite H -le_pred_lt in 3.
-  rewrite /AEAD in 1.
-  fa 1.
-  rewrite /AEAD in 4.
-  rewrite /* in 0.
-  cca1 2; 2:auto.
-  rewrite !len_pair len_diff in 2.
-  namelength k(pid), k_dummy(pid) => -> /=.
-  rewrite /* in 0.    
-  by apply ~fadup Hind (pred(t)).
-
-  (* Decode(pid,j) *)
-  repeat destruct Eq as [_ Eq].
-  rewrite /AEAD in 1.
-  rewrite le_lt // -le_pred_lt in 2.
-  depends Setup(pid), t by auto => H.
-  rewrite /frame /exec /output /cond in 0. 
-  fa 0; fa 1; fa 1.
-
-  rewrite valid_decode_charac //. 
-  (* rewrite the content of the then branch *)
-  rewrite /otp_dec /aead_dec if_aux /= in 2.
-  fa 2.
-  rewrite /AEAD /= in 2.
-  rewrite /aead /otp in 1,2.
-  fa 1. fa 1. fa 1. fa 1.
-  memseq 1 6; 1: by exists pid; rewrite if_true.
-  by apply ~fadup Hind (pred(t)).
-
-  (* Decode1(pid,j) *)
-  repeat destruct Eq as [_ Eq].
-  rewrite /AEAD in 1.
-  rewrite le_lt // -le_pred_lt in 2.
-  depends Setup(pid), t by auto => H.
-  rewrite /frame /exec /output /cond in 0. 
-  fa 0; fa 1; fa 1.
-  rewrite valid_decode_charac //. 
-  rewrite /otp /aead.
-  fa 1. fa 1. fa 1. fa 1. fa 1.
-  memseq 1 5; 1: by exists pid; rewrite if_true.
-  by apply ~fadup Hind (pred(t)).
-Qed.
-
-(* The counter SCtr(j) strictly increases when t is an action Server performed by 
-the server with tag j. *)
+(* The counter SCtr(j) strictly increases when t is an action Server 
+performed by the server with tag j. *)
 
 goal counterIncreaseStrictly (pid,j:index):
    happens(Server(pid,j)) =>
    cond@Server(pid,j) => 
    SCtr(pid)@pred(Server(pid,j)) ~< SCtr(pid)@Server(pid,j).
 Proof.
-auto.
+  auto.
 Qed.
 
 goal counterIncrease (t:timestamp, pid : index) :
@@ -460,8 +293,8 @@ Proof.
   by right; expand SCtr; noif.
 Qed.
 
-
-(* The counter SCpt(ped) increases (not strictly) between t' and t when t' < t *)
+(* The counter SCpt(ped) increases (not strictly) between t' and t 
+when t' < t. *)
 goal counterIncreaseBis:
   forall (t:timestamp), forall (t':timestamp), forall (pid:index),
     happens(t) =>
@@ -501,8 +334,11 @@ Proof.
   by apply H1.
 Qed.
 
-
-(* Property 1 - No replay relying on an invariant *)
+(*------------------------------------------------------------------------------
+SECURITY PROPERTIES 1 (no replay) AND 3 (monotonicity)
+These two properties are proved directly on the real system, since they do not 
+rely on the intctxt tactic.
+------------------------------------------------------------------------------*)
 
 goal noreplayInv (j, j', pid:index):
    happens(Server(pid,j),Server(pid,j')) =>
@@ -527,7 +363,6 @@ Proof.
   by rewrite H2 in *.
 Qed.
 
-
 goal noreplay (j, j', pid:index):
   happens(Server(pid,j')) =>
   exec@Server(pid,j') =>
@@ -545,10 +380,7 @@ Proof.
   by apply orderStrict in Meq.
 Qed.
 
-
-(* Property 3 *)
-(* Monotonicity *)
-
+(*------------------------------------------------------------------*)
 goal monotonicity (j, j', pid:index):
   happens(Server(pid,j'),Server(pid,j)) =>
   exec@Server(pid,j') && exec@Server(pid,j) && 
@@ -557,9 +389,7 @@ goal monotonicity (j, j', pid:index):
 Proof.
   intro Hap [Hexec H].
   assert
-    (Server(pid,j) = Server(pid,j') || 
-     Server(pid,j)< Server(pid,j') || 
-     Server(pid,j) > Server(pid,j')) as Ht;
+    (Server(pid,j) = Server(pid,j') || Server(pid,j)< Server(pid,j') || Server(pid,j) > Server(pid,j')) as Ht;
   1: constraints.
   case Ht.
 
@@ -571,23 +401,210 @@ Proof.
 
   (* case Server(pid,j) > Server(pid,j') *)
   use noreplayInv with j', j, pid  as Meq => //.
-  (* apply orderTrans _ (SCtr(pid)@Server(pid,j')) in H => //. *)
-  use orderTrans with 
-      SCtr(pid)@Server(pid,j),
-      SCtr(pid)@Server(pid,j'), 
-      SCtr(pid)@Server(pid,j) => //.
+  use orderTrans with SCtr(pid)@Server(pid,j), SCtr(pid)@Server(pid,j'), SCtr(pid)@Server(pid,j) => //.
   by apply orderStrict in H0.
 Qed.
 
 
-(*------------------------------------------------------------------*)
+(*------------------------------------------------------------------------------
+SECURITY PROPERTY 2 (injective correspondence)
+The proof of this property is done in 2 steps.
+- We first establish the equivalence between the real system and the ideal one 
+  (in which the key inside the AEAD are replaced by a dummy one).
+  This corresponds to the goal injective_correspondence_equiv.
+- Then, we use the rule REACH-EQUIV (through the tactic rewrite equiv) in order 
+  to replace the real system by the ideal one, so that we only have to prove the 
+  security property on the ideal system.
+  This corresponds to the goal injective_correspondence.
+  
+Beforehand, we prove some helping lemmas:
+- valid_decode, in order to characterize when the AEAD decoding process is valid;
+- if_aux, a lemma used to rewrite a conditional;
+- equiv_real_ideal_enrich_XXX, a serie of lemmas establishing the equivalence
+between the real system and an ideal one, using sequences to enrich the frame.
+------------------------------------------------------------------------------*)
 
+(*------------------------------------------------------------------*)
+(* First property of AEAD decoding. *)
+goal valid_decode (t : timestamp) (pid,j : index):
+  (t = Decode(pid,j) || t = Decode1(pid,j)) =>
+  happens(t) => 
+  (aead_dec(pid,j)@t <> fail) =
+  (exists(pid0 : index), 
+   Setup(pid0) < t &&
+   AEAD(pid0)@Setup(pid0) = aead(pid,j)@t).
+Proof.
+  intro Eq Hap.
+  rewrite eq_iff; split.
+
+  (* Left => Right *)
+  intro AEAD_dec.
+
+  case Eq; 
+  expand aead_dec;
+  intctxt AEAD_dec => H //;
+  intro AEAD_eq;
+  by exists pid0. 
+
+  (* Right => Left *) 
+  intro [pid0 [Clt H]].
+  case Eq; 
+  expand aead_dec;
+  rewrite -H /AEAD /=;
+  apply pair_ne_fail.
+Qed.  
+
+(* Using the `valid_decode` lemma, we can characterize when the full
+   decoding check goes through. *)
+goal valid_decode_charac (t : timestamp) (pid,j : index):
+  (t = Decode(pid,j) || t = Decode1(pid,j)) =>
+  happens(t) => 
+  ( aead_dec(pid,j)@t <> fail &&
+    otp_dec(pid,j)@t <> fail &&
+    fst(otp_dec(pid,j)@t) = snd(snd(aead_dec(pid,j)@t)) &&
+    mpid(pid) = fst(snd(aead_dec(pid,j)@t)) ) 
+  =
+  ( AEAD(pid)@Setup(pid) = aead(pid,j)@t &&
+    dec(otp(pid,j)@t,k(pid)) <> fail &&
+    fst(dec(otp(pid,j)@t,k(pid))) = sid(pid) ).
+Proof.
+  intro Eq Hap.
+  rewrite eq_iff; split.
+
+  (* => case *)
+  intro [AEAD_dec OTP_dec Sid_eq Pid_eq]. 
+  rewrite valid_decode // in AEAD_dec.
+  destruct AEAD_dec as [pid0 [Clt AEAD_dec]]. 
+  
+  assert (pid0 = pid).
+  by case Eq; use mpid_inj with pid, pid0.
+  case Eq; project; auto.
+
+  (* <= case *)
+  intro [AEAD_dec OTP_dec Sid_eq].
+  rewrite valid_decode //. 
+  case Eq;
+  (depends Setup(pid), t by auto);
+  intro Clt;
+  by project; simpl; exists pid.
+Qed.
+
+
+(*------------------------------------------------------------------*)
+(* Auxiliary simple lemma, used to rewrite one of the conditional
+   equality in the then branch. *)
+goal if_aux (b,b0,b1,b2 : boolean) (x,y,z,u,v:message):
+   if (b && (x = y && b0 && b1 && b2)) then
+     snd(dec(z,diff(fst(dec(y,u)),v))) =
+   if (b && (x = y && b0 && b1 && b2)) then 
+    snd(dec(z,diff(fst(dec(x,u)),v))). 
+Proof.
+  case b => _ //. 
+  case b0 => _ //. 
+  case b1 => _ //.
+  case b2 => _ //. 
+  case (x = y) => U //.
+Qed.
+
+set showStrengthenedHyp=true.
+
+(*------------------------------------------------------------------*)
+global goal equiv_real_ideal_enrich (t : timestamp):
+  [happens(t)] -> 
+  equiv(
+    frame@t,
+    seq(pid:index -> AEAD(pid)@t),
+    seq(pid:index -> if Setup(pid) <= t then AEAD(pid)@Setup(pid)),
+    seq(pid:index -> sid(pid)),
+    seq(pid,j:index -> npr(pid,j)),
+    seq(pid,j:index -> nonce(pid,j)),
+    seq(pid:index -> k(pid)),
+    seq(pid:index -> k_dummy(pid))
+  ).
+Proof. 
+  dependent induction t => t Hind Hap.
+  case t => Eq;
+  (try (repeat destruct Eq as [_ Eq];
+       rewrite /* in 0;
+       rewrite /AEAD in 1;
+       rewrite le_lt // -le_pred_lt in 2;
+       by apply ~inductive Hind (pred(t)))).
+
+  (* init *)
+  rewrite /*.
+  by rewrite if_false in 1. 
+
+  (* Setup(pid) *)
+  repeat destruct Eq as [_ Eq].
+  splitseq 2: (fun (pid0 : index) -> pid = pid0).
+  constseq 2: 
+    (fun (pid0 : index) -> pid = pid0 && Setup(pid0) <= t) (AEAD(pid)@t) 
+    (fun (pid0 : index) -> pid <> pid0 || 
+                          (pid = pid0 && not (Setup(pid0) <= t))) zero. 
+  by intro pid0; case (pid=pid0).
+    split => pid0 /= U.
+    by rewrite !if_true.
+
+    case U.
+    by rewrite if_false.
+    by destruct U as [_ _].
+
+  rewrite if_then_then in 3. 
+  assert (forall(pid0 : index), (not (pid = pid0) && Setup(pid0) <= t) = (Setup(pid0) < t)) as H.
+    intro pid0; case pid = pid0 => _ /=. 
+    by rewrite eq_iff. 
+    by rewrite le_lt. 
+  rewrite H -le_pred_lt in 3.
+  rewrite /AEAD in 1.
+  fa 1.
+  rewrite /AEAD in 4.
+  rewrite /* in 0.
+  cca1 2; 2:auto.
+  rewrite !len_pair len_diff in 2.
+  namelength k(pid), k_dummy(pid)=> -> /=.
+  rewrite /* in 0.    
+  by apply  Hind (pred(t)).
+
+  (* Decode(pid,j) *)
+  repeat destruct Eq as [_ Eq].
+  rewrite /AEAD in 1.
+  rewrite le_lt // -le_pred_lt in 2.
+  depends Setup(pid), t by auto => H.
+  rewrite /frame /exec /output /cond in 0. 
+  fa 0; fa 1; fa 1.
+
+  rewrite valid_decode_charac //. 
+  (* rewrite the content of the then branch *)
+  rewrite /otp_dec /aead_dec if_aux /= in 2.
+  fa 2.
+  rewrite /AEAD /= in 2.
+  rewrite /aead /otp in 1,2.
+  fa 1. fa 1. fa 1. fa 1.
+  memseq 1 6; 1: by exists pid; rewrite if_true.
+  by apply Hind (pred(t)).
+
+  (* Decode1(pid,j) *)
+  repeat destruct Eq as [_ Eq].
+  rewrite /AEAD in 1.
+  rewrite le_lt // -le_pred_lt in 2.
+  depends Setup(pid), t by auto => H.
+  rewrite /frame /exec /output /cond in 0. 
+  fa 0; fa 1; fa 1.
+  rewrite valid_decode_charac //. 
+  rewrite /otp /aead.
+  fa 1. fa 1. fa 1. fa 1. fa 1.
+  memseq 1 5; 1: by exists pid; rewrite if_true.
+  by apply  Hind (pred(t)).
+Qed.
+
+
+(*------------------------------------------------------------------*)
 axiom max_ts : 
   exists (tmax : timestamp), 
   happens(tmax) &&
   (forall (t : timestamp), happens(t) => t <= tmax).
 
-global goal david_atomic_key0 :
+global goal equiv_real_ideal_enrich_tmax0 :
   exists (t : timestamp),
   ([happens(t)] /\
    [forall (t' : timestamp), happens(t') => t' <= t] /\
@@ -600,10 +617,9 @@ global goal david_atomic_key0 :
 Proof.
   use max_ts as [tmax [_ U]].
   exists tmax.
-  use stef_atomic_keys with tmax as H; 2: auto. 
-  split. 
-  by (split; intro *); 2: apply U.
-  by apply ~fadup H.
+  split.
+  by (split; intro*); 2: apply U.
+  by apply ~inductive equiv_real_ideal_enrich tmax.
 Qed.
 
 
@@ -619,7 +635,7 @@ abstract exec_dflt : boolean.
 axiom exec_nhap (t' : timestamp) : 
    not happens(t') => exec@t' = exec_dflt.
 
-global goal david_atomic_key :
+global goal equiv_real_ideal_enrich_tmax :
   exists (t : timestamp),
   ([happens(t)] /\
    [forall (t' : timestamp), happens(t') => t' <= t] /\
@@ -630,7 +646,7 @@ global goal david_atomic_key :
       seq(i:index, t':timestamp -> SCtr(i)@t')
   )).
 Proof.
-  use david_atomic_key0 as [tmax [[Hap C] U]].
+  use equiv_real_ideal_enrich_tmax0 as [tmax [[Hap C] U]].
   exists tmax. 
   split; 1: by split. 
   assert (forall (t' : timestamp), (t' <= tmax) = happens(t')) as Eq.
@@ -668,8 +684,9 @@ Proof.
 
   by apply U.
 Qed.
- 
-global goal injective_correspondance_equiv (pid, j:index):
+
+(*------------------------------------------------------------------*)
+global goal injective_correspondence_equiv (pid, j:index):
    [happens(Server(pid,j))] ->
    equiv(
      exec@Server(pid,j) =>
@@ -682,16 +699,13 @@ global goal injective_correspondance_equiv (pid, j:index):
          j = j').
 Proof.
   intro Hap.
-  use david_atomic_key as [tmax [_ H]].
+  use equiv_real_ideal_enrich_tmax as [tmax [_ H]].
   apply H.
 Qed.
 
 (*------------------------------------------------------------------*)
- 
-(* Property 2 *)
-(* injective correspondance as stated in the PhD thesis of R. Kunneman *)
-
-goal [left] injective_correspondance (j, pid:index):
+(* The final proof of injective correspondence. *)
+goal [left] injective_correspondence (j, pid:index):
    happens(Server(pid,j)) =>
    exec@Server(pid,j) =>
      exists (i:index),
@@ -703,7 +717,7 @@ goal [left] injective_correspondance (j, pid:index):
          j = j'.
 Proof.
   intro Hap.
-  rewrite equiv injective_correspondance_equiv pid j => // Hexec.
+  rewrite equiv injective_correspondence_equiv pid j => // Hexec.
   executable Server(pid,j) => //.
   intro exec.
   expand exec, cond.

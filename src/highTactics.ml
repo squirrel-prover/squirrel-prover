@@ -7,7 +7,7 @@ module L = Location
 module T = Prover.ProverTactics
 
 module LT = LowTactics
-  
+
 module St = Term.St
 module Sv = Vars.Sv
 
@@ -33,6 +33,7 @@ let () =
                        Sort Args.String;
                        Sort Args.Message;];
        tactic_group = Logical}
+    ~pq_sound:true
     (LT.gentac_of_any_tac_arg TraceTactics.case_tac EquivTactics.case_tac)
 
 (*------------------------------------------------------------------*)
@@ -49,6 +50,7 @@ let () =
       detailed_help = "";
       tactic_group = Structural;
       usages_sorts = [Sort None] }
+    ~pq_sound:true
    (yes_no_if_tac false)
 
 let () =
@@ -58,6 +60,7 @@ let () =
       detailed_help = "";
       tactic_group = Structural;
       usages_sorts = [Sort None] }
+    ~pq_sound:true
    (yes_no_if_tac true)
 
 
@@ -68,6 +71,7 @@ let () =
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
+    ~pq_sound:true
     (LT.genfun_of_any_fun TraceTactics.assumption EquivTactics.assumption)
 
 (*------------------------------------------------------------------*)
@@ -85,6 +89,7 @@ let () =
                        sequence u1,...,un is diff-equivalent.";
       usages_sorts = [Sort None; Sort Int];
       tactic_group = Structural}
+    ~pq_sound:true
     (LT.gentac_of_any_tac_arg TraceTactics.fa_tac EquivTactics.fa_tac)
 
 (*------------------------------------------------------------------*)
@@ -105,6 +110,7 @@ let () =
                        action.";
       usages_sorts = [Sort String; Sort Int];
       tactic_group=Structural }
+    ~pq_sound:true
     (LT.gentac_of_any_tac_arg TraceTactics.fresh_tac EquivTactics.fresh_tac)
 
 (*------------------------------------------------------------------*)
@@ -114,14 +120,15 @@ let () = T.register_general "induction"
       detailed_help = "";
       usages_sorts = [Sort None];
       tactic_group = Logical}
+    ~pq_sound:true
     (LT.gentac_of_any_tac_arg
        (LT.TraceLT.induction_tac ~dependent:false)
        EquivTactics.old_or_new_induction)
 
 (*------------------------------------------------------------------*)
-(* Remark: EquivTactics and TraceTactics implementation of [tac_autosimpl] 
-   slightly differ, because the [strong] flag is always [true] 
-   in [TraceTactics.tac_autosimpl] when [Config.auto_intro ()] is [true]. 
+(* Remark: EquivTactics and TraceTactics implementation of [tac_autosimpl]
+   slightly differ, because the [strong] flag is always [true]
+   in [TraceTactics.tac_autosimpl] when [Config.auto_intro ()] is [true].
    Because of this, there is some code replication below, to reflect this
    asymmetry. *)
 
@@ -148,22 +155,25 @@ let () =
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Structural}
+    ~pq_sound:true
     tac_autosimpl
-    
-let () = 
+
+let () =
   T.register_general "simpl"
     ~tactic_help:{general_help = "Simplifies a goal, without closing it.";
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Structural}
+    ~pq_sound:true
     (tac_auto ~close:false ~strong:true)
-    
+
 let () =
   T.register_general "auto"
     ~tactic_help:{general_help = "Closes a goal.";
                   detailed_help = "Stronger automation than simpl.";
                   usages_sorts = [Sort None];
                   tactic_group = Structural}
+    ~pq_sound:true
     (tac_auto ~close:true ~strong:true)
 
 (*------------------------------------------------------------------*)
@@ -179,6 +189,7 @@ let () =
       detailed_help = "";
       usages_sorts  = [];
       tactic_group  = Structural;}
+    ~pq_sound:true
     (LT.rewrite_tac (tac_auto []))
 
 (*------------------------------------------------------------------*)
@@ -192,4 +203,5 @@ let () =
       detailed_help = "";
       usages_sorts = [];
       tactic_group = Logical}
+    ~pq_sound:true
     (LT.intro_tac (tac_auto []))

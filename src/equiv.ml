@@ -27,15 +27,15 @@ let subst_equiv (subst : Term.subst) (e : equiv) : equiv =
   List.map (Term.subst subst) e
 
 (** Free variables of an [equiv]. *)
-let fv_equiv e : Sv.t = 
-  List.fold_left (fun sv elem -> 
+let fv_equiv e : Sv.t =
+  List.fold_left (fun sv elem ->
       Sv.union sv (Term.fv elem)
     ) Sv.empty e
 
 (*------------------------------------------------------------------*)
 (** {2 Equivalence atoms} *)
 
-type atom = 
+type atom =
   | Equiv of equiv
   (** Equiv u corresponds to (u)^left ~ (u)^right *)
 
@@ -46,7 +46,7 @@ let pp_atom fmt = function
   | Equiv e -> pp_equiv fmt e
   | Reach f -> Fmt.pf fmt "@[[%a]@]" Term.pp f
 
-let subst_atom (subst : Term.subst) (a : atom) : atom = 
+let subst_atom (subst : Term.subst) (a : atom) : atom =
   match a with
   | Equiv e -> Equiv (subst_equiv subst e)
   | Reach f -> Reach (Term.subst subst f)
@@ -62,7 +62,7 @@ let fv_atom = function
 
 type quant = ForAll | Exists
 
-type form = 
+type form =
   | Quant of quant * Vars.evar list * form
   | Atom  of atom
   | Impl  of form * form
@@ -72,20 +72,20 @@ type form =
 let rec pp fmt = function
   | Atom at -> pp_atom fmt at
 
-  | Impl (f0, f) -> 
+  | Impl (f0, f) ->
     Fmt.pf fmt "@[<v 2>%a ->@ %a@]" pp f0 pp f
 
-  | And (f0, f) -> 
+  | And (f0, f) ->
     Fmt.pf fmt "@[<v 2>%a /\\@ %a@]" pp f0 pp f
 
-  | Or (f0, f) -> 
+  | Or (f0, f) ->
     Fmt.pf fmt "@[<v 2>%a \\/@ %a@]" pp f0 pp f
 
-  | Quant (ForAll, vs, f) -> 
+  | Quant (ForAll, vs, f) ->
     Fmt.pf fmt "@[<v 2>Forall (@[%a@]),@ %a@]"
       Vars.pp_typed_list vs pp f
 
-  | Quant (Exists, vs, f) -> 
+  | Quant (Exists, vs, f) ->
     Fmt.pf fmt "@[<v 2>Exists (@[%a@]),@ %a@]"
       Vars.pp_typed_list vs pp f
 
@@ -102,12 +102,12 @@ let mk_reach_atom f = Atom (Reach f)
 (*------------------------------------------------------------------*)
 (** {2 Map (does not recurse) } *)
 
-(** Does not recurse. 
+(** Does not recurse.
     Applies to arguments of index atoms (see atom_map). *)
-let tmap (func : form -> form) (t : form) : form = 
+let tmap (func : form -> form) (t : form) : form =
 
   let rec tmap = function
-    | Quant (q, vs, b) -> Quant (q, vs, func b)      
+    | Quant (q, vs, b) -> Quant (q, vs, func b)
     | Impl (f1, f2)    -> Impl (tmap f1, tmap f2)
     | And (f1, f2)     -> And (tmap f1, tmap f2)
     | Or (f1, f2)      -> Or (tmap f1, tmap f2)
@@ -115,25 +115,25 @@ let tmap (func : form -> form) (t : form) : form =
   in
   tmap t
 
-let tmap_fold : ('b -> form -> 'b * form) -> 'b -> form -> 'b * form = 
+let tmap_fold : ('b -> form -> 'b * form) -> 'b -> form -> 'b * form =
   fun func b t ->
   let bref = ref b in
-  let g t = 
+  let g t =
     let b, t = func !bref t in
     bref := b;
     t
   in
   let t = tmap g t in
-  !bref, t   
+  !bref, t
 
-let titer (f : form -> unit) (t : form) : unit = 
+let titer (f : form -> unit) (t : form) : unit =
   let g e = f e; e in
   ignore (tmap g t)
 
-let tfold : (form -> 'b -> 'b) -> form -> 'b -> 'b = 
-  fun f t v -> 
+let tfold : (form -> 'b -> 'b) -> form -> 'b -> 'b =
+  fun f t v ->
   let vref : 'b ref = ref v in
-  let fi e = vref := (f e !vref) in  
+  let fi e = vref := (f e !vref) in
   titer fi t;
   !vref
 
@@ -156,12 +156,12 @@ let rec fv = function
   | Impl (f,f0) -> Sv.union (fv f) (fv f0)
   | Quant (_, evs, b) -> Sv.diff (fv b) (Sv.of_list evs)
 
-let rec subst s (f : form) = 
+let rec subst s (f : form) =
   if s = [] ||
-     (Term.is_var_subst s && 
+     (Term.is_var_subst s &&
       Sv.disjoint (Term.subst_support s) (fv f))
   then f
-  else 
+  else
     match f with
     | Atom at -> Atom (subst_atom s at)
 
@@ -170,19 +170,18 @@ let rec subst s (f : form) =
     | Impl (f0, f) -> Impl (subst s f0, subst s f)
 
     | Quant (_, [], f) -> subst s f
-    | Quant (q, v :: evs, b) -> 
+    | Quant (q, v :: evs, b) ->
       let v, s = Term.subst_binding v s in
       let f = subst s (Quant (q, evs,b)) in
       mk_quant q [v] f
 
-let tsubst_atom (ts : Type.tsubst) (at : atom) =  
+let tsubst_atom (ts : Type.tsubst) (at : atom) =
   match at with
   | Reach t -> Reach (Term.tsubst ts t)
   | Equiv e -> Equiv (List.map (Term.tsubst ts) e)
 
 (** Type substitution *)
-let tsubst (ts : Type.tsubst) (t : form) =  
-
+let tsubst (ts : Type.tsubst) (t : form) =
   let rec tsubst = function
     | Quant (q, vs, f) -> Quant (q, List.map (Vars.tsubst_e ts) vs, tsubst f)
     | Atom at -> Atom (tsubst_atom ts at)
@@ -224,20 +223,20 @@ module Smart : Term.SmartFO with type form = _form = struct
     | [] -> f
     | f0 :: impls -> Impl (f0, mk_impls impls f)
 
-  let mk_forall ?(simpl=false) l f = 
-    let l = 
+  let mk_forall ?(simpl=false) l f =
+    let l =
       if simpl then
         let fv = fv f in
-        List.filter (fun v -> Sv.mem v fv) l 
+        List.filter (fun v -> Sv.mem v fv) l
       else l
     in
     mk_forall l f
 
-  let mk_exists ?(simpl=false) l f = 
-    let l = 
+  let mk_exists ?(simpl=false) l f =
+    let l =
       if simpl then
         let fv = fv f in
-        List.filter (fun v -> Sv.mem v fv) l 
+        List.filter (fun v -> Sv.mem v fv) l
       else l
     in
     mk_exists l f
@@ -280,7 +279,7 @@ module Smart : Term.SmartFO with type form = _form = struct
     | Atom (Reach f) -> destr_lift (Term.Smart.destr_or f)
     | _ -> None
 
-  let destr_impl = function 
+  let destr_impl = function
     | Impl (f1, f2) -> Some (f1, f2)
     | Atom (Reach f) -> destr_lift (Term.Smart.destr_impl f)
     | _ -> None
@@ -288,6 +287,7 @@ module Smart : Term.SmartFO with type form = _form = struct
   (*------------------------------------------------------------------*)
   let is_false f = todo ()
   let is_true  f = todo ()
+  let is_zero  f = todo ()
   let is_not   f = false
   let is_and   f = destr_and  f <> None
   let is_or    f = destr_or   f <> None
@@ -312,8 +312,8 @@ module Smart : Term.SmartFO with type form = _form = struct
   let destr_lift_many = function
     | None -> None
     | Some l ->
-      if not (List.for_all Term.is_pure_timestamp l) 
-      then None 
+      if not (List.for_all Term.is_pure_timestamp l)
+      then None
       else Some (List.map (fun f -> Atom (Reach f)) l)
 
   let rec mk_destr_left f_destr =
@@ -345,7 +345,7 @@ module Smart : Term.SmartFO with type form = _form = struct
       if l = 1 then Some [f]
       else match destr_impl f with
         | None -> None
-        | Some (f,g) -> omap (fun l -> f :: l) (destr (l-1) g)    
+        | Some (f,g) -> omap (fun l -> f :: l) (destr (l-1) g)
     in
     destr
 
@@ -354,8 +354,8 @@ module Smart : Term.SmartFO with type form = _form = struct
     | _ -> None
 
   (*------------------------------------------------------------------*)
-  let rec decompose_quant q = function 
-    | Quant (q', es, f) when q = q' -> 
+  let rec decompose_quant q = function
+    | Quant (q', es, f) when q = q' ->
       let es', f = decompose_quant q f in
       es @ es', f
 
@@ -386,10 +386,10 @@ module Smart : Term.SmartFO with type form = _form = struct
     let rec last = function
       | [] -> assert false
       | [f] -> [], f
-      | f :: fs -> 
+      | f :: fs ->
         let prems, goal = last fs in
         f :: prems, goal
-    in 
+    in
     last forms
 end
 
@@ -413,7 +413,7 @@ module PreAny = struct
   let pp fmt = function
     | `Reach f -> Term.pp fmt f
     | `Equiv f -> pp fmt f
-                    
+
   let subst s = function
     | `Reach f -> `Reach (Term.subst s f)
     | `Equiv f -> `Equiv (subst s f)
@@ -425,7 +425,7 @@ module PreAny = struct
   let fv = function
     | `Reach f -> Term.fv f
     | `Equiv f -> fv f
-                    
+
   let get_terms = function
     | `Reach f -> [f]
     | `Equiv f -> get_terms f
@@ -614,6 +614,9 @@ module Any = struct
     let is_true = function
       | `Reach f -> Term.Smart.is_true f
       | `Equiv f -> Smart.is_true f
+    let is_zero = function
+      | `Reach f -> Term.Smart.is_zero f
+      | `Equiv f -> Smart.is_zero f
     let is_not = function
       | `Reach f -> Term.Smart.is_not f
       | `Equiv f -> Smart.is_not f

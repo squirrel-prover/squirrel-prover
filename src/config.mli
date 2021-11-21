@@ -5,7 +5,7 @@
 type p_param_val =
   | Param_bool   of bool
   | Param_string of string
-  | Param_int    of int     
+  | Param_int    of int
 
 (** Parser parameter set *)
 type p_set_param = string * p_param_val
@@ -16,9 +16,9 @@ type p_set_param = string * p_param_val
 
 type params
 
-val reset_params : unit -> unit 
+val reset_params : unit -> unit
 
-val get_params : unit -> params 
+val get_params : unit -> params
 
 val set_params : params -> unit
 
@@ -45,7 +45,7 @@ val strict_alias_mode : unit -> bool
 
 (** Show hypothesis after strengthening *)
 val show_strengthened_hyp : unit -> bool
-    
+
 (** Automatic introductions (in hypotheses and the conclusion). *)
 val auto_intro : unit -> bool
 
@@ -54,6 +54,9 @@ val auto_fadup : unit -> bool
 
 (** New equivalence induction principle. *)
 val new_ind : unit -> bool
+
+(** Post-quantum soundness. *)
+val post_quantum : unit -> bool
 
 (*------------------------------------------------------------------*)
 (** {2  set functions} *)

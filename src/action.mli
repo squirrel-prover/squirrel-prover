@@ -169,23 +169,26 @@ val subst_action : Term.subst -> action -> action
 (** Apply a substitution to a description. *)
 val subst_descr : Term.subst -> descr -> descr
 
+(** Apply an iterator to the terms of a description. *)
+val apply_descr : (Vars.env -> Term.message -> Term.message) -> descr -> descr
+
 
 (*------------------------------------------------------------------*)
 (** {2 FA-DUP } *)
 
 (** [is_dup is_eq t terms] check if:
     - [t] appears twice in [terms];
-    - or if [t] is [input\@t] with [frame\@t'] appearing in [terms] 
+    - or if [t] is [input\@t] with [frame\@t'] appearing in [terms]
       where [pred(t) <= t'];
-    - or if [t] is [exec\@t] with [frame\@t'] appearing in [terms] 
+    - or if [t] is [exec\@t] with [frame\@t'] appearing in [terms]
       where with [t <= t']. *)
-val is_dup : 
-  Symbols.table -> Term.message -> Term.message list 
+val is_dup :
+  Symbols.table -> Term.message -> Term.message list
   -> bool
 
-(** Same as [is_dup], but instead of checking term equality, checks 
+(** Same as [is_dup], but instead of checking term equality, checks
     that term matchs. *)
-val is_dup_match : 
+val is_dup_match :
   (Term.eterm -> Term.eterm -> 'a -> 'a option) -> 'a ->
-  Symbols.table -> Term.message -> Term.message list 
+  Symbols.table -> Term.message -> Term.message list
   -> 'a option

@@ -114,11 +114,13 @@ module ProverTactics : sig
 
   val register_general :
     string -> tactic_help:tactic_help ->
+    ?pq_sound:bool ->
     (TacticsArgs.parser_arg list -> tac) -> unit
 
   (* Register a macro, built using the AST. *)
   val register_macro :
     string -> ?modifiers:string list -> tactic_help:tactic_help ->
+        ?pq_sound:bool ->
     TacticsArgs.parser_arg Tactics.ast -> unit
 
 (* The remaining functions allows to easily register a tactic, without having to
@@ -126,11 +128,13 @@ module ProverTactics : sig
    give a function over judgments, expecting some arguments of the given
    sort. *)
   val register : string -> tactic_help:tactic_help ->
+    ?pq_sound:bool ->
     (judgment -> judgment list) -> unit
 
   val register_typed :
     string ->  general_help:string ->  detailed_help:string ->
     tactic_group:tactic_groups ->
+    ?pq_sound:bool ->
     ?usages_sorts : TacticsArgs.esort list ->
     ('a TacticsArgs.arg -> judgment -> judgment list) ->
     'a TacticsArgs.sort  -> unit
@@ -227,11 +231,11 @@ val pp_decl_error :
 (** {2 Declaration processing} *)
 
 (** Process a declaration. *)
-val declare : 
+val declare :
   Symbols.table -> Hint.hint_db -> Decl.declaration  -> Symbols.table
 
 (** Process a list of declaration. *)
-val declare_list : 
+val declare_list :
   Symbols.table -> Hint.hint_db -> Decl.declarations -> Symbols.table
 
 (*------------------------------------------------------------------*)

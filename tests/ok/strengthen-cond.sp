@@ -52,7 +52,7 @@ Proof.
   intro Hap H.
 
  checkfail (apply H) exn ApplyMatchFailure.
- by apply ~fadup H.
+ by apply ~inductive H.
 Qed.
 
 global goal _ (t : timestamp):
@@ -69,7 +69,7 @@ Proof.
   case t => Eq; 
   try (repeat destruct Eq as [_ Eq]; 
        rewrite /*;
-       by apply ~fadup Hind (pred(t))).
+       by apply ~inductive Hind (pred(t))).
   
   by rewrite /* in 1. 
 
@@ -82,7 +82,7 @@ Proof.
   (* remove the undeducible term m(i) and check that we can conclude 
      without it. *)
   assert (m(i) = zero) as -> by admit.
-  by apply ~fadup Hind (pred(t)).
+  by apply ~inductive Hind (pred(t)).
 Qed.
 
 global goal _ (t : timestamp):

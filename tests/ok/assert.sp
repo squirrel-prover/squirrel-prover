@@ -13,6 +13,12 @@ Proof.
   by use ax.
 Qed.
 
+goal assert_msg2 (i:message) : a=b.
+Proof.
+  assert (T: i=i) by auto.
+  by use ax.
+Qed.
+
 goal assert_cstr (i:index) : a=b.
 Proof.
   assert (i=i); 1: auto.

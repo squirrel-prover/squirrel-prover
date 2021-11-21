@@ -47,19 +47,30 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Module signature of matching} *)
 
-type match_res = 
+type match_res =
   | FreeTyv
-  | NoMatch of (Term.messages * Term.match_infos) option 
+  | NoMatch of (Term.messages * Term.match_infos) option
   | Match   of Mvar.t
 
+(** [f] of type [fmap] is a function that, given [t vars conds] where:
+    - [t] is sub-term of the term we are mapping one
+    - [vars] are the free variable bound above [t]'s occurrence
+    - [conds] are conditions above [t]'s occurrence
+
+    If [f t vars conds = `Continue], we keep looking for an occurrence.
+    If [f t vars conds = `Map t'], we replace [t] by [t']. *)
 type f_map =
   Term.eterm -> Vars.evars -> Term.message list ->
-  [`Map of Term.eterm | `Continue] 
+  [`Map of Term.eterm | `Continue]
 
 (** matching algorithm options *)
 type match_option = {
-  mode      : [`Eq | `EntailLR | `EntailRL];
-  use_fadup : bool;
+  mode          : [`Eq | `EntailLR | `EntailRL];
+  use_fadup     : bool;
+  allow_capture : bool;
+  (** allow pattern variables to capture bound variables (i.e. to be
+      instantiated by terms using bound variables). 
+      When doing rewriting, lemma application, etc, must be false. *)
 }
 
 val default_match_option : match_option
@@ -113,10 +124,20 @@ module type S = sig
     match_res
 
 
-  (** [map ?m_rec func env t] applies [func] at all position in [t]. 
+  (** [map ?m_rec func env t] applies [func] at all position in [t].
       If [m_rec] is true, recurse after applying [func].
       [m_rec] default to [false].*)
   val map : ?m_rec:bool -> f_map -> Vars.env -> t -> t option
+
+  (** [find pat t] returns the list of occurences in t that match the
+     pattern. *)
+  val find : 
+    ?option:match_option ->
+    Symbols.table ->
+    SystemExpr.t ->
+    Vars.env ->
+    'a Term.term pat -> t -> 
+    Term.eterm list
 end
 
 (*------------------------------------------------------------------*)
@@ -124,4 +145,3 @@ end
 module T : S with type t = Term.message
 
 module E : S with type t = Equiv.form
-

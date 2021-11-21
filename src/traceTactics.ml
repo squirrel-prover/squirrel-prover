@@ -52,6 +52,7 @@ let () =
                   detailed_help = "G => A v B yields G => A";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
+    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun goal_or_right_1)
 
 let () =
@@ -62,6 +63,7 @@ let () =
                   detailed_help = "G => A v B yields G => B";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
+    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun goal_or_right_2)
 
 (*------------------------------------------------------------------*)
@@ -75,7 +77,8 @@ let () =
      ~tactic_help:{general_help = "Solves a goal when the conclusion is true.";
                   detailed_help = "";
                   usages_sorts = [Sort None];
-                  tactic_group = Logical}
+                   tactic_group = Logical}
+    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun goal_true_intro)
 
 
@@ -95,6 +98,7 @@ let () =
     ~detailed_help:"Normalize the formula according to the negation rules over \
                     logical connectors."
     ~tactic_group:Logical
+    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun_arg left_not_intro) Args.String
 
 (*------------------------------------------------------------------*)
@@ -205,7 +209,8 @@ let () =
      ~tactic_help:{general_help = "Closes a goal when False is among its assumptions.";
                   detailed_help = "";
                   usages_sorts = [Sort None];
-                  tactic_group = Logical}
+                   tactic_group = Logical}
+    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun false_left)
 
 
@@ -253,6 +258,7 @@ let () =
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
+    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun simpl_left_tac)
 
 (*------------------------------------------------------------------*)
@@ -323,6 +329,7 @@ let () =
                         (f(u)=f(v) <=> u=v).";
        usages_sorts = [Sort None];
        tactic_group = Structural}
+    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun congruence_tac)
 
 (*------------------------------------------------------------------*)
@@ -370,6 +377,7 @@ let () = T.register "constraints"
                         them, i.e., if they are a possible trace.";
        usages_sorts = [Sort None];
        tactic_group = Structural}
+    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun constraints_tac)
 
 
@@ -418,6 +426,7 @@ let () = T.register "eqnames"
                         by the current context.";
        usages_sorts = [Sort None];
        tactic_group = Structural}
+    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun eq_names)
 
 (*------------------------------------------------------------------*)
@@ -471,6 +480,7 @@ let () = T.register "eqtrace"
                         by another in the other terms.";
        usages_sorts = [Sort None];
        tactic_group = Structural}
+    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun eq_trace)
 
 (*------------------------------------------------------------------*)
@@ -516,7 +526,7 @@ type fresh_occ = (Action.action * Vars.index list) Iter.occ
 
 (** check if all instances of [o1] are instances of [o2].
     [o1] and [o2] actions must have the same action name *)
-let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool = 
+let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool =
   let a1, is1 = o1.occ_cnt in
   let a2, is2 = o2.occ_cnt in
 
@@ -548,19 +558,19 @@ let add_fresh_case
     (c : fresh_occ)
     (l : fresh_occ list) : fresh_occ list
   =
-  if List.exists (fun c' -> fresh_occ_incl table system c c') l 
-  then l 
+  if List.exists (fun c' -> fresh_occ_incl table system c c') l
+  then l
   else
     (* remove any old case which is subsumed by [c] *)
     let l' =
-      List.filter (fun c' -> 
+      List.filter (fun c' ->
           not (fresh_occ_incl table system c' c)
         ) l
     in
     c :: l'
 
 (** Add many new fresh rule cases, if they are not redundant. *)
-let add_fresh_cases 
+let add_fresh_cases
     table system
     (l1 : fresh_occ list)
     (l2 : fresh_occ list) : fresh_occ list
@@ -569,15 +579,15 @@ let add_fresh_cases
 
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
 let mk_fresh_indirect_cases
-    (cntxt : Constr.trace_cntxt) 
-    (env : Vars.env) 
-    (ns : Term.nsymb) 
-    (terms : Term.message list) 
+    (cntxt : Constr.trace_cntxt)
+    (env : Vars.env)
+    (ns : Term.nsymb)
+    (terms : Term.message list)
   =
   (* sanity check: free variables in [ns] and [terms] are included in [env] *)
   assert (
-    let all_fv = 
-      List.fold_left (fun s t -> 
+    let all_fv =
+      List.fold_left (fun s t ->
           Sv.union s (Term.fv t)
         ) (Sv.of_list1 ns.Term.s_indices) terms
     in
@@ -585,30 +595,30 @@ let mk_fresh_indirect_cases
 
   let macro_cases =
     Iter.fold_macro_support0 (fun action_name a t macro_cases ->
-        let fv = 
+        let fv =
           Sv.diff
-            (Sv.union (Action.fv_action a) (Term.fv t)) 
-            (Vars.to_set env) 
+            (Sv.union (Action.fv_action a) (Term.fv t))
+            (Vars.to_set env)
         in
 
         let new_cases = Fresh.get_name_indices_ext ~fv:fv cntxt ns.s_symb t in
-        let new_cases =           
-          List.map (fun (case : Fresh.name_occ) -> 
+        let new_cases =
+          List.map (fun (case : Fresh.name_occ) ->
               { case with
                 occ_cnt = (a, case.occ_cnt);
                 occ_cond = case.occ_cond; }
-            ) new_cases 
+            ) new_cases
         in
 
-        List.assoc_up_dflt action_name [] 
-          (fun l -> 
+        List.assoc_up_dflt action_name []
+          (fun l ->
              add_fresh_cases cntxt.table cntxt.system new_cases l
           ) macro_cases
       ) cntxt env terms []
   in
   (* we keep only action names in which the name occurs *)
-  List.filter (fun (_, occs) -> occs <> []) macro_cases 
- 
+  List.filter (fun (_, occs) -> occs <> []) macro_cases
+
 
 let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
   (* TODO: bug, handle free variables *)
@@ -625,15 +635,15 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
   (* the one case occuring in [a] with indices [is_a].
      For [n(is)] to be equal to [n(is_a)], we must have [is=is_a]. *)
   let mk_case ((a, is_a) : Action.action * Vars.index list) : Term.message =
-    let fv = 
-      Sv.diff (Sv.union (Action.fv_action a) (Sv.of_list1 is_a)) sv_env 
+    let fv =
+      Sv.diff (Sv.union (Action.fv_action a) (Sv.of_list1 is_a)) sv_env
     in
-    let fv = 
-      List.map (fun (Vars.EVar v) -> 
+    let fv =
+      List.map (fun (Vars.EVar v) ->
           Vars.cast v Type.KIndex
-        ) (Sv.elements fv) 
+        ) (Sv.elements fv)
     in
-    
+
     (* refresh existantially quantified variables. *)
     let fv, subst = Term.refresh_vars (`InEnv (ref env)) fv in
     let a = Action.subst_action subst a in
@@ -644,18 +654,18 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
        we do this after refresh, to avoid shadowing issues etc. *)
     let subst =
       List.map2
-        (fun i i' -> 
-           if List.mem i fv 
-           then Some (ESubst (Term.mk_var i, Term.mk_var i')) 
+        (fun i i' ->
+           if List.mem i fv
+           then Some (ESubst (Term.mk_var i, Term.mk_var i'))
            else None
         ) is_a ns.s_indices
     in
     let subst = List.filter_map (fun x -> x) subst in
 
     let a = Action.subst_action subst a in
-    
+
     (* we now built the freshness condition *)
-    let a_term = SystemExpr.action_to_term cntxt.table cntxt.system a in    
+    let a_term = SystemExpr.action_to_term cntxt.table cntxt.system a in
     let timestamp_inequalities =
       Term.mk_ors
         (List.map (fun action_from_term ->
@@ -806,8 +816,100 @@ let () =
     ~usages_sorts:[Args.(Sort (Pair (Index, Index)));
                    Args.(Sort (Pair (Timestamp, Timestamp)));
                    Args.(Sort (Pair (Message, Message)))]
+    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun_arg substitute_tac)
     Args.(Pair (ETerm, ETerm))
+
+
+(* let eqsubst arg s =
+ *   let open Args in
+ *   let subst,f = match arg with
+ *   | Pair (ETerm (Type.Message, f1, _), ETerm (Type.Message, f2, _)) ->
+ *     [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
+ *
+ *   | Pair (ETerm (Type.Timestamp, f1, _), ETerm (Type.Timestamp, f2, _)) ->
+ *     [Term.ESubst (f1,f2)],   Term.mk_atom `Eq f1 f2
+ *
+ *   | Pair (ETerm (Type.Index, f1, _), ETerm (Type.Index, f2, _)) ->
+ *     [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
+ *
+ *   | _ ->
+ *     hard_failure
+ *       (Tactics.Failure "expected a pair of messages, booleans or a pair of \
+ *                         index variables")
+ *   in
+ *    TS.set_goal f s :: apply_substitute subst s
+ *
+ * let () =
+ *   T.register_typed "substeq"
+ *     ~general_help:"Given an equality i=t, substitute all occurences \
+ *                    of i by t and remove i from the context variables,\
+ *                    and asks to prove the equality."
+ *     ~detailed_help:""
+ *     ~tactic_group:Structural
+ *     ~usages_sorts:[Args.(Sort (Pair (Index, Index)));
+ *                    Args.(Sort (Pair (Timestamp, Timestamp)));
+ *                    Args.(Sort (Pair (Message, Message)))]
+ *     eqsubst Args.(Pair (ETerm, ETerm)) *)
+
+
+let do_subst_eq (args : Args.parser_arg list) s : sequent list =
+  let subst, f =
+    match args with
+    | [arg] ->
+      (match Args.convert_as_lsymb args with
+      | Some str when Hyps.mem_name (L.unloc str) s ->
+        let id, at = Hyps.by_name str s in
+        (match at with
+         | Atom (`Message (`Eq, t1, t2)) -> [Term.ESubst (t1,t2)],  Term.mk_atom `Eq t1 t2
+         | Atom (`Timestamp (`Eq, f1, f2)) -> [Term.ESubst (f1,f2)],   Term.mk_atom `Eq f1 f2
+         | Atom (`Index (`Eq, f1, f2)) ->
+           let f1, f2 = Term.mk_var f1, Term.mk_var f2 in
+         [Term.ESubst (f1,f2)],   Term.mk_atom `Eq f1 f2
+         | _ -> hard_failure
+                  (Tactics.Failure "expected an equality hypothesis"))
+       | _ -> hard_failure
+                (Tactics.Failure "expected an hypothesis name")
+      )
+    | _ ->
+        match TraceLT.convert_args s args Args.(Sort (Pair (ETerm, ETerm))) with
+        | Args.Arg Pair (ETerm (Type.Message, f1, _), ETerm (Type.Message, f2, _)) ->
+          [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
+
+        |  Args.Arg Pair (ETerm (Type.Timestamp, f1, _), ETerm (Type.Timestamp, f2, _)) ->
+          [Term.ESubst (f1,f2)],   Term.mk_atom `Eq f1 f2
+
+        |  Args.Arg Pair (ETerm (Type.Index, f1, _), ETerm (Type.Index, f2, _)) ->
+          [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
+
+        | _ ->
+          hard_failure
+            (Tactics.Failure "expected a pair of messages, booleans or a pair of \
+                              index variables")
+  in
+   TS.set_goal f s :: apply_substitute subst s
+
+
+
+
+let subst_eq_tac args = wrap_fail (do_subst_eq args)
+
+let () =
+  T.register_general "substeq"
+    ~tactic_help:
+      {general_help = "Given an equality i=t, substitute all occurences \
+                   of i by t and remove i from the context variables,\
+                   and asks to prove the equality.";
+       detailed_help = "";
+       usages_sorts = [Args.(Sort (Pair (Index, Index)));
+                   Args.(Sort (Pair (Timestamp, Timestamp)));
+                       Args.(Sort (Pair (Message, Message)));
+                      Sort Args.String];
+       tactic_group = Logical}
+    ~pq_sound:true
+    (LowTactics.gentac_of_ttac_arg subst_eq_tac)
+
+
 
 
 (*------------------------------------------------------------------*)
@@ -874,6 +976,7 @@ let () =
     ~detailed_help:"This is by definition of exec, which is the conjunction of \
                     all conditions before this timestamp."
     ~tactic_group:Structural
+    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun_arg exec)
     Args.Timestamp
 
@@ -923,9 +1026,9 @@ let fa s =
             in
             subgoals
 
-          | Term.Find (vars,c,t,e),
-            Term.Find (vars',c',t',e') when vars = vars' ->
-            (* We could simply verify that [e = e'],
+          | Term.Find (vs,c,t,e),
+            Term.Find (vars',c',t',e') when List.length vs = List.length vars' ->
+            (* We verify that [e = e'],
              * and that [t = t'] and [c <=> c'] for fresh index variables.
              *
              * We do something more general for the conditions,
@@ -941,14 +1044,29 @@ let fa s =
              * except for the [unused] indices on the left, which does
              * not matter since they do not appear in [t]. *)
 
-            (* Refresh bound variables. *)
+            (* Refresh bound variables in c and t*)
             let env = ref (TS.env s) in
-            let vars, subst = Term.refresh_vars (`InEnv env) vars in
-            let s = TS.set_env !env s in
+            let vars, subst = Term.refresh_vars (`InEnv env) vs in
             let c  = Term.subst subst c in
-            let c' = Term.subst subst c' in
             let t  = Term.subst subst t in
-            let t' = Term.subst subst t' in
+
+
+
+            (* Create substitution from vars' to fresh_var *)
+            (* We avoid relying on the fact that currently, subst is preserving
+               the order of vars, and rather create a substitution vs -> vars',
+               that we apply on the lhs of vs -> vars *)
+
+            let subst_aux = List.map2 (fun x y ->
+                Term.(ESubst (mk_var x,mk_var y))) vs vars' in
+            let subst' = List.map (function ESubst (x, y) ->
+                Term.(ESubst (subst subst_aux x,y))) subst in
+
+            let s = TS.set_env !env s in
+
+            let c' = Term.subst subst' c' in
+
+            let t' = Term.subst subst' t' in
 
             (* Extract unused variables. *)
             let used,unused =
@@ -1129,6 +1247,7 @@ let () =
                         diff operators in local formulas.";
        usages_sorts = [Sort None];
        tactic_group = Structural}
+    ~pq_sound:true
      (LowTactics.genfun_of_pure_tfun project)
 
 (*------------------------------------------------------------------*)
@@ -1384,7 +1503,7 @@ let euf_apply_facts drop_head s
 let euf_apply
     (get_params : Symbols.table -> Term.message -> unforgeabiliy_param)
     (Args.String hyp_name)
-    (s : TS.t) 
+    (s : TS.t)
   =
   let table = TS.table s in
   let id, at = Hyps.by_name hyp_name s in
@@ -1431,6 +1550,7 @@ let () =
                     produced. The tag T must refer to a previously defined axiom \
                     f(mess,sk), of the form forall (m:message,sk:message)."
     ~tactic_group:Cryptographic
+    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun_arg (euf_apply euf_param))
     Args.String
 
@@ -1439,6 +1559,7 @@ let () =
     ~general_help:"Apply the intctxt axiom to the given hypothesis name."
     ~detailed_help:"Conditions are similar to euf."
     ~tactic_group:Cryptographic
+    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun_arg (euf_apply intctxt_param))
     Args.String
 
@@ -1552,6 +1673,7 @@ let () =
     ~general_help:"Apply the NM axiom to the given hypothesis name."
     ~detailed_help:"Can be applied to any hypothesis of the form dec(m,sk) = t(n)."
     ~tactic_group:Cryptographic
+    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun_arg non_malleability)
     Args.(Pair (String, Opt Message))
 
@@ -1560,10 +1682,10 @@ let valid_hash (cntxt : Constr.trace_cntxt) (t : Term.message) =
   match t with
   | Fun ((hash, _), _, [m; Name key]) ->
     Symbols.is_ftype hash Symbols.Hash cntxt.table
-    && (Euf.key_ssc
-          ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false)
-          ~cntxt hash key.s_symb
-        = [])
+    (* && (Euf.key_ssc
+     *       ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false)
+     *       ~cntxt hash key.s_symb
+     *     = []) *)
 
   | _ -> false
 
@@ -1649,6 +1771,7 @@ let () = T.register_typed "collision"
                     as CR holds for any valid key, even known to \
                     the attacker."
     ~tactic_group:Cryptographic
+    ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun_arg collision_resistance)
     Args.(Opt String)
 
@@ -1660,11 +1783,11 @@ exception Invalid
   * Macros in the term occurring (at toplevel) on the [src] projection
   * of some biframe element are replaced by the corresponding [dst]
   * projection. *)
-let rewrite_equiv_transform 
+let rewrite_equiv_transform
     ~(src:Term.projection)
     ~(dst:Term.projection)
     ~(s:TS.t)
-    (biframe : Term.message list) 
+    (biframe : Term.message list)
     (term : Term.message) : Term.message
   =
   let assoc (t : Term.message) : Term.message option =
@@ -1804,4 +1927,5 @@ let () =
          Default direction is left-to-right (can be changed using `-`).";
       tactic_group = Structural;
       usages_sorts = [] }
+    ~pq_sound:true
     (LowTactics.gentac_of_ttac_arg rewrite_equiv_tac)

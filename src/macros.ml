@@ -16,18 +16,66 @@ type global_data = {
   (** inputs of the macro, as variables, in order *)
 
   indices : Vars.index list;
-  (** free indices of the macro, which corresponds to the prefix of 
+  (** free indices of the macro, which corresponds to the prefix of
       the indices of the action defining the macro *)
 
   ts      : Vars.timestamp;
-  (** free timestamp variable of the macro, which can only be instantiated 
+  (** free timestamp variable of the macro, which can only be instantiated
       by a strict suffix of [action] *)
 
-  body    : Term.message;
-  (** macro body *)
+  default_body    : Term.message;
+  (** macro body shared by all systems *)
+
+  systems_body    : (SE.single_system * Term.message) list;
+  (** Optional alternative definitions of the body for a given system.
+      Used by System modifiers.
+  *)
+
 }
 
 type Symbols.data += Global_data of global_data
+
+let sproj s t = Term.pi_term ~projection:(SE.get_proj s) t
+
+let get_single_body single_system data =
+  let body = try
+      (List.assoc single_system data.systems_body)
+    with Not_found ->  data.default_body
+  in
+  sproj single_system body
+
+let get_body system data =
+  let get_pair_body s1 s2 =
+    match List.assoc s1 data.systems_body with
+    | b1 ->
+      let b1 = sproj s1 b1 in
+      begin
+        match List.assoc s2 data.systems_body with
+        | b2 -> Term.mk_diff b1 (sproj s2 b2)
+        | exception Not_found -> Term.mk_diff b1 (sproj s2 data.default_body)
+        end
+    | exception Not_found -> begin
+        match List.assoc s2 data.systems_body with
+        | b2 -> Term.mk_diff (sproj s1 data.default_body) (sproj s2 b2)
+        | exception Not_found ->
+          let t1, t2 = sproj s1 data.default_body, sproj s2 data.default_body in
+          if t1 = t2 then t1 else Term.mk_diff t1 t2
+        end
+  in
+  match system with
+  | SE.Single s -> get_single_body s data
+  | SE.SimplePair s -> get_pair_body (SE.Left s) (SE.Right s)
+  | SE.Pair (s1, s2) -> get_pair_body s1 s2
+
+let apply_global_data table ns dec_def old_single_system new_single_system data f =
+  match Symbols.Macro.get_data ns table with
+  | Global_data data ->
+    let body = get_single_body old_single_system data in
+    let data = Global_data {data with systems_body = (new_single_system, f body)
+                                                     ::data.systems_body} in
+    Symbols.Macro.redefine table ~data ns dec_def
+  | _ -> table
+
 
 let is_tuni = function Type.TUnivar _ -> true | _ -> false
 
@@ -36,7 +84,7 @@ let declare_global table name ~suffix ~action ~inputs ~indices ~ts body ty =
   let data =
     Global_data
       {action = (suffix, action);
-       inputs; indices; ts; body}
+       inputs; indices; ts; default_body=body; systems_body = []}
   in
   let def = Symbols.Global (List.length indices, ty) in
   Symbols.Macro.declare table name ~data def
@@ -53,20 +101,20 @@ let is_prefix ~strict a b =
   | Some i -> match strict with
     | `Large -> true
     | `Strict -> i > 0
-              
+
 (** Check is not done module equality.
     Not exported. *)
 let is_defined name a table =
   match Symbols.Macro.get_all name table with
     | Symbols.(Input | Output | Cond | State _), _ ->
-      (* We can expand the definitions of input@A, output@A, cond@A and 
+      (* We can expand the definitions of input@A, output@A, cond@A and
          state@A when A is an action name. We cannot do so for a variable
          or a predecessor. *)
       is_action a
 
     | Symbols.(Exec | Frame), _ ->
       is_action a
-        
+
     | Symbols.Global _, Global_data {action = (strict,a0); inputs } ->
       (* We can only expand a global macro when [a0] is a prefix of [a],
        * because a global macro m(...)@A refer to inputs of A and
@@ -76,14 +124,14 @@ let is_defined name a table =
         let asymb = get_action_symb a in
         let _, action = Action.of_symbol asymb table in
         is_prefix strict a0 (Action.get_shape action)
-        
+
     | Symbols.Global _, _ -> assert false
 
 (*------------------------------------------------------------------*)
 type def_result = [ `Def of Term.message | `Undef | `MaybeDef ]
 
-(* give the definition of the global macro [symb] at timestamp [a] 
-   corresponding to action [action] 
+(* give the definition of the global macro [symb] at timestamp [a]
+   corresponding to action [action]
    All prefix of [action] must be valid actions of the system, except if:
    - [allow_dummy] is true
    - and for the full action, which may be dummy (we use [a] instead) *)
@@ -94,7 +142,7 @@ let get_def_glob
     (symb   : Term.msymb)
     (a      : Term.timestamp)
     (action : Action.action)
-    ({action = glob_a; inputs; indices; ts; body} : global_data) : def_result
+    ({action = glob_a; inputs; indices; ts; default_body; systems_body} as data : global_data) : def_result
   =
   assert (List.length inputs <= List.length action) ;
   let idx_subst =
@@ -117,7 +165,7 @@ let get_def_glob
            if List.length rev_action = List.length action_prefix &&
               allow_dummy
            then a
-           else SE.action_to_term table system (List.rev action_prefix) 
+           else SE.action_to_term table system (List.rev action_prefix)
          in
          let in_tm =
            Term.mk_macro Term.in_macro [] a_ts
@@ -127,28 +175,9 @@ let get_def_glob
       (ts_subst::idx_subst,rev_action)
       inputs
   in
-  
-  let t = Term.subst subst body in
-  let proj_t proj = Term.pi_term ~projection:proj t in
 
-  let def = 
-    (* The expansion of the body of the macro only depends on the
-       projections, not on the system names. *)
-    match system with
-    (* the body of the macro is expanded by projecting
-       according to the projection in case of single systems. *)
-    | Single (s) -> proj_t (SE.get_proj s)
-    (* For diff cases, if the system corresponds to a left and a right
-       projection of systems we can simply project the macro as is. *)
-    | SimplePair _
-    | Pair (Left _, Right _) -> proj_t PNone
-    (* If we do not have a left and right projection, we must
-       reconstruct the body of the macros to have the correct
-       definition on each side. *)
-    | Pair (s1, s2)  -> 
-      Term.mk_diff (proj_t (SE.get_proj s1)) (proj_t (SE.get_proj s2))
-  in
-  `Def def
+  let t = Term.subst subst (get_body system data) in
+  `Def (Term.simple_bi_term t)
 
 
 let _get_definition
@@ -158,7 +187,7 @@ let _get_definition
     (a      : Term.timestamp) : [ `Def of Term.message | `Undef | `MaybeDef ]
   =
   match Symbols.Macro.get_all symb.s_symb table with
-  | Symbols.Input, _ -> 
+  | Symbols.Input, _ ->
     begin match a with
       | Term.Action (s,_) when s = Symbols.init_action -> `Def Term.empty
       | Term.Action _ ->
@@ -173,16 +202,16 @@ let _get_definition
   | Symbols.Output, _ ->
     let symb, indices = oget (Term.destr_action a) in
     let action = Action.of_term symb indices table in
-    let descr = 
-      SE.descr_of_action table system action 
+    let descr =
+      SE.descr_of_action table system action
     in
     `Def (snd descr.Action.output)
 
   | Symbols.Cond, _ ->
     let symb, indices = oget (Term.destr_action a) in
     let action = Action.of_term symb indices table in
-    let descr = 
-      SE.descr_of_action table system action 
+    let descr =
+      SE.descr_of_action table system action
     in
     `Def (snd Action.(descr.condition))
 
@@ -224,17 +253,17 @@ let _get_definition
     begin try
         (* Look for an update of the state macro [name] in the
            updates of [action] *)
-        let (ns, msg) : Term.state * Term.message = 
-          List.find (fun (ns,_) -> 
-              ns.Term.s_symb = symb.s_symb && 
+        let (ns, msg) : Term.state * Term.message =
+          List.find (fun (ns,_) ->
+              ns.Term.s_symb = symb.s_symb &&
               List.length ns.Term.s_indices = List.length symb.s_indices
             ) descr.Action.updates
         in
         assert (ns.Term.s_typ = symb.s_typ);
 
         (* init case: we substitute the indice by their definition *)
-        if a = Term.init then 
-          let s = List.map2 (fun i1 i2 -> 
+        if a = Term.init then
+          let s = List.map2 (fun i1 i2 ->
               Term.ESubst (Term.mk_var i1, Term.mk_var i2)
               ) ns.s_indices symb.s_indices
           in
@@ -261,7 +290,7 @@ let _get_definition
   | Symbols.Global _,
     Global_data ({action = (strict, glob_a)} as global_data ) ->
     if not (is_action a) then `MaybeDef
-    else 
+    else
       let tsymb, tidx = oget (Term.destr_action a) in
       let action = Action.of_term tsymb tidx table in
       if not (is_prefix strict glob_a (Action.get_shape action)) then
@@ -278,8 +307,8 @@ let get_definition
     (ts    : Term.timestamp) : def_result
   =
   (* try to find an action equal to [ts] in [cntxt] *)
-  let ts_action = 
-    if is_defined symb.s_symb ts cntxt.table 
+  let ts_action =
+    if is_defined symb.s_symb ts cntxt.table
     then ts
     else
       omap_dflt ts (fun models ->
@@ -309,10 +338,10 @@ let get_definition_exn
 
 
 (*------------------------------------------------------------------*)
-let get_dummy_definition 
+let get_dummy_definition
     (table  : Symbols.table)
     (system : SE.t)
-    (symb : Term.msymb) : Term.message 
+    (symb : Term.msymb) : Term.message
   =
   match Symbols.Macro.get_all symb.s_symb table with
   | Symbols.Global _,
@@ -322,7 +351,7 @@ let get_dummy_definition
       let prefix = Action.dummy action in
       match strict with
       | `Large -> prefix
-      | `Strict -> 
+      | `Strict ->
         let dummy_end  =
           Action.{ par_choice = 0,[] ; sum_choice = 0,[] }
         in
@@ -332,7 +361,7 @@ let get_dummy_definition
     let tvar = Vars.make_new Type.Timestamp "dummy" in
     let ts = Term.mk_var tvar in
 
-    let def = 
+    let def =
       get_def_glob ~allow_dummy:true system table symb ts dummy_action gdata
     in
     begin
