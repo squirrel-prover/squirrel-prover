@@ -538,7 +538,7 @@ let main () =
   let html_filename = ref "" in
   let speclist = [
     ("-i", Arg.Set interactive, "interactive mode (e.g, for proof general)");
-    ("--html", Arg.Set_string html_filename, "html mode (take a html file); Incompatible with -i");
+    ("--html", Arg.Set_string html_filename, "<file.html> Output a html file; Incompatible with -i");
     ("-v", Arg.Set verbose, "display more informations");
   ] in
 
