@@ -3,7 +3,7 @@
 examples=(
   "examples/basic-hash.sp"
   "examples/private-authentication.sp"
-  # "examples/stateful/toy-counter.sp"
+  "examples/stateful/toy-counter.sp"
   # "examples/stateful/running-ex-secrecy.sp"
   # "examples/stateful/yubikey.sp"
   # "examples/signed-ddh.sp"
