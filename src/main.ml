@@ -493,17 +493,16 @@ let start_main_loop
     file_stack = []; }
   in
 
-  Printer.pr "%b\n" state.html;
   main_loop ~test state
 
 let generate_html (filename : string) (html_filename : string) =
   Printer.init Printer.Html;
   if Filename.extension filename <> ".sp" then
     cmd_error (InvalidExtention filename);
-  let (out_c, html_pos) = Html.create_out_channel filename html_filename in
+  Html.init filename html_filename;
   let name = Filename.chop_extension filename in
   start_main_loop ~test:false ~html:true ~main_mode:(`File name) ();
-  Html.close out_c html_filename html_pos
+  Html.close filename html_filename
 
 
 

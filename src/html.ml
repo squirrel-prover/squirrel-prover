@@ -1,4 +1,6 @@
 let current_out_c = ref stdout
+let tag_pos = ref (-1)
+let lex = ref (Lexing.from_channel stdin)
 
 (** Print [c].
   * Escape it if it is a html reserved character,
@@ -18,10 +20,16 @@ let esc_char (escaping : bool ref)(c : char) : unit =
     output_char !current_out_c c
   end
 
+
+
+(** Input *)
+
+let () = ()
+
 (** Printing of html output *)
 let pp in_chan p1 p2 counter =
   (*Print input lines*)
-  let input_line = really_input_string in_chan (p2-p1) in
+  let (input_line, coms) = HtmlParser.main HtmlLexer.token !lex in
   output_string !current_out_c (Format.asprintf 
     "<span class=\"input-line\" id=\"in%d\">" counter);
   String.iter (esc_char (ref true)) input_line;
@@ -32,10 +40,18 @@ let pp in_chan p1 p2 counter =
     "<span class=\"output-line\" id=\"out%d\">" counter);
   let output_line = (Format.flush_str_formatter ()) in
   String.iter (esc_char (ref true)) output_line;
-  output_string !current_out_c "</span>"
+  output_string !current_out_c "</span>";
+  
+  (*Print commentaries*)
+  let print_com s =
+    output_string !current_out_c "<span class=\"com-line\">";
+    output_string !current_out_c s;
+    output_string !current_out_c "</span>"
+  in
+  List.iter print_com coms
 
 (** *)
-let create_out_channel (filename : string) (html_filename : string) : out_channel * int =
+let init (filename : string) (html_filename : string) : unit =
   let out_filename = Format.sprintf "%s/%s.html"
     (Filename.dirname html_filename)
     (Filename.(remove_extension @@ basename filename))
@@ -56,7 +72,11 @@ let create_out_channel (filename : string) (html_filename : string) : out_channe
     done;
     close_in html_c;
     current_out_c := out_c;
-    (out_c, !tag_pos)
+    tag_pos := !tag_pos;
+    
+    let in_c = Stdlib.open_in filename in
+    lex := Lexing.from_channel in_c
+    
   with
     | End_of_file ->
       Fmt.epr
@@ -69,17 +89,18 @@ let create_out_channel (filename : string) (html_filename : string) : out_channe
       exit 1
 
 (** *)
-let close (out_c : out_channel) (html_filename : string) (pos : int) : unit =
-  output_string out_c "</span>";
+let close (filename : string) (html_filename : string) : unit =
+  output_string !current_out_c "</span>";
   let html_c = open_in html_filename in
-  seek_in html_c pos;
+  seek_in html_c !tag_pos;
   try
     while true do
       let line = input_line html_c in
-      output_string out_c (line ^ "\n")
+      output_string !current_out_c (line ^ "\n")
     done;
   with
     | End_of_file ->
       close_in html_c;
-      close_out out_c;
-      current_out_c := stdout
+      close_out !current_out_c;
+      current_out_c := stdout;
+      tag_pos := -1
