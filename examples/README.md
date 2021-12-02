@@ -19,7 +19,7 @@ The corresponding files can be found in:
 - `easycrypt/basic-hash-auth.pcv` authentication, EasyCrypt
 - `easycrypt/basic-hash-unlink.pcv` unlinkability, EasyCrypt
 
-## Case Studies
+## Original Case Studies
 
 Case studies that use an axiom among `cca1`, `enckp`, `intctxt`, `prf`, `euf`, `ddh`, `xor`
 can be found with:
@@ -27,7 +27,7 @@ can be found with:
 $ grep "AXIOMNAME " *.sp
 ```
 
-The case studies can be split into multiple categories.
+The case studies of [1] can be split into multiple categories.
 For each protocol, we provide the
 bibliographic reference that contains the description we used to model the
 protocol, which may differ from the original specification of the protocol.
@@ -65,6 +65,22 @@ SSH protocol with forwarding agent [H]
  - `ssh-forward-part1-compo.sp`
  - `ssh-forward-part2-compo.sp`
 
+### Composition
+
+The case studies that end with the `-compo` suffix leverage the composition
+result of [H]. They correspond to proofs that are performed for a single
+session, but that allow to derive thanks to the theorems of [H] a security
+guarantee for an unbounded number of sessions.
+
+
+## Post-quantum Soundness
+
+An option allows to check if a proof is sound for quantum attackers. It is enabled inside a file with:
+`set postQuantumSound = true.`
+
+
+The examples of protocols designed to be post-quantum are inside the `postQuantumKE/` subfolder. though, other case-studies have been verified to be post quantum sound, and a list can be extracted with a `grep` over the flag.
+
 ### KEM based
 
 Generic construction from [I]:
@@ -83,17 +99,8 @@ IkeV1 with pre-shared keys for authentication [L]:
  IkeV2 signed with pre-shared keys [M,N]:
  - `ikeV2_sign.sp`
 
-### Composition
-
-The case studies that end with the `-compo` suffix leverage the composition
-result of [H]. They correspond to proofs that are performed for a single
-session, but that allow to derive thanks to the theorems of [H] a security
-guarantee for an unbounded number of sessions.
 
 ## Post-quantum soundness
-
-An option allows to check if a proof is sound for quantum attackers. It is enabled inside a file with:
-`set postQuantumSound = true.`
 
 All but the DDH based examples in this repository are post-quantum sound.
 

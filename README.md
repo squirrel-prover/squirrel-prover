@@ -1,4 +1,4 @@
-# Squirrel Prover - Post-Quantum Sound
+# Squirrel Prover
 
 ## Build
 
