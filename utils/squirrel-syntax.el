@@ -143,6 +143,10 @@
   "constseq"
   "memseq"
   "byequiv"
+  "diffeq"
+  "gcca"
+  "rename"
+  "gprf"
 ))
 
 (defvar squirrel-closing-keywords '(
