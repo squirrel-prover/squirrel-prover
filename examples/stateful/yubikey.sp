@@ -34,21 +34,21 @@ set autoIntro = false.
 
 senc enc,dec
 
-abstract startplug: message
-abstract endplug: message
-abstract startpress: message
-abstract accept:message
-abstract myzero: message
-abstract myone: message
+abstract startplug  : message
+abstract endplug    : message
+abstract startpress : message
+abstract accept     : message
+abstract myzero     : message
+abstract myone      : message
 
-abstract mySucc : message->message
+abstract mySucc : message -> message
 
 abstract pid : index -> message
 
-name k: index -> message
-name secret: index -> message
-name nonce: index->index->message
-name npr: index->index->message
+name k      : index -> message
+name secret : index -> message
+name nonce  : index -> index -> message
+name npr    : index -> index -> message
 
 mutable YCpt(i:index): message = myzero
 mutable SCpt(i:index): message = myzero
@@ -57,7 +57,7 @@ channel cT
 channel cR
 
 abstract orderOk : message
-abstract (~<) : message->message->message
+abstract (~<) : message -> message -> message
 
 (* When the key is plugged, its counter is incremented. *)
 

@@ -238,7 +238,7 @@ let pp_descr ppf descr =
   let _, s = Term.refresh_vars (`InEnv e) descr.indices in
   let descr = subst_descr s descr in
 
-  Fmt.pf ppf "@[<v 0>name: @[<hov>%a@]@;\
+  Fmt.pf ppf "@[<v 0>action name: @[<hov>%a@]@;\
               %a\
               @[<hv 2>condition:@ @[<hov>%a@]@]@;\
               %a\
