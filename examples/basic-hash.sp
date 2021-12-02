@@ -66,6 +66,10 @@ The reader's role is modelled by the following process. Since readers are
 generic, the process is indexed only by `j` (for the session).
 The reader starts by inputting a message `x` before checking whether this 
 message corresponds to a legitimate output performed by a tag.
+On the left side (the real system), the reader looks up for a key `key(i)`
+in the database (the one corresponding to the tag of identity `i`).
+On the right side (the ideal system), the reader looks up for a key `key(i,k`
+in the database (the one used by the tag of identity `i` at session `k`).
 **)
 
 process reader(j:index) =
@@ -88,12 +92,15 @@ conditional (respectively `R` and `R1`).
 system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
 (**
-This first authentication property is a reachability expressed by a first-order
+This first authentication property is a reachability property expressed by a first-order
 logic formula.
 This property states that whenever a reader accepts a message (_i.e._ the 
 condition of the action `R(j)` evaluates to `true`), then there must exists 
 an action `T(i,k)` that was executed before the reader, and such that the input 
-of the reader corresonds to the output of this tag.
+of the reader corresonds to the output of this tag (and conversely).
+Note that we express this correspondence on each projection. Indeed, for some
+implementations of the pairing primitive, the equality of projections does not imply
+the equality of pairs.
 **)
 
 goal wa_R :
@@ -109,6 +116,8 @@ only the tag `T(i,k)` can forge `h(nT(i,k),key(i))` because the secret key
 is not known by the attacker.
 Therefore, any message accepted by the reader must come from a tag that has 
 played before.
+The converse implication is trivial because any honest tag's output is
+accepted by the reader.
 **)
 Proof.
   (** We start by introducing the variable `j` and the hypothesis 
@@ -119,8 +128,8 @@ Proof.
   (** We have to prove two implications (`<=>`): we thus split the proof 
   in two parts. We now have two different goals to prove. **)
   split.
-  (** For the first implication, we actually prove it separately for the real 
-  system (left) and the ideal system (right). **)
+  (** For the first implication (=>), we actually prove it separately for the 
+  real system (left) and the ideal system (right). **)
   project.
   (** The proof is very similar on both sides and relies on the `euf` tactic.
   Applying the `euf` tactic on the `Meq` hypothesis generates a new hypothesis
@@ -130,8 +139,8 @@ Proof.
   has played before (thus the new hypothesis on timestamps). **)
   (* LEFT *) euf Meq. by exists i,k0.
   (* RIGHT *) euf Meq. by exists i,k.
-  (** For the second implication, the conclusion of the goal can directly be
-  obtained form the hypotheses. **)
+  (** For the second implication (<=), the conclusion of the goal can directly 
+  be obtained from the hypotheses. **)
   by exists i,k.
 Qed.
 
@@ -141,7 +150,7 @@ but for the else branch of the reader.
 This property states that whenever a reader **rejects** a message (_i.e._ the 
 condition of the action `R1(j)` evaluates to `true`), then there does **not**
 exist an action `T(i,k)` that was executed before the reader, and such that the 
-input of the reader corresonds to the output of this tag.
+input of the reader corresonds to the output of this tag (and conversely).
 **)
 
 goal wa_R1 :
@@ -155,9 +164,17 @@ Proof.
   intro *.
   expand cond.
   split.
+  (** 
+  The second implication (<=) is trivial and is proved by contradiction.
+  More precisely, we show that the hypothesis H cannot be satisfied: with the
+  tactic `use H`, we introduce in the conclusion the negation of `H` in order
+  to show that it is derivable from the hypotheses (and thus obtain the
+  contradiction).
+  **)
   use H. exists i,k.
-  use H.
-  project.
+  (** The first implication (=>) relies on the EUF assumption and is also
+  proved by contradiction. **)
+  use H. project.
   (* LEFT *) euf Meq. by exists i,k0.
   (* RIGHT *) euf Meq. by exists i,k.
 Qed.
@@ -230,7 +247,11 @@ Proof.
   the then branch is the fresh name.
   The goal is now to prove that this condition always evaluate to `true`. **)
   prf 2.
-  yesif 2.
+  yesif 2. help project.
+  (** We now project the bi-system into one goal for the left projection and
+  one goal for the right projection. Note that the 3rd conjuct (the one with
+  `nT(i,k) <> nT(i0,k0)`) is automatically simplified by Squirrel, using the
+  fact that names with different indices cannot be equal. **)
   project.
   (** The proof is the same on both sides.
   We first split the conjunction in the conclusion and then have to show that 
