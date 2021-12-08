@@ -34,15 +34,7 @@ type main_state = {
   table : Symbols.table;
 
   interactive : bool;
-
   html : bool;
-  counter : int;
-  (* Count the number of instructions *)
-  prev_pos : Lexing.position;
-  (* Keep track of the previous postion of the lexer *)
-  in_chan_opt : in_channel option;
-  (* Channel for the .sp file. Only used in html mode *)
-  (** fields used in html mode **)
 
   load_paths : load_paths;
   (** load paths *)
@@ -398,13 +390,8 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
   if save then Prover.save_state state.mode state.table ;
 
   match
-    let position = state.file.f_lexbuf.lex_curr_p in
     let cmd = next_input ~test state in
-    let new_state = do_command
-      ~test
-      { state with
-        prev_pos = position }
-      cmd
+    let new_state = do_command ~test state cmd
     in
     new_state, new_state.mode
   with
@@ -414,17 +401,9 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
 
   (* loop *)
   | new_state, _ ->
-    if new_state.html then begin
-      let in_chan = Utils.oget new_state.in_chan_opt in
-      let p1 = new_state.prev_pos.pos_cnum in
-      let p2 = new_state.file.f_lexbuf.lex_curr_p.pos_cnum in
-      let counter = new_state.counter in
-      Html.pp in_chan p1 p2 counter
-    end ;
-    (main_loop[@tailrec])
-      ~test
-      { new_state with
-        counter = state.counter + 1 ; }
+    if new_state.html then
+      Html.pp ();
+    (main_loop[@tailrec]) ~test new_state
 
   (* error handling *)
   | exception e when is_toplevel_error ~test e ->
@@ -462,14 +441,6 @@ let start_main_loop
     () : unit
   =
   let interactive = main_mode = `Stdin in
-  let in_chan_opt = match main_mode with
-    | `Stdin -> None
-    | `File fname ->
-      if html then
-        Some (open_in (fname ^ ".sp"))
-      else
-        None
-  in
   let file = match main_mode with
     | `Stdin -> file_from_stdin ()
     | `File fname -> locate [LP_none] fname
@@ -479,12 +450,9 @@ let start_main_loop
   let state = {
     mode = GoalMode;
     table = Symbols.builtins_table;
-    interactive;
 
+    interactive;
     html;
-    counter = 0;
-    prev_pos = file.f_lexbuf.lex_curr_p;
-    in_chan_opt;
 
     load_paths = mk_load_paths ~main_mode ();
 
@@ -502,7 +470,7 @@ let generate_html (filename : string) (html_filename : string) =
   Html.init filename html_filename;
   let name = Filename.chop_extension filename in
   start_main_loop ~test:false ~html:true ~main_mode:(`File name) ();
-  Html.close filename html_filename
+  Html.close html_filename
 
 
 
