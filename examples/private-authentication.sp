@@ -17,46 +17,40 @@ set autoIntro=false.
 channel cA
 channel cB
 
-name kA : message
+name kA    : message
 name kAbis : message
-name kB : message
-
-name k_fresh : message
+name kB    : message
 
 aenc enc,dec,pk
 
-name n0 : index -> message
-name r0 : index -> message
-
-name n : index -> message
-name r : index -> message
-name r2 : index -> message
-
-abstract plus : message -> message -> message
+abstract (++) : message -> message -> message
 
 process A(i:index) =
-  out(cA,  enc(<pk(kA),n0(i)>,r0(i),pk(kB))).
+  new rA;
+  new nA;
+  out(cA,  enc(<pk(kA),nA>,rA,pk(kB))).
 
 process B(i:index) =
   in(cB, mess);
+  new r;
+  new n;
   let dmess = dec(mess, kB) in
   out(cB,
     enc(
-      (if fst(dmess) = diff(pk(kA),pk(kAbis)) && len(snd(dmess)) = len(n(i)) then
-         <snd(dmess), n(i)>
+      (if fst(dmess) = diff(pk(kA),pk(kAbis)) && len(snd(dmess)) = len(n) then
+         <snd(dmess), n>
        else
-         <n(i), n(i)>),
-      r(i), pk(diff(kA,kAbis)))
+         <n, n>),
+      r, pk(diff(kA,kAbis)))
   ).
 
 system out(cA,<pk(kA),pk(kB)>); (!_i A(i) | !_j B(j)).
 
 include Basic.
 
-axiom length (m1:message, m2:message): len(<m1,m2>) = plus(len(m1),len(m2)).
+axiom length (m1:message, m2:message): len(<m1,m2>) = len(m1) ++ len(m2).
 
-(* Helper lemma for pushing conditionals. Such reasoning should
-   be automatic once we can include a standard library. *)
+(* Helper lemma *)
 goal if_len (b : boolean, y,z:message):
   len(if b then y else z) =
   (if b then len(y) else len(z)).
