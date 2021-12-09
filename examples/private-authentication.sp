@@ -12,6 +12,7 @@ B -> A : enc(<n0,n0>,r,pkA)
 This is a "light" model without the last check of A.
 *******************************************************************************)
 set postQuantumSound=true.
+set autoIntro=false.
 
 channel cA
 channel cB
@@ -50,6 +51,8 @@ process B(i:index) =
 
 system out(cA,<pk(kA),pk(kB)>); (!_i A(i) | !_j B(j)).
 
+include Basic.
+
 axiom length (m1:message, m2:message): len(<m1,m2>) = plus(len(m1),len(m2)).
 
 (* Helper lemma for pushing conditionals. Such reasoning should
@@ -58,8 +61,7 @@ goal if_len (b : boolean, y,z:message):
   len(if b then y else z) =
   (if b then len(y) else len(z)).
 Proof. 
-  case b;
-  try ((yesif; yesif) + (noif; noif)).
+ by case b.
 Qed.
 
 equiv anonymity.
@@ -68,27 +70,30 @@ Proof.
 
   induction t.
 
+   (* init *)
+  auto. 
+
   (* Case A *)
   expandall.
-  fa 2.
+  by fa 2.
 
   (* Case A1 *)
   expandall.
-  fa 2. fa 3.  fa 3.
-  fa 3.
-  fa 3. fresh 3. yesif 3.
-  fresh 3. yesif 3.
+  fa 2. fa 3. fa 3. fa 3. fa 3. 
+  fresh 4; rewrite if_true //. 
+  by fresh 3; rewrite if_true //. 
+ 
   (* Case B *)
   expand frame, output, exec, cond, dmess.
   fa 2. fa 3. fa 3.
-  enckp 3. cca1 3.
+  enckp 3. auto.
+  cca1 3; 2:auto.
 
   (* Pushing conditional underneath len(_) *)
-  rewrite if_len length.
+  rewrite if_len length. 
 
-  ifeq 3, len(snd(dec(input@B(j),kB))), len(n(j)). 
-  trivialif 3. 
-  by rewrite length.
+  ifeq 3, len(snd(dec(input@B(j),kB))), len(n(j)); 1: auto.
+  rewrite length if_same. 
   fa 3. fa 3.
-  fresh 3. yesif 3.
+  by fresh 3; rewrite if_true //.  
 Qed.
