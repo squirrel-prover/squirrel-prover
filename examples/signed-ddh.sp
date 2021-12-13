@@ -5,8 +5,8 @@ The signed DDH protocol as described in [G] features two roles, P and S.
 Each role is associated to a secret key (skP and skS).
 
 P -> S : <pk(skP), g^a>
-S -> P : <pk(skS),g^b>,sign(<<g^a,g^b>,pk(kP)>,skS)
-P -> S : sign(<<g^b,g^a>,pk(kS)>,skP)
+S -> P : <pk(skS),g^b>,sign(<<g^a,g^b>,pk(skP)>,skS)
+P -> S : sign(<<g^b,g^a>,pk(skS)>,skP)
 
 We consider multiple sessions but two agents only (one agent for the role P and
 one agent for the role S) and show the strong secrecy of the shared key.
@@ -152,7 +152,11 @@ Proof.
 Qed.
 
 (**
-We show a similar result for the system `secretS`.
+We show a similar result for the system `secretS`, except that here we
+have `exec@S1(j)` in the hypotheses because we will have to replace
+`fst(input@S(j))` in the formula `cond@S1(j)`. It is possible to replace
+`fst(input@S(j))` by `pk(skP)` thanks to `cond@S(j)`, which is given by
+`exec@S1(j)` since `S(j) < S1(j)`.
 **)
 goal [secretS] S_charac (j:index):
   happens(S1(j)) =>

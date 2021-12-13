@@ -20,6 +20,10 @@ In this file, we prove two security properties for this protocol.
 [A] Mayla Brusò, Kostas Chatzikokolakis, and Jerry den Hartog. Formal
 Verification of Privacy for RFID Systems. pages 75–88, July 2010.
 *******************************************************************************)
+(**
+When this option is set to `true`, Squirrel checks whether each tactic invoked
+for the proof is also sound for quantum attackers.
+**)
 set postQuantumSound=true.
 
 (** 
