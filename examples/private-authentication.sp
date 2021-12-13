@@ -7,7 +7,7 @@ Computer and Communications Security, CCS ’14, pages 609–620.
 ACM, 2014
 
 A -> B : enc(<pkA,n0>,r0,pkB)
-B -> A : enc(<n0,n0>,r,pkA)
+B -> A : enc(<n0,n>,r,pkA)
 
 This is a "light" model without the last check of A.
 *******************************************************************************)
