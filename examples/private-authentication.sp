@@ -6,8 +6,8 @@ attacker for equivalence properties. In 2014 ACM Conference on
 Computer and Communications Security, CCS ’14, pages 609–620.
 ACM, 2014
 
-A -> B : enc(<pkA,n0>,r0,pkB)
-B -> A : enc(<n0,n>,r,pkA)
+A -> B : enc(<pkA,nA>,rA,pkB)
+B -> A : enc(<nA,nB>,rB,pkA)
 
 This is a "light" model without the last check of A.
 *******************************************************************************)
@@ -32,30 +32,39 @@ process A(i:index) =
 
 process B(i:index) =
   in(cB, mess);
-  new r;
-  new n;
+  new rB;
+  new nB;
   let dmess = dec(mess, kB) in
   out(cB,
     enc(
-      (if fst(dmess) = diff(pk(kA),pk(kAbis)) && len(snd(dmess)) = len(n) then
-         <snd(dmess), n>
+      (if fst(dmess) = diff(pk(kA),pk(kAbis)) && len(snd(dmess)) = len(nB) then
+         <snd(dmess), nB>
        else
-         <n, n>),
-      r, pk(diff(kA,kAbis)))
+         <nB, nB>),
+      rB, pk(diff(kA,kAbis)))
   ).
 
 system out(cA,<pk(kA),pk(kB)>); (!_i A(i) | !_j B(j)).
 
 include Basic.
 
-axiom length (m1:message, m2:message): len(<m1,m2>) = len(m1) ++ len(m2).
+axiom length_pair (m1:message, m2:message): len(<m1,m2>) = len(m1) ++ len(m2).
 
 (* Helper lemma *)
-goal if_len (b : boolean, y,z:message):
+goal if_len (b : boolean, y,z : message):
   len(if b then y else z) =
   (if b then len(y) else len(z)).
 Proof. 
  by case b.
+Qed.
+
+(* Helper lemma *)
+goal if_same_branch (x,y,z : message, b : boolean):
+  (b => y = x) => 
+  (not b => z = x) => 
+  (if b then y else z) = x.
+Proof.
+ by intro *; case b.
 Qed.
 
 equiv anonymity.
@@ -84,10 +93,8 @@ Proof.
   cca1 3; 2:auto.
 
   (* Pushing conditional underneath len(_) *)
-  rewrite if_len length. 
-
-  ifeq 3, len(snd(dec(input@B(j),kB))), len(n(j)); 1: auto.
-  rewrite length if_same. 
-  fa 3. fa 3.
+  rewrite if_len !length_pair. 
+  rewrite (if_same_branch (len(nB(j)) ++ len(nB(j)))) //.
+  fa 3; fa 3.
   by fresh 3; rewrite if_true //.  
 Qed.
