@@ -1258,11 +1258,17 @@ let convert_i ?ty_env ?(pat=false) (cenv : conv_env) ty_vars env tm
     t, Type.Infer.norm ty_env ty
 
 (** exported outside Theory.ml *)
-let convert : type s.
-  ?ty_env:Type.Infer.env ->
-  ?pat:bool ->
-  conv_env -> Type.tvars -> Vars.env -> term -> s Type.ty -> s Term.term =
-  fun ?ty_env ?(pat=false) cenv ty_vars env tm ty ->
+let convert 
+    (type s)
+    ?(ty_env : Type.Infer.env option) 
+    ?(pat    : bool = false)
+    (cenv    : conv_env) 
+    (ty_vars : Type.tvars) 
+    (env     : Vars.env) 
+    (tm      : term) 
+    (ty      : s Type.ty)
+  : s Term.term 
+  =
   let must_close, ty_env = match ty_env with
     | None -> true, Type.Infer.mk_env ()
     | Some ty_env -> false, ty_env

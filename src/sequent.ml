@@ -68,68 +68,74 @@ module Mk (Args : MkArgs) : S with
   let is_reach_assumption (name : lsymb) (s : sequent) =
     Hyps.mem_name (L.unloc name) s || Prover.is_reach_assumption (L.unloc name)
 
-  let get_assumption : type a.
-    ?check_compatibility:bool ->
-    a Equiv.f_kind -> lsymb -> t ->
-    (ghyp, a) Goal.abstract_statement
-    = fun ?(check_compatibility=true) k name s ->
-
-      if Hyps.mem_name (L.unloc name) s then
-        let id, f = Hyps.by_name name s in
-        Goal.{ name = `Hyp id;
-               system = system s;
-               ty_vars = [];
-               formula =
-                 Equiv.Babel.convert
-                   ~loc:(L.loc name)
-                   ~src:S.hyp_kind
-                   ~dst:k
-                   f }
-      else
-        let lem = Prover.get_assumption name in
-        (* Verify that it applies to the current system. *)
-        if check_compatibility then begin
-          match k with
-          | Equiv.Local_t
-          | _ when Goal.is_reach_statement lem ->
-            if not (SE.systems_compatible (S.system s) lem.system) then
-              Tactics.hard_failure Tactics.NoAssumpSystem;
-          | _ ->
-            if S.system s <> lem.system then
-              Tactics.hard_failure Tactics.NoAssumpSystem
-        end;
-        { Goal.name = `Lemma lem.Goal.name ;
-          system = lem.system ;
-          ty_vars = lem.ty_vars ;
-          formula = 
-            Equiv.Babel.convert lem.formula
-              ~src:Equiv.Any_t ~dst:k ~loc:(L.loc name) }
+  let get_assumption 
+      (type a)
+      ?(check_compatibility=true) 
+      (k    : a Equiv.f_kind)
+      (name : lsymb)
+      (s    : t)
+    : (ghyp, a) Goal.abstract_statement
+    =
+    if Hyps.mem_name (L.unloc name) s then
+      let id, f = Hyps.by_name name s in
+      Goal.{ name = `Hyp id;
+             system = system s;
+             ty_vars = [];
+             formula =
+               Equiv.Babel.convert
+                 ~loc:(L.loc name)
+                 ~src:S.hyp_kind
+                 ~dst:k
+                 f }
+    else
+      let lem = Prover.get_assumption name in
+      (* Verify that it applies to the current system. *)
+      if check_compatibility then begin
+        match k with
+        | Equiv.Local_t
+        | _ when Goal.is_reach_statement lem ->
+          if not (SE.systems_compatible (S.system s) lem.system) then
+            Tactics.hard_failure Tactics.NoAssumpSystem;
+        | _ ->
+          if S.system s <> lem.system then
+            Tactics.hard_failure Tactics.NoAssumpSystem
+      end;
+      { Goal.name = `Lemma lem.Goal.name ;
+        system = lem.system ;
+        ty_vars = lem.ty_vars ;
+        formula = 
+          Equiv.Babel.convert lem.formula
+            ~src:Equiv.Any_t ~dst:k ~loc:(L.loc name) }
 
   (*------------------------------------------------------------------*)
-  let decompose_forall_k : type a. a Equiv.f_kind -> a -> Vars.evars * a =
-    fun f_kind f ->
+  let decompose_forall_k
+      (type a)
+      (f_kind : a Equiv.f_kind) 
+      (f      : a) 
+    : Vars.evars * a 
+    =
     match f_kind with
     | Equiv.Local_t ->  Term.Smart.decompose_forall f
     | Equiv.Global_t -> Equiv.Smart.decompose_forall f
     | Equiv.Any_t ->
-       match f with
-         | `Reach f ->
-             let vs,f = Term.Smart.decompose_forall f in vs, `Reach f
-         | `Equiv f ->
-             let vs,f = Equiv.Smart.decompose_forall f in vs, `Equiv f
+      match f with
+      | `Reach f ->
+        let vs,f = Term.Smart.decompose_forall f in vs, `Reach f
+      | `Equiv f ->
+        let vs,f = Equiv.Smart.decompose_forall f in vs, `Equiv f
 
   (*------------------------------------------------------------------*)
   (** Parse a partially applied lemma or hypothesis as a pattern. *)
   (* FIXME: convert_pt_hol will not allow the user to instantiate a variable 
      when its type is a type variable of the lemma. *)
-  let convert_pt_hol_gen : type a.
-    ?check_compatibility:bool -> 
-    Theory.p_pt_hol -> 
-    a Equiv.f_kind -> 
-    S.t -> 
-    ghyp * SE.t * a Match.pat 
-    = fun ?(check_compatibility=true) pt f_kind s ->
-
+  let convert_pt_hol_gen 
+      (type a)
+      ?(check_compatibility=true) 
+      (pt     : Theory.p_pt_hol)
+      (f_kind : a Equiv.f_kind) 
+      (s      : S.t) 
+    : ghyp * SE.t * a Match.pat 
+    =
     let lem = get_assumption ~check_compatibility f_kind pt.p_pt_hid s in
     let f_args, f = decompose_forall_k f_kind lem.formula in
     let f_args, subst = Term.erefresh_vars `Global f_args in
@@ -146,7 +152,7 @@ module Mk (Args : MkArgs) : S with
     let pat_vars = ref (Vars.Sv.of_list f_args1) in
 
     let subst = 
-      List.map2 (fun p_arg (Vars.EVar f_arg) ->
+      List.map2 (fun (p_arg : Theory.term) (Vars.EVar f_arg) ->
           let ty = Vars.ty f_arg in
           let t = 
             Theory.convert ~pat:true cenv (S.ty_vars s) (S.env s) p_arg ty
@@ -170,16 +176,17 @@ module Mk (Args : MkArgs) : S with
     in      
     lem.name, lem.system, pat
 
-  let convert_pt_hol : type a.
-    Theory.p_pt_hol -> 
-    a Equiv.f_kind -> 
-    S.t -> 
-    ghyp * a Match.pat 
-    = fun pt f_kind s ->
-      let name, se, pat = 
-        convert_pt_hol_gen ~check_compatibility:true pt f_kind s 
-      in
-      name, pat
+  let convert_pt_hol 
+      (type a)
+      (pt :  Theory.p_pt_hol)
+      (f_kind : a Equiv.f_kind)
+      (s : S.t)
+    : ghyp * a Match.pat 
+    = 
+    let name, se, pat = 
+      convert_pt_hol_gen ~check_compatibility:true pt f_kind s 
+    in
+    name, pat
 
 
   (*------------------------------------------------------------------*)
