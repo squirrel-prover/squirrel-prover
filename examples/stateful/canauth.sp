@@ -483,7 +483,7 @@ Proof.
 
   (* SenderB(i,j1') < SenderB(i,j1) *)
   use counterIncreaseStrictSB with i, j1, SenderB(i,j1') => //=.
-    intro U; apply eq_sym in U; by apply orderStrict in U.
+    intro U; rewrite eq_sym in U; by apply orderStrict in U.
     executable ReceiverA(i,j) => // HexecPred.
     by apply HexecPred.
 Qed.
@@ -546,7 +546,7 @@ Proof.
     case Meq.
     rewrite -Meq in HCpt.
     intro U.
-    apply eq_sym in U.
+    rewrite eq_sym in U.
     by apply orderStrict in U.
 
     use orderTrans with
@@ -555,7 +555,7 @@ Proof.
       cellB(i)@SenderB(i,j1);
     2: auto.
     intro U.
-    apply eq_sym in U.
+    rewrite eq_sym in U.
     by apply orderStrict in U.
 
   (* ReceiverA(i,j) < SenderA(i,j1') *)

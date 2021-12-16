@@ -1270,7 +1270,7 @@ let convert
   : s Term.term 
   =
   let must_close, ty_env = match ty_env with
-    | None -> true, Type.Infer.mk_env ()
+    | None        -> true, Type.Infer.mk_env ()
     | Some ty_env -> false, ty_env
   in
 

@@ -107,8 +107,8 @@ module type S = sig
       - if [mode = `EntailLR] then [t = pθ] or [t ⇒ pθ] (boolean case).
       - if [mode = `EntailRL] then [t = pθ] or [pθ ⇒ t] (boolean case). *)
   val try_match :
-    ?mv:Mvar.t ->
     ?option:match_option ->
+    ?mv:Mvar.t ->
     Symbols.table ->
     SystemExpr.t ->
     t -> t pat ->
@@ -116,8 +116,8 @@ module type S = sig
 
   (** Same as [try_match], but specialized for terms. *)
   val try_match_term :
-    ?mv:Mvar.t ->
     ?option:match_option ->
+    ?mv:Mvar.t ->
     Symbols.table ->
     SystemExpr.t ->
     'a Term.term -> 'b Term.term pat ->

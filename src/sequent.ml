@@ -137,7 +137,14 @@ module Mk (Args : MkArgs) : S with
     : ghyp * SE.t * a Match.pat 
     =
     let lem = get_assumption ~check_compatibility f_kind pt.p_pt_hid s in
-    let f_args, f = decompose_forall_k f_kind lem.formula in
+
+    (* create a fresh unienv *)
+    let ty_env = Type.Infer.mk_env () in
+    (* open the lemma type variables *)
+    let tvars, tsubst = Type.Infer.open_tvars ty_env lem.ty_vars in
+    let f = Equiv.Babel.tsubst f_kind tsubst lem.formula in
+
+    let f_args, f = decompose_forall_k f_kind f in
     let f_args, subst = Term.erefresh_vars `Global f_args in
     let f = Equiv.Babel.subst f_kind subst f in
 
@@ -155,7 +162,10 @@ module Mk (Args : MkArgs) : S with
       List.map2 (fun (p_arg : Theory.term) (Vars.EVar f_arg) ->
           let ty = Vars.ty f_arg in
           let t = 
-            Theory.convert ~pat:true cenv (S.ty_vars s) (S.env s) p_arg ty
+            Theory.convert 
+              ~ty_env ~pat:true
+              cenv (S.ty_vars s) (S.env s) 
+              p_arg ty
           in
           let new_p_vs = 
             Vars.Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
@@ -168,10 +178,15 @@ module Mk (Args : MkArgs) : S with
 
     (* instantiate [f_args0] by [args] *)
     let f = Equiv.Babel.subst f_kind subst f in
+    
+    (* close the unienv and generalize remaining univars*)
+    let pat_tyvars, tysubst = Type.Infer.gen_and_close ty_env in
+    let f = Equiv.Babel.tsubst f_kind tysubst f in
+    let pat_vars = Vars.Sv.map (Vars.tsubst_e tysubst) !pat_vars in
 
     let pat = Match.{ 
-        pat_tyvars = lem.ty_vars;
-        pat_vars = !pat_vars;
+        pat_tyvars;
+        pat_vars;
         pat_term = f; } 
     in      
     lem.name, lem.system, pat

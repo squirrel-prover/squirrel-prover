@@ -23,8 +23,6 @@ Proof.
   by yesif 1. 
 Qed.
 
- (* TODO: librairies *)
-axiom A : (true && true) = true.
 
 (* This time with `frame`, which yields (only) indirect cases *)
 global goal _ (i:index) : 

@@ -219,6 +219,7 @@ let mk_ftype iarr vars args out : ftype = {
 (** {2 Type substitution } *)
 
 module Mid = Ident.Mid
+module Sid = Ident.Sid
                
 (** A type substitution*)
 type tsubst = {
@@ -280,8 +281,9 @@ module Infer : sig
   val unify_eq  : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
   val unify_leq : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
 
-  val is_closed : env -> bool
-  val close : env -> tsubst
+  val is_closed     : env -> bool
+  val close         : env -> tsubst
+  val gen_and_close : env -> tvars * tsubst
 end = struct
   module Mid = Ident.Mid
                  
@@ -335,10 +337,14 @@ end = struct
   let htnorm env ht = match ht with
     | Lambda (evs, ty) -> Lambda (List.map (enorm env) evs, norm env ty)
 
+  let norm_env (env : env) : unit = 
+    env := Mid.map (norm env) !env
+
   (** An type inference environment is closed if every unification variable
        normal form is a univar-free type. *)
   let is_closed (env : env) : bool =
-    Mid.for_all (fun _ ety -> match norm env ety with
+    norm_env env;
+    Mid.for_all (fun _ ety -> match ety with
         | TUnivar _ -> false
         | _ -> true
       ) !env
@@ -347,6 +353,29 @@ end = struct
     assert (is_closed env);
     { ts_tvar   = Mid.empty;
       ts_univar = !env; }
+
+  (** Generalize unification variables and close the unienv. *)
+  let gen_and_close (env : env) : tvars * tsubst =
+    (* find all univar that are unconstrained and generalize them.
+       Compute: 
+       - generalized tvars, 
+       - substitution from univar to generalized tvars *)
+    let gen_tvars, ts_univar = 
+      Mid.fold (fun _ ty (gen_tvars, ts_univar) ->
+          match norm env ty with
+          | TUnivar uid -> 
+            let tv = Ident.fresh uid in
+            ( tv :: gen_tvars, 
+              Mid.add uid (TVar tv) ts_univar )
+
+          | _ -> gen_tvars, ts_univar
+        ) !env ([], Mid.empty)
+    in
+    let ts = { ts_univar; ts_tvar = Mid.empty; } in
+    env := Mid.map (tsubst ts) !env;
+
+    (* close the resulting environment *)
+    gen_tvars, close env
 
   let unify_eq : type a b. env -> a ty -> b ty -> [`Fail | `Ok] =
     fun env t t' ->

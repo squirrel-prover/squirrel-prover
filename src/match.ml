@@ -346,16 +346,16 @@ module type S = sig
     Mvar.t option
 
   val try_match :
-    ?mv:Mvar.t ->
     ?option:match_option ->
+    ?mv:Mvar.t ->
     Symbols.table ->
     SystemExpr.t ->
     t -> t pat ->
     match_res
 
   val try_match_term :
-    ?mv:Mvar.t ->
     ?option:match_option ->
+    ?mv:Mvar.t ->
     Symbols.table ->
     SystemExpr.t ->
     'a term -> 'b term pat ->
@@ -822,14 +822,14 @@ module T (* : S with type t = message *) = struct
   (*------------------------------------------------------------------*)
   (** Exported *)
   let try_match_term : type a b.
-    ?mv:Mvar.t ->
     ?option:match_option ->
+    ?mv:Mvar.t ->
     Symbols.table ->
     SystemExpr.t ->
     a term -> b term pat ->
     match_res
     =
-    fun ?mv ?(option=default_match_option) table system t p ->
+    fun ?(option=default_match_option) ?mv table system t p ->
 
     (* Term matching ignores [mode]. Matching in [Equiv] does not. *)
 
@@ -2175,8 +2175,8 @@ module E : S with type t = Equiv.form = struct
   (*------------------------------------------------------------------*)
   (** Exported *)
   let try_match
-      ?mv
       ?(option=default_match_option)
+      ?mv
       (table : Symbols.table)
       (system : SystemExpr.t)
       (t : t)

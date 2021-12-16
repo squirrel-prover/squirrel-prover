@@ -147,10 +147,10 @@ module Infer : sig
   val unify_eq  : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
   val unify_leq : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
 
-  val is_closed : env -> bool
-  val close : env -> tsubst
+  val is_closed     : env -> bool
+  val close         : env -> tsubst
+  val gen_and_close : env -> tvars * tsubst
 end
-
 
 (*------------------------------------------------------------------*)
 (** {2 Function symbols type} *)
