@@ -42,6 +42,8 @@ module Mvar : sig
   val fold : (Vars.evar -> Term.eterm -> 'b -> 'b) -> t -> 'b -> 'b
 
   val to_subst : mode:[`Match | `Unif] -> t -> Term.subst
+
+  val pp : Format.formatter -> t -> unit
 end
 
 (*------------------------------------------------------------------*)

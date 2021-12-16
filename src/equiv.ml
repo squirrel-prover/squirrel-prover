@@ -434,9 +434,9 @@ type global_form = form
 type any_form = gform
 
 type _ f_kind =
-  | Local_t : local_form f_kind
+  | Local_t  : local_form f_kind
   | Global_t : global_form f_kind
-  | Any_t : any_form f_kind
+  | Any_t    : any_form f_kind
 
 (** Module Any without conversion functions. *)
 module PreAny = struct

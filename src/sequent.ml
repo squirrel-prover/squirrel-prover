@@ -167,7 +167,182 @@ module Mk (Args : MkArgs) : S with
         let vs,f = Equiv.Smart.decompose_forall f in vs, `Equiv f
 
   (*------------------------------------------------------------------*)
+  (** Return the location of a proof term argument. *)
+  let pt_arg_loc (p_arg : Theory.p_pt_arg) : L.t =
+    match p_arg with
+    | PT_term t -> L.loc t
+    | PT_sub pt -> pt.p_pt_loc
+    | PT_obl l  -> l
+
+  let pt_arg_as_term (p_arg : Theory.p_pt_arg) : Theory.term =
+    match p_arg with
+    | Theory.PT_term t -> t
+    | _ -> 
+      hard_failure ~loc:(pt_arg_loc p_arg) (Failure "expected a term")
+
+  (** Try to interpret a proof term argument as a proof term. *)
+  let pt_arg_as_pt (p_arg : Theory.p_pt_arg) : Theory.p_pt =
+    match p_arg with
+    | Theory.PT_sub  pt -> pt
+
+    (* if we gave a term, re-interpret it as a proof term *)
+    | Theory.PT_term ({ pl_desc = App (head, terms) } as t) -> 
+      Theory.{
+        p_pt_head = head;
+        p_pt_args = List.map (fun x -> PT_term x) terms ;
+        p_pt_loc  = L.loc t;
+      }
+
+    | _ -> 
+      hard_failure ~loc:(pt_arg_loc p_arg) (Failure "expected a term")
+
+  let error_pt_nomatch loc f_kind prove target =
+    let err_str = 
+      Fmt.str "@[<v 0>the proof term proves:@;  \
+               @[%a@]@;\
+               but it must prove:@;  \
+               @[%a@]@]"
+        (Equiv.Babel.pp f_kind) prove
+        (Equiv.Babel.pp f_kind) target
+    in
+    soft_failure ~loc (Failure err_str)
+
+
+  (*------------------------------------------------------------------*)
   (** Parse a partially applied lemma or hypothesis as a pattern. *)
+  let rec _convert_pt_gen : type a.
+    ?check_compatibility:bool ->
+    Type.Infer.env ->
+    Match.Mvar.t ->
+    Theory.p_pt ->
+    a Equiv.f_kind ->
+    S.t ->
+    ghyp * SE.t * a Match.pat * Match.Mvar.t 
+    = fun ?(check_compatibility=false) ty_env mv pt f_kind s ->
+      let lem = get_assumption ~check_compatibility f_kind pt.p_pt_head s in
+
+      (* open the lemma type variables *)
+      let tvars, tsubst = Type.Infer.open_tvars ty_env lem.ty_vars in
+      let f = Equiv.Babel.tsubst f_kind tsubst lem.formula in
+
+      let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in 
+      let pat_vars = ref (Vars.Sv.of_list []) in
+
+      (* Pop the first universally quantified variables in [f], 
+         instantiate it with [p_arg], and return the updated substitution
+         and term. *)
+      let do_var (mv, f) (p_arg : Theory.term) : Match.Mvar.t * a =
+        match destr_forall1_k f_kind f with
+        | None ->
+          hard_failure 
+            ~loc:(L.loc pt.p_pt_head)
+            (Failure "too many arguments");
+
+        | Some (f_arg, f) ->
+          (* refresh the variable *)
+          let f_arg, fs = Term.erefresh_vars `Global [f_arg] in
+          let f = Equiv.Babel.subst f_kind fs f in
+          let Vars.EVar f_arg = as_seq1 f_arg in
+
+          let ty = Vars.ty f_arg in
+          let t = 
+            Theory.convert 
+              ~ty_env ~pat:true
+              cenv (S.ty_vars s) (S.env s) 
+              p_arg ty
+          in
+
+          let new_p_vs = 
+            Vars.Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
+          in
+          pat_vars := Vars.Sv.union (!pat_vars) new_p_vs;
+
+          let mv = Match.Mvar.add (Vars.EVar f_arg) (Term.ETerm t) mv in
+          mv, f
+      in
+
+      (* Pop the first implication in [f], 
+         instantiate it with [p_arg], and return the updated substitution
+         and term. *)
+      let do_impl (mv, f) (p_arg : Theory.p_pt) : Match.Mvar.t * a =
+        match destr_impl_k f_kind f with
+        | None ->
+          hard_failure 
+            ~loc:(L.loc pt.p_pt_head)
+            (Failure "too many arguments");
+
+        | Some (f1, f) ->
+          let _, _, pat1, mv = _convert_pt_gen ty_env mv p_arg f_kind s in
+          assert (pat1.pat_tyvars = []);
+
+          (* TODO: MATCH: ty_env *)
+          let ty_env = ty_env in
+
+          (* TODO: MATCH: finish, all case must be done like in the [Equiv.Local_t]
+             case *)
+          let match_res = match f_kind with
+            | Equiv.Local_t ->
+              let subst = Match.Mvar.to_subst ~mode:`Match mv in
+              let pat_f1 = Match.{
+                  pat_vars = !pat_vars;
+                  pat_term = Term.subst subst f1;
+                  pat_tyvars = [];
+                } in
+
+              Match.T.try_match 
+                (* ~ty_env *) ~mv (S.table s) (S.system s) pat1.pat_term pat_f1
+
+            | Equiv.Global_t ->
+              Match.E.try_match 
+                (* ~ty_env *) ~mv (S.table s) (S.system s) f1 pat1
+
+            | Equiv.Any_t -> 
+              match f1, pat1.pat_term with
+              |  `Reach f1, `Reach t1 ->
+                let pat1 = { pat1 with pat_term = t1 } in
+                Match.T.try_match 
+                  (* ~ty_env *) ~mv (S.table s) (S.system s) f1 pat1
+              | `Equiv f1, `Equiv t1  -> 
+                let pat1 = { pat1 with pat_term = t1 } in
+                Match.E.try_match 
+                  (* ~ty_env *) ~mv (S.table s) (S.system s) f1 pat1
+
+              | _ -> (* TODO: improve error message *)
+                hard_failure ~loc:(L.loc pt.p_pt_head) (Failure "kind error");
+          in
+          let mv = match match_res with
+            | Match.FreeTyv -> assert false
+            | Match.NoMatch _ -> 
+              error_pt_nomatch (p_arg.p_pt_loc) f_kind pat1.pat_term f1
+            | Match.Match mv -> mv
+          in
+
+          (* add to [pat_vars] the new variables that must be instantiated in
+             the proof term [p_arg]. *)
+          pat_vars := Vars.Sv.union pat1.pat_vars !pat_vars;
+
+          (mv, f)
+      in
+
+      (* fold through the provided arguments and [f], 
+         instantiating [f] along the way. *)
+      let mv, f = 
+        List.fold_left (fun (subst, f) (p_arg : Theory.p_pt_arg) ->
+            if is_impl_k f_kind f then
+              do_impl (subst, f) (pt_arg_as_pt p_arg)
+            else
+              do_var (subst, f) (pt_arg_as_term p_arg)
+          ) (mv, f) pt.p_pt_args
+      in
+      let pat = Match.{ 
+          pat_tyvars = [];
+          pat_vars = !pat_vars;
+          pat_term = f; } 
+      in      
+      lem.name, lem.system, pat, mv
+
+
+  (** Exported. *)
   let convert_pt_gen 
       (type a)
       ?(check_compatibility=true) 
@@ -176,98 +351,44 @@ module Mk (Args : MkArgs) : S with
       (s      : S.t) 
     : ghyp * SE.t * a Match.pat 
     =
-    let lem = get_assumption ~check_compatibility f_kind pt.p_pt_head s in
-
-    (* create a fresh unienv *)
+    (* create a fresh unienv and matching env *)
     let ty_env = Type.Infer.mk_env () in
-    (* open the lemma type variables *)
-    let tvars, tsubst = Type.Infer.open_tvars ty_env lem.ty_vars in
-    let f = Equiv.Babel.tsubst f_kind tsubst lem.formula in
+    let mv = Match.Mvar.empty in
 
-    let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in 
-    let pat_vars = ref (Vars.Sv.of_list []) in
-
-    (* Pop the first universally quantified variables in [f], 
-       instantiate it with [p_arg], and return the updated substitution
-       and term. *)
-    let do_var (subst, f) (p_arg : Theory.term) : Term.esubst list * a =
-      match destr_forall1_k f_kind f with
-      | None ->
-        hard_failure 
-          ~loc:(L.loc pt.p_pt_head)
-          (Failure "too many arguments");
-
-      | Some (f_arg, f) ->
-        (* refresh the variable *)
-        let f_arg, fs = Term.erefresh_vars `Global [f_arg] in
-        let f = Equiv.Babel.subst f_kind fs f in
-        let Vars.EVar f_arg = as_seq1 f_arg in
-
-        let ty = Vars.ty f_arg in
-        let t = 
-          Theory.convert 
-            ~ty_env ~pat:true
-            cenv (S.ty_vars s) (S.env s) 
-            p_arg ty
-        in
-        let new_p_vs = 
-          Vars.Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
-        in
-        pat_vars := Vars.Sv.union (!pat_vars) new_p_vs;
-        let subst = 
-          Term.ESubst (Term.mk_var f_arg, t) :: subst
-        in
-        subst, f
+    (* convert the proof term *)
+    let name, system, pat, mv = 
+      _convert_pt_gen ~check_compatibility ty_env mv pt f_kind s 
     in
 
-    (* Pop the first implication in [f], 
-       instantiate it with [p_arg], and return the updated substitution
-       and term. *)
-    let do_impl (subst, f) (p_arg : Theory.term) : Term.esubst list * a =
-      match destr_impl_k f_kind f with
-      | None ->
-        hard_failure 
-          ~loc:(L.loc pt.p_pt_head)
-          (Failure "too many arguments");
-
-      | Some (f1, f) ->
-        hard_failure 
-          ~loc:(L.loc pt.p_pt_head)
-          (Failure "cannot instantiate an implication (yet)");
+    (* clear infered variables from [pat_vars] *)
+    let pat_vars = 
+      Vars.Sv.filter (fun v -> not (Match.Mvar.mem v mv)) pat.pat_vars 
     in
+    (* instantiate infered variables *)
+    let subst = Match.Mvar.to_subst ~mode:`Match mv in
+    let f = Equiv.Babel.subst f_kind subst pat.pat_term in
 
-    (* fold through the provided arguments and [f], 
-       instantiating [f] along the way. *)
-    let subst, f = 
-      List.fold_left (fun (subst, f) (p_arg : Theory.term) ->
-          if is_impl_k f_kind f then
-            do_impl (subst, f) p_arg
-          else
-            do_var (subst, f) p_arg
-        ) ([], f) pt.p_pt_args
-    in
-    (* instantiate [f_args0] by [args] *)
-    let f = Equiv.Babel.subst f_kind subst f in
+    (* close the unienv and generalize remaining univars *)
+    let pat_tyvars, tysubst = Type.Infer.gen_and_close ty_env in
+    let f = Equiv.Babel.tsubst f_kind tysubst f in
+    let pat_vars = Vars.Sv.map (Vars.tsubst_e tysubst) pat_vars in
 
     (* generalize remaining universal variables in f *)
     let f_args, f = decompose_forall_k f_kind f in
     let f_args, subst = Term.erefresh_vars `Global f_args in
     let f = Equiv.Babel.subst f_kind subst f in
-    List.iter (fun v -> pat_vars := Vars.Sv.add v !pat_vars) f_args;
-
-    (* close the unienv and generalize remaining univars*)
-    let pat_tyvars, tysubst = Type.Infer.gen_and_close ty_env in
-    let f = Equiv.Babel.tsubst f_kind tysubst f in
-    let pat_vars = Vars.Sv.map (Vars.tsubst_e tysubst) !pat_vars in
+    let pat_vars = 
+      List.fold_left (fun pat_vars v -> Vars.Sv.add v pat_vars) pat_vars f_args
+    in
 
     let pat = Match.{ 
         pat_tyvars;
         pat_vars;
         pat_term = f; } 
     in      
-    lem.name, lem.system, pat
+    name, system, pat
 
-
+  (** Exported. *)
   let convert_pt 
       (type a)
       (pt :  Theory.p_pt)

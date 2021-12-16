@@ -38,6 +38,7 @@
 %token PROOF QED UNDO ABORT HINT
 %token RENAME GPRF GCCA
 %token INCLUDE
+%token TICKUNDERSCORE
 %token EOF
 
 %nonassoc QUANTIF
@@ -583,10 +584,15 @@ as_n_ips:
 sel_tacs:
 | l=slist1(sel_tac,PARALLEL) { l }
 
+p_pt_arg:
+| t=sterm                      { Theory.PT_term t }
+| LPAREN COLON COLON pt=p_pt RPAREN  { Theory.PT_sub pt }
+| l=lloc(TICKUNDERSCORE)       { Theory.PT_obl l }
+
 p_pt:
-| hid=lsymb args=slist(sterm,empty)
+| head=lsymb args=slist(p_pt_arg,empty)
     { let p_pt_loc = L.make $startpos $endpos in
-      { p_pt_head = hid; p_pt_args = args; p_pt_loc; } }
+      { p_pt_head = head; p_pt_args = args; p_pt_loc; } }
 
 /* legacy syntax for use tactic */
 pt_use_tac:
@@ -594,6 +600,7 @@ pt_use_tac:
     { Theory.{ p_pt_head = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
 | hid=lsymb WITH args=slist1(tac_term,COMMA)
     { let p_pt_loc = L.make $startpos $endpos in
+      let args = List.map (fun x -> Theory.PT_term x) args in
       Theory.{ p_pt_head = hid; p_pt_args = args; p_pt_loc; } }
 
 /* non-ambiguous pt */

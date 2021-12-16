@@ -39,7 +39,6 @@ hint rewrite true_false.
 
 goal false_true : (false = true) = false.
 Proof. 
-  (* TODO: work-around until we have a better type inference *)
   by rewrite (eq_sym false true).
 Qed.
 hint rewrite false_true.

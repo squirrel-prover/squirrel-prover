@@ -338,11 +338,17 @@ val econvert : conv_env -> Type.tvars -> Vars.env -> term -> eterm option
 val find_app_terms : term -> string list -> string list
 
 (*------------------------------------------------------------------*)
-(** {2 Apply arguments} *)
+(** {2 Proof terms} *)
 
-(** Proof term *)
+(** proof term *)
 type p_pt = {
   p_pt_head : lsymb;
-  p_pt_args : term list;
+  p_pt_args : p_pt_arg list;
   p_pt_loc  : L.t;
 }
+
+(** proof term argument *)
+and p_pt_arg =
+  | PT_term of term
+  | PT_sub  of p_pt             (* sub proof term *)
+  | PT_obl  of L.t              (* generate a proof obligation *)
