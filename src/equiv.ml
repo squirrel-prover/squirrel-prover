@@ -251,10 +251,41 @@ module Smart : Term.SmartFO with type form = _form = struct
           | Some (es,f) -> Some (es, Atom (Reach f))
           | None -> None
         end
+
+    (** For a local meta-formula f,
+      * (Forall x. [f]) is equivalent to [forall x. f]. *)
+    | Atom (Reach f) when q = ForAll ->
+      begin match Term.Smart.destr_forall f with
+          | Some (es,f) -> Some (es, Atom (Reach f))
+          | None -> None
+        end
+
     | _ -> None
 
   let destr_forall = destr_quant ForAll
   let destr_exists = destr_quant Exists
+
+  (*------------------------------------------------------------------*)
+  let destr_quant1 q = function
+    | Quant (q', v :: es, f) when q = q' -> Some (v, mk_quant q es f)
+    | Atom (Reach f) when Term.is_pure_timestamp f && q = Exists ->
+        begin match Term.Smart.destr_exists1 f with
+          | Some (es,f) -> Some (es, Atom (Reach f))
+          | None -> None
+        end
+
+    (** For a local meta-formula f,
+      * (Forall x. [f]) is equivalent to [forall x. f]. *)
+    | Atom (Reach f) when q = ForAll ->
+      begin match Term.Smart.destr_forall1 f with
+          | Some (es,f) -> Some (es, Atom (Reach f))
+          | None -> None
+        end
+
+    | _ -> None
+
+  let destr_forall1 = destr_quant1 ForAll
+  let destr_exists1 = destr_quant1 Exists
 
   (*------------------------------------------------------------------*)
   let destr_false f = todo ()
@@ -573,6 +604,13 @@ module Any = struct
     let mk_exists ?simpl vs = function
       | `Reach f -> `Reach (Term.Smart.mk_exists ?simpl vs f)
       | `Equiv f -> `Equiv (Smart.mk_exists ?simpl vs f)
+
+    let destr_forall1 = function
+      | `Reach f -> omap (fun (vs,f) -> vs,`Reach f) (Term.Smart.destr_forall1 f)
+      | `Equiv f -> omap (fun (vs,f) -> vs,`Equiv f) (Smart.destr_forall1 f)
+    let destr_exists1 = function
+      | `Reach f -> omap (fun (vs,f) -> vs,`Reach f) (Term.Smart.destr_exists1 f)
+      | `Equiv f -> omap (fun (vs,f) -> vs,`Equiv f) (Smart.destr_exists1 f)
 
     let destr_forall = function
       | `Reach f -> omap (fun (vs,f) -> vs,`Reach f) (Term.Smart.destr_forall f)

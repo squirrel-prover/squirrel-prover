@@ -338,8 +338,10 @@ module type SmartFO = sig
   (*------------------------------------------------------------------*)
   (** {3 Destructors} *)
 
-  val destr_forall : form -> (Vars.evar list * form) option
-  val destr_exists : form -> (Vars.evar list * form) option
+  val destr_forall  : form -> (Vars.evar list * form) option
+  val destr_forall1 : form -> (Vars.evar      * form) option
+  val destr_exists  : form -> (Vars.evar list * form) option
+  val destr_exists1 : form -> (Vars.evar      * form) option
 
   (*------------------------------------------------------------------*)
   val destr_false : form ->         unit  option

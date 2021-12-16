@@ -126,8 +126,6 @@ module Mk (Args : MkArgs) : S with
 
   (*------------------------------------------------------------------*)
   (** Parse a partially applied lemma or hypothesis as a pattern. *)
-  (* FIXME: convert_pt_hol will not allow the user to instantiate a variable 
-     when its type is a type variable of the lemma. *)
   let convert_pt_hol_gen 
       (type a)
       ?(check_compatibility=true) 
