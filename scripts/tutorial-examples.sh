@@ -6,7 +6,8 @@ examples=(
   "examples/stateful/toy-counter.sp"
   "examples/stateful/running-ex-secrecy.sp"
   "examples/stateful/yubikey.sp"
-  "examples/signed-ddh.sp"
+  "examples/signed-ddh-P.sp"
+  "examples/signed-ddh-S.sp"
 )
 
 for ex in ${examples[*]}; do 
