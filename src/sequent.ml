@@ -108,6 +108,48 @@ module Mk (Args : MkArgs) : S with
             ~src:Equiv.Any_t ~dst:k ~loc:(L.loc name) }
 
   (*------------------------------------------------------------------*)
+  let is_impl_k (type a) (f_kind : a Equiv.f_kind) (f : a) : bool
+    =
+    match f_kind with
+    | Equiv.Local_t  ->  Term.Smart.is_impl f
+    | Equiv.Global_t -> Equiv.Smart.is_impl f
+    | Equiv.Any_t ->
+      match f with 
+      | `Reach f -> Term.Smart.is_impl f | 
+        `Equiv f -> Equiv.Smart.is_impl f
+
+  let destr_impl_k
+      (type a)
+      (f_kind : a Equiv.f_kind) 
+      (f      : a) 
+    : (a * a) option
+    =
+    match f_kind with
+    | Equiv.Local_t  ->  Term.Smart.destr_impl f
+    | Equiv.Global_t -> Equiv.Smart.destr_impl f
+    | Equiv.Any_t ->
+      match f with
+      | `Reach f ->
+        omap (fun (v,f) -> `Reach v, `Reach f) (Term.Smart.destr_impl f) 
+      | `Equiv f ->
+        omap (fun (v,f) -> `Equiv v, `Equiv f) (Equiv.Smart.destr_impl f) 
+
+  let destr_forall1_k
+      (type a)
+      (f_kind : a Equiv.f_kind) 
+      (f      : a) 
+    : (Vars.evar * a) option
+    =
+    match f_kind with
+    | Equiv.Local_t  ->  Term.Smart.destr_forall1 f
+    | Equiv.Global_t -> Equiv.Smart.destr_forall1 f
+    | Equiv.Any_t ->
+      match f with
+      | `Reach f ->
+        omap (fun (v,f) -> v, `Reach f) (Term.Smart.destr_forall1 f) 
+      | `Equiv f ->
+        omap (fun (v,f) -> v, `Equiv f) (Equiv.Smart.destr_forall1 f) 
+
   let decompose_forall_k
       (type a)
       (f_kind : a Equiv.f_kind) 
@@ -115,7 +157,7 @@ module Mk (Args : MkArgs) : S with
     : Vars.evars * a 
     =
     match f_kind with
-    | Equiv.Local_t ->  Term.Smart.decompose_forall f
+    | Equiv.Local_t  ->  Term.Smart.decompose_forall f
     | Equiv.Global_t -> Equiv.Smart.decompose_forall f
     | Equiv.Any_t ->
       match f with
@@ -142,41 +184,77 @@ module Mk (Args : MkArgs) : S with
     let tvars, tsubst = Type.Infer.open_tvars ty_env lem.ty_vars in
     let f = Equiv.Babel.tsubst f_kind tsubst lem.formula in
 
+    let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in 
+    let pat_vars = ref (Vars.Sv.of_list []) in
+
+    (* Pop the first universally quantified variables in [f], 
+       instantiate it with [p_arg], and return the updated substitution
+       and term. *)
+    let do_var (subst, f) (p_arg : Theory.term) : Term.esubst list * a =
+      match destr_forall1_k f_kind f with
+      | None ->
+        hard_failure 
+          ~loc:(L.loc pt.p_pt_hid)
+          (Failure "too many arguments");
+
+      | Some (f_arg, f) ->
+        (* refresh the variable *)
+        let f_arg, fs = Term.erefresh_vars `Global [f_arg] in
+        let f = Equiv.Babel.subst f_kind fs f in
+        let Vars.EVar f_arg = as_seq1 f_arg in
+
+        let ty = Vars.ty f_arg in
+        let t = 
+          Theory.convert 
+            ~ty_env ~pat:true
+            cenv (S.ty_vars s) (S.env s) 
+            p_arg ty
+        in
+        let new_p_vs = 
+          Vars.Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
+        in
+        pat_vars := Vars.Sv.union (!pat_vars) new_p_vs;
+        let subst = 
+          Term.ESubst (Term.mk_var f_arg, t) :: subst
+        in
+        subst, f
+    in
+
+    (* Pop the first implication in [f], 
+       instantiate it with [p_arg], and return the updated substitution
+       and term. *)
+    let do_impl (subst, f) (p_arg : Theory.term) : Term.esubst list * a =
+      match destr_impl_k f_kind f with
+      | None ->
+        hard_failure 
+          ~loc:(L.loc pt.p_pt_hid)
+          (Failure "too many arguments");
+
+      | Some (f1, f) ->
+        hard_failure 
+          ~loc:(L.loc pt.p_pt_hid)
+          (Failure "cannot instantiate an implication (yet)");
+    in
+
+    (* fold through the provided arguments and [f], 
+       instantiating [f] along the way. *)
+    let subst, f = 
+      List.fold_left (fun (subst, f) (p_arg : Theory.term) ->
+          if is_impl_k f_kind f then
+            do_impl (subst, f) p_arg
+          else
+            do_var (subst, f) p_arg
+        ) ([], f) pt.p_pt_args
+    in
+    (* instantiate [f_args0] by [args] *)
+    let f = Equiv.Babel.subst f_kind subst f in
+
+    (* generalize remaining universal variables in f *)
     let f_args, f = decompose_forall_k f_kind f in
     let f_args, subst = Term.erefresh_vars `Global f_args in
     let f = Equiv.Babel.subst f_kind subst f in
+    List.iter (fun v -> pat_vars := Vars.Sv.add v !pat_vars) f_args;
 
-    let pt_args_l = List.length pt.p_pt_args in
-
-    if List.length f_args < pt_args_l then
-      hard_failure ~loc:(L.loc pt.p_pt_hid) (Failure "too many arguments");
-
-    let f_args0, f_args1 = List.takedrop pt_args_l f_args in
-
-    let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in 
-    let pat_vars = ref (Vars.Sv.of_list f_args1) in
-
-    let subst = 
-      List.map2 (fun (p_arg : Theory.term) (Vars.EVar f_arg) ->
-          let ty = Vars.ty f_arg in
-          let t = 
-            Theory.convert 
-              ~ty_env ~pat:true
-              cenv (S.ty_vars s) (S.env s) 
-              p_arg ty
-          in
-          let new_p_vs = 
-            Vars.Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
-          in
-          pat_vars := Vars.Sv.union (!pat_vars) new_p_vs;
-
-          Term.ESubst (Term.mk_var f_arg, t)
-        ) pt.p_pt_args f_args0
-    in
-
-    (* instantiate [f_args0] by [args] *)
-    let f = Equiv.Babel.subst f_kind subst f in
-    
     (* close the unienv and generalize remaining univars*)
     let pat_tyvars, tysubst = Type.Infer.gen_and_close ty_env in
     let f = Equiv.Babel.tsubst f_kind tysubst f in
@@ -188,6 +266,55 @@ module Mk (Args : MkArgs) : S with
         pat_term = f; } 
     in      
     lem.name, lem.system, pat
+
+
+  (* (* OLD *)
+   *   let f_args, f = decompose_forall_k f_kind f in
+   *   let f_args, subst = Term.erefresh_vars `Global f_args in
+   *   let f = Equiv.Babel.subst f_kind subst f in
+   * 
+   *   let pt_args_l = List.length pt.p_pt_args in
+   * 
+   *   if List.length f_args < pt_args_l then
+   *     hard_failure ~loc:(L.loc pt.p_pt_hid) (Failure "too many arguments");
+   * 
+   *   let f_args0, f_args1 = List.takedrop pt_args_l f_args in
+   * 
+   *   let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in 
+   *   let pat_vars = ref (Vars.Sv.of_list f_args1) in
+   * 
+   *   let subst = 
+   *     List.map2 (fun (p_arg : Theory.term) (Vars.EVar f_arg) -> *)
+    (*       let ty = Vars.ty f_arg in
+     *       let t = 
+     *         Theory.convert 
+     *           ~ty_env ~pat:true
+     *           cenv (S.ty_vars s) (S.env s) 
+     *           p_arg ty
+     *       in
+     *       let new_p_vs = 
+     *         Vars.Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
+     *       in
+     *       pat_vars := Vars.Sv.union (!pat_vars) new_p_vs;
+     * 
+     *       Term.ESubst (Term.mk_var f_arg, t)
+     *     ) pt.p_pt_args f_args0
+     * in
+     * 
+     * (* instantiate [f_args0] by [args] *)
+     * let f = Equiv.Babel.subst f_kind subst f in
+     * 
+     * (* close the unienv and generalize remaining univars*)
+     * let pat_tyvars, tysubst = Type.Infer.gen_and_close ty_env in
+     * let f = Equiv.Babel.tsubst f_kind tysubst f in
+     * let pat_vars = Vars.Sv.map (Vars.tsubst_e tysubst) !pat_vars in
+     * 
+     * let pat = Match.{ 
+     *     pat_tyvars;
+     *     pat_vars;
+     *     pat_term = f; } 
+     * in      
+     * lem.name, lem.system, pat *)
 
   let convert_pt_hol 
       (type a)
