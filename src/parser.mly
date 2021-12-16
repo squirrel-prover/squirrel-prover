@@ -494,9 +494,9 @@ rw_item:
                                                      rw_type = t; } }
 
 rw_equiv_item:
-| d=loc(rw_dir) pt=pt  { TacticsArgs.{ rw_mult = `Once;
-                                       rw_dir = d;
-                                       rw_type = `Rw pt; } }
+| d=loc(rw_dir) pt=p_pt  { TacticsArgs.{ rw_mult = `Once;
+                                         rw_dir = d;
+                                         rw_type = `Rw pt; } }
 
 expnd_item:
 | d=loc(rw_dir) t=expnd_type  { TacticsArgs.{ rw_mult = `Once;
@@ -583,28 +583,25 @@ as_n_ips:
 sel_tacs:
 | l=slist1(sel_tac,PARALLEL) { l }
 
-pt:
+p_pt:
 | hid=lsymb args=slist(sterm,empty)
     { let p_pt_loc = L.make $startpos $endpos in
-      { p_pt_hid = hid; p_pt_args = args; p_pt_loc; } }
+      { p_pt_head = hid; p_pt_args = args; p_pt_loc; } }
 
 /* legacy syntax for use tactic */
 pt_use_tac:
 | hid=lsymb
-    { Theory.{ p_pt_hid = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
+    { Theory.{ p_pt_head = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
 | hid=lsymb WITH args=slist1(tac_term,COMMA)
     { let p_pt_loc = L.make $startpos $endpos in
-      Theory.{ p_pt_hid = hid; p_pt_args = args; p_pt_loc; } }
+      Theory.{ p_pt_head = hid; p_pt_args = args; p_pt_loc; } }
 
 /* non-ambiguous pt */
 spt:
 | hid=lsymb
-    { Theory.{ p_pt_hid = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
-| LPAREN pt=pt RPAREN
+    { Theory.{ p_pt_head = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
+| LPAREN pt=p_pt RPAREN
     { pt }
-
-apply_arg:
-| pt=pt                  { Theory.PT_hol pt }
 
 constseq_arg:
 | LPAREN b=hterm RPAREN t=sterm { (b,t) }
@@ -729,7 +726,7 @@ tac:
 
   (*------------------------------------------------------------------*)
   /* assert a proof term */
-  | l=lloc(ASSERT) LPAREN ip=simpl_pat? COLONEQ pt=pt RPAREN
+  | l=lloc(ASSERT) LPAREN ip=simpl_pat? COLONEQ pt=p_pt RPAREN
     { mk_abstract l "assert" [TacticsArgs.AssertPt (pt, ip, `None)] }
 
   (*------------------------------------------------------------------*)
@@ -739,7 +736,7 @@ tac:
   | l=lloc(rewrite_equiv) p=rw_equiv_item
     { mk_abstract l "rewrite equiv" [TacticsArgs.RewriteEquiv (p)] }
 
-  | l=lloc(APPLY) a=named_args t=apply_arg w=apply_in
+  | l=lloc(APPLY) a=named_args t=p_pt w=apply_in
     { mk_abstract l "apply" [TacticsArgs.ApplyIn (a, t, w)] }
 
   | l=lloc(SPLITSEQ) i=loc(INT) COLON LPAREN ht=hterm RPAREN

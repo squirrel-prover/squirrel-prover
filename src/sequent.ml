@@ -30,14 +30,14 @@ module type S = sig
 
   val reduce : Reduction.red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
-  val convert_pt_hol_gen :
+  val convert_pt_gen :
     ?check_compatibility:bool -> 
-    Theory.p_pt_hol -> 
+    Theory.p_pt -> 
     'a Equiv.f_kind -> t -> 
     ghyp * SE.t * 'a Match.pat
 
-  val convert_pt_hol :
-    Theory.p_pt_hol ->
+  val convert_pt :
+    Theory.p_pt ->
     'a Equiv.f_kind -> t -> 
     ghyp * 'a Match.pat
 end
@@ -168,15 +168,15 @@ module Mk (Args : MkArgs) : S with
 
   (*------------------------------------------------------------------*)
   (** Parse a partially applied lemma or hypothesis as a pattern. *)
-  let convert_pt_hol_gen 
+  let convert_pt_gen 
       (type a)
       ?(check_compatibility=true) 
-      (pt     : Theory.p_pt_hol)
+      (pt     : Theory.p_pt)
       (f_kind : a Equiv.f_kind) 
       (s      : S.t) 
     : ghyp * SE.t * a Match.pat 
     =
-    let lem = get_assumption ~check_compatibility f_kind pt.p_pt_hid s in
+    let lem = get_assumption ~check_compatibility f_kind pt.p_pt_head s in
 
     (* create a fresh unienv *)
     let ty_env = Type.Infer.mk_env () in
@@ -194,7 +194,7 @@ module Mk (Args : MkArgs) : S with
       match destr_forall1_k f_kind f with
       | None ->
         hard_failure 
-          ~loc:(L.loc pt.p_pt_hid)
+          ~loc:(L.loc pt.p_pt_head)
           (Failure "too many arguments");
 
       | Some (f_arg, f) ->
@@ -227,12 +227,12 @@ module Mk (Args : MkArgs) : S with
       match destr_impl_k f_kind f with
       | None ->
         hard_failure 
-          ~loc:(L.loc pt.p_pt_hid)
+          ~loc:(L.loc pt.p_pt_head)
           (Failure "too many arguments");
 
       | Some (f1, f) ->
         hard_failure 
-          ~loc:(L.loc pt.p_pt_hid)
+          ~loc:(L.loc pt.p_pt_head)
           (Failure "cannot instantiate an implication (yet)");
     in
 
@@ -268,63 +268,15 @@ module Mk (Args : MkArgs) : S with
     lem.name, lem.system, pat
 
 
-  (* (* OLD *)
-   *   let f_args, f = decompose_forall_k f_kind f in
-   *   let f_args, subst = Term.erefresh_vars `Global f_args in
-   *   let f = Equiv.Babel.subst f_kind subst f in
-   * 
-   *   let pt_args_l = List.length pt.p_pt_args in
-   * 
-   *   if List.length f_args < pt_args_l then
-   *     hard_failure ~loc:(L.loc pt.p_pt_hid) (Failure "too many arguments");
-   * 
-   *   let f_args0, f_args1 = List.takedrop pt_args_l f_args in
-   * 
-   *   let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in 
-   *   let pat_vars = ref (Vars.Sv.of_list f_args1) in
-   * 
-   *   let subst = 
-   *     List.map2 (fun (p_arg : Theory.term) (Vars.EVar f_arg) -> *)
-    (*       let ty = Vars.ty f_arg in
-     *       let t = 
-     *         Theory.convert 
-     *           ~ty_env ~pat:true
-     *           cenv (S.ty_vars s) (S.env s) 
-     *           p_arg ty
-     *       in
-     *       let new_p_vs = 
-     *         Vars.Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
-     *       in
-     *       pat_vars := Vars.Sv.union (!pat_vars) new_p_vs;
-     * 
-     *       Term.ESubst (Term.mk_var f_arg, t)
-     *     ) pt.p_pt_args f_args0
-     * in
-     * 
-     * (* instantiate [f_args0] by [args] *)
-     * let f = Equiv.Babel.subst f_kind subst f in
-     * 
-     * (* close the unienv and generalize remaining univars*)
-     * let pat_tyvars, tysubst = Type.Infer.gen_and_close ty_env in
-     * let f = Equiv.Babel.tsubst f_kind tysubst f in
-     * let pat_vars = Vars.Sv.map (Vars.tsubst_e tysubst) !pat_vars in
-     * 
-     * let pat = Match.{ 
-     *     pat_tyvars;
-     *     pat_vars;
-     *     pat_term = f; } 
-     * in      
-     * lem.name, lem.system, pat *)
-
-  let convert_pt_hol 
+  let convert_pt 
       (type a)
-      (pt :  Theory.p_pt_hol)
+      (pt :  Theory.p_pt)
       (f_kind : a Equiv.f_kind)
       (s : S.t)
     : ghyp * a Match.pat 
     = 
     let name, se, pat = 
-      convert_pt_hol_gen ~check_compatibility:true pt f_kind s 
+      convert_pt_gen ~check_compatibility:true pt f_kind s 
     in
     name, pat
 

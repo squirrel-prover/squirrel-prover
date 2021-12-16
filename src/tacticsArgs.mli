@@ -29,7 +29,7 @@ type 'a rw_item_g = {
 
 (** Rewrite or expand item *)
 type rw_item = [
-  | `Rw        of Theory.p_pt_hol
+  | `Rw        of Theory.p_pt
   | `Expand    of Theory.term
   | `ExpandAll of Location.t
 ] rw_item_g
@@ -42,7 +42,7 @@ type expnd_item = [
 
 (** Rewrite equiv item *)
 type rw_equiv_item = [
-  | `Rw of Theory.p_pt_hol
+  | `Rw of Theory.p_pt
 ] rw_item_g
 
 (** Rewrite argument, which is a rewrite or simplification item*)
@@ -125,7 +125,7 @@ type parser_arg =
   | RewriteIn    of rw_arg list * in_target
   | RewriteEquiv of rw_equiv_item
   | ApplyIn      of named_args * Theory.p_pt * apply_in
-  | AssertPt     of Theory.p_pt_hol * simpl_pat option * [`IntroImpl | `None]
+  | AssertPt     of Theory.p_pt * simpl_pat option * [`IntroImpl | `None]
   | SplitSeq     of int L.located * Theory.hterm
   | ConstSeq     of int L.located * (Theory.hterm * Theory.term) list
   | MemSeq       of int L.located * int L.located

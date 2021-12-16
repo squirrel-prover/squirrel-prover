@@ -24,16 +24,16 @@ module type S = sig
   val reduce : Reduction.red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
   (** Convert a proof term into a pattern and the system it applies to. *)
-  val convert_pt_hol_gen :
+  val convert_pt_gen :
     ?check_compatibility:bool -> 
-    Theory.p_pt_hol -> 
+    Theory.p_pt -> 
     'a Equiv.f_kind -> t -> 
     ghyp * SystemExpr.t * 'a Match.pat
 
-  (** Same as [convert_pt_hol_gen], when the system is the current system of 
+  (** Same as [convert_pt_gen], when the system is the current system of 
       the sequent. *)
-  val convert_pt_hol :
-    Theory.p_pt_hol ->
+  val convert_pt :
+    Theory.p_pt ->
     'a Equiv.f_kind -> t -> 
     ghyp * 'a Match.pat
 
