@@ -5,8 +5,9 @@
 .example-left{
 	float: left;
 	width: 50%;
-	height: 600px;
+	height: 700px;
 	margin-bottom: 1rem;
+	border-color: #567482;
 }
 
 .example-buttons{
@@ -17,6 +18,7 @@
 	overflow: auto;
 	border-bottom-width: 4px;
 	border-style: solid solid double solid;
+	border-color: #567482;
 	padding: 6px;
 }
 
@@ -34,16 +36,28 @@
 	color: #567482;
 }
 
+.comment{
+	float: none;
+	width: 100%;
+	white-space: normal;
+	background-color: #9fb7d7;
+	padding: 0.8rem;
+	margin-top: 0;
+	margin-bottom: 0;
+	word-wrap: anywhere;
+	color: black;
+	border-style: solid;
+	border-width: thin;
+	border-radius: 0.5em;
+	border-color: #567482;
+}
+
 .command{
-	background-color: rgb(240, 223, 223);
+	background-color: #9fb7d7;
 	border-radius: 6px;
-	border: 2px solid #8B0000;
-	color: #8B0000;
+	border: 2px solid black;
+	color: black;
 	width: 30px;
 	height: 30px;
 	font-size: 10px;
-}
-
-div.input-line{
-	border-width: thin;
 }

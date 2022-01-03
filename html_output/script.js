@@ -1,5 +1,6 @@
 input_lines = document.querySelectorAll("span.input-line");
 output_lines = document.querySelectorAll("span.output-line");
+comment_lines = document.querySelectorAll("span.com-line");
 in_line = document.getElementById("in-line");
 out_line = document.getElementById("out-line");
 prec_line = document.getElementById("prec-line");
@@ -7,10 +8,16 @@ selected = null;
 i = 0;
 n = output_lines.length;
 for (j = 0; j < n; j++) {
+  com = document.createElement('div');
+  com.className = 'comment';
+  com.innerHTML = comment_lines[j].innerHTML;
+  in_line.appendChild(com);
+
   line = input_lines[j];
+  line.className = 'div';
+
   in_line.appendChild(line);
   line.addEventListener("click", function() { select_line(this);} );
-  line.style.color = "black";
   line.number = j;
 }
 
@@ -27,7 +34,7 @@ function goto_line(j) {
       out_line.innerHTML = output_lines[j-1].innerHTML;
     }
     for (k = 0; k < j; k++) {
-      input_lines[k].style.background = "#50D030";
+      input_lines[k].style.background = "#cfdbeb";
     }
     for (k = j; k < n; k++) {
       input_lines[k].style.background = "none";
