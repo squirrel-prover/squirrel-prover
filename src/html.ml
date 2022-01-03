@@ -48,17 +48,11 @@ let pp () =
   output_string !current_out_c "</span>";
   
   (*Print comments*)
-  let print_com s =
-    output_string !current_out_c "<span class=\"com-line\">";
-    output_string !current_out_c s;
-    output_string !current_out_c "</span>"
-  in
   output_string !current_out_c (Format.asprintf
     "<span class=\"com-line\" id=\"out%d\">"
     !counter);
   output_string !current_out_c (String.concat "\n" coms);
   output_string !current_out_c "</span>";
-  List.iter print_com coms;
   
   incr counter
 
@@ -76,7 +70,6 @@ let init (filename : string) (html_filename : string) : unit =
   in
   let out_c = open_out out_filename in
   let html_c = open_in html_filename in
-  let tag_pos = ref (-1) in
   try
     while !tag_pos = -1 do
       let line = input_line html_c in
@@ -90,7 +83,6 @@ let init (filename : string) (html_filename : string) : unit =
     done;
     close_in html_c;
     current_out_c := out_c;
-    tag_pos := !tag_pos;
     
     let in_c = Stdlib.open_in filename in
     lex := Lexing.from_channel in_c
