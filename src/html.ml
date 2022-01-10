@@ -11,10 +11,11 @@ let counter = ref 0
 (** Print [c].
   * Escape it if it is a html reserved character,
   * unless previous character was ESC *)
-let esc_char (escaping : bool ref)(c : char) : unit =
+let esc_char (escaping : bool ref) (c : char) : unit =
   if !escaping then begin
     match c with
     | '\x1B' -> escaping := false;
+    | '\n' -> output_string !current_out_c "<br>"
     | '<' -> output_string !current_out_c "&lt;"
     | '>' -> output_string !current_out_c "&gt;"
     | '"' -> output_string !current_out_c "&quot;"
@@ -26,33 +27,50 @@ let esc_char (escaping : bool ref)(c : char) : unit =
     output_char !current_out_c c
   end
 
+(** Print [s].
+  * Escape html reserved characters *)
+let esc_string (s : string) : unit =
+  String.iter (esc_char (ref true)) s
+
 (** Print the output formatted with html tag
   * Input and comments are read in [!lex]
   * Output must be already stored in the standard buffer (standard output for Html printer mode).*)
 let pp () =
   let (input_line, coms) = HtmlParser.main HtmlLexer.token !lex in
+  let concat_com = String.concat "\n" coms in
+  
+  output_string !current_out_c (Format.asprintf 
+    "<span class=\"squirrel-step\" id=\"step%d\">\n"
+    !counter);
   
   (*Print input lines*)
   output_string !current_out_c (Format.asprintf 
     "<span class=\"input-line\" id=\"in%d\">"
     !counter);
-  String.iter (esc_char (ref true)) input_line;
-  output_string !current_out_c "</span>";
+  if concat_com <> "" then
+    esc_string (String.trim input_line)
+  else
+    esc_string input_line;
+  output_string !current_out_c "</span>\n";
 
   (*Print output lines*)
   output_string !current_out_c (Format.asprintf
     "<span class=\"output-line\" id=\"out%d\">"
     !counter);
   let output_line = (Format.flush_str_formatter ()) in
-  String.iter (esc_char (ref true)) output_line;
-  output_string !current_out_c "</span>";
+  esc_string output_line;
+  output_string !current_out_c "</span>\n";
   
   (*Print comments*)
-  output_string !current_out_c (Format.asprintf
-    "<span class=\"com-line\" id=\"out%d\">"
-    !counter);
-  output_string !current_out_c (String.concat "\n" coms);
-  output_string !current_out_c "</span>";
+  if concat_com <> "" then begin
+    output_string !current_out_c (Format.asprintf
+      "<span class=\"com-line\" id=\"com%d\">"
+      !counter);
+    esc_string concat_com;
+    output_string !current_out_c "</span>\n"
+  end ;
+  
+  output_string !current_out_c "</span>\n\n";
   
   incr counter
 

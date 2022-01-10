@@ -264,7 +264,7 @@ let rec do_command
       { state with mode = GoalMode; table = table; }
 
     | ProofMode, ParsedTactic utac ->
-      if not state.interactive then begin
+      if not state.interactive && not state.html then begin
         let lnum = state.file.f_lexbuf.lex_curr_p.pos_lnum in
         Printer.prt `Prompt "Line %d: %a" lnum Prover.pp_ast utac
       end;
