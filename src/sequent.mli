@@ -23,9 +23,12 @@ module type S = sig
 
   val reduce : Reduction.red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
-  (** Convert a proof term into a pattern and the system it applies to. *)
+  (** Convert a proof term into a pattern and the system it applies to. 
+      - if [close_pats] is [false], pattern variables that cannot be 
+      inferred remains (default to [true]). Otherwise, *)
   val convert_pt_gen :
     ?check_compatibility:bool -> 
+    ?close_pats:bool ->
     Theory.p_pt -> 
     'a Equiv.f_kind -> t -> 
     ghyp * SystemExpr.t * 'a Match.pat
@@ -33,6 +36,7 @@ module type S = sig
   (** Same as [convert_pt_gen], when the system is the current system of 
       the sequent. *)
   val convert_pt :
+    ?close_pats:bool ->
     Theory.p_pt ->
     'a Equiv.f_kind -> t -> 
     ghyp * 'a Match.pat

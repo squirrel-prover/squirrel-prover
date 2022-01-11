@@ -4,6 +4,8 @@ module L = Location
 module SE = SystemExpr
 module LS = LowSequent
 
+module Sv = Vars.Sv
+
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
@@ -32,11 +34,13 @@ module type S = sig
 
   val convert_pt_gen :
     ?check_compatibility:bool -> 
+    ?close_pats:bool ->
     Theory.p_pt -> 
     'a Equiv.f_kind -> t -> 
     ghyp * SE.t * 'a Match.pat
 
   val convert_pt :
+    ?close_pats:bool ->
     Theory.p_pt ->
     'a Equiv.f_kind -> t -> 
     ghyp * 'a Match.pat
@@ -226,7 +230,7 @@ module Mk (Args : MkArgs) : S with
       let f = Equiv.Babel.tsubst f_kind tsubst lem.formula in
 
       let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in 
-      let pat_vars = ref (Vars.Sv.of_list []) in
+      let pat_vars = ref (Sv.of_list []) in
 
       (* Pop the first universally quantified variables in [f], 
          instantiate it with [p_arg], and return the updated substitution
@@ -253,9 +257,9 @@ module Mk (Args : MkArgs) : S with
           in
 
           let new_p_vs = 
-            Vars.Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
+            Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
           in
-          pat_vars := Vars.Sv.union (!pat_vars) new_p_vs;
+          pat_vars := Sv.union (!pat_vars) new_p_vs;
 
           let mv = Match.Mvar.add (Vars.EVar f_arg) (Term.ETerm t) mv in
           mv, f
@@ -319,7 +323,7 @@ module Mk (Args : MkArgs) : S with
 
           (* add to [pat_vars] the new variables that must be instantiated in
              the proof term [p_arg]. *)
-          pat_vars := Vars.Sv.union pat1.pat_vars !pat_vars;
+          pat_vars := Sv.union pat1.pat_vars !pat_vars;
 
           (mv, f)
       in
@@ -342,10 +346,41 @@ module Mk (Args : MkArgs) : S with
       lem.name, lem.system, pat, mv
 
 
+  let close 
+    (type a)
+    ~(mode:[`Match | `Unif])
+    (mv : Match.Mvar.t)
+    (f_kind : a Equiv.f_kind)
+    (pat : a Match.pat)
+    : a Match.pat
+    =
+    (* clear infered variables from [pat_vars] *)
+    let pat_vars = 
+      Sv.filter (fun v -> not (Match.Mvar.mem v mv)) pat.pat_vars 
+    in
+    (* instantiate infered variables *)
+    let subst = Match.Mvar.to_subst ~mode:`Match mv in
+    let f = Equiv.Babel.subst f_kind subst pat.pat_term in
+
+    assert (Sv.for_all (fun (Vars.EVar v) -> Vars.is_pat v) pat_vars);
+
+    (* renamed remaining pattern variables,
+       to avoir having variable named '_' in the rest of the prover. *)
+    let subst, pat_vars = 
+        Sv.map_fold (fun subst (Vars.EVar v) -> 
+          let new_v = Vars.make_new (Vars.ty v) "x" in
+          Term.ESubst (Term.mk_var v, Term.mk_var new_v) :: subst, 
+          Vars.EVar new_v
+          ) [] pat_vars
+    in
+    let f = Equiv.Babel.subst f_kind subst f in
+    { pat with pat_vars; pat_term = f; }
+
   (** Exported. *)
   let convert_pt_gen 
       (type a)
       ?(check_compatibility=true) 
+      ?(close_pats=true)
       (pt     : Theory.p_pt)
       (f_kind : a Equiv.f_kind) 
       (s      : S.t) 
@@ -360,25 +395,26 @@ module Mk (Args : MkArgs) : S with
       _convert_pt_gen ~check_compatibility ty_env mv pt f_kind s 
     in
 
-    (* clear infered variables from [pat_vars] *)
-    let pat_vars = 
-      Vars.Sv.filter (fun v -> not (Match.Mvar.mem v mv)) pat.pat_vars 
-    in
-    (* instantiate infered variables *)
-    let subst = Match.Mvar.to_subst ~mode:`Match mv in
-    let f = Equiv.Babel.subst f_kind subst pat.pat_term in
+    (* close the pattern by inferring as many pattern variables as possible *)
+    let pat = close ~mode:`Match mv f_kind pat in
+    let pat_vars, f = pat.pat_vars, pat.pat_term in
+
+    (* if close_pats && not (Sv.is_empty pat_vars) then
+     *   (* pattern variable remaining, and not allowed *)
+     *   assert false;            (* TODO: MATCH: proper error message *) *)
 
     (* close the unienv and generalize remaining univars *)
     let pat_tyvars, tysubst = Type.Infer.gen_and_close ty_env in
     let f = Equiv.Babel.tsubst f_kind tysubst f in
-    let pat_vars = Vars.Sv.map (Vars.tsubst_e tysubst) pat_vars in
+    let pat_vars = Sv.map (Vars.tsubst_e tysubst) pat_vars in
 
     (* generalize remaining universal variables in f *)
+    (* TODO: MATCH: remove *)
     let f_args, f = decompose_forall_k f_kind f in
     let f_args, subst = Term.erefresh_vars `Global f_args in
     let f = Equiv.Babel.subst f_kind subst f in
     let pat_vars = 
-      List.fold_left (fun pat_vars v -> Vars.Sv.add v pat_vars) pat_vars f_args
+      List.fold_left (fun pat_vars v -> Sv.add v pat_vars) pat_vars f_args
     in
 
     let pat = Match.{ 
@@ -390,6 +426,7 @@ module Mk (Args : MkArgs) : S with
 
   (** Exported. *)
   let convert_pt 
+      ?close_pats
       (type a)
       (pt :  Theory.p_pt)
       (f_kind : a Equiv.f_kind)
@@ -397,7 +434,7 @@ module Mk (Args : MkArgs) : S with
     : ghyp * a Match.pat 
     = 
     let name, se, pat = 
-      convert_pt_gen ~check_compatibility:true pt f_kind s 
+      convert_pt_gen ~check_compatibility:true ?close_pats pt f_kind s 
     in
     name, pat
 

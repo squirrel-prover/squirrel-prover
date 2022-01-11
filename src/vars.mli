@@ -1,6 +1,8 @@
 (** Basic module for variables, providing local environments to store
     variables. *)
 
+open Utils
+
 (*------------------------------------------------------------------*)
 (** {2 Variables} *)
 
