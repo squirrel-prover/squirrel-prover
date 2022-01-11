@@ -445,7 +445,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let p_rw_rule dir (p_pt : Theory.p_pt)
       : rw_erule * S.sequent list * Ident.t option
       =
-      let ghyp, pat = S.convert_pt p_pt Equiv.Local_t s in
+      let ghyp, pat = S.convert_pt ~close_pats:false p_pt Equiv.Local_t s in
       let id_opt = match ghyp with `Hyp id -> Some id | _ -> None in
 
       (* We are using an hypothesis, hence no new sub-goals *)
@@ -1195,7 +1195,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let nargs, pat, in_opt =
       match args with
       | [Args.ApplyIn (nargs, pt,in_opt)] ->
-        let _, pat = S.convert_pt pt S.conc_kind s in
+        let _, pat = S.convert_pt ~close_pats:false pt S.conc_kind s in
         nargs, pat, in_opt
 
       | _ -> bad_args ()
