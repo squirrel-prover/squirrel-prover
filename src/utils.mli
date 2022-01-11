@@ -12,7 +12,7 @@ end
 
 (*------------------------------------------------------------------*)
 module List : sig
-  include module type of struct include List end
+  include module type of List 
 
   (** [init n f] returns the list containing the results of
       [(f 0)],[(f 1)] ... [(f (n-1))].  *)
@@ -56,16 +56,47 @@ module List : sig
 
   val last : 'a list -> 'a
 
+  val map_fold  : ('a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
+  
+  val mapi_fold : (int -> 'a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
+
   exception Out_of_range
 
 end
 
 (*------------------------------------------------------------------*)
 module String : sig
-    include module type of struct include String end
+    include module type of String 
 
     val split_on_integer : string -> string * int option
   end
+
+(*------------------------------------------------------------------*)
+module Map : sig
+  include module type of Map 
+
+  module type S = sig
+    include Map.S
+
+    val add_list : (key * 'a) list -> 'a t -> 'a t 
+  end
+
+  module Make(O : Map.OrderedType) : S with type key = O.t
+end
+
+
+module Set : sig 
+  include module type of Set 
+
+  module type S = sig
+    include Set.S
+
+    val add_list : elt list -> t -> t 
+    val map_fold : ('a -> elt -> 'a * elt) -> 'a -> t -> 'a * t
+  end
+
+  module Make(O : Set.OrderedType) : S with type elt = O.t
+end
 
 (*------------------------------------------------------------------*)
 module Mi : Map.S with type key = int

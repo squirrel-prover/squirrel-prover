@@ -138,6 +138,27 @@ module List = struct
         ) [] l
     in
     List.rev l_rev  
+
+  (*------------------------------------------------------------------*)
+  let mapi_fold 
+      (f  : int -> 'a -> 'b -> 'a * 'c) 
+      (a  : 'a)
+      (xs : 'b list) 
+    : 'a * 'c list 
+    =
+    let a  = ref a in
+    let xs = List.mapi (fun i b ->
+      let (a', b') = f i !a b in a := a'; b')
+      xs
+    in (!a, xs)
+
+  let map_fold 
+      (f  : 'a -> 'b -> 'a * 'c) 
+      (a  : 'a)
+      (xs : 'b list) 
+    : 'a * 'c list 
+    =
+    mapi_fold (fun (_ : int) x -> f x) a xs
 end
 
 (*------------------------------------------------------------------*)
@@ -164,6 +185,56 @@ module String = struct
     done;
     (String.sub s 0 (!l+1), !res)
 end
+
+(*------------------------------------------------------------------*)
+module Map = struct
+  include Map
+
+  module type S = sig
+    include Map.S
+
+    val add_list : (key * 'a) list -> 'a t -> 'a t 
+  end
+
+  module Make(O : OrderedType) : S with type key = O.t = struct
+    include Map.Make(O)
+
+    let add_list (l : (key * 'a) list) (m : 'a t) : 'a t = 
+      List.fold_left (fun m (k,v) -> add k v m) m l
+  end
+end
+
+module Set = struct
+  include Set
+
+  module type S = sig
+    include Set.S
+
+    val add_list : elt list -> t -> t 
+    val map_fold : ('a -> elt -> 'a * elt) -> 'a -> t -> 'a * t
+  end
+
+  module Make(O : OrderedType) : S with type elt = O.t = struct
+    include Set.Make(O)
+
+    let add_list (l : elt list) (s : t) : t = 
+      List.fold_left (fun m v -> add v m) s l
+
+    let map_fold 
+        (f  : 'a -> elt -> 'a * elt) 
+        (a  : 'a)
+        (xs : t) 
+      : 'a * t
+      =
+      let a  = ref a in
+      let xs = map (fun b ->
+          let (a', b') = f !a b in a := a'; b')
+          xs
+      in (!a, xs)
+  end
+end
+
+
 
 (*------------------------------------------------------------------*)
 module Mi = Map.Make (Int)
