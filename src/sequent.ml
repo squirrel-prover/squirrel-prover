@@ -399,9 +399,9 @@ module Mk (Args : MkArgs) : S with
     let pat = close ~mode:`Match mv f_kind pat in
     let pat_vars, f = pat.pat_vars, pat.pat_term in
 
-    (* if close_pats && not (Sv.is_empty pat_vars) then
-     *   (* pattern variable remaining, and not allowed *)
-     *   assert false;            (* TODO: MATCH: proper error message *) *)
+    (* pattern variable remaining, and not allowed *)
+    if close_pats && not (Sv.is_empty pat_vars) then
+      Tactics.soft_failure Tactics.CannotInferPats;
 
     (* close the unienv and generalize remaining univars *)
     let pat_tyvars, tysubst = Type.Infer.gen_and_close ty_env in
