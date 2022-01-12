@@ -442,10 +442,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** Parse rewrite tactic arguments as rewrite rules with possible subgoals
       showing the rule validity. *)
   let p_rw_item (rw_arg : Args.rw_item) (s : S.t) : rw_earg * S.sequent list =
-    let p_rw_rule dir (p_pt : Theory.p_pt_hol)
+    let p_rw_rule dir (p_pt : Theory.p_pt)
       : rw_erule * S.sequent list * Ident.t option
       =
-      let ghyp, pat = S.convert_pt_hol p_pt Equiv.Local_t s in
+      let ghyp, pat = S.convert_pt ~close_pats:false p_pt Equiv.Local_t s in
       let id_opt = match ghyp with `Hyp id -> Some id | _ -> None in
 
       (* We are using an hypothesis, hence no new sub-goals *)
@@ -510,7 +510,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       let dir = L.unloc rw_arg.rw_dir in
 
       let _, system, pat =
-        S.convert_pt_hol_gen ~check_compatibility:false f Equiv.Global_t s
+        S.convert_pt_gen ~check_compatibility:false f Equiv.Global_t s
       in
 
       if pat.pat_tyvars <> [] then
@@ -1194,8 +1194,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     =
     let nargs, pat, in_opt =
       match args with
-      | [Args.ApplyIn (nargs, Theory.PT_hol pt,in_opt)] ->
-        let _, pat = S.convert_pt_hol pt S.conc_kind s in
+      | [Args.ApplyIn (nargs, pt,in_opt)] ->
+        let _, pat = S.convert_pt ~close_pats:false pt S.conc_kind s in
         nargs, pat, in_opt
 
       | _ -> bad_args ()
@@ -1327,8 +1327,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     * As with apply, we require that the hypothesis (or lemma) is
     * of the kind of conclusion formulas: for local sequents this means
     * that we cannot use a global hypothesis or lemma. *)
-  let use ~(mode:[`IntroImpl | `None]) ip (pt : Theory.p_pt_hol) (s : S.t) =
-    let _, pat = S.convert_pt_hol pt S.conc_kind s in
+  let use ~(mode:[`IntroImpl | `None]) ip (pt : Theory.p_pt) (s : S.t) =
+    let _, pat = S.convert_pt pt S.conc_kind s in
 
     if pat.pat_tyvars <> [] then
       soft_failure (Failure "free type variables remaining") ;

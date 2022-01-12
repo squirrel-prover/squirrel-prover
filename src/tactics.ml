@@ -80,6 +80,8 @@ type tac_error_i =
 
   | PatNumError of int * int    (* given, need *)
 
+  | CannotInferPats
+
 type tac_error = L.t option * tac_error_i
 
 let rec tac_error_to_string = function
@@ -122,7 +124,7 @@ let rec tac_error_to_string = function
   | PatNumError       _    -> "PatNumError"
   | MustHappen        _    -> "MustHappen"
   | BadSSCDetailed    _    -> "BadSSCDetailed"
-
+  | CannotInferPats        -> "CannotInferPats"
 
 let rec pp_tac_error_i ppf = function
   | More -> Fmt.string ppf "more results required"
@@ -237,6 +239,8 @@ let rec pp_tac_error_i ppf = function
     Fmt.pf ppf "apply failed: rhs variables are not all bound by the lhs"
 
   | InvalidVarName -> Fmt.pf ppf "invalid variable name"
+
+  | CannotInferPats -> Fmt.pf ppf "cannot infer all place-holders"
 
 exception Tactic_soft_failure of tac_error
 

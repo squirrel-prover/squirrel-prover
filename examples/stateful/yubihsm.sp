@@ -779,7 +779,7 @@ Proof.
   case H2. 
   
   apply orderTrans _ _ (SCtr(pid)@Server(pid,j)) in H2; 1: auto.
-  apply eq_sym in Meq. 
+  rewrite eq_sym in Meq. 
   by apply orderStrict in Meq.
   
   by apply orderStrict in H1.

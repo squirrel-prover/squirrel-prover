@@ -1258,13 +1258,19 @@ let convert_i ?ty_env ?(pat=false) (cenv : conv_env) ty_vars env tm
     t, Type.Infer.norm ty_env ty
 
 (** exported outside Theory.ml *)
-let convert : type s.
-  ?ty_env:Type.Infer.env ->
-  ?pat:bool ->
-  conv_env -> Type.tvars -> Vars.env -> term -> s Type.ty -> s Term.term =
-  fun ?ty_env ?(pat=false) cenv ty_vars env tm ty ->
+let convert 
+    (type s)
+    ?(ty_env : Type.Infer.env option) 
+    ?(pat    : bool = false)
+    (cenv    : conv_env) 
+    (ty_vars : Type.tvars) 
+    (env     : Vars.env) 
+    (tm      : term) 
+    (ty      : s Type.ty)
+  : s Term.term 
+  =
   let must_close, ty_env = match ty_env with
-    | None -> true, Type.Infer.mk_env ()
+    | None        -> true, Type.Infer.mk_env ()
     | Some ty_env -> false, ty_env
   in
 
@@ -1431,18 +1437,18 @@ let find_app_terms t (names : string list) =
 (*------------------------------------------------------------------*)
 (** {2 Apply arguments} *)
 
-(** Parser type for a formula built by partially applying an hypothesis
-    or a lemma *)
-type p_pt_hol = {
-  p_pt_hid  : lsymb;
-  p_pt_args : term list;
+(** proof term *)
+type p_pt = {
+  p_pt_head : lsymb;
+  p_pt_args : p_pt_arg list;
   p_pt_loc  : L.t;
 }
 
-(** Parser type for `apply` arguments *)
-type p_pt =
-  | PT_hol  of p_pt_hol (* (partially applied) hypothesis or lemma *)
-  (* | PT_form of term *)
+(** proof term argument *)
+and p_pt_arg =
+  | PT_term of term
+  | PT_sub  of p_pt             (* sub proof term *)
+  | PT_obl  of L.t              (* generate a proof obligation *)
 
 (*------------------------------------------------------------------*)
 (** {2 Tests} *)

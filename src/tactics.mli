@@ -86,6 +86,7 @@ type tac_error_i =
   | HypUnknown of string
   | InvalidVarName
   | PatNumError of int * int    (* given, need *)
+  | CannotInferPats
 
 type tac_error = L.t option * tac_error_i
 

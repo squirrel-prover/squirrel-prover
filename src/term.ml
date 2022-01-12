@@ -511,6 +511,10 @@ let oas_seq2 = omap as_seq2
 (** Smart destrucrots.
     The module is included after its definition. *)
 module SmartDestructors = struct
+  let rec destr_exists1 = function
+    | Exists (v :: vs, f) -> Some (v, mk_exists vs f)
+    | _ -> None
+
   let rec destr_exists = function
     | Exists (vs, f) ->
       begin
@@ -525,6 +529,10 @@ module SmartDestructors = struct
       let vs', f0 = decompose_exists f in
       vs @ vs', f0
     | _ as f -> [], f
+
+  let rec destr_forall1 = function
+    | ForAll (v :: vs, f) -> Some (v, mk_forall vs f)
+    | _ -> None
 
   let rec destr_forall = function
     | ForAll (vs, f) ->
@@ -1514,8 +1522,10 @@ module type SmartFO = sig
   (*------------------------------------------------------------------*)
   (** {3 Destructors} *)
 
-  val destr_forall : form -> (Vars.evar list * form) option
-  val destr_exists : form -> (Vars.evar list * form) option
+  val destr_forall  : form -> (Vars.evar list * form) option
+  val destr_forall1 : form -> (Vars.evar      * form) option
+  val destr_exists  : form -> (Vars.evar list * form) option
+  val destr_exists1 : form -> (Vars.evar      * form) option
 
   (*------------------------------------------------------------------*)
   val destr_false : form ->         unit  option

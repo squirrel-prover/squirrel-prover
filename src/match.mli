@@ -42,6 +42,8 @@ module Mvar : sig
   val fold : (Vars.evar -> Term.eterm -> 'b -> 'b) -> t -> 'b -> 'b
 
   val to_subst : mode:[`Match | `Unif] -> t -> Term.subst
+
+  val pp : Format.formatter -> t -> unit
 end
 
 (*------------------------------------------------------------------*)
@@ -107,20 +109,24 @@ module type S = sig
       - if [mode = `EntailLR] then [t = pθ] or [t ⇒ pθ] (boolean case).
       - if [mode = `EntailRL] then [t = pθ] or [pθ ⇒ t] (boolean case). *)
   val try_match :
-    ?mv:Mvar.t ->
     ?option:match_option ->
+    ?mv:Mvar.t ->
+    ?ty_env:Type.Infer.env ->
     Symbols.table ->
     SystemExpr.t ->
-    t -> t pat ->
+    t -> 
+    t pat ->
     match_res
 
   (** Same as [try_match], but specialized for terms. *)
   val try_match_term :
-    ?mv:Mvar.t ->
     ?option:match_option ->
+    ?mv:Mvar.t ->
+    ?ty_env:Type.Infer.env ->
     Symbols.table ->
     SystemExpr.t ->
-    'a Term.term -> 'b Term.term pat ->
+    'a Term.term -> 
+    'b Term.term pat ->
     match_res
 
 
@@ -136,7 +142,8 @@ module type S = sig
     Symbols.table ->
     SystemExpr.t ->
     Vars.env ->
-    'a Term.term pat -> t -> 
+    'a Term.term pat -> 
+    t -> 
     Term.eterm list
 end
 

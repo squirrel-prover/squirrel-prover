@@ -6,10 +6,10 @@ set autoIntro=false.
 (*------------------------------------------------------------------*)
 (* equality *)
 
-goal eq_sym ['a] (x,y : 'a) : x = y => y = x.
-Proof. auto. Qed.
-
 axiom eq_iff (x, y : boolean) : (x = y) = (x <=> y).
+
+goal eq_sym ['a] (x,y : 'a) : (x = y) = (y = x).
+Proof. by rewrite eq_iff. Qed.
 
 goal eq_refl ['a] (x : 'a) : (x = x) = true. 
 Proof. 
@@ -39,13 +39,7 @@ hint rewrite true_false.
 
 goal false_true : (false = true) = false.
 Proof. 
-  (* TODO: work-around until we have a better type inference *)
-  (* rewrite (eq_sym false true). *)
-  assert (forall (x,y : boolean), (x = y) = (y = x)) as H .
-    intro _ _. 
-    by rewrite eq_iff. 
-  rewrite (H false true).
-  auto.
+  by rewrite (eq_sym false true).
 Qed.
 hint rewrite false_true.
 

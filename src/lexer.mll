@@ -33,8 +33,8 @@ rule token = parse
 | "(*" { comment lexbuf; token lexbuf }
 | "!_" (name as i)  { BANG i }
 | "&&"                { AND }
-| "/\\"                { GAND }
-| "\\/"                { GOR }
+| "/\\"               { GAND }
+| "\\/"               { GOR }
 | "||"                { OR }
 | "not"               { NOT }
 | "True"              { TRUE }
@@ -52,6 +52,7 @@ rule token = parse
 | ';'                 { SEMICOLON }
 | '*'                 { STAR }
 | '_'                 { UNDERSCORE }
+| "`_"                { TICKUNDERSCORE }
 | "//"                { SLASHSLASH }
 | "/="                { SLASHEQUAL }
 | "//="               { SLASHSLASHEQUAL }
@@ -73,6 +74,7 @@ rule token = parse
 | '~'                 { TILDE }
 | '+'                 { PLUS }
 | '\''                { TICK }
+| '%'                 { PERCENT }
 | infix_symb as s     { INFIXSYMB s }
 | int as i            { INT (int_of_string i) }
 | "happens"           { HAPPENS }

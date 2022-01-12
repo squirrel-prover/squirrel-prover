@@ -31,6 +31,7 @@
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH SLASHSLASHEQUAL ATSLASH
 %token TIME WHERE WITH ORACLE EXN
 %token LARGE NAMEFIXEDLENGTH
+%token PERCENT
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY
 %token SPLITSEQ CONSTSEQ MEMSEQ
@@ -38,6 +39,7 @@
 %token PROOF QED UNDO ABORT HINT
 %token RENAME GPRF GCCA
 %token INCLUDE
+%token TICKUNDERSCORE
 %token EOF
 
 %nonassoc QUANTIF
@@ -494,9 +496,9 @@ rw_item:
                                                      rw_type = t; } }
 
 rw_equiv_item:
-| d=loc(rw_dir) pt=pt  { TacticsArgs.{ rw_mult = `Once;
-                                       rw_dir = d;
-                                       rw_type = `Rw pt; } }
+| d=loc(rw_dir) pt=p_pt  { TacticsArgs.{ rw_mult = `Once;
+                                         rw_dir = d;
+                                         rw_type = `Rw pt; } }
 
 expnd_item:
 | d=loc(rw_dir) t=expnd_type  { TacticsArgs.{ rw_mult = `Once;
@@ -583,28 +585,34 @@ as_n_ips:
 sel_tacs:
 | l=slist1(sel_tac,PARALLEL) { l }
 
-pt:
-| hid=lsymb args=slist(sterm,empty)
+p_pt_arg:
+| t=sterm                        { Theory.PT_term t }
+/* Note: some terms parsed as [sterm] may be resolved as [PT_sub]
+   later, using the judgement hypotheses. */
+
+| LPAREN PERCENT pt=p_pt RPAREN  { Theory.PT_sub pt }
+| l=lloc(TICKUNDERSCORE)         { Theory.PT_obl l }
+
+p_pt:
+| head=lsymb args=slist(p_pt_arg,empty)
     { let p_pt_loc = L.make $startpos $endpos in
-      { p_pt_hid = hid; p_pt_args = args; p_pt_loc; } }
+      { p_pt_head = head; p_pt_args = args; p_pt_loc; } }
 
 /* legacy syntax for use tactic */
 pt_use_tac:
 | hid=lsymb
-    { Theory.{ p_pt_hid = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
+    { Theory.{ p_pt_head = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
 | hid=lsymb WITH args=slist1(tac_term,COMMA)
     { let p_pt_loc = L.make $startpos $endpos in
-      Theory.{ p_pt_hid = hid; p_pt_args = args; p_pt_loc; } }
+      let args = List.map (fun x -> Theory.PT_term x) args in
+      Theory.{ p_pt_head = hid; p_pt_args = args; p_pt_loc; } }
 
 /* non-ambiguous pt */
 spt:
 | hid=lsymb
-    { Theory.{ p_pt_hid = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
-| LPAREN pt=pt RPAREN
+    { Theory.{ p_pt_head = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
+| LPAREN pt=p_pt RPAREN
     { pt }
-
-apply_arg:
-| pt=pt                  { Theory.PT_hol pt }
 
 constseq_arg:
 | LPAREN b=hterm RPAREN t=sterm { (b,t) }
@@ -729,7 +737,7 @@ tac:
 
   (*------------------------------------------------------------------*)
   /* assert a proof term */
-  | l=lloc(ASSERT) LPAREN ip=simpl_pat? COLONEQ pt=pt RPAREN
+  | l=lloc(ASSERT) LPAREN ip=simpl_pat? COLONEQ pt=p_pt RPAREN
     { mk_abstract l "assert" [TacticsArgs.AssertPt (pt, ip, `None)] }
 
   (*------------------------------------------------------------------*)
@@ -739,7 +747,7 @@ tac:
   | l=lloc(rewrite_equiv) p=rw_equiv_item
     { mk_abstract l "rewrite equiv" [TacticsArgs.RewriteEquiv (p)] }
 
-  | l=lloc(APPLY) a=named_args t=apply_arg w=apply_in
+  | l=lloc(APPLY) a=named_args t=p_pt w=apply_in
     { mk_abstract l "apply" [TacticsArgs.ApplyIn (a, t, w)] }
 
   | l=lloc(SPLITSEQ) i=loc(INT) COLON LPAREN ht=hterm RPAREN
