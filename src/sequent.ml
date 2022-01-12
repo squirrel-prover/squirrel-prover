@@ -319,7 +319,7 @@ module Mk (Args : MkArgs) : S with
           let _, _, pat1, mv = _convert_pt_gen ty_env mv p_arg f_kind s in
           assert (pat1.pat_tyvars = []);
 
-          let subst = Match.Mvar.to_subst ~mode:`Match mv in
+          let subst = Match.Mvar.to_subst ~mode:`Unif mv in
           let f1 = Equiv.Babel.subst f_kind subst f1 in
           let pat_f1 = Match.{
               pat_vars = !pat_vars;
@@ -402,7 +402,7 @@ module Mk (Args : MkArgs) : S with
       Sv.filter (fun v -> not (Match.Mvar.mem v mv)) pat.pat_vars 
     in
     (* instantiate infered variables *)
-    let subst = Match.Mvar.to_subst ~mode:`Match mv in
+    let subst = Match.Mvar.to_subst ~mode mv in
     let f = Equiv.Babel.subst f_kind subst pat.pat_term in
 
     assert (Sv.for_all (fun (Vars.EVar v) -> Vars.is_pat v) pat_vars);
@@ -442,7 +442,7 @@ module Mk (Args : MkArgs) : S with
     in
 
     (* close the pattern by inferring as many pattern variables as possible *)
-    let pat = close ~mode:`Match mv f_kind pat in
+    let pat = close ~mode:`Unif mv f_kind pat in
     let pat_vars, f = pat.pat_vars, pat.pat_term in
 
     (* pattern variable remaining, and not allowed *)
@@ -455,7 +455,7 @@ module Mk (Args : MkArgs) : S with
     let pat_vars = Sv.map (Vars.tsubst_e tysubst) pat_vars in
 
     (* generalize remaining universal variables in f *)
-    (* TODO: MATCH: remove *)
+    (* FIXME: don't generalize in convert_pt_gen *)
     let f_args, f = decompose_forall_k f_kind f in
     let f_args, subst = Term.erefresh_vars `Global f_args in
     let f = Equiv.Babel.subst f_kind subst f in
@@ -468,6 +468,7 @@ module Mk (Args : MkArgs) : S with
         pat_vars;
         pat_term = f; } 
     in      
+    
     name, system, pat
 
   (** Exported. *)

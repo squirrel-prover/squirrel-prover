@@ -68,10 +68,23 @@ abstract g : message -> message.
 goal _ (y,z : message) :
  (forall (x : message), P (x) => g (x) = f (x)) =>
  (forall (x : message), P (x)) =>
+ (f(y) = f(<y,z>)) =>
  g (y) = g (<y,z>).
 Proof.
-  intro H G.
-  (* rewrite (H _ (G (<_,_>))).  *)
+  intro H G F.
+  rewrite (H _ (%G <_,_>)).
   rewrite (H _ (%G y)). 
+  clear H G.
+  assumption.
+Qed.
 
-  rewrite (H <y,z>); 1: by apply G.
+goal _ (y,z : message) :
+ (forall (x : message), P (x) => g (x) = f (x)) =>
+ (forall (x : message), P (x)) =>
+ g (<y,z>) = f (<y,z>).
+Proof.
+  intro H G.
+  assert (U := H _ (%G <y,z>)).
+  clear H G.
+  assumption.
+Qed.
