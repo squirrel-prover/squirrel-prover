@@ -54,7 +54,7 @@ module List : sig
 
   val iteri2 : (int -> 'a -> 'b -> unit) -> 'a list -> 'b list -> unit
 
-  val last : 'a list -> 'a
+  val last : ?e:exn -> 'a list -> 'a
 
   val map_fold  : ('a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
   

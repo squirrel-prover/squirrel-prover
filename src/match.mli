@@ -111,18 +111,22 @@ module type S = sig
   val try_match :
     ?option:match_option ->
     ?mv:Mvar.t ->
+    ?ty_env:Type.Infer.env ->
     Symbols.table ->
     SystemExpr.t ->
-    t -> t pat ->
+    t -> 
+    t pat ->
     match_res
 
   (** Same as [try_match], but specialized for terms. *)
   val try_match_term :
     ?option:match_option ->
     ?mv:Mvar.t ->
+    ?ty_env:Type.Infer.env ->
     Symbols.table ->
     SystemExpr.t ->
-    'a Term.term -> 'b Term.term pat ->
+    'a Term.term -> 
+    'b Term.term pat ->
     match_res
 
 
@@ -138,7 +142,8 @@ module type S = sig
     Symbols.table ->
     SystemExpr.t ->
     Vars.env ->
-    'a Term.term pat -> t -> 
+    'a Term.term pat -> 
+    t -> 
     Term.eterm list
 end
 

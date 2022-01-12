@@ -33,10 +33,10 @@ end
 module List = struct
   include List
 
-  let rec last = function
-    | [] -> raise (Failure "List.last")
+  let rec last ?e = function
     | [x] -> x
     | _ :: l -> last l
+    | [] -> match e with Some e -> raise e | None -> raise (Failure "List.last")
 
   let init n f =
     if n < 0 then raise (Failure "List.init")

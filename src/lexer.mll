@@ -74,6 +74,7 @@ rule token = parse
 | '~'                 { TILDE }
 | '+'                 { PLUS }
 | '\''                { TICK }
+| '%'                 { PERCENT }
 | infix_symb as s     { INFIXSYMB s }
 | int as i            { INT (int_of_string i) }
 | "happens"           { HAPPENS }

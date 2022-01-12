@@ -31,6 +31,7 @@
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH SLASHSLASHEQUAL ATSLASH
 %token TIME WHERE WITH ORACLE EXN
 %token LARGE NAMEFIXEDLENGTH
+%token PERCENT
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY
 %token SPLITSEQ CONSTSEQ MEMSEQ
@@ -585,9 +586,12 @@ sel_tacs:
 | l=slist1(sel_tac,PARALLEL) { l }
 
 p_pt_arg:
-| t=sterm                      { Theory.PT_term t }
-| LPAREN COLON COLON pt=p_pt RPAREN  { Theory.PT_sub pt }
-| l=lloc(TICKUNDERSCORE)       { Theory.PT_obl l }
+| t=sterm                        { Theory.PT_term t }
+/* Note: some terms parsed as [sterm] may be resolved as [PT_sub]
+   later, using the judgement hypotheses. */
+
+| LPAREN PERCENT pt=p_pt RPAREN  { Theory.PT_sub pt }
+| l=lloc(TICKUNDERSCORE)         { Theory.PT_obl l }
 
 p_pt:
 | head=lsymb args=slist(p_pt_arg,empty)

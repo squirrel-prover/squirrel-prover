@@ -213,6 +213,46 @@ module Mk (Args : MkArgs) : S with
 
 
   (*------------------------------------------------------------------*)
+  (** Auxiliary function building a location for nice errors. *)
+  let last_loc (head_loc : L.t) (args : 'a L.located list) : L.t =
+    let exception Fail in
+    let end_loc = 
+      try
+        let last = List.last ~e:Fail args in
+        L.loc last
+      with Fail -> head_loc
+    in
+    L.merge head_loc end_loc
+
+
+  (** Solve parser ambiguities, e.g. in [H (G x)], the sub-element [(G x)] is 
+      parsed as a term (i.e. a [PT_term]. We resolve it as a [PT_sub] using 
+      the context. *)
+  let rec resolve_pt_arg (s : S.t) (pt_arg : Theory.p_pt_arg) : Theory.p_pt_arg =
+    match pt_arg with
+    | Theory.PT_obl _   -> pt_arg
+    | Theory.PT_sub sub -> PT_sub (resolve_pt s sub)
+    | Theory.PT_term t  -> 
+      match L.unloc t with
+      | Theory.App (h, args) ->
+        if S.Hyps.mem_name (L.unloc h) s then
+          let p_pt_args = 
+            List.map (fun a -> resolve_pt_arg s (Theory.PT_term a)) args 
+          in
+          let pt = Theory.{ 
+            p_pt_head = h;
+            p_pt_args;
+            p_pt_loc = last_loc (L.loc h) args;
+          } in
+          PT_sub pt
+        else pt_arg
+
+      | _ -> pt_arg
+
+  and resolve_pt (s : S.t) (pt : Theory.p_pt) : Theory.p_pt =
+    Theory.{ pt with p_pt_args = List.map (resolve_pt_arg s) pt.p_pt_args }
+
+  (*------------------------------------------------------------------*)
   (** Parse a partially applied lemma or hypothesis as a pattern. *)
   let rec _convert_pt_gen : type a.
     ?check_compatibility:bool ->
@@ -279,37 +319,40 @@ module Mk (Args : MkArgs) : S with
           let _, _, pat1, mv = _convert_pt_gen ty_env mv p_arg f_kind s in
           assert (pat1.pat_tyvars = []);
 
-          (* TODO: MATCH: ty_env *)
-          let ty_env = ty_env in
+          let subst = Match.Mvar.to_subst ~mode:`Match mv in
+          let f1 = Equiv.Babel.subst f_kind subst f1 in
+          let pat_f1 = Match.{
+              pat_vars = !pat_vars;
+              pat_term = f1;
+              pat_tyvars = [];
+            } in
 
-          (* TODO: MATCH: finish, all case must be done like in the [Equiv.Local_t]
-             case *)
           let match_res = match f_kind with
             | Equiv.Local_t ->
-              let subst = Match.Mvar.to_subst ~mode:`Match mv in
-              let pat_f1 = Match.{
-                  pat_vars = !pat_vars;
-                  pat_term = Term.subst subst f1;
-                  pat_tyvars = [];
-                } in
-
               Match.T.try_match 
-                (* ~ty_env *) ~mv (S.table s) (S.system s) pat1.pat_term pat_f1
+                ~ty_env ~mv
+                (S.table s) (S.system s) pat1.pat_term pat_f1
 
             | Equiv.Global_t ->
               Match.E.try_match 
-                (* ~ty_env *) ~mv (S.table s) (S.system s) f1 pat1
+                ~ty_env ~mv
+                (S.table s) (S.system s) pat1.pat_term pat_f1
 
             | Equiv.Any_t -> 
               match f1, pat1.pat_term with
               |  `Reach f1, `Reach t1 ->
-                let pat1 = { pat1 with pat_term = t1 } in
+                let pat1   = { pat1 with pat_term = t1 } in
+                let pat_f1 = { pat1 with pat_term = f1 } in
                 Match.T.try_match 
-                  (* ~ty_env *) ~mv (S.table s) (S.system s) f1 pat1
+                  ~ty_env ~mv
+                  (S.table s) (S.system s) pat1.pat_term pat_f1
+
               | `Equiv f1, `Equiv t1  -> 
-                let pat1 = { pat1 with pat_term = t1 } in
+                let pat1   = { pat1 with pat_term = t1 } in
+                let pat_f1 = { pat1 with pat_term = f1 } in
                 Match.E.try_match 
-                  (* ~ty_env *) ~mv (S.table s) (S.system s) f1 pat1
+                  ~ty_env ~mv
+                  (S.table s) (S.system s) pat1.pat_term pat_f1
 
               | _ -> (* TODO: improve error message *)
                 hard_failure ~loc:(L.loc pt.p_pt_head) (Failure "kind error");
@@ -386,6 +429,9 @@ module Mk (Args : MkArgs) : S with
       (s      : S.t) 
     : ghyp * SE.t * a Match.pat 
     =
+    (* resolve the proof-term in [s] *)
+    let pt = resolve_pt s pt in
+
     (* create a fresh unienv and matching env *)
     let ty_env = Type.Infer.mk_env () in
     let mv = Match.Mvar.empty in

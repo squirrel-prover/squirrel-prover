@@ -348,17 +348,21 @@ module type S = sig
   val try_match :
     ?option:match_option ->
     ?mv:Mvar.t ->
+    ?ty_env:Type.Infer.env ->
     Symbols.table ->
     SystemExpr.t ->
-    t -> t pat ->
+    t -> 
+    t pat ->
     match_res
 
   val try_match_term :
     ?option:match_option ->
     ?mv:Mvar.t ->
+    ?ty_env:Type.Infer.env ->
     Symbols.table ->
     SystemExpr.t ->
-    'a term -> 'b term pat ->
+    'a term -> 
+    'b term pat ->
     match_res
 
   val map : ?m_rec:bool -> f_map -> Vars.env -> t -> t option
@@ -368,7 +372,8 @@ module type S = sig
     Symbols.table ->
     SystemExpr.t ->
     Vars.env ->
-    ('a Term.term pat) -> t -> 
+    ('a Term.term pat) -> 
+    t -> 
     Term.eterm list
 end
 
@@ -820,21 +825,29 @@ module T (* : S with type t = message *) = struct
     | _, _ -> no_match ()
 
   (*------------------------------------------------------------------*)
-  (** Exported *)
-  let try_match_term : type a b.
-    ?option:match_option ->
-    ?mv:Mvar.t ->
-    Symbols.table ->
-    SystemExpr.t ->
-    a term -> b term pat ->
-    match_res
-    =
-    fun ?(option=default_match_option) ?mv table system t p ->
 
+  (* TODO: factorize with the other exported function [try_match] for 
+     [Equiv.form] *)
+  (** Exported *)
+  let try_match_term (type a b)
+    ?(option=default_match_option)
+    ?(mv     : Mvar.t option)
+    ?(ty_env : Type.Infer.env option)
+    (table   : Symbols.table)
+    (system  : SystemExpr.t)
+    (t       : a term)
+    (p       : b term pat) 
+    : match_res 
+    =
     (* Term matching ignores [mode]. Matching in [Equiv] does not. *)
 
-    (* [ty_env] must be closed at the end of the matching *)
-    let ty_env = Type.Infer.mk_env () in
+    (* [must_close] state if [ty_env] must be closed at the end of 
+       the matching *)
+    let must_close, ty_env = match ty_env with
+      | Some e -> false, e
+      | None   -> true,  Type.Infer.mk_env () 
+    in
+
     let univars, ty_subst = Type.Infer.open_tvars ty_env p.pat_tyvars in
     let pat = tsubst ty_subst p.pat_term in
 
@@ -862,10 +875,12 @@ module T (* : S with type t = message *) = struct
     try
       let mv = tmatch t pat st_init in
 
-      (* FIXME: shouldn't we substitute type variables in Mv co-domain ? *)
-      if not (Type.Infer.is_closed ty_env)
-      then FreeTyv
+      if not must_close then 
+        Match mv 
+      else if not (Type.Infer.is_closed ty_env) then 
+        FreeTyv
       else
+        (* FIXME: shouldn't we substitute type variables in Mv co-domain ? *)
         let mv =
           Mvar.fold (fun (Vars.EVar v) t mv ->
               let v = Vars.tsubst ty_subst_rev v in
@@ -876,6 +891,7 @@ module T (* : S with type t = message *) = struct
 
     with
     | NoMatch minfos -> NoMatch minfos
+
 
   let try_match = try_match_term
 
@@ -2176,14 +2192,21 @@ module E : S with type t = Equiv.form = struct
   (** Exported *)
   let try_match
       ?(option=default_match_option)
-      ?mv
-      (table : Symbols.table)
-      (system : SystemExpr.t)
-      (t : t)
-      (p : t pat) : match_res
+      ?(mv     : Mvar.t option)
+      ?(ty_env : Type.Infer.env option)
+      (table   : Symbols.table)
+      (system  : SystemExpr.t)
+      (t       : t)
+      (p       : t pat) 
+    : match_res
     =
-    (* [ty_env] must be closed at the end of the matching *)
-    let ty_env = Type.Infer.mk_env () in
+    (* [must_close] state if [ty_env] must be closed at the end of 
+       the matching *)
+    let must_close, ty_env = match ty_env with
+      | Some e -> false, e
+      | None   -> true,  Type.Infer.mk_env () 
+    in
+
     let univars, ty_subst  = Type.Infer.open_tvars ty_env p.pat_tyvars in
     let pat = Equiv.tsubst ty_subst p.pat_term in
 
@@ -2207,6 +2230,7 @@ module E : S with type t = Equiv.form = struct
       use_fadup     = option.use_fadup; 
       allow_capture = option.allow_capture; 
     } in
+
     let mode = match option.mode with
       | `Eq -> `Eq
       | `EntailRL -> `Covar
@@ -2216,10 +2240,12 @@ module E : S with type t = Equiv.form = struct
     try
       let mv = fmatch ~mode t pat st_init in
 
-      (* FIXME: shouldn't we substitute type variables in Mv co-domain ? *)
-      if not (Type.Infer.is_closed ty_env)
-      then FreeTyv
+      if not must_close then 
+        Match mv 
+      else if not (Type.Infer.is_closed ty_env) then 
+        FreeTyv
       else
+        (* FIXME: shouldn't we substitute type variables in Mv co-domain ? *)
         let mv =
           Mvar.fold (fun (Vars.EVar v) t mv ->
               let v = Vars.tsubst ty_subst_rev v in
