@@ -102,6 +102,7 @@ body {
 
 .example-col-left{
 	border-right: 2px solid #8B0000;
+  scroll-behavior: smooth;
 }
 
 .example-col-right{
@@ -119,13 +120,22 @@ body {
 	word-wrap: normal;
 }
 
+.example-line{
+  display: flex;
+  align-items: stretch;
+}
+
+.expand-button{
+  width : 1rem;
+}
+
 .input-line:hover {
   cursor: pointer;
   box-shadow: inset 0 -1px #567482;
 }
 
 .comment{
-	float: none;
+  position: static;
 	padding: 1rem;
 	margin: 1rem 0.5rem;
 	border-style: solid;
@@ -135,16 +145,20 @@ body {
 	font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
 	color: black;
 	background-color: #ffffeb;
-  overflow: clip;
+  overflow-x: hidden;
+  overflow-y: clip;
 	white-space: normal;
 	word-wrap: anywhere;
-	transition: max-height 2s;
 }
 
 .collapsed{
-  width: 8px;
-  height: 1rem;
-  padding: 0;
-  margin: 0 0.5rem;
-  color: transparent;
+  position: relative;
+  left: -0.75rem;
+  top: 0;
+	padding: 0;
+	margin: 0;
+	border-style: none;
+	color: #8B0000;
+	background: none;
+	white-space: nowrap;
 }

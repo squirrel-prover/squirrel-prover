@@ -6,6 +6,7 @@ outLine = document.getElementById("out-line");
 precLine = document.getElementById("prec-line");
 
 stepBegin = []
+stepEnd = []
 i = 0;
 n = lines.length;
 panel = false;
@@ -23,22 +24,25 @@ function init() {
       com = document.createElement('div');
       com.className = 'comment';
       com.innerHTML = comContent[0].innerHTML;
+      com.collapse = false;
+      com.text = com.innerHTML;
       com.addEventListener("click", function() { collapseBox(this); } );
       inLine.appendChild(com);
       stepBegin.push(com);
     } else {
       stepBegin.push(input);
     }
+    stepEnd.push(input);
     
     inLine.appendChild(input);
   }
 }
 
-function goView(j) {
+function goView(j, stepVector, top) {
   if (j <= 1) {
-    stepBegin[0].scrollIntoView({behavior: "smooth"});
+    stepVector[0].scrollIntoView(top);
   } else {
-    stepBegin[j-1].scrollIntoView({behavior: "smooth"});
+    stepVector[j-1].scrollIntoView(top);
   }
 }
 
@@ -66,12 +70,12 @@ function gotoLine(j) {
 
 function gotoUp() {
   gotoLine(i+1);
-  goView(i);
+  goView(i, stepEnd, false);
 }
 
 function gotoDown() {
   gotoLine(i-1);
-  goView(i);
+  goView(i, stepBegin, true);
 }
 
 function key(event) {
@@ -93,7 +97,16 @@ function help() {
 }
 
 function collapseBox(obj) {
-  obj.classList.toggle("collapsed")
+  obj.classList.toggle("collapsed");
+   "+ ---------------";
+  
+  if (obj.collapse) {
+    obj.innerHTML = obj.text;
+    obj.collapse = false;
+  } else {
+    obj.innerHTML = "+ ---------------";
+    obj.collapse = true;
+  }
 }
 
 function highlightOn(id) {
