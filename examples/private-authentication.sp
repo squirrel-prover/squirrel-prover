@@ -25,16 +25,21 @@ attacker for equivalence properties. In 2014 ACM Conference on
 Computer and Communications Security, CCS ’14, pages 609–620.
 ACM, 2014
 *******************************************************************************)
+(**
+When this option is set to `true`, Squirrel checks whether each tactic invoked
+for the proof is also sound for quantum attackers.
+**)
 set postQuantumSound=true.
 
 (** 
-We first declare the channels used by the initiator A and the responder B,
-the function symbols for the public encryption scheme as well as the several
-names used in the protocol's messages. 
+We first declare the communication channels, the function symbols for the public
+encryption scheme as well as the several names used in the protocol's messages. 
 **)
 
 channel cA
+channel cAbis
 channel cB
+channel cO
 
 aenc enc,dec,pk
 
@@ -44,6 +49,8 @@ name kB : message
 
 name n0 : index -> message
 name r0 : index -> message
+name n0bis : index -> message
+name r0bis : index -> message
 
 name n : index -> message
 name r : index -> message.
@@ -59,9 +66,14 @@ abstract plus : message -> message -> message.
 The initiator A is indexed by `i` to represent an unbounded number of sessions
 and is defined by a single output.
 **)
-
 process A(i:index) =
-  out(cA,  enc(<pk(kA),n0(i)>,r0(i),pk(kB))).
+  out(cA, enc(<pk(kA),n0(i)>,r0(i),pk(kB))).
+
+(**
+We define a similar process for the initiator Abis.
+**)
+process Abis(i:index) =
+  out(cAbis, enc(<pk(kAbis),n0bis(i)>,r0bis(i),pk(kB))).
 
 (**
 The responder B is indexed by `j` to represent an unbounded number of sessions.
@@ -69,7 +81,6 @@ In order to express anonymity using an equivalence property, we model two
 systems using the `diff` operator.
 On the left side, the key `kA` is used while the right side uses the key `kAbis`.
 **)
-
 process B(j:index) =
   in(cB, mess);
   let dmess = dec(mess, kB) in
@@ -84,11 +95,12 @@ process B(j:index) =
 
 (**
 The protocol is finally defined by a system where an unbounded number of 
-sessions for A and B play in parallel, after having outputted the public keys
-of A and B.
+sessions for A, Abis and B play in parallel, after having outputted the 
+public keys of A, Abis and B.
 **)
-
-system O: out(cA,<pk(kA),pk(kB)>); (!_i A(i) | !_j B(j)).
+system O: 
+  out(cO,<<pk(kA),pk(kAbis)>,pk(kB)>); 
+  (!_i A(i) | !_ibis Abis(ibis) | !_j B(j)).
 
 (**
 This axiom states that the length of a pair is equal to the sum of the lengths
@@ -121,20 +133,20 @@ encryption satisfies key privacy and IND-CCA1 assumptions.
 **)
 Proof.
   (**
-  We start by adding to the frame the two public keys `pk(kA)` and `pk(kB)` 
-  since any execution starts by the action `O` outputting them.
+  We start by adding to the frame the two public keys `pk(kA)`, `pk(kAbis)`
+  and `pk(kB)` since any execution starts by the action `O` outputting them.
   This allows to simplify some cases in the proof below.
   **)
-  enrich pk(kA), pk(kB).
+  enrich pk(kA), pk(kAbis), pk(kB).
 
   induction t.
 
   (** Case where t = O.
-  This case is trivial thanks to the addition of `pk(kA)` and `pk(kB)` 
-  in the frame.
+  This case is trivial thanks to the addition of `pk(kA)`, `pk(kAbis)`
+  and `pk(kB)` in the frame.
   **)
   expandall.
-  fa 2.
+  fa 3.
 
   (** Case where t = A(i).
   The output of this action is the same on both sides. We show that this
@@ -147,41 +159,49 @@ Proof.
   `fresh` tactic.
   **)
   expandall.
-  fa 2. fa 3. fa 3. fa 3. fa 3. 
-  fresh 3. yesif 3.
-  fresh 3. yesif 3.
+  fa 3. fa 4. fa 4. fa 4. fa 4. 
+  fresh 5. yesif 5.
+  fresh 4. yesif 4.
+
+  (** Case where t = Abis(ibis).
+  Similar to the previous case.
+  **)
+  expandall.
+  fa 3. fa 4. fa 4. fa 4. fa 4. 
+  fresh 5. yesif 5.
+  fresh 4. yesif 4.
 
   (** Case where t = B(j). 
   We have to show that the output message does not give any information
   to the attacker to distinguish the left side from the right side.
   **)
   expand frame, output, exec, cond, dmess.
-  fa 2. fa 3. fa 3.
+  fa 3. fa 4. fa 4.
   (**
   We first use the key privacy assumption: knowing only a cipertext, it 
   should not be possible to know which specific key was used.
   The corresponding `enckp` tactic allows here to replace `kAbis` by `kA`
   on the right side.
   **)
-  enckp 3. 
+  enckp 4. 
   (**
   We now use the ciphertext indistinguishability (IND-CCA1) assumption,
   which requires to show that the lengths of the plaintexts on both sides
   are equal.
   **)
-  cca1 3.
+  cca1 4.
   (** We use the lemma `if_len` to push the conditional under len(_). **)
   rewrite if_len length.
   (** We use the `ifeq` tactic to replace `len(snd(dec(input@B(j),kB)))` 
   by `len(n(j))` in the then branch since this equality is implied by 
   the condition. **)  
-  ifeq 3, len(snd(dec(input@B(j),kB))), len(n(j)).
+  ifeq 4, len(snd(dec(input@B(j),kB))), len(n(j)).
   (** We now notice that the two branches of the conditional are equal,
   we can thus simplify the term by keeping only the then branch.
   Showing that the two branches are equal relies on the `length` axiom
   defined above. **)
-  trivialif 3. by rewrite length.
+  trivialif 4. by rewrite length.
   (** We conclude using the fact that `n(j)` is fresh. **)
-  fa 3. fa 3.
-  fresh 3. yesif 3.
+  fa 4. fa 4.
+  fresh 4. yesif 4.
 Qed.

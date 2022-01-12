@@ -5,15 +5,16 @@ The signed DDH protocol as described in [G] features two roles, P and S.
 Each role is associated to a secret key (skP and skS).
 
 P -> S : <pk(skP), g^a>
-S -> P : <pk(skS),g^b>,sign(<<g^a,g^b>,pk(kP)>,skS)
-P -> S : sign(<<g^b,g^a>,pk(kS)>,skP)
+S -> P : <pk(skS),g^b>,sign(<<g^a,g^b>,pk(skP)>,skS)
+P -> S : sign(<<g^b,g^a>,pk(skS)>,skP)
 
 We consider multiple sessions but two agents only (one agent for the role P and
 one agent for the role S) and show the strong secrecy of the shared key.
-  1/ We show that the key g^a^b as computed by P is indistinguishable from g^k 
-  with k fresh (system secretP).
-  2/ We show that the key g^a^b as computed by S is indistinguishable from g^k
-  with k fresh (system secretS).
+
+* In this file `signed-ddh-P.sp`, we show that the key g^a^b as computed by P 
+  is indistinguishable from g^k with k fresh (system secretP).
+* In another file `signed-ddh-S.sp`, we show that the key g^a^b as computed by S 
+  is indistinguishable from g^k with k fresh (system secretS).
 
 [G] ISO/IEC 9798-3:2019, IT Security techniques – Entity authentication –
 Part 3: Mechanisms using digital signature techniques.
@@ -57,7 +58,7 @@ We also declare a signature scheme by specifying 3 function symbols.
 signature sign,checksign,pk
 
 (**
-In the first system `secretP`, we add an output at the end of the role of P.
+In the system `secretP`, we add an output at the end of the role of P.
 This output is actually a bi-term:
 * the left side of the system outputs the shared key as computed by P,
 * the right side of the system outputs `g^k(i,j)` where `k(i,j)` is fresh.
@@ -93,36 +94,6 @@ process S(j:index) =
 
 system [secretP] (!_i Pchall(i) | !_j S(j)).
 
-
-(**
-The second system `secretS` is the counterpart of the system `secretP`.
-This time, we add an output at the end of the role of S.
-**)
-process P(i:index) =
-  out(cP, <pk(skP),g^a(i)>);
-  in(cP, x2);
-  let gs = snd(fst(x2)) in
-  let pks = fst(fst(x2)) in
-  if checksign(snd(x2),pks) = <<g^a(i),gs>,pk(skP)> && pks = pk(skS) then
-    out(cP,sign(<<gs,g^a(i)>,pks>,skP))
-
-process Schall(j:index) =
-  in(cS, x1);
-  let gp = snd(x1) in
-  let pkp = fst(x1) in
-  if pkp = pk(skP) then
-    out(cS, < <pk(skS),g^b(j)>, sign(<<gp,g^b(j)>,pkp>,skS)>);
-    in(cS, x3);
-    if checksign(x3,pkp) = <<g^b(j),gp>,pk(skS)> then
-      out(cS,ok);
-      in(cS, challenge);
-      try find i such that gp = g^a(i) in
-        out(cS, diff(g^a(i)^b(j),g^k(i,j)))
-      else 
-        out(cS, diff(ok,ko))
-
-system [secretS] (!_i P(i) | !_j Schall(j)).
-
 (**
 In the proof of strong secrecy for the system `secretP`, we will use 
 the following property, stating that whenever P accepts a message from S, 
@@ -150,27 +121,6 @@ Proof.
   (** The conclusion is now trivial from the Meq1 and D1 hypotheses. **)
   by exists j.
 Qed.
-
-(**
-We show a similar result for the system `secretS`.
-**)
-goal [secretS] S_charac (j:index):
-  happens(S1(j)) =>
-    exec@S1(j) => 
-      exists (i:index), snd(input@S(j)) = g^a(i).
-Proof.
-  intro Hap Hexec.
-  expand exec.
-  executable pred(S1(j)).
-  depends S(j), S1(j).
-  use H1 with S(j).
-  expand exec, cond, pkp(j)@S1(j).
-  assert fst(input@S(j)) = pk(skP) as Meq'.
-  rewrite Meq' in H0.
-  euf H0.
-  by exists i.
-Qed.
-
 
 (**
 We now show the strong secrecy of the shared key for the system `secretP`,
@@ -225,36 +175,5 @@ Proof.
     by use H1 with j.
   fa 5. fa 6.
   (** It now remains to simplify `if false then diff(ok,ko)`. **)
-  by noif 6.
-Qed.
-
-(** 
-We show the counterpart for the system `secretS`, for which the proof
-is carried out exactly in the same way. 
-**)
-equiv [secretS] strongSecS.
-Proof.
-  enrich 
-    skP, skS, 
-    seq(i:index ->g^a(i)), 
-    seq(j:index ->g^b(j)),
-    seq(i,j:index ->diff(g^a(i)^b(j),g^k(i,j))).
-
-  induction t; try (by expandall; apply IH).
-
-  (* init *)
-  expandall.
-  by ddh g,a,b,k.
-
-  (* Schall3 *)
-  expand frame, exec, output.
-  equivalent exec@pred(Schall3(j)) && cond@Schall3(j), False.
-    expand cond.
-    executable pred(Schall3(j)).
-    depends S1(j), Schall3(j).
-    use H2 with S1(j).
-    use S_charac with j.
-    by use H1 with i.
-  fa 5. fa 6.
   by noif 6.
 Qed.

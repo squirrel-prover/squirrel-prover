@@ -29,9 +29,12 @@ It states that, if the values stored in the memory cell `s` are strongly
 secret (this is expressed by the formula `equiv(frame@tau, diff(s(i)@tau',m))`), 
 then the value `s(i)@tau'` is weakly secret, _i.e._ the attacker cannot deduce 
 this value (this is expressed by the formula `[input@tau <> s(i)@tau']`).
-Note that this global meta-logic formula is defined w.r.t. the same system for
-the left and the right projections: the only difference is the `diff(_,_)` term.
-This is why we have `[default/left,default/left]` in the declaration.
+Note that `happens(pred(tau))` is needed for the proof, and actually implies 
+`happens(tau)`.
+Note that this global meta-logic formula is defined w.r.t. the same system 
+(`default/left`) for the left and the right projections.
+This is a technical restriction coming from the fact that, in the current
+implementation of Squirrel, global and local hypotheses cannot coexist.
 **)
 global goal [default/left,default/left] secrecy (i:index,tau,tau':timestamp):
   [happens(pred(tau))]
