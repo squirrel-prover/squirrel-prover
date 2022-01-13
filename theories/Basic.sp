@@ -286,4 +286,29 @@ goal len_diff (x, y : message) : len(diff(x,y)) = diff(len(x), len(y)).
 Proof. by project. Qed.
 
 
+(*------------------------------------------------------------------*)
+(* if-and-only-if *)
+
+goal iff_refl (x : boolean) : (x <=> x) = true.
+Proof.
+ by rewrite eq_iff. 
+Qed.
+hint rewrite iff_refl.
+
+goal iff_sym (x, y: boolean) : (x <=> y) = (y <=> x). 
+Proof.
+ by rewrite eq_iff. 
+Qed.
+
+goal true_iff_false : (true <=> false) = false.
+Proof.
+ by rewrite -eq_iff. 
+Qed.
+hint rewrite true_iff_false.
+
+goal false_iff_true : (false <=> true) = false.
+Proof.
+ by rewrite -eq_iff. 
+Qed.
+hint rewrite false_iff_true.
 
