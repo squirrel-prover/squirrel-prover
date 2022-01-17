@@ -32,6 +32,28 @@ let esc_char (escaping : bool ref) (c : char) : unit =
 let esc_string (s : string) : unit =
   String.iter (esc_char (ref true)) s
 
+(** TODO *)
+let print_pandoc (s : string) : unit =
+  let (pipe_out, pipe_in) = Unix.pipe() in
+  let c_pipe_in = Unix.out_channel_of_descr pipe_in in
+  output_string c_pipe_in s ;
+  close_out c_pipe_in ;
+  let (result_out, result_in) = Unix.pipe() in
+  ignore (Unix.create_process "pandoc" 
+    [|"pandoc" ; "-f" ; "markdown" ; "-t" ; "html"|]
+    pipe_out result_in Unix.stderr) ;
+  Unix.close pipe_out;
+  Unix.close result_in;
+  let c_result = Unix.in_channel_of_descr result_out in
+  try
+    while true do
+      let line = input_line c_result in
+      output_string !current_out_c line ;
+      output_char !current_out_c '\n'
+    done
+  with
+  | End_of_file -> close_in c_result
+
 (** Print the output formatted with html tag
   * Input and comments are read in [!lex]
   * Output must be already stored in the standard buffer (standard output for Html printer mode).*)
@@ -66,7 +88,7 @@ let pp () =
     output_string !current_out_c (Format.asprintf
       "<span class=\"com-line\" id=\"com%d\">"
       !counter);
-    esc_string concat_com;
+    print_pandoc concat_com;
     output_string !current_out_c "</span>\n"
   end ;
   

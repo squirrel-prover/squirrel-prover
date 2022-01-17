@@ -1,5 +1,5 @@
 (** This module permit to write the html output into its file *)
-
+val print_pandoc : string -> unit
 (** Print the output formatted with its html tag
   * - Input and comments are read in [!lex]
   * - Output must be already stored in the standard buffer (standard output for Html printer mode)
