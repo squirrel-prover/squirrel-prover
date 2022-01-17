@@ -11,7 +11,7 @@ let counter = ref 0
 (** Print [c].
   * Escape it if it is a html reserved character,
   * unless previous character was ESC *)
-let esc_char (escaping : bool ref) (c : char) : unit =
+let print_esc_char (escaping : bool ref) (c : char) : unit =
   if !escaping then begin
     match c with
     | '\x1B' -> escaping := false;
@@ -29,21 +29,28 @@ let esc_char (escaping : bool ref) (c : char) : unit =
 
 (** Print [s].
   * Escape html reserved characters *)
-let esc_string (s : string) : unit =
-  String.iter (esc_char (ref true)) s
+let print_esc_string (s : string) : unit =
+  String.iter (print_esc_char (ref true)) s
 
-(** TODO *)
+(** Print string [s], translating markdown into html
+    Use pandoc *)
 let print_pandoc (s : string) : unit =
+  (*Write s into a first pipe*)
   let (pipe_out, pipe_in) = Unix.pipe() in
   let c_pipe_in = Unix.out_channel_of_descr pipe_in in
   output_string c_pipe_in s ;
   close_out c_pipe_in ;
+  
+  (*Write the result of pandoc into a second pipe*)
   let (result_out, result_in) = Unix.pipe() in
-  ignore (Unix.create_process "pandoc" 
+  let _ = Unix.create_process "pandoc" 
     [|"pandoc" ; "-f" ; "markdown" ; "-t" ; "html"|]
-    pipe_out result_in Unix.stderr) ;
+    pipe_out result_in Unix.stderr
+  in
   Unix.close pipe_out;
   Unix.close result_in;
+  
+  (*Print the output of the second pipe*)
   let c_result = Unix.in_channel_of_descr result_out in
   try
     while true do
@@ -70,9 +77,9 @@ let pp () =
     "<span class=\"input-line\" id=\"in%d\">"
     !counter);
   if concat_com <> "" then
-    esc_string (String.trim input_line)
+    print_esc_string (String.trim input_line)
   else
-    esc_string input_line;
+    print_esc_string input_line;
   output_string !current_out_c "</span>\n";
 
   (*Print output lines*)
@@ -80,7 +87,7 @@ let pp () =
     "<span class=\"output-line\" id=\"out%d\">"
     !counter);
   let output_line = (Format.flush_str_formatter ()) in
-  esc_string output_line;
+  print_esc_string output_line;
   output_string !current_out_c "</span>\n";
   
   (*Print comments*)
