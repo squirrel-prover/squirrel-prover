@@ -162,3 +162,21 @@ body {
 	background: none;
 	white-space: nowrap;
 }
+
+.comment h1, .comment h2, .comment h3,
+.comment h4, .comment h5, .comment h6 {
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  font-weight: normal;
+  color:#8B0000
+}
+
+.comment code{
+  font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  font-size: 1rem;
+  color: #8B0000;
+}
+
+.comment hr{
+  color: #8B0000;
+}
