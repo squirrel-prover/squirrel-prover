@@ -163,12 +163,20 @@ body {
 	white-space: nowrap;
 }
 
+.comment :first-child {
+    margin-top: 0
+}
+
 .comment h1, .comment h2, .comment h3,
 .comment h4, .comment h5, .comment h6 {
   margin-top: 2rem;
   margin-bottom: 1rem;
   font-weight: normal;
   color:#8B0000
+}
+
+.comment p{
+  margin: 1rem 0 0;
 }
 
 .comment code{
@@ -178,5 +186,10 @@ body {
 }
 
 .comment hr{
+  margin: 1rem 0;
   color: #8B0000;
+}
+
+.comment ul{
+  margin: 0;
 }
