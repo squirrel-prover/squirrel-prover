@@ -137,10 +137,7 @@ let make table hint_db parsed_goal : statement*t =
           let s = TS.init ~system ~table ~hint_db ~ty_vars ~env f in
           `Reach (Term.mk_forall vars f), Trace s
       | Global f ->
-          (* TODO ty_vars are not passed, I'm not sure it makes sense:
-           * assuming them to be empty, just in case, for now. *)
-          assert (ty_vars = []) ;
-          let f = Theory.convert_global_formula conv_env [] env f in
+          let f = Theory.convert_global_formula conv_env ty_vars env f in
           let s = ES.init ~system ~table ~hint_db ~ty_vars ~env f in
           `Equiv (Equiv.mk_forall vars f), Equiv s
       | Obs_equiv ->
