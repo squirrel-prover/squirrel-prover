@@ -142,7 +142,7 @@ module Mk (Args : MkArgs) : S with
       (type a)
       (f_kind : a Equiv.f_kind) 
       (f      : a) 
-    : (Vars.evar * a) option
+    : (Vars.var * a) option
     =
     match f_kind with
     | Equiv.Local_t  ->  Term.Smart.destr_forall1 f
@@ -158,7 +158,7 @@ module Mk (Args : MkArgs) : S with
       (type a)
       (f_kind : a Equiv.f_kind) 
       (f      : a) 
-    : Vars.evars * a 
+    : Vars.vars * a 
     =
     match f_kind with
     | Equiv.Local_t  ->  Term.Smart.decompose_forall f
@@ -284,9 +284,9 @@ module Mk (Args : MkArgs) : S with
 
         | Some (f_arg, f) ->
           (* refresh the variable *)
-          let f_arg, fs = Term.erefresh_vars `Global [f_arg] in
+          let f_arg, fs = Term.refresh_vars `Global [f_arg] in
           let f = Equiv.Babel.subst f_kind fs f in
-          let Vars.EVar f_arg = as_seq1 f_arg in
+          let f_arg = as_seq1 f_arg in
 
           let ty = Vars.ty f_arg in
           let t = 
@@ -296,12 +296,10 @@ module Mk (Args : MkArgs) : S with
               p_arg ty
           in
 
-          let new_p_vs = 
-            Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
-          in
+          let new_p_vs = Sv.filter Vars.is_pat (Term.fv t) in
           pat_vars := Sv.union (!pat_vars) new_p_vs;
 
-          let mv = Match.Mvar.add (Vars.EVar f_arg) (Term.ETerm t) mv in
+          let mv = Match.Mvar.add f_arg t mv in
           mv, f
       in
 
@@ -405,15 +403,15 @@ module Mk (Args : MkArgs) : S with
     let subst = Match.Mvar.to_subst ~mode mv in
     let f = Equiv.Babel.subst f_kind subst pat.pat_term in
 
-    assert (Sv.for_all (fun (Vars.EVar v) -> Vars.is_pat v) pat_vars);
+    assert (Sv.for_all Vars.is_pat pat_vars);
 
     (* renamed remaining pattern variables,
        to avoir having variable named '_' in the rest of the prover. *)
     let subst, pat_vars = 
-        Sv.map_fold (fun subst (Vars.EVar v) -> 
+        Sv.map_fold (fun subst v -> 
           let new_v = Vars.make_new (Vars.ty v) "x" in
           Term.ESubst (Term.mk_var v, Term.mk_var new_v) :: subst, 
-          Vars.EVar new_v
+          new_v
           ) [] pat_vars
     in
     let f = Equiv.Babel.subst f_kind subst f in
@@ -457,7 +455,7 @@ module Mk (Args : MkArgs) : S with
     (* generalize remaining universal variables in f *)
     (* FIXME: don't generalize in convert_pt_gen *)
     let f_args, f = decompose_forall_k f_kind f in
-    let f_args, subst = Term.erefresh_vars `Global f_args in
+    let f_args, subst = Term.refresh_vars `Global f_args in
     let f = Equiv.Babel.subst f_kind subst f in
     let pat_vars = 
       List.fold_left (fun pat_vars v -> Sv.add v pat_vars) pat_vars f_args

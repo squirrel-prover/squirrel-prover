@@ -60,7 +60,7 @@ end
 
 (*------------------------------------------------------------------*)
 module Utv : sig
-  type uvar = Utv of Vars.timestamp | Uind of Vars.index
+  type uvar = Utv of Vars.timestamp | Uind of Vars.var
 
   type ut = { hash : int;
               cnt  : ut_cnt }
@@ -72,19 +72,19 @@ module Utv : sig
     | UInit
     | UUndef                    (* (x <> UUndef) iff. (Happens x) *)
 
-  val uvari  : Vars.index -> ut
-  val uts    : Term.timestamp -> ut
+  val uvari  : Vars.var -> ut
+  val uts    : Term.term -> ut
   val uname  : Symbols.action Symbols.t -> ut list -> ut
   val upred  : ut -> ut
   val uinit  : ut
   val uundef : ut
 
-  val ut_to_term : 'a Type.kind -> ut -> 'a Term.term 
+  val ut_to_term : 'a Type.kind -> ut -> Term.term 
 
   module Ut : Hashtbl.HashedType with type t = ut
 
 end = struct
-  type uvar = Utv of Vars.timestamp | Uind of Vars.index
+  type uvar = Utv of Vars.timestamp | Uind of Vars.var
 
   type ut = { hash : int;
               cnt  : ut_cnt; }
@@ -298,7 +298,7 @@ module Form = struct
         ) (norm_atom atom)
     in
 
-    let mk_idx (od,i1,i2  : [`Eq | `Neq] * Vars.index * Vars.index) =
+    let mk_idx (od,i1,i2  : [`Eq | `Neq] * Vars.var * Vars.var) =
       let od = (od :> [`Eq | `Neq | `Leq]) in
       [Lit (od, uvari i1, uvari i2)]
     in
@@ -1377,7 +1377,7 @@ let max_elems_model (model : model) elems =
 
   model, melems
 
-let maximal_elems ~precise (models : models) (elems : Term.timestamp list) =
+let maximal_elems ~precise (models : models) (elems : Term.term list) =
   (* Invariant: [maxs_acc] is sorted and without duplicates. *)
   let rmodels, maxs = List.fold_left (fun (models, maxs_acc) m ->
       let m, m_maxs = max_elems_model m elems in
@@ -1404,7 +1404,7 @@ let get_ind_equalities ~precise (models : models) inds =
     ) inds
 
 
-let find_eq_action (models : models) (t : Term.timestamp) =
+let find_eq_action (models : models) (t : Term.term) =
   (** [action_model model t] returns an action equal to [t] in [model] *)
   let action_model model = 
     let model, ut = ext_support model (uts t) in

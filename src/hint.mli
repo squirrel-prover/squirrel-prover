@@ -15,4 +15,4 @@ type p_hint =
   | Hint_rewrite of lsymb
 
 val add_hint_rewrite : 
-  lsymb -> Type.tvars -> Term.message -> hint_db -> hint_db
+  lsymb -> Type.tvars -> Term.term -> hint_db -> hint_db

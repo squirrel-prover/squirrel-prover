@@ -60,8 +60,8 @@ type function_def =
 (*------------------------------------------------------------------*)
 type macro_def =
   | Input | Output | Cond | Exec | Frame
-  | State  of int * Type.tmessage
-  | Global of int * Type.tmessage
+  | State  of int * Type.ty
+  | Global of int * Type.ty
 
 (*------------------------------------------------------------------*)
 type bty_info =
@@ -72,8 +72,8 @@ type bty_def = bty_info list
 
 (*------------------------------------------------------------------*)
 type name_def = {
-  n_iarr : int;                  (* index arity *)
-  n_ty   : Type.message Type.ty; (* type *)
+  n_iarr : int;     (** index arity *)
+  n_ty   : Type.ty; (** type *)
 }
 
 (*------------------------------------------------------------------*)
@@ -506,14 +506,14 @@ end)
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)
 
-let get_bty_info table (ty : Type.tmessage) : bty_info list =
+let get_bty_info table (ty : Type.ty) : bty_info list =
   match ty with
     | Type.Boolean -> []
     | Type.Message -> [Ty_large; Ty_name_fixed_length]
     | Type.TBase b -> BType.get_def (BType.cast_of_string b) table
-    | Type.TUnivar _ | Type.TVar _ -> []
+    | _ -> []
 
-let check_bty_info table (ty : Type.tmessage) (info : bty_info) : bool =
+let check_bty_info table (ty : Type.ty) (info : bty_info) : bool =
   let infos = get_bty_info table ty in
   List.mem info infos
 
@@ -566,7 +566,7 @@ let () = builtin_ref := table
 (** {3 Function symbols builtins} *)
 
 (** makes simple function types of [ty^arity] to [ty] *)
-let mk_fty arity (ty : Type.tmessage) =
+let mk_fty arity (ty : Type.ty) =
   Type.mk_ftype 0 [] (List.init arity (fun _ -> ty)) ty
 
 let mk_fsymb ?fty ?(bool=false) ?(f_info=`Prefix) f arity =

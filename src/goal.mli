@@ -34,7 +34,7 @@ type ('a,'b) abstract_statement = {
 (*------------------------------------------------------------------*)
 type       statement = (string,  Equiv.gform) abstract_statement
 type equiv_statement = (string,   Equiv.form) abstract_statement
-type reach_statement = (string, Term.message) abstract_statement
+type reach_statement = (string, Term.term) abstract_statement
 
 (*------------------------------------------------------------------*)
 val is_reach_statement : statement -> bool
@@ -67,7 +67,7 @@ end
 (** {2 Create trace and equivalence goals} *)
 
 val make_obs_equiv :
-  ?enrich:Term.message list ->
+  ?enrich:Term.term list ->
   Symbols.table ->
 Hint.hint_db -> 'a -> SystemExpr.t -> [> `Equiv of Equiv.form ] * t
 

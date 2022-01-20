@@ -15,7 +15,7 @@ type global_data = {
   inputs  : Vars.message list;
   (** inputs of the macro, as variables, in order *)
 
-  indices : Vars.index list;
+  indices : Vars.var list;
   (** free indices of the macro, which corresponds to the prefix of
       the indices of the action defining the macro *)
 
@@ -23,10 +23,10 @@ type global_data = {
   (** free timestamp variable of the macro, which can only be instantiated
       by a strict suffix of [action] *)
 
-  default_body    : Term.message;
+  default_body    : Term.term;
   (** macro body shared by all systems *)
 
-  systems_body    : (SE.single_system * Term.message) list;
+  systems_body    : (SE.single_system * Term.term) list;
   (** Optional alternative definitions of the body for a given system.
       Used by System modifiers.
   *)
@@ -128,7 +128,7 @@ let is_defined name a table =
     | Symbols.Global _, _ -> assert false
 
 (*------------------------------------------------------------------*)
-type def_result = [ `Def of Term.message | `Undef | `MaybeDef ]
+type def_result = [ `Def of Term.term | `Undef | `MaybeDef ]
 
 (* give the definition of the global macro [symb] at timestamp [a]
    corresponding to action [action]
@@ -140,7 +140,7 @@ let get_def_glob
     (system : SE.t)
     (table  : Symbols.table)
     (symb   : Term.msymb)
-    (a      : Term.timestamp)
+    (a      : Term.term)
     (action : Action.action)
     ({action = glob_a; inputs; indices; ts; default_body; systems_body} as data : global_data) : def_result
   =
@@ -184,7 +184,7 @@ let _get_definition
     (system : SE.t)
     (table  : Symbols.table)
     (symb   : Term.msymb)
-    (a      : Term.timestamp) : [ `Def of Term.message | `Undef | `MaybeDef ]
+    (a      : Term.term) : [ `Def of Term.term | `Undef | `MaybeDef ]
   =
   match Symbols.Macro.get_all symb.s_symb table with
   | Symbols.Input, _ ->
@@ -253,7 +253,7 @@ let _get_definition
     begin try
         (* Look for an update of the state macro [name] in the
            updates of [action] *)
-        let (ns, msg) : Term.state * Term.message =
+        let (ns, msg) : Term.state * Term.term =
           List.find (fun (ns,_) ->
               ns.Term.s_symb = symb.s_symb &&
               List.length ns.Term.s_indices = List.length symb.s_indices
@@ -304,7 +304,7 @@ let _get_definition
 let get_definition
     (cntxt : Constr.trace_cntxt)
     (symb  : Term.msymb)
-    (ts    : Term.timestamp) : def_result
+    (ts    : Term.term) : def_result
   =
   (* try to find an action equal to [ts] in [cntxt] *)
   let ts_action =
@@ -325,7 +325,7 @@ let get_definition
 let get_definition_exn
     (cntxt : Constr.trace_cntxt)
     (symb  : Term.msymb)
-    (ts    : Term.timestamp) : Term.message
+    (ts    : Term.term) : Term.term
   =
   match get_definition cntxt symb ts with
   | `Undef ->
@@ -341,7 +341,7 @@ let get_definition_exn
 let get_dummy_definition
     (table  : Symbols.table)
     (system : SE.t)
-    (symb : Term.msymb) : Term.message
+    (symb : Term.msymb) : Term.term
   =
   match Symbols.Macro.get_all symb.s_symb table with
   | Symbols.Global _,

@@ -103,8 +103,8 @@ let hashes_of_action_descr
 type euf_schema = {
   action_name  : Symbols.action Symbols.t;
   action       : Action.action;
-  message      : Term.message;
-  key_indices  : Vars.index list;
+  message      : Term.term;
+  key_indices  : Vars.var list;
   env          : Vars.env;
 }
 
@@ -118,8 +118,8 @@ let pp_euf_schema ppf case =
     [e] of type [euf_case] represents the fact that the message [e.m]
     has been hashed, and the key indices were [e.eindices]. *)
 type euf_direct = { 
-  d_key_indices : Vars.index list;
-  d_message     : Term.message 
+  d_key_indices : Vars.var list;
+  d_message     : Term.term 
 }
 
 let pp_euf_direct ppf case =
@@ -200,8 +200,7 @@ let mk_rule ?(elems=[]) ?(drop_head=true) ~fun_wrap_key
       let vars = Term.get_vars m in
       let vars =
         List.fold_left (fun vars i ->
-            if List.mem (Vars.EVar i) vars then vars else
-              Vars.EVar i :: vars
+            if List.mem i vars then vars else i :: vars
           ) vars is
       in
       (* Remove already handled variables, create substitution. *)
@@ -209,15 +208,15 @@ let mk_rule ?(elems=[]) ?(drop_head=true) ~fun_wrap_key
         not (List.mem i safe_is) &&
         not (List.mem i action_descr.Action.indices)
       in
-      let not_seen = function
-        | Vars.EVar v -> match Vars.ty v with
-          | Type.Index -> index_not_seen v
-          | _ -> true
+      let not_seen = fun v ->
+        match Vars.ty v with
+        | Type.Index -> index_not_seen v
+        | _ -> true
       in
 
       let vars = List.filter not_seen vars in
       List.map
-        (function Vars.EVar v ->
+        (fun v ->
            Term.(ESubst (mk_var v,
                          mk_var (Vars.fresh_r env v))))
         vars

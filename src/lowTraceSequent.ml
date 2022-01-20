@@ -75,7 +75,7 @@ module S : sig
     hyps : H.hyps;
     (** Hypotheses *)
     
-    conclusion : Term.message;
+    conclusion : Term.term;
     (** The conclusion / right-hand side formula of the sequent. *)    
   }
 
@@ -85,7 +85,7 @@ module S : sig
     hint_db:Hint.hint_db ->
     ty_vars:Type.tvars ->
     env:Vars.env ->
-    conclusion:Term.message ->
+    conclusion:Term.term ->
     t
 
   val update :
@@ -94,7 +94,7 @@ module S : sig
     ?ty_vars:Type.tvars ->
     ?env:Vars.env ->
     ?hyps:H.hyps ->
-    ?conclusion:Term.message ->
+    ?conclusion:Term.term ->
     t -> t
 
 end = struct
@@ -106,7 +106,7 @@ end = struct
     env        : Vars.env;
     (* hind_db    : Reduction. *)
     hyps       : H.hyps;
-    conclusion : Term.message;
+    conclusion : Term.term;
   }
 
   let init_sequent ~system ~table ~hint_db ~ty_vars ~env ~conclusion = {
@@ -172,8 +172,8 @@ let get_atoms_from_s (s : sequent) : Term.literal list =
   let fhyps = H.fold (fun _ f acc -> f :: acc) s.hyps [] in
   get_atoms_of_fhyps fhyps
 
-let get_message_atoms (s : sequent) : Term.message_atom list =
-  let do1 (at : Term.literal) : Term.message_atom option =
+let get_message_atoms (s : sequent) : Term.term_atom list =
+  let do1 (at : Term.literal) : Term.term_atom option =
     match at with 
     | `Pos, (`Message _ as at) -> Some at
     | `Neg, (`Message _ as at) -> Some (Term.not_message_atom at)
@@ -330,7 +330,7 @@ module Hyps = struct
   (** Add to [s] equalities corresponding to the expansions of all macros
     * occurring in [f], if [f] happened. *)
   let rec add_macro_defs (s : sequent) f =
-    let macro_eqs : (Term.timestamp * Term.message) list ref = ref [] in
+    let macro_eqs : (Term.term * Term.term) list ref = ref [] in
     let cntxt = Constr.{ 
         table = s.table;
         system = s.system;
@@ -355,7 +355,7 @@ module Hyps = struct
       ) s !macro_eqs
 
   and add_form_aux
-      ?(force=false) (id : Ident.t option) (s : sequent) (f : Term.message) =
+      ?(force=false) (id : Ident.t option) (s : sequent) (f : Term.term) =
     let recurse =
       (not (H.is_hyp (`Reach f) s.hyps)) && (Config.auto_intro ()) in
 

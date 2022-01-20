@@ -24,7 +24,7 @@ let distance a b =
 
 type shape = int t
 
-type action = (Vars.index list) t
+type action = (Vars.var list) t
 
 let rec get_shape = function
   | [] -> []
@@ -62,7 +62,7 @@ let same_shape a b : Term.subst option =
 
 (** Action symbols *)
 
-type Symbols.data += Data of Vars.index list * action
+type Symbols.data += Data of Vars.var list * action
 
 let fresh_symbol table ~exact name =
   if exact
@@ -148,7 +148,7 @@ let rec subst_action (s : Term.subst) (a : action) : action =
       sum_choice = q, List.map (Term.subst_var s) lq }
     :: subst_action s l
 
-let of_term (s:Symbols.action Symbols.t) (l:Vars.index list) table : action =
+let of_term (s:Symbols.action Symbols.t) (l:Vars.var list) table : action =
   let l',a = of_symbol s table in
   let subst =
     List.map2 (fun x y -> Term.ESubst (Term.mk_var x,Term.mk_var y)) l' l
@@ -171,10 +171,10 @@ type descr = {
   name      : Symbols.action Symbols.t ;
   action    : action ;
   input     : Channel.t * string ;
-  indices   : Vars.index list ;
-  condition : Vars.index list * Term.message ;
-  updates   : (Term.state * Term.message) list ;
-  output    : Channel.t * Term.message;
+  indices   : Vars.var list ;
+  condition : Vars.var list * Term.term ;
+  updates   : (Term.state * Term.term) list ;
+  output    : Channel.t * Term.term;
   globals   : Symbols.macro Symbols.t list;
   (** list of global macros declared at [action] *)
 }
@@ -205,7 +205,7 @@ let subst_descr subst descr =
 
 (* Apply an iterator to all terms of the descr. *)
 let apply_descr iter descr =
-  let env = Vars.of_list (List.map Vars.evar descr.indices) in
+  let env = Vars.of_list (List.map Vars.var descr.indices) in
   let iter = iter env in
   let condition =
      fst descr.condition,
@@ -296,16 +296,16 @@ let rec dummy (shape : shape) : action =
 (** {2 FA-DUP } *)
 
 let is_dup_match
-    (is_match : Term.eterm -> Term.eterm -> 'a -> 'a option)
+    (is_match : Term.term -> Term.term -> 'a -> 'a option)
     (st    : 'a)
     (table : Symbols.table)
-    (elem  : Term.message)
-    (elems : Term.message list) : 'a option
+    (elem  : Term.term)
+    (elems : Term.term list) : 'a option
   =
   (* try to match [t] and [t'] modulo ≤ *)
   let is_dup_leq table st t t' : 'a option =
     let rec leq t t' =
-      match is_match (ETerm t) (ETerm t') st with
+      match is_match t t' st with
       | Some st -> Some st
       | None ->
         match t,t' with
@@ -325,7 +325,7 @@ let is_dup_match
 
   let direct_match =
     List.find_map (fun t' ->
-        is_match (ETerm elem) (ETerm t') st
+        is_match elem t' st
       ) elems
   in
   match direct_match with
@@ -356,7 +356,7 @@ let is_dup_match
     | _ -> None
 
 let is_dup table t t' : bool =
-  let is_match (Term.ETerm t) (Term.ETerm t') () =
+  let is_match t t' () =
     match Type.equalk_w (Term.kind t) (Term.kind t') with
     | None -> None
     | Some Type.Type_eq ->

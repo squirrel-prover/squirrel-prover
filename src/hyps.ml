@@ -189,7 +189,7 @@ module type HypsSeq = sig
     (TacticsArgs.naming_pat * hyp) list -> sequent -> Ident.t list * sequent
   val add_list   : (TacticsArgs.naming_pat * hyp) list -> sequent -> sequent
 
-  val pp_hyp   : Format.formatter -> 'a Term.term -> unit
+  val pp_hyp   : Format.formatter -> Term.term -> unit
   val pp_ldecl : ?dbg:bool -> Format.formatter -> ldecl -> unit
 
   val fresh_id  : ?approx:bool -> string -> sequent -> Ident.t

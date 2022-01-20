@@ -6,7 +6,7 @@ module Sv = Vars.Sv
 type prf_param = {
   h_fn  : Term.fname;   (** function name *)
   h_fty : Type.ftype;   (** Hash function type *)
-  h_cnt : Term.message; (** contents, i.e. hashed message *)
+  h_cnt : Term.term; (** contents, i.e. hashed message *)
   h_key : Term.nsymb;   (** key *)
 }
 
@@ -26,7 +26,7 @@ let prf_mk_direct env (param : prf_param) (occ : Iter.hash_occ) =
 
   let vars = occ.occ_vars in
 
-  let vars, subst = Term.erefresh_vars (`InEnv env) (Sv.elements vars) in
+  let vars, subst = Term.refresh_vars (`InEnv env) (Sv.elements vars) in
 
   let is, m = occ.occ_cnt in
   let is = List.map (Term.subst_var subst) is in
@@ -43,7 +43,7 @@ let prf_mk_direct env (param : prf_param) (occ : Iter.hash_occ) =
 
 (*------------------------------------------------------------------*)
 (** triple of the action, the key indices and the term *)
-type prf_occ = (Action.action * Vars.index list * Term.message) Iter.occ
+type prf_occ = (Action.action * Vars.var list * Term.term) Iter.occ
 
 (** check if all instances of [o1] are instances of [o2].
     [o1] and [o2] actions must have the same action name *)
@@ -81,12 +81,12 @@ let prf_mk_indirect
     (cntxt         : Constr.trace_cntxt)
     (param         : prf_param)
     (frame_actions : Fresh.ts_occs)
-    (hash_occ      : prf_occ) : Term.message
+    (hash_occ      : prf_occ) : Term.term
   =
   let env = ref env in
 
   let vars = Sv.elements hash_occ.Iter.occ_vars in
-  let vars, subst = Term.erefresh_vars (`InEnv env) vars in
+  let vars, subst = Term.refresh_vars (`InEnv env) vars in
 
   let action, hash_is, hash_m = hash_occ.Iter.occ_cnt in
 
@@ -119,7 +119,7 @@ let prf_mk_indirect
 
 (*------------------------------------------------------------------*)
 (** indirect case in a PRF application: PRF hash occurrence, sources *)
-type prf_case = prf_occ * Term.message list
+type prf_case = prf_occ * Term.term list
 
 (** map from action names to PRF cases *)
 type prf_cases_sorted = (Symbols.action Symbols.t * prf_case list) list
@@ -225,8 +225,8 @@ let prf_condition_side
     (cntxt : Constr.trace_cntxt)
     (env : Vars.env)
     (biframe : Equiv.equiv)
-    (e : Term.message)
-    (hash : Term.message) : (Term.form * Term.form) option
+    (e : Term.term)
+    (hash : Term.term) : (Term.form * Term.form) option
   =
   let exception HashNoOcc in
   try
@@ -243,7 +243,7 @@ let prf_condition_side
     let e_without_hash = Term.pi_term proj e_without_hash in
 
     (* [hash] does not appear on this side *)
-    if not (Sv.mem (Vars.EVar v) (Term.fv e_without_hash)) then
+    if not (Sv.mem v (Term.fv e_without_hash)) then
       raise HashNoOcc;
 
     let e_without_hash =

@@ -92,7 +92,7 @@ type option_name =
   | Oracle_for_symbol of string
 
 type option_val =
-  | Oracle_formula of Term.message
+  | Oracle_formula of Term.term
 
 type option_def = option_name * option_val
 
@@ -633,7 +633,7 @@ let define_oracle_tag_formula table (h : lsymb) f =
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
   let formula = Theory.convert conv_env [] Vars.empty_env f Type.Boolean in
     match formula with
-     |  Term.ForAll ([Vars.EVar uvarm;Vars.EVar uvarkey],f) ->
+     |  Term.ForAll ([uvarm; uvarkey],f) ->
          begin match Vars.ty uvarm,Vars.ty uvarkey with
          | Type.(Message, Message) ->
            add_option (Oracle_for_symbol (L.unloc h), Oracle_formula formula)

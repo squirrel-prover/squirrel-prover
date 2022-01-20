@@ -56,7 +56,7 @@ type ('a,'b) abstract_statement = {
 (*------------------------------------------------------------------*)
 type       statement = (string,  Equiv.gform) abstract_statement
 type equiv_statement = (string,   Equiv.form) abstract_statement
-type reach_statement = (string, Term.message) abstract_statement
+type reach_statement = (string, Term.term) abstract_statement
 
 (*------------------------------------------------------------------*)
 (** Generalized hypothesis: hypothesis or lemma identifier. *)
@@ -112,7 +112,7 @@ let make_obs_equiv ?(enrich=[]) table hint_db name system =
   let hyp = Equiv.(Atom (Reach happens)) in
   let s = ES.init ~system ~table ~hint_db ~ty_vars:[] ~env ~hyp goal in
   `Equiv
-    (Equiv.mk_forall [Vars.EVar ts] (Equiv.(Impl (hyp,goal)))),
+    (Equiv.mk_forall [ts] (Equiv.(Impl (hyp,goal)))),
           Equiv s
 
 

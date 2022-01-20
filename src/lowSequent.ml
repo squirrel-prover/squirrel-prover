@@ -68,12 +68,12 @@ module type S = sig
     * These functionalities only make sense for equivalence sequents. *)
 
   val mem_felem    : int -> t -> bool
-  val change_felem : ?loc:L.t -> int -> Term.message list -> t -> t
-  val get_felem    : ?loc:L.t -> int -> t -> Term.message
+  val change_felem : ?loc:L.t -> int -> Term.term list -> t -> t
+  val get_felem    : ?loc:L.t -> int -> t -> Term.term
 
   (** {2 Automated reasoning} *)
 
-  val query_happens : precise:bool -> t -> Term.timestamp -> bool
+  val query_happens : precise:bool -> t -> Term.term -> bool
 
   val mk_trace_cntxt : t -> Constr.trace_cntxt
 

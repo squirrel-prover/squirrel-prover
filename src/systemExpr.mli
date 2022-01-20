@@ -64,7 +64,7 @@ val project : Term.projection -> t -> t
     Remark that this requires both system to declare the action,
     with the same name. *)
 val action_to_term :
-  Symbols.table -> t -> Action.action -> Term.timestamp
+  Symbols.table -> t -> Action.action -> Term.term
 
 (*------------------------------------------------------------------*)
 (** {2 Action descriptions and iterators} *)
@@ -100,8 +100,8 @@ val map_descrs  : (Action.descr -> 'a)       -> Symbols.table -> t -> 'a list
 exception SystemNotFresh
 
 type esubst_descr =
-  | Condition of Term.message * Action.action
-  | Output of Term.message * Action.action
+  | Condition of Term.term * Action.action
+  | Output of Term.term * Action.action
 
 type subst_descr = esubst_descr list
 

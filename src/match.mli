@@ -14,7 +14,7 @@ type 'a pat = {
 
 (** Make a pattern out of a formula: all universally quantified variables
     are added to [pat_vars]. *)
-val pat_of_form : Term.message -> Term.message pat
+val pat_of_form : Term.term -> Term.term pat
 
 (*------------------------------------------------------------------*)
 (** {2 Matching variable assignment} *)
@@ -29,17 +29,17 @@ module Mvar : sig
   val union : t -> t -> t
 
   (** remove a variable assignment *)
-  val remove : Vars.evar -> t -> t
+  val remove : Vars.var -> t -> t
 
   (** add a variable assignment *)
-  val add : Vars.evar -> Term.eterm -> t -> t
+  val add : Vars.var -> Term.term -> t -> t
 
   (** check if a variable is assigned *)
-  val mem : Vars.evar -> t -> bool
+  val mem : Vars.var -> t -> bool
 
-  val filter : (Vars.evar -> Term.eterm -> bool) -> t -> t
+  val filter : (Vars.var -> Term.term -> bool) -> t -> t
 
-  val fold : (Vars.evar -> Term.eterm -> 'b -> 'b) -> t -> 'b -> 'b
+  val fold : (Vars.var -> Term.term -> 'b -> 'b) -> t -> 'b -> 'b
 
   val to_subst : mode:[`Match | `Unif] -> t -> Term.subst
 
@@ -51,7 +51,7 @@ end
 
 type match_res =
   | FreeTyv
-  | NoMatch of (Term.messages * Term.match_infos) option
+  | NoMatch of (Term.terms * Term.match_infos) option
   | Match   of Mvar.t
 
 (** [f] of type [fmap] is a function that, given [t vars conds] where:
@@ -62,8 +62,8 @@ type match_res =
     If [f t vars conds = `Continue], we keep looking for an occurrence.
     If [f t vars conds = `Map t'], we replace [t] by [t']. *)
 type f_map =
-  Term.eterm -> Vars.evars -> Term.message list ->
-  [`Map of Term.eterm | `Continue]
+  Term.term -> Vars.vars -> Term.term list ->
+  [`Map of Term.term | `Continue]
 
 (** matching algorithm options *)
 type match_option = {
@@ -125,8 +125,8 @@ module type S = sig
     ?ty_env:Type.Infer.env ->
     Symbols.table ->
     SystemExpr.t ->
-    'a Term.term -> 
-    'b Term.term pat ->
+    Term.term -> 
+    Term.term pat ->
     match_res
 
 
@@ -142,13 +142,13 @@ module type S = sig
     Symbols.table ->
     SystemExpr.t ->
     Vars.env ->
-    'a Term.term pat -> 
+    Term.term pat -> 
     t -> 
-    Term.eterm list
+    Term.term list
 end
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and unification} *)
-module T : S with type t = Term.message
+module T : S with type t = Term.term
 
 module E : S with type t = Equiv.form

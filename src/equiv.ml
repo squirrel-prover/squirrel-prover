@@ -11,7 +11,7 @@ module Mv = Vars.Mv
 let pi_term projection tm = Term.pi_term ~projection tm
 
 (*------------------------------------------------------------------*)
-type equiv = Term.message list
+type equiv = Term.term list
 
 let pp_equiv ppf (l : equiv) =
   Fmt.pf ppf "@[%a@]"
@@ -39,7 +39,7 @@ type atom =
   | Equiv of equiv
   (** Equiv u corresponds to (u)^left ~ (u)^right *)
 
-  | Reach of Term.message
+  | Reach of Term.term
   (** Reach(φ) corresponds to (φ)^left ~ ⊤ ∧ (φ)^right ~ ⊤ *)
 
 let pp_atom fmt = function
@@ -63,7 +63,7 @@ let fv_atom = function
 type quant = ForAll | Exists
 
 type form =
-  | Quant of quant * Vars.evar list * form
+  | Quant of quant * Vars.var list * form
   | Atom  of atom
   | Impl  of form * form
   | And   of form * form
@@ -183,7 +183,7 @@ let tsubst_atom (ts : Type.tsubst) (at : atom) =
 (** Type substitution *)
 let tsubst (ts : Type.tsubst) (t : form) =
   let rec tsubst = function
-    | Quant (q, vs, f) -> Quant (q, List.map (Vars.tsubst_e ts) vs, tsubst f)
+    | Quant (q, vs, f) -> Quant (q, List.map (Vars.tsubst ts) vs, tsubst f)
     | Atom at -> Atom (tsubst_atom ts at)
     | _ as term -> tmap tsubst term
   in
@@ -427,9 +427,9 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Generalized formulas} *)
 
-type gform = [`Equiv of form | `Reach of Term.message]
+type gform = [`Equiv of form | `Reach of Term.term]
 
-type local_form = Term.message
+type local_form = Term.term
 type global_form = form
 type any_form = gform
 
@@ -522,7 +522,7 @@ module Babel = struct
 
   let term_get_terms x = [x]
 
-  let get_terms : type a. a f_kind -> a -> Term.message list = function
+  let get_terms : type a. a f_kind -> a -> Term.term list = function
     | Local_t -> term_get_terms
     | Global_t -> get_terms
     | Any_t -> PreAny.get_terms

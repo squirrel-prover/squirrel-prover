@@ -282,7 +282,7 @@ let mk_trace_cntxt (s : t) =
   }
 
 (*------------------------------------------------------------------*)
-let query_happens ~precise (s : t) (a : Term.timestamp) =
+let query_happens ~precise (s : t) (a : Term.term) =
   let s = to_trace_sequent (set_reach_goal Term.mk_false s) in
   TS.query_happens ~precise s a
 

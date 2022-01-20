@@ -9,34 +9,40 @@ val declare_global :
   Symbols.lsymb ->
   suffix:[`Large | `Strict] ->
   action:Action.shape ->
-  inputs:Vars.message list ->
-  indices:Vars.index list ->
-  ts:Vars.timestamp ->
-  Term.message ->
-  Type.tmessage ->
+  inputs:Vars.var list ->
+  indices:Vars.var list ->
+  ts:Vars.var ->
+  Term.term ->
+  Type.ty ->
   Symbols.table * Symbols.macro Symbols.t
 
 (** {2 Macro expansions} *)
 
-type def_result = [ `Def of Term.message | `Undef | `MaybeDef ]
+type def_result = [ `Def of Term.term | `Undef | `MaybeDef ]
 
 (** Return the term corresponding to the declared macro,
     if the macro can be expanded.
     Does *not* check that the timestamp happens ! *)
 val get_definition :
-  Constr.trace_cntxt -> Term.msymb -> Term.timestamp -> def_result
+  Constr.trace_cntxt -> Term.msymb -> Term.term -> def_result
 
 val get_definition_exn :
-  Constr.trace_cntxt -> Term.msymb -> Term.timestamp -> Term.message
+  Constr.trace_cntxt -> Term.msymb -> Term.term -> Term.term
 
 (** When [m] is a global macro symbol,
   * [get_definition se table m li] return a term which resembles the one that
   * would be obtained with [get_definition m li ts] for some [ts],
   * except that it will feature meaningless action names in some places. *)
 val get_dummy_definition :
-  Symbols.table -> SystemExpr.t -> Term.msymb -> Term.message
+  Symbols.table -> SystemExpr.t -> Term.msymb -> Term.term
 
 val apply_global_data :
-  Symbols.table -> Symbols.macro Symbols.t -> Symbols.macro_def -> SystemExpr.single_system ->
-   SystemExpr.single_system ->
-  'a -> ([ `Message ] Term.term -> [ `Message ] Term.term) -> Symbols.table
+  Symbols.table -> 
+  Symbols.macro Symbols.t -> 
+  Symbols.macro_def -> 
+  SystemExpr.single_system ->
+  SystemExpr.single_system ->
+  'a -> 
+  (Term.term -> Term.term) -> 
+  Symbols.table
+    

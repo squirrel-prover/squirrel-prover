@@ -18,7 +18,7 @@ end
 class get_name_indices ~(cntxt:Constr.trace_cntxt) exact name = object (self)
   inherit Iter.iter_approx_macros ~exact ~cntxt as super
 
-  val mutable indices : (Vars.index list) list = []
+  val mutable indices : (Vars.var list) list = []
   method get_indices = List.sort_uniq Stdlib.compare indices
 
   method visit_message t = match t with
@@ -33,7 +33,7 @@ end
 class get_actions ~(cntxt:Constr.trace_cntxt) = object (self)
   inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
 
-  val mutable actions : Term.timestamp list = []
+  val mutable actions : Term.term list = []
   method get_actions = actions
 
   method visit_macro mn a =
@@ -51,7 +51,7 @@ class get_actions ~(cntxt:Constr.trace_cntxt) = object (self)
 
 (*------------------------------------------------------------------*)
 (** occurrence of a name [n(i,...,j)] *)
-type name_occ = Vars.index list Iter.occ
+type name_occ = Vars.var list Iter.occ
 
 type name_occs = name_occ list
 
@@ -70,7 +70,7 @@ let get_name_indices_ext : type a.
   fun ?(fv=Sv.empty) constr nsymb t ->
 
   let rec get :
-    type a. a Term.term -> fv:Sv.t -> cond:Term.message -> name_occs =
+    type a. a Term.term -> fv:Sv.t -> cond:Term.term -> name_occs =
     fun t ~fv ~cond ->
       match t with
       | Term.Var v when Type.equalk (Vars.kind v) Type.KMessage ->
@@ -86,14 +86,14 @@ let get_name_indices_ext : type a.
 
       | _ ->
         Iter.tfold_occ ~mode:(`Delta constr)
-          (fun ~fv ~cond (Term.ETerm t) occs ->
+          (fun ~fv ~cond t occs ->
              get t ~fv ~cond @ occs
           ) ~fv ~cond t []
   in
   get t ~fv ~cond:Term.mk_true
 
 (*------------------------------------------------------------------*)
-type ts_occ = Term.timestamp Iter.occ
+type ts_occ = Term.term Iter.occ
 
 type ts_occs = ts_occ list
 
@@ -124,7 +124,7 @@ let get_actions_ext :
   fun constr t ->
 
   let rec get :
-    type a. a Term.term -> fv:Sv.t -> cond:Term.message -> ts_occs =
+    type a. a Term.term -> fv:Sv.t -> cond:Term.term -> ts_occs =
     fun t ~fv ~cond ->
       match t with
       | Term.Macro (m, l, ts) ->
@@ -152,7 +152,7 @@ let get_actions_ext :
         (* Remark: we use [`NoDelta] because we want to have a different
            behavior depending on whether the macro can be expended or not. *)
         Iter.tfold_occ ~mode:`NoDelta
-          (fun ~fv ~cond (Term.ETerm t) occs ->
+          (fun ~fv ~cond t occs ->
              get t ~fv ~cond @ occs
           ) ~fv ~cond t []
   in
@@ -166,7 +166,7 @@ let get_actions_ext :
 (** Return timestamps occuring in macros in a set of terms *)
 let get_macro_actions
     (cntxt : Constr.trace_cntxt)
-    (sources : Term.messages) : ts_occs
+    (sources : Term.terms) : ts_occs
   =
   let actions =
     List.concat_map (get_actions_ext cntxt) sources
@@ -177,11 +177,11 @@ let get_macro_actions
     before the macro timestamp occurrence [occ]. *)
 let mk_le_ts_occ
     (env : Vars.env)
-    (ts0 : Term.timestamp)
-    (occ : ts_occ) : Term.message
+    (ts0 : Term.term)
+    (occ : ts_occ) : Term.term
   =
   let occ_vars = Sv.elements occ.Iter.occ_vars in
-  let occ_vars, occ_subst = Term.erefresh_vars (`InEnv (ref env)) occ_vars in
+  let occ_vars, occ_subst = Term.refresh_vars (`InEnv (ref env)) occ_vars in
   let subst = occ_subst in
   let ts   = Term.subst subst occ.occ_cnt  in
   let cond = Term.subst subst occ.occ_cond in
@@ -192,8 +192,8 @@ let mk_le_ts_occ
 
 let mk_le_ts_occs
     (env : Vars.env)
-    (ts0 : Term.timestamp)
-    (occs : ts_occs) : Term.messages
+    (ts0 : Term.term)
+    (occs : ts_occs) : Term.terms
   =
   List.map (mk_le_ts_occ env ts0) occs |>
   List.remove_duplicate (=)

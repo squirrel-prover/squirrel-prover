@@ -26,18 +26,18 @@ val query : precise:bool -> models -> trace_literal list -> bool
     This can only be over-approximated, and our result may not be the best.
     This function may be non-deterministic. *)
 val maximal_elems : 
-  precise:bool -> models -> Term.timestamp list -> Term.timestamp list
+  precise:bool -> models -> Term.term list -> Term.term list
 
 (** [get_ts_equalities models ts], given a list of models [models] and a list
     of timespoints [ts], gives back the classes for equality in all models. *)
 val get_ts_equalities : 
-  precise:bool -> models -> Term.timestamp list -> Term.timestamp list list
+  precise:bool -> models -> Term.term list -> Term.term list list
 
 val get_ind_equalities : 
-  precise:bool -> models -> Vars.index list -> Vars.index list list
+  precise:bool -> models -> Vars.var list -> Vars.var list list
 
 (** [find_eq_action models t] looks for an action [ts] equal to [t]. *)
-val find_eq_action : models -> Term.timestamp -> Term.timestamp option
+val find_eq_action : models -> Term.term -> Term.term option
 
 (*------------------------------------------------------------------*)
 (** Context of a trace model. *)

@@ -1,11 +1,11 @@
 
 module Ts = struct
-  type t = Term.timestamp
+  type t = Term.term
   let compare = Stdlib.compare
 end
 
 module Tt = struct
-  type t = Term.message
+  type t = Term.term
   let compare = Stdlib.compare
 end
 

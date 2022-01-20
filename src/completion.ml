@@ -22,7 +22,7 @@ module Cst = struct
       ]
     (** function symbol, name or action of arity zero *)
 
-    | Cmvar   of Vars.evar
+    | Cmvar   of Vars.var
 
   let cst_cpt = ref 0
 
@@ -267,7 +267,7 @@ let rec cterm_of_term : type a. a Term.term -> cterm = fun c ->
     let is = List.map cterm_of_var ns.s_indices in
     cfun (N (ns.s_symb,ns.s_typ)) (List.length is) is
 
-  | Var m  -> ccst (Cst.Cmvar (Vars.EVar m))
+  | Var m  -> ccst (Cst.Cmvar m)
 
   | Diff(c,d) -> cfun (F Symbols.fs_diff) 0 [cterm_of_term c; cterm_of_term d]
 
@@ -275,12 +275,12 @@ let rec cterm_of_term : type a. a Term.term -> cterm = fun c ->
 
   | _ -> raise Unsupported_conversion
 
-and cterm_of_var i = ccst (Cst.Cmvar (Vars.EVar i))
+and cterm_of_var i = ccst (Cst.Cmvar i)
 
 
 (*------------------------------------------------------------------*)
 let index_of_cterm i = match i.cnt with
-  | Ccst (Cst.Cmvar (Vars.EVar m)) -> Vars.cast m Type.KIndex
+  | Ccst (Cst.Cmvar m) -> Vars.cast m Type.KIndex
   | _ -> assert false
     
 let indices_of_cterms cis = List.map index_of_cterm cis
@@ -321,7 +321,7 @@ let term_of_cterm : type a. Symbols.table -> a Type.kind -> cterm -> a Term.term
         let pred_ts = Term.mk_pred (term_of_cterm Type.KTimestamp ts) in
         Term.cast kind pred_ts   
 
-      | Ccst (Cst.Cmvar (Vars.EVar m)) -> Term.mk_var (Vars.cast m kind)
+      | Ccst (Cst.Cmvar m) -> Term.mk_var (Vars.cast m kind)
 
       | Ccst (Cst.Cgfuncst (`F f)) ->
         Term.cast kind (Term.mk_fun table f [] [])
@@ -1676,7 +1676,7 @@ let () =
        let e', e, d, c, b, a = mk_cst (), mk_cst (), mk_cst (),
                               mk_cst (), mk_cst (), mk_cst () in
 
-       let v = ccst (Cst.Cmvar (Vars.EVar (snd (
+       let v = ccst (Cst.Cmvar ((snd (
            Vars.make `Approx Vars.empty_env (Type.Message) "v"))))
        in
        let state0 = complete_cterms table [(a,b); (b,c);

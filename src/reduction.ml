@@ -22,7 +22,7 @@ module Mk (S : LowSequent.S) = struct
     param      : red_param;
     hint_db    : Hint.hint_db;
     trace_lits : Constr.trace_literals;
-    conds      : Term.message list;     (* accumulated conditions *)
+    conds      : Term.term list;     (* accumulated conditions *)
   }
                  
   (** Reduce a term in a given context. 
@@ -103,7 +103,7 @@ module Mk (S : LowSequent.S) = struct
         match t with
         | Term.Exists (evs, t0) 
         | Term.ForAll (evs, t0) -> 
-          let _, subst = Term.erefresh_vars `Global evs in
+          let _, subst = Term.refresh_vars `Global evs in
           let t0 = Term.subst subst t0 in
           (* let st = { st with subst = subst @ st.subst; } in *)
           let red_t0, has_red = reduce st t0 in
@@ -112,7 +112,7 @@ module Mk (S : LowSequent.S) = struct
           else
             let r_subst = rev_subst subst in
             let red_t0 = Term.subst r_subst red_t0 in
-            let red_t : Term.message = 
+            let red_t : Term.term = 
               match t with
               | Term.Exists _ -> Term.mk_exists ~simpl:false evs red_t0 
               | Term.ForAll _ -> Term.mk_forall ~simpl:false evs red_t0 
@@ -121,7 +121,7 @@ module Mk (S : LowSequent.S) = struct
             Term.cast (Term.kind t) red_t, true
 
         | Term.Seq (is, t0) ->
-          let _, subst = Term.erefresh_vars `Global is in
+          let _, subst = Term.refresh_vars `Global is in
           let t0 = Term.subst subst t0 in
           (* let st = { st with subst = subst @ st.subst; } in *)
           let red_t0, has_red = reduce st t0 in
@@ -174,9 +174,9 @@ module Mk (S : LowSequent.S) = struct
         | Term.Diff   _
         | Term.Atom   _ -> 
           let has_red, t = 
-            Term.tmap_fold (fun has_red (Term.ETerm t) -> 
+            Term.tmap_fold (fun has_red t -> 
                 let t, has_red' = reduce st t in
-                has_red || has_red', Term.ETerm t
+                has_red || has_red', t
               ) false t
           in
           t, has_red
@@ -197,7 +197,7 @@ module Mk (S : LowSequent.S) = struct
   let rec reduce_equiv (param : red_param) s e : Equiv.form =
     match e with
     | Equiv.Quant (q, vs, e) -> 
-      let _, subst = Term.erefresh_vars `Global vs in
+      let _, subst = Term.refresh_vars `Global vs in
       let e = Equiv.subst subst e in
       let red_e = reduce_equiv param s e in
 

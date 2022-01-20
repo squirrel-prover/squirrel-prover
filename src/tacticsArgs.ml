@@ -169,7 +169,7 @@ let pp_intro_pats fmt args =
 (*------------------------------------------------------------------*)
 (** handler for intro pattern application *)
 type ip_handler = [
-  | `Var of Vars.evar (* Careful, the variable is not added to the env  *)
+  | `Var of Vars.var (* Careful, the variable is not added to the env  *)
   | `Hyp of Ident.t
 ]
 
@@ -260,14 +260,14 @@ type ('a, 'b) pair
 type boolean = [`Boolean]
 
 (*------------------------------------------------------------------*)
-(* The types are explicit, in order to type the tactics. *)
+(** Tactic arguments sorts *)
 type _ sort =
   | None      : unit sort
 
-  | Message   : Type.message   sort
-  | Boolean   :      boolean   sort
-  | Timestamp : Type.timestamp sort
-  | Index     : Type.index     sort
+  | Message   : Type.ty sort
+  | Boolean   : Type.ty sort
+  | Timestamp : Type.ty sort
+  | Index     : Type.ty sort
 
   | ETerm     : Theory.eterm    sort
   (** Boolean, timestamp or message *)
@@ -278,16 +278,19 @@ type _ sort =
   | Opt       : 'a sort -> ('a option) sort
 
 (*------------------------------------------------------------------*)
+
+(** Tactic arguments *)
 type _ arg =
   | None      : unit arg
 
-  | Message   : Term.message * Type.tmessage -> Type.message arg
+  | Message   : Term.term * Type.ty -> Type.ty arg
 
-  | Boolean   : Term.message   ->      boolean   arg
-  | Timestamp : Term.timestamp -> Type.timestamp arg
-  | Index     : Vars.index     -> Type.index     arg
+  | Boolean   : Term.term -> Type.ty arg
+  | Timestamp : Term.term -> Type.ty arg
+  | Index     : Vars.var  -> Type.ty arg
 
-  | ETerm     : 'a Type.ty * 'a Term.term * Location.t -> Theory.eterm arg
+  | ETerm     : Type.ty * Term.term * Location.t -> Theory.eterm arg
+  (** A [Term.term] with its sorts. *)
 
   | Int       : int L.located -> int L.located arg
   | String    : lsymb -> lsymb arg
@@ -295,8 +298,7 @@ type _ arg =
   | Opt       : ('a sort * 'a arg option) -> ('a option) arg
 
 (*------------------------------------------------------------------*)
-let rec sort : type a. a arg -> a sort =
-  function
+let rec sort : type a. a arg -> a sort = function
   | None        -> None
   | Message _   -> Message
   | Boolean _   -> Boolean
@@ -468,7 +470,7 @@ let convert_pat_arg sel sexpr conv_cntxt tyvars env p conc =
     Theory.convert_i ~pat:true conv_cntxt tyvars env p
   in
   let pat_vars =
-    Vars.Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
+    Vars.Sv.filter (fun v -> Vars.is_pat v) (Term.fv t)
   in
   let pat = Match.{
       pat_tyvars = [];
@@ -481,7 +483,7 @@ let convert_pat_arg sel sexpr conv_cntxt tyvars env p conc =
     | `Equiv form -> Match.E.find ~option (conv_cntxt.table) sexpr env pat form
   in
   let message = match List.nth res (sel-1) with
-    | Term.ETerm et -> Term.cast (Term.kind t) et
+    | et -> Term.cast (Term.kind t) et
     | exception _ -> raise Theory.(Conv (L._dummy,
                                          Tactic_type
                                            ("Could not extract the element "

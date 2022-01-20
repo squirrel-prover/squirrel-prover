@@ -69,7 +69,7 @@ type option_name =
   | Oracle_for_symbol of string
 
 type option_val =
-  | Oracle_formula of Term.message
+  | Oracle_formula of Term.term
 
 type option_def = option_name * option_val
 
@@ -191,7 +191,7 @@ val declare_new_goal :
 
 (** From the name of the function, returns the corresponding formula. If no tag
    formula was defined, returns False. *)
-val get_oracle_tag_formula : string -> Term.message
+val get_oracle_tag_formula : string -> Term.term
 
 val pp_goal : Format.formatter -> unit -> unit
 

@@ -20,7 +20,7 @@ type lsymb = Theory.lsymb
 
 (** The kind of a process gives, for each of its input variables,
   * the expected kind for that variable. *)
-type proc_ty = (string * Type.ety) list
+type proc_ty = (string * Type.ty) list
 
 val pp_proc_ty : proc_ty Fmt.t
 

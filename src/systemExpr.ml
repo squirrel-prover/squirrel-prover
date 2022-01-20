@@ -302,8 +302,8 @@ let pair table a b =
 (** A substition over a description that allows to either substitute the condition
    or the output of the descr, for a given shape. *)
 type esubst_descr =
-  | Condition of Term.message * Action.action
-  | Output of Term.message * Action.action
+  | Condition of Term.term * Action.action
+  | Output of Term.term * Action.action
 
 type subst_descr = esubst_descr list
 

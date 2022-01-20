@@ -91,16 +91,16 @@ type bty_def = bty_info list
 (*------------------------------------------------------------------*)
 type name_def = { 
   n_iarr : int;                  (* index arity *)
-  n_ty   : Type.message Type.ty; (* type *)
+  n_ty   : Type.ty; (* type *)
 }
 
 (*------------------------------------------------------------------*)
 type macro_def =
   | Input | Output | Cond | Exec | Frame
-  | State of int * Type.tmessage
+  | State of int * Type.ty
     (** Macro that expands to the content of a state at a given
       * timestamp. *)
-  | Global of int * Type.tmessage
+  | Global of int * Type.ty
     (** Global macros are used to encapsulate let-definitions.
       * They are indexed. *)
 
@@ -260,8 +260,8 @@ exception SymbError of symb_err
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)
 
-val get_bty_info   : table -> Type.tmessage -> bty_info list
-val check_bty_info : table -> Type.tmessage -> bty_info -> bool
+val get_bty_info   : table -> Type.ty -> bty_info list
+val check_bty_info : table -> Type.ty -> bty_info -> bool
 
 val is_infix     : fname t -> bool 
 val is_infix_str : string  -> bool 

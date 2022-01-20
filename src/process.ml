@@ -10,7 +10,7 @@ let mk_dum (v : 'a) : 'a L.located = L.mk_loc dum v
 type proc_ty = (string * Type.ety) list
 
 let pp_proc_ty =
-  let pp_el fmt (s,e) = Fmt.pf fmt "(%s : %a)" s Type.pp_e e in
+  let pp_el fmt (s,e) = Fmt.pf fmt "(%s : %a)" s Type.pp e in
   (Fmt.list pp_el)
 
 (*------------------------------------------------------------------*)
@@ -239,7 +239,7 @@ let check_proc table (env : Vars.env) p =
     | Parallel (p, q) -> check_p ty_env  env p ; check_p ty_env  env q
 
     | Let (x, t, ptyo, p) ->
-      let ty : Type.tmessage = match ptyo with
+      let ty : Type.ty = match ptyo with
         | None -> TUnivar (Type.Infer.mk_univar ty_env)
         | Some pty -> Theory.parse_p_ty table [] pty Type.KMessage
       in
@@ -329,25 +329,25 @@ type p_env = {
   alias : lsymb ;
   (* current alias used for action names in the process *)
 
-  indices : Vars.index list ;
+  indices : Vars.var list ;
   (* current list of bound indices (coming from Repl or Exists constructs) *)
 
   vars_env : Vars.env ;
   (* local variables environment *)
 
-  isubst : (string * Theory.term_i * Vars.index) list ;
+  isubst : (string * Theory.term_i * Vars.var) list ;
   (* substitution for index variables (Repl, Exists, Apply)
    * mapping each variable from the original process (before refresh)
    * to the associated refreshed variables
-   * as Theory.term and as a Vars.index suitable for use in Term.term
+   * as Theory.term and as a Vars.var suitable for use in Term.term
    * TODO items are always of the form (i, Theory.Var (Vars.name i'), i')
    *      why not keep (i,i') for simplicity? *)
 
-  msubst : (string * Theory.term_i * Term.message) list ;
+  msubst : (string * Theory.term_i * Term.term) list ;
   (* substitution for message variables (New, Let, In, Apply)
    * each variable from the original process (before refresh)
    * is mapped to the associated refreshed variable
-   * as a Theory.term and as a Term.message
+   * as a Theory.term and as a Term.term
    * (the third component is also used to map input variables to
    * input macros) *)
 
@@ -355,17 +355,17 @@ type p_env = {
   (* bound input variables *)
 
   (* RELATED TO THE CURRENT ACTION *)
-  evars : Vars.index list ;
+  evars : Vars.var list ;
   (* variables bound by existential quantification *)
 
   action : Action.action ;
   (* the type [Action.action] describes the execution point in the protocol
      stored reversed *)
 
-  facts : Term.message list ;
+  facts : Term.term list ;
   (* list of formulas to create the condition term of the action *)
 
-  updates : (lsymb * Vars.index list * Type.tmessage * Term.message) list ;
+  updates : (lsymb * Vars.var list * Type.ty * Term.term) list ;
   (* list of updates performed in the action.
    * The type can be a type unification variables. *)
 
@@ -412,7 +412,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
    * parsing function.
    * The special timestamp variable [ts] is used. *)
   let conv_term : type a.
-    Symbols.table -> p_env -> Term.timestamp -> 
+    Symbols.table -> p_env -> Term.term -> 
     Theory.term -> a Type.ty -> a Term.term =
     fun table env ts t sort ->
     let t = 
@@ -567,7 +567,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
              match Type.kind ty with
              | Type.KMessage ->
                let v'_th = Theory.subst v tsubst in
-               let v'_tm : Term.message =
+               let v'_tm : Term.term =
                  conv_term table env (Term.mk_var ts) v ty in
 
                new_env, iacc, (x, L.unloc v'_th, v'_tm) :: macc
@@ -633,7 +633,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
   let p_let ?(in_update=false) ~table ~env proc = match L.unloc proc with
 
   | Let (x,t,ptyo,p) ->
-    let ty : Type.tmessage = match ptyo with
+    let ty : Type.ty = match ptyo with
       | None -> TUnivar (Type.Infer.mk_univar env.ty_env)
       | Some pty -> Theory.parse_p_ty table [] pty Type.KMessage
     in
@@ -646,7 +646,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       else []
     in
 
-    let body : Term.message =
+    let body : Term.term =
       Term.subst_macros_ts table updated_states (Term.mk_var ts)
         (conv_term table env (Term.mk_var ts) t ty)
     in
@@ -796,7 +796,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
             env,(i,i') :: s
           ) (env,[]) (List.rev evars)
       in
-      let evars' = List.map (fun (_,x) -> Vars.EVar x) s in
+      let evars' = List.map snd s in
       let isubst' =
         List.map
           (fun (i,i') -> i, Theory.var_i dum (Vars.name i'), i')

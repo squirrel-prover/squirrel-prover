@@ -88,7 +88,7 @@ let descr_of_shape table (system : Symbols.system Symbols.t) shape =
     with the same number of indices.
     If that is the case, use the same symbol. *)
 let find_shape table shape =
-  let exception Found of Symbols.action Symbols.t * Vars.index list in
+  let exception Found of Symbols.action Symbols.t * Vars.var list in
   try Symbols.System.iter (fun system () data ->
       let descrs = match data with
         | System_data (descrs,_) -> descrs

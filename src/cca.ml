@@ -88,7 +88,7 @@ let random_ssc
      such extension if need. *)
 let check_encryption_randomness
     ~cntxt case_schemata cases_direct enc_fn messages elems =
-  let encryptions : (Term.message * Vars.index list) list =
+  let encryptions : (Term.term * Vars.var list) list =
     List.map (fun case ->
         case.Euf.message,
         Action.get_indices case.Euf.action
@@ -108,10 +108,9 @@ let check_encryption_randomness
   (* we check that encrypted messages based on indices, do not depend on free
      indices instantiated by the action w.r.t the indices of the random. *)
   if List.exists (function
-      | (Fun ((_, _), _, [m; Name n; _]), (actidx:Vars.index list)) ->
+      | (Fun ((_, _), _, [m; Name n; _]), (actidx:Vars.var list)) ->
         let vars = Term.get_vars m in
-        List.exists (function
-              Vars.EVar v ->
+        List.exists (fun v ->
               (match Vars.ty v with
                |Type.Index -> (List.mem v actidx) && not (List.mem v n.s_indices)
                (* we fail if there exists an indice appearing in the message,

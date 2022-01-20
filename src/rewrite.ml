@@ -13,7 +13,7 @@ module SE   = SystemExpr
 type rw_erule = {
   rw_tyvars : Type.tvars;        (** type variables *)
   rw_vars   : Vars.Sv.t;         (** term variables *)
-  rw_conds  : Term.message list; (** premisses *)
+  rw_conds  : Term.term list; (** premisses *)
   rw_rw     : Term.esubst;       (** pair (source, destination) *)
 }
 
@@ -35,7 +35,7 @@ let check_erule (rule : rw_erule) : unit =
   ()
 
 (** Make a rewrite rule from a formula *)
-let pat_to_rw_erule ?loc dir (p : Term.message Match.pat) : rw_erule =
+let pat_to_rw_erule ?loc dir (p : Term.term Match.pat) : rw_erule =
   let subs, f = Term.decompose_impls_last p.pat_term in
 
   let e = match f with
@@ -72,9 +72,9 @@ let _rewrite_head
     (table  : Symbols.table)
     (system : SE.t)
     (rule   : rw_erule)
-    (t      : Term.message) : Term.message * Term.message list
+    (t      : Term.term) : Term.term * Term.term list
   =
-  let (l, r) : Term.message * Term.message =
+  let (l, r) : Term.term * Term.term =
     match rule.rw_rw with
     | Term.ESubst (l, r) ->
       match Type.equalk_w (Term.kind t) (Term.kind l) with
@@ -101,7 +101,7 @@ let rewrite_head
     (table  : Symbols.table)
     (system : SE.t)
     (rule   : rw_erule)
-    (t      : a Term.term) : (a Term.term * Term.message list) option
+    (t      : a Term.term) : (a Term.term * Term.term list) option
   =
   match Type.equalk_w Type.KMessage (Term.kind t) with
   | None -> None
@@ -110,7 +110,7 @@ let rewrite_head
 
 (*------------------------------------------------------------------*)
   type rw_res = [
-    | `Result of Equiv.any_form * Term.message list
+    | `Result of Equiv.any_form * Term.term list
     | `NothingToRewrite
     | `MaxNestedRewriting
   ]
@@ -118,7 +118,7 @@ let rewrite_head
 (*------------------------------------------------------------------*)
 (** A opened rewrite rule. Not exported. *)
 type 'a rw_rule =
-  Type.tvars * Vars.Sv.t * Term.message list * 'a Term.term * 'a Term.term
+  Type.tvars * Vars.Sv.t * Term.term list * Term.term * Term.term
 
 (*------------------------------------------------------------------*)
 let rewrite
@@ -146,7 +146,7 @@ let rewrite
     Args.rw_count ->
     a rw_rule ->
     Equiv.any_form ->
-    Equiv.any_form * Term.message list
+    Equiv.any_form * Term.term list
     = fun mult (tyvars, sv, rsubs, left, right) f ->
       check_max_rewriting ();
 
@@ -164,7 +164,7 @@ let rewrite
          free variables are instantiated according to [mv], and variables
          bound above the matched occurrences are universally quantified in
          the generated sub-goals. *)
-      let rw_inst (Term.ETerm occ) vars conds =
+      let rw_inst occ vars conds =
         match Match.T.try_match_term table system occ !pat with
         | NoMatch _ | FreeTyv -> `Continue
 
@@ -180,7 +180,7 @@ let rewrite
             let left = Term.subst subst left in
             let right = Term.subst subst right in
 
-            right_instance := Some (Term.ETerm right);
+            right_instance := Some right;
             subs_r :=
               List.map (fun rsub ->
                   Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
@@ -190,7 +190,7 @@ let rewrite
                            pat_tyvars = [];
                            pat_vars   = Sv.empty; };
 
-            `Map (Term.ETerm right)
+            `Map right
           end
       in
 

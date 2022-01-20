@@ -108,7 +108,7 @@ let case_cond orig vars c t e s : sequent list =
   let env = ref (TS.env s) in
   let vars, subst = Term.refresh_vars (`InEnv env) vars in
   let then_c = Term.subst subst c in
-  let else_c = Term.mk_forall (List.map Vars.evar vars) (Term.mk_not c) in
+  let else_c = Term.mk_forall (List.map Vars.var vars) (Term.mk_not c) in
 
   let then_t = Term.subst subst t in
   let else_t = e in
@@ -120,7 +120,7 @@ let case_cond orig vars c t e s : sequent list =
 
     let prem =
       Term.mk_exists
-        (List.map Vars.evar case_vars)
+        (List.map Vars.var case_vars)
         (Term.mk_and ~simpl:false
            case_cond
            (Term.mk_atom `Eq orig case_t))
@@ -137,7 +137,7 @@ let case_cond orig vars c t e s : sequent list =
   [ mk_case vars then_t then_c;
     mk_case    [] else_t else_c]
 
-let conditional_case (m : Term.message) s : sequent list =
+let conditional_case (m : Term.term) s : sequent list =
   match m with
   | Term.Find (vars,c,t,e) -> case_cond m vars c t e s
   | Term.Fun (f,_,[c;t;e]) when f = Term.f_ite ->
@@ -167,7 +167,7 @@ let boolean_case b s : sequent list =
     do_one (Term.mk_not ~simpl:false b) Term.mk_false]
 
 (* [ty] must be the type of [m] *)
-let message_case (t : Term.message) ty s : sequent list =
+let message_case (t : Term.term) ty s : sequent list =
   match ty with
   | Type.Boolean -> boolean_case t s
   | _ -> conditional_case t s
@@ -234,7 +234,7 @@ let rec simpl_left s =
       let env = ref @@ TS.env s in
       let subst =
         List.map
-          (fun (Vars.EVar v) ->
+          (fun v ->
              Term.ESubst  (Term.mk_var v,
                            Term.mk_var (Vars.fresh_r env v)))
           vs
@@ -458,7 +458,7 @@ let eq_trace (s : TS.t) =
   let facts =
     List.fold_left
       (fun acc t ->
-         let normt : Term.message = Term.subst (ts_subst @ ind_subst) t in
+         let normt : Term.term = Term.subst (ts_subst @ ind_subst) t in
          if normt = t
          then acc
          else Term.mk_atom `Eq t normt ::acc)
@@ -512,9 +512,7 @@ let mk_fresh_direct (cntxt : Constr.trace_cntxt) env ns t =
 
     let js = List.map (Term.subst_var subst) js in
 
-    Term.mk_exists
-      (List.map (fun i -> Vars.EVar i) bv)
-      (Term.mk_indices_eq ns.s_indices js)
+    Term.mk_exists bv (Term.mk_indices_eq ns.s_indices js)
   in
 
   let cases = List.map mk_case list_of_indices in
@@ -522,7 +520,7 @@ let mk_fresh_direct (cntxt : Constr.trace_cntxt) env ns t =
 
 (*------------------------------------------------------------------*)
 (** triple of the action and the name indices *)
-type fresh_occ = (Action.action * Vars.index list) Iter.occ
+type fresh_occ = (Action.action * Vars.var list) Iter.occ
 
 (** check if all instances of [o1] are instances of [o2].
     [o1] and [o2] actions must have the same action name *)
@@ -582,7 +580,7 @@ let mk_fresh_indirect_cases
     (cntxt : Constr.trace_cntxt)
     (env : Vars.env)
     (ns : Term.nsymb)
-    (terms : Term.message list)
+    (terms : Term.term list)
   =
   (* sanity check: free variables in [ns] and [terms] are included in [env] *)
   assert (
@@ -620,7 +618,7 @@ let mk_fresh_indirect_cases
   List.filter (fun (_, occs) -> occs <> []) macro_cases
 
 
-let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
+let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.term =
   (* TODO: bug, handle free variables *)
   let term_actions =
     let iter = new Fresh.get_actions ~cntxt in
@@ -634,12 +632,12 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
 
   (* the one case occuring in [a] with indices [is_a].
      For [n(is)] to be equal to [n(is_a)], we must have [is=is_a]. *)
-  let mk_case ((a, is_a) : Action.action * Vars.index list) : Term.message =
+  let mk_case ((a, is_a) : Action.action * Vars.var list) : Term.term =
     let fv =
       Sv.diff (Sv.union (Action.fv_action a) (Sv.of_list1 is_a)) sv_env
     in
     let fv =
-      List.map (fun (Vars.EVar v) ->
+      List.map (fun v ->
           Vars.cast v Type.KIndex
         ) (Sv.elements fv)
     in
@@ -684,7 +682,7 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
     in
 
     Term.mk_exists ~simpl:true
-      (List.map (fun i -> Vars.EVar i) fv)
+      fv
       (Term.mk_and
          timestamp_inequalities
          idx_eqs)
@@ -746,7 +744,7 @@ let apply_substitute subst s =
     let s =
     match subst with
       | Term.ESubst (Term.Var v, t) :: _ when
-        not (List.mem (Vars.EVar v) (Term.get_vars t)) ->
+        not (List.mem v (Term.get_vars t)) ->
           TS.set_env (Vars.rm_var (TS.env s) v) s
       | _ -> s
   in
@@ -957,7 +955,7 @@ let exec (Args.Timestamp a) s =
   let _,var = Vars.make `Approx (TS.env s) Type.Timestamp "t" in
   let formula =
     Term.mk_forall ~simpl:false
-      [Vars.EVar var]
+      [var]
       (Term.mk_impl
          (Term.mk_timestamp_leq (mk_var var) a)
          (mk_macro Term.exec_macro [] (mk_var var)))
@@ -1017,7 +1015,7 @@ let fa s =
           | Term.Seq (vars,t),
             Term.Seq (vars',t') when vars = vars' ->
             let env = ref (TS.env s) in
-            let vars, subst = Term.erefresh_vars (`InEnv env) vars in
+            let vars, subst = Term.refresh_vars (`InEnv env) vars in
             let s = TS.set_env !env s in
             let t = Term.subst subst t in
             let t' = Term.subst subst t' in
@@ -1071,7 +1069,7 @@ let fa s =
             (* Extract unused variables. *)
             let used,unused =
               let occ_vars = Term.get_vars c @ Term.get_vars t in
-              let vars = List.map Vars.evar vars in
+              let vars = List.map Vars.var vars in
               List.partition
                 (fun v -> List.mem v occ_vars)
                 vars
@@ -1290,13 +1288,13 @@ let yes_no_if_args b args s : Goal.t list =
 (*------------------------------------------------------------------*)
 (** Unforgeability Axioms *)
 
-type unforgeabiliy_param = Term.fname * Term.nsymb * Term.message
-                           * Term.message
+type unforgeabiliy_param = Term.fname * Term.nsymb * Term.term
+                           * Term.term
                            * (Symbols.fname Symbols.t -> bool)
-                           * Term.message list * bool
+                           * Term.term list * bool
                            * (Symbols.fname Symbols.t -> bool) option
 
-let euf_param table (t : Term.message) : unforgeabiliy_param =
+let euf_param table (t : Term.term) : unforgeabiliy_param =
   let bad_param () =
     soft_failure
       (Tactics.Failure
@@ -1330,7 +1328,7 @@ let euf_param table (t : Term.message) : unforgeabiliy_param =
 
   | _ -> bad_param ()
 
-let intctxt_param table (t : Term.message) : unforgeabiliy_param =
+let intctxt_param table (t : Term.term) : unforgeabiliy_param =
   let bad_param () =
     soft_failure
       (Tactics.Failure
@@ -1432,14 +1430,14 @@ let euf_apply_direct s (_, key, m, _, _, _, _, _) Euf.{d_key_indices;d_message} 
   let init_env = TS.env s in
   let subst,env =
     List.fold_left
-      (fun (subst,env) (Vars.EVar v) ->
+      (fun (subst,env) v ->
          if Vars.mem init_env v then subst,env else
          let env,v' = Vars.fresh env v in
          let subst = Term.(ESubst (mk_var v, mk_var v')) :: subst in
          subst,env)
       ([],init_env)
       (List.sort_uniq Stdlib.compare
-         (List.map (fun i -> Vars.EVar i) d_key_indices @
+         (d_key_indices @
           Term.get_vars d_message))
   in
   let s = TS.set_env env s in
@@ -1501,7 +1499,7 @@ let euf_apply_facts drop_head s
 
 (** Tag EUFCMA - for composition results *)
 let euf_apply
-    (get_params : Symbols.table -> Term.message -> unforgeabiliy_param)
+    (get_params : Symbols.table -> Term.term -> unforgeabiliy_param)
     (Args.String hyp_name)
     (s : TS.t)
   =
@@ -1524,7 +1522,7 @@ let euf_apply
     then []
     else
       (* else, we create a goal where m,sk satisfy the axiom *)
-      let (Vars.EVar uvarm),(Vars.EVar uvarkey),f = match f with
+      let uvarm, uvarkey,f = match f with
         | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
         | _ -> assert false
       in
@@ -1564,7 +1562,7 @@ let () =
     Args.String
 
 
-let non_malleability_param table (t : Term.message) : unforgeabiliy_param =
+let non_malleability_param table (t : Term.term) : unforgeabiliy_param =
   let bad_param () =
     soft_failure
       (Tactics.Failure
@@ -1678,7 +1676,7 @@ let () =
     Args.(Pair (String, Opt Message))
 
 (*------------------------------------------------------------------*)
-let valid_hash (cntxt : Constr.trace_cntxt) (t : Term.message) =
+let valid_hash (cntxt : Constr.trace_cntxt) (t : Term.term) =
   match t with
   | Fun ((hash, _), _, [m; Name key]) ->
     Symbols.is_ftype hash Symbols.Hash cntxt.table
@@ -1787,10 +1785,10 @@ let rewrite_equiv_transform
     ~(src:Term.projection)
     ~(dst:Term.projection)
     ~(s:TS.t)
-    (biframe : Term.message list)
-    (term : Term.message) : Term.message
+    (biframe : Term.term list)
+    (term : Term.term) : Term.term
   =
-  let assoc (t : Term.message) : Term.message option =
+  let assoc (t : Term.term) : Term.term option =
     match List.find_opt (fun e -> (Term.pi_term src e) = t) biframe with
     | Some e -> Some (Term.pi_term dst e)
     | None -> None
@@ -1803,7 +1801,7 @@ let rewrite_equiv_transform
       | None -> aux_rec t
       | Some t' -> t'
 
-  and aux_rec : Term.message -> Term.message = fun t ->
+  and aux_rec : Term.term -> Term.term = fun t ->
     match t with
     | t when is_pure_timestamp t -> t
 
@@ -1885,7 +1883,7 @@ let rewrite_equiv (ass_sys, ass) (s : TS.t) : TS.t list =
       "Cannot transform %a: it will be dropped.@." Term.pp t
   in
 
-  let rewrite (h : Term.message) : Term.message =
+  let rewrite (h : Term.term) : Term.term =
     (* Attempt to transform. If the transformation can't
      * be applied we can simply drop the hypothesis rather
      * than failing completely. *)

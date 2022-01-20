@@ -40,7 +40,7 @@ let global_rename table sdecl gf =
 
     (* We now build the rewrite rule *)
     let evars = Term.get_vars n1 in
-    let vs, subs = Term.erefresh_vars `Global evars in
+    let vs, subs = Term.refresh_vars `Global evars in
     let (n1', n2') = (Term.subst subs n1, Term.subst subs n2) in
     let rw_rule = Rewrite.{
         rw_tyvars = [];
@@ -166,7 +166,7 @@ let global_prf table sdecl ty_vars hash =
   in
   let rw_rule = Rewrite.{
     rw_tyvars = [];
-    rw_vars = Vars.Sv.of_list ((Vars.evar fresh_x_var)::(List.map Vars.evar is1));
+    rw_vars = Vars.Sv.of_list ((Vars.var fresh_x_var)::(List.map Vars.var is1));
     rw_conds = [];
     rw_rw = Term.ESubst (hash_pattern, mk_tryfind);
   }
@@ -213,7 +213,7 @@ let global_prf table sdecl ty_vars hash =
       let make_conclusion equiv = `Equiv
           Equiv.(Quant (ForAll, [EVar fresh_x_var],
                         Impl(
-                          Quant (ForAll, List.map (fun x -> Vars.EVar x) is,
+                          Quant (ForAll, is,
                                  Atom (
                                    Equiv [Term.mk_var fresh_x_var; Term.mk_diff
                                             (Term.mk_name param.h_key)
@@ -335,15 +335,15 @@ let global_cca table sdecl ty_vars enc =
 
   let enc_rw_rule = Rewrite.{
     rw_tyvars = [];
-    rw_vars = Vars.Sv.of_list (List.map Vars.evar is);
+    rw_vars = Vars.Sv.of_list (List.map Vars.var is);
     rw_conds = [];
     rw_rw = Term.ESubst (enc, new_enc);
   }
   in
   let dec_rw_rule = Rewrite.{
     rw_tyvars = [];
-    rw_vars = Vars.Sv.of_list ((Vars.evar fresh_x_var)
-                               ::(List.map Vars.evar is1));
+    rw_vars = Vars.Sv.of_list ((Vars.var fresh_x_var)
+                               ::(List.map Vars.var is1));
     rw_conds = [];
     rw_rw = Term.ESubst (dec_pattern, tryfind_dec);
   }
@@ -411,7 +411,7 @@ let global_cca table sdecl ty_vars enc =
     let make_conclusion equiv = `Equiv
         Equiv.(Quant (ForAll, [EVar fresh_x_var],
                       Impl(
-                        Quant (ForAll, List.map (fun x -> Vars.EVar x) is,
+                        Quant (ForAll, is,
                                Atom (
                                  Equiv [Term.mk_var fresh_x_var;
                                         Term.mk_diff
