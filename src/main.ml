@@ -34,6 +34,7 @@ type main_state = {
   table : Symbols.table;
 
   interactive : bool;
+  html : bool;
 
   load_paths : load_paths;
   (** load paths *)
@@ -263,8 +264,10 @@ let rec do_command
       { state with mode = GoalMode; table = table; }
 
     | ProofMode, ParsedTactic utac ->
-      if not state.interactive then
-        Printer.prt `Prompt "%a" Prover.pp_ast utac ;
+      if not state.interactive then begin
+        let lnum = state.file.f_lexbuf.lex_curr_p.pos_lnum in
+        Printer.prt `Prompt "Line %d: %a" lnum Prover.pp_ast utac
+      end;
 
       begin match Prover.eval_tactic utac with
       | true ->
@@ -388,14 +391,19 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
 
   match
     let cmd = next_input ~test state in
-    let new_state = do_command ~test state cmd in
+    let new_state = do_command ~test state cmd
+    in
     new_state, new_state.mode
   with
   (* exit prover *)
-  | _, AllDone -> Printer.pr "Goodbye!@." ; if not test then exit 0
+  | new_state, AllDone -> Printer.pr "Goodbye!@." ;
+    if not test && not new_state.html then exit 0;
 
   (* loop *)
-  | new_state, _ -> (main_loop[@tailrec]) ~test new_state
+  | new_state, _ ->
+    if new_state.html then
+      Html.pp ();
+    (main_loop[@tailrec]) ~test new_state
 
   (* error handling *)
   | exception e when is_toplevel_error ~test e ->
@@ -408,6 +416,7 @@ and main_loop_error ~test (state : main_state) : unit =
     assert (state.file.f_path = `Stdin);
     (main_loop[@tailrec]) ~test ~save:false state
   end
+  else if state.html then Fmt.epr "Error in file %s.sp:\nOutput stopped at previous call.\n" state.file.f_name
   else if not test then exit 1
 
 
@@ -427,6 +436,7 @@ let mk_load_paths ~main_mode () : load_paths =
 
 let start_main_loop
     ?(test=false)
+    ?(html=false)
     ~(main_mode : [`Stdin | `File of string])
     () : unit
   =
@@ -440,7 +450,9 @@ let start_main_loop
   let state = {
     mode = GoalMode;
     table = Symbols.builtins_table;
+
     interactive;
+    html;
 
     load_paths = mk_load_paths ~main_mode ();
 
@@ -451,46 +463,65 @@ let start_main_loop
 
   main_loop ~test state
 
-let interactive_prover () : unit =
+let generate_html (filename : string) (html_filename : string) =
+  Printer.init Printer.Html;
+  if Filename.extension filename <> ".sp" then
+    cmd_error (InvalidExtention filename);
+  Html.init filename html_filename;
+  let name = Filename.chop_extension filename in
+  start_main_loop ~test:false ~html:true ~main_mode:(`File name) ();
+  Html.close html_filename
+
+
+
+let interactive_prover () =
   Printer.prt `Start "Squirrel Prover interactive mode.";
   Printer.prt `Start "Git commit: %s" Commit.hash_commit;
-  Printer.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
-  try start_main_loop ~main_mode:`Stdin ()
+  Printer.init Printer.Interactive;
+  try start_main_loop ~html:false ~main_mode:`Stdin ()
   with End_of_file -> Printer.prt `Error "End of file, exiting."
 
 let run ?(test=false) (filename : string) : unit =
   if test then begin
-    Printer.printer_mode := Printer.Test;
+    Printer.init Printer.Test;
     Format.eprintf "Running %S...@." filename
-  end;
-  Printer.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
+  end
+  else
+    Printer.init Printer.File;
 
   if Filename.extension filename <> ".sp" then
     cmd_error (InvalidExtention filename);
 
   let name = Filename.chop_extension filename in
 
-  start_main_loop ~test ~main_mode:(`File name) ()
+  start_main_loop ~test ~html:false ~main_mode:(`File name) ()
 
 
 let main () =
   let args = ref [] in
   let verbose = ref false in
   let interactive = ref false in
-
+  let html_filename = ref "" in
   let speclist = [
     ("-i", Arg.Set interactive, "interactive mode (e.g, for proof general)");
+    ("--html", Arg.Set_string html_filename, "<file.html> Output a html file; Incompatible with -i");
     ("-v", Arg.Set verbose, "display more informations");
   ] in
 
   let collect arg = args := !args @ [arg] in
   let _ = Arg.parse speclist collect usage in
-  if List.length !args = 0 && not !interactive then
+  let html = !html_filename <> "" in
+  if !interactive && html then
+    Arg.usage speclist usage
+  else if List.length !args = 0 && not !interactive then
     Arg.usage speclist usage
   else if List.length !args > 0 && !interactive then
     Printer.pr "No file arguments accepted when running in interactive mode.@."
   else if !interactive then
     interactive_prover ()
+  else if html then
+    let filename = List.hd !args in
+    generate_html filename !html_filename
   else
     let filename = List.hd !args in
     run filename

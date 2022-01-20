@@ -77,7 +77,7 @@ let pp ppf j =
   H.pps ppf j.hyps ;
 
   (* Print separation between hyps and conclusion *)
-  Fmt.styled `Bold Utils.ident ppf (String.make 40 '-') ;
+  Printer.kws `Separation ppf (String.make 40 '-') ;
   Fmt.pf ppf "@;%a@]" pp_goal j.goal
 
 let pp_init ppf j =
