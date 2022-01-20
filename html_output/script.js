@@ -1,67 +1,120 @@
-input_lines = document.querySelectorAll("span.input-line");
-output_lines = document.querySelectorAll("span.output-line");
-in_line = document.getElementById("in-line");
-out_line = document.getElementById("out-line");
-prec_line = document.getElementById("prec-line");
-selected = null;
+lines = document.querySelectorAll("span.squirrel-step");
+outputLines = document.querySelectorAll("span.output-line");
+inputLines = document.querySelectorAll("span.input-line");
+inLine = document.getElementById("in-line");
+outLine = document.getElementById("out-line");
+precLine = document.getElementById("prec-line");
+
+stepBegin = []
+stepEnd = []
 i = 0;
-n = output_lines.length;
-for (j = 0; j < n; j++) {
-  line = input_lines[j];
-  in_line.appendChild(line);
-  line.addEventListener("click", function() { select_line(this);} );
-  line.style.color = "black";
-  line.number = j;
+n = lines.length;
+panel = false;
+
+function init() {
+  for (j = 0; j < n; j++) {
+    line = lines[j];
+
+    input = line.getElementsByClassName("input-line")[0];
+    input.ondblclick = function(){gotoLine(this.number+1);};
+    input.number = j;
+    
+    comContent = line.getElementsByClassName("com-line");
+    if (comContent.length > 0) {
+      com = document.createElement('div');
+      com.className = 'comment';
+      com.innerHTML = comContent[0].innerHTML;
+      com.collapse = false;
+      com.text = com.innerHTML;
+      com.addEventListener("click", function() { collapseBox(this); } );
+      inLine.appendChild(com);
+      stepBegin.push(com);
+    } else {
+      stepBegin.push(input);
+    }
+    stepEnd.push(input);
+    
+    inLine.appendChild(input);
+  }
 }
 
-function goto_line(j) {
+function goView(j, stepVector, top) {
+  if (j <= 1) {
+    stepVector[0].scrollIntoView(top);
+  } else {
+    stepVector[j-1].scrollIntoView(top);
+  }
+}
+
+function gotoLine(j) {
   if (0 <= j && j <= n){
     if (j <= 1){
-      prec_line.innerHTML = ""; 
+      precLine.innerHTML = ""; 
     } else {
-      prec_line.innerHTML = output_lines[j-2].innerHTML;
+      precLine.innerHTML = outputLines[j-2].innerHTML;
     }
     if (j == 0){
-      out_line.innerHTML = ""; 
+      outLine.innerHTML = ""; 
     } else {
-      out_line.innerHTML = output_lines[j-1].innerHTML;
+      outLine.innerHTML = outputLines[j-1].innerHTML;
     }
     for (k = 0; k < j; k++) {
-      input_lines[k].style.background = "#50D030";
+      inputLines[k].style.background = "#cfdbeb";
     }
     for (k = j; k < n; k++) {
-      input_lines[k].style.background = "none";
+      inputLines[k].style.background = "none";
     }
     i = j;
-    if (selected != null) {
-      selected.style.color = "black";
-    }
   }
 }
 
-function goto_up() {
-  goto_line(i+1)
+function gotoUp() {
+  gotoLine(i+1);
+  goView(i, stepEnd, false);
 }
 
-function goto_down() {
-  goto_line(i-1)
+function gotoDown() {
+  gotoLine(i-1);
+  goView(i, stepBegin, true);
 }
 
-function select_line(obj) {
-  if (selected == obj) {
-    selected.style.color = "black";
-    selected = null
+function key(event) {
+  x = event.key;
+  if (x == "ArrowRight") { gotoUp() }
+  else if (x == "ArrowLeft") { gotoDown() }
+}
+
+function help() {
+  if (panel) {
+    document.getElementById("help-panel").style.right = "-20%";
+    document.getElementById("main").style.width = "100%";
+    panel = false;
   } else {
-    if (selected != null) {
-      selected.style.color = "black";
-    }
-    obj.style.color = "red";
-    selected = obj
+    document.getElementById("help-panel").style.right = "0";
+    document.getElementById("main").style.width = "80%";
+    panel = true;
   }
 }
 
-function goto_selected() {
-  if (selected != null) {
-    goto_line(selected.number + 1);
+function collapseBox(obj) {
+  obj.classList.toggle("collapsed");
+   "+ ---------------";
+  
+  if (obj.collapse) {
+    obj.innerHTML = obj.text;
+    obj.collapse = false;
+  } else {
+    obj.innerHTML = "+ ---------------";
+    obj.collapse = true;
   }
 }
+
+function highlightOn(id) {
+  document.getElementById(id).style.backgroundColor = "#ffff9b";
+}
+
+function highlightOff(id) {
+  document.getElementById(id).style.backgroundColor = "white";
+}
+
+init()

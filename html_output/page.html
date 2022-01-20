@@ -8,24 +8,42 @@
   <link rel="stylesheet" href="style.css">
 </head>
 
-<body>
+<body onkeydown="key(event)">
 <!--HERE-->
 
-<h1 id="about-this-tutorial">Example</h1>
-<div class="example-left">
-  <div class="example-buttons">
-    <button type="button" class="command" onclick="goto_down()">-</button>
-    <button type="button" class="command" onclick="goto_selected()">=></button>
-    <button type="button" class="command" onclick="goto_up()">+</button>
-    <button type="button" class="command" style="float: right;">doc</button>
-  </div>
-  <div class="example-code" style="height: 650px;	border-style: none solid solid solid;"><span id="in-line"></span></div>
+<div class="page-header">
+  <img src="logo-circular.png" class="logo">
+  <h1 class="project-tagline">Squirrel Prover</h1>
+  <a href="https://squirrel-prover.github.io/examples.html" class="header-button">
+    <button type="button" class="header-button">Exit</button>
+  </a>
+  <button type="button" class="header-button" onclick="help()" id="button-panel">Help</button>
 </div>
-<div class="example-left">
-  <div class="example-code" style="height: 300px;	border-style: solid solid double none;"><span>Previously:</span>
-<span id="prec-line"></span>
+
+<div class="help-panel" id="help-panel">
+  Press the left and right arrows to do and undo an instruction.
+  <br><br>
+  Alternatively, you can double-click or an instruction.
+  <br><br>
+  <span style="color: #8B0000;" onmouseenter="highlightOn('in-zone')" onmouseleave="highlightOff('in-zone')">This zone</span> show a squirrel file. You can click on a commentary to collapse it for better readabilility.
+  <br><br>
+  <span style="color: #8B0000;" onmouseenter="highlightOn('out-zone')" onmouseleave="highlightOff('out-zone')">This zone</span> show the output given by Squirrel.
+  <br><br>
+  <span style="color: #8B0000;" onmouseenter="highlightOn('prec-zone')" onmouseleave="highlightOff('prec-zone')">This zone</span> show the output of the previous instruction to explicit the change caused by a tactic.
+</div>
+
+<div class="mainsection" id="main">
+  <div class="example-grid">
+    <div class="example-col example-col-left" id="in-zone">
+      <div class="example-code"><span id="in-line"></span></div>
+    </div>
+    <div class="example-col example-col-right">
+      <div class="example-code" style="height: 45%;	border-bottom: 4px double #8B0000;" id="prec-zone"><span>Previously:</span><br><br><span id="prec-line"></span>
+      </div>
+      <div class="example-code" style="height: 55%;" id="out-zone"><span id="out-line"></span>
+      </div>
+    </div>
   </div>
-  <div class="example-code" style="height: 400px;	border-style: none solid solid none;"><span id="out-line"></span></div>
 </div>
 
 <script src="script.js"></script>
