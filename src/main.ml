@@ -479,7 +479,9 @@ and main_loop_error ~test (state : main_state) : unit =
     assert (state.file.f_path = `Stdin);
     (main_loop[@tailrec]) ~test ~save:false state
   end
-  else if state.html then Fmt.epr "Error in file %s.sp:\nOutput stopped at previous call.\n" state.file.f_name
+  else if state.html then 
+    Fmt.epr "Error in file %s.sp:\nOutput stopped at previous call.\n" 
+      state.file.f_name
   else if not test then exit 1
 
 

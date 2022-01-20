@@ -11,10 +11,11 @@ let counter = ref 0
 (** Print [c].
   * Escape it if it is a html reserved character,
   * unless previous character was ESC *)
-let esc_char (escaping : bool ref)(c : char) : unit =
+let print_esc_char (escaping : bool ref) (c : char) : unit =
   if !escaping then begin
     match c with
     | '\x1B' -> escaping := false;
+    | '\n' -> output_string !current_out_c "<br>"
     | '<' -> output_string !current_out_c "&lt;"
     | '>' -> output_string !current_out_c "&gt;"
     | '"' -> output_string !current_out_c "&quot;"
@@ -26,39 +27,79 @@ let esc_char (escaping : bool ref)(c : char) : unit =
     output_char !current_out_c c
   end
 
+(** Print [s].
+  * Escape html reserved characters *)
+let print_esc_string (s : string) : unit =
+  String.iter (print_esc_char (ref true)) s
+
+(** Print string [s], translating markdown into html
+    Use pandoc *)
+let print_pandoc (s : string) : unit =
+  (*Write s into a first pipe*)
+  let (pipe_out, pipe_in) = Unix.pipe() in
+  let c_pipe_in = Unix.out_channel_of_descr pipe_in in
+  output_string c_pipe_in s ;
+  close_out c_pipe_in ;
+  
+  (*Write the result of pandoc into a second pipe*)
+  let (result_out, result_in) = Unix.pipe() in
+  let _ = Unix.create_process "pandoc" 
+    [|"pandoc" ; "-f" ; "markdown" ; "-t" ; "html"|]
+    pipe_out result_in Unix.stderr
+  in
+  Unix.close pipe_out;
+  Unix.close result_in;
+  
+  (*Print the output of the second pipe*)
+  let c_result = Unix.in_channel_of_descr result_out in
+  try
+    while true do
+      let line = input_line c_result in
+      output_string !current_out_c line ;
+      output_char !current_out_c '\n'
+    done
+  with
+  | End_of_file -> close_in c_result
+
 (** Print the output formatted with html tag
   * Input and comments are read in [!lex]
   * Output must be already stored in the standard buffer (standard output for Html printer mode).*)
 let pp () =
   let (input_line, coms) = HtmlParser.main HtmlLexer.token !lex in
+  let concat_com = String.concat "\n" coms in
+  
+  output_string !current_out_c (Format.asprintf 
+    "<span class=\"squirrel-step\" id=\"step%d\">\n"
+    !counter);
   
   (*Print input lines*)
   output_string !current_out_c (Format.asprintf 
     "<span class=\"input-line\" id=\"in%d\">"
     !counter);
-  String.iter (esc_char (ref true)) input_line;
-  output_string !current_out_c "</span>";
+  if concat_com <> "" then
+    print_esc_string (String.trim input_line)
+  else
+    print_esc_string input_line;
+  output_string !current_out_c "</span>\n";
 
   (*Print output lines*)
   output_string !current_out_c (Format.asprintf
     "<span class=\"output-line\" id=\"out%d\">"
     !counter);
   let output_line = (Format.flush_str_formatter ()) in
-  String.iter (esc_char (ref true)) output_line;
-  output_string !current_out_c "</span>";
+  print_esc_string output_line;
+  output_string !current_out_c "</span>\n";
   
   (*Print comments*)
-  let print_com s =
-    output_string !current_out_c "<span class=\"com-line\">";
-    output_string !current_out_c s;
-    output_string !current_out_c "</span>"
-  in
-  output_string !current_out_c (Format.asprintf
-    "<span class=\"com-line\" id=\"out%d\">"
-    !counter);
-  output_string !current_out_c (String.concat "\n" coms);
-  output_string !current_out_c "</span>";
-  List.iter print_com coms;
+  if concat_com <> "" then begin
+    output_string !current_out_c (Format.asprintf
+      "<span class=\"com-line\" id=\"com%d\">"
+      !counter);
+    print_pandoc concat_com;
+    output_string !current_out_c "</span>\n"
+  end ;
+  
+  output_string !current_out_c "</span>\n\n";
   
   incr counter
 
@@ -76,7 +117,6 @@ let init (filename : string) (html_filename : string) : unit =
   in
   let out_c = open_out out_filename in
   let html_c = open_in html_filename in
-  let tag_pos = ref (-1) in
   try
     while !tag_pos = -1 do
       let line = input_line html_c in
@@ -90,7 +130,6 @@ let init (filename : string) (html_filename : string) : unit =
     done;
     close_in html_c;
     current_out_c := out_c;
-    tag_pos := !tag_pos;
     
     let in_c = Stdlib.open_in filename in
     lex := Lexing.from_channel in_c
