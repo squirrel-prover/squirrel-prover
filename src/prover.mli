@@ -165,6 +165,8 @@ val is_equiv_assumption : string -> bool
 (*------------------------------------------------------------------*)
 (** {2 Utilities for parsing} *)
 
+type include_param = { th_name : lsymb; params : lsymb list }
+
 exception ParseError of string
 
 type parsed_input =
@@ -173,7 +175,7 @@ type parsed_input =
   | ParsedTactic     of TacticsArgs.parser_arg Tactics.ast
   | ParsedUndo       of int
   | ParsedGoal       of Goal.Parsed.t Location.located
-  | ParsedInclude    of lsymb
+  | ParsedInclude    of include_param
   | ParsedProof
   | ParsedQed
   | ParsedAbort
@@ -203,7 +205,7 @@ val complete_proof : unit -> unit
 val eval_tactic : TacticsArgs.parser_arg Tactics.ast -> bool
 
 (** Initialize the prover state try to prove the first of the unproved goal. *)
-val start_proof : unit -> string option
+val start_proof : [`NoCheck | `Check] -> string option
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)

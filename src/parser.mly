@@ -944,8 +944,12 @@ set_option:
 hint:
 | HINT REWRITE id=lsymb DOT { Hint.Hint_rewrite id }
 
+include_params:
+| LBRACKET l=slist(lsymb, COMMA) RBRACKET { l }
+|                                         { [] }
+
 p_include:
-| INCLUDE file=lsymb DOT  { file }
+| INCLUDE l=include_params th=lsymb DOT   { Prover.{ th_name = th; params = l; } }
 
 interactive:
 | set=set_option     { Prover.ParsedSetOption set }

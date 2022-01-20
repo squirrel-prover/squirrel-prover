@@ -213,25 +213,28 @@ let add_option ((opt_name,opt_val):option_def) =
 exception ParseError of string
 
 type tactic_groups =
-  | Logical   (* A logic tactic is a tactic that relies on the sequence calculus
-                 logical properties. *)
-  | Structural (* A structural tactic relies on properties inherent to protocol,
-                  on equality between messages, behaviour of if _ then _ else _,
-                  action dependencies... *)
-  | Cryptographic (* Cryptographic assumptions rely on ... a cryptographic assumption ! *)
+  | Logical
+  (** Sequence calculus logical properties. *)
+
+  | Structural
+  (** Properties inherent to protocol, on equality between messages, behaviour 
+     of if _ then _ else _, action dependencies... *)
+
+  | Cryptographic
+  (** Cryptographic assumptions. *)
 
 
-(* The record for a detailed help tactic. *)
-type tactic_help = { general_help : string;
+(** The record for a detailed help tactic. *)
+type tactic_help = { general_help  : string;
                      detailed_help : string;
-                     usages_sorts : TacticsArgs.esort list;
-                     tactic_group : tactic_groups;
+                     usages_sorts  : TacticsArgs.esort list;
+                     tactic_group  : tactic_groups;
                    }
 
 type 'a tac_infos = {
-  maker : TacticsArgs.parser_arg list -> 'a Tactics.tac ;
+  maker    : TacticsArgs.parser_arg list -> 'a Tactics.tac ;
   pq_sound : bool;
-  help : tactic_help ;
+  help     : tactic_help ;
 }
 
 type 'a table = (string, 'a tac_infos) Hashtbl.t
@@ -348,8 +351,11 @@ module ProverTactics = struct
   let convert_args j parser_args tactic_type =
     let table, env, ty_vars, conc, sexpr =
       match j with
-      | Goal.Trace t -> TS.table t, TS.env t, TS.ty_vars t, `Reach (TS.goal t), TS.system t
-      | Goal.Equiv e -> ES.table e, ES.env e, ES.ty_vars e, `Equiv (ES.goal e), ES.system e
+      | Goal.Trace t -> 
+        TS.table t, TS.env t, TS.ty_vars t, `Reach (TS.goal t), TS.system t
+
+      | Goal.Equiv e -> 
+        ES.table e, ES.env e, ES.ty_vars e, `Equiv (ES.goal e), ES.system e
     in
     TacticsArgs.convert_args sexpr table ty_vars env parser_args tactic_type conc
 
@@ -492,7 +498,9 @@ let get_help (tac_name : lsymb) =
 
   let print_lemmas fmt () =
     let goals = !goals_proved in
-    List.iter (fun g -> Fmt.pf fmt "%s: %a@;" g.Goal.name Equiv.Any.pp g.Goal.formula) goals
+    List.iter (fun g -> 
+        Fmt.pf fmt "%s: %a@;" g.Goal.name Equiv.Any.pp g.Goal.formula
+      ) goals
 
 
 
@@ -581,13 +589,15 @@ let get_equiv_assumption gname =
 (*------------------------------------------------------------------*)
 (** {2 Declare Goals And Proofs} *)
 
+type include_param = { th_name : lsymb; params : lsymb list }
+
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
   | ParsedSetOption  of Config.p_set_param
   | ParsedTactic     of TacticsArgs.parser_arg Tactics.ast
   | ParsedUndo       of int
   | ParsedGoal       of Goal.Parsed.t Location.located
-  | ParsedInclude    of lsymb
+  | ParsedInclude    of include_param
   | ParsedProof
   | ParsedQed
   | ParsedAbort
@@ -604,6 +614,7 @@ let declare_new_goal_i table hint_db parsed_goal =
   in
   if is_assumption (L.unloc name) then
     raise (ParseError "a goal or axiom with this name already exists");
+
   let parsed_goal = { parsed_goal with Goal.Parsed.name = Some name } in
   let statement,goal = Goal.make table hint_db parsed_goal in
   goals :=  (statement,goal) :: !goals;
@@ -616,7 +627,7 @@ let declare_new_goal table hint_db parsed_goal =
 
 let add_proved_goal gconcl =
   if is_assumption gconcl.Goal.name then
-    raise (ParseError "a formula with this name alread exists");
+    raise (ParseError "a goal or axiom with this name already exists");
   goals_proved := gconcl :: !goals_proved
 
 let define_oracle_tag_formula table (h : lsymb) f =
@@ -686,12 +697,19 @@ let eval_tactic utac = match utac with
     subgoals := cycle i !subgoals; false
   | _ -> eval_tactic_focus utac
 
-let start_proof () = match !current_goal, !goals with
+let start_proof (check : [`NoCheck | `Check]) = 
+  match !current_goal, !goals with
   | None, (gname,goal) :: _ ->
     assert (!subgoals = []);
     current_goal := Some (gname,goal);
-    subgoals := [goal];
+    let () = 
+      subgoals :=
+        match check with
+        | `Check -> [goal]
+        | `NoCheck -> []
+    in
     None
+
   | Some _,_ ->
     Some "Cannot start a new proof (current proof is not done)."
 
@@ -812,8 +830,12 @@ let declare_i table hint_db decl = match L.unloc decl with
     Process.declare_system table name sdecl.sprocess
 
   | Decl.Decl_system_modifier sdecl ->
-    let new_axiom_name, enrich, make_conclusion, new_system, table = SystemModifiers.declare_system table sdecl in
-    let `Equiv formula, _ = Goal.make_obs_equiv ~enrich table hint_db new_axiom_name new_system in
+    let new_axiom_name, enrich, make_conclusion, new_system, table = 
+      SystemModifiers.declare_system table sdecl 
+    in
+    let `Equiv formula, _ =
+      Goal.make_obs_equiv ~enrich table hint_db new_axiom_name new_system 
+    in
     let formula = make_conclusion formula in
     let statement = Goal.{ name=new_axiom_name; system=new_system; ty_vars=[]; formula} in
     goals_proved :=  statement :: !goals_proved;

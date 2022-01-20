@@ -33,6 +33,8 @@ type main_state = {
   mode  : Prover.prover_mode;
   table : Symbols.table;
 
+  check_mode : [`Check | `NoCheck];
+
   interactive : bool;
 
   load_paths : load_paths;
@@ -241,120 +243,180 @@ let next_input ~test (state : main_state) : Prover.parsed_input =
     ~test ~interactive:state.interactive
     Parser.interactive lexbuf ~filename
 
+(*------------------------------------------------------------------*)
+let do_undo (state : main_state) (nb_undo : int) : main_state =
+  let new_mode, new_table = Prover.reset_state nb_undo in
+  let () = match new_mode with
+    | ProofMode -> Printer.pr "%a" Prover.pp_goal ()
+    | GoalMode -> Printer.pr "%a" Action.pp_actions new_table
+    | WaitQed -> ()
+    | AllDone -> assert false in
+  { state with mode = new_mode; table = new_table; }
+
+let do_decls (state : main_state) (decls : Decl.declarations) : main_state =
+  let hint_db = Prover.current_hint_db () in
+  let table = Prover.declare_list state.table hint_db decls in
+  { state with mode = GoalMode; table = table; }
+
+let do_tactic 
+    (state : main_state)
+    (utac : TacticsArgs.parser_arg Tactics.ast) 
+  : main_state 
+  =
+  let () = 
+  match state.check_mode with
+  | `NoCheck -> assert (state.mode = WaitQed)
+  | `Check   -> 
+    if state.mode <> Prover.ProofMode then
+      cmd_error Unexpected_command;
+  in
+
+  if not state.interactive then
+    Printer.prt `Prompt "%a" Prover.pp_ast utac ;
+
+  match state.check_mode with
+  | `NoCheck -> state
+  | `Check   -> 
+    let proof_done = Prover.eval_tactic utac in
+    if proof_done then
+      begin
+        Printer.prt `Goal "Goal %s is proved" 
+          (Utils.oget (Prover.current_goal_name ()));
+               
+        { state with mode = WaitQed }
+      end
+    else
+      begin
+        Printer.pr "%a" Prover.pp_goal ();
+        { state with mode = ProofMode }
+      end
+
+let do_qed (state : main_state) : main_state =
+  Prover.complete_proof ();
+  Printer.prt `Result "Exiting proof mode.@.";
+  { state with mode = GoalMode }
+
+let do_add_hint (state : main_state) (h : Hint.p_hint) : main_state =
+  let db = Prover.current_hint_db () in
+  let db =
+    match h with
+    | Hint.Hint_rewrite id -> Prover.add_hint_rewrite id db
+  in
+  Prover.set_hint_db db;
+  state
+
+let do_set_option (state : main_state) (sp : Config.p_set_param) : main_state =
+  Config.set_param sp;
+  state
+
+let do_add_goal 
+    (state : main_state)
+    (g : Goal.Parsed.t Location.located) 
+  : main_state 
+  =
+  let hint_db = Prover.current_hint_db () in
+  let i,f =
+    Prover.declare_new_goal state.table hint_db g
+  in
+  Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
+    i
+    Goal.pp_init f;
+  state
+
+let do_start_proof (state : main_state) : main_state =
+  match Prover.start_proof state.check_mode with
+  | None ->
+    Printer.pr "%a" Prover.pp_goal ();
+    let mode = match state.check_mode with
+      | `NoCheck -> Prover.WaitQed 
+      | `Check   -> Prover.ProofMode
+    in
+    { state with mode }
+  | Some es -> cmd_error (StartProofError es)
+
+let do_eof (state : main_state) : main_state =
+  assert (state.file_stack = []);
+  { state with mode = AllDone; }
+
+(*------------------------------------------------------------------*)
+
+let rec do_include 
+    ~test
+    (state : main_state)
+    (i : Prover.include_param) 
+  : main_state 
+  =
+  (* save prover state, in case the include fails *)
+  let prover_state = Prover.get_state state.mode state.table in
+
+  let file = include_get_file state i.th_name in
+  let file_stack = state.file :: state.file_stack in
+
+  Prover.push_pt_history ();
+
+  let check_mode = 
+    if List.exists (fun x -> L.unloc x = "admit") i.Prover.params 
+    then `NoCheck
+    else `Check
+  in
+  let incl_state = { state with file; file_stack; check_mode; } in
+
+  (* try to do the include *)
+  try
+    let final_state = do_all_commands ~test incl_state in
+    Printer.prt `Warning "loaded: %s.sp@;" final_state.file.f_name;
+
+    Prover.pop_pt_history ();
+
+    { final_state with file       = state.file; 
+                       file_stack = state.file_stack; 
+                       check_mode = state.check_mode; }
+
+  (* include failed, revert state *)
+  with e when is_toplevel_error ~test e ->
+    let err_mess fmt =
+      Fmt.pf fmt "@[<v 0>include %s failed:@;@[%a@]@]"
+        (L.unloc i.th_name)
+        (pp_toplevel_error ~test incl_state) e
+    in
+
+    let _ : Prover.prover_mode * Symbols.table =
+      Prover.reset_from_state prover_state
+    in
+    cmd_error (IncludeFailed err_mess)
+
 (** The main loop body: do one command *)
-let rec do_command
+and do_command
     ~(test : bool)
     (state : main_state)
     (command : Prover.parsed_input) : main_state
   =
   match state.mode, command with
-    | mode, ParsedUndo nb_undo ->
-      let new_mode, new_table = Prover.reset_state nb_undo in
-      let () = match new_mode with
-        | ProofMode -> Printer.pr "%a" Prover.pp_goal ()
-        | GoalMode -> Printer.pr "%a" Action.pp_actions new_table
-        | WaitQed -> ()
-        | AllDone -> assert false in
-      { state with mode = new_mode; table = new_table; }
+    | _, ParsedUndo nb_undo            -> do_undo state nb_undo
 
-    | GoalMode, ParsedInputDescr decls ->
-      let hint_db = Prover.current_hint_db () in
-      let table = Prover.declare_list state.table hint_db decls in
-      { state with mode = GoalMode; table = table; }
+    | GoalMode, ParsedInputDescr decls -> do_decls state decls
 
-    | ProofMode, ParsedTactic utac ->
-      if not state.interactive then
-        Printer.prt `Prompt "%a" Prover.pp_ast utac ;
+    | _, ParsedTactic utac             -> do_tactic state utac
 
-      begin match Prover.eval_tactic utac with
-      | true ->
-          Printer.prt `Goal "Goal %s is proved"
-            (match Prover.current_goal_name () with
-               | Some i -> i
-               | None -> assert false);
-          Prover.complete_proof ();
-          { state with mode = WaitQed }
-      | false ->
-          Printer.pr "%a" Prover.pp_goal ();
-          { state with mode = ProofMode }
-      end
+    | WaitQed, ParsedQed               -> do_qed state
 
-    | WaitQed, ParsedQed ->
-      Printer.prt `Result "Exiting proof mode.@.";
-      { state with mode = GoalMode }
+    | GoalMode, ParsedHint h           -> do_add_hint state h
 
-    | GoalMode, ParsedHint h ->
-      let db = Prover.current_hint_db () in
-      let db =
-        match h with
-        | Hint.Hint_rewrite id -> Prover.add_hint_rewrite id db
-      in
-      Prover.set_hint_db db;
-      state
+    | GoalMode, ParsedSetOption sp     -> do_set_option state sp
 
-    | GoalMode, ParsedSetOption sp ->
-      Config.set_param sp;
-      state
+    | GoalMode, ParsedGoal g           -> do_add_goal state g
 
-    | GoalMode, ParsedGoal g ->
-      let hint_db = Prover.current_hint_db () in
-      let i,f =
-        Prover.declare_new_goal state.table hint_db g
-      in
-      Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
-        i
-        Goal.pp_init f;
-      state
+    | GoalMode, ParsedProof            -> do_start_proof state
 
-    | GoalMode, ParsedProof ->
-      begin match Prover.start_proof () with
-        | None ->
-            Printer.pr "%a" Prover.pp_goal ();
-            { state with mode = ProofMode }
-        | Some es -> cmd_error (StartProofError es)
-      end
+    | GoalMode, ParsedInclude inc      -> do_include ~test state inc
 
-    | GoalMode, ParsedInclude fn ->
-      (* save prover state, in case the include fails *)
-      let prover_state = Prover.get_state state.mode state.table in
-
-      let file = include_get_file state fn in
-      let file_stack = state.file :: state.file_stack in
-
-      Prover.push_pt_history ();
-
-      let incl_state = { state with file; file_stack; } in
-
-      (* try to do the include *)
-      begin try
-          let final_state = do_all_commands ~test incl_state in
-          Printer.prt `Warning "loaded: %s.sp@;" final_state.file.f_name;
-
-          Prover.pop_pt_history ();
-
-          { final_state with file = state.file; file_stack = state.file_stack; }
-
-        (* include failed, revert state *)
-        with e when is_toplevel_error ~test e ->
-          let err_mess fmt =
-            Fmt.pf fmt "@[<v 0>include %s failed:@;@[%a@]@]"
-              (L.unloc fn)
-            (pp_toplevel_error ~test incl_state) e
-          in
-
-          let _ : Prover.prover_mode * Symbols.table =
-            Prover.reset_from_state prover_state
-          in
-          cmd_error (IncludeFailed err_mess)
-      end
-
-    | GoalMode, EOF ->
-      assert (state.file_stack = []);
-      { state with mode = AllDone; }
+    | GoalMode, EOF                    -> do_eof state
 
     | WaitQed, ParsedAbort ->
-      if test then raise @@ Failure "Trying to abort a completed proof." else
-        cmd_error AbortIncompleteProof
+      if test then
+        raise (Failure "Trying to abort a completed proof.");
+
+      cmd_error AbortIncompleteProof
 
     | ProofMode, ParsedAbort ->
       Printer.prt `Result "Exiting proof mode and aborting current proof.@.";
@@ -362,8 +424,9 @@ let rec do_command
       { state with mode = GoalMode; }
 
     | _, ParsedQed ->
-      if test then raise Unfinished else
-        cmd_error Unexpected_command
+      if test then raise Unfinished;
+      
+      cmd_error Unexpected_command
 
     | _, _ -> cmd_error Unexpected_command
 
@@ -441,6 +504,8 @@ let start_main_loop
     mode = GoalMode;
     table = Symbols.builtins_table;
     interactive;
+
+    check_mode = `Check;
 
     load_paths = mk_load_paths ~main_mode ();
 
