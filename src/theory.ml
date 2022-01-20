@@ -156,28 +156,45 @@ let pp_var_list ppf l =
 
 
 let rec pp_term_i ppf t = match t with
-  | Tinit -> Fmt.pf ppf "init"
+  | Tinit -> Printer.kws `TermAction ppf "init"
 
   | Tpat -> Fmt.pf ppf "_"
 
-  | Tpred t -> Fmt.pf ppf "pred(%a)" pp_term t
+  | Tpred t ->
+      Fmt.pf ppf "%a(%a)" 
+        (Printer.kws `TermAction) "pred" 
+        pp_term t
 
   | Find (vs,c,t,e) ->
       Fmt.pf ppf
-        "@[try find@ %a@ such that@ %a@ in@ %a@ else@ %a@]"
+        "@[%a@ %a@ %a@ %a@ %a@ %a@ %a@ %a@]"
+        (Printer.kws `TermCondition) "try find"
         (Utils.pp_list Fmt.string) (L.unlocs vs)
-        pp_term c pp_term t pp_term e
+        (Printer.kws `TermCondition) "such that"
+        pp_term c
+        (Printer.kws `TermCondition) "in"
+        pp_term t
+        (Printer.kws `TermCondition) "else"
+        pp_term e
 
   | Diff (l,r) ->
-      Fmt.pf ppf "diff(%a,%a)" pp_term l pp_term r
+      Fmt.pf ppf "%a(%a,%a)"
+        (Printer.kws `TermDiff) "diff"
+        pp_term l
+        pp_term r
 
   | App (f,[t1;t2]) when L.unloc f = "exp" ->
     Fmt.pf ppf "%a^%a" pp_term t1 pp_term t2
 
   | App (f,[i;t;e]) when L.unloc f = "if" ->
-    Fmt.pf ppf
-      "@[if@ %a@ then@ %a@ else@ %a@]"
-      pp_term i pp_term t pp_term e
+      Fmt.pf ppf
+        "@[%a@ %a@ %a@ %a@ %a@ %a@]"
+        (Printer.kws `TermCondition) "if"
+        pp_term i
+        (Printer.kws `TermCondition) "then"
+        pp_term t
+        (Printer.kws `TermCondition) "else"
+        pp_term e
 
   | App (f, [L.{ pl_desc = App (f1,[bl1;br1])};
              L.{ pl_desc = App (f2,[br2;bl2])}])
@@ -193,9 +210,9 @@ let rec pp_term_i ppf t = match t with
   | App (f,[b]) when L.unloc f = "not" ->
     Fmt.pf ppf "not(@[%a@])" pp_term b
 
-  | App (f,[]) when L.unloc f = "true" -> Fmt.pf ppf "True"
+  | App (f,[]) when L.unloc f = "true" -> Printer.kws `TermBool ppf "True"
 
-  | App (f,[]) when L.unloc f = "false" -> Fmt.pf ppf "False"
+  | App (f,[]) when L.unloc f = "false" -> Printer.kws `TermBool ppf "False"
 
   | App (f,terms) ->
     Fmt.pf ppf "%s%a"
@@ -211,20 +228,29 @@ let rec pp_term_i ppf t = match t with
   | Compare (ord,tl,tr) ->
     Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Term.pp_ord ord pp_term tr
 
-  | Happens t -> Fmt.pf ppf "happens(%a)" (Utils.pp_list pp_term) t
+  | Happens t -> 
+      Fmt.pf ppf "%a(%a)"
+        (Printer.kws `TermHappens) "happens"
+        (Utils.pp_list pp_term) t
 
 
   | Seq (vs, b) ->
-    Fmt.pf ppf "@[seq(@[%a->%a@])@]"
-      pp_var_list vs pp_term b
+      Fmt.pf ppf "@[%a(@[%a->%a@])@]"
+        (Printer.kws `TermSeq) "seq"
+        pp_var_list vs
+        pp_term b
 
   | ForAll (vs, b) ->
-    Fmt.pf ppf "@[forall (@[%a@]),@ %a@]"
-      pp_var_list vs pp_term b
+      Fmt.pf ppf "@[%a (@[%a@]),@ %a@]"
+        (Printer.kws `TermQuantif) "forall"
+        pp_var_list vs
+        pp_term b
 
   | Exists (vs, b) ->
-    Fmt.pf ppf "@[exists (@[%a@]),@ %a@]"
-      pp_var_list vs pp_term b
+      Fmt.pf ppf "@[%a (@[%a@]),@ %a@]"
+        (Printer.kws `TermQuantif) "exists"
+        pp_var_list vs
+        pp_term b
 
 
 and pp_ts ppf ts = Fmt.pf ppf "@%a" pp_term ts

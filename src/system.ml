@@ -55,7 +55,7 @@ let symbs table s =
 let pp_system table fmt s =
   let descrs, symbs = get_data table s in
   let descrs = Msh.bindings descrs in
-    Format.printf "System %a registered with actions %a.@."
+    Printer.pr "System %a registered with actions %a.@."
       Symbols.pp s
       (Utils.pp_list (fun fmt (_,d) -> Symbols.pp fmt d.Action.name)) descrs
 
