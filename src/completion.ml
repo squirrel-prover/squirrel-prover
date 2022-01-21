@@ -16,7 +16,7 @@ module Cst = struct
     (** Flattening of the successor of a constant *)
 
     | Cgfuncst of [
-        | `N of Symbols.name   Symbols.t * Type.message Type.ty
+        | `N of Symbols.name   Symbols.t * Type.ty
         | `F of Symbols.fname  Symbols.t
         | `A of Symbols.action Symbols.t
       ]
@@ -37,7 +37,7 @@ module Cst = struct
   let rec print ppf = function
     | Cflat i   -> Fmt.pf ppf "_%d" i
     | Csucc c   -> Fmt.pf ppf "suc(@[%a@])" print c
-    | Cmvar m   -> Vars.pp_e ppf m
+    | Cmvar m   -> Vars.pp ppf m
     | Cgfuncst (`F f) -> Symbols.pp ppf f
     | Cgfuncst (`N (n,_)) -> Symbols.pp ppf n
     | Cgfuncst (`A a) -> Symbols.pp ppf a
@@ -72,11 +72,11 @@ let nilpotence_norm compare l =
 (** Generalized function symbols, for [Term.fsymb], [Term.msymb] and 
     [Symbols.action Symbols.t]. *)
 type gfsymb = 
-  | F of Symbols.fname  Symbols.t                        (* function symbol *)
-  | M of Symbols.macro  Symbols.t * Type.message Type.ty (* macro *)
-  | N of Symbols.name   Symbols.t * Type.message Type.ty (* name *)
-  | A of Symbols.action Symbols.t                        (* action *)
-  | GPred                                                (* predecessor *)
+  | F of Symbols.fname  Symbols.t           (* function symbol *)
+  | M of Symbols.macro  Symbols.t * Type.ty (* macro *)
+  | N of Symbols.name   Symbols.t * Type.ty (* name *)
+  | A of Symbols.action Symbols.t           (* action *)
+  | GPred                                   (* predecessor *)
 
 let hash_gfs = function
   | M (m, _) -> Hashtbl.hash m
@@ -244,7 +244,7 @@ let mk_var () =
 exception Unsupported_conversion
 
 (** Translation from [term] to [cterm] *)
-let rec cterm_of_term : type a. a Term.term -> cterm = fun c ->
+let rec cterm_of_term : Term.term -> cterm = fun c ->
   let open Term in
   match c with
   | Fun ((f,is),_,terms) ->
@@ -285,9 +285,9 @@ let index_of_cterm i = match i.cnt with
     
 let indices_of_cterms cis = List.map index_of_cterm cis
 
-let term_of_cterm : type a. Symbols.table -> a Type.kind -> cterm -> a Term.term =
+let term_of_cterm : Symbols.table -> Type.kind -> cterm -> Term.term =
   fun table kind c ->  
-  let rec term_of_cterm : type a. a Type.kind -> cterm -> a Term.term = 
+  let rec term_of_cterm : Type.kind -> cterm -> Term.term = 
     fun kind c -> 
       match c.cnt with 
       | Cfun (F f, ari, cterms) -> 
@@ -335,7 +335,7 @@ let term_of_cterm : type a. Symbols.table -> a Type.kind -> cterm -> a Term.term
 
       | (Ccst (Cflat _|Csucc _)|Cvar _|Cxor _) -> assert false
 
-  and terms_of_cterms : type a. a Type.kind -> cterm list -> a Term.term list =
+  and terms_of_cterms : Type.kind -> cterm list -> Term.term list =
     fun kind cterms -> List.map (term_of_cterm kind) cterms
 
   in

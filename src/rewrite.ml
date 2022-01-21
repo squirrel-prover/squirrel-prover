@@ -77,9 +77,9 @@ let _rewrite_head
   let (l, r) : Term.term * Term.term =
     match rule.rw_rw with
     | Term.ESubst (l, r) ->
-      match Type.equalk_w (Term.kind t) (Term.kind l) with
-      | Some Type.Type_eq -> l, r
-      | None -> raise NoRW
+      if not (Term.kind t = Term.kind l) then raise NoRW;
+
+      l, r
   in
 
   let pat =
@@ -97,15 +97,14 @@ let _rewrite_head
   r, subs
 
 let rewrite_head
-    (type a)
     (table  : Symbols.table)
     (system : SE.t)
     (rule   : rw_erule)
-    (t      : a Term.term) : (a Term.term * Term.term list) option
+    (t      : Term.term) : (Term.term * Term.term list) option
   =
-  match Type.equalk_w Type.KMessage (Term.kind t) with
-  | None -> None
-  | Some Type.Type_eq ->
+  if not (Term.kind t = Type.KMessage) then 
+    None
+  else
     try Some (_rewrite_head table system rule t) with NoRW -> None
 
 (*------------------------------------------------------------------*)
@@ -117,7 +116,7 @@ let rewrite_head
 
 (*------------------------------------------------------------------*)
 (** A opened rewrite rule. Not exported. *)
-type 'a rw_rule =
+type rw_rule =
   Type.tvars * Vars.Sv.t * Term.term list * Term.term * Term.term
 
 (*------------------------------------------------------------------*)
@@ -142,9 +141,9 @@ let rewrite
   (* Attempt to find an instance of [left], and rewrites all occurrences of
      this instance.
      Return: (f, subs) *)
-  let rec _rewrite : type a.
+  let rec _rewrite : 
     Args.rw_count ->
-    a rw_rule ->
+    rw_rule ->
     Equiv.any_form ->
     Equiv.any_form * Term.term list
     = fun mult (tyvars, sv, rsubs, left, right) f ->
@@ -155,7 +154,7 @@ let rewrite
 
       (* This is a reference, so that it can be over-written later
          after we found an instance of [left]. *)
-      let pat : a Term.term Match.pat ref =
+      let pat : Term.term Match.pat ref =
         ref Match.{ pat_tyvars = tyvars; pat_vars = sv; pat_term = left }
       in
       let right_instance = ref None in

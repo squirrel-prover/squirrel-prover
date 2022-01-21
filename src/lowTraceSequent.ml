@@ -172,8 +172,8 @@ let get_atoms_from_s (s : sequent) : Term.literal list =
   let fhyps = H.fold (fun _ f acc -> f :: acc) s.hyps [] in
   get_atoms_of_fhyps fhyps
 
-let get_message_atoms (s : sequent) : Term.term_atom list =
-  let do1 (at : Term.literal) : Term.term_atom option =
+let get_message_atoms (s : sequent) : Term.message_atom list =
+  let do1 (at : Term.literal) : Term.message_atom option =
     match at with 
     | `Pos, (`Message _ as at) -> Some at
     | `Neg, (`Message _ as at) -> Some (Term.not_message_atom at)
@@ -314,7 +314,7 @@ module Hyps = struct
       match t with
       | Term.Macro (ms,[],a) ->
         if List.for_all
-            Vars.(function EVar v -> not (is_new v))
+            Vars.(fun v -> not (is_new v))
             (Term.get_vars t) 
         then begin
           match Macros.get_definition cntxt ms a with

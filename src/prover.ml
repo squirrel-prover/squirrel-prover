@@ -742,10 +742,10 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
         ) in_tys
     in
 
-    let rec parse_in_tys p_tys : Type.message Type.ty list  =
+    let rec parse_in_tys p_tys : Type.ty list  =
       match p_tys with
       | [] -> []
-      | (loc, Type.ETy ty) :: in_tys -> match Type.kind ty with
+      | (loc, ty) :: in_tys -> match Type.kind ty with
         | Type.KMessage -> ty :: parse_in_tys in_tys
         | Type.KIndex     -> decl_error loc KDecl InvalidAbsType
         | Type.KTimestamp -> decl_error loc KDecl InvalidAbsType
@@ -753,7 +753,7 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
 
     let rec parse_index_prefix iarr in_tys = match in_tys with
       | [] -> iarr, []
-      | (_, Type.ETy ty) :: in_tys as in_tys0 ->
+      | (_, ty) :: in_tys as in_tys0 ->
         match Type.kind ty with
         | Type.KIndex -> parse_index_prefix (iarr + 1) in_tys
         | _ -> iarr, parse_in_tys in_tys0
@@ -761,7 +761,7 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
 
     let iarr, in_tys = parse_index_prefix 0 in_tys in
 
-    let out_ty : Type.message Type.ty =
+    let out_ty : Type.ty =
       Theory.parse_p_ty table ty_args out_ty Type.KMessage
     in
 

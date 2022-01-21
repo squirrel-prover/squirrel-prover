@@ -450,7 +450,7 @@ module Mk (Args : MkArgs) : S with
     (* close the unienv and generalize remaining univars *)
     let pat_tyvars, tysubst = Type.Infer.gen_and_close ty_env in
     let f = Equiv.Babel.tsubst f_kind tysubst f in
-    let pat_vars = Sv.map (Vars.tsubst_e tysubst) pat_vars in
+    let pat_vars = Sv.map (Vars.tsubst tysubst) pat_vars in
 
     (* generalize remaining universal variables in f *)
     (* FIXME: don't generalize in convert_pt_gen *)

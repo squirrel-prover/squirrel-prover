@@ -20,7 +20,8 @@ let global_rename table sdecl gf =
     | _ -> assert false
 
   in
-  let old_system, old_single_system = match SE.parse_se table sdecl.Decl.from_sys  with
+  let old_system, old_single_system = 
+    match SE.parse_se table sdecl.Decl.from_sys with
     | Single s as res -> res, s
     | _ -> assert false
   in
@@ -88,7 +89,7 @@ let global_rename table sdecl gf =
       let fresh_x_var = Vars.make_new Type.Message "mess" in
       let enrich = [Term.mk_var fresh_x_var] in
       let make_conclusion equiv = `Equiv
-          Equiv.(Quant (ForAll, [EVar fresh_x_var],
+          Equiv.(Quant (ForAll, [fresh_x_var],
                         Impl(
                           Quant (ForAll, evars,
                                  Atom (
@@ -112,7 +113,7 @@ let global_prf table sdecl ty_vars hash =
   let env,vars = Theory.convert_p_bnds table [] Vars.empty_env ty_vars in
   let conv_env = Theory.{ table; cntxt = InGoal } in
   let hash, _ = Theory.convert_i conv_env [] env hash in
-  let is =  (List.map (fun x -> Vars.ecast x Type.KIndex) vars) in
+  let is =  (List.map (fun x -> Vars.cast x Type.KIndex) vars) in
 
 
   let env = ref env in
@@ -166,9 +167,9 @@ let global_prf table sdecl ty_vars hash =
   in
   let rw_rule = Rewrite.{
     rw_tyvars = [];
-    rw_vars = Vars.Sv.of_list ((Vars.var fresh_x_var)::(List.map Vars.var is1));
-    rw_conds = [];
-    rw_rw = Term.ESubst (hash_pattern, mk_tryfind);
+    rw_vars   = Vars.Sv.of_list (fresh_x_var :: is1);
+    rw_conds  = [];
+    rw_rw     = Term.ESubst (hash_pattern, mk_tryfind);
   }
   in
 
@@ -211,7 +212,7 @@ let global_prf table sdecl ty_vars hash =
       let fresh_x_var = Vars.make_new Type.Message "mess" in
       let enrich = [Term.mk_var fresh_x_var] in
       let make_conclusion equiv = `Equiv
-          Equiv.(Quant (ForAll, [EVar fresh_x_var],
+          Equiv.(Quant (ForAll, [fresh_x_var],
                         Impl(
                           Quant (ForAll, is,
                                  Atom (
@@ -238,7 +239,7 @@ let global_cca table sdecl ty_vars enc =
   let env,vars = Theory.convert_p_bnds table [] Vars.empty_env ty_vars in
   let conv_env = Theory.{ table; cntxt = InGoal } in
   let enc, _ = Theory.convert_i conv_env [] env enc in
-  let is =  (List.map (fun x -> Vars.ecast x Type.KIndex) vars) in
+  let is =  (List.map (fun x -> Vars.cast x Type.KIndex) vars) in
 
 
   let env = ref env in
@@ -335,17 +336,16 @@ let global_cca table sdecl ty_vars enc =
 
   let enc_rw_rule = Rewrite.{
     rw_tyvars = [];
-    rw_vars = Vars.Sv.of_list (List.map Vars.var is);
-    rw_conds = [];
-    rw_rw = Term.ESubst (enc, new_enc);
+    rw_vars   = Vars.Sv.of_list is;
+    rw_conds  = [];
+    rw_rw     = Term.ESubst (enc, new_enc);
   }
   in
   let dec_rw_rule = Rewrite.{
     rw_tyvars = [];
-    rw_vars = Vars.Sv.of_list ((Vars.var fresh_x_var)
-                               ::(List.map Vars.var is1));
-    rw_conds = [];
-    rw_rw = Term.ESubst (dec_pattern, tryfind_dec);
+    rw_vars   = Vars.Sv.of_list (fresh_x_var :: is1);
+    rw_conds  = [];
+    rw_rw     = Term.ESubst (dec_pattern, tryfind_dec);
   }
   in
 
@@ -409,7 +409,7 @@ let global_cca table sdecl ty_vars enc =
 
     let enrich = [Term.mk_var fresh_x_var] in
     let make_conclusion equiv = `Equiv
-        Equiv.(Quant (ForAll, [EVar fresh_x_var],
+        Equiv.(Quant (ForAll, [fresh_x_var],
                       Impl(
                         Quant (ForAll, is,
                                Atom (

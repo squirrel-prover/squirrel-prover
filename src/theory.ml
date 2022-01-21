@@ -385,7 +385,7 @@ let pp_error_i ppf = function
 
   | BadPty l ->
     Fmt.pf ppf "type must be of kind %a"
-      (Fmt.list ~sep:Fmt.comma Type.pp_kinde) l
+      (Fmt.list ~sep:Fmt.comma Type.pp_kind) l
 
   | BadInfixDecl -> Fmt.pf ppf "bad infix symbol declaration"
 
@@ -404,10 +404,10 @@ let pp_error pp_loc_err ppf (loc,e) =
 
 let parse_p_ty0 table (tvars : Type.tvar list) (pty : p_ty) : Type.ty =
   match L.unloc pty with
-  | P_message        -> Type.ETy (Message  )
-  | P_boolean        -> Type.ETy (Boolean  )
-  | P_index          -> Type.ETy (Index    )
-  | P_timestamp      -> Type.ETy (Timestamp)
+  | P_message        -> Message  
+  | P_boolean        -> Boolean  
+  | P_index          -> Index    
+  | P_timestamp      -> Timestamp
 
   | P_tvar tv_l ->
     let tv =
@@ -419,19 +419,21 @@ let parse_p_ty0 table (tvars : Type.tvar list) (pty : p_ty) : Type.ty =
       with Not_found ->
         conv_err (L.loc tv_l) (UnknownTypeVar (L.unloc tv_l))
     in
-    ETy (TVar tv)
+    TVar tv
 
   | P_tbase tb_l ->
     let s = Symbols.BType.of_lsymb tb_l table in
-    Type.ETy (Type.TBase (Symbols.to_string s)) (* TODO: remove to_string *)
+    Type.TBase (Symbols.to_string s) (* TODO: remove to_string *)
 
-let parse_p_ty : type a.
-  Symbols.table -> Type.tvar list -> p_ty -> a Type.kind -> a Type.ty =
+let parse_p_ty : 
+  Symbols.table -> Type.tvar list -> p_ty -> Type.kind -> Type.ty =
   fun tbl tvars pty kind ->
-  let Type.ETy ty = parse_p_ty0 tbl tvars pty in
-  match Type.equalk_w (Type.kind ty) kind with
-    | Some Type.Type_eq -> ty
-    | _ -> conv_err (L.loc pty) (BadPty [Type.EKind kind])
+  let ty = parse_p_ty0 tbl tvars pty in
+
+  if Type.kind ty <> kind then 
+    conv_err (L.loc pty) (BadPty [kind]);
+
+  ty
 
 
 (*------------------------------------------------------------------*)
@@ -724,9 +726,9 @@ let mk_state table cntxt ty_vars env allow_pat ty_env =
 
 let ty_error ty_env tm ty =
   let ty = Type.Infer.norm ty_env ty in
-  Conv (L.loc tm, Type_error (L.unloc tm, Type.ETy ty))
+  Conv (L.loc tm, Type_error (L.unloc tm, ty))
 
-let check_ty_leq state ~of_t (t_ty : Type.ty) (ty : 'b Type.ty) : unit =
+let check_ty_leq state ~of_t (t_ty : Type.ty) (ty : Type.ty) : unit =
   match Type.Infer.unify_leq state.ty_env t_ty ty with
   | `Ok -> ()
   | `Fail ->
@@ -737,14 +739,14 @@ let check_ty_leq state ~of_t (t_ty : Type.ty) (ty : 'b Type.ty) : unit =
  *   | `Ok -> ()
  *   | `Fail -> raise (ty_error state.ty_env of_t ty) *)
 
-let check_term_ty state ~of_t (t : Term.term) (ty : 'b Type.ty) : unit =
+let check_term_ty state ~of_t (t : Term.term) (ty : Type.ty) : unit =
   check_ty_leq state ~of_t (Term.ty ~ty_env:state.ty_env t) ty
 
 (*------------------------------------------------------------------*)
 (** {2 Conversion} *)
 
 let convert_var :
-  type a. conv_state -> Vars.env -> lsymb -> a Type.ty -> a Term.term
+  conv_state -> Vars.env -> lsymb -> Type.ty -> Term.term
   = fun state env st ty ->
     try
       let v = Vars.find env (L.unloc st) (Type.kind ty) in
@@ -757,10 +759,10 @@ let convert_var :
     with
     | Not_found -> conv_err (L.loc st) (Undefined (L.unloc st))
     | Vars.CastError ->
-      conv_err (L.loc st) (Type_error (App (st,[]), Type.ETy ty))
+      conv_err (L.loc st) (Type_error (App (st,[]), ty))
 
-let convert_bnds env (vars : (lsymb * Type.ety) list) =
-  let do1 (env, v_acc) (vsymb, Type.ETy s) =
+let convert_bnds env (vars : (lsymb * Type.ty) list) =
+  let do1 (env, v_acc) (vsymb, s) =
     let env, var  = Vars.make `Shadow env s (L.unloc vsymb) in
     env, var :: v_acc
   in
@@ -799,14 +801,14 @@ let get_macro table lsymb =
 (*------------------------------------------------------------------*)
 (* internal function to Theory.ml *)
 let rec convert :
-  type s. conv_state -> term -> s Type.ty -> s Term.term =
+  conv_state -> term -> Type.ty -> Term.term =
   fun state tm ty ->
     let t = convert0 state tm ty in
     check_term_ty state ~of_t:tm t ty;
     t
 
 and convert0 :
-  type s. conv_state -> term -> s Type.ty -> s Term.term =
+  conv_state -> term -> Type.ty -> Term.term =
   fun state tm ty ->
   let loc = L.loc tm in
 
@@ -901,10 +903,10 @@ and convert0 :
     let env, evs =
       convert_bnds state.env (List.map (fun x -> x, Type.eindex) vs)
     in
-    let is : Type.index Vars.var list =
+    let is =
       List.map (fun v ->
-        try Vars.cast v Type.KIndex
-        with Vars.CastError -> type_error ()
+          try Vars.cast v Type.KIndex
+          with Vars.CastError -> type_error ()
         ) evs
     in
     begin match Type.kind ty with
@@ -957,9 +959,8 @@ and conv_index state t =
 
 (* The term [tm] in argument is here for error messages. *)
 and conv_app :
-  type s.
   conv_state -> app_cntxt ->
-  (term * app) -> s Type.ty -> s Term.term
+  (term * app) -> Type.ty -> Term.term
   = fun state app_cntxt (tm,app) ty ->
     (* We should have [make_app app = t].
        [t] is here to have meaningful exceptions. *)
@@ -1107,7 +1108,7 @@ let conv_ht : conv_state -> hterm -> Type.hty * Term.hterm =
 
     let ht = Term.Lambda (evs, convert { state with env } t0 ty) in
 
-    let bnd_tys = List.map (fun v -> Type.ETy (Vars.ty v)) evs in
+    let bnd_tys = List.map (fun v -> Vars.ty v) evs in
     let hty = Type.Lambda (bnd_tys, ty) in
 
     hty, ht
@@ -1251,8 +1252,11 @@ let convert_ht : type s.
 
 (*------------------------------------------------------------------*)
 let check
-    table ?(local=false) ?(pat=false) (ty_env : Type.Infer.env)
-    (env : Vars.env) t (Type.ETy s) : unit =
+    table ?(local=false) ?(pat=false) 
+    (ty_env : Type.Infer.env)
+    (env : Vars.env) t (s : Type.ty) 
+  : unit 
+  =
   let dummy_var s =
     Term.mk_var (snd (Vars.make `Approx Vars.empty_env s "#dummy"))
   in
@@ -1285,15 +1289,14 @@ let convert_i ?ty_env ?(pat=false) (cenv : conv_env) ty_vars env tm
 
 (** exported outside Theory.ml *)
 let convert 
-    (type s)
     ?(ty_env : Type.Infer.env option) 
     ?(pat    : bool = false)
     (cenv    : conv_env) 
     (ty_vars : Type.tvars) 
     (env     : Vars.env) 
     (tm      : term) 
-    (ty      : s Type.ty)
-  : s Term.term 
+    (ty      : Type.ty)
+  : Term.term 
   =
   let must_close, ty_env = match ty_env with
     | None        -> true, Type.Infer.mk_env ()
@@ -1402,11 +1405,11 @@ let declare_state table s (typed_args : bnds) (pty : p_ty) t =
 
   let env, evs = convert_p_bnds table [] Vars.empty_env typed_args in
 
-  let indices : Type.index Vars.var list =
+  let indices : Vars.var list =
     List.map (fun v ->
       try Vars.cast v Type.KIndex
       with Vars.CastError ->
-        conv_err (L.loc pty) (BadPty [Type.EKind Type.KIndex])
+        conv_err (L.loc pty) (BadPty [Type.KIndex])
       ) evs
   in
 

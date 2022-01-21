@@ -27,14 +27,14 @@ module Mk (S : LowSequent.S) = struct
                  
   (** Reduce a term in a given context. 
       The sequent's hypotheses must be used sparsingly *)
-  let reduce_term : type a. 
-    red_param -> S.t -> a Term.term -> a Term.term = fun param s t ->
+  let reduce_term : 
+    red_param -> S.t -> Term.term -> Term.term = fun param s t ->
     let exception NoExp in
     
     (** Invariant: we must ensure that fv(reduce(u)) ⊆ fv(t)
         Return: reduced term, reduction occurred *)
     (** TODO: memoisation *)
-    let rec reduce : type a. state -> a Term.term -> a Term.term * bool = 
+    let rec reduce : state -> Term.term -> Term.term * bool = 
       fun st t ->
         let t, has_red = reduce_head_once st t in
 
@@ -45,20 +45,20 @@ module Mk (S : LowSequent.S) = struct
           else t, false
 
     (** Reduce once at head position *)
-    and reduce_head_once : type a. state -> a Term.term -> a Term.term * bool = 
+    and reduce_head_once : state -> Term.term -> Term.term * bool = 
       fun st t ->
         let t, has_red = expand_head_once st t in
         let t, has_red' = rewrite_head_once st t in
         t, has_red || has_red'
 
     (** Expand once at head position *)
-    and expand_head_once : type a. state -> a Term.term -> a Term.term * bool = 
+    and expand_head_once : state -> Term.term -> Term.term * bool = 
       fun st t ->
         if not st.param.delta 
         then t, false 
         else try _expand_head_once st t with NoExp -> t, false
 
-    and _expand_head_once : type a. state -> a Term.term -> a Term.term * bool = 
+    and _expand_head_once : state -> Term.term -> Term.term * bool = 
       fun st t ->
         match t with
         | Term.Macro (ms, l, ts) ->
@@ -78,7 +78,7 @@ module Mk (S : LowSequent.S) = struct
         | _ -> raise NoExp
 
     (** Rewrite once at head position *)
-    and rewrite_head_once : type a. state -> a Term.term -> a Term.term * bool = 
+    and rewrite_head_once : state -> Term.term -> Term.term * bool = 
       fun st t ->
         let rule = List.find_map (fun (_, rule) ->
             match Rewrite.rewrite_head st.table st.system rule t with
@@ -98,7 +98,7 @@ module Mk (S : LowSequent.S) = struct
         | Some red_t -> red_t, true
 
     (** Reduce all strict subterms *)
-    and reduce_subterms : type a. state -> a Term.term -> a Term.term * bool = 
+    and reduce_subterms : state -> Term.term -> Term.term * bool = 
       fun st t -> 
         match t with
         | Term.Exists (evs, t0) 

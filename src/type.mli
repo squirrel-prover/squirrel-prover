@@ -6,6 +6,8 @@ type kind =
   | KIndex  
   | KTimestamp
 
+val pp_kind : Format.formatter -> kind -> unit 
+
 (*------------------------------------------------------------------*)
 (** Type variables *)
 

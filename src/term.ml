@@ -105,6 +105,8 @@ and term =
 
 type t = term
 
+type terms = term list
+
 (*------------------------------------------------------------------*)
 let hash_ord : ord -> int = function
   | `Eq -> 1
@@ -177,9 +179,9 @@ and hash_isymb : type a. a Symbols.t isymb -> int =
 (*------------------------------------------------------------------*)
 (** Subset of all atoms (the subsets are not disjoint). *)
 
-type message_atom = [ `Message of (ord_eq,Type.ty) _atom]
+type message_atom = [ `Message of (ord_eq, term) _atom]
 
-type index_atom = [ `Index of (ord_eq,Vars.var) _atom]
+type index_atom = [ `Index of (ord_eq, Vars.var) _atom]
 
 
 type trace_atom = [

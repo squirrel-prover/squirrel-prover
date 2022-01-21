@@ -60,7 +60,7 @@ end
 
 (*------------------------------------------------------------------*)
 module Utv : sig
-  type uvar = Utv of Vars.timestamp | Uind of Vars.var
+  type uvar = Utv of Vars.var | Uind of Vars.var
 
   type ut = { hash : int;
               cnt  : ut_cnt }
@@ -79,12 +79,12 @@ module Utv : sig
   val uinit  : ut
   val uundef : ut
 
-  val ut_to_term : 'a Type.kind -> ut -> Term.term 
+  val ut_to_term : Type.kind -> ut -> Term.term 
 
   module Ut : Hashtbl.HashedType with type t = ut
 
 end = struct
-  type uvar = Utv of Vars.timestamp | Uind of Vars.var
+  type uvar = Utv of Vars.var | Uind of Vars.var
 
   type ut = { hash : int;
               cnt  : ut_cnt; }
@@ -155,20 +155,20 @@ end = struct
     | Term.Action (s,l) -> uname s (List.map uvari l)
     | _ -> failwith "Not implemented"
 
-  let utv_to_var : type a. a Type.kind -> uvar -> a Vars.var =
+  let utv_to_var : Type.kind -> uvar -> Vars.var =
     fun s utv ->
     match utv with
     | Uind i -> Vars.cast i s
     | Utv  t -> Vars.cast t s
 
-  let ut_to_var : type a. a Type.kind -> ut -> a Vars.var =
+  let ut_to_var : Type.kind -> ut -> Vars.var =
     fun s ut -> 
     match ut.cnt with
     | UVar (Uind i) -> Vars.cast i s
     | UVar (Utv t)  -> Vars.cast t s
     | _ -> assert false
 
-  let rec ut_to_term : type a. a Type.kind -> ut -> a Term.term = 
+  let rec ut_to_term : Type.kind -> ut -> Term.term = 
     fun s ut ->
     match ut.cnt with
     | UVar tv -> Term.mk_var (utv_to_var s tv)

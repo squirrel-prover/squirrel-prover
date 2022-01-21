@@ -973,7 +973,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let try_clean_env vars s : S.t =
     let s_fv = S.fv s in
     let clear = Sv.diff vars (Sv.inter vars s_fv) in
-    let env = Vars.rm_evars (S.env s) (Sv.elements clear) in
+    let env = Vars.rm_vars (S.env s) (Sv.elements clear) in
     S.set_env env s
 
   let _generalize ~dependent t s : Vars.var * S.t =
@@ -1012,7 +1012,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     (* clear unused variables among [terms] free variables *)
     let t_fv =
-      List.fold_left (fun vars (Term.ETerm t) ->
+      List.fold_left (fun vars t ->
           Sv.union vars (Term.fv t)
         ) Sv.empty terms
     in
@@ -1054,7 +1054,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       in
       let n_ips =
         match n_ips_opt with
-        | None -> List.map naming_pat_of_eterm terms
+        | None -> List.map naming_pat_of_term terms
         | Some n_ips ->
           if List.length n_ips <> List.length terms then
             hard_failure (Failure "not the same number of arguments \
@@ -1270,7 +1270,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | _ -> error ()
 
   let induction_gen ~dependent (t : Term.term) s : S.t list =
-    let s = generalize ~dependent [t] [naming_pat_of_eterm t] s in
+    let s = generalize ~dependent [t] [naming_pat_of_term t] s in
     induction s
 
   let induction_args ~dependent args s =

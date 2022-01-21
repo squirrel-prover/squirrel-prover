@@ -309,9 +309,9 @@ let enrich (arg : Theory.eterm Args.arg) (s : ES.t) =
   match arg with
   | Args.ETerm (ty, f, loc) ->
     let elem : Term.term =
-      match Type.equalk_w (Term.kind f) Type.KMessage with
-      | Some Type.Type_eq -> f
-      | None -> hard_failure (Tactics.Failure "expected a message")
+      if (Term.kind f) = Type.KMessage 
+      then f
+      else hard_failure (Tactics.Failure "expected a message")
     in
     ES.set_equiv_goal (elem :: ES.goal_as_equiv s) s
 
@@ -351,7 +351,7 @@ exception No_common_head
 exception No_FA
 
 let fa_expand t =
-  let aux : type a. a Term.term -> Equiv.equiv = function
+  let aux : Term.term -> Equiv.equiv = function
     (* FIXME: this should be subsumed by reduce *)
     | Fun (f,_,[c;t;e]) when f = Term.f_ite && t = e ->
       ES.[ t ]
@@ -389,7 +389,7 @@ let fa i s =
           (fun i i' -> Term.ESubst (Term.mk_var i, Term.mk_var i'))
           vars vars'
       in
-      let c' = Term.mk_seq0 (List.map Vars.var vars) c in
+      let c' = Term.mk_seq0 vars c in
       let t' = Term.subst subst t in
       let biframe =
         List.rev_append before
@@ -535,6 +535,7 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
     | Atom (`Message _)
     | ForAll _ | Exists _ -> super#fold_message timestamps t
 
+    | Pred _ | Action _
     | Macro _ | Name _ | Var _ | Diff _
     | Atom (`Happens _) -> raise Not_FADUP_iter
 end
@@ -1248,6 +1249,8 @@ let prf Args.(Pair (Int i, Opt (Message, m1))) s =
           soft_failure
             (Tactics.Failure "the given hash does not occur in the term")
       end
+
+    | _ -> assert false (* TODO: NO GADT*)
   in
   let fn, ftyp, m, key, hash = match hash_occ.Iter.occ_cnt with
     | Term.Fun ((fn,_), ftyp, [m; key]) as hash ->
@@ -1921,6 +1924,7 @@ let enckp
       end
     | None, None -> None, None
     | None, Some _ -> assert false
+    | _ -> assert false (* TODO: NO GADT*)
   in
 
   match target with

@@ -7,7 +7,7 @@ let dum : L.t = L._dummy
 let mk_dum (v : 'a) : 'a L.located = L.mk_loc dum v
 
 (*------------------------------------------------------------------*)
-type proc_ty = (string * Type.ety) list
+type proc_ty = (string * Type.ty) list
 
 let pp_proc_ty =
   let pp_el fmt (s,e) = Fmt.pf fmt "(%s : %a)" s Type.pp e in
@@ -228,7 +228,7 @@ let check_proc table (env : Vars.env) p =
 
     | Set (s, l, m, p) ->
       let k = Theory.check_state table s (List.length l) in
-      Theory.check table ~local:true ty_env env m (Type.ETy k) ;
+      Theory.check table ~local:true ty_env env m k ;
       List.iter (fun x ->
           Theory.check
             table ~local:true ty_env env
@@ -244,8 +244,7 @@ let check_proc table (env : Vars.env) p =
         | Some pty -> Theory.parse_p_ty table [] pty Type.KMessage
       in
       
-      let ety = Type.ETy ty in
-      Theory.check table ~local:true ty_env env t ety ;
+      Theory.check table ~local:true ty_env env t ty ;
       let env, _ = Vars.make `Shadow env ty (L.unloc x) in
       check_p ty_env env p
 
@@ -287,7 +286,7 @@ let check_proc table (env : Vars.env) p =
 
 let declare table (id : lsymb) (args : proc_ty) proc =
   let env = 
-    List.fold_left (fun env (v, Type.ETy ty) ->
+    List.fold_left (fun env (v, ty) ->
         let env, _ = Vars.make `Shadow env ty v in
         env
       ) Vars.empty_env args 
@@ -351,7 +350,7 @@ type p_env = {
    * (the third component is also used to map input variables to
    * input macros) *)
 
-  inputs : (Channel.t * Vars.message) list ;
+  inputs : (Channel.t * Vars.var) list ;
   (* bound input variables *)
 
   (* RELATED TO THE CURRENT ACTION *)
@@ -411,9 +410,9 @@ let parse_proc (system_name : System.system_name) init_table proc =
    * of substitution ([isubst] and [msubst]) maintained by the
    * parsing function.
    * The special timestamp variable [ts] is used. *)
-  let conv_term : type a.
+  let conv_term : 
     Symbols.table -> p_env -> Term.term -> 
-    Theory.term -> a Type.ty -> a Term.term =
+    Theory.term -> Type.ty -> Term.term =
     fun table env ts t sort ->
     let t = 
       Theory.convert ~ty_env:env.ty_env
@@ -561,7 +560,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
          * in domain of subst, i.e. variables bound above the apply *)
         let tsubst = (to_tsubst env.isubst@to_tsubst env.msubst) in
         List.fold_left2
-          (fun (new_env,iacc,macc) (x,Type.ETy ty) v ->
+          (fun (new_env,iacc,macc) (x, ty) v ->
              let new_env, _ = make_fresh `Shadow new_env ty x in
 
              match Type.kind ty with
@@ -574,7 +573,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
              | Type.KIndex ->
                let v'_th = Theory.subst v tsubst in
-               let v'_tm : Type.index Term.term =
+               let v'_tm : Term.term =
                  conv_term table env (Term.mk_var ts) v ty in
                let v'_tm = Utils.oget (Term.destr_var v'_tm) in
 

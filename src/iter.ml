@@ -42,8 +42,9 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
       self#visit_message t ;
       self#visit_message t'
 
+    | Term.Action _
+    | Term.Pred _
     | Atom (`Index _) | Atom (`Timestamp _) | Atom (`Happens _) -> ()
-
 end
 
 (** Fold over all boolean and message subterms.
@@ -87,6 +88,8 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
     | Atom (`Message (_, t, t')) ->
       self#fold_message (self#fold_message x t) t'
 
+    | Term.Action _
+    | Term.Pred _
     | Atom (`Index _) | Atom (`Timestamp _) | Atom (`Happens _) -> x
 
 end
@@ -180,7 +183,7 @@ type 'a occ = {
 let pp_occ pp_cnt fmt occ =
   Fmt.pf fmt "[@[%a@] | ∃@[%a@], @[%a@]]"
     pp_cnt occ.occ_cnt
-    (Fmt.list ~sep:Fmt.comma Vars.pp_e) (Sv.elements occ.occ_vars)
+    (Fmt.list ~sep:Fmt.comma Vars.pp) (Sv.elements occ.occ_vars)
     Term.pp occ.occ_cond
 
 type 'a occs = 'a occ list
@@ -190,10 +193,10 @@ type 'a occs = 'a occ list
     If [Mode = `Delta _], try to expand macros.
     Over-approximation: we try to expand macros, even if they are at a timestamp
     that may not happen. *)
-let tfold_occ : type b.
+let tfold_occ : 
   mode:[`Delta of Constr.trace_cntxt | `NoDelta ] ->
   (fv:Sv.t -> cond:Term.term -> Term.term -> 'a -> 'a) ->
-  fv:Sv.t -> cond:Term.term -> b Term.term -> 'a -> 'a =
+  fv:Sv.t -> cond:Term.term -> Term.term -> 'a -> 'a =
   fun ~mode func ~fv ~cond t acc ->
   match t with
   | Term.ForAll (evs, t)
@@ -321,19 +324,19 @@ let get_f : type a.
   get t ~fv:Sv.empty ~cond:Term.mk_true
 
 
-let get_ftypes : type a.
+let get_ftypes : 
   ?excludesymtype:Symbols.function_def ->
   Symbols.table ->
   Symbols.function_def ->
-  a Term.term -> mess_occs = fun ?excludesymtype table symtype t ->
+  Term.term -> mess_occs = fun ?excludesymtype table symtype t ->
   get_f  ?excludesymtype table (Type symtype) t
 
-let get_fsymb : type a.
+let get_fsymb : 
   ?excludesymtype:Symbols.function_def ->
   ?allow_diff:bool ->
   Symbols.table ->
   Term.fsymb ->
-  a Term.term -> mess_occs = fun ?excludesymtype ?allow_diff table symtype t ->
+  Term.term -> mess_occs = fun ?excludesymtype ?allow_diff table symtype t ->
   get_f  ?excludesymtype ?allow_diff table (Symbol symtype) t
 
 
@@ -348,13 +351,13 @@ type diff_occs = diff_occ list
 
 
 (** Looks for occurrences of diff operator.  *)
-let get_diff : type a.
+let get_diff : 
   cntxt:Constr.trace_cntxt ->
-  a Term.term -> diff_occs =
+  Term.term -> diff_occs =
   fun ~cntxt t ->
 
   let rec get :
-    type a. a Term.term -> fv:Sv.t -> cond:Term.term -> diff_occs =
+    Term.term -> fv:Sv.t -> cond:Term.term -> diff_occs =
     fun t ~fv ~cond ->
       let occs () =
         tfold_occ ~mode:(`Delta cntxt) (fun ~fv ~cond t occs ->
@@ -385,19 +388,19 @@ type hash_occs = hash_occ list
     function name [f] and [k] a name [k].
     Over-approximation: we try to expand macros, even if they are at a timestamp
     that may not happen. *)
-let get_f_messages_ext : type a.
+let get_f_messages_ext : 
   ?drop_head:bool ->
   ?fun_wrap_key:'b ->
   ?fv:Sv.t ->
   cntxt:Constr.trace_cntxt ->
   Term.fname ->
   Term.name ->
-  a Term.term -> hash_occs
+  Term.term -> hash_occs
   =
   fun ?(drop_head=true) ?(fun_wrap_key=None) ?(fv=Sv.empty) ~cntxt f k t ->
 
   let rec get :
-    type a. a Term.term -> fv:Sv.t -> cond:Term.term -> hash_occs =
+    Term.term -> fv:Sv.t -> cond:Term.term -> hash_occs =
     fun t ~fv ~cond ->
       let occs () =
         tfold_occ ~mode:(`Delta cntxt) (fun ~fv ~cond t occs ->
@@ -437,7 +440,7 @@ let get_f_messages_ext : type a.
         in
         occs @ get m ~fv ~cond @ get k' ~fv ~cond
 
-      | Term.Var m when Type.equalk (Vars.kind m) Type.KMessage -> assert false
+      | Term.Var m when (Vars.kind m) = Type.KMessage -> assert false
       (* SSC must have been checked first *)
 
       | _ -> occs ()
@@ -455,11 +458,11 @@ type ite_occs = ite_occ list
 
 (** Does not remove duplicates.
     Does not look below macros. *)
-let get_ite_term : type a. Constr.trace_cntxt -> a Term.term -> ite_occs =
+let get_ite_term : Constr.trace_cntxt -> Term.term -> ite_occs =
   fun constr t ->
 
   let rec get :
-    type a. a Term.term -> fv:Sv.t -> cond:Term.term -> ite_occs =
+    Term.term -> fv:Sv.t -> cond:Term.term -> ite_occs =
     fun t ~fv ~cond ->
       let occs =
         tfold_occ ~mode:`NoDelta (fun ~fv ~cond t occs ->
@@ -501,16 +504,16 @@ let is_global ms table =
 let get_macro_occs : type a.
   mode:[`FullDelta | `Delta ] ->
   Constr.trace_cntxt ->
-  a Term.term ->
+  Term.term ->
   macro_occs
   =
   fun ~mode constr t ->
 
   let rec get :
-    type a. a Term.term -> fv:Sv.t -> cond:Term.term -> macro_occs =
+    Term.term -> fv:Sv.t -> cond:Term.term -> macro_occs =
     fun t ~fv ~cond ->
       match t with
-      | Term.Var v when Type.equalk (Vars.kind v) Type.KMessage ->
+      | Term.Var v when (Vars.kind v) = Type.KMessage ->
         raise Var_found
 
       | Term.Macro (ms, l, ts) ->
@@ -632,17 +635,15 @@ end = struct
   let mk ~env ~msymb ~indices : t =
     let indices = Sv.diff (Sv.of_list1 indices) env in
     let indices =
-      List.map (fun ev -> Vars.ecast ev Type.KIndex) (Sv.elements indices)
+      List.map (fun ev -> Vars.cast ev Type.KIndex) (Sv.elements indices)
     in
     { msymb; indices }
 
 
   let pp fmt (mset : t) =
-    let vars = List.map Vars.var mset.indices in
-
     Fmt.pf fmt "@[<hv 2>{ @[%a@]@@_ |@ %a}@]"
       Term.pp_msymb mset.msymb
-      (Fmt.list ~sep:Fmt.comma Vars.pp_e) vars
+      (Fmt.list ~sep:Fmt.comma Vars.pp) mset.indices 
 
   let pp_l fmt (mset_l : t list) =
     Fmt.pf fmt "@[<v 0>%a@]"
@@ -817,15 +818,15 @@ end
 (*------------------------------------------------------------------*)
 (** Return an over-approximation of the the macros reachable from a term
     in any trace model. *)
-let macro_support : type a.
+let macro_support : 
   env:Sv.t ->
   Constr.trace_cntxt ->
-  a Term.term ->
+  Term.term ->
   MsetAbs.t
   =
   fun ~env cntxt term ->
-  let get_msymbs : type a.
-    mode:[`Delta | `FullDelta ] -> a Term.term -> MsetAbs.t
+  let get_msymbs : 
+    mode:[`Delta | `FullDelta ] -> Term.term -> MsetAbs.t
     = fun ~mode term ->
       let occs = get_macro_occs ~mode cntxt term in
       let msets = List.map (fun occ ->

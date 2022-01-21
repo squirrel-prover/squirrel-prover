@@ -60,20 +60,20 @@ let pp_name_occ fmt (occ : name_occ) : unit =
 
 (** Looks for indices at which a name occurs.
     Raise @Var_found if a term variable occurs in the term. *)
-let get_name_indices_ext : type a.
+let get_name_indices_ext : 
   ?fv:Sv.t ->
   Constr.trace_cntxt ->
   Symbols.name Symbols.t ->
-  a Term.term ->
+  Term.term ->
   name_occs
   =
   fun ?(fv=Sv.empty) constr nsymb t ->
 
   let rec get :
-    type a. a Term.term -> fv:Sv.t -> cond:Term.term -> name_occs =
+    Term.term -> fv:Sv.t -> cond:Term.term -> name_occs =
     fun t ~fv ~cond ->
       match t with
-      | Term.Var v when Type.equalk (Vars.kind v) Type.KMessage ->
+      | Term.Var v when (Vars.kind v) = Type.KMessage ->
         raise Var_found
 
       | Term.Name ns when ns.s_symb = nsymb ->
@@ -120,11 +120,11 @@ let clear_dup_mtso_le (occs : ts_occs) : ts_occs =
 
 (** Looks for timestamps at which macros occur in a term. *)
 let get_actions_ext :
-  type a. Constr.trace_cntxt -> a Term.term -> ts_occs =
+  Constr.trace_cntxt -> Term.term -> ts_occs =
   fun constr t ->
 
   let rec get :
-    type a. a Term.term -> fv:Sv.t -> cond:Term.term -> ts_occs =
+    Term.term -> fv:Sv.t -> cond:Term.term -> ts_occs =
     fun t ~fv ~cond ->
       match t with
       | Term.Macro (m, l, ts) ->

@@ -22,7 +22,7 @@ type 'a isymb = private {
   s_typ     : Type.ty;
 }
 
-val mk_isymb : 'a -> Type.ty -> Vars.var -> 'a isymb
+val mk_isymb : 'a -> Type.ty -> Vars.vars -> 'a isymb
 
 (** Names represent random values of length the security parameter. *)
 

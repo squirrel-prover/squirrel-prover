@@ -205,7 +205,7 @@ let subst_descr subst descr =
 
 (* Apply an iterator to all terms of the descr. *)
 let apply_descr iter descr =
-  let env = Vars.of_list (List.map Vars.var descr.indices) in
+  let env = Vars.of_list descr.indices in
   let iter = iter env in
   let condition =
      fst descr.condition,
@@ -356,12 +356,7 @@ let is_dup_match
     | _ -> None
 
 let is_dup table t t' : bool =
-  let is_match t t' () =
-    match Type.equalk_w (Term.kind t) (Term.kind t') with
-    | None -> None
-    | Some Type.Type_eq ->
-      if t = t' then Some () else None
-  in
+  let is_match t t' () = if t = t' then Some () else None in
   match is_dup_match is_match () table t t' with
   | None    -> false
   | Some () -> true

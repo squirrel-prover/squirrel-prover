@@ -12,14 +12,14 @@ type global_data = {
   (** the global macro is defined at any action which is a strict or large
       suffix of [action]  *)
 
-  inputs  : Vars.message list;
+  inputs  : Vars.var list;
   (** inputs of the macro, as variables, in order *)
 
   indices : Vars.var list;
   (** free indices of the macro, which corresponds to the prefix of
       the indices of the action defining the macro *)
 
-  ts      : Vars.timestamp;
+  ts      : Vars.var;
   (** free timestamp variable of the macro, which can only be instantiated
       by a strict suffix of [action] *)
 

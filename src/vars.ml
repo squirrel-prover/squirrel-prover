@@ -8,7 +8,7 @@ type var = {
   var_type : Type.ty
 }
 
-type 'a vars = var list
+type vars = var list
 
 (* [i_suffix] is stored to avoid recomputing it.
    we use it as a unique counter for new and pat variables. *)

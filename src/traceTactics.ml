@@ -108,7 +108,7 @@ let case_cond orig vars c t e s : sequent list =
   let env = ref (TS.env s) in
   let vars, subst = Term.refresh_vars (`InEnv env) vars in
   let then_c = Term.subst subst c in
-  let else_c = Term.mk_forall (List.map Vars.var vars) (Term.mk_not c) in
+  let else_c = Term.mk_forall vars (Term.mk_not c) in
 
   let then_t = Term.subst subst t in
   let else_t = e in
@@ -120,7 +120,7 @@ let case_cond orig vars c t e s : sequent list =
 
     let prem =
       Term.mk_exists
-        (List.map Vars.var case_vars)
+        case_vars
         (Term.mk_and ~simpl:false
            case_cond
            (Term.mk_atom `Eq orig case_t))
@@ -503,7 +503,7 @@ let mk_fresh_direct (cntxt : Constr.trace_cntxt) env ns t =
 
   (* build the formula expressing that there exists a name subterm of [t]
    * equal to the name ([n],[is]) *)
-  let mk_case (js : Type.index Vars.var list) =
+  let mk_case (js : Vars.var list) =
     (* select bound variables *)
     let bv = List.filter (fun i -> not (Vars.mem env i)) js in
 
@@ -770,13 +770,15 @@ let substitute_ts (ts1, ts2) s =
   in
   apply_substitute subst s
 
-let substitute_idx (i1 , i2 : Type.index Term.term * Type.index Term.term) s =
+let substitute_idx (i1 , i2 : Term.term * Term.term) s =
   let i1, i2 =  match i1, i2 with
     | Var i1, Var i2 -> i1, i2
     | (Diff _), _ | _, (Diff _) ->
       hard_failure
         (Tactics.Failure "only variables are supported when substituting \
                           index terms")
+
+    | _ -> assert false
   in
 
   let subst =
@@ -926,7 +928,7 @@ let autosubst s =
   in
   let s = Hyps.remove id s in
 
-  let process : type a. a Vars.var -> a Vars.var -> TS.t =
+  let process : Vars.var -> Vars.var -> TS.t =
     fun x y ->
 
       (* Just remove the equality if x and y are the same variable. *)
@@ -1069,7 +1071,6 @@ let fa s =
             (* Extract unused variables. *)
             let used,unused =
               let occ_vars = Term.get_vars c @ Term.get_vars t in
-              let vars = List.map Vars.var vars in
               List.partition
                 (fun v -> List.mem v occ_vars)
                 vars
@@ -1793,7 +1794,7 @@ let rewrite_equiv_transform
     | Some e -> Some (Term.pi_term dst e)
     | None -> None
   in
-  let rec aux : type a. a term -> a term = fun t ->
+  let rec aux : term -> term = fun t ->
     match Term.kind t with
     | Type.KTimestamp | Type.KIndex -> t
     | Type.KMessage ->
