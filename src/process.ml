@@ -221,7 +221,7 @@ let check_proc table (env : Vars.env) p =
       then proc_err loc (StrictAliasError "missing alias")
       else
         (* TODO: subtypes *)
-        let () = Theory.check table ~local:true ty_env env m Type.emessage in
+        let () = Theory.check table ~local:true ty_env env m Type.tmessage in
         check_p ty_env  env p
 
     | Alias (p,_) -> check_p ty_env  env p
@@ -232,7 +232,7 @@ let check_proc table (env : Vars.env) p =
       List.iter (fun x ->
           Theory.check
             table ~local:true ty_env env
-            (Theory.var_of_lsymb x) Type.eindex
+            (Theory.var_of_lsymb x) Type.tindex
         ) l ;
       check_p ty_env  env p
 
@@ -260,7 +260,7 @@ let check_proc table (env : Vars.env) p =
             env
           ) env vars 
       in
-      Theory.check table ~local:true ty_env env test Type.eboolean ;
+      Theory.check table ~local:true ty_env env test Type.tboolean ;
       check_p ty_env  env p
 
     | Apply (id, ts) ->

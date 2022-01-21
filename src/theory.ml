@@ -473,7 +473,7 @@ let function_kind table (f : lsymb) : mf_type =
     | Function (fty, _) -> `Fun fty
 
     | Macro (Global (arity, ty)) ->
-      let targs = (List.init arity (fun _ -> Type.eindex)) in
+      let targs = (List.init arity (fun _ -> Type.tindex)) in
       `Macro (targs, ty)
 
     | Macro (Input|Output|Frame) ->
@@ -745,21 +745,25 @@ let check_term_ty state ~of_t (t : Term.term) (ty : Type.ty) : unit =
 (*------------------------------------------------------------------*)
 (** {2 Conversion} *)
 
-let convert_var :
-  conv_state -> Vars.env -> lsymb -> Type.ty -> Term.term
-  = fun state env st ty ->
-    try
-      let v = Vars.find env (L.unloc st) (Type.kind ty) in
+let convert_var 
+    (state : conv_state)
+    (env   : Vars.env)
+    (st    : lsymb)
+    (ty    : Type.ty) 
+  : Term.term
+  =
+  try
+    let v = Vars.find env (L.unloc st) (Type.kind ty) in
 
-      let of_t = var_of_lsymb st in
+    let of_t = var_of_lsymb st in
 
-      check_ty_leq state ~of_t (Vars.ty v) ty;
+    check_ty_leq state ~of_t (Vars.ty v) ty;
 
-      Term.mk_var v
-    with
-    | Not_found -> conv_err (L.loc st) (Undefined (L.unloc st))
-    | Vars.CastError ->
-      conv_err (L.loc st) (Type_error (App (st,[]), ty))
+    Term.mk_var v
+  with
+  | Not_found -> conv_err (L.loc st) (Undefined (L.unloc st))
+  | Vars.CastError ->
+    conv_err (L.loc st) (Type_error (App (st,[]), ty))
 
 let convert_bnds env (vars : (lsymb * Type.ty) list) =
   let do1 (env, v_acc) (vsymb, s) =
@@ -800,16 +804,21 @@ let get_macro table lsymb =
 
 (*------------------------------------------------------------------*)
 (* internal function to Theory.ml *)
-let rec convert :
-  conv_state -> term -> Type.ty -> Term.term =
-  fun state tm ty ->
-    let t = convert0 state tm ty in
-    check_term_ty state ~of_t:tm t ty;
-    t
+let rec convert 
+    (state : conv_state)
+    (tm    : term)
+    (ty    : Type.ty) 
+  : Term.term
+  =
+  let t = convert0 state tm ty in
+  check_term_ty state ~of_t:tm t ty;
+  t
 
-and convert0 :
-  conv_state -> term -> Type.ty -> Term.term =
-  fun state tm ty ->
+and convert0 
+    (state : conv_state)
+    (tm : term)
+    (ty : Type.ty) : Term.term 
+  =
   let loc = L.loc tm in
 
   let conv ?(env=state.env) s t =
@@ -849,16 +858,16 @@ and convert0 :
       ty
 
   | Tinit ->
-      begin match ty with
-        | Type.Timestamp -> Term.mk_action Symbols.init_action []
-        | _ -> type_error ()
-      end
+    begin match ty with
+      | Type.Timestamp -> Term.mk_action Symbols.init_action []
+      | _ -> type_error ()
+    end
 
   | Tpred t ->
-      begin match ty with
-        | Type.Timestamp -> Term.mk_pred (conv Type.Timestamp t)
-        | _ -> type_error ()
-      end
+    begin match ty with
+      | Type.Timestamp -> Term.mk_pred (conv Type.Timestamp t)
+      | _ -> type_error ()
+    end
 
   | Diff (l,r) -> Term.mk_diff (conv ty l) (conv ty r)
 
@@ -901,7 +910,7 @@ and convert0 :
 
   | Find (vs,c,t,e) ->
     let env, evs =
-      convert_bnds state.env (List.map (fun x -> x, Type.eindex) vs)
+      convert_bnds state.env (List.map (fun x -> x, Type.tindex) vs)
     in
     let is =
       List.map (fun v ->
@@ -958,148 +967,150 @@ and conv_index state t =
     | _ -> conv_err (L.loc t) (Index_not_var (L.unloc t))
 
 (* The term [tm] in argument is here for error messages. *)
-and conv_app :
-  conv_state -> app_cntxt ->
-  (term * app) -> Type.ty -> Term.term
-  = fun state app_cntxt (tm,app) ty ->
-    (* We should have [make_app app = t].
-       [t] is here to have meaningful exceptions. *)
-    let loc = L.loc tm in
-    let t_i = L.unloc tm in
+and conv_app 
+    (state : conv_state)
+    (app_cntxt : app_cntxt)
+    ((tm,app) : (term * app)) 
+    (ty : Type.ty) 
+  : Term.term
+  = 
+  (* We should have [make_app app = t].
+     [t] is here to have meaningful exceptions. *)
+  let loc = L.loc tm in
+  let t_i = L.unloc tm in
 
-    let conv ?(env=state.env) s t =
-      let state = { state with env } in
-      convert state t s in
+  let conv ?(env=state.env) s t =
+    let state = { state with env } in
+    convert state t s in
 
-    let get_at ts_opt =
-      match ts_opt, get_ts app_cntxt with
-      | Some ts, _ -> ts
-      | None, Some ts -> ts
-      | None, None -> conv_err loc (Timestamp_expected (L.unloc tm))
-    in
+  let get_at ts_opt =
+    match ts_opt, get_ts app_cntxt with
+    | Some ts, _ -> ts
+    | None, Some ts -> ts
+    | None, None -> conv_err loc (Timestamp_expected (L.unloc tm))
+  in
 
-    let type_error () = raise (ty_error state.ty_env tm ty) in
+  let type_error () = raise (ty_error state.ty_env tm ty) in
 
-    let conv_fapp (f : lsymb) l ts_opt : Term.term =
-      let mfty = function_kind state.table f in
-      let () = check_arity f (List.length l) (mf_type_arity mfty) in
+  let conv_fapp (f : lsymb) l ts_opt : Term.term =
+    let mfty = function_kind state.table f in
+    let () = check_arity f (List.length l) (mf_type_arity mfty) in
 
-      match Symbols.of_lsymb f state.table with
-      | Symbols.Wrapped (symb, Function (_,_)) ->
-        assert (ts_opt = None);
+    match Symbols.of_lsymb f state.table with
+    | Symbols.Wrapped (symb, Function (_,_)) ->
+      assert (ts_opt = None);
 
-        let fty = match mfty with `Fun x -> x | _ -> assert false in
+      let fty = match mfty with `Fun x -> x | _ -> assert false in
 
-        (* refresh all type variables in [fty] *)
-        let fty_op = Type.open_ftype state.ty_env fty in
+      (* refresh all type variables in [fty] *)
+      let fty_op = Type.open_ftype state.ty_env fty in
 
-        let l_indices, l_messages = List.takedrop fty_op.Type.fty_iarr l in
-        let indices =
-          List.map (fun x -> conv_index state x) l_indices
-        in
-
-        let rmessages =
-          List.fold_left2 (fun rmessages t ty ->
-              let t = conv ty t in
-              t :: rmessages
-            ) [] l_messages fty_op.Type.fty_args
-        in
-        let messages = List.rev rmessages in
-
-        let t = Term.mk_fun0 (symb,indices) fty messages in
-
-        (* additional type check between the type of [t] and the output
-           type in [fty].
-           Note that [convert] checks that the type of [t] is a subtype
-           of [ty], hence we do not need to do it here. *)
-        check_term_ty state ~of_t:tm t fty_op.Type.fty_out;
-
-        t
-
-      (* FIXME: messy code *)
-      | Wrapped (s, Symbols.Macro macro) ->
-        let ty_args, ty_out =
-          match mfty with `Macro x -> x | _ -> assert false
-        in
-        begin match macro with
-          | Symbols.State _ -> assert false
-
-          | Symbols.Global _ ->
-            assert (List.for_all (fun x -> x = Type.eindex) ty_args);
-            let indices = List.map (conv_index state) l in
-            let ms = Term.mk_isymb s ty_out indices in
-            Term.mk_macro ms [] (get_at ts_opt)
-
-          | Input | Output | Frame ->
-            check_arity_i (L.loc f) "input" (List.length l) 0 ;
-            (* TODO: subtypes *)
-            let ms = Term.mk_isymb s ty_out [] in
-            Term.mk_macro ms [] (get_at ts_opt)
-
-          | Cond | Exec ->
-            check_arity_i (L.loc f) "cond" (List.length l) 0 ;
-            let ms = Term.mk_isymb s ty_out [] in
-            Term.mk_macro ms [] (get_at ts_opt)
-
-        end
-
-      | Wrapped (_, _) -> assert false
-    in
-
-
-    match L.unloc app with
-    | AVar s -> convert_var state state.env s ty
-
-    | Fun (f,l,ts_opt) ->
-      begin match Type.kind ty with
-        | Type.KMessage -> conv_fapp f l ts_opt
-        | _ -> type_error ()
-      end
-
-    | Get (s,opt_ts,is) ->
-      let k = check_state state.table s (List.length is) in
-      let is = List.map (conv_index state) is in
-      let s = get_macro state.table s in
-      let ts =
-        (* TODO: check this *)
-        match opt_ts with
-        | Some ts -> ts
-        | None -> conv_err loc (Timestamp_expected t_i)
+      let l_indices, l_messages = List.takedrop fty_op.Type.fty_iarr l in
+      let indices =
+        List.map (fun x -> conv_index state x) l_indices
       in
-      begin match Type.kind ty with
-        | Type.KMessage ->
-          let ms = Term.mk_isymb s k is in
-          Term.mk_macro ms [] ts
 
-        | _ -> type_error ()
+      let rmessages =
+        List.fold_left2 (fun rmessages t ty ->
+            let t = conv ty t in
+            t :: rmessages
+          ) [] l_messages fty_op.Type.fty_args
+      in
+      let messages = List.rev rmessages in
+
+      let t = Term.mk_fun0 (symb,indices) fty messages in
+
+      (* additional type check between the type of [t] and the output
+         type in [fty].
+         Note that [convert] checks that the type of [t] is a subtype
+         of [ty], hence we do not need to do it here. *)
+      check_term_ty state ~of_t:tm t fty_op.Type.fty_out;
+
+      t
+
+    (* FIXME: messy code *)
+    | Wrapped (s, Symbols.Macro macro) ->
+      let ty_args, ty_out =
+        match mfty with `Macro x -> x | _ -> assert false
+      in
+      begin match macro with
+        | Symbols.State _ -> assert false
+
+        | Symbols.Global _ ->
+          assert (List.for_all (fun x -> x = Type.Index) ty_args);
+          let indices = List.map (conv_index state) l in
+          let ms = Term.mk_isymb s ty_out indices in
+          Term.mk_macro ms [] (get_at ts_opt)
+
+        | Input | Output | Frame ->
+          check_arity_i (L.loc f) "input" (List.length l) 0 ;
+          (* TODO: subtypes *)
+          let ms = Term.mk_isymb s ty_out [] in
+          Term.mk_macro ms [] (get_at ts_opt)
+
+        | Cond | Exec ->
+          check_arity_i (L.loc f) "cond" (List.length l) 0 ;
+          let ms = Term.mk_isymb s ty_out [] in
+          Term.mk_macro ms [] (get_at ts_opt)
+
       end
 
-    | Name (s, is) ->
-      let sty = check_name state.table s (List.length is) in
-      begin match Type.kind ty with
-        | Type.KMessage ->
-          let is = List.map (conv_index state) is in
-          let ns = Term.mk_isymb (get_name state.table s) sty is in
-          Term.mk_name ns
-        | _ -> type_error ()
-      end
+    | Wrapped (_, _) -> assert false
+  in
 
-    | Taction (a,is) ->
-      check_action state.table a (List.length is) ;
-      begin match Type.kind ty with
-        | Type.KTimestamp ->
-          Term.mk_action
-            (get_action state.table a)
-            (List.map (conv_index state) is)
-        | _ -> type_error ()
-      end
+
+  match L.unloc app with
+  | AVar s -> convert_var state state.env s ty
+
+  | Fun (f,l,ts_opt) ->
+    begin match Type.kind ty with
+      | Type.KMessage -> conv_fapp f l ts_opt
+      | _ -> type_error ()
+    end
+
+  | Get (s,opt_ts,is) ->
+    let k = check_state state.table s (List.length is) in
+    let is = List.map (conv_index state) is in
+    let s = get_macro state.table s in
+    let ts =
+      (* TODO: check this *)
+      match opt_ts with
+      | Some ts -> ts
+      | None -> conv_err loc (Timestamp_expected t_i)
+    in
+    begin match Type.kind ty with
+      | Type.KMessage ->
+        let ms = Term.mk_isymb s k is in
+        Term.mk_macro ms [] ts
+
+      | _ -> type_error ()
+    end
+
+  | Name (s, is) ->
+    let sty = check_name state.table s (List.length is) in
+    begin match Type.kind ty with
+      | Type.KMessage ->
+        let is = List.map (conv_index state) is in
+        let ns = Term.mk_isymb (get_name state.table s) sty is in
+        Term.mk_name ns
+      | _ -> type_error ()
+    end
+
+  | Taction (a,is) ->
+    check_action state.table a (List.length is) ;
+    begin match Type.kind ty with
+      | Type.KTimestamp ->
+        Term.mk_action
+          (get_action state.table a)
+          (List.map (conv_index state) is)
+      | _ -> type_error ()
+    end
 
 type eterm = ETerm : Type.ty * Term.term * L.t -> eterm
 
 (*------------------------------------------------------------------*)
 (** convert HO terms *)
-let conv_ht : conv_state -> hterm -> Type.hty * Term.hterm =
-  fun state t ->
+let conv_ht (state : conv_state) (t : hterm) : Type.hty * Term.hterm =
   match L.unloc t with
   | Lambda (bnds, t0) ->
     let env, evs = convert_p_bnds state.table state.ty_vars state.env bnds in
@@ -1108,7 +1119,7 @@ let conv_ht : conv_state -> hterm -> Type.hty * Term.hterm =
 
     let ht = Term.Lambda (evs, convert { state with env } t0 ty) in
 
-    let bnd_tys = List.map (fun v -> Vars.ty v) evs in
+    let bnd_tys = List.map Vars.ty evs in
     let hty = Type.Lambda (bnd_tys, ty) in
 
     hty, ht
@@ -1225,11 +1236,15 @@ let empty loc = L.mk_loc loc (App (L.mk_loc loc "empty", []))
 (** {2 Exported conversion and type-checking functions} *)
 
 
-let convert_ht : type s.
-  ?ty_env:Type.Infer.env ->
-  ?pat:bool ->
-  conv_env -> Type.tvars -> Vars.env -> hterm -> Type.hty * Term.hterm =
-  fun ?ty_env ?(pat=false) cenv ty_vars env ht0 ->
+let convert_ht
+    ?ty_env
+    ?(pat=false) 
+    (cenv : conv_env)
+    (ty_vars : Type.tvars)
+    (env : Vars.env) 
+    (ht0 : hterm)
+  : Type.hty * Term.hterm 
+  = 
   let must_close, ty_env = match ty_env with
     | None -> true, Type.Infer.mk_env ()
     | Some ty_env -> false, ty_env
@@ -1530,10 +1545,10 @@ let () =
       let t_i = App (mk "e", [mk (App (mk "h", [x;y]));x;y]) in
       let t = mk t_i in
       let ty_env = Type.Infer.mk_env () in
-      check table ty_env env t Type.emessage ;
+      check table ty_env env t Type.tmessage ;
       Alcotest.check_raises
         "message is not a boolean"
-        (Conv (L._dummy, Type_error (t_i, Type.eboolean)))
-        (fun () -> check table ty_env env t Type.eboolean)
+        (Conv (L._dummy, Type_error (t_i, Type.tboolean)))
+        (fun () -> check table ty_env env t Type.tboolean)
     end
   ]

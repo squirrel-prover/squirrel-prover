@@ -118,18 +118,6 @@ module type S = sig
     t pat ->
     match_res
 
-  (** Same as [try_match], but specialized for terms. *)
-  val try_match_term :
-    ?option:match_option ->
-    ?mv:Mvar.t ->
-    ?ty_env:Type.Infer.env ->
-    Symbols.table ->
-    SystemExpr.t ->
-    Term.term -> 
-    Term.term pat ->
-    match_res
-
-
   (** [map ?m_rec func env t] applies [func] at all position in [t].
       If [m_rec] is true, recurse after applying [func].
       [m_rec] default to [false].*)

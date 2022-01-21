@@ -164,7 +164,7 @@ let rewrite
          bound above the matched occurrences are universally quantified in
          the generated sub-goals. *)
       let rw_inst occ vars conds =
-        match Match.T.try_match_term table system occ !pat with
+        match Match.T.try_match table system occ !pat with
         | NoMatch _ | FreeTyv -> `Continue
 
         (* head matches *)

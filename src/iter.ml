@@ -458,28 +458,24 @@ type ite_occs = ite_occ list
 
 (** Does not remove duplicates.
     Does not look below macros. *)
-let get_ite_term : Constr.trace_cntxt -> Term.term -> ite_occs =
-  fun constr t ->
+let get_ite_term (constr : Constr.trace_cntxt) (t : Term.term) : ite_occs =
+  let rec get (t : Term.term) ~(fv:Sv.t) ~(cond:Term.term) : ite_occs =
+    let occs =
+      tfold_occ ~mode:`NoDelta (fun ~fv ~cond t occs ->
+          get t ~fv ~cond @ occs
+        ) ~fv ~cond t []
+    in
 
-  let rec get :
-    Term.term -> fv:Sv.t -> cond:Term.term -> ite_occs =
-    fun t ~fv ~cond ->
-      let occs =
-        tfold_occ ~mode:`NoDelta (fun ~fv ~cond t occs ->
-            get t ~fv ~cond @ occs
-          ) ~fv ~cond t []
+    match t with
+    | Fun (f,_,[c;t;e]) when f = Term.f_ite ->
+      let occ = {
+        occ_cnt  = c,t,e;
+        occ_vars = fv;
+        occ_cond = cond; }
       in
+      occ :: occs
 
-      match t with
-      | Fun (f,_,[c;t;e]) when f = Term.f_ite ->
-        let occ = {
-          occ_cnt  = c,t,e;
-          occ_vars = fv;
-          occ_cond = cond; }
-        in
-        occ :: occs
-
-      | _ -> occs
+    | _ -> occs
   in
 
   get t ~fv:Sv.empty ~cond:Term.mk_true
@@ -501,40 +497,36 @@ let is_global ms table =
     - [mode = `FullDelta]: all macros that can be expanded are ignored.
     - [mode = `Delta]: only Global macros are expanded (and ignored)
     Raise @Var_found if a term variable occurs in the term. *)
-let get_macro_occs : type a.
-  mode:[`FullDelta | `Delta ] ->
-  Constr.trace_cntxt ->
-  Term.term ->
-  macro_occs
+let get_macro_occs  
+    ~(mode  : [`FullDelta | `Delta ])
+    (constr : Constr.trace_cntxt)
+    (t      : Term.term)
+  : macro_occs
   =
-  fun ~mode constr t ->
+  let rec get (t : Term.term) ~(fv:Sv.t) ~(cond:Term.term) : macro_occs =
+    match t with
+    | Term.Var v when (Vars.kind v) = Type.KMessage ->
+      raise Var_found
 
-  let rec get :
-    Term.term -> fv:Sv.t -> cond:Term.term -> macro_occs =
-    fun t ~fv ~cond ->
-      match t with
-      | Term.Var v when (Vars.kind v) = Type.KMessage ->
-        raise Var_found
+    | Term.Macro (ms, l, ts) ->
+      assert (l = []);
+      let default () =
+        [{ occ_cnt  = ms;
+           occ_vars = fv;
+           occ_cond = cond; }]
+      in
 
-      | Term.Macro (ms, l, ts) ->
-        assert (l = []);
-        let default () =
-          [{ occ_cnt  = ms;
-             occ_vars = fv;
-             occ_cond = cond; }]
-        in
+      if mode = `FullDelta || is_global ms constr.table then
+        match Macros.get_definition constr ms ts with
+        | `Def t -> get t ~fv ~cond
+        | `Undef | `MaybeDef -> default ()
+      else default ()
 
-        if mode = `FullDelta || is_global ms constr.table then
-          match Macros.get_definition constr ms ts with
-          | `Def t -> get t ~fv ~cond
-          | `Undef | `MaybeDef -> default ()
-        else default ()
-
-      | _ ->
-        tfold_occ ~mode:`NoDelta
-          (fun ~fv ~cond t occs ->
-             get t ~fv ~cond @ occs
-          ) ~fv ~cond t []
+    | _ ->
+      tfold_occ ~mode:`NoDelta
+        (fun ~fv ~cond t occs ->
+           get t ~fv ~cond @ occs
+        ) ~fv ~cond t []
   in
   get t ~fv:Sv.empty ~cond:Term.mk_true
 
@@ -551,8 +543,8 @@ let fold_descr
        'a -> 'a)
     (table  : Symbols.table)
     (system : SystemExpr.t)
-    (descr : Action.descr)
-    (init : 'a) : 'a
+    (descr  : Action.descr)
+    (init   : 'a) : 'a
   =
   let mval = f Symbols.out [] Symbols.Output (snd descr.output) init in
   let mval = f Symbols.cond [] Symbols.Cond (snd descr.condition) mval in
@@ -818,13 +810,12 @@ end
 (*------------------------------------------------------------------*)
 (** Return an over-approximation of the the macros reachable from a term
     in any trace model. *)
-let macro_support : 
-  env:Sv.t ->
-  Constr.trace_cntxt ->
-  Term.term ->
-  MsetAbs.t
+let macro_support 
+    ~(env  :Sv.t) 
+    (cntxt : Constr.trace_cntxt)
+    (term  : Term.term)
+  : MsetAbs.t 
   =
-  fun ~env cntxt term ->
   let get_msymbs : 
     mode:[`Delta | `FullDelta ] -> Term.term -> MsetAbs.t
     = fun ~mode term ->
@@ -941,11 +932,11 @@ let pp_iocc fmt (o : iocc) : unit =
 (** Folding over all macro descriptions reachable from some terms.
     [env] must contain the free variables of [terms].  *)
 let _fold_macro_support
-    (func : ((unit -> Action.descr) -> iocc -> 'a -> 'a))
+    (func  : ((unit -> Action.descr) -> iocc -> 'a -> 'a))
     (cntxt : Constr.trace_cntxt)
-    (env : Vars.env)
+    (env   : Vars.env)
     (terms : Term.term list)
-    (init : 'a) : 'a
+    (init  : 'a) : 'a
   =
   let env = Vars.to_set env in
 
@@ -1008,11 +999,11 @@ let _fold_macro_support
 
 (** Same as [fold_macro_support], but without passing the description to [func] *)
 let fold_macro_support
-    (func : (iocc -> 'a -> 'a))
+    (func  : (iocc -> 'a -> 'a))
     (cntxt : Constr.trace_cntxt)
-    (env : Vars.env)
+    (env   : Vars.env)
     (terms : Term.term list)
-    (init : 'a) : 'a
+    (init  : 'a) : 'a
   =
   _fold_macro_support (fun _ -> func) cntxt env terms init
 
@@ -1024,9 +1015,9 @@ let fold_macro_support0
         Term.term ->             (* term *)
         'a -> 'a))
     (cntxt : Constr.trace_cntxt)
-    (env : Vars.env)
+    (env   : Vars.env)
     (terms : Term.term list)
-    (init : 'a) : 'a
+    (init  : 'a) : 'a
   =
   _fold_macro_support (fun _ iocc acc ->
       func iocc.iocc_aname iocc.iocc_action iocc.iocc_cnt acc
@@ -1035,11 +1026,11 @@ let fold_macro_support0
 
 (** Less precise version of [fold_macro_support], which does not track sources. *)
 let fold_macro_support1
-    (func : (Action.descr -> Term.term -> 'a -> 'a))
+    (func  : (Action.descr -> Term.term -> 'a -> 'a))
     (cntxt : Constr.trace_cntxt)
-    (env : Vars.env)
+    (env   : Vars.env)
     (terms : Term.term list)
-    (init : 'a) : 'a
+    (init  : 'a) : 'a
   =
   _fold_macro_support (fun descr iocc acc ->
       func (descr ()) iocc.iocc_cnt acc

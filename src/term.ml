@@ -213,13 +213,6 @@ let mk f : fsymb = (f,[])
 
 let f_diff = mk Symbols.fs_diff
 
-(** Boolean function symbols, where booleans are typed as messages.
-  * The true/false constants are used in message_of_formula,
-  * and other symbols are used in an untyped way in Completion
-  * (in some currently unused code). *)
-
-let eboolean,emessage = Type.eboolean,Type.emessage
-
 (** Boolean connectives *)
 
 let f_false  = mk Symbols.fs_false

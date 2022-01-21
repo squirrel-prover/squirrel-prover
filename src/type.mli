@@ -55,10 +55,10 @@ type hty = Lambda of ty list * ty
 val pp_ht : Format.formatter -> hty -> unit
 
 (*------------------------------------------------------------------*)
-val eboolean   : ty
-val emessage   : ty
-val etimestamp : ty
-val eindex     : ty
+val tboolean   : ty
+val tmessage   : ty
+val ttimestamp : ty
+val tindex     : ty
 
 val base : string -> ty
 

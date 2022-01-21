@@ -46,10 +46,10 @@ type ty =
 type hty = Lambda of ty list * ty
 
 (*------------------------------------------------------------------*)
-let eboolean   = Boolean
-let emessage   = Message
-let etimestamp = Timestamp
-let eindex     = Index
+let tboolean   = Boolean
+let tmessage   = Message
+let ttimestamp = Timestamp
+let tindex     = Index
 
 let base s   = TBase s
 

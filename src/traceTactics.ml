@@ -546,7 +546,7 @@ let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool =
     }
   in
 
-  match Match.T.try_match_term table system (mk_dum a1 is1 cond1) pat2 with
+  match Match.T.try_match table system (mk_dum a1 is1 cond1) pat2 with
   | Match.FreeTyv | Match.NoMatch _ -> false
   | Match.Match _ -> true
 
