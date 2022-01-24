@@ -370,6 +370,86 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Matching and unification} *)
 
+(** Exported 
+    Generic matching function, built upon [Term.term] or [Equiv.form] 
+    matching. *)
+let try_match_gen (type a)
+    (f_kind  : a Equiv.f_kind)
+    (fmatch  : 
+       mode:[`Contravar | `Covar | `Eq] -> a -> a -> match_state -> Mvar.t) 
+    ?(option=default_match_option)
+    ?(mv     : Mvar.t option)
+    ?(ty_env : Type.Infer.env option)
+    (table   : Symbols.table)
+    (system  : SystemExpr.t)
+    (t       : a)
+    (p       : a pat) 
+  : match_res 
+  =
+  (* [must_close] state if [ty_env] must be closed at the end of 
+     the matching *)
+  let must_close, ty_env = match ty_env with
+    | Some e -> false, e
+    | None   -> true,  Type.Infer.mk_env () 
+  in
+
+  let univars, ty_subst = Type.Infer.open_tvars ty_env p.pat_tyvars in
+  let pat = Equiv.Babel.tsubst f_kind ty_subst p.pat_term in
+
+  (* substitute back the univars by the corresponding tvars *)
+  let ty_subst_rev =
+    List.fold_left2 (fun s tv tu ->
+        Type.tsubst_add_univar s tu (Type.TVar tv)
+      ) Type.tsubst_empty p.pat_tyvars univars
+  in
+
+  let support = Sv.map (Vars.tsubst ty_subst) p.pat_vars in
+  let env = 
+    Sv.diff 
+      (Sv.union
+         (Equiv.Babel.fv f_kind t) 
+         (Equiv.Babel.fv f_kind pat)) 
+      support 
+  in
+
+  let mv_init = odflt Mvar.empty mv in
+  let st_init : match_state = { 
+    bvs = Sv.empty;
+    mv = mv_init;
+
+    table; system; env; support; ty_env;
+
+    use_fadup     = option.use_fadup;
+    allow_capture = option.allow_capture; 
+  } in
+
+  (* Term matching ignores [mode]. Matching in [Equiv] does not. *)
+  let mode = match option.mode with
+    | `Eq -> `Eq
+    | `EntailRL -> `Covar
+    | `EntailLR -> `Contravar
+  in
+
+  try
+    let mv = fmatch ~mode t pat st_init in
+
+    if not must_close then 
+      Match mv 
+    else if not (Type.Infer.is_closed ty_env) then 
+      FreeTyv
+    else
+      (* FIXME: shouldn't we substitute type variables in Mv co-domain ? *)
+      let mv =
+        Mvar.fold (fun v t mv ->
+            let v = Vars.tsubst ty_subst_rev v in
+            Mvar.add v t mv
+          ) mv Mvar.empty
+      in
+      Match mv
+
+  with
+  | NoMatch minfos -> NoMatch minfos
+
 (*------------------------------------------------------------------*)
 (** {3 Term matching and unification} *)
 
@@ -795,74 +875,11 @@ module T (* : S with type t = message *) = struct
     | _, _ -> no_match ()
 
   (*------------------------------------------------------------------*)
+  (** Exported 
+      Remark: term matching ignores [mode]. *)
+  let try_match = try_match_gen Equiv.Local_t (fun ~mode -> tmatch)
 
-  (* TODO: NO GADT: factorize with the other exported function [try_match] for 
-     [Equiv.form] *)
-  (** Exported *)
-  let try_match
-    ?(option=default_match_option)
-    (fmatch  : 'a -> 'a -> match_state -> Mvar.t)
-    ?(mv     : Mvar.t option)
-    ?(ty_env : Type.Infer.env option)
-    (table   : Symbols.table)
-    (system  : SystemExpr.t)
-    (t       : term)
-    (p       : term pat) 
-    : match_res 
-    =
-    (* Term matching ignores [mode]. Matching in [Equiv] does not. *)
-
-    (* [must_close] state if [ty_env] must be closed at the end of 
-       the matching *)
-    let must_close, ty_env = match ty_env with
-      | Some e -> false, e
-      | None   -> true,  Type.Infer.mk_env () 
-    in
-
-    let univars, ty_subst = Type.Infer.open_tvars ty_env p.pat_tyvars in
-    let pat = tsubst ty_subst p.pat_term in
-
-    (* substitute back the univars by the corresponding tvars *)
-    let ty_subst_rev =
-      List.fold_left2 (fun s tv tu ->
-          Type.tsubst_add_univar s tu (Type.TVar tv)
-        ) Type.tsubst_empty p.pat_tyvars univars
-    in
-
-    let support = Sv.map (Vars.tsubst ty_subst) p.pat_vars in
-    let env = Sv.diff (Sv.union (Term.fv t) (Term.fv pat)) support in
-
-    let mv_init = odflt Mvar.empty mv in
-    let st_init : match_state = { 
-      bvs = Sv.empty;
-      mv = mv_init;
-
-      table; system; env; support; ty_env;
-
-      use_fadup     = option.use_fadup;
-      allow_capture = option.allow_capture; 
-    } in
-
-    try
-      let mv = tmatch t pat st_init in
-
-      if not must_close then 
-        Match mv 
-      else if not (Type.Infer.is_closed ty_env) then 
-        FreeTyv
-      else
-        (* FIXME: shouldn't we substitute type variables in Mv co-domain ? *)
-        let mv =
-          Mvar.fold (fun v t mv ->
-              let v = Vars.tsubst ty_subst_rev v in
-              Mvar.add v t mv
-            ) mv Mvar.empty
-        in
-        Match mv
-
-    with
-    | NoMatch minfos -> NoMatch minfos
-
+  (*------------------------------------------------------------------*)
   let _map 
       ~(m_rec:bool)
       (func:f_map)
@@ -1916,13 +1933,13 @@ module E : S with type t = Equiv.form = struct
         Some (Mvar.filter (fun v _ -> not (Sv.mem v vars)) mv)
     with NoMatch _ -> None
 
-  (** FIXME *)
   let deduce_mem_one
       (cterm : cond_term)
       (known : known_set)
       (st    : match_state) : Mvar.t option
     =
-    (* if [st.support] is not empty, then we need to find [mv] such that:
+    (* FIXME:
+       if [st.support] is not empty, then we need to find [mv] such that:
        - [mv] represents a substitution θ whose support is included in
          [st.support] ∪ [known.vars]
        - for any v ∈ [st.support], (fv(θ(v)) ∩ st.bvs = ∅)
@@ -2158,72 +2175,7 @@ module E : S with type t = Equiv.form = struct
 
   (*------------------------------------------------------------------*)
   (** Exported *)
-  let try_match
-      ?(option=default_match_option)
-      ?(mv     : Mvar.t option)
-      ?(ty_env : Type.Infer.env option)
-      (table   : Symbols.table)
-      (system  : SystemExpr.t)
-      (t       : t)
-      (p       : t pat) 
-    : match_res
-    =
-    (* [must_close] state if [ty_env] must be closed at the end of 
-       the matching *)
-    let must_close, ty_env = match ty_env with
-      | Some e -> false, e
-      | None   -> true,  Type.Infer.mk_env () 
-    in
-
-    let univars, ty_subst  = Type.Infer.open_tvars ty_env p.pat_tyvars in
-    let pat = Equiv.tsubst ty_subst p.pat_term in
-
-    (* substitute back the univars by the corresponding tvars *)
-    let ty_subst_rev =
-      List.fold_left2 (fun s tv tu ->
-          Type.tsubst_add_univar s tu (Type.TVar tv)
-        ) Type.tsubst_empty p.pat_tyvars univars
-    in
-
-    let support = Sv.map (Vars.tsubst ty_subst) p.pat_vars in
-    let env = Sv.diff (Sv.union (Equiv.fv t) (Equiv.fv pat)) support in
-
-    let mv_init = odflt Mvar.empty mv in
-    let st_init : match_state = {
-      bvs = Sv.empty;
-      mv = mv_init;
-      
-      table; system; support; env; ty_env;
-      
-      use_fadup     = option.use_fadup; 
-      allow_capture = option.allow_capture; 
-    } in
-
-    let mode = match option.mode with
-      | `Eq -> `Eq
-      | `EntailRL -> `Covar
-      | `EntailLR -> `Contravar
-    in
-
-    try
-      let mv = fmatch ~mode t pat st_init in
-
-      if not must_close then 
-        Match mv 
-      else if not (Type.Infer.is_closed ty_env) then 
-        FreeTyv
-      else
-        (* FIXME: shouldn't we substitute type variables in Mv co-domain ? *)
-        let mv =
-          Mvar.fold (fun v t mv ->
-              let v = Vars.tsubst ty_subst_rev v in
-              Mvar.add v t mv
-            ) mv Mvar.empty
-        in
-        Match mv
-
-    with NoMatch infos -> NoMatch infos
-
+  let try_match = try_match_gen Equiv.Global_t fmatch
 
   (*------------------------------------------------------------------*)
   let map
