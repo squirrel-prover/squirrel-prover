@@ -141,7 +141,7 @@ type _ sort =
   | Message   : Type.ty sort
   | Boolean   : Type.ty sort
   | Timestamp : Type.ty sort
-  | Index     : Type.ty sort
+  | Index     : [`Index] sort
 
   | ETerm     : Theory.eterm    sort
   (** Boolean, timestamp or message *)
@@ -151,15 +151,15 @@ type _ sort =
   | Pair      : ('a sort * 'b sort) -> ('a * 'b) sort
   | Opt       : 'a sort -> ('a option) sort
 
+(*------------------------------------------------------------------*)
+
 (** Tactic arguments *)
 type _ arg =
   | None      : unit arg
 
   | Message   : Term.term * Type.ty -> Type.ty arg
 
-  | Boolean   : Term.term -> Type.ty arg
-  | Timestamp : Term.term -> Type.ty arg
-  | Index     : Vars.var  -> Type.ty arg
+  | Index     : Vars.var -> [`Index] arg
 
   | ETerm     : Type.ty * Term.term * Location.t -> Theory.eterm arg
   (** A [Term.term] with its sorts. *)
@@ -173,8 +173,6 @@ type _ arg =
 val pp_parser_arg : Format.formatter -> parser_arg -> unit
 
 (*------------------------------------------------------------------*)
-val sort : 'a arg -> 'a sort
-
 type esort = Sort : ('a sort) -> esort
 
 type earg = Arg : ('a arg) -> earg

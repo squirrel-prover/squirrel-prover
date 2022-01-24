@@ -230,7 +230,7 @@ let generalize (ts : Term.term) s =
     The second one is then direclty simplified by a case on all possible
     values of τ, producing a judgement for each one.
     Generalizes Γ ⊢ E over τ if necessary. *)
-let induction Args.(Timestamp ts) s =
+let induction Args.(Message (ts,_)) s =
   let env = ES.env s in
   match ts with
   | Var t as ts ->
@@ -298,8 +298,8 @@ let old_or_new_induction args =
   else
     (fun s sk fk ->
        match EquivLT.convert_args s args (Args.Sort Args.Timestamp) with
-       | Args.Arg (Args.Timestamp ts) ->
-         let ss = induction (Args.Timestamp ts) s in
+       | Args.Arg (Args.Message (ts,ty)) ->
+         let ss = induction (Args.Message (ts,ty)) s in
          sk ss fk
        | _ -> hard_failure (Failure "ill-formed arguments")
     )
@@ -1013,7 +1013,7 @@ let push_formula (j: 'a option) f term =
 
   | _ -> mk_ite term
 
-let ifcond Args.(Pair (Int i, Pair (Opt (Int, j), Boolean f))) s =
+let ifcond Args.(Pair (Int i, Pair (Opt (Int, j), Message (f,_)))) s =
   let before, e, after = split_equiv_goal i s in
 
   let cond, positive_branch, negative_branch =
@@ -1217,7 +1217,13 @@ let tac_autosimpl s = tac_auto ~close:false ~strong:false s
 
 (** Application of PRF tactic on biframe element number i,
   * optionally specifying which subterm m1 should be considered. *)
-let prf Args.(Pair (Int i, Opt (Message, m1))) s =
+let prf arg s =
+  let i, m1 =
+    match arg with
+    | Args.(Pair (Int i, Opt (Message, m1))) ->
+      i, m1
+    | _ -> assert false
+  in
   let before, e, after = split_equiv_goal i s in
 
   let biframe = List.rev_append before after in
@@ -1249,8 +1255,6 @@ let prf Args.(Pair (Int i, Opt (Message, m1))) s =
           soft_failure
             (Tactics.Failure "the given hash does not occur in the term")
       end
-
-    | _ -> assert false (* TODO: NO GADT*)
   in
   let fn, ftyp, m, key, hash = match hash_occ.Iter.occ_cnt with
     | Term.Fun ((fn,_), ftyp, [m; key]) as hash ->
@@ -1798,9 +1802,13 @@ let () =
 (*------------------------------------------------------------------*)
 (** Encryption key privacy  *)
 
-let enckp
-  Args.(Pair (Int i, Pair (Opt (Message, m1), Opt (Message, m2))))
-  s =
+let enckp arg (s : ES.t) =
+  let i, m1, m2 =
+    match arg with
+    | Args.(Pair (Int i, Pair (Opt (Message, m1), Opt (Message, m2)))) ->
+      i, m1, m2
+    | _ -> assert false
+  in
   let before, e, after = split_equiv_goal i s in
 
   let biframe = List.rev_append before after in
@@ -1928,7 +1936,6 @@ let enckp
       end
     | None, None -> None, None
     | None, Some _ -> assert false
-    | _ -> assert false (* TODO: NO GADT*)
   in
 
   match target with
@@ -2035,7 +2042,14 @@ let is_name_diff mess_name =
   | Name nl, Name nr -> true
   | _ -> false
 
-let xor Args.(Pair (Int i, Pair (Opt (Message, m1), Opt (Message, m2)))) s =
+
+let xor arg s =
+  let i, m1, m2 =
+    match arg with
+    | Args.(Pair (Int i, Pair (Opt (Message, m1), Opt (Message, m2)))) -> 
+      i, m1, m2
+    | _ -> assert false
+  in
   (* We allow the optional arguments to be in any order, we just match them
      however we can. *)
   let opt_m, opt_n =  match m1, m2 with
@@ -2051,9 +2065,9 @@ let xor Args.(Pair (Int i, Pair (Opt (Message, m1), Opt (Message, m2)))) s =
     | Some Message (t1, _), Some Message (t2, _)
       when is_name_diff t2 && is_xored_diff t1 -> Some t1, Some t2
     | _ ->       soft_failure
-        (Tactics.Failure
-           "The optional arguments of xor can only be a name and/or the target \
-            xored term.")
+                   (Tactics.Failure
+                      "The optional arguments of xor can only be a name and/or \
+                       the target xored term.")
   in
   let before, e, after = split_equiv_goal i s in
 

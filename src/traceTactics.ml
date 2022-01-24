@@ -949,7 +949,7 @@ let autosubst s =
 
 (*------------------------------------------------------------------*)
 (* TODO: this should be an axiom in some library, not a rule *)
-let exec (Args.Timestamp a) s =
+let exec (Args.Message (a,_)) s =
   let _,var = Vars.make `Approx (TS.env s) Type.Timestamp "t" in
   let formula =
     Term.mk_forall ~simpl:false
@@ -1610,12 +1610,20 @@ class name_under_enc (cntxt:Constr.trace_cntxt) enc is_pk target_n key_n
 end
 
 
-let non_malleability Args.(Pair (String hyp_name, Opt (Message, opt_m))) (s : TS.t) =
+let non_malleability arg (s : TS.t) =
+  let hyp_name, opt_m = 
+    match arg with
+    | Args.(Pair (String hyp_name, Opt (Message, opt_m))) -> hyp_name, opt_m
+    | _ -> assert false 
+  in
+
   let enc_occurences_goals =
     euf_apply non_malleability_param (Args.String hyp_name) s in
   let table = TS.table s in
   let id, at = Hyps.by_name hyp_name s in
-  let (enc, key_n, _, mess1, mess2 , _ , _, is_pk) = non_malleability_param table at in
+  let (enc, key_n, _, mess1, mess2 , _ , _, is_pk) = 
+    non_malleability_param table at 
+  in
   let name_ssc =  match mess1, opt_m with
     | Term.Name name, None -> name
     | m, Some (Message (Term.Name name,ty)) -> name

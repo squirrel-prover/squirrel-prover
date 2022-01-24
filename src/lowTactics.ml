@@ -1279,7 +1279,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | [Args.Theory t] ->
       begin
         match convert_args s args (Args.Sort Args.Timestamp) with
-        | Args.Arg (Args.Timestamp t) -> induction_gen ~dependent t s
+        | Args.Arg (Args.Message (t, _)) -> induction_gen ~dependent t s
         | _ -> hard_failure (Failure "expected a timestamp")
       end
     | _ -> bad_args ()
@@ -1389,7 +1389,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       | _ -> bad_args () in
 
     let f = match convert_args s [f] Args.(Sort Boolean) with
-      | Args.(Arg (Boolean f)) -> f
+      | Args.(Arg (Message (f,_))) -> f
       | _ -> bad_args ()
     in
     let f_conc =
@@ -1415,7 +1415,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Depends} *)
 
-  let depends Args.(Pair (Timestamp a1, Timestamp a2)) s =
+  let depends Args.(Pair (Message (a1,_), Message (a2,_))) s =
     let models = S.get_models s in
     let get_action ts =
       match Constr.find_eq_action models ts with

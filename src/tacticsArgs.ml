@@ -267,7 +267,7 @@ type _ sort =
   | Message   : Type.ty sort
   | Boolean   : Type.ty sort
   | Timestamp : Type.ty sort
-  | Index     : Type.ty sort
+  | Index     : [`Index] sort
 
   | ETerm     : Theory.eterm    sort
   (** Boolean, timestamp or message *)
@@ -285,9 +285,7 @@ type _ arg =
 
   | Message   : Term.term * Type.ty -> Type.ty arg
 
-  | Boolean   : Term.term -> Type.ty arg
-  | Timestamp : Term.term -> Type.ty arg
-  | Index     : Vars.var  -> Type.ty arg
+  | Index     : Vars.var -> [`Index] arg
 
   | ETerm     : Type.ty * Term.term * Location.t -> Theory.eterm arg
   (** A [Term.term] with its sorts. *)
@@ -298,17 +296,6 @@ type _ arg =
   | Opt       : ('a sort * 'a arg option) -> ('a option) arg
 
 (*------------------------------------------------------------------*)
-let rec sort : type a. a arg -> a sort = function
-  | None        -> None
-  | Message _   -> Message
-  | Boolean _   -> Boolean
-  | Timestamp _ -> Timestamp
-  | Index _     -> Index
-  | Int _       -> Int
-  | String _    -> String
-  | Pair (a, b) -> Pair (sort a, sort b)
-  | Opt (s,_)   -> Opt s
-  | ETerm _     -> ETerm
 
 type esort = Sort : ('a sort) -> esort
 
@@ -321,17 +308,17 @@ let rec cast: type a b. a sort -> b arg -> a arg =
   fun kind t ->
   match kind, t with
   | Pair (a,b), Pair (c,d) -> Pair (cast a c, cast b d)
-  | Opt s, Opt (r, None) -> Opt(s,None)
+  | Opt s, Opt (r, None)   -> Opt(s, None)
   | Opt s, Opt (r, Some q) -> Opt(s, Some (cast s q))
   | _ -> begin
-      match kind, sort t with
-      | Message  , Message   -> t
-      | Boolean  , Boolean   -> t
-      | Timestamp, Timestamp -> t
-      | Index    , Index     -> t
-      | ETerm    , ETerm     -> t
-      | Int      , Int       -> t
-      | String   , String    -> t
+      match kind, t with
+      | Message  , Message _ -> t
+      | Boolean  , Message _ -> t
+      | Timestamp, Message _ -> t
+      | Index    , Index   _ -> t
+      | ETerm    , ETerm   _ -> t
+      | Int      , Int     _ -> t
+      | String   , String  _ -> t
       | None     , None      -> t
       | _ -> raise Uncastable
     end
@@ -501,7 +488,8 @@ let convert_args sexpr table tyvars env parser_args tactic_type conc =
   let rec conv_args parser_args tactic_type env =
     match parser_args, tactic_type with
     | [Theory p], Sort Timestamp ->
-      Arg (Timestamp (Theory.convert conv_cntxt tyvars env p Type.Timestamp))
+      Arg (Message (Theory.convert conv_cntxt tyvars env p Type.Timestamp, 
+                    Type.Timestamp))
 
     | [TermPat (sel, p)], Sort Message ->
       let (m, ty) = convert_pat_arg sel sexpr conv_cntxt tyvars env p conc in
@@ -515,7 +503,8 @@ let convert_args sexpr table tyvars env parser_args tactic_type conc =
             Arg (Message (m, ty))
       end
     | [Theory p], Sort Boolean ->
-      Arg (Boolean   (Theory.convert conv_cntxt tyvars env p Type.Boolean))
+      Arg (Message (Theory.convert conv_cntxt tyvars env p Type.Boolean,
+                    Type.Boolean))
 
     | [Theory p], Sort ETerm ->
       let et = match Theory.econvert conv_cntxt tyvars env p with
