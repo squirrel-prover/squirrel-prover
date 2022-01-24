@@ -13,7 +13,7 @@ exception Bad_ssc_
   * supported when collecting hashes; more importantly, it avoids
   * inspecting each of the multiple expansions of a same macro. *)
 class check_key
-    ~allow_vars ~allow_functions
+    ~allow_functions
     ~cntxt head_fn key_n = object (self)
                                   
   inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
@@ -33,7 +33,10 @@ class check_key
                                  
     | Term.Name n when n.s_symb = key_n -> raise Bad_ssc_
                                              
-    | Term.Var m -> if not(allow_vars) then raise Bad_ssc_
+    | Term.Var m -> 
+      let ty = Vars.ty m in
+      if ty <> Type.tindex && ty <> Type.ttimestamp then
+        raise Bad_ssc_;
           
     | _ -> super#visit_message t
 end
@@ -55,10 +58,10 @@ end
   * [key_n] must appear only in key position of [head_fn].
   * Return unit on success, raise [Bad_ssc] otherwise. *)
 let key_ssc
-    ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~allow_functions
+    ?(messages=[]) ?(elems=[]) ~allow_functions
     ~cntxt head_fn key_n =
   let ssc =
-    new check_key ~allow_vars ~allow_functions ~cntxt head_fn key_n
+    new check_key ~allow_functions ~cntxt head_fn key_n
   in
 
   (* [e_case] is the error message to be thrown in case of error *)

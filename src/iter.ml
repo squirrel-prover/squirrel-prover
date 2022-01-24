@@ -3,7 +3,7 @@ open Utils
 module Sv = Vars.Sv
 
 (*------------------------------------------------------------------*)
-(** Iterate over all boolean and message subterms.
+(** Iterate over all subterms.
   * Bound variables are represented as newly generated fresh variables.
   * When a macro is encountered, its expansion is visited as well. *)
 class iter ~(cntxt:Constr.trace_cntxt) = object (self)
@@ -38,16 +38,18 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
       let l = Term.subst subst l in
       self#visit_message l
 
-    | Atom (`Message (_, t, t')) ->
+    | Atom ((`Message (_, t, t') | `Timestamp (_, t, t'))) ->
       self#visit_message t ;
       self#visit_message t'
 
+    | Term.Pred t 
+    | Atom (`Happens t) -> self#visit_message t 
+
     | Term.Action _
-    | Term.Pred _
-    | Atom (`Index _) | Atom (`Timestamp _) | Atom (`Happens _) -> ()
+    | Atom (`Index _) -> ()
 end
 
-(** Fold over all boolean and message subterms.
+(** Fold over all subterms.
   * Bound variables are represented as newly generated fresh variables.
   * When a macro is encountered, its expansion is visited as well.
   * Note that [iter] could be obtained as a derived class of [fold],
@@ -85,12 +87,14 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
       let l = Term.subst s l in
       self#fold_message x l
 
-    | Atom (`Message (_, t, t')) ->
+    | Atom (`Message   (_, t, t'))
+    | Atom (`Timestamp (_, t, t')) ->
       self#fold_message (self#fold_message x t) t'
 
-    | Term.Action _
-    | Term.Pred _
-    | Atom (`Index _) | Atom (`Timestamp _) | Atom (`Happens _) -> x
+    | Term.Pred t | Atom (`Happens t) -> 
+      self#fold_message x t
+
+    | Term.Action _ | Atom (`Index _) -> x
 
 end
 
@@ -109,7 +113,7 @@ class iter_approx_macros ~exact ~(cntxt:Constr.trace_cntxt) = object (self)
 
   val mutable checked_macros = []
 
-  method visit_macro : Term.msymb -> Term.term -> unit = fun ms a ->
+  method visit_macro (ms : Term.msymb) (a : Term.term) : unit = 
     match Symbols.Macro.get_def ms.s_symb cntxt.table with
     | Symbols.(Input | Output | State _ | Cond | Exec | Frame) -> ()
     | Symbols.Global _ ->
@@ -193,11 +197,15 @@ type 'a occs = 'a occ list
     If [Mode = `Delta _], try to expand macros.
     Over-approximation: we try to expand macros, even if they are at a timestamp
     that may not happen. *)
-let tfold_occ : 
-  mode:[`Delta of Constr.trace_cntxt | `NoDelta ] ->
-  (fv:Sv.t -> cond:Term.term -> Term.term -> 'a -> 'a) ->
-  fv:Sv.t -> cond:Term.term -> Term.term -> 'a -> 'a =
-  fun ~mode func ~fv ~cond t acc ->
+let tfold_occ 
+    ~(mode : [`Delta of Constr.trace_cntxt | `NoDelta ])
+    (func : fv:Sv.t -> cond:Term.term -> Term.term -> 'a -> 'a) 
+    ~(fv   : Sv.t)
+    ~(cond : Term.term)
+    (t    : Term.term) 
+    (acc  : 'a) 
+          : 'a 
+  =
   match t with
   | Term.ForAll (evs, t)
   | Term.Exists (evs, t) ->
@@ -222,9 +230,15 @@ let tfold_occ :
     let c, t = Term.subst subst c, Term.subst subst t in
     let fv1 = Sv.add_list fv is in
 
+    let cond_e =
+      Term.mk_and
+        cond 
+        (Term.(mk_not (mk_exists (List.map (fun i -> i) is)  c)))
+    in
+
     func ~fv:fv1 ~cond c acc                               |>
     func ~fv:fv1 ~cond:(Term.mk_and cond c) t              |>
-    func ~fv:fv  ~cond:(Term.mk_and cond (Term.(mk_not (mk_exists (List.map (fun i -> i) is)  c)))) e
+    func ~fv:fv  ~cond:cond_e e
 
   | Term.Macro (m, l, ts) ->
     if l <> [] then failwith "Not implemented" ;
@@ -270,55 +284,53 @@ let matching table (fn,vs) = function
 (** Looks for occurrences of subterms using a function symbol of the given kind
     (Hash, Dec, ...) or with the given head.
     Does not recurse below terms whose head is excluded by [excludesymtype]. *)
-let get_f : type a.
-  ?excludesymtype:Symbols.function_def ->
-  ?allow_diff:bool ->
-  Symbols.table ->
-  fsymb_matcher ->
-  Term.term -> mess_occs =
-  fun ?excludesymtype ?(allow_diff=false) table symtype t ->
+let get_f 
+    ?(excludesymtype : Symbols.function_def option)
+    ?(allow_diff=false)
+    (table           : Symbols.table)
+    (symtype         : fsymb_matcher)
+    (t               : Term.term)
+  : mess_occs 
+  =
+  let rec get (t : Term.term) ~(fv : Sv.t) ~(cond : Term.term) : mess_occs =
+    let occs () =
+      tfold_occ ~mode:`NoDelta (fun ~fv ~cond t occs ->
+          get t ~fv ~cond @ occs
+        ) ~fv ~cond t []
+    in
 
-  let rec get :
-    type a. Term.term -> fv:Sv.t -> cond:Term.term -> mess_occs =
-    fun t ~fv ~cond ->
-      let occs () =
-        tfold_occ ~mode:`NoDelta (fun ~fv ~cond t occs ->
-            get t ~fv ~cond @ occs
-          ) ~fv ~cond t []
+    match t with
+    | Term.Fun ((fn,vs),_,l)  ->
+      let head_occ =
+        if matching table (fn,vs) symtype
+        then [{ occ_cnt  = t;
+                occ_vars = fv;
+                occ_cond = cond; }]
+        else []
       in
 
-      match t with
-      | Term.Fun ((fn,vs),_,l)  ->
-        let head_occ =
-          if matching table (fn,vs) symtype
-          then [{ occ_cnt  = t;
-                  occ_vars = fv;
-                  occ_cond = cond; }]
-          else []
-        in
+      let rec_occs = match excludesymtype with
+        | Some ex when Symbols.is_ftype fn ex table -> []
+        | _ -> occs ()
+      in
 
-        let rec_occs = match excludesymtype with
-          | Some ex when Symbols.is_ftype fn ex table -> []
-          | _ -> occs ()
-        in
+      head_occ @ rec_occs
 
-        head_occ @ rec_occs
+    | Term.Diff (Term.Fun _, Term. Fun _) when allow_diff ->
+      let head_occ =
+        if (match Term.pi_term PLeft t, Term.pi_term PRight t with
+            | (Fun (fl,_,ll),Fun (fr,_,lr))
+              when (matching table fl symtype
+                    && matching table fr symtype ) -> true
+            | _ -> false )
+        then [{ occ_cnt  = t;
+                occ_vars = fv;
+                occ_cond = cond; }]
+        else []
+      in
+      head_occ @ (occs ())
 
-      | Term.Diff (Term.Fun _, Term. Fun _) when allow_diff ->
-        let head_occ =
-          if (match Term.pi_term PLeft t, Term.pi_term PRight t with
-              | (Fun (fl,_,ll),Fun (fr,_,lr))
-                when (matching table fl symtype
-                      && matching table fr symtype ) -> true
-              | _ -> false )
-          then [{ occ_cnt  = t;
-                  occ_vars = fv;
-                  occ_cond = cond; }]
-          else []
-        in
-        head_occ @ (occs ())
-
-      | _ -> occs ()
+    | _ -> occs ()
   in
 
   get t ~fv:Sv.empty ~cond:Term.mk_true

@@ -47,7 +47,6 @@ val pp_euf_rule : Format.formatter -> euf_rule -> unit
 the protocol and the messages. All occurences of the key must either be inside
 the hash function, or under some public key function.*)
 val key_ssc :
-  ?allow_vars : bool ->
   ?messages:(Term.term list) -> ?elems:Equiv.equiv ->
   allow_functions:(Symbols.fname Symbols.t -> bool) ->
   cntxt:Constr.trace_cntxt ->
