@@ -425,9 +425,13 @@ let parse_p_ty0 table (tvars : Type.tvar list) (pty : p_ty) : Type.ty =
     let s = Symbols.BType.of_lsymb tb_l table in
     Type.TBase (Symbols.to_string s) (* TODO: remove to_string *)
 
-let parse_p_ty : 
-  Symbols.table -> Type.tvar list -> p_ty -> Type.kind -> Type.ty =
-  fun tbl tvars pty kind ->
+let parse_p_ty 
+    (tbl   : Symbols.table)
+    (tvars : Type.tvar list)
+    (pty   : p_ty)
+    (kind  : Type.kind) 
+  : Type.ty 
+  =
   let ty = parse_p_ty0 tbl tvars pty in
 
   if Type.kind ty <> kind then 
@@ -855,56 +859,40 @@ and convert0
       (tm, make_app loc state.table app_cntxt f terms)
       ty
 
-  | Tinit ->
-    begin match ty with
-      | Type.Timestamp -> Term.mk_action Symbols.init_action []
-      | _ -> type_error ()
-    end
+  | Tinit -> Term.mk_action Symbols.init_action []
 
-  | Tpred t ->
-    begin match ty with
-      | Type.Timestamp -> Term.mk_pred (conv Type.Timestamp t)
-      | _ -> type_error ()
-    end
+  | Tpred t -> Term.mk_pred (conv Type.Timestamp t)
 
   | Diff (l,r) -> Term.mk_diff (conv ty l) (conv ty r)
 
   | Compare (o,u,v) ->
-    begin match Type.kind ty with
-      | Type.KMessage ->
+    begin try
+        Term.mk_atom o (conv Type.Timestamp u) (conv Type.Timestamp v)
+      with Conv (_,Type_error _ ) ->
+
+      match o with
+      | #Term.ord_eq as o ->
         begin try
-            Term.mk_atom o (conv Type.Timestamp u) (conv Type.Timestamp v)
+            Term.mk_atom o
+              (Term.mk_var (conv_index state u))
+              (Term.mk_var (conv_index state v))
           with Conv (_,Type_error _ ) ->
 
-          match o with
-          | #Term.ord_eq as o ->
-            begin try
-                Term.mk_atom o
-                  (Term.mk_var (conv_index state u))
-                  (Term.mk_var (conv_index state v))
-              with Conv (_,Type_error _ ) ->
+            let tyv = Type.Infer.mk_univar state.ty_env in
 
-                let tyv = Type.Infer.mk_univar state.ty_env in
-
-                Term.mk_atom o
-                  (conv (Type.TUnivar tyv) u)
-                  (conv (Type.TUnivar tyv) v)
-            end
-
-          | _ -> conv_err (L.loc tm) (Unsupported_ord (L.unloc tm))
+            Term.mk_atom o
+              (conv (Type.TUnivar tyv) u)
+              (conv (Type.TUnivar tyv) v)
         end
-      | _ -> type_error ()
+
+      | _ -> conv_err (L.loc tm) (Unsupported_ord (L.unloc tm))
     end
 
   | Happens ts ->
-    begin match Type.kind ty with
-      | Type.KMessage ->
-        let atoms = List.map (fun t ->
-            Term.mk_happens (conv Type.Timestamp t)
-          ) ts in
-        Term.mk_ands atoms
-      | _ -> type_error ()
-    end
+    let atoms = List.map (fun t ->
+        Term.mk_happens (conv Type.Timestamp t)
+      ) ts in
+    Term.mk_ands atoms
 
   | Find (vs,c,t,e) ->
     let env, evs =
@@ -916,24 +904,20 @@ and convert0
           v
         ) evs
     in
-    begin match Type.kind ty with
-      | Type.KMessage ->
-        let c = conv ~env Type.Boolean c in
-        let t = conv ~env ty t in
-        let e = conv ty e in
-        Term.mk_find is c t e
-      | _ -> type_error ()
-    end
+    let c = conv ~env Type.Boolean c in
+    let t = conv ~env ty t in
+    let e = conv ty e in
+    Term.mk_find is c t e
 
   | ForAll (vs,f) | Exists (vs,f) ->
     let env, evs =
       convert_p_bnds state.table state.ty_vars state.env vs
     in
     let f = conv ~env Type.Boolean f in
-    begin match Type.kind ty, L.unloc tm with
-      | Type.KMessage, ForAll _ -> Term.mk_forall evs f
-      | Type.KMessage, Exists _ -> Term.mk_exists evs f
-      | _ -> type_error ()
+    begin match L.unloc tm with
+      | ForAll _ -> Term.mk_forall evs f
+      | Exists _ -> Term.mk_exists evs f
+      | _ -> assert false
     end
 
   | Seq (vs,t) ->
@@ -948,16 +932,11 @@ and convert0
     let () =
       List.iter (fun v ->
           match Vars.kind v with
-          | Type.KIndex -> ()
-          | Type.KTimestamp -> ()
+          | Type.KIndex | Type.KTimestamp -> ()
           | _ -> type_error ()
         ) evs
     in
-
-    begin match Type.kind ty with
-      | Type.KMessage -> Term.mk_seq0 ~simpl:false evs t
-      | _ -> type_error ()
-    end
+    Term.mk_seq0 ~simpl:false evs t
 
 and conv_index state t =
   match convert state t Type.Index with
@@ -987,9 +966,6 @@ and conv_app
     | None, Some ts -> ts
     | None, None -> conv_err loc (Timestamp_expected (L.unloc tm))
   in
-
-  let type_error () = raise (ty_error state.ty_env tm ty) in
-
   let conv_fapp (f : lsymb) l ts_opt : Term.term =
     let mfty = function_kind state.table f in
     let () = check_arity f (List.length l) (mf_type_arity mfty) in
@@ -1060,11 +1036,7 @@ and conv_app
   match L.unloc app with
   | AVar s -> convert_var state state.env s ty
 
-  | Fun (f,l,ts_opt) ->
-    begin match Type.kind ty with
-      | Type.KMessage -> conv_fapp f l ts_opt
-      | _ -> type_error ()
-    end
+  | Fun (f,l,ts_opt) -> conv_fapp f l ts_opt
 
   | Get (s,opt_ts,is) ->
     let k = check_state state.table s (List.length is) in
@@ -1076,33 +1048,20 @@ and conv_app
       | Some ts -> ts
       | None -> conv_err loc (Timestamp_expected t_i)
     in
-    begin match Type.kind ty with
-      | Type.KMessage ->
-        let ms = Term.mk_isymb s k is in
-        Term.mk_macro ms [] ts
-
-      | _ -> type_error ()
-    end
+    let ms = Term.mk_isymb s k is in
+    Term.mk_macro ms [] ts
 
   | Name (s, is) ->
     let sty = check_name state.table s (List.length is) in
-    begin match Type.kind ty with
-      | Type.KMessage ->
-        let is = List.map (conv_index state) is in
-        let ns = Term.mk_isymb (get_name state.table s) sty is in
-        Term.mk_name ns
-      | _ -> type_error ()
-    end
+    let is = List.map (conv_index state) is in
+    let ns = Term.mk_isymb (get_name state.table s) sty is in
+    Term.mk_name ns
 
   | Taction (a,is) ->
     check_action state.table a (List.length is) ;
-    begin match Type.kind ty with
-      | Type.KTimestamp ->
-        Term.mk_action
-          (get_action state.table a)
-          (List.map (conv_index state) is)
-      | _ -> type_error ()
-    end
+    Term.mk_action
+      (get_action state.table a)
+      (List.map (conv_index state) is)
 
 type eterm = ETerm : Type.ty * Term.term * L.t -> eterm
 
@@ -1331,18 +1290,6 @@ let convert
 (** exported outside Theory.ml *)
 let econvert (cenv : conv_env) ty_vars subst t : eterm option =
   let loc = L.loc t in
-
-  (* sort index *)
-  try let tt = convert cenv ty_vars subst t Type.Index in
-    Some (ETerm (Type.Index, tt, loc))
-  with Conv _ ->
-
-  (* sort timestamp *)
-  try let tt = convert cenv ty_vars subst t Type.Timestamp in
-    Some (ETerm (Type.Timestamp, tt, loc))
-  with Conv _ ->
-
-  (* Type is inferred for sort Message *)
   try let tt, ty = convert_i cenv ty_vars subst t in
     Some (ETerm (ty, tt, loc))
   with

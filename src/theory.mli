@@ -298,7 +298,7 @@ type conv_cntxt =
 type conv_env = { table : Symbols.table;
                   cntxt : conv_cntxt; }
 
-(** converts and infer the type (must be a subtype of Message). *)
+(** converts and infer the type. *)
 val convert_i : 
   ?ty_env:Type.Infer.env ->
   ?pat:bool ->
