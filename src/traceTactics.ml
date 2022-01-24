@@ -636,11 +636,7 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.term =
     let fv =
       Sv.diff (Sv.union (Action.fv_action a) (Sv.of_list1 is_a)) sv_env
     in
-    let fv =
-      List.map (fun v ->
-          Vars.cast v Type.KIndex
-        ) (Sv.elements fv)
-    in
+    let fv = Sv.elements fv in
 
     (* refresh existantially quantified variables. *)
     let fv, subst = Term.refresh_vars (`InEnv (ref env)) fv in

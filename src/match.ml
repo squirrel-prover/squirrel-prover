@@ -150,7 +150,7 @@ end = struct
       Mv.fold (fun v t subst ->
           match v, t with
           | v, t ->
-            ESubst (mk_var v, cast (Vars.kind v) t) :: subst
+            ESubst (mk_var v, t) :: subst
         ) mv.subst []
     in
 
@@ -583,15 +583,13 @@ module T (* : S with type t = message *) = struct
 
       (* If we already saw the variable, check that there is no cycle, and
          call back [unif]. *)
-      | t' -> match cast (kind t) t' with
-        | exception Uncastable -> raise NoMgu
-        | t' ->
-          if Sv.mem v st.subst_vs then raise NoMgu
-          else
-            let st =
-              { st with subst_vs = Sv.add v st.subst_vs }
-            in
-            unif t t' st
+      | t' -> 
+        if Sv.mem v st.subst_vs then raise NoMgu
+        else
+          let st =
+            { st with subst_vs = Sv.add v st.subst_vs }
+          in
+          unif t t' st
 
   (** unifies an atom *)
   and atunif (at : generic_atom) (at' : generic_atom) st : Mvar.t =
@@ -722,12 +720,7 @@ module T (* : S with type t = message *) = struct
        co-domain of [mv]. *)
   let rec tmatch (t : term) (pat : term) (st : match_state) : Mvar.t =
     match t, pat with
-    | _, Var v' ->
-      begin
-        match cast (Vars.kind v') t with
-        | exception Uncastable -> no_match ()
-        | t -> vmatch t v' st
-      end
+    | _, Var v' -> vmatch t v' st
 
     | Fun (symb, fty, terms), Fun (symb', fty', terms') ->
       let mv = smatch symb symb' st in
@@ -850,10 +843,9 @@ module T (* : S with type t = message *) = struct
 
       (* If we already saw the variable, check that the subterms are
          identical. *)
-      | t' -> match cast (kind t) t' with
-        | exception Uncastable -> no_match ()
+      | t' -> 
         (* TODO: check convertible *)
-        | t' -> if t <> t' then no_match () else st.mv
+        if t <> t' then no_match () else st.mv
 
   (* matches an atom *)
   and atmatch (at : generic_atom) (at' : generic_atom) st : Mvar.t =
@@ -902,7 +894,6 @@ module T (* : S with type t = message *) = struct
       (* head matches *)
       | `Map t' ->
         let t' =
-          let t' = cast (kind t) t' in
           if m_rec then snd (map env vars conds t') else t'
         in
         true, t'
@@ -1086,9 +1077,7 @@ end = struct
         (Utils.omap_dflt Sv.empty Term.fv cond_le));
 
     let indices = Sv.diff (Sv.of_list1 indices) env in
-    let indices =
-      List.map (fun ev -> Vars.cast ev Type.KIndex) (Sv.elements indices)
-    in
+    let indices = Sv.elements indices in
     { msymb; indices; cond_le; }
 
   let _pp ~dbg fmt (mset : t) =

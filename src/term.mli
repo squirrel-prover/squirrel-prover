@@ -181,13 +181,6 @@ val kind : term -> Type.kind
 val ty  : ?ty_env:Type.Infer.env -> term -> Type.ty
 
 (*------------------------------------------------------------------*)
-exception Uncastable
-
-(** [cast k t] checks that [t] can be seen as a message of kind [k].
-    @raise Uncastable if the term cannot be cast.*)
-val cast : Type.kind -> term -> term
-
-(*------------------------------------------------------------------*)
 (** [get_vars t] returns the free variables of [t].
   * The returned list is guaranteed to have no duplicate elements. *)
 val get_vars : term -> Vars.var list

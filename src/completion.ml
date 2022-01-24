@@ -280,66 +280,63 @@ and cterm_of_var i = ccst (Cst.Cmvar i)
 
 (*------------------------------------------------------------------*)
 let index_of_cterm i = match i.cnt with
-  | Ccst (Cst.Cmvar m) -> Vars.cast m Type.KIndex
+  | Ccst (Cst.Cmvar m) -> assert (Vars.kind m = Type.KIndex); m
   | _ -> assert false
     
 let indices_of_cterms cis = List.map index_of_cterm cis
 
-let term_of_cterm : Symbols.table -> Type.kind -> cterm -> Term.term =
-  fun table kind c ->  
-  let rec term_of_cterm : Type.kind -> cterm -> Term.term = 
-    fun kind c -> 
+let term_of_cterm : Symbols.table -> cterm -> Term.term =
+  fun table c ->  
+  let rec term_of_cterm : cterm -> Term.term = 
+    fun c -> 
       match c.cnt with 
       | Cfun (F f, ari, cterms) -> 
         let cis, cterms = List.takedrop ari cterms in
         let is = indices_of_cterms cis in
-        let terms = terms_of_cterms Type.KMessage cterms in
-        let t = Term.mk_fun table f is terms in
-        Term.cast kind t
+        let terms = terms_of_cterms cterms in
+        Term.mk_fun table f is terms 
 
       | Cfun (M (m,ek), ari, cterms) -> 
         let cis, cts = List.takedrop ari cterms in
         let cts = as_seq1 cts in
         let m = Term.mk_isymb m ek (indices_of_cterms cis) in
-        let tm = Term.mk_macro m [] (term_of_cterm Type.KTimestamp cts) in
-        Term.cast kind tm
+        Term.mk_macro m [] (term_of_cterm cts) 
 
       | Cfun (A a, ari, is) -> 
         assert (ari = List.length is);
-        let is = indices_of_cterms is in 
-        Term.cast kind (Term.mk_action a is)
+        let is = indices_of_cterms is in
+        Term.mk_action a is
 
       | Cfun (N (n,nty), ari, is) -> 
         assert (ari = List.length is);
         let is = indices_of_cterms is in
         let ns = Term.mk_isymb n nty is in
-        Term.cast kind (Term.mk_name ns)
+        Term.mk_name ns
 
       | Cfun (GPred, ari, ts) ->
         assert (ari = 0);
         let ts = as_seq1 ts in
-        let pred_ts = Term.mk_pred (term_of_cterm Type.KTimestamp ts) in
-        Term.cast kind pred_ts   
+        Term.mk_pred (term_of_cterm ts)
 
-      | Ccst (Cst.Cmvar m) -> Term.mk_var (Vars.cast m kind)
+      | Ccst (Cst.Cmvar m) -> Term.mk_var m
 
       | Ccst (Cst.Cgfuncst (`F f)) ->
-        Term.cast kind (Term.mk_fun table f [] [])
+        Term.mk_fun table f [] []
           
       | Ccst (Cst.Cgfuncst (`A a)) ->
-        Term.cast kind (Term.mk_action a [])
+        Term.mk_action a []
                                         
       | Ccst (Cst.Cgfuncst (`N (n,nty))) ->
         let ns = Term.mk_isymb n nty [] in
-        Term.cast kind (Term.mk_name ns)
+        Term.mk_name ns
 
       | (Ccst (Cflat _|Csucc _)|Cvar _|Cxor _) -> assert false
 
-  and terms_of_cterms : Type.kind -> cterm list -> Term.term list =
-    fun kind cterms -> List.map (term_of_cterm kind) cterms
+  and terms_of_cterms (cterms : cterm list) : Term.term list =
+    List.map term_of_cterm cterms
 
   in
-  term_of_cterm kind c
+  term_of_cterm c
 
 (*------------------------------------------------------------------*)
 let pp_gsymb ppf = function
@@ -1434,8 +1431,6 @@ module Memo = Hashtbl.Make2
       type t = Term.esubst list
       let equal_p (Term.ESubst (t0, t1)) (Term.ESubst (t0', t1')) = 
         Type.equal (Term.ty t0) (Term.ty t0') &&
-        let t0', t1' = Term.cast (Term.kind t0) t0', 
-                       Term.cast (Term.kind t0) t1' in
         t0 = t0' && t1 = t1'
       let equal l l' = 
         let l, l' = List.sort_uniq Stdlib.compare l,
@@ -1633,13 +1628,13 @@ let name_indep_cnstrs table state l =
         | [] -> Term.mk_false
         | [p] -> 
           Term.mk_atom `Eq
-            (term_of_cterm table Type.KMessage p)
-            (term_of_cterm table Type.KMessage name)
+            (term_of_cterm table p)
+            (term_of_cterm table name)
         | p::q ->
           Term.mk_or
             (Term.mk_atom `Eq 
-               (term_of_cterm table Type.KMessage p)
-               (term_of_cterm table Type.KMessage name))
+               (term_of_cterm table p)
+               (term_of_cterm table name))
             (mk_disjunction q)
       in
       [mk_disjunction sub_names]

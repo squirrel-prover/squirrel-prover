@@ -79,7 +79,7 @@ module Utv : sig
   val uinit  : ut
   val uundef : ut
 
-  val ut_to_term : Type.kind -> ut -> Term.term 
+  val ut_to_term : ut -> Term.term 
 
   module Ut : Hashtbl.HashedType with type t = ut
 
@@ -155,27 +155,24 @@ end = struct
     | Term.Action (s,l) -> uname s (List.map uvari l)
     | _ -> failwith "Not implemented"
 
-  let utv_to_var : Type.kind -> uvar -> Vars.var =
-    fun s utv ->
+  let utv_to_var (utv : uvar) : Vars.var =
     match utv with
-    | Uind i -> Vars.cast i s
-    | Utv  t -> Vars.cast t s
+    | Uind i -> i
+    | Utv  t -> t
 
-  let ut_to_var : Type.kind -> ut -> Vars.var =
-    fun s ut -> 
+  let ut_to_var (ut : ut) : Vars.var =
     match ut.cnt with
-    | UVar (Uind i) -> Vars.cast i s
-    | UVar (Utv t)  -> Vars.cast t s
+    | UVar (Uind i) -> i 
+    | UVar (Utv t)  -> t 
     | _ -> assert false
 
-  let rec ut_to_term : Type.kind -> ut -> Term.term = 
-    fun s ut ->
+  let rec ut_to_term (ut : ut) : Term.term = 
     match ut.cnt with
-    | UVar tv -> Term.mk_var (utv_to_var s tv)
+    | UVar tv -> Term.mk_var (utv_to_var tv)
     | UName (a, is) -> 
-      Term.cast s (Term.mk_action a (List.map (ut_to_var Type.KIndex) is))
-    | UPred ut -> Term.cast s (Term.mk_pred (ut_to_term Type.KTimestamp ut))
-    | UInit  -> Term.cast s Term.init
+      Term.mk_action a (List.map ut_to_var is)
+    | UPred ut -> Term.mk_pred (ut_to_term ut)
+    | UInit  -> Term.init
     | UUndef -> assert false
 end
 
@@ -1412,7 +1409,7 @@ let find_eq_action (models : models) (t : Term.term) =
     let classe = get_class uf ut in
     List.find_map (fun ut -> match ut.cnt with
         | UInit
-        | UName _ -> Some (ut_to_term Type.KTimestamp ut)
+        | UName _ -> Some (ut_to_term ut)
         | _ -> None
       ) classe
   in

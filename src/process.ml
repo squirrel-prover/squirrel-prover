@@ -396,12 +396,12 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
   let create_subst env isubst msubst =
     List.map (fun (x,_,tm) -> 
-        let v = Vars.find env x Type.KIndex in
+        let v = Vars.find env x in
         Term.ESubst (Term.mk_var v, Term.mk_var tm)
       ) isubst
     @
     List.map (fun (x,_,tm) -> 
-        let v = Vars.find env x Type.KMessage in
+        let v = Vars.find env x in
         Term.ESubst (Term.mk_var v, tm)
       ) msubst
   in

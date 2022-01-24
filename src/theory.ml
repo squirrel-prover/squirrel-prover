@@ -753,7 +753,7 @@ let convert_var
   : Term.term
   =
   try
-    let v = Vars.find env (L.unloc st) (Type.kind ty) in
+    let v = Vars.find env (L.unloc st) in
 
     let of_t = var_of_lsymb st in
 
@@ -762,8 +762,6 @@ let convert_var
     Term.mk_var v
   with
   | Not_found -> conv_err (L.loc st) (Undefined (L.unloc st))
-  | Vars.CastError ->
-    conv_err (L.loc st) (Type_error (App (st,[]), ty))
 
 let convert_bnds env (vars : (lsymb * Type.ty) list) =
   let do1 (env, v_acc) (vsymb, s) =
@@ -914,8 +912,8 @@ and convert0
     in
     let is =
       List.map (fun v ->
-          try Vars.cast v Type.KIndex
-          with Vars.CastError -> type_error ()
+          if Vars.kind v <> Type.KIndex then type_error ();
+          v
         ) evs
     in
     begin match Type.kind ty with
@@ -1422,9 +1420,9 @@ let declare_state table s (typed_args : bnds) (pty : p_ty) t =
 
   let indices : Vars.var list =
     List.map (fun v ->
-      try Vars.cast v Type.KIndex
-      with Vars.CastError ->
-        conv_err (L.loc pty) (BadPty [Type.KIndex])
+      if Vars.kind v <> Type.KIndex then
+        conv_err (L.loc pty) (BadPty [Type.KIndex]);
+      v
       ) evs
   in
 

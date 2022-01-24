@@ -61,12 +61,6 @@ let pp_typed_list ppf (vars : var list) =
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)
 
-exception CastError
-
-let cast (x : var) (s : Type.kind) : var =
-  if (kind x) <> s then raise CastError;
-  x
-
 let equal (v : var) (v' : var) : bool = v = v'
 
 (** Time-consistent: if [v] was created before [v'], then [compare v v' ≤ 0]. *)
@@ -132,23 +126,7 @@ let mem_e (e : env) (var : var) : bool = M.mem (name var) e
 
 let mem_s (e : env) (s : string) : bool = M.mem s e
 
-let find (e : env) (name : string) (k : Type.kind) : var = 
-  (* let EVar v = 
-   *   let found = ref None in
-   *   let exception Found in
-   *   try
-   *     let () = 
-   *       M.iter (fun id v -> 
-   *           if id = name then 
-   *             let () = found := Some v in
-   *             raise Found) e 
-   *     in
-   *     raise Not_found
-   * 
-   *   with Found -> oget !found
-   * in *)
-  let v = M.find name e in
-  cast v k
+let find (e : env) (name : string) : var = M.find name e 
 
 let of_list l : env =
   List.fold_left (fun e v -> 

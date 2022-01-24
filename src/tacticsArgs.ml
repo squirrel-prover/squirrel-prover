@@ -483,14 +483,14 @@ let convert_pat_arg sel sexpr conv_cntxt tyvars env p conc =
     | `Equiv form -> Match.E.find ~option (conv_cntxt.table) sexpr env pat form
   in
   let message = match List.nth res (sel-1) with
-    | et -> Term.cast (Term.kind t) et
-    | exception _ -> raise Theory.(Conv (L._dummy,
-                                         Tactic_type
-                                           ("Could not extract the element "
-                                            ^string_of_int (sel)
-                                            ^" out of "^string_of_int (List.length res)
-                                            ^" matches found")))
-
+    | et -> et
+    | exception _ -> 
+      raise Theory.(Conv (L._dummy,
+                          Tactic_type
+                            ("Could not extract the element "
+                             ^string_of_int (sel)
+                             ^" out of "^string_of_int (List.length res)
+                             ^" matches found")))
   in
   (message, ty)
 

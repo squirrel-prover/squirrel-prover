@@ -118,7 +118,7 @@ module Mk (S : LowSequent.S) = struct
               | Term.ForAll _ -> Term.mk_forall ~simpl:false evs red_t0 
               | _ -> assert false
             in
-            Term.cast (Term.kind t) red_t, true
+            red_t, true
 
         | Term.Seq (is, t0) ->
           let _, subst = Term.refresh_vars `Global is in
@@ -131,7 +131,7 @@ module Mk (S : LowSequent.S) = struct
             let r_subst = rev_subst subst in
             let red_t0 = Term.subst r_subst red_t0 in
             let red_t = Term.mk_seq0 is red_t0 in
-            Term.cast (Term.kind t) red_t, true
+            red_t, true
 
         | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite -> 
           let c, has_red0 = reduce st c in

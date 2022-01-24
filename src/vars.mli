@@ -38,10 +38,6 @@ val tsubst  : Type.tsubst -> var -> var
 
 val kind : var -> Type.kind
 
-exception CastError
-
-val cast  : var -> Type.kind -> var
-
 val equal : var -> var -> bool
 
 (** Time-consistent: if [v] was created before [v'], then [compare v v' ≤ 0]. *)
@@ -86,13 +82,13 @@ val mem   : env -> var -> bool
 val mem_s : env -> string -> bool
 
 (** Note: pattern variables are not uniquely characterized by a string *)
-val find   : env -> string -> Type.kind -> var 
+val find : env -> string -> var 
 
 (** [rm_var env v] returns [env] minus the variable [v].
   * returns the same [env] if no variable is found. *)
-val rm_var  : env -> var -> env
+val rm_var : env -> var -> env
 
-val rm_vars  : env -> var list -> env
+val rm_vars : env -> var list -> env
 
 
 (*------------------------------------------------------------------*)

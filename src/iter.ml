@@ -638,9 +638,7 @@ end = struct
 
   let mk ~env ~msymb ~indices : t =
     let indices = Sv.diff (Sv.of_list1 indices) env in
-    let indices =
-      List.map (fun ev -> Vars.cast ev Type.KIndex) (Sv.elements indices)
-    in
+    let indices = Sv.elements indices in
     { msymb; indices }
 
 
@@ -987,11 +985,7 @@ let _fold_macro_support
             in
 
             let fv = Sv.diff (Sv.of_list1 is') env in
-            let fv =
-              List.map (fun v ->
-                  Vars.cast v Type.KIndex
-                ) (Sv.elements fv)
-            in
+            let fv = Sv.elements fv in
 
             let iocc = {
               iocc_aname   = descr.name;

@@ -460,13 +460,6 @@ let ty ?ty_env (t : term) : Type.ty =
 
 
 (*------------------------------------------------------------------*)
-exception Uncastable
-
-let cast (k : Type.kind) (t : term) : term =
-  if kind t <> k then raise Uncastable;
-  t
-
-(*------------------------------------------------------------------*)
 (** {2 Destructors} *)
 
 let destr_fun ?fs = function
@@ -1063,10 +1056,7 @@ let rec assoc : subst -> term -> term =
   match subst with
   | [] -> term
   | ESubst (t1,t2)::q ->
-    try
-      let term2 = cast (kind t1) term in
-      if term2 = t1 then cast (kind term) t2 else assoc q term
-    with Uncastable -> assoc q term
+    if term = t1 then t2 else assoc q term
 
 exception Substitution_error of string
 
@@ -1227,7 +1217,6 @@ let rec subst : subst -> term -> term = fun s t ->
 
         let v, s = subst_binding v s in
         let f = subst s (Find (vs, b, c, dummy)) in
-        let v = Vars.cast v Type.KIndex in
         match f with
         | Find (vs, b, c, _) -> Find (v :: vs, b, c, subst s d)
         | _ -> assert false
@@ -1350,14 +1339,7 @@ let refresh_vars_env env vs =
 
 (*------------------------------------------------------------------*)
 
-(** [app func t] applies [func] to [t]. [func] must preserve types. *)
-let app (func : term -> term) (x : term) : term =
-  let x0 = func x in
-  cast (kind x) x0
-
 let atom_map (func : term -> term) (at : generic_atom) : generic_atom =
-  let func (x : term) : term = app func x in
-
   match at with
   | `Message (o,t1,t2) ->
     let t1 = func t1
@@ -1383,10 +1365,7 @@ let atom_map (func : term -> term) (at : generic_atom) : generic_atom =
 
 (** Does not recurse.
     Applies to arguments of index atoms (see atom_map). *)
-let tmap : (term -> term) -> term -> term =
-  fun func0 t ->
-  let func : term -> term = fun x -> app func0 x in
-
+let tmap (func : term -> term) (t : term) : term =
   match t with
   | Action _ -> t
   | Name _   -> t
@@ -1411,7 +1390,7 @@ let tmap : (term -> term) -> term -> term =
   | ForAll (vs, b)    -> ForAll (vs, func b)
   | Exists (vs, b)    -> Exists (vs, func b)
 
-  | Atom at -> Atom (atom_map func0 at)
+  | Atom at -> Atom (atom_map func at)
 
 let tmap_fold : ('b -> term -> 'b * term) -> 'b -> term -> 'b * term =
   fun func b t ->
@@ -1598,9 +1577,7 @@ let apply_ht (ht : hterm) (terms : term list) = match ht with
     let ht = subst_ht s (Lambda (evs1, t)) in
 
     let s_app =
-      List.map2 (fun v t ->
-          ESubst (Var v, cast (Vars.kind v) t)
-        ) evs0 terms
+      List.map2 (fun v t -> ESubst (Var v, t)) evs0 terms
     in
     subst_ht s_app ht
 

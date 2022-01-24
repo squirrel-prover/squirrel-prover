@@ -113,7 +113,7 @@ let global_prf table sdecl ty_vars hash =
   let env,vars = Theory.convert_p_bnds table [] Vars.empty_env ty_vars in
   let conv_env = Theory.{ table; cntxt = InGoal } in
   let hash, _ = Theory.convert_i conv_env [] env hash in
-  let is =  (List.map (fun x -> Vars.cast x Type.KIndex) vars) in
+  let is = vars in
 
 
   let env = ref env in
@@ -239,7 +239,7 @@ let global_cca table sdecl ty_vars enc =
   let env,vars = Theory.convert_p_bnds table [] Vars.empty_env ty_vars in
   let conv_env = Theory.{ table; cntxt = InGoal } in
   let enc, _ = Theory.convert_i conv_env [] env enc in
-  let is =  (List.map (fun x -> Vars.cast x Type.KIndex) vars) in
+  let is = vars in
 
 
   let env = ref env in
