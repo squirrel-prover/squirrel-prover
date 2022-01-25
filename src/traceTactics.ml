@@ -380,6 +380,77 @@ let () = T.register "constraints"
     ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun constraints_tac)
 
+(*------------------------------------------------------------------*)
+(* SMT-based combination of constraints and congruence *)
+
+let smt (s : TS.t) =
+  (* let's avoid massaging the goal beforehand
+   * so that we can send it as it is to the SMT solver
+   * (in the current implementation, the goal is preserved while
+   *  only the trace literals and equality atoms are sent among the hypotheses)
+   * NOTE: this means that in principle this will sometimes be less powerful
+   *       than calling constraints/congruence *)
+  (* match simpl_left s with
+   * | None -> true
+   * | Some s ->
+   *   let conclusions =
+   *     Utils.odflt [] (Term.disjunction_to_literals (TS.goal s))
+   *   in
+   *   let term_conclusions =
+   *     List.fold_left (fun acc conc -> match conc with
+   *         | `Pos, (#generic_atom as at) ->
+   *           let at = (at :> Term.generic_atom) in
+   *           Term.(mk_not (mk_atom1 at)) :: acc
+   *         | `Neg, (#generic_atom as at) ->
+   *           Term.mk_atom1 at :: acc)
+   *       []
+   *       conclusions
+   *   in
+   *   let s = List.fold_left (fun s f ->
+   *       Hyps.add Args.AnyName f s
+   *     ) s term_conclusions
+   *   in *)
+    TS.literals_unsat_smt s
+
+let smt_tac (s : TS.t) =
+  (* let s = as_seq1 (TraceLT.intro_all s) in *)
+  match smt s with
+  | true ->
+    let () = dbg "closed by smt" in
+    []
+
+  | false ->
+   let () = dbg "smt failed" in
+   soft_failure (Tactics.Failure "smt did not return unsat")
+
+let () = T.register "smt"
+    ~tactic_help:
+      {general_help = "Tries to discharge goal using an SMT solver.";
+       detailed_help = "implements a combination of congruence, constraints, \
+                        eqnames and macroexpansion, plus first-order reasoning";
+       usages_sorts = [Sort None];
+       tactic_group = Structural}
+    (LowTactics.genfun_of_pure_tfun smt_tac)
+
+let slowsmt_tac (s : TS.t) =
+  match TS.literals_unsat_smt ~slow:true s with
+  | true ->
+    let () = dbg "closed by smt" in
+    []
+
+  | false ->
+   let () = dbg "smt failed" in
+   soft_failure (Tactics.Failure "smt did not return unsat")
+
+let () = T.register "slowsmt"
+    ~tactic_help:
+      {general_help = "Version of smt tactic with higher time limit.";
+       detailed_help = "";
+       usages_sorts = [Sort None];
+       tactic_group = Structural}
+    (LowTactics.genfun_of_pure_tfun slowsmt_tac)
+
+
 
 (*------------------------------------------------------------------*)
 (** Eq-Indep Axioms *)

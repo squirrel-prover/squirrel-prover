@@ -35,6 +35,11 @@ type global_data = {
 
 type Symbols.data += Global_data of global_data
 
+let get_global_data = function
+  | Global_data x -> Some x
+  | _             -> None
+
+
 let sproj s t = Term.pi_term ~projection:(SE.get_proj s) t
 
 let get_single_body single_system data =
@@ -76,7 +81,6 @@ let apply_global_data table ns dec_def old_single_system new_single_system data 
     Symbols.Macro.redefine table ~data ns dec_def
   | _ -> table
 
-
 let is_tuni = function Type.TUnivar _ -> true | _ -> false
 
 let declare_global table name ~suffix ~action ~inputs ~indices ~ts body ty =
@@ -95,7 +99,7 @@ let declare_global table name ~suffix ~action ~inputs ~indices ~ts body ty =
 let is_action = function Term.Action _ -> true | _ -> false
 let get_action_symb = function Term.Action (a,_) -> a | _ -> assert false
 
-let is_prefix ~strict a b =
+let is_prefix strict a b =
   match Action.distance a b with
   | None -> false     (* [a] and [b] incomparable *)
   | Some i -> match strict with

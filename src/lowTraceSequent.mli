@@ -82,3 +82,7 @@ val maximal_elems :
 (** [get_all_messages s] returns all the messages appearing at toplevel
   * in [s]. *)
 val get_all_messages : sequent -> Term.message list
+
+
+(* using Why3constr *)
+val literals_unsat_smt : ?slow:bool -> sequent -> bool

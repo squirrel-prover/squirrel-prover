@@ -288,6 +288,7 @@ let rec do_command
       let db =
         match h with
         | Hint.Hint_rewrite id -> Prover.add_hint_rewrite id db
+        | Hint.Hint_smt     id -> Prover.add_hint_smt     id db
       in
       Prover.set_hint_db db;
       state

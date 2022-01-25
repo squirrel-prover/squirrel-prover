@@ -39,6 +39,7 @@
 %token PROOF QED UNDO ABORT HINT
 %token RENAME GPRF GCCA
 %token INCLUDE
+%token SMT
 %token TICKUNDERSCORE
 %token EOF
 
@@ -725,6 +726,8 @@ tac:
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
       mk_abstract l "clear" ids }
 
+  | l=lloc(SMT) { mk_abstract l "smt" [] }
+
   (*------------------------------------------------------------------*)
   /* assert a formula */
   | t=assert_tac { t }
@@ -943,6 +946,7 @@ set_option:
 
 hint:
 | HINT REWRITE id=lsymb DOT { Hint.Hint_rewrite id }
+| HINT SMT     id=lsymb DOT { Hint.Hint_smt     id }
 
 p_include:
 | INCLUDE file=lsymb DOT  { file }

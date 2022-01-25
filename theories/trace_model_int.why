@@ -1,0 +1,53 @@
+theory Trace_model
+
+  use int.Int
+
+  type index
+  type action
+  type timestamp = int
+
+  (* idea: any negative number can represent undef, ~~ is the quotiented
+           equality that identifies all those representations
+           advantages: pred is easily defined;
+                       no need to restrict timestamp values *)
+
+  constant  init : action
+  predicate happens (t : timestamp) = t >= 0
+  predicate (~~)  (t : timestamp) (t' : timestamp) =
+    (happens t \/ happens t') -> t = t'
+  predicate (<~)  (t : timestamp) (t' : timestamp) =
+    happens t /\ happens t' /\ t <= t'
+
+  (* ran into a mysterious problem while trying to use Why3 polymorphic lists
+     through the OCaml API -> let's redefine monomorphic lists instead *)
+  type ilist =
+    | Nil
+    | Cons index ilist
+
+  function act action ilist : timestamp
+  axiom act_init : act init Nil = 0
+  axiom act_inj  : forall a a' : action. forall l l' : ilist.
+    happens (act a l) -> happens (act a' l') -> act a l = act a' l'
+      -> (a = a' /\ l = l')
+
+  function pred (t : timestamp) : timestamp = t - 1
+
+  type message (* added for "congruence" *)
+  function xoxo message message : message (* xor *)
+  axiom xor_assoc : forall x y z : message.
+    xoxo x (xoxo y z) = xoxo (xoxo x y) z
+  axiom xor_comm : forall x y : message. xoxo x y = xoxo y x
+  (* "unit-free" formulation of x xor x = 0 *)
+  axiom xor_nil : forall x y : message. xoxo (xoxo x x) y = y
+
+  (* hack for messages of type boolean *)
+  predicate msg_is_true message
+
+  predicate macro_cond timestamp
+  predicate macro_exec timestamp
+
+  axiom macro_cond_happens : forall t : timestamp. macro_cond t -> happens t
+  axiom macro_cond_init    : macro_cond (act init Nil)
+  axiom macro_exec_def : forall t : timestamp.
+    macro_exec t <-> (t = act init Nil \/ (macro_cond t /\ macro_exec (pred t)))
+end

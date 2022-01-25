@@ -899,3 +899,6 @@ let declare_list table hint_db decls =
 let add_hint_rewrite (s : lsymb) db =
   let lem = get_reach_assumption s in
   Hint.add_hint_rewrite s lem.Goal.ty_vars lem.Goal.formula db
+
+let add_hint_smt (s : lsymb) db =
+  Hint.add_hint_smt (get_reach_assumption s).Goal.formula db

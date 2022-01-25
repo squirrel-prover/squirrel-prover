@@ -1,5 +1,5 @@
 OCB_FLAGS = -use-ocamlfind -use-menhir -I src \
-			-pkgs fmt,fmt.tty,alcotest,ocamlgraph,pcre \
+			-pkgs fmt,fmt.tty,alcotest,ocamlgraph,pcre,why3 \
 
 OCB = ocamlbuild $(OCB_FLAGS)
 

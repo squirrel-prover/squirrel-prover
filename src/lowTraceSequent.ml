@@ -76,7 +76,7 @@ module S : sig
     (** Hypotheses *)
     
     conclusion : Term.message;
-    (** The conclusion / right-hand side formula of the sequent. *)    
+    (** The conclusion / right-hand side formula of the sequent. *)
   }
 
   val init_sequent :
@@ -552,10 +552,25 @@ let eq_atoms_valid s =
         let () = dbg "dis-equality %a ≠ %a violated" Term.pp a Term.pp b in
         true
       else
-        let () = dbg "dis-equality %a ≠ %a: no violation" 
+        let () = dbg "dis-equality %a ≠ %a: no violation"
             Term.pp a Term.pp b in
         false)
     neqs
+
+let literals_unsat_smt ?(slow=false) s =
+  Term.pp Format.std_formatter s.conclusion; Format.printf "\n";
+  Why3constr.literals_unsat ~slow
+    s.table
+    s.system
+    (Vars.to_list s.env)
+    (get_message_atoms s)
+    (get_trace_literals s)
+    (* TODO: now that we can pass more general formulas than lists of atoms,
+     * we don't actually need to decompose message atoms / trace literals *)
+    (* since we didn't move the conclusion into the premises,
+     * handle it here *)
+    (Term.mk_not s.conclusion :: Hint.get_smt_db s.hint_db)
+
 
 (*------------------------------------------------------------------*)
 let mk_trace_cntxt s = 

@@ -1,4 +1,35 @@
+val is_prefix : [`Strict | `Large] -> Action.shape -> Action.shape -> bool
+
 (** {2 Macro definitions} *)
+
+type global_data = {
+  action  : [`Strict | `Large] * Action.shape;
+  (** the global macro is defined at any action which is a strict or large
+      suffix of [action]  *)
+
+  inputs  : Vars.message list;
+  (** inputs of the macro, as variables, in order *)
+
+  indices : Vars.index list;
+  (** free indices of the macro, which corresponds to the prefix of
+      the indices of the action defining the macro *)
+
+  ts      : Vars.timestamp;
+  (** free timestamp variable of the macro, which can only be instantiated
+      by a strict suffix of [action] *)
+
+  default_body    : Term.message;
+  (** macro body shared by all systems *)
+
+  systems_body    : (SystemExpr.single_system * Term.message) list;
+  (** Optional alternative definitions of the body for a given system.
+      Used by System modifiers.
+  *)
+
+}
+
+val get_global_data : Symbols.data -> global_data option
+val get_body : SystemExpr.t -> global_data -> Term.message
 
 (** Declare a global (timestamp-dependent) macro,
   * given a term abstracted over input variables, indices,

@@ -21,6 +21,25 @@ You can also just build the prover with `make squirrel`, test with `make test`.
 
 The documentation for developers may be built with `make doc`.
 
+### Setup for SMT Branch
+
+First install Why3 and Alt-Ergo using opam:
+```
+$ opam install why3 alt-ergo
+```
+
+This also installs the Why3 library required to compile this branch of Squirrel.
+
+Then tell Why3 to automatically detect that Alt-Ergo is installed and update its
+configuration accordingly:
+```
+$ why3 config detect
+```
+
+Why3 is also able to find SMT solvers installed using the system package manager
+(e.g. `sudo dnf install z3` on Fedora) but those aren't supported by our code
+yet.
+
 ## Use
 
 ### Standalone

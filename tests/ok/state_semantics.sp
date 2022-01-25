@@ -43,8 +43,14 @@ goal stateSemantics1F (i,j:index):
     happens(T1(i,j)) => 
     output@T(i,j) = <h(k1(i)@pred(T(i,j)),key(i)),k2(i)@pred(T(i,j))>.
 Proof.
-checkfail auto exn GoalNotClosed.
-Abort.
+  (* This manual proof shows that it's supposed to go through without [auto] *)
+  (* intro *. depends T(i,j), T1(i,j). assumption. intro *. expandall. congruence. Qed. *)
+  (* Below, failure of [auto] (no "depends") *)
+  checkfail auto exn GoalNotClosed. (* Abort. *)
+  (* And now we can use smt to handle "depends" automatically? *)
+  smt.
+Qed.
+
 
 goal stateSemantics (i,j:index):
     happens(T1(i,j)) =>
