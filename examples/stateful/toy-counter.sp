@@ -18,7 +18,7 @@ P = ! A | ! B | out(d, 0) | ! in(d, i : nat); out(d, i)
 COMMENTS
 - In this model, we do not use private channels since actions (input/condition/
   update/output) are atomic.
-- The goal is to prove that the secret s is never leaked because the B receives
+- The goal is to prove that the secret s is never leaked because B receives
   only hashes with old values of the counter.
 
 SECURITY PROPERTIES
@@ -36,18 +36,23 @@ name key : message
 abstract error : message
 abstract myZero : message
 
+(** We declare here a mutable state symbol, initialized with the public constant
+`myZero`. **)
 mutable d : message = myZero
 
 channel cA
 channel cB
 
-(* mySucc function for counter *)
+(** 
+In order to model counter values, we use:
+* a function `mySucc` modelling the successor of a value;
+* an order relation `~<` modelling the usual order on natural numbers.
+**)
 abstract mySucc : message->message
-
-(* order relation for counter *)
 abstract (~<) : message -> message -> boolean
 
-(* processes *)
+(** Processes A and B are defined as follows.
+They both access to the mutable state `d`. **)
 process A =
   let m = h(<d,secret>,key) in
   d := mySucc(d);
@@ -66,15 +71,19 @@ system ((!_i A) | (!_j B)).
 
 (* AXIOMS *)
 
+(**
+We now axiomatize the order relation `~<` defined above in order to be able
+to reason on counter values.
+**)
 axiom orderSucc (n:message): n ~< mySucc(n).
-
 axiom orderTrans (n1,n2,n3:message): n1 ~< n2 && n2 ~< n3 => n1 ~< n3.
-
 axiom orderStrict (n1,n2:message): n1 = n2 => n1 ~< n2 => false.
 
 (* SECURITY PROPERTIES *)
 
-(* The counter increases strictly at each update. *)
+(**
+We first show that the counter increases strictly at each update. 
+**)
 goal counterIncreasePred (t:timestamp): 
   t > init => d@pred(t) ~< d@t.
 Proof.
@@ -84,31 +93,56 @@ Proof.
   constraints.
 Qed.
 
-(* A more general result than counterIncreasePred. *)
+(**
+We also show a more general result than counterIncreasePred, stating
+here that the counter strictly increases between two distinct timestamps.
+The proof is done by induction, and relies on the previous result
+counterIncreasePred.
+**)
 goal counterIncrease (t,t':timestamp):
    t' < t => d@t' ~< d@t.
 Proof.
   induction t => t Hind Ht.
+  (** We use the `assert` tactic to introduce two cases. **)
   assert (t' < pred(t) || t' >= pred(t)) as H0 by case t. 
   case H0.
 
-    (* case t' < pred(t) *)
+    (** Case where t' < pred(t).
+    We first apply the induction hypothesis on `t'` to get `d@t' ~< d@pred(t)`,
+    then use the lemma counterIncreasePred with `t` to get `d@pred(t) ~< d@t`.
+    It then remains to conclude by transitivity (applying `orderTrans`).
+    **)
     apply Hind in H0 => //.
     use counterIncreasePred with t; 2: by constraints.
     by apply orderTrans _ (d@pred(t)).
 
-    (* case t' >= pred(t) *)
+    (** Case where t' >= pred(t).
+    Since `t' < t` we can deduce that `t' = pred(t)`. It is then directly
+    a consequence of the counterIncreasePred lemma.
+    **)
     assert t' = pred(t) as Ceq by constraints.
     use counterIncreasePred with t; 2: auto.
-    by rewrite Ceq; use counterIncreasePred with t.
+    by rewrite Ceq; auto.
 Qed.
 
+(**
+The following reachability property states that the secret s is never leaked
+(_i.e._ the condition of the action `B(j)` is never satisfied).
+The proof relies on the EUF assumption: if `cond@B(j)` is satisfied, it would
+mean that the attacker has been able to forge the message `h(<d,secret>,key)`
+with `d` corresponding to the value of the counter at timepoint `B(j)`, because
+all messages outputted so far correspond to older values of `d`.
+**)
 goal secretReach (j:index):
   happens(B(j)) => cond@B(j) => false.
 Proof.
+  (** We start by introducing the hypotheses and expanding the `cond` macro. **)
   intro Hap Hcond.
   expand cond.
+  (** Applying the `euf` tactic generates two new hypotheses, `Ht` and `Heq`. **)
   euf Hcond => Ht Heq. 
+  (** We use here the counterIncrease lemma to show that the equality `Heq` is
+  not possible. **)
   assert pred(A(i)) < pred(B(j)) as H by constraints.
   apply counterIncrease in H.
   by apply orderStrict in H. 

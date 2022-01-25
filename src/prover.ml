@@ -410,7 +410,7 @@ module ProverTactics = struct
           (Tactics.Failure (Printf.sprintf "unknown tactic %S" id_u))
     in
     Fmt.pf fmt  "@.@[- %a -@\n @[<hov 3>   %a @\n %a @\n%s @[%a @] @]@]@."
-      Fmt.(styled `Bold (styled `Magenta Utils.ident))
+      (fun ppf s -> Printer.kw `HelpFunction ppf "%s" s)
       id_u
       Format.pp_print_text
       help.general_help
@@ -445,7 +445,7 @@ module ProverTactics = struct
       | Cryptographic -> "Cryptographic"
     in
     List.iter (fun cat ->
-        Fmt.pf fmt "\n%a" Fmt.(styled `Bold (styled `Red Utils.ident))
+        Printer.kw `HelpType fmt "\n%s"
           (str_cat cat^" tactics:");
         List.iter (fun (name, help) ->
             if help.general_help <> "" then
@@ -466,13 +466,12 @@ module ProverTactics = struct
       | Cryptographic -> "Cryptographic"
     in
     List.iter (fun cat ->
-        Fmt.pf fmt "\n%a" Fmt.(styled `Bold (styled `Red Utils.ident))
+        Printer.kw `HelpType fmt "\n%s"
           (str_cat cat^" tactics:\n");
         Fmt.pf fmt "%a"
           (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "; ")
-             (fun ppf (name,x) -> Fmt.pf ppf "%a"
-                 Fmt.(styled `Bold (styled `Magenta Utils.ident))
-                 name))
+            (fun ppf (name,x) -> Printer.kw
+              `HelpFunction ppf "%s" name))
         (filter_cat helps cat);
     )
     [Logical; Structural; Cryptographic]

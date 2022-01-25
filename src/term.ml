@@ -42,14 +42,14 @@ type msymb = (mname, Type.tmessage) isymb
 type state = msymb
 
 (*------------------------------------------------------------------*)
-let pp_name ppf s = (Utils.kw `Yellow) ppf (Symbols.to_string s)
+let pp_name ppf s = (Printer.kws `GoalName) ppf (Symbols.to_string s)
 
 let pp_nsymb ppf (ns : nsymb) =
   if ns.s_indices <> []
   then Fmt.pf ppf "%a(%a)" pp_name ns.s_symb Vars.pp_list ns.s_indices
   else Fmt.pf ppf "%a" pp_name ns.s_symb
 
-let pp_fname ppf s = (Utils.kw `Bold) ppf (Symbols.to_string s)
+let pp_fname ppf s = (Printer.kws `GoalFunction) ppf (Symbols.to_string s)
 
 let pp_fsymb ppf (fn,is) = match is with
   | [] -> Fmt.pf ppf "%a" pp_fname fn
@@ -57,7 +57,7 @@ let pp_fsymb ppf (fn,is) = match is with
 
 let pp_mname_s ppf s =
   let open Fmt in
-  (styled `Bold (styled `Magenta Utils.ident)) ppf s
+  (Printer.kws `GoalMacro) ppf s
 
 let pp_mname ppf s =
   pp_mname_s ppf (Symbols.to_string s)
@@ -692,15 +692,15 @@ let rec is_and_happens = function
 
 (*------------------------------------------------------------------*)
 (** Additional printing information *)
-type pp_info = { styler : pp_info -> eterm -> Fmt.style list * pp_info; }
+type pp_info = { styler : pp_info -> eterm -> Printer.keyword option * pp_info; }
 
-let default_pp_info = { styler = fun info _ -> [], info; }
+let default_pp_info = { styler = fun info _ -> None, info; }
 
-let rec styled_list (styles : Fmt.style list) printer =
-  match styles with
-  | [] -> printer
-  | style :: styles -> styled_list styles (Fmt.styled style printer)
 
+let styled_opt (err : Printer.keyword option) printer =
+  match err with
+  | None -> printer
+  | Some kw -> fun ppf t -> (Printer.kw kw ppf "%a" printer t)
 
 (* -------------------------------------------------------------------- *)
 type assoc  = [`Left | `Right | `NonAssoc]
@@ -756,8 +756,8 @@ let rec pp : type a.
   a term Fmt.t
   =
   fun info (outer,side) ppf t ->
-  let styles, info = info.styler info (ETerm t) in
-  styled_list styles (_pp info (outer, side)) ppf t
+  let err_opt, info = info.styler info (ETerm t) in
+  styled_opt err_opt (_pp info (outer, side)) ppf t
 
 (** Core printing function *)
 and _pp : type a.
@@ -885,10 +885,7 @@ and _pp : type a.
       (pp (pred_fixity, `NonAssoc)) ts
 
   | Action (symb,indices) ->
-    Fmt.styled `Green
-      (fun ppf () ->
-         Fmt.pf ppf "%s%a" (Symbols.to_string symb) pp_indices indices)
-      ppf ()
+    Printer.kw `GoalAction ppf "%s%a" (Symbols.to_string symb) pp_indices indices
 
   | Diff (bl, br) ->
     Fmt.pf ppf "@[<hv 2>diff(@,%a,@,%a)@]"
@@ -1885,13 +1882,14 @@ let pp_match_infos fmt minfos =
   let pp_one fmt (ETerm t, mi) = Fmt.pf fmt "%a → %a" pp t pp_match_info mi in
   Fmt.pf fmt "@[<v 0>%a@]" (Fmt.list pp_one) (Mt.bindings minfos)
 
+
 let match_infos_to_pp_info (minfos : match_infos) : pp_info =
-  let styler info (t : eterm) : Fmt.style list * pp_info =
+  let styler info (t : eterm) : Printer.keyword option * pp_info =
     match Mt.find_opt t minfos with
-    | None               -> [], info
-    | Some MR_ok         -> [(* Fmt.(`Bg `Green) *)],  default_pp_info
-    | Some MR_check_st _ -> [(* Fmt.(`Bg `Yellow) *)], info
-    | Some MR_failed     -> [Fmt.(`Bg `Red)],    info
+    | None               -> None, info
+    | Some MR_ok         -> None,  default_pp_info
+    | Some MR_check_st _ -> None, info
+    | Some MR_failed     -> Some `Error,    info
   in
   { styler }
 
