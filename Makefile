@@ -9,7 +9,7 @@ PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $
 
 test: squirrel alcotest okfail_test
 
-.PHONY: ok_test ok_test_end alcotest alcotest.exe squirrel
+.PHONY: ok_test ok_test_end alcotest squirrel
 
 # Directory for logging test runs
 RUNLOGDIR=_build/squirrel_log
@@ -43,84 +43,54 @@ tests/test_prologue.ok:
 	 ; then echo -n . ; \
 	 else echo "[FAIL] $(@:.ok=.sp)" >> tests/tests.ko ; echo -n '!' ; fi
 
-alcotest.exe: version sanity
-	dune build test.exe
-	cp -f _build/default/test.exe alcotest.exe
-# Dune is confused if there is a "test.exe" file in the root directory
-# -> use different file name for the copy target to avoid this
-
-alcotest: alcotest.exe
-	@mkdir -p ./_build/_tests
-	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
-	./alcotest.exe --compact
+alcotest: version
+	@mkdir -p ./_build/default/_build/_tests
+	@rm -f ./_build/default/_build/_tests/Squirrel ./_build/default/_build/_tests/latest
+	dune runtest --force
+# TODO: how to pass the --compact flag to the test executable?
 
 clean:
 	dune clean
-	@rm -f squirrel test.exe
+	@rm -f squirrel
 	rm -f *.coverage
 	rm -rf _coverage
 
-squirrel: version sanity
+squirrel: version
 	dune build squirrel.exe
 	cp -f _build/default/squirrel.exe squirrel
 
-
-# ??? shouldn't it be the other way around?
-# since ocamldebug doesn't work with native code
-# debug: version sanity
+# Previously with ocamlbuild:
+# squirrel: squirrel.byte
+# debug: version
 # 	$(OCB) -tags debug squirrel.native
+# --> shouldn't it be the other way around??
+# since ocamldebug doesn't work with native code
 # with Dune: debug flag (-g) enabled by default
-debug: version sanity
+debug: version
 	dune build squirrel.bc
 	cp -f _build/default/squirrel.bc squirrel
 
-# TODO: implement makecoverage / coverage
+makecoverage: version
+	@mkdir -p ./_build/default/_build/_tests
+	@rm -f ./_build/default/_build/_tests/Squirrel ./_build/default/_build/_tests/latest
+	dune runtest --force --instrument-with bisect_ppx
+#	BISECT_COVERAGE=YES $(OCB) squirrel.byte
+#	@ln -s -f squirrel.byte squirrel
 
-# makecoverage: version sanity
-# 	BISECT_COVERAGE=YES $(OCB) test.exe
-# 	@mkdir -p ./_build/_tests
-# 	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
-# 	./alcotest.exe --compact
-# 	BISECT_COVERAGE=YES $(OCB) squirrel.byte
-# 	@ln -s -f squirrel.byte squirrel
-
-# coverage: makecoverage ok_test
-# 	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
-# 	bisect-ppx-report html --ignore-missing-files
-# 	rm -f *.coverage
-
-# %.cmo: sanity
-# 	$(OCB) $@
+coverage: makecoverage ok_test
+	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
+	bisect-ppx-report html --ignore-missing-files
+	rm -f *.coverage
 
 install: version squirrel
 	cp squirrel.byte ~/.local/bin/squirrel.byte
 
 doc: squirrel
+	echo "generating documentation in _build/default/_doc/_html/squirrellib@7bbf1d328548/Squirrellib/index.html"
 	dune build @doc-private
-# Dune puts the doc in the path below (why this hash? dunno)
-# _build/default/_doc/_html/squirrellib@7bbf1d328548/Squirrellib/index.html
-
-sanity: # _build/requirements
 
 version:
 	rm -f src/commit.ml
 	sed 's/GITHASH/$(GITHASH)/' < src/commit.ml.in > src/commit.ml
 
-# check that requirements are installed
-# NOTE: Dune automatically provides this kind of help, so this looks obsolete
-# PLEASE="Please install $$pkg, e.g. using \"opam install $$pkg\"."
-# _build/requirements: Makefile
-# 	@(echo -n "Checking for menhir... " ; \
-# 	  which menhir ) || ( \
-# 	  pkg=menhir ; echo $(PLEASE) ; \
-# 	  false )
-# 	@for pkg in fmt ocamlgraph alcotest pcre ; do \
-# 	  (echo -n "Checking for $$pkg... " ; \
-# 	   ocamlfind query $$pkg ) || ( \
-# 	   pkg=$$pkg ; echo $(PLEASE) ; \
-# 	   false ) ; \
-# 	done
-# 	mkdir -p _build
-# 	touch _build/requirements
-
-.PHONY: version clean sanity
+.PHONY: version clean

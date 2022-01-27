@@ -354,12 +354,12 @@ let fa_expand t =
   let aux : type a. a Term.term -> Equiv.equiv = function
     (* FIXME: this should be subsumed by reduce *)
     | Fun (f,_,[c;t;e]) when f = Term.f_ite && t = e ->
-      ES.[ t ]
+      [ t ]
 
     | Fun (f,_,l) -> l
 
     | Atom (`Message (_,f,g)) ->
-      ES.[ f ; g ]
+      [ f ; g ]
 
     | Diff _ -> raise No_common_head
     | _ -> raise No_FA
@@ -393,7 +393,7 @@ let fa i s =
       let t' = Term.subst subst t in
       let biframe =
         List.rev_append before
-          (Equiv.[ c' ; t' ; e ] @ after)
+          ([ c' ; t' ; e ] @ after)
       in
       [ ES.set_env !env (ES.set_equiv_goal biframe s) ]
 

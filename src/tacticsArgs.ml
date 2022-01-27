@@ -348,12 +348,6 @@ let sort_to_string  : type a. a sort -> string = function
   | Opt _ -> assert false
 
 (*------------------------------------------------------------------*)
-type counters = { message : int;
-                  boolean : int;
-                  timestamp : int;
-                  index : int;
-                  int : int;
-                  string : int}
 
 module Ms = Map.Make (struct type t = esort let compare = Stdlib.compare end)
 

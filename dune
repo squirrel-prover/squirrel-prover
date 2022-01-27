@@ -6,4 +6,6 @@
 (test
   (name test)
   (libraries squirrellib)
-  (modules test))
+  (modules test)
+  (deps (source_tree tests))
+  (instrumentation (backend bisect_ppx)))
