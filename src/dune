@@ -1,0 +1,16 @@
+(library
+ (name squirrellib)
+ ; the library_flags line just below is required to perform the side-effects
+ ; (let () = ...) that register the test suite; it is copy-pasted from
+ ; https://discuss.ocaml.org/t/dune-and-module-initialization-side-effects/4520
+ (library_flags (:standard -linkall))
+ (libraries fmt fmt.tty alcotest ocamlgraph pcre why3))
+
+(ocamllex lexer htmlLexer)
+(menhir
+ (modules parser htmlParser))
+
+;; Too many warnings, so we make them non-fatal
+(env
+  (dev
+    (flags (:standard -warn-error -A))))

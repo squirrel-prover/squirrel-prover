@@ -1,0 +1,9 @@
+(executable
+  (name squirrel)
+  (libraries squirrellib)
+  (modules squirrel))
+
+(test
+  (name test)
+  (libraries squirrellib)
+  (modules test))

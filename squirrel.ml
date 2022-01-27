@@ -1,0 +1,1 @@
+let () = Squirrellib.Main.main ()

@@ -39,7 +39,7 @@
 
 (proof-easy-config 'squirrel "squirrel"
 
- proof-prog-name		     "squirrel.byte -i"  ;; or your program
+ proof-prog-name		     "squirrel -i"  ;; or your program
  proof-terminal-string                 "."   ;; end of commands
 
  proof-script-comment-start             "(*"	;; comments
