@@ -85,9 +85,9 @@ coverage: makecoverage ok_test
 install: version squirrel
 	cp squirrel.byte ~/.local/bin/squirrel.byte
 
-doc: squirrel
-	echo "generating documentation in _build/default/_doc/_html/squirrellib@7bbf1d328548/Squirrellib/index.html"
-	dune build @doc-private
+doc: # squirrel
+	dune build @doc
+	@echo "generated documentation in _build/default/_doc/_html/squirrel/index.html"
 
 version:
 	rm -f src/commit.ml

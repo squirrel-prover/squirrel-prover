@@ -1,5 +1,6 @@
 (library
   (name squirrellib)
+  (public_name squirrel.lib)
   ; the library_flags line just below is required to perform the side-effects
   ; (let () = ...) that register the test suite; it is copy-pasted from
   ; https://discuss.ocaml.org/t/dune-and-module-initialization-side-effects/4520
