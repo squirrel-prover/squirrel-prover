@@ -559,7 +559,7 @@ let eq_atoms_valid s =
 
 let literals_unsat_smt ?(slow=false) s =
   Term.pp Format.std_formatter s.conclusion; Format.printf "\n";
-  Why3constr.literals_unsat ~slow
+  Smt.literals_unsat ~slow
     s.table
     s.system
     (Vars.to_list s.env)

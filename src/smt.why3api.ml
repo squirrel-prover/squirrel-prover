@@ -645,7 +645,7 @@ let literals_unsat ~slow table system evars msg_atoms trace_lits axioms =
   (* List.iter (fun a -> Term.pp Format.std_formatter a; Format.printf "\n") axioms; *)
   try
     match get_smt_setup () with
-    | None -> Format.printf "smt: setup issue\n"; false
+    | None -> print_endline "smt: setup issue"; false
     | Some (tm_theory, _, _) -> begin
         let task =
           build_task_bis table system evars msg_atoms trace_lits axioms tm_theory in
@@ -663,4 +663,6 @@ let literals_unsat ~slow table system evars msg_atoms trace_lits axioms =
          *   end *)
       end
   with
-  | Unsupported -> Format.printf "smt: unsupported\n"; false
+  | Unsupported ->
+    print_endline "smt: some feature is not supported by the translation";
+    false
