@@ -97,12 +97,16 @@ conditional (respectively `R` and `R1`).
 
 system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
+(** Include basic standard library, important helper lemmas and
+    setting proof mode to autoIntro=false. *)
+include Basic.
+
 (**
 This first authentication property is a reachability property expressed by a first-order
 logic formula.
 This property states that whenever a reader accepts a message (_i.e._ the
-condition of the action `R(j)` evaluates to `true`), then there must exists
-an action `T(i,k)` that was executed before the reader, and such that the input
+condition of the action `R(j)` evaluates to `true`), then there exists
+an action `T(i,k)` that has been executed before the reader, and such that the input
 of the reader corresonds to the output of this tag (and conversely).
 Note that we express this correspondence on each projection. Indeed, for some
 implementations of the pairing primitive, the equality of projections does not imply
@@ -112,7 +116,7 @@ the equality of pairs.
 goal wa_R :
   forall (j:index),
     happens(R(j)) =>
-    (cond@R(j) <=>
+    (cond@R(j) =
       (exists (i,k:index), T(i,k) < R(j) &&
        fst(output@T(i,k)) = fst(input@R(j)) &&
        snd(output@T(i,k)) = snd(input@R(j)))).
@@ -133,7 +137,7 @@ Proof.
   expand cond.
   (** We have to prove two implications (`<=>`): we thus split the proof
   in two parts. We now have two different goals to prove.*)
-  split.
+  rewrite eq_iff; split => [i k Meq].
   (** For the first implication (=>), we actually prove it separately for the
   real system (left) and the ideal system (right).*)
   project.
@@ -143,8 +147,8 @@ Proof.
   already been hashed before.nn
   The only possibility is that this hash comes from the output of a tag that
   has played before (thus the new hypothesis on timestamps).*)
-  (* LEFT *) euf Meq. by exists i,k0.
-  (* RIGHT *) euf Meq. by exists i,k.
+  (* LEFT *) euf Meq => *. by exists i,k0.
+  (* RIGHT *) euf Meq => *. by exists i,k.
   (** For the second implication (<=), the conclusion of the goal can directly
   be obtained from the hypotheses.*)
   by exists i,k.
@@ -162,27 +166,22 @@ input of the reader corresonds to the output of this tag (and conversely).
 goal wa_R1 :
   forall (j:index),
     happens(R1(j)) =>
-    cond@R1(j) <=>
+    cond@R1(j) =
     (not(exists (i,k:index), T(i,k) < R1(j) &&
       fst(output@T(i,k)) = fst(input@R1(j)) &&
       snd(output@T(i,k)) = snd(input@R1(j)))).
 Proof.
   intro *.
-  expand cond.
-  split.
-  (**
-  The second implication (<=) is trivial and is proved by contradiction.
-  More precisely, we show that the hypothesis H cannot be satisfied: with the
-  tactic `use H`, we introduce in the conclusion the negation of `H` in order
-  to show that it is derivable from the hypotheses (and thus obtain the
-  contradiction).
-  *)
-  use H. exists i,k.
+  rewrite /cond eq_not eq_iff; split => [i k Meq].
+
   (** The first implication (=>) relies on the EUF assumption and is also
   proved by contradiction. *)
-  use H. project.
-  (* LEFT *) euf Meq. by exists i,k0.
-  (* RIGHT *) euf Meq. by exists i,k.
+  project.
+  (* LEFT  *) euf Meq => *. by exists i,k0.
+  (* RIGHT *) euf Meq => *. by exists i,k.
+
+  (** The second implication (<=) is trivial. *)
+  by exists i,k.
 Qed.
 
 (**
@@ -209,9 +208,9 @@ Proof.
   (** The proof is done by induction over the timestamp `t`.
   The `induction` tactic also automatically introduces a case analysis over
   all the possible values for `t`.
-  The case `t = init` is trivial and automatically closed.
+  The first case, where `t = init`, is trivial.
   The other cases correspond to the 3 different actions of the protocol. *)
-  induction t.
+  induction t; 1: auto.
 
   (** Case where t = R(j).
   We start by expanding the macros and splitting the pairs. *)
@@ -221,12 +220,7 @@ Proof.
   formula `cond@R(j)` by an equivalent formula expressing the fact that a tag
   `T(i,k)` has played before and that the output of this tag is the message
   inputted by the reader. *)
-  equivalent
-    (cond@R(j)),
-    (exists (i,k:index), T(i,k) < R(j) &&
-       fst(output@T(i,k))=fst(input@R(j)) &&
-       snd(output@T(i,k))=snd(input@R(j))).
-  by use wa_R with j.
+  rewrite (wa_R j H).
   (** We are now able to remove this formula from the frame because the attacker
   is able to compute it using information obtained in the past. Indeed, each
   element of this formula is already available in `frame@pred(R(j))`.
@@ -237,12 +231,7 @@ Proof.
   This case is similar to the previous one. *)
   expand frame. fa 0. fa 1.
   expand exec, output.
-  equivalent
-    (cond@R1(j)),
-    (not(exists (i,k:index), T(i,k) < R1(j) &&
-       fst(output@T(i,k))=fst(input@R1(j)) &&
-       snd(output@T(i,k))=snd(input@R1(j)))).
-  by use wa_R1 with j.
+  rewrite (wa_R1 j H).
   by fadup 1.
 
   (** Case where t = T(i,k).
@@ -254,20 +243,24 @@ Proof.
   the then branch is the fresh name.
   The goal is now to prove that this condition always evaluate to `true`. *)
   prf 2.
-  yesif 2. help project.
-  (** We now project the bi-system into one goal for the left projection and
-  one goal for the right projection. Note that the 3rd conjuct (the one with
-  `nT(i,k) <> nT(i0,k0)`) is automatically simplified by Squirrel, using the
-  fact that names with different indices cannot be equal.*)
-  project.
-  (** The proof is the same on both sides.
-  We first split the conjunction in the conclusion and then have to show that
-  the equality `nT(i,k) = fst(input@R(j))` is impossible. Here, the `fresh`
-  tactic allows to conclude because `nT(i,k)` is freshly generated at each new
-  session of a tag, and since `R(j) < T(i,k)` we know that the equality cannot
-  hold. *)
-  split. by fresh Meq. by fresh Meq.
-  split. by fresh Meq. by fresh Meq.
+  yesif 2.
+  split; 1: true.
+  (** Several conjuncts must now be proved, the same tactic can be
+      used on all of them. Here are representative cases:
+
+      - In one case, `nT(i,k)` cannot occur in `input@R(j)`
+        because `R(j) < T(i,k)`.
+      - In another case, `nT(i,k) = nT(i0,k0)` implies that `i=i0` and `k=k0`,
+        contradicting `T(i0,k0)<T(i,k)`.
+
+      In both cases, the reasoning is performed by the fresh tactic on the
+      message equality hypothesis `Meq` whose negation must initially be
+      proved.
+      To be able to use (split and) fresh, we first project the goal into
+      into one goal for the left projection and one goal for the right
+      projection of the initial bi-system. *)
+  project; repeat split; intro *; by fresh Meq.
+
   (** We have now replaced the hash by a fresh name occurring nowhere else,
   so we can remove it using the `fresh` tactic. *)
   fresh 2.
