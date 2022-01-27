@@ -21,7 +21,7 @@ SECRET DATA KNOWN BY EACH PARTY
 - HSM: mkey, { k(pid), sid(pid) | pid }
 
 COMMENTS
-- The last message "otp || nonce || hmac || status" is unclear and 
+- The last message "otp || nonce || hmac || status" is unclear and
   not modelled at all and replaced by "accept".
   It was also not modelled in [1].
 
@@ -31,7 +31,7 @@ COMMENTS
 - enc is assumed to be AEAD (we do not use the associated data).
 
 - In [1], they "over-approximate in the case that the Yubikey increases the
-  session token by allowing the adversary to instantiate the rule for any 
+  session token by allowing the adversary to instantiate the rule for any
   counter value that is higher than the previous one".
   Here, we model the incrementation by 1 of the counter.
 
@@ -43,10 +43,10 @@ COMMENTS
   does not reflect the YubiHSM specification: secret identities have  to
   be protected by the YubiHSM.  Instead, we choose to keep the
   necessary information to map public to private identities in the
-  AEADs (we simply add the public identity to the AEADs plaintext).  
+  AEADs (we simply add the public identity to the AEADs plaintext).
 
 - Diff terms are here to model a real system and an ideal system.
-  The purpose of the ideal system is to replace the key inside the AEAD by a 
+  The purpose of the ideal system is to replace the key inside the AEAD by a
   dummy one, in order to be able to use the intctxt tactic for the third
   security property (injective correspondence).
 
@@ -54,16 +54,16 @@ HELPING LEMMAS
 - counter increase
 - valid decode
 
-SECURITY PROPERTIES 
+SECURITY PROPERTIES
 The 3 security properties as stated in [1].
 - Property 1: no replay counter
 - Property 2: injective correspondence
 - Property 3: monotonicity
 
-Properties 1 and 3 are established directly on the real system. 
-Property 2 is proved in 2 steps: first an equivalence is established 
-between the real system and the ideal one, and then the property 
-is proved on the ideal system. The reach equiv 
+Properties 1 and 3 are established directly on the real system.
+Property 2 is proved in 2 steps: first an equivalence is established
+between the real system and the ideal one, and then the property
+is proved on the ideal system. The reach equiv
 tactic allows one to combine these two steps, and to conclude.
 *******************************************************************************)
 set autoIntro=false.
@@ -99,7 +99,7 @@ name mkey: message
 (*------------------------------------------------------------------*)
 (* working key k(pid) of yubikey `pid`, stored inside the AEAD *)
 name k: index -> message
-(* Dummy key used in AEAD idealized so that the key does not occur in 
+(* Dummy key used in AEAD idealized so that the key does not occur in
    plaintext anymore in the idealized system *)
 name k_dummy: index -> message
 
@@ -133,7 +133,7 @@ name npr : index -> index -> message
    - an otp is sent with the current value of the counter,
    - the counter is incremented. *)
 process yubikeypress (pid:index,j:index) =
-  in(cY,x2);  
+  in(cY,x2);
   let ctr = YCtr(pid) in
   YCtr(pid) := mySucc(YCtr(pid));
   let menc = enc(<sid(pid),ctr>,npr(pid,j),k(pid)) in
@@ -143,10 +143,10 @@ process yubikeypress (pid:index,j:index) =
    - it checks whether it corresponds to a pid in its database,
    - it retrieves the AEAD and kh associated to this pid and asks the HSM to
    decode the received otp,
-   - it checks that the counter inside the otp (received from the HSM) is 
+   - it checks that the counter inside the otp (received from the HSM) is
    strictly greater than the counter associated to the token,
    - if so, this counter value is used to update the database.
-   In our modelling, the server's request to the HSM (to retrieve k(pid) 
+   In our modelling, the server's request to the HSM (to retrieve k(pid)
    and sid(pid)) has been inlined.
  *)
 process server (pid:index) =
@@ -155,8 +155,8 @@ process server (pid:index) =
   let deccipher = dec(cipher,k(pid)) in
   let xcpt = snd(deccipher) in
   if fst(x) = mpid(pid) &&
-     deccipher<>fail && 
-     fst(deccipher) = sid(pid) && 
+     deccipher<>fail &&
+     fst(deccipher) = sid(pid) &&
      SCtr(pid) ~< xcpt then
   SCtr(pid) := xcpt;
   out(cS,accept).
@@ -173,20 +173,20 @@ process write_AEAD (pid:index)=
 (*------------------------------------------------------------------*)
 (* model for the rule YSM_AEAD_YUBIKEY_OTP_DECODE of the HSM. *)
 process YSM_AEAD_YUBIKEY_OTP_DECODE (pid:index) =
-  in(cHSM,xdata); 
-  (* xdata = <<pid,kh>, <aead, otp>> with 
-       otp  = enc(<sid,cpt>,k) 
+  in(cHSM,xdata);
+  (* xdata = <<pid,kh>, <aead, otp>> with
+       otp  = enc(<sid,cpt>,k)
        aead = enc(<k,<pid,sid>>,mkey)*)
    if fst(xdata) = <mpid(pid),kh> then
     let aead = fst(snd(xdata)) in
     let otp = snd(snd(xdata)) in
 
-    let aead_dec = dec(aead,mkey) in    
+    let aead_dec = dec(aead,mkey) in
 
     let otp_dec = dec(otp,diff(fst(aead_dec), k(pid))) in
 
-    if aead_dec <> fail && 
-       otp_dec <> fail && 
+    if aead_dec <> fail &&
+       otp_dec <> fail &&
        fst(otp_dec) = snd(snd(aead_dec)) &&
        mpid(pid) = fst(snd(aead_dec))
     then
@@ -194,11 +194,11 @@ process YSM_AEAD_YUBIKEY_OTP_DECODE (pid:index) =
 
 (*------------------------------------------------------------------*)
 (* real system with ideal system *)
-system !_pid 
+system !_pid
   new rinit;
-  AEAD(pid) := 
-    enc(<diff(k(pid),k_dummy(pid)), <mpid(pid), sid(pid)>>, rinit, mkey); 
-  Setup: out(cS, accept); ( 
+  AEAD(pid) :=
+    enc(<diff(k(pid),k_dummy(pid)), <mpid(pid), sid(pid)>>, rinit, mkey);
+  Setup: out(cS, accept); (
   (!_j Plug   : yubikeyplug(pid)                 ) |
   (!_j Press  : yubikeypress(pid,j)              ) |
   (!_j Server : server(pid)                      ) |
@@ -237,14 +237,14 @@ Proof. auto. Qed.
 (* Others *)
 
 goal le_pred_lt (t, t' : timestamp): (t <= pred(t')) = (t < t').
-Proof. 
+Proof.
   by rewrite eq_iff.
 Qed.
 
-goal le_not_lt (t, t' : timestamp): 
+goal le_not_lt (t, t' : timestamp):
   t <= t' => not (t < t') => t = t'.
 Proof.
-  by case t' = init. 
+  by case t' = init.
 Qed.
 
 goal le_not_lt_charac (t, t' : timestamp):
@@ -253,25 +253,25 @@ Proof.
  by rewrite eq_iff.
 Qed.
 
-goal lt_impl_le (t, t' : timestamp): 
+goal lt_impl_le (t, t' : timestamp):
   t < t' => t <= t'.
 Proof. auto. Qed.
 
-goal le_lt (t, t' : timestamp): 
+goal le_lt (t, t' : timestamp):
   t <> t' => (t <= t') = (t < t').
-Proof. 
-  by intro *; rewrite eq_iff. 
+Proof.
+  by intro *; rewrite eq_iff.
 Qed.
 
 (*------------------------------------------------------------------*)
 (* HELPING LEMMAS - counter increase *)
 
-(* The counter SCtr(j) strictly increases when t is an action Server 
+(* The counter SCtr(j) strictly increases when t is an action Server
 performed by the server with tag j. *)
 
 goal counterIncreaseStrictly (pid,j:index):
    happens(Server(pid,j)) =>
-   cond@Server(pid,j) => 
+   cond@Server(pid,j) =>
    SCtr(pid)@pred(Server(pid,j)) ~< SCtr(pid)@Server(pid,j).
 Proof.
   auto.
@@ -293,23 +293,23 @@ Proof.
   by right; expand SCtr; noif.
 Qed.
 
-(* The counter SCpt(ped) increases (not strictly) between t' and t 
+(* The counter SCpt(ped) increases (not strictly) between t' and t
 when t' < t. *)
 goal counterIncreaseBis:
   forall (t:timestamp), forall (t':timestamp), forall (pid:index),
     happens(t) =>
     exec@t && t' < t =>
-    ( SCtr(pid)@t' ~< SCtr(pid)@t || 
+    ( SCtr(pid)@t' ~< SCtr(pid)@t ||
       SCtr(pid)@t = SCtr(pid)@t').
 Proof.
   induction.
   intro t IH0 t' pid Hap [Hexec Ht'].
-  assert (t' = pred(t) || t' < pred(t)) as H0; 
-  1: case t; constraints. 
+  assert (t' = pred(t) || t' < pred(t)) as H0;
+  1: case t; constraints.
   case H0.
 
   (* case t' = pred(t) *)
-  rewrite !H0. 
+  rewrite !H0.
 
   by apply counterIncrease.
 
@@ -321,28 +321,28 @@ Proof.
     case H3 => //.
       by left; apply orderTrans _ (SCtr(pid)@pred(t)) _.
       (* case H1 - 2/2 *)
-      left. 
+      left.
       by rewrite -H3 in H1.
 
-    case H3 => //=. 
+    case H3 => //=.
     left.
     by rewrite H1 in H3.
-    
+
     by right.
 
-  executable t => // H1. 
+  executable t => // H1.
   by apply H1.
 Qed.
 
 (*------------------------------------------------------------------------------
 SECURITY PROPERTIES 1 (no replay) AND 3 (monotonicity)
-These two properties are proved directly on the real system, since they do not 
+These two properties are proved directly on the real system, since they do not
 rely on the intctxt tactic.
 ------------------------------------------------------------------------------*)
 
 goal noreplayInv (j, j', pid:index):
    happens(Server(pid,j),Server(pid,j')) =>
-   exec@Server(pid,j') && Server(pid,j) < Server(pid,j') => 
+   exec@Server(pid,j') && Server(pid,j) < Server(pid,j') =>
    SCtr(pid)@Server(pid,j) ~< SCtr(pid)@Server(pid,j').
 Proof.
   intro Hap [Hexec Ht].
@@ -357,7 +357,7 @@ Proof.
 
   (* case Server(pid,j) < pred(Server(pid,j')) *)
   use counterIncreaseBis with pred(Server(pid,j')),Server(pid,j),pid as H2 => //.
-  case H2; 
+  case H2;
   1: by apply orderTrans _ (SCtr(pid)@pred(Server(pid,j'))) _.
 
   by rewrite H2 in *.
@@ -367,23 +367,23 @@ goal noreplay (j, j', pid:index):
   happens(Server(pid,j')) =>
   exec@Server(pid,j') =>
   Server(pid,j) <= Server(pid,j') =>
-  SCtr(pid)@Server(pid,j)= SCtr(pid)@Server(pid,j')=> 
+  SCtr(pid)@Server(pid,j)= SCtr(pid)@Server(pid,j')=>
   j = j'.
 Proof.
   intro Hap Hexec Ht Meq.
   assert (Server(pid,j) = Server(pid,j') ||
-          Server(pid,j) < Server(pid,j')) as H1 
+          Server(pid,j) < Server(pid,j')) as H1
   by constraints.
   case H1 => //.
 
-  use noreplayInv with j, j', pid as M1 => //. 
+  use noreplayInv with j, j', pid as M1 => //.
   by apply orderStrict in Meq.
 Qed.
 
 (*------------------------------------------------------------------*)
 goal monotonicity (j, j', pid:index):
   happens(Server(pid,j'),Server(pid,j)) =>
-  exec@Server(pid,j') && exec@Server(pid,j) && 
+  exec@Server(pid,j') && exec@Server(pid,j) &&
   SCtr(pid)@Server(pid,j) ~< SCtr(pid)@Server(pid,j') =>
   Server(pid,j) < Server(pid,j').
 Proof.
@@ -409,14 +409,14 @@ Qed.
 (*------------------------------------------------------------------------------
 SECURITY PROPERTY 2 (injective correspondence)
 The proof of this property is done in 2 steps.
-- We first establish the equivalence between the real system and the ideal one 
+- We first establish the equivalence between the real system and the ideal one
   (in which the key inside the AEAD are replaced by a dummy one).
   This corresponds to the goal injective_correspondence_equiv.
-- Then, we use the rule REACH-EQUIV (through the tactic rewrite equiv) in order 
-  to replace the real system by the ideal one, so that we only have to prove the 
+- Then, we use the rule REACH-EQUIV (through the tactic rewrite equiv) in order
+  to replace the real system by the ideal one, so that we only have to prove the
   security property on the ideal system.
   This corresponds to the goal injective_correspondence.
-  
+
 Beforehand, we prove some helping lemmas:
 - valid_decode, in order to characterize when the AEAD decoding process is valid;
 - if_aux, a lemma used to rewrite a conditional;
@@ -428,9 +428,9 @@ between the real system and an ideal one, using sequences to enrich the frame.
 (* First property of AEAD decoding. *)
 goal valid_decode (t : timestamp) (pid,j : index):
   (t = Decode(pid,j) || t = Decode1(pid,j)) =>
-  happens(t) => 
+  happens(t) =>
   (aead_dec(pid,j)@t <> fail) =
-  (exists(pid0 : index), 
+  (exists(pid0 : index),
    Setup(pid0) < t &&
    AEAD(pid0)@Setup(pid0) = aead(pid,j)@t).
 Proof.
@@ -440,29 +440,29 @@ Proof.
   (* Left => Right *)
   intro AEAD_dec.
 
-  case Eq; 
+  case Eq;
   expand aead_dec;
   intctxt AEAD_dec => H //;
   intro AEAD_eq;
-  by exists pid0. 
+  by exists pid0.
 
-  (* Right => Left *) 
+  (* Right => Left *)
   intro [pid0 [Clt H]].
-  case Eq; 
+  case Eq;
   expand aead_dec;
   rewrite -H /AEAD /=;
   apply pair_ne_fail.
-Qed.  
+Qed.
 
 (* Using the `valid_decode` lemma, we can characterize when the full
    decoding check goes through. *)
 goal valid_decode_charac (t : timestamp) (pid,j : index):
   (t = Decode(pid,j) || t = Decode1(pid,j)) =>
-  happens(t) => 
+  happens(t) =>
   ( aead_dec(pid,j)@t <> fail &&
     otp_dec(pid,j)@t <> fail &&
     fst(otp_dec(pid,j)@t) = snd(snd(aead_dec(pid,j)@t)) &&
-    mpid(pid) = fst(snd(aead_dec(pid,j)@t)) ) 
+    mpid(pid) = fst(snd(aead_dec(pid,j)@t)) )
   =
   ( AEAD(pid)@Setup(pid) = aead(pid,j)@t &&
     dec(otp(pid,j)@t,k(pid)) <> fail &&
@@ -472,17 +472,17 @@ Proof.
   rewrite eq_iff; split.
 
   (* => case *)
-  intro [AEAD_dec OTP_dec Sid_eq Pid_eq]. 
+  intro [AEAD_dec OTP_dec Sid_eq Pid_eq].
   rewrite valid_decode // in AEAD_dec.
-  destruct AEAD_dec as [pid0 [Clt AEAD_dec]]. 
-  
+  destruct AEAD_dec as [pid0 [Clt AEAD_dec]].
+
   assert (pid0 = pid).
   by case Eq; use mpid_inj with pid, pid0.
   case Eq; project; auto.
 
   (* <= case *)
   intro [AEAD_dec OTP_dec Sid_eq].
-  rewrite valid_decode //. 
+  rewrite valid_decode //.
   case Eq;
   (depends Setup(pid), t by auto);
   intro Clt;
@@ -496,13 +496,13 @@ Qed.
 goal if_aux (b,b0,b1,b2 : boolean) (x,y,z,u,v:message):
    if (b && (x = y && b0 && b1 && b2)) then
      snd(dec(z,diff(fst(dec(y,u)),v))) =
-   if (b && (x = y && b0 && b1 && b2)) then 
-    snd(dec(z,diff(fst(dec(x,u)),v))). 
+   if (b && (x = y && b0 && b1 && b2)) then
+    snd(dec(z,diff(fst(dec(x,u)),v))).
 Proof.
-  case b => _ //. 
-  case b0 => _ //. 
+  case b => _ //.
+  case b0 => _ //.
   case b1 => _ //.
-  case b2 => _ //. 
+  case b2 => _ //.
   case (x = y) => U //.
 Qed.
 
@@ -510,7 +510,7 @@ set showStrengthenedHyp=true.
 
 (*------------------------------------------------------------------*)
 global goal equiv_real_ideal_enrich (t : timestamp):
-  [happens(t)] -> 
+  [happens(t)] ->
   equiv(
     frame@t,
     seq(pid:index -> AEAD(pid)@t),
@@ -521,7 +521,7 @@ global goal equiv_real_ideal_enrich (t : timestamp):
     seq(pid:index -> k(pid)),
     seq(pid:index -> k_dummy(pid))
   ).
-Proof. 
+Proof.
   dependent induction t => t Hind Hap.
   case t => Eq;
   (try (repeat destruct Eq as [_ Eq];
@@ -532,15 +532,15 @@ Proof.
 
   (* init *)
   rewrite /*.
-  by rewrite if_false in 1. 
+  by rewrite if_false in 1.
 
   (* Setup(pid) *)
   repeat destruct Eq as [_ Eq].
   splitseq 2: (fun (pid0 : index) -> pid = pid0).
-  constseq 2: 
-    (fun (pid0 : index) -> pid = pid0 && Setup(pid0) <= t) (AEAD(pid)@t) 
-    (fun (pid0 : index) -> pid <> pid0 || 
-                          (pid = pid0 && not (Setup(pid0) <= t))) zero. 
+  constseq 2:
+    (fun (pid0 : index) -> pid = pid0 && Setup(pid0) <= t) (AEAD(pid)@t)
+    (fun (pid0 : index) -> pid <> pid0 ||
+                          (pid = pid0 && not (Setup(pid0) <= t))) zero.
   by intro pid0; case (pid=pid0).
     split => pid0 /= U.
     by rewrite !if_true.
@@ -549,11 +549,11 @@ Proof.
     by rewrite if_false.
     by destruct U as [_ _].
 
-  rewrite if_then_then in 3. 
+  rewrite if_then_then in 3.
   assert (forall(pid0 : index), (not (pid = pid0) && Setup(pid0) <= t) = (Setup(pid0) < t)) as H.
-    intro pid0; case pid = pid0 => _ /=. 
-    by rewrite eq_iff. 
-    by rewrite le_lt. 
+    intro pid0; case pid = pid0 => _ /=.
+    by rewrite eq_iff.
+    by rewrite le_lt.
   rewrite H -le_pred_lt in 3.
   rewrite /AEAD in 1.
   fa 1.
@@ -562,7 +562,7 @@ Proof.
   cca1 2; 2:auto.
   rewrite !len_pair len_diff in 2.
   namelength k(pid), k_dummy(pid)=> -> /=.
-  rewrite /* in 0.    
+  rewrite /* in 0.
   by apply  Hind (pred(t)).
 
   (* Decode(pid,j) *)
@@ -570,10 +570,10 @@ Proof.
   rewrite /AEAD in 1.
   rewrite le_lt // -le_pred_lt in 2.
   depends Setup(pid), t by auto => H.
-  rewrite /frame /exec /output /cond in 0. 
+  rewrite /frame /exec /output /cond in 0.
   fa 0; fa 1; fa 1.
 
-  rewrite valid_decode_charac //. 
+  rewrite valid_decode_charac //.
   (* rewrite the content of the then branch *)
   rewrite /otp_dec /aead_dec if_aux /= in 2.
   fa 2.
@@ -588,9 +588,9 @@ Proof.
   rewrite /AEAD in 1.
   rewrite le_lt // -le_pred_lt in 2.
   depends Setup(pid), t by auto => H.
-  rewrite /frame /exec /output /cond in 0. 
+  rewrite /frame /exec /output /cond in 0.
   fa 0; fa 1; fa 1.
-  rewrite valid_decode_charac //. 
+  rewrite valid_decode_charac //.
   rewrite /otp /aead.
   fa 1. fa 1. fa 1. fa 1. fa 1.
   memseq 1 5; 1: by exists pid; rewrite if_true.
@@ -599,8 +599,8 @@ Qed.
 
 
 (*------------------------------------------------------------------*)
-axiom max_ts : 
-  exists (tmax : timestamp), 
+axiom max_ts :
+  exists (tmax : timestamp),
   happens(tmax) &&
   (forall (t : timestamp), happens(t) => t <= tmax).
 
@@ -623,16 +623,16 @@ Proof.
 Qed.
 
 
-axiom sctr_nhap (i : index, t' : timestamp) : 
+axiom sctr_nhap (i : index, t' : timestamp) :
    not happens(t') => SCtr(i)@t' = empty.
 
-axiom yctr_nhap (i : index, t' : timestamp) : 
+axiom yctr_nhap (i : index, t' : timestamp) :
    not happens(t') => YCtr(i)@t' = empty.
 
 (* default value of `exec` at timestamp not in the trace. Left arbitrary. *)
 abstract exec_dflt : boolean.
 
-axiom exec_nhap (t' : timestamp) : 
+axiom exec_nhap (t' : timestamp) :
    not happens(t') => exec@t' = exec_dflt.
 
 global goal equiv_real_ideal_enrich_tmax :
@@ -647,40 +647,40 @@ global goal equiv_real_ideal_enrich_tmax :
   )).
 Proof.
   use equiv_real_ideal_enrich_tmax0 as [tmax [[Hap C] U]].
-  exists tmax. 
-  split; 1: by split. 
+  exists tmax.
+  split; 1: by split.
   assert (forall (t' : timestamp), (t' <= tmax) = happens(t')) as Eq.
-    intro t'; rewrite eq_iff. 
-    by split; 2: intro _; apply C. 
-  rewrite Eq in U.  
+    intro t'; rewrite eq_iff.
+    by split; 2: intro _; apply C.
+  rewrite Eq in U.
 
   splitseq 3: (fun (i : index, t' : timestamp) -> happens(t')).
   splitseq 2: (fun (i : index, t' : timestamp) -> happens(t')).
   splitseq 1: (fun (t' : timestamp) -> happens(t')).
 
-  constseq 6 : 
+  constseq 6 :
     (fun (i : index, t' : timestamp) -> happens(t')) zero
     (fun (i : index, t' : timestamp) -> not happens(t')) empty.
     auto.
-    split; intro i t' _. 
-      by rewrite if_false.     
-      by rewrite if_true // sctr_nhap. 
+    split; intro i t' _.
+      by rewrite if_false.
+      by rewrite if_true // sctr_nhap.
 
-  constseq 4 : 
+  constseq 4 :
     (fun (i : index, t' : timestamp) -> happens(t')) zero
     (fun (i : index, t' : timestamp) -> not happens(t')) empty.
     auto.
-    split; intro i t' _. 
-      by rewrite if_false.     
-      by rewrite if_true // yctr_nhap. 
+    split; intro i t' _.
+      by rewrite if_false.
+      by rewrite if_true // yctr_nhap.
 
-  constseq 2 : 
+  constseq 2 :
     (fun (t' : timestamp) -> happens(t')) false
     (fun (t' : timestamp) -> not happens(t')) exec_dflt.
     auto.
-    split; intro t' _. 
-      by rewrite if_false.     
-      by rewrite if_true // exec_nhap. 
+    split; intro t' _.
+      by rewrite if_false.
+      by rewrite if_true // exec_nhap.
 
   by apply U.
 Qed.
@@ -709,11 +709,11 @@ goal [left] injective_correspondence (j, pid:index):
    happens(Server(pid,j)) =>
    exec@Server(pid,j) =>
      exists (i:index),
-       Press(pid,i) < Server(pid,j) && 
-       YCtr(pid)@pred(Press(pid,i)) = SCtr(pid)@Server(pid,j) && 
+       Press(pid,i) < Server(pid,j) &&
+       YCtr(pid)@pred(Press(pid,i)) = SCtr(pid)@Server(pid,j) &&
        forall (j':index), happens(Server(pid,j')) =>
          exec@Server(pid,j') =>
-         YCtr(pid)@pred(Press(pid,i)) = SCtr(pid)@Server(pid,j') => 
+         YCtr(pid)@pred(Press(pid,i)) = SCtr(pid)@Server(pid,j') =>
          j = j'.
 Proof.
   intro Hap.
@@ -723,64 +723,64 @@ Proof.
   expand exec, cond.
   destruct Hexec as [Hexecpred [[Mneq1 Mneq2] Hcpt Hpid]].
   expand deccipher.
-  intctxt Mneq2 => //.   
+  intctxt Mneq2 => //.
   intro Ht M1 Eq.
   exists j0.
-  split => //. 
-  
-  intro j' Hap' Hexec'. 
-  
-  intro Eq => //.  
+  split => //.
+
+  intro j' Hap' Hexec'.
+
+  intro Eq => //.
   assert (SCtr(pid)@Server(pid,j) = SCtr(pid)@Server(pid,j')) as Meq by auto.
-  
-  assert (Server(pid,j) = Server(pid,j') || 
-          Server(pid,j) < Server(pid,j') || 
-          Server(pid,j) > Server(pid,j')) => //. 
-  case H => //. 
-  
-  (* 1st case: Server(pid,j) < Server(pid,j') *) 
-  assert (Server(pid,j) = pred(Server(pid,j')) || 
+
+  assert (Server(pid,j) = Server(pid,j') ||
+          Server(pid,j) < Server(pid,j') ||
+          Server(pid,j) > Server(pid,j')) => //.
+  case H => //.
+
+  (* 1st case: Server(pid,j) < Server(pid,j') *)
+  assert (Server(pid,j) = pred(Server(pid,j')) ||
           Server(pid,j) < pred(Server(pid,j'))) by constraints.
-  case H0 => //. 
-  
-  
+  case H0 => //.
+
+
   (* Server(pid,j) = pred(Server(pid,j') < Server(pid,j') *)
   use counterIncreaseStrictly with pid, j' => //.
   rewrite H0 in *.
   by apply orderStrict in Meq.
-  
-  (* Server(pid,j) < pred(Server(pid,j'))  < Server(pid,j') *) 
-  use counterIncreaseStrictly with pid, j' => //. 
-  use counterIncreaseBis with pred(Server(pid,j')), Server(pid,j), pid => //. 
+
+  (* Server(pid,j) < pred(Server(pid,j'))  < Server(pid,j') *)
+  use counterIncreaseStrictly with pid, j' => //.
+  use counterIncreaseBis with pred(Server(pid,j')), Server(pid,j), pid => //.
   case H2.
-  
-  use orderTrans with 
-     SCtr(pid)@Server(pid,j), 
-     SCtr(pid)@pred(Server(pid,j')), 
+
+  use orderTrans with
+     SCtr(pid)@Server(pid,j),
+     SCtr(pid)@pred(Server(pid,j')),
      SCtr(pid)@Server(pid,j') => //.
   by apply orderStrict in Meq.
-  
-  rewrite H2 in *. 
+
+  rewrite H2 in *.
   by apply orderStrict in Meq.
-  
+
   (* 2nd case: Server(pid,j) > Server(pid,j')  *)
-  assert (pred(Server(pid,j)) = Server(pid,j') 
+  assert (pred(Server(pid,j)) = Server(pid,j')
           || pred(Server(pid,j)) > Server(pid,j')) by constraints.
-  case H0 => //. 
-  
+  case H0 => //.
+
   (* Server(pid,j) > pred(Server(pid,j)) = Server(pid,j') *)
   use counterIncreaseStrictly with pid, j as H1 => //.
   clear Eq Hexec' Mneq1 Mneq2 exec M1 Hpid Hexecpred Hcpt Hap' Hap Ht H.
   by apply orderStrict in H1.
-  
-  (* Server(pid,j)  > pred(Server(pid,j)) >  Server(pid,j') *) 
+
+  (* Server(pid,j)  > pred(Server(pid,j)) >  Server(pid,j') *)
   use counterIncreaseStrictly with pid, j => //.
-  use counterIncreaseBis with pred(Server(pid,j)), Server(pid,j'), pid  => //. 
-  case H2. 
-  
+  use counterIncreaseBis with pred(Server(pid,j)), Server(pid,j'), pid  => //.
+  case H2.
+
   apply orderTrans _ _ (SCtr(pid)@Server(pid,j)) in H2; 1: auto.
-  rewrite eq_sym in Meq. 
+  rewrite eq_sym in Meq.
   by apply orderStrict in Meq.
-  
+
   by apply orderStrict in H1.
 Qed.

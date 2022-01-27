@@ -2,12 +2,12 @@
 RUNNING EXAMPLE
 
 This protocol is a variant of the OSK protocol described in:
-M. Ohkubo, K. Suzuki, S. Kinoshita et al., 
-“Cryptographic approach to “privacy-friendly” tags,” 
+M. Ohkubo, K. Suzuki, S. Kinoshita et al.,
+“Cryptographic approach to “privacy-friendly” tags,”
 RFID privacy workshop, vol. 82. Cambridge, USA, 2003.
 
 Each tag is associated to a mutable state sT initialized with s0.
-Readers have access to a database containing an entry sR for each authorized 
+Readers have access to a database containing an entry sR for each authorized
 tag.
 
          sT := H(sT,k)
@@ -17,14 +17,14 @@ T -> R : G(sT,k')
 R -> T : ok
 
 COMMENTS
-- In this model we use two keyed hash functions H and G with fixed keys k and 
+- In this model we use two keyed hash functions H and G with fixed keys k and
 k', instead of two not keyed hash functions as in the specification.
 We address this issue in the file `running-ex-oracle.sp` by adding a process in
 order to provide the attacker the ability to compute hashes with their
 respective keys (without knowing these keys).
 
-HELPING LEMMAS 
-- last update 
+HELPING LEMMAS
+- last update
 - disjoint chains
 
 SECURITY PROPERTIES
@@ -50,10 +50,10 @@ process tag(i:index) =
   out(cT,G(sT(i),k'))
 
 process reader =
-  in(cT,x); 
-  try find ii such that x = G(H(sR(ii),k),k') in 
-    sR(ii):=H(sR(ii),k); 
-    out(cR,ok) 
+  in(cT,x);
+  try find ii such that x = G(H(sR(ii),k),k') in
+    sR(ii):=H(sR(ii),k);
+    out(cR,ok)
 
 system (!_i !_j T: tag(i) | !_jj R: reader).
 
@@ -64,30 +64,30 @@ Each lemma has two versions, one for the tag and one for the reader.
 We describe below the tag's lemmas, the reader's lemmas are similar. *)
 
 (* lastupdate_pure_tag
-This lemmas reasons on the order of actions in the execution trace (i.e. pure 
-trace formulas). It states that a timestamp tau either happens before any 
-action T(i,j), or there exists an action T(i,j) such that T(i,j) is the last 
+This lemmas reasons on the order of actions in the execution trace (i.e. pure
+trace formulas). It states that a timestamp tau either happens before any
+action T(i,j), or there exists an action T(i,j) such that T(i,j) is the last
 action of the form T(i,_) that happens before tau (i.e. any other T(i,j') that
 happens before tau actually happens before T(i,j)). *)
 
-(* lastupdate_init_tag 
-This lemma states that, for any timestamp tau, if no tag T(i,j) has yet played, 
+(* lastupdate_init_tag
+This lemma states that, for any timestamp tau, if no tag T(i,j) has yet played,
 then sT(i)@tau = sT(i)@init. *)
 
-(* lastupdate_T 
-This lemma states that, for any timestamp tau, if T(i,j) is the last action of 
+(* lastupdate_T
+This lemma states that, for any timestamp tau, if T(i,j) is the last action of
 the form T(i,_) that happens before tau, then sT(i)@tau = sT(i)@T(i,j). *)
 
-(* lastupdateTag 
+(* lastupdateTag
 This lemma brings together all previous lemmas. For any timestamp tau:
 - either no tag T(i,j) has played before, in that case sT(i)@tau = sT(i)@init;
-- or there exists an action T(i,j) such that T(i,j) is the last action of the 
+- or there exists an action T(i,j) such that T(i,j) is the last action of the
 form T(i,_) that happens before tau, in that case sT(i)@tau = sT(i)@T(i,j). *)
 
 goal lastupdate_pure_tag (i:index,tau:timestamp):
    happens(tau) => (
     (forall j:index, happens(T(i,j)) => T(i,j)>tau) ||
-    (exists j:index, happens(T(i,j)) && T(i,j)<=tau && 
+    (exists j:index, happens(T(i,j)) && T(i,j)<=tau &&
       forall j':index, happens(T(i,j')) && T(i,j')<=tau => T(i,j')<=T(i,j))).
 Proof.
   induction tau => tau IH Hap.
@@ -100,7 +100,7 @@ Proof.
   intro [i0 j Eq]; subst tau, T(i0,j).
     (* 1st case: i<>i0 *)
     case (i<>i0) => //.
-    intro Neq. 
+    intro Neq.
     use IH with pred(T(i0,j)) => //.
     destruct H as [H1 | [j0 H2]].
       left; intro j0 HapT; by use H1 with j0.
@@ -139,8 +139,8 @@ Qed.
 goal lastupdate_pure_reader (ii:index,tau:timestamp):
   happens(tau) => (
     (forall jj:index, happens(R(jj,ii)) => R(jj,ii)>tau) ||
-    (exists jj:index, happens(R(jj,ii)) && R(jj,ii)<=tau && 
-      forall jj':index, 
+    (exists jj:index, happens(R(jj,ii)) && R(jj,ii)<=tau &&
+      forall jj':index,
         happens(R(jj',ii)) && R(jj',ii)<=tau => R(jj',ii)<=R(jj,ii))).
 Proof.
   induction tau => tau IH Hap.
@@ -190,7 +190,7 @@ Qed.
 
 goal lastupdate_init_tag (i:index,tau:timestamp):
   happens(tau) => (
-    (forall j:index, happens(T(i,j)) => T(i,j)>tau)) 
+    (forall j:index, happens(T(i,j)) => T(i,j)>tau))
       => sT(i)@tau = sT(i)@init.
 Proof.
   induction tau => tau IH Htau.
@@ -214,8 +214,8 @@ Proof.
     by use H0 with j0.
 
   (* R(jj,ii) *)
-  intro HR. 
-  repeat destruct HR as [_ HR]. 
+  intro HR.
+  repeat destruct HR as [_ HR].
   rewrite HR /sT in *.
   intro Hyp.
   apply IH => //.
@@ -224,8 +224,8 @@ Proof.
 
   (* R1(jj) *)
   (* same proof script as above *)
-  intro HR. 
-  repeat destruct HR as [_ HR]. 
+  intro HR.
+  repeat destruct HR as [_ HR].
   rewrite HR /sT in *.
   intro Hyp.
   apply IH => //.
@@ -235,7 +235,7 @@ Qed.
 
 goal lastupdate_init_reader (ii:index,tau:timestamp):
   happens(tau) => (
-    (forall jj:index, happens(R(jj,ii)) => R(jj,ii)>tau)) 
+    (forall jj:index, happens(R(jj,ii)) => R(jj,ii)>tau))
       => sR(ii)@tau = sR(ii)@init.
 Proof.
   induction tau => tau IH Htau.
@@ -273,7 +273,7 @@ Proof.
 Qed.
 
 goal lastupdate_T (i:index, j:index, tau:timestamp):
-    (happens(tau) && T(i,j)<=tau && 
+    (happens(tau) && T(i,j)<=tau &&
       forall j':index, happens(T(i,j')) && T(i,j')<=tau => T(i,j')<=T(i,j))
     => sT(i)@tau = sT(i)@T(i,j).
 Proof.
@@ -295,27 +295,27 @@ Proof.
     noif.
     auto.
     use IH with pred(T(i0,j0)) => //.
-    intro /= _ _. 
+    intro /= _ _.
     by apply Hyp.
 
   (* R(jj,ii) *)
   intro [jj ii HR]; rewrite HR in *.
   expand sT.
   use IH with pred(R(jj,ii)) => //.
-  intro /= _ _. 
+  intro /= _ _.
   by apply Hyp.
 
   (* R1(jj) *)
   intro [jj HR1]; rewrite HR1 in *.
   expand sT.
   use IH with pred(R1(jj)) => //.
-  intro /= _ _. 
+  intro /= _ _.
   by apply Hyp.
 Qed.
 
 goal lastupdate_R (ii:index, jj:index, tau:timestamp):
-    (happens(tau) && R(jj,ii)<=tau && 
-      forall jj':index, 
+    (happens(tau) && R(jj,ii)<=tau &&
+      forall jj':index,
         happens(R(jj',ii)) && R(jj',ii)<=tau => R(jj',ii)<=R(jj,ii))
     => sR(ii)@tau = sR(ii)@R(jj,ii).
 Proof.
@@ -329,7 +329,7 @@ Proof.
   intro [i j HT]; rewrite HT in *.
   expand sR.
   use IH with pred(T(i,j)) => //.
-  intro /= _ _. 
+  intro /= _ _.
   by apply Hyp.
 
   (* R(jj0,ii0) *)
@@ -345,58 +345,58 @@ Proof.
     noif.
     auto.
     use IH with pred(R(jj0,ii0)) => //.
-    intro /= _ _. 
+    intro /= _ _.
     by apply Hyp.
 
   (* R1(jj0) *)
   intro [jj0 HR1]; rewrite HR1 in *.
   expand sR.
   use IH with pred(R1(jj0)) => //.
-  intro /= _ _. 
+  intro /= _ _.
   by apply Hyp.
 Qed.
 
 goal lastupdateTag (i:index,tau:timestamp):
   happens(tau) => (
     (sT(i)@tau = sT(i)@init && forall j:index, happens(T(i,j)) => T(i,j)>tau) ||
-    (exists j:index, 
-      sT(i)@tau = sT(i)@T(i,j) && T(i,j)<=tau && 
+    (exists j:index,
+      sT(i)@tau = sT(i)@T(i,j) && T(i,j)<=tau &&
         forall j':index, happens(T(i,j')) && T(i,j')<=tau => T(i,j')<=T(i,j))).
 Proof.
   intro Htau.
   use lastupdate_pure_tag with i, tau as [Hinit | [j [HTj1 HTj2 HTj3]]] => //.
-    left. 
+    left.
     simpl.
     by apply lastupdate_init_tag.
-    
+
     right.
-    exists j. 
+    exists j.
     simpl.
     by apply lastupdate_T.
 Qed.
 
 goal lastupdateReader (ii:index,tau:timestamp):
   happens(tau) => (
-    (sR(ii)@tau = sR(ii)@init && 
+    (sR(ii)@tau = sR(ii)@init &&
       forall jj:index, happens(R(jj,ii)) => R(jj,ii)>tau) ||
-    (exists jj:index, 
-      sR(ii)@tau = sR(ii)@R(jj,ii) && R(jj,ii)<=tau && 
-        forall jj':index, 
+    (exists jj:index,
+      sR(ii)@tau = sR(ii)@R(jj,ii) && R(jj,ii)<=tau &&
+        forall jj':index,
           happens(R(jj',ii)) && R(jj',ii)<=tau => R(jj',ii)<=R(jj,ii))).
 Proof.
   intro Htau.
   use lastupdate_pure_reader with ii, tau as [Hinit | [jj [HTj1 HTj2 HTj3]]] => //.
-    left.  
+    left.
     simpl.
     by apply lastupdate_init_reader.
 
     right.
-    exists jj. 
+    exists jj.
     simpl.
     by apply lastupdate_R.
 Qed.
 
-(* The following lemma states that values of different memory cells do not 
+(* The following lemma states that values of different memory cells do not
 overlap, relying on the collision resistance of the hash function. *)
 
 goal disjoint_chains (tau',tau:timestamp,i',i:index) :
@@ -407,10 +407,10 @@ Proof.
   induction tau' => tau' IH tau D E Meq.
   use lastupdateTag with i,tau as [[A0 Hinit] | [j [[A0 A1] Hsup]]] => //;
   use lastupdateReader with i',tau' as [[A Hinit'] | [j' [[B C] Hsup']]] => //.
-  rewrite -Meq A0 /sR in B. 
+  rewrite -Meq A0 /sR in B.
   by fresh B.
 
-  rewrite Meq A / sT in A0. 
+  rewrite Meq A / sT in A0.
   by fresh A0.
 
   rewrite Meq B / sT in A0.
@@ -426,7 +426,7 @@ goal authentication (jj,ii:index):
    cond@R(jj,ii) =>
    exists (j:index), T(ii,j) < R(jj,ii) && output@T(ii,j) = input@R(jj,ii).
 Proof.
-  intro Hap @/cond Hcond.  
+  intro Hap @/cond Hcond.
   euf Hcond.
   intro Ht M.
   case (i=ii) => _; 1: by exists j.

@@ -11,10 +11,10 @@ Sender -> Receiver : <<msg,<SIGN,ctr>>,hmac(<ctr,msg>,sk)>
 Receiver -> Sender : input x, check x
                      ctr := ctr+1
 
-An agent has a cell which is used to store a counter. 
+An agent has a cell which is used to store a counter.
 This counter is incremented at each action (receive or send).
 
-HELPING LEMMAS 
+HELPING LEMMAS
 - counter increase
 
 SECURITY PROPERTIES
@@ -99,7 +99,7 @@ axiom orderTrans (n1,n2,n3:message): (n1 ~< n2 && n2 ~< n3) => n1 ~< n3.
 
 axiom orderStrict (n1,n2:message): n1 = n2 => n1 ~< n2 => false.
 
-axiom orderEqSucc (n1,n2:message): 
+axiom orderEqSucc (n1,n2:message):
   (n1 ~< mySucc(n2)) => ((n1 = n2) || n1 ~< n2).
 
 (* HELPING LEMMAS *)
@@ -116,7 +116,7 @@ Proof.
   auto.
 Qed.
 
-(* The counter cellA(i) strictly increases 
+(* The counter cellA(i) strictly increases
    at each action SenderA(i,j) / ReceiverA(i,j). *)
 
 goal counterIncreaseUpdateSA(i,j:index):
@@ -137,7 +137,7 @@ Proof.
   by apply orderSucc.
 Qed.
 
-(* The counter cellB(i) strictly increases 
+(* The counter cellB(i) strictly increases
    at each action SenderB(i,j) / ReceiveB(i,j). *)
 
 goal counterIncreaseUpdateSB(i,j:index):
@@ -387,7 +387,7 @@ Qed.
 (* This security property is actually stronger than the one stated in
    the GSVerif paper. The send action has been done by agent B, and we
    also proved a lemma regarding counters.
-   Moreover, we use this 1st property (authentication) to prove the 
+   Moreover, we use this 1st property (authentication) to prove the
    2nd property (injectivity). *)
 
 goal authA (i,j:index) :

@@ -20,10 +20,10 @@ system (
   * Here we decompose the usual lastupdate lemma to separate the "pure" part
   * from the part that involves message equalities. *)
 
-goal lastupdate_pure : forall tau:timestamp, 
+goal lastupdate_pure : forall tau:timestamp,
   happens(tau) => (
     (forall j:index, happens(A(j)) => A(j)>tau) ||
-    (exists i:index, happens(A(i)) && A(i) <=tau && 
+    (exists i:index, happens(A(i)) && A(i) <=tau &&
      forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i))).
 Proof.
 induction.
@@ -53,9 +53,9 @@ Qed.
 
 
 goal lastupdate_init :
-  forall tau:timestamp, 
-  happens(tau) => 
-  (forall j:index, happens(A(j)) => A(j)>tau) => 
+  forall tau:timestamp,
+  happens(tau) =>
+  (forall j:index, happens(A(j)) => A(j)>tau) =>
   s@tau = s@init.
 Proof.
   induction => tau IH _ Htau.
@@ -73,7 +73,7 @@ Qed.
 
 goal lastupdate_A :
   forall (tau:timestamp,i:index),
-  happens(A(i)) && A(i)<=tau && 
+  happens(A(i)) && A(i)<=tau &&
   (forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i)) =>
   s@tau = s@A(i).
 Proof.
@@ -92,12 +92,12 @@ Proof.
   assert i=j; [2: auto | 1: by use Hsup with j].
 Qed.
 
-goal lastupdate : 
-  forall tau:timestamp, 
+goal lastupdate :
+  forall tau:timestamp,
   happens(tau) =>
     (s@tau = s@init && forall j:index, happens(A(j)) => A(j)>tau) ||
-    (exists i:index, s@tau = s@A(i) && 
-     happens(A(i)) && A(i)<=tau && 
+    (exists i:index, s@tau = s@A(i) &&
+     happens(A(i)) && A(i)<=tau &&
      forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i)).
 Proof.
   intro tau Htau.
@@ -157,10 +157,10 @@ Proof.
     use non_repeating with pred(A(i)),pred(A(i')) => //.
     by exists i'.
     by assumption.
-    
+
   (* Oracle *)
   expand frame, output, exec, cond.
-  fa 0. fa 1. fa 1. fa 1. 
+  fa 0. fa 1. fa 1. fa 1.
   prf 1; yesif 1; 2: fresh 1.
   simpl; split; project; intro i' H; try destruct H as [H|H];
     try by apply unique_queries.

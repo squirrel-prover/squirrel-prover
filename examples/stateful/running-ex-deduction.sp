@@ -108,7 +108,7 @@ include Basic.
 
 goal neq_leq_lemma (t,t':timestamp): ((not(t=t')) && t<=t') = (t<=pred(t')).
 Proof.
- rewrite eq_iff. 
+ rewrite eq_iff.
  by case t.
 Qed.
 
