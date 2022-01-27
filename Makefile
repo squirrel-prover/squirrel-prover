@@ -9,10 +9,10 @@ PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $
 
 test: squirrel alcotest okfail_test
 
-.PHONY: ok_test ok_test_end alcotest test.exe squirrel
+.PHONY: ok_test ok_test_end alcotest alcotest.exe squirrel
 
 # Directory for logging test runs
-RUNLOGDIR=_build/log
+RUNLOGDIR=_build/squirrel_log
 okfail_test:
 	rm -rf $(RUNLOGDIR)
 	@$(MAKE) -j8 okfail_test_end
@@ -43,14 +43,16 @@ tests/test_prologue.ok:
 	 ; then echo -n . ; \
 	 else echo "[FAIL] $(@:.ok=.sp)" >> tests/tests.ko ; echo -n '!' ; fi
 
-test.exe: version sanity
+alcotest.exe: version sanity
 	dune build test.exe
-	cp -f _build/default/test.exe test.exe
+	cp -f _build/default/test.exe alcotest.exe
+# Dune is confused if there is a "test.exe" file in the root directory
+# -> use different file name for the copy target to avoid this
 
-alcotest: test.exe
+alcotest: alcotest.exe
 	@mkdir -p ./_build/_tests
 	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
-	./test.exe --compact
+	./alcotest.exe --compact
 
 clean:
 	dune clean
@@ -72,13 +74,13 @@ debug: version sanity
 	dune build squirrel.bc
 	cp -f _build/default/squirrel.bc squirrel
 
-# TODO: implement makecoverage / coverage / doc
+# TODO: implement makecoverage / coverage
 
 # makecoverage: version sanity
 # 	BISECT_COVERAGE=YES $(OCB) test.exe
 # 	@mkdir -p ./_build/_tests
 # 	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
-# 	./test.exe --compact
+# 	./alcotest.exe --compact
 # 	BISECT_COVERAGE=YES $(OCB) squirrel.byte
 # 	@ln -s -f squirrel.byte squirrel
 
@@ -93,8 +95,10 @@ debug: version sanity
 install: version squirrel
 	cp squirrel.byte ~/.local/bin/squirrel.byte
 
-# doc: squirrel
-# 	$(OCB) -ocamldoc "ocamldoc -stars" squirrel.docdir/index.html
+doc: squirrel
+	dune build @doc-private
+# Dune puts the doc in the path below (why this hash? dunno)
+# _build/default/_doc/_html/squirrellib@7bbf1d328548/Squirrellib/index.html
 
 sanity: # _build/requirements
 
