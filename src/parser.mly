@@ -596,7 +596,7 @@ p_pt_arg:
 p_pt:
 | head=lsymb args=slist(p_pt_arg,empty)
     { let p_pt_loc = L.make $startpos $endpos in
-      { p_pt_head = head; p_pt_args = args; p_pt_loc; } }
+      Theory.{ p_pt_head = head; p_pt_args = args; p_pt_loc; } }
 
 /* legacy syntax for use tactic */
 pt_use_tac:
