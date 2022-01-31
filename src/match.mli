@@ -1,4 +1,28 @@
+open Utils
+
 module Sv = Vars.Sv
+
+(*------------------------------------------------------------------*)
+type term_head =
+  | HExists
+  | HForAll
+  | HSeq
+  | HFind
+  | HFun   of Symbols.fname Symbols.t
+  | HMacro of Symbols.macro Symbols.t
+  | HName  of Symbols.name  Symbols.t
+  | HDiff
+  | HVar
+  | HPred
+  | HAction
+  | HAtom of Term.ord
+  | HHappens
+
+val pp_term_head : Format.formatter -> term_head -> unit
+
+val get_head : Term.term -> term_head
+
+module Hm : Map.S with type key = term_head
 
 (*------------------------------------------------------------------*)
 (** {2 Patterns} *)

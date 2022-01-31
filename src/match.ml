@@ -58,6 +58,11 @@ let get_head : term -> term_head = function
   | Term.Atom (`Index     (ord, _, _)) -> HAtom (ord :> Term.ord)
   | Term.Atom (`Happens _) -> HHappens
 
+module Hm = Map.Make(struct
+    type t = term_head
+    let compare = Stdlib.compare
+  end)
+
 (*------------------------------------------------------------------*)
 (** {2 Patterns} *)
 

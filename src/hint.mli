@@ -1,7 +1,19 @@
+open Utils
+
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
-type rewrite_db = (string * Rewrite.rw_erule) list
+type rw_hint = { 
+  name : string; 
+  rule : Rewrite.rw_erule;
+}
+
+val pp_rw_hint : Format.formatter -> rw_hint -> unit
+
+(*------------------------------------------------------------------*)
+type rewrite_db = rw_hint list Match.Hm.t
+
+val pp_rewrite_db : Format.formatter -> rewrite_db -> unit
 
 (*------------------------------------------------------------------*)
 type hint_db

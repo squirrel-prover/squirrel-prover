@@ -5,11 +5,13 @@
     - sv ⊆ FV(l)
     - ((FV(r) ∪ FV(φ)) ∩ sv) ⊆ FV(l) *)
 type rw_erule = {
-  rw_tyvars : Type.tvars;        (** type variables *)
-  rw_vars   : Vars.Sv.t;         (** term variables *)
+  rw_tyvars : Type.tvars;     (** type variables *)
+  rw_vars   : Vars.Sv.t;      (** term variables *)
   rw_conds  : Term.term list; (** premisses *)
-  rw_rw     : Term.esubst;       (** pair (source, destination) *)
+  rw_rw     : Term.esubst;    (** pair (source, destination) *)
 }
+
+val pp_rw_erule : Format.formatter -> rw_erule -> unit
 
 (*------------------------------------------------------------------*)
 val check_erule : rw_erule -> unit

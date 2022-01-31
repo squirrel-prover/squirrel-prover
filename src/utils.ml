@@ -194,6 +194,7 @@ module Map = struct
     include Map.S
 
     val add_list : (key * 'a) list -> 'a t -> 'a t 
+    val find_dflt : 'a -> key -> 'a t -> 'a
   end
 
   module Make(O : OrderedType) : S with type key = O.t = struct
@@ -201,6 +202,10 @@ module Map = struct
 
     let add_list (l : (key * 'a) list) (m : 'a t) : 'a t = 
       List.fold_left (fun m (k,v) -> add k v m) m l
+
+    let find_dflt dflt k (m : 'a t) : 'a =
+      try find k m with
+      | Not_found -> dflt
   end
 end
 

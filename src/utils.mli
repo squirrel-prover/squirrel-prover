@@ -79,6 +79,7 @@ module Map : sig
     include Map.S
 
     val add_list : (key * 'a) list -> 'a t -> 'a t 
+    val find_dflt : 'a -> key -> 'a t -> 'a
   end
 
   module Make(O : Map.OrderedType) : S with type key = O.t

@@ -354,10 +354,6 @@ exception No_FA
 
 let fa_expand t =
   let aux : Term.term -> Equiv.equiv = function
-    (* FIXME: this should be subsumed by reduce *)
-    | Fun (f,_,[c;t;e]) when f = Term.f_ite && t = e ->
-      ES.[ t ]
-
     | Fun (f,_,l) -> l
 
     | Atom (`Message (_,f,g)) ->

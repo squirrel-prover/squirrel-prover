@@ -11,11 +11,32 @@ module SE   = SystemExpr
     - sv ⊆ FV(l)
     - ((FV(r) ∪ FV(φ)) ∩ sv) ⊆ FV(l) *)
 type rw_erule = {
-  rw_tyvars : Type.tvars;        (** type variables *)
-  rw_vars   : Vars.Sv.t;         (** term variables *)
+  rw_tyvars : Type.tvars;     (** type variables *)
+  rw_vars   : Vars.Sv.t;      (** term variables *)
   rw_conds  : Term.term list; (** premisses *)
-  rw_rw     : Term.esubst;       (** pair (source, destination) *)
+  rw_rw     : Term.esubst;    (** pair (source, destination) *)
 }
+
+let pp_rw_erule fmt (rw : rw_erule) =
+  let pp_tys fmt tys = 
+    if tys = [] then () else
+      Fmt.pf fmt "[%a] " (Fmt.list Type.pp_tvar) tys
+  in
+  let pp_vars fmt vars = 
+    if Vars.Sv.is_empty vars then () else
+      Fmt.pf fmt "%a " Vars.pp_typed_list (Vars.Sv.elements vars)
+  in
+  let pp_conds fmt conds =
+    if conds = [] then () else
+      Fmt.pf fmt " when %a" (Fmt.list Term.pp) conds
+  in
+  
+  let Term.ESubst (src, dst) = rw.rw_rw in
+  Fmt.pf fmt "%a%a: %a -> %a%a"
+    pp_tys rw.rw_tyvars
+    pp_vars rw.rw_vars
+    Term.pp src Term.pp dst
+    pp_conds rw.rw_conds
 
 (*------------------------------------------------------------------*)
 (** Check that the rule is correct. *)
