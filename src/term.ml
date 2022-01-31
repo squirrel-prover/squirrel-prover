@@ -404,21 +404,6 @@ let mk_lambda evs ht = match ht with
 (** {2 Typing} *)
 
 (*------------------------------------------------------------------*)
-let rec kind : term -> Type.kind = function
-  | Name _               -> Type.KMessage
-  | Macro (s,_,_)        -> Type.KMessage
-  | Seq _                -> Type.KMessage
-  | Var v                -> Vars.kind v
-  | Pred _               -> Type.KTimestamp
-  | Action _             -> Type.KTimestamp
-  | Diff (a, b)          -> kind a
-  | Find (a, b, c, d)    -> Type.KMessage
-  | Atom _               -> Type.KMessage
-  | ForAll _             -> Type.KMessage
-  | Exists _             -> Type.KMessage
-  | Fun (_,fty,_)        -> Type.KMessage
-
-(*------------------------------------------------------------------*)
 let ty ?ty_env (t : term) : Type.ty =
   let must_close, ty_env = match ty_env with
     | None        -> true, Type.Infer.mk_env ()
@@ -1518,18 +1503,16 @@ include Smart
 
 let mk_atom : ord -> term -> term -> term =
   fun ord t1 t2 ->
-  match kind t1, kind t2 with
-  | Type.KMessage, Type.KMessage ->
-    Atom (`Message (as_ord_eq ord, t1, t2))
-
-  | Type.KIndex, Type.KIndex ->
+  match ty t1, ty t2 with
+  | Type.Index, Type.Index ->
     let v1, v2 = oget (destr_var t1), oget (destr_var t2) in
     Atom (`Index (as_ord_eq ord, v1, v2))
 
-  | Type.KTimestamp, Type.KTimestamp ->
+  | Type.Timestamp, Type.Timestamp ->
     Atom (`Timestamp (ord, t1, t2))
 
-  | _ -> assert false
+  | _, _ ->
+    Atom (`Message (as_ord_eq ord, t1, t2))
 
 let mk_happens t = Atom (`Happens t)
 

@@ -60,35 +60,31 @@ let pp_name_occ fmt (occ : name_occ) : unit =
 
 (** Looks for indices at which a name occurs.
     Raise @Var_found if a term variable occurs in the term. *)
-let get_name_indices_ext : 
-  ?fv:Sv.t ->
-  Constr.trace_cntxt ->
-  Symbols.name Symbols.t ->
-  Term.term ->
-  name_occs
+let get_name_indices_ext 
+    ?(fv=Sv.empty)
+    (constr : Constr.trace_cntxt)
+    (nsymb : Symbols.name Symbols.t)
+    (t : Term.term)
+  : name_occs
   =
-  fun ?(fv=Sv.empty) constr nsymb t ->
+  let rec get (t : Term.term) ~(fv:Sv.t) ~(cond:Term.term) : name_occs =
+    match t with
+    | Term.Var v when not (Type.is_finite (Vars.ty v)) ->
+      raise Var_found
 
-  let rec get :
-    Term.term -> fv:Sv.t -> cond:Term.term -> name_occs =
-    fun t ~fv ~cond ->
-      match t with
-      | Term.Var v when (Vars.kind v) = Type.KMessage ->
-        raise Var_found
+    | Term.Name ns when ns.s_symb = nsymb ->
+      let occ = Iter.{
+          occ_cnt  = ns.s_indices;
+          occ_vars = fv;
+          occ_cond = cond; }
+      in
+      [occ]
 
-      | Term.Name ns when ns.s_symb = nsymb ->
-        let occ = Iter.{
-            occ_cnt  = ns.s_indices;
-            occ_vars = fv;
-            occ_cond = cond; }
-        in
-        [occ]
-
-      | _ ->
-        Iter.tfold_occ ~mode:(`Delta constr)
-          (fun ~fv ~cond t occs ->
-             get t ~fv ~cond @ occs
-          ) ~fv ~cond t []
+    | _ ->
+      Iter.tfold_occ ~mode:(`Delta constr)
+        (fun ~fv ~cond t occs ->
+           get t ~fv ~cond @ occs
+        ) ~fv ~cond t []
   in
   get t ~fv ~cond:Term.mk_true
 

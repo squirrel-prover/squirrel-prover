@@ -36,8 +36,6 @@ val norm_ty : Type.Infer.env -> var -> var
 
 val tsubst  : Type.tsubst -> var -> var
 
-val kind : var -> Type.kind
-
 val equal : var -> var -> bool
 
 (** Time-consistent: if [v] was created before [v'], then [compare v v' ≤ 0]. *)

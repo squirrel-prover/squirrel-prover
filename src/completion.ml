@@ -280,7 +280,7 @@ and cterm_of_var i = ccst (Cst.Cmvar i)
 
 (*------------------------------------------------------------------*)
 let index_of_cterm i = match i.cnt with
-  | Ccst (Cst.Cmvar m) -> assert (Vars.kind m = Type.KIndex); m
+  | Ccst (Cst.Cmvar m) -> assert (Vars.ty m = Type.Index); m
   | _ -> assert false
     
 let indices_of_cterms cis = List.map index_of_cterm cis

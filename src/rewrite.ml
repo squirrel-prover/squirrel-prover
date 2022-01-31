@@ -97,10 +97,7 @@ let _rewrite_head
   =
   let (l, r) : Term.term * Term.term =
     match rule.rw_rw with
-    | Term.ESubst (l, r) ->
-      if not (Term.kind t = Term.kind l) then raise NoRW;
-
-      l, r
+    | Term.ESubst (l, r) -> l, r
   in
 
   let pat =
@@ -123,10 +120,7 @@ let rewrite_head
     (rule   : rw_erule)
     (t      : Term.term) : (Term.term * Term.term list) option
   =
-  if not (Term.kind t = Type.KMessage) then 
-    None
-  else
-    try Some (_rewrite_head table system rule t) with NoRW -> None
+  try Some (_rewrite_head table system rule t) with NoRW -> None
 
 (*------------------------------------------------------------------*)
   type rw_res = [

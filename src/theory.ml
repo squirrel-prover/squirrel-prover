@@ -312,7 +312,7 @@ type conversion_error_i =
   | BadNamespace         of string * Symbols.namespace
   | Freetyunivar
   | UnknownTypeVar       of string
-  | BadPty               of Type.kind list
+  | BadPty               of Type.ty list
   | BadInfixDecl
   | PatNotAllowed
   | ExplicitTSInProc
@@ -337,8 +337,8 @@ let pp_error_i ppf = function
   | UndefinedOfKind (s,n) ->
     Fmt.pf ppf "%a %s is undefined" Symbols.pp_namespace n s
 
-  | Type_error (s, sort) ->
-    Fmt.pf ppf "Term %a is not of type %a" pp_i s Type.pp sort
+  | Type_error (s, ty) ->
+    Fmt.pf ppf "Term %a is not of type %a" pp_i s Type.pp ty
 
   | Timestamp_expected t ->
     Fmt.pf ppf "The term %a must be given a timestamp" pp_i t
@@ -384,8 +384,8 @@ let pp_error_i ppf = function
     Fmt.pf ppf "undefined type variable %s" ty
 
   | BadPty l ->
-    Fmt.pf ppf "type must be of kind %a"
-      (Fmt.list ~sep:Fmt.comma Type.pp_kind) l
+    Fmt.pf ppf "type must be of type %a"
+      (Fmt.list ~sep:Fmt.comma Type.pp) l
 
   | BadInfixDecl -> Fmt.pf ppf "bad infix symbol declaration"
 
@@ -402,7 +402,7 @@ let pp_error pp_loc_err ppf (loc,e) =
 (*------------------------------------------------------------------*)
 (** {2 Parsing types } *)
 
-let parse_p_ty0 table (tvars : Type.tvar list) (pty : p_ty) : Type.ty =
+let parse_p_ty table (tvars : Type.tvar list) (pty : p_ty) : Type.ty =
   match L.unloc pty with
   | P_message        -> Message  
   | P_boolean        -> Boolean  
@@ -424,20 +424,6 @@ let parse_p_ty0 table (tvars : Type.tvar list) (pty : p_ty) : Type.ty =
   | P_tbase tb_l ->
     let s = Symbols.BType.of_lsymb tb_l table in
     Type.TBase (Symbols.to_string s) (* TODO: remove to_string *)
-
-let parse_p_ty 
-    (tbl   : Symbols.table)
-    (tvars : Type.tvar list)
-    (pty   : p_ty)
-    (kind  : Type.kind) 
-  : Type.ty 
-  =
-  let ty = parse_p_ty0 tbl tvars pty in
-
-  if Type.kind ty <> kind then 
-    conv_err (L.loc pty) (BadPty [kind]);
-
-  ty
 
 
 (*------------------------------------------------------------------*)
@@ -776,7 +762,7 @@ let convert_bnds env (vars : (lsymb * Type.ty) list) =
   env, List.rev v_acc
 
 let convert_p_bnds table ty_vars env (vars : (lsymb * p_ty) list) =
-  let vars = List.map (fun (v,s) -> v, parse_p_ty0 table ty_vars s) vars in
+  let vars = List.map (fun (v,s) -> v, parse_p_ty table ty_vars s) vars in
   convert_bnds env vars
 
 
@@ -1330,11 +1316,11 @@ let declare_state table s (typed_args : bnds) (pty : p_ty) t =
 
   List.iter (fun v ->
       if Vars.ty v <> Type.Index then
-        conv_err (L.loc pty) (BadPty [Type.KIndex]);
+        conv_err (L.loc pty) (BadPty [Type.Index]);
     ) indices;
 
   (* parse the macro type *)
-  let ty = parse_p_ty table [] pty Type.KMessage in
+  let ty = parse_p_ty table [] pty in
 
   let t, _ = convert ~ty conv_env [] env t in
 

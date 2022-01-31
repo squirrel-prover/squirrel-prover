@@ -738,32 +738,30 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
 
     let in_tys =
       List.map (fun pty ->
-          L.loc pty, Theory.parse_p_ty0 table ty_args pty
+          L.loc pty, Theory.parse_p_ty table ty_args pty
         ) in_tys
     in
 
     let rec parse_in_tys p_tys : Type.ty list  =
       match p_tys with
       | [] -> []
-      | (loc, ty) :: in_tys -> match Type.kind ty with
-        | Type.KMessage -> ty :: parse_in_tys in_tys
-        | Type.KIndex     -> decl_error loc KDecl InvalidAbsType
-        | Type.KTimestamp -> decl_error loc KDecl InvalidAbsType
+      | (loc, ty) :: in_tys -> match ty with
+        | Type.Index     -> decl_error loc KDecl InvalidAbsType
+        | Type.Timestamp -> decl_error loc KDecl InvalidAbsType
+        | _ -> ty :: parse_in_tys in_tys
     in
 
     let rec parse_index_prefix iarr in_tys = match in_tys with
       | [] -> iarr, []
       | (_, ty) :: in_tys as in_tys0 ->
-        match Type.kind ty with
-        | Type.KIndex -> parse_index_prefix (iarr + 1) in_tys
+        match ty with
+        | Type.Index -> parse_index_prefix (iarr + 1) in_tys
         | _ -> iarr, parse_in_tys in_tys0
     in
 
     let iarr, in_tys = parse_index_prefix 0 in_tys in
 
-    let out_ty : Type.ty =
-      Theory.parse_p_ty table ty_args out_ty Type.KMessage
-    in
+    let out_ty = Theory.parse_p_ty table ty_args out_ty in
 
     Theory.declare_abstract
       table
@@ -789,7 +787,7 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
       if not (List.mem sp kws) then
         decl_error (L.loc cty.Decl.cty_space) KDecl (InvalidCtySpace kws);
 
-      let ty = Theory.parse_p_ty table [] cty.Decl.cty_ty Type.KMessage in
+      let ty = Theory.parse_p_ty table [] cty.Decl.cty_ty in
       (sp, ty)
     ) ctys
 
@@ -805,7 +803,7 @@ let declare_i table hint_db decl = match L.unloc decl with
   | Decl.Decl_channel s            -> Channel.declare table s
   | Decl.Decl_process (id,pkind,p) ->
     let pkind = List.map (fun (x,t) ->
-        let t = Theory.parse_p_ty0 table [] t in
+        let t = Theory.parse_p_ty table [] t in
         L.unloc x, t
       ) pkind in
     Process.declare table id pkind p
@@ -877,7 +875,7 @@ let declare_i table hint_db decl = match L.unloc decl with
     Theory.declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty senc sdec
 
   | Decl.Decl_name (s, a, pty) ->
-    let ty = Theory.parse_p_ty table [] pty Type.KMessage in
+    let ty = Theory.parse_p_ty table [] pty in
     Theory.declare_name table s Symbols.{ n_iarr = a; n_ty = ty; }
 
   | Decl.Decl_state (s, args, k, t) ->

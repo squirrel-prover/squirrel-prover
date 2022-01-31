@@ -1,8 +1,4 @@
-(** Kinds of types *)
-type kind =
-  | KMessage
-  | KIndex  
-  | KTimestamp
+open Utils
 
 (*------------------------------------------------------------------*)
 (** Type variables *)
@@ -54,17 +50,6 @@ let tindex     = Index
 let base s   = TBase s
 
 (*------------------------------------------------------------------*)
-let kind : ty -> kind = function
-  | Boolean   -> KMessage
-  | Index     -> KIndex
-  | Timestamp -> KTimestamp
-
-  | TVar _    -> KMessage
-  | TBase _   -> KMessage
-  | Message   -> KMessage
-  | TUnivar u -> KMessage
-
-(*------------------------------------------------------------------*)
 (** Equality relation *)
 let equal (a : ty) (b : ty) : bool =
   match a,b with
@@ -109,6 +94,11 @@ let pp (ppf : Format.formatter) : ty -> unit = function
   | TUnivar u -> pp_univar ppf u
 
 (*------------------------------------------------------------------*)
+let is_finite : ty -> bool = function
+  | Index | Timestamp -> true
+  | _ -> false
+
+(*------------------------------------------------------------------*)
 let pp_ht fmt ht = 
   let pp_seq fmt () = Fmt.pf fmt " * " in
 
@@ -122,12 +112,6 @@ let pp_ht fmt ht =
   | Lambda (ets, ty) -> 
     Fmt.pf fmt "@[<hv 2>fun %a ->@ %a@]" pp_ets ets pp ty
 
-
-(*------------------------------------------------------------------*)
-let pp_kind (ppf : Format.formatter) : kind -> unit = function
-  | KMessage   -> Fmt.pf ppf "message"
-  | KIndex     -> Fmt.pf ppf "index"
-  | KTimestamp -> Fmt.pf ppf "timestamp"
 
 (*------------------------------------------------------------------*)
 (** {2 Function symbols type} *)
@@ -263,7 +247,7 @@ end = struct
   let rec norm (env : env) (t : ty) : ty =
     match t with
     | TUnivar u ->
-      let u' = Mid.find u !env in
+      let u' = Mid.find_dflt t u !env in
       if t = u' then u' else norm env u'        
     | _ -> t
 

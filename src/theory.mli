@@ -19,10 +19,7 @@ type p_ty_i =
 
 type p_ty = p_ty_i L.located
     
-val parse_p_ty0 : Symbols.table -> Type.tvar list -> p_ty -> Type.ty 
-
-val parse_p_ty : 
-  Symbols.table -> Type.tvar list -> p_ty -> Type.kind -> Type.ty 
+val parse_p_ty : Symbols.table -> Type.tvar list -> p_ty -> Type.ty 
 
 val pp_p_ty : Format.formatter -> p_ty -> unit
 
@@ -239,7 +236,7 @@ type conversion_error_i =
   | BadNamespace         of string * Symbols.namespace
   | Freetyunivar
   | UnknownTypeVar       of string
-  | BadPty               of Type.kind list
+  | BadPty               of Type.ty list
   | BadInfixDecl
   | PatNotAllowed
   | ExplicitTSInProc 

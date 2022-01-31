@@ -1,12 +1,5 @@
 (** This modules provides the types used to type variables and terms. *)
-
-(** Kinds of types *)
-type kind =
-  | KMessage
-  | KIndex  
-  | KTimestamp
-
-val pp_kind : Format.formatter -> kind -> unit 
+open Utils
 
 (*------------------------------------------------------------------*)
 (** Type variables *)
@@ -49,6 +42,10 @@ type ty =
 val pp : Format.formatter -> ty -> unit
 
 (*------------------------------------------------------------------*)
+(** Is the type a finite type, e.g. [Index] or [Timestamp] *)
+val is_finite : ty -> bool 
+
+(*------------------------------------------------------------------*)
 (** Higher-order *)
 type hty = Lambda of ty list * ty
 
@@ -60,10 +57,7 @@ val tmessage   : ty
 val ttimestamp : ty
 val tindex     : ty
 
-val base : string -> ty
-
-val kind : ty -> kind
-   
+val base : string -> ty   
 
 (*------------------------------------------------------------------*)
 (** Sub-typing relation *)

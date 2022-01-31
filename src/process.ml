@@ -200,7 +200,7 @@ let check_proc table (env : Vars.env) p =
     | Null -> ()
 
     | New (x, ty, p) -> 
-      let ty = Theory.parse_p_ty table [] ty Type.KMessage in 
+      let ty = Theory.parse_p_ty table [] ty in 
       let env, _ = Vars.make `Shadow env ty (L.unloc x) in
       check_p ty_env env p
 
@@ -241,7 +241,7 @@ let check_proc table (env : Vars.env) p =
     | Let (x, t, ptyo, p) ->
       let ty : Type.ty = match ptyo with
         | None -> TUnivar (Type.Infer.mk_univar ty_env)
-        | Some pty -> Theory.parse_p_ty table [] pty Type.KMessage
+        | Some pty -> Theory.parse_p_ty table [] pty 
       in
       
       Theory.check table ~local:true ty_env env t ty ;
@@ -566,23 +566,24 @@ let parse_proc (system_name : System.system_name) init_table proc =
           (fun (new_env,iacc,macc) (x, ty) v ->
              let new_env, _ = make_fresh `Shadow new_env ty x in
 
-             match Type.kind ty with
-             | Type.KMessage ->
-               let v'_th = Theory.subst v tsubst in
-               let v'_tm : Term.term =
-                 conv_term table env (Term.mk_var ts) v ty in
-
-               new_env, iacc, (x, L.unloc v'_th, v'_tm) :: macc
-
-             | Type.KIndex ->
+             match ty with
+             | Type.Index ->
                let v'_th = Theory.subst v tsubst in
                let v'_tm : Term.term =
                  conv_term table env (Term.mk_var ts) v ty in
                let v'_tm = Utils.oget (Term.destr_var v'_tm) in
 
                new_env, (x, L.unloc v'_th, v'_tm) :: iacc, macc
-               
-             | _ -> assert false
+
+             | Type.Timestamp -> assert false
+
+             | _ ->
+               let v'_th = Theory.subst v tsubst in
+               let v'_tm : Term.term =
+                 conv_term table env (Term.mk_var ts) v ty in
+
+               new_env, iacc, (x, L.unloc v'_th, v'_tm) :: macc
+
           ) (env, env.isubst,env.msubst) proc_ty args
       in
 
@@ -595,7 +596,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       (table,env,p)
 
   | New (n, pty, p) ->
-    let ty = Theory.parse_p_ty table [] pty Type.KMessage in
+    let ty = Theory.parse_p_ty table [] pty in
 
     (* TODO getting a globally fresh symbol for the name
      * does not prevent conflicts with variables bound in
@@ -637,7 +638,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
   | Let (x,t,ptyo,p) ->
     let ty : Type.ty = match ptyo with
       | None -> TUnivar (Type.Infer.mk_univar env.ty_env)
-      | Some pty -> Theory.parse_p_ty table [] pty Type.KMessage
+      | Some pty -> Theory.parse_p_ty table [] pty 
     in
 
     let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in

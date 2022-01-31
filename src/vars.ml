@@ -26,8 +26,6 @@ let ty v = v.var_type
 
 let norm_ty (env : Type.Infer.env) (v : var) : var =
   { v with var_type = Type.Infer.norm env v.var_type }
-             
-let kind v = Type.kind (v.var_type)
 
 let tsubst s v = { v with var_type = Type.tsubst s v.var_type }
 

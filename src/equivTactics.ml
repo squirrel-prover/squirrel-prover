@@ -96,11 +96,9 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
     match EquivLT.convert_args s args Args.(Sort Term) with
     | Args.Arg (Term (ty, f, _)) ->
       begin
-        match Type.kind ty with
-        | Type.KTimestamp -> EquivLT.timestamp_case f s
-
-        | Type.KMessage -> bad_args ()
-        | Type.KIndex -> bad_args ()
+        match ty with
+        | Type.Timestamp -> EquivLT.timestamp_case f s
+        | _ -> bad_args ()
       end
     | _ -> bad_args ()
 
@@ -306,12 +304,7 @@ let old_or_new_induction args =
 
 (*------------------------------------------------------------------*)
 let enrich ty f l (s : ES.t) =
-  let elem : Term.term =
-    if (Term.kind f) = Type.KMessage 
-    then f
-    else hard_failure (Tactics.Failure "expected a message")
-  in
-  ES.set_equiv_goal (elem :: ES.goal_as_equiv s) s
+  ES.set_equiv_goal (f :: ES.goal_as_equiv s) s
 
 let enrich_a arg s =
   let tbl, env = ES.table s, ES.env s in
@@ -876,14 +869,12 @@ let equivalent arg s = match arg with
   | Args.Pair (t1,t2) ->
     match t1, t2 with
     | Args.Term (ty1, f1, _), Args.Term (ty2, f2, _) ->
-      match Type.kind ty1, Type.kind ty2 with
-      | Type.KMessage, Type.KMessage when ty1 = ty2 ->
+      if ty1 = ty2 then
         (* TODO: subtypes: unify ty1 and ty2 *)
         if ty1 = Type.Boolean
         then equiv_formula f1 f2 s
         else equiv_message f1 f2 s
-
-      | _ ->
+      else
         hard_failure
           (Tactics.Failure ("expected a pair of messages of the same types"))
 
@@ -1354,14 +1345,14 @@ let global_diff_eq (s : ES.t) =
         let fvars =  Vars.Sv.elements (Vars.Sv.union t.Iter.occ_vars (Term.fv subt)) in
         let pred_ts_list =
           let iter = new Fresh.get_actions ~cntxt in
-          match Term.kind subt with
-          | Type.KMessage ->
+          match Term.ty subt with
+          | Type.Index -> []
+          | Type.Timestamp -> (iter#visit_message t.Iter.occ_cond;
+                                s1 :: s2 :: iter#get_actions)
+          | _ ->
             (iter#visit_message subt;
              iter#visit_message t.Iter.occ_cond;
              iter#get_actions)
-          | Type.KTimestamp -> (iter#visit_message t.Iter.occ_cond;
-                                s1 :: s2 :: iter#get_actions)
-          | _ -> []
         in
         (* Remark that the get_actions add pred to all timestamps, to simplify. *)
         let ts_list = (List.map (fun v -> Term.mk_action v is) vs)

@@ -452,7 +452,7 @@ let get_f_messages_ext :
         in
         occs @ get m ~fv ~cond @ get k' ~fv ~cond
 
-      | Term.Var m when (Vars.kind m) = Type.KMessage -> assert false
+      | Term.Var m when not (Type.is_finite (Vars.ty m)) -> assert false
       (* SSC must have been checked first *)
 
       | _ -> occs ()
@@ -517,7 +517,7 @@ let get_macro_occs
   =
   let rec get (t : Term.term) ~(fv:Sv.t) ~(cond:Term.term) : macro_occs =
     match t with
-    | Term.Var v when (Vars.kind v) = Type.KMessage ->
+    | Term.Var v when not (Type.is_finite (Vars.ty v)) ->
       raise Var_found
 
     | Term.Macro (ms, l, ts) ->

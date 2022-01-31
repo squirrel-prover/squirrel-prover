@@ -185,12 +185,10 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
     match TraceLT.convert_args s args Args.(Sort Term) with
     | Args.Arg (Term (ty, f, _)) ->
       begin
-        match Type.kind ty with
-        | Type.KTimestamp -> TraceLT.timestamp_case f s
-
-        | Type.KMessage -> message_case f ty s
-
-        | Type.KIndex -> bad_args ()
+        match ty with
+        | Type.Timestamp -> TraceLT.timestamp_case f s
+        | Type.Index -> bad_args ()
+        | _ -> message_case f ty s
       end
     | _ -> bad_args ()
 
@@ -1795,9 +1793,9 @@ let rewrite_equiv_transform
     | None -> None
   in
   let rec aux : term -> term = fun t ->
-    match Term.kind t with
-    | Type.KTimestamp | Type.KIndex -> t
-    | Type.KMessage ->
+    match Term.ty t with
+    | Type.Timestamp | Type.Index -> t
+    | _ ->
       match assoc t with
       | None -> aux_rec t
       | Some t' -> t'

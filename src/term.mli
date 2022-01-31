@@ -176,8 +176,6 @@ val pp : Format.formatter -> term -> unit
 val pp_with_info : pp_info -> Format.formatter -> term -> unit
 
 (*------------------------------------------------------------------*)
-val kind : term -> Type.kind
-
 val ty  : ?ty_env:Type.Infer.env -> term -> Type.ty
 
 (*------------------------------------------------------------------*)

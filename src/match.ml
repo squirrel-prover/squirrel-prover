@@ -2000,8 +2000,7 @@ module E : S with type t = Equiv.form = struct
     | Term.Exists (es, term)
     | Term.ForAll (es, term)
       when List.for_all (fun v ->
-          let k = Vars.kind v in
-          k = Type.KIndex || k = Type.KTimestamp
+          Vars.ty v = Type.Index || Vars.ty v = Type.Timestamp
         ) es
       ->
       let es, subst = Term.refresh_vars `Global es in
