@@ -181,7 +181,6 @@ let is_toplevel_error ~test (e : exn) : bool =
   | Prover.Decl_error       _
   | Theory.Conv             _
   | Symbols.SymbError       _
-  | TacticsArgs.TacArgError _
   | Tactic_soft_failure     _
   | Tactic_hard_failure     _ -> not test
 
@@ -217,9 +216,6 @@ let pp_toplevel_error
 
   | Symbols.SymbError e when not test ->
     (Symbols.pp_symb_error pp_loc_error) fmt e
-
-  | TacticsArgs.TacArgError e when not test ->
-    (TacticsArgs.pp_tac_arg_error pp_loc_error) fmt e
 
   | Tactic_soft_failure (l,e) when not test ->
     Fmt.pf fmt "%aTactic failed: %a"

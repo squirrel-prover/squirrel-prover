@@ -182,8 +182,8 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
       (TraceLT.hypothesis_case ~nb:`Any id s)
 
   | _ ->
-    match TraceLT.convert_args s args Args.(Sort ETerm) with
-    | Args.Arg (ETerm (ty, f, _)) ->
+    match TraceLT.convert_args s args Args.(Sort Term) with
+    | Args.Arg (Term (ty, f, _)) ->
       begin
         match Type.kind ty with
         | Type.KTimestamp -> TraceLT.timestamp_case f s
@@ -789,13 +789,13 @@ let substitute_idx (i1 , i2 : Term.term * Term.term) s =
 let substitute_tac arg s =
   let open Args in
   match arg with
-  | Pair (ETerm (Type.Message, f1, _), ETerm (Type.Message, f2, _)) ->
+  | Pair (Term (Type.Message, f1, _), Term (Type.Message, f2, _)) ->
     substitute_mess (f1,f2) s
 
-  | Pair (ETerm (Type.Timestamp, f1, _), ETerm (Type.Timestamp, f2, _)) ->
+  | Pair (Term (Type.Timestamp, f1, _), Term (Type.Timestamp, f2, _)) ->
     substitute_ts (f1,f2) s
 
-  | Pair (ETerm (Type.Index, f1, _), ETerm (Type.Index, f2, _)) ->
+  | Pair (Term (Type.Index, f1, _), Term (Type.Index, f2, _)) ->
     substitute_idx (f1,f2) s
 
   | _ ->
@@ -814,7 +814,7 @@ let () =
                    Args.(Sort (Pair (Message, Message)))]
     ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun_arg substitute_tac)
-    Args.(Pair (ETerm, ETerm))
+    Args.(Pair (Term, Term))
 
 
 (* let eqsubst arg s =
@@ -868,14 +868,14 @@ let do_subst_eq (args : Args.parser_arg list) s : sequent list =
                 (Tactics.Failure "expected an hypothesis name")
       )
     | _ ->
-        match TraceLT.convert_args s args Args.(Sort (Pair (ETerm, ETerm))) with
-        | Args.Arg Pair (ETerm (Type.Message, f1, _), ETerm (Type.Message, f2, _)) ->
+        match TraceLT.convert_args s args Args.(Sort (Pair (Term, Term))) with
+        | Args.Arg Pair (Term (Type.Message, f1, _), Term (Type.Message, f2, _)) ->
           [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
 
-        |  Args.Arg Pair (ETerm (Type.Timestamp, f1, _), ETerm (Type.Timestamp, f2, _)) ->
+        |  Args.Arg Pair (Term (Type.Timestamp, f1, _), Term (Type.Timestamp, f2, _)) ->
           [Term.ESubst (f1,f2)],   Term.mk_atom `Eq f1 f2
 
-        |  Args.Arg Pair (ETerm (Type.Index, f1, _), ETerm (Type.Index, f2, _)) ->
+        |  Args.Arg Pair (Term (Type.Index, f1, _), Term (Type.Index, f2, _)) ->
           [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
 
         | _ ->

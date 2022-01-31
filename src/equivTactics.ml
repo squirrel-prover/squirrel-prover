@@ -93,8 +93,8 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
       (EquivLT.hypothesis_case ~nb:`Any id s)
 
   | _ ->
-    match EquivLT.convert_args s args Args.(Sort ETerm) with
-    | Args.Arg (ETerm (ty, f, _)) ->
+    match EquivLT.convert_args s args Args.(Sort Term) with
+    | Args.Arg (Term (ty, f, _)) ->
       begin
         match Type.kind ty with
         | Type.KTimestamp -> EquivLT.timestamp_case f s
@@ -305,20 +305,22 @@ let old_or_new_induction args =
     )
 
 (*------------------------------------------------------------------*)
-let enrich (arg : Theory.eterm Args.arg) (s : ES.t) =
-  match arg with
-  | Args.ETerm (ty, f, loc) ->
-    let elem : Term.term =
-      if (Term.kind f) = Type.KMessage 
-      then f
-      else hard_failure (Tactics.Failure "expected a message")
-    in
-    ES.set_equiv_goal (elem :: ES.goal_as_equiv s) s
+let enrich ty f l (s : ES.t) =
+  let elem : Term.term =
+    if (Term.kind f) = Type.KMessage 
+    then f
+    else hard_failure (Tactics.Failure "expected a message")
+  in
+  ES.set_equiv_goal (elem :: ES.goal_as_equiv s) s
 
 let enrich_a arg s =
   let tbl, env = ES.table s, ES.env s in
-  match Args.convert_args (ES.system s) tbl (ES.ty_vars s) env [arg] Args.(Sort ETerm) (`Equiv (ES.goal s)) with
-  | Args.Arg (ETerm _ as arg) -> enrich arg s
+  match 
+    Args.convert_args
+      (ES.system s) tbl (ES.ty_vars s) env [arg] 
+      Args.(Sort Term) (`Equiv (ES.goal s)) 
+  with
+  | Args.Arg (Term (ty, t, l)) -> enrich ty t l s
   | _ -> bad_args ()
 
 let enrichs args s =
@@ -771,7 +773,7 @@ let fresh_tac args = match args with
 let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
   let env = ES.env s in
   let table = ES.table s in
-  match EquivLT.convert_i s term with
+  match EquivLT.convert s term with
   (* we expect term to be a sequence *)
   | (Seq (vs, t) as term_seq), ty ->
     (* we parse the arguments ths, to create a substution for variables vs *)
@@ -877,7 +879,7 @@ let equiv_message m1 m2 (s : ES.t) =
 let equivalent arg s = match arg with
   | Args.Pair (t1,t2) ->
     match t1, t2 with
-    | Args.ETerm (ty1, f1, _), Args.ETerm (ty2, f2, _) ->
+    | Args.Term (ty1, f1, _), Args.Term (ty2, f2, _) ->
       match Type.kind ty1, Type.kind ty2 with
       | Type.KMessage, Type.KMessage when ty1 = ty2 ->
         (* TODO: subtypes: unify ty1 and ty2 *)
@@ -899,7 +901,7 @@ let () = T.register_typed "equivalent"
     ~usages_sorts:[Args.(Sort (Pair (Message, Message)));
                    Args.(Sort (Pair (Boolean, Boolean)))]
     (LowTactics.genfun_of_efun_arg equivalent)
-    Args.(Pair (ETerm, ETerm))
+    Args.(Pair (Term, Term))
 
 
 (*------------------------------------------------------------------*)
@@ -1529,7 +1531,7 @@ let const_seq
   let b_t_terms =
     List.map (fun (p_bool, p_term) ->
         let b_ty,  t_bool = EquivLT.convert_ht s p_bool in
-        let term, term_ty = EquivLT.convert_i s p_term in
+        let term, term_ty = EquivLT.convert s p_term in
         let p_bool_loc = L.loc p_bool in
 
         (* check that types are compatible *)

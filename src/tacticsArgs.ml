@@ -269,7 +269,7 @@ type _ sort =
   | Timestamp : Type.ty sort
   | Index     : [`Index] sort
 
-  | ETerm     : Theory.eterm    sort
+  | Term      : [`Term] sort
   (** Boolean, timestamp or message *)
 
   | Int       : int L.located sort
@@ -287,7 +287,7 @@ type _ arg =
 
   | Index     : Vars.var -> [`Index] arg
 
-  | ETerm     : Type.ty * Term.term * Location.t -> Theory.eterm arg
+  | Term      : Type.ty * Term.term * Location.t -> [`Term] arg
   (** A [Term.term] with its sorts. *)
 
   | Int       : int L.located -> int L.located arg
@@ -316,7 +316,7 @@ let rec cast: type a b. a sort -> b arg -> a arg =
       | Boolean  , Message _ -> t
       | Timestamp, Message _ -> t
       | Index    , Index   _ -> t
-      | ETerm    , ETerm   _ -> t
+      | Term     , Term    _ -> t
       | Int      , Int     _ -> t
       | String   , String  _ -> t
       | None     , None      -> t
@@ -330,7 +330,7 @@ let sort_to_string  : type a. a sort -> string = function
   | Boolean   -> "f"
   | Timestamp -> "ts"
   | Index     -> "idx"
-  | ETerm     -> "t"
+  | Term      -> "t"
   | Int       -> "i"
   | String    -> "H"
   | Pair _
@@ -361,7 +361,7 @@ let rec setup_counters : type a. table -> a sort -> table =
   | Boolean
   | Timestamp
   | Index
-  | ETerm
+  | Term
   | Int
   | String ->
     begin
@@ -381,7 +381,7 @@ let has_multiple_occurences  : type a. table -> a sort -> bool =
   | Boolean
   | Timestamp
   | Index
-  | ETerm
+  | Term
   | Int
   | String ->
     begin
@@ -400,7 +400,7 @@ let rec pp_aux_sort : type a. table -> table ref -> bool -> Format.formatter -> 
   | Boolean
   | Timestamp
   | Index
-  | ETerm
+  | Term
   | Int
   | String ->
     if has_multiple_occurences init_table s then
@@ -425,26 +425,6 @@ let pp_esort ppf (Sort s) =
   let counter_table = ref empty_table in
   Fmt.pf ppf "%a" (pp_aux_sort init_table counter_table false) s
 
-
-(*------------------------------------------------------------------*)
-type tac_arg_error_i =
-  | CannotConvETerm
-
-type tac_arg_error = L.t * tac_arg_error_i
-
-exception TacArgError of tac_arg_error
-
-let pp_tac_arg_error_i ppf = function
-  | CannotConvETerm -> Fmt.pf ppf "cannot convert the term as a message, \
-                                   timestamp, boolean or an index"
-
-let pp_tac_arg_error pp_loc_err ppf (loc,e) =
-  Fmt.pf ppf "%a%a"
-    pp_loc_err loc
-    pp_tac_arg_error_i e
-
-let tac_arg_error loc e = raise (TacArgError (loc,e))
-
 (*------------------------------------------------------------------*)
 
 let convert_as_lsymb parser_args = match parser_args with
@@ -454,7 +434,7 @@ let convert_as_lsymb parser_args = match parser_args with
 
 let convert_pat_arg sel sexpr conv_cntxt tyvars env p conc =
   let t, ty =
-    Theory.convert_i ~pat:true conv_cntxt tyvars env p
+    Theory.convert ~pat:true conv_cntxt tyvars env p
   in
   let pat_vars =
     Vars.Sv.filter (fun v -> Vars.is_pat v) (Term.fv t)
@@ -488,32 +468,32 @@ let convert_args sexpr table tyvars env parser_args tactic_type conc =
   let rec conv_args parser_args tactic_type env =
     match parser_args, tactic_type with
     | [Theory p], Sort Timestamp ->
-      Arg (Message (Theory.convert conv_cntxt tyvars env p Type.Timestamp, 
-                    Type.Timestamp))
+      let f, _ = Theory.convert conv_cntxt tyvars env ~ty:Type.Timestamp p in
+      Arg (Message (f, Type.Timestamp))
 
     | [TermPat (sel, p)], Sort Message ->
       let (m, ty) = convert_pat_arg sel sexpr conv_cntxt tyvars env p conc in
         Arg (Message (m, ty))
 
     | [Theory p], Sort Message ->
-      begin match Theory.convert_i conv_cntxt tyvars env p with
+      begin match Theory.convert conv_cntxt tyvars env p with
         | (t, ty) -> Arg (Message (t, ty))
         | exception Theory.(Conv (_,PatNotAllowed)) ->
           let (m, ty) = convert_pat_arg 1 sexpr conv_cntxt tyvars env p conc in
             Arg (Message (m, ty))
       end
     | [Theory p], Sort Boolean ->
-      Arg (Message (Theory.convert conv_cntxt tyvars env p Type.Boolean,
-                    Type.Boolean))
+      let f, _ = Theory.convert conv_cntxt tyvars env ~ty:Type.Boolean p in
+      Arg (Message (f, Type.Boolean))
 
-    | [Theory p], Sort ETerm ->
-      let et = match Theory.econvert conv_cntxt tyvars env p with
-        | Some (Theory.ETerm (s,t,l)) -> ETerm (s,t,l)
-        (* FIXME: this does not give any conversion error to the user. *)
-        | None -> tac_arg_error (L.loc p) CannotConvETerm
-        | exception Theory.(Conv (_,PatNotAllowed)) ->
+    | [Theory p], Sort Term ->
+      let et = 
+        try
+          let et, ty = Theory.convert conv_cntxt tyvars env p in
+          Term (ty,et,L.loc p)
+        with Theory.(Conv (_,PatNotAllowed)) ->
           let (m,ty) = convert_pat_arg 1 sexpr conv_cntxt tyvars env p conc in
-          ETerm (ty, m, L.loc p)
+          Term (ty, m, L.loc p)
       in
       Arg et
 
@@ -530,7 +510,12 @@ let convert_args sexpr table tyvars env parser_args tactic_type conc =
       raise Theory.(Conv (L.loc t, Int_expected (L.unloc t)))
 
     | [Theory p], Sort Index ->
-      Arg (Index (Theory.convert_index table tyvars env p))
+      let f = 
+        match Theory.convert conv_cntxt tyvars env ~ty:Type.Index p with
+        | Term.Var v, _ -> v
+        | _ -> Theory.conv_err (L.loc p) (Index_not_var (L.unloc p))
+      in
+      Arg (Index (f))
 
     | th1::q, Sort (Pair (Opt s1, s2)) ->
       begin match conv_args [th1] (Sort (Opt s1)) env with

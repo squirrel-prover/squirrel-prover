@@ -895,15 +895,12 @@ and convert0
     Term.mk_ands atoms
 
   | Find (vs,c,t,e) ->
-    let env, evs =
+    let env, is =
       convert_bnds state.env (List.map (fun x -> x, Type.tindex) vs)
     in
-    let is =
-      List.map (fun v ->
-          if Vars.kind v <> Type.KIndex then type_error ();
-          v
-        ) evs
-    in
+
+    List.iter (fun v -> if Vars.ty v <> Type.Index then type_error ()) is;
+
     let c = conv ~env Type.Boolean c in
     let t = conv ~env ty t in
     let e = conv ty e in
@@ -931,8 +928,8 @@ and convert0
 
     let () =
       List.iter (fun v ->
-          match Vars.kind v with
-          | Type.KIndex | Type.KTimestamp -> ()
+          match Vars.ty v with
+          | Type.Index | Type.Timestamp -> ()
           | _ -> type_error ()
         ) evs
     in
@@ -1062,8 +1059,6 @@ and conv_app
     Term.mk_action
       (get_action state.table a)
       (List.map (conv_index state) is)
-
-type eterm = ETerm : Type.ty * Term.term * L.t -> eterm
 
 (*------------------------------------------------------------------*)
 (** convert HO terms *)
@@ -1236,15 +1231,25 @@ let check
   let state = mk_state table cntxt [] env pat ty_env in
   ignore (convert state t s)
 
-(** converts and infer the type (must be a subtype of Message).
-    exported outside to Theory.ml *)
-let convert_i ?ty_env ?(pat=false) (cenv : conv_env) ty_vars env tm
-  : Term.term * Type.ty =
+(** exported outside Theory.ml *)
+let convert 
+    ?(ty     : Type.ty option)
+    ?(ty_env : Type.Infer.env option) 
+    ?(pat    : bool = false)
+    (cenv    : conv_env) 
+    (ty_vars : Type.tvars) 
+    (env     : Vars.env) 
+    (tm      : term) 
+  : Term.term * Type.ty
+  =
   let must_close, ty_env = match ty_env with
-    | None -> true, Type.Infer.mk_env ()
+    | None        -> true, Type.Infer.mk_env ()
     | Some ty_env -> false, ty_env
   in
-  let ty = Type.TUnivar (Type.Infer.mk_univar ty_env) in
+  let ty = match ty with
+    | None    -> Type.TUnivar (Type.Infer.mk_univar ty_env) 
+    | Some ty -> ty 
+  in
   let state = mk_state cenv.table cenv.cntxt ty_vars env pat ty_env in
   let t = convert state tm ty in
 
@@ -1259,55 +1264,11 @@ let convert_i ?ty_env ?(pat=false) (cenv : conv_env) ty_vars env tm
   else
     t, Type.Infer.norm ty_env ty
 
-(** exported outside Theory.ml *)
-let convert 
-    ?(ty_env : Type.Infer.env option) 
-    ?(pat    : bool = false)
-    (cenv    : conv_env) 
-    (ty_vars : Type.tvars) 
-    (env     : Vars.env) 
-    (tm      : term) 
-    (ty      : Type.ty)
-  : Term.term 
-  =
-  let must_close, ty_env = match ty_env with
-    | None        -> true, Type.Infer.mk_env ()
-    | Some ty_env -> false, ty_env
-  in
-
-  let state = mk_state cenv.table cenv.cntxt ty_vars env pat ty_env in
-  let t = convert state tm ty in
-
-  if must_close then
-    begin
-      if not (Type.Infer.is_closed state.ty_env) then
-        conv_err (L.loc tm) Freetyunivar;
-
-      Term.tsubst (Type.Infer.close ty_env) t
-    end
-  else t
-
-(** exported outside Theory.ml *)
-let econvert (cenv : conv_env) ty_vars subst t : eterm option =
-  let loc = L.loc t in
-  try let tt, ty = convert_i cenv ty_vars subst t in
-    Some (ETerm (ty, tt, loc))
-  with
-    Conv (_, PatNotAllowed) as e -> raise e
-  | Conv e -> None
-
-(** exported outside Theory.ml *)
-let convert_index table ty_vars env t =
-  let cenv = { table = table; cntxt = InGoal; } in
-  match convert cenv ty_vars env t Type.Index with
-  | Term.Var x -> x
-  | _ -> conv_err (L.loc t) (Index_not_var (L.unloc t))
-
 (*------------------------------------------------------------------*)
 (** {2 Convert equiv formulas} *)
 
 let convert_el cenv ty_vars (env : Vars.env) el : Term.term =
-  let t, _ = convert_i cenv ty_vars env el in
+  let t, _ = convert cenv ty_vars env el in
   t
 
 let convert_equiv cenv ty_vars (env : Vars.env) (e : equiv) =
@@ -1328,7 +1289,8 @@ let convert_global_formula cenv ty_vars env (p : global_formula) =
       Equiv.Atom (Equiv.Equiv (convert_equiv cenv ty_vars env e))
 
     | PReach f ->
-      Equiv.Atom (Equiv.Reach (convert cenv ty_vars env f Type.Boolean))
+      let f, _ = convert ~ty:Type.Boolean cenv ty_vars env f in
+      Equiv.Atom (Equiv.Reach f)
 
 
     | PQuant (q, bnds, e) ->
@@ -1352,7 +1314,8 @@ let parse_subst table ty_vars env (uvars : Vars.var list) (ts : term list)
   : Term.subst =
   let conv_env = { table = table; cntxt = InGoal; } in
   let f t u =
-    Term.ESubst (Term.mk_var u, convert conv_env ty_vars env t (Vars.ty u))
+    let t, _ = convert ~ty:(Vars.ty u) conv_env ty_vars env t in
+    Term.ESubst (Term.mk_var u, t)
   in
   List.map2 f ts uvars
 
@@ -1363,20 +1326,17 @@ let declare_state table s (typed_args : bnds) (pty : p_ty) t =
   let ts_init = Term.mk_action Symbols.init_action [] in
   let conv_env = { table = table; cntxt = InProc ts_init; } in
 
-  let env, evs = convert_p_bnds table [] Vars.empty_env typed_args in
+  let env, indices = convert_p_bnds table [] Vars.empty_env typed_args in
 
-  let indices : Vars.var list =
-    List.map (fun v ->
-      if Vars.kind v <> Type.KIndex then
+  List.iter (fun v ->
+      if Vars.ty v <> Type.Index then
         conv_err (L.loc pty) (BadPty [Type.KIndex]);
-      v
-      ) evs
-  in
+    ) indices;
 
   (* parse the macro type *)
   let ty = parse_p_ty table [] pty Type.KMessage in
 
-  let t = convert conv_env [] env t ty in
+  let t, _ = convert ~ty conv_env [] env t in
 
   let data = StateInit_data (indices,t) in
   let table, _ =

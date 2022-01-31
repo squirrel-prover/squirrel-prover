@@ -90,15 +90,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Conversion} *)
 
   let convert_args (s : S.sequent) args sort =
-    Args.convert_args (S.system s) (S.table s) (S.ty_vars s) (S.env s) args sort (S.wrap_conc (S.goal s))
-
-  let convert_i ?pat (s : S.sequent) term =
+    Args.convert_args 
+      (S.system s) (S.table s) (S.ty_vars s) (S.env s) 
+      args sort (S.wrap_conc (S.goal s))
+  
+  let convert (s : S.sequent) term =
     let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in
-    Theory.convert_i ?pat cenv (S.ty_vars s) (S.env s) term
-
-  let econvert (s : S.sequent) term =
-    let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in
-    Theory.econvert cenv (S.ty_vars s) (S.env s) term
+    Theory.convert cenv (S.ty_vars s) (S.env s) term
 
   let convert_ht (s : S.sequent)  ht =
     let env = S.env s in
@@ -1046,8 +1044,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | [Args.Generalize (terms, n_ips_opt)] ->
       let terms =
         List.map (fun arg ->
-            match convert_args s [Args.Theory arg] (Args.Sort Args.ETerm) with
-            | Args.Arg (Args.ETerm (_, t, _)) -> t
+            match convert_args s [Args.Theory arg] (Args.Sort Args.Term) with
+            | Args.Arg (Args.Term (_, t, _)) -> t
 
             | _ -> bad_args ()
           ) terms
@@ -1479,18 +1477,16 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Remember} *)
 
   let remember (id : Theory.lsymb) (term : Theory.term) s =
-    match econvert s term with
-    | None -> soft_failure ~loc:(L.loc term) (Failure "type error")
-    | Some (Theory.ETerm (ty, t, _)) ->
-      let env, x = make_exact ~loc:(L.loc id) (S.env s) ty (L.unloc id) in
-      let subst = [Term.ESubst (t, Term.mk_var x)] in
+    let t, ty = convert s term in
+    let env, x = make_exact ~loc:(L.loc id) (S.env s) ty (L.unloc id) in
+    let subst = [Term.ESubst (t, Term.mk_var x)] in
 
-      let s = S.subst subst (S.set_env env s) in
-      let eq =
-        Equiv.Babel.convert
-          (Term.mk_atom `Eq (Term.mk_var x) t)
-          ~src:Equiv.Local_t ~dst:S.conc_kind in
-      S.set_goal (S.Conc.mk_impl ~simpl:false eq (S.goal s)) s
+    let s = S.subst subst (S.set_env env s) in
+    let eq =
+      Equiv.Babel.convert
+        (Term.mk_atom `Eq (Term.mk_var x) t)
+        ~src:Equiv.Local_t ~dst:S.conc_kind in
+    S.set_goal (S.Conc.mk_impl ~simpl:false eq (S.goal s)) s
 
   let remember_tac_args (args : Args.parser_arg list) s : S.t list =
     match args with

@@ -284,8 +284,6 @@ val parse_subst :
   Symbols.table -> Type.tvars -> Vars.env -> Vars.var list -> term list ->
   Term.subst
 
-val convert_index : Symbols.table -> Type.tvars -> Vars.env -> term -> Vars.var
-
 (** Conversion context.
   * - [InGoal]: we are converting a term in a goal (or tactic). All
   *   timestamps must be explicitely given.
@@ -298,19 +296,16 @@ type conv_cntxt =
 type conv_env = { table : Symbols.table;
                   cntxt : conv_cntxt; }
 
-(** converts and infer the type. *)
-val convert_i : 
-  ?ty_env:Type.Infer.env ->
-  ?pat:bool ->
-  conv_env -> Type.tvars -> Vars.env -> term -> 
-  Term.term * Type.ty
-
+(** Converts and infer the type. *)
 val convert : 
+  ?ty:Type.ty ->
   ?ty_env:Type.Infer.env -> 
   ?pat:bool ->
-  conv_env -> Type.tvars -> Vars.env -> 
-  term -> Type.ty
-  -> Term.term
+  conv_env -> 
+  Type.tvars -> 
+  Vars.env -> 
+  term ->
+  Term.term * Type.ty
 
 val convert_p_bnds :
   Symbols.table -> Type.tvar list -> Vars.env -> bnds -> 
@@ -323,14 +318,6 @@ val convert_ht :
 
 val convert_global_formula :
   conv_env -> Type.tvars -> Vars.env -> global_formula -> Equiv.form
-
-(** Existantial type wrapping a converted term and its sort.
-    The location is the location of the original [Theory.term].  *)
-type eterm = ETerm : Type.ty * Term.term * L.t -> eterm
-
-(** Convert a term to any sort (tries sequentially all conversions).
-    Should return the most precise sort (i.e. [Boolean] before [Message]). *)
-val econvert : conv_env -> Type.tvars -> Vars.env -> term -> eterm option
 
 (** [find_app_terms t names] returns the sublist of [names] for which there
   * exists a subterm [Theory.App(name,_)] or [Theory.AppAt(name,_,_)] in the

@@ -410,13 +410,16 @@ let parse_proc (system_name : System.system_name) init_table proc =
    * of substitution ([isubst] and [msubst]) maintained by the
    * parsing function.
    * The special timestamp variable [ts] is used. *)
-  let conv_term : 
-    Symbols.table -> p_env -> Term.term -> 
-    Theory.term -> Type.ty -> Term.term =
-    fun table env ts t sort ->
-    let t = 
+  let conv_term 
+      (table : Symbols.table)
+      (env   : p_env)
+      (ts    : Term.term) 
+      (t     : Theory.term)
+      (ty  : Type.ty) 
+    : Term.term =
+    let t, _ = 
       Theory.convert ~ty_env:env.ty_env
-        { table = table; cntxt = InProc ts; } [] env.vars_env t sort
+        { table = table; cntxt = InProc ts; } [] env.vars_env ~ty t 
     in
     let subst = create_subst env.vars_env env.isubst env.msubst in
     Term.subst subst t

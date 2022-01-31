@@ -143,7 +143,7 @@ type _ sort =
   | Timestamp : Type.ty sort
   | Index     : [`Index] sort
 
-  | ETerm     : Theory.eterm    sort
+  | Term      : [`Term] sort
   (** Boolean, timestamp or message *)
 
   | Int       : int L.located sort
@@ -161,7 +161,7 @@ type _ arg =
 
   | Index     : Vars.var -> [`Index] arg
 
-  | ETerm     : Type.ty * Term.term * Location.t -> Theory.eterm arg
+  | Term      : Type.ty * Term.term * Location.t -> [`Term] arg
   (** A [Term.term] with its sorts. *)
 
   | Int       : int L.located -> int L.located arg
@@ -193,17 +193,3 @@ val convert_as_lsymb : parser_arg list -> lsymb option
 val convert_args :
   SystemExpr.t -> Symbols.table -> Type.tvars -> Vars.env ->
   parser_arg list -> esort -> Equiv.any_form -> earg
-
-(*------------------------------------------------------------------*)
-(** {2 Error handling} *)
-
-type tac_arg_error_i =
-  | CannotConvETerm
-
-type tac_arg_error = Location.t * tac_arg_error_i
-
-exception TacArgError of tac_arg_error
-
-val pp_tac_arg_error :
-  (Format.formatter -> Location.t -> unit) ->
-  Format.formatter -> tac_arg_error -> unit

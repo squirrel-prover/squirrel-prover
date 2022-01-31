@@ -289,11 +289,11 @@ module Mk (Args : MkArgs) : S with
           let f_arg = as_seq1 f_arg in
 
           let ty = Vars.ty f_arg in
-          let t = 
+          let t, _ = 
             Theory.convert 
               ~ty_env ~pat:true
               cenv (S.ty_vars s) (S.env s) 
-              p_arg ty
+              ~ty p_arg 
           in
 
           let new_p_vs = Sv.filter Vars.is_pat (Term.fv t) in

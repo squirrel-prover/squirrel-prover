@@ -133,7 +133,7 @@ let make table hint_db parsed_goal : statement*t =
   let formula,goal =
     match formula with
       | Local f ->
-          let f = Theory.convert conv_env ty_vars env f Type.Boolean in
+          let f, _ = Theory.convert conv_env ty_vars env ~ty:Type.Boolean f in
           let s = TS.init ~system ~table ~hint_db ~ty_vars ~env f in
           `Reach (Term.mk_forall vars f), Trace s
       | Global f ->

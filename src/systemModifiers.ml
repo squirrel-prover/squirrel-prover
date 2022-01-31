@@ -112,7 +112,7 @@ let global_rename table sdecl gf =
 let global_prf table sdecl ty_vars hash =
   let env,vars = Theory.convert_p_bnds table [] Vars.empty_env ty_vars in
   let conv_env = Theory.{ table; cntxt = InGoal } in
-  let hash, _ = Theory.convert_i conv_env [] env hash in
+  let hash, _ = Theory.convert conv_env [] env hash in
   let is = vars in
 
 
@@ -238,7 +238,7 @@ let global_prf table sdecl ty_vars hash =
 let global_cca table sdecl ty_vars enc =
   let env,vars = Theory.convert_p_bnds table [] Vars.empty_env ty_vars in
   let conv_env = Theory.{ table; cntxt = InGoal } in
-  let enc, _ = Theory.convert_i conv_env [] env enc in
+  let enc, _ = Theory.convert conv_env [] env enc in
   let is = vars in
 
 
