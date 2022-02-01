@@ -65,17 +65,12 @@ val pp_ord   : Format.formatter -> ord -> unit
 
 type ('a,'b) _atom = 'a * 'b * 'b
 
-type generic_atom = [
-  | `Happens of term
-]
-
 and term = private
   | Fun    of fsymb * Type.ftype * term list
   | Name   of nsymb
   | Macro  of msymb * term list * term
 
   | Seq    of Vars.var list * term
-  | Pred   of term
   | Action of Symbols.action Symbols.t * Vars.var list 
 
   | Var    of Vars.var
@@ -83,8 +78,6 @@ and term = private
   | Diff of term * term
 
   | Find of Vars.var list * term * term * term 
-
-  | Atom of generic_atom
 
   | ForAll of Vars.var list * term 
   | Exists of Vars.var list * term 
@@ -231,6 +224,10 @@ val frame_macro : msymb
 val cond_macro  : msymb
 val exec_macro  : msymb
 
+val f_happens : fsymb
+
+val f_pred : fsymb
+
 val f_true  : fsymb
 val f_false : fsymb
 val f_and   : fsymb
@@ -356,12 +353,12 @@ include module type of Smart
 (*------------------------------------------------------------------*)
 (** {3 Smart constructors: terms} *)
 
-val mk_pred   : term -> term
-val mk_var    : Vars.var -> term
-val mk_action : Symbols.action Symbols.t -> Vars.var list -> term
-val mk_name   : nsymb -> term
-val mk_macro  : msymb -> term list -> term -> term
-val mk_diff   : term -> term -> term
+val mk_pred    : term -> term
+val mk_var     : Vars.var -> term
+val mk_action  : Symbols.action Symbols.t -> Vars.var list -> term
+val mk_name    : nsymb -> term
+val mk_macro   : msymb -> term list -> term -> term
+val mk_diff    : term -> term -> term
 
 val mk_find : Vars.var list -> term -> term -> term -> term
 

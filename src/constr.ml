@@ -140,7 +140,7 @@ end = struct
 
   let rec uts ts = match ts with
     | Term.Var tv -> uvar tv
-    | Term.Pred ts -> upred (uts ts)
+    | Term.Fun (fs, _, [ts]) when fs = Term.f_pred -> upred (uts ts)
     | Term.Action (s,_) when s = Symbols.init_action -> uinit
     | Term.Action (s,l) -> uname s (List.map uvar l)
     | _ -> failwith "Not implemented"

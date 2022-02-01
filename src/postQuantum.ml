@@ -119,8 +119,12 @@ let is_attacker_call_synchronized cntxt models biframe =
           (Sts.empty, Sts.empty) biframe
       in
       let maximal_elems = Sts.filter (function
-          |  Term.Pred ts -> not (Sts.mem ts max_ts) (* we direclty remove pred(t) with t in the set *)
-          | _ -> true) max_ts
+          | Term.Fun (fs, _, [ts]) when fs = Term.f_pred -> 
+            not (Sts.mem ts max_ts) 
+          (* we direclty remove pred(t) with t in the set *)
+
+          | _ -> true
+        ) max_ts
       in
       let maximal_elems =
         Constr.maximal_elems ~precise:false models (Sts.elements maximal_elems)
@@ -144,7 +148,8 @@ let is_attacker_call_synchronized cntxt models biframe =
           [frame_at tau; frame_at_pred tau; input_at tau]
           @
           match tau with
-          | Term.Pred tau' -> [frame_at tau'; frame_at_pred tau'; input_at tau']
+          | Term.Fun (fs, _, [tau']) when fs = Term.f_pred -> 
+            [frame_at tau'; frame_at_pred tau'; input_at tau']
           | _ -> []
         in
         (* let rec is_in = function

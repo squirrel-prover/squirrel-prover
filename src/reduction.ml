@@ -164,11 +164,9 @@ module Mk (S : LowSequent.S) = struct
       | Term.Macro  _
       | Term.Name   _
       | Term.Fun    _
-      | Term.Pred   _
       | Term.Action _
       | Term.Var    _
-      | Term.Diff   _
-      | Term.Atom   _ -> 
+      | Term.Diff   _ -> 
         let has_red, t = 
           Term.tmap_fold (fun has_red t -> 
               let t, has_red' = reduce st t in

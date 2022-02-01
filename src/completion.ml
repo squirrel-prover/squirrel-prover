@@ -76,7 +76,6 @@ type gfsymb =
   | M of Symbols.macro  Symbols.t * Type.ty (* macro *)
   | N of Symbols.name   Symbols.t * Type.ty (* name *)
   | A of Symbols.action Symbols.t           (* action *)
-  | GPred                                   (* predecessor *)
 
 let hash_gfs = function
   | M (m, _) -> Hashtbl.hash m
@@ -95,8 +94,6 @@ let equal_gfs f1 f2 = match f1, f2 with
     (assert (t1 = t2); true) (* sanity check, for now *)
 
   | A a1, A a2 -> a1 = a2
-
-  | GPred, GPred -> true
 
   | _ -> false
 
@@ -215,7 +212,7 @@ end = struct
         | F f -> make (Ccst (Cgfuncst (`F f)))
         | A a -> make (Ccst (Cgfuncst (`A a)))
         | N (n,t) -> make (Ccst (Cgfuncst (`N (n,t))))
-        | GPred | M _ -> assert false
+        | M _ -> assert false
       end
     else make (Cfun (f, i, ts))
 
@@ -271,8 +268,6 @@ let rec cterm_of_term : Term.term -> cterm = fun c ->
 
   | Diff(c,d) -> cfun (F Symbols.fs_diff) 0 [cterm_of_term c; cterm_of_term d]
 
-  | Term.Pred ts -> cfun GPred 0 [cterm_of_term ts]
-
   | _ -> raise Unsupported_conversion
 
 and cterm_of_var i = ccst (Cst.Cmvar i)
@@ -313,11 +308,6 @@ let term_of_cterm : Symbols.table -> cterm -> Term.term =
         let ns = Term.mk_isymb n nty is in
         Term.mk_name ns
 
-      | Cfun (GPred, ari, ts) ->
-        assert (ari = 0);
-        let ts = as_seq1 ts in
-        Term.mk_pred (term_of_cterm ts)
-
       | Ccst (Cst.Cmvar m) -> Term.mk_var m
 
       | Ccst (Cst.Cgfuncst (`F f)) ->
@@ -344,7 +334,6 @@ let pp_gsymb ppf = function
   | M (x,t) -> Fmt.pf ppf "%a : %a" Symbols.pp x Type.pp t
   | A x     -> Symbols.pp ppf x
   | N (x,t) -> Symbols.pp ppf x
-  | GPred   -> Fmt.pf ppf "pred"
 
 let rec pp_cterm ppf t = match t.cnt with
   | Cvar v -> Fmt.pf ppf "v#%d" v
@@ -369,7 +358,6 @@ let rec no_macros t = match t.cnt with
 
   | Ccst _ | Cvar _ -> true
 
-  | Cfun (GPred, _, ts)
   | Cxor ts -> List.for_all no_macros ts
 
   | Cfun ((A _ | F _ | N _), _, ts) -> List.for_all no_macros ts
@@ -1490,7 +1478,6 @@ let rec is_ground_term t = match t.cnt with
 
   | Ccst _ -> true
 
-  | Cfun (GPred, _, ts)
   | Cxor ts 
   | Cfun ((A _ | F _ | N _), _, ts) -> List.for_all is_ground_term ts
 

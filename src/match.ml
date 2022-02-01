@@ -21,10 +21,7 @@ type term_head =
   | HName  of Symbols.name  Symbols.t
   | HDiff
   | HVar
-  | HPred
   | HAction
-  | HAtom of Term.ord
-  | HHappens
 
 let pp_term_head fmt = function
   | HExists   -> Fmt.pf fmt "Exists"
@@ -36,10 +33,7 @@ let pp_term_head fmt = function
   | HName  n  -> Fmt.pf fmt "Name %a"  Symbols.pp n
   | HDiff     -> Fmt.pf fmt "Diff"
   | HVar      -> Fmt.pf fmt "Var"
-  | HPred     -> Fmt.pf fmt "Pred"
   | HAction   -> Fmt.pf fmt "Action"
-  | HAtom ord -> Fmt.pf fmt "Atom %a" Term.pp_ord ord
-  | HHappens  -> Fmt.pf fmt "Happens"
 
 let get_head : term -> term_head = function
   | Term.Exists _          -> HExists
@@ -51,9 +45,7 @@ let get_head : term -> term_head = function
   | Term.Name n1           -> HName n1.Term.s_symb
   | Term.Diff _            -> HDiff
   | Term.Var _             -> HVar
-  | Term.Pred _            -> HPred
   | Term.Action _          -> HAction
-  | Term.Atom (`Happens _) -> HHappens
 
 module Hm = Map.Make(struct
     type t = term_head
@@ -491,14 +483,10 @@ module T (* : S with type t = message *) = struct
       let mv = unif_l terms (terms') { st with mv } in
       unif ts ts' { st with mv }
 
-    | Pred ts, Pred ts' -> unif ts ts' st
-
     | Action (s,is), Action (s',is') -> sunif (s,is) (s',is') st
 
     | Diff (a,b), Diff (a', b') ->
       unif_l [a;b] [a';b'] st
-
-    | Atom at, Atom at' -> atunif at at' st
 
     | Find (is, c, t, e), Find (is', pat_c, pat_t, pat_e) ->
       let s, s', st = unif_bnds is is' st in
@@ -592,11 +580,6 @@ module T (* : S with type t = message *) = struct
             { st with subst_vs = Sv.add v st.subst_vs }
           in
           unif t t' st
-
-  (** unifies an atom *)
-  and atunif (at : generic_atom) (at' : generic_atom) st : Mvar.t =
-    match at, at' with
-    | `Happens ts, `Happens ts' -> unif ts ts' st
 
   and unif_l (tl1 : term list) (tl2 : term list) (st: unif_state) : Mvar.t =
     List.fold_left2 (fun mv t1 t2 ->
@@ -724,14 +707,10 @@ module T (* : S with type t = message *) = struct
       let mv = tmatch_l terms terms' { st with mv } in
       tmatch ts ts' { st with mv }
 
-    | Pred ts, Pred ts' -> tmatch ts ts' st
-
     | Action (s,is), Action (s',is') -> smatch (s,is) (s',is') st
 
     | Diff (a,b), Diff (a', b') ->
       tmatch_l [a;b] [a';b'] st
-
-    | Atom at, Atom at' -> atmatch at at' st
 
     | Find (is, c, t, e), Find (is', pat_c, pat_t, pat_e) ->
       let s, s', st = match_bnds is is' st in
@@ -834,11 +813,6 @@ module T (* : S with type t = message *) = struct
       | t' -> 
         (* TODO: check convertible *)
         if t <> t' then no_match () else st.mv
-
-  (* matches an atom *)
-  and atmatch (at : generic_atom) (at' : generic_atom) st : Mvar.t =
-    match at, at' with
-    | `Happens ts, `Happens ts' -> tmatch ts ts' st
 
   (*------------------------------------------------------------------*)
   (** Exported 
@@ -1442,8 +1416,10 @@ module E : S with type t = Equiv.form = struct
     let rec leq t t' =
       match t,t' with
       | _ when t = t' -> true
-      | Pred t, Pred t' -> leq t t'
-      | Pred t,      t' -> leq t t'
+      | Fun (f,_, [t]), Fun (f',_, [t']) 
+        when f = f_pred && f' = f_pred ->
+        leq t t'
+      | Fun (f,_, [t]), t' when f = f_pred -> leq t t'
 
       | Action (n,is), Action (n',is') ->
         Action.depends

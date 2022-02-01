@@ -13,10 +13,7 @@ type term_head =
   | HName  of Symbols.name  Symbols.t
   | HDiff
   | HVar
-  | HPred
   | HAction
-  | HAtom of Term.ord
-  | HHappens
 
 val pp_term_head : Format.formatter -> term_head -> unit
 

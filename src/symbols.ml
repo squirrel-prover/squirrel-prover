@@ -584,6 +584,18 @@ let mk_fsymb ?fty ?(bool=false) ?(f_info=`Prefix) f arity =
 
 let fs_diff  = mk_fsymb "diff" 2
 
+(** Happens *)
+
+let fs_happens = 
+  let fty = Type.mk_ftype 0 [] [Type.Timestamp] Type.Boolean in
+  mk_fsymb ~fty "happens" (-1)
+
+(** Pred *)
+
+let fs_pred = 
+  let fty = Type.mk_ftype 0 [] [Type.Timestamp] Type.Timestamp in
+  mk_fsymb ~fty "pred" (-1)
+
 (** Boolean connectives *)
 
 let fs_false = mk_fsymb ~bool:true "false" 0

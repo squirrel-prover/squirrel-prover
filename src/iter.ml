@@ -38,9 +38,6 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
       let l = Term.subst subst l in
       self#visit_message l
 
-    | Term.Pred t 
-    | Atom (`Happens t) -> self#visit_message t 
-
     | Term.Action _ -> ()
 end
 
@@ -81,9 +78,6 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
       let _, s = Term.refresh_vars `Global vs in
       let l = Term.subst s l in
       self#fold_message x l
-
-    | Term.Pred t | Atom (`Happens t) -> 
-      self#fold_message x t
 
     | Term.Action _ -> x
 
@@ -247,11 +241,9 @@ let tfold_occ
 
   | Term.Name   _
   | Term.Fun    _
-  | Term.Pred   _
   | Term.Action _
   | Term.Var    _
-  | Term.Diff   _
-  | Term.Atom   _ ->
+  | Term.Diff   _ ->
     Term.tfold (fun t acc ->
         func ~fv ~cond t acc
       ) t acc

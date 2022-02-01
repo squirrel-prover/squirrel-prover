@@ -528,9 +528,8 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
     | Fun _ | Seq _ | Find _
     | ForAll _ | Exists _ -> super#fold_message timestamps t
 
-    | Pred _ | Action _
-    | Macro _ | Name _ | Var _ | Diff _
-    | Atom (`Happens _) -> raise Not_FADUP_iter
+    | Action _
+    | Macro _ | Name _ | Var _ | Diff _ -> raise Not_FADUP_iter
 end
 
 let fa_dup_int (i : int L.located) s =
@@ -553,10 +552,14 @@ let fa_dup_int (i : int L.located) s =
       in
 
       match f,g with
-      | (Term.Macro (fm,[], Term.Pred tau), phi) when fm = Term.exec_macro
-        -> (tau,phi)
-      | (phi, Term.Macro (fm,[], Term.Pred tau)) when fm = Term.exec_macro
-        -> (tau,phi)
+      | (Term.Macro (fm,[], Fun (fs, _, [tau])), phi) 
+        when fm = Term.exec_macro && fs = Term.f_pred -> 
+        (tau,phi)
+
+      | (phi, Term.Macro (fm,[], Fun (fs, _, [tau]))) 
+        when fm = Term.exec_macro && fs = Term.f_pred -> 
+        (tau,phi)
+
       | _ -> raise Not_FADUP_formula
     in
 
@@ -1358,8 +1361,10 @@ let global_diff_eq (s : ES.t) =
         in
         (* Remark that the get_actions add pred to all timestamps, to simplify. *)
         let ts_list = (List.map (fun v -> Term.mk_action v is) vs)
-                      @ List.map
-                        (function Term.Pred (x) -> x | t -> t) pred_ts_list in
+                      @ List.map (function
+                          | Term.Fun (fs, _, [tau]) when fs = Term.f_pred -> tau
+                          | t -> t
+                        ) pred_ts_list in
         let s1 = 
           Term.pi_term ~projection:PLeft 
             (EquivLT.expand_all_term ~force_happens:true s1 s) 

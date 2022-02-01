@@ -367,7 +367,9 @@ module Hyps = struct
   (** if [force], we add the formula to [Hyps] even if it already exists. *)
   let add_formula ?(force=false) id f (s : sequent) =
     match f with
-    | Term.Atom (`Happens ts) -> add_happens ~force id s ts
+    | Term.Fun (f, _, [ts]) when f = Term.f_happens -> 
+      add_happens ~force id s ts
+
     | _ -> add_form_aux ~force (Some id) s f
 
   let add_i npat f s =

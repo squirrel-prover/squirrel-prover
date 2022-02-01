@@ -282,6 +282,7 @@ val ftype : table -> fname t -> Type.ftype
 
 val init_action : action t
 
+(*------------------------------------------------------------------*)
 (** {3 Macro builtins} *)
 
 val inp   : macro t
@@ -290,14 +291,24 @@ val cond  : macro t
 val exec  : macro t
 val frame : macro t
 
+(*------------------------------------------------------------------*)
 (** {3 Channel builtins} *)
 
 val dummy_channel_lsymb : lsymb
 val dummy_channel : channel t
 
+(*------------------------------------------------------------------*)
 (** {3 Function symbols builtins} *)
 
-val fs_diff   : fname t
+val fs_diff : fname t
+
+(** Happens *)
+
+val fs_happens : fname t
+
+(** Pred *)
+
+val fs_pred : fname t
 
 (** Boolean connectives *)
 
