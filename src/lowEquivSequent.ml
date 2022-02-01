@@ -42,12 +42,9 @@ let conc_kind = Equiv.Global_t
   * to two frames, interpreting macros wrt the left and right systems
   * respectively. *)
 type t = {
-  vars     : Vars.env;
-  table   : Symbols.table;
-  ty_vars : Type.tvars;
+  env     : Env.t;
   hyps    : H.hyps;
   goal    : Equiv.form;
-  system  : SystemExpr.t;
   hint_db : Hint.hint_db;
 }
 
@@ -65,14 +62,14 @@ let pp_goal fmt = function
 let pp ppf j =
   Fmt.pf ppf "@[<v 0>" ;
   Fmt.pf ppf "@[Systems: %a@]@;"
-    SystemExpr.pp j.system;
+    SystemExpr.pp j.env.system;
 
-  if j.ty_vars <> [] then
+  if j.env.ty_vars <> [] then
     Fmt.pf ppf "@[Type variables: %a@]@;"
-      (Fmt.list ~sep:Fmt.comma Type.pp_tvar) j.ty_vars ;
+      (Fmt.list ~sep:Fmt.comma Type.pp_tvar) j.env.ty_vars ;
 
-  if j.vars <> Vars.empty_env then
-    Fmt.pf ppf "@[Variables: %a@]@;" Vars.pp_env j.vars ;
+  if j.env.vars <> Vars.empty_env then
+    Fmt.pf ppf "@[Variables: %a@]@;" Vars.pp_env j.env.vars ;
 
   H.pps ppf j.hyps ;
 
@@ -81,8 +78,8 @@ let pp ppf j =
   Fmt.pf ppf "@;%a@]" pp_goal j.goal
 
 let pp_init ppf j =
-  if j.vars <> Vars.empty_env then
-    Fmt.pf ppf "forall %a,@ " Vars.pp_env j.vars ;
+  if j.env.vars <> Vars.empty_env then
+    Fmt.pf ppf "forall %a,@ " Vars.pp_env j.env.vars ;
   Fmt.pf ppf "%a" Equiv.pp j.goal
 
 
@@ -179,19 +176,25 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Accessors and utils} *)
 
-let vars j = j.vars
+let update ?system ?table ?ty_vars ?vars ?hyps ?goal t =
+  let env = Env.update ?system ?table ?ty_vars ?vars t.env 
+  and hyps       = Utils.odflt t.hyps hyps
+  and goal = Utils.odflt t.goal goal in
+  { t with env; hyps; goal; } 
 
-let set_vars e j = { j with vars = e }
+let vars j = j.env.vars
 
-let system j = j.system
-let set_system system j = { j with system }
+let set_vars vars j = update ~vars j
 
-let table j = j.table
-let set_table table j = { j with table = table }
+let system j = j.env.system
+let set_system system j = update ~system j
+
+let table j = j.env.table
+let set_table table j = update ~table j
 
 let goal j = j.goal
 
-let ty_vars j = j.ty_vars
+let ty_vars j = j.env.ty_vars
 
 let hyps j = j.hyps
 
@@ -202,7 +205,7 @@ let set_goal goal j = { j with goal }
 
 let set_reach_goal f s = set_goal Equiv.(Atom (Reach f)) s
 
-let set_ty_vars ty_vars j = { j with ty_vars }
+let set_ty_vars ty_vars j = update ~ty_vars j
 
 let get_frame proj j = match j.goal with
   | Equiv.Atom (Equiv.Equiv e) ->
@@ -234,14 +237,12 @@ let goal_as_equiv s = match goal s with
   * only keep global formula hypotheses in a restricted case: the two
   * projections are the same. *)
 let to_trace_sequent s =
-  let vars = vars s in
+  let env = s.env in
   let system = system s in
   let keep_global_hyps =
     SystemExpr.project Term.PLeft  system =
     SystemExpr.project Term.PRight system
   in
-  let table   = table s in
-  let ty_vars = ty_vars s in
   let hint_db = s.hint_db in
 
   let goal = match s.goal with
@@ -251,7 +252,7 @@ let to_trace_sequent s =
         (Tactics.GoalBadShape "expected a reachability formula")
   in
 
-  let trace_s = TS.init ~system ~table ~hint_db ~ty_vars ~vars goal in
+  let trace_s = TS.init ~env ~hint_db goal in
 
   (* Add all relevant hypotheses. *)
   Hyps.fold
@@ -276,8 +277,8 @@ let get_models (s : t) =
 
 let mk_trace_cntxt (s : t) =
   Constr.{
-    table  = s.table;
-    system = s.system;
+    table  = s.env.table;
+    system = s.env.system;
     models = Some (get_models s);
   }
 
@@ -306,14 +307,14 @@ let set_equiv_goal e j =
   else new_sequent
 
 
-let init ~system ~table ~hint_db ~ty_vars ~vars ?hyp goal =
+let init ~env ~hint_db ?hyp goal =
   let hyps = H.empty in
   let hyps = match hyp with
     | None -> hyps
     | Some h ->
         snd (H.add ~force:false (H.fresh_id "H" hyps) h hyps)
   in
-  let new_sequent = { table; hint_db; system; ty_vars; vars; hyps; goal } in
+  let new_sequent = { env; hint_db; hyps; goal } in
   if Config.post_quantum () then
    check_pq_sound_sequent new_sequent
   else new_sequent

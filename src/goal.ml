@@ -110,7 +110,8 @@ let make_obs_equiv ?(enrich=[]) table hint_db name system =
   let goal = Equiv.(Atom (Equiv (term :: enrich))) in
   let happens = Term.mk_happens (Term.mk_var ts) in
   let hyp = Equiv.(Atom (Reach happens)) in
-  let s = ES.init ~system ~table ~hint_db ~ty_vars:[] ~vars ~hyp goal in
+  let env = Env.init ~system ~table ~ty_vars:[] ~vars in
+  let s = ES.init ~env ~hint_db ~hyp goal in
   `Equiv
     (Equiv.mk_forall [ts] (Equiv.(Impl (hyp,goal)))),
           Equiv s
@@ -130,15 +131,16 @@ let make table hint_db parsed_goal : statement*t =
   let vars,vs = Theory.convert_p_bnds table ty_vars Vars.empty_env vars in
 
   let conv_env = Theory.{ table; cntxt = InGoal } in
+  let env = Env.init ~system ~table ~ty_vars ~vars in
   let formula,goal =
     match formula with
       | Local f ->
           let f, _ = Theory.convert conv_env ty_vars vars ~ty:Type.Boolean f in
-          let s = TS.init ~system ~table ~hint_db ~ty_vars ~vars f in
+          let s = TS.init ~env ~hint_db f in
           `Reach (Term.mk_forall vs f), Trace s
       | Global f ->
           let f = Theory.convert_global_formula conv_env ty_vars vars f in
-          let s = ES.init ~system ~table ~hint_db ~ty_vars ~vars f in
+          let s = ES.init ~env ~hint_db f in
           `Equiv (Equiv.mk_forall vs f), Equiv s
       | Obs_equiv ->
         assert (vs = [] && ty_vars = []) ;

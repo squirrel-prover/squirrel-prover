@@ -57,17 +57,9 @@ module H = Hyps.Mk(FHyp)
 (*------------------------------------------------------------------*)
 module S : sig
   type t = private {
-    system : SystemExpr.t ;
-    table : Symbols.table;
+    env : Env.t;
 
     hint_db : Hint.hint_db;
-
-    ty_vars : Type.tvars;
-    (** Free type variables of the sequent. *)
-
-    vars : Vars.env;
-    (** Must contain all free variables of the sequent,
-      * which are logically understood as universally quantified. *)
     
     hyps : H.hyps;
     (** Hypotheses *)
@@ -77,11 +69,8 @@ module S : sig
   }
 
   val init_sequent :
-    system:SystemExpr.t ->
-    table:Symbols.table ->
+    env:Env.t ->
     hint_db:Hint.hint_db ->
-    ty_vars:Type.tvars ->
-    vars:Vars.env ->
     conclusion:Term.term ->
     t
 
@@ -96,34 +85,25 @@ module S : sig
 
 end = struct
   type t = {
-    system     : SystemExpr.t ;
-    table      : Symbols.table;
+    env        : Env.t;
     hint_db    : Hint.hint_db;
-    ty_vars    : Type.tvars;
-    vars       : Vars.env;
     (* hind_db    : Reduction. *)
     hyps       : H.hyps;
     conclusion : Term.term;
   }
 
-  let init_sequent ~system ~table ~hint_db ~ty_vars ~vars ~conclusion = {
-    system ;
-    table;
+  let init_sequent ~env ~hint_db ~conclusion = {
+    env ;
     hint_db;
-    ty_vars;
-    vars;
     hyps = H.empty;
     conclusion;
   }
 
   let update ?system ?table ?ty_vars ?vars ?hyps ?conclusion t =
-    let system     = Utils.odflt t.system system
-    and table      = Utils.odflt t.table table
-    and ty_vars    = Utils.odflt t.ty_vars ty_vars
-    and vars       = Utils.odflt t.vars vars
+    let env = Env.update ?system ?table ?ty_vars ?vars t.env 
     and hyps       = Utils.odflt t.hyps hyps
     and conclusion = Utils.odflt t.conclusion conclusion in
-    { t with system; table; ty_vars; vars; hyps; conclusion; } 
+    { t with env; hyps; conclusion; } 
 end
 
 include S
@@ -135,14 +115,14 @@ let pp ppf s =
   let open Fmt in
   pf ppf "@[<v 0>" ;
   pf ppf "@[System: %a@]@;"
-    SystemExpr.pp s.system;
+    SystemExpr.pp s.env.system;
 
-  if s.ty_vars <> [] then
+  if s.env.ty_vars <> [] then
     pf ppf "@[Type variables: %a@]@;" 
-      (Fmt.list ~sep:Fmt.comma Type.pp_tvar) s.ty_vars ;
+      (Fmt.list ~sep:Fmt.comma Type.pp_tvar) s.env.ty_vars ;
 
-  if s.vars <> Vars.empty_env then
-    pf ppf "@[Variables: %a@]@;" Vars.pp_env s.vars ;
+  if s.env.vars <> Vars.empty_env then
+    pf ppf "@[Variables: %a@]@;" Vars.pp_env s.env.vars ;
 
   (* Print hypotheses *)
   H.pps ppf s.hyps ;
@@ -319,8 +299,8 @@ module Hyps = struct
   let rec add_macro_defs (s : sequent) f =
     let macro_eqs : (Term.term * Term.term) list ref = ref [] in
     let cntxt = Constr.{ 
-        table = s.table;
-        system = s.system;
+        table = s.env.table;
+        system = s.env.system;
         models = None;
       } in
         
@@ -434,10 +414,10 @@ module Hyps = struct
 end
 
 (*------------------------------------------------------------------*)
-let vars    s = s.vars
-let ty_vars s = s.ty_vars
-let system  s = s.system
-let table   s = s.table
+let vars    s = s.env.vars
+let ty_vars s = s.env.ty_vars
+let system  s = s.env.system
+let table   s = s.env.table
 
 let set_vars   a      s = S.update ~vars:a        s
 let set_system system s = S.update ~system:system s 
@@ -493,8 +473,8 @@ let set_goal a s =
         Hyps.add_macro_defs s a
       | _ -> s
 
-let init ~system ~table ~hint_db ~ty_vars ~vars conclusion =
-  init_sequent ~system ~table ~hint_db ~ty_vars ~vars ~conclusion
+let init ~env ~hint_db conclusion =
+  init_sequent ~env ~hint_db ~conclusion
 
 let goal s = s.conclusion
 
@@ -522,7 +502,7 @@ let get_eqs_neqs s =
 
 let get_trs_t s : Completion.state Utils.timeout_r =
   let eqs,_ = get_eqs_neqs s in
-  Completion.complete s.table eqs 
+  Completion.complete s.env.table eqs 
 
 let get_trs s = Tactics.timeout_get (get_trs_t s)
 
