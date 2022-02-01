@@ -59,11 +59,8 @@ let check_erule (rule : rw_erule) : unit =
 let pat_to_rw_erule ?loc dir (p : Term.term Match.pat) : rw_erule =
   let subs, f = Term.decompose_impls_last p.pat_term in
 
-  let e = match f with
-    | Term.Atom (`Message   (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
-    | Term.Atom (`Timestamp (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
-    | Term.Atom (`Index     (`Eq, t1, t2)) ->
-      Term.ESubst (Term.mk_var t1,Term.mk_var t2)
+  let e = match Term.destr_eq f with
+    | Some (t1, t2) -> Term.ESubst (t1,t2)
     | _ -> Tactics.hard_failure ?loc (Tactics.Failure "not an equality")
   in
 

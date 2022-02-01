@@ -18,18 +18,21 @@ class collect_max_ts ~(cntxt:Constr.trace_cntxt) = object (self)
   inherit [Sts.t * Sts.t] Iter.fold ~cntxt as super
 
   method extract_ts_atoms phi =
-    List.partition
-      (function Term.Atom (`Timestamp _) -> true | _ -> false)
-      (Term.decompose_ands phi)
+    List.partition (fun t ->
+        match Term.form_to_xatom t with
+        | Some at when Term.ty_xatom at = Type.Timestamp -> true
+        | _ -> false
+      ) (Term.decompose_ands phi)
 
   (* Given a set of atoms, returns a list of ts that are smaller than other
      timestamps. *)
   method add_atoms atoms  =
     List.fold_left
-      (fun (smaller_acc) at -> match at with
-         | Term.Atom (`Timestamp (`Leq,tau_1,tau_2)) ->
+      (fun (smaller_acc) at -> 
+         match Term.form_to_xatom at with
+         | Some (`Comp (`Leq,tau_1,tau_2)) ->
            Sts.add tau_1 smaller_acc
-         | Atom (`Timestamp (`Lt,tau_1,tau_2)) ->
+         | Some (`Comp (`Lt,tau_1,tau_2)) ->
             Sts.add tau_1 smaller_acc
         | _ -> smaller_acc)
       Sts.empty

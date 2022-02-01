@@ -242,6 +242,10 @@ module Smart : Term.SmartFO with type form = _form = struct
     mk_exists l f
 
   (*------------------------------------------------------------------*)
+  let mk_eq  ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_eq  ?simpl f1 f2))
+  let mk_leq ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_leq ?simpl f1 f2))
+
+  (*------------------------------------------------------------------*)
   (** {3 Destructors} *)
 
   let destr_quant q = function
@@ -316,27 +320,6 @@ module Smart : Term.SmartFO with type form = _form = struct
     | _ -> None
 
   (*------------------------------------------------------------------*)
-  let is_false f = todo ()
-  let is_true  f = todo ()
-  let is_zero  f = todo ()
-  let is_not   f = false
-  let is_and   f = destr_and  f <> None
-  let is_or    f = destr_or   f <> None
-  let is_impl  f = destr_impl f <> None
-
-  let is_forall = function Quant (ForAll, _, _) -> true | _ -> false
-  let is_exists = function
-    | Quant (Exists, _, _) -> true
-    | Atom (Reach f) ->
-        Term.Smart.is_exists f &&
-        Term.is_pure_timestamp f
-    | _ -> false
-
-  let is_matom = function
-    | Atom (Reach f) -> Term.is_matom f
-    | _ -> false
-
-  (*------------------------------------------------------------------*)
 
   (** Lifts a (many) destructor over [Impl], [And] or [Or] when one of the
       two formulas is a pure trace model formula. *)
@@ -380,9 +363,43 @@ module Smart : Term.SmartFO with type form = _form = struct
     in
     destr
 
-  let destr_matom = function
-    | Atom (Reach f) -> Term.destr_matom f
+  let destr_eq = function
+    | Atom (Reach f) -> Term.destr_eq f
     | _ -> None
+
+  let destr_neq = function
+    | Atom (Reach f) -> Term.destr_eq f
+    | _ -> None
+
+  let destr_leq = function
+    | Atom (Reach f) -> Term.destr_eq f
+    | _ -> None
+
+  let destr_lt = function
+    | Atom (Reach f) -> Term.destr_eq f
+    | _ -> None
+
+  (*------------------------------------------------------------------*)
+  let is_false f = todo ()
+  let is_true  f = todo ()
+  let is_zero  f = todo ()
+  let is_not   f = false
+  let is_and   f = destr_and  f <> None
+  let is_or    f = destr_or   f <> None
+  let is_impl  f = destr_impl f <> None
+
+  let is_forall = function Quant (ForAll, _, _) -> true | _ -> false
+  let is_exists = function
+    | Quant (Exists, _, _) -> true
+    | Atom (Reach f) ->
+        Term.Smart.is_exists f &&
+        Term.is_pure_timestamp f
+    | _ -> false
+
+  let is_eq  f = destr_eq  f <> None
+  let is_neq f = destr_neq f <> None
+  let is_leq f = destr_leq f <> None
+  let is_lt  f = destr_lt  f <> None
 
   (*------------------------------------------------------------------*)
   let rec decompose_quant q = function
@@ -547,7 +564,7 @@ module Any = struct
   module Smart = struct
     type form = any_form
 
-    let mk_true = `Reach Term.mk_true
+    let mk_true  = `Reach Term.mk_true
     let mk_false = `Reach Term.mk_false
 
     let mk_not ?simpl f =
@@ -560,11 +577,13 @@ module Any = struct
         | `Reach f, `Reach g -> `Reach (Term.Smart.mk_and ?simpl f g)
         | `Equiv f, `Equiv g -> `Equiv (Smart.mk_and ?simpl f g)
         | _ -> assert false
+
     let mk_or ?simpl f g =
       match f,g with
         | `Reach f, `Reach g -> `Reach (Term.Smart.mk_or ?simpl f g)
         | `Equiv f, `Equiv g -> `Equiv (Smart.mk_or ?simpl f g)
         | _ -> assert false
+
     let mk_impl ?simpl f g : any_form =
       match f,g with
         | `Reach f, `Reach g -> `Reach (Term.Smart.mk_impl ?simpl f g)
@@ -579,6 +598,7 @@ module Any = struct
       | (`Equiv _ :: _) as l ->
           let l = List.map (function `Equiv f -> f | _ -> assert false) l in
           `Equiv (Smart.mk_ands ?simpl l)
+
     let mk_ors ?simpl = function
       | [] -> `Reach (Term.Smart.mk_ors ?simpl [])
       | (`Reach _ :: _) as l ->
@@ -587,6 +607,7 @@ module Any = struct
       | (`Equiv _ :: _) as l ->
           let l = List.map (function `Equiv f -> f | _ -> assert false) l in
           `Equiv (Smart.mk_ors ?simpl l)
+
     let mk_impls ?simpl l f = match l,f with
       | [],`Reach f -> `Reach (Term.Smart.mk_impls ?simpl [] f)
       | [],`Equiv f -> `Equiv (Smart.mk_impls ?simpl [] f)
@@ -598,30 +619,39 @@ module Any = struct
           `Equiv (Smart.mk_impls ?simpl l f)
       | _ -> assert false
 
+    let mk_eq ?simpl  f g = `Reach (Term.Smart.mk_eq  ?simpl f g)
+    let mk_leq ?simpl f g = `Reach (Term.Smart.mk_leq ?simpl f g)
+
+    (*------------------------------------------------------------------*)
     let mk_forall ?simpl vs = function
-      | `Reach f -> `Reach (Term.Smart.mk_forall ?simpl vs f)
-      | `Equiv f -> `Equiv (Smart.mk_forall ?simpl vs f)
+      | `Reach f -> `Reach (Term. Smart.mk_forall ?simpl vs f)
+      | `Equiv f -> `Equiv (      Smart.mk_forall ?simpl vs f)
+
     let mk_exists ?simpl vs = function
-      | `Reach f -> `Reach (Term.Smart.mk_exists ?simpl vs f)
-      | `Equiv f -> `Equiv (Smart.mk_exists ?simpl vs f)
+      | `Reach f -> `Reach (Term. Smart.mk_exists ?simpl vs f)
+      | `Equiv f -> `Equiv (      Smart.mk_exists ?simpl vs f)
 
     let destr_forall1 = function
-      | `Reach f -> omap (fun (vs,f) -> vs,`Reach f) (Term.Smart.destr_forall1 f)
-      | `Equiv f -> omap (fun (vs,f) -> vs,`Equiv f) (Smart.destr_forall1 f)
+      | `Reach f -> omap (fun (vs,f) -> vs,`Reach f) (Term. Smart.destr_forall1 f)
+      | `Equiv f -> omap (fun (vs,f) -> vs,`Equiv f) (      Smart.destr_forall1 f)
+
     let destr_exists1 = function
-      | `Reach f -> omap (fun (vs,f) -> vs,`Reach f) (Term.Smart.destr_exists1 f)
-      | `Equiv f -> omap (fun (vs,f) -> vs,`Equiv f) (Smart.destr_exists1 f)
+      | `Reach f -> omap (fun (vs,f) -> vs,`Reach f) (Term. Smart.destr_exists1 f)
+      | `Equiv f -> omap (fun (vs,f) -> vs,`Equiv f) (      Smart.destr_exists1 f)
 
     let destr_forall = function
-      | `Reach f -> omap (fun (vs,f) -> vs,`Reach f) (Term.Smart.destr_forall f)
-      | `Equiv f -> omap (fun (vs,f) -> vs,`Equiv f) (Smart.destr_forall f)
-    let destr_exists = function
-      | `Reach f -> omap (fun (vs,f) -> vs,`Reach f) (Term.Smart.destr_exists f)
-      | `Equiv f -> omap (fun (vs,f) -> vs,`Equiv f) (Smart.destr_exists f)
+      | `Reach f -> omap (fun (vs,f) -> vs,`Reach f) (Term. Smart.destr_forall f)
+      | `Equiv f -> omap (fun (vs,f) -> vs,`Equiv f) (      Smart.destr_forall f)
 
+    let destr_exists = function
+      | `Reach f -> omap (fun (vs,f) -> vs,`Reach f) (Term. Smart.destr_exists f)
+      | `Equiv f -> omap (fun (vs,f) -> vs,`Equiv f) (      Smart.destr_exists f)
+
+    (*------------------------------------------------------------------*)
     let destr_false = function
       | `Reach f -> Term.Smart.destr_false f
       | `Equiv f -> Smart.destr_false f
+
     let destr_true = function
       | `Reach f -> Term.Smart.destr_true f
       | `Equiv f -> Smart.destr_true f
@@ -646,37 +676,60 @@ module Any = struct
       | `Equiv f ->
           omap (fun (x,y) -> `Equiv x, `Equiv y) (Smart.destr_impl f)
 
+    (*------------------------------------------------------------------*)
     let is_false = function
       | `Reach f -> Term.Smart.is_false f
-      | `Equiv f -> Smart.is_false f
+      | `Equiv f ->      Smart.is_false f
+
     let is_true = function
       | `Reach f -> Term.Smart.is_true f
-      | `Equiv f -> Smart.is_true f
+      | `Equiv f ->      Smart.is_true f
+
     let is_zero = function
       | `Reach f -> Term.Smart.is_zero f
-      | `Equiv f -> Smart.is_zero f
+      | `Equiv f ->      Smart.is_zero f
+
     let is_not = function
       | `Reach f -> Term.Smart.is_not f
-      | `Equiv f -> Smart.is_not f
+      | `Equiv f ->      Smart.is_not f
+
     let is_and = function
       | `Reach f -> Term.Smart.is_and f
-      | `Equiv f -> Smart.is_and f
+      | `Equiv f ->      Smart.is_and f
+
     let is_or = function
       | `Reach f -> Term.Smart.is_or f
-      | `Equiv f -> Smart.is_or f
+      | `Equiv f ->      Smart.is_or f
+
     let is_impl = function
       | `Reach f -> Term.Smart.is_impl f
-      | `Equiv f -> Smart.is_impl f
+      | `Equiv f ->      Smart.is_impl f
+
     let is_forall = function
       | `Reach f -> Term.Smart.is_forall f
-      | `Equiv f -> Smart.is_forall f
+      | `Equiv f ->      Smart.is_forall f
+
     let is_exists = function
       | `Reach f -> Term.Smart.is_exists f
-      | `Equiv f -> Smart.is_exists f
-    let is_matom = function
-      | `Reach f -> Term.Smart.is_matom f
-      | `Equiv f -> Smart.is_matom f
+      | `Equiv f ->      Smart.is_exists f
 
+    let is_eq = function
+      | `Reach f -> Term.Smart.is_eq f
+      | `Equiv f ->      Smart.is_eq f
+
+    let is_neq = function
+      | `Reach f -> Term.Smart.is_neq f
+      | `Equiv f ->      Smart.is_neq f
+
+    let is_leq = function
+      | `Reach f -> Term.Smart.is_leq f
+      | `Equiv f ->      Smart.is_leq f
+
+    let is_lt = function
+      | `Reach f -> Term.Smart.is_lt f
+      | `Equiv f ->      Smart.is_lt f
+
+    (*------------------------------------------------------------------*)
     let destr_ands i = function
       | `Reach f ->
           omap (fun l -> List.map (fun x -> `Reach x) l)
@@ -684,6 +737,7 @@ module Any = struct
       | `Equiv f ->
           omap (fun l -> List.map (fun x -> `Equiv x) l)
             (Smart.destr_ands i f)
+
     let destr_ors i = function
       | `Reach f ->
           omap (fun l -> List.map (fun x -> `Reach x) l)
@@ -691,6 +745,7 @@ module Any = struct
       | `Equiv f ->
           omap (fun l -> List.map (fun x -> `Equiv x) l)
             (Smart.destr_ors i f)
+
     let destr_impls i = function
       | `Reach f ->
           omap (fun l -> List.map (fun x -> `Reach x) l)
@@ -699,10 +754,23 @@ module Any = struct
           omap (fun l -> List.map (fun x -> `Equiv x) l)
             (Smart.destr_impls i f)
 
-    let destr_matom = function
-      | `Reach f -> Term.Smart.destr_matom f
-      | `Equiv f -> Smart.destr_matom f
+    let destr_eq = function
+      | `Reach f -> Term.Smart.destr_eq f
+      | `Equiv f ->      Smart.destr_eq f
 
+    let destr_neq = function
+      | `Reach f -> Term.Smart.destr_neq f
+      | `Equiv f ->      Smart.destr_neq f
+
+    let destr_leq = function
+      | `Reach f -> Term.Smart.destr_leq f
+      | `Equiv f ->      Smart.destr_leq f
+
+    let destr_lt = function
+      | `Reach f -> Term.Smart.destr_lt f
+      | `Equiv f ->      Smart.destr_lt f
+
+    (*------------------------------------------------------------------*)
     let decompose_forall = function
       | `Reach f ->
           let vs,f = Term.Smart.decompose_forall f in
@@ -710,6 +778,7 @@ module Any = struct
       | `Equiv f ->
           let vs,f = Smart.decompose_forall f in
             vs, `Equiv f
+
     let decompose_exists = function
       | `Reach f ->
           let vs,f = Term.Smart.decompose_exists f in
@@ -720,13 +789,15 @@ module Any = struct
 
     let decompose_ands = function
       | `Reach f -> List.map (fun x -> `Reach x) (Term.Smart.decompose_ands f)
-      | `Equiv f -> List.map (fun x -> `Equiv x) (Smart.decompose_ands f)
+      | `Equiv f -> List.map (fun x -> `Equiv x) (     Smart.decompose_ands f)
+
     let decompose_ors = function
       | `Reach f -> List.map (fun x -> `Reach x) (Term.Smart.decompose_ors f)
-      | `Equiv f -> List.map (fun x -> `Equiv x) (Smart.decompose_ors f)
+      | `Equiv f -> List.map (fun x -> `Equiv x) (     Smart.decompose_ors f)
+
     let decompose_impls = function
       | `Reach f -> List.map (fun x -> `Reach x) (Term.Smart.decompose_impls f)
-      | `Equiv f -> List.map (fun x -> `Equiv x) (Smart.decompose_impls f)
+      | `Equiv f -> List.map (fun x -> `Equiv x) (     Smart.decompose_impls f)
 
     let decompose_impls_last = function
       | `Reach f ->

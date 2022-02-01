@@ -77,7 +77,7 @@ module type S = sig
 
   val mk_trace_cntxt : t -> Constr.trace_cntxt
 
-  val get_trace_literals : t -> Term.trace_literal list
+  val get_trace_literals : t -> Term.literal list
 
   val get_hint_db : t -> Hint.hint_db
 

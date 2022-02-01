@@ -348,12 +348,8 @@ exception No_FA
 let fa_expand t =
   let aux : Term.term -> Equiv.equiv = function
     | Fun (f,_,l) -> l
-
-    | Atom (`Message (_,f,g)) ->
-      ES.[ f ; g ]
-
-    | Diff _ -> raise No_common_head
-    | _ -> raise No_FA
+    | Diff _      -> raise No_common_head
+    | _           -> raise No_FA
   in
 
   (* FIXME: this may no longer be necessary (type changes) *)
@@ -471,22 +467,24 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
   inherit [Term.term list] Iter.fold ~cntxt as super
 
   method check_formula f = ignore (self#fold_message [Term.mk_pred tau] f)
-
+ 
   method extract_ts_atoms phi =
-    List.partition
-      (function Term.Atom (`Timestamp _) -> true | _ -> false)
-      (Term.decompose_ands phi)
+    List.partition (fun t ->
+        match Term.form_to_xatom t with
+        | Some at when Term.ty_xatom at = Type.Timestamp -> true
+        | _ -> false
+      ) (Term.decompose_ands phi)
 
   method add_atoms atoms timestamps =
-    List.fold_left
-      (fun acc at -> match at with
-        | Term.Atom (`Timestamp (`Leq,tau_1,tau_2)) ->
+    List.fold_left (fun acc at -> 
+        match Term.form_to_xatom at with
+        | Some (`Comp (`Leq,tau_1,tau_2)) ->
           if List.mem tau_2 acc
-          then tau_1::acc
+          then tau_1 :: acc
           else acc
-        | Atom (`Timestamp (`Lt,tau_1,tau_2)) ->
+        | Some (`Comp (`Lt,tau_1,tau_2)) ->
           if (List.mem (Term.mk_pred tau_2) acc || List.mem tau_2 acc)
-          then tau_1::acc
+          then tau_1 :: acc
           else acc
         | _ -> raise Not_FADUP_iter)
       timestamps
@@ -502,8 +500,10 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
       when f = Term.f_ite && ms = Term.exec_macro && List.mem a timestamps
            && Term.Smart.is_zero else_branch ->
       self#fold_message timestamps then_branch
-    (* Remark: the condition that the else_branch is zero is for the post-quantum condition.
-       It could probably be removed if needed, cf the issue of the CS rule in the PQ paper.*)
+    (* Remark: the condition that the else_branch is zero is for the
+       post-quantum condition.
+       It could probably be removed if
+       needed, cf the issue of the CS rule in the PQ paper.*)
     | Fun (f, _, [phi_1;phi_2]) when f = Term.f_impl ->
       let atoms,l = self#extract_ts_atoms phi_1 in
       let ts' = self#add_atoms atoms timestamps in
@@ -520,10 +520,12 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
         l ;
       timestamps
 
-    | Atom (`Index _) | Atom (`Timestamp _) -> timestamps
+    | Fun (f, _, [t1;_]) when
+        (f = Term.f_lt || f = Term.f_leq || f = Term.f_geq || f = Term.f_gt)
+        && (Term.ty t1 = Type.Index || Term.ty t1 = Type.Timestamp) ->
+      timestamps
 
     | Fun _ | Seq _ | Find _
-    | Atom (`Message _)
     | ForAll _ | Exists _ -> super#fold_message timestamps t
 
     | Pred _ | Action _

@@ -309,6 +309,14 @@ val fs_impl   : fname t
 val fs_not    : fname t
 val fs_ite    : fname t
 
+(** Comparison *)
+val fs_eq  : fname t
+val fs_neq : fname t
+val fs_leq : fname t
+val fs_lt  : fname t
+val fs_geq : fname t
+val fs_gt  : fname t
+
 (** Witness *)
 
 val fs_witness : fname t

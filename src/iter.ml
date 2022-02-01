@@ -38,15 +38,10 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
       let l = Term.subst subst l in
       self#visit_message l
 
-    | Atom ((`Message (_, t, t') | `Timestamp (_, t, t'))) ->
-      self#visit_message t ;
-      self#visit_message t'
-
     | Term.Pred t 
     | Atom (`Happens t) -> self#visit_message t 
 
-    | Term.Action _
-    | Atom (`Index _) -> ()
+    | Term.Action _ -> ()
 end
 
 (** Fold over all subterms.
@@ -87,14 +82,10 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
       let l = Term.subst s l in
       self#fold_message x l
 
-    | Atom (`Message   (_, t, t'))
-    | Atom (`Timestamp (_, t, t')) ->
-      self#fold_message (self#fold_message x t) t'
-
     | Term.Pred t | Atom (`Happens t) -> 
       self#fold_message x t
 
-    | Term.Action _ | Atom (`Index _) -> x
+    | Term.Action _ -> x
 
 end
 

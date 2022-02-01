@@ -42,20 +42,17 @@ let pp_term_head fmt = function
   | HHappens  -> Fmt.pf fmt "Happens"
 
 let get_head : term -> term_head = function
-  | Term.Exists _        -> HExists
-  | Term.ForAll _        -> HForAll
-  | Term.Seq _           -> HSeq
-  | Term.Fun ((f,_),_,_) -> HFun f
-  | Term.Find _          -> HFind
-  | Term.Macro (m1,_,_)  -> HMacro m1.Term.s_symb
-  | Term.Name n1         -> HName n1.Term.s_symb
-  | Term.Diff _          -> HDiff
-  | Term.Var _           -> HVar
-  | Term.Pred _          -> HPred
-  | Term.Action _        -> HAction
-  | Term.Atom (`Message   (ord, _, _)) -> HAtom (ord :> Term.ord)
-  | Term.Atom (`Timestamp (ord, _, _)) -> HAtom (ord :> Term.ord)
-  | Term.Atom (`Index     (ord, _, _)) -> HAtom (ord :> Term.ord)
+  | Term.Exists _          -> HExists
+  | Term.ForAll _          -> HForAll
+  | Term.Seq _             -> HSeq
+  | Term.Fun ((f,_),_,_)   -> HFun f
+  | Term.Find _            -> HFind
+  | Term.Macro (m1,_,_)    -> HMacro m1.Term.s_symb
+  | Term.Name n1           -> HName n1.Term.s_symb
+  | Term.Diff _            -> HDiff
+  | Term.Var _             -> HVar
+  | Term.Pred _            -> HPred
+  | Term.Action _          -> HAction
   | Term.Atom (`Happens _) -> HHappens
 
 module Hm = Map.Make(struct
@@ -599,21 +596,7 @@ module T (* : S with type t = message *) = struct
   (** unifies an atom *)
   and atunif (at : generic_atom) (at' : generic_atom) st : Mvar.t =
     match at, at' with
-    | `Message (ord, t1, t2), `Message (ord', t1', t2') ->
-      if ord <> ord' then raise NoMgu;
-      unif_l [t1;t2] [t1';t2'] st
-
-    | `Timestamp (ord, t1, t2), `Timestamp (ord', t1', t2') ->
-      if ord <> ord' then raise NoMgu;
-      unif_l [t1;t2] [t1';t2'] st
-
-    | `Index (ord, t1, t2), `Index (ord', t1', t2') ->
-      if ord <> ord' then raise NoMgu;
-      unif_l [mk_var t1; mk_var t2] [mk_var t1'; mk_var t2'] st
-
     | `Happens ts, `Happens ts' -> unif ts ts' st
-
-    | _, _ -> raise NoMgu
 
   and unif_l (tl1 : term list) (tl2 : term list) (st: unif_state) : Mvar.t =
     List.fold_left2 (fun mv t1 t2 ->
@@ -855,21 +838,7 @@ module T (* : S with type t = message *) = struct
   (* matches an atom *)
   and atmatch (at : generic_atom) (at' : generic_atom) st : Mvar.t =
     match at, at' with
-    | `Message (ord, t1, t2), `Message (ord', t1', t2') ->
-      if ord <> ord' then no_match ();
-      tmatch_l [t1;t2] [t1';t2'] st
-
-    | `Timestamp (ord, t1, t2), `Timestamp (ord', t1', t2') ->
-      if ord <> ord' then no_match ();
-      tmatch_l [t1;t2] [t1';t2'] st
-
-    | `Index (ord, t1, t2), `Index (ord', t1', t2') ->
-      if ord <> ord' then no_match ();
-      tmatch_l [mk_var t1; mk_var t2] [mk_var t1'; mk_var t2'] st
-
     | `Happens ts, `Happens ts' -> tmatch ts ts' st
-
-    | _, _ -> no_match ()
 
   (*------------------------------------------------------------------*)
   (** Exported 
@@ -1497,18 +1466,19 @@ module E : S with type t = Equiv.form = struct
 
     let check_one cond =
       match cond with
-      | Term.Atom (`Timestamp ((`Lt | `Leq as ord), t1, t2)) ->
+      | Term.Fun (fs, _, [t1;t2]) 
+        when (fs = Term.f_lt || fs = Term.f_leq)
+          && Term.ty t1 = Type.Timestamp ->
         let t2' =
-          match ord with
-          | `Lt -> Term.mk_pred t2
-          | `Leq -> t2
+          if fs = Term.f_lt then Term.mk_pred t2 else t2
         in
 
         let check_direct = leq_tauto table t1 t2' in
         let check_indirect =
           List.exists (fun hyp ->
               match hyp with
-              | Term.Atom (`Timestamp (`Leq, ta, tb)) -> (* ≤ *)
+              | Term.Fun (fs, _, [ta;tb]) 
+                when fs = Term.f_leq && Term.ty t1 = Type.Timestamp -> (* ≤ *)
 
                 (* checks whether [ta ≤ tb] implies [t1 ≤ t2'] *)
                 leq_tauto table t1 ta && leq_tauto table tb t2'
@@ -1663,16 +1633,6 @@ module E : S with type t = Equiv.form = struct
             term = Term.mk_fun0 fs fty (f_terms_ded.term) }
         ) f_terms_deds
 
-    (* similar to the [Fun _] case *)
-    | Term.Atom (`Message (ord, t1, t2)) ->
-      let f_terms_cand = { cand with term = [t1;t2] } in
-      let f_terms_deds = deduce_list table system f_terms_cand known_sets in
-      List.map (fun (f_terms_ded : cand_tuple_set) ->
-          let t1, t2 = Utils.as_seq2 f_terms_ded.term in
-          { f_terms_ded with
-            term = Term.mk_atom (ord :> Term.ord) t1 t2 }
-        ) f_terms_deds
-
     | _ -> []
 
   (*------------------------------------------------------------------*)
@@ -1734,7 +1694,7 @@ module E : S with type t = Equiv.form = struct
               (* sanity check *)
               let () =
                 assert (match ded_set.cond with
-                    | Term.Atom (`Timestamp (`Leq, _, c)) ->
+                    | Term.Fun (fs, _, [_; c]) when fs = Term.f_leq ->
                       Some c = cand.cond_le
                     | Term.Fun (fs,_,_) -> None = cand.cond_le
                     | _ -> false)
@@ -1985,10 +1945,6 @@ module E : S with type t = Equiv.form = struct
 
     | Term.Fun (_, _, terms) ->
       Some (List.map (fun term -> st, { cterm with term } ) terms)
-
-    | Term.Atom (`Message (_, t1, t2)) ->
-      Some (List.map (fun t -> st, t) [{ cterm with term = t1; };
-                                       { cterm with term = t2; }])
 
     | Term.Seq (is, term) ->
       let is, subst = Term.refresh_vars `Global is in

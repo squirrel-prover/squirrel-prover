@@ -292,14 +292,9 @@ let congruence (s : TS.t) : bool =
     in
 
     let term_conclusions =
-      List.fold_left (fun acc conc -> match conc with
-          | `Pos, (#generic_atom as at) ->
-            let at = (at :> Term.generic_atom) in
-            Term.(mk_not (mk_atom1 at)) :: acc
-          | `Neg, (#generic_atom as at) ->
-            Term.mk_atom1 at :: acc)
-        []
-        conclusions
+      List.fold_left (fun acc conc -> 
+          lit_to_form (neg_lit conc) :: acc
+        ) [] conclusions
     in
     let s = List.fold_left (fun s f ->
         Hyps.add Args.AnyName f s
@@ -339,15 +334,17 @@ let constraints (s : TS.t) =
       Utils.odflt [] (Term.disjunction_to_literals (TS.goal s))
     in
     let trace_conclusions =
-      List.fold_left (fun acc conc -> match conc with
-          | `Pos, (#trace_atom as at) ->
-            let at = (at :> Term.generic_atom) in
-            Term.(mk_not (mk_atom1 at)) :: acc
-          | `Neg, (#trace_atom as at) ->
-            Term.mk_atom1 at :: acc
-          | _ -> acc)
-        []
-        conclusions
+      List.fold_left (fun acc conc -> 
+          let keep = match conc with 
+            | _, `Happens _ -> true
+            | _, `Comp (_, t, _) ->
+              Term.ty t = Type.Timestamp || Term.ty t = Type.Index
+          in
+          if keep then
+            lit_to_form (neg_lit conc) :: acc
+          else 
+            acc
+        ) [] conclusions
     in
     let s = List.fold_left (fun s f ->
         Hyps.add Args.AnyName f s
@@ -702,8 +699,9 @@ let fresh (m : lsymb) s =
     let table = TS.table s in
     let env   = TS.env s in
 
-    begin match hyp with
-      | Atom (`Message (`Eq,m1,m2)) ->
+    begin
+      match Term.destr_eq hyp with
+      | Some (m1,m2) ->
         let (ns,t) = fresh_param m1 m2 in
 
         let ty = ns.s_typ in
@@ -720,8 +718,8 @@ let fresh (m : lsymb) s =
         let goal = Term.mk_impl ~simpl:false phi (TS.goal s) in
         [TS.set_goal goal s]
 
-      | _ -> soft_failure
-               (Tactics.Failure "can only be applied on message hypothesis")
+      | None -> soft_failure
+                  (Tactics.Failure "can only be applied on message hypothesis")
     end
   with
   | Fresh.Var_found ->
@@ -757,7 +755,7 @@ let substitute_mess (m1, m2) s =
 let substitute_ts (ts1, ts2) s =
   let subst =
       let models = TS.get_models s in
-      if Constr.query ~precise:true models [(`Pos, `Timestamp (`Eq,ts1,ts2))] then
+      if Constr.query ~precise:true models [(`Pos, `Comp (`Eq,ts1,ts2))] then
         [Term.ESubst (ts1,ts2)]
       else
         soft_failure Tactics.NotEqualArguments
@@ -766,19 +764,18 @@ let substitute_ts (ts1, ts2) s =
 
 let substitute_idx (i1 , i2 : Term.term * Term.term) s =
   let i1, i2 =  match i1, i2 with
-    | Var i1, Var i2 -> i1, i2
+    | Var _, Var _ -> i1, i2
     | (Diff _), _ | _, (Diff _) ->
       hard_failure
         (Tactics.Failure "only variables are supported when substituting \
                           index terms")
-
     | _ -> assert false
   in
 
   let subst =
     let models = TS.get_models s in
-    if Constr.query ~precise:true models [(`Pos, `Index (`Eq,i1,i2))] then
-      [Term.ESubst (Term.mk_var i1,Term.mk_var i2)]
+    if Constr.query ~precise:true models [(`Pos, `Comp (`Eq,i1,i2))] then
+      [Term.ESubst (i1,i2)]
     else
       soft_failure Tactics.NotEqualArguments
   in
@@ -847,41 +844,36 @@ let () =
  *     eqsubst Args.(Pair (ETerm, ETerm)) *)
 
 
+(* FIXME: use higher-level function to retrieve the equality *)
 let do_subst_eq (args : Args.parser_arg list) s : sequent list =
   let subst, f =
     match args with
     | [arg] ->
-      (match Args.convert_as_lsymb args with
-      | Some str when Hyps.mem_name (L.unloc str) s ->
-        let id, at = Hyps.by_name str s in
-        (match at with
-         | Atom (`Message (`Eq, t1, t2)) -> [Term.ESubst (t1,t2)],  Term.mk_atom `Eq t1 t2
-         | Atom (`Timestamp (`Eq, f1, f2)) -> [Term.ESubst (f1,f2)],   Term.mk_atom `Eq f1 f2
-         | Atom (`Index (`Eq, f1, f2)) ->
-           let f1, f2 = Term.mk_var f1, Term.mk_var f2 in
-         [Term.ESubst (f1,f2)],   Term.mk_atom `Eq f1 f2
-         | _ -> hard_failure
-                  (Tactics.Failure "expected an equality hypothesis"))
-       | _ -> hard_failure
-                (Tactics.Failure "expected an hypothesis name")
-      )
+      begin
+        match Args.convert_as_lsymb args with
+        | Some str when Hyps.mem_name (L.unloc str) s ->
+          let id, at = Hyps.by_name str s in
+          begin match Term.destr_eq at with
+            | Some (t1, t2) ->
+              [Term.ESubst (t1,t2)],  Term.mk_eq t1 t2
+
+            | _ -> hard_failure
+                     (Tactics.Failure "expected an equality hypothesis")
+          end
+        | _ -> hard_failure
+                 (Tactics.Failure "expected an hypothesis name")
+      end
+
     | _ ->
-        match TraceLT.convert_args s args Args.(Sort (Pair (Term, Term))) with
-        | Args.Arg Pair (Term (Type.Message, f1, _), Term (Type.Message, f2, _)) ->
-          [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
+      match TraceLT.convert_args s args Args.(Sort (Pair (Term, Term))) with
+      | Args.Arg Pair (Term (_, f1, _), Term (_, f2, _)) ->
+        [Term.ESubst (f1,f2)],  Term.mk_eq f1 f2
 
-        |  Args.Arg Pair (Term (Type.Timestamp, f1, _), Term (Type.Timestamp, f2, _)) ->
-          [Term.ESubst (f1,f2)],   Term.mk_atom `Eq f1 f2
-
-        |  Args.Arg Pair (Term (Type.Index, f1, _), Term (Type.Index, f2, _)) ->
-          [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
-
-        | _ ->
-          hard_failure
-            (Tactics.Failure "expected a pair of messages, booleans or a pair of \
-                              index variables")
+      | _ ->
+        hard_failure
+          (Tactics.Failure "expected a pair of messages")
   in
-   TS.set_goal f s :: apply_substitute subst s
+  TS.set_goal f s :: apply_substitute subst s
 
 
 
@@ -908,13 +900,13 @@ let () =
 
 (*------------------------------------------------------------------*)
 let autosubst s =
-  let id, f = match
+  let id, (x,y) = match
       Hyps.find_map
-        (fun id f -> match f with
-           | Atom (`Timestamp (`Eq, Term.Var x, Term.Var y) as atom) ->
-             Some (id, atom)
-           | Atom (`Index (`Eq, x, y) as atom) ->
-             Some (id,atom)
+        (fun id f -> match Term.destr_eq f with
+           | Some (Term.Var x, Term.Var y) 
+             when Vars.ty x = Type.Timestamp || 
+                  Vars.ty x = Type.Index ->
+             Some (id, (x,y))
            | _ -> None)
         s
     with | Some (id,f) -> id, f
@@ -922,11 +914,9 @@ let autosubst s =
   in
   let s = Hyps.remove id s in
 
-  let process : Vars.var -> Vars.var -> TS.t =
-    fun x y ->
-
-      (* Just remove the equality if x and y are the same variable. *)
-      if x = y then s else
+  let process (x : Vars.var) (y : Vars.var) : TS.t =
+    (* Just remove the equality if x and y are the same variable. *)
+    if x = y then s else
       (* Otherwise substitute the newest variable by the oldest one,
        * and remove it from the environment. *)
       let x,y =
@@ -938,12 +928,9 @@ let autosubst s =
       let s =
         TS.set_env (Vars.rm_var (TS.env s) x) s
       in
-        TS.subst [Term.ESubst (Term.mk_var x, Term.mk_var y)] s
+      TS.subst [Term.ESubst (Term.mk_var x, Term.mk_var y)] s
   in
-    match f with
-    | `Timestamp (`Eq, Term.Var x, Term.Var y) -> [process x y]
-    | `Index (`Eq, x, y)                       -> [process x y]
-    | _ -> assert false
+  [process x y]
 
 (*------------------------------------------------------------------*)
 (* TODO: this should be an axiom in some library, not a rule *)
@@ -985,107 +972,104 @@ let fa s =
   let unsupported () =
     Tactics.(soft_failure (Failure "equality expected")) in
 
-  match TS.goal s with
-    | Term.Atom (`Message (`Eq,u,v)) ->
-        begin match u,v with
+  let u, v = match Term.destr_eq (TS.goal s) with
+    | Some (u,v) -> u, v
+    | None -> unsupported ()
+  in
+  match u,v with
+  | Term.Fun (f,_,[c;t;e]), Term.Fun (f',_,[c';t';e'])
+    when f = Term.f_ite && f' = Term.f_ite ->
+    let subgoals =
+      let open TraceSequent in
+      [ s |> set_goal (Term.mk_impl c c') ;
 
-          | Term.Fun (f,_,[c;t;e]), Term.Fun (f',_,[c';t';e'])
-            when f = Term.f_ite && f' = Term.f_ite ->
-            let subgoals =
-              let open TraceSequent in
-              [ s |> set_goal (Term.mk_impl c c') ;
+        s |> set_goal (Term.mk_impl c' c) ;
 
-                s |> set_goal (Term.mk_impl c' c) ;
+        s |> set_goal (Term.mk_impls
+                         (if c = c' then [c] else [c;c'])
+                         (Term.mk_atom `Eq t t'));
 
-                s |> set_goal (Term.mk_impls
-                                       (if c = c' then [c] else [c;c'])
-                                       (Term.mk_atom `Eq t t'));
+        s |> set_goal (Term.mk_impls
+                         [Term.mk_not c;
+                          Term.mk_not c']
+                         (Term.mk_atom `Eq e e')) ]
+    in
+    subgoals
 
-                s |> set_goal (Term.mk_impls
-                                       [Term.mk_not c;
-                                        Term.mk_not c']
-                                       (Term.mk_atom `Eq e e')) ]
-            in
-            subgoals
+  | Term.Seq (vars,t),
+    Term.Seq (vars',t') when vars = vars' ->
+    let env = ref (TS.env s) in
+    let vars, subst = Term.refresh_vars (`InEnv env) vars in
+    let s = TS.set_env !env s in
+    let t = Term.subst subst t in
+    let t' = Term.subst subst t' in
+    let subgoals =
+      [ TS.set_goal (Term.mk_atom `Eq t t') s ]
+    in
+    subgoals
 
-          | Term.Seq (vars,t),
-            Term.Seq (vars',t') when vars = vars' ->
-            let env = ref (TS.env s) in
-            let vars, subst = Term.refresh_vars (`InEnv env) vars in
-            let s = TS.set_env !env s in
-            let t = Term.subst subst t in
-            let t' = Term.subst subst t' in
-            let subgoals =
-              [ TS.set_goal (Term.mk_atom `Eq t t') s ]
-            in
-            subgoals
+  | Term.Find (vs,c,t,e),
+    Term.Find (vars',c',t',e') when List.length vs = List.length vars' ->
+    (* We verify that [e = e'],
+     * and that [t = t'] and [c <=> c'] for fresh index variables.
+     *
+     * We do something more general for the conditions,
+     * which is useful for cases arising from diff-equivalence
+     * where some indices are unused on one side:
+     *
+     * Assume [vars = used@unused]
+     * where [unusued] variables are unused in [c] and [t].
+     *
+     * We verify that [forall used. (c <=> exists unused. c')]:
+     * this ensures that if one find succeeds, the other does
+     * too, and also that the selected indices will match
+     * except for the [unused] indices on the left, which does
+     * not matter since they do not appear in [t]. *)
 
-          | Term.Find (vs,c,t,e),
-            Term.Find (vars',c',t',e') when List.length vs = List.length vars' ->
-            (* We verify that [e = e'],
-             * and that [t = t'] and [c <=> c'] for fresh index variables.
-             *
-             * We do something more general for the conditions,
-             * which is useful for cases arising from diff-equivalence
-             * where some indices are unused on one side:
-             *
-             * Assume [vars = used@unused]
-             * where [unusued] variables are unused in [c] and [t].
-             *
-             * We verify that [forall used. (c <=> exists unused. c')]:
-             * this ensures that if one find succeeds, the other does
-             * too, and also that the selected indices will match
-             * except for the [unused] indices on the left, which does
-             * not matter since they do not appear in [t]. *)
+    (* Refresh bound variables in c and t*)
+    let env = ref (TS.env s) in
+    let vars, subst = Term.refresh_vars (`InEnv env) vs in
+    let c  = Term.subst subst c in
+    let t  = Term.subst subst t in
 
-            (* Refresh bound variables in c and t*)
-            let env = ref (TS.env s) in
-            let vars, subst = Term.refresh_vars (`InEnv env) vs in
-            let c  = Term.subst subst c in
-            let t  = Term.subst subst t in
+    (* Create substitution from vars' to fresh_var *)
+    (* We avoid relying on the fact that currently, subst is preserving
+       the order of vars, and rather create a substitution vs -> vars',
+       that we apply on the lhs of vs -> vars *)
 
+    let subst_aux = List.map2 (fun x y ->
+        Term.(ESubst (mk_var x,mk_var y))) vs vars' in
+    let subst' = List.map (function ESubst (x, y) ->
+        Term.(ESubst (subst subst_aux x,y))) subst in
 
+    let s = TS.set_env !env s in
 
-            (* Create substitution from vars' to fresh_var *)
-            (* We avoid relying on the fact that currently, subst is preserving
-               the order of vars, and rather create a substitution vs -> vars',
-               that we apply on the lhs of vs -> vars *)
+    let c' = Term.subst subst' c' in
 
-            let subst_aux = List.map2 (fun x y ->
-                Term.(ESubst (mk_var x,mk_var y))) vs vars' in
-            let subst' = List.map (function ESubst (x, y) ->
-                Term.(ESubst (subst subst_aux x,y))) subst in
+    let t' = Term.subst subst' t' in
 
-            let s = TS.set_env !env s in
+    (* Extract unused variables. *)
+    let used,unused =
+      let occ_vars = Term.get_vars c @ Term.get_vars t in
+      List.partition
+        (fun v -> List.mem v occ_vars)
+        vars
+    in
 
-            let c' = Term.subst subst' c' in
+    let subgoals =
+      let open TraceSequent in
+      [ set_goal (Term.mk_impl c (Term.mk_exists unused c')) s ;
 
-            let t' = Term.subst subst' t' in
+        set_goal (Term.mk_impl c' c) s;
 
-            (* Extract unused variables. *)
-            let used,unused =
-              let occ_vars = Term.get_vars c @ Term.get_vars t in
-              List.partition
-                (fun v -> List.mem v occ_vars)
-                vars
-            in
+        set_goal (Term.mk_impls [c;c']
+                    (mk_atom `Eq t t')) s;
 
-            let subgoals =
-              let open TraceSequent in
-              [ set_goal (Term.mk_impl c (Term.mk_exists unused c')) s ;
+        set_goal (Term.mk_atom `Eq e e') s]
+    in
+    subgoals
 
-                set_goal (Term.mk_impl c' c) s;
-
-                set_goal (Term.mk_impls [c;c']
-                                  (mk_atom `Eq t t')) s;
-
-                set_goal (Term.mk_atom `Eq e e') s]
-            in
-            subgoals
-
-          | _ -> Tactics.(soft_failure (Failure "unsupported equality"))
-        end
-    | _ -> unsupported ()
+  | _ -> Tactics.(soft_failure (Failure "unsupported equality"))
 
 let fa_tac args = match args with
   | [] -> wrap_fail fa
@@ -1101,19 +1085,23 @@ let new_simpl ~congr ~constr s =
   let s = TS.set_goal Term.mk_false s in
   let goals = List.filter_map (fun goal ->
       if Hyps.is_hyp goal s || Term.f_triv goal then None
-      else match goal with
-        | Term.Atom Term.(#trace_atom as at) ->
-          if constr && Constr.query ~precise:true (TS.get_models s) [`Pos, at]
-          then None
-          else Some goal
+      else match form_to_xatom goal with
+        | None -> Some goal
+        | Some at ->
+          match at, Term.ty_xatom at with
+          | _, Type.Index | _, Type.Timestamp -> 
+            let lit = `Pos, (at :> xatom) in
+            if constr && Constr.query ~precise:true (TS.get_models s) [lit]
+            then None
+            else Some goal
 
-        | Term.Atom (`Message (`Eq, t1, t2)) ->
-          if congr &&
-             Completion.check_equalities (TS.get_trs s) [Term.ESubst (t1,t2)]
-          then None
-          else Some goal
+          | `Comp (`Eq, t1, t2), _ ->
+            if congr &&
+               Completion.check_equalities (TS.get_trs s) [Term.ESubst (t1,t2)]
+            then None
+            else Some goal
 
-        | _ -> Some goal
+          | _ -> Some goal
     ) goals in
   [TS.set_goal (Term.mk_ands goals) s]
 
@@ -1297,13 +1285,14 @@ let euf_param table (t : Term.term) : unforgeabiliy_param =
           or checksign(s,pk(k))=m \
           for some hash or signature or decryption functions") in
 
-  let at = match t with
-    | Atom (`Message at) -> at
-    | _ -> bad_param () in
+  let t1, t2 = match Term.destr_eq t with
+    | Some (t1, t2) -> t1, t2
+    | _ -> bad_param () 
+  in
 
-  match at with
-  | (`Eq, Fun ((checksign, _),    _, [s; Fun ((pk,_), _, [Name key])]), m)
-  | (`Eq, m, Fun ((checksign, _), _, [s; Fun ((pk,_), _, [Name key])])) ->
+  match t1, t2 with
+  | (Fun ((checksign, _),    _, [s; Fun ((pk,_), _, [Name key])]), m)
+  | (m, Fun ((checksign, _), _, [s; Fun ((pk,_), _, [Name key])])) ->
     begin match Theory.check_signature table checksign pk with
       | None ->
         soft_failure
@@ -1313,11 +1302,11 @@ let euf_param table (t : Term.term) : unforgeabiliy_param =
       | Some sign -> (sign, key, m, s,  (fun x -> x=pk), [], true, None)
     end
 
-  | (`Eq, Fun ((hash, _), _, [m; Name key]), s)
+  | (Fun ((hash, _), _, [m; Name key]), s)
     when Symbols.is_ftype hash Symbols.Hash table ->
     (hash, key, m, s, (fun x -> false), [], true, None)
 
-  | (`Eq, s, Fun ((hash, _), _, [m; Name key]))
+  | (s, Fun ((hash, _), _, [m; Name key]))
     when Symbols.is_ftype hash Symbols.Hash table ->
     (hash, key, m, s, (fun x -> false), [], true, None)
 
@@ -1332,9 +1321,10 @@ let intctxt_param table (t : Term.term) : unforgeabiliy_param =
           or sdec(s,sk) = m (or symmetrically) \
           for some hash or signature or decryption functions") in
 
-  let at = match t with
-    | Atom (`Message at) -> at
-    | _ -> bad_param () in
+  let at = match Term.form_to_xatom t with
+    | Some (`Comp at) -> at
+    | _ -> bad_param () 
+  in
 
   let param_dec sdec key m s =
     match Symbols.Function.get_data sdec table with
@@ -1562,11 +1552,13 @@ let non_malleability_param table (t : Term.term) : unforgeabiliy_param =
     soft_failure
       (Tactics.Failure
          "NM can only be applied to an hypothesis of the form
-          sdec(s,sk) = m (or symmetrically) ") in
+          sdec(s,sk) = m (or symmetrically) ") 
+  in
 
-  let at = match t with
-    | Atom (`Message at) -> at
-    | _ -> bad_param () in
+  let t1, t2 = match Term.destr_eq t with
+    | Some (t1, t2) -> t1, t2
+    | _ -> bad_param () 
+  in
 
   let param_dec adec key m s =
     match Symbols.Function.get_data adec table with
@@ -1576,12 +1568,12 @@ let non_malleability_param table (t : Term.term) : unforgeabiliy_param =
 
     | _ -> assert false in
 
-  match at with
-  | (`Eq, Fun ((adec, _), _, [m; Name key]), s)
+  match t1, t2 with
+  | (Fun ((adec, _), _, [m; Name key]), s)
     when Symbols.is_ftype adec Symbols.ADec table ->
     param_dec adec key m s
 
-  | (`Eq, s, Fun ((adec, _), _, [m; Name key]))
+  | (s, Fun ((adec, _), _, [m; Name key]))
     when Symbols.is_ftype adec Symbols.ADec table ->
     param_dec adec key m s
 
@@ -1729,8 +1721,10 @@ let collision_resistance TacticsArgs.(Opt (String, i)) (s : TS.t) =
 
   let hash_eqs = match i with
     | None -> top_level_hashes s
-    | Some (String j) -> match Hyps.by_name j s with
-      | _, Term.Atom (`Message (`Eq, t1, t2)) ->
+    | Some (String j) -> 
+      let _, h = Hyps.by_name j s in
+      match Term.destr_eq h with
+      | Some (t1, t2) ->
         let cntxt = TS.mk_trace_cntxt s in
         if not (valid_hash cntxt t1) || not (valid_hash cntxt t2) then
           soft_failure Tactics.NoSSC;
@@ -1800,18 +1794,13 @@ let rewrite_equiv_transform
       | None -> aux_rec t
       | Some t' -> t'
 
-  and aux_rec : Term.term -> Term.term = fun t ->
+  and aux_rec (t : Term.term) : Term.term = 
     match t with
     | t when is_pure_timestamp t -> t
 
     | Fun (fsymb,ftype,args) ->
       let args = List.map aux args in
       Term.mk_fun0 fsymb ftype args
-
-    | Atom (`Message (ord,t1,t2)) ->
-      let t1 = aux t1 in
-      let t2 = aux t2 in
-      Term.mk_atom (ord:>Term.ord) t1 t2
 
     (* We can support input@ts (and keep it unchanged) if
      * for some ts' such that ts'>=pred(ts),
@@ -1826,7 +1815,7 @@ let rewrite_equiv_transform
         | Macro (msymb',[],ts') ->
           msymb' = Term.frame_macro &&
           TS.query ~precise:true s
-            [`Pos,`Timestamp (`Leq, mk_pred ts, ts')]
+            [`Pos,`Comp (`Leq, mk_pred ts, ts')]
         | _ -> false
       in
       if List.exists ok_frame biframe then t else raise Invalid

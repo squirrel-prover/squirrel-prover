@@ -11,7 +11,9 @@ class find_name ~(cntxt:Constr.trace_cntxt) exact name = object (self)
 
   method visit_message t = match t with
     | Term.Name ns -> if ns.s_symb = name then raise Name_found
-    | Term.Var m -> raise Var_found
+    | Term.Var m
+        when Vars.ty m <> Type.Timestamp && Vars.ty m <> Type.Index -> 
+        raise Var_found
     | _ -> super#visit_message t
 end
 

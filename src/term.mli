@@ -66,9 +66,6 @@ val pp_ord   : Format.formatter -> ord -> unit
 type ('a,'b) _atom = 'a * 'b * 'b
 
 type generic_atom = [
-  | `Message of (ord_eq,term) _atom
-  | `Timestamp of (ord,term) _atom
-  | `Index of (ord_eq,Vars.var) _atom
   | `Happens of term
 ]
 
@@ -106,55 +103,40 @@ val tfold      : (term -> 'a -> 'a) -> term -> 'a -> 'a
 val tmap_fold  : ('b -> term -> 'b * term) -> 'b -> term -> 'b * term
 
 (*------------------------------------------------------------------*)
-(** {2 Subset of all atoms} *)
-(** (the subsets are not disjoint). *)
+(** {2 Literals} *)
 
-type message_atom = [ `Message of (ord_eq,term) _atom]
-
-type index_atom = [ `Index of (ord_eq,Vars.var) _atom]
-
-type trace_atom = [
-  | `Timestamp of (ord,term) _atom
-  | `Index     of (ord_eq,Vars.var) _atom
-  | `Happens   of term
+type xatom = [
+  | `Comp    of (ord,term) _atom
+  | `Happens of term
 ]
 
-type trace_eq_atom = [
-  | `Timestamp of (ord_eq,term)     _atom
-  | `Index     of (ord_eq,Vars.var) _atom
-]
+type literal = [`Neg | `Pos] * xatom
 
-type eq_atom = [
-  | `Message   of (ord_eq, term)     _atom
-  | `Timestamp of (ord_eq, term)     _atom
-  | `Index     of (ord_eq, Vars.var) _atom
-]
+type literals = literal list
 
-(*------------------------------------------------------------------*)
-(** Literals. *)
+(** Type of compared elements. *)
+val ty_xatom : xatom -> Type.ty
 
-type literal = [`Neg | `Pos] * generic_atom
+(** Type of compared elements. *)
+val ty_lit  : literal -> Type.ty
 
-type eq_literal = [`Pos | `Neg] * eq_atom
-
-type trace_literal = [`Pos | `Neg] * trace_atom
-
-val pp_literal  : Format.formatter -> literal      -> unit
-val pp_literals : Format.formatter -> literal list -> unit
-
-val pp_trace_literal  : Format.formatter -> trace_literal      -> unit
-val pp_trace_literals : Format.formatter -> trace_literal list -> unit
+val pp_literal  : Format.formatter -> literal  -> unit
+val pp_literals : Format.formatter -> literals -> unit
 
 val neg_lit : literal -> literal
 
-val neg_trace_lit : trace_literal -> trace_literal
-
 val disjunction_to_literals : term -> literal list option
+
+val form_to_xatom   : term ->   xatom option
+val form_to_literal : term -> literal option
 
 (** Given a formula, return a list of literals which is either
     entailed by the formula, or equivalent to the formula. *)
 val form_to_literals :
   term -> [`Entails of literal list | `Equiv of literal list]
+
+val xatom_to_form : xatom   -> term
+val lit_to_form   : literal -> term
 
 (*------------------------------------------------------------------*)
 (** {2 Higher-order terms} *)
@@ -249,30 +231,37 @@ val frame_macro : msymb
 val cond_macro  : msymb
 val exec_macro  : msymb
 
-val f_true   : fsymb
-val f_false  : fsymb
-val f_and    : fsymb
-val f_impl   : fsymb
-val f_or     : fsymb
-val f_not    : fsymb
-val f_ite    : fsymb
+val f_true  : fsymb
+val f_false : fsymb
+val f_and   : fsymb
+val f_impl  : fsymb
+val f_or    : fsymb
+val f_not   : fsymb
+val f_ite   : fsymb
 
-val f_diff   : fsymb
+val f_eq  : fsymb
+val f_neq : fsymb
+val f_leq : fsymb
+val f_lt  : fsymb
+val f_geq : fsymb
+val f_gt  : fsymb
 
-val f_succ   : fsymb
+val f_diff : fsymb
 
-val f_att    : fsymb
+val f_succ : fsymb
 
-val f_fail   : fsymb
+val f_att : fsymb
 
-val f_xor    : fsymb
-val f_zero   : fsymb
+val f_fail : fsymb
 
-val f_pair   : fsymb
-val f_fst    : fsymb
-val f_snd    : fsymb
+val f_xor  : fsymb
+val f_zero : fsymb
 
-val f_of_bool   : fsymb
+val f_pair : fsymb
+val f_fst  : fsymb
+val f_snd  : fsymb
+
+val f_of_bool : fsymb
 
 val f_len    : fsymb
 val f_zeroes : fsymb
@@ -288,6 +277,9 @@ module type SmartFO = sig
   (** {3 Constructors} *)
   val mk_true    : form
   val mk_false   : form
+
+  val mk_eq    : ?simpl:bool -> term -> term -> form
+  val mk_leq   : ?simpl:bool -> term -> term -> form
 
   val mk_not   : ?simpl:bool -> form              -> form
   val mk_and   : ?simpl:bool -> form      -> form -> form
@@ -309,6 +301,12 @@ module type SmartFO = sig
   val destr_exists1 : form -> (Vars.var      * form) option
 
   (*------------------------------------------------------------------*)
+  val destr_neq : form -> (term * term) option
+  val destr_eq  : form -> (term * term) option
+  val destr_leq : form -> (term * term) option
+  val destr_lt  : form -> (term * term) option
+
+  (*------------------------------------------------------------------*)
   val destr_false : form ->         unit  option
   val destr_true  : form ->         unit  option
   val destr_not   : form ->         form  option
@@ -326,16 +324,18 @@ module type SmartFO = sig
   val is_impl   : form -> bool
   val is_forall : form -> bool
   val is_exists : form -> bool
-  val is_matom  : form -> bool
+
+  (*------------------------------------------------------------------*)
+  val is_neq : form -> bool
+  val is_eq  : form -> bool
+  val is_leq : form -> bool
+  val is_lt  : form -> bool
 
   (*------------------------------------------------------------------*)
   (** left-associative *)
   val destr_ands  : int -> form -> form list option
   val destr_ors   : int -> form -> form list option
   val destr_impls : int -> form -> form list option
-
-  (*------------------------------------------------------------------*)
-  val destr_matom : form -> (ord_eq * term * term) option
 
   (*------------------------------------------------------------------*)
   val decompose_forall : form -> Vars.var list * form
@@ -392,12 +392,11 @@ val mk_ite : ?simpl:bool -> term -> term -> term -> term
 
 val mk_timestamp_leq : term -> term -> term
 
-val mk_indices_neq : Vars.var list -> Vars.var list -> term
+val mk_indices_neq :                Vars.var list -> Vars.var list -> term
 val mk_indices_eq  : ?simpl:bool -> Vars.var list -> Vars.var list -> term
 
 val mk_atom : ord -> term -> term -> term
 val mk_happens : term -> term
-val mk_atom1 : generic_atom -> term
 
 val mk_seq0 : ?simpl:bool -> Vars.vars -> term -> term
 
@@ -420,10 +419,6 @@ val destr_pair : term -> (term * term) option
 
 (*------------------------------------------------------------------*)
 (** {2 Simplification} *)
-
-val not_message_atom  : message_atom  -> message_atom
-val not_index_atom    : index_atom    -> index_atom
-val not_trace_eq_atom : trace_eq_atom -> trace_eq_atom
 
 val not_simpl : term -> term
 

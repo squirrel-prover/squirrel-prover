@@ -737,10 +737,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
       let form = Hyps.by_id hid s in
       let s = Hyps.remove hid s in
 
-      if S.Hyp.is_matom form then
+      if S.Hyp.is_eq form then
         begin
-          match S.Hyp.destr_matom form with
-          | Some (`Eq,a,b) ->
+          match S.Hyp.destr_eq form with
+          | Some (a,b) ->
             let a1, a2 = get_destr ~orig:(`Reach a) (Term.destr_pair a)
             and b1, b2 = get_destr ~orig:(`Reach b) (Term.destr_pair b) in
 
@@ -915,16 +915,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
         `Hyp id, s
       end
 
-    else if S.Conc.is_matom form then
+    else if S.Conc.is_neq form then
       begin
-        match oget (S.Conc.destr_matom form) with
-        | `Neq, u, v ->
-          let h = Term.mk_atom `Eq u v in
-          let h = S.unwrap_hyp (`Reach h) in
-          let id, s = Hyps.add_i Args.Unnamed h s in
-          let s = S.set_goal S.Conc.mk_false s in
-          `Hyp id, s
-        | _ -> soft_failure Tactics.NothingToIntroduce
+        let u, v = oget (S.Conc.destr_neq form) in
+        let h = Term.mk_atom `Eq u v in
+        let h = S.unwrap_hyp (`Reach h) in
+        let id, s = Hyps.add_i Args.Unnamed h s in
+        let s = S.set_goal S.Conc.mk_false s in
+        `Hyp id, s
       end
 
     else soft_failure Tactics.NothingToIntroduce

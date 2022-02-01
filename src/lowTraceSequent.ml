@@ -17,36 +17,33 @@ let dbg ?(force=false) s =
   Printer.prt mode s
 
 (*------------------------------------------------------------------*)
-let get_ord (at : Term.generic_atom ) : Term.ord option = match at with
-  | `Timestamp (ord,_,_) -> Some ord
-  | `Message   (ord,_,_) -> Some (ord :> Term.ord)
-  | `Index     (ord,_,_) -> Some (ord :> Term.ord)
-  | `Happens _           -> None
+let get_ord (at : Term.xatom ) : Term.ord = match at with
+  | `Comp (ord,_,_) -> ord
+  | `Happens _      -> assert false
 
 (** Chooses a name for a formula, depending on an old name (if any), and the
     formula shape. *)
 let choose_name = function
   | `Equiv _ -> "G"
-  | `Reach (Term.Atom at) ->
-
-    let sort = match at with
-      | `Timestamp _ -> "C"
-      | `Message _ -> "M"
-      | `Index _ -> "I"
-      | `Happens _ -> "Hap" in
-
-    let ord = match get_ord at with
-      | Some `Eq  -> "eq"
-      | Some `Neq -> "neq"
-      | Some `Leq -> "le"
-      | Some `Geq -> "ge"
-      | Some `Lt  -> "lt"
-      | Some `Gt  -> "gt"
-      | None      -> "" in
-
+  | `Reach f ->
+    match Term.form_to_xatom f with
+    | None -> "H"
+    | Some (`Happens _) -> "Hap"
+    | Some at ->
+      let sort = match Term.ty_xatom at with
+        | Type.Timestamp -> "C"
+        | Type.Index     -> "I"
+        | _              -> "M" 
+      in
+      let ord = match get_ord at with
+        | `Eq  -> "eq"
+        | `Neq -> "neq"
+        | `Leq -> "le"
+        | `Geq -> "ge"
+        | `Lt  -> "lt"
+        | `Gt  -> "gt"
+      in
     sort ^ ord
-
-  | _ -> "H"
 
 (*------------------------------------------------------------------*)
 module FHyp = struct
@@ -159,7 +156,7 @@ let pp ppf s =
 (*------------------------------------------------------------------*)
 (** Collect specific local hypotheses *)
   
-let get_atoms_of_fhyps (forms : FHyp.t list) : Term.literal list =
+let get_atoms_of_fhyps (forms : FHyp.t list) : Term.literals =
   List.fold_left (fun acc f ->
       match f with
       | `Equiv _ -> acc
@@ -168,64 +165,54 @@ let get_atoms_of_fhyps (forms : FHyp.t list) : Term.literal list =
         | `Entails lits | `Equiv lits -> lits @ acc
     ) [] forms 
 
-let get_atoms_from_s (s : sequent) : Term.literal list =
+let get_atoms_from_s (s : sequent) : Term.literals =
   let fhyps = H.fold (fun _ f acc -> f :: acc) s.hyps [] in
   get_atoms_of_fhyps fhyps
 
-let get_message_atoms (s : sequent) : Term.message_atom list =
-  let do1 (at : Term.literal) : Term.message_atom option =
-    match at with 
-    | `Pos, (`Message _ as at) -> Some at
-    | `Neg, (`Message _ as at) -> Some (Term.not_message_atom at)
+let get_message_atoms (s : sequent) : Term.xatom list =
+  let do1 (at : Term.literal) : Term.xatom option =
+    match Term.ty_lit at with
+    | Type.Timestamp | Type.Index -> None
+    | _ ->
+      (* FIXME: move simplifications elsewhere *)
+      match at with 
+      | `Pos, (`Comp _ as at)       -> Some at
+      | `Neg, (`Comp (`Eq, t1, t2)) -> Some (`Comp (`Neq, t1, t2))
+      | _ -> None
+  in
+  List.filter_map do1 (get_atoms_from_s s)
+
+let get_trace_literals (s : sequent) : Term.literals =
+  let do1 (lit : Term.literal) : Term.literal option =
+    match Term.ty_lit lit with 
+    | Type.Index | Type.Timestamp -> Some lit
     | _ -> None
   in
   List.filter_map do1 (get_atoms_from_s s)
 
-let get_trace_literals (s : sequent) : Term.trace_literal list =
-  let do1 (at : Term.literal) : Term.trace_literal option =
-    match at with 
-    | x, Term.(#trace_atom as at) -> Some (x, at)
+let get_eq_atoms (s : sequent) : Term.xatom list =
+  let do1 (lit : Term.literal) : Term.xatom option =
+    match lit with 
+    | `Pos, (`Comp ((`Eq | `Neq), _, _) as at) -> Some at
+
+    | `Neg, (`Comp (`Eq,  t1, t2)) -> Some (`Comp (`Neq, t1, t2))
+    | `Neg, (`Comp (`Neq, t1, t2)) -> Some (`Comp (`Eq,  t1, t2))
+
     | _ -> None
-  in
-  List.filter_map do1 (get_atoms_from_s s)
-
-let get_eq_atoms (s : sequent) : Term.eq_atom list =
-  let do1 (at : Term.literal) : Term.eq_atom option =
-    match at with               (* FIXME: improve this *)
-    | `Pos, Term.(#message_atom as at) -> 
-      Some (at :> Term.eq_atom)
-
-    | `Pos, Term.(#index_atom as at) -> 
-      Some (at :> Term.eq_atom)
-
-    | `Pos, Term.(`Timestamp ((`Eq | `Neq), _, _) as at) -> 
-      Some (at :> Term.eq_atom)
-
-    | `Neg, Term.(#message_atom as at) -> 
-      Some (Term.not_message_atom at :> Term.eq_atom)
-
-    | `Neg, Term.(#index_atom as at) -> 
-      Some (Term.not_index_atom at :> Term.eq_atom)
-
-    | `Neg, Term.(`Timestamp (`Eq, a, b)) -> 
-      Some (`Timestamp (`Neq, a,b) :> Term.eq_atom)
-
-    | `Neg, Term.(`Timestamp (`Neq, a, b)) -> 
-      Some (`Timestamp (`Eq, a,b) :> Term.eq_atom)
-
-    | _, `Happens _ 
-    | _, `Timestamp ((`Leq | `Geq | `Lt | `Gt), _, _) -> None
   in
   List.filter_map do1 (get_atoms_from_s s) 
 
 let get_all_messages s =
   let atoms = get_message_atoms s in
   let atoms =
-    match s.conclusion with
-      | Term.Atom (`Message _ as atom) -> atom :: atoms
+    match Term.form_to_xatom s.conclusion with
+      | Some at -> at :: atoms
       | _ -> atoms
   in
-  List.fold_left (fun acc (`Message (_,a,b)) -> a :: b :: acc) [] atoms
+  List.fold_left (fun acc at -> match at with
+      | `Happens _ -> acc
+      | (`Comp (_,a,b)) -> a :: b :: acc
+    ) [] atoms
 
 (*------------------------------------------------------------------*)
 (** Prepare constraints or TRS query *)
@@ -497,9 +484,11 @@ let pi projection s =
 
 let set_goal a s =
   let s = S.update ~conclusion:a s in
-    match a with
-      | Term.Atom Term.(#message_atom) 
-        when Config.auto_intro () -> Hyps.add_macro_defs s a
+    match Term.form_to_xatom a with
+      | Some at 
+        when Term.ty_xatom at = Type.Message && 
+             Config.auto_intro () -> 
+        Hyps.add_macro_defs s a
       | _ -> s
 
 let init ~system ~table ~hint_db ~ty_vars ~env conclusion =
@@ -523,17 +512,10 @@ let subst subst s =
 (** TRS *)
 
 let get_eqs_neqs s =
-  List.fold_left (fun (eqs, neqs) (atom : Term.eq_atom) -> match atom with
-      | `Message   (`Eq,  a, b) -> Term.ESubst (a,b) :: eqs, neqs
-      | `Timestamp (`Eq,  a, b) -> Term.ESubst (a,b) :: eqs, neqs
-      | `Index     (`Eq,  a, b) -> 
-        Term.ESubst (Term.mk_var a, Term.mk_var b) :: eqs, neqs
-
-      | `Message   (`Neq, a, b) -> eqs, Term.ESubst (a,b) :: neqs
-      | `Timestamp (`Neq, a, b) -> eqs, Term.ESubst (a,b) :: neqs
-      | `Index     (`Neq, a, b) -> 
-        eqs, Term.ESubst (Term.mk_var a,Term.mk_var b) :: neqs
-
+  List.fold_left (fun (eqs, neqs) (atom : Term.xatom) -> match atom with
+      | `Comp (`Eq,  a, b) -> Term.ESubst (a,b) :: eqs, neqs
+      | `Comp (`Neq, a, b) -> eqs, Term.ESubst (a,b) :: neqs
+      | _ -> assert false
     ) ([],[]) (get_eq_atoms s)
 
 let get_trs_t s : Completion.state Utils.timeout_r =

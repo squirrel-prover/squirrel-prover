@@ -3,14 +3,10 @@
     Here, minimanility means inclusion w.r.t. the predicates. *)
 type models
 
-type trace_literal = [`Pos | `Neg] * Term.trace_atom
-
-type trace_literals = trace_literal list
-
 (*------------------------------------------------------------------*) 
 (** [models_conunct l] returns the list of minimal models of the conjunction of
     atoms. *)
-val models_conjunct : trace_literals -> models Utils.timeout_r
+val models_conjunct : Term.literal list -> models Utils.timeout_r
 
 val m_is_sat : models -> bool
 
@@ -19,7 +15,7 @@ val m_is_sat : models -> bool
     This is an under-approximation (i.e. correct but not complete).
     Because we under-approximate, we are very unprecise on dis-equalities
     (i.e. atoms of the form [(Neq,_,_)]). *)
-val query : precise:bool -> models -> trace_literal list -> bool
+val query : precise:bool -> models -> Term.literals -> bool
 
 (** [maximal_elems models elems] computes a set of elements which contains
     the maximal elements of [elems] in every model in [models].

@@ -602,6 +602,27 @@ let fs_ite =
       tyvar in
   mk_fsymb ~fty "if" (-1)
 
+(*------------------------------------------------------------------*)
+(** Comparison *)
+
+let mk_comp name =
+  let tyv = Type.mk_tvar "t" in
+  let tyvar = Type.TVar tyv in
+  let fty = 
+    Type.mk_ftype
+      0 [tyv]
+      [tyvar; tyvar]
+      Type.Boolean
+  in
+  mk_fsymb ~f_info:`Infix ~fty name (-1)
+
+let fs_eq  = mk_comp "="
+let fs_neq = mk_comp "<>"
+let fs_leq = mk_comp "<="
+let fs_lt  = mk_comp "<"
+let fs_geq = mk_comp ">="
+let fs_gt  = mk_comp ">"
+
 (** Witness *)
 
 let fs_witness =
@@ -645,7 +666,7 @@ let fs_empty = mk_fsymb "empty" 0
 
 (** Length *)
 
-let fs_len    =
+let fs_len =
   let tyv = Type.mk_tvar "t" in
   let tyvar = Type.TVar tyv in
 

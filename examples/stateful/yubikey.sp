@@ -293,8 +293,8 @@ Proof.
     1: constraints.
   case H1.
     (* Case S(ii,i) = pred(S(ii1,i)). *)
-    use counterIncreaseStrictly with ii1, i as M0 => //.
-    congruence.
+    by use counterIncreaseStrictly with ii1, i as M0.
+
     (* Case S(ii,i) < pred(S(ii1,i)). *)
     use counterIncreaseBis with pred(S(ii1,i)),S(ii,i),i as H2 => //.
     case H2 => //.

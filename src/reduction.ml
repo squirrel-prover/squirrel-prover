@@ -21,7 +21,7 @@ module Mk (S : LowSequent.S) = struct
     system     : SystemExpr.t;
     param      : red_param;
     hint_db    : Hint.hint_db;
-    trace_lits : Constr.trace_literals;
+    trace_lits : Term.literals;
     conds      : Term.term list;     (* accumulated conditions *)
   }
                  
