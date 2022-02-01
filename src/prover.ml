@@ -352,10 +352,10 @@ module ProverTactics = struct
     let table, env, ty_vars, conc, sexpr =
       match j with
       | Goal.Trace t -> 
-        TS.table t, TS.env t, TS.ty_vars t, `Reach (TS.goal t), TS.system t
+        TS.table t, TS.vars t, TS.ty_vars t, `Reach (TS.goal t), TS.system t
 
       | Goal.Equiv e -> 
-        ES.table e, ES.env e, ES.ty_vars e, `Equiv (ES.goal e), ES.system e
+        ES.table e, ES.vars e, ES.ty_vars e, `Equiv (ES.goal e), ES.system e
     in
     TacticsArgs.convert_args sexpr table ty_vars env parser_args tactic_type conc
 

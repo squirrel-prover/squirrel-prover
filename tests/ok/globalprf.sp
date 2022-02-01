@@ -10,7 +10,7 @@ name m:message
 system null.
 
 abstract ok : message.
-
+abstract ok2 : message.
 
 system [test] (A: out(c, <ok,<h(ok,k),h(ok,k)>>) | B: out(c, h(ok,k))).
 
@@ -83,7 +83,6 @@ system [testi2] (!_i A: out(c, <ok, idn(i)>) | !_i B: out(c,  idn(i))).
 (* we start with a first transitivity, from testi/left to testiPrf *)
 system testiPrf = [testi/left] with gprf (j:index), h(msg(j),key(j)).
 
-
 (* Then, second transitivity, from testiPrf to testiRenamed *)
 system testiRenamed = [testiPrf/left] with rename forall (i:index), equiv(diff(n_PRF1(i),idn(i))).
 (* equiv [testiPrf] t. Proof. print. admit. Qed *)
@@ -145,3 +144,24 @@ fa 2.
 auto.
 
 Qed.
+
+
+(* (*------------------------------------------------------------------*) *)
+(* name ke : message. *)
+(* abstract me : index -> message. *)
+
+(* system [testii] (!_i A: out(c, <ok,h(me(i),ke)>) |  *)
+(*                  !_i B: out(c, h(me(i),ke))). *)
+
+(* (*  We should have  [testi/left,testi2/right] *) *)
+
+(* (* we start with a first transitivity, from testi/left to testiPrf *) *)
+(* system testiiPrf = [testii/left] with gprf (j:index), h(me(j),ke). *)
+
+(* (* TODO: Bug*) *)
+(* global goal [testii/left, testiiPrf/left] _ (i,j : index) :  *)
+(*   [happens(B, B)] -> equiv(output@B, output@B). *)
+(* Proof. *)
+(*   intro H @/output.   *)
+
+

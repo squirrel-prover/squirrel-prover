@@ -105,7 +105,7 @@ let () =
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
   * This can be used with [vars = []] if orig is an [if-then-else] term. *)
 let case_cond orig vars c t e s : sequent list =
-  let env = ref (TS.env s) in
+  let env = ref (TS.vars s) in
   let vars, subst = Term.refresh_vars (`InEnv env) vars in
   let then_c = Term.subst subst c in
   let else_c = Term.mk_forall vars (Term.mk_not c) in
@@ -229,7 +229,7 @@ let rec simpl_left s =
 
     | Exists (vs,f) ->
       let s = Hyps.remove id s in
-      let env = ref @@ TS.env s in
+      let env = ref @@ TS.vars s in
       let subst =
         List.map
           (fun v ->
@@ -238,7 +238,7 @@ let rec simpl_left s =
           vs
       in
       let f = Term.subst subst f in
-      simpl_left (Hyps.add Args.AnyName f (TS.set_env !env s))
+      simpl_left (Hyps.add Args.AnyName f (TS.set_vars !env s))
 
     | _ as form ->
       let f, g = oget (Term.destr_and form) in
@@ -697,7 +697,7 @@ let fresh (m : lsymb) s =
     let id,hyp = Hyps.by_name m s in
     let hyp = TraceLT.expand_all_term hyp s in
     let table = TS.table s in
-    let env   = TS.env s in
+    let env   = TS.vars s in
 
     begin
       match Term.destr_eq hyp with
@@ -737,7 +737,7 @@ let apply_substitute subst s =
     match subst with
       | Term.ESubst (Term.Var v, t) :: _ when
         not (List.mem v (Term.get_vars t)) ->
-          TS.set_env (Vars.rm_var (TS.env s) v) s
+          TS.set_vars (Vars.rm_var (TS.vars s) v) s
       | _ -> s
   in
   [TS.subst subst s]
@@ -926,7 +926,7 @@ let autosubst s =
       let () = dbg "subst %a by %a" Vars.pp x Vars.pp y in
 
       let s =
-        TS.set_env (Vars.rm_var (TS.env s) x) s
+        TS.set_vars (Vars.rm_var (TS.vars s) x) s
       in
       TS.subst [Term.ESubst (Term.mk_var x, Term.mk_var y)] s
   in
@@ -935,7 +935,7 @@ let autosubst s =
 (*------------------------------------------------------------------*)
 (* TODO: this should be an axiom in some library, not a rule *)
 let exec (Args.Message (a,_)) s =
-  let _,var = Vars.make `Approx (TS.env s) Type.Timestamp "t" in
+  let _,var = Vars.make `Approx (TS.vars s) Type.Timestamp "t" in
   let formula =
     Term.mk_forall ~simpl:false
       [var]
@@ -998,9 +998,9 @@ let fa s =
 
   | Term.Seq (vars,t),
     Term.Seq (vars',t') when vars = vars' ->
-    let env = ref (TS.env s) in
+    let env = ref (TS.vars s) in
     let vars, subst = Term.refresh_vars (`InEnv env) vars in
-    let s = TS.set_env !env s in
+    let s = TS.set_vars !env s in
     let t = Term.subst subst t in
     let t' = Term.subst subst t' in
     let subgoals =
@@ -1027,7 +1027,7 @@ let fa s =
      * not matter since they do not appear in [t]. *)
 
     (* Refresh bound variables in c and t*)
-    let env = ref (TS.env s) in
+    let env = ref (TS.vars s) in
     let vars, subst = Term.refresh_vars (`InEnv env) vs in
     let c  = Term.subst subst c in
     let t  = Term.subst subst t in
@@ -1042,7 +1042,7 @@ let fa s =
     let subst' = List.map (function ESubst (x, y) ->
         Term.(ESubst (subst subst_aux x,y))) subst in
 
-    let s = TS.set_env !env s in
+    let s = TS.set_vars !env s in
 
     let c' = Term.subst subst' c' in
 
@@ -1399,7 +1399,7 @@ let euf_apply_schema sequent (_, key, m, s, _, _, _, _) case =
   let le_cnstr = Term.mk_ors le_cnstr in
 
   (* TODO: use an existential for new indices. *)
-  let sequent = TS.set_env case.env sequent in
+  let sequent = TS.set_vars case.env sequent in
 
   let goal =
     Term.mk_impls [eq_indices; new_f; le_cnstr]
@@ -1412,7 +1412,7 @@ let euf_apply_direct s (_, key, m, _, _, _, _, _) Euf.{d_key_indices;d_message} 
    * not in the current environment: this happens when the case is extracted
    * from under a binder, e.g. a Seq or ForAll construct. We need to add
    * such variables to the environment. *)
-  let init_env = TS.env s in
+  let init_env = TS.vars s in
   let subst,env =
     List.fold_left
       (fun (subst,env) v ->
@@ -1425,7 +1425,7 @@ let euf_apply_direct s (_, key, m, _, _, _, _, _) Euf.{d_key_indices;d_message} 
          (d_key_indices @
           Term.get_vars d_message))
   in
-  let s = TS.set_env env s in
+  let s = TS.set_vars env s in
   let d_message = Term.subst subst d_message in
 
   (* Equality between hashed messages. *)
@@ -1448,7 +1448,7 @@ let euf_apply_direct s (_, key, m, _, _, _, _, _) Euf.{d_key_indices;d_message} 
 
 let euf_apply_facts drop_head s
     ((head_fn, key, mess, sign, allow_functions, _, _, fun_wrap_key) as p) =
-  let env = TS.env s in
+  let env = TS.vars s in
   let cntxt = TS.mk_trace_cntxt s in
 
   (* check that the SSCs hold *)

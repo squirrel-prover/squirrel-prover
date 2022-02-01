@@ -42,7 +42,7 @@ let conc_kind = Equiv.Global_t
   * to two frames, interpreting macros wrt the left and right systems
   * respectively. *)
 type t = {
-  env     : Vars.env;
+  vars     : Vars.env;
   table   : Symbols.table;
   ty_vars : Type.tvars;
   hyps    : H.hyps;
@@ -71,8 +71,8 @@ let pp ppf j =
     Fmt.pf ppf "@[Type variables: %a@]@;"
       (Fmt.list ~sep:Fmt.comma Type.pp_tvar) j.ty_vars ;
 
-  if j.env <> Vars.empty_env then
-    Fmt.pf ppf "@[Variables: %a@]@;" Vars.pp_env j.env ;
+  if j.vars <> Vars.empty_env then
+    Fmt.pf ppf "@[Variables: %a@]@;" Vars.pp_env j.vars ;
 
   H.pps ppf j.hyps ;
 
@@ -81,8 +81,8 @@ let pp ppf j =
   Fmt.pf ppf "@;%a@]" pp_goal j.goal
 
 let pp_init ppf j =
-  if j.env <> Vars.empty_env then
-    Fmt.pf ppf "forall %a,@ " Vars.pp_env j.env ;
+  if j.vars <> Vars.empty_env then
+    Fmt.pf ppf "forall %a,@ " Vars.pp_env j.vars ;
   Fmt.pf ppf "%a" Equiv.pp j.goal
 
 
@@ -179,9 +179,9 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Accessors and utils} *)
 
-let env j = j.env
+let vars j = j.vars
 
-let set_env e j = {j with env = e}
+let set_vars e j = { j with vars = e }
 
 let system j = j.system
 let set_system system j = { j with system }
@@ -234,7 +234,7 @@ let goal_as_equiv s = match goal s with
   * only keep global formula hypotheses in a restricted case: the two
   * projections are the same. *)
 let to_trace_sequent s =
-  let env = env s in
+  let vars = vars s in
   let system = system s in
   let keep_global_hyps =
     SystemExpr.project Term.PLeft  system =
@@ -251,7 +251,7 @@ let to_trace_sequent s =
         (Tactics.GoalBadShape "expected a reachability formula")
   in
 
-  let trace_s = TS.init ~system ~table ~hint_db ~ty_vars ~env goal in
+  let trace_s = TS.init ~system ~table ~hint_db ~ty_vars ~vars goal in
 
   (* Add all relevant hypotheses. *)
   Hyps.fold
@@ -306,14 +306,14 @@ let set_equiv_goal e j =
   else new_sequent
 
 
-let init ~system ~table ~hint_db ~ty_vars ~env ?hyp goal =
+let init ~system ~table ~hint_db ~ty_vars ~vars ?hyp goal =
   let hyps = H.empty in
   let hyps = match hyp with
     | None -> hyps
     | Some h ->
         snd (H.add ~force:false (H.fresh_id "H" hyps) h hyps)
   in
-  let new_sequent = { table; hint_db; system; ty_vars; env; hyps; goal } in
+  let new_sequent = { table; hint_db; system; ty_vars; vars; hyps; goal } in
   if Config.post_quantum () then
    check_pq_sound_sequent new_sequent
   else new_sequent

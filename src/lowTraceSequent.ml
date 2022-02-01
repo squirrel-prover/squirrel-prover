@@ -65,7 +65,7 @@ module S : sig
     ty_vars : Type.tvars;
     (** Free type variables of the sequent. *)
 
-    env : Vars.env;
+    vars : Vars.env;
     (** Must contain all free variables of the sequent,
       * which are logically understood as universally quantified. *)
     
@@ -81,7 +81,7 @@ module S : sig
     table:Symbols.table ->
     hint_db:Hint.hint_db ->
     ty_vars:Type.tvars ->
-    env:Vars.env ->
+    vars:Vars.env ->
     conclusion:Term.term ->
     t
 
@@ -89,7 +89,7 @@ module S : sig
     ?system:SystemExpr.t ->
     ?table:Symbols.table ->
     ?ty_vars:Type.tvars ->
-    ?env:Vars.env ->
+    ?vars:Vars.env ->
     ?hyps:H.hyps ->
     ?conclusion:Term.term ->
     t -> t
@@ -100,30 +100,30 @@ end = struct
     table      : Symbols.table;
     hint_db    : Hint.hint_db;
     ty_vars    : Type.tvars;
-    env        : Vars.env;
+    vars       : Vars.env;
     (* hind_db    : Reduction. *)
     hyps       : H.hyps;
     conclusion : Term.term;
   }
 
-  let init_sequent ~system ~table ~hint_db ~ty_vars ~env ~conclusion = {
+  let init_sequent ~system ~table ~hint_db ~ty_vars ~vars ~conclusion = {
     system ;
     table;
     hint_db;
     ty_vars;
-    env;
+    vars;
     hyps = H.empty;
     conclusion;
   }
 
-  let update ?system ?table ?ty_vars ?env ?hyps ?conclusion t =
+  let update ?system ?table ?ty_vars ?vars ?hyps ?conclusion t =
     let system     = Utils.odflt t.system system
     and table      = Utils.odflt t.table table
     and ty_vars    = Utils.odflt t.ty_vars ty_vars
-    and env        = Utils.odflt t.env env
+    and vars       = Utils.odflt t.vars vars
     and hyps       = Utils.odflt t.hyps hyps
     and conclusion = Utils.odflt t.conclusion conclusion in
-    { t with system; table; ty_vars; env; hyps; conclusion; } 
+    { t with system; table; ty_vars; vars; hyps; conclusion; } 
 end
 
 include S
@@ -141,8 +141,8 @@ let pp ppf s =
     pf ppf "@[Type variables: %a@]@;" 
       (Fmt.list ~sep:Fmt.comma Type.pp_tvar) s.ty_vars ;
 
-  if s.env <> Vars.empty_env then
-    pf ppf "@[Variables: %a@]@;" Vars.pp_env s.env ;
+  if s.vars <> Vars.empty_env then
+    pf ppf "@[Variables: %a@]@;" Vars.pp_env s.vars ;
 
   (* Print hypotheses *)
   H.pps ppf s.hyps ;
@@ -434,12 +434,12 @@ module Hyps = struct
 end
 
 (*------------------------------------------------------------------*)
-let env     s = s.env
+let vars    s = s.vars
 let ty_vars s = s.ty_vars
 let system  s = s.system
 let table   s = s.table
 
-let set_env    a      s = S.update ~env:a         s
+let set_vars   a      s = S.update ~vars:a        s
 let set_system system s = S.update ~system:system s 
 let set_ty_vars vs    s = S.update ~ty_vars:vs    s 
 let set_table  table  s = S.update ~table:table   s 
@@ -493,8 +493,8 @@ let set_goal a s =
         Hyps.add_macro_defs s a
       | _ -> s
 
-let init ~system ~table ~hint_db ~ty_vars ~env conclusion =
-  init_sequent ~system ~table ~hint_db ~ty_vars ~env ~conclusion
+let init ~system ~table ~hint_db ~ty_vars ~vars conclusion =
+  init_sequent ~system ~table ~hint_db ~ty_vars ~vars ~conclusion
 
 let goal s = s.conclusion
 

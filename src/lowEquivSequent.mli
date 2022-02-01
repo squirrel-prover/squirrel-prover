@@ -21,7 +21,7 @@ val init :
   table:Symbols.table ->
   hint_db:Hint.hint_db ->
   ty_vars:Type.tvars ->
-  env:Vars.env ->
+  vars:Vars.env ->
   ?hyp:Equiv.form ->
   Equiv.form ->
   t

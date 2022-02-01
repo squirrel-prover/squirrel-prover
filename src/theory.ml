@@ -456,7 +456,7 @@ let check_name table (s : lsymb) n : Type.ty =
     if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity));
     ndef.n_ty
 
-let check_action table (s : lsymb) n =
+let check_action table (s : lsymb) (n : int) : unit =
   let l,_ = Action.find_symbol s table in
   let arity = List.length l in
   if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity));

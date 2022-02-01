@@ -91,15 +91,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   let convert_args (s : S.sequent) args sort =
     Args.convert_args 
-      (S.system s) (S.table s) (S.ty_vars s) (S.env s) 
+      (S.system s) (S.table s) (S.ty_vars s) (S.vars s) 
       args sort (S.wrap_conc (S.goal s))
   
   let convert (s : S.sequent) term =
     let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in
-    Theory.convert cenv (S.ty_vars s) (S.env s) term
+    Theory.convert cenv (S.ty_vars s) (S.vars s) term
 
   let convert_ht (s : S.sequent)  ht =
-    let env = S.env s in
+    let env = S.vars s in
     let table = S.table s in
     let conv_env = Theory.{ table = table; cntxt = InGoal; } in
     Theory.convert_ht conv_env (S.ty_vars s) env ht
@@ -269,11 +269,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       match f with
       | `Equiv f ->
-        let f = odflt f (Match.E.map ?m_rec expand_inst (S.env s) f) in
+        let f = odflt f (Match.E.map ?m_rec expand_inst (S.vars s) f) in
         `Equiv f, []
 
       | `Reach f ->
-        let f = odflt f (Match.T.map ?m_rec expand_inst (S.env s) f) in
+        let f = odflt f (Match.T.map ?m_rec expand_inst (S.vars s) f) in
         `Reach f, []
     in
 
@@ -295,7 +295,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       | _ -> `Continue
     in
-    let f_opt = Match.T.map ~m_rec:true expand_inst (S.env s) f in
+    let f_opt = Match.T.map ~m_rec:true expand_inst (S.vars s) f in
     odflt f f_opt
 
   (** expand all macro of some targets in a sequent *)
@@ -415,7 +415,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       else
         let rw_res =
           Rewrite.rewrite
-            (S.table s) (S.system s) (S.env s)
+            (S.table s) (S.system s) (S.vars s)
             mult rw_erule f
         in
         match rw_res with
@@ -567,7 +567,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let table  = S.table s in
 
     let mk_case descr : Vars.var list * Term.term =
-      let env = ref (S.env s) in
+      let env = ref (S.vars s) in
       let indices, s = Term.refresh_vars (`InEnv env) descr.Action.indices in
 
       let name =
@@ -706,12 +706,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
     match ip_handler with
     | `Var v ->
       let env, v' =
-        var_of_naming_pat n_ip ~dflt_name:(Vars.name v) (Vars.ty v) (S.env s)
+        var_of_naming_pat n_ip ~dflt_name:(Vars.name v) (Vars.ty v) (S.vars s)
       in
       let subst = [Term.ESubst (Term.mk_var v, Term.mk_var v')] in
 
       (* FIXME: we substitute everywhere. This is inefficient. *)
-      S.subst subst (S.set_env env s)
+      S.subst subst (S.set_vars env s)
 
     | `Hyp hid ->
       let f = Hyps.by_id hid s in
@@ -969,8 +969,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let try_clean_env vars s : S.t =
     let s_fv = S.fv s in
     let clear = Sv.diff vars (Sv.inter vars s_fv) in
-    let env = Vars.rm_vars (S.env s) (Sv.elements clear) in
-    S.set_env env s
+    let env = Vars.rm_vars (S.vars s) (Sv.elements clear) in
+    S.set_vars env s
 
   let _generalize ~dependent t s : Vars.var * S.t =
     let v = Vars.make_new (Term.ty t) "_x" in
@@ -1023,7 +1023,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           env,
           v' :: new_vars,
           Term.ESubst (Term.mk_var v, Term.mk_var v') :: subst
-        ) (S.env s, [], []) vars n_ips
+        ) (S.vars s, [], []) vars n_ips
     in
     let s = S.subst subst s in
 
@@ -1296,7 +1296,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       soft_failure (Tactics.Failure "cannot introduce exists");
 
     let table = S.table s in
-    let nu = Theory.parse_subst table (S.ty_vars s) (S.env s) vs ths in
+    let nu = Theory.parse_subst table (S.ty_vars s) (S.vars s) vs ths in
     let new_formula = S.subst_conc nu f in
     [S.set_goal new_formula s]
 
@@ -1330,7 +1330,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
    (* rename cleanly the variables *)
     let vars, subst =
-      Term.refresh_vars (`InEnv (ref (S.env s))) (Sv.elements pat.pat_vars)
+      Term.refresh_vars (`InEnv (ref (S.vars s))) (Sv.elements pat.pat_vars)
     in
     let f = S.subst_conc subst pat.pat_term in
     let f =
@@ -1476,10 +1476,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   let remember (id : Theory.lsymb) (term : Theory.term) s =
     let t, ty = convert s term in
-    let env, x = make_exact ~loc:(L.loc id) (S.env s) ty (L.unloc id) in
+    let env, x = make_exact ~loc:(L.loc id) (S.vars s) ty (L.unloc id) in
     let subst = [Term.ESubst (t, Term.mk_var x)] in
 
-    let s = S.subst subst (S.set_env env s) in
+    let s = S.subst subst (S.set_vars env s) in
     let eq =
       Equiv.Babel.convert
         (Term.mk_atom `Eq (Term.mk_var x) t)

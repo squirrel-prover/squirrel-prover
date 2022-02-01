@@ -292,7 +292,7 @@ module Mk (Args : MkArgs) : S with
           let t, _ = 
             Theory.convert 
               ~ty_env ~pat:true
-              cenv (S.ty_vars s) (S.env s) 
+              cenv (S.ty_vars s) (S.vars s) 
               ~ty p_arg 
           in
 

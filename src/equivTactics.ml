@@ -229,14 +229,14 @@ let generalize (ts : Term.term) s =
     values of τ, producing a judgement for each one.
     Generalizes Γ ⊢ E over τ if necessary. *)
 let induction Args.(Message (ts,_)) s =
-  let env = ES.env s in
+  let env = ES.vars s in
   match ts with
   | Var t as ts ->
     (* Generalizes over [ts]. *)
     let intro_back, s = generalize ts s in
 
     (* Remove ts from the sequent, as it will become unused. *)
-    let s = ES.set_env (Vars.rm_var env t) s in
+    let s = ES.set_vars (Vars.rm_var env t) s in
     let table  = ES.table s in
     let system = ES.system s in
     let subst = [Term.ESubst (ts, Term.mk_pred ts)] in
@@ -260,7 +260,7 @@ let induction Args.(Message (ts,_)) s =
       then ()
       else
         begin
-          let env = ref @@ ES.env induc_s in
+          let env = ref @@ ES.vars induc_s in
           let subst =
             List.map
               (fun i ->
@@ -274,7 +274,7 @@ let induction Args.(Message (ts,_)) s =
           in
           let ts_subst = [Term.ESubst(ts,name)] in
           goals := (ES.subst ts_subst induc_s
-                    |> ES.set_env !env)
+                    |> ES.set_vars !env)
                    ::!goals
         end
     in
@@ -307,7 +307,7 @@ let enrich ty f l (s : ES.t) =
   ES.set_equiv_goal (f :: ES.goal_as_equiv s) s
 
 let enrich_a arg s =
-  let tbl, env = ES.table s, ES.env s in
+  let tbl, env = ES.table s, ES.vars s in
   match 
     Args.convert_args
       (ES.system s) tbl (ES.ty_vars s) env [arg] 
@@ -369,7 +369,7 @@ let fa i s =
     (* Special case for try find, otherwise we use fa_expand *)
     match e with
     | Find (vars,c,t,e) ->
-      let env = ref (ES.env s) in
+      let env = ref (ES.vars s) in
       let vars' = List.map (Vars.fresh_r env) vars in
       let subst =
         List.map2
@@ -382,7 +382,7 @@ let fa i s =
         List.rev_append before
           (Equiv.[ c' ; t' ; e ] @ after)
       in
-      [ ES.set_env !env (ES.set_equiv_goal biframe s) ]
+      [ ES.set_vars !env (ES.set_equiv_goal biframe s) ]
 
     | Seq(vars,t) ->
       let terms = fa_expand t in
@@ -747,7 +747,7 @@ let fresh i s =
      condition *)
   let biframe_exp = List.map (fun t -> EquivLT.expand_all_term t s) biframe in
   let cntxt   = ES.mk_trace_cntxt s in
-  let env     = ES.env s in
+  let env     = ES.vars s in
   try
     let if_term = fresh_mk_if_term cntxt env e biframe_exp in
     let biframe = List.rev_append before (if_term :: after) in
@@ -765,7 +765,7 @@ let fresh_tac args = match args with
 (*------------------------------------------------------------------*)
 (** Sequence expansion of the sequence [term] for the given parameters [ths]. *)
 let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
-  let env = ES.env s in
+  let env = ES.vars s in
   let table = ES.table s in
   match EquivLT.convert s term with
   (* we expect term to be a sequence *)
@@ -1222,7 +1222,7 @@ let prf arg s =
 
   let biframe = List.rev_append before after in
   let cntxt = ES.mk_trace_cntxt s in
-  let env = ES.env s in
+  let env = ES.vars s in
 
   let e = Term.head_normal_biterm e in
   (* search for the first occurrence of a hash in [e] *)
@@ -1441,7 +1441,7 @@ let split_seq (li : int L.located) ht s : ES.sequent =
   let ti_t = Term.mk_ite cond               ti else_branch in
   let ti_f = Term.mk_ite (Term.mk_not cond) ti else_branch in
 
-  let env = ES.env s in
+  let env = ES.vars s in
   let frame = List.rev_append before ([Term.mk_seq env is ti_t;
                                        Term.mk_seq env is ti_f] @ after) in
   ES.set_equiv_goal frame s
@@ -1476,7 +1476,7 @@ let mem_seq (i_l : int L.located) (j_l : int L.located) s : Goal.t list =
   EquivLT.check_ty_eq (Term.ty t) (Term.ty seq_term);
 
   (* refresh the sequence *)
-  let env = ref (ES.env s) in
+  let env = ref (ES.vars s) in
   let seq_vars, subst = Term.refresh_vars (`InEnv env) seq_vars in
   let seq_term = Term.subst subst seq_term in
 
@@ -1548,7 +1548,7 @@ let const_seq
   in
 
   (* refresh variables *)
-  let env = ref (ES.env s) in
+  let env = ref (ES.vars s) in
   let e_is, subst = Term.refresh_vars (`InEnv env) e_is in
   let e_ti = Term.subst subst e_ti in
 
@@ -1616,7 +1616,7 @@ let cca1 Args.(Int i) s =
   let biframe = List.rev_append before after in
   let cntxt = ES.mk_trace_cntxt s in
   let table = cntxt.table in
-  let env = ES.env s in
+  let env = ES.vars s in
 
   let e = Term.head_normal_biterm e in
 
@@ -1810,7 +1810,7 @@ let enckp arg (s : ES.t) =
   let biframe = List.rev_append before after in
   let cntxt = ES.mk_trace_cntxt s in
   let table = cntxt.table in
-  let env = ES.env s in
+  let env = ES.vars s in
 
   (* Apply tactic to replace key(s) in [enc] using [new_key].
    * Precondition:
@@ -2070,7 +2070,7 @@ let xor arg s =
   (* the biframe to consider when checking the freshness *)
   let biframe = List.rev_append before after in
   let cntxt = ES.mk_trace_cntxt s in
-  let env = ES.env s in
+  let env = ES.vars s in
 
   let xor_occ =
     match (Iter.get_fsymb ~allow_diff:true (ES.table s) Term.f_xor e), opt_m with

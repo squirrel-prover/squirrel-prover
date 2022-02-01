@@ -10,7 +10,7 @@ type t = Trace of TS.t | Equiv of ES.t
 val pp : Format.formatter -> t -> unit
 val pp_init : Format.formatter -> t -> unit
 
-val get_env : t -> Vars.env
+val vars : t -> Vars.env
 
 (*------------------------------------------------------------------*)
 val map      : (TS.t -> TS.t)      -> (ES.t -> ES.t)      -> t -> t
