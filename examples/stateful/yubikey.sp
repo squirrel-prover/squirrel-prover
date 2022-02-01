@@ -49,6 +49,7 @@ computational model’, 2014.
 *******************************************************************************)
 
 set autoIntro = false.
+set timeout=3.
 
 (** Public constants (`abstract`) and names used in the protocol. **)
 abstract startplug  : message
