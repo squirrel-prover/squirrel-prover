@@ -7,7 +7,7 @@ Proof.
  auto.
 Qed.
 
-goal _ (t:timestamp): t = pred(t) => not happens(t).
+goal _ (t:timestamp): t = pred(t) => not (happens(t)).
 Proof.
  auto.
 Qed.
@@ -53,7 +53,7 @@ Proof.
 Abort.
 
 (* we can check it *)
-goal _ (t:timestamp): t = init => not happens(pred(t)).
+goal _ (t:timestamp): t = init => not (happens(pred(t))).
 Proof.
  auto.
 Qed.

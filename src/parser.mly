@@ -13,11 +13,11 @@
 %token <string> ID   /* general purpose identifier */
 %token <string> INFIXSYMB   /* infix function symbols */
 %token <string> BANG
-%token AT PRED
+%token AT 
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
 %token LANGLE RANGLE
-%token GAND GOR AND OR NOT TRUE FALSE HAPPENS
+%token GAND GOR AND OR NOT TRUE FALSE 
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS COLONEQ
 %token XOR STAR UNDERSCORE QMARK TICK
 %token LET IN IF THEN ELSE FIND SUCHTHAT
@@ -25,7 +25,7 @@
 %token NEW OUT PARALLEL NULL
 %token CHANNEL PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT TYPE FUN
 %token MUTABLE SYSTEM SET
-%token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW RARROW
+%token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW RARROW
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token LOCAL GLOBAL
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH SLASHSLASHEQUAL ATSLASH
@@ -49,7 +49,7 @@
 %left AND OR
 %left GAND GOR
 
-%nonassoc TRUE SEQ PRED NOT LPAREN INIT ID UNDERSCORE HAPPENS FALSE DIFF
+%nonassoc TRUE SEQ NOT LPAREN ID UNDERSCORE FALSE DIFF
 
 %nonassoc EQ NEQ GEQ LEQ LANGLE RANGLE
 
@@ -131,13 +131,6 @@ sterm_i:
 
 | l=lloc(TRUE)   { Theory.App (L.mk_loc l "true",[]) }
 
-| HAPPENS LPAREN ts=slist1(term,COMMA) RPAREN
-                                          { Theory.Happens ts }
-
-/* timestamp */
-
-| PRED LPAREN ts=term RPAREN             { Theory.Tpred ts }
-| INIT                                   { Theory.Tinit }
 
 %inline infix_s:
 | AND         { "&&"  }
@@ -169,7 +162,8 @@ term_i:
 | FIND is=opt_indices SUCHTHAT b=term IN t=term t0=else_term
                                           { Theory.Find (is,b,t,t0) }
 
-| f=term o=ord f0=term                    { Theory.Compare (o,f,f0) }
+| f=term o=loc(ord) f0=term                
+    { Theory.App (o,[f;f0]) }
 
 | EXISTS LPAREN vs=arg_list RPAREN sep f=term %prec QUANTIF
                                  { Theory.Exists (vs,f)  }
@@ -211,12 +205,12 @@ tm_list:
 (* Facts, aka booleans *)
 
 %inline ord:
-| EQ                             { `Eq }
-| NEQ                            { `Neq }
-| LEQ                            { `Leq }
-| LANGLE                         { `Lt }
-| GEQ                            { `Geq }
-| RANGLE                         { `Gt }
+| EQ                             { "=" }
+| NEQ                            { "<>" }
+| LEQ                            { "<=" }
+| LANGLE                         { "<" }
+| GEQ                            { ">=" }
+| RANGLE                         { ">" }
 
 arg:
 | is=ids COLON k=p_ty                     { List.map (fun x -> x,k) is }

@@ -147,7 +147,7 @@ let () =
     end ;
     "Quantifiers", `Quick, begin fun () ->
       check "forall (x:index), True" ;
-      check "forall (x:index), (x = x && x <> x)" ;
+      check "forall (x:index), ((x = x) && (x <> x))" ;
       check "exists (x:index), True" ;
       check "exists (x:index,y:message,z:index,t:timestamp), True" ;
       eqf "exists x:index, True" "exists (x:index) True" ;

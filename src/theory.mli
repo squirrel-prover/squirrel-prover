@@ -43,9 +43,7 @@ type bnds = bnd list
   * function applications, macros, variables, names etc. *)
 
 type term_i =
-  | Tinit
   | Tpat  
-  | Tpred of term
   | Diff  of term * term
   | Seq   of bnds * term
   | Find  of lsymb list * term * term * term
@@ -62,8 +60,6 @@ type term_i =
     * disambiguated yet.
     * [AppAt(f,t1 :: ... :: tn,tau)] is [f (t1, ..., tn)\@tau] *)
                  
-  | Compare of Term.ord * term * term
-  | Happens of term list
   | ForAll  of bnds * term
   | Exists  of bnds * term
 

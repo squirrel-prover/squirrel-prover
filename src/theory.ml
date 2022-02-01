@@ -38,9 +38,7 @@ type bnds = (lsymb * p_ty) list
 (** {2 Terms} *)
 
 type term_i =
-  | Tinit
   | Tpat
-  | Tpred of term
   | Diff  of term * term
   | Seq   of bnds * term
   | Find  of lsymb list * term * term * term
@@ -56,9 +54,6 @@ type term_i =
       timestamp.  As for [App _], the head function symbol has not been
       disambiguated yet.
       [AppAt(f,t1 :: ... :: tn,tau)] is [f (t1, ..., tn)@tau] *)
-
-  | Compare of Term.ord * term * term
-  | Happens of term list
 
   | ForAll  of bnds * term
   | Exists  of bnds * term
@@ -81,20 +76,8 @@ let rec equal_p_ty t t' = match L.unloc t, L.unloc t' with
 
 (*------------------------------------------------------------------*)
 let rec equal t t' = match L.unloc t, L.unloc t' with
-  | Tinit, Tinit -> true
-
-  | Tpred   a, Tpred   a' ->
-    equal a a'
-
-  | Happens l, Happens l' ->
-    List.length l = List.length l' &&
-    List.for_all2 equal l l'
-
   | Diff (a,b), Diff (a',b') ->
     equal a a' && equal b b'
-
-  | Compare (ord, a, b), Compare (ord', a', b') ->
-    ord = ord' && equal a a' && equal b b'
 
   | Seq (l, a),    Seq (l', a')
   | ForAll (l, a), ForAll (l', a')
@@ -156,14 +139,7 @@ let pp_var_list ppf l =
 
 
 let rec pp_term_i ppf t = match t with
-  | Tinit -> Printer.kws `TermAction ppf "init"
-
   | Tpat -> Fmt.pf ppf "_"
-
-  | Tpred t ->
-      Fmt.pf ppf "%a(%a)" 
-        (Printer.kws `TermAction) "pred" 
-        pp_term t
 
   | Find (vs,c,t,e) ->
       Fmt.pf ppf
@@ -224,15 +200,6 @@ let rec pp_term_i ppf t = match t with
       (L.unloc f)
       (Utils.pp_list pp_term) terms
       pp_ts ts
-
-  | Compare (ord,tl,tr) ->
-    Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Term.pp_ord ord pp_term tr
-
-  | Happens t -> 
-      Fmt.pf ppf "%a(%a)"
-        (Printer.kws `TermHappens) "happens"
-        (Utils.pp_list pp_term) t
-
 
   | Seq (vs, b) ->
       Fmt.pf ppf "@[%a(@[%a->%a@])@]"
@@ -657,13 +624,9 @@ let subst t (s : (string * term_i) list) =
         with Not_found -> t
       end
     | Tpat              -> Tpat
-    | Tinit             -> Tinit
-    | Tpred t           -> Tpred (aux t)
-    | Happens t         -> Happens (List.map aux t)
     | App (s,l)         -> App (s, List.map aux l)
     | AppAt (s,l,ts)    -> AppAt (s, List.map aux l, aux ts)
     | Seq (vs,t)        -> Seq (vs, aux t)
-    | Compare (o,t1,t2) -> Compare (o, aux t1, aux t2)
     | ForAll (vs,f)     -> ForAll (vs, aux f)
     | Exists (vs,f)     -> Exists (vs, aux f)
     | Diff (l,r)        -> Diff (aux l, aux r)
@@ -823,6 +786,23 @@ and convert0
     let env, p = Vars.make ~allow_pat:true `Approx state.env ty "_" in
     Term.mk_var p
 
+  (*------------------------------------------------------------------*)
+  (* particular cases for init and happens *)
+
+  | App ({ pl_desc = "init" },terms) ->
+    if terms <> [] then type_error ();
+    Term.mk_action Symbols.init_action []
+
+  (* happens distributes over its arguments *)
+  | App ({ pl_desc = "happens" },ts) ->
+    let atoms = List.map (fun t ->
+        Term.mk_happens (conv Type.Timestamp t)
+      ) ts in
+    Term.mk_ands atoms
+
+  (* end of special cases *)
+  (*------------------------------------------------------------------*)
+
   | App   (f,terms) ->
     if terms = [] && Vars.mem_s state.env (L.unloc f)
     then convert_var state state.env f ty
@@ -845,40 +825,7 @@ and convert0
       (tm, make_app loc state.table app_cntxt f terms)
       ty
 
-  | Tinit -> Term.mk_action Symbols.init_action []
-
-  | Tpred t -> Term.mk_pred (conv Type.Timestamp t)
-
   | Diff (l,r) -> Term.mk_diff (conv ty l) (conv ty r)
-
-  | Compare (o,u,v) ->
-    begin try
-        Term.mk_atom o (conv Type.Timestamp u) (conv Type.Timestamp v)
-      with Conv (_,Type_error _ ) ->
-
-      match o with
-      | #Term.ord_eq as o ->
-        begin try
-            Term.mk_atom o
-              (Term.mk_var (conv_index state u))
-              (Term.mk_var (conv_index state v))
-          with Conv (_,Type_error _ ) ->
-
-            let tyv = Type.Infer.mk_univar state.ty_env in
-
-            Term.mk_atom o
-              (conv (Type.TUnivar tyv) u)
-              (conv (Type.TUnivar tyv) v)
-        end
-
-      | _ -> conv_err (L.loc tm) (Unsupported_ord (L.unloc tm))
-    end
-
-  | Happens ts ->
-    let atoms = List.map (fun t ->
-        Term.mk_happens (conv Type.Timestamp t)
-      ) ts in
-    Term.mk_ands atoms
 
   | Find (vs,c,t,e) ->
     let env, is =
@@ -921,7 +868,7 @@ and convert0
     in
     Term.mk_seq0 ~simpl:false evs t
 
-and conv_index state t =
+and conv_index state t = 
   match convert state t Type.Index with
     | Term.Var x -> x
     | _ -> conv_err (L.loc t) (Index_not_var (L.unloc t))
@@ -1353,9 +1300,6 @@ let find_app_terms t (names : string list) =
     | AppAt (x',l,ts) ->
       let acc = if L.unloc x' = name then L.unloc x'::acc else acc in
       aux_list name acc (ts :: l)
-
-    | Compare (_,t1,t2) -> aux_list name acc [t1;t2]
-    | Happens t'        -> aux_list name acc t'
 
     | Exists (_,t')
     | ForAll (_,t') -> aux name acc t'
