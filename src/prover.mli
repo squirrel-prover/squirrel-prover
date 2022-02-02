@@ -216,6 +216,7 @@ type decl_error_i =
   | InvalidCtySpace of string list
   | DuplicateCty of string
 
+  | NonDetOp
   | SystemError     of System.system_error
   | SystemExprError of SE.system_expr_err
 

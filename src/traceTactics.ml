@@ -695,7 +695,7 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.term =
 let fresh (m : lsymb) s =
   try
     let id,hyp = Hyps.by_name m s in
-    let hyp = TraceLT.expand_all_term hyp s in
+    let hyp = TraceLT.expand_all_macros hyp s in
     let table = TS.table s in
     let env   = TS.vars s in
 

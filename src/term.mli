@@ -61,19 +61,19 @@ val pp_msymb :  Format.formatter -> msymb -> unit
 type ord = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
 type ord_eq = [ `Eq | `Neq ]
 
-val pp_ord   : Format.formatter -> ord -> unit
+val pp_ord : Format.formatter -> ord -> unit
 
 type ('a,'b) _atom = 'a * 'b * 'b
 
 and term = private
-  | Fun    of fsymb * Type.ftype * term list
-  | Name   of nsymb
-  | Macro  of msymb * term list * term
+  | Fun   of fsymb * Type.ftype * term list
+  | Name  of nsymb
+  | Macro of msymb * term list * term
 
   | Seq    of Vars.var list * term
   | Action of Symbols.action Symbols.t * Vars.var list 
 
-  | Var    of Vars.var
+  | Var of Vars.var
 
   | Diff of term * term
 
@@ -418,6 +418,10 @@ val destr_pair : term -> (term * term) option
 (** {2 Simplification} *)
 
 val not_simpl : term -> term
+
+(** Check if a formula represents a deterministic (i.e. 
+    non-probabilistic) computation. *)
+val is_deterministic : term -> bool
 
 (** Check if a formula only depends on the trace model. *)
 val is_pure_timestamp : term -> bool

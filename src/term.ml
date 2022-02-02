@@ -1557,6 +1557,17 @@ let rec not_simpl = function
 
     | m -> mk_not m
 
+(*------------------------------------------------------------------*)
+let is_deterministic (t : term) : bool = 
+  let exception NonDet in
+
+  let rec is_det : term -> unit = function
+    | Name _ | Macro _ -> raise NonDet
+    | t -> titer is_det t
+  in
+  try is_det t; true with NonDet -> false
+
+
 let is_pure_timestamp (t : term) =
   let rec pure_ts = function
     | Fun (fs, _, [t]) when fs = f_happens -> pure_ts t

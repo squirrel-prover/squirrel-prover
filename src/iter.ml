@@ -90,8 +90,7 @@ end
   * any guarantee on the indices and action used for that expansion,
   * because [get_dummy_definition] is used -- this behaviour is disabled
   * with [exact], in which case all macros will be expanded and must
-  * thus be defined.
-  * If [full] is false, may not visit all macros. *)
+  * thus be defined. *)
 class iter_approx_macros ~exact ~(cntxt:Constr.trace_cntxt) = object (self)
 
   inherit iter ~cntxt as super
@@ -165,8 +164,8 @@ end
 (** {2 Occurrences} *)
 type 'a occ = {
   occ_cnt  : 'a;
-  occ_vars : Sv.t;             (* variables binded above the occurrence *)
-  occ_cond : Term.term;     (* conditions above the occurrence *)
+  occ_vars : Sv.t;      (** variables binded above the occurrence *)
+  occ_cond : Term.term; (** conditions above the occurrence *)
 }
 
 let pp_occ pp_cnt fmt occ =
@@ -184,12 +183,12 @@ type 'a occs = 'a occ list
     that may not happen. *)
 let tfold_occ 
     ~(mode : [`Delta of Constr.trace_cntxt | `NoDelta ])
-    (func : fv:Sv.t -> cond:Term.term -> Term.term -> 'a -> 'a) 
+    (func  : fv:Sv.t -> cond:Term.term -> Term.term -> 'a -> 'a) 
     ~(fv   : Sv.t)
     ~(cond : Term.term)
-    (t    : Term.term) 
-    (acc  : 'a) 
-          : 'a 
+    (t     : Term.term) 
+    (acc   : 'a) 
+  : 'a 
   =
   match t with
   | Term.ForAll (evs, t)
@@ -319,26 +318,27 @@ let get_f
   get t ~fv:Sv.empty ~cond:Term.mk_true
 
 
-let get_ftypes : 
-  ?excludesymtype:Symbols.function_def ->
-  Symbols.table ->
-  Symbols.function_def ->
-  Term.term -> mess_occs = fun ?excludesymtype table symtype t ->
-  get_f  ?excludesymtype table (Type symtype) t
+let get_ftypes 
+    ?(excludesymtype : Symbols.function_def option)
+    (table           : Symbols.table)
+    (symtype         : Symbols.function_def)
+    (t               : Term.term) 
+  : mess_occs 
+  = 
+  get_f ?excludesymtype table (Type symtype) t
 
-let get_fsymb : 
-  ?excludesymtype:Symbols.function_def ->
-  ?allow_diff:bool ->
-  Symbols.table ->
-  Term.fsymb ->
-  Term.term -> mess_occs = fun ?excludesymtype ?allow_diff table symtype t ->
-  get_f  ?excludesymtype ?allow_diff table (Symbol symtype) t
+let get_fsymb 
+    ?(excludesymtype : Symbols.function_def option)
+    ?(allow_diff     : bool option)
+    (table           : Symbols.table)
+    (symtype         : Term.fsymb)
+    (t               : Term.term)
+  :  mess_occs = 
+  get_f ?excludesymtype ?allow_diff table (Symbol symtype) t
 
 
 (*------------------------------------------------------------------*)
 (** {2 get_ftype} *)
-
-
 
 type diff_occ = Term.term occ
 
@@ -346,26 +346,20 @@ type diff_occs = diff_occ list
 
 
 (** Looks for occurrences of diff operator.  *)
-let get_diff : 
-  cntxt:Constr.trace_cntxt ->
-  Term.term -> diff_occs =
-  fun ~cntxt t ->
+let get_diff ~(cntxt : Constr.trace_cntxt) (t : Term.term) : diff_occs =
+  let rec get (t : Term.term) ~(fv:Sv.t) ~(cond:Term.term) : diff_occs =
+    let occs () =
+      tfold_occ ~mode:(`Delta cntxt) (fun ~fv ~cond t occs ->
+          get t ~fv ~cond @ occs
+        ) ~fv ~cond t []
+    in
+    match t with
+    | Term.Diff (s1, s2) ->
+      [{ occ_cnt  = t;
+         occ_vars = fv;
+         occ_cond = cond; }]
 
-  let rec get :
-    Term.term -> fv:Sv.t -> cond:Term.term -> diff_occs =
-    fun t ~fv ~cond ->
-      let occs () =
-        tfold_occ ~mode:(`Delta cntxt) (fun ~fv ~cond t occs ->
-            get t ~fv ~cond @ occs
-          ) ~fv ~cond t []
-      in
-        match t with
-        | Term.Diff (s1, s2) ->
-          [{ occ_cnt  = t;
-             occ_vars = fv;
-             occ_cond = cond; }]
-
-        | _ -> occs ()
+    | _ -> occs ()
   in
 
   get t ~fv:Sv.empty ~cond:Term.mk_true
@@ -383,62 +377,59 @@ type hash_occs = hash_occ list
     function name [f] and [k] a name [k].
     Over-approximation: we try to expand macros, even if they are at a timestamp
     that may not happen. *)
-let get_f_messages_ext : 
-  ?drop_head:bool ->
-  ?fun_wrap_key:'b ->
-  ?fv:Sv.t ->
-  cntxt:Constr.trace_cntxt ->
-  Term.fname ->
-  Term.name ->
-  Term.term -> hash_occs
+let get_f_messages_ext 
+    ?(drop_head = true)
+    ?(fun_wrap_key = None)
+    ?(fv:Sv.t = Sv.empty)
+    ~(cntxt:Constr.trace_cntxt)
+    (f : Term.fname)
+    (k : Term.name)
+    (t : Term.term)
+  : hash_occs
   =
-  fun ?(drop_head=true) ?(fun_wrap_key=None) ?(fv=Sv.empty) ~cntxt f k t ->
+  let rec get (t : Term.term) ~(fv:Sv.t) ~(cond:Term.term) : hash_occs =
+    let occs () =
+      tfold_occ ~mode:(`Delta cntxt) (fun ~fv ~cond t occs ->
+          get t ~fv ~cond @ occs
+        ) ~fv ~cond t []
+    in
 
-  let rec get :
-    Term.term -> fv:Sv.t -> cond:Term.term -> hash_occs =
-    fun t ~fv ~cond ->
-      let occs () =
-        tfold_occ ~mode:(`Delta cntxt) (fun ~fv ~cond t occs ->
-            get t ~fv ~cond @ occs
-          ) ~fv ~cond t []
+    match t with
+    | Term.Fun ((f',_),_, [m;k']) as m_full when f' = f ->
+      let occs =
+        match k' with
+        | Term.Name s' when s'.s_symb = k ->
+          let ret_m = if drop_head then m else m_full in
+          [{ occ_cnt  = s'.s_indices,ret_m;
+             occ_vars = fv;
+             occ_cond = cond; }]
+        | _ -> []
       in
+      occs @ get m ~fv ~cond @ get k' ~fv ~cond
 
-      match t with
-      | Term.Fun ((f',_),_, [m;k']) as m_full when f' = f ->
-        let occs =
-          match k' with
-          | Term.Name s' when s'.s_symb = k ->
-            let ret_m = if drop_head then m else m_full in
-            [{ occ_cnt  = s'.s_indices,ret_m;
-               occ_vars = fv;
-               occ_cond = cond; }]
-          | _ -> []
-        in
-        occs @ get m ~fv ~cond @ get k' ~fv ~cond
+    | Term.Fun ((f',_), _, [m;r;k']) as m_full when f' = f ->
+      let occs =
+        match k', fun_wrap_key with
+        | Term.Name s', None when s'.s_symb = k ->
+          let ret_m = if drop_head then m else m_full in
+          [{ occ_cnt  = s'.s_indices,ret_m;
+             occ_vars = fv;
+             occ_cond = cond; }]
 
-      | Term.Fun ((f',_), _, [m;r;k']) as m_full when f' = f ->
-        let occs =
-          match k', fun_wrap_key with
-          | Term.Name s', None when s'.s_symb = k ->
-            let ret_m = if drop_head then m else m_full in
-            [{ occ_cnt  = s'.s_indices,ret_m;
-               occ_vars = fv;
-               occ_cond = cond; }]
+        |Term.Fun ((f',_), _, [Term.Name s']), Some is_pk
+          when is_pk f' && s'.s_symb = k ->
+          let ret_m = if drop_head then m else m_full in
+          [{ occ_cnt  = s'.s_indices,ret_m;
+             occ_vars = fv;
+             occ_cond = cond; }]
+        | _ -> []
+      in
+      occs @ get m ~fv ~cond @ get k' ~fv ~cond
 
-          |Term.Fun ((f',_), _, [Term.Name s']), Some is_pk
-            when is_pk f' && s'.s_symb = k ->
-            let ret_m = if drop_head then m else m_full in
-            [{ occ_cnt  = s'.s_indices,ret_m;
-               occ_vars = fv;
-               occ_cond = cond; }]
-          | _ -> []
-        in
-        occs @ get m ~fv ~cond @ get k' ~fv ~cond
+    | Term.Var m when not (Type.is_finite (Vars.ty m)) -> assert false
+    (* SSC must have been checked first *)
 
-      | Term.Var m when not (Type.is_finite (Vars.ty m)) -> assert false
-      (* SSC must have been checked first *)
-
-      | _ -> occs ()
+    | _ -> occs ()
   in
 
   get t ~fv ~cond:Term.mk_true
@@ -532,9 +523,9 @@ let fold_descr
     ~(globals:bool)
     (f :
        Symbols.macro Symbols.t -> (* macro symbol [ms] *)
-       Vars.var list ->         (* indices [is] of [ms] *)
+       Vars.var list ->           (* indices [is] of [ms] *)
        Symbols.macro_def ->       (* macro definition *)
-       Term.term ->            (* term [t] defining [ms(is)] *)
+       Term.term ->               (* term [t] defining [ms(is)] *)
        'a -> 'a)
     (table  : Symbols.table)
     (system : SystemExpr.t)
@@ -718,8 +709,7 @@ end = struct
     let join_ms = Term.mk_isymb a_ms.s_symb a_ms.s_typ join_is in
     mk ~env:Sv.empty ~msymb:join_ms ~indices:(!indices_r)
 
-  let incl table system (s1 : t) (s2 : t) : bool
-    =
+  let incl table system (s1 : t) (s2 : t) : bool =
     let tv = Vars.make_new Type.Timestamp "t" in
     let term1 = Term.mk_macro s1.msymb [] (Term.mk_var tv) in
     let term2 = Term.mk_macro s2.msymb [] (Term.mk_var tv) in
@@ -807,7 +797,7 @@ let macro_support
     ~(env  :Sv.t) 
     (cntxt : Constr.trace_cntxt)
     (term  : Term.term)
-  : MsetAbs.t 
+  : MsetAbs.t
   =
   let get_msymbs : 
     mode:[`Delta | `FullDelta ] -> Term.term -> MsetAbs.t
@@ -1001,7 +991,7 @@ let fold_macro_support0
     (func : (
         Symbols.action Symbols.t -> (* action name *)
         Action.action ->            (* action *)
-        Term.term ->             (* term *)
+        Term.term ->                (* term *)
         'a -> 'a))
     (cntxt : Constr.trace_cntxt)
     (env   : Vars.env)

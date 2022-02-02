@@ -28,6 +28,7 @@ type decl_error_i =
   | InvalidCtySpace of string list
   | DuplicateCty of string
 
+  | NonDetOp
   (* TODO: remove these errors, catch directly at top-level *)
   | SystemError     of System.system_error
   | SystemExprError of SE.system_expr_err
@@ -48,6 +49,9 @@ let pp_decl_error_i fmt = function
       (Fmt.list ~sep:Fmt.comma Fmt.string) kws
 
   | DuplicateCty s -> Fmt.pf fmt "duplicated entry %s" s
+
+  | NonDetOp ->
+    Fmt.pf fmt "an operator body cannot contain probabilistic computations"
 
   | SystemExprError e -> SE.pp_system_expr_err fmt e
 
@@ -723,11 +727,16 @@ let set_hint_db db = hint_db := db
 (*------------------------------------------------------------------*)
 (** {2 Declaration parsing} *)
 
+let check_fun_out_ty loc ty =
+  if ty = Type.Index || ty = Type.Timestamp then
+    decl_error loc KDecl InvalidAbsType
+  else ()
+
 let parse_abstract_decl table (decl : Decl.abstract_decl) =
     let in_tys, out_ty =
       List.takedrop (List.length decl.abs_tys - 1) decl.abs_tys
     in
-    let out_ty = as_seq1 out_ty in
+    let p_out_ty = as_seq1 out_ty in
 
     let ty_args = List.map (fun l ->
         Type.mk_tvar (L.unloc l)
@@ -746,11 +755,9 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
 
     let iarr, in_tys = parse_index_prefix 0 in_tys in
 
-    let out_ty = match Theory.parse_p_ty env out_ty with
-      | Type.Index | Type.Timestamp -> 
-        decl_error (L.loc out_ty) KDecl InvalidAbsType
-      | ty -> ty
-    in
+    let out_ty = Theory.parse_p_ty env p_out_ty in
+    
+    check_fun_out_ty (L.loc p_out_ty) out_ty;
 
     Theory.declare_abstract
       table
@@ -761,6 +768,46 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
       decl.name
       decl.symb_type
 
+(*------------------------------------------------------------------*)
+let parse_operator_decl table (decl : Decl.operator_decl) =
+    let name = L.unloc decl.op_name in
+
+    let ty_vars = List.map (fun l ->
+        Type.mk_tvar (L.unloc l)
+      ) decl.op_tyargs
+    in
+
+    let env = Env.init ~table ~ty_vars () in
+    let env, args = Theory.convert_p_bnds env decl.op_args in
+
+    let out_ty = omap (Theory.parse_p_ty env) decl.op_tyout in
+
+    let body, out_ty = 
+      Theory.convert ?ty:out_ty { env; cntxt = InGoal } decl.op_body 
+    in
+    
+    check_fun_out_ty (L.loc decl.op_body) out_ty;
+
+    if not (Term.is_deterministic body) then
+      decl_error (L.loc decl.op_body) KDecl NonDetOp;
+
+    let data = Operator.mk ~name ~ty_vars ~args ~out_ty ~body in
+    let ftype = Operator.ftype data in
+    let table, _ = 
+      Symbols.Function.declare_exact 
+        table decl.op_name
+        ~data:(Operator.Operator data)
+        (ftype, Symbols.Operator)
+    in
+
+    Printer.prt `Result "@[<v 2>new operator:@;%a@]" 
+      Operator.pp_operator data;
+
+    table
+
+(*------------------------------------------------------------------*)
+(** Parse additional type information for procedure declarations 
+    (enc, dec, hash, ...) *)
 let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
   (* check for duplicate *)
   let _ : string list = List.fold_left (fun acc cty ->
@@ -826,7 +873,12 @@ let declare_i table hint_db decl = match L.unloc decl with
       Goal.make_obs_equiv ~enrich table hint_db new_axiom_name new_system 
     in
     let formula = make_conclusion formula in
-    let statement = Goal.{ name=new_axiom_name; system=new_system; ty_vars=[]; formula} in
+    let statement = Goal.{ 
+        name    = new_axiom_name; 
+        system  = new_system; 
+        ty_vars = []; 
+        formula }
+    in
     goals_proved :=  statement :: !goals_proved;
     table
 
@@ -862,7 +914,7 @@ let declare_i table hint_db decl = match L.unloc decl with
     let ptxt_ty = List.assoc_opt "ptxt" ctys
     and ctxt_ty = List.assoc_opt "ctxt" ctys
     and rnd_ty  = List.assoc_opt "rnd"  ctys
-    and k_ty   = List.assoc_opt  "k"    ctys in
+    and k_ty    = List.assoc_opt  "k"   ctys in
 
     Theory.declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty senc sdec
 
@@ -891,6 +943,9 @@ let declare_i table hint_db decl = match L.unloc decl with
 
   | Decl.Decl_abstract decl -> 
     parse_abstract_decl table decl
+
+  | Decl.Decl_operator decl -> 
+    parse_operator_decl table decl
 
   | Decl.Decl_bty bty_decl ->
     let table, _ =

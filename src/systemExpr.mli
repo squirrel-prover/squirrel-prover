@@ -57,9 +57,9 @@ exception BiSystemError of system_expr_err
 (*------------------------------------------------------------------*)
 (** {2 Projection and action builder} *)
 
-(** Prject a system according to the given projection.  The pojection must not
-   be None, and the system must be a bi system, i.e either SimplePair or Pair.
-   *)
+(** Project a system according to the given projection. The pojection
+    must not be None, and the system must be a bi system, i.e either
+    SimplePair or Pair. *)
 val project : Term.projection -> t -> t
 
 (** Convert action to the corresponding [Action] timestamp term in

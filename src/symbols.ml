@@ -56,6 +56,7 @@ type function_def =
   | CheckSign
   | PublicKey
   | Abstract of symb_type
+  | Operator                    (* definition in associated data *)
 
 (*------------------------------------------------------------------*)
 type macro_def =
@@ -240,16 +241,21 @@ let of_lsymb_opt ?(group=default_group) (s : lsymb) (table : table) =
 module type Namespace = sig
   type ns
   type def
-  val reserve : table -> lsymb -> table * data t
+
+  val reserve       : table -> lsymb -> table * data t
   val reserve_exact : table -> lsymb -> table * ns t
-  val define : table -> data t -> ?data:data -> def -> table
+
+  val define   : table -> data t -> ?data:data -> def -> table
   val redefine : table -> data t -> ?data:data -> def -> table
-  val declare :
-    table -> lsymb -> ?data:data -> def -> table * ns t
-  val declare_exact :
-    table -> lsymb -> ?data:data -> def -> table * ns t
-  val of_lsymb : lsymb -> table -> ns t
+
+  val declare       : table -> lsymb -> ?data:data -> def -> table * ns t
+  val declare_exact : table -> lsymb -> ?data:data -> def -> table * ns t
+
+  val mem : lsymb -> table -> bool
+
+  val of_lsymb     : lsymb -> table -> ns t
   val of_lsymb_opt : lsymb -> table -> ns t option
+
   val cast_of_string : string -> ns t
 
   val get_all       : ns t   -> table -> def * data
@@ -328,6 +334,15 @@ module Make (N:S) : Namespace
   let get_data name (table : table) = snd (get_all name table)
 
   let cast_of_string name = {group;name}
+
+  let mem (name : lsymb) (table : table) : bool =
+    let symb = { group; name = L.unloc name } in
+    try
+      ignore (N.deconstruct
+                ~loc:(Some (L.loc name))
+                (fst (Msymb.find symb table.cnt))) ;
+      true
+    with _ -> false
 
   let of_lsymb (name : lsymb) (table : table) =
     let symb = { group; name = L.unloc name } in

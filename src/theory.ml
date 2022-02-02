@@ -1119,6 +1119,25 @@ let declare_abstract table ~index_arity ~ty_args ~in_tys ~out_ty
   let ftype = Type.mk_ftype index_arity ty_args in_tys out_ty in
   fst (Symbols.Function.declare_exact table s (ftype, Symbols.Abstract f_info))
 
+
+let declare_abstract 
+    table ~index_arity ~ty_args ~in_tys ~out_ty 
+    (s : lsymb) (f_info : Symbols.symb_type) 
+  =
+  (* if we declare an infix symbol, run some sanity checks *)
+  let () = match f_info with
+    | `Prefix -> ()
+    | `Infix ->
+      if not (index_arity = 0) ||
+         not (List.length ty_args = 0) ||
+         not (List.length in_tys = 2) then
+        conv_err (L.loc s) BadInfixDecl;
+  in
+
+  let ftype = Type.mk_ftype index_arity ty_args in_tys out_ty in
+  fst (Symbols.Function.declare_exact table s (ftype, Symbols.Abstract f_info))
+
+
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)
 

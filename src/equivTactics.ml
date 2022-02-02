@@ -742,7 +742,7 @@ let fresh i s =
   let biframe = List.rev_append before after in
   (* expand the biframe to improve precision when computing the freshness
      condition *)
-  let biframe_exp = List.map (fun t -> EquivLT.expand_all_term t s) biframe in
+  let biframe_exp = List.map (fun t -> EquivLT.expand_all_macros t s) biframe in
   let cntxt   = ES.mk_trace_cntxt s in
   let env     = ES.vars s in
   try
@@ -1334,12 +1334,14 @@ let global_diff_eq (s : ES.t) =
                             (Iter.get_diff ~cntxt (Term.simple_bi_term t)))
                         @ !ocs in
   List.iter (iter [] []) frame;
+
   SystemExpr.iter_descrs cntxt.table cntxt.system (
     fun action_descr ->
       let miter =   iter [action_descr.Action.name]  action_descr.Action.indices in
      miter (snd action_descr.Action.output) ;
      miter (snd action_descr.Action.condition) ;
      List.iter (fun (_,m) -> miter m) action_descr.Action.updates) ;
+
   List.map (fun (vs,is,t) -> match t.Iter.occ_cnt with
       | (Term.Diff(s1,s2) as subt)->
         let fvars =  Vars.Sv.elements (Vars.Sv.union t.Iter.occ_vars (Term.fv subt)) in
@@ -1362,11 +1364,11 @@ let global_diff_eq (s : ES.t) =
                         ) pred_ts_list in
         let s1 = 
           Term.pi_term ~projection:PLeft 
-            (EquivLT.expand_all_term ~force_happens:true s1 s) 
+            (EquivLT.expand_all_macros ~force_happens:true s1 s) 
         in
         let s2 = 
           Term.pi_term ~projection:PRight 
-            (EquivLT.expand_all_term ~force_happens:true s2 s)
+            (EquivLT.expand_all_macros ~force_happens:true s2 s)
         in
         Goal.Trace ES.(to_trace_sequent
                          (set_reach_goal

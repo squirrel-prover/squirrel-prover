@@ -42,13 +42,23 @@ let pp_system_decl fmt sys =
 (*------------------------------------------------------------------*)
 type system_modifier =
   | Rename of Theory.global_formula
-  | PRF of Theory.bnds * Theory.term
-  | CCA of Theory.bnds * Theory.term
+  | PRF    of Theory.bnds * Theory.term
+  | CCA    of Theory.bnds * Theory.term
 
-type system_decl_modifier = { from_sys    : SystemExpr.parsed;
-                              modifier : system_modifier;
-                              name : Theory.lsymb
-                            }
+type system_decl_modifier = { 
+  from_sys    : SystemExpr.parsed;
+  modifier : system_modifier;
+  name : Theory.lsymb
+}
+
+(*------------------------------------------------------------------*)
+type operator_decl = { 
+  op_name   : Theory.lsymb;
+  op_tyargs : lsymb list;
+  op_args   : Theory.bnds;
+  op_tyout  : Theory.p_ty option;
+  op_body   : Theory.term;
+}
 
 (*------------------------------------------------------------------*)
 type orcl_tag_info = Theory.formula
@@ -76,6 +86,7 @@ type declaration_i =
 
   | Decl_name     of lsymb * int * Theory.p_ty
   | Decl_state    of macro_decl
+  | Decl_operator of operator_decl
   | Decl_abstract of abstract_decl
   | Decl_bty      of bty_decl
 

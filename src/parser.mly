@@ -23,7 +23,7 @@
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token TILDE DIFF LEFT RIGHT SEQ
 %token NEW OUT PARALLEL NULL
-%token CHANNEL PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT TYPE FUN
+%token CHANNEL PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT OP TYPE FUN
 %token MUTABLE SYSTEM SET
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW RARROW
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
@@ -343,6 +343,9 @@ p_ty:
 fun_ty:
 | l=slist1(p_ty,ARROW)      { l }
 
+p_out_ty:
+| COLON ty=p_ty { ty }
+
 /* crypto assumption typed space */
 c_ty:
 | l=lsymb COLON ty=p_ty { Decl.{ cty_space = l;
@@ -410,6 +413,15 @@ declaration_i:
                 symb_type = symb_type;
                 ty_args   = a;
                 abs_tys   = t; }) }
+
+
+| OP name=lsymb tyargs=ty_args args=opt_arg_list tyo=p_out_ty? EQ t=term
+    { Decl.(Decl_operator
+              { op_name   = name;
+                op_tyargs = tyargs;
+                op_args   = args;
+                op_tyout  = tyo;
+                op_body   = t; }) }
 
 | MUTABLE e=lsymb args=opt_arg_list COLON typ=p_ty EQ t=term
                           { Decl.Decl_state (e, args, typ, t) }

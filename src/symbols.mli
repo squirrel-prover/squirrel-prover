@@ -76,6 +76,7 @@ type function_def =
   | CheckSign
   | PublicKey
   | Abstract of symb_type
+  | Operator                    (* definition in associated data *)
 
 (** Indicates if a function symbol has been defined with
   * the specified definition. *)
@@ -196,11 +197,14 @@ module type Namespace = sig
   val declare_exact :
     table -> lsymb -> ?data:data -> def -> table * ns t
 
+  (** [mem s table] checks if [s] exists in this namespace. *)
+  val mem : lsymb -> table -> bool
+
   (** [of_lsymb s] returns [s] as a symbol, if it exists in this namespace.
     * @raise Unbound_identifier otherwise. *)
   val of_lsymb : lsymb -> table -> ns t
 
-  (** [of_lsymb s] returns [Some s] as a symbol, if it exists in this
+  (** [of_lsymb_opt s] returns [Some s] as a symbol, if it exists in this
       namespace, and None otherwise. *)
   val of_lsymb_opt : lsymb -> table -> ns t option
 

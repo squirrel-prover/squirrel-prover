@@ -90,6 +90,7 @@ rule token = parse
 | "such that"         { SUCHTHAT }
 | "process"           { PROCESS }
 | "abstract"          { ABSTRACT }
+| "op"                { OP }
 | "fun"               { FUN }
 | "type"              { TYPE }
 | "name_fixed_length" { NAMEFIXEDLENGTH }
