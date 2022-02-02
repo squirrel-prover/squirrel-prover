@@ -41,8 +41,7 @@ let pp_decl_error_i fmt = function
     Fmt.pf fmt "equivalence goal ill-formed"
 
   | InvalidAbsType ->
-    Fmt.pf fmt "invalid type, must be of the form:@ \n \
-                Indexⁿ → Messageᵐ → Message"
+    Fmt.pf fmt "invalid type, return type must not be Index or Timestamp."
 
   | InvalidCtySpace kws ->
     Fmt.pf fmt "invalid space@ (allowed: @[<hov 2>%a@])"
@@ -736,32 +735,22 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
     in
 
     let env = Env.init ~table ~ty_vars:ty_args () in
-    let in_tys =
-      List.map (fun pty ->
-          L.loc pty, Theory.parse_p_ty env pty
-        ) in_tys
-    in
+    let in_tys = List.map (Theory.parse_p_ty env) in_tys in
 
-    let rec parse_in_tys p_tys : Type.ty list  =
-      match p_tys with
-      | [] -> []
-      | (loc, ty) :: in_tys -> match ty with
-        | Type.Index     -> decl_error loc KDecl InvalidAbsType
-        | Type.Timestamp -> decl_error loc KDecl InvalidAbsType
-        | _ -> ty :: parse_in_tys in_tys
-    in
-
-    let rec parse_index_prefix iarr in_tys = match in_tys with
-      | [] -> iarr, []
-      | (_, ty) :: in_tys as in_tys0 ->
-        match ty with
-        | Type.Index -> parse_index_prefix (iarr + 1) in_tys
-        | _ -> iarr, parse_in_tys in_tys0
+    let rec parse_index_prefix iarr in_tys = 
+      match in_tys with
+      | Type.Index :: in_tys -> 
+        parse_index_prefix (iarr + 1) in_tys
+      | _ -> iarr, in_tys
     in
 
     let iarr, in_tys = parse_index_prefix 0 in_tys in
 
-    let out_ty = Theory.parse_p_ty env out_ty in
+    let out_ty = match Theory.parse_p_ty env out_ty with
+      | Type.Index | Type.Timestamp -> 
+        decl_error (L.loc out_ty) KDecl InvalidAbsType
+      | ty -> ty
+    in
 
     Theory.declare_abstract
       table
