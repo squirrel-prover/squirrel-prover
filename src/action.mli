@@ -89,8 +89,6 @@ val dummy : shape -> action
   * They are indexed and are associated to an action using the argument
   * indices. *)
 
-type Symbols.data += Data of Vars.var list * action
-
 (** Get a fresh symbol whose name starts with the given prefix.
     If [exact] is true, the symbol must be exactly the argument. *)
 val fresh_symbol :

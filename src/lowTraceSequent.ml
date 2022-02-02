@@ -75,10 +75,7 @@ module S : sig
     t
 
   val update :
-    ?system:SystemExpr.t ->
-    ?table:Symbols.table ->
-    ?ty_vars:Type.tvars ->
-    ?vars:Vars.env ->
+    ?env:Env.t ->
     ?hyps:H.hyps ->
     ?conclusion:Term.term ->
     t -> t
@@ -99,8 +96,8 @@ end = struct
     conclusion;
   }
 
-  let update ?system ?table ?ty_vars ?vars ?hyps ?conclusion t =
-    let env = Env.update ?system ?table ?ty_vars ?vars t.env 
+  let update ?env ?hyps ?conclusion t =
+    let env        = Utils.odflt t.env env
     and hyps       = Utils.odflt t.hyps hyps
     and conclusion = Utils.odflt t.conclusion conclusion in
     { t with env; hyps; conclusion; } 
@@ -414,15 +411,29 @@ module Hyps = struct
 end
 
 (*------------------------------------------------------------------*)
+let env     s = s.env
 let vars    s = s.env.vars
 let ty_vars s = s.env.ty_vars
 let system  s = s.env.system
 let table   s = s.env.table
 
-let set_vars   a      s = S.update ~vars:a        s
-let set_system system s = S.update ~system:system s 
-let set_ty_vars vs    s = S.update ~ty_vars:vs    s 
-let set_table  table  s = S.update ~table:table   s 
+let set_env env s = S.update ~env s
+
+let set_vars (vars : Vars.env) s = 
+  let env = Env.update ~vars s.env in
+  S.update ~env s
+
+let set_table table s = 
+  let env = Env.update ~table s.env in
+  S.update ~env s
+
+let set_system system s = 
+  let env = Env.update ~system s.env in
+  S.update ~env s
+
+let set_ty_vars ty_vars s = 
+  let env = Env.update ~ty_vars s.env in
+  S.update ~env s
 
 (*------------------------------------------------------------------*)
 let filter_map_hyps func hyps =
@@ -442,12 +453,14 @@ let pi projection s =
   in
   let hyps = filter_map_hyps pi s.hyps in
   let system = system s in
+  let env = Env.update ~system:(SystemExpr.project projection system) s.env in
   let s =
   S.update
-    ~system:(SystemExpr.project projection system)
+    ~env
     ~conclusion:(Term.pi_term ~projection s.conclusion)
     ~hyps:H.empty
-    s in
+    s 
+  in
   let keep_global =
     SystemExpr.project Term.PLeft  system =
     SystemExpr.project Term.PRight system

@@ -72,7 +72,7 @@ and process = process_i Location.located
 val pp_process : Format.formatter -> process -> unit
 
 (** Check that a process is well-typed in some environment. *)
-val check_proc : Symbols.table -> Vars.env -> process -> unit
+val check_proc : Env.t -> process -> unit
 
 (** Declare a named process. The body of the definition is type-checked. *)
 val declare : Symbols.table -> lsymb -> proc_ty -> process -> Symbols.table

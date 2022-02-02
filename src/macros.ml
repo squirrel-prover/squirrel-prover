@@ -44,7 +44,7 @@ let get_single_body single_system data =
   in
   sproj single_system body
 
-let get_body system data =
+let get_body system data : Term.term =
   let get_pair_body s1 s2 =
     match List.assoc s1 data.systems_body with
     | b1 ->
@@ -63,10 +63,12 @@ let get_body system data =
         end
   in
   match system with
-  | SE.Single s -> get_single_body s data
-  | SE.SimplePair s -> get_pair_body (SE.Left s) (SE.Right s)
+  | SE.Single s      -> get_single_body s data
+  | SE.SimplePair s  -> get_pair_body (SE.Left s) (SE.Right s)
   | SE.Pair (s1, s2) -> get_pair_body s1 s2
+  | SE.Empty         -> assert false (* FIXME: user-level exception? *)
 
+(** Exported *)
 let apply_global_data table ns dec_def old_single_system new_single_system data f =
   match Symbols.Macro.get_data ns table with
   | Global_data data ->
@@ -79,6 +81,7 @@ let apply_global_data table ns dec_def old_single_system new_single_system data 
 
 let is_tuni = function Type.TUnivar _ -> true | _ -> false
 
+(** Exported *)
 let declare_global table name ~suffix ~action ~inputs ~indices ~ts body ty =
   assert (not (is_tuni ty));
   let data =
@@ -130,33 +133,34 @@ let is_defined name a table =
 (*------------------------------------------------------------------*)
 type def_result = [ `Def of Term.term | `Undef | `MaybeDef ]
 
-(* give the definition of the global macro [symb] at timestamp [a]
-   corresponding to action [action]
-   All prefix of [action] must be valid actions of the system, except if:
-   - [allow_dummy] is true
-   - and for the full action, which may be dummy (we use [a] instead) *)
+(** give the definition of the global macro [symb] at timestamp [a]
+    corresponding to action [action]
+    All prefix of [action] must be valid actions of the system, except if:
+    - [allow_dummy] is true
+    - and for the full action, which may be dummy (we use [a] instead) *)
 let get_def_glob
-    ~(allow_dummy:bool)
+    ~(allow_dummy : bool)
     (system : SE.t)
     (table  : Symbols.table)
     (symb   : Term.msymb)
     (a      : Term.term)
     (action : Action.action)
-    ({action = glob_a; inputs; indices; ts; default_body; systems_body} as data : global_data) : def_result
+    (data   : global_data) 
+  : def_result
   =
-  assert (List.length inputs <= List.length action) ;
+  assert (List.length data.inputs <= List.length action) ;
   let idx_subst =
     List.map2
       (fun i i' -> Term.ESubst (Term.mk_var i,Term.mk_var i'))
-      indices
+      data.indices
       symb.s_indices
   in
-  let ts_subst = Term.ESubst (Term.mk_var ts, a) in
+  let ts_subst = Term.ESubst (Term.mk_var data.ts, a) in
   (* Compute the relevant part of the action, i.e. the
        * prefix of length [length inputs], reversed. *)
   let rev_action =
     let rec drop n l = if n=0 then l else drop (n-1) (List.tl l) in
-    drop (List.length action - List.length inputs) (List.rev action)
+    drop (List.length action - List.length data.inputs) (List.rev action)
   in
   let subst,_ =
     List.fold_left
@@ -173,7 +177,7 @@ let get_def_glob
          Term.ESubst (Term.mk_var x,in_tm) :: subst,
          List.tl action_prefix)
       (ts_subst::idx_subst,rev_action)
-      inputs
+      data.inputs
   in
 
   let t = Term.subst subst (get_body system data) in
@@ -301,10 +305,12 @@ let _get_definition
   |  _ -> assert false
 
 (*------------------------------------------------------------------*)
+(** Exported *)
 let get_definition
     (cntxt : Constr.trace_cntxt)
     (symb  : Term.msymb)
-    (ts    : Term.term) : def_result
+    (ts    : Term.term) 
+  : def_result
   =
   (* try to find an action equal to [ts] in [cntxt] *)
   let ts_action =
@@ -338,10 +344,12 @@ let get_definition_exn
 
 
 (*------------------------------------------------------------------*)
+(** Exported *)
 let get_dummy_definition
     (table  : Symbols.table)
     (system : SE.t)
-    (symb : Term.msymb) : Term.term
+    (symb   : Term.msymb) 
+  : Term.term
   =
   match Symbols.Macro.get_all symb.s_symb table with
   | Symbols.Global _,

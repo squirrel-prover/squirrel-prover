@@ -19,7 +19,7 @@ type p_ty_i =
 
 type p_ty = p_ty_i L.located
     
-val parse_p_ty : Symbols.table -> Type.tvar list -> p_ty -> Type.ty 
+val parse_p_ty : Env.t -> p_ty -> Type.ty 
 
 val pp_p_ty : Format.formatter -> p_ty -> unit
 
@@ -236,6 +236,7 @@ type conversion_error_i =
   | BadInfixDecl
   | PatNotAllowed
   | ExplicitTSInProc 
+  | UndefInSystem of SystemExpr.t
     
 type conversion_error = L.t * conversion_error_i
 
@@ -248,8 +249,8 @@ val pp_error :
   Format.formatter -> conversion_error -> unit
 
 val check : 
-  Symbols.table -> ?local:bool -> ?pat:bool ->
-  Type.Infer.env -> Vars.env -> term -> Type.ty
+  Env.t -> ?local:bool -> ?pat:bool ->
+  Type.Infer.env -> term -> Type.ty
   -> unit
 
 val check_state : Symbols.table -> lsymb -> int -> Type.ty
@@ -273,9 +274,7 @@ type subst = esubst list
 (** {2 Conversions}
   * Convert terms inside the theory to terms of the prover. *)
 
-val parse_subst :
-  Symbols.table -> Type.tvars -> Vars.env -> Vars.var list -> term list ->
-  Term.subst
+val parse_subst : Env.t -> Vars.var list -> term list -> Term.subst
 
 (** Conversion context.
   * - [InGoal]: we are converting a term in a goal (or tactic). All
@@ -286,8 +285,10 @@ type conv_cntxt =
   | InProc of Term.term
   | InGoal
 
-type conv_env = { table : Symbols.table;
-                  cntxt : conv_cntxt; }
+type conv_env = { 
+  env   : Env.t;
+  cntxt : conv_cntxt; 
+}
 
 (** Converts and infer the type. *)
 val convert : 
@@ -295,22 +296,19 @@ val convert :
   ?ty_env:Type.Infer.env -> 
   ?pat:bool ->
   conv_env -> 
-  Type.tvars -> 
-  Vars.env -> 
   term ->
   Term.term * Type.ty
 
-val convert_p_bnds :
-  Symbols.table -> Type.tvar list -> Vars.env -> bnds -> 
-  Vars.env * Vars.var list
+val convert_p_bnds : Env.t -> bnds -> Env.t * Vars.var list
 
 val convert_ht :
   ?ty_env:Type.Infer.env -> 
   ?pat:bool ->
-  conv_env -> Type.tvars -> Vars.env -> hterm -> Type.hty * Term.hterm
+  conv_env -> 
+  hterm -> 
+  Type.hty * Term.hterm
 
-val convert_global_formula :
-  conv_env -> Type.tvars -> Vars.env -> global_formula -> Equiv.form
+val convert_global_formula : conv_env -> global_formula -> Equiv.form
 
 (** [find_app_terms t names] returns the sublist of [names] for which there
   * exists a subterm [Theory.App(name,_)] or [Theory.AppAt(name,_,_)] in the

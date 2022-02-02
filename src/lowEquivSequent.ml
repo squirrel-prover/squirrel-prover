@@ -177,10 +177,14 @@ end
 (** {2 Accessors and utils} *)
 
 let update ?system ?table ?ty_vars ?vars ?hyps ?goal t =
-  let env = Env.update ?system ?table ?ty_vars ?vars t.env 
-  and hyps       = Utils.odflt t.hyps hyps
+  let env  = Env.update ?system ?table ?ty_vars ?vars t.env 
+  and hyps = Utils.odflt t.hyps hyps
   and goal = Utils.odflt t.goal goal in
   { t with env; hyps; goal; } 
+
+let env j = j.env
+
+let set_env env s = { s with env }
 
 let vars j = j.env.vars
 

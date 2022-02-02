@@ -145,23 +145,3 @@ auto.
 
 Qed.
 
-
-(* (*------------------------------------------------------------------*) *)
-(* name ke : message. *)
-(* abstract me : index -> message. *)
-
-(* system [testii] (!_i A: out(c, <ok,h(me(i),ke)>) |  *)
-(*                  !_i B: out(c, h(me(i),ke))). *)
-
-(* (*  We should have  [testi/left,testi2/right] *) *)
-
-(* (* we start with a first transitivity, from testi/left to testiPrf *) *)
-(* system testiiPrf = [testii/left] with gprf (j:index), h(me(j),ke). *)
-
-(* (* TODO: Bug*) *)
-(* global goal [testii/left, testiiPrf/left] _ (i,j : index) :  *)
-(*   [happens(B, B)] -> equiv(output@B, output@B). *)
-(* Proof. *)
-(*   intro H @/output.   *)
-
-

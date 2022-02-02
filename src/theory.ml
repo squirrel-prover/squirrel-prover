@@ -1,4 +1,5 @@
 open Utils
+open Env
 
 module L = Location
 
@@ -283,6 +284,7 @@ type conversion_error_i =
   | BadInfixDecl
   | PatNotAllowed
   | ExplicitTSInProc
+  | UndefInSystem of SystemExpr.t
 
 type conversion_error = L.t * conversion_error_i
 
@@ -358,8 +360,13 @@ let pp_error_i ppf = function
 
   | PatNotAllowed -> Fmt.pf ppf "pattern not allowed"
 
-  | ExplicitTSInProc -> Fmt.pf ppf "macros cannot be written at explicit \
-                                    timestamps in procedure"
+  | ExplicitTSInProc ->
+    Fmt.pf ppf "macros cannot be written at explicit \
+                timestamps in procedure"
+
+  | UndefInSystem t ->
+    Fmt.pf ppf "action not defined in system @[%a@]"
+      SystemExpr.pp t
 
 let pp_error pp_loc_err ppf (loc,e) =
   Fmt.pf ppf "%a%a"
@@ -369,7 +376,7 @@ let pp_error pp_loc_err ppf (loc,e) =
 (*------------------------------------------------------------------*)
 (** {2 Parsing types } *)
 
-let parse_p_ty table (tvars : Type.tvar list) (pty : p_ty) : Type.ty =
+let parse_p_ty (env : Env.t) (pty : p_ty) : Type.ty =
   match L.unloc pty with
   | P_message        -> Message  
   | P_boolean        -> Boolean  
@@ -382,14 +389,14 @@ let parse_p_ty table (tvars : Type.tvar list) (pty : p_ty) : Type.ty =
         List.find (fun tv' ->
             let tv' = Type.ident_of_tvar tv' in
             Ident.name tv' = L.unloc tv_l
-          ) tvars
+          ) env.ty_vars
       with Not_found ->
         conv_err (L.loc tv_l) (UnknownTypeVar (L.unloc tv_l))
     in
     TVar tv
 
   | P_tbase tb_l ->
-    let s = Symbols.BType.of_lsymb tb_l table in
+    let s = Symbols.BType.of_lsymb tb_l env.table in
     Type.TBase (Symbols.to_string s) (* TODO: remove to_string *)
 
 
@@ -456,10 +463,16 @@ let check_name table (s : lsymb) n : Type.ty =
     if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity));
     ndef.n_ty
 
-let check_action table (s : lsymb) (n : int) : unit =
-  let l,_ = Action.find_symbol s table in
+let check_action (env : Env.t) (s : lsymb) (n : int) : unit =
+  let l,action = Action.find_symbol s env.table in
   let arity = List.length l in
+
   if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity));
+
+  let _ = 
+    try SystemExpr.descr_of_action env.table env.system action with
+    | Not_found -> conv_err (L.loc s) (UndefInSystem env.system)
+  in
   ()
 
 
@@ -651,9 +664,9 @@ type conv_cntxt =
 let is_in_proc = function InProc _ -> true | InGoal -> false
 
 (** Exported conversion environments. *)
-type conv_env = {
-  table : Symbols.table;
-  cntxt : conv_cntxt;
+type conv_env = { 
+  env   : Env.t;
+  cntxt : conv_cntxt; 
 }
 
 (** Internal conversion states, containing:
@@ -662,17 +675,15 @@ type conv_env = {
     - a type unification environment
     - a variable substitution  *)
 type conv_state = {
-  table     : Symbols.table;
-  ty_vars   : Type.tvar list;
+  env       : Env.t;
   cntxt     : conv_cntxt;
   allow_pat : bool;
 
-  env       : Vars.env;
   ty_env    : Type.Infer.env;
 }
 
-let mk_state table cntxt ty_vars env allow_pat ty_env =
-  { table; cntxt; ty_vars; env; allow_pat; ty_env; }
+let mk_state env cntxt allow_pat ty_env =
+  { cntxt; env; allow_pat; ty_env; }
 
 (*------------------------------------------------------------------*)
 (** {2 Types} *)
@@ -700,13 +711,12 @@ let check_term_ty state ~of_t (t : Term.term) (ty : Type.ty) : unit =
 
 let convert_var 
     (state : conv_state)
-    (env   : Vars.env)
     (st    : lsymb)
     (ty    : Type.ty) 
   : Term.term
   =
   try
-    let v = Vars.find env (L.unloc st) in
+    let v = Vars.find state.env.vars (L.unloc st) in
 
     let of_t = var_of_lsymb st in
 
@@ -716,17 +726,17 @@ let convert_var
   with
   | Not_found -> conv_err (L.loc st) (Undefined (L.unloc st))
 
-let convert_bnds env (vars : (lsymb * Type.ty) list) =
-  let do1 (env, v_acc) (vsymb, s) =
-    let env, var  = Vars.make `Shadow env s (L.unloc vsymb) in
-    env, var :: v_acc
+let convert_bnds (env : Env.t) (vars : (lsymb * Type.ty) list) =
+  let do1 (vars, v_acc) (vsymb, s) =
+    let vars, v  = Vars.make `Shadow vars s (L.unloc vsymb) in
+    vars, v :: v_acc
   in
-  let env, v_acc = List.fold_left do1 (env, []) vars in
-  env, List.rev v_acc
+  let venv, v_acc = List.fold_left do1 (env.vars, []) vars in
+  { env with vars = venv }, List.rev v_acc
 
-let convert_p_bnds table ty_vars env (vars : (lsymb * p_ty) list) =
-  let vars = List.map (fun (v,s) -> v, parse_p_ty table ty_vars s) vars in
-  convert_bnds env vars
+let convert_p_bnds (env : Env.t) (vars : bnds) =
+  let vs = List.map (fun (v,s) -> v, parse_p_ty env s) vars in
+  convert_bnds env vs 
 
 
 let get_fun table lsymb =
@@ -741,14 +751,14 @@ let get_name table lsymb =
   | None ->
     conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.NName))
 
-let get_action table lsymb =
-  match Symbols.Action.of_lsymb_opt lsymb table with
+let get_action (env : Env.t) lsymb =
+  match Symbols.Action.of_lsymb_opt lsymb env.table with
   | Some n -> n
   | None ->
     conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.NAction))
 
-let get_macro table lsymb =
-  match Symbols.Macro.of_lsymb_opt lsymb table with
+let get_macro (env : Env.t) lsymb =
+  match Symbols.Macro.of_lsymb_opt lsymb env.table with
   | Some n -> n
   | None ->
     conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.NMacro))
@@ -783,7 +793,7 @@ and convert0
     if not state.allow_pat then
       conv_err (L.loc tm) PatNotAllowed;
 
-    let env, p = Vars.make ~allow_pat:true `Approx state.env ty "_" in
+    let _, p = Vars.make ~allow_pat:true `Approx state.env.vars ty "_" in
     Term.mk_var p
 
   (*------------------------------------------------------------------*)
@@ -804,8 +814,8 @@ and convert0
   (*------------------------------------------------------------------*)
 
   | App   (f,terms) ->
-    if terms = [] && Vars.mem_s state.env (L.unloc f)
-    then convert_var state state.env f ty
+    if terms = [] && Vars.mem_s state.env.vars (L.unloc f)
+    then convert_var state f ty
 
     (* otherwise build the application and convert it. *)
     else
@@ -814,7 +824,7 @@ and convert0
           InProc ts -> MaybeAt ts in
 
       conv_app state app_cntxt
-        (tm, make_app loc state.table app_cntxt f terms)
+        (tm, make_app loc state.env.table app_cntxt f terms)
         ty
 
   | AppAt (f,terms,ts) ->
@@ -822,7 +832,7 @@ and convert0
 
     let app_cntxt = At (conv Type.Timestamp ts) in
     conv_app state app_cntxt
-      (tm, make_app loc state.table app_cntxt f terms)
+      (tm, make_app loc state.env.table app_cntxt f terms)
       ty
 
   | Diff (l,r) -> Term.mk_diff (conv ty l) (conv ty r)
@@ -840,9 +850,7 @@ and convert0
     Term.mk_find is c t e
 
   | ForAll (vs,f) | Exists (vs,f) ->
-    let env, evs =
-      convert_p_bnds state.table state.ty_vars state.env vs
-    in
+    let env, evs = convert_p_bnds state.env vs in
     let f = conv ~env Type.Boolean f in
     begin match L.unloc tm with
       | ForAll _ -> Term.mk_forall evs f
@@ -851,9 +859,7 @@ and convert0
     end
 
   | Seq (vs,t) ->
-    let env, evs =
-      convert_p_bnds state.table state.ty_vars state.env vs
-    in
+    let env, evs = convert_p_bnds state.env vs in
 
     let tyv = Type.Infer.mk_univar state.ty_env in
 
@@ -875,10 +881,10 @@ and conv_index state t =
 
 (* The term [tm] in argument is here for error messages. *)
 and conv_app 
-    (state : conv_state)
+    (state     : conv_state)
     (app_cntxt : app_cntxt)
-    ((tm,app) : (term * app)) 
-    (ty : Type.ty) 
+    ((tm,app)  : (term * app)) 
+    (ty        : Type.ty) 
   : Term.term
   = 
   (* We should have [make_app app = t].
@@ -897,10 +903,10 @@ and conv_app
     | None, None -> conv_err loc (Timestamp_expected (L.unloc tm))
   in
   let conv_fapp (f : lsymb) l ts_opt : Term.term =
-    let mfty = function_kind state.table f in
+    let mfty = function_kind state.env.table f in
     let () = check_arity f (List.length l) (mf_type_arity mfty) in
 
-    match Symbols.of_lsymb f state.table with
+    match Symbols.of_lsymb f state.env.table with
     | Symbols.Wrapped (symb, Function (_,_)) ->
       assert (ts_opt = None);
 
@@ -964,14 +970,14 @@ and conv_app
 
 
   match L.unloc app with
-  | AVar s -> convert_var state state.env s ty
+  | AVar s -> convert_var state s ty
 
   | Fun (f,l,ts_opt) -> conv_fapp f l ts_opt
 
   | Get (s,opt_ts,is) ->
-    let k = check_state state.table s (List.length is) in
+    let k = check_state state.env.table s (List.length is) in
     let is = List.map (conv_index state) is in
-    let s = get_macro state.table s in
+    let s = get_macro state.env s in
     let ts =
       (* TODO: check this *)
       match opt_ts with
@@ -982,15 +988,15 @@ and conv_app
     Term.mk_macro ms [] ts
 
   | Name (s, is) ->
-    let sty = check_name state.table s (List.length is) in
+    let sty = check_name state.env.table s (List.length is) in
     let is = List.map (conv_index state) is in
-    let ns = Term.mk_isymb (get_name state.table s) sty is in
+    let ns = Term.mk_isymb (get_name state.env.table s) sty is in
     Term.mk_name ns
 
   | Taction (a,is) ->
-    check_action state.table a (List.length is) ;
+    check_action state.env a (List.length is) ;
     Term.mk_action
-      (get_action state.table a)
+      (get_action state.env a)
       (List.map (conv_index state) is)
 
 (*------------------------------------------------------------------*)
@@ -998,11 +1004,13 @@ and conv_app
 let conv_ht (state : conv_state) (t : hterm) : Type.hty * Term.hterm =
   match L.unloc t with
   | Lambda (bnds, t0) ->
-    let env, evs = convert_p_bnds state.table state.ty_vars state.env bnds in
+    let env, evs = convert_p_bnds state.env bnds in
+    let state = { state with env } in
+
     let tyv = Type.Infer.mk_univar state.ty_env in
     let ty = Type.TUnivar tyv in
 
-    let ht = Term.Lambda (evs, convert { state with env } t0 ty) in
+    let ht = Term.Lambda (evs, convert state t0 ty) in
 
     let bnd_tys = List.map Vars.ty evs in
     let hty = Type.Lambda (bnd_tys, ty) in
@@ -1125,8 +1133,6 @@ let convert_ht
     ?ty_env
     ?(pat=false) 
     (cenv : conv_env)
-    (ty_vars : Type.tvars)
-    (env : Vars.env) 
     (ht0 : hterm)
   : Type.hty * Term.hterm 
   = 
@@ -1135,7 +1141,7 @@ let convert_ht
     | Some ty_env -> false, ty_env
   in
 
-  let state = mk_state cenv.table cenv.cntxt ty_vars env pat ty_env in
+  let state = mk_state cenv.env cenv.cntxt pat ty_env in
   let hty, ht = conv_ht state ht0 in
 
   if must_close then
@@ -1152,16 +1158,17 @@ let convert_ht
 
 (*------------------------------------------------------------------*)
 let check
-    table ?(local=false) ?(pat=false) 
+    (env : Env.t) ?(local=false) ?(pat=false) 
     (ty_env : Type.Infer.env)
-    (env : Vars.env) t (s : Type.ty) 
+    t (s : Type.ty) 
   : unit 
   =
   let dummy_var s =
     Term.mk_var (snd (Vars.make `Approx Vars.empty_env s "#dummy"))
   in
   let cntxt = if local then InProc (dummy_var Type.Timestamp) else InGoal in
-  let state = mk_state table cntxt [] env pat ty_env in
+  
+  let state = mk_state env cntxt pat ty_env in
   ignore (convert state t s)
 
 (** exported outside Theory.ml *)
@@ -1170,8 +1177,6 @@ let convert
     ?(ty_env : Type.Infer.env option) 
     ?(pat    : bool = false)
     (cenv    : conv_env) 
-    (ty_vars : Type.tvars) 
-    (env     : Vars.env) 
     (tm      : term) 
   : Term.term * Type.ty
   =
@@ -1183,7 +1188,7 @@ let convert
     | None    -> Type.TUnivar (Type.Infer.mk_univar ty_env) 
     | Some ty -> ty 
   in
-  let state = mk_state cenv.table cenv.cntxt ty_vars env pat ty_env in
+  let state = mk_state cenv.env cenv.cntxt pat ty_env in
   let t = convert state tm ty in
 
   if must_close then
@@ -1200,18 +1205,16 @@ let convert
 (*------------------------------------------------------------------*)
 (** {2 Convert equiv formulas} *)
 
-let convert_el cenv ty_vars (env : Vars.env) el : Term.term =
-  let t, _ = convert cenv ty_vars env el in
-  t
+let convert_equiv cenv (e : equiv) =
+  let convert_el el : Term.term =
+    let t, _ = convert cenv el in
+    t
+  in
+  List.map convert_el e
 
-let convert_equiv cenv ty_vars (env : Vars.env) (e : equiv) =
-  List.map (convert_el cenv ty_vars env) e
-
-let convert_global_formula cenv ty_vars env (p : global_formula) =
-  let rec conve cenv ty_vars env p =
-    let conve ?(cenv=cenv) ?(ty_vars=ty_vars) ?(env=env) p =
-       conve cenv ty_vars env p
-    in
+let convert_global_formula (cenv : conv_env) (p : global_formula) =
+  let rec conve (cenv : conv_env) p =
+    let conve ?(env=cenv.env) p = conve { cenv with env } p in
 
     match L.unloc p with
     | PImpl (f1, f2) -> Equiv.Impl (conve f1, conve f2)
@@ -1219,17 +1222,15 @@ let convert_global_formula cenv ty_vars env (p : global_formula) =
     | POr   (f1, f2) -> Equiv.Or   (conve f1, conve f2)
 
     | PEquiv e ->
-      Equiv.Atom (Equiv.Equiv (convert_equiv cenv ty_vars env e))
+      Equiv.Atom (Equiv.Equiv (convert_equiv cenv e))
 
     | PReach f ->
-      let f, _ = convert ~ty:Type.Boolean cenv ty_vars env f in
+      let f, _ = convert ~ty:Type.Boolean cenv f in
       Equiv.Atom (Equiv.Reach f)
 
 
     | PQuant (q, bnds, e) ->
-      let env, evs =
-        convert_p_bnds cenv.table ty_vars env bnds
-      in
+      let env, evs = convert_p_bnds cenv.env bnds in
       let e = conve ~env e in
       let q = match q with
         | PForAll -> Equiv.ForAll
@@ -1238,16 +1239,16 @@ let convert_global_formula cenv ty_vars env (p : global_formula) =
       Equiv.mk_quant q evs e
   in
 
-  conve cenv ty_vars env p
+  conve cenv p
 
 (*------------------------------------------------------------------*)
 (** {2 State and substitution parsing} *)
 
-let parse_subst table ty_vars env (uvars : Vars.var list) (ts : term list)
+let parse_subst (env : Env.t) (uvars : Vars.var list) (ts : term list)
   : Term.subst =
-  let conv_env = { table = table; cntxt = InGoal; } in
+  let conv_env = { env; cntxt = InGoal; } in
   let f t u =
-    let t, _ = convert ~ty:(Vars.ty u) conv_env ty_vars env t in
+    let t, _ = convert ~ty:(Vars.ty u) conv_env t in
     Term.ESubst (Term.mk_var u, t)
   in
   List.map2 f ts uvars
@@ -1255,11 +1256,20 @@ let parse_subst table ty_vars env (uvars : Vars.var list) (ts : term list)
 type Symbols.data += Local_data of Vars.var list * Vars.var * Term.term
 type Symbols.data += StateInit_data of Vars.var list * Term.term
 
-let declare_state table s (typed_args : bnds) (pty : p_ty) t =
+let declare_state
+    (table      : Symbols.table)
+    (s          : lsymb) 
+    (typed_args : bnds) 
+    (pty        : p_ty) 
+    (t          : term) 
+  =
   let ts_init = Term.mk_action Symbols.init_action [] in
-  let conv_env = { table = table; cntxt = InProc ts_init; } in
+  
+  let env = Env.init ~table () in
+  let conv_env = { env; cntxt = InProc ts_init; } in
 
-  let env, indices = convert_p_bnds table [] Vars.empty_env typed_args in
+  let env, indices = convert_p_bnds env typed_args in
+  let conv_env = { conv_env with env } in
 
   List.iter (fun v ->
       if Vars.ty v <> Type.Index then
@@ -1267,9 +1277,9 @@ let declare_state table s (typed_args : bnds) (pty : p_ty) t =
     ) indices;
 
   (* parse the macro type *)
-  let ty = parse_p_ty table [] pty in
+  let ty = parse_p_ty env pty in
 
-  let t, _ = convert ~ty conv_env [] env t in
+  let t, _ = convert ~ty conv_env t in
 
   let data = StateInit_data (indices,t) in
   let table, _ =
@@ -1373,17 +1383,18 @@ let () =
       let x = mk (App (mk "x", [])) in
       let y = mk (App (mk "y", [])) in
 
-      let env = Vars.empty_env in
-      let env, _ = Vars.make `Approx env Type.Message "x" in
-      let env, _ = Vars.make `Approx env Type.Message "y" in
+      let vars = Vars.empty_env in
+      let vars, _ = Vars.make `Approx vars Type.Message "x" in
+      let vars, _ = Vars.make `Approx vars Type.Message "y" in
+      let env = Env.init ~vars ~table () in
 
       let t_i = App (mk "e", [mk (App (mk "h", [x;y]));x;y]) in
       let t = mk t_i in
       let ty_env = Type.Infer.mk_env () in
-      check table ty_env env t Type.tmessage ;
+      check env ty_env t Type.tmessage ;
       Alcotest.check_raises
         "message is not a boolean"
         (Conv (L._dummy, Type_error (t_i, Type.tboolean)))
-        (fun () -> check table ty_env env t Type.tboolean)
+        (fun () -> check env ty_env t Type.tboolean)
     end
   ]

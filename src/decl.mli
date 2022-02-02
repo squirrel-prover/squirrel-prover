@@ -48,10 +48,11 @@ type system_modifier =
   | PRF of Theory.bnds * Theory.term
   | CCA of Theory.bnds * Theory.term
 
-type system_decl_modifier = { from_sys    : SystemExpr.parsed;
-                              modifier : system_modifier;
-                              name : Theory.lsymb
-                            }
+type system_decl_modifier = { 
+  from_sys : SystemExpr.parsed;
+  modifier : system_modifier;
+  name     : Theory.lsymb
+}
 
 (*------------------------------------------------------------------*)
 (** Additional oracle tagging information

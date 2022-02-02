@@ -18,9 +18,11 @@ type t = private
   | Single     of single_system
   | SimplePair of Symbols.system Symbols.t
   | Pair       of single_system * single_system
+  | Empty
 
 val hash : t -> int
 
+val empty       : t
 val single      : Symbols.table -> single_system -> t
 val simple_pair : Symbols.table -> Symbols.system Symbols.t -> t
 val pair        : Symbols.table -> single_system -> single_system -> t
@@ -42,8 +44,9 @@ type ssymb_pair = System.system_name *
                   System.system_name
 
 type system_expr_err =
-  | SE_NotABiProcess of System.system_name
+  | SE_NotABiProcess of System.system_name option
   | SE_NoneProject
+  | SE_InvalidAction of t * Action.shape
   | SE_IncompatibleAction   of ssymb_pair * string
   | SE_DifferentControlFlow of ssymb_pair
 

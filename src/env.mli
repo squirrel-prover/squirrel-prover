@@ -1,4 +1,4 @@
-type t = private {
+type t = {
   table   : Symbols.table;      (** symbol table *)
   system  : SystemExpr.t;       (** default system *)
   ty_vars : Type.tvar list;     (** free type variables *)
@@ -6,11 +6,11 @@ type t = private {
 }
 
 val init : 
-  system:SystemExpr.t ->
   table:Symbols.table ->
-  ty_vars:Type.tvars ->
-  vars:Vars.env ->
-  t
+  ?system:SystemExpr.t ->
+  ?vars:Vars.env ->
+  ?ty_vars:Type.tvars ->
+  unit -> t
 
 val update :
   ?system:SystemExpr.t ->

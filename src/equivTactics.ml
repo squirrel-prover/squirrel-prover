@@ -307,11 +307,8 @@ let enrich ty f l (s : ES.t) =
   ES.set_equiv_goal (f :: ES.goal_as_equiv s) s
 
 let enrich_a arg s =
-  let tbl, env = ES.table s, ES.vars s in
   match 
-    Args.convert_args
-      (ES.system s) tbl (ES.ty_vars s) env [arg] 
-      Args.(Sort Term) (`Equiv (ES.goal s)) 
+    Args.convert_args (ES.env s) [arg] Args.(Sort Term) (`Equiv (ES.goal s)) 
   with
   | Args.Arg (Term (ty, t, l)) -> enrich ty t l s
   | _ -> bad_args ()
@@ -765,13 +762,11 @@ let fresh_tac args = match args with
 (*------------------------------------------------------------------*)
 (** Sequence expansion of the sequence [term] for the given parameters [ths]. *)
 let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
-  let env = ES.vars s in
-  let table = ES.table s in
   match EquivLT.convert s term with
   (* we expect term to be a sequence *)
   | (Seq (vs, t) as term_seq), ty ->
     (* we parse the arguments ths, to create a substution for variables vs *)
-    let subst = Theory.parse_subst table (ES.ty_vars s) env vs ths in
+    let subst = Theory.parse_subst (ES.env s) vs ths in
 
     (* new_t is the term of the sequence instantiated with the subst *)
     let new_t = Term.subst subst t in

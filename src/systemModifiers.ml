@@ -4,10 +4,10 @@ module SE   = SystemExpr
 module L    = Location
 
 let global_rename table sdecl gf =
-  let env,vars = Theory.convert_p_bnds table [] Vars.empty_env [] in
-  let conv_env = Theory.{ table; cntxt = InGoal } in
+  let env = Env.init ~table () in
+  let conv_env = Theory.{ env; cntxt = InGoal } in
 
-  let f = Theory.convert_global_formula conv_env [] env gf in
+  let f = Theory.convert_global_formula conv_env gf in
 
   let ns1, ns2, n1, n2 =
     match f with
@@ -52,7 +52,7 @@ let global_rename table sdecl gf =
     in
     let iterator cenv t =
       match
-        Rewrite.rewrite table old_system env TacticsArgs.(`Once)
+        Rewrite.rewrite table old_system env.vars TacticsArgs.(`Once)
           rw_rule (`Reach t)
       with
       | `Result (`Reach res, ls) -> res
@@ -109,22 +109,23 @@ let global_rename table sdecl gf =
                              (Tactics.Failure "The name on the right-hand side already occurs in the left-hand side.")
 
 
-let global_prf table sdecl ty_vars hash =
-  let env,vars = Theory.convert_p_bnds table [] Vars.empty_env ty_vars in
-  let conv_env = Theory.{ table; cntxt = InGoal } in
-  let hash, _ = Theory.convert conv_env [] env hash in
-  let is = vars in
+let global_prf table sdecl bnds hash =
+  let env = Env.init ~table () in
+  let env,is = Theory.convert_p_bnds env bnds in
 
+  let conv_env = Theory.{ env = env; cntxt = InGoal } in
+  let hash, _ = Theory.convert conv_env hash in
 
-  let env = ref env in
-  let old_system, old_single_system = match SE.parse_se table sdecl.Decl.from_sys  with
+  let old_system, old_single_system = 
+    match SE.parse_se table sdecl.Decl.from_sys with
     | Single s as res -> res, s
     | _ -> assert false
   in
 
-  let cntxt = Constr.{table=table;
-                      system= old_system;
-                      models=None}
+  let cntxt = Constr.{
+      table  = table;
+      system = old_system;
+      models = None}
   in
 
   let param = Prf.prf_param hash in
@@ -175,7 +176,7 @@ let global_prf table sdecl ty_vars hash =
 
   let iterator _ t =
     match
-      Rewrite.rewrite table old_system (!env) TacticsArgs.(`Once)
+      Rewrite.rewrite table old_system env.vars TacticsArgs.(`Once)
         rw_rule (`Reach t)
     with
     | `Result (`Reach res, ls) -> res
@@ -235,22 +236,22 @@ let global_prf table sdecl ty_vars hash =
 
 
 
-let global_cca table sdecl ty_vars enc =
-  let env,vars = Theory.convert_p_bnds table [] Vars.empty_env ty_vars in
-  let conv_env = Theory.{ table; cntxt = InGoal } in
-  let enc, _ = Theory.convert conv_env [] env enc in
-  let is = vars in
+let global_cca table sdecl bnds enc =
+  let env = Env.init ~table () in
+  let env,is = Theory.convert_p_bnds env bnds in
+  let conv_env = Theory.{ env; cntxt = InGoal } in
+  let enc, _ = Theory.convert conv_env enc in
 
-
-  let env = ref env in
-  let old_system, old_single_system = match SE.parse_se table sdecl.Decl.from_sys  with
+  let old_system, old_single_system = 
+    match SE.parse_se table sdecl.Decl.from_sys with
     | Single s as res -> res, s
     | _ -> assert false
   in
 
-  let cntxt = Constr.{table=table;
-                      system= old_system;
-                      models=None}
+  let cntxt = Constr.{
+      table  = table;
+      system = old_system;
+      models = None}
   in
 
   let enc_fn, enc_key, is_plaintext_name, plaintext, enc_pk, enc_rnd =
@@ -351,13 +352,13 @@ let global_cca table sdecl ty_vars enc =
 
   let iterator cenv t =
     match
-      Rewrite.rewrite table old_system (!env) TacticsArgs.(`Once)
+      Rewrite.rewrite table old_system env.vars `Once
         enc_rw_rule (`Reach t)
     with
     | `Result (`Reach res, ls) ->
       begin
         match
-          Rewrite.rewrite table old_system (!env) TacticsArgs.(`Once)
+          Rewrite.rewrite table old_system env.vars `Once
             dec_rw_rule (`Reach res)
         with
         | `Result (`Reach res2, ls) -> res2
@@ -366,7 +367,7 @@ let global_cca table sdecl ty_vars enc =
     | _ ->
       begin
         match
-          Rewrite.rewrite table old_system (!env) TacticsArgs.(`Once)
+          Rewrite.rewrite table old_system env.vars `Once
             dec_rw_rule (`Reach t)
         with
         | `Result (`Reach res2, ls) -> res2
@@ -438,5 +439,5 @@ let global_cca table sdecl ty_vars enc =
 let declare_system table sdecl =
    match sdecl.Decl.modifier with
      | Rename gf -> global_rename table sdecl gf
-     | PRF (ty_vars, hash) -> global_prf table sdecl ty_vars hash
-     | CCA (ty_vars, enc) -> global_cca table sdecl ty_vars enc
+     | PRF (bnds, hash) -> global_prf table sdecl bnds hash
+     | CCA (bnds, enc) -> global_cca table sdecl bnds enc

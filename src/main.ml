@@ -817,4 +817,10 @@ let () =
            | Symbols.(SymbError (_, Multiple_declarations _)) ->
              raise Ok)
     end ;
+    "Undefined Action", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
+           try run ~test "tests/alcotest/bad-actions.sp" with
+             Theory.Conv (_, UndefInSystem _) -> raise Ok)
+    end ;
   ]

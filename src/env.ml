@@ -5,12 +5,17 @@ type t = {
   vars    : Vars.env;           (** free term variables *)
 }
 
-let init ~system ~table ~ty_vars ~vars = {
-  system ;
-  table;
-  ty_vars;
-  vars;
-}
+let init 
+    ~table 
+    ?(system = SystemExpr.empty)
+    ?(vars = Vars.empty_env) 
+    ?(ty_vars = []) () 
+  = {
+    system ;
+    table;
+    ty_vars;
+    vars;
+  }
 
 let update ?system ?table ?ty_vars ?vars e =
   let system  = Utils.odflt e.system system

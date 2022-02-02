@@ -349,15 +349,13 @@ module ProverTactics = struct
                            pq_sound}
 
   let convert_args j parser_args tactic_type =
-    let table, env, ty_vars, conc, sexpr =
+    let env, conc =
       match j with
-      | Goal.Trace t -> 
-        TS.table t, TS.vars t, TS.ty_vars t, `Reach (TS.goal t), TS.system t
+      | Goal.Trace t -> TS.env t, `Reach (TS.goal t)
 
-      | Goal.Equiv e -> 
-        ES.table e, ES.vars e, ES.ty_vars e, `Equiv (ES.goal e), ES.system e
+      | Goal.Equiv e -> ES.env e, `Equiv (ES.goal e)
     in
-    TacticsArgs.convert_args sexpr table ty_vars env parser_args tactic_type conc
+    TacticsArgs.convert_args env parser_args tactic_type conc
 
   let register id ~tactic_help ?(pq_sound=false) f =
     register_general id ~tactic_help ~pq_sound
@@ -630,8 +628,9 @@ let add_proved_goal gconcl =
   goals_proved := gconcl :: !goals_proved
 
 let define_oracle_tag_formula table (h : lsymb) f =
-  let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-  let form, _ = Theory.convert conv_env [] Vars.empty_env ~ty:Type.Boolean f in
+  let env = Env.init ~table () in
+  let conv_env = Theory.{ env; cntxt = InGoal; } in
+  let form, _ = Theory.convert conv_env ~ty:Type.Boolean f in
     match form with
      |  Term.ForAll ([uvarm; uvarkey],f) ->
          begin match Vars.ty uvarm,Vars.ty uvarkey with
@@ -736,9 +735,10 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
       ) decl.ty_args
     in
 
+    let env = Env.init ~table ~ty_vars:ty_args () in
     let in_tys =
       List.map (fun pty ->
-          L.loc pty, Theory.parse_p_ty table ty_args pty
+          L.loc pty, Theory.parse_p_ty env pty
         ) in_tys
     in
 
@@ -761,7 +761,7 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
 
     let iarr, in_tys = parse_index_prefix 0 in_tys in
 
-    let out_ty = Theory.parse_p_ty table ty_args out_ty in
+    let out_ty = Theory.parse_p_ty env out_ty in
 
     Theory.declare_abstract
       table
@@ -781,13 +781,15 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
       sp :: acc
     ) [] ctys in
 
+  let env = Env.init ~table () in
+
   (* check that we only use allowed keyword *)
   List.map (fun cty ->
       let sp = L.unloc cty.Decl.cty_space in
       if not (List.mem sp kws) then
         decl_error (L.loc cty.Decl.cty_space) KDecl (InvalidCtySpace kws);
 
-      let ty = Theory.parse_p_ty table [] cty.Decl.cty_ty in
+      let ty = Theory.parse_p_ty env cty.Decl.cty_ty in
       (sp, ty)
     ) ctys
 
@@ -802,8 +804,9 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
 let declare_i table hint_db decl = match L.unloc decl with
   | Decl.Decl_channel s            -> Channel.declare table s
   | Decl.Decl_process (id,pkind,p) ->
+    let env = Env.init ~table () in
     let pkind = List.map (fun (x,t) ->
-        let t = Theory.parse_p_ty table [] t in
+        let t = Theory.parse_p_ty env t in
         L.unloc x, t
       ) pkind in
     Process.declare table id pkind p
@@ -875,7 +878,7 @@ let declare_i table hint_db decl = match L.unloc decl with
     Theory.declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty senc sdec
 
   | Decl.Decl_name (s, a, pty) ->
-    let ty = Theory.parse_p_ty table [] pty in
+    let ty = Theory.parse_p_ty (Env.init ~table ()) pty in
     Theory.declare_name table s Symbols.{ n_iarr = a; n_ty = ty; }
 
   | Decl.Decl_state (s, args, k, t) ->
@@ -897,7 +900,9 @@ let declare_i table hint_db decl = match L.unloc decl with
     Theory.declare_signature table
       ?m_ty ?sig_ty ?check_ty ?sk_ty ?pk_ty sign checksign pk
 
-  | Decl.Decl_abstract decl -> parse_abstract_decl table decl
+  | Decl.Decl_abstract decl -> 
+    parse_abstract_decl table decl
+
   | Decl.Decl_bty bty_decl ->
     let table, _ =
       Symbols.BType.declare_exact

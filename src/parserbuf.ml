@@ -112,9 +112,9 @@ let parse parser parser_name string =
       parser_name (Lexing.lexeme lexbuf) ;
     raise e
 
-let parse_process table ?(typecheck=false) str =
+let parse_process (env : Env.t) ?(typecheck=false) str =
   let p = parse Parser.top_process "process" str in
-    if typecheck then Process.check_proc table Vars.empty_env p ;
+    if typecheck then Process.check_proc env p ;
     p
 
 let parse_formula = parse Parser.top_formula "formula"
@@ -158,30 +158,31 @@ let () =
 
 let () =
   let table = Channel.declare Symbols.builtins_table (L.mk_loc L._dummy "c") in
+  let env = Env.init ~table () in
 
   Checks.add_suite "Process parsing" [
     "Null", `Quick, begin fun () ->
-      ignore (parse_process table "null" : Process.process)
+      ignore (parse_process env "null" : Process.process)
     end ;
     "Simple", `Quick, begin fun () ->
-      ignore (parse_process table "in(c,x);out(c,x);null" : Process.process) ;
-      ignore (parse_process table "in(c,x);out(c,x)" : Process.process) ;
+      ignore (parse_process env "in(c,x);out(c,x);null" : Process.process) ;
+      ignore (parse_process env "in(c,x);out(c,x)" : Process.process) ;
       Alcotest.check_raises "fails" Parser.Error
         (fun () ->
-           ignore (parse_process table "in(c,x) then null" : Process.process)) ;
+           ignore (parse_process env "in(c,x) then null" : Process.process)) ;
       begin
         match
-          Location.unloc (parse_process table "(in(c,x);out(c,x) | in(c,x))")
+          Location.unloc (parse_process env "(in(c,x);out(c,x) | in(c,x))")
         with
         | Process.Parallel _ -> ()
         | _ -> assert false
       end ;
-      ignore (parse_process table
+      ignore (parse_process env
                 "if u=true then if True then null else null else null"
               : Process.process)
     end ;
     "Pairs", `Quick, begin fun () ->
-      ignore (parse_process table "in(c,x);out(c,<x,x>)" : Process.process)
+      ignore (parse_process env "in(c,x);out(c,<x,x>)" : Process.process)
     end ;
     "If", `Quick, begin fun () ->
       let table =
@@ -194,7 +195,8 @@ let () =
         in
         let decl = Location.mk_loc Location._dummy decl_i in
         Prover.declare table Hint.empty_hint_db decl in
-      ignore (parse_process table "in(c,x); out(c, if x=x then x else error)"
+      let env = { env with table } in
+      ignore (parse_process env "in(c,x); out(c, if x=x then x else error)"
               : Process.process)
     end ;
     "Try", `Quick, begin fun () ->
@@ -222,13 +224,14 @@ let () =
         let decl = Location.mk_loc Location._dummy decl_i in
         Prover.declare table Hint.empty_hint_db decl
       in
-      ignore (parse_process table
+      let env = { env with table } in
+      ignore (parse_process env
                 "in(c,x); \
                  try find i such that x = x in \
                  out(c,ok)\
                  else out(c,error)"
               : Process.process) ;
-      ignore (parse_process table
+      ignore (parse_process env
                 "in(c,x); \
                  out(c, try find i such that x = x in ok \
                  else error)"

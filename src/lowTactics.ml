@@ -90,19 +90,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Conversion} *)
 
   let convert_args (s : S.sequent) args sort =
-    Args.convert_args 
-      (S.system s) (S.table s) (S.ty_vars s) (S.vars s) 
-      args sort (S.wrap_conc (S.goal s))
+    Args.convert_args (S.env s) args sort (S.wrap_conc (S.goal s))
   
   let convert (s : S.sequent) term =
-    let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in
-    Theory.convert cenv (S.ty_vars s) (S.vars s) term
+    let cenv = Theory.{ env = S.env s; cntxt = InGoal; } in
+    Theory.convert cenv term
 
   let convert_ht (s : S.sequent)  ht =
-    let env = S.vars s in
-    let table = S.table s in
-    let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-    Theory.convert_ht conv_env (S.ty_vars s) env ht
+    let conv_env = Theory.{ env = S.env s; cntxt = InGoal; } in
+    Theory.convert_ht conv_env ht
 
   (*------------------------------------------------------------------*)
   let make_exact ?loc env ty name =
@@ -549,6 +545,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
           soft_failure ~loc:(L.loc rw_arg.rw_dir)
             (Failure "cannot swap the systems: lemma applies to a \
                       single system)")
+
+        | _, Empty -> 
+          soft_failure (Failure "empty system: nothing to rewrite")
       in
       system, f
 
@@ -1295,8 +1294,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     if not (List.length ths = List.length vs) then
       soft_failure (Tactics.Failure "cannot introduce exists");
 
-    let table = S.table s in
-    let nu = Theory.parse_subst table (S.ty_vars s) (S.vars s) vs ths in
+    let nu = Theory.parse_subst (S.env s) vs ths in
     let new_formula = S.subst_conc nu f in
     [S.set_goal new_formula s]
 

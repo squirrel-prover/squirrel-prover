@@ -269,7 +269,7 @@ module Mk (Args : MkArgs) : S with
       let tvars, tsubst = Type.Infer.open_tvars ty_env lem.ty_vars in
       let f = Equiv.Babel.tsubst f_kind tsubst lem.formula in
 
-      let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in 
+      let cenv = Theory.{ env = S.env s; cntxt = InGoal; } in 
       let pat_vars = ref (Sv.of_list []) in
 
       (* Pop the first universally quantified variables in [f], 
@@ -289,12 +289,7 @@ module Mk (Args : MkArgs) : S with
           let f_arg = as_seq1 f_arg in
 
           let ty = Vars.ty f_arg in
-          let t, _ = 
-            Theory.convert 
-              ~ty_env ~pat:true
-              cenv (S.ty_vars s) (S.vars s) 
-              ~ty p_arg 
-          in
+          let t, _ = Theory.convert ~ty_env ~pat:true cenv ~ty p_arg in
 
           let new_p_vs = Sv.filter Vars.is_pat (Term.fv t) in
           pat_vars := Sv.union (!pat_vars) new_p_vs;

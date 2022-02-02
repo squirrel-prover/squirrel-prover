@@ -24,11 +24,13 @@ type t =
   | Single     of single_system
   | SimplePair of Symbols.system Symbols.t
   | Pair       of single_system * single_system
+  | Empty
 
 let hash = function
   | Single s -> hash_single s
   | SimplePair str -> hcombine 2 (Symbols.hash str)
   | Pair (s1, s2) -> hcombine (hash_single s1) (hash_single s2)
+  | Empty -> 1
 
 let pp_single fmt = function
   | Left id  -> Fmt.pf fmt "%s/left"  (Symbols.to_string id)
@@ -38,24 +40,31 @@ let pp fmt = function
   | Single s      -> Fmt.pf fmt "%a" pp_single s
   | SimplePair id -> Fmt.pf fmt "%s" (Symbols.to_string id)
   | Pair (s1, s2) -> Fmt.pf fmt "%a,%a" pp_single s1 pp_single s2
+  | Empty         -> Fmt.pf fmt "empty" 
 
 (*------------------------------------------------------------------*)
 type ssymb_pair = System.system_name *
                   System.system_name
 
 type system_expr_err =
-  | SE_NotABiProcess of System.system_name
+  | SE_NotABiProcess of System.system_name option
   | SE_NoneProject
+  | SE_InvalidAction of t * Action.shape
   | SE_IncompatibleAction   of ssymb_pair * string
   | SE_DifferentControlFlow of ssymb_pair
 
 let pp_system_expr_err fmt = function
   | SE_NotABiProcess s ->
-    Fmt.pf fmt "cannot project system [%s], which is not a bi-process"
-      (Symbols.to_string s)
+    Fmt.pf fmt "cannot project system [%a], which is not a bi-process"
+      (Fmt.option Fmt.string) (omap Symbols.to_string s)
 
   | SE_NoneProject ->
     Fmt.pf fmt "cannot project a system with None"
+
+  | SE_InvalidAction (t, sh) ->
+    Fmt.pf fmt "@[<v>system %a has no action with shape:@;  @[%a@]"
+      pp t
+      Action.pp_shape sh
 
   | SE_IncompatibleAction ((s1,s2),s) ->
     Fmt.pf fmt "systems [%s] and [%s] are not compatible: %s"
@@ -77,11 +86,12 @@ let incompatible_error s1 s2 s =
 
 (** [single_compatible s s'] checks that the single system [s]
   * is one of the projections of the system [s']. *)
-let rec single_compatible s s' = match s,s' with
+let rec single_compatible (s : single_system) (s' : t) : bool = match s,s' with
   | s, Single s' -> s = s'
   | Left s, SimplePair s' -> s = s'
   | Right s, SimplePair s' -> s = s'
   | s, Pair (s1,s2) -> s = s1 || s = s2
+  | _, Empty -> false
 
 (** [systems_compatible s1 s2] checks that all projections of [s1]
   * are projections of [s2]. *)
@@ -95,14 +105,20 @@ let systems_compatible s1 s2 =
       | Pair (s',s'') ->
           single_compatible s' s2 &&
           single_compatible s'' s2
-
+      | Empty -> true
 
 (*------------------------------------------------------------------*)
 (** {2 Misc } *)
 
 let symbs table = function
-  | SimplePair s | Pair (Left s,_) | Pair (Right s,_)
-  | Single (Left s) | Single (Right s) -> System.symbs table s
+  | SimplePair s
+  | Pair (Left s,_) 
+  | Pair (Right s,_)
+  | Single (Left s)
+  | Single (Right s) -> 
+    System.symbs table s
+
+  | Empty -> System.Msh.empty
 
 let action_to_term table system a =
   let msymbs = symbs table system in
@@ -111,7 +127,8 @@ let action_to_term table system a =
 
 (*------------------------------------------------------------------*)
 let project proj = function
-  | Single s -> bisystem_error (SE_NotABiProcess (get_id s))
+  | Empty -> bisystem_error (SE_NotABiProcess None)
+  | Single s -> bisystem_error (SE_NotABiProcess (Some (get_id s)))
 
   | SimplePair id ->
     begin
@@ -187,6 +204,8 @@ let descr_of_shape table (se : t) shape =
   let getd s_symb = System.descr_of_shape table s_symb shape in
 
   match se with
+  | Empty -> bisystem_error (SE_InvalidAction (se, shape))
+
   (* we simply project the description according to the projection *)
   | Single s ->
     let descr = getd (get_id s) in
@@ -229,6 +248,7 @@ let descrs table se =
 
   (* We built the new action descriptions *)
   match se with
+  | Empty -> System.Msh.empty
   | Pair (s1, s2) ->
     (* we must check that the two systems have the same set of shapes *)
     let sname1 = get_id s1
@@ -283,6 +303,8 @@ let check_system_expr table se = iter_descrs table se (fun _ -> ())
 
 (*------------------------------------------------------------------*)
 (** {2 Smart constructor } *)
+
+let empty = Empty
 
 let single _table a = Single a
 

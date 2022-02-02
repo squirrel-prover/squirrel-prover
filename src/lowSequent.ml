@@ -49,6 +49,9 @@ module type S = sig
     * a system, table, environment, type variables,
     * goal formula, and hypotheses. *)
 
+  val env : t -> Env.t
+  val set_env : Env.t -> t -> t
+
   val vars : t -> Vars.env
   val set_vars : Vars.env -> t -> t
 

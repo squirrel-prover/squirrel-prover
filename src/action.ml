@@ -62,7 +62,7 @@ let same_shape a b : Term.subst option =
 
 (** Action symbols *)
 
-type Symbols.data += Data of Vars.var list * action
+type Symbols.data += ActionData of Vars.var list * action
 
 let fresh_symbol table ~exact name =
   if exact
@@ -70,17 +70,17 @@ let fresh_symbol table ~exact name =
   else Symbols.Action.reserve       table name
 
 let define_symbol table symb args action =
-  let data = Data (args,action) in
+  let data = ActionData (args,action) in
   Symbols.Action.define table symb ~data (List.length args)
 
 let find_symbol s table =
   match Symbols.Action.data_of_lsymb s table with
-    | Data (x,y) -> x,y
+    | ActionData (x,y) -> x,y
     | _ -> assert false
 
 let of_symbol s table =
   match Symbols.Action.get_data s table with
-    | Data (x,y) -> x,y
+    | ActionData (x,y) -> x,y
     | _ -> assert false
 
 let arity s table =
@@ -90,7 +90,7 @@ let arity s table =
 let iter_table f table =
   Symbols.Action.iter
     (fun s _ -> function
-       | Data (args,action) -> f s args action
+       | ActionData (args,action) -> f s args action
        | _ -> assert false)
     table
 
