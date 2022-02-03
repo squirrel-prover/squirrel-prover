@@ -1,3 +1,6 @@
+module L = Location
+
+(*------------------------------------------------------------------*)
 (** A single system, that is a system without diff, is given by the name of a
    (bi)system , and either Left or Right. *)
 type single_system =
@@ -130,12 +133,12 @@ type p_single_system =
   | P_Left  of lsymb
   | P_Right of lsymb
 
-type p_system_expr =
+type p_system_expr_i =
   | P_Single     of p_single_system
   | P_SimplePair of lsymb
   | P_Pair       of p_single_system * p_single_system
 
-type parsed = p_system_expr
+type p_system_expr = p_system_expr_i L.located 
 
 val parse_single : Symbols.table -> p_single_system -> single_system
 val parse_se     : Symbols.table -> p_system_expr   -> t

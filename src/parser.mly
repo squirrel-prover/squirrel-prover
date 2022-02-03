@@ -1,6 +1,7 @@
 %{
   module L  = Location
   module T  = Tactics
+  module SE = SystemExpr
 
   let sloc startpos endpos s =
     let loc = L.make startpos endpos in
@@ -850,28 +851,32 @@ global_formula:
  * ----------------------------------------------------------------------- */
 
 system_proj:
-| LEFT                { SystemExpr.(P_Left  default_system_name) }
-| RIGHT               { SystemExpr.(P_Right default_system_name) }
-| i=lsymb SLASH LEFT  { SystemExpr. P_Left                    i  }
-| i=lsymb SLASH RIGHT { SystemExpr. P_Right                   i  }
+| LEFT                { SE.(P_Left  default_system_name) }
+| RIGHT               { SE.(P_Right default_system_name) }
+| i=lsymb SLASH LEFT  { SE. P_Left                    i  }
+| i=lsymb SLASH RIGHT { SE. P_Right                   i  }
 
 /* A single or bi-system */
-system:
-|                                  { SystemExpr.P_SimplePair
-                                       SystemExpr.default_system_name }
-| LBRACKET i=lsymb        RBRACKET { SystemExpr. P_SimplePair i }
-| LBRACKET sp=system_proj RBRACKET { SystemExpr. P_Single sp }
+system_i:
+|                                  { SE.P_SimplePair
+                                       SE.default_system_name }
+| LBRACKET i=lsymb        RBRACKET { SE. P_SimplePair i }
+| LBRACKET sp=system_proj RBRACKET { SE. P_Single sp }
 | LBRACKET s1=system_proj COMMA s2=system_proj RBRACKET
-                                   { SystemExpr. P_Pair (s1, s2) }
+                                   { SE. P_Pair (s1, s2) }
 
+system:
+| s=loc(system_i) { s }
 
 /* A bi-system */
-bisystem:
-|                                  { SystemExpr.(P_SimplePair default_system_name) }
-| LBRACKET i=lsymb RBRACKET        { SystemExpr. P_SimplePair i }
+bisystem_i:
+|                                  { SE.(P_SimplePair default_system_name) }
+| LBRACKET i=lsymb RBRACKET        { SE. P_SimplePair i }
 | LBRACKET s1=system_proj COMMA s2=system_proj RBRACKET
-                                   { SystemExpr. P_Pair (s1, s2) }
+                                   { SE. P_Pair (s1, s2) }
 
+bisystem:
+| s=loc(bisystem_i) { s }
 
 /* -----------------------------------------------------------------------
  * Statements and goals
@@ -897,26 +902,12 @@ local_statement:
   COLON f=term
    { let formula = Goal.Parsed.Local f in
      Goal.Parsed.{ name; ty_vars; vars; system; formula } }
-| vars=args
-  COLON f=term
-   { let formula = Goal.Parsed.Local f in
-     let name = None in
-     let system = SystemExpr.P_SimplePair
-                    SystemExpr.default_system_name in
-     Goal.Parsed.{ name; ty_vars=[]; vars; system; formula } }
 
 global_statement:
 | system=bisystem name=statement_name ty_vars=ty_args vars=args
   COLON f=global_formula
    { let formula = Goal.Parsed.Global f in
      Goal.Parsed.{ name; ty_vars; vars; system; formula } }
-| vars=args
-  COLON f=global_formula
-   { let formula = Goal.Parsed.Global f in
-     let name = None in
-     let system = SystemExpr.P_SimplePair
-                    SystemExpr.default_system_name in
-     Goal.Parsed.{ name; ty_vars=[]; vars; system; formula } }
 
 obs_equiv_statement:
 | s=bisystem n=statement_name

@@ -7,7 +7,9 @@ let global_rename table sdecl gf =
   let old_system, old_single_system = 
     match SE.parse_se table sdecl.Decl.from_sys with
     | Single s as res -> res, s
-    | _ -> assert false
+    | _ -> 
+      Tactics.soft_failure ~loc:(L.loc sdecl.Decl.from_sys)
+        (Failure "a single system must be provided")
   in
   let env = Env.init ~table ~system:old_system () in
   let conv_env = Theory.{ env; cntxt = InGoal } in
@@ -113,7 +115,8 @@ let global_prf table sdecl bnds hash =
   let old_system, old_single_system = 
     match SE.parse_se table sdecl.Decl.from_sys with
     | Single s as res -> res, s
-    | _ -> assert false
+    | _ -> Tactics.soft_failure ~loc:(L.loc sdecl.Decl.from_sys)
+             (Failure "a single system must be provided")
   in
 
   let env = Env.init ~table ~system:old_system () in
@@ -240,7 +243,8 @@ let global_cca table sdecl bnds enc =
   let old_system, old_single_system = 
     match SE.parse_se table sdecl.Decl.from_sys with
     | Single s as res -> res, s
-    | _ -> assert false
+    | _ -> Tactics.soft_failure ~loc:(L.loc sdecl.Decl.from_sys)
+             (Failure "a single system must be provided")
   in
 
   let env = Env.init ~table ~system:old_system () in

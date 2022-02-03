@@ -57,7 +57,7 @@ module Parsed : sig
     name    : Theory.lsymb option;
     ty_vars : Theory.lsymb list;
     vars    : Theory.bnds;
-    system  : SystemExpr.parsed;
+    system  : SystemExpr.p_system_expr;
     formula : contents
   }
 

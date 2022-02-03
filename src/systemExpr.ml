@@ -374,18 +374,19 @@ type p_single_system =
   | P_Left  of lsymb
   | P_Right of lsymb
 
-type p_system_expr =
+type p_system_expr_i =
   | P_Single     of p_single_system
   | P_SimplePair of lsymb
   | P_Pair       of p_single_system * p_single_system
 
-type parsed = p_system_expr
+type p_system_expr = p_system_expr_i L.located 
 
 let pp_p_single fmt = function
   | P_Left id  -> Fmt.pf fmt "%s/left"  (L.unloc id)
   | P_Right id -> Fmt.pf fmt "%s/right" (L.unloc id)
 
-let pp_p_system fmt = function
+let pp_p_system fmt (s : p_system_expr) = 
+  match L.unloc s with
   | P_Single s      -> Fmt.pf fmt "%a" pp_p_single s
   | P_SimplePair id -> Fmt.pf fmt "%s" (L.unloc id)
   | P_Pair (s1, s2) -> Fmt.pf fmt "%a,%a" pp_p_single s1 pp_p_single s2
@@ -394,7 +395,7 @@ let parse_single table = function
   | P_Left a  -> Left  (System.of_lsymb a table)
   | P_Right a -> Right (System.of_lsymb a table)
 
-let parse_se table p_se = match p_se with
+let parse_se table p_se = match L.unloc p_se with
   | P_Single s       -> single table (parse_single table s)
   | P_SimplePair str -> simple_pair table (System.of_lsymb str table)
   | P_Pair (a,b)     ->
