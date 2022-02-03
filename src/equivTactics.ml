@@ -255,8 +255,8 @@ let induction Args.(Timestamp ts) s =
     let init_s = intro_back init_s in
 
     let goals = ref [] in
-    (** [add_action _action descr] adds to goals the goal corresponding to the
-      * case where [t] is instantiated by [descr]. *)
+    (* [add_action _action descr] adds to goals the goal corresponding to the
+     * case where [t] is instantiated by [descr]. *)
     let add_action descr =
       if descr.Action.name = Symbols.init_action
       then ()
@@ -711,7 +711,7 @@ let mk_phi_proj
 
 let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe : Term.message =
   let n_left, n_right =
-    match Term.pi_term PLeft t, Term.pi_term PRight t with
+    match Term.pi_term ~projection:PLeft t, Term.pi_term ~projection:PRight t with
     | (Name nl, Name nr) -> nl, nr
     | _ -> raise Fresh.Not_name
   in
@@ -967,7 +967,7 @@ let push_formula (j: 'a option) f term =
   let f_vars = Term.fv f in
   let not_in_f_vars vs = Sv.disjoint vs f_vars in
 
-  let rec mk_ite m = match m with
+  let mk_ite m = match m with
     (* if c then t else e becomes if (f => c) then t else e *)
     | Term.Fun (fs,_,[c;t;e]) when fs = Term.f_ite ->
       Term.mk_ite ~simpl:false (Term.mk_impl ~simpl:false f c) t e
@@ -1364,7 +1364,7 @@ let global_diff_eq (s : ES.t) =
                         (function Term.Pred (x) -> x | t -> t) pred_ts_list in
         let s1,s2 = Term.cast Type.KMessage s1, Term.cast Type.KMessage s2
         in
-        let s1 = Term.pi_term ~projection:PLeft @@ EquivLT.expand_all_term ~force_happens:true s1 s in
+        let s1 = Term.pi_term ~projection:PLeft  @@ EquivLT.expand_all_term ~force_happens:true s1 s in
         let s2 = Term.pi_term ~projection:PRight @@ EquivLT.expand_all_term ~force_happens:true s2 s in
         Goal.Trace ES.(to_trace_sequent
                          (set_reach_goal
@@ -1939,9 +1939,9 @@ let enckp
       Iter.get_ftypes ~excludesymtype:Symbols.ADec table Symbols.AEnc e @
       Iter.get_ftypes ~excludesymtype:Symbols.SDec table Symbols.SEnc e
     in
-    (** Run [apply] on first item in [encs] that is well-formed
-      * and has a diff in its key.
-      * We could also backtrack in case of failure. *)
+    (* Run [apply] on first item in [encs] that is well-formed
+     * and has a diff in its key.
+     * We could also backtrack in case of failure. *)
     let diff_key = function
       | Term.Diff _ | Term.Fun (_, _, [Term.Diff _]) -> true
       | _ -> false
@@ -1983,7 +1983,7 @@ let () =
 exception Not_xor
 
 (* Removes the first occurence of Name (n,is) in the list l. *)
-let rec remove_name_occ ns l = match l with
+let remove_name_occ ns l = match l with
   | [Term.Name ns'; t] when ns = ns' -> t
   | [t; Term.Name ns'] when ns = ns' -> t
   | _ ->
@@ -2021,13 +2021,13 @@ let mk_xor_phi_base (cntxt : Constr.trace_cntxt) env biframe
   phi
 
 let is_xored_diff t =
-  match Term.pi_term PLeft t, Term.pi_term PRight t with
+  match Term.pi_term ~projection:PLeft t, Term.pi_term ~projection:PRight t with
   | (Fun (fl,_,ll),Fun (fr,_,lr))
     when (fl = Term.f_xor && fr = Term.f_xor) -> true
   | _ -> false
 
 let is_name_diff mess_name =
-  match Term.pi_term PLeft mess_name, Term.pi_term PRight mess_name with
+  match Term.pi_term ~projection:PLeft mess_name, Term.pi_term ~projection:PRight mess_name with
   | Name nl, Name nr -> true
   | _ -> false
 
@@ -2088,7 +2088,7 @@ let xor Args.(Pair (Int i, Pair (Opt (Message, m1), Opt (Message, m2)))) s =
     match opt_n with
     | None ->
       begin
-        match Term.pi_term PLeft t, Term.pi_term PRight t with
+        match Term.pi_term ~projection:PLeft t, Term.pi_term ~projection:PRight t with
         | (Fun (fl, _, [Term.Name nl;ll]),
            Fun (fr, _, [Term.Name nr;lr]))
           when (fl = Term.f_xor && fr = Term.f_xor) ->
@@ -2098,9 +2098,9 @@ let xor Args.(Pair (Int i, Pair (Opt (Message, m1), Opt (Message, m2)))) s =
       end
     | Some mess_name ->
       begin
-        match Term.pi_term PLeft mess_name, Term.pi_term PRight mess_name with
+        match Term.pi_term ~projection:PLeft mess_name, Term.pi_term ~projection:PRight mess_name with
         | Name nl, Name nr ->
-          begin match Term.pi_term PLeft t, Term.pi_term PRight t with
+          begin match Term.pi_term ~projection:PLeft t, Term.pi_term ~projection:PRight t with
             | (Fun (fl,_,ll),Fun (fr,_,lr))
               when (fl = Term.f_xor && fr = Term.f_xor) ->
               (nl,remove_name_occ nl ll,

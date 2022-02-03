@@ -201,7 +201,7 @@ let init (mode : printer_mode) : unit =
   match mode with
   | File | Interactive ->
       Fmt.set_style_renderer
-        (get_std ()) Fmt.(`Ansi_tty);
+        (get_std ()) `Ansi_tty;
       Format.pp_set_mark_tags
         (get_std ()) true;
       pp_set_formatter_stag_functions
@@ -216,8 +216,6 @@ let init (mode : printer_mode) : unit =
 
 
 (** {2 Printing functions} **)
-
-let strf = Fmt.strf
 
 let pr x = Fmt.pf (get_std ()) x
 

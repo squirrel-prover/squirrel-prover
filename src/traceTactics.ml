@@ -1565,7 +1565,7 @@ let euf_apply_facts drop_head s
   if Symbols.is_ftype head_fn Symbols.SEnc cntxt.table
   || Symbols.is_ftype head_fn Symbols.AEnc cntxt.table then
     Cca.check_encryption_randomness
-      cntxt
+      ~cntxt
       rule.Euf.case_schemata rule.Euf.cases_direct head_fn [mess;sign] [];
 
   schemata_premises @ direct_premises
@@ -1862,8 +1862,8 @@ let rewrite_equiv_transform
     (term : Term.message) : Term.message
   =
   let assoc (t : Term.message) : Term.message option =
-    match List.find_opt (fun e -> (Term.pi_term src e) = t) biframe with
-    | Some e -> Some (Term.pi_term dst e)
+    match List.find_opt (fun e -> (Term.pi_term ~projection:src e) = t) biframe with
+    | Some e -> Some (Term.pi_term ~projection:dst e)
     | None -> None
   in
   let rec aux : type a. a term -> a term = fun t ->

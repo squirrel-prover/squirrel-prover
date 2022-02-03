@@ -126,7 +126,7 @@ let rec tac_error_to_string = function
   | BadSSCDetailed    _    -> "BadSSCDetailed"
   | CannotInferPats        -> "CannotInferPats"
 
-let rec pp_tac_error_i ppf = function
+let pp_tac_error_i ppf = function
   | More -> Fmt.string ppf "more results required"
   | Failure s -> Fmt.pf ppf "%s" s
   | NotEqualArguments -> Fmt.pf ppf "arguments not equals"

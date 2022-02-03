@@ -77,7 +77,7 @@ let incompatible_error s1 s2 s =
 
 (** [single_compatible s s'] checks that the single system [s]
   * is one of the projections of the system [s']. *)
-let rec single_compatible s s' = match s,s' with
+let single_compatible s s' = match s,s' with
   | s, Single s' -> s = s'
   | Left s, SimplePair s' -> s = s'
   | Right s, SimplePair s' -> s = s'
@@ -307,6 +307,7 @@ type esubst_descr =
 
 type subst_descr = esubst_descr list
 
+(* TODO: unused value *)
 let rec subst s d =
   match s with
   | [] -> d

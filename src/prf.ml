@@ -179,7 +179,7 @@ let mk_prf_phi_proj cntxt env param frame hash =
 
   (* Indirect cases: potential occurrences through macro expansions. *)
 
-  (** Compute association list from action names to prf cases. *)
+  (* Compute association list from action names to prf cases. *)
   let macro_cases : prf_cases_sorted =
     Iter.fold_macro_support (fun iocc macro_cases ->
         let name = iocc.iocc_aname in
@@ -231,7 +231,7 @@ let prf_condition_side
   let exception HashNoOcc in
   try
     let cntxt = { cntxt with system = SE.project proj cntxt.system } in
-    let param = prf_param (Term.pi_term proj hash) in
+    let param = prf_param (Term.pi_term ~projection:proj hash) in
 
     (* Create the frame on which we will iterate to compute the PRF formulas *)
     let hash_ty = param.h_fty.fty_out in
@@ -240,7 +240,7 @@ let prf_condition_side
     let e_without_hash =
       Term.subst [Term.ESubst (hash,Term.mk_var v)] e
     in
-    let e_without_hash = Term.pi_term proj e_without_hash in
+    let e_without_hash = Term.pi_term ~projection:proj e_without_hash in
 
     (* [hash] does not appear on this side *)
     if not (Sv.mem (Vars.EVar v) (Term.fv e_without_hash)) then

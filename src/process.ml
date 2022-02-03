@@ -39,7 +39,6 @@ and process = process_i L.located
 (*------------------------------------------------------------------*)
 let rec pp_process ppf process =
   let open Fmt in
-  let open Utils in
   match L.unloc process with
   | Null -> Printer.kws `ProcessName ppf "null"
 
@@ -302,7 +301,7 @@ let declare table (id : lsymb) (args : proc_ty) proc =
 (* Enable/disable debug messages by setting debug to debug_on/off. *)
 
 let debug_off fmt = Format.fprintf Printer.dummy_fmt fmt
-let debug_on fmt =
+let[@warning "-32"] debug_on fmt =
   Format.printf "[DEBUG] " ;
   Format.printf fmt
 
@@ -691,11 +690,11 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
   in
 
-  (** Parse process, looking for an input action.
-    * Maintains the position [pos] in parallel compositions,
-    * together with the indices [pos_indices] associated to replications:
-    * these two components will form the [par_choice] part of an
-    * [Action.item]. *)
+  (* Parse process, looking for an input action.
+     Maintains the position [pos] in parallel compositions,
+     together with the indices [pos_indices] associated to replications:
+     these two components will form the [par_choice] part of an
+     [Action.item]. *)
   let rec p_in ~table ~env ~pos ~pos_indices proc =
     let p, pos, table = p_in_i ~table ~env ~pos ~pos_indices proc in
     (L.mk_loc (L.loc proc) p, pos, table)
@@ -765,10 +764,10 @@ let parse_proc (system_name : System.system_name) init_table proc =
       let p',_,table = p_cond_i ~table ~env ~pos:0 ~par_choice proc in
       (p', pos+1,table)
 
-  (** Similar to [p_in].
-    * The [par_choice] component of the action under construction
-    * has been determined by [p_in].
-    * The [pos] argument is the position in the tree of conditionals. *)
+  (* Similar to [p_in].
+     The [par_choice] component of the action under construction
+     has been determined by [p_in].
+     The [pos] argument is the position in the tree of conditionals. *)
   and p_cond ~table ~env ~pos ~par_choice proc =
     let p, pos, table = p_cond_i ~table ~env ~pos ~par_choice proc in
     (L.mk_loc (L.loc proc) p, pos, table)

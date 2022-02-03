@@ -42,20 +42,17 @@ val pp_univar : Format.formatter -> univar -> unit
 (*------------------------------------------------------------------*)
 (** Types of terms *)
 type _ ty =
-  (** Built-in types *)
+  (* Built-in types *)
   | Message   : message   ty
   | Boolean   : message   ty
   | Index     : index     ty
   | Timestamp : timestamp ty
-
-  (** User-defined types *)
   | TBase     : string -> message ty
-        
-  (** Type variable *)
+  (** User-defined types *)
   | TVar      : tvar -> message ty
-
-  (** Type unification variable *)
+  (** Type variable *)
   | TUnivar   : univar -> message ty
+  (** Type unification variable *)
  
 (*------------------------------------------------------------------*)
 type 'a t = 'a ty

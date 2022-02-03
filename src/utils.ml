@@ -106,7 +106,7 @@ module List = struct
       | [] -> []
       | x :: t -> x :: take0 (i - 1) l
                     
-  let rec take i l =
+  let take i l =
     if i < 0 then failwith "invalid argument";
     take0 i l
 
@@ -312,7 +312,7 @@ end = struct
       size = n;
       max_size = 2 * n }
 
-  let print ppf t =
+  let[@warning "-32"] print ppf t =
     for i = 0 to t.max_size - 1 do
       let ri = Puf.find t.uf i in
       Fmt.pf ppf "@[%d->%d @]"
@@ -412,8 +412,6 @@ module Uf (Ord: Ordered) = struct
         ( 0, Vmap.empty, Mi.empty ) l
     in
     Smart.mk ~map:m ~rmap:rm ~cpt:0 (Smart.empty (List.length l))
-
-  let id t = t.id
 
   (** [extend t v] add the element [v] to [t], if necessary. *)
   let extend t v =

@@ -1169,7 +1169,7 @@ let pp_msets fmt (msets : msets) =
   MCset.pp_l fmt mset_l
 
 (*------------------------------------------------------------------*)
-let pp_cand_set pp_term fmt (cand : 'a cand_set_g) =
+let[@warning "-32"] pp_cand_set pp_term fmt (cand : 'a cand_set_g) =
   let pp_subst fmt mv =
     let s = Mvar.to_subst ~mode:`Unif mv in
     if s = [] then ()
@@ -1705,8 +1705,8 @@ module E : S with type t = Equiv.form = struct
       (env    : Sv.t)
       (init_terms : Term.messages) : msets
     =
-    (** Return a list of specialization of [cand] deducible from
-        [init_terms, known_sets] for action [a] at time [a]. *)
+    (* Return a list of specialization of [cand] deducible from
+       [init_terms, known_sets] for action [a] at time [a]. *)
     let filter_deduce_action
         (a : Symbols.action Symbols.t)
         (cand : MCset.t)
@@ -2134,7 +2134,7 @@ module E : S with type t = Equiv.form = struct
 
 
   (*------------------------------------------------------------------*)
-  let rec match_equiv_eq
+  let match_equiv_eq
       (terms     : Term.message list)
       (pat_terms : Term.message list)
       (st        : match_state) : Mvar.t

@@ -13,6 +13,8 @@ type p_set_param = string * p_param_val
 
 module M = Utils.Ms
 
+(* TODO: PString / get_string never used? (raises warnings) *)
+
 type param_kind =
   | PBool
   | PString

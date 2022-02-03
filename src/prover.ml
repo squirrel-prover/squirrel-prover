@@ -241,12 +241,12 @@ let pp_usage tacname fmt esort =
 
 let pp_help fmt (th, tac_name) =
   let usages_string =
-    Fmt.strf "%a"
+    Fmt.str "%a"
       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",\n") (pp_usage tac_name))
       th.usages_sorts
  in
   let res_string =
-    Fmt.strf "%s \n %s: @[ %s  @] " th.general_help
+    Fmt.str "%s \n %s: @[ %s  @] " th.general_help
       (if List.length th.usages_sorts = 0 then ""
        else if List.length th.usages_sorts =1 then "Usage"
        else "Usages")

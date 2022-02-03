@@ -1166,8 +1166,8 @@ let find_new_undef inst g =
   let uf = inst.uf in
   let elems = elems uf in
 
-  (** Looks for new instances of the rule:
-      ∀τ, (happens(τ) ∧ τ ≠ init) ⇒ happens(pred(τ)) *)
+  (* Looks for new instances of the rule:
+     ∀τ, (happens(τ) ∧ τ ≠ init) ⇒ happens(pred(τ)) *)
   let undefs0 = 
     List.filter_map (fun ut -> 
         if is_not_init uf inst.neqs ut && 
@@ -1178,8 +1178,8 @@ let find_new_undef inst g =
       ) elems 
   in
 
-  (** Looks for new instances of the rule:
-      ∀τ τ', τ ≤ τ' ⇒ happens(τ,τ') *)
+  (* Looks for new instances of the rule:
+     ∀τ τ', τ ≤ τ' ⇒ happens(τ,τ') *)
   let undefs1 = 
     UtG.fold_edges (fun ut1 ut2 undefs -> 
         (if undef_is_new inst ut1 then [ut1] else []) @
@@ -1264,9 +1264,6 @@ let split_models instance =
 (** The minimal models a of constraint.
     Here, minimanility means inclusion w.r.t. the predicates. *)
 type models = model list
-
-let tot = ref 0.
-let cptd = ref 0
 
 (*------------------------------------------------------------------*)
 let models_conjunct (l : trace_literal list) : models =
@@ -1405,7 +1402,7 @@ let get_ind_equalities ~precise (models : models) inds =
 
 
 let find_eq_action (models : models) (t : Term.timestamp) =
-  (** [action_model model t] returns an action equal to [t] in [model] *)
+  (* [action_model model t] returns an action equal to [t] in [model] *)
   let action_model model = 
     let model, ut = ext_support model (uts t) in
     let uf = model.inst.uf in
@@ -1458,9 +1455,7 @@ and tau4 = mk_var "tau"
 and i =  mk_var_i "i"
 and i' = mk_var_i "i"
 
-let table = Symbols.builtins_table
-              
-let table, a = Symbols.Action.declare table (L.mk_loc L._dummy "a") 1
+let _, a = Symbols.Action.declare Symbols.builtins_table (L.mk_loc L._dummy "a") 1
 
 let pb_eq1 = (`Timestamp (`Eq,tau, mk_pred tau'))
              :: (`Timestamp (`Eq,tau', mk_pred tau''))

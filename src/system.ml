@@ -20,7 +20,7 @@ let system_err e = raise (SystemError e)
 (*------------------------------------------------------------------*)
 module ShapeCmp = struct
   type t = Action.shape
-  let rec compare (u : t) (v : t) = Stdlib.compare u v
+  let compare (u : t) (v : t) = Stdlib.compare u v
 end
 
 module Msh = Map.Make (ShapeCmp)
@@ -32,9 +32,6 @@ module Msh = Map.Make (ShapeCmp)
   * their corresponding symbols. *)
 type Symbols.data += System_data of Action.descr Msh.t *
                                     Symbols.action Symbols.t Msh.t
-
-let of_string (name : lsymb) (table : Symbols.table) =
-  Symbols.System.of_lsymb name table
 
 let declare_empty table system_name =
   let def = () in

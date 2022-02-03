@@ -8,8 +8,6 @@ type conc_form = Equiv.local_form
 let hyp_kind = Equiv.Any_t
 let conc_kind = Equiv.Local_t
 
-let pp_form = Term.pp
-
 (*------------------------------------------------------------------*)
 (* For debugging *)
 let dbg ?(force=false) s =
@@ -198,7 +196,7 @@ let get_eq_atoms (s : sequent) : Term.eq_atom list =
     | `Pos, Term.(#index_atom as at) -> 
       Some (at :> Term.eq_atom)
 
-    | `Pos, Term.(`Timestamp ((`Eq | `Neq), _, _) as at) -> 
+    | `Pos, (`Timestamp ((`Eq | `Neq), _, _) as at) ->
       Some (at :> Term.eq_atom)
 
     | `Neg, Term.(#message_atom as at) -> 
@@ -207,10 +205,10 @@ let get_eq_atoms (s : sequent) : Term.eq_atom list =
     | `Neg, Term.(#index_atom as at) -> 
       Some (Term.not_index_atom at :> Term.eq_atom)
 
-    | `Neg, Term.(`Timestamp (`Eq, a, b)) -> 
+    | `Neg, (`Timestamp (`Eq, a, b)) ->
       Some (`Timestamp (`Neq, a,b) :> Term.eq_atom)
 
-    | `Neg, Term.(`Timestamp (`Neq, a, b)) -> 
+    | `Neg, (`Timestamp (`Neq, a, b)) ->
       Some (`Timestamp (`Eq, a,b) :> Term.eq_atom)
 
     | _, `Happens _ 
@@ -452,8 +450,7 @@ let table   s = s.table
 
 let set_env    a      s = S.update ~env:a         s
 let set_system system s = S.update ~system:system s 
-let set_ty_vars vs    s = S.update ~ty_vars:vs    s 
-let set_table  table  s = S.update ~table:table   s 
+let set_table  table  s = S.update ~table:table   s
 
 (*------------------------------------------------------------------*)
 let filter_map_hyps func hyps =

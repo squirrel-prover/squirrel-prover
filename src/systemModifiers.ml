@@ -51,7 +51,7 @@ let global_rename table sdecl gf =
     in
     let iterator cenv t =
       match
-        Rewrite.rewrite table old_system env TacticsArgs.(`Once)
+        Rewrite.rewrite table old_system env `Once
           rw_rule (`Reach t)
       with
       | `Result (`Reach res, ls) -> res
@@ -174,7 +174,7 @@ let global_prf table sdecl ty_vars hash =
 
   let iterator _ t =
     match
-      Rewrite.rewrite table old_system (!env) TacticsArgs.(`Once)
+      Rewrite.rewrite table old_system (!env) `Once
         rw_rule (`Reach t)
     with
     | `Result (`Reach res, ls) -> res
@@ -351,13 +351,13 @@ let global_cca table sdecl ty_vars enc =
 
   let iterator cenv t =
     match
-      Rewrite.rewrite table old_system (!env) TacticsArgs.(`Once)
+      Rewrite.rewrite table old_system (!env) `Once
         enc_rw_rule (`Reach t)
     with
     | `Result (`Reach res, ls) ->
       begin
         match
-          Rewrite.rewrite table old_system (!env) TacticsArgs.(`Once)
+          Rewrite.rewrite table old_system (!env) `Once
             dec_rw_rule (`Reach res)
         with
         | `Result (`Reach res2, ls) -> res2
@@ -366,7 +366,7 @@ let global_cca table sdecl ty_vars enc =
     | _ ->
       begin
         match
-          Rewrite.rewrite table old_system (!env) TacticsArgs.(`Once)
+          Rewrite.rewrite table old_system (!env) `Once
             dec_rw_rule (`Reach t)
         with
         | `Result (`Reach res2, ls) -> res2

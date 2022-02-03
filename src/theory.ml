@@ -68,7 +68,7 @@ and term = term_i L.located
 type formula = term
 
 (*------------------------------------------------------------------*)
-let rec equal_p_ty t t' = match L.unloc t, L.unloc t' with
+let equal_p_ty t t' = match L.unloc t, L.unloc t' with
   | P_message  , P_message
   | P_boolean  , P_boolean
   | P_index    , P_index
@@ -254,8 +254,6 @@ let rec pp_term_i ppf t = match t with
 
 
 and pp_ts ppf ts = Fmt.pf ppf "@%a" pp_term ts
-
-and pp_ots ppf ots = Fmt.option pp_ts ppf ots
 
 and pp_term ppf t =
   Fmt.pf ppf "%a" pp_term_i (L.unloc t)
@@ -562,8 +560,6 @@ let pp_app_i ppf = function
       (Fmt.option Term.pp) ots
 
   | AVar s -> Fmt.pf ppf "%s" (L.unloc s)
-
-let pp_app ppf app = pp_app_i ppf (L.unloc app)
 
 (** Context of a application construction. *)
 type app_cntxt =
@@ -1224,6 +1220,7 @@ let empty loc = L.mk_loc loc (App (L.mk_loc loc "empty", []))
 (** {2 Exported conversion and type-checking functions} *)
 
 
+(* TODO: warning unused type s *)
 let convert_ht : type s.
   ?ty_env:Type.Infer.env ->
   ?pat:bool ->
@@ -1393,6 +1390,7 @@ let parse_subst table ty_vars env (uvars : Vars.evar list) (ts : term list)
   in
   List.map2 f ts uvars
 
+(* TODO: what is Local_data for?? (it's unused) *)
 type Symbols.data += Local_data of Vars.evar list * Vars.evar * Term.message
 type Symbols.data += StateInit_data of Vars.index list * Term.message
 

@@ -1,7 +1,5 @@
 open Utils
 
-type lsymb = Theory.lsymb
-
 (*------------------------------------------------------------------*)
 let rev_subst subst = 
   List.map (fun (Term.ESubst (u,v)) -> Term.ESubst (v,u)) subst
@@ -31,9 +29,9 @@ module Mk (S : LowSequent.S) = struct
     red_param -> S.t -> a Term.term -> a Term.term = fun param s t ->
     let exception NoExp in
     
-    (** Invariant: we must ensure that fv(reduce(u)) ⊆ fv(t)
-        Return: reduced term, reduction occurred *)
-    (** TODO: memoisation *)
+    (* Invariant: we must ensure that fv(reduce(u)) ⊆ fv(t)
+       Return: reduced term, reduction occurred *)
+    (* TODO: memoisation *)
     let rec reduce : type a. state -> a Term.term -> a Term.term * bool = 
       fun st t ->
         let t, has_red = reduce_head_once st t in
@@ -44,14 +42,14 @@ module Mk (S : LowSequent.S) = struct
           if has_red then fst (reduce st t), true
           else t, false
 
-    (** Reduce once at head position *)
+    (* Reduce once at head position *)
     and reduce_head_once : type a. state -> a Term.term -> a Term.term * bool = 
       fun st t ->
         let t, has_red = expand_head_once st t in
         let t, has_red' = rewrite_head_once st t in
         t, has_red || has_red'
 
-    (** Expand once at head position *)
+    (* Expand once at head position *)
     and expand_head_once : type a. state -> a Term.term -> a Term.term * bool = 
       fun st t ->
         if not st.param.delta 
@@ -77,7 +75,7 @@ module Mk (S : LowSequent.S) = struct
 
         | _ -> raise NoExp
 
-    (** Rewrite once at head position *)
+    (* Rewrite once at head position *)
     and rewrite_head_once : type a. state -> a Term.term -> a Term.term * bool = 
       fun st t ->
         let rule = List.find_map (fun (_, rule) ->
@@ -97,7 +95,7 @@ module Mk (S : LowSequent.S) = struct
         | None -> t, false
         | Some red_t -> red_t, true
 
-    (** Reduce all strict subterms *)
+    (* Reduce all strict subterms *)
     and reduce_subterms : type a. state -> a Term.term -> a Term.term * bool = 
       fun st t -> 
         match t with

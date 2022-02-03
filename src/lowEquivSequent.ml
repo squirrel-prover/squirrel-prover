@@ -22,8 +22,6 @@ module H = Hyps.Mk
 let subst_hyps (subst : Term.subst) (hyps : H.hyps) : H.hyps =
   H.map (Equiv.subst subst) hyps
 
-type hyps = H.hyps
-
 (*------------------------------------------------------------------*)
 (** {2 Equivalence sequent} *)
 
@@ -178,6 +176,8 @@ end
 
 (*------------------------------------------------------------------*)
 (** {2 Accessors and utils} *)
+
+(* TODO: several of those are unused values *)
 
 let env j = j.env
 

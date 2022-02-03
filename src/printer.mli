@@ -51,9 +51,6 @@ val init : printer_mode -> unit
 
 (** {2 Printing functions} *)
 
-(** Change a format into a string. *)
-val strf : ('a, Format.formatter, unit, string) format4 -> 'a
-
 (** Type defining the markup to use before and after printing. *)
 type pp = [ `Prompt | `Start | `Result | `Error
   | `Dbg | `Warning | `Ignore | `Goal | `Default ]

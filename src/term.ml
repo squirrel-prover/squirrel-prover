@@ -5,7 +5,7 @@ module L = Location
 module Sv = Vars.Sv
 module Mv = Vars.Mv
 
-let dbg s = Printer.prt `Ignore s
+(* let dbg s = Printer.prt `Ignore s *)
 (* let dbg s = Printer.prt `Dbg s *)
 
 (*------------------------------------------------------------------*)
@@ -56,7 +56,6 @@ let pp_fsymb ppf (fn,is) = match is with
   | _ -> Fmt.pf ppf "%a(%a)" pp_fname fn Vars.pp_list is
 
 let pp_mname_s ppf s =
-  let open Fmt in
   (Printer.kws `GoalMacro) ppf s
 
 let pp_mname ppf s =
@@ -231,8 +230,6 @@ let f_diff = mk Symbols.fs_diff
   * and other symbols are used in an untyped way in Completion
   * (in some currently unused code). *)
 
-let eboolean,emessage = Type.eboolean,Type.emessage
-
 (** Boolean connectives *)
 
 let f_false  = mk Symbols.fs_false
@@ -243,7 +240,7 @@ let f_impl   = mk Symbols.fs_impl
 let f_not    = mk Symbols.fs_not
 let f_ite    = mk Symbols.fs_ite
 
-(** Fail *)
+(** Fail (TODO: unused value f_witness) *)
 
 let f_witness = mk Symbols.fs_witness
 
@@ -511,7 +508,7 @@ let oas_seq2 = omap as_seq2
 (** Smart destrucrots.
     The module is included after its definition. *)
 module SmartDestructors = struct
-  let rec destr_exists1 = function
+  let destr_exists1 = function
     | Exists (v :: vs, f) -> Some (v, mk_exists vs f)
     | _ -> None
 
@@ -530,7 +527,7 @@ module SmartDestructors = struct
       vs @ vs', f0
     | _ as f -> [], f
 
-  let rec destr_forall1 = function
+  let destr_forall1 = function
     | ForAll (v :: vs, f) -> Some (v, mk_forall vs f)
     | _ -> None
 
@@ -640,7 +637,8 @@ module SmartDestructors = struct
   let is_or   f = destr_or   f <> None
   let is_and  f = destr_and  f <> None
   let is_impl f = destr_impl f <> None
-  let is_pair f = destr_pair f <> None
+  (* is_pair is unused but having it seems to make sense *)
+  let[@warning "-32"] is_pair f = destr_pair f <> None
 
   let is_exists f = destr_exists f <> None
   let is_forall f = destr_forall f <> None

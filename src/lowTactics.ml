@@ -74,7 +74,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let check_ty_eq ?loc ty1 ty2 =
     if not (Type.equal ty1 ty2) then
       soft_failure ?loc
-        (Failure (Fmt.strf "types %a and %a are not compatible"
+        (Failure (Fmt.str "types %a and %a are not compatible"
                     Type.pp ty1 Type.pp ty2));
     ()
 
@@ -82,7 +82,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let check_hty_eq ?loc hty1 hty2 =
     if not (Type.ht_equal hty1 hty2) then
       soft_failure ?loc
-        (Failure (Fmt.strf "types %a and %a are not compatible"
+        (Failure (Fmt.str "types %a and %a are not compatible"
                     Type.pp_ht hty1 Type.pp_ht hty2));
     ()
 
@@ -253,7 +253,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
 
     (* applies [doit] to all subterms of the target [f] *)
-    let rec doit ((f,_) : cform * Ident.t option) : cform * S.conc_form list =
+    let doit ((f,_) : cform * Ident.t option) : cform * S.conc_form list =
 
       let expand_inst (Term.ETerm occ) vars conds =
         match occ with
@@ -1440,8 +1440,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       else
         soft_failure
-          (Tactics.NotDepends (Fmt.strf "%a" Term.pp a1,
-                               Fmt.strf "%a" Term.pp a2))
+          (Tactics.NotDepends (Fmt.str "%a" Term.pp a1,
+                               Fmt.str "%a" Term.pp a2))
 
     | _ -> assert false
 

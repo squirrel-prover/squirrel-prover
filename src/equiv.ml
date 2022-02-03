@@ -252,8 +252,8 @@ module Smart : Term.SmartFO with type form = _form = struct
           | None -> None
         end
 
-    (** For a local meta-formula f,
-      * (Forall x. [f]) is equivalent to [forall x. f]. *)
+    (* For a local meta-formula f,
+       (Forall x. [f]) is equivalent to [forall x. f]. *)
     | Atom (Reach f) when q = ForAll ->
       begin match Term.Smart.destr_forall f with
           | Some (es,f) -> Some (es, Atom (Reach f))
@@ -274,8 +274,8 @@ module Smart : Term.SmartFO with type form = _form = struct
           | None -> None
         end
 
-    (** For a local meta-formula f,
-      * (Forall x. [f]) is equivalent to [forall x. f]. *)
+    (* For a local meta-formula f,
+       (Forall x. [f]) is equivalent to [forall x. f]. *)
     | Atom (Reach f) when q = ForAll ->
       begin match Term.Smart.destr_forall1 f with
           | Some (es,f) -> Some (es, Atom (Reach f))
@@ -347,7 +347,7 @@ module Smart : Term.SmartFO with type form = _form = struct
       then None
       else Some (List.map (fun f -> Atom (Reach f)) l)
 
-  let rec mk_destr_left f_destr =
+  let mk_destr_left f_destr =
     let rec destr l f =
       if l < 0 then assert false;
       if l = 1 then Some [f]
@@ -390,8 +390,8 @@ module Smart : Term.SmartFO with type form = _form = struct
       let es', f = decompose_quant q f in
       es @ es', f
 
-    (** For a local meta-formula f,
-      * (Forall x. [f]) is equivalent to [forall x. f]. *)
+    (* For a local meta-formula f,
+     * (Forall x. [f]) is equivalent to [forall x. f]. *)
     | Atom (Reach f) when q = ForAll ->
       let es,f = Term.Smart.decompose_forall f in
       es, Atom (Reach f)

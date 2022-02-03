@@ -16,7 +16,6 @@ exception Error of string
   *
   * For bad, internal errors that should be
   * reported with a backtrace, return [None]. *)
-(** Pretty-printer for parsing locations. *)
 let pp_error pp_loc pp_pref_loc e = match e with
   | Parser.Error ->
       Some (fun ppf () ->
@@ -33,6 +32,7 @@ let pp_error pp_loc pp_pref_loc e = match e with
                 s)
   | _ -> None
 
+(** Pretty-printer for parsing locations. *)
 let pp_loc interactive filename lexbuf ppf () =
   if not interactive then
     Fmt.pf ppf
@@ -75,7 +75,7 @@ let parse_from_buf
     | Some pp_error ->
       if test then raise e else
       if interactive then
-        let msg = Fmt.strf "%a" pp_error () in
+        let msg = Fmt.str "%a" pp_error () in
         raise (Error msg)
       else begin
         Printer.prt `Error "%a" pp_error () ;

@@ -303,7 +303,7 @@ let get_f : type a.
 
       | Term.Diff (Term.Fun _, Term. Fun _) when allow_diff ->
         let head_occ =
-          if (match Term.pi_term PLeft t, Term.pi_term PRight t with
+          if (match Term.pi_term ~projection:PLeft t, Term.pi_term ~projection:PRight t with
               | (Fun (fl,_,ll),Fun (fr,_,lr))
                 when (matching table fl symtype
                       && matching table fr symtype ) -> true

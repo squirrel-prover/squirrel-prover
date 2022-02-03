@@ -6,18 +6,12 @@ module Sv = Vars.Sv
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
-let rev_subst subst = 
-  List.map (fun (Term.ESubst (u,v)) -> Term.ESubst (u,v)) subst
-
-(*------------------------------------------------------------------*)
 
 (* FIXME: store and access by head symbol *)
 type rewrite_db = (string * Rewrite.rw_erule) list
 
 let empty_rewrite_db = []
 let add_rewrite_rule r db = r :: db
-
-let rules = []
 
 (*------------------------------------------------------------------*)
 

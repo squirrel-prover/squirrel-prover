@@ -20,7 +20,6 @@ let get_smt_setup
           let exec_dir = Filename.dirname Sys.executable_name in
           Why3.Env.create_env (Filename.(concat exec_dir "theories") ::
                                Why3.Whyconf.(loadpath (get_main config))) in
-        let exception Load_driver_fails in
         try
           let tm_theory =
             Why3.Env.read_theory env ["trace_model_int"] "Trace_model" in
@@ -101,7 +100,7 @@ let build_task_bis
   let macro_cond_symb  = Why3.Theory.ns_find_ls tm_export ["macro_cond"] in
   let macro_exec_symb  = Why3.Theory.ns_find_ls tm_export ["macro_exec"] in
 
-  (** TODO copy/pasted from trace_literals_unsat (+ msgvars) **)
+  (* copy/pasted from trace_literals_unsat (+ msgvars) **)
   let indices = filter_cast Type.KIndex     evars
   and tsvars  = filter_cast Type.KTimestamp evars
   and msgvars = filter_cast Type.KMessage   evars in

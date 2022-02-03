@@ -455,6 +455,8 @@ module Theories = struct
     ( cfun mcheck 0 [cfun msig 0 [m; k]; t_pk], t_true )
 
 
+  (* TODO: mk_simpl_* functions are unused *)
+
   (** Simple And Boolean rules. *)
   let mk_simpl_and () =
     let u, v, t = mk_var (), mk_var (), mk_var () in
@@ -493,8 +495,9 @@ module Cset = struct
   include Cset
 
   (* Because of the nilpotence rule for the xor, [map] can only be used on
-      injective functions. To avoid mistake, I removed it. *)
-  let map _ _ = assert false
+      injective functions. To avoid mistake, I removed it.
+     -> make the "unused value" warning silent since it's the whole point *)
+  let[@warning "-32"] map _ _ = assert false
 
   (* [of_list l] is modulo nilpotence. For example:
       [of_list [a;b;a;c] = [b;c]] *)
@@ -1419,9 +1422,6 @@ let complete_cterms table (l : (cterm * cterm) list) : state =
 
   complete_state state
   |> finalize_completion
-
-let tot = ref 0.
-let cptd = ref 0
 
 (* FIXME: memory leaks *)
 module Memo = Hashtbl.Make2
