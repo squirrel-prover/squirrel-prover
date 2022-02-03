@@ -4,7 +4,12 @@ module SE   = SystemExpr
 module L    = Location
 
 let global_rename table sdecl gf =
-  let env = Env.init ~table () in
+  let old_system, old_single_system = 
+    match SE.parse_se table sdecl.Decl.from_sys with
+    | Single s as res -> res, s
+    | _ -> assert false
+  in
+  let env = Env.init ~table ~system:old_system () in
   let conv_env = Theory.{ env; cntxt = InGoal } in
 
   let f = Theory.convert_global_formula conv_env gf in
@@ -19,11 +24,6 @@ let global_rename table sdecl gf =
         ->  ns1, ns2, Term.mk_name ns1, Term.mk_name ns2
     | _ -> assert false
 
-  in
-  let old_system, old_single_system = 
-    match SE.parse_se table sdecl.Decl.from_sys with
-    | Single s as res -> res, s
-    | _ -> assert false
   in
 
   (* We check that n2 does not occur in the old system using fresh. *)
@@ -110,17 +110,17 @@ let global_rename table sdecl gf =
 
 
 let global_prf table sdecl bnds hash =
-  let env = Env.init ~table () in
-  let env,is = Theory.convert_p_bnds env bnds in
-
-  let conv_env = Theory.{ env = env; cntxt = InGoal } in
-  let hash, _ = Theory.convert conv_env hash in
-
   let old_system, old_single_system = 
     match SE.parse_se table sdecl.Decl.from_sys with
     | Single s as res -> res, s
     | _ -> assert false
   in
+
+  let env = Env.init ~table ~system:old_system () in
+  let env,is = Theory.convert_p_bnds env bnds in
+
+  let conv_env = Theory.{ env = env; cntxt = InGoal } in
+  let hash, _ = Theory.convert conv_env hash in
 
   let cntxt = Constr.{
       table  = table;
@@ -237,16 +237,16 @@ let global_prf table sdecl bnds hash =
 
 
 let global_cca table sdecl bnds enc =
-  let env = Env.init ~table () in
-  let env,is = Theory.convert_p_bnds env bnds in
-  let conv_env = Theory.{ env; cntxt = InGoal } in
-  let enc, _ = Theory.convert conv_env enc in
-
   let old_system, old_single_system = 
     match SE.parse_se table sdecl.Decl.from_sys with
     | Single s as res -> res, s
     | _ -> assert false
   in
+
+  let env = Env.init ~table ~system:old_system () in
+  let env,is = Theory.convert_p_bnds env bnds in
+  let conv_env = Theory.{ env; cntxt = InGoal } in
+  let enc, _ = Theory.convert conv_env enc in
 
   let cntxt = Constr.{
       table  = table;

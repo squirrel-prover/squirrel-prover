@@ -1337,7 +1337,7 @@ let global_diff_eq (s : ES.t) =
 
   SystemExpr.iter_descrs cntxt.table cntxt.system (
     fun action_descr ->
-      let miter =   iter [action_descr.Action.name]  action_descr.Action.indices in
+      let miter = iter [action_descr.Action.name]  action_descr.Action.indices in
      miter (snd action_descr.Action.output) ;
      miter (snd action_descr.Action.condition) ;
      List.iter (fun (_,m) -> miter m) action_descr.Action.updates) ;
