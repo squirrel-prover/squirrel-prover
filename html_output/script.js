@@ -26,7 +26,7 @@ function init() {
       com.innerHTML = comContent[0].innerHTML;
       com.collapse = false;
       com.text = com.innerHTML;
-      com.addEventListener("click", function() { collapseBox(this); } );
+      com.addEventListener("dblclick", function() { collapseBox(this); } );
       inLine.appendChild(com);
       stepBegin.push(com);
     } else {
@@ -115,6 +115,23 @@ function highlightOn(id) {
 
 function highlightOff(id) {
   document.getElementById(id).style.backgroundColor = "white";
+}
+
+function hidePrec() {
+  
+  button = document.getElementById('prec-button');
+  if (button.status) {
+    document.getElementById('out-zone').style.height = "55%";
+    document.getElementById('prec-zone').style.display = "block";
+    button.innerHTML = "Hide";
+    button.status = false;
+  } else {
+    document.getElementById('out-zone').style.height = "100%";
+    document.getElementById('prec-zone').style.display = "none";
+    button.innerHTML = "Show";
+    button.status = true;
+  }
+  
 }
 
 init()

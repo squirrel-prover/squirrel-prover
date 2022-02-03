@@ -3,6 +3,7 @@
 }
 
 body {
+  -moz-overflow: -moz-hidden-unscrollable;
   overflow: clip;
 }
 
@@ -125,8 +126,20 @@ body {
   align-items: stretch;
 }
 
-.expand-button{
-  width : 1rem;
+.prec-button{
+  position: relative;
+  float:left;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width : 3rem;
+  padding: 0;
+  margin: auto;
+	border-style: none solid solid;
+	border-width: 1px;
+	border-color: #8B0000;
+  background-color: #ffffeb;
+	border-radius: 0 0 4px 4px;
 }
 
 .input-line:hover {

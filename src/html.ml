@@ -32,6 +32,23 @@ let print_esc_char (escaping : bool ref) (c : char) : unit =
 let print_esc_string (s : string) : unit =
   String.iter (print_esc_char (ref true)) s
 
+(** Return [s] without empty lines at the beginniginitial new_lines characters *)
+let trim (s : string) : string =
+  let l = String.length s in
+  let rec start_pos (pos : int) (start : int): int =
+  (* [start] store the position of the begin of a line.
+     This value is retuned when a non empty character is read. *)
+    if pos >= l then
+      pos
+    else match s.[pos] with
+    | '\n' -> start_pos (pos+1) (pos+1)
+    | ' ' | '\x0C' | '\r' | '\t' ->
+      start_pos (pos+1) start
+    | _ -> start
+  in
+  let pos = start_pos 0 0 in
+  String.sub s pos (l-pos)
+
 (** Print string [s], translating markdown into html
     Use pandoc *)
 let print_pandoc (s : string) : unit =
@@ -77,7 +94,7 @@ let pp () =
     "<span class=\"input-line\" id=\"in%d\">"
     !counter);
   if concat_com <> "" then
-    print_esc_string (String.trim input_line)
+    print_esc_string (trim input_line)
   else
     print_esc_string input_line;
   output_string !current_out_c "</span>\n";
