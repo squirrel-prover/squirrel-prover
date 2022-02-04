@@ -35,13 +35,15 @@
 <div class="mainsection" id="main">
   <div class="example-grid">
     <div class="example-col example-col-left" id="in-zone">
-      <div class="example-code"><span id="in-line"></span></div>
+      <p class="example-code"><span id="in-line"></span></p>
     </div>
     <div class="example-col example-col-right">
-      <div class="example-code" style="height: 45%;	border-bottom: 4px double #8B0000;" id="prec-zone"><span>Previously:</span><br><br><span id="prec-line"></span>
+      <div class="example-code example-code-right" style="height: 45%;	border-bottom: 4px double #8B0000;" id="prec-zone"><span>Previously:</span><br><br><span id="prec-line"></span>
       </div>
+      <div style="position: relative;">
       <button type="button" class="prec-button" onclick="hidePrec()" id="prec-button" >Hide</button>
-      <div class="example-code" style="height: 55%;" id="out-zone"><span id="out-line"></span>
+      </div>
+      <div class="example-code example-code-right" style="height: 55%;" id="out-zone"><span id="out-line"></span>
       </div>
     </div>
   </div>

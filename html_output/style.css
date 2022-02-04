@@ -98,12 +98,12 @@ body {
 	float: left;
 	width: 50%;
 	height: 100%;
-	overflow: auto;
 }
 
 .example-col-left{
 	border-right: 2px solid #8B0000;
   scroll-behavior: smooth;
+	overflow: auto;
 }
 
 .example-col-right{
@@ -111,23 +111,23 @@ body {
 }
 
 .example-code{
-	width: 100%;
 	margin: 0;
 	padding: 1.5rem 1.5rem;
 	font: 1rem Consolas, "Liberation Mono", Menlo, Courier, monospace;
 	color: #567482;
 	white-space: pre;
-	overflow: auto;
 	word-wrap: normal;
 }
-
+.example-code-right{
+	overflow: auto;
+}
 .example-line{
   display: flex;
   align-items: stretch;
 }
 
 .prec-button{
-  position: relative;
+  position: absolute;
   float:left;
   top: 0;
   left: 50%;

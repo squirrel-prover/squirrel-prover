@@ -83,7 +83,7 @@ let print_pandoc (s : string) : unit =
   * Output must be already stored in the standard buffer (standard output for Html printer mode).*)
 let pp () =
   let (input_line, coms) = HtmlParser.main HtmlLexer.token !lex in
-  let concat_com = String.concat "\n" coms in
+  let concat_com = String.concat "\n\n" coms in
   
   output_string !current_out_c (Format.asprintf 
     "<span class=\"squirrel-step\" id=\"step%d\">\n"
