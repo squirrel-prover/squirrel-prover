@@ -1117,28 +1117,34 @@ module MkCommonLowTac (S : Sequent.S) = struct
     * as premisses. *)
 
   let apply ~use_fadup (pat : S.conc_form Match.pat) (s : S.t) : S.t list =
-    let subs, f = S.Conc.decompose_impls_last pat.pat_term in
-
-    if not (Vars.Sv.subset pat.pat_vars (S.fv_conc f)) then
-      soft_failure ApplyBadInst;
-
-    let pat = { pat with pat_term = f } in
     let option =
       { Match.default_match_option with mode = `EntailRL; use_fadup }
     in
+    let table, system, goal = S.table s, S.system s, S.goal s in
 
-    (* Check that [pat] entails [S.goal s]. *)
-    match S.MatchF.try_match ~option
-            (S.table s) (S.system s)
-            (S.goal s) pat
-    with
-    | NoMatch minfos  -> soft_failure (ApplyMatchFailure minfos)
-    | FreeTyv         -> soft_failure (ApplyMatchFailure None)
-    | Match mv ->
-      let subst = Match.Mvar.to_subst ~mode:`Match mv in
+    let rec _apply (subs : S.conc_form list) (pat : S.conc_form Match.pat) =
+      if not (Vars.Sv.subset pat.pat_vars (S.fv_conc pat.pat_term)) then
+        soft_failure ApplyBadInst;
 
-      let goals = List.map (S.subst_conc subst) subs in
-      List.map (fun g -> S.set_goal g s) goals
+      (* Check that [pat] entails [S.goal s]. *)
+      match S.MatchF.try_match ~option table system goal pat with
+      (* match failed by [pat] is a product: retry with the rhs *)
+      | (NoMatch _ | FreeTyv) when S.Conc.is_impl pat.pat_term ->
+        let t1, t2 = oget (S.Conc.destr_impl pat.pat_term) in
+        _apply (t1 :: subs) { pat with pat_term = t2 }
+
+      (* match failed, [pat] is not a product: user-level error *)
+      | NoMatch minfos  -> soft_failure (ApplyMatchFailure minfos)
+      | FreeTyv         -> soft_failure (ApplyMatchFailure None)
+
+      (* match succeeded *)
+      | Match mv ->
+        let subst = Match.Mvar.to_subst ~mode:`Match mv in
+
+        let goals = List.map (S.subst_conc subst) (List.rev subs) in
+        List.map (fun g -> S.set_goal g s) goals
+    in
+    _apply [] pat
 
   (** [apply_in f hyp s] tries to match a premise of [f] with the conclusion of
       [hyp], and replaces [hyp] by the conclusion of [f].
