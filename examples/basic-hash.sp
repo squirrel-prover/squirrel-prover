@@ -177,54 +177,54 @@ Proof.
   induction t; 1: auto.
 
   (** Case where t = R(j).
-      We start by expanding the macros and splitting the pairs. *)
+  We start by expanding the macros and splitting the pairs. *)
   + expand frame. fa 0. fa 1.
     expand exec, output.
-    (** Using the authentication goal `wa_R` previously proved, we replace the
-        formula `cond@R(j)` by an equivalent formula expressing the fact that
-        a tag `T(i,k)` has played before and that the output of this tag is
-        the message inputted by the reader. *)
+  (** Using the authentication goal `wa_R` previously proved, we replace the
+  formula `cond@R(j)` by an equivalent formula expressing the fact that
+  a tag `T(i,k)` has played before and that the output of this tag is
+  the message inputted by the reader. *)
     rewrite /cond (wa_R (R(j)) H).
-    (** We are now able to remove this formula from the frame because
-        the attacker is able to compute it using information obtained
-        in the past. Indeed, each element of this formula is already available
-        in `frame@pred(R(j))`. This is done by the `fadup` tactic. *)
+  (** We are now able to remove this formula from the frame because
+  the attacker is able to compute it using information obtained
+  in the past. Indeed, each element of this formula is already available
+  in `frame@pred(R(j))`. This is done by the `fadup` tactic. *)
     by fadup 1.
-
-  (** Case where t = R1(j).
-      This case is similar to the previous one. *)
+    
+  (** **Case where t = R1(j):**  
+  This case is similar to the previous one. *)
   + expand frame. fa 0. fa 1.
     expand exec, output.
     rewrite /cond (wa_R (R1(j)) H).
     by fadup 1.
 
-  (** Case where t = T(i,k).
-      We start by expanding the macros and splitting the pairs. *)
+  (** **Case where t = T(i,k):**  
+  We start by expanding the macros and splitting the pairs. *)
   + expand frame, exec, cond, output.
     fa 0; fa 1; fa 1; fa 1.
-    (** We now apply the `prf` tactic, in order to replace the hash by a fresh
-        name. The tactic actually replaces the hash by a conditional term in
-        which the then branch is the fresh name.
-        The goal is now to prove that this condition always evaluates to
-        `true`. *)
+  (** We now apply the `prf` tactic, in order to replace the hash by a fresh
+  name. The tactic actually replaces the hash by a conditional term in which
+  the then branch is the fresh name.
+  The goal is now to prove that this condition always evaluate to `true`. *)
     prf 2. rewrite if_true. {
       split; 1: true.
-      (** Several conjuncts must now be proved, the same tactic can be
-          used on all of them. Here are representative cases:
+  (** Several conjuncts must now be proved, the same tactic can be
+  used on all of them. Here are representative cases:
 
-          - In one case, `nT(i,k)` cannot occur in `input@R(j)`
-            because `R(j) < T(i,k)`.
-          - In another case, `nT(i,k) = nT(i0,k0)` implies that `i=i0` and
-            `k=k0`, contradicting `T(i0,k0)<T(i,k)`.
+  - In one case, `nT(i,k)` cannot occur in `input@R(j)`
+    because `R(j) < T(i,k)`.
+  - In another case, `nT(i,k) = nT(i0,k0)` implies that `i=i0` and `k=k0`,
+    contradicting `T(i0,k0)<T(i,k)`.
 
-          In both cases, the reasoning is performed by the fresh tactic on the
-          message equality hypothesis `Meq` whose negation must initially be
-          proved.
-          To be able to use (split and) fresh, we first project the goal into
-          into one goal for the left projection and one goal for the right
-          projection of the initial bi-system. *)
+  In both cases, the reasoning is performed by the fresh tactic on the
+  message equality hypothesis `Meq` whose negation must initially be
+  proved.
+  To be able to use (split and) fresh, we first project the goal into
+  into one goal for the left projection and one goal for the right
+  projection of the initial bi-system. *)
       project; repeat split; intro *; by fresh Meq.
     }
+
 
     (** We have now replaced the hash by a fresh name occurring nowhere else,
         so we can remove it using the `fresh` tactic. *)

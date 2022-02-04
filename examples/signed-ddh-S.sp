@@ -1,12 +1,12 @@
-(*******************************************************************************
-SIGNED DDH
+(**
+# SIGNED DDH
 
 The signed DDH protocol as described in [G] features two roles, P and S.
 Each role is associated to a secret key (skP and skS).
 
-P -> S : <pk(skP), g^a>
-S -> P : <pk(skS),g^b>,sign(<<g^a,g^b>,pk(skP)>,skS)
-P -> S : sign(<<g^b,g^a>,pk(skS)>,skP)
+* P -> S : <pk(skP), g^a>
+* S -> P : <pk(skS),g^b>,sign(<<g^a,g^b>,pk(skP)>,skS)
+* P -> S : sign(<<g^b,g^a>,pk(skS)>,skP)
 
 We consider multiple sessions but two agents only (one agent for the role P and
 one agent for the role S) and show the strong secrecy of the shared key.
@@ -18,11 +18,12 @@ one agent for the role S) and show the strong secrecy of the shared key.
 
 [G] ISO/IEC 9798-3:2019, IT Security techniques – Entity authentication –
 Part 3: Mechanisms using digital signature techniques.
+
 *******************************************************************************)
 
 (**
 Declarations are identical to the ones in `signed-ddh-P.sp`.
-**)
+*)
 abstract ok : message
 abstract ko : message
 
@@ -43,8 +44,9 @@ signature sign,checksign,pk
 (**
 The system `secretS` is the counterpart of the system `secretP` defined in
 the file `signed-ddh-P.sp`.
+
 This time, we add an output at the end of the role of S.
-**)
+*)
 process P(i:index) =
   out(cP, <pk(skP),g^a(i)>);
   in(cP, x2);
@@ -74,7 +76,7 @@ system [secretS] (!_i P(i) | !_j Schall(j)).
 In the proof of strong secrecy for the system `secretS`, we will use
 the following property, stating that whenever S accepts a message from P,
 this message is of the form `<<_,x>,_>` where `x = g^a(i)`.
-**)
+*)
 goal [secretS] S_charac (j:index):
   happens(Schall1(j)) =>
     exec@Schall1(j) =>
@@ -95,7 +97,7 @@ Qed.
 (**
 We show the counterpart of the property `strongSecP`, this time for the
 system `secretS`. The proof is carried out exactly in the same way.
-**)
+*)
 equiv [secretS] strongSecS.
 Proof.
   enrich
