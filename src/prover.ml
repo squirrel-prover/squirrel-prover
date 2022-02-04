@@ -28,6 +28,7 @@ type decl_error_i =
   | InvalidCtySpace of string list
   | DuplicateCty of string
 
+  | NonDetOp
   (* TODO: remove these errors, catch directly at top-level *)
   | SystemError     of System.system_error
   | SystemExprError of SE.system_expr_err
@@ -41,14 +42,16 @@ let pp_decl_error_i fmt = function
     Fmt.pf fmt "equivalence goal ill-formed"
 
   | InvalidAbsType ->
-    Fmt.pf fmt "invalid type, must be of the form:@ \n \
-                Indexⁿ → Messageᵐ → Message"
+    Fmt.pf fmt "invalid type, return type must not be Index or Timestamp."
 
   | InvalidCtySpace kws ->
     Fmt.pf fmt "invalid space@ (allowed: @[<hov 2>%a@])"
       (Fmt.list ~sep:Fmt.comma Fmt.string) kws
 
   | DuplicateCty s -> Fmt.pf fmt "duplicated entry %s" s
+
+  | NonDetOp ->
+    Fmt.pf fmt "an operator body cannot contain probabilistic computations"
 
   | SystemExprError e -> SE.pp_system_expr_err fmt e
 
@@ -92,7 +95,7 @@ type option_name =
   | Oracle_for_symbol of string
 
 type option_val =
-  | Oracle_formula of Term.message
+  | Oracle_formula of Term.term
 
 type option_def = option_name * option_val
 
@@ -213,25 +216,28 @@ let add_option ((opt_name,opt_val):option_def) =
 exception ParseError of string
 
 type tactic_groups =
-  | Logical   (* A logic tactic is a tactic that relies on the sequence calculus
-                 logical properties. *)
-  | Structural (* A structural tactic relies on properties inherent to protocol,
-                  on equality between messages, behaviour of if _ then _ else _,
-                  action dependencies... *)
-  | Cryptographic (* Cryptographic assumptions rely on ... a cryptographic assumption ! *)
+  | Logical
+  (** Sequence calculus logical properties. *)
+
+  | Structural
+  (** Properties inherent to protocol, on equality between messages, behaviour 
+     of if _ then _ else _, action dependencies... *)
+
+  | Cryptographic
+  (** Cryptographic assumptions. *)
 
 
-(* The record for a detailed help tactic. *)
-type tactic_help = { general_help : string;
+(** The record for a detailed help tactic. *)
+type tactic_help = { general_help  : string;
                      detailed_help : string;
-                     usages_sorts : TacticsArgs.esort list;
-                     tactic_group : tactic_groups;
+                     usages_sorts  : TacticsArgs.esort list;
+                     tactic_group  : tactic_groups;
                    }
 
 type 'a tac_infos = {
-  maker : TacticsArgs.parser_arg list -> 'a Tactics.tac ;
+  maker    : TacticsArgs.parser_arg list -> 'a Tactics.tac ;
   pq_sound : bool;
-  help : tactic_help ;
+  help     : tactic_help ;
 }
 
 type 'a table = (string, 'a tac_infos) Hashtbl.t
@@ -346,12 +352,13 @@ module ProverTactics = struct
                            pq_sound}
 
   let convert_args j parser_args tactic_type =
-    let table, env, ty_vars, conc, sexpr =
+    let env, conc =
       match j with
-      | Goal.Trace t -> TS.table t, TS.env t, TS.ty_vars t, `Reach (TS.goal t), TS.system t
-      | Goal.Equiv e -> ES.table e, ES.env e, ES.ty_vars e, `Equiv (ES.goal e), ES.system e
+      | Goal.Trace t -> TS.env t, `Reach (TS.goal t)
+
+      | Goal.Equiv e -> ES.env e, `Equiv (ES.goal e)
     in
-    TacticsArgs.convert_args sexpr table ty_vars env parser_args tactic_type conc
+    TacticsArgs.convert_args env parser_args tactic_type conc
 
   let register id ~tactic_help ?(pq_sound=false) f =
     register_general id ~tactic_help ~pq_sound
@@ -491,7 +498,9 @@ let get_help (tac_name : lsymb) =
 
   let print_lemmas fmt () =
     let goals = !goals_proved in
-    List.iter (fun g -> Fmt.pf fmt "%s: %a@;" g.Goal.name Equiv.Any.pp g.Goal.formula) goals
+    List.iter (fun g -> 
+        Fmt.pf fmt "%s: %a@;" g.Goal.name Equiv.Any.pp g.Goal.formula
+      ) goals
 
 
 
@@ -580,13 +589,15 @@ let get_equiv_assumption gname =
 (*------------------------------------------------------------------*)
 (** {2 Declare Goals And Proofs} *)
 
+type include_param = { th_name : lsymb; params : lsymb list }
+
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
   | ParsedSetOption  of Config.p_set_param
   | ParsedTactic     of TacticsArgs.parser_arg Tactics.ast
   | ParsedUndo       of int
   | ParsedGoal       of Goal.Parsed.t Location.located
-  | ParsedInclude    of lsymb
+  | ParsedInclude    of include_param
   | ParsedProof
   | ParsedQed
   | ParsedAbort
@@ -603,6 +614,7 @@ let declare_new_goal_i table hint_db parsed_goal =
   in
   if is_assumption (L.unloc name) then
     raise (ParseError "a goal or axiom with this name already exists");
+
   let parsed_goal = { parsed_goal with Goal.Parsed.name = Some name } in
   let statement,goal = Goal.make table hint_db parsed_goal in
   goals :=  (statement,goal) :: !goals;
@@ -615,17 +627,18 @@ let declare_new_goal table hint_db parsed_goal =
 
 let add_proved_goal gconcl =
   if is_assumption gconcl.Goal.name then
-    raise (ParseError "a formula with this name alread exists");
+    raise (ParseError "a goal or axiom with this name already exists");
   goals_proved := gconcl :: !goals_proved
 
 let define_oracle_tag_formula table (h : lsymb) f =
-  let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-  let formula = Theory.convert conv_env [] Vars.empty_env f Type.Boolean in
-    match formula with
-     |  Term.ForAll ([Vars.EVar uvarm;Vars.EVar uvarkey],f) ->
+  let env = Env.init ~table () in
+  let conv_env = Theory.{ env; cntxt = InGoal; } in
+  let form, _ = Theory.convert conv_env ~ty:Type.Boolean f in
+    match form with
+     |  Term.ForAll ([uvarm; uvarkey],f) ->
          begin match Vars.ty uvarm,Vars.ty uvarkey with
          | Type.(Message, Message) ->
-           add_option (Oracle_for_symbol (L.unloc h), Oracle_formula formula)
+           add_option (Oracle_for_symbol (L.unloc h), Oracle_formula form)
          | _ -> raise @@ ParseError "The tag formula must be of \
                                      the form forall (m:message,sk:message)"
          end
@@ -685,12 +698,19 @@ let eval_tactic utac = match utac with
     subgoals := cycle i !subgoals; false
   | _ -> eval_tactic_focus utac
 
-let start_proof () = match !current_goal, !goals with
+let start_proof (check : [`NoCheck | `Check]) = 
+  match !current_goal, !goals with
   | None, (gname,goal) :: _ ->
     assert (!subgoals = []);
     current_goal := Some (gname,goal);
-    subgoals := [goal];
+    let () = 
+      subgoals :=
+        match check with
+        | `Check -> [goal]
+        | `NoCheck -> []
+    in
     None
+
   | Some _,_ ->
     Some "Cannot start a new proof (current proof is not done)."
 
@@ -707,45 +727,37 @@ let set_hint_db db = hint_db := db
 (*------------------------------------------------------------------*)
 (** {2 Declaration parsing} *)
 
+let check_fun_out_ty loc ty =
+  if ty = Type.Index || ty = Type.Timestamp then
+    decl_error loc KDecl InvalidAbsType
+  else ()
+
 let parse_abstract_decl table (decl : Decl.abstract_decl) =
     let in_tys, out_ty =
       List.takedrop (List.length decl.abs_tys - 1) decl.abs_tys
     in
-    let out_ty = as_seq1 out_ty in
+    let p_out_ty = as_seq1 out_ty in
 
     let ty_args = List.map (fun l ->
         Type.mk_tvar (L.unloc l)
       ) decl.ty_args
     in
 
-    let in_tys =
-      List.map (fun pty ->
-          L.loc pty, Theory.parse_p_ty0 table ty_args pty
-        ) in_tys
-    in
+    let env = Env.init ~table ~ty_vars:ty_args () in
+    let in_tys = List.map (Theory.parse_p_ty env) in_tys in
 
-    let rec parse_in_tys p_tys : Type.message Type.ty list  =
-      match p_tys with
-      | [] -> []
-      | (loc, Type.ETy ty) :: in_tys -> match Type.kind ty with
-        | Type.KMessage -> ty :: parse_in_tys in_tys
-        | Type.KIndex     -> decl_error loc KDecl InvalidAbsType
-        | Type.KTimestamp -> decl_error loc KDecl InvalidAbsType
-    in
-
-    let rec parse_index_prefix iarr in_tys = match in_tys with
-      | [] -> iarr, []
-      | (_, Type.ETy ty) :: in_tys as in_tys0 ->
-        match Type.kind ty with
-        | Type.KIndex -> parse_index_prefix (iarr + 1) in_tys
-        | _ -> iarr, parse_in_tys in_tys0
+    let rec parse_index_prefix iarr in_tys = 
+      match in_tys with
+      | Type.Index :: in_tys -> 
+        parse_index_prefix (iarr + 1) in_tys
+      | _ -> iarr, in_tys
     in
 
     let iarr, in_tys = parse_index_prefix 0 in_tys in
 
-    let out_ty : Type.message Type.ty =
-      Theory.parse_p_ty table ty_args out_ty Type.KMessage
-    in
+    let out_ty = Theory.parse_p_ty env p_out_ty in
+    
+    check_fun_out_ty (L.loc p_out_ty) out_ty;
 
     Theory.declare_abstract
       table
@@ -756,6 +768,46 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
       decl.name
       decl.symb_type
 
+(*------------------------------------------------------------------*)
+let parse_operator_decl table (decl : Decl.operator_decl) =
+    let name = L.unloc decl.op_name in
+
+    let ty_vars = List.map (fun l ->
+        Type.mk_tvar (L.unloc l)
+      ) decl.op_tyargs
+    in
+
+    let env = Env.init ~table ~ty_vars () in
+    let env, args = Theory.convert_p_bnds env decl.op_args in
+
+    let out_ty = omap (Theory.parse_p_ty env) decl.op_tyout in
+
+    let body, out_ty = 
+      Theory.convert ?ty:out_ty { env; cntxt = InGoal } decl.op_body 
+    in
+    
+    check_fun_out_ty (L.loc decl.op_body) out_ty;
+
+    if not (Term.is_deterministic body) then
+      decl_error (L.loc decl.op_body) KDecl NonDetOp;
+
+    let data = Operator.mk ~name ~ty_vars ~args ~out_ty ~body in
+    let ftype = Operator.ftype data in
+    let table, _ = 
+      Symbols.Function.declare_exact 
+        table decl.op_name
+        ~data:(Operator.Operator data)
+        (ftype, Symbols.Operator)
+    in
+
+    Printer.prt `Result "@[<v 2>new operator:@;%a@]" 
+      Operator.pp_operator data;
+
+    table
+
+(*------------------------------------------------------------------*)
+(** Parse additional type information for procedure declarations 
+    (enc, dec, hash, ...) *)
 let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
   (* check for duplicate *)
   let _ : string list = List.fold_left (fun acc cty ->
@@ -765,13 +817,15 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
       sp :: acc
     ) [] ctys in
 
+  let env = Env.init ~table () in
+
   (* check that we only use allowed keyword *)
   List.map (fun cty ->
       let sp = L.unloc cty.Decl.cty_space in
       if not (List.mem sp kws) then
         decl_error (L.loc cty.Decl.cty_space) KDecl (InvalidCtySpace kws);
 
-      let ty = Theory.parse_p_ty table [] cty.Decl.cty_ty Type.KMessage in
+      let ty = Theory.parse_p_ty env cty.Decl.cty_ty in
       (sp, ty)
     ) ctys
 
@@ -786,8 +840,9 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
 let declare_i table hint_db decl = match L.unloc decl with
   | Decl.Decl_channel s            -> Channel.declare table s
   | Decl.Decl_process (id,pkind,p) ->
+    let env = Env.init ~table () in
     let pkind = List.map (fun (x,t) ->
-        let t = Theory.parse_p_ty0 table [] t in
+        let t = Theory.parse_p_ty env t in
         L.unloc x, t
       ) pkind in
     Process.declare table id pkind p
@@ -811,10 +866,19 @@ let declare_i table hint_db decl = match L.unloc decl with
     Process.declare_system table name sdecl.sprocess
 
   | Decl.Decl_system_modifier sdecl ->
-    let new_axiom_name, enrich, make_conclusion, new_system, table = SystemModifiers.declare_system table sdecl in
-    let `Equiv formula, _ = Goal.make_obs_equiv ~enrich table hint_db new_axiom_name new_system in
+    let new_axiom_name, enrich, make_conclusion, new_system, table = 
+      SystemModifiers.declare_system table sdecl 
+    in
+    let `Equiv formula, _ =
+      Goal.make_obs_equiv ~enrich table hint_db new_axiom_name new_system 
+    in
     let formula = make_conclusion formula in
-    let statement = Goal.{ name=new_axiom_name; system=new_system; ty_vars=[]; formula} in
+    let statement = Goal.{ 
+        name    = new_axiom_name; 
+        system  = new_system; 
+        ty_vars = []; 
+        formula }
+    in
     goals_proved :=  statement :: !goals_proved;
     table
 
@@ -850,12 +914,12 @@ let declare_i table hint_db decl = match L.unloc decl with
     let ptxt_ty = List.assoc_opt "ptxt" ctys
     and ctxt_ty = List.assoc_opt "ctxt" ctys
     and rnd_ty  = List.assoc_opt "rnd"  ctys
-    and k_ty   = List.assoc_opt  "k"    ctys in
+    and k_ty    = List.assoc_opt  "k"   ctys in
 
     Theory.declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty senc sdec
 
   | Decl.Decl_name (s, a, pty) ->
-    let ty = Theory.parse_p_ty table [] pty Type.KMessage in
+    let ty = Theory.parse_p_ty (Env.init ~table ()) pty in
     Theory.declare_name table s Symbols.{ n_iarr = a; n_ty = ty; }
 
   | Decl.Decl_state (s, args, k, t) ->
@@ -877,7 +941,12 @@ let declare_i table hint_db decl = match L.unloc decl with
     Theory.declare_signature table
       ?m_ty ?sig_ty ?check_ty ?sk_ty ?pk_ty sign checksign pk
 
-  | Decl.Decl_abstract decl -> parse_abstract_decl table decl
+  | Decl.Decl_abstract decl -> 
+    parse_abstract_decl table decl
+
+  | Decl.Decl_operator decl -> 
+    parse_operator_decl table decl
+
   | Decl.Decl_bty bty_decl ->
     let table, _ =
       Symbols.BType.declare_exact

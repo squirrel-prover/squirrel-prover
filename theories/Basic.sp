@@ -1,6 +1,6 @@
 set autoIntro=false.
 
-(* comment out to work on the librairie *)
+(* (* comment out to work on the librairie *) *)
 (* system null. *)
 
 (*------------------------------------------------------------------*)
@@ -16,20 +16,6 @@ Proof.
   by rewrite eq_iff. 
 Qed.
 hint rewrite eq_refl.
-
-(* SP: merge with eq_refl *)
-goal eq_refl_i (x : index) : (x = x) = true.
-Proof.
-  by rewrite eq_iff. 
-Qed.
-hint rewrite eq_refl_i.
-
-(* SP: merge with eq_refl *)
-goal eq_refl_t (x : timestamp) : (x = x) = true.
-Proof.
-  by rewrite eq_iff. 
-Qed.
-hint rewrite eq_refl_t.
 
 (*------------------------------------------------------------------*)
 (* true/false *)
@@ -65,39 +51,11 @@ by rewrite eq_iff.
 Qed.
 hint rewrite not_eq.
 
-(* SP: merge with eq_not_eq *)
-goal not_eq_i (x, y : index): not (x = y) = (x <> y).
-Proof. 
-by rewrite eq_iff. 
-Qed.
-hint rewrite not_eq_i.
-
-(* SP: merge with eq_not_eq *)
-goal not_eq_t (x, y : timestamp): not (x = y) = (x <> y).
-Proof. 
-by rewrite eq_iff. 
-Qed.
-hint rewrite not_eq_t.
-
 goal not_neq ['a] (x, y : 'a): not (x <> y) = (x = y).
 Proof. 
 by rewrite eq_iff. 
 Qed.
 hint rewrite not_neq.
-
-(* SP: merge with eq_not_neq *)
-goal not_neq_i (x, y : index): not (x <> y) = (x = y).
-Proof. 
-by rewrite eq_iff. 
-Qed.
-hint rewrite not_neq_i.
-
-(* SP: merge with eq_not_neq *)
-goal not_neq_t (x, y : timestamp): not (x <> y) = (x = y).
-Proof. 
-by rewrite eq_iff. 
-Qed.
-hint rewrite not_neq_t.
 
 (*------------------------------------------------------------------*)
 (* disequality *)
@@ -108,22 +66,6 @@ rewrite -not_eq. case (x = y) => _. simpl. auto.
 by rewrite eq_iff. 
 Qed.
 hint rewrite eq_false.
-
-(* SP: merge with eq_false *)
-goal eq_false_i (x, y : index): ((x = y) = false) = (x <> y).
-Proof. 
-rewrite -not_eq_i. case (x = y) => _. simpl. auto.
-by rewrite eq_iff. 
-Qed.
-hint rewrite eq_false_i.
-
-(* SP: merge with eq_false *)
-goal eq_false_t (x, y : timestamp): ((x = y) = false) = (x <> y).
-Proof. 
-rewrite -not_eq_t. case (x = y) => _. simpl. auto.
-by rewrite eq_iff. 
-Qed.
-hint rewrite eq_false_t.
 
 (*------------------------------------------------------------------*)
 (* and *)

@@ -77,7 +77,6 @@ rule token = parse
 | '%'                 { PERCENT }
 | infix_symb as s     { INFIXSYMB s }
 | int as i            { INT (int_of_string i) }
-| "happens"           { HAPPENS }
 | "if"                { IF }
 | "then"              { THEN }
 | "else"              { ELSE }
@@ -91,6 +90,7 @@ rule token = parse
 | "such that"         { SUCHTHAT }
 | "process"           { PROCESS }
 | "abstract"          { ABSTRACT }
+| "op"                { OP }
 | "fun"               { FUN }
 | "type"              { TYPE }
 | "name_fixed_length" { NAMEFIXEDLENGTH }
@@ -106,14 +106,12 @@ rule token = parse
 | "intro"             { INTRO }
 | "destruct"          { DESTRUCT }
 | "as"                { AS }
-| "init"              { INIT }
 | "index"             { INDEX }
 | "message"           { MESSAGE }
 | "channel"           { CHANNEL }
 | "boolean"           { BOOLEAN }
 | "timestamp"         { TIMESTAMP }
 | "null"              { NULL }
-| "pred"              { PRED }
 | "seq"               { SEQ }
 | "oracle"            { ORACLE }
 | "with"              { WITH }

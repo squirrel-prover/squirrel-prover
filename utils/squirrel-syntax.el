@@ -38,6 +38,7 @@
   "hash"
   "senc"
   "abstract"
+  "op"
   "system"
   "type"
   "name"

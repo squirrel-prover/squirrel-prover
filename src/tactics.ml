@@ -10,7 +10,7 @@ type ssc_error_c =
       Symbols.action Symbols.t *
       [`Cond | `Output | `Update of Symbols.macro Symbols.t]
 
-type ssc_error = Term.message * ssc_error_c
+type ssc_error = Term.term * ssc_error_c
 
 let pp_ssc_error fmt (t, e) =
   let pp_ssc_error_c fmt = function
@@ -65,10 +65,10 @@ type tac_error_i =
   | NothingToIntroduce
   | NothingToRewrite
   | BadRewriteRule
-  | MustHappen of Term.timestamp
+  | MustHappen of Term.term
   | NotHypothesis
 
-  | ApplyMatchFailure of (Term.messages * Term.match_infos) option
+  | ApplyMatchFailure of (Term.terms * Term.match_infos) option
   | ApplyBadInst
 
   | NoCollision

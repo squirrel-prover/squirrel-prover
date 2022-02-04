@@ -63,6 +63,6 @@ val symbs :
   * reasons that will eventually disappear TODO). *)
 val register_action :
   Symbols.table -> system_name ->
-  Symbols.action Symbols.t -> Vars.index list ->
+  Symbols.action Symbols.t -> Vars.var list ->
   Action.action -> Action.descr -> 
   Symbols.table * Symbols.action Symbols.t * Action.descr

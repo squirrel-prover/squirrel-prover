@@ -49,8 +49,11 @@ module type S = sig
     * a system, table, environment, type variables,
     * goal formula, and hypotheses. *)
 
-  val env : t -> Vars.env
-  val set_env : Vars.env -> t -> t
+  val env : t -> Env.t
+  val set_env : Env.t -> t -> t
+
+  val vars : t -> Vars.env
+  val set_vars : Vars.env -> t -> t
 
   val goal : t -> conc_form
   val set_goal : conc_form -> t -> t
@@ -68,16 +71,16 @@ module type S = sig
     * These functionalities only make sense for equivalence sequents. *)
 
   val mem_felem    : int -> t -> bool
-  val change_felem : ?loc:L.t -> int -> Term.message list -> t -> t
-  val get_felem    : ?loc:L.t -> int -> t -> Term.message
+  val change_felem : ?loc:L.t -> int -> Term.term list -> t -> t
+  val get_felem    : ?loc:L.t -> int -> t -> Term.term
 
   (** {2 Automated reasoning} *)
 
-  val query_happens : precise:bool -> t -> Term.timestamp -> bool
+  val query_happens : precise:bool -> t -> Term.term -> bool
 
   val mk_trace_cntxt : t -> Constr.trace_cntxt
 
-  val get_trace_literals : t -> Term.trace_literal list
+  val get_trace_literals : t -> Term.literal list
 
   val get_hint_db : t -> Hint.hint_db
 

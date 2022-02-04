@@ -3,10 +3,10 @@
 (*------------------------------------------------------------------*)
 (** {2 Equivalence} *)
 
-val pi_term : Term.projection -> 'a Term.term -> 'a Term.term
+val pi_term : Term.projection -> Term.term -> Term.term
 
 (*------------------------------------------------------------------*)
-type equiv = Term.message list
+type equiv = Term.term list
 
 val pp_equiv : Format.formatter -> equiv -> unit
 val pp_equiv_numbered : Format.formatter -> equiv -> unit
@@ -23,7 +23,7 @@ type atom =
   | Equiv of equiv
   (** Equiv u corresponds to (u)^left ~ (u)^right *)
 
-  | Reach of Term.message
+  | Reach of Term.term
   (** Reach(φ) corresponds to (φ)^left ~ ⊤ ∧ (φ)^right ~ ⊤ *)
 
 val pp_atom : Format.formatter -> atom -> unit
@@ -40,7 +40,7 @@ val fv_atom : atom -> Vars.Sv.t
 type quant = ForAll | Exists
 
 type form = 
-  | Quant of quant * Vars.evar list * form
+  | Quant of quant * Vars.var list * form
   | Atom  of atom
   | Impl  of form * form
   | And   of form * form
@@ -48,11 +48,11 @@ type form =
 
 val pp : Format.formatter -> form -> unit
 
-val mk_quant  : quant -> Vars.evar list -> form -> form
-val mk_forall :          Vars.evar list -> form -> form
-val mk_exists :          Vars.evar list -> form -> form
+val mk_quant  : quant -> Vars.var list -> form -> form
+val mk_forall :          Vars.var list -> form -> form
+val mk_exists :          Vars.var list -> form -> form
 
-val mk_reach_atom : Term.message -> form
+val mk_reach_atom : Term.term -> form
 
 (** Does not recurse. *)
 val tmap       : (form -> form) -> form -> form 
@@ -62,7 +62,7 @@ val tmap_fold  : ('b -> form -> 'b * form) -> 'b -> form -> 'b * form
 
 (** Get (some) terms appearing in a formula.
   * For instance, terms occurring under binders may not be included. *)
-val get_terms : form -> Term.message list
+val get_terms : form -> Term.term list
 
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
@@ -78,11 +78,11 @@ val fv : form -> Vars.Sv.t
 (** {2 Generalized formuals} *)
 
 (** A local meta-formula is a boolean term. *)
-type local_form = Term.message
+type local_form = Term.term
 
 type global_form = form
 
-type gform = [`Equiv of form | `Reach of Term.message]
+type gform = [`Equiv of form | `Reach of Term.term]
 type any_form = gform
 
 type _ f_kind =
@@ -118,7 +118,7 @@ module Babel : sig
   val subst  : 'a f_kind -> Term.subst -> 'a -> 'a
   val tsubst : 'a f_kind -> Type.tsubst -> 'a -> 'a
   val fv     : 'a f_kind -> 'a -> Vars.Sv.t
-  val get_terms : 'a f_kind -> 'a -> Term.message list
+  val get_terms : 'a f_kind -> 'a -> Term.term list
   val pp : 'a f_kind -> Format.formatter -> 'a -> unit
 end
 

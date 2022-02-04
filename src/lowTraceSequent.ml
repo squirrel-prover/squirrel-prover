@@ -15,36 +15,33 @@ let dbg ?(force=false) s =
   Printer.prt mode s
 
 (*------------------------------------------------------------------*)
-let get_ord (at : Term.generic_atom ) : Term.ord option = match at with
-  | `Timestamp (ord,_,_) -> Some ord
-  | `Message   (ord,_,_) -> Some (ord :> Term.ord)
-  | `Index     (ord,_,_) -> Some (ord :> Term.ord)
-  | `Happens _           -> None
+let get_ord (at : Term.xatom ) : Term.ord = match at with
+  | `Comp (ord,_,_) -> ord
+  | `Happens _      -> assert false
 
 (** Chooses a name for a formula, depending on an old name (if any), and the
     formula shape. *)
 let choose_name = function
   | `Equiv _ -> "G"
-  | `Reach (Term.Atom at) ->
-
-    let sort = match at with
-      | `Timestamp _ -> "C"
-      | `Message _ -> "M"
-      | `Index _ -> "I"
-      | `Happens _ -> "Hap" in
-
-    let ord = match get_ord at with
-      | Some `Eq  -> "eq"
-      | Some `Neq -> "neq"
-      | Some `Leq -> "le"
-      | Some `Geq -> "ge"
-      | Some `Lt  -> "lt"
-      | Some `Gt  -> "gt"
-      | None      -> "" in
-
+  | `Reach f ->
+    match Term.form_to_xatom f with
+    | None -> "H"
+    | Some (`Happens _) -> "Hap"
+    | Some at ->
+      let sort = match Term.ty_xatom at with
+        | Type.Timestamp -> "C"
+        | Type.Index     -> "I"
+        | _              -> "M" 
+      in
+      let ord = match get_ord at with
+        | `Eq  -> "eq"
+        | `Neq -> "neq"
+        | `Leq -> "le"
+        | `Geq -> "ge"
+        | `Lt  -> "lt"
+        | `Gt  -> "gt"
+      in
     sort ^ ord
-
-  | _ -> "H"
 
 (*------------------------------------------------------------------*)
 module FHyp = struct
@@ -58,73 +55,50 @@ module H = Hyps.Mk(FHyp)
 (*------------------------------------------------------------------*)
 module S : sig
   type t = private {
-    system : SystemExpr.t ;
-    table : Symbols.table;
+    env : Env.t;
 
     hint_db : Hint.hint_db;
-
-    ty_vars : Type.tvars;
-    (** Free type variables of the sequent. *)
-
-    env : Vars.env;
-    (** Must contain all free variables of the sequent,
-      * which are logically understood as universally quantified. *)
     
     hyps : H.hyps;
     (** Hypotheses *)
     
-    conclusion : Term.message;
-    (** The conclusion / right-hand side formula of the sequent. *)
+    conclusion : Term.term;
+    (** The conclusion / right-hand side formula of the sequent. *)    
   }
 
   val init_sequent :
-    system:SystemExpr.t ->
-    table:Symbols.table ->
+    env:Env.t ->
     hint_db:Hint.hint_db ->
-    ty_vars:Type.tvars ->
-    env:Vars.env ->
-    conclusion:Term.message ->
+    conclusion:Term.term ->
     t
 
   val update :
-    ?system:SystemExpr.t ->
-    ?table:Symbols.table ->
-    ?ty_vars:Type.tvars ->
-    ?env:Vars.env ->
+    ?env:Env.t ->
     ?hyps:H.hyps ->
-    ?conclusion:Term.message ->
+    ?conclusion:Term.term ->
     t -> t
 
 end = struct
   type t = {
-    system     : SystemExpr.t ;
-    table      : Symbols.table;
+    env        : Env.t;
     hint_db    : Hint.hint_db;
-    ty_vars    : Type.tvars;
-    env        : Vars.env;
     (* hind_db    : Reduction. *)
     hyps       : H.hyps;
-    conclusion : Term.message;
+    conclusion : Term.term;
   }
 
-  let init_sequent ~system ~table ~hint_db ~ty_vars ~env ~conclusion = {
-    system ;
-    table;
+  let init_sequent ~env ~hint_db ~conclusion = {
+    env ;
     hint_db;
-    ty_vars;
-    env;
     hyps = H.empty;
     conclusion;
   }
 
-  let update ?system ?table ?ty_vars ?env ?hyps ?conclusion t =
-    let system     = Utils.odflt t.system system
-    and table      = Utils.odflt t.table table
-    and ty_vars    = Utils.odflt t.ty_vars ty_vars
-    and env        = Utils.odflt t.env env
+  let update ?env ?hyps ?conclusion t =
+    let env        = Utils.odflt t.env env
     and hyps       = Utils.odflt t.hyps hyps
     and conclusion = Utils.odflt t.conclusion conclusion in
-    { t with system; table; ty_vars; env; hyps; conclusion; } 
+    { t with env; hyps; conclusion; } 
 end
 
 include S
@@ -136,14 +110,14 @@ let pp ppf s =
   let open Fmt in
   pf ppf "@[<v 0>" ;
   pf ppf "@[System: %a@]@;"
-    SystemExpr.pp s.system;
+    SystemExpr.pp s.env.system;
 
-  if s.ty_vars <> [] then
+  if s.env.ty_vars <> [] then
     pf ppf "@[Type variables: %a@]@;" 
-      (Fmt.list ~sep:Fmt.comma Type.pp_tvar) s.ty_vars ;
+      (Fmt.list ~sep:Fmt.comma Type.pp_tvar) s.env.ty_vars ;
 
-  if s.env <> Vars.empty_env then
-    pf ppf "@[Variables: %a@]@;" Vars.pp_env s.env ;
+  if s.env.vars <> Vars.empty_env then
+    pf ppf "@[Variables: %a@]@;" Vars.pp_env s.env.vars ;
 
   (* Print hypotheses *)
   H.pps ppf s.hyps ;
@@ -157,7 +131,7 @@ let pp ppf s =
 (*------------------------------------------------------------------*)
 (** Collect specific local hypotheses *)
   
-let get_atoms_of_fhyps (forms : FHyp.t list) : Term.literal list =
+let get_atoms_of_fhyps (forms : FHyp.t list) : Term.literals =
   List.fold_left (fun acc f ->
       match f with
       | `Equiv _ -> acc
@@ -166,64 +140,54 @@ let get_atoms_of_fhyps (forms : FHyp.t list) : Term.literal list =
         | `Entails lits | `Equiv lits -> lits @ acc
     ) [] forms 
 
-let get_atoms_from_s (s : sequent) : Term.literal list =
+let get_atoms_from_s (s : sequent) : Term.literals =
   let fhyps = H.fold (fun _ f acc -> f :: acc) s.hyps [] in
   get_atoms_of_fhyps fhyps
 
-let get_message_atoms (s : sequent) : Term.message_atom list =
-  let do1 (at : Term.literal) : Term.message_atom option =
-    match at with 
-    | `Pos, (`Message _ as at) -> Some at
-    | `Neg, (`Message _ as at) -> Some (Term.not_message_atom at)
+let get_message_atoms (s : sequent) : Term.xatom list =
+  let do1 (at : Term.literal) : Term.xatom option =
+    match Term.ty_lit at with
+    | Type.Timestamp | Type.Index -> None
+    | _ ->
+      (* FIXME: move simplifications elsewhere *)
+      match at with 
+      | `Pos, (`Comp _ as at)       -> Some at
+      | `Neg, (`Comp (`Eq, t1, t2)) -> Some (`Comp (`Neq, t1, t2))
+      | _ -> None
+  in
+  List.filter_map do1 (get_atoms_from_s s)
+
+let get_trace_literals (s : sequent) : Term.literals =
+  let do1 (lit : Term.literal) : Term.literal option =
+    match Term.ty_lit lit with 
+    | Type.Index | Type.Timestamp -> Some lit
     | _ -> None
   in
   List.filter_map do1 (get_atoms_from_s s)
 
-let get_trace_literals (s : sequent) : Term.trace_literal list =
-  let do1 (at : Term.literal) : Term.trace_literal option =
-    match at with 
-    | x, Term.(#trace_atom as at) -> Some (x, at)
+let get_eq_atoms (s : sequent) : Term.xatom list =
+  let do1 (lit : Term.literal) : Term.xatom option =
+    match lit with 
+    | `Pos, (`Comp ((`Eq | `Neq), _, _) as at) -> Some at
+
+    | `Neg, (`Comp (`Eq,  t1, t2)) -> Some (`Comp (`Neq, t1, t2))
+    | `Neg, (`Comp (`Neq, t1, t2)) -> Some (`Comp (`Eq,  t1, t2))
+
     | _ -> None
   in
   List.filter_map do1 (get_atoms_from_s s)
-
-let get_eq_atoms (s : sequent) : Term.eq_atom list =
-  let do1 (at : Term.literal) : Term.eq_atom option =
-    match at with               (* FIXME: improve this *)
-    | `Pos, Term.(#message_atom as at) -> 
-      Some (at :> Term.eq_atom)
-
-    | `Pos, Term.(#index_atom as at) -> 
-      Some (at :> Term.eq_atom)
-
-    | `Pos, (`Timestamp ((`Eq | `Neq), _, _) as at) ->
-      Some (at :> Term.eq_atom)
-
-    | `Neg, Term.(#message_atom as at) -> 
-      Some (Term.not_message_atom at :> Term.eq_atom)
-
-    | `Neg, Term.(#index_atom as at) -> 
-      Some (Term.not_index_atom at :> Term.eq_atom)
-
-    | `Neg, (`Timestamp (`Eq, a, b)) ->
-      Some (`Timestamp (`Neq, a,b) :> Term.eq_atom)
-
-    | `Neg, (`Timestamp (`Neq, a, b)) ->
-      Some (`Timestamp (`Eq, a,b) :> Term.eq_atom)
-
-    | _, `Happens _ 
-    | _, `Timestamp ((`Leq | `Geq | `Lt | `Gt), _, _) -> None
-  in
-  List.filter_map do1 (get_atoms_from_s s) 
 
 let get_all_messages s =
   let atoms = get_message_atoms s in
   let atoms =
-    match s.conclusion with
-      | Term.Atom (`Message _ as atom) -> atom :: atoms
+    match Term.form_to_xatom s.conclusion with
+      | Some at -> at :: atoms
       | _ -> atoms
   in
-  List.fold_left (fun acc (`Message (_,a,b)) -> a :: b :: acc) [] atoms
+  List.fold_left (fun acc at -> match at with
+      | `Happens _ -> acc
+      | (`Comp (_,a,b)) -> a :: b :: acc
+    ) [] atoms
 
 (*------------------------------------------------------------------*)
 (** Prepare constraints or TRS query *)
@@ -312,7 +276,7 @@ module Hyps = struct
       match t with
       | Term.Macro (ms,[],a) ->
         if List.for_all
-            Vars.(function EVar v -> not (is_new v))
+            Vars.(fun v -> not (is_new v))
             (Term.get_vars t) 
         then begin
           match Macros.get_definition cntxt ms a with
@@ -328,10 +292,10 @@ module Hyps = struct
   (** Add to [s] equalities corresponding to the expansions of all macros
     * occurring in [f], if [f] happened. *)
   let rec add_macro_defs (s : sequent) f =
-    let macro_eqs : (Term.timestamp * Term.message) list ref = ref [] in
+    let macro_eqs : (Term.term * Term.term) list ref = ref [] in
     let cntxt = Constr.{ 
-        table = s.table;
-        system = s.system;
+        table = s.env.table;
+        system = s.env.system;
         models = None;
       } in
         
@@ -353,7 +317,7 @@ module Hyps = struct
       ) s !macro_eqs
 
   and add_form_aux
-      ?(force=false) (id : Ident.t option) (s : sequent) (f : Term.message) =
+      ?(force=false) (id : Ident.t option) (s : sequent) (f : Term.term) =
     let recurse =
       (not (H.is_hyp (`Reach f) s.hyps)) && (Config.auto_intro ()) in
 
@@ -378,7 +342,9 @@ module Hyps = struct
   (** if [force], we add the formula to [Hyps] even if it already exists. *)
   let add_formula ?(force=false) id f (s : sequent) =
     match f with
-    | Term.Atom (`Happens ts) -> add_happens ~force id s ts
+    | Term.Fun (f, _, [ts]) when f = Term.f_happens -> 
+      add_happens ~force id s ts
+
     | _ -> add_form_aux ~force (Some id) s f
 
   let add_i npat f s =
@@ -444,13 +410,28 @@ end
 
 (*------------------------------------------------------------------*)
 let env     s = s.env
-let ty_vars s = s.ty_vars
-let system  s = s.system
-let table   s = s.table
+let vars    s = s.env.vars
+let ty_vars s = s.env.ty_vars
+let system  s = s.env.system
+let table   s = s.env.table
 
-let set_env    a      s = S.update ~env:a         s
-let set_system system s = S.update ~system:system s 
-let set_table  table  s = S.update ~table:table   s
+let set_env env s = S.update ~env s
+
+let set_vars (vars : Vars.env) s = 
+  let env = Env.update ~vars s.env in
+  S.update ~env s
+
+let set_table table s = 
+  let env = Env.update ~table s.env in
+  S.update ~env s
+
+let set_system system s = 
+  let env = Env.update ~system s.env in
+  S.update ~env s
+
+let set_ty_vars ty_vars s = 
+  let env = Env.update ~ty_vars s.env in
+  S.update ~env s
 
 (*------------------------------------------------------------------*)
 let filter_map_hyps func hyps =
@@ -470,12 +451,14 @@ let pi projection s =
   in
   let hyps = filter_map_hyps pi s.hyps in
   let system = system s in
+  let env = Env.update ~system:(SystemExpr.project projection system) s.env in
   let s =
   S.update
-    ~system:(SystemExpr.project projection system)
+    ~env
     ~conclusion:(Term.pi_term ~projection s.conclusion)
     ~hyps:H.empty
-    s in
+    s 
+  in
   let keep_global =
     SystemExpr.project Term.PLeft  system =
     SystemExpr.project Term.PRight system
@@ -494,13 +477,15 @@ let pi projection s =
 
 let set_goal a s =
   let s = S.update ~conclusion:a s in
-    match a with
-      | Term.Atom Term.(#message_atom) 
-        when Config.auto_intro () -> Hyps.add_macro_defs s a
+    match Term.form_to_xatom a with
+      | Some at 
+        when Term.ty_xatom at = Type.Message && 
+             Config.auto_intro () -> 
+        Hyps.add_macro_defs s a
       | _ -> s
 
-let init ~system ~table ~hint_db ~ty_vars ~env conclusion =
-  init_sequent ~system ~table ~hint_db ~ty_vars ~env ~conclusion
+let init ~env ~hint_db conclusion =
+  init_sequent ~env ~hint_db ~conclusion
 
 let goal s = s.conclusion
 
@@ -520,22 +505,15 @@ let subst subst s =
 (** TRS *)
 
 let get_eqs_neqs s =
-  List.fold_left (fun (eqs, neqs) (atom : Term.eq_atom) -> match atom with
-      | `Message   (`Eq,  a, b) -> Term.ESubst (a,b) :: eqs, neqs
-      | `Timestamp (`Eq,  a, b) -> Term.ESubst (a,b) :: eqs, neqs
-      | `Index     (`Eq,  a, b) -> 
-        Term.ESubst (Term.mk_var a, Term.mk_var b) :: eqs, neqs
-
-      | `Message   (`Neq, a, b) -> eqs, Term.ESubst (a,b) :: neqs
-      | `Timestamp (`Neq, a, b) -> eqs, Term.ESubst (a,b) :: neqs
-      | `Index     (`Neq, a, b) -> 
-        eqs, Term.ESubst (Term.mk_var a,Term.mk_var b) :: neqs
-
+  List.fold_left (fun (eqs, neqs) (atom : Term.xatom) -> match atom with
+      | `Comp (`Eq,  a, b) -> Term.ESubst (a,b) :: eqs, neqs
+      | `Comp (`Neq, a, b) -> eqs, Term.ESubst (a,b) :: neqs
+      | _ -> assert false
     ) ([],[]) (get_eq_atoms s)
 
 let get_trs_t s : Completion.state Utils.timeout_r =
   let eqs,_ = get_eqs_neqs s in
-  Completion.complete s.table eqs 
+  Completion.complete s.env.table eqs 
 
 let get_trs s = Tactics.timeout_get (get_trs_t s)
 
@@ -557,9 +535,9 @@ let eq_atoms_valid s =
 let literals_unsat_smt ?(slow=false) s =
   Term.pp Format.std_formatter s.conclusion; Format.printf "\n";
   Smt.literals_unsat ~slow
-    s.table
-    s.system
-    (Vars.to_list s.env)
+    s.env.table
+    s.env.system
+    (Vars.to_list s.env.vars)
     (get_message_atoms s)
     (get_trace_literals s)
     (* TODO: now that we can pass more general formulas than lists of atoms,

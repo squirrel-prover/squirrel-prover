@@ -2,8 +2,8 @@ val literals_unsat :
   slow:bool ->
   Symbols.table ->
   SystemExpr.t ->
-  Vars.evar list ->
-  Term.message_atom list ->
-  Term.trace_literal list ->
-  Term.message list ->
+  Vars.var list ->
+  Term.xatom list ->
+  Term.literals ->
+  Term.term list ->
   bool

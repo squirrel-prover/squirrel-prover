@@ -21,7 +21,11 @@ class check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)
       self#visit_message m
 
     | Term.Name ns when ns.s_symb = key_n -> raise Bad_ssc
-    | Term.Var m -> raise Bad_ssc
+    | Term.Var m -> 
+      let ty = Vars.ty m in
+      if ty <> Type.tindex && ty <> Type.ttimestamp then
+        raise Bad_ssc
+
     | _ -> super#visit_message t
 end
 
@@ -38,7 +42,7 @@ let symenc_key_ssc ?(messages=[]) ?(elems=[]) ~cntxt enc_fn dec_fn key_n =
 
 (* Iterator to check that the given randoms are only used in random seed
    position for encryption. *)
-class check_rand ~allow_vars ~cntxt enc_fn randoms = object (self)
+class check_rand ~cntxt enc_fn randoms = object (self)
   inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
   method visit_message t = match t with
     | Term.Fun ((fn,_), _, [m1;Term.Name _; m2]) when fn = enc_fn ->
@@ -50,7 +54,9 @@ class check_rand ~allow_vars ~cntxt enc_fn randoms = object (self)
     | Term.Name ns when List.mem ns.s_symb randoms ->
       Tactics.soft_failure (Tactics.SEncRandomNotFresh)
 
-    | Term.Var m -> if not(allow_vars) then
+    | Term.Var m -> 
+      let ty = Vars.ty m in
+      if ty <> Type.tindex && ty <> Type.ttimestamp then
         Tactics.soft_failure
           (Tactics.Failure "No universal quantification over \
                             messages allowed")
@@ -60,9 +66,9 @@ end
 (* Check that the given randoms are only used in random seed position for
    encryption. *)
 let random_ssc
-    ?(allow_vars=false) ?(messages=[]) ?(elems=[])
+    ?(messages=[]) ?(elems=[])
     ~cntxt enc_fn randoms =
-  let ssc = new check_rand ~allow_vars ~cntxt enc_fn randoms in
+  let ssc = new check_rand ~cntxt enc_fn randoms in
   List.iter ssc#visit_message messages;
   List.iter ssc#visit_message elems;
   SystemExpr.(iter_descrs cntxt.table cntxt.system
@@ -88,7 +94,7 @@ let random_ssc
      such extension if need. *)
 let check_encryption_randomness
     ~cntxt case_schemata cases_direct enc_fn messages elems =
-  let encryptions : (Term.message * Vars.index list) list =
+  let encryptions : (Term.term * Vars.var list) list =
     List.map (fun case ->
         case.Euf.message,
         Action.get_indices case.Euf.action
@@ -108,10 +114,9 @@ let check_encryption_randomness
   (* we check that encrypted messages based on indices, do not depend on free
      indices instantiated by the action w.r.t the indices of the random. *)
   if List.exists (function
-      | (Fun ((_, _), _, [m; Name n; _]), (actidx:Vars.index list)) ->
+      | (Fun ((_, _), _, [m; Name n; _]), (actidx:Vars.var list)) ->
         let vars = Term.get_vars m in
-        List.exists (function
-              Vars.EVar v ->
+        List.exists (fun v ->
               (match Vars.ty v with
                |Type.Index -> (List.mem v actidx) && not (List.mem v n.s_indices)
                (* we fail if there exists an indice appearing in the message,

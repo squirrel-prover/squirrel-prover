@@ -11,11 +11,32 @@ module SE   = SystemExpr
     - sv ⊆ FV(l)
     - ((FV(r) ∪ FV(φ)) ∩ sv) ⊆ FV(l) *)
 type rw_erule = {
-  rw_tyvars : Type.tvars;        (** type variables *)
-  rw_vars   : Vars.Sv.t;         (** term variables *)
-  rw_conds  : Term.message list; (** premisses *)
-  rw_rw     : Term.esubst;       (** pair (source, destination) *)
+  rw_tyvars : Type.tvars;     (** type variables *)
+  rw_vars   : Vars.Sv.t;      (** term variables *)
+  rw_conds  : Term.term list; (** premisses *)
+  rw_rw     : Term.esubst;    (** pair (source, destination) *)
 }
+
+let pp_rw_erule fmt (rw : rw_erule) =
+  let pp_tys fmt tys = 
+    if tys = [] then () else
+      Fmt.pf fmt "[%a] " (Fmt.list Type.pp_tvar) tys
+  in
+  let pp_vars fmt vars = 
+    if Vars.Sv.is_empty vars then () else
+      Fmt.pf fmt "%a " Vars.pp_typed_list (Vars.Sv.elements vars)
+  in
+  let pp_conds fmt conds =
+    if conds = [] then () else
+      Fmt.pf fmt " when %a" (Fmt.list Term.pp) conds
+  in
+  
+  let Term.ESubst (src, dst) = rw.rw_rw in
+  Fmt.pf fmt "%a%a: %a -> %a%a"
+    pp_tys rw.rw_tyvars
+    pp_vars rw.rw_vars
+    Term.pp src Term.pp dst
+    pp_conds rw.rw_conds
 
 (*------------------------------------------------------------------*)
 (** Check that the rule is correct. *)
@@ -35,14 +56,11 @@ let check_erule (rule : rw_erule) : unit =
   ()
 
 (** Make a rewrite rule from a formula *)
-let pat_to_rw_erule ?loc dir (p : Term.message Match.pat) : rw_erule =
+let pat_to_rw_erule ?loc dir (p : Term.term Match.pat) : rw_erule =
   let subs, f = Term.decompose_impls_last p.pat_term in
 
-  let e = match f with
-    | Term.Atom (`Message   (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
-    | Term.Atom (`Timestamp (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
-    | Term.Atom (`Index     (`Eq, t1, t2)) ->
-      Term.ESubst (Term.mk_var t1,Term.mk_var t2)
+  let e = match Term.destr_eq f with
+    | Some (t1, t2) -> Term.ESubst (t1,t2)
     | _ -> Tactics.hard_failure ?loc (Tactics.Failure "not an equality")
   in
 
@@ -72,14 +90,11 @@ let _rewrite_head
     (table  : Symbols.table)
     (system : SE.t)
     (rule   : rw_erule)
-    (t      : Term.message) : Term.message * Term.message list
+    (t      : Term.term) : Term.term * Term.term list
   =
-  let (l, r) : Term.message * Term.message =
+  let (l, r) : Term.term * Term.term =
     match rule.rw_rw with
-    | Term.ESubst (l, r) ->
-      match Type.equalk_w (Term.kind t) (Term.kind l) with
-      | Some Type.Type_eq -> l, r
-      | None -> raise NoRW
+    | Term.ESubst (l, r) -> l, r
   in
 
   let pat =
@@ -97,28 +112,24 @@ let _rewrite_head
   r, subs
 
 let rewrite_head
-    (type a)
     (table  : Symbols.table)
     (system : SE.t)
     (rule   : rw_erule)
-    (t      : a Term.term) : (a Term.term * Term.message list) option
+    (t      : Term.term) : (Term.term * Term.term list) option
   =
-  match Type.equalk_w Type.KMessage (Term.kind t) with
-  | None -> None
-  | Some Type.Type_eq ->
-    try Some (_rewrite_head table system rule t) with NoRW -> None
+  try Some (_rewrite_head table system rule t) with NoRW -> None
 
 (*------------------------------------------------------------------*)
   type rw_res = [
-    | `Result of Equiv.any_form * Term.message list
+    | `Result of Equiv.any_form * Term.term list
     | `NothingToRewrite
     | `MaxNestedRewriting
   ]
 
 (*------------------------------------------------------------------*)
 (** A opened rewrite rule. Not exported. *)
-type 'a rw_rule =
-  Type.tvars * Vars.Sv.t * Term.message list * 'a Term.term * 'a Term.term
+type rw_rule =
+  Type.tvars * Vars.Sv.t * Term.term list * Term.term * Term.term
 
 (*------------------------------------------------------------------*)
 let rewrite
@@ -142,78 +153,78 @@ let rewrite
   (* Attempt to find an instance of [left], and rewrites all occurrences of
      this instance.
      Return: (f, subs) *)
-  let rec _rewrite : type a.
-    Args.rw_count ->
-    a rw_rule ->
-    Equiv.any_form ->
-    Equiv.any_form * Term.message list
-    = fun mult (tyvars, sv, rsubs, left, right) f ->
-      check_max_rewriting ();
+  let rec _rewrite 
+      (mult : Args.rw_count)
+      ((tyvars, sv, rsubs, left, right) : rw_rule)
+      (f : Equiv.any_form)
+    : Equiv.any_form * Term.term list
+    =
+    check_max_rewriting ();
 
-      let subs_r = ref [] in
-      let found_instance = ref false in
+    let subs_r = ref [] in
+    let found_instance = ref false in
 
-      (* This is a reference, so that it can be over-written later
-         after we found an instance of [left]. *)
-      let pat : a Term.term Match.pat ref =
-        ref Match.{ pat_tyvars = tyvars; pat_vars = sv; pat_term = left }
-      in
-      let right_instance = ref None in
+    (* This is a reference, so that it can be over-written later
+       after we found an instance of [left]. *)
+    let pat : Term.term Match.pat ref =
+      ref Match.{ pat_tyvars = tyvars; pat_vars = sv; pat_term = left }
+    in
+    let right_instance = ref None in
 
-      (* If there is a match (with [mv]), substitute [occ] by [right] where
-         free variables are instantiated according to [mv], and variables
-         bound above the matched occurrences are universally quantified in
-         the generated sub-goals. *)
-      let rw_inst (Term.ETerm occ) vars conds =
-        match Match.T.try_match_term table system occ !pat with
-        | NoMatch _ | FreeTyv -> `Continue
+    (* If there is a match (with [mv]), substitute [occ] by [right] where
+       free variables are instantiated according to [mv], and variables
+       bound above the matched occurrences are universally quantified in
+       the generated sub-goals. *)
+    let rw_inst occ vars conds =
+      match Match.T.try_match table system occ !pat with
+      | NoMatch _ | FreeTyv -> `Continue
 
-        (* head matches *)
-        | Match mv ->
-          if !found_instance then
-            (* we already found the rewrite instance earlier *)
-            `Map (oget !right_instance)
+      (* head matches *)
+      | Match mv ->
+        if !found_instance then
+          (* we already found the rewrite instance earlier *)
+          `Map (oget !right_instance)
 
-          else begin (* we found the rewrite instance *)
-            found_instance := true;
-            let subst = Match.Mvar.to_subst ~mode:`Match mv in
-            let left = Term.subst subst left in
-            let right = Term.subst subst right in
+        else begin (* we found the rewrite instance *)
+          found_instance := true;
+          let subst = Match.Mvar.to_subst ~mode:`Match mv in
+          let left = Term.subst subst left in
+          let right = Term.subst subst right in
 
-            right_instance := Some (Term.ETerm right);
-            subs_r :=
-              List.map (fun rsub ->
-                  Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
-                ) rsubs;
+          right_instance := Some right;
+          subs_r :=
+            List.map (fun rsub ->
+                Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
+              ) rsubs;
 
-            pat := Match.{ pat_term   = left;
-                           pat_tyvars = [];
-                           pat_vars   = Sv.empty; };
+          pat := Match.{ pat_term   = left;
+                         pat_tyvars = [];
+                         pat_vars   = Sv.empty; };
 
-            `Map (Term.ETerm right)
-          end
-      in
+          `Map right
+        end
+    in
 
-      let f_opt = match f with
-        | `Equiv f ->
-          let f_opt = Match.E.map rw_inst env f in
-          omap (fun x -> `Equiv x) f_opt
+    let f_opt = match f with
+      | `Equiv f ->
+        let f_opt = Match.E.map rw_inst env f in
+        omap (fun x -> `Equiv x) f_opt
 
-        | `Reach f ->
-          let f_opt = Match.T.map rw_inst env f in
-          omap (fun x -> `Reach x) f_opt
-      in
+      | `Reach f ->
+        let f_opt = Match.T.map rw_inst env f in
+        omap (fun x -> `Reach x) f_opt
+    in
 
-      match mult, f_opt with
-      | `Any, None -> f, !subs_r
+    match mult, f_opt with
+    | `Any, None -> f, !subs_r
 
-      | (`Once | `Many), None -> raise (Failed `NothingToRewrite)
+    | (`Once | `Many), None -> raise (Failed `NothingToRewrite)
 
-      | (`Many | `Any), Some f ->
-        let f, rsubs' = _rewrite `Any (tyvars, sv, rsubs, left, right) f in
-        f, List.rev_append (!subs_r) rsubs'
+    | (`Many | `Any), Some f ->
+      let f, rsubs' = _rewrite `Any (tyvars, sv, rsubs, left, right) f in
+      f, List.rev_append (!subs_r) rsubs'
 
-      | `Once, Some f -> f, !subs_r
+    | `Once, Some f -> f, !subs_r
   in
 
   let Term.ESubst (l,r) = rule.rw_rw in

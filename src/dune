@@ -8,7 +8,7 @@
   (instrumentation (backend bisect_ppx))
   (libraries fmt fmt.tty alcotest ocamlgraph pcre
     (select smt.ml from
-      (why3  -> smt.why3api.ml)
+      (why3  -> smt.stub.ml) ; TODO: smt.why3api.ml broken after dev2 merge
       (!why3 -> smt.stub.ml))))
 
 (ocamllex lexer htmlLexer)

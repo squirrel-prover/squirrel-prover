@@ -1,6 +1,6 @@
 (** Sequents used to prove trace properties, aka reachability properties.
-  *
-  * This module implements {!LowSequent.S} with [type form = Term.message]. *)
+
+    This module implements {!LowSequent.S} with [type form = Term.term]. *)
 
 type trace_sequent
 
@@ -19,12 +19,9 @@ include LowSequent.S
 (** {2 Sequent type and basic operations} *)
 
 val init :
-  system:SystemExpr.t ->
-  table:Symbols.table ->
+  env:Env.t ->
   hint_db:Hint.hint_db ->
-  ty_vars:Type.tvars ->
-  env:Vars.env ->
-  Term.message ->
+  Term.term ->
   sequent
   
 (** Project diff-operators occurring in a sequent;
@@ -45,44 +42,45 @@ val pi : Term.projection -> sequent -> sequent
 val get_trs : sequent -> Completion.state 
 
 (** See [Constr.query] *)
-val query : precise:bool -> t -> Constr.trace_literal list -> bool
+val query : precise:bool -> t -> Term.literals -> bool
 
-val query_happens : precise:bool -> t -> Term.timestamp -> bool
+val query_happens : precise:bool -> t -> Term.term -> bool
 
 (** If [message_atoms_valid s] returns [true] then (dis)equalities over
-  * terms on both sides of the sequents make the sequent valid. 
-  * May timeout. *)
+    terms on both sides of the sequents make the sequent valid.
+    May timeout. *)
 val eq_atoms_valid : sequent -> bool 
 
 (** [constraints_valid s] returns true if constraints make the sequent valid,
-  * taking into account constraint trace formula hypotheses and atomic
-  * constraint conclusion. 
-  * May timeout. *)
+    taking into account constraint trace formula hypotheses and atomic
+    constraint conclusion.
+    May timeout. *)
 val constraints_valid : sequent -> bool 
 
 (** [get_ts_equalities s] returns all the equalities between timestamps
     derivable from its hypothesis. 
     May timeout. *)
 val get_ts_equalities :
-  precise:bool -> sequent -> Term.timestamp list list
+  precise:bool -> sequent -> Term.term list list
 
 (** [get_ind_equalities s] returns all the equalities between indices
     derivable from its hypothesis. 
     May timeout. *)
 val get_ind_equalities :
-  precise:bool -> sequent -> Vars.index list list 
+  precise:bool -> sequent -> Vars.var list list 
 
 (** [maximal_elems s ts] returns the maximal elements of the timestamps,
     according to their ordering derived from the hypothesis in [s]. 
     May timeout. *)
 val maximal_elems : 
-  precise:bool -> sequent -> Term.timestamp list -> 
-  Term.timestamp list 
+  precise:bool -> sequent -> Term.term list -> 
+  Term.term list 
 
 (** [get_all_messages s] returns all the messages appearing at toplevel
-  * in [s]. *)
-val get_all_messages : sequent -> Term.message list
+    in [s]. *)
+val get_all_messages : sequent -> Term.term list
 
-
-(* using Why3constr *)
+(** [literals_unsat_smt] checks whether the conclusion of the sequent follows
+    from some "simple" literals in the hypotheses + the formulas declared by
+    "hint smt" *)
 val literals_unsat_smt : ?slow:bool -> sequent -> bool

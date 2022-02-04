@@ -1,11 +1,11 @@
 
 module Ts = struct
-  type t = Term.timestamp
+  type t = Term.term
   let compare = Stdlib.compare
 end
 
 module Tt = struct
-  type t = Term.message
+  type t = Term.term
   let compare = Stdlib.compare
 end
 
@@ -18,18 +18,21 @@ class collect_max_ts ~(cntxt:Constr.trace_cntxt) = object (self)
   inherit [Sts.t * Sts.t] Iter.fold ~cntxt as super
 
   method extract_ts_atoms phi =
-    List.partition
-      (function Term.Atom (`Timestamp _) -> true | _ -> false)
-      (Term.decompose_ands phi)
+    List.partition (fun t ->
+        match Term.form_to_xatom t with
+        | Some at when Term.ty_xatom at = Type.Timestamp -> true
+        | _ -> false
+      ) (Term.decompose_ands phi)
 
   (* Given a set of atoms, returns a list of ts that are smaller than other
      timestamps. *)
   method add_atoms atoms  =
     List.fold_left
-      (fun (smaller_acc) at -> match at with
-         | Term.Atom (`Timestamp (`Leq,tau_1,tau_2)) ->
+      (fun (smaller_acc) at -> 
+         match Term.form_to_xatom at with
+         | Some (`Comp (`Leq,tau_1,tau_2)) ->
            Sts.add tau_1 smaller_acc
-         | Atom (`Timestamp (`Lt,tau_1,tau_2)) ->
+         | Some (`Comp (`Lt,tau_1,tau_2)) ->
             Sts.add tau_1 smaller_acc
         | _ -> smaller_acc)
       Sts.empty
@@ -116,8 +119,12 @@ let is_attacker_call_synchronized cntxt models biframe =
           (Sts.empty, Sts.empty) biframe
       in
       let maximal_elems = Sts.filter (function
-          |  Term.Pred ts -> not (Sts.mem ts max_ts) (* we direclty remove pred(t) with t in the set *)
-          | _ -> true) max_ts
+          | Term.Fun (fs, _, [ts]) when fs = Term.f_pred -> 
+            not (Sts.mem ts max_ts) 
+          (* we direclty remove pred(t) with t in the set *)
+
+          | _ -> true
+        ) max_ts
       in
       let maximal_elems =
         Constr.maximal_elems ~precise:false models (Sts.elements maximal_elems)
@@ -141,7 +148,8 @@ let is_attacker_call_synchronized cntxt models biframe =
           [frame_at tau; frame_at_pred tau; input_at tau]
           @
           match tau with
-          | Term.Pred tau' -> [frame_at tau'; frame_at_pred tau'; input_at tau']
+          | Term.Fun (fs, _, [tau']) when fs = Term.f_pred -> 
+            [frame_at tau'; frame_at_pred tau'; input_at tau']
           | _ -> []
         in
         (* let rec is_in = function

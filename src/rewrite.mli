@@ -5,11 +5,13 @@
     - sv ⊆ FV(l)
     - ((FV(r) ∪ FV(φ)) ∩ sv) ⊆ FV(l) *)
 type rw_erule = {
-  rw_tyvars : Type.tvars;        (** type variables *)
-  rw_vars   : Vars.Sv.t;         (** term variables *)
-  rw_conds  : Term.message list; (** premisses *)
-  rw_rw     : Term.esubst;       (** pair (source, destination) *)
+  rw_tyvars : Type.tvars;     (** type variables *)
+  rw_vars   : Vars.Sv.t;      (** term variables *)
+  rw_conds  : Term.term list; (** premisses *)
+  rw_rw     : Term.esubst;    (** pair (source, destination) *)
 }
+
+val pp_rw_erule : Format.formatter -> rw_erule -> unit
 
 (*------------------------------------------------------------------*)
 val check_erule : rw_erule -> unit
@@ -17,7 +19,7 @@ val check_erule : rw_erule -> unit
 val pat_to_rw_erule :
   ?loc:Location.t ->
   [< `LeftToRight | `RightToLeft ] ->
-  Term.message Match.pat ->
+  Term.term Match.pat ->
   rw_erule
 
 (*------------------------------------------------------------------*)
@@ -26,12 +28,12 @@ val rewrite_head :
   Symbols.table ->
   SystemExpr.t ->
   rw_erule ->
-  'a Term.term ->
-  ('a Term.term * Term.message list) option
+  Term.term ->
+  (Term.term * Term.term list) option
 
 (*------------------------------------------------------------------*)
 type rw_res = [
-  | `Result of Equiv.any_form * Term.message list
+  | `Result of Equiv.any_form * Term.term list
   | `NothingToRewrite
   | `MaxNestedRewriting
 ]

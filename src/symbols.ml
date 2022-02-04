@@ -56,12 +56,13 @@ type function_def =
   | CheckSign
   | PublicKey
   | Abstract of symb_type
+  | Operator                    (* definition in associated data *)
 
 (*------------------------------------------------------------------*)
 type macro_def =
   | Input | Output | Cond | Exec | Frame
-  | State  of int * Type.tmessage
-  | Global of int * Type.tmessage
+  | State  of int * Type.ty
+  | Global of int * Type.ty
 
 (*------------------------------------------------------------------*)
 type bty_info =
@@ -72,8 +73,8 @@ type bty_def = bty_info list
 
 (*------------------------------------------------------------------*)
 type name_def = {
-  n_iarr : int;                  (* index arity *)
-  n_ty   : Type.message Type.ty; (* type *)
+  n_iarr : int;     (** index arity *)
+  n_ty   : Type.ty; (** type *)
 }
 
 (*------------------------------------------------------------------*)
@@ -240,16 +241,21 @@ let of_lsymb_opt ?(group=default_group) (s : lsymb) (table : table) =
 module type Namespace = sig
   type ns
   type def
-  val reserve : table -> lsymb -> table * data t
+
+  val reserve       : table -> lsymb -> table * data t
   val reserve_exact : table -> lsymb -> table * ns t
-  val define : table -> data t -> ?data:data -> def -> table
+
+  val define   : table -> data t -> ?data:data -> def -> table
   val redefine : table -> data t -> ?data:data -> def -> table
-  val declare :
-    table -> lsymb -> ?data:data -> def -> table * ns t
-  val declare_exact :
-    table -> lsymb -> ?data:data -> def -> table * ns t
-  val of_lsymb : lsymb -> table -> ns t
+
+  val declare       : table -> lsymb -> ?data:data -> def -> table * ns t
+  val declare_exact : table -> lsymb -> ?data:data -> def -> table * ns t
+
+  val mem : lsymb -> table -> bool
+
+  val of_lsymb     : lsymb -> table -> ns t
   val of_lsymb_opt : lsymb -> table -> ns t option
+
   val cast_of_string : string -> ns t
 
   val get_all       : ns t   -> table -> def * data
@@ -328,6 +334,15 @@ module Make (N:S) : Namespace
   let get_data name (table : table) = snd (get_all name table)
 
   let cast_of_string name = {group;name}
+
+  let mem (name : lsymb) (table : table) : bool =
+    let symb = { group; name = L.unloc name } in
+    try
+      ignore (N.deconstruct
+                ~loc:(Some (L.loc name))
+                (fst (Msymb.find symb table.cnt))) ;
+      true
+    with _ -> false
 
   let of_lsymb (name : lsymb) (table : table) =
     let symb = { group; name = L.unloc name } in
@@ -506,14 +521,14 @@ end)
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)
 
-let get_bty_info table (ty : Type.tmessage) : bty_info list =
+let get_bty_info table (ty : Type.ty) : bty_info list =
   match ty with
     | Type.Boolean -> []
     | Type.Message -> [Ty_large; Ty_name_fixed_length]
     | Type.TBase b -> BType.get_def (BType.cast_of_string b) table
-    | Type.TUnivar _ | Type.TVar _ -> []
+    | _ -> []
 
-let check_bty_info table (ty : Type.tmessage) (info : bty_info) : bool =
+let check_bty_info table (ty : Type.ty) (info : bty_info) : bool =
   let infos = get_bty_info table ty in
   List.mem info infos
 
@@ -566,7 +581,7 @@ let () = builtin_ref := table
 (** {3 Function symbols builtins} *)
 
 (** makes simple function types of [ty^arity] to [ty] *)
-let mk_fty arity (ty : Type.tmessage) =
+let mk_fty arity (ty : Type.ty) =
   Type.mk_ftype 0 [] (List.init arity (fun _ -> ty)) ty
 
 let mk_fsymb ?fty ?(bool=false) ?(f_info=`Prefix) f arity =
@@ -583,6 +598,18 @@ let mk_fsymb ?fty ?(bool=false) ?(f_info=`Prefix) f arity =
 (** Diff *)
 
 let fs_diff  = mk_fsymb "diff" 2
+
+(** Happens *)
+
+let fs_happens = 
+  let fty = Type.mk_ftype 0 [] [Type.Timestamp] Type.Boolean in
+  mk_fsymb ~fty "happens" (-1)
+
+(** Pred *)
+
+let fs_pred = 
+  let fty = Type.mk_ftype 0 [] [Type.Timestamp] Type.Timestamp in
+  mk_fsymb ~fty "pred" (-1)
 
 (** Boolean connectives *)
 
@@ -601,6 +628,27 @@ let fs_ite =
       [Type.Boolean; tyvar; tyvar]
       tyvar in
   mk_fsymb ~fty "if" (-1)
+
+(*------------------------------------------------------------------*)
+(** Comparison *)
+
+let mk_comp name =
+  let tyv = Type.mk_tvar "t" in
+  let tyvar = Type.TVar tyv in
+  let fty = 
+    Type.mk_ftype
+      0 [tyv]
+      [tyvar; tyvar]
+      Type.Boolean
+  in
+  mk_fsymb ~f_info:`Infix ~fty name (-1)
+
+let fs_eq  = mk_comp "="
+let fs_neq = mk_comp "<>"
+let fs_leq = mk_comp "<="
+let fs_lt  = mk_comp "<"
+let fs_geq = mk_comp ">="
+let fs_gt  = mk_comp ">"
 
 (** Witness *)
 
@@ -645,7 +693,7 @@ let fs_empty = mk_fsymb "empty" 0
 
 (** Length *)
 
-let fs_len    =
+let fs_len =
   let tyv = Type.mk_tvar "t" in
   let tyvar = Type.TVar tyv in
 

@@ -90,21 +90,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Conversion} *)
 
   let convert_args (s : S.sequent) args sort =
-    Args.convert_args (S.system s) (S.table s) (S.ty_vars s) (S.env s) args sort (S.wrap_conc (S.goal s))
-
-  let convert_i ?pat (s : S.sequent) term =
-    let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in
-    Theory.convert_i ?pat cenv (S.ty_vars s) (S.env s) term
-
-  let econvert (s : S.sequent) term =
-    let cenv = Theory.{ table = S.table s; cntxt = InGoal; } in
-    Theory.econvert cenv (S.ty_vars s) (S.env s) term
+    Args.convert_args (S.env s) args sort (S.wrap_conc (S.goal s))
+  
+  let convert (s : S.sequent) term =
+    let cenv = Theory.{ env = S.env s; cntxt = InGoal; } in
+    Theory.convert cenv term
 
   let convert_ht (s : S.sequent)  ht =
-    let env = S.env s in
-    let table = S.table s in
-    let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-    Theory.convert_ht conv_env (S.ty_vars s) env ht
+    let conv_env = Theory.{ env = S.env s; cntxt = InGoal; } in
+    Theory.convert_ht conv_env ht
 
   (*------------------------------------------------------------------*)
   let make_exact ?loc env ty name =
@@ -122,7 +116,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Some v' -> v'
 
   (*------------------------------------------------------------------*)
-  let happens_premise (s : S.t) (a : Term.timestamp) : S.t =
+  let happens_premise (s : S.t) (a : Term.term) : S.t =
     let form = Term.mk_happens a in
     S.set_goal (S.unwrap_conc (`Reach form)) s
 
@@ -206,9 +200,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
 
   (*------------------------------------------------------------------*)
-  (** {3 Macro unfolding} *)
+  (** {3 Macro and term unfolding} *)
 
-  let unfold_macro_exn ?(force_happens=false) (t: Term.message) (s : S.sequent) : Term.message =
+  let unfold_term_exn 
+      ?(force_happens=false)
+      (t: Term.term) 
+      (s : S.sequent) : 
+    Term.term 
+    =
     match t with
     | Macro (ms,l,a) ->
       if not (force_happens) && not (S.query_happens ~precise:true s a) then
@@ -216,66 +215,85 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       Macros.get_definition_exn (S.mk_trace_cntxt s) ms a
 
+    | Fun (fs, _, ts) 
+      when Operator.is_operator (S.table s) fs -> 
+      Operator.unfold (S.mk_trace_cntxt s) fs ts
+      
     | _ ->
-      soft_failure (Tactics.Failure "can only expand macros")
+      soft_failure (Tactics.Failure "nothing to expand")
 
-  let unfold_macro
+  (** If [strict] is true, the unfolding must succeed. *)
+  let unfold_term
       ?(force_happens=false)
       ~(strict:bool)
-      (t: Term.message)
-      (s : S.sequent) : Term.message option
+      (t : Term.term)
+      (s : S.sequent) 
+    : Term.term option
     =
-    try Some (unfold_macro_exn ~force_happens t s) with
+    try Some (unfold_term_exn ~force_happens t s) with
     | Tactics.Tactic_soft_failure _ when not strict -> None
+
+  let found_occ_macro target ms occ =
+    match target with
+    | `Msymb mname -> ms.Term.s_symb = mname
+    | `Mterm t     -> occ = t
+    | `Any         -> true
+    | `Fsymb _     -> false
+
+  let found_occ_fun target fs =
+    match target with
+    | `Any                -> true
+    | `Fsymb fname        -> fs = fname
+    | `Msymb _ | `Mterm _ -> false
 
   (** If [m_rec = true], recurse on expanded sub-terms. *)
   let expand
       ?m_rec
       (targets: target list)
-      (macro : [ `Msymb of Symbols.macro Symbols.t
-               | `Mterm of Term.message
+      (target : [ `Msymb of Symbols.macro Symbols.t
+               | `Fsymb of Symbols.fname Symbols.t
+               | `Mterm of Term.term
                | `Any])
       (s : S.sequent) : bool * S.sequent
     =
     let found1 = ref false in
 
-    let found_occ ms occ =
-      match macro with
-      | `Msymb mname -> ms.Term.s_symb = mname
-      | `Mterm t -> occ = t
-      | `Any -> true
-    in
     (* unfold_macro is not allowed to fail if we try to expand a specific term *)
     let strict =
-      match macro with
+      match target with
       | `Mterm _ -> true
-      | `Msymb _ | `Any -> false
+      | `Fsymb _ | `Msymb _ | `Any -> false
     in
 
     (* applies [doit] to all subterms of the target [f] *)
     let doit ((f,_) : cform * Ident.t option) : cform * S.conc_form list =
 
-      let expand_inst (Term.ETerm occ) vars conds =
+      let unfold occ = 
+        match unfold_term ~strict occ s with
+        | None -> `Continue
+        | Some t ->
+          found1 := true;
+          `Map t
+      in
+
+      let expand_inst occ vars conds =
         match occ with
-        | Term.Macro (ms, l, _) ->
-          if found_occ ms occ then
-            match unfold_macro ~strict occ s with
-            | None -> `Continue
-            | Some t ->
-              found1 := true;
-              `Map (Term.ETerm t)
-          else `Continue
+        | Term.Macro (ms, _, _) ->
+          if found_occ_macro target ms occ then unfold occ else `Continue
+
+        | Term.Fun ((f,_), _, _) ->
+          if found_occ_fun target f then unfold occ else `Continue
 
         | _ -> `Continue
       in
 
       match f with
       | `Equiv f ->
-        let f = odflt f (Match.E.map ?m_rec expand_inst (S.env s) f) in
+        let f = odflt f (Match.E.map ?m_rec expand_inst (S.vars s) f) in
         `Equiv f, []
 
       | `Reach f ->
-        let f = odflt f (Match.T.map ?m_rec expand_inst (S.env s) f) in
+        let f = odflt f (Match.T.map ?m_rec expand_inst (S.vars s) f) in
         `Reach f, []
     in
 
@@ -284,20 +302,25 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     !found1, s
 
-  (** expand all macros in a term *)
-  let expand_all_term ?(force_happens=false) (f : Term.message) (s : S.t) : Term.message =
-    let expand_inst (Term.ETerm occ) vars conds =
+  (** expand all macros (not operators) in a term *)
+  let expand_all_macros
+      ?(force_happens=false)
+      (f : Term.term) 
+      (s : S.t) 
+    : Term.term 
+    =
+    let expand_inst occ vars conds =
       match occ with
       | Term.Macro (ms, l, _) ->
         begin
-          match unfold_macro ~strict:false ~force_happens occ s with
+          match unfold_term ~strict:false ~force_happens occ s with
           | None -> `Continue
-          | Some t -> `Map (Term.ETerm t)
+          | Some t -> `Map t
         end
 
       | _ -> `Continue
     in
-    let f_opt = Match.T.map ~m_rec:true expand_inst (S.env s) f in
+    let f_opt = Match.T.map ~m_rec:true expand_inst (S.vars s) f in
     odflt f f_opt
 
   (** expand all macro of some targets in a sequent *)
@@ -311,8 +334,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     [expand_all targets s]
 
   let expand_arg (targets : target list) (arg : Theory.term) (s : S.t) : S.t =
-    let expand targs macro s =
-      let found, s = expand targets macro s in
+    let expand targs symb s =
+      let found, s = expand targets symb s in
       if not found then
         soft_failure ~loc:(L.loc arg) (Failure "nothing to expand");
       s
@@ -321,8 +344,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let tbl = S.table s in
     match Args.convert_as_lsymb [Args.Theory arg] with
     | Some m ->
-      let m = Symbols.Macro.of_lsymb m tbl in
-      expand targets (`Msymb m) s
+      let m =
+        if Symbols.Macro.mem m tbl then
+          `Msymb (Symbols.Macro.of_lsymb m tbl)
+        else if Symbols.Function.mem m tbl then
+          `Fsymb (Symbols.Function.of_lsymb m tbl)
+        else 
+          soft_failure ~loc:(L.loc arg) (Failure "not a macro or operator");
+      in
+      expand targets m s
 
     | _ ->
       match convert_args s [Args.Theory arg] Args.(Sort Message) with
@@ -417,7 +447,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       else
         let rw_res =
           Rewrite.rewrite
-            (S.table s) (S.system s) (S.env s)
+            (S.table s) (S.system s) (S.vars s)
             mult rw_erule f
         in
         match rw_res with
@@ -551,6 +581,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
           soft_failure ~loc:(L.loc rw_arg.rw_dir)
             (Failure "cannot swap the systems: lemma applies to a \
                       single system)")
+
+        | _, Empty -> 
+          soft_failure (Failure "empty system: nothing to rewrite")
       in
       system, f
 
@@ -564,12 +597,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
   type c_res = c_handler * S.sequent
 
   (** Case analysis on a timestamp *)
-  let timestamp_case (ts : Term.timestamp) s : S.sequent list =
+  let timestamp_case (ts : Term.term) s : S.sequent list =
     let system = S.system s in
     let table  = S.table s in
 
-    let mk_case descr : Vars.evar list * Term.timestamp =
-      let env = ref (S.env s) in
+    let mk_case descr : Vars.var list * Term.term =
+      let env = ref (S.vars s) in
       let indices, s = Term.refresh_vars (`InEnv env) descr.Action.indices in
 
       let name =
@@ -579,7 +612,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (* FIXME: is this second substitution useful ? *)
       let name = Term.subst s name in
 
-      List.map (fun x -> Vars.EVar x) indices, name
+      indices, name
     in
 
     let cases = SystemExpr.map_descrs mk_case table system in
@@ -691,7 +724,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Intro patterns} *)
 
   let var_of_naming_pat
-      n_ip ~dflt_name (ty : 'a Type.ty) env : Vars.env * 'a Vars.var =
+      n_ip ~dflt_name (ty : Type.ty) env : Vars.env * Vars.var =
     match n_ip with
     | Args.Unnamed
     | Args.AnyName     -> Vars.make `Approx env ty dflt_name
@@ -706,14 +739,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (s : S.t) : S.t
     =
     match ip_handler with
-    | `Var Vars.EVar v ->
+    | `Var v ->
       let env, v' =
-        var_of_naming_pat n_ip ~dflt_name:(Vars.name v) (Vars.ty v) (S.env s)
+        var_of_naming_pat n_ip ~dflt_name:(Vars.name v) (Vars.ty v) (S.vars s)
       in
       let subst = [Term.ESubst (Term.mk_var v, Term.mk_var v')] in
 
       (* FIXME: we substitute everywhere. This is inefficient. *)
-      S.subst subst (S.set_env env s)
+      S.subst subst (S.set_vars env s)
 
     | `Hyp hid ->
       let f = Hyps.by_id hid s in
@@ -739,10 +772,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
       let form = Hyps.by_id hid s in
       let s = Hyps.remove hid s in
 
-      if S.Hyp.is_matom form then
+      if S.Hyp.is_eq form then
         begin
-          match S.Hyp.destr_matom form with
-          | Some (`Eq,a,b) ->
+          match S.Hyp.destr_eq form with
+          | Some (a,b) ->
             let a1, a2 = get_destr ~orig:(`Reach a) (Term.destr_pair a)
             and b1, b2 = get_destr ~orig:(`Reach b) (Term.destr_pair b) in
 
@@ -779,7 +812,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
           let vs, vs' = List.takedrop (len - 1) vs in
 
-          let vs_fresh, subst = Term.erefresh_vars `Global vs in
+          let vs_fresh, subst = Term.refresh_vars `Global vs in
 
           let f = S.Hyp.mk_exists vs' f in
           let f = S.subst_hyp subst f in
@@ -868,7 +901,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     if S.Conc.is_forall form then
       begin
         match S.Conc.decompose_forall form with
-        | Vars.EVar x :: vs, f ->
+        | x :: vs, f ->
           let x' = Vars.make_new_from x in
 
           let subst = [Term.ESubst (Term.mk_var x, Term.mk_var x')] in
@@ -876,7 +909,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let f = S.Conc.mk_forall ~simpl:false vs f in
 
           let new_formula = S.subst_conc subst f in
-          ( `Var (Vars.EVar x'),
+          ( `Var x',
             S.set_goal new_formula s )
 
         | [], f ->
@@ -917,16 +950,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
         `Hyp id, s
       end
 
-    else if S.Conc.is_matom form then
+    else if S.Conc.is_neq form then
       begin
-        match oget (S.Conc.destr_matom form) with
-        | `Neq, u, v ->
-          let h = Term.mk_atom `Eq u v in
-          let h = S.unwrap_hyp (`Reach h) in
-          let id, s = Hyps.add_i Args.Unnamed h s in
-          let s = S.set_goal S.Conc.mk_false s in
-          `Hyp id, s
-        | _ -> soft_failure Tactics.NothingToIntroduce
+        let u, v = oget (S.Conc.destr_neq form) in
+        let h = Term.mk_atom `Eq u v in
+        let h = S.unwrap_hyp (`Reach h) in
+        let id, s = Hyps.add_i Args.Unnamed h s in
+        let s = S.set_goal S.Conc.mk_false s in
+        `Hyp id, s
       end
 
     else soft_failure Tactics.NothingToIntroduce
@@ -973,10 +1004,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let try_clean_env vars s : S.t =
     let s_fv = S.fv s in
     let clear = Sv.diff vars (Sv.inter vars s_fv) in
-    let env = Vars.rm_evars (S.env s) (Sv.elements clear) in
-    S.set_env env s
+    let env = Vars.rm_vars (S.vars s) (Sv.elements clear) in
+    S.set_vars env s
 
-  let _generalize ~dependent (Term.ETerm t) s : Vars.evar * S.t =
+  let _generalize ~dependent t s : Vars.var * S.t =
     let v = Vars.make_new (Term.ty t) "_x" in
 
     let subst = [Term.ESubst (t, Term.mk_var v)] in
@@ -992,14 +1023,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
       then [], s
       else
         Hyps.fold (fun id f (gen_hyps, s) ->
-            if Vars.Sv.mem (Vars.EVar v) (S.fv_hyp f)
+            if Vars.Sv.mem v (S.fv_hyp f)
             then S.hyp_to_conc f :: gen_hyps, Hyps.remove id s
             else gen_hyps, s
           ) s ([], s)
     in
 
     let goal = S.Conc.mk_impls ~simpl:true gen_hyps (S.goal s) in
-    Vars.EVar v, S.set_goal goal s
+    v, S.set_goal goal s
 
   (** [terms] and [n_ips] must be of the same length *)
   let generalize ~dependent terms n_ips s : S.t =
@@ -1012,7 +1043,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     (* clear unused variables among [terms] free variables *)
     let t_fv =
-      List.fold_left (fun vars (Term.ETerm t) ->
+      List.fold_left (fun vars t ->
           Sv.union vars (Term.fv t)
         ) Sv.empty terms
     in
@@ -1020,14 +1051,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     (* we rename generalized variables *)
     let _, new_vars, subst =
-      List.fold_left2 (fun (env, new_vars, subst) (Vars.EVar v) n_ip ->
+      List.fold_left2 (fun (env, new_vars, subst) v n_ip ->
           let env, v' =
             var_of_naming_pat n_ip ~dflt_name:"x" (Vars.ty v) env
           in
           env,
-          Vars.EVar v' :: new_vars,
+          v' :: new_vars,
           Term.ESubst (Term.mk_var v, Term.mk_var v') :: subst
-        ) (S.env s, [], []) vars n_ips
+        ) (S.vars s, [], []) vars n_ips
     in
     let s = S.subst subst s in
 
@@ -1036,7 +1067,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let goal = S.Conc.mk_forall ~simpl:false new_vars (S.goal s) in
     S.set_goal goal s
 
-  let naming_pat_of_eterm (Term.ETerm t) =
+  let naming_pat_of_term t =
     match t with
     | Term.Var v -> Args.Approx (Vars.name v) (* use the same name *)
     | _ -> Args.AnyName
@@ -1046,15 +1077,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | [Args.Generalize (terms, n_ips_opt)] ->
       let terms =
         List.map (fun arg ->
-            match convert_args s [Args.Theory arg] (Args.Sort Args.ETerm) with
-            | Args.Arg (Args.ETerm (_, t, _)) -> Term.ETerm t
+            match convert_args s [Args.Theory arg] (Args.Sort Args.Term) with
+            | Args.Arg (Args.Term (_, t, _)) -> t
 
             | _ -> bad_args ()
           ) terms
       in
       let n_ips =
         match n_ips_opt with
-        | None -> List.map naming_pat_of_eterm terms
+        | None -> List.map naming_pat_of_term terms
         | Some n_ips ->
           if List.length n_ips <> List.length terms then
             hard_failure (Failure "not the same number of arguments \
@@ -1231,7 +1262,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     let goal = S.goal s in
     let vs0, f = S.Conc.decompose_forall goal in
-    let Vars.EVar v, vs = match vs0 with
+    let v, vs = match vs0 with
       | v :: vs -> v, vs
       | _ -> error ()
     in
@@ -1251,7 +1282,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           in
 
           S.Conc.mk_forall ~simpl:false
-            (Vars.EVar v' :: vs)
+            (v' :: vs)
             (S.Conc.mk_impl ~simpl:false
                (atom_lt)
                (S.subst_conc [Term.ESubst (Term.mk_var v,Term.mk_var v')] f))
@@ -1259,7 +1290,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
         let new_goal =
           S.Conc.mk_forall ~simpl:false
-            [Vars.EVar v]
+            [v]
             (S.Conc.mk_impl ~simpl:false
                ih
                (S.Conc.mk_forall ~simpl:false vs f))
@@ -1269,9 +1300,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
       end
     | _ -> error ()
 
-  let induction_gen ~dependent (t : Term.timestamp) s : S.t list =
-    let t = Term.ETerm t in
-    let s = generalize ~dependent [t] [naming_pat_of_eterm t] s in
+  let induction_gen ~dependent (t : Term.term) s : S.t list =
+    let s = generalize ~dependent [t] [naming_pat_of_term t] s in
     induction s
 
   let induction_args ~dependent args s =
@@ -1280,7 +1310,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | [Args.Theory t] ->
       begin
         match convert_args s args (Args.Sort Args.Timestamp) with
-        | Args.Arg (Args.Timestamp t) -> induction_gen ~dependent t s
+        | Args.Arg (Args.Message (t, _)) -> induction_gen ~dependent t s
         | _ -> hard_failure (Failure "expected a timestamp")
       end
     | _ -> bad_args ()
@@ -1300,8 +1330,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     if not (List.length ths = List.length vs) then
       soft_failure (Tactics.Failure "cannot introduce exists");
 
-    let table = S.table s in
-    let nu = Theory.parse_subst table (S.ty_vars s) (S.env s) vs ths in
+    let nu = Theory.parse_subst (S.env s) vs ths in
     let new_formula = S.subst_conc nu f in
     [S.set_goal new_formula s]
 
@@ -1335,7 +1364,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
    (* rename cleanly the variables *)
     let vars, subst =
-      Term.erefresh_vars (`InEnv (ref (S.env s))) (Sv.elements pat.pat_vars)
+      Term.refresh_vars (`InEnv (ref (S.vars s))) (Sv.elements pat.pat_vars)
     in
     let f = S.subst_conc subst pat.pat_term in
     let f =
@@ -1390,7 +1419,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       | _ -> bad_args () in
 
     let f = match convert_args s [f] Args.(Sort Boolean) with
-      | Args.(Arg (Boolean f)) -> f
+      | Args.(Arg (Message (f,_))) -> f
       | _ -> bad_args ()
     in
     let f_conc =
@@ -1416,7 +1445,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Depends} *)
 
-  let depends Args.(Pair (Timestamp a1, Timestamp a2)) s =
+  let depends Args.(Pair (Message (a1,_), Message (a2,_))) s =
     let models = S.get_models s in
     let get_action ts =
       match Constr.find_eq_action models ts with
@@ -1480,18 +1509,16 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Remember} *)
 
   let remember (id : Theory.lsymb) (term : Theory.term) s =
-    match econvert s term with
-    | None -> soft_failure ~loc:(L.loc term) (Failure "type error")
-    | Some (Theory.ETerm (ty, t, _)) ->
-      let env, x = make_exact ~loc:(L.loc id) (S.env s) ty (L.unloc id) in
-      let subst = [Term.ESubst (t, Term.mk_var x)] in
+    let t, ty = convert s term in
+    let env, x = make_exact ~loc:(L.loc id) (S.vars s) ty (L.unloc id) in
+    let subst = [Term.ESubst (t, Term.mk_var x)] in
 
-      let s = S.subst subst (S.set_env env s) in
-      let eq =
-        Equiv.Babel.convert
-          (Term.mk_atom `Eq (Term.mk_var x) t)
-          ~src:Equiv.Local_t ~dst:S.conc_kind in
-      S.set_goal (S.Conc.mk_impl ~simpl:false eq (S.goal s)) s
+    let s = S.subst subst (S.set_vars env s) in
+    let eq =
+      Equiv.Babel.convert
+        (Term.mk_atom `Eq (Term.mk_var x) t)
+        ~src:Equiv.Local_t ~dst:S.conc_kind in
+    S.set_goal (S.Conc.mk_impl ~simpl:false eq (S.goal s)) s
 
   let remember_tac_args (args : Args.parser_arg list) s : S.t list =
     match args with

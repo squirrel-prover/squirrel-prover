@@ -43,13 +43,13 @@ type 'a t = ('a item) list
 
 (** Actions are lists of items where infinite choices are represented
   * by index lists. *)
-type action = (Vars.index list) t
+type action = (Vars.var list) t
 
 (** Shapes represent classes of actions differing only in their indices:
   * they are obtained by replacing lists of indices by their lengths. *)
 type shape = int t
 
-val get_indices : action -> Vars.index list
+val get_indices : action -> Vars.var list
 
 val fv_action : action -> Vars.Sv.t
 
@@ -75,7 +75,7 @@ val same_shape : action -> action -> Term.subst option
 
 (** Convert [Action] parameters to an action. *)
 val of_term :
-  Symbols.action Symbols.t -> Vars.index list ->
+  Symbols.action Symbols.t -> Vars.var list ->
   Symbols.table ->
   action
 
@@ -89,8 +89,6 @@ val dummy : shape -> action
   * They are indexed and are associated to an action using the argument
   * indices. *)
 
-type Symbols.data += Data of Vars.index list * action
-
 (** Get a fresh symbol whose name starts with the given prefix.
     If [exact] is true, the symbol must be exactly the argument. *)
 val fresh_symbol :
@@ -99,14 +97,14 @@ val fresh_symbol :
 
 val define_symbol :
   Symbols.table ->
-  Symbols.Action.ns Symbols.t -> Vars.index list -> action ->
+  Symbols.Action.ns Symbols.t -> Vars.var list -> action ->
   Symbols.table
 
-val find_symbol : Symbols.lsymb -> Symbols.table -> Vars.index list * action
+val find_symbol : Symbols.lsymb -> Symbols.table -> Vars.var list * action
 
 val of_symbol :
   Symbols.action Symbols.t -> Symbols.table ->
-  Vars.index list * action
+  Vars.var list * action
 
 val arity : Symbols.action Symbols.t -> Symbols.table -> int
 
@@ -121,10 +119,10 @@ type descr = {
   name      : Symbols.action Symbols.t ;
   action    : action ;
   input     : Channel.t * string ;
-  indices   : Vars.index list ;
-  condition : Vars.index list * Term.message ;
-  updates   : (Term.state * Term.message) list ;
-  output    : Channel.t * Term.message;
+  indices   : Vars.var list ;
+  condition : Vars.var list * Term.term ;
+  updates   : (Term.state * Term.term) list ;
+  output    : Channel.t * Term.term;
   globals : Symbols.macro Symbols.t list;
 }
 
@@ -170,7 +168,7 @@ val subst_action : Term.subst -> action -> action
 val subst_descr : Term.subst -> descr -> descr
 
 (** Apply an iterator to the terms of a description. *)
-val apply_descr : (Vars.env -> Term.message -> Term.message) -> descr -> descr
+val apply_descr : (Vars.env -> Term.term -> Term.term) -> descr -> descr
 
 
 (*------------------------------------------------------------------*)
@@ -183,12 +181,12 @@ val apply_descr : (Vars.env -> Term.message -> Term.message) -> descr -> descr
     - or if [t] is [exec\@t] with [frame\@t'] appearing in [terms]
       where with [t <= t']. *)
 val is_dup :
-  Symbols.table -> Term.message -> Term.message list
+  Symbols.table -> Term.term -> Term.term list
   -> bool
 
 (** Same as [is_dup], but instead of checking term equality, checks
     that term matchs. *)
 val is_dup_match :
-  (Term.eterm -> Term.eterm -> 'a -> 'a option) -> 'a ->
-  Symbols.table -> Term.message -> Term.message list
+  (Term.term -> Term.term -> 'a -> 'a option) -> 'a ->
+  Symbols.table -> Term.term -> Term.term list
   -> 'a option

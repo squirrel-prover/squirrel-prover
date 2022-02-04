@@ -16,13 +16,13 @@ module Cst = struct
     (** Flattening of the successor of a constant *)
 
     | Cgfuncst of [
-        | `N of Symbols.name   Symbols.t * Type.message Type.ty
+        | `N of Symbols.name   Symbols.t * Type.ty
         | `F of Symbols.fname  Symbols.t
         | `A of Symbols.action Symbols.t
       ]
     (** function symbol, name or action of arity zero *)
 
-    | Cmvar   of Vars.evar
+    | Cmvar   of Vars.var
 
   let cst_cpt = ref 0
 
@@ -37,7 +37,7 @@ module Cst = struct
   let rec print ppf = function
     | Cflat i   -> Fmt.pf ppf "_%d" i
     | Csucc c   -> Fmt.pf ppf "suc(@[%a@])" print c
-    | Cmvar m   -> Vars.pp_e ppf m
+    | Cmvar m   -> Vars.pp ppf m
     | Cgfuncst (`F f) -> Symbols.pp ppf f
     | Cgfuncst (`N (n,_)) -> Symbols.pp ppf n
     | Cgfuncst (`A a) -> Symbols.pp ppf a
@@ -72,11 +72,10 @@ let nilpotence_norm compare l =
 (** Generalized function symbols, for [Term.fsymb], [Term.msymb] and 
     [Symbols.action Symbols.t]. *)
 type gfsymb = 
-  | F of Symbols.fname  Symbols.t                        (* function symbol *)
-  | M of Symbols.macro  Symbols.t * Type.message Type.ty (* macro *)
-  | N of Symbols.name   Symbols.t * Type.message Type.ty (* name *)
-  | A of Symbols.action Symbols.t                        (* action *)
-  | GPred                                                (* predecessor *)
+  | F of Symbols.fname  Symbols.t           (* function symbol *)
+  | M of Symbols.macro  Symbols.t * Type.ty (* macro *)
+  | N of Symbols.name   Symbols.t * Type.ty (* name *)
+  | A of Symbols.action Symbols.t           (* action *)
 
 let hash_gfs = function
   | M (m, _) -> Hashtbl.hash m
@@ -95,8 +94,6 @@ let equal_gfs f1 f2 = match f1, f2 with
     (assert (t1 = t2); true) (* sanity check, for now *)
 
   | A a1, A a2 -> a1 = a2
-
-  | GPred, GPred -> true
 
   | _ -> false
 
@@ -215,7 +212,7 @@ end = struct
         | F f -> make (Ccst (Cgfuncst (`F f)))
         | A a -> make (Ccst (Cgfuncst (`A a)))
         | N (n,t) -> make (Ccst (Cgfuncst (`N (n,t))))
-        | GPred | M _ -> assert false
+        | M _ -> assert false
       end
     else make (Cfun (f, i, ts))
 
@@ -244,7 +241,7 @@ let mk_var () =
 exception Unsupported_conversion
 
 (** Translation from [term] to [cterm] *)
-let rec cterm_of_term : type a. a Term.term -> cterm = fun c ->
+let rec cterm_of_term : Term.term -> cterm = fun c ->
   let open Term in
   match c with
   | Fun ((f,is),_,terms) ->
@@ -267,79 +264,69 @@ let rec cterm_of_term : type a. a Term.term -> cterm = fun c ->
     let is = List.map cterm_of_var ns.s_indices in
     cfun (N (ns.s_symb,ns.s_typ)) (List.length is) is
 
-  | Var m  -> ccst (Cst.Cmvar (Vars.EVar m))
+  | Var m  -> ccst (Cst.Cmvar m)
 
   | Diff(c,d) -> cfun (F Symbols.fs_diff) 0 [cterm_of_term c; cterm_of_term d]
 
-  | Term.Pred ts -> cfun GPred 0 [cterm_of_term ts]
-
   | _ -> raise Unsupported_conversion
 
-and cterm_of_var i = ccst (Cst.Cmvar (Vars.EVar i))
+and cterm_of_var i = ccst (Cst.Cmvar i)
 
 
 (*------------------------------------------------------------------*)
 let index_of_cterm i = match i.cnt with
-  | Ccst (Cst.Cmvar (Vars.EVar m)) -> Vars.cast m Type.KIndex
+  | Ccst (Cst.Cmvar m) -> assert (Vars.ty m = Type.Index); m
   | _ -> assert false
     
 let indices_of_cterms cis = List.map index_of_cterm cis
 
-let term_of_cterm : type a. Symbols.table -> a Type.kind -> cterm -> a Term.term =
-  fun table kind c ->  
-  let rec term_of_cterm : type a. a Type.kind -> cterm -> a Term.term = 
-    fun kind c -> 
+let term_of_cterm : Symbols.table -> cterm -> Term.term =
+  fun table c ->  
+  let rec term_of_cterm : cterm -> Term.term = 
+    fun c -> 
       match c.cnt with 
       | Cfun (F f, ari, cterms) -> 
         let cis, cterms = List.takedrop ari cterms in
         let is = indices_of_cterms cis in
-        let terms = terms_of_cterms Type.KMessage cterms in
-        let t = Term.mk_fun table f is terms in
-        Term.cast kind t
+        let terms = terms_of_cterms cterms in
+        Term.mk_fun table f is terms 
 
       | Cfun (M (m,ek), ari, cterms) -> 
         let cis, cts = List.takedrop ari cterms in
         let cts = as_seq1 cts in
         let m = Term.mk_isymb m ek (indices_of_cterms cis) in
-        let tm = Term.mk_macro m [] (term_of_cterm Type.KTimestamp cts) in
-        Term.cast kind tm
+        Term.mk_macro m [] (term_of_cterm cts) 
 
       | Cfun (A a, ari, is) -> 
         assert (ari = List.length is);
-        let is = indices_of_cterms is in 
-        Term.cast kind (Term.mk_action a is)
+        let is = indices_of_cterms is in
+        Term.mk_action a is
 
       | Cfun (N (n,nty), ari, is) -> 
         assert (ari = List.length is);
         let is = indices_of_cterms is in
         let ns = Term.mk_isymb n nty is in
-        Term.cast kind (Term.mk_name ns)
+        Term.mk_name ns
 
-      | Cfun (GPred, ari, ts) ->
-        assert (ari = 0);
-        let ts = as_seq1 ts in
-        let pred_ts = Term.mk_pred (term_of_cterm Type.KTimestamp ts) in
-        Term.cast kind pred_ts   
-
-      | Ccst (Cst.Cmvar (Vars.EVar m)) -> Term.mk_var (Vars.cast m kind)
+      | Ccst (Cst.Cmvar m) -> Term.mk_var m
 
       | Ccst (Cst.Cgfuncst (`F f)) ->
-        Term.cast kind (Term.mk_fun table f [] [])
+        Term.mk_fun table f [] []
           
       | Ccst (Cst.Cgfuncst (`A a)) ->
-        Term.cast kind (Term.mk_action a [])
+        Term.mk_action a []
                                         
       | Ccst (Cst.Cgfuncst (`N (n,nty))) ->
         let ns = Term.mk_isymb n nty [] in
-        Term.cast kind (Term.mk_name ns)
+        Term.mk_name ns
 
       | (Ccst (Cflat _|Csucc _)|Cvar _|Cxor _) -> assert false
 
-  and terms_of_cterms : type a. a Type.kind -> cterm list -> a Term.term list =
-    fun kind cterms -> List.map (term_of_cterm kind) cterms
+  and terms_of_cterms (cterms : cterm list) : Term.term list =
+    List.map term_of_cterm cterms
 
   in
-  term_of_cterm kind c
+  term_of_cterm c
 
 (*------------------------------------------------------------------*)
 let pp_gsymb ppf = function
@@ -347,7 +334,6 @@ let pp_gsymb ppf = function
   | M (x,t) -> Fmt.pf ppf "%a : %a" Symbols.pp x Type.pp t
   | A x     -> Symbols.pp ppf x
   | N (x,t) -> Symbols.pp ppf x
-  | GPred   -> Fmt.pf ppf "pred"
 
 let rec pp_cterm ppf t = match t.cnt with
   | Cvar v -> Fmt.pf ppf "v#%d" v
@@ -372,7 +358,6 @@ let rec no_macros t = match t.cnt with
 
   | Ccst _ | Cvar _ -> true
 
-  | Cfun (GPred, _, ts)
   | Cxor ts -> List.for_all no_macros ts
 
   | Cfun ((A _ | F _ | N _), _, ts) -> List.for_all no_macros ts
@@ -1434,8 +1419,6 @@ module Memo = Hashtbl.Make2
       type t = Term.esubst list
       let equal_p (Term.ESubst (t0, t1)) (Term.ESubst (t0', t1')) = 
         Type.equal (Term.ty t0) (Term.ty t0') &&
-        let t0', t1' = Term.cast (Term.kind t0) t0', 
-                       Term.cast (Term.kind t0) t1' in
         t0 = t0' && t1 = t1'
       let equal l l' = 
         let l, l' = List.sort_uniq Stdlib.compare l,
@@ -1495,7 +1478,6 @@ let rec is_ground_term t = match t.cnt with
 
   | Ccst _ -> true
 
-  | Cfun (GPred, _, ts)
   | Cxor ts 
   | Cfun ((A _ | F _ | N _), _, ts) -> List.for_all is_ground_term ts
 
@@ -1633,13 +1615,13 @@ let name_indep_cnstrs table state l =
         | [] -> Term.mk_false
         | [p] -> 
           Term.mk_atom `Eq
-            (term_of_cterm table Type.KMessage p)
-            (term_of_cterm table Type.KMessage name)
+            (term_of_cterm table p)
+            (term_of_cterm table name)
         | p::q ->
           Term.mk_or
             (Term.mk_atom `Eq 
-               (term_of_cterm table Type.KMessage p)
-               (term_of_cterm table Type.KMessage name))
+               (term_of_cterm table p)
+               (term_of_cterm table name))
             (mk_disjunction q)
       in
       [mk_disjunction sub_names]
@@ -1676,7 +1658,7 @@ let () =
        let e', e, d, c, b, a = mk_cst (), mk_cst (), mk_cst (),
                               mk_cst (), mk_cst (), mk_cst () in
 
-       let v = ccst (Cst.Cmvar (Vars.EVar (snd (
+       let v = ccst (Cst.Cmvar ((snd (
            Vars.make `Approx Vars.empty_env (Type.Message) "v"))))
        in
        let state0 = complete_cterms table [(a,b); (b,c);

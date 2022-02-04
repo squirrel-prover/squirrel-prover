@@ -12,13 +12,10 @@ equiv nonempty (i:index) : seq(i:index ->n(i)), diff(n(i),m(i)).
 Proof.
   fresh 1.
   (* Check that the right formula has been produced,
-     using an incorrect equivalence that we admit. *)
-  equivalent
-    (forall i0:index, i<>i0),
-    True.
-  admit.
+     using an incorrect formula that we admit. *)
+  assert (forall i0:index, i<>i0) by admit.
   nosimpl(yesif 1).
-  true.
+  assumption.
   refl.
 Qed.
 
@@ -28,12 +25,9 @@ equiv empty (i:index) : n(i), diff(n(i),m(i)).
 Proof.
   fresh 1.
   (* Check that the right formula has been produced,
-     using an incorrect equivalence that we admit. *)
-  equivalent
-    (i<>i),
-    True.
-  admit.
+     using an incorrect formula that we admit. *)
+  assert (i<>i) by admit.
   nosimpl(yesif 1).
-  true.
+  assumption.
   refl.
 Qed.

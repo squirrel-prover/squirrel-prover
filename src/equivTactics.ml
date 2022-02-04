@@ -36,7 +36,7 @@ let wrap_fail = EquivLT.wrap_fail
 (** {2 Logical Tactics} *)
 
 (** Build the sequent showing that a timestamp happens. *)
-let happens_premise (s : ES.t) (a : Term.timestamp) =
+let happens_premise (s : ES.t) (a : Term.term) =
   let s = ES.(to_trace_sequent (set_reach_goal (Term.mk_happens a) s)) in
   Goal.Trace s
 
@@ -46,12 +46,12 @@ exception NoReflMacros
 let check_no_macro_or_var t =
   let exception Failed in
 
-  let rec check (Term.ETerm t) =
+  let rec check t =
     match t with
     | Term.Var _ | Term.Macro _ -> raise Failed
     | _ -> Term.titer check t
   in
-  try check (Term.ETerm t); true with Failed -> false
+  try check t; true with Failed -> false
 
 (** Closes the goal if it is an equivalence
   * where the two frames are identical. *)
@@ -93,14 +93,12 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
       (EquivLT.hypothesis_case ~nb:`Any id s)
 
   | _ ->
-    match EquivLT.convert_args s args Args.(Sort ETerm) with
-    | Args.Arg (ETerm (ty, f, _)) ->
+    match EquivLT.convert_args s args Args.(Sort Term) with
+    | Args.Arg (Term (ty, f, _)) ->
       begin
-        match Type.kind ty with
-        | Type.KTimestamp -> EquivLT.timestamp_case f s
-
-        | Type.KMessage -> bad_args ()
-        | Type.KIndex -> bad_args ()
+        match ty with
+        | Type.Timestamp -> EquivLT.timestamp_case f s
+        | _ -> bad_args ()
       end
     | _ -> bad_args ()
 
@@ -194,9 +192,9 @@ let simpl_ident : LowTactics.f_simpl = fun ~strong ~close s sk fk ->
 (** [generalize ts s] reverts all hypotheses that talk about [ts] in [s],
     by introducing them in the goal.
     Also returns a function that introduces back the generalized hypothesis.*)
-let generalize (ts : Term.timestamp) s =
+let generalize (ts : Term.term) s =
   let ts = match ts with
-    | Var t -> Vars.EVar t
+    | Var t -> t
     | _ -> hard_failure (Failure "timestamp is not a var") in
 
   let gen_hyps = Hyps.fold (fun id f gen_hyps ->
@@ -230,15 +228,15 @@ let generalize (ts : Term.timestamp) s =
     The second one is then direclty simplified by a case on all possible
     values of τ, producing a judgement for each one.
     Generalizes Γ ⊢ E over τ if necessary. *)
-let induction Args.(Timestamp ts) s =
-  let env = ES.env s in
+let induction Args.(Message (ts,_)) s =
+  let env = ES.vars s in
   match ts with
   | Var t as ts ->
     (* Generalizes over [ts]. *)
     let intro_back, s = generalize ts s in
 
     (* Remove ts from the sequent, as it will become unused. *)
-    let s = ES.set_env (Vars.rm_var env t) s in
+    let s = ES.set_vars (Vars.rm_var env t) s in
     let table  = ES.table s in
     let system = ES.system s in
     let subst = [Term.ESubst (ts, Term.mk_pred ts)] in
@@ -262,7 +260,7 @@ let induction Args.(Timestamp ts) s =
       then ()
       else
         begin
-          let env = ref @@ ES.env induc_s in
+          let env = ref @@ ES.vars induc_s in
           let subst =
             List.map
               (fun i ->
@@ -276,7 +274,7 @@ let induction Args.(Timestamp ts) s =
           in
           let ts_subst = [Term.ESubst(ts,name)] in
           goals := (ES.subst ts_subst induc_s
-                    |> ES.set_env !env)
+                    |> ES.set_vars !env)
                    ::!goals
         end
     in
@@ -298,27 +296,21 @@ let old_or_new_induction args =
   else
     (fun s sk fk ->
        match EquivLT.convert_args s args (Args.Sort Args.Timestamp) with
-       | Args.Arg (Args.Timestamp ts) ->
-         let ss = induction (Args.Timestamp ts) s in
+       | Args.Arg (Args.Message (ts,ty)) ->
+         let ss = induction (Args.Message (ts,ty)) s in
          sk ss fk
        | _ -> hard_failure (Failure "ill-formed arguments")
     )
 
 (*------------------------------------------------------------------*)
-let enrich (arg : Theory.eterm Args.arg) (s : ES.t) =
-  match arg with
-  | Args.ETerm (ty, f, loc) ->
-    let elem : Term.message =
-      match Type.equalk_w (Term.kind f) Type.KMessage with
-      | Some Type.Type_eq -> f
-      | None -> hard_failure (Tactics.Failure "expected a message")
-    in
-    ES.set_equiv_goal (elem :: ES.goal_as_equiv s) s
+let enrich ty f l (s : ES.t) =
+  ES.set_equiv_goal (f :: ES.goal_as_equiv s) s
 
 let enrich_a arg s =
-  let tbl, env = ES.table s, ES.env s in
-  match Args.convert_args (ES.system s) tbl (ES.ty_vars s) env [arg] Args.(Sort ETerm) (`Equiv (ES.goal s)) with
-  | Args.Arg (ETerm _ as arg) -> enrich arg s
+  match 
+    Args.convert_args (ES.env s) [arg] Args.(Sort Term) (`Equiv (ES.goal s)) 
+  with
+  | Args.Arg (Term (ty, t, l)) -> enrich ty t l s
   | _ -> bad_args ()
 
 let enrichs args s =
@@ -351,18 +343,10 @@ exception No_common_head
 exception No_FA
 
 let fa_expand t =
-  let aux : type a. a Term.term -> Equiv.equiv = function
-    (* FIXME: this should be subsumed by reduce *)
-    | Fun (f,_,[c;t;e]) when f = Term.f_ite && t = e ->
-      [ t ]
-
+  let aux : Term.term -> Equiv.equiv = function
     | Fun (f,_,l) -> l
-
-    | Atom (`Message (_,f,g)) ->
-      [ f ; g ]
-
-    | Diff _ -> raise No_common_head
-    | _ -> raise No_FA
+    | Diff _      -> raise No_common_head
+    | _           -> raise No_FA
   in
 
   (* FIXME: this may no longer be necessary (type changes) *)
@@ -382,20 +366,20 @@ let fa i s =
     (* Special case for try find, otherwise we use fa_expand *)
     match e with
     | Find (vars,c,t,e) ->
-      let env = ref (ES.env s) in
+      let env = ref (ES.vars s) in
       let vars' = List.map (Vars.fresh_r env) vars in
       let subst =
         List.map2
           (fun i i' -> Term.ESubst (Term.mk_var i, Term.mk_var i'))
           vars vars'
       in
-      let c' = Term.mk_seq0 (List.map Vars.evar vars) c in
+      let c' = Term.mk_seq0 vars c in
       let t' = Term.subst subst t in
       let biframe =
         List.rev_append before
           ([ c' ; t' ; e ] @ after)
       in
-      [ ES.set_env !env (ES.set_equiv_goal biframe s) ]
+      [ ES.set_vars !env (ES.set_equiv_goal biframe s) ]
 
     | Seq(vars,t) ->
       let terms = fa_expand t in
@@ -477,25 +461,27 @@ exception Not_FADUP_iter
 
 class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
 
-  inherit [Term.timestamp list] Iter.fold ~cntxt as super
+  inherit [Term.term list] Iter.fold ~cntxt as super
 
   method check_formula f = ignore (self#fold_message [Term.mk_pred tau] f)
-
+ 
   method extract_ts_atoms phi =
-    List.partition
-      (function Term.Atom (`Timestamp _) -> true | _ -> false)
-      (Term.decompose_ands phi)
+    List.partition (fun t ->
+        match Term.form_to_xatom t with
+        | Some at when Term.ty_xatom at = Type.Timestamp -> true
+        | _ -> false
+      ) (Term.decompose_ands phi)
 
   method add_atoms atoms timestamps =
-    List.fold_left
-      (fun acc at -> match at with
-        | Term.Atom (`Timestamp (`Leq,tau_1,tau_2)) ->
+    List.fold_left (fun acc at -> 
+        match Term.form_to_xatom at with
+        | Some (`Comp (`Leq,tau_1,tau_2)) ->
           if List.mem tau_2 acc
-          then tau_1::acc
+          then tau_1 :: acc
           else acc
-        | Atom (`Timestamp (`Lt,tau_1,tau_2)) ->
+        | Some (`Comp (`Lt,tau_1,tau_2)) ->
           if (List.mem (Term.mk_pred tau_2) acc || List.mem tau_2 acc)
-          then tau_1::acc
+          then tau_1 :: acc
           else acc
         | _ -> raise Not_FADUP_iter)
       timestamps
@@ -511,8 +497,10 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
       when f = Term.f_ite && ms = Term.exec_macro && List.mem a timestamps
            && Term.Smart.is_zero else_branch ->
       self#fold_message timestamps then_branch
-    (* Remark: the condition that the else_branch is zero is for the post-quantum condition.
-       It could probably be removed if needed, cf the issue of the CS rule in the PQ paper.*)
+    (* Remark: the condition that the else_branch is zero is for the
+       post-quantum condition.
+       It could probably be removed if
+       needed, cf the issue of the CS rule in the PQ paper.*)
     | Fun (f, _, [phi_1;phi_2]) when f = Term.f_impl ->
       let atoms,l = self#extract_ts_atoms phi_1 in
       let ts' = self#add_atoms atoms timestamps in
@@ -529,14 +517,16 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
         l ;
       timestamps
 
-    | Atom (`Index _) | Atom (`Timestamp _) -> timestamps
+    | Fun (f, _, [t1;_]) when
+        (f = Term.f_lt || f = Term.f_leq || f = Term.f_geq || f = Term.f_gt)
+        && (Term.ty t1 = Type.Index || Term.ty t1 = Type.Timestamp) ->
+      timestamps
 
     | Fun _ | Seq _ | Find _
-    | Atom (`Message _)
     | ForAll _ | Exists _ -> super#fold_message timestamps t
 
-    | Macro _ | Name _ | Var _ | Diff _
-    | Atom (`Happens _) -> raise Not_FADUP_iter
+    | Action _
+    | Macro _ | Name _ | Var _ | Diff _ -> raise Not_FADUP_iter
 end
 
 let fa_dup_int (i : int L.located) s =
@@ -551,7 +541,7 @@ let fa_dup_int (i : int L.located) s =
         | Term.Fun (fs,_, [f;g]) when fs = Term.f_and -> f,g
 
         | Term.Seq (vars, Term.Fun (fs,_, [f;g])) when fs = Term.f_and ->
-          let _, subst = Term.erefresh_vars `Global vars in
+          let _, subst = Term.refresh_vars `Global vars in
           Term.subst subst f,
           Term.subst subst g
 
@@ -559,10 +549,14 @@ let fa_dup_int (i : int L.located) s =
       in
 
       match f,g with
-      | (Term.Macro (fm,[], Term.Pred tau), phi) when fm = Term.exec_macro
-        -> (tau,phi)
-      | (phi, Term.Macro (fm,[], Term.Pred tau)) when fm = Term.exec_macro
-        -> (tau,phi)
+      | (Term.Macro (fm,[], Fun (fs, _, [tau])), phi) 
+        when fm = Term.exec_macro && fs = Term.f_pred -> 
+        (tau,phi)
+
+      | (phi, Term.Macro (fm,[], Fun (fs, _, [tau]))) 
+        when fm = Term.exec_macro && fs = Term.f_pred -> 
+        (tau,phi)
+
       | _ -> raise Not_FADUP_formula
     in
 
@@ -616,10 +610,10 @@ let () =
 let fresh_mk_direct
     (env : Vars.env)
     (n : Term.nsymb)
-    (occ : Fresh.name_occ) : Term.message
+    (occ : Fresh.name_occ) : Term.term
   =
   let env = ref env in
-  let bv, subst = Term.erefresh_vars (`InEnv env) (Sv.elements occ.occ_vars) in
+  let bv, subst = Term.refresh_vars (`InEnv env) (Sv.elements occ.occ_vars) in
   let cond = Term.subst subst occ.occ_cond in
   let j = List.map (Term.subst_var subst) occ.occ_cnt in
   Term.mk_forall ~simpl:true bv
@@ -630,7 +624,7 @@ let fresh_mk_indirect
     (env : Vars.env)
     (n : Term.nsymb)
     (frame_actions : Fresh.ts_occs)
-    (occ : TraceTactics.fresh_occ) : Term.message
+    (occ : TraceTactics.fresh_occ) : Term.term
   =
   (* for each action [a] in which [name] occurs with indices from [occ] *)
   let bv = occ.Iter.occ_vars in
@@ -639,7 +633,7 @@ let fresh_mk_indirect
   assert (Sv.subset (Action.fv_action action) (Sv.union (Vars.to_set env) bv));
 
   let env = ref env in
-  let bv, subst = Term.erefresh_vars (`InEnv env) (Sv.elements bv) in
+  let bv, subst = Term.refresh_vars (`InEnv env) (Sv.elements bv) in
 
   (* apply [subst] to the action and to the list of
    * indices of our name's occurrences *)
@@ -668,7 +662,7 @@ let mk_phi_proj
     (env : Vars.env)
     (n : Term.nsymb)
     (proj : Term.projection)
-    (biframe : Term.message list) : Term.message list
+    (biframe : Term.term list) : Term.term list
   =
   let frame = List.map (Equiv.pi_term proj) biframe in
   try
@@ -709,7 +703,7 @@ let mk_phi_proj
     soft_failure
       (Failure "cannot apply fresh: the formula contains a term variable")
 
-let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe : Term.message =
+let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe : Term.term =
   let n_left, n_right =
     match Term.pi_term ~projection:PLeft t, Term.pi_term ~projection:PRight t with
     | (Name nl, Name nr) -> nl, nr
@@ -748,9 +742,9 @@ let fresh i s =
   let biframe = List.rev_append before after in
   (* expand the biframe to improve precision when computing the freshness
      condition *)
-  let biframe_exp = List.map (fun t -> EquivLT.expand_all_term t s) biframe in
+  let biframe_exp = List.map (fun t -> EquivLT.expand_all_macros t s) biframe in
   let cntxt   = ES.mk_trace_cntxt s in
-  let env     = ES.env s in
+  let env     = ES.vars s in
   try
     let if_term = fresh_mk_if_term cntxt env e biframe_exp in
     let biframe = List.rev_append before (if_term :: after) in
@@ -768,13 +762,11 @@ let fresh_tac args = match args with
 (*------------------------------------------------------------------*)
 (** Sequence expansion of the sequence [term] for the given parameters [ths]. *)
 let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
-  let env = ES.env s in
-  let table = ES.table s in
-  match EquivLT.convert_i s term with
+  match EquivLT.convert s term with
   (* we expect term to be a sequence *)
   | (Seq (vs, t) as term_seq), ty ->
     (* we parse the arguments ths, to create a substution for variables vs *)
-    let subst = Theory.parse_subst table (ES.ty_vars s) env vs ths in
+    let subst = Theory.parse_subst (ES.env s) vs ths in
 
     (* new_t is the term of the sequence instantiated with the subst *)
     let new_t = Term.subst subst t in
@@ -876,15 +868,13 @@ let equiv_message m1 m2 (s : ES.t) =
 let equivalent arg s = match arg with
   | Args.Pair (t1,t2) ->
     match t1, t2 with
-    | Args.ETerm (ty1, f1, _), Args.ETerm (ty2, f2, _) ->
-      match Type.kind ty1, Type.kind ty2 with
-      | Type.KMessage, Type.KMessage when ty1 = ty2 ->
+    | Args.Term (ty1, f1, _), Args.Term (ty2, f2, _) ->
+      if ty1 = ty2 then
         (* TODO: subtypes: unify ty1 and ty2 *)
         if ty1 = Type.Boolean
         then equiv_formula f1 f2 s
         else equiv_message f1 f2 s
-
-      | _ ->
+      else
         hard_failure
           (Tactics.Failure ("expected a pair of messages of the same types"))
 
@@ -898,7 +888,7 @@ let () = T.register_typed "equivalent"
     ~usages_sorts:[Args.(Sort (Pair (Message, Message)));
                    Args.(Sort (Pair (Boolean, Boolean)))]
     (LowTactics.genfun_of_efun_arg equivalent)
-    Args.(Pair (ETerm, ETerm))
+    Args.(Pair (Term, Term))
 
 
 (*------------------------------------------------------------------*)
@@ -1012,7 +1002,7 @@ let push_formula (j: 'a option) f term =
 
   | _ -> mk_ite term
 
-let ifcond Args.(Pair (Int i, Pair (Opt (Int, j), Boolean f))) s =
+let ifcond Args.(Pair (Int i, Pair (Opt (Int, j), Message (f,_)))) s =
   let before, e, after = split_equiv_goal i s in
 
   let cond, positive_branch, negative_branch =
@@ -1216,12 +1206,18 @@ let tac_autosimpl s = tac_auto ~close:false ~strong:false s
 
 (** Application of PRF tactic on biframe element number i,
   * optionally specifying which subterm m1 should be considered. *)
-let prf Args.(Pair (Int i, Opt (Message, m1))) s =
+let prf arg s =
+  let i, m1 =
+    match arg with
+    | Args.(Pair (Int i, Opt (Message, m1))) ->
+      i, m1
+    | _ -> assert false
+  in
   let before, e, after = split_equiv_goal i s in
 
   let biframe = List.rev_append before after in
   let cntxt = ES.mk_trace_cntxt s in
-  let env = ES.env s in
+  let env = ES.vars s in
 
   let e = Term.head_normal_biterm e in
   (* search for the first occurrence of a hash in [e] *)
@@ -1292,7 +1288,7 @@ let prf Args.(Pair (Int i, Opt (Message, m1))) s =
 
   let final_if_formula =
     if Term.is_false oracle_formula then formula else
-      let (Vars.EVar uvarm),(Vars.EVar uvarkey),f =
+      let uvarm, uvarkey, f =
         match oracle_formula with
         | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
         | _ -> assert false
@@ -1338,34 +1334,42 @@ let global_diff_eq (s : ES.t) =
                             (Iter.get_diff ~cntxt (Term.simple_bi_term t)))
                         @ !ocs in
   List.iter (iter [] []) frame;
+
   SystemExpr.iter_descrs cntxt.table cntxt.system (
     fun action_descr ->
-      let miter =   iter [action_descr.Action.name]  action_descr.Action.indices in
+      let miter = iter [action_descr.Action.name]  action_descr.Action.indices in
      miter (snd action_descr.Action.output) ;
      miter (snd action_descr.Action.condition) ;
      List.iter (fun (_,m) -> miter m) action_descr.Action.updates) ;
+
   List.map (fun (vs,is,t) -> match t.Iter.occ_cnt with
-      | Term.ETerm (Diff(s1,s2) as subt)->
+      | (Term.Diff(s1,s2) as subt)->
         let fvars =  Vars.Sv.elements (Vars.Sv.union t.Iter.occ_vars (Term.fv subt)) in
         let pred_ts_list =
           let iter = new Fresh.get_actions ~cntxt in
-          match Term.kind subt with
-          | Type.KMessage ->
+          match Term.ty subt with
+          | Type.Index -> []
+          | Type.Timestamp -> (iter#visit_message t.Iter.occ_cond;
+                                s1 :: s2 :: iter#get_actions)
+          | _ ->
             (iter#visit_message subt;
              iter#visit_message t.Iter.occ_cond;
              iter#get_actions)
-          | Type.KTimestamp -> (iter#visit_message t.Iter.occ_cond;
-                                s1 :: s2 :: iter#get_actions)
-          | _ -> []
         in
         (* Remark that the get_actions add pred to all timestamps, to simplify. *)
         let ts_list = (List.map (fun v -> Term.mk_action v is) vs)
-                      @ List.map
-                        (function Term.Pred (x) -> x | t -> t) pred_ts_list in
-        let s1,s2 = Term.cast Type.KMessage s1, Term.cast Type.KMessage s2
+                      @ List.map (function
+                          | Term.Fun (fs, _, [tau]) when fs = Term.f_pred -> tau
+                          | t -> t
+                        ) pred_ts_list in
+        let s1 = 
+          Term.pi_term ~projection:PLeft 
+            (EquivLT.expand_all_macros ~force_happens:true s1 s) 
         in
-        let s1 = Term.pi_term ~projection:PLeft  @@ EquivLT.expand_all_term ~force_happens:true s1 s in
-        let s2 = Term.pi_term ~projection:PRight @@ EquivLT.expand_all_term ~force_happens:true s2 s in
+        let s2 = 
+          Term.pi_term ~projection:PRight 
+            (EquivLT.expand_all_macros ~force_happens:true s2 s)
+        in
         Goal.Trace ES.(to_trace_sequent
                          (set_reach_goal
                             Term.(
@@ -1405,7 +1409,7 @@ let split_seq (li : int L.located) ht s : ES.sequent =
 
   (* check that types are compatible *)
   let seq_hty =
-    Type.Lambda (List.map (fun v -> Vars.ety v) is, Type.Boolean)
+    Type.Lambda (List.map Vars.ty is, Type.Boolean)
   in
 
   let hty, ht = EquivLT.convert_ht s ht in
@@ -1413,12 +1417,10 @@ let split_seq (li : int L.located) ht s : ES.sequent =
   EquivLT.check_hty_eq hty seq_hty;
 
   (* compute the new sequent *)
-  let is, subst = Term.erefresh_vars `Global is in
+  let is, subst = Term.refresh_vars `Global is in
   let ti = Term.subst subst ti in
 
-  let is_terms =
-    List.map (fun (Vars.EVar v) -> Term.ETerm (Term.mk_var v)) is
-  in
+  let is_terms = List.map Term.mk_var is in
 
   let cond =
     match Term.apply_ht ht is_terms with
@@ -1436,7 +1438,7 @@ let split_seq (li : int L.located) ht s : ES.sequent =
   let ti_t = Term.mk_ite cond               ti else_branch in
   let ti_f = Term.mk_ite (Term.mk_not cond) ti else_branch in
 
-  let env = ES.env s in
+  let env = ES.vars s in
   let frame = List.rev_append before ([Term.mk_seq env is ti_t;
                                        Term.mk_seq env is ti_f] @ after) in
   ES.set_equiv_goal frame s
@@ -1471,8 +1473,8 @@ let mem_seq (i_l : int L.located) (j_l : int L.located) s : Goal.t list =
   EquivLT.check_ty_eq (Term.ty t) (Term.ty seq_term);
 
   (* refresh the sequence *)
-  let env = ref (ES.env s) in
-  let seq_vars, subst = Term.erefresh_vars (`InEnv env) seq_vars in
+  let env = ref (ES.vars s) in
+  let seq_vars, subst = Term.refresh_vars (`InEnv env) seq_vars in
   let seq_term = Term.subst subst seq_term in
 
   let subgoal =
@@ -1520,12 +1522,12 @@ let const_seq
   let b_t_terms =
     List.map (fun (p_bool, p_term) ->
         let b_ty,  t_bool = EquivLT.convert_ht s p_bool in
-        let term, term_ty = EquivLT.convert_i s p_term in
+        let term, term_ty = EquivLT.convert s p_term in
         let p_bool_loc = L.loc p_bool in
 
         (* check that types are compatible *)
         let seq_hty =
-          Type.Lambda (List.map (fun v -> Vars.ety v) e_is, Type.Boolean)
+          Type.Lambda (List.map Vars.ty e_is, Type.Boolean)
         in
         EquivLT.check_hty_eq ~loc:p_bool_loc b_ty seq_hty;
 
@@ -1543,15 +1545,13 @@ let const_seq
   in
 
   (* refresh variables *)
-  let env = ref (ES.env s) in
-  let e_is, subst = Term.erefresh_vars (`InEnv env) e_is in
+  let env = ref (ES.vars s) in
+  let e_is, subst = Term.refresh_vars (`InEnv env) e_is in
   let e_ti = Term.subst subst e_ti in
 
   (* instantiate all boolean [hterms] in [b_t_terms] using [e_is] *)
-  let e_is_terms =
-    List.map (fun (Vars.EVar v) -> Term.ETerm (Term.mk_var v)) e_is
-  in
-  let b_t_terms : (Term.message * Term.message) list =
+  let e_is_terms = List.map Term.mk_var e_is in
+  let b_t_terms : (Term.term * Term.term) list =
     List.map (fun (t_bool, term) ->
         let t_bool =
           match Term.apply_ht t_bool e_is_terms with
@@ -1613,7 +1613,7 @@ let cca1 Args.(Int i) s =
   let biframe = List.rev_append before after in
   let cntxt = ES.mk_trace_cntxt s in
   let table = cntxt.table in
-  let env = ES.env s in
+  let env = ES.vars s in
 
   let e = Term.head_normal_biterm e in
 
@@ -1795,15 +1795,19 @@ let () =
 (*------------------------------------------------------------------*)
 (** Encryption key privacy  *)
 
-let enckp
-  Args.(Pair (Int i, Pair (Opt (Message, m1), Opt (Message, m2))))
-  s =
+let enckp arg (s : ES.t) =
+  let i, m1, m2 =
+    match arg with
+    | Args.(Pair (Int i, Pair (Opt (Message, m1), Opt (Message, m2)))) ->
+      i, m1, m2
+    | _ -> assert false
+  in
   let before, e, after = split_equiv_goal i s in
 
   let biframe = List.rev_append before after in
   let cntxt = ES.mk_trace_cntxt s in
   let table = cntxt.table in
-  let env = ES.env s in
+  let env = ES.vars s in
 
   (* Apply tactic to replace key(s) in [enc] using [new_key].
    * Precondition:
@@ -1811,13 +1815,13 @@ let enckp
    * Verify that the encryption primitive is used correctly,
    * that the randomness is fresh and that the keys satisfy their SSC. *)
   let apply
-      ~(enc     : Term.message)
-      ~(new_key : Term.message option)
+      ~(enc     : Term.term)
+      ~(new_key : Term.term option)
       ~(fnenc   : Term.fname)
       ~(indices : 'a)
       ~(m       : 'b)
       ~(r       : Term.nsymb)
-      ~(k       : Term.message)
+      ~(k       : Term.term)
     : Goal.t list =
 
     let k = Term.head_normal_biterm k in
@@ -2031,7 +2035,14 @@ let is_name_diff mess_name =
   | Name nl, Name nr -> true
   | _ -> false
 
-let xor Args.(Pair (Int i, Pair (Opt (Message, m1), Opt (Message, m2)))) s =
+
+let xor arg s =
+  let i, m1, m2 =
+    match arg with
+    | Args.(Pair (Int i, Pair (Opt (Message, m1), Opt (Message, m2)))) -> 
+      i, m1, m2
+    | _ -> assert false
+  in
   (* We allow the optional arguments to be in any order, we just match them
      however we can. *)
   let opt_m, opt_n =  match m1, m2 with
@@ -2047,16 +2058,16 @@ let xor Args.(Pair (Int i, Pair (Opt (Message, m1), Opt (Message, m2)))) s =
     | Some Message (t1, _), Some Message (t2, _)
       when is_name_diff t2 && is_xored_diff t1 -> Some t1, Some t2
     | _ ->       soft_failure
-        (Tactics.Failure
-           "The optional arguments of xor can only be a name and/or the target \
-            xored term.")
+                   (Tactics.Failure
+                      "The optional arguments of xor can only be a name and/or \
+                       the target xored term.")
   in
   let before, e, after = split_equiv_goal i s in
 
   (* the biframe to consider when checking the freshness *)
   let biframe = List.rev_append before after in
   let cntxt = ES.mk_trace_cntxt s in
-  let env = ES.env s in
+  let env = ES.vars s in
 
   let xor_occ =
     match (Iter.get_fsymb ~allow_diff:true (ES.table s) Term.f_xor e), opt_m with

@@ -76,6 +76,7 @@ type function_def =
   | CheckSign
   | PublicKey
   | Abstract of symb_type
+  | Operator                    (* definition in associated data *)
 
 (** Indicates if a function symbol has been defined with
   * the specified definition. *)
@@ -91,16 +92,16 @@ type bty_def = bty_info list
 (*------------------------------------------------------------------*)
 type name_def = { 
   n_iarr : int;                  (* index arity *)
-  n_ty   : Type.message Type.ty; (* type *)
+  n_ty   : Type.ty; (* type *)
 }
 
 (*------------------------------------------------------------------*)
 type macro_def =
   | Input | Output | Cond | Exec | Frame
-  | State of int * Type.tmessage
+  | State of int * Type.ty
     (** Macro that expands to the content of a state at a given
       * timestamp. *)
-  | Global of int * Type.tmessage
+  | Global of int * Type.ty
     (** Global macros are used to encapsulate let-definitions.
       * They are indexed. *)
 
@@ -196,11 +197,14 @@ module type Namespace = sig
   val declare_exact :
     table -> lsymb -> ?data:data -> def -> table * ns t
 
+  (** [mem s table] checks if [s] exists in this namespace. *)
+  val mem : lsymb -> table -> bool
+
   (** [of_lsymb s] returns [s] as a symbol, if it exists in this namespace.
     * @raise Unbound_identifier otherwise. *)
   val of_lsymb : lsymb -> table -> ns t
 
-  (** [of_lsymb s] returns [Some s] as a symbol, if it exists in this
+  (** [of_lsymb_opt s] returns [Some s] as a symbol, if it exists in this
       namespace, and None otherwise. *)
   val of_lsymb_opt : lsymb -> table -> ns t option
 
@@ -260,8 +264,8 @@ exception SymbError of symb_err
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)
 
-val get_bty_info   : table -> Type.tmessage -> bty_info list
-val check_bty_info : table -> Type.tmessage -> bty_info -> bool
+val get_bty_info   : table -> Type.ty -> bty_info list
+val check_bty_info : table -> Type.ty -> bty_info -> bool
 
 val is_infix     : fname t -> bool 
 val is_infix_str : string  -> bool 
@@ -282,6 +286,7 @@ val ftype : table -> fname t -> Type.ftype
 
 val init_action : action t
 
+(*------------------------------------------------------------------*)
 (** {3 Macro builtins} *)
 
 val inp   : macro t
@@ -290,14 +295,24 @@ val cond  : macro t
 val exec  : macro t
 val frame : macro t
 
+(*------------------------------------------------------------------*)
 (** {3 Channel builtins} *)
 
 val dummy_channel_lsymb : lsymb
 val dummy_channel : channel t
 
+(*------------------------------------------------------------------*)
 (** {3 Function symbols builtins} *)
 
-val fs_diff   : fname t
+val fs_diff : fname t
+
+(** Happens *)
+
+val fs_happens : fname t
+
+(** Pred *)
+
+val fs_pred : fname t
 
 (** Boolean connectives *)
 
@@ -308,6 +323,14 @@ val fs_or     : fname t
 val fs_impl   : fname t
 val fs_not    : fname t
 val fs_ite    : fname t
+
+(** Comparison *)
+val fs_eq  : fname t
+val fs_neq : fname t
+val fs_leq : fname t
+val fs_lt  : fname t
+val fs_geq : fname t
+val fs_gt  : fname t
 
 (** Witness *)
 

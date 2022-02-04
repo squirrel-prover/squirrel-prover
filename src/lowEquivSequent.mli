@@ -17,11 +17,8 @@ include LowSequent.S with
   * For more general cases, the global meta-formula used as conclusion
   * can include implications. *)
 val init : 
-  system:SystemExpr.t ->
-  table:Symbols.table ->
+  env:Env.t->
   hint_db:Hint.hint_db ->
-  ty_vars:Type.tvars ->
-  env:Vars.env ->
   ?hyp:Equiv.form ->
   Equiv.form ->
   t
@@ -51,7 +48,7 @@ val goal_as_equiv : t -> Equiv.equiv
 (** {2 Trace sequents and reachability goals} *)
 
 (** Change sequent goal to some reachability atom. *)
-val set_reach_goal : Term.message -> t -> t
+val set_reach_goal : Term.term -> t -> t
 
 (** Convert a global sequent whose conclusion is a reachability
   * atom to a trace sequent.
@@ -61,4 +58,4 @@ val to_trace_sequent : t -> LowTraceSequent.t
 (*------------------------------------------------------------------*)
 (** {2 Automated reasoning} *)
 
-val query_happens : precise:bool -> t -> Term.timestamp -> bool
+val query_happens : precise:bool -> t -> Term.term -> bool

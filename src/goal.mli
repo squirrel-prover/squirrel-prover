@@ -10,7 +10,7 @@ type t = Trace of TS.t | Equiv of ES.t
 val pp : Format.formatter -> t -> unit
 val pp_init : Format.formatter -> t -> unit
 
-val get_env : t -> Vars.env
+val vars : t -> Vars.env
 
 (*------------------------------------------------------------------*)
 val map      : (TS.t -> TS.t)      -> (ES.t -> ES.t)      -> t -> t
@@ -34,7 +34,7 @@ type ('a,'b) abstract_statement = {
 (*------------------------------------------------------------------*)
 type       statement = (string,  Equiv.gform) abstract_statement
 type equiv_statement = (string,   Equiv.form) abstract_statement
-type reach_statement = (string, Term.message) abstract_statement
+type reach_statement = (string, Term.term) abstract_statement
 
 (*------------------------------------------------------------------*)
 val is_reach_statement : statement -> bool
@@ -57,7 +57,7 @@ module Parsed : sig
     name    : Theory.lsymb option;
     ty_vars : Theory.lsymb list;
     vars    : Theory.bnds;
-    system  : SystemExpr.parsed;
+    system  : SystemExpr.p_system_expr;
     formula : contents
   }
 
@@ -67,9 +67,9 @@ end
 (** {2 Create trace and equivalence goals} *)
 
 val make_obs_equiv :
-  ?enrich:Term.message list ->
+  ?enrich:Term.term list ->
   Symbols.table ->
-Hint.hint_db -> 'a -> SystemExpr.t -> [> `Equiv of Equiv.form ] * t
+  Hint.hint_db -> 'a -> SystemExpr.t -> [> `Equiv of Equiv.form ] * t
 
 
 val make :

@@ -67,6 +67,7 @@ is proved on the ideal system. The reach equiv
 tactic allows one to combine these two steps, and to conclude.
 *******************************************************************************)
 set autoIntro=false.
+set timeout=6.
 
 (* AEAD symmetric encryption scheme: IND-CCA + INT-CTXT *)
 senc enc,dec
@@ -624,16 +625,16 @@ Qed.
 
 
 axiom sctr_nhap (i : index, t' : timestamp) : 
-   not happens(t') => SCtr(i)@t' = empty.
+   not (happens(t')) => SCtr(i)@t' = empty.
 
 axiom yctr_nhap (i : index, t' : timestamp) : 
-   not happens(t') => YCtr(i)@t' = empty.
+   not (happens(t')) => YCtr(i)@t' = empty.
 
 (* default value of `exec` at timestamp not in the trace. Left arbitrary. *)
 abstract exec_dflt : boolean.
 
 axiom exec_nhap (t' : timestamp) : 
-   not happens(t') => exec@t' = exec_dflt.
+   not (happens(t')) => exec@t' = exec_dflt.
 
 global goal equiv_real_ideal_enrich_tmax :
   exists (t : timestamp),
@@ -660,7 +661,7 @@ Proof.
 
   constseq 6 : 
     (fun (i : index, t' : timestamp) -> happens(t')) zero
-    (fun (i : index, t' : timestamp) -> not happens(t')) empty.
+    (fun (i : index, t' : timestamp) -> not (happens(t'))) empty.
     auto.
     split; intro i t' _. 
       by rewrite if_false.     
@@ -668,7 +669,7 @@ Proof.
 
   constseq 4 : 
     (fun (i : index, t' : timestamp) -> happens(t')) zero
-    (fun (i : index, t' : timestamp) -> not happens(t')) empty.
+    (fun (i : index, t' : timestamp) -> not (happens(t'))) empty.
     auto.
     split; intro i t' _. 
       by rewrite if_false.     
@@ -676,7 +677,7 @@ Proof.
 
   constseq 2 : 
     (fun (t' : timestamp) -> happens(t')) false
-    (fun (t' : timestamp) -> not happens(t')) exec_dflt.
+    (fun (t' : timestamp) -> not (happens(t'))) exec_dflt.
     auto.
     split; intro t' _. 
       by rewrite if_false.     

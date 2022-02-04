@@ -9,8 +9,8 @@
 type euf_schema = {
   action_name  : Symbols.action Symbols.t;
   action       : Action.action;
-  message      : Term.message;
-  key_indices  : Vars.index list;
+  message      : Term.term;
+  key_indices  : Vars.var list;
   env          : Vars.env 
 }
 
@@ -22,8 +22,8 @@ val pp_euf_schema : Format.formatter -> euf_schema -> unit
     [e] of type [euf_case] represents the fact that the message [e.m]
     has been hashed, and the key indices were [e.eindices]. *)
 type euf_direct = {
-  d_key_indices : Vars.index list;
-  d_message : Term.message 
+  d_key_indices : Vars.var list;
+  d_message : Term.term 
 }
 
 val pp_euf_direct : Format.formatter -> euf_direct -> unit
@@ -47,8 +47,7 @@ val pp_euf_rule : Format.formatter -> euf_rule -> unit
 the protocol and the messages. All occurences of the key must either be inside
 the hash function, or under some public key function.*)
 val key_ssc :
-  ?allow_vars : bool ->
-  ?messages:(Term.message list) -> ?elems:Equiv.equiv ->
+  ?messages:(Term.term list) -> ?elems:Equiv.equiv ->
   allow_functions:(Symbols.fname Symbols.t -> bool) ->
   cntxt:Constr.trace_cntxt ->
   Term.fname -> Term.name -> Tactics.ssc_error list
@@ -63,5 +62,5 @@ val mk_rule :
   fun_wrap_key:((Symbols.fname Symbols.t -> bool) option) ->
   allow_functions:(Symbols.fname Symbols.t -> bool) ->
   cntxt:Constr.trace_cntxt ->
-  env:Vars.env -> mess:Term.message -> sign:Term.message ->
-  head_fn:Term.fname -> key_n:Term.name -> key_is:Vars.index list -> euf_rule
+  env:Vars.env -> mess:Term.term -> sign:Term.term ->
+  head_fn:Term.fname -> key_n:Term.name -> key_is:Vars.var list -> euf_rule

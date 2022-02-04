@@ -10,7 +10,7 @@ name m:message
 system null.
 
 abstract ok : message.
-
+abstract ok2 : message.
 
 system [test] (A: out(c, <ok,<h(ok,k),h(ok,k)>>) | B: out(c, h(ok,k))).
 
@@ -83,7 +83,6 @@ system [testi2] (!_i A: out(c, <ok, idn(i)>) | !_i B: out(c,  idn(i))).
 (* we start with a first transitivity, from testi/left to testiPrf *)
 system testiPrf = [testi/left] with gprf (j:index), h(msg(j),key(j)).
 
-
 (* Then, second transitivity, from testiPrf to testiRenamed *)
 system testiRenamed = [testiPrf/left] with rename forall (i:index), equiv(diff(n_PRF1(i),idn(i))).
 (* equiv [testiPrf] t. Proof. print. admit. Qed *)
@@ -145,3 +144,4 @@ fa 2.
 auto.
 
 Qed.
+

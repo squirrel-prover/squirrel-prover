@@ -69,7 +69,7 @@ type option_name =
   | Oracle_for_symbol of string
 
 type option_val =
-  | Oracle_formula of Term.message
+  | Oracle_formula of Term.term
 
 type option_def = option_name * option_val
 
@@ -165,6 +165,8 @@ val is_equiv_assumption : string -> bool
 (*------------------------------------------------------------------*)
 (** {2 Utilities for parsing} *)
 
+type include_param = { th_name : lsymb; params : lsymb list }
+
 exception ParseError of string
 
 type parsed_input =
@@ -173,7 +175,7 @@ type parsed_input =
   | ParsedTactic     of TacticsArgs.parser_arg Tactics.ast
   | ParsedUndo       of int
   | ParsedGoal       of Goal.Parsed.t Location.located
-  | ParsedInclude    of lsymb
+  | ParsedInclude    of include_param
   | ParsedProof
   | ParsedQed
   | ParsedAbort
@@ -189,7 +191,7 @@ val declare_new_goal :
 
 (** From the name of the function, returns the corresponding formula. If no tag
    formula was defined, returns False. *)
-val get_oracle_tag_formula : string -> Term.message
+val get_oracle_tag_formula : string -> Term.term
 
 val pp_goal : Format.formatter -> unit -> unit
 
@@ -203,7 +205,7 @@ val complete_proof : unit -> unit
 val eval_tactic : TacticsArgs.parser_arg Tactics.ast -> bool
 
 (** Initialize the prover state try to prove the first of the unproved goal. *)
-val start_proof : unit -> string option
+val start_proof : [`NoCheck | `Check] -> string option
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
@@ -214,6 +216,7 @@ type decl_error_i =
   | InvalidCtySpace of string list
   | DuplicateCty of string
 
+  | NonDetOp
   | SystemError     of System.system_error
   | SystemExprError of SE.system_expr_err
 

@@ -1,3 +1,6 @@
+module L = Location
+
+(*------------------------------------------------------------------*)
 (** A single system, that is a system without diff, is given by the name of a
    (bi)system , and either Left or Right. *)
 type single_system =
@@ -18,9 +21,11 @@ type t = private
   | Single     of single_system
   | SimplePair of Symbols.system Symbols.t
   | Pair       of single_system * single_system
+  | Empty
 
 val hash : t -> int
 
+val empty       : t
 val single      : Symbols.table -> single_system -> t
 val simple_pair : Symbols.table -> Symbols.system Symbols.t -> t
 val pair        : Symbols.table -> single_system -> single_system -> t
@@ -42,8 +47,9 @@ type ssymb_pair = System.system_name *
                   System.system_name
 
 type system_expr_err =
-  | SE_NotABiProcess of System.system_name
+  | SE_NotABiProcess of System.system_name option
   | SE_NoneProject
+  | SE_InvalidAction of t * Action.shape
   | SE_IncompatibleAction   of ssymb_pair * string
   | SE_DifferentControlFlow of ssymb_pair
 
@@ -54,9 +60,9 @@ exception BiSystemError of system_expr_err
 (*------------------------------------------------------------------*)
 (** {2 Projection and action builder} *)
 
-(** Prject a system according to the given projection.  The pojection must not
-   be None, and the system must be a bi system, i.e either SimplePair or Pair.
-   *)
+(** Project a system according to the given projection. The pojection
+    must not be None, and the system must be a bi system, i.e either
+    SimplePair or Pair. *)
 val project : Term.projection -> t -> t
 
 (** Convert action to the corresponding [Action] timestamp term in
@@ -64,7 +70,7 @@ val project : Term.projection -> t -> t
     Remark that this requires both system to declare the action,
     with the same name. *)
 val action_to_term :
-  Symbols.table -> t -> Action.action -> Term.timestamp
+  Symbols.table -> t -> Action.action -> Term.term
 
 (*------------------------------------------------------------------*)
 (** {2 Action descriptions and iterators} *)
@@ -100,8 +106,8 @@ val map_descrs  : (Action.descr -> 'a)       -> Symbols.table -> t -> 'a list
 exception SystemNotFresh
 
 type esubst_descr =
-  | Condition of Term.message * Action.action
-  | Output of Term.message * Action.action
+  | Condition of Term.term * Action.action
+  | Output of Term.term * Action.action
 
 type subst_descr = esubst_descr list
 
@@ -127,12 +133,12 @@ type p_single_system =
   | P_Left  of lsymb
   | P_Right of lsymb
 
-type p_system_expr =
+type p_system_expr_i =
   | P_Single     of p_single_system
   | P_SimplePair of lsymb
   | P_Pair       of p_single_system * p_single_system
 
-type parsed = p_system_expr
+type p_system_expr = p_system_expr_i L.located 
 
 val parse_single : Symbols.table -> p_single_system -> single_system
 val parse_se     : Symbols.table -> p_system_expr   -> t

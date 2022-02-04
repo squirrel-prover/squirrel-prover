@@ -95,7 +95,7 @@ val pp_intro_pats : Format.formatter -> intro_pattern list -> unit
 (*------------------------------------------------------------------*)
 (** handler for intro pattern application *)
 type ip_handler = [
-  | `Var of Vars.evar (* Careful, the variable is not added to the env  *)
+  | `Var of Vars.var (* Careful, the variable is not added to the env  *)
   | `Hyp of Ident.t
 ]
 
@@ -110,7 +110,6 @@ type named_args = named_arg list
 (*------------------------------------------------------------------*)
 (** {2 Tactic arguments types} *)
 
-type boolean = [`Boolean]
 
 (** Types used during parsing.
     Note that all tactics not defined in the parser must rely on the Theory
@@ -139,12 +138,12 @@ type parser_args = parser_arg list
 type _ sort =
   | None      : unit sort
 
-  | Message   : Type.message   sort
-  | Boolean   :      boolean   sort
-  | Timestamp : Type.timestamp sort
-  | Index     : Type.index     sort
+  | Message   : Type.ty sort
+  | Boolean   : Type.ty sort
+  | Timestamp : Type.ty sort
+  | Index     : [`Index] sort
 
-  | ETerm     : Theory.eterm    sort
+  | Term      : [`Term] sort
   (** Boolean, timestamp or message *)
 
   | Int       : int L.located sort
@@ -152,17 +151,17 @@ type _ sort =
   | Pair      : ('a sort * 'b sort) -> ('a * 'b) sort
   | Opt       : 'a sort -> ('a option) sort
 
+(*------------------------------------------------------------------*)
+
 (** Tactic arguments *)
 type _ arg =
   | None      : unit arg
 
-  | Message   : Term.message * Type.tmessage -> Type.message arg
+  | Message   : Term.term * Type.ty -> Type.ty arg
 
-  | Boolean   : Term.message   ->      boolean   arg
-  | Timestamp : Term.timestamp -> Type.timestamp arg
-  | Index     : Vars.index     -> Type.index     arg
+  | Index     : Vars.var -> [`Index] arg
 
-  | ETerm     : 'a Type.ty * 'a Term.term * Location.t -> Theory.eterm arg
+  | Term      : Type.ty * Term.term * Location.t -> [`Term] arg
   (** A [Term.term] with its sorts. *)
 
   | Int       : int L.located -> int L.located arg
@@ -174,8 +173,6 @@ type _ arg =
 val pp_parser_arg : Format.formatter -> parser_arg -> unit
 
 (*------------------------------------------------------------------*)
-val sort : 'a arg -> 'a sort
-
 type esort = Sort : ('a sort) -> esort
 
 type earg = Arg : ('a arg) -> earg
@@ -193,20 +190,4 @@ val pp_esort : Format.formatter -> esort -> unit
 
 val convert_as_lsymb : parser_arg list -> lsymb option
 
-val convert_args :
-  SystemExpr.t -> Symbols.table -> Type.tvars -> Vars.env ->
-  parser_arg list -> esort -> Equiv.any_form -> earg
-
-(*------------------------------------------------------------------*)
-(** {2 Error handling} *)
-
-type tac_arg_error_i =
-  | CannotConvETerm
-
-type tac_arg_error = Location.t * tac_arg_error_i
-
-exception TacArgError of tac_arg_error
-
-val pp_tac_arg_error :
-  (Format.formatter -> Location.t -> unit) ->
-  Format.formatter -> tac_arg_error -> unit
+val convert_args : Env.t -> parser_arg list -> esort -> Equiv.any_form -> earg

@@ -4,10 +4,17 @@ module SE   = SystemExpr
 module L    = Location
 
 let global_rename table sdecl gf =
-  let env,vars = Theory.convert_p_bnds table [] Vars.empty_env [] in
-  let conv_env = Theory.{ table; cntxt = InGoal } in
+  let old_system, old_single_system = 
+    match SE.parse_se table sdecl.Decl.from_sys with
+    | Single s as res -> res, s
+    | _ -> 
+      Tactics.soft_failure ~loc:(L.loc sdecl.Decl.from_sys)
+        (Failure "a single system must be provided")
+  in
+  let env = Env.init ~table ~system:old_system () in
+  let conv_env = Theory.{ env; cntxt = InGoal } in
 
-  let f = Theory.convert_global_formula conv_env [] env gf in
+  let f = Theory.convert_global_formula conv_env gf in
 
   let ns1, ns2, n1, n2 =
     match f with
@@ -19,10 +26,6 @@ let global_rename table sdecl gf =
         ->  ns1, ns2, Term.mk_name ns1, Term.mk_name ns2
     | _ -> assert false
 
-  in
-  let old_system, old_single_system = match SE.parse_se table sdecl.Decl.from_sys  with
-    | Single s as res -> res, s
-    | _ -> assert false
   in
 
   (* We check that n2 does not occur in the old system using fresh. *)
@@ -40,7 +43,7 @@ let global_rename table sdecl gf =
 
     (* We now build the rewrite rule *)
     let evars = Term.get_vars n1 in
-    let vs, subs = Term.erefresh_vars `Global evars in
+    let vs, subs = Term.refresh_vars `Global evars in
     let (n1', n2') = (Term.subst subs n1, Term.subst subs n2) in
     let rw_rule = Rewrite.{
         rw_tyvars = [];
@@ -51,7 +54,7 @@ let global_rename table sdecl gf =
     in
     let iterator cenv t =
       match
-        Rewrite.rewrite table old_system env `Once
+        Rewrite.rewrite table old_system env.vars `Once
           rw_rule (`Reach t)
       with
       | `Result (`Reach res, ls) -> res
@@ -88,7 +91,7 @@ let global_rename table sdecl gf =
       let fresh_x_var = Vars.make_new Type.Message "mess" in
       let enrich = [Term.mk_var fresh_x_var] in
       let make_conclusion equiv = `Equiv
-          Equiv.(Quant (ForAll, [EVar fresh_x_var],
+          Equiv.(Quant (ForAll, [fresh_x_var],
                         Impl(
                           Quant (ForAll, evars,
                                  Atom (
@@ -108,22 +111,24 @@ let global_rename table sdecl gf =
                              (Tactics.Failure "The name on the right-hand side already occurs in the left-hand side.")
 
 
-let global_prf table sdecl ty_vars hash =
-  let env,vars = Theory.convert_p_bnds table [] Vars.empty_env ty_vars in
-  let conv_env = Theory.{ table; cntxt = InGoal } in
-  let hash, _ = Theory.convert_i conv_env [] env hash in
-  let is =  (List.map (fun x -> Vars.ecast x Type.KIndex) vars) in
-
-
-  let env = ref env in
-  let old_system, old_single_system = match SE.parse_se table sdecl.Decl.from_sys  with
+let global_prf table sdecl bnds hash =
+  let old_system, old_single_system = 
+    match SE.parse_se table sdecl.Decl.from_sys with
     | Single s as res -> res, s
-    | _ -> assert false
+    | _ -> Tactics.soft_failure ~loc:(L.loc sdecl.Decl.from_sys)
+             (Failure "a single system must be provided")
   in
 
-  let cntxt = Constr.{table=table;
-                      system= old_system;
-                      models=None}
+  let env = Env.init ~table ~system:old_system () in
+  let env,is = Theory.convert_p_bnds env bnds in
+
+  let conv_env = Theory.{ env = env; cntxt = InGoal } in
+  let hash, _ = Theory.convert conv_env hash in
+
+  let cntxt = Constr.{
+      table  = table;
+      system = old_system;
+      models = None}
   in
 
   let param = Prf.prf_param hash in
@@ -166,15 +171,15 @@ let global_prf table sdecl ty_vars hash =
   in
   let rw_rule = Rewrite.{
     rw_tyvars = [];
-    rw_vars = Vars.Sv.of_list ((Vars.evar fresh_x_var)::(List.map Vars.evar is1));
-    rw_conds = [];
-    rw_rw = Term.ESubst (hash_pattern, mk_tryfind);
+    rw_vars   = Vars.Sv.of_list (fresh_x_var :: is1);
+    rw_conds  = [];
+    rw_rw     = Term.ESubst (hash_pattern, mk_tryfind);
   }
   in
 
   let iterator _ t =
     match
-      Rewrite.rewrite table old_system (!env) `Once
+      Rewrite.rewrite table old_system env.vars `Once
         rw_rule (`Reach t)
     with
     | `Result (`Reach res, ls) -> res
@@ -211,9 +216,9 @@ let global_prf table sdecl ty_vars hash =
       let fresh_x_var = Vars.make_new Type.Message "mess" in
       let enrich = [Term.mk_var fresh_x_var] in
       let make_conclusion equiv = `Equiv
-          Equiv.(Quant (ForAll, [EVar fresh_x_var],
+          Equiv.(Quant (ForAll, [fresh_x_var],
                         Impl(
-                          Quant (ForAll, List.map (fun x -> Vars.EVar x) is,
+                          Quant (ForAll, is,
                                  Atom (
                                    Equiv [Term.mk_var fresh_x_var; Term.mk_diff
                                             (Term.mk_name param.h_key)
@@ -234,22 +239,23 @@ let global_prf table sdecl ty_vars hash =
 
 
 
-let global_cca table sdecl ty_vars enc =
-  let env,vars = Theory.convert_p_bnds table [] Vars.empty_env ty_vars in
-  let conv_env = Theory.{ table; cntxt = InGoal } in
-  let enc, _ = Theory.convert_i conv_env [] env enc in
-  let is =  (List.map (fun x -> Vars.ecast x Type.KIndex) vars) in
-
-
-  let env = ref env in
-  let old_system, old_single_system = match SE.parse_se table sdecl.Decl.from_sys  with
+let global_cca table sdecl bnds enc =
+  let old_system, old_single_system = 
+    match SE.parse_se table sdecl.Decl.from_sys with
     | Single s as res -> res, s
-    | _ -> assert false
+    | _ -> Tactics.soft_failure ~loc:(L.loc sdecl.Decl.from_sys)
+             (Failure "a single system must be provided")
   in
 
-  let cntxt = Constr.{table=table;
-                      system= old_system;
-                      models=None}
+  let env = Env.init ~table ~system:old_system () in
+  let env,is = Theory.convert_p_bnds env bnds in
+  let conv_env = Theory.{ env; cntxt = InGoal } in
+  let enc, _ = Theory.convert conv_env enc in
+
+  let cntxt = Constr.{
+      table  = table;
+      system = old_system;
+      models = None}
   in
 
   let enc_fn, enc_key, is_plaintext_name, plaintext, enc_pk, enc_rnd =
@@ -335,29 +341,28 @@ let global_cca table sdecl ty_vars enc =
 
   let enc_rw_rule = Rewrite.{
     rw_tyvars = [];
-    rw_vars = Vars.Sv.of_list (List.map Vars.evar is);
-    rw_conds = [];
-    rw_rw = Term.ESubst (enc, new_enc);
+    rw_vars   = Vars.Sv.of_list is;
+    rw_conds  = [];
+    rw_rw     = Term.ESubst (enc, new_enc);
   }
   in
   let dec_rw_rule = Rewrite.{
     rw_tyvars = [];
-    rw_vars = Vars.Sv.of_list ((Vars.evar fresh_x_var)
-                               ::(List.map Vars.evar is1));
-    rw_conds = [];
-    rw_rw = Term.ESubst (dec_pattern, tryfind_dec);
+    rw_vars   = Vars.Sv.of_list (fresh_x_var :: is1);
+    rw_conds  = [];
+    rw_rw     = Term.ESubst (dec_pattern, tryfind_dec);
   }
   in
 
   let iterator cenv t =
     match
-      Rewrite.rewrite table old_system (!env) `Once
+      Rewrite.rewrite table old_system env.vars `Once
         enc_rw_rule (`Reach t)
     with
     | `Result (`Reach res, ls) ->
       begin
         match
-          Rewrite.rewrite table old_system (!env) `Once
+          Rewrite.rewrite table old_system env.vars `Once
             dec_rw_rule (`Reach res)
         with
         | `Result (`Reach res2, ls) -> res2
@@ -366,7 +371,7 @@ let global_cca table sdecl ty_vars enc =
     | _ ->
       begin
         match
-          Rewrite.rewrite table old_system (!env) `Once
+          Rewrite.rewrite table old_system env.vars `Once
             dec_rw_rule (`Reach t)
         with
         | `Result (`Reach res2, ls) -> res2
@@ -409,9 +414,9 @@ let global_cca table sdecl ty_vars enc =
 
     let enrich = [Term.mk_var fresh_x_var] in
     let make_conclusion equiv = `Equiv
-        Equiv.(Quant (ForAll, [EVar fresh_x_var],
+        Equiv.(Quant (ForAll, [fresh_x_var],
                       Impl(
-                        Quant (ForAll, List.map (fun x -> Vars.EVar x) is,
+                        Quant (ForAll, is,
                                Atom (
                                  Equiv [Term.mk_var fresh_x_var;
                                         Term.mk_diff
@@ -438,5 +443,5 @@ let global_cca table sdecl ty_vars enc =
 let declare_system table sdecl =
    match sdecl.Decl.modifier with
      | Rename gf -> global_rename table sdecl gf
-     | PRF (ty_vars, hash) -> global_prf table sdecl ty_vars hash
-     | CCA (ty_vars, enc) -> global_cca table sdecl ty_vars enc
+     | PRF (bnds, hash) -> global_prf table sdecl bnds hash
+     | CCA (bnds, enc) -> global_cca table sdecl bnds enc
