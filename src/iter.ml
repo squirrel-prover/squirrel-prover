@@ -126,8 +126,7 @@ end
     and name [k]. We use the exact version of [iter_approx_macros], otherwise we
     might obtain meaningless terms provided by [get_dummy_definition].
     Patterns must be of the form [f(_,_,g(k(_)))] if allow_funs is defined
-    and [allows_funs g] returns true.
-*)
+    and [allows_funs g] returns true. *)
 class get_f_messages ?(drop_head=true)
     ?(fun_wrap_key=None)
     ~(cntxt:Constr.trace_cntxt) f k = object (self)
@@ -164,7 +163,7 @@ end
 (** {2 Occurrences} *)
 type 'a occ = {
   occ_cnt  : 'a;
-  occ_vars : Sv.t;      (** variables binded above the occurrence *)
+  occ_vars : Sv.t;      (** variables bound above the occurrence *)
   occ_cond : Term.term; (** conditions above the occurrence *)
 }
 
@@ -177,8 +176,8 @@ let pp_occ pp_cnt fmt occ =
 type 'a occs = 'a occ list
 
 (** Like [Term.tfold], but also propagate downward (globally refreshed)
-    binded variables and conditions.
-    If [Mode = `Delta _], try to expand macros.
+    bound variables and conditions.
+    If [Mode = `Delta _], try to expand macros before calling [func].
     Over-approximation: we try to expand macros, even if they are at a timestamp
     that may not happen. *)
 let tfold_occ 
@@ -338,7 +337,7 @@ let get_fsymb
 
 
 (*------------------------------------------------------------------*)
-(** {2 get_ftype} *)
+(** {2 get_diff} *)
 
 type diff_occ = Term.term occ
 
@@ -366,17 +365,18 @@ let get_diff ~(cntxt : Constr.trace_cntxt) (t : Term.term) : diff_occs =
 
 
 (*------------------------------------------------------------------*)
-(** {2 Find [h(_, k)]} *)
+(** {2 Find [Fun _] applications} *)
 
 (** pair of the key indices and the term *)
 type hash_occ = (Vars.var list * Term.term) occ
 
 type hash_occs = hash_occ list
 
-(** Collect direct occurrences of [f(_,k(_))] or [f(_,_,k(_))] where [f] is a
-    function name [f] and [k] a name [k].
-    Over-approximation: we try to expand macros, even if they are at a timestamp
-    that may not happen. *)
+(** [get_f_messages_ext ~cntxt f k t] collects direct occurrences of
+    [f(_,k(_))] or [f(_,_,k(_))] where [f] is a function name [f] and [k] 
+    a name [k].
+    Over-approximation: we try to expand macros, even if they are at a 
+    timestamp that may not happen. *)
 let get_f_messages_ext 
     ?(drop_head = true)
     ?(fun_wrap_key = None)
@@ -467,7 +467,9 @@ let get_ite_term (constr : Constr.trace_cntxt) (t : Term.term) : ite_occs =
   get t ~fv:Sv.empty ~cond:Term.mk_true
 
 (*------------------------------------------------------------------*)
-(** occurrence of a macro [n(i,...,j)] *)
+(** {2 Macros} *)
+
+(** occurrences of a macro [n(i,...,j)] *)
 type macro_occ = Term.msymb occ
 
 type macro_occs = macro_occ list
@@ -517,7 +519,9 @@ let get_macro_occs
   get t ~fv:Sv.empty ~cond:Term.mk_true
 
 (*------------------------------------------------------------------*)
-(** fold over macros defined at a given description.
+(** {2 Folding over action descriptions} *)
+
+(** Fold over macros defined at a given description.
     Also folds over global macros if [globals] is [true]. *)
 let fold_descr
     ~(globals:bool)
@@ -526,7 +530,8 @@ let fold_descr
        Vars.var list ->           (* indices [is] of [ms] *)
        Symbols.macro_def ->       (* macro definition *)
        Term.term ->               (* term [t] defining [ms(is)] *)
-       'a -> 'a)
+       'a ->                      (* folding argument *)
+       'a)
     (table  : Symbols.table)
     (system : SystemExpr.t)
     (descr  : Action.descr)
@@ -579,7 +584,9 @@ module Mset : sig
   (** Set of macros over some indices.
         [{ msymb   = m;
            indices = vars; }]
-      represents the set of terms [\{m@τ | ∀ vars, τ \}]. *)
+      represents the set of terms [\{m@τ | ∀ vars, τ \}]. 
+
+      It is guaranteed that [vars ∩ env = ∅]. *)
   type t = private {
     msymb   : Term.msymb;
     indices : Vars.var list;
@@ -799,20 +806,22 @@ let macro_support
     (term  : Term.term)
   : MsetAbs.t
   =
-  let get_msymbs : 
-    mode:[`Delta | `FullDelta ] -> Term.term -> MsetAbs.t
-    = fun ~mode term ->
-      let occs = get_macro_occs ~mode cntxt term in
-      let msets = List.map (fun occ ->
-          let indices = occ.occ_cnt.Term.s_indices in
-          Mset.mk ~env ~msymb:occ.occ_cnt ~indices) occs
-      in
-      List.fold_left (fun abs mset -> MsetAbs.join_single mset abs) [] msets
+  let get_msymbs
+      ~(mode : [`Delta | `FullDelta ]) 
+      (term  : Term.term) 
+    : MsetAbs.t 
+    =
+    let occs = get_macro_occs ~mode cntxt term in
+    let msets = List.map (fun occ ->
+        let indices = occ.occ_cnt.Term.s_indices in
+        Mset.mk ~env ~msymb:occ.occ_cnt ~indices) occs
+    in
+    List.fold_left (fun abs mset -> MsetAbs.join_single mset abs) [] msets
   in
 
   let init = get_msymbs ~mode:`FullDelta term in
 
-  let do1 (sm : MsetAbs.t) =
+  let do1 (sm : MsetAbs.t) : MsetAbs.t =
     (* special cases for Input, Frame and Exec, since they do not appear in the
        action descriptions. *)
     let sm =
@@ -879,6 +888,7 @@ let macro_support
   MsetAbs.diff cntxt.table cntxt.system s_reach s_reach'_glob
 
 
+(*------------------------------------------------------------------*)
 (** An indirect occurrence of a macro term, used as return type of
     [fold_macro_support]. The record:
 
@@ -893,13 +903,11 @@ let macro_support
     in some trace model.
     Notes:
     - [env ∩ is = ∅]
-    - if [env] are the free index variables of [srcs], then the free index
-      variables of [t] and [a] are included in [env ∪ is].
-*)
+    - the free index variables of [t] and [a] are included in [env ∪ is]. *)
 type iocc = {
   iocc_aname   : Symbols.action Symbols.t;
   iocc_action  : Action.action;
-  iocc_vars    : Vars.var list;
+  iocc_vars    : Sv.t;
   iocc_cnt     : Term.term;
   iocc_sources : Term.term list;
 }
@@ -910,10 +918,12 @@ let pp_iocc fmt (o : iocc) : unit =
     Vars.pp_list (Action.get_indices o.iocc_action)
     Term.pp o.iocc_cnt
     (Fmt.list ~sep:Fmt.comma Term.pp) o.iocc_sources
-    (Fmt.list ~sep:Fmt.comma Vars.pp) o.iocc_vars
+    (Fmt.list ~sep:Fmt.comma Vars.pp) (Sv.elements o.iocc_vars)
 
 (** Folding over all macro descriptions reachable from some terms.
-    [env] must contain the free variables of [terms].  *)
+    [env] must contain the free variables of [terms]. 
+    See the function [fold_macro_support] below for a more detailed 
+    description. *)
 let _fold_macro_support
     (func  : ((unit -> Action.descr) -> iocc -> 'a -> 'a))
     (cntxt : Constr.trace_cntxt)
@@ -944,25 +954,22 @@ let _fold_macro_support
   in
 
   SystemExpr.fold_descrs (fun descr acc ->
-      fold_descr ~globals:true (fun msymb is _ t acc ->
+      fold_descr ~globals:true (fun msymb m_is _ t acc ->
           if Ms.mem msymb macro_occs then
             let srcs, mset = Ms.find msymb macro_occs in
 
-            let is' = mset.Mset.msymb.Term.s_indices in
+            let m_is' = mset.Mset.msymb.Term.s_indices in
             (* we compute the substitution which we will use to instantiate
                [t] on the indices of the macro set in [mset]. *)
             let subst =
               List.map2 (fun i j ->
                   Term.ESubst (Term.mk_var i, Term.mk_var j)
-                ) is is'
+                ) m_is m_is'
             in
-
-            let fv = Sv.diff (Sv.of_list1 is') env in
-            let fv = Sv.elements fv in
 
             let iocc = {
               iocc_aname   = descr.name;
-              iocc_vars    = fv;
+              iocc_vars    = Sv.diff (Term.fv t) env;
               iocc_action  = Action.subst_action subst descr.action;
               iocc_cnt     = Term.subst subst t;
               iocc_sources = srcs;
@@ -976,7 +983,27 @@ let _fold_macro_support
     ) cntxt.table cntxt.system init
 
 
-(** Same as [fold_macro_support], but without passing the description to [func] *)
+(** Folding over all macro descriptions reachable from some terms.
+    [env] must contain the free variables of [terms]. 
+
+    Guarrantees:
+    [fold_macro_support func cntxt env terms init] will return:
+
+    [List.fold_left func init occs]
+
+    where [occs] is a list of indirect occurrences of sort [iocc] 
+    that, roughly, "covers" all subterms of any all expansions of [terms], 
+    in the following sense:
+    
+     ∀ trace model T, ∀ s ∈ st( ([terms])^T ), ∃ occ ∈ [occs], and:
+
+     - ∃ s₀ ∈ st([occ.occ_cnt])
+
+     - ∃ σ : (F_{s₀} ↦ T_I) 
+       a valuation of s₀'s free variables, w.r.t. [env], in the trace
+       model index interpretation T_I (i.e F_{s₀} = fv(s₀) \ [env]).
+
+     such that s ≡ (s₀)^{Tσ}. *)
 let fold_macro_support
     (func  : (iocc -> 'a -> 'a))
     (cntxt : Constr.trace_cntxt)
@@ -986,7 +1013,8 @@ let fold_macro_support
   =
   _fold_macro_support (fun _ -> func) cntxt env terms init
 
-(** Less precise version of [fold_macro_support], which does not track sources. *)
+(** Less precise version of [fold_macro_support], which does not track 
+    sources. *)
 let fold_macro_support0
     (func : (
         Symbols.action Symbols.t -> (* action name *)
@@ -1003,7 +1031,8 @@ let fold_macro_support0
     ) cntxt env terms init
 
 
-(** Less precise version of [fold_macro_support], which does not track sources. *)
+(** Less precise version of [fold_macro_support], which does not track 
+    sources. *)
 let fold_macro_support1
     (func  : (Action.descr -> Term.term -> 'a -> 'a))
     (cntxt : Constr.trace_cntxt)

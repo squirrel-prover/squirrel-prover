@@ -184,7 +184,7 @@ let mk_prf_phi_proj cntxt env param frame hash =
     Iter.fold_macro_support (fun iocc macro_cases ->
         let name = iocc.iocc_aname in
         let t = iocc.iocc_cnt in
-        let fv = Sv.diff (Term.fv t) (Vars.to_set env) in
+        let fv = iocc.iocc_vars in
 
         let new_cases =
           Iter.get_f_messages_ext ~fv ~cntxt param.h_fn param.h_key.s_symb t

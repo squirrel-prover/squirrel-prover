@@ -133,7 +133,7 @@ type descr = {
    the action.  *)
 val pi_descr : Term.projection -> descr -> descr
 
-(** Refresh (globally) binded variables in a description. *)
+(** Refresh (globally) bound variables in a description. *)
 val refresh_descr : descr -> descr
 
 (*------------------------------------------------------------------*)
