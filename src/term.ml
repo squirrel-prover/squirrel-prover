@@ -73,9 +73,7 @@ let pp_msymb ppf (ms : msymb) =
 type ord    = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
 type ord_eq = [ `Eq | `Neq ]
 
-type ('a,'b) _atom = 'a * 'b * 'b
-
-and term =
+type term =
   | Fun    of fsymb * Type.ftype * term list
   | Name   of nsymb
   | Macro  of msymb * term list * term
@@ -904,6 +902,8 @@ let pp_hterm fmt = function
 
 (*------------------------------------------------------------------*)
 (** Literals. *)
+
+type ('a,'b) _atom = 'a * 'b * 'b
 
 type xatom = [
   | `Comp    of (ord,term) _atom

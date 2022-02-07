@@ -55,20 +55,10 @@ clean:
 	rm -f *.coverage
 	rm -rf _coverage
 
+# debug flag (-g) enabled by default
 squirrel: version
 	dune build squirrel.exe
 	cp -f _build/default/squirrel.exe squirrel
-
-# Previously with ocamlbuild:
-# squirrel: squirrel.byte
-# debug: version
-# 	$(OCB) -tags debug squirrel.native
-# --> shouldn't it be the other way around??
-# since ocamldebug doesn't work with native code
-# with Dune: debug flag (-g) enabled by default
-debug: version
-	dune build squirrel.bc
-	cp -f _build/default/squirrel.bc squirrel
 
 makecoverage: version
 	@mkdir -p ./_build/default/_build/_tests

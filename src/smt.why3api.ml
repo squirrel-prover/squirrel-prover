@@ -1,10 +1,4 @@
-(* Useful auxiliary function? *)
-let cast_evar_option kind ev =
-  try Some (Vars.ecast ev kind)
-  with Vars.CastError -> None
-
-let filter_cast (kind : 'a Type.kind) (evars : Vars.evars) : 'a Vars.var list =
-  List.filter_map (cast_evar_option kind) evars
+let filter_ty t = List.filter (fun x -> Vars.ty x = t)
 
 let get_smt_setup
   : unit -> (Why3.Theory.theory * Why3.Whyconf.config_prover * Why3.Driver.driver) option =
@@ -63,17 +57,17 @@ let mk_const_symb x ty_symb =
 
 exception Unsupported
 
-(** this is called [build_task_bis] because there was another build_task
- ** previously that just handled the theory of timestamps / actions
- ** (i.e. "constraints" tactic + dependencies) *)
+(* this is called [build_task_bis] because there was another build_task
+ * previously that just handled the theory of timestamps / actions
+ * (i.e. "constraints" tactic + dependencies) *)
 
 let build_task_bis
     (table       : Symbols.table)
     (system      : SystemExpr.t)
-    (evars       : Vars.evar list)
-    (msg_atoms   : Term.message_atom list)
-    (trace_lits  : Term.trace_literal list)
-    (given_axioms: Term.message list)
+    (evars       : Vars.vars)
+    (msg_atoms   : Term.xatom list)
+    (trace_lits  : Term.literals)
+    (given_axioms: Term.terms)
     (tm_theory   : Why3.Theory.theory)
   : Why3.Task.task =
   let tm_export = tm_theory.Why3.Theory.th_export in
@@ -100,10 +94,9 @@ let build_task_bis
   let macro_cond_symb  = Why3.Theory.ns_find_ls tm_export ["macro_cond"] in
   let macro_exec_symb  = Why3.Theory.ns_find_ls tm_export ["macro_exec"] in
 
-  (* copy/pasted from trace_literals_unsat (+ msgvars) **)
-  let indices = filter_cast Type.KIndex     evars
-  and tsvars  = filter_cast Type.KTimestamp evars
-  and msgvars = filter_cast Type.KMessage   evars in
+  let indices = filter_ty Type.Index     evars
+  and tsvars  = filter_ty Type.Timestamp evars
+  and msgvars = filter_ty Type.Message   evars in
 
   (* We first create Why3 constants for all action/index/timestamp names that appear
    * TODO: check that our conversions var/symbol -> string avoids spurious collisions *)
@@ -179,7 +172,7 @@ let build_task_bis
             Hashtbl.add action_indices str vsymb;
             vsymb
           ) in
-        let list_of_list (l : Vars.index list) : Why3.Term.term =
+        let list_of_index_list (l : Vars.var list) : Why3.Term.term =
           let open Why3.Term in
           List.fold_right (fun i acc ->
               t_app_infer cons_symb
@@ -189,7 +182,7 @@ let build_task_bis
         let f (d : Action.descr) =
           let symb = Hashtbl.find actions_tbl (Symbols.to_string d.name) in
           Why3.Term.t_app_infer act_symb [Why3.Term.t_app_infer symb [];
-                                          list_of_list d.indices]
+                                          list_of_index_list d.indices]
         in
         (* 1 <~ 2 **when 2 happens** *)
         let axiom = let open Why3.Term in
@@ -243,51 +236,59 @@ let build_task_bis
                     |> add_all_symbols macros_tbl
                     |> add_all_symbols names_tbl in
   let open Why3.Term in
-  let index_to_wterm i =
-    Hashtbl.find indices_tbl (Vars.name i)
-  in
+  let index_to_wterm i = Hashtbl.find indices_tbl (Vars.name i) in
   let rec ilist_to_wterm = function
     | []    -> t_app_infer nil_symb []
     | i::is -> t_app_infer cons_symb [index_to_wterm i; ilist_to_wterm is]
   in
   let rec timestamp_to_wterm = function
-    | Term.Pred ts -> t_app_infer pred_symb [timestamp_to_wterm ts]
+    | Term.Fun (fs, _, [ts]) when fs = Term.f_pred ->
+      t_app_infer pred_symb [timestamp_to_wterm ts]
     | Term.Action (a, indices) -> t_app_infer act_symb [
         t_app_infer (Hashtbl.find actions_tbl (Symbols.to_string a)) [];
         ilist_to_wterm indices
       ]
     | Var v -> Hashtbl.find timestamps_tbl (Vars.name v)
-    | Diff (_, _) -> failwith "diff of timestamps to why3 term not implemented"
-    (* TODO doesn't seem necessary? *)
+    | Diff (_, _) -> (* TODO doesn't seem necessary? *)
+      failwith "diff of timestamps to why3 term not implemented"
+    | _ -> assert false
   in
-  let trace_atom_to_fmla = function
-    | `Timestamp (comp,ts1,ts2) ->
-      let listargs = List.map timestamp_to_wterm [ts1; ts2] in
-      begin match comp with
-        | `Eq  -> t_app_infer eqv_symb listargs
-        | `Neq -> t_not (t_app_infer eqv_symb listargs)
-        | `Leq -> t_app_infer leq_symb listargs
-        | `Geq -> t_app_infer leq_symb (List.rev listargs)
-        | `Lt  -> t_and (t_app_infer leq_symb listargs)
-                    (t_not @@ t_app_infer eqv_symb listargs)
-        | `Gt  -> let listargs = List.rev listargs in
-          t_and (t_app_infer leq_symb listargs)
-            (t_not @@ t_app_infer eqv_symb listargs)
+  let rec atom_to_fmla : Term.xatom -> Why3.Term.term = fun atom ->
+    let handle_eq_atom rec_call = match atom with
+      | `Comp (`Eq,  x, y) -> t_equ (rec_call x) (rec_call y)
+      | `Comp (`Neq, x, y) -> t_neq (rec_call x) (rec_call y)
+      | _ -> assert false
+    in
+    match Term.ty_xatom atom with
+    | Type.Timestamp -> begin match atom with
+        | `Comp (comp,ts1,ts2) ->
+          let listargs = List.map timestamp_to_wterm [ts1; ts2] in
+          begin match comp with
+            | `Eq  -> t_app_infer eqv_symb listargs
+            | `Neq -> t_not (t_app_infer eqv_symb listargs)
+            | `Leq -> t_app_infer leq_symb listargs
+            | `Geq -> t_app_infer leq_symb (List.rev listargs)
+            | `Lt  -> t_and (t_app_infer leq_symb listargs)
+                        (t_not @@ t_app_infer eqv_symb listargs)
+            | `Gt  -> let listargs = List.rev listargs in
+              t_and (t_app_infer leq_symb listargs)
+                (t_not @@ t_app_infer eqv_symb listargs)
+          end
+        | `Happens ts -> Why3.Term.t_app_infer happens_symb [timestamp_to_wterm ts]
       end
-    | `Index (`Eq,  i1, i2) ->        t_equ (index_to_wterm i1) (index_to_wterm i2)
-    | `Index (`Neq, i1, i2) -> t_not (t_equ (index_to_wterm i1) (index_to_wterm i2))
-    | `Happens ts -> Why3.Term.t_app_infer happens_symb [timestamp_to_wterm ts]
-  in
-  let trace_lit_to_fmla = function
-    | (`Pos, x) ->        trace_atom_to_fmla x
-    | (`Neg, x) -> t_not (trace_atom_to_fmla x)
-  in
-  let find_fn f = Hashtbl.find functions_tbl (Symbols.to_string f) in
-  (* in the function below I guess t_app_infer invokes the Why3 typechecker
+    | Type.Index -> handle_eq_atom (function
+        | Term.Var i -> index_to_wterm i
+        | _          -> assert false)
+    | _          -> handle_eq_atom msg_to_wterm
+  and lit_to_fmla : Term.literal -> Why3.Term.term = function
+    | (`Pos, x) ->        atom_to_fmla x
+    | (`Neg, x) -> t_not (atom_to_fmla x)
+  and find_fn f = Hashtbl.find functions_tbl (Symbols.to_string f)
+  (* in thne function below I guess t_app_infer invokes the Why3 typechecker
    * to ensure that messages and timestamps are not mixed up
    * but this is not reflected in our OCaml types
    * the function subsumes timestamp_to_wterm from build_task (constraints) *)
-  let rec msg_to_wterm : Term.message -> Why3.Term.term = fun c ->
+  and msg_to_wterm : Term.term -> Why3.Term.term = fun c ->
     let open Term in
     let open Why3.Term in
     (* TODO lots of t_app_infer + Hashtbl.find + Symbols.to_string
@@ -322,32 +323,13 @@ let build_task_bis
         (find_fn Symbols.fs_diff)
         [ilist_to_wterm []; msg_to_wterm c; msg_to_wterm d]
 
-    | Var v -> Hashtbl.find messages_tbl (Vars.name v)
+    | Var v -> begin
+        try Hashtbl.find messages_tbl (Vars.name v)
+        with Not_found -> (print_endline ("ouch " ^ Vars.name v); raise Not_found)
+      end
+    | _ -> raise Unsupported (* TODO: better error reporting? *)
 
-    | Atom a ->
-      Format.printf "TODO: handle atoms as messages properly\n";
-      (* maybe using msg_atom_to_fmla below *)
-      raise Unsupported
-
-    | _ ->  Format.printf "%s\n" begin match c with
-        | Fun  _ -> "fun"
-        | Name _ -> "name"
-        | Macro _ -> "macro"
-        | Seq _ -> "seq"
-        | Var _ -> "var"
-        | Diff _ -> "diff"
-        | Find _ -> "find"
-        | Atom _ -> "atom"
-        | ForAll _ -> "forall"
-        | Exists _ -> "exists"
-      end;
-      raise Unsupported
-
-  and msg_atom_to_fmla = function
-    | `Message (`Eq,  m1, m2) -> t_equ (msg_to_wterm m1) (msg_to_wterm m2)
-    | `Message (`Neq, m1, m2) -> t_neq (msg_to_wterm m1) (msg_to_wterm m2)
-
-  and msg_to_fmla fmla =
+  and msg_to_fmla : Term.term -> Why3.Term.term = fun fmla ->
     (* TODO: there has to be a better way to write this sequence of destrs... *)
     match Term.destr_false fmla with
     | Some () -> t_false
@@ -365,18 +347,18 @@ let build_task_bis
                 | Some (vs, f) -> msg_to_fmla_q t_forall_close vs f
                 | None -> match Term.destr_exists fmla with
                   | Some (vs, f) -> msg_to_fmla_q t_exists_close vs f
-                  | None -> match fmla with
-                    | Atom (#Term.message_atom as at) ->   msg_atom_to_fmla at
-                    | Atom (#Term.trace_atom   as at) -> trace_atom_to_fmla at
-                    | Macro (ms,[],ts) when ms.s_symb = Symbols.cond ->
-                      t_app_infer macro_cond_symb [timestamp_to_wterm ts]
-                    | Macro (ms,[],ts) when ms.s_symb = Symbols.exec ->
-                      t_app_infer macro_exec_symb [timestamp_to_wterm ts]
-                    | x -> t_app_infer msg_is_true_symb [msg_to_wterm x]
+                  | None -> match Term.form_to_xatom fmla with
+                    | Some at -> atom_to_fmla at
+                    | None -> match fmla with
+                      | Macro (ms,[],ts) when ms.s_symb = Symbols.cond ->
+                        t_app_infer macro_cond_symb [timestamp_to_wterm ts]
+                      | Macro (ms,[],ts) when ms.s_symb = Symbols.exec ->
+                        t_app_infer macro_exec_symb [timestamp_to_wterm ts]
+                      | x -> t_app_infer msg_is_true_symb [msg_to_wterm x]
   and msg_to_fmla_q quantifier vs f =
-    let i_vs = filter_cast Type.KIndex     vs
-    and t_vs = filter_cast Type.KTimestamp vs
-    and m_vs = filter_cast Type.KMessage   vs in
+    let i_vs = filter_ty Type.Index     vs
+    and t_vs = filter_ty Type.Timestamp vs
+    and m_vs = filter_ty Type.Message   vs in
     (* NOTE: here we use the fact that OCaml hashtables can have multiple
      *       bindings, and the newer ones shadow the older ones
      * thus we can use Hashtbl.(add|remove) to handle bound variable scope *)
@@ -635,8 +617,8 @@ let build_task_bis
 
   Why3.Task.add_prop_decl task_header Why3.Decl.Pgoal
     (Why3.Decl.create_prsymbol @@ Why3.Ident.id_fresh "GOOOOAL")
-    (List.map trace_lit_to_fmla trace_lits
-     @ List.map msg_atom_to_fmla msg_atoms
+    (List.map lit_to_fmla trace_lits
+     @ List.map atom_to_fmla msg_atoms
      @ List.map msg_to_fmla given_axioms
      |> t_and_l |> t_not)
 
