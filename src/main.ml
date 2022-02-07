@@ -49,7 +49,7 @@ type main_state = {
 }
 
 (*------------------------------------------------------------------*)
-let get_lexbuf (state : main_state) : string * Lexing.lexbuf =
+let get_lexbuf (state : main_state) : string * Lexing.lexbuf = 
   let lexbuf = match state.file.f_path with
     | `Stdin -> Lexing.from_channel stdin
     (* we need to re-compute the lexer buffer from the input channel, or error
