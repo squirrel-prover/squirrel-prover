@@ -6,8 +6,6 @@ module T = Tactics
 
 module TS = LowTraceSequent
 
-type lsymb = Theory.lsymb
-
 (*------------------------------------------------------------------*)
 (** {2 Hypotheses for equivalence sequents} *)
 
@@ -199,10 +197,6 @@ let set_table table j = update ~table j
 let goal j = j.goal
 
 let ty_vars j = j.env.ty_vars
-
-let hyps j = j.hyps
-
-let set_hyps hyps j = { j with hyps }
 
 let set_goal goal j = { j with goal }
 

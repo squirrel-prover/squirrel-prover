@@ -254,10 +254,6 @@ let pp_parser_arg ppf = function
     Fmt.pf ppf "{%i}(%a)" sel Theory.pp term
 
 (*------------------------------------------------------------------*)
-
-type boolean = [`Boolean]
-
-(*------------------------------------------------------------------*)
 (** Tactic arguments sorts *)
 type _ sort =
   | None      : unit sort

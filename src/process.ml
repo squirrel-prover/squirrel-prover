@@ -14,7 +14,6 @@ let pp_proc_ty =
   (Fmt.list pp_el)
 
 (*------------------------------------------------------------------*)
-type id = string
 type lsymb = Theory.lsymb
 
 type term = Theory.term

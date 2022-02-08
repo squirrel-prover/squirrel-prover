@@ -23,10 +23,6 @@ module TraceLits : sig
 
   val mk : Term.literals -> t array
 
-  val compare : t -> t -> int
-  val equal : t -> t -> bool
-  val hash : t -> int
-
   module Memo : Ephemeron.S with type key = t array
 end = struct
   type t = Term.literal 
@@ -577,15 +573,7 @@ let is_undef uf ut = snd (mgu uf ut) = uundef
 (* Remark: [uf] under-approximate equalities, hence any equality it contains 
    is sound. *)
 
-let get_pred ut = match ut.cnt with
-  | UPred t -> t
-  | _ -> assert false
-
-let is_pred ut = match ut.cnt with
-  | UPred _ -> true
-  | _ -> false 
-
-(** [is_undef uf ut] returns [true] if [ut] must be defined in [uf], 
+(** [is_undef uf ut] returns [true] if [ut] must be defined in [uf],
     under dis-equalities [neqs]. 
     This does not look for instances of the axiom:
     ∀τ, (happens(τ) ∧ τ ≠ init) ⇒ happens(pred(τ))

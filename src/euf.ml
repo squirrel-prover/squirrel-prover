@@ -91,8 +91,9 @@ let key_ssc
 
 (*------------------------------------------------------------------*)
 (** [hashes_of_action_descr ~system action_descr head_fn key_n]
-  * returns the list of pairs [is,m] such that [head_fn(m,key_n[is])]
-  * occurs in [action_descr]. *)
+    returns the list of pairs [is,m] such that [head_fn(m,key_n[is])]
+    occurs in [action_descr].
+    TODO: unused value *)
 let hashes_of_action_descr
      ?(drop_head=true) ~fun_wrap_key ~cntxt action_descr head_fn key_n =
   let iter = new get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n in

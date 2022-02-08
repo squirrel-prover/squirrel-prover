@@ -104,6 +104,7 @@ let find_shape table shape =
 (** We look whether the dummy shape already has a name in another system.
     If that is the case, use the same symbol. *)
 let find_dum_shape table shape =
+  (* TODO: unused value warning *)
   let exception Found of Symbols.action Symbols.t in
   try Symbols.System.iter (fun system () data ->
       let symbs = match data with

@@ -18,10 +18,6 @@ let vars = function
   | Trace j -> TS.vars j
   | Equiv j -> ES.vars j
 
-let get_table = function
-  | Trace j -> TS.table j
-  | Equiv j -> ES.table j
-
 let pp ch = function
   | Trace j -> TS.pp ch j
   | Equiv j -> ES.pp ch j

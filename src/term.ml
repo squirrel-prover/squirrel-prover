@@ -95,7 +95,7 @@ type t = term
 type terms = term list
 
 (*------------------------------------------------------------------*)
-let hash_ord : ord -> int = function
+let hash_ord : ord -> int = function (* TODO: unused value *)
   | `Eq  -> 1
   | `Neq -> 2
   | `Leq -> 3
@@ -603,12 +603,6 @@ let is_binder : term -> bool = function
   | _ -> false
 
 (*------------------------------------------------------------------*)
-let as_ord_eq (ord : ord) : ord_eq = match ord with
-  | `Eq -> `Eq
-  | `Neq -> `Neq
-  | _ -> assert false
-
-(*------------------------------------------------------------------*)
 (** {2 Printing} *)
 let pp_indices ppf l =
   if l <> [] then Fmt.pf ppf "(%a)" Vars.pp_list l
@@ -686,27 +680,17 @@ let ord_fixity ord = `Ord ord           , `NonAssoc
 
 (*------------------------------------------------------------------*)
 
-(** Applies the styling info in [info] *)
-let rec pp : type a.
-  pp_info ->
-  (('b * fixity) * assoc) ->
-  term Fmt.t
-  =
+(** Applies the styling info in [info]
+    NOTE: this is *not* the [pp] exported by the module, it is shadowed later *)
+let rec pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
   fun info (outer,side) ppf t ->
   let err_opt, info = info.styler info t in
   styled_opt err_opt (_pp info (outer, side)) ppf t
 
 (** Core printing function *)
-and _pp : type a.
-  pp_info ->
-  (('b * fixity) * assoc) ->
-  term Fmt.t
-  =
+and _pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
   fun info (outer, side) ppf t ->
-  let pp : type a.
-    (('b * fixity) * assoc)->
-    term Fmt.t
-    =
+  let pp : (('b * fixity) * assoc) -> term Fmt.t =
     fun (outer,side) fmt t -> pp info (outer, side) fmt t
   in
 
@@ -944,7 +928,7 @@ let neg_lit ((pn, at) : literal) : literal =
     | `Neg -> `Pos in
   (pn, at)
 
-let rec form_to_xatom (form : term) : xatom option =
+let form_to_xatom (form : term) : xatom option =
   match form with
   | Fun (f, _, [a]) when f = f_happens -> Some (`Happens a)
 
@@ -1534,13 +1518,6 @@ let tsubst_ht (ts : Type.tsubst) (ht : hterm) : hterm =
 (*------------------------------------------------------------------*)
 (** {2 Simplification} *)
 
-let not_ord_eq o = match o with
-  | `Eq -> `Neq
-  | `Neq -> `Eq
-
-let not_ord_eq (o,l,r) = (not_ord_eq o, l, r)
-
-(*------------------------------------------------------------------*)
 let rec not_simpl = function
     | Exists (vs, f) -> ForAll(vs, not_simpl f)
     | ForAll (vs, f) -> Exists(vs, not_simpl f)

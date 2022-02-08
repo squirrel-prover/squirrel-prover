@@ -1,5 +1,4 @@
 (** This modules provides the types used to type variables and terms. *)
-open Utils
 
 (*------------------------------------------------------------------*)
 (** Type variables *)

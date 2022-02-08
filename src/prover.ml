@@ -270,7 +270,6 @@ module Table : sig
 
   val pp_goal_concl : Format.formatter -> Goal.t -> unit
 end = struct
-  type judgment = Goal.t
   let table = Hashtbl.create 97
 
   (* TODO:location *)
