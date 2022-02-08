@@ -200,10 +200,7 @@ let ty_vars j = j.env.ty_vars
 
 let set_goal goal j = { j with goal }
 
-
 let set_reach_goal f s = set_goal Equiv.(Atom (Reach f)) s
-
-let set_ty_vars ty_vars j = update ~ty_vars j
 
 let get_frame proj j = match j.goal with
   | Equiv.Atom (Equiv.Equiv e) ->

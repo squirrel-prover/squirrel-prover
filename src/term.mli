@@ -38,7 +38,7 @@ type fsymb = fname * Vars.var list
   * variables, and let definitions: everything that is expanded when
   * translating the meta-logic to the base logic. *)
 
-type mname    = Symbols.macro Symbols.t
+type mname = Symbols.macro Symbols.t
 type msymb = mname isymb
 
 type state = msymb

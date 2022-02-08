@@ -816,7 +816,7 @@ let apply_substitute subst s =
 let substitute_mess (m1, m2) s =
   let subst =
         let trs = TS.get_trs s in
-        if Completion.check_equalities trs [Term.ESubst (m1,m2)] then
+        if Completion.check_equalities trs [(m1,m2)] then
           [Term.ESubst (m1,m2)]
         else
           soft_failure Tactics.NotEqualArguments
@@ -1168,7 +1168,7 @@ let new_simpl ~congr ~constr s =
 
           | `Comp (`Eq, t1, t2), _ ->
             if congr &&
-               Completion.check_equalities (TS.get_trs s) [Term.ESubst (t1,t2)]
+               Completion.check_equalities (TS.get_trs s) [(t1,t2)]
             then None
             else Some goal
 
@@ -1779,7 +1779,7 @@ let top_level_hashes s =
 
   make_eq [] hashes
   |> List.filter (fun (a,b) ->
-      Completion.check_equalities trs [Term.ESubst (a,b)])
+      Completion.check_equalities trs [(a,b)])
 
 
 

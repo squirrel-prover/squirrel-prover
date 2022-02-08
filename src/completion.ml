@@ -439,11 +439,8 @@ module Theories = struct
     let t_pk = cfun pk 0 [k] in
     ( cfun mcheck 0 [cfun msig 0 [m; k]; t_pk], t_true )
 
-
-  (* TODO: mk_simpl_* functions are unused *)
-
   (** Simple And Boolean rules. *)
-  let mk_simpl_and () =
+  let _mk_simpl_and () =
     let u, v, t = mk_var (), mk_var (), mk_var () in
     [( cfun (F Symbols.fs_and) 0 [t_true; u]), u;
      ( cfun (F Symbols.fs_and) 0 [v; t_true]), v;
@@ -452,7 +449,7 @@ module Theories = struct
      ( cfun (F Symbols.fs_and) 0 [t; t]), t] 
 
   (** Simple Or Boolean rules. *)
-  let mk_simpl_or () =
+  let _mk_simpl_or () =
     let u, v, t = mk_var (), mk_var (), mk_var () in
     [ ( cfun (F Symbols.fs_or) 0 [t_true; mk_var ()], t_true);
       ( cfun (F Symbols.fs_or) 0 [mk_var (); t_true], t_true);
@@ -461,7 +458,7 @@ module Theories = struct
       ( cfun (F Symbols.fs_or) 0 [t; t], t)] 
 
   (** Simple Not Boolean rules. *)
-  let mk_simpl_not () =
+  let _mk_simpl_not () =
     [( cfun (F Symbols.fs_not) 0 [t_true], t_false);
      ( cfun (F Symbols.fs_not) 0 [t_false], t_true)] 
 
@@ -883,15 +880,6 @@ let find_grules :
     None
   with Found (a,b) -> Some (a,b)
 
-let find_erules :
-  (cterm * cterm -> bool) -> e_rules -> (cterm * cterm) option =
-  fun f erules ->
-  let exception Found of cterm * cterm in
-  try
-    iter_erules (fun (a,b) -> if f (a,b) then raise (Found (a,b))) erules;
-    None
-  with Found (a,b) -> Some (a,b)
-
 let find_map_erules : (cterm * cterm -> 'a option) -> e_rules -> 'a option =
   fun f erules ->
   let found = ref None in
@@ -951,11 +939,12 @@ module Unify = struct
 
   let empty_subst = Mi.empty
 
-  let pp_subst fmt s =
-    (Fmt.list ~sep:Fmt.comma
+  let[@warning "-32"] pp_subst fmt s =
+    Fmt.list ~sep:Fmt.comma
       (fun fmt (i,c) ->
-        Fmt.pf fmt "%d -> %a" i pp_cterm c))
-      fmt (Mi.bindings s)
+         Fmt.pf fmt "%d -> %a" i pp_cterm c)
+      fmt
+      (Mi.bindings s)
 
   exception Unify_cycle
 
@@ -1495,13 +1484,13 @@ let check_disequality_cterm state neqs (u,v) =
   (* if the term are grounds and have different normal form, return disequal *)
   || (is_ground_term u && is_ground_term v && (u <> v))
 
-(** [check_disequalities s neqs l] checks that all disequalities inside [l] are
-    implied by inequalities inside neqs, w.r.t [s]. *)
 let check_disequality state neqs (u,v) =
   try check_disequality_cterm state neqs (cterm_of_term u, cterm_of_term v)
   with
   | Unsupported_conversion -> false
 
+(** [check_disequalities s neqs l] checks that all disequalities inside [l]
+    are implied by inequalities inside [neqs], wrt [s]. *)
 let check_disequalities state neqs l =
   let neqs = List.map (fun (x, y) ->
          cterm_of_term x, cterm_of_term y) neqs in
@@ -1514,7 +1503,7 @@ let check_equality_cterm state (u,v) =
   normalize ~print:true state u = 
   normalize ~print:true state v
 
-let check_equality state (Term.ESubst (u,v)) =  
+let check_equality state (u,v) =
   try
     let cu, cv = cterm_of_term u, cterm_of_term v in
     let bool = check_equality_cterm state (cu, cv) in

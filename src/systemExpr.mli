@@ -105,12 +105,6 @@ val map_descrs  : (Action.descr -> 'a)       -> Symbols.table -> t -> 'a list
 
 exception SystemNotFresh
 
-type esubst_descr =
-  | Condition of Term.term * Action.action
-  | Output of Term.term * Action.action
-
-type subst_descr = esubst_descr list
-
 val clone_system_iter : Symbols.table -> t ->
            Symbols.lsymb ->
            (Action.descr -> Action.descr) -> Symbols.table * Symbols.System.ns Symbols.t

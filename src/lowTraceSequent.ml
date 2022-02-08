@@ -429,10 +429,6 @@ let set_system system s =
   let env = Env.update ~system s.env in
   S.update ~env s
 
-let set_ty_vars ty_vars s = 
-  let env = Env.update ~ty_vars s.env in
-  S.update ~env s
-
 (*------------------------------------------------------------------*)
 let filter_map_hyps func hyps =
   H.map (fun f -> func f) hyps
@@ -523,7 +519,7 @@ let eq_atoms_valid s =
 
   let _, neqs = get_eqs_neqs s in
   List.exists (fun (Term.ESubst (a, b)) ->
-      if Completion.check_equalities trs [Term.ESubst (a, b)] then
+      if Completion.check_equalities trs [(a,b)] then
         let () = dbg "dis-equality %a ≠ %a violated" Term.pp a Term.pp b in
         true
       else

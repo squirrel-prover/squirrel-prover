@@ -101,28 +101,6 @@ let find_shape table shape =
     None
   with Found (x,y) -> Some (x,y)
 
-(** We look whether the dummy shape already has a name in another system.
-    If that is the case, use the same symbol. *)
-let find_dum_shape table shape =
-  (* TODO: unused value warning *)
-  let exception Found of Symbols.action Symbols.t in
-  try Symbols.System.iter (fun system () data ->
-      let symbs = match data with
-        | System_data (_,symbs) -> symbs
-        | _ -> assert false
-      in
-
-      if Msh.mem shape symbs then
-        let symb = Msh.find shape symbs in
-        raise (Found symb)
-      else ()
-    ) table;
-
-    None
-  with Found x -> Some x
-
-
-
 (*------------------------------------------------------------------*)
 let register_action table system_symb symb indices action descr =
   let shape = Action.get_shape action in

@@ -523,11 +523,8 @@ let build_task_bis
                 let same_as_pred =
                   t_app_infer m_symb [ilist; t_app_infer pred_symb [ts]] in
                 try
-                  (* TODO: wait, can an action update multiple state macros
-                   *       with the same name and different indices?
-                   *       if so then the below is incomplete
-                   *       (but macros.ml looks like it behaves the same way?) *)
-                  let (ns, msg) = List.find (fun (ns,_) -> ns.Term.s_symb = mn)
+                  let (ns, msg) =
+                    List.find (fun (ns,_) -> ns.Term.s_symb = mn)
                       descr.Action.updates in
                   let expansion_ok = msg_to_wterm msg in
                   if descr.Action.name = Symbols.init_action

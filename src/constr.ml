@@ -18,11 +18,12 @@ module L = Location
 let dbg s = Printer.prt (if Config.debug_constr () then `Dbg else `Ignore) s
 
 (*------------------------------------------------------------------*)
-module TraceLits : sig 
+module TraceLits : sig[@warning "-32"]
   type t = Term.literal 
-
+  val compare : t -> t -> int
+  val equal : t -> t -> bool
+  val hash : t -> int
   val mk : Term.literals -> t array
-
   module Memo : Ephemeron.S with type key = t array
 end = struct
   type t = Term.literal 
@@ -62,7 +63,6 @@ module Utv : sig
     | UInit
     | UUndef                    (* (x <> UUndef) iff. (Happens x) *)
 
-  val uvar   : Vars.var -> ut
   val uts    : Term.term -> ut
   val uname  : Symbols.action Symbols.t -> ut list -> ut
   val upred  : ut -> ut
@@ -770,12 +770,6 @@ let unify inst eqs =
   in
   { inst with uf = uf; }
 
-(** Only compute the mgu for the equality constraints in [l] *)
-let mgu_eqs l =
-  let instance = mk_instance l in
-  unify instance instance.eqs
-
-
 (*------------------------------------------------------------------*)
 (** {2 Order models using graphs} *)
 
@@ -932,13 +926,6 @@ let add_disj uf g u x =
         ) (max_pred uf g nu x)
     ) (min_pred uf g nu x)
 
-
-let find_map_all (f : UtG.vertex -> UtG.vertex -> 'a option) g : 'a list =
-  UtG.fold_edges (fun v v' acc ->
-      match f v v' with
-      | None -> acc
-      | Some x -> x :: acc
-    ) g []
 
 let for_all (f : UtG.vertex -> UtG.vertex -> bool) g : bool =
   let exception Found in

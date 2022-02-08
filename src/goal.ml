@@ -55,10 +55,6 @@ type equiv_statement = (string,   Equiv.form) abstract_statement
 type reach_statement = (string, Term.term) abstract_statement
 
 (*------------------------------------------------------------------*)
-(** Generalized hypothesis: hypothesis or lemma identifier. *)
-type ghyp = [ `Hyp of Ident.t | `Lemma of string ]
-
-(*------------------------------------------------------------------*)
 
 let is_reach_statement stmt : bool =
   match stmt.formula with

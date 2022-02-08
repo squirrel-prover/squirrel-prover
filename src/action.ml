@@ -176,7 +176,6 @@ type descr = {
   updates   : (Term.state * Term.term) list ;
   output    : Channel.t * Term.term;
   globals   : Symbols.macro Symbols.t list;
-  (** list of global macros declared at [action] *)
 }
 
 

@@ -15,7 +15,7 @@ module M = Utils.Ms
 
 (* TODO: PString / get_string never used? (raises warnings) *)
 
-type param_kind =
+type [@warning "-37"] param_kind =
   | PBool
   | PString
   | PInt
@@ -27,7 +27,8 @@ let pp_kind fmt = function
 
 
 let get_int    = function _,_, Param_int    i -> i | _ -> assert false
-let get_string = function _,_, Param_string s -> s | _ -> assert false
+let [@warning "-32"]
+  get_string = function _,_, Param_string s -> s | _ -> assert false
 let get_bool   = function _,_, Param_bool   b -> b | _ -> assert false
 
 (** Function checking that a parameter value is valid.

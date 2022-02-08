@@ -76,7 +76,7 @@ let pat_of_form (t : term) =
 (*------------------------------------------------------------------*)
 (** {2 Matching variable assignment} *)
 
-module Mvar : sig
+module Mvar : sig[@warning "-32"]
   type t
 
   val make : term Mv.t -> t
@@ -108,7 +108,7 @@ end = struct
              subst : term Mv.t; }
 
   let cpt = ref 0
-  let make subst = { id = (incr cpt; !cpt); subst }
+  let make subst = incr cpt; { id = !cpt; subst }
 
   let pp fmt (mv : t) : unit =
     let pp_binding fmt (v, t) =
@@ -118,7 +118,7 @@ end = struct
     Fmt.pf fmt "@[<v 2>{id:%d@;%a}@]" mv.id
       (Fmt.list ~sep:Fmt.cut pp_binding) (Mv.bindings mv.subst)
 
-  let empty = make (Mv.empty)
+  let empty = make Mv.empty
 
   let union mv1 mv2 =
     make (Mv.union (fun _ _ _ -> assert false) mv1.subst mv2.subst)
@@ -985,7 +985,7 @@ type known_set = {
 type known_sets = (term_head * known_set list) list
 
 (*------------------------------------------------------------------*)
-module MCset : sig
+module MCset : sig[@warning "-32"]
   (** Set of macros over some indices, with a conditional.
         [{ msymb   = m;
            indices = vars;

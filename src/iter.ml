@@ -580,7 +580,7 @@ let is_glob table ms =
   | _ -> false
 
 (*------------------------------------------------------------------*)
-module Mset : sig
+module Mset : sig[@warning "-32"]
   (** Set of macros over some indices.
         [{ msymb   = m;
            indices = vars; }]
@@ -735,16 +735,16 @@ end = struct
     mk ~env:Sv.empty ~msymb ~indices:[]
 end
 
-module MsetAbs : sig
-  (** abstract value containing one mset per macro symbol. *)
+module MsetAbs : sig[@warning "-32"]
+  (** Abstract value containing one mset per macro symbol. *)
   type t = (Term.mname * Mset.t) list
 
   val pp : Format.formatter -> t -> unit
 
-  (** join a single [mset] into an full abstract value. *)
+  (** Join a single [mset] into an full abstract value. *)
   val join_single : Mset.t -> t -> t
 
-  (** join operator. *)
+  (** Join operator. *)
   val join : t -> t -> t
 
   (** [incl abs1 abs2] checks if [abs1 ⊆ abs2]. *)

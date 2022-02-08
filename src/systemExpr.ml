@@ -319,35 +319,6 @@ let pair table a b =
     se
 
 (*------------------------------------------------------------------*)
-(** {2 Substitution } *)
-
-(** A substition over a description that allows to either substitute the condition
-   or the output of the descr, for a given shape. *)
-type esubst_descr =
-  | Condition of Term.term * Action.action
-  | Output of Term.term * Action.action
-
-type subst_descr = esubst_descr list
-
-(* TODO: unused value *)
-let rec subst s d =
-  match s with
-  | [] -> d
-  | Condition (f,a) :: q ->
-    begin
-      match Action.same_shape a d.Action.action with
-      | None -> subst q d
-      | Some s ->
-          subst q {d with condition = (fst(d.condition), Term.subst s f)}
-    end
-  | Output (t,a) :: q ->
-    begin
-      match Action.same_shape a d.Action.action with
-      | None -> subst q d
-      | Some s ->
-          subst q {d with output = (fst(d.output), Term.subst s t)}
-    end
-
 
 let pp_descrs table ppf system =
   Fmt.pf ppf "@[<v 2>Available actions:@;@;";
@@ -363,8 +334,8 @@ let clone_system_iter table original_system new_system iterdescr =
   let ndescrs = System.Msh.map iterdescr odescrs in
   let data = System.System_data (ndescrs,symbs) in
   Symbols.System.declare_exact table new_system ~data ()
-exception SystemNotFresh
 
+exception SystemNotFresh
 
 (*------------------------------------------------------------------*)
 (** {2 Parser types } *)

@@ -5,7 +5,7 @@ module SE = SystemExpr
 (** operator body *)
 type body = Term.term
 
-type op_body =
+type[@warning "-37"] op_body =
   | SingleDef of body                           (** same for all systems *)
   
   | ManyDefs  of (SE.single_system * body) list (** system by system *)

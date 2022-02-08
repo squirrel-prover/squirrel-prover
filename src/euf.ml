@@ -90,18 +90,6 @@ let key_ssc
   errors1 @ errors2 @ errors3
 
 (*------------------------------------------------------------------*)
-(** [hashes_of_action_descr ~system action_descr head_fn key_n]
-    returns the list of pairs [is,m] such that [head_fn(m,key_n[is])]
-    occurs in [action_descr].
-    TODO: unused value *)
-let hashes_of_action_descr
-     ?(drop_head=true) ~fun_wrap_key ~cntxt action_descr head_fn key_n =
-  let iter = new get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n in
-  iter#visit_message (snd action_descr.Action.output) ;
-  List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates ;
-  List.sort_uniq Stdlib.compare iter#get_occurrences
-
-(*------------------------------------------------------------------*)
 (** {2 Euf rules datatypes} *)
 
 type euf_schema = {

@@ -243,9 +243,9 @@ type 'a tac_infos = {
 type 'a table = (string, 'a tac_infos) Hashtbl.t
 
 let pp_usage tacname fmt esort =
-   Fmt.pf fmt "%s %a" tacname TacticsArgs.pp_esort esort
+  Fmt.pf fmt "%s %a" tacname TacticsArgs.pp_esort esort
 
-let pp_help fmt (th, tac_name) =
+let[@warning "-32"] pp_help fmt (th, tac_name) =
   let usages_string =
     Fmt.str "%a"
       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",\n") (pp_usage tac_name))

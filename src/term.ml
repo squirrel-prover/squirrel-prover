@@ -95,14 +95,6 @@ type t = term
 type terms = term list
 
 (*------------------------------------------------------------------*)
-let hash_ord : ord -> int = function (* TODO: unused value *)
-  | `Eq  -> 1
-  | `Neq -> 2
-  | `Leq -> 3
-  | `Geq -> 4
-  | `Lt  -> 5
-  | `Gt  -> 6
-
 let rec hash : term -> int = function
   | Name n -> hcombine 0 (hash_isymb n)
 
@@ -164,6 +156,8 @@ let f_happens = mk Symbols.fs_happens
 
 let f_pred = mk Symbols.fs_pred
 
+let f_witness = mk Symbols.fs_witness
+
 (** Boolean connectives *)
 
 let f_false  = mk Symbols.fs_false
@@ -182,10 +176,6 @@ let f_leq = mk Symbols.fs_leq
 let f_lt  = mk Symbols.fs_lt
 let f_geq = mk Symbols.fs_geq
 let f_gt  = mk Symbols.fs_gt
-
-(** TODO: unused value f_witness *)
-
-let f_witness = mk Symbols.fs_witness
 
 (** Fail *)
 
@@ -358,7 +348,7 @@ let mk_of_bool t = mk_fbuiltin Symbols.fs_of_bool [] [t]
 
 let mk_witness ty =
   let fty = Type.mk_ftype 0 [] [] ty in
-  Fun ((Symbols.fs_witness,[]), fty, [])
+  Fun (f_witness, fty, [])
 
 
 (*------------------------------------------------------------------*)
@@ -598,11 +588,6 @@ let destr_action = function
   | _ -> None
 
 (*------------------------------------------------------------------*)
-let is_binder : term -> bool = function
-  | ForAll _ | Exists _ | Find _ | Seq _ -> true
-  | _ -> false
-
-(*------------------------------------------------------------------*)
 (** {2 Printing} *)
 let pp_indices ppf l =
   if l <> [] then Fmt.pf ppf "(%a)" Vars.pp_list l
@@ -664,19 +649,14 @@ let maybe_paren
 let ite_fixity     = `F Symbols.fs_ite  , `Prefix
 let pair_fixity    = `F Symbols.fs_pair , `NoParens
 let iff_fixity     = `Iff               , `Infix `Right
-let impl_fixity    = `F Symbols.fs_impl , `Infix `Right
-let or_fixity      = `F Symbols.fs_or   , `Infix `Left
-let and_fixity     = `F Symbols.fs_and  , `Infix `Left
 let not_fixity     = `F Symbols.fs_not  , `Prefix
 let seq_fixity     = `Seq               , `Prefix
 let find_fixity    = `Find              , `Prefix
 let quant_fixity   = `Quant             , `NonAssoc
 let macro_fixity   = `Macro             , `NoParens
-let pred_fixity    = `Pred              , `NoParens
 let diff_fixity    = `Diff              , `NoParens
 let fun_fixity     = `Fun               , `NoParens
 let happens_fixity = `Happens           , `NoParens
-let ord_fixity ord = `Ord ord           , `NonAssoc
 
 (*------------------------------------------------------------------*)
 
@@ -1197,9 +1177,6 @@ and subst_binding : Vars.var -> subst -> Vars.var * subst =
 
   var, s
 
-and subst_generic_atom s = function
-  | `Happens a -> `Happens (subst s a)
-
 let subst_macros_ts table l ts t =
   let rec subst_term (t : term) : term = match t with
     | Macro (is, terms, ts') ->
@@ -1239,15 +1216,7 @@ let refresh_var (arg : refresh_arg) v =
   | `Global    -> Vars.make_new_from v
   | `InEnv env -> Vars.fresh_r env v
 
-(* the substitution must be build reversed w.r.t. vars, to handle capture *)
-let refresh_vars (arg : refresh_arg) vars =
-  let vars' = List.map (refresh_var arg) vars in
-  let subst =
-    List.rev_map2 (fun v v' -> ESubst (Var v, Var v')) vars vars'
-  in
-  vars', subst
-
-(* the substitution must be build reversed w.r.t. vars, to handle capture *)
+(* The substitution must be built reversed w.r.t. vars, to handle capture. *)
 let refresh_vars (arg : refresh_arg) evars =
   let l =
     List.rev_map (fun v ->
@@ -1257,11 +1226,6 @@ let refresh_vars (arg : refresh_arg) evars =
   in
   let vars, subst = List.split l in
   List.rev vars, subst
-
-let refresh_vars_env env vs =
-  let env = ref env in
-  let vs, s = refresh_vars (`InEnv env) vs in
-  !env, vs, s
 
 let refresh_vars_env env vs =
   let env = ref env in

@@ -504,7 +504,7 @@ type app_i =
 
 and app = app_i L.located
 
-let pp_app_i ppf = function
+let[@warning "-32"] pp_app_i ppf = function
   | Taction (a,l) ->
     Fmt.pf ppf "%s%a"
       (L.unloc a)
@@ -1099,23 +1099,6 @@ let check_signature table checksign pk =
 let declare_name table s ndef =
   fst (Symbols.Name.declare_exact table s ndef)
 
-let declare_abstract table ~index_arity ~ty_args ~in_tys ~out_ty
-    (s : lsymb) (f_info : Symbols.symb_type) =
-
-  (* if we declare an infix symbol, run some sanity checks *)
-  let () = match f_info with
-    | `Prefix -> ()
-    | `Infix ->
-      if not (index_arity = 0) ||
-         not (List.length ty_args = 0) ||
-         not (List.length in_tys = 2) then
-        conv_err (L.loc s) BadInfixDecl;
-  in
-
-  let ftype = Type.mk_ftype index_arity ty_args in_tys out_ty in
-  fst (Symbols.Function.declare_exact table s (ftype, Symbols.Abstract f_info))
-
-
 let declare_abstract 
     table ~index_arity ~ty_args ~in_tys ~out_ty 
     (s : lsymb) (f_info : Symbols.symb_type) 
@@ -1268,8 +1251,6 @@ let parse_subst (env : Env.t) (uvars : Vars.var list) (ts : term list)
   in
   List.map2 f ts uvars
 
-(* TODO: what is Local_data for?? (it's unused) *)
-type Symbols.data += Local_data of Vars.var list * Vars.var * Term.term
 type Symbols.data += StateInit_data of Vars.var list * Term.term
 
 let declare_state
