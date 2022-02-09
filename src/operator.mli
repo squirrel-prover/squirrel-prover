@@ -1,5 +1,3 @@
-open Utils
-
 type operator
 
 val pp_operator : Format.formatter -> operator -> unit

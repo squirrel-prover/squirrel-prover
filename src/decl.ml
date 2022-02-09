@@ -1,5 +1,3 @@
-open Utils
-
 module L = Location
 type lsymb = Theory.lsymb
 

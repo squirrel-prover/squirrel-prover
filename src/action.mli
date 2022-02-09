@@ -122,8 +122,10 @@ type descr = {
   indices   : Vars.var list ;
   condition : Vars.var list * Term.term ;
   updates   : (Term.state * Term.term) list ;
+    (** State updates, at most one per state symbol. *)
   output    : Channel.t * Term.term;
   globals : Symbols.macro Symbols.t list;
+    (** List of global macros declared at [action]. *)
 }
 
 (** [pi_descr s a] returns the projection of the description. As descriptions

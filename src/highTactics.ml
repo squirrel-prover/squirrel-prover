@@ -1,5 +1,4 @@
 open Utils
-open Rewrite
 
 module Args = TacticsArgs
 module L = Location

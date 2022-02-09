@@ -1,7 +1,5 @@
 open Utils
 
-type lsymb = Theory.lsymb
-
 (*------------------------------------------------------------------*)
 let rev_subst subst = 
   List.map (fun (Term.ESubst (u,v)) -> Term.ESubst (v,u)) subst
@@ -30,9 +28,9 @@ module Mk (S : LowSequent.S) = struct
   let reduce_term (param : red_param) (s : S.t) (t : Term.term) : Term.term = 
     let exception NoExp in
     
-    (** Invariant: we must ensure that fv(reduce(u)) ⊆ fv(t)
+    (* Invariant: we must ensure that fv(reduce(u)) ⊆ fv(t)
         Return: reduced term, reduction occurred *)
-    (** TODO: memoisation *)
+    (* TODO: memoisation *)
     let rec reduce (st : state) (t : Term.term) : Term.term * bool = 
       let t, has_red = reduce_head_once st t in
 
@@ -42,13 +40,13 @@ module Mk (S : LowSequent.S) = struct
         if has_red then fst (reduce st t), true
         else t, false
 
-    (** Reduce once at head position *)
+    (* Reduce once at head position *)
     and reduce_head_once (st : state) (t : Term.term) : Term.term * bool = 
       let t, has_red = expand_head_once st t in
       let t, has_red' = rewrite_head_once st t in
       t, has_red || has_red'
 
-    (** Expand once at head position *)
+    (* Expand once at head position *)
     and expand_head_once (st : state) (t : Term.term) : Term.term * bool = 
       if not st.param.delta 
       then t, false 
@@ -72,7 +70,7 @@ module Mk (S : LowSequent.S) = struct
 
       | _ -> raise NoExp
 
-    (** Rewrite once at head position *)
+    (* Rewrite once at head position *)
     and rewrite_head_once (st : state) (t : Term.term) : Term.term * bool = 
       let db = Hint.get_rewrite_db st.hint_db in
       let hints = Match.Hm.find_dflt [] (Match.get_head t) db in
@@ -94,7 +92,7 @@ module Mk (S : LowSequent.S) = struct
       | None -> t, false
       | Some red_t -> red_t, true
 
-    (** Reduce all strict subterms *)
+    (* Reduce all strict subterms *)
     and reduce_subterms (st : state) (t : Term.term) : Term.term * bool = 
       match t with
       | Term.Exists (evs, t0) 

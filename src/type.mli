@@ -1,5 +1,4 @@
 (** This modules provides the types used to type variables and terms. *)
-open Utils
 
 (*------------------------------------------------------------------*)
 (** Type variables *)
@@ -23,21 +22,21 @@ val pp_univar : Format.formatter -> univar -> unit
 (*------------------------------------------------------------------*)
 (** Types of terms *)
 type ty =
-  (** Built-in types *)
+  (* Built-in types *)
   | Message
   | Boolean
   | Index  
   | Timestamp
 
-  (** User-defined types *)
   | TBase   of string
+  (** User-defined types *)
         
+  | TVar    of tvar
   (** Type variable *)
-  | TVar    of tvar  
 
-  (** Type unification variable *)
   | TUnivar of univar
- 
+  (** Type unification variable *)
+
 (*------------------------------------------------------------------*)
 val pp : Format.formatter -> ty -> unit
 

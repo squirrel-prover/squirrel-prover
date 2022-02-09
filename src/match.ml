@@ -76,7 +76,7 @@ let pat_of_form (t : term) =
 (*------------------------------------------------------------------*)
 (** {2 Matching variable assignment} *)
 
-module Mvar : sig
+module Mvar : sig[@warning "-32"]
   type t
 
   val make : term Mv.t -> t
@@ -108,7 +108,7 @@ end = struct
              subst : term Mv.t; }
 
   let cpt = ref 0
-  let make subst = { id = (incr cpt; !cpt); subst }
+  let make subst = incr cpt; { id = !cpt; subst }
 
   let pp fmt (mv : t) : unit =
     let pp_binding fmt (v, t) =
@@ -118,7 +118,7 @@ end = struct
     Fmt.pf fmt "@[<v 2>{id:%d@;%a}@]" mv.id
       (Fmt.list ~sep:Fmt.cut pp_binding) (Mv.bindings mv.subst)
 
-  let empty = make (Mv.empty)
+  let empty = make Mv.empty
 
   let union mv1 mv2 =
     make (Mv.union (fun _ _ _ -> assert false) mv1.subst mv2.subst)
@@ -985,7 +985,7 @@ type known_set = {
 type known_sets = (term_head * known_set list) list
 
 (*------------------------------------------------------------------*)
-module MCset : sig
+module MCset : sig[@warning "-32"]
   (** Set of macros over some indices, with a conditional.
         [{ msymb   = m;
            indices = vars;
@@ -1091,7 +1091,7 @@ let pp_msets fmt (msets : msets) =
   MCset.pp_l fmt mset_l
 
 (*------------------------------------------------------------------*)
-let pp_cand_set pp_term fmt (cand : 'a cand_set_g) =
+let[@warning "-32"] pp_cand_set pp_term fmt (cand : 'a cand_set_g) =
   let pp_subst fmt mv =
     let s = Mvar.to_subst ~mode:`Unif mv in
     if s = [] then ()
@@ -1620,8 +1620,8 @@ module E : S with type t = Equiv.form = struct
       (env    : Sv.t)
       (init_terms : Term.terms) : msets
     =
-    (** Return a list of specialization of [cand] deducible from
-        [init_terms, known_sets] for action [a] at time [a]. *)
+    (* Return a list of specialization of [cand] deducible from
+       [init_terms, known_sets] for action [a] at time [a]. *)
     let filter_deduce_action
         (a : Symbols.action Symbols.t)
         (cand : MCset.t)
@@ -2044,7 +2044,7 @@ module E : S with type t = Equiv.form = struct
 
 
   (*------------------------------------------------------------------*)
-  let rec match_equiv_eq
+  let match_equiv_eq
       (terms     : Term.term list)
       (pat_terms : Term.term list)
       (st        : match_state) : Mvar.t

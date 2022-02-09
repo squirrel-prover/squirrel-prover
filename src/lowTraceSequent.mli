@@ -1,6 +1,6 @@
 (** Sequents used to prove trace properties, aka reachability properties.
-  *
-  * This module implements {!LowSequent.S} with [type form = Term.term]. *)
+
+    This module implements {!LowSequent.S} with [type form = Term.term]. *)
 
 type trace_sequent
 
@@ -47,14 +47,14 @@ val query : precise:bool -> t -> Term.literals -> bool
 val query_happens : precise:bool -> t -> Term.term -> bool
 
 (** If [message_atoms_valid s] returns [true] then (dis)equalities over
-  * terms on both sides of the sequents make the sequent valid. 
-  * May timeout. *)
+    terms on both sides of the sequents make the sequent valid.
+    May timeout. *)
 val eq_atoms_valid : sequent -> bool 
 
 (** [constraints_valid s] returns true if constraints make the sequent valid,
-  * taking into account constraint trace formula hypotheses and atomic
-  * constraint conclusion. 
-  * May timeout. *)
+    taking into account constraint trace formula hypotheses and atomic
+    constraint conclusion.
+    May timeout. *)
 val constraints_valid : sequent -> bool 
 
 (** [get_ts_equalities s] returns all the equalities between timestamps
@@ -77,5 +77,10 @@ val maximal_elems :
   Term.term list 
 
 (** [get_all_messages s] returns all the messages appearing at toplevel
-  * in [s]. *)
+    in [s]. *)
 val get_all_messages : sequent -> Term.term list
+
+(** [literals_unsat_smt] checks whether the conclusion of the sequent follows
+    from some "simple" literals in the hypotheses + the formulas declared by
+    "hint smt" *)
+val literals_unsat_smt : ?slow:bool -> sequent -> bool

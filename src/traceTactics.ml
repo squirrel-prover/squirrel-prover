@@ -375,6 +375,77 @@ let () = T.register "constraints"
     ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun constraints_tac)
 
+(*------------------------------------------------------------------*)
+(* SMT-based combination of constraints and congruence *)
+
+let smt (s : TS.t) =
+  (* let's avoid massaging the goal beforehand
+   * so that we can send it as it is to the SMT solver
+   * (in the current implementation, the goal is preserved while
+   *  only the trace literals and equality atoms are sent among the hypotheses)
+   * NOTE: this means that in principle this will sometimes be less powerful
+   *       than calling constraints/congruence *)
+  (* match simpl_left s with
+   * | None -> true
+   * | Some s ->
+   *   let conclusions =
+   *     Utils.odflt [] (Term.disjunction_to_literals (TS.goal s))
+   *   in
+   *   let term_conclusions =
+   *     List.fold_left (fun acc conc -> match conc with
+   *         | `Pos, (#generic_atom as at) ->
+   *           let at = (at :> Term.generic_atom) in
+   *           Term.(mk_not (mk_atom1 at)) :: acc
+   *         | `Neg, (#generic_atom as at) ->
+   *           Term.mk_atom1 at :: acc)
+   *       []
+   *       conclusions
+   *   in
+   *   let s = List.fold_left (fun s f ->
+   *       Hyps.add Args.AnyName f s
+   *     ) s term_conclusions
+   *   in *)
+    TS.literals_unsat_smt s
+
+let smt_tac (s : TS.t) =
+  (* let s = as_seq1 (TraceLT.intro_all s) in *)
+  match smt s with
+  | true ->
+    let () = dbg "closed by smt" in
+    []
+
+  | false ->
+   let () = dbg "smt failed" in
+   soft_failure (Tactics.Failure "smt did not return unsat")
+
+let () = T.register "smt"
+    ~tactic_help:
+      {general_help = "Tries to discharge goal using an SMT solver.";
+       detailed_help = "implements a combination of congruence, constraints, \
+                        eqnames and macroexpansion, plus first-order reasoning";
+       usages_sorts = [Sort None];
+       tactic_group = Structural}
+    (LowTactics.genfun_of_pure_tfun smt_tac)
+
+let slowsmt_tac (s : TS.t) =
+  match TS.literals_unsat_smt ~slow:true s with
+  | true ->
+    let () = dbg "closed by smt" in
+    []
+
+  | false ->
+   let () = dbg "smt failed" in
+   soft_failure (Tactics.Failure "smt did not return unsat")
+
+let () = T.register "slowsmt"
+    ~tactic_help:
+      {general_help = "Version of smt tactic with higher time limit.";
+       detailed_help = "";
+       usages_sorts = [Sort None];
+       tactic_group = Structural}
+    (LowTactics.genfun_of_pure_tfun slowsmt_tac)
+
+
 
 (*------------------------------------------------------------------*)
 (** Eq-Indep Axioms *)
@@ -745,7 +816,7 @@ let apply_substitute subst s =
 let substitute_mess (m1, m2) s =
   let subst =
         let trs = TS.get_trs s in
-        if Completion.check_equalities trs [Term.ESubst (m1,m2)] then
+        if Completion.check_equalities trs [(m1,m2)] then
           [Term.ESubst (m1,m2)]
         else
           soft_failure Tactics.NotEqualArguments
@@ -1097,7 +1168,7 @@ let new_simpl ~congr ~constr s =
 
           | `Comp (`Eq, t1, t2), _ ->
             if congr &&
-               Completion.check_equalities (TS.get_trs s) [Term.ESubst (t1,t2)]
+               Completion.check_equalities (TS.get_trs s) [(t1,t2)]
             then None
             else Some goal
 
@@ -1477,7 +1548,7 @@ let euf_apply_facts drop_head s
   if Symbols.is_ftype head_fn Symbols.SEnc cntxt.table
   || Symbols.is_ftype head_fn Symbols.AEnc cntxt.table then
     Cca.check_encryption_randomness
-      cntxt
+      ~cntxt
       rule.Euf.case_schemata rule.Euf.cases_direct head_fn [mess;sign] [];
 
   schemata_premises @ direct_premises
@@ -1708,7 +1779,7 @@ let top_level_hashes s =
 
   make_eq [] hashes
   |> List.filter (fun (a,b) ->
-      Completion.check_equalities trs [Term.ESubst (a,b)])
+      Completion.check_equalities trs [(a,b)])
 
 
 
@@ -1782,8 +1853,8 @@ let rewrite_equiv_transform
     (term : Term.term) : Term.term
   =
   let assoc (t : Term.term) : Term.term option =
-    match List.find_opt (fun e -> (Term.pi_term src e) = t) biframe with
-    | Some e -> Some (Term.pi_term dst e)
+    match List.find_opt (fun e -> (Term.pi_term ~projection:src e) = t) biframe with
+    | Some e -> Some (Term.pi_term ~projection:dst e)
     | None -> None
   in
   let rec aux : term -> term = fun t ->

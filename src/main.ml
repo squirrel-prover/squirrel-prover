@@ -4,14 +4,14 @@ module L = Location
 
 module Initialization = struct
   (* Opening these modules is only useful for their side effects,
-   * e.g. registering tactics. *)
-  open LowTactics
-  open TraceTactics
-  open EquivTactics
-  open HighTactics
+   * e.g. registering tactics - hence the use of "open!" *)
+  open! LowTactics
+  open! TraceTactics
+  open! EquivTactics
+  open! HighTactics
 end
 
-let usage = Printer.strf "Usage: %s filename" (Filename.basename Sys.argv.(0))
+let usage = Fmt.str "Usage: %s filename" (Filename.basename Sys.argv.(0))
 
 (*------------------------------------------------------------------*)
 (** A loading path: directory to lookup during includes *)
@@ -300,6 +300,7 @@ let do_add_hint (state : main_state) (h : Hint.p_hint) : main_state =
   let db =
     match h with
     | Hint.Hint_rewrite id -> Prover.add_hint_rewrite id db
+    | Hint.Hint_smt     id -> Prover.add_hint_smt     id db
   in
   Prover.set_hint_db db;
   state

@@ -20,7 +20,7 @@ let system_err e = raise (SystemError e)
 (*------------------------------------------------------------------*)
 module ShapeCmp = struct
   type t = Action.shape
-  let rec compare (u : t) (v : t) = Stdlib.compare u v
+  let compare (u : t) (v : t) = Stdlib.compare u v
 end
 
 module Msh = Map.Make (ShapeCmp)
@@ -32,9 +32,6 @@ module Msh = Map.Make (ShapeCmp)
   * their corresponding symbols. *)
 type Symbols.data += System_data of Action.descr Msh.t *
                                     Symbols.action Symbols.t Msh.t
-
-let of_string (name : lsymb) (table : Symbols.table) =
-  Symbols.System.of_lsymb name table
 
 let declare_empty table system_name =
   let def = () in
@@ -103,27 +100,6 @@ let find_shape table shape =
 
     None
   with Found (x,y) -> Some (x,y)
-
-(** We look whether the dummy shape already has a name in another system.
-    If that is the case, use the same symbol. *)
-let find_dum_shape table shape =
-  let exception Found of Symbols.action Symbols.t in
-  try Symbols.System.iter (fun system () data ->
-      let symbs = match data with
-        | System_data (_,symbs) -> symbs
-        | _ -> assert false
-      in
-
-      if Msh.mem shape symbs then
-        let symb = Msh.find shape symbs in
-        raise (Found symb)
-      else ()
-    ) table;
-
-    None
-  with Found x -> Some x
-
-
 
 (*------------------------------------------------------------------*)
 let register_action table system_symb symb indices action descr =

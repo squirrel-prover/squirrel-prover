@@ -3,6 +3,7 @@ _build/*
 *.native
 todo
 *.byte
+*.exe
 output.tex
 *.aux
 *.bbl

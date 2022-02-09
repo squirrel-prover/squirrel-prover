@@ -64,7 +64,7 @@ and term = term_i L.located
 type formula = term
 
 (*------------------------------------------------------------------*)
-let rec equal_p_ty t t' = match L.unloc t, L.unloc t' with
+let equal_p_ty t t' = match L.unloc t, L.unloc t' with
   | P_message  , P_message
   | P_boolean  , P_boolean
   | P_index    , P_index
@@ -222,8 +222,6 @@ let rec pp_term_i ppf t = match t with
 
 
 and pp_ts ppf ts = Fmt.pf ppf "@%a" pp_term ts
-
-and pp_ots ppf ots = Fmt.option pp_ts ppf ots
 
 and pp_term ppf t =
   Fmt.pf ppf "%a" pp_term_i (L.unloc t)
@@ -506,7 +504,7 @@ type app_i =
 
 and app = app_i L.located
 
-let pp_app_i ppf = function
+let[@warning "-32"] pp_app_i ppf = function
   | Taction (a,l) ->
     Fmt.pf ppf "%s%a"
       (L.unloc a)
@@ -534,8 +532,6 @@ let pp_app_i ppf = function
       (Fmt.option Term.pp) ots
 
   | AVar s -> Fmt.pf ppf "%s" (L.unloc s)
-
-let pp_app ppf app = pp_app_i ppf (L.unloc app)
 
 (** Context of a application construction. *)
 type app_cntxt =
@@ -1103,23 +1099,6 @@ let check_signature table checksign pk =
 let declare_name table s ndef =
   fst (Symbols.Name.declare_exact table s ndef)
 
-let declare_abstract table ~index_arity ~ty_args ~in_tys ~out_ty
-    (s : lsymb) (f_info : Symbols.symb_type) =
-
-  (* if we declare an infix symbol, run some sanity checks *)
-  let () = match f_info with
-    | `Prefix -> ()
-    | `Infix ->
-      if not (index_arity = 0) ||
-         not (List.length ty_args = 0) ||
-         not (List.length in_tys = 2) then
-        conv_err (L.loc s) BadInfixDecl;
-  in
-
-  let ftype = Type.mk_ftype index_arity ty_args in_tys out_ty in
-  fst (Symbols.Function.declare_exact table s (ftype, Symbols.Abstract f_info))
-
-
 let declare_abstract 
     table ~index_arity ~ty_args ~in_tys ~out_ty 
     (s : lsymb) (f_info : Symbols.symb_type) 
@@ -1272,7 +1251,6 @@ let parse_subst (env : Env.t) (uvars : Vars.var list) (ts : term list)
   in
   List.map2 f ts uvars
 
-type Symbols.data += Local_data of Vars.var list * Vars.var * Term.term
 type Symbols.data += StateInit_data of Vars.var list * Term.term
 
 let declare_state

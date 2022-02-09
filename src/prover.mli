@@ -243,3 +243,4 @@ val declare_list :
 
 (*------------------------------------------------------------------*)
 val add_hint_rewrite : lsymb -> Hint.hint_db -> Hint.hint_db
+val add_hint_smt     : lsymb -> Hint.hint_db -> Hint.hint_db

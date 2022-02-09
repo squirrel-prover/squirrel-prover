@@ -18,10 +18,6 @@ let vars = function
   | Trace j -> TS.vars j
   | Equiv j -> ES.vars j
 
-let get_table = function
-  | Trace j -> TS.table j
-  | Equiv j -> ES.table j
-
 let pp ch = function
   | Trace j -> TS.pp ch j
   | Equiv j -> ES.pp ch j
@@ -57,10 +53,6 @@ type ('a,'b) abstract_statement = {
 type       statement = (string,  Equiv.gform) abstract_statement
 type equiv_statement = (string,   Equiv.form) abstract_statement
 type reach_statement = (string, Term.term) abstract_statement
-
-(*------------------------------------------------------------------*)
-(** Generalized hypothesis: hypothesis or lemma identifier. *)
-type ghyp = [ `Hyp of Ident.t | `Lemma of string ]
 
 (*------------------------------------------------------------------*)
 

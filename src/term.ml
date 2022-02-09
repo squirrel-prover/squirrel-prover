@@ -5,7 +5,7 @@ module L = Location
 module Sv = Vars.Sv
 module Mv = Vars.Mv
 
-let dbg s = Printer.prt `Ignore s
+(* let dbg s = Printer.prt `Ignore s *)
 (* let dbg s = Printer.prt `Dbg s *)
 
 (*------------------------------------------------------------------*)
@@ -57,7 +57,6 @@ let pp_fsymb ppf (fn,is) = match is with
   | _ -> Fmt.pf ppf "%a(%a)" pp_fname fn Vars.pp_list is
 
 let pp_mname_s ppf s =
-  let open Fmt in
   (Printer.kws `GoalMacro) ppf s
 
 let pp_mname ppf s =
@@ -74,9 +73,7 @@ let pp_msymb ppf (ms : msymb) =
 type ord    = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
 type ord_eq = [ `Eq | `Neq ]
 
-type ('a,'b) _atom = 'a * 'b * 'b
-
-and term =
+type term =
   | Fun    of fsymb * Type.ftype * term list
   | Name   of nsymb
   | Macro  of msymb * term list * term
@@ -98,14 +95,6 @@ type t = term
 type terms = term list
 
 (*------------------------------------------------------------------*)
-let hash_ord : ord -> int = function
-  | `Eq  -> 1
-  | `Neq -> 2
-  | `Leq -> 3
-  | `Geq -> 4
-  | `Lt  -> 5
-  | `Gt  -> 6
-
 let rec hash : term -> int = function
   | Name n -> hcombine 0 (hash_isymb n)
 
@@ -167,6 +156,8 @@ let f_happens = mk Symbols.fs_happens
 
 let f_pred = mk Symbols.fs_pred
 
+let f_witness = mk Symbols.fs_witness
+
 (** Boolean connectives *)
 
 let f_false  = mk Symbols.fs_false
@@ -177,7 +168,7 @@ let f_impl   = mk Symbols.fs_impl
 let f_not    = mk Symbols.fs_not
 let f_ite    = mk Symbols.fs_ite
 
-(** Comparisions *)
+(** Comparisons *)
 
 let f_eq  = mk Symbols.fs_eq
 let f_neq = mk Symbols.fs_neq
@@ -185,10 +176,6 @@ let f_leq = mk Symbols.fs_leq
 let f_lt  = mk Symbols.fs_lt
 let f_geq = mk Symbols.fs_geq
 let f_gt  = mk Symbols.fs_gt
-
-(** Fail *)
-
-let f_witness = mk Symbols.fs_witness
 
 (** Fail *)
 
@@ -361,7 +348,7 @@ let mk_of_bool t = mk_fbuiltin Symbols.fs_of_bool [] [t]
 
 let mk_witness ty =
   let fty = Type.mk_ftype 0 [] [] ty in
-  Fun ((Symbols.fs_witness,[]), fty, [])
+  Fun (f_witness, fty, [])
 
 
 (*------------------------------------------------------------------*)
@@ -447,7 +434,7 @@ let oas_seq2 = omap as_seq2
 (** Smart destrucrots.
     The module is included after its definition. *)
 module SmartDestructors = struct
-  let rec destr_exists1 = function
+  let destr_exists1 = function
     | Exists (v :: vs, f) -> Some (v, mk_exists vs f)
     | _ -> None
 
@@ -466,7 +453,7 @@ module SmartDestructors = struct
       vs @ vs', f0
     | _ as f -> [], f
 
-  let rec destr_forall1 = function
+  let destr_forall1 = function
     | ForAll (v :: vs, f) -> Some (v, mk_forall vs f)
     | _ -> None
 
@@ -576,7 +563,8 @@ module SmartDestructors = struct
   let is_or   f = destr_or   f <> None
   let is_and  f = destr_and  f <> None
   let is_impl f = destr_impl f <> None
-  let is_pair f = destr_pair f <> None
+  (* is_pair is unused but having it seems to make sense *)
+  let[@warning "-32"] is_pair f = destr_pair f <> None
 
   let is_exists f = destr_exists f <> None
   let is_forall f = destr_forall f <> None
@@ -598,17 +586,6 @@ let destr_var : term -> Vars.var option = function
 let destr_action = function
   | Action (s,is) -> Some (s,is)
   | _ -> None
-
-(*------------------------------------------------------------------*)
-let is_binder : term -> bool = function
-  | ForAll _ | Exists _ | Find _ | Seq _ -> true
-  | _ -> false
-
-(*------------------------------------------------------------------*)
-let as_ord_eq (ord : ord) : ord_eq = match ord with
-  | `Eq -> `Eq
-  | `Neq -> `Neq
-  | _ -> assert false
 
 (*------------------------------------------------------------------*)
 (** {2 Printing} *)
@@ -672,43 +649,28 @@ let maybe_paren
 let ite_fixity     = `F Symbols.fs_ite  , `Prefix
 let pair_fixity    = `F Symbols.fs_pair , `NoParens
 let iff_fixity     = `Iff               , `Infix `Right
-let impl_fixity    = `F Symbols.fs_impl , `Infix `Right
-let or_fixity      = `F Symbols.fs_or   , `Infix `Left
-let and_fixity     = `F Symbols.fs_and  , `Infix `Left
 let not_fixity     = `F Symbols.fs_not  , `Prefix
 let seq_fixity     = `Seq               , `Prefix
 let find_fixity    = `Find              , `Prefix
 let quant_fixity   = `Quant             , `NonAssoc
 let macro_fixity   = `Macro             , `NoParens
-let pred_fixity    = `Pred              , `NoParens
 let diff_fixity    = `Diff              , `NoParens
 let fun_fixity     = `Fun               , `NoParens
 let happens_fixity = `Happens           , `NoParens
-let ord_fixity ord = `Ord ord           , `NonAssoc
 
 (*------------------------------------------------------------------*)
 
-(** Applies the styling info in [info] *)
-let rec pp : type a.
-  pp_info ->
-  (('b * fixity) * assoc) ->
-  term Fmt.t
-  =
+(** Applies the styling info in [info]
+    NOTE: this is *not* the [pp] exported by the module, it is shadowed later *)
+let rec pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
   fun info (outer,side) ppf t ->
   let err_opt, info = info.styler info t in
   styled_opt err_opt (_pp info (outer, side)) ppf t
 
 (** Core printing function *)
-and _pp : type a.
-  pp_info ->
-  (('b * fixity) * assoc) ->
-  term Fmt.t
-  =
+and _pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
   fun info (outer, side) ppf t ->
-  let pp : type a.
-    (('b * fixity) * assoc)->
-    term Fmt.t
-    =
+  let pp : (('b * fixity) * assoc) -> term Fmt.t =
     fun (outer,side) fmt t -> pp info (outer, side) fmt t
   in
 
@@ -905,6 +867,8 @@ let pp_hterm fmt = function
 (*------------------------------------------------------------------*)
 (** Literals. *)
 
+type ('a,'b) _atom = 'a * 'b * 'b
+
 type xatom = [
   | `Comp    of (ord,term) _atom
   | `Happens of term
@@ -944,7 +908,7 @@ let neg_lit ((pn, at) : literal) : literal =
     | `Neg -> `Pos in
   (pn, at)
 
-let rec form_to_xatom (form : term) : xatom option =
+let form_to_xatom (form : term) : xatom option =
   match form with
   | Fun (f, _, [a]) when f = f_happens -> Some (`Happens a)
 
@@ -1213,9 +1177,6 @@ and subst_binding : Vars.var -> subst -> Vars.var * subst =
 
   var, s
 
-and subst_generic_atom s = function
-  | `Happens a -> `Happens (subst s a)
-
 let subst_macros_ts table l ts t =
   let rec subst_term (t : term) : term = match t with
     | Macro (is, terms, ts') ->
@@ -1255,15 +1216,7 @@ let refresh_var (arg : refresh_arg) v =
   | `Global    -> Vars.make_new_from v
   | `InEnv env -> Vars.fresh_r env v
 
-(* the substitution must be build reversed w.r.t. vars, to handle capture *)
-let refresh_vars (arg : refresh_arg) vars =
-  let vars' = List.map (refresh_var arg) vars in
-  let subst =
-    List.rev_map2 (fun v v' -> ESubst (Var v, Var v')) vars vars'
-  in
-  vars', subst
-
-(* the substitution must be build reversed w.r.t. vars, to handle capture *)
+(* The substitution must be built reversed w.r.t. vars, to handle capture. *)
 let refresh_vars (arg : refresh_arg) evars =
   let l =
     List.rev_map (fun v ->
@@ -1273,11 +1226,6 @@ let refresh_vars (arg : refresh_arg) evars =
   in
   let vars, subst = List.split l in
   List.rev vars, subst
-
-let refresh_vars_env env vs =
-  let env = ref env in
-  let vs, s = refresh_vars (`InEnv env) vs in
-  !env, vs, s
 
 let refresh_vars_env env vs =
   let env = ref env in
@@ -1534,13 +1482,6 @@ let tsubst_ht (ts : Type.tsubst) (ht : hterm) : hterm =
 (*------------------------------------------------------------------*)
 (** {2 Simplification} *)
 
-let not_ord_eq o = match o with
-  | `Eq -> `Neq
-  | `Neq -> `Eq
-
-let not_ord_eq (o,l,r) = (not_ord_eq o, l, r)
-
-(*------------------------------------------------------------------*)
 let rec not_simpl = function
     | Exists (vs, f) -> ForAll(vs, not_simpl f)
     | ForAll (vs, f) -> Exists(vs, not_simpl f)

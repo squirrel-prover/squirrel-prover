@@ -22,20 +22,20 @@ let pp_univar fmt u = Fmt.pf fmt "'_%a" Ident.pp u
 (*------------------------------------------------------------------*)
 (** Types of terms *)
 type ty =
-  (** Built-in types *)
+  (* Built-in types *)
   | Message
   | Boolean
   | Index  
   | Timestamp
 
-  (** User-defined types *)
   | TBase   of string
+  (** User-defined types *)
         
+  | TVar    of tvar
   (** Type variable *)
-  | TVar    of tvar  
 
-  (** Type unification variable *)
   | TUnivar of univar
+  (** Type unification variable *)
 
 (*------------------------------------------------------------------*)
 (** Higher-order *)

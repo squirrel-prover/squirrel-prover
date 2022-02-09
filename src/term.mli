@@ -38,7 +38,7 @@ type fsymb = fname * Vars.var list
   * variables, and let definitions: everything that is expanded when
   * translating the meta-logic to the base logic. *)
 
-type mname    = Symbols.macro Symbols.t
+type mname = Symbols.macro Symbols.t
 type msymb = mname isymb
 
 type state = msymb
@@ -63,9 +63,7 @@ type ord_eq = [ `Eq | `Neq ]
 
 val pp_ord : Format.formatter -> ord -> unit
 
-type ('a,'b) _atom = 'a * 'b * 'b
-
-and term = private
+type term = private
   | Fun   of fsymb * Type.ftype * term list
   | Name  of nsymb
   | Macro of msymb * term list * term
@@ -97,6 +95,8 @@ val tmap_fold  : ('b -> term -> 'b * term) -> 'b -> term -> 'b * term
 
 (*------------------------------------------------------------------*)
 (** {2 Literals} *)
+
+type ('a,'b) _atom = 'a * 'b * 'b
 
 type xatom = [
   | `Comp    of (ord,term) _atom

@@ -6,8 +6,6 @@ module T = Tactics
 
 module TS = LowTraceSequent
 
-type lsymb = Theory.lsymb
-
 (*------------------------------------------------------------------*)
 (** {2 Hypotheses for equivalence sequents} *)
 
@@ -21,8 +19,6 @@ module H = Hyps.Mk
 
 let subst_hyps (subst : Term.subst) (hyps : H.hyps) : H.hyps =
   H.map (Equiv.subst subst) hyps
-
-type hyps = H.hyps
 
 (*------------------------------------------------------------------*)
 (** {2 Equivalence sequent} *)
@@ -182,6 +178,8 @@ let update ?system ?table ?ty_vars ?vars ?hyps ?goal t =
   and goal = Utils.odflt t.goal goal in
   { t with env; hyps; goal; } 
 
+(* TODO: several of those are unused values *)
+
 let env j = j.env
 
 let set_env env s = { s with env }
@@ -200,16 +198,9 @@ let goal j = j.goal
 
 let ty_vars j = j.env.ty_vars
 
-let hyps j = j.hyps
-
-let set_hyps hyps j = { j with hyps }
-
 let set_goal goal j = { j with goal }
 
-
 let set_reach_goal f s = set_goal Equiv.(Atom (Reach f)) s
-
-let set_ty_vars ty_vars j = update ~ty_vars j
 
 let get_frame proj j = match j.goal with
   | Equiv.Atom (Equiv.Equiv e) ->

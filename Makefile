@@ -1,8 +1,3 @@
-OCB_FLAGS = -use-ocamlfind -use-menhir -I src \
-			-pkgs fmt,fmt.tty,alcotest,ocamlgraph,pcre \
-
-OCB = ocamlbuild $(OCB_FLAGS)
-
 GITHASH := $(shell scripts/git-hash)
 
 default: squirrel
@@ -14,10 +9,10 @@ PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $
 
 test: squirrel alcotest okfail_test
 
-.PHONY: ok_test ok_test_end alcotest test.byte squirrel squirrel.byte
+.PHONY: ok_test ok_test_end alcotest squirrel
 
 # Directory for logging test runs
-RUNLOGDIR=_build/log
+RUNLOGDIR=_build/squirrel_log
 okfail_test:
 	rm -rf $(RUNLOGDIR)
 	@$(MAKE) -j8 okfail_test_end
@@ -48,72 +43,44 @@ tests/test_prologue.ok:
 	 ; then echo -n . ; \
 	 else echo "[FAIL] $(@:.ok=.sp)" >> tests/tests.ko ; echo -n '!' ; fi
 
-test.byte: version sanity
-	$(OCB) test.byte
-
-alcotest: test.byte
-	@mkdir -p ./_build/_tests
-	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
-	./test.byte --compact
+alcotest: version
+	@mkdir -p ./_build/default/_build/_tests
+	@rm -f ./_build/default/_build/_tests/Squirrel ./_build/default/_build/_tests/latest
+	dune runtest --force
+# TODO: how to pass the --compact flag to the test executable?
 
 clean:
-	$(OCB) -clean
+	dune clean
 	@rm -f squirrel
 	rm -f *.coverage
 	rm -rf _coverage
 
-squirrel.byte: version sanity
-	$(OCB) squirrel.byte
+# debug flag (-g) enabled by default
+squirrel: version
+	dune build squirrel.exe
+	cp -f _build/default/squirrel.exe squirrel
 
-debug: version sanity
-	$(OCB) -tags debug squirrel.native
-
-
-squirrel: squirrel.byte
-	@ln -s -f squirrel.byte squirrel
-
-makecoverage: version sanity
-	BISECT_COVERAGE=YES $(OCB) test.byte
-	@mkdir -p ./_build/_tests
-	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
-	./test.byte --compact
-	BISECT_COVERAGE=YES $(OCB) squirrel.byte
-	@ln -s -f squirrel.byte squirrel
+makecoverage: version
+	@mkdir -p ./_build/default/_build/_tests
+	@rm -f ./_build/default/_build/_tests/Squirrel ./_build/default/_build/_tests/latest
+	dune runtest --force --instrument-with bisect_ppx
+#	BISECT_COVERAGE=YES $(OCB) squirrel.byte
+#	@ln -s -f squirrel.byte squirrel
 
 coverage: makecoverage ok_test
 	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
 	bisect-ppx-report html --ignore-missing-files
 	rm -f *.coverage
 
-%.cmo: sanity
-	$(OCB) $@
-
 install: version squirrel
 	cp squirrel.byte ~/.local/bin/squirrel.byte
 
-doc: squirrel
-	$(OCB) -ocamldoc "ocamldoc -stars" squirrel.docdir/index.html
-
-sanity: _build/requirements
+doc: # squirrel
+	dune build @doc
+	@echo "generated documentation in _build/default/_doc/_html/squirrel/index.html"
 
 version:
 	rm -f src/commit.ml
 	sed 's/GITHASH/$(GITHASH)/' < src/commit.ml.in > src/commit.ml
 
-# check that requirements are installed
-PLEASE="Please install $$pkg, e.g. using \"opam install $$pkg\"."
-_build/requirements: Makefile
-	@(echo -n "Checking for menhir... " ; \
-	  which menhir ) || ( \
-	  pkg=menhir ; echo $(PLEASE) ; \
-	  false )
-	@for pkg in fmt ocamlgraph alcotest pcre ; do \
-	  (echo -n "Checking for $$pkg... " ; \
-	   ocamlfind query $$pkg ) || ( \
-	   pkg=$$pkg ; echo $(PLEASE) ; \
-	   false ) ; \
-	done
-	mkdir -p _build
-	touch _build/requirements
-
-.PHONY: version clean sanity
+.PHONY: version clean

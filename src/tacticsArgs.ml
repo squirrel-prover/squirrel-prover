@@ -7,7 +7,7 @@ type s_item =
   | Tryautosimpl of Location.t    (** '//' *)
   | Simplify     of Location.t    (** '//=' *)
 
-let rec pp_s_item fmt = function
+let pp_s_item fmt = function
   | Simplify      _ -> Fmt.pf fmt "/="
   | Tryauto       _ -> Fmt.pf fmt "//"
   | Tryautosimpl  _ -> Fmt.pf fmt "//="
@@ -154,7 +154,7 @@ and pp_simpl_pat fmt = function
   | Srewrite L.{ pl_desc = `RightToLeft } -> Fmt.pf fmt "<-"
 
 
-let rec pp_intro_pat fmt = function
+let pp_intro_pat fmt = function
   | SItem s    -> pp_s_item fmt s
   | Star     _ -> Fmt.pf fmt "*"
   | StarV    _ -> Fmt.pf fmt ">"
@@ -254,12 +254,6 @@ let pp_parser_arg ppf = function
     Fmt.pf ppf "{%i}(%a)" sel Theory.pp term
 
 (*------------------------------------------------------------------*)
-type ('a, 'b) pair
-
-
-type boolean = [`Boolean]
-
-(*------------------------------------------------------------------*)
 (** Tactic arguments sorts *)
 type _ sort =
   | None      : unit sort
@@ -337,12 +331,6 @@ let sort_to_string  : type a. a sort -> string = function
   | Opt _ -> assert false
 
 (*------------------------------------------------------------------*)
-type counters = { message : int;
-                  boolean : int;
-                  timestamp : int;
-                  index : int;
-                  int : int;
-                  string : int}
 
 module Ms = Map.Make (struct type t = esort let compare = Stdlib.compare end)
 

@@ -8,8 +8,6 @@ type conc_form = Equiv.local_form
 let hyp_kind = Equiv.Any_t
 let conc_kind = Equiv.Local_t
 
-let pp_form = Term.pp
-
 (*------------------------------------------------------------------*)
 (* For debugging *)
 let dbg ?(force=false) s =
@@ -177,7 +175,7 @@ let get_eq_atoms (s : sequent) : Term.xatom list =
 
     | _ -> None
   in
-  List.filter_map do1 (get_atoms_from_s s) 
+  List.filter_map do1 (get_atoms_from_s s)
 
 let get_all_messages s =
   let atoms = get_message_atoms s in
@@ -431,10 +429,6 @@ let set_system system s =
   let env = Env.update ~system s.env in
   S.update ~env s
 
-let set_ty_vars ty_vars s = 
-  let env = Env.update ~ty_vars s.env in
-  S.update ~env s
-
 (*------------------------------------------------------------------*)
 let filter_map_hyps func hyps =
   H.map (fun f -> func f) hyps
@@ -525,14 +519,28 @@ let eq_atoms_valid s =
 
   let _, neqs = get_eqs_neqs s in
   List.exists (fun (Term.ESubst (a, b)) ->
-      if Completion.check_equalities trs [Term.ESubst (a, b)] then
+      if Completion.check_equalities trs [(a,b)] then
         let () = dbg "dis-equality %a ≠ %a violated" Term.pp a Term.pp b in
         true
       else
-        let () = dbg "dis-equality %a ≠ %a: no violation" 
+        let () = dbg "dis-equality %a ≠ %a: no violation"
             Term.pp a Term.pp b in
         false)
     neqs
+
+let literals_unsat_smt ?(slow=false) s =
+  Smt.literals_unsat ~slow
+    s.env.table
+    s.env.system
+    (Vars.to_list s.env.vars)
+    (get_message_atoms s)
+    (get_trace_literals s)
+    (* TODO: now that we can pass more general formulas than lists of atoms,
+     * we don't actually need to decompose message atoms / trace literals *)
+    (* since we didn't move the conclusion into the premises,
+     * handle it here *)
+    (Term.mk_not s.conclusion :: Hint.get_smt_db s.hint_db)
+
 
 (*------------------------------------------------------------------*)
 let mk_trace_cntxt s = 

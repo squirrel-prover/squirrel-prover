@@ -243,16 +243,16 @@ type 'a tac_infos = {
 type 'a table = (string, 'a tac_infos) Hashtbl.t
 
 let pp_usage tacname fmt esort =
-   Fmt.pf fmt "%s %a" tacname TacticsArgs.pp_esort esort
+  Fmt.pf fmt "%s %a" tacname TacticsArgs.pp_esort esort
 
-let pp_help fmt (th, tac_name) =
+let[@warning "-32"] pp_help fmt (th, tac_name) =
   let usages_string =
-    Fmt.strf "%a"
+    Fmt.str "%a"
       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",\n") (pp_usage tac_name))
       th.usages_sorts
  in
   let res_string =
-    Fmt.strf "%s \n %s: @[ %s  @] " th.general_help
+    Fmt.str "%s \n %s: @[ %s  @] " th.general_help
       (if List.length th.usages_sorts = 0 then ""
        else if List.length th.usages_sorts =1 then "Usage"
        else "Usages")
@@ -270,7 +270,6 @@ module Table : sig
 
   val pp_goal_concl : Format.formatter -> Goal.t -> unit
 end = struct
-  type judgment = Goal.t
   let table = Hashtbl.create 97
 
   (* TODO:location *)
@@ -967,3 +966,6 @@ let declare_list table hint_db decls =
 let add_hint_rewrite (s : lsymb) db =
   let lem = get_reach_assumption s in
   Hint.add_hint_rewrite s lem.Goal.ty_vars lem.Goal.formula db
+
+let add_hint_smt (s : lsymb) db =
+  Hint.add_hint_smt (get_reach_assumption s).Goal.formula db

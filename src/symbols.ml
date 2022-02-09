@@ -31,9 +31,9 @@ let pp_namespace fmt = function
 
 (*------------------------------------------------------------------*)
 (** Type of symbols.
-  * The group should be understood as a namespace,
-  * though it does not correspond to the (poorly named) namespace type
-  * below. *)
+    The group should be understood as a namespace,
+    though it does not correspond to the (poorly named) namespace type
+    below. *)
 type symb = { group: string; name: string }
 
 (** Symbols of type ['a t] are symbols of namespace ['a]. *)

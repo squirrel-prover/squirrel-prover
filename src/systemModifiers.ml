@@ -54,7 +54,7 @@ let global_rename table sdecl gf =
     in
     let iterator cenv t =
       match
-        Rewrite.rewrite table old_system env.vars TacticsArgs.(`Once)
+        Rewrite.rewrite table old_system env.vars `Once
           rw_rule (`Reach t)
       with
       | `Result (`Reach res, ls) -> res
@@ -179,7 +179,7 @@ let global_prf table sdecl bnds hash =
 
   let iterator _ t =
     match
-      Rewrite.rewrite table old_system env.vars TacticsArgs.(`Once)
+      Rewrite.rewrite table old_system env.vars `Once
         rw_rule (`Reach t)
     with
     | `Result (`Reach res, ls) -> res

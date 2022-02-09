@@ -158,6 +158,7 @@ rule token = parse
 | "gcca"              { GCCA }
 | "checkfail"         { CHECKFAIL }
 | "include"           { INCLUDE }
+| "smt"               { SMT }
 | name as n           { ID n }
 | eof                 { EOF }
 

@@ -120,8 +120,6 @@ let empty_env : env = M.empty
 
 let mem (e : env) var : bool = M.mem (name var) e
 
-let mem_e (e : env) (var : var) : bool = M.mem (name var) e
-
 let mem_s (e : env) (s : string) : bool = M.mem s e
 
 let find (e : env) (name : string) : var = M.find name e 

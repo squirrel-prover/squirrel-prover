@@ -18,15 +18,12 @@ module L = Location
 let dbg s = Printer.prt (if Config.debug_constr () then `Dbg else `Ignore) s
 
 (*------------------------------------------------------------------*)
-module TraceLits : sig 
+module TraceLits : sig[@warning "-32"]
   type t = Term.literal 
-
-  val mk : Term.literals -> t array
-
   val compare : t -> t -> int
   val equal : t -> t -> bool
   val hash : t -> int
-
+  val mk : Term.literals -> t array
   module Memo : Ephemeron.S with type key = t array
 end = struct
   type t = Term.literal 
@@ -66,7 +63,6 @@ module Utv : sig
     | UInit
     | UUndef                    (* (x <> UUndef) iff. (Happens x) *)
 
-  val uvar   : Vars.var -> ut
   val uts    : Term.term -> ut
   val uname  : Symbols.action Symbols.t -> ut list -> ut
   val upred  : ut -> ut
@@ -577,15 +573,7 @@ let is_undef uf ut = snd (mgu uf ut) = uundef
 (* Remark: [uf] under-approximate equalities, hence any equality it contains 
    is sound. *)
 
-let get_pred ut = match ut.cnt with
-  | UPred t -> t
-  | _ -> assert false
-
-let is_pred ut = match ut.cnt with
-  | UPred _ -> true
-  | _ -> false 
-
-(** [is_undef uf ut] returns [true] if [ut] must be defined in [uf], 
+(** [is_undef uf ut] returns [true] if [ut] must be defined in [uf],
     under dis-equalities [neqs]. 
     This does not look for instances of the axiom:
     ∀τ, (happens(τ) ∧ τ ≠ init) ⇒ happens(pred(τ))
@@ -782,12 +770,6 @@ let unify inst eqs =
   in
   { inst with uf = uf; }
 
-(** Only compute the mgu for the equality constraints in [l] *)
-let mgu_eqs l =
-  let instance = mk_instance l in
-  unify instance instance.eqs
-
-
 (*------------------------------------------------------------------*)
 (** {2 Order models using graphs} *)
 
@@ -944,13 +926,6 @@ let add_disj uf g u x =
         ) (max_pred uf g nu x)
     ) (min_pred uf g nu x)
 
-
-let find_map_all (f : UtG.vertex -> UtG.vertex -> 'a option) g : 'a list =
-  UtG.fold_edges (fun v v' acc ->
-      match f v v' with
-      | None -> acc
-      | Some x -> x :: acc
-    ) g []
 
 let for_all (f : UtG.vertex -> UtG.vertex -> bool) g : bool =
   let exception Found in
@@ -1146,8 +1121,8 @@ let find_new_undef inst g =
   let uf = inst.uf in
   let elems = elems uf in
 
-  (** Looks for new instances of the rule:
-      ∀τ, (happens(τ) ∧ τ ≠ init) ⇒ happens(pred(τ)) *)
+  (* Looks for new instances of the rule:
+     ∀τ, (happens(τ) ∧ τ ≠ init) ⇒ happens(pred(τ)) *)
   let undefs0 = 
     List.filter_map (fun ut -> 
         if is_not_init uf inst.neqs ut && 
@@ -1158,8 +1133,8 @@ let find_new_undef inst g =
       ) elems 
   in
 
-  (** Looks for new instances of the rule:
-      ∀τ τ', τ ≤ τ' ⇒ happens(τ,τ') *)
+  (* Looks for new instances of the rule:
+     ∀τ τ', τ ≤ τ' ⇒ happens(τ,τ') *)
   let undefs1 = 
     UtG.fold_edges (fun ut1 ut2 undefs -> 
         (if undef_is_new inst ut1 then [ut1] else []) @
@@ -1244,9 +1219,6 @@ let split_models instance =
 (** The minimal models a of constraint.
     Here, minimanility means inclusion w.r.t. the predicates. *)
 type models = model list
-
-let tot = ref 0.
-let cptd = ref 0
 
 (*------------------------------------------------------------------*)
 let models_conjunct (l : Term.literals) : models =
@@ -1390,8 +1362,8 @@ let get_ind_equalities ~precise (models : models) inds =
 
 
 let find_eq_action (models : models) (t : Term.term) =
-  (** [action_model model t] returns an action equal to [t] in [model] *)
-  let action_model model = 
+  (* [action_model model t] returns an action equal to [t] in [model] *)
+  let action_model model =
     let model, ut = ext_support model (uts t) in
     let uf = model.inst.uf in
     let classe = get_class uf ut in
@@ -1443,9 +1415,7 @@ and tau4 = mk_var "tau"
 and i =  mk_var_i "i"
 and i' = mk_var_i "i"
 
-let table = Symbols.builtins_table
-              
-let table, a = Symbols.Action.declare table (L.mk_loc L._dummy "a") 1
+let _, a = Symbols.Action.declare Symbols.builtins_table (L.mk_loc L._dummy "a") 1
 
 let pb_eq1 = (`Comp (`Eq,tau, mk_pred tau'))
              :: (`Comp (`Eq,tau', mk_pred tau''))

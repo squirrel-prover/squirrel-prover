@@ -12,7 +12,12 @@ val complete :
 
 (** [check_equalities s l] checks that all equalities inside [l] hold
     w.r.t [s] *)
-val check_equalities : state -> Term.esubst list -> bool
+val check_equalities : state -> (Term.term*Term.term) list -> bool
+
+(** [check_disequalities s neqs l] checks that all disequalities inside [l]
+    are implied by inequalities inside [neqs], wrt [s]. *)
+val check_disequalities :
+  state -> (Term.term*Term.term) list -> (Term.term*Term.term) list -> bool
 
 (** [name_index_cnstrs state l] looks for all names that are equal w.r.t. the
     rewrite relation in [state], and add the corresponding index equalities.

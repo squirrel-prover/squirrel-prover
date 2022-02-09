@@ -11,8 +11,6 @@ let declare table s = fst (declare_exact table s ())
 let pp_channel ppf c =
   (Printer.kws `ProcessChannel) ppf (Symbols.to_string c)
 
-let fail : 'a -> unit = function _ -> assert false
-
 (*------------------------------------------------------------------*)
 type p_channel = string Location.located
     

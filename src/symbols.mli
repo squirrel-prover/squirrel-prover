@@ -1,6 +1,6 @@
 (** This module defines a notion of symbol with a global table of symbols,
-  * separated into namespaces, and where each symbol is attached to a
-  * definition whose type depends on the namespace. *)
+    separated into namespaces, and where each symbol is attached to a
+    definition whose type depends on the namespace. *)
 
 type lsymb = string Location.located
 
@@ -19,20 +19,20 @@ type 'a t
 val hash : 'a t -> int
 
 (** Symbol groups:
-  * symbols with the same name can exist in different groups.
-  * Groups are usually called namespaces, but what we (improperly)
-  * call namespaces here is different: it's more of a name kind. *)
+    symbols with the same name can exist in different groups.
+    Groups are usually called namespaces, but what we (improperly)
+    call namespaces here is different: it's more of a name kind. *)
 type group
 
 (** Type of tables of persistent symbol definitions.
-  * It is currently ineffective. *)
+    It is currently ineffective. *)
 type table
 
 (** Associates a unique tag to a table. For memoisation. *)
 val tag : table -> int
 
 (** Each possible namespace is represented by an abstract datatype.
-  * Their names are descriptive; [fname] is for function symbols. *)
+    Their names are descriptive; [fname] is for function symbols. *)
 
 (*------------------------------------------------------------------*)
 type channel
@@ -61,9 +61,9 @@ val get_namespace : ?group:group -> table -> string -> namespace option
 
 (*------------------------------------------------------------------*)
 (** {2 Symbol definitions}
-  *
-  * Each symbol is defined by some data,
-  * whose type depends on the namespace. *)
+
+    Each symbol is defined by some data,
+    whose type depends on the namespace. *)
 
 type function_def =
   | Hash
@@ -79,7 +79,7 @@ type function_def =
   | Operator                    (* definition in associated data *)
 
 (** Indicates if a function symbol has been defined with
-  * the specified definition. *)
+    the specified definition. *)
 val is_ftype : fname t -> function_def -> table -> bool
 
 (*------------------------------------------------------------------*)
@@ -99,15 +99,14 @@ type name_def = {
 type macro_def =
   | Input | Output | Cond | Exec | Frame
   | State of int * Type.ty
-    (** Macro that expands to the content of a state at a given
-      * timestamp. *)
+    (** Macro that expands to the content of a state at a given timestamp. *)
   | Global of int * Type.ty
     (** Global macros are used to encapsulate let-definitions.
-      * They are indexed. *)
+        They are indexed. *)
 
 (*------------------------------------------------------------------*)
 (** Information about symbol definitions, depending on the namespace.
-  * Integers refer to the index arity of symbols. *)
+    Integers refer to the index arity of symbols. *)
 type _ def =
   | Channel  : unit      -> channel def
   | Name     : name_def  -> name    def
@@ -125,13 +124,13 @@ type edef =
 
 (*------------------------------------------------------------------*)
 (** {2 Data}
-  * In addition to their definition data, some more data can be attached
-  * to symbols. This is used for data that is defined in modules that
-  * depend on this module, through an extensible datatype. *)
+    In addition to their definition data, some more data can be attached
+    to symbols. This is used for data that is defined in modules that
+    depend on this module, through an extensible datatype. *)
 
 (** Extensible type for data associated to symbols.
-  * Due to circular dependencies, this is not type-safe, but
-  * at least avoids having multiple hashtables for symbols. *)
+    Due to circular dependencies, this is not type-safe, but
+    at least avoids having multiple hashtables for symbols. *)
 type data = ..
 type data += Empty
 type data += AssociatedFunctions of (fname t) list
@@ -146,7 +145,7 @@ val to_string : 'a t -> string
 val pp : Format.formatter -> 'a t -> unit
 
 (** [def_of_lsymb s] returns the definition of the symbol named [s].
-  * @raise Unbound_identifier if no such symbol has been defined. *)
+    @raise Unbound_identifier if no such symbol has been defined. *)
 val def_of_lsymb : ?group:group -> lsymb -> table -> edef
 
 val is_defined : ?group:group -> string -> table -> bool
@@ -154,8 +153,8 @@ val is_defined : ?group:group -> string -> table -> bool
 type wrapped = Wrapped : 'a t * 'a def -> wrapped
 
 (** [of_lsymb s] returns the symbol associated to [s]
-  * together with its defining data.
-  * @raise Unbound_identifier if no such symbol has been defined. *)
+    together with its defining data.
+    @raise Unbound_identifier if no such symbol has been defined. *)
 val of_lsymb : ?group:group -> lsymb -> table -> wrapped
 
 (** [of_lsymb_opt s] is the same as [of_lsymb_opt s], but return [None]
@@ -181,19 +180,19 @@ module type Namespace = sig
   val reserve_exact : table -> lsymb -> table * ns t
 
   (** Define a symbol name that has been previously reserved
-    * using [fresh]. *)
+      using [fresh]. *)
   val define : table -> ns t -> ?data:data -> def -> table
 
   (** Redefine a symbol name that has been previously defined. *)
   val redefine : table -> ns t -> ?data:data -> def -> table
 
   (** Declare a new symbol, with a name resembling the given string,
-    * defined by the given value. *)
+      defined by the given value. *)
   val declare :
     table -> lsymb -> ?data:data -> def -> table * ns t
 
   (** Like declare, but use the exact string as symbol name.
-    * @raise Multiple_declarations if the name is not available. *)
+      @raise Multiple_declarations if the name is not available. *)
   val declare_exact :
     table -> lsymb -> ?data:data -> def -> table * ns t
 
@@ -201,7 +200,7 @@ module type Namespace = sig
   val mem : lsymb -> table -> bool
 
   (** [of_lsymb s] returns [s] as a symbol, if it exists in this namespace.
-    * @raise Unbound_identifier otherwise. *)
+      @raise Unbound_identifier otherwise. *)
   val of_lsymb : lsymb -> table -> ns t
 
   (** [of_lsymb_opt s] returns [Some s] as a symbol, if it exists in this

@@ -1,0 +1,11 @@
+(executable
+  (name squirrel)
+  (libraries squirrellib)
+  (modules squirrel))
+
+(test
+  (name test)
+  (libraries squirrellib)
+  (modules test)
+  (deps (source_tree tests))
+  (instrumentation (backend bisect_ppx)))

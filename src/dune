@@ -1,0 +1,26 @@
+(library
+  (name squirrellib)
+  (public_name squirrel.lib)
+  ; the library_flags line just below is required to perform the side-effects
+  ; (let () = ...) that register the test suite; it is copy-pasted from
+  ; https://discuss.ocaml.org/t/dune-and-module-initialization-side-effects/4520
+  (library_flags (:standard -linkall))
+  (instrumentation (backend bisect_ppx))
+  (libraries fmt fmt.tty alcotest ocamlgraph pcre
+    (select smt.ml from
+      (why3  -> smt.why3api.ml)
+      (!why3 -> smt.stub.ml))))
+
+(ocamllex lexer htmlLexer)
+(menhir
+  (modules parser htmlParser))
+
+;; Too many warnings, so we make them non-fatal
+;; ignore irrelevant warnings:
+;; 7:  method overriden
+;; 9:  unbound label in record pattern
+;; 27: unused variable
+;; 36: unused ancestor variable super
+(env
+  (dev
+    (flags (:standard -warn-error -A -w -7-9-27-36))))

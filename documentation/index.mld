@@ -1,0 +1,18 @@
+{0 Squirrel}
+
+{1 User guide}
+
+TODO
+
+{1 Internals}
+
+Most of the code (except for the very short files [squirrel.ml] and [test.ml])
+is in the [/src] directory and forms the {!module-Squirrellib} module (follow
+the link to see an exhaustive list of submodules, corresponding to each source
+file). The files within [/src] do not refer to the name {!module-Squirrellib},
+the latter being only defined in the build configuration.
+
+The representation of actions is defined in {!module-Squirrellib.Action}. Maybe
+say something about the list of series/parallel choices.
+
+etc, etc.
