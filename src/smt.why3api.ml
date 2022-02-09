@@ -530,7 +530,7 @@ let build_task_bis
                         (Term.mk_isymb mn gty m_idx) descr.name descr.indices with
                 | `Undef   -> None
                 | `Def msg -> Some (macro_wterm_eq
-                                      (ilist_to_wterm [])
+                                      (ilist_to_wterm m_idx)
                                       (msg_to_wterm msg))
               end
             | Symbols.State _ ->
