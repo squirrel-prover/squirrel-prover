@@ -35,10 +35,6 @@ type global_data = {
 
 type Symbols.data += Global_data of global_data
 
-let get_global_data = function
-  | Global_data x -> Some x
-  | _             -> None
-
 
 let sproj s t = Term.pi_term ~projection:(SE.get_proj s) t
 
@@ -187,8 +183,10 @@ let get_def_glob
   let t = Term.subst subst (get_body system data) in
   `Def (Term.simple_bi_term t)
 
+(*------------------------------------------------------------------*)
+(** Exported *)
 
-let _get_definition
+let get_definition_nocntxt
     (system : SE.t)
     (table  : Symbols.table)
     (symb   : Term.msymb)
@@ -259,8 +257,9 @@ let _get_definition
     let action = Action.of_term asymb indices table in
     let descr = SE.descr_of_action table system action in
     begin try
-        (* Look for an update of the state macro [name] in the
-           updates of [action] *)
+        (* Look for an update of the state macro [name] in the updates
+           of [action]; we rely on the fact that [action] can only contain
+           a single update for each state macro symbol *)
         let (ns, msg) : Term.state * Term.term =
           List.find (fun (ns,_) ->
               ns.Term.s_symb = symb.s_symb &&
@@ -269,7 +268,7 @@ let _get_definition
         in
         assert (ns.Term.s_typ = symb.s_typ);
 
-        (* init case: we substitute the indice by their definition *)
+        (* init case: we substitute the indices by their definition *)
         if a = Term.init then
           let s = List.map2 (fun i1 i2 ->
               Term.ESubst (Term.mk_var i1, Term.mk_var i2)
@@ -308,8 +307,6 @@ let _get_definition
 
   |  _ -> assert false
 
-(*------------------------------------------------------------------*)
-(** Exported *)
 let get_definition
     (cntxt : Constr.trace_cntxt)
     (symb  : Term.msymb)
@@ -326,7 +323,7 @@ let get_definition
         ) cntxt.models
   in
   if not (is_defined symb.s_symb ts_action cntxt.table) then `Undef else
-    match _get_definition cntxt.system cntxt.table symb ts_action with
+    match get_definition_nocntxt cntxt.system cntxt.table symb ts_action with
     | `Undef | `MaybeDef as res -> res
     | `Def mdef ->
       let mdef = Term.subst [Term.ESubst (ts_action, ts)] mdef in

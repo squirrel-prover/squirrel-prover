@@ -475,7 +475,8 @@ let build_task_bis
       ) [("axiom_pair", axiom_pair)] table in
 
   let macro_axioms = ref [] in
-  (* NOTE: for now we don't handle input/frame *)
+  (* TODO: input/frame are not handled; they could be defined in the .why file
+     but this would perhaps require a special handling of the "att" symbol *)
   action_iter (fun descr ->
       (* TODO: some code below (handling var scope) is taken from msg_to_fmla_q
        *       this should be factored into an auxiliary function *)
@@ -503,18 +504,24 @@ let build_task_bis
       macro_axioms := ("expand_cond_" ^ name_str,
                        t_forall_close quantified_vars [] ax_cond) ::
                       !macro_axioms;
-      (* the following partially copied on _get_definition (private) in macros.ml *)
       Symbols.Macro.iter (fun mn mdef mdata ->
           let m_str  = Symbols.to_string mn in
           let m_symb = Hashtbl.find macros_tbl m_str in
           let macro_wterm_eq is msg = t_equ (t_app_infer m_symb [is; ts]) msg in
           let ax_option = match mdef with
+            (* cond@ already handled above; exec@ defined in .why file *)
+            | Symbols.Cond | Symbols.Exec -> None
             | Symbols.Output ->
               (* output@A(i1,...) = output *)
               Some (macro_wterm_eq
                       (ilist_to_wterm [])
                       (msg_to_wterm (snd descr.Action.output)))
+            | Symbols.Global _ -> None (* TODO use get_definition_nocntxt
+                                          + think about index var generation *)
             | Symbols.State _ ->
+              (* TODO: could probably be treated by calling
+                 Macros.get_definition_nocntxt, instead of copying its code
+                 (but it would be annoying to handle fresh index variables) *)
               let quantified_ilist = Why3.(Term.create_vsymbol
                                              (Ident.id_fresh "ii")
                                              (Ty.ty_app ilist_symb [])) in
@@ -536,39 +543,7 @@ let build_task_bis
                 with Not_found -> same_as_pred in
               Some (t_forall_close [quantified_ilist] []
                       (macro_wterm_eq ilist expansion))
-            | Symbols.Global _ -> begin match Macros.get_global_data mdata with
-                (* partially copied on get_def_glob from macros.ml  *)
-                | Some ({action = (strict, glob_a); inputs = g_inputs;
-                         indices = g_indices; ts = g_ts} as g_data)
-                  when Macros.is_prefix strict glob_a (Action.get_shape descr.action) ->
-                  let ts_subst = Term.ESubst (Term.mk_var g_ts,
-                                              SystemExpr.action_to_term
-                                                table system descr.action) in
-                  let rev_action =
-                    let rec drop n l =
-                      if n=0 then l else drop (n-1) (List.tl l) in
-                    drop (List.length descr.action - List.length g_inputs)
-                      (List.rev descr.action)
-                  in
-                  let subst,_ =
-                    List.fold_left
-                      (fun (subst,action_prefix) x ->
-                         let a_ts = SystemExpr.action_to_term
-                             table system (List.rev action_prefix) in
-                         let in_tm = Term.mk_macro Term.in_macro [] a_ts in
-                         (Term.ESubst (Term.mk_var x, in_tm) :: subst,
-                          List.tl action_prefix))
-                      ([ts_subst], rev_action)
-                      g_inputs
-                  in
-                  let t = Term.subst subst (Macros.get_body system g_data) in
-                  (* TODO: quantify over g_indices (counterpart to idx_subst)
-                   *       what relationship is required between g_indices and
-                   *       the action indices??? *)
-                  None
-                | _  -> None
-              end
-            | _ -> None
+            | _ -> None (* input/frame, see earlier TODO *)
           in
           match ax_option with
           | None -> ()
