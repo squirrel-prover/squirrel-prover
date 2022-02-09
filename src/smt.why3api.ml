@@ -1,4 +1,6 @@
 let filter_ty t = List.filter (fun x -> Vars.ty x = t)
+let filter_msg  = List.filter (fun x -> let t = Vars.ty x in
+                                t <> Type.Index && t <> Type.Timestamp)
 
 let get_smt_setup
   : unit -> (Why3.Theory.theory * Why3.Whyconf.config_prover * Why3.Driver.driver) option =
@@ -55,7 +57,7 @@ let run_prover ?limit_opt task =
 let mk_const_symb x ty_symb =
   Why3.Term.create_fsymbol (Why3.Ident.id_fresh x) [] (Why3.Ty.ty_app ty_symb [])
 
-exception Unsupported
+exception Unsupported of Term.term
 exception InternalError
 
 (* this is called [build_task_bis] because there was another build_task
@@ -95,9 +97,9 @@ let build_task_bis
   let macro_cond_symb  = Why3.Theory.ns_find_ls tm_export ["macro_cond"] in
   let macro_exec_symb  = Why3.Theory.ns_find_ls tm_export ["macro_exec"] in
 
-  let indices = filter_ty Type.Index     evars
-  and tsvars  = filter_ty Type.Timestamp evars
-  and msgvars = filter_ty Type.Message   evars in
+  let indices = filter_ty  Type.Index     evars
+  and tsvars  = filter_ty  Type.Timestamp evars
+  and msgvars = filter_msg                evars in
 
   (* We first create Why3 constants for all action/index/timestamp names that appear
    * TODO: check that our conversions var/symbol -> string avoids spurious collisions *)
@@ -326,9 +328,12 @@ let build_task_bis
 
     | Var v -> begin
         try Hashtbl.find messages_tbl (Vars.name v)
-        with Not_found -> (print_endline ("ouch " ^ Vars.name v); raise InternalError)
+        with Not_found ->
+          print_endline ("ouch " ^ Vars.name v);
+          Format.printf "%a\n" Type.pp (Vars.ty v);
+          raise InternalError
       end
-    | _ -> raise Unsupported (* TODO: better error reporting? *)
+    | t -> raise (Unsupported t)
 
   and msg_to_fmla : Term.term -> Why3.Term.term = fun fmla ->
     (* TODO: there has to be a better way to write this sequence of destrs... *)
@@ -357,9 +362,9 @@ let build_task_bis
                         t_app_infer macro_exec_symb [timestamp_to_wterm ts]
                       | x -> t_app_infer msg_is_true_symb [msg_to_wterm x]
   and msg_to_fmla_q quantifier vs f =
-    let i_vs = filter_ty Type.Index     vs
-    and t_vs = filter_ty Type.Timestamp vs
-    and m_vs = filter_ty Type.Message   vs in
+    let i_vs = filter_ty  Type.Index     vs
+    and t_vs = filter_ty  Type.Timestamp vs
+    and m_vs = filter_msg                vs in
     (* NOTE: here we use the fact that OCaml hashtables can have multiple
      *       bindings, and the newer ones shadow the older ones
      * thus we can use Hashtbl.(add|remove) to handle bound variable scope *)
@@ -509,7 +514,7 @@ let build_task_bis
           let m_str  = Symbols.to_string mn in
           let m_symb = Hashtbl.find macros_tbl m_str in
           let macro_wterm_eq is msg = t_equ (t_app_infer m_symb [is; ts]) msg in
-          let ax_option = match mdef with
+          let ax_option = try begin match mdef with
             (* cond@ already handled above; exec@ defined in .why file *)
             | Symbols.Cond | Symbols.Exec -> None
             | Symbols.Output ->
@@ -554,6 +559,7 @@ let build_task_bis
               Some (t_forall_close [quantified_ilist] []
                       (macro_wterm_eq ilist expansion))
             | _ -> None (* input/frame, see earlier TODO *)
+          end with Unsupported _ -> None
           in
           match ax_option with
           | None -> ()
@@ -626,8 +632,9 @@ let literals_unsat ~slow table system evars msg_atoms trace_lits axioms =
          *   end *)
       end
   with
-  | Unsupported ->
-    print_endline "smt: some feature is not supported by the translation";
+  | Unsupported t ->
+    print_endline "smt: some feature is not supported by the translation in the following term";
+    Format.printf "%a\n" Term.pp t;
     false
   | InternalError ->
     print_endline "smt: internal error in tactic";
