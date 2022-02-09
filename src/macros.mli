@@ -39,7 +39,8 @@ val get_definition_exn :
     whereas [get_definition] does some clever stuff to find a "Term.Action sth"
     equal to the given timestamp. *)
 val get_definition_nocntxt :
-  SystemExpr.t -> Symbols.table -> Term.msymb -> Term.term -> def_result
+  SystemExpr.t -> Symbols.table -> Term.msymb -> Symbols.action Symbols.t
+  -> Vars.vars -> [ `Def of Term.term | `Undef ]
 
 (** When [m] is a global macro symbol,
     [get_definition se table m li] return a term which resembles the one that

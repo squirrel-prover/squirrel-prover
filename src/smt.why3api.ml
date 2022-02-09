@@ -56,6 +56,7 @@ let mk_const_symb x ty_symb =
   Why3.Term.create_fsymbol (Why3.Ident.id_fresh x) [] (Why3.Ty.ty_app ty_symb [])
 
 exception Unsupported
+exception InternalError
 
 (* this is called [build_task_bis] because there was another build_task
  * previously that just handled the theory of timestamps / actions
@@ -325,7 +326,7 @@ let build_task_bis
 
     | Var v -> begin
         try Hashtbl.find messages_tbl (Vars.name v)
-        with Not_found -> (print_endline ("ouch " ^ Vars.name v); raise Not_found)
+        with Not_found -> (print_endline ("ouch " ^ Vars.name v); raise InternalError)
       end
     | _ -> raise Unsupported (* TODO: better error reporting? *)
 
@@ -516,8 +517,17 @@ let build_task_bis
               Some (macro_wterm_eq
                       (ilist_to_wterm [])
                       (msg_to_wterm (snd descr.Action.output)))
-            | Symbols.Global _ -> None (* TODO use get_definition_nocntxt
-                                          + think about index var generation *)
+            | Symbols.Global (arity, gty) -> begin
+                (* for now, handle only the case where the indices of the macro
+                   coincide with those of the action *)
+                let m_idx = Utils.List.take arity descr.indices in
+                match Macros.get_definition_nocntxt system table
+                        (Term.mk_isymb mn gty m_idx) descr.name descr.indices with
+                | `Undef   -> None
+                | `Def msg -> Some (macro_wterm_eq
+                                      (ilist_to_wterm [])
+                                      (msg_to_wterm msg))
+              end
             | Symbols.State _ ->
               (* TODO: could probably be treated by calling
                  Macros.get_definition_nocntxt, instead of copying its code
@@ -618,4 +628,7 @@ let literals_unsat ~slow table system evars msg_atoms trace_lits axioms =
   with
   | Unsupported ->
     print_endline "smt: some feature is not supported by the translation";
+    false
+  | InternalError ->
+    print_endline "smt: internal error in tactic";
     false

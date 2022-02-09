@@ -146,7 +146,7 @@ let get_def_glob
     (a      : Term.term)
     (action : Action.action)
     (data   : global_data) 
-  : def_result
+  : Term.term
   =
   assert (List.length data.inputs <= List.length action) ;
   let idx_subst =
@@ -181,7 +181,7 @@ let get_def_glob
   in
 
   let t = Term.subst subst (get_body system data) in
-  `Def (Term.simple_bi_term t)
+  Term.simple_bi_term t
 
 (*------------------------------------------------------------------*)
 (** Exported *)
@@ -190,73 +190,47 @@ let get_definition_nocntxt
     (system : SE.t)
     (table  : Symbols.table)
     (symb   : Term.msymb)
-    (a      : Term.term) : [ `Def of Term.term | `Undef | `MaybeDef ]
+    (asymb  : Symbols.action Symbols.t)
+    (aidx   : Vars.vars) : [ `Def of Term.term | `Undef ]
   =
+  let init_or_generic init_case f =
+    `Def (if asymb = Symbols.init_action
+          then init_case
+          else f (Term.mk_action asymb aidx))
+  in
+  let action = Action.of_term asymb aidx table in
+  let descr = SE.descr_of_action table system action in
   match Symbols.Macro.get_all symb.s_symb table with
   | Symbols.Input, _ ->
-    begin match a with
-      | Term.Action (s,_) when s = Symbols.init_action -> `Def Term.empty
-      | Term.Action _ ->
-        let d =
-          Term.mk_fun table Symbols.fs_att []
-            [Term.mk_macro Term.frame_macro [] (Term.mk_pred a)]
-        in
-        `Def d
-      | _ -> `MaybeDef
-    end
+    init_or_generic Term.empty (fun a ->
+        Term.mk_fun table Symbols.fs_att []
+          [Term.mk_macro Term.frame_macro [] (Term.mk_pred a)])
 
   | Symbols.Output, _ ->
-    let symb, indices = oget (Term.destr_action a) in
-    let action = Action.of_term symb indices table in
-    let descr =
-      SE.descr_of_action table system action
-    in
     `Def (snd descr.Action.output)
 
   | Symbols.Cond, _ ->
-    let symb, indices = oget (Term.destr_action a) in
-    let action = Action.of_term symb indices table in
-    let descr =
-      SE.descr_of_action table system action
-    in
     `Def (snd Action.(descr.condition))
 
   | Symbols.Exec, _ ->
-    begin match a with
-      | Term.Action (s,_) when s = Symbols.init_action -> `Def Term.mk_true
-      | Term.Action _ ->
-        let d =
-          Term.mk_and
-            (Term.mk_macro symb [] (Term.mk_pred a))
-            (Term.mk_macro Term.cond_macro [] a)
-        in
-        `Def d
-      | _ -> `MaybeDef
-    end
+    init_or_generic Term.mk_true (fun a ->
+        Term.mk_and
+          (Term.mk_macro symb [] (Term.mk_pred a))
+          (Term.mk_macro Term.cond_macro [] a))
 
   | Symbols.Frame, _ ->
-    begin match a with
-      | Term.Action (s,_) when s = Symbols.init_action -> `Def Term.mk_zero
-      | Term.Action _ ->
-        let def =
-          Term.mk_pair
-            (Term.mk_macro symb [] (Term.mk_pred a))
-            (Term.mk_pair
-               (Term.mk_of_bool (Term.mk_macro Term.exec_macro [] a))
-               (Term.mk_ite
-                  (Term.mk_macro Term.exec_macro [] a)
-                  (Term.mk_macro Term.out_macro [] a)
-                  Term.mk_zero))
-        in
-        `Def def
-      | _ -> `MaybeDef
-    end
+    init_or_generic Term.mk_zero (fun a ->
+        Term.mk_pair
+          (Term.mk_macro symb [] (Term.mk_pred a))
+          (Term.mk_pair
+             (Term.mk_of_bool (Term.mk_macro Term.exec_macro [] a))
+             (Term.mk_ite
+                (Term.mk_macro Term.exec_macro [] a)
+                (Term.mk_macro Term.out_macro [] a)
+                Term.mk_zero)))
 
   | Symbols.State _, _ ->
-    let asymb, indices = oget (Term.destr_action a) in
-    let action = Action.of_term asymb indices table in
-    let descr = SE.descr_of_action table system action in
-    begin try
+    `Def begin try
         (* Look for an update of the state macro [name] in the updates
            of [action]; we rely on the fact that [action] can only contain
            a single update for each state macro symbol *)
@@ -269,17 +243,17 @@ let get_definition_nocntxt
         assert (ns.Term.s_typ = symb.s_typ);
 
         (* init case: we substitute the indices by their definition *)
-        if a = Term.init then
+        if asymb = Symbols.init_action then
           let s = List.map2 (fun i1 i2 ->
               Term.ESubst (Term.mk_var i1, Term.mk_var i2)
-              ) ns.s_indices symb.s_indices
+            ) ns.s_indices symb.s_indices
           in
-          `Def (Term.subst s msg)
+          Term.subst s msg
           (* if indices [args] of the macro we want
              to expand are equal to indices [is] corresponding to this macro
              in the action description, then the macro expanded as defined
              by the update term *)
-        else if symb.s_indices = ns.s_indices then `Def msg
+        else if symb.s_indices = ns.s_indices then msg
         (*  otherwise, we need to take into account the possibility that
             [arg] and [is] might be equal, and generate a conditional.  *)
         else
@@ -287,23 +261,19 @@ let get_definition_nocntxt
             Term.mk_ite
               (Term.mk_indices_eq symb.s_indices ns.s_indices)
               msg
-              (Term.mk_macro symb [] (Term.mk_pred a))
+              (Term.mk_macro symb [] (Term.mk_pred (Term.mk_action asymb aidx)))
           in
-          `Def def
+          def
       with Not_found ->
-        `Def (Term.mk_macro symb [] (Term.mk_pred a))
+        Term.mk_macro symb [] (Term.mk_pred (Term.mk_action asymb aidx))
     end
 
   | Symbols.Global _,
     Global_data ({action = (strict, glob_a)} as global_data ) ->
-    if not (is_action a) then `MaybeDef
-    else
-      let tsymb, tidx = oget (Term.destr_action a) in
-      let action = Action.of_term tsymb tidx table in
-      if not (is_prefix strict glob_a (Action.get_shape action)) then
-        `Undef
-      else
-        get_def_glob ~allow_dummy:false system table symb a action global_data
+    if is_prefix strict glob_a (Action.get_shape action)
+    then `Def (get_def_glob ~allow_dummy:false system table
+                 symb (Term.mk_action asymb aidx) action global_data)
+    else `Undef
 
   |  _ -> assert false
 
@@ -322,12 +292,13 @@ let get_definition
           odflt ts (Constr.find_eq_action models ts)
         ) cntxt.models
   in
-  if not (is_defined symb.s_symb ts_action cntxt.table) then `Undef else
-    match get_definition_nocntxt cntxt.system cntxt.table symb ts_action with
-    | `Undef | `MaybeDef as res -> res
-    | `Def mdef ->
-      let mdef = Term.subst [Term.ESubst (ts_action, ts)] mdef in
-      `Def (mdef)
+  match ts_action with
+  | Term.Action (asymb, idx) -> begin
+      match get_definition_nocntxt cntxt.system cntxt.table symb asymb idx with
+      | `Undef    -> `Undef
+      | `Def mdef -> `Def (Term.subst [Term.ESubst (ts_action, ts)] mdef)
+    end
+  | _ -> `MaybeDef
 
 let get_definition_exn
     (cntxt : Constr.trace_cntxt)
@@ -370,12 +341,6 @@ let get_dummy_definition
     let tvar = Vars.make_new Type.Timestamp "dummy" in
     let ts = Term.mk_var tvar in
 
-    let def =
-      get_def_glob ~allow_dummy:true system table symb ts dummy_action gdata
-    in
-    begin
-      match def with
-      | `Def def -> def
-      | _ -> assert false
-    end
+    get_def_glob ~allow_dummy:true system table symb ts dummy_action gdata
+
   | _ -> assert false
