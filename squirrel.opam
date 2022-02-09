@@ -17,6 +17,11 @@ depends: [
   "bisect_ppx" {dev & = "2.4.0"}
 ]
 
+depopts: [
+  "why3"
+  "alt-ergo"
+]
+
 pin-depends: [
   ["bisect_ppx.2.4.0" "git+https://github.com/aantron/bisect_ppx.git"]
 ]
