@@ -404,14 +404,15 @@ let rec pp_aux_sort : type a. table -> table ref -> bool -> Format.formatter -> 
       Fmt.pf ppf (if printopt then "[%s]" else  "%s") (sort_to_string s)
 
   | Opt a -> pp_aux_sort init_table counter_table true ppf a
-  | Pair (a, b) -> Fmt.pf ppf "%a %a"
-                     (pp_aux_sort init_table counter_table printopt) a
-                     (pp_aux_sort init_table counter_table printopt) b
+  | Pair (a, b) ->
+      Fmt.pf ppf "%a, %a"
+        (pp_aux_sort init_table counter_table printopt) a
+        (pp_aux_sort init_table counter_table printopt) b
 
 let pp_esort ppf (Sort s) =
   let init_table = setup_counters (empty_table) s in
   let counter_table = ref empty_table in
-  Fmt.pf ppf "%a" (pp_aux_sort init_table counter_table false) s
+  pp_aux_sort init_table counter_table false ppf s
 
 (*------------------------------------------------------------------*)
 

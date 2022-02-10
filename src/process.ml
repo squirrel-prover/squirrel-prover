@@ -998,7 +998,9 @@ let parse_proc (system_name : System.system_name) init_table proc =
   (proc, table)
 
 let declare_system table (system_name : lsymb) proc =
-  Printer.pr "@[<v 2>Un-processed system:@;@;@[%a@]@]@.@." pp_process proc ;
+  Printer.pr
+    "@[<v 2>System before processing:@;@;@[%a@]@]@.@."
+    pp_process proc ;
 
   let env = Env.init ~table () in
   check_proc env proc ;
@@ -1025,6 +1027,6 @@ let declare_system table (system_name : lsymb) proc =
   in
 
   let proc,table = parse_proc system_name table proc in
-  Printer.pr "@[<v 2>Processed system:@;@;@[%a@]@]@.@." pp_process proc ;
+  Printer.pr "@[<v 2>System after processing:@;@;@[%a@]@]@.@." pp_process proc ;
   Printer.pr "%a" System.pp_systems table;
   table
