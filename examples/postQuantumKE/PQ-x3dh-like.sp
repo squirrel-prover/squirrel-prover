@@ -51,6 +51,7 @@ secrecy of the keys.
 *******************************************************************************)
 set timeout = 10.
 set postQuantumSound = true.
+set autoIntro = false.
 
 hash exct
 
@@ -220,56 +221,91 @@ axiom [mainCCAkR/left,idealized/left] tf: forall (x,y,z:message), decap(encap(x,
 equiv [mainCCAkR/left,idealized/left] test.
 Proof.
 
-diffeq.
+diffeq; try auto.
+
+intro *.
 
 case try find il,jl,kl such that _ in k(il,jl,kl) else _.
-rewrite Meq0.
+intro [il jl kl [Eq ->]].
 
 case try find il,jl,kl such that _ in exct(skex, k(il,jl,kl)) else _.
-rewrite Meq2.
+intro [il0 jl0 kl0 [Eq2 ->]].
+
 
 assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
 
-case H1.
-case H2.
+auto.
+simpl.
 
-use H1 with il,jl,kl.
+by case H1.
+
+intro [Abs _].
+use Abs with il,jl,kl.
+auto.
 
 
 case try find il,jl,kl such that _ in  exct(skex,k(il,jl,kl)) else _.
-use H1 with il,jl,kl.
+intro [il jl kl Ex] [Abs _].
+use Abs with il,jl,kl.
+auto.
+auto.
 
-case try find il,jl,kl such that _ in  k(il,jl,kl) else _.
-rewrite Meq0.
+intro *.
+
+case try find il,jl,kl such that _ in k(il,jl,kl) else _.
+intro [il jl kl [Eq ->]].
+
 case try find il,jl,kl such that _ in exct(skex, k(il,jl,kl)) else _.
-rewrite Meq2.
-
+intro [il0 jl0 kl0 [Eq2 ->]].
 
 
 assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
 
-case H1.
-case H2.
+auto.
+simpl.
 
-use H1 with il,jl,kl.
+by case H1.
 
-case try find il,jl,kl such that _ in exct(skex,k(il,jl,kl)) else _.
-use H1 with il,jl,kl.
+intro [Abs _].
+use Abs with il,jl,kl.
+auto.
 
-case try find il,jl,kl such that _ in  k(il,jl,kl) else _.
-rewrite Meq0.
+
+case try find il,jl,kl such that _ in  exct(skex,k(il,jl,kl)) else _.
+intro [il jl kl Ex] [Abs _].
+use Abs with il,jl,kl.
+auto.
+auto.
+
+
+intro *.
+
+intro *.
+
+case try find il,jl,kl such that _ in k(il,jl,kl) else _.
+intro [il jl kl [Eq ->]].
+
 case try find il,jl,kl such that _ in exct(skex, k(il,jl,kl)) else _.
-rewrite Meq2.
+intro [il0 jl0 kl0 [Eq2 ->]].
 
 
 assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
-case H1.
-case H2.
 
-use H1 with il,jl,kl.
+auto.
+simpl.
 
-case try find il,jl,kl such that _ in exct(skex,k(il,jl,kl)) else _.
-use H1 with il,jl,kl.
+by case H1.
+
+intro [Abs _].
+use Abs with il,jl,kl.
+auto.
+
+
+case try find il,jl,kl such that _ in  exct(skex,k(il,jl,kl)) else _.
+intro [il jl kl Ex] [Abs _].
+use Abs with il,jl,kl.
+auto.
+auto.
 Qed.
 
 
@@ -393,7 +429,7 @@ case try find il,jl,kl such that
             <fst(snd(att(frame@pred(I1(i,j,k))))),
              fst(att(frame@pred(I1(i,j,k))))>>>>,n_PRF(il,jl,kl))
     else _.
-rewrite Meq0.
+intro [il jl kl [_ ->]]. 
 
 case   try find il,jl,kl such that
       fst(snd(att(frame@pred(I1(i,j,k))))) =
@@ -401,21 +437,25 @@ case   try find il,jl,kl such that
     in
  _
     else exct(skex,decap(fst(snd(att(frame@pred(I1(i,j,k))))),vkI(i))).
-rewrite Meq2.
+intro [il0 jl0 kl0 [_ ->]]. 
 
 case   try find iv,jv,kv such that
       (skex = skex && (il0 = iv && jl0 = jv && kl0 = kv))
     in n_PRF(iv,jv,kv) else exct(skex,k(il0,jl0,kl0)).
-rewrite Meq3.
+intro [iv jv kv [[_ [[_ _] _]] ->]]. 
 
 assert decap( encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))), vkI(il)) =
 decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
-case H.
-case H0.
+auto.
+simpl.
+by case H.
 
-use H with il0,jl0,kl0.
-use H with il,jl,kl.
+intro [Abs _].
+by use Abs with il0,jl0,kl0.
+intro [Abs _].
+by use Abs with il,jl,kl.
 
+intro [Abs M].
 case   try find il,jl,kl such that
       fst(snd(att(frame@pred(I1(i,j,k))))) =
       encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
@@ -424,10 +464,10 @@ case   try find il,jl,kl such that
         (skex = skex && (il = iv && jl = jv && kl = kv))
       in n_PRF(iv,jv,kv) else exct(skex,k(il,jl,kl))
     else exct(skex,decap(fst(snd(att(frame@pred(I1(i,j,k))))),vkI(i))).
+intro [il jl kl [_ ->]]. 
 
-
-rewrite Meq1.
-use H with il,jl,kl.
+by use Abs with il,jl,kl.
+auto.
 Qed.
 
 axiom [idealized3/left,idealized2/left]  fasign : forall (m1,m2,m3:message), m1=m2 => checksign(m1,m3) = checksign(m2,m3).
@@ -491,7 +531,7 @@ case try find il,jl,kl such that
             <fst(snd(att(frame@pred(FI(i,j,k))))),
              fst(att(frame@pred(FI(i,j,k))))>>>>,
       exct(skex,decap(fst(snd(att(frame@pred(FI(i,j,k))))),vkI(i)))).
-rewrite Meq0.
+intro [il jl kl [_ ->]]. 
 
 case  try find il,jl,kl such that
       fst(snd(att(frame@pred(FI(i,j,k))))) =
@@ -501,20 +541,27 @@ case  try find il,jl,kl such that
         (skex = skex && (il = iv && jl = jv && kl = kv))
       in n_PRF(iv,jv,kv) else exct(skex,k(il,jl,kl))
     else exct(skex,decap(fst(snd(att(frame@pred(FI(i,j,k))))),vkI(i))).
-rewrite Meq2.
+intro [il0 jl0 kl0 [_ ->]]. 
+
 
 case  try find iv,jv,kv such that
       (skex = skex && (il0 = iv && jl0 = jv && kl0 = kv))
     in n_PRF(iv,jv,kv) else exct(skex,k(il0,jl0,kl0)).
-rewrite Meq3.
+intro [iv jv kv [_ ->]]. 
+
 assert decap( encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))), vkI(il)) =
 decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
-case H.
-case H0.
-use H with il0,jl0,kl0.
+auto.
+simpl.
+by case H.
 
-use H with il,jl,kl.
+intro [Abs _].
+by use Abs with il0,jl0,kl0.
 
+intro [Abs _].
+by use Abs with il,jl,kl.
+
+intro [Abs _].
 case     try find il,jl,kl such that
       fst(snd(att(frame@pred(FI(i,j,k))))) =
       encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
@@ -523,33 +570,47 @@ case     try find il,jl,kl such that
         (skex = skex && (il = iv && jl = jv && kl = kv))
       in n_PRF(iv,jv,kv) else exct(skex,k(il,jl,kl))
     else exct(skex,decap(fst(snd(att(frame@pred(FI(i,j,k))))),vkI(i))).
-use H with il,jl,kl.
+intro [il jl kl [_ ->]]. 
+by use Abs with il,jl,kl.
+auto.
 Qed.
 
 
 equiv [idealized3/left,idealized2/left] transitivity.
 Proof.
-diffeq.
-use trans_eq with i,j,k.
+diffeq; try auto.
+intro *.
+by use trans_eq with i,j,k.
 
-use trans_eq2 with i,j,k.
+intro *.
+by use trans_eq2 with i,j,k.
 
+intro *.
 use ifte with i,j,k.
 use trans_eq with i,j,k.
+
 rewrite -Meq in Meq0.
 rewrite -Meq0.
 
-admit. (* TODO: this is a bug witness in the congruence closure. *)
+auto.
 
+intro *.
 case  try find iv,jv,kv such that (skex = skex && (i = iv && j = jv && k = kv))
     in n_PRF(iv,jv,kv) else exct(skex,k(i,j,k)).
-rewrite Meq.
-use H1 with i,j,k.
+intro [iv jv kv [_ ->]].
+auto.
+intro [Abs _].
+by use Abs with i,j,k.
 
+intro *.
 case    try find iv,jv,kv such that (skex = skex && (i = iv && j = jv && k = kv))
     in n_PRF(iv,jv,kv) else exct(skex,k(i,j,k)).
-rewrite Meq.
-use H1 with  i,j,k.
+intro [iv jv kv [_ ->]].
+auto.
+
+intro [Abs _].
+by use Abs with i,j,k.
+
 Qed.
 
 axiom [idealized3] uniqepk : forall (m1,m2:message), epk(m1) =epk(m2) => m1=m2.
@@ -576,57 +637,80 @@ goal [idealized3/left] auth :  forall (i,j,l:index) ,
 .
 Proof.
 intro i j l.
+intro Hap Exec.
 expand exec.
 expand cond.
-euf H0.
-assert ( SR(j,k,i0) <= FI(i,j,l) || SR(j,k,i0) < FI(i,j,l)) <=>  SR(j,k,i0) < FI(i,j,l).
-case H1.
-use H2.
+destruct Exec as [_ EUF].
 
-use uniqepk with vkI(i),vkI(i0).
+euf EUF.
+intro Ord.
+assert ( SR(j,k,i0) <= FI(i,j,l) || SR(j,k,i0) < FI(i,j,l)) <=>  SR(j,k,i0) < FI(i,j,l).
+split.
+intro H.
+by case H.
+auto.
+destruct H.
+use H; try auto.
+intro Meq _.
+
+use uniqepk with vkI(i),vkI(i0); try auto.
 exists k.
 depends I(i,j,l), FI(i,j,l).
+auto.
+
+intro OrdIFI.
+simpl.
 
 
-use sufcma with  (xor(ktilde8(i,j,l)@FI(i,j,l),snd(snd(input@FI(i,j,l))))),  sid8(i,j,l)@FI(i,j,l)  ,  skR(j) .
+use sufcma with  (xor(ktilde8(i,j,l)@FI(i,j,l),snd(snd(input@FI(i,j,l))))),  sid8(i,j,l)@FI(i,j,l)  ,  skR(j); try auto .
 expand output.
 rewrite snd_pair.
 rewrite snd_pair.
 
-use xorconcel with ktilde6(j,k,i)@SR(j,k,i), ktilde6(j,k,i)@SR(j,k,i), sign(sid6(j,k,i)@SR(j,k,i),skR(j)).
+use xorconcel with ktilde6(j,k,i)@SR(j,k,i), ktilde6(j,k,i)@SR(j,k,i), sign(sid6(j,k,i)@SR(j,k,i),skR(j)); try auto.
 rewrite -Meq in Meq0.
 rewrite -Meq0.
-
+expand sid6,sid8, C4,CT4.
+simpl.
 assert ktilde6(j,k,i)@SR(j,k,i)=ktilde8(i,j,l)@FI(i,j,l).
+cycle 1.
+rewrite Meq2.
+by use xorconcel with ktilde8(i,j,l)@FI(i,j,l), ktilde8(i,j,l)@FI(i,j,l),snd(snd(input@FI(i,j,l))) .
+
+cycle 1.
+expand ktilde6, ktilde8, FK2.
+
 
 case  try find il,jl,kl such that
-      fst(snd(input@FI(i,j,l))) =
-      encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
+     _
     in F2(sid8(i,j,l)@FI(i,j,l),n_PRF(il,jl,kl))
     else
       F2(sid8(i,j,l)@FI(i,j,l),
       exct(skex,decap(fst(snd(input@FI(i,j,l))),vkI(i)))).
-rewrite Meq3 in D3.
+intro [il jl kl [ _ ->]].
 
-expand ktilde6,ktilde8.
 assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))), vkI(il)) =
 decap( encap(n_CCA(i,j,k),rk(i,j,k),epk(vkI(i))), vkI(il)).
+auto.
+simpl.
+case H1; try auto.
+by case H2.
 
-case H4.
-case H5.
+intro [Abs _].
+by use Abs with i,j,k.
 
-use H4 with i,j,k.
-
-
-executable pred(FI(i,j,l)).
-use H2 with DSR(j,k).
+intro Ord Eqsid _.
+executable pred(FI(i,j,l)); try auto.
+intro Exec.
+use Exec with DSR(j,k); try auto.
 assert happens(DSR(j,k)).
-case H1.
+by case Ord.
 expand  exec@DSR(j,k).
 expand cond.
-use H4 with i.
+destruct H as [_ Conc].
+by use Conc with i.
 
-case H1.
+by case Ord.
 Qed.
 (* As I1 is the converse of FI, we also have freely that *)
 
@@ -652,7 +736,7 @@ Qed.
 (*******************************************)
 (*** Strong Secrecy of the responder key ***)
 (*******************************************)
-set autoIntro = false.
+
 axiom  [idealized3/left,idealized3/left]  fst_p: forall (x,y:message) fst(<x,y>)=x.
 axiom  [idealized3/left,idealized3/left]  snd_p: forall (x,y:message) snd(<x,y>)=y.
 
