@@ -20,9 +20,9 @@ type lsymb = Theory.lsymb
 
 (** The kind of a process gives, for each of its input variables,
   * the expected kind for that variable. *)
-type pkind = (string * Sorts.esort) list
+type proc_ty = (string * Type.ety) list
 
-val pp_pkind : (string * Sorts.esort) list Fmt.t
+val pp_proc_ty : proc_ty Fmt.t
 
 
 (** {2 Front-end processes}
@@ -37,27 +37,32 @@ val pp_pkind : (string * Sorts.esort) list Fmt.t
 
 (** Process types *)
 type process_i =
-  | Null                                    (** Null process *)
-  | New of lsymb * process                 (** Name creation *)
+  | Null                                       (** Null process *)
+  | New of lsymb * Theory.p_ty * process       (** Name creation *)
   | In  of Channel.p_channel * lsymb * process (** Input *)
-  | Out of Channel.p_channel * term * process   (** Output *)
+  | Out of Channel.p_channel * term * process  (** Output *)
+  | Parallel of process * process              (** Parallel composition *)
+  
   | Set of lsymb * lsymb list * term * process
-                                            (** [Set (s,l,t,p)] stores [t]
-                                              * in cell [s(l)] and
-                                              * continues with [p]. *)
-  | Parallel of process * process           (** Parallel composition *)
-  | Let of lsymb * term * process          (** Local definition *)
+  (** [Set (s,l,t,p)] stores [t] in cell [s(l)] and continues with [p]. *)
+           
+  | Let of lsymb * term * Theory.p_ty option * process 
+  (** Local definition, optional type information *)
+  
   | Repl of lsymb * process
       (** [Repl (x,p)] is the parallel composition of [p[x:=i]]
         * for all indices [i]. *)
+  
   | Exists of lsymb list * formula * process * process
       (** [Exists (vars,test,p,q)] evalues to [p[vars:=indices]]
         * if there exists [indices] such that [test[vars:=indices]]
         * is true, and [q] otherwise. Note that this construct
         * subsumes the common conditional construct. *)
+  
   | Apply of lsymb * term list
       (** Process invocation: [Apply (p,ts)] gets expanded
         * to [p(ts)]. *)
+  
   | Alias of process * lsymb
       (** [Alias (p,i)] behaves as [p] but [i] will be used
         * as a naming prefix for its actions. *)
@@ -67,10 +72,10 @@ and process = process_i Location.located
 val pp_process : Format.formatter -> process -> unit
 
 (** Check that a process is well-typed in some environment. *)
-val check_proc : Symbols.table -> Theory.env -> process -> unit
+val check_proc : Symbols.table -> Vars.env -> process -> unit
 
 (** Declare a named process. The body of the definition is type-checked. *)
-val declare : Symbols.table -> lsymb -> pkind -> process -> Symbols.table
+val declare : Symbols.table -> lsymb -> proc_ty -> process -> Symbols.table
 
 (** Final declaration of the system under consideration,
   * which triggers the computation of its internal representation
@@ -86,7 +91,8 @@ type proc_error_i =
   | Arity_error of string * int * int
   | StrictAliasError of string
   | DuplicatedUpdate of string
-
+  | Freetyunivar
+  
 type proc_error = Location.t * proc_error_i
 
 val pp_proc_error :

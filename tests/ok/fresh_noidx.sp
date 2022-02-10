@@ -7,9 +7,11 @@ system new n; out(c,n).
 equiv test.
 Proof.
   induction t.
+
+  auto.
+
   expandall.
   fa 0; fa 1; fa 1.
   fresh 1.
-  yesif 1.
-  by auto.
+  by yesif 1.
 Qed.

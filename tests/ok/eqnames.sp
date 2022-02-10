@@ -13,7 +13,7 @@ system null.
 
 goal different : n1 <> n2.
 Proof.
- by auto.
+ auto.
 Qed.
 
 goal injectivity :
@@ -21,7 +21,7 @@ forall (i:index,j:index),
 i <> j =>
  m1(i) <> m1(j).
 Proof.
- by auto.
+ auto.
 Qed.
 
 goal independency :
@@ -32,11 +32,10 @@ Proof.
 Qed.
 
 
-goal independency_bis :
- forall (i:index,j:index),
+goal independency_bis (i:index,j:index):
   i <> j =>
   h(m1(i),k) <> m1(j).
 Proof.
- intro i j Hneq Heq. simpl.
+ intro Hneq Heq. simpl.
  by case H.
 Qed.

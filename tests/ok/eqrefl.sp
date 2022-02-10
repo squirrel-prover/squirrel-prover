@@ -5,22 +5,27 @@ abstract ko : message
 
 system null.
 
-equiv e : ok, ok.
+equiv _ : ok, ok.
 Proof.
   refl.
 Qed.
 
-equiv e1 : ok.
+equiv _ : ok.
 Proof.
   refl.
 Qed.
 
-equiv e2 : diff(ok,ok).
+equiv _ : diff(ok,ok).
 Proof.
   refl.
 Qed.
 
-equiv e3 : diff(diff(ok,ko),ok).
+equiv _ : diff(diff(ok,ko),ok).
 Proof.
   refl.
 Qed.
+
+equiv _ (x : message) : x.
+Proof.
+  checkfail refl exn NoReflMacroVar.
+Abort.

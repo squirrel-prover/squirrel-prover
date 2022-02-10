@@ -34,9 +34,9 @@ let pp_error pp_loc pp_pref_loc e = match e with
   | _ -> None
 
 let pp_loc interactive filename lexbuf ppf () =
-  if not(interactive) then
+  if not interactive then
     Fmt.pf ppf
-      " in %s @,\
+      "in %s @,\
        at line %d char %d @,\
        before %S"
       filename
@@ -55,47 +55,52 @@ let pp_loc interactive filename lexbuf ppf () =
 
 let pp_pref_loc interactive lexbuf ppf () =
   if interactive then
-        Fmt.pf ppf
+    Fmt.pf ppf
       "[error-%d-%d]"
       (Lexing.lexeme_start_p lexbuf).pos_cnum
       (Lexing.lexeme_end_p lexbuf).pos_cnum
 
 
 let parse_from_buf
-      ?(test=false) ?(interactive=false) parse_fun lexbuf filename =
+    ?(test=false)
+    ?(interactive=false) 
+    (parse_fun : (Lexing.lexbuf -> Parser.token) -> Lexing.lexbuf -> 'a)
+    (lexbuf    : Lexing.lexbuf)
+    ~(filename  : string) : 'a 
+  =
   try parse_fun Lexer.token lexbuf with e ->
     let pp_loc = pp_loc interactive filename lexbuf in
     let pp_pref_loc = pp_pref_loc interactive lexbuf in
-      match pp_error pp_loc pp_pref_loc e with
-        | Some pp_error ->
-            if test then raise e else
-            if interactive then
-              let msg = Fmt.strf "%a" pp_error () in
-                raise (Error msg)
-            else begin
-              Printer.prt `Error "%a" pp_error () ;
-              exit 1
-            end
-        | None ->
-            if test || interactive then raise e else begin
-              Printer.prt `Error
-                "@[Exception %a: @,%s.@]@.@.\
-                 %s@."
-                pp_loc ()
-                (Printexc.to_string e)
-                (Printexc.get_backtrace ()) ;
-              exit 1
-            end
+    match pp_error pp_loc pp_pref_loc e with
+    | Some pp_error ->
+      if test then raise e else
+      if interactive then
+        let msg = Fmt.strf "%a" pp_error () in
+        raise (Error msg)
+      else begin
+        Printer.prt `Error "%a" pp_error () ;
+        exit 1
+      end
+    | None ->
+      if test || interactive then raise e else begin
+        Printer.prt `Error
+          "@[Exception %a: @,%s.@]@.@.\
+           %s@."
+          pp_loc ()
+          (Printexc.to_string e)
+          (Printexc.get_backtrace ()) ;
+        exit 1
+      end
 
 (** Testing *)
 
 let parse_theory_buf ?(test=false) lexbuf filename =
-  parse_from_buf ~test Parser.declarations lexbuf filename
+  parse_from_buf ~test Parser.declarations lexbuf ~filename
 
 let parse_theory_test ?(test=false) filename =
   let lexbuf = Lexing.from_channel (Stdlib.open_in filename) in
   let decls = parse_theory_buf ~test lexbuf filename in
-  Prover.declare_list Symbols.builtins_table decls
+  Prover.declare_list Symbols.builtins_table Hint.empty_hint_db decls
 
 let parse parser parser_name string =
   let lexbuf = Lexing.from_string string in
@@ -109,7 +114,7 @@ let parse parser parser_name string =
 
 let parse_process table ?(typecheck=false) str =
   let p = parse Parser.top_process "process" str in
-    if typecheck then Process.check_proc table [] p ;
+    if typecheck then Process.check_proc table Vars.empty_env p ;
     p
 
 let parse_formula = parse Parser.top_formula "formula"
@@ -180,27 +185,43 @@ let () =
     end ;
     "If", `Quick, begin fun () ->
       let table =
-        let decl_i = Decl.Decl_abstract { name = L.mk_loc L._dummy "error";
-                                          index_arity = 0;
-                                          message_arity = 0;} in
+        let decl_i =
+          Decl.Decl_abstract {
+            name = L.mk_loc L._dummy "error";
+            symb_type = `Prefix;
+            ty_args = [];
+            abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
+        in
         let decl = Location.mk_loc Location._dummy decl_i in
-        Prover.declare table decl in
+        Prover.declare table Hint.empty_hint_db decl in
       ignore (parse_process table "in(c,x); out(c, if x=x then x else error)"
               : Process.process)
     end ;
     "Try", `Quick, begin fun () ->
       let table =
-        let decl_i = Decl.Decl_abstract { name = L.mk_loc L._dummy "ok";
-                                          index_arity = 0;
-                                          message_arity = 0;} in
+        let decl_i =
+          Decl.Decl_abstract
+            { name = L.mk_loc L._dummy "ok";
+              symb_type = `Prefix;
+              ty_args = [];
+              abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
+        in
         let decl = Location.mk_loc Location._dummy decl_i in
-        Prover.declare table decl in
+        Prover.declare table Hint.empty_hint_db decl
+      in
+      
       let table =
-        let decl_i = Decl.Decl_abstract { name = L.mk_loc L._dummy "error";
-                                          index_arity = 0;
-                                          message_arity = 0;} in
+        let decl_i =
+          Decl.Decl_abstract
+            { name = L.mk_loc L._dummy "error";
+              symb_type = `Prefix;
+              ty_args = [];
+              abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
+        in
+        
         let decl = Location.mk_loc Location._dummy decl_i in
-        Prover.declare table decl in
+        Prover.declare table Hint.empty_hint_db decl
+      in
       ignore (parse_process table
                 "in(c,x); \
                  try find i such that x = x in \
@@ -255,13 +276,6 @@ let () =
            with (Symbols.SymbError (_,
                                     Multiple_declarations "c")) -> raise Ok)
     end ;
-    (* TODO: this test is no longer possible because we must provid locations *)
-    (* "Action creation", `Quick, begin fun () ->
-     *   let table = parse_theory_test ~test "tests/alcotest/actions.sp" in
-     *   ignore (Action.find_symbol "IOIO1" table) ;
-     *   ignore (Action.find_symbol "IOIO2" table)
-     *   (\* TODO test resulting action structure *\)
-     * end ; *)
     "Let in actions", `Quick, begin fun () ->
       ignore (parse_theory_test ~test "tests/alcotest/action_let.sp"
               : Symbols.table )
@@ -301,9 +315,18 @@ let () =
            with
              Theory.Conv
                (_,
-                Theory.Type_error (
-                  App (L.{ pl_desc = "n" },[]),
-                  Sorts.(ESort Timestamp))) ->
+                Theory.ExplicitTSInProc) ->
+             raise Ok)
+    end ;
+    "Local Process", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
+           try ignore (parse_theory_test ~test "tests/alcotest/proc_local2.sp"
+                       : Symbols.table )
+           with
+             Theory.Conv
+               (_,
+                Theory.ExplicitTSInProc) ->
              raise Ok)
     end ;
     "Apply Proc - 0", `Quick, begin fun () ->

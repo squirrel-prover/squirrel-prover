@@ -24,14 +24,14 @@ abstract tag2: message
 abstract ok: message
 
 
-axiom id_neq : forall (i,j:index), id(i) = id(j) => i=j
-axiom pair_fst: forall (x,y:message), fst(<x,y>) =x
-axiom pair_snd: forall (x,y:message), snd(<x,y>) =y
+axiom id_neq (i,j:index): id(i) = id(j) => i=j
+axiom pair_fst (x,y:message): fst(<x,y>) =x
+axiom pair_snd (x,y:message): snd(<x,y>) =y
 
 axiom tags_neq : tag1 <> tag2
 channel c
 
-axiom dec:forall (m:message, r:message, key:message), dec(enc(m,r,key),key)  = m
+axiom dec (m:message, r:message, key:message): dec(enc(m,r,key),key)  = m
 
 
 process A(i:index) =

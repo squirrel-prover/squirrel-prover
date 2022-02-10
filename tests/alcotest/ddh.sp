@@ -4,12 +4,13 @@ name a : index -> message
 name b : index -> message
 name k : index -> message
 
+ddh g, (^) where group:message exposants:message.
+
 channel c
 
-system (!_i ( out(c, diff((g^a(i))^b(i),g^k(i))))
-       | !_j ( in(c,x);out(c,g^x^a(j)))
-       )
-.
+system (!_i ( out(c, diff((g ^ a(i)) ^ b(i),g ^ k(i))))
+       | !_j ( in(c,x);out(c,g ^ x ^ a(j)))
+       ).
 
 
 equiv ddh_goal.
@@ -19,11 +20,10 @@ Proof.
  fadup; try (expandall; refl + assumption).
  fadup; try (expandall; refl + assumption).
  cycle 1.
- expand exec@A1(j). 
  nosimpl(expandall).
 
  fadup; try (expandall; refl + assumption).
 
  fa 0; fa 1; fa 1.
- ddh a, b, k.
+ ddh g, a, b, k.
 Qed.

@@ -24,4 +24,6 @@ val create : int -> t
 
 val find : t -> int -> int
 
-val union : t -> int -> int -> t
+(* if [ignore_rank] is true, the left element is always choosen as 
+   representent of the union. *)
+val union : ?ignore_rank:bool -> t -> int -> int -> t

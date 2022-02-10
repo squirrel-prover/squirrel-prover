@@ -21,12 +21,20 @@
 let name = ['a'-'z' 'A'-'Z'] ['a'-'z' 'A'-'Z' '0'-'9' '_' '\'']*
 let int = ['0'-'9'] ['0'-'9']*
 
+
+(* Hard-coded in Symbols.ml ! Do not change. *)
+let infix_char_first = ['^' '+' '-' '*' '|' '&' '~']
+let infix_char = infix_char_first | ['<' '>']
+let infix_symb = infix_char_first ( infix_char* | (['0'-'9']* infix_char+) )
+
 rule token = parse
 | [' ' '\t']              { token lexbuf }
 | '\n'                    { newline lexbuf ; token lexbuf }
 | "(*" { comment lexbuf; token lexbuf }
 | "!_" (name as i)  { BANG i }
 | "&&"                { AND }
+| "/\\"               { GAND }
+| "\\/"               { GOR }
 | "||"                { OR }
 | "not"               { NOT }
 | "True"              { TRUE }
@@ -40,12 +48,16 @@ rule token = parse
 | "!"                 { BANGU }
 | '.'                 { DOT }
 | ':'                 { COLON }
+| ":="                { COLONEQ }
 | ';'                 { SEMICOLON }
 | '*'                 { STAR }
 | '_'                 { UNDERSCORE }
+| "`_"                { TICKUNDERSCORE }
 | "//"                { SLASHSLASH }
 | "/="                { SLASHEQUAL }
+| "//="               { SLASHSLASHEQUAL }
 | '/'                 { SLASH }
+| "@/"                { ATSLASH }
 | "="                 { EQ }
 | "<>"                { NEQ }
 | ">="                { GEQ }
@@ -54,11 +66,17 @@ rule token = parse
 | ')'                 { RPAREN }
 | '|'                 { PARALLEL }
 | "->"                { ARROW }
+| "<-"                { RARROW }
 | "=>"                { DARROW }
 | "<=>"               { DEQUIVARROW }
-| ":="                { ASSIGN }
 | "-"                 { MINUS }
 | "@"                 { AT }
+| '~'                 { TILDE }
+| '+'                 { PLUS }
+| '\''                { TICK }
+| '%'                 { PERCENT }
+| infix_symb as s     { INFIXSYMB s }
+| int as i            { INT (int_of_string i) }
 | "happens"           { HAPPENS }
 | "if"                { IF }
 | "then"              { THEN }
@@ -71,9 +89,12 @@ rule token = parse
 | "new"               { NEW }
 | "try find"          { FIND }
 | "such that"         { SUCHTHAT }
-| "term"              { TERM }
 | "process"           { PROCESS }
 | "abstract"          { ABSTRACT }
+| "fun"               { FUN }
+| "type"              { TYPE }
+| "name_fixed_length" { NAMEFIXEDLENGTH }
+| "large"             { LARGE }
 | "name"              { NAME }
 | "mutable"           { MUTABLE }
 | "system"            { SYSTEM }
@@ -96,17 +117,25 @@ rule token = parse
 | "seq"               { SEQ }
 | "oracle"            { ORACLE }
 | "with"              { WITH }
+| "where"             { WHERE }
+| "time"              { TIME }
 | "diff"              { DIFF }
 | "left"              { LEFT }
-| "^"                 { EXP }
 | "right"             { RIGHT }
-| "none"              { NONE }
 | "forall"            { FORALL }
 | "exists"            { EXISTS }
+| "splitseq"          { SPLITSEQ }
+| "constseq"          { CONSTSEQ }
+| "memseq"            { MEMSEQ }
+| "remember"          { REMEMBER }
+| "dependent"         { DEPENDENT }
 | "goal"              { GOAL }
+| "local"             { LOCAL }
+| "global"            { GLOBAL }
 | "equiv"             { EQUIV }
 | "axiom"             { AXIOM }
 | "Proof."            { PROOF }
+| "hint"              { HINT }
 | "Qed."              { QED }
 | "Abort."            { ABORT }
 | "help"              { HELP }
@@ -118,16 +147,20 @@ rule token = parse
 | "exn"               { EXN }
 | "use"               { USE }
 | "rewrite"           { REWRITE }
+| "apply"             { APPLY }
 | "revert"            { REVERT }
 | "generalize"        { GENERALIZE }
+| "induction"         { INDUCTION }
 | "depends"           { DEPENDS }
 | "clear"             { CLEAR }
 | "ddh"               { DDH }
 | "nosimpl"           { NOSIMPL }
+| "rename"            { RENAME }
+| "gprf"              { GPRF }
+| "gcca"              { GCCA }
 | "checkfail"         { CHECKFAIL }
-| '+'                 { PLUS }
+| "include"           { INCLUDE }
 | name as n           { ID n }
-| int as i            { INT (int_of_string i) }
 | eof                 { EOF }
 
 and comment = parse

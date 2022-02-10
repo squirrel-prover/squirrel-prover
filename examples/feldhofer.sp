@@ -24,8 +24,9 @@ induction for wa_* goals.
 
 This is a "light" model without the last check of T.
 *******************************************************************************)
-
+set autoIntro=false.
 set timeout=4.
+set postQuantumSound=true.
 
 channel cR
 channel cT
@@ -76,10 +77,10 @@ system (!_k Reader(k) | !_i !_j Tag(i,j)).
 
 axiom tags_neq : tagR <> tagT
 
-axiom fail_not_pair : forall (x,y:message), fail <> <x,y>.
+axiom fail_not_pair (x,y:message): fail <> <x,y>.
 
 goal wa_Reader1 (k:index):
-  happens(Reader1(k)) => 
+  happens(Reader1(k)) =>
     (exec@Reader1(k)
      <=>
      exec@pred(Reader1(k)) && (exists (i,j:index),
@@ -88,24 +89,25 @@ goal wa_Reader1 (k:index):
        input@Tag(i,j) = output@Reader(k))).
 Proof.
   intro *.
-  depends Reader(k), Reader1(k).
-  expand exec, cond, output.
-  split.
+  depends Reader(k), Reader1(k); 1: auto.
+  intro C.
+  expand exec, cond.
+  split => [_ [i j [[H _] _]]].
 
-  project; use tags_neq.
+  project; use tags_neq as _.
 
   (* First projection. *)
-  intctxt Mneq.
+  intctxt H => // _ _ _ /=.
   by exists i, j0.
 
   (* Second projection. *)
-  intctxt Mneq.
-  by exists i,j. 
+  intctxt H => // _ _ _ /=.
+  by exists i, j.
 
   (* Direction <= *)
+  simpl.
   exists i,j.
-  expand output.
-  by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>. 
+  by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
 Qed.
 
 (* Action Reader2 is the empty else branch of the reader. *)
@@ -120,80 +122,96 @@ goal wa_Reader2 (k:index):
 Proof.
   intro *.
   expand exec, cond.
-  depends Reader(k),Reader2(k).
-  expand output.
+  depends Reader(k),Reader2(k); 1: auto.
+  intro C.
   split.
 
   (* Direction => is the obvious one *)
-  expand output. 
+  intro [_ H0] => /= [i j [[H1 _] _]].
   notleft H0.
   use H0 with i,j; case H1.
-  by use fail_not_pair with tagT, <input@Tag(i,j), nt(i,j)>.
+  clear H0.
+  expand output, cipher.
+  use fail_not_pair with tagT, <input@Tag(i,j), nt(i,j)>.
+  by case H.
 
   (* Direction <= *)
-
+  intro [_ H0] => /= [i j [[H1 _] _]].
   notleft H0.
   use tags_neq.
   project.
 
-  intctxt Mneq.
-  by use H0 with i,j0; case H1.
+  intctxt H1 => // _ _ _.
+  use H0 with i,j0 as C1.
+  clear H0.
+  by expand output, cipher; case C1.
 
-  intctxt Mneq.
-  by use H0 with i,j; case H1.
+  intctxt H1 => // _ _ _.
+  use H0 with i,j as C1.
+  clear H0.
+  by expand output, cipher; case C1.
 Qed.
 
-goal lemma (i,j,i1,j1:index):
-  happens(Tag(i,j),Tag(i1,j1)) => 
-     output@Tag(i,j) = output@Tag(i1,j1) => i = i1 && j = j1.
+(** This lemma about unique outputs will be useful for both sides of our system.
+  * Unfortunately the proof argument involves intctxt and thus requires a projection.
+  * The two subproofs are almost identical. *)
+goal unique_outputs (i,j,i0,j0:index):
+  happens(Tag(i,j),Tag(i0,j0)) =>
+     output@Tag(i,j) = output@Tag(i0,j0) => i = i0 && j = j0.
 Proof.
-  intro *.
-  project. 
+  intro H Meq.
+  project.
 
-  assert dec(output@Tag(i,j),kE(i0)) = <tagT,<input@Tag(i0,j0),nt(i0,j0)>>.
-  intctxt Meq0.
-  case H.
-  assert dec(output@Tag(i0,j0),kE(i)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
-  intctxt Meq2.
-  by case H.
+  assert dec(output@Tag(i,j),kE(i0)) = <tagT,<input@Tag(i0,j0),nt(i0,j0)>> as Meq0;
+  1: by expand output, cipher.
+  intctxt Meq0 => C //.
+  case C => //.
+  assert dec(output@Tag(i0,j0),kE(i)) = <tagT,<input@Tag(i,j),nt(i,j)>> as Meq2;
+  1: by expand output, cipher.
+  intctxt Meq2 => C1 //.
+  by case C1.
   by use fail_not_pair with tagT,<input@Tag(i,j),nt(i,j)>.
   by use fail_not_pair with tagT,<input@Tag(i0,j0),nt(i0,j0)>.
 
-  assert dec(output@Tag(i,j),kbE(i0,j0)) = <tagT,<input@Tag(i0,j0),nt(i0,j0)>>.
-  intctxt Meq0.
-  case H.
-  assert dec(output@Tag(i0,j0),kbE(i,j)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
-  intctxt Meq2.
-  by case H.
+  assert dec(output@Tag(i,j),kbE(i0,j0)) = <tagT,<input@Tag(i0,j0),nt(i0,j0)>>
+  as Meq0;
+  1: by expand output, cipher.
+  intctxt Meq0 => C //.
+  case C => //.
+  assert dec(output@Tag(i0,j0),kbE(i,j)) = <tagT,<input@Tag(i,j),nt(i,j)>> as Meq2;
+  1: by expand output, cipher.
+  intctxt Meq2 => C1 //.
+  by case C1.
   by use fail_not_pair with tagT,<input@Tag(i,j),nt(i,j)>.
   by use fail_not_pair with tagT,<input@Tag(i0,j0),nt(i0,j0)>.
 Qed.
 
 equiv unlinkability.
 Proof.
-  enrich seq(k->nr(k)), seq(i,j->nt(i,j)).
+  enrich seq(k:index -> nr(k)), seq(i,j:index -> nt(i,j)).
 
   induction t.
 
+  (* init *)
+  auto.
+
   (* Action 1/4: Reader *)
 
-  expand seq(k->nr(k)),k.
-  expandall.
-  by fa 3.
+  by expandall; apply IH.
 
   (* Action 2/4: Reader1 *)
 
-  expand frame@Reader1(k).
+  expand frame.
   equivalent
     exec@Reader1(k),
     exec@pred(Reader1(k)) &&
     exists (i,j:index),
       Tag(i,j) < Reader1(k) && Reader(k) < Reader1(k)  &&
       output@Tag(i,j) = input@Reader1(k) &&
-      input@Tag(i,j) = output@Reader(k).
-  by use wa_Reader1 with k.
+      input@Tag(i,j) = output@Reader(k);
+  1: by use wa_Reader1 with k.
 
-  expand output@Reader1(k).
+  expand output.
   fa 2. fa 3. fadup 3.
 
   equivalent
@@ -231,41 +249,48 @@ Proof.
         in
           enc(<tagR,<nt(i,j),nr(k)>>,rr(k),
               diff(kE(i),kbE(i,j))))).
-  fa. 
-  by exists i,j.
-  by exists i,j.
+  fa.
+  intro *; auto.
+  by intro [_ [i j _]] /=; exists i,j.
+  intro [_ [i j _]] /=.
   project.
 
-  fa. 
+  fa => //.
   (* find condA => condB *)
-  intctxt Mneq.
-  by use tags_neq.
-  by exists j1.
+  intro [Mneq _ _].
+  intctxt Mneq => // _ _ _;
+  [1: by use tags_neq|
+   2: by exists j1].
 
   (* find condB => condA *)
-  use lemma with i,j,i0,j0.
-  by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>. 
+  intro _.
+  use unique_outputs with i,j,i0,j0 as [_ _]; 2,3: auto.
+  use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
+  by expand output, cipher.
 
-  fa. 
+  fa => //.
   (* find condA => condB *)
-  intctxt Mneq. 
+  intro [Mneq _ _].
+  intctxt Mneq => // _ _ [_ _].
   by use tags_neq.
+
   (* find condB => condA *)
-  use lemma with i,j,i0,j0 as Hlem. 
-  by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
+  intro _.
+  use unique_outputs with i,j,i0,j0 as [_ _]; 2,3: auto.
+  use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
+  by expand output, cipher.
+
+  auto.
 
   fa 3; fadup 3.
   fa 3; fadup 3.
-  enckp 3, k_fresh.
-  expand seq(k->nr(k)),k.
-  expand seq(i,j->nt(i,j)),i,j.
-  fa 5.
-  fresh 6.
-  by fresh 5; yesif 5.
+  enckp 3, k_fresh; 1: auto.
+  fa 3. fresh 4; yesif 4; 1: auto. fresh 4.
+  apply IH.
 
   (* Action 3/4: Reader2 *)
 
-  expand frame@Reader2(k).
+  expand frame.
 
   equivalent
     exec@Reader2(k),
@@ -282,11 +307,12 @@ Proof.
   (* Action 4/4: Tag *)
 
   expandall.
-  fa 2. fa 3.  fa 3.
+  fa 2. fa 3. fa 3.
 
-  enckp 3, k_fresh.
-  expand seq(i,j->nt(i,j)),i,j.
-  fa 4.
+  enckp 3, k_fresh; 1: auto.
+
+  fa 3.
   fresh 5.
-  by fresh 4; yesif 4.
+  fresh 4; yesif 4; 1: auto.
+  apply IH.
 Qed.

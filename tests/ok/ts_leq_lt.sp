@@ -6,5 +6,5 @@ system ((A:out(c,ok)) | (B:out(c,ok))).
 
 goal _: A <= B => A < B.
 Proof.
- by auto.
+ auto.
 Qed.

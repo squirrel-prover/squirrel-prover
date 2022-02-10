@@ -5,6 +5,54 @@ module L = Location
 
 type lsymb = Theory.lsymb
 
+type s_item =
+  | Tryauto      of Location.t    (** '//' *)
+  | Tryautosimpl of Location.t    (** '//' *)
+  | Simplify     of Location.t    (** '//=' *)
+
+(** Tactic target. *)
+type in_target = [`Goal | `All | `Hyps of lsymb list]
+
+(*------------------------------------------------------------------*)
+(** {2 Parsed arguments for rewrite} *)
+
+type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
+
+type rw_dir = [`LeftToRight | `RightToLeft ] L.located
+
+(** General rewrite item *)
+type 'a rw_item_g = {
+  rw_mult : rw_count;
+  rw_dir  : rw_dir;
+  rw_type : 'a;
+}
+
+(** Rewrite or expand item *)
+type rw_item = [
+  | `Rw        of Theory.p_pt
+  | `Expand    of Theory.term
+  | `ExpandAll of Location.t
+] rw_item_g
+
+(** Expand item *)
+type expnd_item = [
+  | `Expand    of Theory.term
+  | `ExpandAll of Location.t
+] rw_item_g
+
+(** Rewrite equiv item *)
+type rw_equiv_item = [
+  | `Rw of Theory.p_pt
+] rw_item_g
+
+(** Rewrite argument, which is a rewrite or simplification item*)
+type rw_arg =
+  | R_item   of rw_item
+  | R_s_item of s_item
+
+(*------------------------------------------------------------------*)
+type apply_in = lsymb option
+
 (*------------------------------------------------------------------*)
 (** {2 Intro patterns} *)
 
@@ -12,12 +60,13 @@ type naming_pat =
   | Unnamed   (** '_' *)
   | AnyName   (** '?' *)
   | Named of string
+  | Approx  of string        (* only used internally *)
 
 type and_or_pat =
   | Or      of simpl_pat list
   (** e.g. \[H1 | H2\] to do a case on a disjunction. *)
-               
-  | Split 
+
+  | Split
   (** \[\] to do a case. *)
 
   | And     of simpl_pat list
@@ -26,14 +75,13 @@ type and_or_pat =
 and simpl_pat =
   | SAndOr of and_or_pat
   | SNamed of naming_pat
-
-type s_item =
-  | Tryauto   of Location.t    (** '//' *)
-  | Simplify  of Location.t    (** '/=' *)
+  | Srewrite of rw_dir                    (** -> or <-*)
 
 type intro_pattern =
   | Star   of Location.t    (** '*' *)
-  | SItem of s_item
+  | StarV  of Location.t    (** '>' *)
+  | SItem  of s_item
+  | SExpnd of expnd_item    (** @/macro *)
   | Simpl  of simpl_pat
 
 (*------------------------------------------------------------------*)
@@ -42,7 +90,7 @@ val pp_and_or_pat : Format.formatter -> and_or_pat         -> unit
 val pp_simpl_pat  : Format.formatter -> simpl_pat          -> unit
 val pp_intro_pat  : Format.formatter -> intro_pattern      -> unit
 val pp_intro_pats : Format.formatter -> intro_pattern list -> unit
-  
+
 
 (*------------------------------------------------------------------*)
 (** handler for intro pattern application *)
@@ -52,72 +100,72 @@ type ip_handler = [
 ]
 
 (*------------------------------------------------------------------*)
-(** {2 Tactic arguments types} *)
+(** {2 Tactics named arguments} *)
+
+type named_arg =
+  | NArg of lsymb               (** '~id' *)
+
+type named_args = named_arg list
 
 (*------------------------------------------------------------------*)
-(** Parsed arguments for rewrite *)
+(** {2 Tactic arguments types} *)
 
-type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
+type boolean = [`Boolean]
 
-(* rewrite item *)
-type rw_item = { 
-  rw_mult : rw_count;
-  rw_dir  : [`LeftToRight | `RightToLeft ] L.located;
-  rw_type : [
-    | `Form   of Theory.formula   (* formula or hypothesis ident *)
-    | `Expand of Theory.term      (* term or macro name *)
-  ];
-}
-
-type rw_arg =
-  | R_item   of rw_item 
-  | R_s_item of s_item
-
-type rw_in = [`All | `Hyps of lsymb list] option 
-
-(*------------------------------------------------------------------*)  
-(** Types used during parsing. 
-    Note that all tactics not defined in the parser must rely on the Theory 
+(** Types used during parsing.
+    Note that all tactics not defined in the parser must rely on the Theory
     type, even to parse strings. *)
 type parser_arg =
-  | String_name of lsymb
-  | Int_parsed  of int
-  | Theory      of Theory.term
-  | IntroPat    of intro_pattern list
-  | AndOrPat    of and_or_pat
-  | SimplPat    of simpl_pat
-  | RewriteIn   of rw_arg list * rw_in
-      
+  | String_name  of lsymb
+  | Int_parsed   of int L.located
+  | Theory       of Theory.term
+  | IntroPat     of intro_pattern list
+  | AndOrPat     of and_or_pat
+  | SimplPat     of simpl_pat
+  | RewriteIn    of rw_arg list * in_target
+  | RewriteEquiv of rw_equiv_item
+  | ApplyIn      of named_args * Theory.p_pt * apply_in
+  | AssertPt     of Theory.p_pt * simpl_pat option * [`IntroImpl | `None]
+  | SplitSeq     of int L.located * Theory.hterm
+  | ConstSeq     of int L.located * (Theory.hterm * Theory.term) list
+  | MemSeq       of int L.located * int L.located
+  | Remember     of Theory.term * lsymb
+  | Generalize   of Theory.term list * naming_pat list option
+  | TermPat      of int * Theory.term
+
+type parser_args = parser_arg list
+
 (** Tactic arguments sorts *)
 type _ sort =
   | None      : unit sort
 
-  | Message   : Sorts.message   sort
-  | Boolean   : Sorts.boolean   sort
-  | Timestamp : Sorts.timestamp sort        
-  | Index     : Sorts.index     sort
-        
+  | Message   : Type.message   sort
+  | Boolean   :      boolean   sort
+  | Timestamp : Type.timestamp sort
+  | Index     : Type.index     sort
+
   | ETerm     : Theory.eterm    sort
   (** Boolean, timestamp or message *)
 
-  | Int       : int sort
+  | Int       : int L.located sort
   | String    : lsymb sort
   | Pair      : ('a sort * 'b sort) -> ('a * 'b) sort
   | Opt       : 'a sort -> ('a option) sort
 
 (** Tactic arguments *)
 type _ arg =
-  | None      : unit arg 
+  | None      : unit arg
 
-  | Message   : Term.message   -> Sorts.message   arg
-  | Boolean   : Term.formula   -> Sorts.boolean   arg
-  | Timestamp : Term.timestamp -> Sorts.timestamp arg
-  | Index     : Vars.index     -> Sorts.index     arg
+  | Message   : Term.message * Type.tmessage -> Type.message arg
 
-  | ETerm     : 'a Sorts.sort * 'a Term.term * Location.t -> Theory.eterm arg
+  | Boolean   : Term.message   ->      boolean   arg
+  | Timestamp : Term.timestamp -> Type.timestamp arg
+  | Index     : Vars.index     -> Type.index     arg
+
+  | ETerm     : 'a Type.ty * 'a Term.term * Location.t -> Theory.eterm arg
   (** A [Term.term] with its sorts. *)
-        
-  | Int       : int -> int arg
+
+  | Int       : int L.located -> int L.located arg
   | String    : lsymb -> lsymb arg
   | Pair      : 'a arg * 'b arg -> ('a * 'b) arg
   | Opt       : ('a sort * 'a arg option) -> ('a option) arg
@@ -144,16 +192,16 @@ val pp_esort : Format.formatter -> esort -> unit
 (** {2 Argument conversion} *)
 
 val convert_as_lsymb : parser_arg list -> lsymb option
-  
+
 val convert_args :
-  Symbols.table -> Vars.env ->
-  parser_arg list -> esort -> earg
+  SystemExpr.t -> Symbols.table -> Type.tvars -> Vars.env ->
+  parser_arg list -> esort -> Equiv.any_form -> earg
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
 type tac_arg_error_i =
-  | CannotConvETerm 
+  | CannotConvETerm
 
 type tac_arg_error = Location.t * tac_arg_error_i
 
@@ -162,4 +210,3 @@ exception TacArgError of tac_arg_error
 val pp_tac_arg_error :
   (Format.formatter -> Location.t -> unit) ->
   Format.formatter -> tac_arg_error -> unit
-

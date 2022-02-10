@@ -29,17 +29,17 @@ Proof.
   auto.
 Qed.
 
-goal [none, toto] test2 : happens(B) => output@B = diff(ko,koo).
+goal [toto] test2 : happens(B) => output@B = diff(ko,koo).
 Proof.
   auto.
 Qed.
 
-goal [left, toto] test_left2 : happens(B) => cond@B => output@B = ko.
+goal [toto/left] test_left2 : happens(B) => cond@B => output@B = ko.
 Proof.
   auto.
 Qed.
 
-goal [right, toto] test_right2 : happens(B) => output@B = koo.
+goal [toto/right] test_right2 : happens(B) => output@B = koo.
 Proof.
   auto.
 Qed.

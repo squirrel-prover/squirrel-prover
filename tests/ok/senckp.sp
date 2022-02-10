@@ -31,7 +31,7 @@ Qed.
 
 equiv test_arg4 : enc(n,r,diff(k1,k2)).
 Proof.
-  enckp 0, diff(k2,k1); 1: by auto.
+  enckp 0, diff(k2,k1); 1: auto.
   by enckp 0.
 Qed.
 
@@ -41,7 +41,9 @@ Proof.
   auto.
   (* Decompose explicitly to make sure the context
    * is still there. *)
-  nosimpl(fa 0). nosimpl(fa 0). fa 3.
+  nosimpl(fa 0). nosimpl(fa 0). 
+  fa 3.
+  refl.
 Qed.
 
 equiv test_diffsimpl : enc(n,r,diff(k1,k1)).
@@ -61,5 +63,7 @@ Proof.
   auto.
   (* Decompose explicitly to make sure the context
    * is still there. *)
-  nosimpl(fa 0). nosimpl(fa 0). fa 3.
+  nosimpl(fa 0). nosimpl(fa 0). 
+  fa 3. 
+  refl.
 Qed.

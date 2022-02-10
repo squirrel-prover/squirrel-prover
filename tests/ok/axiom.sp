@@ -5,35 +5,22 @@ set autoIntro=false.
 
 name k:message
 
-system  null.
+system null.
 
-axiom dummy_false_axiom :
-forall (ma : message),
+axiom dummy_false_axiom (ma : message):
 exists (m:message), m=k && ma=k.
 
-goal [left] dummy (ma : message) :
-ma=k.
-
+goal [left] dummy (ma : message) : ma=k.
 Proof.
- intro ma.
- use dummy_false_axiom with ma. 
- auto.
+ by use dummy_false_axiom with ma. 
 Qed.
 
-goal [right] _ (ma : message):
-ma=k.
-
+goal [right] _ (ma : message): ma=k.
 Proof.
- intro ma.
- use dummy_false_axiom with ma.
- auto.
+ by use dummy_false_axiom with ma.
 Qed.
 
-goal _ (ma : message) :
-ma=k.
-
+goal _ (ma : message) : ma=k.
 Proof.
- intro ma.
- use dummy_false_axiom with ma.
- auto.
+ by use dummy_false_axiom with ma.
 Qed.

@@ -19,12 +19,10 @@ equiv testXorOneArg : diff(f(ok),f(ok)),diff(n,m) XOR k.
 Proof.
   nosimpl(xor 1).
   nosimpl(yesif 1).
-  namelength k,n; namelength k,m.
-  by auto.
-  simpl.
+  by namelength k,n; namelength k,m.
+  auto.
 Qed.
 
-set debugCompletion=true.
 equiv testXorTwoArg : diff(f(ok),f(ok)),diff(ko,ko) XOR diff(n,m) XOR k.
 Proof.
   nosimpl(xor 1, k).

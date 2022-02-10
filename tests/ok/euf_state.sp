@@ -14,5 +14,5 @@ goal collision_absurd (tau:timestamp):
  happens(tau) => output@tau <> h(m,k).
 
 Proof.
-  by intro tau Hap Heq; euf Heq; auto.
+  by intro Hap Heq; euf Heq; auto.
 Qed.

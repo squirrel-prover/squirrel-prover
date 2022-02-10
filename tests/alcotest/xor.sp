@@ -11,13 +11,13 @@ system out(c,<n1,diff(xor(n1,ok),xor(n1,ko))>).
 
 equiv test.
 Proof.
-induction t.
+induction t; try auto.
 expandall.
 fa 0.
 fa 1.
 fa 1.
 fa 1.
 xor 2.
-noif 2.
+noif 2; 1: auto.
 simpl.
 Qed.

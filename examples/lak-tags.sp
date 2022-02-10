@@ -13,6 +13,8 @@ We consider tags in the messages (tag1 and tag2) to ease the proof.
 
 This is a "light" model without the last check of T.
 *******************************************************************************)
+set autoIntro=false.
+set postQuantumSound=true.
 
 hash h
 
@@ -62,28 +64,32 @@ goal wa_R1 (j:index):
        fst(output@T(i,k)) = fst(input@R1(j)) &&
        input@T(i,k) = output@R(j))).
 Proof.
-  intro *.
+  intro Hap.
   expand cond.
   split.
 
   (* COND => WA *)
+  intro [i k H].
   use tags_neq; project.
   (* LEFT *)
-  euf Meq.
+  euf H => _ _ _ //.
   exists i,k0.
-  assert input@T(i,k0)=nR(j).
-  fresh Meq1.
-  by case H; depends R(j),R2(j).
+  assert input@T(i,k0)=nR(j) as Meq1; 1: auto.
+  fresh Meq1 => C /=.
+  case C => //.
+  by depends R(j),R2(j).
 
   (* RIGHT *)
-  euf Meq.
+  euf H => _ _ _ //.
   exists i,k.
-  assert input@T(i,k)=nR(j).
-  fresh Meq1.
-  by case H; depends R(j),R2(j).
+  assert input@T(i,k)=nR(j) as Meq1; 1: by auto.
+  fresh Meq1 => C /=.
+  case C => //.
+  by depends R(j),R2(j).
 
   (* WA => COND *)
-  by exists i,k.
+  intro [i k _]; exists i,k.
+  by expand output, m2.
 Qed.
 
 goal wa_R2 (j:index):
@@ -96,30 +102,35 @@ goal wa_R2 (j:index):
       fst(output@T(i,k)) = fst(input@R2(j)) &&
       input@T(i,k) = output@R(j)))).
 Proof.
-  intro *.
+  intro Hap.
   expand cond.
   split.
 
   (* WA => COND *)
+  intro H [i k H0].
   use H.
-  by exists i,k.
+  exists i,k.
+  by expand output, m2.
 
   (* COND => WA *)
+  intro H [i k Meq].
   use H.
   use tags_neq; project.
-  (* LEFT *) 
-  euf Meq.
+  (* LEFT *)
+  euf Meq => _ _ _ //.
   exists i,k0.
-  assert input@T(i,k0)=nR(j).
-  fresh Meq1.
-  by case H0; depends R(j),R1(j).
+  assert input@T(i,k0)=nR(j) as Meq1; 1: auto.
+  fresh Meq1 => C /=.
+  case C => //.
+  by depends R(j),R1(j).
 
   (* RIGHT *)
-  euf Meq.
+  euf Meq => _ _ _ //.
   exists i,k.
-  assert input@T(i,k)=nR(j).
-  fresh Meq1.
-  by case H0; depends R(j),R1(j).
+  assert input@T(i,k)=nR(j) as Meq1; 1: auto.
+  fresh Meq1 => C /=.
+  case C => //.
+  by depends R(j),R1(j).
 Qed.
 
 goal [left] wa_R1_left (i,j:index):
@@ -132,13 +143,17 @@ goal [left] wa_R1_left (i,j:index):
      fst(output@T(i,k)) = fst(input@R1(j)) &&
      input@T(i,k) = output@R(j))).
 Proof.
-  intro *.
+  intro Hap.
+  split; 2 : by intro [k _]; expand output, m2.
+
+  intro Meq.
   use tags_neq.
-  euf Meq.
+  euf Meq => _ _ _ //.
   exists k.
-  assert input@T(i,k)=nR(j).
-  fresh Meq1.
-  by case H; depends R(j),R2(j).
+  assert input@T(i,k)=nR(j) as Meq1; 1: auto.
+  fresh Meq1 => C /=.
+  case C => //.
+  by depends R(j),R2(j).
 Qed.
 
 goal [right] wa_R1_right (i,j,k:index):
@@ -150,12 +165,16 @@ goal [right] wa_R1_right (i,j,k:index):
      fst(output@T(i,k)) = fst(input@R1(j)) &&
      input@T(i,k) = output@R(j))).
 Proof.
-  intro *.
+  intro Hap.
+  split; 2 : by intro [k _]; expand output, m2.
+
+  intro Meq.
   use tags_neq.
-  euf Meq.
-  assert input@T(i,k)=nR(j).
-  fresh Meq1.
-  by case H; depends R(j),R2(j).
+  euf Meq => _ _ _ //.
+  assert input@T(i,k)=nR(j) as Meq1; 1: auto.
+  fresh Meq1 => C /=.
+  case C => //.
+  by depends R(j),R2(j).
 Qed.
 
 
@@ -163,18 +182,20 @@ equiv unlinkability.
 Proof.
   induction t.
 
+  (* init *)
+  auto.
+
   (* Case R *)
-  expand frame@R(j); expand exec@R(j).
-  expand cond@R(j); expand output@R(j).
+  expand frame, exec, cond, output.
   fa 0; fa 1; fa 1.
   fresh 1; yesif 1.
-  repeat split. 
-  by depends R(j0),R1(j0).
+  repeat split => // j0 H1.
   by depends R(j0),R2(j0).
+  by depends R(j0),R1(j0).
+  auto.
 
   (* Case R1 *)
-  expand frame@R1(j); expand exec@R1(j).
-  expand output@R1(j).
+  expand frame, exec, output.
   fa 0; fa 1.
 
   equivalent
@@ -210,35 +231,43 @@ Proof.
            in
   	   if exec@pred(R1(j))
   	   then h(<<snd(input@R1(j)),nR(j)>,tag2>,diff(key(i),key'(i,k))))).
-  fa.
-  by exists i,k. by exists i,k.
+  fa; 1,4: intro *; auto.
+  intro [_ [i k _]] /=.
+  by exists i,k.
+  intro [_ [i k _]] /=.
   project.
 
   (* LEFT *)
-  fa.
-  use wa_R1_left with i0,j.
-  use H1.
-  by exists k. 
-
-  yesif.
-  (* RIGHT *)
-  fa.
-  use wa_R1_right with i0,j,k0.
-  by use H1.
+  fa => // _.
+  exists k => /=.
+  use wa_R1_left with i0,j as [H1 H2]; 2: auto.
+  clear H2.
+  use H1 as [k1 _]; 2: auto.
+  clear H1.
+  by expand output, m2.
   by yesif.
+
+  (* RIGHT *)
+  fa => // _.
+  use wa_R1_right with i0,j,k0 as [H1 H2]; 2: auto.
+  clear H2.
+  use H1 as [k1 _]; 2: auto.
+  clear H1.
+  by expand output, m2.
+  by yesif.
+
 
   fa 2; fadup 1.
   fa 1; fadup 1.
   prf 1.
-  ifcond 1, exec@pred(R1(j)).
+  ifcond 1, exec@pred(R1(j)); 1: auto.
   fa 1.
   yesif 1.
   by use tags_neq; project.
   by fresh 1.
 
   (* Case R2 *)
-  expand frame@R2(j); expand exec@R2(j).
-  expand output@R2(j).
+  expand frame, exec, output.
   fa 0; fa 1.
   equivalent
     cond@R2(j),
@@ -251,23 +280,14 @@ Proof.
   by fadup 1.
 
   (* Case T *)
-  expand frame@T(i,k); expand exec@T(i,k).
-  expand cond@T(i,k); expand output@T(i,k).
+  expand frame, exec, cond, output.
   expand m2(i,k)@T(i,k).
   fa 0. fa 1. fa 1. fa 1.
   prf 2.
-  yesif 2.
-  use tags_neq; project.
-  split.
-  assert fst(input@R2(j))=nT(i,k); by fresh Meq0.
-  split.
-  assert fst(input@R1(j))=nT(i,k); by fresh Meq0.
-  assert fst(input@R1(j))=nT(i,k); by fresh Meq0.
-  split.
-  split.  
-  assert fst(input@R1(j))=nT(i,k); by fresh Meq0.
-  assert fst(input@R1(j))=nT(i,k); by fresh Meq0.
-  assert fst(input@R2(j))=nT(i,k); by fresh Meq0.
+  yesif 2; simpl.
+  use tags_neq.
+  by project; repeat split; intro > _ _ [[_ Meq] _]; fresh Meq.
+
   fresh 2.
   by fresh 1; yesif 1.
 Qed.

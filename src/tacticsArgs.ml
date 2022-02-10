@@ -2,40 +2,138 @@ module L = Location
 
 type lsymb = Theory.lsymb
 
+type s_item =
+  | Tryauto      of Location.t    (** '//' *)
+  | Tryautosimpl of Location.t    (** '//' *)
+  | Simplify     of Location.t    (** '//=' *)
+
+let rec pp_s_item fmt = function
+  | Simplify      _ -> Fmt.pf fmt "/="
+  | Tryauto       _ -> Fmt.pf fmt "//"
+  | Tryautosimpl  _ -> Fmt.pf fmt "//="
+
+(** Tactic target. *)
+type in_target = [
+  | `Goal
+  | `All
+  | `Hyps of lsymb list         (* hypotheses, or frame elements *)
+]
+
+let pp_in_target ppf (in_t : in_target) =
+  match in_t with
+  | `Goal      -> ()
+  | `All -> Fmt.pf ppf " in *"
+  | `Hyps symb ->
+    Fmt.pf ppf " in %a"
+      (Fmt.list ~sep:Fmt.comma Fmt.string) (L.unlocs symb)
+
 (*------------------------------------------------------------------*)
+(** {2 Parsed arguments for rewrite} *)
+
+type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
+
+type rw_dir = [`LeftToRight | `RightToLeft ] L.located
+
+(** General rewrite item *)
+type 'a rw_item_g = {
+  rw_mult : rw_count;
+  rw_dir  : rw_dir;
+  rw_type : 'a;
+}
+
+(** Rewrite or expand item *)
+type rw_item = [
+  | `Rw        of Theory.p_pt
+  | `Expand    of Theory.term
+  | `ExpandAll of Location.t
+] rw_item_g
+
+(** Expand item *)
+type expnd_item = [
+  | `Expand    of Theory.term
+  | `ExpandAll of Location.t
+] rw_item_g
+
+(** Rewrite equiv item *)
+type rw_equiv_item = [
+  | `Rw of Theory.p_pt
+] rw_item_g
+
+(** Rewrite argument, which is a rewrite or simplification item*)
+type rw_arg =
+  | R_item   of rw_item
+  | R_s_item of s_item
+
+let pp_rw_count ppf = function
+  | `Once -> ()
+  | `Many -> Fmt.pf ppf "!"
+  | `Any -> Fmt.pf ppf  "?"
+
+
+let pp_rw_dir ppf d = match L.unloc d with
+  | `LeftToRight -> ()
+  | `RightToLeft -> Fmt.pf ppf "-"
+
+let pp_rw_type ppf = function
+  | `Form f      -> Theory.pp ppf f
+  | `Expand t    -> Fmt.pf ppf "/%a" Theory.pp t
+  | `ExpandAll _ -> Fmt.pf ppf "/*"
+
+let pp_rw_item ppf rw_item =
+  Fmt.pf ppf "%a%a%a"
+    pp_rw_dir   rw_item.rw_dir
+    pp_rw_count rw_item.rw_mult
+    pp_rw_type  rw_item.rw_type
+
+let pp_rw_arg ppf rw_arg = match rw_arg with
+  | R_s_item s -> pp_s_item ppf s
+  | R_item r -> Fmt.pf ppf "..."
+
+(*------------------------------------------------------------------*)
+type apply_in = lsymb option
+
+let pp_apply_in ppf = function
+  | None      -> ()
+  | Some symb ->
+    Fmt.pf ppf " in %a" Fmt.string (L.unloc symb)
+
+(*------------------------------------------------------------------*)
+(** {2 Intro patterns} *)
+
 type naming_pat =
   | Unnamed                  (** '_' *)
   | AnyName                  (** '?' *)
   | Named   of string
+  | Approx  of string        (* only used internally *)
 
 type and_or_pat =
   | Or      of simpl_pat list
   (** e.g. \[H1 | H2\] to do a case on a disjunction. *)
-        
-  | Split 
+
+  | Split
   (** e.g. \[\] to do a case. *)
 
   | And     of simpl_pat list
   (** e.g. \[H1 H2\] to destruct a conjunction. *)
-        
+
 and simpl_pat =
   | SAndOr of and_or_pat
   | SNamed of naming_pat
-
-type s_item =
-  | Tryauto   of Location.t    (** '//' *)
-  | Simplify  of Location.t    (** '/=' *)
+  | Srewrite of rw_dir                    (** -> or <-*)
 
 type intro_pattern =
   | Star   of Location.t    (** '*' *)
-  | SItem of s_item
+  | StarV  of Location.t    (** '>' *)
+  | SItem  of s_item
+  | SExpnd of expnd_item    (** @/macro *)
   | Simpl  of simpl_pat
 
 (*------------------------------------------------------------------*)
 let pp_naming_pat fmt = function
-  | Unnamed -> Fmt.pf fmt "_"
-  | AnyName -> Fmt.pf fmt "?"
-  | Named s -> Fmt.pf fmt "%s" s
+  | Unnamed  -> Fmt.pf fmt "_"
+  | AnyName  -> Fmt.pf fmt "?"
+  | Named s  -> Fmt.pf fmt "%s" s
+  | Approx s -> Fmt.pf fmt "≈%s" s
 
 let rec pp_and_or_pat fmt = function
   | Or      l ->
@@ -52,15 +150,16 @@ and pp_simpl_pat fmt = function
   | SAndOr ao_ip -> pp_and_or_pat fmt ao_ip
   | SNamed n_ip  -> pp_naming_pat fmt n_ip
 
-let rec pp_s_item fmt = function
-  | Simplify _    -> Fmt.pf fmt "/="
-  | Tryauto  _    -> Fmt.pf fmt "//"
+  | Srewrite L.{ pl_desc = `LeftToRight } -> Fmt.pf fmt "->"
+  | Srewrite L.{ pl_desc = `RightToLeft } -> Fmt.pf fmt "<-"
+
 
 let rec pp_intro_pat fmt = function
   | SItem s    -> pp_s_item fmt s
   | Star     _ -> Fmt.pf fmt "*"
+  | StarV    _ -> Fmt.pf fmt ">"
   | Simpl s_ip -> pp_simpl_pat fmt s_ip
-
+  | SExpnd e   -> pp_rw_item fmt e
 
 let pp_intro_pats fmt args =
   let pp_sep fmt () = Fmt.pf fmt "@ " in
@@ -73,68 +172,41 @@ type ip_handler = [
   | `Var of Vars.evar (* Careful, the variable is not added to the env  *)
   | `Hyp of Ident.t
 ]
-  
-(*------------------------------------------------------------------*)
-(** {2 Parsed arguments for rewrite} *)
-
-type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
-
-(** rewrite item *)
-type rw_item = { 
-  rw_mult : rw_count; 
-  rw_dir  : [`LeftToRight | `RightToLeft ] L.located;
-  rw_type : [`Form of Theory.formula | `Expand of Theory.term];
-}
-
-type rw_arg =
-  | R_item   of rw_item 
-  | R_s_item of s_item
-
-type rw_in = [`All | `Hyps of lsymb list] option 
-
-let pp_rw_count ppf = function
-  | `Once -> ()
-  | `Many -> Fmt.pf ppf "!"
-  | `Any -> Fmt.pf ppf  "?"
-
-let pp_rw_in ppf = function
-  | None      -> ()
-  | Some `All -> Fmt.pf ppf " in *"
-  | Some (`Hyps symb) -> 
-    Fmt.pf ppf " in %a"
-      (Fmt.list ~sep:Fmt.comma Fmt.string) (L.unlocs symb)
-
-let pp_rw_dir ppf d = match L.unloc d with
-  | `LeftToRight -> ()
-  | `RightToLeft -> Fmt.pf ppf "-"
-
-let pp_rw_type ppf = function
-  | `Form f   -> Theory.pp ppf f
-  | `Expand t -> Theory.pp ppf t
-
-let pp_rw_item ppf rw_item =
-  Fmt.pf ppf "%a%a%a"
-    pp_rw_dir   rw_item.rw_dir
-    pp_rw_count rw_item.rw_mult
-    pp_rw_type  rw_item.rw_type
-
-let pp_rw_arg ppf rw_arg = match rw_arg with
-  | R_s_item s -> pp_s_item ppf s
-  | R_item r -> pp_rw_item ppf r
 
 (*------------------------------------------------------------------*)
-(** One tactic argument (in the parser) *)
+(** {2 Tactics named args} *)
+
+type named_arg =
+  | NArg of lsymb               (** '~id' *)
+
+type named_args = named_arg list
+
+(*------------------------------------------------------------------*)
+(** {2 Tactics args} *)
+
+(** A parser tactic argument *)
 type parser_arg =
-  | String_name of lsymb
-  | Int_parsed  of int
-  | Theory      of Theory.term
-  | IntroPat    of intro_pattern list
-  | AndOrPat    of and_or_pat
-  | SimplPat    of simpl_pat
-  | RewriteIn   of rw_arg list * rw_in
+  | String_name  of lsymb
+  | Int_parsed   of int L.located
+  | Theory       of Theory.term
+  | IntroPat     of intro_pattern list
+  | AndOrPat     of and_or_pat
+  | SimplPat     of simpl_pat
+  | RewriteIn    of rw_arg list * in_target
+  | RewriteEquiv of rw_equiv_item
+  | ApplyIn      of named_args * Theory.p_pt * apply_in
+  | AssertPt     of Theory.p_pt * simpl_pat option * [`IntroImpl | `None]
+  | SplitSeq     of int L.located * Theory.hterm
+  | ConstSeq     of int L.located * (Theory.hterm * Theory.term) list
+  | MemSeq       of int L.located * int L.located
+  | Remember     of Theory.term * lsymb
+  | Generalize   of Theory.term list * naming_pat list option
+  | TermPat      of int * Theory.term
+
+type parser_args = parser_arg list
 
 let pp_parser_arg ppf = function
-  | Int_parsed i  -> Fmt.int ppf i
+  | Int_parsed i  -> Fmt.int ppf (L.unloc i)
   | String_name s -> Fmt.string ppf (L.unloc s)
   | Theory th     -> Theory.pp ppf th
   | IntroPat args -> pp_intro_pats ppf args
@@ -144,41 +216,80 @@ let pp_parser_arg ppf = function
   | RewriteIn (rw_args, in_opt) ->
     Fmt.pf ppf "%a%a"
       (Fmt.list ~sep:Fmt.sp pp_rw_arg) rw_args
-      pp_rw_in in_opt
+      pp_in_target in_opt
 
-(*------------------------------------------------------------------*)      
+  | RewriteEquiv rw_arg ->
+    Fmt.pf ppf "..."
+
+  | ApplyIn (_, _, in_opt) ->
+    Fmt.pf ppf "... %a" pp_apply_in in_opt
+
+  | AssertPt (_, ip, `IntroImpl) ->
+    Fmt.pf ppf "... as %a"
+      (Fmt.option ~none:Fmt.nop pp_simpl_pat) ip
+
+  | AssertPt (_, ip, `None) ->
+    Fmt.pf ppf "(%a := ...)"
+      (Fmt.option ~none:Fmt.nop pp_simpl_pat) ip
+
+  | ConstSeq (i, t) -> Fmt.pf ppf "%d: ..." (L.unloc i)
+
+  | SplitSeq (i, ht) -> Fmt.pf ppf "%d ..." (L.unloc i)
+
+  | MemSeq (i, j) -> Fmt.pf ppf "%d %d" (L.unloc i) (L.unloc j)
+
+  | Remember (t, id) ->
+    Fmt.pf ppf "%a as %s" Theory.pp t (L.unloc id)
+
+  | Generalize (terms, None) ->
+    Fmt.pf ppf "%a" (Fmt.list ~sep:Fmt.sp Theory.pp) terms
+
+  | Generalize (terms, Some _) ->
+    Fmt.pf ppf "%a as ..." (Fmt.list ~sep:Fmt.sp Theory.pp) terms
+
+  | TermPat (sel, term) when sel = 1 ->
+    Theory.pp ppf term
+
+  | TermPat (sel, term) ->
+    Fmt.pf ppf "{%i}(%a)" sel Theory.pp term
+
+(*------------------------------------------------------------------*)
 type ('a, 'b) pair
+
+
+type boolean = [`Boolean]
 
 (*------------------------------------------------------------------*)
 (* The types are explicit, in order to type the tactics. *)
 type _ sort =
   | None      : unit sort
 
-  | Message   : Sorts.message   sort
-  | Boolean   : Sorts.boolean   sort
-  | Timestamp : Sorts.timestamp sort        
-  | Index     : Sorts.index     sort
+  | Message   : Type.message   sort
+  | Boolean   :      boolean   sort
+  | Timestamp : Type.timestamp sort
+  | Index     : Type.index     sort
 
   | ETerm     : Theory.eterm    sort
   (** Boolean, timestamp or message *)
-        
-  | Int       : int sort
+
+  | Int       : int L.located sort
   | String    : lsymb sort
   | Pair      : ('a sort * 'b sort) -> ('a * 'b) sort
   | Opt       : 'a sort -> ('a option) sort
 
 (*------------------------------------------------------------------*)
 type _ arg =
-  | None      : unit arg 
+  | None      : unit arg
 
-  | Message   : Term.message   -> Sorts.message   arg
-  | Boolean   : Term.formula   -> Sorts.boolean   arg
-  | Timestamp : Term.timestamp -> Sorts.timestamp arg
-  | Index     : Vars.index     -> Sorts.index     arg
+  | Message   : Term.message * Type.tmessage -> Type.message arg
 
-  | ETerm     : 'a Sorts.sort * 'a Term.term * Location.t -> Theory.eterm arg
+  | Boolean   : Term.message   ->      boolean   arg
+  | Timestamp : Term.timestamp -> Type.timestamp arg
+  | Index     : Vars.index     -> Type.index     arg
 
-  | Int       : int -> int arg
+  | ETerm     : 'a Type.ty * 'a Term.term * Location.t -> Theory.eterm arg
+
+  | Int       : int L.located -> int L.located arg
   | String    : lsymb -> lsymb arg
   | Pair      : 'a arg * 'b arg -> ('a * 'b) arg
   | Opt       : ('a sort * 'a arg option) -> ('a option) arg
@@ -328,7 +439,7 @@ let pp_esort ppf (Sort s) =
 
 (*------------------------------------------------------------------*)
 type tac_arg_error_i =
-  | CannotConvETerm 
+  | CannotConvETerm
 
 type tac_arg_error = L.t * tac_arg_error_i
 
@@ -336,7 +447,7 @@ exception TacArgError of tac_arg_error
 
 let pp_tac_arg_error_i ppf = function
   | CannotConvETerm -> Fmt.pf ppf "cannot convert the term as a message, \
-                                   timestamp, boolean and an index"
+                                   timestamp, boolean or an index"
 
 let pp_tac_arg_error pp_loc_err ppf (loc,e) =
   Fmt.pf ppf "%a%a"
@@ -344,7 +455,7 @@ let pp_tac_arg_error pp_loc_err ppf (loc,e) =
     pp_tac_arg_error_i e
 
 let tac_arg_error loc e = raise (TacArgError (loc,e))
-    
+
 (*------------------------------------------------------------------*)
 
 let convert_as_lsymb parser_args = match parser_args with
@@ -352,30 +463,71 @@ let convert_as_lsymb parser_args = match parser_args with
     Some p
   | _ -> None
 
-let convert_args table env parser_args tactic_type =
+let convert_pat_arg sel sexpr conv_cntxt tyvars env p conc =
+  let t, ty =
+    Theory.convert_i ~pat:true conv_cntxt tyvars env p
+  in
+  let pat_vars =
+    Vars.Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
+  in
+  let pat = Match.{
+      pat_tyvars = [];
+      pat_vars;
+      pat_term = t; }
+  in
+  let option = { Match.default_match_option with allow_capture = true; } in
+  let res = match conc with
+    | `Reach form -> Match.T.find ~option (conv_cntxt.table) sexpr env pat form
+    | `Equiv form -> Match.E.find ~option (conv_cntxt.table) sexpr env pat form
+  in
+  let message = match List.nth res (sel-1) with
+    | Term.ETerm et -> Term.cast (Term.kind t) et
+    | exception _ -> raise Theory.(Conv (L._dummy,
+                                         Tactic_type
+                                           ("Could not extract the element "
+                                            ^string_of_int (sel)
+                                            ^" out of "^string_of_int (List.length res)
+                                            ^" matches found")))
+
+  in
+  (message, ty)
+
+
+let convert_args sexpr table tyvars env parser_args tactic_type conc =
   let conv_cntxt = Theory.{ table = table; cntxt = InGoal; } in
-  
+
   let rec conv_args parser_args tactic_type env =
-    let tsubst = Theory.subst_of_env env in    
     match parser_args, tactic_type with
     | [Theory p], Sort Timestamp ->
-      Arg (Timestamp (Theory.convert conv_cntxt tsubst p Sorts.Timestamp))
+      Arg (Timestamp (Theory.convert conv_cntxt tyvars env p Type.Timestamp))
+
+    | [TermPat (sel, p)], Sort Message ->
+      let (m, ty) = convert_pat_arg sel sexpr conv_cntxt tyvars env p conc in
+        Arg (Message (m, ty))
 
     | [Theory p], Sort Message ->
-      Arg (Message   (Theory.convert conv_cntxt tsubst p Sorts.Message))
-
+      begin match Theory.convert_i conv_cntxt tyvars env p with
+        | (t, ty) -> Arg (Message (t, ty))
+        | exception Theory.(Conv (_,PatNotAllowed)) ->
+          let (m, ty) = convert_pat_arg 1 sexpr conv_cntxt tyvars env p conc in
+            Arg (Message (m, ty))
+      end
     | [Theory p], Sort Boolean ->
-      Arg (Boolean   (Theory.convert conv_cntxt tsubst p Sorts.Boolean))
+      Arg (Boolean   (Theory.convert conv_cntxt tyvars env p Type.Boolean))
 
     | [Theory p], Sort ETerm ->
-      let et = match Theory.econvert conv_cntxt tsubst p with
+      let et = match Theory.econvert conv_cntxt tyvars env p with
         | Some (Theory.ETerm (s,t,l)) -> ETerm (s,t,l)
         (* FIXME: this does not give any conversion error to the user. *)
-        | None -> tac_arg_error (L.loc p) CannotConvETerm in
+        | None -> tac_arg_error (L.loc p) CannotConvETerm
+        | exception Theory.(Conv (_,PatNotAllowed)) ->
+          let (m,ty) = convert_pat_arg 1 sexpr conv_cntxt tyvars env p conc in
+          ETerm (ty, m, L.loc p)
+      in
       Arg et
 
     | [Theory (L.{ pl_desc = App (p,[]) } )], Sort String ->
-      Arg (String p) (* TODO: location *)
+      Arg (String p)
 
     | [Int_parsed i], Sort Int ->
       Arg (Int i)
@@ -387,9 +539,7 @@ let convert_args table env parser_args tactic_type =
       raise Theory.(Conv (L.loc t, Int_expected (L.unloc t)))
 
     | [Theory p], Sort Index ->
-      Arg (Index (Theory.convert_index table tsubst p))
-    (* old code: *)
-    (* Arg (Index (Theory.convert_index table tsubst (Theory.var p))) *)
+      Arg (Index (Theory.convert_index table tyvars env p))
 
     | th1::q, Sort (Pair (Opt s1, s2)) ->
       begin match conv_args [th1] (Sort (Opt s1)) env with
@@ -422,7 +572,7 @@ let convert_args table env parser_args tactic_type =
           )
 
     | [], Sort None -> Arg None
-      
+
     (* TODO: location *)
     | [], _ -> raise Theory.(Conv (L._dummy, Tactic_type "more arguments expected"))
 
@@ -434,4 +584,3 @@ let convert_args table env parser_args tactic_type =
 
   in
   conv_args parser_args tactic_type env
-

@@ -22,15 +22,16 @@ system [t1] !_i if diff(True,False)  then (S:= diff(ok,koo); out(c,diff(S,ko))).
 system [t2] !_i if diff(False,ok=ok) then (S:= diff(koo,ok); out(c,diff(ko,S))).
 
 
-equiv [left,t1] [right,t2] test.
+equiv [t1/left, t2/right] test.
 Proof.
 induction t.
+auto. 
+
 nosimpl(expandall).
 fa 0. fa 1.
-equivalent ok=ok, True.
-by auto.
+by equivalent ok=ok, True.
+
 nosimpl(expandall).
 fa 0; fa 1.
-equivalent ok=ok, True.
-by auto.
+by equivalent ok=ok, True.
 Qed.

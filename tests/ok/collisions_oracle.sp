@@ -23,23 +23,23 @@ system O: out(ch,cst); (
 goal dummy (tau1 : timestamp, tau2 : timestamp, a : index, b: message):
  tau1 = tau2 => output@tau1= output@tau2.
 Proof.
- by auto.
+ auto.
 Qed.
 
 goal unforgeable_1 (a : index, b : index):
  happens(A(b)) => b <> a => output@A(b) <> h(na(a),k).
 
 Proof.
- intro a b Hap Hneq Heq.
+ intro Hap Hneq @/output Heq.
  collision. 
- by auto.
+ auto.
 Qed.
 
 goal unforgeable_2 (a : index, b : index):
    happens(B(b)) => output@B(b) <> h(na(a),k).
 
 Proof.
- intro a b Hap Heq.
+ intro Hap @/output Heq.
  nosimpl(collision).
  auto.
 Qed.
@@ -49,7 +49,7 @@ goal unforgeable_3 (a : index, b : index):
  happens(C(b)) => output@C(b) <> h(na(a),k).
 
 Proof.
- intro a b Hap Heq.
+ intro Hap @/output Heq.
  collision.
  intro Heq2.
  eqnames.

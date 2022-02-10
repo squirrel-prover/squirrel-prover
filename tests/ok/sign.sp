@@ -16,7 +16,7 @@ system (out(c,sign(m,k)) | ( in(c,x); if checksign(x,pk(k))=n then out(c,x))).
 
 goal _ (tau:timestamp): happens(A1) => cond@A1 => False.
 Proof.
-  intro tau Hap Hcond.
+  intro Hap Hcond.
   expand cond@A1.
   nosimpl(euf Hcond).
   auto.

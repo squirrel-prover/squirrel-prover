@@ -8,7 +8,7 @@ name n : index->index->message
 
 channel c
 
-system out(c,seq(a,b -> h(n(a,a),k(b,b)))).
+system out(c,seq(a,b:index -> h(n(a,a),k(b,b)))).
 
 (* Here, there should be single direct case in euf tactic,
  * where the same variable v is introduced to represent the bound
@@ -17,7 +17,7 @@ goal _ (tau:timestamp,i,j,w:index):
   happens(tau) => output@tau = h(n(i,j),k(w,w)) =>
   i = j.
 Proof.
-  intro tau i j w Hap Heq.
+  intro Hap Heq.
   nosimpl(euf Heq).
   auto.
 Qed.
@@ -28,7 +28,7 @@ goal _ (tau:timestamp,i,j,w:index):
   happens(tau) => output@tau = h(n(w,w),k(i,j)) =>
   i = j.
 Proof.
-  intro tau i j w Hap Heq.
+  intro Hap Heq.
   nosimpl(euf Heq).
   auto.
 Qed.

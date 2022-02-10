@@ -1,6 +1,7 @@
 (** EUF-CMA obviously implies key privacy, because the attacker can forge
   * anything if he can recover the key from chosen-message attacks.
   * Here we carry out this argument formally in Squirrel. *)
+set postQuantumSound=true.
 
 hash h
 name k : message

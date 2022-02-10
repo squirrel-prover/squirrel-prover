@@ -8,17 +8,17 @@ system
 goal testA :
   happens(A) => output@A = empty.
 Proof.
- by auto.
+ auto.
 Qed.
 
 goal testA1 :
   happens(A1) => output@A1 = empty.
 Proof.
- by auto.
+ auto.
 Qed.
 
 goal testA2 :
   happens(A2) => output@A2 = input@A2.
 Proof.
- by auto.
+ auto.
 Qed.

@@ -1,5 +1,42 @@
+
+let hcombine acc n = acc * 65599 + n
+
+let hcombine_list fhash hash l =
+  List.fold_left (fun hash x -> 
+      hcombine hash (fhash x)
+    ) hash l
+
+(* -------------------------------------------------------------------- *)
+module Hashtbl = struct
+  include Hashtbl
+
+  let to_list (tbl : ('a, 'b) Hashtbl.t) : ('a * 'b) list = 
+    Hashtbl.fold 
+      (fun x y acc -> (x,y) :: acc)
+      tbl
+      []
+
+  module Make2
+      (H1:HashedType)
+      (H2:HashedType) : S with type key = H1.t * H2.t = struct
+    module H = struct
+      type t = H1.t * H2.t
+
+      let hash (t1,t2) = hcombine (H1.hash t1) (H2.hash t2)
+      let equal (t1,t2) (t1',t2') = H1.equal t1 t1' && H2.equal t2 t2'
+    end
+
+    include Make (H)
+  end
+end
+
 module List = struct
   include List
+
+  let rec last ?e = function
+    | [x] -> x
+    | _ :: l -> last l
+    | [] -> match e with Some e -> raise e | None -> raise (Failure "List.last")
 
   let init n f =
     if n < 0 then raise (Failure "List.init")
@@ -18,14 +55,6 @@ module List = struct
       then h1 :: merge cmp t1 l2
       else h2 :: merge cmp l1 t2
 
-  let split_pred f l =
-    let rec aux t_l f_l = function
-      | [] -> (t_l, f_l)
-      | a :: l' ->
-        if f a then aux (a :: t_l) f_l l' else aux t_l (a :: f_l) l'
-    in
-    aux [] [] l
-
   let rec split3 = function
     | [] -> ([], [], [])
     | (x,y,z)::l ->
@@ -39,6 +68,25 @@ module List = struct
     | (a,b) :: t ->
       if a = s then (a, f b) :: t
       else (a,b) :: assoc_up s f t
+
+  let rec assoc_up_dflt s dflt f = function
+    | [] -> [s, f dflt]
+    | (a,b) :: t ->
+      if a = s then (a, f b) :: t
+      else (a,b) :: assoc_up_dflt s dflt f t
+
+  let rec assoc_dflt dflt x = function
+    | [] -> dflt
+    | (a,b)::l -> if Stdlib.compare a x = 0 then b else assoc_dflt dflt x l
+
+  (*------------------------------------------------------------------*)
+  let rec iteri2 i f l1 l2 =
+    match (l1, l2) with
+      ([], []) -> ()
+    | (a1::l1, a2::l2) -> f i a1 a2; iteri2 (i+1) f l1 l2
+    | (_, _) -> invalid_arg "List.iteri2"
+
+  let iteri2 f l1 l2 = iteri2 0 f l1 l2
 
   (*------------------------------------------------------------------*)
   let rec drop0 i l =
@@ -72,6 +120,45 @@ module List = struct
   let takedrop i l =
     if i < 0 then failwith "invalid argument";
     takedrop0 [] i l
+
+  (*------------------------------------------------------------------*)
+  exception Out_of_range
+    
+  let splitat i l =
+    let rec aux i acc = function
+      | [] -> raise Out_of_range
+      | e::tl -> if i=0 then acc,e,tl else aux (i-1) (e::acc) tl
+    in aux i [] l
+
+  (*------------------------------------------------------------------*)
+  let remove_duplicate cmp l =
+    let l_rev = 
+      List.fold_left (fun l el ->
+          if List.exists (cmp el) l then l else el :: l
+        ) [] l
+    in
+    List.rev l_rev  
+
+  (*------------------------------------------------------------------*)
+  let mapi_fold 
+      (f  : int -> 'a -> 'b -> 'a * 'c) 
+      (a  : 'a)
+      (xs : 'b list) 
+    : 'a * 'c list 
+    =
+    let a  = ref a in
+    let xs = List.mapi (fun i b ->
+      let (a', b') = f i !a b in a := a'; b')
+      xs
+    in (!a, xs)
+
+  let map_fold 
+      (f  : 'a -> 'b -> 'a * 'c) 
+      (a  : 'a)
+      (xs : 'b list) 
+    : 'a * 'c list 
+    =
+    mapi_fold (fun (_ : int) x -> f x) a xs
 end
 
 (*------------------------------------------------------------------*)
@@ -98,6 +185,56 @@ module String = struct
     done;
     (String.sub s 0 (!l+1), !res)
 end
+
+(*------------------------------------------------------------------*)
+module Map = struct
+  include Map
+
+  module type S = sig
+    include Map.S
+
+    val add_list : (key * 'a) list -> 'a t -> 'a t 
+  end
+
+  module Make(O : OrderedType) : S with type key = O.t = struct
+    include Map.Make(O)
+
+    let add_list (l : (key * 'a) list) (m : 'a t) : 'a t = 
+      List.fold_left (fun m (k,v) -> add k v m) m l
+  end
+end
+
+module Set = struct
+  include Set
+
+  module type S = sig
+    include Set.S
+
+    val add_list : elt list -> t -> t 
+    val map_fold : ('a -> elt -> 'a * elt) -> 'a -> t -> 'a * t
+  end
+
+  module Make(O : OrderedType) : S with type elt = O.t = struct
+    include Set.Make(O)
+
+    let add_list (l : elt list) (s : t) : t = 
+      List.fold_left (fun m v -> add v m) s l
+
+    let map_fold 
+        (f  : 'a -> elt -> 'a * elt) 
+        (a  : 'a)
+        (xs : t) 
+      : 'a * t
+      =
+      let a  = ref a in
+      let xs = map (fun b ->
+          let (a', b') = f !a b in a := a'; b')
+          xs
+      in (!a, xs)
+  end
+end
+
+
 
 (*------------------------------------------------------------------*)
 module Mi = Map.Make (Int)
@@ -127,6 +264,10 @@ let obind f a = match a with
 let omap f a = match a with
   | None -> None
   | Some x -> Some (f x)
+
+let omap_dflt dflt f a = match a with
+  | None -> dflt
+  | Some x -> f x
 
 let oiter f a = match a with
   | None -> ()
@@ -171,13 +312,22 @@ end = struct
       size = n;
       max_size = 2 * n }
 
+  let print ppf t =
+    for i = 0 to t.max_size - 1 do
+      let ri = Puf.find t.uf i in
+      Fmt.pf ppf "@[%d->%d @]"
+        i ri           
+    done
+
   let extend t =
     if t.size < t.max_size then (t.size, { t with size = t.size + 1 })
     else
       begin
         let uf' = ref (Puf.create (t.max_size * 2)) in
         for i = 0 to t.size - 1 do
-          uf' := Puf.union !uf' i (Puf.find t.uf i);
+          (* ignore_rank ensure that thi right element is choosen as
+             a representent of the set. *)
+          uf' := Puf.union ~ignore_rank:true !uf' i (Puf.find t.uf i);
         done;
         (t.size, { uf = !uf'; size = t.size + 1; max_size = t.max_size * 2 } )
       end
@@ -186,8 +336,6 @@ end = struct
     if i >= t.size then raise (Failure "Vuf: out of range")
     else Puf.find t.uf i
 
-  (** [union t u v] always uses the representent of [v], i.e.
-      [find [union t u v] u] = [find t v] *)
   let union t i j =
     if i >= t.size || j >= t.size then raise (Failure "Vuf: out of range")
     else { t with uf = Puf.union t.uf i j }
@@ -351,9 +499,9 @@ end
 
 
 (*------------------------------------------------------------------*)
-let rec fpt f a =
+let rec fpt eq f a =
   let b = f a in
-  if b = a then b else fpt f b
+  if eq b a then b else fpt eq f b
 
 (*------------------------------------------------------------------*)
 let classes (f_eq : 'a -> 'a -> bool) (l : 'a list) : 'a list list =
@@ -432,10 +580,3 @@ let as_seq3 = function [x1; x2; x3] -> (x1, x2, x3) | _ -> assert false
 let as_seq4 = function [x1; x2; x3; x4] -> (x1, x2, x3, x4)
   | _ -> assert false
 
-(* -------------------------------------------------------------------- *)
-let hcombine acc n = acc * 65599 + n
-
-let hcombine_list fhash hash l =
-  List.fold_left (fun hash x -> 
-      hcombine hash (fhash x)
-    ) hash l

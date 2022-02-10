@@ -1,4 +1,5 @@
 set autoIntro=false.
+set newInduction=true.
 
 hash h
 channel c
@@ -13,28 +14,27 @@ system
 
 equiv simp.
 Proof.
-enrich seq(i->h(ok,k(i))).
+enrich seq(i:index ->h(ok,k(i))).
 
- induction t. 
- expand frame@A(i).
- expand output@A(i).
- expand exec@A(i).
+ dependent induction t => t Hind Hap. 
+ case t => H.
+
+ auto.
+
+ destruct H as [i H].
+ expandall. 
+ fa 1.
+ fa 2. 
+ noif 2; 1: auto.
+ by apply Hind.
+
+ destruct H as [i H].
+ expandall.
  fa 1.
  fa 2.
- equivalent cond@A(i), False.
- by expand cond@A(i); auto.
- noif 2. 
- by auto.
-
- expand frame@A1(i).
- expand output@A1(i).
- expand exec@A1(i).
- fa 1.
- fa 2.
- equivalent cond@A1(i), True.
- expand cond@A1(i). 
- by auto.
+ equivalent cond@t, True.
+ by expand cond. 
  fa 2.
 
- expand seq(i->h(ok,k(i))),i.
+ by apply Hind.
 Qed.

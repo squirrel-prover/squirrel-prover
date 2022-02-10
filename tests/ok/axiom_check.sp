@@ -13,9 +13,9 @@ signature sign,checksign,pk
 
 system out(c,ok).
 
-axiom mycheck : forall (x1,x2: message), checksign(sign(x1,x2),pk(x2)) = x1
+axiom mycheck (x1,x2: message): checksign(sign(x1,x2),pk(x2)) = x1
 
-axiom autre: forall (x1:message), sign(x1,ok) = x1.
+axiom autre (x1:message): sign(x1,ok) = x1.
 
 set timeout=1.
 

@@ -6,5 +6,5 @@ system !_i A:out(c,ok).
 
 goal _ (i:index,j:index) : A(i) <= A(j) => A(i) < A(j).
 Proof.
-  intro i j Hle.
+  intro Hle.
 Qed.

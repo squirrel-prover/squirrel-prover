@@ -38,6 +38,8 @@ let rec get_indices = function
   | a :: l ->
     snd a.par_choice @ snd a.sum_choice @ get_indices l
 
+let fv_action a = Vars.Sv.of_list1 (get_indices a)
+
 let same_shape a b : Term.subst option =
   let rec same acc a b = match a,b with
   | [],[] -> Some acc
@@ -49,9 +51,11 @@ let same_shape a b : Term.subst option =
        s = s' && List.length ls = List.length ls'
     then
       let acc' =
-        List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i')) lp lp' in
+        List.map2 (fun i i' -> Term.ESubst (Term.mk_var i,Term.mk_var i')) lp lp'
+      in
       let acc'' =
-        List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i')) ls ls' in
+        List.map2 (fun i i' -> Term.ESubst (Term.mk_var i,Term.mk_var i')) ls ls'
+      in
       same (acc'' @ acc' @ acc) l l'
     else None in
   same [] a b
@@ -79,11 +83,11 @@ let of_symbol s table =
     | Data (x,y) -> x,y
     | _ -> assert false
 
-let arity s table = 
+let arity s table =
   let l,_ = of_symbol s table in
   List.length l
 
-let iter f table =
+let iter_table f table =
   Symbols.Action.iter
     (fun s _ -> function
        | Data (args,action) -> f s args action
@@ -130,7 +134,7 @@ let pp_action_f f d ppf a =
     a
 
 let pp_action_structure ppf a =
-  Fmt.styled `Green (pp_action_f pp_indices (0,[])) ppf a
+  Printer.kw `GoalAction ppf "%a" (pp_action_f pp_indices (0,[])) a
 
 let pp_shape ppf a = pp_action_f pp_int (0,0) ppf a
 
@@ -147,7 +151,8 @@ let rec subst_action (s : Term.subst) (a : action) : action =
 let of_term (s:Symbols.action Symbols.t) (l:Vars.index list) table : action =
   let l',a = of_symbol s table in
   let subst =
-    List.map2 (fun x y -> Term.ESubst (Term.Var x,Term.Var y)) l' l in
+    List.map2 (fun x y -> Term.ESubst (Term.mk_var x,Term.mk_var y)) l' l
+  in
   subst_action subst a
 
 let pp_parsed_action ppf a = pp_action_f pp_strings (0,[]) ppf a
@@ -167,17 +172,73 @@ type descr = {
   action    : action ;
   input     : Channel.t * string ;
   indices   : Vars.index list ;
-  condition : Vars.index list * Term.formula ;
+  condition : Vars.index list * Term.message ;
   updates   : (Term.state * Term.message) list ;
-  output    : Channel.t * Term.message
+  output    : Channel.t * Term.message;
+  globals   : Symbols.macro Symbols.t list;
+  (** list of global macros declared at [action] *)
 }
 
+
+(** Apply a substitution to an action description.
+  * The domain of the substitution must contain all indices
+  * occurring in the description. *)
+let subst_descr subst descr =
+  let action = subst_action subst descr.action in
+  let subst_term = Term.subst subst in
+  let indices = List.map (Term.subst_var subst) descr.indices  in
+  let condition =
+    (* FIXME: do we need to substitute ? *)
+     fst descr.condition,
+     Term.subst subst (snd descr.condition) in
+  let updates =
+    List.map (fun (ss,t) ->
+        Term.subst_isymb subst ss, subst_term t
+      ) descr.updates
+  in
+  let output = fst descr.output, subst_term (snd descr.output) in
+  { name = descr.name;
+    input = descr.input;
+    globals = descr.globals;
+    action; indices; condition; updates; output;  }
+
+
+(* Apply an iterator to all terms of the descr. *)
+let apply_descr iter descr =
+  let env = Vars.of_list (List.map Vars.evar descr.indices) in
+  let iter = iter env in
+  let condition =
+     fst descr.condition,
+     iter (snd descr.condition) in
+  let updates =
+    List.map (fun (ss,t) ->
+        ss, iter t
+      ) descr.updates
+  in
+  let output = fst descr.output, iter (snd descr.output) in
+  { name = descr.name;
+    input = descr.input;
+    globals = descr.globals;
+    action = descr.action;
+    indices = descr.indices;
+    condition; updates; output;  }
+
+
+
+let refresh_descr descr =
+  let _, s = Term.refresh_vars `Global descr.indices in
+  subst_descr s descr
+
 let pp_descr_short ppf descr =
-  let t = Term.Action (descr.name, descr.indices) in
+  let t = Term.mk_action descr.name descr.indices in
   Term.pp ppf t
 
 let pp_descr ppf descr =
-  Fmt.pf ppf "@[<v 0>name: @[<hov>%a@]@;\
+  let e = ref (Vars.of_list []) in
+  let _, s = Term.refresh_vars (`InEnv e) descr.indices in
+  let descr = subst_descr s descr in
+
+  Fmt.pf ppf "@[<v 0>action name: @[<hov>%a@]@;\
               %a\
               @[<hv 2>condition:@ @[<hov>%a@]@]@;\
               %a\
@@ -186,11 +247,11 @@ let pp_descr ppf descr =
     (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" Vars.pp_list)
     descr.indices
     Term.pp (snd descr.condition)
-    (Utils.pp_ne_list "@[<hv 2>updates:@ @[<hov>%a@]@]@;"
+    (Utils.pp_ne_list "@[<hv 2>updates:@ @[<hv>%a@]@]@;"
        (Fmt.list
           ~sep:(fun ppf () -> Fmt.pf ppf ";@ ")
           (fun ppf (s, t) ->
-             Fmt.pf ppf "%a :=@ %a" Term.pp_msymb s Term.pp t)))
+             Fmt.pf ppf "@[%a :=@ %a@]" Term.pp_msymb s Term.pp t)))
     descr.updates
     Term.pp (snd descr.output)
 
@@ -201,35 +262,13 @@ let pi_descr s d =
     updates = List.map (fun (st, m) -> st, pi_term m) d.updates;
     output = (let c,m = d.output in c, pi_term m) }
 
-(** Apply a substitution to an action description.
-  * The domain of the substitution must contain all indices
-  * occurring in the description. *)
-let subst_descr subst descr =
-  let action = subst_action subst descr.action in
-  let input = descr.input in
-  let name = descr.name in
-  let subst_term = Term.subst subst in
-  let indices = List.map (Term.subst_var subst) descr.indices  in
-  let condition =
-    fst descr.condition, Term.subst subst (snd descr.condition) in
-  let updates =
-    List.map
-      (fun ((ss,sort,is),t) ->
-         ((ss, sort, List.map (Term.subst_var subst) is),
-          subst_term t))
-      descr.updates
-  in
-  let output = fst descr.output, subst_term (snd descr.output) in
-  {name; action; input; indices; condition; updates; output }
-
-
 (*------------------------------------------------------------------*)
 let debug = false
 
 let pp_actions ppf table =
   Fmt.pf ppf "@[<v 2>Available action shapes:@;@;@[" ;
   let comma = ref false in
-  iter
+  iter_table
     (fun symbol indices action ->
        if !comma then Fmt.pf ppf ",@;" ;
        comma := true ;
@@ -245,6 +284,84 @@ let pp_actions ppf table =
     table;
   Fmt.pf ppf "@]@]@."
 
-let rec dummy len =
-  if len = 0 then [] else
-     { par_choice = 0,[] ; sum_choice = 0,[] } :: dummy (len-1)
+let rec dummy (shape : shape) : action =
+  match shape with
+  | [] -> []
+  | { par_choice = (p,lp) ; sum_choice = (s,ls) } :: l ->
+    { par_choice = (p, List.init lp (fun _ -> Vars.make_new Type.Index "i")) ;
+      sum_choice = (s, List.init ls (fun _ -> Vars.make_new Type.Index "i")) }
+    :: dummy l
+
+(*------------------------------------------------------------------*)
+(** {2 FA-DUP } *)
+
+let is_dup_match
+    (is_match : Term.eterm -> Term.eterm -> 'a -> 'a option)
+    (st    : 'a)
+    (table : Symbols.table)
+    (elem  : Term.message)
+    (elems : Term.message list) : 'a option
+  =
+  (* try to match [t] and [t'] modulo ≤ *)
+  let is_dup_leq table st t t' : 'a option =
+    let rec leq t t' =
+      match is_match (ETerm t) (ETerm t') st with
+      | Some st -> Some st
+      | None ->
+        match t,t' with
+        | Pred t, Pred t' -> leq t t'
+        | Pred t,      t' -> leq t t'
+
+        | Action (n,is), Action (n',is') ->
+          (* FIXME: allow to match [is] with (a prefix of) [is'] *)
+          if depends (of_term n is table) (of_term n' is' table)
+          then Some st
+          else None
+
+        | _ -> None
+    in
+    leq t t'
+  in
+
+  let direct_match =
+    List.find_map (fun t' ->
+        is_match (ETerm elem) (ETerm t') st
+      ) elems
+  in
+  match direct_match with
+  | Some res -> Some res
+  | None ->
+    match elem with
+    | Macro (im,[],t) when im = Term.in_macro ->
+      List.find_map (function
+          | Term.Macro (fm,[],t') when fm = Term.frame_macro ->
+            is_dup_leq table st (Term.mk_pred t) t'
+          | _ -> None
+        ) elems
+
+    | Macro (em,[],t) when em = Term.frame_macro ->
+      List.find_map (function
+          | Term.Macro (fm,[],t')
+            when fm = Term.frame_macro -> is_dup_leq table st t t'
+          | _ -> None
+        ) elems
+
+    | Macro (em,[],t) when em = Term.exec_macro ->
+      List.find_map (function
+          | Term.Macro (fm,[],t')
+            when fm = Term.frame_macro -> is_dup_leq table st t t'
+          | _ -> None
+        ) elems
+
+    | _ -> None
+
+let is_dup table t t' : bool =
+  let is_match (Term.ETerm t) (Term.ETerm t') () =
+    match Type.equalk_w (Term.kind t) (Term.kind t') with
+    | None -> None
+    | Some Type.Type_eq ->
+      if t = t' then Some () else None
+  in
+  match is_dup_match is_match () table t t' with
+  | None    -> false
+  | Some () -> true

@@ -1,23 +1,15 @@
-(** Generic hypotheses, used in trace and equivalence sequent. *)
+(** Generic hypotheses, used in all kinds of sequents. *)
 
-module L=Location
-
-type lsymb = Theory.lsymb
-
+(** Signature for hypothesis data-type:
+  * anything that can be printed and has some notion of
+  * a [true] hypothesis. *)
 module type Hyp = sig 
   type t 
   val pp_hyp : Format.formatter -> t -> unit
   val htrue : t
 end
 
-(*------------------------------------------------------------------*)
-(** {2 Error handling} *)
-
-val hyp_error : loc:L.t option -> Tactics.tac_error -> 'a
-
-(*------------------------------------------------------------------*) 
-(** {2 Signature} *)
-
+(** Signature for contexts of hypotheses. *)
 module type S = sig
   type hyp 
 
@@ -29,11 +21,11 @@ module type S = sig
 
   val is_hyp : hyp -> hyps -> bool
     
-  val by_id   : Ident.t -> hyps -> hyp
-  val by_name : lsymb   -> hyps -> ldecl
+  val by_id   : Ident.t      -> hyps -> hyp
+  val by_name : Theory.lsymb -> hyps -> ldecl
 
-  val hyp_by_name : lsymb -> hyps -> hyp
-  val id_by_name  : lsymb -> hyps -> Ident.t
+  val hyp_by_name : Theory.lsymb -> hyps -> hyp
+  val id_by_name  : Theory.lsymb -> hyps -> Ident.t
 
   val fresh_id : string -> hyps -> Ident.t
   val fresh_ids : string list -> hyps -> Ident.t list
@@ -66,12 +58,12 @@ module type S = sig
 
 end
 
+(** Functor for building an implementation of contexts
+  * for a particular kind of hypotheses. *)
 module Mk (Hyp : Hyp) : S with type hyp = Hyp.t
 
 
-(*------------------------------------------------------------------*)
-(** {2 Signature of hypotheses of some sequent} *)
-
+(** Signature for sequents with hypotheses. *)
 module type HypsSeq = sig
   (** Hypothesis *)
   type hyp 
@@ -102,15 +94,15 @@ module type HypsSeq = sig
   val is_hyp : hyp -> sequent -> bool
 
   (** [by_id id s] returns the hypothesis with id [id] in [s]. *)
-  val by_id   : Ident.t -> sequent -> hyp
+  val by_id : Ident.t -> sequent -> hyp
 
   (** Same as [by_id], but does a look-up by name and returns the full local 
       declaration. *)
-  val by_name : lsymb -> sequent -> ldecl
+  val by_name : Theory.lsymb -> sequent -> ldecl
 
   (** [mem_id id s] returns true if there is an hypothesis with id [id] 
       in [s]. *)
-  val mem_id   : Ident.t -> sequent -> bool
+  val mem_id : Ident.t -> sequent -> bool
 
   (** Same as [mem_id], but does a look-up by name. *)  
   val mem_name : string -> sequent -> bool

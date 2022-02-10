@@ -13,6 +13,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* Original file Jean-Christophe Filliatre                               
+   Modified for the use of Squirrel *)
+
+
 (* Persistent union-find = Tarjan's algorithm with persistent arrays *)
 
 (* persistent arrays; see the
@@ -102,13 +106,15 @@ let rec find_aux f i =
 let find h x =
   let f,rx = find_aux h.father x in h.father <- f; rx
 
-let union h x y =
+let union ?(ignore_rank=false) h x y =
   let rx = find h x in
   let ry = find h y in
   if rx != ry then begin
     let rxc = Pa.get h.c rx in
     let ryc = Pa.get h.c ry in
-    if rxc > ryc then
+    if ignore_rank then
+      { h with father = Pa.set h.father rx ry }
+    else if rxc > ryc then
       { h with father = Pa.set h.father ry rx }
     else if rxc < ryc then
       { h with father = Pa.set h.father rx ry }

@@ -16,9 +16,11 @@ channel cS
 name a0 :message
 name a : index -> message
 
-hash h with oracle forall (m:message,sk:message) ( sk <> kP || exists (i:index) m=g^a(i))
+abstract g : message
+abstract (^) : message -> message -> message
 
-term test : boolean = zero
+hash h with oracle forall (m:message,sk:message) 
+ ( sk <> kP || exists (i:index) m = g ^ a(i)).
 
 process P =
   Pout: out(cP, <g^a0, h(g^a0,kP)>)
@@ -44,7 +46,7 @@ goal charac :
 Proof.
  intro Hap He.
  executable OutFalse; 
- 1,2: by auto.
+ 1,2: auto.
  intro Hexec.
  depends Out, OutFalse; 1: auto.
  intro Hle.
@@ -59,7 +61,7 @@ Proof.
  (* we prove the goal where the message satisfies the tag *)
  intro [Hneq | [i Heq]]. 
  nosimpl(notleft H1). 
- by auto.
+ auto.
 
  by use He with i.  
  auto.

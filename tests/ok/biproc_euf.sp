@@ -21,7 +21,7 @@ Proof.
   euf Hm; auto.
 Qed.
 
-goal [left,toto] _:  input@A1 <> h(ok,k).
+goal [toto/left] _:  input@A1 <> h(ok,k).
 Proof.
   intro Hm.
   euf Hm; auto.

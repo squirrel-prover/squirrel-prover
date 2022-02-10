@@ -5,12 +5,12 @@ type models
 
 type trace_literal = [`Pos | `Neg] * Term.trace_atom
 
+type trace_literals = trace_literal list
+
 (*------------------------------------------------------------------*) 
 (** [models_conunct l] returns the list of minimal models of the conjunction of
     atoms. *)
-val models_conjunct : trace_literal list -> models Utils.timeout_r
-
-(** [models l] returns the list of minimal models of a constraint. *)
+val models_conjunct : trace_literals -> models Utils.timeout_r
 
 val m_is_sat : models -> bool
 
@@ -40,10 +40,10 @@ val get_ind_equalities :
 val find_eq_action : models -> Term.timestamp -> Term.timestamp option
 
 (*------------------------------------------------------------------*)
-(** Context of an trace model *)
+(** Context of a trace model. *)
 type trace_cntxt = {
   table  : Symbols.table;
-  system : SystemExpr.system_expr;
+  system : SystemExpr.t;
 
   (* used to find an action occuring at a given timestamp *)
   models : models option;

@@ -15,8 +15,11 @@ R --> T: id + H(<c1, nr, nt>,k)
 This is a "full" model with the last check of T, but our tool lacks a notion of
 induction over sequences to complete the proof.
 *******************************************************************************)
-
+(* set debugTactics=true. *)
 set autoIntro=false.
+set postQuantumSound=true.
+set timeout=4.
+
 hash H
 
 abstract id : index->message
@@ -38,7 +41,7 @@ process tag(i:index, t:index)=
   new nt;
   out(c,<nt,xor(diff(id(i),id'(i,t)),H(<tag0,<x,nt>>,diff(key(i),key'(i,t))))>);
   in(c,y);
-  if y = xor(diff(id(i),id'(i,t)),H(<tag1,<x,nt>>,diff(key(i),key'(i,t)))) 
+  if y = xor(diff(id(i),id'(i,t)),H(<tag1,<x,nt>>,diff(key(i),key'(i,t))))
   then out(c,ok)
   else out(c,ko)
 
@@ -62,9 +65,9 @@ process reader =
 system (!_r R: reader | !_i !_t T: tag(i,t)).
 
 axiom tags_neq : tag0 <> tag1.
-goal tags_neq0 : tag0 = tag1 => False. 
-Proof. 
- use tags_neq; auto. 
+goal tags_neq0 : tag0 = tag1 => False.
+Proof.
+ use tags_neq; auto.
 Qed.
 
 (* Well-authentication for R1's condition, formulated in an imprecise
@@ -81,27 +84,27 @@ goal wa_R1 (r:index) :
    R(r) < T(i,t) &&
    output@R(r) = input@T(i,t)).
 Proof.
-
-  intro r; split.
+  split.
 
   (* Cond => WA *)
   intro [i t Meq].
-  project. 
+  project.
   (* left *)
   euf Meq => _ _ _; 1: auto.
   exists i,t0; simpl.
   assert (input@T(i,t0) = nr(r)) as F; 1: auto.
   fresh F => C.
-  by case C; 1: depends R(r), R2(r).
+  by case C; 3: depends R(r), R2(r).
   (* right *)
   euf Meq => _ _ _; 1:auto.
   exists i,t; simpl.
   assert (input@T(i,t) = nr(r)) as F; 1: auto.
   fresh F => C.
-  by case C; 1: depends R(r), R2(r).
+  by case C; 3: depends R(r), R2(r).
 
   (* WA => Cond *)
   by intro [i t _]; expand output; exists i,t.
+
 Qed.
 
 (** Same as before, but more precise wrt i, for the left process.
@@ -118,13 +121,12 @@ goal [left] wa_R1_left (i,r:index):
   R(r) < T(i,t) &&
   output@R(r) = input@T(i,t).
 Proof.
-  intro i r.
   split; 2: by intro [_ _]; expand output.
   intro Meq; euf Meq => _ _ _; 1: auto.
   exists t; simpl.
   assert input@T(i,t) = nr(r) as F; 1: auto.
   fresh F => C.
-  by case C; 1:depends R(r), R2(r).
+  by case C; 3:depends R(r), R2(r).
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
@@ -138,12 +140,11 @@ goal [right] wa_R1_right (i,t,r:index):
   R(r) < T(i,t) &&
   output@R(r) = input@T(i,t).
 Proof.
-  intro i t r.
   split; 2: by intro [_ _]; expand output.
   intro Meq; euf Meq => _ _ _; 1: auto.
   assert input@T(i,t) = nr(r) as F; 1: auto.
   fresh F => C.
-  by case C; 1:depends R(r), R2(r).  
+  by case C; 3:depends R(r), R2(r).
 Qed.
 
 equiv unlinkability.
@@ -175,11 +176,11 @@ Proof.
    - we can finally get rid of the nonces nr and nt in the first
      two sequences using fresh. *)
 
-enrich seq(r -> nr(r)),
-       seq(i,t -> nt(i,t)),
-       seq(i,t -> diff(id(i),id'(i,t)) XOR
+enrich seq(r:index -> nr(r)),
+       seq(i,t:index -> nt(i,t)),
+       seq(i,t:index -> diff(id(i),id'(i,t)) XOR
                   H(<tag0,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t)))),
-       seq(i,r,t -> diff(id(i),id'(i,t)) XOR
+       seq(i,r,t:index -> diff(id(i),id'(i,t)) XOR
                     H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))).
 induction t.
 
@@ -187,12 +188,10 @@ induction t.
 by admit. (* see comment above *)
 
 (* Case R - Done *)
-expand frame@R(r). fa 4.
-by expand seq(r->nr(r)), r.
+by expandall; apply IH.
 
 (* Case R1  WIP *)
-expand frame@R1(r); expand exec@R1(r).
-expand cond@R1(r); expand output@R1(r).
+expand frame, exec, cond, output.
 fa 4; fa 5.
 
 equivalent
@@ -231,7 +230,7 @@ equivalent
       then
       (try find i,t such that
          exec@pred(R1(r)) &&
-	 (T(i,t) < R1(r) &&
+       (T(i,t) < R1(r) &&
           snd(output@T(i,t)) = snd(input@R1(r)) &&
           fst(output@T(i,t)) = fst(input@R1(r)) &&
           R(r) < T(i,t) &&
@@ -247,9 +246,9 @@ fa; [1,2: by intro [_ [i t _]]; simpl; exists i,t |
 intro [_ [i t _]].
 fa; 2,3,4: intro *; expand output; auto.
 intro Meq.
-use wa_R1_left with i0,r as [H1 H2]. 
+use wa_R1_left with i0,r as [H1 H2].
 use H1 as [_ _]; 2: expand output; auto.
-by expand output; exists t. 
+by expand output; exists t.
 (* Right *)
 fa; [1,2: by intro [_ [i t _]]; simpl; exists i,t |
      4: auto].
@@ -259,17 +258,12 @@ intro Meq; simpl.
 use wa_R1_right with i0,t0,r as [H1 H2].
 by use H1.
 
-fa 5.
-fadup 5.
-fa 5.
-expand seq(i,r,t->xor((diff(id(i),id'(i,t))),
-                  H(<tag1,<nr(r),nt(i,t)>>,(diff(key(i),key'(i,t)))))),
-       i,r,t.
-by fadup 5.
+fa 5; fadup 5.
+fa 5; fadup 5.
+apply IH.
 
 (* Case R2 *)
-expand frame@R2(r); expand exec@R2(r).
-expand cond@R2(r); expand output@R2(r).
+expand frame, exec, cond, output.
 fa 4. fa 5.
 
 (* Same as wa_R1 but with @R2 instead of @R1,
@@ -307,13 +301,10 @@ by intro [i t _]; expand output; exists i,t.
 by fadup 5.
 
 (* Case T *)
-expand frame@T(i,t). fa 4.
-expand seq(i,t->nt(i,t)),i,t.
-by expand seq(i,t->xor((diff(id(i),id'(i,t))),
-                H(<tag0,<input@T(i,t),nt(i,t)>>,(diff(key(i),key'(i,t)))))),i,t.
+expand frame, output, exec, cond; apply IH.
 
 (* Case T1 *)
-expand frame@T1(i,t); expand exec@T1(i,t).
+expand frame, exec.
 fa 4. fa 5.
 
 equivalent exec@pred(T1(i,t)) && cond@T1(i,t),
@@ -326,7 +317,7 @@ equivalent exec@pred(T1(i,t)) && cond@T1(i,t),
   snd(input@R1(r)) = snd(output@T(i,t)) &&
   R(r) < T(i,t) &&
   input@T(i,t) = output@R(r).
-expand cond@T1(i,t); split.
+  expand cond; split.
   (* Cond => Honest *)
   intro [_ Meq]; simpl.
   assert input@T1(i,t) XOR diff(id(i),id'(i,t)) =
@@ -341,19 +332,19 @@ expand cond@T1(i,t); split.
   clear Ctrace.
   assert cond@R1(r) as Hcond.
     executable pred(T1(i,t)); 1,2: auto.
-    by intro HH; use HH with R1(r); expand exec@R1(r).
-  expand cond@R1(r).
+    by intro HH; use HH with R1(r); 1: expand exec.
+  expand cond.
   destruct Hcond as [i1 t1 Hcond].
   euf Hcond => _ [_ [_ _]] _; 1:auto.
   exists r; simpl.
   assert R(r) < T(i,t) as _.
-    assert nr(r) = input@T(i,t) as HF; 1:auto.
-    fresh HF => C.
-    case C; 2,3:auto. 
-    by depends R(r),R2(r). 
+    admit.
   simpl.
-  case output@R1(r).
+  case output@R1(r) => Meq1.
+  destruct Meq1 as [_ _ [Meq1 ->]].
   by euf Meq1.
+
+  destruct Meq1 as [H0 _].
   by use H0 with i,t.
 
   (* Right *)
@@ -364,33 +355,39 @@ expand cond@T1(i,t); split.
   clear Ctrace.
   assert cond@R1(r) as Hcond.
     executable pred(T1(i,t)); 1,2: auto.
-    by intro Hex; use Hex with R1(r); expand exec@R1(r).
-  expand cond@R1(r).
+    by intro Hex; use Hex with R1(r); 1: expand exec.
+  expand cond.
   destruct Hcond as [i1 t1 Hcond].
   euf Hcond => Clt1 [_ [D F]] [? ?]; [1:auto].
   exists r; simpl.
   assert R(r) < T(i,t) as _.
     assert nr(r) = input@T(i,t) as HF; 1:auto.
     fresh HF => C.
-    by case C; [1: depends R(r),R2(r) |
+    by case C; [3: depends R(r),R2(r) |
                 2: depends R(r),R1(r)].
   simpl.
-  case output@R1(r).
-  euf Meq1 => A0 [A1 _] [_ _]; 1,2: by auto.
-  by use H0 with i,t. 
+  case output@R1(r) => Meq1.
+    destruct Meq1 as [_ _ [Meq1 ->]].
+    by euf Meq1 => A0 [A1 _] [_ _].
+
+    destruct Meq1 as [H0 _].
+    by use H0 with i,t.
 
   (* Honest => Cond *)
-  intro [_ [r _]]; simpl.
-  case output@R1(r); expand output.
-  by project; euf Meq.
+  intro [_ [r H1]]; simpl.
+  case output@R1(r) => Meq1.
+    destruct Meq1 as [_ _ [Meq1 Meq2]].
+    rewrite Meq2 in H1.
+    by project; euf Meq1.
 
-  by use H0 with i,t.
+    destruct Meq1 as [H0 _].
+    by use H0 with i,t.
 
 fa 6.
 by fadup 5.
 
 (* Case T2 *)
-expand frame@T2(i,t); expand exec@T2(i,t); expand cond@T2(i,t).
+expand frame, exec, cond.
 fa 4. fa 5.
 equivalent
   (exec@pred(T2(i,t)) &&
@@ -406,38 +403,47 @@ equivalent
       R(r) < T(i,t) &&
       input@T(i,t) = output@R(r)).
 split; intro [_ H1]; simpl.
+
   (* Honest => Cond *)
   intro [r H2]; use H1.
-  case output@R1(r); expand output.
-  (* by project; euf Meq. *)
-  by project; euf Meq => _ [F _] *.
-  by use H0 with i,t.
+  case output@R1(r) => Meq1.
+    destruct Meq1 as [_ _ [Meq1 Meq2]].
+    rewrite Meq2 in H2.
+    by project; euf Meq1.
+
+    destruct Meq1 as [H0 _].
+    by use H0 with i,t.
+
   (* Cond => Honest *)
   intro Meq.
   use H1.
   assert input@T2(i,t) XOR diff(id(i),id'(i,t)) =
          H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t))); 1:auto.
   use tags_neq; project.
+
   (* Left *)
   euf Meq0 => Ct _ _; 2:auto.
   assert R1(r) < T2(i,t) as _.
     by case Ct; try depends T(i,t),T2(i,t).
   clear Ct.
   assert cond@R1(r) as Hcond.
-    executable pred(T2(i,t)); 1,2: auto.    
-    by intro He; use He with R1(r); expand exec@R1(r).
-  expand cond@R1(r).
-  destruct Hcond as [i1 t1 Hcond]. 
+    executable pred(T2(i,t)); 1,2: auto.
+    by intro He; use He with R1(r); 1: expand exec.
+  expand cond.
+  destruct Hcond as [i1 t1 Hcond].
   euf Hcond => _ _ _; 1: auto.
   exists r; simpl.
   assert R(r) < T(i,t).
     assert nr(r) = input@T(i,t) as HF; 1: auto.
     fresh HF => C.
-    by case C; 1: depends R(r),R2(r). 
+    by case C; 3: depends R(r),R2(r).
   simpl.
-  case output@R1(r).
-  by euf Meq1.
-  by use H0 with i,t.
+  case output@R1(r) => Meq1.
+    destruct Meq1 as [_ _ [Meq1 ->]].
+    by euf Meq1.
+
+    destruct Meq1 as [H0 _].
+    by use H0 with i,t.
 
   (* Right *)
   euf Meq0 => Ct _ [_ _]; 2:auto.
@@ -446,21 +452,25 @@ split; intro [_ H1]; simpl.
   clear Ct.
   assert cond@R1(r) as Hcond.
     executable pred(T2(i,t)); 1,2: auto => He.
-    by use He with R1(r); expand exec@R1(r). 
-  expand cond@R1(r).
+    by use He with R1(r); 1: expand exec.
+  expand cond.
   destruct Hcond as [i1 t1 Hcond].
   euf Hcond; 1: auto => _ _ [_ _].
   exists r; simpl.
   assert R(r) < T(i,t) as _.
     assert nr(r) = input@T(i,t) as HF; 1: auto.
     fresh HF => C.
-    by case C; 1: depends R(r),R2(r).
+    by case C; 3: depends R(r),R2(r).
   simpl.
-  case output@R1(r).
-  by euf Meq1.
-  by use H0 with i,t.
 
-fa 6. 
+  case output@R1(r) => Meq1.
+    destruct Meq1 as [_ _ [Meq1 ->]].
+    by euf Meq1.
+
+    destruct Meq1 as [H0 _].
+    by use H0 with i,t.
+
+fa 6.
 by fadup 5.
 
 Qed.

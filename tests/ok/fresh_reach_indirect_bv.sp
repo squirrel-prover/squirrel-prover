@@ -17,6 +17,6 @@ goal test (i,j:index):
   h(fst(output@A(i)),k) <> n(i,j).
 
 Proof.
- nosimpl(intro i j Hneq Heq).
+ nosimpl(intro Hneq Heq).
  fresh Heq => [] _; auto.
 Qed.

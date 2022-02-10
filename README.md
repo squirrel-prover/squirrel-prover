@@ -1,9 +1,8 @@
 # Squirrel Prover
 
-
 ## Build
 
-You need OCaml version 4.10 or more.
+You need OCaml version 4.10 or more (tested up to 4.13.1).
 
 We recommend that you use opam (version 2.0 or more). It will notably allow
 you to install the required tools and libraries, with the following command
@@ -41,12 +40,18 @@ We recommend installing ProofGeneral from the git repository.
 Examples of developments in Squirrel can be found in:
 - `examples/`
 
+Those include classical and post-quantum sound proofs of protocols.
+See `examples/README.md` for details.
+
 ## Quick guide
 
 For a first introduction to the syntax, we recommend to open with ProofGeneral
 the `examples/tutorial/tutorial.sp`, that provides a run through of the syntax
 with executables snippets. Then, browsing the `examples` folder should provide a
 wide variety of examples, starting e.g. with `basic-hash.sp`.
+
+As a next step, a more advanced tutorial is available in
+`examples/tutorial/tutorial-avanced.sp`.
 
 Squirrel developments are conventionally written in `.sp` files. They start
 with a system description, followed by some lemmas corresponding to trace

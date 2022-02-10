@@ -14,7 +14,7 @@ goal _ (tau:timestamp,a,b:index):
   happens(tau) => output@tau = h(n,k(a,b)) =>
   a = b.
 Proof.
-  intro tau a b Hap Heq.
+  intro Hap Heq.
   nosimpl(euf Heq).
   (* There should be one indirect case,
    * where a newly introduced index i should be

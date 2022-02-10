@@ -4,6 +4,8 @@ name a : index -> message
 name b : index -> message
 name k : index -> message
 
+ddh g, (^) where group:message exposants:message.
+
 channel c
 
 system !_i ( out(c, diff((g^a(i))^b(i),g^k(i)))).
@@ -12,7 +14,10 @@ system !_i ( out(c, diff((g^a(i))^b(i),g^k(i)))).
 equiv ddh_goal.
 Proof.
 induction t.
-expand frame@init; expand exec@init.
 
-ddh a, b, k.
+auto.
+
+expand frame; expand exec.
+
+by ddh g, a, b, k.
 Qed.

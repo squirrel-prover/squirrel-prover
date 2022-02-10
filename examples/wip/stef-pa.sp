@@ -17,7 +17,7 @@ name r2 : index -> message
 
 abstract plus : message -> message -> message
 
-axiom length : forall (m1:message, m2:message) len(<m1,m2>) = plus(len(m1),len(m2))
+axiom length (m1:message, m2:message): len(<m1,m2>) = plus(len(m1),len(m2))
 
 process Key =
   out(cK, pk(kA));

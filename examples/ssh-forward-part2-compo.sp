@@ -77,6 +77,8 @@ name r3 : message
 name r4 : message
 name r5 : message
 
+ddh g, (^) where group:message exposants:message.
+
 (* As ssh uses a non keyed hash function, we rely on a fixed key hKey known to the attacker *)
 (* Note that hKey has to be a name and not a constant and this key is revealed at the beginning *)
 
@@ -84,7 +86,7 @@ name hKey : message
 hash h with oracle forall (m:message,sk:message), sk = hKey
 
 (* We assume that the encryption is INT-CTXT. This is assumed to hold even when the key appears under some hash functions. *)
-senc enc,dec with h
+senc enc,dec with hash h.
 
 
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
@@ -229,9 +231,9 @@ process SDISDDH =
 system [secret] K: (P1FADDH | SDISDDH | PDISDDH).
 
 
-equiv [left,secret] [right,secret] secret.
+equiv [secret] secret.
 Proof.
-   ddh a1, b1, c11.
+   ddh g, a1, b1, c11.
 Qed.
 
 
@@ -320,15 +322,14 @@ system [auth] K: ( P1FAauth | SDISauth | PDISauth).
 (* Based on a difference between the bitstring lengths, we can assume that it is
 impossible to confuse a hash with the tag forwarded, and another hash. *)
 
-axiom [auth] hashlengthnotpair : forall (m1,m2:message),
+axiom [auth] hashlengthnotpair (m1,m2:message):
    <forwarded,h(m1,hKey)> <> h(m2, hKey)
 
 (* The following axiom is a modelling trick. We need at some point to use an
 hypothesis that require to instantiate an index, but this index is not used. *)
 axiom [auth] freshindex : exists (l:index), True
 
-axiom [auth] signnottag :
-  forall (m1,m2:message),
+axiom [auth] signnottag (m1,m2:message):
   fst(sign(m1,m2)) <> anssign &&
   fst(sign(m1,m2)) <> reqsign
 
@@ -338,31 +339,32 @@ axiom [auth] difftags :
 
 
 
-goal [none, auth] P_charac :
+goal [auth] P_charac :
   happens(Pfail) => exec@PDIS5 => (cond@Pfail => False) .
 Proof.
   intro Hap He Hc.
   depends PDIS5, Pfail => // Hap2.
   expand exec, cond.
-  rewrite (pkSa@PDIS5 = pk(kS)) in *; 1: auto.
-  destruct He as [_ [_ Hchk]].
+  destruct He as [_ [He Hchk]].
+  rewrite !He in *.
   expand sidPa.
-  euf Hchk => Euf. 
+  euf Hchk => Euf.
 
   (* oracle case *)
-  destruct Euf as [H1 [_|[i m m1 [_|[i1 H2]]]]]; 
+  destruct Euf as [_ [_|[i m m1 [H1|[i1 H2]]]]];
   1: by auto.
-  by use hashlengthnotpair with 
-   <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1>.
+  by use hashlengthnotpair with
+   <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1> as HH.
+  (* rewrite H1 in HH. *)
 
   use signnottag with sidPa@P2, kP.
   use Hc with i1.
-  destruct H2 as [m2 [m3 H2]].  (* TODO: H2 is bugged here *)
-  left; right. 
+  destruct H2 as [m2 [m3 H2]].
+  left; right.
   by collision.
 
   (* honest case SDIS *)
-  intro Heq. 
+  intro Heq.
   use freshindex as [l _].
   use Hc with l.
   by case Euf; expand sidSa; collision => _.
@@ -376,7 +378,7 @@ Qed.
 
 
 (* This is the most complex case, as the received signature was not performed by PDis, but queried by PDis to FA. *)
-goal [none, auth] S_charac :
+goal [auth] S_charac :
    happens(Sfail) => exec@Sok =>(cond@Sfail => False).
 Proof.
   intro Hap He Hc.
@@ -385,11 +387,11 @@ Proof.
   destruct He as [_ Hchk].
 
   expand sidSa, x4.
-  euf Hchk => Euf. 
+  euf Hchk => Euf.
 
 (* oracle clase *)
   destruct Euf as [[_|[i m m1 H1]] H2]; 1: by auto.
-  destruct H1 as [H1| [i1 m2 m3 H1]]. 
+  destruct H1 as [H1| [i1 m2 m3 H1]].
 (* sub case with wrong tag *)
   use Hc with i.
   assert h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey) = h(<<g^a(i),m>,m1>,hKey);
@@ -398,29 +400,29 @@ Proof.
   by use hashlengthnotpair with <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake1(i1),m2>,m3>.
 
 (* else, it comes from P2, and is not well tagged *)
-  
- by use hashlengthnotpair with 
+
+ by use hashlengthnotpair with
   <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake11,input@P1>,k11> as Hlen;
- intro *; case Euf; expand sidPaF. 
+ intro *; case Euf; expand sidPaF.
 
 (* Honest case of signature produced by Fa.
    We need to prove that the sign req received by FA comes from PDIS. *)
 
   intro Meq.
   executable pred(Sok); 1,2: by auto => H2.
-  
-  depends SDIS, Sok => // _.  
+
+  depends SDIS, Sok => // _.
   assert happens(SDIS); 1: auto.
   assert happens(P3(i)); 1: case Euf; auto.
   expand x3(i)@P3(i).
   use H2 with P3(i) as H3; 2: case Euf; auto.
   expand exec, cond.
-  destruct H3 as [H3 [Mneq Meq0]]. 
-  
-  assert (x3(i)@P3(i) = dec(input@P3(i),k11)) as D1; 
+  destruct H3 as [H3 [Mneq Meq0]].
+
+  assert (x3(i)@P3(i) = dec(input@P3(i),k11)) as D1;
   1: by auto.
 (* We have that x3 is a message encrypted with the secret key, we use the intctxt of encryption *)
-  intctxt D1; 4: by auto. 
+  intctxt D1; 4: by auto.
 
 (* Ill-tagged cases *)
   by use signnottag with sidPaF@P2,kP.
@@ -430,106 +432,54 @@ Proof.
   intro H4 Meq1.
   assert happens(PDIS5); 1: case H4; auto.
   expand x3(i)@P3(i), sidPa.
-  assert PDIS5 <= Sok; 
+  assert PDIS5 <= Sok;
   1: by case H4; case Euf.
   use H2 with PDIS5; 2: by auto.
-  expand exec, cond. 
+  expand exec, cond.
   use Hc with i.
   right.
-  expand pkSa, sidPa. 
+  expand pkSa, sidPa.
   assert (h(<<g^a1,input@PDIS4>,input@PDIS4^a1>,hKey) =
           h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey)) as Hcol;
   1: auto.
-  collision => [[A _] _]. 
-  by rewrite A. 
+  collision => [[A _] _].
+  by rewrite A.
 Qed.
 
 (* The equivalence for authentication is obtained by using the unreachability
    proofs over the two actions. The rest of the protocol can be handled through
    some simple enriching of the induction hypothesis, and then dup applications. *)
 
-equiv [left, auth] [right, auth] auth.
+equiv [auth] auth.
 Proof.
-  enrich a1, b1, seq(i-> b(i)), seq(i-> a(i)), kP, kS;
-  enrich ake11, bke11, seq(i-> bke1(i)), seq(i-> ake1(i)), k11, hKey, r, 
-   seq(i->r2(i)), r3, r4, r5.
+  enrich a1, b1, seq(i:index -> b(i)), seq(i:index -> a(i)), kP, kS;
+  enrich ake11, bke11, seq(i:index -> bke1(i)), seq(i:index -> ake1(i)), k11, hKey, r,
+   seq(i:index ->r2(i)), r3, r4, r5.
 
-  induction t.
+  induction t; try (expandall; apply IH).
 
-  (* P1 *)
-  by expandall; fa 17.
-  (* P2 *)
-  by expandall; fa 17.
- (* P3 *)
-  expandall; fa 17.
-  by expand seq(i -> r2(i)),i.
- (* A *)
-  by expandall; fa 17.
-  (* A1 *)
-  by expandall; fa 17.
-  (* A 2 *)
-  by expandall; fa 17.
-  (* SDIS *)
-  by expandall; fa 17.
-  (* SDIS1 *)
-  by expandall; fa 17.
-  (* Sok *)
-  by expandall; fa 17.
-  (* SDISauth3 *)
-  expandall; fa 17.
-  by expand seq(i -> a(i)),i.
+  (* Init *)
+  auto.
+
   (* Sfail *)
-  expand frame@Sfail.
+  expand frame.
+  equivalent exec@Sfail, false.
+    split; 2: by auto.
+    intro Hfail.
+    use S_charac; try auto.
+    depends Sok, Sfail => // _.
+    executable Sfail; 1,2: auto.
+    by intro H0; use H0 with Sok.
+  by noif 17.
 
-  equivalent exec@Sfail, false. 
-  split; 2: by auto. 
-  intro Hfail.
-  use S_charac; try auto.
-  depends Sok, Sfail => // _.
-  executable Sfail; 1,2: auto.  
-  by intro H0; use H0 with Sok.
-  by expand exec@Sfail.
-
-  by fa 17; fa 18; noif 18.
-  (* A3 *)
-  by expandall; fa 17.
-  (* PDIS *)
-  by expandall; fa 17.
-  (* PDIS1 *)
-  by expandall; fa 17.
-  (* PDSI2 *)
-  by expandall; fa 17.
-  (* PDIS3 *)
-  by expandall; fa 17.
-  (* PDIS4 *)
-  by expandall; fa 17.
-  (* PDIS5 *)
-  by expandall; fa 17.
-  (* Pok *)
-  by expandall; fa 17.
-  (* PDISauth7 *)
-  expandall; fa 17.
-  expand seq(i -> b(i)),i. 
-  by expand seq(i -> bke1(i)),i.
   (* Pfail *)
-  expand frame@Pfail.
-
-  equivalent exec@Pfail, false. 
-  split; 2: by auto. 
-  intro Hfail.
-  use P_charac; try auto.
-  depends PDIS5, Pfail => // _.
-  executable Pfail; 1,2: auto.  
-  by intro H0; use H0 with PDIS5.
-  by expand exec@Pfail.
-
-  by fa 17; fa 18; noif 18.
- (* A4 *)
-  by expandall; fa 17.
- (* A5 *)
-  by expandall; fa 17.
- (* A6 *)
-  by expandall; fa 17.
-  (* A7 *)
-  by expandall; fa 17.
+  expand frame.
+  equivalent exec@Pfail, false.
+    split; 2: by auto.
+    intro Hfail.
+    use P_charac; try auto.
+    depends PDIS5, Pfail => // _.
+    executable Pfail; 1,2: auto.
+    by intro H0; use H0 with PDIS5.
+  by noif 17.
 Qed.

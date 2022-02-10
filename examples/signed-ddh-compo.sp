@@ -48,6 +48,8 @@ name k11 : message  (* ideal key derived between P and S *)
 name a : index -> message
 name b : index -> message
 
+ddh g, (^) where group:message exposants:message.
+
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
  (sk <> kP || exists (i:index, x1:message, x2:message) m=<<x1,g^a(i)>,x2> )
   &&
@@ -133,12 +135,12 @@ system [secret] ( P2 | S2).
 
 
 (** Prove that the condition above the only diff term inside S is never true. **)
-goal [none, auth] S1_charac :
+goal [auth] S1_charac :
   happens(S1,S4) => cond@S1 => (cond@S4 => False) .
 Proof.
   intro Hap Hcond1 Hcond4.
   expand cond, pkP.
-  rewrite (fst(input@S) = pk(kP)) in Hcond1.
+  rewrite Meq in Hcond1.
   euf Hcond1.
 
   case H1.
@@ -146,12 +148,12 @@ Proof.
 Qed.
 
 (** Prove that the condition above the only diff term inside P is never true. **)
-goal [none, auth] P1_charac :
+goal [auth] P1_charac :
    happens(P1,P4) => cond@P1 => (cond@P4 => False).
 Proof.
   intro Hap Hcond1 Hcond4.
   expand cond.
-  rewrite (pkS@P1 = pk(kS)) in *.
+  rewrite /pkS Meq in *.
   euf Hcond1.
 
   case H2.
@@ -159,18 +161,18 @@ Proof.
 Qed.
 
 (** The strong secrecy is directly obtained through ddh. *)
-equiv [left,secret] [right,secret] secret.
+equiv [secret] secret.
 Proof.
-   ddh a1, b1, k11.
+   ddh g, a1, b1, k11.
 Qed.
 
 (** The equivalence for authentication is obtained by using the unreachability
 proofs over the two actions. The rest of the protocol can be handled through
 some simple enriching of the induction hypothesis, and then dup applications. *)
 
-equiv [left, auth] [right, auth] auth.
+equiv [auth] auth.
 Proof.
-   enrich kP, g^a1, g^b1, kS, seq(i-> g^b(i)), seq(i-> g^a(i)).
+   enrich kP, g^a1, g^b1, kS, seq(i:index -> g^b(i)), seq(i:index -> g^a(i)).
 
    induction t.
 
@@ -185,16 +187,16 @@ Proof.
 
    (* P3 *)
    expandall; fa 6.
-   expand seq(i->g^b(i)),j.
+   by apply IH.
 
    (* P4 *)
-   expand frame@P4; expand exec@P4.
+   expand frame, exec.
    fa 6.
 
    equivalent exec@pred(P4) && cond@P4, False.
-   executable pred(P4). 
-   depends P1, P4; use H2 with P1. 
-   expand exec@P1.
+   executable pred(P4).
+   depends P1, P4; use H2 with P1.
+   expand exec.
    by use P1_charac.
 
    by fa 7; noif 7.
@@ -216,16 +218,15 @@ Proof.
 
    (* S3 *)
    expandall.
-   expand seq(i->g^a(i)),l.
-   fa 7.
+   by apply IH.
 
    (* S4 *)
-   expand frame@S4; expand exec@S4.
+   expand frame, exec.
 
    equivalent exec@pred(S4) && cond@S4, False.
-   executable pred(S4). 
-   depends S1, S4; use H2 with S1. 
-   expand exec@S1. 
+   executable pred(S4).
+   depends S1, S4; use H2 with S1.
+   expand exec.
    by use S1_charac.
 
    by fa 6; fa 7; noif 7.

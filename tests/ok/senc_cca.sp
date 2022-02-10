@@ -17,14 +17,15 @@ Proof.
 enrich diff(n,m).
 
 induction t.
+
 expandall.
-fresh 0.
-yesif 0. 
-by auto.
+by fresh 0.
 
 expandall.
 fa 1; fa 2; fa 2; fa 2.  cca1 2.
 
 admit 2. 
-by auto.
+auto.
+
+auto.
 Qed.

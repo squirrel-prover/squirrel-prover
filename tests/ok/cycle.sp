@@ -13,7 +13,6 @@ goal collision_absurd (tau:timestamp):
   output@tau <> h(m,k) &&   ( output@tau <> h(t,k) || output@tau <> h(t,k)).
 
 Proof.
-intro tau.
 split.
 cycle 1.
 cycle 2.

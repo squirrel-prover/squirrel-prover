@@ -8,16 +8,18 @@ name n : index->message
 name m : index->message
 system !_i !_j out(c,<n(i),n(j)>).
 
-equiv test (k:index) : 
-[happens(A(k,k))] -> output@A(k,k), diff(n(k),m(k)).
-Proof.
-  intro Hap.
-  fresh 1.
-  equivalent (forall (i,j:index), A(i,j)<=A(k,k) => i<>k && j<>k), True.
-    (* The equivalence does not hold. We are only checking that the right
-     * formula has been produced. *)
-    admit.
+global goal test (k:index) : 
+  [(((exec@pred(A(k,k)) && true) => k <> k) && 
+    (forall (i,j:index), A(i,j)<A(k,k) => i<>k) &&
+    (forall (i,j:index), A(i,j)<A(k,k) => j<>k)) = true] ->
+  [happens(A(k,k))] -> 
+  equiv(frame@A(k,k)) -> 
+  equiv(frame@A(k,k), diff(n(k),m(k))).
+Proof. 
+  intro Heq Hap H. 
+  fresh 1. 
+  rewrite Heq.
   nosimpl(yesif 1).
-  true.
-  expandall; refl.
+  true. 
+  expandall; assumption.
 Qed.

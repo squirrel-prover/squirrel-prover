@@ -5,23 +5,25 @@ OCB = ocamlbuild $(OCB_FLAGS)
 
 GITHASH := $(shell scripts/git-hash)
 
+PREFIX = ~/.local
+
 default: squirrel
 
 all: squirrel test
 
 PROVER_TESTS = $(wildcard tests/ok/*.sp) $(wildcard tests/fail/*.sp)
-PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp)
+PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $(wildcard examples/stateful/*.sp)  $(wildcard examples/postQuantumKE/*.sp)
 
 test: squirrel alcotest okfail_test
 
-.PHONY: ok_test ok_test_end alcotest
+.PHONY: ok_test ok_test_end alcotest test.byte squirrel squirrel.byte
 
 # Directory for logging test runs
 RUNLOGDIR=_build/log
 okfail_test:
 	rm -rf $(RUNLOGDIR)
 	@$(MAKE) -j8 okfail_test_end
-	@$(MAKE) -j8 examples_end
+	@$(MAKE) -j4 examples_end
 
 okfail_test_end: $(PROVER_TESTS:.sp=.ok)
 	@echo
@@ -39,7 +41,7 @@ examples_end: $(PROVER_EXAMPLES:.sp=.ok)
 	 else echo All tests passed successfully. ; fi
 
 tests/test_prologue.ok:
-	@echo "Running tests/ok/*.sp, tests/fail/*.sp and examples/*.sp."
+	@echo "Running tests/ok/*.sp, tests/fail/*.sp, examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 %.ok: tests/test_prologue.ok %.sp
 	@mkdir -p `dirname $(RUNLOGDIR)/$(@:.ok=.sp)`
 	@if ./squirrel $(@:.ok=.sp) \
@@ -48,8 +50,10 @@ tests/test_prologue.ok:
 	 ; then echo -n . ; \
 	 else echo "[FAIL] $(@:.ok=.sp)" >> tests/tests.ko ; echo -n '!' ; fi
 
-alcotest: version sanity
+test.byte: version sanity
 	$(OCB) test.byte
+
+alcotest: test.byte
 	@mkdir -p ./_build/_tests
 	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
 	./test.byte --compact
@@ -60,8 +64,14 @@ clean:
 	rm -f *.coverage
 	rm -rf _coverage
 
-squirrel: version sanity
+squirrel.byte: version sanity
 	$(OCB) squirrel.byte
+
+debug: version sanity
+	$(OCB) -tags debug squirrel.native
+
+
+squirrel: squirrel.byte
 	@ln -s -f squirrel.byte squirrel
 
 makecoverage: version sanity
@@ -80,20 +90,8 @@ coverage: makecoverage ok_test
 %.cmo: sanity
 	$(OCB) $@
 
-native: version sanity
-	$(OCB) test.native
-
-byte: version sanity
-	$(OCB) test.byte
-
-profile: version sanity
-	$(OCB) -tag profile test.native
-
-debug: version sanity
-	$(OCB) -tag debug test.byte
-
 install: version squirrel
-	cp squirrel.byte ~/.local/bin/squirrel.byte
+	cp squirrel.byte $(PREFIX)/bin/squirrel.byte
 
 doc: squirrel
 	$(OCB) -ocamldoc "ocamldoc -stars" squirrel.docdir/index.html
@@ -120,4 +118,4 @@ _build/requirements: Makefile
 	mkdir -p _build
 	touch _build/requirements
 
-.PHONY: version clean byte native profile debug sanity
+.PHONY: version clean sanity

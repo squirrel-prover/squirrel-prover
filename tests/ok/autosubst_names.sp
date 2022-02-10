@@ -6,7 +6,7 @@ channel c
 system !_i out(c,n(i)).
 
 goal _ (i,j:index) : happens(A(i)) => n(i)=n(j) && cond@A(i) => cond@A(j).
-Proof.
+Proof. 
   auto.
 Qed.
 

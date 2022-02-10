@@ -19,42 +19,37 @@ let dbg s = Printer.prt (if Config.debug_constr () then `Dbg else `Ignore) s
 
 type trace_literal = Term.trace_literal
 
+type trace_literals = trace_literal list
+
 (*------------------------------------------------------------------*)
 module TraceLits : sig 
-  type t = private C of trace_literal list
+  type t = trace_literal 
 
-  val mk : trace_literal list -> t
+  val mk : trace_literal list -> t array
 
   val compare : t -> t -> int
   val equal : t -> t -> bool
   val hash : t -> int
 
-  module Memo : Ephemeron.S with type key = t
+  module Memo : Ephemeron.S with type key = t array
 end = struct
-  type t = C of trace_literal list
+  type t = trace_literal 
  
-  let mk l = C (List.sort_uniq Stdlib.compare l)
+  let mk l = Array.of_list (List.sort_uniq Stdlib.compare l)
 
-  let compare (C l) (C l') = 
-    let ll, ll' = List.length l, List.length l' in
-    if ll <> ll' then Stdlib.compare ll ll' 
-    else
-      let exception Done of int in
-      try 
-        List.iter2 (fun lit lit' ->
-            (* FIXME: if we add hash-consing, update *)
-            let c = Stdlib.compare lit lit' in
-            if c <> 0 then raise (Done c) 
-          ) l l';
-        0
-      with Done c -> c
+  let compare = Stdlib.compare
 
-  let equal t t' = compare t t' = 0
+  let equal t t' = t = t'
 
-  (* FIXME: if we add hash-consing, change [Hashtbl.hash] to the literal tag *)
-  let hash (C l) = Utils.hcombine_list Hashtbl.hash 0 l
+  (* FIXME: term hashconsing *)
+  let hash ((l,t) : trace_literal) = 
+    let h = match l with
+        | `Neg -> 0
+        | `Pos -> 1
+    in
+    hcombine h (Term.hash (Term.mk_atom1 (t :> Term.generic_atom)))
 
-  module Memo = Ephemeron.K1.Make(struct 
+  module Memo = Ephemeron.Kn.Make(struct 
       type _t = t
       type t = _t
       let equal = equal
@@ -68,7 +63,7 @@ module Utv : sig
   type uvar = Utv of Vars.timestamp | Uind of Vars.index
 
   type ut = { hash : int;
-              cnt : ut_cnt }
+              cnt  : ut_cnt }
 
   and ut_cnt = private
     | UVar of uvar
@@ -84,7 +79,7 @@ module Utv : sig
   val uinit  : ut
   val uundef : ut
 
-  val ut_to_term : 'a Sorts.sort -> ut -> 'a Term.term 
+  val ut_to_term : 'a Type.kind -> ut -> 'a Term.term 
 
   module Ut : Hashtbl.HashedType with type t = ut
 
@@ -160,26 +155,26 @@ end = struct
     | Term.Action (s,l) -> uname s (List.map uvari l)
     | _ -> failwith "Not implemented"
 
-  let utv_to_var : type a. a Sorts.sort -> uvar -> a Vars.var =
+  let utv_to_var : type a. a Type.kind -> uvar -> a Vars.var =
     fun s utv ->
     match utv with
     | Uind i -> Vars.cast i s
     | Utv  t -> Vars.cast t s
 
-  let ut_to_var : type a. a Sorts.sort -> ut -> a Vars.var =
+  let ut_to_var : type a. a Type.kind -> ut -> a Vars.var =
     fun s ut -> 
     match ut.cnt with
     | UVar (Uind i) -> Vars.cast i s
     | UVar (Utv t)  -> Vars.cast t s
     | _ -> assert false
 
-  let rec ut_to_term : type a. a Sorts.sort -> ut -> a Term.term = 
+  let rec ut_to_term : type a. a Type.kind -> ut -> a Term.term = 
     fun s ut ->
     match ut.cnt with
-    | UVar tv -> Term.Var (utv_to_var s tv)
+    | UVar tv -> Term.mk_var (utv_to_var s tv)
     | UName (a, is) -> 
-      Term.cast s (Term.Action (a, List.map (ut_to_var Sorts.Index) is))
-    | UPred ut -> Term.cast s (Term.Pred (ut_to_term Sorts.Timestamp ut))
+      Term.cast s (Term.mk_action a (List.map (ut_to_var Type.KIndex) is))
+    | UPred ut -> Term.cast s (Term.mk_pred (ut_to_term Type.KTimestamp ut))
     | UInit  -> Term.cast s Term.init
     | UUndef -> assert false
 end
@@ -327,7 +322,7 @@ module Form = struct
          undefined elements. 
          Indeed, when ⋄ ∈ {≤, <, ≥, >}, we have:
          ¬ (x ⋄ y) ⇔ (undef(x) ∨ undef(y) ∨ (x □ y))
-         where □ is not standard negation of ⋄ (e.g. if ⋄ = ≤, then □ = >) *)
+         where □ is the standard negation of ⋄ (e.g. if ⋄ = ≤, then □ = >) *)
       | `Neg, `Timestamp ((`Leq|`Lt|`Geq|`Gt) as ord, u, v) ->
         let nord = not_ord ord in
         let form =
@@ -1051,7 +1046,7 @@ let log_segment_eq eq =
 let log_split f =
   dbg "@[<v 2>Splitting clause:@, %a@]" Form.pp_disj f
     
-let log_init_eqs eqs =
+let log_new_eqs eqs =
   let pp_eq fmt (ut1, ut2) =
     Fmt.pf fmt "%a = %a" pp_ut ut1 pp_ut ut2 in
   
@@ -1059,7 +1054,7 @@ let log_init_eqs eqs =
     Fmt.pf fmt "@[<hv 2>%a@]" 
       (Fmt.list ~sep:Fmt.comma pp_eq) eqs in
       
-  dbg "@[<v 2>Adding new init equalities:@, %a@]"
+  dbg "@[<v 2>Adding new equalities:@, %a@]"
     pp_eqs eqs
 
 let log_new_neqs neqs =
@@ -1103,10 +1098,10 @@ let find_segment_disj instance g =
 (*------------------------------------------------------------------*)
 (** Looks for instances of the rule:
     ∀ τ, (happens(τ) ∧ ¬happens(pred(τ))) ⇒ τ = init *)
-let find_eq_init inst =  
+let find_eq_init (inst : constr_instance) =  
   let uf = inst.uf in
 
-  let new_eqs = List.filter_map (fun (ut1, ut2) ->     
+  List.filter_map (fun (ut1, ut2) ->     
       let uf, uts = mgus uf [ut1;ut2] in
       let ut1, ut2 = Utils.as_seq2 uts in
 
@@ -1114,14 +1109,42 @@ let find_eq_init inst =
       else
         let ut = if ut_equal ut1 uundef then ut2 else ut1 in
         let _, put = mgu uf (upred ut) in
-        
+
         if ut_equal put uundef &&
            (not (ut_equal put uinit)) &&
            (not (ut_equal ut uinit))
         then Some (ut, uinit)
         else None
-    ) inst.neqs in
+    ) inst.neqs 
 
+(*------------------------------------------------------------------*)
+(** Looks for instances of the rule:
+    ∀ τ τ', τ ≤ τ' ∧ pred(τ') = ⊥ ⇒ τ = τ' *)
+let find_pred_undef (inst : constr_instance) graph =  
+  let uf = inst.uf in
+
+  UtG.fold_edges (fun t t' new_eqs ->
+      let uf, uts = mgus uf [t;t'] in
+      let t, t' = Utils.as_seq2 uts in
+
+      if is_undef uf (upred t') && 
+         not (ut_equal t t')    (* do not add existing equalities *)
+      then (t, t') :: new_eqs 
+      else new_eqs
+    ) graph []
+
+let find_new_eqs inst graph = 
+  let uf = inst.uf in
+  let new_eqs = find_eq_init inst @ find_pred_undef inst graph in
+  let new_eqs = 
+    (* we remove already known equalities *)
+    List.filter (fun (t,t') -> 
+      let uf, uts = mgus uf [t;t'] in
+      let t, t' = Utils.as_seq2 uts in
+
+        not (ut_equal t t')
+      ) new_eqs 
+  in
   if new_eqs = [] then None else Some new_eqs
 
 (*------------------------------------------------------------------*)
@@ -1179,9 +1202,9 @@ let rec split (instance : constr_instance) : model list =
     
     let g = UtGOp.transitive_closure g in
 
-    begin match find_eq_init instance with
+    begin match find_new_eqs instance g with
       | Some new_eqs ->
-        log_init_eqs new_eqs;
+        log_new_eqs new_eqs;
         split { instance with eqs = new_eqs @ instance.eqs; }
         
       | None -> match find_new_undef instance g with
@@ -1228,6 +1251,16 @@ let rec split (instance : constr_instance) : model list =
     dbg "@[<v 2>No_unif@]";
     []
 
+let split_models instance =
+  let models = split instance in
+  
+  dbg "@[<v 1>final models (%d models):@;%a@]"
+    (List.length models)
+    (Fmt.list (pp_constr_instance ~full:false))
+    (List.map (fun x -> x.inst) models);
+
+  models
+
 (** The minimal models a of constraint.
     Here, minimanility means inclusion w.r.t. the predicates. *)
 type models = model list
@@ -1235,28 +1268,29 @@ type models = model list
 let tot = ref 0.
 let cptd = ref 0
 
-let models_conjunct0 (l : trace_literal list) : models =
+(*------------------------------------------------------------------*)
+let models_conjunct (l : trace_literal list) : models =
   let l = Form.mk_list l in
   let instance = mk_instance l in
-  split instance 
+  split_models instance 
 
 (** Memoisation *)
-let models_conjunct0 =
+let models_conjunct =
   let memo = TraceLits.Memo.create 256 in
   fun (l : trace_literal list) -> 
-    let (C l) as lits = TraceLits.mk l in
+    let lits = TraceLits.mk l in
     try TraceLits.Memo.find memo lits with
     | Not_found ->
-      let res = models_conjunct0 l in
+      let res = models_conjunct l in
       TraceLits.Memo.add memo lits res;
       res
 
+(** Time-out information *)
 let models_conjunct (l : trace_literal list) : models timeout_r =
-  let l = Form.mk_list l in
-  let instance = mk_instance l in
-  Utils.timeout (Config.solver_timeout ()) split instance 
+  Utils.timeout (Config.solver_timeout ()) models_conjunct l
 
 
+(*------------------------------------------------------------------*)
 let m_is_sat models = models <> []
 
 
@@ -1313,7 +1347,7 @@ let query ~precise (models : models) (ats : trace_literal list) =
     let insts = List.map (fun model ->
         add_forms model.inst forms 
       ) models in
-    List.for_all (fun inst -> split inst = []) insts
+    List.for_all (fun inst -> split_models inst = []) insts
 
 (* adds debugging information *)
 let query ~precise models ats =
@@ -1378,26 +1412,29 @@ let find_eq_action (models : models) (t : Term.timestamp) =
     let classe = get_class uf ut in
     List.find_map (fun ut -> match ut.cnt with
         | UInit
-        | UName _ -> Some (ut_to_term Sorts.Timestamp ut)
+        | UName _ -> Some (ut_to_term Type.KTimestamp ut)
         | _ -> None
       ) classe
   in
 
-  (* compute an action equal to [t] in one model. *)
-  match List.find_map action_model models with
-  | None -> None
-  | Some term ->
-  (* check that [t] = [term] in all models. *)
-    if query ~precise:true models [`Pos, `Timestamp (`Eq,t,term)] 
-    then Some term 
-    else None
-    
+  match t with
+  | Term.Action _ -> Some t     (* already an action *)
+  | _ ->
+    (* compute an action equal to [t] in one model. *)
+    match List.find_map action_model models with
+    | None -> None
+    | Some term ->
+      (* check that [t] = [term] in all models. *)
+      if query ~precise:true models [`Pos, `Timestamp (`Eq,t,term)] 
+      then Some term 
+      else None
+
 
 (*------------------------------------------------------------------*)
 (** Context of an trace model *)
 type trace_cntxt = {
   table  : Symbols.table;
-  system : SystemExpr.system_expr;
+  system : SystemExpr.t;
 
   (* used to find an action occuring at a given timestamp *)
   models : models option;
@@ -1407,50 +1444,54 @@ type trace_cntxt = {
 (** Tests Suites *)
 
 open Term
-open Sorts
-let env = ref Vars.empty_env
-let tau = Var (Vars.make_fresh_and_update env Timestamp "tau")
-and tau' = Var (Vars.make_fresh_and_update env Timestamp "tau")
-and tau'' = Var (Vars.make_fresh_and_update env Timestamp "tau")
-and tau3 = Var (Vars.make_fresh_and_update env Timestamp "tau")
-and tau4 = Var (Vars.make_fresh_and_update env Timestamp "tau")        
-and i =  Vars.make_fresh_and_update env Index "i"
-and i' = Vars.make_fresh_and_update env Index "i"
+    
+let env = ref Vars.empty_env 
+
+let mk_var   v = Term.mk_var (Vars.make_r `Approx env Timestamp v) 
+let mk_var_i v = Vars.make_r `Approx env Index     v 
+
+let tau = mk_var "tau"
+and tau' = mk_var "tau"
+and tau'' = mk_var "tau"
+and tau3 = mk_var "tau"
+and tau4 = mk_var "tau"
+and i =  mk_var_i "i"
+and i' = mk_var_i "i"
 
 let table = Symbols.builtins_table
               
 let table, a = Symbols.Action.declare table (L.mk_loc L._dummy "a") 1
 
-let pb_eq1 = (`Timestamp (`Eq,tau, Pred tau'))
-             :: (`Timestamp (`Eq,tau', Pred tau''))
-             :: (`Timestamp (`Eq,tau, Action (a,[i])))
-             :: [`Timestamp (`Eq,tau'', Action (a,[i']))]
-and pb_eq2 = [`Timestamp (`Eq,tau, Pred tau)]
-and pb_eq3 = (`Timestamp (`Eq,tau, Pred tau'))
-             :: (`Timestamp (`Eq,tau', Pred tau''))
+let pb_eq1 = (`Timestamp (`Eq,tau, mk_pred tau'))
+             :: (`Timestamp (`Eq,tau', mk_pred tau''))
+             :: (`Timestamp (`Eq,tau, mk_action a [i]))
+             :: [`Timestamp (`Eq,tau'', mk_action a [i'])]
+and pb_eq2 = [`Timestamp (`Eq,tau, mk_pred tau)]
+and pb_eq3 = (`Timestamp (`Eq,tau, mk_pred tau'))
+             :: (`Timestamp (`Eq,tau', mk_pred tau''))
              :: [`Timestamp (`Eq,tau'', tau)]
-and pb_eq4 = (`Timestamp (`Eq,Term.init, Pred tau))
-             :: (`Timestamp (`Eq,tau, Pred tau'))
-             :: (`Timestamp (`Eq,tau', Pred tau''))
-             :: (`Timestamp (`Eq,tau, Action (a,[i])))
-             :: [`Timestamp (`Eq,tau'', Action (a,[i]))]
-and pb_eq5 = (`Timestamp (`Eq,Term.init, Pred tau))
-             :: (`Timestamp (`Eq,tau, Pred tau'))
-             :: (`Timestamp (`Eq,tau', Action (a,[i'])))
-             :: (`Timestamp (`Eq,tau, Action (a,[i])))                 
-             :: (`Timestamp (`Eq,tau'', Action (a,[i])))
-             :: [`Timestamp (`Eq,tau'', Action (a,[i']))]
-and pb_eq6 = (`Timestamp (`Eq,tau, Pred tau'))
-             :: (`Timestamp (`Eq,tau', Action (a,[i'])))
-             :: (`Timestamp (`Eq,tau, Action (a,[i])))
-             :: (`Timestamp (`Eq,tau3, Action (a,[i])))
-             :: [`Timestamp (`Eq,tau'', Action (a,[i']))]
-and pb_eq7 = (`Timestamp (`Eq,tau, Pred tau'))
-             :: (`Timestamp (`Eq,tau', Pred tau''))
-             :: (`Timestamp (`Eq,tau, Action (a,[i])))
-             :: [`Timestamp (`Eq,tau'', Action (a,[i']))]
-and pb_eq8 = (`Timestamp (`Eq,tau, Pred tau'))
-             :: (`Timestamp (`Eq,tau', Pred tau''))
+and pb_eq4 = (`Timestamp (`Eq,Term.init, mk_pred tau))
+             :: (`Timestamp (`Eq,tau, mk_pred tau'))
+             :: (`Timestamp (`Eq,tau', mk_pred tau''))
+             :: (`Timestamp (`Eq,tau, mk_action a [i]))
+             :: [`Timestamp (`Eq,tau'', mk_action a [i])]
+and pb_eq5 = (`Timestamp (`Eq,Term.init, mk_pred tau))
+             :: (`Timestamp (`Eq,tau, mk_pred tau'))
+             :: (`Timestamp (`Eq,tau', mk_action a [i']))
+             :: (`Timestamp (`Eq,tau, mk_action a [i]))                 
+             :: (`Timestamp (`Eq,tau'', mk_action a [i]))
+             :: [`Timestamp (`Eq,tau'', mk_action a [i'])]
+and pb_eq6 = (`Timestamp (`Eq,tau, mk_pred tau'))
+             :: (`Timestamp (`Eq,tau', mk_action a [i']))
+             :: (`Timestamp (`Eq,tau, mk_action a [i]))
+             :: (`Timestamp (`Eq,tau3, mk_action a [i]))
+             :: [`Timestamp (`Eq,tau'', mk_action a [i'])]
+and pb_eq7 = (`Timestamp (`Eq,tau, mk_pred tau'))
+             :: (`Timestamp (`Eq,tau', mk_pred tau''))
+             :: (`Timestamp (`Eq,tau, mk_action a [i]))
+             :: [`Timestamp (`Eq,tau'', mk_action a [i'])]
+and pb_eq8 = (`Timestamp (`Eq,tau, mk_pred tau'))
+             :: (`Timestamp (`Eq,tau', mk_pred tau''))
              :: [`Timestamp (`Eq,tau'', tau3)]
 
 (* let () = Printexc.record_backtrace true *)
@@ -1510,12 +1551,12 @@ let () =
                        pb_eq1] in
 
        List.iteri (fun i pb ->
-           Alcotest.check_raises ("graph(sat)" ^ string_of_int i) Sat
+           Alcotest.check_raises ("graph(sat) " ^ string_of_int i) Sat
              (fun () -> test (models_conjunct (mk pb))))
          successes;
 
        List.iteri (fun i pb ->
-           Alcotest.check_raises ("graph(unsat)" ^ string_of_int i) Unsat
+           Alcotest.check_raises ("graph(unsat) " ^ string_of_int i) Unsat
              (fun () -> test (models_conjunct (mk pb))))
          failures;)
   ]

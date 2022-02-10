@@ -51,6 +51,8 @@ type shape = int t
 
 val get_indices : action -> Vars.index list
 
+val fv_action : action -> Vars.Sv.t
+
 (** [depends a b] test if [a] must occur before [b] as far
     as the control-flow is concerned -- it does not (cannot)
     take messages into account. It is not reflexive. *)
@@ -77,8 +79,8 @@ val of_term :
   Symbols.table ->
   action
 
-(** Return a dummy action of a given length. *)
-val dummy : int -> action
+(** Return a dummy action of a given shape. *)
+val dummy : shape -> action
 
 (*------------------------------------------------------------------*)
 (** {2 Action symbols}
@@ -120,9 +122,10 @@ type descr = {
   action    : action ;
   input     : Channel.t * string ;
   indices   : Vars.index list ;
-  condition : Vars.index list * Term.formula ;
+  condition : Vars.index list * Term.message ;
   updates   : (Term.state * Term.message) list ;
-  output    : Channel.t * Term.message
+  output    : Channel.t * Term.message;
+  globals : Symbols.macro Symbols.t list;
 }
 
 (** [pi_descr s a] returns the projection of the description. As descriptions
@@ -132,6 +135,8 @@ type descr = {
    the action.  *)
 val pi_descr : Term.projection -> descr -> descr
 
+(** Refresh (globally) binded variables in a description. *)
+val refresh_descr : descr -> descr
 
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printing} *)
@@ -163,3 +168,27 @@ val subst_action : Term.subst -> action -> action
 
 (** Apply a substitution to a description. *)
 val subst_descr : Term.subst -> descr -> descr
+
+(** Apply an iterator to the terms of a description. *)
+val apply_descr : (Vars.env -> Term.message -> Term.message) -> descr -> descr
+
+
+(*------------------------------------------------------------------*)
+(** {2 FA-DUP } *)
+
+(** [is_dup is_eq t terms] check if:
+    - [t] appears twice in [terms];
+    - or if [t] is [input\@t] with [frame\@t'] appearing in [terms]
+      where [pred(t) <= t'];
+    - or if [t] is [exec\@t] with [frame\@t'] appearing in [terms]
+      where with [t <= t']. *)
+val is_dup :
+  Symbols.table -> Term.message -> Term.message list
+  -> bool
+
+(** Same as [is_dup], but instead of checking term equality, checks
+    that term matchs. *)
+val is_dup_match :
+  (Term.eterm -> Term.eterm -> 'a -> 'a option) -> 'a ->
+  Symbols.table -> Term.message -> Term.message list
+  -> 'a option

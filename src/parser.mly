@@ -1,56 +1,72 @@
 %{
   module L  = Location
   module T  = Tactics
+
+  let sloc startpos endpos s =
+    let loc = L.make startpos endpos in
+    L.mk_loc loc s
+
+  let mk_abstract loc s args = T.Abstract (L.mk_loc loc s, args)
 %}
 
 %token <int> INT
 %token <string> ID   /* general purpose identifier */
+%token <string> INFIXSYMB   /* infix function symbols */
 %token <string> BANG
 %token AT PRED
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
 %token LANGLE RANGLE
-%token AND OR NOT TRUE FALSE HAPPENS
-%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS XOR STAR UNDERSCORE QMARK
+%token GAND GOR AND OR NOT TRUE FALSE HAPPENS
+%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS COLONEQ
+%token XOR STAR UNDERSCORE QMARK TICK
 %token LET IN IF THEN ELSE FIND SUCHTHAT
-%token DIFF LEFT RIGHT NONE SEQ EXP
+%token TILDE DIFF LEFT RIGHT SEQ
 %token NEW OUT PARALLEL NULL
-%token CHANNEL TERM PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT
+%token CHANNEL PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT TYPE FUN
 %token MUTABLE SYSTEM SET
-%token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
+%token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW RARROW
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
-%token DOT SLASH BANGU SLASHEQUAL SLASHSLASH
-%token WITH ORACLE EXN
-%token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
-%token REWRITE REVERT CLEAR GENERALIZE DEPENDS
-%token BY INTRO AS DESTRUCT
-%token PROOF QED UNDO ABORT
+%token LOCAL GLOBAL
+%token DOT SLASH BANGU SLASHEQUAL SLASHSLASH SLASHSLASHEQUAL ATSLASH
+%token TIME WHERE WITH ORACLE EXN
+%token LARGE NAMEFIXEDLENGTH
+%token PERCENT
+%token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE
+%token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY
+%token SPLITSEQ CONSTSEQ MEMSEQ
+%token BY INTRO AS DESTRUCT REMEMBER INDUCTION
+%token PROOF QED UNDO ABORT HINT
+%token RENAME GPRF GCCA
+%token INCLUDE
+%token TICKUNDERSCORE
 %token EOF
 
 %nonassoc QUANTIF
 %right ARROW
 %right DARROW
 %right DEQUIVARROW
-%left OR
-%left AND
+%left AND OR
+%left GAND GOR
 
-%nonassoc TRUE SEQ PRED NOT LPAREN INIT ID HAPPENS FALSE DIFF
+%nonassoc TRUE SEQ PRED NOT LPAREN INIT ID UNDERSCORE HAPPENS FALSE DIFF
 
 %nonassoc EQ NEQ GEQ LEQ LANGLE RANGLE
 
 %nonassoc empty_else
 %nonassoc ELSE
 
+%left INFIXSYMB
+
 %left XOR
-%left EXP
 
 %nonassoc AT
 
 %nonassoc tac_prec
 
+%nonassoc BY
 %left PLUS
 %right SEMICOLON
-%nonassoc BY
 %nonassoc REPEAT
 %nonassoc TRY
 %nonassoc NOSIMPL
@@ -66,13 +82,16 @@
 
 %%
 
-(* Ls *)
+(* Locations *)
 %inline loc(X):
 | x=X {
     { L.pl_desc = x;
       L.pl_loc  = L.make $startpos $endpos;
     }
   }
+
+%inline lloc(X):
+| X { L.make $startpos $endpos }
 
 (* Lists *)
 %inline empty:
@@ -84,29 +103,33 @@
 %inline slist1(X, S):
 | l=separated_nonempty_list(S, X) { l }
 
-
 (* Terms *)
 lsymb:
 | id=loc(ID) { id }
 
 /* non-ambiguous term */
 sterm_i:
-| LPAREN t=term_i RPAREN          { t }
-| id=lsymb                        { Theory.App (id, []) }
+| LPAREN t=term_i RPAREN        { t }
+| id=lsymb                      { Theory.App (id, []) }
+| UNDERSCORE                    { Theory.Tpat }
 
 | LANGLE t=term COMMA t0=term RANGLE
-    { let loc = L.make $startpos $endpos in
-      let fsymb = L.mk_loc loc "pair" in
+    { let fsymb = sloc $startpos $endpos "pair" in
       Theory.App (fsymb, [t;t0]) }
 
 /* formula */
 
 | DIFF LPAREN t=term COMMA t0=term RPAREN { Theory.Diff (t,t0) }
-| SEQ LPAREN i=ids ARROW t=term RPAREN    { Theory.Seq (i,t) }
 
-| NOT f=sterm                             { Theory.Not (f) }
-| FALSE                                   { Theory.False }
-| TRUE                                    { Theory.True }
+| SEQ LPAREN vs=arg_list ARROW t=term RPAREN    { Theory.Seq (vs,t) }
+
+| l=loc(NOT) f=sterm
+    { let fsymb = L.mk_loc (L.loc l) "not" in
+      Theory.App (fsymb,[f]) }
+
+| l=lloc(FALSE)  { Theory.App (L.mk_loc l "false",[]) }
+
+| l=lloc(TRUE)   { Theory.App (L.mk_loc l "true",[]) }
 
 | HAPPENS LPAREN ts=slist1(term,COMMA) RPAREN
                                           { Theory.Happens ts }
@@ -116,6 +139,13 @@ sterm_i:
 | PRED LPAREN ts=term RPAREN             { Theory.Tpred ts }
 | INIT                                   { Theory.Tinit }
 
+%inline infix_s:
+| AND         { "&&"  }
+| OR          { "||"   }
+| s=INFIXSYMB { s }
+| XOR         { "xor"  }
+| DARROW      { "=>" }
+
 /* ambiguous term */
 term_i:
 | f=sterm_i                                  { f }
@@ -123,41 +153,35 @@ term_i:
 | id=lsymb AT ts=term                        { Theory.AppAt (id,[],ts) }
 | id=lsymb terms=term_list1 AT ts=term       { Theory.AppAt (id,terms,ts) }
 
-| t=term XOR t0=term
-    { let loc = L.make $startpos $endpos in
-      let fsymb = L.mk_loc loc "xor" in
-      Theory.App (fsymb,  [t;t0]) }
+| t=term s=loc(infix_s) t0=term             { Theory.App (s, [t;t0]) }
 
-| t=term EXP t0=term
+| f=term l=lloc(DEQUIVARROW) f0=term
     { let loc = L.make $startpos $endpos in
-      let fsymb = L.mk_loc loc "exp" in
-      Theory.App (fsymb,  [t;t0])}
- 
+      let fi = L.mk_loc l "=>" in
+      let fa = L.mk_loc l "&&"  in
+      Theory.App (fa, [L.mk_loc loc (Theory.App (fi, [f;f0]));
+                       L.mk_loc loc (Theory.App (fi, [f0;f]))]) }
+
 | IF b=term THEN t=term t0=else_term
-                                          { Theory.ITE (b,t,t0) }
+    { let fsymb = sloc $startpos $endpos "if" in
+      Theory.App (fsymb,  [b;t;t0]) }
 
-| FIND is=indices SUCHTHAT b=term IN t=term t0=else_term
+| FIND is=opt_indices SUCHTHAT b=term IN t=term t0=else_term
                                           { Theory.Find (is,b,t,t0) }
 
-
-| f=term AND f0=term                { Theory.And (f,f0) }
-| f=term OR f0=term                 { Theory.Or (f,f0) }
-| f=term DARROW f0=term             { Theory.Impl (f,f0) }
 | f=term o=ord f0=term                    { Theory.Compare (o,f,f0) }
 
 | EXISTS LPAREN vs=arg_list RPAREN sep f=term %prec QUANTIF
                                  { Theory.Exists (vs,f)  }
+
 | FORALL LPAREN vs=arg_list RPAREN sep f=term %prec QUANTIF
                                  { Theory.ForAll (vs,f)  }
-| EXISTS id=lsymb COLON k=kind sep f=term %prec QUANTIF
-                                 { Theory.Exists ([id,k],f)  }
-| FORALL id=lsymb COLON k=kind sep f=term %prec QUANTIF
-                                 { Theory.ForAll ([id,k],f)  }
 
-| f=term DEQUIVARROW f0=term
-    { let loc = L.make $startpos $endpos in
-      Theory.And (L.mk_loc loc (Theory.Impl (f,f0)),
-                  L.mk_loc loc (Theory.Impl (f0,f))) }
+| EXISTS a=arg sep f=term %prec QUANTIF
+                                 { Theory.Exists (a,f)  }
+
+| FORALL a=arg sep f=term %prec QUANTIF
+                                 { Theory.ForAll (a,f)  }
 
 /* non-ambiguous term */
 %inline else_term:
@@ -194,16 +218,13 @@ tm_list:
 | GEQ                            { `Geq }
 | RANGLE                         { `Gt }
 
-kind:
-| INDEX                          { Sorts.eindex }
-| MESSAGE                        { Sorts.emessage }
-| BOOLEAN                        { Sorts.eboolean }
-| TIMESTAMP                      { Sorts.etimestamp }
+arg:
+| is=ids COLON k=p_ty                     { List.map (fun x -> x,k) is }
 
 arg_list:
 |                                         { [] }
-| is=ids COLON k=kind                     { List.map (fun x -> x,k) is }
-| is=ids COLON k=kind COMMA args=arg_list { List.map (fun x -> x,k) is @ args }
+| is=ids COLON k=p_ty                     { List.map (fun x -> x,k) is }
+| is=ids COLON k=p_ty COMMA args=arg_list { List.map (fun x -> x,k) is @ args }
 
 ids:
 | id=lsymb                             { [id] }
@@ -216,34 +237,58 @@ sep:
 |       {()}
 | COMMA {()}
 
+(* higher-order terms *)
+
+hterm_i:
+| FUN LPAREN args=arg_list RPAREN ARROW t=term { Theory.Lambda (args,t) }
+
+hterm:
+| t=loc(hterm_i) { t }
+
 (* Processes *)
 
 top_process:
 | p=process EOF                    { p }
+
+colon_ty:
+| COLON t=p_ty { t }
 
 process_i:
 | NULL                             { Process.Null }
 | LPAREN ps=processes_i RPAREN     { ps }
 | id=lsymb terms=term_list         { Process.Apply (id,terms) }
 | id=lsymb COLON p=process         { Process.Alias (p,id) }
-| NEW id=lsymb SEMICOLON p=process { Process.New (id,p) }
+
+| NEW id=lsymb ty=colon_ty? SEMICOLON p=process
+    { let ty = match ty with
+        | Some ty -> ty
+        | None -> L.mk_loc (L.loc id) Theory.P_message
+      in
+      Process.New (id,ty,p) }
+
 | IN LPAREN c=lsymb COMMA id=lsymb RPAREN p=process_cont
     { Process.In (c,id,p) }
+
 | OUT LPAREN c=lsymb COMMA t=term RPAREN p=process_cont
     { Process.Out (c,t,p) }
+
 | IF f=term THEN p=process p0=else_process
     { Process.Exists ([],f,p,p0) }
-| FIND is=indices SUCHTHAT f=term IN p=process p0=else_process
+
+| FIND is=opt_indices SUCHTHAT f=term IN p=process p0=else_process
     { Process.Exists (is,f,p,p0) }
-| LET id=lsymb EQ t=term IN p=process
-    { Process.Let (id,t,p) }
-| id=lsymb terms=term_list ASSIGN t=term p=process_cont
+
+| LET id=lsymb ty=colon_ty? EQ t=term IN p=process
+    { Process.Let (id,t,ty,p) }
+
+| id=lsymb terms=term_list COLONEQ t=term p=process_cont
     { let to_idx t = match L.unloc t with
         | Theory.App(x,[]) -> x
         | ti -> raise @@ Theory.Conv (L.loc t, Theory.Index_not_var ti)
       in
       let l = List.map to_idx terms in
       Process.Set (id,l,t,p) }
+
 | s=loc(BANG) p=process { Process.Repl (s,p) }
 
 process:
@@ -267,78 +312,145 @@ indices:
 | id=lsymb                          { [id] }
 | id=lsymb COMMA ids=indices        { id::ids }
 
+
+opt_indices:
+|                                   { [] }
+| id=lsymb                          { [id] }
+| id=lsymb COMMA ids=indices        { id::ids }
+
+
 opt_arg_list:
 | LPAREN args=arg_list RPAREN    { args }
 |                                { [] }
 
 name_type:
-| MESSAGE                        { 0 }
-| INDEX ARROW t=name_type        { 1 + t }
+| ty=p_ty                     { 0,ty }
+| INDEX ARROW t=name_type     { let i,ty = t in
+                                1 + i,ty }
 
-msg_or_bool:
-| MESSAGE                        { Sorts.emessage }
-| BOOLEAN                        { Sorts.eboolean }
-
-/* state_type:
-| t=msg_or_bool                  { 0, t }
-| INDEX ARROW t=state_type       { let n,k = t in n+1,k } */
-
-msg_type:
-| MESSAGE                        { 0 }
-| MESSAGE ARROW t=msg_type       { 1 + t }
-
-abs_type:
-| t=msg_type                     { 0,t }
-| INDEX ARROW t=abs_type         { let i,m = t in i+1,m }
+ty_var:
+| TICK id=lsymb     { id }
 
 index_arity:
 |                                { 0 }
 | LPAREN i=INT RPAREN            { i }
 
+p_ty_i:
+| MESSAGE      { Theory.P_message }
+| INDEX        { Theory.P_index }
+| TIMESTAMP    { Theory.P_timestamp }
+| BOOLEAN      { Theory.P_boolean }
+| tv=ty_var    { Theory.P_tvar tv }
+| l=lsymb      { Theory.P_tbase l }
+
+p_ty:
+| ty=loc(p_ty_i) { ty }
+
+fun_ty:
+| l=slist1(p_ty,ARROW)      { l }
+
+/* crypto assumption typed space */
+c_ty:
+| l=lsymb COLON ty=p_ty { Decl.{ cty_space = l;
+                                 cty_ty    = ty; } }
+
+/* crypto assumption typed space */
+c_tys:
+| WHERE list=slist1(c_ty, empty) { list }
+|                                { [] }
+
+ty_args:
+|                                          { [] }
+| LBRACKET ids=slist1(ty_var,empty) RBRACKET { ids }
+
+bty_info:
+| NAMEFIXEDLENGTH { Symbols.Ty_name_fixed_length }
+| LARGE           { Symbols.Ty_large }
+
+bty_infos:
+| LBRACKET l=slist(bty_info,COMMA) RBRACKET { l }
+|                                           { [] }
+
+lsymb_decl:
+| id=lsymb                       { `Prefix, id }
+| LPAREN s=loc(INFIXSYMB) RPAREN { `Infix, s }
+
 declaration_i:
-| HASH e=lsymb a=index_arity
-                          { Decl.Decl_hash (Some a, e, None) }
+| HASH e=lsymb a=index_arity ctys=c_tys
+                          { Decl.Decl_hash (Some a, e, None, ctys) }
+
 | HASH e=lsymb WITH ORACLE f=term
-                          { Decl.Decl_hash (None, e, Some f) }
-| AENC e=lsymb COMMA d=lsymb COMMA p=lsymb
-                          { Decl.Decl_aenc (e, d, p) }
-| SENC e=lsymb COMMA d=lsymb
-                          { Decl.Decl_senc (e, d) }
-| SENC e=lsymb COMMA d=lsymb WITH h=lsymb
+                          { Decl.Decl_hash (None, e, Some f, []) }
+
+| AENC e=lsymb COMMA d=lsymb COMMA p=lsymb ctys=c_tys
+                          { Decl.Decl_aenc (e, d, p, ctys) }
+
+| SENC e=lsymb COMMA d=lsymb ctys=c_tys
+                          { Decl.Decl_senc (e, d, ctys) }
+
+| SENC e=lsymb COMMA d=lsymb WITH HASH h=lsymb
                           { Decl.Decl_senc_w_join_hash (e, d, h) }
+
+| SIGNATURE s=lsymb COMMA c=lsymb COMMA p=lsymb ctys=c_tys
+                          { Decl.Decl_sign (s, c, p, None, ctys) }
+
 | SIGNATURE s=lsymb COMMA c=lsymb COMMA p=lsymb
-                          { Decl.Decl_sign (s, c, p, None) }
-| SIGNATURE s=lsymb COMMA c=lsymb COMMA p=lsymb
-  WITH ORACLE f=term   { Decl.Decl_sign (s, c, p, Some f) }
+  WITH ORACLE f=term
+                          { Decl.Decl_sign (s, c, p, Some f, []) }
+
+| DDH g=lsymb COMMA ei=lsymb_decl ctys=c_tys
+    { let e, f_info = ei in
+      Decl.Decl_ddh (g,(f_info,e), ctys) }
+
 | NAME e=lsymb COLON t=name_type
-                          { Decl.Decl_name (e, t) }
-| ABSTRACT e=lsymb COLON t=abs_type
-                          { let index_arity,message_arity = t in
-                            Decl.(Decl_abstract
-                                    { name = e;
-                                      index_arity=index_arity;
-                                      message_arity=message_arity;}) }
-| MUTABLE e=lsymb args=opt_arg_list COLON typ=msg_or_bool EQ t=term
+                          { let a,ty = t in
+                            Decl.Decl_name (e, a, ty) }
+
+| TYPE e=lsymb infos=bty_infos
+                          { Decl.Decl_bty { bty_name = e; bty_infos = infos; } }
+
+| ABSTRACT e=lsymb_decl a=ty_args COLON t=fun_ty
+    { let symb_type, name = e in
+      Decl.(Decl_abstract
+              { name      = name;
+                symb_type = symb_type;
+                ty_args   = a;
+                abs_tys   = t; }) }
+
+| MUTABLE e=lsymb args=opt_arg_list COLON typ=p_ty EQ t=term
                           { Decl.Decl_state (e, args, typ, t) }
+
 | CHANNEL e=lsymb         { Decl.Decl_channel e }
-| TERM e=lsymb args=opt_arg_list COLON typ=msg_or_bool EQ t=term
-                          { Decl.Decl_macro (e, args, typ, t) }
+
 | PROCESS e=lsymb args=opt_arg_list EQ p=process
                           { Decl.Decl_process (e, args, p) }
-| AXIOM s=bsystem f=term
-                          { Decl.(Decl_axiom { gname = None;
-                                               gsystem = s;
-                                               gform = f; }) }
-| AXIOM s=bsystem i=lsymb COLON f=term
-                          { Decl.(Decl_axiom { gname = Some i;
-                                               gsystem = s;
-                                               gform = f; }) }
+
+|        AXIOM s=local_statement  { Decl.Decl_axiom s }
+|  LOCAL AXIOM s=local_statement  { Decl.Decl_axiom s }
+| GLOBAL AXIOM s=global_statement { Decl.Decl_axiom s }
+
 | SYSTEM p=process
                           { Decl.(Decl_system { sname = None;
                                                 sprocess = p}) }
+
 | SYSTEM LBRACKET id=lsymb RBRACKET p=process
                           { Decl.(Decl_system { sname = Some id;
                                                 sprocess = p}) }
+
+| SYSTEM id=lsymb EQ from_sys=system WITH RENAME gf=global_formula
+                          { Decl.(Decl_system_modifier { from_sys = from_sys;
+                                                         modifier = Rename gf;
+			                                 name = id}) }
+
+| SYSTEM id=lsymb EQ from_sys=system WITH GPRF args=opt_arg_list COMMA hash=term
+                          { Decl.(Decl_system_modifier { from_sys = from_sys;
+                                                         modifier = PRF (args, hash);
+			                                 name = id}) }
+
+| SYSTEM id=lsymb EQ from_sys=system WITH GCCA args=opt_arg_list COMMA enc=term
+                          { Decl.(Decl_system_modifier { from_sys = from_sys;
+                                                         modifier = CCA (args, enc);
+			                                 name = id}) }
 
 declaration:
 | ldecl=loc(declaration_i)                  { ldecl }
@@ -352,7 +464,7 @@ declarations:
 
 tactic_param:
 | f=term %prec tac_prec  { TacticsArgs.Theory f }
-| i=INT                  { TacticsArgs.Int_parsed i }
+| i=loc(INT)             { TacticsArgs.Int_parsed i }
 
 tactic_params:
 |                                       { [] }
@@ -370,13 +482,29 @@ rw_dir:
 | MINUS { `RightToLeft }
 
 rw_type:
-| f=sterm        { `Form f }  
-| SLASH t=sterm  { `Expand t }
+| pt=spt             { `Rw pt }
+| SLASH t=sterm      { `Expand t }
+| SLASH l=lloc(STAR)  { `ExpandAll l }
+
+expnd_type:
+| ATSLASH t=sterm      { `Expand t }
+| ATSLASH l=lloc(STAR)  { `ExpandAll l }
 
 rw_item:
-| m=rw_mult d=loc(rw_dir) t=rw_type  { TacticsArgs.{ rw_mult = m; 
-                                                     rw_dir = d; 
+| m=rw_mult d=loc(rw_dir) t=rw_type  { TacticsArgs.{ rw_mult = m;
+                                                     rw_dir = d;
                                                      rw_type = t; } }
+
+rw_equiv_item:
+| d=loc(rw_dir) pt=p_pt  { TacticsArgs.{ rw_mult = `Once;
+                                         rw_dir = d;
+                                         rw_type = `Rw pt; } }
+
+expnd_item:
+| d=loc(rw_dir) t=expnd_type  { TacticsArgs.{ rw_mult = `Once;
+                                              rw_dir = d;
+                                              rw_type = t; } }
+
 
 rw_arg:
 | r=rw_item { TacticsArgs.R_item r }
@@ -385,16 +513,18 @@ rw_arg:
 rw_args:
 | l=slist1(rw_arg, empty) { l }
 
-rw_in:
-|                          { None }
-| IN l=slist1(lsymb,COMMA) { Some (`Hyps l) }
-| IN STAR                  { Some `All }
+single_target:
+| id=lsymb { id }
+| i=loc(int)    { L.mk_loc (L.loc i) (string_of_int (L.unloc i)) }
 
-(*------------------------------------------------------------------*)
-tac_errors:
-|                         { [] }
-| i=ID                    { [i] }
-| i=ID COMMA t=tac_errors { i::t }
+in_target:
+|                                  { `Goal }
+| IN l=slist1(single_target,COMMA) { `Hyps l }
+| IN STAR                          { `All }
+
+apply_in:
+|             { None }
+| IN id=lsymb { Some id }
 
 (*------------------------------------------------------------------*)
 naming_pat:
@@ -409,18 +539,26 @@ and_or_pat:
                     { TacticsArgs.Or  (s :: ips) }
 | LBRACKET RBRACKET { TacticsArgs.Split }
 
+ip_rw_dir:
+| ARROW  { `LeftToRight }
+| RARROW { `RightToLeft }
+
 simpl_pat:
 | n_ip=naming_pat  { TacticsArgs.SNamed n_ip }
 | ao_ip=and_or_pat { TacticsArgs.SAndOr ao_ip }
+| d=loc(ip_rw_dir) { TacticsArgs.Srewrite d }
 
 s_item:
-| l=loc(SLASHSLASH) { TacticsArgs.Tryauto  (L.loc l)}
-| l=loc(SLASHEQUAL) { TacticsArgs.Simplify (L.loc l)}
+| l=loc(SLASHSLASH)      { TacticsArgs.Tryauto      (L.loc l)}
+| l=loc(SLASHEQUAL)      { TacticsArgs.Simplify     (L.loc l)}
+| l=loc(SLASHSLASHEQUAL) { TacticsArgs.Tryautosimpl (L.loc l)}
 
 intro_pat:
 | s=s_item      { TacticsArgs.SItem (s) }
 | l=loc(STAR)   { TacticsArgs.Star  (L.loc l)}
+| l=loc(RANGLE) { TacticsArgs.StarV (L.loc l)}
 | pat=simpl_pat { TacticsArgs.Simpl pat }
+| e=expnd_item  { TacticsArgs.SExpnd e }
 
 intro_pat_list:
 | l=slist1(intro_pat,empty) { l }
@@ -432,17 +570,82 @@ int:
 selector:
 | l=slist1(int,COMMA) { l }
 
-tac_formula:
+tac_term:
 | f=term  %prec tac_prec { f }
 
 as_ip:
 | AS ip=simpl_pat { ip }
+
+as_n_ips:
+| AS n_ips=slist1(naming_pat, empty) { n_ips }
 
 %inline sel_tac:
 | s=selector COLON r=tac { (s,r) }
 
 sel_tacs:
 | l=slist1(sel_tac,PARALLEL) { l }
+
+p_pt_arg:
+| t=sterm                        { Theory.PT_term t }
+/* Note: some terms parsed as [sterm] may be resolved as [PT_sub]
+   later, using the judgement hypotheses. */
+
+| LPAREN PERCENT pt=p_pt RPAREN  { Theory.PT_sub pt }
+| l=lloc(TICKUNDERSCORE)         { Theory.PT_obl l }
+
+p_pt:
+| head=lsymb args=slist(p_pt_arg,empty)
+    { let p_pt_loc = L.make $startpos $endpos in
+      Theory.{ p_pt_head = head; p_pt_args = args; p_pt_loc; } }
+
+/* legacy syntax for use tactic */
+pt_use_tac:
+| hid=lsymb
+    { Theory.{ p_pt_head = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
+| hid=lsymb WITH args=slist1(tac_term,COMMA)
+    { let p_pt_loc = L.make $startpos $endpos in
+      let args = List.map (fun x -> Theory.PT_term x) args in
+      Theory.{ p_pt_head = hid; p_pt_args = args; p_pt_loc; } }
+
+/* non-ambiguous pt */
+spt:
+| hid=lsymb
+    { Theory.{ p_pt_head = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
+| LPAREN pt=p_pt RPAREN
+    { pt }
+
+constseq_arg:
+| LPAREN b=hterm RPAREN t=sterm { (b,t) }
+
+(*------------------------------------------------------------------*)
+%inline generalize_dependent:
+| GENERALIZE DEPENDENT { }
+
+%inline dependent_induction:
+| DEPENDENT INDUCTION { }
+
+%inline rewrite_equiv:
+| REWRITE EQUIV { }
+
+%inline assert_tac:
+| l=lloc(ASSERT) p=tac_term ip=as_ip?
+    { let ip = match ip with
+        | None -> []
+        | Some ip -> [TacticsArgs.SimplPat ip] in
+      mk_abstract l "assert" (TacticsArgs.Theory p :: ip) }
+
+| l=lloc(ASSERT) LPAREN ip=simpl_pat COLON p=tac_term RPAREN
+    { let ip = [TacticsArgs.SimplPat ip] in
+      mk_abstract l "assert" (TacticsArgs.Theory p :: ip) }
+
+(*------------------------------------------------------------------*)
+/* tactics named arguments */
+
+named_arg:
+| TILDE l=lsymb { TacticsArgs.NArg l }
+
+named_args:
+| args=slist(named_arg, empty) { args }
 
 (*------------------------------------------------------------------*)
 tac:
@@ -452,125 +655,155 @@ tac:
                                        { T.AndThenSel (l,sls) }
   | l=tac SEMICOLON sl=sel_tac %prec tac_prec
                                        { T.AndThenSel (l,[sl]) }
-  | BY t=tac %prec tac_prec            { T.By t }
+  | l=lloc(BY) t=tac                   { T.By (t,l) }
   | l=tac PLUS r=tac                   { T.OrElse [l;r] }
   | TRY l=tac                          { T.Try l }
   | REPEAT t=tac                       { T.Repeat t }
-  | id=ID t=tactic_params              { T.Abstract (id,t) }
+  | id=lsymb t=tactic_params           { mk_abstract (L.loc id) (L.unloc id) t }
 
   (* Special cases for tactics whose names are not parsed as ID
    * because they are reserved. *)
 
-  | LEFT                               { T.Abstract ("left",[]) }
-  | RIGHT                              { T.Abstract ("right",[]) }
+  | l=lloc(LEFT)                       { mk_abstract l "left"  [] }
+  | l=lloc(RIGHT)                      { mk_abstract l "right" [] }
 
-  | INTRO p=intro_pat_list             { T.Abstract
-                                           ("intro",[TacticsArgs.IntroPat p]) }
+  | l=lloc(INTRO) p=intro_pat_list
+    { mk_abstract l "intro" [TacticsArgs.IntroPat p] }
 
-  | t=tac DARROW p=intro_pat_list      { T.AndThen
-                                           [t;T.Abstract
-                                                ("intro",[TacticsArgs.IntroPat p])] }
+  | t=tac l=lloc(DARROW) p=intro_pat_list
+    { T.AndThen [t; mk_abstract l "intro" [TacticsArgs.IntroPat p]] }
 
-  | DESTRUCT i=lsymb                   { T.Abstract
-                                           ("destruct",[TacticsArgs.String_name i]) }
+  | l=lloc(DESTRUCT) i=lsymb
+    { mk_abstract l "destruct" [TacticsArgs.String_name i] }
 
-  | DESTRUCT i=lsymb AS p=and_or_pat   { T.Abstract
-                                           ("destruct",[TacticsArgs.String_name i;
-                                                        TacticsArgs.AndOrPat p]) }
+  | l=lloc(DESTRUCT) i=lsymb AS p=and_or_pat
+    { mk_abstract l "destruct" [TacticsArgs.String_name i;
+                                TacticsArgs.AndOrPat p] }
 
-  | DEPENDS args=tactic_params         { T.Abstract ("depends",args) }
-  | DEPENDS args=tactic_params BY t=tac
-                                       { T.AndThenSel
-                                           (T.Abstract ("depends",args), 
-                                            [[1], t]) }
+  | l=lloc(DEPENDS) args=tactic_params
+    { mk_abstract l "depends" args }
 
-  | EXISTS t=tactic_params             { T.Abstract
-                                          ("exists",t) }
-  | NOSIMPL t=tac                      { T.Modifier
-                                          ("nosimpl", t) }
-  | CYCLE i=INT                        { T.Abstract
-                                         ("cycle",[TacticsArgs.Int_parsed i]) }
-  | CYCLE MINUS i=INT                  { T.Abstract
-                                         ("cycle",[TacticsArgs.Int_parsed (-i)]) }
-  | CHECKFAIL t=tac EXN ts=tac_errors  { T.CheckFail
-                                         (T.tac_error_of_strings  ts,t) }
+  | l=lloc(DEPENDS) args=tactic_params l1=lloc(BY) t=tac
+    { T.AndThenSel (mk_abstract l "depends" args, [[1], T.By (t,l1)]) }
 
-  | REVERT ids=slist1(lsymb, empty)     
+  | l=lloc(REMEMBER) t=term AS id=lsymb
+    { mk_abstract l "remember" [TacticsArgs.Remember (t, id)] }
+
+  | l=lloc(EXISTS) t=tactic_params
+    { mk_abstract l "exists" t }
+
+  | NOSIMPL t=tac                      { T.Modifier ("nosimpl", t) }
+  | TIME t=tac  %prec tac_prec         { T.Time t }
+
+  | l=lloc(CYCLE) i=loc(INT)
+    { mk_abstract l "cycle" [TacticsArgs.Int_parsed i] }
+
+  | l=lloc(CYCLE) MINUS i=loc(INT)
+    { let im = L.mk_loc (L.loc i) (- (L.unloc i)) in
+      mk_abstract l "cycle" [TacticsArgs.Int_parsed im] }
+
+  | CHECKFAIL t=tac EXN ts=ID  { T.CheckFail (ts, t) }
+
+  | l=lloc(REVERT) ids=slist1(lsymb, empty)
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
-      T.Abstract ("revert", ids) }
+      mk_abstract l "revert" ids }
 
-  | GENERALIZE ids=slist1(sterm, empty)     
-    { let ids = List.map (fun id -> TacticsArgs.Theory id) ids in
-      T.Abstract ("generalize", ids) }
+  | l=lloc(GENERALIZE) terms=slist1(sterm, empty) n_ips_o=as_n_ips?
+    { mk_abstract l "generalize" [TacticsArgs.Generalize (terms, n_ips_o)] }
 
-  | CLEAR ids=slist1(lsymb, empty)     
+  | l=lloc(generalize_dependent) terms=slist1(sterm, empty) n_ips_o=as_n_ips?
+    { mk_abstract l "generalize dependent"
+                  [TacticsArgs.Generalize (terms, n_ips_o)] }
+
+  | l=lloc(INDUCTION) t=tactic_params
+    { mk_abstract l "induction" t}
+
+  | l=lloc(dependent_induction) t=tactic_params
+    { mk_abstract l "dependent induction" t }
+
+  | l=lloc(CLEAR) ids=slist1(lsymb, empty)
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
-      T.Abstract ("clear", ids) }
+      mk_abstract l "clear" ids }
 
-  | ASSERT p=tac_formula ip=as_ip?
-    { let ip = match ip with
-        | None -> []
-        | Some ip -> [TacticsArgs.SimplPat ip] in
-      T.Abstract ("assert", TacticsArgs.Theory p::ip) }
+  (*------------------------------------------------------------------*)
+  /* assert a formula */
+  | t=assert_tac { t }
 
-  | USE i=lsymb ip=as_ip?
-    { let ip = match ip with
-        | None -> []
-        | Some ip -> [TacticsArgs.SimplPat ip] in
-      T.Abstract ("use", ip @ [TacticsArgs.String_name i]) }
+  | t=assert_tac l=lloc(BY) t1=tac
+    { T.AndThenSel (t, [[1], T.By (t1,l)]) }
 
-  | USE i=lsymb WITH t=tactic_params ip=as_ip?
-    { let ip : TacticsArgs.parser_arg list = match ip with
-        | None -> []
-        | Some ip -> [TacticsArgs.SimplPat ip] in
-      T.Abstract ("use", ip @ [TacticsArgs.String_name i] @ t) }
+  | l=lloc(USE) pt=pt_use_tac ip=as_ip?
+    { mk_abstract l "assert" [TacticsArgs.AssertPt (pt, ip, `IntroImpl)] }
 
-  | REWRITE p=rw_args w=rw_in
-    { T.Abstract ("rewrite", [TacticsArgs.RewriteIn (p, w)]) }
+  (*------------------------------------------------------------------*)
+  /* assert a proof term */
+  | l=lloc(ASSERT) LPAREN ip=simpl_pat? COLONEQ pt=p_pt RPAREN
+    { mk_abstract l "assert" [TacticsArgs.AssertPt (pt, ip, `None)] }
 
-  | DDH i1=lsymb COMMA i2=lsymb COMMA i3=lsymb  { T.Abstract
-                                          ("ddh",
-                                           [TacticsArgs.String_name i1;
-					                                  TacticsArgs.String_name i2;
-					                                  TacticsArgs.String_name i3;
-				                                   ]) }
+  (*------------------------------------------------------------------*)
+  | l=lloc(REWRITE) p=rw_args w=in_target
+    { mk_abstract l "rewrite" [TacticsArgs.RewriteIn (p, w)] }
 
-  | HELP                               { T.Abstract
-                                          ("help",
-                                           []) }
+  | l=lloc(rewrite_equiv) p=rw_equiv_item
+    { mk_abstract l "rewrite equiv" [TacticsArgs.RewriteEquiv (p)] }
 
-  | HELP i=lsymb                          { T.Abstract
-                                          ("help",
-                                           [TacticsArgs.String_name i]) }
+  | l=lloc(APPLY) a=named_args t=p_pt w=apply_in
+    { mk_abstract l "apply" [TacticsArgs.ApplyIn (a, t, w)] }
 
-  | HELP h=help_tac
-   { T.Abstract ("help",[TacticsArgs.String_name h]) }
+  | l=lloc(SPLITSEQ) i=loc(INT) COLON LPAREN ht=hterm RPAREN
+    { mk_abstract l "splitseq" [TacticsArgs.SplitSeq (i, ht)] }
+
+  | l=lloc(CONSTSEQ) i=loc(INT) COLON terms=slist1(constseq_arg, empty)
+    { mk_abstract l "constseq" [TacticsArgs.ConstSeq (i, terms)] }
+
+  | l=lloc(MEMSEQ) i=loc(INT) j=loc(INT)
+    { mk_abstract l "memseq" [TacticsArgs.MemSeq (i, j)] }
+
+  | l=lloc(DDH) g=lsymb COMMA i1=lsymb COMMA i2=lsymb COMMA i3=lsymb
+    { mk_abstract l "ddh"
+         [TacticsArgs.String_name g;
+          TacticsArgs.String_name i1;
+					TacticsArgs.String_name i2;
+					TacticsArgs.String_name i3] }
+
+  | l=lloc(HELP)
+    { mk_abstract l "help" [] }
+
+  | l=lloc(HELP) i=lsymb
+    { mk_abstract l "help" [TacticsArgs.String_name i] }
+
+  | l=lloc(HELP) h=help_tac
+   { mk_abstract l "help" [TacticsArgs.String_name h] }
 
 (* A few special cases for tactics whose names are not parsed as ID
  * because they are reserved. *)
 help_tac_i:
-| LEFT       { "left"}     
-| RIGHT      { "right"}    
-| EXISTS     { "exists"}    
-| USE        { "use"}      
-| REWRITE    { "rewrite"}  
-| REVERT     { "revert"}  
-| GENERALIZE { "generalize"}  
-| DEPENDS    { "depends"}  
-| DDH        { "ddh"}      
-| ASSERT     { "assert"}   
-| DESTRUCT   { "destruct"} 
-| INTRO      { "intro"} 
+| LEFT       { "left"}
+| RIGHT      { "right"}
+| INTRO      { "intro"}
+| DESTRUCT   { "destruct"}
+| DEPENDS    { "depends"}
+| REMEMBER   { "remember"}
+| EXISTS     { "exists"}
+| REVERT     { "revert"}
+| GENERALIZE { "generalize"}
+| INDUCTION  { "induction"}
+| CLEAR      { "clear"}
+| ASSERT     { "assert"}
+| USE        { "use"}
+| REWRITE    { "rewrite"}
+| APPLY      { "apply"}
+| SPLITSEQ   { "splitseq"}
+| CONSTSEQ   { "constseq"}
+| MEMSEQ     { "memseq"}
+| DDH        { "ddh"}
+
+| DEPENDENT INDUCTION  { "dependent induction"}
+| GENERALIZE DEPENDENT { "generalize dependent"}
+| REWRITE EQUIV        { "rewrite equiv"}
 
 help_tac:
 | l=loc(help_tac_i) { l }
-
-qed:
-| QED                                 { () }
-
-abort:
-| ABORT                               { () }
-
 
 undo:
 | UNDO i=INT DOT                      { i }
@@ -578,60 +811,120 @@ undo:
 tactic:
 | t=tac DOT                           { t }
 
-equiv:
-| ei=term                 { [ei] }
-| ei=term COMMA eis=equiv { ei::eis }
+biframe:
+| ei=term                   { [ei] }
+| ei=term COMMA eis=biframe { ei::eis }
 
-equiv_form:
-| LBRACKET f=term RBRACKET      { Prover.PReach f }
-| e=equiv            { Prover.PEquiv e }
-/* | LPAREN f=equiv_form RPAREN       { f } */
-| f=equiv_form ARROW f0=equiv_form { Prover.PImpl (f,f0) }
+%inline quant:
+| FORALL { Theory.PForAll }
+| EXISTS { Theory.PExists }
+
+global_formula_i:
+| LBRACKET f=term RBRACKET         { Theory.PReach f }
+| TILDE LPAREN e=biframe RPAREN    { Theory.PEquiv e }
+| EQUIV LPAREN e=biframe RPAREN    { Theory.PEquiv e }
+| LPAREN f=global_formula_i RPAREN { f }
+
+| f=global_formula ARROW f0=global_formula { Theory.PImpl (f,f0) }
+
+| q=quant LPAREN vs=arg_list RPAREN sep f=global_formula %prec QUANTIF
+                                   { Theory.PQuant (q,vs,f)  }
+
+| f1=global_formula GAND f2=global_formula
+                                   { Theory.PAnd (f1, f2) }
+| f1=global_formula GOR f2=global_formula
+                                   { Theory.POr (f1, f2) }
+
+global_formula:
+| f=loc(global_formula_i) { f }
+
+
+/* -----------------------------------------------------------------------
+ * Systems
+ * ----------------------------------------------------------------------- */
+
+system_proj:
+| LEFT                { SystemExpr.(P_Left  default_system_name) }
+| RIGHT               { SystemExpr.(P_Right default_system_name) }
+| i=lsymb SLASH LEFT  { SystemExpr. P_Left                    i  }
+| i=lsymb SLASH RIGHT { SystemExpr. P_Right                   i  }
+
+/* A single or bi-system */
+system:
+|                                  { SystemExpr.P_SimplePair
+                                       SystemExpr.default_system_name }
+| LBRACKET i=lsymb        RBRACKET { SystemExpr. P_SimplePair i }
+| LBRACKET sp=system_proj RBRACKET { SystemExpr. P_Single sp }
+| LBRACKET s1=system_proj COMMA s2=system_proj RBRACKET
+                                   { SystemExpr. P_Pair (s1, s2) }
+
+
+/* A bi-system */
+bisystem:
+|                                  { SystemExpr.(P_SimplePair default_system_name) }
+| LBRACKET i=lsymb RBRACKET        { SystemExpr. P_SimplePair i }
+| LBRACKET s1=system_proj COMMA s2=system_proj RBRACKET
+                                   { SystemExpr. P_Pair (s1, s2) }
+
+
+/* -----------------------------------------------------------------------
+ * Statements and goals
+ * ----------------------------------------------------------------------- */
 
 args:
-|                                         { [] }
+|                                    { [] }
 | LPAREN vs0=arg_list RPAREN vs=args { vs0 @ vs }
 
-system:
-|                         { SystemExpr.(P_SimplePair default_system_name) }
-| LBRACKET LEFT RBRACKET  { SystemExpr.(P_Single (P_Left default_system_name)) }
-| LBRACKET RIGHT RBRACKET { SystemExpr.(P_Single (P_Right default_system_name)) }
-| LBRACKET NONE  COMMA i=lsymb RBRACKET { SystemExpr.(P_SimplePair i) }
-| LBRACKET LEFT  COMMA i=lsymb RBRACKET { SystemExpr.(P_Single (P_Left i)) }
-| LBRACKET RIGHT COMMA i=lsymb RBRACKET { SystemExpr.(P_Single (P_Right i)) }
+/* We use brackets to delimitate system expression and type variables,
+   which creates a conflict if statement names can be empty, which
+   we use in many examples.
+   This use of brackets for both constructs may be reconsidered in
+   the future; until then, we treat the case with an empty name
+   separately and with limitations. */
 
-bsystem:
-|                            { SystemExpr.(P_SimplePair default_system_name) }
-| LBRACKET i=lsymb RBRACKET  { SystemExpr.(P_SimplePair i) }
+statement_name:
+| i=lsymb    { Some i }
+| UNDERSCORE { None }
 
-single_system:
-| LBRACKET LEFT RBRACKET  { SystemExpr.(P_Left default_system_name)}
-| LBRACKET RIGHT RBRACKET { SystemExpr.(P_Right default_system_name)}
-| LBRACKET LEFT  COMMA i=lsymb RBRACKET { SystemExpr.(P_Left i) }
-| LBRACKET RIGHT COMMA i=lsymb RBRACKET { SystemExpr.(P_Right i)}
+local_statement:
+| system=system name=statement_name ty_vars=ty_args vars=args
+  COLON f=term
+   { let formula = Goal.Parsed.Local f in
+     Goal.Parsed.{ name; ty_vars; vars; system; formula } }
+| vars=args
+  COLON f=term
+   { let formula = Goal.Parsed.Local f in
+     let name = None in
+     let system = SystemExpr.P_SimplePair
+                    SystemExpr.default_system_name in
+     Goal.Parsed.{ name; ty_vars=[]; vars; system; formula } }
 
-gname:
-| i=lsymb    { P_named i }
-| UNDERSCORE { P_unknown }
+global_statement:
+| system=bisystem name=statement_name ty_vars=ty_args vars=args
+  COLON f=global_formula
+   { let formula = Goal.Parsed.Global f in
+     Goal.Parsed.{ name; ty_vars; vars; system; formula } }
+| vars=args
+  COLON f=global_formula
+   { let formula = Goal.Parsed.Global f in
+     let name = None in
+     let system = SystemExpr.P_SimplePair
+                    SystemExpr.default_system_name in
+     Goal.Parsed.{ name; ty_vars=[]; vars; system; formula } }
+
+obs_equiv_statement:
+| s=bisystem n=statement_name
+   { Goal.Parsed.{ name = n; system = s; ty_vars = []; vars = [];
+                   formula = Goal.Parsed.Obs_equiv } }
 
 goal_i:
-| GOAL s=system n=gname args=args COLON f=term DOT
-    { let f_i = Theory.ForAll (args, f) in
-      let fa = L.mk_loc (L.loc f) f_i in
-      Prover.Gm_goal (n, P_trace_goal (s, fa)) }
-
-| EQUIV n=gname env=args COLON f=loc(equiv_form) DOT
-                 { Prover.Gm_goal (n, P_equiv_goal (env, f)) }
-| EQUIV n=gname DOT
-                 { Prover.Gm_goal
-                     (n, P_equiv_goal_process
-                                   (SystemExpr.(P_Left  default_system_name),
-			                              SystemExpr.(P_Right default_system_name))) }
-| EQUIV b1=single_system b2=single_system n=gname DOT
-                 { Prover.Gm_goal
-                     (n, Prover.P_equiv_goal_process (b1, b2))}
-
-| PROOF          { Prover.Gm_proof }
+|        GOAL s=local_statement  DOT { s }
+|  LOCAL GOAL s=local_statement  DOT { s }
+| GLOBAL GOAL s=global_statement DOT { s }
+| EQUIV  s=obs_equiv_statement   DOT { s }
+| EQUIV system=bisystem name=statement_name vars=args COLON b=loc(biframe) DOT
+    { let f = L.mk_loc (L.loc b) (Theory.PEquiv (L.unloc b)) in
+      Goal.Parsed.{ name; system; ty_vars = []; vars; formula = Global f } }
 
 goal:
 | goal=loc(goal_i) { goal }
@@ -648,12 +941,21 @@ option_param:
 set_option:
 | SET n=ID EQ param=option_param DOT { (n, param) }
 
-interactive :
+hint:
+| HINT REWRITE id=lsymb DOT { Hint.Hint_rewrite id }
+
+p_include:
+| INCLUDE file=lsymb DOT  { file }
+
+interactive:
 | set=set_option     { Prover.ParsedSetOption set }
 | decls=declarations { Prover.ParsedInputDescr decls }
 | u=undo             { Prover.ParsedUndo u }
 | tac=tactic         { Prover.ParsedTactic tac }
-| qed                { Prover.ParsedQed }
-| abort              { Prover.ParsedAbort }
+| PROOF              { Prover.ParsedProof }
+| i=p_include        { Prover.ParsedInclude i }
+| QED                { Prover.ParsedQed }
+| ABORT              { Prover.ParsedAbort }
 | g=goal             { Prover.ParsedGoal g }
+| h=hint             { Prover.ParsedHint h }
 | EOF                { Prover.EOF }

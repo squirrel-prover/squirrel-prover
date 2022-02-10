@@ -6,13 +6,18 @@ abstract f : message->message
 
 system null.
 
-axiom one : forall x:message, f(x)=a
-axiom two : forall x:message, (forall x:message, f(x)=a) => f(x)=b.
+axiom one (x:message): f(x)=a
+axiom two (x:message): (forall x:message, f(x)=a) => f(x)=b.
 
 goal _ (x:message): f(x)=b.
 Proof.
-  intro x.
-  use two with x; 1: by auto.
+  use two with x; 1: auto.
   intro x'.
   by use one with x'.
+Qed.
+
+goal _ (z,u,w,x:message): (forall (x, y, x : message), f(x)=b) => f(z) = b.
+Proof.
+  intro H. 
+  by use H with w, u, z.
 Qed.

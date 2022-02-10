@@ -18,8 +18,7 @@ system O: out(ch,cst); out(ch,k); (
   | (C: !_c out(ch,h(<nc(c),mc(c)>,k)))
 ).
 
-axiom name_not_pair :
-forall (ma : message, mb : message, a:index),
+axiom name_not_pair (ma : message, mb : message, a:index):
 na(a) <>  <ma, mb>.
 
 goal unforgeable_1 :

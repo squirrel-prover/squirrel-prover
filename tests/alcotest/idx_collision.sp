@@ -10,6 +10,6 @@ system null.
 
 goal _ (i,j:index) : h(i,a,k) = h(j,b,k) => a = b.
 Proof.
-  nosimpl(intro i j Heq).
+  nosimpl(intro Heq).
   checkfail collision exn NoCollision.
 Qed.

@@ -14,6 +14,9 @@ R --> T: id + H(<c1, nr, nt>,k)
 
 This is a "light" model without the last check of T.
 *******************************************************************************)
+set autoIntro=false.
+set postQuantumSound=true.
+set timeout=4.
 
 hash H
 
@@ -52,14 +55,14 @@ process reader =
 
 system (!_r R: reader | !_i !_t T: tag(i,t)).
 
-axiom len_id : forall (i:index) len(id(i)) = len(dummy)
-axiom len_id' : forall (i,t:index) len(id'(i,t)) = len(dummy)
+axiom len_id (i:index)   : len(id(i))    = len(dummy)
+axiom len_id' (i,t:index): len(id'(i,t)) = len(dummy)
 
 axiom tags_neq : tag0 <> tag1.
 
 (* Well-authentication for R1's condition, formulated in an imprecise
    way with respect to the involved indices. *)
-goal wa_R1 : forall r:index,
+goal wa_R1 (r:index):
   (exists (i,t:index),
    xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
    H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))))
@@ -71,30 +74,30 @@ goal wa_R1 : forall r:index,
    R(r) < T(i,t) &&
    output@R(r) = input@T(i,t)).
 Proof.
-
-  intro *; split.
+  split.
 
   (* Cond => WA *)
+  intro [i t Meq].
   project.
   (* left *)
-  euf Meq.
-  exists i,t0.
-  assert (input@T(i,t0) = nr(r)).
-  fresh Meq1.
-  by case H; depends R(r), R2(r).
+  euf Meq => _ _ _; 1: auto.
+  exists i,t0; simpl.
+  assert (input@T(i,t0) = nr(r)) as F; 1: auto.
+  fresh F => C.
+  by case C; 3: depends R(r), R2(r).
   (* right *)
-  euf Meq.
-  exists i,t.
-  assert (input@T(i,t) = nr(r)).
-  fresh Meq1.
-  by case H; depends R(r), R2(r).
+  euf Meq => _ _ _; 1:auto.
+  exists i,t; simpl.
+  assert (input@T(i,t) = nr(r)) as F; 1: auto.
+  fresh F => C.
+  by case C; 3: depends R(r), R2(r).
 
   (* WA => Cond *)
-  by exists i,t.
+  by intro [i t _]; expand output; exists i,t.
 Qed.
 
 (* Same with R2 *)
-goal wa_R2 : forall r:index,
+goal wa_R2 (r:index):
   (exists (i,t:index),
    xor(diff(id(i),id'(i,t)),snd(input@R2(r))) =
    H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t))))
@@ -106,32 +109,31 @@ goal wa_R2 : forall r:index,
    R(r) < T(i,t) &&
    output@R(r) = input@T(i,t)).
 Proof.
-
   use tags_neq; split.
 
-  (* Cond => WA *)
+  intro [i t Meq].
   project.
   (* left *)
-  euf Meq.
-  exists i,t0.
-  assert (input@T(i,t0) = nr(r)).
-  fresh Meq1.
-  by case H; depends R(r), R1(r).
+  euf Meq => _ _ _; 1: auto.
+  exists i,t0; simpl.
+  assert (input@T(i,t0) = nr(r)) as F; 1: auto.
+  fresh F => C.
+  by case C; 2: depends R(r), R1(r).
   (* right *)
-  euf Meq.
-  exists i,t.
-  assert (input@T(i,t) = nr(r)).
-  fresh Meq1.
-  by case H; depends R(r), R1(r).
+  euf Meq => _ _ _; 1:auto.
+  exists i,t; simpl.
+  assert (input@T(i,t) = nr(r)) as F; 1: auto.
+  fresh F => C.
+  by case C; 2: depends R(r), R1(r).
 
   (* WA => Cond *)
-  by exists i,t.
+  by intro [i t _]; expand output; exists i,t.
 Qed.
 
 (** Same as before, but more precise wrt i, for the left process.
     There has to remain an existential quantification on t,
     because it is not involved in the condition. *)
-goal [left] wa_R1_left : forall (i,r:index),
+goal [left] wa_R1_left (i,r:index):
   xor(id(i),snd(input@R1(r))) =
   H(<tag0,<nr(r),fst(input@R1(r))>>,key(i))
   <=>
@@ -142,16 +144,16 @@ goal [left] wa_R1_left : forall (i,r:index),
   R(r) < T(i,t) &&
   output@R(r) = input@T(i,t).
 Proof.
-  intro *.
-  euf Meq.
-  exists t.
-  assert input@T(i,t) = nr(r).
-  fresh Meq1.
-  by case H; depends R(r), R2(r).
+  split; 2: by intro [_ _]; expand output.
+  intro Meq; euf Meq => _ _ _; 1: auto.
+  exists t; simpl.
+  assert input@T(i,t) = nr(r) as F; 1: auto.
+  fresh F => C.
+  by case C; 3:depends R(r), R2(r).
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
-goal [right] wa_R1_right : forall (i,t,r:index),
+goal [right] wa_R1_right (i,t,r:index):
   xor(id'(i,t),snd(input@R1(r))) =
   H(<tag0,<nr(r),fst(input@R1(r))>>,key'(i,t))
   <=>
@@ -161,33 +163,31 @@ goal [right] wa_R1_right : forall (i,t,r:index),
   R(r) < T(i,t) &&
   output@R(r) = input@T(i,t).
 Proof.
-  intro *.
-  euf Meq.
-  assert input@T(i,t) = nr(r).
-  fresh Meq1.
-  by case H; depends R(r), R2(r).
+  split; 2: by intro [_ _]; expand output.
+  intro Meq; euf Meq => _ _ _; 1: auto.
+  assert input@T(i,t) = nr(r) as F; 1: auto.
+  fresh F => C.
+  by case C; 3:depends R(r), R2(r).
 Qed.
-
 
 equiv unlinkability.
 Proof.
-induction t.
+induction t; try auto.
 
 (* Case R *)
-expand frame@R(r); expand exec@R(r).
-expand cond@R(r);expand output@R(r).
+expand frame, exec, cond, output.
 fa 0.
 fa 1.
 fa 1.
 fresh 1.
 yesif 1.
-repeat split.
-depends R(r0), R1(r0).
-by depends R(r0), R2(r0).
+by (repeat split => r0 _;
+    try (depends R(r0), R1(r0) by auto);
+    try (depends R(r0), R2(r0) by auto)).
+auto.
 
 (* Case R1 *)
-expand frame@R1(r); expand exec@R1(r).
-expand cond@R1(r); expand output@R1(r).
+expand frame, exec, cond, output.
 
 fa 0; fa 1.
 
@@ -238,38 +238,54 @@ equivalent
 
 (* IF-THEN-ELSE *)
 nosimpl(fa); try auto.
-by intro *; split; exists i,t.
-by intro *; split; exists i,t.
+by intro [_ [i t _]] /=; exists i,t.
+by intro [_ [i t _]] /=; exists i,t.
 
 (* TRY-FIND *)
 (* We have index variables corresponding to the existentials from
    the if-then-else condition: i,t for the honest formula and
    i1,t0 for the condition. *)
-project.
-fa. 
-use wa_R1_left with i0,r.
-use H1. 
-by exists t.
-yesif.
-fa.
-use wa_R1_right with i0,t0,r.
-by use H1.
-by yesif.
+project => // [_ [i t G]].
+
+(* LEFT *)
+fa; 2: intro *; expand output; auto.
+intro Meq.
+use wa_R1_left with i0,r as [H1 H2].
+use H1 as [_ _]; 2: expand output; auto.
+by expand output; exists t.
+
+intro *.
+yesif; 1: auto.
+by expand output.
+auto.
+
+(* RIGHT *)
+fa; 2: intro *; expand output; auto.
+intro Meq.
+use wa_R1_right with i0,t0,r as [H1 H2].
+use H1 as [_ _]; 2: expand output; auto.
+by expand output.
+
+intro *.
+yesif; 1: auto.
+by expand output.
+auto.
 
 fa 2; fadup 1.
 fa 1; fadup 1.
 prf 1.
-ifcond 1, 1, exec@pred(R1(r)).
+ifcond 1, 1, exec@pred(R1(r)); 1: auto.
 fa 1.
 yesif 1.
-use tags_neq; project.
+use tags_neq; project; auto.
 xor 1,n_PRF.
 yesif 1.
-use len_id with i; use len_id' with i,t; namelength n_PRF, dummy.
+by use len_id with i; use len_id' with i,t; namelength n_PRF, dummy.
+fresh 1.
+auto.
 
 (* Case R2 *)
-expand frame@R2(r); expand exec@R2(r).
-expand cond@R2(r); expand output@R2(r).
+expand frame, exec, cond, output.
 
 fa 0. fa 1.
 
@@ -286,8 +302,7 @@ by use wa_R2 with r.
 by fadup 1.
 
 (* Case T *)
-expand frame@T(i,t); expand exec@T(i,t).
-expand cond@T(i,t);expand output@T(i,t).
+expand frame, exec, cond, output.
 fa 0.
 fa 1.
 fa 1.
@@ -296,19 +311,17 @@ fa 1.
 prf 2. (* we use PRF under XOR to be able with use XOR tactic later on *)
 yesif 2.
 use tags_neq.
-project.
-split.
-by assert (fst(input@R2(r)) = nt(i,t)); fresh Meq0.
-split.
-by assert (fst(input@R1(r)) = nt(i,t)); fresh Meq0.
-by assert (fst(input@R1(r)) = nt(i,t)); fresh Meq0.
-split.
-split.
-by assert (fst(input@R1(r)) = nt(i,t)); fresh Meq0.
-by assert (fst(input@R1(r)) = nt(i,t)); fresh Meq0.
-by assert (fst(input@R2(r)) = nt(i,t)); fresh Meq0.
-fresh 1. yesif 1.
+
+simpl; project;
+by (repeat split => > _;
+    repeat split => > _ [_ [_ Meq]];
+    fresh Meq).
+
+fresh 1.
+yesif 1; 1: auto.
 xor 1, n_PRF.
 yesif 1.
-use len_id with i; use len_id' with i,t; namelength n_PRF,dummy.
+by use len_id with i; use len_id' with i,t; namelength n_PRF,dummy.
+fresh 1.
+auto.
 Qed.

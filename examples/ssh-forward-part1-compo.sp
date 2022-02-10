@@ -66,6 +66,7 @@ name k : index -> index -> message
 abstract enc : message -> message -> message
 abstract dec : message -> message -> message
 
+ddh g, (^) where group:message exposants:message.
 
 (* As ssh uses a non keyed hash function, we rely on a fixed key hKey known to the attacker *)
 (* Note that hKey has to be a name and not a constant and the attacker can compute h values with the oracle.  *)
@@ -140,9 +141,9 @@ system [secret] (PDDH | SDDH).
 
 
 (** The strong secrecy is directly obtained through ddh. *)
-equiv [left,secret] [right,secret] secret.
+equiv [secret] secret.
 Proof.
-   ddh a1, b1, k11.
+   ddh g, a1, b1, k11.
 Qed.
 
 
@@ -188,41 +189,40 @@ process Sauth =
 
 system [auth]  K: (Pauth | Sauth).
 
-axiom [auth] hashnotfor :
-  forall (x1,x2:message), h(x1,hKey) <> <forwarded,x2>
+axiom [auth] hashnotfor (x1,x2:message): h(x1,hKey) <> <forwarded,x2>
 
 (* This is an axiom that simply states the existence of an index *)
 axiom [auth] freshindex : exists (l:index), True.
 
 
 (** Prove that the condition above the only diff term inside S is never true. **)
-goal [none, auth] P_charac :
+goal [auth] P_charac :
   happens(Pfail) => cond@Pok => (cond@Pfail => False) .
 Proof.
   intro Hap HcOk HcFail.
   depends Pok, Pfail => // _.
   expand cond, pkS1.
-  rewrite (fst(input@Pok) = pk(kS)) in HcOk; 1: auto.
-  destruct HcOk as [_ HcOk].
+  destruct HcOk as [Hpk HcOk].
+  rewrite !Hpk in HcOk.
   euf HcOk => Euf.
-  destruct Euf as [H [_|[i x1 x2 H1]]]; 1: by auto.  
+  destruct Euf as [H [_|[i x1 x2 H1]]]; 1: by auto.
   expand sidP1; destruct H1 as [_|[x3 H1]].
-  
+
   collision => _; use HcFail with i.
   by auto.
 
   by use hashnotfor with <<g^a1,input@P1>,input@P1^a1>, x3.
-  
-  intro Heq. 
+
+  intro Heq.
   expand sidP1; case Euf; expand sidS1; collision => _;
   use freshindex as [l _];
-  use HcFail with l. 
-  by auto. 
+  use HcFail with l.
+  by auto.
   by auto.
 Qed.
 
 (** Prove that the condition above the only diff term inside P is never true. **)
-goal [none, auth] S_charac :
+goal [auth] S_charac :
   happens(Sfail) => cond@Sok => (cond@Sfail => False).
 Proof.
   intro Hap HcOk HcFail.
@@ -240,7 +240,7 @@ Proof.
 
   intro _; case Euf; expand sidP1; collision => _;
   use freshindex as [l _];
-  use HcFail with l; 
+  use HcFail with l;
   auto.
 Qed.
 
@@ -249,70 +249,43 @@ Qed.
 proofs over the two actions. The rest of the protocol can be handled through
 some simple enriching of the induction hypothesis, and then dup applications. *)
 
-equiv [left, auth] [right, auth] auth.
+equiv [auth] auth.
 Proof.
-   enrich a1, b1, seq(i-> g^b(i)), seq(i-> g^a(i)), kP, kS, hKey.
+   enrich a1, b1, seq(i:index -> g^b(i)), seq(i:index -> g^a(i)), kP, kS, hKey.
 
-   induction t.
+   induction t; try (by expandall; apply IH).
 
-   (* P *)
-   by expandall; fa 7.
-   (* P1 *)
-   by expandall; fa 7.
-   (* Pok *)
-   by expandall; fa 7.
-   (* Pauth3 *)
-   expandall; fa 7.
-   by expand seq(i->g^b(i)),i. 
+   (* init *)
+   auto.
+
    (* Pfail *)
-   expand frame@Pfail.
+   expand frame.
 
    equivalent exec@Pfail, False.
-     expand exec. 
+     expand exec.
      split; 2: by auto => _.
      depends Pok, Pfail => // _.
      executable pred(Pfail); 1,2: by auto.
      intro He; use He with Pok; 2: by auto.
-   
+
      expand exec.
      by use P_charac.
 
-   fa 7; fa 8.
-   by noif 8.
+   by noif 7.
 
-   (* A *)
-   by expandall; fa 7.
-
-   (* S *)
-   by expandall; fa 7.
-
-   (* S1 *)
-   by expandall; fa 7.
-
-   (* Sok *)
-   by expandall; fa 7.
-
-   (* Sauth3 *)
-   expandall; fa 7.
-   by expand seq(i->g^a(i)),i.
-   (* Safil *)
-   expand frame@Sfail.
-
-   expand frame@Sfail.
+   (* Sfail *)
+   expand frame.
 
    equivalent exec@Sfail, False.
-     expand exec. 
+     expand exec.
      split; 2: by auto => _.
      depends Sok, Sfail => // _.
      executable pred(Sfail); 1,2: by auto.
      intro He; use He with Sok; 2: by auto.
-   
+
      expand exec.
      by use S_charac.
 
-   fa 7; fa 8.
-   by noif 8.
+   by noif 7.
 
-   (* A1 *)
-   by expandall; fa 7.
 Qed.

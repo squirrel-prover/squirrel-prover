@@ -20,7 +20,7 @@ Qed.
 
 goal _ (x:message) : <m1,m2> <> h(<<m3,x>,m3>).
 Proof.
-intro x Heq.
+intro Heq.
 assert fst( h(<<m3,x>,m3>))=m1. auto.
 admit.
 Qed.

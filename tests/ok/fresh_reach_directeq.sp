@@ -6,7 +6,7 @@ system null.
 
 goal _ (i,j:index): n(j) = n(i) => j = i.
 Proof.
-nosimpl(intro i j Heq).
+nosimpl(intro Heq).
 nosimpl(fresh Heq; intro Heq2).
 nosimpl(assumption).
 Qed.

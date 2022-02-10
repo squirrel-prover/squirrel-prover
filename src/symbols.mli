@@ -4,10 +4,19 @@
 
 type lsymb = string Location.located
 
+(*------------------------------------------------------------------*)
+(** Type of a function symbol (Prefix or Infix)
+    - infix symbols must start by a character in [infix_first_chars]
+    - infix symbols must be without index parameters *)
+type symb_type = [ `Prefix | `Infix ]
+
+val infix_fist_chars : char list
 
 (*------------------------------------------------------------------*)
 (** ['a t] is the type of symbols of namespace ['a]. *)
 type 'a t
+
+val hash : 'a t -> int
 
 (** Symbol groups:
   * symbols with the same name can exist in different groups.
@@ -25,6 +34,7 @@ val tag : table -> int
 (** Each possible namespace is represented by an abstract datatype.
   * Their names are descriptive; [fname] is for function symbols. *)
 
+(*------------------------------------------------------------------*)
 type channel
 type name
 type action
@@ -32,6 +42,7 @@ type fname
 type macro
 type system
 type process
+type btype
 
 (*------------------------------------------------------------------*)
 type namespace =
@@ -42,11 +53,13 @@ type namespace =
   | NMacro
   | NSystem
   | NProcess
+  | NBType
 
 val pp_namespace : Format.formatter -> namespace -> unit
 
 val get_namespace : ?group:group -> table -> string -> namespace option
 
+(*------------------------------------------------------------------*)
 (** {2 Symbol definitions}
   *
   * Each symbol is defined by some data,
@@ -54,6 +67,7 @@ val get_namespace : ?group:group -> table -> string -> namespace option
 
 type function_def =
   | Hash
+  | DDHgen
   | AEnc
   | ADec
   | SEnc
@@ -61,35 +75,49 @@ type function_def =
   | Sign
   | CheckSign
   | PublicKey
-  | Abstract of int (** Message arity *)
+  | Abstract of symb_type
 
 (** Indicates if a function symbol has been defined with
   * the specified definition. *)
 val is_ftype : fname t -> function_def -> table -> bool
 
+(*------------------------------------------------------------------*)
+type bty_info = 
+  | Ty_large
+  | Ty_name_fixed_length
+
+type bty_def = bty_info list
+
+(*------------------------------------------------------------------*)
+type name_def = { 
+  n_iarr : int;                  (* index arity *)
+  n_ty   : Type.message Type.ty; (* type *)
+}
+
+(*------------------------------------------------------------------*)
 type macro_def =
   | Input | Output | Cond | Exec | Frame
-  | State of int * Sorts.esort
+  | State of int * Type.tmessage
     (** Macro that expands to the content of a state at a given
       * timestamp. *)
-  | Global of int
+  | Global of int * Type.tmessage
     (** Global macros are used to encapsulate let-definitions.
       * They are indexed. *)
-  | Local of Sorts.esort list * Sorts.esort
-    (** Local macro definitions are explicitly defined by the
-      * user, and may depend on arbitrary terms. *)
 
+(*------------------------------------------------------------------*)
 (** Information about symbol definitions, depending on the namespace.
   * Integers refer to the index arity of symbols. *)
 type _ def =
-  | Channel  : unit                 -> channel def
-  | Name     : int                  -> name    def
-  | Action   : int                  -> action  def
-  | Function : (int * function_def) -> fname   def
-  | Macro    : macro_def            -> macro   def
-  | System   : unit                 -> system  def
-  | Process  : unit                 -> process def
-
+  | Channel  : unit      -> channel def
+  | Name     : name_def  -> name    def
+  | Action   : int       -> action  def
+  | Macro    : macro_def -> macro   def
+  | System   : unit      -> system  def
+  | Process  : unit      -> process def
+  | BType    : bty_def   -> btype   def
+        
+  | Function : (Type.ftype * function_def) -> fname def
+        
 type edef =
   | Exists : 'a def -> edef
   | Reserved of namespace
@@ -107,6 +135,7 @@ type data = ..
 type data += Empty
 type data += AssociatedFunctions of (fname t) list
 
+(*------------------------------------------------------------------*)
 (** {2 Basic namespace-independent operations} *)
 
 (** Converts a symbol to a string, for printing purposes. *)
@@ -132,6 +161,7 @@ val of_lsymb : ?group:group -> lsymb -> table -> wrapped
     if [s] is not defined. *)
 val of_lsymb_opt : ?group:group -> lsymb -> table -> wrapped option
 
+(*------------------------------------------------------------------*)
 (** {2 Namespaces} *)
 
 (** Signature for namespaces. *)
@@ -199,14 +229,17 @@ module type Namespace = sig
   val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> table -> 'a
 end
 
-module Channel  : Namespace with type def = unit with type ns = channel
-module Name     : Namespace with type def = int  with type ns = name
-module Action   : Namespace with type def = int  with type ns = action
-module System   : Namespace with type def = unit with type ns = system
-module Process  : Namespace with type def = unit with type ns = process
+module Channel  : Namespace with type def = unit    with type ns = channel
+module BType    : Namespace with type def = bty_def with type ns = btype
+module Action   : Namespace with type def = int     with type ns = action
+module System   : Namespace with type def = unit    with type ns = system
+module Process  : Namespace with type def = unit    with type ns = process
+
 module Function : Namespace
-  with type def = int * function_def with type ns = fname
+  with type def = Type.ftype * function_def with type ns = fname
+
 module Macro    : Namespace with type def = macro_def with type ns = macro
+module Name     : Namespace with type def = name_def with type ns = name
 
 (*------------------------------------------------------------------*)
 (** {2 Error Handling} *)
@@ -225,9 +258,27 @@ val pp_symb_error :
 exception SymbError of symb_err
 
 (*------------------------------------------------------------------*)
+(** {2 Miscellaneous} *)
+
+val get_bty_info   : table -> Type.tmessage -> bty_info list
+val check_bty_info : table -> Type.tmessage -> bty_info -> bool
+
+val is_infix     : fname t -> bool 
+val is_infix_str : string  -> bool 
+
+(*------------------------------------------------------------------*)
 (** {2 Builtins} *)
 
 val builtins_table : table
+
+(** Returns the type of a builtin function *)
+val ftype_builtin : fname t -> Type.ftype
+
+(** Returns the type of a function *)
+val ftype : table -> fname t -> Type.ftype
+
+(*------------------------------------------------------------------*)
+(** {3 Action builtins} *)
 
 val init_action : action t
 
@@ -254,12 +305,21 @@ val fs_true   : fname t
 val fs_false  : fname t
 val fs_and    : fname t
 val fs_or     : fname t
+val fs_impl   : fname t
 val fs_not    : fname t
 val fs_ite    : fname t
+
+(** Witness *)
+
+val fs_witness : fname t
 
 (** Successor over natural numbers *)
 
 val fs_succ   : fname t
+
+(** Adversary function *)
+
+val fs_att    : fname t
 
 (** Fail *)
 
@@ -276,10 +336,8 @@ val fs_pair   : fname t
 val fs_fst    : fname t
 val fs_snd    : fname t
 
-(** Exp **)
-
-val fs_exp    : fname t
-val fs_g      : fname t
+(** Boolean to Message *)
+val fs_of_bool : fname t
 
 (** Empty *)
 
@@ -289,3 +347,7 @@ val fs_empty  : fname t
 
 val fs_len    : fname t
 val fs_zeroes : fname t
+
+(*------------------------------------------------------------------*)
+module Ss (S : Namespace) : Set.S with type elt := S.ns t 
+module Ms (S : Namespace) : Map.S with type key := S.ns t 

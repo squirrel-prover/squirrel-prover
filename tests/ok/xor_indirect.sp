@@ -7,14 +7,15 @@ name b : index->index->message
 
 system A : !_i new a; !_j out(c,b(i,j)).
 
-axiom len_ok : forall (i,j:index), len(ok) = len(b(i,j)).
+axiom len_ok (i,j:index): len(ok) = len(b(i,j)).
 
-equiv test (i,j,ii,jj:index) :
+global goal test (i,j,ii,jj:index) :
   (* [happens(A(i,j))] -> *)
   (* [happens(A(ii,jj))] -> *)
   [happens(A(i,j),A(ii,jj))] ->
-  diff(output@pred(A(i,j)),output@pred(A(ii,jj))),
-  diff(output@A(i,j),output@A(ii,jj)) XOR ok.
+  equiv(
+    diff(output@pred(A(i,j)),output@pred(A(ii,jj))),
+    diff(output@A(i,j),output@A(ii,jj)) XOR ok).
 
 Proof.
   intro Hap.
@@ -27,10 +28,11 @@ Proof.
   admit. (* Induction hypothesis.*)
 Qed.
 
-equiv test2 (i,j,ii,jj:index) :
+global goal test2 (i,j,ii,jj:index) :
   [happens(A(i,j),A(ii,jj))] ->
-  diff(output@pred(A(i,j)),output@pred(A(ii,jj))),
-  ok XOR diff(output@A(i,j),output@A(ii,jj)).
+  equiv(
+    diff(output@pred(A(i,j)),output@pred(A(ii,jj))),
+    ok XOR diff(output@A(i,j),output@A(ii,jj))).
 Proof.
   intro Hap.
   expand output@A(i,j).

@@ -1,3 +1,6 @@
+(* This is a full model of LAK with pairs and tags, ie. it includes the last conditional
+ * and message of tags. It contains admits and is broken due to the changes in the prover. *)
+
 hash h
 
 abstract ok:message
@@ -5,7 +8,6 @@ abstract ko:message
 
 abstract tag1:message
 abstract tag2:message
-axiom tags_neq : tag1 <> tag2
 
 name key : index->message
 name key': index->index->message
@@ -40,6 +42,8 @@ process reader(j:index) =
 
 system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
+axiom tags_neq : tag1 <> tag2.
+
 goal wa_R1: forall j:index,
   (exists (i,k:index),
    snd(input@R1(j)) =
@@ -50,9 +54,8 @@ goal wa_R1: forall j:index,
    snd(output@T(i,k)) = snd(input@R1(j)) &&
    fst(output@T(i,k)) = fst(input@R1(j)) &&
    R(j) < T(i,k) && input@T(i,k) = output@R(j)).
-
 Proof.
-intros; split.
+intro *; split.
 (* cond => wa *)
 use tags_neq; project.
 (* LEFT *)
@@ -154,11 +157,11 @@ induction t.
 admit. (* TODO lak-prelim *)
 
 (* Case R: OK *)
-expand seq(j->nR(j)), j.
+expandseq seq(j->nR(j)), j.
 
 (* Case R1: OK *)
-expand frame@R1(j); expand exec@R1(j).
-expand cond@R1(j); expand output@R1(j).
+expand frame, exec.
+expand cond; expand output.
 
 equivalent
   (exists (i,k:index),
@@ -215,7 +218,7 @@ yesif.
 fa 5. fadup 4.
 fa 6. fadup 6.
 fa 6. fadup 6.
-expand seq(i,j,k->h(<<snd(input@R1(j)),nR(j)>,tag2>,
+expandseq seq(i,j,k->h(<<snd(input@R1(j)),nR(j)>,tag2>,
                          diff(key(i),key'(i,k)))), i,j,k.
 
 (* Case R2: OK *)
@@ -237,8 +240,8 @@ use wa_R2 with j.
 fadup 4.
 
 (* Case T: OK *)
-expand seq(i,k->nT(i,k)),i,k.
-expand seq(i,k->h(<<input@T(i,k),nT(i,k)>,tag1>,diff(key(i),key'(i,k)))),i,k.
+expandseq seq(i,k->nT(i,k)),i,k.
+expandseq seq(i,k->h(<<input@T(i,k),nT(i,k)>,tag1>,diff(key(i),key'(i,k)))),i,k.
 
 (* Case T1: OK *)
 expand frame@T1(i,k); expand exec@T1(i,k).
