@@ -245,21 +245,6 @@ type 'a table = (string, 'a tac_infos) Hashtbl.t
 let pp_usage tacname fmt esort =
   Fmt.pf fmt "%s %a" tacname TacticsArgs.pp_esort esort
 
-let[@warning "-32"] pp_help fmt (th, tac_name) =
-  let usages_string =
-    Fmt.str "%a"
-      (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",\n") (pp_usage tac_name))
-      th.usages_sorts
- in
-  let res_string =
-    Fmt.str "%s \n %s: @[ %s  @] " th.general_help
-      (if List.length th.usages_sorts = 0 then ""
-       else if List.length th.usages_sorts =1 then "Usage"
-       else "Usages")
-      usages_string
- in
-  Format.pp_print_text fmt res_string
-
 (*------------------------------------------------------------------*)
 (** Basic tactic tables, without registration *)
 
@@ -374,7 +359,8 @@ module ProverTactics = struct
         | _ -> hard_failure (Tactics.Failure "no argument allowed"))
 
   let register_typed id
-      ~general_help ~detailed_help  ~tactic_group ?(pq_sound=false) ?(usages_sorts)
+      ~general_help ~detailed_help
+      ~tactic_group ?(pq_sound=false) ?(usages_sorts)
       f sort =
     let usages_sorts = match usages_sorts with
       | None -> [TacticsArgs.Sort sort]
