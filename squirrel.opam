@@ -24,3 +24,5 @@ depends: [
 pin-depends: [
   ["bisect_ppx.2.4.0" "git+https://github.com/aantron/bisect_ppx.git"]
 ]
+
+install: [make "PREFIX=%{prefix}%" "install"]
