@@ -203,15 +203,16 @@ By default, rewrite acts on the goal. The syntax `rewrite H in C1,...,C2` allows
 
 ```*)
 
-goal _ (x,y:message): h(x) = h(y) => h(x) = g => false.
+abstract test : message -> message.
+
+goal _ (x,y:message): h(x) = h(y) => h(x) = h(x) => false.
 Proof.
 intro eq.
 rewrite eq.
 (* and we now we go on the other direction, going back to the initial state. *)
 rewrite -eq.
 
-intro C.
-rewrite eq in C.
+
 Abort.
 
 (*
