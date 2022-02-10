@@ -77,7 +77,7 @@ module List = struct
 
   let rec assoc_dflt dflt x = function
     | [] -> dflt
-    | (a,b)::l -> if compare a x = 0 then b else assoc_dflt dflt x l
+    | (a,b)::l -> if Stdlib.compare a x = 0 then b else assoc_dflt dflt x l
 
   (*------------------------------------------------------------------*)
   let rec iteri2 i f l1 l2 =
