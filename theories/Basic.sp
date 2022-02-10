@@ -8,6 +8,8 @@ set autoIntro=false.
 
 axiom eq_iff (x, y : boolean) : (x = y) = (x <=> y).
 
+axiom eq_not (x, y : boolean) : (not(x) = not(y)) = (x = y).
+
 goal eq_sym ['a] (x,y : 'a) : (x = y) = (y = x).
 Proof. by rewrite eq_iff. Qed.
 

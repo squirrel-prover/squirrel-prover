@@ -83,11 +83,11 @@ Proof.
     (* case HH0 - general *)
     right. simpl_left.
     exists j0.
-    split. split. 
+    split. split.
     by congruence.
     by constraints.
     intro j' Hap'.
-    use H1 with j' as H2; 2: by auto. 
+    use H1 with j' as H2; 2: by auto.
     case H2.
     left; by assumption.
     right; by constraints.
@@ -118,7 +118,7 @@ Proof.
     (* case H1 - init *)
     destruct H1 as [H1 H1'].
     (* kT(i)@pred(T(i,j)) = kT(i)@init
-       this can actually happen only if tag i has 
+       this can actually happen only if tag i has
        not played from init to pred(T(i,j))
        but we know that T(i,j0) < T(i,j): absurd *)
     use H1' with j0; 1,2: case Ht; by auto.
@@ -128,15 +128,15 @@ Proof.
     (* kT(i)@pred(T(i,j)) = kT(i)@T(i,j1)
        then we should have that T(i,j0) <= T(i,j1) *)
     assert (T(i,j0) <= T(i,j1)).
-      use H0 with j0 as H0'. 
-      case Ht; 1,2: case H0'; by auto. 
+      use H0 with j0 as H0'.
+      case Ht; 1,2: case H0'; by auto.
       case Ht; 1,2: by auto.
     use Hind with T(i,j1),pred(T(i,j0)),i,j1,i; 1,2,3,4: by auto.
 Qed.
 
 goal stateInequalityHelpful :
-forall (i,j,j':index), 
-  happens(T(i,j)) => 
+forall (i,j,j':index),
+  happens(T(i,j)) =>
     ( T(i,j')<T(i,j) => kT(i)@pred(T(i,j)) <> kT(i)@pred(T(i,j')) ).
 Proof.
   intro i j j' Hap Hlt Heq.
@@ -157,6 +157,6 @@ Proof.
   yesif 1; simpl.
   intro i0 j0 *.
   use stateInequalityHelpful with i,j,j0; 1,2,3: by auto.
-  fresh 1. 
+  fresh 1.
   yesif 1; by auto.
 Qed.

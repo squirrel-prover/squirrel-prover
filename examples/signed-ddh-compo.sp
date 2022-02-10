@@ -194,8 +194,8 @@ Proof.
    fa 6.
 
    equivalent exec@pred(P4) && cond@P4, False.
-   executable pred(P4). 
-   depends P1, P4; use H2 with P1. 
+   executable pred(P4).
+   depends P1, P4; use H2 with P1.
    expand exec.
    by use P1_charac.
 
@@ -224,9 +224,9 @@ Proof.
    expand frame, exec.
 
    equivalent exec@pred(S4) && cond@S4, False.
-   executable pred(S4). 
-   depends S1, S4; use H2 with S1. 
-   expand exec. 
+   executable pred(S4).
+   depends S1, S4; use H2 with S1.
+   expand exec.
    by use S1_charac.
 
    by fa 6; fa 7; noif 7.

@@ -1,7 +1,11 @@
-opam-version: "2.0.4"
+opam-version: "2.0"
 name: "squirrel"
-description: "squirrel"
+synopsis: "The Squirrel Prover is a proof assistant for protocols, based on first-order logic and provides guarantees in the computational model"      
 version: "0.1"
+homepage: "https://squirrel-prover.github.io/"
+bug-reports: "https://github.com/squirrel-prover/squirrel-prover/issues"
+maintainer: "Charlie Jacomme <charlie.jacomme@cispa.de>"
+authors: "David Baelde, Stéphanie Delaune, Charlie Jacomme, Adrien Koutsos, Solène Moreau"
 build: [
   [make]
   [make "test"] {with-test}
@@ -25,3 +29,5 @@ depopts: [
 pin-depends: [
   ["bisect_ppx.2.4.0" "git+https://github.com/aantron/bisect_ppx.git"]
 ]
+
+install: [make "PREFIX=%{prefix}%" "install"]

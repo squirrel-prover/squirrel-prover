@@ -11,9 +11,9 @@ P -> S : sign(<<g^b,g^a>,pk(skS)>,skP)
 We consider multiple sessions but two agents only (one agent for the role P and
 one agent for the role S) and show the strong secrecy of the shared key.
 
-* In this file `signed-ddh-S.sp`, we show that the key g^a^b as computed by S 
+* In this file `signed-ddh-S.sp`, we show that the key g^a^b as computed by S
   is indistinguishable from g^k with k fresh (system secretS).
-* In another file `signed-ddh-P.sp`, we show that the key g^a^b as computed by P 
+* In another file `signed-ddh-P.sp`, we show that the key g^a^b as computed by P
   is indistinguishable from g^k with k fresh (system secretP).
 
 [G] ISO/IEC 9798-3:2019, IT Security techniques – Entity authentication –
@@ -41,7 +41,7 @@ ddh g, (^) where group:message exposants:message.
 signature sign,checksign,pk
 
 (**
-The system `secretS` is the counterpart of the system `secretP` defined in 
+The system `secretS` is the counterpart of the system `secretP` defined in
 the file `signed-ddh-P.sp`.
 This time, we add an output at the end of the role of S.
 **)
@@ -65,19 +65,19 @@ process Schall(j:index) =
       in(cS, challenge);
       try find i such that gp = g^a(i) in
         out(cS, diff(g^a(i)^b(j),g^k(i,j)))
-      else 
+      else
         out(cS, diff(ok,ko))
 
 system [secretS] (!_i P(i) | !_j Schall(j)).
 
 (**
-In the proof of strong secrecy for the system `secretS`, we will use 
-the following property, stating that whenever S accepts a message from P, 
+In the proof of strong secrecy for the system `secretS`, we will use
+the following property, stating that whenever S accepts a message from P,
 this message is of the form `<<_,x>,_>` where `x = g^a(i)`.
 **)
 goal [secretS] S_charac (j:index):
   happens(Schall1(j)) =>
-    exec@Schall1(j) => 
+    exec@Schall1(j) =>
       exists (i:index), snd(input@Schall(j)) = g^a(i).
 Proof.
   intro Hap Hexec.
@@ -92,15 +92,15 @@ Proof.
   by exists i.
 Qed.
 
-(** 
-We show the counterpart of the property `strongSecP`, this time for the 
-system `secretS`. The proof is carried out exactly in the same way. 
+(**
+We show the counterpart of the property `strongSecP`, this time for the
+system `secretS`. The proof is carried out exactly in the same way.
 **)
 equiv [secretS] strongSecS.
 Proof.
-  enrich 
-    skP, skS, 
-    seq(i:index ->g^a(i)), 
+  enrich
+    skP, skS,
+    seq(i:index ->g^a(i)),
     seq(j:index ->g^b(j)),
     seq(i,j:index ->diff(g^a(i)^b(j),g^k(i,j))).
 

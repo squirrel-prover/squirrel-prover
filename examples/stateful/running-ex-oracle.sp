@@ -2,12 +2,12 @@
 RUNNING EXAMPLE
 
 This protocol is a variant of the OSK protocol described in:
-M. Ohkubo, K. Suzuki, S. Kinoshita et al., 
-“Cryptographic approach to “privacy-friendly” tags,” 
+M. Ohkubo, K. Suzuki, S. Kinoshita et al.,
+“Cryptographic approach to “privacy-friendly” tags,”
 RFID privacy workshop, vol. 82. Cambridge, USA, 2003.
 
 Each tag is associated to a mutable state sT initialized with s0.
-Readers have access to a database containing an entry sR for each authorized 
+Readers have access to a database containing an entry sR for each authorized
 tag.
 
          sT := H(sT,k)
@@ -17,18 +17,18 @@ T -> R : G(sT,k')
 R -> T : ok
 
 COMMENTS
-- In this model we add in parallel a process in order to provide the attacker 
-the ability to compute hashes with their respective keys (without knowing these 
+- In this model we add in parallel a process in order to provide the attacker
+the ability to compute hashes with their respective keys (without knowing these
 keys).
 - The reader process is not modelled here, this is left for future work.
 
-HELPING LEMMAS 
-- last update 
-- disjoint chains 
+HELPING LEMMAS
+- last update
+- disjoint chains
 - monotonic chain
 
 SECURITY PROPERTIES
-- strong secrecy 
+- strong secrecy
 *******************************************************************************)
 
 set autoIntro  = false.
@@ -60,7 +60,7 @@ axiom unique_queries : forall (i,j:index) i <> j => input@O(i) <> input@O(j).
 
 goal lastupdate_pure : forall (i:index,tau:timestamp), happens(tau) => (
   (forall j:index, happens(A(i,j)) => A(i,j)>tau) ||
-  (exists j:index, happens(A(i,j)) && A(i,j)<=tau 
+  (exists j:index, happens(A(i,j)) && A(i,j)<=tau
     && forall jj:index, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))).
 
 Proof.
@@ -103,7 +103,7 @@ Proof.
 Qed.
 
 goal lastupdate_init : forall (i:index,tau:timestamp), happens(tau) => (
-  (forall j:index, happens(A(i,j)) => A(i,j)>tau)) 
+  (forall j:index, happens(A(i,j)) => A(i,j)>tau))
   => s(i)@tau = s(i)@init.
 
 Proof.
@@ -183,8 +183,8 @@ Qed.
 
 goal lastupdate : forall (i:index,tau:timestamp), happens(tau) => (
   (s(i)@tau = s(i)@init && forall j:index, happens(A(i,j)) => A(i,j)>tau) ||
-  (exists j:index, 
-    s(i)@tau = s(i)@A(i,j) && A(i,j)<=tau 
+  (exists j:index,
+    s(i)@tau = s(i)@A(i,j) && A(i,j)<=tau
     && forall jj:index, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))).
 Proof.
   intro i tau Htau.
@@ -208,10 +208,10 @@ Proof.
   induction => tau' IH tau i' i D E Meq.
   use lastupdate with i,tau as [[A0 Hinit] | [j [[A0 A1] Hsup]]] => //;
   use lastupdate with i',tau' as [[A Hinit'] | [j' [[B C] Hsup']]] => //.
-  rewrite -Meq A0 /s in B. 
+  rewrite -Meq A0 /s in B.
   by fresh B.
 
-  rewrite Meq A /s in A0. 
+  rewrite Meq A /s in A0.
   by fresh A0.
 
   rewrite Meq B /s in A0.
@@ -243,11 +243,11 @@ Proof.
     destruct H4 as [j1 [Meq1 H4 H5]].
     use IH with pred(A(i,j)),pred(A(i,j0)),i,j1 as H; try auto.
     repeat split.
-    auto. 
+    auto.
     use H5 with j0; 1,2: case Heuf; auto.
     auto.
   (* case i<>i0 *)
-  use disjoint_chains with pred(A(i0,j0)),pred(A(i,j)),i0,i => //.  
+  use disjoint_chains with pred(A(i0,j0)),pred(A(i,j)),i0,i => //.
   by case Heuf.
 Qed.
 
@@ -313,7 +313,7 @@ Proof.
     rewrite equiv IH i (A(i,j)) => // Hf; by fresh Hf.
     intro i0 j0 H.
     assert i=i0 || i<>i0; try auto.
-    case H0. 
+    case H0.
     by use monotonic_chain with A(i,j),A(i,j0),i,j => //.
     by use disjoint_chains with A(i,j),A(i0,j0),i,i0.
 Qed.

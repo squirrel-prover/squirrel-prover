@@ -19,13 +19,13 @@ R -> T : h(kR2)
          kR2 := k2+h(k1+r1+k)
 
 COMMENTS
-- In this model we use 2 different keyed hash functions, instead of a single 
+- In this model we use 2 different keyed hash functions, instead of a single
 (not keyed) hash function as in the specification.
 
-HELPING LEMMAS 
+HELPING LEMMAS
 - no update
 
-SECURITY PROPERTIES 
+SECURITY PROPERTIES
 - authentication
 *******************************************************************************)
 
@@ -82,7 +82,7 @@ system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
 (* Minimal sequentiality assumption needed for the proofs *)
 axiom sequentiality (t:timestamp, i,j:index):
   happens(T(i,j),t,T1(i,j)) =>
-    T(i,j) < t => t < T1(i,j) => 
+    T(i,j) < t => t < T1(i,j) =>
       not(exists (j':index), t = T1(i,j') && j <> j').
 
 (* LIBRARIES *)
@@ -97,7 +97,7 @@ goal noUpdateTag (t:timestamp, i,j:index):
 Proof.
   generalize i j.
   induction t => t IH0 i j Hap [H1 H2].
-  case t => He; 
+  case t => He;
   try by (simpl_left; expand kT(i)@t; apply IH0).
 
   auto.
@@ -112,16 +112,16 @@ Proof.
   rewrite He.
   case (i=i0) => _.
   case (j=j0) => _.
-  
+
     (* case i=i0 && j=j0 *)
     auto.
-  
+
     (* case i=i0 && j<>j0 *)
     use sequentiality with T1(i,j0),i,j => //.
     by exists j0.
-  
+
     (* case i<>i0 *)
-    use IH0 with pred(T1(i0,j0)),i,j as Meq; 2,3,4: auto. 
+    use IH0 with pred(T1(i0,j0)),i,j as Meq; 2,3,4: auto.
     by rewrite /kT if_false //.
 Qed.
 
@@ -146,7 +146,7 @@ Proof.
     executable pred(R1(jj,ii)) => // H.
     use H with R1(jj0,ii) as Ht1; 2: auto.
     expand exec, cond.
-    destruct Ht1 as [_ _]. 
+    destruct Ht1 as [_ _].
     use IH0 with R1(jj0,ii),jj0,ii as [j _]; 2,3,4: auto.
     by exists j.
 
@@ -156,10 +156,10 @@ Proof.
 
     (* case 3/3: equality with hashed message in update@T1 *)
     (* if there is an update@T1, then action T happened before *)
-    intro Ht Heq *. 
+    intro Ht Heq *.
     exists j.
-    depends T(ii,j),T1(ii,j) by auto => _. 
-    by rewrite /output (noUpdateTag (pred(T1(ii,j)))). 
+    depends T(ii,j),T1(ii,j) by auto => _.
+    by rewrite /output (noUpdateTag (pred(T1(ii,j)))).
 Qed.
 
 goal auth_T1_induction (t:timestamp, i,j:index):
@@ -182,11 +182,11 @@ Proof.
 
     (* case 2/2: equality with hashed message in update@T1 *)
     use IH0 with T1(i,j0),i,j0 as [jj _] => //.
-    exists jj => /=. 
+    exists jj => /=.
     executable pred(T1(i,j)) => // H.
     by apply H in Clt.
 
   simpl.
-  executable pred(T1(i,j)) => // H. 
+  executable pred(T1(i,j)) => // H.
   by apply H.
 Qed.

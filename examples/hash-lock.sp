@@ -41,16 +41,16 @@ system ((!_j R:reader(j)) | (!_i !_k T: tag(i,k))).
 include Basic.
 
 (* for the sack of simplicity, we assume injective pairing *)
-axiom injective_pairing (x,y : message) : 
+axiom injective_pairing (x,y : message) :
   fst (x) = fst (y) => snd (x) = snd (y) => x = y.
 
 goal wa_R1 (j:index):
   happens(R1(j)) =>
     (cond@R1(j) =
-     (exists (i,k:index), T(i,k) < R1(j) && R(j) < T(i,k) && 
+     (exists (i,k:index), T(i,k) < R1(j) && R(j) < T(i,k) &&
        output@T(i,k) = input@R1(j) &&
        input@T(i,k) = output@R(j))).
-Proof. 
+Proof.
   rewrite eq_iff.
   intro Hap.
   expand cond.
@@ -64,11 +64,11 @@ Proof.
   exists i,k0.
   simpl.
   assert input@T(i,k0)=nR(j) as Meq1 by auto.
-  fresh Meq1 => C /=. 
-  case C => //=; 
+  fresh Meq1 => C /=.
+  case C => //=;
   2: depends R(j),R2(j) by auto.
     by apply injective_pairing.
-    intro _ /=. 
+    intro _ /=.
     by apply injective_pairing.
 
   (* RIGHT *)
@@ -76,10 +76,10 @@ Proof.
   exists i,k.
   assert input@T(i,k)=nR(j) as Meq1; 1: by auto.
   fresh Meq1 => C /=.
-  case C => //=; 
+  case C => //=;
   2: depends R(j),R2(j) by auto.
     by apply injective_pairing.
-    intro _ /=. 
+    intro _ /=.
     by apply injective_pairing.
 
   (* WA => COND *)
@@ -90,7 +90,7 @@ Qed.
 goal wa_R2 (j:index):
   happens(R2(j)) =>
    (cond@R2(j) =
-     (not(exists (i,k:index), T(i,k) < R2(j) && R(j) < T(i,k) && 
+     (not(exists (i,k:index), T(i,k) < R2(j) && R(j) < T(i,k) &&
        output@T(i,k) = input@R2(j) &&
        input@T(i,k) = output@R(j)))).
 Proof.
@@ -114,10 +114,10 @@ Proof.
   exists i,k0.
   assert input@T(i,k0)=nR(j) as Meq1; 1: auto.
   fresh Meq1 => C /=.
-  case C => //=; 
+  case C => //=;
   2: depends R(j),R1(j) by auto.
     by apply injective_pairing.
-    intro _ /=. 
+    intro _ /=.
     by apply injective_pairing.
 
   (* RIGHT *)
@@ -125,10 +125,10 @@ Proof.
   exists i,k.
   assert input@T(i,k)=nR(j) as Meq1; 1: auto.
   fresh Meq1 => C /=.
-  case C => //=; 
+  case C => //=;
   2: depends R(j),R1(j) by auto.
     by apply injective_pairing.
-    intro _ /=. 
+    intro _ /=.
     by apply injective_pairing.
 Qed.
 
@@ -143,7 +143,7 @@ Proof.
   (* Case R *)
   expand frame, exec, cond, output.
   fa 0; fa 1; fa 1.
-  fresh 1; rewrite if_true. 
+  fresh 1; rewrite if_true.
   repeat split => j0 _ //.
   by depends R(j0), R2(j0).
   by depends R(j0), R1(j0).
@@ -151,31 +151,31 @@ Proof.
 
   (* Case R1 *)
   expand frame, exec, output.
-  fa 0; fa 1. 
+  fa 0; fa 1.
   rewrite wa_R1 //.
   by fadup 1.
 
   (* Case R2 *)
   expand frame, exec, output.
-  fa 0; fa 1. 
+  fa 0; fa 1.
   rewrite wa_R2 //.
   by fadup 1.
 
   (* Case T *)
   expand frame, exec, cond, output.
   fa 0; fa 1; fa 1; fa 1.
-  prf 2. 
+  prf 2.
   rewrite if_true /=.
   project;
   repeat split => > _ _ [_ Meq0]; (try fresh Meq0); auto.
 
   fresh 2.
-  by fresh 1; rewrite if_true. 
+  by fresh 1; rewrite if_true.
 Qed.
 
 
 (*-------------------------------------------------------------------*)
-(* In the real-world system, we go further and prove injective 
+(* In the real-world system, we go further and prove injective
    authentication.  *)
 goal [default/left] injective_auth (j:index):
   happens(R1(j)) =>
@@ -192,7 +192,7 @@ goal [default/left] injective_auth (j:index):
       )
     ).
 Proof.
-  intro Hap Cond. 
+  intro Hap Cond.
   rewrite wa_R1 // in Cond.
   revert Cond => [i k [Clt Clt0 Cond0 Cond1]].
   exists i, k => /=.
@@ -203,4 +203,3 @@ Proof.
   intro _; rewrite /output in Cond1.
   by fresh Cond1.
 Qed.
-

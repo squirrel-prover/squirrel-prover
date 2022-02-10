@@ -11,9 +11,9 @@ P -> S : sign(<<g^b,g^a>,pk(skS)>,skP)
 We consider multiple sessions but two agents only (one agent for the role P and
 one agent for the role S) and show the strong secrecy of the shared key.
 
-* In this file `signed-ddh-P.sp`, we show that the key g^a^b as computed by P 
+* In this file `signed-ddh-P.sp`, we show that the key g^a^b as computed by P
   is indistinguishable from g^k with k fresh (system secretP).
-* In another file `signed-ddh-S.sp`, we show that the key g^a^b as computed by S 
+* In another file `signed-ddh-S.sp`, we show that the key g^a^b as computed by S
   is indistinguishable from g^k with k fresh (system secretS).
 
 [G] ISO/IEC 9798-3:2019, IT Security techniques – Entity authentication –
@@ -95,13 +95,13 @@ process S(j:index) =
 system [secretP] (!_i Pchall(i) | !_j S(j)).
 
 (**
-In the proof of strong secrecy for the system `secretP`, we will use 
-the following property, stating that whenever P accepts a message from S, 
+In the proof of strong secrecy for the system `secretP`, we will use
+the following property, stating that whenever P accepts a message from S,
 this message is of the form `<<_,x>,_>` where `x = g^b(j)`.
 **)
 goal [secretP] P_charac (i:index):
-  happens(Pchall1(i)) => 
-    cond@Pchall1(i) => 
+  happens(Pchall1(i)) =>
+    cond@Pchall1(i) =>
       exists (j:index), snd(fst(input@Pchall1(i))) = g^b(j).
 (**
 The high-level idea of the proof is to use the EUF cryptographic axiom:
@@ -113,7 +113,7 @@ Proof.
   intro Hap Hcond.
   expand cond, pkS(i)@Pchall1(i).
   (** We then rewrite Meq using the message equality Meq0. **)
-  rewrite Meq0 in Meq. 
+  rewrite Meq0 in Meq.
   (** We are now able to apply the `euf` tactic, which will search for
   occurences of signatures with `skS`: the only possibility is the output
   of an action `S(j)`.  **)
@@ -124,9 +124,9 @@ Qed.
 
 (**
 We now show the strong secrecy of the shared key for the system `secretP`,
-expressed by the logic formula `forall t:timestamp, frame@t` where `frame@t` 
-is actually a bi-frame. We will prove that the left projection of `frame@t` 
-(_i.e._ where the shared key `g^a^b` is outputted) is indistinguishable from the 
+expressed by the logic formula `forall t:timestamp, frame@t` where `frame@t`
+is actually a bi-frame. We will prove that the left projection of `frame@t`
+(_i.e._ where the shared key `g^a^b` is outputted) is indistinguishable from the
 right projection of `frame@t` (_i.e._ where `g^k` is outputted).
 **)
 equiv [secretP] strongSecP.
@@ -142,9 +142,9 @@ output is never reached using the previous `P_charac` property.
 **)
 Proof.
   (** We start by enriching the frame. **)
-  enrich 
-    skP, skS, 
-    seq(i:index ->g^a(i)), 
+  enrich
+    skP, skS,
+    seq(i:index ->g^a(i)),
     seq(j:index ->g^b(j)),
     seq(i,j:index ->diff(g^a(i)^b(j),g^k(i,j))).
 
@@ -160,7 +160,7 @@ Proof.
   expandall.
   by ddh g,a,b,k.
 
-  (** Case where `t = Pchall3(i)`. 
+  (** Case where `t = Pchall3(i)`.
   We will show that this case is not possible, by showing that the formula
   `exec@pred(Pchall3(i)) && cond@Pchall3(i)` is equivalent to `False`, relying
   on the previous property `P_charac`. **)

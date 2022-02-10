@@ -1,5 +1,7 @@
 GITHASH := $(shell scripts/git-hash)
 
+PREFIX = ~/.local
+
 default: squirrel
 
 all: squirrel test
@@ -73,7 +75,7 @@ coverage: makecoverage ok_test
 	rm -f *.coverage
 
 install: version squirrel
-	cp squirrel.byte ~/.local/bin/squirrel.byte
+	cp squirrel.byte $(PREFIX)/bin/squirrel.byte
 
 doc: # squirrel
 	dune build @doc

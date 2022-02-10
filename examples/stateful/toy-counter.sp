@@ -43,7 +43,7 @@ mutable d : message = myZero
 channel cA
 channel cB
 
-(** 
+(**
 In order to model counter values, we use:
 * a function `mySucc` modelling the successor of a value;
 * an order relation `~<` modelling the usual order on natural numbers.
@@ -82,14 +82,14 @@ axiom orderStrict (n1,n2:message): n1 = n2 => n1 ~< n2 => false.
 (* SECURITY PROPERTIES *)
 
 (**
-We first show that the counter increases strictly at each update. 
+We first show that the counter increases strictly at each update.
 **)
-goal counterIncreasePred (t:timestamp): 
+goal counterIncreasePred (t:timestamp):
   t > init => d@pred(t) ~< d@t.
 Proof.
-  intro Hc. 
+  intro Hc.
   use orderSucc with d@pred(t).
-  case t; 2,3,4: auto. 
+  case t; 2,3,4: auto.
   constraints.
 Qed.
 
@@ -104,7 +104,7 @@ goal counterIncrease (t,t':timestamp):
 Proof.
   induction t => t Hind Ht.
   (** We use the `assert` tactic to introduce two cases. **)
-  assert (t' < pred(t) || t' >= pred(t)) as H0 by case t. 
+  assert (t' < pred(t) || t' >= pred(t)) as H0 by case t.
   case H0.
 
     (** Case where t' < pred(t).
@@ -140,10 +140,10 @@ Proof.
   intro Hap Hcond.
   expand cond.
   (** Applying the `euf` tactic generates two new hypotheses, `Ht` and `Heq`. **)
-  euf Hcond => Ht Heq. 
+  euf Hcond => Ht Heq.
   (** We use here the counterIncrease lemma to show that the equality `Heq` is
   not possible. **)
   assert pred(A(i)) < pred(B(j)) as H by constraints.
   apply counterIncrease in H.
-  by apply orderStrict in H. 
+  by apply orderStrict in H.
 Qed.
