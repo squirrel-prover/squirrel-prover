@@ -75,7 +75,8 @@ coverage: makecoverage ok_test
 	rm -f *.coverage
 
 install: version squirrel
-	cp squirrel.byte $(PREFIX)/bin/squirrel.byte
+	cp -f squirrel $(PREFIX)/bin/squirrel
+	cp -r theories $(PREFIX)/bin/theories
 
 doc: # squirrel
 	dune build @doc
