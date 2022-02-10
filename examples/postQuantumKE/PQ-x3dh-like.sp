@@ -237,7 +237,8 @@ assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = d
 auto.
 simpl.
 
-by case H1.
+case H1; try auto.
+by case H2.
 
 intro [Abs _].
 use Abs with il,jl,kl.
@@ -264,7 +265,8 @@ assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = d
 auto.
 simpl.
 
-by case H1.
+case H1; try auto.
+by case H2.
 
 intro [Abs _].
 use Abs with il,jl,kl.
@@ -294,7 +296,8 @@ assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = d
 auto.
 simpl.
 
-by case H1.
+case H1; try auto.
+by case H2.
 
 intro [Abs _].
 use Abs with il,jl,kl.
@@ -448,7 +451,8 @@ assert decap( encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))), vkI(il)) =
 decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
 auto.
 simpl.
-by case H.
+case H; try auto.
+by case H0.
 
 intro [Abs _].
 by use Abs with il0,jl0,kl0.
@@ -553,7 +557,9 @@ assert decap( encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))), vkI(il)) =
 decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
 auto.
 simpl.
-by case H.
+
+case H; try auto.
+by case H0.
 
 intro [Abs _].
 by use Abs with il0,jl0,kl0.
