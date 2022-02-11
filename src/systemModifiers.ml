@@ -3,6 +3,41 @@ open Utils
 module SE   = SystemExpr
 module L    = Location
 
+(*------------------------------------------------------------------*)
+(** rewrite a rule as much as possible without recursing *)
+let rewrite_norec
+    (table  : Symbols.table)
+    (system : SE.t)
+    (venv   : Vars.env)
+    (rule   : Rewrite.rw_erule) 
+    (t      : Term.term)
+  : Term.term 
+  =
+  assert (rule.rw_conds = []);
+  let Term.ESubst (left,right) = rule.rw_rw in
+  let pat : Term.term Match.pat = Match.{ 
+      pat_tyvars = rule.rw_tyvars; 
+      pat_vars   = rule.rw_vars; 
+      pat_term   = left;
+    } 
+  in
+  let rw_inst : Match.Pos.f_map = 
+    fun occ vars _conds _p ->
+      match Match.T.try_match table system occ pat with
+      | NoMatch _ | FreeTyv -> `Continue
+
+      (* head matches *)
+      | Match mv ->
+        let subst = Match.Mvar.to_subst ~mode:`Match mv in
+        let left = Term.subst subst left in
+        let right = Term.subst subst right in
+        assert (left = occ);
+        `Map right
+  in
+  let _, f = Match.Pos.map ~m_rec:false rw_inst venv t in
+  f
+
+(*------------------------------------------------------------------*)
 let global_rename table sdecl gf =
   let old_system, old_single_system = 
     match SE.parse_se table sdecl.Decl.from_sys with
@@ -53,12 +88,7 @@ let global_rename table sdecl gf =
       }
     in
     let iterator cenv t =
-      match
-        Rewrite.rewrite table old_system env.vars `Once
-          rw_rule (`Reach t)
-      with
-      | `Result (`Reach res, ls) -> res
-      | _ -> t
+      rewrite_norec table old_system env.vars rw_rule t
     in
   let global_macro_iterator system table ns dec_def data =
     table := Macros.apply_global_data !table ns dec_def old_single_system system data (iterator ());
@@ -178,12 +208,7 @@ let global_prf table sdecl bnds hash =
   in
 
   let iterator _ t =
-    match
-      Rewrite.rewrite table old_system env.vars `Once
-        rw_rule (`Reach t)
-    with
-    | `Result (`Reach res, ls) -> res
-    | _ -> t
+    rewrite_norec table old_system env.vars rw_rule t
   in
   let global_macro_iterator system table ns dec_def data =
     table := Macros.apply_global_data !table ns dec_def old_single_system system data (iterator ());
@@ -355,28 +380,10 @@ let global_cca table sdecl bnds enc =
   in
 
   let iterator cenv t =
-    match
-      Rewrite.rewrite table old_system env.vars `Once
-        enc_rw_rule (`Reach t)
-    with
-    | `Result (`Reach res, ls) ->
-      begin
-        match
-          Rewrite.rewrite table old_system env.vars `Once
-            dec_rw_rule (`Reach res)
-        with
-        | `Result (`Reach res2, ls) -> res2
-        | _ -> res
-      end
-    | _ ->
-      begin
-        match
-          Rewrite.rewrite table old_system env.vars `Once
-            dec_rw_rule (`Reach t)
-        with
-        | `Result (`Reach res2, ls) -> res2
-        | _ -> t
-      end
+    let t =
+      rewrite_norec table old_system env.vars enc_rw_rule t
+    in
+    rewrite_norec table old_system env.vars dec_rw_rule t
   in
   let global_macro_iterator system table ns dec_def data =
     table := Macros.apply_global_data !table ns dec_def old_single_system system data (iterator ());
