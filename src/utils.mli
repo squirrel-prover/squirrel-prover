@@ -60,8 +60,9 @@ module List : sig
   
   val mapi_fold : (int -> 'a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
 
-  exception Out_of_range
+  val foldi : (int -> 'a -> 'b -> 'a) -> 'a -> 'b list -> 'a
 
+  exception Out_of_range
 end
 
 (*------------------------------------------------------------------*)

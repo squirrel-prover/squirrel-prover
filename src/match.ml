@@ -9,7 +9,398 @@ let dbg ?(force=false) s =
   else Printer.prt `Ignore s
 
 (*------------------------------------------------------------------*)
-(** {2 Patterns} *)
+(** {2 Positions} *)
+
+module Pos = struct
+  (** A position, represented by a list of integer.
+      The position [pos @ [i]] of [f(t0,...,tn)] is the position 
+      [pos] of [ti]. 
+      If [i < 0] or [t > n], the position is invalid. 
+  
+      Note that the list is in reversed order compared to the intuitive 
+      representation. Since we build an use positions in that order, this
+      is more efficient. *)
+  type pos = int list
+
+  module Sp = Set.Make (struct
+      type t = pos
+      let compare = Stdlib.compare
+    end)
+
+  (*------------------------------------------------------------------*)
+  type f_sel =
+    Term.term -> Vars.vars -> Term.term list ->
+    [`Select | `Continue]
+
+  (*------------------------------------------------------------------*)
+  (* [p] is the current position *)
+  let rec sel fsel (sp : Sp.t) ~vars ~conds ~(p : pos) (t : Term.term) = 
+    match fsel t vars conds with
+    | `Select -> Sp.add p sp
+    | `Continue -> 
+      match t with
+      | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite ->
+        assert (snd fs = []);
+
+        let conds_t =             c :: conds in
+        let conds_e = Term.mk_not c :: conds in
+
+        let sp = sel fsel sp ~vars ~conds         ~p:(0 :: p) c in
+        let sp = sel fsel sp ~vars ~conds:conds_t ~p:(1 :: p) t in
+        (*    *) sel fsel sp ~vars ~conds:conds_e ~p:(2 :: p) e 
+
+      | Term.Fun ((_, l1), _, l2) ->
+        let l = (List.map Term.mk_var l1) @ l2 in
+        sel_l fsel sp ~vars ~conds ~p l
+
+      | Term.Name ns ->
+        let l = List.map Term.mk_var ns.s_indices in
+        sel_l fsel sp ~vars ~conds ~p l
+
+      | Term.Macro (ms, terms, ts) ->
+        assert (terms = []);
+
+        let l = (List.map Term.mk_var ms.s_indices) @ [ts] in
+        sel_l fsel sp ~vars ~conds ~p l
+
+      | Term.Action (_, is) ->
+        let l = List.map Term.mk_var is in
+        sel_l fsel sp ~vars ~conds ~p l
+
+      | Term.Var _ -> sp
+
+      | Term.ForAll (is, t)
+      | Term.Exists (is, t)
+      | Term.Seq    (is, t) -> 
+        let is, subst = Term.refresh_vars `Global is in
+        let t = Term.subst subst t in
+        let vars = List.rev_append is vars in
+        sel fsel sp ~vars ~conds ~p:(0 :: p) t
+
+      | Term.Diff (t1, t2) ->
+        sel_l fsel sp ~vars ~conds ~p [t1; t2]
+
+      | Term.Find (is, c, t, e) ->
+        let is, subst = Term.refresh_vars `Global is in
+        let c = Term.subst subst c in
+        let t = Term.subst subst t in
+
+        let vars1 = List.rev_append is vars in
+
+        let conds_t = c :: conds in 
+        let conds_e =      conds in (* could be improved *)
+
+        let sp = sel fsel sp ~vars:vars1 ~conds         ~p:(0 :: p) c in
+        let sp = sel fsel sp ~vars:vars1 ~conds:conds_t ~p:(1 :: p) t in
+        (*    *) sel fsel sp ~vars       ~conds:conds_e ~p:(2 :: p) e 
+
+  and sel_l fsel (sp : Sp.t) ~vars ~conds ~(p : pos) (l : Term.term list) = 
+    List.foldi (fun i sp t -> sel fsel sp ~vars ~conds ~p:(i :: p) t) sp l 
+
+
+  (** Exported *)
+  let select (fsel : f_sel) (t : Term.term) : Sp.t =
+    sel fsel Sp.empty ~vars:[] ~conds:[] ~p:[] t
+
+  (*------------------------------------------------------------------*)
+  (** Exported *)
+  let select_e (fsel : f_sel) (t : Equiv.form) : Sp.t =
+    
+    (* [p] is the current position *)
+    let rec sel_e (sp : Sp.t) ~vars ~conds ~(p : pos) (t : Equiv.form) =  
+      match t with
+      | Equiv.Quant (q, is, t0) ->
+        let is, subst = Term.refresh_vars `Global is in
+        let t0 = Equiv.subst subst t0 in
+        let vars = List.rev_append is vars in
+        sel_e sp ~vars ~conds ~p:(0 :: p) t0
+
+      | Equiv.Atom (Reach t) -> 
+        sel fsel sp ~vars ~conds ~p:(0 :: 0 :: p) t
+
+      | Equiv.Atom (Equiv e) -> 
+        sel_l fsel sp ~vars ~conds ~p:(0 :: 0 :: p) e
+
+      | Equiv.Impl (f1, f2)
+      | Equiv.And  (f1, f2)
+      | Equiv.Or   (f1, f2) -> 
+        sel_e_l sp ~vars ~conds ~p [f1; f2]
+        
+    and sel_e_l (sp : Sp.t) ~vars ~conds ~(p : pos) (l : Equiv.form list) = 
+      List.foldi (fun i sp t -> sel_e sp ~vars ~conds ~p:(i :: p) t) sp l 
+    in 
+    
+    sel_e Sp.empty ~vars:[] ~conds:[] ~p:[] t
+
+
+  (*------------------------------------------------------------------*)
+  let destr_vars (l : Term.term list) : Vars.var list =
+    List.map (fun x -> oget (Term.destr_var x)) l
+
+  (*------------------------------------------------------------------*)
+  type 'a f_map_fold =
+    Term.term -> Vars.vars -> Term.term list -> pos -> 'a ->
+    'a * [`Map of Term.term | `Continue]
+
+  type f_map =
+    Term.term -> Vars.vars -> Term.term list -> pos -> 
+    [`Map of Term.term | `Continue]
+
+  (*------------------------------------------------------------------*)
+  (** Internal *)
+  let rec map_fold
+      (func   : 'a f_map_fold) 
+      (m_rec  : bool)           (* do we recurse under successful folds *)
+      ~(env   : Vars.env)       (* var env, to have clean variable names *)
+      ~(vars  : Vars.var list)  (* variable bound above the current position *)
+      ~(conds : Term.term list) (* conditions above the current position *)
+      ~(p     : pos)            (* current position *)
+      ~(acc   : 'a)             (* folding value *)
+      (ti    : Term.term) 
+    : 'a * bool * Term.term     (* folding value, `Map found, term *)
+    = 
+    let map_fold ?(env = env) ?(vars = vars) ?(conds = conds) = 
+      map_fold func m_rec ~env ~vars ~conds 
+    in
+    let map_fold_l ?(env = env) ?(vars = vars) ?(conds = conds) = 
+      map_fold_l func m_rec ~env ~vars ~conds 
+    in
+
+    match func ti vars conds p acc with
+    | acc, `Map t -> 
+      let acc, _, t =
+        if m_rec then map_fold ~p ~acc:acc t else acc, true, t
+      in
+      acc, true, t
+
+    | acc, `Continue ->
+      match ti with
+      | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite ->
+        assert (snd fs = []);
+
+        let conds_t =             c :: conds in
+        let conds_e = Term.mk_not c :: conds in
+
+        let acc, foundc, c = map_fold ~conds         ~p:(0 :: p) ~acc c in
+        let acc, foundt, t = map_fold ~conds:conds_t ~p:(1 :: p) ~acc t in
+        let acc, founde, e = map_fold ~conds:conds_e ~p:(2 :: p) ~acc e in
+        let found = foundc || foundt || founde in
+        
+        let ti' = Term.mk_ite ~simpl:false c t e in
+        acc, found, if found then ti' else ti
+
+      | Term.Fun ((fs, l1), fty, l2) ->
+        let l = (List.map Term.mk_var l1) @ l2 in
+
+        let acc, found, l = map_fold_l ~p ~acc l in
+
+        let l1, l2 = List.takedrop (List.length l1) l in
+        let l1 = destr_vars l1 in
+
+        let ti' = Term.mk_fun0 (fs, l1) fty l2 in
+        acc, found, if found then ti' else ti
+
+      | Term.Name ns ->
+        let l = List.map Term.mk_var ns.s_indices in
+
+        let acc, found, l = map_fold_l ~p ~acc l in
+        let l = destr_vars l in
+
+        let ti' = Term.mk_name (Term.mk_isymb ns.s_symb ns.s_typ l) in
+        acc, found, if found then ti' else ti
+
+      | Term.Macro (ms, terms, ts) ->
+        assert (terms = []);
+
+        let l = (List.map Term.mk_var ms.s_indices) @ [ts] in
+
+        let acc, found, l = map_fold_l ~vars ~conds ~p ~acc l in
+
+        let l1, ts = List.takedrop (List.length ms.s_indices) l in
+        let l1 = destr_vars l1 in
+        let ts = as_seq1 ts in
+
+        let ti' = Term.mk_macro (Term.mk_isymb ms.s_symb ms.s_typ l1) [] ts in
+        acc, found, if found then ti' else ti
+
+      | Term.Action (a, is) ->
+        let l = List.map Term.mk_var is in
+
+        let acc, found, l = map_fold_l ~vars ~conds ~p ~acc l in
+
+        let l = destr_vars l in
+
+        let ti' = Term.mk_action a l in
+        acc, found, if found then ti' else ti
+
+      | Term.Var _ -> acc, false, ti
+
+      | Term.ForAll (is, t0)
+      | Term.Exists (is, t0)
+      | Term.Seq    (is, t0) -> 
+        let env, is, subst = Term.refresh_vars_env env is in
+        let t0 = Term.subst subst t0 in
+        let vars = List.rev_append is vars in
+
+        let acc, found, t0 = map_fold ~env ~vars ~p:(0 :: p) ~acc t0 in
+
+        let ti' = 
+          match ti with
+          | Term.ForAll _ -> Term.mk_forall is t0
+          | Term.Exists _ -> Term.mk_exists is t0
+          | Term.Seq    _ -> Term.mk_seq0   is t0
+
+          | _ -> assert false
+        in
+
+        acc, found, if found then ti' else ti
+
+      | Term.Diff (t1, t2) ->
+        let acc, found, l = map_fold_l ~p ~acc [t1; t2] in
+        let t1, t2 = as_seq2 l in
+
+        let ti' = Term.mk_diff t1 t2 in
+        acc, found, if found then ti' else ti
+
+      | Term.Find (is, c, t, e) ->
+        let env, is, subst = Term.refresh_vars_env env is in
+        let c = Term.subst subst c in
+        let t = Term.subst subst t in
+        
+        let vars1 = List.rev_append is vars in
+
+        let conds_t = c :: conds in 
+        let conds_e =      conds in (* could be improved *)
+        
+        let acc, foundc, c = 
+          map_fold ~env ~vars:vars1 ~conds         ~p:(0 :: p) ~acc c 
+        in
+        let acc, foundt, t = 
+          map_fold ~env ~vars:vars1 ~conds:conds_t ~p:(1 :: p) ~acc t 
+        in
+        let acc, founde, e = 
+          map_fold ~env ~vars       ~conds:conds_e ~p:(2 :: p) ~acc e 
+        in
+        let found = foundc || foundt || founde in
+
+        let ti' = Term.mk_find is c t e in
+        acc, found, if found then ti' else ti
+
+  and map_fold_l func m_rec ~env ~vars ~conds ~(p : pos) ~acc (l : Term.terms) =
+    let (acc, found), l =
+      List.mapi_fold (fun i (acc, found) ti -> 
+          let acc, found', ti = 
+            map_fold func m_rec ~env ~vars ~conds ~p:(i :: p) ~acc ti
+          in
+          (acc, found || found'), ti
+        ) (acc, false) l 
+    in
+    acc, found, l
+
+  (*------------------------------------------------------------------*)
+  (** Internal *)
+  let rec map_fold_e
+      (func   : 'a f_map_fold) 
+      (m_rec  : bool)           (* do we recurse under successful maps *)
+      ~(env   : Vars.env)       (* var env, to have clean variable names *)
+      ~(vars  : Vars.var list)  (* variable bound above the current position *)
+      ~(conds : Term.term list) (* conditions above the current position *)
+      ~(p     : pos)            (* current position *)
+      ~(acc   : 'a)             (* folding value *)
+      (ti     : Equiv.form) 
+    : 'a * bool * Equiv.form     (* folding value, `Map found, term *)
+    = 
+    let map_fold_e ?(env = env) ?(vars = vars) ?(conds = conds) = 
+      map_fold_e func m_rec ~env ~vars ~conds 
+    in
+    let map_fold_e_l ?(env = env) ?(vars = vars) ?(conds = conds) = 
+      map_fold_e_l func m_rec ~env ~vars ~conds 
+    in
+
+    match ti with
+    | Equiv.Quant (q, is, t0) ->
+      let env, is, subst = Term.refresh_vars_env env is in
+      let t0 = Equiv.subst subst t0 in
+      let vars = List.rev_append is vars in
+
+      let acc, found, t0 = map_fold_e ~env ~vars ~p:(0 :: p) ~acc t0 in
+
+      let ti' = Equiv.mk_quant q is t0 in
+      acc, found, if found then ti' else ti
+
+    | Equiv.Atom (Reach t) -> 
+      let acc, found, t =
+        map_fold func m_rec ~env ~vars ~conds ~p:(0 :: 0 :: p) ~acc t 
+      in
+      let ti' = Equiv.Atom (Reach t) in
+      acc, found, if found then ti' else ti
+
+    | Equiv.Atom (Equiv e) -> 
+      let acc, found, l = 
+        map_fold_l func m_rec ~env ~vars ~conds ~p:(0 :: 0 :: p) ~acc e 
+      in
+      let ti' = Equiv.Atom (Equiv l) in
+      acc, found, if found then ti' else ti
+
+    | Equiv.Impl (f1, f2)
+    | Equiv.And  (f1, f2)
+    | Equiv.Or   (f1, f2) -> 
+      let acc, found, l = map_fold_e_l ~env ~vars ~conds ~p ~acc [f1; f2] in
+      let f1, f2 = as_seq2 l in
+      let ti' = 
+        match ti with
+        | Equiv.Impl _ -> Equiv.Impl (f1, f2)
+        | Equiv.And  _ -> Equiv.And  (f1, f2)
+        | Equiv.Or   _ -> Equiv.Or   (f1, f2)
+        | _ -> assert false
+      in
+      acc, found, if found then ti' else ti
+
+  and map_fold_e_l func m_rec ~env ~vars ~conds ~p ~acc (l : Equiv.form list) =
+    let (acc, found), l =
+      List.mapi_fold (fun i (acc, found) ti -> 
+          let acc, found', ti = 
+            map_fold_e func m_rec ~env ~vars ~conds ~p:(i :: p) ~acc ti
+          in
+          (acc, found || found'), ti
+        ) (acc, false) l 
+    in
+    acc, found, l
+
+
+  (*------------------------------------------------------------------*)
+  (** Exported *)
+  let map ?(m_rec=false) (func : f_map) env (t : Term.term) : bool * Term.term =
+    let func : unit f_map_fold = 
+      fun t vars conds p () -> (), func t vars conds p 
+    in
+    let (), found, t =
+      map_fold func m_rec ~env ~vars:[] ~conds:[] ~p:[] ~acc:() t
+    in
+    found, t
+
+  (** Exported *)
+  let map_e ?(m_rec=false) (func : f_map) env (t : Equiv.form) : bool * Equiv.form =
+    let func : unit f_map_fold = 
+      fun t vars conds p () -> (), func t vars conds p 
+    in
+    let (), found, t = 
+      map_fold_e func m_rec ~env ~vars:[] ~conds:[] ~p:[] ~acc:() t
+    in
+    found, t
+
+  (*------------------------------------------------------------------*)
+  (** Exported *)
+  let map_fold ?(m_rec=false) func env acc (t : Term.term) =
+    map_fold func m_rec ~env ~vars:[] ~conds:[] ~p:[] ~acc t
+
+  (** Exported *)
+  let map_fold_e ?(m_rec=false) func env acc (t : Equiv.form) =
+    map_fold_e func m_rec ~env ~vars:[] ~conds:[] ~p:[] ~acc t
+end
+
+(*------------------------------------------------------------------*)
+(** {2 Term heads} *)
 
 type term_head =
   | HExists
@@ -299,9 +690,6 @@ type match_res =
   | NoMatch of (terms * match_infos) option
   | Match   of Mvar.t
 
-type f_map =
-  term -> Vars.vars -> Term.term list -> [`Map of term | `Continue]
-
 (** matching algorithm options *)
 type match_option = {
   mode          : [`Eq | `EntailLR | `EntailRL];
@@ -348,8 +736,6 @@ module type S = sig
     t -> 
     t pat ->
     match_res
-
-  val map : ?m_rec:bool -> f_map -> Vars.env -> t -> t option
 
   val find : 
     ?option:match_option ->
@@ -447,7 +833,7 @@ let try_match_gen (type a)
 (*------------------------------------------------------------------*)
 (** {3 Term matching and unification} *)
 
-module T (* : S with type t = message *) = struct
+module T (* : S with type t = Term.term *) = struct
   type t = term
 
   let pp_pat pp_t fmt p =
@@ -820,123 +1206,23 @@ module T (* : S with type t = message *) = struct
   let try_match = try_match_gen Equiv.Local_t (fun ~mode -> tmatch)
 
   (*------------------------------------------------------------------*)
-  let _map 
-      ~(m_rec:bool)
-      (func:f_map)
-      (env:Vars.env)
-      ~(vars:Vars.vars)
-      ~(conds:Term.term list)
-      (t : term) 
-    : bool * term
-    =
-
-    (* the return boolean indicates whether a match was found in the subterm. *)
-    let rec map 
-        (env   : Vars.env)
-        (vars  : Vars.vars)
-        (conds : Term.term list)
-        (t     : term) 
-      : bool * term
-      =
-      match func t vars conds with
-      (* head matches *)
-      | `Map t' ->
-        let t' =
-          if m_rec then snd (map env vars conds t') else t'
-        in
-        true, t'
-
-      (* head does not match, recurse with a special handling of binders and if *)
-      | `Continue ->
-        match t with
-        | ForAll (vs, b) ->
-          let env, vs, s = refresh_vars_env env vs in
-          let b = Term.subst s b in
-          let vars = List.rev_append vs vars in
-          let found, b = map env vars conds b in
-          let t' = Term.mk_forall ~simpl:false vs b in
-
-          if found then true, t' else false, t
-
-        | Exists (vs, b) ->
-          let env, vs, s = refresh_vars_env env vs in
-          let b = Term.subst s b in
-          let vars = List.rev_append vs vars in
-          let found, b = map env vars conds b in
-          let t' = Term.mk_exists ~simpl:false vs b in
-
-          if found then true, t' else false, t
-
-        | Find (b, c, d, e) ->
-          let env1, vs, s = refresh_vars_env env b in
-          let c, d = Term.subst s c, Term.subst s d in
-          let vars1 = List.rev_append b vars in
-          let dconds = c :: conds in
-          let found0, c = map env1 vars1 conds  c in
-          let found1, d = map env1 vars1 dconds d in
-          let found2, e = map env  vars  conds  e in
-          let t' = Term.mk_find vs c d e in
-          let found = found0 || found1 || found2 in
-
-          if found then true, t' else false, t
-
-        | Seq (vs, b) ->
-          let env, vs, s = refresh_vars_env env vs in
-          let b = Term.subst s b in
-          let vars = List.rev_append vs vars in
-          let found, b = map env vars conds b in
-          let t' = Term.mk_seq0 vs b in
-
-          if found then true, t' else false, t
-
-        | Term.Fun (fs, _, [c;ft;fe]) when fs = Term.f_ite ->
-          let tconds = c :: conds in
-          let econds = Term.mk_not ~simpl:false c :: conds in
-          let found0, c  = map env vars conds  c in
-          let found1, ft = map env vars tconds ft in
-          let found2, fe = map env vars econds fe in
-          let t' = Term.mk_ite ~simpl:false c ft fe in
-          let found = found0 || found1 || found2 in
-
-          if found then true, t' else false, t
-
-        | _ ->
-          tmap_fold (fun found t ->
-              let found', t = map env vars conds t in
-              found || found', t
-            ) false t
-    in
-
-    map env vars conds t
-
   (** Exported *)
-  let map 
-      ?(m_rec=false)
-      (func : f_map)
-      (env  : Vars.env)
-      (t    : term) 
-    : term option
-    =
-    let found, t = _map ~m_rec func env ~vars:[] ~conds:[] t in
-    match found with
-    | false -> None
-    | true  -> Some t
-
   let find
       ?option
       (table : Symbols.table) 
       (expr  : SystemExpr.t) 
-      (env   : Vars.env)
+      (venv  : Vars.env)
       (pat   : term pat) 
       (t     : t) 
+    : Term.term list
     =
-    let acc = ref [] in 
-    ignore (map (fun e v conds -> 
-        match try_match ?option table expr e pat with
-        | Match _ -> acc := e :: !acc ; `Continue
-        | _ -> `Continue
-      ) env t);
-    !acc
+    let f_fold : Term.terms Pos.f_map_fold = fun e _vars _conds _p acc ->
+      match try_match ?option table expr e pat with
+      | Match _ -> e :: acc, `Continue
+      | _       -> acc, `Continue
+    in
+    let acc, _, _ = Pos.map_fold f_fold venv [] t in
+    acc
 end
 
 (*------------------------------------------------------------------*)
@@ -2103,82 +2389,21 @@ module E : S with type t = Equiv.form = struct
   let try_match = try_match_gen Equiv.Global_t fmatch
 
   (*------------------------------------------------------------------*)
-  let map
-      ?(m_rec=false)
-      (func : f_map)
-      (env : Vars.env)
-      (e : Equiv.form) 
-    : Equiv.form option
-    =
-
-    let rec map
-        (env : Vars.env)
-        (vars : Vars.vars)
-        (conds : Term.term list)
-        (e : Equiv.form) 
-      : bool * Equiv.form
-      =
-      match e with
-      | Atom (Reach f) ->
-        let found, f = T._map ~m_rec func env ~vars ~conds f in
-        let e' = Equiv.Atom (Reach f) in
-
-        if found then true, e' else false, e
-
-      | Atom (Equiv frame) ->
-        let found, frame = List.fold_left (fun (found,acc) f ->
-            let found0, f = T._map ~m_rec func env ~vars ~conds f in
-            found0 || found, f :: acc
-          ) (false,[]) frame
-        in
-        let frame = List.rev frame in
-        let e' = Equiv.Atom (Equiv frame) in
-
-        if found then true, e' else false, e
-
-      | Or   (e1, e2)
-      | And  (e1, e2)
-      | Impl (e1, e2) ->
-        let found1, e1 = map env vars conds e1
-        and found2, e2 = map env vars conds e2 in
-        let e' = match e with
-          | Or  _  -> Equiv.Or (e1, e2)
-          | And  _ -> Equiv.And (e1, e2)
-          | Impl _ -> Equiv.Impl (e1, e2)
-          | _ -> assert false
-        in
-        let found = found1 || found2 in
-
-        if found then true, e' else false, e
-
-      | Quant (q,vs,e0) ->
-        let env, vs, s = refresh_vars_env env vs in
-        let vars = List.rev_append vs vars in
-        let e0 = Equiv.subst s e0 in
-        let found, b = map env vars conds e0 in
-        let e' = Equiv.Quant (q,vs,b) in
-
-        if found then true, e' else false, e
-    in
-
-    let found, e = map env [] [] e in
-    match found with
-    | false -> None
-    | true  -> Some e
-
+  (** Exported *)
   let find
       ?option
       (table : Symbols.table) 
       (expr  : SystemExpr.t) 
-      (env   : Vars.env)
+      (venv  : Vars.env)
       (pat   : term pat) 
       (t     : Equiv.form) 
+    : Term.terms
     =
-    let acc = ref [] in
-    ignore (map (fun e v conds -> 
-        match T.try_match table expr e pat with
-        | Match _ -> acc := e :: !acc ; `Continue
-        | _ -> `Continue
-      ) env t);
-    !acc
+    let f_fold : Term.terms Pos.f_map_fold = fun e _vars _conds _p acc ->
+      match T.try_match ?option table expr e pat with
+      | Match _ -> e :: acc, `Continue
+      | _       ->      acc, `Continue
+    in
+    let acc, _, _ = Pos.map_fold_e f_fold venv [] t in
+    acc
 end

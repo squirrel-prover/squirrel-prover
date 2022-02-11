@@ -159,6 +159,12 @@ module List = struct
     : 'a * 'c list 
     =
     mapi_fold (fun (_ : int) x -> f x) a xs
+
+  let foldi (f : (int -> 'a -> 'b -> 'a)) (acc : 'a) (l : 'b list) : 'a =
+    let acc, _ = 
+      List.fold_left (fun (acc, i) x -> f i acc x, i + 1) (acc,0) l 
+    in
+    acc
 end
 
 (*------------------------------------------------------------------*)

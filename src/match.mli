@@ -3,6 +3,92 @@ open Utils
 module Sv = Vars.Sv
 
 (*------------------------------------------------------------------*)
+(** {2 Positions} *)
+
+module Pos : sig
+
+  (** A position in a term *)
+  type pos
+
+  (** set of positions *)
+  module Sp : Set.S with type elt = pos
+
+  (*------------------------------------------------------------------*)
+  (** [f] of type [f_sel] is a function that, given [t vars conds] where:
+      - [t] is sub-term of the term we are mapping one
+      - [vars] are the free variable bound above [t]'s occurrence
+      - [conds] are conditions above [t]'s occurrence
+
+      If [f t vars conds = `Select], we found a position.
+      If [f t vars conds = `Continue], we keep looking for positions downwards. *)
+  type f_sel =
+    Term.term -> Vars.vars -> Term.term list ->
+    [`Select | `Continue]
+
+  (*------------------------------------------------------------------*)
+  (** [select f t] compute the positions in [t] selected by [f]. *)
+  val select : f_sel -> Term.term -> Sp.t
+
+  (** Same as [select], except that is acts on [Equiv.form]. Note that we 
+      can only select [Term.term] positions. *)
+  val select_e : f_sel -> Equiv.form -> Sp.t
+
+  (*------------------------------------------------------------------*)
+  (** [f] of type ['a f_map_fold] is a function that, given 
+      [t vars conds p acc] where:
+      - [t] is sub-term of the term we are mapping one
+      - [vars] are the free variable bound above [t]'s occurrence
+      - [conds] are conditions above [t]'s occurrence
+      - [p] is the position of [t]'s occurrence
+
+      If [f t vars conds p acc =]:
+      - [`Select], we found a position.
+      - [`Continue], we keep looking for positions downwards. *)
+  type 'a f_map_fold =
+    Term.term -> Vars.vars -> Term.term list -> pos -> 'a ->
+    'a * [`Map of Term.term | `Continue]
+
+  (** Same as [f_map_fold], but just for a map. *)
+  type f_map =
+    Term.term -> Vars.vars -> Term.term list -> pos -> 
+    [`Map of Term.term | `Continue]
+
+  (*------------------------------------------------------------------*)
+  (** [map_fold ?m_rec func env acc t] applies [func] at all position in [t].
+      If [m_rec] is true, recurse after applying [func].
+      [m_rec] default to [false].*)
+  val map_fold : 
+    ?m_rec:bool -> 
+    'a f_map_fold ->            (* folding function *)
+    Vars.env ->                 (* for clean variable printing *)
+    'a ->                       (* folding value *)
+    Term.term -> 
+    'a * bool * Term.form       (* folding value, `Map found, term *)
+
+  (** Same as [map_fold] for [Equiv.form]. *)
+  val map_fold_e : 
+    ?m_rec:bool -> 
+    'a f_map_fold ->            (* folding function *)
+    Vars.env ->                 (* for clean variable printing *)
+    'a ->                       (* folding value *)
+    Equiv.form -> 
+    'a * bool * Equiv.form      (* folding value, `Map found, term *)
+
+  (*------------------------------------------------------------------*)
+  (** Same as [map_fold], but only a map. 
+      Return: `Map found, term *)
+  val map : 
+    ?m_rec:bool -> f_map -> Vars.env -> Term.term -> bool * Term.form
+
+  (** Same as [map_fold_e], but only a map.
+      Return: `Map found, term *)
+  val map_e :
+    ?m_rec:bool -> f_map -> Vars.env -> Equiv.form -> bool * Equiv.form
+end
+
+(*------------------------------------------------------------------*)
+(** {2 Term heads} *)
+
 type term_head =
   | HExists
   | HForAll
@@ -75,17 +161,6 @@ type match_res =
   | NoMatch of (Term.terms * Term.match_infos) option
   | Match   of Mvar.t
 
-(** [f] of type [fmap] is a function that, given [t vars conds] where:
-    - [t] is sub-term of the term we are mapping one
-    - [vars] are the free variable bound above [t]'s occurrence
-    - [conds] are conditions above [t]'s occurrence
-
-    If [f t vars conds = `Continue], we keep looking for an occurrence.
-    If [f t vars conds = `Map t'], we replace [t] by [t']. *)
-type f_map =
-  Term.term -> Vars.vars -> Term.term list ->
-  [`Map of Term.term | `Continue]
-
 (** matching algorithm options *)
 type match_option = {
   mode          : [`Eq | `EntailLR | `EntailRL];
@@ -138,11 +213,6 @@ module type S = sig
     t -> 
     t pat ->
     match_res
-
-  (** [map ?m_rec func env t] applies [func] at all position in [t].
-      If [m_rec] is true, recurse after applying [func].
-      [m_rec] default to [false].*)
-  val map : ?m_rec:bool -> f_map -> Vars.env -> t -> t option
 
   (** [find pat t] returns the list of occurences in t that match the
      pattern. *)

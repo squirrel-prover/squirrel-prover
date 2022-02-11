@@ -8,6 +8,8 @@ name n : index->message
 name m : index->message
 system !_i !_j out(c,<n(i),n(j)>).
 
+include Basic.
+
 global goal test (k:index) : 
   [(((exec@pred(A(k,k)) && true) => k <> k) && 
     (forall (i,j:index), A(i,j)<A(k,k) => i<>k) &&
@@ -19,7 +21,6 @@ Proof.
   intro Heq Hap H. 
   fresh 1. 
   rewrite Heq.
-  nosimpl(yesif 1).
-  true. 
+  rewrite if_true; 1: assumption.
   expandall; assumption.
 Qed.

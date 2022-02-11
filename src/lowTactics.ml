@@ -128,12 +128,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | T_hyp   of Ident.t  (** Hypothesis. *)
     | T_felem of int      (** Element in conclusion biframe. *)
 
-  (** Formulas and terms of different types, corresponding to different targets.
-    * It is slight abusive to use [any_form] here: we represent frame elements
-    * as local formulas, though local formulas must be boolean terms while
-    * frame elements can be arbitrary messages. *)
-  type cform = Equiv.any_form
-
   type targets = target list
 
   let target_all s : target list =
@@ -164,7 +158,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** Apply some function [doit] to a single target. *)
   let do_target
-      (doit : (cform * Ident.t option) -> cform * S.conc_form list)
+      (doit : (
+          (Equiv.any_form * Ident.t option) -> 
+          Equiv.any_form * S.conc_form list))
       (s : S.sequent) (t : target) : S.sequent * S.sequent list =
     let f, s, tgt_id = match t with
       | T_conc ->
@@ -266,8 +262,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
 
     (* applies [doit] to all subterms of the target [f] *)
-    let doit ((f,_) : cform * Ident.t option) : cform * S.conc_form list =
-
+    let doit
+        ((f,_) : Equiv.any_form * Ident.t option) 
+      : Equiv.any_form * S.conc_form list 
+      =
       let unfold occ = 
         match unfold_term ~strict occ s with
         | None -> `Continue
@@ -276,24 +274,35 @@ module MkCommonLowTac (S : Sequent.S) = struct
           `Map t
       in
 
-      let expand_inst occ vars conds =
-        match occ with
-        | Term.Macro (ms, _, _) ->
-          if found_occ_macro target ms occ then unfold occ else `Continue
+      let expand_inst : Match.Pos.f_map = 
+        fun occ _vars _conds _p ->
+          match occ with
+          | Term.Macro (ms, _, _) ->
+            if found_occ_macro target ms occ then
+              unfold occ 
+            else
+              `Continue
 
-        | Term.Fun ((f,_), _, _) ->
-          if found_occ_fun target f then unfold occ else `Continue
+          | Term.Fun ((f,_), _, _) ->
+            if found_occ_fun target f then 
+              unfold occ
+            else
+              `Continue
 
-        | _ -> `Continue
+          | _ -> `Continue
       in
 
       match f with
       | `Equiv f ->
-        let f = odflt f (Match.E.map ?m_rec expand_inst (S.vars s) f) in
+        let _, f = 
+          Match.Pos.map_e ?m_rec expand_inst (S.vars s) f 
+        in
         `Equiv f, []
 
       | `Reach f ->
-        let f = odflt f (Match.T.map ?m_rec expand_inst (S.vars s) f) in
+        let _, f = 
+          Match.Pos.map ?m_rec expand_inst (S.vars s) f 
+        in
         `Reach f, []
     in
 
@@ -309,19 +318,22 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (s : S.t) 
     : Term.term 
     =
-    let expand_inst occ vars conds =
-      match occ with
-      | Term.Macro (ms, l, _) ->
-        begin
-          match unfold_term ~strict:false ~force_happens occ s with
-          | None -> `Continue
-          | Some t -> `Map t
-        end
-
-      | _ -> `Continue
+    let expand_inst : Match.Pos.f_map = 
+      fun occ _vars _conds _p ->
+        match occ with
+        | Term.Macro (ms, l, _) ->
+          begin
+            match unfold_term ~strict:false ~force_happens occ s with
+            | None -> `Continue
+            | Some t -> `Map t
+          end
+          
+        | _ -> `Continue
     in
-    let f_opt = Match.T.map ~m_rec:true expand_inst (S.vars s) f in
-    odflt f f_opt
+    let _, f = 
+      Match.Pos.map ~m_rec:true expand_inst (S.vars s) f 
+    in
+    f
 
   (** expand all macro of some targets in a sequent *)
   let expand_all targets (s : S.sequent) : S.sequent =
@@ -440,7 +452,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
     (* set to true if at least one rewriting occured in any of the targets *)
     let found = ref false in
 
-    let doit_tgt (f,tgt_id : cform * Ident.t option) : cform * S.conc_form list =
+    let doit_tgt 
+        (f,tgt_id : Equiv.any_form * Ident.t option) 
+      : Equiv.any_form * S.conc_form list 
+      =
       let mult, id_opt, rw_erule = rw in
       if is_same id_opt tgt_id
       then f, []

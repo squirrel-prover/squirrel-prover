@@ -175,56 +175,57 @@ let rewrite
        free variables are instantiated according to [mv], and variables
        bound above the matched occurrences are universally quantified in
        the generated sub-goals. *)
-    let rw_inst occ vars conds =
-      match Match.T.try_match table system occ !pat with
-      | NoMatch _ | FreeTyv -> `Continue
+    let rw_inst : Match.Pos.f_map = 
+      fun occ vars _conds _p ->
+        match Match.T.try_match table system occ !pat with
+        | NoMatch _ | FreeTyv -> `Continue
 
-      (* head matches *)
-      | Match mv ->
-        if !found_instance then
-          (* we already found the rewrite instance earlier *)
-          `Map (oget !right_instance)
+        (* head matches *)
+        | Match mv ->
+          if !found_instance then
+            (* we already found the rewrite instance earlier *)
+            `Map (oget !right_instance)
 
-        else begin (* we found the rewrite instance *)
-          found_instance := true;
-          let subst = Match.Mvar.to_subst ~mode:`Match mv in
-          let left = Term.subst subst left in
-          let right = Term.subst subst right in
+          else begin (* we found the rewrite instance *)
+            found_instance := true;
+            let subst = Match.Mvar.to_subst ~mode:`Match mv in
+            let left = Term.subst subst left in
+            let right = Term.subst subst right in
 
-          right_instance := Some right;
-          subs_r :=
-            List.map (fun rsub ->
-                Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
-              ) rsubs;
+            right_instance := Some right;
+            subs_r :=
+              List.map (fun rsub ->
+                  Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
+                ) rsubs;
 
-          pat := Match.{ pat_term   = left;
-                         pat_tyvars = [];
-                         pat_vars   = Sv.empty; };
+            pat := Match.{ pat_term   = left;
+                           pat_tyvars = [];
+                           pat_vars   = Sv.empty; };
 
-          `Map right
-        end
+            `Map right
+          end
     in
 
-    let f_opt = match f with
+    let found, f = match f with
       | `Equiv f ->
-        let f_opt = Match.E.map rw_inst env f in
-        omap (fun x -> `Equiv x) f_opt
+        let found, f = Match.Pos.map_e rw_inst env f in
+        found, `Equiv f
 
       | `Reach f ->
-        let f_opt = Match.T.map rw_inst env f in
-        omap (fun x -> `Reach x) f_opt
+        let found, f = Match.Pos.map rw_inst env f in
+        found, `Reach f
     in
 
-    match mult, f_opt with
-    | `Any, None -> f, !subs_r
+    match mult, found with
+    | `Any, false -> f, !subs_r
 
-    | (`Once | `Many), None -> raise (Failed `NothingToRewrite)
+    | (`Once | `Many), false -> raise (Failed `NothingToRewrite)
 
-    | (`Many | `Any), Some f ->
+    | (`Many | `Any), true ->
       let f, rsubs' = _rewrite `Any (tyvars, sv, rsubs, left, right) f in
       f, List.rev_append (!subs_r) rsubs'
 
-    | `Once, Some f -> f, !subs_r
+    | `Once, true -> f, !subs_r
   in
 
   let Term.ESubst (l,r) = rule.rw_rw in
