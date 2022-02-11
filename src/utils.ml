@@ -104,7 +104,7 @@ module List = struct
     if i = 0 then []
     else match l with
       | [] -> []
-      | x :: t -> x :: take0 (i - 1) l
+      | x :: t -> x :: take0 (i - 1) t
                     
   let take i l =
     if i < 0 then failwith "invalid argument";
