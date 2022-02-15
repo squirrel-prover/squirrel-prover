@@ -145,3 +145,31 @@ auto.
 
 Qed.
 
+(*------------------------------------------------------------------*)
+include Basic.
+
+system [test_ok2] (A: out(c, <ok,<h(ok,k),h(ok2,k)>>) | B: out(c, h(ok,k))).
+(* we start with a first transitivity, from test/left to testPrf *)
+system test_ok2G = [test_ok2/left] with gprf, h(ok,k).
+
+axiom [test_ok2G] ok_ok2 : ok = ok2.
+
+goal [test_ok2G/left] _ :
+  happens(A) =>
+  ok = ok2 =>
+  output@A = <ok, <n_PRF2,n_PRF2>>.
+Proof.
+  intro Hap ok_ok2 @/output.
+  case (try find such that (ok = ok) in n_PRF2 else _) => [_ _] //.
+  case (try find such that (ok2 = ok) in n_PRF2 else _) => [H _] //.
+Qed.
+
+goal [test_ok2G/left] _ :
+  happens(A) =>
+  ok <> ok2 =>
+  output@A = <ok, <n_PRF2,h(ok2, k)>>.
+Proof.
+  intro Hap ok_ok2 @/output.
+  case (try find such that (ok = ok) in n_PRF2 else _) => [_ _] //.
+  case (try find such that (ok2 = ok) in n_PRF2 else _) => [H _] //.
+Qed.
