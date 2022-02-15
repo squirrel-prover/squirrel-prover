@@ -7,5 +7,6 @@
   (name test)
   (libraries squirrellib)
   (modules test)
-  (deps (source_tree tests))
+  (action (run %{test} --compact))
+  (deps (source_tree tests)) ;; some tests rely on *.sp files in tests/
   (instrumentation (backend bisect_ppx)))

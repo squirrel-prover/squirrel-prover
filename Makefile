@@ -6,38 +6,42 @@ default: squirrel
 
 all: squirrel test
 
+test: alcotest okfail_test
+
+.PHONY: okfail_test okfail_test_end examples_end alcotest squirrel
+
+# Directory for logging test runs on "*.sp" files.
+RUNLOGDIR=_build/squirrel_log
+
+# Make sure the "echo" commands in okfail_test below are updated
+# to reflect the content of these variables.
 PROVER_TESTS = $(wildcard tests/ok/*.sp) $(wildcard tests/fail/*.sp)
 PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $(wildcard examples/stateful/*.sp)  $(wildcard examples/postQuantumKE/*.sp)
 
-test: squirrel alcotest okfail_test
-
-.PHONY: ok_test ok_test_end alcotest squirrel
-
-# Directory for logging test runs
-RUNLOGDIR=_build/squirrel_log
-okfail_test:
+okfail_test: squirrel
 	rm -rf $(RUNLOGDIR)
+	@echo "Running tests/ok/*.sp and tests/fail/*.sp."
 	@$(MAKE) -j8 okfail_test_end
+	@echo "Running examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 	@$(MAKE) -j4 examples_end
 
+# Run PROVER_TESTS as a dependency, then check for errors.
 okfail_test_end: $(PROVER_TESTS:.sp=.ok)
 	@echo
 	@if test -f tests/tests.ko ; then \
 	  echo Some tests failed: ; \
-	  cat tests/tests.ko ; rm -f tests/tests.ko ; exit 1 ; \
+	  cat tests/tests.ko | sort ; rm -f tests/tests.ko ; exit 1 ; \
 	 else echo All tests passed successfully. ; fi
 
+# Run PROVER_EXAMPLES as a dependency, then check for errors.
 examples_end: $(PROVER_EXAMPLES:.sp=.ok)
 	@echo
-	@rm -f tests/test_prologue.ok
 	@if test -f tests/tests.ko ; then \
 	  echo Some tests failed: ; \
-	  cat tests/tests.ko ; rm -f tests/tests.ko ; exit 1 ; \
+	  cat tests/tests.ko | sort ; rm -f tests/tests.ko ; exit 1 ; \
 	 else echo All tests passed successfully. ; fi
 
-tests/test_prologue.ok:
-	@echo "Running tests/ok/*.sp, tests/fail/*.sp, examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
-%.ok: tests/test_prologue.ok %.sp
+%.ok: %.sp
 	@mkdir -p `dirname $(RUNLOGDIR)/$(@:.ok=.sp)`
 	@if ./squirrel $(@:.ok=.sp) \
 	  > $(RUNLOGDIR)/$(@:.ok=.sp) \
@@ -45,40 +49,42 @@ tests/test_prologue.ok:
 	 ; then echo -n . ; \
 	 else echo "[FAIL] $(@:.ok=.sp)" >> tests/tests.ko ; echo -n '!' ; fi
 
+# Only executes tests if dependencies have changed,
+# relying on dune file to know (possibly runtime) dependencies.
 alcotest: version
-	@mkdir -p ./_build/default/_build/_tests
-	@rm -f ./_build/default/_build/_tests/Squirrel ./_build/default/_build/_tests/latest
-	dune runtest --force
-# TODO: how to pass the --compact flag to the test executable?
+	dune runtest
 
 clean:
 	dune clean
 	@rm -f squirrel
-	rm -f *.coverage
 	rm -rf _coverage
 
-# debug flag (-g) enabled by default
 squirrel: version
 	dune build squirrel.exe
 	cp -f _build/default/squirrel.exe squirrel
 
-makecoverage: version
-	@mkdir -p ./_build/default/_build/_tests
-	@rm -f ./_build/default/_build/_tests/Squirrel ./_build/default/_build/_tests/latest
+# Run tests (forcing a re-run) with bisect_ppx instrumentation on
+# to get coverage files, and generate an HTML report from them.
+# TODO also generate coverage report when running squirrel on *.sp files,
+# with two options:
+# 1. The instrumentation option could be passed to dune exec squirrel,
+#    but the latter does not work (theories are not installed).
+# 2. These tests could be ran as dune tests rather than through this
+#    Makefile, which would render instrumentation available and would
+#    also avoid re-runnning tests when unnecessary.
+coverage:
+	rm -rf _coverage
 	dune runtest --force --instrument-with bisect_ppx
-#	BISECT_COVERAGE=YES $(OCB) squirrel.byte
-#	@ln -s -f squirrel.byte squirrel
-
-coverage: makecoverage ok_test
-	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
-	bisect-ppx-report html --ignore-missing-files
-	rm -f *.coverage
+	find . -name '*.coverage' | \
+	  xargs bisect-ppx-report html --ignore-missing-files
+	find . -name '*.coverage' | xargs rm -f
+	@echo "Coverage report available: _coverage/index.html"
 
 install: version squirrel
 	cp -f squirrel $(PREFIX)/bin/squirrel
 	cp -r theories $(PREFIX)/bin/theories
 
-doc: # squirrel
+doc:
 	dune build @doc
 	@echo "generated documentation in _build/default/_doc/_html/squirrel/index.html"
 

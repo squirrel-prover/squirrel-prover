@@ -94,7 +94,12 @@ module List = struct
       match l with
       | _ :: t -> drop0 (i-1) t
       | [] -> l
-        
+
+  let%test _ = drop0 0 [1;2] = [1;2]
+  let%test _ = drop0 1 [1;2] = [2]
+  let%test _ = drop0 2 [1;2] = []
+  let%test _ = drop0 3 [1;2] = []
+
   let drop i l =
     if i < 0 then failwith "invalid argument";
     drop0 i l
@@ -105,7 +110,12 @@ module List = struct
     else match l with
       | [] -> []
       | x :: t -> x :: take0 (i - 1) t
-                    
+
+  let%test _ = take0 0 [1;2] = []
+  let%test _ = take0 1 [1;2] = [1]
+  let%test _ = take0 2 [1;2] = [1;2]
+  let%test _ = take0 3 [1;2] = [1;2]
+
   let take i l =
     if i < 0 then failwith "invalid argument";
     take0 i l
@@ -116,6 +126,11 @@ module List = struct
     else match r with
       | [] -> List.rev l, r
       | x :: t -> takedrop0 (x :: l) (i - 1) t
+
+  let %test _ = takedrop0 [] 0 [1;2] = ([],[1;2])
+  let %test _ = takedrop0 [] 1 [1;2] = ([1],[2])
+  let %test _ = takedrop0 [] 2 [1;2] = ([1;2],[])
+  let %test _ = takedrop0 [] 3 [1;2] = ([1;2],[])
 
   let takedrop i l =
     if i < 0 then failwith "invalid argument";

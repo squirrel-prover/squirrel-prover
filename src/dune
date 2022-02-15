@@ -6,6 +6,8 @@
   ; https://discuss.ocaml.org/t/dune-and-module-initialization-side-effects/4520
   (library_flags (:standard -linkall))
   (instrumentation (backend bisect_ppx))
+  (inline_tests)
+  (preprocess (pps ppx_inline_test))
   (libraries fmt fmt.tty alcotest ocamlgraph pcre
     (select smt.ml from
       (why3  -> smt.why3api.ml)
