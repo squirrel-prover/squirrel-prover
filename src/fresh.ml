@@ -1,3 +1,5 @@
+(** Utilities for tactics exploiting a name's freshness. *)
+
 open Utils
 
 module Sv = Vars.Sv
@@ -61,7 +63,7 @@ let pp_name_occ fmt (occ : name_occ) : unit =
   Iter.pp_occ (Fmt.list ~sep:Fmt.comma Vars.pp) fmt occ
 
 (** Looks for indices at which a name occurs.
-    Raise @Var_found if a term variable occurs in the term. *)
+    @raise Var_found if a term variable occurs in the term. *)
 let get_name_indices_ext 
     ?(fv=Sv.empty)
     (constr : Constr.trace_cntxt)

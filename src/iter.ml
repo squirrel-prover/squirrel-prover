@@ -484,7 +484,7 @@ let is_global ms table =
 (** Looks for macro occurrences in a term.
     - [mode = `FullDelta]: all macros that can be expanded are ignored.
     - [mode = `Delta]: only Global macros are expanded (and ignored)
-    Raise @Var_found if a term variable occurs in the term. *)
+    @raise Var_found if a term variable occurs in the term. *)
 let get_macro_occs  
     ~(mode  : [`FullDelta | `Delta ])
     (constr : Constr.trace_cntxt)

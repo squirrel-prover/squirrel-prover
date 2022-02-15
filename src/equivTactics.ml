@@ -224,7 +224,7 @@ let generalize (ts : Term.term) s =
 (*------------------------------------------------------------------*)
 (** Given a judgement [s] of the form Γ ⊢ E, and a timestamp τ,
     produce the judgments
-    Γ ⊢ E{ts → init}   and   (Γ, E{ts → pred τ}) ⊢ E.
+    [Γ ⊢ E{ts → init}] and [(Γ, E{ts → pred τ}) ⊢ E].
     The second one is then direclty simplified by a case on all possible
     values of τ, producing a judgement for each one.
     Generalizes Γ ⊢ E over τ if necessary. *)

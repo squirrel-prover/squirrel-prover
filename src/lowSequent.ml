@@ -85,10 +85,10 @@ module type S = sig
   val get_hint_db : t -> Hint.hint_db
 
   (** [get_models s] returns a set of minimal models corresponding to the
-    * trace atoms in the sequent [s].
-    * See module {!Constr}.
-    * @raise Tactics.Tactic_hard_failure
-    *        with parameter {!Tactics.TacTimeout} in case of timeout. *)
+      trace atoms in the sequent [s].
+      See module {!Constr}.
+      @raise Tactics.Tactic_hard_failure
+         with parameter {!Tactics.TacTimeout} in case of timeout. *)
   val get_models : t -> Constr.models
 
   (** {2 Substitution} *)

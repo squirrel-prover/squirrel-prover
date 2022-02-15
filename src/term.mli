@@ -1,21 +1,19 @@
-(** Terms for the Meta-BC logic.
-  *
-  * This module describes the syntax of the logic. It does not
-  * provide low-level representations, normal forms, etc. that
-  * are to be used in automated reasoning, nor does it provide
-  * representations necessary for the front-end involving
-  * processes, axioms, etc. *)
+(** Terms and formulas for the meta-logic.
 
-module Sv = Vars.Sv
+    This module describes the syntax of the logic. It does not
+    provide low-level representations, normal forms, etc. that
+    are to be used in automated reasoning, nor does it provide
+    representations necessary for the front-end involving
+    processes, axioms, etc. *)
 
 (*------------------------------------------------------------------*)
 (** {2 Symbols}
-  *
-  * We have function, name and macro symbols. Each symbol
-  * can then be indexed. *)
+
+    We have function, name and macro symbols. Each symbol
+    can then be indexed. *)
 
 (** Ocaml type of a typed index symbol.
-    Invariant: [s_typ] do not contain tvar or univars *)
+    Invariant: [s_typ] do not contain tvar or univars. *)
 type 'a isymb = private {
   s_symb    : 'a;
   s_indices : Vars.var list;
@@ -35,8 +33,8 @@ type fname = Symbols.fname Symbols.t
 type fsymb = fname * Vars.var list
 
 (** Macros are used to represent inputs, outputs, contents of state
-  * variables, and let definitions: everything that is expanded when
-  * translating the meta-logic to the base logic. *)
+    variables, and let definitions: everything that is expanded when
+    translating the meta-logic to the base logic. *)
 
 type mname = Symbols.macro Symbols.t
 type msymb = mname isymb
@@ -56,7 +54,9 @@ val pp_mname :  Format.formatter -> mname -> unit
 val pp_msymb :  Format.formatter -> msymb -> unit
 
 (*------------------------------------------------------------------*)
-(** {2 Terms} *)
+(** {2 Terms}
+
+  In this module {!term} describe both terms and formulas of the meta-logic. *)
 
 type ord = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
 type ord_eq = [ `Eq | `Neq ]
@@ -159,7 +159,7 @@ val ty  : ?ty_env:Type.Infer.env -> term -> Type.ty
 val get_vars : term -> Vars.var list
 
 (** [fv t] returns the free variables of [t]. *)
-val fv : term -> Sv.t
+val fv : term -> Vars.Sv.t
 
 val f_triv : term -> bool
 
@@ -167,8 +167,8 @@ val f_triv : term -> bool
 (** {2 Substitutions} *)
 
 (** Substitutions for all purpose, applicable to terms and timestamps.
-  * TODO unusually, we map terms to terms and not just variables to terms;
-  * this is used somewhere... but I forgot where *)
+    {b TODO} unusually, we map terms to terms and not just variables to terms;
+    this is used somewhere... but I forgot where. *)
 type esubst = ESubst of term * term 
 
 type subst = esubst list
@@ -177,7 +177,7 @@ val pp_subst : Format.formatter -> subst -> unit
 
 val is_var_subst : subst -> bool
 
-val subst_support : subst -> Sv.t
+val subst_support : subst -> Vars.Sv.t
 
 val subst_binding : Vars.var -> subst -> Vars.var * subst
 
@@ -190,8 +190,8 @@ val tsubst : Type.tsubst -> term -> term
 val tsubst_ht : Type.tsubst -> hterm -> hterm
 
 (** [subst_var s v] returns [v'] if substitution [s] maps [v] to [Var v'],
-  * and [v] if the variable is not in the domain of the substitution.
-  * @raise Substitution_error if [v] is mapped to a non-variable term in [s]. *)
+    and [v] if the variable is not in the domain of the substitution.
+    @raise Substitution_error if [v] is mapped to a non-variable term in [s]. *)
 val subst_var  : subst -> Vars.var -> Vars.var
 
 (** Substitute indices in an indexed symbols. *)
@@ -434,10 +434,10 @@ module Mt : Map.S with type key = term
 
 (*------------------------------------------------------------------*)
 (** {2 Convert from bi-terms to terms}
-  *
-  * TODO Could we use a strong typing of [term] to make a static
-  * distinction between biterms (general terms) and terms (terms
-  * without diff operators)? *)
+
+    {b TODO} Could we use a strong typing of [term] to make a static
+    distinction between biterms (general terms) and terms (terms
+    without diff operators)? *)
 
 type projection = PLeft | PRight | PNone
 
@@ -445,13 +445,13 @@ val pp_projection : Format.formatter -> projection -> unit
 
 
 (** Evaluate all diff operators wrt a projection.
-  * If the projection is [None], the input term is returned unchanged.
-  * Otherwise all diff operators are evaluated to the given
-  * side and the returned term does not feature diff operators.
-  * If the bi-term contains macros, and come from a bi-system, its
-  * projection is only correctly interpreted if it is used inside
-  * the projected system.
-  * *)
+    If the projection is [None], the input term is returned unchanged.
+    Otherwise all diff operators are evaluated to the given
+    side and the returned term does not feature diff operators.
+    If the bi-term contains macros, and come from a bi-system, its
+    projection is only correctly interpreted if it is used inside
+    the projected system.
+    *)
 val pi_term :  projection:projection -> term -> term
 
 (** Evaluate topmost diff operators

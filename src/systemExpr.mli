@@ -80,7 +80,7 @@ val descr_of_shape :
 
 (** [descr_of_action table t a] returns the description corresponding
     to the action [a] in [t].
-    @Raise Not_found if no action corresponds to [a]. *)
+    @raise Not_found if no action corresponds to [a]. *)
 val descr_of_action :
   Symbols.table -> t -> Action.action -> Action.descr
 
@@ -93,8 +93,8 @@ val symbs :
   Symbols.action Symbols.t System.Msh.t
 
 (** Iterate over all action descriptions in [system].
-  * Only one representative of each action shape will be passed
-  * to the function, with indices that are guaranteed to be fresh. *)
+    Only one representative of each action shape will be passed
+    to the function, with indices that are guaranteed to be fresh. *)
 val iter_descrs : Symbols.table -> t -> (Action.descr -> unit)     -> unit
 
 val fold_descrs : (Action.descr -> 'a -> 'a) -> Symbols.table -> t -> 'a -> 'a

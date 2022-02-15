@@ -78,10 +78,10 @@ and simpl_pat =
   | Srewrite of rw_dir                    (** -> or <-*)
 
 type intro_pattern =
-  | Star   of Location.t    (** '*' *)
-  | StarV  of Location.t    (** '>' *)
+  | Star   of Location.t    (** [*] *)
+  | StarV  of Location.t    (** [>] *)
   | SItem  of s_item
-  | SExpnd of expnd_item    (** @/macro *)
+  | SExpnd of expnd_item    (** [@/macro] *)
   | Simpl  of simpl_pat
 
 (*------------------------------------------------------------------*)

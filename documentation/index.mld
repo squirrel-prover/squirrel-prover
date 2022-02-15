@@ -1,18 +1,36 @@
 {0 Squirrel}
 
-{1 User guide}
+This is the documentation for Squirrel's source code.
 
-TODO
+All modules are grouped in {!module-Squirrellib}: head there for
+an exhaustive list.
 
-{1 Internals}
+{1 Core infrastructure}
 
-Most of the code (except for the very short files [squirrel.ml] and [test.ml])
-is in the [/src] directory and forms the {!module-Squirrellib} module (follow
-the link to see an exhaustive list of submodules, corresponding to each source
-file). The files within [/src] do not refer to the name {!module-Squirrellib},
-the latter being only defined in the build configuration.
+Our code relies on a general notion of symbol
+(see {{!module-Squirrellib.Symbols}Symbols})
+used for channels, processes, function symbols, etc.
+Symbols are often attached to a location
+(see {{!module-Squirrellib.Location}Location})
+for error-reporting.
+
+The {{!module-Squirrellib.Vars}Vars} module is used to handle variables,
+which are organized in environments with functionalities such as fresh
+variable generation.
+
+
+{1 Syntax and semantics}
+
+  - {{!module-Squirrellib.Term}Term}:
+    syntax of terms and formulas of the meta-logic
+  - {{!module-Squirrellib.System}System}: systems
+  - {{!module-Squirrellib.System}System}: actions
+  - {{!module-Squirrellib.SystemExpr}SystemExpr}: system expressions
+    are used to refer to one or several systems.
 
 The representation of actions is defined in {!module-Squirrellib.Action}. Maybe
 say something about the list of series/parallel choices.
 
-etc, etc.
+{1 Proof systems}
+
+{1 Front-end}

@@ -29,7 +29,7 @@ val of_lsymb : lsymb -> Symbols.table -> system_name
 val declare_empty : Symbols.table -> lsymb -> Symbols.table * system_name
 
 (** Get a (refreshed) descr.
-    @Raise Not_found if no action corresponds to the wanted shape. *)
+    @raise Not_found if no action corresponds to the wanted shape. *)
 val descr_of_shape :
   Symbols.table -> Symbols.system Symbols.t -> Action.shape -> 
   Action.descr

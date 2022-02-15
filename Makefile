@@ -80,13 +80,15 @@ coverage:
 	find . -name '*.coverage' | xargs rm -f
 	@echo "Coverage report available: _coverage/index.html"
 
-install: version squirrel
+# The install target should probably be changed to using dune,
+# so that dune exec could work.
+install: squirrel
 	cp -f squirrel $(PREFIX)/bin/squirrel
 	cp -r theories $(PREFIX)/bin/theories
 
 doc:
 	dune build @doc
-	@echo "generated documentation in _build/default/_doc/_html/squirrel/index.html"
+	@echo "Documentation available: _build/default/_doc/_html/squirrel/index.html"
 
 version:
 	rm -f src/commit.ml

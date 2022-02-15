@@ -35,7 +35,7 @@ val get_definition_exn :
 (** Variant of [get_definition] without dependency on Constr module.
     When the Term.term argument is not of the form "Term.Action something",
     either returns [`MaybeDef] or raises [Not_found] (the latter happens when
-    symb.s_symb is among Symbols.{Output,Cond,State} - TODO: why?),
+    symb.s_symb is among [Symbols.{Output,Cond,State}] - TODO: why?),
     whereas [get_definition] does some clever stuff to find a "Term.Action sth"
     equal to the given timestamp. *)
 val get_definition_nocntxt :

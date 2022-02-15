@@ -174,7 +174,7 @@ type macro_occs = macro_occ list
 (** Looks for macro occurrences in a term.
     - [mode = `FullDelta]: all macros that can be expanded are ignored.
     - [mode = `Delta]: only Global macros are expanded (and ignored)
-    Raise @Var_found if a term variable occurs in the term. *)
+    @raise Var_found if a message variable occurs in the term. *)
 val get_macro_occs :
   mode:[ `Delta | `FullDelta ] ->
   Constr.trace_cntxt -> 
@@ -232,24 +232,23 @@ val pp_iocc : Format.formatter -> iocc -> unit
 (** Folding over all macro descriptions reachable from some terms.
     [env] must contain the free variables of [terms]. 
 
-    Guarrantees:
     [fold_macro_support func cntxt env terms init] will return:
 
     [List.fold_left func init occs]
 
-    where [occs] is a list of indirect occurrences of sort [iocc] 
-    that, roughly, "covers" all subterms of any all expansions of [terms], 
+    where [occs] is a list of indirect occurrences of sort [iocc]
+    that, roughly, "covers" all subterms of any expansion of [terms],
     in the following sense:
     
-     ∀ trace model T, ∀ s ∈ st( ([terms])^T ), ∃ occ ∈ [occs], and:
+    [∀ trace model T, ∀ s ∈ st( ([terms])^T ), ∃ occ ∈ [occs]] and:
 
-     - ∃ s₀ ∈ st([occ.occ_cnt])
+     - [∃ s₀ ∈ st([occ.occ_cnt])]
 
-     - ∃ σ : (F_{s₀} ↦ T_I) 
-       a valuation of s₀'s free variables, w.r.t. [env], in the trace
-       model index interpretation T_I (i.e F_{s₀} = fv(s₀) \ [env]).
+     - [∃ σ : (F_{s₀} ↦ T_I)]
+       a valuation of [s₀]'s free variables, w.r.t. [env], in the trace
+       model index interpretation T_I (i.e [F_{s₀} = fv(s₀) \ [env]]).
 
-     such that s ≡ (s₀)^{Tσ}. *)
+     such that [s ≡ (s₀)^{Tσ}]. *)
 val fold_macro_support :
   (iocc -> 'a -> 'a) ->
   Constr.trace_cntxt -> 

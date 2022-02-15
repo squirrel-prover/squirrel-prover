@@ -5,9 +5,6 @@ module L = Location
 module Sv = Vars.Sv
 module Mv = Vars.Mv
 
-(* let dbg s = Printer.prt `Ignore s *)
-(* let dbg s = Printer.prt `Dbg s *)
-
 (*------------------------------------------------------------------*)
 (** {2 Symbols} *)
 
