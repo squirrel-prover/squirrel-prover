@@ -430,7 +430,6 @@ module Theories = struct
     ( cfun dec 0 [cfun enc 0 [m; r; k]; k], m )
 
   let t_true  = cfun (F Symbols.fs_true) 0 []
-  let t_false = cfun (F Symbols.fs_false) 0 []
 
   (** Signature.
       mcheck(msig(m, k), pk(k)) -> true *)
@@ -438,36 +437,6 @@ module Theories = struct
     let m, k = mk_var (), mk_var () in
     let t_pk = cfun pk 0 [k] in
     ( cfun mcheck 0 [cfun msig 0 [m; k]; t_pk], t_true )
-
-  (** Simple And Boolean rules. *)
-  let _mk_simpl_and () =
-    let u, v, t = mk_var (), mk_var (), mk_var () in
-    [( cfun (F Symbols.fs_and) 0 [t_true; u]), u;
-     ( cfun (F Symbols.fs_and) 0 [v; t_true]), v;
-     ( cfun (F Symbols.fs_and) 0 [t_false; mk_var ()]), t_false;
-     ( cfun (F Symbols.fs_and) 0 [mk_var (); t_false]), t_false;
-     ( cfun (F Symbols.fs_and) 0 [t; t]), t] 
-
-  (** Simple Or Boolean rules. *)
-  let _mk_simpl_or () =
-    let u, v, t = mk_var (), mk_var (), mk_var () in
-    [ ( cfun (F Symbols.fs_or) 0 [t_true; mk_var ()], t_true);
-      ( cfun (F Symbols.fs_or) 0 [mk_var (); t_true], t_true);
-      ( cfun (F Symbols.fs_or) 0 [t_false; u], u);
-      ( cfun (F Symbols.fs_or) 0 [v; t_false], v);
-      ( cfun (F Symbols.fs_or) 0 [t; t], t)] 
-
-  (** Simple Not Boolean rules. *)
-  let _mk_simpl_not () =
-    [( cfun (F Symbols.fs_not) 0 [t_true], t_false);
-     ( cfun (F Symbols.fs_not) 0 [t_false], t_true)] 
-
-  (* (\** Some simple IfThenElse rules. A lot of rules are missing. *\)
-   * let mk_simpl_ite () =
-   *   let u, v, s, b = mk_var (), mk_var (), mk_var (), mk_var () in
-   *   [( cfun (F Symbols.fs_ite) 0 [t_true; u; mk_var ()], u);
-   *    ( cfun (F Symbols.fs_ite) 0 [t_false; mk_var (); v], v);
-   *    ( cfun (F Symbols.fs_ite) 0 [b; s; s], s)] *)
 end
 
 
@@ -477,8 +446,7 @@ module Cset = struct
   include Cset
 
   (* Because of the nilpotence rule for the xor, [map] can only be used on
-      injective functions. To avoid mistake, I removed it.
-     -> make the "unused value" warning silent since it's the whole point *)
+      injective functions. To avoid mistake, I removed it. *)
   let[@warning "-32"] map _ _ = assert false
 
   (* [of_list l] is modulo nilpotence. For example:

@@ -13,8 +13,6 @@ type p_set_param = string * p_param_val
 
 module M = Utils.Ms
 
-(* TODO: PString / get_string never used? (raises warnings) *)
-
 type [@warning "-37"] param_kind =
   | PBool
   | PString
@@ -26,10 +24,13 @@ let pp_kind fmt = function
   | PInt -> Fmt.pf fmt "int"
 
 
-let get_int    = function _,_, Param_int    i -> i | _ -> assert false
-let [@warning "-32"]
-  get_string = function _,_, Param_string s -> s | _ -> assert false
-let get_bool   = function _,_, Param_bool   b -> b | _ -> assert false
+let get_int = function _,_, Param_int i -> i | _ -> assert false
+
+let [@warning "-32"] get_string = function 
+  | _,_, Param_string s -> s 
+  | _ -> assert false
+
+let get_bool = function _,_, Param_bool b -> b | _ -> assert false
 
 (** Function checking that a parameter value is valid.
     To be registered when declaring a new parameter. *)
