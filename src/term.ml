@@ -713,7 +713,7 @@ and _pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
     when fa = f_and && fi1 = f_impl && fi1 = f_impl &&
          bl1 = bl2 && br1 = br2 ->
     let pp fmt () =
-      Fmt.pf ppf "%a@ <=>@ %a]"
+      Fmt.pf ppf "@[%a@ <=>@ %a@]"
         (pp (iff_fixity, `Left)) bl1
         (pp (iff_fixity, `Right)) br1
     in

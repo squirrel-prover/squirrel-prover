@@ -43,7 +43,7 @@ type atom =
   (** Reach(φ) corresponds to (φ)^left ~ ⊤ ∧ (φ)^right ~ ⊤ *)
 
 let pp_atom fmt = function
-  | Equiv e -> pp_equiv fmt e
+  | Equiv e -> Fmt.pf fmt "equiv(%a)" pp_equiv e
   | Reach f -> Fmt.pf fmt "@[[%a]@]" Term.pp f
 
 let subst_atom (subst : Term.subst) (a : atom) : atom =
