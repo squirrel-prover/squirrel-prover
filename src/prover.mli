@@ -182,7 +182,7 @@ type parsed_input =
   | ParsedHint       of Hint.p_hint
   | EOF
 
-(** Declare a new goal to the current goals, and returns it *)
+(** Declare a new goal to the current goals, and returns it. *)
 val declare_new_goal :
   Symbols.table ->
   Hint.hint_db ->

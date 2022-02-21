@@ -1,4 +1,5 @@
 (** State in proof mode. *)
+
 open Utils
 
 module L    = Location
@@ -79,17 +80,41 @@ let error_handler loc k f a =
 
 
 (*------------------------------------------------------------------*)
-(** {2 Prover state} *)
+(** {2 Prover state}
 
+    The term "goal" refers to two things below:
+
+    - A toplevel goal declaration (i.e. a lemma/theorem)
+      which is represented (with some redundancy) by a [Goal.statement]
+      and a [Goal.t] which is the associated sequent that has to be
+      proved, i.e. the root of the required proof tree.
+
+    - A sequent that has to be proved (i.e. a node in a proof tree)
+      which is represented by a [Goal.t].
+
+    For now we use the adjectives toplevel and inner to distinguish
+    the two kinds of goals. *)
+
+(** Toplevel goals declared in scripts, possibly not yet proved. *)
 let goals        : (Goal.statement * Goal.t) list   ref = ref []
+
+(** Currently proved toplevel goal. *)
 let current_goal : (Goal.statement * Goal.t) option ref = ref None
+
+(** Current inner goals that have to be proved. *)
 let subgoals     : Goal.t list ref = ref []
+
+(** Proved toplevel goals. *)
 let goals_proved : Goal.statement list ref = ref []
 
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
 (*------------------------------------------------------------------*)
-(** {2 Options} *)
+(** {2 Options}
+
+    TODO [option_defs] and [hint_db] are not directly related to
+    this module and should be moved elsewhere, e.g. [Main] could
+    deal with them through the table. *)
 
 type option_name =
   | Oracle_for_symbol of string
@@ -99,7 +124,7 @@ type option_val =
 
 type option_def = option_name * option_val
 
-let option_defs : option_def list ref= ref []
+let option_defs : option_def list ref = ref []
 
 let hint_db : Hint.hint_db ref = ref Hint.empty_hint_db
 
@@ -161,6 +186,9 @@ let reset_from_state (p : proof_state) =
 
   ( p.prover_mode, p.table )
 
+(* TODO if [n] is too large [pt_history] will be changed to the empty list
+   but [reset_from_state] won't be called to change the actual state, which
+   seems undesirable: forbid this? *)
 let rec reset_state n =
   match (!pt_history,n) with
   | [],_ -> (GoalMode, Symbols.builtins_table)
