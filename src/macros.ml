@@ -70,7 +70,7 @@ let get_body system data : Term.term =
   | SE.Empty         -> assert false (* FIXME: user-level exception? *)
 
 (** Exported *)
-let apply_global_data table ns dec_def old_single_system new_single_system data f =
+let apply_global_data table ns dec_def old_single_system new_single_system f =
   match Symbols.Macro.get_data ns table with
   | Global_data data ->
     let body = get_single_body old_single_system data in

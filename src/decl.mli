@@ -42,12 +42,17 @@ type system_decl = { sname    : Theory.lsymb option;
 val pp_system_decl : Format.formatter -> system_decl -> unit
 
 (*------------------------------------------------------------------*)
-(** Information for a system declaration using a globla modifier    *)
+(** Information for a system declaration using a global modifier    *)
+
+(* List of possible cryptographic axioms. *)
 type system_modifier =
   | Rename of Theory.global_formula
   | PRF    of Theory.bnds * Theory.term
   | CCA    of Theory.bnds * Theory.term
 
+
+(* It contains the original system, the underlying cryptoraphic axiom
+   used, and the name of the new system. *)
 type system_decl_modifier = { 
   from_sys : SystemExpr.p_system_expr;
   modifier : system_modifier;

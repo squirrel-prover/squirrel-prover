@@ -103,8 +103,6 @@ val map_descrs  : (Action.descr -> 'a)       -> Symbols.table -> t -> 'a list
 (*------------------------------------------------------------------*)
 (** {2 Cloning } *)
 
-exception SystemNotFresh
-
 val clone_system_iter : Symbols.table -> t ->
            Symbols.lsymb ->
            (Action.descr -> Action.descr) -> Symbols.table * Symbols.System.ns Symbols.t

@@ -734,7 +734,6 @@ let convert_p_bnds (env : Env.t) (vars : bnds) =
   let vs = List.map (fun (v,s) -> v, parse_p_ty env s) vars in
   convert_bnds env vs 
 
-
 let get_fun table lsymb =
   match Symbols.Function.of_lsymb_opt lsymb table with
   | Some n -> n
@@ -837,8 +836,8 @@ and convert0
     let env, is =
       convert_bnds state.env (List.map (fun x -> x, Type.tindex) vs)
     in
-
-    List.iter (fun v -> if Vars.ty v <> Type.Index then type_error ()) is;
+    
+    Vars.check_type_vars is [Type.Index] (type_error ());
 
     let c = conv ~env Type.Boolean c in
     let t = conv ~env ty t in
@@ -862,11 +861,7 @@ and convert0
     let t = conv ~env (Type.TUnivar tyv) t in
 
     let () =
-      List.iter (fun v ->
-          match Vars.ty v with
-          | Type.Index | Type.Timestamp -> ()
-          | _ -> type_error ()
-        ) evs
+      Vars.check_type_vars evs [Type.Index; Type.Timestamp] (type_error ())
     in
     Term.mk_seq0 ~simpl:false evs t
 
@@ -1267,11 +1262,9 @@ let declare_state
 
   let env, indices = convert_p_bnds env typed_args in
   let conv_env = { conv_env with env } in
-
-  List.iter (fun v ->
-      if Vars.ty v <> Type.Index then
-        conv_err (L.loc pty) (BadPty [Type.Index]);
-    ) indices;
+  
+  Vars.check_type_vars indices [Type.Index]
+    (conv_err (L.loc pty) (BadPty [Type.Index]));
 
   (* parse the macro type *)
   let ty = parse_p_ty env pty in

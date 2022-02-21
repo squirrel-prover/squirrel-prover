@@ -55,7 +55,6 @@ val apply_global_data :
   Symbols.macro_def -> 
   SystemExpr.single_system ->
   SystemExpr.single_system ->
-  'a -> 
   (Term.term -> Term.term) -> 
   Symbols.table
     

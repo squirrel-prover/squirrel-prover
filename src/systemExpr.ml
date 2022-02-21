@@ -335,8 +335,6 @@ let clone_system_iter table original_system new_system iterdescr =
   let data = System.System_data (ndescrs,symbs) in
   Symbols.System.declare_exact table new_system ~data ()
 
-exception SystemNotFresh
-
 (*------------------------------------------------------------------*)
 (** {2 Parser types } *)
 
