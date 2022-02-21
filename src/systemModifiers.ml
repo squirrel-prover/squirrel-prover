@@ -61,7 +61,7 @@ let global_rename table sdecl gf =
       ]
       )) ) ->
       Vars.check_type_vars vs [Type.Index]
-        (Tactics.hard_failure
+        (fun () -> Tactics.hard_failure
            (Tactics.Failure "Only index variables can be bound in the tactic."));
       ns1, ns2, Term.mk_name ns1, Term.mk_name ns2
     |  Atom (Equiv ([Term.Diff (Term.Name ns1, Term.Name ns2)]))
@@ -153,7 +153,7 @@ let global_prf table sdecl bnds hash =
   let env,is = Theory.convert_p_bnds env bnds in
 
   Vars.check_type_vars is [Type.Index]
-    (Tactics.hard_failure
+    (fun () -> Tactics.hard_failure
        (Tactics.Failure "Only index variables can be bound in the tactic."));
 
   let conv_env = Theory.{ env = env; cntxt = InGoal } in
@@ -267,7 +267,7 @@ let global_cca table sdecl bnds enc =
   let env = Env.init ~table ~system:old_system () in
   let env,is = Theory.convert_p_bnds env bnds in
   Vars.check_type_vars is [Type.Index]
-    (Tactics.hard_failure
+    (fun () -> Tactics.hard_failure
        (Tactics.Failure "Only index variables can be bound in the tactic."));  
   let conv_env = Theory.{ env; cntxt = InGoal } in
   let enc, _ = Theory.convert conv_env enc in

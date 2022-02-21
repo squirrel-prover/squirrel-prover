@@ -41,7 +41,7 @@ val equal : var -> var -> bool
 (** Time-consistent: if [v] was created before [v'], then [compare v v' ≤ 0]. *)
 val compare : var -> var -> int
 
-val check_type_vars : vars -> Type.ty list -> unit -> unit
+val check_type_vars : vars -> Type.ty list -> (unit -> unit) -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Set and Maps} *)

@@ -837,7 +837,7 @@ and convert0
       convert_bnds state.env (List.map (fun x -> x, Type.tindex) vs)
     in
     
-    Vars.check_type_vars is [Type.Index] (type_error ());
+    Vars.check_type_vars is [Type.Index] type_error;
 
     let c = conv ~env Type.Boolean c in
     let t = conv ~env ty t in
@@ -861,7 +861,7 @@ and convert0
     let t = conv ~env (Type.TUnivar tyv) t in
 
     let () =
-      Vars.check_type_vars evs [Type.Index; Type.Timestamp] (type_error ())
+      Vars.check_type_vars evs [Type.Index; Type.Timestamp] type_error
     in
     Term.mk_seq0 ~simpl:false evs t
 
@@ -1264,7 +1264,7 @@ let declare_state
   let conv_env = { conv_env with env } in
   
   Vars.check_type_vars indices [Type.Index]
-    (conv_err (L.loc pty) (BadPty [Type.Index]));
+    (fun () -> conv_err (L.loc pty) (BadPty [Type.Index]));
 
   (* parse the macro type *)
   let ty = parse_p_ty env pty in
