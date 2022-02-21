@@ -57,8 +57,8 @@ val key_ssc :
    function and key in a process.  If drop_head is true, the message stored do
    not contain anymore the head_fn function, else they still do. *)
 val mk_rule :
-  ?elems:Equiv.equiv ->
-  ?drop_head:bool ->
+  elems:Equiv.equiv ->
+  drop_head:bool ->
   fun_wrap_key:((Symbols.fname Symbols.t -> bool) option) ->
   allow_functions:(Symbols.fname Symbols.t -> bool) ->
   cntxt:Constr.trace_cntxt ->

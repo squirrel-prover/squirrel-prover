@@ -138,7 +138,7 @@ let pp_euf_rule ppf rule =
 (*------------------------------------------------------------------*)
 (** {2 Build the Euf rule} *)
 
-let mk_rule ?(elems=[]) ?(drop_head=true) ~fun_wrap_key
+let mk_rule ~elems ~drop_head ~fun_wrap_key
     ~allow_functions ~cntxt ~env ~mess ~sign ~head_fn ~key_n ~key_is =
 
   let mk_of_hash action_descr (is,m) =
