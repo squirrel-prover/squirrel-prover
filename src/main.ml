@@ -238,7 +238,11 @@ let next_input ~test (state : main_state) : Prover.parsed_input =
   let filename, lexbuf = get_lexbuf state in
   Parserbuf.parse_from_buf
     ~test ~interactive:state.interactive
-    Parser.interactive lexbuf ~filename
+    (if state.mode = Prover.ProofMode then
+       Parser.top_proofmode
+     else
+       Parser.interactive)
+    lexbuf ~filename
 
 (*------------------------------------------------------------------*)
 let do_undo (state : main_state) (nb_undo : int) : main_state =
@@ -255,11 +259,7 @@ let do_decls (state : main_state) (decls : Decl.declarations) : main_state =
   let table = Prover.declare_list state.table hint_db decls in
   { state with mode = GoalMode; table = table; }
 
-let do_tactic 
-    (state : main_state)
-    (utac : TacticsArgs.parser_arg Tactics.ast) 
-  : main_state 
-  =
+let do_tactic (state : main_state) bullet utac : main_state =
   let () = 
     match state.check_mode with
     | `NoCheck -> assert (state.mode = WaitQed)
@@ -275,7 +275,8 @@ let do_tactic
 
   match state.check_mode with
   | `NoCheck -> state
-  | `Check   -> 
+  | `Check   ->
+    if bullet <> "" then Prover.open_bullet bullet;
     let proof_done = Prover.eval_tactic utac in
     if proof_done then
       begin
@@ -396,7 +397,7 @@ and do_command
 
     | GoalMode, ParsedInputDescr decls -> do_decls state decls
 
-    | _, ParsedTactic utac             -> do_tactic state utac
+    | _, ParsedTactic (bullet,utac)    -> do_tactic state bullet utac
 
     | WaitQed, ParsedQed               -> do_qed state
 

@@ -131,37 +131,37 @@ accepted by the reader.
 *)
 Proof.
   (** We start by introducing the variable `j` and the hypothesis
-  `happens(R(j))`, before unfolding the definiton of the `cond` macro,
-  which corresponds to an existential quantification.*)
+      `happens(R(j))`, before unfolding the definiton of the `cond` macro,
+      which corresponds to an existential quantification.*)
   intro j Hap.
   expand cond.
   (** We have to prove two implications (`<=>`): we thus split the proof
-  in two parts. We now have two different goals to prove.*)
+      in two parts. We now have two different goals to prove.*)
   rewrite eq_iff; split => [i k Meq].
   (** For the first implication (=>), we actually prove it separately for the
-  real system (left) and the ideal system (right).*)
-  project.
-  (** The proof is very similar on both sides and relies on the `euf` tactic.
-  Applying the `euf` tactic on the `Meq` hypothesis generates a new hypothesis
-  stating that `fst(input@R(j))` must be equal to some message that has
-  already been hashed before.nn
-  The only possibility is that this hash comes from the output of a tag that
-  has played before (thus the new hypothesis on timestamps).*)
-  (* LEFT *) euf Meq => *. by exists i,k0.
-  (* RIGHT *) euf Meq => *. by exists i,k.
+      real system (left) and the ideal system (right).*)
+  + project.
+    (** The proof is very similar on both sides and relies on the `euf` tactic.
+        Applying the `euf` tactic on the `Meq` hypothesis generates a new hypothesis
+       stating that `fst(input@R(j))` must be equal to some message that has
+       already been hashed before.nn
+       The only possibility is that this hash comes from the output of a tag that
+       has played before (thus the new hypothesis on timestamps).*)
+    ++ (* LEFT *)
+       euf Meq => *. by exists i,k0.
+    ++ (* RIGHT *)
+       euf Meq => *. by exists i,k.
   (** For the second implication (<=), the conclusion of the goal can directly
-  be obtained from the hypotheses.*)
-  by exists i,k.
+       be obtained from the hypotheses.*)
+  + by exists i,k.
 Qed.
 
-(**
-This second authentication property is the counterpart of the previous one,
-but for the else branch of the reader.
-This property states that whenever a reader **rejects** a message (_i.e._ the
-condition of the action `R1(j)` evaluates to `true`), then there does **not**
-exist an action `T(i,k)` that was executed before the reader, and such that the
-input of the reader corresonds to the output of this tag (and conversely).
-*)
+(** This second authentication property is the counterpart of the previous one,
+    but for the else branch of the reader.
+    This property states that whenever a reader **rejects** a message (_i.e._ the
+    condition of the action `R1(j)` evaluates to `true`), then there does **not**
+    exist an action `T(i,k)` that was executed before the reader, and such that the
+    input of the reader corresonds to the output of this tag (and conversely). *)
 
 goal wa_R1 :
   forall (j:index),
@@ -175,13 +175,13 @@ Proof.
   rewrite /cond eq_not eq_iff; split => [i k Meq].
 
   (** The first implication (=>) relies on the EUF assumption and is also
-  proved by contradiction. *)
-  project.
-  (* LEFT  *) euf Meq => *. by exists i,k0.
-  (* RIGHT *) euf Meq => *. by exists i,k.
+      proved by contradiction. *)
+  + project.
+    ++ (* LEFT  *) euf Meq => *. by exists i,k0.
+    ++ (* RIGHT *) euf Meq => *. by exists i,k.
 
   (** The second implication (<=) is trivial. *)
-  by exists i,k.
+  + by exists i,k.
 Qed.
 
 (**

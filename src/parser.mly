@@ -77,10 +77,12 @@
 %start top_formula
 %start top_process
 %start interactive
+%start top_proofmode
 %type <Decl.declarations> declarations
 %type <Theory.formula> top_formula
 %type <Process.process> top_process
 %type <Prover.parsed_input> interactive
+%type <Prover.parsed_input> top_proofmode
 
 %%
 
@@ -956,11 +958,22 @@ interactive:
 | set=set_option     { Prover.ParsedSetOption set }
 | decls=declarations { Prover.ParsedInputDescr decls }
 | u=undo             { Prover.ParsedUndo u }
-| tac=tactic         { Prover.ParsedTactic tac }
 | PROOF              { Prover.ParsedProof }
 | i=p_include        { Prover.ParsedInclude i }
 | QED                { Prover.ParsedQed }
-| ABORT              { Prover.ParsedAbort }
 | g=goal             { Prover.ParsedGoal g }
 | h=hint             { Prover.ParsedHint h }
+| EOF                { Prover.EOF }
+
+bullet:
+|                    { "" }
+| PLUS               { "+" }
+| STAR               { "*" }
+| INFIXSYMB          { $1 }
+
+top_proofmode:
+| b=bullet t=tactic  { Prover.ParsedTactic (b,t) }
+| u=undo             { Prover.ParsedUndo u }
+| ABORT              { Prover.ParsedAbort }
+| QED                { Prover.ParsedQed }
 | EOF                { Prover.EOF }

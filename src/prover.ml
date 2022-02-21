@@ -104,6 +104,9 @@ let current_goal : (Goal.statement * Goal.t) option ref = ref None
 (** Current inner goals that have to be proved. *)
 let subgoals     : Goal.t list ref = ref []
 
+(** Bullets for current proof. *)
+let bullets      : Bullets.path ref = ref Bullets.empty_path
+
 (** Proved toplevel goals. *)
 let goals_proved : Goal.statement list ref = ref []
 
@@ -133,6 +136,7 @@ type proof_state = {
   table        : Symbols.table;
   current_goal : (Goal.statement * Goal.t) option;
   subgoals     : Goal.t list;
+  bullets      : Bullets.path;
   goals_proved : Goal.statement list;
   option_defs  : option_def list;
   params       : Config.params;
@@ -149,12 +153,14 @@ let pt_history_stack : proof_history list ref = ref []
 
 let abort () =
     current_goal := None;
+    bullets := Bullets.empty_path;
     subgoals := []
 
 let reset () =
     pt_history := [];
     goals := [];
     current_goal := None;
+    bullets := Bullets.empty_path;
     subgoals := [];
     goals_proved := [];
     option_defs := [];
@@ -164,6 +170,7 @@ let get_state mode table =
   { goals        = !goals;
     table        = table;
     current_goal = !current_goal;
+    bullets      = !bullets;
     subgoals     = !subgoals;
     goals_proved = !goals_proved;
     option_defs  = !option_defs;
@@ -177,6 +184,7 @@ let save_state mode table =
 let reset_from_state (p : proof_state) =
   goals := p.goals;
   current_goal := p.current_goal;
+  bullets := p.bullets;
   subgoals := p.subgoals;
   goals_proved := p.goals_proved;
   option_defs := p.option_defs;
@@ -607,7 +615,7 @@ type include_param = { th_name : lsymb; params : lsymb list }
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
   | ParsedSetOption  of Config.p_set_param
-  | ParsedTactic     of TacticsArgs.parser_arg Tactics.ast
+  | ParsedTactic     of Bullets.bullet * TacticsArgs.parser_arg Tactics.ast
   | ParsedUndo       of int
   | ParsedGoal       of Goal.Parsed.t Location.located
   | ParsedInclude    of include_param
@@ -664,7 +672,9 @@ let get_oracle_tag_formula h =
   | Some (Oracle_formula f) -> f
   | None -> Term.mk_false
 
-let is_proof_completed () = !subgoals = []
+let is_proof_completed () =
+  assert (Bullets.is_empty !bullets = (!subgoals = []));
+  !subgoals = []
 
 let complete_proof () =
   assert (is_proof_completed ());
@@ -672,6 +682,7 @@ let complete_proof () =
     let gc, _ = Utils.oget !current_goal in
     add_proved_goal gc;
     current_goal := None;
+    bullets := Bullets.empty_path;
     subgoals := []
   with Not_found ->
     hard_failure
@@ -693,7 +704,15 @@ let eval_tactic_focus tac = match !subgoals with
   | judge :: ejs' ->
     let new_j = AST.eval_judgment tac judge in
     subgoals := new_j @ ejs';
+    begin try
+      bullets := Bullets.expand_goal (List.length new_j) !bullets
+    with _ -> Tactics.(hard_failure (Failure "bullet error")) end;
     is_proof_completed ()
+
+let open_bullet bullet =
+  assert (bullet <> "");
+  try bullets := Bullets.open_bullet bullet !bullets with
+    | _ -> Tactics.(hard_failure (Failure "bullet error"))
 
 let cycle i_l l =
   let i, loc = L.unloc i_l, L.loc i_l in
@@ -708,6 +727,12 @@ let cycle i_l l =
 
 let eval_tactic utac = match utac with
   | Tactics.Abstract (L.{ pl_desc = "cycle"}, [TacticsArgs.Int_parsed i]) ->
+    (* TODO do something more for bullets?
+       Cycling the list of subgoals does not change its length so
+       nothing will break (fail) wrt bullets, but the result will
+       be meaningless: we may want to warn the user, forbid cycles
+       accross opened bullets, or even update the Bullets.path to
+       reflect cycles. *)
     subgoals := cycle i !subgoals; false
   | _ -> eval_tactic_focus utac
 
@@ -716,12 +741,10 @@ let start_proof (check : [`NoCheck | `Check]) =
   | None, (gname,goal) :: _ ->
     assert (!subgoals = []);
     current_goal := Some (gname,goal);
-    let () = 
-      subgoals :=
-        match check with
-        | `Check -> [goal]
-        | `NoCheck -> []
-    in
+    begin match check with
+      | `Check -> subgoals := [goal] ; bullets := Bullets.initial_path
+      | `NoCheck -> subgoals := [] ; bullets := Bullets.empty_path
+    end;
     None
 
   | Some _,_ ->
