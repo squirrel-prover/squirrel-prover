@@ -99,12 +99,21 @@ name DkR :  index -> index -> message
 name DrR :  index -> index -> message
 
 
+(* compromised long term key of R *)
+name DskR : index->  message
+
+(* session randomess of I talking to compromised *)
+name DkI : index -> index -> index -> message
+name DrI : index -> index -> index -> message
+
+
 (* ideal keys *)
 name ikIR : index -> index -> index -> message
 
 mutable sIR(i,j,k:index) : message =  zero
 mutable sRI(i,j,k:index) : message =  zero
 mutable DsRI(j,k:index) : message =  zero
+mutable DsIR(i,j,k:index) : message =  zero
 
 abstract ok:message
 
@@ -150,7 +159,22 @@ process Responder(j,k:index) =
      let Ds = <pkI,<ctI,<pk(skR(j)),DctR>>> in
      DsRI(j,k) :=  expd(Ds,DkI2) XOR expd(Ds,DkR2)
 
-system [main] out(cI,skex); ((!_j !_k R: Responder(j,k)) | (!_i !_j !_k I: Initiator(i,j,k))).
+(* k-th copy of initiator with key skI(i) trying to communicate with compromised responder with key pk(DskR(j)) *)
+process InitiatorToCompromised(i,j,k:index) =
+  (* we only send an encapsulation to an honest peer, with what we assume to be a valid public key*)
+ let ctI = encap(DkI(i,j,k), DrI(i,j,k) ,pk(DskR(j))) in
+ out(cI, ctI ); (* we omit the public parameters in the output *)
+
+ in(cR,ctR);
+ (* first key derivation *)
+ (* common derivations *)
+ let kI2 = exct(skex,DkI(i,j,k)) in
+ let kR2 = exct(skex,decap(ctR,skI(i)) ) in
+ let s = <pk(skI(i)),<ctI,<pk(DskR(j)),ctR>>> in
+ sIR(i,j,k) :=  expd(s,kI2) XOR expd(s,kR2).
+
+
+system [main] out(cI,skex); ((!_j !_k R: Responder(j,k)) | (!_i !_j !_k I: Initiator(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised(i,j,k))).
 
 
 system mainCCAkR = [main/left] with gcca (il,jl,kl:index),  encap(kR(il,jl,kl), rR(il,jl,kl), pk(skI(il))).
@@ -221,8 +245,28 @@ in
      let Ds = <pkI,<ctI,<pk(skR(j)),DctR>>> in
      DsRI(j,k) :=  expd(Ds,DkI2) XOR expd(Ds,DkR2).
 
+process InitiatorToCompromised2(i,j,k:index) =
+  (* we only send an encapsulation to an honest peer, with what we assume to be a valid public key*)
+ let ctI = encap(DkI(i,j,k), DrI(i,j,k) ,pk(DskR(j))) in
+ out(cI, ctI ); (* we omit the public parameters in the output *)
 
-system [idealized] out(cI,skex); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k))).
+ in(cR,ctR);
+ (* first key derivation *)
+ (* common derivations *)
+ let kI2 = exct(skex,DkI(i,j,k)) in
+ let kR2 =
+     try find il,jl,kl such that
+            ctR =  encap(n_CCA(il,jl,kl), rR(il,jl,kl), pk(skI(il))) in
+             exct(skex,kR(il,jl,kl))
+      else
+       exct(skex,decap(ctR,skI(i)))
+ in
+ let s = <pk(skI(i)),<ctI,<pk(DskR(j)),ctR>>> in
+ sIR(i,j,k) :=  expd(s,kI2) XOR expd(s,kR2).
+
+
+
+system [idealized] out(cI,skex); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised2(i,j,k))).
 
 axiom [mainCCAkI/left,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,pk(z)),z)=x.
 
@@ -231,6 +275,32 @@ equiv [mainCCAkI/left,idealized/left] test.
 Proof.
 
 diffeq; try auto.
+
+intro *.
+case try find il,jl,kl such that _ in kR(il,jl,kl) else _.
+intro [il jl kl [A ->]].
+
+case try find il,jl,kl such that _ in exct(skex, kR(il,jl,kl)) else _.
+intro [il0 jl0 kl0 [B ->]].
+
+assert decap(   encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(skI(il)))  , skI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(skI(il0))) , skI(il)).
+auto.
+
+simpl.
+case H1; try auto.
+case H2; try auto.
+
+intro [H1 _].
+by use H1 with il,jl,kl.
+
+
+intro [H1 _].
+case try find il,jl,kl such that _ in  exct(skex,kR(il,jl,kl)) else _.
+intro [il jl kl [A ->]].
+by use H1 with il,jl,kl.
+
+auto.
+
 
 intro *.
 case try find il,jl,kl such that _ in kR(il,jl,kl) else _.
