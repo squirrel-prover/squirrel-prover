@@ -108,11 +108,23 @@ name dkR : index -> message
 name skR : index -> message
 name sk2R : index -> message
 
+(* session randomess of I talking to compromised R *)
+name DkI : index -> index -> index -> message
+name DrI : index -> index -> index -> message
+name DrI2 : index -> index -> index -> message
+name DdkT : index -> index -> index -> message
+
+(* long term keys of compromised R *)
+abstract DdkR : index -> message
+abstract DskR : index -> message
+abstract Dsk2R : index -> message
+
 (* session randomess of I *)
 name kI : index -> index -> index -> message
 name rI : index -> index -> index -> message
 name rI2 : index -> index -> index -> message
 name dkT : index -> index -> index -> message
+
 
 abstract ok : message
 
@@ -136,7 +148,7 @@ name kIR : index -> index -> index -> message
 mutable sIR(i,j,k:index) : message =  zero
 mutable sRI(i,j,k:index) : message =  zero
 mutable DsRI(j,k:index) : message =  zero
-
+mutable DsIR(i,j,k:index) : message =  zero
 
 hash kdf
 
@@ -206,7 +218,33 @@ process Responder(j,k:index) =
      DsRI(j,k) := xor(G(ST,K1), xor( G(ST,K2), G(ST,K3))).
 
 
-system [main] out(cI,s); ((!_j !_k R: Responder(j,k)) | (!_i !_j !_k I: Initiator(i,j,k))).
+
+(* k-th copy of initiator with key dkI(i) trying to communicate with compromised responder with key pk(DdkR(j)) *)
+process InitiatorToCompromised(i,j,k:index) =
+ let ctI = encap(DkI(i,j,k), F(DrI(i,j,k),skI(i)) XOR F(sk2I(i),DrI2(i,j,k))  ,pk(DdkR(j))) in
+ let ekT = wpk(DdkT(i,j,k)) in
+ out(cI, <ctI,ekT> ); (*we omit the public parameters in the output *)
+
+ in(cR,messI);
+ let ctR = fst(messI) in
+ let ctT = snd(messI) in
+
+ (* first key derivations *)
+ let kT = wdecap(ctT,DdkT(i,j,k)) in
+
+ (* Full common key derivations *)
+ let K1 = kdf(s,DkI(i,j,k)) in
+ let K2 = kdf(s, decap(ctR,dkI(i)) ) in
+ let K3 = kdf(s,kT) in
+
+ let ST = <pk(dkI(i)),<pk(DdkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
+ sIR(i,j,k) := xor(G(ST,K1), xor( G(ST,K2), G(ST,K3))).
+
+
+
+system [main] out(cI,s); ((!_j !_k R: Responder(j,k)) | (!_i !_j !_k I: Initiator(i,j,k))
+| (!_i !_j !_k I: InitiatorToCompromised(i,j,k))
+).
 
 
 (******* Valid cypher randomness  ******)
@@ -276,7 +314,9 @@ process Responder2(j,k:index) =
      DsRI(j,k) := xor(G(ST,K1), xor( G(ST,K2), G(ST,K3))).
 
 
-system [main_rand] out(cI,s); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k))).
+system [main_rand] out(cI,s); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k))
+| (!_i !_j !_k DI: InitiatorToCompromised(i,j,k))
+).
 
 
 axiom [main_rand] len_F (x1,x2:message) : len(F(x1,x2)) = len(s).
@@ -291,102 +331,137 @@ Proof.
  enrich seq(i,j,k:index-> kI(i,j,k)).
 
  (* enrich of the dishonest randoms *)
- enrich seq(j,k:index-> DkT(j,k)); enrich seq(j,k:index->DrTI(j,k));
+ enrich seq(j,k:index-> DkT(j,k)); 
+ enrich seq(j,k:index->DrTI(j,k));
  enrich seq(j,k:index-> DkR(j,k));
  enrich seq(j,k:index-> DrR(j,k));
+
+ enrich  seq(i,j,k:index->DkI(i,j,k)).
+ enrich  seq(i,j,k:index->DdkT(i,j,k)).
+ enrich  seq(i:index->dkR(i)).
+
  induction t.
 
  expandall.
- fa 12.
+ fa 14.
 
 
  expandall.
- fa 12.
+ fa 14.
 
 
  (* First output of R *)
  expandall.
- fa 12.
- fa 13.
- fa 13.
- fa 13.
  fa 14.
+ fa 15.
+ fa 15.
+ fa 15.
+ fa 16.
  expandseq  seq(i,j,k:index-> kT(i,j,k)), i,j,k.
  expandseq  seq(i,j,k:index-> rTI(i,j,k)), i,j,k.
- prf 16.
- yesif 16.
+ prf 18.
+ yesif 18.
 
- xor 16, xor(F(rR(i,j,k),skR(j)),n_PRF), n_PRF.
- yesif 16.
+ xor 18, xor(F(rR(i,j,k),skR(j)),n_PRF), n_PRF.
+ yesif 18.
 
  use len_F with rR(i,j,k), skR(j).
  namelength n_PRF,s.
 
- fa 16. fa 16.
- fresh 17.
- yesif 17.
+ fa 18. fa 18.
+ fresh 19.
+ yesif 19.
  expandseq  seq(i,j,k:index-> kR(i,j,k)), i,j,k.
  expandseq  seq(i:index-> dkI(i)), i.
 
 
  (* Second output of R *)
  expandall.
- fa 12.
+ fa 14.
 
 (* First output of R with dishonnest talker *)
  expandall.
- fa 12.
- fa 13.
  fa 14.
- admit 13. (* this is a dumb fadup weakness, as all the dkI(i) are in the frame, the forall is obviously ok. *)
+ fa 15.
+ fa 16.
+ admit 15. (* this is a dumb fadup weakness, as all the dkI(i) are in the frame, the forall is obviously ok. *)
 
- repeat fa 13.
+ repeat fa 15.
 
-  fa 15.
+  fa 17.
  expandseq  seq(j,k:index-> DkR(j,k)), j,k.
  expandseq  seq(j,k:index-> DrTI(j,k)), j,k.
  expandseq  seq(j,k:index-> DkT(j,k)), j,k.
-  prf 14; yesif 14.
- xor 14, n_PRF.
- yesif 14.
+  prf 16; yesif 16.
+ xor 16, n_PRF.
+ yesif 16.
   use len_F with DrR(j,k), skR(j).
   namelength n_PRF,s.
- fresh 14.
+ fresh 16.
 
 (* Second output of R with dishonnest talker *)
 
   expandall.
-  fa 12.
+  fa 14.
 
 
  (* First output of I *)
   expandall.
-  fa 12.
-  fa 13.
-  fa 13.
-  fa 13.
   fa 14.
+  fa 15.
+  fa 15.
+  fa 15.
+  fa 16.
   expandseq seq(i,j,k:index-> dkT(i,j,k)),i,j,k.
-  prf 13.
-  yesif 13.
+  prf 15.
+  yesif 15.
 
 
-  xor 13, xor(F(rI(i,j,k),skI(i)),n_PRF), n_PRF.
-  yesif 13.
+  xor 15, xor(F(rI(i,j,k),skI(i)),n_PRF), n_PRF.
+  yesif 15.
 
   use len_F with rI(i,j,k), skI(i).
   by namelength n_PRF,s.
 
-  fa 13.
-  fresh 14.
-  yesif 14.
+  fa 15.
+  fresh 16.
+  yesif 16.
   expandseq  seq(i,j,k:index->kI(i,j,k)),i,j,k.
   expandseq  seq(i,j,k:index->dkT(i,j,k)),i,j,k.
   expandseq  seq(i:index->dkR(i)),j.
 
  (* Second output of I *)
  expandall.
- fa 12.
+ fa 14.
+
+
+
+ (* First output of DI *)
+  expandall.
+  fa 14.
+  fa 15.
+  fa 15.
+  fa 15.
+  fa 15.
+  expandseq seq(i,j,k:index-> DdkT(i,j,k)),i,j,k.
+  prf 17.
+  yesif 17.
+
+
+  xor 17, xor(F(DrI(i,j,k),skI(i)),n_PRF), n_PRF.
+  yesif 17.
+
+  use len_F with DrI(i,j,k), skI(i).
+  by namelength n_PRF,s.
+
+  fresh 17.
+  expandseq  seq(i,j,k:index->DkI(i,j,k)),i,j,k.
+
+ (* Second output of DI *)
+ expandall.
+ fa 14.
+
+
 Qed.
 
 (* From [main_rand/right], we can now use cca to hide the two main random seeds, kR and kI *)
@@ -489,7 +564,37 @@ in
      DsRI(j,k) := xor(G(ST,K1), xor( G(ST,K2), G(ST,K3))).
 
 
-system [idealized] out(cI,s); ((!_j !_k R: Responder3(j,k)) | (!_i !_j !_k I: Initiator3(i,j,k))).
+(* k-th copy of initiator with key dkI(i) trying to communicate with compromised responder with key pk(DdkR(j)) *)
+process InitiatorToCompromised3(i,j,k:index) =
+ let ctI = encap(DkI(i,j,k), F(DrI(i,j,k),skI(i)) XOR F(sk2I(i),DrI2(i,j,k))  ,pk(DdkR(j))) in
+ let ekT = wpk(DdkT(i,j,k)) in
+ out(cI, <ctI,ekT> ); (*we omit the public parameters in the output *)
+
+ in(cR,messI);
+ let ctR = fst(messI) in
+ let ctT = snd(messI) in
+
+ (* first key derivations *)
+ let kT = wdecap(ctT,DdkT(i,j,k)) in
+
+ (* Full common key derivations *)
+ let K1 = kdf(s,DkI(i,j,k)) in
+ let K2 =
+   try find il,jl,kl such that
+   ctR = encap(n_CCA(il,jl,kl), rR(il,jl,kl), pk(dkI(il)))
+   in
+       kdf(s,kR(il,jl,kl))
+   else
+   kdf(s,decap(ctR,dkI(i)))
+
+in
+ let K3 = kdf(s,kT) in
+
+ let ST = <pk(dkI(i)),<pk(DdkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
+ sIR(i,j,k) := xor(G(ST,K1), xor( G(ST,K2), G(ST,K3))).
+
+
+system [idealized] out(cI,s); ((!_j !_k R: Responder3(j,k)) | (!_i !_j !_k I: Initiator3(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised3(i,j,k))).
 
 axiom [mainCCAkI/right,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,pk(z)),z)=x.
 
@@ -509,6 +614,20 @@ use H1 with il,jl,kl.
 
 case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
 use H1 with il,jl,kl.
+
+case try find il,jl,kl such that _ in kR(il,jl,kl) else _.
+rewrite Meq0.
+
+case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
+rewrite Meq2.
+
+assert decap(   encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(dkI(il)))  , dkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(dkI(il0))) , dkI(il)).
+case H1.
+use H1 with il,jl,kl.
+
+case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
+use H1 with il,jl,kl.
+
 
 case try find il,jl,kl such that _ in kI(il,jl,kl) else _.
 rewrite Meq0.
