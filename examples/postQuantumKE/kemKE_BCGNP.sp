@@ -64,7 +64,7 @@ party could potentially compute the key.
 
 
 *******************************************************************************)
-
+set autoIntro = false.
 set postQuantumSound = true.
 
 hash exct
@@ -125,6 +125,7 @@ process Initiator(i,j,k:index) =
  let kR2 = exct(skex,decap(ctR,skI(i)) ) in
  let s = <pk(skI(i)),<ctI,<pk(skR(j)),ctR>>> in
  sIR(i,j,k) :=  expd(s,kI2) XOR expd(s,kR2).
+
 (* k-th copy of responder with key skR(j) *)
 process Responder(j,k:index) =
    in(cR,pkI);
@@ -229,54 +230,85 @@ axiom [mainCCAkI/left,idealized/left] tf: forall (x,y,z:message), decap(encap(x,
 equiv [mainCCAkI/left,idealized/left] test.
 Proof.
 
-diffeq.
+diffeq; try auto.
 
+intro *.
 case try find il,jl,kl such that _ in kR(il,jl,kl) else _.
-rewrite Meq0.
+intro [il jl kl [A ->]].
 
 case try find il,jl,kl such that _ in exct(skex, kR(il,jl,kl)) else _.
-rewrite Meq2.
+intro [il0 jl0 kl0 [B ->]].
 
 assert decap(   encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(skI(il)))  , skI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(skI(il0))) , skI(il)).
+auto.
 
-case H1.
-case H2.
+simpl.
+case H1; try auto.
+case H2; try auto.
 
-use H1 with il,jl,kl.
+intro [H1 _].
+by use H1 with il,jl,kl.
 
 
+intro [H1 _].
 case try find il,jl,kl such that _ in  exct(skex,kR(il,jl,kl)) else _.
-use H1 with il,jl,kl.
+intro [il jl kl [A ->]].
+by use H1 with il,jl,kl.
 
+auto.
+
+intro *.
 case try find il,jl,kl such that _ in  kI(il,jl,kl) else _.
-rewrite Meq0.
+intro [il jl kl [A ->]].
+
 case try find il,jl,kl such that _ in exct(skex, kI(il,jl,kl)) else _.
-rewrite Meq2.
+intro [il0 jl0 kl0 [B ->]].
 
 
 assert decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))  , skR(jl)) = decap(   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(skR(jl0))) , skR(jl)).
-case H1.
-case H2.
+auto.
 
-use H1 with il,jl,kl.
+simpl.
+case H1; try auto.
+case H2; try auto.
 
-case try find il,jl,kl such that _ in exct(skex,kI(il,jl,kl)) else _.
-use H1 with il,jl,kl.
+intro [H1 _].
+by use H1 with il,jl,kl.
 
+
+intro [H1 _].
+case try find il,jl,kl such that _ in  exct(skex,kI(il,jl,kl)) else _.
+intro [il jl kl [A ->]].
+by use H1 with il,jl,kl.
+
+auto.
+
+
+intro *.
 case try find il,jl,kl such that _ in  kI(il,jl,kl) else _.
-rewrite Meq0.
+intro [il jl kl [A ->]].
+
 case try find il,jl,kl such that _ in exct(skex, kI(il,jl,kl)) else _.
-rewrite Meq2.
+intro [il0 jl0 kl0 [B ->]].
 
 
 assert decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))  , skR(jl)) = decap(   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(skR(jl0))) , skR(jl)).
-case H1.
-case H2.
+auto.
 
-use H1 with il,jl,kl.
+simpl.
+case H1; try auto.
+case H2; try auto.
 
-case try find il,jl,kl such that _ in exct(skex,kI(il,jl,kl)) else _.
-use H1 with il,jl,kl.
+intro [H1 _].
+by use H1 with il,jl,kl.
+
+
+intro [H1 _].
+case try find il,jl,kl such that _ in  exct(skex,kI(il,jl,kl)) else _.
+intro [il jl kl [A ->]].
+by use H1 with il,jl,kl.
+
+auto.
 Qed.
 
 
@@ -302,8 +334,10 @@ use reflex with R2(i,j,k) => //.
 expandall.
 
 prf 1, exct(skex,kR(k,i,j)); yesif 1.
+auto.
 
 prf 1; yesif 1.
+auto.
 
 xor 1,   xor(expd(<pk(skI(k)),
                <input@R1(i,j,k),
@@ -317,7 +351,9 @@ rewrite len_expd.
 namelength n_PRF1, skex.
 intro Len.
 yesif 1.
+auto.
 fresh 1.
+auto.
 Qed.
 
 
@@ -335,18 +371,20 @@ use reflex with I1(i,j,k) => //.
 
 expandall.
 prf 1, exct(skex,kI(i,j,k)); yesif 1.
-
+auto.
 
 
 prf 1, expd(<pk(skI(i)),
                <encap(n_CCA1(i,j,k),rI(i,j,k),pk(skR(j))),
                 <pk(skR(j)),att(frame@pred(I1(i,j,k)))>>>,n_PRF) ; yesif 1.
-
+auto.
 xor 1, n_PRF1.
 
 rewrite len_expd.
 namelength n_PRF1, skex.
 intro Len.
 yesif 1.
+auto.
 fresh 1.
+auto.
 Qed.
