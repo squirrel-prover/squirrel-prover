@@ -5,7 +5,8 @@ before_script:
  - opam pin -y dune 2.9.3
  - opam install . -y --deps-only
  - opam pin -y alt-ergo-lib https://github.com/OCamlPro/alt-ergo/archive/refs/heads/next.zip
- - opam install -y alt-ergo why3
+ - opam install -y --ignore-constraints-on alt-ergo-lib alt-ergo
+ - opam install -y why3
  - eval $(opam env)
  - why3 config detect
 build:
