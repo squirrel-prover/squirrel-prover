@@ -16,8 +16,8 @@ R --> T : ok
 
 In this file, we prove two security properties for this protocol.
 
-* We first prove an **authentication** property for the reader
-  (both for the then and the else branches).
+* We first prove an **authentication** property for the reader.
+
 * We then prove **unlinkability**, _i.e._ the equivalence between
   a **real** system (where each tag can play multiple sessions) and
   an **ideal** system (where each tag plays only one session).
@@ -95,24 +95,27 @@ system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
     setting proof mode to autoIntro=false. *)
 include Basic.
 
-(** This first authentication property is a reachability property
-    expressed by a first-order logic formula.
-    This property states that whenever a reader accepts a message (_i.e._ the
-    condition of the action `R(j)` evaluates to `true`), then there exists
-    an action `T(i,k)` that has been executed before the reader, and such that
-    the input of the reader corresonds to the output of this tag (and
-    conversely).
-    Note that we express this correspondence on each projection. Indeed, for
-    some implementations of the pairing primitive, the equality of projections
-    does not imply the equality of pairs. *)
+(** Whenever a reader accepts a message (_i.e._ the condition of the action
+    `R(j)` evaluates to `true`), there exists an action `T(i,k)` that has been
+    executed before the reader, and such that the input of the reader
+    corresponds to the output of this tag (and conversely).
 
+    The same holds for `R1` (the else branch of the reader) but with a negation.
+    We will prove once and for all a property that is generalized for any
+    `tau`, which will be useful later for `tau = R(j)` and `tau = R1(j)`.
+
+    Note that we express our correspondence property on each projection of the
+    pair. Indeed, for some implementations of the pairing primitive, the
+    equality of projections does not imply the equality of pairs. *)
 goal wa_R :
-  forall (j:index),
-    happens(R(j)) =>
-    (cond@R(j) =
-      (exists (i,k:index), T(i,k) < R(j) &&
-       fst(output@T(i,k)) = fst(input@R(j)) &&
-       snd(output@T(i,k)) = snd(input@R(j)))).
+  forall (tau:timestamp),
+    happens(tau) =>
+    ((exists (i,k:index),
+       snd(input@tau) = h(fst(input@tau),diff(key(i),key'(i,k))))
+     =
+     (exists (i,k:index), T(i,k) < tau &&
+       fst(output@T(i,k)) = fst(input@tau) &&
+       snd(output@T(i,k)) = snd(input@tau))).
 (** The high-level idea of the proof is to use the EUF cryptographic axiom:
     only the tag `T(i,k)` can forge `h(nT(i,k),key(i))` because the secret key
     is not known by the attacker.
@@ -124,8 +127,7 @@ Proof.
   (** We start by introducing the variable `j` and the hypothesis
       `happens(R(j))`, before unfolding the definiton of the `cond` macro,
       which corresponds to an existential quantification.*)
-  intro j Hap.
-  expand cond.
+  intro tau Hap.
   (** We have to prove two implications (`<=>`): we thus split the proof
       in two parts. We now have two different goals to prove.*)
   rewrite eq_iff; split => [i k Meq].
@@ -147,35 +149,6 @@ Proof.
   + by exists i,k.
 Qed.
 
-(** This second authentication property is the counterpart of the previous one,
-    but for the else branch of the reader.
-    This property states that whenever a reader **rejects** a message
-    (_i.e._ the condition of the action `R1(j)` evaluates to `true`), then
-    there does **not** exist an action `T(i,k)` that was executed before the
-    reader, and such that the input of the reader corresponds to the output of
-    this tag (and conversely). *)
-
-goal wa_R1 :
-  forall (j:index),
-    happens(R1(j)) =>
-    cond@R1(j) =
-    (not(exists (i,k:index), T(i,k) < R1(j) &&
-      fst(output@T(i,k)) = fst(input@R1(j)) &&
-      snd(output@T(i,k)) = snd(input@R1(j)))).
-Proof.
-  intro *.
-  rewrite /cond eq_not eq_iff; split => [i k Meq].
-
-  (** The first implication (=>) relies on the EUF assumption and is also
-      proved by contradiction. *)
-  + project.
-    ++ (* LEFT  *) euf Meq => *. by exists i,k0.
-    ++ (* RIGHT *) euf Meq => *. by exists i,k.
-
-  (** The second implication (<=) is trivial. *)
-  + by exists i,k.
-Qed.
-
 (** We now prove an equivalence property expressing unlinkability of the
     protocol. This property is expressed by the logic formula
     `forall t:timestamp, frame@t`
@@ -189,6 +162,7 @@ equiv unlinkability.
     * if `t` corresponds to a reader's action, we show that the outcome of the
       conditional is the same on both sides and that this outcome only depends
       on information already available to the attacker;
+
     * if `t` corresponds to a tag's action, we show that the new message added
       in the frame (_i.e._ the tag's output) does not give any information to
       the attacker to distinguish the real system from the ideal one since
@@ -210,7 +184,7 @@ Proof.
         formula `cond@R(j)` by an equivalent formula expressing the fact that
         a tag `T(i,k)` has played before and that the output of this tag is
         the message inputted by the reader. *)
-    rewrite (wa_R j H).
+    rewrite /cond (wa_R (R(j)) H).
     (** We are now able to remove this formula from the frame because
         the attacker is able to compute it using information obtained
         in the past. Indeed, each element of this formula is already available
@@ -221,7 +195,7 @@ Proof.
       This case is similar to the previous one. *)
   + expand frame. fa 0. fa 1.
     expand exec, output.
-    rewrite (wa_R1 j H).
+    rewrite /cond (wa_R (R1(j)) H).
     by fadup 1.
 
   (** Case where t = T(i,k).
@@ -233,8 +207,7 @@ Proof.
         which the then branch is the fresh name.
         The goal is now to prove that this condition always evaluates to
         `true`. *)
-    prf 2.
-    yesif 2. {
+    prf 2. rewrite if_true. {
       split; 1: true.
       (** Several conjuncts must now be proved, the same tactic can be
           used on all of them. Here are representative cases:
@@ -259,5 +232,5 @@ Proof.
     (** We can also remove the name `nT(i,k)`, and conclude by induction
         hypothesis. *)
     fresh 1.
-    by yesif 1.
+    by rewrite if_true.
 Qed.
