@@ -43,6 +43,8 @@ rule token = parse
 | '>'                 { RANGLE }
 | '['                 { LBRACKET }
 | ']'                 { RBRACKET }
+| '{'                 { LBRACE }
+| '}'                 { RBRACE }
 | '?'                 { QMARK }
 | ','                 { COMMA }
 | "!"                 { BANGU }

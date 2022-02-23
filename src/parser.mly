@@ -17,6 +17,7 @@
 %token AT 
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
+%token LBRACE RBRACE
 %token LANGLE RANGLE
 %token GAND GOR AND OR NOT TRUE FALSE 
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS COLONEQ
@@ -967,12 +968,19 @@ interactive:
 
 bullet:
 |                    { "" }
+| MINUS              { "-" }
 | PLUS               { "+" }
 | STAR               { "*" }
 | INFIXSYMB          { $1 }
 
+brace:
+|                    { `None }
+| LBRACE             { `Open }
+| RBRACE             { `Close }
+
 top_proofmode:
-| b=bullet t=tactic  { Prover.ParsedTactic (b,t) }
+| bl=bullet br=brace t=tactic
+                     { Prover.ParsedTactic (bl,br,t) }
 | u=undo             { Prover.ParsedUndo u }
 | ABORT              { Prover.ParsedAbort }
 | QED                { Prover.ParsedQed }

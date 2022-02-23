@@ -6,6 +6,8 @@ type bullet = string
 (** Path through a proof tree under construction. *)
 type path
 
+val pp : Format.formatter -> path -> unit
+
 val initial_path : path
 
 val empty_path : path

@@ -615,7 +615,8 @@ type include_param = { th_name : lsymb; params : lsymb list }
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
   | ParsedSetOption  of Config.p_set_param
-  | ParsedTactic     of Bullets.bullet * TacticsArgs.parser_arg Tactics.ast
+  | ParsedTactic     of string * [`None|`Open|`Close] *
+                        TacticsArgs.parser_arg Tactics.ast
   | ParsedUndo       of int
   | ParsedGoal       of Goal.Parsed.t Location.located
   | ParsedInclude    of include_param
@@ -702,17 +703,27 @@ let pp_goal ppf () = match !current_goal, !subgoals with
 let eval_tactic_focus tac = match !subgoals with
   | [] -> assert false
   | judge :: ejs' ->
+    if not (Bullets.tactic_allowed !bullets) then
+      Tactics.(hard_failure (Failure "bullet needed before tactic"));
     let new_j = AST.eval_judgment tac judge in
     subgoals := new_j @ ejs';
     begin try
-      bullets := Bullets.expand_goal (List.length new_j) !bullets
+      bullets := Bullets.expand_goal (List.length new_j) !bullets ;
     with _ -> Tactics.(hard_failure (Failure "bullet error")) end;
     is_proof_completed ()
 
 let open_bullet bullet =
   assert (bullet <> "");
   try bullets := Bullets.open_bullet bullet !bullets with
-    | _ -> Tactics.(hard_failure (Failure "bullet error"))
+    | _ -> Tactics.(hard_failure (Failure "invalid bullet"))
+
+let open_brace bullet =
+  try bullets := Bullets.open_brace !bullets with
+    | _ -> Tactics.(hard_failure (Failure "invalid brace"))
+
+let close_brace bullet =
+  try bullets := Bullets.close_brace !bullets with
+    | _ -> Tactics.(hard_failure (Failure "invalid brace"))
 
 let cycle i_l l =
   let i, loc = L.unloc i_l, L.loc i_l in

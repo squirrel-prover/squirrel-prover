@@ -259,7 +259,7 @@ let do_decls (state : main_state) (decls : Decl.declarations) : main_state =
   let table = Prover.declare_list state.table hint_db decls in
   { state with mode = GoalMode; table = table; }
 
-let do_tactic (state : main_state) bullet utac : main_state =
+let do_tactic (state : main_state) bullet brace utac : main_state =
   let () = 
     match state.check_mode with
     | `NoCheck -> assert (state.mode = WaitQed)
@@ -276,6 +276,11 @@ let do_tactic (state : main_state) bullet utac : main_state =
   match state.check_mode with
   | `NoCheck -> state
   | `Check   ->
+    begin match brace with
+      | `Open -> Prover.open_brace ()
+      | `Close -> Prover.close_brace ()
+      | `None -> ()
+    end ;
     if bullet <> "" then Prover.open_bullet bullet;
     let proof_done = Prover.eval_tactic utac in
     if proof_done then
@@ -397,7 +402,7 @@ and do_command
 
     | GoalMode, ParsedInputDescr decls -> do_decls state decls
 
-    | _, ParsedTactic (bullet,utac)    -> do_tactic state bullet utac
+    | _, ParsedTactic (bl,br,utac)     -> do_tactic state bl br utac
 
     | WaitQed, ParsedQed               -> do_qed state
 
