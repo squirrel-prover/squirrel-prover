@@ -25,7 +25,7 @@ module type S = sig
 
   (** Convert a proof term into a pattern and the system it applies to. 
       - if [close_pats] is [false], pattern variables that cannot be 
-      inferred remains (default to [true]). Otherwise, *)
+      inferred remains (default to [true]). *)
   val convert_pt_gen :
     ?check_compatibility:bool -> 
     ?close_pats:bool ->

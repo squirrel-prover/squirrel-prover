@@ -983,6 +983,7 @@ let _fold_macro_support
     ) cntxt.table cntxt.system init
 
 
+
 (** Folding over all macro descriptions reachable from some terms.
     [env] must contain the free variables of [terms]. 
 
@@ -994,8 +995,11 @@ let _fold_macro_support
     where [occs] is a list of indirect occurrences of sort [iocc] 
     that, roughly, "covers" all subterms of any all expansions of [terms], 
     in the following sense:
+
+    TODO: the description below is completely accurrante, as only indirect
+    occurrences are covered!
     
-     ∀ trace model T, ∀ s ∈ st( ([terms])^T ), ∃ occ ∈ [occs], and:
+    ∀ trace model T, ∀ s ∈ st( ([terms])^T ), ∃ occ ∈ [occs], and:
 
      - ∃ s₀ ∈ st([occ.occ_cnt])
 

@@ -97,9 +97,11 @@ module Mk (Args : MkArgs) : S with
       if check_compatibility then begin
         match k with
         | Equiv.Local_t
+
         | _ when Goal.is_reach_statement lem ->
           if not (SE.systems_compatible (S.system s) lem.system) then
-            Tactics.hard_failure Tactics.NoAssumpSystem;
+            Tactics.hard_failure Tactics.NoAssumpSystem
+
         | _ ->
           if S.system s <> lem.system then
             Tactics.hard_failure Tactics.NoAssumpSystem
