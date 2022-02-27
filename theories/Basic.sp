@@ -157,6 +157,17 @@ Proof.
   by case b; case b'.
 Qed.
 
+goal if_then_implies ['a] (b,b' : boolean, x,y,z : 'a):
+  if b then (if b' then x else y) else z =
+  if b then (if b => b' then x else y) else z.
+Proof.
+  case b; intro H; case b'; intro H'; simpl; try auto.
+  + by rewrite if_true.
+  + rewrite if_false.
+    intro Habs; by use Habs.
+    auto.
+Qed.
+
 goal if_same ['a] (b : boolean, x : 'a):
   if b then x else x = x.
 Proof.
