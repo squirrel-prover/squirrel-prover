@@ -18,16 +18,17 @@ process reader(j:index) =
 
 system (!_j R: reader(j) | !_i !_j T: tag(i,j)).
 
+set autoIntro = false.
+
 goal auth (i:index, j:index):
   happens(R(j,i)) =>
-    (cond@R(j,i) =>
-     exists (j':index), T(i,j') < R(j,i)
-     && fst(input@R(j,i)) = fst(output@T(i,j'))
-     && snd(input@R(j,i)) = snd(output@T(i,j'))).
-
+  cond@R(j,i) =>
+  exists (j':index), T(i,j') < R(j,i) &&
+  fst(input@R(j,i)) = fst(output@T(i,j')) &&
+  snd(input@R(j,i)) = snd(output@T(i,j')).
 Proof.
- intro Hap Hcond.
- expand cond.
- euf Hcond.
- intro *; exists j0.
+  intro Hap Hcond.
+  expand cond.
+  euf Hcond.
+  intro *; by exists j0.
 Qed.

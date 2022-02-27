@@ -1,15 +1,19 @@
 system null.
-goal dummy : True.
 
+set autoIntro = false.
+
+goal dummy : True.
 Proof.
-nosimpl(help).
-nosimpl(help concise).
-help euf.
+  help.
+  help concise.
+  help euf.
+  auto.
 Qed.
 
 equiv test: diff(zero,zero).
 Proof.
-nosimpl(help).
-nosimpl(help concise).
-help fresh.
+  help.
+  help concise.
+  help fresh.
+  auto.
 Qed.
