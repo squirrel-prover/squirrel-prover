@@ -86,11 +86,13 @@ function key(event) {
 
 function help() {
   if (panel) {
-    document.getElementById("help-panel").style.right = "-20%";
+    document.getElementById("help-panel").style.width = "0";
+    document.getElementById("help-panel").style.padding = "3.5rem 0 0.5rem";
     document.getElementById("main").style.width = "100%";
     panel = false;
   } else {
-    document.getElementById("help-panel").style.right = "0";
+    document.getElementById("help-panel").style.width = "20%";
+    document.getElementById("help-panel").style.padding = "3.5rem 0.5rem 0.5rem";
     document.getElementById("main").style.width = "80%";
     panel = true;
   }

@@ -61,11 +61,11 @@ body {
 .help-panel {
   position: absolute;
   top: 0;
-  right: -20%;
+  right: 0;
   z-index: 2;
   height: 100%;
-  width: 20%;
-  padding: 3.5rem 0.5rem 0.5rem;
+  width: 0;
+  padding: 3.5rem 0 0.5rem;
 	border-style: none none none solid;
 	border-width: 4px;
 	border-color: #8B0000;
