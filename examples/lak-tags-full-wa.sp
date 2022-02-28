@@ -3,8 +3,9 @@
 (* R --> T: nr                                    *)
 (* T --> R: nT, h(<nR, nT, tag1>, k)              *)
 (* R --> T: h(<h(<nR, nT, tag2>, k), nr, tag2>,k) *)
-set postQuantumSound=true.
-set timeout=4.
+
+set postQuantumSound = true.
+set autoIntro = false.
 
 hash h
 
@@ -49,61 +50,59 @@ goal wa_R:
   exists (k:index),
   T(i,k) < R1(j,i) &&
   fst(input@R1(j,i)) = fst(output@T(i,k)) &&
-  snd(input@R1(j,i)) = snd(output@T(i,k)) && R(j) < T(i,k) && output@R(j) = input@T(i,k).
+  snd(input@R1(j,i)) = snd(output@T(i,k)) &&
+  R(j) < T(i,k) &&
+  output@R(j) = input@T(i,k).
 Proof.
-simpl.
-expand cond@R1(j,i).
-euf H.
-use tags_neq.
-exists k.
-assert (nR(j) = input@T(i,k)).
-fresh Meq0.
-case H0.
-depends R(j), R2(j).
-depends R(j), R1(j,i0).
+  intro j i _ Hc.
+  rewrite /cond in Hc; euf Hc => // _ _ _.
+  + by use tags_neq.
+  + exists k.
+    assert (nR(j) = input@T(i,k)) as Mfresh; 1: auto.
+    fresh Mfresh => [Hfresh | Hfresh | [i0 Hfresh]] //.
+    - by depends R(j), R2(j).
+    - by depends R(j), R1(j,i0).
 Qed.
 
 goal executable_R1 (t:timestamp) (j,i:index) :
   happens(t) => exec@t => R1(j,i)<=t => exec@R1(j,i) && cond@R1(j,i).
 Proof.
-  intro *.
-  executable t.
-  use H0 with R1(j,i).
-  expand exec@R1(j,i).
+  intro _ _ _.
+  executable t => // He.
+  by use He with R1(j,i).
 Qed.
 
 goal wa_T:
- forall (i:index, k:index),
- happens(T1(i,k)) => exec@T1(i,k) =>
- exists (j:index),
- R1(j,i) < T1(i,k) &&
- output@R1(j,i) = input@T1(i,k) &&
- T(i,k) < R1(j,i) &&
- fst(output@T(i,k)) = fst(input@R1(j,i)) &&  snd(output@T(i,k)) = snd(input@R1(j,i)) &&
- R(j) < T(i,k) &&
- output@R(j) = input@T(i,k).
+
+  forall (i:index, k:index),
+  happens(T1(i,k)) =>
+  exec@T1(i,k) =>
+
+  exists (j:index),
+  R1(j,i) < T1(i,k) &&
+  output@R1(j,i) = input@T1(i,k) &&
+  T(i,k) < R1(j,i) &&
+  fst(output@T(i,k)) = fst(input@R1(j,i)) &&
+  snd(output@T(i,k)) = snd(input@R1(j,i)) &&
+  R(j) < T(i,k) &&
+  output@R(j) = input@T(i,k).
+
 Proof.
-  intro *.
-  assert cond@T1(i,k).
-  expand exec@T1(i,k).
-  expand cond@T1(i,k).
-  use tags_neq.
-  euf H0.
-  assert (snd(input@R1(j,i)) = h(<<input@T(i,k),nT(i,k)>,tag1>,key(i))).
-  euf Meq0.
-  case H2.
-  case H1.
-  nosimpl(exists j).
-  use executable_R1 with T1(i,k),j,i.
-  expand cond@R1(j,i).
+  intro i k Hh He.
+  assert cond@T1(i,k) as Hc; 1: auto.
+  use tags_neq as _.
+  rewrite /cond in Hc; euf Hc => // H1t H1m _.
+  assert (snd(input@R1(j,i)) = h(<<input@T(i,k),nT(i,k)>,tag1>,key(i))) as Heuf; 1: auto.
+  euf Heuf => // H2t H2m _.
+  case H1t; case H2t; try auto.
+  exists j.
+  use executable_R1 with T1(i,k),j,i as [He' Hc'] => //.
   assert h(<<nR(j),fst(input@R1(j,i))>,tag1>,key(i)) =
          h(<<input@T(i,k),nT(i,k)>,tag1>,key(i)) as Hcoll;
-    [0: congruence].
-  collision Hcoll.
-  assert (input@T(i,k) = nR(j)) as Hfresh;
-    [0: congruence].
-  fresh Hfresh.
-  case H5.
-  by depends R(j), R2(j).
-  by depends R(j), R1(j,i0).
+    1: auto.
+  collision Hcoll => Hcoll'.
+  assert (input@T(i,k) = nR(j)) as Hfresh; 1: auto.
+  fresh Hfresh => [Hfresh' | Hfresh' | [i0 Hfresh']] //.
+  + by depends R(j), R2(j).
+  + by depends R(j), R1(j,i0).
 Qed.
