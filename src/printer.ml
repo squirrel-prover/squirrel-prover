@@ -92,7 +92,7 @@ let kw_ansi (keyword : keyword) : string =
   | `HelpType -> "1;31"
   | `HelpFunction -> "1;35"
   | `Test -> "1;3;4;35"
-  | `Error -> "101"
+  | `Error -> "41"
 
 (* Defines the string that will be outputed when a semantic tag is opened *)
 let kw_ansi_pref (stag : Format.stag) : string =
