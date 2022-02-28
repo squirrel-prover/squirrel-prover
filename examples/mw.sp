@@ -16,7 +16,6 @@ This is a "light" model without the last check of T.
 *******************************************************************************)
 
 set postQuantumSound=true.
-set timeout=4.
 
 hash H
 
@@ -62,71 +61,40 @@ axiom len_id' (i,t:index): len(id'(i,t)) = len(dummy)
 
 axiom tags_neq : tag0 <> tag1.
 
-(* Well-authentication for R1's condition, formulated in an imprecise
-   way with respect to the involved indices. *)
-goal wa_R1 (r:index):
+(* Well-authentication for R1 and R2's condition. *)
+goal wa_R1_R2 (tau:timestamp,r:index):
   (exists (i,t:index),
-   xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
-   H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))))
-  <=>
+   xor(diff(id(i),id'(i,t)),snd(input@tau)) =
+   H(<tag0,<nr(r),fst(input@tau)>>,diff(key(i),key'(i,t))))
+  =
   (exists (i,t:index),
-   T(i,t) < R1(r) &&
-   fst(output@T(i,t)) = fst(input@R1(r)) &&
-   snd(output@T(i,t)) = snd(input@R1(r)) &&
+   T(i,t) < tau &&
+   fst(output@T(i,t)) = fst(input@tau) &&
+   snd(output@T(i,t)) = snd(input@tau) &&
    R(r) < T(i,t) &&
    output@R(r) = input@T(i,t)).
 Proof.
-  split.
+  rewrite eq_iff; split.
 
   (* Cond => WA *)
   + intro [i t Meq].
     project.
     (* left *)
-    - euf Meq => _ _ _; 1: auto.
-      exists i,t0; simpl.
-      assert (input@T(i,t0) = nr(r)) as F; 1: auto.
-      fresh F => C.
-      by case C; 3: depends R(r), R2(r).
+    - euf Meq => _ _ _.
+      * by use tags_neq.
+      * exists i,t0; simpl.
+        assert (input@T(i,t0) = nr(r)) as F; 1: auto.
+        fresh F => [_|_|_] //.
+        ** by depends R(r), R1(r).
+        ** by depends R(r), R2(r).
     (* right *)
-    - euf Meq => _ _ _; 1:auto.
-      exists i,t; simpl.
-      assert (input@T(i,t) = nr(r)) as F; 1: auto.
-      fresh F => C.
-      by case C; 3: depends R(r), R2(r).
-
-  (* WA => Cond *)
-  + by intro [i t _]; expand output; exists i,t.
-Qed.
-
-(* Same with R2 *)
-goal wa_R2 (r:index):
-  (exists (i,t:index),
-   xor(diff(id(i),id'(i,t)),snd(input@R2(r))) =
-   H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t))))
-  <=>
-  (exists (i,t:index),
-   T(i,t) < R2(r) &&
-   fst(output@T(i,t)) = fst(input@R2(r)) &&
-   snd(output@T(i,t)) = snd(input@R2(r)) &&
-   R(r) < T(i,t) &&
-   output@R(r) = input@T(i,t)).
-Proof.
-  use tags_neq; split.
-
-  + intro [i t Meq].
-    project.
-    (* left *)
-    - euf Meq => _ _ _; 1: auto.
-      exists i,t0; simpl.
-      assert (input@T(i,t0) = nr(r)) as F; 1: auto.
-      fresh F => C.
-      by case C; 2: depends R(r), R1(r).
-    (* right *)
-    - euf Meq => _ _ _; 1:auto.
-      exists i,t; simpl.
-      assert (input@T(i,t) = nr(r)) as F; 1: auto.
-      fresh F => C.
-      by case C; 2: depends R(r), R1(r).
+    - euf Meq => _ _ _.
+      * by use tags_neq.
+      * exists i,t; simpl.
+        assert (input@T(i,t) = nr(r)) as F; 1: auto.
+        fresh F => [_|_|_] //.
+        ** by depends R(r),R1(r).
+        ** by depends R(r),R2(r).
 
   (* WA => Cond *)
   + by intro [i t _]; expand output; exists i,t.
@@ -193,16 +161,7 @@ Proof.
 
     fa 0; fa 1.
 
-    equivalent
-      (exists (i,t:index),
-       diff(id(i),id'(i,t)) XOR snd(input@R1(r)) =
-       H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))),
-      (exists (i,t:index),
-       T(i,t) < R1(r) &&
-       fst(output@T(i,t)) = fst(input@R1(r)) &&
-       snd(output@T(i,t)) = snd(input@R1(r)) &&
-       R(r) < T(i,t) && output@R(r) = input@T(i,t)).
-    by use wa_R1 with r.
+    rewrite wa_R1_R2.
 
     (* Perform a similar rewriting in try-find condition,
        also propagating exec@pred(R1(r)) there, and changing
@@ -250,28 +209,28 @@ Proof.
       project => // [_ [i t G]].
 
       (* LEFT *)
-      fa; 2: intro *; expand output; auto.
-      intro Meq.
-      use wa_R1_left with i0,r as [H1 H2].
-      use H1 as [_ _]; 2: expand output; auto.
-      by expand output; exists t.
+      - fa; 2: intro *; expand output; auto.
+        intro Meq.
+        use wa_R1_left with i0,r as [H1 H2].
+        use H1 as [_ _]; 2: expand output; auto.
+        by expand output; exists t.
 
-      intro *.
-      rewrite if_true; 1: auto.
-      by expand output.
-      auto.
+        intro *.
+        rewrite if_true; 1: auto.
+        by expand output.
+        auto.
 
       (* RIGHT *)
-      fa; 2: intro *; expand output; auto.
-      intro Meq.
-      use wa_R1_right with i0,t0,r as [H1 H2].
-      use H1 as [_ _]; 2: expand output; auto.
-      by expand output.
+      - fa; 2: intro *; expand output; auto.
+        intro Meq.
+        use wa_R1_right with i0,t0,r as [H1 H2].
+        use H1 as [_ _]; 2: expand output; auto.
+        by expand output.
 
-      intro *.
-      rewrite if_true; 1: auto.
-      by expand output.
-      auto.
+        intro *.
+        rewrite if_true; 1: auto.
+        by expand output.
+        auto.
     }
 
     fa 2; fadup 1.
@@ -284,24 +243,12 @@ Proof.
     xor 1,n_PRF.
     rewrite if_true.
     by use len_id with i; use len_id' with i,t; namelength n_PRF, dummy.
-    fresh 1.
-    auto.
+    by fresh 1.
 
   (* Case R2 *)
   + expand frame, exec, cond, output.
-
     fa 0. fa 1.
-
-    equivalent
-      (exists (i,t:index),
-         xor(diff(id(i),id'(i,t)),snd(input@R2(r))) =
-         H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t)))),
-      (exists (i,t:index), T(i,t) < R2(r) &&
-         fst(output@T(i,t)) = fst(input@R2(r)) &&
-         snd(output@T(i,t)) = snd(input@R2(r)) &&
-         R(r) < T(i,t) && output@R(r) = input@T(i,t)).
-    by use wa_R2 with r.
-
+    rewrite wa_R1_R2.
     by fadup 1.
 
   (* Case T *)
@@ -322,6 +269,5 @@ Proof.
     xor 1, n_PRF.
     rewrite if_true.
     by use len_id with i; use len_id' with i,t; namelength n_PRF,dummy.
-    fresh 1.
-    auto.
+    by fresh 1.
 Qed.
