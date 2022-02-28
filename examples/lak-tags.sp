@@ -77,7 +77,7 @@ Proof.
     (* LEFT *)
     - euf H => _ _ _ //.
       exists i,k0.
-      assert input@T(i,k0)=nR(j) as Meq1; 1: auto.
+      assert input@T(i,k0)=nR(j) as Meq1 by auto.
       fresh Meq1 => C /=.
       case C => //.
       * by depends R(j),R1(j).
@@ -86,7 +86,7 @@ Proof.
     (* RIGHT *)
     - euf H => _ _ _ //.
       exists i,k.
-      assert input@T(i,k)=nR(j) as Meq1; 1: by auto.
+      assert input@T(i,k)=nR(j) as Meq1 by auto.
       fresh Meq1 => C /=.
       case C => //.
       * by depends R(j),R1(j).
@@ -120,7 +120,7 @@ Proof.
   use tags_neq.
   euf Meq => _ _ _ //.
   exists k.
-  assert input@T(i,k) = nR(j) as Meq1; 1: auto.
+  assert input@T(i,k) = nR(j) as Meq1 by auto.
   fresh Meq1 => C /=.
   case C => //.
   by depends R(j),R2(j).
@@ -141,7 +141,7 @@ Proof.
   intro Meq.
   use tags_neq.
   euf Meq => _ _ _ //.
-  assert input@T(i,k) = nR(j) as Meq1; 1: auto.
+  assert input@T(i,k) = nR(j) as Meq1 by auto.
   fresh Meq1 => C /=.
   case C => //.
   by depends R(j),R2(j).
@@ -170,27 +170,14 @@ Proof.
   case exec@pred(R1(j)) => Hexec; 2: auto.
   case cond@R1(j) => Hcond; 2: auto.
   simpl.
-
-  expand cond; rewrite wa_R1_R2 in Hcond => //.
-  destruct Hcond as [i0 k0 Hcond].
-
   (* It is important to project before using "fa" on
      the "try find" construct so that the redundant
      index k on the left is treated smartly. *)
   project.
-
-  + fa; try auto.
-    intro Heq.
-    rewrite wa_R1_left in Heq; 1: auto.
-    destruct Heq as [k1 Heq].
-    assert nT(i0,k0) = nT(i,k1); 1: auto.
-    eqnames.
-    by exists k0.
-
-  + fa; try auto.
-    intro Heq.
+  + fa => // Heq.
+    by rewrite wa_R1_left in Heq.
+  + fa => // Heq.
     by rewrite wa_R1_right in Heq.
-
 Qed.
 
 equiv unlinkability.
@@ -213,7 +200,7 @@ Proof.
   (* Case R1 *)
   + expand frame, exec, output.
     fa 0; fa 1.
-    rewrite wa_R1_tryfind; 1: auto.
+    rewrite wa_R1_tryfind //.
     expand cond; rewrite wa_R1_R2 => //.
     fa 2; fadup 1.
     fa 1; fadup 1.
@@ -225,7 +212,7 @@ Proof.
   (* Case R2 *)
   + expand frame, exec, output.
     fa 0; fa 1.
-    expand cond; rewrite wa_R1_R2; 1: auto.
+    expand cond; rewrite wa_R1_R2 //.
     by fadup 1.
 
   (* Case T *)

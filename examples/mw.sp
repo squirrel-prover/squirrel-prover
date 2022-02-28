@@ -83,7 +83,7 @@ Proof.
     - euf Meq => _ _ _.
       * by use tags_neq.
       * exists i,t0; simpl.
-        assert (input@T(i,t0) = nr(r)) as F; 1: auto.
+        assert (input@T(i,t0) = nr(r)) as F by auto.
         fresh F => [_|_|_] //.
         ** by depends R(r), R1(r).
         ** by depends R(r), R2(r).
@@ -91,7 +91,7 @@ Proof.
     - euf Meq => _ _ _.
       * by use tags_neq.
       * exists i,t; simpl.
-        assert (input@T(i,t) = nr(r)) as F; 1: auto.
+        assert (input@T(i,t) = nr(r)) as F by auto.
         fresh F => [_|_|_] //.
         ** by depends R(r),R1(r).
         ** by depends R(r),R2(r).
@@ -104,40 +104,76 @@ Qed.
     There has to remain an existential quantification on t,
     because it is not involved in the condition. *)
 goal [left] wa_R1_left (i,r:index):
-  xor(id(i),snd(input@R1(r))) =
-  H(<tag0,<nr(r),fst(input@R1(r))>>,key(i))
-  <=>
-  exists t:index,
-  T(i,t) < R1(r) &&
-  fst(output@T(i,t)) = fst(input@R1(r)) &&
-  snd(output@T(i,t)) = snd(input@R1(r)) &&
-  R(r) < T(i,t) &&
-  output@R(r) = input@T(i,t).
+  (xor(id(i),snd(input@R1(r))) =
+   H(<tag0,<nr(r),fst(input@R1(r))>>,key(i)))
+  =
+  (exists t:index,
+   T(i,t) < R1(r) &&
+   fst(output@T(i,t)) = fst(input@R1(r)) &&
+   snd(output@T(i,t)) = snd(input@R1(r)) &&
+   R(r) < T(i,t) &&
+   output@R(r) = input@T(i,t)).
 Proof.
-  split; 2: by intro [_ _]; expand output.
+  rewrite eq_iff; split; 2: by intro [_ _]; expand output.
   intro Meq; euf Meq => _ _ _; 1: auto.
   exists t; simpl.
-  assert input@T(i,t) = nr(r) as F; 1: auto.
+  assert input@T(i,t) = nr(r) as F by auto.
   fresh F => C.
   by case C; 3:depends R(r), R2(r).
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
 goal [right] wa_R1_right (i,t,r:index):
-  xor(id'(i,t),snd(input@R1(r))) =
-  H(<tag0,<nr(r),fst(input@R1(r))>>,key'(i,t))
-  <=>
-  T(i,t) < R1(r) &&
-  fst(output@T(i,t)) = fst(input@R1(r)) &&
-  snd(output@T(i,t)) = snd(input@R1(r)) &&
-  R(r) < T(i,t) &&
-  output@R(r) = input@T(i,t).
+  (xor(id'(i,t),snd(input@R1(r))) =
+   H(<tag0,<nr(r),fst(input@R1(r))>>,key'(i,t)))
+  =
+  (T(i,t) < R1(r) &&
+   fst(output@T(i,t)) = fst(input@R1(r)) &&
+   snd(output@T(i,t)) = snd(input@R1(r)) &&
+   R(r) < T(i,t) &&
+   output@R(r) = input@T(i,t)).
 Proof.
-  split; 2: by intro [_ _]; expand output.
+  rewrite eq_iff; split; 2: by intro [_ _]; expand output.
   intro Meq; euf Meq => _ _ _; 1: auto.
-  assert input@T(i,t) = nr(r) as F; 1: auto.
+  assert input@T(i,t) = nr(r) as F by auto.
   fresh F => C.
   by case C; 3:depends R(r), R2(r).
+Qed.
+
+(** Equality used to rewrite the try-find in R1
+    so that its condition can be discharged using fadup:
+    change condition to honest transcript formula,
+    and insert exec conjunct. *)
+goal wa_R1_tryfind (r:index) : happens(R1(r)) =>
+  (if exec@pred(R1(r)) && cond@R1(r) then
+   try find i,t such that
+     xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
+     H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))) in
+   xor(diff(id(i),id'(i,t)),H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))))
+  =
+  (if exec@pred(R1(r)) && cond@R1(r) then
+   try find i,t such that
+     exec@pred(R1(r)) &&
+     (T(i,t) < R1(r) &&
+      fst(output@T(i,t)) = fst(input@R1(r)) &&
+      snd(output@T(i,t)) = snd(input@R1(r)) &&
+      R(r) < T(i,t) &&
+      output@R(r) = input@T(i,t))
+   in
+   xor(diff(id(i),id'(i,t)),H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))))).
+Proof.
+  intro Hap.
+  case exec@pred(R1(r)) => // Hexec.
+  case cond@R1(r) => // Hcond.
+  simpl.
+  (* Projection must be performed before fa
+     so that useless indices are handled smartly. *)
+  project.
+  + fa => // Heq.
+    (* Timestamp t introduced by fa is unused. *)
+    by rewrite wa_R1_left in Heq.
+  + fa => // Heq.
+    by rewrite wa_R1_right in Heq.
 Qed.
 
 equiv unlinkability.
@@ -157,87 +193,15 @@ Proof.
     auto.
 
   (* Case R1 *)
-  + expand frame, exec, cond, output.
-
+  + expand frame, exec, output.
     fa 0; fa 1.
 
-    rewrite wa_R1_R2.
-
-    (* Perform a similar rewriting in try-find condition,
-       also propagating exec@pred(R1(r)) there, and changing
-       fst(input@R1(r)) into nt(i,t) in the final output. *)
-    equivalent
-      (if exec@pred(R1(r)) &&
-          exists (i,t:index),
-          T(i,t) < R1(r) &&
-          fst(output@T(i,t)) = fst(input@R1(r)) &&
-          snd(output@T(i,t)) = snd(input@R1(r)) &&
-          R(r) < T(i,t) && output@R(r) = input@T(i,t)
-       then try find i,t such that
-          xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
-          H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))
-       in
-          diff(id(i),id'(i,t)) XOR
-          H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))),
-      (if exec@pred(R1(r)) &&
-          exists (i,t:index),
-          T(i,t) < R1(r) &&
-          fst(output@T(i,t)) = fst(input@R1(r)) &&
-          snd(output@T(i,t)) = snd(input@R1(r)) &&
-          R(r) < T(i,t) && output@R(r) = input@T(i,t)
-       then
-       try find i,t such that
-          exec@pred(R1(r)) &&
-          (T(i,t) < R1(r) &&
-           fst(output@T(i,t)) = fst(input@R1(r)) &&
-           snd(output@T(i,t)) = snd(input@R1(r)) &&
-           R(r) < T(i,t) && output@R(r) = input@T(i,t))
-       in
-       if exec@pred(R1(r)) then
-          diff(id(i),id'(i,t)) XOR
-          H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))).
-    {
-      (* IF-THEN-ELSE *)
-      nosimpl(fa); try auto.
-      by intro [_ [i t _]] /=; exists i,t.
-      by intro [_ [i t _]] /=; exists i,t.
-
-      (* TRY-FIND *)
-      (* We have index variables corresponding to the existentials from
-         the if-then-else condition: i,t for the honest formula and
-         i1,t0 for the condition. *)
-      project => // [_ [i t G]].
-
-      (* LEFT *)
-      - fa; 2: intro *; expand output; auto.
-        intro Meq.
-        use wa_R1_left with i0,r as [H1 H2].
-        use H1 as [_ _]; 2: expand output; auto.
-        by expand output; exists t.
-
-        intro *.
-        rewrite if_true; 1: auto.
-        by expand output.
-        auto.
-
-      (* RIGHT *)
-      - fa; 2: intro *; expand output; auto.
-        intro Meq.
-        use wa_R1_right with i0,t0,r as [H1 H2].
-        use H1 as [_ _]; 2: expand output; auto.
-        by expand output.
-
-        intro *.
-        rewrite if_true; 1: auto.
-        by expand output.
-        auto.
-    }
-
+    rewrite wa_R1_tryfind //.
+    rewrite /cond wa_R1_R2.
     fa 2; fadup 1.
     fa 1; fadup 1.
+
     prf 1.
-    ifcond 1, 1, exec@pred(R1(r)); 1: auto.
-    fa 1.
     rewrite if_true.
     by use tags_neq; project.
     xor 1,n_PRF.
@@ -265,7 +229,7 @@ Proof.
           fresh Meq).
     }
     fresh 1.
-    rewrite if_true; 1: auto.
+    rewrite if_true //.
     xor 1, n_PRF.
     rewrite if_true.
     by use len_id with i; use len_id' with i,t; namelength n_PRF,dummy.
