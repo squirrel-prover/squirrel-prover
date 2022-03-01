@@ -15,6 +15,7 @@ system (
    (A: !_i s:=H(s,k); out(o,G(s,k')))
 ).
 
+include Basic.
 
 (** Last update lemmas: basic reasoning about the memory cell.
   * Here we decompose the usual lastupdate lemma to separate the "pure" part
@@ -85,7 +86,7 @@ Proof.
   intro H; rewrite H in Hinf; auto.
 
   intro [j Hj]; rewrite Hj in *; expand s@O(j).
-  apply IH => //; simpl.
+  apply IH => //=.
   intro k Hk; by use Hsup with k.
 
   intro [j Hj]; rewrite Hj in *.
@@ -147,38 +148,43 @@ Proof.
   expand frame@init.
   use lastupdate_pure with tau' as [Hinit | [i HA]].
 
-    use lastupdate_init with tau' as H; try auto.
+  + use lastupdate_init with tau' as H; try auto.
     rewrite H; expand s@init; fresh 0; auto.
 
-    use lastupdate_A with tau',i as H; try auto.
+  + use lastupdate_A with tau',i as H; try auto.
     rewrite H in *; expand s@A(i).
-    prf 0; yesif 0; [2: by fresh 0].
-    simpl. intro i' HAi'.
+    prf 0; rewrite if_true; [2: by fresh 0].
+    intro /= i' HAi'.
     use non_repeating with pred(A(i)),pred(A(i')) => //.
     by exists i'.
-    by assumption.
+
+  + by assumption.
 
   (* Oracle *)
   expand frame, output, exec, cond.
   fa 0. fa 1. fa 1. fa 1.
-  prf 1; yesif 1; 2: fresh 1.
-  simpl; split; project; intro i' H; try destruct H as [H|H];
+  prf 1; rewrite if_true /=.
+  + split; project; intro i' H; try destruct H as [H|H];
     try by apply unique_queries.
     rewrite equiv IH (pred(A(i'))) => //.
       intro Hf; by fresh Hf.
     rewrite equiv IH (pred(A(i'))) => // Hf; by fresh Hf.
     rewrite equiv IH (pred(A(i'))) => // Hf; by fresh Hf.
-  prf 1; yesif 1; 2: fresh 1; by apply IH.
-  simpl; split; project; intro i' H; try destruct H as [H|H];
-    try by apply unique_queries.
-    rewrite equiv IH (A(i')) => // Hf; by fresh Hf.
-    rewrite equiv IH (A(i')) => // Hf; by fresh Hf.
+
+  + fresh 1.
+    prf 1; rewrite if_true /=.
+    - split; project; intro i' H; try destruct H as [H|H];
+      try by apply unique_queries.
+      rewrite equiv IH (A(i')) => // Hf; by fresh Hf.
+      rewrite equiv IH (A(i')) => // Hf; by fresh Hf.
+
+    - by fresh 1; apply IH.
 
   (* Tag *)
   expand frame, exec, cond, output.
   fa 0. fa 1. fa 1.
-  prf 1; yesif 1; 2: fresh 1; by apply IH.
-  simpl; split; project; intro i' H; try destruct H as [H|H].
+  prf 1; rewrite if_true /=; 2: fresh 1; by apply IH.
+    split; project; intro i' H; try destruct H as [H|H].
     rewrite equiv IH (A(i)) => // Hf; by fresh Hf.
     rewrite equiv IH (A(i)) => // Hf; by fresh Hf.
     use non_repeating with A(i),A(i') => //; by exists i.

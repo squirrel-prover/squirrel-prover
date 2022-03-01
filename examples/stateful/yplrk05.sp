@@ -142,7 +142,7 @@ Proof.
   euf Meq.
 
     (* case 1/3: equality with hashed message in update@R1 *)
-    intro Ht Heq *.
+  + intro Ht Heq *.
     executable pred(R1(jj,ii)) => // H.
     use H with R1(jj0,ii) as Ht1; 2: auto.
     expand exec, cond.
@@ -152,11 +152,11 @@ Proof.
 
     (* case 2/3: equality with hashed message in output@T *)
     (* honest case *)
-    by intro *; exists j.
+  + by intro *; exists j.
 
     (* case 3/3: equality with hashed message in update@T1 *)
     (* if there is an update@T1, then action T happened before *)
-    intro Ht Heq *.
+  + intro Ht Heq *.
     exists j.
     depends T(ii,j),T1(ii,j) by auto => _.
     by rewrite /output (noUpdateTag (pred(T1(ii,j)))).
@@ -178,15 +178,16 @@ Proof.
 
     (* case 1/2: equality with hashed message in output@R1 *)
     (* honest case *)
-    by exists jj.
+  + by exists jj.
 
     (* case 2/2: equality with hashed message in update@T1 *)
-    use IH0 with T1(i,j0),i,j0 as [jj _] => //.
-    exists jj => /=.
-    executable pred(T1(i,j)) => // H.
-    by apply H in Clt.
+  + use IH0 with T1(i,j0),i,j0 as [jj _] => //. {
+     exists jj => /=.
+     executable pred(T1(i,j)) => // H.
+     by apply H in Clt.
+    } 
 
-  simpl.
-  executable pred(T1(i,j)) => // H.
-  by apply H.
+    simpl.
+    executable pred(T1(i,j)) => // H.
+    by apply H.
 Qed.

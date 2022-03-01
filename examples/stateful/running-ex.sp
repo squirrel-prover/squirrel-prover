@@ -57,6 +57,8 @@ process reader =
 
 system (!_i !_j T: tag(i) | !_jj R: reader).
 
+include Basic.
+
 (* HELPING LEMMAS *)
 
 (* Last update lemmas: basic reasoning about the memory cells.
@@ -201,16 +203,15 @@ Proof.
 
   (* T(i0,j) *)
   intro [i0 j HT]; rewrite HT in *.
-  case (i = i0) => //.
-    intro Eq H0.
-    use H0 with j => //.
+  case (i = i0).
+  + intro Eq H0.
+    by use H0 with j.
 
-    intro Neq H0.
+  + intro Neq H0.
     use IH with pred(T(i0,j)) => //.
     expand sT.
-    noif => //.
-    intro j0.
-    intro Hp.
+    rewrite if_false //. 
+    intro j0 Hp.
     by use H0 with j0.
 
   (* R(jj,ii) *)
@@ -260,7 +261,7 @@ Proof.
     intro Neq H0.
     use IH with pred(R(jj,ii0)) => //.
     expand sR.
-    noif => //.
+    rewrite if_false //.
     intro jj0 Hp.
     by use H0 with jj0.
 
@@ -285,15 +286,14 @@ Proof.
 
   (* T(i0,j0) *)
   intro [i0 j0 H]; rewrite H in *.
-  case (i=i0) => //.
-    intro Eqi.
+  case (i=i0).
+  + intro Eqi.
     use Hyp with j0 => //.
     by case (j=j0).
 
-    intro Neqi.
+  + intro Neqi.
     expand sT(i)@T(i0,j0).
-    noif.
-    auto.
+    rewrite if_false //.
     use IH with pred(T(i0,j0)) => //.
     intro /= _ _.
     by apply Hyp.
@@ -342,8 +342,7 @@ Proof.
 
     intro Neqii.
     expand sR.
-    noif.
-    auto.
+    rewrite if_false //.
     use IH with pred(R(jj0,ii0)) => //.
     intro /= _ _.
     by apply Hyp.
@@ -430,7 +429,7 @@ Proof.
   euf Hcond.
   intro Ht M.
   case (i=ii) => _; 1: by exists j.
-  expand sT.
+  rewrite /sT in M.
   collision.
   intro Meq.
   by use disjoint_chains with pred(R(jj,ii)),pred(T(i,j)),ii,i.
