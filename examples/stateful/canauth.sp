@@ -387,7 +387,7 @@ Proof.
 
   (* case j1 <>j1' *)
   right.
-  split. smt. (* split; *) (* 1: by rewrite -Eq1 -Eq1' in *. *)
+  split; 1: smt. (* split; *) (* 1: by rewrite -Eq1 -Eq1' in *. *)
 
   (* Sadly this still timeouts... *)
   (* use counterIncreaseStrictSB as CIB. revert CIB Hexec Hexec' HCpt HCpt'. slowsmt. *)

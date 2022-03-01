@@ -7,7 +7,7 @@
 
 module SE   = SystemExpr
 
-(* [declare_system table sdecl] returns a tuple 
+(** [declare_system table sdecl] returns a tuple 
    (name, fresh_vars, goal_maker, new_system, new_table) :
     - the [name] of the indistinguishability axiom introduced by the tactic
     - the fresh variables [fresh_vars] needed to define the axiom
@@ -16,7 +16,8 @@ module SE   = SystemExpr
     - the [new_system]
     - the [new_table]
 *)  
-val declare_system : Symbols.table ->
+val declare_system :
+  Symbols.table ->
   Decl.system_decl_modifier ->
   string *
   Term.term list *

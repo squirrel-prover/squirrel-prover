@@ -575,6 +575,11 @@ end
 include SmartDestructors
 
 (*------------------------------------------------------------------*)
+let is_name : term -> bool = function
+  | Name _ -> true
+  | _      -> false
+    
+(*------------------------------------------------------------------*)
 let destr_var : term -> Vars.var option = function
   | Var v -> Some v
   | _ -> None
