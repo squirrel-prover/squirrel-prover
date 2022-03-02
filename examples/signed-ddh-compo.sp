@@ -31,7 +31,7 @@ tion: a technique for protocol composition with long term shared secrets.
 In Proceedings of the 2020 ACM SIGSAC Conference on Computer and
 Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
-
+set autoIntro=false.
 
 abstract ok : message
 abstract ko : message
@@ -133,19 +133,24 @@ process S2 =
 
 system [secret] ( P2 | S2).
 
+set autoIntro=false.
 
 (** Prove that the condition above the only diff term inside S is never true. **)
 goal [auth] S1_charac :
-  happens(S1,S4) => cond@S1 => (cond@S4 => False) .
+  happens(S1,S4) => cond@S1 => (cond@S4 => False).
 Proof.
   intro Hap Hcond1 Hcond4.
-  expand cond, pkP.
+  expand cond, pkP. 
+  destruct Hcond4 as [H1 H2 Meq].
   rewrite Meq in Hcond1.
   euf Hcond1.
-
-  case H1.
-  by use H with i.
+    + intro [Hyp1 Hyp2].
+      case Hyp1 => //.
+      destruct Hyp1 as [i x1 x2 Hyp1].
+      by use H1 with i.
+    + auto.
 Qed.
+
 
 (** Prove that the condition above the only diff term inside P is never true. **)
 goal [auth] P1_charac :
@@ -153,11 +158,14 @@ goal [auth] P1_charac :
 Proof.
   intro Hap Hcond1 Hcond4.
   expand cond.
+  destruct Hcond4 as [H1 H2 Meq].
   rewrite /pkS Meq in *.
   euf Hcond1.
-
-  case H2.
-  by use H with i.
+    + intro [Hyp1 Hyp2].
+      case Hyp2 => //.
+      destruct Hyp2 as [i x1 x2 Hyp2].
+      by use H1 with i.
+    + auto.
 Qed.
 
 (** The strong secrecy is directly obtained through ddh. *)
@@ -174,66 +182,69 @@ equiv [auth] auth.
 Proof.
    enrich kP, g^a1, g^b1, kS, seq(i:index -> g^b(i)), seq(i:index -> g^a(i)).
 
-   induction t.
+   induction t => //.
 
-   (* P *)
-   expandall; fa 6.
+   + (* P *)
+     expandall; by fa 6. 
 
-   (* P1 *)
-   expandall; fa 6.
+   + (* P1 *)
+     expandall; by fa 6.
 
-   (* P2 *)
-   expandall; fa 6.
+   + (* P2 *)
+     expandall; by fa 6.
 
-   (* P3 *)
-   expandall; fa 6.
-   by apply IH.
+   + (* P3 *)
+     expandall; fa 6. by apply IH.
 
-   (* P4 *)
-   expand frame, exec.
-   fa 6.
+   + (* P4 *)
+     expand frame, exec. fa 6.
 
-   equivalent exec@pred(P4) && cond@P4, False.
-   executable pred(P4).
-   depends P1, P4; use H2 with P1.
-   expand exec.
-   by use P1_charac.
+     equivalent exec@pred(P4) && cond@P4, False.
+     {split => //. intro [Hexec Hcond].
+      depends P1, P4 => //. 
+      executable pred(P4) => //.
+      intro Hexec' Ord. 
+      use Hexec' with P1 as H1 => //.
+      expand exec.
+      by use P1_charac.}
 
    by fa 7; noif 7.
 
-   (* A *)
-   by expandall; fa 6.
+   + (* A *)
+     by expandall; fa 6.
 
-   (* A1 *)
-   by expandall; fa 6.
+   + (* A1 *)
+      by expandall; fa 6.
 
-   (* S *)
-   by expandall; fa 6.
+   + (* S *)
+     by expandall; fa 6.
 
-   (* S1 *)
-   by expandall; fa 6.
+   + (* S1 *)
+     by expandall; fa 6.
 
-   (* S2 *)
-   by expandall; fa 6.
+   + (* S2 *)
+     by expandall; fa 6.
 
-   (* S3 *)
-   expandall.
-   by apply IH.
+   + (* S3 *)
+     expandall. by apply IH.
 
-   (* S4 *)
-   expand frame, exec.
+   + (* S4 *)
+     expand frame, exec.
 
-   equivalent exec@pred(S4) && cond@S4, False.
-   executable pred(S4).
-   depends S1, S4; use H2 with S1.
-   expand exec.
-   by use S1_charac.
+     equivalent exec@pred(S4) && cond@S4, False.
+     {split => //. intro [Hexec Hcond]. 
+      depends S1, S4 => //.
+      executable pred(S4) => //.
+      intro Hexec' Ord.
+      use Hexec' with S1 as H1 => //.
+      expand exec.
+      by use S1_charac.}
 
-   by fa 6; fa 7; noif 7.
+      by fa 6; fa 7; noif 7.
 
-   (* A2 *)
-   by expandall; fa 6.
+   + (* A2 *)
+     by expandall; fa 6.
 
-   (* A3 *)
-   by expandall; fa 6.
+   + (* A3 *)
+     by expandall; fa 6.
 Qed.

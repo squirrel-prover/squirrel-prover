@@ -19,6 +19,8 @@ one agent for the role S) and show the strong secrecy of the shared key.
 [G] ISO/IEC 9798-3:2019, IT Security techniques – Entity authentication –
 Part 3: Mechanisms using digital signature techniques.
 *******************************************************************************)
+set autoIntro=false. 
+
 
 (**
 We first declare some public constants, the secret keys for roles P and S,
@@ -112,6 +114,8 @@ Proof.
   (** We start by introducing the hypotheses and expanding the macros. **)
   intro Hap Hcond.
   expand cond, pkS(i)@Pchall1(i).
+  destruct Hcond as [Meq Meq0].
+
   (** We then rewrite Meq using the message equality Meq0. **)
   rewrite Meq0 in Meq.
   (** We are now able to apply the `euf` tactic, which will search for
@@ -119,6 +123,7 @@ Proof.
   of an action `S(j)`.  **)
   euf Meq.
   (** The conclusion is now trivial from the Meq1 and D1 hypotheses. **)
+   intro *.
   by exists j.
 Qed.
 
@@ -155,25 +160,30 @@ Proof.
   the frame by the tactic `enrich`. **)
   induction t; try (by expandall; apply IH).
 
-  (** Case where `t = init`.
-  We use here the DDH assumption. **)
-  expandall.
-  by ddh g,a,b,k.
+    + (** Case where `t = init`.
+      We use here the DDH assumption. **)
+      expandall.
+      by ddh g,a,b,k.
 
-  (** Case where `t = Pchall3(i)`.
-  We will show that this case is not possible, by showing that the formula
-  `exec@pred(Pchall3(i)) && cond@Pchall3(i)` is equivalent to `False`, relying
-  on the previous property `P_charac`. **)
-  expand frame, exec, output.
-  equivalent exec@pred(Pchall3(i)) && cond@Pchall3(i), False.
-    expand cond.
-    executable pred(Pchall3(i)).
-    depends Pchall1(i), Pchall3(i).
-    use H2 with Pchall1(i).
-    expand exec.
-    use P_charac with i.
-    by use H1 with j.
-  fa 5. fa 6.
-  (** It now remains to simplify `if false then diff(ok,ko)`. **)
-  by noif 6.
+    + (** Case where `t = Pchall3(i)`.
+      We will show that this case is not possible, by showing that the formula
+      `exec@pred(Pchall3(i)) && cond@Pchall3(i)` is equivalent to `False`, relying
+      on the previous property `P_charac`. **)
+      expand frame, exec, output.
+      equivalent exec@pred(Pchall3(i)) && cond@Pchall3(i), False.
+      {split => //.
+       intro [Hexec Hcond].
+       expand cond.
+       depends Pchall1(i), Pchall3(i) => //.
+       intro Ord.
+       executable pred(Pchall3(i)) => //. 
+       intro Hexec'.
+       use Hexec' with Pchall1(i) as Hexec1 => //.
+       expand exec.
+       use P_charac with i as [j0 Hyp] => //.
+       by use Hcond with j0.}
+
+      fa 5. fa 6.
+      (** It now remains to simplify `if false then diff(ok,ko)`. **)
+      by noif 6.
 Qed.
