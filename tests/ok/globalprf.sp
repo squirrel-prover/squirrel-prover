@@ -159,9 +159,8 @@ goal [test_ok2G/left] _ :
   ok = ok2 =>
   output@A = <ok, <n_PRF2,n_PRF2>>.
 Proof.
-  intro Hap ok_ok2 @/output.
-  case (try find such that (ok = ok) in n_PRF2 else _) => [_ _] //.
-  case (try find such that (ok2 = ok) in n_PRF2 else _) => [H _] //.
+  intro Hap ok_ok2 @/output. 
+  by case (try find such that (ok = ok) in n_PRF2 else _) => [_ _].
 Qed.
 
 goal [test_ok2G/left] _ :
@@ -170,6 +169,5 @@ goal [test_ok2G/left] _ :
   output@A = <ok, <n_PRF2,h(ok2, k)>>.
 Proof.
   intro Hap ok_ok2 @/output.
-  case (try find such that (ok = ok) in n_PRF2 else _) => [_ _] //.
-  case (try find such that (ok2 = ok) in n_PRF2 else _) => [H _] //.
+  by case (try find such that (ok = ok) in n_PRF2 else _) => [_ _].
 Qed.

@@ -22,8 +22,12 @@ module Cst = struct
       ]
     (** function symbol, name or action of arity zero *)
 
-    | Cmvar   of Vars.var
-
+    | Cmvar of Vars.var
+    (** Variable *)
+  
+    | Cboxed of Term.term
+    (** Boxed term, for unsupported terms (e.g. binders) *)
+  
   let cst_cpt = ref 0
 
   let mk_flat () =
@@ -41,7 +45,8 @@ module Cst = struct
     | Cgfuncst (`F f) -> Symbols.pp ppf f
     | Cgfuncst (`N (n,_)) -> Symbols.pp ppf n
     | Cgfuncst (`A a) -> Symbols.pp ppf a
-
+    | Cboxed  t -> Fmt.pf ppf "Box(@[%a@])" Term.pp t
+                     
   (* The successor function symbol is the second smallest in the precedence
       used for the LPO (0 is the smallest element).  *)
   let rec compare c c' = match c,c' with
@@ -238,8 +243,6 @@ let mk_var () =
   let () = incr var_cpt in
   cvar !var_cpt
 
-exception Unsupported_conversion
-
 (** Translation from [term] to [cterm] *)
 let rec cterm_of_term : Term.term -> cterm = fun c ->
   let open Term in
@@ -268,7 +271,8 @@ let rec cterm_of_term : Term.term -> cterm = fun c ->
 
   | Diff(c,d) -> cfun (F Symbols.fs_diff) 0 [cterm_of_term c; cterm_of_term d]
 
-  | _ -> raise Unsupported_conversion
+  (* default case *)
+  | t -> ccst (Cst.Cboxed t)
 
 and cterm_of_var i = ccst (Cst.Cmvar i)
 
@@ -320,6 +324,8 @@ let term_of_cterm : Symbols.table -> cterm -> Term.term =
         let ns = Term.mk_isymb n nty [] in
         Term.mk_name ns
 
+      | Ccst (Cst.Cboxed t) -> t
+        
       | (Ccst (Cflat _|Csucc _)|Cvar _|Cxor _) -> assert false
 
   and terms_of_cterms (cterms : cterm list) : Term.term list =
@@ -1393,17 +1399,12 @@ let complete table (l : Term.esubst list)
   let l =
     List.fold_left
       (fun l (Term.ESubst (u,v)) ->
-         try
-           let cu, cv = cterm_of_term u, cterm_of_term v in
+         let cu, cv = cterm_of_term u, cterm_of_term v in
 
-           dbg "Completion: %a = %a added as %a = %a"
-             Term.pp u Term.pp v pp_cterm cu pp_cterm cv; 
+         dbg "Completion: %a = %a added as %a = %a"
+           Term.pp u Term.pp v pp_cterm cu pp_cterm cv; 
 
-           (cu, cv):: l 
-
-         with Unsupported_conversion -> 
-           dbg "Completion: %a = %a ignored (unsupported)" Term.pp u Term.pp v; 
-           l)
+         (cu, cv):: l )
       []
       l
   in
@@ -1453,9 +1454,7 @@ let check_disequality_cterm state neqs (u,v) =
   || (is_ground_term u && is_ground_term v && (u <> v))
 
 let check_disequality state neqs (u,v) =
-  try check_disequality_cterm state neqs (cterm_of_term u, cterm_of_term v)
-  with
-  | Unsupported_conversion -> false
+  check_disequality_cterm state neqs (cterm_of_term u, cterm_of_term v)
 
 (** [check_disequalities s neqs l] checks that all disequalities inside [l]
     are implied by inequalities inside [neqs], wrt [s]. *)
@@ -1472,18 +1471,13 @@ let check_equality_cterm state (u,v) =
   normalize ~print:true state v
 
 let check_equality state (u,v) =
-  try
-    let cu, cv = cterm_of_term u, cterm_of_term v in
-    let bool = check_equality_cterm state (cu, cv) in
+  let cu, cv = cterm_of_term u, cterm_of_term v in
+  let bool = check_equality_cterm state (cu, cv) in
 
-    dbg "check_equality: %a = %a as %a = %a: %a"
-      Term.pp u Term.pp v pp_cterm cu pp_cterm cv Fmt.bool bool;
+  dbg "check_equality: %a = %a as %a = %a: %a"
+    Term.pp u Term.pp v pp_cterm cu pp_cterm cv Fmt.bool bool;
 
-    bool
-
-  with Unsupported_conversion -> 
-    dbg "check_equality: %a = %a ignored (unsupported)" Term.pp u Term.pp v;
-    false
+  bool
 
 let check_equalities state l = List.for_all (check_equality state) l
 
@@ -1507,7 +1501,7 @@ let star_apply f = function
 
 let x_index_cnstrs state l select f_cnstr =
   List.fold_left
-    (fun l t -> try cterm_of_term t :: l with Unsupported_conversion -> l)
+    (fun l t -> cterm_of_term t :: l)
     [] l
   |> subterms
   |> List.filter select
