@@ -603,64 +603,26 @@ Proof.
 diffeq.
 
 case try find il,jl,kl such that _ in kR(il,jl,kl) else _.
-rewrite Meq0.
 
 case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
-rewrite Meq2.
-
-assert decap(   encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(dkI(il)))  , dkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(dkI(il0))) , dkI(il)).
-case H1.
-use H1 with il,jl,kl.
-
-case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
-use H1 with il,jl,kl.
+by use H1 with il,jl,kl.
 
 case try find il,jl,kl such that _ in kR(il,jl,kl) else _.
-rewrite Meq0.
 
 case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
-rewrite Meq2.
-
-assert decap(   encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(dkI(il)))  , dkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(dkI(il0))) , dkI(il)).
-case H1.
-use H1 with il,jl,kl.
-
-case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
-use H1 with il,jl,kl.
+by use H1 with il,jl,kl.
 
 
 case try find il,jl,kl such that _ in kI(il,jl,kl) else _.
-rewrite Meq0.
 
 case try find il, jl, kl such that _ in kdf(s,kI(il,jl,kl)) else _.
-rewrite Meq2.
-
-
-assert decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(dkR(jl)))  , dkR(jl)) = decap(   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(dkR(jl0))) , dkR(jl)).
-case H1.
-case H1.
- use H1 with il,jl,kl.
-
-case try find il, jl, kl such that _ in kdf(s,kI(il,jl,kl)) else _.
-use H1 with il,jl,kl.
-
-
+by use H1 with il,jl,kl.
 
 
 case try find il,jl,kl such that _ in kI(il,jl,kl) else _.
-rewrite Meq0.
 
 case try find il, jl, kl such that _ in kdf(s,kI(il,jl,kl)) else _.
-rewrite Meq2.
-
-
-assert decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(dkR(jl)))  , dkR(jl)) = decap(   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(dkR(jl0))) , dkR(jl)).
-case H1.
-
- use H1 with il,jl,kl.
-
-case try find il, jl, kl such that _ in kdf(s,kI(il,jl,kl)) else _.
-use H1 with il,jl,kl.
+by use H1 with il,jl,kl.
 Qed.
 
 
@@ -681,11 +643,12 @@ axiom  [idealized/left,idealized/left]  len_xor (x1,x2:message) : len(x1) = len(
 
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
-global goal [idealized/left,idealized/left] resp_key: forall (i,j,k:index), [happens(R2(i,j,k))] -> equiv(frame@R2(i,j,k), diff(sRI(i,j,k)@R2(i,j,k), kIR(i,j,k))) .
+global goal [idealized/left,idealized/left] resp_key (i,j,k:index):
+ [happens(R2(i,j,k))] -> 
+ equiv(frame@R2(i,j,k), diff(sRI(i,j,k)@R2(i,j,k), kIR(i,j,k))) .
 Proof.
 
-print.
-intro i j k Hap .
+intro Hap .
 use reflex with R2(i,j,k) => //.
 
 expandall.
@@ -724,10 +687,9 @@ prf 1, G(_, n_PRF); yesif 1.
 
 xor 1, n_PRF1; yesif 1.
 rewrite len_xor.
+by rewrite !len_G.
 rewrite len_G.
-rewrite len_G.
-rewrite len_G.
-namelength s, n_PRF1.
+by namelength s, n_PRF1.
 
-fresh 1.
+by fresh 1.
 Qed.

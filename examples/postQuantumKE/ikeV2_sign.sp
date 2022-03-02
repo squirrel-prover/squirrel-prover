@@ -278,19 +278,10 @@ Proof.
     case try find il,jl,kl,ll such that _ in idealkeys(il,jl,kl,ll) else _.
     intro [il jl ? ? [[Meq1 [? ?]] Meq2]]. 
     rewrite Meq2.
-    collision => Meq3 /=.
-    
-    case try find jf,kf such that _
-    in _ else fail.
-    intro [jf kf [Meq4 Meq5]] /=.
-    by rewrite Meq5.
-    
-    intro [H2 ?].
-    by use H2 with jl,il.
+    by collision.
     
     intro [H2 ?].
     by use H2 with i,j,j,i.
-  
   
   (* R part *)
   + intro k l H0 H1 Hap Hap0.
@@ -301,15 +292,7 @@ Proof.
     
     intro [il jl ? ? [[Meq1 [? ?]] Meq2]]. 
     rewrite Meq2.
-    collision => Meq3 /=.
-    
-    case try find jf,kf such that _ in _ else fail.
-    intro [jf kf [Meq4 Meq5]] /=.
-    by rewrite Meq5.
-    
-    intro [H2 ?].
-    by use H2 with l,jl.
-    
+    by collision.
     intro [H2 Meq1].
     
     expand input .

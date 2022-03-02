@@ -22,8 +22,12 @@ module Cst = struct
       ]
     (** function symbol, name or action of arity zero *)
 
-    | Cmvar   of Vars.var
-
+    | Cmvar of Vars.var
+    (** Variable *)
+  
+    | Cboxed of Term.term
+    (** Boxed term, for unsupported terms (e.g. binders) *)
+  
   let cst_cpt = ref 0
 
   let mk_flat () =
@@ -41,7 +45,8 @@ module Cst = struct
     | Cgfuncst (`F f) -> Symbols.pp ppf f
     | Cgfuncst (`N (n,_)) -> Symbols.pp ppf n
     | Cgfuncst (`A a) -> Symbols.pp ppf a
-
+    | Cboxed  t -> Fmt.pf ppf "Box(@[%a@])" Term.pp t
+                     
   (* The successor function symbol is the second smallest in the precedence
       used for the LPO (0 is the smallest element).  *)
   let rec compare c c' = match c,c' with
@@ -268,7 +273,8 @@ let rec cterm_of_term : Term.term -> cterm = fun c ->
 
   | Diff(c,d) -> cfun (F Symbols.fs_diff) 0 [cterm_of_term c; cterm_of_term d]
 
-  | _ -> raise Unsupported_conversion
+  (* default case *)
+  | t -> ccst (Cst.Cboxed t)
 
 and cterm_of_var i = ccst (Cst.Cmvar i)
 
@@ -320,6 +326,8 @@ let term_of_cterm : Symbols.table -> cterm -> Term.term =
         let ns = Term.mk_isymb n nty [] in
         Term.mk_name ns
 
+      | Ccst (Cst.Cboxed t) -> t
+        
       | (Ccst (Cflat _|Csucc _)|Cvar _|Cxor _) -> assert false
 
   and terms_of_cterms (cterms : cterm list) : Term.term list =
