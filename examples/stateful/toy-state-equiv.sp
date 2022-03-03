@@ -71,7 +71,7 @@ Proof.
         subst t,T(i0,j).
         assert kT(i)@T(i0,j) = kT(i)@pred(T(i0,j)).
         expand kT(i)@T(i0,j).
-        by noif.
+        by rewrite if_false.
         use Hind with pred(T(i0,j)),i as HH0 => //.
         case HH0.
           * (* case HH0 - init *)
