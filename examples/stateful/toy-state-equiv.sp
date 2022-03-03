@@ -37,6 +37,8 @@ process tag(i:index,j:index) =
 
 system (!_i !_j T: tag(i,j)).
 
+include Basic.
+
 (* HELPING LEMMAS *)
 
 (* kT(i)@t = kT(i)@t' where t' is init or the previous update of kT(i) *)
@@ -145,9 +147,9 @@ Proof.
   fa 1. fa 1.
   expand output@T(i,j). expand kT(i)@T(i,j).
   prf 1.
-  yesif 1; simpl.
+  rewrite if_true; simpl.
     + intro i0 j0 *.
       use stateInequalityHelpful with i,j,j0 => //.
     + fresh 1.
-      yesif 1 => //.
+      rewrite if_true => //.
 Qed.
