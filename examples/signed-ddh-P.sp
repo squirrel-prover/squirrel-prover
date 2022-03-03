@@ -94,14 +94,16 @@ process S(j:index) =
     if checksign(x3,pkP) = <<g^b(j),gP>,pk(skS)> then
       out(cS,ok)
 
-system [secretP] (!_i Pchall(i) | !_j S(j)).
+system (!_i Pchall(i) | !_j S(j)).
+
+include Basic.
 
 (**
 In the proof of strong secrecy for the system `secretP`, we will use
 the following property, stating that whenever P accepts a message from S,
 this message is of the form `<<_,x>,_>` where `x = g^b(j)`.
 **)
-goal [secretP] P_charac (i:index):
+goal  P_charac (i:index):
   happens(Pchall1(i)) =>
     cond@Pchall1(i) =>
       exists (j:index), snd(fst(input@Pchall1(i))) = g^b(j).
@@ -134,7 +136,7 @@ is actually a bi-frame. We will prove that the left projection of `frame@t`
 (_i.e._ where the shared key `g^a^b` is outputted) is indistinguishable from the
 right projection of `frame@t` (_i.e._ where `g^k` is outputted).
 **)
-equiv [secretP] strongSecP.
+equiv strongSecP.
 (**
 The proof is done by induction, after having enriched the frame with some
 additional (bi-)terms. Intuitively, the idea of enriching the frame is to
@@ -185,5 +187,5 @@ Proof.
 
       fa 5. fa 6.
       (** It now remains to simplify `if false then diff(ok,ko)`. **)
-      by noif 6.
+      by rewrite if_false.
 Qed.
