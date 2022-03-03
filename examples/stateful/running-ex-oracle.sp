@@ -48,6 +48,8 @@ system (
    (A: !_i !_j s(i):=H(s(i),k); out(o,G(s(i),k')))
 ).
 
+include Basic.
+
 (* AXIOMS *)
 
 (* We assume that the attacker never repeats a query to the oracle. *)
@@ -130,7 +132,7 @@ Proof.
         - intro Neq H0.
           use IH with pred(A(i0,j)) => //.
             * expand s(i)@A(i0,j).
-              noif => //.
+              rewrite if_false => //.
             * intro j0 Hp.
               use H0 with j0 => //.
 Qed.
@@ -165,7 +167,7 @@ Proof.
             * auto.
         - intro Neqi.
           expand s(i)@A(i0,j0).
-          noif.
+          rewrite if_false.
             * auto.
             * use IH with pred(A(i0,j0)) => //.
               repeat split => //.
@@ -263,7 +265,7 @@ Proof.
 
     - use lastupdate_A with i',j,tau' as H; try auto.
       rewrite H in *; expand s(i')@A(i',j).
-      prf 0; yesif 0; [2: by fresh 0].
+      prf 0; rewrite if_true; [2: by fresh 0].
       simpl. intro j0 HAi0.
       use lastupdate with i',pred(A(i',j)) as [[H1 H2] | H1]; try auto.
         * use H2 with j0 as H3; try auto.
@@ -274,7 +276,7 @@ Proof.
 
   + (* Oracle *)
      expand frame.  fa 0. fa 1. fa 2. expand exec.  fa 1. expand cond. expand output. fa 1.
-     prf 1; yesif 1; 2: fresh 1.
+     prf 1; rewrite if_true; 2: fresh 1.
        - simpl; split.
           * intro j0 H; try destruct H as [H|H].
             apply unique_queries; auto.
@@ -285,7 +287,7 @@ Proof.
                  *** rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
               ** intro  H. rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
 
-      - prf 1; yesif 1; 2: fresh 1; by apply IH.
+      - prf 1; rewrite if_true; 2: fresh 1; by apply IH.
         simpl; split.
           * intro j0 H.
             apply unique_queries; auto.
@@ -296,7 +298,7 @@ Proof.
    + (* Tag *)
   expand frame@A(i,j). expand exec@A(i,j). expand cond@A(i,j). expand output@A(i,j).
   fa 0. fa 1. fa 1.
-  prf 1; yesif 1; 2: fresh 1; by apply IH.
+  prf 1; rewrite if_true; 2: fresh 1; by apply IH.
   simpl; split.
     - intro j0 H.
       rewrite equiv IH i (A(i,j)) => // Hf; by fresh Hf.
