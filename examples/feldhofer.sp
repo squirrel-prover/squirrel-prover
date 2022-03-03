@@ -80,6 +80,8 @@ process Tag(i:index, j:index) =
 
 system (!_k Reader(k) | !_i !_j Tag(i,j)).
 
+include Basic.
+
 axiom tags_neq : tagR <> tagT
 
 axiom fail_not_pair (x,y:message): fail <> <x,y>.
@@ -291,7 +293,7 @@ Proof.
     fa 3; fadup 3.
     fa 3; fadup 3.
     enckp 3, k_fresh; 1: auto.
-    fa 3. fresh 4; yesif 4; 1: auto. fresh 4.
+    fa 3. fresh 4; rewrite if_true; 1: auto. fresh 4.
     apply IH.
 
   (* Action 3/4: Reader2 *)
@@ -319,6 +321,6 @@ Proof.
 
     fa 3.
     fresh 5.
-    fresh 4; yesif 4; 1: auto.
+    fresh 4; rewrite if_true; 1: auto.
     apply IH.
 Qed.
