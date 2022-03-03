@@ -70,14 +70,16 @@ process Schall(j:index) =
       else
         out(cS, diff(ok,ko))
 
-system [secretS] (!_i P(i) | !_j Schall(j)).
+system  (!_i P(i) | !_j Schall(j)).
+
+include Basic.
 
 (**
 In the proof of strong secrecy for the system `secretS`, we will use
 the following property, stating that whenever S accepts a message from P,
 this message is of the form `<<_,x>,_>` where `x = g^a(i)`.
 **)
-goal [secretS] S_charac (j:index):
+goal  S_charac (j:index):
   happens(Schall1(j)) =>
     exec@Schall1(j) =>
       exists (i:index), snd(input@Schall(j)) = g^a(i).
@@ -99,7 +101,7 @@ Qed.
 We show the counterpart of the property `strongSecP`, this time for the
 system `secretS`. The proof is carried out exactly in the same way.
 **)
-equiv [secretS] strongSecS.
+equiv strongSecS.
 Proof.
   enrich
     skP, skS,
@@ -129,5 +131,5 @@ Proof.
        by use Hcond with j0.}
 
   fa 5. fa 6.
-  by noif 6.
+  by rewrite if_false.
 Qed.
