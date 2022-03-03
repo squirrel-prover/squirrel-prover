@@ -309,30 +309,27 @@ Proof.
   1: case t; constraints.
   case H0.
 
-  (* case t' = pred(t) *)
-  rewrite !H0.
+  + (* case t' = pred(t) *)
+    rewrite !H0.
+    by apply counterIncrease.
 
-  by apply counterIncrease.
+  + (* case t' < pred(t) *)
+    use IH0 with pred(t),t',pid as H1 => //=.
+      - use counterIncrease with t,pid as H3 => //.
+        case H1 => //.
+          * (* case H1 - 1/2 *)
+            case H3 => //.
+            by left; apply orderTrans _ (SCtr(pid)@pred(t)) _.
+            (* case H1 - 2/2 *)
+           left.
+           by rewrite -H3 in H1.
+         * case H3 => //=.
+           left.
+           by rewrite H1 in H3.
+           by right.
 
-  (* case t' < pred(t) *)
-  use IH0 with pred(t),t',pid as H1 => //=.
-  use counterIncrease with t,pid as H3 => //.
-  case H1 => //.
-    (* case H1 - 1/2 *)
-    case H3 => //.
-      by left; apply orderTrans _ (SCtr(pid)@pred(t)) _.
-      (* case H1 - 2/2 *)
-      left.
-      by rewrite -H3 in H1.
-
-    case H3 => //=.
-    left.
-    by rewrite H1 in H3.
-
-    by right.
-
-  executable t => // H1.
-  by apply H1.
+      - executable t => // H1.
+        by apply H1.
 Qed.
 
 (*------------------------------------------------------------------------------
@@ -353,15 +350,14 @@ Proof.
   by constraints.
   case H1.
 
-  (* case Server(pid,j) = pred(Server(pid,j')) *)
-  by rewrite H1 in *.
+  + (* case Server(pid,j) = pred(Server(pid,j')) *)
+    by rewrite H1 in *.
 
-  (* case Server(pid,j) < pred(Server(pid,j')) *)
-  use counterIncreaseBis with pred(Server(pid,j')),Server(pid,j),pid as H2 => //.
-  case H2;
-  1: by apply orderTrans _ (SCtr(pid)@pred(Server(pid,j'))) _.
-
-  by rewrite H2 in *.
+  + (* case Server(pid,j) < pred(Server(pid,j')) *)
+    use counterIncreaseBis with pred(Server(pid,j')),Server(pid,j),pid as H2 => //.
+    case H2;
+    1: by apply orderTrans _ (SCtr(pid)@pred(Server(pid,j'))) _.
+    by rewrite H2 in *.
 Qed.
 
 goal noreplay (j, j', pid:index):
@@ -394,16 +390,16 @@ Proof.
   1: constraints.
   case Ht.
 
-  (* case Server(pid,j) = Server(pid,j') *)
-  by apply orderStrict in H.
+  + (* case Server(pid,j) = Server(pid,j') *)
+    by apply orderStrict in H.
 
-  (* case Server(pid,j) < Server(pid,j') *)
-  assumption.
+  + (* case Server(pid,j) < Server(pid,j') *)
+    assumption.
 
-  (* case Server(pid,j) > Server(pid,j') *)
-  use noreplayInv with j', j, pid  as Meq => //.
-  use orderTrans with SCtr(pid)@Server(pid,j), SCtr(pid)@Server(pid,j'), SCtr(pid)@Server(pid,j) => //.
-  by apply orderStrict in H0.
+  + (* case Server(pid,j) > Server(pid,j') *)
+    use noreplayInv with j', j, pid  as Meq => //.
+    use orderTrans with SCtr(pid)@Server(pid,j), SCtr(pid)@Server(pid,j'), SCtr(pid)@Server(pid,j) => //.
+    by apply orderStrict in H0.
 Qed.
 
 
@@ -438,21 +434,21 @@ Proof.
   intro Eq Hap.
   rewrite eq_iff; split.
 
-  (* Left => Right *)
-  intro AEAD_dec.
+  + (* Left => Right *)
+    intro AEAD_dec.
 
-  case Eq;
-  expand aead_dec;
-  intctxt AEAD_dec => H //;
-  intro AEAD_eq;
-  by exists pid0.
+    case Eq;
+    expand aead_dec;
+    intctxt AEAD_dec => H //;
+    intro AEAD_eq;
+    by exists pid0.
 
-  (* Right => Left *)
-  intro [pid0 [Clt H]].
-  case Eq;
-  expand aead_dec;
-  rewrite -H /AEAD /=;
-  apply pair_ne_fail.
+  + (* Right => Left *)
+    intro [pid0 [Clt H]].
+    case Eq;
+    expand aead_dec;
+    rewrite -H /AEAD /=;
+    apply pair_ne_fail.
 Qed.
 
 (* Using the `valid_decode` lemma, we can characterize when the full
@@ -472,22 +468,22 @@ Proof.
   intro Eq Hap.
   rewrite eq_iff; split.
 
-  (* => case *)
-  intro [AEAD_dec OTP_dec Sid_eq Pid_eq].
-  rewrite valid_decode // in AEAD_dec.
-  destruct AEAD_dec as [pid0 [Clt AEAD_dec]].
+  + (* => case *)
+    intro [AEAD_dec OTP_dec Sid_eq Pid_eq].
+    rewrite valid_decode // in AEAD_dec.
+    destruct AEAD_dec as [pid0 [Clt AEAD_dec]].
 
-  assert (pid0 = pid).
-  by case Eq; use mpid_inj with pid, pid0.
-  case Eq; project; auto.
+    assert (pid0 = pid).
+    by case Eq; use mpid_inj with pid, pid0.
+    case Eq; project; auto.
 
-  (* <= case *)
-  intro [AEAD_dec OTP_dec Sid_eq].
-  rewrite valid_decode //.
-  case Eq;
-  (depends Setup(pid), t by auto);
-  intro Clt;
-  by project; simpl; exists pid.
+  + (* <= case *)
+    intro [AEAD_dec OTP_dec Sid_eq].
+    rewrite valid_decode //.
+    case Eq;
+    (depends Setup(pid), t by auto);
+    intro Clt;
+    by project; simpl; exists pid.
 Qed.
 
 
@@ -531,71 +527,70 @@ Proof.
        rewrite le_lt // -le_pred_lt in 2;
        by apply ~inductive Hind (pred(t)))).
 
-  (* init *)
-  rewrite /*.
-  by rewrite if_false in 1.
+  + (* init *)
+    rewrite /*.
+    by rewrite if_false in 1.
 
-  (* Setup(pid) *)
-  repeat destruct Eq as [_ Eq].
-  splitseq 2: (fun (pid0 : index) -> pid = pid0).
-  constseq 2:
-    (fun (pid0 : index) -> pid = pid0 && Setup(pid0) <= t) (AEAD(pid)@t)
-    (fun (pid0 : index) -> pid <> pid0 ||
+  + (* Setup(pid) *)
+    repeat destruct Eq as [_ Eq].
+    splitseq 2: (fun (pid0 : index) -> pid = pid0).
+    constseq 2:
+      (fun (pid0 : index) -> pid = pid0 && Setup(pid0) <= t) (AEAD(pid)@t)
+      (fun (pid0 : index) -> pid <> pid0 ||
                           (pid = pid0 && not (Setup(pid0) <= t))) zero.
-  by intro pid0; case (pid=pid0).
-    split => pid0 /= U.
-    by rewrite !if_true.
+      - by intro pid0; case (pid=pid0).
+      - split => pid0 /= U.
+          * by rewrite !if_true.
 
-    case U.
-    by rewrite if_false.
-    by destruct U as [_ _].
+          * case U. by rewrite if_false. by destruct U as [_ _].
 
-  rewrite if_then_then in 3.
-  assert (forall(pid0 : index), (not (pid = pid0) && Setup(pid0) <= t) = (Setup(pid0) < t)) as H.
-    intro pid0; case pid = pid0 => _ /=.
-    by rewrite eq_iff.
-    by rewrite le_lt.
-  rewrite H -le_pred_lt in 3.
-  rewrite /AEAD in 1.
-  fa 1.
-  rewrite /AEAD in 4.
-  rewrite /* in 0.
-  cca1 2; 2:auto.
-  rewrite !len_pair len_diff in 2.
-  namelength k(pid), k_dummy(pid)=> -> /=.
-  rewrite /* in 0.
-  by apply  Hind (pred(t)).
+      - rewrite if_then_then in 3.
+        assert (forall(pid0 : index), (not (pid = pid0) && Setup(pid0) <= t) = (Setup(pid0) < t)) as H. 
+     { intro pid0; case pid = pid0 => _ /=.
+      by rewrite eq_iff.
+      by rewrite le_lt.}
 
-  (* Decode(pid,j) *)
-  repeat destruct Eq as [_ Eq].
-  rewrite /AEAD in 1.
-  rewrite le_lt // -le_pred_lt in 2.
-  depends Setup(pid), t by auto => H.
-  rewrite /frame /exec /output /cond in 0.
-  fa 0; fa 1; fa 1.
+      rewrite H -le_pred_lt in 3.
+      rewrite /AEAD in 1.
+      fa 1.
+      rewrite /AEAD in 4.
+      rewrite /* in 0.
+      cca1 2; 2:auto.
+      rewrite !len_pair len_diff in 2.
+      namelength k(pid), k_dummy(pid)=> -> /=.
+      rewrite /* in 0.
+      by apply  Hind (pred(t)).
 
-  rewrite valid_decode_charac //.
-  (* rewrite the content of the then branch *)
-  rewrite /otp_dec /aead_dec if_aux /= in 2.
-  fa 2.
-  rewrite /AEAD /= in 2.
-  rewrite /aead /otp in 1,2.
-  fa 1. fa 1. fa 1. fa 1.
-  memseq 1 6; 1: by exists pid; rewrite if_true.
-  by apply Hind (pred(t)).
+  + (* Decode(pid,j) *)
+    repeat destruct Eq as [_ Eq].
+    rewrite /AEAD in 1.
+    rewrite le_lt // -le_pred_lt in 2.
+    depends Setup(pid), t by auto => H.
+    rewrite /frame /exec /output /cond in 0.
+    fa 0; fa 1; fa 1.
 
-  (* Decode1(pid,j) *)
-  repeat destruct Eq as [_ Eq].
-  rewrite /AEAD in 1.
-  rewrite le_lt // -le_pred_lt in 2.
-  depends Setup(pid), t by auto => H.
-  rewrite /frame /exec /output /cond in 0.
-  fa 0; fa 1; fa 1.
-  rewrite valid_decode_charac //.
-  rewrite /otp /aead.
-  fa 1. fa 1. fa 1. fa 1. fa 1.
-  memseq 1 5; 1: by exists pid; rewrite if_true.
-  by apply  Hind (pred(t)).
+    rewrite valid_decode_charac //.
+    (* rewrite the content of the then branch *)
+    rewrite /otp_dec /aead_dec if_aux /= in 2.
+    fa 2.
+    rewrite /AEAD /= in 2.
+    rewrite /aead /otp in 1,2.
+    fa 1. fa 1. fa 1. fa 1.
+    memseq 1 6; 1: by exists pid; rewrite if_true.
+    by apply Hind (pred(t)).
+
+  + (* Decode1(pid,j) *)
+    repeat destruct Eq as [_ Eq].
+    rewrite /AEAD in 1.
+    rewrite le_lt // -le_pred_lt in 2.
+    depends Setup(pid), t by auto => H.
+    rewrite /frame /exec /output /cond in 0.
+    fa 0; fa 1; fa 1.
+    rewrite valid_decode_charac //.
+    rewrite /otp /aead.
+    fa 1. fa 1. fa 1. fa 1. fa 1.
+    memseq 1 5; 1: by exists pid; rewrite if_true.
+    by apply  Hind (pred(t)).
 Qed.
 
 
@@ -619,8 +614,8 @@ Proof.
   use max_ts as [tmax [_ U]].
   exists tmax.
   split.
-  by (split; intro*); 2: apply U.
-  by apply ~inductive equiv_real_ideal_enrich tmax.
+    + by (split; intro*); 2: apply U.
+    + by apply ~inductive equiv_real_ideal_enrich tmax.
 Qed.
 
 axiom sctr_nhap (i : index, t' : timestamp) : 
@@ -650,8 +645,8 @@ Proof.
   exists tmax.
   split; 1: by split.
   assert (forall (t' : timestamp), (t' <= tmax) = happens(t')) as Eq.
-    intro t'; rewrite eq_iff.
-    by split; 2: intro _; apply C.
+    {intro t'; rewrite eq_iff.
+    by split; 2: intro _; apply C.}
   rewrite Eq in U.
 
   splitseq 3: (fun (i : index, t' : timestamp) -> happens(t')).
@@ -661,28 +656,27 @@ Proof.
   constseq 6 :
     (fun (i : index, t' : timestamp) -> happens(t')) zero
     (fun (i : index, t' : timestamp) -> not (happens(t'))) empty.
-    auto.
-    split; intro i t' _.
-      by rewrite if_false.
-      by rewrite if_true // sctr_nhap.
+    +  auto.
+    +   split; intro i t' _. 
+       - by rewrite if_false.
+       - by rewrite if_true // sctr_nhap.
 
-  constseq 4 :
-    (fun (i : index, t' : timestamp) -> happens(t')) zero
-    (fun (i : index, t' : timestamp) -> not (happens(t'))) empty.
-    auto.
-    split; intro i t' _.
-      by rewrite if_false.
-      by rewrite if_true // yctr_nhap.
+    + constseq 4 :
+      (fun (i : index, t' : timestamp) -> happens(t')) zero
+      (fun (i : index, t' : timestamp) -> not (happens(t'))) empty.
+        - auto.
+        - split; intro i t' _.
+            * by rewrite if_false.
+            * by rewrite if_true // yctr_nhap.
 
-  constseq 2 :
-    (fun (t' : timestamp) -> happens(t')) false
-    (fun (t' : timestamp) -> not (happens(t'))) exec_dflt.
-    auto.
-    split; intro t' _.
-      by rewrite if_false.
-      by rewrite if_true // exec_nhap.
-
-  by apply U.
+       - constseq 2 :
+        (fun (t' : timestamp) -> happens(t')) false
+        (fun (t' : timestamp) -> not (happens(t'))) exec_dflt.
+          *  auto.
+          * split; intro t' _.
+             ** by rewrite if_false.
+             ** by rewrite if_true // exec_nhap.
+          * by apply U.
 Qed.
 
 (*------------------------------------------------------------------*)
@@ -738,49 +732,46 @@ Proof.
           Server(pid,j) > Server(pid,j')) => //.
   case H => //.
 
-  (* 1st case: Server(pid,j) < Server(pid,j') *)
-  assert (Server(pid,j) = pred(Server(pid,j')) ||
-          Server(pid,j) < pred(Server(pid,j'))) by constraints.
-  case H0 => //.
+  + (* 1st case: Server(pid,j) < Server(pid,j') *)
+    assert (Server(pid,j) = pred(Server(pid,j')) ||
+            Server(pid,j) < pred(Server(pid,j'))) by constraints.
+    case H0 => //.
 
 
-  (* Server(pid,j) = pred(Server(pid,j') < Server(pid,j') *)
-  use counterIncreaseStrictly with pid, j' => //.
-  rewrite H0 in *.
-  by apply orderStrict in Meq.
+    - (* Server(pid,j) = pred(Server(pid,j') < Server(pid,j') *)
+      use counterIncreaseStrictly with pid, j' => //.
+      rewrite H0 in *.
+      by apply orderStrict in Meq.
 
-  (* Server(pid,j) < pred(Server(pid,j'))  < Server(pid,j') *)
-  use counterIncreaseStrictly with pid, j' => //.
-  use counterIncreaseBis with pred(Server(pid,j')), Server(pid,j), pid => //.
-  case H2.
+    - (* Server(pid,j) < pred(Server(pid,j'))  < Server(pid,j') *)
+      use counterIncreaseStrictly with pid, j' => //.
+      use counterIncreaseBis with pred(Server(pid,j')), Server(pid,j), pid => //.
+      case H2.
 
-  use orderTrans with
-     SCtr(pid)@Server(pid,j),
-     SCtr(pid)@pred(Server(pid,j')),
-     SCtr(pid)@Server(pid,j') => //.
-  by apply orderStrict in Meq.
+        * use orderTrans with
+              SCtr(pid)@Server(pid,j),
+              SCtr(pid)@pred(Server(pid,j')),
+              SCtr(pid)@Server(pid,j') => //.
+          by apply orderStrict in Meq.
 
-  rewrite H2 in *.
-  by apply orderStrict in Meq.
+       * rewrite H2 in *.
+         by apply orderStrict in Meq.
 
-  (* 2nd case: Server(pid,j) > Server(pid,j')  *)
-  assert (pred(Server(pid,j)) = Server(pid,j')
+  + (* 2nd case: Server(pid,j) > Server(pid,j')  *)
+    assert (pred(Server(pid,j)) = Server(pid,j')
           || pred(Server(pid,j)) > Server(pid,j')) by constraints.
-  case H0 => //.
+    case H0 => //.
 
-  (* Server(pid,j) > pred(Server(pid,j)) = Server(pid,j') *)
-  use counterIncreaseStrictly with pid, j as H1 => //.
-  clear Eq Hexec' Mneq1 Mneq2 exec M1 Hpid Hexecpred Hcpt Hap' Hap Ht H.
-  by apply orderStrict in H1.
+    - (* Server(pid,j) > pred(Server(pid,j)) = Server(pid,j') *)
+      use counterIncreaseStrictly with pid, j as H1 => //.
+      clear Eq Hexec' Mneq1 Mneq2 exec M1 Hpid Hexecpred Hcpt Hap' Hap Ht H.
+      by apply orderStrict in H1.
 
-  (* Server(pid,j)  > pred(Server(pid,j)) >  Server(pid,j') *)
-  use counterIncreaseStrictly with pid, j => //.
-  use counterIncreaseBis with pred(Server(pid,j)), Server(pid,j'), pid  => //.
-  case H2.
-
-  apply orderTrans _ _ (SCtr(pid)@Server(pid,j)) in H2; 1: auto.
-  rewrite eq_sym in Meq.
-  by apply orderStrict in Meq.
-
-  by apply orderStrict in H1.
+    - (* Server(pid,j)  > pred(Server(pid,j)) >  Server(pid,j') *)
+      use counterIncreaseStrictly with pid, j => //.
+      use counterIncreaseBis with pred(Server(pid,j)), Server(pid,j'), pid  => //.
+      case H2.
+        * apply orderTrans _ _ (SCtr(pid)@Server(pid,j)) in H2; 1: auto.
+          rewrite eq_sym in Meq. by apply orderStrict in Meq.
+        * by apply orderStrict in H1.
 Qed.
