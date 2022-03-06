@@ -32,9 +32,9 @@ type ('a,'b) abstract_statement = {
 }
 
 (*------------------------------------------------------------------*)
-type       statement = (string, Equiv.gform) abstract_statement
-type equiv_statement = (string,  Equiv.form) abstract_statement
-type reach_statement = (string,   Term.term) abstract_statement
+type statement       = (string, Equiv.gform) abstract_statement
+type equiv_statement = (string, Equiv.form ) abstract_statement
+type reach_statement = (string, Term.term  ) abstract_statement
 
 (*------------------------------------------------------------------*)
 val is_reach_statement : statement -> bool

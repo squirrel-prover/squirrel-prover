@@ -1,5 +1,4 @@
 open Utils
-open Rewrite
 
 module Args = TacticsArgs
 module L = Location
@@ -23,7 +22,25 @@ let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
+(** {3 Miscellaneous} *)
+
 let bad_args () = hard_failure (Failure "improper arguments")
+
+(*------------------------------------------------------------------*)
+let check_ty_eq ?loc ty1 ty2 =
+  if not (Type.equal ty1 ty2) then
+    soft_failure ?loc
+      (Failure (Fmt.str "types %a and %a are not compatible"
+                  Type.pp ty1 Type.pp ty2));
+  ()
+
+(*------------------------------------------------------------------*)
+let check_hty_eq ?loc hty1 hty2 =
+  if not (Type.ht_equal hty1 hty2) then
+    soft_failure ?loc
+      (Failure (Fmt.str "types %a and %a are not compatible"
+                  Type.pp_ht hty1 Type.pp_ht hty2));
+  ()
 
 (*------------------------------------------------------------------*)
 (** {2 Functor building common tactics code from a Sequent module} *)
@@ -63,28 +80,22 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Miscellaneous} *)
 
   (*------------------------------------------------------------------*)
-  let bad_args () = hard_failure (Failure "improper arguments")
-
-  (*------------------------------------------------------------------*)
   let wrap_fail f (s: S.sequent) sk fk =
     try sk (f s) fk with
     | Tactics.Tactic_soft_failure e -> fk e
 
   (*------------------------------------------------------------------*)
-  let check_ty_eq ?loc ty1 ty2 =
-    if not (Type.equal ty1 ty2) then
-      soft_failure ?loc
-        (Failure (Fmt.str "types %a and %a are not compatible"
-                    Type.pp ty1 Type.pp ty2));
-    ()
+  let make_exact ?loc env ty name =
+    match Vars.make_exact env ty name with
+    | None ->
+      hard_failure ?loc
+        (Tactics.Failure ("variable name " ^ name ^ " already used"))
+    | Some v' -> v'
 
   (*------------------------------------------------------------------*)
-  let check_hty_eq ?loc hty1 hty2 =
-    if not (Type.ht_equal hty1 hty2) then
-      soft_failure ?loc
-        (Failure (Fmt.str "types %a and %a are not compatible"
-                    Type.pp_ht hty1 Type.pp_ht hty2));
-    ()
+  let happens_premise (s : S.t) (a : Term.term) : S.t =
+    let form = Term.mk_happens a in
+    S.set_goal (S.unwrap_conc (`Reach form)) s
 
   (*------------------------------------------------------------------*)
   (** {3 Conversion} *)
@@ -101,28 +112,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     Theory.convert_ht conv_env ht
 
   (*------------------------------------------------------------------*)
-  let make_exact ?loc env ty name =
-    match Vars.make_exact env ty name with
-    | None ->
-      hard_failure ?loc
-        (Tactics.Failure ("variable name " ^ name ^ " already used"))
-    | Some v' -> v'
-
-  let make_exact_r ?loc env ty name =
-    match Vars.make_exact_r env ty name with
-    | None ->
-      hard_failure ?loc
-        (Tactics.Failure ("variable name " ^ name ^ " already used"))
-    | Some v' -> v'
-
-  (*------------------------------------------------------------------*)
-  let happens_premise (s : S.t) (a : Term.term) : S.t =
-    let form = Term.mk_happens a in
-    S.set_goal (S.unwrap_conc (`Reach form)) s
-
-  (*------------------------------------------------------------------*)
-
   (** {3 Targets} *)
+
   type target =
     | T_conc              (** Conclusion. *)
     | T_hyp   of Ident.t  (** Hypothesis. *)
@@ -423,8 +414,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Rewriting types and functions} *)
 
   type rw_arg =
-    | Rw_rw of L.t * Ident.t option * rw_erule
-    (* The ident is the ident of the hyp the rule came from (if any) *)
+    | Rw_rw of L.t * Ident.t option * Rewrite.rw_erule
+    (** The ident is the ident of the hyp the rule came from (if any) *)
 
     | Rw_expand    of Theory.term
     | Rw_expandall of Location.t
@@ -437,7 +428,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       ~(loc:L.t)
       ~(all:bool)
       (targets: target list)
-      (rw : Args.rw_count * Ident.t option * rw_erule)
+      (rw : Args.rw_count * Ident.t option * Rewrite.rw_erule)
       (s : S.sequent)
     : S.sequent * S.sequent list
     =
@@ -488,7 +479,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       showing the rule validity. *)
   let p_rw_item (rw_arg : Args.rw_item) (s : S.t) : rw_earg * S.sequent list =
     let p_rw_rule dir (p_pt : Theory.p_pt)
-      : rw_erule * S.sequent list * Ident.t option
+      : Rewrite.rw_erule * S.sequent list * Ident.t option
       =
       let ghyp, pat = S.convert_pt ~close_pats:false p_pt Equiv.Local_t s in
       let id_opt = match ghyp with `Hyp id -> Some id | _ -> None in
@@ -496,7 +487,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (* We are using an hypothesis, hence no new sub-goals *)
       let premise = [] in
 
-      pat_to_rw_erule dir pat, premise, id_opt
+      Rewrite.pat_to_rw_erule dir pat, premise, id_opt
     in
 
     let p_rw_item (rw_arg : Args.rw_item) : rw_earg * (S.sequent list) =
@@ -1549,8 +1540,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let remember_tac args = wrap_fail (remember_tac_args args)
 
   (*------------------------------------------------------------------*)
-  (** Split a conjunction conclusion,
-    * creating one subgoal per conjunct. *)
+  (** Split a conjunction conclusion, creating one subgoal per conjunct. *)
   let goal_and_right (s : S.t) : S.t list =
     match S.Conc.destr_and (S.goal s) with
     | Some (lformula, rformula) ->
@@ -1706,7 +1696,7 @@ let gentac_of_ttac (t : ttac) : gentac = fun s sk fk ->
   genfun_of_tfun t' s sk fk
 
 (** As [gentac_of_etac], but with an extra arguments. *)
-let gentac_of_ttac_arg t a s sk fk =
+let gentac_of_ttac_arg (t : 'a -> ttac) (a : 'a) : gentac = fun s sk fk ->
   let t' s sk fk =
     t a s (fun l fk -> sk (List.map (fun s -> Goal.Trace s) l) fk) fk
   in
@@ -1721,7 +1711,7 @@ let gentac_of_etac (t : etac) : gentac = fun s sk fk ->
   genfun_of_efun t' s sk fk
 
 (** As [gentac_of_etac], but with an extra arguments. *)
-let gentac_of_etac_arg t a s sk fk =
+let gentac_of_etac_arg (t : 'a -> etac) (a : 'a) : gentac = fun s sk fk ->
   let t' s sk fk =
     t a s (fun l fk -> sk (List.map (fun s -> Goal.Equiv s) l) fk) fk
   in
@@ -1752,12 +1742,12 @@ let gentac_of_any_tac_arg
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
 
-(* same as [CommonLT.wrap_fail], but for goals *)
+(** same as [CommonLT.wrap_fail], but for goals *)
 let wrap_fail f s sk fk =
   try sk (f s) fk with
   | Tactics.Tactic_soft_failure e -> fk e
 
-let split_equiv_goal (i : int L.located) s =
+let split_equiv_goal (i : int L.located) (s : ES.t) =
   try List.splitat (L.unloc i) (ES.goal_as_equiv s)
   with List.Out_of_range ->
     soft_failure ~loc:(L.loc i) (Tactics.Failure "out of range position")
@@ -1829,7 +1819,8 @@ let rewrite_tac
 
   | _ -> bad_args ()
 
-let rewrite_tac (simpl : f_simpl) args = wrap_fail (rewrite_tac simpl args)
+let rewrite_tac (simpl : f_simpl) args : gentac =
+  wrap_fail (rewrite_tac simpl args)
 
 (*------------------------------------------------------------------*)
 (** {3 Intro} *)
@@ -1920,7 +1911,8 @@ let intro_tac_args (simpl : f_simpl) args (s : Goal.t) : Goal.t list =
   | [Args.IntroPat intros] -> do_intros_ip simpl intros s
   | _ -> bad_args ()
 
-let intro_tac (simpl : f_simpl) args = wrap_fail (intro_tac_args simpl args)
+let intro_tac (simpl : f_simpl) args : gentac =
+  wrap_fail (intro_tac_args simpl args)
 
 (*------------------------------------------------------------------*)
 (** Admit tactic *)

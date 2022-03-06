@@ -84,8 +84,10 @@ let pat_to_rw_erule ?loc dir (p : Term.term Match.pat) : rw_erule =
   rule
 
 (*------------------------------------------------------------------*)
+(** Internal exception *)
 exception NoRW
 
+(*------------------------------------------------------------------*)
 let _rewrite_head
     (table  : Symbols.table)
     (system : SE.t)
@@ -97,8 +99,10 @@ let _rewrite_head
     | Term.ESubst (l, r) -> l, r
   in
 
-  let pat =
-    Match.{ pat_tyvars = rule.rw_tyvars; pat_vars = rule.rw_vars; pat_term = l; }
+  let pat = Match.{ 
+      pat_tyvars = rule.rw_tyvars; 
+      pat_vars   = rule.rw_vars; 
+      pat_term   = l; }
   in
 
   let mv =

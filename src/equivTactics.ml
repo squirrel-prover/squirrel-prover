@@ -32,6 +32,9 @@ let split_equiv_goal = LowTactics.split_equiv_goal
 (*------------------------------------------------------------------*)
 let wrap_fail = EquivLT.wrap_fail
 
+let hard_failure = Tactics.hard_failure
+let soft_failure = Tactics.soft_failure
+
 (*------------------------------------------------------------------*)
 (** {2 Logical Tactics} *)
 
@@ -290,7 +293,7 @@ let induction Args.(Message (ts,_)) s =
 (*------------------------------------------------------------------*)
 (** Induction *)
 
-let old_or_new_induction args =
+let old_or_new_induction args : etac =
   if Config.new_ind () then
     (EquivLT.induction_tac ~dependent:false) args
   else
@@ -1091,7 +1094,7 @@ let () =
 let ifeq Args.(Pair (Int i, Pair (Message (t1,ty1), Message (t2,ty2)))) s =
 
   (* check that types are equal *)
-  EquivLT.check_ty_eq ty1 ty2;
+  check_ty_eq ty1 ty2;
 
   let before, e, after = split_equiv_goal i s in
 
@@ -1414,7 +1417,7 @@ let split_seq (li : int L.located) ht s : ES.sequent =
 
   let hty, ht = EquivLT.convert_ht s ht in
 
-  EquivLT.check_hty_eq hty seq_hty;
+  check_hty_eq hty seq_hty;
 
   (* compute the new sequent *)
   let is, subst = Term.refresh_vars `Global is in
@@ -1470,7 +1473,7 @@ let mem_seq (i_l : int L.located) (j_l : int L.located) s : Goal.t list =
         (Failure (string_of_int (L.unloc j_l) ^ " is not a seq"))
   in
 
-  EquivLT.check_ty_eq (Term.ty t) (Term.ty seq_term);
+  check_ty_eq (Term.ty t) (Term.ty seq_term);
 
   (* refresh the sequence *)
   let env = ref (ES.vars s) in
@@ -1529,9 +1532,9 @@ let const_seq
         let seq_hty =
           Type.Lambda (List.map Vars.ty e_is, Type.Boolean)
         in
-        EquivLT.check_hty_eq ~loc:p_bool_loc b_ty seq_hty;
+        check_hty_eq ~loc:p_bool_loc b_ty seq_hty;
 
-        EquivLT.check_ty_eq ~loc:(L.loc p_term) term_ty (Term.ty e_ti);
+        check_ty_eq ~loc:(L.loc p_term) term_ty (Term.ty e_ti);
 
         (* check that [p_bool] is a pure timestamp formula *)
         let t_bool_body = match t_bool with
@@ -1882,7 +1885,7 @@ let enckp arg (s : ES.t) =
       | None -> (skl, skl), Term.mk_name skl
     in
 
-    EquivLT.check_ty_eq (Term.ty new_key) (Term.ty sk);
+    check_ty_eq (Term.ty new_key) (Term.ty sk);
 
     (* Verify all side conditions, and create the reachability goal
      * for the freshness of [r]. *)

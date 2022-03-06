@@ -29,6 +29,9 @@ open LowTactics
 (*------------------------------------------------------------------*)
 let wrap_fail = TraceLT.wrap_fail
 
+let hard_failure = Tactics.hard_failure
+let soft_failure = Tactics.soft_failure
+
 (*------------------------------------------------------------------*)
 (** {2 Logical Tactics} *)
 
