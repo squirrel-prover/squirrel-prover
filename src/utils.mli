@@ -62,6 +62,8 @@ module List : sig
 
   val foldi : (int -> 'a -> 'b -> 'a) -> 'a -> 'b list -> 'a
 
+  val find_mapi : (int -> 'a -> 'b option) -> 'a list -> 'b option 
+
   exception Out_of_range
 end
 

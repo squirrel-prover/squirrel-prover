@@ -342,6 +342,16 @@ let () =
 (*------------------------------------------------------------------*)
 (** Function application *)
 
+(** Select a frame element matching a pattern. *)
+let fa_select_felems (pat : Term.term Match.pat) (s : sequent) : int option =
+  let option = { Match.default_match_option with allow_capture = true; } in
+  List.find_mapi (fun i e ->
+      match Match.T.try_match ~option (ES.table s) (ES.system s) e pat with
+      | NoMatch _ | FreeTyv -> None
+      | Match _             -> Some i
+    ) (ES.goal_as_equiv s)
+
+
 exception No_common_head
 exception No_FA
 
@@ -363,48 +373,89 @@ let fa_expand t =
   in
   filterBoolAsMsg (aux (Term.head_normal_biterm t))
 
-let fa i s =
+(** Applies Function Application on a given frame element *)
+let do_fa_felem (i : int L.located) (s : sequent) : sequent =
   let before, e, after = split_equiv_goal i s in
-  try
-    (* Special case for try find, otherwise we use fa_expand *)
-    match e with
-    | Find (vars,c,t,e) ->
-      let env = ref (ES.vars s) in
-      let vars' = List.map (Vars.fresh_r env) vars in
-      let subst =
-        List.map2
-          (fun i i' -> Term.ESubst (Term.mk_var i, Term.mk_var i'))
-          vars vars'
-      in
-      let c' = Term.mk_seq0 vars c in
-      let t' = Term.subst subst t in
-      let biframe =
-        List.rev_append before
-          ([ c' ; t' ; e ] @ after)
-      in
-      [ ES.set_vars !env (ES.set_equiv_goal biframe s) ]
+  (* Special case for try find, otherwise we use fa_expand *)
+  match e with
+  | Find (vars,c,t,e) ->
+    let env = ref (ES.vars s) in
+    let vars' = List.map (Vars.fresh_r env) vars in
+    let subst =
+      List.map2
+        (fun i i' -> Term.ESubst (Term.mk_var i, Term.mk_var i'))
+        vars vars'
+    in
+    let c' = Term.mk_seq0 vars c in
+    let t' = Term.subst subst t in
+    let biframe =
+      List.rev_append before
+        ([ c' ; t' ; e ] @ after)
+    in
+    ES.set_vars !env (ES.set_equiv_goal biframe s) 
 
-    | Seq(vars,t) ->
-      let terms = fa_expand t in
-      let biframe =
-        List.rev_append
-          before
-          ((List.map (fun t' -> Term.mk_seq0 ~simpl:true vars t') terms) @ after)
-      in
-      [ ES.set_equiv_goal biframe s ]
+  | Seq(vars,t) ->
+    let terms = fa_expand t in
+    let biframe =
+      List.rev_append
+        before
+        ((List.map (fun t' -> Term.mk_seq0 ~simpl:true vars t') terms) @ after)
+    in
+    ES.set_equiv_goal biframe s 
 
-    | _ ->
-      let biframe =
-        List.rev_append before (fa_expand e @ after) in
-      [ ES.set_equiv_goal biframe s ]
-  with
+  | _ ->
+    let biframe = List.rev_append before (fa_expand e @ after) in
+    ES.set_equiv_goal biframe s 
+
+(** [do_fa_felem] with user-level errors *)
+let fa_felem (i : int L.located) (s : sequent) : sequent list =
+  try [do_fa_felem i s] with
   | No_common_head ->
-    soft_failure (Tactics.Failure "No common construct")
+    soft_failure ~loc:(L.loc i) (Tactics.Failure "No common construct")
   | No_FA ->
-    soft_failure (Tactics.Failure "FA not applicable")
+    soft_failure ~loc:(L.loc i) (Tactics.Failure "FA not applicable")
 
+let do_fa_tac (args : Args.fa_arg list) (s : sequent) : sequent list =
+  let args = 
+    let cntxt = Theory.{ env = ES.env s; cntxt = InGoal; } in
+    List.map (fun (mult, tpat) ->
+        let t, ty = Theory.convert ~pat:true cntxt tpat in
+        let pat_vars =
+          Vars.Sv.filter (fun v -> Vars.is_pat v) (Term.fv t)
+        in
+        let pat = Match.{
+            pat_tyvars = [];
+            pat_vars;
+            pat_term = t; }
+        in
+        (mult, L.loc tpat, pat)
+      ) args 
+  in
+
+  let rec do1 
+      (s    : sequent) 
+      ((mult, loc, pat) : Args.rw_count * L.t * Term.term Match.pat)
+    : sequent 
+    =
+    match fa_select_felems pat s with
+    | None -> 
+      if mult = `Any 
+      then s
+      else soft_failure ~loc (Failure "FA not applicable")
+    | Some i ->
+      (* useless loc, as we know [i] is in range *)
+      let i = L.mk_loc L._dummy i in
+
+      let s = do_fa_felem i s in
+      match mult with
+      | `Once -> s
+      | `Any | `Many -> do1 s (`Any, loc, pat)
+  in
+  [List.fold_left do1 s args]
+                                                       
 let fa_tac args = match args with
-  | [Args.Int_parsed i] -> wrap_fail (fa i)
+  | [Args.Int_parsed i] -> wrap_fail (fa_felem i)
+  | [Args.Fa args] -> wrap_fail (do_fa_tac args)
   | _ -> bad_args ()
 
 

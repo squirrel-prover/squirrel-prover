@@ -180,6 +180,16 @@ module List = struct
       List.fold_left (fun (acc, i) x -> f i acc x, i + 1) (acc,0) l 
     in
     acc
+
+  let find_mapi (type b) (f : int -> 'a -> b option) (l : 'a list) : b option =
+    let exception Found of b option in
+    try ignore (mapi (fun i e ->  
+        match f i e with
+        | None -> () 
+        | Some _ as res -> raise (Found res)
+      ) l);
+      None
+    with Found res -> res
 end
 
 (*------------------------------------------------------------------*)

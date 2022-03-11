@@ -90,6 +90,10 @@ let pp_rw_arg ppf rw_arg = match rw_arg with
   | R_item r -> Fmt.pf ppf "..."
 
 (*------------------------------------------------------------------*)
+(** Function application argument *)
+type fa_arg = rw_count * Theory.term
+
+(*------------------------------------------------------------------*)
 type apply_in = lsymb option
 
 let pp_apply_in ppf = function
@@ -119,7 +123,7 @@ type and_or_pat =
 and simpl_pat =
   | SAndOr of and_or_pat
   | SNamed of naming_pat
-  | Srewrite of rw_dir                    (** -> or <-*)
+  | Srewrite of rw_dir      (** -> or <-*)
 
 type intro_pattern =
   | Star   of Location.t    (** '*' *)
@@ -201,6 +205,7 @@ type parser_arg =
   | MemSeq       of int L.located * int L.located
   | Remember     of Theory.term * lsymb
   | Generalize   of Theory.term list * naming_pat list option
+  | Fa           of fa_arg list
   | TermPat      of int * Theory.term
 
 type parser_args = parser_arg list
@@ -253,6 +258,12 @@ let pp_parser_arg ppf = function
   | TermPat (sel, term) ->
     Fmt.pf ppf "{%i}(%a)" sel Theory.pp term
 
+  | Fa l ->
+    let pp_el ppf (count, term) =
+      Fmt.pf ppf "%a%a" pp_rw_count count Theory.pp term
+    in
+    Fmt.pf ppf "@[<hov> %a@]" (Fmt.list ~sep:Fmt.sp pp_el) l
+      
 (*------------------------------------------------------------------*)
 (** Tactic arguments sorts *)
 type _ sort =
@@ -415,12 +426,12 @@ let pp_esort ppf (Sort s) =
   pp_aux_sort init_table counter_table false ppf s
 
 (*------------------------------------------------------------------*)
-
 let convert_as_lsymb parser_args = match parser_args with
   | [Theory (L.{ pl_desc = App (p,[]) } )] ->
     Some p
   | _ -> None
 
+(*------------------------------------------------------------------*)
 let convert_pat_arg sel conv_cntxt p conc =
   let t, ty = Theory.convert ~pat:true conv_cntxt p in
   let pat_vars =
@@ -445,13 +456,13 @@ let convert_pat_arg sel conv_cntxt p conc =
       raise Theory.(Conv (L._dummy,
                           Tactic_type
                             ("Could not extract the element "
-                             ^string_of_int (sel)
-                             ^" out of "^string_of_int (List.length res)
-                             ^" matches found")))
+                             ^ string_of_int (sel)
+                             ^ " out of " ^ string_of_int (List.length res)
+                             ^ " matches found")))
   in
   (message, ty)
 
-
+(*------------------------------------------------------------------*)
 let convert_args env parser_args tactic_type conc =
   let conv_cntxt = Theory.{ env; cntxt = InGoal; } in
 
@@ -463,14 +474,14 @@ let convert_args env parser_args tactic_type conc =
 
     | [TermPat (sel, p)], Sort Message ->
       let (m, ty) = convert_pat_arg sel conv_cntxt p conc in
-        Arg (Message (m, ty))
+      Arg (Message (m, ty))
 
     | [Theory p], Sort Message ->
       begin match Theory.convert conv_cntxt p with
         | (t, ty) -> Arg (Message (t, ty))
         | exception Theory.(Conv (_,PatNotAllowed)) ->
           let (m, ty) = convert_pat_arg 1 conv_cntxt p conc in
-            Arg (Message (m, ty))
+          Arg (Message (m, ty))
       end
     | [Theory p], Sort Boolean ->
       let f, _ = Theory.convert conv_cntxt ~ty:Type.Boolean p in

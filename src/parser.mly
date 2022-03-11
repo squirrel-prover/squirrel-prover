@@ -37,7 +37,7 @@
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY
 %token SPLITSEQ CONSTSEQ MEMSEQ
-%token BY INTRO AS DESTRUCT REMEMBER INDUCTION
+%token BY FA INTRO AS DESTRUCT REMEMBER INDUCTION
 %token PROOF QED UNDO ABORT HINT
 %token RENAME GPRF GCCA
 %token INCLUDE
@@ -533,6 +533,11 @@ in_target:
 | IN l=slist1(single_target,COMMA) { `Hyps l }
 | IN STAR                          { `All }
 
+(*------------------------------------------------------------------*)
+fa_arg:
+| d=rw_mult t=term { (d,t) }
+
+(*------------------------------------------------------------------*)
 apply_in:
 |             { None }
 | IN id=lsymb { Some id }
@@ -678,6 +683,18 @@ tac:
   | l=lloc(LEFT)                       { mk_abstract l "left"  [] }
   | l=lloc(RIGHT)                      { mk_abstract l "right" [] }
 
+  (* FA, equiv tactic, patterns *)
+  | l=lloc(FA) args=slist1(fa_arg, COMMA)
+    { mk_abstract l "fa" [TacticsArgs.Fa args] }
+
+  (* FA, equiv tactic, frame element number *)
+  | l=lloc(FA) i=loc(int)
+    { mk_abstract l "fa" [TacticsArgs.Int_parsed i] }
+
+  (* FA, trace tactic *)
+  | l=lloc(FA) 
+    { mk_abstract l "fa" [] }
+
   | l=lloc(INTRO) p=intro_pat_list
     { mk_abstract l "intro" [TacticsArgs.IntroPat p] }
 
@@ -793,6 +810,7 @@ tac:
 help_tac_i:
 | LEFT       { "left"}
 | RIGHT      { "right"}
+| FA         { "fa"}
 | INTRO      { "intro"}
 | DESTRUCT   { "destruct"}
 | DEPENDS    { "depends"}

@@ -86,7 +86,7 @@ let () =
                        To prove that a goal containing f(u1,...,un) is \
                        diff-equivalent, one can prove that the goal containing the \
                        sequence u1,...,un is diff-equivalent.";
-      usages_sorts = [Sort None; Sort Int];
+      usages_sorts = [Sort None; Sort Int; Sort Term];
       tactic_group = Structural}
     ~pq_sound:true
     (LT.gentac_of_any_tac_arg TraceTactics.fa_tac EquivTactics.fa_tac)

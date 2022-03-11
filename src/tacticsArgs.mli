@@ -45,11 +45,15 @@ type rw_equiv_item = [
   | `Rw of Theory.p_pt
 ] rw_item_g
 
-(** Rewrite argument, which is a rewrite or simplification item*)
+(** Rewrite argument, which is a rewrite or simplification item *)
 type rw_arg =
   | R_item   of rw_item
   | R_s_item of s_item
 
+(*------------------------------------------------------------------*)
+(** Function application argument *)
+type fa_arg = rw_count * Theory.term
+                           
 (*------------------------------------------------------------------*)
 type apply_in = lsymb option
 
@@ -130,6 +134,7 @@ type parser_arg =
   | MemSeq       of int L.located * int L.located
   | Remember     of Theory.term * lsymb
   | Generalize   of Theory.term list * naming_pat list option
+  | Fa           of fa_arg list
   | TermPat      of int * Theory.term
 
 type parser_args = parser_arg list

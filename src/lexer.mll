@@ -107,6 +107,7 @@ rule token = parse
 | "signature"         { SIGNATURE }
 | "intro"             { INTRO }
 | "destruct"          { DESTRUCT }
+| "fa"                { FA }
 | "as"                { AS }
 | "index"             { INDEX }
 | "message"           { MESSAGE }
