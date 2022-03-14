@@ -38,11 +38,12 @@ function init() {
   }
 }
 
-function goView(j, stepVector, top) {
+function goView(j, stepVector) {
+  options = {behavior: "smooth", block: "nearest", inline: "nearest"}
   if (j <= 1) {
-    stepVector[0].scrollIntoView(top);
+    stepVector[0].scrollIntoView(options);
   } else {
-    stepVector[j-1].scrollIntoView(top);
+    stepVector[j-1].scrollIntoView(options);
   }
 }
 
@@ -70,12 +71,12 @@ function gotoLine(j) {
 
 function gotoUp() {
   gotoLine(i+1);
-  goView(i, stepEnd, false);
+  goView(i, stepEnd);
 }
 
 function gotoDown() {
   gotoLine(i-1);
-  goView(i, stepBegin, true);
+  goView(i, stepBegin);
 }
 
 function key(event) {
