@@ -13,6 +13,9 @@ axiom eq_not (x, y : boolean) : (not(x) = not(y)) = (x = y).
 goal eq_sym ['a] (x,y : 'a) : (x = y) = (y = x).
 Proof. by rewrite eq_iff. Qed.
 
+goal neq_sym ['a] (x,y : 'a) : (x <> y) = (y <> x).
+Proof. by rewrite eq_iff. Qed.
+
 goal eq_refl ['a] (x : 'a) : (x = x) = true. 
 Proof. 
   by rewrite eq_iff. 
