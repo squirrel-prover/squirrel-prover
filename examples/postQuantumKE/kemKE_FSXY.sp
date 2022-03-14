@@ -324,144 +324,123 @@ axiom [main_rand] len_F (x1,x2:message) : len(F(x1,x2)) = len(s).
 
 equiv [main_rand] trans_auth.
 Proof.
- enrich seq(i:index->dkI(i)); enrich seq(i:index-> dkR(i)); enrich s.
- enrich seq(i,j,k:index-> kT(i,j,k)); enrich seq(i,j,k:index->rTI(i,j,k));
- enrich seq(i,j,k:index-> dkT(i,j,k));
- enrich seq(i,j,k:index-> kR(i,j,k));
- enrich seq(i,j,k:index-> kI(i,j,k)).
+  enrich seq(i:index->dkI(i)); enrich seq(i:index-> dkR(i)); enrich s.
+  enrich seq(i,j,k:index-> kT(i,j,k)); enrich seq(i,j,k:index->rTI(i,j,k));
+  enrich seq(i,j,k:index-> dkT(i,j,k));
+  enrich seq(i,j,k:index-> kR(i,j,k));
+  enrich seq(i,j,k:index-> kI(i,j,k)).
 
- (* enrich of the dishonest randoms *)
- enrich seq(j,k:index-> DkT(j,k)); 
- enrich seq(j,k:index->DrTI(j,k));
- enrich seq(j,k:index-> DkR(j,k));
- enrich seq(j,k:index-> DrR(j,k));
+  (* enrich of the dishonest randoms *)
+  enrich seq(j,k:index-> DkT(j,k)); 
+  enrich seq(j,k:index->DrTI(j,k));
+  enrich seq(j,k:index-> DkR(j,k));
+  enrich seq(j,k:index-> DrR(j,k));
+  enrich  seq(i,j,k:index->DkI(i,j,k)).
+  enrich  seq(i,j,k:index->DdkT(i,j,k)).
+  enrich  seq(i:index->dkR(i)).
 
- enrich  seq(i,j,k:index->DkI(i,j,k)).
- enrich  seq(i,j,k:index->DdkT(i,j,k)).
- enrich  seq(i:index->dkR(i)).
+  induction t.
+    + expandall.
+      fa 14.
 
- induction t.
+    + expandall.
+      fa 14.
+      
+    + (* First output of R *)
+      expandall.
+      fa 14.
+      fa 15.
+      fa 15.
+      fa 15.
+      fa 16.
+      expandseq  seq(i,j,k:index-> kT(i,j,k)), i,j,k.
+      expandseq  seq(i,j,k:index-> rTI(i,j,k)), i,j,k.
+      prf 18.
+      yesif 18.
+      xor 18, xor(F(rR(i,j,k),skR(j)),n_PRF), n_PRF.
+      yesif 18.
+      use len_F with rR(i,j,k), skR(j).
+      namelength n_PRF,s.
+      fa 18. fa 18.
+      fresh 19.
+      yesif 19.
+      expandseq  seq(i,j,k:index-> kR(i,j,k)), i,j,k.
+      expandseq  seq(i:index-> dkI(i)), i.
 
- expandall.
- fa 14.
+    + (* Second output of R *)
+      expandall.
+      fa 14.
 
+    + (* First output of R with dishonnest talker *)
+       expandall.
+       fa 14.
+       fa 15.
+       fa 16.
+       admit 15. (* this is a dumb fadup weakness, as all the dkI(i) are in the frame, the forall is obviously ok. *)
+       repeat fa 15.
+       fa 17.
+       expandseq  seq(j,k:index-> DkR(j,k)), j,k.
+       expandseq  seq(j,k:index-> DrTI(j,k)), j,k.
+       expandseq  seq(j,k:index-> DkT(j,k)), j,k.
+       prf 16; yesif 16.
+       xor 16, n_PRF.
+       yesif 16.
+       use len_F with DrR(j,k), skR(j).
+       namelength n_PRF,s.
+       fresh 16.
 
- expandall.
- fa 14.
-
-
- (* First output of R *)
- expandall.
- fa 14.
- fa 15.
- fa 15.
- fa 15.
- fa 16.
- expandseq  seq(i,j,k:index-> kT(i,j,k)), i,j,k.
- expandseq  seq(i,j,k:index-> rTI(i,j,k)), i,j,k.
- prf 18.
- yesif 18.
-
- xor 18, xor(F(rR(i,j,k),skR(j)),n_PRF), n_PRF.
- yesif 18.
-
- use len_F with rR(i,j,k), skR(j).
- namelength n_PRF,s.
-
- fa 18. fa 18.
- fresh 19.
- yesif 19.
- expandseq  seq(i,j,k:index-> kR(i,j,k)), i,j,k.
- expandseq  seq(i:index-> dkI(i)), i.
-
-
- (* Second output of R *)
- expandall.
- fa 14.
-
-(* First output of R with dishonnest talker *)
- expandall.
- fa 14.
- fa 15.
- fa 16.
- admit 15. (* this is a dumb fadup weakness, as all the dkI(i) are in the frame, the forall is obviously ok. *)
-
- repeat fa 15.
-
-  fa 17.
- expandseq  seq(j,k:index-> DkR(j,k)), j,k.
- expandseq  seq(j,k:index-> DrTI(j,k)), j,k.
- expandseq  seq(j,k:index-> DkT(j,k)), j,k.
-  prf 16; yesif 16.
- xor 16, n_PRF.
- yesif 16.
-  use len_F with DrR(j,k), skR(j).
-  namelength n_PRF,s.
- fresh 16.
-
-(* Second output of R with dishonnest talker *)
-
-  expandall.
-  fa 14.
+    + (* Second output of R with dishonnest talker *)
+      expandall.
+      fa 14.
 
 
- (* First output of I *)
-  expandall.
-  fa 14.
-  fa 15.
-  fa 15.
-  fa 15.
-  fa 16.
-  expandseq seq(i,j,k:index-> dkT(i,j,k)),i,j,k.
-  prf 15.
-  yesif 15.
+    + (* First output of I *)
+      expandall.
+      fa 14.
+      fa 15.
+      fa 15.
+      fa 15.
+      fa 16.
+      expandseq seq(i,j,k:index-> dkT(i,j,k)),i,j,k.
+      prf 15.
+      yesif 15.
+      xor 15, xor(F(rI(i,j,k),skI(i)),n_PRF), n_PRF.
+      yesif 15.
+      use len_F with rI(i,j,k), skI(i).
+      by namelength n_PRF,s.
+      fa 15.
+      fresh 16.
+      yesif 16.
+      expandseq  seq(i,j,k:index->kI(i,j,k)),i,j,k.
+      expandseq  seq(i,j,k:index->dkT(i,j,k)),i,j,k.
+      expandseq  seq(i:index->dkR(i)),j.
 
-
-  xor 15, xor(F(rI(i,j,k),skI(i)),n_PRF), n_PRF.
-  yesif 15.
-
-  use len_F with rI(i,j,k), skI(i).
-  by namelength n_PRF,s.
-
-  fa 15.
-  fresh 16.
-  yesif 16.
-  expandseq  seq(i,j,k:index->kI(i,j,k)),i,j,k.
-  expandseq  seq(i,j,k:index->dkT(i,j,k)),i,j,k.
-  expandseq  seq(i:index->dkR(i)),j.
-
- (* Second output of I *)
- expandall.
- fa 14.
+    + (* Second output of I *)
+      expandall.
+      fa 14.
 
 
 
- (* First output of DI *)
-  expandall.
-  fa 14.
-  fa 15.
-  fa 15.
-  fa 15.
-  fa 15.
-  expandseq seq(i,j,k:index-> DdkT(i,j,k)),i,j,k.
-  prf 17.
-  yesif 17.
+    + (* First output of DI *)
+      expandall.
+      fa 14.
+      fa 15.
+      fa 15.
+      fa 15.
+      fa 15.
+      expandseq seq(i,j,k:index-> DdkT(i,j,k)),i,j,k.
+      prf 17.
+      yesif 17.
+      xor 17, xor(F(DrI(i,j,k),skI(i)),n_PRF), n_PRF.
+      yesif 17.
+      use len_F with DrI(i,j,k), skI(i).
+      by namelength n_PRF,s.
+      fresh 17.
+      expandseq  seq(i,j,k:index->DkI(i,j,k)),i,j,k.
 
-
-  xor 17, xor(F(DrI(i,j,k),skI(i)),n_PRF), n_PRF.
-  yesif 17.
-
-  use len_F with DrI(i,j,k), skI(i).
-  by namelength n_PRF,s.
-
-  fresh 17.
-  expandseq  seq(i,j,k:index->DkI(i,j,k)),i,j,k.
-
- (* Second output of DI *)
- expandall.
- fa 14.
-
-
+    + (* Second output of DI *)
+      expandall.
+      fa 14.
 Qed.
 
 (* From [main_rand/right], we can now use cca to hide the two main random seeds, kR and kI *)
@@ -472,12 +451,9 @@ system mainCCAkR = [main_rand/right] with gcca (il,jl,kl:index),  encap(kR(il,jl
 system mainCCAkI = [mainCCAkR/right] with gcca (il,jl,kl:index),  encap(kI(il,jl,kl), rI(il,jl,kl) ,pk(dkR(jl))).
 
 
-
-
 (******* Strong secrecy  ******)
 (***************************************)
 (* Idealized version with kI and kR hidden *)
-
 
 (* k-th copy of initiator with key skI(i) trying to communicate with responder with key pk(dkR(j)) *)
 process Initiator3(i,j,k:index) =
@@ -600,38 +576,26 @@ axiom [mainCCAkI/right,idealized/left] tf: forall (x,y,z:message), decap(encap(x
 
 equiv [mainCCAkI/right,idealized/left] ideal.
 Proof.
-diffeq.
+  diffeq.
 
-case try find il,jl,kl such that _ in kR(il,jl,kl) else _.
-
-case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
-by use H1 with il,jl,kl.
-
-case try find il,jl,kl such that _ in kR(il,jl,kl) else _.
-
-case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
-by use H1 with il,jl,kl.
-
-
-case try find il,jl,kl such that _ in kI(il,jl,kl) else _.
-
-case try find il, jl, kl such that _ in kdf(s,kI(il,jl,kl)) else _.
-by use H1 with il,jl,kl.
-
-
-case try find il,jl,kl such that _ in kI(il,jl,kl) else _.
-
-case try find il, jl, kl such that _ in kdf(s,kI(il,jl,kl)) else _.
-by use H1 with il,jl,kl.
+    + case try find il,jl,kl such that _ in kR(il,jl,kl) else _.
+      case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
+      by use H1 with il,jl,kl.
+    + case try find il,jl,kl such that _ in kR(il,jl,kl) else _.
+      case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
+      by use H1 with il,jl,kl.
+    + case try find il,jl,kl such that _ in kI(il,jl,kl) else _.
+      case try find il, jl, kl such that _ in kdf(s,kI(il,jl,kl)) else _.
+      by use H1 with il,jl,kl.
+    + case try find il,jl,kl such that _ in kI(il,jl,kl) else _.
+      case try find il, jl, kl such that _ in kdf(s,kI(il,jl,kl)) else _.
+      by use H1 with il,jl,kl.
 Qed.
-
-
 
 equiv [idealized/left,idealized/left] reflex.
 Proof.
-diffeq.
+  diffeq.
 Qed.
-
 
 axiom  [idealized/left,idealized/left]  len_G (x1,x2:message) : len(G(x1,x2)) = len(s).
 
@@ -648,48 +612,36 @@ global goal [idealized/left,idealized/left] resp_key (i,j,k:index):
  equiv(frame@R2(i,j,k), diff(sRI(i,j,k)@R2(i,j,k), kIR(i,j,k))) .
 Proof.
 
-intro Hap .
-use reflex with R2(i,j,k) => //.
-
-expandall.
-
-prf 1, kdf(s,kR(k,i,j)); yesif 1.
-
-prf 1, G(_,n_PRF); yesif 1.
-
-xor 1,  xor(n_PRF1,_), n_PRF1; yesif 1.
-rewrite len_G.
-namelength s, n_PRF1.
-
-
-xor 1,  n_XOR; yesif 1.
-rewrite len_G.
-namelength s, n_XOR.
-fresh 1.
+  intro Hap .
+  use reflex with R2(i,j,k) => //.
+  expandall.
+  prf 1, kdf(s,kR(k,i,j)); yesif 1.
+  prf 1, G(_,n_PRF); yesif 1.
+  xor 1,  xor(n_PRF1,_), n_PRF1; yesif 1.
+  rewrite len_G.
+  namelength s, n_PRF1.
+  xor 1,  n_XOR; yesif 1.
+  rewrite len_G.
+  namelength s, n_XOR.
+  fresh 1.
 Qed.
-
 
 (*******************************************)
 (*** Strong Secrecy of the initiator key ***)
 (*******************************************)
 
-
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
 global goal [idealized/left,idealized/left] right_key: forall (i,j,k:index), [happens(I1(i,j,k))] -> equiv(frame@I1(i,j,k), diff(sIR(i,j,k)@I1(i,j,k), kIR(i,j,k))) .
 Proof.
-intro i j k Hap .
-use reflex with I1(i,j,k) => //.
-
-expandall.
-prf 1, kdf(s,kI(i,j,k)); yesif 1.
-
-prf 1, G(_, n_PRF); yesif 1.
-
-xor 1, n_PRF1; yesif 1.
-rewrite len_xor.
-by rewrite !len_G.
-rewrite len_G.
-by namelength s, n_PRF1.
-
-by fresh 1.
+  intro i j k Hap .
+  use reflex with I1(i,j,k) => //.
+  expandall.
+  prf 1, kdf(s,kI(i,j,k)); yesif 1.
+  prf 1, G(_, n_PRF); yesif 1.
+  xor 1, n_PRF1; yesif 1.
+  rewrite len_xor.
+  by rewrite !len_G.
+  rewrite len_G.
+  by namelength s, n_PRF1.
+  by fresh 1.
 Qed.
