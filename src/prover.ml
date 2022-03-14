@@ -615,8 +615,9 @@ type include_param = { th_name : lsymb; params : lsymb list }
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
   | ParsedSetOption  of Config.p_set_param
-  | ParsedTactic     of string * [`None|`Open|`Close] *
-                        TacticsArgs.parser_arg Tactics.ast
+  | ParsedTactic     of [ `Bullet of string |
+                          `Brace of [`Open|`Close] |
+                          `Tactic of TacticsArgs.parser_arg Tactics.ast ] list
   | ParsedUndo       of int
   | ParsedGoal       of Goal.Parsed.t Location.located
   | ParsedInclude    of include_param
@@ -673,9 +674,9 @@ let get_oracle_tag_formula h =
   | Some (Oracle_formula f) -> f
   | None -> Term.mk_false
 
+(** Check that all goals and braces have been closed. *)
 let is_proof_completed () =
-  assert (Bullets.is_empty !bullets = (!subgoals = []));
-  !subgoals = []
+  !subgoals = [] && Bullets.is_empty !bullets
 
 let complete_proof () =
   assert (is_proof_completed ());
@@ -698,8 +699,7 @@ let pp_goal ppf () = match !current_goal, !subgoals with
       Goal.pp j
   | _ -> assert false
 
-(** [eval_tactic_focus tac] applies [tac] to the focused goal.
-  * @return [true] if there are no subgoals remaining. *)
+(** [eval_tactic_focus tac] applies [tac] to the focused goal. *)
 let eval_tactic_focus tac = match !subgoals with
   | [] -> assert false
   | judge :: ejs' ->
@@ -709,8 +709,7 @@ let eval_tactic_focus tac = match !subgoals with
     subgoals := new_j @ ejs';
     begin try
       bullets := Bullets.expand_goal (List.length new_j) !bullets ;
-    with _ -> Tactics.(hard_failure (Failure "bullet error")) end;
-    is_proof_completed ()
+    with _ -> Tactics.(hard_failure (Failure "bullet error")) end
 
 let open_bullet bullet =
   assert (bullet <> "");
@@ -744,7 +743,7 @@ let eval_tactic utac = match utac with
        be meaningless: we may want to warn the user, forbid cycles
        accross opened bullets, or even update the Bullets.path to
        reflect cycles. *)
-    subgoals := cycle i !subgoals; false
+    subgoals := cycle i !subgoals
   | _ -> eval_tactic_focus utac
 
 let start_proof (check : [`NoCheck | `Check]) = 

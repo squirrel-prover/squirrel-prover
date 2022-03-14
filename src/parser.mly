@@ -985,20 +985,23 @@ interactive:
 | EOF                { Prover.EOF }
 
 bullet:
-|                    { "" }
 | MINUS              { "-" }
 | PLUS               { "+" }
 | STAR               { "*" }
 | INFIXSYMB          { $1 }
 
 brace:
-|                    { `None }
 | LBRACE             { `Open }
 | RBRACE             { `Close }
 
+bulleted_tactic:
+| bullet bulleted_tactic { `Bullet $1 :: $2 }
+| brace  bulleted_tactic { `Brace  $1 :: $2 }
+| tactic                 { [ `Tactic $1 ] }
+| DOT                    { [] }
+
 top_proofmode:
-| bl=bullet br=brace t=tactic
-                     { Prover.ParsedTactic (bl,br,t) }
+| bulleted_tactic    { Prover.ParsedTactic $1 }
 | u=undo             { Prover.ParsedUndo u }
 | ABORT              { Prover.ParsedAbort }
 | QED                { Prover.ParsedQed }

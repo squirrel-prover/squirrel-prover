@@ -172,8 +172,9 @@ exception ParseError of string
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
   | ParsedSetOption  of Config.p_set_param
-  | ParsedTactic     of string * [`None|`Open|`Close] *
-                        TacticsArgs.parser_arg Tactics.ast
+  | ParsedTactic     of [ `Bullet of string |
+                          `Brace of [`Open|`Close] |
+                          `Tactic of TacticsArgs.parser_arg Tactics.ast ] list
   | ParsedUndo       of int
   | ParsedGoal       of Goal.Parsed.t Location.located
   | ParsedInclude    of include_param
@@ -201,9 +202,8 @@ val is_proof_completed : unit -> bool
 (** Complete the proofs, resetting the current goal to None. *)
 val complete_proof : unit -> unit
 
-(** [eval_tactic utac] applies the tactic [utac].
-    Return [true] if there are no subgoals remaining. *)
-val eval_tactic : TacticsArgs.parser_arg Tactics.ast -> bool
+(** [eval_tactic utac] applies the tactic [utac]. *)
+val eval_tactic : TacticsArgs.parser_arg Tactics.ast -> unit
 
 (** Insert a bullet in the proof script. *)
 val open_bullet : Bullets.bullet -> unit

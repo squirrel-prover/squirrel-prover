@@ -259,42 +259,46 @@ let do_decls (state : main_state) (decls : Decl.declarations) : main_state =
   let table = Prover.declare_list state.table hint_db decls in
   { state with mode = GoalMode; table = table; }
 
-let do_tactic (state : main_state) bullet brace utac : main_state =
-  let () = 
-    match state.check_mode with
+let do_tactic (state : main_state) l : main_state =
+  begin match state.check_mode with
     | `NoCheck -> assert (state.mode = WaitQed)
     | `Check   -> 
       if state.mode <> Prover.ProofMode then
         cmd_error Unexpected_command;
-  in
+  end;
 
   if not state.interactive then begin
     let lnum = state.file.f_lexbuf.lex_curr_p.pos_lnum in
-    Printer.prt `Prompt "Line %d: %a" lnum Prover.pp_ast utac
+    match List.filter_map (function `Tactic t -> Some t | _ -> None) l with
+      | [utac] ->
+          Printer.prt `Prompt "Line %d: %a" lnum Prover.pp_ast utac
+      | _ ->
+          Printer.prt `Prompt "Line %d: ??" lnum
   end;
 
   match state.check_mode with
   | `NoCheck -> state
   | `Check   ->
-    begin match brace with
-      | `Open -> Prover.open_brace ()
-      | `Close -> Prover.close_brace ()
-      | `None -> ()
+    let prover_state = Prover.get_state state.mode state.table in
+    begin try
+      List.iter
+        (function
+           | `Bullet bl -> Prover.open_bullet bl ;
+           | `Brace `Open -> Prover.open_brace ()
+           | `Brace `Close -> Prover.close_brace ()
+           | `Tactic utac -> Prover.eval_tactic utac)
+        l
+    with
+      | e -> ignore (Prover.reset_from_state prover_state) ; raise e
     end ;
-    if bullet <> "" then Prover.open_bullet bullet;
-    let proof_done = Prover.eval_tactic utac in
-    if proof_done then
-      begin
-        Printer.prt `Goal "Goal %s is proved" 
-          (Utils.oget (Prover.current_goal_name ()));
-               
-        { state with mode = WaitQed }
-      end
-    else
-      begin
-        Printer.pr "%a" Prover.pp_goal ();
-        { state with mode = ProofMode }
-      end
+    if Prover.is_proof_completed () then begin
+      Printer.prt `Goal "Goal %s is proved"
+        (Utils.oget (Prover.current_goal_name ()));
+      { state with mode = WaitQed }
+    end else begin
+      Printer.pr "%a" Prover.pp_goal ();
+      { state with mode = ProofMode }
+    end
 
 let do_qed (state : main_state) : main_state =
   Prover.complete_proof ();
@@ -402,7 +406,7 @@ and do_command
 
     | GoalMode, ParsedInputDescr decls -> do_decls state decls
 
-    | _, ParsedTactic (bl,br,utac)     -> do_tactic state bl br utac
+    | _, ParsedTactic l                -> do_tactic state l
 
     | WaitQed, ParsedQed               -> do_qed state
 
