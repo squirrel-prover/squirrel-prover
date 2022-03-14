@@ -17,7 +17,6 @@ abstract g  : boolean
 system if f && g then out(c,ok).
 
 
-
 (*
 
 # Intro patterns
@@ -75,24 +74,16 @@ Proof. intro [[Hf | Hg] _].   (* names can be dropped if useless, with _ *)
 Abort.
 
 
-(*
-By default, automatic introduction are performed after every tactic.
-*)
+(** Include basic standard library, important helper lemmas and
+    setting proof mode to autoIntro=false. *)
+include Basic.
+
+(* The library notably contains an equation allowing to simplify a trivial if. *)
 goal _ (x,y:message): if true then x else y=x.
 Proof.
-yesif.
-Qed.
-
-
-(* While this allows to efficiently close many trivial goals, advanced users may prefer to control introduction and naming manually. It can be disabled with the following command. *)
-set autoIntro=false.
-
-(*
-This removes automatic introduction.
-*)
-goal _ (x,y:message): if true then x else y=x.
-Proof.
-yesif; auto.
+rewrite if_true.
+auto.
+auto.
 Qed.
 
 (*
@@ -106,7 +97,6 @@ Some syntactic sugar allow to quickly combine intros, rewrites and macro expansi
 For instance, `tactic; intros PAT`, applies the intro pattern `PAT` to every subgoal created by `tactic`. This can be written more concisely using `tactic => PAT`.
 *)
 
-set autoIntro=false.
 goal _ (x,y:message): (x=y => false) || (x<> y => false) .
 Proof.
 case x=y => XY.  (* the hypothesis introduced by the case is introduced in both subgoals as XY *)
@@ -145,7 +135,7 @@ abstract m : message->message.
 
 goal _ (x,y:message): m(x) = x => if true then x else y= m(x).
 Proof.
-yesif => //= t.
+rewrite if_true => //= t.
 Qed.
 
 (*
