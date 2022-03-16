@@ -141,7 +141,7 @@ let global_rename table sdecl (gf : Theory.global_formula) =
   let table, new_system =
     SystemExpr.clone_system_iter
       table old_system
-      sdecl.Decl.name (Action.apply_descr map)
+      sdecl.Decl.name (Action.descr_map map)
   in
 
   (* We finally put as axiom the equivalence between the old and the 
@@ -256,7 +256,7 @@ let global_prf table sdecl bnds hash =
   let table, new_system =
     SystemExpr.clone_system_iter
       table old_system
-      sdecl.Decl.name (Action.apply_descr map)
+      sdecl.Decl.name (Action.descr_map map)
   in
 
   (* We finally put as axiom the equivalence between the old 
@@ -427,7 +427,7 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
   let table, new_system =
     SystemExpr.clone_system_iter
       table old_system
-      sdecl.Decl.name (Action.apply_descr map)
+      sdecl.Decl.name (Action.descr_map map)
   in
 
   (* We finally put as axiom the equivalence between the old and 

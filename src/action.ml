@@ -202,19 +202,19 @@ let subst_descr subst descr =
     action; indices; condition; updates; output;  }
 
 
-(* Apply an iterator to all terms of the descr. *)
-let apply_descr iter descr =
+(* Map over the descr with function f *)
+let descr_map f descr =
   let env = Vars.of_list descr.indices in
-  let iter = iter env in
+  let f = f env in
   let condition =
      fst descr.condition,
-     iter (snd descr.condition) in
+     f (snd descr.condition) in
   let updates =
     List.map (fun (ss,t) ->
-        ss, iter t
+        ss, f t
       ) descr.updates
   in
-  let output = fst descr.output, iter (snd descr.output) in
+  let output = fst descr.output, f (snd descr.output) in
   { name = descr.name;
     input = descr.input;
     globals = descr.globals;
