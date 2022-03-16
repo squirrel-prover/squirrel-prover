@@ -131,7 +131,7 @@ let global_rename table sdecl (gf : Theory.global_formula) =
   in
   let global_macro_iterator system table ns dec_def _ : unit =
     table :=
-      Macros.apply_global_data
+      Macros.update_global_data
         !table ns dec_def
         old_single_system system (map ())
   in
@@ -248,7 +248,7 @@ let global_prf table sdecl bnds hash =
   in
   let global_macro_iterator system table ns dec_def _ : unit =
     table :=
-      Macros.apply_global_data
+      Macros.update_global_data
         !table ns
         dec_def old_single_system system (map ())
   in
@@ -419,7 +419,7 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
   in
   let global_macro_iterator system table ns dec_def _ =
     table :=
-      Macros.apply_global_data
+      Macros.update_global_data
         !table ns
         dec_def old_single_system system (map ())
   in

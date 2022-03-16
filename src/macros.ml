@@ -69,8 +69,18 @@ let get_body system data : Term.term =
   | SE.Pair (s1, s2) -> get_pair_body s1 s2
   | SE.Empty         -> assert false (* FIXME: user-level exception? *)
 
-(** Exported *)
-let apply_global_data table ns dec_def old_single_system new_single_system f =
+(** Given the name [ns] of a macro as well as a function [f] over
+   terms, an [old_single_system] and a [new_single_system], takes the
+   existing definition of [ns] in the old system, applies [f] to the
+   existing definition, and update the value of [ns] accordingly in
+   the new system. *)
+let update_global_data
+    (table : Symbols.table)
+    (ns : Symbols.macro Symbols.t)
+    (dec_def : Symbols.macro_def)
+    (old_single_system : SystemExpr.single_system)
+    (new_single_system :  SystemExpr.single_system)
+    (f : Term.term -> Term.term) =
   match Symbols.Macro.get_data ns table with
   | Global_data data ->
     let body = get_single_body old_single_system data in

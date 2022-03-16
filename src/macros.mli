@@ -49,7 +49,12 @@ val get_definition_nocntxt :
 val get_dummy_definition :
   Symbols.table -> SystemExpr.t -> Term.msymb -> Term.term
 
-val apply_global_data :
+(** Given the name [ns] of a macro as well as a function [f] over
+   terms, an [old_single_system] and a [new_single_system], takes the
+   existing definition of [ns] in the old system, applies [f] to the
+   existing definition, and update the value of [ns] accordingly in
+   the new system. *)
+val update_global_data :
   Symbols.table -> 
   Symbols.macro Symbols.t -> 
   Symbols.macro_def -> 
