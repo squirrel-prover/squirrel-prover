@@ -15,7 +15,8 @@
 
 (ocamllex lexer htmlLexer)
 (menhir
-  (modules parser htmlParser))
+  (modules parser htmlParser)
+   (flags --table --explain))
 
 ;; Too many warnings, so we make them non-fatal
 ;; ignore irrelevant warnings:
