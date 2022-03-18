@@ -65,9 +65,17 @@ val get_namespace : ?group:group -> table -> string -> namespace option
     Each symbol is defined by some data,
     whose type depends on the namespace. *)
 
+(*------------------------------------------------------------------*)
+(** Different variants on the Diffie-Hellman crypto assumption      *)
+                          
+type dh_hyp =
+  | DH_DDH
+  | DH_CDH
+  | DH_GDH
+
 type function_def =
   | Hash
-  | DDHgen
+  | DHgen of dh_hyp list
   | AEnc
   | ADec
   | SEnc

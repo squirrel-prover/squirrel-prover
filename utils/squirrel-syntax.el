@@ -125,6 +125,8 @@
   "true"
   "cca1"
   "ddh"
+  "gdh"
+  "cdh"
   "enckp"
   "enrich"
   "equivalent"

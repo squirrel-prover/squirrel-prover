@@ -34,7 +34,7 @@
 %token TIME WHERE WITH ORACLE EXN
 %token LARGE NAMEFIXEDLENGTH
 %token PERCENT
-%token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE
+%token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT USE
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY
 %token SPLITSEQ CONSTSEQ MEMSEQ
 %token BY FA INTRO AS DESTRUCT REMEMBER INDUCTION
@@ -107,6 +107,16 @@
 
 %inline slist1(X, S):
 | l=separated_nonempty_list(S, X) { l }
+
+(* DH flags *)
+dh_flag:
+| DDH { Symbols.DH_DDH }
+| CDH { Symbols.DH_CDH }
+| GDH { Symbols.DH_GDH }
+
+dh_flags:
+| l=slist1(dh_flag, COMMA) { l }
+
 
 (* Terms *)
 lsymb:
@@ -400,9 +410,14 @@ declaration_i:
   WITH ORACLE f=term
                           { Decl.Decl_sign (s, c, p, Some f, []) }
 
-| DDH g=lsymb COMMA ei=lsymb_decl ctys=c_tys
+| h=dh_flags g=lsymb COMMA ei=lsymb_decl ctys=c_tys
     { let e, f_info = ei in
-      Decl.Decl_ddh (g,(f_info,e), ctys) }
+      Decl.Decl_dh (h, g, (f_info, e), None, ctys) }
+
+| h=dh_flags g=lsymb COMMA ei=lsymb_decl COMMA mm=lsymb_decl ctys=c_tys
+    { let e, f_info = ei in
+      let m, m_info = mm in
+      Decl.Decl_dh (h, g, (f_info, e), Some (m_info, m), ctys) }
 
 | NAME e=lsymb COLON t=name_type
                           { let a,ty = t in
@@ -796,6 +811,16 @@ tac:
 					TacticsArgs.String_name i2;
 					TacticsArgs.String_name i3] }
 
+  | l=lloc(CDH) i1=tac_term COMMA g=tac_term
+    { mk_abstract l "cdh"
+         [TacticsArgs.Theory i1;
+          TacticsArgs.Theory g] }
+
+  | l=lloc(GDH) i1=tac_term COMMA g=tac_term
+    { mk_abstract l "gdh"
+         [TacticsArgs.Theory i1;
+          TacticsArgs.Theory g] }
+
   | l=lloc(HELP)
     { mk_abstract l "help" [] }
 
@@ -828,6 +853,8 @@ help_tac_i:
 | CONSTSEQ   { "constseq"}
 | MEMSEQ     { "memseq"}
 | DDH        { "ddh"}
+| GDH        { "gdh"}
+| CDH        { "cdh"}
 
 | DEPENDENT INDUCTION  { "dependent induction"}
 | GENERALIZE DEPENDENT { "generalize dependent"}

@@ -1086,6 +1086,9 @@ let is_binder : term -> bool = function
   | Seq _ | ForAll _ | Exists _ | Find _ -> true
   | _ -> false
 
+let is_macro : term -> bool = function
+  | Macro _ -> true | _ -> false
+    
 let rec subst (s : subst) (t : term) : term = 
   if s = [] ||
      (is_binder t &&

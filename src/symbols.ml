@@ -45,9 +45,17 @@ let default_group = ""
 let hash s = hcombine (Hashtbl.hash s.group) (Hashtbl.hash s.name)
 
 (*------------------------------------------------------------------*)
+(** Different variants on the Diffie-Hellman crypto assumption      *)
+                          
+type dh_hyp =
+  | DH_DDH
+  | DH_CDH
+  | DH_GDH
+
+(*------------------------------------------------------------------*)
 type function_def =
   | Hash
-  | DDHgen
+  | DHgen of dh_hyp list
   | AEnc
   | ADec
   | SEnc

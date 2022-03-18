@@ -58,7 +58,7 @@ type system_decl_modifier = {
   modifier : system_modifier;
   name     : Theory.lsymb
 }
-
+                          
 (*------------------------------------------------------------------*)
 (** Information for an operator declaration *)
 type operator_decl = { 
@@ -89,7 +89,7 @@ type declaration_i =
   | Decl_system  of system_decl
   | Decl_system_modifier  of system_decl_modifier
 
-  | Decl_ddh of lsymb * (lsymb * Symbols.symb_type) * c_tys
+  | Decl_dh of Symbols.dh_hyp list * lsymb * (lsymb * Symbols.symb_type) * (lsymb * Symbols.symb_type) option * c_tys
 
   | Decl_hash of int option * lsymb * orcl_tag_info option * c_tys
 

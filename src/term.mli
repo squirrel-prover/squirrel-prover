@@ -404,6 +404,9 @@ val mk_seq : Vars.env -> Vars.vars -> term -> term
 (** {3 Destructors} *)
 
 val is_binder : term -> bool
+
+val is_macro  : term -> bool
+
 val is_name : term -> bool
 
 val destr_var : term -> Vars.var option

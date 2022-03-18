@@ -155,6 +155,8 @@ rule token = parse
 | "depends"           { DEPENDS }
 | "clear"             { CLEAR }
 | "ddh"               { DDH }
+| "cdh"               { CDH }
+| "gdh"               { GDH }
 | "nosimpl"           { NOSIMPL }
 | "rename"            { RENAME }
 | "gprf"              { GPRF }

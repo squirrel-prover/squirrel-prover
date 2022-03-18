@@ -805,6 +805,9 @@ let fresh_tac args s =
   | Args.Arg (Args.String str) -> wrap_fail (fresh str) s
   | _ -> bad_args ()
 
+
+
+    
 (*------------------------------------------------------------------*)
 let apply_substitute subst s =
     let s =

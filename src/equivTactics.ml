@@ -2226,6 +2226,9 @@ class ddh_context ~(cntxt:Constr.trace_cntxt) ~gen ~exp exact a b c
 
   (* we check if the only diff are over g^ab and g^c, and that a, b and c
      appears only as g^a, g^b and g^c. *)
+  (* if we ever decide to rewrite this tactic or generalize it,
+     we may want to use functions from dh.ml written for cdh/gdh,
+     that do this in a more general way *)
   method visit_message t =
     match t with
     (* any name n can occur as g^n *)
@@ -2293,7 +2296,7 @@ let is_ddh_context (cntxt : Constr.trace_cntxt) ~gen ~exp a b c elem_list =
 
 let is_ddh_gen tbl gen =
   match Symbols.Function.get_def gen tbl with
-  | _, Symbols.DDHgen -> true
+  | _, Symbols.DHgen l -> List.mem Symbols.DH_DDH l
   | _ -> false
 
 let ddh (lgen : lsymb) (na : lsymb) (nb : lsymb) (nc : lsymb) s sk fk =

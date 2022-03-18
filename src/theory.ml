@@ -1015,14 +1015,29 @@ let mk_ftype iarr vars args out =
   let mdflt ty = odflt Type.Message ty in
   Type.mk_ftype iarr vars (List.map mdflt args) (mdflt out)
 
-let declare_ddh table ?group_ty ?exp_ty gen exp (f_info : Symbols.symb_type) =
+let declare_dh
+      (table : Symbols.table)
+      (h : Symbols.dh_hyp list)
+      ?group_ty ?exp_ty
+      (gen : lsymb)
+      ((exp, f_info) : lsymb * Symbols.symb_type)
+      (omult : (lsymb * Symbols.symb_type) option)
+    : Symbols.table =
   let open Symbols in
   let gen_fty = mk_ftype 0 [] [] group_ty in
   let exp_fty = mk_ftype 0 [] [group_ty; exp_ty] group_ty in
-
-  let table, exp = Function.declare_exact table exp (exp_fty,Abstract f_info) in
-  let data = AssociatedFunctions [exp] in
-  fst (Function.declare_exact table ~data gen (gen_fty,DDHgen))
+  let table, exp = Function.declare_exact table exp (exp_fty, Abstract f_info) in
+  let (table, af) = match omult with
+    | None -> (table, [exp])
+    | Some (mult, mf_info) ->
+       let mult_fty = mk_ftype 0 [] [exp_ty; exp_ty] exp_ty in
+       let (table, mult) =
+         Function.declare_exact table mult (mult_fty, Abstract mf_info)
+       in
+       (table, [exp; mult])
+  in
+  let data = AssociatedFunctions af in
+  fst (Function.declare_exact table ~data gen (gen_fty, DHgen h))
 
 let declare_hash table ?index_arity ?m_ty ?k_ty ?h_ty s =
   let index_arity = odflt 0 index_arity in

@@ -113,12 +113,15 @@ val declare_hash :
   lsymb ->
   Symbols.table
 
-(** DDH assumption on a group with generator gen and exponentiation exp. *)
-val declare_ddh :
+(** DH assumption given by h on a group with generator gen, exponentiation exp, optionnally multiplication mult. *)
+val declare_dh :
   Symbols.table ->
+  Symbols.dh_hyp list ->
   ?group_ty:Type.ty ->
   ?exp_ty:Type.ty ->
-  lsymb -> lsymb -> Symbols.symb_type -> 
+  lsymb ->
+  lsymb * Symbols.symb_type -> 
+  (lsymb * Symbols.symb_type) option -> 
   Symbols.table
 
 (** Asymmetric encryption function symbols are defined by the triplet
