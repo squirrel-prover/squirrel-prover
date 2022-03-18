@@ -664,17 +664,25 @@ let happens_fixity = `Happens           , `NoParens
 
 (** Applies the styling info in [info]
     NOTE: this is *not* the [pp] exported by the module, it is shadowed later *)
-let rec pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
-  fun info (outer,side) ppf t ->
+let rec pp
+    (info         : pp_info)
+    ((outer,side) : ('b * fixity) * assoc)
+    (ppf          : Format.formatter)
+    (t            : term)
+  : unit
+  =
   let err_opt, info = info.styler info t in
   styled_opt err_opt (_pp info (outer, side)) ppf t
 
 (** Core printing function *)
-and _pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
-  fun info (outer, side) ppf t ->
-  let pp : (('b * fixity) * assoc) -> term Fmt.t =
-    fun (outer,side) fmt t -> pp info (outer, side) fmt t
-  in
+and _pp
+    (info         : pp_info)
+    ((outer,side) : ('b * fixity) * assoc)
+    (ppf          : Format.formatter)
+    (t            : term)
+  : unit
+  =
+  let pp = pp info in
 
   match t with
   | Var m -> Fmt.pf ppf "%a" Vars.pp m
@@ -798,7 +806,7 @@ and _pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
       Fmt.pf ppf "@[<hov 0>\
                   @[<hov 2>try find %a such that@ %a@]@;<1 0>\
                   @[<hov 2>in@ %a@]@]"
-        Vars.pp_list b
+        Vars.pp_typed_list b
         (pp (find_fixity, `NonAssoc)) c
         (pp (find_fixity, `Right)) d
     in
@@ -811,7 +819,7 @@ and _pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
                   @[<hov 0>\
                   @[<hov 2>in@ %a@]@;<1 0>\
                   @[<hov 2>else@ %a@]@]@]"
-        Vars.pp_list b
+        Vars.pp_typed_list b
         (pp (find_fixity, `NonAssoc)) c
         (pp (find_fixity, `NonAssoc)) d
         (pp (find_fixity, `Right)) e

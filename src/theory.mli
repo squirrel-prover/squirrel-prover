@@ -46,7 +46,7 @@ type term_i =
   | Tpat  
   | Diff  of term * term
   | Seq   of bnds * term
-  | Find  of lsymb list * term * term * term
+  | Find  of bnds * term * term * term
 
   | App of lsymb * term list
   (** An application of a symbol to some arguments which as not been

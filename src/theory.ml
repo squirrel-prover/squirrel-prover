@@ -42,7 +42,7 @@ type term_i =
   | Tpat
   | Diff  of term * term
   | Seq   of bnds * term
-  | Find  of lsymb list * term * term * term
+  | Find  of bnds * term * term * term
 
   | App of lsymb * term list
   (** An application of a symbol to some arguments which as not been
@@ -76,6 +76,11 @@ let equal_p_ty t t' = match L.unloc t, L.unloc t' with
   | _, _ -> false
 
 (*------------------------------------------------------------------*)
+let equal_bnds l l' =
+  List.for_all2 (fun (s,k) (s',k') ->
+      L.unloc s = L.unloc s' && equal_p_ty k k'
+    ) l l'
+
 let rec equal t t' = match L.unloc t, L.unloc t' with
   | Diff (a,b), Diff (a',b') ->
     equal a a' && equal b b'
@@ -84,17 +89,13 @@ let rec equal t t' = match L.unloc t, L.unloc t' with
   | ForAll (l, a), ForAll (l', a')
   | Exists (l, a), Exists (l', a') ->
     List.length l = List.length l' &&
-    List.for_all2 (fun (s,k) (s',k') ->
-        L.unloc s = L.unloc s' && equal_p_ty k k'
-      ) l l'
-    && equal a a'
+    equal_bnds l l' &&
+    equal a a'
 
   | Find (l, a, b, c), Find (l', a', b', c') ->
     List.length l = List.length l' &&
-    List.for_all2 (fun s s' ->
-        L.unloc s = L.unloc s'
-      ) l l'
-    && equals [a; b; c] [a'; b'; c']
+    equal_bnds l l' &&
+    equals [a; b; c] [a'; b'; c']
 
   | AppAt (s, ts, t), AppAt (s', ts', t') ->
     L.unloc s = L.unloc s' &&
@@ -146,7 +147,7 @@ let rec pp_term_i ppf t = match t with
       Fmt.pf ppf
         "@[%a@ %a@ %a@ %a@ %a@ %a@ %a@ %a@]"
         (Printer.kws `TermCondition) "try find"
-        (Utils.pp_list Fmt.string) (L.unlocs vs)
+        pp_var_list vs
         (Printer.kws `TermCondition) "such that"
         pp_term c
         (Printer.kws `TermCondition) "in"
@@ -834,10 +835,10 @@ and convert0
 
   | Find (vs,c,t,e) ->
     let env, is =
-      convert_bnds state.env (List.map (fun x -> x, Type.tindex) vs)
+      convert_p_bnds state.env vs
     in
     
-    Vars.check_type_vars is [Type.Index] type_error;
+    Vars.check_type_vars is [Type.tindex; Type.ttimestamp] type_error;
 
     let c = conv ~env Type.Boolean c in
     let t = conv ~env ty t in

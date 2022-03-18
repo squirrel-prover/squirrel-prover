@@ -45,6 +45,8 @@
 %token TICKUNDERSCORE
 %token EOF
 
+%right COMMA
+
 %nonassoc QUANTIF
 %right ARROW
 %right DARROW
@@ -174,8 +176,8 @@ term_i:
     { let fsymb = sloc $startpos $endpos "if" in
       Theory.App (fsymb,  [b;t;t0]) }
 
-| FIND is=opt_indices SUCHTHAT b=term IN t=term t0=else_term
-                                          { Theory.Find (is,b,t,t0) }
+| FIND vs=tf_arg_list SUCHTHAT b=term IN t=term t0=else_term
+                                 { Theory.Find (vs,b,t,t0) }
 
 | f=term o=loc(ord) f0=term                
     { Theory.App (o,[f;f0]) }
@@ -231,12 +233,19 @@ arg:
 | is=ids COLON k=p_ty                     { List.map (fun x -> x,k) is }
 
 arg_list:
-|                                         { [] }
-| is=ids COLON k=p_ty                     { List.map (fun x -> x,k) is }
-| is=ids COLON k=p_ty COMMA args=arg_list { List.map (fun x -> x,k) is @ args }
+| args=slist(arg,COMMA) { List.flatten args }
 
+/* argument whose type defaults to Index */
+tf_arg:
+| is=ids COLON k=p_ty { List.map (fun x -> x,k) is }
+| is=ids              { List.map (fun x -> x,sloc $startpos $endpos Theory.P_index) is }
+
+tf_arg_list:
+| args=slist(tf_arg,COMMA) { List.flatten args }
+
+/* precedent rule for COMMA favors shifting COMMAs */
 ids:
-| id=lsymb                             { [id] }
+| id=lsymb                %prec COMMA  { [id] }
 | id=lsymb COMMA ids=ids               { id::ids }
 
 top_formula:
