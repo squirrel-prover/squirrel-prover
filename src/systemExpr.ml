@@ -328,10 +328,10 @@ let pp_descrs table ppf system =
   Fmt.pf ppf "@]%!@."
 
 
-let clone_system_iter table original_system new_system iterdescr =
+let clone_system_iter table original_system new_system mapdescr =
   let odescrs = descrs table original_system in
   let symbs = symbs table original_system in
-  let ndescrs = System.Msh.map iterdescr odescrs in
+  let ndescrs = System.Msh.map mapdescr odescrs in
   let data = System.System_data (ndescrs,symbs) in
   Symbols.System.declare_exact table new_system ~data ()
 

@@ -302,7 +302,7 @@ process_i:
 | id=lsymb terms=term_list COLONEQ t=term p=process_cont
     { let to_idx t = match L.unloc t with
         | Theory.App(x,[]) -> x
-        | ti -> raise @@ Theory.Conv (L.loc t, Theory.Index_not_var ti)
+        | ti -> raise @@ Theory.Conv (L.loc t, Theory.NotVar)
       in
       let l = List.map to_idx terms in
       Process.Set (id,l,t,p) }
@@ -340,11 +340,6 @@ opt_indices:
 opt_arg_list:
 | LPAREN args=arg_list RPAREN    { args }
 |                                { [] }
-
-name_type:
-| ty=p_ty                     { 0,ty }
-| INDEX ARROW t=name_type     { let i,ty = t in
-                                1 + i,ty }
 
 ty_var:
 | TICK id=lsymb     { id }
@@ -428,9 +423,8 @@ declaration_i:
       let m, m_info = mm in
       Decl.Decl_dh (h, g, (f_info, e), Some (m_info, m), ctys) }
 
-| NAME e=lsymb COLON t=name_type
-                          { let a,ty = t in
-                            Decl.Decl_name (e, a, ty) }
+| NAME e=lsymb COLON t=fun_ty
+                          { Decl.Decl_name (e, t) }
 
 | TYPE e=lsymb infos=bty_infos
                           { Decl.Decl_bty { bty_name = e; bty_infos = infos; } }

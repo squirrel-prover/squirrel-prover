@@ -225,6 +225,7 @@ type decl_error_i =
   | InvalidAbsType
   | InvalidCtySpace of string list
   | DuplicateCty of string
+  | NotTSOrIndex
 
   | NonDetOp
   | SystemError     of System.system_error

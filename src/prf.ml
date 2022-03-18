@@ -4,10 +4,10 @@ module SE = SystemExpr
 module Sv = Vars.Sv
 
 type prf_param = {
-  h_fn  : Term.fname;   (** function name *)
-  h_fty : Type.ftype;   (** Hash function type *)
-  h_cnt : Term.term; (** contents, i.e. hashed message *)
-  h_key : Term.nsymb;   (** key *)
+  h_fn  : Term.fname;  (** function name *)
+  h_fty : Type.ftype;  (** Hash function type *)
+  h_cnt : Term.term;   (** contents, i.e. hashed message *)
+  h_key : Term.nsymb;  (** key *)
 }
 
 let prf_param hash : prf_param =

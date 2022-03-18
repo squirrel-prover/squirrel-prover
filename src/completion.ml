@@ -278,11 +278,14 @@ and cterm_of_var i = ccst (Cst.Cmvar i)
 
 
 (*------------------------------------------------------------------*)
-let index_of_cterm i = match i.cnt with
-  | Ccst (Cst.Cmvar m) -> assert (Vars.ty m = Type.Index); m
+let i_or_ts_of_cterm i = match i.cnt with
+  | Ccst (Cst.Cmvar m) ->
+    assert (Type.equal (Vars.ty m) Type.tindex ||
+            Type.equal (Vars.ty m) Type.ttimestamp);
+    m
   | _ -> assert false
     
-let indices_of_cterms cis = List.map index_of_cterm cis
+let i_or_ts_of_cterms cis = List.map i_or_ts_of_cterm cis
 
 let term_of_cterm : Symbols.table -> cterm -> Term.term =
   fun table c ->  
@@ -291,24 +294,24 @@ let term_of_cterm : Symbols.table -> cterm -> Term.term =
       match c.cnt with 
       | Cfun (F f, ari, cterms) -> 
         let cis, cterms = List.takedrop ari cterms in
-        let is = indices_of_cterms cis in
+        let is = i_or_ts_of_cterms cis in
         let terms = terms_of_cterms cterms in
         Term.mk_fun table f is terms 
 
       | Cfun (M (m,ek), ari, cterms) -> 
         let cis, cts = List.takedrop ari cterms in
         let cts = as_seq1 cts in
-        let m = Term.mk_isymb m ek (indices_of_cterms cis) in
+        let m = Term.mk_isymb m ek (i_or_ts_of_cterms cis) in
         Term.mk_macro m [] (term_of_cterm cts) 
 
       | Cfun (A a, ari, is) -> 
         assert (ari = List.length is);
-        let is = indices_of_cterms is in
+        let is = i_or_ts_of_cterms is in
         Term.mk_action a is
 
       | Cfun (N (n,nty), ari, is) -> 
         assert (ari = List.length is);
-        let is = indices_of_cterms is in
+        let is = i_or_ts_of_cterms is in
         let ns = Term.mk_isymb n nty is in
         Term.mk_name ns
 
@@ -1517,7 +1520,7 @@ let x_index_cnstrs state l select f_cnstr =
     rewrite relation in [state], and add the corresponding index equalities.
     Only applies to names with \[large\] types.
     E.g., if n(i,j) and n(k,l) are equal, then i = k and j = l.*)
-let name_index_cnstrs table state l =
+let name_index_cnstrs table state l : Term.term list =
   let n_cnstr a b = match a.cnt,b.cnt with
     | Ccst (Cst.Cgfuncst (`N n)), Ccst (Cst.Cgfuncst (`N n')) ->
       if n <> n' then [Term.mk_false] else []
@@ -1529,8 +1532,8 @@ let name_index_cnstrs table state l =
         assert (ari = ari');
         List.map2 (fun x y -> 
             Term.mk_atom `Eq 
-              (Term.mk_var (index_of_cterm x))
-              (Term.mk_var (index_of_cterm y))
+              (Term.mk_var (i_or_ts_of_cterm x))
+              (Term.mk_var (i_or_ts_of_cterm y))
           ) is is'
       end
 
@@ -1539,7 +1542,8 @@ let name_index_cnstrs table state l =
       assert (ari <> 0 && n <> n');
       [Term.mk_false] 
 
-    | _ -> assert false in
+    | _ -> assert false
+  in
 
   x_index_cnstrs state l (is_lname table) n_cnstr
 

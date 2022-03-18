@@ -480,7 +480,7 @@ let eq_names (s : TS.t) =
   in
   let s =
     List.fold_left (fun s c ->
-        let () = dbg "new index equality (names): %a" Term.pp c in
+        let () = dbg "new equalities (names): %a" Term.pp c in
         Hyps.add Args.AnyName c s
       ) s cnstrs
   in
@@ -1722,7 +1722,7 @@ let non_malleability arg (s : TS.t) =
                                     not equal to another fres name *)
   | m, Some (Message (Term.Name n as name,ty)) ->
     (* we now create the inequality to be checked *)
-    let ndef = Symbols.{ n_iarr = 0; n_ty = ty; } in
+    let ndef = Symbols.{ n_fty = Type.mk_ftype 0 [] [] ty; } in
     let table,n =
       Symbols.Name.declare table (L.mk_loc L._dummy "n_NM") ndef
     in

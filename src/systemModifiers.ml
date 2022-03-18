@@ -1,8 +1,10 @@
 open Utils
 
-module SE   = SystemExpr
-module L    = Location
+module SE = SystemExpr
+module L  = Location
 
+module Sv = Vars.Sv
+              
 (*------------------------------------------------------------------*)
 (** rewrite a rule as much as possible without recursing *)
 let rewrite_norec
@@ -48,7 +50,7 @@ let parse_single_system_name table sdecl =
 (*------------------------------------------------------------------*)
 (** Convertion of system modifiers arguments.
     - [bnds] are additional binded variables. *)
-let conv_term table system ~bnds (term : Theory.term)
+let conv_term ?pat table system ~bnds (term : Theory.term)
   : Vars.env * Vars.vars * Term.term
   =
   let env = Env.init ~table ~system:system () in
@@ -65,7 +67,7 @@ let conv_term table system ~bnds (term : Theory.term)
          (Tactics.Failure "Only index variables can be bound."));
 
   let conv_env = Theory.{ env; cntxt = InGoal } in
-  let t, _ = Theory.convert conv_env term in
+  let t, _ = Theory.convert ?pat conv_env term in
   env.vars, is, t
 
 (*------------------------------------------------------------------*)
@@ -184,7 +186,17 @@ let global_rename table sdecl (gf : Theory.global_formula) =
 (*------------------------------------------------------------------*)
 (** {2 PRF} *)
 
-let global_prf table sdecl bnds hash =
+let global_prf
+    (table : Symbols.table)
+    (sdecl : Decl.system_decl_modifier)
+    (bnds  : Theory.bnds)
+    (hash  : Theory.term)
+  : string *
+    Term.term list *
+    (Equiv.global_form -> [> `Equiv of Equiv.global_form ]) *
+    SE.t *
+    Symbols.table
+  =
   let old_system, old_single_system =
     parse_single_system_name table sdecl
   in
@@ -198,6 +210,7 @@ let global_prf table sdecl bnds hash =
   in
 
   let param = Prf.prf_param hash in
+  
   (* Check syntactic side condition. *)
   let errors =
     Euf.key_ssc
@@ -207,8 +220,8 @@ let global_prf table sdecl bnds hash =
   if errors <> [] then
     Tactics.soft_failure (Tactics.BadSSCDetailed errors);
 
-  (* We first refresh globably the indices to create the left pattern*)
-  let is1, left_subst = Term.refresh_vars (`Global) is in
+  (* We first refresh globably the indices to create the left pattern *)
+  let is1, left_subst = Term.refresh_vars `Global is in
 
   let left_key =  Term.subst left_subst (Term.mk_name param.h_key) in
   let left_key_ids = match left_key with
@@ -217,14 +230,19 @@ let global_prf table sdecl bnds hash =
   in
   (* We create the pattern for the hash *)
   let fresh_x_var = Vars.make_new Type.Message "x" in
-  let hash_pattern = Term.mk_fun table param.h_fn [] [Term.mk_var fresh_x_var;
-                                                      left_key ] in
+  let hash_pattern =
+    Term.mk_fun table param.h_fn [] [Term.mk_var fresh_x_var; left_key ]
+  in
 
   (* Instantiation of the fresh name *)
-  let ndef = Symbols.{ n_iarr = List.length is; n_ty = Message ; } in
+  let ndef =
+    let ty_args = List.map Vars.ty is in
+    Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args Type.Message ; }
+  in
   let table,n =
     Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
   in
+  
   (* the hash h of a message m will be replaced by tryfind is s.t = fresh mess
      in fresh else h *)
   let mk_tryfind =
@@ -365,13 +383,14 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
   let dec_pattern = Term.subst left_subst dec_pattern in
 
   (* Instantiation of the fresh replacement *)
-  let ndef = Symbols.{
-      n_iarr = List.length enc_rnd.s_indices;
-      n_ty = Message; }
+  let ndef =
+    let ty_args = List.map Vars.ty enc_rnd.s_indices in
+    Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args Type.Message ; }
   in
   let table,n =
     Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_CCA") ndef
   in
+  
   let mess_replacement =
     if Term.is_name plaintext then
       let ns = Term.mk_isymb n Message (enc_rnd.s_indices) in
@@ -452,7 +471,10 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
 
   (* we now create the lhs of the obtained conclusion *)
   let fresh_x_var = Vars.make_new Type.Message "mess" in
-  let rdef = Symbols.{ n_iarr = List.length is; n_ty = Message ; } in
+  let rdef =
+    let ty_args = List.map Vars.ty is in
+    Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args Type.Message ; }
+  in
   let table,r =
     Symbols.Name.declare table (L.mk_loc L._dummy "r_CCA") rdef
   in
@@ -476,7 +498,129 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
   in
   (axiom_name, enrich, make_conclusion, new_system_e, table)
 
+(*------------------------------------------------------------------*)
+(** {2 Global PRF with time} *)
 
+let check_fv_finite (fv : Sv.t) =
+  Sv.iter (fun v ->
+      if not (Type.equal (Vars.ty v) Type.tindex) &&
+         not (Type.equal (Vars.ty v) Type.ttimestamp) then
+        Tactics.hard_failure
+          (Failure
+             "system contain quantifiers over types ≠ from \
+              Index and Timestamp, which are not supported.")
+    ) fv
+
+let global_prf_time
+    (table : Symbols.table)
+    (sdecl : Decl.system_decl_modifier)
+    (bnds  : Theory.bnds)
+    (hash   : Theory.term)
+  : string *
+    Term.term list *
+    (Equiv.global_form -> [> `Equiv of Equiv.global_form ]) *
+    SE.t *
+    Symbols.table
+  =
+  let old_system, old_single_system =
+    parse_single_system_name table sdecl
+  in
+  
+  let venv, is, hash = conv_term ~pat:true table old_system ~bnds hash in
+
+  let cntxt = Constr.{
+      table  = table;
+      system = old_system;
+      models = None}
+  in
+
+  let param = Prf.prf_param hash in
+
+  (* Check syntactic side condition. *)
+  let errors =
+    Euf.key_ssc
+      ~elems:[] ~allow_functions:(fun x -> false)
+      ~cntxt param.h_fn param.h_key.s_symb
+  in
+  if errors <> [] then
+    Tactics.soft_failure (Tactics.BadSSCDetailed errors);
+
+  let occs =
+    SystemExpr.fold_descrs (fun descr occs ->
+        Iter.fold_descr ~globals:true (fun msymb m_is _ t occs ->
+            let new_occs =
+              Iter.get_f_messages_ext
+                ~fv:Sv.empty ~cntxt
+                param.h_fn param.h_key.s_symb t
+            in
+            new_occs @ occs
+          ) cntxt.table cntxt.system descr occs
+      ) cntxt.table cntxt.system []
+  in
+
+  (* FIXME: check duplicate module alpha-renaming *)
+  let occs = List.remove_duplicate (=) occs in
+
+  (* type of the hash function input *)
+  let m_ty = List.hd (param.h_fty.fty_args) in
+
+  (* fresh variable representing the hashed message to rewrite *)
+  let x = Vars.make_new m_ty "x" in
+
+  (* timestamp at which [H(x,k)] occurs  *)
+  let tau = Vars.make_new Type.ttimestamp "t" in
+
+  let table, occ_names =
+    List.map_fold (fun table occ ->
+        check_fv_finite occ.Iter.occ_vars;
+
+        let ndef =
+          let ty_args = List.map Vars.ty (Sv.elements occ.Iter.occ_vars) in
+          Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args m_ty ; }
+        in
+        let table,n =
+          Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
+        in
+        table, (occ, n)
+      ) table occs
+  in
+
+  let is, subst = Term.refresh_vars `Global is in
+  let key =  Term.subst subst (Term.mk_name param.h_key) in
+  
+  let to_rw =
+    Term.mk_fun table param.h_fn [] [Term.mk_var x; key ]
+  in
+
+  (* we rewrite [H(x,k)] at occurrence s0 at time tau0 into:
+     try find tau, occ s.t. tau <= tau0 && x = s_{occ} 
+     then n_{occ}@tau
+     else n_s0@tau0 *)
+  let term (tau0 : Term.term) =
+    Term.mk_find [tau] cond t_then t_else
+  in
+
+  let rw_rule (tau0 : Term.term) = Rewrite.{
+      rw_tyvars = [];
+      rw_vars   = Sv.of_list (x :: is);
+      rw_conds  = [];
+      rw_rw     = Term.ESubst (to_rw,term tau0);
+    } in
+
+  let map (tau0 : Term.term) cenv t : Term.term =
+    rewrite_norec table old_system venv (rw_rule tau0)
+  in
+  let global_macro_iterator system table ns dec_def _ : unit =
+    let tau = 
+    table :=
+      Macros.update_global_data
+        !table ns dec_def
+        old_single_system system (map ())
+  in
+  
+  assert false
+
+  
 (*------------------------------------------------------------------*)
 let declare_system table sdecl =
   match sdecl.Decl.modifier with

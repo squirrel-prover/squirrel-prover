@@ -8,8 +8,10 @@ type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
 (** Type of a crypto assumption space (e.g. plaintext, ciphertext, key). *)
-type c_ty = { cty_space : lsymb;
-              cty_ty    : Theory.p_ty; }
+type c_ty = {
+  cty_space : lsymb;
+  cty_ty    : Theory.p_ty;
+}
 
 type c_tys = c_ty list
 
@@ -19,25 +21,33 @@ type macro_decl = lsymb * Theory.bnds * Theory.p_ty * Theory.term
 
 (*------------------------------------------------------------------*)
 (** Information for an abstract declaration *)
-type abstract_decl = { name    : lsymb;
-                       symb_type : Symbols.symb_type;
-                       ty_args : lsymb list; (* type variables *)
-                       abs_tys : Theory.p_ty list; }
+type abstract_decl = {
+  name      : lsymb;
+  symb_type : Symbols.symb_type;
+  ty_args   : lsymb list;          (** type variables *)
+  abs_tys   : Theory.p_ty list;
+}
 
 (*------------------------------------------------------------------*)
 (** Information for a name declaration *)
-type name_decl = { n_name : lsymb ;
-                   n_type : Theory.p_ty list; }
+type name_decl = {
+  n_name : lsymb ;
+  n_ty   : Theory.p_ty list;
+}
 
 (*------------------------------------------------------------------*)
 (** Information for a base type declaration *)
-type bty_decl = { bty_name  : lsymb ;
-                  bty_infos : Symbols.bty_info list ; }
+type bty_decl = {
+  bty_name  : lsymb ;
+  bty_infos : Symbols.bty_info list ;
+}
 
 (*------------------------------------------------------------------*)
 (** Information for a system declaration *)
-type system_decl = { sname    : Theory.lsymb option;
-                     sprocess : Process.process; }
+type system_decl = {
+  sname    : Theory.lsymb option;
+  sprocess : Process.process;
+}
 
 val pp_system_decl : Format.formatter -> system_decl -> unit
 
@@ -100,7 +110,7 @@ type declaration_i =
 
   | Decl_sign of lsymb * lsymb * lsymb * orcl_tag_info option * c_tys
 
-  | Decl_name     of lsymb * int * Theory.p_ty
+  | Decl_name     of lsymb * Theory.p_ty list
   | Decl_state    of macro_decl
   | Decl_operator of operator_decl
   | Decl_abstract of abstract_decl

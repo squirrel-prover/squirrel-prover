@@ -21,7 +21,11 @@ let mk_isymb (s : 'a) (t : Type.ty) (is : Vars.vars) =
     | Type.TVar _ | Type.TUnivar _ -> assert false;
     | _ -> ()
   in
-  assert (List.for_all (fun v -> Vars.ty v = Type.Index) is);
+  assert (
+    List.for_all (fun v ->
+        Type.equal (Vars.ty v) Type.tindex ||
+        Type.equal (Vars.ty v) Type.ttimestamp
+      ) is);
 
   { s_symb    = s;
     s_typ     = t;

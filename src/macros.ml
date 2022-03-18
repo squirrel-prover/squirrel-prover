@@ -76,10 +76,10 @@ let get_body system data : Term.term =
    the new system. *)
 let update_global_data
     (table : Symbols.table)
-    (ns : Symbols.macro Symbols.t)
+    (ns    : Symbols.macro Symbols.t)
     (dec_def : Symbols.macro_def)
     (old_single_system : SystemExpr.single_system)
-    (new_single_system :  SystemExpr.single_system)
+    (new_single_system : SystemExpr.single_system)
     (f : Term.term -> Term.term) =
   match Symbols.Macro.get_data ns table with
   | Global_data data ->

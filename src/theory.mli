@@ -230,7 +230,7 @@ type conversion_error_i =
   | String_expected      of term_i
   | Int_expected         of term_i
   | Tactic_type          of string
-  | Index_not_var        of term_i
+  | NotVar
   | Assign_no_state      of string
   | BadNamespace         of string * Symbols.namespace
   | Freetyunivar

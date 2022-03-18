@@ -81,8 +81,7 @@ type bty_def = bty_info list
 
 (*------------------------------------------------------------------*)
 type name_def = {
-  n_iarr : int;     (** index arity *)
-  n_ty   : Type.ty; (** type *)
+  n_fty   : Type.ftype; (** restricted to: (Index | Timestamp)^* -> T *)
 }
 
 (*------------------------------------------------------------------*)

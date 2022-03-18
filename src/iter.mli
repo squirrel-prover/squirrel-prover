@@ -240,6 +240,9 @@ val pp_iocc : Format.formatter -> iocc -> unit
     that, roughly, "covers" all subterms of any expansion of [terms],
     in the following sense:
     
+    TODO: the description below is completely accurrante, as only indirect
+    occurrences are covered!
+
     [∀ trace model T, ∀ s ∈ st( ([terms])^T ), ∃ occ ∈ [occs]] and:
 
      - [∃ s₀ ∈ st([occ.occ_cnt])]

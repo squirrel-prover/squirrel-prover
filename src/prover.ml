@@ -28,6 +28,7 @@ type decl_error_i =
   | InvalidAbsType
   | InvalidCtySpace of string list
   | DuplicateCty of string
+  | NotTSOrIndex
 
   | NonDetOp
   (* TODO: remove these errors, catch directly at top-level *)
@@ -54,6 +55,9 @@ let pp_decl_error_i fmt = function
   | NonDetOp ->
     Fmt.pf fmt "an operator body cannot contain probabilistic computations"
 
+  | NotTSOrIndex ->
+    Fmt.pf fmt "must be an index or timestamp"
+      
   | SystemExprError e -> SE.pp_system_expr_err fmt e
 
   | SystemError e -> System.pp_system_error fmt e
@@ -779,40 +783,40 @@ let check_fun_out_ty loc ty =
   else ()
 
 let parse_abstract_decl table (decl : Decl.abstract_decl) =
-    let in_tys, out_ty =
-      List.takedrop (List.length decl.abs_tys - 1) decl.abs_tys
-    in
-    let p_out_ty = as_seq1 out_ty in
+  let in_tys, out_ty =
+    List.takedrop (List.length decl.abs_tys - 1) decl.abs_tys
+  in
+  let p_out_ty = as_seq1 out_ty in
 
-    let ty_args = List.map (fun l ->
-        Type.mk_tvar (L.unloc l)
-      ) decl.ty_args
-    in
+  let ty_args = List.map (fun l ->
+      Type.mk_tvar (L.unloc l)
+    ) decl.ty_args
+  in
 
-    let env = Env.init ~table ~ty_vars:ty_args () in
-    let in_tys = List.map (Theory.parse_p_ty env) in_tys in
+  let env = Env.init ~table ~ty_vars:ty_args () in
+  let in_tys = List.map (Theory.parse_p_ty env) in_tys in
 
-    let rec parse_index_prefix iarr in_tys = 
-      match in_tys with
-      | Type.Index :: in_tys -> 
-        parse_index_prefix (iarr + 1) in_tys
-      | _ -> iarr, in_tys
-    in
+  let rec parse_index_prefix iarr in_tys = 
+    match in_tys with
+    | Type.Index :: in_tys -> 
+      parse_index_prefix (iarr + 1) in_tys
+    | _ -> iarr, in_tys
+  in
 
-    let iarr, in_tys = parse_index_prefix 0 in_tys in
+  let iarr, in_tys = parse_index_prefix 0 in_tys in
 
-    let out_ty = Theory.parse_p_ty env p_out_ty in
-    
-    check_fun_out_ty (L.loc p_out_ty) out_ty;
+  let out_ty = Theory.parse_p_ty env p_out_ty in
 
-    Theory.declare_abstract
-      table
-      ~index_arity:iarr
-      ~ty_args
-      ~in_tys
-      ~out_ty
-      decl.name
-      decl.symb_type
+  check_fun_out_ty (L.loc p_out_ty) out_ty;
+
+  Theory.declare_abstract
+    table
+    ~index_arity:iarr
+    ~ty_args
+    ~in_tys
+    ~out_ty
+    decl.name
+    decl.symb_type
 
 (*------------------------------------------------------------------*)
 let parse_operator_decl table (decl : Decl.operator_decl) =
@@ -965,9 +969,23 @@ let declare_i table hint_db decl = match L.unloc decl with
 
     Theory.declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty senc sdec
 
-  | Decl.Decl_name (s, a, pty) ->
-    let ty = Theory.parse_p_ty (Env.init ~table ()) pty in
-    Theory.declare_name table s Symbols.{ n_iarr = a; n_ty = ty; }
+  | Decl.Decl_name (s, ptys) ->
+    let env = Env.init ~table () in
+    let p_args_tys, p_out_ty = List.takedrop (List.length ptys - 1) ptys in
+    let p_out_ty = as_seq1 p_out_ty in
+
+    let args_tys = List.map (Theory.parse_p_ty env) p_args_tys in
+    let out_ty = Theory.parse_p_ty env p_out_ty in
+    
+    let n_fty = Type.mk_ftype 0 [] args_tys out_ty in
+
+    List.iter2 (fun ty pty ->
+        if not (Type.equal ty Type.ttimestamp) &&
+           not (Type.equal ty Type.tindex) then
+          decl_error (L.loc pty) KDecl NotTSOrIndex
+      ) args_tys p_args_tys;
+    
+    Theory.declare_name table s Symbols.{ n_fty }
 
   | Decl.Decl_state (s, args, k, t) ->
     Theory.declare_state table s args k t

@@ -52,6 +52,8 @@ end
 
 
 (*------------------------------------------------------------------*)
+exception Unsupported
+  
 module Utv : sig
   type ut = { hash : int;
               cnt  : ut_cnt }
@@ -139,7 +141,7 @@ end = struct
     | Term.Fun (fs, _, [ts]) when fs = Term.f_pred -> upred (uts ts)
     | Term.Action (s,_) when s = Symbols.init_action -> uinit
     | Term.Action (s,l) -> uname s (List.map uvar l)
-    | _ -> failwith "Not implemented"
+    | _ -> raise Unsupported      
 
   let ut_to_var (ut : ut) : Vars.var =
     match ut.cnt with
@@ -310,7 +312,8 @@ module Form = struct
     in
     doit lit
       
-  let mk_list l : conjunction = List.map mk l |> List.flatten 
+  let mk_list l : conjunction =
+    List.concat_map (fun t -> try mk t with Unsupported -> []) l
 end
 
 

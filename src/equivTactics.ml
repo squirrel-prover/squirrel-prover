@@ -1332,7 +1332,7 @@ let prf arg s =
   assert (ftyp.fty_vars = []);
 
   let nty = ftyp.fty_out in
-  let ndef = Symbols.{ n_iarr = 0; n_ty = nty; } in
+  let ndef = Symbols.{ n_fty = Type.mk_ftype 0 [] [] nty; } in
   let table,n =
     Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
   in
@@ -2182,7 +2182,7 @@ let xor arg s =
   let phi =
     mk_xor_phi_base cntxt env biframe (n_left, l_left, n_right, l_right, term)
   in
-  let ndef = Symbols.{ n_iarr = 0; n_ty = Message ; } in
+  let ndef = Symbols.{ n_fty = Type.mk_ftype 0 [] [] Message ; } in
   let table,n =
     Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_XOR") ndef
   in
