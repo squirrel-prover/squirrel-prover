@@ -48,7 +48,7 @@ name k11 : message  (* ideal key derived between P and S *)
 name a : index -> message
 name b : index -> message
 
-ddh g, (^) where group:message exposants:message.
+ddh g, (^) where group:message exponents:message.
 
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
  (sk <> kP || exists (i:index, x1:message, x2:message) m=<<x1,g^a(i)>,x2> )

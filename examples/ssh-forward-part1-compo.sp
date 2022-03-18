@@ -66,7 +66,7 @@ name k : index -> index -> message
 abstract enc : message -> message -> message
 abstract dec : message -> message -> message
 
-ddh g, (^) where group:message exposants:message.
+ddh g, (^) where group:message exponents:message.
 
 (* As ssh uses a non keyed hash function, we rely on a fixed key hKey known to the attacker *)
 (* Note that hKey has to be a name and not a constant and the attacker can compute h values with the oracle.  *)

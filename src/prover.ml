@@ -929,17 +929,11 @@ let declare_i table hint_db decl = match L.unloc decl with
     table
 
   | Decl.Decl_dh (h, g, ex, om, ctys) ->
-     (* exposants was a typo I guess, but we
-        don't want to break existing files *)
      let ctys =
-       parse_ctys table ctys ["group"; "exposants"; "exponents"]
+       parse_ctys table ctys ["group"; "exponents"]
      in
      let group_ty = List.assoc_opt "group"     ctys
      and exp_ty   = List.assoc_opt "exponents" ctys in
-     let exp_ty =
-       if exp_ty = None then List.assoc_opt "exposants" ctys
-       else exp_ty
-     in
      Theory.declare_dh table h ?group_ty ?exp_ty g ex om
 
   | Decl.Decl_hash (a, n, tagi, ctys) ->

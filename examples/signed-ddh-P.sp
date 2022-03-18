@@ -52,7 +52,7 @@ name k :  index -> index -> message
 We declare a DDH context, using `g` for the generator element and `^` for the
 power operator.
 **)
-ddh g, (^) where group:message exposants:message.
+ddh g, (^) where group:message exponents:message.
 
 (**
 We also declare a signature scheme by specifying 3 function symbols.

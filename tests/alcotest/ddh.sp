@@ -4,7 +4,7 @@ name a : index -> message
 name b : index -> message
 name k : index -> message
 
-ddh g, (^) where group:message exposants:message.
+ddh g, (^) where group:message exponents:message.
 
 channel c
 

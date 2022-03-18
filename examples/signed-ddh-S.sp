@@ -38,7 +38,7 @@ name a : index -> message
 name b : index -> message
 name k :  index -> index -> message
 
-ddh g, (^) where group:message exposants:message.
+ddh g, (^) where group:message exponents:message.
 
 signature sign,checksign,pk
 
