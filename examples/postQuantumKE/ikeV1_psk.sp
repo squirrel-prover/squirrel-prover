@@ -571,7 +571,7 @@ Proof.
       euf CondTF => //.
         ++ by use ddhnotuple with fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>, fst(input@R(jl,il)),b(jl).
         ++ intro OrdI.
-           by depends I1(il,jl),I14(il,jl).
+           by depends I1(il,jl),I4(il,jl).
     + intro [Abs Meq].
       rewrite Meq in CondTF.
       euf CondTF.

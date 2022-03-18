@@ -533,6 +533,10 @@ let parse_proc (system_name : System.system_name) init_table proc =
       System.register_action table system_name a' indices action action_descr
     in
 
+    let table =
+      if new_a <> a' then Symbols.Action.release table a' else table
+    in
+
     debug "descr = %a@." Action.pp_descr action_descr ;
     let new_indices = action_descr.indices in
     let new_action_term = Term.mk_action new_a new_indices in

@@ -179,6 +179,9 @@ module type Namespace = sig
   (** Reserve a fresh symbol name. *)
   val reserve_exact : table -> lsymb -> table * ns t
 
+  (** Release a reserved symbol. *)
+  val release : table -> ns t -> table
+    
   (** Define a symbol name that has been previously reserved
       using [fresh]. *)
   val define : table -> ns t -> ?data:data -> def -> table

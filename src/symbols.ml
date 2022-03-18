@@ -245,6 +245,8 @@ module type Namespace = sig
   val reserve       : table -> lsymb -> table * data t
   val reserve_exact : table -> lsymb -> table * ns t
 
+  val release : table -> ns t -> table
+
   val define   : table -> data t -> ?data:data -> def -> table
   val redefine : table -> data t -> ?data:data -> def -> table
 
@@ -299,6 +301,10 @@ module Make (N:S) : Namespace
     let table_c = Msymb.add symb (Reserved N.namespace,Empty) table.cnt in
     mk table_c, symb
 
+  let release (table : table) (name : ns t) : table =
+    assert (Msymb.mem name table.cnt);
+    mk (Msymb.remove name table.cnt)
+    
   let define (table : table) symb ?(data=Empty) value =
     assert (fst (Msymb.find symb table.cnt) = Reserved N.namespace) ;
     let table_c = Msymb.add symb (Exists (N.construct value), data) table.cnt in
