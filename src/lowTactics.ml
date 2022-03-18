@@ -891,7 +891,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       let pat = Match.pat_of_form f in
       let erule = Rewrite.pat_to_rw_erule ~loc (L.unloc dir) pat in
       let s, subgoals =
-        rewrite ~loc ~all:false [T_conc] (`Many, Some id, erule) s
+        rewrite ~loc ~all:false [T_conc] (`Once, Some id, erule) s
       in
       subgoals @ [s]
 

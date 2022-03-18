@@ -456,3 +456,10 @@ Proof.
   rewrite ?foog.
   assumption.
 Qed.
+
+(*------------------------------------------------------------------*)
+goal _ : (<f(a),b> = c) => (a = f(a)) => <a,b> = c.
+Proof.
+  intro H ->.
+  assumption.
+Qed.
