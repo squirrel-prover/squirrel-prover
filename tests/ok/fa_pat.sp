@@ -72,3 +72,8 @@ Proof.
   fa !g (_,_), !f (_).
   apply H.
 Qed.
+
+global goal _ (t : timestamp): equiv(frame@t).
+Proof.
+  try fa frame@_.
+Abort.

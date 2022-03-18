@@ -352,14 +352,13 @@ let fa_select_felems (pat : Term.term Match.pat) (s : sequent) : int option =
     ) (ES.goal_as_equiv s)
 
 
-exception No_common_head
-exception No_FA
+exception No_FA of [`HeadDiff | `HeadNoFun]
 
 let fa_expand t =
   let aux : Term.term -> Equiv.equiv = function
     | Fun (f,_,l) -> l
-    | Diff _      -> raise No_common_head
-    | _           -> raise No_FA
+    | Diff _      -> raise (No_FA `HeadDiff)
+    | _           -> raise (No_FA `HeadNoFun)
   in
 
   (* FIXME: this may no longer be necessary (type changes) *)
@@ -410,9 +409,9 @@ let do_fa_felem (i : int L.located) (s : sequent) : sequent =
 (** [do_fa_felem] with user-level errors *)
 let fa_felem (i : int L.located) (s : sequent) : sequent list =
   try [do_fa_felem i s] with
-  | No_common_head ->
+  | No_FA `HeadDiff ->
     soft_failure ~loc:(L.loc i) (Tactics.Failure "No common construct")
-  | No_FA ->
+  | No_FA `HeadNoFun ->
     soft_failure ~loc:(L.loc i) (Tactics.Failure "FA not applicable")
 
 let do_fa_tac (args : Args.fa_arg list) (s : sequent) : sequent list =
@@ -446,13 +445,17 @@ let do_fa_tac (args : Args.fa_arg list) (s : sequent) : sequent list =
       (* useless loc, as we know [i] is in range *)
       let i = L.mk_loc L._dummy i in
 
-      let s = do_fa_felem i s in
+      let s =
+        try do_fa_felem i s with
+        | No_FA _ ->
+          soft_failure ~loc (Failure "bad FA pattern")
+      in
       match mult with
       | `Once -> s
       | `Any | `Many -> do1 s (`Any, loc, pat)
   in
   [List.fold_left do1 s args]
-                                                       
+
 let fa_tac args = match args with
   | [Args.Int_parsed i] -> wrap_fail (fa_felem i)
   | [Args.Fa args] -> wrap_fail (do_fa_tac args)
@@ -481,7 +484,7 @@ let rec filter_fa_dup table res assump (elems : Equiv.equiv) =
           let (fa_succ,fa_rem) = is_fa_dup acc elems e in
           fa_succ && aux1, fa_rem @ aux2)
         (true,[]) new_els
-    with No_FA | No_common_head -> (false,[])
+    with No_FA _ -> (false,[])
   in
   match elems with
   | [] -> res
