@@ -2,6 +2,8 @@ GITHASH := $(shell scripts/git-hash)
 
 PREFIX = ~/.local
 
+ECHO = /bin/echo
+
 default: squirrel
 
 all: squirrel test
@@ -20,34 +22,34 @@ PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $
 
 okfail_test: squirrel
 	rm -rf $(RUNLOGDIR)
-	@echo "Running tests/ok/*.sp and tests/fail/*.sp."
+	@$(ECHO) "Running tests/ok/*.sp and tests/fail/*.sp."
 	@$(MAKE) -j8 okfail_test_end
-	@echo "Running examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
+	@$(ECHO) "Running examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 	@$(MAKE) -j4 examples_end
 
 # Run PROVER_TESTS as a dependency, then check for errors.
 okfail_test_end: $(PROVER_TESTS:.sp=.ok)
-	@echo
+	@$(ECHO)
 	@if test -f tests/tests.ko ; then \
-	  echo Some tests failed: ; \
+	  $(ECHO) Some tests failed: ; \
 	  cat tests/tests.ko | sort ; rm -f tests/tests.ko ; exit 1 ; \
-	 else echo All tests passed successfully. ; fi
+	 else $(ECHO) All tests passed successfully. ; fi
 
 # Run PROVER_EXAMPLES as a dependency, then check for errors.
 examples_end: $(PROVER_EXAMPLES:.sp=.ok)
-	@echo
+	@$(ECHO)
 	@if test -f tests/tests.ko ; then \
-	  echo Some tests failed: ; \
+	  $(ECHO) Some tests failed: ; \
 	  cat tests/tests.ko | sort ; rm -f tests/tests.ko ; exit 1 ; \
-	 else echo All tests passed successfully. ; fi
+	 else $(ECHO) All tests passed successfully. ; fi
 
 %.ok: %.sp
 	@mkdir -p `dirname $(RUNLOGDIR)/$(@:.ok=.sp)`
 	@if ./squirrel $(@:.ok=.sp) \
 	  > $(RUNLOGDIR)/$(@:.ok=.sp) \
 	  2> $(RUNLOGDIR)/$(@:.ok=.sp.stderr) \
-	 ; then echo -n . ; \
-	 else echo "[FAIL] $(@:.ok=.sp)" >> tests/tests.ko ; echo -n '!' ; fi
+	 ; then $(ECHO) -n . ; \
+	 else $(ECHO) "[FAIL] $(@:.ok=.sp)" >> tests/tests.ko ; $(ECHO) -n '!' ; fi
 
 # Only executes tests if dependencies have changed,
 # relying on dune file to know (possibly runtime) dependencies.
@@ -78,7 +80,7 @@ coverage:
 	find . -name '*.coverage' | \
 	  xargs bisect-ppx-report html --ignore-missing-files
 	find . -name '*.coverage' | xargs rm -f
-	@echo "Coverage report available: _coverage/index.html"
+	@$(ECHO) "Coverage report available: _coverage/index.html"
 
 # The install target should probably be changed to using dune,
 # so that dune exec could work.
@@ -88,7 +90,7 @@ install: squirrel
 
 doc:
 	dune build @doc
-	@echo "Documentation available: _build/default/_doc/_html/squirrel/index.html"
+	@$(ECHO) "Documentation available: _build/default/_doc/_html/squirrel/index.html"
 
 version:
 	rm -f src/commit.ml
