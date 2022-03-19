@@ -127,9 +127,28 @@ let file_from_stdin () : file =
     f_path = `Stdin;
     f_lexbuf = Lexing.from_channel stdin; }
 
+(* case sensitive version of file_exists *)
+(* useful on macOS/HFS+/apfs, which is case insensitive but preserves case *)
+let file_exists_cs (dir : load_path) (name : string) : bool =
+  let dir = match dir with
+    | LP_dir s -> s
+    | LP_none -> "."
+  in
+  let name = name ^ ".sp" in
+  try
+    let dirc = Sys.readdir dir in
+    let n = Array.length dirc in
+    let rec loop b i =
+      if i = n then b
+      else loop (b || dirc.(i) = name) (i+1)
+    in
+    loop false 0
+  with
+  | Sys_error _ -> false
+    
+
 let file_from_path (dir : load_path) (name : string) : file option =
   let filename = name ^ ".sp" in
-
   try
     let path = match dir with
       | LP_none    -> filename
@@ -146,19 +165,40 @@ let file_from_path (dir : load_path) (name : string) : file option =
   | Sys_error _ -> None
 
 (** try to locate a file according to some loading paths *)
+(* It's a bit tricky to make it work as intended on macOS,
+   because of case-sensitivity.
+   We first look for name in all the load path in a case-sensitive way. 
+   If we find nothing, we try again but case-insensitively.   
+   This way, if the load_paths are [path1; path2], we are looking for
+   File.sp, and path1 happens to contain file.sp, we will look for
+   File.sp in path2, and either
+    - open it, if it exists
+    - or open path1/file.sp, if it doesn't *)   
 let locate (lds : load_paths) (name : string) : file =
   if not (Pcre.pmatch ~rex:valid_theory_regexp name) then
     cmd_error (InvalidTheoryName name);  (* FIXME: location *)
-
-  let rec try_dirs (dirs : load_paths) : file =
+  
+  let rec try_dirs_cs (dirs : load_paths) : file option =
     match dirs with
-    | [] -> cmd_error (IncludeNotFound name)
-    | dir :: dirs -> match file_from_path dir name with
-      | Some file -> file
-      | None -> try_dirs dirs
+    | [] -> None
+    | dir :: dirs ->
+       if file_exists_cs dir name then
+         file_from_path dir name (* should always be Some *)
+       else try_dirs_cs dirs
   in
+  
+  match try_dirs_cs lds with
+  | Some f -> f
+  | None ->
+     let rec try_dirs (dirs : load_paths) : file =
+       match dirs with
+       | [] -> cmd_error (IncludeNotFound name)
+       | dir :: dirs -> match file_from_path dir name with
+                        | Some file -> file
+                        | None -> try_dirs dirs
+     in
 
-  try_dirs lds
+     try_dirs lds
 
 
 let include_get_file (state : main_state) (name : Theory.lsymb) : file =
