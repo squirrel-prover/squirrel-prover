@@ -606,6 +606,10 @@ let timeout timeout f x =
   | exn     -> finish (); raise exn
 
 (* -------------------------------------------------------------------- *)
+let fst_map f (x,_) = f x
+let snd_map f (_,y) = f y
+
+(* -------------------------------------------------------------------- *)
 let as_seq0 = function [] -> ()                     | _ -> assert false
 let as_seq1 = function [x] -> x                     | _ -> assert false
 let as_seq2 = function [x1; x2] -> (x1, x2)         | _ -> assert false

@@ -69,7 +69,9 @@ end
 val make_obs_equiv :
   ?enrich:Term.term list ->
   Symbols.table ->
-  Hint.hint_db -> 'a -> SystemExpr.t -> [> `Equiv of Equiv.form ] * t
+  Hint.hint_db ->
+  SystemExpr.t ->
+  [> `Equiv of Equiv.form ] * t
 
 
 val make :

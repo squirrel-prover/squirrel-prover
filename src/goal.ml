@@ -95,8 +95,7 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Create trace and equivalence goals} *)
 
-
-let make_obs_equiv ?(enrich=[]) table hint_db name system =
+let make_obs_equiv ?(enrich=[]) table hint_db system =
   let vars,ts = Vars.make `Approx Vars.empty_env Type.Timestamp "t" in
   let term = Term.mk_macro Term.frame_macro [] (Term.mk_var ts) in
   let goal = Equiv.(Atom (Equiv (term :: enrich))) in
@@ -137,7 +136,7 @@ let make table hint_db parsed_goal : statement * t =
           `Equiv (Equiv.mk_forall vs f), Equiv s
       | Obs_equiv ->
         assert (vs = [] && ty_vars = []) ;
-        make_obs_equiv table hint_db name system
+        make_obs_equiv table hint_db system
   in
 
   { name; system; ty_vars; formula },

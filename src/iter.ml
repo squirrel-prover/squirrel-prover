@@ -378,13 +378,13 @@ type hash_occs = hash_occ list
     Over-approximation: we try to expand macros, even if they are at a 
     timestamp that may not happen. *)
 let get_f_messages_ext 
-    ?(drop_head = true)
+    ?(drop_head    = true)
     ?(fun_wrap_key = None)
-    ?(fv:Sv.t = Sv.empty)
-    ~(cntxt:Constr.trace_cntxt)
-    (f : Term.fname)
-    (k : Term.name)
-    (t : Term.term)
+    ?(fv    : Sv.t = Sv.empty)
+    ~(cntxt : Constr.trace_cntxt)
+    (f      : Term.fname)
+    (k      : Term.name)
+    (t      : Term.term)
   : hash_occs
   =
   let rec get (t : Term.term) ~(fv:Sv.t) ~(cond:Term.term) : hash_occs =

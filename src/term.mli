@@ -353,12 +353,12 @@ include module type of Smart
 (*------------------------------------------------------------------*)
 (** {3 Smart constructors: terms} *)
 
-val mk_pred    : term -> term
-val mk_var     : Vars.var -> term
-val mk_action  : Symbols.action Symbols.t -> Vars.var list -> term
-val mk_name    : nsymb -> term
-val mk_macro   : msymb -> term list -> term -> term
-val mk_diff    : term -> term -> term
+val mk_pred   : term -> term
+val mk_var    : Vars.var -> term
+val mk_action : Symbols.action Symbols.t -> Vars.var list -> term
+val mk_name   : nsymb -> term
+val mk_macro  : msymb -> term list -> term -> term
+val mk_diff   : term -> term -> term
 
 val mk_find : Vars.var list -> term -> term -> term -> term
 

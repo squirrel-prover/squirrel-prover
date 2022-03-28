@@ -48,14 +48,14 @@ let pp_system_decl fmt sys =
     Process.pp_process sys.sprocess
 
 (*------------------------------------------------------------------*)
-type system_modifier =
+type global_rule =
   | Rename of Theory.global_formula
   | PRF    of Theory.bnds * Theory.term
   | CCA    of Theory.bnds * Theory.term
 
-type system_decl_modifier = { 
+type system_modifier = { 
   from_sys : SystemExpr.p_system_expr;
-  modifier : system_modifier;
+  modifier : global_rule;
   name     : Theory.lsymb
 }
             
@@ -80,7 +80,7 @@ type declaration_i =
   | Decl_process of lsymb * Theory.bnds * Process.process
   | Decl_axiom   of Goal.Parsed.t
   | Decl_system  of system_decl
-  | Decl_system_modifier  of system_decl_modifier
+  | Decl_system_modifier  of system_modifier
 
   | Decl_dh of Symbols.dh_hyp list * lsymb * (lsymb * Symbols.symb_type) * (lsymb * Symbols.symb_type) option * c_tys
 

@@ -202,6 +202,10 @@ type 'a timeout_r =
 val timeout : int -> ('a -> 'b) -> 'a -> 'b timeout_r
 
 (*------------------------------------------------------------------*)
+val fst_map : ('a -> 'c) -> 'a * 'b -> 'c
+val snd_map : ('b -> 'c) -> 'a * 'b -> 'c
+  
+(*------------------------------------------------------------------*)
 val as_seq0 : 'a list -> unit
 val as_seq1 : 'a list -> 'a
 val as_seq2 : 'a list -> 'a * 'a
