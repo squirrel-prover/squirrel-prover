@@ -21,7 +21,7 @@ type global_data = {
 
   ts : Vars.var;
   (** free timestamp variable of the macro, which can only be instantiated
-      by a strict suffix of [action] *)
+      by a strict or large suffix of [action] *)
 
   default_body : Term.term;
   (** macro body shared by all systems *)
@@ -37,29 +37,18 @@ type Symbols.data += Global_data of global_data
 let sproj s t = Term.pi_term ~projection:(SE.get_proj s) t
 
 let get_single_body single_system data =
-  let body = try
+  let body =
+    try
       (List.assoc single_system data.systems_body)
-    with Not_found ->  data.default_body
+    with Not_found -> data.default_body
   in
   sproj single_system body
 
 let get_body system data : Term.term =
   let get_pair_body s1 s2 =
-    match List.assoc s1 data.systems_body with
-    | b1 ->
-      let b1 = sproj s1 b1 in
-      begin
-        match List.assoc s2 data.systems_body with
-        | b2 -> Term.mk_diff b1 (sproj s2 b2)
-        | exception Not_found -> Term.mk_diff b1 (sproj s2 data.default_body)
-        end
-    | exception Not_found -> begin
-        match List.assoc s2 data.systems_body with
-        | b2 -> Term.mk_diff (sproj s1 data.default_body) (sproj s2 b2)
-        | exception Not_found ->
-          let t1, t2 = sproj s1 data.default_body, sproj s2 data.default_body in
-          if t1 = t2 then t1 else Term.mk_diff t1 t2
-        end
+    let t1 = get_single_body s1 data
+    and t2 = get_single_body s2 data in
+    Term.mk_diff t1 t2
   in
   match system with
   | SE.Single s      -> get_single_body s data
