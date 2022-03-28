@@ -75,18 +75,20 @@ let get_body system data : Term.term =
    existing definition, and update the value of [ns] accordingly in
    the new system. *)
 let update_global_data
-    (table : Symbols.table)
-    (ns    : Symbols.macro Symbols.t)
-    (dec_def : Symbols.macro_def)
-    (old_single_system : SystemExpr.single_system)
-    (new_single_system : SystemExpr.single_system)
-    (f : Term.term -> Term.term) =
+    (table        : Symbols.table)
+    (ns           : Symbols.macro Symbols.t)
+    (dec_def      : Symbols.macro_def)
+    (old_s_system : SystemExpr.single_system)
+    (new_s_system : SystemExpr.single_system)
+    (f            : Term.term -> Term.term)
+  =
   match Symbols.Macro.get_data ns table with
   | Global_data data ->
-    let body = get_single_body old_single_system data in
+    let body = get_single_body old_s_system data in
     let data =
-      Global_data { data with systems_body = (new_single_system, f body) ::
-                                             data.systems_body}
+      Global_data { data with
+                    systems_body = (new_s_system, f body) ::
+                                   data.systems_body }
     in
     Symbols.Macro.redefine table ~data ns dec_def
       

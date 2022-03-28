@@ -328,12 +328,17 @@ let pp_descrs table ppf system =
   Fmt.pf ppf "@]%!@."
 
 
-let clone_system_iter table original_system new_system mapdescr =
-  let odescrs = descrs table original_system in
-  let symbs = symbs table original_system in
-  let ndescrs = System.Msh.map mapdescr odescrs in
-  let data = System.System_data (ndescrs,symbs) in
-  Symbols.System.declare_exact table new_system ~data ()
+let clone_system_map 
+    (table    : Symbols.table)
+    (system   : t)
+    (new_name : Symbols.lsymb)
+    (mapdescr : Action.descr -> Action.descr)
+  : Symbols.table * Symbols.System.ns Symbols.t
+  =
+  let symbs  = symbs table system in
+  let descrs = System.Msh.map mapdescr (descrs table system) in
+  let data   = System.System_data (descrs,symbs) in
+  Symbols.System.declare_exact table new_name ~data ()
 
 (*------------------------------------------------------------------*)
 (** {2 Parser types } *)

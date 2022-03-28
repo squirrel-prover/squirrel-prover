@@ -196,32 +196,22 @@ let subst_descr subst descr =
       ) descr.updates
   in
   let output = fst descr.output, subst_term (snd descr.output) in
-  { name = descr.name;
-    input = descr.input;
-    globals = descr.globals;
-    action; indices; condition; updates; output;  }
+  { descr with action; indices; condition; updates; output; }
 
 
-(* Map over the descr with function f *)
-let descr_map f descr =
+let descr_map
+    (f : Vars.env -> Term.term -> Term.term) 
+    (descr : descr)
+  : descr
+  =
   let env = Vars.of_list descr.indices in
   let f = f env in
-  let condition =
-     fst descr.condition,
-     f (snd descr.condition) in
-  let updates =
-    List.map (fun (ss,t) ->
-        ss, f t
-      ) descr.updates
-  in
+  
+  let condition = fst descr.condition, f (snd descr.condition) in
+  let updates = List.map (fun (ss,t) -> ss, f t) descr.updates in
   let output = fst descr.output, f (snd descr.output) in
-  { name = descr.name;
-    input = descr.input;
-    globals = descr.globals;
-    action = descr.action;
-    indices = descr.indices;
-    condition; updates; output;  }
 
+  { descr with condition; updates; output;  }
 
 
 let refresh_descr descr =

@@ -10,7 +10,7 @@ module Sv = Vars.Sv
 let rewrite_norec
     (table  : Symbols.table)
     (system : SE.t)
-    (venv   : Vars.env)
+    (venv   : Vars.env)         (* for clean variable naming *)
     (rule   : Rewrite.rw_erule) 
     (t      : Term.term)
   : Term.term 
@@ -38,6 +38,42 @@ let rewrite_norec
   in
   let _, f = Match.Pos.map ~m_rec:false rw_inst venv t in
   f
+
+(*------------------------------------------------------------------*)
+(** High-level system cloning function. *)
+let clone_system_map
+    (table    : Symbols.table)
+    (system   : SE.t)
+    (s_system : SE.single_system)
+    (new_name : Theory.lsymb)
+    (fmap     : Term.term -> Term.term)
+  : Symbols.table * SE.t * Symbols.system Symbols.t
+  =
+  (* We declare the system *)
+  let table, new_system_name =
+    SystemExpr.clone_system_map
+      table system
+      new_name (Action.descr_map (fun _ -> fmap))
+  in
+
+  let new_s_system, old_s_system, old_system_name =
+    match system with
+    | Single (Left  s as old) -> SE.Left  new_system_name, old, s
+    | Single (Right s as old) -> SE.Right new_system_name, old, s
+    |  _ -> assert false
+  in
+
+  let global_macro_fold ns dec_def _ table : Symbols.table =
+    Macros.update_global_data
+      table ns dec_def
+      s_system new_s_system fmap
+  in
+
+  let table = Symbols.Macro.fold global_macro_fold table table in
+
+  let new_system_e = SystemExpr.pair table old_s_system new_s_system in
+
+  table, new_system_e, old_system_name
 
 (*------------------------------------------------------------------*)
 let parse_single_system_name table sdecl =
@@ -117,51 +153,28 @@ let global_rename table sdecl (gf : Theory.global_formula) =
         (Tactics.Failure "The name on the right-hand side already \
                           occurs in the left-hand side.")
   in
+
   (* We now build the rewrite rule *)
   let evars = Term.get_vars n1 in
   let vs, subs = Term.refresh_vars `Global evars in
   let n1', n2' = (Term.subst subs n1, Term.subst subs n2) in
   let rw_rule = Rewrite.{
       rw_tyvars = [];
-      rw_vars = Vars.Sv.of_list vs;
-      rw_conds = [];
-      rw_rw = Term.ESubst (n1', n2');
+      rw_vars   = Vars.Sv.of_list vs;
+      rw_conds  = [];
+      rw_rw     = Term.ESubst (n1', n2');
     }
   in
-  let map cenv t : Term.term =
+
+  let fmap t : Term.term =
     rewrite_norec table old_system env.vars rw_rule t
   in
-  let global_macro_iterator system table ns dec_def _ : unit =
-    table :=
-      Macros.update_global_data
-        !table ns dec_def
-        old_single_system system (map ())
-  in
-
-
-  (* We now declare the system *)
-  let table, new_system =
-    SystemExpr.clone_system_iter
-      table old_system
-      sdecl.Decl.name (Action.descr_map map)
-  in
-
-  (* We finally put as axiom the equivalence between the old and the 
-     new system *)
-  let new_system_expr,old_system_expr, old_system_name =
-    match old_system with
-    | Single (Left  s as old) -> SE.Left  new_system, old, s
-    | Single (Right s as old) -> SE.Right new_system, old, s
-    |  _ -> assert false
-  in
-
-  let aux_table = ref table in
-
-  Symbols.Macro.iter (global_macro_iterator new_system_expr aux_table) table;
-
-  let table = !aux_table in
-
-  let new_system_e = SystemExpr.pair table old_system_expr new_system_expr in
+  
+  let table, new_system_e, old_system_name =
+    clone_system_map
+      table old_system old_single_system sdecl.Decl.name fmap
+  in 
+  
   let axiom_name =
     "rename_from_" ^ Symbols.to_string old_system_name ^
     "_to_" ^ Location.unloc sdecl.name
@@ -261,35 +274,15 @@ let global_prf
     }
   in
 
-  let map _ t =
+  let fmap t =
     rewrite_norec table old_system venv rw_rule t
   in
-  let global_macro_iterator system table ns dec_def _ : unit =
-    table :=
-      Macros.update_global_data
-        !table ns
-        dec_def old_single_system system (map ())
-  in
 
-  let table, new_system =
-    SystemExpr.clone_system_iter
-      table old_system
-      sdecl.Decl.name (Action.descr_map map)
-  in
-
-  (* We finally put as axiom the equivalence between the old 
-     and the new system *)
-  let new_system_expr,old_system_expr, old_system_name =
-    match old_system with
-    | Single (Left s as old) -> SE.Left new_system, old, s
-    | Single (Right s as old) -> SE.Right new_system, old, s
-    |  _ -> assert false
-  in
-  let aux_table = ref table in
-  Symbols.Macro.iter (global_macro_iterator new_system_expr aux_table) table;
-  let table = !aux_table in
-
-  let new_system_e = SystemExpr.pair table old_system_expr new_system_expr in
+  let table, new_system_e, old_system_name =
+    clone_system_map
+      table old_system old_single_system sdecl.Decl.name fmap
+  in 
+  
   let axiom_name =
     "prf_from_" ^ Symbols.to_string old_system_name ^
     "_to_" ^ Location.unloc sdecl.name
@@ -432,38 +425,16 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
     }
   in
 
-  let map cenv t =
+  let fmap t =
     rewrite_norec table old_system venv enc_rw_rule t |>
     rewrite_norec table old_system venv dec_rw_rule 
   in
-  let global_macro_iterator system table ns dec_def _ =
-    table :=
-      Macros.update_global_data
-        !table ns
-        dec_def old_single_system system (map ())
+
+  let table, new_system_e, old_system_name =
+    clone_system_map
+      table old_system old_single_system sdecl.Decl.name fmap
   in
 
-  let table, new_system =
-    SystemExpr.clone_system_iter
-      table old_system
-      sdecl.Decl.name (Action.descr_map map)
-  in
-
-  (* We finally put as axiom the equivalence between the old and 
-     the new system *)
-  let new_system_expr,old_system_expr, old_system_name =
-    match old_system with
-    | Single (Left s as old) -> SE.Left new_system, old, s
-    | Single (Right s as old) -> SE.Right new_system, old, s
-    |  _ -> assert false
-  in
-
-  let aux_table = ref table in
-  Symbols.Macro.iter (global_macro_iterator new_system_expr aux_table) table;
-  let table = !aux_table in
-
-
-  let new_system_e = SystemExpr.pair table old_system_expr new_system_expr in
   let axiom_name =
     "cca_from_" ^ Symbols.to_string old_system_name ^
     "_to_" ^ Location.unloc sdecl.name
@@ -511,114 +482,122 @@ let check_fv_finite (fv : Sv.t) =
               Index and Timestamp, which are not supported.")
     ) fv
 
-let global_prf_time
-    (table : Symbols.table)
-    (sdecl : Decl.system_decl_modifier)
-    (bnds  : Theory.bnds)
-    (hash   : Theory.term)
-  : string *
-    Term.term list *
-    (Equiv.global_form -> [> `Equiv of Equiv.global_form ]) *
-    SE.t *
-    Symbols.table
-  =
-  let old_system, old_single_system =
-    parse_single_system_name table sdecl
-  in
-  
-  let venv, is, hash = conv_term ~pat:true table old_system ~bnds hash in
-
-  let cntxt = Constr.{
-      table  = table;
-      system = old_system;
-      models = None}
-  in
-
-  let param = Prf.prf_param hash in
-
-  (* Check syntactic side condition. *)
-  let errors =
-    Euf.key_ssc
-      ~elems:[] ~allow_functions:(fun x -> false)
-      ~cntxt param.h_fn param.h_key.s_symb
-  in
-  if errors <> [] then
-    Tactics.soft_failure (Tactics.BadSSCDetailed errors);
-
-  let occs =
-    SystemExpr.fold_descrs (fun descr occs ->
-        Iter.fold_descr ~globals:true (fun msymb m_is _ t occs ->
-            let new_occs =
-              Iter.get_f_messages_ext
-                ~fv:Sv.empty ~cntxt
-                param.h_fn param.h_key.s_symb t
-            in
-            new_occs @ occs
-          ) cntxt.table cntxt.system descr occs
-      ) cntxt.table cntxt.system []
-  in
-
-  (* FIXME: check duplicate module alpha-renaming *)
-  let occs = List.remove_duplicate (=) occs in
-
-  (* type of the hash function input *)
-  let m_ty = List.hd (param.h_fty.fty_args) in
-
-  (* fresh variable representing the hashed message to rewrite *)
-  let x = Vars.make_new m_ty "x" in
-
-  (* timestamp at which [H(x,k)] occurs  *)
-  let tau = Vars.make_new Type.ttimestamp "t" in
-
-  let table, occ_names =
-    List.map_fold (fun table occ ->
-        check_fv_finite occ.Iter.occ_vars;
-
-        let ndef =
-          let ty_args = List.map Vars.ty (Sv.elements occ.Iter.occ_vars) in
-          Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args m_ty ; }
-        in
-        let table,n =
-          Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
-        in
-        table, (occ, n)
-      ) table occs
-  in
-
-  let is, subst = Term.refresh_vars `Global is in
-  let key =  Term.subst subst (Term.mk_name param.h_key) in
-  
-  let to_rw =
-    Term.mk_fun table param.h_fn [] [Term.mk_var x; key ]
-  in
-
-  (* we rewrite [H(x,k)] at occurrence s0 at time tau0 into:
-     try find tau, occ s.t. tau <= tau0 && x = s_{occ} 
-     then n_{occ}@tau
-     else n_s0@tau0 *)
-  let term (tau0 : Term.term) =
-    Term.mk_find [tau] cond t_then t_else
-  in
-
-  let rw_rule (tau0 : Term.term) = Rewrite.{
-      rw_tyvars = [];
-      rw_vars   = Sv.of_list (x :: is);
-      rw_conds  = [];
-      rw_rw     = Term.ESubst (to_rw,term tau0);
-    } in
-
-  let map (tau0 : Term.term) cenv t : Term.term =
-    rewrite_norec table old_system venv (rw_rule tau0)
-  in
-  let global_macro_iterator system table ns dec_def _ : unit =
-    let tau = 
-    table :=
-      Macros.update_global_data
-        !table ns dec_def
-        old_single_system system (map ())
-  in
-  
-  assert false
+(* let global_prf_time
+ *     (table : Symbols.table)
+ *     (sdecl : Decl.system_decl_modifier)
+ *     (bnds  : Theory.bnds)
+ *     (hash   : Theory.term)
+ *   : string *
+ *     Term.term list *
+ *     (Equiv.global_form -> [> `Equiv of Equiv.global_form ]) *
+ *     SE.t *
+ *     Symbols.table
+ *   =
+ *   let old_system, old_single_system =
+ *     parse_single_system_name table sdecl
+ *   in
+ *   
+ *   let venv, is, hash = conv_term ~pat:true table old_system ~bnds hash in
+ * 
+ *   let cntxt = Constr.{
+ *       table  = table;
+ *       system = old_system;
+ *       models = None}
+ *   in
+ * 
+ *   let param = Prf.prf_param hash in
+ * 
+ *   (\* Check syntactic side condition. *\)
+ *   let errors =
+ *     Euf.key_ssc
+ *       ~elems:[] ~allow_functions:(fun x -> false)
+ *       ~cntxt param.h_fn param.h_key.s_symb
+ *   in
+ *   if errors <> [] then
+ *     Tactics.soft_failure (Tactics.BadSSCDetailed errors);
+ * 
+ *   let occs =
+ *     SystemExpr.fold_descrs (fun descr occs ->
+ *         Iter.fold_descr ~globals:true (fun msymb m_is _ t occs ->
+ *             let new_occs =
+ *               Iter.get_f_messages_ext
+ *                 ~fv:Sv.empty ~cntxt
+ *                 param.h_fn param.h_key.s_symb t
+ *             in
+ *             new_occs @ occs
+ *           ) cntxt.table cntxt.system descr occs
+ *       ) cntxt.table cntxt.system []
+ *   in
+ * 
+ *   (\* FIXME: check duplicate module alpha-renaming *\)
+ *   let occs = List.remove_duplicate (=) occs in
+ * 
+ *   (\* type of the hash function input *\)
+ *   let m_ty = List.hd (param.h_fty.fty_args) in
+ * 
+ *   (\* fresh variable representing the hashed message to rewrite *\)
+ *   let x = Vars.make_new m_ty "x" in
+ * 
+ *   (\* timestamp at which [H(x,k)] occurs  *\)
+ *   let tau = Vars.make_new Type.ttimestamp "t" in
+ * 
+ *   let table, occ_names =
+ *     List.map_fold (fun table occ ->
+ *         check_fv_finite occ.Iter.occ_vars;
+ * 
+ *         let ndef =
+ *           let ty_args = List.map Vars.ty (Sv.elements occ.Iter.occ_vars) in
+ *           Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args m_ty ; }
+ *         in
+ *         let table,n =
+ *           Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
+ *         in
+ *         table, (occ, n)
+ *       ) table occs
+ *   in
+ * 
+ *   let is, subst = Term.refresh_vars `Global is in
+ *   let key =  Term.subst subst (Term.mk_name param.h_key) in
+ * 
+ *   (\* term to rewrite *\)
+ *   let to_rw =
+ *     Term.mk_fun table param.h_fn [] [Term.mk_var x; key ]
+ *   in
+ * 
+ *   (\* we rewrite [H(x,k)] at occurrence s0 at time tau0 into:
+ *      try find tau, occ s.t. tau <= tau0 && x = s_{occ} 
+ *      then n_{occ}@tau
+ *      else n_s0@tau0 *\)
+ *   let rw_target (tau0 : Term.term) =
+ *     Term.mk_find [tau] cond t_then t_else
+ *   in
+ * 
+ *   let mk_rw_rule (tau0 : Term.term) = Rewrite.{
+ *       rw_tyvars = [];
+ *       rw_vars   = Sv.of_list (x :: is);
+ *       rw_conds  = [];
+ *       rw_rw     = Term.ESubst (to_rw,rw_target tau0);
+ *     } in
+ * 
+ *   let map (tau0 : Term.term) _ (t : Term.term) : Term.term =
+ *     rewrite_norec table old_system venv (mk_rw_rule tau0) t
+ *   in
+ *   let global_macro_iterator system table ns dec_def _ : unit =
+ *     let tau0 = assert false in
+ *     table :=
+ *       Macros.update_global_data
+ *         !table ns dec_def
+ *         old_single_system system (map tau0 ())
+ *   in
+ * 
+ *   (\* We now declare the system *\)
+ *   let table, new_system =
+ *     SystemExpr.clone_system_iter
+ *       table old_system
+ *       sdecl.Decl.name (Action.descr_map map)
+ *   in
+ * 
+ *   assert false *)
 
   
 (*------------------------------------------------------------------*)

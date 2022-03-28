@@ -169,7 +169,7 @@ val subst_action : Term.subst -> action -> action
 (** Apply a substitution to a description. *)
 val subst_descr : Term.subst -> descr -> descr
 
-(** Map a function over a descritpor. *)
+(** Map a function over a descriptor. *)
 val descr_map : (Vars.env -> Term.term -> Term.term) -> descr -> descr
 
 
