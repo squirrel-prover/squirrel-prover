@@ -1,5 +1,6 @@
 val is_prefix : [`Strict | `Large] -> Action.shape -> Action.shape -> bool
 
+(*------------------------------------------------------------------*)
 (** {2 Macro definitions} *)
 
 (** Declare a global (timestamp-dependent) macro,
@@ -18,6 +19,7 @@ val declare_global :
   Type.ty ->
   Symbols.table * Symbols.macro Symbols.t
 
+(*------------------------------------------------------------------*)
 (** {2 Macro expansions} *)
 
 type def_result = [ `Def of Term.term | `Undef | `MaybeDef ]
@@ -32,6 +34,7 @@ val get_definition :
 val get_definition_exn :
   Constr.trace_cntxt -> Term.msymb -> Term.term -> Term.term
 
+(*------------------------------------------------------------------*)
 (** Variant of [get_definition] without dependency on Constr module.
     When the Term.term argument is not of the form "Term.Action something",
     either returns [`MaybeDef] or raises [Not_found] (the latter happens when
@@ -49,11 +52,12 @@ val get_definition_nocntxt :
 val get_dummy_definition :
   Symbols.table -> SystemExpr.t -> Term.msymb -> Term.term
 
+(*------------------------------------------------------------------*)
 (** Given the name [ns] of a macro as well as a function [f] over
-   terms, an [old_single_system] and a [new_single_system], takes the
-   existing definition of [ns] in the old system, applies [f] to the
-   existing definition, and update the value of [ns] accordingly in
-   the new system. *)
+    terms, an [old_single_system] and a [new_single_system], takes the
+    existing definition of [ns] in the old system, applies [f] to the
+    existing definition, and update the value of [ns] accordingly in
+    the new system. *)
 val update_global_data :
   Symbols.table -> 
   Symbols.macro Symbols.t -> 
@@ -63,3 +67,6 @@ val update_global_data :
   (Term.term -> Term.term) -> 
   Symbols.table
     
+(*------------------------------------------------------------------*)
+(** Remove all macro definition associated with a system *)
+val remove_system : Symbols.table -> SystemExpr.single_system -> Symbols.table

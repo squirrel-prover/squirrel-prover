@@ -98,6 +98,8 @@ let is_finite : ty -> bool = function
   | Index | Timestamp -> true
   | _ -> false
 
+let is_tuni = function TUnivar _ -> true | _ -> false
+  
 (*------------------------------------------------------------------*)
 let pp_ht fmt ht = 
   let pp_seq fmt () = Fmt.pf fmt " * " in

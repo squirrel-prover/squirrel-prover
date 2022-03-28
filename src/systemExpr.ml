@@ -340,6 +340,13 @@ let clone_system_map
   let data   = System.System_data (descrs,symbs) in
   Symbols.System.declare_exact table new_name ~data ()
 
+let remove_system
+    (table  : Symbols.table)
+    (system : Symbols.system Symbols.t)
+  : Symbols.table
+  =
+  Symbols.System.remove table system
+    
 (*------------------------------------------------------------------*)
 (** {2 Parser types } *)
 

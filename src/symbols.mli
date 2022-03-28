@@ -180,6 +180,8 @@ module type Namespace = sig
   (** Type of values defining the symbols of this namespace. *)
   type def
 
+  val remove : table -> ns t -> table
+    
   (** Reserve a fresh symbol name, resembling the given string. *)
   val reserve : table -> lsymb -> table * ns t
 
@@ -240,6 +242,9 @@ module type Namespace = sig
 
   (** Fold over the defined symbols of this namespace. *)
   val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> table -> 'a
+
+  (** Map over the defined symbols of this namespace. *)
+  val map : (ns t -> def -> data -> (def * data)) -> table -> table
 end
 
 module Channel  : Namespace with type def = unit    with type ns = channel

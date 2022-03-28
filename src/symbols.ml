@@ -249,6 +249,8 @@ module type Namespace = sig
   type ns
   type def
 
+  val remove : table -> ns t -> table
+    
   val reserve       : table -> lsymb -> table * data t
   val reserve_exact : table -> lsymb -> table * ns t
 
@@ -275,6 +277,7 @@ module type Namespace = sig
 
   val iter : (ns t -> def -> data -> unit) -> table -> unit
   val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> table -> 'a
+  val map  : (ns t -> def -> data -> (def * data)) -> table -> table
 end
 
 module type S = sig
@@ -295,6 +298,9 @@ module Make (N:S) : Namespace
 
   let group = N.group
 
+  let remove (table : table) (symb : ns t) : table =
+    mk (Msymb.remove symb table.cnt)
+    
   let reserve (table : table) (name : lsymb) =
     let symb = fresh ~group (L.unloc name) table.cnt in
     let table_c = Msymb.add symb (Reserved N.namespace,Empty) table.cnt in
@@ -409,6 +415,18 @@ module Make (N:S) : Namespace
          with SymbError (_,Incorrect_namespace _) -> acc)
       table.cnt acc
 
+  let map (f : ns t -> def -> data -> (def * data)) (table : table) : table =
+    let table =
+      Msymb.mapi
+        (fun s (def,data) ->
+           try
+             let def = N.deconstruct ~loc:None def in
+             let def, data = f s def data in
+             Exists (N.construct def), data
+           with SymbError (_,Incorrect_namespace _) -> (def,data)
+        ) table.cnt
+    in
+    mk table
 end
 
 let namespace_err (l : L.t option) c n =

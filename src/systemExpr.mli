@@ -103,14 +103,18 @@ val map_descrs  : (Action.descr -> 'a)       -> Symbols.table -> t -> 'a list
 (*------------------------------------------------------------------*)
 (** {2 Cloning } *)
 
-(** Low-level cloning function over system expressions. *)
+(** Low-level cloning function over system expressions. 
+    Does not clone global macros. *)
 val clone_system_map :
   Symbols.table ->
   t ->
   Symbols.lsymb ->
   (Action.descr -> Action.descr) ->
   Symbols.table * Symbols.System.ns Symbols.t
-                                      
+
+(** Low-level system symbols suppression *)
+val remove_system : Symbols.table -> Symbols.system Symbols.t -> Symbols.table
+
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printing } *)
 

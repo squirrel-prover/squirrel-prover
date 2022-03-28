@@ -8,34 +8,32 @@ let soft_failure = Tactics.soft_failure
 (** {2 Macro definitions} *)
 
 type global_data = {
-  action  : [`Strict | `Large] * Action.shape;
+  action : [`Strict | `Large] * Action.shape;
   (** the global macro is defined at any action which is a strict or large
       suffix of [action]  *)
 
-  inputs  : Vars.var list;
+  inputs : Vars.var list;
   (** inputs of the macro, as variables, in order *)
 
   indices : Vars.var list;
   (** free indices of the macro, which corresponds to the prefix of
       the indices of the action defining the macro *)
 
-  ts      : Vars.var;
+  ts : Vars.var;
   (** free timestamp variable of the macro, which can only be instantiated
       by a strict suffix of [action] *)
 
-  default_body    : Term.term;
+  default_body : Term.term;
   (** macro body shared by all systems *)
 
-  systems_body    : (SE.single_system * Term.term) list;
+  systems_body : (SE.single_system * Term.term) list;
   (** Optional alternative definitions of the body for a given system.
-      Used by System modifiers.
-  *)
-
+      Used by System modifiers. *)
 }
 
 type Symbols.data += Global_data of global_data
 
-
+(*------------------------------------------------------------------*)
 let sproj s t = Term.pi_term ~projection:(SE.get_proj s) t
 
 let get_single_body single_system data =
@@ -67,38 +65,12 @@ let get_body system data : Term.term =
   | SE.Single s      -> get_single_body s data
   | SE.SimplePair s  -> get_pair_body (SE.Left s) (SE.Right s)
   | SE.Pair (s1, s2) -> get_pair_body s1 s2
-  | SE.Empty         -> assert false (* FIXME: user-level exception? *)
+  | SE.Empty         -> assert false (* should never happen *)
 
-(** Given the name [ns] of a macro as well as a function [f] over
-   terms, an [old_single_system] and a [new_single_system], takes the
-   existing definition of [ns] in the old system, applies [f] to the
-   existing definition, and update the value of [ns] accordingly in
-   the new system. *)
-let update_global_data
-    (table        : Symbols.table)
-    (ns           : Symbols.macro Symbols.t)
-    (dec_def      : Symbols.macro_def)
-    (old_s_system : SystemExpr.single_system)
-    (new_s_system : SystemExpr.single_system)
-    (f            : Term.term -> Term.term)
-  =
-  match Symbols.Macro.get_data ns table with
-  | Global_data data ->
-    let body = get_single_body old_s_system data in
-    let data =
-      Global_data { data with
-                    systems_body = (new_s_system, f body) ::
-                                   data.systems_body }
-    in
-    Symbols.Macro.redefine table ~data ns dec_def
-      
-  | _ -> table
-
-let is_tuni = function Type.TUnivar _ -> true | _ -> false
-
+(*------------------------------------------------------------------*)
 (** Exported *)
 let declare_global table name ~suffix ~action ~inputs ~indices ~ts body ty =
-  assert (not (is_tuni ty));
+  assert (not (Type.is_tuni ty));
   let data =
     Global_data
       {action = (suffix, action);
@@ -359,3 +331,46 @@ let get_dummy_definition
     get_def_glob ~allow_dummy:true system table symb ts dummy_action gdata
 
   | _ -> assert false
+
+(*------------------------------------------------------------------*)
+(** Given the name [ns] of a macro as well as a function [f] over
+    terms, an [old_single_system] and a [new_single_system], takes the
+    existing definition of [ns] in the old system, applies [f] to the
+    existing definition, and update the value of [ns] accordingly in
+    the new system. *)
+let update_global_data
+    (table        : Symbols.table)
+    (ns           : Symbols.macro Symbols.t)
+    (dec_def      : Symbols.macro_def)
+    (old_s_system : SystemExpr.single_system)
+    (new_s_system : SystemExpr.single_system)
+    (f            : Term.term -> Term.term)
+  :  Symbols.table
+  =
+  match Symbols.Macro.get_data ns table with
+  | Global_data data -> 
+    let body = get_single_body old_s_system data in
+    let data =
+      Global_data { data with
+                    systems_body = (new_s_system, f body) ::
+                                   data.systems_body }
+    in
+    Symbols.Macro.redefine table ~data ns dec_def
+
+  | _ -> table
+    
+(*------------------------------------------------------------------*)
+(** Remove all macro definition associated with a system *)
+let remove_system
+    (table        : Symbols.table)
+    (s_system : SystemExpr.single_system)
+  : Symbols.table
+  =
+  Symbols.Macro.map (fun ns def data ->
+      match Symbols.Macro.get_data ns table with
+      | Global_data data -> 
+        let systems_body = List.remove_assoc s_system data.systems_body in
+        def, Global_data { data with systems_body }
+
+      | _ -> def, data
+    ) table
