@@ -2,7 +2,9 @@ open Utils
 
 module SE = SystemExpr
 module Sv = Vars.Sv
+module Sp = Match.Pos.Sp
 
+(*------------------------------------------------------------------*)
 type prf_param = {
   h_fn  : Term.fname;  (** function name *)
   h_fty : Type.ftype;  (** Hash function type *)
@@ -17,6 +19,7 @@ let prf_param hash : prf_param =
 
   | _ -> Tactics.soft_failure Tactics.Bad_SSC
 
+(*------------------------------------------------------------------*)
 (** Compute conjunct of PRF condition for a direct case,
   * that is an explicit occurrence of the hash in the frame. *)
 let prf_mk_direct env (param : prf_param) (occ : Iter.hash_occ) =
@@ -144,6 +147,7 @@ let add_prf_case
       List.fold_right (fun ((occ', srcs') as c2) cases ->
           if (not !found) && prf_occ_incl table system occ occ' then
             let () = found := true in
+            let occ' = { occ' with occ_pos = Sp.union occ'.occ_pos occ.occ_pos } in
             (occ', srcs @ srcs') :: cases
           else c2 :: cases
         ) cases []
@@ -187,7 +191,7 @@ let mk_prf_phi_proj cntxt env param frame hash =
     Iter.fold_macro_support (fun iocc macro_cases ->
         let name = iocc.iocc_aname in
         let t = iocc.iocc_cnt in
-        let fv = (List.rev (Sv.elements iocc.iocc_vars)) in
+        let fv = (Sv.elements iocc.iocc_vars) in
 
         let new_cases =
           Iter.get_f_messages_ext ~fv ~cntxt param.h_fn param.h_key.s_symb t

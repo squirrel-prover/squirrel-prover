@@ -63,8 +63,9 @@ class get_f_messages :
 (** An occurrence. *)
 type 'a occ = {
   occ_cnt  : 'a;
-  occ_vars : Vars.vars;  (** variables bound above the occurrence *)
-  occ_cond : Term.terms; (** conditions above the occurrence *)
+  occ_vars : Vars.vars;      (** variables bound above the occ. *)
+  occ_cond : Term.terms;     (** conditions above the occ. *)
+  occ_pos  : Match.Pos.Sp.t; (** optional, empty if unused *)
 }
 
 val pp_occ :

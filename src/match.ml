@@ -22,6 +22,9 @@ module Pos = struct
       is more efficient. *)
   type pos = int list
 
+  let pp (fmt : Format.formatter) (pos : pos) : unit =
+    Fmt.list ~sep:(Fmt.any ".") Fmt.int fmt pos
+
   module Sp = Set.Make (struct
       type t = pos
       let compare = Stdlib.compare

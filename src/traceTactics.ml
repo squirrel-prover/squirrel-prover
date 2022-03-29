@@ -23,6 +23,8 @@ type tac = TS.t Tactics.tac
 type lsymb = Theory.lsymb
 type sequent = TS.sequent
 
+module Sp = Match.Pos.Sp
+              
 (*------------------------------------------------------------------*)
 open LowTactics
 
@@ -594,6 +596,9 @@ type fresh_occ = (Action.action * Vars.var list) Iter.occ
 (** check if all instances of [o1] are instances of [o2].
     [o1] and [o2] actions must have the same action name *)
 let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool =
+  (* for now, positions not allowed here *)
+  assert (Sp.is_empty o1.occ_pos && Sp.is_empty o2.occ_pos);
+  
   let a1, is1 = o1.occ_cnt in
   let a2, is2 = o2.occ_cnt in
 

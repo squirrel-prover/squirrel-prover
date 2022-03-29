@@ -3,7 +3,8 @@
 open Utils
 
 module Sv = Vars.Sv
-
+module Sp = Match.Pos.Sp
+              
 exception Name_found
 exception Var_found
 exception Not_name
@@ -80,7 +81,8 @@ let get_name_indices_ext
       let occ = Iter.{
           occ_cnt  = ns.s_indices;
           occ_vars = List.rev fv;
-          occ_cond = cond; }
+          occ_cond = cond;
+          occ_pos  = Sp.empty; }
       in
       [occ]
 
@@ -103,6 +105,9 @@ let pp_ts_occ fmt (occ : ts_occ) : unit = Iter.pp_occ Term.pp fmt occ
 (** remove duplicates from occs for some subsuming relation. *)
 let clear_dup_mtso_le (occs : ts_occs) : ts_occs =
   let subsumes (occ1 : ts_occ) (occ2 : ts_occ) =
+    (* for now, positions not allowed here *)
+    assert (Sp.is_empty occ1.occ_pos && Sp.is_empty occ2.occ_pos);
+    
     (* TODO: alpha-renaming *)
     List.length occ1.occ_vars = List.length occ2.occ_vars &&
     List.for_all2 (=) occ1.occ_vars occ2.occ_vars &&
@@ -135,7 +140,8 @@ let get_actions_ext (constr : Constr.trace_cntxt) (t : Term.term) : ts_occs =
         let occ = Iter.{
             occ_cnt  = ts;
             occ_vars = List.rev fv;
-            occ_cond = cond; }
+            occ_cond = cond;
+            occ_pos  = Sp.empty; }
         in
         [occ] @ get ~fv ~cond ts
       in

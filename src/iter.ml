@@ -1,7 +1,8 @@
 open Utils
 
 module Sv = Vars.Sv
-
+module Sp = Match.Pos.Sp
+              
 (*------------------------------------------------------------------*)
 (** Iterate over all subterms.
   * Bound variables are represented as newly generated fresh variables.
@@ -163,15 +164,23 @@ end
 (** {2 Occurrences} *)
 type 'a occ = {
   occ_cnt  : 'a;
-  occ_vars : Vars.vars;  (** variables bound above the occurrence *)
-  occ_cond : Term.terms; (** conditions above the occurrence *)
+  occ_vars : Vars.vars;  (** variables bound above the occ. *)
+  occ_cond : Term.terms; (** conditions above the occ. *)
+  occ_pos  : Sp.t;       (** optional, empty if unused *)
 }
 
 let pp_occ pp_cnt fmt occ =
-  Fmt.pf fmt "[@[%a@] | ∃@[%a@], @[%a@]]"
+  let pp_pos fmt pos =
+    if pos = [] then ()
+    else
+      Fmt.pf fmt " at @[%a@]"
+        (Fmt.list ~sep:Fmt.comma Match.Pos.pp) pos
+  in
+  Fmt.pf fmt "[@[%a@] | ∃@[%a@], @[%a@]%a]"
     pp_cnt occ.occ_cnt
     (Fmt.list ~sep:Fmt.comma Vars.pp) occ.occ_vars
     (Fmt.list ~sep:Fmt.comma Term.pp) occ.occ_cond
+    pp_pos (Match.Pos.Sp.elements occ.occ_pos)
 
 type 'a occs = 'a occ list
 
@@ -245,6 +254,14 @@ let tfold_occ
       ) t acc
 
 (*------------------------------------------------------------------*)
+(** Try to unfold a macro.
+    To be used in conjunction with [Match.Pos.map_fold]. *)
+let try_unfold cntxt (m : Term.msymb) (ts : Term.term) acc =
+  match Macros.get_definition cntxt m ts with
+  | `Def t             -> acc, `Map t
+  | `Undef | `MaybeDef -> acc, `Continue
+
+(*------------------------------------------------------------------*)
 (** {2 get_ftype} *)
 
 type mess_occ = Term.term occ
@@ -284,7 +301,8 @@ let get_f
         if matching table (fn,vs) symtype
         then [{ occ_cnt  = t;
                 occ_vars = List.rev fv;
-                occ_cond = cond; }]
+                occ_cond = cond;
+                occ_pos  = Sp.empty; }]
         else []
       in
 
@@ -304,7 +322,8 @@ let get_f
             | _ -> false )
         then [{ occ_cnt  = t;
                 occ_vars = List.rev fv;
-                occ_cond = cond; }]
+                occ_cond = cond;
+                occ_pos  = Sp.empty; }]
         else []
       in
       head_occ @ (occs ())
@@ -354,7 +373,8 @@ let get_diff ~(cntxt : Constr.trace_cntxt) (t : Term.term) : diff_occs =
     | Term.Diff (s1, s2) ->
       [{ occ_cnt  = t;
          occ_vars = List.rev fv;
-         occ_cond = cond; }]
+         occ_cond = cond;
+         occ_pos  = Sp.empty; }]
 
     | _ -> occs ()
   in
@@ -385,52 +405,59 @@ let get_f_messages_ext
     (t      : Term.term)
   : hash_occs
   =
-  let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.terms) : hash_occs =
-    let occs () =
-      tfold_occ ~mode:(`Delta cntxt) (fun ~fv ~cond t occs ->
-          get t ~fv ~cond @ occs
-        ) ~fv ~cond t []
-    in
+  let init_fv = fv in
+  
+  let func : hash_occs Match.Pos.f_map_fold =
+    fun (t : Term.term) (fv:Vars.vars) (cond:Term.terms) pos occs ->
+      match t with
+      | Term.Fun ((f',_),_, [m;k']) as m_full when f' = f ->
+        let occs' =
+          match k' with
+          | Term.Name s' when s'.s_symb = k ->
+            let ret_m = if drop_head then m else m_full in
+            [{ occ_cnt  = s'.s_indices,ret_m;
+               occ_vars = init_fv @ (List.rev fv);
+               occ_cond = cond;
+               occ_pos  = Sp.singleton pos; }]
+          | _ -> []
+        in
+        occs' @ occs, `Continue
 
-    match t with
-    | Term.Fun ((f',_),_, [m;k']) as m_full when f' = f ->
-      let occs =
-        match k' with
-        | Term.Name s' when s'.s_symb = k ->
-          let ret_m = if drop_head then m else m_full in
-          [{ occ_cnt  = s'.s_indices,ret_m;
-             occ_vars = List.rev fv;
-             occ_cond = cond; }]
-        | _ -> []
-      in
-      occs @ get m ~fv ~cond @ get k' ~fv ~cond
+      | Term.Fun ((f',_), _, [m;r;k']) as m_full when f' = f ->
+        let occs' =
+          match k', fun_wrap_key with
+          | Term.Name s', None when s'.s_symb = k ->
+            let ret_m = if drop_head then m else m_full in
+            [{ occ_cnt  = s'.s_indices,ret_m;
+               occ_vars = init_fv @ (List.rev fv);
+               occ_cond = cond;
+               occ_pos  = Sp.singleton pos; }]
 
-    | Term.Fun ((f',_), _, [m;r;k']) as m_full when f' = f ->
-      let occs =
-        match k', fun_wrap_key with
-        | Term.Name s', None when s'.s_symb = k ->
-          let ret_m = if drop_head then m else m_full in
-          [{ occ_cnt  = s'.s_indices,ret_m;
-             occ_vars = List.rev fv;
-             occ_cond = cond; }]
+          |Term.Fun ((f',_), _, [Term.Name s']), Some is_pk
+            when is_pk f' && s'.s_symb = k ->
+            let ret_m = if drop_head then m else m_full in
+            [{ occ_cnt  = s'.s_indices,ret_m;
+               occ_vars = init_fv @ (List.rev fv);
+               occ_cond = cond;
+               occ_pos  = Sp.singleton pos; }]
+          | _ -> []
+        in
+        occs' @ occs, `Continue
 
-        |Term.Fun ((f',_), _, [Term.Name s']), Some is_pk
-          when is_pk f' && s'.s_symb = k ->
-          let ret_m = if drop_head then m else m_full in
-          [{ occ_cnt  = s'.s_indices,ret_m;
-             occ_vars = List.rev fv;
-             occ_cond = cond; }]
-        | _ -> []
-      in
-      occs @ get m ~fv ~cond @ get k' ~fv ~cond
+      | Term.Var m when not (Type.is_finite (Vars.ty m)) -> assert false
+      (* SSC must have been checked first *)
 
-    | Term.Var m when not (Type.is_finite (Vars.ty m)) -> assert false
-    (* SSC must have been checked first *)
-
-    | _ -> occs ()
+      | Term.Macro (m, l, ts) ->
+        assert (l = []);
+        try_unfold cntxt m ts occs
+        
+      | _ -> occs, `Continue
   in
 
-  get t ~fv ~cond:[]
+  let occs, _, _ =
+    Match.Pos.map_fold ~m_rec:true func (Vars.of_list fv) [] t
+  in
+  occs
 
 
 (*------------------------------------------------------------------*)
@@ -455,7 +482,8 @@ let get_ite_term (constr : Constr.trace_cntxt) (t : Term.term) : ite_occs =
       let occ = {
         occ_cnt  = c,t,e;
         occ_vars = List.rev fv;
-        occ_cond = cond; }
+        occ_cond = cond;
+        occ_pos  = Sp.empty; }
       in
       occ :: occs
 
@@ -499,7 +527,8 @@ let get_macro_occs
       let default () =
         [{ occ_cnt  = ms;
            occ_vars = List.rev fv;
-           occ_cond = cond; }]
+           occ_cond = cond;
+           occ_pos  = Sp.empty; }]
       in
 
       if mode = `FullDelta || is_global ms constr.table then

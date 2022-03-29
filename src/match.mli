@@ -10,6 +10,8 @@ module Pos : sig
   (** A position in a term *)
   type pos
 
+  val pp : Format.formatter -> pos -> unit
+    
   (** set of positions *)
   module Sp : Set.S with type elt = pos
 
