@@ -101,7 +101,8 @@ type fsymb_matcher = Type of Symbols.function_def | Symbol of Term.fsymb
 
 (** Looks for occurrences of subterms using a function symbol of the given kind
     (Hash, Dec, ...).
-    Does not recurse below terms whose head is excluded by [excludesymtype]. *)
+    Does not recurse below terms whose head is excluded by [excludesymtype]. 
+    Incomplete. *)
 val get_ftypes :
   ?excludesymtype:Symbols.function_def ->
   Symbols.table -> 
@@ -110,7 +111,8 @@ val get_ftypes :
   mess_occs
 
 (** Looks for occurrences of subterms using a function symbol of the given head.
-    Does not recurse below terms whose head is excluded by [excludesymtype]. *)
+    Does not recurse below terms whose head is excluded by [excludesymtype]. 
+    Incomplete. *)
 val get_fsymb :
   ?excludesymtype:Symbols.function_def ->
   ?allow_diff:bool -> 

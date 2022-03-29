@@ -1842,7 +1842,7 @@ let cca1 Args.(Int i) s =
          "CCA1 can only be applied on a term with at least one occurrence \
           of an encryption term enc(t,r,pk(k))");
 
-  let new_elem =    Equiv.subst_equiv substs [e] in
+  let new_elem = Equiv.subst_equiv substs [e] in
   let biframe = (List.rev_append before (new_elem @ after)) in
   Goal.Equiv (ES.set_equiv_goal biframe s) :: fgoals
 

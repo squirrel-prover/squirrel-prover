@@ -1,7 +1,9 @@
 open Utils
 
+module Pos = Match.Pos
+               
 module Sv = Vars.Sv
-module Sp = Match.Pos.Sp
+module Sp = Pos.Sp
               
 (*------------------------------------------------------------------*)
 (** Iterate over all subterms.
@@ -174,7 +176,7 @@ let pp_occ pp_cnt fmt occ =
     if pos = [] then ()
     else
       Fmt.pf fmt " at @[%a@]"
-        (Fmt.list ~sep:Fmt.comma Match.Pos.pp) pos
+        (Fmt.list ~sep:Fmt.comma Pos.pp) pos
   in
   Fmt.pf fmt "[@[%a@] | ∃@[%a@], @[%a@]%a]"
     pp_cnt occ.occ_cnt
@@ -315,10 +317,11 @@ let get_f
 
     | Term.Diff (Term.Fun _, Term. Fun _) when allow_diff ->
       let head_occ =
-        if (match Term.pi_term ~projection:PLeft t, Term.pi_term ~projection:PRight t with
+        if (match Term.pi_term ~projection:PLeft t,
+                  Term.pi_term ~projection:PRight t with
             | (Fun (fl,_,ll),Fun (fr,_,lr))
-              when (matching table fl symtype
-                    && matching table fr symtype ) -> true
+              when (matching table fl symtype &&
+                    matching table fr symtype ) -> true
             | _ -> false )
         then [{ occ_cnt  = t;
                 occ_vars = List.rev fv;
@@ -407,7 +410,7 @@ let get_f_messages_ext
   =
   let init_fv = fv in
   
-  let func : hash_occs Match.Pos.f_map_fold =
+  let func : hash_occs Pos.f_map_fold =
     fun (t : Term.term) (fv:Vars.vars) (cond:Term.terms) pos occs ->
       match t with
       | Term.Fun ((f',_),_, [m;k']) as m_full when f' = f ->
@@ -454,9 +457,7 @@ let get_f_messages_ext
       | _ -> occs, `Continue
   in
 
-  let occs, _, _ =
-    Match.Pos.map_fold ~m_rec:true func (Vars.of_list fv) [] t
-  in
+  let occs, _, _ = Pos.map_fold ~m_rec:true func (Vars.of_list fv) [] t in
   occs
 
 
