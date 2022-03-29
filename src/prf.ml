@@ -51,7 +51,8 @@ let prf_occ_incl table system (o1 : prf_occ) (o2 : prf_occ) : bool =
   let a1, is1, t1 = o1.occ_cnt in
   let a2, is2, t2 = o2.occ_cnt in
 
-  let cond1, cond2 = o1.occ_cond, o2.occ_cond in
+  let cond1 = Term.mk_ands (List.rev o1.occ_cond)
+  and cond2 = Term.mk_ands (List.rev o2.occ_cond) in
 
   (* build a dummy term, which we used to match in one go all elements of
      the two occurrences *)
@@ -98,7 +99,9 @@ let prf_mk_indirect
   in
   let hash_is = List.map (Term.subst_var subst) hash_is
   and hash_m = Term.subst subst hash_m
-  and hash_cond = Term.subst subst hash_occ.Iter.occ_cond in
+  and hash_cond = List.map (Term.subst subst) hash_occ.Iter.occ_cond in
+
+  let hash_cond = Term.mk_ands (List.rev hash_cond) in
 
   (* save the environment after having renamed all free variables until now. *)
   let env0 = !env in

@@ -597,7 +597,8 @@ let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool =
   let a1, is1 = o1.occ_cnt in
   let a2, is2 = o2.occ_cnt in
 
-  let cond1, cond2 = o1.occ_cond, o2.occ_cond in
+  let cond1 = Term.mk_ands (List.rev o1.occ_cond)
+  and cond2 = Term.mk_ands (List.rev o2.occ_cond) in
 
   (* build a dummy term, which we used to match in one go all elements of
      the two occurrences *)

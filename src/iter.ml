@@ -163,15 +163,15 @@ end
 (** {2 Occurrences} *)
 type 'a occ = {
   occ_cnt  : 'a;
-  occ_vars : Vars.vars; (** variables bound above the occurrence *)
-  occ_cond : Term.term; (** conditions above the occurrence *)
+  occ_vars : Vars.vars;  (** variables bound above the occurrence *)
+  occ_cond : Term.terms; (** conditions above the occurrence *)
 }
 
 let pp_occ pp_cnt fmt occ =
   Fmt.pf fmt "[@[%a@] | ∃@[%a@], @[%a@]]"
     pp_cnt occ.occ_cnt
     (Fmt.list ~sep:Fmt.comma Vars.pp) occ.occ_vars
-    Term.pp occ.occ_cond
+    (Fmt.list ~sep:Fmt.comma Term.pp) occ.occ_cond
 
 type 'a occs = 'a occ list
 
@@ -182,9 +182,9 @@ type 'a occs = 'a occ list
     that may not happen. *)
 let tfold_occ 
     ~(mode : [`Delta of Constr.trace_cntxt | `NoDelta ])
-    (func  : fv:Vars.vars -> cond:Term.term -> Term.term -> 'a -> 'a) 
+    (func  : fv:Vars.vars -> cond:Term.terms -> Term.term -> 'a -> 'a) 
     ~(fv   : Vars.vars)
-    ~(cond : Term.term)
+    ~(cond : Term.terms)
     (t     : Term.term) 
     (acc   : 'a) 
   : 'a 
@@ -204,9 +204,9 @@ let tfold_occ
     func ~fv ~cond t acc
 
   | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite ->
-    func ~fv ~cond c acc                               |>
-    func ~fv ~cond:(Term.mk_and cond c) t              |>
-    func ~fv ~cond:(Term.mk_and cond (Term.mk_not c)) e
+    func ~fv ~cond c acc |>
+    func ~fv ~cond:(c :: cond) t |>
+    func ~fv ~cond:(Term.mk_not c :: cond) e
 
   | Term.Find (is, c, t, e) ->
     let is, subst = Term.refresh_vars `Global is in
@@ -214,13 +214,11 @@ let tfold_occ
     let fv1 = List.rev_append is fv in
 
     let cond_e =
-      Term.mk_and
-        cond 
-        (Term.(mk_not (mk_exists (List.map (fun i -> i) is)  c)))
+      Term.(mk_not (mk_exists (List.map (fun i -> i) is)  c)) :: cond 
     in
 
-    func ~fv:fv1 ~cond c acc                               |>
-    func ~fv:fv1 ~cond:(Term.mk_and cond c) t              |>
+    func ~fv:fv1 ~cond c acc |>
+    func ~fv:fv1 ~cond:(c :: cond) t |>
     func ~fv:fv  ~cond:cond_e e
 
   | Term.Macro (m, l, ts) ->
@@ -273,7 +271,7 @@ let get_f
     (t               : Term.term)
   : mess_occs 
   =
-  let rec get (t : Term.term) ~(fv : Vars.vars) ~(cond : Term.term) : mess_occs =
+  let rec get (t : Term.term) ~(fv : Vars.vars) ~(cond : Term.terms) : mess_occs =
     let occs () =
       tfold_occ ~mode:`NoDelta (fun ~fv ~cond t occs ->
           get t ~fv ~cond @ occs
@@ -314,7 +312,7 @@ let get_f
     | _ -> occs ()
   in
 
-  get t ~fv:[] ~cond:Term.mk_true
+  get t ~fv:[] ~cond:[]
 
 
 let get_ftypes 
@@ -346,7 +344,7 @@ type diff_occs = diff_occ list
 
 (** Looks for occurrences of diff operator.  *)
 let get_diff ~(cntxt : Constr.trace_cntxt) (t : Term.term) : diff_occs =
-  let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.term) : diff_occs =
+  let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.terms) : diff_occs =
     let occs () =
       tfold_occ ~mode:(`Delta cntxt) (fun ~fv ~cond t occs ->
           get t ~fv ~cond @ occs
@@ -361,7 +359,7 @@ let get_diff ~(cntxt : Constr.trace_cntxt) (t : Term.term) : diff_occs =
     | _ -> occs ()
   in
 
-  get t ~fv:[] ~cond:Term.mk_true
+  get t ~fv:[] ~cond:[]
 
 
 (*------------------------------------------------------------------*)
@@ -387,7 +385,7 @@ let get_f_messages_ext
     (t      : Term.term)
   : hash_occs
   =
-  let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.term) : hash_occs =
+  let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.terms) : hash_occs =
     let occs () =
       tfold_occ ~mode:(`Delta cntxt) (fun ~fv ~cond t occs ->
           get t ~fv ~cond @ occs
@@ -432,7 +430,7 @@ let get_f_messages_ext
     | _ -> occs ()
   in
 
-  get t ~fv ~cond:Term.mk_true
+  get t ~fv ~cond:[]
 
 
 (*------------------------------------------------------------------*)
@@ -445,7 +443,7 @@ type ite_occs = ite_occ list
 (** Does not remove duplicates.
     Does not look below macros. *)
 let get_ite_term (constr : Constr.trace_cntxt) (t : Term.term) : ite_occs =
-  let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.term) : ite_occs =
+  let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.terms) : ite_occs =
     let occs =
       tfold_occ ~mode:`NoDelta (fun ~fv ~cond t occs ->
           get t ~fv ~cond @ occs
@@ -464,7 +462,7 @@ let get_ite_term (constr : Constr.trace_cntxt) (t : Term.term) : ite_occs =
     | _ -> occs
   in
 
-  get t ~fv:[] ~cond:Term.mk_true
+  get t ~fv:[] ~cond:[]
 
 (*------------------------------------------------------------------*)
 (** {2 Macros} *)
@@ -491,7 +489,7 @@ let get_macro_occs
     (t      : Term.term)
   : macro_occs
   =
-  let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.term) : macro_occs =
+  let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.terms) : macro_occs =
     match t with
     | Term.Var v when not (Type.is_finite (Vars.ty v)) ->
       raise Var_found
@@ -516,7 +514,7 @@ let get_macro_occs
            get t ~fv ~cond @ occs
         ) ~fv ~cond t []
   in
-  get t ~fv:[] ~cond:Term.mk_true
+  get t ~fv:[] ~cond:[]
 
 (*------------------------------------------------------------------*)
 (** {2 Folding over action descriptions} *)

@@ -63,8 +63,8 @@ class get_f_messages :
 (** An occurrence. *)
 type 'a occ = {
   occ_cnt  : 'a;
-  occ_vars : Vars.vars; (** variables bound above the occurrence *)
-  occ_cond : Term.term; (** conditions above the occurrence *)
+  occ_vars : Vars.vars;  (** variables bound above the occurrence *)
+  occ_cond : Term.terms; (** conditions above the occurrence *)
 }
 
 val pp_occ :
@@ -82,9 +82,9 @@ type 'a occs = 'a occ list
     that may not happen. *)
 val tfold_occ :
   mode:[ `Delta of Constr.trace_cntxt | `NoDelta ] ->
-  (fv:Vars.vars -> cond:Term.term -> Term.term -> 'a -> 'a) ->
+  (fv:Vars.vars -> cond:Term.terms -> Term.term -> 'a -> 'a) ->
   fv:Vars.vars -> 
-  cond:Term.term -> 
+  cond:Term.terms -> 
   Term.term -> 
   'a -> 
   'a

@@ -71,7 +71,7 @@ let get_name_indices_ext
     (t : Term.term)
   : name_occs
   =
-  let rec get (t : Term.term) ~(fv : Vars.vars) ~(cond : Term.term) : name_occs =
+  let rec get (t : Term.term) ~(fv : Vars.vars) ~(cond : Term.terms) : name_occs =
     match t with
     | Term.Var v when not (Type.is_finite (Vars.ty v)) ->
       raise Var_found
@@ -90,7 +90,7 @@ let get_name_indices_ext
            get t ~fv ~cond @ occs
         ) ~fv ~cond t []
   in
-  get t ~fv ~cond:Term.mk_true
+  get t ~fv ~cond:[]
 
 (*------------------------------------------------------------------*)
 type ts_occ = Term.term Iter.occ
@@ -122,7 +122,7 @@ let clear_dup_mtso_le (occs : ts_occs) : ts_occs =
 (** Looks for timestamps at which macros occur in a term. *)
 let get_actions_ext (constr : Constr.trace_cntxt) (t : Term.term) : ts_occs =
 
-  let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.term) : ts_occs =
+  let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.terms) : ts_occs =
     match t with
     | Term.Macro (m, l, ts) ->
       if l <> [] then failwith "Not implemented" ;
@@ -153,7 +153,7 @@ let get_actions_ext (constr : Constr.trace_cntxt) (t : Term.term) : ts_occs =
            get t ~fv ~cond @ occs
         ) ~fv ~cond t []
   in
-  get t ~fv:[] ~cond:Term.mk_true
+  get t ~fv:[] ~cond:[]
 
 
 (*------------------------------------------------------------------*)
@@ -180,11 +180,14 @@ let mk_le_ts_occ
   let occ_vars, occ_subst = Term.refresh_vars (`InEnv (ref env)) occ_vars in
   let subst = occ_subst in
   let ts   = Term.subst subst occ.occ_cnt  in
-  let cond = Term.subst subst occ.occ_cond in
+
+  let cond = List.map (Term.subst subst) occ.occ_cond in
+  let cond = List.rev cond in
+  
   Term.mk_exists ~simpl:true occ_vars
     (Term.mk_and
        (Term.mk_timestamp_leq ts0 ts)
-       cond)
+       (Term.mk_ands cond))
 
 let mk_le_ts_occs
     (env : Vars.env)

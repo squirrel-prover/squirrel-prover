@@ -671,7 +671,10 @@ let fresh_mk_direct
   =
   let env = ref env in
   let bv, subst = Term.refresh_vars (`InEnv env) occ.occ_vars in
-  let cond = Term.subst subst occ.occ_cond in
+  let cond = List.map (Term.subst subst) occ.occ_cond in
+
+  let cond = Term.mk_ands (List.rev cond) in
+  
   let j = List.map (Term.subst_var subst) occ.occ_cnt in
   Term.mk_forall ~simpl:true bv
     (Term.mk_impl cond (Term.mk_indices_neq n.s_indices j))
@@ -1403,7 +1406,9 @@ let global_diff_eq (s : ES.t) =
      miter (snd action_descr.Action.condition) ;
      List.iter (fun (_,m) -> miter m) action_descr.Action.updates) ;
 
-  List.map (fun (vs,is,t) -> match t.Iter.occ_cnt with
+  List.map (fun (vs,is,t) ->
+      let cond = Term.mk_ands (List.rev t.Iter.occ_cond) in
+      match t.Iter.occ_cnt with
       | (Term.Diff(s1,s2) as subt)->
         let fvars =
           t.Iter.occ_vars @ Vars.Sv.elements (Term.fv subt)
@@ -1412,11 +1417,11 @@ let global_diff_eq (s : ES.t) =
           let iter = new Fresh.get_actions ~cntxt in
           match Term.ty subt with
           | Type.Index -> []
-          | Type.Timestamp -> (iter#visit_message t.Iter.occ_cond;
+          | Type.Timestamp -> (iter#visit_message cond;
                                 s1 :: s2 :: iter#get_actions)
           | _ ->
             (iter#visit_message subt;
-             iter#visit_message t.Iter.occ_cond;
+             iter#visit_message cond;
              iter#get_actions)
         in
         (* Remark that the get_actions add pred to all timestamps, to simplify. *)
@@ -1439,7 +1444,7 @@ let global_diff_eq (s : ES.t) =
                               mk_forall fvars
                                 (mk_impls (List.map mk_happens ts_list
                                            @ List.map (fun t -> mk_macro exec_macro [] t) ts_list
-                                           @ [t.Iter.occ_cond])
+                                           @ [cond])
                               (mk_atom `Eq s1 s2))
                             )
                             s))
