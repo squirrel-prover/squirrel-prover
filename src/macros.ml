@@ -329,22 +329,22 @@ let get_dummy_definition
     the new system. *)
 let update_global_data
     (table        : Symbols.table)
-    (ns           : Symbols.macro)
+    (ms           : Symbols.macro)
     (dec_def      : Symbols.macro_def)
     (old_s_system : SystemExpr.single_system)
     (new_s_system : SystemExpr.single_system)
-    (f            : Term.term -> Term.term)
+    (f            : Symbols.macro -> Term.term -> Term.term)
   :  Symbols.table
   =
-  match Symbols.Macro.get_data ns table with
+  match Symbols.Macro.get_data ms table with
   | Global_data data -> 
     let body = get_single_body old_s_system data in
     let data =
       Global_data { data with
-                    systems_body = (new_s_system, f body) ::
+                    systems_body = (new_s_system, f ms body) ::
                                    data.systems_body }
     in
-    Symbols.Macro.redefine table ~data ns dec_def
+    Symbols.Macro.redefine table ~data ms dec_def
 
   | _ -> table
     

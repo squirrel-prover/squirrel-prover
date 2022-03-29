@@ -1,3 +1,5 @@
+open Utils
+
 type 'a item = {
   par_choice : int * 'a ; (** position in parallel compositions *)
   sum_choice : int * 'a   (** position in conditionals *)
@@ -200,16 +202,21 @@ let subst_descr subst descr =
 
 
 let descr_map
-    (f : Vars.env -> Term.term -> Term.term) 
+    (f : Vars.env -> Symbols.macro -> Term.term -> Term.term) 
     (descr : descr)
   : descr
   =
   let env = Vars.of_list descr.indices in
   let f = f env in
   
-  let condition = fst descr.condition, f (snd descr.condition) in
-  let updates = List.map (fun (ss,t) -> ss, f t) descr.updates in
-  let output = fst descr.output, f (snd descr.output) in
+  let condition =
+    fst descr.condition,
+    f Symbols.cond (snd descr.condition)
+  in
+  let updates =
+    List.map (fun (ss,t) -> ss, f ss.Term.s_symb t) descr.updates
+  in
+  let output = fst descr.output, f Symbols.out (snd descr.output) in
 
   { descr with condition; updates; output;  }
 

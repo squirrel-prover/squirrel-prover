@@ -46,14 +46,21 @@ let clone_system_map
     (system   : SE.t)
     (s_system : SE.single_system)
     (new_name : Theory.lsymb)
-    (fmap     : Term.term -> Term.term)
+    (fmap     :
+       ( [`Global | `Action of Symbols.action] ->
+         Symbols.macro ->
+         Term.term ->
+         Term.term ))
   : Symbols.table * SE.t * Symbols.system 
   =
   (* We declare the system *)
   let table, new_system_name =
     SystemExpr.clone_system_map
-      table system
-      new_name (Action.descr_map (fun _ -> fmap))
+      table system new_name
+      (fun descr ->
+         Action.descr_map (fun _ ->
+             fmap (`Action descr.Action.name)
+           ) descr)
   in
 
   let new_s_system, old_s_system, old_system_name =
@@ -66,7 +73,7 @@ let clone_system_map
   let global_macro_fold ns dec_def _ table : Symbols.table =
     Macros.update_global_data
       table ns dec_def
-      s_system new_s_system fmap
+      s_system new_s_system (fmap `Global)
   in
 
   let table = Symbols.Macro.fold global_macro_fold table table in
@@ -166,7 +173,7 @@ let global_rename table sdecl (gf : Theory.global_formula) =
     }
   in
 
-  let fmap t : Term.term =
+  let fmap _ _ms t : Term.term =
     rewrite_norec table old_system env.vars rw_rule t
   in
   
@@ -274,7 +281,7 @@ let global_prf
     }
   in
 
-  let fmap t =
+  let fmap _ _ms t =
     rewrite_norec table old_system venv rw_rule t
   in
 
@@ -425,7 +432,7 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
     }
   in
 
-  let fmap t =
+  let fmap _ _ms t =
     rewrite_norec table old_system venv enc_rw_rule t |>
     rewrite_norec table old_system venv dec_rw_rule 
   in
@@ -517,6 +524,17 @@ let global_prf_time
     Tactics.soft_failure (Tactics.BadSSCDetailed errors);
 
   let occs : Iter.hash_occs =
+    let occs = ref [] in
+    let fmap _ _ms (t : Term.term) : Term.term =
+      assert false
+    in
+    let table, new_system_e, old_system_name =
+      clone_system_map
+        table old_system old_single_system sdecl.Decl.name fmap
+    in 
+    (* !occs *)
+
+    
     SystemExpr.fold_descrs (fun descr occs ->
         Iter.fold_descr ~globals:true (fun msymb m_is _ t occs ->
             let new_occs =
@@ -531,7 +549,9 @@ let global_prf_time
 
   (* FIXME: check duplicate module alpha-renaming *)
   let occs = List.remove_duplicate (=) occs in
+  (* TODO: improve *)
 
+  
   (* type of the hash function input *)
   let m_ty = List.hd (param.h_fty.fty_args) in
 
@@ -620,7 +640,7 @@ let global_prf_time
       rw_rw     = Term.ESubst (to_rw, assert false(* rw_target tau0 *));
     } in
 
-  let fmap (tau0 : Term.term) _ (t : Term.term) : Term.term =
+  let fmap _ (tau0 : Term.term) _ _ms (t : Term.term) : Term.term =
     rewrite_norec table old_system venv (mk_rw_rule tau0) t
   in
 

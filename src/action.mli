@@ -170,7 +170,10 @@ val subst_action : Term.subst -> action -> action
 val subst_descr : Term.subst -> descr -> descr
 
 (** Map a function over a descriptor. *)
-val descr_map : (Vars.env -> Term.term -> Term.term) -> descr -> descr
+val descr_map :
+  (Vars.env -> Symbols.macro -> Term.term -> Term.term) ->
+  descr ->
+  descr
 
 
 (*------------------------------------------------------------------*)
