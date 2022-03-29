@@ -479,8 +479,8 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
 (*------------------------------------------------------------------*)
 (** {2 Global PRF with time} *)
 
-let check_fv_finite (fv : Sv.t) =
-  Sv.iter (fun v ->
+let check_fv_finite (fv : Vars.vars) =
+  List.iter (fun v ->
       if not (Type.equal (Vars.ty v) Type.tindex) &&
          not (Type.equal (Vars.ty v) Type.ttimestamp) then
         Tactics.hard_failure
@@ -539,7 +539,7 @@ let global_prf_time
         Iter.fold_descr ~globals:true (fun msymb m_is _ t occs ->
             let new_occs =
               Iter.get_f_messages_ext
-                ~fv:Sv.empty ~cntxt
+                ~fv:[] ~cntxt
                 param.h_fn param.h_key.s_symb t
             in
             new_occs @ occs
@@ -571,7 +571,7 @@ let global_prf_time
         check_fv_finite occ.Iter.occ_vars;
 
         let ndef =
-          let ty_args = List.map Vars.ty (Sv.elements occ.Iter.occ_vars) in
+          let ty_args = List.map Vars.ty occ.Iter.occ_vars in
           Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args m_ty ; }
         in
         let table,n =
@@ -602,8 +602,7 @@ let global_prf_time
   let mk_occ_term
       (occ : Iter.hash_occ) (n_occ : Symbols.name) : Term.term
     =
-      (* FIXME: use a list of variables and not a set in [occ.occ_vars] *)
-      Term.mk_name (Term.mk_isymb n_occ m_ty (Sv.elements occ.occ_vars))
+      Term.mk_name (Term.mk_isymb n_occ m_ty occ.occ_vars)
   in
   
   (* we rewrite [H(x,k)] at occurrence occ0 at time tau0 into:

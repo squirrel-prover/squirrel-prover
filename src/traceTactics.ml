@@ -610,7 +610,7 @@ let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool =
   in
   let pat2 = Match.{
       pat_tyvars = [];
-      pat_vars   = o2.occ_vars;
+      pat_vars   = Sv.of_list o2.occ_vars;
       pat_term   = mk_dum a2 is2 cond2;
     }
   in
@@ -668,7 +668,10 @@ let mk_fresh_indirect_cases
             (Vars.to_set env)
         in
 
-        let new_cases = Fresh.get_name_indices_ext ~fv:fv cntxt ns.s_symb t in
+        let new_cases =
+          let fv = List.rev (Sv.elements fv) in
+          Fresh.get_name_indices_ext ~fv cntxt ns.s_symb t
+        in
         let new_cases =
           List.map (fun (case : Fresh.name_occ) ->
               { case with
@@ -1325,7 +1328,7 @@ let yes_no_if b s =
 
   | occ :: _ ->
     (* Context with bound variables (eg try find) are not supported. *)
-    if not (Sv.is_empty occ.Iter.occ_vars) then
+    if not (occ.Iter.occ_vars = []) then
       soft_failure (Tactics.Failure "cannot be applied in a under a binder");
 
     let c,t,e = occ.occ_cnt in

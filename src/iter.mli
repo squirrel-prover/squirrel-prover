@@ -63,7 +63,7 @@ class get_f_messages :
 (** An occurrence. *)
 type 'a occ = {
   occ_cnt  : 'a;
-  occ_vars : Sv.t;      (** variables bound above the occurrence *)
+  occ_vars : Vars.vars; (** variables bound above the occurrence *)
   occ_cond : Term.term; (** conditions above the occurrence *)
 }
 
@@ -82,8 +82,8 @@ type 'a occs = 'a occ list
     that may not happen. *)
 val tfold_occ :
   mode:[ `Delta of Constr.trace_cntxt | `NoDelta ] ->
-  (fv:Sv.t -> cond:Term.term -> Term.term -> 'a -> 'a) ->
-  fv:Sv.t -> 
+  (fv:Vars.vars -> cond:Term.term -> Term.term -> 'a -> 'a) ->
+  fv:Vars.vars -> 
   cond:Term.term -> 
   Term.term -> 
   'a -> 
@@ -144,7 +144,7 @@ type hash_occs = hash_occ list
 val get_f_messages_ext :
   ?drop_head:bool ->
   ?fun_wrap_key:(Term.fname -> bool) option ->
-  ?fv:Sv.t ->
+  ?fv:Vars.vars ->
   cntxt:Constr.trace_cntxt ->
   Term.fname -> 
   Term.name -> 
@@ -219,10 +219,10 @@ val fold_descr :
     - [env ∩ is = ∅]
     - the free index variables of [t] and [a] are included in [env ∪ is]. *)
 type iocc = {
-  iocc_aname : Symbols.action;
-  iocc_action : Action.action;
-  iocc_vars : Sv.t;
-  iocc_cnt : Term.term;
+  iocc_aname   : Symbols.action;
+  iocc_action  : Action.action;
+  iocc_vars    : Sv.t;
+  iocc_cnt     : Term.term;
   iocc_sources : Term.term list;
 }
 

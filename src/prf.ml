@@ -26,7 +26,7 @@ let prf_mk_direct env (param : prf_param) (occ : Iter.hash_occ) =
 
   let vars = occ.occ_vars in
 
-  let vars, subst = Term.refresh_vars (`InEnv env) (Sv.elements vars) in
+  let vars, subst = Term.refresh_vars (`InEnv env) vars in
 
   let is, m = occ.occ_cnt in
   let is = List.map (Term.subst_var subst) is in
@@ -65,7 +65,7 @@ let prf_occ_incl table system (o1 : prf_occ) (o2 : prf_occ) : bool =
   in
   let pat2 = Match.{
       pat_tyvars = [];
-      pat_vars   = o2.occ_vars;
+      pat_vars   = Sv.of_list o2.occ_vars;
       pat_term   = mk_dum a2 is2 cond2 t2;
     }
   in
@@ -84,8 +84,8 @@ let prf_mk_indirect
     (hash_occ      : prf_occ) : Term.term
   =
   let env = ref env in
-
-  let vars = Sv.elements hash_occ.Iter.occ_vars in
+  
+  let vars = hash_occ.Iter.occ_vars in
   let vars, subst = Term.refresh_vars (`InEnv env) vars in
 
   let action, hash_is, hash_m = hash_occ.Iter.occ_cnt in
@@ -184,7 +184,7 @@ let mk_prf_phi_proj cntxt env param frame hash =
     Iter.fold_macro_support (fun iocc macro_cases ->
         let name = iocc.iocc_aname in
         let t = iocc.iocc_cnt in
-        let fv = iocc.iocc_vars in
+        let fv = (List.rev (Sv.elements iocc.iocc_vars)) in
 
         let new_cases =
           Iter.get_f_messages_ext ~fv ~cntxt param.h_fn param.h_key.s_symb t
