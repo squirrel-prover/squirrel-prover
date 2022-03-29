@@ -1350,9 +1350,9 @@ let yes_no_if_args b args s : Goal.t list =
 
 type unforgeabiliy_param = Term.fname * Term.nsymb * Term.term
                            * Term.term
-                           * (Symbols.fname Symbols.t -> bool)
+                           * (Symbols.fname -> bool)
                            * Term.term list * bool
-                           * (Symbols.fname Symbols.t -> bool) option
+                           * (Symbols.fname -> bool) option
 
 let euf_param table (t : Term.term) : unforgeabiliy_param =
   let bad_param () =

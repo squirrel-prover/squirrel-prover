@@ -188,11 +188,11 @@ val get_macro_occs :
     Also folds over global macros if [globals] is [true]. *)
 val fold_descr :
   globals:bool ->
-  ( Symbols.macro Symbols.t -> (* macro symbol [ms] *)
-    Vars.var list           -> (* indices [is] of [ms] *)
-    Symbols.macro_def       -> (* macro definition *)
-    Term.term               -> (* term [t] defining [ms(is)] *)
-    'a                      -> (* folding accumulator *)
+  ( Symbols.macro     -> (* macro symbol [ms] *)
+    Vars.var list     -> (* indices [is] of [ms] *)
+    Symbols.macro_def -> (* macro definition *)
+    Term.term         -> (* term [t] defining [ms(is)] *)
+    'a                -> (* folding accumulator *)
     'a) ->
   Symbols.table -> 
   SystemExpr.t -> 
@@ -219,7 +219,7 @@ val fold_descr :
     - [env ∩ is = ∅]
     - the free index variables of [t] and [a] are included in [env ∪ is]. *)
 type iocc = {
-  iocc_aname : Symbols.action Symbols.t;
+  iocc_aname : Symbols.action;
   iocc_action : Action.action;
   iocc_vars : Sv.t;
   iocc_cnt : Term.term;
@@ -263,10 +263,10 @@ val fold_macro_support :
 (** Less precise version of [fold_macro_support], which does not track 
     sources. *)
 val fold_macro_support0 :
-  (Symbols.action Symbols.t -> (* action name *)
-   Action.action            -> (* action *)
-   Term.term                -> (* term *)
-   'a                       -> (* folding accumulator *)
+  (Symbols.action -> (* action name *)
+   Action.action  -> (* action *)
+   Term.term      -> (* term *)
+   'a             -> (* folding accumulator *)
    'a) ->
   Constr.trace_cntxt -> 
   Vars.env -> 

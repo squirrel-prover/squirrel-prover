@@ -7,7 +7,7 @@
     with fresh indices where relevant (i.e. for indices other than the
     key's indices).  *)
 type euf_schema = {
-  action_name  : Symbols.action Symbols.t;
+  action_name  : Symbols.action;
   action       : Action.action;
   message      : Term.term;
   key_indices  : Vars.var list;
@@ -48,7 +48,7 @@ the protocol and the messages. All occurences of the key must either be inside
 the hash function, or under some public key function.*)
 val key_ssc :
   ?messages:(Term.term list) -> ?elems:Equiv.equiv ->
-  allow_functions:(Symbols.fname Symbols.t -> bool) ->
+  allow_functions:(Symbols.fname -> bool) ->
   cntxt:Constr.trace_cntxt ->
   Term.fname -> Term.name -> Tactics.ssc_error list
 
@@ -59,8 +59,8 @@ val key_ssc :
 val mk_rule :
   elems:Equiv.equiv ->
   drop_head:bool ->
-  fun_wrap_key:((Symbols.fname Symbols.t -> bool) option) ->
-  allow_functions:(Symbols.fname Symbols.t -> bool) ->
+  fun_wrap_key:((Symbols.fname -> bool) option) ->
+  allow_functions:(Symbols.fname -> bool) ->
   cntxt:Constr.trace_cntxt ->
   env:Vars.env -> mess:Term.term -> sign:Term.term ->
   head_fn:Term.fname -> key_n:Term.name -> key_is:Vars.var list -> euf_rule

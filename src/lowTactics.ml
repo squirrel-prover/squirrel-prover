@@ -237,10 +237,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let expand
       ?m_rec
       (targets: target list)
-      (target : [ `Msymb of Symbols.macro Symbols.t
-               | `Fsymb of Symbols.fname Symbols.t
-               | `Mterm of Term.term
-               | `Any])
+      (target : [ `Msymb of Symbols.macro
+                | `Fsymb of Symbols.fname 
+                | `Mterm of Term.term
+                | `Any])
       (s : S.sequent) : bool * S.sequent
     =
     let found1 = ref false in

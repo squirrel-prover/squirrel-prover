@@ -93,7 +93,7 @@ let key_ssc
 (** {2 Euf rules datatypes} *)
 
 type euf_schema = {
-  action_name  : Symbols.action Symbols.t;
+  action_name  : Symbols.action;
   action       : Action.action;
   message      : Term.term;
   key_indices  : Vars.var list;

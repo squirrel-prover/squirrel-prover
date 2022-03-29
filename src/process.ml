@@ -369,7 +369,7 @@ type p_env = {
   (* list of updates performed in the action.
    * The type can be a type unification variables. *)
 
-  globals : Symbols.macro Symbols.t list;
+  globals : Symbols.macro list;
   (* list of global macros declared at [action] *)
 
 }

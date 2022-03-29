@@ -47,7 +47,7 @@ let clone_system_map
     (s_system : SE.single_system)
     (new_name : Theory.lsymb)
     (fmap     : Term.term -> Term.term)
-  : Symbols.table * SE.t * Symbols.system Symbols.t
+  : Symbols.table * SE.t * Symbols.system 
   =
   (* We declare the system *)
   let table, new_system_name =
@@ -580,7 +580,7 @@ let global_prf_time
 
   (* fresh name corresponding to occurrence [occ]. *)
   let mk_occ_term
-      (occ : Iter.hash_occ) (n_occ : Symbols.name Symbols.t) : Term.term
+      (occ : Iter.hash_occ) (n_occ : Symbols.name) : Term.term
     =
       (* FIXME: use a list of variables and not a set in [occ.occ_vars] *)
       Term.mk_name (Term.mk_isymb n_occ m_ty (Sv.elements occ.occ_vars))
@@ -593,7 +593,7 @@ let global_prf_time
   let rw_target
       (tau0   : Term.term)
       (occ0   : Iter.hash_occ)
-      (n_occ0 : Symbols.name Symbols.t)
+      (n_occ0 : Symbols.name)
     =
     let cond =
       Term.mk_ands ~simpl:false

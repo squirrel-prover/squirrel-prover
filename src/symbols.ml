@@ -81,30 +81,38 @@ type bty_def = bty_info list
 
 (*------------------------------------------------------------------*)
 type name_def = {
-  n_fty   : Type.ftype; (** restricted to: (Index | Timestamp)^* -> T *)
+  n_fty   : Type.ftype; (** restricted to: (Index | Timestamp)^* -> ty *)
 }
 
 (*------------------------------------------------------------------*)
-type channel
-type name
-type action
-type fname
-type macro
-type system
-type process
-type btype
+type _channel
+type _name
+type _action
+type _fname
+type _macro
+type _system
+type _process
+type _btype
 
+type channel = _channel t
+type name    = _name    t
+type action  = _action  t
+type fname   = _fname   t
+type macro   = _macro   t
+type system  = _system  t
+type process = _process t
+type btype   = _btype   t
 (*------------------------------------------------------------------*)
 type _ def =
-  | Channel  : unit      -> channel def
-  | Name     : name_def  -> name    def
-  | Action   : int       -> action  def
-  | Macro    : macro_def -> macro   def
-  | System   : unit      -> system  def
-  | Process  : unit      -> process def
-  | BType    : bty_def   -> btype   def
+  | Channel  : unit      -> _channel def
+  | Name     : name_def  -> _name    def
+  | Action   : int       -> _action  def
+  | Macro    : macro_def -> _macro   def
+  | System   : unit      -> _system  def
+  | Process  : unit      -> _process def
+  | BType    : bty_def   -> _btype   def
 
-  | Function : (Type.ftype * function_def) -> fname def
+  | Function : (Type.ftype * function_def) -> _fname def
 
 type edef =
   | Exists : 'a def -> edef
@@ -437,7 +445,7 @@ let namespace_err (l : L.t option) c n =
   symb_err l (Incorrect_namespace (edef_namespace c, n))
 
 module Action = Make (struct
-  type ns = action
+  type ns = _action
   type local_def = int
 
   let namespace = NAction
@@ -451,7 +459,7 @@ module Action = Make (struct
 end)
 
 module Name = Make (struct
-  type ns = name
+  type ns = _name
   type local_def = name_def
 
   let namespace = NName
@@ -464,7 +472,7 @@ module Name = Make (struct
 end)
 
 module Channel = Make (struct
-  type ns = channel
+  type ns = _channel
   type local_def = unit
 
   let namespace = NChannel
@@ -477,7 +485,7 @@ module Channel = Make (struct
 end)
 
 module BType = Make (struct
-  type ns = btype
+  type ns = _btype
   type local_def = bty_def
 
   let namespace = NBType
@@ -490,7 +498,7 @@ module BType = Make (struct
 end)
 
 module System = Make (struct
-  type ns = system
+  type ns = _system
   type local_def = unit
 
   let namespace = NSystem
@@ -503,7 +511,7 @@ module System = Make (struct
 end)
 
 module Process = Make (struct
-  type ns = process
+  type ns = _process
   type local_def = unit
 
   let namespace = NProcess
@@ -516,7 +524,7 @@ module Process = Make (struct
 end)
 
 module Function = Make (struct
-  type ns = fname
+  type ns = _fname
   type local_def = Type.ftype * function_def
 
   let namespace = NFunction
@@ -537,7 +545,7 @@ let is_ftype s ftype table =
       symb_err L._dummy (Unbound_identifier s.name)
 
 module Macro = Make (struct
-  type ns = macro
+  type ns = _macro
   type local_def = macro_def
 
   let namespace = NMacro

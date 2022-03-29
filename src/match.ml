@@ -407,9 +407,9 @@ type term_head =
   | HForAll
   | HSeq
   | HFind
-  | HFun   of Symbols.fname Symbols.t
-  | HMacro of Symbols.macro Symbols.t
-  | HName  of Symbols.name  Symbols.t
+  | HFun   of Symbols.fname 
+  | HMacro of Symbols.macro 
+  | HName  of Symbols.name  
   | HDiff
   | HVar
   | HAction
@@ -1909,7 +1909,7 @@ module E : S with type t = Equiv.form = struct
     (* Return a list of specialization of [cand] deducible from
        [init_terms, known_sets] for action [a] at time [a]. *)
     let filter_deduce_action
-        (a : Symbols.action Symbols.t)
+        (a : Symbols.action)
         (cand : MCset.t)
         (init_terms : known_sets)              (* initial terms *)
         (known_sets : MCset.t list)            (* induction *)
@@ -1969,7 +1969,7 @@ module E : S with type t = Equiv.form = struct
     in
 
     let filter_deduce_action_list
-        (a : Symbols.action Symbols.t)
+        (a : Symbols.action)
         (cands : msets)
         (init_terms : known_sets)              (* initial terms *)
         (known_sets : MCset.t list)            (* induction *)

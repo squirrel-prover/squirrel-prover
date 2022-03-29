@@ -17,7 +17,7 @@ val declare_global :
   ts:Vars.var ->
   Term.term ->
   Type.ty ->
-  Symbols.table * Symbols.macro Symbols.t
+  Symbols.table * Symbols.macro 
 
 (*------------------------------------------------------------------*)
 (** {2 Macro expansions} *)
@@ -42,7 +42,7 @@ val get_definition_exn :
     whereas [get_definition] does some clever stuff to find a "Term.Action sth"
     equal to the given timestamp. *)
 val get_definition_nocntxt :
-  SystemExpr.t -> Symbols.table -> Term.msymb -> Symbols.action Symbols.t
+  SystemExpr.t -> Symbols.table -> Term.msymb -> Symbols.action 
   -> Vars.vars -> [ `Def of Term.term | `Undef ]
 
 (** When [m] is a global macro symbol,
@@ -60,7 +60,7 @@ val get_dummy_definition :
     the new system. *)
 val update_global_data :
   Symbols.table -> 
-  Symbols.macro Symbols.t -> 
+  Symbols.macro -> 
   Symbols.macro_def -> 
   SystemExpr.single_system ->
   SystemExpr.single_system ->

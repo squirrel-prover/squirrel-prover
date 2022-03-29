@@ -32,13 +32,13 @@ let mk_isymb (s : 'a) (t : Type.ty) (is : Vars.vars) =
     s_indices = is; }
 
 
-type name = Symbols.name Symbols.t
+type name = Symbols.name
 type nsymb = name isymb
 
-type fname = Symbols.fname Symbols.t
+type fname = Symbols.fname
 type fsymb = fname * Vars.var list (* TODO: use isymb *)
 
-type mname = Symbols.macro Symbols.t
+type mname = Symbols.macro
 type msymb = mname isymb
 
 type state = msymb
@@ -80,7 +80,7 @@ type term =
   | Macro  of msymb * term list * term
 
   | Seq    of Vars.var list * term
-  | Action of Symbols.action Symbols.t * Vars.var list 
+  | Action of Symbols.action * Vars.var list 
 
   | Var    of Vars.var
 

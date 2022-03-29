@@ -94,9 +94,9 @@ type term_head =
   | HForAll
   | HSeq
   | HFind
-  | HFun   of Symbols.fname Symbols.t
-  | HMacro of Symbols.macro Symbols.t
-  | HName  of Symbols.name  Symbols.t
+  | HFun   of Symbols.fname 
+  | HMacro of Symbols.macro 
+  | HName  of Symbols.name  
   | HDiff
   | HVar
   | HAction

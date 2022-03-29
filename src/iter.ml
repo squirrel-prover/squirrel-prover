@@ -526,7 +526,7 @@ let get_macro_occs
 let fold_descr
     ~(globals:bool)
     (f :
-       Symbols.macro Symbols.t -> (* macro symbol [ms] *)
+       Symbols.macro -> (* macro symbol [ms] *)
        Vars.var list ->           (* indices [is] of [ms] *)
        Symbols.macro_def ->       (* macro definition *)
        Term.term ->               (* term [t] defining [ms(is)] *)
@@ -555,7 +555,7 @@ let fold_descr
   else
     let ts = SystemExpr.action_to_term table system descr.action in
     (* fold over global macros in scope of [descr.action] *)
-    List.fold_left (fun mval (mg : Symbols.macro Symbols.t) ->
+    List.fold_left (fun mval (mg : Symbols.macro) ->
         let cntxt = Constr.{ system; table; models = None; } in
         let mdef, is_arr,ty = match Symbols.Macro.get_def mg table with
           | Global (is,ty) as mdef -> mdef, is, ty
@@ -610,7 +610,7 @@ module Mset : sig[@warning "-32"]
   val incl : Symbols.table -> SystemExpr.t -> t -> t -> bool
 
   (** simpl mset builder, when the macro symbol is not indexed. *)
-  val mk_simple : Symbols.macro Symbols.t -> Type.ty -> t
+  val mk_simple : Symbols.macro -> Type.ty -> t
 end = struct
   type t = {
     msymb   : Term.msymb;
@@ -730,7 +730,7 @@ end = struct
     | Match _ -> true
     | FreeTyv | NoMatch _ -> false
 
-  let mk_simple (m : Symbols.macro Symbols.t) ty : t =
+  let mk_simple (m : Symbols.macro) ty : t =
     let msymb = Term.mk_isymb m ty [] in
     mk ~env:Sv.empty ~msymb ~indices:[]
 end
@@ -905,7 +905,7 @@ let macro_support
     - [env ∩ is = ∅]
     - the free index variables of [t] and [a] are included in [env ∪ is]. *)
 type iocc = {
-  iocc_aname   : Symbols.action Symbols.t;
+  iocc_aname   : Symbols.action;
   iocc_action  : Action.action;
   iocc_vars    : Sv.t;
   iocc_cnt     : Term.term;
@@ -1021,9 +1021,9 @@ let fold_macro_support
     sources. *)
 let fold_macro_support0
     (func : (
-        Symbols.action Symbols.t -> (* action name *)
-        Action.action ->            (* action *)
-        Term.term ->                (* term *)
+        Symbols.action -> (* action name *)
+        Action.action ->  (* action *)
+        Term.term ->      (* term *)
         'a -> 'a))
     (cntxt : Constr.trace_cntxt)
     (env   : Vars.env)

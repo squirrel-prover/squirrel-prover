@@ -67,7 +67,7 @@ let pp_name_occ fmt (occ : name_occ) : unit =
 let get_name_indices_ext 
     ?(fv=Sv.empty)
     (constr : Constr.trace_cntxt)
-    (nsymb : Symbols.name Symbols.t)
+    (nsymb : Symbols.name)
     (t : Term.term)
   : name_occs
   =

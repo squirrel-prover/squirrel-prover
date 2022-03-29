@@ -16,9 +16,9 @@ module Cst = struct
     (** Flattening of the successor of a constant *)
 
     | Cgfuncst of [
-        | `N of Symbols.name   Symbols.t * Type.ty
-        | `F of Symbols.fname  Symbols.t
-        | `A of Symbols.action Symbols.t
+        | `N of Symbols.name * Type.ty
+        | `F of Symbols.fname
+        | `A of Symbols.action 
       ]
     (** function symbol, name or action of arity zero *)
 
@@ -75,12 +75,12 @@ let nilpotence_norm compare l =
 
 (*------------------------------------------------------------------*)
 (** Generalized function symbols, for [Term.fsymb], [Term.msymb] and 
-    [Symbols.action Symbols.t]. *)
+    [Symbols.action]. *)
 type gfsymb = 
-  | F of Symbols.fname  Symbols.t           (* function symbol *)
-  | M of Symbols.macro  Symbols.t * Type.ty (* macro *)
-  | N of Symbols.name   Symbols.t * Type.ty (* name *)
-  | A of Symbols.action Symbols.t           (* action *)
+  | F of Symbols.fname           (* function symbol *)
+  | M of Symbols.macro * Type.ty (* macro *)
+  | N of Symbols.name  * Type.ty (* name *)
+  | A of Symbols.action          (* action *)
 
 let hash_gfs = function
   | M (m, _) -> Hashtbl.hash m

@@ -5,8 +5,8 @@ type lsymb = Symbols.lsymb
 
 (*------------------------------------------------------------------*)
 type single_system =
-  | Left  of Symbols.system Symbols.t
-  | Right of Symbols.system Symbols.t
+  | Left  of Symbols.system 
+  | Right of Symbols.system 
 
 let get_proj = function
   | Left _ -> Term.PLeft
@@ -22,7 +22,7 @@ let hash_single = function
 (*------------------------------------------------------------------*)
 type t =
   | Single     of single_system
-  | SimplePair of Symbols.system Symbols.t
+  | SimplePair of Symbols.system 
   | Pair       of single_system * single_system
   | Empty
 
@@ -333,7 +333,7 @@ let clone_system_map
     (system   : t)
     (new_name : Symbols.lsymb)
     (mapdescr : Action.descr -> Action.descr)
-  : Symbols.table * Symbols.System.ns Symbols.t
+  : Symbols.table * Symbols.system
   =
   let symbs  = symbs table system in
   let descrs = System.Msh.map mapdescr (descrs table system) in
@@ -342,7 +342,7 @@ let clone_system_map
 
 let remove_system
     (table  : Symbols.table)
-    (system : Symbols.system Symbols.t)
+    (system : Symbols.system)
   : Symbols.table
   =
   Symbols.System.remove table system

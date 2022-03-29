@@ -61,12 +61,12 @@ module Utv : sig
   and ut_cnt = private
     | UVar  of Vars.var
     | UPred of ut
-    | UName of Symbols.action Symbols.t * ut list
+    | UName of Symbols.action * ut list
     | UInit
     | UUndef                    (* (x <> UUndef) iff. (Happens x) *)
 
   val uts    : Term.term -> ut
-  val uname  : Symbols.action Symbols.t -> ut list -> ut
+  val uname  : Symbols.action -> ut list -> ut
   val upred  : ut -> ut
   val uinit  : ut
   val uundef : ut
@@ -82,7 +82,7 @@ end = struct
   and ut_cnt =
     | UVar  of Vars.var
     | UPred of ut
-    | UName of Symbols.action Symbols.t * ut list
+    | UName of Symbols.action * ut list
     | UInit
     | UUndef
 

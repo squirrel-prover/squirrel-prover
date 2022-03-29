@@ -24,19 +24,19 @@ val mk_isymb : 'a -> Type.ty -> Vars.vars -> 'a isymb
 
 (** Names represent random values of length the security parameter. *)
 
-type name = Symbols.name Symbols.t
+type name = Symbols.name 
 type nsymb = name isymb
 
 (** Function symbols, may represent primitives or abstract functions. *)
 
-type fname = Symbols.fname Symbols.t
+type fname = Symbols.fname 
 type fsymb = fname * Vars.var list
 
 (** Macros are used to represent inputs, outputs, contents of state
     variables, and let definitions: everything that is expanded when
     translating the meta-logic to the base logic. *)
 
-type mname = Symbols.macro Symbols.t
+type mname = Symbols.macro 
 type msymb = mname isymb
 
 type state = msymb
@@ -69,7 +69,7 @@ type term = private
   | Macro of msymb * term list * term
 
   | Seq    of Vars.var list * term
-  | Action of Symbols.action Symbols.t * Vars.var list 
+  | Action of Symbols.action * Vars.var list 
 
   | Var of Vars.var
 
@@ -355,7 +355,7 @@ include module type of Smart
 
 val mk_pred   : term -> term
 val mk_var    : Vars.var -> term
-val mk_action : Symbols.action Symbols.t -> Vars.var list -> term
+val mk_action : Symbols.action -> Vars.var list -> term
 val mk_name   : nsymb -> term
 val mk_macro  : msymb -> term list -> term -> term
 val mk_diff   : term -> term -> term
@@ -412,7 +412,7 @@ val is_name : term -> bool
 val destr_var : term -> Vars.var option
 
 (*------------------------------------------------------------------*)
-val destr_action : term -> (Symbols.action Symbols.t * Vars.var list) option
+val destr_action : term -> (Symbols.action * Vars.var list) option
 
 (*------------------------------------------------------------------*)
 val destr_pair : term -> (term * term) option

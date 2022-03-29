@@ -166,7 +166,7 @@ let get_definition_nocntxt
     (system : SE.t)
     (table  : Symbols.table)
     (symb   : Term.msymb)
-    (asymb  : Symbols.action Symbols.t)
+    (asymb  : Symbols.action)
     (aidx   : Vars.vars) : [ `Def of Term.term | `Undef ]
   =
   let init_or_generic init_case f =
@@ -329,7 +329,7 @@ let get_dummy_definition
     the new system. *)
 let update_global_data
     (table        : Symbols.table)
-    (ns           : Symbols.macro Symbols.t)
+    (ns           : Symbols.macro)
     (dec_def      : Symbols.macro_def)
     (old_s_system : SystemExpr.single_system)
     (new_s_system : SystemExpr.single_system)

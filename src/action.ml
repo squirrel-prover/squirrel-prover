@@ -148,7 +148,7 @@ let rec subst_action (s : Term.subst) (a : action) : action =
       sum_choice = q, List.map (Term.subst_var s) lq }
     :: subst_action s l
 
-let of_term (s:Symbols.action Symbols.t) (l:Vars.var list) table : action =
+let of_term (s:Symbols.action) (l:Vars.var list) table : action =
   let l',a = of_symbol s table in
   let subst =
     List.map2 (fun x y -> Term.ESubst (Term.mk_var x,Term.mk_var y)) l' l
@@ -168,14 +168,14 @@ let pp_parsed_action ppf a = pp_action_f pp_strings (0,[]) ppf a
   * conditions). *)
 
 type descr = {
-  name      : Symbols.action Symbols.t ;
+  name      : Symbols.action ;
   action    : action ;
   input     : Channel.t * string ;
   indices   : Vars.var list ;
   condition : Vars.var list * Term.term ;
   updates   : (Term.state * Term.term) list ;
   output    : Channel.t * Term.term;
-  globals   : Symbols.macro Symbols.t list;
+  globals   : Symbols.macro list;
 }
 
 

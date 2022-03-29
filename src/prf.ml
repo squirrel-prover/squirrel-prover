@@ -122,11 +122,11 @@ let prf_mk_indirect
 type prf_case = prf_occ * Term.term list
 
 (** map from action names to PRF cases *)
-type prf_cases_sorted = (Symbols.action Symbols.t * prf_case list) list
+type prf_cases_sorted = (Symbols.action * prf_case list) list
 
 let add_prf_case
     table system
-    (action_name : Symbols.action Symbols.t)
+    (action_name : Symbols.action)
     (c : prf_case)
     (assoc_cases : prf_cases_sorted) : prf_cases_sorted
   =
