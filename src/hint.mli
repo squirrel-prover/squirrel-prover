@@ -3,7 +3,7 @@ type lsymb = Theory.lsymb
 (*------------------------------------------------------------------*)
 type rw_hint = { 
   name : string; 
-  rule : Rewrite.rw_erule;
+  rule : Rewrite.rw_rule;
 }
 
 val pp_rw_hint : Format.formatter -> rw_hint -> unit

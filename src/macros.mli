@@ -1,7 +1,7 @@
 val is_prefix : [`Strict | `Large] -> Action.shape -> Action.shape -> bool
 
 (*------------------------------------------------------------------*)
-(** {2 Macro definitions} *)
+(** {2 Global macro definitions} *)
 
 (** Declare a global (timestamp-dependent) macro,
     given a term abstracted over input variables, indices,
@@ -70,3 +70,14 @@ val update_global_data :
 (*------------------------------------------------------------------*)
 (** Remove all macro definition associated with a system *)
 val remove_system : Symbols.table -> SystemExpr.single_system -> Symbols.table
+
+(*------------------------------------------------------------------*)
+(** {2 Utilities} *)
+
+(** Type of the output a macro. *)
+val ty_out : Symbols.table -> Symbols.macro -> Type.ty 
+
+(** Types of the arguments of a macro. *)
+val ty_args : Symbols.table -> Symbols.macro -> Type.ty list 
+
+val is_global : Symbols.table -> Symbols.macro -> bool

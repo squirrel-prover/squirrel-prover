@@ -272,11 +272,14 @@ module type SmartFO = sig
   type form
 
   (** {3 Constructors} *)
-  val mk_true    : form
-  val mk_false   : form
+  val mk_true  : form
+  val mk_false : form
 
-  val mk_eq    : ?simpl:bool -> term -> term -> form
-  val mk_leq   : ?simpl:bool -> term -> term -> form
+  val mk_eq  : ?simpl:bool -> term -> term -> form
+  val mk_leq : ?simpl:bool -> term -> term -> form
+  val mk_geq : ?simpl:bool -> term -> term -> form
+  val mk_lt  : ?simpl:bool -> term -> term -> form
+  val mk_gt  : ?simpl:bool -> term -> term -> form
 
   val mk_not   : ?simpl:bool -> form              -> form
   val mk_and   : ?simpl:bool -> form      -> form -> form

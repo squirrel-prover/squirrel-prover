@@ -414,7 +414,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Rewriting types and functions} *)
 
   type rw_arg =
-    | Rw_rw of L.t * Ident.t option * Rewrite.rw_erule
+    | Rw_rw of L.t * Ident.t option * Rewrite.rw_rule
     (** The ident is the ident of the hyp the rule came from (if any) *)
 
     | Rw_expand    of Theory.term
@@ -428,7 +428,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       ~(loc:L.t)
       ~(all:bool)
       (targets: target list)
-      (rw : Args.rw_count * Ident.t option * Rewrite.rw_erule)
+      (rw : Args.rw_count * Ident.t option * Rewrite.rw_rule)
       (s : S.sequent)
     : S.sequent * S.sequent list
     =
@@ -479,7 +479,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       showing the rule validity. *)
   let p_rw_item (rw_arg : Args.rw_item) (s : S.t) : rw_earg * S.sequent list =
     let p_rw_rule dir (p_pt : Theory.p_pt)
-      : Rewrite.rw_erule * S.sequent list * Ident.t option
+      : Rewrite.rw_rule * S.sequent list * Ident.t option
       =
       let ghyp, pat = S.convert_pt ~close_pats:false p_pt Equiv.Local_t s in
       let id_opt = match ghyp with `Hyp id -> Some id | _ -> None in
@@ -487,7 +487,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (* We are using an hypothesis, hence no new sub-goals *)
       let premise = [] in
 
-      Rewrite.pat_to_rw_erule dir pat, premise, id_opt
+      Rewrite.pat_to_rw_rule dir pat, premise, id_opt
     in
 
     let p_rw_item (rw_arg : Args.rw_item) : rw_earg * (S.sequent list) =
@@ -889,7 +889,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       in
       let s = Hyps.remove id s in
       let pat = Match.pat_of_form f in
-      let erule = Rewrite.pat_to_rw_erule ~loc (L.unloc dir) pat in
+      let erule = Rewrite.pat_to_rw_rule ~loc (L.unloc dir) pat in
       let s, subgoals =
         rewrite ~loc ~all:false [T_conc] (`Once, Some id, erule) s
       in

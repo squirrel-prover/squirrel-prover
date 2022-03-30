@@ -5,7 +5,7 @@ module SE = SystemExpr
 let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
-(** {2 Macro definitions} *)
+(** {2 Global macro definitions} *)
 
 type global_data = {
   action : [`Strict | `Large] * Action.shape;
@@ -83,7 +83,7 @@ let is_prefix strict a b =
 
 (** Check is not done module equality.
     Not exported. *)
-let is_defined name a table =
+let is_defined (name : Symbols.macro) (a : Term.term) table =
   match Symbols.Macro.get_all name table with
     | Symbols.(Input | Output | Cond | State _), _ ->
       (* We can expand the definitions of input@A, output@A, cond@A and
@@ -333,16 +333,19 @@ let update_global_data
     (dec_def      : Symbols.macro_def)
     (old_s_system : SystemExpr.single_system)
     (new_s_system : SystemExpr.single_system)
-    (f            : Symbols.macro -> Term.term -> Term.term)
+    (func         : Symbols.macro -> Term.term -> Term.term)
   :  Symbols.table
   =
   match Symbols.Macro.get_data ms table with
-  | Global_data data -> 
+  | Global_data data ->
+    (* let ts_le, ts_shape = data.action in
+     * let ts = System.descr_of_shape table (SE.get_id old_s_system) ts_shape in *)
+    
     let body = get_single_body old_s_system data in
+    let body = func ms body in
     let data =
       Global_data { data with
-                    systems_body = (new_s_system, f ms body) ::
-                                   data.systems_body }
+                    systems_body = (new_s_system, body) :: data.systems_body }
     in
     Symbols.Macro.redefine table ~data ms dec_def
 
@@ -363,3 +366,33 @@ let remove_system
 
       | _ -> def, data
     ) table
+
+
+(*------------------------------------------------------------------*)
+(** {2 Utilities} *)
+
+let ty_out (table : Symbols.table) (ms : Symbols.macro) : Type.ty =
+  match Symbols.Macro.get_def ms table with
+    | Symbols.Global (_, ty) -> ty
+
+    | Input | Output | Frame -> Type.tmessage
+
+    | Cond | Exec -> Type.tboolean
+
+    | Symbols.State (_,ty) -> ty
+
+let ty_args (table : Symbols.table) (ms : Symbols.macro) : Type.ty list =
+  match Symbols.Macro.get_def ms table with
+    | Symbols.Global (arity, ty) ->
+      List.init arity (fun _ -> Type.tindex)
+
+    | Input | Output | Frame | Cond | Exec -> []
+
+    | Symbols.State (arity,ty) ->
+      List.init arity (fun _ -> Type.tindex)
+
+let is_global table (ms : Symbols.macro) : bool =
+  match Symbols.Macro.get_def ms table with
+  | Symbols.Global (_, _) -> true
+  | _ -> false
+  

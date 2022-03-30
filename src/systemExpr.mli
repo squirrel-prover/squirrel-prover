@@ -9,6 +9,8 @@ type single_system =
 
 val get_proj : single_system -> Term.projection
 
+val get_id : single_system -> Symbols.system
+                                       
 (*------------------------------------------------------------------*)
 (** A system expression is a system without diff, or a system with diff. It can
     be obtained from:

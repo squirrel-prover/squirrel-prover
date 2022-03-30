@@ -3,42 +3,64 @@ open Utils
 module SE = SystemExpr
 module L  = Location
 
+module Pos = Match.Pos
+               
 module Sv = Vars.Sv
+module Sp = Pos.Sp
               
 (*------------------------------------------------------------------*)
-(** rewrite a rule as much as possible without recursing *)
+(** Rewrite a rule as much as possible.
+    The rewriting rule can depend on the position in the term. *)
+let rewrite
+    ~(m_rec  : bool)
+    (table   : Symbols.table)
+    (system  : SE.t)
+    (venv    : Vars.env)         (* for clean variable naming *)
+    (mk_rule : Pos.pos -> Rewrite.rw_rule option) 
+    (t       : Term.term)
+  : Term.term 
+  =
+  let rw_inst : Match.Pos.f_map = 
+    fun occ vars _conds p ->
+      (* build the rule to apply at position [p] *)
+      match mk_rule p with
+      | None -> `Continue
+      | Some rule ->
+        assert (rule.rw_conds = []);
+
+        let left,right = rule.rw_rw in
+        let pat : Term.term Match.pat = Match.{ 
+            pat_tyvars = rule.rw_tyvars; 
+            pat_vars   = rule.rw_vars; 
+            pat_term   = left;
+          } 
+        in      
+        match Match.T.try_match table system occ pat with
+        | NoMatch _ | FreeTyv -> `Continue
+
+        (* head matches *)
+        | Match mv ->
+          let subst = Match.Mvar.to_subst ~mode:`Match mv in
+          let left = Term.subst subst left in
+          let right = Term.subst subst right in
+          assert (left = occ);
+          `Map right
+  in
+  let _, f = Match.Pos.map ~m_rec rw_inst venv t in
+  f
+
+(** Simple case of [rewrite], without recursion and with a single rewriting 
+    rule. *)
 let rewrite_norec
     (table  : Symbols.table)
     (system : SE.t)
     (venv   : Vars.env)         (* for clean variable naming *)
-    (rule   : Rewrite.rw_erule) 
+    (rule   : Rewrite.rw_rule) 
     (t      : Term.term)
   : Term.term 
   =
-  assert (rule.rw_conds = []);
-  let Term.ESubst (left,right) = rule.rw_rw in
-  let pat : Term.term Match.pat = Match.{ 
-      pat_tyvars = rule.rw_tyvars; 
-      pat_vars   = rule.rw_vars; 
-      pat_term   = left;
-    } 
-  in
-  let rw_inst : Match.Pos.f_map = 
-    fun occ vars _conds _p ->
-      match Match.T.try_match table system occ pat with
-      | NoMatch _ | FreeTyv -> `Continue
-
-      (* head matches *)
-      | Match mv ->
-        let subst = Match.Mvar.to_subst ~mode:`Match mv in
-        let left = Term.subst subst left in
-        let right = Term.subst subst right in
-        assert (left = occ);
-        `Map right
-  in
-  let _, f = Match.Pos.map ~m_rec:false rw_inst venv t in
-  f
-
+  rewrite ~m_rec:false table system venv (fun _ -> Some rule) t
+    
 (*------------------------------------------------------------------*)
 (** High-level system cloning function. *)
 let clone_system_map
@@ -47,7 +69,7 @@ let clone_system_map
     (s_system : SE.single_system)
     (new_name : Theory.lsymb)
     (fmap     :
-       ( [`Global | `Action of Symbols.action] ->
+       ( [`Global | `Action of Action.descr] ->
          Symbols.macro ->
          Term.term ->
          Term.term ))
@@ -59,7 +81,7 @@ let clone_system_map
       table system new_name
       (fun descr ->
          Action.descr_map (fun _ ->
-             fmap (`Action descr.Action.name)
+             fmap (`Action descr)
            ) descr)
   in
 
@@ -141,7 +163,7 @@ let global_rename table sdecl (gf : Theory.global_formula) =
   in
 
   (* We check that n2 does not occur in the old system using fresh. *)
-  let cntxt = Constr.{ table  = table;
+  let cntxt = Constr.{ table;
                        system = old_system;
                        models = None; }
   in
@@ -149,7 +171,7 @@ let global_rename table sdecl (gf : Theory.global_formula) =
   let () =
     try
       SystemExpr.iter_descrs
-        cntxt.table cntxt.system
+        table old_system
         (fun action_descr ->
            iter#visit_message (snd action_descr.output) ;
            iter#visit_message (snd action_descr.condition) ;
@@ -169,7 +191,7 @@ let global_rename table sdecl (gf : Theory.global_formula) =
       rw_tyvars = [];
       rw_vars   = Vars.Sv.of_list vs;
       rw_conds  = [];
-      rw_rw     = Term.ESubst (n1', n2');
+      rw_rw     = n1', n2';
     }
   in
 
@@ -260,7 +282,7 @@ let global_prf
     Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args Type.Message ; }
   in
   let table,n =
-    Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
+    Symbols.Name.declare table (L.mk_loc L._dummy "n_PRF") ndef
   in
   
   (* the hash h of a message m will be replaced by tryfind is s.t = fresh mess
@@ -277,7 +299,7 @@ let global_prf
       rw_tyvars = [];
       rw_vars   = Vars.Sv.of_list (fresh_x_var :: is1);
       rw_conds  = [];
-      rw_rw     = Term.ESubst (hash_pattern, mk_tryfind);
+      rw_rw     = hash_pattern, mk_tryfind;
     }
   in
 
@@ -336,7 +358,7 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
     | Term.Fun ((fnenc,eis), _,
                 [m; Term.Name r;
                  Term.Fun ((fnpk,is), _, [Term.Name sk])])
-      when Symbols.is_ftype fnpk Symbols.PublicKey cntxt.table &&
+      when Symbols.is_ftype fnpk Symbols.PublicKey table &&
            Symbols.is_ftype fnenc Symbols.AEnc table ->
       fnenc, sk, m, fnpk, r
 
@@ -388,7 +410,7 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
     Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args Type.Message ; }
   in
   let table,n =
-    Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_CCA") ndef
+    Symbols.Name.declare table (L.mk_loc L._dummy "n_CCA") ndef
   in
   
   let mess_replacement =
@@ -421,14 +443,14 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
       rw_tyvars = [];
       rw_vars   = Vars.Sv.of_list is;
       rw_conds  = [];
-      rw_rw     = Term.ESubst (enc, new_enc);
+      rw_rw     = enc, new_enc;
     }
   in
   let dec_rw_rule = Rewrite.{
       rw_tyvars = [];
       rw_vars   = Vars.Sv.of_list (fresh_x_var :: is1);
       rw_conds  = [];
-      rw_rw     = Term.ESubst (dec_pattern, tryfind_dec);
+      rw_rw     = dec_pattern, tryfind_dec;
     }
   in
 
@@ -476,6 +498,7 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
   in
   (axiom_name, enrich, make_conclusion, new_system_e, table)
 
+
 (*------------------------------------------------------------------*)
 (** {2 Global PRF with time} *)
 
@@ -489,6 +512,128 @@ let check_fv_finite (fv : Vars.vars) =
               Index and Timestamp, which are not supported.")
     ) fv
 
+
+(*------------------------------------------------------------------*)
+
+(** Extended hash occurrence *)
+type x_hash_occ = {
+  (* macro of the occurrence *)
+  x_msymb : Symbols.macro;
+
+  (* macro definition of the occurrence *)
+  x_mdef : Symbols.macro_def;
+
+  x_a : Symbols.action;
+  (* action of the occurrence *)
+
+  x_a_is : Vars.vars;
+  (* action indices of the occurrence *)
+
+  (* the occurrence *)
+  x_occ : Iter.hash_occ;
+
+  (* the associated generated name (≠ for all extended hash occurrences) *)
+  x_nsymb : Symbols.Name.ns Symbols.t;
+}
+
+(*------------------------------------------------------------------*)
+(** Hash occurrences with unique identifiers *)
+module XO : sig
+  type t = private { cnt : x_hash_occ; tag : int; }
+
+  val mk : x_hash_occ -> t
+end = struct
+  type t = { cnt : x_hash_occ; tag : int; }
+
+  (* create fresh identifiers *)
+  let mk =
+    let cpt = ref 0 in
+    fun cnt -> { cnt; tag = ((incr cpt); !cpt); }
+end
+
+(** Strict pre-ordering over hash occurrences, resulting from the 
+    pre-order underlying the protocol well-foundness *)
+let xo_lt
+    (table : Symbols.table) (system : SE.t)
+    (x : XO.t) (y : XO.t)
+  : bool
+  =
+  let x, y = x.cnt, y.cnt in
+  (* create a [msymb] with new (fresh) indices for [y] *)
+  let ms_y =
+    Term.mk_isymb
+      y.x_msymb
+      (Macros.ty_out table y.x_msymb)
+      (List.map (fun ty ->
+           Vars.make_new ty "a"
+         ) (Macros.ty_args table y.x_msymb))
+  in
+  let t_y = Macros.get_dummy_definition table system ms_y in
+
+  (* search if the macro [x.x_msymb] appears in [t_y] *)
+  let rec search (t : Term.term) : bool =
+    match t with
+    | Macro (ms, _, _) when ms.s_symb = x.x_msymb -> true
+    | Macro (ms, _, _) when Macros.is_global table ms.s_symb ->
+      search (Macros.get_dummy_definition table system ms)
+
+    (* recurse *)
+    | _ -> Term.tfold (fun t found -> found || search t) t false
+  in
+  search t_y
+    
+(*------------------------------------------------------------------*)
+(** Maps over hash occurrences *)
+module Mxo = Map.Make(struct
+    type t = XO.t
+    let compare (x : XO.t) (y : XO.t) = Stdlib.compare x.tag y.tag
+  end)
+
+(*------------------------------------------------------------------*)
+(** A hash occurrence graph.
+    There is an edge [(v → u) ∈ m] iff [List.mem v (List.find u m)]. *)
+type xomap = XO.t list Mxo.t
+
+(** [cmp x y] iff [(x → y)] *)
+let xocc_ordering (cmp : XO.t -> XO.t -> bool) (xs : XO.t list) : xomap =
+  let add (map : xomap) (x : XO.t) : xomap =
+    let map = Mxo.mapi (fun y s -> if cmp x y then x :: s else s) map in
+    let lx =
+      Mxo.fold (fun y _ lx -> if cmp y x then y :: lx else lx) map []
+    in
+    Mxo.add x lx map
+  in
+  List.fold_left add Mxo.empty xs
+
+(** Comparison in the transitive closure, i.e. [x →* y]. *)
+let rec lt (map : xomap) (x : XO.t) (y : XO.t) =
+  if not (Mxo.mem y map) then false
+  else
+    let ly = Mxo.find y map in
+    List.exists (fun (z : XO.t) -> x.tag = z.tag || lt map x z) ly
+
+(** [x] and [y] incomparable w.r.t. the transitive closure of [map]. *)
+let incomparable map x y = not (lt map x y) && not (lt map y x) 
+
+(** Linearize the partial ordering [map].
+    I.e. return a total ordering compatible with [map]. *)
+let rec linearize (map : xomap) : xomap =
+  let exception Found of XO.t * XO.t in
+  try
+    Mxo.iter (fun x _ ->
+        Mxo.iter (fun y _ ->
+            if incomparable map x y then raise (Found (x,y))
+          ) map
+      ) map;
+    map    (* map is a lineare ordering *)
+
+  with Found (x,y) ->
+    (* x,y incomparable, arbitrarily choose [(y → x)] and add it to the map. *)
+    let lx = Mxo.find x map in
+    linearize (Mxo.add x (y  :: lx) map)
+  
+  
+(*------------------------------------------------------------------*)
 let global_prf_time
     (table : Symbols.table)
     (sdecl : Decl.system_modifier)
@@ -503,11 +648,11 @@ let global_prf_time
   let old_system, old_single_system =
     parse_single_system_name table sdecl
   in
-  
+
   let venv, is, hash = conv_term ~pat:true table old_system ~bnds hash in
 
   let cntxt = Constr.{
-      table  = table;
+      table;
       system = old_system;
       models = None}
   in
@@ -515,6 +660,8 @@ let global_prf_time
   let param = Prf.prf_param hash in
 
   (* Check syntactic side condition. *)
+  (* TODO: this is not correct, as global macros are not iterated upon by 
+     [Euf.key_ssc] *)
   let errors =
     Euf.key_ssc
       ~elems:[] ~allow_functions:(fun x -> false)
@@ -523,63 +670,66 @@ let global_prf_time
   if errors <> [] then
     Tactics.soft_failure (Tactics.BadSSCDetailed errors);
 
-  let occs : Iter.hash_occs =
-    let occs = ref [] in
-    let fmap _ _ms (t : Term.term) : Term.term =
-      assert false
-    in
-    let table, new_system_e, old_system_name =
-      clone_system_map
-        table old_system old_single_system sdecl.Decl.name fmap
-    in 
-    (* !occs *)
-
-    
-    SystemExpr.fold_descrs (fun descr occs ->
-        Iter.fold_descr ~globals:true (fun msymb m_is _ t occs ->
-            let new_occs =
-              Iter.get_f_messages_ext
-                ~fv:[] ~cntxt
-                param.h_fn param.h_key.s_symb t
-            in
-            new_occs @ occs
-          ) cntxt.table cntxt.system descr occs
-      ) cntxt.table cntxt.system []
-  in
-
-  (* FIXME: check duplicate module alpha-renaming *)
-  let occs = List.remove_duplicate (=) occs in
-  (* TODO: improve *)
-
-  
   (* type of the hash function input *)
   let m_ty = List.hd (param.h_fty.fty_args) in
 
+  let mk_occ_name
+      (table : Symbols.table)
+      (occ   : Iter.hash_occ)
+    : Symbols.table * Symbols.name
+    =
+    (* check that no occurrence of the hash appears below a binder
+       with a non-finite type. *)
+    check_fv_finite occ.Iter.occ_vars;
+
+    let ndef =
+      let ty_args = List.map Vars.ty occ.Iter.occ_vars in
+      Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args m_ty ; }
+    in
+    Symbols.Name.declare table (L.mk_loc L._dummy "n_PRF") ndef
+  in
+
+  let (table, occs) : Symbols.table * XO.t list =
+    SystemExpr.fold_descrs (fun descr (table,occs) ->
+        Iter.fold_descr ~globals:true (fun ms m_is mdef t (table,occs) ->
+            (* find new occurrences *)
+            let new_occs =
+              Iter.get_f_messages_ext
+                ~fv:descr.indices ~cntxt
+                param.h_fn param.h_key.s_symb t
+            in
+
+            (* extend new occurrences with additional information *)
+            let table, new_occs =
+              List.map_fold (fun table occ ->
+                  let table, x_nsymb = mk_occ_name table occ in
+                  table,
+                  XO.mk {
+                    x_msymb = ms;
+                    x_mdef  = mdef;
+                    x_occ   = occ;
+                    x_nsymb;
+                    x_a     = descr.name;
+                    x_a_is  = descr.indices;
+                  }
+                ) table new_occs
+            in
+            table, new_occs @ occs
+          ) table old_system descr (table,occs)
+      ) table old_system (table,[])
+  in
+
+  (* FIXME: check duplicate module alpha-renaming 
+     (merge [occ.occ_pos] which are duplicated) *)
+  let occs = List.remove_duplicate (=) occs in
+
   (* fresh variable representing the hashed message to rewrite *)
-  let x   = Vars.make_new m_ty "x" in
+  let x = Vars.make_new m_ty "x" in
   let x_t = Term.mk_var x in
   
   (* timestamp at which [H(x,k)] occurs  *)
   let tau = Vars.make_new Type.ttimestamp "t" in
-
-  (* [occ_name] is a list of hash occurrence and their associated 
-     name symbol. *)
-  let table, occ_names =
-    List.map_fold (fun table occ ->
-        (* check that no occurrence of the hash appears below a binder
-           with a non-finite type. *)
-        check_fv_finite occ.Iter.occ_vars;
-
-        let ndef =
-          let ty_args = List.map Vars.ty occ.Iter.occ_vars in
-          Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args m_ty ; }
-        in
-        let table,n =
-          Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
-        in
-        table, (occ, n)
-      ) table occs
-  in
+  let tau_t = Term.mk_var tau in
 
   let is, subst = Term.refresh_vars `Global is in
   let key = Term.subst subst (Term.mk_name param.h_key) in
@@ -590,62 +740,124 @@ let global_prf_time
     Term.mk_fun table param.h_fn [] [x_t; key ]
   in
 
-  (* condition stating that [x] is equal to a hash occurrence. *)
-  let mk_occ_cond (occ : Iter.hash_occ) : Term.term =
-    let occ_vars, occ_t = occ.occ_cnt in
-    Term.mk_and ~simpl:false
-      (Term.mk_eq ~simpl:true x_t occ_t)               (* hash content equ. *)
-      (Term.mk_indices_eq ~simpl:true key_is occ_vars) (* hash key equ. *)
+  (* name term associated to a hash occurrence. *)
+  let mk_occ_term (xocc : XO.t) : Term.term =
+    Term.mk_name (Term.mk_isymb xocc.cnt.x_nsymb m_ty xocc.cnt.x_occ.occ_vars)
   in
 
-  (* fresh name corresponding to occurrence [occ]. *)
-  let mk_occ_term
-      (occ : Iter.hash_occ) (n_occ : Symbols.name) : Term.term
+  (* action term at associated to a hash occurrence. *)
+  let mk_occ_ts (xocc : XO.t) : Term.term =
+    Term.mk_action xocc.cnt.x_a xocc.cnt.x_a_is
+  in
+
+  (* condition checking whether [(tau1, s1) < (tau2, s2)] *)
+  let mk_xocc_lt
+      (tau1 : Term.term) (xocc1 : XO.t)
+      (tau2 : Term.term) (xocc2 : XO.t)
+    : Term.term
     =
-      Term.mk_name (Term.mk_isymb n_occ m_ty occ.occ_vars)
+    let is_glob = function Symbols.Global _ -> true | _ -> false in
+    
+    if is_glob xocc1.cnt.x_mdef && is_glob xocc2.cnt.x_mdef then
+      assert false
+    else
+      assert false
+  in
+
+  let mk_xocc_collision
+      (tau1 : Term.term) (xocc1 : XO.t)
+      (tau2 : Term.term) (xocc2 : XO.t)
+    : Term.term
+    = 
+    (* condition stating that [x] is equal to a hash occurrence [xocc]. *)
+    let occ_vars, occ_t = xocc1.cnt.x_occ.occ_cnt in
+    let msg_eq = 
+    Term.mk_ands ~simpl:false
+      [ Term.mk_eq ~simpl:true x_t occ_t;                 (* hash content equ. *)
+        Term.mk_indices_eq ~simpl:true key_is occ_vars;   (* hash key equ. *)
+        Term.mk_eq ~simpl:true tau_t (mk_occ_ts xocc1); ] (* timestamp equ. *)
+    in
+    let xocc_lt = mk_xocc_lt tau1 xocc1 tau2 xocc2 in
+    Term.mk_and ~simpl:false msg_eq xocc_lt 
   in
   
-  (* we rewrite [H(x,k)] at occurrence occ0 at time tau0 into:
-     try find tau, occ s.t. tau <= tau0 && x = s_{occ} 
-     then n_{occ}@tau
-     else n_occ0@tau0 *)
+  (* we rewrite [H(x,k)] at occurrence [s0] at time [tau0] into:
+     [
+       try find tau, occ s.t. (tau,s) < (tau0,s0) && x = s_{occ} 
+       then n_{occ}@tau
+       else n_occ0@tau0
+     ] *)
   let rw_target
-      (tau0   : Term.term)
-      (occ0   : Iter.hash_occ)
-      (n_occ0 : Symbols.name)
+      (tau0_t : Term.term)
+      (xocc0  : XO.t)
     =
     let cond =
-      Term.mk_ands ~simpl:false
-        [ Term.mk_leq ~simpl:true (Term.mk_var tau) tau0;
-          Term.mk_ors (List.map (fst_map mk_occ_cond) occ_names);
-          assert false; ]
+      (* We check whether there exists [(tau,s)] such that:
+         [(tau,s) < (tau0,s0) && x = s_x] *)
+      Term.mk_ors
+        (List.map (fun xocc ->
+             mk_xocc_collision tau_t xocc tau0_t xocc0
+           ) occs)
     in
-    let t_else = mk_occ_term occ0 n_occ0 in
+    let t_else = mk_occ_term xocc0 in
     let t_then =
-      List.fold_left (fun t_then (occ, occ_name) ->
-          let t_cond = mk_occ_cond occ in
-          let t_occ = mk_occ_term occ occ_name in
+      List.fold_left (fun t_then xocc ->
+          let t_cond = mk_xocc_collision tau_t xocc tau0_t xocc0 in
+          let t_occ = mk_occ_term xocc in
           Term.mk_ite ~simpl:false t_cond t_occ t_then
-        ) (Term.mk_witness m_ty) occ_names
+        ) (Term.mk_witness m_ty) occs
       
     in
     Term.mk_find [tau] cond t_then t_else
   in
 
-  let mk_rw_rule (tau0 : Term.term) = Rewrite.{
-      rw_tyvars = [];
-      rw_vars   = Sv.of_list (x :: is);
-      rw_conds  = [];
-      rw_rw     = Term.ESubst (to_rw, assert false(* rw_target tau0 *));
-    } in
+  (* - [tau0] is the time at which the term being rewritten in is 
+       evaluated. 
+       E.g., if we rewrite in the body of [output@A(i)] then [tau0] 
+       is [A(i)]. 
+     - [pos] is the position at which we are trying to do the rewrite, 
+       which is necessary to retrieve the associated fresh name. *)
+  let mk_rw_rule (tau0 : Term.term) (pos : Pos.pos) : Rewrite.rw_rule option =
+    let hash_occ =
+      List.find_opt (fun (xocc : XO.t) ->
+          Sp.mem pos xocc.cnt.x_occ.occ_pos
+        ) occs
+    in
+    match hash_occ with
+    (* not an interesting position, no rewriting to do *)
+    | None -> None
 
-  let fmap _ (tau0 : Term.term) _ _ms (t : Term.term) : Term.term =
-    rewrite_norec table old_system venv (mk_rw_rule tau0) t
+    (* interesting position, retrieve the associated occurrence *)
+    | Some xocc ->
+      let rule = Rewrite.{
+          rw_tyvars = [];
+          rw_vars   = Sv.of_list (x :: is);
+          rw_conds  = [];
+          rw_rw     = (to_rw, rw_target tau0 xocc); }
+      in
+      Some rule
   in
 
-  let table, new_system_e, old_system_name =
+  let fmap
+      (kind : [ `Action of Action.descr | `Global ])
+      (ms   : Symbols.macro)
+      (t    : Term.term)
+    : Term.term
+    =
+    let tau0 = match kind with
+      | `Action d -> Term.mk_action d.name d.indices
+      | `Global   -> assert false  (* TODO *)
+    in
+
+    (* TODO: we probably want more precise control over the recursion,
+       as we want to recurse only on a part of the subterm we built ? 
+       Unclear how to do, especially how to keep meaningful positions. *)
+    rewrite ~m_rec:true table old_system venv (mk_rw_rule tau0) t
+  in
+  
+  let _table, _new_system_e, _old_system_name =
     clone_system_map
-      table old_system old_single_system sdecl.Decl.name (assert false) (* fmap *)
+      table old_system old_single_system sdecl.Decl.name fmap
   in 
   assert false
   
