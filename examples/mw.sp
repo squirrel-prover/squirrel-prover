@@ -182,19 +182,16 @@ Proof.
 
   (* Case R *)
   + expand frame, exec, cond, output.
-    fa 0.
-    fa 1.
-    fa 1.
+    fa !<_,_>, if _ then _.
     fresh 1.
-    rewrite if_true.
+    rewrite if_true //.
     by (repeat split => r0 _;
         try (depends R(r0), R1(r0) by auto);
         try (depends R(r0), R2(r0) by auto)).
-    auto.
 
   (* Case R1 *)
   + expand frame, exec, output.
-    fa 0; fa 1.
+    fa !<_,_>.
 
     rewrite wa_R1_tryfind //.
     rewrite /cond wa_R1_R2.
@@ -211,16 +208,15 @@ Proof.
 
   (* Case R2 *)
   + expand frame, exec, cond, output.
-    fa 0. fa 1.
+    fa !<_,_>.
     rewrite wa_R1_R2.
     by fadup 1.
 
   (* Case T *)
   + expand frame, exec, cond, output.
+    fa !<_,_>, if _ then _, <_,_>.
 
-    fa 0. fa 1. fa 1. fa 1.
-
-    prf 2. (* we use PRF under XOR to be able with use XOR tactic later on *)
+    prf 2. (* we use PRF under XOR to be able to use XOR tactic later on *)
     rewrite if_true. {
       use tags_neq.
       simpl; project;

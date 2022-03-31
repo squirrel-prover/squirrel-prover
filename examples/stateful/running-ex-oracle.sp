@@ -275,25 +275,26 @@ Proof.
           use H3 with j0 as H4; try auto.
 
   + (* Oracle *)
-     expand frame.  fa 0. fa 1. fa 2. expand exec.  fa 1. expand cond. expand output. fa 1.
-     prf 1; rewrite if_true; 2: fresh 1.
-       - simpl; split.
-          * intro j0 H; try destruct H as [H|H].
-            apply unique_queries; auto.
-          * intro i0 j0.
-            project.
-              ** intro H; destruct H as [H1|H2].
-                 *** rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
-                 *** rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
-              ** intro  H. rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
-
-      - prf 1; rewrite if_true; 2: fresh 1; by apply IH.
-        simpl; split.
-          * intro j0 H.
-            apply unique_queries; auto.
-          * intro i0 j0 H.
-            rewrite equiv IH i0 (A(i0,j0)) => // Hf.
-            by fresh Hf.
+     expand frame, exec, cond, output.
+     fa !<_,_>, if _ then _, (_ && _), <_,_>.
+     prf 1; rewrite if_true; 2: fresh 1. {
+       simpl; split.
+       * intro j0 H; try destruct H as [H|H].
+         apply unique_queries; auto.
+       * intro i0 j0.
+         project.
+           ** intro H; destruct H as [H1|H2].
+              *** rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
+              *** rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
+           ** intro  H. rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
+     }.
+     prf 1; rewrite if_true; 2: fresh 1; by apply IH.
+     simpl; split.
+       * intro j0 H.
+         apply unique_queries; auto.
+       * intro i0 j0 H.
+         rewrite equiv IH i0 (A(i0,j0)) => // Hf.
+         by fresh Hf.
 
    + (* Tag *)
   expand frame@A(i,j). expand exec@A(i,j). expand cond@A(i,j). expand output@A(i,j).

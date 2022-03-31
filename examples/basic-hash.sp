@@ -80,8 +80,8 @@ process reader(j:index) =
   else
     out(cR,ko).
 
-(** The system is finally defined by putting an unbounded number of tag's and
-    reader's processes in parallel.
+(** The system is finally defined by putting an unbounded number of tag and
+    reader processes in parallel.
     This system is automatically translated to a set of actions:
 
     * the initial action (`init`);
@@ -121,7 +121,7 @@ goal wa_R :
     is not known by the attacker.
     Therefore, any message accepted by the reader must come from a tag that has
     played before.
-    The converse implication is trivial because any honest tag's output is
+    The converse implication is trivial because any honest tag output is
     accepted by the reader. *)
 Proof.
   (** We start by introducing the variable `j` and the hypothesis
@@ -178,8 +178,7 @@ Proof.
 
   (** Case where t = R(j).
       We start by expanding the macros and splitting the pairs. *)
-  + expand frame. fa 0. fa 1.
-    expand exec, output.
+  + expand frame, exec, output. fa !<_,_>.
     (** Using the authentication goal `wa_R` previously proved, we replace the
         formula `cond@R(j)` by an equivalent formula expressing the fact that
         a tag `T(i,k)` has played before and that the output of this tag is
@@ -193,15 +192,14 @@ Proof.
 
   (** Case where t = R1(j).
       This case is similar to the previous one. *)
-  + expand frame. fa 0. fa 1.
-    expand exec, output.
+  + expand frame, exec, output. fa !<_,_>.
     rewrite /cond (wa_R (R1(j)) H).
     by fadup 1.
 
   (** Case where t = T(i,k).
       We start by expanding the macros and splitting the pairs. *)
   + expand frame, exec, cond, output.
-    fa 0; fa 1; fa 1; fa 1.
+    fa !<_,_>, if _ then _, <_,_>.
     (** We now apply the `prf` tactic, in order to replace the hash by a fresh
         name. The tactic actually replaces the hash by a conditional term in
         which the then branch is the fresh name.
@@ -224,7 +222,7 @@ Proof.
           into one goal for the left projection and one goal for the right
           projection of the initial bi-system. *)
       project; repeat split; intro *; by fresh Meq.
-    }
+    }.
 
     (** We have now replaced the hash by a fresh name occurring nowhere else,
         so we can remove it using the `fresh` tactic. *)
