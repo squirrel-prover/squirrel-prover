@@ -457,7 +457,9 @@ let get_f_messages_ext
       | _ -> occs, `Continue
   in
 
-  let occs, _, _ = Pos.map_fold ~m_rec:true func (Vars.of_list fv) [] t in
+  let occs, _, _ =
+    Pos.map_fold ~mode:(`TopDown true) func (Vars.of_list fv) [] t
+  in
   occs
 
 
@@ -554,11 +556,11 @@ let get_macro_occs
 let fold_descr
     ~(globals:bool)
     (f :
-       Symbols.macro -> (* macro symbol [ms] *)
-       Vars.var list ->           (* indices [is] of [ms] *)
-       Symbols.macro_def ->       (* macro definition *)
-       Term.term ->               (* term [t] defining [ms(is)] *)
-       'a ->                      (* folding argument *)
+       Symbols.macro ->       (* macro symbol [ms] *)
+       Vars.var list ->       (* indices [is] of [ms] *)
+       Symbols.macro_def ->   (* macro definition *)
+       Term.term ->           (* term [t] defining [ms(is)] *)
+       'a ->                  (* folding argument *)
        'a)
     (table  : Symbols.table)
     (system : SystemExpr.t)
@@ -582,10 +584,11 @@ let fold_descr
   if not globals then mval
   else
     let ts = SystemExpr.action_to_term table system descr.action in
+    let cntxt = Constr.{ system; table; models = None; } in
+
     (* fold over global macros in scope of [descr.action] *)
     List.fold_left (fun mval (mg : Symbols.macro) ->
-        let cntxt = Constr.{ system; table; models = None; } in
-        let mdef, is_arr,ty = match Symbols.Macro.get_def mg table with
+        let mdef, is_arr, ty = match Symbols.Macro.get_def mg table with
           | Global (is,ty) as mdef -> mdef, is, ty
           | _ -> assert false
         in

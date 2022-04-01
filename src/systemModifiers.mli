@@ -12,4 +12,4 @@ val declare_system :
   Symbols.table ->
   Hint.hint_db ->
   Decl.system_modifier ->
-  Goal.statement * Symbols.table
+  Goal.statement option * Symbols.table

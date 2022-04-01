@@ -293,6 +293,7 @@ val check_bty_info : table -> Type.ty -> bty_info -> bool
 val is_infix     : fname -> bool 
 val is_infix_str : string  -> bool 
 
+val is_global : macro_def -> bool
 (*------------------------------------------------------------------*)
 (** {2 Builtins} *)
 

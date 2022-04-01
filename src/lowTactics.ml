@@ -235,7 +235,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** If [m_rec = true], recurse on expanded sub-terms. *)
   let expand
-      ?m_rec
+      ?(m_rec = false)
       (targets: target list)
       (target : [ `Msymb of Symbols.macro
                 | `Fsymb of Symbols.fname 
@@ -286,13 +286,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
       match f with
       | `Equiv f ->
         let _, f = 
-          Match.Pos.map_e ?m_rec expand_inst (S.vars s) f 
+          Match.Pos.map_e ~mode:(`TopDown m_rec) expand_inst (S.vars s) f 
         in
         `Equiv f, []
 
       | `Reach f ->
         let _, f = 
-          Match.Pos.map ?m_rec expand_inst (S.vars s) f 
+          Match.Pos.map ~mode:(`TopDown m_rec) expand_inst (S.vars s) f 
         in
         `Reach f, []
     in
@@ -322,7 +322,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         | _ -> `Continue
     in
     let _, f = 
-      Match.Pos.map ~m_rec:true expand_inst (S.vars s) f 
+      Match.Pos.map ~mode:(`TopDown true) expand_inst (S.vars s) f 
     in
     f
 

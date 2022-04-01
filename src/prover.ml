@@ -919,7 +919,9 @@ let declare_i table hint_db decl = match L.unloc decl with
     let new_lemma, table = 
       SystemModifiers.declare_system table hint_db sdecl 
     in
-    goals_proved :=  new_lemma :: !goals_proved;
+    oiter (fun new_lemma ->
+        goals_proved :=  new_lemma :: !goals_proved
+      ) new_lemma;
     table
 
   | Decl.Decl_dh (h, g, ex, om, ctys) ->

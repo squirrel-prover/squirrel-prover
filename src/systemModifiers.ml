@@ -12,7 +12,7 @@ module Sp = Pos.Sp
 (** Rewrite a rule as much as possible.
     The rewriting rule can depend on the position in the term. *)
 let rewrite
-    ~(m_rec  : bool)
+    ~(mode   : [`TopDown of bool | `BottomUp])
     (table   : Symbols.table)
     (system  : SE.t)
     (venv    : Vars.env)         (* for clean variable naming *)
@@ -46,7 +46,7 @@ let rewrite
           assert (left = occ);
           `Map right
   in
-  let _, f = Match.Pos.map ~m_rec rw_inst venv t in
+  let _, f = Match.Pos.map ~mode rw_inst venv t in
   f
 
 (** Simple case of [rewrite], without recursion and with a single rewriting 
@@ -59,7 +59,7 @@ let rewrite_norec
     (t      : Term.term)
   : Term.term 
   =
-  rewrite ~m_rec:false table system venv (fun _ -> Some rule) t
+  rewrite ~mode:(`TopDown false) table system venv (fun _ -> Some rule) t
     
 (*------------------------------------------------------------------*)
 (** High-level system cloning function. *)
@@ -69,7 +69,7 @@ let clone_system_map
     (s_system : SE.single_system)
     (new_name : Theory.lsymb)
     (fmap     :
-       ( [`Global | `Action of Action.descr] ->
+       ( Action.descr ->
          Symbols.macro ->
          Term.term ->
          Term.term ))
@@ -79,10 +79,7 @@ let clone_system_map
   let table, new_system_name =
     SystemExpr.clone_system_map
       table system new_name
-      (fun descr ->
-         Action.descr_map (fun _ ->
-             fmap (`Action descr)
-           ) descr)
+      (fun descr -> Action.descr_map (fun _ -> fmap descr) descr)
   in
 
   let new_s_system, old_s_system, old_system_name =
@@ -95,7 +92,7 @@ let clone_system_map
   let global_macro_fold ns dec_def _ table : Symbols.table =
     Macros.update_global_data
       table ns dec_def
-      s_system new_s_system (fmap `Global)
+      s_system new_s_system fmap
   in
 
   let table = Symbols.Macro.fold global_macro_fold table table in
@@ -136,9 +133,27 @@ let conv_term ?pat table system ~bnds (term : Theory.term)
   env.vars, is, t
 
 (*------------------------------------------------------------------*)
+let mk_equiv_statement
+    table hint_db
+    new_axiom_name enrich make_conclusion new_system
+  : Goal.statement
+  =
+  let `Equiv formula, _ =
+    Goal.make_obs_equiv ~enrich table hint_db new_system 
+  in
+  let formula = make_conclusion formula in
+  Goal.{ name    = new_axiom_name; 
+         system  = new_system; 
+         ty_vars = []; 
+         formula }
+
+(*------------------------------------------------------------------*)
 (** {2 Renaming} *)
 
-let global_rename table sdecl (gf : Theory.global_formula) =
+let global_rename
+    (table : Symbols.table) (hint_db : Hint.hint_db)
+    sdecl (gf : Theory.global_formula)
+  =
   let old_system, old_single_system =
     parse_single_system_name table sdecl
   in
@@ -222,7 +237,13 @@ let global_rename table sdecl (gf : Theory.global_formula) =
     in
     `Equiv (Equiv.mk_forall [fresh_x_var] fimpl)
   in
-  (axiom_name, enrich, make_conclusion, new_system_e, table)
+
+  let lemma =
+    mk_equiv_statement
+      table hint_db
+      axiom_name enrich make_conclusion new_system_e
+  in
+  (Some lemma, table)
 
 
 (*------------------------------------------------------------------*)
@@ -230,14 +251,11 @@ let global_rename table sdecl (gf : Theory.global_formula) =
 
 let global_prf
     (table : Symbols.table)
+    (hint_db : Hint.hint_db)
     (sdecl : Decl.system_modifier)
     (bnds  : Theory.bnds)
     (hash  : Theory.term)
-  : string *
-    Term.term list *
-    (Equiv.global_form -> [> `Equiv of Equiv.global_form ]) *
-    SE.t *
-    Symbols.table
+  : Goal.statement option * Symbols.table
   =
   let old_system, old_single_system =
     parse_single_system_name table sdecl
@@ -334,14 +352,24 @@ let global_prf
     in
     `Equiv concl
   in
-  (axiom_name, enrich, make_conclusion, new_system_e, table)
+
+  let lemma =
+    mk_equiv_statement
+      table hint_db
+      axiom_name enrich make_conclusion new_system_e
+  in
+
+  Some lemma, table
 
 
 (*------------------------------------------------------------------*)
 (** {2 CCA} *)
 
   
-let global_cca table sdecl bnds (p_enc : Theory.term) =
+let global_cca
+    (table : Symbols.table) (hint_db : Hint.hint_db)
+    sdecl bnds (p_enc : Theory.term)
+  =
   let old_system, old_single_system =
     parse_single_system_name table sdecl
   in
@@ -496,8 +524,13 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
     let concl = Equiv.Impl (Equiv.mk_forall is atom, equiv) in      
     `Equiv (Equiv.mk_forall [fresh_x_var] concl)
   in
-  (axiom_name, enrich, make_conclusion, new_system_e, table)
 
+  let lemma =
+    mk_equiv_statement
+      table hint_db
+      axiom_name enrich make_conclusion new_system_e
+  in
+  Some lemma, table
 
 (*------------------------------------------------------------------*)
 (** {2 Global PRF with time} *)
@@ -559,29 +592,65 @@ let xo_lt
   : bool
   =
   let x, y = x.cnt, y.cnt in
-  (* create a [msymb] with new (fresh) indices for [y] *)
-  let ms_y =
-    Term.mk_isymb
-      y.x_msymb
-      (Macros.ty_out table y.x_msymb)
-      (List.map (fun ty ->
-           Vars.make_new ty "a"
-         ) (Macros.ty_args table y.x_msymb))
-  in
-  let t_y = Macros.get_dummy_definition table system ms_y in
 
-  (* search if the macro [x.x_msymb] appears in [t_y] *)
-  let rec search (t : Term.term) : bool =
-    match t with
-    | Macro (ms, _, _) when ms.s_symb = x.x_msymb -> true
-    | Macro (ms, _, _) when Macros.is_global table ms.s_symb ->
-      search (Macros.get_dummy_definition table system ms)
+  if x.x_msymb = y.x_msymb then
+    (* If we compare the same macros, at the same action, only look for
+       subterm ordering constraints. *)
+    begin
+      if Symbols.is_global x.x_mdef && Symbols.is_global y.x_mdef then
+        assert (x.x_a = y.x_a);   (* TODO: is this indeed an invariant? *)
 
-    (* recurse *)
-    | _ -> Term.tfold (fun t found -> found || search t) t false
-  in
-  search t_y
+      x.x_a = y.x_a &&
+      (let px = Sp.choose x.x_occ.occ_pos
+       and py = Sp.choose y.x_occ.occ_pos in
+       (* Checking for a single position is enough *)
+       Pos.lt px py)
+    end
     
+  else
+    (* Otherwise, unroll [y] definition and look whether [x] appears *)
+    
+    (* create a [msymb] with new (fresh) indices for [y] *)
+    let ms_y =
+      Term.mk_isymb
+        y.x_msymb
+        (Macros.ty_out table y.x_msymb)
+        (List.map (fun ty ->
+             Vars.make_new ty "a"
+           ) (Macros.ty_args table y.x_msymb))
+    in
+    let a_y = Term.mk_action y.x_a y.x_a_is in
+
+    let cntxt = Constr.{ table; system; models = None } in
+    let t_y =
+      match Macros.get_definition cntxt ms_y a_y with
+      | `Def t -> t
+      | _ -> assert false       (* must be defined here *)
+    in
+
+    (* search if the macro [x.x_msymb] appears in [t_y] *)
+    let rec search (t : Term.term) : bool =
+      match t with
+      | Macro (ms, _, ts) ->
+        if ms.s_symb = x.x_msymb then
+          match ts with
+          | Term.Action (a, _) ->
+            if Symbols.is_global x.x_mdef then
+              assert (x.x_a = a);   (* TODO: is this indeed an invariant? *)
+            a = x.x_a
+          | _ -> false
+        else
+          begin
+            match Macros.get_definition cntxt ms ts with
+            | `Def ty -> search ty
+            | _ -> false
+          end
+
+      (* recurse *)
+      | _ -> Term.tfold (fun t found -> found || search t) t false
+    in
+    search t_y
+
 (*------------------------------------------------------------------*)
 (** Maps over hash occurrences *)
 module Mxo = Map.Make(struct
@@ -595,7 +664,7 @@ module Mxo = Map.Make(struct
 type xomap = XO.t list Mxo.t
 
 (** [cmp x y] iff [(x → y)] *)
-let xocc_ordering (cmp : XO.t -> XO.t -> bool) (xs : XO.t list) : xomap =
+let map_from_cmp (cmp : XO.t -> XO.t -> bool) (xs : XO.t list) : xomap =
   let add (map : xomap) (x : XO.t) : xomap =
     let map = Mxo.mapi (fun y s -> if cmp x y then x :: s else s) map in
     let lx =
@@ -606,14 +675,14 @@ let xocc_ordering (cmp : XO.t -> XO.t -> bool) (xs : XO.t list) : xomap =
   List.fold_left add Mxo.empty xs
 
 (** Comparison in the transitive closure, i.e. [x →* y]. *)
-let rec lt (map : xomap) (x : XO.t) (y : XO.t) =
+let rec lt_map (map : xomap) (x : XO.t) (y : XO.t) =
   if not (Mxo.mem y map) then false
   else
     let ly = Mxo.find y map in
-    List.exists (fun (z : XO.t) -> x.tag = z.tag || lt map x z) ly
+    List.exists (fun (z : XO.t) -> x.tag = z.tag || lt_map map x z) ly
 
 (** [x] and [y] incomparable w.r.t. the transitive closure of [map]. *)
-let incomparable map x y = not (lt map x y) && not (lt map y x) 
+let incomparable map x y = not (lt_map map x y) && not (lt_map map y x) 
 
 (** Linearize the partial ordering [map].
     I.e. return a total ordering compatible with [map]. *)
@@ -750,18 +819,24 @@ let global_prf_time
     Term.mk_action xocc.cnt.x_a xocc.cnt.x_a_is
   in
 
-  (* condition checking whether [(tau1, s1) < (tau2, s2)] *)
+  (* compute the constraints maps between hash occurrences, resulting
+     from the protocol definition. *)
+  let map_cnstrs = map_from_cmp (xo_lt table old_system) occs in
+
+  (* arbitrary linearization of the map *)
+  let map_cnstrs = linearize map_cnstrs in
+
+  (* Condition checking whether [(tau1, s1) < (tau2, s2)].
+     We use the lexicographic order [(Term.mk_lt, mt_map map_cnstrs)]. *)
   let mk_xocc_lt
       (tau1 : Term.term) (xocc1 : XO.t)
       (tau2 : Term.term) (xocc2 : XO.t)
     : Term.term
     =
-    let is_glob = function Symbols.Global _ -> true | _ -> false in
-    
-    if is_glob xocc1.cnt.x_mdef && is_glob xocc2.cnt.x_mdef then
-      assert false
+    if lt_map map_cnstrs xocc1 xocc2 then
+      Term.mk_leq tau1 tau2
     else
-      assert false
+      Term.mk_lt tau1 tau2
   in
 
   let mk_xocc_collision
@@ -838,50 +913,32 @@ let global_prf_time
       Some rule
   in
 
-  let fmap
-      (kind : [ `Action of Action.descr | `Global ])
-      (ms   : Symbols.macro)
-      (t    : Term.term)
-    : Term.term
-    =
-    let tau0 = match kind with
-      | `Action d -> Term.mk_action d.name d.indices
-      | `Global   -> assert false  (* TODO *)
-    in
+  let fmap (d : Action.descr) (ms : Symbols.macro) (t : Term.term) : Term.term =
+    let tau0 = Term.mk_action d.name d.indices in
 
-    (* TODO: we probably want more precise control over the recursion,
-       as we want to recurse only on a part of the subterm we built ? 
-       Unclear how to do, especially how to keep meaningful positions. *)
-    rewrite ~m_rec:true table old_system venv (mk_rw_rule tau0) t
+    (* To keep meaningful positions, we need to do the rewriting bottom-up.
+       Indeed, this ensures that a rewriting does not modify the positions
+       of the sub-terms above the position the rewriting occurs at. *)
+    rewrite ~mode:`BottomUp table old_system venv (mk_rw_rule tau0) t
   in
-  
+
   let _table, _new_system_e, _old_system_name =
     clone_system_map
       table old_system old_single_system sdecl.Decl.name fmap
   in 
   assert false
-  
+
 (*------------------------------------------------------------------*)
 let declare_system
     (table   : Symbols.table)
     (hint_db : Hint.hint_db)
     (sdecl   : Decl.system_modifier)
-  : Goal.statement * Symbols.table
+  : Goal.statement option * Symbols.table
   =
-  let new_axiom_name, enrich, make_conclusion, new_system, table = 
+  let lemma, table = 
     match sdecl.Decl.modifier with
-    | Rename gf        -> global_rename table sdecl        gf
-    | PRF (bnds, hash) -> global_prf    table sdecl bnds hash
-    | CCA (bnds, enc)  -> global_cca    table sdecl bnds  enc
-  in
-  let `Equiv formula, _ =
-    Goal.make_obs_equiv ~enrich table hint_db new_system 
-  in
-  let formula = make_conclusion formula in
-  let lemma = Goal.{ 
-      name    = new_axiom_name; 
-      system  = new_system; 
-      ty_vars = []; 
-      formula }
+    | Rename gf        -> global_rename table hint_db sdecl        gf
+    | PRF (bnds, hash) -> global_prf    table hint_db sdecl bnds hash
+    | CCA (bnds, enc)  -> global_cca    table hint_db sdecl bnds  enc
   in
   lemma, table

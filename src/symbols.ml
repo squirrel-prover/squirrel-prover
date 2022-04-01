@@ -581,6 +581,8 @@ let is_infix (s : fname t) : bool =
   let s = to_string s in
   is_infix_str s
 
+let is_global : macro_def -> bool = function Global _ -> true | _ -> false
+
 (*------------------------------------------------------------------*)
 (** {2 Builtins} *)
 

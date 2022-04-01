@@ -11,10 +11,13 @@ module Pos : sig
   type pos
 
   val pp : Format.formatter -> pos -> unit
-    
+
   (** set of positions *)
   module Sp : Set.S with type elt = pos
 
+  (*------------------------------------------------------------------*)
+  val lt : pos -> pos -> bool
+    
   (*------------------------------------------------------------------*)
   (** [f] of type [f_sel] is a function that, given [t vars conds] where:
       - [t] is sub-term of the term we are mapping one
@@ -56,11 +59,14 @@ module Pos : sig
     [`Map of Term.term | `Continue]
 
   (*------------------------------------------------------------------*)
-  (** [map_fold ?m_rec func env acc t] applies [func] at all position in [t].
-      If [m_rec] is true, recurse after applying [func].
-      [m_rec] default to [false].*)
+  (** [map_fold ?mode func env acc t] applies [func] at all position in [t].
+
+      Tree traversal can be controlled using [mode]:
+      - [`TopDown b]: apply [func] at top-level first, then recurse.
+        [b] tells if we recurse under successful maps.
+      - [`BottomUp _]: recurse, then apply [func] at top-level *)
   val map_fold : 
-    ?m_rec:bool -> 
+    ?mode:[`TopDown of bool | `BottomUp] -> 
     'a f_map_fold ->            (* folding function *)
     Vars.env ->                 (* for clean variable naming *)
     'a ->                       (* folding value *)
@@ -69,7 +75,7 @@ module Pos : sig
 
   (** Same as [map_fold] for [Equiv.form]. *)
   val map_fold_e : 
-    ?m_rec:bool -> 
+    ?mode:[`TopDown of bool | `BottomUp] -> 
     'a f_map_fold ->            (* folding function *)
     Vars.env ->                 (* for clean variable naming *)
     'a ->                       (* folding value *)
@@ -80,12 +86,20 @@ module Pos : sig
   (** Same as [map_fold], but only a map. 
       Return: `Map found, term *)
   val map : 
-    ?m_rec:bool -> f_map -> Vars.env -> Term.term -> bool * Term.form
+    ?mode:[`TopDown of bool | `BottomUp] ->
+    f_map ->
+    Vars.env ->
+    Term.term ->
+    bool * Term.form
 
   (** Same as [map_fold_e], but only a map.
       Return: `Map found, term *)
   val map_e :
-    ?m_rec:bool -> f_map -> Vars.env -> Equiv.form -> bool * Equiv.form
+    ?mode:[`TopDown of bool | `BottomUp] ->
+    f_map ->
+    Vars.env ->
+    Equiv.form ->
+    bool * Equiv.form
 end
 
 (*------------------------------------------------------------------*)
