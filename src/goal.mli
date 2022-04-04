@@ -7,10 +7,13 @@ type lsymb = Theory.lsymb
 (** A goal consists of one of our two kinds of sequents. *)
 type t = Trace of TS.t | Equiv of ES.t
 
+(*------------------------------------------------------------------*)
 val pp : Format.formatter -> t -> unit
 val pp_init : Format.formatter -> t -> unit
 
-val vars : t -> Vars.env
+(*------------------------------------------------------------------*)
+val vars   : t -> Vars.env
+val system : t -> SystemExpr.t
 
 (*------------------------------------------------------------------*)
 val map      : (TS.t -> TS.t)      -> (ES.t -> ES.t)      -> t -> t
@@ -35,6 +38,9 @@ type ('a,'b) abstract_statement = {
 type statement       = (string, Equiv.gform) abstract_statement
 type equiv_statement = (string, Equiv.form ) abstract_statement
 type reach_statement = (string, Term.term  ) abstract_statement
+
+(*------------------------------------------------------------------*)
+val pp_statement : Format.formatter -> statement -> unit
 
 (*------------------------------------------------------------------*)
 val is_reach_statement : statement -> bool

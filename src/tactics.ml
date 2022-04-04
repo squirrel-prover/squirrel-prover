@@ -729,8 +729,9 @@ let timeout_get = function
 
 
 (*------------------------------------------------------------------*)
-let print_system table system =
-  Printer.prt `Result "@.%a@.%a@."
+let print_system table (system : SystemExpr.t) = 
+  Printer.prt `Result "@[<v>System @[[%a]@]@;@[%a@]@;@[%a@]@;@]%!"
+    SystemExpr.pp system
     (SystemExpr.pp_descrs table) system
     (if Config.print_trs_equations ()
      then Completion.print_init_trs

@@ -449,6 +449,12 @@ end
 
 type gform = [`Equiv of form | `Reach of Term.term]
 
+let pp_gform fmt (f : gform) =
+  match f with
+  | `Equiv e -> pp fmt e
+  | `Reach f -> Term.pp fmt f
+
+(*------------------------------------------------------------------*)
 type local_form = Term.term
 type global_form = form
 type any_form = gform

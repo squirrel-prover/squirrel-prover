@@ -382,10 +382,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Print} *)
 
-  let print_tac s =
-    Tactics.print_system (S.table s) (S.system s);
-    [s]
-
   let print_messages args s =
     let messages = List.map (fun arg ->
         match convert_args s [Args.Theory arg] Args.(Sort Message) with
@@ -2100,6 +2096,7 @@ let () = T.register_general "dependent induction"
        (EquivLT.induction_tac ~dependent:true))
 
 (*------------------------------------------------------------------*)
+(* we are only registering the help here *)
 let () =
   T.register "print"
     ~tactic_help:{general_help = "Shows the current system.";
@@ -2107,7 +2104,7 @@ let () =
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
     ~pq_sound:true
-    (genfun_of_any_pure_fun TraceLT.print_tac EquivLT.print_tac)
+    (genfun_of_any_pure_fun (fun _ -> assert false) (fun _ -> assert false))
 
 (*------------------------------------------------------------------*)
 let () = T.register_general "show"

@@ -12,6 +12,10 @@ type lsymb = Theory.lsymb
 (** Return the name of the goal currently being proved, if any. *)
 val current_goal_name : unit -> string option
 
+val get_current_goal : unit -> (Goal.statement * Goal.t) option
+
+val get_current_system : unit -> SE.t option
+
 (** Current mode of the prover:
     - [GoalMode] : waiting for the next goal.
     - [ProofMode] : proof of a goal in progress.
@@ -163,25 +167,41 @@ val is_reach_assumption : string -> bool
 val is_equiv_assumption : string -> bool
 
 (*------------------------------------------------------------------*)
+val get_assumption_kind : string -> [`Axiom | `Lemma] option 
+val pp_kind : Format.formatter -> [`Axiom | `Lemma] -> unit
+
+(*------------------------------------------------------------------*)
+(** {2 User printing query} *)
+
+(** User printing query *)
+type print_query =
+  | Pr_system    of SE.p_system_expr option (* [None] means current system *)
+  | Pr_statement of lsymb
+
+(*------------------------------------------------------------------*)
 (** {2 Utilities for parsing} *)
 
 type include_param = { th_name : lsymb; params : lsymb list }
 
 exception ParseError of string
 
+(*------------------------------------------------------------------*)
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
   | ParsedSetOption  of Config.p_set_param
-  | ParsedTactic     of [ `Bullet of string |
+
+  | ParsedTactic of [ `Bullet of string |
                           `Brace of [`Open|`Close] |
                           `Tactic of TacticsArgs.parser_arg Tactics.ast ] list
-  | ParsedUndo       of int
-  | ParsedGoal       of Goal.Parsed.t Location.located
-  | ParsedInclude    of include_param
+
+  | ParsedPrint   of print_query
+  | ParsedUndo    of int
+  | ParsedGoal    of Goal.Parsed.t Location.located
+  | ParsedInclude of include_param
   | ParsedProof
   | ParsedQed
   | ParsedAbort
-  | ParsedHint       of Hint.p_hint
+  | ParsedHint of Hint.p_hint
   | EOF
 
 (** Declare a new goal to the current goals, and returns it. *)

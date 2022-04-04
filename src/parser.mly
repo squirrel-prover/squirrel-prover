@@ -40,7 +40,7 @@
 %token BY FA INTRO AS DESTRUCT REMEMBER INDUCTION
 %token PROOF QED UNDO ABORT HINT
 %token RENAME GPRF GCCA
-%token INCLUDE
+%token INCLUDE PRINT
 %token SMT
 %token TICKUNDERSCORE
 %token EOF
@@ -866,6 +866,7 @@ help_tac_i:
 | DDH        { "ddh"}
 | GDH        { "gdh"}
 | CDH        { "cdh"}
+| PRINT      { "print"}
 
 | DEPENDENT INDUCTION  { "dependent induction"}
 | GENERALIZE DEPENDENT { "generalize dependent"}
@@ -918,24 +919,26 @@ system_proj:
 | i=lsymb SLASH LEFT  { SE. P_Left                    i  }
 | i=lsymb SLASH RIGHT { SE. P_Right                   i  }
 
-/* A single or bi-system */
+/* System expression for a single or bi-system */
+%inline system_expr:
+| i=lsymb        { SE.P_SimplePair i }
+| sp=system_proj { SE.P_Single sp }
+| s1=system_proj COMMA s2=system_proj 
+                 { SE.P_Pair (s1, s2) }
+
 system_i:
-|                                  { SE.P_SimplePair
-                                       SE.default_system_name }
-| LBRACKET i=lsymb        RBRACKET { SE. P_SimplePair i }
-| LBRACKET sp=system_proj RBRACKET { SE. P_Single sp }
-| LBRACKET s1=system_proj COMMA s2=system_proj RBRACKET
-                                   { SE. P_Pair (s1, s2) }
+|                                  { SE.P_SimplePair SE.default_system_name }
+| LBRACKET se=system_expr RBRACKET { se }
 
 system:
 | s=loc(system_i) { s }
 
-/* A bi-system */
+/* System expression for a bi-system */
 bisystem_i:
 |                                  { SE.(P_SimplePair default_system_name) }
-| LBRACKET i=lsymb RBRACKET        { SE. P_SimplePair i }
+| LBRACKET i=lsymb RBRACKET        { SE.P_SimplePair i }
 | LBRACKET s1=system_proj COMMA s2=system_proj RBRACKET
-                                   { SE. P_Pair (s1, s2) }
+                                   { SE.P_Pair (s1, s2) }
 
 bisystem:
 | s=loc(bisystem_i) { s }
@@ -988,6 +991,7 @@ goal_i:
 goal:
 | goal=loc(goal_i) { goal }
 
+(*------------------------------------------------------------------*)
 option_param:
 | TRUE  { Config.Param_bool true  }
 | FALSE { Config.Param_bool false }
@@ -1000,21 +1004,34 @@ option_param:
 set_option:
 | SET n=ID EQ param=option_param DOT { (n, param) }
 
+(*------------------------------------------------------------------*)
 hint:
 | HINT REWRITE id=lsymb DOT { Hint.Hint_rewrite id }
 | HINT SMT     id=lsymb DOT { Hint.Hint_smt     id }
 
+(*------------------------------------------------------------------*)
 include_params:
 | LBRACKET l=slist(lsymb, COMMA) RBRACKET { l }
 |                                         { [] }
 
 p_include:
-| INCLUDE l=include_params th=lsymb DOT   { Prover.{ th_name = th; params = l; } }
+| INCLUDE l=include_params th=lsymb DOT
+    { Prover.{ th_name = th; params = l; } }
 
+(*------------------------------------------------------------------*)
+/* print query */
+pr_query:
+| GOAL   l=lsymb  DOT { Prover.Pr_statement l }
+| SYSTEM l=system DOT { Prover.Pr_system (Some l) }
+|                 DOT { Prover.Pr_system None }
+
+
+(*------------------------------------------------------------------*)
 interactive:
 | set=set_option     { Prover.ParsedSetOption set }
 | decls=declarations { Prover.ParsedInputDescr decls }
 | u=undo             { Prover.ParsedUndo u }
+| PRINT q=pr_query   { Prover.ParsedPrint q }
 | PROOF              { Prover.ParsedProof }
 | i=p_include        { Prover.ParsedInclude i }
 | QED                { Prover.ParsedQed }
@@ -1039,6 +1056,7 @@ bulleted_tactic:
 | DOT                    { [] }
 
 top_proofmode:
+| PRINT q=pr_query   { Prover.ParsedPrint q }
 | bulleted_tactic    { Prover.ParsedTactic $1 }
 | u=undo             { Prover.ParsedUndo u }
 | ABORT              { Prover.ParsedAbort }
