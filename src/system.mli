@@ -59,7 +59,7 @@ val symbs :
   * The set of registered actions for this system name will define
   * the protocol under study.
   * Returns the updated table and the actual action symbol and description
-  * used * (currently the proposed symbol may not be used for technical
+  * used (currently the proposed symbol may not be used for technical
   * reasons that will eventually disappear TODO). *)
 val register_action :
   Symbols.table -> system_name ->

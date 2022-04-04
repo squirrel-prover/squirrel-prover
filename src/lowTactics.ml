@@ -536,10 +536,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Rewrite Equiv} *)
 
-  (** Rewrite a sequent using an equivalence.
-      Correspond to the ReachEquiv rule of CSF'21. *)
+  (** Parameter for "rewrite equiv" tactic, i.e. a global formula (which
+      should allow to derive an equivalence) and its associated system
+      expression.
+      The rewrite equiv tactic corresponds to the ReachEquiv rule of CSF'22. *)
   type rw_equiv =  SystemExpr.t * Equiv.global_form
 
+  (** Parse rewrite equiv arguments. *)
   let p_rw_equiv (rw_arg : Args.rw_equiv_item) (s : S.t) : rw_equiv =
     match rw_arg.rw_type with
     | `Rw f ->
@@ -560,7 +563,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
                                rewrite equiv") ;
 
       let f = pat.pat_term in
-
 
       (* If assumption is a hypothesis from current trace sequent,
        * it will come attached to the sequent's system expression,

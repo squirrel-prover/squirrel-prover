@@ -199,7 +199,7 @@ module type S = sig
 
   (** [try_match t p] tries to match [p] with [t] (at head position).
       If it succeeds, it returns a map [θ] instantiating the variables
-      [p.pat_vars] as substerms of [t], and:
+      [p.pat_vars] as subterms of [t], and:
 
       - if [mode = `Eq] then [t = pθ] (default mode);
       - if [mode = `EntailLR] then [t = pθ] or [t ⇒ pθ] (boolean case).

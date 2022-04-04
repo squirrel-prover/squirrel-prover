@@ -9,8 +9,9 @@
 (*------------------------------------------------------------------*)
 (** {2 Symbols}
 
-    We have function, name and macro symbols. Each symbol
-    can then be indexed. *)
+    We have function, name and macro symbols.
+    Each symbol can then be indexed.
+    TODO document the more general treatment of function symbols. *)
 
 (** Ocaml type of a typed index symbol.
     Invariant: [s_typ] do not contain tvar or univars. *)

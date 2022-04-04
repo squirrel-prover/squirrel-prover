@@ -108,8 +108,7 @@ let global_rename table sdecl (gf : Theory.global_formula) =
         (fun action_descr ->
            iter#visit_message (snd action_descr.output) ;
            iter#visit_message (snd action_descr.condition) ;
-           List.iter (fun (_,m) -> iter#visit_message m) action_descr.updates
-        );
+           List.iter (fun (_,m) -> iter#visit_message m) action_descr.updates)
     with Fresh.Name_found ->
       Tactics.hard_failure
         (Tactics.Failure "The name on the right-hand side already \

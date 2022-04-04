@@ -24,7 +24,7 @@ variable generation.
   - {{!module-Squirrellib.Term}Term}:
     syntax of terms and formulas of the meta-logic
   - {{!module-Squirrellib.System}System}: systems
-  - {{!module-Squirrellib.System}System}: actions
+  - {{!module-Squirrellib.Action}Action}: actions
   - {{!module-Squirrellib.SystemExpr}SystemExpr}: system expressions
     are used to refer to one or several systems.
 

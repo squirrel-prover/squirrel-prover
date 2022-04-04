@@ -1,8 +1,8 @@
-open Term
+(** Utilities for CCA-based tactics. *)
 
 (* TODO: better error message, see [Euf] *)
 exception Bad_ssc
-  
+
 class check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)
   inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
   method visit_message t = match t with
@@ -21,7 +21,7 @@ class check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)
       self#visit_message m
 
     | Term.Name ns when ns.s_symb = key_n -> raise Bad_ssc
-    | Term.Var m -> 
+    | Term.Var m ->
       let ty = Vars.ty m in
       if ty <> Type.tindex && ty <> Type.ttimestamp then
         raise Bad_ssc
@@ -54,7 +54,7 @@ class check_rand ~cntxt enc_fn randoms = object (self)
     | Term.Name ns when List.mem ns.s_symb randoms ->
       Tactics.soft_failure (Tactics.SEncRandomNotFresh)
 
-    | Term.Var m -> 
+    | Term.Var m ->
       let ty = Vars.ty m in
       if ty <> Type.tindex && ty <> Type.ttimestamp then
         Tactics.soft_failure
@@ -104,6 +104,7 @@ let check_encryption_randomness
   in
   let encryptions = List.sort_uniq Stdlib.compare encryptions in
 
+  let open Term in
   let randoms = List.map (function
       | Fun ((_, _), _, [_; Name r; _]), _-> r.s_symb
       | _ ->  Tactics.soft_failure (Tactics.SEncNoRandom))
@@ -125,12 +126,12 @@ let check_encryption_randomness
                | _ -> false)) vars
       | _ -> assert false) encryptions then
     Tactics.soft_failure (Tactics.SEncSharedRandom);
-    
+
   (* we check that no encryption is shared between multiple encryptions *)
   let enc_classes = Utils.classes (fun m1 m2 ->
       match m1, m2 with
       | (Fun ((_, _), _, [m1; Name r; k1]),_),
-        (Fun ((_, _), _, [m2; Name r2; k2]),_) -> 
+        (Fun ((_, _), _, [m2; Name r2; k2]),_) ->
         r.s_symb = r2.s_symb &&
         (m1 <> m2 || k1 <> k2)
       (* the patterns should match, if they match inside the declaration
@@ -144,12 +145,12 @@ let check_encryption_randomness
 
 let symenc_rnd_ssc ~cntxt env head_fn key elems =
   let rule =
-    Euf.mk_rule 
+    Euf.mk_rule
       ~fun_wrap_key:None
       ~elems ~drop_head:false
       ~allow_functions:(fun x -> false)
       ~cntxt ~env ~mess:Term.empty ~sign:Term.empty
-      ~head_fn ~key_n:key.s_symb ~key_is:key.s_indices
+      ~head_fn ~key_n:key.Term.s_symb ~key_is:key.s_indices
   in
   check_encryption_randomness ~cntxt
     rule.Euf.case_schemata rule.Euf.cases_direct head_fn [] elems

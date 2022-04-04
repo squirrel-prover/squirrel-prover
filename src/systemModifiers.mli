@@ -4,10 +4,8 @@
     specifying that the old and new systems are indistinguishable is
     declared. *)
 
-module SE = SystemExpr
-
 (** [declare_system table sdecl] returns a tuple 
-   (name, fresh_vars, goal_maker, new_system, new_table) :
+    [(name, fresh_vars, goal_maker, new_system, new_table)] containing:
     - the [name] of the indistinguishability axiom introduced by the tactic
     - the fresh variables [fresh_vars] needed to define the axiom
     - the function [goal_maker] that will allow to create the correct goal 
@@ -20,5 +18,5 @@ val declare_system :
   string *
   Term.term list *
   (Equiv.global_form -> [> `Equiv of Equiv.global_form ]) *
-  SE.t *
+  SystemExpr.t *
   Symbols.table

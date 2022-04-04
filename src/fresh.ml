@@ -4,8 +4,15 @@ open Utils
 
 module Sv = Vars.Sv
 
+(** Exception raised when a forbidden occurrence of a name is found. *)
 exception Name_found
+
+(** Exception raised when a forbidden occurrence of a message variable
+    is found. *)
 exception Var_found
+
+(** Exception raised when attempting to apply a tactic on something
+    that should be a name but isn't. *)
 exception Not_name
 
 class find_name ~(cntxt:Constr.trace_cntxt) exact name = object (self)
