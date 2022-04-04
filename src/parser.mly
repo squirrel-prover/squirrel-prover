@@ -467,19 +467,27 @@ declaration_i:
                                                 sprocess = p}) }
 
 | SYSTEM id=lsymb EQ from_sys=system WITH RENAME gf=global_formula
-                          { Decl.(Decl_system_modifier { from_sys = from_sys;
-                                                         modifier = Rename gf;
-			                                 name = id}) }
+    { Decl.(Decl_system_modifier
+              { from_sys = from_sys;
+                modifier = Rename gf;
+			          name = id}) }
 
 | SYSTEM id=lsymb EQ from_sys=system WITH GPRF args=opt_arg_list COMMA hash=term
-                          { Decl.(Decl_system_modifier { from_sys = from_sys;
-                                                         modifier = PRF (args, hash);
-			                                 name = id}) }
+    { Decl.(Decl_system_modifier
+              { from_sys = from_sys;
+                modifier = PRF (args, hash);
+			          name = id}) }
+
+| SYSTEM id=lsymb EQ from_sys=system WITH GPRF TIME args=opt_arg_list COMMA hash=term
+    { Decl.(Decl_system_modifier
+              { from_sys = from_sys;
+                modifier = PRFt (args, hash);
+			          name = id}) }
 
 | SYSTEM id=lsymb EQ from_sys=system WITH GCCA args=opt_arg_list COMMA enc=term
-                          { Decl.(Decl_system_modifier { from_sys = from_sys;
-                                                         modifier = CCA (args, enc);
-			                                 name = id}) }
+    { Decl.(Decl_system_modifier { from_sys = from_sys;
+                                   modifier = CCA (args, enc);
+			                             name = id}) }
 
 declaration:
 | ldecl=loc(declaration_i)                  { ldecl }

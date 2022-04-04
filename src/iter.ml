@@ -393,6 +393,13 @@ type hash_occ = (Vars.var list * Term.term) occ
 
 type hash_occs = hash_occ list
 
+let pp_hash_occ fmt (x : hash_occ) =
+  pp_occ (fun fmt (kis, m) ->
+      Fmt.pf fmt "@[&H(%a, &K(%a))@]"
+        Term.pp m
+        (Fmt.list ~sep:Fmt.sp Vars.pp) kis) fmt x
+
+(*------------------------------------------------------------------*)
 (** [get_f_messages_ext ~cntxt f k t] collects direct occurrences of
     [f(_,k(_))] or [f(_,_,k(_))] where [f] is a function name [f] and [k] 
     a name [k].

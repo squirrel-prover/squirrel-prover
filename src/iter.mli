@@ -139,6 +139,9 @@ type hash_occ = (Vars.var list * Term.term) occ
 
 type hash_occs = hash_occ list
 
+val pp_hash_occ : Format.formatter -> hash_occ -> unit
+
+(*------------------------------------------------------------------*)
 (** [get_f_messages_ext ~cntxt f k t] collects direct occurrences of
     [f(_,k(_))] or [f(_,_,k(_))] where [f] is a function name [f] and [k] 
     a name [k].

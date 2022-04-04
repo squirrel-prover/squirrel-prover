@@ -566,15 +566,28 @@ type x_hash_occ = {
   x_occ : Iter.hash_occ;
 
   (* the associated generated name (≠ for all extended hash occurrences) *)
-  x_nsymb : Symbols.Name.ns Symbols.t;
+  x_nsymb : Symbols.name;
 }
 
+let pp_x_hash_occ fmt (x : x_hash_occ) : unit =
+  Fmt.pf fmt "@[<v>action: %a :- %a@;\
+              macro %a@;\
+              fresh name: %a@;\
+              %a@]"
+    Symbols.pp x.x_msymb
+    Symbols.pp x.x_a
+    Vars.pp_list x.x_a_is
+    Symbols.pp x.x_nsymb
+    Iter.pp_hash_occ x.x_occ
+  
 (*------------------------------------------------------------------*)
 (** Hash occurrences with unique identifiers *)
 module XO : sig
   type t = private { cnt : x_hash_occ; tag : int; }
 
   val mk : x_hash_occ -> t
+
+  val pp : Format.formatter -> t -> unit
 end = struct
   type t = { cnt : x_hash_occ; tag : int; }
 
@@ -582,6 +595,9 @@ end = struct
   let mk =
     let cpt = ref 0 in
     fun cnt -> { cnt; tag = ((incr cpt); !cpt); }
+
+  let pp fmt (x : t) : unit =
+    Fmt.pf fmt "%d: @[%a@]" x.tag pp_x_hash_occ x.cnt
 end
 
 (** Strict pre-ordering over hash occurrences, resulting from the 
@@ -663,6 +679,12 @@ module Mxo = Map.Make(struct
     There is an edge [(v → u) ∈ m] iff [List.mem v (List.find u m)]. *)
 type xomap = XO.t list Mxo.t
 
+let[@warning "-32"] pp_xomap fmt (map : xomap) : unit =
+  let pp_el fmt (u, vs) =
+    Fmt.pf fmt "@[[%a → %a]@]" XO.pp u (Fmt.list XO.pp) vs
+  in
+  Fmt.pf fmt "@[<v>%a@]" (Fmt.list pp_el) (Mxo.bindings map)
+  
 (** [cmp x y] iff [(x → y)] *)
 let map_from_cmp (cmp : XO.t -> XO.t -> bool) (xs : XO.t list) : xomap =
   let add (map : xomap) (x : XO.t) : xomap =
@@ -674,7 +696,7 @@ let map_from_cmp (cmp : XO.t -> XO.t -> bool) (xs : XO.t list) : xomap =
   in
   List.fold_left add Mxo.empty xs
 
-(** Comparison in the transitive closure, i.e. [x →* y]. *)
+(** Comparison in the transitive closure, i.e. [x →+ y]. *)
 let rec lt_map (map : xomap) (x : XO.t) (y : XO.t) =
   if not (Mxo.mem y map) then false
   else
@@ -682,7 +704,9 @@ let rec lt_map (map : xomap) (x : XO.t) (y : XO.t) =
     List.exists (fun (z : XO.t) -> x.tag = z.tag || lt_map map x z) ly
 
 (** [x] and [y] incomparable w.r.t. the transitive closure of [map]. *)
-let incomparable map x y = not (lt_map map x y) && not (lt_map map y x) 
+let incomparable map (x : XO.t) (y : XO.t) =
+  x.tag <> y.tag &&
+  not (lt_map map x y) && not (lt_map map y x) 
 
 (** Linearize the partial ordering [map].
     I.e. return a total ordering compatible with [map]. *)
@@ -703,16 +727,13 @@ let rec linearize (map : xomap) : xomap =
   
   
 (*------------------------------------------------------------------*)
-let global_prf_time
-    (table : Symbols.table)
-    (sdecl : Decl.system_modifier)
-    (bnds  : Theory.bnds)
-    (hash  : Theory.term)
-  : string *
-    Term.term list *
-    (Equiv.global_form -> [> `Equiv of Equiv.global_form ]) *
-    SE.t *
-    Symbols.table
+let global_prf_t
+    (table   : Symbols.table)
+    (hint_db : Hint.hint_db)
+    (sdecl   : Decl.system_modifier)
+    (bnds    : Theory.bnds)
+    (hash    : Theory.term)
+  : Goal.statement option * Symbols.table
   =
   let old_system, old_single_system =
     parse_single_system_name table sdecl
@@ -822,7 +843,7 @@ let global_prf_time
   (* compute the constraints maps between hash occurrences, resulting
      from the protocol definition. *)
   let map_cnstrs = map_from_cmp (xo_lt table old_system) occs in
-
+ 
   (* arbitrary linearization of the map *)
   let map_cnstrs = linearize map_cnstrs in
 
@@ -926,7 +947,7 @@ let global_prf_time
     clone_system_map
       table old_system old_single_system sdecl.Decl.name fmap
   in 
-  assert false
+  None, table
 
 (*------------------------------------------------------------------*)
 let declare_system
@@ -937,8 +958,9 @@ let declare_system
   =
   let lemma, table = 
     match sdecl.Decl.modifier with
-    | Rename gf        -> global_rename table hint_db sdecl        gf
-    | PRF (bnds, hash) -> global_prf    table hint_db sdecl bnds hash
-    | CCA (bnds, enc)  -> global_cca    table hint_db sdecl bnds  enc
+    | Rename gf         -> global_rename table hint_db sdecl        gf
+    | PRF  (bnds, hash) -> global_prf    table hint_db sdecl bnds hash
+    | PRFt (bnds, hash) -> global_prf_t  table hint_db sdecl bnds hash
+    | CCA  (bnds, enc)  -> global_cca    table hint_db sdecl bnds  enc
   in
   lemma, table

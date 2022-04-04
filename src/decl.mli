@@ -58,6 +58,7 @@ val pp_system_decl : Format.formatter -> system_decl -> unit
 type global_rule =
   | Rename of Theory.global_formula
   | PRF    of Theory.bnds * Theory.term
+  | PRFt   of Theory.bnds * Theory.term (* gPRF, with time *)
   | CCA    of Theory.bnds * Theory.term
 
 (** System modifier, comprising:

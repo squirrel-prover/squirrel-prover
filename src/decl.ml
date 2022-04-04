@@ -51,6 +51,7 @@ let pp_system_decl fmt sys =
 type global_rule =
   | Rename of Theory.global_formula
   | PRF    of Theory.bnds * Theory.term
+  | PRFt   of Theory.bnds * Theory.term (* gPRF, with time *)
   | CCA    of Theory.bnds * Theory.term
 
 type system_modifier = { 
