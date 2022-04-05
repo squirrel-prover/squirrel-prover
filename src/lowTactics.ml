@@ -1006,7 +1006,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let try_clean_env vars s : S.t =
     let s_fv = S.fv s in
     let clear = Sv.diff vars (Sv.inter vars s_fv) in
-    let env = Vars.rm_vars (S.vars s) (Sv.elements clear) in
+    let env = Vars.rm_vars (Sv.elements clear) (S.vars s) in
     S.set_vars env s
 
   let _generalize ~dependent t s : Vars.var * S.t =

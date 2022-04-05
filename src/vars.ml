@@ -128,19 +128,23 @@ let mem_s (e : env) (s : string) : bool = M.mem s e
 
 let find (e : env) (name : string) : var = M.find name e 
 
-let of_list l : env =
+let add_var v e : env = M.add (name v) v e
+
+let add_vars vs e : env =
   List.fold_left (fun e v -> 
-      M.add (name v) v e
-    ) empty_env l
+      add_var v e
+    ) e vs
+
+let of_list vs : env = add_vars vs empty_env
 
 let of_set s : env = 
   Sv.fold (fun v e -> 
-      M.add (name v) v e
+      add_var v e
     ) s empty_env 
 
-let rm_var e v = M.remove (name v) e
+let rm_var v e : env = M.remove (name v) e
 
-let rm_vars e vs = List.fold_left rm_var e vs
+let rm_vars vs e : env = List.fold_left (fun e v -> rm_var v e) e vs
 
 let prefix_count_regexp = Pcre.regexp "#*(_*.*[^0-9])([0-9]*)$"
 

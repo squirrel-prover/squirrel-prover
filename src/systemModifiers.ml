@@ -16,14 +16,14 @@ let rewrite
     (table   : Symbols.table)
     (system  : SE.t)
     (venv    : Vars.env)         (* for clean variable naming *)
-    (mk_rule : Pos.pos -> Rewrite.rw_rule option) 
+    (mk_rule : Vars.vars -> Pos.pos -> Rewrite.rw_rule option) 
     (t       : Term.term)
   : Term.term 
   =
   let rw_inst : Match.Pos.f_map = 
     fun occ vars _conds p ->
       (* build the rule to apply at position [p] *)
-      match mk_rule p with
+      match mk_rule vars p with
       | None -> `Continue
       | Some rule ->
         assert (rule.rw_conds = []);
@@ -59,7 +59,7 @@ let rewrite_norec
     (t      : Term.term)
   : Term.term 
   =
-  rewrite ~mode:(`TopDown false) table system venv (fun _ -> Some rule) t
+  rewrite ~mode:(`TopDown false) table system venv (fun _ _ -> Some rule) t
     
 (*------------------------------------------------------------------*)
 (** High-level system cloning function. *)
@@ -579,7 +579,32 @@ let pp_x_hash_occ fmt (x : x_hash_occ) : unit =
     Vars.pp_list x.x_a_is
     Symbols.pp x.x_nsymb
     Iter.pp_hash_occ x.x_occ
-  
+
+let subst_xocc (s : Term.subst) (o : x_hash_occ) : x_hash_occ =
+  let occ = o.x_occ in
+  let x_a_is = Term.subst_vars s o.x_a_is in
+  let is, t = occ.occ_cnt in
+  let x_occ = Iter.{ 
+      occ with
+      occ_vars = Term.subst_vars s occ.occ_vars;
+      occ_cnt = Term.subst_vars s is, Term.subst s t;
+      occ_cond = List.map (Term.subst s) o.x_occ.occ_cond;
+    } 
+  in
+  { o with x_a_is; x_occ; }
+
+
+let refresh_xocc
+    (venv : Vars.env) (o : x_hash_occ) 
+  : Vars.env * Term.subst * x_hash_occ 
+  =
+  let occ = o.x_occ in
+  assert (Sv.subset (Sv.of_list o.x_a_is) (Sv.of_list occ.occ_vars));
+
+  let venv, occ_vars, subst = Term.refresh_vars_env venv occ.occ_vars in
+
+  venv, subst, subst_xocc subst o
+
 (*------------------------------------------------------------------*)
 (** Hash occurrences with unique identifiers *)
 module XO : sig
@@ -587,17 +612,31 @@ module XO : sig
 
   val mk : x_hash_occ -> t
 
+  val compare : t -> t -> int
+
+  val subst : Term.subst -> t -> t
+
+  val refresh : Vars.env -> t -> Vars.env * Term.subst * t
+
   val pp : Format.formatter -> t -> unit
 end = struct
   type t = { cnt : x_hash_occ; tag : int; }
+
+  let pp fmt (x : t) : unit =
+    Fmt.pf fmt "%d: @[%a@]" x.tag pp_x_hash_occ x.cnt
 
   (* create fresh identifiers *)
   let mk =
     let cpt = ref 0 in
     fun cnt -> { cnt; tag = ((incr cpt); !cpt); }
 
-  let pp fmt (x : t) : unit =
-    Fmt.pf fmt "%d: @[%a@]" x.tag pp_x_hash_occ x.cnt
+  let compare (x : t) (y : t) = Stdlib.compare x.tag y.tag
+
+  let subst s x = { x with cnt = subst_xocc s x.cnt }
+
+  let refresh venv x = 
+    let venv, subst, cnt = refresh_xocc venv x.cnt in
+    venv, subst, { x with cnt }
 end
 
 (** Strict pre-ordering over hash occurrences, resulting from the 
@@ -671,7 +710,7 @@ let xo_lt
 (** Maps over hash occurrences *)
 module Mxo = Map.Make(struct
     type t = XO.t
-    let compare (x : XO.t) (y : XO.t) = Stdlib.compare x.tag y.tag
+    let compare = XO.compare
   end)
 
 (*------------------------------------------------------------------*)
@@ -818,10 +857,10 @@ let global_prf_t
   let x_t = Term.mk_var x in
   
   (* timestamp at which [H(x,k)] occurs  *)
-  let tau = Vars.make_new Type.ttimestamp "t" in
+  let venv, tau = Vars.make `Approx venv Type.ttimestamp "t" in
   let tau_t = Term.mk_var tau in
 
-  let is, subst = Term.refresh_vars `Global is in
+  let venv, is, subst = Term.refresh_vars_env venv is in
   let key = Term.subst subst (Term.mk_name param.h_key) in
   let key_is = List.map (Term.subst_var subst) param.h_key.s_indices in
 
@@ -841,11 +880,21 @@ let global_prf_t
   in
 
   (* compute the constraints maps between hash occurrences, resulting
-     from the protocol definition. *)
+     from the protocol definition. 
+     An occurrence [x] is smaller than [y] w.r.t. [map_cnstrs] if 
+     [x] must be computed before [y]. *)
   let map_cnstrs = map_from_cmp (xo_lt table old_system) occs in
  
   (* arbitrary linearization of the map *)
   let map_cnstrs = linearize map_cnstrs in
+
+  (* Occurrences sorted according to the computation order. *)
+  let occs = 
+    List.sort_uniq (fun (x : XO.t) (y : XO.t) ->
+        if x.tag = y.tag then 0 
+        else if lt_map map_cnstrs x y then -1 else 1
+      ) occs 
+  in
 
   (* Condition checking whether [(tau1, s1) < (tau2, s2)].
      We use the lexicographic order [(Term.mk_lt, mt_map map_cnstrs)]. *)
@@ -867,16 +916,13 @@ let global_prf_t
     = 
     (* condition stating that [x] is equal to a hash occurrence [xocc]. *)
     let occ_vars, occ_t = xocc1.cnt.x_occ.occ_cnt in
-    let msg_eq = 
-    Term.mk_ands ~simpl:false
-      [ Term.mk_eq ~simpl:true x_t occ_t;                 (* hash content equ. *)
-        Term.mk_indices_eq ~simpl:true key_is occ_vars;   (* hash key equ. *)
-        Term.mk_eq ~simpl:true tau_t (mk_occ_ts xocc1); ] (* timestamp equ. *)
-    in
-    let xocc_lt = mk_xocc_lt tau1 xocc1 tau2 xocc2 in
-    Term.mk_and ~simpl:false msg_eq xocc_lt 
+    Term.mk_ands ~simpl:true
+      [ Term.mk_eq ~simpl:true x_t occ_t;               (* hash content equ. *)
+        Term.mk_indices_eq ~simpl:true key_is occ_vars; (* hash key equ. *)
+        Term.mk_eq ~simpl:true tau_t (mk_occ_ts xocc1); (* timestamp equ. *)
+        mk_xocc_lt tau1 xocc1 tau2 xocc2; ] 
   in
-  
+
   (* we rewrite [H(x,k)] at occurrence [s0] at time [tau0] into:
      [
        try find tau, occ s.t. (tau,s) < (tau0,s0) && x = s_{occ} 
@@ -884,6 +930,7 @@ let global_prf_t
        else n_occ0@tau0
      ] *)
   let rw_target
+      (venv   : Vars.env)
       (tau0_t : Term.term)
       (xocc0  : XO.t)
     =
@@ -891,31 +938,42 @@ let global_prf_t
       (* We check whether there exists [(tau,s)] such that:
          [(tau,s) < (tau0,s0) && x = s_x] *)
       Term.mk_ors
-        (List.map (fun xocc ->
-             mk_xocc_collision tau_t xocc tau0_t xocc0
+        (List.map (fun (xocc : XO.t) ->
+             let venv, _, xocc = XO.refresh venv xocc in
+             Term.mk_exists ~simpl:true 
+               xocc.cnt.x_a_is
+               (mk_xocc_collision tau_t xocc tau0_t xocc0)
            ) occs)
     in
     let t_else = mk_occ_term xocc0 in
     let t_then =
-      List.fold_left (fun t_then xocc ->
+      List.fold_right (fun xocc t_then ->
+          let venv, _, xocc = XO.refresh venv xocc in
           let t_cond = mk_xocc_collision tau_t xocc tau0_t xocc0 in
           let t_occ = mk_occ_term xocc in
-          Term.mk_ite ~simpl:false t_cond t_occ t_then
-        ) (Term.mk_witness m_ty) occs
+          Term.mk_find xocc.cnt.x_a_is t_cond t_occ t_then
+        ) occs (Term.mk_witness m_ty) 
       
     in
     Term.mk_find [tau] cond t_then t_else
   in
 
-  (* - [tau0] is the time at which the term being rewritten in is 
-       evaluated. 
-       E.g., if we rewrite in the body of [output@A(i)] then [tau0] 
-       is [A(i)]. 
+  (* - [d] is the action description we are rewritting in
+     - [ms] is the macro whose body we are rewritting at time [d] 
      - [pos] is the position at which we are trying to do the rewrite, 
-       which is necessary to retrieve the associated fresh name. *)
-  let mk_rw_rule (tau0 : Term.term) (pos : Pos.pos) : Rewrite.rw_rule option =
+       which is necessary to retrieve the associated fresh name. 
+     - [bnd_vars] are the variable bound above [pos]. *)
+  let mk_rw_rule
+      (d : Action.descr)
+      (ms : Symbols.macro)
+      (bnd_vars : Vars.vars) 
+      (pos : Pos.pos) 
+    : Rewrite.rw_rule option 
+    =
     let hash_occ =
       List.find_opt (fun (xocc : XO.t) ->
+          xocc.cnt.x_a = d.name &&
+          xocc.cnt.x_msymb = ms &&
           Sp.mem pos xocc.cnt.x_occ.occ_pos
         ) occs
     in
@@ -925,25 +983,40 @@ let global_prf_t
 
     (* interesting position, retrieve the associated occurrence *)
     | Some xocc ->
+      (* Time at which the term being rewritten in is evaluated. 
+         E.g., if we rewrite in the body of [output@A(i)] then [tau0] 
+         is [A(i)]. *)
+      let tau0 = Term.mk_action d.name d.indices in
+
+      let s = 
+        List.map2 (fun i j -> 
+            Term.ESubst (Term.mk_var i,Term.mk_var j)
+          ) xocc.cnt.x_occ.occ_vars (d.indices @ bnd_vars)
+      in
+      let venv = Vars.add_vars (d.indices @ bnd_vars) venv in
+      let xocc = XO.subst s xocc in
+      
       let rule = Rewrite.{
           rw_tyvars = [];
           rw_vars   = Sv.of_list (x :: is);
           rw_conds  = [];
-          rw_rw     = (to_rw, rw_target tau0 xocc); }
+          rw_rw     = (to_rw, rw_target venv tau0 xocc); }
       in
       Some rule
   in
 
   let fmap (d : Action.descr) (ms : Symbols.macro) (t : Term.term) : Term.term =
-    let tau0 = Term.mk_action d.name d.indices in
+    (* refresh the description with clean names *)
+    let venv, _, s  = Term.refresh_vars_env venv d.indices in
+    let d = Action.subst_descr s d in
 
     (* To keep meaningful positions, we need to do the rewriting bottom-up.
        Indeed, this ensures that a rewriting does not modify the positions
        of the sub-terms above the position the rewriting occurs at. *)
-    rewrite ~mode:`BottomUp table old_system venv (mk_rw_rule tau0) t
+    rewrite ~mode:`BottomUp table old_system venv (mk_rw_rule d ms) t
   in
 
-  let _table, _new_system_e, _old_system_name =
+  let table, _new_system_e, _old_system_name =
     clone_system_map
       table old_system old_single_system sdecl.Decl.name fmap
   in 

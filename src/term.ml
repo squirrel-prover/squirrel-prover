@@ -1009,8 +1009,6 @@ let rec assoc : subst -> term -> term =
   | ESubst (t1,t2)::q ->
     if term = t1 then t2 else assoc q term
 
-exception Substitution_error of string
-
 let pp_esubst ppf (ESubst (t1,t2)) =
   Fmt.pf ppf "%a->%a" pp t1 pp t2
 
@@ -1018,19 +1016,20 @@ let pp_subst ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_esubst) s
 
-let subst_var : subst -> Vars.var -> Vars.var =
-    fun subst var ->
-    match assoc subst (Var var) with
-    | Var var -> var
-    | _ -> raise @@ Substitution_error
-        "Must map the given variable to another variable"
+let subst_var (subst : subst) (var : Vars.var) : Vars.var =
+  match assoc subst (Var var) with
+  | Var var -> var
+  | _ -> assert false
+
+let subst_vars (subst : subst) (vs : Vars.vars) : Vars.vars =
+  List.map (subst_var subst) vs
 
 let subst_isymb (s : subst) (symb : 'a isymb) : 'a isymb =
-  { symb with s_indices = List.map (subst_var s) symb.s_indices }
+  { symb with s_indices = subst_vars s symb.s_indices }
 
 
 let subst_macro (s : subst) isymb =
-  { isymb with s_indices = List.map (subst_var s) isymb.s_indices }
+  { isymb with s_indices = subst_vars s isymb.s_indices }
 
 (*------------------------------------------------------------------*)
 
@@ -1111,16 +1110,16 @@ let rec subst (s : subst) (t : term) : term =
     let new_term =
       match t with
       | Fun ((fs,is), fty, lt) ->
-        Fun ((fs, List.map (subst_var s) is), fty, List.map (subst s) lt)
+        Fun ((fs, subst_vars s is), fty, List.map (subst s) lt)
 
       | Name symb ->
-        Name { symb with s_indices = List.map (subst_var s) symb.s_indices}
+        Name { symb with s_indices = subst_vars s symb.s_indices}
 
       | Macro (m, l, ts) ->
         Macro (subst_macro s m, List.map (subst s) l, subst s ts)
 
       | Var m -> Var m
-      | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
+      | Action (a,indices) -> Action (a, subst_vars s indices)
       | Diff (a, b) -> Diff (subst s a, subst s b)
 
       | Seq ([], f) -> Seq ([], subst s f)

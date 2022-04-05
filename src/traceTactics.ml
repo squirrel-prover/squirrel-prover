@@ -823,7 +823,7 @@ let apply_substitute subst s =
     match subst with
       | Term.ESubst (Term.Var v, t) :: _ when
         not (List.mem v (Term.get_vars t)) ->
-          TS.set_vars (Vars.rm_var (TS.vars s) v) s
+          TS.set_vars (Vars.rm_var v (TS.vars s)) s
       | _ -> s
   in
   [TS.subst subst s]
@@ -1012,7 +1012,7 @@ let autosubst s =
       let () = dbg "subst %a by %a" Vars.pp x Vars.pp y in
 
       let s =
-        TS.set_vars (Vars.rm_var (TS.vars s) x) s
+        TS.set_vars (Vars.rm_var x (TS.vars s)) s
       in
       TS.subst [Term.ESubst (Term.mk_var x, Term.mk_var y)] s
   in

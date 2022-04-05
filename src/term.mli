@@ -190,9 +190,10 @@ val tsubst : Type.tsubst -> term -> term
 val tsubst_ht : Type.tsubst -> hterm -> hterm
 
 (** [subst_var s v] returns [v'] if substitution [s] maps [v] to [Var v'],
-    and [v] if the variable is not in the domain of the substitution.
-    @raise Substitution_error if [v] is mapped to a non-variable term in [s]. *)
-val subst_var  : subst -> Vars.var -> Vars.var
+    and [v] if the variable is not in the domain of the substitution. *)
+val subst_var : subst -> Vars.var -> Vars.var
+
+val subst_vars : subst -> Vars.vars -> Vars.vars
 
 (** Substitute indices in an indexed symbols. *)
 val subst_isymb : subst -> 'a isymb -> 'a isymb
@@ -204,7 +205,7 @@ val subst_macros_ts : Symbols.table -> string list -> term -> term -> term
 (*------------------------------------------------------------------*)
 type refresh_arg = [`Global | `InEnv of Vars.env ref ]
 
-val refresh_vars  : refresh_arg -> Vars.vars -> Vars.vars * esubst list
+val refresh_vars : refresh_arg -> Vars.vars -> Vars.vars * esubst list
 
 val refresh_vars_env :
   Vars.env -> Vars.var list -> Vars.env * Vars.var list * esubst list

@@ -239,7 +239,7 @@ let induction Args.(Message (ts,_)) s =
     let intro_back, s = generalize ts s in
 
     (* Remove ts from the sequent, as it will become unused. *)
-    let s = ES.set_vars (Vars.rm_var env t) s in
+    let s = ES.set_vars (Vars.rm_var t env) s in
     let table  = ES.table s in
     let system = ES.system s in
     let subst = [Term.ESubst (ts, Term.mk_pred ts)] in
