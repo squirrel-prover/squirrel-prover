@@ -36,7 +36,15 @@ let rewrite
           } 
         in      
         match Match.T.try_match table system occ pat with
-        | NoMatch _ | FreeTyv -> `Continue
+        | NoMatch _ | FreeTyv ->
+          begin match mode with
+            | `TopDown _ -> `Continue
+            | `BottomUp  -> 
+              Printer.prt `Dbg "occ:%a@.pat:%a@."
+              Term.pp occ (Match.T.pp_pat Term.pp) pat;
+              assert (Term.is_macro occ); `Continue
+            (* in bottom-up mode, we build rules that should always succeed. *)
+          end
 
         (* head matches *)
         | Match mv ->
@@ -46,6 +54,7 @@ let rewrite
           assert (left = occ);
           `Map right
   in
+
   let _, f = Match.Pos.map ~mode rw_inst venv t in
   f
 
@@ -70,6 +79,7 @@ let clone_system_map
     (new_name : Theory.lsymb)
     (fmap     :
        ( Action.descr ->
+         extra_is:Vars.vars ->
          Symbols.macro ->
          Term.term ->
          Term.term ))
@@ -79,7 +89,14 @@ let clone_system_map
   let table, new_system_name =
     SystemExpr.clone_system_map
       table system new_name
-      (fun descr -> Action.descr_map (fun _ -> fmap descr) descr)
+      (fun descr -> 
+         (* description with clean variable names *)
+         let venv, _, s  = 
+           Term.refresh_vars_env (Vars.empty_env) descr.indices 
+         in
+         let descr = Action.subst_descr s descr in
+
+         Action.descr_map (fun _ -> fmap descr ~extra_is:[]) descr)
   in
 
   let new_s_system, old_s_system, old_system_name =
@@ -89,6 +106,7 @@ let clone_system_map
     |  _ -> assert false
   in
 
+  Fmt.epr "@.update globals@.@.";
   let global_macro_fold ns dec_def _ table : Symbols.table =
     Macros.update_global_data
       table ns dec_def
@@ -210,7 +228,7 @@ let global_rename
     }
   in
 
-  let fmap _ _ms t : Term.term =
+  let fmap _ ~extra_is _ms t : Term.term =
     rewrite_norec table old_system env.vars rw_rule t
   in
   
@@ -321,7 +339,7 @@ let global_prf
     }
   in
 
-  let fmap _ _ms t =
+  let fmap _ ~extra_is _ms t =
     rewrite_norec table old_system venv rw_rule t
   in
 
@@ -482,7 +500,7 @@ let global_cca
     }
   in
 
-  let fmap _ _ms t =
+  let fmap _ ~extra_is _ms t =
     rewrite_norec table old_system venv enc_rw_rule t |>
     rewrite_norec table old_system venv dec_rw_rule 
   in
@@ -570,13 +588,12 @@ type x_hash_occ = {
 }
 
 let pp_x_hash_occ fmt (x : x_hash_occ) : unit =
-  Fmt.pf fmt "@[<v>action: %a :- %a@;\
-              macro %a@;\
+  Fmt.pf fmt "@[<v>action: %a(%a) :- %a@;\
               fresh name: %a@;\
               %a@]"
-    Symbols.pp x.x_msymb
     Symbols.pp x.x_a
     Vars.pp_list x.x_a_is
+    Symbols.pp x.x_msymb
     Symbols.pp x.x_nsymb
     Iter.pp_hash_occ x.x_occ
 
@@ -896,6 +913,8 @@ let global_prf_t
       ) occs 
   in
 
+  Fmt.epr "occs:@.@[<v>%a@]@." (Fmt.list ~sep:Fmt.cut XO.pp) occs;
+
   (* Condition checking whether [(tau1, s1) < (tau2, s2)].
      We use the lexicographic order [(Term.mk_lt, mt_map map_cnstrs)]. *)
   let mk_xocc_lt
@@ -941,7 +960,7 @@ let global_prf_t
         (List.map (fun (xocc : XO.t) ->
              let venv, _, xocc = XO.refresh venv xocc in
              Term.mk_exists ~simpl:true 
-               xocc.cnt.x_a_is
+               xocc.cnt.x_occ.occ_vars
                (mk_xocc_collision tau_t xocc tau0_t xocc0)
            ) occs)
     in
@@ -951,7 +970,7 @@ let global_prf_t
           let venv, _, xocc = XO.refresh venv xocc in
           let t_cond = mk_xocc_collision tau_t xocc tau0_t xocc0 in
           let t_occ = mk_occ_term xocc in
-          Term.mk_find xocc.cnt.x_a_is t_cond t_occ t_then
+          Term.mk_find xocc.cnt.x_occ.occ_vars t_cond t_occ t_then
         ) occs (Term.mk_witness m_ty) 
       
     in
@@ -964,37 +983,51 @@ let global_prf_t
        which is necessary to retrieve the associated fresh name. 
      - [bnd_vars] are the variable bound above [pos]. *)
   let mk_rw_rule
-      (d : Action.descr)
-      (ms : Symbols.macro)
-      (bnd_vars : Vars.vars) 
-      (pos : Pos.pos) 
+      (d         : Action.descr)
+      ~(extra_is : Vars.vars)
+      (ms        : Symbols.macro)
+      (bnd_vars  : Vars.vars) 
+      (pos       : Pos.pos) 
     : Rewrite.rw_rule option 
     =
     let hash_occ =
       List.find_opt (fun (xocc : XO.t) ->
-          xocc.cnt.x_a = d.name &&
+          (Macros.is_global table ms || xocc.cnt.x_a = d.name) &&
           xocc.cnt.x_msymb = ms &&
           Sp.mem pos xocc.cnt.x_occ.occ_pos
         ) occs
     in
     match hash_occ with
     (* not an interesting position, no rewriting to do *)
-    | None -> None
+    | None -> 
+      Fmt.epr "ignore: %a -- %a at %a@."
+        Action.pp_descr_short d Symbols.pp ms Pos.pp pos;
+      None
 
     (* interesting position, retrieve the associated occurrence *)
     | Some xocc ->
+      Fmt.epr "try: %a -- %a at %a@."
+        Action.pp_descr_short d Symbols.pp ms Pos.pp pos;
+
+      Fmt.epr "%a and %a@." 
+        Vars.pp_list xocc.cnt.x_occ.occ_vars
+        Vars.pp_list (d.indices @ bnd_vars);
+      (* substitute [xocc] variables by the variables used during the rewriting *)
+      let s = 
+        let indices = 
+          if Macros.is_global table ms then extra_is else d.indices 
+        in
+        List.map2 (fun i j -> 
+            Term.ESubst (Term.mk_var i,Term.mk_var j)
+          ) xocc.cnt.x_occ.occ_vars (indices @ bnd_vars)
+      in
+      let xocc = XO.subst s xocc in
+      let venv = Vars.of_list (d.indices @ bnd_vars) in
+
       (* Time at which the term being rewritten in is evaluated. 
          E.g., if we rewrite in the body of [output@A(i)] then [tau0] 
          is [A(i)]. *)
       let tau0 = Term.mk_action d.name d.indices in
-
-      let s = 
-        List.map2 (fun i j -> 
-            Term.ESubst (Term.mk_var i,Term.mk_var j)
-          ) xocc.cnt.x_occ.occ_vars (d.indices @ bnd_vars)
-      in
-      let venv = Vars.add_vars (d.indices @ bnd_vars) venv in
-      let xocc = XO.subst s xocc in
       
       let rule = Rewrite.{
           rw_tyvars = [];
@@ -1005,15 +1038,16 @@ let global_prf_t
       Some rule
   in
 
-  let fmap (d : Action.descr) (ms : Symbols.macro) (t : Term.term) : Term.term =
-    (* refresh the description with clean names *)
-    let venv, _, s  = Term.refresh_vars_env venv d.indices in
-    let d = Action.subst_descr s d in
-
+  let fmap 
+      (d : Action.descr) ~(extra_is : Vars.vars)
+      (ms : Symbols.macro) (t : Term.term) 
+    : Term.term
+    =
     (* To keep meaningful positions, we need to do the rewriting bottom-up.
        Indeed, this ensures that a rewriting does not modify the positions
        of the sub-terms above the position the rewriting occurs at. *)
-    rewrite ~mode:`BottomUp table old_system venv (mk_rw_rule d ms) t
+    rewrite ~mode:`BottomUp
+      table old_system venv (mk_rw_rule d ~extra_is ms) t
   in
 
   let table, _new_system_e, _old_system_name =

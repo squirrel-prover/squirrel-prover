@@ -320,7 +320,7 @@ let pair table a b =
 
 (*------------------------------------------------------------------*)
 
-let pp_descrs table ppf system =
+let pp_descrs (table : Symbols.table) ppf (system : t) =
   Fmt.pf ppf "@[<v 2>Available actions:@;@;";
   iter_descrs table system (fun descr ->
       Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
@@ -332,11 +332,11 @@ let clone_system_map
     (table    : Symbols.table)
     (system   : t)
     (new_name : Symbols.lsymb)
-    (mapdescr : Action.descr -> Action.descr)
+    (map      : Action.descr -> Action.descr)
   : Symbols.table * Symbols.system
   =
   let symbs  = symbs table system in
-  let descrs = System.Msh.map mapdescr (descrs table system) in
+  let descrs = System.Msh.map map (descrs table system) in
   let data   = System.System_data (descrs,symbs) in
   Symbols.System.declare_exact table new_name ~data ()
 

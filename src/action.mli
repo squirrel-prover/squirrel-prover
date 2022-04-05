@@ -128,6 +128,10 @@ type descr = {
     (** List of global macros declared at [action]. *)
 }
 
+(*------------------------------------------------------------------*)
+(** well-formedness check for a description: check free variables *)
+val check_descr : descr -> bool
+
 (** [pi_descr s a] returns the projection of the description. As descriptions
    are only obtained for a system, one can when this system is without
    projection, validly project to obtain the left or the right descriptions,
@@ -149,6 +153,8 @@ val pp_descr_short : Format.formatter -> descr -> unit
 
 (** Formatter for descriptions. *)
 val pp_descr : Format.formatter -> descr -> unit
+
+val pp_descr_dbg : Format.formatter -> descr -> unit
 
 (** Formatter for actions shapes. *)
 val pp_shape : Format.formatter -> shape -> unit

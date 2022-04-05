@@ -23,7 +23,8 @@ module Pos = struct
   type pos = int list
 
   let pp (fmt : Format.formatter) (pos : pos) : unit =
-    Fmt.list ~sep:(Fmt.any ".") Fmt.int fmt pos
+    if pos = [] then Fmt.pf fmt "ε"
+    else Fmt.list ~sep:(Fmt.any ".") Fmt.int fmt pos
 
   (*------------------------------------------------------------------*)
   let rec lt (p1 : pos) (p2 : pos) : bool =

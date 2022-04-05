@@ -333,16 +333,23 @@ let update_global_data
     (dec_def      : Symbols.macro_def)
     (old_s_system : SystemExpr.single_system)
     (new_s_system : SystemExpr.single_system)
-    (func         : Action.descr -> Symbols.macro -> Term.term -> Term.term)
+    (func         : Action.descr -> extra_is:Vars.vars -> Symbols.macro -> Term.term -> Term.term)
   :  Symbols.table
   =
   match Symbols.Macro.get_data ms table with
   | Global_data data ->
     let _, ts_shape = data.action in
+    
     let descr = System.descr_of_shape table (SE.get_id old_s_system) ts_shape in
     
     let body = get_single_body old_s_system data in
-    let body = func descr ms body in
+
+    let extra_is = data.indices in
+    Fmt.epr "up: %a@." Action.pp_descr_short descr;
+
+    Fmt.epr "body : %a@." Term.pp body;
+    let body = func descr ~extra_is ms body in
+    Fmt.epr "body': %a@." Term.pp body;
     let data =
       Global_data { data with
                     systems_body = (new_s_system, body) :: data.systems_body }

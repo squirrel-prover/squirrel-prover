@@ -64,11 +64,14 @@ let pp_systems fmt table =
 let add_action
     (table : Symbols.table) (s_symb : Symbols.system)
     (shape : Action.shape)  (action : Symbols.action)
-    (descr : Action.descr) =
+    (descr : Action.descr) 
+  =
   (* Sanity checks *)
   assert (shape = Action.get_shape descr.action);
   assert (Action.get_indices descr.action = descr.indices);
   assert (action = descr.name);
+  assert (Action.check_descr descr);
+
   let descrs,symbs = get_data table s_symb in
   assert (not (Msh.mem shape descrs || Msh.mem shape symbs));
   let descrs = Msh.add shape descr descrs in
@@ -79,7 +82,10 @@ let add_action
 (*------------------------------------------------------------------*)
 let descr_of_shape table (system : Symbols.system) shape =
   let descrs,_ = get_data table system in
-  Action.refresh_descr (Msh.find shape descrs)
+  let descr = Msh.find shape descrs in
+  assert (Action.check_descr descr);
+
+  Action.refresh_descr descr
 
 (** We look whether the shape already has a name in another system,
     with the same number of indices.

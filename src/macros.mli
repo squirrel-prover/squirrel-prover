@@ -64,7 +64,7 @@ val update_global_data :
   Symbols.macro_def -> 
   SystemExpr.single_system ->
   SystemExpr.single_system ->
-  (Action.descr -> Symbols.macro -> Term.term -> Term.term) -> 
+  (Action.descr -> extra_is:Vars.vars -> Symbols.macro -> Term.term -> Term.term) -> 
   Symbols.table
     
 (*------------------------------------------------------------------*)
