@@ -839,10 +839,11 @@ let global_prf_t
   let (table, occs) : Symbols.table * XO.t list =
     SystemExpr.fold_descrs (fun descr (table,occs) ->
         Iter.fold_descr ~globals:true (fun ms m_is mdef t (table,occs) ->
-            (* find new occurrences *)
+            (* find new occurrences using NoDelta, as we also fold over 
+               global macros. *)
             let new_occs =
-              Iter.get_f_messages_ext
-                ~fv:descr.indices ~cntxt
+              Iter.get_f_messages_ext ~mode:`NoDelta
+                ~fv:descr.indices 
                 param.h_fn param.h_key.s_symb t
             in
 
@@ -943,6 +944,13 @@ let global_prf_t
         mk_xocc_lt tau1 xocc1 tau2 xocc2; ] 
   in
 
+  let table, err_fs = 
+    let ftype = Type.mk_ftype 0 [] [] m_ty in
+    Symbols.Function.declare
+      table (L.mk_loc L._dummy "error") (ftype,Symbols.Abstract `Prefix)
+  in
+  let err_t = Term.mk_fun table err_fs [] [] in
+    
   (* we rewrite [H(x,k)] at occurrence [s0] at time [tau0] into:
      [
        try find tau, occ s.t. (tau,s) < (tau0,s0) && x = s_{occ} 
@@ -972,7 +980,7 @@ let global_prf_t
           let t_cond = mk_xocc_collision tau_t xocc tau0_t xocc0 in
           let t_occ = mk_occ_term xocc in
           Term.mk_find xocc.cnt.x_occ.occ_vars t_cond t_occ t_then
-        ) occs (Term.mk_witness m_ty) 
+        ) occs err_t
       
     in
     Term.mk_find [tau] cond t_then t_else

@@ -75,35 +75,64 @@ system p2 = [p/left] with gprf time, H(_, k).
 
 print system [p2].
 
-(* TODO: there should be only two cases. Some redundancy here. *)
-
-goal [p2/left] _ (i,j : index) : happens(U(i)) => m1(j)@U(i) = empty.
-Proof.
-  intro Hap.
-  expand m1.
-Abort.
+goal [p2/left] _ (i : index) : 
+  happens(U(i)) => 
+  m1(i)@U(i) = 
+  (try find t:timestamp such that
+    (exists (i0:index), ((n1p(i) = n1p(i0)) && (t = U(i0)) && (t < U(i))))
+     in
+     try find i0:index such that
+    ((n1p(i) = n1p(i0)) && (t = U(i0)) && (t < U(i)))
+     in n_PRF7(i0) else error5 else n_PRF7(i)).
+Proof. intro Hap @/m1. auto. Qed.
 
 (*------------------------------------------------------------------*)
 (* system with two nested hashes and a global macro *)
 
-system [q] (!_i U: let m = H(n1p(i),k) in out(c, H(<n1(i),m>,k))).
+system [q] (!_i U: let mq = H(n1p(i),k) in out(c, H(n1(i),k))).
 
 system q2 = [q/left] with gprf time, H(_, k).
 
 print system [q2].
 
-goal [p2/left] _ (i,j : index) : happens(U(i)) => m1(i)@U(i) = empty.
+goal [q2/left] _ (i,j : index) : 
+  happens(U(i)) => 
+  output@U(i) = 
+  (try find t:timestamp such that
+     ((exists (i0:index), ((n1(i) = n1p(i0)) && (t = U(i0)) && (t <= U(i)))) ||
+      exists (i0:index),
+        ((n1(i) = n1(i0)) && (t = U(i0)) && (t < U(i))))
+   in
+     try find i0:index such that
+       ((n1(i) = n1p(i0)) && (t = U(i0)) && (t <= U(i)))
+     in n_PRF9(i0)
+     else
+       try find i0:index such that
+         ((n1(i) = n1(i0)) && (t = U(i0)) && (t < U(i)))
+       in n_PRF8(i0) else error6 else n_PRF8(i)).
 Proof.
-  intro Hap.
-  expand m1.
-Abort.
+  intro Hap @/output.
+  auto.
+Qed.
 
-(* TODO: generated condition is bugged. It should be t < U(i). 
-   For global macros, we should use the timestamp variables in the global 
-   data instead of a variable we build. 
-
-   Also, rewrite the code to clarify that we do a different rewriting 
-   for global and local macros. *)
+goal [q2/left] _ (i,j : index) : 
+  happens(U(i)) => 
+  mq(i)@U(i) = 
+  (try find t:timestamp such that
+     ((exists (i0:index), ((n1p(i) = n1p(i0)) && (t = U(i0)) && (t < U(i)))) ||
+      exists (i0:index), ((n1p(i) = n1(i0)) && (t = U(i0)) && (t < U(i))))
+   in
+     try find i0:index such that
+       ((n1p(i) = n1p(i0)) && (t = U(i0)) && (t < U(i)))
+     in n_PRF9(i0)
+     else
+       try find i0:index such that
+         ((n1p(i) = n1(i0)) && (t = U(i0)) && (t < U(i)))
+       in n_PRF8(i0) else error6 else n_PRF9(i)).
+Proof.
+  intro Hap @/mq. 
+  auto.
+Qed.
 
 (*------------------------------------------------------------------*)
 (* system with two nested hashes *)
@@ -114,12 +143,3 @@ system x2 = [x/left] with gprf time, H(_, k).
 
 print system [x2].
 (* TODO: hash not fully substituted ... *)
-
-(* (*------------------------------------------------------------------*) *)
-(* (* system with two nested hashes under binder (index) *) *)
-
-(* system [y] (!_i U: out(c, seq(j : index -> H(<n1(j),H(n2(i,j),k)>,k)))). *)
-
-(* system y2 = [y/left] with gprf time, H(_, k). *)
-
-(* print system [y2]. *)

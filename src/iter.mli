@@ -151,7 +151,7 @@ val get_f_messages_ext :
   ?drop_head:bool ->
   ?fun_wrap_key:(Term.fname -> bool) option ->
   ?fv:Vars.vars ->
-  cntxt:Constr.trace_cntxt ->
+  mode:[`Delta of Constr.trace_cntxt | `NoDelta] ->
   Term.fname -> 
   Term.name -> 
   Term.term -> 

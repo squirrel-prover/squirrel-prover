@@ -845,14 +845,9 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
 
   check_fun_out_ty (L.loc p_out_ty) out_ty;
 
-  Theory.declare_abstract
-    table
-    ~index_arity:iarr
-    ~ty_args
-    ~in_tys
-    ~out_ty
-    decl.name
-    decl.symb_type
+  Theory.declare_abstract table
+    ~index_arity:iarr ~ty_args ~in_tys ~out_ty
+    decl.name decl.symb_type
 
 (*------------------------------------------------------------------*)
 let parse_operator_decl table (decl : Decl.operator_decl) =

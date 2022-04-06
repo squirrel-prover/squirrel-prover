@@ -409,7 +409,7 @@ let get_f_messages_ext
     ?(drop_head    = true)
     ?(fun_wrap_key = None)
     ?(fv    : Vars.vars = [])
-    ~(cntxt : Constr.trace_cntxt)
+    ~(mode:[`Delta of Constr.trace_cntxt | `NoDelta])
     (f      : Term.fname)
     (k      : Term.name)
     (t      : Term.term)
@@ -459,7 +459,11 @@ let get_f_messages_ext
 
       | Term.Macro (m, l, ts) ->
         assert (l = []);
-        try_unfold cntxt m ts occs
+        begin
+          match mode with 
+          | `Delta cntxt -> try_unfold cntxt m ts occs
+          | `NoDelta -> occs, `Continue
+        end
         
       | _ -> occs, `Continue
   in

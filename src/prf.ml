@@ -176,7 +176,8 @@ let mk_prf_phi_proj cntxt env param frame hash =
 
   let frame_hashes : Iter.hash_occs =
     List.fold_left (fun acc t ->
-        Iter.get_f_messages_ext ~cntxt param.h_fn param.h_key.s_symb t @ acc
+        Iter.get_f_messages_ext ~mode:(`Delta cntxt) 
+          param.h_fn param.h_key.s_symb t @ acc
       ) [] frame
   in
   let frame_hashes = List.sort_uniq Stdlib.compare frame_hashes in
@@ -194,7 +195,8 @@ let mk_prf_phi_proj cntxt env param frame hash =
         let fv = (Sv.elements iocc.iocc_vars) in
 
         let new_cases =
-          Iter.get_f_messages_ext ~fv ~cntxt param.h_fn param.h_key.s_symb t
+          Iter.get_f_messages_ext ~mode:(`Delta cntxt)
+            ~fv param.h_fn param.h_key.s_symb t
         in
         let new_cases =
           List.map (fun occ ->
