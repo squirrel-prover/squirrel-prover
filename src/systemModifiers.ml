@@ -785,6 +785,20 @@ let rec linearize (map : xomap) : xomap =
     linearize (Mxo.add x (y  :: lx) map)
   
 (*------------------------------------------------------------------*)
+(* check that at most one hash occurrence appears per macro *)
+let check_uniq table (map : XO.t list) = 
+  List.for_all (fun (x : XO.t) ->
+      List.for_all (fun (y : XO.t) -> 
+          x.tag = y.tag ||
+          let x, y = x.cnt, y.cnt in
+          if Macros.is_global table x.x_msymb then
+            x.x_msymb <> y.x_msymb
+          else
+            x.x_msymb <> y.x_msymb || x.x_a <> y.x_a
+        ) map
+    ) map
+
+(*------------------------------------------------------------------*)
 let global_prf_t
     (table   : Symbols.table)
     (hint_db : Hint.hint_db)
@@ -915,7 +929,13 @@ let global_prf_t
       ) occs 
   in
 
-  Fmt.epr "occs:@.@[<v>%a@]@." (Fmt.list ~sep:Fmt.cut XO.pp) occs;
+  if not (check_uniq table occs) then
+    Tactics.hard_failure 
+      (Failure
+         "there are several hash occurrence in the same macro \
+          (maybe try adding let bindings).");
+                            
+  (* Fmt.epr "occs:@.@[<v>%a@]@." (Fmt.list ~sep:Fmt.cut XO.pp) occs; *)
 
   (* Condition checking whether [(tau1, s1) < (tau2, s2)].
      We use the lexicographic order [(Term.mk_lt, mt_map map_cnstrs)]. *)
