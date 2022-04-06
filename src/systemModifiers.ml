@@ -40,10 +40,8 @@ let rewrite
           begin match mode with
             | `TopDown _ -> `Continue
             | `BottomUp  -> 
-              Printer.prt `Dbg "occ:%a@.pat:%a@."
-              Term.pp occ (Match.T.pp_pat Term.pp) pat;
               assert (Term.is_macro occ); `Continue
-            (* in bottom-up mode, we build rules that should always succeed. *)
+              (* in bottom-up mode, we build rules that always succeed. *)
           end
 
         (* head matches *)
@@ -70,6 +68,10 @@ let rewrite_norec
   =
   rewrite ~mode:(`TopDown false) table system venv (fun _ _ -> Some rule) t
     
+
+(*------------------------------------------------------------------*)
+type system_map_arg = Macros.system_map_arg
+
 (*------------------------------------------------------------------*)
 (** High-level system cloning function. *)
 let clone_system_map
@@ -78,8 +80,7 @@ let clone_system_map
     (s_system : SE.single_system)
     (new_name : Theory.lsymb)
     (fmap     :
-       ( Action.descr ->
-         extra_is:Vars.vars ->
+       ( system_map_arg ->
          Symbols.macro ->
          Term.term ->
          Term.term ))
@@ -96,7 +97,7 @@ let clone_system_map
          in
          let descr = Action.subst_descr s descr in
 
-         Action.descr_map (fun _ -> fmap descr ~extra_is:[]) descr)
+         Action.descr_map (fun _ -> fmap (ADescr descr)) descr)
   in
 
   let new_s_system, old_s_system, old_system_name =
@@ -106,11 +107,12 @@ let clone_system_map
     |  _ -> assert false
   in
 
-  Fmt.epr "@.update globals@.@.";
-  let global_macro_fold ns dec_def _ table : Symbols.table =
-    Macros.update_global_data
-      table ns dec_def
-      s_system new_s_system fmap
+  let global_macro_fold
+      (ns : Symbols.macro) (dec_def : Symbols.macro_def) 
+      (_ : Symbols.data) (table : Symbols.table)
+    : Symbols.table 
+    =
+    Macros.update_global_data table ns dec_def s_system new_s_system fmap
   in
 
   let table = Symbols.Macro.fold global_macro_fold table table in
@@ -228,7 +230,7 @@ let global_rename
     }
   in
 
-  let fmap _ ~extra_is _ms t : Term.term =
+  let fmap _ _ms t : Term.term =
     rewrite_norec table old_system env.vars rw_rule t
   in
   
@@ -339,7 +341,7 @@ let global_prf
     }
   in
 
-  let fmap _ ~extra_is _ms t =
+  let fmap _ _ms t =
     rewrite_norec table old_system venv rw_rule t
   in
 
@@ -500,7 +502,7 @@ let global_cca
     }
   in
 
-  let fmap _ ~extra_is _ms t =
+  let fmap _ _ms t =
     rewrite_norec table old_system venv enc_rw_rule t |>
     rewrite_norec table old_system venv dec_rw_rule 
   in
@@ -781,7 +783,6 @@ let rec linearize (map : xomap) : xomap =
     let lx = Mxo.find x map in
     linearize (Mxo.add x (y  :: lx) map)
   
-  
 (*------------------------------------------------------------------*)
 let global_prf_t
     (table   : Symbols.table)
@@ -983,51 +984,54 @@ let global_prf_t
        which is necessary to retrieve the associated fresh name. 
      - [bnd_vars] are the variable bound above [pos]. *)
   let mk_rw_rule
-      (d         : Action.descr)
-      ~(extra_is : Vars.vars)
-      (ms        : Symbols.macro)
-      (bnd_vars  : Vars.vars) 
-      (pos       : Pos.pos) 
+      (arg      : system_map_arg)
+      (ms       : Symbols.macro)
+      (bnd_vars : Vars.vars) 
+      (pos      : Pos.pos) 
     : Rewrite.rw_rule option 
     =
     let hash_occ =
       List.find_opt (fun (xocc : XO.t) ->
-          (Macros.is_global table ms || xocc.cnt.x_a = d.name) &&
+          let found_descr = 
+            match arg with
+            | Macros.ADescr d -> xocc.cnt.x_a = d.name
+            | Macros.AGlobal a -> assert (Macros.is_global table ms); true
+          in
+          found_descr && 
           xocc.cnt.x_msymb = ms &&
           Sp.mem pos xocc.cnt.x_occ.occ_pos
         ) occs
     in
     match hash_occ with
     (* not an interesting position, no rewriting to do *)
-    | None -> 
-      Fmt.epr "ignore: %a -- %a at %a@."
-        Action.pp_descr_short d Symbols.pp ms Pos.pp pos;
-      None
+    | None -> None
 
     (* interesting position, retrieve the associated occurrence *)
     | Some xocc ->
-      Fmt.epr "try: %a -- %a at %a@."
-        Action.pp_descr_short d Symbols.pp ms Pos.pp pos;
-
-      Fmt.epr "%a and %a@." 
-        Vars.pp_list xocc.cnt.x_occ.occ_vars
-        Vars.pp_list (d.indices @ bnd_vars);
-      (* substitute [xocc] variables by the variables used during the rewriting *)
-      let s = 
         let indices = 
-          if Macros.is_global table ms then extra_is else d.indices 
+          match arg with
+          | Macros.ADescr d -> d.indices 
+          | Macros.AGlobal a -> a.is
         in
+
+      (* substitute [xocc] vars by the vars used during the rewriting *)
+      let s = 
         List.map2 (fun i j -> 
             Term.ESubst (Term.mk_var i,Term.mk_var j)
           ) xocc.cnt.x_occ.occ_vars (indices @ bnd_vars)
       in
       let xocc = XO.subst s xocc in
-      let venv = Vars.of_list (d.indices @ bnd_vars) in
+      let venv = Vars.of_list (indices @ bnd_vars) in
 
       (* Time at which the term being rewritten in is evaluated. 
-         E.g., if we rewrite in the body of [output@A(i)] then [tau0] 
-         is [A(i)]. *)
-      let tau0 = Term.mk_action d.name d.indices in
+         - if we rewrite in the body of [output@A(i)] then [tau0] 
+           is [A(i)]. 
+         - if we rewrite in a global macro, we use the global macro
+           dedicated timestamp variable. *)
+      let tau0 = match arg with
+        | Macros.ADescr d  -> Term.mk_action d.name d.indices 
+        | Macros.AGlobal a -> Term.mk_var a.ts 
+      in
       
       let rule = Rewrite.{
           rw_tyvars = [];
@@ -1038,16 +1042,14 @@ let global_prf_t
       Some rule
   in
 
-  let fmap 
-      (d : Action.descr) ~(extra_is : Vars.vars)
-      (ms : Symbols.macro) (t : Term.term) 
-    : Term.term
+  let fmap (arg : system_map_arg) (ms : Symbols.macro) (t : Term.term) 
+    : Term.term 
     =
     (* To keep meaningful positions, we need to do the rewriting bottom-up.
        Indeed, this ensures that a rewriting does not modify the positions
        of the sub-terms above the position the rewriting occurs at. *)
     rewrite ~mode:`BottomUp
-      table old_system venv (mk_rw_rule d ~extra_is ms) t
+      table old_system venv (mk_rw_rule arg ms) t
   in
 
   let table, _new_system_e, _old_system_name =

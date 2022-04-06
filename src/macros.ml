@@ -322,6 +322,11 @@ let get_dummy_definition
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
+type system_map_arg =
+  | ADescr  of Action.descr 
+  | AGlobal of { is : Vars.vars; ts : Vars.var; }
+
+(*------------------------------------------------------------------*)
 (** Given the name [ns] of a macro as well as a function [f] over
     terms, an [old_single_system] and a [new_single_system], takes the
     existing definition of [ns] in the old system, applies [f] to the
@@ -333,7 +338,11 @@ let update_global_data
     (dec_def      : Symbols.macro_def)
     (old_s_system : SystemExpr.single_system)
     (new_s_system : SystemExpr.single_system)
-    (func         : Action.descr -> extra_is:Vars.vars -> Symbols.macro -> Term.term -> Term.term)
+    (func         : 
+       (system_map_arg ->
+        Symbols.macro -> 
+        Term.term -> 
+        Term.term))
   :  Symbols.table
   =
   match Symbols.Macro.get_data ms table with
@@ -344,11 +353,10 @@ let update_global_data
     
     let body = get_single_body old_s_system data in
 
-    let extra_is = data.indices in
     Fmt.epr "up: %a@." Action.pp_descr_short descr;
 
     Fmt.epr "body : %a@." Term.pp body;
-    let body = func descr ~extra_is ms body in
+    let body = func (AGlobal { is = data.indices; ts = data.ts; }) ms body in
     Fmt.epr "body': %a@." Term.pp body;
     let data =
       Global_data { data with

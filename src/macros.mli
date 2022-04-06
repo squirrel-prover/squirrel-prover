@@ -53,6 +53,11 @@ val get_dummy_definition :
   Symbols.table -> SystemExpr.t -> Term.msymb -> Term.term
 
 (*------------------------------------------------------------------*)
+type system_map_arg =
+  | ADescr  of Action.descr 
+  | AGlobal of { is : Vars.vars; ts : Vars.var; }
+
+(*------------------------------------------------------------------*)
 (** Given the name [ns] of a macro as well as a function [f] over
     terms, an [old_single_system] and a [new_single_system], takes the
     existing definition of [ns] in the old system, applies [f] to the
@@ -64,7 +69,7 @@ val update_global_data :
   Symbols.macro_def -> 
   SystemExpr.single_system ->
   SystemExpr.single_system ->
-  (Action.descr -> extra_is:Vars.vars -> Symbols.macro -> Term.term -> Term.term) -> 
+  (system_map_arg -> Symbols.macro -> Term.term -> Term.term) -> 
   Symbols.table
     
 (*------------------------------------------------------------------*)
