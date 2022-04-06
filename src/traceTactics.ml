@@ -1539,7 +1539,7 @@ let euf_apply_facts drop_head s
 
   (* check that the SSCs hold *)
   let errors =
-    Euf.key_ssc ~messages:[mess;sign]
+    Euf.key_ssc ~globals:false ~messages:[mess;sign]
       ~allow_functions ~cntxt head_fn key.s_symb
   in
   if errors <> [] then

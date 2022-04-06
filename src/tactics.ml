@@ -8,7 +8,7 @@ type ssc_error_c =
   | E_elem
   | E_indirect of
       Symbols.action *
-      [`Cond | `Output | `Update of Symbols.macro]
+      [`Cond | `Output | `Update of Symbols.macro | `Global of Symbols.macro]
 
 type ssc_error = Term.term * ssc_error_c
 
@@ -21,6 +21,7 @@ let pp_ssc_error fmt (t, e) =
     | `Cond      -> Fmt.pf fmt "%a condition" Symbols.pp a
     | `Output    -> Fmt.pf fmt "%a output" Symbols.pp a
     | `Update st -> Fmt.pf fmt "%a, state update: %a" Symbols.pp a Symbols.pp st
+    | `Global m  -> Fmt.pf fmt "%a, global: %a" Symbols.pp a Symbols.pp m
   in
   Fmt.pf fmt "%a %a" pp_ssc_error_c e Term.pp t
 

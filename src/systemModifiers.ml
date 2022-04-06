@@ -293,7 +293,7 @@ let global_prf
   
   (* Check syntactic side condition. *)
   let errors =
-    Euf.key_ssc
+    Euf.key_ssc ~globals:false
       ~elems:[] ~allow_functions:(fun x -> false)
       ~cntxt param.h_fn param.h_key.s_symb
   in
@@ -423,7 +423,8 @@ let global_cca
     | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = enc_pk ->
       (* Check syntactic side condition. *)
       let errors =
-        Euf.key_ssc ~messages:[enc] ~allow_functions:(fun x -> x = enc_pk)
+        Euf.key_ssc ~globals:false
+          ~messages:[enc] ~allow_functions:(fun x -> x = enc_pk)
           ~cntxt fndec enc_key.s_symb
       in
       
@@ -672,7 +673,7 @@ let xo_lt
        subterm ordering constraints. *)
     begin
       if Symbols.is_global x.x_mdef && Symbols.is_global y.x_mdef then
-        assert (x.x_a = y.x_a);   (* TODO: is this indeed an invariant? *)
+        assert (x.x_a = y.x_a);  
 
       x.x_a = y.x_a &&
       (let px = Sp.choose x.x_occ.occ_pos
@@ -710,7 +711,7 @@ let xo_lt
           match ts with
           | Term.Action (a, _) ->
             if Symbols.is_global x.x_mdef then
-              assert (x.x_a = a);   (* TODO: is this indeed an invariant? *)
+              assert (x.x_a = a);   
             a = x.x_a
           | _ -> false
         else
@@ -806,11 +807,10 @@ let global_prf_t
 
   let param = Prf.prf_param hash in
 
-  (* Check syntactic side condition. *)
-  (* TODO: this is not correct, as global macros are not iterated upon by 
-     [Euf.key_ssc] *)
+  (* Check syntactic side condition.
+     We iter over global macros too ! *)
   let errors =
-    Euf.key_ssc
+    Euf.key_ssc ~globals:true
       ~elems:[] ~allow_functions:(fun x -> false)
       ~cntxt param.h_fn param.h_key.s_symb
   in

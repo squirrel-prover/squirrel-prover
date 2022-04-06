@@ -37,7 +37,7 @@ type ssc_error_c =
   | E_elem
   | E_indirect of
       Symbols.action *
-      [`Cond | `Output | `Update of Symbols.macro]
+      [`Cond | `Output | `Update of Symbols.macro | `Global of Symbols.macro]
 
 type ssc_error = Term.term * ssc_error_c
 

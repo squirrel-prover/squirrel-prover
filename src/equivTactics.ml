@@ -1758,7 +1758,8 @@ let cca1 Args.(Int i) s =
           ->
           begin
             let errors =
-              Euf.key_ssc ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
+              Euf.key_ssc ~globals:false
+                ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
                 ~cntxt fndec sk.s_symb
             in
             if errors <> [] then
@@ -1917,7 +1918,8 @@ let enckp arg (s : ES.t) =
           (fun (sk,system) ->
              let cntxt = Constr.{ cntxt with system } in
              let errors =
-               Euf.key_ssc ~cntxt ~elems:(ES.goal_as_equiv s)
+               Euf.key_ssc ~globals:false
+                 ~cntxt ~elems:(ES.goal_as_equiv s)
                  ~allow_functions:(fun x -> x = fnpk) fndec sk.s_symb
              in
              if errors <> [] then

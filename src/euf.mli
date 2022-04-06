@@ -43,10 +43,11 @@ type euf_rule = {
 val pp_euf_rule : Format.formatter -> euf_rule -> unit
 
 
-(** Raises Bad_ssc if the syntactic side condition of the key is not met inside
-the protocol and the messages. All occurences of the key must either be inside
-the hash function, or under some public key function.*)
+(** Check the syntactic side conditions of the key in the protocol and
+    the messages.
+    When [global] is true, also checks in global macros. *)
 val key_ssc :
+  globals:bool ->
   ?messages:(Term.term list) -> ?elems:Equiv.equiv ->
   allow_functions:(Symbols.fname -> bool) ->
   cntxt:Constr.trace_cntxt ->

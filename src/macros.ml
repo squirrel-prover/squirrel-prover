@@ -347,17 +347,10 @@ let update_global_data
   =
   match Symbols.Macro.get_data ms table with
   | Global_data data ->
-    let _, ts_shape = data.action in
-    
-    let descr = System.descr_of_shape table (SE.get_id old_s_system) ts_shape in
-    
     let body = get_single_body old_s_system data in
-
-    Fmt.epr "up: %a@." Action.pp_descr_short descr;
-
-    Fmt.epr "body : %a@." Term.pp body;
-    let body = func (AGlobal { is = data.indices; ts = data.ts; }) ms body in
-    Fmt.epr "body': %a@." Term.pp body;
+    let body = 
+      func (AGlobal { is = data.indices; ts = data.ts; }) ms body 
+    in
     let data =
       Global_data { data with
                     systems_body = (new_s_system, body) :: data.systems_body }
