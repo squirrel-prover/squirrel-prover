@@ -235,12 +235,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** If [m_rec = true], recurse on expanded sub-terms. *)
   let expand
-      ?m_rec
+      ?(m_rec = false)
       (targets: target list)
-      (target : [ `Msymb of Symbols.macro Symbols.t
-               | `Fsymb of Symbols.fname Symbols.t
-               | `Mterm of Term.term
-               | `Any])
+      (target : [ `Msymb of Symbols.macro
+                | `Fsymb of Symbols.fname 
+                | `Mterm of Term.term
+                | `Any])
       (s : S.sequent) : bool * S.sequent
     =
     let found1 = ref false in
@@ -286,13 +286,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
       match f with
       | `Equiv f ->
         let _, f = 
-          Match.Pos.map_e ?m_rec expand_inst (S.vars s) f 
+          Match.Pos.map_e ~mode:(`TopDown m_rec) expand_inst (S.vars s) f 
         in
         `Equiv f, []
 
       | `Reach f ->
         let _, f = 
-          Match.Pos.map ?m_rec expand_inst (S.vars s) f 
+          Match.Pos.map ~mode:(`TopDown m_rec) expand_inst (S.vars s) f 
         in
         `Reach f, []
     in
@@ -322,7 +322,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         | _ -> `Continue
     in
     let _, f = 
-      Match.Pos.map ~m_rec:true expand_inst (S.vars s) f 
+      Match.Pos.map ~mode:(`TopDown true) expand_inst (S.vars s) f 
     in
     f
 
@@ -382,10 +382,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Print} *)
 
-  let print_tac s =
-    Tactics.print_system (S.table s) (S.system s);
-    [s]
-
   let print_messages args s =
     let messages = List.map (fun arg ->
         match convert_args s [Args.Theory arg] Args.(Sort Message) with
@@ -414,7 +410,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Rewriting types and functions} *)
 
   type rw_arg =
-    | Rw_rw of L.t * Ident.t option * Rewrite.rw_erule
+    | Rw_rw of L.t * Ident.t option * Rewrite.rw_rule
     (** The ident is the ident of the hyp the rule came from (if any) *)
 
     | Rw_expand    of Theory.term
@@ -428,7 +424,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       ~(loc:L.t)
       ~(all:bool)
       (targets: target list)
-      (rw : Args.rw_count * Ident.t option * Rewrite.rw_erule)
+      (rw : Args.rw_count * Ident.t option * Rewrite.rw_rule)
       (s : S.sequent)
     : S.sequent * S.sequent list
     =
@@ -479,7 +475,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       showing the rule validity. *)
   let p_rw_item (rw_arg : Args.rw_item) (s : S.t) : rw_earg * S.sequent list =
     let p_rw_rule dir (p_pt : Theory.p_pt)
-      : Rewrite.rw_erule * S.sequent list * Ident.t option
+      : Rewrite.rw_rule * S.sequent list * Ident.t option
       =
       let ghyp, pat = S.convert_pt ~close_pats:false p_pt Equiv.Local_t s in
       let id_opt = match ghyp with `Hyp id -> Some id | _ -> None in
@@ -487,7 +483,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (* We are using an hypothesis, hence no new sub-goals *)
       let premise = [] in
 
-      Rewrite.pat_to_rw_erule dir pat, premise, id_opt
+      Rewrite.pat_to_rw_rule dir pat, premise, id_opt
     in
 
     let p_rw_item (rw_arg : Args.rw_item) : rw_earg * (S.sequent list) =
@@ -889,7 +885,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       in
       let s = Hyps.remove id s in
       let pat = Match.pat_of_form f in
-      let erule = Rewrite.pat_to_rw_erule ~loc (L.unloc dir) pat in
+      let erule = Rewrite.pat_to_rw_rule ~loc (L.unloc dir) pat in
       let s, subgoals =
         rewrite ~loc ~all:false [T_conc] (`Once, Some id, erule) s
       in
@@ -1010,7 +1006,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let try_clean_env vars s : S.t =
     let s_fv = S.fv s in
     let clear = Sv.diff vars (Sv.inter vars s_fv) in
-    let env = Vars.rm_vars (S.vars s) (Sv.elements clear) in
+    let env = Vars.rm_vars (Sv.elements clear) (S.vars s) in
     S.set_vars env s
 
   let _generalize ~dependent t s : Vars.var * S.t =
@@ -2100,6 +2096,7 @@ let () = T.register_general "dependent induction"
        (EquivLT.induction_tac ~dependent:true))
 
 (*------------------------------------------------------------------*)
+(* we are only registering the help here *)
 let () =
   T.register "print"
     ~tactic_help:{general_help = "Shows the current system.";
@@ -2107,7 +2104,7 @@ let () =
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
     ~pq_sound:true
-    (genfun_of_any_pure_fun TraceLT.print_tac EquivLT.print_tac)
+    (genfun_of_any_pure_fun (fun _ -> assert false) (fun _ -> assert false))
 
 (*------------------------------------------------------------------*)
 let () = T.register_general "show"

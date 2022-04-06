@@ -41,6 +41,8 @@ type ty =
 val pp : Format.formatter -> ty -> unit
 
 (*------------------------------------------------------------------*)
+val is_tuni : ty -> bool
+
 (** Is the type a finite type, e.g. [Index] or [Timestamp] *)
 val is_finite : ty -> bool 
 

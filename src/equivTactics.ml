@@ -239,7 +239,7 @@ let induction Args.(Message (ts,_)) s =
     let intro_back, s = generalize ts s in
 
     (* Remove ts from the sequent, as it will become unused. *)
-    let s = ES.set_vars (Vars.rm_var env t) s in
+    let s = ES.set_vars (Vars.rm_var t env) s in
     let table  = ES.table s in
     let system = ES.system s in
     let subst = [Term.ESubst (ts, Term.mk_pred ts)] in
@@ -670,8 +670,11 @@ let fresh_mk_direct
     (occ : Fresh.name_occ) : Term.term
   =
   let env = ref env in
-  let bv, subst = Term.refresh_vars (`InEnv env) (Sv.elements occ.occ_vars) in
-  let cond = Term.subst subst occ.occ_cond in
+  let bv, subst = Term.refresh_vars (`InEnv env) occ.occ_vars in
+  let cond = List.map (Term.subst subst) occ.occ_cond in
+
+  let cond = Term.mk_ands (List.rev cond) in
+  
   let j = List.map (Term.subst_var subst) occ.occ_cnt in
   Term.mk_forall ~simpl:true bv
     (Term.mk_impl cond (Term.mk_indices_neq n.s_indices j))
@@ -682,15 +685,17 @@ let fresh_mk_indirect
     (n : Term.nsymb)
     (frame_actions : Fresh.ts_occs)
     (occ : TraceTactics.fresh_occ) : Term.term
-  =
+  =  
   (* for each action [a] in which [name] occurs with indices from [occ] *)
   let bv = occ.Iter.occ_vars in
   let action, occ = occ.Iter.occ_cnt in
 
-  assert (Sv.subset (Action.fv_action action) (Sv.union (Vars.to_set env) bv));
+  assert ( Sv.subset
+             (Action.fv_action action)
+             (Sv.union (Vars.to_set env) (Sv.of_list bv)));
 
   let env = ref env in
-  let bv, subst = Term.refresh_vars (`InEnv env) (Sv.elements bv) in
+  let bv, subst = Term.refresh_vars (`InEnv env) bv in
 
   (* apply [subst] to the action and to the list of
    * indices of our name's occurrences *)
@@ -969,7 +974,7 @@ let get_ite ~cntxt elem =
   | [] -> None
   | occ :: _ ->
     (* Context with bound variables (eg try find) are not supported. *)
-    if not (Sv.is_empty occ.Iter.occ_vars) then
+    if not (occ.Iter.occ_vars = []) then
       soft_failure (Tactics.Failure "cannot be applied in a under a binder");
 
     Some (occ.Iter.occ_cnt)
@@ -1287,7 +1292,7 @@ let prf arg s =
             of a hash term h(t,k)")
 
     | occ :: _, None ->
-      if not (Sv.is_empty occ.Iter.occ_vars) then
+      if not (occ.Iter.occ_vars = []) then
         soft_failure
           (Tactics.Failure "application below a binder is not supported");
       occ
@@ -1332,7 +1337,7 @@ let prf arg s =
   assert (ftyp.fty_vars = []);
 
   let nty = ftyp.fty_out in
-  let ndef = Symbols.{ n_iarr = 0; n_ty = nty; } in
+  let ndef = Symbols.{ n_fty = Type.mk_ftype 0 [] [] nty; } in
   let table,n =
     Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
   in
@@ -1344,7 +1349,9 @@ let prf arg s =
   in
 
   let final_if_formula =
-    if Term.is_false oracle_formula then formula else
+    if Term.is_false oracle_formula then
+      formula
+    else
       let uvarm, uvarkey, f =
         match oracle_formula with
         | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
@@ -1399,18 +1406,22 @@ let global_diff_eq (s : ES.t) =
      miter (snd action_descr.Action.condition) ;
      List.iter (fun (_,m) -> miter m) action_descr.Action.updates) ;
 
-  List.map (fun (vs,is,t) -> match t.Iter.occ_cnt with
+  List.map (fun (vs,is,t) ->
+      let cond = Term.mk_ands (List.rev t.Iter.occ_cond) in
+      match t.Iter.occ_cnt with
       | (Term.Diff(s1,s2) as subt)->
-        let fvars =  Vars.Sv.elements (Vars.Sv.union t.Iter.occ_vars (Term.fv subt)) in
+        let fvars =
+          t.Iter.occ_vars @ Vars.Sv.elements (Term.fv subt)
+        in
         let pred_ts_list =
           let iter = new Fresh.get_actions ~cntxt in
           match Term.ty subt with
           | Type.Index -> []
-          | Type.Timestamp -> (iter#visit_message t.Iter.occ_cond;
+          | Type.Timestamp -> (iter#visit_message cond;
                                 s1 :: s2 :: iter#get_actions)
           | _ ->
             (iter#visit_message subt;
-             iter#visit_message t.Iter.occ_cond;
+             iter#visit_message cond;
              iter#get_actions)
         in
         (* Remark that the get_actions add pred to all timestamps, to simplify. *)
@@ -1433,7 +1444,7 @@ let global_diff_eq (s : ES.t) =
                               mk_forall fvars
                                 (mk_impls (List.map mk_happens ts_list
                                            @ List.map (fun t -> mk_macro exec_macro [] t) ts_list
-                                           @ [t.Iter.occ_cond])
+                                           @ [cond])
                               (mk_atom `Eq s1 s2))
                             )
                             s))
@@ -1729,7 +1740,7 @@ let cca1 Args.(Int i) s =
   (* FIXME: Adrien: the description is not accurrate *)
   let hide_all_encs (occ : Iter.mess_occ) : Goal.t * Term.esubst =
     (* FIXME: check that this is what we want. *)
-    if not (Sv.is_empty occ.Iter.occ_vars) then
+    if not (occ.Iter.occ_vars = []) then
       soft_failure (Tactics.Failure "cannot be applied in a under a binder");
 
     match occ.Iter.occ_cnt with
@@ -1747,7 +1758,8 @@ let cca1 Args.(Int i) s =
           ->
           begin
             let errors =
-              Euf.key_ssc ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
+              Euf.key_ssc ~globals:false
+                ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
                 ~cntxt fndec sk.s_symb
             in
             if errors <> [] then
@@ -1831,7 +1843,7 @@ let cca1 Args.(Int i) s =
          "CCA1 can only be applied on a term with at least one occurrence \
           of an encryption term enc(t,r,pk(k))");
 
-  let new_elem =    Equiv.subst_equiv substs [e] in
+  let new_elem = Equiv.subst_equiv substs [e] in
   let biframe = (List.rev_append before (new_elem @ after)) in
   Goal.Equiv (ES.set_equiv_goal biframe s) :: fgoals
 
@@ -1906,7 +1918,8 @@ let enckp arg (s : ES.t) =
           (fun (sk,system) ->
              let cntxt = Constr.{ cntxt with system } in
              let errors =
-               Euf.key_ssc ~cntxt ~elems:(ES.goal_as_equiv s)
+               Euf.key_ssc ~globals:false
+                 ~cntxt ~elems:(ES.goal_as_equiv s)
                  ~allow_functions:(fun x -> x = fnpk) fndec sk.s_symb
              in
              if errors <> [] then
@@ -2010,7 +2023,7 @@ let enckp arg (s : ES.t) =
 
     let rec find = function
       | occ :: occs ->
-        if not (Sv.is_empty occ.Iter.occ_vars) then find occs
+        if not (occ.Iter.occ_vars = []) then find occs
         else
         begin match occ.Iter.occ_cnt with
           | Term.Fun ((fnenc,indices), _, [m; Term.Name r; k]) as enc
@@ -2135,7 +2148,7 @@ let xor arg s =
             of a term xor(t,k)")
 
     | occ :: _, None ->
-      if not (Sv.is_empty occ.Iter.occ_vars) then
+      if not (occ.Iter.occ_vars = []) then
         soft_failure
           (Tactics.Failure "application below a binder is not supported");
       occ
@@ -2182,7 +2195,7 @@ let xor arg s =
   let phi =
     mk_xor_phi_base cntxt env biframe (n_left, l_left, n_right, l_right, term)
   in
-  let ndef = Symbols.{ n_iarr = 0; n_ty = Message ; } in
+  let ndef = Symbols.{ n_fty = Type.mk_ftype 0 [] [] Message ; } in
   let table,n =
     Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_XOR") ndef
   in

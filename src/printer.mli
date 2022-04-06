@@ -17,6 +17,7 @@ type keyword = [
   | `ProcessName
   | `ProcessVariable
   | `ProcessCondition
+  | `Goal
   | `ProcessInOut
   | `ProcessChannel
   | `ProcessKeyword

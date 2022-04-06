@@ -1,7 +1,7 @@
 (** The user specifies one or more (bi)systems, identified using names.
   * Each (bi)system is a set of (bi)actions, obtained from a (bi)process. *)
 
-type system_name = Symbols.system Symbols.t
+type system_name = Symbols.system 
 
 val pp_system : Symbols.table -> Format.formatter -> system_name -> unit
 
@@ -31,25 +31,25 @@ val declare_empty : Symbols.table -> lsymb -> Symbols.table * system_name
 (** Get a (refreshed) descr.
     @raise Not_found if no action corresponds to the wanted shape. *)
 val descr_of_shape :
-  Symbols.table -> Symbols.system Symbols.t -> Action.shape -> 
+  Symbols.table -> Symbols.system -> Action.shape -> 
   Action.descr
 
 module Msh : Map.S with type key = Action.shape
 
 type Symbols.data +=
-  System_data of Action.descr Msh.t * Symbols.action Symbols.t Msh.t
+  System_data of Action.descr Msh.t * Symbols.action Msh.t
 
 (** Return (refreshed) action descriptions of a given system. *)
 val descrs : 
   Symbols.table ->
-  Symbols.system Symbols.t ->
+  Symbols.system ->
   Action.descr Msh.t
 
 (** Return all the action symbols of a system. *)
 val symbs :
   Symbols.table ->
-  Symbols.system Symbols.t ->
-  Symbols.action Symbols.t Msh.t
+  Symbols.system ->
+  Symbols.action Msh.t
 
 (*------------------------------------------------------------------*)
 (** {2 Registration of actions} *)
@@ -62,7 +62,10 @@ val symbs :
   * used * (currently the proposed symbol may not be used for technical
   * reasons that will eventually disappear TODO). *)
 val register_action :
-  Symbols.table -> system_name ->
-  Symbols.action Symbols.t -> Vars.var list ->
-  Action.action -> Action.descr -> 
-  Symbols.table * Symbols.action Symbols.t * Action.descr
+  Symbols.table ->
+  system_name ->
+  Symbols.action ->
+  Vars.var list ->
+  Action.action ->
+  Action.descr -> 
+  Symbols.table * Symbols.action * Action.descr

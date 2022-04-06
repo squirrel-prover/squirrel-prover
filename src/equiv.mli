@@ -83,6 +83,9 @@ type local_form = Term.term
 type global_form = form
 
 type gform = [`Equiv of form | `Reach of Term.term]
+
+val pp_gform : Format.formatter -> gform -> unit
+
 type any_form = gform
 
 type _ f_kind =

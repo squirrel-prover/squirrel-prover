@@ -11,7 +11,7 @@
   *    pi-calculus.
   *  - We associate to each such action an "action description"
   *    (type [descr]) which carries the semantics of the action.
-  *  - Finally, we have action symbols (type [Symbols.action Symbols.t]).
+  *  - Finally, we have action symbols (type [Symbols.action]).
   *
   * Our prover allows to declare and reason about several systems.
   * Actions and symbols exist independently of a system, but descriptions
@@ -75,7 +75,7 @@ val same_shape : action -> action -> Term.subst option
 
 (** Convert [Action] parameters to an action. *)
 val of_term :
-  Symbols.action Symbols.t -> Vars.var list ->
+  Symbols.action -> Vars.var list ->
   Symbols.table ->
   action
 
@@ -93,20 +93,20 @@ val dummy : shape -> action
     If [exact] is true, the symbol must be exactly the argument. *)
 val fresh_symbol :
   Symbols.table -> exact:bool -> Symbols.lsymb ->
-  Symbols.table * Symbols.action Symbols.t
+  Symbols.table * Symbols.action 
 
 val define_symbol :
   Symbols.table ->
-  Symbols.Action.ns Symbols.t -> Vars.var list -> action ->
+  Symbols.action -> Vars.var list -> action ->
   Symbols.table
 
 val find_symbol : Symbols.lsymb -> Symbols.table -> Vars.var list * action
 
 val of_symbol :
-  Symbols.action Symbols.t -> Symbols.table ->
+  Symbols.action -> Symbols.table ->
   Vars.var list * action
 
-val arity : Symbols.action Symbols.t -> Symbols.table -> int
+val arity : Symbols.action -> Symbols.table -> int
 
 (*------------------------------------------------------------------*)
 (** {2 Action descriptions}
@@ -116,7 +116,7 @@ val arity : Symbols.action Symbols.t -> Symbols.table -> int
 
 (** Type of action descriptions. *)
 type descr = {
-  name      : Symbols.action Symbols.t ;
+  name      : Symbols.action ;
   action    : action ;
   input     : Channel.t * string ;
   indices   : Vars.var list ;
@@ -124,9 +124,13 @@ type descr = {
   updates   : (Term.state * Term.term) list ;
     (** State updates, at most one per state symbol. *)
   output    : Channel.t * Term.term;
-  globals : Symbols.macro Symbols.t list;
+  globals   : Symbols.macro list;
     (** List of global macros declared at [action]. *)
 }
+
+(*------------------------------------------------------------------*)
+(** well-formedness check for a description: check free variables *)
+val check_descr : descr -> bool
 
 (** [pi_descr s a] returns the projection of the description. As descriptions
    are only obtained for a system, one can when this system is without
@@ -150,6 +154,8 @@ val pp_descr_short : Format.formatter -> descr -> unit
 (** Formatter for descriptions. *)
 val pp_descr : Format.formatter -> descr -> unit
 
+val pp_descr_dbg : Format.formatter -> descr -> unit
+
 (** Formatter for actions shapes. *)
 val pp_shape : Format.formatter -> shape -> unit
 
@@ -169,8 +175,11 @@ val subst_action : Term.subst -> action -> action
 (** Apply a substitution to a description. *)
 val subst_descr : Term.subst -> descr -> descr
 
-(** Map a function over a descritpor. *)
-val descr_map : (Vars.env -> Term.term -> Term.term) -> descr -> descr
+(** Map a function over a descriptor. *)
+val descr_map :
+  (Vars.env -> Symbols.macro -> Term.term -> Term.term) ->
+  descr ->
+  descr
 
 
 (*------------------------------------------------------------------*)

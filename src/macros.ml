@@ -5,98 +5,61 @@ module SE = SystemExpr
 let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
-(** {2 Macro definitions} *)
+(** {2 Global macro definitions} *)
 
 type global_data = {
-  action  : [`Strict | `Large] * Action.shape;
+  action : [`Strict | `Large] * Action.shape;
   (** the global macro is defined at any action which is a strict or large
       suffix of [action]  *)
 
-  inputs  : Vars.var list;
+  inputs : Vars.var list;
   (** inputs of the macro, as variables, in order *)
 
   indices : Vars.var list;
   (** free indices of the macro, which corresponds to the prefix of
       the indices of the action defining the macro *)
 
-  ts      : Vars.var;
+  ts : Vars.var;
   (** free timestamp variable of the macro, which can only be instantiated
-      by a strict suffix of [action] *)
+      by a strict or large suffix of [action] *)
 
-  default_body    : Term.term;
+  default_body : Term.term;
   (** macro body shared by all systems *)
 
-  systems_body    : (SE.single_system * Term.term) list;
+  systems_body : (SE.single_system * Term.term) list;
   (** Optional alternative definitions of the body for a given system.
-      Used by System modifiers.
-  *)
-
+      Used by System modifiers. *)
 }
 
 type Symbols.data += Global_data of global_data
 
-
+(*------------------------------------------------------------------*)
 let sproj s t = Term.pi_term ~projection:(SE.get_proj s) t
 
 let get_single_body single_system data =
-  let body = try
+  let body =
+    try
       (List.assoc single_system data.systems_body)
-    with Not_found ->  data.default_body
+    with Not_found -> data.default_body
   in
   sproj single_system body
 
 let get_body system data : Term.term =
   let get_pair_body s1 s2 =
-    match List.assoc s1 data.systems_body with
-    | b1 ->
-      let b1 = sproj s1 b1 in
-      begin
-        match List.assoc s2 data.systems_body with
-        | b2 -> Term.mk_diff b1 (sproj s2 b2)
-        | exception Not_found -> Term.mk_diff b1 (sproj s2 data.default_body)
-        end
-    | exception Not_found -> begin
-        match List.assoc s2 data.systems_body with
-        | b2 -> Term.mk_diff (sproj s1 data.default_body) (sproj s2 b2)
-        | exception Not_found ->
-          let t1, t2 = sproj s1 data.default_body, sproj s2 data.default_body in
-          if t1 = t2 then t1 else Term.mk_diff t1 t2
-        end
+    let t1 = get_single_body s1 data
+    and t2 = get_single_body s2 data in
+    Term.mk_diff t1 t2
   in
   match system with
   | SE.Single s      -> get_single_body s data
   | SE.SimplePair s  -> get_pair_body (SE.Left s) (SE.Right s)
   | SE.Pair (s1, s2) -> get_pair_body s1 s2
-  | SE.Empty         -> assert false (* FIXME: user-level exception? *)
+  | SE.Empty         -> assert false (* should never happen *)
 
-(** Given the name [ns] of a macro as well as a function [f] over
-   terms, an [old_single_system] and a [new_single_system], takes the
-   existing definition of [ns] in the old system, applies [f] to the
-   existing definition, and update the value of [ns] accordingly in
-   the new system. *)
-let update_global_data
-    (table : Symbols.table)
-    (ns : Symbols.macro Symbols.t)
-    (dec_def : Symbols.macro_def)
-    (old_single_system : SystemExpr.single_system)
-    (new_single_system :  SystemExpr.single_system)
-    (f : Term.term -> Term.term) =
-  match Symbols.Macro.get_data ns table with
-  | Global_data data ->
-    let body = get_single_body old_single_system data in
-    let data =
-      Global_data { data with systems_body = (new_single_system, f body) ::
-                                             data.systems_body}
-    in
-    Symbols.Macro.redefine table ~data ns dec_def
-      
-  | _ -> table
-
-let is_tuni = function Type.TUnivar _ -> true | _ -> false
-
+(*------------------------------------------------------------------*)
 (** Exported *)
 let declare_global table name ~suffix ~action ~inputs ~indices ~ts body ty =
-  assert (not (is_tuni ty));
+  assert (not (Type.is_tuni ty));
   let data =
     Global_data
       {action = (suffix, action);
@@ -120,7 +83,7 @@ let is_prefix strict a b =
 
 (** Check is not done module equality.
     Not exported. *)
-let is_defined name a table =
+let is_defined (name : Symbols.macro) (a : Term.term) table =
   match Symbols.Macro.get_all name table with
     | Symbols.(Input | Output | Cond | State _), _ ->
       (* We can expand the definitions of input@A, output@A, cond@A and
@@ -203,7 +166,7 @@ let get_definition_nocntxt
     (system : SE.t)
     (table  : Symbols.table)
     (symb   : Term.msymb)
-    (asymb  : Symbols.action Symbols.t)
+    (asymb  : Symbols.action)
     (aidx   : Vars.vars) : [ `Def of Term.term | `Undef ]
   =
   let init_or_generic init_case f =
@@ -357,3 +320,87 @@ let get_dummy_definition
     get_def_glob ~allow_dummy:true system table symb ts dummy_action gdata
 
   | _ -> assert false
+
+(*------------------------------------------------------------------*)
+type system_map_arg =
+  | ADescr  of Action.descr 
+  | AGlobal of { is : Vars.vars; ts : Vars.var; }
+
+(*------------------------------------------------------------------*)
+(** Given the name [ns] of a macro as well as a function [f] over
+    terms, an [old_single_system] and a [new_single_system], takes the
+    existing definition of [ns] in the old system, applies [f] to the
+    existing definition, and update the value of [ns] accordingly in
+    the new system. *)
+let update_global_data
+    (table        : Symbols.table)
+    (ms           : Symbols.macro)
+    (dec_def      : Symbols.macro_def)
+    (old_s_system : SystemExpr.single_system)
+    (new_s_system : SystemExpr.single_system)
+    (func         : 
+       (system_map_arg ->
+        Symbols.macro -> 
+        Term.term -> 
+        Term.term))
+  :  Symbols.table
+  =
+  match Symbols.Macro.get_data ms table with
+  | Global_data data ->
+    let body = get_single_body old_s_system data in
+    let body = 
+      func (AGlobal { is = data.indices; ts = data.ts; }) ms body 
+    in
+    let data =
+      Global_data { data with
+                    systems_body = (new_s_system, body) :: data.systems_body }
+    in
+    Symbols.Macro.redefine table ~data ms dec_def
+
+  | _ -> table
+    
+(*------------------------------------------------------------------*)
+(** Remove all macro definition associated with a system *)
+let remove_system
+    (table        : Symbols.table)
+    (s_system : SystemExpr.single_system)
+  : Symbols.table
+  =
+  Symbols.Macro.map (fun ns def data ->
+      match Symbols.Macro.get_data ns table with
+      | Global_data data -> 
+        let systems_body = List.remove_assoc s_system data.systems_body in
+        def, Global_data { data with systems_body }
+
+      | _ -> def, data
+    ) table
+
+
+(*------------------------------------------------------------------*)
+(** {2 Utilities} *)
+
+let ty_out (table : Symbols.table) (ms : Symbols.macro) : Type.ty =
+  match Symbols.Macro.get_def ms table with
+    | Symbols.Global (_, ty) -> ty
+
+    | Input | Output | Frame -> Type.tmessage
+
+    | Cond | Exec -> Type.tboolean
+
+    | Symbols.State (_,ty) -> ty
+
+let ty_args (table : Symbols.table) (ms : Symbols.macro) : Type.ty list =
+  match Symbols.Macro.get_def ms table with
+    | Symbols.Global (arity, ty) ->
+      List.init arity (fun _ -> Type.tindex)
+
+    | Input | Output | Frame | Cond | Exec -> []
+
+    | Symbols.State (arity,ty) ->
+      List.init arity (fun _ -> Type.tindex)
+
+let is_global table (ms : Symbols.macro) : bool =
+  match Symbols.Macro.get_def ms table with
+  | Symbols.Global (_, _) -> true
+  | _ -> false
+  

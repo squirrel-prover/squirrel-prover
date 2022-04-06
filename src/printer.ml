@@ -38,6 +38,7 @@ type keyword = [
   | `ProcessName      (* [reader], [tag], [null] *)
   | `ProcessVariable  (* [x] in [in(cT,x)] *)
   | `ProcessCondition (* [if], [find], [else] *)
+  | `Goal             (* [goal], [global goal], [axiom] *)
   | `ProcessInOut     (* [in], [out] *)
   | `ProcessChannel   (* [cT] *)
   | `ProcessKeyword   (* [let], [set], [new] *)
@@ -81,6 +82,7 @@ let kw_ansi (keyword : keyword) : string =
   | `ProcessName -> "1;34"
   | `ProcessVariable -> "1;35"
   | `ProcessCondition -> "4;31"
+  | `Goal -> "31"
   | `ProcessInOut -> "1"
   | `ProcessChannel -> ""
   | `ProcessKeyword -> "1"
@@ -149,6 +151,7 @@ let kw_html_attributes (keyword : keyword) : string =
   | `GoalName -> " class=\x1B\"gn\x1B\" style=\x1B\"color: #AA5500\x1B\""
   | `Separation -> " class=\x1B\"sep\x1B\" style=\x1B\"font-weight: bold\x1B\""
   | `HelpType -> " class=\x1B\"ht\x1B\" style=\x1B\"font-weight: bold; color: #AA0000\x1B\""
+  | `Goal -> " class=\x1B\"ht\x1B\" style=\x1B\"color: #AA0000\x1B\""
   | `HelpFunction -> " class=\x1B\"hf\x1B\" style=\x1B\"font-weight: bold; color: #AA00AA\x1B\""
   | `Test -> ""
   | `Error -> " class=\x1B\"err\x1B\" style=\x1B\"background-color: red\x1B\""

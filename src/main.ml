@@ -254,11 +254,36 @@ let do_undo (state : main_state) (nb_undo : int) : main_state =
     | AllDone -> assert false in
   { state with mode = new_mode; table = new_table; }
 
+(*------------------------------------------------------------------*)
 let do_decls (state : main_state) (decls : Decl.declarations) : main_state =
   let hint_db = Prover.current_hint_db () in
   let table = Prover.declare_list state.table hint_db decls in
   { state with mode = GoalMode; table = table; }
 
+(*------------------------------------------------------------------*)
+let do_print (state : main_state) (q : Prover.print_query) : main_state =
+  match q with
+  | Prover.Pr_statement l -> 
+    let g = Prover.get_assumption l in
+    let k = oget (Prover.get_assumption_kind (L.unloc l)) in
+    Printer.prt `Default "%a %a" Prover.pp_kind k Goal.pp_statement g;
+    state
+
+  | Prover.Pr_system s_opt ->
+    let system = 
+      match s_opt with
+      | None   -> 
+        begin match Prover.get_current_system () with
+          | Some s -> s
+          | None -> hard_failure (Failure "no default system");
+        end
+
+      | Some s -> SystemExpr.parse_se state.table s
+    in
+    Tactics.print_system state.table system;
+    state
+
+(*------------------------------------------------------------------*)
 let do_tactic (state : main_state) l : main_state =
   begin match state.check_mode with
     | `NoCheck -> assert (state.mode = WaitQed)
@@ -283,10 +308,10 @@ let do_tactic (state : main_state) l : main_state =
     begin try
       List.iter
         (function
-           | `Bullet bl -> Prover.open_bullet bl ;
-           | `Brace `Open -> Prover.open_brace ()
+           | `Bullet bl    -> Prover.open_bullet bl 
+           | `Brace `Open  -> Prover.open_brace ()
            | `Brace `Close -> Prover.close_brace ()
-           | `Tactic utac -> Prover.eval_tactic utac)
+           | `Tactic utac  -> Prover.eval_tactic utac)
         l
     with
       | e -> ignore (Prover.reset_from_state prover_state) ; raise e
@@ -300,11 +325,13 @@ let do_tactic (state : main_state) l : main_state =
       { state with mode = ProofMode }
     end
 
+(*------------------------------------------------------------------*)
 let do_qed (state : main_state) : main_state =
   Prover.complete_proof ();
   Printer.prt `Result "Exiting proof mode.@.";
   { state with mode = GoalMode }
 
+(*------------------------------------------------------------------*)
 let do_add_hint (state : main_state) (h : Hint.p_hint) : main_state =
   let db = Prover.current_hint_db () in
   let db =
@@ -315,10 +342,12 @@ let do_add_hint (state : main_state) (h : Hint.p_hint) : main_state =
   Prover.set_hint_db db;
   state
 
+(*------------------------------------------------------------------*)
 let do_set_option (state : main_state) (sp : Config.p_set_param) : main_state =
   Config.set_param sp;
   state
 
+(*------------------------------------------------------------------*)
 let do_add_goal 
     (state : main_state)
     (g : Goal.Parsed.t Location.located) 
@@ -333,6 +362,7 @@ let do_add_goal
     Goal.pp_init f;
   state
 
+(*------------------------------------------------------------------*)
 let do_start_proof (state : main_state) : main_state =
   match Prover.start_proof state.check_mode with
   | None ->
@@ -344,12 +374,12 @@ let do_start_proof (state : main_state) : main_state =
     { state with mode }
   | Some es -> cmd_error (StartProofError es)
 
+(*------------------------------------------------------------------*)
 let do_eof (state : main_state) : main_state =
   assert (state.file_stack = []);
   { state with mode = AllDone; }
 
 (*------------------------------------------------------------------*)
-
 let rec do_include 
     ~test
     (state : main_state)
@@ -406,9 +436,11 @@ and do_command
 
     | GoalMode, ParsedInputDescr decls -> do_decls state decls
 
-    | _, ParsedTactic l                -> do_tactic state l
+    | _,        ParsedTactic l         -> do_tactic state l
 
-    | WaitQed, ParsedQed               -> do_qed state
+    | _,        ParsedPrint q          -> do_print state q
+
+    | WaitQed,  ParsedQed              -> do_qed state
 
     | GoalMode, ParsedHint h           -> do_add_hint state h
 

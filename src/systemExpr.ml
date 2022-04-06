@@ -5,8 +5,8 @@ type lsymb = Symbols.lsymb
 
 (*------------------------------------------------------------------*)
 type single_system =
-  | Left  of Symbols.system Symbols.t
-  | Right of Symbols.system Symbols.t
+  | Left  of Symbols.system 
+  | Right of Symbols.system 
 
 let get_proj = function
   | Left _ -> Term.PLeft
@@ -22,7 +22,7 @@ let hash_single = function
 (*------------------------------------------------------------------*)
 type t =
   | Single     of single_system
-  | SimplePair of Symbols.system Symbols.t
+  | SimplePair of Symbols.system 
   | Pair       of single_system * single_system
   | Empty
 
@@ -320,7 +320,7 @@ let pair table a b =
 
 (*------------------------------------------------------------------*)
 
-let pp_descrs table ppf system =
+let pp_descrs (table : Symbols.table) ppf (system : t) =
   Fmt.pf ppf "@[<v 2>Available actions:@;@;";
   iter_descrs table system (fun descr ->
       Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
@@ -328,13 +328,25 @@ let pp_descrs table ppf system =
   Fmt.pf ppf "@]%!@."
 
 
-let clone_system_iter table original_system new_system iterdescr =
-  let odescrs = descrs table original_system in
-  let symbs = symbs table original_system in
-  let ndescrs = System.Msh.map iterdescr odescrs in
-  let data = System.System_data (ndescrs,symbs) in
-  Symbols.System.declare_exact table new_system ~data ()
+let clone_system_map 
+    (table    : Symbols.table)
+    (system   : t)
+    (new_name : Symbols.lsymb)
+    (map      : Action.descr -> Action.descr)
+  : Symbols.table * Symbols.system
+  =
+  let symbs  = symbs table system in
+  let descrs = System.Msh.map map (descrs table system) in
+  let data   = System.System_data (descrs,symbs) in
+  Symbols.System.declare_exact table new_name ~data ()
 
+let remove_system
+    (table  : Symbols.table)
+    (system : Symbols.system)
+  : Symbols.table
+  =
+  Symbols.System.remove table system
+    
 (*------------------------------------------------------------------*)
 (** {2 Parser types } *)
 

@@ -244,6 +244,9 @@ module Smart : Term.SmartFO with type form = _form = struct
   (*------------------------------------------------------------------*)
   let mk_eq  ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_eq  ?simpl f1 f2))
   let mk_leq ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_leq ?simpl f1 f2))
+  let mk_geq ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_geq ?simpl f1 f2))
+  let mk_lt  ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_lt  ?simpl f1 f2))
+  let mk_gt  ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_gt  ?simpl f1 f2))
 
   (*------------------------------------------------------------------*)
   (** {3 Destructors} *)
@@ -446,6 +449,12 @@ end
 
 type gform = [`Equiv of form | `Reach of Term.term]
 
+let pp_gform fmt (f : gform) =
+  match f with
+  | `Equiv e -> pp fmt e
+  | `Reach f -> Term.pp fmt f
+
+(*------------------------------------------------------------------*)
 type local_form = Term.term
 type global_form = form
 type any_form = gform
@@ -561,7 +570,7 @@ module Any = struct
   let convert_to ?loc k f =
     Babel.convert ?loc ~dst:k ~src:Any_t f
 
-  module Smart = struct
+  module Smart : Term.SmartFO with type form = any_form = struct
     type form = any_form
 
     let mk_true  = `Reach Term.mk_true
@@ -619,8 +628,11 @@ module Any = struct
           `Equiv (Smart.mk_impls ?simpl l f)
       | _ -> assert false
 
-    let mk_eq ?simpl  f g = `Reach (Term.Smart.mk_eq  ?simpl f g)
+    let mk_eq  ?simpl f g = `Reach (Term.Smart.mk_eq  ?simpl f g)
     let mk_leq ?simpl f g = `Reach (Term.Smart.mk_leq ?simpl f g)
+    let mk_geq ?simpl f g = `Reach (Term.Smart.mk_geq ?simpl f g)
+    let mk_lt  ?simpl f g = `Reach (Term.Smart.mk_lt  ?simpl f g)
+    let mk_gt  ?simpl f g = `Reach (Term.Smart.mk_gt  ?simpl f g)
 
     (*------------------------------------------------------------------*)
     let mk_forall ?simpl vs = function

@@ -24,19 +24,19 @@ val mk_isymb : 'a -> Type.ty -> Vars.vars -> 'a isymb
 
 (** Names represent random values of length the security parameter. *)
 
-type name = Symbols.name Symbols.t
+type name = Symbols.name 
 type nsymb = name isymb
 
 (** Function symbols, may represent primitives or abstract functions. *)
 
-type fname = Symbols.fname Symbols.t
+type fname = Symbols.fname 
 type fsymb = fname * Vars.var list
 
 (** Macros are used to represent inputs, outputs, contents of state
     variables, and let definitions: everything that is expanded when
     translating the meta-logic to the base logic. *)
 
-type mname = Symbols.macro Symbols.t
+type mname = Symbols.macro 
 type msymb = mname isymb
 
 type state = msymb
@@ -69,7 +69,7 @@ type term = private
   | Macro of msymb * term list * term
 
   | Seq    of Vars.var list * term
-  | Action of Symbols.action Symbols.t * Vars.var list 
+  | Action of Symbols.action * Vars.var list 
 
   | Var of Vars.var
 
@@ -190,9 +190,10 @@ val tsubst : Type.tsubst -> term -> term
 val tsubst_ht : Type.tsubst -> hterm -> hterm
 
 (** [subst_var s v] returns [v'] if substitution [s] maps [v] to [Var v'],
-    and [v] if the variable is not in the domain of the substitution.
-    @raise Substitution_error if [v] is mapped to a non-variable term in [s]. *)
-val subst_var  : subst -> Vars.var -> Vars.var
+    and [v] if the variable is not in the domain of the substitution. *)
+val subst_var : subst -> Vars.var -> Vars.var
+
+val subst_vars : subst -> Vars.vars -> Vars.vars
 
 (** Substitute indices in an indexed symbols. *)
 val subst_isymb : subst -> 'a isymb -> 'a isymb
@@ -204,7 +205,7 @@ val subst_macros_ts : Symbols.table -> string list -> term -> term -> term
 (*------------------------------------------------------------------*)
 type refresh_arg = [`Global | `InEnv of Vars.env ref ]
 
-val refresh_vars  : refresh_arg -> Vars.vars -> Vars.vars * esubst list
+val refresh_vars : refresh_arg -> Vars.vars -> Vars.vars * esubst list
 
 val refresh_vars_env :
   Vars.env -> Vars.var list -> Vars.env * Vars.var list * esubst list
@@ -272,11 +273,14 @@ module type SmartFO = sig
   type form
 
   (** {3 Constructors} *)
-  val mk_true    : form
-  val mk_false   : form
+  val mk_true  : form
+  val mk_false : form
 
-  val mk_eq    : ?simpl:bool -> term -> term -> form
-  val mk_leq   : ?simpl:bool -> term -> term -> form
+  val mk_eq  : ?simpl:bool -> term -> term -> form
+  val mk_leq : ?simpl:bool -> term -> term -> form
+  val mk_geq : ?simpl:bool -> term -> term -> form
+  val mk_lt  : ?simpl:bool -> term -> term -> form
+  val mk_gt  : ?simpl:bool -> term -> term -> form
 
   val mk_not   : ?simpl:bool -> form              -> form
   val mk_and   : ?simpl:bool -> form      -> form -> form
@@ -353,12 +357,12 @@ include module type of Smart
 (*------------------------------------------------------------------*)
 (** {3 Smart constructors: terms} *)
 
-val mk_pred    : term -> term
-val mk_var     : Vars.var -> term
-val mk_action  : Symbols.action Symbols.t -> Vars.var list -> term
-val mk_name    : nsymb -> term
-val mk_macro   : msymb -> term list -> term -> term
-val mk_diff    : term -> term -> term
+val mk_pred   : term -> term
+val mk_var    : Vars.var -> term
+val mk_action : Symbols.action -> Vars.var list -> term
+val mk_name   : nsymb -> term
+val mk_macro  : msymb -> term list -> term -> term
+val mk_diff   : term -> term -> term
 
 val mk_find : Vars.var list -> term -> term -> term -> term
 
@@ -412,7 +416,7 @@ val is_name : term -> bool
 val destr_var : term -> Vars.var option
 
 (*------------------------------------------------------------------*)
-val destr_action : term -> (Symbols.action Symbols.t * Vars.var list) option
+val destr_action : term -> (Symbols.action * Vars.var list) option
 
 (*------------------------------------------------------------------*)
 val destr_pair : term -> (term * term) option

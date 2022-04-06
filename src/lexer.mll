@@ -164,6 +164,7 @@ rule token = parse
 | "checkfail"         { CHECKFAIL }
 | "include"           { INCLUDE }
 | "smt"               { SMT }
+| "print"             { PRINT }
 | name as n           { ID n }
 | eof                 { EOF }
 

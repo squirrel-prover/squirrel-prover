@@ -81,31 +81,38 @@ type bty_def = bty_info list
 
 (*------------------------------------------------------------------*)
 type name_def = {
-  n_iarr : int;     (** index arity *)
-  n_ty   : Type.ty; (** type *)
+  n_fty   : Type.ftype; (** restricted to: (Index | Timestamp)^* -> ty *)
 }
 
 (*------------------------------------------------------------------*)
-type channel
-type name
-type action
-type fname
-type macro
-type system
-type process
-type btype
+type _channel
+type _name
+type _action
+type _fname
+type _macro
+type _system
+type _process
+type _btype
 
+type channel = _channel t
+type name    = _name    t
+type action  = _action  t
+type fname   = _fname   t
+type macro   = _macro   t
+type system  = _system  t
+type process = _process t
+type btype   = _btype   t
 (*------------------------------------------------------------------*)
 type _ def =
-  | Channel  : unit      -> channel def
-  | Name     : name_def  -> name    def
-  | Action   : int       -> action  def
-  | Macro    : macro_def -> macro   def
-  | System   : unit      -> system  def
-  | Process  : unit      -> process def
-  | BType    : bty_def   -> btype   def
+  | Channel  : unit      -> _channel def
+  | Name     : name_def  -> _name    def
+  | Action   : int       -> _action  def
+  | Macro    : macro_def -> _macro   def
+  | System   : unit      -> _system  def
+  | Process  : unit      -> _process def
+  | BType    : bty_def   -> _btype   def
 
-  | Function : (Type.ftype * function_def) -> fname def
+  | Function : (Type.ftype * function_def) -> _fname def
 
 type edef =
   | Exists : 'a def -> edef
@@ -250,6 +257,8 @@ module type Namespace = sig
   type ns
   type def
 
+  val remove : table -> ns t -> table
+    
   val reserve       : table -> lsymb -> table * data t
   val reserve_exact : table -> lsymb -> table * ns t
 
@@ -276,6 +285,7 @@ module type Namespace = sig
 
   val iter : (ns t -> def -> data -> unit) -> table -> unit
   val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> table -> 'a
+  val map  : (ns t -> def -> data -> (def * data)) -> table -> table
 end
 
 module type S = sig
@@ -296,6 +306,9 @@ module Make (N:S) : Namespace
 
   let group = N.group
 
+  let remove (table : table) (symb : ns t) : table =
+    mk (Msymb.remove symb table.cnt)
+    
   let reserve (table : table) (name : lsymb) =
     let symb = fresh ~group (L.unloc name) table.cnt in
     let table_c = Msymb.add symb (Reserved N.namespace,Empty) table.cnt in
@@ -410,6 +423,18 @@ module Make (N:S) : Namespace
          with SymbError (_,Incorrect_namespace _) -> acc)
       table.cnt acc
 
+  let map (f : ns t -> def -> data -> (def * data)) (table : table) : table =
+    let table =
+      Msymb.mapi
+        (fun s (def,data) ->
+           try
+             let def = N.deconstruct ~loc:None def in
+             let def, data = f s def data in
+             Exists (N.construct def), data
+           with SymbError (_,Incorrect_namespace _) -> (def,data)
+        ) table.cnt
+    in
+    mk table
 end
 
 let namespace_err (l : L.t option) c n =
@@ -420,7 +445,7 @@ let namespace_err (l : L.t option) c n =
   symb_err l (Incorrect_namespace (edef_namespace c, n))
 
 module Action = Make (struct
-  type ns = action
+  type ns = _action
   type local_def = int
 
   let namespace = NAction
@@ -434,7 +459,7 @@ module Action = Make (struct
 end)
 
 module Name = Make (struct
-  type ns = name
+  type ns = _name
   type local_def = name_def
 
   let namespace = NName
@@ -447,7 +472,7 @@ module Name = Make (struct
 end)
 
 module Channel = Make (struct
-  type ns = channel
+  type ns = _channel
   type local_def = unit
 
   let namespace = NChannel
@@ -460,7 +485,7 @@ module Channel = Make (struct
 end)
 
 module BType = Make (struct
-  type ns = btype
+  type ns = _btype
   type local_def = bty_def
 
   let namespace = NBType
@@ -473,7 +498,7 @@ module BType = Make (struct
 end)
 
 module System = Make (struct
-  type ns = system
+  type ns = _system
   type local_def = unit
 
   let namespace = NSystem
@@ -486,7 +511,7 @@ module System = Make (struct
 end)
 
 module Process = Make (struct
-  type ns = process
+  type ns = _process
   type local_def = unit
 
   let namespace = NProcess
@@ -499,7 +524,7 @@ module Process = Make (struct
 end)
 
 module Function = Make (struct
-  type ns = fname
+  type ns = _fname
   type local_def = Type.ftype * function_def
 
   let namespace = NFunction
@@ -520,7 +545,7 @@ let is_ftype s ftype table =
       symb_err L._dummy (Unbound_identifier s.name)
 
 module Macro = Make (struct
-  type ns = macro
+  type ns = _macro
   type local_def = macro_def
 
   let namespace = NMacro
@@ -555,6 +580,8 @@ let is_infix_str (s : string) : bool =
 let is_infix (s : fname t) : bool =
   let s = to_string s in
   is_infix_str s
+
+let is_global : macro_def -> bool = function Global _ -> true | _ -> false
 
 (*------------------------------------------------------------------*)
 (** {2 Builtins} *)

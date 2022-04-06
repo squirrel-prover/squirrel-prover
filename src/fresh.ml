@@ -3,7 +3,8 @@
 open Utils
 
 module Sv = Vars.Sv
-
+module Sp = Match.Pos.Sp
+              
 exception Name_found
 exception Var_found
 exception Not_name
@@ -65,13 +66,13 @@ let pp_name_occ fmt (occ : name_occ) : unit =
 (** Looks for indices at which a name occurs.
     @raise Var_found if a term variable occurs in the term. *)
 let get_name_indices_ext 
-    ?(fv=Sv.empty)
+    ?(fv=[])
     (constr : Constr.trace_cntxt)
-    (nsymb : Symbols.name Symbols.t)
+    (nsymb : Symbols.name)
     (t : Term.term)
   : name_occs
   =
-  let rec get (t : Term.term) ~(fv:Sv.t) ~(cond:Term.term) : name_occs =
+  let rec get (t : Term.term) ~(fv : Vars.vars) ~(cond : Term.terms) : name_occs =
     match t with
     | Term.Var v when not (Type.is_finite (Vars.ty v)) ->
       raise Var_found
@@ -79,8 +80,9 @@ let get_name_indices_ext
     | Term.Name ns when ns.s_symb = nsymb ->
       let occ = Iter.{
           occ_cnt  = ns.s_indices;
-          occ_vars = fv;
-          occ_cond = cond; }
+          occ_vars = List.rev fv;
+          occ_cond = cond;
+          occ_pos  = Sp.empty; }
       in
       [occ]
 
@@ -90,7 +92,7 @@ let get_name_indices_ext
            get t ~fv ~cond @ occs
         ) ~fv ~cond t []
   in
-  get t ~fv ~cond:Term.mk_true
+  get t ~fv ~cond:[]
 
 (*------------------------------------------------------------------*)
 type ts_occ = Term.term Iter.occ
@@ -103,8 +105,12 @@ let pp_ts_occ fmt (occ : ts_occ) : unit = Iter.pp_occ Term.pp fmt occ
 (** remove duplicates from occs for some subsuming relation. *)
 let clear_dup_mtso_le (occs : ts_occs) : ts_occs =
   let subsumes (occ1 : ts_occ) (occ2 : ts_occ) =
+    (* for now, positions not allowed here *)
+    assert (Sp.is_empty occ1.occ_pos && Sp.is_empty occ2.occ_pos);
+    
     (* TODO: alpha-renaming *)
-    Sv.equal occ1.occ_vars occ2.occ_vars &&
+    List.length occ1.occ_vars = List.length occ2.occ_vars &&
+    List.for_all2 (=) occ1.occ_vars occ2.occ_vars &&
     occ1.occ_cond = occ2.occ_cond &&
     (occ1.occ_cnt = occ2.occ_cnt || occ1.occ_cnt = Term.mk_pred occ2.occ_cnt)
   in
@@ -119,45 +125,41 @@ let clear_dup_mtso_le (occs : ts_occs) : ts_occs =
   List.rev occs
 
 (** Looks for timestamps at which macros occur in a term. *)
-let get_actions_ext :
-  Constr.trace_cntxt -> Term.term -> ts_occs =
-  fun constr t ->
+let get_actions_ext (constr : Constr.trace_cntxt) (t : Term.term) : ts_occs =
 
-  let rec get :
-    Term.term -> fv:Sv.t -> cond:Term.term -> ts_occs =
-    fun t ~fv ~cond ->
-      match t with
-      | Term.Macro (m, l, ts) ->
-        if l <> [] then failwith "Not implemented" ;
+  let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.terms) : ts_occs =
+    match t with
+    | Term.Macro (m, l, ts) ->
+      if l <> [] then failwith "Not implemented" ;
 
-        let get_macro_default () =
-          let ts = match Symbols.Macro.get_def m.s_symb constr.table with
-            | Symbols.Input -> Term.mk_pred ts
-            | _             -> ts
-          in
-          let occ = Iter.{
-            occ_cnt  = ts;
-            occ_vars = fv;
-            occ_cond = cond; }
-          in
-          [occ] @ get ~fv ~cond ts
+      let get_macro_default () =
+        let ts = match Symbols.Macro.get_def m.s_symb constr.table with
+          | Symbols.Input -> Term.mk_pred ts
+          | _             -> ts
         in
+        let occ = Iter.{
+            occ_cnt  = ts;
+            occ_vars = List.rev fv;
+            occ_cond = cond;
+            occ_pos  = Sp.empty; }
+        in
+        [occ] @ get ~fv ~cond ts
+      in
 
-        begin match Macros.get_definition constr m ts with
-          | `Def t -> get ~fv ~cond t
-          | `Undef | `MaybeDef -> get_macro_default ()
-        end
+      begin match Macros.get_definition constr m ts with
+        | `Def t -> get ~fv ~cond t
+        | `Undef | `MaybeDef -> get_macro_default ()
+      end
 
-      | _ ->
-        (* Remark: we use [`NoDelta] because we want to have a different
-           behavior depending on whether the macro can be expended or not. *)
-        Iter.tfold_occ ~mode:`NoDelta
-          (fun ~fv ~cond t occs ->
-             get t ~fv ~cond @ occs
-          ) ~fv ~cond t []
+    | _ ->
+      (* Remark: we use [`NoDelta] because we want to have a different
+         behavior depending on whether the macro can be expended or not. *)
+      Iter.tfold_occ ~mode:`NoDelta
+        (fun ~fv ~cond t occs ->
+           get t ~fv ~cond @ occs
+        ) ~fv ~cond t []
   in
-  get t ~fv:Sv.empty ~cond:Term.mk_true
-
+  get t ~fv:[] ~cond:[]
 
 
 (*------------------------------------------------------------------*)
@@ -180,15 +182,18 @@ let mk_le_ts_occ
     (ts0 : Term.term)
     (occ : ts_occ) : Term.term
   =
-  let occ_vars = Sv.elements occ.Iter.occ_vars in
+  let occ_vars = occ.Iter.occ_vars in
   let occ_vars, occ_subst = Term.refresh_vars (`InEnv (ref env)) occ_vars in
   let subst = occ_subst in
   let ts   = Term.subst subst occ.occ_cnt  in
-  let cond = Term.subst subst occ.occ_cond in
+
+  let cond = List.map (Term.subst subst) occ.occ_cond in
+  let cond = List.rev cond in
+  
   Term.mk_exists ~simpl:true occ_vars
     (Term.mk_and
        (Term.mk_timestamp_leq ts0 ts)
-       cond)
+       (Term.mk_ands cond))
 
 let mk_le_ts_occs
     (env : Vars.env)

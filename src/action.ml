@@ -1,3 +1,5 @@
+open Utils
+
 type 'a item = {
   par_choice : int * 'a ; (** position in parallel compositions *)
   sum_choice : int * 'a   (** position in conditionals *)
@@ -148,7 +150,7 @@ let rec subst_action (s : Term.subst) (a : action) : action =
       sum_choice = q, List.map (Term.subst_var s) lq }
     :: subst_action s l
 
-let of_term (s:Symbols.action Symbols.t) (l:Vars.var list) table : action =
+let of_term (s:Symbols.action) (l:Vars.var list) table : action =
   let l',a = of_symbol s table in
   let subst =
     List.map2 (fun x y -> Term.ESubst (Term.mk_var x,Term.mk_var y)) l' l
@@ -157,6 +159,7 @@ let of_term (s:Symbols.action Symbols.t) (l:Vars.var list) table : action =
 
 let pp_parsed_action ppf a = pp_action_f pp_strings (0,[]) ppf a
 
+(*------------------------------------------------------------------*)
 (** An action description features an input, a condition (which sums up
   * several [Exist] constructs which might have succeeded or not) and
   * subsequent updates and outputs.
@@ -168,24 +171,24 @@ let pp_parsed_action ppf a = pp_action_f pp_strings (0,[]) ppf a
   * conditions). *)
 
 type descr = {
-  name      : Symbols.action Symbols.t ;
+  name      : Symbols.action ;
   action    : action ;
   input     : Channel.t * string ;
   indices   : Vars.var list ;
   condition : Vars.var list * Term.term ;
   updates   : (Term.state * Term.term) list ;
   output    : Channel.t * Term.term;
-  globals   : Symbols.macro Symbols.t list;
+  globals   : Symbols.macro list;
 }
 
-
+(*------------------------------------------------------------------*)
 (** Apply a substitution to an action description.
   * The domain of the substitution must contain all indices
   * occurring in the description. *)
 let subst_descr subst descr =
   let action = subst_action subst descr.action in
   let subst_term = Term.subst subst in
-  let indices = List.map (Term.subst_var subst) descr.indices  in
+  let indices = Term.subst_vars subst descr.indices  in
   let condition =
     (* FIXME: do we need to substitute ? *)
      fst descr.condition,
@@ -196,46 +199,18 @@ let subst_descr subst descr =
       ) descr.updates
   in
   let output = fst descr.output, subst_term (snd descr.output) in
-  { name = descr.name;
-    input = descr.input;
-    globals = descr.globals;
-    action; indices; condition; updates; output;  }
+  { descr with action; indices; condition; updates; output; }
 
-
-(* Map over the descr with function f *)
-let descr_map f descr =
-  let env = Vars.of_list descr.indices in
-  let f = f env in
-  let condition =
-     fst descr.condition,
-     f (snd descr.condition) in
-  let updates =
-    List.map (fun (ss,t) ->
-        ss, f t
-      ) descr.updates
-  in
-  let output = fst descr.output, f (snd descr.output) in
-  { name = descr.name;
-    input = descr.input;
-    globals = descr.globals;
-    action = descr.action;
-    indices = descr.indices;
-    condition; updates; output;  }
-
-
-
-let refresh_descr descr =
-  let _, s = Term.refresh_vars `Global descr.indices in
-  subst_descr s descr
-
+(*------------------------------------------------------------------*)
 let pp_descr_short ppf descr =
   let t = Term.mk_action descr.name descr.indices in
   Term.pp ppf t
 
-let pp_descr ppf descr =
+(*------------------------------------------------------------------*)
+let pp_descr ~debug ppf descr =
   let e = ref (Vars.of_list []) in
   let _, s = Term.refresh_vars (`InEnv e) descr.indices in
-  let descr = subst_descr s descr in
+  let descr = if debug then descr else subst_descr s descr in
 
   Fmt.pf ppf "@[<v 0>action name: @[<hov>%a@]@;\
               %a\
@@ -254,6 +229,56 @@ let pp_descr ppf descr =
     descr.updates
     Term.pp (snd descr.output)
 
+(*------------------------------------------------------------------*)
+(* well-formedness check for a description: check free variables *)
+let check_descr (d : descr) : bool =
+  (* special case for [init], which does not satisfy the free variables
+     condition. *)
+  if d.name = Symbols.init_action then true else
+    begin
+      let _, cond = d.condition
+      and _, outp = d.output in
+
+      let dfv = Vars.Sv.of_list d.indices in
+
+      Vars.Sv.subset (Term.fv cond) dfv &&
+      Vars.Sv.subset (Term.fv outp) dfv &&
+      List.for_all (fun (_, state) ->
+          Vars.Sv.subset (Term.fv state) dfv
+        ) d.updates
+    end
+
+(*------------------------------------------------------------------*)
+let descr_map
+    (f : Vars.env -> Symbols.macro -> Term.term -> Term.term) 
+    (descr : descr)
+  : descr
+  =
+  let env = Vars.of_list descr.indices in
+  let f = f env in
+  
+  let condition =
+    fst descr.condition,
+    f Symbols.cond (snd descr.condition)
+  in
+  let updates =
+    List.map (fun (ss,t) -> ss, f ss.Term.s_symb t) descr.updates
+  in
+  let output = fst descr.output, f Symbols.out (snd descr.output) in
+
+  let descr = { descr with condition; updates; output;  } in
+  assert (check_descr descr);
+
+  descr
+
+(*------------------------------------------------------------------*)
+let refresh_descr descr =
+  let _, s = Term.refresh_vars `Global descr.indices in
+  let descr = subst_descr s descr in
+  assert (check_descr descr);
+
+  descr
+  
 let pi_descr s d =
   let pi_term t = Term.pi_term ~projection:s t in
   { d with
@@ -361,3 +386,8 @@ let is_dup table t t' : bool =
   match is_dup_match is_match () table t t' with
   | None    -> false
   | Some () -> true
+
+(*------------------------------------------------------------------*)
+let pp_descr_dbg = pp_descr ~debug:true
+let pp_descr     = pp_descr ~debug:false
+

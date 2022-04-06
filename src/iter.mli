@@ -63,8 +63,9 @@ class get_f_messages :
 (** An occurrence. *)
 type 'a occ = {
   occ_cnt  : 'a;
-  occ_vars : Sv.t;      (** variables bound above the occurrence *)
-  occ_cond : Term.term; (** conditions above the occurrence *)
+  occ_vars : Vars.vars;      (** variables bound above the occ. *)
+  occ_cond : Term.terms;     (** conditions above the occ. *)
+  occ_pos  : Match.Pos.Sp.t; (** optional, empty if unused *)
 }
 
 val pp_occ :
@@ -82,9 +83,9 @@ type 'a occs = 'a occ list
     that may not happen. *)
 val tfold_occ :
   mode:[ `Delta of Constr.trace_cntxt | `NoDelta ] ->
-  (fv:Sv.t -> cond:Term.term -> Term.term -> 'a -> 'a) ->
-  fv:Sv.t -> 
-  cond:Term.term -> 
+  (fv:Vars.vars -> cond:Term.terms -> Term.term -> 'a -> 'a) ->
+  fv:Vars.vars -> 
+  cond:Term.terms -> 
   Term.term -> 
   'a -> 
   'a
@@ -100,7 +101,8 @@ type fsymb_matcher = Type of Symbols.function_def | Symbol of Term.fsymb
 
 (** Looks for occurrences of subterms using a function symbol of the given kind
     (Hash, Dec, ...).
-    Does not recurse below terms whose head is excluded by [excludesymtype]. *)
+    Does not recurse below terms whose head is excluded by [excludesymtype]. 
+    Incomplete. *)
 val get_ftypes :
   ?excludesymtype:Symbols.function_def ->
   Symbols.table -> 
@@ -109,7 +111,8 @@ val get_ftypes :
   mess_occs
 
 (** Looks for occurrences of subterms using a function symbol of the given head.
-    Does not recurse below terms whose head is excluded by [excludesymtype]. *)
+    Does not recurse below terms whose head is excluded by [excludesymtype]. 
+    Incomplete. *)
 val get_fsymb :
   ?excludesymtype:Symbols.function_def ->
   ?allow_diff:bool -> 
@@ -136,6 +139,9 @@ type hash_occ = (Vars.var list * Term.term) occ
 
 type hash_occs = hash_occ list
 
+val pp_hash_occ : Format.formatter -> hash_occ -> unit
+
+(*------------------------------------------------------------------*)
 (** [get_f_messages_ext ~cntxt f k t] collects direct occurrences of
     [f(_,k(_))] or [f(_,_,k(_))] where [f] is a function name [f] and [k] 
     a name [k].
@@ -144,8 +150,8 @@ type hash_occs = hash_occ list
 val get_f_messages_ext :
   ?drop_head:bool ->
   ?fun_wrap_key:(Term.fname -> bool) option ->
-  ?fv:Sv.t ->
-  cntxt:Constr.trace_cntxt ->
+  ?fv:Vars.vars ->
+  mode:[`Delta of Constr.trace_cntxt | `NoDelta] ->
   Term.fname -> 
   Term.name -> 
   Term.term -> 
@@ -188,11 +194,11 @@ val get_macro_occs :
     Also folds over global macros if [globals] is [true]. *)
 val fold_descr :
   globals:bool ->
-  ( Symbols.macro Symbols.t -> (* macro symbol [ms] *)
-    Vars.var list           -> (* indices [is] of [ms] *)
-    Symbols.macro_def       -> (* macro definition *)
-    Term.term               -> (* term [t] defining [ms(is)] *)
-    'a                      -> (* folding accumulator *)
+  ( Symbols.macro     -> (* macro symbol [ms] *)
+    Vars.var list     -> (* indices [is] of [ms] *)
+    Symbols.macro_def -> (* macro definition *)
+    Term.term         -> (* term [t] defining [ms(is)] *)
+    'a                -> (* folding accumulator *)
     'a) ->
   Symbols.table -> 
   SystemExpr.t -> 
@@ -219,10 +225,10 @@ val fold_descr :
     - [env ∩ is = ∅]
     - the free index variables of [t] and [a] are included in [env ∪ is]. *)
 type iocc = {
-  iocc_aname : Symbols.action Symbols.t;
-  iocc_action : Action.action;
-  iocc_vars : Sv.t;
-  iocc_cnt : Term.term;
+  iocc_aname   : Symbols.action;
+  iocc_action  : Action.action;
+  iocc_vars    : Sv.t;
+  iocc_cnt     : Term.term;
   iocc_sources : Term.term list;
 }
 
@@ -240,6 +246,9 @@ val pp_iocc : Format.formatter -> iocc -> unit
     that, roughly, "covers" all subterms of any expansion of [terms],
     in the following sense:
     
+    TODO: the description below is completely accurrante, as only indirect
+    occurrences are covered!
+
     [∀ trace model T, ∀ s ∈ st( ([terms])^T ), ∃ occ ∈ [occs]] and:
 
      - [∃ s₀ ∈ st([occ.occ_cnt])]
@@ -260,10 +269,10 @@ val fold_macro_support :
 (** Less precise version of [fold_macro_support], which does not track 
     sources. *)
 val fold_macro_support0 :
-  (Symbols.action Symbols.t -> (* action name *)
-   Action.action            -> (* action *)
-   Term.term                -> (* term *)
-   'a                       -> (* folding accumulator *)
+  (Symbols.action -> (* action name *)
+   Action.action  -> (* action *)
+   Term.term      -> (* term *)
+   'a             -> (* folding accumulator *)
    'a) ->
   Constr.trace_cntxt -> 
   Vars.env -> 

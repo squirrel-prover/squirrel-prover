@@ -52,6 +52,8 @@ end
 
 
 (*------------------------------------------------------------------*)
+exception Unsupported
+  
 module Utv : sig
   type ut = { hash : int;
               cnt  : ut_cnt }
@@ -59,12 +61,12 @@ module Utv : sig
   and ut_cnt = private
     | UVar  of Vars.var
     | UPred of ut
-    | UName of Symbols.action Symbols.t * ut list
+    | UName of Symbols.action * ut list
     | UInit
     | UUndef                    (* (x <> UUndef) iff. (Happens x) *)
 
   val uts    : Term.term -> ut
-  val uname  : Symbols.action Symbols.t -> ut list -> ut
+  val uname  : Symbols.action -> ut list -> ut
   val upred  : ut -> ut
   val uinit  : ut
   val uundef : ut
@@ -80,7 +82,7 @@ end = struct
   and ut_cnt =
     | UVar  of Vars.var
     | UPred of ut
-    | UName of Symbols.action Symbols.t * ut list
+    | UName of Symbols.action * ut list
     | UInit
     | UUndef
 
@@ -139,7 +141,7 @@ end = struct
     | Term.Fun (fs, _, [ts]) when fs = Term.f_pred -> upred (uts ts)
     | Term.Action (s,_) when s = Symbols.init_action -> uinit
     | Term.Action (s,l) -> uname s (List.map uvar l)
-    | _ -> failwith "Not implemented"
+    | _ -> raise Unsupported      
 
   let ut_to_var (ut : ut) : Vars.var =
     match ut.cnt with
@@ -310,7 +312,8 @@ module Form = struct
     in
     doit lit
       
-  let mk_list l : conjunction = List.map mk l |> List.flatten 
+  let mk_list l : conjunction =
+    List.concat_map (fun t -> try mk t with Unsupported -> []) l
 end
 
 

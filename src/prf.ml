@@ -2,12 +2,14 @@ open Utils
 
 module SE = SystemExpr
 module Sv = Vars.Sv
+module Sp = Match.Pos.Sp
 
+(*------------------------------------------------------------------*)
 type prf_param = {
-  h_fn  : Term.fname;   (** function name *)
-  h_fty : Type.ftype;   (** Hash function type *)
-  h_cnt : Term.term; (** contents, i.e. hashed message *)
-  h_key : Term.nsymb;   (** key *)
+  h_fn  : Term.fname;  (** function name *)
+  h_fty : Type.ftype;  (** Hash function type *)
+  h_cnt : Term.term;   (** contents, i.e. hashed message *)
+  h_key : Term.nsymb;  (** key *)
 }
 
 let prf_param hash : prf_param =
@@ -17,6 +19,7 @@ let prf_param hash : prf_param =
 
   | _ -> Tactics.soft_failure Tactics.Bad_SSC
 
+(*------------------------------------------------------------------*)
 (** Compute conjunct of PRF condition for a direct case,
   * that is an explicit occurrence of the hash in the frame. *)
 let prf_mk_direct env (param : prf_param) (occ : Iter.hash_occ) =
@@ -26,7 +29,7 @@ let prf_mk_direct env (param : prf_param) (occ : Iter.hash_occ) =
 
   let vars = occ.occ_vars in
 
-  let vars, subst = Term.refresh_vars (`InEnv env) (Sv.elements vars) in
+  let vars, subst = Term.refresh_vars (`InEnv env) vars in
 
   let is, m = occ.occ_cnt in
   let is = List.map (Term.subst_var subst) is in
@@ -51,7 +54,8 @@ let prf_occ_incl table system (o1 : prf_occ) (o2 : prf_occ) : bool =
   let a1, is1, t1 = o1.occ_cnt in
   let a2, is2, t2 = o2.occ_cnt in
 
-  let cond1, cond2 = o1.occ_cond, o2.occ_cond in
+  let cond1 = Term.mk_ands (List.rev o1.occ_cond)
+  and cond2 = Term.mk_ands (List.rev o2.occ_cond) in
 
   (* build a dummy term, which we used to match in one go all elements of
      the two occurrences *)
@@ -65,7 +69,7 @@ let prf_occ_incl table system (o1 : prf_occ) (o2 : prf_occ) : bool =
   in
   let pat2 = Match.{
       pat_tyvars = [];
-      pat_vars   = o2.occ_vars;
+      pat_vars   = Sv.of_list o2.occ_vars;
       pat_term   = mk_dum a2 is2 cond2 t2;
     }
   in
@@ -84,8 +88,8 @@ let prf_mk_indirect
     (hash_occ      : prf_occ) : Term.term
   =
   let env = ref env in
-
-  let vars = Sv.elements hash_occ.Iter.occ_vars in
+  
+  let vars = hash_occ.Iter.occ_vars in
   let vars, subst = Term.refresh_vars (`InEnv env) vars in
 
   let action, hash_is, hash_m = hash_occ.Iter.occ_cnt in
@@ -98,7 +102,9 @@ let prf_mk_indirect
   in
   let hash_is = List.map (Term.subst_var subst) hash_is
   and hash_m = Term.subst subst hash_m
-  and hash_cond = Term.subst subst hash_occ.Iter.occ_cond in
+  and hash_cond = List.map (Term.subst subst) hash_occ.Iter.occ_cond in
+
+  let hash_cond = Term.mk_ands (List.rev hash_cond) in
 
   (* save the environment after having renamed all free variables until now. *)
   let env0 = !env in
@@ -122,11 +128,11 @@ let prf_mk_indirect
 type prf_case = prf_occ * Term.term list
 
 (** map from action names to PRF cases *)
-type prf_cases_sorted = (Symbols.action Symbols.t * prf_case list) list
+type prf_cases_sorted = (Symbols.action * prf_case list) list
 
 let add_prf_case
     table system
-    (action_name : Symbols.action Symbols.t)
+    (action_name : Symbols.action)
     (c : prf_case)
     (assoc_cases : prf_cases_sorted) : prf_cases_sorted
   =
@@ -141,6 +147,7 @@ let add_prf_case
       List.fold_right (fun ((occ', srcs') as c2) cases ->
           if (not !found) && prf_occ_incl table system occ occ' then
             let () = found := true in
+            let occ' = { occ' with occ_pos = Sp.union occ'.occ_pos occ.occ_pos } in
             (occ', srcs @ srcs') :: cases
           else c2 :: cases
         ) cases []
@@ -158,7 +165,7 @@ let add_prf_case
 let mk_prf_phi_proj cntxt env param frame hash =
   (* Check syntactic side condition. *)
   let errors =
-    Euf.key_ssc
+    Euf.key_ssc ~globals:false
       ~elems:frame ~allow_functions:(fun x -> false)
       ~cntxt param.h_fn param.h_key.s_symb
   in
@@ -169,7 +176,8 @@ let mk_prf_phi_proj cntxt env param frame hash =
 
   let frame_hashes : Iter.hash_occs =
     List.fold_left (fun acc t ->
-        Iter.get_f_messages_ext ~cntxt param.h_fn param.h_key.s_symb t @ acc
+        Iter.get_f_messages_ext ~mode:(`Delta cntxt) 
+          param.h_fn param.h_key.s_symb t @ acc
       ) [] frame
   in
   let frame_hashes = List.sort_uniq Stdlib.compare frame_hashes in
@@ -184,10 +192,11 @@ let mk_prf_phi_proj cntxt env param frame hash =
     Iter.fold_macro_support (fun iocc macro_cases ->
         let name = iocc.iocc_aname in
         let t = iocc.iocc_cnt in
-        let fv = iocc.iocc_vars in
+        let fv = (Sv.elements iocc.iocc_vars) in
 
         let new_cases =
-          Iter.get_f_messages_ext ~fv ~cntxt param.h_fn param.h_key.s_symb t
+          Iter.get_f_messages_ext ~mode:(`Delta cntxt)
+            ~fv param.h_fn param.h_key.s_symb t
         in
         let new_cases =
           List.map (fun occ ->

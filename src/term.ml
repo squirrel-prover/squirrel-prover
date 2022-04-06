@@ -21,20 +21,24 @@ let mk_isymb (s : 'a) (t : Type.ty) (is : Vars.vars) =
     | Type.TVar _ | Type.TUnivar _ -> assert false;
     | _ -> ()
   in
-  assert (List.for_all (fun v -> Vars.ty v = Type.Index) is);
+  assert (
+    List.for_all (fun v ->
+        Type.equal (Vars.ty v) Type.tindex ||
+        Type.equal (Vars.ty v) Type.ttimestamp
+      ) is);
 
   { s_symb    = s;
     s_typ     = t;
     s_indices = is; }
 
 
-type name = Symbols.name Symbols.t
+type name = Symbols.name
 type nsymb = name isymb
 
-type fname = Symbols.fname Symbols.t
+type fname = Symbols.fname
 type fsymb = fname * Vars.var list (* TODO: use isymb *)
 
-type mname = Symbols.macro Symbols.t
+type mname = Symbols.macro
 type msymb = mname isymb
 
 type state = msymb
@@ -76,7 +80,7 @@ type term =
   | Macro  of msymb * term list * term
 
   | Seq    of Vars.var list * term
-  | Action of Symbols.action Symbols.t * Vars.var list 
+  | Action of Symbols.action * Vars.var list 
 
   | Var    of Vars.var
 
@@ -664,17 +668,25 @@ let happens_fixity = `Happens           , `NoParens
 
 (** Applies the styling info in [info]
     NOTE: this is *not* the [pp] exported by the module, it is shadowed later *)
-let rec pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
-  fun info (outer,side) ppf t ->
+let rec pp
+    (info         : pp_info)
+    ((outer,side) : ('b * fixity) * assoc)
+    (ppf          : Format.formatter)
+    (t            : term)
+  : unit
+  =
   let err_opt, info = info.styler info t in
   styled_opt err_opt (_pp info (outer, side)) ppf t
 
 (** Core printing function *)
-and _pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
-  fun info (outer, side) ppf t ->
-  let pp : (('b * fixity) * assoc) -> term Fmt.t =
-    fun (outer,side) fmt t -> pp info (outer, side) fmt t
-  in
+and _pp
+    (info         : pp_info)
+    ((outer,side) : ('b * fixity) * assoc)
+    (ppf          : Format.formatter)
+    (t            : term)
+  : unit
+  =
+  let pp = pp info in
 
   match t with
   | Var m -> Fmt.pf ppf "%a" Vars.pp m
@@ -798,7 +810,7 @@ and _pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
       Fmt.pf ppf "@[<hov 0>\
                   @[<hov 2>try find %a such that@ %a@]@;<1 0>\
                   @[<hov 2>in@ %a@]@]"
-        Vars.pp_list b
+        Vars.pp_typed_list b
         (pp (find_fixity, `NonAssoc)) c
         (pp (find_fixity, `Right)) d
     in
@@ -811,7 +823,7 @@ and _pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
                   @[<hov 0>\
                   @[<hov 2>in@ %a@]@;<1 0>\
                   @[<hov 2>else@ %a@]@]@]"
-        Vars.pp_list b
+        Vars.pp_typed_list b
         (pp (find_fixity, `NonAssoc)) c
         (pp (find_fixity, `NonAssoc)) d
         (pp (find_fixity, `Right)) e
@@ -997,8 +1009,6 @@ let rec assoc : subst -> term -> term =
   | ESubst (t1,t2)::q ->
     if term = t1 then t2 else assoc q term
 
-exception Substitution_error of string
-
 let pp_esubst ppf (ESubst (t1,t2)) =
   Fmt.pf ppf "%a->%a" pp t1 pp t2
 
@@ -1006,19 +1016,20 @@ let pp_subst ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_esubst) s
 
-let subst_var : subst -> Vars.var -> Vars.var =
-    fun subst var ->
-    match assoc subst (Var var) with
-    | Var var -> var
-    | _ -> raise @@ Substitution_error
-        "Must map the given variable to another variable"
+let subst_var (subst : subst) (var : Vars.var) : Vars.var =
+  match assoc subst (Var var) with
+  | Var var -> var
+  | _ -> assert false
+
+let subst_vars (subst : subst) (vs : Vars.vars) : Vars.vars =
+  List.map (subst_var subst) vs
 
 let subst_isymb (s : subst) (symb : 'a isymb) : 'a isymb =
-  { symb with s_indices = List.map (subst_var s) symb.s_indices }
+  { symb with s_indices = subst_vars s symb.s_indices }
 
 
 let subst_macro (s : subst) isymb =
-  { isymb with s_indices = List.map (subst_var s) isymb.s_indices }
+  { isymb with s_indices = subst_vars s isymb.s_indices }
 
 (*------------------------------------------------------------------*)
 
@@ -1099,16 +1110,16 @@ let rec subst (s : subst) (t : term) : term =
     let new_term =
       match t with
       | Fun ((fs,is), fty, lt) ->
-        Fun ((fs, List.map (subst_var s) is), fty, List.map (subst s) lt)
+        Fun ((fs, subst_vars s is), fty, List.map (subst s) lt)
 
       | Name symb ->
-        Name { symb with s_indices = List.map (subst_var s) symb.s_indices}
+        Name { symb with s_indices = subst_vars s symb.s_indices}
 
       | Macro (m, l, ts) ->
         Macro (subst_macro s m, List.map (subst s) l, subst s ts)
 
       | Var m -> Var m
-      | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
+      | Action (a,indices) -> Action (a, subst_vars s indices)
       | Diff (a, b) -> Diff (subst s a, subst s b)
 
       | Seq ([], f) -> Seq ([], subst s f)
@@ -1295,11 +1306,14 @@ module type SmartFO = sig
   type form
 
   (** {3 Constructors} *)
-  val mk_true    : form
-  val mk_false   : form
+  val mk_true  : form
+  val mk_false : form
 
-  val mk_eq    : ?simpl:bool -> term -> term -> form
-  val mk_leq   : ?simpl:bool -> term -> term -> form
+  val mk_eq  : ?simpl:bool -> term -> term -> form
+  val mk_leq : ?simpl:bool -> term -> term -> form
+  val mk_geq : ?simpl:bool -> term -> term -> form
+  val mk_lt  : ?simpl:bool -> term -> term -> form
+  val mk_gt  : ?simpl:bool -> term -> term -> form
 
   val mk_not   : ?simpl:bool -> form              -> form
   val mk_and   : ?simpl:bool -> form      -> form -> form

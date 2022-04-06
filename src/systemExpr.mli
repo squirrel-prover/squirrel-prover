@@ -4,11 +4,13 @@ module L = Location
 (** A single system, that is a system without diff, is given by the name of a
    (bi)system , and either Left or Right. *)
 type single_system =
-  | Left  of Symbols.system Symbols.t
-  | Right of Symbols.system Symbols.t
+  | Left  of Symbols.system 
+  | Right of Symbols.system 
 
 val get_proj : single_system -> Term.projection
 
+val get_id : single_system -> Symbols.system
+                                       
 (*------------------------------------------------------------------*)
 (** A system expression is a system without diff, or a system with diff. It can
     be obtained from:
@@ -19,7 +21,7 @@ val get_proj : single_system -> Term.projection
       combinaison of two single system, one for the left and one for the right. *)
 type t = private
   | Single     of single_system
-  | SimplePair of Symbols.system Symbols.t
+  | SimplePair of Symbols.system 
   | Pair       of single_system * single_system
   | Empty
 
@@ -27,7 +29,7 @@ val hash : t -> int
 
 val empty       : t
 val single      : Symbols.table -> single_system -> t
-val simple_pair : Symbols.table -> Symbols.system Symbols.t -> t
+val simple_pair : Symbols.table -> Symbols.system -> t
 val pair        : Symbols.table -> single_system -> single_system -> t
 
 (** [systems_compatible s1 s2] holds if all projections
@@ -90,7 +92,7 @@ val descr_of_action :
 val symbs :
   Symbols.table ->
   t ->
-  Symbols.action Symbols.t System.Msh.t
+  Symbols.action System.Msh.t
 
 (** Iterate over all action descriptions in [system].
     Only one representative of each action shape will be passed
@@ -103,9 +105,17 @@ val map_descrs  : (Action.descr -> 'a)       -> Symbols.table -> t -> 'a list
 (*------------------------------------------------------------------*)
 (** {2 Cloning } *)
 
-val clone_system_iter : Symbols.table -> t ->
-           Symbols.lsymb ->
-           (Action.descr -> Action.descr) -> Symbols.table * Symbols.System.ns Symbols.t
+(** Low-level cloning function over system expressions. 
+    Does not clone global macros. *)
+val clone_system_map :
+  Symbols.table ->
+  t ->
+  Symbols.lsymb ->
+  (Action.descr -> Action.descr) ->
+  Symbols.table * Symbols.system
+
+(** Low-level system symbols suppression *)
+val remove_system : Symbols.table -> Symbols.system -> Symbols.table
 
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printing } *)

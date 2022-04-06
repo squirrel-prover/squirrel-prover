@@ -18,6 +18,11 @@ let vars = function
   | Trace j -> TS.vars j
   | Equiv j -> ES.vars j
 
+let system = function
+  | Trace j -> TS.system j
+  | Equiv j -> ES.system j
+
+(*------------------------------------------------------------------*)
 let pp ch = function
   | Trace j -> TS.pp ch j
   | Equiv j -> ES.pp ch j
@@ -53,6 +58,18 @@ type ('a,'b) abstract_statement = {
 type statement       = (string, Equiv.gform) abstract_statement
 type equiv_statement = (string, Equiv.form ) abstract_statement
 type reach_statement = (string, Term.term  ) abstract_statement
+
+(*------------------------------------------------------------------*)
+let pp_statement fmt (g : statement) : unit =
+  let pp_tyvars fmt tyvs = 
+    if tyvs = [] then () 
+    else Fmt.list ~sep:Fmt.sp Type.pp_tvar fmt tyvs
+  in
+  Fmt.pf fmt "[%a] %s%a : %a"
+    SE.pp g.system
+    g.name
+    pp_tyvars g.ty_vars
+    Equiv.pp_gform g.formula
 
 (*------------------------------------------------------------------*)
 
@@ -95,8 +112,7 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Create trace and equivalence goals} *)
 
-
-let make_obs_equiv ?(enrich=[]) table hint_db name system =
+let make_obs_equiv ?(enrich=[]) table hint_db system =
   let vars,ts = Vars.make `Approx Vars.empty_env Type.Timestamp "t" in
   let term = Term.mk_macro Term.frame_macro [] (Term.mk_var ts) in
   let goal = Equiv.(Atom (Equiv (term :: enrich))) in
@@ -137,7 +153,7 @@ let make table hint_db parsed_goal : statement * t =
           `Equiv (Equiv.mk_forall vs f), Equiv s
       | Obs_equiv ->
         assert (vs = [] && ty_vars = []) ;
-        make_obs_equiv table hint_db name system
+        make_obs_equiv table hint_db system
   in
 
   { name; system; ty_vars; formula },

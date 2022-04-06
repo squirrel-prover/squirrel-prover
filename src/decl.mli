@@ -8,8 +8,10 @@ type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
 (** Type of a crypto assumption space (e.g. plaintext, ciphertext, key). *)
-type c_ty = { cty_space : lsymb;
-              cty_ty    : Theory.p_ty; }
+type c_ty = {
+  cty_space : lsymb;
+  cty_ty    : Theory.p_ty;
+}
 
 type c_tys = c_ty list
 
@@ -19,43 +21,52 @@ type macro_decl = lsymb * Theory.bnds * Theory.p_ty * Theory.term
 
 (*------------------------------------------------------------------*)
 (** Information for an abstract declaration *)
-type abstract_decl = { name    : lsymb;
-                       symb_type : Symbols.symb_type;
-                       ty_args : lsymb list; (* type variables *)
-                       abs_tys : Theory.p_ty list; }
+type abstract_decl = {
+  name      : lsymb;
+  symb_type : Symbols.symb_type;
+  ty_args   : lsymb list;          (** type variables *)
+  abs_tys   : Theory.p_ty list;
+}
 
 (*------------------------------------------------------------------*)
 (** Information for a name declaration *)
-type name_decl = { n_name : lsymb ;
-                   n_type : Theory.p_ty list; }
+type name_decl = {
+  n_name : lsymb ;
+  n_ty   : Theory.p_ty list;
+}
 
 (*------------------------------------------------------------------*)
 (** Information for a base type declaration *)
-type bty_decl = { bty_name  : lsymb ;
-                  bty_infos : Symbols.bty_info list ; }
+type bty_decl = {
+  bty_name  : lsymb ;
+  bty_infos : Symbols.bty_info list ;
+}
 
 (*------------------------------------------------------------------*)
 (** Information for a system declaration *)
-type system_decl = { sname    : Theory.lsymb option;
-                     sprocess : Process.process; }
+type system_decl = {
+  sname    : Theory.lsymb option;
+  sprocess : Process.process;
+}
 
 val pp_system_decl : Format.formatter -> system_decl -> unit
 
 (*------------------------------------------------------------------*)
 (** Information for a system declaration using a global modifier    *)
 
-(* List of possible cryptographic axioms. *)
-type system_modifier =
+(** Global cryptographic rules *)
+type global_rule =
   | Rename of Theory.global_formula
   | PRF    of Theory.bnds * Theory.term
+  | PRFt   of Theory.bnds * Theory.term (* gPRF, with time *)
   | CCA    of Theory.bnds * Theory.term
 
-
-(* It contains the original system, the underlying cryptoraphic axiom
-   used, and the name of the new system. *)
-type system_decl_modifier = { 
+(** System modifier, comprising:
+    the original system, the global rule to apply, and the name of 
+    the new system. *)
+type system_modifier = { 
   from_sys : SystemExpr.p_system_expr;
-  modifier : system_modifier;
+  modifier : global_rule;
   name     : Theory.lsymb
 }
                           
@@ -87,7 +98,7 @@ type declaration_i =
   | Decl_process of lsymb * Theory.bnds * Process.process
   | Decl_axiom   of Goal.Parsed.t
   | Decl_system  of system_decl
-  | Decl_system_modifier  of system_decl_modifier
+  | Decl_system_modifier  of system_modifier
 
   | Decl_dh of Symbols.dh_hyp list * lsymb * (lsymb * Symbols.symb_type) * (lsymb * Symbols.symb_type) option * c_tys
 
@@ -100,7 +111,7 @@ type declaration_i =
 
   | Decl_sign of lsymb * lsymb * lsymb * orcl_tag_info option * c_tys
 
-  | Decl_name     of lsymb * int * Theory.p_ty
+  | Decl_name     of lsymb * Theory.p_ty list
   | Decl_state    of macro_decl
   | Decl_operator of operator_decl
   | Decl_abstract of abstract_decl

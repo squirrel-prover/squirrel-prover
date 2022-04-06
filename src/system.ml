@@ -4,7 +4,7 @@ type lsymb = Symbols.lsymb
 (*------------------------------------------------------------------*)
 include Symbols.System
 
-type system_name = Symbols.system Symbols.t
+type system_name = Symbols.system 
 
 (*------------------------------------------------------------------*)
 type system_error =
@@ -31,7 +31,7 @@ module Msh = Map.Make (ShapeCmp)
   * the second one maps each shapes of valid actions to
   * their corresponding symbols. *)
 type Symbols.data += System_data of Action.descr Msh.t *
-                                    Symbols.action Symbols.t Msh.t
+                                    Symbols.action Msh.t
 
 let declare_empty table system_name =
   let def = () in
@@ -62,13 +62,16 @@ let pp_systems fmt table =
 
 (*------------------------------------------------------------------*)
 let add_action
-    (table : Symbols.table) (s_symb : Symbols.system Symbols.t)
-    (shape : Action.shape)  (action : Symbols.action Symbols.t)
-    (descr : Action.descr) =
+    (table : Symbols.table) (s_symb : Symbols.system)
+    (shape : Action.shape)  (action : Symbols.action)
+    (descr : Action.descr) 
+  =
   (* Sanity checks *)
   assert (shape = Action.get_shape descr.action);
   assert (Action.get_indices descr.action = descr.indices);
   assert (action = descr.name);
+  assert (Action.check_descr descr);
+
   let descrs,symbs = get_data table s_symb in
   assert (not (Msh.mem shape descrs || Msh.mem shape symbs));
   let descrs = Msh.add shape descr descrs in
@@ -77,15 +80,18 @@ let add_action
   Symbols.System.redefine table s_symb ~data ()
 
 (*------------------------------------------------------------------*)
-let descr_of_shape table (system : Symbols.system Symbols.t) shape =
+let descr_of_shape table (system : Symbols.system) shape =
   let descrs,_ = get_data table system in
-  Action.refresh_descr (Msh.find shape descrs)
+  let descr = Msh.find shape descrs in
+  assert (Action.check_descr descr);
+
+  Action.refresh_descr descr
 
 (** We look whether the shape already has a name in another system,
     with the same number of indices.
     If that is the case, use the same symbol. *)
 let find_shape table shape =
-  let exception Found of Symbols.action Symbols.t * Vars.var list in
+  let exception Found of Symbols.action * Vars.var list in
   try Symbols.System.iter (fun system () data ->
       let descrs = match data with
         | System_data (descrs,_) -> descrs
