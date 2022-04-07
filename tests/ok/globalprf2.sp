@@ -48,6 +48,25 @@ system t2 = [t/left] with gprf time, H(_, k).
 
 print system [t2].
 
+goal [t2/left] _ (i : index) : 
+  happens(U(i)) => 
+  output@U(i) = 
+    seq(j:index->
+      (try find t:timestamp such that
+         (exists (i0,j0:index),
+            ((n2(i,j) = n2(i0,j0)) && (t = U(i0)) &&
+             ((t < U(i)) || ((t = U(i)) && (j0 < j)))))
+       in
+         try find i0,j0:index such that
+           ((n2(i,j) = n2(i0,j0)) && (t = U(i0)) &&
+            ((t < U(i)) || ((t = U(i)) && (j0 < j))))
+         in n_PRF3(i0,j0) else error2 else n_PRF3(i,j))).
+Proof.
+  intro Hap @/output. 
+  auto.
+Qed.
+
+
 (*------------------------------------------------------------------*)
 (* system with one hash under binder (timestamp) *)
 
@@ -86,7 +105,7 @@ system q2 = [q/left] with gprf time, H(_, k).
 
 print system [q2].
 
-goal [q2/left] _ (i,j : index) : 
+goal [q2/left] _ (i : index) : 
   happens(U(i)) => 
   output@U(i) = 
   (try find t:timestamp such that
@@ -106,7 +125,7 @@ Proof.
   auto.
 Qed.
 
-goal [q2/left] _ (i,j : index) : 
+goal [q2/left] _ (i : index) : 
   happens(U(i)) => 
   mq(i)@U(i) = 
   (try find t:timestamp such that

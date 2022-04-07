@@ -786,12 +786,6 @@ let () =
            try run ~test "tests/alcotest/fadup_input.sp" with
            | Tactic_soft_failure (_,Tactics.NoReflMacroVar) -> raise Ok)
     end ;
-    "XOR", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok
-        (fun () ->
-           try run ~test "tests/alcotest/xor.sp" with
-           | Unfinished -> raise Ok)
-    end ;
     "XOR2", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->

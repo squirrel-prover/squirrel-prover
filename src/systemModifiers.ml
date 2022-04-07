@@ -937,17 +937,52 @@ let global_prf_t
                             
   (* Fmt.epr "occs:@.@[<v>%a@]@." (Fmt.list ~sep:Fmt.cut XO.pp) occs; *)
 
-  (* Condition checking whether [(tau1, s1) < (tau2, s2)].
-     We use the lexicographic order [(Term.mk_lt, mt_map map_cnstrs)]. *)
+  let rec lt_lex (is1 : Vars.vars) (is2 : Vars.vars) : Term.term =
+    match is1, is2 with
+    | [], [] -> Term.mk_false
+    | i1 :: is1, i2 :: is2 ->
+      let i1, i2 = Term.mk_var i1, Term.mk_var i2 in
+      Term.mk_or ~simpl:true
+        (Term.mk_lt i1 i2)
+        (Term.mk_and ~simpl:true (Term.mk_eq ~simpl:true i1 i2) (lt_lex is1 is2))
+    | _ -> assert false
+  in
+      
+  (* - Condition checking whether [(tau1, s1) < (tau2, s2)].
+     - We use the lexicographic order [(Term.mk_lt, mt_map map_cnstrs)].
+     - If [xocc1] and [xocc2] are the same occurrence, and if they have free
+       variables on top of the action free variable (i.e. if they occur 
+       below a binder), then we also consider self-collision between an 
+       an occurrence and another occurrence at the same timestamp, but 
+       earlier in the binder. *)
   let mk_xocc_lt
       (tau1 : Term.term) (xocc1 : XO.t)
       (tau2 : Term.term) (xocc2 : XO.t)
     : Term.term
     =
-    if lt_map map_cnstrs xocc1 xocc2 then
-      Term.mk_leq tau1 tau2
-    else
-      Term.mk_lt tau1 tau2
+    (* collision between occurrences earlier in time *)
+    let ts_lt =
+      if lt_map map_cnstrs xocc1 xocc2 then
+        Term.mk_leq tau1 tau2
+      else
+        Term.mk_lt tau1 tau2
+    in
+
+    (* same occurrence, appearing under a binder: self collision between
+       [xocc2] and [xocc1] occurring earlier in the binder. *)
+    let idx_lt =
+      if xocc1.tag = xocc2.tag then
+        let _, is1 = 
+          List.takedrop (List.length xocc1.cnt.x_a_is) xocc1.cnt.x_occ.occ_vars 
+        in
+        let _, is2 = 
+          List.takedrop (List.length xocc2.cnt.x_a_is) xocc2.cnt.x_occ.occ_vars 
+        in
+        Term.mk_and ~simpl:true (Term.mk_eq tau1 tau2) (lt_lex is1 is2)
+      else Term.mk_false
+    in
+
+    Term.mk_or ~simpl:true ts_lt idx_lt
   in
 
   let mk_xocc_collision

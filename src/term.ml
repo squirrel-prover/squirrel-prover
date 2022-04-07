@@ -288,6 +288,9 @@ module SmartConstructors = struct
     if t1 = t2 && simpl then mk_false else mk_gt_ns t1 t2
 
   let mk_and ?(simpl=true) t1 t2 = match t1,t2 with
+    | tt, _ when tt = mk_false && simpl -> mk_false
+    | _, tt when tt = mk_false && simpl -> mk_false
+
     | tt, t when tt = mk_true && simpl -> t
     | t, tt when tt = mk_true && simpl -> t
     | t1,t2 -> mk_and_ns t1 t2
@@ -295,6 +298,9 @@ module SmartConstructors = struct
   let mk_ands ?(simpl=true) ts = List.fold_left (mk_and ~simpl) mk_true ts
 
   let mk_or ?(simpl=true) t1 t2 = match t1,t2 with
+    | tt, _ when tt = mk_true && simpl -> mk_true
+    | _, tt when tt = mk_true && simpl -> mk_true
+
     | tf, t when tf = mk_false && simpl -> t
     | t, tf when tf = mk_false && simpl -> t
     | t1,t2 -> mk_or_ns t1 t2
