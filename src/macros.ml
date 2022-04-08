@@ -75,11 +75,10 @@ let get_body system data : Term.term =
           if t1 = t2 then t1 else Term.mk_diff t1 t2
         end
   in
-  match system with
-  | SE.Single s      -> get_single_body s data
-  | SE.SimplePair s  -> get_pair_body (SE.Left s) (SE.Right s)
-  | SE.Pair (s1, s2) -> get_pair_body s1 s2
-  | SE.Empty         -> assert false (* FIXME: user-level exception? *)
+  match SE.to_list system with
+  | [s] -> get_single_body s data
+  | [s1;s2] -> get_pair_body s1 s2
+  | _ -> assert false (* FIXME: user-level exception? *)
 
 (** Given the name [ns] of a macro as well as a function [f] over
     terms, an [old_single_system] and a [new_single_system], takes the
@@ -90,8 +89,8 @@ let update_global_data
     (table : Symbols.table)
     (ns : Symbols.macro Symbols.t)
     (dec_def : Symbols.macro_def)
-    (old_single_system : SystemExpr.single_system)
-    (new_single_system :  SystemExpr.single_system)
+    (old_single_system : SystemExpr.Single.t)
+    (new_single_system :  SystemExpr.Single.t)
     (f : Term.term -> Term.term) =
   match Symbols.Macro.get_data ns table with
   | Global_data data ->

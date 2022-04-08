@@ -99,7 +99,7 @@ module Mk (Args : MkArgs) : S with
         | Equiv.Local_t
 
         | _ when Goal.is_reach_statement lem ->
-          if not (SE.systems_compatible (S.system s) lem.system) then
+          if not (SE.Set.subset (S.system s) lem.system) then
             Tactics.hard_failure Tactics.NoAssumpSystem
 
         | _ ->

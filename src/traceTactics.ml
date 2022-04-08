@@ -1288,13 +1288,15 @@ let tac_autosimpl s = tac_auto ~close:false ~strong:(Config.auto_intro ()) s
 
 let project s =
   let system = TS.system s in
-  match system with
-  | Single _ ->
+  match SE.to_list system with
+  | [_] ->
     soft_failure (Tactics.Failure "goal already deals with a \
                                            single process")
-  | _ ->
+  | [_;_] ->
     [TS.pi PLeft s;
      TS.pi PRight s]
+
+  | _ -> assert false (* TODO implement this *)
 
 let () =
   T.register "project"
@@ -1913,11 +1915,11 @@ let rewrite_equiv (ass_sys, ass) (s : TS.t) : TS.t list =
 
   let cur_sys = TS.system s in
 
-  (* Identify which projection of the assumptions conclusion
+  (* Identify which projection of the assumption's conclusion
    * corresponds to the current goal (projection [src]) and
    * what will be the new system after the transformation. *)
-  let src, new_sys = match cur_sys with
-    | SystemExpr.Single _ ->
+  let src, new_sys =
+    if List.length (SE.to_list cur_sys) = 1 then
       if SystemExpr.project Term.PLeft ass_sys = cur_sys then
         PLeft,
         SystemExpr.project Term.PRight ass_sys
@@ -1926,21 +1928,23 @@ let rewrite_equiv (ass_sys, ass) (s : TS.t) : TS.t list =
         SystemExpr.project Term.PLeft ass_sys
       else
         Tactics.(soft_failure NoAssumpSystem)
-    | se ->
+    else begin
       (* Support only a useful particular case for now.
        * This could be generalized, e.g. to use an equivalence
        * that is not between the current system and itself.
        * I'm leaving this for when we have system annotations
        * in global meta formulas, and perhaps more general system
        * expressions. *)
-      if se <> ass_sys then
+
+      if cur_sys <> ass_sys then
         Tactics.(soft_failure NoAssumpSystem);
 
-      if SE.project Term.PLeft se <> SE.project Term.PRight se then
+      if SE.project Term.PLeft cur_sys <> SE.project Term.PRight cur_sys then
         Tactics.(soft_failure NoAssumpSystem);
 
       (* TODO the user might want the reverse direction *)
-      PLeft, se
+      PLeft, cur_sys
+    end
   in
   let dst = if src = PLeft then PRight else PLeft in
   let warn_unsupported t =

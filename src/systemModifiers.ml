@@ -38,10 +38,11 @@ let rewrite_norec
   f
 
 (*------------------------------------------------------------------*)
-let parse_single_system_name table sdecl =
-  match SE.parse_se table sdecl.Decl.from_sys with
-  | Single s as res -> res, s
-  | _ -> 
+let parse_single_system_name table sdecl : SE.t * SE.Single.t =
+  let res = SE.parse_se table sdecl.Decl.from_sys in
+  match SE.to_list res with
+  | [s] -> res, s
+  | _ ->
     Tactics.soft_failure ~loc:(L.loc sdecl.Decl.from_sys)
       (Failure "a single system must be provided")
 
@@ -136,19 +137,22 @@ let global_rename table sdecl (gf : Theory.global_formula) =
   in
 
 
-  (* We now declare the system *)
+  (* We now declare the system. *)
   let table, new_system =
     SystemExpr.clone_system_iter
-      table old_system
+      table old_single_system
       sdecl.Decl.name (Action.descr_map map)
   in
 
   (* We finally put as axiom the equivalence between the old and the 
-     new system *)
-  let new_system_expr,old_system_expr, old_system_name =
-    match old_system with
-    | Single (Left  s as old) -> SE.Left  new_system, old, s
-    | Single (Right s as old) -> SE.Right new_system, old, s
+     new system.
+     TODO in the future the new system should be a single system
+          where left/right projections won't make sense *)
+  let new_system_expr, old_system_expr, old_system_name =
+    match SE.to_list old_system with
+    | [s] ->
+        SE.Single.make new_system (SE.get_proj_string s), s,
+        Symbols.to_string (SE.Single.get_symbol s)
     |  _ -> assert false
   in
 
@@ -158,10 +162,10 @@ let global_rename table sdecl (gf : Theory.global_formula) =
 
   let table = !aux_table in
 
-  let new_system_e = SystemExpr.pair table old_system_expr new_system_expr in
+  let new_system_e =
+    SystemExpr.Pair.make table old_system_expr new_system_expr in
   let axiom_name =
-    "rename_from_" ^ Symbols.to_string old_system_name ^
-    "_to_" ^ Location.unloc sdecl.name
+    "rename_from_" ^ old_system_name ^ "_to_" ^ Location.unloc sdecl.name
   in
 
   (* we now create the lhs of the obtained conclusion *)
@@ -254,26 +258,28 @@ let global_prf table sdecl bnds hash =
 
   let table, new_system =
     SystemExpr.clone_system_iter
-      table old_system
+      table old_single_system
       sdecl.Decl.name (Action.descr_map map)
   in
 
   (* We finally put as axiom the equivalence between the old 
-     and the new system *)
-  let new_system_expr,old_system_expr, old_system_name =
-    match old_system with
-    | Single (Left s as old) -> SE.Left new_system, old, s
-    | Single (Right s as old) -> SE.Right new_system, old, s
+     and the new system.
+     TODO in the future projecting the new system won't make sense. *)
+  let new_system_expr, old_system_expr, old_system_name =
+    match SE.to_list old_system with
+    | [s] ->
+        SE.Single.make new_system (SE.get_proj_string s), s,
+        Symbols.to_string (SE.Single.get_symbol s)
     |  _ -> assert false
   in
   let aux_table = ref table in
   Symbols.Macro.iter (global_macro_iterator new_system_expr aux_table) table;
   let table = !aux_table in
 
-  let new_system_e = SystemExpr.pair table old_system_expr new_system_expr in
+  let new_system_e =
+    SystemExpr.Pair.make table old_system_expr new_system_expr in
   let axiom_name =
-    "prf_from_" ^ Symbols.to_string old_system_name ^
-    "_to_" ^ Location.unloc sdecl.name
+    "prf_from_" ^ old_system_name ^ "_to_" ^ Location.unloc sdecl.name
   in
 
   (* we now create the lhs of the obtained conclusion *)
@@ -425,16 +431,18 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
 
   let table, new_system =
     SystemExpr.clone_system_iter
-      table old_system
+      table old_single_system
       sdecl.Decl.name (Action.descr_map map)
   in
 
   (* We finally put as axiom the equivalence between the old and 
-     the new system *)
-  let new_system_expr,old_system_expr, old_system_name =
-    match old_system with
-    | Single (Left s as old) -> SE.Left new_system, old, s
-    | Single (Right s as old) -> SE.Right new_system, old, s
+     the new system.
+     TODO in the future projecting the new system won't make sense. *)
+  let new_system_expr, old_system_expr, old_system_name =
+    match SE.to_list old_system with
+    | [s] ->
+        SE.Single.make new_system (SE.get_proj_string s), s,
+        Symbols.to_string (SE.Single.get_symbol s)
     |  _ -> assert false
   in
 
@@ -443,10 +451,10 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
   let table = !aux_table in
 
 
-  let new_system_e = SystemExpr.pair table old_system_expr new_system_expr in
+  let new_system_e =
+    SystemExpr.Pair.make table old_system_expr new_system_expr in
   let axiom_name =
-    "cca_from_" ^ Symbols.to_string old_system_name ^
-    "_to_" ^ Location.unloc sdecl.name
+    "cca_from_" ^ old_system_name ^ "_to_" ^ Location.unloc sdecl.name
   in
 
   (* we now create the lhs of the obtained conclusion *)

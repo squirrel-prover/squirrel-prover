@@ -3,6 +3,10 @@ module L = Location
 
 type lsymb = Symbols.lsymb
 
+(* TODO temporary implementation for compatibility *)
+
+type projection = string
+
 (*------------------------------------------------------------------*)
 type single_system =
   | Left  of Symbols.system Symbols.t
@@ -11,6 +15,10 @@ type single_system =
 let get_proj = function
   | Left _ -> Term.PLeft
   | Right _ -> Term.PRight
+
+let get_proj_string = function
+  | Left _ -> "left"
+  | Right _ -> "right"
 
 let get_id = function
   | Left id | Right id -> id
@@ -41,6 +49,17 @@ let pp fmt = function
   | SimplePair id -> Fmt.pf fmt "%s" (Symbols.to_string id)
   | Pair (s1, s2) -> Fmt.pf fmt "%a,%a" pp_single s1 pp_single s2
   | Empty         -> Fmt.pf fmt "empty" 
+
+type unary     = [`Unary]
+type binary    = [`Binary]
+type arbitrary = [`Unary|`Binary|`Other]
+type 'a expr = t
+
+let to_list : arbitrary expr -> unary expr list = function
+  | Single s -> [Single s]
+  | SimplePair s -> [Single (Left s); Single (Right s)]
+  | Pair (s1,s2) -> [Single s1;Single s2]
+  | Empty -> []
 
 (*------------------------------------------------------------------*)
 type ssymb_pair = System.system_name *
@@ -304,8 +323,6 @@ let check_system_expr table se = iter_descrs table se (fun _ -> ())
 (*------------------------------------------------------------------*)
 (** {2 Smart constructor } *)
 
-let empty = Empty
-
 let single _table a = Single a
 
 let simple_pair _table s = SimplePair s
@@ -334,6 +351,45 @@ let clone_system_iter table original_system new_system iterdescr =
   let ndescrs = System.Msh.map iterdescr odescrs in
   let data = System.System_data (ndescrs,symbs) in
   Symbols.System.declare_exact table new_system ~data ()
+
+(* TODO *)
+
+module Single = struct
+  type t = unary expr
+  let make symb proj =
+    match proj with
+      | "left" -> Single (Left symb)
+      | "right" -> Single (Right symb)
+      | _ -> assert false
+  let pp = pp
+  let get_symbol = function
+    | Single (Left s) -> s
+    | Single (Right s) -> s
+    | _ -> assert false
+end
+
+module Set = struct
+  type t = arbitrary expr
+  let any = Empty (* TODO fix this *)
+  let of_list table ?labels l = assert false
+  let of_symbol s = assert false
+  let subset = systems_compatible
+end
+
+module Pair = struct
+  type t = binary expr
+  let pp = pp
+  let get_single = function Single s -> s | _ -> assert false
+  let make table left right =
+    let left = get_single left in
+    let right = get_single right in
+    pair table left right
+end
+
+let get_proj =
+  function Single s -> get_proj s | _ -> assert false
+let get_proj_string =
+  function Single s -> get_proj_string s | _ -> assert false
 
 (*------------------------------------------------------------------*)
 (** {2 Parser types } *)
@@ -370,3 +426,5 @@ let parse_se table p_se = match L.unloc p_se with
   | P_SimplePair str -> simple_pair table (System.of_lsymb str table)
   | P_Pair (a,b)     ->
     pair table (parse_single table a) (parse_single table b)
+
+let parse_single table p = Single (parse_single table p)

@@ -97,6 +97,7 @@ end
 
 
 let make_obs_equiv ?(enrich=[]) table hint_db name system =
+  let system = (system :> SE.t) in (* TODO avoid loosing precision *)
   let vars,ts = Vars.make `Approx Vars.empty_env Type.Timestamp "t" in
   let term = Term.mk_macro Term.frame_macro [] (Term.mk_var ts) in
   let goal = Equiv.(Atom (Equiv (term :: enrich))) in

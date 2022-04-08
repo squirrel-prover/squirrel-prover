@@ -6,9 +6,9 @@ module SE = SystemExpr
 type body = Term.term
 
 type[@warning "-37"] op_body =
-  | SingleDef of body                           (** same for all systems *)
+  | SingleDef of body                      (** same for all systems *)
   
-  | ManyDefs  of (SE.single_system * body) list (** system by system *)
+  | ManyDefs  of (SE.Single.t * body) list (** system by system *)
   (* TODO: unused for now *)
 
 type operator = {
@@ -27,7 +27,7 @@ let pp_op_body fmt body =
   | SingleDef t -> Fmt.pf fmt "%a" Term.pp t
   | ManyDefs  l -> 
     Fmt.pf fmt "@[<v 0>%a@]"
-      (Fmt.list (Fmt.pair ~sep:Fmt.comma SE.pp_single Term.pp)) l
+      (Fmt.list (Fmt.pair ~sep:Fmt.comma SE.Single.pp Term.pp)) l
 
 let pp_operator fmt op =
   let pp_tyvars fmt tyvars =

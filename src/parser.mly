@@ -902,10 +902,10 @@ global_formula:
  * ----------------------------------------------------------------------- */
 
 system_proj:
-| LEFT                { SE.(P_Left  default_system_name) }
-| RIGHT               { SE.(P_Right default_system_name) }
-| i=lsymb SLASH LEFT  { SE. P_Left                    i  }
-| i=lsymb SLASH RIGHT { SE. P_Right                   i  }
+| LEFT                { SE.P_Left  SE.default_system_name }
+| RIGHT               { SE.P_Right SE.default_system_name }
+| i=lsymb SLASH LEFT  { SE.P_Left  i }
+| i=lsymb SLASH RIGHT { SE.P_Right i }
 
 /* A single or bi-system */
 system_i:

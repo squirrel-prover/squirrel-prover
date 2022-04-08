@@ -18,5 +18,5 @@ val declare_system :
   string *
   Term.term list *
   (Equiv.global_form -> [> `Equiv of Equiv.global_form ]) *
-  SystemExpr.t *
+  SystemExpr.Pair.t *
   Symbols.table

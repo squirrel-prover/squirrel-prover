@@ -921,7 +921,7 @@ let declare_i table hint_db decl = match L.unloc decl with
     let formula = make_conclusion formula in
     let statement = Goal.{ 
         name    = new_axiom_name; 
-        system  = new_system; 
+        system  = (new_system:>SE.t); (* TODO avoid loosing precise type? *)
         ty_vars = []; 
         formula }
     in

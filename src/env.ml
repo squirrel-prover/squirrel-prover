@@ -7,7 +7,7 @@ type t = {
 
 let init 
     ~table 
-    ?(system = SystemExpr.empty)
+    ?(system = SystemExpr.Set.any)
     ?(vars = Vars.empty_env) 
     ?(ty_vars = []) () 
   = {

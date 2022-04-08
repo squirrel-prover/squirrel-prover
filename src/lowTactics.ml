@@ -571,29 +571,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
        * convention is that the global formula in assumption holds
        * for the pair (S,S).
        * This will be clarified when system specifications can be
-       * embedded in global formulas. *)
-      let system = match system with
-        | SystemExpr.Single st -> SystemExpr.pair (S.table s) st st
-        | st -> st
+       * embedded in global formulas. TODO ongoing work... *)
+      let s1,s2 = match SE.to_list system, dir with
+        | [s],_ -> s,s
+        | [s1;s2],`LeftToRight -> s1,s2
+        | [s1;s2],`RightToLeft -> s2,s1
+        | _ -> assert false
       in
-
-      let system = match dir, system with
-        | `LeftToRight, _ -> system
-        | `RightToLeft, SE.Pair (s1, s2) ->
-          SE.pair (S.table s) s2 s1
-
-        | `RightToLeft, SE.SimplePair st ->
-          SE.pair (S.table s) (SE.Right st) (SE.Left st)
-
-        | `RightToLeft, SE.Single s ->
-          soft_failure ~loc:(L.loc rw_arg.rw_dir)
-            (Failure "cannot swap the systems: lemma applies to a \
-                      single system)")
-
-        | _, Empty -> 
-          soft_failure (Failure "empty system: nothing to rewrite")
-      in
-      system, f
+      let system = SE.Pair.make (S.table s) s1 s2 in
+      (system:>SE.t), f
 
   (*------------------------------------------------------------------*)
   (** {3 Case tactic} *)
