@@ -3,7 +3,7 @@
     systems, and equivalence formulas only make sense relative to
     a pair of systems. *)
 
-(** Projections are identified by strings.
+(** We use names to identify the projections of a multi-system.
     Default strings like "left"/"right" or "1"/"2"/...
     are often used but the user may prefer to use e.g. "real"/"ideal". *)
 type projection = string
@@ -90,18 +90,18 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
-type ssymb_pair = System.system_name * System.system_name
+type ssymb_pair = System.t * System.t
 
 type system_expr_err =
-  | SE_NotABiProcess of System.system_name option
-  | SE_NoneProject
-  | SE_InvalidAction of t * Action.shape
-  | SE_IncompatibleAction   of ssymb_pair * string
-  | SE_DifferentControlFlow of ssymb_pair
+  | NotABiProcess        of System.t option
+  | NoneProject
+  | InvalidAction        of t * Action.shape
+  | IncompatibleAction   of ssymb_pair * string
+  | DifferentControlFlow of ssymb_pair
 
 val pp_system_expr_err : Format.formatter -> system_expr_err -> unit
 
-exception BiSystemError of system_expr_err
+exception System_error of system_expr_err
 
 (*------------------------------------------------------------------*)
 (** {2 Projection and action builder} *)

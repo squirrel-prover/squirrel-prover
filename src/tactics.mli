@@ -70,8 +70,6 @@ type tac_error_i =
   | GoalBadShape of string
   | GoalNotPQSound
   | TacticNotPQSound
-  | SystemError     of System.system_error
-  | SystemExprError of SystemExpr.system_expr_err
   | CongrFail
   | GoalNotClosed
   | NothingToIntroduce

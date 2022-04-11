@@ -56,10 +56,6 @@ type tac_error_i =
   | GoalNotPQSound
   | TacticNotPQSound
 
-  (* TODO: remove these errors, catch directly at top-level *)
-  | SystemError     of System.system_error
-  | SystemExprError of SystemExpr.system_expr_err
-
   | CongrFail
   | GoalNotClosed
   | NothingToIntroduce
@@ -116,11 +112,9 @@ let rec tac_error_to_string = function
   | ApplyMatchFailure _   -> "ApplyMatchFailure"
   | HypAlreadyExists  _    -> "HypAlreadyExists"
   | HypUnknown        _    -> "HypUnknown"
-  | SystemExprError   _    -> "SystemExpr_Error"
   | GoalBadShape      _    -> "GoalBadShape"
   | GoalNotPQSound         -> "GoalNotPQSound"
   | TacticNotPQSound       -> "TacticNotPQSound"
-  | SystemError       _    -> "System_Error"
   | PatNumError       _    -> "PatNumError"
   | MustHappen        _    -> "MustHappen"
   | BadSSCDetailed    _    -> "BadSSCDetailed"
@@ -151,10 +145,6 @@ let pp_tac_error_i ppf = function
   | NotDDHContext ->
       Fmt.pf ppf "the current system cannot be seen as a context \
                   of the given DDH shares"
-
-  | SystemExprError e -> SystemExpr.pp_system_expr_err ppf e
-
-  | SystemError e -> System.pp_system_error ppf e
 
   | SEncNoRandom ->
     Fmt.string ppf "an encryption is performed without a random name"

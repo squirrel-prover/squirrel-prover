@@ -62,43 +62,42 @@ let to_list : arbitrary expr -> unary expr list = function
   | Empty -> []
 
 (*------------------------------------------------------------------*)
-type ssymb_pair = System.system_name *
-                  System.system_name
+type ssymb_pair = System.t * System.t
 
 type system_expr_err =
-  | SE_NotABiProcess of System.system_name option
-  | SE_NoneProject
-  | SE_InvalidAction of t * Action.shape
-  | SE_IncompatibleAction   of ssymb_pair * string
-  | SE_DifferentControlFlow of ssymb_pair
+  | NotABiProcess of System.t option
+  | NoneProject
+  | InvalidAction of t * Action.shape
+  | IncompatibleAction   of ssymb_pair * string
+  | DifferentControlFlow of ssymb_pair
 
 let pp_system_expr_err fmt = function
-  | SE_NotABiProcess s ->
+  | NotABiProcess s ->
     Fmt.pf fmt "cannot project system [%a], which is not a bi-process"
       (Fmt.option Fmt.string) (omap Symbols.to_string s)
 
-  | SE_NoneProject ->
+  | NoneProject ->
     Fmt.pf fmt "cannot project a system with None"
 
-  | SE_InvalidAction (t, sh) ->
+  | InvalidAction (t, sh) ->
     Fmt.pf fmt "@[<v>system %a has no action with shape:@;  @[%a@]"
       pp t
       Action.pp_shape sh
 
-  | SE_IncompatibleAction ((s1,s2),s) ->
+  | IncompatibleAction ((s1,s2),s) ->
     Fmt.pf fmt "systems [%s] and [%s] are not compatible: %s"
       (Symbols.to_string s1) (Symbols.to_string s2) s
 
-  | SE_DifferentControlFlow (s1,s2) ->
+  | DifferentControlFlow (s1,s2) ->
     Fmt.pf fmt "systems [%s] and [%s] have distinct control flow"
       (Symbols.to_string s1) (Symbols.to_string s2)
 
-exception BiSystemError of system_expr_err
+exception System_error of system_expr_err
 
-let bisystem_error e = raise (BiSystemError e)
+let bisystem_error e = raise (System_error e)
 
 let incompatible_error s1 s2 s =
-  raise (BiSystemError (SE_IncompatibleAction ((s1,s2),s)))
+  raise (System_error (IncompatibleAction ((s1,s2),s)))
 
 
 (*------------------------------------------------------------------*)
@@ -146,22 +145,22 @@ let action_to_term table system a =
 
 (*------------------------------------------------------------------*)
 let project proj = function
-  | Empty -> bisystem_error (SE_NotABiProcess None)
-  | Single s -> bisystem_error (SE_NotABiProcess (Some (get_id s)))
+  | Empty -> bisystem_error (NotABiProcess None)
+  | Single s -> bisystem_error (NotABiProcess (Some (get_id s)))
 
   | SimplePair id ->
     begin
       match proj with
       | Term.PLeft  -> Single (Left id)
       | Term.PRight -> Single (Right id)
-      | Term.PNone  -> bisystem_error SE_NoneProject
+      | Term.PNone  -> bisystem_error NoneProject
     end
   | Pair (s1, s2) ->
     begin
       match proj with
       | Term.PLeft  -> Single s1
       | Term.PRight -> Single s2
-      | Term.PNone  -> bisystem_error SE_NoneProject
+      | Term.PNone  -> bisystem_error NoneProject
     end
 
 (*------------------------------------------------------------------*)
@@ -223,7 +222,7 @@ let descr_of_shape table (se : t) shape =
   let getd s_symb = System.descr_of_shape table s_symb shape in
 
   match se with
-  | Empty -> bisystem_error (SE_InvalidAction (se, shape))
+  | Empty -> bisystem_error (InvalidAction (se, shape))
 
   (* we simply project the description according to the projection *)
   | Single s ->
@@ -276,7 +275,7 @@ let descrs table se =
     let right_descrs = System.descrs table sname2 in
 
     if not (same_shapes left_descrs right_descrs) then
-      bisystem_error (SE_DifferentControlFlow (sname1,sname2));
+      bisystem_error (DifferentControlFlow (sname1,sname2));
 
     System.Msh.mapi
       (fun shape _ -> descr_of_shape table se shape)
@@ -340,8 +339,8 @@ let pair table a b =
 let pp_descrs table ppf system =
   Fmt.pf ppf "@[<v 2>Available actions:@;@;";
   iter_descrs table system (fun descr ->
-      Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
-        Action.pp_descr descr) ;
+    Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
+      Action.pp_descr descr) ;
   Fmt.pf ppf "@]%!@."
 
 

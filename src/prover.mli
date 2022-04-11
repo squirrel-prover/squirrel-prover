@@ -225,10 +225,7 @@ type decl_error_i =
   | InvalidAbsType
   | InvalidCtySpace of string list
   | DuplicateCty of string
-
   | NonDetOp
-  | SystemError     of System.system_error
-  | SystemExprError of SE.system_expr_err
 
 type dkind = KDecl | KGoal
 

@@ -1,22 +1,19 @@
-module L = Location
-type lsymb = Symbols.lsymb
+type t = Symbols.system Symbols.t
 
-(*------------------------------------------------------------------*)
-include Symbols.System
-
-type system_name = Symbols.system Symbols.t
+let of_lsymb = Symbols.System.of_lsymb
 
 (*------------------------------------------------------------------*)
 type system_error =
-  | SE_ShapeError
+  | Shape_error
 
 let pp_system_error fmt = function
-  | SE_ShapeError ->
+  | Shape_error ->
     Fmt.pf fmt "cannot register a shape twice with distinct indices"
 
-exception SystemError of system_error
+exception System_error of system_error
 
-let system_err e = raise (SystemError e)
+let system_err e = raise (System_error e)
+
 (*------------------------------------------------------------------*)
 module ShapeCmp = struct
   type t = Action.shape
@@ -81,23 +78,22 @@ let descr_of_shape table (system : Symbols.system Symbols.t) shape =
   let descrs,_ = get_data table system in
   Action.refresh_descr (Msh.find shape descrs)
 
-(** We look whether the shape already has a name in another system,
-    with the same number of indices.
-    If that is the case, use the same symbol. *)
+(** [find_shape table shape] returns [Some (name,indices)] if some
+    action with name [n] and indices [i] and shape [shape] is registered
+    in [table]. Return [None] if no such action exists. *)
 let find_shape table shape =
   let exception Found of Symbols.action Symbols.t * Vars.var list in
-  try Symbols.System.iter (fun system () data ->
+  try
+    Symbols.System.iter (fun system () data ->
       let descrs = match data with
         | System_data (descrs,_) -> descrs
         | _ -> assert false
       in
-
       if Msh.mem shape descrs then
         let descr = Msh.find shape descrs in
         raise (Found (descr.name, descr.indices))
       else ()
     ) table;
-
     None
   with Found (x,y) -> Some (x,y)
 
@@ -106,7 +102,7 @@ let register_action table system_symb symb indices action descr =
   let shape = Action.get_shape action in
   match find_shape table shape with
   | Some (symb2, is) when List.length indices <> List.length is ->
-      system_err SE_ShapeError
+      system_err Shape_error
 
   | Some (symb2, is) ->
     let subst_action =

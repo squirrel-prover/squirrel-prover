@@ -374,7 +374,7 @@ type p_env = {
 
 }
 
-let parse_proc (system_name : System.system_name) init_table proc =
+let parse_proc (system_name : System.t) init_table proc =
 
   (* Initial env with special variables registered.
    * The special variables should never be visible to the user,

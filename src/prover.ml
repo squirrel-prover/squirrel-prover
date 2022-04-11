@@ -28,11 +28,7 @@ type decl_error_i =
   | InvalidAbsType
   | InvalidCtySpace of string list
   | DuplicateCty of string
-
   | NonDetOp
-  (* TODO: remove these errors, catch directly at top-level *)
-  | SystemError     of System.system_error
-  | SystemExprError of SE.system_expr_err
 
 type dkind = KDecl | KGoal
 
@@ -54,10 +50,6 @@ let pp_decl_error_i fmt = function
   | NonDetOp ->
     Fmt.pf fmt "an operator body cannot contain probabilistic computations"
 
-  | SystemExprError e -> SE.pp_system_expr_err fmt e
-
-  | SystemError e -> System.pp_system_error fmt e
-
 let pp_decl_error pp_loc_err fmt (loc,k,e) =
   let pp_k fmt = function
     | KDecl -> Fmt.pf fmt "declaration"
@@ -71,13 +63,6 @@ let pp_decl_error pp_loc_err fmt (loc,k,e) =
 exception Decl_error of decl_error
 
 let decl_error loc k e = raise (Decl_error (loc,k,e))
-
-let error_handler loc k f a =
-  let decl_error = decl_error loc k in
-  try f a with
-  | System.SystemError e -> decl_error (SystemError e)
-  | SE.BiSystemError e -> decl_error (SystemExprError e)
-
 
 (*------------------------------------------------------------------*)
 (** {2 Prover state}
@@ -387,10 +372,6 @@ module ProverTactics = struct
           fun s sk fk -> begin match f s with
               | subgoals -> sk subgoals fk
               | exception Tactics.Tactic_soft_failure e -> fk e
-              | exception System.SystemError e ->
-                hard_failure (Tactics.SystemError e)
-              | exception SE.BiSystemError e ->
-                hard_failure (Tactics.SystemExprError e)
             end
         | _ -> hard_failure (Tactics.Failure "no argument allowed"))
 
@@ -407,23 +388,19 @@ module ProverTactics = struct
       ~pq_sound
       (fun args s sk fk ->
          match convert_args s args (TacticsArgs.Sort sort) with
-         | TacticsArgs.Arg (th)  ->
+         | TacticsArgs.Arg th  ->
            try
              let th = TacticsArgs.cast sort th in
              begin
-               match f (th) s with
+               match f th s with
                | subgoals -> sk subgoals fk
                | exception Tactics.Tactic_soft_failure e -> fk e
-               | exception System.SystemError e ->
-                 hard_failure (Tactics.SystemError e)
-               | exception SE.BiSystemError e ->
-                 hard_failure (Tactics.SystemExprError e)
              end
            with TacticsArgs.Uncastable ->
-             hard_failure (Tactics.Failure "ill-formed arguments")
-      )
+             hard_failure (Tactics.Failure "ill-formed arguments"))
 
-  let register_macro id ?(modifiers=["nosimpl"])  ~tactic_help ?(pq_sound=false) m =
+  let register_macro
+        id ?(modifiers=["nosimpl"]) ~tactic_help ?(pq_sound=false) m =
     register_general id ~tactic_help ~pq_sound
       (fun args s sk fk ->
          if args = [] then AST.eval modifiers m s sk fk else
@@ -644,9 +621,8 @@ let declare_new_goal_i table hint_db parsed_goal =
   L.unloc name, goal
 
 let declare_new_goal table hint_db parsed_goal =
-  let loc = L.loc parsed_goal in
   let parsed_goal = L.unloc parsed_goal in
-  error_handler loc KGoal (declare_new_goal_i table hint_db) parsed_goal
+  declare_new_goal_i table hint_db parsed_goal
 
 let add_proved_goal gconcl =
   if is_assumption gconcl.Goal.name then
@@ -883,7 +859,7 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
   *   to do with the prover, move Decl_axiom to Prover.parsed_input and
   *   process declarations somewhere else than Prover. *)
 
-let declare_i table hint_db decl = match L.unloc decl with
+let declare table hint_db decl = match L.unloc decl with
   | Decl.Decl_channel s            -> Channel.declare table s
   | Decl.Decl_process (id,pkind,p) ->
     let env = Env.init ~table () in
@@ -1002,10 +978,6 @@ let declare_i table hint_db decl = match L.unloc decl with
         bty_decl.bty_infos
     in
     table
-
-let declare table hint_db decl =
-  let loc = L.loc decl in
-  error_handler loc KDecl (declare_i table hint_db) decl
 
 let declare_list table hint_db decls =
   List.fold_left (fun table d -> declare table hint_db d) table decls
