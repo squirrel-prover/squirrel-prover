@@ -444,7 +444,7 @@ let convert_pat_arg sel conv_cntxt p conc =
   in
   let option = { Match.default_match_option with allow_capture = true; } in
   let table = conv_cntxt.env.table
-  and sexpr = conv_cntxt.env.system
+  and sexpr = conv_cntxt.env.system.set (* TODO abusive ? *)
   and vars  = conv_cntxt.env.vars in
   let res = match conc with
     | `Reach form -> Match.T.find ~option table sexpr vars pat form

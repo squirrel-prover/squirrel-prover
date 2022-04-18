@@ -66,7 +66,7 @@ exception InternalError
 
 let build_task_bis
     (table       : Symbols.table)
-    (system      : SystemExpr.t)
+    (system      : SystemExpr.fset)
     (evars       : Vars.vars)
     (msg_atoms   : Term.xatom list)
     (trace_lits  : Term.literals)
@@ -252,7 +252,7 @@ let build_task_bis
         ilist_to_wterm indices
       ]
     | Var v -> Hashtbl.find timestamps_tbl (Vars.name v)
-    | Diff (_, _) -> (* TODO doesn't seem necessary? *)
+    | Diff _ -> (* TODO doesn't seem necessary? *)
       failwith "diff of timestamps to why3 term not implemented"
     | _ -> assert false
   in
@@ -321,10 +321,11 @@ let build_task_bis
         (Hashtbl.find names_tbl (Symbols.to_string ns.s_symb))
         [ilist_to_wterm ns.s_indices]
 
-    | Diff(c,d) ->
-      t_app_infer
+    | Diff _ ->
+      failwith "diff of timestamps to why3 term not implemented"
+      (* TODO t_app_infer
         (find_fn Symbols.fs_diff)
-        [ilist_to_wterm []; msg_to_wterm c; msg_to_wterm d]
+        [ilist_to_wterm []; msg_to_wterm c; msg_to_wterm d] *)
 
     | Var v -> begin
         try Hashtbl.find messages_tbl (Vars.name v)

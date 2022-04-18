@@ -8,7 +8,7 @@ type body = Term.term
 type[@warning "-37"] op_body =
   | SingleDef of body                      (** same for all systems *)
   
-  | ManyDefs  of (SE.Single.t * body) list (** system by system *)
+  | ManyDefs  of (System.Single.t * body) list (** system by system *)
   (* TODO: unused for now *)
 
 type operator = {
@@ -27,7 +27,7 @@ let pp_op_body fmt body =
   | SingleDef t -> Fmt.pf fmt "%a" Term.pp t
   | ManyDefs  l -> 
     Fmt.pf fmt "@[<v 0>%a@]"
-      (Fmt.list (Fmt.pair ~sep:Fmt.comma SE.Single.pp Term.pp)) l
+      (Fmt.list (Fmt.pair ~sep:Fmt.comma System.Single.pp Term.pp)) l
 
 let pp_operator fmt op =
   let pp_tyvars fmt tyvars =
@@ -56,7 +56,7 @@ let mk ~name ~ty_vars ~args ~out_ty ~body =
 let ftype (op : operator) : Type.ftype = 
   Type.mk_ftype 0 op.ty_vars (List.map Vars.ty op.args) op.out_ty
 
-let get_body (system : SystemExpr.t) (op_body : op_body) : body =
+let get_body (system : 'a SystemExpr.expr) (op_body : op_body) : body =
   match op_body with
     | SingleDef body -> body
     | ManyDefs defs -> assert false (* TODO *)

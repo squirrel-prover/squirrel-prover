@@ -58,8 +58,9 @@ module type S = sig
   val goal : t -> conc_form
   val set_goal : conc_form -> t -> t
 
-  val system : t -> SystemExpr.t
-  val set_system : SystemExpr.t -> t -> t
+  val system : t -> SystemExpr.context
+  val set_system : SystemExpr.context -> t -> t
+    (* TODO double-check all uses now that contexts are used *)
 
   val table : t -> Symbols.table
   val set_table : Symbols.table -> t -> t
@@ -78,6 +79,10 @@ module type S = sig
 
   val query_happens : precise:bool -> t -> Term.term -> bool
 
+  (** Returns trace context, corresponding to [s.env.system.set] for
+      both kinds of sequents. TODO this may not be what is expected
+      for equiv sequents, but it corresponds to the models that are
+      computed in that case *)
   val mk_trace_cntxt : t -> Constr.trace_cntxt
 
   val get_trace_literals : t -> Term.literal list

@@ -82,7 +82,7 @@ val declare : Symbols.table -> lsymb -> proc_ty -> process -> Symbols.table
   * as a set of actions. In that process, name creations are compiled away.
   * Other constructs are grouped into action descriptions. *)
 val declare_system :
-  Symbols.table -> lsymb -> process -> Symbols.table
+  Symbols.table -> lsymb option -> process -> Symbols.table
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling}*)

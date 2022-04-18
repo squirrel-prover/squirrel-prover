@@ -6,20 +6,10 @@ exception Bad_ssc
 class check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)
   inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
   method visit_message t = match t with
-    | Term.Fun ((fn,_), _, [m;r; Term.Name _]) when fn = enc_fn ->
+    | Term.Fun ((fn,_), _, [m;r;k]) when fn = enc_fn && Term.diff_names k ->
       self#visit_message m; self#visit_message r
-
-    | Term.Fun ((fn,_), _, [m; Term.Name _]) when fn = dec_fn ->
+    | Term.Fun ((fn,_), _, [m;k]) when fn = dec_fn && Term.diff_names k ->
       self#visit_message m
-
-    | Term.Fun ((fn,_), _, [m;r; Diff(Term.Name _, Term.Name _)])
-      when fn = enc_fn ->
-      self#visit_message m; self#visit_message r
-
-    | Term.Fun ((fn,_), _, [m;  Diff(Term.Name _, Term.Name _)])
-      when fn = dec_fn ->
-      self#visit_message m
-
     | Term.Name ns when ns.s_symb = key_n -> raise Bad_ssc
     | Term.Var m ->
       let ty = Vars.ty m in
@@ -33,11 +23,11 @@ let symenc_key_ssc ?(messages=[]) ?(elems=[]) ~cntxt enc_fn dec_fn key_n =
   let ssc = new check_symenc_key ~cntxt enc_fn dec_fn key_n in
   List.iter ssc#visit_message messages ;
   List.iter ssc#visit_message elems ;
-  SystemExpr.(iter_descrs cntxt.table cntxt.system
+  SystemExpr.iter_descrs cntxt.table cntxt.system
     (fun action_descr ->
        ssc#visit_message (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
-       List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
+       List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates)
 
 
 (* Iterator to check that the given randoms are only used in random seed
@@ -71,11 +61,11 @@ let random_ssc
   let ssc = new check_rand ~cntxt enc_fn randoms in
   List.iter ssc#visit_message messages;
   List.iter ssc#visit_message elems;
-  SystemExpr.(iter_descrs cntxt.table cntxt.system
+  SystemExpr.iter_descrs cntxt.table cntxt.system
     (fun action_descr ->
        ssc#visit_message (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
-       List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
+       List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates)
 
 
   (* Given cases produced by an Euf.mk_rule for some symmetric encryption

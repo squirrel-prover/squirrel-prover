@@ -176,7 +176,7 @@ module Mk (S : LowSequent.S) = struct
     in
     let state = { 
       table      = S.table s;
-      system     = S.system s; 
+      system     = (S.system s).set; (* TODO quickfix might be abusive *)
       param      = param;
       hint_db    = S.get_hint_db s;
       trace_lits = S.get_trace_literals s;

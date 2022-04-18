@@ -1,13 +1,15 @@
-val is_prefix : [`Strict | `Large] -> Action.shape -> Action.shape -> bool
+(** Declaring and unfolding macros *)
 
 (** {2 Macro definitions} *)
 
-(** Declare a global (timestamp-dependent) macro,
+(** Declare a global macro (whose meaning is the same accross
+    several actions, which is useful to model let-expressions)
     given a term abstracted over input variables, indices,
     and some timestamp.
     A fresh name is generated for the macro if needed. *)
 val declare_global :
   Symbols.table ->
+  System.t ->
   Symbols.lsymb ->
   suffix:[`Large | `Strict] ->
   action:Action.shape ->
@@ -48,7 +50,7 @@ val get_definition_exn :
     since we can always determine whether a macro is defined or not at
     a given action. *)
 val get_definition_nocntxt :
-  SystemExpr.t -> Symbols.table ->
+  SystemExpr.fset -> Symbols.table ->
   Term.msymb -> Symbols.action Symbols.t -> Vars.vars ->
   [ `Def of Term.term | `Undef ]
 
@@ -57,7 +59,7 @@ val get_definition_nocntxt :
     would be obtained with [get_definition m li ts] for some [ts],
     except that it will feature meaningless action names in some places. *)
 val get_dummy_definition :
-  Symbols.table -> SystemExpr.t -> Term.msymb -> Term.term
+  Symbols.table -> SystemExpr.fset -> Term.msymb -> Term.term
 
 (** Given the name [ns] of a macro as well as a function [f] over
    terms, an [old_single_system] and a [new_single_system], takes the
@@ -68,7 +70,7 @@ val update_global_data :
   Symbols.table -> 
   Symbols.macro Symbols.t -> 
   Symbols.macro_def -> 
-  SystemExpr.Single.t ->
-  SystemExpr.Single.t ->
+  System.Single.t ->
+  System.Single.t ->
   (Term.term -> Term.term) -> 
   Symbols.table

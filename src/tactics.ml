@@ -720,9 +720,18 @@ let timeout_get = function
 
 (*------------------------------------------------------------------*)
 let print_system table system =
-  Printer.prt `Result "@.%a@.%a@."
-    (SystemExpr.pp_descrs table) system
-    (if Config.print_trs_equations ()
-     then Completion.print_init_trs
-     else (fun _fmt _ -> ()))
-    table
+  try
+    let system = SystemExpr.to_fset system in
+    Printer.prt `Result "@.%a@.%a@."
+      (SystemExpr.pp_descrs table) system
+      (if Config.print_trs_equations ()
+       then Completion.print_init_trs
+       else (fun _fmt _ -> ()))
+      table
+  with _ ->
+    Printer.prt `Result "@.Cannot print action descriptions for system %a@."
+      SystemExpr.pp system
+
+let print_system table {SystemExpr.set;pair} =
+  print_system table set;
+  match pair with Some e -> print_system table e | None -> ()

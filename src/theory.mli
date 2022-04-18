@@ -240,6 +240,7 @@ type conversion_error_i =
   | PatNotAllowed
   | ExplicitTSInProc 
   | UndefInSystem of SystemExpr.t
+  | MissingSystem
     
 type conversion_error = L.t * conversion_error_i
 
@@ -293,7 +294,9 @@ type conv_env = {
   cntxt : conv_cntxt; 
 }
 
-(** Converts and infer the type. *)
+(** Converts and infers the type.
+    Only the [set] part of the [SystemExpr.context] inside the environment
+    is useful. *)
 val convert : 
   ?ty:Type.ty ->
   ?ty_env:Type.Infer.env -> 
@@ -311,6 +314,9 @@ val convert_ht :
   hterm -> 
   Type.hty * Term.hterm
 
+(** Converts and infers the type.
+    Each part of the [SystemExpr.context] inside the environment
+    is used when converting the corresponding kind of atom. *)
 val convert_global_formula : conv_env -> global_formula -> Equiv.form
 
 (** [find_app_terms t names] returns the sublist of [names] for which there

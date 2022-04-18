@@ -118,6 +118,8 @@ type 'a pat = {
   pat_vars : Sv.t;
   pat_term : 'a;
 }
+(* TODO we should probably indicate wrt which system (context)
+   the pattern should be understood *)
 
 (** Make a pattern out of a formula: all universally quantified variables
     are added to [pat_vars]. *)
@@ -197,7 +199,7 @@ module type S = sig
     t pat -> t pat ->
     Mvar.t option
 
-  (** [try_match t p] tries to match [p] with [t] (at head position).
+  (** [try_match ... t p] tries to match [p] with [t] (at head position).
       If it succeeds, it returns a map [θ] instantiating the variables
       [p.pat_vars] as subterms of [t], and:
 
@@ -209,7 +211,7 @@ module type S = sig
     ?mv:Mvar.t ->
     ?ty_env:Type.Infer.env ->
     Symbols.table ->
-    SystemExpr.t ->
+    SystemExpr.t -> (* TODO generalize into context *)
     t -> 
     t pat ->
     match_res

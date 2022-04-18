@@ -110,7 +110,7 @@ let pp ppf s =
   let open Fmt in
   pf ppf "@[<v 0>" ;
   pf ppf "@[System: %a@]@;"
-    SystemExpr.pp s.env.system;
+    SystemExpr.pp_context s.env.system;
 
   if s.env.ty_vars <> [] then
     pf ppf "@[Type variables: %a@]@;" 
@@ -293,12 +293,14 @@ module Hyps = struct
     * occurring in [f], if [f] happened. *)
   let rec add_macro_defs (s : sequent) f =
     let macro_eqs : (Term.term * Term.term) list ref = ref [] in
-    let cntxt = Constr.{ 
-        table = s.env.table;
-        system = s.env.system;
-        models = None;
-      } in
-        
+    match SystemExpr.to_fset s.env.system.set with
+    | exception _ -> s
+    | system ->
+
+    let cntxt =
+      Constr.make_context ~table:s.env.table ~system
+    in
+
     let iter =
       new iter_macros
         ~cntxt
@@ -435,29 +437,32 @@ let filter_map_hyps func hyps =
     
 (*------------------------------------------------------------------*)
 (** [pi proj s] returns the projection of [s] along [proj].
-  * Global hypotheses can only be kept in the projection if we are
-  * projecting from pair(s,s) to single(s), if we adopt the convention
-  * that global formula hypotheses are for pair(s,s) when the system
-  * is single(s). We'll do better when global formulas have system
-  * annotations. *)
+    Fails if [s.system.set] cannot be projected. *)
 let pi projection s =
   let pi = function
     | `Reach t -> `Reach (Term.pi_term ~projection t)
     | h -> h
   in
   let hyps = filter_map_hyps pi s.hyps in
-  let system = system s in
-  let env = Env.update ~system:(SystemExpr.project projection system) s.env in
-  let s =
-  S.update
-    ~env
-    ~conclusion:(Term.pi_term ~projection s.conclusion)
-    ~hyps:H.empty
-    s 
+  let new_env =
+    let context = s.env.system in
+    let fset = SystemExpr.to_fset context.set in
+    let context =
+      SystemExpr.update
+        ~set:(SystemExpr.(singleton (project projection fset)))
+        context
+    in
+    Env.update ~system:context s.env
   in
-  let keep_global =
-    SystemExpr.project Term.PLeft  system =
-    SystemExpr.project Term.PRight system
+  let pair_annotation_preserved =
+    new_env.system.pair = s.env.system.pair
+  in
+  let s =
+    S.update
+      ~env:new_env
+      ~conclusion:(Term.pi_term ~projection s.conclusion)
+      ~hyps:H.empty
+      s
   in
   (* We add back manually all formulas, to ensure that definitions are
      unrolled. *)
@@ -466,9 +471,11 @@ let pi projection s =
        match f with
          | `Reach f -> snd (Hyps.add_formula id f s)
          | _ ->
-             if not keep_global then s else
+             if not pair_annotation_preserved then s else
              let _,hyps = H.add ~force:true id f s.hyps in
-               S.update ~hyps s)
+             (* TODO we could insert [f] with the old system annotation,
+                which is a stronger hypothesis *)
+             S.update ~hyps s)
     hyps s
 
 let set_goal a s =
@@ -531,7 +538,7 @@ let eq_atoms_valid s =
 let literals_unsat_smt ?(slow=false) s =
   Smt.literals_unsat ~slow
     s.env.table
-    s.env.system
+    (SystemExpr.to_fset s.env.system.set) (* TODO handle failure *)
     (Vars.to_list s.env.vars)
     (get_message_atoms s)
     (get_trace_literals s)
@@ -544,11 +551,13 @@ let literals_unsat_smt ?(slow=false) s =
 
 (*------------------------------------------------------------------*)
 let mk_trace_cntxt s = 
-  Constr.{
-    table  = table s;
-    system = system s;
-    models = Some (get_models s);
-  }
+  try
+    Constr.{
+      table  = table s;
+      system = SystemExpr.to_fset (system s).set;
+      models = Some (get_models s);
+    }
+  with _ -> Tactics.(soft_failure (Failure "underspecified system"))
 
 let get_hint_db s = s.hint_db
 

@@ -26,59 +26,22 @@ type global_data = {
   (** Free timestamp variable of the macro, which can only be instantiated
       by a strict suffix of [action]. *)
 
-  default_body    : Term.term;
-  (** Macro body shared by all systems where the macro makes sense.
-      It may contain diff operators.
-      TODO This design is too imprecise: how do we know where the body
-           makes sense?
-           We may define the macro in a bisystem and use it in a trisystem
-           with the same action shapes! *)
-
-  systems_body    : (SE.Single.t * Term.term) list;
-  (** Optional alternative definitions of the body for a given system.
-      Used by System modifiers. *)
-
+  bodies  : (System.Single.t * Term.term) list;
+  (** Definitions of macro body for single systems where it is defined. *)
 }
 
 type Symbols.data += Global_data of global_data
 
-
-let sproj s t = Term.pi_term ~projection:(SE.get_proj s) t
-
-(** Get body of a global macro for a single system.
-    TODO clarify assumptions on single system & validity checks *)
+(** Get body of a global macro for a single system. *)
 let get_single_body single_system data =
-  let body =
-    try
-      List.assoc single_system data.systems_body
-    with Not_found -> data.default_body
-  in
-  sproj single_system body
+  List.assoc single_system data.bodies
 
-(** Get body of a global macro for a system expression.
-    TODO clarify assumptions on system & validity checks *)
+(** Get body of a global macro for a system expression. *)
 let get_body system data : Term.term =
-  let get_pair_body s1 s2 =
-    match List.assoc s1 data.systems_body with
-    | b1 ->
-      let b1 = sproj s1 b1 in
-      begin
-        match List.assoc s2 data.systems_body with
-        | b2 -> Term.mk_diff b1 (sproj s2 b2)
-        | exception Not_found -> Term.mk_diff b1 (sproj s2 data.default_body)
-        end
-    | exception Not_found -> begin
-        match List.assoc s2 data.systems_body with
-        | b2 -> Term.mk_diff (sproj s1 data.default_body) (sproj s2 b2)
-        | exception Not_found ->
-          let t1, t2 = sproj s1 data.default_body, sproj s2 data.default_body in
-          if t1 = t2 then t1 else Term.mk_diff t1 t2
-        end
-  in
-  match SE.to_list system with
-  | [s] -> get_single_body s data
-  | [s1;s2] -> get_pair_body s1 s2
-  | _ -> assert false (* FIXME: user-level exception? *)
+  Term.combine
+    (List.map
+       (fun (lbl,single_system) -> lbl, get_single_body single_system data)
+       (SE.to_list system))
 
 (** Given the name [ns] of a macro as well as a function [f] over
     terms, an [old_single_system] and a [new_single_system], takes the
@@ -89,15 +52,15 @@ let update_global_data
     (table : Symbols.table)
     (ns : Symbols.macro Symbols.t)
     (dec_def : Symbols.macro_def)
-    (old_single_system : SystemExpr.Single.t)
-    (new_single_system :  SystemExpr.Single.t)
+    (old_system : System.Single.t)
+    (new_system :  System.Single.t)
     (f : Term.term -> Term.term) =
   match Symbols.Macro.get_data ns table with
   | Global_data data ->
-    let body = get_single_body old_single_system data in
+    assert (not (List.mem_assoc new_system data.bodies));
+    let body = get_single_body old_system data in
     let data =
-      Global_data { data with systems_body = (new_single_system, f body) ::
-                                             data.systems_body }
+      Global_data { data with bodies = (new_system, f body) :: data.bodies }
     in
     Symbols.Macro.redefine table ~data ns dec_def
   | _ -> table
@@ -105,15 +68,23 @@ let update_global_data
 let is_tuni = function Type.TUnivar _ -> true | _ -> false
 
 (** Exported *)
-let declare_global table name ~suffix ~action ~inputs ~indices ~ts body ty =
+let declare_global
+      table system macro ~suffix ~action ~inputs ~indices ~ts body ty =
   assert (not (is_tuni ty));
+  let bodies =
+    List.map
+      (fun projection ->
+         System.Single.make table system projection,
+         Term.pi_term ~projection body)
+      (System.projections table system)
+  in
   let data =
     Global_data
       {action = (suffix, action);
-       inputs; indices; ts; default_body = body; systems_body = []}
+       inputs; indices; ts; bodies}
   in
   let def = Symbols.Global (List.length indices, ty) in
-  Symbols.Macro.declare table name ~data def
+  Symbols.Macro.declare table macro ~data def
 
 (*------------------------------------------------------------------*)
 (** {2 Macro expansions} *)
@@ -163,7 +134,7 @@ type def_result = [ `Def of Term.term | `Undef | `MaybeDef ]
     - and for the full action, which may be dummy (we use [a] instead). *)
 let get_def_glob
    ~(allow_dummy : bool)
-    (system : SE.t)
+    (system : SE.fset)
     (table  : Symbols.table)
     (symb   : Term.msymb)
     (a      : Term.term)
@@ -210,7 +181,7 @@ let get_def_glob
 (** Exported *)
 
 let get_definition_nocntxt
-    (system : SE.t)
+    (system : SE.fset)
     (table  : Symbols.table)
     (symb   : Term.msymb)
     (asymb  : Symbols.action Symbols.t)
@@ -309,22 +280,25 @@ let get_definition
     (ts    : Term.term)
   : def_result
   =
-  (* Try to find an action equal to [ts] in [cntxt]. *)
-  let ts_action =
-    if is_defined symb.s_symb ts cntxt.table
-    then ts
-    else
-      omap_dflt ts (fun models ->
-          odflt ts (Constr.find_eq_action models ts)
-        ) cntxt.models
-  in
-  match ts_action with
-  | Term.Action (asymb, idx) -> begin
-      match get_definition_nocntxt cntxt.system cntxt.table symb asymb idx with
-      | `Undef    -> `Undef
-      | `Def mdef -> `Def (Term.subst [Term.ESubst (ts_action, ts)] mdef)
-    end
-  | _ -> `MaybeDef
+  match SE.to_fset cntxt.system with
+  | exception SE.(Error Expected_fset) -> `MaybeDef
+  | system ->
+    (* Try to find an action equal to [ts] in [cntxt]. *)
+    let ts_action =
+      if is_defined symb.s_symb ts cntxt.table
+      then ts
+      else
+        omap_dflt ts (fun models ->
+            odflt ts (Constr.find_eq_action models ts)
+          ) cntxt.models
+    in
+    match ts_action with
+    | Term.Action (asymb, idx) -> begin
+        match get_definition_nocntxt system cntxt.table symb asymb idx with
+        | `Undef    -> `Undef
+        | `Def mdef -> `Def (Term.subst [Term.ESubst (ts_action, ts)] mdef)
+      end
+    | _ -> `MaybeDef
 
 let get_definition_exn
     (cntxt : Constr.trace_cntxt)
@@ -345,7 +319,7 @@ let get_definition_exn
 (** Exported *)
 let get_dummy_definition
     (table  : Symbols.table)
-    (system : SE.t)
+    (system : SE.fset)
     (symb   : Term.msymb)
   : Term.term
   =

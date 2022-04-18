@@ -20,7 +20,8 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
 
     | Name _ | Var _ -> ()
 
-    | Diff(a, b) -> self#visit_message a; self#visit_message b
+    | Diff (Explicit l) ->
+      List.iter (fun (_,tm) -> self#visit_message tm) l
 
     | Seq (a, b) ->
       let _, s = Term.refresh_vars `Global a in
@@ -60,7 +61,8 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
 
     | Name _ | Var _ -> x
 
-    | Diff (a, b) -> self#fold_message (self#fold_message x a) b
+    | Diff (Explicit l) ->
+      List.fold_left (fun x (_,tm) -> self#fold_message x tm) x l
 
     | Seq (a, b) ->
       let _, s = Term.refresh_vars `Global a in
@@ -297,19 +299,19 @@ let get_f
 
       head_occ @ rec_occs
 
-    | Term.Diff (Term.Fun _, Term. Fun _) when allow_diff ->
+    | Term.Diff (Explicit l) when allow_diff ->
       let head_occ =
-        if (match Term.pi_term ~projection:PLeft t, Term.pi_term ~projection:PRight t with
-            | (Fun (fl,_,ll),Fun (fr,_,lr))
-              when (matching table fl symtype
-                    && matching table fr symtype ) -> true
-            | _ -> false )
+        if List.for_all
+             (function
+                | (_, Term.Fun (f,_,_)) -> matching table f symtype
+                | _ -> false)
+             l
         then [{ occ_cnt  = t;
                 occ_vars = fv;
                 occ_cond = cond; }]
         else []
       in
-      head_occ @ (occs ())
+      head_occ @ occs ()
 
     | _ -> occs ()
   in
@@ -353,7 +355,7 @@ let get_diff ~(cntxt : Constr.trace_cntxt) (t : Term.term) : diff_occs =
         ) ~fv ~cond t []
     in
     match t with
-    | Term.Diff (s1, s2) ->
+    | Term.Diff _ ->
       [{ occ_cnt  = t;
          occ_vars = fv;
          occ_cond = cond; }]
@@ -533,7 +535,7 @@ let fold_descr
        'a ->                      (* folding argument *)
        'a)
     (table  : Symbols.table)
-    (system : SystemExpr.t)
+    (system : SystemExpr.fset)
     (descr  : Action.descr)
     (init   : 'a) : 'a
   =
@@ -607,7 +609,7 @@ module Mset : sig[@warning "-32"]
 
   (** [mset_incl tbl system s1 s2] check if all terms in [s1] are
       members of [s2]. *)
-  val incl : Symbols.table -> SystemExpr.t -> t -> t -> bool
+  val incl : Symbols.table -> SystemExpr.fset -> t -> t -> bool
 
   (** simpl mset builder, when the macro symbol is not indexed. *)
   val mk_simple : Symbols.macro Symbols.t -> Type.ty -> t
@@ -716,7 +718,7 @@ end = struct
     let join_ms = Term.mk_isymb a_ms.s_symb a_ms.s_typ join_is in
     mk ~env:Sv.empty ~msymb:join_ms ~indices:(!indices_r)
 
-  let incl table system (s1 : t) (s2 : t) : bool =
+  let incl table (system:SystemExpr.fset) (s1 : t) (s2 : t) : bool =
     let tv = Vars.make_new Type.Timestamp "t" in
     let term1 = Term.mk_macro s1.msymb [] (Term.mk_var tv) in
     let term2 = Term.mk_macro s2.msymb [] (Term.mk_var tv) in
@@ -726,7 +728,7 @@ end = struct
               pat_tyvars = [];
               pat_vars = Sv.of_list1 s2.indices;}
     in
-    match Match.T.try_match table system term1 pat2 with
+    match Match.T.try_match table (system:>SystemExpr.t) term1 pat2 with
     | Match _ -> true
     | FreeTyv | NoMatch _ -> false
 
@@ -747,11 +749,11 @@ module MsetAbs : sig[@warning "-32"]
   (** Join operator. *)
   val join : t -> t -> t
 
-  (** [incl abs1 abs2] checks if [abs1 ⊆ abs2]. *)
-  val incl : Symbols.table -> SystemExpr.t -> t -> t -> bool
+  (** [incl ... abs1 abs2] checks if [abs1 ⊆ abs2]. *)
+  val incl : Symbols.table -> SystemExpr.fset -> t -> t -> bool
 
-  (** [diff abs1 abs2] over-approximates [abs1 \ abs2]. *)
-  val diff : Symbols.table -> SystemExpr.t -> t -> t -> t
+  (** [diff ... abs1 abs2] over-approximates [abs1 \ abs2]. *)
+  val diff : Symbols.table -> SystemExpr.fset -> t -> t -> t
 end = struct
   type t = (Term.mname * Mset.t) list
 
@@ -772,7 +774,7 @@ end = struct
 
   let incl
       (table  : Symbols.table)
-      (system : SystemExpr.t)
+      (system : SystemExpr.fset)
       (abs1   : t)
       (abs2   : t) : bool
     =
@@ -785,7 +787,7 @@ end = struct
 
   let diff
       (table  : Symbols.table)
-      (system : SystemExpr.t)
+      (system : SystemExpr.fset)
       (abs1   : t)
       (abs2   : t) : t
     =

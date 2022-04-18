@@ -178,6 +178,10 @@ type descr = {
   globals   : Symbols.macro Symbols.t list;
 }
 
+(* Minimal validation function. Could be improved to check for free
+   variables, valid diff operators, etc. *)
+let valid_descr d =
+  d.indices = get_indices d.action
 
 (** Apply a substitution to an action description.
   * The domain of the substitution must contain all indices
@@ -261,6 +265,58 @@ let pi_descr s d =
     updates = List.map (fun (st, m) -> st, pi_term m) d.updates;
     output = (let c,m = d.output in c, pi_term m) }
 
+let strongly_compatible_descr d1 d2 =
+  d1.name    = d2.name &&
+  d1.action  = d2.action &&
+  d1.input   = d2.input &&
+  d1.indices = d2.indices &&
+  fst d1.condition = fst d2.condition &&
+  List.map fst d1.updates = List.map fst d2.updates &&
+  fst d1.output = fst d2.output
+
+let combine_descrs (descrs : (Term.projection * descr) list) : descr =
+
+  let (p1,d1),rest =
+    match descrs with
+      | hd::tl -> hd,tl
+      | [] -> raise (Invalid_argument "combine_descrs")
+  in
+  (* Rename indices of descriptions in [rest] to agree with [d1]. *)
+  let rest =
+    List.map
+      (fun (proj,d2) ->
+         let subst =
+           List.map2
+             (fun i j -> Term.ESubst (Term.mk_var i, Term.mk_var j))
+             d2.indices d1.indices
+         in
+         proj, subst_descr subst d2)
+      rest
+  in
+  let descrs = (p1,d1)::rest in
+
+  assert (List.for_all (fun (_,d2) -> strongly_compatible_descr d1 d2) rest);
+
+  let map f = List.map (fun (lbl,descr) -> (lbl, f descr)) descrs in
+
+  { name    = d1.name;
+    action  = d1.action;
+    input   = d1.input;
+    indices = d1.indices;
+    condition =
+      fst d1.condition,
+      Term.combine (map (fun descr -> snd descr.condition));
+    updates =
+      List.map
+        (fun (st,_) ->
+           st, Term.combine (map (fun descr -> List.assoc st descr.updates)))
+        d1.updates;
+    output =
+      fst d1.output, Term.combine (map (fun descr -> snd descr.output));
+    globals =
+      List.sort_uniq Stdlib.compare
+        (List.concat (List.map (fun (_,d) -> d.globals) descrs)) }
+
 (*------------------------------------------------------------------*)
 let debug = false
 
@@ -292,7 +348,16 @@ let rec dummy (shape : shape) : action =
     :: dummy l
 
 (*------------------------------------------------------------------*)
-(** {2 FA-DUP } *)
+(** {2 Shapes} *)
+
+module Shape = struct
+  type t = shape
+  let pp = pp_shape
+  let compare (u : t) (v : t) = Stdlib.compare u v
+end
+
+(*------------------------------------------------------------------*)
+(** {2 FA-DUP} *)
 
 let is_dup_match
     (is_match : Term.term -> Term.term -> 'a -> 'a option)

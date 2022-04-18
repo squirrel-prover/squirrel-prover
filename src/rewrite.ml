@@ -138,12 +138,13 @@ type rw_rule =
 (*------------------------------------------------------------------*)
 let rewrite
     (table  : Symbols.table)
-    (system : SE.t)
+    (system : SE.context)
     (env    : Vars.env)
     (mult   : Args.rw_count)
     (rule   : rw_erule)
     (target : Equiv.any_form) : rw_res
   =
+  let system = system.set in (* TODO fixme *)
   let exception Failed of [`NothingToRewrite | `MaxNestedRewriting] in
 
   let check_max_rewriting : unit -> unit =

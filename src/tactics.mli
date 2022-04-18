@@ -203,4 +203,4 @@ val timeout_get : 'a Utils.timeout_r -> 'a
 val hard_failure : ?loc:Location.t -> tac_error_i -> 'a
 
 (** Print the system to the user. *)
-val print_system : Symbols.table -> SystemExpr.t -> unit
+val print_system : Symbols.table -> SystemExpr.context -> unit

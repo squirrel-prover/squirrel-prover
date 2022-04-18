@@ -269,7 +269,10 @@ let rec cterm_of_term : Term.term -> cterm = fun c ->
 
   | Var m  -> ccst (Cst.Cmvar m)
 
-  | Diff(c,d) -> cfun (F Symbols.fs_diff) 0 [cterm_of_term c; cterm_of_term d]
+  | Diff (Explicit l) ->
+      let l = List.sort (fun (l1,_) (l2,_) -> Stdlib.compare l1 l2) l in
+      let l = List.map (fun (_,tm) -> cterm_of_term tm) l in
+      cfun (F Symbols.fs_diff) 0 l
 
   (* default case *)
   | t -> ccst (Cst.Cboxed t)

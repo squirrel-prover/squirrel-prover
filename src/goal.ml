@@ -7,8 +7,6 @@ module ES = LowEquivSequent
 
 module SE = SystemExpr
 
-type lsymb = Theory.lsymb
-
 (*------------------------------------------------------------------*)
 (** {2 Goals} *)
 
@@ -45,7 +43,7 @@ let bind ft fe = function
 type ('a,'b) abstract_statement = {
   name    : 'a;
   ty_vars : Type.tvars;
-  system  : SystemExpr.t;
+  system  : SE.context;
   formula : 'b;
 }
 
@@ -86,7 +84,7 @@ module Parsed = struct
     name    : Theory.lsymb option;
     ty_vars : Theory.lsymb list;
     vars    : Theory.bnds;
-    system  : SystemExpr.p_system_expr;
+    system  : SE.parsed_t; (** may be parsed as SE.t or SE.pair *)
     formula : contents
   }
 
@@ -97,7 +95,6 @@ end
 
 
 let make_obs_equiv ?(enrich=[]) table hint_db name system =
-  let system = (system :> SE.t) in (* TODO avoid loosing precision *)
   let vars,ts = Vars.make `Approx Vars.empty_env Type.Timestamp "t" in
   let term = Term.mk_macro Term.frame_macro [] (Term.mk_var ts) in
   let goal = Equiv.(Atom (Equiv (term :: enrich))) in
@@ -105,41 +102,49 @@ let make_obs_equiv ?(enrich=[]) table hint_db name system =
   let hyp = Equiv.(Atom (Reach happens)) in
   let env = Env.init ~system ~table ~vars () in
   let s = ES.init ~env ~hint_db ~hyp goal in
-  `Equiv
-    (Equiv.mk_forall [ts] (Equiv.(Impl (hyp,goal)))),
-          Equiv s
+  let formula =
+    `Equiv
+      (Equiv.mk_forall [ts] (Equiv.(Impl (hyp,goal))))
+  in
+  {name;ty_vars=[];system;formula}, Equiv s
 
 
 let make table hint_db parsed_goal : statement * t =
 
-  let {Parsed.name; system; ty_vars; vars; formula} = parsed_goal in
+  let Parsed.{name;system;ty_vars;vars;formula} = parsed_goal in
 
   let name = match name with
     | Some n -> L.unloc n
     | None -> assert false
   in
 
-  let system = SE.parse_se table system in
+  let system =
+    match formula with
+      | Local _ ->
+          let system = SE.parse table system in
+          SE.{set=system;pair=None}
+      | _ ->
+          let set = SE.parse table system in
+          let pair = Some (SE.to_pair set) in
+          SE.{set;pair}
+  in
   let ty_vars = List.map (fun ls -> Type.mk_tvar (L.unloc ls)) ty_vars in
   let env = Env.init ~system ~ty_vars ~table () in
 
   let env,vs = Theory.convert_p_bnds env vars in
 
   let conv_env = Theory.{ env; cntxt = InGoal } in
-  let formula,goal =
-    match formula with
-      | Local f ->
-          let f, _ = Theory.convert conv_env ~ty:Type.Boolean f in
-          let s = TS.init ~env ~hint_db f in
-          `Reach (Term.mk_forall vs f), Trace s
-      | Global f ->
-          let f = Theory.convert_global_formula conv_env f in
-          let s = ES.init ~env ~hint_db f in
-          `Equiv (Equiv.mk_forall vs f), Equiv s
-      | Obs_equiv ->
+  match formula with
+    | Local f ->
+        let f,_ = Theory.convert conv_env ~ty:Type.Boolean f in
+        let s = TS.init ~env ~hint_db f in
+        let formula = `Reach (Term.mk_forall vs f) in
+        {name;ty_vars;system;formula}, Trace s
+    | Global f ->
+        let f = Theory.convert_global_formula conv_env f in
+        let s = ES.init ~env ~hint_db f in
+        let formula = `Equiv (Equiv.mk_forall vs f) in
+        {name;ty_vars;system;formula}, Equiv s
+    | Obs_equiv ->
         assert (vs = [] && ty_vars = []) ;
         make_obs_equiv table hint_db name system
-  in
-
-  { name; system; ty_vars; formula },
-  goal

@@ -530,7 +530,7 @@ let parse_proc (system_name : System.t) init_table proc =
     in
 
     let table, new_a, action_descr =
-      System.register_action table system_name a' indices action action_descr
+      System.register_action table system_name action_descr
     in
 
     let table =
@@ -669,7 +669,7 @@ let parse_proc (system_name : System.t) init_table proc =
     let shape = Action.get_shape (List.rev penv.action) in
     let table,x' =
       let suffix = if in_update then `Large else `Strict in
-      Macros.declare_global penv.env.table x
+      Macros.declare_global penv.env.table system_name x
         ~suffix
         ~action:shape ~inputs:invars
         ~indices:(List.rev penv.indices) ~ts body ty
@@ -1001,7 +1001,7 @@ let parse_proc (system_name : System.t) init_table proc =
 
   (proc, table)
 
-let declare_system table (system_name : lsymb) proc =
+let declare_system table system_name proc =
   Printer.pr
     "@[<v 2>System before processing:@;@;@[%a@]@]@.@."
     pp_process proc ;
@@ -1009,7 +1009,12 @@ let declare_system table (system_name : lsymb) proc =
   let env = Env.init ~table () in
   check_proc env proc ;
 
-  let table, system_name = System.declare_empty table system_name in
+  let projections = ["left";"right"] in (* TODO *)
+  let system_name = match system_name with
+    | Some lsymb -> lsymb
+    | None -> L.mk_loc Location._dummy "default"
+  in
+  let table,system_name = System.declare_empty table system_name projections in
 
   (* before parsing the system, we register the init action,
   using for the updates the initial values declared when declaring
@@ -1027,7 +1032,7 @@ let declare_system table (system_name : lsymb) proc =
       globals   = []; }
   in
   let table, _, _ =
-    System.register_action table system_name a' [] [] action_descr
+    System.register_action table system_name action_descr
   in
 
   let proc,table = parse_proc system_name table proc in

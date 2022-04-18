@@ -615,7 +615,7 @@ let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool =
     }
   in
 
-  match Match.T.try_match table system (mk_dum a1 is1 cond1) pat2 with
+  match Match.T.try_match table (system:>SE.t) (mk_dum a1 is1 cond1) pat2 with
   | Match.FreeTyv | Match.NoMatch _ -> false
   | Match.Match _ -> true
 
@@ -1287,16 +1287,12 @@ let tac_autosimpl s = tac_auto ~close:false ~strong:(Config.auto_intro ()) s
   * to distinct goals for each projected system. *)
 
 let project s =
-  let system = TS.system s in
-  match SE.to_list system with
+  match SE.to_list (SE.to_fset (TS.system s).set) with
   | [_] ->
     soft_failure (Tactics.Failure "goal already deals with a \
                                            single process")
-  | [_;_] ->
-    [TS.pi PLeft s;
-     TS.pi PRight s]
-
-  | _ -> assert false (* TODO implement this *)
+  | l ->
+    List.map (fun (lbl,_) -> TS.pi lbl s) l
 
 let () =
   T.register "project"
@@ -1453,7 +1449,7 @@ let euf_apply_schema sequent (_, key, m, s, _, _, _, _) case =
       key.s_indices case.key_indices
   in
 
-  let system = TS.system sequent in
+  let system = SE.to_fset (TS.system sequent).set in
   let table  = TS.table sequent in
 
   (* Now, we need to add the timestamp constraints. *)
@@ -1712,13 +1708,12 @@ let non_malleability arg (s : TS.t) =
   (try
      (* Remark: if we start considering C[dec(m,sk)], we will need to also
         check the SSC for C. *)
-     SystemExpr.(iter_descrs cntxt.table cntxt.system
-                   (fun action_descr ->
-                      ssc#visit_message (snd action_descr.output) ;
-                      List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
-   with Name_not_hidden -> soft_failure
-                             Tactics.NameNotUnderEnc
-  );
+     SystemExpr.iter_descrs
+       cntxt.table cntxt.system
+       (fun action_descr ->
+          ssc#visit_message (snd action_descr.output) ;
+          List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates)
+  with Name_not_hidden -> soft_failure Tactics.NameNotUnderEnc);
   let neq_goals = match mess1, opt_m with
     | Term.Name name, None -> [] (* we have nothing to do, a name will always be
                                     not equal to another fres name *)
@@ -1903,7 +1898,11 @@ let rewrite_equiv_transform
   in
   aux term
 
-let rewrite_equiv (ass_sys, ass) (s : TS.t) : TS.t list =
+(* Rewrite equiv rule on sequent [s] with direction [dir],
+   using assumption [ass] wrt system [ass_sys]. *)
+let rewrite_equiv (ass_sys,ass,dir) (s : TS.t) : TS.t list =
+
+  (* Decompose [ass] as [subgoal_1 => .. => subgoal_N => equiv(biframe)]. *)
   let subgoals, biframe =
     let rec aux = function
       | Equiv.(Atom (Equiv bf)) -> [],bf
@@ -1911,42 +1910,26 @@ let rewrite_equiv (ass_sys, ass) (s : TS.t) : TS.t list =
       | _ -> Tactics.(soft_failure (Failure "invalid assumption"))
     in aux ass
   in
+  (* TODO subgoal sequents should be wrt ass_sys *)
   let subgoals = List.map (fun f -> TS.set_goal f s) subgoals in
 
-  let cur_sys = TS.system s in
-
   (* Identify which projection of the assumption's conclusion
-   * corresponds to the current goal (projection [src]) and
-   * what will be the new system after the transformation. *)
-  let src, new_sys =
-    if List.length (SE.to_list cur_sys) = 1 then
-      if SystemExpr.project Term.PLeft ass_sys = cur_sys then
-        PLeft,
-        SystemExpr.project Term.PRight ass_sys
-      else if SystemExpr.project Term.PRight ass_sys = cur_sys then
-        PRight,
-        SystemExpr.project Term.PLeft ass_sys
-      else
-        Tactics.(soft_failure NoAssumpSystem)
-    else begin
-      (* Support only a useful particular case for now.
-       * This could be generalized, e.g. to use an equivalence
-       * that is not between the current system and itself.
-       * I'm leaving this for when we have system annotations
-       * in global meta formulas, and perhaps more general system
-       * expressions. *)
-
-      if cur_sys <> ass_sys then
-        Tactics.(soft_failure NoAssumpSystem);
-
-      if SE.project Term.PLeft cur_sys <> SE.project Term.PRight cur_sys then
-        Tactics.(soft_failure NoAssumpSystem);
-
-      (* TODO the user might want the reverse direction *)
-      PLeft, cur_sys
-    end
+     corresponds to the current goal and new goal (projections [src,dst])
+     and the expected systems before and after the transformation. *)
+  let src,dst,orig_sys,new_sys =
+    (* TODO we should be looking at the pair component of some context *)
+    match dir, SE.to_list ass_sys with
+      | `LeftToRight, [left,lsys;right,rsys] -> left,right,lsys,rsys
+      | `RightToLeft, [left,lsys;right,rsys] -> right,left,rsys,lsys
+      | _ -> assert false
   in
-  let dst = if src = PLeft then PRight else PLeft in
+
+  (* Check that rewrite equiv applies to sequent [s]. *)
+  begin match SE.to_list (SE.to_fset (TS.system s).set) with
+    | [_,sys] when sys = orig_sys -> ()
+    | _ -> Tactics.(soft_failure NoAssumpSystem)
+  end;
+
   let warn_unsupported t =
     Printer.prt `Warning
       "Cannot transform %a: it will be dropped.@." Term.pp t
@@ -1962,7 +1945,7 @@ let rewrite_equiv (ass_sys, ass) (s : TS.t) : TS.t list =
 
   let goal =
     TS.LocalHyps.map rewrite s
-    |> TS.set_system new_sys
+    |> TS.set_system (SE.update ~set:(SE.singleton new_sys) (TS.system s))
     |> TS.set_goal
       (try rewrite_equiv_transform ~src ~dst ~s biframe (TS.goal s) with
        | Invalid -> warn_unsupported (TS.goal s); Term.mk_false)

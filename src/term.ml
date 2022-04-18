@@ -70,6 +70,11 @@ let pp_msymb ppf (ms : msymb) =
 type ord    = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
 type ord_eq = [ `Eq | `Neq ]
 
+type projection = string
+
+type 'a diff_args =
+  | Explicit of (projection*'a) list
+
 type term =
   | Fun    of fsymb * Type.ftype * term list
   | Name   of nsymb
@@ -80,7 +85,7 @@ type term =
 
   | Var    of Vars.var
 
-  | Diff of term * term
+  | Diff of term diff_args
 
   | Find of Vars.var list * term * term * term 
 
@@ -108,7 +113,7 @@ let rec hash : term -> int = function
     let h = hcombine_list Vars.hash (hash b) vars in
     hcombine 3 h
 
-  | Diff (bl, br) -> hcombine 5 (hash_l [bl; br] 3)
+  | Diff (Explicit l) -> hcombine 5 (hash_l (List.map snd l) 3)
 
   | Find (b, c, d, e) ->
     let h = hcombine_list Vars.hash 6 b in
@@ -225,7 +230,11 @@ let mk_name n = Name n
 
 let mk_macro ms l t = Macro (ms, l, t)
 
-let mk_diff (a : term) (b : term) : term = Diff (a,b)
+let mk_diff l =
+  assert
+    (let projs = List.map fst l in
+     List.sort Stdlib.compare projs = List.sort_uniq Stdlib.compare projs);
+  Diff (Explicit l)
 
 let mk_find is c t e = Find (is, c, t, e)
 
@@ -400,7 +409,7 @@ let ty ?ty_env (t : term) : Type.ty =
     | Seq _                -> Type.Message
     | Var v                -> Vars.ty v
     | Action _             -> Type.Timestamp
-    | Diff (a, b)          -> ty a
+    | Diff (Explicit l)    -> ty (snd (List.hd l))
     | Find (a, b, c, d)    -> ty c
     | ForAll _             -> Type.Boolean
     | Exists _             -> Type.Boolean
@@ -788,10 +797,11 @@ and _pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
   | Action (symb,indices) ->
     Printer.kw `GoalAction ppf "%s%a" (Symbols.to_string symb) pp_indices indices
 
-  | Diff (bl, br) ->
-    Fmt.pf ppf "@[<hv 2>diff(@,%a,@,%a)@]"
-      (pp (diff_fixity, `NonAssoc)) bl
-      (pp (diff_fixity, `NonAssoc)) br
+  | Diff (Explicit l) ->
+    Fmt.pf ppf "@[<hv 2>diff(@,%a)@]"
+      (Fmt.list ~sep:(fun fmt () -> Format.fprintf fmt ",")
+         (pp (diff_fixity, `NonAssoc)))
+      (List.map snd l) (* TODO labels *)
 
   | Find (b, c, d, Fun (f,_,[])) when f = f_zero ->
     let pp fmt () =
@@ -1037,7 +1047,7 @@ let fv (term : term) : Sv.t =
 
     | Name s -> Sv.of_list s.s_indices
 
-    | Diff (a, b) -> fvs [a;b]
+    | Diff (Explicit l) -> fvs (List.map snd l)
 
     | Find (a, b, c, d) ->
       Sv.union
@@ -1108,8 +1118,11 @@ let rec subst (s : subst) (t : term) : term =
         Macro (subst_macro s m, List.map (subst s) l, subst s ts)
 
       | Var m -> Var m
+
       | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
-      | Diff (a, b) -> Diff (subst s a, subst s b)
+
+      | Diff (Explicit l) ->
+        Diff (Explicit (List.map (fun (lbl,tm) -> lbl, subst s tm) l))
 
       | Seq ([], f) -> Seq ([], subst s f)
 
@@ -1195,13 +1208,15 @@ let subst_macros_ts table l ts t =
       | _ -> Macro(is, terms', ts')
       end
 
+    | Diff (Explicit l) ->
+      Diff (Explicit (List.map (fun (lbl,tm) -> lbl, subst_term tm) l))
+
     | Fun (f,fty,terms)  -> Fun    (f, fty, List.map subst_term terms)
     | Seq (a, b)         -> Seq    (a, subst_term b)
-    | Diff (a, b)        -> Diff   (subst_term a, subst_term b)
     | Find (vs, b, t, e) -> Find   (vs, subst_term b, subst_term t, subst_term e)
     | ForAll (vs, b)     -> ForAll (vs, subst_term b)
     | Exists (vs, b)     -> Exists (vs, subst_term b)
-    | _ -> t
+    | Name _ | Action _ | Var _ -> t
   in
 
   subst_term t
@@ -1240,7 +1255,7 @@ let refresh_vars_env env vs =
 (*------------------------------------------------------------------*)
 
 (** Does not recurse.
-    Applies to arguments of index atoms (see atom_map). *)
+    Applies to arguments of index atoms (see atom_map). TODO update doc? *)
 let tmap (func : term -> term) (t : term) : term =
   match t with
   | Action _ -> t
@@ -1251,10 +1266,8 @@ let tmap (func : term -> term) (t : term) : term =
   | Macro (m, l, ts)  -> Macro (m, List.map func l, func ts)
   | Seq (vs, b)       -> Seq (vs, func b)
 
-  | Diff (bl, br)     ->
-    let bl = func bl in
-    let br = func br in
-    Diff (bl, br)
+  | Diff (Explicit l) ->
+    Diff (Explicit (List.map (fun (lbl,tm) -> lbl, func tm) l))
 
   | Find (b, c, d, e) ->
     let c = func c
@@ -1542,13 +1555,6 @@ let is_pure_timestamp (t : term) =
 (*------------------------------------------------------------------*)
 (** {2 Projection} *)
 
-type projection = PLeft | PRight | PNone
-
-let pp_projection fmt = function
-  | PLeft  -> Fmt.pf fmt "Left"
-  | PRight -> Fmt.pf fmt "Right"
-  | PNone  -> Fmt.pf fmt "None"
-
 let pi_term ~projection term =
 
   let rec pi_term (s : projection) (t : term) : term = 
@@ -1559,37 +1565,31 @@ let pi_term ~projection term =
     | Seq (a, b) -> Seq (a, pi_term s b)
     | Action (a, b) -> Action (a, b)
     | Var a -> Var a
-    | Diff (a, b) ->
-      begin
-        match s with
-        | PLeft -> pi_term s a
-        | PRight -> pi_term s b
-        | PNone -> Diff (a, b)
-      end
+    | Diff (Explicit l) -> pi_term s (List.assoc s l)
     | Find (vs, b, t, e) -> Find (vs, pi_term s b, pi_term s t, pi_term s e)
     | ForAll (vs, b) -> ForAll (vs, pi_term s b)
     | Exists (vs, b) -> Exists (vs, pi_term s b)
   in
+
   pi_term projection term
 
-(* Go through a term and removes all diff occurences according to the projection. *)
+(* Go through a term and remove all diff occurrences according to the projection. *)
 let rec head_pi_term (s : projection) (t : term) : term =
-  match t,s with
-  | Diff (t,_), PLeft
-  | Diff (_,t), PRight -> head_pi_term s t
+  match t with
+  | Diff (Explicit l) -> head_pi_term s (List.assoc s l)
   | _ -> t
 
-let diff a b =
-  let a = match a with Diff (a,_) | a -> a in
+let diff a b = Diff (Explicit ["left",a;"right",b])
+  (* TODO let a = match a with Diff (a,_) | a -> a in
   let b = match b with Diff (_,b) | b -> b in
-  if a = b then a else Diff (a,b)
+  if a = b then a else Diff (a,b) *)
 
 let rec make_normal_biterm (dorec : bool) (t : term) : term = 
   let mdiff : term -> term -> term = fun t t' ->
     if dorec then make_normal_biterm dorec (diff t t')
     else diff t t'
   in
-  match head_pi_term PLeft t, head_pi_term PRight t with
+  match head_pi_term "left" t, head_pi_term "right" t with
   | Fun (f,fty,l), Fun (f',fty',l') when f = f' ->
     Fun (f, fty, List.map2 mdiff l l')
 
@@ -1608,16 +1608,26 @@ let rec make_normal_biterm (dorec : bool) (t : term) : term =
   | ForAll (vs,f), ForAll (vs',f') when vs=vs' -> ForAll (vs, mdiff f f')
   | Exists (vs,f), Exists (vs',f') when vs=vs' -> Exists (vs, mdiff f f')
 
-  | t1    ,t2      -> diff t1 t2
+  | t1,t2 -> diff t1 t2
+
+let combine = function
+  | [_,t] -> t
+  | ["left",l;"right",r] -> make_normal_biterm true (diff l r)
+  | _ -> assert false
 
 let head_normal_biterm : term -> term = fun t ->
   make_normal_biterm false t
 
 let make_bi_term  : term -> term -> term = fun t1 t2 ->
-  head_normal_biterm (Diff (t1, t2))
+  head_normal_biterm (Diff (Explicit ["left",t1;"right",t2]))
 
 let simple_bi_term : term -> term = fun t ->
   make_normal_biterm true t
+
+let rec diff_names = function
+  | Name _ -> true
+  | Diff (Explicit l) -> List.for_all (fun (_,tm) -> diff_names tm) l
+  | _ -> false
 
 (*------------------------------------------------------------------*)
 (** {2 Sets and Maps } *)
@@ -1673,7 +1683,7 @@ let () =
       let ts = mkvar "ts" Type.Timestamp in
       let ts' = mkvar "ts'" Type.Timestamp in
       let m = in_macro in
-      let t = Diff (Macro (m,[],ts), Macro (m,[],ts')) in
+      let t = diff (Macro (m,[],ts)) (Macro (m,[],ts')) in
       let r = head_normal_biterm t in
       assert (r = t)
     end ;
@@ -1682,8 +1692,8 @@ let () =
       let g = mkvar "g" Type.Boolean in
       let f' = mkvar "f'" Type.Boolean in
       let g' = mkvar "g'" Type.Boolean in
-      let t = Diff (mk_and f g, mk_and f' g') in
-        assert (head_normal_biterm t = mk_and (Diff (f,f')) (Diff (g,g')))
+      let t = diff (mk_and f g) (mk_and f' g') in
+        assert (head_normal_biterm t = mk_and (diff f f') (diff g g'))
     end ;
   ] ;
   Checks.add_suite "Projection" [
@@ -1700,9 +1710,9 @@ let () =
           Symbols.builtins_table (L.mk_loc L._dummy "f") def in
       let fty = Type.mk_ftype 0 [] [] Type.Message in
       let f x = Fun ((f,[]),fty,[x]) in
-      let t = Diff (f (Diff(a,b)), c) in
-      let r = head_pi_term PLeft t in
-        assert (pi_term  ~projection:PLeft t = f a) ;
-        assert (r = f (Diff (a,b)))
+      let t = diff (f (diff a b)) c in
+      let r = head_pi_term "left" t in
+        assert (pi_term  ~projection:"left" t = f a) ;
+        assert (r = f (diff a b))
     end ;
   ]

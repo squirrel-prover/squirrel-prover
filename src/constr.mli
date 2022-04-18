@@ -39,7 +39,13 @@ val find_eq_action : models -> Term.term -> Term.term option
 (** Context of a trace model. *)
 type trace_cntxt = {
   table  : Symbols.table;
-  system : SystemExpr.t;
+  system : SystemExpr.fset;
   models : models option;
     (** used to find an action occurring at a given timestamp *)
 }
+
+(** Create context with undefined models. *)
+val make_context :
+  table:Symbols.table ->
+  system:SystemExpr.fset ->
+  trace_cntxt

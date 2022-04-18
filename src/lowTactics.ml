@@ -536,11 +536,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Rewrite Equiv} *)
 
-  (** Parameter for "rewrite equiv" tactic, i.e. a global formula (which
-      should allow to derive an equivalence) and its associated system
-      expression.
+  (** Parameter for "rewrite equiv" tactic:
+      - a global formula that is a chain of implications concluding
+        with an equivalence atom;
+      - the corresponding system expression;
+      - the rewriting direction.
       The rewrite equiv tactic corresponds to the ReachEquiv rule of CSF'22. *)
-  type rw_equiv =  SystemExpr.t * Equiv.global_form
+  type rw_equiv =
+    SystemExpr.fset * Equiv.global_form * [ `LeftToRight | `RightToLeft ]
 
   (** Parse rewrite equiv arguments. *)
   let p_rw_equiv (rw_arg : Args.rw_equiv_item) (s : S.t) : rw_equiv =
@@ -564,22 +567,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       let f = pat.pat_term in
 
-      (* If assumption is a hypothesis from current trace sequent,
-       * it will come attached to the sequent's system expression,
-       * which can be a single system S.
-       * In that case (cf. LowEquivSequent.to_trace_sequent) the
-       * convention is that the global formula in assumption holds
-       * for the pair (S,S).
-       * This will be clarified when system specifications can be
-       * embedded in global formulas. TODO ongoing work... *)
-      let s1,s2 = match SE.to_list system, dir with
-        | [s],_ -> s,s
-        | [s1;s2],`LeftToRight -> s1,s2
-        | [s1;s2],`RightToLeft -> s2,s1
-        | _ -> assert false
+      let system =
+        (* TODO system should be a context, the pair is already an fset:
+             this check should go away *)
+        try SE.to_fset system with _ ->
+          hard_failure (Failure "finite system expression expected")
       in
-      let system = SE.Pair.make (S.table s) s1 s2 in
-      (system:>SE.t), f
+
+      system,f,dir
 
   (*------------------------------------------------------------------*)
   (** {3 Case tactic} *)
@@ -592,16 +587,20 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** Case analysis on a timestamp *)
   let timestamp_case (ts : Term.term) s : S.sequent list =
-    let system = S.system s in
+    let system =
+      match SE.get_compatible_expr (S.system s) with
+        | Some e -> e
+        | None -> soft_failure (Failure "underspecified systems")
+    in
     let table  = S.table s in
 
-    let mk_case descr : Vars.var list * Term.term =
+    let mk_case (action,symbol,indices) : Vars.var list * Term.term =
       let env = ref (S.vars s) in
-      let indices, s = Term.refresh_vars (`InEnv env) descr.Action.indices in
+      let indices, s = Term.refresh_vars (`InEnv env) indices in
 
       let name =
         SystemExpr.action_to_term table system
-          (Action.subst_action s descr.Action.action)
+          (Action.subst_action s action)
       in
       (* FIXME: is this second substitution useful ? *)
       let name = Term.subst s name in
@@ -609,7 +608,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       indices, name
     in
 
-    let cases = SystemExpr.map_descrs mk_case table system in
+    let cases = List.map mk_case (SystemExpr.actions table system) in
 
     List.map (fun (indices, ts_case) ->
         let ts_subst =
@@ -1120,8 +1119,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
       if not (Vars.Sv.subset pat.pat_vars (S.fv_conc pat.pat_term)) then
         soft_failure ApplyBadInst;
 
-      (* Check that [pat] entails [S.goal s]. *)
-      match S.MatchF.try_match ~option table system goal pat with
+      (* Check that [pat] entails [S.goal s]. TODO system.set abusive? *)
+      match S.MatchF.try_match ~option table system.set goal pat with
       (* match failed by [pat] is a product: retry with the rhs *)
       | (NoMatch _ | FreeTyv) when S.Conc.is_impl pat.pat_term ->
         let t1, t2 = oget (S.Conc.destr_impl pat.pat_term) in
@@ -1167,9 +1166,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
           Match.{ default_match_option with mode = `EntailLR; use_fadup; }
         in
 
-        (* Check that [hconcl] entails [pat]. *)
+        (* Check that [hconcl] entails [pat]. TODO _.set abusive *)
         match
-          S.MatchF.try_match ~option (S.table s) (S.system s) hconcl pat
+          S.MatchF.try_match ~option (S.table s) (S.system s).set hconcl pat
         with
         | NoMatch _ | FreeTyv -> None
         | Match mv -> Some mv

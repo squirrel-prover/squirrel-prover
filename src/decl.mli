@@ -54,7 +54,7 @@ type system_modifier =
 (* It contains the original system, the underlying cryptoraphic axiom
    used, and the name of the new system. *)
 type system_decl_modifier = { 
-  from_sys : SystemExpr.p_system_expr;
+  from_sys : SystemExpr.parsed_t;
   modifier : system_modifier;
   name     : Theory.lsymb
 }

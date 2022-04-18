@@ -23,7 +23,7 @@
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS COLONEQ
 %token XOR STAR UNDERSCORE QMARK TICK
 %token LET IN IF THEN ELSE FIND SUCHTHAT
-%token TILDE DIFF LEFT RIGHT SEQ
+%token TILDE DIFF SEQ
 %token NEW OUT PARALLEL NULL
 %token CHANNEL PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT OP TYPE FUN
 %token MUTABLE SYSTEM SET
@@ -695,9 +695,6 @@ tac:
   (* Special cases for tactics whose names are not parsed as ID
    * because they are reserved. *)
 
-  | l=lloc(LEFT)                       { mk_abstract l "left"  [] }
-  | l=lloc(RIGHT)                      { mk_abstract l "right" [] }
-
   (* FA, equiv tactic, patterns *)
   | l=lloc(FA) args=slist1(fa_arg, COMMA)
     { mk_abstract l "fa" [TacticsArgs.Fa args] }
@@ -833,8 +830,6 @@ tac:
 (* A few special cases for tactics whose names are not parsed as ID
  * because they are reserved. *)
 help_tac_i:
-| LEFT       { "left"}
-| RIGHT      { "right"}
 | FA         { "fa"}
 | INTRO      { "intro"}
 | DESTRUCT   { "destruct"}
@@ -901,33 +896,20 @@ global_formula:
  * Systems
  * ----------------------------------------------------------------------- */
 
-system_proj:
-| LEFT                { SE.P_Left  SE.default_system_name }
-| RIGHT               { SE.P_Right SE.default_system_name }
-| i=lsymb SLASH LEFT  { SE.P_Left  i }
-| i=lsymb SLASH RIGHT { SE.P_Right i }
+system_item:
+| i=lsymb               { SE.{alias=None;system=i;projection=  None} }
+| i=lsymb SLASH p=lsymb { SE.{alias=None;system=i;projection=Some p} }
 
-/* A single or bi-system */
+system_item_list:
+| i=system_item                          {  [i] }
+| i=system_item COMMA l=system_item_list { i::l }
+
 system_i:
-|                                  { SE.P_SimplePair
-                                       SE.default_system_name }
-| LBRACKET i=lsymb        RBRACKET { SE. P_SimplePair i }
-| LBRACKET sp=system_proj RBRACKET { SE. P_Single sp }
-| LBRACKET s1=system_proj COMMA s2=system_proj RBRACKET
-                                   { SE. P_Pair (s1, s2) }
+|                                        { [] }
+| LBRACKET l=system_item_list RBRACKET   {  l }
 
 system:
 | s=loc(system_i) { s }
-
-/* A bi-system */
-bisystem_i:
-|                                  { SE.(P_SimplePair default_system_name) }
-| LBRACKET i=lsymb RBRACKET        { SE. P_SimplePair i }
-| LBRACKET s1=system_proj COMMA s2=system_proj RBRACKET
-                                   { SE. P_Pair (s1, s2) }
-
-bisystem:
-| s=loc(bisystem_i) { s }
 
 /* -----------------------------------------------------------------------
  * Statements and goals
@@ -955,13 +937,13 @@ local_statement:
      Goal.Parsed.{ name; ty_vars; vars; system; formula } }
 
 global_statement:
-| system=bisystem name=statement_name ty_vars=ty_args vars=args
+| system=system name=statement_name ty_vars=ty_args vars=args
   COLON f=global_formula
    { let formula = Goal.Parsed.Global f in
      Goal.Parsed.{ name; ty_vars; vars; system; formula } }
 
 obs_equiv_statement:
-| s=bisystem n=statement_name
+| s=system n=statement_name
    { Goal.Parsed.{ name = n; system = s; ty_vars = []; vars = [];
                    formula = Goal.Parsed.Obs_equiv } }
 
@@ -970,7 +952,7 @@ goal_i:
 |  LOCAL GOAL s=local_statement  DOT { s }
 | GLOBAL GOAL s=global_statement DOT { s }
 | EQUIV  s=obs_equiv_statement   DOT { s }
-| EQUIV system=bisystem name=statement_name vars=args COLON b=loc(biframe) DOT
+| EQUIV system=system name=statement_name vars=args COLON b=loc(biframe) DOT
     { let f = L.mk_loc (L.loc b) (Theory.PEquiv (L.unloc b)) in
       Goal.Parsed.{ name; system; ty_vars = []; vars; formula = Global f } }
 

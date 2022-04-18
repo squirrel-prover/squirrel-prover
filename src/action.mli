@@ -128,15 +128,33 @@ type descr = {
     (** List of global macros declared at [action]. *)
 }
 
-(** [pi_descr s a] returns the projection of the description. As descriptions
-   are only obtained for a system, one can when this system is without
-   projection, validly project to obtain the left or the right descriptions,
-   that in fact corresponds to the left or the right base_sytem projection of
-   the action.  *)
-val pi_descr : Term.projection -> descr -> descr
+(** Check that an action description is well-formed. *)
+val valid_descr : descr -> bool
 
 (** Refresh (globally) bound variables in a description. *)
 val refresh_descr : descr -> descr
+
+(** [pi_descr proj descr] returns the projection of the description. *)
+val pi_descr : Term.projection -> descr -> descr (* TODO rename to project_descr *)
+
+(** Strong notion of compatibility, more restrictive (and syntactical) than
+    what system compatibility alone would require, which helps to combine
+    descriptions. *)
+val strongly_compatible_descr : descr -> descr -> bool
+
+(** Takes a labelled list of single-system descriptions
+    and combines them into a multi-system description.
+    Requires that descriptions are pairwise strongly compatible. *)
+val combine_descrs : (Term.projection * descr) list -> descr
+
+(*------------------------------------------------------------------*)
+(** {2 Action shapes} *)
+
+module Shape : sig
+  type t = shape
+  val pp : Format.formatter -> t -> unit
+  val compare : t -> t -> int
+end
 
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printing} *)

@@ -195,7 +195,7 @@ val fold_descr :
     'a                      -> (* folding accumulator *)
     'a) ->
   Symbols.table -> 
-  SystemExpr.t -> 
+  SystemExpr.fset ->
   Action.descr -> 
   'a -> 
   'a

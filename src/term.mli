@@ -64,22 +64,32 @@ type ord_eq = [ `Eq | `Neq ]
 
 val pp_ord : Format.formatter -> ord -> unit
 
+(** We use strings to identify components of diff operators. *)
+type projection = string
+
+(** We allow users to write diff(t1,t2) as well as diff(lbl1:t1,lbl2:t2)
+    and even diff(l1:t1,l2:t2,_:t) and keep trace of this structure in
+    terms in order to display them back similarly.
+    TODO for simplicity we allow only a simple style for now *)
+type 'a diff_args =
+  | Explicit of (projection*'a) list
+
 type term = private
   | Fun   of fsymb * Type.ftype * term list
   | Name  of nsymb
   | Macro of msymb * term list * term
 
   | Seq    of Vars.var list * term
-  | Action of Symbols.action Symbols.t * Vars.var list 
+  | Action of Symbols.action Symbols.t * Vars.var list
 
   | Var of Vars.var
 
-  | Diff of term * term
+  | Diff of term diff_args
 
-  | Find of Vars.var list * term * term * term 
+  | Find of Vars.var list * term * term * term
 
-  | ForAll of Vars.var list * term 
-  | Exists of Vars.var list * term 
+  | ForAll of Vars.var list * term
+  | Exists of Vars.var list * term
 
 type t = term
 
@@ -359,7 +369,7 @@ val mk_var     : Vars.var -> term
 val mk_action  : Symbols.action Symbols.t -> Vars.var list -> term
 val mk_name    : nsymb -> term
 val mk_macro   : msymb -> term list -> term -> term
-val mk_diff    : term -> term -> term
+val mk_diff    : (projection*term) list -> term
 
 val mk_find : Vars.var list -> term -> term -> term -> term
 
@@ -438,16 +448,7 @@ module St : Set.S with type elt = term
 module Mt : Map.S with type key = term
 
 (*------------------------------------------------------------------*)
-(** {2 Convert from bi-terms to terms}
-
-    {b TODO} Could we use a strong typing of [term] to make a static
-    distinction between biterms (general terms) and terms (terms
-    without diff operators)? *)
-
-type projection = PLeft | PRight | PNone
-
-val pp_projection : Format.formatter -> projection -> unit
-
+(** {2 Multi-terms} *)
 
 (** Evaluate all diff operators wrt a projection.
     If the projection is [None], the input term is returned unchanged.
@@ -455,33 +456,37 @@ val pp_projection : Format.formatter -> projection -> unit
     side and the returned term does not feature diff operators.
     If the bi-term contains macros, and come from a bi-system, its
     projection is only correctly interpreted if it is used inside
-    the projected system.
-    *)
-val pi_term :  projection:projection -> term -> term
+    the projected system. *)
+val pi_term : projection:projection -> term -> term
+(* TODO rename to project *)
+(* TODO take projection AND list of all projections to handle complex diffs *)
 
-(** Evaluate topmost diff operators
-  * for a given projection of a biterm.
-  * For example [head_pi_term Left (diff(f(diff(a,b)),c))]
-  * would be [f(diff(a,b))].
-  * Macros are returned without suspended projections over them. *)
+(** Evaluate topmost diff operators for a given projection of a biterm.
+    For example [head_pi_term left (diff(f(diff(a,b)),c))]
+    is [f(diff(a,b))]. *)
 val head_pi_term : projection -> term -> term
 
 (** Push topmost diff-operators just enough to expose the common
-  * topmost constructor of the two projections of a biterm.
-  *
-  * Macros with different timestamps do not count as a common
-  * constructor: [head_normal_biterm (Diff(Macro(m,l,ts),Macro(m,l,ts')))]
-  * will be [Diff(Macro(m,l,ts),Macro(m,l,ts'))] and not
-  * [Macro(m,l,Diff(ts,ts'))].
-  *
-  * If the returned biterm starts with a diff, then its immediate
-  * subterms have topmost different constructors, and they do not
-  * start with diffs themselves. *)
+    topmost constructor of the two projections of a biterm, if possible.
+
+    If the returned biterm starts with a diff, then its immediate
+    subterms have topmost different constructors, and they do not
+    start with diffs themselves.
+
+    Macros with different timestamps do not count as a common
+    constructor: [head_normal_biterm (Diff(Macro(m,l,ts),Macro(m,l,ts')))]
+    will be [Diff(Macro(m,l,ts),Macro(m,l,ts'))] and not
+    [Macro(m,l,Diff(ts,ts'))]. *)
 val head_normal_biterm : term -> term
 
 val make_bi_term : term -> term -> term
 
 val simple_bi_term : term -> term
+
+val combine : (projection*term) list -> term
+
+(** All projections of the term are names. *)
+val diff_names : term -> bool
 
 (*------------------------------------------------------------------*)
 (** {2 Matching information for error messages} *)

@@ -1,10 +1,6 @@
 (** Extending sequents with functionalities based on proved goals. *)
 
-(** Generalized hypothesis: hypothesis or lemma identifier.
-    TODO I guess the [`Lemma] case also covers axioms.
-    TODO Clarify why we use the terms "generalized hypothesis",
-      "assumption" and "statement" (cf. [Prover]); we should perhaps
-      merge some of these concepts. *)
+(** Generalized hypothesis: hypothesis or lemma/axiom identifier. *)
 type ghyp = [ `Hyp of Ident.t | `Lemma of string ]
 
 (** Sequents with functionalities based on proved goals. *)
@@ -22,16 +18,14 @@ module type S = sig
     * By default it checks for compatibility: this means system inclusion
     * for local assumptions, and system equality otherwise. *)
   val get_assumption :
-    ?check_compatibility:bool ->
+    ?check_compatibility:bool -> table:Symbols.table ->
     'a Equiv.f_kind -> Theory.lsymb -> t -> (ghyp, 'a) Goal.abstract_statement
 
   val reduce : Reduction.red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
   (** Convert a proof term into a pattern and the system it applies to.
       If [close_pats] is [false], pattern variables that cannot be
-      inferred remains (default to [true]).
-      TODO what is the meaning of the pattern? only relevant for
-      equalities and equivalences? *)
+      inferred remains (default to [true]). *)
   val convert_pt_gen :
     ?check_compatibility:bool ->
     ?close_pats:bool ->

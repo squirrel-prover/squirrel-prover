@@ -3,188 +3,229 @@
     systems, and equivalence formulas only make sense relative to
     a pair of systems. *)
 
-(** We use names to identify the projections of a multi-system.
-    Default strings like "left"/"right" or "1"/"2"/...
-    are often used but the user may prefer to use e.g. "real"/"ideal". *)
-type projection = string
+(** Expressions denoting sets of single systems.
+    When a local formula is annotated with one such expression
+    it means that it holds for all systems in the set.
 
-(** TODO documentation *)
+    An [arbitrary expr] can be any set, it practice we use it only
+    to denote the set of all systems.
 
-type unary     = [`Unary]
-type binary    = [`Binary]
-type arbitrary = [`Unary|`Binary|`Other]
+    A [compatible expr] denotes a set of compatible systems,
+    which makes it possible to interpret formulas with actions.
+
+    Formulas with macros can only be interpreted in finite sets,
+    represented by an [fset expr]. These sets are actually labelled,
+    ordered and non-empty.
+
+    An equivalence must be annotated with a [pair expr], representing
+    an ordered and labelled pair. *)
 type +'a expr
-type t = arbitrary expr
 
-(*------------------------------------------------------------------*)
-(** {2 Utilities} *)
+(** Hierarchy of subtypes used as phantom types. *)
+type arbitrary  = < > expr
+type compatible = < symbols : unit > expr
+type fset       = < symbols : unit ; fset : unit > expr
+type pair       = < symbols : unit ; fset : unit ; pair : unit > expr
 
-val hash : t -> int
-val pp : Format.formatter -> t -> unit
+type t = arbitrary
 
-(** {2 Compatibility} TODO *)
+type equiv_t = pair
 
-val to_list : arbitrary expr -> unary expr list
-val get_proj : unary expr -> Term.projection
-val get_proj_string : unary expr -> string
+val hash : 'a expr -> int
 
-(*------------------------------------------------------------------*)
-(** Expressions denoting single systems. *)
-module Single : sig
+val pp : Format.formatter -> 'a expr -> unit
 
-  type t = unary expr
+(** System expression denoting all possible systems.
+    It is typically used for axioms or lemmas about primitives. *)
+val any : arbitrary
 
-  (** A single system is obtained by projecting a multi-system,
-      identified by a system symbol. *)
-  val make : Symbols.system Symbols.t -> projection -> t
+(** System expression denoting all possible systems
+    compatible with a given system. *)
+val any_compatible_with : System.t -> compatible
 
-  val pp : Format.formatter -> t -> unit
+(** [subset s1 s2] iff [s1] is included in [s2]. *)
+val subset : Symbols.table -> 'a expr -> 'a expr -> bool
 
-  val get_symbol : t -> Symbols.system Symbols.t
-
-end
-
-(*------------------------------------------------------------------*)
-(** Expressions denoting sets of systems. *)
-module Set : sig
-
-  (** A system expression denoting a finite set of compatible systems,
-      or the set of all systems, including those that are not yet declared.
-      When a local formula is annotated with one such expression
-      it means that it holds for all systems in the set. *)
-  type t = arbitrary expr
-
-  (** System expression denoting all possible systems.
-      It is typically used for axioms or lemmas about primitives. *)
-  val any : t
-
-  (** Create a set expression from a non-empty list of compatible systems.
-      If a list of labels is specified, it must be of the same length
-      as the list of systems. *)
-  val of_list : Symbols.table ->
-                ?labels:string list ->
-                Single.t list ->
-                t
-
-  (** Create a set expression from a system symbol. *)
-  val of_symbol : Single.t list -> t
-
-  (** [subset s1 s2] iff [s1] is included in [s2]. *)
-  val subset : t -> t -> bool
-
-end
-
-(*------------------------------------------------------------------*)
-(** Expressions denoting pairs of systems. *)
-module Pair : sig
-
-  (** A system expression denoting a pair of compatible systems. *)
-  type t = binary expr
-
-  val make : Symbols.table -> Single.t -> Single.t -> t
-
-  val pp : Format.formatter -> t -> unit
-
-end
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
-type ssymb_pair = System.t * System.t
+type error =
+  | Invalid_projection
+  | Missing_projection
+  | Incompatible_systems
+  | Expected_compatible
+  | Expected_fset
+  | Expected_pair
 
-type system_expr_err =
-  | NotABiProcess        of System.t option
-  | NoneProject
-  | InvalidAction        of t * Action.shape
-  | IncompatibleAction   of ssymb_pair * string
-  | DifferentControlFlow of ssymb_pair
+exception Error of error
 
-val pp_system_expr_err : Format.formatter -> system_expr_err -> unit
+val pp_error : Format.formatter -> error -> unit
 
-exception System_error of system_expr_err
 
 (*------------------------------------------------------------------*)
-(** {2 Projection and action builder} *)
+(** {2 Conversions} *)
 
-(** Project a system according to the given projection. The projection
-    must not be None, and the system must be a bi-system.
-    TODO this is for compatibility and should eventually disappear *)
-val project : Term.projection -> t -> t
+val to_arbitrary : 'a expr -> arbitrary
 
-(** Convert action to the corresponding [Action] timestamp term in
-    a system expression.
-    Remark that this requires both system to declare the action,
-    with the same name. *)
+val to_compatible : 'a expr -> compatible
+
+val to_fset : 'a expr -> fset
+
+val to_pair : 'a expr -> pair
+
+
+(*------------------------------------------------------------------*)
+(** {2 Actions symbols} *)
+
+(** Get the table of action descriptions of a system expression. *)
+val symbs :
+  Symbols.table ->
+  <symbols:unit;..> expr ->
+  Symbols.action Symbols.t System.Msh.t
+
+(** Convert action to the corresponding timestamp term. *)
 val action_to_term :
-  Symbols.table -> t -> Action.action -> Term.term
+  Symbols.table -> <symbols:unit;..> expr -> Action.action -> Term.term
+
+(** List of action, symbol and list of indices,
+    for each action of compatible systems. *)
+val actions :
+  Symbols.table ->
+  <symbols:unit;..> expr ->
+  (Action.action * Symbols.action Symbols.t * Vars.vars) list
 
 (*------------------------------------------------------------------*)
-(** {2 Action descriptions and iterators} *)
+(** {2 Action descriptions} *)
 
+(** Return the action description associated to a shape. *)
 val descr_of_shape :
-  Symbols.table -> t -> Action.shape -> Action.descr
+  Symbols.table -> <fset:unit;..> expr -> Action.shape -> Action.descr
 
 (** [descr_of_action table t a] returns the description corresponding
     to the action [a] in [t].
     @raise Not_found if no action corresponds to [a]. *)
 val descr_of_action :
-  Symbols.table -> t -> Action.action -> Action.descr
-
-(** Get the action symbols table of a system expression.
-  * We rely on the invariant that the systems of a system expression
-  * must have the same action names. *)
-val symbs :
-  Symbols.table ->
-  t ->
-  Symbols.action Symbols.t System.Msh.t
+  Symbols.table -> <fset:unit;..> expr -> Action.action -> Action.descr
 
 (** Iterate over all action descriptions in [system].
     Only one representative of each action shape will be passed
     to the function, with indices that are guaranteed to be fresh. *)
-val iter_descrs : Symbols.table -> t -> (Action.descr -> unit) -> unit
+val iter_descrs :
+  Symbols.table -> <fset:unit;..> expr -> (Action.descr -> unit) -> unit
 
-val fold_descrs : (Action.descr -> 'a -> 'a) -> Symbols.table -> t -> 'a -> 'a
-val map_descrs  : (Action.descr -> 'a)       -> Symbols.table -> t -> 'a list
-
-(*------------------------------------------------------------------*)
-(** {2 Cloning } *)
-
-(** [clone_system_iter table sys name f] creates a copy of single system [sys]
-    with each action description modified by [f] and registers it as [name].
-    Fails if [name] is already in use.
-    Returns the newly enriched table and [name] as a system symbol. *)
-val clone_system_iter :
+val fold_descrs :
+  (Action.descr -> 'a -> 'a) ->
   Symbols.table ->
-  Single.t ->
-  Symbols.lsymb ->
-  (Action.descr -> Action.descr) ->
-  Symbols.table * Symbols.System.ns Symbols.t
+  <fset:unit;..> expr ->
+  'a ->
+  'a
 
-(*------------------------------------------------------------------*)
-(** {2 Pretty-printing } *)
+val map_descrs  :
+  (Action.descr -> 'a) -> Symbols.table -> <fset:unit;..> expr -> 'a list
 
 (** Pretty-print all action descriptions. *)
-val pp_descrs : Symbols.table -> Format.formatter -> t -> unit
+val pp_descrs : Symbols.table -> Format.formatter -> <fset:unit;..> expr -> unit
+
 
 (*------------------------------------------------------------------*)
-(** {2 Parser types} TODO compatibility *)
+(** {2 Operations on finite sets} *)
 
-type lsymb = Symbols.lsymb
+(** A set containing only a single system. *)
+val singleton : System.Single.t -> fset
 
-val default_system_name : lsymb
+(** Create a set expression from a non-empty list of compatible single systems.
+    If a list of projections is specified, it must be of the same length
+    as the list of systems: these projections will be used to label the
+    single systems as part of the newly formed system expression.
 
-type p_single_system =
-  | P_Left  of lsymb
-  | P_Right of lsymb
+    For example, [of_list ?labels:["left";"right"] [(s,"right");(s,"left")]]
+    is an expression with two elements. Its first projection, labelled
+    "left", is the right projection of [s]. *)
+val of_list : Symbols.table ->
+              ?labels:string option list ->
+              System.Single.t list ->
+              fset
 
-type p_system_expr_i =
-  | P_Single     of p_single_system
-  | P_SimplePair of lsymb
-  | P_Pair       of p_single_system * p_single_system
+(** Finite set of all projections of a system. *)
+val of_system : Symbols.table -> System.t -> fset
 
-type p_system_expr = p_system_expr_i Location.located 
+(** List of labelled elements of a set. Guaranteed to be non-empty.
+    Fails if expression does not correspond to a finite set. *)
+val to_list : <fset:unit;..> expr -> (Term.projection*System.Single.t) list
 
-val parse_single : Symbols.table -> p_single_system -> Single.t
-val parse_se     : Symbols.table -> p_system_expr   -> t
+(** Project a system according to the given projection. *)
+val project : Term.projection -> <fset:unit;..> expr -> System.Single.t
 
-val pp_p_system : Format.formatter -> p_system_expr -> unit
+(** [clone_system table sys name f] registers a new system named [name],
+    obtained by modifying the actions of the system expression [sys]
+    with [f].
+    Fails if [name] is already in use.
+    Returns the newly enriched table and [name] as a system symbol. *)
+val clone_system :
+  Symbols.table ->
+  <fset:unit;..> expr ->
+  Symbols.lsymb ->
+  (Action.descr -> Action.descr) ->
+  Symbols.table * System.t
+
+
+(*------------------------------------------------------------------*)
+(** {2 Operations on pairs} *)
+
+val make_pair : System.Single.t -> System.Single.t -> pair
+
+val fst : <pair:unit;..> expr -> Term.projection * System.Single.t
+
+val snd : <pair:unit;..> expr -> Term.projection * System.Single.t
+
+
+(*------------------------------------------------------------------*)
+(** {2 Parsing, printing, and conversions} *)
+
+(** This module defines several kinds of expressions, they are
+    all parsed from the same datatype.
+    A parse item may be a system symbol or the projection of a system
+    symbol and, when the item corresponds to a single system,
+    it may come with an alias identifying the single system as some
+    projection of the multisystem in construction. *)
+type parse_item = {
+  system     : Symbols.lsymb;
+  projection : Symbols.lsymb option;
+  alias      : Symbols.lsymb option
+}
+
+type parsed_t = parse_item list Location.located
+
+val parse : Symbols.table -> parsed_t -> arbitrary
+
+
+(*------------------------------------------------------------------*)
+(** {2 Contexts} *)
+
+(** Context for interpreting global or local formulas.
+    The set expression is used as default systems for interpreting
+    local formulas, while the pair (when present) is used as default
+    for interpreting equivalence atoms.
+
+    It is not possible to express that an equivalence holds for all
+    systems (or for all systems compatible with a given one). This
+    does not seem like an important feature, and it would complexify
+    the API.
+
+    Invariant: if [pair<>None] then [set<>any]. Indeed we must ensure
+    that all systems in [pair] and [set] are compatible. *)
+type context = {
+  set  : arbitrary ;
+  pair : pair option
+}
+
+val context_any : context
+
+val update : ?set:'a expr -> ?pair:pair -> context -> context
+
+val pp_context : Format.formatter -> context -> unit
+
+(** Get an expression with which all systems of a context are compatible.
+    Return [None] if context is not [context_any]. *)
+val get_compatible_expr : context -> compatible option

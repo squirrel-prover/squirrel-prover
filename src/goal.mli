@@ -1,10 +1,9 @@
 module TS = LowTraceSequent
 module ES = LowEquivSequent
 
-type lsymb = Theory.lsymb
-
 (*------------------------------------------------------------------*)
-(** A goal consists of one of our two kinds of sequents. *)
+(** A goal (in the sense of proof obligation)
+    consists of one of our two kinds of sequents. *)
 type t = Trace of TS.t | Equiv of ES.t
 
 val pp : Format.formatter -> t -> unit
@@ -19,15 +18,13 @@ val bind     : (TS.t -> 'a)        -> (ES.t -> 'a)        -> t -> 'a
 
 (*------------------------------------------------------------------*)
 (** Statements are formulas in context.
-  * They may be used to generate initial goals, or to represent
-  * hypotheses extracted from a goal.
-  * TODO currently free variables used in axioms and lemmas are
-  * quantified in the formula, but this will break when we
-  * properly forbid quantification over messages in local meta-formulas. *)
+    They may be used to represent goals (in the sense of lemmas,
+    that will then give rise to an initial proof obligation),
+    axioms, or hypotheses extracted from a sequent. *)
 type ('a,'b) abstract_statement = {
   name    : 'a;
   ty_vars : Type.tvars;
-  system  : SystemExpr.t;
+  system  : SystemExpr.context;
   formula : 'b;
 }
 
@@ -57,7 +54,7 @@ module Parsed : sig
     name    : Theory.lsymb option;
     ty_vars : Theory.lsymb list;
     vars    : Theory.bnds;
-    system  : SystemExpr.p_system_expr;
+    system  : SystemExpr.parsed_t;
     formula : contents
   }
 
@@ -69,8 +66,10 @@ end
 val make_obs_equiv :
   ?enrich:Term.term list ->
   Symbols.table ->
-  Hint.hint_db -> 'a -> SystemExpr.Pair.t -> [> `Equiv of Equiv.form ] * t
-
+  Hint.hint_db ->
+  string ->
+  SystemExpr.context ->
+  statement * t
 
 val make :
   Symbols.table -> Hint.hint_db -> Parsed.t ->

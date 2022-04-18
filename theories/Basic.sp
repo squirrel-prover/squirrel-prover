@@ -1,8 +1,5 @@
 set autoIntro=false.
 
-(* (* comment out to work on the librairie *) *)
-(* system null. *)
-
 (*------------------------------------------------------------------*)
 (* equality *)
 
@@ -131,7 +128,10 @@ Qed.
 goal if_true ['a] (b : boolean, x,y : 'a):
  b => if b then x else y = x.
 Proof.
-  by intro *; yesif.
+  intro *.
+  case (if b then x else y).
+  + auto.
+  + intro [HH _]. by use HH.
 Qed.
 
 goal if_true0 ['a] (x,y : 'a):
@@ -144,7 +144,9 @@ hint rewrite if_true0.
 goal if_false ['a] (b : boolean, x,y : 'a):
  (not b) => if b then x else y = y.
 Proof.
-  by intro *; noif.
+  intro *; case (if b then x else y).
+  + intro [HH _]. by use H.
+  + auto.
 Qed.
 
 goal if_false0 ['a] (x,y : 'a):
@@ -224,25 +226,6 @@ hint rewrite fst_pair.
 goal snd_pair (x,y : message) : snd (<x,y>) = y.
 Proof. auto. Qed.
 hint rewrite snd_pair.
-
-(*------------------------------------------------------------------*)
-(* diff *)
-
-goal diff_eq ['a] (x,y : 'a) : x = y => diff(x,y) = x.
-Proof. by project. Qed.
-hint rewrite diff_eq.
-
-goal diff_diff_l ['a] (x,y,z: 'a): diff(diff(x,y),z) = diff(x,z).
-Proof. by project. Qed.
-hint rewrite diff_diff_l.
-
-goal diff_diff_r ['a] (x,y,z: 'a): diff(x,diff(y,z)) = diff(x,z).
-Proof. by project. Qed.
-hint rewrite diff_diff_r.
-
-goal len_diff (x, y : message) : len(diff(x,y)) = diff(len(x), len(y)).
-Proof. by project. Qed.
-
 
 (*------------------------------------------------------------------*)
 (* if-and-only-if *)

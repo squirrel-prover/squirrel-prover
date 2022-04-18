@@ -77,8 +77,8 @@ module Pos = struct
         let vars = List.rev_append is vars in
         sel fsel sp ~vars ~conds ~p:(0 :: p) t
 
-      | Term.Diff (t1, t2) ->
-        sel_l fsel sp ~vars ~conds ~p [t1; t2]
+      | Term.Diff (Explicit l) ->
+        sel_l fsel sp ~vars ~conds ~p (List.map snd l)
 
       | Term.Find (is, c, t, e) ->
         let is, subst = Term.refresh_vars `Global is in
@@ -255,11 +255,10 @@ module Pos = struct
 
         acc, found, if found then ti' else ti
 
-      | Term.Diff (t1, t2) ->
-        let acc, found, l = map_fold_l ~p ~acc [t1; t2] in
-        let t1, t2 = as_seq2 l in
-
-        let ti' = Term.mk_diff t1 t2 in
+      | Term.Diff (Explicit l) ->
+        let acc, found, l' = map_fold_l ~p ~acc (List.map snd l) in
+        let l = List.map2 (fun (lbl,_) t -> lbl,t) l l' in
+        let ti' = Term.mk_diff l in
         acc, found, if found then ti' else ti
 
       | Term.Find (is, c, t, e) ->
@@ -871,8 +870,17 @@ module T (* : S with type t = Term.term *) = struct
 
     | Action (s,is), Action (s',is') -> sunif (s,is) (s',is') st
 
-    | Diff (a,b), Diff (a', b') ->
-      unif_l [a;b] [a';b'] st
+    | Diff (Explicit l), Diff (Explicit l') ->
+      let l,l' =
+        try
+          List.split
+            (List.map2
+               (fun (lbl,t) (lbl',t') ->
+                  if lbl = lbl' then t,t' else raise NoMgu)
+               l l')
+        with Invalid_argument _ -> raise NoMgu
+      in
+      unif_l l l' st
 
     | Find (is, c, t, e), Find (is', pat_c, pat_t, pat_e) ->
       let s, s', st = unif_bnds is is' st in
@@ -1095,8 +1103,17 @@ module T (* : S with type t = Term.term *) = struct
 
     | Action (s,is), Action (s',is') -> smatch (s,is) (s',is') st
 
-    | Diff (a,b), Diff (a', b') ->
-      tmatch_l [a;b] [a';b'] st
+    | Diff (Explicit l), Diff (Explicit l') ->
+      let l,l' =
+        try
+          List.split
+            (List.map2
+               (fun (lbl,t) (lbl',t') ->
+                  if lbl = lbl' then t,t' else raise NoMgu)
+               l l')
+        with Invalid_argument _ -> no_match ()
+      in
+      tmatch_l l l' st
 
     | Find (is, c, t, e), Find (is', pat_c, pat_t, pat_e) ->
       let s, s', st = match_bnds is is' st in
@@ -1823,7 +1840,7 @@ module E : S with type t = Equiv.form = struct
       the Function Application rule. *)
   let rec deduce
       (table  : Symbols.table)
-      (system : SystemExpr.t)
+      (system : SystemExpr.fset)
       (cand : cand_set)
       (known_sets : known_sets) : cand_sets
     =
@@ -1836,7 +1853,7 @@ module E : S with type t = Equiv.form = struct
       [terms] and [pseqs]. *)
   and deduce_list
       (table  : Symbols.table)
-      (system : SystemExpr.t)
+      (system : SystemExpr.fset)
       (cand : cand_tuple_set)
       (known_sets : known_sets) : cand_tuple_sets
     =
@@ -1865,7 +1882,7 @@ module E : S with type t = Equiv.form = struct
       Does not include direct specialization. *)
   and deduce_fa
       (table  : Symbols.table)
-      (system : SystemExpr.t)
+      (system : SystemExpr.fset)
       (cand : cand_set)
       (known_sets : known_sets) : cand_sets
     =
@@ -1879,7 +1896,7 @@ module E : S with type t = Equiv.form = struct
     | Term.Macro (ms, l, a) ->
       assert (l = []);
       begin
-        let cntxt = Constr.{ system; table; models = None; } in
+        let cntxt = Constr.make_context ~system ~table in
         match Macros.get_definition cntxt ms a with
         | `Undef | `MaybeDef -> []
         | `Def body ->
@@ -1902,7 +1919,7 @@ module E : S with type t = Equiv.form = struct
       invariant on deducible messages which contains [terms]. *)
   let strengthen
       (table  : Symbols.table)
-      (system : SystemExpr.t)
+      (system : SystemExpr.fset)
       (env    : Sv.t)
       (init_terms : Term.terms) : msets
     =
@@ -1921,7 +1938,7 @@ module E : S with type t = Equiv.form = struct
       let ts = Term.mk_action a is in
 
       (* we unroll the definition of [cand] at time [ts] *)
-      let cntxt = Constr.{ system; table; models = None; } in
+      let cntxt = Constr.make_context ~system ~table in
       match Macros.get_definition cntxt cand.msymb ts with
       | `Undef | `MaybeDef -> []
 
@@ -1965,7 +1982,7 @@ module E : S with type t = Equiv.form = struct
               mset :: mset_l
             ) [] ded_sets
         in
-        mset_list_simplify table system mset_l
+        mset_list_simplify table (system:>SystemExpr.t) mset_l
     in
 
     let filter_deduce_action_list
@@ -1981,7 +1998,7 @@ module E : S with type t = Equiv.form = struct
                 filter_deduce_action a cand init_terms known_sets
               ) cand_l
           in
-          (mname, mset_list_inter table system env cand_l mset_l)
+          (mname, mset_list_inter table (system:>SystemExpr.t) env cand_l mset_l)
         ) cands
   in
 
@@ -2010,7 +2027,7 @@ module E : S with type t = Equiv.form = struct
       dbg "deduce_fixpoint:@.%a@." pp_msets cands';
 
       (* check if [cands] is included in [cands'] *)
-      if msets_incl table system cands cands'
+      if msets_incl table (system:>SystemExpr.t) cands cands'
       then cands'
       else deduce_fixpoint cands' init_terms
     in
@@ -2062,7 +2079,7 @@ module E : S with type t = Equiv.form = struct
   (* memoisation *)
   let strengthen =
     let module M = struct
-      type t = Symbols.table * SystemExpr.t * Sv.t * Term.terms
+      type t = Symbols.table * SystemExpr.fset * Sv.t * Term.terms
 
       let hash (tbl, s, e, terms) =
         hcombine_list Term.hash
@@ -2303,8 +2320,11 @@ module E : S with type t = Equiv.form = struct
        See explanation in [mset_mem_one]. *)
     let mset_l =
       if Sv.is_empty st.support && st.use_fadup then
-        let msets = strengthen st.table st.system st.env pat_terms in
-        msets_to_list msets
+        match SystemExpr.to_fset st.system with
+          | system ->
+              let msets = strengthen st.table system st.env pat_terms in
+              msets_to_list msets
+          | exception _ -> []
       else []
     in
 

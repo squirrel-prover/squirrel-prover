@@ -27,11 +27,12 @@ module type S = sig
   val to_general_sequent : t -> Goal.t
     
   val get_assumption :
-    ?check_compatibility:bool ->
+    ?check_compatibility:bool -> table:Symbols.table ->
     'a Equiv.f_kind -> Theory.lsymb -> t -> (ghyp, 'a) Goal.abstract_statement
 
   val reduce : Reduction.red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
+  (* TODO document; should [SE.t] be generalized to [SE.context]? *)
   val convert_pt_gen :
     ?check_compatibility:bool -> 
     ?close_pats:bool ->
@@ -74,7 +75,8 @@ module Mk (Args : MkArgs) : S with
 
   let get_assumption 
       (type a)
-      ?(check_compatibility=true) 
+     ?(check_compatibility=true)
+     ~(table: Symbols.table)
       (k    : a Equiv.f_kind)
       (name : lsymb)
       (s    : t)
@@ -93,19 +95,6 @@ module Mk (Args : MkArgs) : S with
                  f }
     else
       let lem = Prover.get_assumption name in
-      (* Verify that it applies to the current system. *)
-      if check_compatibility then begin
-        match k with
-        | Equiv.Local_t
-
-        | _ when Goal.is_reach_statement lem ->
-          if not (SE.Set.subset (S.system s) lem.system) then
-            Tactics.hard_failure Tactics.NoAssumpSystem
-
-        | _ ->
-          if S.system s <> lem.system then
-            Tactics.hard_failure Tactics.NoAssumpSystem
-      end;
       { Goal.name = `Lemma lem.Goal.name ;
         system = lem.system ;
         ty_vars = lem.ty_vars ;
@@ -265,7 +254,9 @@ module Mk (Args : MkArgs) : S with
     S.t ->
     ghyp * SE.t * a Match.pat * Match.Mvar.t 
     = fun ?(check_compatibility=false) ty_env mv pt f_kind s ->
-      let lem = get_assumption ~check_compatibility f_kind pt.p_pt_head s in
+      let table = S.table s in
+      let lem =
+        get_assumption ~check_compatibility ~table f_kind pt.p_pt_head s in
 
       (* open the lemma type variables *)
       let tvars, tsubst = Type.Infer.open_tvars ty_env lem.ty_vars in
@@ -311,6 +302,7 @@ module Mk (Args : MkArgs) : S with
             (Failure "too many arguments");
 
         | Some (f1, f) ->
+          (* TODO do not ignore the system *)
           let _, _, pat1, mv = _convert_pt_gen ty_env mv p_arg f_kind s in
           assert (pat1.pat_tyvars = []);
 
@@ -326,12 +318,14 @@ module Mk (Args : MkArgs) : S with
             | Equiv.Local_t ->
               Match.T.try_match 
                 ~ty_env ~mv
-                (S.table s) (S.system s) pat1.pat_term pat_f1
+                (* TODO double-check all uses of context.set below
+                     it is likely that try_match should take a full context *)
+                (S.table s) (S.system s).set pat1.pat_term pat_f1
 
             | Equiv.Global_t ->
               Match.E.try_match 
                 ~ty_env ~mv
-                (S.table s) (S.system s) pat1.pat_term pat_f1
+                (S.table s) (S.system s).set pat1.pat_term pat_f1
 
             | Equiv.Any_t -> 
               match f1, pat1.pat_term with
@@ -340,14 +334,14 @@ module Mk (Args : MkArgs) : S with
                 let pat_f1 = { pat1 with pat_term = f1 } in
                 Match.T.try_match 
                   ~ty_env ~mv
-                  (S.table s) (S.system s) pat1.pat_term pat_f1
+                  (S.table s) (S.system s).set pat1.pat_term pat_f1
 
               | `Equiv f1, `Equiv t1  -> 
                 let pat1   = { pat1 with pat_term = t1 } in
                 let pat_f1 = { pat1 with pat_term = f1 } in
                 Match.E.try_match 
                   ~ty_env ~mv
-                  (S.table s) (S.system s) pat1.pat_term pat_f1
+                  (S.table s) (S.system s).set pat1.pat_term pat_f1
 
               | _ -> (* TODO: improve error message *)
                 hard_failure ~loc:(L.loc pt.p_pt_head) (Failure "kind error");
@@ -381,7 +375,7 @@ module Mk (Args : MkArgs) : S with
           pat_vars = !pat_vars;
           pat_term = f; } 
       in      
-      lem.name, lem.system, pat, mv
+      lem.name, lem.system.set, pat, mv
 
 
   let close 

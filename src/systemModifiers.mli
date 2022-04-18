@@ -10,13 +10,13 @@
     - the fresh variables [fresh_vars] needed to define the axiom
     - the function [goal_maker] that will allow to create the correct goal 
       for the axiom, once back in the prover loop
-    - the [new_system]
+    - a [pair_expr] composed of the original and new systems
     - the [new_table] *)  
 val declare_system :
   Symbols.table ->
   Decl.system_decl_modifier ->
   string *
   Term.term list *
-  (Equiv.global_form -> [> `Equiv of Equiv.global_form ]) *
-  SystemExpr.Pair.t *
+  (Equiv.global_form -> Equiv.any_form) *
+  SystemExpr.pair *
   Symbols.table

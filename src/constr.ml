@@ -1391,11 +1391,14 @@ let find_eq_action (models : models) (t : Term.term) =
 (** Context of an trace model *)
 type trace_cntxt = {
   table  : Symbols.table;
-  system : SystemExpr.t;
+  system : SystemExpr.fset;
 
   (* used to find an action occuring at a given timestamp *)
   models : models option;
 }
+
+let make_context ~table ~system =
+  { table ; system ; models = None }
 
 (*------------------------------------------------------------------*)
 (** Tests Suites *)

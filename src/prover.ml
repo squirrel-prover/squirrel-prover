@@ -881,25 +881,15 @@ let declare table hint_db decl = match L.unloc decl with
     table
 
   | Decl.Decl_system sdecl ->
-    let name = match sdecl.sname with
-      | None -> SE.default_system_name
-      | Some n -> n
-    in
-    Process.declare_system table name sdecl.sprocess
+    Process.declare_system table sdecl.sname sdecl.sprocess
 
   | Decl.Decl_system_modifier sdecl ->
     let new_axiom_name, enrich, make_conclusion, new_system, table = 
       SystemModifiers.declare_system table sdecl 
     in
-    let `Equiv formula, _ =
-      Goal.make_obs_equiv ~enrich table hint_db new_axiom_name new_system 
-    in
-    let formula = make_conclusion formula in
-    let statement = Goal.{ 
-        name    = new_axiom_name; 
-        system  = (new_system:>SE.t); (* TODO avoid loosing precise type? *)
-        ty_vars = []; 
-        formula }
+    let context = SE.update ~pair:new_system SE.context_any in
+    let statement, _ =
+      Goal.make_obs_equiv ~enrich table hint_db new_axiom_name context
     in
     goals_proved :=  statement :: !goals_proved;
     table

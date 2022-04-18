@@ -41,7 +41,7 @@ type rw_res = [
 (*------------------------------------------------------------------*)
 val rewrite :
   Symbols.table ->
-  SystemExpr.t ->
+  SystemExpr.context ->
   Vars.env ->
   TacticsArgs.rw_count ->
   rw_erule ->

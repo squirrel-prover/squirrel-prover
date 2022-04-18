@@ -58,7 +58,7 @@ let pp_goal fmt = function
 let pp ppf j =
   Fmt.pf ppf "@[<v 0>" ;
   Fmt.pf ppf "@[Systems: %a@]@;"
-    SystemExpr.pp j.env.system;
+    SystemExpr.pp_context j.env.system;
 
   if j.env.ty_vars <> [] then
     Fmt.pf ppf "@[Type variables: %a@]@;"
@@ -172,8 +172,8 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Accessors and utils} *)
 
-let update ?system ?table ?ty_vars ?vars ?hyps ?goal t =
-  let env  = Env.update ?system ?table ?ty_vars ?vars t.env 
+let update ?table ?ty_vars ?vars ?hyps ?goal t =
+  let env  = Env.update ?table ?ty_vars ?vars t.env
   and hyps = Utils.odflt t.hyps hyps
   and goal = Utils.odflt t.goal goal in
   { t with env; hyps; goal; } 
@@ -189,7 +189,9 @@ let vars j = j.env.vars
 let set_vars vars j = update ~vars j
 
 let system j = j.env.system
-let set_system system j = update ~system j
+let set_system system j =
+  let env = Env.set_system j.env system in
+  { j with env }
 
 let table j = j.env.table
 let set_table table j = update ~table j
@@ -222,22 +224,10 @@ let goal_as_equiv s = match goal s with
     Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
 
 (*------------------------------------------------------------------*)
-(** Convert global sequent to local sequent.
-  * Assume that the conclusion of the input sequent is a local formula.
-  * The semantics of the system expression differs from global and
-  * local sequents: for the former we need two systems to make sense
-  * of equivalences; for the latter we are checking that a local
-  * formula holds for all projections of the system expression.
-  * For now (without system annotations in global formulas) we can
-  * only keep global formula hypotheses in a restricted case: the two
-  * projections are the same. *)
+(** Convert global sequent to local sequent, assuming
+    that the conclusion of the input sequent is a local formula. *)
 let to_trace_sequent s =
   let env = s.env in
-  let system = system s in
-  let keep_global_hyps =
-    SystemExpr.project Term.PLeft  system =
-    SystemExpr.project Term.PRight system
-  in
   let hint_db = s.hint_db in
 
   let goal = match s.goal with
@@ -249,16 +239,16 @@ let to_trace_sequent s =
 
   let trace_s = TS.init ~env ~hint_db goal in
 
-  (* Add all relevant hypotheses. *)
+  (* Add all relevant hypotheses.
+     TODO we could add all hypotheses as global formulas,
+     which would be stronger, though things like [get_trace_literals]
+     below might stop working without adjustments. *)
   Hyps.fold
     (fun id hyp trace_s -> match hyp with
       | Equiv.Atom (Equiv.Reach h) ->
         TS.LocalHyps.add (Args.Named (Ident.name id)) h trace_s
       | h ->
-        if keep_global_hyps then
-          TS.Hyps.add (Args.Named (Ident.name id)) (`Equiv h) trace_s
-        else
-          trace_s)
+        TS.Hyps.add (Args.Named (Ident.name id)) (`Equiv h) trace_s)
     s trace_s
 
 (*------------------------------------------------------------------*)
@@ -273,7 +263,7 @@ let get_models (s : t) =
 let mk_trace_cntxt (s : t) =
   Constr.{
     table  = s.env.table;
-    system = s.env.system;
+    system = SystemExpr.to_fset s.env.system.set;
     models = Some (get_models s);
   }
 
@@ -287,7 +277,11 @@ let check_pq_sound_sequent s =
   match goal s with
   | Atom (Equiv.Equiv e) ->
       let models = get_models s in
-      let cntxt = mk_trace_cntxt s in
+      let cntxt = Constr.{
+        table = s.env.table;
+        system = (Utils.oget s.env.system.pair:>SystemExpr.fset);
+        models = Some (get_models s)
+      } in
       if not (PostQuantum.is_attacker_call_synchronized cntxt models e) then
         Tactics.hard_failure Tactics.GoalNotPQSound
       else

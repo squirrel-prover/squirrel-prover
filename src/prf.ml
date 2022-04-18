@@ -70,7 +70,7 @@ let prf_occ_incl table system (o1 : prf_occ) (o2 : prf_occ) : bool =
     }
   in
 
-  match Match.T.try_match table system (mk_dum a1 is1 cond1 t1) pat2 with
+  match Match.T.try_match table (system:>SE.t) (mk_dum a1 is1 cond1 t1) pat2 with
   | Match.FreeTyv | Match.NoMatch _ -> false
   | Match.Match _ -> true
 
@@ -230,7 +230,8 @@ let prf_condition_side
   =
   let exception HashNoOcc in
   try
-    let cntxt = { cntxt with system = SE.project proj cntxt.system } in
+    let system = SE.(singleton (project proj cntxt.system)) in
+    let cntxt = { cntxt with system } in
     let param = prf_param (Term.pi_term ~projection:proj hash) in
 
     (* Create the frame on which we will iterate to compute the PRF formulas *)
@@ -281,4 +282,5 @@ let combine_conj_formulas p q =
   Term.mk_and
     (Term.mk_ands common)
     (Term.head_normal_biterm
-       (Term.mk_diff (Term.mk_ands new_p) (Term.mk_ands (List.rev !aux_q))))
+       (Term.mk_diff ["left",  Term.mk_ands new_p;
+                      "right", Term.mk_ands (List.rev !aux_q)]))

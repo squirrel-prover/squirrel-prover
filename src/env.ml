@@ -1,13 +1,13 @@
 type t = {
   table   : Symbols.table;      (** symbol table *)
-  system  : SystemExpr.t;       (** default system *)
+  system  : SystemExpr.context; (** default systems *)
   ty_vars : Type.tvar list;     (** free type variables *)
   vars    : Vars.env;           (** free term variables *)
 }
 
 let init 
     ~table 
-    ?(system = SystemExpr.Set.any)
+    ?(system = SystemExpr.context_any)
     ?(vars = Vars.empty_env) 
     ?(ty_vars = []) () 
   = {

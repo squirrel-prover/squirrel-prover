@@ -38,10 +38,10 @@ let rewrite_norec
   f
 
 (*------------------------------------------------------------------*)
-let parse_single_system_name table sdecl : SE.t * SE.Single.t =
-  let res = SE.parse_se table sdecl.Decl.from_sys in
-  match SE.to_list res with
-  | [s] -> res, s
+let parse_single_system_name table sdecl : SE.fset * System.Single.t =
+  let res = SE.parse table sdecl.Decl.from_sys in
+  match SE.(to_list (to_fset res)) with
+  | [_,s] -> SE.to_fset res, s
   | _ ->
     Tactics.soft_failure ~loc:(L.loc sdecl.Decl.from_sys)
       (Failure "a single system must be provided")
@@ -70,26 +70,46 @@ let conv_term table system ~bnds (term : Theory.term)
   env.vars, is, t
 
 (*------------------------------------------------------------------*)
+(** Return type for [global_*] functions below. *)
+type ret_t =
+  string *
+  Term.term list *
+  (Equiv.global_form -> Equiv.any_form) *
+  SystemExpr.pair *
+  Symbols.table
+
+(*------------------------------------------------------------------*)
 (** {2 Renaming} *)
 
-let global_rename table sdecl (gf : Theory.global_formula) =
+let global_rename table sdecl (gf : Theory.global_formula) : ret_t =
+
   let old_system, old_single_system =
     parse_single_system_name table sdecl
   in
-  let env = Env.init ~table ~system:old_system () in
-  let conv_env = Theory.{ env; cntxt = InGoal } in
 
+  (* Convert equivalence formula [gf].
+     We parse it with old_single_system on both sides,
+     but any system would work here since the equivalence must
+     relate names. *)
+  let system =
+    SE.update
+      ~pair:(SE.make_pair old_single_system old_single_system)
+      SE.context_any
+  in
+  let env = Env.init ~table ~system () in
+  let conv_env = Theory.{ env; cntxt = InGoal } in
   let f = Theory.convert_global_formula conv_env gf in
 
+  (* Decompose it as universally quantified equivalence over names. *)
   let vs, f = Equiv.Smart.decompose_forall f in
-
   Vars.check_type_vars vs [Type.Index]
     (fun () -> Tactics.hard_failure ~loc:(L.loc gf)
         (Tactics.Failure "Only index variables can be bound."));
-
   let ns1, ns2, n1, n2 =
     match f with
-    |  Atom (Equiv ([Term.Diff (Term.Name ns1, Term.Name ns2)])) ->
+    |  Atom
+         (Equiv ([Term.Diff (Explicit [_,Term.Name ns1; _,Term.Name ns2])]))
+      ->
       ns1, ns2, Term.mk_name ns1, Term.mk_name ns2
 
     | _ ->
@@ -97,15 +117,14 @@ let global_rename table sdecl (gf : Theory.global_formula) =
   in
 
   (* We check that n2 does not occur in the old system using fresh. *)
-  let cntxt = Constr.{ table  = table;
-                       system = old_system;
-                       models = None; }
+  let cntxt =
+    Constr.make_context ~table ~system:(SE.singleton old_single_system)
   in
   let iter = new Fresh.find_name ~cntxt true ns2.s_symb in
   let () =
     try
       SystemExpr.iter_descrs
-        cntxt.table cntxt.system
+        table (SE.singleton old_single_system)
         (fun action_descr ->
            iter#visit_message (snd action_descr.output) ;
            iter#visit_message (snd action_descr.condition) ;
@@ -115,6 +134,7 @@ let global_rename table sdecl (gf : Theory.global_formula) =
         (Tactics.Failure "The name on the right-hand side already \
                           occurs in the left-hand side.")
   in
+
   (* We now build the rewrite rule *)
   let evars = Term.get_vars n1 in
   let vs, subs = Term.refresh_vars `Global evars in
@@ -127,7 +147,7 @@ let global_rename table sdecl (gf : Theory.global_formula) =
     }
   in
   let map cenv t : Term.term =
-    rewrite_norec table old_system env.vars rw_rule t
+    rewrite_norec table (old_system:>SE.t) env.vars rw_rule t
   in
   let global_macro_iterator system table ns dec_def _ : unit =
     table :=
@@ -136,35 +156,28 @@ let global_rename table sdecl (gf : Theory.global_formula) =
         old_single_system system (map ())
   in
 
-
   (* We now declare the system. *)
   let table, new_system =
-    SystemExpr.clone_system_iter
-      table old_single_system
-      sdecl.Decl.name (Action.descr_map map)
+    SystemExpr.clone_system
+      table (SE.singleton old_single_system)
+      sdecl.name (Action.descr_map map)
   in
-
-  (* We finally put as axiom the equivalence between the old and the 
-     new system.
-     TODO in the future the new system should be a single system
-          where left/right projections won't make sense *)
-  let new_system_expr, old_system_expr, old_system_name =
-    match SE.to_list old_system with
-    | [s] ->
-        SE.Single.make new_system (SE.get_proj_string s), s,
-        Symbols.to_string (SE.Single.get_symbol s)
-    |  _ -> assert false
+  let new_single_system =
+    match System.projections table new_system with
+      | [p] -> System.Single.make table new_system p
+      | _ -> assert false
   in
-
   let aux_table = ref table in
-
-  Symbols.Macro.iter (global_macro_iterator new_system_expr aux_table) table;
-
+  Symbols.Macro.iter (global_macro_iterator new_single_system aux_table) table;
   let table = !aux_table in
 
-  let new_system_e =
-    SystemExpr.Pair.make table old_system_expr new_system_expr in
+  (* We finally put as axiom the equivalence between the old and the
+     new system. *)
+  let old_new_pair =
+    SE.make_pair old_single_system new_single_system
+  in
   let axiom_name =
+    let old_system_name = Symbols.to_string old_single_system.system in
     "rename_from_" ^ old_system_name ^ "_to_" ^ Location.unloc sdecl.name
   in
 
@@ -176,31 +189,39 @@ let global_rename table sdecl (gf : Theory.global_formula) =
     let fimpl =
       Equiv.Impl(
         Equiv.mk_forall evars
-          (Atom (Equiv [Term.mk_var fresh_x_var; Term.mk_diff n1 n2])),
+          (Atom (Equiv [Term.mk_var fresh_x_var;
+                        Term.mk_diff ["left",n1;"right",n2]])),
         equiv)
     in
     `Equiv (Equiv.mk_forall [fresh_x_var] fimpl)
   in
-  (axiom_name, enrich, make_conclusion, new_system_e, table)
+  (axiom_name, enrich, make_conclusion, old_new_pair, table)
 
 
 (*------------------------------------------------------------------*)
 (** {2 PRF} *)
 
-let global_prf table sdecl bnds hash =
+let global_prf table sdecl bnds hash : ret_t =
+
   let old_system, old_single_system =
     parse_single_system_name table sdecl
   in
 
-  let venv, is, hash = conv_term table old_system ~bnds hash in
+  let venv, is, hash =
+    let context =
+      SystemExpr.update
+        ~set:(SE.singleton old_single_system)
+        SystemExpr.context_any
+    in
+    conv_term table context ~bnds hash
+  in
 
-  let cntxt = Constr.{
-      table  = table;
-      system = old_system;
-      models = None}
+  let cntxt =
+    Constr.make_context ~table ~system:(SE.singleton old_single_system)
   in
 
   let param = Prf.prf_param hash in
+
   (* Check syntactic side condition. *)
   let errors =
     Euf.key_ssc
@@ -247,7 +268,7 @@ let global_prf table sdecl bnds hash =
   in
 
   let map _ t =
-    rewrite_norec table old_system venv rw_rule t
+    rewrite_norec table (old_system:>SE.t) venv rw_rule t
   in
   let global_macro_iterator system table ns dec_def _ : unit =
     table :=
@@ -256,29 +277,28 @@ let global_prf table sdecl bnds hash =
         dec_def old_single_system system (map ())
   in
 
+  (* We now declare the system. *)
   let table, new_system =
-    SystemExpr.clone_system_iter
-      table old_single_system
+    SystemExpr.clone_system
+      table (SE.singleton old_single_system)
       sdecl.Decl.name (Action.descr_map map)
   in
-
-  (* We finally put as axiom the equivalence between the old 
-     and the new system.
-     TODO in the future projecting the new system won't make sense. *)
-  let new_system_expr, old_system_expr, old_system_name =
-    match SE.to_list old_system with
-    | [s] ->
-        SE.Single.make new_system (SE.get_proj_string s), s,
-        Symbols.to_string (SE.Single.get_symbol s)
-    |  _ -> assert false
+  let new_single_system =
+    match System.projections table new_system with
+      | [p] -> System.Single.make table new_system p
+      | _ -> assert false
   in
   let aux_table = ref table in
-  Symbols.Macro.iter (global_macro_iterator new_system_expr aux_table) table;
+  Symbols.Macro.iter (global_macro_iterator new_single_system aux_table) table;
   let table = !aux_table in
 
-  let new_system_e =
-    SystemExpr.Pair.make table old_system_expr new_system_expr in
+  (* We finally put as axiom the equivalence between the old
+     and the new system. *)
+  let old_new_pair =
+    SE.make_pair old_single_system new_single_system
+  in
   let axiom_name =
+    let old_system_name = Symbols.to_string old_single_system.system in
     "prf_from_" ^ old_system_name ^ "_to_" ^ Location.unloc sdecl.name
   in
 
@@ -290,8 +310,8 @@ let global_prf table sdecl bnds hash =
       Equiv.Atom (
         Equiv [Term.mk_var fresh_x_var;
                Term.mk_diff
-                 (Term.mk_name param.h_key)
-                 (Term.mk_name @@ Term.mk_isymb n Message (is))])
+                 ["left", Term.mk_name param.h_key;
+                  "right", Term.mk_name @@ Term.mk_isymb n Message (is)]])
     in
     let concl = 
       Equiv.mk_forall [fresh_x_var]
@@ -299,23 +319,30 @@ let global_prf table sdecl bnds hash =
     in
     `Equiv concl
   in
-  (axiom_name, enrich, make_conclusion, new_system_e, table)
+  (axiom_name, enrich, make_conclusion, old_new_pair, table)
 
 
 (*------------------------------------------------------------------*)
 (** {2 CCA} *)
 
   
-let global_cca table sdecl bnds (p_enc : Theory.term) =
+let global_cca table sdecl bnds (p_enc : Theory.term) : ret_t =
+
   let old_system, old_single_system =
     parse_single_system_name table sdecl
   in
-  let venv, is, enc = conv_term table old_system ~bnds p_enc in
 
-  let cntxt = Constr.{
-      table  = table;
-      system = old_system;
-      models = None }
+  let venv, is, enc =
+    let context =
+      SystemExpr.update
+        ~set:(SE.singleton old_single_system)
+        SystemExpr.context_any
+    in
+    conv_term table context ~bnds p_enc
+  in
+
+  let cntxt =
+    Constr.make_context ~table ~system:(SE.singleton old_single_system)
   in
 
   let enc_fn, enc_key, plaintext, enc_pk, enc_rnd =
@@ -419,8 +446,8 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
   in
 
   let map cenv t =
-    rewrite_norec table old_system venv enc_rw_rule t |>
-    rewrite_norec table old_system venv dec_rw_rule 
+    rewrite_norec table (old_system:>SE.t) venv enc_rw_rule t |>
+    rewrite_norec table (old_system:>SE.t) venv dec_rw_rule
   in
   let global_macro_iterator system table ns dec_def _ =
     table :=
@@ -430,30 +457,26 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
   in
 
   let table, new_system =
-    SystemExpr.clone_system_iter
-      table old_single_system
+    SystemExpr.clone_system
+      table (SE.singleton old_single_system)
       sdecl.Decl.name (Action.descr_map map)
   in
-
-  (* We finally put as axiom the equivalence between the old and 
-     the new system.
-     TODO in the future projecting the new system won't make sense. *)
-  let new_system_expr, old_system_expr, old_system_name =
-    match SE.to_list old_system with
-    | [s] ->
-        SE.Single.make new_system (SE.get_proj_string s), s,
-        Symbols.to_string (SE.Single.get_symbol s)
-    |  _ -> assert false
+  let new_single_system =
+    match System.projections table new_system with
+      | [p] -> System.Single.make table new_system p
+      | _ -> assert false
   in
-
   let aux_table = ref table in
-  Symbols.Macro.iter (global_macro_iterator new_system_expr aux_table) table;
+  Symbols.Macro.iter (global_macro_iterator new_single_system aux_table) table;
   let table = !aux_table in
 
-
-  let new_system_e =
-    SystemExpr.Pair.make table old_system_expr new_system_expr in
+  (* We finally put as axiom the equivalence between the old and
+     the new system. *)
+  let old_new_pair =
+    SE.make_pair old_single_system new_single_system
+  in
   let axiom_name =
+    let old_system_name = Symbols.to_string old_single_system.system in
     "cca_from_" ^ old_system_name ^ "_to_" ^ Location.unloc sdecl.name
   in
 
@@ -471,17 +494,17 @@ let global_cca table sdecl bnds (p_enc : Theory.term) =
         Equiv [ Term.mk_var fresh_x_var;
                 
                 Term.mk_diff
-                 (Term.mk_name enc_key)
-                 (Term.mk_name @@ Term.mk_isymb n Message (is));
+                  ["left", Term.mk_name enc_key;
+                   "right", Term.mk_name @@ Term.mk_isymb n Message is];
                 
                Term.mk_diff
-                 (Term.mk_name enc_rnd)
-                 (Term.mk_name @@ Term.mk_isymb r Message (is))])
+                 ["left", Term.mk_name enc_rnd;
+                  "right", Term.mk_name @@ Term.mk_isymb r Message is] ])
     in
     let concl = Equiv.Impl (Equiv.mk_forall is atom, equiv) in      
     `Equiv (Equiv.mk_forall [fresh_x_var] concl)
   in
-  (axiom_name, enrich, make_conclusion, new_system_e, table)
+  (axiom_name, enrich, make_conclusion, old_new_pair, table)
 
 
 (*------------------------------------------------------------------*)

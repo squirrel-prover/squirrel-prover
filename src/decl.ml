@@ -44,7 +44,7 @@ type system_modifier =
   | CCA    of Theory.bnds * Theory.term
 
 type system_decl_modifier = { 
-  from_sys : SystemExpr.p_system_expr;
+  from_sys : SystemExpr.parsed_t;
   modifier : system_modifier;
   name     : Theory.lsymb
 }

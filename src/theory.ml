@@ -40,7 +40,7 @@ type bnds = (lsymb * p_ty) list
 
 type term_i =
   | Tpat
-  | Diff  of term * term
+  | Diff  of term * term (* TODO generalize *)
   | Seq   of bnds * term
   | Find  of lsymb list * term * term * term
 
@@ -282,7 +282,8 @@ type conversion_error_i =
   | BadInfixDecl
   | PatNotAllowed
   | ExplicitTSInProc
-  | UndefInSystem of SystemExpr.t
+  | UndefInSystem        of SystemExpr.t
+  | MissingSystem
 
 type conversion_error = L.t * conversion_error_i
 
@@ -365,6 +366,9 @@ let pp_error_i ppf = function
   | UndefInSystem t ->
     Fmt.pf ppf "action not defined in system @[%a@]"
       SystemExpr.pp t
+
+  | MissingSystem ->
+    Fmt.pf ppf "missing system annotation"
 
 let pp_error pp_loc_err ppf (loc,e) =
   Fmt.pf ppf "%a%a"
@@ -467,11 +471,10 @@ let check_action (env : Env.t) (s : lsymb) (n : int) : unit =
 
   if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity));
 
-  let _ = 
-    try SystemExpr.descr_of_action env.table env.system action with
-    | Not_found -> conv_err (L.loc s) (UndefInSystem env.system)
-  in
-  ()
+  try
+    let system = SystemExpr.to_compatible env.system.set in
+    ignore (SystemExpr.action_to_term env.table system action)
+  with _ -> conv_err (L.loc s) (UndefInSystem env.system.set)
 
 
 (*------------------------------------------------------------------*)
@@ -830,7 +833,8 @@ and convert0
       (tm, make_app loc state.env.table app_cntxt f terms)
       ty
 
-  | Diff (l,r) -> Term.mk_diff (conv ty l) (conv ty r)
+  | Diff (l,r) ->
+    Term.mk_diff ["left",conv ty l; "right",conv ty r]
 
   | Find (vs,c,t,e) ->
     let env, is =
@@ -1230,7 +1234,15 @@ let convert_global_formula (cenv : conv_env) (p : global_formula) =
     | POr   (f1, f2) -> Equiv.Or   (conve f1, conve f2)
 
     | PEquiv e ->
-      Equiv.Atom (Equiv.Equiv (convert_equiv cenv e))
+      begin match cenv.env.system with
+      | SystemExpr.{ pair = Some p } ->
+        let system = SystemExpr.{ set = (p:>SystemExpr.t) ; pair = None } in
+        let env = Env.update ~system cenv.env in
+        let cenv = { cenv with env } in
+        Equiv.Atom (Equiv.Equiv (convert_equiv cenv e))
+      | _ ->
+        conv_err (L.loc p) MissingSystem
+      end
 
     | PReach f ->
       let f, _ = convert ~ty:Type.Boolean cenv f in
