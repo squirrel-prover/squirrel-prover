@@ -733,7 +733,7 @@ and _pp
 
   | Fun (fa,_,[Fun (fi1,_,[bl1;br1]);
                Fun (fi2,_,[br2;bl2])])
-    when fa = f_and && fi1 = f_impl && fi1 = f_impl &&
+    when fa = f_and && fi1 = f_impl && fi2 = f_impl &&
          bl1 = bl2 && br1 = br2 ->
     let pp fmt () =
       Fmt.pf ppf "@[%a@ <=>@ %a@]"
