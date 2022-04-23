@@ -1581,10 +1581,9 @@ let head_pi_term (s : projection) (t : term) : term =
   | Diff (Explicit l) -> List.assoc s l
   | _ -> t
 
-let diff a b = Diff (Explicit ["left",a;"right",b])
-  (* TODO let a = match a with Diff (a,_) | a -> a in
-  let b = match b with Diff (_,b) | b -> b in
-  if a = b then a else Diff (a,b) *)
+let diff a b =
+  if a = b then a else
+    Diff (Explicit ["left",a;"right",b])
 
 let rec make_normal_biterm (dorec : bool) (t : term) : term = 
   let mdiff : term -> term -> term = fun t t' ->
