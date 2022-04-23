@@ -461,11 +461,6 @@ val pi_term : projection:projection -> term -> term
 (* TODO rename to project *)
 (* TODO take projection AND list of all projections to handle complex diffs *)
 
-(** Evaluate topmost diff operators for a given projection of a biterm.
-    For example [head_pi_term left (diff(f(diff(a,b)),c))]
-    is [f(diff(a,b))]. *)
-val head_pi_term : projection -> term -> term
-
 (** Push topmost diff-operators just enough to expose the common
     topmost constructor of the two projections of a biterm, if possible.
 

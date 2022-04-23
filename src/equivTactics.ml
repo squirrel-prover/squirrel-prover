@@ -360,7 +360,7 @@ let fa_select_felems (pat : Term.term Match.pat) (s : sequent) : int option =
 exception No_FA of [`HeadDiff | `HeadNoFun]
 
 let fa_expand (t:Term.t) =
-  let l = match t with
+  let l = match Term.head_normal_biterm t with
     | Fun (f,_,l) -> l
     | Diff _      -> raise (No_FA `HeadDiff)
     | _           -> raise (No_FA `HeadNoFun)

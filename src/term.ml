@@ -1573,10 +1573,12 @@ let pi_term ~projection term =
 
   pi_term projection term
 
-(* Go through a term and remove all diff occurrences according to the projection. *)
-let rec head_pi_term (s : projection) (t : term) : term =
+(** Evaluate topmost diff operators for a given projection of a biterm.
+    For example [head_pi_term left (diff(a,b))] is [a]
+    and [head_pi_term left f(diff(a,b),c)] is [f(diff(a,b),c)]. *)
+let head_pi_term (s : projection) (t : term) : term =
   match t with
-  | Diff (Explicit l) -> head_pi_term s (List.assoc s l)
+  | Diff (Explicit l) -> List.assoc s l
   | _ -> t
 
 let diff a b = Diff (Explicit ["left",a;"right",b])
@@ -1589,6 +1591,7 @@ let rec make_normal_biterm (dorec : bool) (t : term) : term =
     if dorec then make_normal_biterm dorec (diff t t')
     else diff t t'
   in
+  (* TODO generalize to non-binary diff *)
   match head_pi_term "left" t, head_pi_term "right" t with
   | Fun (f,fty,l), Fun (f',fty',l') when f = f' ->
     Fun (f, fty, List.map2 mdiff l l')
