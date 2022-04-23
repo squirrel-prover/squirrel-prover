@@ -157,7 +157,12 @@ let parse_single table item =
         System.Single.make table sys (L.unloc p)
 
 let parse table p = match Location.unloc p with
-  | []
+  | [] ->
+      (* Default system annotation. We might make it mean "any" eventually
+         but for now "default" avoids changing most files. *)
+      of_system table
+        (System.of_lsymb table (Location.mk_loc Location._dummy "default"))
+
   | [{system={pl_desc="any"};projection=None;alias=None}] ->
       any
 
