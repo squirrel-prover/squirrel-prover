@@ -139,7 +139,8 @@ val pi_descr : Term.projection -> descr -> descr (* TODO rename to project_descr
 
 (** Strong notion of compatibility, more restrictive (and syntactical) than
     what system compatibility alone would require, which helps to combine
-    descriptions. *)
+    descriptions. Does not rename indices, i.e. not stable by alpha
+    renaming. *)
 val strongly_compatible_descr : descr -> descr -> bool
 
 (** Takes a labelled list of single-system descriptions

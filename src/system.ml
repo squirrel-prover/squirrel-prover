@@ -58,6 +58,14 @@ let compatible table s1 s2 =
   Msh.for_all
     (fun shape d1 ->
        let d2 = Msh.find shape d2 in
+       let d2 =
+         let subst =
+           List.map2
+             (fun i j -> Term.ESubst (Term.mk_var i, Term.mk_var j))
+             d2.Action.indices d1.Action.indices
+         in
+         Action.subst_descr subst d2
+       in
        Action.strongly_compatible_descr d1 d2)
     d1
 

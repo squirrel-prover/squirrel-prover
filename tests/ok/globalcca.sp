@@ -33,12 +33,12 @@ system testCCA = [test/left] with gcca, enc(n,r,pk(kenc)).
 system testCCAR = [test/right] with gcca, enc(n,r,pk(kenc)).
 
 (* we map the fresh value of testCCAr to the one of testCCA *)
-system testCCAf = [testCCAR/left] with rename equiv(diff(n_CCA1,n_CCA)).
+system testCCAf = [testCCAR] with rename equiv(diff(n_CCA1,n_CCA)).
 
-axiom  [testCCA/left,testCCAf/right] fst_pair: forall (x,y:message), fst(<x,y>)=x.
-axiom  [testCCA/left,testCCAf/right] snd_pair: forall (x,y:message), snd(<x,y>)=y.
+axiom [any] fst_pair: forall (x,y:message), fst(<x,y>)=x.
+axiom [any] snd_pair: forall (x,y:message), snd(<x,y>)=y.
 
-equiv [testCCA/left,testCCAf/right] tests.
+equiv [testCCA,testCCAf] tests.
 Proof.
 print.
 enrich pk(kenc), n_CCA, r, h(enc(n_CCA,r,pk(kenc)),khash).

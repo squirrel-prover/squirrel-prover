@@ -15,7 +15,7 @@ system [test] (!_i A: out(c, diff(n(i),m(i)) ) | (!_i B: out(c, diff(n(i),m(i)) 
 
 system newTest = [test/left] with rename forall (i:index), equiv(diff(n(i),m(i))).
 
-equiv [newTest/left,test/right] tutu.
+equiv [newTest,test/right] tutu.
 Proof.
 help.
 print.

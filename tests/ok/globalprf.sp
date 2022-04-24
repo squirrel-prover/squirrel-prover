@@ -23,16 +23,16 @@ system [test2] (A: out(c, <ok,<n,n>>) | B: out(c, n)).
 system testPrf = [test/left] with gprf, h(ok,k).
 
 (* Then, second transitivity, from testprf to testRenamed *)
-system testRenamed = [testPrf/left] with rename equiv(diff(n_PRF,n)).
+system testRenamed = [testPrf] with rename equiv(diff(n_PRF,n)).
 
 
-axiom [testRenamed/left,test2/right] tf : forall ( p, n:message), try find such that true in p else n =p .
+axiom [testRenamed,test2/right] tf : forall ( p, n:message), try find such that true in p else n =p .
 
-axiom [testRenamed/left,test2/right] ref : forall ( n:message), diff(n,n)=n .
+axiom [testRenamed,test2/right] ref : forall ( n:message), diff(n,n)=n .
 
 
 
-equiv [testRenamed/left,test2/right] test2.
+equiv [testRenamed,test2/right] test2.
 Proof.
 
 enrich n.
@@ -84,11 +84,11 @@ system [testi2] (!_i A: out(c, <ok, idn(i)>) | !_i B: out(c,  idn(i))).
 system testiPrf = [testi/left] with gprf (j:index), h(msg(j),key(j)).
 
 (* Then, second transitivity, from testiPrf to testiRenamed *)
-system testiRenamed = [testiPrf/left] with rename forall (i:index), equiv(diff(n_PRF1(i),idn(i))).
+system testiRenamed = [testiPrf] with rename forall (i:index), equiv(diff(n_PRF1(i),idn(i))).
 (* equiv [testiPrf] t. Proof. print. admit. Qed *)
 
 
-equiv [testiRenamed/left,testi2/right] test3.
+equiv [testiRenamed,testi2/right] test3.
 Proof.
 enrich seq(i:index-> idn(i)).
 induction t.
@@ -154,7 +154,7 @@ system test_ok2G = [test_ok2/left] with gprf, h(ok,k).
 
 axiom [test_ok2G] ok_ok2 : ok = ok2.
 
-goal [test_ok2G/left] _ :
+goal [test_ok2G] _ :
   happens(A) =>
   ok = ok2 =>
   output@A = <ok, <n_PRF2,n_PRF2>>.
@@ -163,7 +163,7 @@ Proof.
   by case (try find such that (ok = ok) in n_PRF2 else _) => [_ _].
 Qed.
 
-goal [test_ok2G/left] _ :
+goal [test_ok2G] _ :
   happens(A) =>
   ok <> ok2 =>
   output@A = <ok, <n_PRF2,h(ok2, k)>>.

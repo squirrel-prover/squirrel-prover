@@ -18,13 +18,13 @@ Proof.
   auto.
 Qed.
 
-goal [left] test_left : happens(B) => cond@B => output@B = input@B.
+goal [default/left] test_left : happens(B) => cond@B => output@B = input@B.
 Proof.
   intro Hap Hc.
   by expand cond@B.
 Qed.
 
-goal [right] test_right : happens(B) => output@B = ko.
+goal [default/right] test_right : happens(B) => output@B = ko.
 Proof.
   auto.
 Qed.
