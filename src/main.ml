@@ -181,6 +181,8 @@ let is_toplevel_error ~test (e : exn) : bool =
   | Prover.Decl_error       _
   | Theory.Conv             _
   | Symbols.SymbError       _
+  | System.Error            _
+  | SystemExpr.Error        _
   | Tactic_soft_failure     _
   | Tactic_hard_failure     _ -> not test
 
@@ -216,6 +218,12 @@ let pp_toplevel_error
 
   | Symbols.SymbError e when not test ->
     (Symbols.pp_symb_error pp_loc_error) fmt e
+
+  | System.Error e when not test ->
+    Format.fprintf fmt "System error: %a" System.pp_error e
+
+  | SystemExpr.Error e when not test ->
+    Format.fprintf fmt "System error: %a" SystemExpr.pp_error e
 
   | Tactic_soft_failure (l,e) when not test ->
     Fmt.pf fmt "%aTactic failed: %a"

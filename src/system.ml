@@ -3,19 +3,19 @@ type t = Symbols.system Symbols.t
 let of_lsymb table s = Symbols.System.of_lsymb s table
 
 (*------------------------------------------------------------------*)
-type system_error =
+type error =
   | Shape_error
   | Invalid_projection
 
-let pp_system_error fmt = function
+let pp_error fmt = function
   | Shape_error ->
     Format.fprintf fmt "cannot register a shape twice with distinct indices"
   | Invalid_projection ->
     Format.fprintf fmt "invalid projection"
 
-exception System_error of system_error
+exception Error of error
 
-let system_err e = raise (System_error e)
+let error e = raise (Error e)
 
 (*------------------------------------------------------------------*)
 
@@ -117,7 +117,7 @@ let register_action table system_symb descr =
     table, symb, descr
 
   | Some (symb2, is) when List.length indices <> List.length is ->
-    system_err Shape_error
+    error Shape_error
 
   | Some (symb2, is) ->
     let subst_action =
@@ -151,7 +151,7 @@ module Single = struct
     if valid_projection table system projection then
       {system;projection}
     else
-      system_err Invalid_projection
+      error Invalid_projection
 
   let pp fmt {system;projection} =
     if projection = "" then

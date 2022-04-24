@@ -32,13 +32,13 @@ val pp_systems : Format.formatter -> Symbols.table -> unit
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
-type system_error =
+type error =
   | Shape_error        (** Inconsistency between shapes and indices. *)
   | Invalid_projection
 
-val pp_system_error : Format.formatter -> system_error -> unit
+val pp_error : Format.formatter -> error -> unit
 
-exception System_error of system_error
+exception Error of error
 
 (*------------------------------------------------------------------*)
 (** {2 Access functions} *)
