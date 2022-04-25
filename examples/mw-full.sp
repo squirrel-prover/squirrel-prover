@@ -208,12 +208,12 @@ Proof.
 
     equivalent
       (if
-          (exec@pred(R1(r)) &&
-           exists (i,t:index),
-           ((((T(i,t) < R1(r) && snd(output@T(i,t)) = snd(input@R1(r))) &&
-              fst(output@T(i,t)) = fst(input@R1(r)))
-             && R(r) < T(i,t))
-            && output@R(r) = input@T(i,t)))
+          exec@pred(R1(r)) &&
+          exists (i,t:index),
+          T(i,t) < R1(r) && snd(output@T(i,t)) = snd(input@R1(r)) &&
+          fst(output@T(i,t)) = fst(input@R1(r)) && 
+          R(r) < T(i,t) && 
+          output@R(r) = input@T(i,t)
         then
           (try find i,t such that
              xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
@@ -221,12 +221,12 @@ Proof.
              xor(diff(id(i),id'(i,t)),
                  H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))))),
       (if
-          (exec@pred(R1(r)) &&
-           exists (i,t:index),
-           ((((T(i,t) < R1(r) && snd(output@T(i,t)) = snd(input@R1(r))) &&
-              fst(output@T(i,t)) = fst(input@R1(r)))
-             && R(r) < T(i,t))
-            && output@R(r) = input@T(i,t)))
+          exec@pred(R1(r)) &&
+          exists (i,t:index),
+          T(i,t) < R1(r) && snd(output@T(i,t)) = snd(input@R1(r)) &&
+             fst(output@T(i,t)) = fst(input@R1(r))
+            && R(r) < T(i,t)
+           && output@R(r) = input@T(i,t)
           then
           (try find i,t such that
              exec@pred(R1(r)) &&

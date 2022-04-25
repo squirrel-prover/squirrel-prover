@@ -384,9 +384,11 @@ goal monotonicity (j, j', pid:index):
   SCtr(pid)@Server(pid,j) ~< SCtr(pid)@Server(pid,j') =>
   Server(pid,j) < Server(pid,j').
 Proof.
-  intro Hap [Hexec H].
+  intro Hap [_ _ H].
   assert
-    (Server(pid,j) = Server(pid,j') || Server(pid,j)< Server(pid,j') || Server(pid,j) > Server(pid,j')) as Ht;
+    (Server(pid,j) = Server(pid,j') || 
+     Server(pid,j)< Server(pid,j') || 
+     Server(pid,j) > Server(pid,j')) as Ht;
   1: constraints.
   case Ht.
 
@@ -490,16 +492,15 @@ Qed.
 (*------------------------------------------------------------------*)
 (* Auxiliary simple lemma, used to rewrite one of the conditional
    equality in the then branch. *)
-goal if_aux (b,b0,b1,b2 : boolean) (x,y,z,u,v:message):
-   if (b && (x = y && b0 && b1 && b2)) then
+goal if_aux (b,b0,b1 : boolean) (x,y,z,u,v:message):
+   if b && (x = y && b0) && b1 then
      snd(dec(z,diff(fst(dec(y,u)),v))) =
-   if (b && (x = y && b0 && b1 && b2)) then
+   if b && (x = y && b0) && b1 then
     snd(dec(z,diff(fst(dec(x,u)),v))).
 Proof.
   case b => _ //.
   case b0 => _ //.
   case b1 => _ //.
-  case b2 => _ //.
   case (x = y) => U //.
 Qed.
 
@@ -571,11 +572,11 @@ Proof.
 
     rewrite valid_decode_charac //.
     (* rewrite the content of the then branch *)
-    rewrite /otp_dec /aead_dec if_aux /= in 2.
+    rewrite /otp_dec /aead_dec if_aux /= in 2. 
     fa 2.
     rewrite /AEAD /= in 2.
     rewrite /aead /otp in 1,2.
-    fa 1. fa 1. fa 1. fa 1.
+    fa !(_ && _). fa 1.
     memseq 1 6; 1: by exists pid; rewrite if_true.
     by apply Hind (pred(t)).
 
@@ -588,7 +589,7 @@ Proof.
     fa 0; fa 1; fa 1.
     rewrite valid_decode_charac //.
     rewrite /otp /aead.
-    fa 1. fa 1. fa 1. fa 1. fa 1.
+    fa _ && _, not (_), !_ && _. fa 1.
     memseq 1 5; 1: by exists pid; rewrite if_true.
     by apply  Hind (pred(t)).
 Qed.
@@ -612,9 +613,10 @@ global goal equiv_real_ideal_enrich_tmax0 :
   )).
 Proof.
   use max_ts as [tmax [_ U]].
-  exists tmax.
+  exists tmax. 
+  split; 1: auto.
   split.
-    + by (split; intro*); 2: apply U.
+    + by intro*; apply U.
     + by apply ~inductive equiv_real_ideal_enrich tmax.
 Qed.
 
@@ -641,9 +643,10 @@ global goal equiv_real_ideal_enrich_tmax :
       seq(i:index, t':timestamp -> SCtr(i)@t')
   )).
 Proof.
-  use equiv_real_ideal_enrich_tmax0 as [tmax [[Hap C] U]].
+  use equiv_real_ideal_enrich_tmax0 as [tmax [Hap C U]].
   exists tmax.
-  split; 1: by split.
+  split; 1: auto. 
+  split; 1: auto. 
   assert (forall (t' : timestamp), (t' <= tmax) = happens(t')) as Eq.
     {intro t'; rewrite eq_iff.
     by split; 2: intro _; apply C.}
@@ -693,7 +696,7 @@ global goal injective_correspondence_equiv (pid, j:index):
          j = j').
 Proof.
   intro Hap.
-  use equiv_real_ideal_enrich_tmax as [tmax [_ H]].
+  use equiv_real_ideal_enrich_tmax as [tmax [_ _ H]].
   apply H.
 Qed.
 
@@ -715,11 +718,11 @@ Proof.
   executable Server(pid,j) => //.
   intro exec.
   expand exec, cond.
-  destruct Hexec as [Hexecpred [[Mneq1 Mneq2] Hcpt Hpid]].
+  destruct Hexec as [Hexecpred Mneq1 Mneq2 Hcpt Hpid].
   expand deccipher.
   intctxt Mneq2 => //.
   intro Ht M1 Eq.
-  exists j0.
+  exists j0 => /=.
   split => //.
 
   intro j' Hap' Hexec'.

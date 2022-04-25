@@ -357,8 +357,8 @@ Proof.
      
         - use signnottag with sidPa@P2, kP.
           use Hc with i1.
-          destruct H2 as [m2 [m3 H2]].
-          left; right.
+          destruct H2 as [m2 m3 H2]. 
+          right; right.
           by collision.
 
     + (* honest case SDIS *)

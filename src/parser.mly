@@ -51,8 +51,8 @@
 %right ARROW
 %right DARROW
 %right DEQUIVARROW
-%left AND OR
-%left GAND GOR
+%right AND OR
+%right GAND GOR
 
 %nonassoc TRUE SEQ NOT LPAREN ID UNDERSCORE FALSE DIFF
 
@@ -61,7 +61,7 @@
 %nonassoc empty_else
 %nonassoc ELSE
 
-%left INFIXSYMB
+%right INFIXSYMB
 
 %left XOR
 
@@ -389,7 +389,7 @@ bty_infos:
 
 lsymb_decl:
 | id=lsymb                       { `Prefix, id }
-| LPAREN s=loc(INFIXSYMB) RPAREN { `Infix, s }
+| LPAREN s=loc(INFIXSYMB) RPAREN { `Infix `Right, s }
 
 declaration_i:
 | HASH e=lsymb a=index_arity ctys=c_tys

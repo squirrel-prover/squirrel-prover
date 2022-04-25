@@ -77,30 +77,27 @@ Proof.
       intro [j Eq]; subst tau, O(j).
       use IH with pred(O(j)) => //.
       destruct H as [H1 | [j0 H2]].
-        - left; intro j0 HpA; by use H1 with j0 => //.
-        - right. destruct H2 as [H21 H22].
+        - left; intro j0 HpA; by use H1 with j0.
+        - right. destruct H2 as [_ _ H2].
           exists j0.
-          split => //.
-          intro jj.
-          intro Hyp.
-          use H22 with jj => //.
+          intro /= jj Hyp.
+          by apply H2.
 
     + (* A(i0,j) *)
-      intro [i0 j Eq]; subst tau, A(i0,j). case (i<>i0) => //.
+      intro [i0 j Eq]; subst tau, A(i0,j). 
+      case (i<>i0) => //.
        - (* 1st case: i<>i0 *)
           intro Neq.
           use IH with pred(A(i0,j)) => //.
           destruct H as [H1 | [j0 H2]].
-            * left; intro j0 HpA; by use H1 with j0 => //.
-            * right; destruct H2 as [H21 H22]; exists j0.
-              split => //.
-              intro jj.
-              intro Hyp.
-              use H22 with jj => //.
+            * left; intro j0 HpA; by use H1 with j0.
+            * right; destruct H2 as [_ _ H2]; exists j0.
+              intro /= jj Hyp.
+              by apply H2.
 
       - (* 2nd case: i<>i0 *)
         intro Eq; subst i0, i.
-        right; exists j; split => //.
+        by right; exists j.
 Qed.
 
 goal lastupdate_init : forall (i:index,tau:timestamp), happens(tau) => (
@@ -201,8 +198,8 @@ goal disjoint_chains :
   s(i)@tau <> s(i')@tau'.
 Proof.
   induction => tau' IH tau i' i D E Meq.
-  use lastupdate with i,tau as [[A0 Hinit] | [j [[A0 A1] Hsup]]] => //;
-  use lastupdate with i',tau' as [[A Hinit'] | [j' [[B C] Hsup']]] => //.
+  use lastupdate with i,tau as [[A0 Hinit] | [j [A0 A1 Hsup]]] => //;
+  use lastupdate with i',tau' as [[A Hinit'] | [j' [B C Hsup']]] => //.
 
     + rewrite -Meq A0 /s in B.
       by fresh B.

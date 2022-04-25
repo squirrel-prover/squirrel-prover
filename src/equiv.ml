@@ -333,7 +333,8 @@ module Smart : Term.SmartFO with type form = _form = struct
       then None
       else Some (List.map (fun f -> Atom (Reach f)) l)
 
-  let mk_destr_left f_destr =
+  (** left-associative *)
+  let[@warning "-32"] mk_destr_left f_destr =
     let rec destr l f =
       if l < 0 then assert false;
       if l = 1 then Some [f]
@@ -343,28 +344,34 @@ module Smart : Term.SmartFO with type form = _form = struct
     in
     destr
 
-  (** left-associative *)
+  (** right-associative *)
+  let mk_destr_right f_destr =
+    let rec destr l f =
+      if l < 0 then assert false;
+      if l = 1 then Some [f]
+      else match f_destr f with
+        | None -> None
+        | Some (f,g) -> omap (fun l -> f :: l) (destr (l-1) g)
+    in
+    destr
+
   let destr_ands i f =
     match f with
     | Atom (Reach f) ->
       destr_lift_many (Term.Smart.destr_ands i f)
-    | _ -> mk_destr_left destr_and i f
+    | _ -> mk_destr_right destr_and i f
 
   let destr_ors i f =
     match f with
     | Atom (Reach f) ->
       destr_lift_many (Term.Smart.destr_ors i f)
-    | _ -> mk_destr_left destr_or i f
+    | _ -> mk_destr_right destr_or i f
 
-  let destr_impls =
-    let rec destr l f =
-      if l < 0 then assert false;
-      if l = 1 then Some [f]
-      else match destr_impl f with
-        | None -> None
-        | Some (f,g) -> omap (fun l -> f :: l) (destr (l-1) g)
-    in
-    destr
+  let destr_impls i f =
+    match f with
+    | Atom (Reach f) ->
+      destr_lift_many (Term.Smart.destr_impls i f)
+    | _ -> mk_destr_right destr_impl i f
 
   let destr_eq = function
     | Atom (Reach f) -> Term.destr_eq f

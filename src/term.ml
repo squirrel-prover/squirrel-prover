@@ -295,7 +295,7 @@ module SmartConstructors = struct
     | t, tt when tt = mk_true && simpl -> t
     | t1,t2 -> mk_and_ns t1 t2
 
-  let mk_ands ?(simpl=true) ts = List.fold_left (mk_and ~simpl) mk_true ts
+  let mk_ands ?(simpl=true) ts = List.fold_right (mk_and ~simpl) ts mk_true 
 
   let mk_or ?(simpl=true) t1 t2 = match t1,t2 with
     | tt, _ when tt = mk_true && simpl -> mk_true
@@ -305,7 +305,7 @@ module SmartConstructors = struct
     | t, tf when tf = mk_false && simpl -> t
     | t1,t2 -> mk_or_ns t1 t2
 
-  let mk_ors ?(simpl=true) ts = List.fold_left (mk_or ~simpl) mk_false ts
+  let mk_ors ?(simpl=true) ts = List.fold_right (mk_or ~simpl) ts mk_false 
 
   let mk_impl ?(simpl=true) t1 t2 = match t1,t2 with
     | tf, _ when tf = mk_false && simpl -> mk_true
@@ -501,7 +501,7 @@ module SmartDestructors = struct
 
   (*------------------------------------------------------------------*)
   (** for [fs] of arity 2, left associative *)
-  let mk_destr_many_left fs =
+  let[@warning "-32"] mk_destr_many_left fs =
     let rec destr l f =
       if l < 0 then assert false;
       if l = 1 then Some [f]
@@ -524,8 +524,8 @@ module SmartDestructors = struct
     in
     destr
 
-  let destr_ors   = mk_destr_many_left  f_or
-  let destr_ands  = mk_destr_many_left  f_and
+  let destr_ors   = mk_destr_many_right  f_or
+  let destr_ands  = mk_destr_many_right  f_and
   let destr_impls = mk_destr_many_right f_impl
 
   (*------------------------------------------------------------------*)
@@ -638,6 +638,10 @@ type fixity = [`Prefix | `Postfix | `Infix of assoc | `NonAssoc | `NoParens]
 let pp_maybe_paren (c : bool) (pp : 'a Fmt.t) : 'a Fmt.t =
   if c then Fmt.parens pp else pp
 
+(** Parenthesis rules.
+    N.B.: the rule for infix left-associative symbols is only valid if,
+    in the parser, all prefix symbols are reduction-favored over 
+    shifting the infix symbol. *)
 let maybe_paren
     ~(inner : 'a * fixity)
     ~(outer : 'a * fixity)
@@ -745,26 +749,16 @@ and _pp
   | Fun _ as f when is_and_happens f ->
     pp_and_happens info ppf f
 
-  (* only right-associate symbol we have *)
-  | Fun ((s,is),_,[bl;br]) when (s = Symbols.fs_impl) ->
-    assert (is = []);
-    let pp fmt () =
-      Fmt.pf ppf "@[<0>%a %s@ %a@]"
-        (pp ((`F s, `Infix `Right), `Left)) bl
-        (Symbols.to_string s)
-        (pp ((`F s, `Infix `Right), `Right)) br
-    in
-    maybe_paren ~outer ~side ~inner:(`F s, `Infix `Right) pp ppf ()
-
   | Fun ((s,is),_,[bl;br]) when Symbols.is_infix s ->
+    let assoc = Symbols.infix_assoc s in
     assert (is = []);
     let pp fmt () =
       Fmt.pf ppf "@[<0>%a %s@ %a@]"
-        (pp ((`F s, `Infix `Left), `Left)) bl
+        (pp ((`F s, `Infix assoc), `Left)) bl
         (Symbols.to_string s)
-        (pp ((`F s, `Infix `Left), `Right)) br
+        (pp ((`F s, `Infix assoc), `Right)) br
     in
-    maybe_paren ~outer ~side ~inner:(`F s, `Infix `Left) pp ppf ()
+    maybe_paren ~outer ~side ~inner:(`F s, `Infix assoc) pp ppf ()
 
   | Fun (s,_,[b]) when s = f_not ->
     Fmt.pf ppf "@[<hov 2>not(%a)@]" (pp (not_fixity, `Right)) b

@@ -99,7 +99,7 @@ Proof.
   depends Reader(k), Reader1(k); 1: auto.
   intro C.
   expand exec, cond.
-  split => [_ [i j [[H _] _]]].
+  split => [_ [i j [H [_ _]]]].
 
   (* Direction => *)
   + project; use tags_neq as _.
@@ -135,7 +135,7 @@ Proof.
   split.
 
   (* Direction => is the obvious one *)
-  + intro [_ H0] => /= [i j [[H1 _] _]].
+  + intro [_ H0] => /= [i j [H1 [_ _]]].
     notleft H0.
     use H0 with i,j; case H1.
     clear H0.
@@ -144,7 +144,7 @@ Proof.
     by case H.
 
   (* Direction <= *)
-  + intro [_ H0] => /= [i j [[H1 _] _]].
+  + intro [_ H0] => /= [i j [H1 [_ _]]].
     notleft H0.
     use tags_neq.
     project.
@@ -228,14 +228,14 @@ Proof.
       (if
          exec@pred(Reader1(k)) &&
          (exists (i,j:index),
-           ((Tag(i,j) < Reader1(k) &&
-             Reader(k) < Reader1(k)) &&
-            output@Tag(i,j) = input@Reader1(k)) &&
+           Tag(i,j) < Reader1(k) &&
+           Reader(k) < Reader1(k) &&
+           output@Tag(i,j) = input@Reader1(k) &&
            input@Tag(i,j) = output@Reader(k))
        then
          (try find i,j such that
-            (dec(input@Reader1(k),diff(kE(i),kbE(i,j))) <> fail &&
-             fst(dec(input@Reader1(k),diff(kE(i),kbE(i,j)))) = tagT) &&
+            dec(input@Reader1(k),diff(kE(i),kbE(i,j))) <> fail &&
+            fst(dec(input@Reader1(k),diff(kE(i),kbE(i,j)))) = tagT &&
             fst(snd(dec(input@Reader1(k),diff(kE(i),kbE(i,j))))) = nr(k)
           in
             enc(<tagR,<snd(snd(dec(input@Reader1(k),diff(kE(i),kbE(i,j))))),
@@ -245,9 +245,9 @@ Proof.
       (if
          exec@pred(Reader1(k)) &&
          (exists (i,j:index),
-           ((Tag(i,j) < Reader1(k) &&
-             Reader(k) < Reader1(k)) &&
-            output@Tag(i,j) = input@Reader1(k)) &&
+           Tag(i,j) < Reader1(k) &&
+           Reader(k) < Reader1(k) &&
+           output@Tag(i,j) = input@Reader1(k) &&
            input@Tag(i,j) = output@Reader(k))
        then
          (try find i,j such that

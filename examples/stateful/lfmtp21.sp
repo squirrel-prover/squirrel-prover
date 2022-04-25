@@ -118,7 +118,7 @@ goal non_repeating :
   s@alpha <> s@beta.
 Proof.
   induction => beta IH alpha _ [i [_ _]] Meq.
-  use lastupdate with beta as [[_ Habs] | [j [[_ _] Hsup]]] => //;
+  use lastupdate with beta as [[_ Habs] | [j [_ _ _ Hsup]]] => //;
     1: by use Habs with i.
 
   use Hsup with i => //.

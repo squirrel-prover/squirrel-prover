@@ -8,7 +8,9 @@ type lsymb = string Location.located
 (** Type of a function symbol (Prefix or Infix)
     - infix symbols must start by a character in [infix_first_chars]
     - infix symbols must be without index parameters *)
-type symb_type = [ `Prefix | `Infix ]
+
+type assoc = [`Right | `Left | `NonAssoc]
+type symb_type = [ `Prefix | `Infix of assoc ]
 
 val infix_fist_chars : char list
 
@@ -293,7 +295,10 @@ val check_bty_info : table -> Type.ty -> bty_info -> bool
 val is_infix     : fname -> bool 
 val is_infix_str : string  -> bool 
 
+val infix_assoc : fname -> assoc
+
 val is_global : macro_def -> bool
+
 (*------------------------------------------------------------------*)
 (** {2 Builtins} *)
 

@@ -1122,7 +1122,7 @@ let declare_abstract
   (* if we declare an infix symbol, run some sanity checks *)
   let () = match f_info with
     | `Prefix -> ()
-    | `Infix ->
+    | `Infix side ->
       if not (index_arity = 0) ||
          not (List.length ty_args = 0) ||
          not (List.length in_tys = 2) then

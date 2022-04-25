@@ -6,7 +6,8 @@ type lsymb = string L.located
 
 (*------------------------------------------------------------------*)
 (** Type of a function symbol (Prefix or Infix *)
-type symb_type = [ `Prefix | `Infix ]
+type assoc = [`Right | `Left | `NonAssoc]
+type symb_type = [ `Prefix | `Infix of assoc ]
 
 (*------------------------------------------------------------------*)
 type namespace =
@@ -124,7 +125,7 @@ type data += AssociatedFunctions of (fname t) list
 
 
 (*------------------------------------------------------------------*)
-let to_string s = s.name
+let to_string (s : symb) : string = s.name
 
 let pp fmt symb = Format.pp_print_string fmt symb.name
 
@@ -581,6 +582,17 @@ let is_infix (s : fname t) : bool =
   let s = to_string s in
   is_infix_str s
 
+(* We only have non-associative and right-associative symbols.
+   Indeed, if we wanted symbols to have an optional associativity, we would 
+   have to record it in the symbol table. This would require the 
+   pretty-printer to take the table as argument, which is cumbersome. *)
+let infix_assoc (s : fname t) : assoc =
+  assert (is_infix s);
+  let s = to_string s in
+  if s = "=" || s = "<>" || s = "<=" || 
+     s = "<" || s = ">=" || s = ">" then `NonAssoc
+  else `Right
+
 let is_global : macro_def -> bool = function Global _ -> true | _ -> false
 
 (*------------------------------------------------------------------*)
@@ -656,9 +668,9 @@ let fs_pred =
 
 let fs_false = mk_fsymb ~bool:true "false" 0
 let fs_true  = mk_fsymb ~bool:true "true" 0
-let fs_and   = mk_fsymb ~bool:true ~f_info:`Infix "&&" 2
-let fs_or    = mk_fsymb ~bool:true ~f_info:`Infix "||" 2
-let fs_impl  = mk_fsymb ~bool:true ~f_info:`Infix "=>" 2
+let fs_and   = mk_fsymb ~bool:true ~f_info:(`Infix `Right) "&&" 2
+let fs_or    = mk_fsymb ~bool:true ~f_info:(`Infix `Right) "||" 2
+let fs_impl  = mk_fsymb ~bool:true ~f_info:(`Infix `Right) "=>" 2
 let fs_not   = mk_fsymb ~bool:true "not" 1
 
 let fs_ite =
@@ -682,7 +694,7 @@ let mk_comp name =
       [tyvar; tyvar]
       Type.Boolean
   in
-  mk_fsymb ~f_info:`Infix ~fty name (-1)
+  mk_fsymb ~f_info:(`Infix `NonAssoc) ~fty name (-1)
 
 let fs_eq  = mk_comp "="
 let fs_neq = mk_comp "<>"
@@ -705,7 +717,7 @@ let fs_fail = mk_fsymb "fail" 0
 
 (** Xor and its unit *)
 
-let fs_xor  = mk_fsymb ~f_info:`Infix "xor" 2
+let fs_xor  = mk_fsymb ~f_info:(`Infix `Right) "xor" 2
 let fs_zero = mk_fsymb "zero" 0
 
 (** Successor over natural numbers *)

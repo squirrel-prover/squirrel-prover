@@ -41,15 +41,13 @@ Proof.
   assert (->:
     try find j,j2 such that (j = i && j = j2) in <mess(i),mess(j2)> 
     = 
-    <mess(i),mess(i)>).
-  case  try find j,j2 such that (j = i && j = j2) in <mess(i),mess(j2)>.
-  intro [_ _ [_ _ ->]]. 
-  auto.
+    <mess(i),mess(i)>). {
+    case  try find j,j2 such that (j = i && j = j2) in <mess(i),mess(j2)>.
+    + auto.
   
-  intro H0.
-  destruct H0.
-  use H0 with i,i.
-  auto.
+    + intro [H0 _].
+      by use H0 with i,i.
+  }.
   
   auto.
 Qed.
