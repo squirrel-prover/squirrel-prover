@@ -181,6 +181,6 @@ rule token = parse
 and comment = parse
   | "*)"        { () }
   | "(*"        { comment lexbuf; comment lexbuf }
-  | "\n"     { new_line lexbuf; comment lexbuf }
+  | "\n"        { new_line lexbuf; comment lexbuf }
   | eof         { unterminated_comment () }
   | _           { comment lexbuf }

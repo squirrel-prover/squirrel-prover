@@ -719,10 +719,10 @@ and _pp
 
   | Fun (s,_,[a;b;c]) when s = f_ite ->
     let pp fmt () =
-      Fmt.pf ppf "@[<hov 0>@[<hov 2>if %a@ then@ %a@]@ @[<hov 2>else@ %a@]@]"
+      Fmt.pf ppf "@[<hv 0>@[<hov 2>if %a@ then@ %a@]@ %a@]"
         (pp (ite_fixity, `NonAssoc)) a
         (pp (ite_fixity, `NonAssoc)) b
-        (pp (ite_fixity, `Right)) c
+        (pp_chained_ite info)        c (* prints the [else] *)
     in
     maybe_paren ~outer ~side ~inner:ite_fixity pp ppf ()
 
@@ -807,7 +807,7 @@ and _pp
 
   | Find (b, c, d, Fun (f,_,[])) when f = f_zero ->
     let pp fmt () =
-      Fmt.pf ppf "@[<hov 0>\
+      Fmt.pf ppf "@[<hv 0>\
                   @[<hov 2>try find %a such that@ %a@]@;<1 0>\
                   @[<hov 2>in@ %a@]@]"
         Vars.pp_typed_list b
@@ -818,15 +818,14 @@ and _pp
 
   | Find (b, c, d, e) ->
     let pp fmt () =
-      Fmt.pf ppf "@[<hov 0>\
+      Fmt.pf ppf "@[<hv 0>\
                   @[<hov 2>try find %a such that@ %a@]@;<1 0>\
-                  @[<hov 0>\
                   @[<hov 2>in@ %a@]@;<1 0>\
-                  @[<hov 2>else@ %a@]@]@]"
+                  %a@]"
         Vars.pp_typed_list b
         (pp (find_fixity, `NonAssoc)) c
         (pp (find_fixity, `NonAssoc)) d
-        (pp (find_fixity, `Right)) e
+        (pp_chained_find info)        e (* prints the [else] *)
     in
     maybe_paren ~outer ~side ~inner:find_fixity pp ppf ()
 
@@ -845,6 +844,32 @@ and _pp
         (pp (quant_fixity, `Right)) b
     in
     maybe_paren ~outer ~side ~inner:(`Quant, `Prefix) pp ppf ()
+
+(* Printing in a [hv] box. Print the trailing [else] of the caller. *)
+and pp_chained_ite info ppf (t : term) = 
+  match t with
+  | Fun (s,_,[a;b;c]) when s = f_ite ->
+    Fmt.pf ppf "@[<hov 2>else if %a@ then@ %a@]@ %a"
+      (pp info (ite_fixity, `NonAssoc)) a
+      (pp info (ite_fixity, `NonAssoc)) b
+      (pp_chained_ite info)             c
+
+  | _ -> Fmt.pf ppf "@[<hov 2>else@ %a@]" (pp info (ite_fixity, `Right)) t
+
+(* Printing in a [hv] box. Print the trailing [else] of the caller. *)
+and pp_chained_find info ppf (t : term) = 
+  match t with
+  | Find (b, c, d, e) ->
+    Fmt.pf ppf "@[<hov 2>else try find %a such that@ %a@]@;<1 0>\
+                @[<hov 2>in@ %a@]@;<1 0>\
+                %a"
+      Vars.pp_typed_list b
+      (pp info (find_fixity, `NonAssoc)) c
+      (pp info (find_fixity, `NonAssoc)) d
+      (pp_chained_find info)        e
+
+  | _ -> Fmt.pf ppf "@[<hov 2>else@ %a@]" (pp info (find_fixity, `Right)) t
+
 
 and pp_happens info ppf (ts : term list) =
   Fmt.pf ppf "@[<hv 2>%a(%a)@]"
