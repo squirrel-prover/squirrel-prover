@@ -666,21 +666,18 @@ let xo_lt
     (x : XO.t) (y : XO.t)
   : bool
   =
+  Fmt.epr "@.x: %a@.y: %a@." XO.pp x XO.pp y;
+
   let x, y = x.cnt, y.cnt in
 
   if x.x_msymb = y.x_msymb then
     (* If we compare the same macros, at the same action, only look for
        subterm ordering constraints. *)
-    begin
-      if Symbols.is_global x.x_mdef && Symbols.is_global y.x_mdef then
-        assert (x.x_a = y.x_a);  
-
-      x.x_a = y.x_a &&
-      (let px = Sp.choose x.x_occ.occ_pos
-       and py = Sp.choose y.x_occ.occ_pos in
-       (* Checking for a single position is enough *)
-       Pos.lt px py)
-    end
+    x.x_a = y.x_a &&
+    (let px = Sp.choose x.x_occ.occ_pos
+     and py = Sp.choose y.x_occ.occ_pos in
+     (* Checking for a single position is enough *)
+     Pos.lt px py)
     
   else
     (* Otherwise, unroll [y] definition and look whether [x] appears *)
@@ -709,10 +706,7 @@ let xo_lt
       | Macro (ms, _, ts) ->
         if ms.s_symb = x.x_msymb then
           match ts with
-          | Term.Action (a, _) ->
-            if Symbols.is_global x.x_mdef then
-              assert (x.x_a = a);   
-            a = x.x_a
+          | Term.Action (a, _) -> a = x.x_a
           | _ -> false
         else
           begin

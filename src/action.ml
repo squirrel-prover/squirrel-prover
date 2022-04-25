@@ -216,6 +216,7 @@ let pp_descr ~debug ppf descr =
               %a\
               @[<hv 2>condition:@ @[<hov>%a@]@]@;\
               %a\
+              %a\
               @[<hv 2>output:@ @[<hov>%a@]@]@]"
     pp_descr_short descr
     (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" Vars.pp_list)
@@ -227,6 +228,9 @@ let pp_descr ~debug ppf descr =
           (fun ppf (s, t) ->
              Fmt.pf ppf "@[%a :=@ %a@]" Term.pp_msymb s Term.pp t)))
     descr.updates
+    (Utils.pp_ne_list "@[<hv 2>globals:@ @[<hv>%a@]@]@;"
+       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ";@ ") Symbols.pp))
+    descr.globals
     Term.pp (snd descr.output)
 
 (*------------------------------------------------------------------*)

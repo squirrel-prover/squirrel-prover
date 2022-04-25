@@ -866,7 +866,7 @@ and pp_chained_find info ppf (t : term) =
       Vars.pp_typed_list b
       (pp info (find_fixity, `NonAssoc)) c
       (pp info (find_fixity, `NonAssoc)) d
-      (pp_chained_find info)        e
+      (pp_chained_find info)             e
 
   | _ -> Fmt.pf ppf "@[<hov 2>else@ %a@]" (pp info (find_fixity, `Right)) t
 
