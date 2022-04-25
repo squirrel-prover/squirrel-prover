@@ -572,11 +572,22 @@ let check_bty_info table (ty : Type.ty) (info : bty_info) : bool =
   let infos = get_bty_info table ty in
   List.mem info infos
 
-let infix_fist_chars =  ['^'; '+'; '-'; '*'; '|'; '&'; '='; '>'; '<'; '~']
+(*------------------------------------------------------------------*)
+let right_infix_fist_chars =  ['+'; '-'; '*'; '|'; '&'; '='; '>'; '<'; '~']
+let left_infix_fist_chars  =  ['^']
+let infix_fist_chars = left_infix_fist_chars @ right_infix_fist_chars
 
 let is_infix_str (s : string) : bool =
   let first = String.get s 0  in
   List.mem first infix_fist_chars
+
+let is_left_infix_str (s : string) : bool =
+  let first = String.get s 0  in
+  List.mem first left_infix_fist_chars
+
+let is_right_infix_str (s : string) : bool =
+  let first = String.get s 0  in
+  List.mem first right_infix_fist_chars
 
 let is_infix (s : fname t) : bool =
   let s = to_string s in
@@ -591,8 +602,11 @@ let infix_assoc (s : fname t) : assoc =
   let s = to_string s in
   if s = "=" || s = "<>" || s = "<=" || 
      s = "<" || s = ">=" || s = ">" then `NonAssoc
-  else `Right
+  else if is_right_infix_str s then `Right
+  else if is_left_infix_str s then `Left
+  else assert false
 
+(*------------------------------------------------------------------*)
 let is_global : macro_def -> bool = function Global _ -> true | _ -> false
 
 (*------------------------------------------------------------------*)
@@ -637,7 +651,7 @@ let () = builtin_ref := table
 let mk_fty arity (ty : Type.ty) =
   Type.mk_ftype 0 [] (List.init arity (fun _ -> ty)) ty
 
-let mk_fsymb ?fty ?(bool=false) ?(f_info=`Prefix) f arity =
+let mk_fsymb ?fty ?(bool=false) ?(f_info=`Prefix) (f : string) arity =
   let fty = match fty with
     | None -> mk_fty arity (if bool then Type.Boolean else Type.Message)
     | Some fty -> fty in

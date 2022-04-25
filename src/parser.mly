@@ -12,8 +12,10 @@
 
 %token <int> INT
 %token <string> ID   /* general purpose identifier */
-%token <string> INFIXSYMB   /* infix function symbols */
+%token <string> LEFTINFIXSYMB    /* left infix function symbols */
+%token <string> RIGHTINFIXSYMB   /* right infix function symbols */
 %token <string> BANG
+
 %token AT 
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
@@ -61,7 +63,8 @@
 %nonassoc empty_else
 %nonassoc ELSE
 
-%right INFIXSYMB
+%right RIGHTINFIXSYMB
+%left  LEFTINFIXSYMB
 
 %left XOR
 
@@ -152,7 +155,8 @@ sterm_i:
 %inline infix_s:
 | AND         { "&&"  }
 | OR          { "||"   }
-| s=INFIXSYMB { s }
+| s=LEFTINFIXSYMB  { s }
+| s=RIGHTINFIXSYMB { s }
 | XOR         { "xor"  }
 | DARROW      { "=>" }
 
@@ -388,8 +392,9 @@ bty_infos:
 |                                           { [] }
 
 lsymb_decl:
-| id=lsymb                       { `Prefix, id }
-| LPAREN s=loc(INFIXSYMB) RPAREN { `Infix `Right, s }
+| id=lsymb                            { `Prefix, id }
+| LPAREN s=loc(RIGHTINFIXSYMB) RPAREN { `Infix `Right, s }
+| LPAREN s=loc(LEFTINFIXSYMB)  RPAREN { `Infix `Left, s }
 
 declaration_i:
 | HASH e=lsymb a=index_arity ctys=c_tys
@@ -1043,7 +1048,8 @@ bullet:
 | MINUS              { "-" }
 | PLUS               { "+" }
 | STAR               { "*" }
-| INFIXSYMB          { $1 }
+| s=RIGHTINFIXSYMB   { s }
+| s=LEFTINFIXSYMB    { s }
 
 brace:
 | LBRACE             { `Open }
