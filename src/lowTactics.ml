@@ -1862,19 +1862,19 @@ let rec do_intros_ip
   match intros with
   | [] -> [s]
 
-  | (Args.SItem s_item) :: intros ->
+  | Args.SItem s_item :: intros ->
     do_intros_ip_list simpl intros (do_s_item simpl s_item s)
 
-  | (Args.Simpl s_ip) :: intros ->
+  | Args.Simpl s_ip :: intros ->
     let ss = do_intro_pat s_ip s in
     do_intros_ip_list simpl intros ss
 
-  | (Args.SExpnd s_e) :: intros ->
+  | Args.SExpnd s_e :: intros ->
     let ss = do_rw_item (s_e :> Args.rw_item) `Goal s in
     let ss = as_seq1 ss in (* we get exactly one new goal *)
     do_intros_ip simpl intros ss
 
-  | (Args.StarV loc) :: intros0 ->
+  | Args.StarV loc :: intros0 ->
     let repeat, s =
       try
         let handler, s = do_intro_var s in
@@ -1886,13 +1886,14 @@ let rec do_intros_ip
     let intros = if repeat then intros else intros0 in
     do_intros_ip simpl intros s
 
-  | (Args.Star loc) :: intros ->
+  | Args.Star loc :: intros ->
     try
       let handler, s = do_intro s in
       let s = do_naming_pat handler Args.AnyName s in
-      do_intros_ip simpl [Args.Star loc] s
+      do_intros_ip simpl (Args.Star loc :: intros) s
 
-    with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> [s]
+    with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> 
+      do_intros_ip simpl intros s
 
 and do_intros_ip_list
     (simpl : f_simpl)
