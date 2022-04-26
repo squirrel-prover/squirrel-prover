@@ -586,7 +586,9 @@ type x_hash_occ = {
   (* the occurrence *)
   x_occ : Iter.hash_occ;
 
-  (* the associated generated name (≠ for all extended hash occurrences) *)
+  (* associated generated name, which is ≠ for all extended hash occs., 
+     except for global macros, where the same name is used for the same
+     global macro appearing in different (mutually exclusive) branches. *)
   x_nsymb : Symbols.name;
 }
 
@@ -785,10 +787,7 @@ let check_uniq table (map : XO.t list) =
       List.for_all (fun (y : XO.t) -> 
           x.tag = y.tag ||
           let x, y = x.cnt, y.cnt in
-          if Macros.is_global table x.x_msymb then
-            x.x_msymb <> y.x_msymb
-          else
-            x.x_msymb <> y.x_msymb || x.x_a <> y.x_a
+          x.x_msymb <> y.x_msymb || x.x_a <> y.x_a
         ) map
     ) map
 
@@ -830,18 +829,30 @@ let global_prf_t
 
   let mk_occ_name
       (table : Symbols.table)
-      (occ   : Iter.hash_occ)
+      (occ   : Iter.hash_occ)   (* new occurrence *)
+      (ms    : Symbols.macro)   (* macro the new occ. appears in *)
+      (occs  : XO.t list)       (* already computed occurrences *)
     : Symbols.table * Symbols.name
     =
     (* check that no occurrence of the hash appears below a binder
        with a non-finite type. *)
     check_fv_finite occ.Iter.occ_vars;
 
-    let ndef =
-      let ty_args = List.map Vars.ty occ.Iter.occ_vars in
-      Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args m_ty ; }
-    in
-    Symbols.Name.declare table (L.mk_loc L._dummy "n_PRF") ndef
+    try
+      (* for global macros, we use the same name for the same global macro
+         appearing in different (mutually exclusive) branches of the system. *)
+      let x = 
+        List.find (fun x -> 
+            Macros.is_global table ms && x.XO.cnt.x_msymb = ms
+          ) occs 
+      in
+      table, x.cnt.x_nsymb 
+    with Not_found ->
+      let ndef =
+        let ty_args = List.map Vars.ty occ.Iter.occ_vars in
+        Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args m_ty ; }
+      in
+      Symbols.Name.declare table (L.mk_loc L._dummy "n_PRF") ndef
   in
 
   let (table, occs) : Symbols.table * XO.t list =
@@ -858,7 +869,7 @@ let global_prf_t
             (* extend new occurrences with additional information *)
             let table, new_occs =
               List.map_fold (fun table occ ->
-                  let table, x_nsymb = mk_occ_name table occ in
+                  let table, x_nsymb = mk_occ_name table occ ms occs in
                   table,
                   XO.mk {
                     x_msymb = ms;
@@ -1035,8 +1046,7 @@ let global_prf_t
     Term.mk_find [tau] cond t_then t_else
   in
 
-  (* - [d] is the action description we are rewritting in
-     - [ms] is the macro whose body we are rewritting at time [d] 
+  (* - [ms] is the macro whose body we are rewritting at time [d] 
      - [pos] is the position at which we are trying to do the rewrite, 
        which is necessary to retrieve the associated fresh name. 
      - [bnd_vars] are the variable bound above [pos]. *)
