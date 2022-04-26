@@ -49,14 +49,24 @@ class get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n = object (sel
 end
 
 (*------------------------------------------------------------------*)
-  
+let err_msg_of_msymb table a (ms : Symbols.macro) : Tactics.ssc_error_c =
+  let k = 
+    match Symbols.Macro.get_def ms table with
+    | Symbols.Output   -> `Output
+    | Symbols.Cond     -> `Cond
+    | Symbols.Global _ -> `Global ms
+    | Symbols.State _  -> `Update ms
+    | _ -> assert false
+  in
+  Tactics.E_indirect (a,k)
+
 (*------------------------------------------------------------------*) 
 (** Check the key syntactic side-condition in the given list of messages
   * and in the outputs, conditions and updates of all system actions:
   * [key_n] must appear only in key position of [head_fn].
   * Return unit on success, raise [Bad_ssc] otherwise. *)
 let key_ssc
-    ?(messages=[]) ?(elems=[]) ~allow_functions
+    ~globals ?(messages=[]) ?(elems=[]) ~allow_functions
     ~cntxt head_fn key_n =
   let ssc =
     new check_key ~allow_functions ~cntxt head_fn key_n
@@ -72,17 +82,14 @@ let key_ssc
   let errors2 = List.filter_map (check E_elem) elems in
 
   let errors3 =
-    SystemExpr.fold_descrs 
-      (fun descr acc ->
-         let name = descr.name in
-
-         let errors = 
-           check (E_indirect (name, `Cond)) (snd descr.condition) ::
-           check (E_indirect (name, `Output)) (snd descr.output) ::
-           List.map (fun (update,t) ->
-               check (E_indirect (name, `Update update.Term.s_symb)) t
-             ) descr.updates in
-         (List.filter_map (fun x -> x) errors) @ acc       
+    SystemExpr.fold_descrs (fun descr acc ->
+        let name = descr.name in
+        Iter.fold_descr ~globals (fun ms _m_is _mdef t acc ->
+            let err_msg = err_msg_of_msymb cntxt.table name ms in
+            match check err_msg t with
+            | None -> acc
+            | Some x -> x :: acc
+          ) cntxt.table cntxt.system descr acc
       ) cntxt.table cntxt.system []
   in
   errors1 @ errors2 @ errors3
@@ -91,7 +98,7 @@ let key_ssc
 (** {2 Euf rules datatypes} *)
 
 type euf_schema = {
-  action_name  : Symbols.action Symbols.t;
+  action_name  : Symbols.action;
   action       : Action.action;
   message      : Term.term;
   key_indices  : Vars.var list;

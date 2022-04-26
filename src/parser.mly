@@ -12,8 +12,10 @@
 
 %token <int> INT
 %token <string> ID   /* general purpose identifier */
-%token <string> INFIXSYMB   /* infix function symbols */
+%token <string> LEFTINFIXSYMB    /* left infix function symbols */
+%token <string> RIGHTINFIXSYMB   /* right infix function symbols */
 %token <string> BANG
+
 %token AT 
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
@@ -40,17 +42,19 @@
 %token BY FA INTRO AS DESTRUCT REMEMBER INDUCTION
 %token PROOF QED UNDO ABORT HINT
 %token RENAME GPRF GCCA
-%token INCLUDE
+%token INCLUDE PRINT
 %token SMT
 %token TICKUNDERSCORE
 %token EOF
+
+%right COMMA
 
 %nonassoc QUANTIF
 %right ARROW
 %right DARROW
 %right DEQUIVARROW
-%left AND OR
-%left GAND GOR
+%right AND OR
+%right GAND GOR
 
 %nonassoc TRUE SEQ NOT LPAREN ID UNDERSCORE FALSE DIFF
 
@@ -59,7 +63,8 @@
 %nonassoc empty_else
 %nonassoc ELSE
 
-%left INFIXSYMB
+%right RIGHTINFIXSYMB
+%left  LEFTINFIXSYMB
 
 %left XOR
 
@@ -150,7 +155,8 @@ sterm_i:
 %inline infix_s:
 | AND         { "&&"  }
 | OR          { "||"   }
-| s=INFIXSYMB { s }
+| s=LEFTINFIXSYMB  { s }
+| s=RIGHTINFIXSYMB { s }
 | XOR         { "xor"  }
 | DARROW      { "=>" }
 
@@ -174,8 +180,8 @@ term_i:
     { let fsymb = sloc $startpos $endpos "if" in
       Theory.App (fsymb,  [b;t;t0]) }
 
-| FIND is=opt_indices SUCHTHAT b=term IN t=term t0=else_term
-                                          { Theory.Find (is,b,t,t0) }
+| FIND vs=tf_arg_list SUCHTHAT b=term IN t=term t0=else_term
+                                 { Theory.Find (vs,b,t,t0) }
 
 | f=term o=loc(ord) f0=term                
     { Theory.App (o,[f;f0]) }
@@ -231,12 +237,19 @@ arg:
 | is=ids COLON k=p_ty                     { List.map (fun x -> x,k) is }
 
 arg_list:
-|                                         { [] }
-| is=ids COLON k=p_ty                     { List.map (fun x -> x,k) is }
-| is=ids COLON k=p_ty COMMA args=arg_list { List.map (fun x -> x,k) is @ args }
+| args=slist(arg,COMMA) { List.flatten args }
 
+/* argument whose type defaults to Index */
+tf_arg:
+| is=ids COLON k=p_ty { List.map (fun x -> x,k) is }
+| is=ids              { List.map (fun x -> x,sloc $startpos $endpos Theory.P_index) is }
+
+tf_arg_list:
+| args=slist(tf_arg,COMMA) { List.flatten args }
+
+/* precedent rule for COMMA favors shifting COMMAs */
 ids:
-| id=lsymb                             { [id] }
+| id=lsymb                %prec COMMA  { [id] }
 | id=lsymb COMMA ids=ids               { id::ids }
 
 top_formula:
@@ -293,7 +306,7 @@ process_i:
 | id=lsymb terms=term_list COLONEQ t=term p=process_cont
     { let to_idx t = match L.unloc t with
         | Theory.App(x,[]) -> x
-        | ti -> raise @@ Theory.Conv (L.loc t, Theory.Index_not_var ti)
+        | ti -> raise @@ Theory.Conv (L.loc t, Theory.NotVar)
       in
       let l = List.map to_idx terms in
       Process.Set (id,l,t,p) }
@@ -331,11 +344,6 @@ opt_indices:
 opt_arg_list:
 | LPAREN args=arg_list RPAREN    { args }
 |                                { [] }
-
-name_type:
-| ty=p_ty                     { 0,ty }
-| INDEX ARROW t=name_type     { let i,ty = t in
-                                1 + i,ty }
 
 ty_var:
 | TICK id=lsymb     { id }
@@ -384,8 +392,9 @@ bty_infos:
 |                                           { [] }
 
 lsymb_decl:
-| id=lsymb                       { `Prefix, id }
-| LPAREN s=loc(INFIXSYMB) RPAREN { `Infix, s }
+| id=lsymb                            { `Prefix, id }
+| LPAREN s=loc(RIGHTINFIXSYMB) RPAREN { `Infix `Right, s }
+| LPAREN s=loc(LEFTINFIXSYMB)  RPAREN { `Infix `Left, s }
 
 declaration_i:
 | HASH e=lsymb a=index_arity ctys=c_tys
@@ -419,9 +428,8 @@ declaration_i:
       let m, m_info = mm in
       Decl.Decl_dh (h, g, (f_info, e), Some (m_info, m), ctys) }
 
-| NAME e=lsymb COLON t=name_type
-                          { let a,ty = t in
-                            Decl.Decl_name (e, a, ty) }
+| NAME e=lsymb COLON t=fun_ty
+                          { Decl.Decl_name (e, t) }
 
 | TYPE e=lsymb infos=bty_infos
                           { Decl.Decl_bty { bty_name = e; bty_infos = infos; } }
@@ -464,19 +472,27 @@ declaration_i:
                                                 sprocess = p}) }
 
 | SYSTEM id=lsymb EQ from_sys=system WITH RENAME gf=global_formula
-                          { Decl.(Decl_system_modifier { from_sys = from_sys;
-                                                         modifier = Rename gf;
-			                                 name = id}) }
+    { Decl.(Decl_system_modifier
+              { from_sys = from_sys;
+                modifier = Rename gf;
+			          name = id}) }
 
 | SYSTEM id=lsymb EQ from_sys=system WITH GPRF args=opt_arg_list COMMA hash=term
-                          { Decl.(Decl_system_modifier { from_sys = from_sys;
-                                                         modifier = PRF (args, hash);
-			                                 name = id}) }
+    { Decl.(Decl_system_modifier
+              { from_sys = from_sys;
+                modifier = PRF (args, hash);
+			          name = id}) }
+
+| SYSTEM id=lsymb EQ from_sys=system WITH GPRF TIME args=opt_arg_list COMMA hash=term
+    { Decl.(Decl_system_modifier
+              { from_sys = from_sys;
+                modifier = PRFt (args, hash);
+			          name = id}) }
 
 | SYSTEM id=lsymb EQ from_sys=system WITH GCCA args=opt_arg_list COMMA enc=term
-                          { Decl.(Decl_system_modifier { from_sys = from_sys;
-                                                         modifier = CCA (args, enc);
-			                                 name = id}) }
+    { Decl.(Decl_system_modifier { from_sys = from_sys;
+                                   modifier = CCA (args, enc);
+			                             name = id}) }
 
 declaration:
 | ldecl=loc(declaration_i)                  { ldecl }
@@ -850,6 +866,7 @@ help_tac_i:
 | DDH        { "ddh"}
 | GDH        { "gdh"}
 | CDH        { "cdh"}
+| PRINT      { "print"}
 
 | DEPENDENT INDUCTION  { "dependent induction"}
 | GENERALIZE DEPENDENT { "generalize dependent"}
@@ -959,6 +976,7 @@ goal_i:
 goal:
 | goal=loc(goal_i) { goal }
 
+(*------------------------------------------------------------------*)
 option_param:
 | TRUE  { Config.Param_bool true  }
 | FALSE { Config.Param_bool false }
@@ -971,21 +989,34 @@ option_param:
 set_option:
 | SET n=ID EQ param=option_param DOT { (n, param) }
 
+(*------------------------------------------------------------------*)
 hint:
 | HINT REWRITE id=lsymb DOT { Hint.Hint_rewrite id }
 | HINT SMT     id=lsymb DOT { Hint.Hint_smt     id }
 
+(*------------------------------------------------------------------*)
 include_params:
 | LBRACKET l=slist(lsymb, COMMA) RBRACKET { l }
 |                                         { [] }
 
 p_include:
-| INCLUDE l=include_params th=lsymb DOT   { Prover.{ th_name = th; params = l; } }
+| INCLUDE l=include_params th=lsymb DOT
+    { Prover.{ th_name = th; params = l; } }
 
+(*------------------------------------------------------------------*)
+/* print query */
+pr_query:
+| GOAL   l=lsymb  DOT { Prover.Pr_statement l }
+| SYSTEM l=system DOT { Prover.Pr_system (Some l) }
+|                 DOT { Prover.Pr_system None }
+
+
+(*------------------------------------------------------------------*)
 interactive:
 | set=set_option     { Prover.ParsedSetOption set }
 | decls=declarations { Prover.ParsedInputDescr decls }
 | u=undo             { Prover.ParsedUndo u }
+| PRINT q=pr_query   { Prover.ParsedPrint q }
 | PROOF              { Prover.ParsedProof }
 | i=p_include        { Prover.ParsedInclude i }
 | QED                { Prover.ParsedQed }
@@ -997,7 +1028,8 @@ bullet:
 | MINUS              { "-" }
 | PLUS               { "+" }
 | STAR               { "*" }
-| INFIXSYMB          { $1 }
+| s=RIGHTINFIXSYMB   { s }
+| s=LEFTINFIXSYMB    { s }
 
 brace:
 | LBRACE             { `Open }
@@ -1010,6 +1042,7 @@ bulleted_tactic:
 | DOT                    { [] }
 
 top_proofmode:
+| PRINT q=pr_query   { Prover.ParsedPrint q }
 | bulleted_tactic    { Prover.ParsedTactic $1 }
 | u=undo             { Prover.ParsedUndo u }
 | ABORT              { Prover.ParsedAbort }

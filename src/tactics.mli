@@ -36,8 +36,8 @@ type ssc_error_c =
   | E_message
   | E_elem
   | E_indirect of
-      Symbols.action Symbols.t *
-      [`Cond | `Output | `Update of Symbols.macro Symbols.t]
+      Symbols.action *
+      [`Cond | `Output | `Update of Symbols.macro | `Global of Symbols.macro]
 
 type ssc_error = Term.term * ssc_error_c
 
@@ -203,4 +203,4 @@ val timeout_get : 'a Utils.timeout_r -> 'a
 val hard_failure : ?loc:Location.t -> tac_error_i -> 'a
 
 (** Print the system to the user. *)
-val print_system : Symbols.table -> SystemExpr.context -> unit
+val print_system : Symbols.table -> _ SystemExpr.expr -> unit

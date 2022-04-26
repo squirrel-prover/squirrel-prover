@@ -7,8 +7,8 @@ type ssc_error_c =
   | E_message
   | E_elem
   | E_indirect of
-      Symbols.action Symbols.t *
-      [`Cond | `Output | `Update of Symbols.macro Symbols.t]
+      Symbols.action *
+      [`Cond | `Output | `Update of Symbols.macro | `Global of Symbols.macro]
 
 type ssc_error = Term.term * ssc_error_c
 
@@ -21,6 +21,7 @@ let pp_ssc_error fmt (t, e) =
     | `Cond      -> Fmt.pf fmt "%a condition" Symbols.pp a
     | `Output    -> Fmt.pf fmt "%a output" Symbols.pp a
     | `Update st -> Fmt.pf fmt "%a, state update: %a" Symbols.pp a Symbols.pp st
+    | `Global m  -> Fmt.pf fmt "%a, global: %a" Symbols.pp a Symbols.pp m
   in
   Fmt.pf fmt "%a %a" pp_ssc_error_c e Term.pp t
 
@@ -719,10 +720,11 @@ let timeout_get = function
 
 
 (*------------------------------------------------------------------*)
-let print_system table system =
+let print_system (table : Symbols.table) (system : _ SystemExpr.expr) : unit =
   try
     let system = SystemExpr.to_fset system in
-    Printer.prt `Result "@.%a@.%a@."
+    Printer.prt `Result "@[<v>System @[[%a]@]@;@[%a@]@;@[%a@]@;@]%!"
+      SystemExpr.pp system
       (SystemExpr.pp_descrs table) system
       (if Config.print_trs_equations ()
        then Completion.print_init_trs
@@ -731,7 +733,3 @@ let print_system table system =
   with _ ->
     Printer.prt `Result "@.Cannot print action descriptions for system %a@."
       SystemExpr.pp system
-
-let print_system table {SystemExpr.set;pair} =
-  print_system table set;
-  match pair with Some e -> print_system table e | None -> ()

@@ -10,14 +10,14 @@ module SE   = SystemExpr
     is a rewrite rule, then:
     - sv ⊆ FV(l)
     - ((FV(r) ∪ FV(φ)) ∩ sv) ⊆ FV(l) *)
-type rw_erule = {
-  rw_tyvars : Type.tvars;     (** type variables *)
-  rw_vars   : Vars.Sv.t;      (** term variables *)
-  rw_conds  : Term.term list; (** premisses *)
-  rw_rw     : Term.esubst;    (** pair (source, destination) *)
+type rw_rule = {
+  rw_tyvars : Type.tvars;            (** type variables *)
+  rw_vars   : Vars.Sv.t;             (** term variables *)
+  rw_conds  : Term.term list;        (** premises *)
+  rw_rw     : Term.term * Term.term; (** pair (source, destination) *)
 }
 
-let pp_rw_erule fmt (rw : rw_erule) =
+let pp_rw_rule fmt (rw : rw_rule) =
   let pp_tys fmt tys = 
     if tys = [] then () else
       Fmt.pf fmt "[%a] " (Fmt.list Type.pp_tvar) tys
@@ -31,7 +31,7 @@ let pp_rw_erule fmt (rw : rw_erule) =
       Fmt.pf fmt " when %a" (Fmt.list Term.pp) conds
   in
   
-  let Term.ESubst (src, dst) = rw.rw_rw in
+  let src, dst = rw.rw_rw in
   Fmt.pf fmt "%a%a: %a -> %a%a"
     pp_tys rw.rw_tyvars
     pp_vars rw.rw_vars
@@ -40,8 +40,8 @@ let pp_rw_erule fmt (rw : rw_erule) =
 
 (*------------------------------------------------------------------*)
 (** Check that the rule is correct. *)
-let check_erule (rule : rw_erule) : unit =
-  let Term.ESubst (l, r) = rule.rw_rw in
+let check_rule (rule : rw_rule) : unit =
+  let l, r = rule.rw_rw in
   let fvl, fvr = Term.fv l, Term.fv r in
   let sh = List.fold_left (fun sh h ->
       Vars.Sv.union sh (Term.fv h)
@@ -56,19 +56,19 @@ let check_erule (rule : rw_erule) : unit =
   ()
 
 (** Make a rewrite rule from a formula *)
-let pat_to_rw_erule ?loc dir (p : Term.term Match.pat) : rw_erule =
+let pat_to_rw_rule ?loc dir (p : Term.term Match.pat) : rw_rule =
   let subs, f = Term.decompose_impls_last p.pat_term in
 
   let e = match Term.destr_eq f with
-    | Some (t1, t2) -> Term.ESubst (t1,t2)
+    | Some (t1, t2) -> t1,t2
     | _ -> Tactics.hard_failure ?loc (Tactics.Failure "not an equality")
   in
 
   let e = match dir with
     | `LeftToRight -> e
     | `RightToLeft ->
-      let Term.ESubst (t1,t2) = e in
-      Term.ESubst (t2,t1)
+      let t1,t2 = e in
+      t2,t1
   in
 
   let rule = {
@@ -79,7 +79,7 @@ let pat_to_rw_erule ?loc dir (p : Term.term Match.pat) : rw_erule =
   } in
 
   (* We check that the rule is valid *)
-  check_erule rule;
+  check_rule rule;
 
   rule
 
@@ -91,13 +91,10 @@ exception NoRW
 let _rewrite_head
     (table  : Symbols.table)
     (system : SE.t)
-    (rule   : rw_erule)
+    (rule   : rw_rule)
     (t      : Term.term) : Term.term * Term.term list
   =
-  let (l, r) : Term.term * Term.term =
-    match rule.rw_rw with
-    | Term.ESubst (l, r) -> l, r
-  in
+  let l, r = rule.rw_rw in
 
   let pat = Match.{ 
       pat_tyvars = rule.rw_tyvars; 
@@ -118,7 +115,7 @@ let _rewrite_head
 let rewrite_head
     (table  : Symbols.table)
     (system : SE.t)
-    (rule   : rw_erule)
+    (rule   : rw_rule)
     (t      : Term.term) : (Term.term * Term.term list) option
   =
   try Some (_rewrite_head table system rule t) with NoRW -> None
@@ -132,7 +129,7 @@ let rewrite_head
 
 (*------------------------------------------------------------------*)
 (** A opened rewrite rule. Not exported. *)
-type rw_rule =
+type _rw_rule =
   Type.tvars * Vars.Sv.t * Term.term list * Term.term * Term.term
 
 (*------------------------------------------------------------------*)
@@ -141,7 +138,7 @@ let rewrite
     (system : SE.context)
     (env    : Vars.env)
     (mult   : Args.rw_count)
-    (rule   : rw_erule)
+    (rule   : rw_rule)
     (target : Equiv.any_form) : rw_res
   =
   let system = system.set in (* TODO fixme *)
@@ -160,7 +157,7 @@ let rewrite
      Return: (f, subs) *)
   let rec _rewrite 
       (mult : Args.rw_count)
-      ((tyvars, sv, rsubs, left, right) : rw_rule)
+      ((tyvars, sv, rsubs, left, right) : _rw_rule)
       (f : Equiv.any_form)
     : Equiv.any_form * Term.term list
     =
@@ -233,7 +230,7 @@ let rewrite
     | `Once, true -> f, !subs_r
   in
 
-  let Term.ESubst (l,r) = rule.rw_rw in
+  let l,r = rule.rw_rw in
   match
     _rewrite mult (rule.rw_tyvars, rule.rw_vars, rule.rw_conds, l, r) target
   with

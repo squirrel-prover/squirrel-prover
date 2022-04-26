@@ -22,6 +22,8 @@ system [test2] (A: out(c, <ok,<n,n>>) | B: out(c, n)).
 (* we start with a first transitivity, from test/left to testPrf *)
 system testPrf = [test/left] with gprf, h(ok,k).
 
+print system [testPrf].
+
 (* Then, second transitivity, from testprf to testRenamed *)
 system testRenamed = [testPrf] with rename equiv(diff(n_PRF,n)).
 

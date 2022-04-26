@@ -514,7 +514,7 @@ let convert_args env parser_args tactic_type conc =
       let f = 
         match Theory.convert conv_cntxt ~ty:Type.Index p with
         | Term.Var v, _ -> v
-        | _ -> Theory.conv_err (L.loc p) (Index_not_var (L.unloc p))
+        | _ -> Theory.conv_err (L.loc p) NotVar
       in
       Arg (Index (f))
 

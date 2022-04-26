@@ -22,7 +22,7 @@ let pp_error fmt = function
   | Expected_pair -> Format.fprintf fmt "expected a pair expr"
 
 (*------------------------------------------------------------------*)
-(* Expressions *)
+(** {2 Expressions} *)
 
 type t =
   | Any
@@ -83,7 +83,7 @@ let subset table e1 e2 = match e1,e2 with
   | _ -> false
 
 (*------------------------------------------------------------------*)
-(* Finite sets *)
+(** {2 Finite sets} *)
 
 let to_list = function
   | List l -> l
@@ -133,7 +133,7 @@ let of_list table ?labels (l:System.Single.t list) : t =
         List (List.combine labels l)
 
 (*------------------------------------------------------------------*)
-(* Parsing *)
+(** {2 Parsing} *)
 
 type parse_item = {
   system     : Symbols.lsymb;
@@ -241,7 +241,7 @@ let fold_descrs (f : Action.descr -> 'a -> 'a) table system init =
 
 (*------------------------------------------------------------------*)
 
-let pp_descrs table ppf system =
+let pp_descrs (table : Symbols.table) ppf (system : t) =
   Fmt.pf ppf "@[<v 2>Available actions:@;@;";
   iter_descrs table system (fun descr ->
     Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
@@ -250,20 +250,26 @@ let pp_descrs table ppf system =
 
 (*------------------------------------------------------------------*)
 
-let clone_system table old_system (new_system:Symbols.lsymb) update =
+let clone_system 
+    (table      : Symbols.table)
+    (old_system : t)
+    (new_system : Symbols.lsymb)
+    (map        : Action.descr -> Action.descr)
+  : Symbols.table * Symbols.system 
+  =
   let projections = List.map fst (to_list old_system) in
   let old_actions = descrs table old_system in
-  let table,new_system = System.declare_empty table new_system projections in
+  let table, new_system = System.declare_empty table new_system projections in
   let table =
     System.Msh.fold
       (fun _ descr table ->
-         let descr = update descr in
+         let descr = map descr in
          let table,_,_ = System.register_action table new_system descr in
          table)
       old_actions
       table
   in
-  table,new_system
+  table, new_system
 
 (*------------------------------------------------------------------*)
 (* Pairs *)

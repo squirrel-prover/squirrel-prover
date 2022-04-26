@@ -22,6 +22,18 @@ module Pos = struct
       is more efficient. *)
   type pos = int list
 
+  let pp (fmt : Format.formatter) (pos : pos) : unit =
+    if pos = [] then Fmt.pf fmt "ε"
+    else Fmt.list ~sep:(Fmt.any ".") Fmt.int fmt pos
+
+  (*------------------------------------------------------------------*)
+  let rec lt (p1 : pos) (p2 : pos) : bool =
+    match p1, p2 with
+    | x1 :: p1, x2 :: p2 -> x1 = x2 && lt p1 p2
+    | [], _ -> true
+    | _, [] -> false
+  
+  (*------------------------------------------------------------------*)
   module Sp = Set.Make (struct
       type t = pos
       let compare = Stdlib.compare
@@ -150,30 +162,28 @@ module Pos = struct
   (** Internal *)
   let rec map_fold
       (func   : 'a f_map_fold) 
-      (m_rec  : bool)           (* do we recurse under successful folds *)
+      (mode   : [`TopDown of bool | `BottomUp])
+      (* - [`TopDown b]: apply [func] at top-level first, then recurse.
+           [b] tells if we recurse under successful maps.
+         - [`BottomUp _]: recurse, then apply [func] at top-level *)
+      
       ~(env   : Vars.env)       (* var env, to have clean variable names *)
       ~(vars  : Vars.var list)  (* variable bound above the current position *)
       ~(conds : Term.term list) (* conditions above the current position *)
       ~(p     : pos)            (* current position *)
       ~(acc   : 'a)             (* folding value *)
-      (ti    : Term.term) 
+      (ti     : Term.term) 
     : 'a * bool * Term.term     (* folding value, `Map found, term *)
     = 
     let map_fold ?(env = env) ?(vars = vars) ?(conds = conds) = 
-      map_fold func m_rec ~env ~vars ~conds 
+      map_fold func mode ~env ~vars ~conds 
     in
     let map_fold_l ?(env = env) ?(vars = vars) ?(conds = conds) = 
-      map_fold_l func m_rec ~env ~vars ~conds 
+      map_fold_l func mode ~env ~vars ~conds 
     in
 
-    match func ti vars conds p acc with
-    | acc, `Map t -> 
-      let acc, _, t =
-        if m_rec then map_fold ~p ~acc:acc t else acc, true, t
-      in
-      acc, true, t
-
-    | acc, `Continue ->
+    (* recurse strictly one level below *)
+    let rec_strict_subterm ti acc =
       match ti with
       | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite ->
         assert (snd fs = []);
@@ -185,7 +195,7 @@ module Pos = struct
         let acc, foundt, t = map_fold ~conds:conds_t ~p:(1 :: p) ~acc t in
         let acc, founde, e = map_fold ~conds:conds_e ~p:(2 :: p) ~acc e in
         let found = foundc || foundt || founde in
-        
+
         let ti' = Term.mk_ite ~simpl:false c t e in
         acc, found, if found then ti' else ti
 
@@ -265,12 +275,12 @@ module Pos = struct
         let env, is, subst = Term.refresh_vars_env env is in
         let c = Term.subst subst c in
         let t = Term.subst subst t in
-        
+
         let vars1 = List.rev_append is vars in
 
         let conds_t = c :: conds in 
         let conds_e =      conds in (* could be improved *)
-        
+
         let acc, foundc, c = 
           map_fold ~env ~vars:vars1 ~conds         ~p:(0 :: p) ~acc c 
         in
@@ -284,12 +294,35 @@ module Pos = struct
 
         let ti' = Term.mk_find is c t e in
         acc, found, if found then ti' else ti
+    in
 
-  and map_fold_l func m_rec ~env ~vars ~conds ~(p : pos) ~acc (l : Term.terms) =
+    match mode with
+    | `TopDown b ->
+      begin
+        match func ti vars conds p acc with
+        | acc, `Map t -> 
+          if b then
+            let acc, _, t = map_fold ~p ~acc:acc t in
+            acc, true, t
+          else
+            acc, true, t
+
+        | acc, `Continue -> rec_strict_subterm ti acc
+      end
+      
+    | `BottomUp ->
+      let acc, found, ti = rec_strict_subterm ti acc in
+      match func ti vars conds p acc with
+      | acc, `Map ti   -> acc, true,  ti
+      | acc, `Continue -> acc, found, ti
+
+
+  
+  and map_fold_l func mode ~env ~vars ~conds ~(p : pos) ~acc (l : Term.terms) =
     let (acc, found), l =
       List.mapi_fold (fun i (acc, found) ti -> 
           let acc, found', ti = 
-            map_fold func m_rec ~env ~vars ~conds ~p:(i :: p) ~acc ti
+            map_fold func mode ~env ~vars ~conds ~p:(i :: p) ~acc ti
           in
           (acc, found || found'), ti
         ) (acc, false) l 
@@ -300,7 +333,11 @@ module Pos = struct
   (** Internal *)
   let rec map_fold_e
       (func   : 'a f_map_fold) 
-      (m_rec  : bool)           (* do we recurse under successful maps *)
+      (mode   : [`TopDown of bool | `BottomUp])
+      (* - [`TopDown b]: apply [func] at top-level first, then recurse.
+           [b] tells if we recurse under successful maps.
+         - [`BottomUp _]: recurse, then apply [func] at top-level *)
+
       ~(env   : Vars.env)       (* var env, to have clean variable names *)
       ~(vars  : Vars.var list)  (* variable bound above the current position *)
       ~(conds : Term.term list) (* conditions above the current position *)
@@ -310,10 +347,10 @@ module Pos = struct
     : 'a * bool * Equiv.form     (* folding value, `Map found, term *)
     = 
     let map_fold_e ?(env = env) ?(vars = vars) ?(conds = conds) = 
-      map_fold_e func m_rec ~env ~vars ~conds 
+      map_fold_e func mode ~env ~vars ~conds 
     in
     let map_fold_e_l ?(env = env) ?(vars = vars) ?(conds = conds) = 
-      map_fold_e_l func m_rec ~env ~vars ~conds 
+      map_fold_e_l func mode ~env ~vars ~conds 
     in
 
     match ti with
@@ -329,14 +366,14 @@ module Pos = struct
 
     | Equiv.Atom (Reach t) -> 
       let acc, found, t =
-        map_fold func m_rec ~env ~vars ~conds ~p:(0 :: 0 :: p) ~acc t 
+        map_fold func mode ~env ~vars ~conds ~p:(0 :: 0 :: p) ~acc t 
       in
       let ti' = Equiv.Atom (Reach t) in
       acc, found, if found then ti' else ti
 
     | Equiv.Atom (Equiv e) -> 
       let acc, found, l = 
-        map_fold_l func m_rec ~env ~vars ~conds ~p:(0 :: 0 :: p) ~acc e 
+        map_fold_l func mode ~env ~vars ~conds ~p:(0 :: 0 :: p) ~acc e 
       in
       let ti' = Equiv.Atom (Equiv l) in
       acc, found, if found then ti' else ti
@@ -355,11 +392,11 @@ module Pos = struct
       in
       acc, found, if found then ti' else ti
 
-  and map_fold_e_l func m_rec ~env ~vars ~conds ~p ~acc (l : Equiv.form list) =
+  and map_fold_e_l func mode ~env ~vars ~conds ~p ~acc (l : Equiv.form list) =
     let (acc, found), l =
       List.mapi_fold (fun i (acc, found) ti -> 
           let acc, found', ti = 
-            map_fold_e func m_rec ~env ~vars ~conds ~p:(i :: p) ~acc ti
+            map_fold_e func mode ~env ~vars ~conds ~p:(i :: p) ~acc ti
           in
           (acc, found || found'), ti
         ) (acc, false) l 
@@ -369,33 +406,41 @@ module Pos = struct
 
   (*------------------------------------------------------------------*)
   (** Exported *)
-  let map ?(m_rec=false) (func : f_map) env (t : Term.term) : bool * Term.term =
+  let map
+      ?(mode=`TopDown false) (func : f_map)
+      (env : Vars.env) (t : Term.term)
+    : bool * Term.term
+    =
     let func : unit f_map_fold = 
       fun t vars conds p () -> (), func t vars conds p 
     in
     let (), found, t =
-      map_fold func m_rec ~env ~vars:[] ~conds:[] ~p:[] ~acc:() t
+      map_fold func mode ~env ~vars:[] ~conds:[] ~p:[] ~acc:() t
     in
     found, t
 
   (** Exported *)
-  let map_e ?(m_rec=false) (func : f_map) env (t : Equiv.form) : bool * Equiv.form =
+  let map_e
+      ?(mode=`TopDown false) (func : f_map)
+      (env : Vars.env) (t : Equiv.form)
+    : bool * Equiv.form
+    =
     let func : unit f_map_fold = 
       fun t vars conds p () -> (), func t vars conds p 
     in
     let (), found, t = 
-      map_fold_e func m_rec ~env ~vars:[] ~conds:[] ~p:[] ~acc:() t
+      map_fold_e func mode ~env ~vars:[] ~conds:[] ~p:[] ~acc:() t
     in
     found, t
 
   (*------------------------------------------------------------------*)
   (** Exported *)
-  let map_fold ?(m_rec=false) func env acc (t : Term.term) =
-    map_fold func m_rec ~env ~vars:[] ~conds:[] ~p:[] ~acc t
+  let map_fold ?(mode=`TopDown false) func env acc (t : Term.term) =
+    map_fold func mode ~env ~vars:[] ~conds:[] ~p:[] ~acc t
 
   (** Exported *)
-  let map_fold_e ?(m_rec=false) func env acc (t : Equiv.form) =
-    map_fold_e func m_rec ~env ~vars:[] ~conds:[] ~p:[] ~acc t
+  let map_fold_e ?(mode=`TopDown false) func env acc (t : Equiv.form) =
+    map_fold_e func mode ~env ~vars:[] ~conds:[] ~p:[] ~acc t
 end
 
 (*------------------------------------------------------------------*)
@@ -406,9 +451,9 @@ type term_head =
   | HForAll
   | HSeq
   | HFind
-  | HFun   of Symbols.fname Symbols.t
-  | HMacro of Symbols.macro Symbols.t
-  | HName  of Symbols.name  Symbols.t
+  | HFun   of Symbols.fname 
+  | HMacro of Symbols.macro 
+  | HName  of Symbols.name  
   | HDiff
   | HVar
   | HAction
@@ -1926,7 +1971,7 @@ module E : S with type t = Equiv.form = struct
     (* Return a list of specialization of [cand] deducible from
        [init_terms, known_sets] for action [a] at time [a]. *)
     let filter_deduce_action
-        (a : Symbols.action Symbols.t)
+        (a : Symbols.action)
         (cand : MCset.t)
         (init_terms : known_sets)              (* initial terms *)
         (known_sets : MCset.t list)            (* induction *)
@@ -1986,7 +2031,7 @@ module E : S with type t = Equiv.form = struct
     in
 
     let filter_deduce_action_list
-        (a : Symbols.action Symbols.t)
+        (a : Symbols.action)
         (cands : msets)
         (init_terms : known_sets)              (* initial terms *)
         (known_sets : MCset.t list)            (* induction *)

@@ -53,7 +53,7 @@ Qed.
 
 goal _ (y : message) :
   (forall (x : message), P (x ++ x) => Q (x)) =>
-  (P(y ++ zero ++ (y ++ zero))) =>
+  (P((y ++ zero) ++ (y ++ zero))) =>
   Q (y ++ zero).
 Proof.
   intro H G.

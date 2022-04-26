@@ -105,10 +105,10 @@ Proof.
     intro Neq.
     use IH with pred(T(i0,j)) => //.
     destruct H as [H1 | [j0 H2]].
-      left; intro j0 HapT; by use H1 with j0.
-      right; destruct H2 as [H21 H22]; exists j0.
+    - left; intro j0 HapT; by use H1 with j0.
+    - right; destruct H2 as [_ _ H2]; exists j0.
       intro /= _ _.
-      by apply H22.
+      by apply H2.
 
     (* 2nd case: i<>i0 *)
     intro _; subst i0, i.
@@ -119,20 +119,20 @@ Proof.
     use IH with pred(R(jj,ii)) => //.
     destruct H as [H1 | [j H2]].
     - left; intro j HapT; by use H1 with j.
-    - right; destruct H2 as [H21 H22].
+    - right; destruct H2 as [_ _ H2].
       exists j.
       intro /= _ _.
-      by apply H22.
+      by apply H2.
 
   (* R1(jj) *)
   + intro [jj Eq]; subst tau, R1(jj).
     use IH with pred(R1(jj)) => //.
     destruct H as [H1 | [j H2]].
     - left; intro j HapT; by use H1 with j.
-    - right; destruct H2 as [H21 H22].
+    - right; destruct H2 as [_ _ H2].
       exists j.
       intro /= _ _.
-      by apply H22.
+      by apply H2.
 Qed.
 
 
@@ -154,10 +154,10 @@ Proof.
     use IH with pred(T(i,j)) => //.
     destruct H as [H1 | [jj H2]].
     - left; intro jj HapR; by use H1 with jj => //.
-    - right; destruct H2 as [H21 H22].
+    - right; destruct H2 as [_ _ H2].
       exists jj.
       intro /= _ _.
-      by apply H22.
+      by apply H2.
 
   (* R(jj,ii0) *)
   + intro [jj ii0 Eq]; subst tau, R(jj,ii0).
@@ -167,11 +167,12 @@ Proof.
       use IH with pred(R(jj,ii0)) => //.
       destruct H as [H1 | [jj0 H2]].
       left; intro jj0 HapR; by use H1 with jj0 => //.
-      right; destruct H2 as [H21 H22]; exists jj0.
-      split => //.
+      right; destruct H2 as [_ _ H2]; exists jj0.
+      simpl.
       intro jj'.
       intro Hyp.
-      use H22 with jj' => //.
+      by apply H2.
+
     (* 2nd case: ii<>ii0 *)
     - intro Eq; subst ii0, ii.
       right; exists jj; split => //.
@@ -181,10 +182,10 @@ Proof.
     use IH with pred(R1(jj)) => //.
     destruct H as [H1 | [j H2]].
     - left; intro j HapT; by use H1 with j => //.
-    - right. destruct H2 as [H21 H22].
+    - right. destruct H2 as [_ _ H2].
       exists j.
       intro /= _ _.
-      by apply H22.
+      by apply H2.
 Qed.
 
 goal lastupdate_init_tag (i:index,tau:timestamp):
@@ -396,8 +397,8 @@ goal disjoint_chains (tau',tau:timestamp,i',i:index) :
 Proof.
   generalize tau.
   induction tau' => tau' IH tau D E Meq.
-  use lastupdateTag with i,tau as [[A0 Hinit] | [j [[A0 A1] Hsup]]] => //;
-  use lastupdateReader with i',tau' as [[A Hinit'] | [j' [[B C] Hsup']]] => //.
+  use lastupdateTag with i,tau as [[A0 Hinit] | [j [A0 A1 Hsup]]] => //;
+  use lastupdateReader with i',tau' as [[A Hinit'] | [j' [B C Hsup']]] => //.
 
   + rewrite -Meq A0 /sR in B.
     by fresh B.

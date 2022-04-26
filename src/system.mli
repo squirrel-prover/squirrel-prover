@@ -5,24 +5,28 @@
     In this module, system means multi-system. *)
 
 (** A system is indirectly represented by a system symbol. *)
-type t = Symbols.system Symbols.t
+type t = Symbols.system 
 
+(*------------------------------------------------------------------*)
 (** Indicates the list of projections of a system. *)
 val projections : Symbols.table -> t -> Term.projection list
 
 (** Indicates whether a system supports a given projection. *)
 val valid_projection : Symbols.table -> t -> Term.projection -> bool
 
+(*------------------------------------------------------------------*)
 (** Check that two systems are strongly compatible.
     This implies the theoretical notion of compatibility,
     and relies on [Action.strongly_compatible_descr] to ensure
     that descriptions can be merged later on. *)
 val compatible : Symbols.table -> t -> t -> bool
 
+(*------------------------------------------------------------------*)
 (** [of_lsymb tbl s] convert [s] to a symbol,
     if it corresponds to a registered system in [tbl]. *)
 val of_lsymb : Symbols.table -> Symbols.lsymb -> t
 
+(*------------------------------------------------------------------*)
 (** Print given system as declared in symbols table. *)
 val pp_system : Symbols.table -> Format.formatter -> t -> unit
 
@@ -46,7 +50,7 @@ exception Error of error
 (** Get a (refreshed) descr.
     @raise Not_found if no action corresponds to the wanted shape. *)
 val descr_of_shape :
-  Symbols.table -> Symbols.system Symbols.t -> Action.shape ->
+  Symbols.table -> Symbols.system -> Action.shape ->
   Action.descr
 
 module Msh : Map.S with type key = Action.shape
@@ -54,14 +58,14 @@ module Msh : Map.S with type key = Action.shape
 (** Return (refreshed) action descriptions of a given system. *)
 val descrs :
   Symbols.table ->
-  Symbols.system Symbols.t ->
+  Symbols.system ->
   Action.descr Msh.t
 
 (** Return all the action symbols of a system. *)
 val symbs :
   Symbols.table ->
-  Symbols.system Symbols.t ->
-  Symbols.action Symbols.t Msh.t
+  Symbols.system ->
+  Symbols.action Msh.t
 
 (*------------------------------------------------------------------*)
 (** {2 Creating new systems and actions} *)
@@ -81,7 +85,7 @@ val declare_empty :
   * reasons that will eventually disappear TODO). *)
 val register_action :
   Symbols.table -> t -> Action.descr ->
-  Symbols.table * Symbols.action Symbols.t * Action.descr
+  Symbols.table * Symbols.action * Action.descr
 
 (*------------------------------------------------------------------*)
 (** {2 Single systems} *)
@@ -89,7 +93,7 @@ val register_action :
 module Single : sig
 
   type t = private {
-    system     : Symbols.system Symbols.t ;
+    system     : Symbols.system ;
     projection : Term.projection
   }
 
@@ -100,10 +104,9 @@ module Single : sig
       and is then not attached to this particular table.
       This shouldn't be too bad because we never override system
       symbols after their complete definition. *)
-  val make : Symbols.table -> Symbols.system Symbols.t -> Term.projection -> t
+  val make : Symbols.table -> Symbols.system -> Term.projection -> t
 
   val pp : Format.formatter -> t -> unit
 
   val descr_of_shape : Symbols.table -> t -> Action.shape -> Action.descr
-
 end

@@ -31,6 +31,7 @@ type t = arbitrary
 
 type equiv_t = pair
 
+(*------------------------------------------------------------------*)
 val hash : 'a expr -> int
 
 val pp : Format.formatter -> 'a expr -> unit
@@ -45,7 +46,6 @@ val any_compatible_with : System.t -> compatible
 
 (** [subset s1 s2] iff [s1] is included in [s2]. *)
 val subset : Symbols.table -> 'a expr -> 'a expr -> bool
-
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
@@ -62,7 +62,6 @@ exception Error of error
 
 val pp_error : Format.formatter -> error -> unit
 
-
 (*------------------------------------------------------------------*)
 (** {2 Conversions} *)
 
@@ -74,7 +73,6 @@ val to_fset : 'a expr -> fset
 
 val to_pair : 'a expr -> pair
 
-
 (*------------------------------------------------------------------*)
 (** {2 Actions symbols} *)
 
@@ -82,7 +80,7 @@ val to_pair : 'a expr -> pair
 val symbs :
   Symbols.table ->
   <symbols:unit;..> expr ->
-  Symbols.action Symbols.t System.Msh.t
+  Symbols.action System.Msh.t
 
 (** Convert action to the corresponding timestamp term. *)
 val action_to_term :
@@ -93,7 +91,7 @@ val action_to_term :
 val actions :
   Symbols.table ->
   <symbols:unit;..> expr ->
-  (Action.action * Symbols.action Symbols.t * Vars.vars) list
+  (Action.action * Symbols.action * Vars.vars) list
 
 (*------------------------------------------------------------------*)
 (** {2 Action descriptions} *)
@@ -160,15 +158,14 @@ val project : Term.projection -> <fset:unit;..> expr -> System.Single.t
 (** [clone_system table sys name f] registers a new system named [name],
     obtained by modifying the actions of the system expression [sys]
     with [f].
-    Fails if [name] is already in use.
-    Returns the newly enriched table and [name] as a system symbol. *)
+    Returns the newly enriched table and [name] as a system symbol.
+    Does not clone global macros. *)
 val clone_system :
   Symbols.table ->
   <fset:unit;..> expr ->
   Symbols.lsymb ->
   (Action.descr -> Action.descr) ->
   Symbols.table * System.t
-
 
 (*------------------------------------------------------------------*)
 (** {2 Operations on pairs} *)

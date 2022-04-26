@@ -244,6 +244,9 @@ module Smart : Term.SmartFO with type form = _form = struct
   (*------------------------------------------------------------------*)
   let mk_eq  ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_eq  ?simpl f1 f2))
   let mk_leq ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_leq ?simpl f1 f2))
+  let mk_geq ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_geq ?simpl f1 f2))
+  let mk_lt  ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_lt  ?simpl f1 f2))
+  let mk_gt  ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_gt  ?simpl f1 f2))
 
   (*------------------------------------------------------------------*)
   (** {3 Destructors} *)
@@ -330,7 +333,8 @@ module Smart : Term.SmartFO with type form = _form = struct
       then None
       else Some (List.map (fun f -> Atom (Reach f)) l)
 
-  let mk_destr_left f_destr =
+  (** left-associative *)
+  let[@warning "-32"] mk_destr_left f_destr =
     let rec destr l f =
       if l < 0 then assert false;
       if l = 1 then Some [f]
@@ -340,28 +344,34 @@ module Smart : Term.SmartFO with type form = _form = struct
     in
     destr
 
-  (** left-associative *)
+  (** right-associative *)
+  let mk_destr_right f_destr =
+    let rec destr l f =
+      if l < 0 then assert false;
+      if l = 1 then Some [f]
+      else match f_destr f with
+        | None -> None
+        | Some (f,g) -> omap (fun l -> f :: l) (destr (l-1) g)
+    in
+    destr
+
   let destr_ands i f =
     match f with
     | Atom (Reach f) ->
       destr_lift_many (Term.Smart.destr_ands i f)
-    | _ -> mk_destr_left destr_and i f
+    | _ -> mk_destr_right destr_and i f
 
   let destr_ors i f =
     match f with
     | Atom (Reach f) ->
       destr_lift_many (Term.Smart.destr_ors i f)
-    | _ -> mk_destr_left destr_or i f
+    | _ -> mk_destr_right destr_or i f
 
-  let destr_impls =
-    let rec destr l f =
-      if l < 0 then assert false;
-      if l = 1 then Some [f]
-      else match destr_impl f with
-        | None -> None
-        | Some (f,g) -> omap (fun l -> f :: l) (destr (l-1) g)
-    in
-    destr
+  let destr_impls i f =
+    match f with
+    | Atom (Reach f) ->
+      destr_lift_many (Term.Smart.destr_impls i f)
+    | _ -> mk_destr_right destr_impl i f
 
   let destr_eq = function
     | Atom (Reach f) -> Term.destr_eq f
@@ -446,6 +456,12 @@ end
 
 type gform = [`Equiv of form | `Reach of Term.term]
 
+let pp_gform fmt (f : gform) =
+  match f with
+  | `Equiv e -> pp fmt e
+  | `Reach f -> Term.pp fmt f
+
+(*------------------------------------------------------------------*)
 type local_form = Term.term
 type global_form = form
 type any_form = gform
@@ -561,7 +577,7 @@ module Any = struct
   let convert_to ?loc k f =
     Babel.convert ?loc ~dst:k ~src:Any_t f
 
-  module Smart = struct
+  module Smart : Term.SmartFO with type form = any_form = struct
     type form = any_form
 
     let mk_true  = `Reach Term.mk_true
@@ -619,8 +635,11 @@ module Any = struct
           `Equiv (Smart.mk_impls ?simpl l f)
       | _ -> assert false
 
-    let mk_eq ?simpl  f g = `Reach (Term.Smart.mk_eq  ?simpl f g)
+    let mk_eq  ?simpl f g = `Reach (Term.Smart.mk_eq  ?simpl f g)
     let mk_leq ?simpl f g = `Reach (Term.Smart.mk_leq ?simpl f g)
+    let mk_geq ?simpl f g = `Reach (Term.Smart.mk_geq ?simpl f g)
+    let mk_lt  ?simpl f g = `Reach (Term.Smart.mk_lt  ?simpl f g)
+    let mk_gt  ?simpl f g = `Reach (Term.Smart.mk_gt  ?simpl f g)
 
     (*------------------------------------------------------------------*)
     let mk_forall ?simpl vs = function

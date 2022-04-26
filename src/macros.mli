@@ -1,6 +1,7 @@
 (** Declaring and unfolding macros *)
 
-(** {2 Macro definitions} *)
+(*------------------------------------------------------------------*)
+(** {2 Global macro definitions} *)
 
 (** Declare a global macro (whose meaning is the same accross
     several actions, which is useful to model let-expressions)
@@ -18,8 +19,9 @@ val declare_global :
   ts:Vars.var ->
   Term.term ->
   Type.ty ->
-  Symbols.table * Symbols.macro Symbols.t
+  Symbols.table * Symbols.macro 
 
+(*------------------------------------------------------------------*)
 (** {2 Macro expansions} *)
 
 (** [get_definition context macro t] returns the expansion of [macro] at [t],
@@ -51,7 +53,7 @@ val get_definition_exn :
     a given action. *)
 val get_definition_nocntxt :
   SystemExpr.fset -> Symbols.table ->
-  Term.msymb -> Symbols.action Symbols.t -> Vars.vars ->
+  Term.msymb -> Symbols.action -> Vars.vars ->
   [ `Def of Term.term | `Undef ]
 
 (** When [m] is a global macro symbol,
@@ -61,16 +63,33 @@ val get_definition_nocntxt :
 val get_dummy_definition :
   Symbols.table -> SystemExpr.fset -> Term.msymb -> Term.term
 
+(*------------------------------------------------------------------*)
+type system_map_arg =
+  | ADescr  of Action.descr 
+  | AGlobal of { is : Vars.vars; ts : Vars.var; }
+
+(*------------------------------------------------------------------*)
 (** Given the name [ns] of a macro as well as a function [f] over
-   terms, an [old_single_system] and a [new_single_system], takes the
-   existing definition of [ns] in the old system, applies [f] to the
-   existing definition, and update the value of [ns] accordingly in
-   the new system. *)
+    terms, an [old_single_system] and a [new_single_system], takes the
+    existing definition of [ns] in the old system, applies [f] to the
+    existing definition, and update the value of [ns] accordingly in
+    the new system. *)
 val update_global_data :
   Symbols.table -> 
-  Symbols.macro Symbols.t -> 
+  Symbols.macro -> 
   Symbols.macro_def -> 
   System.Single.t ->
   System.Single.t ->
-  (Term.term -> Term.term) -> 
+  (system_map_arg -> Symbols.macro -> Term.term -> Term.term) -> 
   Symbols.table
+    
+(*------------------------------------------------------------------*)
+(** {2 Utilities} *)
+
+(** Type of the output a macro. *)
+val ty_out : Symbols.table -> Symbols.macro -> Type.ty 
+
+(** Types of the arguments of a macro. *)
+val ty_args : Symbols.table -> Symbols.macro -> Type.ty list 
+
+val is_global : Symbols.table -> Symbols.macro -> bool

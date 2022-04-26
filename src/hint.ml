@@ -7,11 +7,11 @@ type lsymb = Theory.lsymb
 
 type rw_hint = {
   name : string; 
-  rule : Rewrite.rw_erule;
+  rule : Rewrite.rw_rule;
 }
 
 let pp_rw_hint fmt rwh : unit =
-  Fmt.pf fmt "%s : %a" rwh.name Rewrite.pp_rw_erule rwh.rule
+  Fmt.pf fmt "%s : %a" rwh.name Rewrite.pp_rw_rule rwh.rule
 
 (*------------------------------------------------------------------*)
 module Hm = Match.Hm
@@ -48,10 +48,10 @@ type p_hint =
 let add_hint_rewrite (s : lsymb) tyvars form db =
   let pat = Match.pat_of_form form in
   let pat = Match.{ pat with pat_tyvars = tyvars; } in      
-  let rule = Rewrite.pat_to_rw_erule ~loc:(L.loc s) `LeftToRight pat in
+  let rule = Rewrite.pat_to_rw_rule ~loc:(L.loc s) `LeftToRight pat in
   let h = { name = L.unloc s; rule; } in
   let head =
-    let Term.ESubst (src, _) = rule.Rewrite.rw_rw in
+    let src, _ = rule.Rewrite.rw_rw in
     Match.get_head src
   in
   { db with db_rewrite = add_rewrite_rule head h db.db_rewrite; }

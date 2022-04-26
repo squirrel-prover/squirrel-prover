@@ -23,6 +23,8 @@ type tac = TS.t Tactics.tac
 type lsymb = Theory.lsymb
 type sequent = TS.sequent
 
+module Sp = Match.Pos.Sp
+              
 (*------------------------------------------------------------------*)
 open LowTactics
 
@@ -480,7 +482,7 @@ let eq_names (s : TS.t) =
   in
   let s =
     List.fold_left (fun s c ->
-        let () = dbg "new index equality (names): %a" Term.pp c in
+        let () = dbg "new equalities (names): %a" Term.pp c in
         Hyps.add Args.AnyName c s
       ) s cnstrs
   in
@@ -594,10 +596,14 @@ type fresh_occ = (Action.action * Vars.var list) Iter.occ
 (** check if all instances of [o1] are instances of [o2].
     [o1] and [o2] actions must have the same action name *)
 let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool =
+  (* for now, positions not allowed here *)
+  assert (Sp.is_empty o1.occ_pos && Sp.is_empty o2.occ_pos);
+  
   let a1, is1 = o1.occ_cnt in
   let a2, is2 = o2.occ_cnt in
 
-  let cond1, cond2 = o1.occ_cond, o2.occ_cond in
+  let cond1 = Term.mk_ands (List.rev o1.occ_cond)
+  and cond2 = Term.mk_ands (List.rev o2.occ_cond) in
 
   (* build a dummy term, which we used to match in one go all elements of
      the two occurrences *)
@@ -610,7 +616,7 @@ let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool =
   in
   let pat2 = Match.{
       pat_tyvars = [];
-      pat_vars   = o2.occ_vars;
+      pat_vars   = Sv.of_list o2.occ_vars;
       pat_term   = mk_dum a2 is2 cond2;
     }
   in
@@ -668,7 +674,10 @@ let mk_fresh_indirect_cases
             (Vars.to_set env)
         in
 
-        let new_cases = Fresh.get_name_indices_ext ~fv:fv cntxt ns.s_symb t in
+        let new_cases =
+          let fv = List.rev (Sv.elements fv) in
+          Fresh.get_name_indices_ext ~fv cntxt ns.s_symb t
+        in
         let new_cases =
           List.map (fun (case : Fresh.name_occ) ->
               { case with
@@ -814,7 +823,7 @@ let apply_substitute subst s =
     match subst with
       | Term.ESubst (Term.Var v, t) :: _ when
         not (List.mem v (Term.get_vars t)) ->
-          TS.set_vars (Vars.rm_var (TS.vars s) v) s
+          TS.set_vars (Vars.rm_var v (TS.vars s)) s
       | _ -> s
   in
   [TS.subst subst s]
@@ -1003,7 +1012,7 @@ let autosubst s =
       let () = dbg "subst %a by %a" Vars.pp x Vars.pp y in
 
       let s =
-        TS.set_vars (Vars.rm_var (TS.vars s) x) s
+        TS.set_vars (Vars.rm_var x (TS.vars s)) s
       in
       TS.subst [Term.ESubst (Term.mk_var x, Term.mk_var y)] s
   in
@@ -1323,7 +1332,7 @@ let yes_no_if b s =
 
   | occ :: _ ->
     (* Context with bound variables (eg try find) are not supported. *)
-    if not (Sv.is_empty occ.Iter.occ_vars) then
+    if not (occ.Iter.occ_vars = []) then
       soft_failure (Tactics.Failure "cannot be applied in a under a binder");
 
     let c,t,e = occ.occ_cnt in
@@ -1348,9 +1357,9 @@ let yes_no_if_args b args s : Goal.t list =
 
 type unforgeabiliy_param = Term.fname * Term.nsymb * Term.term
                            * Term.term
-                           * (Symbols.fname Symbols.t -> bool)
+                           * (Symbols.fname -> bool)
                            * Term.term list * bool
-                           * (Symbols.fname Symbols.t -> bool) option
+                           * (Symbols.fname -> bool) option
 
 let euf_param table (t : Term.term) : unforgeabiliy_param =
   let bad_param () =
@@ -1528,7 +1537,7 @@ let euf_apply_facts drop_head s
 
   (* check that the SSCs hold *)
   let errors =
-    Euf.key_ssc ~messages:[mess;sign]
+    Euf.key_ssc ~globals:false ~messages:[mess;sign]
       ~allow_functions ~cntxt head_fn key.s_symb
   in
   if errors <> [] then
@@ -1719,7 +1728,7 @@ let non_malleability arg (s : TS.t) =
                                     not equal to another fres name *)
   | m, Some (Message (Term.Name n as name,ty)) ->
     (* we now create the inequality to be checked *)
-    let ndef = Symbols.{ n_iarr = 0; n_ty = ty; } in
+    let ndef = Symbols.{ n_fty = Type.mk_ftype 0 [] [] ty; } in
     let table,n =
       Symbols.Name.declare table (L.mk_loc L._dummy "n_NM") ndef
     in

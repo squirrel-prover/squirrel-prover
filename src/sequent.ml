@@ -85,7 +85,7 @@ module Mk (Args : MkArgs) : S with
     if Hyps.mem_name (L.unloc name) s then
       let id, f = Hyps.by_name name s in
       Goal.{ name = `Hyp id;
-             system = system s;
+             system = S.system s;
              ty_vars = [];
              formula =
                Equiv.Babel.convert

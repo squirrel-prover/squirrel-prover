@@ -15,7 +15,9 @@ module Hyps = TS.LocalHyps
 type sequent = TS.sequent
 
 type lsymb = Theory.lsymb
-           
+
+module Sp = Match.Pos.Sp
+              
 (*------------------------------------------------------------------*)
 open LowTactics
 
@@ -105,7 +107,7 @@ type allowed_occs = NotAllowed | OneInProduct | UnderEqual
 (** we assume n is in excl *)
 let get_name_except_allowed
     (gdh_oracles : bool)
-    ?(fv=Sv.empty)
+    ?(fv=[])
     (contx       : Constr.trace_cntxt)
     (n           : name)
     (excl        : name list)
@@ -118,8 +120,8 @@ let get_name_except_allowed
   let rec get
       (allowed : allowed_occs)
       (t       : term)
-      ~(fv     : Sv.t)
-      ~(cond   : term)
+      ~(fv     : Vars.vars)
+      ~(cond   : terms)
     : name_occs
     =
     match t with
@@ -130,19 +132,20 @@ let get_name_except_allowed
       let occ = Iter.{
           occ_cnt  = ns.s_indices;
           occ_vars = fv;
-          occ_cond = cond; }
+          occ_cond = cond;
+          occ_pos  = Sp.empty; }
       in
       [occ]
 
     | Fun (f, _, [t1; t2]) when f = exp && allowed <> UnderEqual ->
       let occs_t1 = get NotAllowed t1 ~fv ~cond in
-      let is_pow = check_pow_g ~fv:fv contx g exp mult t1 excl in
+      let is_pow = check_pow_g ~fv:(Sv.of_list fv) contx g exp mult t1 excl in
       let all = if is_pow then OneInProduct else NotAllowed in
       let occs_t2 = get all t2 ~fv ~cond in
       occs_t1 @ occs_t2
 
     | Fun (f, _, [t1; t2]) when f = exp && allowed = UnderEqual ->
-      let not_bad_mult = not_occurs_mult ~fv:fv contx mult t2 excl in
+      let not_bad_mult = not_occurs_mult ~fv:(Sv.of_list fv) contx mult t2 excl in
       if not_bad_mult then
         (* t2 is not a bad product -> we check t1 with UnderEqual and 
            t2 with NotAllowed *)
@@ -159,7 +162,7 @@ let get_name_except_allowed
 
 
     | Fun (f, _, [t1; t2]) when Some f = mult && allowed = OneInProduct ->
-      let not_bad_mult1 = not_occurs_mult ~fv:fv contx mult t1 excl in
+      let not_bad_mult1 = not_occurs_mult ~fv:(Sv.of_list fv) contx mult t1 excl in
       (* detail of how the parameters are chosen *)
       (* if t1 is not a bad product: we allow one occ in t2, and we know 
          none are in t1 if it can be a bad product: we allow one occ in t1, 
@@ -190,7 +193,7 @@ let get_name_except_allowed
            get allow t' ~fv ~cond @ occs
         ) ~fv ~cond t []
   in
-  get NotAllowed t ~fv ~cond:Term.mk_true
+  get NotAllowed t ~fv ~cond:[]
 
 
 
@@ -222,7 +225,7 @@ let occurrence_formula
   : term
   =
   let updated_env, vars, sigma =
-    refresh_vars_env env (Sv.elements occ.occ_vars)
+    refresh_vars_env env occ.occ_vars
   in
   let renamed_indices = List.map (subst_var sigma) occ.occ_cnt in
   let phi_eq = mk_indices_eq ~simpl:true (n.s_indices) renamed_indices in
@@ -234,7 +237,7 @@ let occurrence_formula
     let phis_time =
       List.map (fun (ti:Fresh.ts_occ) -> 
            let (_, vars', sigma') =
-             refresh_vars_env updated_env (Sv.elements ti.occ_vars)
+             refresh_vars_env updated_env ti.occ_vars
            in
            let renamed_ti = subst sigma' ti.occ_cnt in
            mk_exists ~simpl:true
@@ -409,11 +412,11 @@ let cgdh
           (* indirect occurrences in iocc *)
           let na_in_occ =
             get_name_except_allowed
-              gdh_oracles ~fv:fv cntxt nas excl gen exp_s mult_s t
+              gdh_oracles ~fv:(Sv.elements fv) cntxt nas excl gen exp_s mult_s t
           in
           let nb_in_occ =
             get_name_except_allowed
-              gdh_oracles ~fv:fv cntxt nbs excl gen exp_s mult_s t
+              gdh_oracles ~fv:(Sv.elements fv) cntxt nbs excl gen exp_s mult_s t
           in
 
           (* proof obligations for the indirect occurrences *)

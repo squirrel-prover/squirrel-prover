@@ -1,5 +1,6 @@
-type t = Symbols.system Symbols.t
+type t = Symbols.system 
 
+(*------------------------------------------------------------------*)
 let of_lsymb table s = Symbols.System.of_lsymb s table
 
 (*------------------------------------------------------------------*)
@@ -82,7 +83,9 @@ let pp_systems fmt table =
 
 (*------------------------------------------------------------------*)
 let add_action table system descr =
+  (* Sanity check *)
   assert (Action.valid_descr descr);
+
   let shape = Action.get_shape descr.action in
   let { actions } as data = get_data table system in
   assert (not (Msh.mem shape actions));
@@ -93,13 +96,16 @@ let add_action table system descr =
 (*------------------------------------------------------------------*)
 let descr_of_shape table system shape =
   let {actions} = get_data table system in
-  Action.refresh_descr (Msh.find shape actions)
+  let descr = Msh.find shape actions in
+  assert (Action.valid_descr descr);
+
+  Action.refresh_descr descr
 
 (** [find_shape table shape] returns [Some (name,indices)] if some
     action with name [n] and indices [i] and shape [shape] is registered
     in [table]. Return [None] if no such action exists. *)
 let find_shape table shape =
-  let exception Found of Symbols.action Symbols.t * Vars.var list in
+  let exception Found of Symbols.action * Vars.var list in
   try
     Symbols.System.iter (fun system () data ->
       let descrs = match data with
@@ -151,7 +157,7 @@ let register_action table system_symb descr =
 module Single = struct
 
   type t = {
-    system     : Symbols.system Symbols.t ;
+    system     : Symbols.system ;
     projection : Term.projection
   }
 

@@ -2,16 +2,20 @@ set autoIntro = false.
 
 channel c
 
-gdh g, (^), ( ** ) where group:message exponents:message.
+type E [large].
 
-cdh gg, (^^) where group:message exponents:message.
+gdh g, (^), ( ** ) where group:message exponents:E.
+
+cdh gg, (^^) where group:message exponents:E.
 
 abstract top : message.
 abstract bot : message.
 
-name a : index -> message.
-name b : index -> message.
-name d : index -> message.
+name a : index -> E.
+name b : index -> E.
+name d : index -> E.
+
+abstract toM : E -> message.
 
 abstract corrupted : index -> boolean.
 
@@ -25,7 +29,7 @@ process resp (i:index) =
   R: out(c, gb).
 
 process badguy (i:index) =
-  B: out(c, d(i)).
+  B: out(c, toM (d(i))).
 
 process leak (i:index) =
   L: out(c, g ^ (b(i) ** a(i))).

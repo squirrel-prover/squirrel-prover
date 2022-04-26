@@ -28,6 +28,7 @@ type decl_error_i =
   | InvalidAbsType
   | InvalidCtySpace of string list
   | DuplicateCty of string
+  | NotTSOrIndex
   | NonDetOp
 
 type dkind = KDecl | KGoal
@@ -50,6 +51,9 @@ let pp_decl_error_i fmt = function
   | NonDetOp ->
     Fmt.pf fmt "an operator body cannot contain probabilistic computations"
 
+  | NotTSOrIndex ->
+    Fmt.pf fmt "must be an index or timestamp"
+      
 let pp_decl_error pp_loc_err fmt (loc,k,e) =
   let pp_k fmt = function
     | KDecl -> Fmt.pf fmt "declaration"
@@ -63,6 +67,16 @@ let pp_decl_error pp_loc_err fmt (loc,k,e) =
 exception Decl_error of decl_error
 
 let decl_error loc k e = raise (Decl_error (loc,k,e))
+
+(*------------------------------------------------------------------*)
+type proved_goal = { 
+  stmt : Goal.statement;
+  kind : [`Axiom | `Lemma] 
+} 
+
+let pp_kind fmt = function
+  | `Axiom -> Printer.kw `Goal fmt "axiom"
+  | `Lemma -> Printer.kw `Goal fmt "goal"
 
 (*------------------------------------------------------------------*)
 (** {2 Prover state}
@@ -93,9 +107,18 @@ let subgoals     : Goal.t list ref = ref []
 let bullets      : Bullets.path ref = ref Bullets.empty_path
 
 (** Proved toplevel goals. *)
-let goals_proved : Goal.statement list ref = ref []
+let goals_proved : proved_goal list ref = ref []
 
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
+
+(*------------------------------------------------------------------*)
+let get_current_goal () = !current_goal
+
+(*------------------------------------------------------------------*)
+let get_current_system () =
+  match get_current_goal () with
+  | None -> None
+  | Some (_, g) -> Some (Goal.system g )
 
 (*------------------------------------------------------------------*)
 (** {2 Options}
@@ -122,7 +145,7 @@ type proof_state = {
   current_goal : (Goal.statement * Goal.t) option;
   subgoals     : Goal.t list;
   bullets      : Bullets.path;
-  goals_proved : Goal.statement list;
+  goals_proved : proved_goal list;
   option_defs  : option_def list;
   params       : Config.params;
   prover_mode  : prover_mode;
@@ -496,8 +519,8 @@ let get_help (tac_name : lsymb) =
 
   let print_lemmas fmt () =
     let goals = !goals_proved in
-    List.iter (fun g -> 
-        Fmt.pf fmt "%s: %a@;" g.Goal.name Equiv.Any.pp g.Goal.formula
+    List.iter (fun (g : proved_goal) -> 
+        Fmt.pf fmt "%s: %a@;" g.stmt.name Equiv.Any.pp g.stmt.formula
       ) goals
 
 
@@ -552,9 +575,9 @@ let () =
 
 (*------------------------------------------------------------------*)
 let get_assumption_opt gname : Goal.statement option =
-  match List.find_opt (fun s -> s.Goal.name = gname) !goals_proved with
+  match List.find_opt (fun s -> s.stmt.name = gname) !goals_proved with
   | None -> None
-  | Some s -> Some s
+  | Some s -> Some s.stmt
 
 (*------------------------------------------------------------------*)
 let is_assumption gname : bool = get_assumption_opt gname <> None
@@ -583,7 +606,20 @@ let get_reach_assumption gname =
 let get_equiv_assumption gname =
   Goal.to_equiv_statement ~loc:(L.loc gname) (get_assumption gname)
 
+(*------------------------------------------------------------------*)
+let get_assumption_kind (gname : string) : [`Axiom | `Lemma] option =
+  match List.find_opt (fun s -> s.stmt.name = gname) !goals_proved with
+  | None -> None
+  | Some s -> Some s.kind
 
+(*------------------------------------------------------------------*)
+(** {2 User printing query} *)
+
+(** User printing query *)
+type print_query =
+  | Pr_system    of SE.parsed_t option (* [None] means current system *)
+  | Pr_statement of lsymb
+  
 (*------------------------------------------------------------------*)
 (** {2 Declare Goals And Proofs} *)
 
@@ -592,16 +628,19 @@ type include_param = { th_name : lsymb; params : lsymb list }
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
   | ParsedSetOption  of Config.p_set_param
-  | ParsedTactic     of [ `Bullet of string |
+
+  | ParsedTactic of [ `Bullet of string |
                           `Brace of [`Open|`Close] |
                           `Tactic of TacticsArgs.parser_arg Tactics.ast ] list
-  | ParsedUndo       of int
-  | ParsedGoal       of Goal.Parsed.t Location.located
-  | ParsedInclude    of include_param
+
+  | ParsedPrint   of print_query
+  | ParsedUndo    of int
+  | ParsedGoal    of Goal.Parsed.t Location.located
+  | ParsedInclude of include_param
   | ParsedProof
   | ParsedQed
   | ParsedAbort
-  | ParsedHint       of Hint.p_hint
+  | ParsedHint of Hint.p_hint
   | EOF
 
 let unnamed_goal () =
@@ -624,10 +663,10 @@ let declare_new_goal table hint_db parsed_goal =
   let parsed_goal = L.unloc parsed_goal in
   declare_new_goal_i table hint_db parsed_goal
 
-let add_proved_goal gconcl =
+let add_proved_goal (kind : [`Axiom | `Lemma]) gconcl =
   if is_assumption gconcl.Goal.name then
     raise (ParseError "a goal or axiom with this name already exists");
-  goals_proved := gconcl :: !goals_proved
+  goals_proved := { stmt = gconcl; kind } :: !goals_proved
 
 let define_oracle_tag_formula table (h : lsymb) f =
   let env = Env.init ~table () in
@@ -658,7 +697,7 @@ let complete_proof () =
   assert (is_proof_completed ());
   try
     let gc, _ = Utils.oget !current_goal in
-    add_proved_goal gc;
+    add_proved_goal `Lemma gc;
     current_goal := None;
     bullets := Bullets.empty_path;
     subgoals := []
@@ -681,8 +720,10 @@ let eval_tactic_focus tac = match !subgoals with
   | judge :: ejs' ->
     if not (Bullets.tactic_allowed !bullets) then
       Tactics.(hard_failure (Failure "bullet needed before tactic"));
+    
     let new_j = AST.eval_judgment tac judge in
     subgoals := new_j @ ejs';
+    
     begin try
       bullets := Bullets.expand_goal (List.length new_j) !bullets ;
     with _ -> Tactics.(hard_failure (Failure "bullet error")) end
@@ -755,40 +796,35 @@ let check_fun_out_ty loc ty =
   else ()
 
 let parse_abstract_decl table (decl : Decl.abstract_decl) =
-    let in_tys, out_ty =
-      List.takedrop (List.length decl.abs_tys - 1) decl.abs_tys
-    in
-    let p_out_ty = as_seq1 out_ty in
+  let in_tys, out_ty =
+    List.takedrop (List.length decl.abs_tys - 1) decl.abs_tys
+  in
+  let p_out_ty = as_seq1 out_ty in
 
-    let ty_args = List.map (fun l ->
-        Type.mk_tvar (L.unloc l)
-      ) decl.ty_args
-    in
+  let ty_args = List.map (fun l ->
+      Type.mk_tvar (L.unloc l)
+    ) decl.ty_args
+  in
 
-    let env = Env.init ~table ~ty_vars:ty_args () in
-    let in_tys = List.map (Theory.parse_p_ty env) in_tys in
+  let env = Env.init ~table ~ty_vars:ty_args () in
+  let in_tys = List.map (Theory.parse_p_ty env) in_tys in
 
-    let rec parse_index_prefix iarr in_tys = 
-      match in_tys with
-      | Type.Index :: in_tys -> 
-        parse_index_prefix (iarr + 1) in_tys
-      | _ -> iarr, in_tys
-    in
+  let rec parse_index_prefix iarr in_tys = 
+    match in_tys with
+    | Type.Index :: in_tys -> 
+      parse_index_prefix (iarr + 1) in_tys
+    | _ -> iarr, in_tys
+  in
 
-    let iarr, in_tys = parse_index_prefix 0 in_tys in
+  let iarr, in_tys = parse_index_prefix 0 in_tys in
 
-    let out_ty = Theory.parse_p_ty env p_out_ty in
-    
-    check_fun_out_ty (L.loc p_out_ty) out_ty;
+  let out_ty = Theory.parse_p_ty env p_out_ty in
 
-    Theory.declare_abstract
-      table
-      ~index_arity:iarr
-      ~ty_args
-      ~in_tys
-      ~out_ty
-      decl.name
-      decl.symb_type
+  check_fun_out_ty (L.loc p_out_ty) out_ty;
+
+  Theory.declare_abstract table
+    ~index_arity:iarr ~ty_args ~in_tys ~out_ty
+    decl.name decl.symb_type
 
 (*------------------------------------------------------------------*)
 let parse_operator_decl table (decl : Decl.operator_decl) =
@@ -860,7 +896,8 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
   *   process declarations somewhere else than Prover. *)
 
 let declare table hint_db decl = match L.unloc decl with
-  | Decl.Decl_channel s            -> Channel.declare table s
+  | Decl.Decl_channel s -> Channel.declare table s
+
   | Decl.Decl_process (id,pkind,p) ->
     let env = Env.init ~table () in
     let pkind = List.map (fun (x,t) ->
@@ -877,21 +914,17 @@ let declare table hint_db decl = match L.unloc decl with
             { parsed_goal with Goal.Parsed.name = Some (unnamed_goal ()) }
     in
     let gc,_ = Goal.make table hint_db parsed_goal in
-    add_proved_goal gc;
+    add_proved_goal `Axiom gc;
     table
 
   | Decl.Decl_system sdecl ->
     Process.declare_system table sdecl.sname sdecl.sprocess
 
   | Decl.Decl_system_modifier sdecl ->
-    let new_axiom_name, enrich, make_conclusion, new_system, table = 
-      SystemModifiers.declare_system table sdecl 
+    let new_lemma, table = 
+      SystemModifiers.declare_system table hint_db sdecl 
     in
-    let context = SE.update ~pair:new_system SE.context_any in
-    let statement, _ =
-      Goal.make_obs_equiv ~enrich table hint_db new_axiom_name context
-    in
-    goals_proved :=  statement :: !goals_proved;
+    oiter (add_proved_goal `Lemma) new_lemma;
     table
 
   | Decl.Decl_dh (h, g, ex, om, ctys) ->
@@ -931,9 +964,23 @@ let declare table hint_db decl = match L.unloc decl with
 
     Theory.declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty senc sdec
 
-  | Decl.Decl_name (s, a, pty) ->
-    let ty = Theory.parse_p_ty (Env.init ~table ()) pty in
-    Theory.declare_name table s Symbols.{ n_iarr = a; n_ty = ty; }
+  | Decl.Decl_name (s, ptys) ->
+    let env = Env.init ~table () in
+    let p_args_tys, p_out_ty = List.takedrop (List.length ptys - 1) ptys in
+    let p_out_ty = as_seq1 p_out_ty in
+
+    let args_tys = List.map (Theory.parse_p_ty env) p_args_tys in
+    let out_ty = Theory.parse_p_ty env p_out_ty in
+    
+    let n_fty = Type.mk_ftype 0 [] args_tys out_ty in
+
+    List.iter2 (fun ty pty ->
+        if not (Type.equal ty Type.ttimestamp) &&
+           not (Type.equal ty Type.tindex) then
+          decl_error (L.loc pty) KDecl NotTSOrIndex
+      ) args_tys p_args_tys;
+    
+    Theory.declare_name table s Symbols.{ n_fty }
 
   | Decl.Decl_state (s, args, k, t) ->
     Theory.declare_state table s args k t

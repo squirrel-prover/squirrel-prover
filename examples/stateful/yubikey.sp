@@ -179,7 +179,7 @@ goal counterIncrease (t:timestamp, i : index) :
   happens(t) =>
     (t > init && exec@t) =>
       (SCpt(i)@pred(t) ~< SCpt(i)@t = orderOk) ||
-        (SCpt(i)@t = SCpt(i)@pred(t)).
+       SCpt(i)@t = SCpt(i)@pred(t).
 Proof.
   (** After having introduced the hypotheses, we perform a case analysis
   on all possible values that the timestamp `t` can take.
@@ -284,8 +284,8 @@ compared to the last time the server accepted for this YubiKey.
 **)
 goal noreplayInv (ii, ii1, i:index):
   happens(S(ii1,i),S(ii,i)) =>
-    exec@S(ii1,i) && S(ii,i) < S(ii1,i) =>
-      SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk.
+  exec@S(ii1,i) && S(ii,i) < S(ii1,i) =>
+  SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk.
 (** The proof relies on the previous helping lemmas reasoning on counter
 values. **)
 Proof.
@@ -331,11 +331,14 @@ the use of the INT-CTXT cryptographic assumption.
 **)
 goal injective_correspondence (ii,i:index):
   happens(S(ii,i)) =>
-    exec@S(ii,i) =>
-      exists (j:index),
-        Press(i,j) < S(ii,i) && cpt(i,j)@Press(i,j) = SCpt(i)@S(ii,i)
-        && forall (ii1:index), happens(S(ii1,i)) => exec@S(ii1,i) =>
-             cpt(i,j)@Press(i,j) = SCpt(i)@S(ii1,i) => ii1 = ii.
+  exec@S(ii,i) =>
+  exists (j:index),
+    Press(i,j) < S(ii,i) && cpt(i,j)@Press(i,j) = SCpt(i)@S(ii,i) && 
+    forall (ii1:index), 
+      happens(S(ii1,i)) => 
+      exec@S(ii1,i) =>
+      cpt(i,j)@Press(i,j) = SCpt(i)@S(ii1,i) => 
+      ii1 = ii.
 (** The high-level idea of this proof is to use the INT-CTXT assumption:
 if the message received by the server is a valid ciphertext, then it must
 be equal to an encryption that took place before.
@@ -348,16 +351,18 @@ Proof.
   executable S(ii,i) => //.
   intro Hexec'.
   expand exec, cond.
-  destruct Hexec as [Hexecpred [Mneq Hcpt Hpid]].
+  destruct Hexec as [Hexecpred [Mneq Hcpt] Hpid].
   (** We apply the INT-CTXT assumption, which directly gives the existence
   of an action `Press(i,j)` that happens before `S(ii,i)`. **)
   intctxt Mneq => //.
   intro Ht M1 *.
   exists j.
+
   (** The two first conjucts of the conclusion are automatically proved
   by Squirrel (the equality of counter values is a consequence of M1 once
   we have expanded the macros `cpt` and `SCpt`. **)
-  split => //.
+  simpl. 
+  split; 1: auto.
   (** It now remains to show that the counter value `cpt(i,j)@Press(i,j)` is
   not involved in another successful login.
   We first show if this second successful login `S(ii',i)` had happened, then

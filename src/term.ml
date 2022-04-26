@@ -21,20 +21,24 @@ let mk_isymb (s : 'a) (t : Type.ty) (is : Vars.vars) =
     | Type.TVar _ | Type.TUnivar _ -> assert false;
     | _ -> ()
   in
-  assert (List.for_all (fun v -> Vars.ty v = Type.Index) is);
+  assert (
+    List.for_all (fun v ->
+        Type.equal (Vars.ty v) Type.tindex ||
+        Type.equal (Vars.ty v) Type.ttimestamp
+      ) is);
 
   { s_symb    = s;
     s_typ     = t;
     s_indices = is; }
 
 
-type name = Symbols.name Symbols.t
+type name = Symbols.name
 type nsymb = name isymb
 
-type fname = Symbols.fname Symbols.t
+type fname = Symbols.fname
 type fsymb = fname * Vars.var list (* TODO: use isymb *)
 
-type mname = Symbols.macro Symbols.t
+type mname = Symbols.macro
 type msymb = mname isymb
 
 type state = msymb
@@ -81,7 +85,7 @@ type term =
   | Macro  of msymb * term list * term
 
   | Seq    of Vars.var list * term
-  | Action of Symbols.action Symbols.t * Vars.var list 
+  | Action of Symbols.action * Vars.var list 
 
   | Var    of Vars.var
 
@@ -293,18 +297,24 @@ module SmartConstructors = struct
     if t1 = t2 && simpl then mk_false else mk_gt_ns t1 t2
 
   let mk_and ?(simpl=true) t1 t2 = match t1,t2 with
+    | tt, _ when tt = mk_false && simpl -> mk_false
+    | _, tt when tt = mk_false && simpl -> mk_false
+
     | tt, t when tt = mk_true && simpl -> t
     | t, tt when tt = mk_true && simpl -> t
     | t1,t2 -> mk_and_ns t1 t2
 
-  let mk_ands ?(simpl=true) ts = List.fold_left (mk_and ~simpl) mk_true ts
+  let mk_ands ?(simpl=true) ts = List.fold_right (mk_and ~simpl) ts mk_true 
 
   let mk_or ?(simpl=true) t1 t2 = match t1,t2 with
+    | tt, _ when tt = mk_true && simpl -> mk_true
+    | _, tt when tt = mk_true && simpl -> mk_true
+
     | tf, t when tf = mk_false && simpl -> t
     | t, tf when tf = mk_false && simpl -> t
     | t1,t2 -> mk_or_ns t1 t2
 
-  let mk_ors ?(simpl=true) ts = List.fold_left (mk_or ~simpl) mk_false ts
+  let mk_ors ?(simpl=true) ts = List.fold_right (mk_or ~simpl) ts mk_false 
 
   let mk_impl ?(simpl=true) t1 t2 = match t1,t2 with
     | tf, _ when tf = mk_false && simpl -> mk_true
@@ -500,7 +510,7 @@ module SmartDestructors = struct
 
   (*------------------------------------------------------------------*)
   (** for [fs] of arity 2, left associative *)
-  let mk_destr_many_left fs =
+  let[@warning "-32"] mk_destr_many_left fs =
     let rec destr l f =
       if l < 0 then assert false;
       if l = 1 then Some [f]
@@ -523,8 +533,8 @@ module SmartDestructors = struct
     in
     destr
 
-  let destr_ors   = mk_destr_many_left  f_or
-  let destr_ands  = mk_destr_many_left  f_and
+  let destr_ors   = mk_destr_many_right  f_or
+  let destr_ands  = mk_destr_many_right  f_and
   let destr_impls = mk_destr_many_right f_impl
 
   (*------------------------------------------------------------------*)
@@ -637,6 +647,10 @@ type fixity = [`Prefix | `Postfix | `Infix of assoc | `NonAssoc | `NoParens]
 let pp_maybe_paren (c : bool) (pp : 'a Fmt.t) : 'a Fmt.t =
   if c then Fmt.parens pp else pp
 
+(** Parenthesis rules.
+    N.B.: the rule for infix left-associative symbols is only valid if,
+    in the parser, all prefix symbols are reduction-favored over 
+    shifting the infix symbol. *)
 let maybe_paren
     ~(inner : 'a * fixity)
     ~(outer : 'a * fixity)
@@ -673,17 +687,25 @@ let happens_fixity = `Happens           , `NoParens
 
 (** Applies the styling info in [info]
     NOTE: this is *not* the [pp] exported by the module, it is shadowed later *)
-let rec pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
-  fun info (outer,side) ppf t ->
+let rec pp
+    (info         : pp_info)
+    ((outer,side) : ('b * fixity) * assoc)
+    (ppf          : Format.formatter)
+    (t            : term)
+  : unit
+  =
   let err_opt, info = info.styler info t in
   styled_opt err_opt (_pp info (outer, side)) ppf t
 
 (** Core printing function *)
-and _pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
-  fun info (outer, side) ppf t ->
-  let pp : (('b * fixity) * assoc) -> term Fmt.t =
-    fun (outer,side) fmt t -> pp info (outer, side) fmt t
-  in
+and _pp
+    (info         : pp_info)
+    ((outer,side) : ('b * fixity) * assoc)
+    (ppf          : Format.formatter)
+    (t            : term)
+  : unit
+  =
+  let pp = pp info in
 
   match t with
   | Var m -> Fmt.pf ppf "%a" Vars.pp m
@@ -706,10 +728,10 @@ and _pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
 
   | Fun (s,_,[a;b;c]) when s = f_ite ->
     let pp fmt () =
-      Fmt.pf ppf "@[<hov 0>@[<hov 2>if %a@ then@ %a@]@ @[<hov 2>else@ %a@]@]"
+      Fmt.pf ppf "@[<hv 0>@[<hov 2>if %a@ then@ %a@]@ %a@]"
         (pp (ite_fixity, `NonAssoc)) a
         (pp (ite_fixity, `NonAssoc)) b
-        (pp (ite_fixity, `Right)) c
+        (pp_chained_ite info)        c (* prints the [else] *)
     in
     maybe_paren ~outer ~side ~inner:ite_fixity pp ppf ()
 
@@ -724,7 +746,7 @@ and _pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
 
   | Fun (fa,_,[Fun (fi1,_,[bl1;br1]);
                Fun (fi2,_,[br2;bl2])])
-    when fa = f_and && fi1 = f_impl && fi1 = f_impl &&
+    when fa = f_and && fi1 = f_impl && fi2 = f_impl &&
          bl1 = bl2 && br1 = br2 ->
     let pp fmt () =
       Fmt.pf ppf "@[%a@ <=>@ %a@]"
@@ -736,26 +758,16 @@ and _pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
   | Fun _ as f when is_and_happens f ->
     pp_and_happens info ppf f
 
-  (* only right-associate symbol we have *)
-  | Fun ((s,is),_,[bl;br]) when (s = Symbols.fs_impl) ->
-    assert (is = []);
-    let pp fmt () =
-      Fmt.pf ppf "@[<0>%a %s@ %a@]"
-        (pp ((`F s, `Infix `Right), `Left)) bl
-        (Symbols.to_string s)
-        (pp ((`F s, `Infix `Right), `Right)) br
-    in
-    maybe_paren ~outer ~side ~inner:(`F s, `Infix `Right) pp ppf ()
-
   | Fun ((s,is),_,[bl;br]) when Symbols.is_infix s ->
+    let assoc = Symbols.infix_assoc s in
     assert (is = []);
     let pp fmt () =
       Fmt.pf ppf "@[<0>%a %s@ %a@]"
-        (pp ((`F s, `Infix `Left), `Left)) bl
+        (pp ((`F s, `Infix assoc), `Left)) bl
         (Symbols.to_string s)
-        (pp ((`F s, `Infix `Left), `Right)) br
+        (pp ((`F s, `Infix assoc), `Right)) br
     in
-    maybe_paren ~outer ~side ~inner:(`F s, `Infix `Left) pp ppf ()
+    maybe_paren ~outer ~side ~inner:(`F s, `Infix assoc) pp ppf ()
 
   | Fun (s,_,[b]) when s = f_not ->
     Fmt.pf ppf "@[<hov 2>not(%a)@]" (pp (not_fixity, `Right)) b
@@ -805,10 +817,10 @@ and _pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
 
   | Find (b, c, d, Fun (f,_,[])) when f = f_zero ->
     let pp fmt () =
-      Fmt.pf ppf "@[<hov 0>\
+      Fmt.pf ppf "@[<hv 0>\
                   @[<hov 2>try find %a such that@ %a@]@;<1 0>\
                   @[<hov 2>in@ %a@]@]"
-        Vars.pp_list b
+        Vars.pp_typed_list b
         (pp (find_fixity, `NonAssoc)) c
         (pp (find_fixity, `Right)) d
     in
@@ -816,15 +828,14 @@ and _pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
 
   | Find (b, c, d, e) ->
     let pp fmt () =
-      Fmt.pf ppf "@[<hov 0>\
+      Fmt.pf ppf "@[<hv 0>\
                   @[<hov 2>try find %a such that@ %a@]@;<1 0>\
-                  @[<hov 0>\
                   @[<hov 2>in@ %a@]@;<1 0>\
-                  @[<hov 2>else@ %a@]@]@]"
-        Vars.pp_list b
+                  %a@]"
+        Vars.pp_typed_list b
         (pp (find_fixity, `NonAssoc)) c
         (pp (find_fixity, `NonAssoc)) d
-        (pp (find_fixity, `Right)) e
+        (pp_chained_find info)        e (* prints the [else] *)
     in
     maybe_paren ~outer ~side ~inner:find_fixity pp ppf ()
 
@@ -843,6 +854,32 @@ and _pp : pp_info -> (('b * fixity) * assoc) -> term Fmt.t =
         (pp (quant_fixity, `Right)) b
     in
     maybe_paren ~outer ~side ~inner:(`Quant, `Prefix) pp ppf ()
+
+(* Printing in a [hv] box. Print the trailing [else] of the caller. *)
+and pp_chained_ite info ppf (t : term) = 
+  match t with
+  | Fun (s,_,[a;b;c]) when s = f_ite ->
+    Fmt.pf ppf "@[<hov 2>else if %a@ then@ %a@]@ %a"
+      (pp info (ite_fixity, `NonAssoc)) a
+      (pp info (ite_fixity, `NonAssoc)) b
+      (pp_chained_ite info)             c
+
+  | _ -> Fmt.pf ppf "@[<hov 2>else@ %a@]" (pp info (ite_fixity, `Right)) t
+
+(* Printing in a [hv] box. Print the trailing [else] of the caller. *)
+and pp_chained_find info ppf (t : term) = 
+  match t with
+  | Find (b, c, d, e) ->
+    Fmt.pf ppf "@[<hov 2>else try find %a such that@ %a@]@;<1 0>\
+                @[<hov 2>in@ %a@]@;<1 0>\
+                %a"
+      Vars.pp_typed_list b
+      (pp info (find_fixity, `NonAssoc)) c
+      (pp info (find_fixity, `NonAssoc)) d
+      (pp_chained_find info)             e
+
+  | _ -> Fmt.pf ppf "@[<hov 2>else@ %a@]" (pp info (find_fixity, `Right)) t
+
 
 and pp_happens info ppf (ts : term list) =
   Fmt.pf ppf "@[<hv 2>%a(%a)@]"
@@ -1007,8 +1044,6 @@ let rec assoc : subst -> term -> term =
   | ESubst (t1,t2)::q ->
     if term = t1 then t2 else assoc q term
 
-exception Substitution_error of string
-
 let pp_esubst ppf (ESubst (t1,t2)) =
   Fmt.pf ppf "%a->%a" pp t1 pp t2
 
@@ -1016,19 +1051,20 @@ let pp_subst ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_esubst) s
 
-let subst_var : subst -> Vars.var -> Vars.var =
-    fun subst var ->
-    match assoc subst (Var var) with
-    | Var var -> var
-    | _ -> raise @@ Substitution_error
-        "Must map the given variable to another variable"
+let subst_var (subst : subst) (var : Vars.var) : Vars.var =
+  match assoc subst (Var var) with
+  | Var var -> var
+  | _ -> assert false
+
+let subst_vars (subst : subst) (vs : Vars.vars) : Vars.vars =
+  List.map (subst_var subst) vs
 
 let subst_isymb (s : subst) (symb : 'a isymb) : 'a isymb =
-  { symb with s_indices = List.map (subst_var s) symb.s_indices }
+  { symb with s_indices = subst_vars s symb.s_indices }
 
 
 let subst_macro (s : subst) isymb =
-  { isymb with s_indices = List.map (subst_var s) isymb.s_indices }
+  { isymb with s_indices = subst_vars s isymb.s_indices }
 
 (*------------------------------------------------------------------*)
 
@@ -1109,17 +1145,17 @@ let rec subst (s : subst) (t : term) : term =
     let new_term =
       match t with
       | Fun ((fs,is), fty, lt) ->
-        Fun ((fs, List.map (subst_var s) is), fty, List.map (subst s) lt)
+        Fun ((fs, subst_vars s is), fty, List.map (subst s) lt)
 
       | Name symb ->
-        Name { symb with s_indices = List.map (subst_var s) symb.s_indices}
+        Name { symb with s_indices = subst_vars s symb.s_indices}
 
       | Macro (m, l, ts) ->
         Macro (subst_macro s m, List.map (subst s) l, subst s ts)
 
       | Var m -> Var m
 
-      | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
+      | Action (a,indices) -> Action (a, subst_vars s indices)
 
       | Diff (Explicit l) ->
         Diff (Explicit (List.map (fun (lbl,tm) -> lbl, subst s tm) l))
@@ -1308,11 +1344,14 @@ module type SmartFO = sig
   type form
 
   (** {3 Constructors} *)
-  val mk_true    : form
-  val mk_false   : form
+  val mk_true  : form
+  val mk_false : form
 
-  val mk_eq    : ?simpl:bool -> term -> term -> form
-  val mk_leq   : ?simpl:bool -> term -> term -> form
+  val mk_eq  : ?simpl:bool -> term -> term -> form
+  val mk_leq : ?simpl:bool -> term -> term -> form
+  val mk_geq : ?simpl:bool -> term -> term -> form
+  val mk_lt  : ?simpl:bool -> term -> term -> form
+  val mk_gt  : ?simpl:bool -> term -> term -> form
 
   val mk_not   : ?simpl:bool -> form              -> form
   val mk_and   : ?simpl:bool -> form      -> form -> form

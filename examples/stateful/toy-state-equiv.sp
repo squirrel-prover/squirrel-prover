@@ -79,12 +79,12 @@ Proof.
             left. split => //.
             intro j' Hap'. use H2 with j' => //.
           * (* case HH0 - general *)
-            right. simpl_left.
+            right. 
+            destruct HH0 as [j0 [_ _ H]]. 
             exists j0.
-            repeat split => //.
-            intro j' Hap'.
-            use H1 with j' as H2 => //.
-            case H2 => //.
+            intro /= j' Hap'.
+            apply H in Hap'.
+            by case Hap'.
 Qed.
 
 goal stateInequality :
@@ -118,14 +118,14 @@ Proof.
        use H1' with j0; 1,2: case Ht; by auto.
 
      + (* case H1 - general *)
-       simpl_left.
+       destruct H1 as [j1 [_ _ H1]].
        (* kT(i)@pred(T(i,j)) = kT(i)@T(i,j1)
        then we should have that T(i,j0) <= T(i,j1) *)
        assert (T(i,j0) <= T(i,j1)).
-          - use H0 with j0 as H0'.
-            case Ht; 1,2: case H0'; by auto.
-            case Ht; 1,2: by auto.
-          - use Hind with T(i,j1),pred(T(i,j0)),i,j1,i; 1,2,3,4: by auto.
+          - use H1 with j0 as H0'.
+            by case Ht; case H0'. 
+            by case Ht.
+          - by use Hind with T(i,j1),pred(T(i,j0)),i,j1,i.
 Qed.
 
 goal stateInequalityHelpful :
