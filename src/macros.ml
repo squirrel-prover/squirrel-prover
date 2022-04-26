@@ -373,7 +373,7 @@ let update_global_data
   : Symbols.table
   =
   match Symbols.Macro.get_data ms table with
-  | Global_data data ->
+  | Global_data data when List.mem_assoc old_system data.bodies ->
     assert (not (List.mem_assoc new_system data.bodies));
     let body = get_single_body old_system data in
     let body = 
