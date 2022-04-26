@@ -690,8 +690,7 @@ let xo_lt
     (x : XO.t) (y : XO.t)
   : bool
   =
-  Fmt.epr "@.x: %a@.y: %a@." XO.pp x XO.pp y;
-
+  
   let x, y = x.cnt, y.cnt in
 
   if x.x_msymb = y.x_msymb then
