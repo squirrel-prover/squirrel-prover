@@ -126,14 +126,16 @@ let pp_sum_choice_f f d ppf (k,a) =
   * relying on the formatter [f] for ['a], and ignoring
   * the default sum choice [d]. *)
 let pp_action_f f d ppf a =
-  Fmt.list
-    ~sep:(fun fmt () -> Fmt.pf fmt "_")
-    (fun ppf {par_choice;sum_choice} ->
-       Fmt.pf ppf "%a%a"
-         (pp_par_choice_f f) par_choice
-         (pp_sum_choice_f f d) sum_choice)
-    ppf
-    a
+  if a = [] then Fmt.pf ppf "ε" 
+  else
+    Fmt.list
+      ~sep:(fun fmt () -> Fmt.pf fmt "_")
+      (fun ppf {par_choice;sum_choice} ->
+         Fmt.pf ppf "%a%a"
+           (pp_par_choice_f f) par_choice
+           (pp_sum_choice_f f d) sum_choice)
+      ppf
+      a
 
 let pp_action_structure ppf a =
   Printer.kw `GoalAction ppf "%a" (pp_action_f pp_indices (0,[])) a

@@ -31,12 +31,32 @@ type global_data = {
   (** Definitions of macro body for single systems where it is defined. *)
 }
 
+let[@warning "-32"] pp fmt (g : global_data) : unit =
+  let pp_strict fmt = function
+    | `Strict -> Fmt.pf fmt "Strict"
+    | `Large -> Fmt.pf fmt "Large"
+  in
+  Fmt.pf fmt "@[<v>action: @[%a@]@;\
+              inputs: @[%a@]@;\
+              indices: @[%a@]@;\
+              ts: @[%a@]@;\
+              @[<v 2>bodies:@;%a@]\
+              @]%!"
+    (Fmt.pair ~sep:Fmt.comma pp_strict Action.pp_shape) g.action
+    Vars.pp_typed_list g.inputs
+    Vars.pp_typed_list g.indices
+    Vars.pp g.ts
+    (Fmt.list ~sep:Fmt.cut
+       (Fmt.parens (Fmt.pair ~sep:Fmt.comma System.Single.pp Term.pp)))
+    g.bodies
+
 (*------------------------------------------------------------------*)
 type Symbols.data += Global_data of global_data
 
 (*------------------------------------------------------------------*)
 (** Get body of a global macro for a single system. *)
 let get_single_body (single : S.Single.t) (data : global_data) : Term.term =
+  (* Fmt.epr "single : %a@.data: %a@." S.Single.pp single pp data; *)
   List.assoc single data.bodies
 
 (*------------------------------------------------------------------*)
@@ -340,17 +360,17 @@ type system_map_arg =
     existing definition, and update the value of [ns] accordingly in
     the new system. *)
 let update_global_data
-    (table        : Symbols.table)
-    (ms           : Symbols.macro)
-    (dec_def      : Symbols.macro_def)
+    (table      : Symbols.table)
+    (ms         : Symbols.macro)
+    (dec_def    : Symbols.macro_def)
     (old_system : System.Single.t)
     (new_system : System.Single.t)
-    (func         : 
+    (func       : 
        (system_map_arg ->
         Symbols.macro -> 
         Term.term -> 
         Term.term))
-  :  Symbols.table
+  : Symbols.table
   =
   match Symbols.Macro.get_data ms table with
   | Global_data data ->
