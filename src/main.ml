@@ -419,7 +419,7 @@ let rec do_include
         (L.unloc i.th_name)
         (pp_toplevel_error ~test incl_state) e
     in
-
+    Prover.pop_pt_history ();
     let _ : Prover.prover_mode * Symbols.table =
       Prover.reset_from_state prover_state
     in
