@@ -51,10 +51,14 @@ let pp fmt : 'a expr -> unit = function
   | Any_compatible_with s -> Format.fprintf fmt "any(%a)" Symbols.pp s
   | List l ->
       Fmt.list
-        ~sep:(fun fmt () -> Format.fprintf fmt ",")
+        ~sep:Fmt.comma
         (fun fmt (label,single_sys) ->
-           if label = "" then System.Single.pp fmt single_sys else
-             Format.fprintf fmt "%s:%a" label System.Single.pp single_sys)
+           if Term.proj_to_string label = "" then
+             System.Single.pp fmt single_sys
+           else
+             Format.fprintf fmt "%a:%a"
+               Term.pp_projection label
+               System.Single.pp single_sys)
         fmt
         l
 
@@ -93,17 +97,17 @@ let project proj : t -> System.Single.t = function
   | List l -> List.assoc proj l
   | _ -> assert false
 
-let singleton s = List ["",s]
+let singleton s = List [Term.proj_from_string "",s]
 
 let of_system table s : t =
   let projections = System.projections table s in
   List
     (List.map (fun proj -> proj, System.Single.make table s proj) projections)
 
-let default_labels = function
-  | 1 -> [""]
-  | 2 -> ["left";"right"]
-  | n -> Array.to_list (Array.init n (fun i -> string_of_int (i+1)))
+let default_labels : int -> Term.projection list = function
+  | 1 -> [Term.proj_from_string ""]
+  | 2 -> [Term.left_proj;Term.right_proj]
+  | n -> List.init n (fun i -> Term.proj_from_string (string_of_int (i+1)))
 
 let of_list table ?labels (l:System.Single.t list) : t =
   (* Check for compatibility. *)
@@ -154,7 +158,7 @@ let parse_single table item =
           | _ -> error Missing_projection
         end
     | Some p ->
-        System.Single.make table sys (L.unloc p)
+        System.Single.make table sys (Term.proj_from_string (L.unloc p))
 
 let parse table p = match Location.unloc p with
   | [] ->
@@ -173,7 +177,10 @@ let parse table p = match Location.unloc p with
       of_system table (System.of_lsymb table system)
 
   | l ->
-      let labels = List.map (fun i -> Utils.omap L.unloc i.alias) l in
+    let labels =
+      List.map (fun i ->
+          Utils.omap (Term.proj_from_string -| L.unloc) i.alias
+        ) l in
       let l =
         List.map (fun i -> parse_single table { i with alias = None }) l
       in
@@ -274,7 +281,7 @@ let clone_system
 (*------------------------------------------------------------------*)
 (* Pairs *)
 
-let make_pair a b = List ["left",a;"right",b]
+let make_pair a b = List [Term.left_proj,a; Term.right_proj,b]
 
 let fst = function
   | List [x;_] -> x

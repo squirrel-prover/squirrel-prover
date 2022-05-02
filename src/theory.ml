@@ -834,7 +834,7 @@ and convert0
       ty
 
   | Diff (l,r) ->
-    Term.mk_diff ["left",conv ty l; "right",conv ty r]
+    Term.mk_diff [Term.left_proj,conv ty l; Term.right_proj,conv ty r]
 
   | Find (vs,c,t,e) ->
     let env, is =

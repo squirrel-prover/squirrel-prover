@@ -61,7 +61,7 @@ let check_no_macro_or_var t =
 let refl (e : Equiv.equiv) (s : ES.t) =
   if not (List.for_all check_no_macro_or_var e)
   then `NoReflMacroVar
-  else if ES.get_frame "left" s = ES.get_frame "right" s
+  else if ES.get_frame Term.left_proj s = ES.get_frame Term.right_proj s
   then `True
   else `NoRefl
 
@@ -728,7 +728,7 @@ let mk_phi_proj
     (proj : Term.projection)
     (biframe : Term.term list) : Term.term list
   =
-  let frame = List.map (Equiv.project_term proj) biframe in
+  let frame = List.map (Equiv.project1 proj) biframe in
   try
     let frame_indices : Fresh.name_occs =
       List.fold_left (fun acc t ->
@@ -769,19 +769,19 @@ let mk_phi_proj
 
 let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe : Term.term =
   let n_left, n_right =
-    match Term.project_term ~projection:"left"  t,
-          Term.project_term ~projection:"right" t with
+    match Term.project1 Term.left_proj  t,
+          Term.project1 Term.right_proj t with
     | (Name nl, Name nr) -> nl, nr
     | _ -> raise Fresh.Not_name
   in
 
-  let system_left = SE.project "left" cntxt.system in
+  let system_left = SE.project Term.left_proj cntxt.system in
   let cntxt_left = { cntxt with system = SE.singleton system_left } in
-  let phi_left = mk_phi_proj cntxt_left env n_left "left" biframe in
+  let phi_left = mk_phi_proj cntxt_left env n_left Term.left_proj biframe in
 
-  let system_right = SE.project "right" cntxt.system in
+  let system_right = SE.project Term.right_proj cntxt.system in
   let cntxt_right = { cntxt with system = SE.singleton system_right } in
-  let phi_right = mk_phi_proj cntxt_right env n_right "right" biframe in
+  let phi_right = mk_phi_proj cntxt_right env n_right Term.right_proj biframe in
 
   Term.mk_ands
     (* remove duplicates, and then concatenate *)
@@ -1325,8 +1325,8 @@ let prf arg s =
 
   (* The formula, without the oracle condition. *)
   let formula =
-    let cond_l = Prf.prf_condition_side "left"  cntxt env biframe e hash in
-    let cond_r = Prf.prf_condition_side "right" cntxt env biframe e hash in
+    let cond_l = Prf.prf_condition_side Term.left_proj  cntxt env biframe e hash in
+    let cond_r = Prf.prf_condition_side Term.right_proj cntxt env biframe e hash in
 
     match cond_l, cond_r with
     | None, None -> assert false
@@ -1422,7 +1422,8 @@ let global_diff_eq (s : ES.t) =
   let subgoal_of_occ (vs,is,t) = 
     let cond = Term.mk_ands (List.rev t.Iter.occ_cond) in
     match t.Iter.occ_cnt with
-    | Term.Diff (Explicit ["left",s1;"right",s2]) as subterm ->
+    | Term.Diff (Explicit [p1,s1; p2,s2]) as subterm
+      when p1 = Term.left_proj && p2 = Term.right_proj ->
         let fvars =
           t.Iter.occ_vars @ Vars.Sv.elements (Term.fv subterm)
         in
@@ -1451,11 +1452,11 @@ let global_diff_eq (s : ES.t) =
                 I don't know if we're missing something with the removal
                 of expand_all_macros.
         let s1 = 
-          Term.project_term ~projection:"left"
+          Term.project1 left_proj
             (EquivLT.expand_all_macros ~force_happens:true s1 s) 
         in
         let s2 = 
-          Term.project_term ~projection:"right"
+          Term.project1 right_proj
             (EquivLT.expand_all_macros ~force_happens:true s2 s)
         in *)
         Goal.Trace ES.(to_trace_sequent
@@ -1980,8 +1981,8 @@ let enckp arg (s : ES.t) =
         (* For each key we actually only need to verify the SSC
          * wrt. the appropriate projection of the system. *)
         let system = Utils.oget (ES.system s).pair in
-        let sysl = SystemExpr.(singleton (project "left" system)) in
-        let sysr = SystemExpr.(singleton (project "right" system)) in
+        let sysl = SystemExpr.(singleton (project Term.left_proj system)) in
+        let sysr = SystemExpr.(singleton (project Term.right_proj system)) in
         List.iter ssc
           (List.sort_uniq Stdlib.compare
              [(skl, sysl); (skr, sysr); (new_skl, sysl); (new_skr, sysr)]) ;
@@ -2085,15 +2086,15 @@ let remove_name_occ ns l = match l with
 
 let mk_xor_phi_base (cntxt : Constr.trace_cntxt) env biframe
     (n_left, l_left, n_right, l_right, term) =
-  let biframe = Term.mk_diff ["left",l_left;"right",l_right] :: biframe in
+  let biframe = Term.mk_diff [Term.left_proj,l_left;Term.right_proj,l_right] :: biframe in
 
-  let system_left = SystemExpr.(singleton (project "left" cntxt.system)) in
+  let system_left = SystemExpr.(singleton (project Term.left_proj cntxt.system)) in
   let cntxt_left = { cntxt with system = system_left } in
-  let phi_left = mk_phi_proj cntxt_left env n_left "left" biframe in
+  let phi_left = mk_phi_proj cntxt_left env n_left Term.left_proj biframe in
 
-  let system_right = SystemExpr.(singleton (project "right" cntxt.system)) in
+  let system_right = SystemExpr.(singleton (project Term.right_proj cntxt.system)) in
   let cntxt_right = { cntxt with system = system_right } in
-  let phi_right = mk_phi_proj cntxt_right env n_right "right" biframe in
+  let phi_right = mk_phi_proj cntxt_right env n_right Term.right_proj biframe in
 
   let len_left =
     Term.(mk_atom `Eq (mk_len l_left) (mk_len (mk_name n_left)))
@@ -2115,15 +2116,15 @@ let mk_xor_phi_base (cntxt : Constr.trace_cntxt) env biframe
   phi
 
 let is_xored_diff t =
-  match Term.project_term ~projection:"left"  t,
-        Term.project_term ~projection:"right" t with
+  match Term.project1 Term.left_proj  t,
+        Term.project1 Term.right_proj t with
   | (Fun (fl,_,ll),Fun (fr,_,lr))
     when (fl = Term.f_xor && fr = Term.f_xor) -> true
   | _ -> false
 
 let is_name_diff mess_name =
-  match Term.project_term ~projection:"left"  mess_name,
-        Term.project_term ~projection:"right" mess_name with
+  match Term.project1 Term.left_proj  mess_name,
+        Term.project1 Term.right_proj mess_name with
   | Name nl, Name nr -> true
   | _ -> false
 
@@ -2193,8 +2194,8 @@ let xor arg s =
     match opt_n with
     | None ->
       begin
-        match Term.project_term ~projection:"left"  t,
-              Term.project_term ~projection:"right" t with
+        match Term.project1 Term.left_proj  t,
+              Term.project1 Term.right_proj t with
         | (Fun (fl, _, [Term.Name nl;ll]),
            Fun (fr, _, [Term.Name nr;lr]))
           when (fl = Term.f_xor && fr = Term.f_xor) ->
@@ -2204,11 +2205,11 @@ let xor arg s =
       end
     | Some mess_name ->
       begin
-        match Term.project_term ~projection:"left"  mess_name,
-              Term.project_term ~projection:"right" mess_name with
+        match Term.project1 Term.left_proj  mess_name,
+              Term.project1 Term.right_proj mess_name with
         | Name nl, Name nr ->
-          begin match Term.project_term ~projection:"left"  t,
-                      Term.project_term ~projection:"right" t with
+          begin match Term.project1 Term.left_proj  t,
+                      Term.project1 Term.right_proj t with
             | (Fun (fl,_,ll),Fun (fr,_,lr))
               when (fl = Term.f_xor && fr = Term.f_xor) ->
               (nl,remove_name_occ nl ll,

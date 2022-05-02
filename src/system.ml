@@ -168,11 +168,13 @@ module Single = struct
       error Invalid_projection
 
   let pp fmt {system;projection} =
-    if projection = "" then
+    if Term.proj_to_string projection = "" then
       (* Convention typically used for single system. *)
       Format.fprintf fmt "%a" Symbols.pp system
     else
-      Format.fprintf fmt "%a/%s" Symbols.pp system projection
+      Format.fprintf fmt "%a/%a"
+        Symbols.pp system
+        Term.pp_projection projection
 
   let descr_of_shape table {system;projection} shape =
     let multi_descr = descr_of_shape table system shape in

@@ -71,14 +71,22 @@ let pp_msymb ppf (ms : msymb) =
 (*------------------------------------------------------------------*)
 (** {2 Atoms and terms} *)
 
-type ord    = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
-type ord_eq = [ `Eq | `Neq ]
-
 type projection = string
 
-type 'a diff_args =
-  | Explicit of (projection*'a) list
+let proj_from_string x : projection = x
 
+let proj_to_string x : string = x
+
+let pp_projection fmt (x : projection) = Fmt.string fmt x
+
+let left_proj  = "left"
+let right_proj = "right"
+  
+(*------------------------------------------------------------------*)
+type 'a diff_args =
+  | Explicit of (projection * 'a) list
+
+(*------------------------------------------------------------------*)
 type term =
   | Fun    of fsymb * Type.ftype * term list
   | Name   of nsymb
@@ -916,6 +924,9 @@ let pp_hterm fmt = function
 (*------------------------------------------------------------------*)
 (** Literals. *)
 
+type ord    = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
+type ord_eq = [ `Eq | `Neq ]
+
 type ('a,'b) _atom = 'a * 'b * 'b
 
 type xatom = [
@@ -1594,16 +1605,34 @@ let is_pure_timestamp (t : term) =
 (*------------------------------------------------------------------*)
 (** {2 Projection} *)
 
-let project_term ~projection term =
-
-  let rec project_term (s : projection) (t : term) : term = 
+let project1 (projection : projection) (term : term) : term =
+  let rec project1 (t : term) : term = 
     match t with
-    | Diff (Explicit l) -> project_term s (List.assoc s l)
-    | _ -> tmap (project_term s) t
+    (* do not recurse, as subterms cannot contain any diff *)
+    | Diff (Explicit l) -> List.assoc projection l
+
+    | _ -> tmap project1 t
   in
 
-  project_term projection term
+  project1 term
 
+(*------------------------------------------------------------------*)
+let project (projections : projection list) (term : term) : term =
+  let rec project (t : term) : term = 
+    match t with
+    | Diff (Explicit l) ->
+      (* we only project over a subset of [l]'s projections *)
+      assert (List.for_all (fun x -> List.mem_assoc x l) projections);
+
+      (* do not recurse, as subterms cannot contain any diff *)
+      mk_diff (List.filter (fun (x,_) -> List.mem x projections) l)
+        
+    | _ -> tmap project t
+  in
+
+  project term
+
+(*------------------------------------------------------------------*)
 (** Evaluate topmost diff operators for a given projection of a biterm.
     For example [head_pi_term left (diff(a,b))] is [a]
     and [head_pi_term left f(diff(a,b),c)] is [f(diff(a,b),c)]. *)
@@ -1614,7 +1643,7 @@ let head_pi_term (s : projection) (t : term) : term =
 
 let diff a b =
   if a = b then a else
-    Diff (Explicit ["left",a;"right",b])
+    Diff (Explicit [left_proj,a; right_proj,b])
 
 let rec make_normal_biterm (dorec : bool) (t : term) : term = 
   let mdiff : term -> term -> term = fun t t' ->
@@ -1622,7 +1651,7 @@ let rec make_normal_biterm (dorec : bool) (t : term) : term =
     else diff t t'
   in
   (* TODO generalize to non-binary diff *)
-  match head_pi_term "left" t, head_pi_term "right" t with
+  match head_pi_term left_proj t, head_pi_term right_proj t with
   | Fun (f,fty,l), Fun (f',fty',l') when f = f' ->
     Fun (f, fty, List.map2 mdiff l l')
 
@@ -1652,7 +1681,7 @@ let head_normal_biterm : term -> term = fun t ->
   make_normal_biterm false t
 
 let make_bi_term  : term -> term -> term = fun t1 t2 ->
-  head_normal_biterm (Diff (Explicit ["left",t1;"right",t2]))
+  head_normal_biterm (Diff (Explicit [left_proj,t1; right_proj,t2]))
 
 let simple_bi_term : term -> term = fun t ->
   make_normal_biterm true t
@@ -1744,8 +1773,8 @@ let () =
       let fty = Type.mk_ftype 0 [] [] Type.Message in
       let f x = Fun ((f,[]),fty,[x]) in
       let t = diff (f (diff a b)) c in
-      let r = head_pi_term "left" t in
-        assert (project_term  ~projection:"left" t = f a) ;
+      let r = head_pi_term left_proj t in
+        assert (project1 left_proj t = f a) ;
         assert (r = f (diff a b))
     end ;
   ]

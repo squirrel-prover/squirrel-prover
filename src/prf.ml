@@ -241,7 +241,7 @@ let prf_condition_side
   try
     let system = SE.(singleton (project proj cntxt.system)) in
     let cntxt = { cntxt with system } in
-    let param = prf_param (Term.project_term ~projection:proj hash) in
+    let param = prf_param (Term.project1 proj hash) in
 
     (* Create the frame on which we will iterate to compute the PRF formulas *)
     let hash_ty = param.h_fty.fty_out in
@@ -250,7 +250,7 @@ let prf_condition_side
     let e_without_hash =
       Term.subst [Term.ESubst (hash,Term.mk_var v)] e
     in
-    let e_without_hash = Term.project_term ~projection:proj e_without_hash in
+    let e_without_hash = Term.project1 proj e_without_hash in
 
     (* [hash] does not appear on this side *)
     if not (Sv.mem v (Term.fv e_without_hash)) then
@@ -263,7 +263,7 @@ let prf_condition_side
     in
 
     let frame =
-      param.h_cnt :: e_without_hash :: List.map (Equiv.project_term proj) (biframe)
+      param.h_cnt :: e_without_hash :: List.map (Equiv.project1 proj) (biframe)
     in
     Some (mk_prf_phi_proj cntxt env param frame hash)
 
@@ -291,5 +291,5 @@ let combine_conj_formulas p q =
   Term.mk_and
     (Term.mk_ands common)
     (Term.head_normal_biterm
-       (Term.mk_diff ["left",  Term.mk_ands new_p;
-                      "right", Term.mk_ands (List.rev !aux_q)]))
+       (Term.mk_diff [Term.left_proj,  Term.mk_ands new_p;
+                      Term.right_proj, Term.mk_ands (List.rev !aux_q)]))

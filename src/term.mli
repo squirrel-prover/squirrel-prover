@@ -59,14 +59,19 @@ val pp_msymb :  Format.formatter -> msymb -> unit
 
   In this module {!term} describe both terms and formulas of the meta-logic. *)
 
-type ord = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
-type ord_eq = [ `Eq | `Neq ]
+(** components of diff operators. *)
+type projection
 
-val pp_ord : Format.formatter -> ord -> unit
-
+val pp_projection : Format.formatter -> projection -> unit
+  
 (** We use strings to identify components of diff operators. *)
-type projection = string
+val proj_from_string : string -> projection
+val proj_to_string   : projection -> string
 
+val left_proj  : projection
+val right_proj : projection
+
+(*------------------------------------------------------------------*)
 (** We allow users to write [diff(t1,t2)] as well as [diff(lbl1:t1,lbl2:t2)]
     and even [diff(l1:t1,l2:t2,_:t)] and keep trace of this structure in
     terms in order to display them back similarly.
@@ -107,6 +112,11 @@ val tmap_fold  : ('b -> term -> 'b * term) -> 'b -> term -> 'b * term
 
 (*------------------------------------------------------------------*)
 (** {2 Literals} *)
+
+type ord = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
+type ord_eq = [ `Eq | `Neq ]
+
+val pp_ord : Format.formatter -> ord -> unit
 
 type ('a,'b) _atom = 'a * 'b * 'b
 
@@ -462,9 +472,10 @@ module Mt : Map.S with type key = term
     If the bi-term contains macros, and come from a bi-system, its
     projection is only correctly interpreted if it is used inside
     the projected system. *)
-val project_term : projection:projection -> term -> term
-(* TODO take projection AND list of all projections to handle complex diffs *)
+val project1 : projection -> term -> term
 
+val project : projection list -> term -> term
+  
 (** Push topmost diff-operators just enough to expose the common
     topmost constructor of the two projections of a biterm, if possible.
 

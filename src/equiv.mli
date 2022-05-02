@@ -3,7 +3,7 @@
 (*------------------------------------------------------------------*)
 (** {2 Equivalence} *)
 
-val project_term : Term.projection -> Term.term -> Term.term
+val project1 : Term.projection -> Term.term -> Term.term
 
 (*------------------------------------------------------------------*)
 type equiv = Term.term list

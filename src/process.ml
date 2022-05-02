@@ -1006,7 +1006,7 @@ let declare_system table system_name proc =
   let env = Env.init ~table () in
   check_proc env proc ;
 
-  let projections = ["left";"right"] in (* TODO *)
+  let projections = [Term.left_proj; Term.right_proj] in (* TODO *)
   let system_name = match system_name with
     | Some lsymb -> lsymb
     | None -> L.mk_loc Location._dummy "default"

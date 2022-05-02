@@ -263,7 +263,7 @@ let global_rename
       Equiv.Impl(
         Equiv.mk_forall evars
           (Atom (Equiv [Term.mk_var fresh_x_var;
-                        Term.mk_diff ["left",n1;"right",n2]])),
+                        Term.mk_diff [Term.left_proj,n1;Term.right_proj,n2]])),
         equiv)
     in
     `Equiv (Equiv.mk_forall [fresh_x_var] fimpl)
@@ -378,8 +378,8 @@ let global_prf
       Equiv.Atom (
         Equiv [Term.mk_var fresh_x_var;
                Term.mk_diff
-                 ["left", Term.mk_name param.h_key;
-                  "right", Term.mk_name @@ Term.mk_isymb n Message (is)]])
+                 [Term.left_proj, Term.mk_name param.h_key;
+                  Term.right_proj, Term.mk_name @@ Term.mk_isymb n Message (is)]])
     in
     let concl = 
       Equiv.mk_forall [fresh_x_var]
@@ -557,12 +557,12 @@ let global_cca
         Equiv [ Term.mk_var fresh_x_var;
                 
                 Term.mk_diff
-                  ["left", Term.mk_name enc_key;
-                   "right", Term.mk_name @@ Term.mk_isymb n Message is];
+                  [Term.left_proj, Term.mk_name enc_key;
+                   Term.right_proj, Term.mk_name @@ Term.mk_isymb n Message is];
                 
                Term.mk_diff
-                 ["left", Term.mk_name enc_rnd;
-                  "right", Term.mk_name @@ Term.mk_isymb r Message is] ])
+                 [Term.left_proj, Term.mk_name enc_rnd;
+                  Term.right_proj, Term.mk_name @@ Term.mk_isymb r Message is] ])
     in
     let concl = Equiv.Impl (Equiv.mk_forall is atom, equiv) in      
     `Equiv (Equiv.mk_forall [fresh_x_var] concl)

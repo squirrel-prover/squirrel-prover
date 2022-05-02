@@ -141,7 +141,7 @@ val singleton : System.Single.t -> fset
     is an expression with two elements. Its first projection, labelled
     "left", is the right projection of [s]. *)
 val of_list : Symbols.table ->
-              ?labels:string option list ->
+              ?labels:Term.projection option list ->
               System.Single.t list ->
               fset
 

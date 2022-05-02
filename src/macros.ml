@@ -78,7 +78,7 @@ let declare_global
     List.map
       (fun projection ->
          System.Single.make table system projection,
-         Term.project_term ~projection body)
+         Term.project1 projection body)
       (System.projections table system)
   in
   let data =

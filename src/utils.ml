@@ -57,7 +57,7 @@ module List = struct
 
   let rec split3 = function
     | [] -> ([], [], [])
-    | (x,y,z)::l ->
+    | (x,y,z)::l -> 
       let (rx, ry, rz) = split3 l in (x::rx, y::ry, z::rz)
 
   let inclusion a b =
@@ -618,3 +618,5 @@ let as_seq3 = function [x1; x2; x3] -> (x1, x2, x3) | _ -> assert false
 let as_seq4 = function [x1; x2; x3; x4] -> (x1, x2, x3, x4)
   | _ -> assert false
 
+(* -------------------------------------------------------------------- *)
+let (-|) f g = fun x -> f (g x)
