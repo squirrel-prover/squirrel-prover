@@ -3,8 +3,6 @@
 (*------------------------------------------------------------------*)
 (** {2 Equivalence} *)
 
-val project1 : Term.projection -> Term.term -> Term.term
-
 (*------------------------------------------------------------------*)
 type equiv = Term.term list
 
@@ -65,6 +63,10 @@ val tmap_fold  : ('b -> form -> 'b * form) -> 'b -> form -> 'b * form
 val get_terms : form -> Term.term list
 
 (*------------------------------------------------------------------*)
+(** Project the reachability formulas in a global formula. *)
+val project : Term.projection list -> form -> form 
+  
+(*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
 
 val subst : Term.subst -> form -> form
@@ -100,6 +102,8 @@ module Any : sig
   val subst : Term.subst -> t -> t
   val fv : t -> Vars.Sv.t
 
+  val project : Term.projection list -> t -> t
+    
   (** Convert any formula kind to [any_form]. *)
   val convert_from : 'a f_kind -> 'a -> any_form
 
@@ -123,6 +127,7 @@ module Babel : sig
   val fv     : 'a f_kind -> 'a -> Vars.Sv.t
   val get_terms : 'a f_kind -> 'a -> Term.term list
   val pp : 'a f_kind -> Format.formatter -> 'a -> unit
+  val project : 'a f_kind -> Term.projection list -> 'a -> 'a
 end
 
 (*------------------------------------------------------------------*)

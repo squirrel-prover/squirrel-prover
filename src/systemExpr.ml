@@ -27,7 +27,7 @@ let pp_error fmt = function
 type t =
   | Any
   | Any_compatible_with of System.t
-  | List of (Term.projection*System.Single.t) list
+  | List of (Term.projection * System.Single.t) list
       (** Each single system is identified by a label.
           The list cannot be empty. All single systems are compatible. *)
 
@@ -40,12 +40,18 @@ type pair       = < symbols : unit ; fset : unit ; pair : unit > expr
 
 type equiv_t = pair expr
 
+(*------------------------------------------------------------------*)
 let hash : 'a expr -> int = Hashtbl.hash
 
+(*------------------------------------------------------------------*)
 let any = Any
 
 let any_compatible_with s = Any_compatible_with s
 
+(*------------------------------------------------------------------*)
+let is_fset : t -> bool = function List _ -> true | _ -> false
+
+(*------------------------------------------------------------------*)
 let pp fmt : 'a expr -> unit = function
   | Any -> Format.fprintf fmt "any"
   | Any_compatible_with s -> Format.fprintf fmt "any(%a)" Symbols.pp s
@@ -78,11 +84,14 @@ let to_pair = function
 
 let subset table e1 e2 = match e1,e2 with
   | Any_compatible_with s1, Any_compatible_with s2 ->
-      System.compatible table s1 s2
+    System.compatible table s1 s2
+      
   | List l, Any_compatible_with s ->
-      System.compatible table (snd (List.hd l)).system s
+    System.compatible table (snd (List.hd l)).system s
+      
   | List l1, List l2 ->
-      List.for_all (fun (_,s1) -> List.exists (fun (_,s2) -> s1 = s2) l2) l1
+    List.for_all (fun (_,s1) -> List.exists (fun (_,s2) -> s1 = s2) l2) l1
+      
   | _, Any -> true
   | _ -> false
 

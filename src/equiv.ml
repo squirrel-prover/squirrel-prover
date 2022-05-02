@@ -1,16 +1,15 @@
-open Utils
-
 (** Equivalence formulas.  *)
 
+open Utils
+    
 module Sv = Vars.Sv
 module Mv = Vars.Mv
 
+module SE = SystemExpr
+  
 (*------------------------------------------------------------------*)
 (** {2 Equivalence} *)
 
-let project1 projection tm = Term.project1 projection tm
-
-(*------------------------------------------------------------------*)
 type equiv = Term.term list
 
 let pp_equiv ppf (l : equiv) =
@@ -145,6 +144,13 @@ let rec get_terms = function
   | Impl (e1, e2) -> get_terms e1 @ get_terms e2
   | Quant _ -> []
 
+(*------------------------------------------------------------------*)
+let rec project (projs : Term.projection list) (f : form) : form =
+  match f with
+  | Atom (Reach f) -> Atom (Reach (Term.project projs f))
+
+  | _ -> tmap (project projs) f
+    
 (*------------------------------------------------------------------*)
 (** {2 Substitution} *)
 
@@ -476,15 +482,15 @@ module PreAny = struct
   type t = any_form
   let pp fmt = function
     | `Reach f -> Term.pp fmt f
-    | `Equiv f -> pp fmt f
+    | `Equiv f ->      pp fmt f
 
   let subst s = function
     | `Reach f -> `Reach (Term.subst s f)
-    | `Equiv f -> `Equiv (subst s f)
+    | `Equiv f -> `Equiv (     subst s f)
 
   let tsubst s = function
     | `Reach f -> `Reach (Term.tsubst s f)
-    | `Equiv f -> `Equiv (tsubst s f)
+    | `Equiv f -> `Equiv (     tsubst s f)
 
   let fv = function
     | `Reach f -> Term.fv f
@@ -493,6 +499,10 @@ module PreAny = struct
   let get_terms = function
     | `Reach f -> [f]
     | `Equiv f -> get_terms f
+
+  let project p = function
+    | `Reach f -> `Reach (Term.project p f)
+    | `Equiv f -> `Equiv (     project p f)
 end
 
 module Babel = struct
@@ -539,31 +549,36 @@ module Babel = struct
          end
 
   let subst : type a. a f_kind -> Term.subst -> a -> a = function
-    | Local_t -> Term.subst
+    | Local_t  -> Term.subst
     | Global_t -> subst
-    | Any_t -> PreAny.subst
+    | Any_t    -> PreAny.subst
 
   let tsubst : type a. a f_kind -> Type.tsubst -> a -> a = function
-    | Local_t -> Term.tsubst
+    | Local_t  -> Term.tsubst
     | Global_t -> tsubst
-    | Any_t -> PreAny.tsubst
+    | Any_t    -> PreAny.tsubst
 
   let fv : type a. a f_kind -> a -> Vars.Sv.t = function
-    | Local_t -> Term.fv
+    | Local_t  -> Term.fv
     | Global_t -> fv
-    | Any_t -> PreAny.fv
+    | Any_t    -> PreAny.fv
 
   let term_get_terms x = [x]
 
   let get_terms : type a. a f_kind -> a -> Term.term list = function
-    | Local_t -> term_get_terms
+    | Local_t  -> term_get_terms
     | Global_t -> get_terms
-    | Any_t -> PreAny.get_terms
+    | Any_t    -> PreAny.get_terms
 
   let pp : type a. a f_kind -> Format.formatter -> a -> unit = function
-    | Local_t -> Term.pp
+    | Local_t  -> Term.pp
     | Global_t -> pp
-    | Any_t -> PreAny.pp
+    | Any_t    -> PreAny.pp
+
+  let project : type a. a f_kind -> Term.projection list -> a -> a = function
+    | Local_t  -> Term.project
+    | Global_t -> project
+    | Any_t    -> PreAny.project
 
 end
 

@@ -75,8 +75,8 @@ module Mk (Args : MkArgs) : S with
 
   let get_assumption 
       (type a)
-     ?(check_compatibility=true)
-     ~(table: Symbols.table)
+      ?(check_compatibility=true)
+      ~(table: Symbols.table)
       (k    : a Equiv.f_kind)
       (name : lsymb)
       (s    : t)
@@ -84,8 +84,8 @@ module Mk (Args : MkArgs) : S with
     =
     if Hyps.mem_name (L.unloc name) s then
       let id, f = Hyps.by_name name s in
-      Goal.{ name = `Hyp id;
-             system = S.system s;
+      Goal.{ name    = `Hyp id;
+             system  = S.system s;
              ty_vars = [];
              formula =
                Equiv.Babel.convert
@@ -95,11 +95,32 @@ module Mk (Args : MkArgs) : S with
                  f }
     else
       let lem = Prover.get_assumption name in
+      (* Verify that it applies to the current system. *)
+      if check_compatibility then begin
+        match k with
+        | Equiv.Local_t
+
+        | _ when Goal.is_reach_statement lem ->
+          if not (SE.subset table (S.system s).set lem.system.set) then
+            Tactics.hard_failure Tactics.NoAssumpSystem
+
+        | _ ->
+          if S.system s <> lem.system then
+            Tactics.hard_failure Tactics.NoAssumpSystem
+      end;
+      let formula =
+        if SE.is_fset lem.system.set then
+          let projs = List.map fst (SE.to_list @@ SE.to_fset lem.system.set) in
+          Equiv.Any.project projs lem.formula
+        else
+          lem.formula
+      in
+
       { Goal.name = `Lemma lem.Goal.name ;
-        system = lem.system ;
+        system  = lem.system ;
         ty_vars = lem.ty_vars ;
         formula = 
-          Equiv.Babel.convert lem.formula
+          Equiv.Babel.convert formula
             ~src:Equiv.Any_t ~dst:k ~loc:(L.loc name) }
 
   (*------------------------------------------------------------------*)

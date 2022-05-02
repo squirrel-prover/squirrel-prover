@@ -263,7 +263,7 @@ let prf_condition_side
     in
 
     let frame =
-      param.h_cnt :: e_without_hash :: List.map (Equiv.project1 proj) (biframe)
+      param.h_cnt :: e_without_hash :: List.map (Term.project1 proj) (biframe)
     in
     Some (mk_prf_phi_proj cntxt env param frame hash)
 

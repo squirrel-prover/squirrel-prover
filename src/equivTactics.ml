@@ -728,7 +728,7 @@ let mk_phi_proj
     (proj : Term.projection)
     (biframe : Term.term list) : Term.term list
   =
-  let frame = List.map (Equiv.project1 proj) biframe in
+  let frame = List.map (Term.project1 proj) biframe in
   try
     let frame_indices : Fresh.name_occs =
       List.fold_left (fun acc t ->
