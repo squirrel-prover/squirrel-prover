@@ -143,7 +143,7 @@ val singleton : System.Single.t -> fset
     is an expression with two elements. Its first projection, labelled
     "left", is the right projection of [s]. *)
 val of_list : Symbols.table ->
-              ?labels:Term.projection option list ->
+              ?labels:Term.proj option list ->
               System.Single.t list ->
               fset
 
@@ -152,10 +152,11 @@ val of_system : Symbols.table -> System.t -> fset
 
 (** List of labelled elements of a set. Guaranteed to be non-empty.
     Fails if expression does not correspond to a finite set. *)
-val to_list : <fset:unit;..> expr -> (Term.projection * System.Single.t) list
+val to_list : <fset:unit;..> expr -> (Term.proj * System.Single.t) list
 
-(** Project a system according to the given projection. *)
-val project : Term.projection -> <fset:unit;..> expr -> System.Single.t
+(** Project a system according to the given projections. *)
+val project     : Term.projs        -> 'a expr -> 'a expr
+val project_opt : Term.projs option -> 'a expr -> 'a expr
 
 (** [clone_system table sys name f] registers a new system named [name],
     obtained by modifying the actions of the system expression [sys]
@@ -174,9 +175,9 @@ val clone_system :
 
 val make_pair : System.Single.t -> System.Single.t -> pair
 
-val fst : <pair:unit;..> expr -> Term.projection * System.Single.t
+val fst : <pair:unit;..> expr -> Term.proj * System.Single.t
 
-val snd : <pair:unit;..> expr -> Term.projection * System.Single.t
+val snd : <pair:unit;..> expr -> Term.proj * System.Single.t
 
 
 (*------------------------------------------------------------------*)

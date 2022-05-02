@@ -4,6 +4,7 @@ module L = Location
 module Args = TacticsArgs
 module T = Tactics
 
+module SE = SystemExpr
 module TS = LowTraceSequent
 
 (*------------------------------------------------------------------*)
@@ -260,10 +261,13 @@ let get_models (s : t) =
   let s = to_trace_sequent (set_reach_goal Term.mk_false s) in
   TS.get_models s
 
-let mk_trace_cntxt (s : t) =
+let mk_trace_cntxt ?(projs : Term.projs option)  (s : t) =
+  let system =
+    SE.project_opt projs (SE.to_fset s.env.system.set)
+  in
   Constr.{
     table  = s.env.table;
-    system = SystemExpr.to_fset s.env.system.set;
+    system;
     models = Some (get_models s);
   }
 

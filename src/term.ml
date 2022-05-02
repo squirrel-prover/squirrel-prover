@@ -71,20 +71,22 @@ let pp_msymb ppf (ms : msymb) =
 (*------------------------------------------------------------------*)
 (** {2 Atoms and terms} *)
 
-type projection = string
+type proj = string
+type projs = proj list
 
-let proj_from_string x : projection = x
+let proj_from_string x : proj = x
 
 let proj_to_string x : string = x
 
-let pp_projection fmt (x : projection) = Fmt.string fmt x
+let pp_proj  fmt (x : proj)  = Fmt.string fmt x
+let pp_projs fmt (l : projs) = Fmt.list ~sep:Fmt.comma pp_proj fmt l
 
 let left_proj  = "left"
 let right_proj = "right"
   
 (*------------------------------------------------------------------*)
 type 'a diff_args =
-  | Explicit of (projection * 'a) list
+  | Explicit of (proj * 'a) list
 
 (*------------------------------------------------------------------*)
 type term =
@@ -1605,11 +1607,11 @@ let is_pure_timestamp (t : term) =
 (*------------------------------------------------------------------*)
 (** {2 Projection} *)
 
-let project1 (projection : projection) (term : term) : term =
+let project1 (proj : proj) (term : term) : term =
   let rec project1 (t : term) : term = 
     match t with
     (* do not recurse, as subterms cannot contain any diff *)
-    | Diff (Explicit l) -> List.assoc projection l
+    | Diff (Explicit l) -> List.assoc proj l
 
     | _ -> tmap project1 t
   in
@@ -1617,15 +1619,15 @@ let project1 (projection : projection) (term : term) : term =
   project1 term
 
 (*------------------------------------------------------------------*)
-let project (projections : projection list) (term : term) : term =
+let project (projs : proj list) (term : term) : term =
   let rec project (t : term) : term = 
     match t with
     | Diff (Explicit l) ->
-      (* we only project over a subset of [l]'s projections *)
-      assert (List.for_all (fun x -> List.mem_assoc x l) projections);
+      (* we only project over a subset of [l]'s projs *)
+      assert (List.for_all (fun x -> List.mem_assoc x l) projs);
 
       (* do not recurse, as subterms cannot contain any diff *)
-      mk_diff (List.filter (fun (x,_) -> List.mem x projections) l)
+      mk_diff (List.filter (fun (x,_) -> List.mem x projs) l)
         
     | _ -> tmap project t
   in
@@ -1633,10 +1635,10 @@ let project (projections : projection list) (term : term) : term =
   project term
 
 (*------------------------------------------------------------------*)
-(** Evaluate topmost diff operators for a given projection of a biterm.
+(** Evaluate topmost diff operators for a given proj of a biterm.
     For example [head_pi_term left (diff(a,b))] is [a]
     and [head_pi_term left f(diff(a,b),c)] is [f(diff(a,b),c)]. *)
-let head_pi_term (s : projection) (t : term) : term =
+let head_pi_term (s : proj) (t : term) : term =
   match t with
   | Diff (Explicit l) -> List.assoc s l
   | _ -> t

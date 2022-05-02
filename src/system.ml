@@ -26,7 +26,7 @@ module Msh = Map.Make (Action.Shape)
     the system's arity) and a map from action shapes to action descriptions,
     which also contain action symbols. *)
 type data = {
-  projections : Term.projection list;
+  projections : Term.proj list;
   actions     : Action.descr Msh.t
 }
 
@@ -158,7 +158,7 @@ module Single = struct
 
   type t = {
     system     : Symbols.system ;
-    projection : Term.projection
+    projection : Term.proj
   }
 
   let make table system projection =
@@ -174,7 +174,7 @@ module Single = struct
     else
       Format.fprintf fmt "%a/%a"
         Symbols.pp system
-        Term.pp_projection projection
+        Term.pp_proj projection
 
   let descr_of_shape table {system;projection} shape =
     let multi_descr = descr_of_shape table system shape in

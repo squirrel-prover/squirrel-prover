@@ -1,7 +1,10 @@
 module List = Utils.List
 
+module SE = SystemExpr
+
 module Args = TacticsArgs
 
+(*------------------------------------------------------------------*)
 type hyp_form = Equiv.any_form
 type conc_form = Equiv.local_form
 
@@ -449,7 +452,7 @@ let pi projection s =
     let fset = SystemExpr.to_fset context.set in
     let context =
       SystemExpr.update
-        ~set:(SystemExpr.(singleton (project projection fset)))
+        ~set:(SystemExpr.project [projection] fset)
         context
     in
     Env.update ~system:context s.env
@@ -550,11 +553,14 @@ let literals_unsat_smt ?(slow=false) s =
 
 
 (*------------------------------------------------------------------*)
-let mk_trace_cntxt s = 
+let mk_trace_cntxt ?projs s =
   try
+    let system =
+      SE.project_opt projs (SE.to_fset (system s).set)
+    in
     Constr.{
       table  = table s;
-      system = SystemExpr.to_fset (system s).set;
+      system;
       models = Some (get_models s);
     }
   with _ -> Tactics.(soft_failure (Failure "underspecified system"))

@@ -290,7 +290,7 @@ let refresh_descr descr =
 
   descr
   
-let project_descr (s : Term.projection) d =
+let project_descr (s : Term.proj) d =
   let project1 t = Term.project1 s t in
   { d with
     condition = (let is,t = d.condition in is, project1 t);
@@ -306,7 +306,7 @@ let strongly_compatible_descr d1 d2 =
   List.map fst d1.updates = List.map fst d2.updates &&
   fst d1.output = fst d2.output
 
-let combine_descrs (descrs : (Term.projection * descr) list) : descr =
+let combine_descrs (descrs : (Term.proj * descr) list) : descr =
 
   let (p1,d1),rest =
     match descrs with

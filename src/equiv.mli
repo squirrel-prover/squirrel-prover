@@ -64,7 +64,7 @@ val get_terms : form -> Term.term list
 
 (*------------------------------------------------------------------*)
 (** Project the reachability formulas in a global formula. *)
-val project : Term.projection list -> form -> form 
+val project : Term.proj list -> form -> form 
   
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
@@ -102,7 +102,7 @@ module Any : sig
   val subst : Term.subst -> t -> t
   val fv : t -> Vars.Sv.t
 
-  val project : Term.projection list -> t -> t
+  val project : Term.proj list -> t -> t
     
   (** Convert any formula kind to [any_form]. *)
   val convert_from : 'a f_kind -> 'a -> any_form
@@ -127,7 +127,7 @@ module Babel : sig
   val fv     : 'a f_kind -> 'a -> Vars.Sv.t
   val get_terms : 'a f_kind -> 'a -> Term.term list
   val pp : 'a f_kind -> Format.formatter -> 'a -> unit
-  val project : 'a f_kind -> Term.projection list -> 'a -> 'a
+  val project : 'a f_kind -> Term.proj list -> 'a -> 'a
 end
 
 (*------------------------------------------------------------------*)

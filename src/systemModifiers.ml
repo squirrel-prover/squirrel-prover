@@ -21,20 +21,22 @@ let rewrite
   : Term.term 
   =
   let rw_inst : Match.Pos.f_map = 
-    fun occ vars _conds p ->
+    fun occ projs vars _conds p ->
       (* build the rule to apply at position [p] *)
       match mk_rule vars p with
       | None -> `Continue
       | Some rule ->
         assert (rule.rw_conds = []);
 
+        (* TODO: project the pattern somehow *)
         let left,right = rule.rw_rw in
         let pat : Term.term Match.pat = Match.{ 
             pat_tyvars = rule.rw_tyvars; 
             pat_vars   = rule.rw_vars; 
             pat_term   = left;
           } 
-        in      
+        in
+        let system = SE.project_opt projs system in
         match Match.T.try_match table system occ pat with
         | NoMatch _ | FreeTyv ->
           begin match mode with
@@ -967,8 +969,6 @@ let global_prf_t
       (Failure
          "there are several hash occurrence in the same macro \
           (maybe try adding let bindings).");
-                            
-  (* Fmt.epr "occs:@.@[<v>%a@]@." (Fmt.list ~sep:Fmt.cut XO.pp) occs; *)
 
   let rec lt_lex (is1 : Vars.vars) (is2 : Vars.vars) : Term.term =
     match is1, is2 with

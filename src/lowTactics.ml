@@ -191,20 +191,21 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   let unfold_term_exn 
       ?(force_happens=false)
-      (t: Term.term) 
-      (s : S.sequent) : 
-    Term.term 
+      (t     : Term.term)
+      (projs : Term.projs option) 
+      (s     : S.sequent)
+    : Term.term 
     =
     match t with
     | Macro (ms,l,a) ->
       if not (force_happens) && not (S.query_happens ~precise:true s a) then
         soft_failure (Tactics.MustHappen a);
 
-      Macros.get_definition_exn (S.mk_trace_cntxt s) ms a
+      Macros.get_definition_exn (S.mk_trace_cntxt ?projs s) ms a
 
     | Fun (fs, _, ts) 
       when Operator.is_operator (S.table s) fs -> 
-      Operator.unfold (S.mk_trace_cntxt s) fs ts
+      Operator.unfold (S.mk_trace_cntxt ?projs s) fs ts
       
     | _ ->
       soft_failure (Tactics.Failure "nothing to expand")
@@ -213,11 +214,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let unfold_term
       ?(force_happens=false)
       ~(strict:bool)
-      (t : Term.term)
-      (s : S.sequent) 
+      (t     : Term.term)
+      (projs : Term.projs option) 
+      (s     : S.sequent) 
     : Term.term option
     =
-    try Some (unfold_term_exn ~force_happens t s) with
+    try Some (unfold_term_exn ~force_happens t projs s) with
     | Tactics.Tactic_soft_failure _ when not strict -> None
 
   let found_occ_macro target ms occ =
@@ -257,8 +259,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
         ((f,_) : Equiv.any_form * Ident.t option) 
       : Equiv.any_form * S.conc_form list 
       =
-      let unfold occ = 
-        match unfold_term ~strict occ s with
+      let unfold (projs : Term.projs option) occ = 
+        match unfold_term ~strict occ projs s with
         | None -> `Continue
         | Some t ->
           found1 := true;
@@ -266,17 +268,17 @@ module MkCommonLowTac (S : Sequent.S) = struct
       in
 
       let expand_inst : Match.Pos.f_map = 
-        fun occ _vars _conds _p ->
+        fun occ projs _vars _conds _p ->
           match occ with
           | Term.Macro (ms, _, _) ->
             if found_occ_macro target ms occ then
-              unfold occ 
+              unfold projs occ 
             else
               `Continue
 
           | Term.Fun ((f,_), _, _) ->
             if found_occ_fun target f then 
-              unfold occ
+              unfold projs occ
             else
               `Continue
 
@@ -310,11 +312,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
     : Term.term 
     =
     let expand_inst : Match.Pos.f_map = 
-      fun occ _vars _conds _p ->
+      fun occ projs _vars _conds _p ->
         match occ with
         | Term.Macro (ms, l, _) ->
           begin
-            match unfold_term ~strict:false ~force_happens occ s with
+            match unfold_term ~strict:false ~force_happens occ projs s with
             | None -> `Continue
             | Some t -> `Map t
           end

@@ -60,16 +60,18 @@ val pp_msymb :  Format.formatter -> msymb -> unit
   In this module {!term} describe both terms and formulas of the meta-logic. *)
 
 (** components of diff operators. *)
-type projection
+type proj
+type projs = proj list
 
-val pp_projection : Format.formatter -> projection -> unit
+val pp_proj  : Format.formatter -> proj -> unit
+val pp_projs : Format.formatter -> projs -> unit
   
 (** We use strings to identify components of diff operators. *)
-val proj_from_string : string -> projection
-val proj_to_string   : projection -> string
+val proj_from_string : string -> proj
+val proj_to_string   : proj -> string
 
-val left_proj  : projection
-val right_proj : projection
+val left_proj  : proj
+val right_proj : proj
 
 (*------------------------------------------------------------------*)
 (** We allow users to write [diff(t1,t2)] as well as [diff(lbl1:t1,lbl2:t2)]
@@ -77,7 +79,7 @@ val right_proj : projection
     terms in order to display them back similarly.
     TODO for simplicity we allow only a simple style for now *)
 type 'a diff_args =
-  | Explicit of (projection * 'a) list
+  | Explicit of (proj * 'a) list
 
 type term = private
   | Fun   of fsymb * Type.ftype * term list
@@ -384,7 +386,7 @@ val mk_var     : Vars.var -> term
 val mk_action  : Symbols.action -> Vars.var list -> term
 val mk_name    : nsymb -> term
 val mk_macro   : msymb -> term list -> term -> term
-val mk_diff    : (projection * term) list -> term
+val mk_diff    : (proj * term) list -> term
 
 val mk_find : Vars.var list -> term -> term -> term -> term
 
@@ -472,9 +474,9 @@ module Mt : Map.S with type key = term
     If the bi-term contains macros, and come from a bi-system, its
     projection is only correctly interpreted if it is used inside
     the projected system. *)
-val project1 : projection -> term -> term
+val project1 : proj -> term -> term
 
-val project : projection list -> term -> term
+val project : proj list -> term -> term
   
 (** Push topmost diff-operators just enough to expose the common
     topmost constructor of the two projections of a biterm, if possible.
@@ -493,7 +495,7 @@ val make_bi_term : term -> term -> term
 
 val simple_bi_term : term -> term
 
-val combine : (projection*term) list -> term
+val combine : (proj * term) list -> term
 
 (** All projections of the term are names. *)
 val diff_names : term -> bool

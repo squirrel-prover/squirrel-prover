@@ -80,10 +80,12 @@ module type S = sig
   val query_happens : precise:bool -> t -> Term.term -> bool
 
   (** Returns trace context, corresponding to [s.env.system.set] for
-      both kinds of sequents. TODO this may not be what is expected
+      both kinds of sequents. 
+      Option projections to restrict the systems considered.
+      TODO this may not be what is expected
       for equiv sequents, but it corresponds to the models that are
       computed in that case *)
-  val mk_trace_cntxt : t -> Constr.trace_cntxt
+  val mk_trace_cntxt : ?projs:Term.projs -> t -> Constr.trace_cntxt
 
   val get_trace_literals : t -> Term.literal list
 

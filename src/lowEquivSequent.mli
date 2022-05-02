@@ -38,7 +38,7 @@ val set_equiv_goal : Equiv.equiv -> t -> t
     as a list of terms where diff operators have been fully
     eliminated.
     @return [None] if the conclusion is not an equivalence atom. *)
-val get_frame : Term.projection -> t -> Equiv.equiv option
+val get_frame : Term.proj -> t -> Equiv.equiv option
 
 val goal_is_equiv : t -> bool
 

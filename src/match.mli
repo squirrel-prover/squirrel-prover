@@ -2,6 +2,8 @@ open Utils
 
 module Sv = Vars.Sv
 
+module SE = SystemExpr
+
 (*------------------------------------------------------------------*)
 (** {2 Positions} *)
 
@@ -16,18 +18,20 @@ module Pos : sig
   module Sp : Set.S with type elt = pos
 
   (*------------------------------------------------------------------*)
+  (** strict prefix comparison over positions *)
   val lt : pos -> pos -> bool
     
   (*------------------------------------------------------------------*)
-  (** [f] of type [f_sel] is a function that, given [t vars conds] where:
+  (** [f] of type [f_sel] is a function that, given [t projs vars conds] where:
       - [t] is sub-term of the term we are mapping one
+      - [projs] are the projections applying to [t], if any
       - [vars] are the free variable bound above [t]'s occurrence
       - [conds] are conditions above [t]'s occurrence
 
       If [f t vars conds = `Select], we found a position.
       If [f t vars conds = `Continue], we keep looking for positions downwards. *)
   type f_sel =
-    Term.term -> Vars.vars -> Term.term list ->
+    Term.term -> Term.projs option -> Vars.vars -> Term.term list ->
     [`Select | `Continue]
 
   (*------------------------------------------------------------------*)
@@ -50,12 +54,15 @@ module Pos : sig
       - [`Select], we found a position.
       - [`Continue], we keep looking for positions downwards. *)
   type 'a f_map_fold =
-    Term.term -> Vars.vars -> Term.term list -> pos -> 'a ->
+    Term.term ->
+    Term.projs option -> Vars.vars -> Term.term list -> pos ->
+    'a ->
     'a * [`Map of Term.term | `Continue]
 
   (** Same as [f_map_fold], but just for a map. *)
   type f_map =
-    Term.term -> Vars.vars -> Term.term list -> pos -> 
+    Term.term ->
+    Term.projs option -> Vars.vars -> Term.term list -> pos -> 
     [`Map of Term.term | `Continue]
 
   (*------------------------------------------------------------------*)

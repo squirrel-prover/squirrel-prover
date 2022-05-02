@@ -178,7 +178,9 @@ let rewrite
        bound above the matched occurrences are universally quantified in
        the generated sub-goals. *)
     let rw_inst : Match.Pos.f_map = 
-      fun occ vars _conds _p ->
+      fun occ projs vars _conds _p ->
+        let system = SE.project_opt projs system in
+        (* TODO: [pat] must be projected somehow *)
         match Match.T.try_match table system occ !pat with
         | NoMatch _ | FreeTyv -> `Continue
 

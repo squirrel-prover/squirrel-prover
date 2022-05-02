@@ -145,7 +145,7 @@ let rec get_terms = function
   | Quant _ -> []
 
 (*------------------------------------------------------------------*)
-let rec project (projs : Term.projection list) (f : form) : form =
+let rec project (projs : Term.proj list) (f : form) : form =
   match f with
   | Atom (Reach f) -> Atom (Reach (Term.project projs f))
 
@@ -575,7 +575,7 @@ module Babel = struct
     | Global_t -> pp
     | Any_t    -> PreAny.pp
 
-  let project : type a. a f_kind -> Term.projection list -> a -> a = function
+  let project : type a. a f_kind -> Term.proj list -> a -> a = function
     | Local_t  -> Term.project
     | Global_t -> project
     | Any_t    -> PreAny.project

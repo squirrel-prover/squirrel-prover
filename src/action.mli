@@ -135,7 +135,7 @@ val valid_descr : descr -> bool
 val refresh_descr : descr -> descr
 
 (** [project_descr proj descr] returns the projection of the description. *)
-val project_descr : Term.projection -> descr -> descr
+val project_descr : Term.proj -> descr -> descr
 
 (** Strong notion of compatibility, more restrictive (and syntactical) than
     what system compatibility alone would require, which helps to combine
@@ -146,7 +146,7 @@ val strongly_compatible_descr : descr -> descr -> bool
 (** Takes a labelled list of single-system descriptions
     and combines them into a multi-system description.
     Requires that descriptions are pairwise strongly compatible. *)
-val combine_descrs : (Term.projection * descr) list -> descr
+val combine_descrs : (Term.proj * descr) list -> descr
 
 (*------------------------------------------------------------------*)
 (** {2 Action shapes} *)

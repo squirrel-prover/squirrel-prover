@@ -1858,8 +1858,8 @@ exception Invalid
   * of some biframe element are replaced by the corresponding [dst]
   * projection. *)
 let rewrite_equiv_transform
-    ~(src:Term.projection)
-    ~(dst:Term.projection)
+    ~(src:Term.proj)
+    ~(dst:Term.proj)
     ~(s:TS.t)
     (biframe : Term.term list)
     (term : Term.term) : Term.term

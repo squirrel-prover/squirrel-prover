@@ -725,7 +725,7 @@ let mk_phi_proj
     (cntxt : Constr.trace_cntxt)
     (env : Vars.env)
     (n : Term.nsymb)
-    (proj : Term.projection)
+    (proj : Term.proj)
     (biframe : Term.term list) : Term.term list
   =
   let frame = List.map (Term.project1 proj) biframe in
@@ -775,12 +775,12 @@ let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe : Term.term =
     | _ -> raise Fresh.Not_name
   in
 
-  let system_left = SE.project Term.left_proj cntxt.system in
-  let cntxt_left = { cntxt with system = SE.singleton system_left } in
+  let system_left = SE.project [Term.left_proj] cntxt.system in
+  let cntxt_left = { cntxt with system = system_left } in
   let phi_left = mk_phi_proj cntxt_left env n_left Term.left_proj biframe in
 
-  let system_right = SE.project Term.right_proj cntxt.system in
-  let cntxt_right = { cntxt with system = SE.singleton system_right } in
+  let system_right = SE.project [Term.right_proj] cntxt.system in
+  let cntxt_right = { cntxt with system = system_right } in
   let phi_right = mk_phi_proj cntxt_right env n_right Term.right_proj biframe in
 
   Term.mk_ands
@@ -1981,9 +1981,11 @@ let enckp arg (s : ES.t) =
         (* For each key we actually only need to verify the SSC
          * wrt. the appropriate projection of the system. *)
         let system = Utils.oget (ES.system s).pair in
-        let sysl = SystemExpr.(singleton (project Term.left_proj system)) in
-        let sysr = SystemExpr.(singleton (project Term.right_proj system)) in
-        List.iter ssc
+        let sysl = SystemExpr.(project [Term.left_proj] system) in
+        let sysr = SystemExpr.(project [Term.right_proj] system) in
+        List.iter (fun (ns, system) ->
+            ssc (ns, (system :> SE.fset))
+          )
           (List.sort_uniq Stdlib.compare
              [(skl, sysl); (skr, sysr); (new_skl, sysl); (new_skr, sysr)]) ;
         let context =
@@ -2088,11 +2090,11 @@ let mk_xor_phi_base (cntxt : Constr.trace_cntxt) env biframe
     (n_left, l_left, n_right, l_right, term) =
   let biframe = Term.mk_diff [Term.left_proj,l_left;Term.right_proj,l_right] :: biframe in
 
-  let system_left = SystemExpr.(singleton (project Term.left_proj cntxt.system)) in
+  let system_left = SystemExpr.project [Term.left_proj] cntxt.system in
   let cntxt_left = { cntxt with system = system_left } in
   let phi_left = mk_phi_proj cntxt_left env n_left Term.left_proj biframe in
 
-  let system_right = SystemExpr.(singleton (project Term.right_proj cntxt.system)) in
+  let system_right = SystemExpr.project [Term.right_proj] cntxt.system in
   let cntxt_right = { cntxt with system = system_right } in
   let phi_right = mk_phi_proj cntxt_right env n_right Term.right_proj biframe in
 

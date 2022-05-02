@@ -4,7 +4,9 @@ module Pos = Match.Pos
                
 module Sv = Vars.Sv
 module Sp = Pos.Sp
-              
+
+module SE = SystemExpr
+  
 (*------------------------------------------------------------------*)
 (** Iterate over all subterms.
   * Bound variables are represented as newly generated fresh variables.
@@ -418,9 +420,11 @@ let get_f_messages_ext
   =
   let init_fv = fv in
   
-  let func : hash_occs Pos.f_map_fold =
-    fun (t : Term.term) (fv:Vars.vars) (cond:Term.terms) pos occs ->
-      match t with
+  let func : hash_occs Pos.f_map_fold = fun
+    (t : Term.term)
+    (projs : Term.projs option) (fv : Vars.vars) (cond : Term.terms) pos
+    (occs : hash_occs) ->
+    match t with
       | Term.Fun ((f',_),_, [m;k']) as m_full when f' = f ->
         let occs' =
           match k' with
@@ -462,7 +466,11 @@ let get_f_messages_ext
         assert (l = []);
         begin
           match mode with 
-          | `Delta cntxt -> try_unfold cntxt m ts occs
+          | `Delta cntxt ->
+            let cntxt =
+              { cntxt with system = SE.project_opt projs cntxt.system }
+            in
+            try_unfold cntxt m ts occs
           | `NoDelta -> occs, `Continue
         end
         

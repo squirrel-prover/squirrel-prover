@@ -27,7 +27,7 @@ let pp_error fmt = function
 type t =
   | Any
   | Any_compatible_with of System.t
-  | List of (Term.projection * System.Single.t) list
+  | List of (Term.proj * System.Single.t) list
       (** Each single system is identified by a label.
           The list cannot be empty. All single systems are compatible. *)
 
@@ -63,7 +63,7 @@ let pp fmt : 'a expr -> unit = function
              System.Single.pp fmt single_sys
            else
              Format.fprintf fmt "%a:%a"
-               Term.pp_projection label
+               Term.pp_proj label
                System.Single.pp single_sys)
         fmt
         l
@@ -102,10 +102,20 @@ let to_list = function
   | List l -> l
   | _ -> assert false
 
-let project proj : t -> System.Single.t = function
-  | List l -> List.assoc proj l
-  | _ -> assert false
+let project_opt (projs : Term.projs option) t =
+  match t, projs with
+  | List l, Some projs ->
+    (* we only project over a subset of [l]'s projs *)
+    assert (List.for_all (fun x -> List.mem_assoc x l) projs);
 
+    List (List.filter (fun (x,_) -> List.mem x projs) l)
+
+  | (Any | Any_compatible_with _), Some projs -> assert false
+
+  | _, None -> t
+    
+let project  (projs : Term.projs) t = project_opt (Some projs) t
+  
 let singleton s = List [Term.proj_from_string "",s]
 
 let of_system table s : t =
@@ -113,7 +123,7 @@ let of_system table s : t =
   List
     (List.map (fun proj -> proj, System.Single.make table s proj) projections)
 
-let default_labels : int -> Term.projection list = function
+let default_labels : int -> Term.proj list = function
   | 1 -> [Term.proj_from_string ""]
   | 2 -> [Term.left_proj;Term.right_proj]
   | n -> List.init n (fun i -> Term.proj_from_string (string_of_int (i+1)))

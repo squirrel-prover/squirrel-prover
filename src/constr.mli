@@ -41,7 +41,7 @@ type trace_cntxt = {
   table  : Symbols.table;
   system : SystemExpr.fset;
   models : models option;
-    (** used to find an action occurring at a given timestamp *)
+  (** used to find an action occurring at a given timestamp *)
 }
 
 (** Create context with undefined models. *)

@@ -4,6 +4,8 @@ open Term
 module Sv = Vars.Sv
 module Mv = Vars.Mv
 
+module SE = SystemExpr
+  
 let dbg ?(force=false) s =
   if force then Printer.prt `Dbg s
   else Printer.prt `Ignore s
@@ -41,13 +43,17 @@ module Pos = struct
 
   (*------------------------------------------------------------------*)
   type f_sel =
-    Term.term -> Vars.vars -> Term.term list ->
+    Term.term -> Term.projs option -> Vars.vars -> Term.term list ->
     [`Select | `Continue]
 
   (*------------------------------------------------------------------*)
   (* [p] is the current position *)
-  let rec sel fsel (sp : Sp.t) ~vars ~conds ~(p : pos) (t : Term.term) = 
-    match fsel t vars conds with
+  let rec sel
+      (fsel : f_sel) (sp : Sp.t)
+      ~projs ~vars ~conds ~(p : pos)
+      (t : Term.term)
+    = 
+    match fsel t projs vars conds with
     | `Select -> Sp.add p sp
     | `Continue -> 
       match t with
@@ -57,27 +63,27 @@ module Pos = struct
         let conds_t =             c :: conds in
         let conds_e = Term.mk_not c :: conds in
 
-        let sp = sel fsel sp ~vars ~conds         ~p:(0 :: p) c in
-        let sp = sel fsel sp ~vars ~conds:conds_t ~p:(1 :: p) t in
-        (*    *) sel fsel sp ~vars ~conds:conds_e ~p:(2 :: p) e 
+        let sp = sel fsel sp ~projs ~vars ~conds         ~p:(0 :: p) c in
+        let sp = sel fsel sp ~projs ~vars ~conds:conds_t ~p:(1 :: p) t in
+        (*    *) sel fsel sp ~projs ~vars ~conds:conds_e ~p:(2 :: p) e 
 
       | Term.Fun ((_, l1), _, l2) ->
         let l = (List.map Term.mk_var l1) @ l2 in
-        sel_l fsel sp ~vars ~conds ~p l
+        sel_l fsel sp ~projs ~vars ~conds ~p l
 
       | Term.Name ns ->
         let l = List.map Term.mk_var ns.s_indices in
-        sel_l fsel sp ~vars ~conds ~p l
+        sel_l fsel sp ~projs ~vars ~conds ~p l
 
       | Term.Macro (ms, terms, ts) ->
         assert (terms = []);
 
         let l = (List.map Term.mk_var ms.s_indices) @ [ts] in
-        sel_l fsel sp ~vars ~conds ~p l
+        sel_l fsel sp ~projs ~vars ~conds ~p l
 
       | Term.Action (_, is) ->
         let l = List.map Term.mk_var is in
-        sel_l fsel sp ~vars ~conds ~p l
+        sel_l fsel sp ~projs ~vars ~conds ~p l
 
       | Term.Var _ -> sp
 
@@ -87,10 +93,12 @@ module Pos = struct
         let is, subst = Term.refresh_vars `Global is in
         let t = Term.subst subst t in
         let vars = List.rev_append is vars in
-        sel fsel sp ~vars ~conds ~p:(0 :: p) t
+        sel fsel sp ~projs ~vars ~conds ~p:(0 :: p) t
 
       | Term.Diff (Explicit l) ->
-        sel_l fsel sp ~vars ~conds ~p (List.map snd l)
+        List.foldi (fun i sp (label,t) ->
+            sel fsel sp ~projs:(Some [label]) ~vars ~conds ~p:(i :: p) t
+          ) sp l
 
       | Term.Find (is, c, t, e) ->
         let is, subst = Term.refresh_vars `Global is in
@@ -102,47 +110,48 @@ module Pos = struct
         let conds_t = c :: conds in 
         let conds_e =      conds in (* could be improved *)
 
-        let sp = sel fsel sp ~vars:vars1 ~conds         ~p:(0 :: p) c in
-        let sp = sel fsel sp ~vars:vars1 ~conds:conds_t ~p:(1 :: p) t in
-        (*    *) sel fsel sp ~vars       ~conds:conds_e ~p:(2 :: p) e 
+        let sp = sel fsel sp ~projs ~vars:vars1 ~conds         ~p:(0 :: p) c in
+        let sp = sel fsel sp ~projs ~vars:vars1 ~conds:conds_t ~p:(1 :: p) t in
+        (*    *) sel fsel sp ~projs ~vars       ~conds:conds_e ~p:(2 :: p) e 
 
-  and sel_l fsel (sp : Sp.t) ~vars ~conds ~(p : pos) (l : Term.term list) = 
-    List.foldi (fun i sp t -> sel fsel sp ~vars ~conds ~p:(i :: p) t) sp l 
+  and sel_l fsel (sp : Sp.t) ~projs ~vars ~conds ~(p : pos) (l : Term.term list) = 
+    List.foldi (fun i sp t -> sel fsel sp ~projs ~vars ~conds ~p:(i :: p) t) sp l 
 
 
   (** Exported *)
   let select (fsel : f_sel) (t : Term.term) : Sp.t =
-    sel fsel Sp.empty ~vars:[] ~conds:[] ~p:[] t
+    sel fsel Sp.empty ~projs:None ~vars:[] ~conds:[] ~p:[] t
 
   (*------------------------------------------------------------------*)
   (** Exported *)
   let select_e (fsel : f_sel) (t : Equiv.form) : Sp.t =
     
     (* [p] is the current position *)
-    let rec sel_e (sp : Sp.t) ~vars ~conds ~(p : pos) (t : Equiv.form) =  
+    let rec sel_e (sp : Sp.t) ~projs ~vars ~conds ~(p : pos) (t : Equiv.form) =  
       match t with
       | Equiv.Quant (q, is, t0) ->
         let is, subst = Term.refresh_vars `Global is in
         let t0 = Equiv.subst subst t0 in
         let vars = List.rev_append is vars in
-        sel_e sp ~vars ~conds ~p:(0 :: p) t0
+        sel_e sp ~projs ~vars ~conds ~p:(0 :: p) t0
 
-      | Equiv.Atom (Reach t) -> 
-        sel fsel sp ~vars ~conds ~p:(0 :: 0 :: p) t
+      | Equiv.Atom (Reach t) ->
+        let projs = Some [Term.left_proj; Term.right_proj] in
+        sel fsel sp ~projs ~vars ~conds ~p:(0 :: 0 :: p) t
 
       | Equiv.Atom (Equiv e) -> 
-        sel_l fsel sp ~vars ~conds ~p:(0 :: 0 :: p) e
+        sel_l fsel sp ~projs ~vars ~conds ~p:(0 :: 0 :: p) e
 
       | Equiv.Impl (f1, f2)
       | Equiv.And  (f1, f2)
       | Equiv.Or   (f1, f2) -> 
-        sel_e_l sp ~vars ~conds ~p [f1; f2]
+        sel_e_l sp ~projs ~vars ~conds ~p [f1; f2]
         
-    and sel_e_l (sp : Sp.t) ~vars ~conds ~(p : pos) (l : Equiv.form list) = 
-      List.foldi (fun i sp t -> sel_e sp ~vars ~conds ~p:(i :: p) t) sp l 
+    and sel_e_l (sp : Sp.t) ~projs ~vars ~conds ~(p : pos) (l : Equiv.form list) = 
+      List.foldi (fun i sp t -> sel_e sp ~projs ~vars ~conds ~p:(i :: p) t) sp l 
     in 
     
-    sel_e Sp.empty ~vars:[] ~conds:[] ~p:[] t
+    sel_e Sp.empty ~projs:None ~vars:[] ~conds:[] ~p:[] t
 
 
   (*------------------------------------------------------------------*)
@@ -151,11 +160,14 @@ module Pos = struct
 
   (*------------------------------------------------------------------*)
   type 'a f_map_fold =
-    Term.term -> Vars.vars -> Term.term list -> pos -> 'a ->
+    Term.term ->
+    Term.projs option -> Vars.vars -> Term.term list -> pos ->
+    'a ->
     'a * [`Map of Term.term | `Continue]
 
   type f_map =
-    Term.term -> Vars.vars -> Term.term list -> pos -> 
+    Term.term ->
+    Term.projs option -> Vars.vars -> Term.term list -> pos -> 
     [`Map of Term.term | `Continue]
 
   (*------------------------------------------------------------------*)
@@ -167,19 +179,20 @@ module Pos = struct
            [b] tells if we recurse under successful maps.
          - [`BottomUp _]: recurse, then apply [func] at top-level *)
       
-      ~(env   : Vars.env)       (* var env, to have clean variable names *)
-      ~(vars  : Vars.var list)  (* variable bound above the current position *)
-      ~(conds : Term.term list) (* conditions above the current position *)
-      ~(p     : pos)            (* current position *)
-      ~(acc   : 'a)             (* folding value *)
-      (ti     : Term.term) 
-    : 'a * bool * Term.term     (* folding value, `Map found, term *)
-    = 
-    let map_fold ?(env = env) ?(vars = vars) ?(conds = conds) = 
-      map_fold func mode ~env ~vars ~conds 
+      ~(env   : Vars.env)          (* var env, to have clean variable names *)
+      ~(projs : Term.projs option) (* projs. applying to the current pos. *)
+      ~(vars  : Vars.var list)     (* variable bound above the current pos. *)
+      ~(conds : Term.term list)    (* conditions above the current pos. *)
+      ~(p     : pos)               (* current position *)
+      ~(acc   : 'a)                (* folding value *)
+      (ti     : Term.term)         
+    : 'a * bool * Term.term        (* folding value, `Map found, term *)
+    =
+    let map_fold ~projs ?(env = env) ?(vars = vars) ?(conds = conds) = 
+      map_fold func mode ~env ~projs ~vars ~conds 
     in
-    let map_fold_l ?(env = env) ?(vars = vars) ?(conds = conds) = 
-      map_fold_l func mode ~env ~vars ~conds 
+    let map_fold_l ~projs ?(env = env) ?(vars = vars) ?(conds = conds) =
+      map_fold_l func mode ~env ~projs ~vars ~conds 
     in
 
     (* recurse strictly one level below *)
@@ -191,9 +204,9 @@ module Pos = struct
         let conds_t =             c :: conds in
         let conds_e = Term.mk_not c :: conds in
 
-        let acc, foundc, c = map_fold ~conds         ~p:(0 :: p) ~acc c in
-        let acc, foundt, t = map_fold ~conds:conds_t ~p:(1 :: p) ~acc t in
-        let acc, founde, e = map_fold ~conds:conds_e ~p:(2 :: p) ~acc e in
+        let acc, foundc, c = map_fold ~projs ~conds         ~p:(0 :: p) ~acc c in
+        let acc, foundt, t = map_fold ~projs ~conds:conds_t ~p:(1 :: p) ~acc t in
+        let acc, founde, e = map_fold ~projs ~conds:conds_e ~p:(2 :: p) ~acc e in
         let found = foundc || foundt || founde in
 
         let ti' = Term.mk_ite ~simpl:false c t e in
@@ -202,7 +215,7 @@ module Pos = struct
       | Term.Fun ((fs, l1), fty, l2) ->
         let l = (List.map Term.mk_var l1) @ l2 in
 
-        let acc, found, l = map_fold_l ~p ~acc l in
+        let acc, found, l = map_fold_l ~projs ~p ~acc l in
 
         let l1, l2 = List.takedrop (List.length l1) l in
         let l1 = destr_vars l1 in
@@ -213,7 +226,7 @@ module Pos = struct
       | Term.Name ns ->
         let l = List.map Term.mk_var ns.s_indices in
 
-        let acc, found, l = map_fold_l ~p ~acc l in
+        let acc, found, l = map_fold_l ~projs ~p ~acc l in
         let l = destr_vars l in
 
         let ti' = Term.mk_name (Term.mk_isymb ns.s_symb ns.s_typ l) in
@@ -224,7 +237,7 @@ module Pos = struct
 
         let l = (List.map Term.mk_var ms.s_indices) @ [ts] in
 
-        let acc, found, l = map_fold_l ~vars ~conds ~p ~acc l in
+        let acc, found, l = map_fold_l ~projs ~vars ~conds ~p ~acc l in
 
         let l1, ts = List.takedrop (List.length ms.s_indices) l in
         let l1 = destr_vars l1 in
@@ -236,7 +249,7 @@ module Pos = struct
       | Term.Action (a, is) ->
         let l = List.map Term.mk_var is in
 
-        let acc, found, l = map_fold_l ~vars ~conds ~p ~acc l in
+        let acc, found, l = map_fold_l ~projs ~vars ~conds ~p ~acc l in
 
         let l = destr_vars l in
 
@@ -252,7 +265,7 @@ module Pos = struct
         let t0 = Term.subst subst t0 in
         let vars = List.rev_append is vars in
 
-        let acc, found, t0 = map_fold ~env ~vars ~p:(0 :: p) ~acc t0 in
+        let acc, found, t0 = map_fold ~projs ~env ~vars ~p:(0 :: p) ~acc t0 in
 
         let ti' = 
           match ti with
@@ -266,7 +279,9 @@ module Pos = struct
         acc, found, if found then ti' else ti
 
       | Term.Diff (Explicit l) ->
-        let acc, found, l' = map_fold_l ~p ~acc (List.map snd l) in
+        let acc, found, l' =
+          map_fold_l ~projs ~p ~acc ~projlabels:(List.map fst l) (List.map snd l)
+        in
         let l = List.map2 (fun (lbl,_) t -> lbl,t) l l' in
         let ti' = Term.mk_diff l in
         acc, found, if found then ti' else ti
@@ -282,13 +297,13 @@ module Pos = struct
         let conds_e =      conds in (* could be improved *)
 
         let acc, foundc, c = 
-          map_fold ~env ~vars:vars1 ~conds         ~p:(0 :: p) ~acc c 
+          map_fold ~projs ~env ~vars:vars1 ~conds         ~p:(0 :: p) ~acc c 
         in
         let acc, foundt, t = 
-          map_fold ~env ~vars:vars1 ~conds:conds_t ~p:(1 :: p) ~acc t 
+          map_fold ~projs ~env ~vars:vars1 ~conds:conds_t ~p:(1 :: p) ~acc t 
         in
         let acc, founde, e = 
-          map_fold ~env ~vars       ~conds:conds_e ~p:(2 :: p) ~acc e 
+          map_fold ~projs ~env ~vars       ~conds:conds_e ~p:(2 :: p) ~acc e 
         in
         let found = foundc || foundt || founde in
 
@@ -299,10 +314,10 @@ module Pos = struct
     match mode with
     | `TopDown b ->
       begin
-        match func ti vars conds p acc with
+        match func ti projs vars conds p acc with
         | acc, `Map t -> 
           if b then
-            let acc, _, t = map_fold ~p ~acc:acc t in
+            let acc, _, t = map_fold ~projs ~p ~acc:acc t in
             acc, true, t
           else
             acc, true, t
@@ -312,17 +327,25 @@ module Pos = struct
       
     | `BottomUp ->
       let acc, found, ti = rec_strict_subterm ti acc in
-      match func ti vars conds p acc with
+      match func ti projs vars conds p acc with
       | acc, `Map ti   -> acc, true,  ti
       | acc, `Continue -> acc, found, ti
 
-
   
-  and map_fold_l func mode ~env ~vars ~conds ~(p : pos) ~acc (l : Term.terms) =
+  and map_fold_l
+      func mode      
+      ~env ~projs ~vars ~conds ~(p : pos) ~acc
+      ?projlabels            (* optional list of projection labels *)
+      (l : Term.terms)
+    =
     let (acc, found), l =
-      List.mapi_fold (fun i (acc, found) ti -> 
-          let acc, found', ti = 
-            map_fold func mode ~env ~vars ~conds ~p:(i :: p) ~acc ti
+      List.mapi_fold (fun i (acc, found) ti ->
+          let projs = match projlabels with
+            | None -> projs
+            | Some labels -> Some [List.nth labels i]
+          in
+          let acc, found', ti =
+            map_fold func mode ~env ~projs ~vars ~conds ~p:(i :: p) ~acc ti
           in
           (acc, found || found'), ti
         ) (acc, false) l 
@@ -338,19 +361,20 @@ module Pos = struct
            [b] tells if we recurse under successful maps.
          - [`BottomUp _]: recurse, then apply [func] at top-level *)
 
-      ~(env   : Vars.env)       (* var env, to have clean variable names *)
-      ~(vars  : Vars.var list)  (* variable bound above the current position *)
-      ~(conds : Term.term list) (* conditions above the current position *)
-      ~(p     : pos)            (* current position *)
-      ~(acc   : 'a)             (* folding value *)
-      (ti     : Equiv.form) 
-    : 'a * bool * Equiv.form     (* folding value, `Map found, term *)
+      ~(env   : Vars.env)          (* var env, to have clean variable names *)
+      ~(projs : Term.projs option) (* projs. applying to the current pos. *)
+      ~(vars  : Vars.var list)     (* variable bound above the current position *)
+      ~(conds : Term.term list)    (* conditions above the current position *)
+      ~(p     : pos)               (* current position *)
+      ~(acc   : 'a)                (* folding value *)
+      (ti     : Equiv.form)       
+    : 'a * bool * Equiv.form        (* folding value, `Map found, term *)
     = 
-    let map_fold_e ?(env = env) ?(vars = vars) ?(conds = conds) = 
-      map_fold_e func mode ~env ~vars ~conds 
+    let map_fold_e ?(env = env) ?(projs = projs) ?(vars = vars) ?(conds = conds) = 
+      map_fold_e func mode ~env ~projs ~vars ~conds 
     in
-    let map_fold_e_l ?(env = env) ?(vars = vars) ?(conds = conds) = 
-      map_fold_e_l func mode ~env ~vars ~conds 
+    let map_fold_e_l ?(env = env) ?(projs = projs) ?(vars = vars) ?(conds = conds) = 
+      map_fold_e_l func mode ~env ~projs ~vars ~conds 
     in
 
     match ti with
@@ -366,14 +390,14 @@ module Pos = struct
 
     | Equiv.Atom (Reach t) -> 
       let acc, found, t =
-        map_fold func mode ~env ~vars ~conds ~p:(0 :: 0 :: p) ~acc t 
+        map_fold func mode ~env ~projs ~vars ~conds ~p:(0 :: 0 :: p) ~acc t 
       in
       let ti' = Equiv.Atom (Reach t) in
       acc, found, if found then ti' else ti
 
     | Equiv.Atom (Equiv e) -> 
       let acc, found, l = 
-        map_fold_l func mode ~env ~vars ~conds ~p:(0 :: 0 :: p) ~acc e 
+        map_fold_l func mode ~env ~projs ~vars ~conds ~p:(0 :: 0 :: p) ~acc e 
       in
       let ti' = Equiv.Atom (Equiv l) in
       acc, found, if found then ti' else ti
@@ -392,11 +416,11 @@ module Pos = struct
       in
       acc, found, if found then ti' else ti
 
-  and map_fold_e_l func mode ~env ~vars ~conds ~p ~acc (l : Equiv.form list) =
+  and map_fold_e_l func mode ~env ~projs ~vars ~conds ~p ~acc (l : Equiv.form list) =
     let (acc, found), l =
       List.mapi_fold (fun i (acc, found) ti -> 
           let acc, found', ti = 
-            map_fold_e func mode ~env ~vars ~conds ~p:(i :: p) ~acc ti
+            map_fold_e func mode ~env ~projs ~vars ~conds ~p:(i :: p) ~acc ti
           in
           (acc, found || found'), ti
         ) (acc, false) l 
@@ -412,10 +436,10 @@ module Pos = struct
     : bool * Term.term
     =
     let func : unit f_map_fold = 
-      fun t vars conds p () -> (), func t vars conds p 
+      fun t projs vars conds p () -> (), func t projs vars conds p 
     in
     let (), found, t =
-      map_fold func mode ~env ~vars:[] ~conds:[] ~p:[] ~acc:() t
+      map_fold func mode ~env ~projs:None ~vars:[] ~conds:[] ~p:[] ~acc:() t
     in
     found, t
 
@@ -426,21 +450,21 @@ module Pos = struct
     : bool * Equiv.form
     =
     let func : unit f_map_fold = 
-      fun t vars conds p () -> (), func t vars conds p 
+      fun t projs vars conds p () -> (), func t projs vars conds p 
     in
     let (), found, t = 
-      map_fold_e func mode ~env ~vars:[] ~conds:[] ~p:[] ~acc:() t
+      map_fold_e func mode ~env ~projs:None ~vars:[] ~conds:[] ~p:[] ~acc:() t
     in
     found, t
 
   (*------------------------------------------------------------------*)
   (** Exported *)
   let map_fold ?(mode=`TopDown false) func env acc (t : Term.term) =
-    map_fold func mode ~env ~vars:[] ~conds:[] ~p:[] ~acc t
+    map_fold func mode ~env ~projs:None ~vars:[] ~conds:[] ~p:[] ~acc t
 
   (** Exported *)
   let map_fold_e ?(mode=`TopDown false) func env acc (t : Equiv.form) =
-    map_fold_e func mode ~env ~vars:[] ~conds:[] ~p:[] ~acc t
+    map_fold_e func mode ~env ~projs:None ~vars:[] ~conds:[] ~p:[] ~acc t
 end
 
 (*------------------------------------------------------------------*)
@@ -1278,7 +1302,7 @@ module T (* : S with type t = Term.term *) = struct
       (t     : t) 
     : Term.term list
     =
-    let f_fold : Term.terms Pos.f_map_fold = fun e _vars _conds _p acc ->
+    let f_fold : Term.terms Pos.f_map_fold = fun e _projs _vars _conds _p acc ->
       match try_match ?option table expr e pat with
       | Match _ -> e :: acc, `Continue
       | _       -> acc, `Continue
@@ -2464,7 +2488,7 @@ module E : S with type t = Equiv.form = struct
       (t     : Equiv.form) 
     : Term.terms
     =
-    let f_fold : Term.terms Pos.f_map_fold = fun e _vars _conds _p acc ->
+    let f_fold : Term.terms Pos.f_map_fold = fun e _projs _vars _conds _p acc ->
       match T.try_match ?option table expr e pat with
       | Match _ -> e :: acc, `Continue
       | _       ->      acc, `Continue

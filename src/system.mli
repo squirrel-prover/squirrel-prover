@@ -9,10 +9,10 @@ type t = Symbols.system
 
 (*------------------------------------------------------------------*)
 (** Indicates the list of projections of a system. *)
-val projections : Symbols.table -> t -> Term.projection list
+val projections : Symbols.table -> t -> Term.proj list
 
 (** Indicates whether a system supports a given projection. *)
-val valid_projection : Symbols.table -> t -> Term.projection -> bool
+val valid_projection : Symbols.table -> t -> Term.proj -> bool
 
 (*------------------------------------------------------------------*)
 (** Check that two systems are strongly compatible.
@@ -74,7 +74,7 @@ val symbs :
     without any associated actions.
     Fails if name is already in use. *)
 val declare_empty :
-  Symbols.table -> Symbols.lsymb -> Term.projection list-> Symbols.table * t
+  Symbols.table -> Symbols.lsymb -> Term.proj list-> Symbols.table * t
 
 (** Register an action symbol in a system,
   * associating it with an action description.
@@ -94,7 +94,7 @@ module Single : sig
 
   type t = private {
     system     : Symbols.system ;
-    projection : Term.projection
+    projection : Term.proj
   }
 
   (** A single system is obtained by taking a valid projection
@@ -104,7 +104,7 @@ module Single : sig
       and is then not attached to this particular table.
       This shouldn't be too bad because we never override system
       symbols after their complete definition. *)
-  val make : Symbols.table -> Symbols.system -> Term.projection -> t
+  val make : Symbols.table -> Symbols.system -> Term.proj -> t
 
   val pp : Format.formatter -> t -> unit
 

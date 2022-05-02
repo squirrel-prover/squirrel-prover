@@ -230,16 +230,17 @@ let mk_prf_phi_proj cntxt env param frame hash =
 (** Build the PRF condition on one side, if the hash occurs on this side.
     Return [None] if the hash does not occurs. *)
 let prf_condition_side
-    (proj : Term.projection)
-    (cntxt : Constr.trace_cntxt)
-    (env : Vars.env)
+    (proj    : Term.proj)
+    (cntxt   : Constr.trace_cntxt)
+    (env     : Vars.env)
     (biframe : Equiv.equiv)
-    (e : Term.term)
-    (hash : Term.term) : (Term.form * Term.form) option
+    (e       : Term.term)
+    (hash    : Term.term)
+  : (Term.form * Term.form) option
   =
   let exception HashNoOcc in
   try
-    let system = SE.(singleton (project proj cntxt.system)) in
+    let system = SE.(project [proj] cntxt.system) in
     let cntxt = { cntxt with system } in
     let param = prf_param (Term.project1 proj hash) in
 
