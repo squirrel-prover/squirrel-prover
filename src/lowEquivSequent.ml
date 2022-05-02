@@ -206,7 +206,7 @@ let set_reach_goal f s = set_goal Equiv.(Atom (Reach f)) s
 
 let get_frame proj j = match j.goal with
   | Equiv.Atom (Equiv.Equiv e) ->
-    Some (List.map (Equiv.pi_term proj) e)
+    Some (List.map (Equiv.project_term proj) e)
   | _ -> None
 
 let subst subst s =

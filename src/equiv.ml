@@ -8,7 +8,7 @@ module Mv = Vars.Mv
 (*------------------------------------------------------------------*)
 (** {2 Equivalence} *)
 
-let pi_term projection tm = Term.pi_term ~projection tm
+let project_term projection tm = Term.project_term ~projection tm
 
 (*------------------------------------------------------------------*)
 type equiv = Term.term list

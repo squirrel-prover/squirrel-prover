@@ -150,7 +150,7 @@ val of_system : Symbols.table -> System.t -> fset
 
 (** List of labelled elements of a set. Guaranteed to be non-empty.
     Fails if expression does not correspond to a finite set. *)
-val to_list : <fset:unit;..> expr -> (Term.projection*System.Single.t) list
+val to_list : <fset:unit;..> expr -> (Term.projection * System.Single.t) list
 
 (** Project a system according to the given projection. *)
 val project : Term.projection -> <fset:unit;..> expr -> System.Single.t

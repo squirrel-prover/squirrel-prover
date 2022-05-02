@@ -1594,23 +1594,15 @@ let is_pure_timestamp (t : term) =
 (*------------------------------------------------------------------*)
 (** {2 Projection} *)
 
-let pi_term ~projection term =
+let project_term ~projection term =
 
-  let rec pi_term (s : projection) (t : term) : term = 
+  let rec project_term (s : projection) (t : term) : term = 
     match t with
-    | Fun (f,fty,terms) -> Fun (f, fty, List.map (pi_term s) terms)
-    | Name n -> Name n
-    | Macro (m, terms, ts) -> Macro(m, List.map (pi_term s) terms, pi_term s ts)
-    | Seq (a, b) -> Seq (a, pi_term s b)
-    | Action (a, b) -> Action (a, b)
-    | Var a -> Var a
-    | Diff (Explicit l) -> pi_term s (List.assoc s l)
-    | Find (vs, b, t, e) -> Find (vs, pi_term s b, pi_term s t, pi_term s e)
-    | ForAll (vs, b) -> ForAll (vs, pi_term s b)
-    | Exists (vs, b) -> Exists (vs, pi_term s b)
+    | Diff (Explicit l) -> project_term s (List.assoc s l)
+    | _ -> tmap (project_term s) t
   in
 
-  pi_term projection term
+  project_term projection term
 
 (** Evaluate topmost diff operators for a given projection of a biterm.
     For example [head_pi_term left (diff(a,b))] is [a]
@@ -1753,7 +1745,7 @@ let () =
       let f x = Fun ((f,[]),fty,[x]) in
       let t = diff (f (diff a b)) c in
       let r = head_pi_term "left" t in
-        assert (pi_term  ~projection:"left" t = f a) ;
+        assert (project_term  ~projection:"left" t = f a) ;
         assert (r = f (diff a b))
     end ;
   ]

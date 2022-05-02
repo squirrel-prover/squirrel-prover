@@ -67,12 +67,12 @@ val pp_ord : Format.formatter -> ord -> unit
 (** We use strings to identify components of diff operators. *)
 type projection = string
 
-(** We allow users to write diff(t1,t2) as well as diff(lbl1:t1,lbl2:t2)
-    and even diff(l1:t1,l2:t2,_:t) and keep trace of this structure in
+(** We allow users to write [diff(t1,t2)] as well as [diff(lbl1:t1,lbl2:t2)]
+    and even [diff(l1:t1,l2:t2,_:t)] and keep trace of this structure in
     terms in order to display them back similarly.
     TODO for simplicity we allow only a simple style for now *)
 type 'a diff_args =
-  | Explicit of (projection*'a) list
+  | Explicit of (projection * 'a) list
 
 type term = private
   | Fun   of fsymb * Type.ftype * term list
@@ -374,7 +374,7 @@ val mk_var     : Vars.var -> term
 val mk_action  : Symbols.action -> Vars.var list -> term
 val mk_name    : nsymb -> term
 val mk_macro   : msymb -> term list -> term -> term
-val mk_diff    : (projection*term) list -> term
+val mk_diff    : (projection * term) list -> term
 
 val mk_find : Vars.var list -> term -> term -> term -> term
 
@@ -462,8 +462,7 @@ module Mt : Map.S with type key = term
     If the bi-term contains macros, and come from a bi-system, its
     projection is only correctly interpreted if it is used inside
     the projected system. *)
-val pi_term : projection:projection -> term -> term
-(* TODO rename to project *)
+val project_term : projection:projection -> term -> term
 (* TODO take projection AND list of all projections to handle complex diffs *)
 
 (** Push topmost diff-operators just enough to expose the common

@@ -1865,8 +1865,8 @@ let rewrite_equiv_transform
     (term : Term.term) : Term.term
   =
   let assoc (t : Term.term) : Term.term option =
-    match List.find_opt (fun e -> (Term.pi_term ~projection:src e) = t) biframe with
-    | Some e -> Some (Term.pi_term ~projection:dst e)
+    match List.find_opt (fun e -> (Term.project_term ~projection:src e) = t) biframe with
+    | Some e -> Some (Term.project_term ~projection:dst e)
     | None -> None
   in
   let rec aux : term -> term = fun t ->

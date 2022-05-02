@@ -290,12 +290,12 @@ let refresh_descr descr =
 
   descr
   
-let pi_descr s d =
-  let pi_term t = Term.pi_term ~projection:s t in
+let project_descr s d =
+  let project_term t = Term.project_term ~projection:s t in
   { d with
-    condition = (let is,t = d.condition in is, pi_term t);
-    updates = List.map (fun (st, m) -> st, pi_term m) d.updates;
-    output = (let c,m = d.output in c, pi_term m) }
+    condition = (let is,t = d.condition in is, project_term t);
+    updates   = List.map (fun (st, m) -> st, project_term m) d.updates;
+    output    = (let c,m = d.output in c, project_term m) }
 
 let strongly_compatible_descr d1 d2 =
   d1.name    = d2.name &&

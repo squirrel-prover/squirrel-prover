@@ -40,8 +40,8 @@ type reach_statement = (string, Term.term  ) abstract_statement
 val pp_statement : Format.formatter -> statement -> unit
 
 (*------------------------------------------------------------------*)
-val is_reach_statement : statement -> bool
-val is_equiv_statement : statement -> bool
+val is_reach_statement : (_, Equiv.gform) abstract_statement -> bool
+val is_equiv_statement : (_, Equiv.gform) abstract_statement -> bool
 
 val to_reach_statement : ?loc:Location.t -> statement -> reach_statement
 val to_equiv_statement : ?loc:Location.t -> statement -> equiv_statement

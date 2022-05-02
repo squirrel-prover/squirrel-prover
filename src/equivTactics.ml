@@ -728,7 +728,7 @@ let mk_phi_proj
     (proj : Term.projection)
     (biframe : Term.term list) : Term.term list
   =
-  let frame = List.map (Equiv.pi_term proj) biframe in
+  let frame = List.map (Equiv.project_term proj) biframe in
   try
     let frame_indices : Fresh.name_occs =
       List.fold_left (fun acc t ->
@@ -769,8 +769,8 @@ let mk_phi_proj
 
 let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe : Term.term =
   let n_left, n_right =
-    match Term.pi_term ~projection:"left"  t,
-          Term.pi_term ~projection:"right" t with
+    match Term.project_term ~projection:"left"  t,
+          Term.project_term ~projection:"right" t with
     | (Name nl, Name nr) -> nl, nr
     | _ -> raise Fresh.Not_name
   in
@@ -1451,11 +1451,11 @@ let global_diff_eq (s : ES.t) =
                 I don't know if we're missing something with the removal
                 of expand_all_macros.
         let s1 = 
-          Term.pi_term ~projection:"left"
+          Term.project_term ~projection:"left"
             (EquivLT.expand_all_macros ~force_happens:true s1 s) 
         in
         let s2 = 
-          Term.pi_term ~projection:"right"
+          Term.project_term ~projection:"right"
             (EquivLT.expand_all_macros ~force_happens:true s2 s)
         in *)
         Goal.Trace ES.(to_trace_sequent
@@ -2115,15 +2115,15 @@ let mk_xor_phi_base (cntxt : Constr.trace_cntxt) env biframe
   phi
 
 let is_xored_diff t =
-  match Term.pi_term ~projection:"left"  t,
-        Term.pi_term ~projection:"right" t with
+  match Term.project_term ~projection:"left"  t,
+        Term.project_term ~projection:"right" t with
   | (Fun (fl,_,ll),Fun (fr,_,lr))
     when (fl = Term.f_xor && fr = Term.f_xor) -> true
   | _ -> false
 
 let is_name_diff mess_name =
-  match Term.pi_term ~projection:"left"  mess_name,
-        Term.pi_term ~projection:"right" mess_name with
+  match Term.project_term ~projection:"left"  mess_name,
+        Term.project_term ~projection:"right" mess_name with
   | Name nl, Name nr -> true
   | _ -> false
 
@@ -2193,8 +2193,8 @@ let xor arg s =
     match opt_n with
     | None ->
       begin
-        match Term.pi_term ~projection:"left"  t,
-              Term.pi_term ~projection:"right" t with
+        match Term.project_term ~projection:"left"  t,
+              Term.project_term ~projection:"right" t with
         | (Fun (fl, _, [Term.Name nl;ll]),
            Fun (fr, _, [Term.Name nr;lr]))
           when (fl = Term.f_xor && fr = Term.f_xor) ->
@@ -2204,11 +2204,11 @@ let xor arg s =
       end
     | Some mess_name ->
       begin
-        match Term.pi_term ~projection:"left"  mess_name,
-              Term.pi_term ~projection:"right" mess_name with
+        match Term.project_term ~projection:"left"  mess_name,
+              Term.project_term ~projection:"right" mess_name with
         | Name nl, Name nr ->
-          begin match Term.pi_term ~projection:"left"  t,
-                      Term.pi_term ~projection:"right" t with
+          begin match Term.project_term ~projection:"left"  t,
+                      Term.project_term ~projection:"right" t with
             | (Fun (fl,_,ll),Fun (fr,_,lr))
               when (fl = Term.f_xor && fr = Term.f_xor) ->
               (nl,remove_name_occ nl ll,

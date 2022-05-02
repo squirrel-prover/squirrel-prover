@@ -440,7 +440,7 @@ let filter_map_hyps func hyps =
     Fails if [s.system.set] cannot be projected. *)
 let pi projection s =
   let pi = function
-    | `Reach t -> `Reach (Term.pi_term ~projection t)
+    | `Reach t -> `Reach (Term.project_term ~projection t)
     | h -> h
   in
   let hyps = filter_map_hyps pi s.hyps in
@@ -460,7 +460,7 @@ let pi projection s =
   let s =
     S.update
       ~env:new_env
-      ~conclusion:(Term.pi_term ~projection s.conclusion)
+      ~conclusion:(Term.project_term ~projection s.conclusion)
       ~hyps:H.empty
       s
   in

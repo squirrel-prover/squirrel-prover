@@ -134,8 +134,8 @@ val valid_descr : descr -> bool
 (** Refresh (globally) bound variables in a description. *)
 val refresh_descr : descr -> descr
 
-(** [pi_descr proj descr] returns the projection of the description. *)
-val pi_descr : Term.projection -> descr -> descr (* TODO rename to project_descr *)
+(** [project_descr proj descr] returns the projection of the description. *)
+val project_descr : Term.projection -> descr -> descr
 
 (** Strong notion of compatibility, more restrictive (and syntactical) than
     what system compatibility alone would require, which helps to combine

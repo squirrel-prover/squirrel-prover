@@ -19,7 +19,8 @@ module type S = sig
     * for local assumptions, and system equality otherwise. *)
   val get_assumption :
     ?check_compatibility:bool -> table:Symbols.table ->
-    'a Equiv.f_kind -> Theory.lsymb -> t -> (ghyp, 'a) Goal.abstract_statement
+    'a Equiv.f_kind -> Theory.lsymb -> t ->
+    (ghyp, 'a) Goal.abstract_statement
 
   val reduce : Reduction.red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 

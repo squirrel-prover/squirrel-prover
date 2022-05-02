@@ -71,7 +71,7 @@ let pp_statement fmt (g : statement) : unit =
 
 (*------------------------------------------------------------------*)
 
-let is_reach_statement stmt : bool =
+let is_reach_statement (stmt : (_, Equiv.gform) abstract_statement) : bool =
   match stmt.formula with
   | `Equiv _ -> false
   | `Reach _ -> true

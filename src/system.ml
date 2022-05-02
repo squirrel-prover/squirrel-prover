@@ -176,6 +176,6 @@ module Single = struct
 
   let descr_of_shape table {system;projection} shape =
     let multi_descr = descr_of_shape table system shape in
-    Action.pi_descr projection multi_descr
+    Action.project_descr projection multi_descr
 
 end
