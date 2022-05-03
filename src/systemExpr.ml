@@ -102,6 +102,8 @@ let to_list = function
   | List l -> l
   | _ -> assert false
 
+let to_projs t = List.map fst (to_list t)
+    
 let project_opt (projs : Term.projs option) t =
   match t, projs with
   | List l, Some projs ->
@@ -337,3 +339,6 @@ let pp_context fmt = function
 let get_compatible_expr = function
   | { set = Any } -> None
   | { set = expr } -> Some expr
+
+let project_set (projs : Term.projs) (c : context) : context =
+  { c with set = project projs c.set }

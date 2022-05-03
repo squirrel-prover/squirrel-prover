@@ -85,7 +85,7 @@
 %start interactive
 %start top_proofmode
 %type <Decl.declarations> declarations
-%type <Theory.formula> top_formula
+%type <Theory.term> top_formula
 %type <Process.process> top_process
 %type <Prover.parsed_input> interactive
 %type <Prover.parsed_input> top_proofmode
@@ -396,6 +396,10 @@ lsymb_decl:
 | LPAREN s=loc(RIGHTINFIXSYMB) RPAREN { `Infix `Right, s }
 | LPAREN s=loc(LEFTINFIXSYMB)  RPAREN { `Infix `Left, s }
 
+%inline projs:
+|                                     { None }
+| LBRACE l=slist(lsymb, empty) RBRACE { Some l }
+
 declaration_i:
 | HASH e=lsymb a=index_arity ctys=c_tys
                           { Decl.Decl_hash (Some a, e, None, ctys) }
@@ -456,19 +460,21 @@ declaration_i:
 
 | CHANNEL e=lsymb         { Decl.Decl_channel e }
 
-| PROCESS e=lsymb args=opt_arg_list EQ p=process
-                          { Decl.Decl_process (e, args, p) }
+| PROCESS id=lsymb projs=projs args=opt_arg_list EQ proc=process
+                          { Decl.Decl_process {id; projs; args; proc} }
 
 |        AXIOM s=local_statement  { Decl.Decl_axiom s }
 |  LOCAL AXIOM s=local_statement  { Decl.Decl_axiom s }
 | GLOBAL AXIOM s=global_statement { Decl.Decl_axiom s }
 
-| SYSTEM p=process
+| SYSTEM sprojs=projs p=process
                           { Decl.(Decl_system { sname = None;
+                                                sprojs;
                                                 sprocess = p}) }
 
-| SYSTEM LBRACKET id=lsymb RBRACKET p=process
+| SYSTEM LBRACKET id=lsymb RBRACKET sprojs=projs p=process
                           { Decl.(Decl_system { sname = Some id;
+                                                sprojs;
                                                 sprocess = p}) }
 
 | SYSTEM id=lsymb EQ from_sys=system WITH RENAME gf=global_formula

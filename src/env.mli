@@ -1,3 +1,4 @@
+(*------------------------------------------------------------------*)
 type t = {
   table   : Symbols.table;      (** symbol table *)
   system  : SystemExpr.context; (** default systems *)
@@ -5,6 +6,7 @@ type t = {
   vars    : Vars.env;           (** free term variables *)
 }
 
+(*------------------------------------------------------------------*)
 val init : 
   table:Symbols.table ->
   ?system:SystemExpr.context ->
@@ -20,7 +22,11 @@ val update :
   t -> 
   t
 
+(*------------------------------------------------------------------*)
 val set_table   : t -> Symbols.table  -> t 
 val set_system  : t -> SystemExpr.context -> t
 val set_ty_vars : t -> Type.tvar list -> t 
 val set_vars    : t -> Vars.env       -> t 
+
+(*------------------------------------------------------------------*)
+val projs_set : Term.projs -> t -> t

@@ -46,6 +46,7 @@ type bty_decl = {
 (** Information for a system declaration *)
 type system_decl = {
   sname    : Theory.lsymb option;
+  sprojs   : lsymb list option;
   sprocess : Process.process;
 }
 
@@ -81,12 +82,21 @@ type operator_decl = {
 }
 
 (*------------------------------------------------------------------*)
+(** Processus declaration *)
+type proc_decl = {
+  id    : lsymb;
+  projs : lsymb list option;
+  args  : Theory.bnds;
+  proc  : Process.process;
+}
+
+(*------------------------------------------------------------------*)
 (** Additional oracle tagging information
     Allows to define the tag formula corresponding to some function.
     Defining a function with such a tag, is equivalent to giving to the
     attacker a backdoor, allowing to compute the ouput of the function on
     all messages that satisfy the tag. *)
-type orcl_tag_info = Theory.formula
+type orcl_tag_info = Theory.term
 
 val pp_orcl_tag_info : Format.formatter -> orcl_tag_info -> unit
 
@@ -95,7 +105,7 @@ val pp_orcl_tag_info : Format.formatter -> orcl_tag_info -> unit
 
 type declaration_i =
   | Decl_channel of lsymb
-  | Decl_process of lsymb * Theory.bnds * Process.process
+  | Decl_process of proc_decl
   | Decl_axiom   of Goal.Parsed.t
   | Decl_system  of system_decl
   | Decl_system_modifier  of system_modifier

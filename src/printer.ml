@@ -246,23 +246,23 @@ let pp_pref (ty : pp) =
   | `Goal    -> pr "@[[goal> "
   | `Default -> ()
 
-let pp_suf (ty : pp) =
+let pp_suf fmt (ty : pp) =
   match ty with
-  | `Prompt  -> pr "@;@]@."
-  | `Start   -> pr "@;<]@]@."
-  | `Result  -> pr "@;@]@."
-  | `Error   -> pr "@;@]@."
-  | `Dbg     -> pr "@;<]@]@."
-  | `Warning -> pr "@;<]@]@."
+  | `Prompt  -> Fmt.pf fmt "@;@]@."
+  | `Start   -> Fmt.pf fmt "@;<]@]@."
+  | `Result  -> Fmt.pf fmt "@;@]@."
+  | `Error   -> Fmt.pf fmt "@;@]@."
+  | `Dbg     -> Fmt.pf fmt "@;<]@]@."
+  | `Warning -> Fmt.pf fmt "@;<]@]@."
   | `Ignore  -> ()
-  | `Goal    -> pr "@;@]@."
+  | `Goal    -> Fmt.pf fmt "@;@]@."
   | `Default -> ()
 
 let prt ty fmt = 
   let out = match ty with
     | `Ignore -> dummy_fmt
     | _ -> get_std () in
-    pp_pref ty; Fmt.kpf (fun fmt -> pp_suf ty) out fmt
+    pp_pref ty; Fmt.kpf (fun fmt -> pp_suf fmt ty) out fmt
 
 let pr fmt = prt `Default fmt
 

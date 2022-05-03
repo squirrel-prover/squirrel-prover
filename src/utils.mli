@@ -28,6 +28,9 @@ module List : sig
   val remove_duplicate : ('a -> 'a -> bool) -> 'a list -> 'a list
 
   val inclusion : 'a list -> 'a list -> bool
+
+  (** [diff a b] is [a] minus [b]'s elements  *)
+  val diff : 'a list -> 'a list -> 'a list
  
   (** [take n l] returns up to the [n] first elements from list [l], if available. *)
   val take : int -> 'a list -> 'a list

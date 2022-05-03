@@ -110,7 +110,7 @@ Qed.
 (** Same as before, but more precise wrt i, for the left process.
     There has to remain an existential quantification on t,
     because it is not involved in the condition. *)
-goal [left] wa_R1_left (i,r:index):
+goal [default/left] wa_R1_left (i,r:index):
   xor(id(i),snd(input@R1(r))) =
   H(<tag0,<nr(r),fst(input@R1(r))>>,key(i))
   <=>
@@ -130,7 +130,7 @@ Proof.
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
-goal [right] wa_R1_right (i,t,r:index):
+goal [default/right] wa_R1_right (i,t,r:index):
   xor(id'(i,t),snd(input@R1(r))) =
   H(<tag0,<nr(r),fst(input@R1(r))>>,key'(i,t))
   <=>

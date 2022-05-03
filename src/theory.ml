@@ -1,6 +1,7 @@
 open Utils
 open Env
 
+module SE = SystemExpr
 module L = Location
 
 type lsymb = string L.located
@@ -60,8 +61,6 @@ type term_i =
   | Exists  of bnds * term
 
 and term = term_i L.located
-
-type formula = term
 
 (*------------------------------------------------------------------*)
 let equal_p_ty t t' = match L.unloc t, L.unloc t' with
@@ -251,7 +250,7 @@ type global_formula = global_formula_i Location.located
 
 and global_formula_i =
   | PEquiv  of equiv
-  | PReach  of formula
+  | PReach  of term
   | PImpl   of global_formula * global_formula
   | PAnd    of global_formula * global_formula
   | POr     of global_formula * global_formula
@@ -269,7 +268,6 @@ type conversion_error_i =
   | Type_error           of term_i * Type.ty
   | Timestamp_expected   of term_i
   | Timestamp_unexpected of term_i
-  (* | Untypable_equality   of term_i *)
   | Unsupported_ord      of term_i
   | String_expected      of term_i (* TODO: move *)
   | Int_expected         of term_i (* TODO: move *)
@@ -283,8 +281,9 @@ type conversion_error_i =
   | BadInfixDecl
   | PatNotAllowed
   | ExplicitTSInProc
-  | UndefInSystem        of SystemExpr.t
+  | UndefInSystem        of SE.t
   | MissingSystem
+  | BadProjInSubterm     of Term.projs * Term.projs
 
 type conversion_error = L.t * conversion_error_i
 
@@ -365,11 +364,18 @@ let pp_error_i ppf = function
 
   | UndefInSystem t ->
     Fmt.pf ppf "action not defined in system @[%a@]"
-      SystemExpr.pp t
+      SE.pp t
 
   | MissingSystem ->
     Fmt.pf ppf "missing system annotation"
 
+  | BadProjInSubterm (ps1, ps2) ->
+    Fmt.pf ppf "@[<v 2>invalid projection:@;missing projections: %a@;\
+                unknown projections: %a@]"
+      Term.pp_projs ps1
+      Term.pp_projs ps2
+
+      
 let pp_error pp_loc_err ppf (loc,e) =
   Fmt.pf ppf "%a%a"
     pp_loc_err loc
@@ -472,8 +478,8 @@ let check_action (env : Env.t) (s : lsymb) (n : int) : unit =
   if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity));
 
   try
-    let system = SystemExpr.to_compatible env.system.set in
-    ignore (SystemExpr.action_to_term env.table system action)
+    let system = SE.to_compatible env.system.set in
+    ignore (SE.action_to_term env.table system action)
   with _ -> conv_err (L.loc s) (UndefInSystem env.system.set)
 
 
@@ -652,12 +658,12 @@ let subst t (s : (string * term_i) list) =
 (** {2 Conversion contexts and states} *)
 
 (** Conversion contexts.
-  * - [InGoal]: we are converting a term in a goal (or tactic). All
-  *   timestamps must be explicitely given.
-  * - [InProc ts]: we are converting a term in a process at an implicit
-  *   timestamp [ts]. *)
+    - [InGoal]: converting a term in a goal (or tactic). All
+      timestamps must be explicitely given.
+    - [InProc (projs, ts)]: converting a term in a process at an implicit
+      timestamp [ts], with projections [projs]. *)
 type conv_cntxt =
-  | InProc of Term.term
+  | InProc of Term.projs * Term.term
   | InGoal
 
 let is_in_proc = function InProc _ -> true | InGoal -> false
@@ -704,6 +710,32 @@ let check_ty_leq state ~of_t (t_ty : Type.ty) (ty : Type.ty) : unit =
 
 let check_term_ty state ~of_t (t : Term.term) (ty : Type.ty) : unit =
   check_ty_leq state ~of_t (Term.ty ~ty_env:state.ty_env t) ty
+
+(*------------------------------------------------------------------*)
+(** {2 System projections} *)
+
+let check_system_projs loc (state : conv_state) (projs : Term.projs) : unit =
+  let current_projs =
+    match state.cntxt with
+    | InProc (ps, _) -> ps
+    | InGoal ->
+      if not (SE.is_fset state.env.system.set) then
+        conv_err loc MissingSystem;
+
+      let fset = SE.to_fset state.env.system.set in
+      SE.to_projs fset
+  in
+
+  let diff1 = List.diff current_projs projs
+  and diff2 = List.diff projs current_projs in
+
+  if diff1 <> [] || diff2 <> [] then
+    conv_err loc (BadProjInSubterm (diff1, diff2))
+
+let proj_state (projs : Term.projs) (state : conv_state) : conv_state =
+  match state.cntxt with 
+  | InProc (ps, ts) -> { state with cntxt = InProc ([Term.left_proj], ts) }
+  | InGoal -> { state with env = projs_set [Term.left_proj ] state.env }
 
 (*------------------------------------------------------------------*)
 (** {2 Conversion} *)
@@ -818,8 +850,8 @@ and convert0
     (* otherwise build the application and convert it. *)
     else
       let app_cntxt = match state.cntxt with
-        | InGoal -> NoTS |
-          InProc ts -> MaybeAt ts in
+        | InGoal -> NoTS
+        | InProc (_, ts) -> MaybeAt ts in
 
       conv_app state app_cntxt
         (tm, make_app loc state.env.table app_cntxt f terms)
@@ -834,7 +866,13 @@ and convert0
       ty
 
   | Diff (l,r) ->
-    Term.mk_diff [Term.left_proj,conv ty l; Term.right_proj,conv ty r]
+    check_system_projs loc state [Term.left_proj; Term.right_proj];
+    
+    let statel = proj_state [Term.left_proj ] state in
+    let stater = proj_state [Term.right_proj] state in
+    
+    Term.mk_diff [Term.left_proj , convert statel l ty;
+                  Term.right_proj, convert stater r ty; ]
 
   | Find (vs,c,t,e) ->
     let env, is =
@@ -1178,13 +1216,14 @@ let convert_ht
 let check
     (env : Env.t) ?(local=false) ?(pat=false) 
     (ty_env : Type.Infer.env)
-    t (s : Type.ty) 
+    (projs : Term.projs)
+    (t : term) (s : Type.ty) 
   : unit 
   =
   let dummy_var s =
     Term.mk_var (snd (Vars.make `Approx Vars.empty_env s "#dummy"))
   in
-  let cntxt = if local then InProc (dummy_var Type.Timestamp) else InGoal in
+  let cntxt = if local then InProc (projs, (dummy_var Type.Timestamp)) else InGoal in
   
   let state = mk_state env cntxt pat ty_env in
   ignore (convert state t s)
@@ -1241,8 +1280,8 @@ let convert_global_formula (cenv : conv_env) (p : global_formula) =
 
     | PEquiv e ->
       begin match cenv.env.system with
-      | SystemExpr.{ pair = Some p } ->
-        let system = SystemExpr.{ set = (p:>SystemExpr.t) ; pair = None } in
+      | SE.{ pair = Some p } ->
+        let system = SE.{ set = (p :> SE.t) ; pair = None } in
         let env = Env.update ~system cenv.env in
         let cenv = { cenv with env } in
         Equiv.Atom (Equiv.Equiv (convert_equiv cenv e))
@@ -1291,7 +1330,7 @@ let declare_state
   let ts_init = Term.mk_action Symbols.init_action [] in
   
   let env = Env.init ~table () in
-  let conv_env = { env; cntxt = InProc ts_init; } in
+  let conv_env = { env; cntxt = InProc ([], ts_init); } in
 
   let env, indices = convert_p_bnds env typed_args in
   let conv_env = { conv_env with env } in
@@ -1414,10 +1453,10 @@ let () =
       let t_i = App (mk "e", [mk (App (mk "h", [x;y]));x;y]) in
       let t = mk t_i in
       let ty_env = Type.Infer.mk_env () in
-      check env ty_env t Type.tmessage ;
+      check env ty_env [] t Type.tmessage ;
       Alcotest.check_raises
         "message is not a boolean"
         (Conv (L._dummy, Type_error (t_i, Type.tboolean)))
-        (fun () -> check env ty_env t Type.tboolean)
+        (fun () -> check env ty_env [] t Type.tboolean)
     end
   ]

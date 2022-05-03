@@ -172,18 +172,19 @@ Proof.
       `exec@pred(Pchall3(i)) && cond@Pchall3(i)` is equivalent to `False`, relying
       on the previous property `P_charac`. **)
       expand frame, exec, output.
-      equivalent exec@pred(Pchall3(i)) && cond@Pchall3(i), False.
-      {split => //.
-       intro [Hexec Hcond].
-       expand cond.
-       depends Pchall1(i), Pchall3(i) => //.
-       intro Ord.
-       executable pred(Pchall3(i)) => //. 
-       intro Hexec'.
-       use Hexec' with Pchall1(i) as Hexec1 => //.
-       expand exec.
-       use P_charac with i as [j0 Hyp] => //.
-       by use Hcond with j0.}
+      equivalent exec@pred(Pchall3(i)) && cond@Pchall3(i), False. {
+        split => //.
+        intro [Hexec Hcond].
+        expand cond.
+        depends Pchall1(i), Pchall3(i) => //.
+        intro Ord.
+        executable pred(Pchall3(i)) => //. 
+        intro Hexec'.
+        use Hexec' with Pchall1(i) as Hexec1 => //.
+        expand exec.
+        use P_charac with i as [j0 Hyp] => //.
+        by use Hcond with j0.
+      }
 
       fa 5. fa 6.
       (** It now remains to simplify `if false then diff(ok,ko)`. **)

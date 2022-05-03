@@ -1,5 +1,4 @@
-(** Module instantiating parsing from buffers.
- *)
+(** Module instantiating parsing from buffers. *)
 
 let () = Printexc.record_backtrace true
 
@@ -114,8 +113,9 @@ let parse parser parser_name string =
 
 let parse_process (env : Env.t) ?(typecheck=false) str =
   let p = parse Parser.top_process "process" str in
-    if typecheck then Process.check_proc env p ;
-    p
+  let projs = [ Term.left_proj; Term.right_proj; ] in
+  if typecheck then Process.check_proc env projs p ;
+  p
 
 let parse_formula = parse Parser.top_formula "formula"
 

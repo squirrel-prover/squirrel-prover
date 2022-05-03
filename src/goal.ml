@@ -93,7 +93,7 @@ let to_equiv_statement ?loc stmt =
 module Parsed = struct
 
   type contents =
-  | Local     of Theory.formula
+  | Local     of Theory.term
   | Global    of Theory.global_formula
   | Obs_equiv   (** All the information is in the system expression. *)
 
@@ -113,34 +113,35 @@ end
 let make_obs_equiv ?(enrich=[]) table hint_db system =
   let vars,ts = Vars.make `Approx Vars.empty_env Type.Timestamp "t" in
   let term = Term.mk_macro Term.frame_macro [] (Term.mk_var ts) in
+
   let goal = Equiv.(Atom (Equiv (term :: enrich))) in
+  
   let happens = Term.mk_happens (Term.mk_var ts) in
   let hyp = Equiv.(Atom (Reach happens)) in
+  
   let env = Env.init ~system ~table ~vars () in
+  
   let s = ES.init ~env ~hint_db ~hyp goal in
-  `Equiv
-    (Equiv.mk_forall [ts] (Equiv.(Impl (hyp,goal)))),
+  
+  `Equiv (Equiv.mk_forall [ts] (Equiv.(Impl (hyp,goal)))),
   Equiv s
 
 
 let make table hint_db parsed_goal : statement * t =
 
-  let Parsed.{name;system;ty_vars;vars;formula} = parsed_goal in
+  let Parsed.{name; system; ty_vars; vars; formula} = parsed_goal in
 
-  let name = match name with
-    | Some n -> L.unloc n
-    | None -> assert false
-  in
+  let name = L.unloc (oget name) in
 
   let system =
     match formula with
       | Local _ ->
           let system = SE.parse table system in
-          SE.{set=system;pair=None}
+          SE.{set = system; pair = None}
       | _ ->
           let set = SE.parse table system in
           let pair = Some (SE.to_pair set) in
-          SE.{set;pair}
+          SE.{set; pair}
   in
   let ty_vars = List.map (fun ls -> Type.mk_tvar (L.unloc ls)) ty_vars in
   let env = Env.init ~system ~ty_vars ~table () in

@@ -8,32 +8,35 @@ default: squirrel
 
 all: squirrel test
 
-test: alcotest okfail_test
+test: alcotest okfail example
 
-.PHONY: okfail_test okfail_test_end examples_end alcotest squirrel
+.PHONY: okfail okfail_end example examples_end alcotest squirrel
 
 # Directory for logging test runs on "*.sp" files.
 RUNLOGDIR=_build/squirrel_log
 
-# Make sure the "echo" commands in okfail_test below are updated
+# Make sure the "echo" commands in okfail below are updated
 # to reflect the content of these variables.
 PROVER_TESTS = $(wildcard tests/ok/*.sp) $(wildcard tests/fail/*.sp)
 PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $(wildcard examples/stateful/*.sp)  $(wildcard examples/postQuantumKE/*.sp)
 
-okfail_test: squirrel
+okfail: squirrel
 	rm -rf $(RUNLOGDIR)
 	@$(ECHO) "Running tests/ok/*.sp and tests/fail/*.sp."
-	@$(MAKE) -j8 okfail_test_end
-	@$(ECHO) "Running examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
-	@$(MAKE) -j4 examples_end
+	@$(MAKE) -j8 okfail_end
 
 # Run PROVER_TESTS as a dependency, then check for errors.
-okfail_test_end: $(PROVER_TESTS:.sp=.ok)
+okfail_end: $(PROVER_TESTS:.sp=.ok)
 	@$(ECHO)
 	@if test -f tests/tests.ko ; then \
 	  $(ECHO) Some tests failed: ; \
 	  cat tests/tests.ko | sort ; rm -f tests/tests.ko ; exit 1 ; \
 	 else $(ECHO) All tests passed successfully. ; fi
+
+example: squirrel
+	rm -rf `$(RUNLOGDIR)/examples`
+	@$(ECHO) "Running examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
+	@$(MAKE) -j4 examples_end
 
 # Run PROVER_EXAMPLES as a dependency, then check for errors.
 examples_end: $(PROVER_EXAMPLES:.sp=.ok)

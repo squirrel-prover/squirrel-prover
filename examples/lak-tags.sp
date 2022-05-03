@@ -103,7 +103,7 @@ Qed.
     lemmas are almost identical, but their statements differ in the treatment
     of index k, and they deal with distinct systems. *)
 
-goal [left] wa_R1_left (i,k:index):
+goal [default/left] wa_R1_left (i,k:index):
   happens(R1(k)) =>
   (snd(input@R1(k)) = h(<<nR(k),fst(input@R1(k))>,tag1>,key(i)))
   =
@@ -126,7 +126,7 @@ Proof.
   by depends R(k),R2(k).
 Qed.
 
-goal [right] wa_R1_right (i,j,k:index):
+goal [default/right] wa_R1_right (i,j,k:index):
   happens(R1(k)) =>
   (snd(input@R1(k)) = h(<<nR(k),fst(input@R1(k))>,tag1>,key'(i,j)))
   =

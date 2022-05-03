@@ -154,6 +154,9 @@ val of_system : Symbols.table -> System.t -> fset
     Fails if expression does not correspond to a finite set. *)
 val to_list : <fset:unit;..> expr -> (Term.proj * System.Single.t) list
 
+(** Same as [to_list], but only returns the list of projections *)
+val to_projs : <fset:unit;..> expr -> Term.projs
+
 (** Project a system according to the given projections. *)
 val project     : Term.projs        -> 'a expr -> 'a expr
 val project_opt : Term.projs option -> 'a expr -> 'a expr
@@ -229,3 +232,5 @@ val pp_context : Format.formatter -> context -> unit
 (** Get an expression with which all systems of a context are compatible.
     Return [None] if context is not [context_any]. *)
 val get_compatible_expr : context -> compatible option
+
+val project_set : Term.projs -> context -> context

@@ -887,6 +887,12 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
       (sp, ty)
     ) ctys
 
+let parse_projs (p_projs : lsymb list option) : Term.projs =
+  omap_dflt
+    [Term.left_proj; Term.right_proj]
+    (List.map (Term.proj_from_string -| L.unloc))
+    p_projs
+
 (*------------------------------------------------------------------*)
 (** {2 Declaration processing}
   *
@@ -898,13 +904,15 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
 let declare table hint_db decl = match L.unloc decl with
   | Decl.Decl_channel s -> Channel.declare table s
 
-  | Decl.Decl_process (id,pkind,p) ->
+  | Decl.Decl_process { id; projs; args; proc} ->
     let env = Env.init ~table () in
-    let pkind = List.map (fun (x,t) ->
-        let t = Theory.parse_p_ty env t in
-        L.unloc x, t
-      ) pkind in
-    Process.declare table id pkind p
+    let args = List.map (fun (x,t) ->
+        L.unloc x, Theory.parse_p_ty env t
+      ) args
+    in
+    let projs = parse_projs projs in
+    
+    Process.declare table id args projs proc
 
   | Decl.Decl_axiom parsed_goal ->
     let parsed_goal =
@@ -918,7 +926,8 @@ let declare table hint_db decl = match L.unloc decl with
     table
 
   | Decl.Decl_system sdecl ->
-    Process.declare_system table sdecl.sname sdecl.sprocess
+    let projs = parse_projs sdecl.sprojs in
+    Process.declare_system table sdecl.sname projs sdecl.sprocess
 
   | Decl.Decl_system_modifier sdecl ->
     let new_lemma, table = 

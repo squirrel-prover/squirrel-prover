@@ -61,8 +61,11 @@ module List = struct
       let (rx, ry, rz) = split3 l in (x::rx, y::ry, z::rz)
 
   let inclusion a b =
-    List.for_all (fun x -> List.mem x b)  a
+    List.for_all (fun x -> List.mem x b) a
 
+  let diff a b =
+    List.filter (fun x -> not (List.mem x b)) a
+                            
   let rec assoc_up s f = function
     | [] -> raise Not_found
     | (a,b) :: t ->

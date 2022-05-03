@@ -52,7 +52,7 @@ val to_equiv_statement : ?loc:Location.t -> statement -> equiv_statement
 module Parsed : sig
 
   type contents =
-  | Local     of Theory.formula
+  | Local     of Theory.term
   | Global    of Theory.global_formula
   | Obs_equiv   (** All the information is in the system expression. *)
 

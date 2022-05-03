@@ -36,6 +36,7 @@ type bty_decl = {
 (*------------------------------------------------------------------*)
 type system_decl = {
   sname    : Theory.lsymb option;
+  sprojs   : lsymb list option;
   sprocess : Process.process;
 }
 
@@ -71,14 +72,22 @@ type operator_decl = {
 }
 
 (*------------------------------------------------------------------*)
-type orcl_tag_info = Theory.formula
+type proc_decl = {
+  id    : lsymb;
+  projs : lsymb list option;
+  args  : Theory.bnds;
+  proc  : Process.process;
+}
+
+(*------------------------------------------------------------------*)
+type orcl_tag_info = Theory.term
 
 let pp_orcl_tag_info = Theory.pp
 
 (*------------------------------------------------------------------*)
 type declaration_i =
   | Decl_channel of lsymb
-  | Decl_process of lsymb * Theory.bnds * Process.process
+  | Decl_process of proc_decl
   | Decl_axiom   of Goal.Parsed.t
   | Decl_system  of system_decl
   | Decl_system_modifier  of system_modifier
