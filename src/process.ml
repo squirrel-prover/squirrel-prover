@@ -356,9 +356,7 @@ type p_env = {
   (* substitution for index variables (Repl, Exists, Apply)
    * mapping each variable from the original process (before refresh)
    * to the associated refreshed variables
-   * as Theory.term and as a Vars.var suitable for use in Term.term
-   * TODO items are always of the form (i, Theory.Var (Vars.name i'), i')
-   *      why not keep (i,i') for simplicity? *)
+   * as Theory.term and as a Vars.var suitable for use in Term.term *)
 
   msubst : (string * Theory.term_i * Term.term) list ;
   (* substitution for message variables (New, Let, In, Apply)

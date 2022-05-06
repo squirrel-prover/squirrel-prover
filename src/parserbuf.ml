@@ -136,10 +136,6 @@ let () =
       check "False"
     end ;
     "Boolean connectives", `Quick, begin fun () ->
-      (* TODO improve without parentheses:
-       * the pretty-printer should ideally be aware of precedences
-       * between connectives (and quantifiers) and only insert parentheses
-       * and boxes when precedences require it  *)
       check "not(True)" ;
       check "(True => False)" ;
       check "(True || False)" ;

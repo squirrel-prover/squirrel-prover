@@ -201,23 +201,6 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
 let case_tac args = wrap_fail (do_case_tac args)
 
 (*------------------------------------------------------------------*)
-(* TODO: remove, as it is subsumed by the tactic `assumption` ? *)
-let false_left s =
-  if Hyps.exists (fun _ f -> Term.is_false f) s
-  then []
-  else Tactics.(soft_failure (Failure "no False assumption"))
-
-let () =
-  T.register "false_left"
-     ~tactic_help:{general_help = "Closes a goal when False is among its assumptions.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                   tactic_group = Logical}
-    ~pq_sound:true
-    (LowTactics.genfun_of_pure_tfun false_left)
-
-
-(*------------------------------------------------------------------*)
 
 let rec simpl_left s =
   let func _ f = match f with
@@ -253,16 +236,6 @@ let rec simpl_left s =
 let simpl_left_tac s = match simpl_left s with
   | None -> []
   | Some s -> [s]
-
-let () =
-  T.register "simpl_left"
-    ~tactic_help:{general_help = "Introduce all conjunctions, existentials and \
-                                  false hypotheses.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
-    ~pq_sound:true
-    (LowTactics.genfun_of_pure_tfun simpl_left_tac)
 
 (*------------------------------------------------------------------*)
 (** [assumption judge sk fk] proves the sequent using the axiom rule. *)

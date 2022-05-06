@@ -346,8 +346,7 @@ module AST :
       | [] -> Tactics.andthen tac (Lazy.force autosimpl)
       | _ -> assert false
 
-  (* a printer for tactics that follows a specific syntax.
-     TODO: tactics with "as" for intro pattern are not printed correctly.*)
+  (* a printer for tactics that follows a specific syntax. *)
   let pp_abstract ~pp_args s args ppf =
     (* match s,args with
      *   | "use", TacticsArgs.String_name id :: l ->

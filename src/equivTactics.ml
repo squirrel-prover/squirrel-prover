@@ -1119,44 +1119,6 @@ let () =
    (LowTactics.genfun_of_efun_arg ifcond) Args.(Pair (Int, Pair( Opt Int, Boolean)))
 
 
-(*------------------------------------------------------------------*)
-(* TODO: should be a rewriting rule *)
-let trivial_if (Args.Int i) (s : ES.sequent) =
-  let cntxt = ES.mk_trace_cntxt s in
-
-  let before, elem, after = split_equiv_goal i s in
-
-  (* search for the first occurrence of an if-then-else in [elem] *)
-  match get_ite ~cntxt elem with
-  | None ->
-    soft_failure
-      (Tactics.Failure
-         "can only be applied on a term with at least one occurrence \
-          of an if then else term")
-  | Some (c,t,e) ->
-    let trace_seq =
-      ES.(to_trace_sequent
-           (set_reach_goal (Term.mk_atom `Eq t e) s))
-    in
-    let trace_goal  = Goal.Trace trace_seq in
-
-    let new_elem =
-      Equiv.subst_equiv
-        [Term.ESubst (Term.mk_ite c t e,t)]
-        [elem]
-    in
-    let biframe = List.rev_append before (new_elem @ after) in
-    [ trace_goal;
-      Goal.Equiv (ES.set_equiv_goal biframe s) ]
-
-let () =
- T.register_typed "trivialif"
-   ~general_help:"Simplify a conditional when the two branches are equal."
-   ~detailed_help:""
-   ~tactic_group:Structural
-   ~pq_sound:true
-   (LowTactics.genfun_of_efun_arg trivial_if) Args.Int
-
 
 (*------------------------------------------------------------------*)
 (* TODO: should be a rewriting rule *)

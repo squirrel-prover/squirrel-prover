@@ -60,7 +60,7 @@ Proof.
     by auto.
 
   + (* t = T(i0,j) *)
-    intro Texists; simpl_left.
+    intro [i0 j Ceq]. 
     assert (i=i0 || i<>i0) as H0 => //.
     case H0.
       - (* i=i0 *)

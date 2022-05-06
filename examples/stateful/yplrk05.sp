@@ -98,7 +98,7 @@ Proof.
   generalize i j.
   induction t => t IH0 i j Hap [H1 H2].
   case t => He;
-  try by (simpl_left; expand kT(i)@t; apply IH0).
+  try by (repeat destruct He as [_ He]; expand kT(i)@t; apply IH0).
 
   auto.
 

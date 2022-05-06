@@ -179,8 +179,6 @@ let update ?table ?ty_vars ?vars ?hyps ?goal t =
   and goal = Utils.odflt t.goal goal in
   { t with env; hyps; goal; } 
 
-(* TODO: several of those are unused values *)
-
 let env j = j.env
 
 let set_env env s = { s with env }

@@ -36,7 +36,7 @@ type name = Symbols.name
 type nsymb = name isymb
 
 type fname = Symbols.fname
-type fsymb = fname * Vars.var list (* TODO: use isymb *)
+type fsymb = fname * Vars.var list
 
 type mname = Symbols.macro
 type msymb = mname isymb
@@ -1303,8 +1303,7 @@ let refresh_vars_env env vs =
 
 (*------------------------------------------------------------------*)
 
-(** Does not recurse.
-    Applies to arguments of index atoms (see atom_map). TODO update doc? *)
+(** Does not recurse. *)
 let tmap (func : term -> term) (t : term) : term =
   match t with
   | Action _ -> t

@@ -1361,8 +1361,6 @@ let get_init_states table : (Term.state * Term.term) list =
       | _ -> acc
     ) [] table
 
-(* TODO could be generalized into a generic fold function
- * fold : (term -> 'a -> 'a) -> term -> 'a -> 'a *)
 let find_app_terms t (names : string list) =
   let rec aux (name : string) acc t = match L.unloc t with
     | App (x',l) ->
@@ -1376,7 +1374,6 @@ let find_app_terms t (names : string list) =
     | Exists (_,t')
     | ForAll (_,t') -> aux name acc t'
 
-    (* FIXME: I think some cases may be missing *)
     | _                 -> acc
 
   and aux_list name acc l =

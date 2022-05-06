@@ -971,7 +971,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
     (* Only destruct the top-most connective *)
     let handlers, s = do_and_pat hid 2 s in
     [List.fold_left (fun s handler ->
-         (* TODO: location errors *)
          do_naming_pat handler Args.AnyName s
        ) s handlers]
 

@@ -87,18 +87,15 @@ val add_option : option_def -> unit
 (** {2 Tactics syntax trees} *)
 (** Prover tactics, and tables for storing them. *)
 
-(* TODO module AST : Tactics.AST_sig
-   with type arg = tac_arg and type judgment = Sequent.t *)
-
 
 (* Define formats of help informations for tactics *)
 type tactic_groups =
-  | Logical   (* A logic tactic is a tactic that relies on the sequence calculus
-                 logical properties. *)
-  | Structural (* A structural tactic relies on properties inherent to protocol,
-                  on equality between messages, behaviour of if _ then _ else _,
-                  action dependencies... *)
-  | Cryptographic (* Cryptographic assumptions rely on ... a cryptographic assumption ! *)
+  | Logical       (* A logic tactic is a tactic that relies on the sequence calculus
+                     logical properties. *)
+  | Structural    (* A structural tactic relies on properties inherent to protocol,
+                     on equality between messages, behaviour of ifthenelse,
+                     action dependencies... *)
+  | Cryptographic (* Cryptographic assumptions *)
 
 
 (* The record for a detailed help tactic. *)
