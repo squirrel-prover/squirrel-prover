@@ -179,7 +179,7 @@ system [main] out(cI,skex); ((!_j !_k R: Responder(j,k)) | (!_i !_j !_k I: Initi
 
 system mainCCAkR = [main/left] with gcca (il,jl,kl:index),  encap(kR(il,jl,kl), rR(il,jl,kl), pk(skI(il))).
 
-system mainCCAkI = [mainCCAkR/left] with gcca (il,jl,kl:index),  encap(kI(il,jl,kl), rI(il,jl,kl) ,pk(skR(jl))).
+system mainCCAkI = [mainCCAkR] with gcca (il,jl,kl:index),  encap(kI(il,jl,kl), rI(il,jl,kl) ,pk(skR(jl))).
 
 
 (* After two transitivity, kR and kI only occurs in key position. We make it explicit in the idealized version of the protocol *)
@@ -268,10 +268,10 @@ process InitiatorToCompromised2(i,j,k:index) =
 
 system [idealized] out(cI,skex); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised2(i,j,k))).
 
-axiom [mainCCAkI/left,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,pk(z)),z)=x.
+axiom [mainCCAkI,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,pk(z)),z)=x.
 
 (* We prove that the original game, after transitivity to mainCCAkI, is equivalent to idealized. *)
-equiv [mainCCAkI/left,idealized/left] test.
+equiv [mainCCAkI,idealized/left] test.
 Proof.
 
   diffeq => //.

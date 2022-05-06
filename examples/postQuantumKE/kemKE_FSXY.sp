@@ -448,7 +448,7 @@ Qed.
 
 system mainCCAkR = [main_rand/right] with gcca (il,jl,kl:index),  encap(kR(il,jl,kl), rR(il,jl,kl), pk(dkI(il))).
 
-system mainCCAkI = [mainCCAkR/right] with gcca (il,jl,kl:index),  encap(kI(il,jl,kl), rI(il,jl,kl) ,pk(dkR(jl))).
+system mainCCAkI = [mainCCAkR] with gcca (il,jl,kl:index),  encap(kI(il,jl,kl), rI(il,jl,kl) ,pk(dkR(jl))).
 
 
 (******* Strong secrecy  ******)
@@ -572,9 +572,9 @@ in
 
 system [idealized] out(cI,s); ((!_j !_k R: Responder3(j,k)) | (!_i !_j !_k I: Initiator3(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised3(i,j,k))).
 
-axiom [mainCCAkI/right,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,pk(z)),z)=x.
+axiom [mainCCAkI,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,pk(z)),z)=x.
 
-equiv [mainCCAkI/right,idealized/left] ideal.
+equiv [mainCCAkI,idealized/left] ideal.
 Proof.
   diffeq.
 

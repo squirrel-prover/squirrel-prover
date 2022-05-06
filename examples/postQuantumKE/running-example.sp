@@ -114,7 +114,7 @@ action Initiator1, the key stored in the state sIR@Initiator1 is
 indistinguishable from ikIR.  Remark that this holds even if the encryption
 received by the initiator is dishonnest, because the attacker cannot compute kI.
  *)
-global goal [mainCCAkR] resp_key: [happens(Initiator1)] -> equiv(frame@Initiator1, diff(sIR@Initiator1, ikIR)).
+global goal [mainCCAkR, mainCCAkR] resp_key: [happens(Initiator1)] -> equiv(frame@Initiator1, diff(sIR@Initiator1, ikIR)).
 Proof.
   intro Hap .
 

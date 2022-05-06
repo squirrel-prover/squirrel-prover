@@ -268,12 +268,11 @@ process InitiatorToCompromised2(i,j,k:index) =
 
 system [idealized]  out(cI,skex); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k)) | (!_i !_j !_k I: InitiatorToCompromised2(i,j,k))).
 
-axiom [mainCCAkR/left,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,epk(z)),z)=x.
+axiom [mainCCAkR,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,epk(z)),z)=x.
 
 (* We prove that the original game, after transitivity to mainCCAkI, is equivalent to idealized. *)
-equiv [mainCCAkR/left,idealized/left] test.
+equiv [mainCCAkR,idealized/left] test.
 Proof.
-
   diffeq => //.
     + intro *.
       case try find il,jl,kl such that _ in k(il,jl,kl) else _.
@@ -498,12 +497,12 @@ process InitiatorToCompromised3(i,j,k:index) =
 
 system [idealized3]  out(cI,skex); ((!_j !_k R: Responder3(j,k)) | (!_i !_j !_k I: Initiator3(i,j,k)) | (!_i !_j !_k I: InitiatorToCompromised3(i,j,k))).
 
-axiom [idealized3/left,idealized2/left] ifte (i,j,k:index): att(frame@pred(FI(i,j,k))) =  att(frame@pred(I1(i,j,k))).
+axiom [idealized3/left,idealized2] ifte (i,j,k:index): att(frame@pred(FI(i,j,k))) =  att(frame@pred(I1(i,j,k))).
 
-axiom [idealized3/left,idealized2/left] ifteD (i,j,k:index): att(frame@pred(DFI(i,j,k))) =  att(frame@pred(DI1(i,j,k))).
+axiom [idealized3/left,idealized2] ifteD (i,j,k:index): att(frame@pred(DFI(i,j,k))) =  att(frame@pred(DI1(i,j,k))).
 
 
-goal  [idealized3/left,idealized2/left] trans_eq (i,j,k:index):
+goal  [idealized3/left,idealized2] trans_eq (i,j,k:index):
 xor(try find il,jl,kl such that
       fst(snd(att(frame@pred(I1(i,j,k))))) =
       encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
@@ -593,7 +592,7 @@ Proof.
 Qed.
 
 
-goal  [idealized3/left,idealized2/left] trans_eqD (i,j,k:index):
+goal  [idealized3/left,idealized2] trans_eqD (i,j,k:index):
 xor(try find il,jl,kl such that
       (fst(snd(att(frame@pred(DI1(i,j,k))))) =
        encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))))
@@ -682,10 +681,10 @@ Proof.
 Qed.
 
 
-axiom [idealized3/left,idealized2/left]  fasign : forall (m1,m2,m3:message), m1=m2 => checksign(m1,m3) = checksign(m2,m3).
+axiom [idealized3/left,idealized2]  fasign : forall (m1,m2,m3:message), m1=m2 => checksign(m1,m3) = checksign(m2,m3).
 
 
-goal  [idealized3/left,idealized2/left] trans_eq2 (i,j,k:index):
+goal  [idealized3/left,idealized2] trans_eq2 (i,j,k:index):
 xor(try find il,jl,kl such that
       fst(snd(att(frame@pred(FI(i,j,k))))) =
       encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
@@ -786,7 +785,7 @@ Qed.
 
 
 
-goal  [idealized3/left,idealized2/left] trans_eq2D (i,j,k:index):
+goal  [idealized3/left,idealized2] trans_eq2D (i,j,k:index):
 xor(try find il,jl,kl such that
       (fst(snd(att(frame@pred(DFI(i,j,k))))) =
        encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))))
@@ -878,7 +877,7 @@ Proof.
 Qed.
 
 
-equiv [idealized3/left,idealized2/left] transitivity.
+equiv [idealized3/left,idealized2] transitivity.
 Proof.
   diffeq => //.
   + intro *.

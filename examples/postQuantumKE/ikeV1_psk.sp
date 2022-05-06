@@ -177,33 +177,29 @@ system [Ideal1] ((!_j R: ResponderI(j)) | (!_i I: InitiatorI(i))).
 
 (* We start with 3 global prf applications, renaming the prf name to the one we want after each application. *)
 system Main1 = [Main/left] with gprf (il,jl:index),  h(<Ni(il), Nr(jl) > ,psk(il,jl)).
-system Main2 = [Main1/left] with rename forall (i,j:index), equiv(diff(n_PRF(i,j), Ininr(i,j))).
+system Main2 = [Main1] with rename forall (i,j:index), equiv(diff(n_PRF(i,j), Ininr(i,j))).
 
 
-system Main3 = [Main2/left] with gprf (il,jl:index),  h(<Ni(il), fst(snd(input@I1(il,jl))) > ,psk(il,jl)).
-system Main4 = [Main3/left] with rename forall (i,j:index), equiv(diff(n_PRF1(i,j), IgarbI(i,j))).
+system Main3 = [Main2] with gprf (il,jl:index),  h(<Ni(il), fst(snd(input@I1(il,jl))) > ,psk(il,jl)).
+system Main4 = [Main3] with rename forall (i,j:index), equiv(diff(n_PRF1(i,j), IgarbI(i,j))).
 
-system Main5 = [Main4/left] with gprf (il,jl:index),  h(<fst(snd(input@R(jl,il))),Nr(jl) > ,psk(il,jl)).
-system Main6 = [Main5/left] with rename forall (i,j:index), equiv(diff(n_PRF2(i,j), IgarbR(i,j))).
+system Main5 = [Main4] with gprf (il,jl:index),  h(<fst(snd(input@R(jl,il))),Nr(jl) > ,psk(il,jl)).
+system Main6 = [Main5] with rename forall (i,j:index), equiv(diff(n_PRF2(i,j), IgarbR(i,j))).
 
 
-axiom  [Main6/left,Ideal1/right] tryfind : forall (i,j:index), pred(I1(i,j)) = pred(I2(i,j)).
+axiom  [Main6,Ideal1/right] tryfind : forall (i,j:index), pred(I1(i,j)) = pred(I2(i,j)).
 
-equiv [Main6/left,Ideal1/right] test.
+equiv [Main6,Ideal1/right] test.
 Proof.
 
   diffeq.
   (* From here, we need to prove that we indede get ideal keys everywhere. Mostly dumb manipulations of all the conditions introduced by the prf tactic, that are all contractory.
      *)
-    + intro *.
-      case  try find il0,jl0 such that
-          _
-         in IgarbI(il0,jl0)
-         else
-          _.
+    + intro *. 
+      case  try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
         ++ intro [il jl [_ ->]]. 
-           fa; auto.
-        ++ rewrite tryfind.
+           fa; auto. print goal tryfind.
+        ++ rewrite tryfind. 
            intro [Abs TFeq].
            use Abs with i,j; auto.
 

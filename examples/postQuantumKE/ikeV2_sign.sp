@@ -216,11 +216,11 @@ system [core]  out(cI, seedpubkey); ((!_k !_l R: ResponderRor(k,l)) | (!_i !_j I
 system core2 = [core/left] with gprf (il,jl,kl,ll:index),
  prfd(  hseed( < <Ni(il,jl),Nr(kl,ll)>,  exp(exp(g,xr(kl,ll)),xi(il,jl))>, seedpubkey  )(* SKEYSEED *), psk(ll,kl)).
 
-system core3 =  [core2/left] with rename forall (l,k,i,j:index), equiv(diff( n_PRF(l,k,j,i),  idealkeys(l,k,j,i))).
+system core3 = [core2] with rename forall (l,k,i,j:index), equiv(diff( n_PRF(l,k,j,i),  idealkeys(l,k,j,i))).
 
 
 
-goal [core3/left,core/right] authR (i,j:index):
+goal [core3,core/right] authR (i,j:index):
        happens(FR(i,j)) => exec@FR(i,j) =>
            exists (l:index), SI(j,l) < FR(i,j) &&
                       fst(input@R(i,j)) = exp(g,xi(j,l)) &&
@@ -240,7 +240,7 @@ Proof.
   by case H2; depends R(i,j),FR(i,j).
 Qed.
 
-goal [core3/left,core/right] authI (i,j:index):
+goal [core3,core/right] authI (i,j:index):
        happens(FI(i,j)) => exec@FI(i,j) =>
                       SR(j,i) < FI(i,j) &&
                       fst(input@SI(i,j)) = exp(g,xr(j,i)) &&
@@ -263,10 +263,10 @@ Proof.
 Qed.
 
 
-axiom [core3/left,core/right] ddhcommu (i,j,k,l:index):
+axiom [core3,core/right] ddhcommu (i,j,k,l:index):
  exp(exp(g,xi(i,j)),xr(k,l)) =  exp(exp(g,xr(k,l)),xi(i,j)) .
 
-equiv [core3/left,core/right] final.
+equiv [core3,core/right] final.
 Proof.
 
   diffeq.
