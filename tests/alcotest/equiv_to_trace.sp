@@ -8,4 +8,5 @@ global goal [default/right,default/left] _ (tau:timestamp) :
   [False].
 Proof.
   intro H.
+  project. 
   clear H.

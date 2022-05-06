@@ -1758,24 +1758,4 @@ let () =
       let t = diff (mk_and f g) (mk_and f' g') in
         assert (head_normal_biterm t = mk_and (diff f f') (diff g g'))
     end ;
-  ] ;
-  Checks.add_suite "Projection" [
-    "Simple example", `Quick, begin fun () ->
-      let a = mkvar "a" Type.Message in
-      let b = mkvar "b" Type.Message in
-      let c = mkvar "c" Type.Message in
-
-      let fty = Type.mk_ftype 0 [] [Type.Message;Type.Message] Type.Message in
-
-      let def = fty, Symbols.Abstract `Prefix in
-      let table,f =
-        Symbols.Function.declare_exact
-          Symbols.builtins_table (L.mk_loc L._dummy "f") def in
-      let fty = Type.mk_ftype 0 [] [] Type.Message in
-      let f x = Fun ((f,[]),fty,[x]) in
-      let t = diff (f (diff a b)) c in
-      let r = head_pi_term left_proj t in
-        assert (project1 left_proj t = f a) ;
-        assert (r = f (diff a b))
-    end ;
-  ]
+  ] 
