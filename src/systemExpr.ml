@@ -116,8 +116,9 @@ let project_opt (projs : Term.projs option) t =
 
   | _, None -> t
     
-let project  (projs : Term.projs) t = project_opt (Some projs) t
-  
+let project (projs : Term.projs) t = project_opt (Some projs) t
+
+(*------------------------------------------------------------------*)  
 let singleton s = List [Term.proj_from_string "",s]
 
 let of_system table s : t =
@@ -125,11 +126,13 @@ let of_system table s : t =
   List
     (List.map (fun proj -> proj, System.Single.make table s proj) projections)
 
+(*------------------------------------------------------------------*)
 let default_labels : int -> Term.proj list = function
   | 1 -> [Term.proj_from_string ""]
   | 2 -> [Term.left_proj;Term.right_proj]
   | n -> List.init n (fun i -> Term.proj_from_string (string_of_int (i+1)))
 
+(*------------------------------------------------------------------*)
 let of_list table ?labels (l:System.Single.t list) : t =
   (* Check for compatibility. *)
   let {System.Single.system=hd_system},tl = match l with

@@ -111,6 +111,8 @@ val tmap       : (term -> term) -> term -> term
 val titer      : (term -> unit) -> term -> unit
 val tfold      : (term -> 'a -> 'a) -> term -> 'a -> 'a
 val tmap_fold  : ('b -> term -> 'b * term) -> 'b -> term -> 'b * term
+val texists    : (term -> bool) -> term -> bool 
+val tforall    : (term -> bool) -> term -> bool 
 
 (*------------------------------------------------------------------*)
 (** {2 Literals} *)
@@ -490,8 +492,6 @@ val project : proj list -> term -> term
     will be [Diff(Macro(m,l,ts),Macro(m,l,ts'))] and not
     [Macro(m,l,Diff(ts,ts'))]. *)
 val head_normal_biterm : term -> term
-
-val make_bi_term : term -> term -> term
 
 val simple_bi_term : term -> term
 

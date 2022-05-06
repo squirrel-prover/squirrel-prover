@@ -107,7 +107,7 @@ Proof.
     skP, skS,
     seq(i:index ->g^a(i)),
     seq(j:index ->g^b(j)),
-    seq(i,j:index ->diff(g^a(i)^b(j),g^k(i,j))).
+    seq(i,j:index ->diff( g ^ a(i), g) ^ diff( b(j), k(i,j))).
 
   induction t; try (by expandall; apply IH).
 

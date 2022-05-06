@@ -2235,28 +2235,32 @@ class ddh_context ~(cntxt:Constr.trace_cntxt) ~gen ~exp exact a b c
      we may want to use functions from dh.ml written for cdh/gdh,
      that do this in a more general way *)
   method visit_message t =
-    match t with
-    (* any name n can occur as g^n *)
-    | Term.Fun (f, _, [g1; Name n]) when f = exp && g1 = gen -> ()
-
-    (* any names a b can occur as g^a^b *)
-    | Term.(Diff (Explicit
-                    [_,Fun (f1,_, [(Fun (f2,_, [g1; Name n1])); Name n2]);
-                     _,Term.Fun (f, _, [g3; Name n3])]))
+    match Term.project1 Term.left_proj t, 
+          Term.project1 Term.right_proj t with
+    (* left:  a b can occur as g^a^b 
+       right: c can occur as g^c *)
+    | Term.(Fun (f1,_, [(Fun (f2,_, [g1; Name n1])); Name n2])),
+      Term.(Fun (f, _, [g3; Name n3])) 
       when f1 = exp && f2 = exp && g1 = gen && g3 = gen && n3.s_symb = c &&
            ((n1.s_symb = a && n2.s_symb = b) ||
             (n1.s_symb = b && n2.s_symb = a)) -> ()
 
-    (* if a name a, b, c appear anywhere else, fail *)
-    | Term.Name n when List.mem n.s_symb [a; b; c] -> raise Not_context
+    | _ ->
+      match t with
+      (* any name n can occur as g^n *)
+      | Term.Fun (f, _, [g1; Name n]) when f = exp && g1 = gen -> ()
 
-    (* if a diff is not over a valid ddh diff, we fail  *)
-    | Term.Diff _ -> raise Not_context
+      (* if a name a, b, c appear anywhere else, fail *)
+      | Term.Name n when List.mem n.s_symb [a; b; c] -> raise Not_context
 
-    | _ -> super#visit_message t
+      (* if a diff is not over a valid ddh diff, we fail  *)
+      | Term.Diff _ -> raise Not_context
+
+      | _ -> super#visit_message t
 
 end
 
+(*------------------------------------------------------------------*)
 exception Macro_found
 
 class find_macros ~(cntxt:Constr.trace_cntxt) exact = object (self)
@@ -2271,8 +2275,8 @@ end
 
 
 (** If all the terms of a system can be seen as a context of the terms, where
-   all the names appearing inside the terms are only used inside those, returns
-   true. *)
+    all the names appearing inside the terms are only used inside those, returns
+    true. *)
 let is_ddh_context (cntxt : Constr.trace_cntxt) ~gen ~exp a b c elem_list =
   let a,b,c = Symbols.Name.of_lsymb a cntxt.table,
               Symbols.Name.of_lsymb b cntxt.table,
@@ -2299,11 +2303,13 @@ let is_ddh_context (cntxt : Constr.trace_cntxt) ~gen ~exp a b c elem_list =
     true
   with Not_context | Fresh.Name_found -> false
 
+(*------------------------------------------------------------------*)
 let is_ddh_gen tbl gen =
   match Symbols.Function.get_def gen tbl with
   | _, Symbols.DHgen l -> List.mem Symbols.DH_DDH l
   | _ -> false
 
+(*------------------------------------------------------------------*)
 let ddh (lgen : lsymb) (na : lsymb) (nb : lsymb) (nc : lsymb) s sk fk =
   let tbl = ES.table s in
   let gen_symb = Symbols.Function.of_lsymb lgen tbl in
@@ -2342,7 +2348,9 @@ let () = T.register_general "ddh"
                         uses the names in a correct way. Can be used \
                         in collaboration with some transitivity to \
                         obtain a system where ddh can be applied.";
-                  usages_sorts = [Sort (Pair (String, Pair (String, Pair( String, String))))];
+                  usages_sorts = [Sort (Pair (String, 
+                                              Pair (String, 
+                                                    Pair( String, String))))];
                   tactic_group = Cryptographic}
     (function
        | [Args.String_name gen;

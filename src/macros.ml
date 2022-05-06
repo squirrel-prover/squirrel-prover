@@ -178,7 +178,7 @@ let get_def_glob
   in
 
   let t = Term.subst subst (get_body system data) in
-  Term.simple_bi_term t
+  Term.simple_bi_term t 
 
 (*------------------------------------------------------------------*)
 (** Exported *)

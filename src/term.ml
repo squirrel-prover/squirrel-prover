@@ -820,8 +820,8 @@ and _pp
     Printer.kw `GoalAction ppf "%s%a" (Symbols.to_string symb) pp_indices indices
 
   | Diff (Explicit l) ->
-    Fmt.pf ppf "@[<hv 2>diff(@,%a)@]"
-      (Fmt.list ~sep:(fun fmt () -> Format.fprintf fmt ",")
+    Fmt.pf ppf "@[<hov 2>diff(@;%a)@]"
+      (Fmt.list ~sep:(fun fmt () -> Format.fprintf fmt ",@ ")
          (pp (diff_fixity, `NonAssoc)))
       (List.map snd l) (* TODO labels *)
 
@@ -1326,8 +1326,7 @@ let tmap (func : term -> term) (t : term) : term =
   | ForAll (vs, b) -> ForAll (vs, func b)
   | Exists (vs, b) -> Exists (vs, func b)
 
-let tmap_fold : ('b -> term -> 'b * term) -> 'b -> term -> 'b * term =
-  fun func b t ->
+let tmap_fold (func : 'b -> term -> 'b * term) (b : 'b) (t : term) : 'b * term =
   let bref = ref b in
   let g t =
     let b, t = func !bref t in
@@ -1341,13 +1340,17 @@ let titer (f : term -> unit) (t : term) : unit =
   let g e = f e; e in
   ignore (tmap g t)
 
-let tfold : (term -> 'b -> 'b) -> term -> 'b -> 'b =
-  fun f t v ->
+let tfold (f : term -> 'b -> 'b) (t : term) (v : 'b) : 'b =
   let vref : 'b ref = ref v in
   let fi e = vref := (f e !vref) in
   titer fi t;
   !vref
 
+let texists (f : term -> bool) (t : term) : bool =
+  tfold (fun t b -> f t || b) t false
+
+let tforall (f : term -> bool) (t : term) : bool =
+  tfold (fun t b -> f t || b) t false
 
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructors -- Part 2} *)
@@ -1647,7 +1650,7 @@ let diff a b =
     Diff (Explicit [left_proj,a; right_proj,b])
 
 let rec make_normal_biterm (dorec : bool) (t : term) : term = 
-  let mdiff : term -> term -> term = fun t t' ->
+  let mdiff (t : term) (t' : term) : term = 
     if dorec then make_normal_biterm dorec (diff t t')
     else diff t t'
   in
@@ -1673,20 +1676,18 @@ let rec make_normal_biterm (dorec : bool) (t : term) : term =
 
   | t1,t2 -> diff t1 t2
 
+let simple_bi_term     : term -> term = make_normal_biterm true
+let head_normal_biterm : term -> term = make_normal_biterm false 
+
+(*------------------------------------------------------------------*)
 let combine = function
   | [_,t] -> t
-  | ["left",l;"right",r] -> make_normal_biterm true (diff l r)
+  | ["left",_;"right",_] as l -> 
+    simple_bi_term (Diff (Explicit l))
+
   | _ -> assert false
 
-let head_normal_biterm : term -> term = fun t ->
-  make_normal_biterm false t
-
-let make_bi_term  : term -> term -> term = fun t1 t2 ->
-  head_normal_biterm (Diff (Explicit [left_proj,t1; right_proj,t2]))
-
-let simple_bi_term : term -> term = fun t ->
-  make_normal_biterm true t
-
+(*------------------------------------------------------------------*)
 let rec diff_names = function
   | Name _ -> true
   | Diff (Explicit l) -> List.for_all (fun (_,tm) -> diff_names tm) l

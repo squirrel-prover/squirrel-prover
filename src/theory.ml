@@ -714,6 +714,8 @@ let check_term_ty state ~of_t (t : Term.term) (ty : Type.ty) : unit =
 (*------------------------------------------------------------------*)
 (** {2 System projections} *)
 
+(** check that projection alive at a given subterm w.r.t. projections
+    used in a diff operator application. *)
 let check_system_projs loc (state : conv_state) (projs : Term.projs) : unit =
   let current_projs =
     match state.cntxt with
@@ -870,9 +872,9 @@ and convert0
     
     let statel = proj_state [Term.left_proj ] state in
     let stater = proj_state [Term.right_proj] state in
-    
+      
     Term.mk_diff [Term.left_proj , convert statel l ty;
-                  Term.right_proj, convert stater r ty; ]
+                  Term.right_proj, convert stater r ty; ] 
 
   | Find (vs,c,t,e) ->
     let env, is =

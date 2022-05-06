@@ -153,7 +153,7 @@ Proof.
     skP, skS,
     seq(i:index ->g^a(i)),
     seq(j:index ->g^b(j)),
-    seq(i,j:index ->diff(g^a(i)^b(j),g^k(i,j))).
+    seq(i,j:index ->diff( g ^ a(i), g) ^ diff( b(j), k(i,j))).
 
   (** We now apply the `induction` tactic, which generates several cases,
   one for each possible value that can be taken by the timestamp `t`.
@@ -166,7 +166,7 @@ Proof.
       We use here the DDH assumption. **)
       expandall.
       by ddh g,a,b,k.
-
+    
     + (** Case where `t = Pchall3(i)`.
       We will show that this case is not possible, by showing that the formula
       `exec@pred(Pchall3(i)) && cond@Pchall3(i)` is equivalent to `False`, relying

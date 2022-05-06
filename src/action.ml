@@ -341,10 +341,12 @@ let combine_descrs (descrs : (Term.proj * descr) list) : descr =
     updates =
       List.map
         (fun (st,_) ->
-           st, Term.combine (map (fun descr -> List.assoc st descr.updates)))
+           st,
+           Term.combine (map (fun descr -> List.assoc st descr.updates)))
         d1.updates;
     output =
-      fst d1.output, Term.combine (map (fun descr -> snd descr.output));
+      fst d1.output, 
+      Term.combine (map (fun descr -> snd descr.output));
     globals =
       List.sort_uniq Stdlib.compare
         (List.concat (List.map (fun (_,d) -> d.globals) descrs)) }
