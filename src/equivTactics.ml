@@ -1410,17 +1410,19 @@ let global_diff_eq (s : ES.t) =
                           | Term.Fun (fs, _, [tau]) when fs = Term.f_pred -> tau
                           | t -> t
                         ) pred_ts_list in
-        (* TODO It doesn't make sense anymore to project s1 and s2.
-                I don't know if we're missing something with the removal
-                of expand_all_macros.
+        (* XXX the expansions that come next are inefficient (and may become
+           in incorrect if we allow richer diff operators): s1 and s2 only make
+           sense in projected systems, so we should not expand macros wrt s in
+           them; anyway it is useless to do so if we project immediately
+           afterwards. *)
         let s1 = 
-          Term.project1 left_proj
+          Term.project1 p1
             (EquivLT.expand_all_macros ~force_happens:true s1 s) 
         in
         let s2 = 
-          Term.project1 right_proj
+          Term.project1 p2
             (EquivLT.expand_all_macros ~force_happens:true s2 s)
-        in *)
+        in
         Goal.Trace ES.(to_trace_sequent
                          (set_reach_goal
                             Term.(
