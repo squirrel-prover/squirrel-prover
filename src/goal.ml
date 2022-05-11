@@ -63,7 +63,7 @@ let pp_statement fmt (g : statement) : unit =
     if tyvs = [] then () 
     else Fmt.list ~sep:Fmt.sp Type.pp_tvar fmt tyvs
   in
-  Fmt.pf fmt "[%a] %s%a : %a"
+  Fmt.pf fmt "[%a] %s%a :@ %a"
     SE.pp_context g.system
     g.name
     pp_tyvars g.ty_vars

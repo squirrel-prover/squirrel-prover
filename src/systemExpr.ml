@@ -54,7 +54,7 @@ let is_fset : t -> bool = function List _ -> true | _ -> false
 (*------------------------------------------------------------------*)
 let pp fmt : 'a expr -> unit = function
   | Any -> Format.fprintf fmt "any"
-  | Any_compatible_with s -> Format.fprintf fmt "any(%a)" Symbols.pp s
+  | Any_compatible_with s -> Format.fprintf fmt "any/%a" Symbols.pp s
   | List l ->
       Fmt.list
         ~sep:Fmt.comma
@@ -336,8 +336,12 @@ let update ?set ?pair ctxt = match set,pair with
 let pp_context fmt = function
   | {set;pair=None} -> pp fmt set
   | {set;pair=Some p} ->
-      assert (set = p) ;
-      pp fmt p
+      if set = p then
+        Format.fprintf fmt "%a@ (same for equivalences)" pp set
+      else
+        Format.fprintf fmt "%a@ (@[<2>equivalences:@ %a@])" pp set pp p
+
+let pp_context fmt c = Format.fprintf fmt "@[%a@]" pp_context c
 
 let get_compatible_expr = function
   | { set = Any } -> None

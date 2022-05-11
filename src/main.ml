@@ -274,7 +274,7 @@ let do_print (state : main_state) (q : Prover.print_query) : main_state =
   | Prover.Pr_statement l -> 
     let g = Prover.get_assumption l in
     let k = oget (Prover.get_assumption_kind (L.unloc l)) in
-    Printer.prt `Default "%a %a" Prover.pp_kind k Goal.pp_statement g;
+    Printer.prt `Default "@[<2>%a %a@]" Prover.pp_kind k Goal.pp_statement g;
     state
 
   | Prover.Pr_system s_opt ->
