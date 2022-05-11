@@ -817,13 +817,6 @@ let () =
            try run ~test "tests/alcotest/pred.sp" with
            | Unfinished -> raise Ok)
     end ;
-    "ES.to_trace_sequent", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok
-        (fun () ->
-           try run ~test "tests/alcotest/equiv_to_trace.sp" with
-           | Tactic_soft_failure
-               (_, HypUnknown "H") -> raise Ok)
-    end;
     "DDH not PQ Sound", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
