@@ -82,7 +82,7 @@ module MkCommonLowTac (S : Sequent.S) : sig
   (** {3 Rewriting types and functions} *)
 
   type rw_equiv =
-    SystemExpr.fset * Equiv.global_form * [ `LeftToRight | `RightToLeft ]
+    SystemExpr.context * Equiv.global_form * [ `LeftToRight | `RightToLeft ]
   val p_rw_equiv : Args.rw_equiv_item -> S.t -> rw_equiv
 
   (*------------------------------------------------------------------*)

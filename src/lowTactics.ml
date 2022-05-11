@@ -541,7 +541,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       - the rewriting direction.
       The rewrite equiv tactic corresponds to the ReachEquiv rule of CSF'22. *)
   type rw_equiv =
-    SystemExpr.fset * Equiv.global_form * [ `LeftToRight | `RightToLeft ]
+    SystemExpr.context * Equiv.global_form * [ `LeftToRight | `RightToLeft ]
 
   (** Parse rewrite equiv arguments. *)
   let p_rw_equiv (rw_arg : Args.rw_equiv_item) (s : S.t) : rw_equiv =
@@ -549,7 +549,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | `Rw f ->
       let dir = L.unloc rw_arg.rw_dir in
 
-      let _, system, pat =
+      let _, context, pat =
         S.convert_pt_gen ~check_compatibility:false f Equiv.Global_t s
       in
 
@@ -565,14 +565,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       let f = pat.pat_term in
 
-      let system =
-        (* TODO system should be a context, the pair is already an fset:
-             this check should go away *)
-        try SE.to_fset system with _ ->
-          hard_failure (Failure "finite system expression expected")
-      in
-
-      system,f,dir
+      context,f,dir
 
   (*------------------------------------------------------------------*)
   (** {3 Case tactic} *)

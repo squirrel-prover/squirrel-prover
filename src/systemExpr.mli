@@ -139,13 +139,16 @@ val singleton : System.Single.t -> fset
     as the list of systems: these projections will be used to label the
     single systems as part of the newly formed system expression.
 
-    For example, [of_list ?labels:["left";"right"] [(s,"right");(s,"left")]]
+    The table is used to check that all systems in the list are compatible.
+
+    For example, [make_fset tbl ?labels:["left";"right"] [(s,"right");(s,"left")]]
     is an expression with two elements. Its first projection, labelled
     "left", is the right projection of [s]. *)
-val of_list : Symbols.table ->
-              ?labels:Term.proj option list ->
-              System.Single.t list ->
-              fset
+val make_fset :
+    Symbols.table ->
+    ?labels:Term.proj option list ->
+    System.Single.t list ->
+    fset
 
 (** Finite set of all projections of a system. *)
 val of_system : Symbols.table -> System.t -> fset
@@ -153,6 +156,9 @@ val of_system : Symbols.table -> System.t -> fset
 (** List of labelled elements of a set. Guaranteed to be non-empty.
     Fails if expression does not correspond to a finite set. *)
 val to_list : <fset:unit;..> expr -> (Term.proj * System.Single.t) list
+
+(** Inverse of [to_list]. Does not perform any validation. *)
+val of_list : (Term.proj * System.Single.t) list -> fset
 
 (** Same as [to_list], but only returns the list of projections *)
 val to_projs : <fset:unit;..> expr -> Term.projs
@@ -200,6 +206,7 @@ type parse_item = {
 
 type parsed_t = parse_item list Location.located
 
+(** Parsing relies on [any], [any_compatible_with] and [make_fset]. *)
 val parse : Symbols.table -> parsed_t -> arbitrary
 
 
@@ -231,6 +238,7 @@ val context_any : context
     compatible with the pair). *)
 val equivalence_context : ?set:('a expr) -> <pair:unit;..> expr -> context
 
+(** Create context for interpreting reachability formulas. *)
 val reachability_context : 'a expr -> context
 
 val pp_context : Format.formatter -> context -> unit

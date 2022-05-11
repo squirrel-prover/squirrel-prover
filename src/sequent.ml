@@ -26,19 +26,14 @@ module type S = sig
 
   val to_general_sequent : t -> Goal.t
     
-  val get_assumption :
-    ?check_compatibility:bool -> table:Symbols.table ->
-    'a Equiv.f_kind -> Theory.lsymb -> t -> (ghyp, 'a) Goal.abstract_statement
-
   val reduce : Reduction.red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
-  (* TODO document; should [SE.t] be generalized to [SE.context]? *)
   val convert_pt_gen :
     ?check_compatibility:bool -> 
     ?close_pats:bool ->
     Theory.p_pt -> 
-    'a Equiv.f_kind -> t -> 
-    ghyp * SE.t * 'a Match.pat
+    'a Equiv.f_kind -> t ->
+    ghyp * SE.context * 'a Match.pat
 
   val convert_pt :
     ?close_pats:bool ->
@@ -73,6 +68,10 @@ module Mk (Args : MkArgs) : S with
   let is_reach_assumption (name : lsymb) (s : sequent) =
     Hyps.mem_name (L.unloc name) s || Prover.is_reach_assumption (L.unloc name)
 
+  (* Get assumption by name.
+     If required, check for compatibility, i.e. ensure that the assumption
+     can be incorporated into the sequent under its own system annotation
+     without changing its meaning (projections are performed if needed). *)
   let get_assumption 
       (type a)
       ?(check_compatibility=true)
@@ -110,6 +109,9 @@ module Mk (Args : MkArgs) : S with
       end;
       let formula =
         if SE.is_fset lem.system.set then
+          (* TODO shouldn't we project to the sequent's systems
+               it also feels unsafe to do this when check_compatibility=false,
+               or to just leave the else branch unguarded *)
           let projs = List.map fst (SE.to_list @@ SE.to_fset lem.system.set) in
           Equiv.Any.project projs lem.formula
         else
@@ -273,7 +275,7 @@ module Mk (Args : MkArgs) : S with
     Theory.p_pt ->
     a Equiv.f_kind ->
     S.t ->
-    ghyp * SE.t * a Match.pat * Match.Mvar.t 
+    ghyp * SE.context * a Match.pat * Match.Mvar.t
     = fun ?(check_compatibility=false) ty_env mv pt f_kind s ->
       let table = S.table s in
       let lem =
@@ -396,7 +398,7 @@ module Mk (Args : MkArgs) : S with
           pat_vars = !pat_vars;
           pat_term = f; } 
       in      
-      lem.name, lem.system.set, pat, mv
+      lem.name, lem.system, pat, mv
 
 
   let close 
@@ -437,7 +439,7 @@ module Mk (Args : MkArgs) : S with
       (pt     : Theory.p_pt)
       (f_kind : a Equiv.f_kind) 
       (s      : S.t) 
-    : ghyp * SE.t * a Match.pat 
+    : ghyp * SE.context * a Match.pat
     =
     (* resolve the proof-term in [s] *)
     let pt = resolve_pt s pt in

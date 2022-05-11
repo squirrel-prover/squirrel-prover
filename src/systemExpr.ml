@@ -102,6 +102,8 @@ let to_list = function
   | List l -> l
   | _ -> assert false
 
+let of_list l = List l
+
 let to_projs t = List.map fst (to_list t)
     
 let project_opt (projs : Term.projs option) t =
@@ -133,11 +135,11 @@ let default_labels : int -> Term.proj list = function
   | n -> List.init n (fun i -> Term.proj_from_string (string_of_int (i+1)))
 
 (*------------------------------------------------------------------*)
-let of_list table ?labels (l:System.Single.t list) : t =
+let make_fset table ?labels (l:System.Single.t list) : t =
   (* Check for compatibility. *)
   let {System.Single.system=hd_system},tl = match l with
     | hd::tl -> hd,tl
-    | [] -> raise (Invalid_argument "SystemExpr.of_list")
+    | [] -> raise (Invalid_argument "SystemExpr.make_fset")
   in
   List.iter
     (fun {System.Single.system} ->
@@ -151,7 +153,7 @@ let of_list table ?labels (l:System.Single.t list) : t =
     | Some labels ->
         let len = List.length l in
         if List.length labels <> len then
-          raise (Invalid_argument "SystemExpr.of_list");
+          raise (Invalid_argument "SystemExpr.make_fset");
         let labels =
           List.map2
             (fun default -> function None -> default | Some x -> x)
@@ -208,7 +210,7 @@ let parse table p = match Location.unloc p with
       let l =
         List.map (fun i -> parse_single table { i with alias = None }) l
       in
-      of_list table ~labels l
+      make_fset table ~labels l
 
 (*------------------------------------------------------------------*)
 (** Action symbols and terms *)

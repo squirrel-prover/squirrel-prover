@@ -1858,6 +1858,9 @@ let rewrite_equiv_transform
       let args = List.map aux args in
       Term.mk_fun0 fsymb ftype args
 
+    | Diff (Explicit l) ->
+      Term.mk_diff (List.map (fun (p,t) -> p, aux t) l)
+
     (* We can support input@ts (and keep it unchanged) if
      * for some ts' such that ts'>=pred(ts),
      * frame@ts' is a biframe element, i.e. the two
@@ -1881,10 +1884,12 @@ let rewrite_equiv_transform
   aux term
 
 (* Rewrite equiv rule on sequent [s] with direction [dir],
-   using assumption [ass] wrt system [ass_sys]. *)
-let rewrite_equiv (ass_sys,ass,dir) (s : TS.t) : TS.t list =
+   using assumption [ass] wrt system [ass_context]. *)
+let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
 
-  (* Decompose [ass] as [subgoal_1 => .. => subgoal_N => equiv(biframe)]. *)
+  (* Decompose [ass] as [subgoal_1 => .. => subgoal_N => equiv(biframe)].
+     We currently require subgoals to be reachability formulas,
+     for simplicity. *)
   let subgoals, biframe =
     let rec aux = function
       | Equiv.(Atom (Equiv bf)) -> [],bf
@@ -1892,25 +1897,46 @@ let rewrite_equiv (ass_sys,ass,dir) (s : TS.t) : TS.t list =
       | _ -> Tactics.(soft_failure (Failure "invalid assumption"))
     in aux ass
   in
-  (* TODO subgoal sequents should be wrt ass_sys *)
+  (* Subgoals are relative to [ass_context.set]. For now we require
+     that it coincides with the original sequent's set annotation,
+     for simplicity.
+     TODO it is unsound to keep local hypotheses of [s]
+          when trying to prove subgoal [f] -- but it should be
+          sound and sufficient to keep trace hypotheses
+          (without diff operators) which is enough for our needs:
+          in practice subgoals are happens(_) atoms *)
+  List.iter
+    (fun subgoal ->
+       if not (Term.is_pure_timestamp subgoal) &&
+          ass_context.SE.set <> (TS.system s).set
+       then
+         Tactics.(soft_failure NoAssumpSystem))
+    subgoals ;
   let subgoals = List.map (fun f -> TS.set_goal f s) subgoals in
 
   (* Identify which projection of the assumption's conclusion
      corresponds to the current goal and new goal (projections [src,dst])
      and the expected systems before and after the transformation. *)
   let src,dst,orig_sys,new_sys =
-    (* TODO we should be looking at the pair component of some context *)
-    match dir, SE.to_list ass_sys with
-      | `LeftToRight, [left,lsys;right,rsys] -> left,right,lsys,rsys
-      | `RightToLeft, [left,lsys;right,rsys] -> right,left,rsys,lsys
-      | _ -> assert false
+    let pair = Utils.oget ass_context.pair in
+    let left,lsys = SE.fst pair in
+    let right,rsys = SE.snd pair in
+    match dir with
+      | `LeftToRight -> left,right,lsys,rsys
+      | `RightToLeft -> right,left,rsys,lsys
   in
 
-  (* Check that rewrite equiv applies to sequent [s]. *)
-  begin match SE.to_list (SE.to_fset (TS.system s).set) with
-    | [_,sys] when sys = orig_sys -> ()
-    | _ -> Tactics.(soft_failure NoAssumpSystem)
-  end;
+  (* Compute new set annotation, checking by the way
+     that rewrite equiv applies to sequent [s]. *)
+  let updated_set =
+    SE.to_list (SE.to_fset (TS.system s).set) |>
+    List.map (fun (p,s) ->
+                if s = orig_sys then p, new_sys else
+                  Tactics.(soft_failure NoAssumpSystem)) |>
+    SE.of_list
+  in
+  let updated_context =
+    { (TS.system s) with set = (updated_set:>SE.arbitrary) } in
 
   let warn_unsupported t =
     Printer.prt `Warning
@@ -1927,7 +1953,7 @@ let rewrite_equiv (ass_sys,ass,dir) (s : TS.t) : TS.t list =
 
   let goal =
     TS.LocalHyps.map rewrite s
-    |> TS.set_system (SE.update ~set:(SE.singleton new_sys) (TS.system s))
+    |> TS.set_system updated_context
     |> TS.set_goal
       (try rewrite_equiv_transform ~src ~dst ~s biframe (TS.goal s) with
        | Invalid -> warn_unsupported (TS.goal s); Term.mk_false)
