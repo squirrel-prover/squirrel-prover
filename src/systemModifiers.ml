@@ -160,7 +160,7 @@ let mk_equiv_statement
     new_axiom_name enrich make_conclusion new_system
   : Goal.statement
   =
-  let context = SE.update ~pair:new_system SE.context_any in
+  let context = SE.equivalence_context ~set:new_system new_system in
   let `Equiv formula, _ =
     Goal.make_obs_equiv ~enrich table hint_db context
   in
@@ -187,10 +187,7 @@ let global_rename
      but any system would work here since the equivalence must
      relate names. *)
   let system =
-    SE.update
-      ~pair:(SE.make_pair old_single_system old_single_system)
-      SE.context_any
-  in
+    SE.equivalence_context (SE.make_pair old_single_system old_single_system) in
   let env = Env.init ~table ~system () in
   let conv_env = Theory.{ env; cntxt = InGoal } in
   let f = Theory.convert_global_formula conv_env gf in
@@ -294,11 +291,7 @@ let global_prf
   in
 
   let venv, is, hash =
-    let context =
-      SystemExpr.update
-        ~set:(SE.singleton old_single_system)
-        SystemExpr.context_any
-    in
+    let context = SE.(reachability_context (singleton old_single_system)) in
     conv_term table context ~bnds hash
   in
 
@@ -413,11 +406,7 @@ let global_cca
   in
 
   let venv, is, enc =
-    let context =
-      SystemExpr.update
-        ~set:(SE.singleton old_single_system)
-        SystemExpr.context_any
-    in
+    let context = SE.(reachability_context (singleton old_single_system)) in
     conv_term table context ~bnds p_enc
   in
 
@@ -828,11 +817,7 @@ let global_prf_t
   in
 
   let venv, is, hash =
-    let context =
-      SystemExpr.update
-        ~set:(SE.singleton old_single_system)
-        SystemExpr.context_any
-    in
+    let context = SE.(reachability_context (singleton old_single_system)) in
     conv_term ~pat:true table context ~bnds hash 
   in
 

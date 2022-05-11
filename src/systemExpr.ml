@@ -325,13 +325,18 @@ type context = {
 
 let context_any = { set = any ; pair = None }
 
-let update ?set ?pair ctxt = match set,pair with
-  | None, None -> ctxt
-  | Some s, Some p -> { set = s ; pair = Some p }
-  | Some s, None -> { set = s ; pair = None }
-  | None, Some p ->
-      let _,{System.Single.system=s} = fst p in
-      { set = any_compatible_with s ; pair = Some p }
+let equivalence_context ?set pair =
+  let set = match set with
+    | Some s -> s
+    | None ->
+       begin match pair with
+         | List ((_,ss)::_) -> any_compatible_with ss.system
+         | _ -> assert false
+       end
+  in
+  { pair = Some pair ; set }
+
+let reachability_context set = { set ; pair = None }
 
 let pp_context fmt = function
   | {set;pair=None} -> pp fmt set

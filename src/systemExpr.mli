@@ -225,7 +225,13 @@ type context = {
 
 val context_any : context
 
-val update : ?set:'a expr -> ?pair:pair -> context -> context
+(** Create context for global formulas where equivalence atoms are
+    interpreted wrt the given pair, and reachability atoms are
+    interpreted wrt the given set expression (default: any system
+    compatible with the pair). *)
+val equivalence_context : ?set:('a expr) -> <pair:unit;..> expr -> context
+
+val reachability_context : 'a expr -> context
 
 val pp_context : Format.formatter -> context -> unit
 
