@@ -444,21 +444,15 @@ let filter_map_hyps func hyps =
 let pi projection s =
   let pi = function
     | `Reach t -> `Reach (Term.project1 projection t)
-    | h -> h
+    | h -> h (* Leave it untouched, we'll take care of it later. *)
   in
   let hyps = filter_map_hyps pi s.hyps in
   let new_env =
     let context = s.env.system in
     let fset = SystemExpr.to_fset context.set in
-    let context =
-      SystemExpr.update
-        ~set:(SystemExpr.project [projection] fset)
-        context
-    in
+    let new_set = SystemExpr.((project [projection] fset :> arbitrary)) in
+    let context = { context with set = new_set } in
     Env.update ~system:context s.env
-  in
-  let pair_annotation_preserved =
-    new_env.system.pair = s.env.system.pair
   in
   let s =
     S.update
@@ -468,16 +462,31 @@ let pi projection s =
       s
   in
   (* We add back manually all formulas, to ensure that definitions are
-     unrolled. *)
+     unrolled. The next function is used to determine when we can keep
+     a global formula: its local atoms need to be logically equivalent
+     under the old and new annotations. We ensure this by keeping only
+     trace formulas and making sure that they do not contain diff
+     operators, which is equivalent to check that the projection leaves
+     them unchanged. *)
+  let rec can_keep_global = function
+    | Equiv.Quant (_,_,f) :: l ->
+        can_keep_global (f::l)
+    | Impl (f,g) :: l | Equiv.And (f,g) :: l | Or (f,g) :: l ->
+        can_keep_global (f::g::l)
+    | Atom (Equiv _) :: l -> can_keep_global l
+    | Atom (Reach a) :: l ->
+        Term.project1 projection a = a &&
+        Term.is_pure_timestamp a &&
+        can_keep_global l
+    | [] -> true
+  in
   H.fold
     (fun id f s ->
        match f with
          | `Reach f -> snd (Hyps.add_formula id f s)
-         | _ ->
-             if not pair_annotation_preserved then s else
+         | `Equiv e ->
+             if not (can_keep_global [e]) then s else
              let _,hyps = H.add ~force:true id f s.hyps in
-             (* TODO we could insert [f] with the old system annotation,
-                which is a stronger hypothesis *)
              S.update ~hyps s)
     hyps s
 

@@ -1583,7 +1583,7 @@ let is_deterministic (t : term) : bool =
 
 let is_pure_timestamp (t : term) =
   let rec pure_ts = function
-    | Fun (fs, _, [t]) when fs = f_happens -> pure_ts t
+    | Fun (fs, _, [t]) when fs = f_happens || fs = f_pred -> pure_ts t
 
     | Fun (fs, _, [t1; t2])
       when fs = f_or || fs = f_and || fs = f_impl || 
