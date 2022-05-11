@@ -52,7 +52,7 @@ Qed.
 goal [default/left] _ : happens(A) => input@A = s@B => False.
 Proof.
   intro H.
-  rewrite equiv ax_ground_rev.
+  rewrite equiv -ax_ground_rev.
   use check_right.
   by use m_fresh with A.
 Qed.

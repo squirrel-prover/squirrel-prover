@@ -222,6 +222,19 @@ abstract c_pair : message.
 abstract (++) : message -> message -> message.
 axiom len_pair (x, y : message) : len(<x,y>) = (len(x) ++ len(y) ++ c_pair).
 
+(* Utilities for simplifying some diff expressions. *)
+
+goal len_diff (x,y:message) : len(diff(x,y)) = diff(len(x),len(y)).
+Proof.
+  by project.
+Qed.
+
+goal diff_refl (x:message) : diff(x,x) = x.
+Proof.
+  by project.
+Qed.
+hint rewrite diff_refl.
+
 (*------------------------------------------------------------------*)
 (* LIBRAIRIES *)
 
@@ -560,7 +573,7 @@ Proof.
       rewrite !len_pair len_diff in 2.
       namelength k(pid), k_dummy(pid)=> -> /=.
       rewrite /* in 0.
-      by apply  Hind (pred(t)).
+      by apply Hind (pred(t)).
 
   + (* Decode(pid,j) *)
     repeat destruct Eq as [_ Eq].
@@ -702,7 +715,7 @@ Qed.
 
 (*------------------------------------------------------------------*)
 (* The final proof of injective correspondence. *)
-goal [left] injective_correspondence (j, pid:index):
+goal [default/left] injective_correspondence (j, pid:index):
    happens(Server(pid,j)) =>
    exec@Server(pid,j) =>
      exists (i:index),
