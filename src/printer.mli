@@ -45,9 +45,11 @@ val dummy_fmt : Format.formatter
 (** Define a standard formatter for the printer w.r.t. printer_mode. *)
 val get_std : unit -> Format.formatter
 
+(** Initialisation of a formatter. *)
+val init_ppf : Format.formatter -> printer_mode -> unit
+
 (** Initialisation of the standard formatter. *)
 val init : printer_mode -> unit
-
 
 (** {2 Printing functions} *)
 

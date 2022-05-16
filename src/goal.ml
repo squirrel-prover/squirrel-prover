@@ -26,6 +26,10 @@ let pp_init ch = function
   | Trace j -> Term.pp ch (TS.goal j)
   | Equiv j -> ES.pp_init ch j
 
+let pp_graph ch = function
+  | Trace j -> Constr.dump ch (TS.get_models j)
+  | Equiv j -> ()
+
 (*------------------------------------------------------------------*)
 let map ft fe = function
   | Trace t -> Trace (ft t)

@@ -44,3 +44,7 @@ type trace_cntxt = {
   (* used to find an action occuring at a given timestamp *)
   models : models option;
 }
+
+(*------------------------------------------------------------------*)
+(** Write the graph represented by [models] in the file [file] *)
+val dump : Format.formatter -> models -> unit

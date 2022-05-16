@@ -196,6 +196,8 @@ val get_oracle_tag_formula : string -> Term.term
 
 val pp_goal : Format.formatter -> unit -> unit
 
+val pp_graph : Format.formatter -> unit -> unit
+
 val is_proof_completed : unit -> bool
 
 (** Complete the proofs, resetting the current goal to None. *)

@@ -1397,6 +1397,88 @@ type trace_cntxt = {
   models : models option;
 }
 
+
+(*------------------------------------------------------------------*)
+
+(** Print the graph is JSON format *)
+let get_children g v =
+  let succ_of_succ = List.concat_map (fun w -> UtG.succ g w) (UtG.succ g v) in
+  List.filter (fun w -> not (List.mem w succ_of_succ)) (UtG.succ g v)
+
+let dump_nodes ppf g =
+  let rec pp_child ppf l =
+    match l with
+    | [] -> ()
+    | v :: l' -> 
+      Format.fprintf ppf "\"%a\"" pp_ut v;
+      pp_childs ppf l'
+  and pp_childs ppf l =
+    match l with
+    | [] -> ()
+    | v :: l' -> 
+      Format.fprintf ppf ", \"%a\"" pp_ut v;
+      pp_childs ppf l'
+  in
+  let pp_vertex v =
+    Format.fprintf ppf "const n%d = {\n" v.hash;
+    Format.fprintf ppf "  \"id\": \"%a\",\n" pp_ut v;
+    Format.fprintf ppf "  \"children\": [%a],\n" pp_child (get_children g v);
+    Format.fprintf ppf "  \"cond\": \"\",\n";
+    Format.fprintf ppf "  \"state\": \"\",\n";
+    Format.fprintf ppf "  \"output\": \"\"\n";
+    Format.fprintf ppf "}@.@."
+  in
+  UtG.iter_vertex pp_vertex g
+
+let dump_layout ppf g =
+  (* Remove vertex [v] from the graph and print it, if it has no predecessor *)
+  let comma = ref false in
+  let filter g v acc =
+    if UtG.in_degree g v = 0 then begin
+      if !comma then
+        Format.fprintf ppf ","
+      else
+        comma := true;
+      Format.fprintf ppf "n%d" v.hash;
+      UtG.remove_vertex acc v
+    end
+    else
+      acc
+  in
+  let rec pp_layers g first =
+    if not (UtG.is_empty g) then begin
+      if first then
+        Format.fprintf ppf "["
+      else
+        Format.fprintf ppf ",[";
+      let new_g = UtG.fold_vertex (filter g) g g in
+      comma := false;
+      Format.fprintf ppf "]";
+      pp_layers new_g false
+    end
+  in
+  Format.fprintf ppf "const data = [";
+  pp_layers g true;
+  Format.fprintf ppf "]@."
+  
+(** Print the model in JSON format if there is one non-empty model *)
+let dump ppf models =
+  match models with
+  | [model] -> 
+    let g = model.tr_graph in
+    if UtG.is_empty g then
+      Printer.kw `Error (Printer.get_std()) "Empty model"
+    else begin
+      Printer.kw `Error (Printer.get_std()) "MODEL %d" (UtG.nb_vertex g);
+      Printer.init_ppf ppf Printer.Html;
+      Format.fprintf ppf "// %d noeuds.@." (UtG.nb_vertex g);
+      Format.fprintf ppf "// %d arrêtes.@.@." (UtG.nb_edges g);
+      dump_nodes ppf g;
+      dump_layout ppf g(*;
+      close_out out_c*)
+    end
+  | _ -> Printer.kw `Error (Printer.get_std()) "Several models"
+
 (*------------------------------------------------------------------*)
 (** Tests Suites *)
 

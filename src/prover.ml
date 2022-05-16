@@ -698,6 +698,11 @@ let pp_goal ppf () = match !current_goal, !subgoals with
       Goal.pp j
   | _ -> assert false
 
+let pp_graph ppf () =
+  match !current_goal, !subgoals with
+  | Some _, j :: _ -> Goal.pp_graph ppf j
+  | _ -> assert false
+
 (** [eval_tactic_focus tac] applies [tac] to the focused goal.
   * @return [true] if there are no subgoals remaining. *)
 let eval_tactic_focus tac = match !subgoals with

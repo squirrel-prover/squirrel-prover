@@ -194,25 +194,27 @@ let ansi_out_funs =
 
 (** Printer initialization **)
 
-
-(* Initialisation of the printer giving it a mode *)
-let init (mode : printer_mode) : unit =
-  printer_mode := mode;
+(* Initialisation of a given formatter giving it a mode *)
+let init_ppf (ppf : formatter) (mode : printer_mode) : unit =
   match mode with
   | File | Interactive ->
       Fmt.set_style_renderer
-        (get_std ()) `Ansi_tty;
-      Format.pp_set_mark_tags
-        (get_std ()) true;
+        ppf `Ansi_tty;
+      pp_set_mark_tags ppf true;
       pp_set_formatter_stag_functions
-        (get_std ()) kw_ansi_stag_funs ;
+        ppf kw_ansi_stag_funs ;
       pp_set_formatter_out_functions
-        (get_std ()) ansi_out_funs
+        ppf ansi_out_funs
   | Html ->
-      Format.pp_set_mark_tags (get_std ()) true;
+      pp_set_mark_tags ppf true;
       pp_set_formatter_stag_functions
-        (get_std ()) kw_html_stag_funs
+        ppf kw_html_stag_funs
   | Test -> ()
+
+(* Initialisation of the standard formatter giving it a mode *)
+let init (mode : printer_mode) : unit =
+  printer_mode := mode;
+  init_ppf (get_std ()) mode
 
 
 (** {2 Printing functions} **)

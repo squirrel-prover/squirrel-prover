@@ -9,6 +9,7 @@ type t = Trace of TS.t | Equiv of ES.t
 
 val pp : Format.formatter -> t -> unit
 val pp_init : Format.formatter -> t -> unit
+val pp_graph : Format.formatter -> t -> unit
 
 val vars : t -> Vars.env
 
