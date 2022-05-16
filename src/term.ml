@@ -820,7 +820,7 @@ and _pp
     Printer.kw `GoalAction ppf "%s%a" (Symbols.to_string symb) pp_indices indices
 
   | Diff (Explicit l) ->
-    Fmt.pf ppf "@[<hov 2>diff(@;%a)@]"
+    Fmt.pf ppf "@[<hov 2>diff(@,%a)@]"
       (Fmt.list ~sep:(fun fmt () -> Format.fprintf fmt ",@ ")
          (pp (diff_fixity, `NonAssoc)))
       (List.map snd l) (* TODO labels *)
