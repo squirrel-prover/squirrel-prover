@@ -47,14 +47,12 @@ let choose_name = function
     sort ^ ord
 
 (*------------------------------------------------------------------*)
-module FHyp = struct
-  type t = hyp_form
-  let pp_hyp = Equiv.Any.pp
-  let htrue = `Reach Term.mk_true
-end
-
-module H = Hyps.Mk(FHyp)
-
+module H = Hyps.Mk(struct
+    type t = hyp_form
+    let pp_hyp = Equiv.Any.pp
+    let htrue = `Reach Term.mk_true
+  end)
+    
 (*------------------------------------------------------------------*)
 module S : sig
   type t = private {
@@ -134,7 +132,7 @@ let pp ppf s =
 (*------------------------------------------------------------------*)
 (** Collect specific local hypotheses *)
   
-let get_atoms_of_fhyps (forms : FHyp.t list) : Term.literals =
+let get_atoms_of_fhyps (forms : hyp_form list) : Term.literals =
   List.fold_left (fun acc f ->
       match f with
       | `Equiv _ -> acc
@@ -228,8 +226,8 @@ let constraints_valid s =
   not (Constr.m_is_sat models)
 
 (*------------------------------------------------------------------*)  
-module Hyps = struct
-
+module AnyHyps = struct
+  
   type sequent = t
 
   type hyp = Equiv.any_form
@@ -384,6 +382,8 @@ module Hyps = struct
   let map f s  = S.update ~hyps:(H.map f s.hyps)  s
   let mapi f s = S.update ~hyps:(H.mapi f s.hyps) s
 
+  let filter f s = S.update ~hyps:(H.filter f s.hyps) s
+
   (*------------------------------------------------------------------*)
   (* We add back manually all formulas, to ensure that definitions are 
      unrolled. *)
@@ -483,7 +483,7 @@ let pi projection s =
   H.fold
     (fun id f s ->
        match f with
-         | `Reach f -> snd (Hyps.add_formula id f s)
+         | `Reach f -> snd (AnyHyps.add_formula id f s)
          | `Equiv e ->
              if not (can_keep_global [e]) then s else
              let _,hyps = H.add ~force:true id f s.hyps in
@@ -496,7 +496,7 @@ let set_goal a s =
       | Some at 
         when Term.ty_xatom at = Type.Message && 
              Config.auto_intro () -> 
-        Hyps.add_macro_defs s a
+        AnyHyps.add_macro_defs s a
       | _ -> s
 
 let init ~env ~hint_db conclusion =
@@ -514,7 +514,7 @@ let subst subst s =
         ~conclusion:(Term.subst subst s.conclusion)
         s in
 
-    Hyps.reload s
+    AnyHyps.reload s
 
 (*------------------------------------------------------------------*)
 (** TRS *)
@@ -584,12 +584,12 @@ let get_felem ?loc _ _ = assert false
 (*------------------------------------------------------------------*)
 let map f s : sequent =
   let f' x = f.Equiv.Babel.call Equiv.Any_t x in
-  set_goal (f.Equiv.Babel.call Equiv.Local_t (goal s)) (Hyps.map f' s)
+  set_goal (f.Equiv.Babel.call Equiv.Local_t (goal s)) (AnyHyps.map f' s)
 
 (*------------------------------------------------------------------*)
 let fv s : Vars.Sv.t = 
   let h_vars = 
-    Hyps.fold (fun _ f vars -> 
+    AnyHyps.fold (fun _ f vars -> 
         Vars.Sv.union (Equiv.Any.fv f) vars
       ) s Vars.Sv.empty
   in
@@ -599,13 +599,15 @@ let fv s : Vars.Sv.t =
 module MatchF = Match.T
 
 (*------------------------------------------------------------------*)
-module Conc  = Term.Smart
-module Hyp   = Equiv.Any.Smart
+module Conc = Term.Smart
+module Hyp  = Equiv.Any.Smart
 
 (*------------------------------------------------------------------*)
 type trace_sequent = t
 
-module LocalHyps = struct
+module LocalHyps
+  : Hyps.HypsSeq with type hyp = Equiv.local_form and type sequent = t
+= struct
   type hyp = Equiv.local_form
   type ldecl = Ident.t * hyp
   type sequent = trace_sequent
@@ -614,47 +616,47 @@ module LocalHyps = struct
     | `Reach h -> h
     | `Equiv _ -> assert false
 
-  let add p h s = Hyps.add p (`Reach h) s
+  let add p h s = AnyHyps.add p (`Reach h) s
 
-  let add_i p h s = Hyps.add_i p (`Reach h) s
+  let add_i p h s = AnyHyps.add_i p (`Reach h) s
 
   let add_i_list l s =
     let l = List.map (fun (p,h) -> p,`Reach h) l in
-    Hyps.add_i_list l s
+    AnyHyps.add_i_list l s
 
   let add_list l s = snd (add_i_list l s)
 
   let pp_hyp = Term.pp
 
-  let pp_ldecl ?dbg fmt (id,h) = Hyps.pp_ldecl ?dbg fmt (id,`Reach h)
+  let pp_ldecl ?dbg fmt (id,h) = AnyHyps.pp_ldecl ?dbg fmt (id,`Reach h)
 
-  let fresh_id = Hyps.fresh_id
-  let fresh_ids = Hyps.fresh_ids
+  let fresh_id = AnyHyps.fresh_id
+  let fresh_ids = AnyHyps.fresh_ids
 
-  let is_hyp h s = Hyps.is_hyp (`Reach h) s
+  let is_hyp h s = AnyHyps.is_hyp (`Reach h) s
 
-  let by_id id s = !!(Hyps.by_id id s)
+  let by_id id s = !!(AnyHyps.by_id id s)
 
   let by_name name s =
-    let l,h = Hyps.by_name name s in
+    let l,h = AnyHyps.by_name name s in
     l,!!h
 
-  let mem_id = Hyps.mem_id
+  let mem_id = AnyHyps.mem_id
 
-  let mem_name = Hyps.mem_name
+  let mem_name = AnyHyps.mem_name
   let to_list s =
     List.filter_map
       (function
          | l, `Reach h -> Some (l,h)
          | l, `Equiv _ -> None)
-      (Hyps.to_list s)
+      (AnyHyps.to_list s)
 
   let find_opt f s =
     let f id = function
       | `Reach h -> f id h
       | `Equiv _ -> false
     in
-    match Hyps.find_opt f s with
+    match AnyHyps.find_opt f s with
       | None -> None
       | Some (id,`Reach h) -> Some (id,h)
       | _ -> assert false
@@ -664,34 +666,43 @@ module LocalHyps = struct
       | `Reach h -> f id h
       | `Equiv _ -> None
     in
-    Hyps.find_map f s
+    AnyHyps.find_map f s
 
   let exists f s =
     let f id = function
       | `Reach h -> f id h
       | `Equiv _ -> false
     in
-    Hyps.exists f s
+    AnyHyps.exists f s
 
   let map f s =
     let f = function `Equiv h -> `Equiv h | `Reach h -> `Reach (f h) in
-    Hyps.map f s
+    AnyHyps.map f s
 
   let mapi f s =
     let f i = function `Equiv h -> `Equiv h | `Reach h -> `Reach (f i h) in
-    Hyps.mapi f s
+    AnyHyps.mapi f s
 
-  let remove = Hyps.remove
+  let filter f s =
+    let f i = function `Equiv h -> true | `Reach h -> f i h in
+    AnyHyps.filter f s
+    
+  let remove = AnyHyps.remove
 
   let fold f s =
     let f id h acc = match h with
       | `Equiv _ -> acc
       | `Reach h -> f id h acc
     in
-    Hyps.fold f s
+    AnyHyps.fold f s
 
-  let clear_triv = Hyps.clear_triv
+  let clear_triv = AnyHyps.clear_triv
 
-  let pp = Hyps.pp
-  let pp_dbg = Hyps.pp_dbg
+  let pp = AnyHyps.pp
+  let pp_dbg = AnyHyps.pp_dbg
 end
+
+(*------------------------------------------------------------------*)
+module Hyps
+  : Hyps.HypsSeq with type hyp = Equiv.any_form and type sequent = t
+= AnyHyps

@@ -164,6 +164,8 @@ module Hyps
   let map  f s = { s with hyps = H.map f s.hyps }
   let mapi f s = { s with hyps = H.mapi f s.hyps }
 
+  let filter f s = { s with hyps = H.filter f s.hyps }
+
   let clear_triv s = s
 
   let pp fmt s = H.pps fmt s.hyps
