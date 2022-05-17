@@ -7,7 +7,7 @@ type lsymb = Theory.lsymb
 let hyp_error ~loc e = raise (T.Tactic_soft_failure (loc,e))
 
 (*------------------------------------------------------------------*) 
-module type Hyp =sig 
+module type Hyp = sig 
   type t 
   val pp_hyp : Format.formatter -> t -> unit
   val htrue : t

@@ -10,7 +10,20 @@ type red_param = { delta : bool; }
 let rp_full = { delta = true; }
 
 (*------------------------------------------------------------------*)
-module Mk (S : LowSequent.S) = struct
+module type S = sig
+  type t                        (* type of sequent *)
+
+  val reduce_term  : red_param -> t -> Term.term -> Term.term     
+  val reduce_equiv : red_param -> t -> Equiv.form -> Equiv.form
+  val reduce       : red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
+
+  val destr_eq : 
+    red_param -> t -> 'a Equiv.f_kind -> 'a ->
+    (Term.term * Term.term) option
+end
+
+(*------------------------------------------------------------------*)
+module Mk (S : LowSequent.S) : S with type t := S.t = struct
   (* TODOs: 
      - conds ignored for now.
      - trace literals not updated *)
@@ -42,9 +55,8 @@ module Mk (S : LowSequent.S) = struct
 
     (* Reduce once at head position *)
     and reduce_head_once (st : state) (t : Term.term) : Term.term * bool = 
-      let t, has_red = expand_head_once st t in
-      let t, has_red' = rewrite_head_once st t in
-      t, has_red || has_red'
+      let t, has_red  = expand_head_once st t in
+      if has_red then t, true else rewrite_head_once st t 
 
     (* Expand once at head position *)
     and expand_head_once (st : state) (t : Term.term) : Term.term * bool = 
@@ -214,8 +226,9 @@ module Mk (S : LowSequent.S) = struct
       Equiv.Atom (Equiv.Equiv e)
 
   (** We need type introspection there *)
-  let reduce : type a. red_param -> S.t -> a Equiv.f_kind -> a -> a
-   = fun param s k x ->
+  let reduce (type a) 
+      (param : red_param) (s : S.t) (k : a Equiv.f_kind) (x : a) : a 
+    =
     match k with
     | Local_t  -> reduce_term  param s x
     | Global_t -> reduce_equiv param s x
@@ -224,4 +237,25 @@ module Mk (S : LowSequent.S) = struct
          | `Reach x -> `Reach (reduce_term param  s x)
          | `Equiv x -> `Equiv (reduce_equiv param s x)
 
+ (*------------------------------------------------------------------*)
+  (* FIXME: use [param] and [s] to reduce [x] if necessary *)
+  let destr_eq (type a)
+      (param : red_param) (s : S.t) (k : a Equiv.f_kind)
+      (x : a) : (Term.term * Term.term) option
+    =
+    let destr_eq x =
+      match Term.destr_eq x with
+      | Some _ as res -> res
+      | None -> Term.destr_iff x
+    in
+    let e_destr_eq x = obind destr_eq (Equiv.destr_reach x) in
+
+    match k with
+    | Local_t  ->   destr_eq x
+    | Global_t -> e_destr_eq x
+    | Any_t ->
+      match x with
+      | `Reach x ->   destr_eq x
+      | `Equiv x -> e_destr_eq x
 end
+

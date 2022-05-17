@@ -7,14 +7,15 @@ type ghyp = [ `Hyp of Ident.t | `Lemma of string ]
 module type S = sig
   include LowSequent.S
 
+  (** reduction functions *)
+  module Reduce : Reduction.S with type t := t
+
   (** An assumption can be an hypothesis, an axiom, or a proved goal. *)
   val is_assumption       : Theory.lsymb -> t -> bool
   val is_equiv_assumption : Theory.lsymb -> t -> bool
   val is_reach_assumption : Theory.lsymb -> t -> bool
 
   val to_general_sequent : t -> Goal.t
-
-  val reduce : Reduction.red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
   (** Convert a proof term into a pattern and the system it applies to.
       The pattern is the conclusion of the proof term.

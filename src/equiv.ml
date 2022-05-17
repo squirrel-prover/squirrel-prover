@@ -457,6 +457,10 @@ module Smart : Term.SmartFO with type form = _form = struct
     last forms
 end
 
+let destr_reach = function
+  | Atom (Reach f) -> Some f
+  | _ -> None
+
 (*------------------------------------------------------------------*)
 (** {2 Generalized formulas} *)
 

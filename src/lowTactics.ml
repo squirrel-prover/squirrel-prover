@@ -656,13 +656,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** Reduce the full sequent *)
   let reduce_sequent param s =
     let mapper k f =
-      S.reduce param s k f
+      S.Reduce.reduce param s k f
     in
       S.map { call = mapper } s
 
   (** Reduce the goal *)
   let reduce_goal param s =
-    S.set_goal (S.reduce param s S.conc_kind (S.goal s)) s
+    S.set_goal (S.Reduce.reduce param s S.conc_kind (S.goal s)) s
 
   let reduce_args args s : S.t list =
     match args with
@@ -767,7 +767,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       if S.Hyp.is_eq form then
         begin
-          match S.Hyp.destr_eq form with
+          match S.Reduce.destr_eq Reduction.rp_full s S.hyp_kind form with
           | Some (a,b) ->
             let a1, a2 = get_destr ~orig:(`Reach a) (Term.destr_pair a)
             and b1, b2 = get_destr ~orig:(`Reach b) (Term.destr_pair b) in

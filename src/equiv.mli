@@ -133,3 +133,5 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructots} *)
 module Smart : Term.SmartFO with type form = global_form
+
+val destr_reach : form -> Term.term option

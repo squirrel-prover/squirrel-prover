@@ -395,6 +395,7 @@ val mk_diff    : (proj * term) list -> term
 
 val mk_find : Vars.var list -> term -> term -> term -> term
 
+val destr_iff : term -> (term * term) option
 
 (*------------------------------------------------------------------*)
 val mk_fun0 : fsymb -> Type.ftype -> term list -> term
@@ -449,7 +450,6 @@ val destr_action : term -> (Symbols.action * Vars.var list) option
 
 (*------------------------------------------------------------------*)
 val destr_pair : term -> (term * term) option
-
 
 (*------------------------------------------------------------------*)
 (** {2 Simplification} *)

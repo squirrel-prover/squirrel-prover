@@ -514,6 +514,15 @@ module SmartDestructors = struct
   let destr_impl f = oas_seq2 (destr_fun ~fs:f_impl f)
   let destr_pair f = oas_seq2 (destr_fun ~fs:f_pair f)
 
+  let destr_iff f = 
+    match f with
+    | Fun (fs, _, [Fun (fs1, _, [t1 ; t2]);
+                   Fun (fs2, _, [t2'; t1'])]) 
+      when fs = f_and && fs1 = f_impl && fs2 = f_impl ->
+      if t1 = t1' && t2 = t2' then Some (t1, t2) else None
+
+    | _ -> None 
+
   (*------------------------------------------------------------------*)
   (* let destr_neq f = oas_seq2 (obind (destr_fun ~fs:f_eq) (destr_not f)) *)
   let destr_neq f = oas_seq2 (destr_fun ~fs:f_neq f)
