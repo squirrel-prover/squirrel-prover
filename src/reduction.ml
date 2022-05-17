@@ -24,7 +24,7 @@ end
 
 (*------------------------------------------------------------------*)
 module Mk (S : LowSequent.S) : S with type t := S.t = struct
-  (* TODOs: 
+  (* FEATURE: 
      - conds ignored for now.
      - trace literals not updated *)
   type state = { 
@@ -42,8 +42,8 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     let exception NoExp in
     
     (* Invariant: we must ensure that fv(reduce(u)) ⊆ fv(t)
-        Return: reduced term, reduction occurred *)
-    (* TODO: memoisation *)
+       Return: reduced term, reduction occurred *)
+    (* FEATURE: memoisation *)
     let rec reduce (st : state) (t : Term.term) : Term.term * bool = 
       let t, has_red = reduce_head_once st t in
 

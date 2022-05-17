@@ -117,7 +117,7 @@ let clear_dup_mtso_le (occs : ts_occs) : ts_occs =
     (* for now, positions not allowed here *)
     assert (Sp.is_empty occ1.occ_pos && Sp.is_empty occ2.occ_pos);
     
-    (* TODO: alpha-renaming *)
+    (* FEATURE: alpha-renaming *)
     List.length occ1.occ_vars = List.length occ2.occ_vars &&
     List.for_all2 (=) occ1.occ_vars occ2.occ_vars &&
     occ1.occ_cond = occ2.occ_cond &&

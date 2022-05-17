@@ -702,7 +702,7 @@ let minfos_norm (minit : match_infos) : match_infos =
         in
         (* special case for binders, because alpha-renamed subterms
            cannot be checked later *)
-        (* TODO: fix it to have an improved printing *)
+        (* FEATURE: fix it to have an improved printing *)
         if List.for_all (fun x -> x = MR_ok) infos
         then MR_ok, Mt.add t MR_ok mfinal
         else if Term.is_binder t

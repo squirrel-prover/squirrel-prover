@@ -41,9 +41,9 @@ type bnds = (lsymb * p_ty) list
 
 type term_i =
   | Tpat
-  | Diff  of term * term (* TODO generalize *)
-  | Seq   of bnds * term
-  | Find  of bnds * term * term * term
+  | Diff of term * term (* TODO generalize *)
+  | Seq  of bnds * term
+  | Find of bnds * term * term * term
 
   | App of lsymb * term list
   (** An application of a symbol to some arguments which as not been
@@ -269,9 +269,9 @@ type conversion_error_i =
   | Timestamp_expected   of term_i
   | Timestamp_unexpected of term_i
   | Unsupported_ord      of term_i
-  | String_expected      of term_i (* TODO: move *)
-  | Int_expected         of term_i (* TODO: move *)
-  | Tactic_type          of string (* TODO: move *)
+  | String_expected      of term_i
+  | Int_expected         of term_i
+  | Tactic_type          of string
   | NotVar
   | Assign_no_state      of string
   | BadNamespace         of string * Symbols.namespace
@@ -449,7 +449,7 @@ let function_kind table (f : lsymb) : mf_type =
       `Macro (targs, ty)
 
     | Macro (Input|Output|Frame) ->
-      (* TODO: subtypes*)
+      (* FEATURE: subtypes*)
       `Macro ([], Type.tmessage)
 
     | Macro (Cond|Exec) ->
@@ -995,7 +995,7 @@ and conv_app
 
         | Input | Output | Frame ->
           check_arity_i (L.loc f) "input" (List.length l) 0 ;
-          (* TODO: subtypes *)
+          (* FEATURE: subtypes *)
           let ms = Term.mk_isymb s ty_out [] in
           Term.mk_macro ms [] (get_at ts_opt)
 
@@ -1134,7 +1134,6 @@ let declare_signature table
   let open Symbols in
   let sig_fty   = mk_ftype 0 [] [m_ty; sk_ty] sig_ty in
 
-  (* TODO: change output type to booleans ? *)
   let check_fty = mk_ftype 0 [] [sig_ty; pk_ty] check_ty in
 
   let pk_fty    = mk_ftype 0 [] [sk_ty] pk_ty in

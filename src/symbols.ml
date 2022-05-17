@@ -541,9 +541,7 @@ let is_ftype s ftype table =
   match Function.get_def s table with
     | _,t when t = ftype -> true
     | _ -> false
-    | exception Not_found ->
-      (* TODO: this should be an assert false *)
-      symb_err L._dummy (Unbound_identifier s.name)
+    | exception Not_found -> assert false
 
 module Macro = Make (struct
   type ns = _macro

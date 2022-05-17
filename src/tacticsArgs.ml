@@ -550,11 +550,9 @@ let convert_args env parser_args tactic_type conc =
 
     | [], Sort None -> Arg None
 
-    (* TODO: location *)
     | [], _ -> raise Theory.(Conv (L._dummy, Tactic_type "more arguments expected"))
 
-    (* TODO: location *)
-    | p, _  ->
+    | p :: _, _  ->
       raise Theory.(Conv (L._dummy,
                           Tactic_type "tactic argument error \
                                        (maybe you gave too many arguments?)"))

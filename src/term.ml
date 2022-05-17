@@ -1720,8 +1720,6 @@ module St = Set.Make (T)
 (*------------------------------------------------------------------*)
 (** {2 Matching information for error messages} *)
 
-(* TODO: this should'nt be here *)
-
 type match_info =
   | MR_ok                         (* term matches *)
   | MR_check_st of term list   (* need to look at subterms *)

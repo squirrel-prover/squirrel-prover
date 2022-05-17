@@ -211,7 +211,7 @@ let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
     | In (c,x,p) -> 
       check_channel env.table c;
 
-      (* TODO: subtypes*)
+      (* FEATURE: subtypes*)
       let vars, _ = Vars.make `Shadow env.vars (Type.Message) (L.unloc x) in
       check_p ty_env { env with vars } p
 
@@ -224,7 +224,7 @@ let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
       if is_out proc && (Config.strict_alias_mode ())
       then proc_err loc (StrictAliasError "missing alias")
       else
-        (* TODO: subtypes *)
+        (* FEATURE: subtypes *)
         let () = 
           Theory.check env ~local:true ty_env projs m Type.tmessage 
         in
@@ -524,7 +524,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     let output = match output with
       | Some (c,t) ->
         let t = 
-          (* TODO: subtypes *)
+          (* FEATURE: subtypes *)
           Term.subst (subst_ts @ subst_input)
             (conv_term penv action_term t Type.Message) 
         in
@@ -764,7 +764,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
     | In (c,x,p) ->
       let ch = Channel.of_lsymb c penv.env.table in
-      (* TODO: subtypes*)
+      (* FEATURE: subtypes *)
       let penv,x' = make_fresh `Shadow penv Type.Message (L.unloc x) in
       let in_th = Theory.var_i dum (Vars.name x') in
       let in_tm = Term.mk_var x' in

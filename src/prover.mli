@@ -140,7 +140,7 @@ module ProverTactics : sig
     ('a TacticsArgs.arg -> judgment -> judgment list) ->
     'a TacticsArgs.sort  -> unit
 
-  val get : string -> TacticsArgs.parser_arg list -> tac
+  val get : L.t -> string -> TacticsArgs.parser_arg list -> tac
   val pp : bool -> Format.formatter -> lsymb -> unit
 
   (* Print all tactics with their help. Do not print tactics without help

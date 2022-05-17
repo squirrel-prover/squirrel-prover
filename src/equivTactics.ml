@@ -963,7 +963,7 @@ let push_formula (j: 'a option) f term =
 
 
 (*------------------------------------------------------------------*)
-(* TODO: should be a rewriting rule *)
+(* TODO: remove this tactic *)
 let ifeq Args.(Pair (Int i, Pair (Message (t1,ty1), Message (t2,ty2)))) s =
 
   (* check that types are equal *)
@@ -1233,18 +1233,9 @@ let global_diff_eq (s : ES.t) =
         in
         let pred_ts_list =
           let iter = new Fresh.get_actions ~cntxt in
-          match Term.ty subterm with
-          | Type.Index ->
-              (* TODO if this can't happen we should rather raise an error *)
-              []
-          | Type.Timestamp ->
-              (* TODO can we really have a diff on timestamps? *)
-              iter#visit_message cond;
-              s1 :: s2 :: iter#get_actions
-          | _ ->
-              iter#visit_message subterm;
-              iter#visit_message cond;
-              iter#get_actions
+          iter#visit_message subterm;
+          iter#visit_message cond;
+          iter#get_actions
         in
         (* Remark that the get_actions add pred to all timestamps, to simplify. *)
         let ts_list = (List.map (fun v -> Term.mk_action v is) vs)

@@ -295,21 +295,20 @@ let pp_usage tacname fmt esort =
 module Table : sig
   val table : Goal.t table
 
-  val get : string -> TacticsArgs.parser_arg list -> Goal.t Tactics.tac
+  val get : L.t -> string -> TacticsArgs.parser_arg list -> Goal.t Tactics.tac
 
   val pp_goal_concl : Format.formatter -> Goal.t -> unit
 end = struct
   let table = Hashtbl.create 97
 
-  (* TODO:location *)
-  let get id =
-    try let tac = (Hashtbl.find table id) in
+  let get loc id =
+    try let tac = Hashtbl.find table id in
       if not(tac.pq_sound) && Config.post_quantum () then
         Tactics.hard_failure Tactics.TacticNotPQSound
       else
         tac.maker
     with
-      | Not_found -> hard_failure
+      | Not_found -> hard_failure ~loc
              (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
 
   let pp_goal_concl ppf j = match j with
@@ -330,7 +329,7 @@ module AST :
 
   let pp_arg = TacticsArgs.pp_parser_arg
 
-  let autosimpl () = Table.get "autosimpl" []
+  let autosimpl () = Table.get L._dummy "autosimpl" []
   let autosimpl = Lazy.from_fun autosimpl
 
   let re_raise_tac loc tac s sk fk : Tactics.a =
@@ -340,7 +339,7 @@ module AST :
 
   let eval_abstract mods (id : lsymb) args : judgment Tactics.tac =
     let loc, id = L.loc id, L.unloc id in
-    let tac = re_raise_tac loc (Table.get id args) in
+    let tac = re_raise_tac loc (Table.get loc id args) in
     match mods with
       | "nosimpl" :: _ -> tac
       | [] -> Tactics.andthen tac (Lazy.force autosimpl)
