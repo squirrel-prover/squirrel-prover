@@ -44,13 +44,14 @@ module Pos : sig
 
   (*------------------------------------------------------------------*)
   (** [f] of type ['a f_map_fold] is a function that, given 
-      [t vars conds p acc] where:
+      [t projs vars conds p acc] where:
       - [t] is sub-term of the term we are mapping one
+      - [projs] are the projections applying to [t], if any
       - [vars] are the free variable bound above [t]'s occurrence
       - [conds] are conditions above [t]'s occurrence
       - [p] is the position of [t]'s occurrence
 
-      If [f t vars conds p acc =]:
+      If [f t projs vars conds p acc =]:
       - [`Select], we found a position.
       - [`Continue], we keep looking for positions downwards. *)
   type 'a f_map_fold =
@@ -143,6 +144,8 @@ type 'a pat = {
 }
 (* TODO we should probably indicate wrt which system (context)
    the pattern should be understood *)
+
+val project_term_pat : Term.projs -> Term.term pat -> Term.term pat
 
 (** Make a pattern out of a formula: all universally quantified variables
     are added to [pat_vars]. *)

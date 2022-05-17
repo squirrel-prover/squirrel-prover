@@ -532,6 +532,9 @@ let pat_of_form (t : term) =
     pat_vars = Vars.Sv.of_list vs;
     pat_term = t; }
 
+let project_term_pat (projs : Term.projs) (pat : Term.term pat) : Term.term pat =
+  { pat with pat_term = Term.project projs pat.pat_term; }
+
 (*------------------------------------------------------------------*)
 (** {2 Matching variable assignment} *)
 

@@ -95,6 +95,8 @@ let subset table e1 e2 = match e1,e2 with
   | _, Any -> true
   | _ -> false
 
+let equal table s1 s2 = subset table s1 s2 && subset table s2 s1
+
 (*------------------------------------------------------------------*)
 (** {2 Finite sets} *)
 

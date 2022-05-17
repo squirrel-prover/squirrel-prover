@@ -233,6 +233,7 @@ let global_rename
   let n1', n2' = (Term.subst subs n1, Term.subst subs n2) in
   let rw_rule = Rewrite.{
       rw_tyvars = [];
+      rw_system = SE.any;
       rw_vars   = Vars.Sv.of_list vs;
       rw_conds  = [];
       rw_rw     = n1', n2';
@@ -345,6 +346,7 @@ let global_prf
   in
   let rw_rule = Rewrite.{
       rw_tyvars = [];
+      rw_system = SE.any;
       rw_vars   = Vars.Sv.of_list (fresh_x_var :: is1);
       rw_conds  = [];
       rw_rw     = hash_pattern, mk_tryfind;
@@ -503,6 +505,7 @@ let global_cca
 
   let enc_rw_rule = Rewrite.{
       rw_tyvars = [];
+      rw_system = SE.any;
       rw_vars   = Vars.Sv.of_list is;
       rw_conds  = [];
       rw_rw     = enc, new_enc;
@@ -510,6 +513,7 @@ let global_cca
   in
   let dec_rw_rule = Rewrite.{
       rw_tyvars = [];
+      rw_system = SE.any;
       rw_vars   = Vars.Sv.of_list (fresh_x_var :: is1);
       rw_conds  = [];
       rw_rw     = dec_pattern, tryfind_dec;
@@ -1115,6 +1119,7 @@ let global_prf_t
       
       let rule = Rewrite.{
           rw_tyvars = [];
+          rw_system = SE.any;
           rw_vars   = Sv.of_list (x :: is);
           rw_conds  = [];
           rw_rw     = (to_rw, rw_target venv tau0 xocc); }

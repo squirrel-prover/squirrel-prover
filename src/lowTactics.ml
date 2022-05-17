@@ -151,7 +151,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let do_target
       (doit : (
           (Equiv.any_form * Ident.t option) -> 
-          Equiv.any_form * S.conc_form list))
+          (Equiv.any_form * (SE.context * S.conc_form) list)))
       (s : S.sequent) (t : target) : S.sequent * S.sequent list =
     let f, s, tgt_id = match t with
       | T_conc ->
@@ -167,7 +167,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     let f,subs = doit (f,tgt_id) in
     let subs : S.sequent list =
-      List.map (fun sub -> S.set_goal sub s) subs
+      List.map (fun (sub_system, sub) -> 
+          S.set_system sub_system (S.set_goal sub s)
+        ) subs
     in
 
     match t, f with
@@ -176,7 +178,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | T_felem i, `Reach f -> S.change_felem i [f] s, subs
     | _ -> assert false
 
-  let do_targets doit (s : S.sequent) targets : S.sequent * S.sequent list =
+  let do_targets doit (s : S.sequent) (targets : target list) 
+    : S.sequent * S.sequent list 
+    =
     let s, subs =
       List.fold_left (fun (s,subs) target ->
           let s, subs' = do_target doit s target in
@@ -257,7 +261,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     (* applies [doit] to all subterms of the target [f] *)
     let doit
         ((f,_) : Equiv.any_form * Ident.t option) 
-      : Equiv.any_form * S.conc_form list 
+      : Equiv.any_form * (SE.context * S.conc_form) list 
       =
       let unfold (projs : Term.projs option) occ = 
         match unfold_term ~strict occ projs s with
@@ -443,7 +447,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     let doit_tgt 
         (f,tgt_id : Equiv.any_form * Ident.t option) 
-      : Equiv.any_form * S.conc_form list 
+      : Equiv.any_form * (SE.context * S.conc_form) list 
       =
       let mult, id_opt, rw_erule = rw in
       if is_same id_opt tgt_id
@@ -457,7 +461,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         match rw_res with
         | `Result (f, subs) ->
           found := true;
-          f, List.map (fun l -> S.unwrap_conc (`Reach l)) subs
+          f, List.map (fun (system, l) -> system, S.unwrap_conc (`Reach l)) subs
 
         | `NothingToRewrite ->
           if all then f, []
@@ -479,13 +483,18 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let p_rw_rule dir (p_pt : Theory.p_pt)
       : Rewrite.rw_rule * S.sequent list * Ident.t option
       =
-      let ghyp, pat = S.convert_pt ~close_pats:false p_pt Equiv.Local_t s in
+      let ghyp, pat_system, pat = 
+        S.convert_pt_gen
+          ~check_compatibility:false
+          ~close_pats:false
+          p_pt Equiv.Local_t s 
+      in
       let id_opt = match ghyp with `Hyp id -> Some id | _ -> None in
 
       (* We are using an hypothesis, hence no new sub-goals *)
       let premise = [] in
 
-      Rewrite.pat_to_rw_rule dir pat, premise, id_opt
+      Rewrite.pat_to_rw_rule pat_system.set dir pat, premise, id_opt
     in
 
     let p_rw_item (rw_arg : Args.rw_item) : rw_earg * (S.sequent list) =
@@ -867,7 +876,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       in
       let s = Hyps.remove id s in
       let pat = Match.pat_of_form f in
-      let erule = Rewrite.pat_to_rw_rule ~loc (L.unloc dir) pat in
+      let erule = Rewrite.pat_to_rw_rule ~loc (S.system s).set (L.unloc dir) pat in
       let s, subgoals =
         rewrite ~loc ~all:false [T_conc] (`Once, Some id, erule) s
       in

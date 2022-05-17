@@ -83,7 +83,10 @@ let pp_projs fmt (l : projs) = Fmt.list ~sep:Fmt.comma pp_proj fmt l
 
 let left_proj  = "left"
 let right_proj = "right"
-  
+
+module Sproj = Ss 
+module Mproj = Ms
+
 (*------------------------------------------------------------------*)
 type 'a diff_args =
   | Explicit of (proj * 'a) list

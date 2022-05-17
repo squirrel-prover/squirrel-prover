@@ -12,6 +12,7 @@ module SE   = SystemExpr
     - ((FV(r) ∪ FV(φ)) ∩ sv) ⊆ FV(l) *)
 type rw_rule = {
   rw_tyvars : Type.tvars;            (** type variables *)
+  rw_system : SE.t;                  (** systems the rule applies to *)
   rw_vars   : Vars.Sv.t;             (** term variables *)
   rw_conds  : Term.term list;        (** premises *)
   rw_rw     : Term.term * Term.term; (** pair (source, destination) *)
@@ -56,7 +57,7 @@ let check_rule (rule : rw_rule) : unit =
   ()
 
 (** Make a rewrite rule from a formula *)
-let pat_to_rw_rule ?loc dir (p : Term.term Match.pat) : rw_rule =
+let pat_to_rw_rule ?loc system dir (p : Term.term Match.pat) : rw_rule =
   let subs, f = Term.decompose_impls_last p.pat_term in
 
   let e = match Term.destr_eq f with
@@ -73,6 +74,7 @@ let pat_to_rw_rule ?loc dir (p : Term.term Match.pat) : rw_rule =
 
   let rule = {
     rw_tyvars = p.pat_tyvars;
+    rw_system = system;
     rw_vars   = p.pat_vars;
     rw_conds  = subs;
     rw_rw     = e;
@@ -122,7 +124,7 @@ let rewrite_head
 
 (*------------------------------------------------------------------*)
   type rw_res = [
-    | `Result of Equiv.any_form * Term.term list
+    | `Result of Equiv.any_form * (SE.context * Term.term) list
     | `NothingToRewrite
     | `MaxNestedRewriting
   ]
@@ -141,8 +143,9 @@ let rewrite
     (rule   : rw_rule)
     (target : Equiv.any_form) : rw_res
   =
-  let system = system.set in (* TODO fixme *)
   let exception Failed of [`NothingToRewrite | `MaxNestedRewriting] in
+
+  let left, right = rule.rw_rw in
 
   let check_max_rewriting : unit -> unit =
     let cpt_occ = ref 0 in
@@ -155,21 +158,24 @@ let rewrite
   (* Attempt to find an instance of [left], and rewrites all occurrences of
      this instance.
      Return: (f, subs) *)
-  let rec _rewrite 
-      (mult : Args.rw_count)
-      ((tyvars, sv, rsubs, left, right) : _rw_rule)
-      (f : Equiv.any_form)
-    : Equiv.any_form * Term.term list
+  let rec _rewrite (mult : Args.rw_count) (f : Equiv.any_form) 
+    : Equiv.any_form * (SE.context * Term.term) list
     =
     check_max_rewriting ();
 
     let subs_r = ref [] in
-    let found_instance = ref false in
-
+    let found_instance : [`False | `Found of SE.t] ref = 
+      ref `False 
+    in
+    
     (* This is a reference, so that it can be over-written later
        after we found an instance of [left]. *)
-    let pat : Term.term Match.pat ref =
-      ref Match.{ pat_tyvars = tyvars; pat_vars = sv; pat_term = left }
+    let pat : Term.term Match.pat ref = 
+      ref Match.{ 
+          pat_tyvars = rule.rw_tyvars; 
+          pat_vars   = rule.rw_vars; 
+          pat_term   = left 
+        }
     in
     let right_instance = ref None in
 
@@ -179,35 +185,58 @@ let rewrite
        the generated sub-goals. *)
     let rw_inst : Match.Pos.f_map = 
       fun occ projs vars _conds _p ->
-        let system = SE.project_opt projs system in
-        (* TODO: [pat] must be projected somehow *)
-        match Match.T.try_match table system occ !pat with
-        | NoMatch _ | FreeTyv -> `Continue
+        (* project the system *)
+        let system_set = SE.project_opt projs system.set in
 
-        (* head matches *)
-        | Match mv ->
-          if !found_instance then
+        if not (SE.subset table system_set rule.rw_system) then 
+          `Continue
+        else 
+          match !found_instance with
+          | `Found p_system -> 
             (* we already found the rewrite instance earlier *)
-            `Map (oget !right_instance)
 
-          else begin (* we found the rewrite instance *)
-            found_instance := true;
-            let subst = Match.Mvar.to_subst ~mode:`Match mv in
-            let left = Term.subst subst left in
-            let right = Term.subst subst right in
+            (* check if the same system apply to the subterm *)
+            if not (SE.equal table system_set p_system) then 
+              `Continue 
+            else
+              begin match Match.T.try_match table system_set occ !pat with
+                | NoMatch _ | FreeTyv -> `Continue
+                | Match mv -> `Map (oget !right_instance)
+              end
 
-            right_instance := Some right;
-            subs_r :=
-              List.map (fun rsub ->
-                  Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
-                ) rsubs;
+          | `False ->
+            (* project the pattern *)
+            let pat_proj = 
+              omap_dflt !pat (Match.project_term_pat ^~ !pat) projs
+            in
+            match Match.T.try_match table system_set occ pat_proj with
+            | NoMatch _ | FreeTyv -> `Continue
 
-            pat := Match.{ pat_term   = left;
-                           pat_tyvars = [];
-                           pat_vars   = Sv.empty; };
+            (* head matches *)
+            | Match mv ->
+              (* we found the rewrite instance *)
+              found_instance := `Found system_set;
+              let subst = Match.Mvar.to_subst ~mode:`Match mv in
+              let left = Term.subst subst pat_proj.pat_term in
+              let right = 
+                let right_proj = 
+                  omap_dflt right (Term.project ^~ right) projs 
+                in
+                Term.subst subst right_proj
+              in
 
-            `Map right
-          end
+              right_instance := Some right;
+              subs_r :=
+                List.map (fun rsub ->
+                    { system with set = system_set}, 
+                    Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
+                  ) rule.rw_conds;
+
+              pat := Match.{ pat_term   = left;
+                             pat_tyvars = [];
+                             pat_vars   = Sv.empty; };
+
+              `Map right
     in
 
     let found, f = match f with
@@ -226,16 +255,14 @@ let rewrite
     | (`Once | `Many), false -> raise (Failed `NothingToRewrite)
 
     | (`Many | `Any), true ->
-      let f, rsubs' = _rewrite `Any (tyvars, sv, rsubs, left, right) f in
+      let f, rsubs' = _rewrite `Any f in
       f, List.rev_append (!subs_r) rsubs'
 
     | `Once, true -> f, !subs_r
   in
 
-  let l,r = rule.rw_rw in
-  match
-    _rewrite mult (rule.rw_tyvars, rule.rw_vars, rule.rw_conds, l, r) target
-  with
-  | f, subs                                -> `Result (f, List.rev subs)
+  match _rewrite mult target with
+  | f, subs -> `Result (f, List.rev subs)
+
   | exception Failed (`NothingToRewrite)   -> `NothingToRewrite
   | exception Failed (`MaxNestedRewriting) -> `MaxNestedRewriting

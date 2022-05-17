@@ -312,6 +312,12 @@ let oiter f a = match a with
   | None -> ()
   | Some x -> f x
 
+let oequal eq a b =
+  match a, b with
+  | None, None -> true
+  | Some a, Some b -> eq a b
+  | _ -> false
+
 (*------------------------------------------------------------------*)
 module type Ordered = sig
   type t
@@ -623,3 +629,5 @@ let as_seq4 = function [x1; x2; x3; x4] -> (x1, x2, x3, x4)
 
 (* -------------------------------------------------------------------- *)
 let (-|) f g = fun x -> f (g x)
+
+let (^~) f = fun x y -> f y x

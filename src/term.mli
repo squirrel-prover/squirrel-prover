@@ -63,6 +63,9 @@ val pp_msymb :  Format.formatter -> msymb -> unit
 type proj
 type projs = proj list
 
+module Mproj : Map.S with type key = proj
+module Sproj : Set.S with type elt = proj
+
 val pp_proj  : Format.formatter -> proj -> unit
 val pp_projs : Format.formatter -> projs -> unit
   

@@ -47,6 +47,8 @@ val any_compatible_with : System.t -> compatible
 (** [subset s1 s2] iff [s1] is included in [s2]. *)
 val subset : Symbols.table -> 'a expr -> 'a expr -> bool
 
+val equal : Symbols.table -> 'a expr -> 'a expr -> bool
+
 val is_fset : t -> bool
   
 (*------------------------------------------------------------------*)

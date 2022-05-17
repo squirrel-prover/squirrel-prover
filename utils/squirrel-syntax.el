@@ -25,6 +25,7 @@
   "Proof"
   "Qed"
   "equiv"
+  "any"
 ))
 
 (defvar squirrel-dangerous-keywords '(

@@ -174,6 +174,7 @@ val obind     : ('a -> 'b option) -> 'a option -> 'b option
 val omap      : ('a -> 'b) -> 'a option -> 'b option
 val omap_dflt : 'b -> ('a -> 'b) -> 'a option -> 'b
 val oiter     : ('a -> unit) -> 'a option -> unit
+val oequal    : ('a -> 'b -> bool) -> 'a option -> 'b option -> bool
 
 (*------------------------------------------------------------------*)
 (** [classes f_eq l] returns the equivalence classes of [l] modulo [f_eq],
@@ -211,6 +212,9 @@ val snd_map : ('b -> 'c) -> 'a * 'b -> 'c
 (*------------------------------------------------------------------*)
 (** composition *)
 val (-|) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
+
+(** inverse arguments *)
+val (^~) : ('a -> 'b -> 'c) -> ('b -> 'a -> 'c)
   
 (*------------------------------------------------------------------*)
 val as_seq0 : 'a list -> unit
