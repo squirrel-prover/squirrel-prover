@@ -959,49 +959,6 @@ let push_formula (j: 'a option) f term =
 
   | _ -> mk_ite term
 
-let ifcond Args.(Pair (Int i, Pair (Opt (Int, j), Message (f,_)))) s =
-  let before, e, after = split_equiv_goal i s in
-
-  let cond, positive_branch, negative_branch =
-    match e with
-    | Term.Fun (fs,_,[c;t;e]) when fs = Term.f_ite -> (c, t, e)
-    | _ ->  soft_failure
-              (Tactics.Failure "can only be applied to a conditional")
-  in
-
-  try
-    let new_elem =
-      Term.mk_ite ~simpl:false
-        cond (push_formula j f positive_branch) negative_branch
-    in
-    let biframe = List.rev_append before (new_elem :: after) in
-    let trace_sequent =
-      ES.(to_trace_sequent
-            (set_reach_goal Term.(mk_impl ~simpl:false cond f) s))
-    in
-
-    [ Goal.Trace trace_sequent;
-      Goal.Equiv (ES.set_equiv_goal biframe s) ]
-  with
-  | Not_ifcond ->
-    soft_failure
-      (Tactics.Failure "the formula contains variables that overlap with \
-                        variables bound by \
-                        a seq or a try find construct")
-
-
-let () =
-  T.register_typed "ifcond"
-    ~general_help: "If the given conditional implies that the given formula f is \
-                    true, push the formula f at top-level in all the subterms of \
-                    the then branch. "
-    ~detailed_help:"A message m in the positive branch will become of the form \
-                    `if f then m else 0`. If the int parameter j is given, will \
-                    push the formula only in the jth subterm of the then branch \
-                    (zero-based)."
-    ~pq_sound:true
-   ~tactic_group:Structural
-   (LowTactics.genfun_of_efun_arg ifcond) Args.(Pair (Int, Pair( Opt Int, Boolean)))
 
 
 

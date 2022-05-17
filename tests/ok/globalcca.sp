@@ -75,24 +75,28 @@ expand output.
 
 ifeq 5,fst(input@B), fst(output@A).
 intro _ => //.
-help.
-ifcond 5, exec@pred(B) && A<B => //.
+
+have ->: forall (b, b', b'' : boolean, x, y : message),
+ if b && b' && b'' then diff(x,y) =
+ if b && b' && b'' then diff(if b && b' then x, if b && b' then y).
+by intro ?? b''; case b''; project.
 
 have -> : if exec@pred(B) && A < B then
          h(ok,
          try find  such that fst(output@A) = enc(n_CCA,r,pk(kenc))
          in n else dec(fst(output@A),kenc)) =
        if exec@pred(B) && A < B then
-         h(ok,n).
-fa => //.
-intro Ord.
-
-expand output.
-rewrite fst_pair.
-case try find such that _ in n else _.
-intro [_ Meq].
-auto.
-intro [Neg _] => //.
+         h(ok,n). {
+  fa => //.
+  intro Ord.
+  
+  expand output.
+  rewrite fst_pair.
+  case try find such that _ in n else _.
+  intro [_ Meq].
+  auto.
+  intro [Neg _] => //.
+}
 
 fa 5. fadup 5.
 fa 5. fadup 5.
