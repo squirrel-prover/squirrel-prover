@@ -212,20 +212,12 @@ Proof.
   (* Action 2/4: Reader1 *)
 
   + expand frame.
-
-    have -> :
-      exec@Reader1(k) =
-      (exec@pred(Reader1(k)) &&
-       exists (i,j:index),
-         Tag(i,j) < Reader1(k) && Reader(k) < Reader1(k)  &&
-         output@Tag(i,j) = input@Reader1(k) &&
-         input@Tag(i,j) = output@Reader(k));
-    1: by rewrite eq_iff; use wa_Reader1 with k.
+    rewrite wa_Reader1 //.
 
     expand output.
     fa 2. fa 3. fadup 3.
 
-    equivalent
+    have ->:
       (if
          exec@pred(Reader1(k)) &&
          (exists (i,j:index),
@@ -242,7 +234,8 @@ Proof.
             enc(<tagR,<snd(snd(dec(input@Reader1(k),diff(kE(i),kbE(i,j))))),
                        nr(k)>>,
                 rr(k),
-                diff(kE(i),kbE(i,j))))),
+                diff(kE(i),kbE(i,j)))))
+      =
       (if
          exec@pred(Reader1(k)) &&
          (exists (i,j:index),
@@ -300,14 +293,7 @@ Proof.
   (* Action 3/4: Reader2 *)
 
   + expand frame.
-
-    equivalent
-      exec@Reader2(k),
-      exec@pred(Reader2(k)) && not (exists (i,j:index),
-        Tag(i,j) < Reader2(k) && Reader(k) < Reader2(k)  &&
-        output@Tag(i,j) = input@Reader2(k) &&
-        input@Tag(i,j) = output@Reader(k)).
-    by use wa_Reader2 with k.
+    rewrite wa_Reader2 //.
 
     fa 2.
     fa 3; fadup 3.

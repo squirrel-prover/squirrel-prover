@@ -264,30 +264,32 @@ Proof.
    + (* Pfail *)
      expand frame.
 
-     equivalent exec@Pfail, False.
-     {expand exec.
-     split; 2: by auto => _.
-     depends Pok, Pfail => // _.
-     executable pred(Pfail); 1,2: by auto.
-     intro He; use He with Pok; 2: by auto.
-
-     expand exec.
-     by use P_charac.}
+     have -> : exec@Pfail <=> false. {
+       expand exec.
+       split; 2: by auto => _.
+       depends Pok, Pfail => // _.
+       executable pred(Pfail); 1,2: by auto.
+       intro He; use He with Pok; 2: by auto.
+       
+       expand exec.
+       by use P_charac.
+     }
 
      by rewrite if_false in 7.
 
    + (* Sfail *)
      expand frame.
 
-     equivalent exec@Sfail, False.
-     {expand exec.
-     split; 2: by auto => _.
-     depends Sok, Sfail => // _.
-     executable pred(Sfail); 1,2: by auto.
-     intro He; use He with Sok; 2: by auto.
-
-     expand exec.
-     by use S_charac.}
+     have -> : exec@Sfail <=> False. {
+       expand exec.
+       split; 2: by auto => _.
+       depends Sok, Sfail => // _.
+       executable pred(Sfail); 1,2: by auto.
+       intro He; use He with Sok; 2: by auto.
+       
+       expand exec.
+       by use S_charac.
+     }
 
      by rewrite if_false in 7.
 

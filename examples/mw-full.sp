@@ -193,20 +193,11 @@ Proof.
   (* Case R1  WIP *)
   + expand frame, exec, cond, output.
     fa 4; fa 5.
-
-    equivalent
-      (exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
-                           H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))),
-      (exists (i,t:index), T(i,t) < R1(r) &&
-       snd(output@T(i,t)) = snd(input@R1(r)) &&
-       fst(output@T(i,t)) = fst(input@R1(r)) &&
-       R(r) < T(i,t) &&
-       output@R(r) = input@T(i,t)).
-    by use wa_R1 with r.
+    rewrite wa_R1 //.
 
     fadup 5.
 
-    equivalent
+    have -> :
       (if
           exec@pred(R1(r)) &&
           exists (i,t:index),
@@ -219,7 +210,8 @@ Proof.
              xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
              H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))) in
              xor(diff(id(i),id'(i,t)),
-                 H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))))),
+                 H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))))))
+      =
       (if
           exec@pred(R1(r)) &&
           exists (i,t:index),
@@ -269,9 +261,10 @@ Proof.
 
     (* Same as wa_R1 but with @R2 instead of @R1,
        and the equivalence is used under a negation. *)
-    equivalent
+    have -> :
       (exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R2(r))) =
-                     H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t)))),
+                     H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t))))
+      <=>
       (exists (i,t:index), T(i,t) < R2(r) &&
         snd(output@T(i,t)) = snd(input@R2(r)) &&
         fst(output@T(i,t)) = fst(input@R2(r)) &&
@@ -311,16 +304,18 @@ Proof.
   + expand frame, exec.
     fa 4. fa 5.
 
-    equivalent exec@pred(T1(i,t)) && cond@T1(i,t),
-      exec@pred(T1(i,t)) &&
-      exists r:index,
+    have ->:
+    (exec@pred(T1(i,t)) && cond@T1(i,t)) 
+    <=>
+    (exec@pred(T1(i,t)) &&
+     exists r:index,
       R1(r) < T1(i,t) &&
       input@T1(i,t) = output@R1(r) &&
       T(i,t) < R1(r) &&
       fst(input@R1(r)) = fst(output@T(i,t)) &&
       snd(input@R1(r)) = snd(output@T(i,t)) &&
       R(r) < T(i,t) &&
-      input@T(i,t) = output@R(r).
+      input@T(i,t) = output@R(r)).
     {
       expand cond; split.
       (* Cond => Honest *)
@@ -395,19 +390,20 @@ Proof.
   (* Case T2 *)
   + expand frame, exec, cond.
     fa 4. fa 5.
-    equivalent
+    have ->:
       (exec@pred(T2(i,t)) &&
        not(input@T2(i,t) =
-           diff(id(i),id'(i,t)) XOR H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t))))),
-      exec@pred(T2(i,t)) &&
-      not(exists r:index,
+           diff(id(i),id'(i,t)) XOR H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t)))))
+      <=>
+      (exec@pred(T2(i,t)) &&
+       not(exists r:index,
           R1(r) < T2(i,t) &&
           input@T2(i,t) = output@R1(r) &&
           T(i,t) < R1(r) &&
           fst(input@R1(r)) = fst(output@T(i,t)) &&
           snd(input@R1(r)) = snd(output@T(i,t)) &&
           R(r) < T(i,t) &&
-          input@T(i,t) = output@R(r)).
+          input@T(i,t) = output@R(r))).
     {
       split; intro [_ H1]; simpl.
 

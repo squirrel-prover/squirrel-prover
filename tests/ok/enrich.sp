@@ -34,8 +34,6 @@ enrich seq(i:index ->h(ok,k(i))).
  expandall.
  fa 1.
  fa 2.
- equivalent cond@t, True.
- by expand cond. 
  fa 2.
 
  by apply Hind.

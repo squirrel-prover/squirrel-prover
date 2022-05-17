@@ -117,7 +117,7 @@ Proof.
 
     + (* Schall3 *)
       expand frame, exec, output.
-      equivalent exec@pred(Schall3(j)) && cond@Schall3(j), False.
+      have ->: (exec@pred(Schall3(j)) && cond@Schall3(j)) <=> False.
       {split => //. 
        intro [Hexec Hcond].
        expand cond.

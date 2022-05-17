@@ -1,6 +1,8 @@
 set autoIntro=false.
 (* set debugConstr=true. *)
 
+include Basic.
+
 hash h
 name k:message
 channel c
@@ -45,7 +47,7 @@ auto.
 expandall.
 fa 1.
 repeat fa 2.
-equivalent  diff(try find  such that ok = ok in n else h(ok,k),n), n.
+have -> : diff(try find  such that ok = ok in n else h(ok,k),n) = n.
 project.
 
 case (try find  such that ok = ok in n else h(ok,k)); auto.
@@ -57,18 +59,10 @@ expandall.
 fa 1.
 repeat fa 2.
 
-
-equivalent ok=ok,true.
-auto.
+simpl. 
 rewrite tf in 2.
 rewrite ref in 2.
-equivalent  diff(try find  such that ok = ok in n else h(ok,k),n), n.
-project.
-
-case (try find  such that ok = ok in n else h(ok,k)); auto.
 auto.
-auto.
-
 Qed.
 
 
@@ -102,8 +96,8 @@ expandall.
 fa 1. repeat fa 2.
 
 
-equivalent      try find j such that (msg(i) = msg(j) && i = j)
-     in idn(j) else h(msg(i),key(i)),
+have ->:      try find j such that (msg(i) = msg(j) && i = j)
+     in idn(j) else h(msg(i),key(i)) =
      idn(i).
 case      try find j such that (msg(i) = msg(j) && i = j)
      in idn(j) else h(msg(i),key(i)).
@@ -117,15 +111,15 @@ destruct H2.
 use H0 with i.
 auto.
 
-equivalent  diff(idn(i),idn(i)), idn(i).
+have ->:  diff(idn(i),idn(i)) = idn(i).
 project; auto.
 expandseq seq(i:index->idn(i)), i.
 auto.
 
 
 expandall.
-equivalent   try find j such that (msg(i) = msg(j) && i = j)
-         in idn(j) else h(msg(i),key(i)),
+have ->:   try find j such that (msg(i) = msg(j) && i = j)
+         in idn(j) else h(msg(i),key(i)) =
          idn(i).
 case  try find j such that (msg(i) = msg(j) && i = j)
          in idn(j) else h(msg(i),key(i)).
@@ -139,7 +133,7 @@ destruct H2.
 use H0 with i.
 auto.
 
-equivalent  diff(idn(i),idn(i)), idn(i).
+have ->:  diff(idn(i),idn(i)) = idn(i).
 project; auto.
 expandseq seq(i:index->idn(i)), i.
 fa 2.
@@ -148,8 +142,6 @@ auto.
 Qed.
 
 (*------------------------------------------------------------------*)
-include Basic.
-
 system [test_ok2] (A: out(c, <ok,<h(ok,k),h(ok2,k)>>) | B: out(c, h(ok,k))).
 (* we start with a first transitivity, from test/left to testPrf *)
 system test_ok2G = [test_ok2/left] with gprf, h(ok,k).

@@ -49,7 +49,11 @@ type p_hint =
 let add_hint_rewrite (s : lsymb) tyvars form db =
   let pat = Match.pat_of_form form in
   let pat = Match.{ pat with pat_tyvars = tyvars; } in      
-  let rule = Rewrite.pat_to_rw_rule ~loc:(L.loc s) SE.any `LeftToRight pat in
+  let rule = 
+    Rewrite.pat_to_rw_rule
+      ~loc:(L.loc s) ~destr_eq:Term.destr_eq 
+      SE.any `LeftToRight pat 
+  in
   let h = { name = L.unloc s; rule; } in
   let head =
     let src, _ = rule.Rewrite.rw_rw in

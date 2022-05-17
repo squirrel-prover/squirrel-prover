@@ -201,7 +201,7 @@ Proof.
    + (* P4 *)
      expand frame, exec. fa 6.
 
-     equivalent exec@pred(P4) && cond@P4, False.
+     have ->: (exec@pred(P4) && cond@P4) <=> False.
      {split => //. intro [Hexec Hcond].
       depends P1, P4 => //. 
       executable pred(P4) => //.
@@ -233,7 +233,7 @@ Proof.
    + (* S4 *)
      expand frame, exec.
 
-     equivalent exec@pred(S4) && cond@S4, False.
+     have ->: (exec@pred(S4) && cond@S4) <=> False.
      {split => //. intro [Hexec Hcond]. 
       depends S1, S4 => //.
       executable pred(S4) => //.

@@ -57,10 +57,16 @@ let check_rule (rule : rw_rule) : unit =
   ()
 
 (** Make a rewrite rule from a formula *)
-let pat_to_rw_rule ?loc system dir (p : Term.term Match.pat) : rw_rule =
+let pat_to_rw_rule ?loc 
+    ~(destr_eq : Term.term -> (Term.term * Term.term) option)
+    (system    : SE.arbitrary) 
+    (dir       : [< `LeftToRight | `RightToLeft ])
+    (p         : Term.term Match.pat) 
+  : rw_rule 
+  =
   let subs, f = Term.decompose_impls_last p.pat_term in
 
-  let e = match Term.destr_eq f with
+  let e = match destr_eq f with
     | Some (t1, t2) -> t1,t2
     | _ -> Tactics.hard_failure ?loc (Tactics.Failure "not an equality")
   in

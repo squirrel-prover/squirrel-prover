@@ -165,7 +165,7 @@ expandall.
     expand seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), i, j.
 
    expand frame@P3(i); expand exec@P3(i); expand output@P3(i).
-   equivalent cond@P3(i), False.
+   have ->: cond@P3(i) <=> False.
    expand cond@P3(i).
    executable pred(P3(i)).
 
@@ -191,7 +191,7 @@ expandall.
 
    expand frame@S3(j); expand exec@S3(j).
    (* Unreachability of S3  *)
-   equivalent cond@S3(j), False.
+   have ->: cond@S3(j) <=> False.
    expand cond@S3(j).
    executable pred(S3(j)).
    depends S1(j), S3(j).

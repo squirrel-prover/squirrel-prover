@@ -17,9 +17,9 @@ Proof.
   prf 1.
   (* Check that the right formula has been produced,
      using an incorrect equivalence that we admit. *)
-  equivalent
-    (forall (i0:index), (diff(n(i) <> n(i0), m(i) <> n(i0)))),
-    True.
+  have ->:
+    (forall (i0:index), (diff(n(i) <> n(i0), m(i) <> n(i0)))) =
+    true.
   admit. 
   by rewrite if_true in 1.
 Qed.
@@ -31,9 +31,8 @@ Proof.
   prf 1.
   (* Check that the right formula has been produced,
      using an incorrect equivalence that we admit. *)
-  equivalent
-    (diff(n(i), m(i)) <> n(i)),
-    True.
+  have ->:
+    (diff(n(i), m(i)) <> n(i)) = true.
   admit.
   by rewrite if_true in 1.
 Qed.

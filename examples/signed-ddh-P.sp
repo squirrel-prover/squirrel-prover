@@ -172,7 +172,7 @@ Proof.
       `exec@pred(Pchall3(i)) && cond@Pchall3(i)` is equivalent to `False`, relying
       on the previous property `P_charac`. **)
       expand frame, exec, output.
-      equivalent exec@pred(Pchall3(i)) && cond@Pchall3(i), False. {
+      have ->: (exec@pred(Pchall3(i)) && cond@Pchall3(i)) <=> false. {
         split => //.
         intro [Hexec Hcond].
         expand cond.

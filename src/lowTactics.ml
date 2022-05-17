@@ -79,6 +79,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Miscellaneous} *)
 
+  (** build a pattern from a rewriting rule using S.Reduce to get the equality *)
+  let pat_to_rw_rule s =
+    Rewrite.pat_to_rw_rule
+      ~destr_eq:(S.Reduce.destr_eq Reduction.rp_full s Equiv.Local_t) 
+
   (*------------------------------------------------------------------*)
   let wrap_fail f (s: S.sequent) sk fk =
     try sk (f s) fk with
@@ -494,7 +499,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (* We are using an hypothesis, hence no new sub-goals *)
       let premise = [] in
 
-      Rewrite.pat_to_rw_rule pat_system.set dir pat, premise, id_opt
+      pat_to_rw_rule s pat_system.set dir pat, premise, id_opt
     in
 
     let p_rw_item (rw_arg : Args.rw_item) : rw_earg * (S.sequent list) =
@@ -876,7 +881,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       in
       let s = Hyps.remove id s in
       let pat = Match.pat_of_form f in
-      let erule = Rewrite.pat_to_rw_rule ~loc (S.system s).set (L.unloc dir) pat in
+      let erule = pat_to_rw_rule s ~loc (S.system s).set (L.unloc dir) pat in
       let s, subgoals =
         rewrite ~loc ~all:false [T_conc] (`Once, Some id, erule) s
       in

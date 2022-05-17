@@ -1044,11 +1044,13 @@ Proof.
   expand FK1.
   use auth3 with i,j,k => //.
   destruct H0.
-  equivalent try find il,jl,kl such that
+  have ->: (try find il,jl,kl such that
                fst(snd(input@FI(i,j,k))) =
                encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
              in F1(sid10(i,j,k)@FI(i,j,k),n_PRF(il,jl,kl))
-             else _,
+             else F1(sid10(i,j,k)@FI(i,j,k),
+                  exct(skex,decap(fst(snd(input@FI(i,j,k))),vkI(i)))))
+             =
               F1(sid10(i,j,k)@FI(i,j,k),n_PRF(i,j,k0)).
     + repeat destruct H0.
       expand output.

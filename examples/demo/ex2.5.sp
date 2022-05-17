@@ -109,7 +109,7 @@ equiv unreach.
 
    expand frame@S2(j).
 
-     equivalent  exec@S2(j),False.
+     have ->:  exec@S2(j) <=> False.
     simpl.
 
      expand exec@S2(j).

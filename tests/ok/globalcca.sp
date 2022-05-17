@@ -47,17 +47,13 @@ prf 0.
 rewrite if_true // in 0.
 
 expandall.
-equivalent  try find  such that n = n
-          in enc(n_CCA,r,pk(kenc)) else enc(n,r,pk(kenc)),
-  enc(n_CCA,r,pk(kenc)) .
-case (try find  such that n = n in enc(n_CCA,r,pk(kenc)) else enc(n,r,pk(kenc))) => //.
 fa 4.
 auto.
 
 expand frame.
 fa 4.
 fa 5.
-equivalent  exec@B, exec@pred(B) && (A<B && fst(input@B) = fst(output@A)  && snd(input@B) = snd(output@A)).
+have -> : exec@B <=> (exec@pred(B) && (A<B && fst(input@B) = fst(output@A)  && snd(input@B) = snd(output@A))).
 split.
 expand exec,cond.
 intro [ex Ha].
@@ -82,12 +78,10 @@ intro _ => //.
 help.
 ifcond 5, exec@pred(B) && A<B => //.
 
-
-
-equivalent        if exec@pred(B) && A < B then
+have -> : if exec@pred(B) && A < B then
          h(ok,
          try find  such that fst(output@A) = enc(n_CCA,r,pk(kenc))
-         in n else dec(fst(output@A),kenc)),
+         in n else dec(fst(output@A),kenc)) =
        if exec@pred(B) && A < B then
          h(ok,n).
 fa => //.
