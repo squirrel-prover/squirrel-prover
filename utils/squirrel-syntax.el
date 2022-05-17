@@ -82,6 +82,7 @@
   "namelength"
   "with"
   "assert"
+  "have"
   "case"
   "collision"
   "depends"

@@ -1410,7 +1410,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     * We only consider the case here where [f] is a local formula
     * (which is then converted to conclusion and hypothesis formulae)
     * more general forms should be allowed here or elsewhere. *)
-  let assert_form (args : Args.parser_arg list) s : S.t list =
+  let have_form (args : Args.parser_arg list) s : S.t list =
     let ip, f = match args with
       | [f] -> None, f
       | [f; Args.SimplPat ip] -> Some ip, f
@@ -1433,11 +1433,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
     s1 :: s2
 
-  let assert_args = function
+  let have_args = function
     | [Args.AssertPt (pt, ip, mode)] -> use ~mode ip pt
-    | _ as args -> assert_form args
+    | _ as args -> have_form args
 
-  let assert_tac args = wrap_fail (assert_args args)
+  let have_tac args = wrap_fail (have_args args)
 
 
   (*------------------------------------------------------------------*)
@@ -2025,24 +2025,24 @@ let () =
 
 (*------------------------------------------------------------------*)
 let () =
-  T.register_general "assert"
+  T.register_general "have"
     ~tactic_help:
       {general_help = "Add a new hypothesis.";
        detailed_help =
-         "- assert form:\n\
+         "- have form:\n\
          \  Add `form` to the hypotheses, and produce a subgoal to prove \
           `form`. \n\
-          - assert form as intro_pat:\n\
+          - have form as intro_pat:\n\
          \  Idem, except that `intro_pat` is applied to `form`.\n\
-          - assert (intro_pat := proof_term):\n\
+          - have intro_pat := proof_term:\n\
          \  Compute the formula corresponding to `proof_term`, and\n\
          \  apply `intro_pat` to it.\n\
-         \  Exemples: * `assert (H := H0 i i2)`\n\
-         \            * `assert (H := H0 _ i2)`";
+         \  Exemples: * `have H := H0 i i2`\n\
+         \            * `have H := H0 _ i2`";
        usages_sorts = [];
        tactic_group = Logical}
     ~pq_sound:true
-    (gentac_of_any_tac_arg TraceLT.assert_tac EquivLT.assert_tac)
+    (gentac_of_any_tac_arg TraceLT.have_tac EquivLT.have_tac)
 
 (*------------------------------------------------------------------*)
 (* The `use` tacitcs now rely on the same code as the `assert` tactic.

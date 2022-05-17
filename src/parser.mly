@@ -36,7 +36,7 @@
 %token TIME WHERE WITH ORACLE EXN
 %token LARGE NAMEFIXEDLENGTH
 %token PERCENT
-%token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT USE
+%token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT HAVE USE
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY
 %token SPLITSEQ CONSTSEQ MEMSEQ
 %token BY FA INTRO AS DESTRUCT REMEMBER INDUCTION
@@ -680,16 +680,20 @@ constseq_arg:
 %inline rewrite_equiv:
 | REWRITE EQUIV { }
 
-%inline assert_tac:
-| l=lloc(ASSERT) p=tac_term ip=as_ip?
+%inline have_kw: 
+| ASSERT {}
+| HAVE   {}
+
+%inline have_tac:
+| l=lloc(have_kw) p=tac_term ip=as_ip?
     { let ip = match ip with
         | None -> []
         | Some ip -> [TacticsArgs.SimplPat ip] in
-      mk_abstract l "assert" (TacticsArgs.Theory p :: ip) }
+      mk_abstract l "have" (TacticsArgs.Theory p :: ip) }
 
-| l=lloc(ASSERT) LPAREN ip=simpl_pat COLON p=tac_term RPAREN
+| l=lloc(have_kw) ip=simpl_pat COLON p=tac_term 
     { let ip = [TacticsArgs.SimplPat ip] in
-      mk_abstract l "assert" (TacticsArgs.Theory p :: ip) }
+      mk_abstract l "have" (TacticsArgs.Theory p :: ip) }
 
 (*------------------------------------------------------------------*)
 /* tactics named arguments */
@@ -790,19 +794,19 @@ tac:
   | l=lloc(SMT) { mk_abstract l "smt" [] }
 
   (*------------------------------------------------------------------*)
-  /* assert a formula */
-  | t=assert_tac { t }
+  /* assert that we have a formula */
+  | t=have_tac { t }
 
-  | t=assert_tac l=lloc(BY) t1=tac
+  | t=have_tac l=lloc(BY) t1=tac
     { T.AndThenSel (t, [[1], T.By (t1,l)]) }
 
   | l=lloc(USE) pt=pt_use_tac ip=as_ip?
-    { mk_abstract l "assert" [TacticsArgs.AssertPt (pt, ip, `IntroImpl)] }
+    { mk_abstract l "have" [TacticsArgs.AssertPt (pt, ip, `IntroImpl)] }
 
   (*------------------------------------------------------------------*)
   /* assert a proof term */
-  | l=lloc(ASSERT) LPAREN ip=simpl_pat? COLONEQ pt=p_pt RPAREN
-    { mk_abstract l "assert" [TacticsArgs.AssertPt (pt, ip, `None)] }
+  | l=lloc(HAVE) ip=simpl_pat? COLONEQ pt=p_pt 
+    { mk_abstract l "have" [TacticsArgs.AssertPt (pt, ip, `None)] }
 
   (*------------------------------------------------------------------*)
   | l=lloc(REWRITE) p=rw_args w=in_target

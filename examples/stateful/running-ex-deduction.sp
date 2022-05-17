@@ -125,9 +125,9 @@ Proof.
 
   ++
   (* The base case requires rewriting inside the sequence. *)
-  assert (-> :
+  have -> :
      (seq(i:index,t':timestamp -> if t'<=init then sT(i)@t')) =
-     (seq(i:index,t':timestamp -> if t'<=init then empty)));
+     (seq(i:index,t':timestamp -> if t'<=init then empty));
   1: by fa; fa.
   expand frame; apply fresh_names_k.
 
@@ -162,18 +162,18 @@ Proof.
   rewrite !if_then_then.
   (* More rewriting inside sequences. *)
 
-  assert (-> :
+  have -> :
     (seq(i0:index,t':timestamp-> 
       if i0=i && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@t')) =
     (seq(i0:index,t':timestamp-> 
-      if i0=i && (t'=T(i,j) && t'<=T(i,j)) then H(sT(i0)@pred(t'),k))));
+      if i0=i && (t'=T(i,j) && t'<=T(i,j)) then H(sT(i0)@pred(t'),k)));
   1: by fa; fa.
 
-  assert (-> :
+  have -> :
     (seq(i0:index,t':timestamp-> 
       if not(i0=i) && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@t')) =
     (seq(i0:index,t':timestamp->
-      if not(i0=i) && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@pred(t')))).
+      if not(i0=i) && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@pred(t'))).
     + fa; fa => // [H1 [H2 H3]]. 
       by rewrite H2 /sT if_false. 
   (* At this point our automatic bi-deduction checker cannot verify that

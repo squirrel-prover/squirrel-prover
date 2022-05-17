@@ -26,7 +26,7 @@ by fa 0.
 expand frame@B.
 fa 0; fa 1.
 expand exec@B.
-equivalent cond@B, False.
+assert -> : cond@B = False.
 by expand cond@B. 
 by rewrite if_false in 1.
 

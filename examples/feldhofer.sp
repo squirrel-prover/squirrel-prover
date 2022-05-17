@@ -212,14 +212,15 @@ Proof.
   (* Action 2/4: Reader1 *)
 
   + expand frame.
-    equivalent
-      exec@Reader1(k),
-      exec@pred(Reader1(k)) &&
-      exists (i,j:index),
-        Tag(i,j) < Reader1(k) && Reader(k) < Reader1(k)  &&
-        output@Tag(i,j) = input@Reader1(k) &&
-        input@Tag(i,j) = output@Reader(k);
-    1: by use wa_Reader1 with k.
+
+    have -> :
+      exec@Reader1(k) =
+      (exec@pred(Reader1(k)) &&
+       exists (i,j:index),
+         Tag(i,j) < Reader1(k) && Reader(k) < Reader1(k)  &&
+         output@Tag(i,j) = input@Reader1(k) &&
+         input@Tag(i,j) = output@Reader(k));
+    1: by rewrite eq_iff; use wa_Reader1 with k.
 
     expand output.
     fa 2. fa 3. fadup 3.
