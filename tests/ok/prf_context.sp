@@ -1,5 +1,7 @@
 set autoIntro=false.
 
+include Basic.
+
 channel c
 
 hash h
@@ -16,10 +18,10 @@ Proof.
   expandall.
   fa 0. fa 1; fa 1.
   prf 1.
-  yesif 1; 1: auto.
+  rewrite if_true in 1; 1: auto.
 
   xor 1,n_PRF.
-  yesif 1.
+  rewrite if_true in 1.
   by namelength m, n_PRF.
   fresh 1.
   auto.

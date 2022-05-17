@@ -1,3 +1,5 @@
+include Basic.
+
 hash h
 
 abstract ok : message
@@ -172,7 +174,7 @@ expandall.
    use P1_charac with i.
    use H0 with s.
 
-   expand gb(i)@P3(i). fa 5.  noif 6. simpl.
+   expand gb(i)@P3(i). fa 5.  rewrite if_false 6. simpl.
 
    expand gb(i)@A(i);
    expand  seq(i->g^a(i)), i.
@@ -198,7 +200,7 @@ expandall.
    use H0 with s.
 
    fa 5.
-   noif 6. simpl.
+   rewrite if_false in 6. simpl.
 
    expand  seq(i->g^b(i)), j.
 

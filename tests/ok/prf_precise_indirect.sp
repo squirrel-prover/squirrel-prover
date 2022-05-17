@@ -1,5 +1,7 @@
 set autoIntro=false.
 
+include Basic.
+
 channel c.
 
 hash h.
@@ -24,7 +26,7 @@ Proof.
   fa 0.
   prf 2.
   rewrite H1 H2.
-  yesif 2; 1: auto.
+  rewrite if_true in 2; 1: auto.
   fresh 2.    
   apply E.
 Qed.

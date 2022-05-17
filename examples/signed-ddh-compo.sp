@@ -33,6 +33,8 @@ Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
 set autoIntro=false.
 
+include Basic.
+
 abstract ok : message
 abstract ko : message
 
@@ -208,7 +210,7 @@ Proof.
       expand exec.
       by use P1_charac.}
 
-   by fa 7; noif 7.
+   by fa 7; rewrite if_false in 7.
 
    + (* A *)
      by expandall; fa 6.
@@ -240,7 +242,7 @@ Proof.
       expand exec.
       by use S1_charac.}
 
-      by fa 6; fa 7; noif 7.
+      by fa 6; fa 7; rewrite if_false in 7.
 
    + (* A2 *)
      by expandall; fa 6.

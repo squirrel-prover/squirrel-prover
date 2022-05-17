@@ -1,6 +1,8 @@
 set autoIntro=false.
 (* set debugConstr=true. *)
 
+include Basic.
+
 hash h
 name k:message
 channel c
@@ -13,12 +15,12 @@ equiv test : h(diff(m,n),k),h(diff(n,m),k) .
 Proof.
 prf 1.
 
-yesif 1.
+rewrite if_true in 1.
 by project.
 fresh 1.
 
 prf 0.
-by yesif 0.
+by rewrite if_true in 0.
 Qed.
 
 
@@ -40,7 +42,7 @@ expandall.
 fa 0.
 fa 1. fa 1. prf 1. 
 (* easy case, it is the firt produced hash. *)
-yesif 1.
+rewrite if_true in 1.
 by project.
 by fresh 1.
 
@@ -48,7 +50,7 @@ expandall.
 fa 0.
 fa 1; fa 1.
 prf 1.
-yesif 1; simpl.
+rewrite if_true in 1; simpl.
 project.
 
 (* Here, if the macros are not correclty projected, we cannot prove the goal,

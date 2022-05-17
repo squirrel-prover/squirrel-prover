@@ -48,6 +48,8 @@ The attacker does not have any pre-shared key.
 set postQuantumSound = true.
 set autoIntro = false.
 
+(* include Basic. *)
+
 hash h
 
 (* pre-shared keys *)
@@ -349,12 +351,6 @@ process ResponderI2(j:index) =
 system [Ideal2] ((!_j R: ResponderI2(j)) | (!_i I: InitiatorI2(i))).
 
 (* We now prove the authentication on this ideal system. *)
-goal [Ideal2] fst_pair (x,y : message) : fst (<x, y >) = x.
-Proof. auto. Qed.
-hint rewrite fst_pair.
-goal [Ideal2] snd_pair (x,y : message) : snd (<x, y >) = y.
-Proof. auto. Qed.
-hint rewrite fst_pair.
 
 goal [Ideal2] wa_1 :
   forall (i,j:index),

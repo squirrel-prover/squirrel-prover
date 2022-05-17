@@ -1,5 +1,7 @@
 set autoIntro=false.
 
+include Basic.
+
 mutable s(i:index): message = empty
 abstract f : message->message
 
@@ -16,5 +18,5 @@ goal not_update (i,j:index):
 Proof.
   intro Hhap Hneq.
   expand s(i)@A(j). 
-  by noif.
+  by rewrite if_false.
 Qed.

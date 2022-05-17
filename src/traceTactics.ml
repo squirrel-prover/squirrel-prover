@@ -1289,40 +1289,6 @@ let () =
      (LowTactics.genfun_of_pure_tfun project)
 
 (*------------------------------------------------------------------*)
-(** Replacing a conditional by the then branch (resp. the else branch) if the
- * condition is true (resp. false). *)
-
-let yes_no_if b s =
-  let cntxt = TS.mk_trace_cntxt s in
-  let conclusion = TS.goal s in
-  (* search for the first occurrence of an if-then-else in [elem] *)
-  match Iter.get_ite_term cntxt conclusion with
-  | [] ->
-    soft_failure
-      (Tactics.Failure
-         "the conclusion must contain at least \
-          one occurrence of an if term")
-
-  | occ :: _ ->
-    (* Context with bound variables (eg try find) are not supported. *)
-    if not (occ.Iter.occ_vars = []) then
-      soft_failure (Tactics.Failure "cannot be applied in a under a binder");
-
-    let c,t,e = occ.occ_cnt in
-
-    let branch, trace_sequent =
-      if b then (t, TS.set_goal c s)
-      else (e, TS.set_goal (Term.mk_not c) s)
-    in
-    let subst = [Term.ESubst (Term.mk_ite ~simpl:false c t e,branch)] in
-    [ Goal.Trace trace_sequent; Goal.Trace (TS.subst subst s) ]
-
-let yes_no_if_args b args s : Goal.t list =
-    match args with
-    | [] -> yes_no_if b s
-    | _ -> bad_args ()
-
-(*------------------------------------------------------------------*)
 (** {2 Cryptographic Tactics} *)
 
 (*------------------------------------------------------------------*)

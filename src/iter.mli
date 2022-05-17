@@ -157,18 +157,6 @@ val get_f_messages_ext :
   Term.term -> 
   hash_occs
 
-
-(*------------------------------------------------------------------*)
-(** {2 If-Then-Else} *)
-
-type ite_occ = (Term.term * Term.term * Term.term) occ
-
-type ite_occs = ite_occ list
-
-(** Does not remove duplicates.
-    Does not look below macros. *)
-val get_ite_term : Constr.trace_cntxt -> Term.term -> ite_occs
-
 (*------------------------------------------------------------------*)
 (** {2 Macros} *)
 

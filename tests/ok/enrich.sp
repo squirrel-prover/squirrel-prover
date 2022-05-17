@@ -1,6 +1,8 @@
 set autoIntro=false.
 set newInduction=true.
 
+include Basic.
+
 hash h
 channel c
 
@@ -25,7 +27,7 @@ enrich seq(i:index ->h(ok,k(i))).
  expandall. 
  fa 1.
  fa 2. 
- noif 2; 1: auto.
+ rewrite if_false in 2; 1: auto.
  by apply Hind.
 
  destruct H as [i H].

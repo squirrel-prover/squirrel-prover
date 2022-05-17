@@ -36,6 +36,8 @@ KIR := h(s,kI2) XOR h(s,kR2)
 
 *******************************************************************************)
 
+include Basic.
+
 (***********************)
 (* Global Declarations *)
 (***********************)
@@ -128,16 +130,16 @@ Proof.
   (* The condition for the validity of the PRF application is trivial, as kI is
   hidden from the attacker through the CCA application. *) (* We thus simplify the
   trivial conditional. *) 
-  yesif 1.
+  rewrite if_true // in 1.
   (* We now use the one-time pad property of the xor. *)
   xor 1.
   (* We show that the condition of the introduced conditional is always true. *)
-  yesif 1.
+  rewrite if_true in 1.
   (* First by using the axiom saying that the length of the hash output is equal
   to the length of the public name s. *)
   rewrite len_hashes.
   (* Then using the assumption that all names of the same length. *)
-  namelength s,n_PRF.
+  by namelength s,n_PRF.
 
   (* Finally, we have to prove that two completely fresh names are
   indistinguishable. This is done with the fresh tactic. *)

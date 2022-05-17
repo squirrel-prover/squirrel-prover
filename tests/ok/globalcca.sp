@@ -15,6 +15,8 @@ system null.
 
 abstract ok : message.
 
+include Basic.
+
 system [test]
    (A:
     out(c, <enc(n,r,pk(kenc)) , h(enc(n,r,pk(kenc)),khash)>)
@@ -35,9 +37,6 @@ system testCCAR = [test/right] with gcca, enc(n,r,pk(kenc)).
 (* we map the fresh value of testCCAr to the one of testCCA *)
 system testCCAf = [testCCAR] with rename equiv(diff(n_CCA1,n_CCA)).
 
-axiom [any] fst_pair: forall (x,y:message), fst(<x,y>)=x.
-axiom [any] snd_pair: forall (x,y:message), snd(<x,y>)=y.
-
 equiv [testCCA,testCCAf] tests.
 Proof.
 print.
@@ -45,7 +44,7 @@ enrich pk(kenc), n_CCA, r, h(enc(n_CCA,r,pk(kenc)),khash).
 
 induction t.
 prf 0.
-yesif 0 => //.
+rewrite if_true // in 0.
 
 expandall.
 equivalent  try find  such that n = n

@@ -1,5 +1,7 @@
 set autoIntro=false.
 
+include Basic.
+
 (* Checking the treatment of bound variables in direct cases for xor. *)
 
 name n : index->message
@@ -26,7 +28,7 @@ Proof.
     (forall i0:index, i<>i0),
     True.
   admit.
-  nosimpl(yesif 1).
+  nosimpl(rewrite if_true in 1).
   by use len_ok_ko with i; use len_ko_ok with i.
   refl.
 Qed.
@@ -42,7 +44,7 @@ Proof.
     (i<>i),
     True.
   admit.
-  nosimpl(yesif 1).
+  nosimpl(rewrite if_true in 1).
   by use len_ok with i; use len_ko with i.
   refl.
 Qed.

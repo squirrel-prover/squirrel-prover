@@ -53,6 +53,8 @@ set timeout = 10.
 set postQuantumSound = true.
 set autoIntro = false.
 
+include Basic.
+
 hash exct
 
 (* public random key for exct *)
@@ -282,7 +284,6 @@ Proof.
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
               simpl.
-              case H1 => //.
               by case H2.
 
             * intro [Abs _].
@@ -303,7 +304,6 @@ Proof.
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
               simpl.
-              case H1 => //.
               by case H2.
 
             * intro [Abs _].
@@ -324,7 +324,6 @@ Proof.
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
               simpl.
-              case H1 => //.
               by case H2.
 
             * intro [Abs _].
@@ -344,7 +343,6 @@ Proof.
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
               simpl.
-              case H1 => //.
               by case H2.
 
             * intro [Abs _].
@@ -364,7 +362,6 @@ Proof.
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
               simpl.
-              case H1 => //.
               by case H2.
               
             * intro [Abs _].
@@ -385,7 +382,6 @@ Proof.
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
               simpl.
-              case H1 => //.
               by case H2.
 
             * intro [Abs _].
@@ -570,7 +566,6 @@ Proof.
                decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
                auto.
                simpl.
-               case H => //.
                by case H0.
           +++ intro [Abs _].
               by use Abs with il0,jl0,kl0.
@@ -661,7 +656,6 @@ Proof.
                 decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
                 auto.
                 simpl.
-                case H => //.
                 by case H0.
             +++ intro [Abs _].
                 by use Abs with il0,jl0,kl0.
@@ -760,7 +754,6 @@ Proof.
                  decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
                  auto.
                  simpl.
-                 case H => //.
                  by case H0.
 
              +++ intro [Abs _].
@@ -855,7 +848,6 @@ Proof.
                  decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
                  auto.
                  simpl.
-                 case H => //.
                  by case H0.
 
              +++ intro [Abs _].
@@ -932,8 +924,6 @@ axiom [idealized3] xorconcel : forall (m1,m2,m3:message) m1=m2 => xor(m1,xor(m2,
 
 axiom [idealized3] rcheck : forall (m1,m2,sk:message), m1=m2 => checksign(sign(m1,sk),spk(sk)) = m2.
 
-axiom [idealized3] snd_pair (x,y : message) : snd (<x, y >) = y.
-
 goal [idealized3/left] auth :  forall (i,j,l:index) ,
    happens(FI(i,j,l)) =>
         exec@FI(i,j,l) =>
@@ -990,7 +980,6 @@ Proof.
                  decap( encap(n_CCA(i,j,k),rk(i,j,k),epk(vkI(i))), vkI(il)).
                  auto.
                  simpl.
-                 case H1 => //.
                  by case H2.
 
                  intro [Abs _].
@@ -1078,8 +1067,8 @@ decap(encap(n_CCA(i,j,k0),rk(i,j,k0),epk(vkI(i))), vkI(i1)) .
            use I with i,j,k0.
            auto.
     + rewrite multprf.
-      prf 1, F1(_,n_PRF2(i,j,k0)); yesif 1 => //.
-      xor 1; yesif 1.
+      prf 1, F1(_,n_PRF2(i,j,k0)); rewrite if_true in 1 => //.
+      xor 1; rewrite if_true in 1.
       rewrite len_F.
       namelength skex,n_PRF1.
       auto.
@@ -1098,8 +1087,8 @@ Proof.
   expand kj8.
 
   rewrite multprf.
-  prf 1, F1(_,n_PRF2(i,j,k)); yesif 1 => //.
-  xor 1; yesif 1.
+  prf 1, F1(_,n_PRF2(i,j,k)); rewrite if_true in 1 => //.
+  xor 1; rewrite if_true in 1.
   rewrite len_F.
   namelength skex,n_PRF1.
   auto.

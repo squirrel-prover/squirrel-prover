@@ -1,5 +1,7 @@
 set autoIntro=false.
 
+include Basic.
+
 (* Checking the treatment of bound variables in direct cases for prf. *)
 
 hash h
@@ -19,7 +21,7 @@ Proof.
     (forall (i0:index), (diff(n(i) <> n(i0), m(i) <> n(i0)))),
     True.
   admit. 
-  by yesif 1.
+  by rewrite if_true in 1.
 Qed.
 
 (* Secondary test, without any bound variable, just to check
@@ -33,5 +35,5 @@ Proof.
     (diff(n(i), m(i)) <> n(i)),
     True.
   admit.
-  by yesif 1.
+  by rewrite if_true in 1.
 Qed.

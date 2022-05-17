@@ -1,5 +1,7 @@
 set autoIntro=false.
 
+include Basic.
+
 (* Checking the treatment of bound variables in indirect cases for prf. *)
 
 hash h
@@ -29,7 +31,7 @@ Proof.
   prf 1.
 
   rewrite H.
-  yesif 1; 1: auto.
+  rewrite if_true in 1; 1: auto.
   fresh 1.
   by apply E.
 Qed.
@@ -53,7 +55,7 @@ Proof.
   prf 1.
 
   rewrite H.
-  yesif 1; 1: auto.
+  rewrite if_true in 1; 1: auto.
   fresh 1.
   by apply E.
 Qed.

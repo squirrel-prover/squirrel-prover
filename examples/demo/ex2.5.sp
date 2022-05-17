@@ -126,6 +126,6 @@ equiv unreach.
      use H2 with S(j).
 
      fa 2.
-     noif 3.
+     rewrite if_false 3.
      simpl.
      Qed.

@@ -1,5 +1,7 @@
 set autoIntro=false.
 
+include Basic.
+
 hash h
 
 name key : message
@@ -35,7 +37,7 @@ fa 0.
 fa 1.
 fa 1.
 prf 1. 
-yesif 1; simpl.
+rewrite if_true in 1; simpl.
 by intro > _; apply H. 
 fresh 1. 
 admit 0.

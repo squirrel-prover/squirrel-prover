@@ -45,6 +45,8 @@ Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
 set autoIntro=false.
 
+include Basic.
+
 abstract ok : message
 abstract ko : message
 abstract forwarded : message
@@ -463,7 +465,7 @@ Proof.
        depends Sok, Sfail => // _.
        executable Sfail; 1,2: auto.
        by intro H0; use H0 with Sok.}
-     by noif 17.
+     by rewrite if_false in 17.
 
   + (* Pfail *)
     expand frame.
@@ -474,5 +476,5 @@ Proof.
       depends PDIS5, Pfail => // _.
       executable Pfail; 1,2: auto.
       by intro H0; use H0 with PDIS5.}
-  by noif 17.
+  by rewrite if_false in 17.
 Qed.

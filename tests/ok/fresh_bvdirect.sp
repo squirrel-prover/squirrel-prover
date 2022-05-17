@@ -7,6 +7,8 @@ name m : index->message
 
 system null.
 
+include Basic.
+
 (* The main test, with a non-empty list of bound variables. *)
 equiv nonempty (i:index) : seq(i:index ->n(i)), diff(n(i),m(i)).
 Proof.
@@ -14,7 +16,7 @@ Proof.
   (* Check that the right formula has been produced,
      using an incorrect formula that we admit. *)
   assert (forall i0:index, i<>i0) by admit.
-  nosimpl(yesif 1).
+  nosimpl(rewrite if_true in 1).
   assumption.
   refl.
 Qed.
@@ -27,7 +29,7 @@ Proof.
   (* Check that the right formula has been produced,
      using an incorrect formula that we admit. *)
   assert (i<>i) by admit.
-  nosimpl(yesif 1).
+  nosimpl(rewrite if_true in 1).
   assumption.
   refl.
 Qed.

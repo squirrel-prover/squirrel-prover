@@ -67,6 +67,8 @@ party could potentially compute the key.
 set autoIntro = false.
 set postQuantumSound = true.
 
+include Basic.
+
 hash exct
 
 hash expd
@@ -284,7 +286,6 @@ Proof.
                  assert decap(   encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(skI(il)))  , skI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(skI(il0))) , skI(il)).
                  auto.
                  simpl.
-                 case H1 => //.
                  case H2 => //.
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
@@ -302,7 +303,6 @@ Proof.
                  assert decap(   encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(skI(il)))  , skI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(skI(il0))) , skI(il)).
                  auto.
                  simpl.
-                 case H1 => //.
                  case H2 => //.
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
@@ -320,7 +320,6 @@ Proof.
                  assert decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))  , skR(jl)) = decap(   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(skR(jl0))) , skR(jl)).
                  auto.
                  simpl.
-                 case H1 => //.
                  case H2 => //.
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
@@ -338,7 +337,6 @@ Proof.
                  assert decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))  , skR(jl)) = decap                 (   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(skR(jl0))) , skR(jl)).
                  auto.
                  simpl.
-                 case H1 => //.
                  case H2 => //.
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
@@ -369,9 +367,9 @@ Proof.
   intro i j k Hap .
   use reflex with R2(i,j,k) => //.
   expandall.
-  prf 1, exct(skex,kR(k,i,j)); yesif 1.
+  prf 1, exct(skex,kR(k,i,j)); rewrite if_true in 1.
   auto.
-  prf 1; yesif 1.
+  prf 1; rewrite if_true in 1.
   auto.
   xor 1,   xor(expd(<pk(skI(k)),
                <input@R1(i,j,k),
@@ -383,7 +381,7 @@ Proof.
   rewrite len_expd.
   namelength n_PRF1, skex.
   intro Len.
-  yesif 1.
+  rewrite if_true in 1.
   auto.
   fresh 1.
   auto.
@@ -402,17 +400,17 @@ Proof.
   intro i j k Hap .
   use reflex with I1(i,j,k) => //.
   expandall.
-  prf 1, exct(skex,kI(i,j,k)); yesif 1.
+  prf 1, exct(skex,kI(i,j,k)); rewrite if_true in 1.
   auto.
   prf 1, expd(<pk(skI(i)),
                <encap(n_CCA1(i,j,k),rI(i,j,k),pk(skR(j))),
-                <pk(skR(j)),att(frame@pred(I1(i,j,k)))>>>,n_PRF) ; yesif 1.
+                <pk(skR(j)),att(frame@pred(I1(i,j,k)))>>>,n_PRF) ; rewrite if_true in 1.
   auto.
   xor 1, n_PRF1.
   rewrite len_expd.
   namelength n_PRF1, skex.
   intro Len.
-  yesif 1.
+  rewrite if_true in 1.
   auto.
   fresh 1.
   auto.

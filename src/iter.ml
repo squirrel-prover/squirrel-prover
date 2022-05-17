@@ -484,38 +484,6 @@ let get_f_messages_ext
 
 
 (*------------------------------------------------------------------*)
-(** {2 If-Then-Else} *)
-
-type ite_occ = (Term.term * Term.term * Term.term) occ
-
-type ite_occs = ite_occ list
-
-(** Does not remove duplicates.
-    Does not look below macros. *)
-let get_ite_term (constr : Constr.trace_cntxt) (t : Term.term) : ite_occs =
-  let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.terms) : ite_occs =
-    let occs =
-      tfold_occ ~mode:`NoDelta (fun ~fv ~cond t occs ->
-          get t ~fv ~cond @ occs
-        ) ~fv ~cond t []
-    in
-
-    match t with
-    | Fun (f,_,[c;t;e]) when f = Term.f_ite ->
-      let occ = {
-        occ_cnt  = c,t,e;
-        occ_vars = List.rev fv;
-        occ_cond = cond;
-        occ_pos  = Sp.empty; }
-      in
-      occ :: occs
-
-    | _ -> occs
-  in
-
-  get t ~fv:[] ~cond:[]
-
-(*------------------------------------------------------------------*)
 (** {2 Macros} *)
 
 (** occurrences of a macro [n(i,...,j)] *)

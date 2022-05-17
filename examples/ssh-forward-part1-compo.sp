@@ -45,6 +45,8 @@ Communications Security, pages 1427–1444, 2020.
 
 set autoIntro=false.
 
+include Basic.
+
 abstract ok : message
 abstract ko : message
 abstract forwarded : message
@@ -272,7 +274,7 @@ Proof.
      expand exec.
      by use P_charac.}
 
-     by noif 7.
+     by rewrite if_false in 7.
 
    + (* Sfail *)
      expand frame.
@@ -287,6 +289,6 @@ Proof.
      expand exec.
      by use S_charac.}
 
-     by noif 7.
+     by rewrite if_false in 7.
 
 Qed.

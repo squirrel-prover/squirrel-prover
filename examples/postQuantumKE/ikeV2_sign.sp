@@ -51,6 +51,8 @@ set timeout=10.
 set postQuantumSound = true.
 set autoIntro=false.
 
+include Basic.
+
 hash h
 
 (* pre-shared keys *)

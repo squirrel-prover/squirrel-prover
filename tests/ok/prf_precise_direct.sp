@@ -1,5 +1,7 @@
 set autoIntro=false.
 
+include Basic.
+
 channel c.
 
 hash h.
@@ -18,5 +20,5 @@ global goal _ (j : index) :
 Proof.
   intro H. 
   prf 0.
-  by yesif 0.
+  by rewrite if_true in 0.
 Qed.

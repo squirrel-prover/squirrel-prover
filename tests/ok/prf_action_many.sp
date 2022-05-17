@@ -1,5 +1,7 @@
 set autoIntro=false.
 
+include Basic.
+
 (* Test that the prf tactic creates the correct formula when
  * several instances of the name are found in an action. 
  * Each time, the prf condition does not hold. We add it in hypothesis and check
@@ -20,7 +22,7 @@ Proof.
   intro H Hap.
   prf 1. 
   rewrite H.
-  by yesif 1. 
+  by rewrite if_true in 1. 
 Qed.
 
 
@@ -39,7 +41,7 @@ Proof.
   intro H1 H2 E Hap. 
   prf 1.
   rewrite H1 H2.
-  yesif 1; 1: auto.
+  rewrite if_true in 1; 1: auto.
   fresh 1. 
   by apply E.
 Qed.

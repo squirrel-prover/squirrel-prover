@@ -1,5 +1,7 @@
 set autoIntro=false.
 
+include Basic.
+
 name ok : message
 name ko : message
 name koo : message
@@ -20,7 +22,7 @@ auto.
 
 expandall.
 fa 0; fa 1. 
-by noif 1. 
+by rewrite if_false in 1. 
 
 expandall.
 by fa 0.
@@ -34,7 +36,7 @@ auto.
 
 expandall.
 fa 0; fa 1. 
-by noif 1.
+by rewrite if_false in 1.
 
 expandall.
 by fa 0.

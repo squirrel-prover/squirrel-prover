@@ -972,45 +972,6 @@ let simplify_ite b s cond positive_branch negative_branch =
     (negative_branch, trace_s)
 
 
-let get_ite ~cntxt elem =
-  match Iter.get_ite_term cntxt elem with
-  | [] -> None
-  | occ :: _ ->
-    (* Context with bound variables (eg try find) are not supported. *)
-    if not (occ.Iter.occ_vars = []) then
-      soft_failure (Tactics.Failure "cannot be applied in a under a binder");
-
-    Some (occ.Iter.occ_cnt)
-
-let yes_no_if b i s =
-  let cntxt = ES.mk_trace_cntxt s in
-
-  let before, elem, after = split_equiv_goal i s in
-
-  (* search for the first occurrence of an if-then-else in [elem] *)
-  match get_ite ~cntxt elem with
-  | None ->
-    soft_failure
-      (Tactics.Failure
-         "can only be applied on a term with at least one occurrence \
-          of an if-then-else term")
-
-  | Some (c,t,e) ->
-    let branch, trace_sequent = simplify_ite b s c t e in
-    let new_elem =
-      Equiv.subst_equiv
-        [Term.ESubst (Term.mk_ite ~simpl:false c t e,branch)]
-        [elem]
-    in
-    let biframe = List.rev_append before (new_elem @ after) in
-    [ Goal.Trace trace_sequent;
-      Goal.Equiv (ES.set_equiv_goal biframe s) ]
-
-let yes_no_if_args b args s : Goal.t list =
-    match args with
-    | [Args.Int_parsed arg] -> yes_no_if b arg s
-    | _ -> bad_args ()
-
 (*------------------------------------------------------------------*)
 exception Not_ifcond
 
