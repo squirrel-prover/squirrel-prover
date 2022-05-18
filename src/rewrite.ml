@@ -8,8 +8,7 @@ module SE   = SystemExpr
     Invariant: if
     [{ rw_tyvars = tyvars; rw_vars = sv; rw_conds = φ; rw_rw = (l,r); }]
     is a rewrite rule, then:
-    - sv ⊆ FV(l)
-    - ((FV(r) ∪ FV(φ)) ∩ sv) ⊆ FV(l) *)
+    - sv ⊆ FV(l) *)
 type rw_rule = {
   rw_tyvars : Type.tvars;            (** type variables *)
   rw_system : SE.t;                  (** systems the rule applies to *)
@@ -43,16 +42,8 @@ let pp_rw_rule fmt (rw : rw_rule) =
 (** Check that the rule is correct. *)
 let check_rule (rule : rw_rule) : unit =
   let l, r = rule.rw_rw in
-  let fvl, fvr = Term.fv l, Term.fv r in
-  let sh = List.fold_left (fun sh h ->
-      Vars.Sv.union sh (Term.fv h)
-    ) Vars.Sv.empty rule.rw_conds
-  in
 
-  if not (Vars.Sv.subset rule.rw_vars fvl) ||
-     not (Vars.Sv.subset
-            (Vars.Sv.inter (Vars.Sv.union fvr sh) rule.rw_vars)
-            fvl) then
+  if not (Vars.Sv.subset rule.rw_vars (Term.fv l)) then
     Tactics.hard_failure Tactics.BadRewriteRule;
   ()
 
@@ -231,6 +222,19 @@ let mk_state
 
   if projs = Some [] then
     raise (Failed (`RuleBadSystems "no system of the rule applies"));
+
+  (* check that all projection of [rule] on [projs] are valid *)
+  let () = match projs with
+    | None -> ()
+    | Some projs ->
+      let left  = Term.subst_projs psubst left in
+      let right = Term.subst_projs psubst right in
+      List.iter (fun proj ->
+          let left = Term.project1 proj left in
+          let right = Term.project1 proj right in
+          check_rule { rule with rw_rw = left, right }
+        ) projs
+  in
 
   let mk_form f =
     Term.project_opt projs (Term.subst_projs psubst f)
