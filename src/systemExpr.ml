@@ -51,6 +51,10 @@ let any_compatible_with s = Any_compatible_with s
 (*------------------------------------------------------------------*)
 let is_fset : t -> bool = function List _ -> true | _ -> false
 
+let is_any_or_any_comp : t -> bool = function
+  | Any | Any_compatible_with _ -> true
+  | _ -> false
+
 (*------------------------------------------------------------------*)
 let pp fmt : 'a expr -> unit = function
   | Any -> Format.fprintf fmt "any"
@@ -59,7 +63,7 @@ let pp fmt : 'a expr -> unit = function
       Fmt.list
         ~sep:Fmt.comma
         (fun fmt (label,single_sys) ->
-           if Term.proj_to_string label = "" then
+           if Term.proj_to_string label = "ε" then
              System.Single.pp fmt single_sys
            else
              Format.fprintf fmt "%a:%a"
@@ -107,8 +111,20 @@ let to_list = function
 let of_list l = List l
 
 let to_projs t = List.map fst (to_list t)
-    
-let project_opt (projs : Term.projs option) t =
+
+(*------------------------------------------------------------------*)    
+let to_list_any (t : _ expr) : (Term.proj * System.Single.t) list option =
+  match t with
+  | List l -> Some l
+  | Any | Any_compatible_with _ -> None
+
+let to_projs_any (t : _ expr) : Term.projs option =
+  match t with
+  | List l -> Some (List.map fst l)
+  | Any | Any_compatible_with _ -> None
+
+(*------------------------------------------------------------------*)
+let project_opt (projs : Term.projs option) t : fset =
   match t, projs with
   | List l, Some projs ->
     (* we only project over a subset of [l]'s projs *)
@@ -117,13 +133,14 @@ let project_opt (projs : Term.projs option) t =
     List (List.filter (fun (x,_) -> List.mem x projs) l)
 
   | (Any | Any_compatible_with _), Some projs -> assert false
+  (* should this be [List projs] ? *)
 
   | _, None -> t
     
 let project (projs : Term.projs) t = project_opt (Some projs) t
 
 (*------------------------------------------------------------------*)  
-let singleton s = List [Term.proj_from_string "",s]
+let singleton s = List [Term.proj_from_string "ε",s]
 
 let of_system table s : t =
   let projections = System.projections table s in
@@ -132,37 +149,35 @@ let of_system table s : t =
 
 (*------------------------------------------------------------------*)
 let default_labels : int -> Term.proj list = function
-  | 1 -> [Term.proj_from_string ""]
+  | 1 -> [Term.proj_from_string "ε"]
   | 2 -> [Term.left_proj;Term.right_proj]
   | n -> List.init n (fun i -> Term.proj_from_string (string_of_int (i+1)))
 
 (*------------------------------------------------------------------*)
-let make_fset table ?labels (l:System.Single.t list) : t =
+let make_fset table ~labels (l : System.Single.t list) : t =
   (* Check for compatibility. *)
-  let {System.Single.system=hd_system},tl = match l with
-    | hd::tl -> hd,tl
-    | [] -> raise (Invalid_argument "SystemExpr.make_fset")
+  let () = match l with
+    | [] -> assert false
+    | { System.Single.system = hd_system } :: tl ->
+      List.iter
+        (fun {System.Single.system} ->
+           if not (System.compatible table hd_system system) then
+             error Incompatible_systems)
+        tl
   in
-  List.iter
-    (fun {System.Single.system} ->
-       if not (System.compatible table hd_system system) then
-         error Incompatible_systems)
-    tl;
   (* Build labelled list using a mix of default and provided labels. *)
-  match labels with
-    | None ->
-        List (List.combine (default_labels (List.length l)) l)
-    | Some labels ->
-        let len = List.length l in
-        if List.length labels <> len then
-          raise (Invalid_argument "SystemExpr.make_fset");
-        let labels =
-          List.map2
-            (fun default -> function None -> default | Some x -> x)
-            (default_labels len)
-            labels
-        in
-        List (List.combine labels l)
+  let len = List.length l in
+  assert (List.length labels = len);
+
+  let labels =
+    List.map2 (fun default -> function
+        | None -> default
+        | Some x -> x
+      )
+      (default_labels len)
+      labels
+  in
+  List (List.combine labels l)
 
 (*------------------------------------------------------------------*)
 (** {2 Parsing} *)
@@ -195,24 +210,25 @@ let parse table p = match Location.unloc p with
       of_system table
         (System.of_lsymb table (Location.mk_loc Location._dummy "default"))
 
-  | [{system={pl_desc="any"};projection=None;alias=None}] ->
+  | [{ system = { pl_desc = "any" }; projection = None; alias = None}] ->
       any
 
-  | [{system={pl_desc="any"};projection=Some system}] ->
+  | [{ system = { pl_desc = "any" }; projection = Some system}] ->
       any_compatible_with (System.of_lsymb table system)
 
-  | [{system;projection=None;alias=None}] ->
+  | [{ system; projection = None; alias = None}] ->
       of_system table (System.of_lsymb table system)
 
   | l ->
     let labels =
       List.map (fun i ->
           Utils.omap (Term.proj_from_string -| L.unloc) i.alias
-        ) l in
-      let l =
-        List.map (fun i -> parse_single table { i with alias = None }) l
-      in
-      make_fset table ~labels l
+        ) l 
+    in
+    let l =
+      List.map (fun i -> parse_single table { i with alias = None }) l
+    in
+    make_fset table ~labels l
 
 (*------------------------------------------------------------------*)
 (** Action symbols and terms *)
@@ -343,8 +359,8 @@ let equivalence_context ?set pair =
 let reachability_context set = { set ; pair = None }
 
 let pp_context fmt = function
-  | {set;pair=None} -> pp fmt set
-  | {set;pair=Some p} ->
+  | { set; pair = None   } -> pp fmt set
+  | { set; pair = Some p } ->
       if set = p then
         Format.fprintf fmt "%a@ (same for equivalences)" pp set
       else

@@ -142,10 +142,9 @@ type 'a pat = {
   pat_vars : Sv.t;
   pat_term : 'a;
 }
-(* TODO we should probably indicate wrt which system (context)
-   the pattern should be understood *)
 
-val project_term_pat : Term.projs -> Term.term pat -> Term.term pat
+val project_tpat     : Term.projs        -> Term.term pat -> Term.term pat
+val project_tpat_opt : Term.projs option -> Term.term pat -> Term.term pat
 
 (** Make a pattern out of a formula: all universally quantified variables
     are added to [pat_vars]. *)

@@ -474,6 +474,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
         | `MaxNestedRewriting ->
           hard_failure ~loc (Failure "max nested rewriting reached (1000)")
+
+        | `RuleBadSystems s ->
+          soft_failure ~loc (Tactics.Failure ("rule bad systems: " ^ s))
     in
 
     let s, subs = do_targets doit_tgt s targets in

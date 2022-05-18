@@ -267,5 +267,5 @@ val declare_list :
   Symbols.table -> Hint.hint_db -> Decl.declarations -> Symbols.table
 
 (*------------------------------------------------------------------*)
-val add_hint_rewrite : lsymb -> Hint.hint_db -> Hint.hint_db
-val add_hint_smt     : lsymb -> Hint.hint_db -> Hint.hint_db
+val add_hint_rewrite : Symbols.table -> lsymb -> Hint.hint_db -> Hint.hint_db
+val add_hint_smt     : Symbols.table -> lsymb -> Hint.hint_db -> Hint.hint_db

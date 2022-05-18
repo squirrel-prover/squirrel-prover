@@ -924,8 +924,8 @@ global_formula:
  * ----------------------------------------------------------------------- */
 
 system_item:
-| i=lsymb               { SE.{alias=None;system=i;projection=  None} }
-| i=lsymb SLASH p=lsymb { SE.{alias=None;system=i;projection=Some p} }
+| i=lsymb               { SE.{ alias = None; system = i; projection = None   } }
+| i=lsymb SLASH p=lsymb { SE.{ alias = None; system = i; projection = Some p } }
 
 system_item_list:
 | i=system_item                          {  [i] }

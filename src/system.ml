@@ -168,7 +168,7 @@ module Single = struct
       error Invalid_projection
 
   let pp fmt {system;projection} =
-    if Term.proj_to_string projection = "" then
+    if Term.proj_to_string projection = "ε" then
       (* Convention typically used for single system. *)
       Format.fprintf fmt "%a" Symbols.pp system
     else

@@ -2,16 +2,33 @@ set autoIntro=false.
 
 system null.
 
-axiom toto : diff(true,false) = true.
+axiom [default] toto : diff(true,false) = true.
 
-axiom tutu : false = true.
+axiom [default] tutu : false = true.
 
 goal [default/right] _ : false = true.
 Proof.
   by rewrite tutu. 
 Qed.
 
+abstract a : message.
+abstract b : message.
+abstract c : message.
+abstract d : message.
+
+axiom foo : diff(a,b) = c.
+
+goal _ : 
+  <a, diff(d, c)> = empty => 
+  <a, diff(d, b)> = empty.
+Proof.
+  intro H. 
+  rewrite foo.
+  assumption.
+Qed.
+
 goal [default/right] _ : false = true.
 Proof.
-  checkfail rewrite toto exn NothingToRewrite.
-Abort.
+  rewrite toto.
+  auto.
+Qed.

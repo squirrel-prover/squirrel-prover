@@ -50,6 +50,8 @@ val subset : Symbols.table -> 'a expr -> 'a expr -> bool
 val equal : Symbols.table -> 'a expr -> 'a expr -> bool
 
 val is_fset : t -> bool
+
+val is_any_or_any_comp : t -> bool
   
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
@@ -137,34 +139,45 @@ val pp_descrs : Symbols.table -> Format.formatter -> <fset:unit;..> expr -> unit
 val singleton : System.Single.t -> fset
 
 (** Create a set expression from a non-empty list of compatible single systems.
-    If a list of projections is specified, it must be of the same length
+    The list of projections must be of the same length
     as the list of systems: these projections will be used to label the
     single systems as part of the newly formed system expression.
 
     The table is used to check that all systems in the list are compatible.
 
-    For example, [make_fset tbl ?labels:["left";"right"] [(s,"right");(s,"left")]]
+    For example, [make_fset tbl ~labels:["left";"right"] [(s,"right");(s,"left")]]
     is an expression with two elements. Its first projection, labelled
     "left", is the right projection of [s]. *)
 val make_fset :
     Symbols.table ->
-    ?labels:Term.proj option list ->
+    labels:Term.proj option list ->
     System.Single.t list ->
     fset
 
 (** Finite set of all projections of a system. *)
 val of_system : Symbols.table -> System.t -> fset
 
+(** Inverse of [to_list]. Does not perform any validation. *)
+val of_list : (Term.proj * System.Single.t) list -> fset
+
+(*------------------------------------------------------------------*)
 (** List of labelled elements of a set. Guaranteed to be non-empty.
     Fails if expression does not correspond to a finite set. *)
 val to_list : <fset:unit;..> expr -> (Term.proj * System.Single.t) list
 
-(** Inverse of [to_list]. Does not perform any validation. *)
-val of_list : (Term.proj * System.Single.t) list -> fset
-
 (** Same as [to_list], but only returns the list of projections *)
 val to_projs : <fset:unit;..> expr -> Term.projs
 
+(*------------------------------------------------------------------*)
+(** Same as [to_list], but for any system expression.
+    Return [None] if no projections. *)
+val to_list_any : _ expr -> (Term.proj * System.Single.t) list option
+
+(** Same as [to_list], but for any system expression.
+    Return [None] if no projections. *)
+val to_projs_any : _ expr -> Term.projs option
+
+(*------------------------------------------------------------------*)
 (** Project a system according to the given projections. *)
 val project     : Term.projs        -> 'a expr -> 'a expr
 val project_opt : Term.projs option -> 'a expr -> 'a expr

@@ -102,6 +102,10 @@ let _rewrite_head
     (rule   : rw_rule)
     (t      : Term.term) : Term.term * Term.term list
   =
+  (* FEATURE: allow [rewrite_head] to rewrite rules that do not apply to 
+     all systems. *)
+  assert (SE.subset table rule.rw_system SE.any);
+
   let l, r = rule.rw_rw in
 
   let pat = Match.{ 
@@ -129,16 +133,188 @@ let rewrite_head
   try Some (_rewrite_head table system rule t) with NoRW -> None
 
 (*------------------------------------------------------------------*)
-  type rw_res = [
-    | `Result of Equiv.any_form * (SE.context * Term.term) list
-    | `NothingToRewrite
-    | `MaxNestedRewriting
-  ]
+type rw_res = [
+  | `Result of Equiv.any_form * (SE.context * Term.term) list
+  | `NothingToRewrite
+  | `MaxNestedRewriting
+  | `RuleBadSystems of string
+]
 
 (*------------------------------------------------------------------*)
-(** A opened rewrite rule. Not exported. *)
-type _rw_rule =
-  Type.tvars * Vars.Sv.t * Term.term list * Term.term * Term.term
+(** as an instance been found:
+    - [pat]: pattern of the instance found (no free variables left)
+    - [right]: right term instantiated with the instance found
+    - [system]: systems applying to the instance found *) 
+type found = { 
+  pat    : Term.term Match.pat; 
+  right  : Term.term;
+  system : SE.t; 
+  subgs  : (SE.context * Term.term) list;
+}
+
+type rw_state = { 
+  init_pat   : Term.term Match.pat;
+  init_subs  : Term.term list;
+  init_right : Term.term;
+
+  found_instance : [ `False | `Found of found ];
+}
+
+(*------------------------------------------------------------------*)
+(** Not exported *)
+exception Failed of [
+    | `NothingToRewrite
+    | `MaxNestedRewriting
+    | `RuleBadSystems of string
+  ] 
+
+(*------------------------------------------------------------------*)
+(** Build the rewrite state corresponding to a rewrite rule.
+
+    - [systems] are the systems applying to the term we are rewriting in
+
+    Tries to rename the projections of [rule] in a way which is 
+    compatible with [systems]. 
+    Raise [Failed `RuleBadSystems] if it failed  *)
+let mk_state
+    (rule : rw_rule)
+    (systems : (Term.proj * System.Single.t) list option) 
+  : rw_state
+  = 
+  let left, right = rule.rw_rw in
+
+  (* substitution renaming the projections of [rule] using corresponding 
+     projections of systems, if any. *)
+  let psubst : (Term.proj * Term.proj) list option = 
+    match systems with
+    | None -> None
+    | Some systems ->
+      if not (SE.is_fset rule.rw_system) then
+        (* [rule] applies to all systems in [systems], nothing to do *)
+        let () = assert (SE.is_any_or_any_comp rule.rw_system) in
+        None
+
+      else begin
+        (* [rule] may not apply to all systems in [systems] *)
+        let rule_systems = SE.to_list (SE.to_fset rule.rw_system) in
+        if systems = rule_systems then None else
+          (* [l] contains tuples [(p,q), single] where:
+             - [p] is a projection of [rule.rw_system] for [single]
+             - [q] is a projection of [systems] for [single] *)
+          let l =
+            List.filter_map (fun (p, single) ->
+                List.find_map (fun (p_rule, rule_single) -> 
+                    if single = rule_single then
+                      Some ((p_rule,p), single)
+                    else None
+                  ) rule_systems
+              ) systems
+          in
+
+          (* If two projections of [rule.rw_system] applies to the
+             same element in [systems], there is an ambiguity
+             about which rewriting to apply.
+             In that case, we raise an error. *)
+          if List.exists (fun ((p_rule, p), single) ->
+              List.exists (fun ((p_rule', p'), single') ->
+                  p_rule <> p_rule' && p = p' && single = single'
+                ) l
+            ) l then
+            raise (Failed (`RuleBadSystems "system projection ambiguity"));
+
+          Some (List.map fst l)
+      end
+  in
+
+  let projs = omap (List.map snd) psubst in
+  let psubst = odflt [] psubst in
+
+  if projs = Some [] then
+    raise (Failed (`RuleBadSystems "no system of the rule applies"));
+
+  let mk_form f =
+    Term.project_opt projs (Term.subst_projs psubst f)
+  in
+  { init_pat = Match.{ 
+        pat_tyvars = rule.rw_tyvars; 
+        pat_vars   = rule.rw_vars; 
+        pat_term   = mk_form left;
+      };
+    init_right = mk_form right;
+    init_subs      = List.map mk_form rule.rw_conds;
+    found_instance = `False; } 
+
+
+(*------------------------------------------------------------------*)
+(* If there is a match (with [mv]), substitute [occ] by [right] where
+   free variables are instantiated according to [mv], and variables
+   bound above the matched occurrences are universally quantified in
+   the generated sub-goals. *)
+let rw_inst
+    (table : Symbols.table) (rule : rw_rule) (system : SE.context)
+  : rw_state Match.Pos.f_map_fold 
+  = 
+  fun occ projs vars _conds _p (s : rw_state) ->
+  (* project the system *)
+  let system_set = SE.project_opt projs system.set in
+
+  if not (SE.subset table system_set rule.rw_system) then 
+    s, `Continue
+  else 
+    match s.found_instance with
+    | `Found inst -> 
+      (* we already found the rewrite instance earlier *)
+
+      (* check if the same system apply to the subterm *)
+      if not (SE.subset table system_set inst.system) then 
+        s, `Continue 
+      else
+        begin match Match.T.try_match table system_set occ inst.pat with
+          | NoMatch _ | FreeTyv -> s, `Continue
+          | Match mv -> 
+            (* project the already found instance with the projections
+               applying to the current subterm *)
+            s, `Map (Term.project_opt projs inst.right)
+        end
+
+    | `False ->
+      (* project the pattern *)
+      let pat_proj = Match.project_tpat_opt projs s.init_pat in
+    
+      match Match.T.try_match table system_set occ pat_proj with
+      | NoMatch _ | FreeTyv -> s, `Continue
+
+      (* head matches *)
+      | Match mv -> 
+        (* we found the rewrite instance *)
+        let subst = Match.Mvar.to_subst ~mode:`Match mv in
+        let left = Term.subst subst pat_proj.pat_term in
+        let right = 
+          let right_proj = Term.project_opt projs s.init_right in
+          Term.subst subst right_proj
+        in
+
+        let found_subs =
+          List.map (fun rsub ->
+              { system with set = system_set}, 
+              Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
+            ) rule.rw_conds
+        in
+
+        let found_pat = Match.{ 
+            pat_term   = left;
+            pat_tyvars = [];
+            pat_vars   = Sv.empty; 
+          } in
+
+        let found_instance = `Found {
+            pat    = found_pat;
+            right;
+            system = system_set;
+            subgs  = found_subs;
+          } in
+
+        { s with found_instance }, `Map right
 
 (*------------------------------------------------------------------*)
 let rewrite
@@ -149,16 +325,25 @@ let rewrite
     (rule   : rw_rule)
     (target : Equiv.any_form) : rw_res
   =
-  let exception Failed of [`NothingToRewrite | `MaxNestedRewriting] in
-
-  let left, right = rule.rw_rw in
-
   let check_max_rewriting : unit -> unit =
     let cpt_occ = ref 0 in
     fun () ->
       if !cpt_occ > 1000 then   (* hard-coded *)
         raise (Failed `MaxNestedRewriting);
       incr cpt_occ;
+  in
+
+  (* Built the rewrite state corresponding the rewrite rule [rule] and the 
+     systems applying to [target].
+     This may require renaming projections in [rule], and removing some
+     projections from [rule]. *)
+  let s = 
+    let target_systems =
+      match target with
+      | `Equiv _ -> Some (SE.to_list (oget system.pair))
+      | `Reach _ -> SE.to_list_any system.set
+    in
+    mk_state rule target_systems
   in
 
   (* Attempt to find an instance of [left], and rewrites all occurrences of
@@ -169,102 +354,30 @@ let rewrite
     =
     check_max_rewriting ();
 
-    let subs_r = ref [] in
-    let found_instance : [`False | `Found of SE.t] ref = 
-      ref `False 
-    in
-    
-    (* This is a reference, so that it can be over-written later
-       after we found an instance of [left]. *)
-    let pat : Term.term Match.pat ref = 
-      ref Match.{ 
-          pat_tyvars = rule.rw_tyvars; 
-          pat_vars   = rule.rw_vars; 
-          pat_term   = left 
-        }
-    in
-    let right_instance = ref None in
-
-    (* If there is a match (with [mv]), substitute [occ] by [right] where
-       free variables are instantiated according to [mv], and variables
-       bound above the matched occurrences are universally quantified in
-       the generated sub-goals. *)
-    let rw_inst : Match.Pos.f_map = 
-      fun occ projs vars _conds _p ->
-        (* project the system *)
-        let system_set = SE.project_opt projs system.set in
-
-        if not (SE.subset table system_set rule.rw_system) then 
-          `Continue
-        else 
-          match !found_instance with
-          | `Found p_system -> 
-            (* we already found the rewrite instance earlier *)
-
-            (* check if the same system apply to the subterm *)
-            if not (SE.equal table system_set p_system) then 
-              `Continue 
-            else
-              begin match Match.T.try_match table system_set occ !pat with
-                | NoMatch _ | FreeTyv -> `Continue
-                | Match mv -> `Map (oget !right_instance)
-              end
-
-          | `False ->
-            (* project the pattern *)
-            let pat_proj = 
-              omap_dflt !pat (Match.project_term_pat ^~ !pat) projs
-            in
-            match Match.T.try_match table system_set occ pat_proj with
-            | NoMatch _ | FreeTyv -> `Continue
-
-            (* head matches *)
-            | Match mv ->
-              (* we found the rewrite instance *)
-              found_instance := `Found system_set;
-              let subst = Match.Mvar.to_subst ~mode:`Match mv in
-              let left = Term.subst subst pat_proj.pat_term in
-              let right = 
-                let right_proj = 
-                  omap_dflt right (Term.project ^~ right) projs 
-                in
-                Term.subst subst right_proj
-              in
-
-              right_instance := Some right;
-              subs_r :=
-                List.map (fun rsub ->
-                    { system with set = system_set}, 
-                    Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
-                  ) rule.rw_conds;
-
-              pat := Match.{ pat_term   = left;
-                             pat_tyvars = [];
-                             pat_vars   = Sv.empty; };
-
-              `Map right
-    in
-
-    let found, f = match f with
+    let s, f = match f with
       | `Equiv f ->
-        let found, f = Match.Pos.map_e rw_inst env f in
-        found, `Equiv f
+        let s, _, f = 
+          Match.Pos.map_fold_e (rw_inst table rule system) env s f 
+        in
+        s, `Equiv f
 
       | `Reach f ->
-        let found, f = Match.Pos.map rw_inst env f in
-        found, `Reach f
+        let s, _, f = 
+          Match.Pos.map_fold (rw_inst table rule system) env s f 
+        in
+        s, `Reach f
     in
 
-    match mult, found with
-    | `Any, false -> f, !subs_r
+    match mult, s.found_instance with
+    | `Any, `False -> f, []
 
-    | (`Once | `Many), false -> raise (Failed `NothingToRewrite)
+    | (`Once | `Many), `False -> raise (Failed `NothingToRewrite)
 
-    | (`Many | `Any), true ->
+    | (`Many | `Any), `Found inst  ->
       let f, rsubs' = _rewrite `Any f in
-      f, List.rev_append (!subs_r) rsubs'
+      f, List.rev_append inst.subgs rsubs'
 
-    | `Once, true -> f, !subs_r
+    | `Once, `Found inst -> f, inst.subgs
   in
 
   match _rewrite mult target with
@@ -272,3 +385,4 @@ let rewrite
 
   | exception Failed (`NothingToRewrite)   -> `NothingToRewrite
   | exception Failed (`MaxNestedRewriting) -> `MaxNestedRewriting
+  | exception Failed (`RuleBadSystems s)   -> `RuleBadSystems s

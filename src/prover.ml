@@ -1027,9 +1027,20 @@ let declare_list table hint_db decls =
   List.fold_left (fun table d -> declare table hint_db d) table decls
 
 (*------------------------------------------------------------------*)
-let add_hint_rewrite (s : lsymb) db =
+let add_hint_rewrite table (s : lsymb) db =
   let lem = get_reach_assumption s in
+  
+  if not (SE.subset table lem.system.set SE.any) then
+    Tactics.hard_failure ~loc:(L.loc s)
+      (Failure "rewrite hints must apply to any system");
+
   Hint.add_hint_rewrite s lem.Goal.ty_vars lem.Goal.formula db
 
-let add_hint_smt (s : lsymb) db =
-  Hint.add_hint_smt (get_reach_assumption s).Goal.formula db
+let add_hint_smt table (s : lsymb) db =
+  let lem = get_reach_assumption s in
+
+  if not (SE.subset table lem.system.set SE.any) then
+    Tactics.hard_failure ~loc:(L.loc s)
+      (Failure "rewrite hints must apply to any system");
+
+  Hint.add_hint_smt lem.Goal.formula db

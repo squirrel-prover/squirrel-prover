@@ -42,6 +42,7 @@ type rw_res = [
   | `Result of Equiv.any_form * (SE.context * Term.term) list
   | `NothingToRewrite
   | `MaxNestedRewriting
+  | `RuleBadSystems of string
 ]
 
 (*------------------------------------------------------------------*)

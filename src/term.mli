@@ -231,6 +231,8 @@ val subst_isymb : subst -> 'a isymb -> 'a isymb
   * if [ts] is applied to a state macro whose name is NOT in [l]. *)
 val subst_macros_ts : Symbols.table -> string list -> term -> term -> term
 
+val subst_projs : (proj * proj) list -> term -> term 
+
 (*------------------------------------------------------------------*)
 type refresh_arg = [`Global | `InEnv of Vars.env ref ]
 
@@ -472,16 +474,9 @@ module Mt : Map.S with type key = term
 (*------------------------------------------------------------------*)
 (** {2 Multi-terms} *)
 
-(** Evaluate all diff operators wrt a projection.
-    If the projection is [None], the input term is returned unchanged.
-    Otherwise all diff operators are evaluated to the given
-    side and the returned term does not feature diff operators.
-    If the bi-term contains macros, and come from a bi-system, its
-    projection is only correctly interpreted if it is used inside
-    the projected system. *)
-val project1 : proj -> term -> term
-
-val project : proj list -> term -> term
+val project1    : proj         -> term -> term
+val project     : projs        -> term -> term
+val project_opt : projs option -> term -> term 
   
 (** Push topmost diff-operators just enough to expose the common
     topmost constructor of the two projections of a biterm, if possible.

@@ -251,7 +251,11 @@ let mk_diff l =
   assert
     (let projs = List.map fst l in
      List.sort Stdlib.compare projs = List.sort_uniq Stdlib.compare projs);
-  Diff (Explicit l)
+
+  match l with
+  | []     -> assert false
+  | [_, t] -> t
+  | _      -> Diff (Explicit l)
 
 let mk_find is c t e = Find (is, c, t, e)
 
@@ -1128,6 +1132,58 @@ let fv (term : term) : Sv.t =
 let get_vars t = fv t |> Sv.elements
 
 (*------------------------------------------------------------------*)
+(** {2 Iterators} *)
+
+(** Does not recurse. *)
+let tmap (func : term -> term) (t : term) : term =
+  match t with
+  | Action _ -> t
+  | Name _   -> t
+  | Var _    -> t
+
+  | Fun (f,fty,terms) -> Fun (f, fty, List.map func terms)
+  | Macro (m, l, ts)  -> Macro (m, List.map func l, func ts)
+  | Seq (vs, b)       -> Seq (vs, func b)
+
+  | Diff (Explicit l) ->
+    Diff (Explicit (List.map (fun (lbl,tm) -> lbl, func tm) l))
+
+  | Find (b, c, d, e) ->
+    let c = func c
+    and d = func d
+    and e = func e in
+    Find (b, c, d, e)
+
+  | ForAll (vs, b) -> ForAll (vs, func b)
+  | Exists (vs, b) -> Exists (vs, func b)
+
+let tmap_fold (func : 'b -> term -> 'b * term) (b : 'b) (t : term) : 'b * term =
+  let bref = ref b in
+  let g t =
+    let b, t = func !bref t in
+    bref := b;
+    t
+  in
+  let t = tmap g t in
+  !bref, t
+
+let titer (f : term -> unit) (t : term) : unit =
+  let g e = f e; e in
+  ignore (tmap g t)
+
+let tfold (f : term -> 'b -> 'b) (t : term) (v : 'b) : 'b =
+  let vref : 'b ref = ref v in
+  let fi e = vref := (f e !vref) in
+  titer fi t;
+  !vref
+
+let texists (f : term -> bool) (t : term) : bool =
+  tfold (fun t b -> f t || b) t false
+
+let tforall (f : term -> bool) (t : term) : bool =
+  tfold (fun t b -> f t || b) t false
+
+(*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
 
 (** given a variable [x] and a subst [s], remove from [s] all
@@ -1255,7 +1311,7 @@ and subst_binding : Vars.var -> subst -> Vars.var * subst =
     else ( var, s ) in
 
   var, s
-
+(*------------------------------------------------------------------*)
 let subst_macros_ts table l ts t =
   let rec subst_term (t : term) : term = match t with
     | Macro (is, terms, ts') ->
@@ -1282,12 +1338,35 @@ let subst_macros_ts table l ts t =
 
   subst_term t
 
+(*------------------------------------------------------------------*)
 let rec subst_ht s ht = match ht with
   | Lambda (ev :: evs, t) ->
     let ev, s = subst_binding ev s in
     mk_lambda [ev] (subst_ht s (Lambda (evs, t)))
   | Lambda ([], t) -> Lambda ([], subst s t)
 
+(*------------------------------------------------------------------*)
+(* sanity check *)
+let check_projs_subst (s : (proj * proj) list) : unit = 
+  assert (
+    List.for_all (fun (p1, p2) -> 
+        List.for_all (fun (p1', p2') -> 
+            p1 = p1' && p2 = p2' ||
+            (p1 <> p1' && p2 <> p2')
+          ) s
+      ) s)
+
+let subst_projs (s : (proj * proj) list) (t : term) : term = 
+  check_projs_subst s;
+
+  let rec do_subst : term -> term = function
+    | Diff (Explicit l) ->
+      Diff (Explicit (List.map (fun (p, t) -> List.assoc_dflt p p s, t) l))
+
+    | _ as t -> tmap do_subst t
+
+  in
+  do_subst t
 
 (*------------------------------------------------------------------*)
 type refresh_arg = [`Global | `InEnv of Vars.env ref ]
@@ -1312,57 +1391,6 @@ let refresh_vars_env env vs =
   let env = ref env in
   let vs, s = refresh_vars (`InEnv env) vs in
   !env, vs, s
-
-(*------------------------------------------------------------------*)
-
-(** Does not recurse. *)
-let tmap (func : term -> term) (t : term) : term =
-  match t with
-  | Action _ -> t
-  | Name _   -> t
-  | Var _    -> t
-
-  | Fun (f,fty,terms) -> Fun (f, fty, List.map func terms)
-  | Macro (m, l, ts)  -> Macro (m, List.map func l, func ts)
-  | Seq (vs, b)       -> Seq (vs, func b)
-
-  | Diff (Explicit l) ->
-    Diff (Explicit (List.map (fun (lbl,tm) -> lbl, func tm) l))
-
-  | Find (b, c, d, e) ->
-    let c = func c
-    and d = func d
-    and e = func e in
-    Find (b, c, d, e)
-
-  | ForAll (vs, b) -> ForAll (vs, func b)
-  | Exists (vs, b) -> Exists (vs, func b)
-
-let tmap_fold (func : 'b -> term -> 'b * term) (b : 'b) (t : term) : 'b * term =
-  let bref = ref b in
-  let g t =
-    let b, t = func !bref t in
-    bref := b;
-    t
-  in
-  let t = tmap g t in
-  !bref, t
-
-let titer (f : term -> unit) (t : term) : unit =
-  let g e = f e; e in
-  ignore (tmap g t)
-
-let tfold (f : term -> 'b -> 'b) (t : term) (v : 'b) : 'b =
-  let vref : 'b ref = ref v in
-  let fi e = vref := (f e !vref) in
-  titer fi t;
-  !vref
-
-let texists (f : term -> bool) (t : term) : bool =
-  tfold (fun t b -> f t || b) t false
-
-let tforall (f : term -> bool) (t : term) : bool =
-  tfold (fun t b -> f t || b) t false
 
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructors -- Part 2} *)
@@ -1647,6 +1675,9 @@ let project (projs : proj list) (term : term) : term =
   in
 
   project term
+
+let project_opt (projs : projs option) (term : term) : term =
+  omap_dflt term (project ^~ term) projs 
 
 (*------------------------------------------------------------------*)
 (** Evaluate topmost diff operators for a given proj of a biterm.
