@@ -16,7 +16,7 @@ type in_target = [`Goal | `All | `Hyps of lsymb list]
 (*------------------------------------------------------------------*)
 (** {2 Parsed arguments for rewrite} *)
 
-type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
+type rw_count = [`Once | `Many | `Any ] (** ε | ! | ? *)
 
 type rw_dir = [`LeftToRight | `RightToLeft ] L.located
 
@@ -64,7 +64,7 @@ type naming_pat =
   | Unnamed   (** '_' *)
   | AnyName   (** '?' *)
   | Named of string
-  | Approx  of string        (* only used internally *)
+  | Approx  of string        (** only used internally *)
 
 type and_or_pat =
   | Or      of simpl_pat list

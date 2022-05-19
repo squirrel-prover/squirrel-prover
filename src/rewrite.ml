@@ -1,7 +1,13 @@
 open Utils
 
+module L    = Location
 module Args = TacticsArgs
 module SE   = SystemExpr
+module Pos  = Match.Pos
+
+(*------------------------------------------------------------------*)
+let hard_failure = Tactics.hard_failure
+let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
 (** A rewrite rule.
@@ -124,14 +130,6 @@ let rewrite_head
   try Some (_rewrite_head table system rule t) with NoRW -> None
 
 (*------------------------------------------------------------------*)
-type rw_res = [
-  | `Result of Equiv.any_form * (SE.context * Term.term) list
-  | `NothingToRewrite
-  | `MaxNestedRewriting
-  | `RuleBadSystems of string
-]
-
-(*------------------------------------------------------------------*)
 (** as an instance been found:
     - [pat]: pattern of the instance found (no free variables left)
     - [right]: right term instantiated with the instance found
@@ -152,12 +150,26 @@ type rw_state = {
 }
 
 (*------------------------------------------------------------------*)
+(** Rewrite error *)
+type error = 
+  | NothingToRewrite
+  | MaxNestedRewriting
+  | RuleBadSystems of string
+
+(*------------------------------------------------------------------*)
+(** Recast a rewrite error as a [Tactic] error *)
+let recast_error ~loc = function
+  | NothingToRewrite -> soft_failure ~loc Tactics.NothingToRewrite
+
+  | MaxNestedRewriting ->
+    hard_failure ~loc (Failure "max nested rewriting reached (1000)")
+
+  | RuleBadSystems s ->
+    soft_failure ~loc (Tactics.Failure ("rule bad systems: " ^ s))
+
+(*------------------------------------------------------------------*)
 (** Not exported *)
-exception Failed of [
-    | `NothingToRewrite
-    | `MaxNestedRewriting
-    | `RuleBadSystems of string
-  ] 
+exception Failed of error
 
 (*------------------------------------------------------------------*)
 (** Build the rewrite state corresponding to a rewrite rule.
@@ -211,7 +223,7 @@ let mk_state
                   p_rule <> p_rule' && p = p' && single = single'
                 ) l
             ) l then
-            raise (Failed (`RuleBadSystems "system projection ambiguity"));
+            raise (Failed (RuleBadSystems "system projection ambiguity"));
 
           Some (List.map fst l)
       end
@@ -221,7 +233,7 @@ let mk_state
   let psubst = odflt [] psubst in
 
   if projs = Some [] then
-    raise (Failed (`RuleBadSystems "no system of the rule applies"));
+    raise (Failed (RuleBadSystems "no system of the rule applies"));
 
   (* check that all projection of [rule] on [projs] are valid *)
   let () = match projs with
@@ -256,7 +268,7 @@ let mk_state
    the generated sub-goals. *)
 let rw_inst
     (table : Symbols.table) (rule : rw_rule) (system : SE.context)
-  : rw_state Match.Pos.f_map_fold 
+  : rw_state Pos.f_map_fold 
   = 
   fun occ projs vars _conds _p (s : rw_state) ->
   (* project the system *)
@@ -320,6 +332,15 @@ let rw_inst
 
         { s with found_instance }, `Map right
 
+
+(*------------------------------------------------------------------*)
+type rw_res = Equiv.any_form * (SE.context * Term.term) list
+
+type rw_res_opt = [
+  | `Result of rw_res
+  | `Failed of error
+]
+
 (*------------------------------------------------------------------*)
 let rewrite
     (table  : Symbols.table)
@@ -327,13 +348,13 @@ let rewrite
     (env    : Vars.env)
     (mult   : Args.rw_count)
     (rule   : rw_rule)
-    (target : Equiv.any_form) : rw_res
+    (target : Equiv.any_form) : rw_res_opt
   =
   let check_max_rewriting : unit -> unit =
     let cpt_occ = ref 0 in
     fun () ->
       if !cpt_occ > 1000 then   (* hard-coded *)
-        raise (Failed `MaxNestedRewriting);
+        raise (Failed MaxNestedRewriting);
       incr cpt_occ;
   in
 
@@ -361,13 +382,13 @@ let rewrite
     let s, f = match f with
       | `Equiv f ->
         let s, _, f = 
-          Match.Pos.map_fold_e (rw_inst table rule system) env s f 
+          Pos.map_fold_e (rw_inst table rule system) env s f 
         in
         s, `Equiv f
 
       | `Reach f ->
         let s, _, f = 
-          Match.Pos.map_fold (rw_inst table rule system) env s f 
+          Pos.map_fold (rw_inst table rule system) env s f 
         in
         s, `Reach f
     in
@@ -375,7 +396,7 @@ let rewrite
     match mult, s.found_instance with
     | `Any, `False -> f, []
 
-    | (`Once | `Many), `False -> raise (Failed `NothingToRewrite)
+    | (`Once | `Many), `False -> raise (Failed NothingToRewrite)
 
     | (`Many | `Any), `Found inst  ->
       let f, rsubs' = _rewrite `Any f in
@@ -385,8 +406,67 @@ let rewrite
   in
 
   match _rewrite mult target with
-  | f, subs -> `Result (f, List.rev subs)
+  | f, subs            -> `Result (f, List.rev subs)
+  | exception Failed e -> `Failed e
 
-  | exception Failed (`NothingToRewrite)   -> `NothingToRewrite
-  | exception Failed (`MaxNestedRewriting) -> `MaxNestedRewriting
-  | exception Failed (`RuleBadSystems s)   -> `RuleBadSystems s
+let rewrite_exn   
+    ~(loc   : L.t)
+    (table  : Symbols.table)
+    (system : SE.context)
+    (env    : Vars.env)
+    (mult   : Args.rw_count)
+    (rule   : rw_rule)
+    (target : Equiv.any_form) : rw_res
+  =
+  match rewrite table system env mult rule target with
+  | `Result r -> r
+  | `Failed e -> recast_error ~loc e
+
+(*------------------------------------------------------------------*)
+(** {2 Higher-level rewrite} *)
+
+let high_rewrite
+    ~(mode   : [`TopDown of bool | `BottomUp])
+    (table   : Symbols.table)
+    (system  : SE.t)
+    (venv    : Vars.env)         (* for clean variable naming *)
+    (mk_rule : Vars.vars -> Pos.pos -> rw_rule option) 
+    (t       : Term.term)
+  : Term.term 
+  =
+  let rw_inst : Pos.f_map = 
+    fun occ projs vars _conds p ->
+      (* build the rule to apply at position [p] *)
+      match mk_rule vars p with
+      | None -> `Continue
+      | Some rule ->
+        assert (rule.rw_conds = [] && rule.rw_system = system);
+
+        let left,right = rule.rw_rw in
+        let pat : Term.term Match.pat = Match.{ 
+            pat_tyvars = rule.rw_tyvars; 
+            pat_vars   = rule.rw_vars; 
+            pat_term   = left;
+          } 
+        in
+        let system = SE.project_opt projs system in
+        match Match.T.try_match table system occ pat with
+        | NoMatch _ | FreeTyv ->
+          begin match mode with
+            | `TopDown _ -> `Continue
+            | `BottomUp  -> 
+              assert (Term.is_macro occ); `Continue
+              (* in bottom-up mode, we build rules that always succeed. *)
+          end
+
+        (* head matches *)
+        | Match mv ->
+          let subst = Match.Mvar.to_subst ~mode:`Match mv in
+          let left = Term.subst subst left in
+          let right = Term.subst subst right in
+          assert (left = occ);
+          `Map right
+  in
+
+  let _, f = Pos.map ~mode rw_inst venv t in
+  f

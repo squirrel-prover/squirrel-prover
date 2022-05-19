@@ -9,58 +9,10 @@ module Sv = Vars.Sv
 module Sp = Pos.Sp
               
 (*------------------------------------------------------------------*)
-(** Rewrite a rule as much as possible.
-    The rewriting rule can depend on the position in the term. *)
-let rewrite
-    ~(mode   : [`TopDown of bool | `BottomUp])
-    (table   : Symbols.table)
-    (system  : SE.t)
-    (venv    : Vars.env)         (* for clean variable naming *)
-    (mk_rule : Vars.vars -> Pos.pos -> Rewrite.rw_rule option) 
-    (t       : Term.term)
-  : Term.term 
-  =
-  let rw_inst : Match.Pos.f_map = 
-    fun occ projs vars _conds p ->
-      (* build the rule to apply at position [p] *)
-      match mk_rule vars p with
-      | None -> `Continue
-      | Some rule ->
-        assert (rule.rw_conds = []);
-
-        (* TODO: project the pattern somehow *)
-        let left,right = rule.rw_rw in
-        let pat : Term.term Match.pat = Match.{ 
-            pat_tyvars = rule.rw_tyvars; 
-            pat_vars   = rule.rw_vars; 
-            pat_term   = left;
-          } 
-        in
-        let system = SE.project_opt projs system in
-        match Match.T.try_match table system occ pat with
-        | NoMatch _ | FreeTyv ->
-          begin match mode with
-            | `TopDown _ -> `Continue
-            | `BottomUp  -> 
-              assert (Term.is_macro occ); `Continue
-              (* in bottom-up mode, we build rules that always succeed. *)
-          end
-
-        (* head matches *)
-        | Match mv ->
-          let subst = Match.Mvar.to_subst ~mode:`Match mv in
-          let left = Term.subst subst left in
-          let right = Term.subst subst right in
-          assert (left = occ);
-          `Map right
-  in
-
-  let _, f = Match.Pos.map ~mode rw_inst venv t in
-  f
 
 (** Simple case of [rewrite], without recursion and with a single rewriting 
     rule. *)
-let rewrite_norec
+let high_rewrite_norec
     (table  : Symbols.table)
     (system : SE.t)
     (venv   : Vars.env)         (* for clean variable naming *)
@@ -68,7 +20,8 @@ let rewrite_norec
     (t      : Term.term)
   : Term.term 
   =
-  rewrite ~mode:(`TopDown false) table system venv (fun _ _ -> Some rule) t
+  let mk_rule = fun _ _ -> Some rule in
+  Rewrite.high_rewrite ~mode:(`TopDown false) table system venv mk_rule t
     
 
 (*------------------------------------------------------------------*)
@@ -241,7 +194,7 @@ let global_rename
   in
 
   let fmap _ _ms t : Term.term =
-    rewrite_norec table (old_system :> SE.t) env.vars rw_rule t
+    high_rewrite_norec table (old_system :> SE.t) env.vars rw_rule t
   in
   
   let table, old_new_pair =
@@ -354,7 +307,7 @@ let global_prf
   in
 
   let fmap _ _ms t =
-    rewrite_norec table (old_system :> SE.t) venv rw_rule t
+    high_rewrite_norec table (old_system :> SE.t) venv rw_rule t
   in
 
   let table, old_new_pair =
@@ -521,8 +474,8 @@ let global_cca
   in
 
   let fmap _ _ms t =
-    rewrite_norec table (old_system :> SE.t) venv enc_rw_rule t |>
-    rewrite_norec table (old_system :> SE.t) venv dec_rw_rule
+    high_rewrite_norec table (old_system :> SE.t) venv enc_rw_rule t |>
+    high_rewrite_norec table (old_system :> SE.t) venv dec_rw_rule
   in
 
   let table, old_new_pair =
@@ -1133,7 +1086,7 @@ let global_prf_t
     (* To keep meaningful positions, we need to do the rewriting bottom-up.
        Indeed, this ensures that a rewriting does not modify the positions
        of the sub-terms above the position the rewriting occurs at. *)
-    rewrite ~mode:`BottomUp
+    Rewrite.high_rewrite ~mode:`BottomUp
       table (old_system :> SE.t) venv (mk_rw_rule arg ms) t
   in
 

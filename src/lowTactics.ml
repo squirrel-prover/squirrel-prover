@@ -157,7 +157,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (doit : (
           (Equiv.any_form * Ident.t option) -> 
           (Equiv.any_form * (SE.context * S.conc_form) list)))
-      (s : S.sequent) (t : target) : S.sequent * S.sequent list =
+      (s : S.sequent) (t : target) 
+    : S.sequent * S.sequent list 
+    =
     let f, s, tgt_id = match t with
       | T_conc ->
           let f = S.wrap_conc (S.goal s) in
@@ -178,8 +180,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
 
     match t, f with
-    | T_conc,    f -> S.set_goal (S.unwrap_conc f) s, subs
-    | T_hyp id,  f -> Hyps.add (Args.Named (Ident.name id)) (S.unwrap_hyp f) s, subs
+    | T_conc, f -> S.set_goal (S.unwrap_conc f) s, subs
+    | T_hyp id, f -> 
+      Hyps.add (Args.Named (Ident.name id)) (S.unwrap_hyp f) s, subs
     | T_felem i, `Reach f -> S.change_felem i [f] s, subs
     | _ -> assert false
 
@@ -429,54 +432,47 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   type rw_earg = Args.rw_count * rw_arg
 
+  let hyp_is_same (hyp_id : Ident.t option) (target_id : Ident.t option) =
+    match hyp_id, target_id with
+    | None, _ | _, None -> false
+    | Some hyp_id, Some target_id ->
+      Ident.name hyp_id = Ident.name target_id &&
+      Ident.name hyp_id <> "_"
+
   (** [rewrite ~all tgt rw_args] rewrites [rw_arg] in [tgt].
       If [all] is true, then does not fail if no rewriting occurs. *)
   let rewrite
-      ~(loc:L.t)
-      ~(all:bool)
-      (targets: target list)
+      ~(loc : L.t)
+      ~(all : bool)
+      (targets : target list)
       (rw : Args.rw_count * Ident.t option * Rewrite.rw_rule)
       (s : S.sequent)
     : S.sequent * S.sequent list
     =
-    let is_same (hyp_id : Ident.t option) (target_id : Ident.t option) =
-      match hyp_id, target_id with
-      | None, _ | _, None -> false
-      | Some hyp_id, Some target_id ->
-        Ident.name hyp_id = Ident.name target_id &&
-        Ident.name hyp_id <> "_"
-    in
-
     (* set to true if at least one rewriting occured in any of the targets *)
     let found = ref false in
+
+    let mult, id_opt, rw_erule = rw in
 
     let doit_tgt 
         (f,tgt_id : Equiv.any_form * Ident.t option) 
       : Equiv.any_form * (SE.context * S.conc_form) list 
       =
-      let mult, id_opt, rw_erule = rw in
-      if is_same id_opt tgt_id
+      if hyp_is_same id_opt tgt_id
       then f, []
       else
-        let rw_res =
-          Rewrite.rewrite
-            (S.table s) (S.system s) (S.vars s)
+        match
+          Rewrite.rewrite_exn 
+            ~loc (S.table s) (S.system s) (S.vars s)
             mult rw_erule f
-        in
-        match rw_res with
-        | `Result (f, subs) ->
+        with
+        | f, subs ->
           found := true;
           f, List.map (fun (system, l) -> system, S.unwrap_conc (`Reach l)) subs
 
-        | `NothingToRewrite ->
+        | exception Tactics.Tactic_soft_failure (_,NothingToRewrite) ->
           if all then f, []
           else soft_failure ~loc Tactics.NothingToRewrite
-
-        | `MaxNestedRewriting ->
-          hard_failure ~loc (Failure "max nested rewriting reached (1000)")
-
-        | `RuleBadSystems s ->
-          soft_failure ~loc (Tactics.Failure ("rule bad systems: " ^ s))
     in
 
     let s, subs = do_targets doit_tgt s targets in
@@ -485,12 +481,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     s, subs
 
-  (** Parse rewrite tactic arguments as rewrite rules with possible subgoals
-      showing the rule validity. *)
-  let p_rw_item (rw_arg : Args.rw_item) (s : S.t) : rw_earg * S.sequent list =
-    let p_rw_rule dir (p_pt : Theory.p_pt)
-      : Rewrite.rw_rule * S.sequent list * Ident.t option
-      =
+  (** Parse rewrite tactic arguments as rewrite rules. *)
+  let p_rw_item (rw_arg : Args.rw_item) (s : S.t) : rw_earg =
+    let p_rw_rule dir (p_pt : Theory.p_pt) : Rewrite.rw_rule * Ident.t option =
       let ghyp, pat_system, pat = 
         S.convert_pt_gen
           ~check_compatibility:false
@@ -499,31 +492,28 @@ module MkCommonLowTac (S : Sequent.S) = struct
       in
       let id_opt = match ghyp with `Hyp id -> Some id | _ -> None in
 
-      (* We are using an hypothesis, hence no new sub-goals *)
-      let premise = [] in
-
-      pat_to_rw_rule s pat_system.set dir pat, premise, id_opt
+      pat_to_rw_rule s pat_system.set dir pat, id_opt
     in
 
-    let p_rw_item (rw_arg : Args.rw_item) : rw_earg * (S.sequent list) =
-      let rw, subgoals = match rw_arg.rw_type with
+    let p_rw_item (rw_arg : Args.rw_item) : rw_earg =
+      let rw = match rw_arg.rw_type with
         | `Rw f ->
           let dir = L.unloc rw_arg.rw_dir in
           (* (rewrite rule, subgols, hyp id) if applicable *)
-          let rule, subgoals, id_opt = p_rw_rule dir f in
-          Rw_rw (f.p_pt_loc, id_opt, rule), subgoals
+          let rule, id_opt = p_rw_rule dir f in
+          Rw_rw (f.p_pt_loc, id_opt, rule)
 
         | `Expand t ->
           if L.unloc rw_arg.rw_dir <> `LeftToRight then
             hard_failure ~loc:(L.loc rw_arg.rw_dir)
               (Failure "expand cannot take a direction");
 
-          Rw_expand t, []
+          Rw_expand t
 
-        | `ExpandAll loc -> Rw_expandall loc, []
+        | `ExpandAll loc -> Rw_expandall loc
 
       in
-      (rw_arg.rw_mult, rw), subgoals
+      rw_arg.rw_mult, rw
     in
 
     p_rw_item rw_arg
@@ -535,12 +525,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (s : S.sequent) : S.sequent list
     =
     let targets, all = make_in_targets rw_in s in
-    let (rw_c,rw_arg), subgoals = p_rw_item rw_item s in
+    let rw_c,rw_arg = p_rw_item rw_item s in
 
     match rw_arg with
     | Rw_rw (loc, id, erule) ->
       let s, subs = rewrite ~loc ~all targets (rw_c, id, erule) s in
-      subgoals @                  (* prove rule *)
       subs @                      (* prove instances premisses *)
       [s]                         (* final sequent *)
 
