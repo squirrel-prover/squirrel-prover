@@ -1160,7 +1160,8 @@ let do_rw_arg (rw_arg : Args.rw_arg) (s : TS.t) (t : Term.term)
   | Args.R_item rw_item  -> do_rw_item rw_item s t
   | Args.R_s_item s_item -> do_s_item s_item s t, []
 
-let do_rw_args (rw_args : Args.rw_arg list) (s : TS.t) (t : Term.term) 
+let do_rw_args
+    (rw_args : Args.rw_arg list) (s : TS.t) (t : Term.term) 
   : Term.term * TS.t list
   =
   List.fold_left (fun (t,subgs) rw_arg ->
@@ -1168,6 +1169,9 @@ let do_rw_args (rw_args : Args.rw_arg list) (s : TS.t) (t : Term.term)
       t, subgs @ subgs'
     ) (t, []) rw_args
 
+
+(* let mk_rewrite_cond (arg : system_map_arg) (ms : Symbols.macro) = *)
+  
 
 let global_rewrite
     (table   : Symbols.table)
@@ -1181,15 +1185,29 @@ let global_rewrite
   in
 
   let context = SE.{ set = (old_system :> arbitrary); pair = None; } in
-  let env = Env.init ~table ~system:context () in
-  let s = TS.init ~env ~hint_db Term.mk_false in
   
   let subgs = ref [] in
 
   let fmap (arg : system_map_arg) (ms : Symbols.macro) (t : Term.term) 
     : Term.term 
     =
+    let vars, ts = match arg with
+      | Macros.ADescr d -> 
+        Vars.of_list d.indices, 
+        Term.mk_action d.name d.indices
+
+      | Macros.AGlobal { is; ts; } -> 
+        Vars.of_list (ts :: is), 
+        Term.mk_var ts 
+    in
+    let env = Env.init ~table ~vars ~system:context () in
+    let s = TS.init ~env ~hint_db Term.mk_false in
+
     let t, subgs' = do_rw_args rw s t in
+    let subgs' = List.map (fun s -> 
+        TS.set_goal (Term.mk_impl (Term.mk_happens ts) (TS.goal s)) s
+      ) subgs'
+    in
     subgs := subgs' @ !subgs;   (* new subgoals *)
     t
   in

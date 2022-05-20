@@ -72,3 +72,21 @@ goal [R1] _ (i : index) :
 Proof.
   auto.
 Qed.
+
+(*------------------------------------------------------------------*)
+name n : index -> message.
+
+system [G] !_i (in(c,x); A: out(c, f(f(n(i))))).
+
+axiom [G] check_ax_n0 (i : index) : happens (A(i)) => check(f(n(i))).
+axiom [G] check_ax_n1 (i : index) : happens (A(i)) => check(n(i)).
+
+system G1 = [G/left] with rewrite !barP foo.
+Proof. by have ? := check_ax_n0 i. Qed.
+Proof. by have ? := check_ax_n1 i. Qed.
+
+goal [G1] _ (i : index) :  
+  happens(A(i)) => output@A(i) = n(i).
+Proof. 
+  auto.
+Qed.

@@ -270,7 +270,7 @@ let rw_inst
     (table : Symbols.table) (rule : rw_rule) (system : SE.context)
   : rw_state Pos.f_map_fold 
   = 
-  fun occ projs vars _conds _p (s : rw_state) ->
+  fun occ projs vars conds _p (s : rw_state) ->
   (* project the system *)
   let system_set = SE.project_opt projs system.set in
 
@@ -313,7 +313,9 @@ let rw_inst
         let found_subs =
           List.map (fun rsub ->
               { system with set = system_set}, 
-              Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
+              Term.mk_forall ~simpl:true vars 
+                ((* Term.mk_impls ~simpl:true conds *) 
+                  (Term.subst subst rsub))
             ) rule.rw_conds
         in
 
