@@ -57,10 +57,11 @@ val pp_system_decl : Format.formatter -> system_decl -> unit
 
 (** Global cryptographic rules *)
 type global_rule =
-  | Rename of Theory.global_formula
-  | PRF    of Theory.bnds * Theory.term
-  | PRFt   of Theory.bnds * Theory.term (* gPRF, with time *)
-  | CCA    of Theory.bnds * Theory.term
+  | Rename  of Theory.global_formula
+  | PRF     of Theory.bnds * Theory.term
+  | PRFt    of Theory.bnds * Theory.term (* gPRF, with time *)
+  | CCA     of Theory.bnds * Theory.term
+  | Rewrite of TacticsArgs.rw_arg list
 
 (** System modifier, comprising:
     the original system, the global rule to apply, and the name of 
@@ -110,7 +111,9 @@ type declaration_i =
   | Decl_system  of system_decl
   | Decl_system_modifier  of system_modifier
 
-  | Decl_dh of Symbols.dh_hyp list * lsymb * (lsymb * Symbols.symb_type) * (lsymb * Symbols.symb_type) option * c_tys
+  | Decl_dh of Symbols.dh_hyp list * lsymb * 
+               (lsymb * Symbols.symb_type) * 
+               (lsymb * Symbols.symb_type) option * c_tys
 
   | Decl_hash of int option * lsymb * orcl_tag_info option * c_tys
 

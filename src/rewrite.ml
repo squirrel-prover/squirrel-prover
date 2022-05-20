@@ -440,8 +440,9 @@ let high_rewrite
       match mk_rule vars p with
       | None -> `Continue
       | Some rule ->
-        assert (rule.rw_conds = [] && rule.rw_system = system);
+        assert (rule.rw_conds = []);
 
+        (* TODO : project the pattern somehow *)
         let left,right = rule.rw_rw in
         let pat : Term.term Match.pat = Match.{ 
             pat_tyvars = rule.rw_tyvars; 

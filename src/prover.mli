@@ -12,8 +12,6 @@ type lsymb = Theory.lsymb
 (** Return the name of the goal currently being proved, if any. *)
 val current_goal_name : unit -> string option
 
-val get_current_goal : unit -> (Goal.statement * Goal.t) option
-
 val get_current_system : unit -> SE.context option
 
 (** Current mode of the prover:
@@ -27,6 +25,7 @@ type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 val current_hint_db : unit -> Hint.hint_db
 val set_hint_db : Hint.hint_db -> unit
 
+val unnamed_goal : unit -> lsymb
 
 (*------------------------------------------------------------------*)
 (** {2 History management} *)
@@ -82,6 +81,8 @@ exception Option_already_defined
 val get_option : option_name -> option_val option
 
 val add_option : option_def -> unit
+
+val add_proved_goal : [ `Axiom | `Lemma ] -> Goal.statement -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Tactics syntax trees} *)
@@ -202,11 +203,13 @@ type parsed_input =
   | EOF
 
 (** Declare a new goal to the current goals, and returns it. *)
-val declare_new_goal :
+val add_new_goal :
   Symbols.table ->
   Hint.hint_db ->
   Goal.Parsed.t Location.located ->
   string * Goal.t
+
+val add_proof_obl : Goal.t -> unit
 
 (** From the name of the function, returns the corresponding formula. If no tag
    formula was defined, returns False. *)
@@ -233,39 +236,3 @@ val close_brace : unit -> unit
 
 (** Initialize the prover state try to prove the first of the unproved goal. *)
 val start_proof : [`NoCheck | `Check] -> string option
-
-(*------------------------------------------------------------------*)
-(** {2 Error handling} *)
-
-type decl_error_i =
-  | BadEquivForm
-  | InvalidAbsType
-  | InvalidCtySpace of string list
-  | DuplicateCty of string
-  | NotTSOrIndex
-  | NonDetOp
-
-type dkind = KDecl | KGoal
-
-type decl_error =  L.t * dkind * decl_error_i
-
-exception Decl_error of decl_error
-
-val pp_decl_error :
-  (Format.formatter -> L.t -> unit) ->
-  Format.formatter -> decl_error -> unit
-
-(*------------------------------------------------------------------*)
-(** {2 Declaration processing} *)
-
-(** Process a declaration. *)
-val declare :
-  Symbols.table -> Hint.hint_db -> Decl.declaration  -> Symbols.table
-
-(** Process a list of declaration. *)
-val declare_list :
-  Symbols.table -> Hint.hint_db -> Decl.declarations -> Symbols.table
-
-(*------------------------------------------------------------------*)
-val add_hint_rewrite : Symbols.table -> lsymb -> Hint.hint_db -> Hint.hint_db
-val add_hint_smt     : Symbols.table -> lsymb -> Hint.hint_db -> Hint.hint_db

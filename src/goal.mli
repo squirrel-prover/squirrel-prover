@@ -32,16 +32,16 @@ type ('a,'b) abstract_statement = {
 }
 
 (*------------------------------------------------------------------*)
-type statement       = (string, Equiv.gform) abstract_statement
-type equiv_statement = (string, Equiv.form ) abstract_statement
-type reach_statement = (string, Term.term  ) abstract_statement
+type statement       = (string, Equiv.any_form) abstract_statement
+type equiv_statement = (string, Equiv.form    ) abstract_statement
+type reach_statement = (string, Term.term     ) abstract_statement
 
 (*------------------------------------------------------------------*)
 val pp_statement : Format.formatter -> statement -> unit
 
 (*------------------------------------------------------------------*)
-val is_reach_statement : (_, Equiv.gform) abstract_statement -> bool
-val is_equiv_statement : (_, Equiv.gform) abstract_statement -> bool
+val is_reach_statement : (_, Equiv.any_form) abstract_statement -> bool
+val is_equiv_statement : (_, Equiv.any_form) abstract_statement -> bool
 
 val to_reach_statement : ?loc:Location.t -> statement -> reach_statement
 val to_equiv_statement : ?loc:Location.t -> statement -> equiv_statement

@@ -247,68 +247,85 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | `Fsymb fname        -> fs = fname
     | `Msymb _ | `Mterm _ -> false
 
-  (** If [m_rec = true], recurse on expanded sub-terms. *)
-  let expand
+  type expand_kind = [ 
+    | `Msymb of Symbols.macro
+    | `Fsymb of Symbols.fname 
+    | `Mterm of Term.term
+    | `Any
+  ]
+ 
+  let expand_term 
       ?(m_rec = false)
-      (targets: target list)
-      (target : [ `Msymb of Symbols.macro
-                | `Fsymb of Symbols.fname 
-                | `Mterm of Term.term
-                | `Any])
-      (s : S.sequent) : bool * S.sequent
+      (target : expand_kind)
+      (s : S.sequent)
+      (f : Equiv.any_form) : bool * Equiv.any_form
     =
     let found1 = ref false in
 
-    (* unfold_macro is not allowed to fail if we try to expand a specific term *)
+    (* unfold_macro is not allowed to fail if we try to expand a 
+       specific term *)
     let strict =
       match target with
       | `Mterm _ -> true
       | `Fsymb _ | `Msymb _ | `Any -> false
     in
+    let unfold (projs : Term.projs option) occ = 
+      match unfold_term ~strict occ projs s with
+      | None -> `Continue
+      | Some t ->
+        found1 := true;
+        `Map t
+    in
+
+    let expand_inst : Match.Pos.f_map = 
+      fun occ projs _vars _conds _p ->
+        match occ with
+        | Term.Macro (ms, _, _) ->
+          if found_occ_macro target ms occ then
+            unfold projs occ 
+          else
+            `Continue
+
+        | Term.Fun ((f,_), _, _) ->
+          if found_occ_fun target f then 
+            unfold projs occ
+          else
+            `Continue
+
+        | _ -> `Continue
+    in
+
+    match f with
+    | `Equiv f ->
+      let _, f = 
+        Match.Pos.map_e ~mode:(`TopDown m_rec) expand_inst (S.vars s) f 
+      in
+      !found1, `Equiv f
+
+    | `Reach f ->
+      let _, f = 
+        Match.Pos.map ~mode:(`TopDown m_rec) expand_inst (S.vars s) f 
+      in
+      !found1, `Reach f
+
+
+  (** If [m_rec = true], recurse on expanded sub-terms. *)
+  let expand
+      ?(m_rec = false)
+      (targets: target list)
+      (target : expand_kind)
+      (s : S.sequent) : bool * S.sequent
+    =
+    let found1 = ref false in
 
     (* applies [doit] to all subterms of the target [f] *)
     let doit
         ((f,_) : Equiv.any_form * Ident.t option) 
       : Equiv.any_form * (SE.context * S.conc_form) list 
       =
-      let unfold (projs : Term.projs option) occ = 
-        match unfold_term ~strict occ projs s with
-        | None -> `Continue
-        | Some t ->
-          found1 := true;
-          `Map t
-      in
-
-      let expand_inst : Match.Pos.f_map = 
-        fun occ projs _vars _conds _p ->
-          match occ with
-          | Term.Macro (ms, _, _) ->
-            if found_occ_macro target ms occ then
-              unfold projs occ 
-            else
-              `Continue
-
-          | Term.Fun ((f,_), _, _) ->
-            if found_occ_fun target f then 
-              unfold projs occ
-            else
-              `Continue
-
-          | _ -> `Continue
-      in
-
-      match f with
-      | `Equiv f ->
-        let _, f = 
-          Match.Pos.map_e ~mode:(`TopDown m_rec) expand_inst (S.vars s) f 
-        in
-        `Equiv f, []
-
-      | `Reach f ->
-        let _, f = 
-          Match.Pos.map ~mode:(`TopDown m_rec) expand_inst (S.vars s) f 
-        in
-        `Reach f, []
+      let found1', f = expand_term ~m_rec target s f in
+      found1 := found1' || !found1;
+      f, []
     in
 
     let s, subs = do_targets doit s targets in
@@ -350,35 +367,32 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let targets, _all = make_in_targets targets s in
     [expand_all targets s]
 
-  let expand_arg (targets : target list) (arg : Theory.term) (s : S.t) : S.t =
-    let expand targs symb s =
-      let found, s = expand targets symb s in
-      if not found then
-        soft_failure ~loc:(L.loc arg) (Failure "nothing to expand");
-      s
-    in
-
+  (** parse a expand argument *)
+  let p_rw_expand_arg (s : S.t) (arg : Theory.term) : expand_kind = 
     let tbl = S.table s in
     match Args.convert_as_lsymb [Args.Theory arg] with
     | Some m ->
-      let m =
-        if Symbols.Macro.mem m tbl then
-          `Msymb (Symbols.Macro.of_lsymb m tbl)
-        else if Symbols.Function.mem m tbl then
-          `Fsymb (Symbols.Function.of_lsymb m tbl)
-        else 
-          soft_failure ~loc:(L.loc arg) (Failure "not a macro or operator");
-      in
-      expand targets m s
+      if Symbols.Macro.mem m tbl then
+        `Msymb (Symbols.Macro.of_lsymb m tbl)
+      else if Symbols.Function.mem m tbl then
+        `Fsymb (Symbols.Function.of_lsymb m tbl)
+      else 
+        soft_failure ~loc:(L.loc arg) (Failure "not a macro or operator");
 
     | _ ->
       match convert_args s [Args.Theory arg] Args.(Sort Message) with
-      | Args.Arg (Args.Message (f, _)) ->
-        expand targets (`Mterm f) s
-
+      | Args.Arg (Args.Message (f, _)) -> `Mterm f
+                                            
       | _ ->
         hard_failure ~loc:(L.loc arg)
           (Tactics.Failure "expected a term of sort message")
+
+  let expand_arg (targets : target list) (arg : Theory.term) (s : S.t) : S.t =
+    let expnd_arg = p_rw_expand_arg s arg in
+    let found, s = expand targets expnd_arg s in
+    if not found then
+      soft_failure ~loc:(L.loc arg) (Failure "nothing to expand");
+    s
 
   let expands (args : Theory.term list) (s : S.t) : S.t =
     List.fold_left (fun s arg -> expand_arg (target_all s) arg s) s args

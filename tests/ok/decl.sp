@@ -24,20 +24,20 @@ name nt : index -> T.
 
 system null.
 
-goal _ (x : message) : gg(zero) = zero.
+axiom _ (x : message) : gg(zero) = zero.
 
-goal _ (x,y : message) : to_T(x) = to_T(y) => x = y.
+axiom _ (x,y : message) : to_T(x) = to_T(y) => x = y.
 
-goal _ (x : message) : from_T(to_T(x)) = x.
+axiom _ (x : message) : from_T(to_T(x)) = x.
 
-goal _ (x : message) : N_to_T(to_N(x)) = to_T(x).
+axiom _ (x : message) : N_to_T(to_N(x)) = to_T(x).
 
 (* gg is polymorphique *)
-goal _ (x : message) : gg(N_to_T(gg(to_N(gg(x))))) = gg(to_T(gg(x))).
+axiom _ (x : message) : gg(N_to_T(gg(to_N(gg(x))))) = gg(to_T(gg(x))).
 
 (*------------------------------------------------------------------*)
 (* check that len is polymorphique *)
-goal _ (i,j : index) : 
+axiom _ (i,j : index) : 
 len(nn(i)) = len(empty) && len(nn(j)) = len(nt(j)) => i = j.
 
 (*------------------------------------------------------------------*)

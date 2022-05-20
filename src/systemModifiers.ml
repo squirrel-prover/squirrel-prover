@@ -7,9 +7,16 @@ module Pos = Match.Pos
                
 module Sv = Vars.Sv
 module Sp = Pos.Sp
-              
-(*------------------------------------------------------------------*)
 
+module Args = TacticsArgs
+module TS   = TraceSequent
+module LT   = LowTactics
+module TLT  = LT.TraceLT
+
+(*------------------------------------------------------------------*)
+let soft_failure = Tactics.soft_failure
+
+(*------------------------------------------------------------------*)
 (** Simple case of [rewrite], without recursion and with a single rewriting 
     rule. *)
 let high_rewrite_norec
@@ -32,7 +39,6 @@ type system_map_arg = Macros.system_map_arg
 let clone_system_map
     (table    : Symbols.table)
     (system   : System.Single.t)
-    (s_system : _)
     (new_name : Theory.lsymb)
     (fmap     :
        ( system_map_arg ->
@@ -81,7 +87,7 @@ let parse_single_system_name table sdecl : SE.fset * System.Single.t =
   match SE.(to_list (to_fset res)) with
   | [_,s] -> SE.to_fset res, s
   | _ ->
-    Tactics.soft_failure ~loc:(L.loc sdecl.Decl.from_sys)
+    soft_failure ~loc:(L.loc sdecl.Decl.from_sys)
       (Failure "a single system must be provided")
 
 (*------------------------------------------------------------------*)
@@ -198,8 +204,7 @@ let global_rename
   in
   
   let table, old_new_pair =
-    clone_system_map
-      table old_single_system old_single_system sdecl.Decl.name fmap
+    clone_system_map table old_single_system sdecl.Decl.name fmap
   in 
   
   let axiom_name =
@@ -226,7 +231,7 @@ let global_rename
       table hint_db
       axiom_name enrich make_conclusion old_new_pair
   in
-  (Some lemma, table)
+  (Some lemma, [], table)
 
 
 (*------------------------------------------------------------------*)
@@ -238,7 +243,7 @@ let global_prf
     (sdecl : Decl.system_modifier)
     (bnds  : Theory.bnds)
     (hash  : Theory.term)
-  : Goal.statement option * Symbols.table
+  : Goal.statement option * Goal.t list * Symbols.table
   =
   let old_system, old_single_system =
     parse_single_system_name table sdecl
@@ -262,7 +267,7 @@ let global_prf
       ~cntxt param.h_fn param.h_key.s_symb
   in
   if errors <> [] then
-    Tactics.soft_failure (Tactics.BadSSCDetailed errors);
+    soft_failure (Tactics.BadSSCDetailed errors);
 
   (* We first refresh globably the indices to create the left pattern *)
   let is1, left_subst = Term.refresh_vars `Global is in
@@ -311,8 +316,7 @@ let global_prf
   in
 
   let table, old_new_pair =
-    clone_system_map
-      table old_single_system old_single_system sdecl.Decl.name fmap
+    clone_system_map table old_single_system sdecl.Decl.name fmap
   in 
   
   let axiom_name =
@@ -344,7 +348,7 @@ let global_prf
       axiom_name enrich make_conclusion old_new_pair
   in
 
-  Some lemma, table
+  Some lemma, [], table
 
 
 
@@ -379,7 +383,7 @@ let global_cca
       fnenc, sk, m, fnpk, r
 
     | _ ->
-      Tactics.soft_failure ~loc:(L.loc p_enc)
+      soft_failure ~loc:(L.loc p_enc)
         (Tactics.Failure
            "CCA can only be applied on an encryption term enc(t,r,pk(k))")
   in
@@ -397,12 +401,12 @@ let global_cca
       in
       
       if errors <> [] then
-        Tactics.soft_failure (Tactics.BadSSCDetailed errors);
+        soft_failure (Tactics.BadSSCDetailed errors);
       
       fndec
 
     | _ ->
-      Tactics.soft_failure
+      soft_failure
         (Tactics.Failure
            "The first encryption symbol is not used with the correct \
             public key function.")
@@ -479,8 +483,7 @@ let global_cca
   in
 
   let table, old_new_pair =
-    clone_system_map
-      table old_single_system old_single_system sdecl.Decl.name fmap
+    clone_system_map table old_single_system sdecl.Decl.name fmap
   in
 
   let axiom_name =
@@ -521,7 +524,7 @@ let global_cca
       table hint_db
       axiom_name enrich make_conclusion old_new_pair
   in
-  Some lemma, table
+  Some lemma, [], table
 
 (*------------------------------------------------------------------*)
 (** {2 Global PRF with time} *)
@@ -767,7 +770,7 @@ let global_prf_t
     (sdecl   : Decl.system_modifier)
     (bnds    : Theory.bnds)
     (hash    : Theory.term)
-  : Goal.statement option * Symbols.table
+  : Goal.statement option * Goal.t list * Symbols.table
   =
   let old_system, old_single_system =
     parse_single_system_name table sdecl
@@ -794,7 +797,7 @@ let global_prf_t
       ~cntxt param.h_fn param.h_key.s_symb
   in
   if errors <> [] then
-    Tactics.soft_failure (Tactics.BadSSCDetailed errors);
+    soft_failure (Tactics.BadSSCDetailed errors);
 
   (* type of the hash function input *)
   let m_ty = List.hd (param.h_fty.fty_args) in
@@ -1091,23 +1094,124 @@ let global_prf_t
   in
 
   let table, _new_system_e =
-    clone_system_map
-      table old_single_system old_single_system sdecl.Decl.name fmap
+    clone_system_map table old_single_system sdecl.Decl.name fmap
   in 
-  None, table
+  None, [], table
+
+(*------------------------------------------------------------------*)
+(** {2 Global rewriting} *)
+
+let do_rewrite
+    ~(loc : L.t)
+    (rw : Args.rw_count * Rewrite.rw_rule)
+    (s  : TS.sequent)
+    (t  : Term.term)
+  : Term.term * TS.sequent list
+  =
+  let mult, rw_erule = rw in
+  match
+    Rewrite.rewrite_exn 
+      ~loc (TS.table s) (TS.system s) (TS.vars s)
+      mult rw_erule (`Reach t)
+  with
+  | `Reach t, subs ->
+    let subs =
+      List.map (fun (sub_system, sub) -> 
+          TS.set_system sub_system (TS.set_goal sub s)
+        ) subs
+    in
+    t, subs
+
+  | `Equiv _, _ -> assert false
+
+  | exception Tactics.Tactic_soft_failure (_,NothingToRewrite) -> t, []
+
+
+(** Applies a rewrite item *)
+let do_rw_item (rw_item : Args.rw_item) (s : TS.t) (t : Term.term) 
+  : Term.term * TS.t list 
+  =
+  let rw_c,rw_arg = TLT.p_rw_item rw_item s in
+
+  match rw_arg with
+  | Rw_rw (loc, _, erule) -> do_rewrite ~loc (rw_c, erule) s t 
+
+  (* | _ -> assert false *)
+  | Rw_expand p_arg -> 
+    let arg = TLT.p_rw_expand_arg s p_arg in
+    let _, t = TLT.expand_term arg s (`Reach t) in
+    Equiv.any_to_reach t, []
+  
+  | Rw_expandall _ ->
+    let _, t = TLT.expand_term `Any s (`Reach t) in
+    Equiv.any_to_reach t, []    
+
+let do_s_item (s_item : Args.s_item) (s : TS.t) (t : Term.term) : Term.term =
+  match s_item with
+  | Args.Simplify l -> TS.Reduce.reduce_term Reduction.rp_full s t
+
+  | Args.Tryauto l | Args.Tryautosimpl l ->
+    soft_failure ~loc:l (Failure "cannot use // or /= in global rewriting")
+
+let do_rw_arg (rw_arg : Args.rw_arg) (s : TS.t) (t : Term.term) 
+  : Term.term * TS.t list
+  =
+  match rw_arg with
+  | Args.R_item rw_item  -> do_rw_item rw_item s t
+  | Args.R_s_item s_item -> do_s_item s_item s t, []
+
+let do_rw_args (rw_args : Args.rw_arg list) (s : TS.t) (t : Term.term) 
+  : Term.term * TS.t list
+  =
+  List.fold_left (fun (t,subgs) rw_arg ->
+      let t, subgs' = do_rw_arg rw_arg s t in
+      t, subgs @ subgs'
+    ) (t, []) rw_args
+
+
+let global_rewrite
+    (table   : Symbols.table)
+    (hint_db : Hint.hint_db)
+    (sdecl   : Decl.system_modifier)
+    (rw      : Args.rw_arg list)
+  : Goal.statement option * Goal.t list * Symbols.table
+  =
+  let old_system, old_single_system =
+    parse_single_system_name table sdecl
+  in
+
+  let context = SE.{ set = (old_system :> arbitrary); pair = None; } in
+  let env = Env.init ~table ~system:context () in
+  let s = TS.init ~env ~hint_db Term.mk_false in
+  
+  let subgs = ref [] in
+
+  let fmap (arg : system_map_arg) (ms : Symbols.macro) (t : Term.term) 
+    : Term.term 
+    =
+    let t, subgs' = do_rw_args rw s t in
+    subgs := subgs' @ !subgs;   (* new subgoals *)
+    t
+  in
+
+  let table, _new_system_e =
+    clone_system_map table old_single_system sdecl.Decl.name fmap
+  in 
+
+  let subgs = List.map (fun s -> Goal.Trace s) !subgs in
+  None, subgs, table
+
 
 (*------------------------------------------------------------------*)
 let declare_system
     (table   : Symbols.table)
     (hint_db : Hint.hint_db)
     (sdecl   : Decl.system_modifier)
-  : Goal.statement option * Symbols.table
+  : Goal.statement option * Goal.t list * Symbols.table
   =
-  let lemma, table = 
-    match sdecl.Decl.modifier with
-    | Rename gf         -> global_rename table hint_db sdecl        gf
-    | PRF  (bnds, hash) -> global_prf    table hint_db sdecl bnds hash
-    | PRFt (bnds, hash) -> global_prf_t  table hint_db sdecl bnds hash
-    | CCA  (bnds, enc)  -> global_cca    table hint_db sdecl bnds  enc
-  in
-  lemma, table
+  match sdecl.Decl.modifier with
+  | Rename gf         -> global_rename  table hint_db sdecl        gf
+  | PRF  (bnds, hash) -> global_prf     table hint_db sdecl bnds hash
+  | PRFt (bnds, hash) -> global_prf_t   table hint_db sdecl bnds hash
+  | CCA  (bnds, enc)  -> global_cca     table hint_db sdecl bnds  enc
+  | Rewrite rw        -> global_rewrite table hint_db sdecl rw

@@ -84,12 +84,14 @@ type local_form = Term.term
 
 type global_form = form
 
-type gform = [`Equiv of form | `Reach of Term.term]
+type any_form = [`Equiv of form | `Reach of Term.term]
 
-val pp_gform : Format.formatter -> gform -> unit
+val pp_any_form : Format.formatter -> any_form -> unit
 
-type any_form = gform
+val any_to_reach : any_form -> Term.term 
+val any_to_equiv : any_form -> form 
 
+(*------------------------------------------------------------------*)
 type _ f_kind =
   | Local_t  : local_form f_kind
   | Global_t : global_form f_kind

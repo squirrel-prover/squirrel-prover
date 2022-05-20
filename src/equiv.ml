@@ -464,17 +464,26 @@ let destr_reach = function
 (*------------------------------------------------------------------*)
 (** {2 Generalized formulas} *)
 
-type gform = [`Equiv of form | `Reach of Term.term]
+type any_form = [`Equiv of form | `Reach of Term.term]
 
-let pp_gform fmt (f : gform) =
+let pp_any_form fmt (f : any_form) =
   match f with
   | `Equiv e -> pp fmt e
   | `Reach f -> Term.pp fmt f
 
+let any_to_reach (f : any_form) : Term.term =
+  match f with
+  | `Equiv _ -> assert false
+  | `Reach f -> f
+
+let any_to_equiv (f : any_form) : form =
+  match f with
+  | `Equiv f -> f
+  | `Reach _ -> assert false
+
 (*------------------------------------------------------------------*)
 type local_form = Term.term
 type global_form = form
-type any_form = gform
 
 type _ f_kind =
   | Local_t  : local_form f_kind
@@ -527,7 +536,7 @@ module Babel = struct
       | Global_t, Global_t -> f
       | Any_t,    Any_t    -> f
 
-      (* Injections into gform *)
+      (* Injections into [any_form] *)
       | Local_t,  Any_t -> `Reach f
       | Global_t, Any_t -> `Equiv f
 

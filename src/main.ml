@@ -178,7 +178,7 @@ let is_toplevel_error ~test (e : exn) : bool =
   | Prover.ParseError       _
   | Cmd_error               _
   | Process.ProcError       _
-  | Prover.Decl_error       _
+  | ProcessDecl.Decl_error  _
   | Theory.Conv             _
   | Symbols.SymbError       _
   | System.Error            _
@@ -210,8 +210,8 @@ let pp_toplevel_error
   | Process.ProcError e ->
     (Process.pp_proc_error pp_loc_error) fmt e
 
-  | Prover.Decl_error e when not test ->
-    (Prover.pp_decl_error pp_loc_error) fmt e
+  | ProcessDecl.Decl_error e when not test ->
+    (ProcessDecl.pp_decl_error pp_loc_error) fmt e
 
   | Theory.Conv e when not test ->
     (Theory.pp_error pp_loc_error) fmt e
@@ -265,7 +265,14 @@ let do_undo (state : main_state) (nb_undo : int) : main_state =
 (*------------------------------------------------------------------*)
 let do_decls (state : main_state) (decls : Decl.declarations) : main_state =
   let hint_db = Prover.current_hint_db () in
-  let table = Prover.declare_list state.table hint_db decls in
+  let table, proof_obls = ProcessDecl.declare_list state.table hint_db decls in
+
+  if proof_obls <> [] then
+    Printer.pr "@[<v 2>proof oblitations:@;%a@]"
+      (Fmt.list ~sep:Fmt.cut Goal.pp_init) proof_obls;
+
+  List.iter Prover.add_proof_obl proof_obls;
+
   { state with mode = GoalMode; table = table; }
 
 (*------------------------------------------------------------------*)
@@ -344,8 +351,8 @@ let do_add_hint (state : main_state) (h : Hint.p_hint) : main_state =
   let db = Prover.current_hint_db () in
   let db =
     match h with
-    | Hint.Hint_rewrite id -> Prover.add_hint_rewrite state.table id db
-    | Hint.Hint_smt     id -> Prover.add_hint_smt     state.table id db
+    | Hint.Hint_rewrite id -> ProcessDecl.add_hint_rewrite state.table id db
+    | Hint.Hint_smt     id -> ProcessDecl.add_hint_smt     state.table id db
   in
   Prover.set_hint_db db;
   state
@@ -363,11 +370,9 @@ let do_add_goal
   =
   let hint_db = Prover.current_hint_db () in
   let i,f =
-    Prover.declare_new_goal state.table hint_db g
+    Prover.add_new_goal state.table hint_db g
   in
-  Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
-    i
-    Goal.pp_init f;
+  Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@." i Goal.pp_init f;
   state
 
 (*------------------------------------------------------------------*)

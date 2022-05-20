@@ -53,9 +53,9 @@ type ('a,'b) abstract_statement = {
 }
 
 (*------------------------------------------------------------------*)
-type statement       = (string, Equiv.gform) abstract_statement
-type equiv_statement = (string, Equiv.form ) abstract_statement
-type reach_statement = (string, Term.term  ) abstract_statement
+type statement       = (string, Equiv.any_form) abstract_statement
+type equiv_statement = (string, Equiv.form    ) abstract_statement
+type reach_statement = (string, Term.term     ) abstract_statement
 
 (*------------------------------------------------------------------*)
 let pp_statement fmt (g : statement) : unit =
@@ -67,11 +67,11 @@ let pp_statement fmt (g : statement) : unit =
     SE.pp_context g.system
     g.name
     pp_tyvars g.ty_vars
-    Equiv.pp_gform g.formula
+    Equiv.pp_any_form g.formula
 
 (*------------------------------------------------------------------*)
 
-let is_reach_statement (stmt : (_, Equiv.gform) abstract_statement) : bool =
+let is_reach_statement (stmt : (_, Equiv.any_form) abstract_statement) : bool =
   match stmt.formula with
   | `Equiv _ -> false
   | `Reach _ -> true

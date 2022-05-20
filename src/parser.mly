@@ -400,6 +400,23 @@ lsymb_decl:
 |                                     { None }
 | LBRACE l=slist(lsymb, empty) RBRACE { Some l }
 
+system_modifier:
+| RENAME gf=global_formula
+    { Decl.Rename gf }
+
+| GCCA args=opt_arg_list COMMA enc=term
+    { Decl.CCA (args, enc) }
+
+| GPRF args=opt_arg_list COMMA hash=term
+    { Decl.PRF (args, hash) }
+
+| GPRF TIME args=opt_arg_list COMMA hash=term
+    { Decl.PRFt (args, hash) }
+
+| REWRITE p=rw_args
+    { Decl.Rewrite p }
+
+
 declaration_i:
 | HASH e=lsymb a=index_arity ctys=c_tys
                           { Decl.Decl_hash (Some a, e, None, ctys) }
@@ -477,28 +494,11 @@ declaration_i:
                                                 sprojs;
                                                 sprocess = p}) }
 
-| SYSTEM id=lsymb EQ from_sys=system WITH RENAME gf=global_formula
+| SYSTEM id=lsymb EQ from_sys=system WITH modifier=system_modifier
     { Decl.(Decl_system_modifier
               { from_sys = from_sys;
-                modifier = Rename gf;
+                modifier;
 			          name = id}) }
-
-| SYSTEM id=lsymb EQ from_sys=system WITH GPRF args=opt_arg_list COMMA hash=term
-    { Decl.(Decl_system_modifier
-              { from_sys = from_sys;
-                modifier = PRF (args, hash);
-			          name = id}) }
-
-| SYSTEM id=lsymb EQ from_sys=system WITH GPRF TIME args=opt_arg_list COMMA hash=term
-    { Decl.(Decl_system_modifier
-              { from_sys = from_sys;
-                modifier = PRFt (args, hash);
-			          name = id}) }
-
-| SYSTEM id=lsymb EQ from_sys=system WITH GCCA args=opt_arg_list COMMA enc=term
-    { Decl.(Decl_system_modifier { from_sys = from_sys;
-                                   modifier = CCA (args, enc);
-			                             name = id}) }
 
 declaration:
 | ldecl=loc(declaration_i)                  { ldecl }

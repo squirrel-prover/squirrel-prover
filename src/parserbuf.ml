@@ -99,7 +99,11 @@ let parse_theory_buf ?(test=false) lexbuf filename =
 let parse_theory_test ?(test=false) filename =
   let lexbuf = Lexing.from_channel (Stdlib.open_in filename) in
   let decls = parse_theory_buf ~test lexbuf filename in
-  Prover.declare_list Symbols.builtins_table Hint.empty_hint_db decls
+  let table, subgs =
+    ProcessDecl.declare_list Symbols.builtins_table Hint.empty_hint_db decls
+  in
+  assert (subgs = []);
+  table
 
 let parse parser parser_name string =
   let lexbuf = Lexing.from_string string in
@@ -181,7 +185,7 @@ let () =
       ignore (parse_process env "in(c,x);out(c,<x,x>)" : Process.process)
     end ;
     "If", `Quick, begin fun () ->
-      let table =
+      let table, _ =
         let decl_i =
           Decl.Decl_abstract {
             name = L.mk_loc L._dummy "error";
@@ -190,13 +194,13 @@ let () =
             abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
         in
         let decl = Location.mk_loc Location._dummy decl_i in
-        Prover.declare table Hint.empty_hint_db decl in
+        ProcessDecl.declare table Hint.empty_hint_db decl in
       let env = { env with table } in
       ignore (parse_process env "in(c,x); out(c, if x=x then x else error)"
               : Process.process)
     end ;
     "Try", `Quick, begin fun () ->
-      let table =
+      let table, _ =
         let decl_i =
           Decl.Decl_abstract
             { name = L.mk_loc L._dummy "ok";
@@ -205,10 +209,10 @@ let () =
               abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
         in
         let decl = Location.mk_loc Location._dummy decl_i in
-        Prover.declare table Hint.empty_hint_db decl
+        ProcessDecl.declare table Hint.empty_hint_db decl
       in
       
-      let table =
+      let table, _ =
         let decl_i =
           Decl.Decl_abstract
             { name = L.mk_loc L._dummy "error";
@@ -218,7 +222,7 @@ let () =
         in
         
         let decl = Location.mk_loc Location._dummy decl_i in
-        Prover.declare table Hint.empty_hint_db decl
+        ProcessDecl.declare table Hint.empty_hint_db decl
       in
       let env = { env with table } in
       ignore (parse_process env

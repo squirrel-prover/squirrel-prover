@@ -25,11 +25,11 @@ module MkCommonLowTac (S : Sequent.S) : sig
        and type conc_form = S.conc_form
        and type hyp_form = S.hyp_form
 
-    val wrap_conc   : conc_form -> Equiv.gform
-    val unwrap_conc : Equiv.gform -> conc_form
+    val wrap_conc   : conc_form      -> Equiv.any_form
+    val unwrap_conc : Equiv.any_form -> conc_form
 
-    val wrap_hyp   : hyp_form    -> Equiv.gform
-    val unwrap_hyp : Equiv.gform -> hyp_form
+    val wrap_hyp   : hyp_form       -> Equiv.any_form
+    val unwrap_hyp : Equiv.any_form -> hyp_form
 
     val hyp_to_conc : ?loc:L.t -> hyp_form -> conc_form
     val hyp_of_conc : ?loc:L.t -> conc_form -> hyp_form
@@ -79,11 +79,41 @@ module MkCommonLowTac (S : Sequent.S) : sig
   val expand_all_l : Args.in_target -> S.t -> S.t list
 
   (*------------------------------------------------------------------*)
-  (** {3 Rewriting types and functions} *)
+  (** {3 Rewriting equiv} *)
 
   type rw_equiv =
     SystemExpr.context * Equiv.global_form * [ `LeftToRight | `RightToLeft ]
+
   val p_rw_equiv : Args.rw_equiv_item -> S.t -> rw_equiv
+
+  (*------------------------------------------------------------------*)
+  (** {3 Rewriting and term expantion} *)
+
+  type rw_arg =
+    | Rw_rw of L.t * Ident.t option * Rewrite.rw_rule
+    (** The ident is the ident of the hyp the rule came from (if any) *)
+
+    | Rw_expand    of Theory.term
+    | Rw_expandall of Location.t
+
+  type rw_earg = Args.rw_count * rw_arg
+
+  val p_rw_item : Args.rw_item -> S.t -> rw_earg 
+
+  (*------------------------------------------------------------------*)
+
+  type expand_kind = [ 
+    | `Msymb of Symbols.macro
+    | `Fsymb of Symbols.fname 
+    | `Mterm of Term.term
+    | `Any
+  ]
+
+  val p_rw_expand_arg : S.t -> Theory.term -> expand_kind 
+
+  val expand_term :
+    ?m_rec:bool -> expand_kind -> S.sequent -> Equiv.any_form -> 
+    bool * Equiv.any_form
 
   (*------------------------------------------------------------------*)
   (** {3 Case tactic} *)

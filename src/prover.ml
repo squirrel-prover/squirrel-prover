@@ -21,54 +21,6 @@ let soft_failure = Tactics.soft_failure
 let bad_args () = hard_failure (Failure "improper arguments")
 
 (*------------------------------------------------------------------*)
-(** {Error handling} *)
-
-type decl_error_i =
-  | BadEquivForm
-  | InvalidAbsType
-  | InvalidCtySpace of string list
-  | DuplicateCty of string
-  | NotTSOrIndex
-  | NonDetOp
-
-type dkind = KDecl | KGoal
-
-type decl_error =  L.t * dkind * decl_error_i
-
-let pp_decl_error_i fmt = function
-  | BadEquivForm ->
-    Fmt.pf fmt "equivalence goal ill-formed"
-
-  | InvalidAbsType ->
-    Fmt.pf fmt "invalid type, return type must not be Index or Timestamp."
-
-  | InvalidCtySpace kws ->
-    Fmt.pf fmt "invalid space@ (allowed: @[<hov 2>%a@])"
-      (Fmt.list ~sep:Fmt.comma Fmt.string) kws
-
-  | DuplicateCty s -> Fmt.pf fmt "duplicated entry %s" s
-
-  | NonDetOp ->
-    Fmt.pf fmt "an operator body cannot contain probabilistic computations"
-
-  | NotTSOrIndex ->
-    Fmt.pf fmt "must be an index or timestamp"
-      
-let pp_decl_error pp_loc_err fmt (loc,k,e) =
-  let pp_k fmt = function
-    | KDecl -> Fmt.pf fmt "declaration"
-    | KGoal -> Fmt.pf fmt "goal declaration" in
-
-  Fmt.pf fmt "@[<v 2>%a%a failed: %a.@]"
-    pp_loc_err loc
-    pp_k k
-    pp_decl_error_i e
-
-exception Decl_error of decl_error
-
-let decl_error loc k e = raise (Decl_error (loc,k,e))
-
-(*------------------------------------------------------------------*)
 type proved_goal = { 
   stmt : Goal.statement;
   kind : [`Axiom | `Lemma] 
@@ -94,17 +46,24 @@ let pp_kind fmt = function
     For now we use the adjectives toplevel and inner to distinguish
     the two kinds of goals. *)
 
+type pending_proof = 
+  | ProofObl of Goal.t          
+  (** proof obligation *)
+
+  | UnprovedLemma of Goal.statement * Goal.t
+  (** lemma remaining to be proved *)
+
 (** Toplevel goals declared in scripts, possibly not yet proved. *)
-let goals        : (Goal.statement * Goal.t) list   ref = ref []
+let goals : pending_proof list ref = ref []
 
 (** Currently proved toplevel goal. *)
-let current_goal : (Goal.statement * Goal.t) option ref = ref None
+let current_goal : pending_proof option ref = ref None
 
 (** Current inner goals that have to be proved. *)
-let subgoals     : Goal.t list ref = ref []
+let subgoals : Goal.t list ref = ref []
 
 (** Bullets for current proof. *)
-let bullets      : Bullets.path ref = ref Bullets.empty_path
+let bullets : Bullets.path ref = ref Bullets.empty_path
 
 (** Proved toplevel goals. *)
 let goals_proved : proved_goal list ref = ref []
@@ -118,7 +77,8 @@ let get_current_goal () = !current_goal
 let get_current_system () =
   match get_current_goal () with
   | None -> None
-  | Some (_, g) -> Some (Goal.system g )
+  | Some (ProofObl g)
+  | Some (UnprovedLemma (_, g)) -> Some (Goal.system g )
 
 (*------------------------------------------------------------------*)
 (** {2 Options}
@@ -140,9 +100,9 @@ let option_defs : option_def list ref = ref []
 let hint_db : Hint.hint_db ref = ref Hint.empty_hint_db
 
 type proof_state = {
-  goals        : (Goal.statement * Goal.t) list;
+  goals        : pending_proof list;
   table        : Symbols.table;
-  current_goal : (Goal.statement * Goal.t) option;
+  current_goal : pending_proof option;
   subgoals     : Goal.t list;
   bullets      : Bullets.path;
   goals_proved : proved_goal list;
@@ -627,9 +587,9 @@ type parsed_input =
   | ParsedInputDescr of Decl.declarations
   | ParsedSetOption  of Config.p_set_param
 
-  | ParsedTactic of [ `Bullet of string |
-                          `Brace of [`Open|`Close] |
-                          `Tactic of TacticsArgs.parser_arg Tactics.ast ] list
+  | ParsedTactic of [ `Bullet of string 
+                    | `Brace of [`Open|`Close] 
+                    | `Tactic of TacticsArgs.parser_arg Tactics.ast ] list
 
   | ParsedPrint   of print_query
   | ParsedUndo    of int
@@ -641,10 +601,12 @@ type parsed_input =
   | ParsedHint of Hint.p_hint
   | EOF
 
+(*------------------------------------------------------------------*)
 let unnamed_goal () =
   L.mk_loc L._dummy ("unnamedgoal" ^ string_of_int (List.length !goals_proved))
 
-let declare_new_goal_i table hint_db parsed_goal =
+(*------------------------------------------------------------------*)
+let add_new_goal_i table hint_db parsed_goal =
   let name = match parsed_goal.Goal.Parsed.name with
     | None -> unnamed_goal ()
     | Some s -> s
@@ -654,34 +616,26 @@ let declare_new_goal_i table hint_db parsed_goal =
 
   let parsed_goal = { parsed_goal with Goal.Parsed.name = Some name } in
   let statement,goal = Goal.make table hint_db parsed_goal in
-  goals :=  (statement,goal) :: !goals;
+  goals :=  UnprovedLemma (statement,goal) :: !goals;
   L.unloc name, goal
 
-let declare_new_goal table hint_db parsed_goal =
-  let parsed_goal = L.unloc parsed_goal in
-  declare_new_goal_i table hint_db parsed_goal
+let add_new_goal table hint_db parsed_goal =
+  if !goals <> [] then
+    raise (ParseError "cannot add new goal: proof obligations remaining");
 
-let add_proved_goal (kind : [`Axiom | `Lemma]) gconcl =
+  let parsed_goal = L.unloc parsed_goal in
+  add_new_goal_i table hint_db parsed_goal
+
+let add_proof_obl (goal : Goal.t) : unit = 
+  goals :=  ProofObl (goal) :: !goals
+
+(*------------------------------------------------------------------*)
+let add_proved_goal (kind : [`Axiom | `Lemma]) (gconcl : Goal.statement) =
   if is_assumption gconcl.Goal.name then
     raise (ParseError "a goal or axiom with this name already exists");
   goals_proved := { stmt = gconcl; kind } :: !goals_proved
 
-let define_oracle_tag_formula table (h : lsymb) f =
-  let env = Env.init ~table () in
-  let conv_env = Theory.{ env; cntxt = InGoal; } in
-  let form, _ = Theory.convert conv_env ~ty:Type.Boolean f in
-    match form with
-     |  Term.ForAll ([uvarm; uvarkey],f) ->
-         begin match Vars.ty uvarm,Vars.ty uvarkey with
-         | Type.(Message, Message) ->
-           add_option (Oracle_for_symbol (L.unloc h), Oracle_formula form)
-         | _ -> raise @@ ParseError "The tag formula must be of \
-                                     the form forall (m:message,sk:message)"
-         end
-     | _ -> raise @@ ParseError "The tag formula must be of \
-                                 the form forall (m:message,sk:message)"
-
-
+(*------------------------------------------------------------------*)
 let get_oracle_tag_formula h =
   match get_option (Oracle_for_symbol h) with
   | Some (Oracle_formula f) -> f
@@ -693,15 +647,18 @@ let is_proof_completed () =
 
 let complete_proof () =
   assert (is_proof_completed ());
-  try
-    let gc, _ = Utils.oget !current_goal in
-    add_proved_goal `Lemma gc;
-    current_goal := None;
-    bullets := Bullets.empty_path;
-    subgoals := []
-  with Not_found ->
+
+  if !current_goal = None then
     hard_failure
-      (Tactics.Failure "cannot complete proof: no current goal")
+      (Tactics.Failure "cannot complete proof: no current goal");
+
+  let () = match oget !current_goal with
+    | ProofObl _ -> ()
+    | UnprovedLemma (gc, _) -> add_proved_goal `Lemma gc;
+  in
+  current_goal := None;
+  bullets := Bullets.empty_path;
+  subgoals := []
 
 let pp_goal ppf () = match !current_goal, !subgoals with
   | None,[] -> assert false
@@ -763,9 +720,17 @@ let eval_tactic utac = match utac with
 
 let start_proof (check : [`NoCheck | `Check]) = 
   match !current_goal, !goals with
-  | None, (gname,goal) :: _ ->
+  | None, pending_proof :: remaining_goals ->
     assert (!subgoals = []);
-    current_goal := Some (gname,goal);
+
+    goals := remaining_goals;
+
+    let goal = match pending_proof with
+        | ProofObl goal
+        | UnprovedLemma (_,goal) -> goal
+    in
+
+    current_goal := Some pending_proof;
     begin match check with
       | `Check -> subgoals := [goal] ; bullets := Bullets.initial_path
       | `NoCheck -> subgoals := [] ; bullets := Bullets.empty_path
@@ -779,268 +744,11 @@ let start_proof (check : [`NoCheck | `Check]) =
     Some "Cannot start a new proof (no goal remaining to prove)."
 
 let current_goal_name () =
-  omap (fun (stmt,_) -> stmt.Goal.name) !current_goal
+  omap (function 
+      | UnprovedLemma (stmt,_) -> stmt.Goal.name
+      | ProofObl _ -> "proof obligation" ) !current_goal
 
 let current_hint_db () = !hint_db
 
 let set_hint_db db = hint_db := db
-
-(*------------------------------------------------------------------*)
-(** {2 Declaration parsing} *)
-
-let check_fun_out_ty loc ty =
-  if ty = Type.Index || ty = Type.Timestamp then
-    decl_error loc KDecl InvalidAbsType
-  else ()
-
-let parse_abstract_decl table (decl : Decl.abstract_decl) =
-  let in_tys, out_ty =
-    List.takedrop (List.length decl.abs_tys - 1) decl.abs_tys
-  in
-  let p_out_ty = as_seq1 out_ty in
-
-  let ty_args = List.map (fun l ->
-      Type.mk_tvar (L.unloc l)
-    ) decl.ty_args
-  in
-
-  let env = Env.init ~table ~ty_vars:ty_args () in
-  let in_tys = List.map (Theory.parse_p_ty env) in_tys in
-
-  let rec parse_index_prefix iarr in_tys = 
-    match in_tys with
-    | Type.Index :: in_tys -> 
-      parse_index_prefix (iarr + 1) in_tys
-    | _ -> iarr, in_tys
-  in
-
-  let iarr, in_tys = parse_index_prefix 0 in_tys in
-
-  let out_ty = Theory.parse_p_ty env p_out_ty in
-
-  check_fun_out_ty (L.loc p_out_ty) out_ty;
-
-  Theory.declare_abstract table
-    ~index_arity:iarr ~ty_args ~in_tys ~out_ty
-    decl.name decl.symb_type
-
-(*------------------------------------------------------------------*)
-let parse_operator_decl table (decl : Decl.operator_decl) =
-    let name = L.unloc decl.op_name in
-
-    let ty_vars = List.map (fun l ->
-        Type.mk_tvar (L.unloc l)
-      ) decl.op_tyargs
-    in
-
-    let env = Env.init ~table ~ty_vars () in
-    let env, args = Theory.convert_p_bnds env decl.op_args in
-
-    let out_ty = omap (Theory.parse_p_ty env) decl.op_tyout in
-
-    let body, out_ty = 
-      Theory.convert ?ty:out_ty { env; cntxt = InGoal } decl.op_body 
-    in
-    
-    check_fun_out_ty (L.loc decl.op_body) out_ty;
-
-    if not (Term.is_deterministic body) then
-      decl_error (L.loc decl.op_body) KDecl NonDetOp;
-
-    let data = Operator.mk ~name ~ty_vars ~args ~out_ty ~body in
-    let ftype = Operator.ftype data in
-    let table, _ = 
-      Symbols.Function.declare_exact 
-        table decl.op_name
-        ~data:(Operator.Operator data)
-        (ftype, Symbols.Operator)
-    in
-
-    Printer.prt `Result "@[<v 2>new operator:@;%a@]" 
-      Operator.pp_operator data;
-
-    table
-
-(*------------------------------------------------------------------*)
-(** Parse additional type information for procedure declarations 
-    (enc, dec, hash, ...) *)
-let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
-  (* check for duplicate *)
-  let _ : string list = List.fold_left (fun acc cty ->
-      let sp = L.unloc cty.Decl.cty_space in
-      if List.mem sp acc then
-        decl_error (L.loc cty.Decl.cty_space) KDecl (DuplicateCty sp);
-      sp :: acc
-    ) [] ctys in
-
-  let env = Env.init ~table () in
-
-  (* check that we only use allowed keyword *)
-  List.map (fun cty ->
-      let sp = L.unloc cty.Decl.cty_space in
-      if not (List.mem sp kws) then
-        decl_error (L.loc cty.Decl.cty_space) KDecl (InvalidCtySpace kws);
-
-      let ty = Theory.parse_p_ty env cty.Decl.cty_ty in
-      (sp, ty)
-    ) ctys
-
-let parse_projs (p_projs : lsymb list option) : Term.projs =
-  omap_dflt
-    [Term.left_proj; Term.right_proj]
-    (List.map (Term.proj_from_string -| L.unloc))
-    p_projs
-
-(*------------------------------------------------------------------*)
-(** {2 Declaration processing}
-  *
-  * TODO We should probably either merge Prover.parsed_input and
-  *   Decl.declaration or, if we decide that declarations have nothing
-  *   to do with the prover, move Decl_axiom to Prover.parsed_input and
-  *   process declarations somewhere else than Prover. *)
-
-let declare table hint_db decl = match L.unloc decl with
-  | Decl.Decl_channel s -> Channel.declare table s
-
-  | Decl.Decl_process { id; projs; args; proc} ->
-    let env = Env.init ~table () in
-    let args = List.map (fun (x,t) ->
-        L.unloc x, Theory.parse_p_ty env t
-      ) args
-    in
-    let projs = parse_projs projs in
-    
-    Process.declare table id args projs proc
-
-  | Decl.Decl_axiom parsed_goal ->
-    let parsed_goal =
-      match parsed_goal.Goal.Parsed.name with
-        | Some n -> parsed_goal
-        | None ->
-            { parsed_goal with Goal.Parsed.name = Some (unnamed_goal ()) }
-    in
-    let gc,_ = Goal.make table hint_db parsed_goal in
-    add_proved_goal `Axiom gc;
-    table
-
-  | Decl.Decl_system sdecl ->
-    let projs = parse_projs sdecl.sprojs in
-    Process.declare_system table sdecl.sname projs sdecl.sprocess
-
-  | Decl.Decl_system_modifier sdecl ->
-    let new_lemma, table = 
-      SystemModifiers.declare_system table hint_db sdecl 
-    in
-    oiter (add_proved_goal `Lemma) new_lemma;
-    table
-
-  | Decl.Decl_dh (h, g, ex, om, ctys) ->
-     let ctys =
-       parse_ctys table ctys ["group"; "exponents"]
-     in
-     let group_ty = List.assoc_opt "group"     ctys
-     and exp_ty   = List.assoc_opt "exponents" ctys in
-     Theory.declare_dh table h ?group_ty ?exp_ty g ex om
-
-  | Decl.Decl_hash (a, n, tagi, ctys) ->
-    let () = Utils.oiter (define_oracle_tag_formula table n) tagi in
-
-    let ctys = parse_ctys table ctys ["m"; "h"; "k"] in
-    let m_ty = List.assoc_opt  "m" ctys
-    and h_ty = List.assoc_opt  "h" ctys
-    and k_ty  = List.assoc_opt "k" ctys in
-
-    Theory.declare_hash table ?m_ty ?h_ty ?k_ty ?index_arity:a n
-
-  | Decl.Decl_aenc (enc, dec, pk, ctys) ->
-    let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "rnd"; "sk"; "pk"] in
-    let ptxt_ty = List.assoc_opt "ptxt" ctys
-    and ctxt_ty = List.assoc_opt "ctxt" ctys
-    and rnd_ty  = List.assoc_opt "rnd"  ctys
-    and sk_ty   = List.assoc_opt "sk"   ctys
-    and pk_ty   = List.assoc_opt "pk"   ctys in
-
-    Theory.declare_aenc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?sk_ty ?pk_ty enc dec pk
-
-  | Decl.Decl_senc (senc, sdec, ctys) ->
-    let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "rnd"; "k"] in
-    let ptxt_ty = List.assoc_opt "ptxt" ctys
-    and ctxt_ty = List.assoc_opt "ctxt" ctys
-    and rnd_ty  = List.assoc_opt "rnd"  ctys
-    and k_ty    = List.assoc_opt  "k"   ctys in
-
-    Theory.declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty senc sdec
-
-  | Decl.Decl_name (s, ptys) ->
-    let env = Env.init ~table () in
-    let p_args_tys, p_out_ty = List.takedrop (List.length ptys - 1) ptys in
-    let p_out_ty = as_seq1 p_out_ty in
-
-    let args_tys = List.map (Theory.parse_p_ty env) p_args_tys in
-    let out_ty = Theory.parse_p_ty env p_out_ty in
-    
-    let n_fty = Type.mk_ftype 0 [] args_tys out_ty in
-
-    List.iter2 (fun ty pty ->
-        if not (Type.equal ty Type.ttimestamp) &&
-           not (Type.equal ty Type.tindex) then
-          decl_error (L.loc pty) KDecl NotTSOrIndex
-      ) args_tys p_args_tys;
-    
-    Theory.declare_name table s Symbols.{ n_fty }
-
-  | Decl.Decl_state (s, args, k, t) ->
-    Theory.declare_state table s args k t
-
-  | Decl.Decl_senc_w_join_hash (senc, sdec, h) ->
-    Theory.declare_senc_joint_with_hash table senc sdec h
-
-  | Decl.Decl_sign (sign, checksign, pk, tagi, ctys) ->
-    let () = Utils.oiter (define_oracle_tag_formula table sign) tagi in
-
-    let ctys = parse_ctys table ctys ["m"; "sig"; "check"; "sk"; "pk"] in
-    let m_ty     = List.assoc_opt "m"     ctys
-    and sig_ty   = List.assoc_opt "sig"   ctys
-    and check_ty = List.assoc_opt "check" ctys
-    and sk_ty    = List.assoc_opt "sk"    ctys
-    and pk_ty    = List.assoc_opt "pk"    ctys in
-
-    Theory.declare_signature table
-      ?m_ty ?sig_ty ?check_ty ?sk_ty ?pk_ty sign checksign pk
-
-  | Decl.Decl_abstract decl -> 
-    parse_abstract_decl table decl
-
-  | Decl.Decl_operator decl -> 
-    parse_operator_decl table decl
-
-  | Decl.Decl_bty bty_decl ->
-    let table, _ =
-      Symbols.BType.declare_exact
-        table
-        bty_decl.bty_name
-        bty_decl.bty_infos
-    in
-    table
-
-let declare_list table hint_db decls =
-  List.fold_left (fun table d -> declare table hint_db d) table decls
-
-(*------------------------------------------------------------------*)
-let add_hint_rewrite table (s : lsymb) db =
-  let lem = get_reach_assumption s in
   
-  if not (SE.subset table lem.system.set SE.any) then
-    Tactics.hard_failure ~loc:(L.loc s)
-      (Failure "rewrite hints must apply to any system");
-
-  Hint.add_hint_rewrite s lem.Goal.ty_vars lem.Goal.formula db
-
-let add_hint_smt table (s : lsymb) db =
-  let lem = get_reach_assumption s in
-
-  if not (SE.subset table lem.system.set SE.any) then
-    Tactics.hard_failure ~loc:(L.loc s)
-      (Failure "rewrite hints must apply to any system");
-
-  Hint.add_hint_smt lem.Goal.formula db
