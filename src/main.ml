@@ -294,6 +294,7 @@ let do_tactic (state : main_state) bullet brace utac : main_state =
       begin
         Printer.pr "%a" Prover.pp_goal ();
         Visualisation.dump ();
+        Server.update ();
         { state with mode = ProofMode }
       end
 
@@ -549,6 +550,7 @@ let interactive_prover () =
   Printer.prt `Start "Squirrel Prover interactive mode.";
   Printer.prt `Start "Git commit: %s" Commit.hash_commit;
   Printer.init Printer.Interactive;
+  Server.start ();
   try start_main_loop ~html:false ~main_mode:`Stdin ()
   with End_of_file -> Printer.prt `Error "End of file, exiting."
 
