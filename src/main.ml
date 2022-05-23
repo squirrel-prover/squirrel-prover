@@ -293,11 +293,7 @@ let do_tactic (state : main_state) bullet brace utac : main_state =
     else
       begin
         Printer.pr "%a" Prover.pp_goal ();
-        (** Move this part somewhere else
-            (in printer.ml) **)
-        let out_c = open_out "/tmp/dump.js" in
-        let ppf = Format.formatter_of_out_channel out_c in
-        Prover.pp_graph ppf ();
+        Visualisation.dump ();
         { state with mode = ProofMode }
       end
 

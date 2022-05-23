@@ -35,6 +35,8 @@ function make_links(data) {
       });
     });
   });
+  console.log(dic);
+  console.log(links);
   return links
 }
 
@@ -108,8 +110,8 @@ function updateAll(selectionLevels, selectionNodes, selectionLinks, delay) {
       return `M ${pX} ${pY} C ${pX} ${cY}, ${cX} ${pY}, ${cX} ${cY}`
     });
   // Use height and width to put all attributes for the differents part of a node
-  updateLine(selectionNodes, "id", null, delay);
-  updateLine(selectionNodes, "cond", "id", delay);
+  updateLine(selectionNodes, "name", null, delay);
+  updateLine(selectionNodes, "cond", "name", delay);
   updateLine(selectionNodes, "state", "cond", delay);
   updateLine(selectionNodes, "output", "state", delay);
 }
@@ -206,7 +208,7 @@ function plot(data, links, svg) {
   
   // Create all the elements inside a node
   partialClick = click(data, selectionLevels, selectionNodes, selectionLinks, 2000)
-  selectionName = plot_line(selectionNodes, "id", false);
+  selectionName = plot_line(selectionNodes, "name", false);
   selectionCond = plot_line(selectionName, "cond", true, "Condition", partialClick);
   selectionState = plot_line(selectionCond, "state", true, "States", partialClick);
   selectionOutput = plot_line(selectionState, "output", true, "Output", partialClick);

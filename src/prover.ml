@@ -178,6 +178,11 @@ let get_state mode table =
     prover_mode  = mode;
     hint_db      = !hint_db; }
 
+let get_first_subgoal () =
+  match !current_goal, !subgoals with
+  | Some _, j :: _ -> j
+  | _ -> assert false
+
 let save_state mode table =
   pt_history := get_state mode table :: (!pt_history)
 
@@ -696,11 +701,6 @@ let pp_goal ppf () = match !current_goal, !subgoals with
     Fmt.pf ppf "@[<v 0>[goal> Focused goal (1/%d):@;%a@;@]@."
       (List.length !subgoals)
       Goal.pp j
-  | _ -> assert false
-
-let pp_graph ppf () =
-  match !current_goal, !subgoals with
-  | Some _, j :: _ -> Goal.pp_graph ppf j
   | _ -> assert false
 
 (** [eval_tactic_focus tac] applies [tac] to the focused goal.

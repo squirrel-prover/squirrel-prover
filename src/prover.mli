@@ -35,6 +35,10 @@ val abort : unit -> unit
 (** Get the current prover state. *)
 val get_state : prover_mode -> Symbols.table -> proof_state
 
+(** Get the first subgoal.
+    Fail if there is no subgoal or current goal. *)
+val get_first_subgoal : unit -> Goal.t
+
 (** Restore a proof state. *)
 val reset_from_state : proof_state -> prover_mode * Symbols.table
 
@@ -195,8 +199,6 @@ val declare_new_goal :
 val get_oracle_tag_formula : string -> Term.term
 
 val pp_goal : Format.formatter -> unit -> unit
-
-val pp_graph : Format.formatter -> unit -> unit
 
 val is_proof_completed : unit -> bool
 

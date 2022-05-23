@@ -32,7 +32,7 @@ let print_esc_char (escaping : bool ref) (c : char) : unit =
 let print_esc_string (s : string) : unit =
   String.iter (print_esc_char (ref true)) s
 
-(** Return [s] without empty lines at the beginniginitial new_lines characters *)
+(** Return [s] without empty lines at the beginnig *)
 let trim (s : string) : string =
   let l = String.length s in
   let rec start_pos (pos : int) (start : int): int =
@@ -104,7 +104,7 @@ let pp () =
     "<span class=\"output-line\" id=\"out%d\">"
     !counter);
   let output_line = (Format.flush_str_formatter ()) in
-  print_esc_string output_line;
+  output_string !current_out_c output_line;
   output_string !current_out_c "</span>\n";
   
   (*Print comments*)

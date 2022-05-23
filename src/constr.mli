@@ -1,7 +1,8 @@
 
 (** The minimal models a of constraint.
     Here, minimality means inclusion w.r.t. the predicates. *)
-type models
+type model
+type models = model list
 
 (*------------------------------------------------------------------*) 
 (** [models_conunct l] returns the list of minimal models of the conjunction of
@@ -46,5 +47,5 @@ type trace_cntxt = {
 }
 
 (*------------------------------------------------------------------*)
-(** Write the graph represented by [models] in the file [file] *)
-val dump : Format.formatter -> models -> unit
+(** Print the model in JSON format if there is one non-empty model *)
+val dump : Format.formatter -> trace_cntxt -> unit

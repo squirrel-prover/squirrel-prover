@@ -1405,28 +1405,37 @@ let get_children g v =
   let succ_of_succ = List.concat_map (fun w -> UtG.succ g w) (UtG.succ g v) in
   List.filter (fun w -> not (List.mem w succ_of_succ)) (UtG.succ g v)
 
-let dump_nodes ppf g =
+let dump_nodes ppf cntxt g =
   let rec pp_child ppf l =
     match l with
     | [] -> ()
     | v :: l' -> 
-      Format.fprintf ppf "\"%a\"" pp_ut v;
+      Format.fprintf ppf "\x1B'%a\x1B'" pp_ut v;
       pp_childs ppf l'
   and pp_childs ppf l =
     match l with
     | [] -> ()
     | v :: l' -> 
-      Format.fprintf ppf ", \"%a\"" pp_ut v;
+      Format.fprintf ppf ", \x1B'%a\x1B'" pp_ut v;
       pp_childs ppf l'
   in
   let pp_vertex v =
-    Format.fprintf ppf "const n%d = {\n" v.hash;
-    Format.fprintf ppf "  \"id\": \"%a\",\n" pp_ut v;
-    Format.fprintf ppf "  \"children\": [%a],\n" pp_child (get_children g v);
-    Format.fprintf ppf "  \"cond\": \"\",\n";
-    Format.fprintf ppf "  \"state\": \"\",\n";
-    Format.fprintf ppf "  \"output\": \"\"\n";
-    Format.fprintf ppf "}@.@."
+    (*DEBUG*) (*Printer.pr "%a\n" pp_ut v;*)
+    Format.fprintf ppf "const n%d = {\x1B\n" v.hash;
+    Format.fprintf ppf "  \x1B\"id\x1B\": \x1B'%a\x1B',\x1B\n" pp_ut v;
+    Format.fprintf ppf "  \x1B\"children\x1B\": [%a],\x1B\n" pp_child (get_children g v);
+    Format.fprintf ppf "  \x1B\"name\x1B\": \x1B'%a\x1B',\x1B\n" Term.pp (ut_to_term v);
+    begin
+      match find_eq_action (Utils.oget cntxt.models) (ut_to_term v) with
+      | Some Term.Action (asymb, idx) ->
+        let action = Action.of_term asymb idx cntxt.table in
+        let descr = SystemExpr.descr_of_action cntxt.table cntxt.system action in
+        Format.fprintf ppf "  \x1B\"cond\x1B\": \x1B'%a\x1B',\x1B\n" Term.pp (snd descr.condition);
+        Format.fprintf ppf "  \x1B\"state\x1B\": \x1B'\x1B',\x1B\n";
+        Format.fprintf ppf "  \x1B\"output\x1B\": \x1B'%a\x1B'\x1B\n" Term.pp (snd descr.output)
+      | _ -> ()
+    end;
+    Format.fprintf ppf "}\x1B\n\x1B\n@?"
   in
   UtG.iter_vertex pp_vertex g
 
@@ -1459,25 +1468,25 @@ let dump_layout ppf g =
   in
   Format.fprintf ppf "const data = [";
   pp_layers g true;
-  Format.fprintf ppf "]@."
+  Format.fprintf ppf "]\x1B\n@?"
   
 (** Print the model in JSON format if there is one non-empty model *)
-let dump ppf models =
-  match models with
-  | [model] -> 
+let dump ppf cntxt =
+  match cntxt.models with
+  | Some [model] -> 
     let g = model.tr_graph in
     if UtG.is_empty g then
-      Printer.kw `Error (Printer.get_std()) "Empty model"
+      (*DEBUG*) Printer.kw `Error (Printer.get_std()) "Empty model"
     else begin
-      Printer.kw `Error (Printer.get_std()) "MODEL %d" (UtG.nb_vertex g);
+      (*DEBUG*) Printer.kw `Error (Printer.get_std()) "MODEL %d" (UtG.nb_vertex g);
       Printer.init_ppf ppf Printer.Html;
-      Format.fprintf ppf "// %d noeuds.@." (UtG.nb_vertex g);
-      Format.fprintf ppf "// %d arrêtes.@.@." (UtG.nb_edges g);
-      dump_nodes ppf g;
-      dump_layout ppf g(*;
-      close_out out_c*)
+      Format.fprintf ppf "// %d noeuds.\x1B\n@?" (UtG.nb_vertex g);
+      Format.fprintf ppf "// %d arrêtes.\x1B\n\x1B\n@?" (UtG.nb_edges g);
+      dump_nodes ppf cntxt g;
+      dump_layout ppf g
     end
-  | _ -> Printer.kw `Error (Printer.get_std()) "Several models"
+  | Some _ -> (*DEBUG*) Printer.kw `Error (Printer.get_std()) "Several models"
+  | None -> (*DEBUG*) Printer.kw `Error (Printer.get_std()) "Don't know this case"
 
 (*------------------------------------------------------------------*)
 (** Tests Suites *)
