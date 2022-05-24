@@ -1410,32 +1410,32 @@ let dump_nodes ppf cntxt g =
     match l with
     | [] -> ()
     | v :: l' -> 
-      Format.fprintf ppf "\x1B'%a\x1B'" pp_ut v;
+      Format.fprintf ppf "\'%a\'" (Printer.html pp_ut) v;
       pp_childs ppf l'
   and pp_childs ppf l =
     match l with
     | [] -> ()
     | v :: l' -> 
-      Format.fprintf ppf ", \x1B'%a\x1B'" pp_ut v;
+      Format.fprintf ppf ", \'%a\'" (Printer.html pp_ut) v;
       pp_childs ppf l'
   in
   let pp_vertex v =
     (*DEBUG*) (*Printer.pr "%a\n" pp_ut v;*)
-    Format.fprintf ppf "const n%d = {\x1B\n" v.hash;
-    Format.fprintf ppf "  \x1B\"id\x1B\": \x1B'%a\x1B',\x1B\n" pp_ut v;
-    Format.fprintf ppf "  \x1B\"children\x1B\": [%a],\x1B\n" pp_child (get_children g v);
-    Format.fprintf ppf "  \x1B\"name\x1B\": \x1B'%a\x1B',\x1B\n" Term.pp (ut_to_term v);
+    Format.fprintf ppf "const n%d = {\n" v.hash;
+    Format.fprintf ppf "  \"id\": '%a',\n" (Printer.html pp_ut) v;
+    Format.fprintf ppf "  \"children\": [%a],\n" pp_child (get_children g v);
+    Format.fprintf ppf "  \"name\": \'%a\',\n" (Printer.html Term.pp) (ut_to_term v);
     begin
       match find_eq_action (Utils.oget cntxt.models) (ut_to_term v) with
       | Some Term.Action (asymb, idx) ->
         let action = Action.of_term asymb idx cntxt.table in
         let descr = SystemExpr.descr_of_action cntxt.table cntxt.system action in
-        Format.fprintf ppf "  \x1B\"cond\x1B\": \x1B'%a\x1B',\x1B\n" Term.pp (snd descr.condition);
-        Format.fprintf ppf "  \x1B\"state\x1B\": \x1B'\x1B',\x1B\n";
-        Format.fprintf ppf "  \x1B\"output\x1B\": \x1B'%a\x1B'\x1B\n" Term.pp (snd descr.output)
+        Format.fprintf ppf "  \"cond\": \'%a\',\n" (Printer.html Term.pp) (snd descr.condition);
+        Format.fprintf ppf "  \"state\": \'\',\n";
+        Format.fprintf ppf "  \"output\": \'%a\'\n" (Printer.html Term.pp) (snd descr.output)
       | _ -> ()
     end;
-    Format.fprintf ppf "}\x1B\n\x1B\n@?"
+    Format.fprintf ppf "}\n\n@?"
   in
   UtG.iter_vertex pp_vertex g
 
@@ -1468,7 +1468,7 @@ let dump_layout ppf g =
   in
   Format.fprintf ppf "const data = [";
   pp_layers g true;
-  Format.fprintf ppf "]\x1B\n@?"
+  Format.fprintf ppf "]\n@?"
   
 (** Print the model in JSON format if there is one non-empty model *)
 let dump ppf cntxt =
@@ -1479,9 +1479,8 @@ let dump ppf cntxt =
       (*DEBUG*) Printer.kw `Error (Printer.get_std()) "Empty model"
     else begin
       (*DEBUG*) Printer.kw `Error (Printer.get_std()) "MODEL %d" (UtG.nb_vertex g);
-      Printer.init_ppf ppf Printer.Html;
-      Format.fprintf ppf "// %d noeuds.\x1B\n@?" (UtG.nb_vertex g);
-      Format.fprintf ppf "// %d arrêtes.\x1B\n\x1B\n@?" (UtG.nb_edges g);
+      Format.fprintf ppf "// %d noeuds.\n@?" (UtG.nb_vertex g);
+      Format.fprintf ppf "// %d arrêtes.\n\n@?" (UtG.nb_edges g);
       dump_nodes ppf cntxt g;
       dump_layout ppf g
     end

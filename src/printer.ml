@@ -91,7 +91,7 @@ let kw_ansi (keyword : keyword) : string =
   | `Separation -> "1"
   | `HelpType -> "1;31"
   | `HelpFunction -> "1;35"
-  | `Test -> "1;3;4;35"
+  | `Test -> "103"
   | `Error -> "41"
 
 (* Defines the string that will be outputed when a semantic tag is opened *)
@@ -300,3 +300,16 @@ let kw (keyword : keyword) ppf fmt =
 
 let kws (keyword : keyword) ppf (s : string) =
   kw keyword ppf "%s" s
+
+
+(** {2 HTML printing} **)
+
+let html_buffer = Buffer.create 80
+let html_formatter = formatter_of_buffer html_buffer
+let _ = init_ppf html_formatter Html
+
+let html (pp : formatter -> 'a -> unit) ppf x =
+  Format.fprintf html_formatter "%a@?" pp x;
+  let s = Buffer.contents html_buffer in
+  Buffer.reset html_buffer;
+  Format.fprintf ppf "%s" s

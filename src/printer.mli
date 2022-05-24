@@ -51,6 +51,7 @@ val init_ppf : Format.formatter -> printer_mode -> unit
 (** Initialisation of the standard formatter. *)
 val init : printer_mode -> unit
 
+
 (** {2 Printing functions} *)
 
 (** Type defining the markup to use before and after printing. *)
@@ -68,3 +69,9 @@ val kw : keyword -> Format.formatter -> ('a, Format.formatter, unit) format -> '
 
 (** Like [kw] but with a string. *)
 val kws : keyword -> Format.formatter -> string -> unit
+
+
+(** {2 HTML printing} *)
+
+(** [html pp] return a printing function which apply [pp] with HTML tags and escaping special characters *)
+val html : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a -> unit
