@@ -269,7 +269,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       | `Mterm _ -> true
       | `Fsymb _ | `Msymb _ | `Any -> false
     in
-    let unfold (projs : Term.projs option) occ = 
+    let unfold (projs : Term.projs option) occ s = 
       match unfold_term ~strict occ projs s with
       | None -> `Continue
       | Some t ->
@@ -278,17 +278,22 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
 
     let expand_inst : Match.Pos.f_map = 
-      fun occ projs _vars _conds _p ->
+      fun occ projs _vars conds _p ->
+        let s =                 (* adds [conds] in [s] *)
+          List.fold_left (fun s cond ->
+              S.Hyps.add AnyName (S.unwrap_hyp (`Reach cond)) s
+            ) s conds
+        in
         match occ with
         | Term.Macro (ms, _, _) ->
           if found_occ_macro target ms occ then
-            unfold projs occ 
+            unfold projs occ s
           else
             `Continue
 
         | Term.Fun ((f,_), _, _) ->
           if found_occ_fun target f then 
-            unfold projs occ
+            unfold projs occ s
           else
             `Continue
 
@@ -341,10 +346,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
     : Term.term 
     =
     let expand_inst : Match.Pos.f_map = 
-      fun occ projs _vars _conds _p ->
+      fun (occ : Term.term) projs _vars conds _p ->
         match occ with
         | Term.Macro (ms, l, _) ->
           begin
+            let s =             (* add [conds] in [s] *)
+              List.fold_left (fun s cond ->
+                  S.Hyps.add AnyName (S.unwrap_hyp (`Reach cond)) s
+                ) s conds
+            in
             match unfold_term ~strict:false ~force_happens occ projs s with
             | None -> `Continue
             | Some t -> `Map t

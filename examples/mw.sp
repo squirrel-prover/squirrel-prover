@@ -193,7 +193,7 @@ Proof.
   + expand frame, exec, output.
     fa !<_,_>.
 
-    rewrite wa_R1_tryfind //.
+    rewrite wa_R1_tryfind; 1:auto.
     rewrite /cond wa_R1_R2.
     fa 2; fadup 1.
     fa 1; fadup 1.

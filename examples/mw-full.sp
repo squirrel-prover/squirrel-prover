@@ -192,8 +192,8 @@ Proof.
 
   (* Case R1  WIP *)
   + expand frame, exec, cond, output.
-    fa 4; fa 5.
-    rewrite wa_R1 //.
+    fa 4; fa 5. 
+    rewrite wa_R1.
 
     fadup 5.
 

@@ -71,7 +71,7 @@ split => //.
 
 
 fadup 5.
-expand output.
+expand output@B.
 
 ifeq 5,fst(input@B), fst(output@A).
 intro _ => //.
@@ -97,7 +97,7 @@ have -> : if exec@pred(B) && A < B then
   auto.
   intro [Neg _] => //.
 }
-
+simpl.
 fa 5. fadup 5.
 fa 5. fadup 5.
 (* prf 5 *)

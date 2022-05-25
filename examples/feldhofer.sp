@@ -212,9 +212,9 @@ Proof.
   (* Action 2/4: Reader1 *)
 
   + expand frame.
-    rewrite wa_Reader1 //.
+    rewrite wa_Reader1; 1:auto. 
 
-    expand output.
+    expand output@Reader1(k).
     fa 2. fa 3. fadup 3.
 
     have ->:
@@ -293,7 +293,7 @@ Proof.
   (* Action 3/4: Reader2 *)
 
   + expand frame.
-    rewrite wa_Reader2 //.
+    rewrite wa_Reader2; 1:auto.
 
     fa 2.
     fa 3; fadup 3.
