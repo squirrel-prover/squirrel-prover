@@ -1863,22 +1863,25 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
       | _ -> Tactics.(soft_failure (Failure "invalid assumption"))
     in aux ass
   in
-  (* Subgoals are relative to [ass_context.set]. For now we require
-     that it coincides with the original sequent's set annotation,
-     for simplicity.
-     TODO it is unsound to keep local hypotheses of [s]
-          when trying to prove subgoal [f] -- but it should be
-          sound and sufficient to keep trace hypotheses
-          (without diff operators) which is enough for our needs:
-          in practice subgoals are happens(_) atoms *)
-  List.iter
-    (fun subgoal ->
-       if not (Term.is_pure_timestamp subgoal) &&
-          ass_context.SE.set <> (TS.system s).set
-       then
-         Tactics.(soft_failure NoAssumpSystem))
-    subgoals ;
-  let subgoals = List.map (fun f -> TS.set_goal f s) subgoals in
+
+  (* Subgoals are relative to [ass_context.set].
+     They are proved in theory as global formulas, immediately changed in
+     the tactic to local formulas. These local formulas cannot be proved
+     while keeping all local hypotheses: however, we can keep the pure trace
+     formulas from the local hypotheses.
+     We already know that [ass_context.set] is compatible with the systems
+     used in the equivalence, one of which will be the system in use in [s],
+     so there is no need to check the compatibility of the systems for
+     which the kept local hypotheses are expressed. *)
+  let s' =
+    s |>
+    TS.set_system SE.{ set = ass_context.set ; pair = None } |>
+    TS.Hyps.filter
+      (fun _ -> function
+         | `Reach f -> Term.is_pure_timestamp f
+         | `Equiv  _ -> true)
+  in
+  let subgoals = List.map (fun f -> TS.set_goal f s') subgoals in
 
   (* Identify which projection of the assumption's conclusion
      corresponds to the current goal and new goal (projections [src,dst])
@@ -1898,7 +1901,7 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
     SE.to_list (SE.to_fset (TS.system s).set) |>
     List.map (fun (p,s) ->
                 if s = orig_sys then p, new_sys else
-                  Tactics.(soft_failure NoAssumpSystem)) |>
+                  Tactics.(soft_failure Rewrite_equiv_system_mismatch)) |>
     SE.of_list
   in
   let updated_context =

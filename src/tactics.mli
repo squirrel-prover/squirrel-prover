@@ -56,6 +56,7 @@ type tac_error_i =
   | BadSSCDetailed of ssc_error list
   | NoSSC
   | NoAssumpSystem
+  | Rewrite_equiv_system_mismatch
   | NotDepends of string * string
   | NotDDHContext
   | SEncNoRandom

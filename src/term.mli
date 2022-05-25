@@ -462,7 +462,10 @@ val not_simpl : term -> term
     non-probabilistic) computation. *)
 val is_deterministic : term -> bool
 
-(** Check if a formula only depends on the trace model. *)
+(** Check if a formula [phi] is deterministic and does not depend
+    on system-specific aspects. More specifically, the aim is to
+    guarantee that [phi \/ not(phi)]_any holds, which means that
+    diff operators are forbidden in [phi]. *)
 val is_pure_timestamp : term -> bool
 
 (*------------------------------------------------------------------*)

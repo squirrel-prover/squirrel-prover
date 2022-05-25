@@ -42,6 +42,7 @@ type tac_error_i =
   | BadSSCDetailed of ssc_error list
   | NoSSC
   | NoAssumpSystem
+  | Rewrite_equiv_system_mismatch
   | NotDepends of string * string
   | NotDDHContext
   | SEncNoRandom
@@ -87,6 +88,8 @@ let rec tac_error_to_string = function
   | Bad_SSC            -> "BadSSC"
   | NoSSC              -> "NoSSC"
   | NoAssumpSystem     -> "NoAssumpSystem"
+  | Rewrite_equiv_system_mismatch
+                       -> "Rewrite_equiv_system_mismatch"
   | NotDDHContext      -> "NotDDHContext"
   | SEncNoRandom       -> "SEncNoRandom"
   | CongrFail          -> "CongrFail"
@@ -142,6 +145,9 @@ let pp_tac_error_i ppf = function
 
   | NoAssumpSystem ->
       Fmt.pf ppf "assumption does not apply to the current system"
+
+  | Rewrite_equiv_system_mismatch ->
+      Fmt.pf ppf "equivalence cannot be used to rewrite in current system"
 
   | NotDDHContext ->
       Fmt.pf ppf "the current system cannot be seen as a context \
