@@ -90,3 +90,16 @@ goal [G1] _ (i : index) :
 Proof. 
   auto.
 Qed.
+
+(*------------------------------------------------------------------*)
+system [H] !_i (in(c,x); let y = <x, zero> in A: out(c, y)).
+
+system H1 = [H/left] with rewrite /y.
+
+goal [H1] _ (i : index) :  
+  happens(A(i)) => output@A(i) = <input@A(i), zero>. 
+Proof. 
+  intro Hap @/output. 
+  rewrite eq_refl.
+  assumption.
+Qed.

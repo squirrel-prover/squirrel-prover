@@ -1136,7 +1136,6 @@ let do_rw_item (rw_item : Args.rw_item) (s : TS.t) (t : Term.term)
   match rw_arg with
   | Rw_rw (loc, _, erule) -> do_rewrite ~loc (rw_c, erule) s t 
 
-  (* | _ -> assert false *)
   | Rw_expand p_arg -> 
     let arg = TLT.p_rw_expand_arg s p_arg in
     let _, t = TLT.expand_term arg s (`Reach t) in
@@ -1200,12 +1199,15 @@ let global_rewrite
         Vars.of_list (ts :: is), 
         Term.mk_var ts 
     in
+    let hyp_hap = Term.mk_happens ts in
+    
     let env = Env.init ~table ~vars ~system:context () in
     let s = TS.init ~env ~hint_db Term.mk_false in
+    let s = TS.LocalHyps.add AnyName hyp_hap s in
 
     let t, subgs' = do_rw_args rw s t in
     let subgs' = List.map (fun s -> 
-        TS.set_goal (Term.mk_impl (Term.mk_happens ts) (TS.goal s)) s
+        TS.set_goal (Term.mk_impl hyp_hap (TS.goal s)) s
       ) subgs'
     in
     subgs := subgs' @ !subgs;   (* new subgoals *)

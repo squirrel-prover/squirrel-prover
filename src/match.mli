@@ -79,7 +79,7 @@ module Pos : sig
     Vars.env ->                 (* for clean variable naming *)
     'a ->                       (* folding value *)
     Term.term -> 
-    'a * bool * Term.form       (* folding value, `Map found, term *)
+    'a * bool * Term.term       (* folding value, `Map found, term *)
 
   (** Same as [map_fold] for [Equiv.form]. *)
   val map_fold_e : 
@@ -98,7 +98,7 @@ module Pos : sig
     f_map ->
     Vars.env ->
     Term.term ->
-    bool * Term.form
+    bool * Term.term
 
   (** Same as [map_fold_e], but only a map.
       Return: `Map found, term *)
