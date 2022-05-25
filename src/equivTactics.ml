@@ -415,10 +415,14 @@ let fa_felem (i : int L.located) (s : sequent) : sequent list =
     soft_failure ~loc:(L.loc i) (Tactics.Failure "FA not applicable")
 
 let do_fa_tac (args : Args.fa_arg list) (s : sequent) : sequent list =
-  let args = 
-    (* TODO cntxt should focus on the pair of systems; does it make a
-     * difference? *)
-    let cntxt = Theory.{ env = ES.env s; cntxt = InGoal; } in
+  let args =
+    let env =
+      let env = ES.env s in
+      let pair = Utils.oget env.system.pair in
+      Env.set_system env
+        SE.{ set = (pair:>SE.arbitrary) ; pair = None }
+    in
+    let cntxt = Theory.{ env; cntxt = InGoal; } in
     List.map (fun (mult, tpat) ->
         let t, ty = Theory.convert ~pat:true cntxt tpat in
         let pat_vars =
