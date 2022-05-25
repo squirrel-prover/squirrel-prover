@@ -18,8 +18,7 @@ module type S = sig
   val reduce       : red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
   val destr_eq : 
-    red_param -> t -> 'a Equiv.f_kind -> 'a ->
-    (Term.term * Term.term) option
+    t -> 'a Equiv.f_kind -> 'a -> (Term.term * Term.term) option
 end
 
 (*------------------------------------------------------------------*)
@@ -238,9 +237,9 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
          | `Equiv x -> `Equiv (reduce_equiv param s x)
 
  (*------------------------------------------------------------------*)
-  (* FIXME: use [param] and [s] to reduce [x] if necessary *)
+  (* FIXME: use [s] to reduce [x] if necessary *)
   let destr_eq (type a)
-      (param : red_param) (s : S.t) (k : a Equiv.f_kind)
+      (s : S.t) (k : a Equiv.f_kind)
       (x : a) : (Term.term * Term.term) option
     =
     let destr_eq x =

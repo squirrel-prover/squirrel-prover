@@ -11,8 +11,7 @@ module type S = sig
   val reduce       : red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
   val destr_eq : 
-    red_param -> t -> 'a Equiv.f_kind -> 'a ->
-    (Term.term * Term.term) option
+    t -> 'a Equiv.f_kind -> 'a -> (Term.term * Term.term) option
 end
 
 (*------------------------------------------------------------------*)

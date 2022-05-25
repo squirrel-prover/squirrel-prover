@@ -82,7 +82,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** build a pattern from a rewriting rule using S.Reduce to get the equality *)
   let pat_to_rw_rule s =
     Rewrite.pat_to_rw_rule
-      ~destr_eq:(S.Reduce.destr_eq Reduction.rp_full s Equiv.Local_t) 
+      ~destr_eq:(S.Reduce.destr_eq s Equiv.Local_t) 
 
   (*------------------------------------------------------------------*)
   let wrap_fail f (s: S.sequent) sk fk =
@@ -778,7 +778,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       if S.Hyp.is_eq form then
         begin
-          match S.Reduce.destr_eq Reduction.rp_full s S.hyp_kind form with
+          match S.Reduce.destr_eq s S.hyp_kind form with
           | Some (a,b) ->
             let a1, a2 = get_destr ~orig:(`Reach a) (Term.destr_pair a)
             and b1, b2 = get_destr ~orig:(`Reach b) (Term.destr_pair b) in

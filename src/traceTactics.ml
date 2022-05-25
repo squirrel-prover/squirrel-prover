@@ -756,7 +756,7 @@ let fresh (m : lsymb) s =
     let env   = TS.vars s in
 
     begin
-      match TS.Reduce.destr_eq Reduction.rp_full s Local_t hyp with
+      match TS.Reduce.destr_eq s Local_t hyp with
       | Some (m1,m2) ->
         let (ns,t) = fresh_param m1 m2 in
 
@@ -1031,7 +1031,7 @@ let fa s =
   let unsupported () =
     Tactics.(soft_failure (Failure "equality expected")) in
 
-  let u, v = match TS.Reduce.destr_eq Reduction.rp_full s Local_t (TS.goal s) with
+  let u, v = match TS.Reduce.destr_eq s Local_t (TS.goal s) with
     | Some (u,v) -> u, v
     | None -> unsupported ()
   in
@@ -1745,7 +1745,7 @@ let collision_resistance TacticsArgs.(Opt (String, i)) (s : TS.t) =
     | None -> top_level_hashes s
     | Some (String j) -> 
       let _, h = Hyps.by_name j s in
-      match TS.Reduce.destr_eq Reduction.rp_full s Local_t h with
+      match TS.Reduce.destr_eq s Local_t h with
       | Some (t1, t2) ->
         let cntxt = TS.mk_trace_cntxt s in
         if not (valid_hash cntxt t1) || not (valid_hash cntxt t2) then
