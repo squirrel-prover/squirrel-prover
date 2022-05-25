@@ -60,7 +60,11 @@ module Parsed : sig
     name    : Theory.lsymb option;
     ty_vars : Theory.lsymb list;
     vars    : Theory.bnds;
-    system  : SystemExpr.parsed_t;
+    system  : Symbols.table -> SystemExpr.context;
+      (** Function producing the context given the current table.
+          Setting SystemExpr.parsed_t would be too rigid, and asking
+          for a context directly is impossible because the parsed does
+          not have the table. *)
     formula : contents
   }
 

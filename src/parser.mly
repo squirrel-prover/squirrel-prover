@@ -8,6 +8,42 @@
     L.mk_loc loc s
 
   let mk_abstract loc s args = T.Abstract (L.mk_loc loc s, args)
+
+  (** Parsing functions for system expressions. *)
+
+  let empty = Location.(mk_loc _dummy [])
+
+  type parsed_sys = [
+    | `None
+    | `Some of SE.parsed_t
+    | `Set_pair of SE.parsed_t * SE.parsed_t
+  ]
+
+  let local_context table : parsed_sys -> SE.context = function
+    | `None ->
+        SE.{ set = SE.parse table empty ; pair = None }
+    | `Some s ->
+        let set = SE.parse table s in
+        SE.{ set ; pair = None }
+    | `Set_pair (s,p) ->
+        let set = SE.parse table s in
+        let pair = Some (SE.to_pair (SE.parse table p)) in
+        SE.{ set ; pair }
+
+  let global_context table : parsed_sys -> SE.context = function
+    | `None ->
+        let set = SE.parse table empty in
+        let pair = SE.to_pair set in
+        SE.{ set ; pair = Some pair }
+    | `Some s ->
+        let set = SE.parse table s in
+        let pair = SE.to_pair set in
+        SE.{ set ; pair = Some pair }
+    | `Set_pair (s,p) ->
+        let set = SE.parse table s in
+        let pair = Some (SE.to_pair (SE.parse table p)) in
+        SE.{ set ; pair }
+
 %}
 
 %token <int> INT
@@ -494,11 +530,11 @@ declaration_i:
                                                 sprojs;
                                                 sprocess = p}) }
 
-| SYSTEM id=lsymb EQ from_sys=system WITH modifier=system_modifier
+| SYSTEM id=lsymb EQ from_sys=system_expr WITH modifier=system_modifier
     { Decl.(Decl_system_modifier
               { from_sys = from_sys;
                 modifier;
-			          name = id}) }
+                name = id}) }
 
 declaration:
 | ldecl=loc(declaration_i)                  { ldecl }
@@ -931,12 +967,16 @@ system_item_list:
 | i=system_item                          {  [i] }
 | i=system_item COMMA l=system_item_list { i::l }
 
-system_i:
-|                                        { [] }
-| LBRACKET l=system_item_list RBRACKET   {  l }
+system_expr:
+| LBRACKET s=loc(system_item_list) RBRACKET   { s }
 
-system:
-| s=loc(system_i) { s }
+system_annot:
+|                                             { `None }
+| LBRACKET l=loc(system_item_list) RBRACKET   { `Some l }
+| LBRACKET
+    SET COLON s=loc(system_item_list) SEMICOLON
+  EQUIV COLON p=loc(system_item_list)
+  RBRACKET                                    { `Set_pair (s,p) }
 
 /* -----------------------------------------------------------------------
  * Statements and goals
@@ -946,32 +986,28 @@ args:
 |                                    { [] }
 | LPAREN vs0=arg_list RPAREN vs=args { vs0 @ vs }
 
-/* We use brackets to delimitate system expression and type variables,
-   which creates a conflict if statement names can be empty, which
-   we use in many examples.
-   This use of brackets for both constructs may be reconsidered in
-   the future; until then, we treat the case with an empty name
-   separately and with limitations. */
-
 statement_name:
 | i=lsymb    { Some i }
 | UNDERSCORE { None }
 
 local_statement:
-| system=system name=statement_name ty_vars=ty_args vars=args
+| s=system_annot name=statement_name ty_vars=ty_args vars=args
   COLON f=term
-   { let formula = Goal.Parsed.Local f in
+   { let system table = local_context table s in
+     let formula = Goal.Parsed.Local f in
      Goal.Parsed.{ name; ty_vars; vars; system; formula } }
 
 global_statement:
-| system=system name=statement_name ty_vars=ty_args vars=args
+| s=system_annot name=statement_name ty_vars=ty_args vars=args
   COLON f=global_formula
    { let formula = Goal.Parsed.Global f in
+     let system table = global_context table s in
      Goal.Parsed.{ name; ty_vars; vars; system; formula } }
 
 obs_equiv_statement:
-| s=system n=statement_name
-   { Goal.Parsed.{ name = n; system = s; ty_vars = []; vars = [];
+| s=system_annot n=statement_name
+   { let system table = global_context table s in
+     Goal.Parsed.{ name = n; system; ty_vars = []; vars = [];
                    formula = Goal.Parsed.Obs_equiv } }
 
 goal_i:
@@ -979,8 +1015,9 @@ goal_i:
 |  LOCAL GOAL s=local_statement  DOT { s }
 | GLOBAL GOAL s=global_statement DOT { s }
 | EQUIV  s=obs_equiv_statement   DOT { s }
-| EQUIV system=system name=statement_name vars=args COLON b=loc(biframe) DOT
+| EQUIV s=system_annot name=statement_name vars=args COLON b=loc(biframe) DOT
     { let f = L.mk_loc (L.loc b) (Theory.PEquiv (L.unloc b)) in
+      let system table = global_context table s in
       Goal.Parsed.{ name; system; ty_vars = []; vars; formula = Global f } }
 
 goal:
@@ -1017,7 +1054,7 @@ p_include:
 /* print query */
 pr_query:
 | GOAL   l=lsymb  DOT { Prover.Pr_statement l }
-| SYSTEM l=system DOT { Prover.Pr_system (Some l) }
+| SYSTEM l=system_expr DOT { Prover.Pr_system (Some l) }
 |                 DOT { Prover.Pr_system None }
 
 

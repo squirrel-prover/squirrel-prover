@@ -101,7 +101,7 @@ module Parsed = struct
     name    : Theory.lsymb option;
     ty_vars : Theory.lsymb list;
     vars    : Theory.bnds;
-    system  : SE.parsed_t; (** may be parsed as SE.t or SE.pair *)
+    system  : Symbols.table -> SE.context;
     formula : contents
   }
 
@@ -133,16 +133,7 @@ let make table hint_db parsed_goal : statement * t =
 
   let name = L.unloc (oget name) in
 
-  let system =
-    match formula with
-      | Local _ ->
-          let system = SE.parse table system in
-          SE.{set = system; pair = None}
-      | _ ->
-          let set = SE.parse table system in
-          let pair = Some (SE.to_pair set) in
-          SE.{set; pair}
-  in
+  let system = system table in
   let ty_vars = List.map (fun ls -> Type.mk_tvar (L.unloc ls)) ty_vars in
   let env = Env.init ~system ~ty_vars ~table () in
 
