@@ -268,7 +268,7 @@ let do_decls (state : main_state) (decls : Decl.declarations) : main_state =
   let table, proof_obls = ProcessDecl.declare_list state.table hint_db decls in
 
   if proof_obls <> [] then
-    Printer.pr "@[<v 2>proof oblitations:@;%a@]"
+    Printer.pr "@[<v 2>proof obligations:@;%a@]"
       (Fmt.list ~sep:Fmt.cut Goal.pp_init) proof_obls;
 
   List.iter Prover.add_proof_obl proof_obls;
