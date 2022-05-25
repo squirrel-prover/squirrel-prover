@@ -1147,7 +1147,7 @@ let do_rw_item (rw_item : Args.rw_item) (s : TS.t) (t : Term.term)
 
 let do_s_item (s_item : Args.s_item) (s : TS.t) (t : Term.term) : Term.term =
   match s_item with
-  | Args.Simplify l -> TS.Reduce.reduce_term Reduction.rp_full s t
+  | Args.Simplify l -> TS.Reduce.reduce_term Reduction.{ delta = false; } s t
 
   | Args.Tryauto l | Args.Tryautosimpl l ->
     soft_failure ~loc:l (Failure "cannot use // or /= in global rewriting")
