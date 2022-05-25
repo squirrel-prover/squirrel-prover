@@ -971,10 +971,11 @@ let global_prf_t
     (* condition stating that [x] is equal to a hash occurrence [xocc]. *)
     let occ_vars, occ_t = xocc1.cnt.x_occ.occ_cnt in
     Term.mk_ands ~simpl:true
-      [ Term.mk_eq ~simpl:true x_t occ_t;               (* hash content equ. *)
+      [ Term.mk_eq ~simpl:true tau_t (mk_occ_ts xocc1); (* timestamp equ. *)
+        mk_xocc_lt tau1 xocc1 tau2 xocc2;               (* timestamp ord. *)
+        Term.mk_eq ~simpl:true x_t occ_t;               (* hash content equ. *)
         Term.mk_indices_eq ~simpl:true key_is occ_vars; (* hash key equ. *)
-        Term.mk_eq ~simpl:true tau_t (mk_occ_ts xocc1); (* timestamp equ. *)
-        mk_xocc_lt tau1 xocc1 tau2 xocc2; ] 
+      ] 
   in
 
   let table, err_fs = 
