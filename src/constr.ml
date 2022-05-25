@@ -1431,7 +1431,10 @@ let dump_nodes ppf cntxt g =
         let action = Action.of_term asymb idx cntxt.table in
         let descr = SystemExpr.descr_of_action cntxt.table cntxt.system action in
         Format.fprintf ppf "  \"cond\": \'%a\',\n" (Printer.html Term.pp) (snd descr.condition);
-        Format.fprintf ppf "  \"state\": \'\',\n";
+        let pp_states = Format.pp_print_list 
+          ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
+          (fun ppf (state,term) -> Format.fprintf ppf "%a := %a" Term.pp_msymb state Term.pp term) in
+        Format.fprintf ppf "  \"state\": \'%a\',\n" (Printer.html pp_states) descr.updates;
         Format.fprintf ppf "  \"output\": \'%a\'\n" (Printer.html Term.pp) (snd descr.output)
       | _ -> ()
     end;
@@ -1439,11 +1442,15 @@ let dump_nodes ppf cntxt g =
   in
   UtG.iter_vertex pp_vertex g
 
+let first_layer g v =
+  let degree = UtG.in_degree g v in
+  degree = 0 || (degree = 1 && UtG.mem_edge g v v)
+
 let dump_layout ppf g =
   (* Remove vertex [v] from the graph and print it, if it has no predecessor *)
   let comma = ref false in
   let filter g v acc =
-    if UtG.in_degree g v = 0 then begin
+    if first_layer g v then begin
       if !comma then
         Format.fprintf ppf ","
       else
