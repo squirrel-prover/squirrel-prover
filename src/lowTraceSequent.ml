@@ -596,9 +596,6 @@ let fv s : Vars.Sv.t =
   Vars.Sv.union h_vars (Term.fv (goal s))
 
 (*------------------------------------------------------------------*)
-module MatchF = Match.T
-
-(*------------------------------------------------------------------*)
 module Conc = Term.Smart
 module Hyp  = Equiv.Any.Smart
 

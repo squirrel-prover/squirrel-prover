@@ -978,16 +978,13 @@ module T (* : S with type t = Term.term *) = struct
     | Action (s,is), Action (s',is') -> sunif (s,is) (s',is') st
 
     | Diff (Explicit l), Diff (Explicit l') ->
-      let l,l' =
-        try
-          List.split
-            (List.map2
-               (fun (lbl,t) (lbl',t') ->
-                  if lbl = lbl' then t,t' else raise NoMgu)
-               l l')
-        with Invalid_argument _ -> raise NoMgu
-      in
-      unif_l l l' st
+      if List.length l <> List.length l' then no_match ();
+      
+      List.fold_left2 (fun mv (lt,t) (lpat, pat) ->
+          if lt <> lpat then no_match ();
+          
+          unif t pat { st with mv }
+        ) st.mv l l'
 
     | Find (is, c, t, e), Find (is', pat_c, pat_t, pat_e) ->
       let s, s', st = unif_bnds is is' st in
@@ -1211,16 +1208,13 @@ module T (* : S with type t = Term.term *) = struct
     | Action (s,is), Action (s',is') -> smatch (s,is) (s',is') st
 
     | Diff (Explicit l), Diff (Explicit l') ->
-      let l,l' =
-        try
-          List.split
-            (List.map2
-               (fun (lbl,t) (lbl',t') ->
-                  if lbl = lbl' then t,t' else raise NoMgu)
-               l l')
-        with Invalid_argument _ -> no_match ()
-      in
-      tmatch_l l l' st
+      if List.length l <> List.length l' then no_match ();
+      
+      List.fold_left2 (fun mv (lt,t) (lpat, pat) ->
+          if lt <> lpat then no_match ();
+          
+          tmatch t pat { st with mv; system = SE.project [lt] st.system }
+        ) st.mv l l'
 
     | Find (is, c, t, e), Find (is', pat_c, pat_t, pat_e) ->
       let s, s', st = match_bnds is is' st in
@@ -1274,7 +1268,7 @@ module T (* : S with type t = Term.term *) = struct
     List.fold_left2 (fun mv t pat ->
         tmatch t pat { st with mv }
       ) st.mv tl patl
-
+ 
   (* match an [i_symb].
      Note: types are not checked. *)
   and isymb_match : type a.

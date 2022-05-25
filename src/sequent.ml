@@ -20,15 +20,18 @@ type ghyp = [ `Hyp of Ident.t | `Lemma of string ]
 module type S = sig
   include LowSequent.S
 
-  (** reduction functions *)
+  (*------------------------------------------------------------------*) 
   module Reduce : Reduction.S with type t := t
-                 
+
+  (*------------------------------------------------------------------*) 
   val is_assumption       : lsymb -> t -> bool
   val is_equiv_assumption : lsymb -> t -> bool
   val is_reach_assumption : lsymb -> t -> bool
 
+  (*------------------------------------------------------------------*) 
   val to_general_sequent : t -> Goal.t
-    
+
+  (*------------------------------------------------------------------*)     
   val convert_pt_gen :
     ?check_compatibility:bool -> 
     ?close_pats:bool ->

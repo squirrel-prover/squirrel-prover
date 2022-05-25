@@ -1139,8 +1139,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
       if not (Vars.Sv.subset pat.pat_vars (S.fv_conc pat.pat_term)) then
         soft_failure ApplyBadInst;
 
+      let match_res =
+        match S.conc_kind with
+        | Local_t  -> Match.T.try_match ~option table system.set goal pat 
+        | Global_t -> Match.E.try_match ~option table system.set goal pat
+        | Any_t -> assert false (* cannot happen *)
+      in
+
       (* Check that [pat] entails [S.goal s]. TODO system.set abusive? *)
-      match S.MatchF.try_match ~option table system.set goal pat with
+      match match_res with
       (* match failed by [pat] is a product: retry with the rhs *)
       | (NoMatch _ | FreeTyv) when S.Conc.is_impl pat.pat_term ->
         let t1, t2 = oget (S.Conc.destr_impl pat.pat_term) in
@@ -1186,10 +1193,17 @@ module MkCommonLowTac (S : Sequent.S) = struct
           Match.{ default_match_option with mode = `EntailLR; use_fadup; }
         in
 
+        let table = S.table s in
+        let system = S.system s in
+        let match_res =
+          match S.conc_kind with
+          | Local_t  -> Match.T.try_match ~option table system.set hconcl pat
+          | Global_t -> Match.E.try_match ~option table system.set hconcl pat
+          | Any_t -> assert false (* cannot happen *)
+        in
+
         (* Check that [hconcl] entails [pat]. TODO _.set abusive *)
-        match
-          S.MatchF.try_match ~option (S.table s) (S.system s).set hconcl pat
-        with
+        match match_res with
         | NoMatch _ | FreeTyv -> None
         | Match mv -> Some mv
     in

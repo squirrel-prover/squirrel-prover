@@ -37,9 +37,6 @@ module type S = sig
   val hyp_kind : hyp_form Equiv.f_kind
   val conc_kind : conc_form Equiv.f_kind
 
-  (* val pp_hyp  : Format.formatter -> hyp_form  -> unit
-  val pp_conc : Format.formatter -> conc_form -> unit *)
-
   (*------------------------------------------------------------------*)
   module Hyps : Hyps.HypsSeq with type hyp = hyp_form and type sequent = t
 
@@ -112,9 +109,6 @@ module type S = sig
   (** {2 Misc} *)
 
   val map : Equiv.Babel.mapper -> t -> t
-
-  (** Matching. *)
-  module MatchF : Match.S with type t = conc_form
 
   (** Smart constructors and destructors for hypotheses. *)
   module Hyp : Term.SmartFO with type form = hyp_form
