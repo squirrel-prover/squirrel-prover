@@ -1001,32 +1001,7 @@ let _fold_macro_support
         ) cntxt.table cntxt.system descr acc
     ) cntxt.table cntxt.system init
 
-
-
-(** Folding over all macro descriptions reachable from some terms.
-    [env] must contain the free variables of [terms]. 
-
-    Guarrantees:
-    [fold_macro_support func cntxt env terms init] will return:
-
-    [List.fold_left func init occs]
-
-    where [occs] is a list of indirect occurrences of sort [iocc] 
-    that, roughly, "covers" all subterms of any all expansions of [terms], 
-    in the following sense:
-
-    TODO: the description below is completely accurrante, as only indirect
-    occurrences are covered!
-    
-    ∀ trace model T, ∀ s ∈ st( ([terms])^T ), ∃ occ ∈ [occs], and:
-
-     - ∃ s₀ ∈ st([occ.occ_cnt])
-
-     - ∃ σ : (F_{s₀} ↦ T_I) 
-       a valuation of s₀'s free variables, w.r.t. [env], in the trace
-       model index interpretation T_I (i.e F_{s₀} = fv(s₀) \ [env]).
-
-     such that s ≡ (s₀)^{Tσ}. *)
+(** See `.mli` for a complete description *)
 let fold_macro_support
     (func  : (iocc -> 'a -> 'a))
     (cntxt : Constr.trace_cntxt)

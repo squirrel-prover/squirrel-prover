@@ -230,16 +230,16 @@ val pp_iocc : Format.formatter -> iocc -> unit
 
     [List.fold_left func init occs]
 
-    where [occs] is a list of indirect occurrences of sort [iocc]
+    where [occs] is a list of indirect occurrences of type [iocc]
     that, roughly, "covers" all subterms of any expansion of [terms],
     in the following sense:
     
-    TODO: the description below is completely accurrante, as only indirect
+    TODO: the description below is not completely acurrate, as only indirect
     occurrences are covered!
 
     [∀ trace model T, ∀ s ∈ st( ([terms])^T ), ∃ occ ∈ [occs]] and:
 
-     - [∃ s₀ ∈ st([occ.occ_cnt])]
+     - [∃ s₀ ∈ st([occ.iocc_cnt])]
 
      - [∃ σ : (F_{s₀} ↦ T_I)]
        a valuation of [s₀]'s free variables, w.r.t. [env], in the trace
