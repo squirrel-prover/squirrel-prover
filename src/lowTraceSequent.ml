@@ -1,3 +1,5 @@
+open Utils
+
 module List = Utils.List
 
 module SE = SystemExpr
@@ -562,17 +564,17 @@ let literals_unsat_smt ?(slow=false) s =
 
 
 (*------------------------------------------------------------------*)
-let mk_trace_cntxt ?projs s =
+let mk_trace_cntxt ?se s =
   try
-    let system =
-      SE.project_opt projs (SE.to_fset (system s).set)
-    in
+    let system = odflt (SE.to_fset s.env.system.set) se in
     Constr.{
       table  = table s;
       system;
       models = Some (get_models s);
     }
-  with _ -> Tactics.(soft_failure (Failure "underspecified system"))
+
+  (* TODO: remove user-level exception *)
+  with SE.Error _ -> Tactics.soft_failure (Failure "underspecified system")
 
 let get_hint_db s = s.hint_db
 

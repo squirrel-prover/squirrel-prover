@@ -374,3 +374,6 @@ let get_compatible_expr = function
 
 let project_set (projs : Term.projs) (c : context) : context =
   { c with set = project projs c.set }
+
+let project_set_opt (projs : Term.projs option) (c : context) : context =
+  { c with set = project_opt projs c.set }

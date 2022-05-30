@@ -838,6 +838,7 @@ let global_prf_t
             let new_occs =
               Iter.get_f_messages_ext ~mode:`NoDelta
                 ~fv:descr.indices 
+                (old_system :> SE.arbitrary)
                 param.h_fn param.h_key.s_symb t
             in
 

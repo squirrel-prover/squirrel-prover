@@ -444,11 +444,11 @@ let convert_pat_arg sel conv_cntxt p conc =
   in
   let option = { Match.default_match_option with allow_capture = true; } in
   let table = conv_cntxt.env.table
-  and sexpr = conv_cntxt.env.system.set (* TODO abusive ? *)
+  and system = conv_cntxt.env.system
   and vars  = conv_cntxt.env.vars in
   let res = match conc with
-    | `Reach form -> Match.T.find ~option table sexpr vars pat form
-    | `Equiv form -> Match.E.find ~option table sexpr vars pat form
+    | `Reach form -> Match.T.find ~option table system vars pat form
+    | `Equiv form -> Match.E.find ~option table system vars pat form
   in
   let message = match List.nth res (sel-1) with
     | et -> et

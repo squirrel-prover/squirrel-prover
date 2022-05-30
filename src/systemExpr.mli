@@ -262,4 +262,5 @@ val pp_context : Format.formatter -> context -> unit
     Return [None] if context is not [context_any]. *)
 val get_compatible_expr : context -> compatible option
 
-val project_set : Term.projs -> context -> context
+val project_set     : Term.projs        -> context -> context
+val project_set_opt : Term.projs option -> context -> context

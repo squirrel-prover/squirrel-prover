@@ -261,10 +261,8 @@ let get_models (s : t) =
   let s = to_trace_sequent (set_reach_goal Term.mk_false s) in
   TS.get_models s
 
-let mk_trace_cntxt ?(projs : Term.projs option)  (s : t) =
-  let system =
-    SE.project_opt projs (SE.to_fset s.env.system.set)
-  in
+let mk_trace_cntxt ?(se : SE.fset option) (s : t) =
+  let system = odflt (SE.to_fset s.env.system.set) se in
   Constr.{
     table  = s.env.table;
     system;

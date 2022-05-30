@@ -16,6 +16,9 @@
 
 module L = Location
 
+module SE = SystemExpr
+
+(*------------------------------------------------------------------*)
 module type S = sig
 
   type t
@@ -78,11 +81,8 @@ module type S = sig
 
   (** Returns trace context, corresponding to [s.env.system.set] for
       both kinds of sequents. 
-      Option projections to restrict the systems considered.
-      TODO this may not be what is expected
-      for equiv sequents, but it corresponds to the models that are
-      computed in that case *)
-  val mk_trace_cntxt : ?projs:Term.projs -> t -> Constr.trace_cntxt
+      Option projections to restrict the systems considered. *)
+  val mk_trace_cntxt : ?se:SE.fset -> t -> Constr.trace_cntxt
 
   val get_trace_literals : t -> Term.literal list
 

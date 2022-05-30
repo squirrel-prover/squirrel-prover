@@ -48,10 +48,9 @@ val rewrite_head :
 (*------------------------------------------------------------------*)
 type rw_res = Equiv.any_form * (SE.context * Term.term) list
 
-type rw_res_opt = [
-  | `Result of rw_res
-  | `Failed of error
-]
+type rw_res_opt = 
+  | RW_Result of rw_res
+  | RW_Failed of error
 
 (*------------------------------------------------------------------*)
 val rewrite :

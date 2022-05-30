@@ -71,9 +71,9 @@ module MkCommonLowTac (S : Sequent.S) : sig
   (*------------------------------------------------------------------*)
   (** {3 Expantion} *)
 
-  (** expand all macros (not operators) in a term *)
+  (** expand all macros (not operators) in a term relatively to a system *)
   val expand_all_macros :
-    ?force_happens:bool -> Term.term -> S.t -> Term.term
+    ?force_happens:bool -> Term.term -> SE.arbitrary -> S.t -> Term.term
 
   (** expand all macro of some targets in a sequent *)
   val expand_all_l : Args.in_target -> S.t -> S.t list

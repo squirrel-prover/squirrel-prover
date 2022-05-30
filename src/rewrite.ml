@@ -95,7 +95,7 @@ exception NoRW
 (*------------------------------------------------------------------*)
 let _rewrite_head
     (table  : Symbols.table)
-    (system : SE.t)
+    (sexpr : SE.t)
     (rule   : rw_rule)
     (t      : Term.term) : Term.term * Term.term list
   =
@@ -111,6 +111,7 @@ let _rewrite_head
       pat_term   = l; }
   in
 
+  let system = SE.reachability_context sexpr in
   let mv =
     match Match.T.try_match table system t pat with
     | FreeTyv | NoMatch _ -> raise NoRW
@@ -123,11 +124,11 @@ let _rewrite_head
 
 let rewrite_head
     (table  : Symbols.table)
-    (system : SE.t)
+    (sexpr : SE.t)
     (rule   : rw_rule)
     (t      : Term.term) : (Term.term * Term.term list) option
   =
-  try Some (_rewrite_head table system rule t) with NoRW -> None
+  try Some (_rewrite_head table sexpr rule t) with NoRW -> None
 
 (*------------------------------------------------------------------*)
 (** as an instance been found:
@@ -138,7 +139,7 @@ type found = {
   pat    : Term.term Match.pat; 
   right  : Term.term;
   system : SE.t; 
-  subgs  : (SE.context * Term.term) list;
+  subgs  : (SE.t * Term.term) list;
 }
 
 type rw_state = { 
@@ -267,14 +268,16 @@ let mk_state
    bound above the matched occurrences are universally quantified in
    the generated sub-goals. *)
 let rw_inst
-    (table : Symbols.table) (rule : rw_rule) (system : SE.context)
+    (table : Symbols.table) (rule : rw_rule) 
   : rw_state Pos.f_map_fold 
   = 
-  fun occ projs vars conds _p (s : rw_state) ->
-  (* project the system *)
-  let system_set = SE.project_opt projs system.set in
+  fun occ se vars conds _p (s : rw_state) ->
 
-  if not (SE.subset table system_set rule.rw_system) then 
+  let projs = 
+    if SE.is_fset se then Some (SE.to_projs (SE.to_fset se)) else None
+  in
+
+  if not (SE.subset table se rule.rw_system) then 
     s, `Continue
   else 
     match s.found_instance with
@@ -282,10 +285,11 @@ let rw_inst
       (* we already found the rewrite instance earlier *)
 
       (* check if the same system apply to the subterm *)
-      if not (SE.subset table system_set inst.system) then 
+      if not (SE.subset table se inst.system) then 
         s, `Continue 
       else
-        begin match Match.T.try_match table system_set occ inst.pat with
+        let context = SE.reachability_context se in
+        begin match Match.T.try_match table context occ inst.pat with
           | NoMatch _ | FreeTyv -> s, `Continue
           | Match mv -> 
             (* project the already found instance with the projections
@@ -297,7 +301,8 @@ let rw_inst
       (* project the pattern *)
       let pat_proj = Match.project_tpat_opt projs s.init_pat in
     
-      match Match.T.try_match table system_set occ pat_proj with
+      let context = SE.reachability_context se in
+      match Match.T.try_match table context occ pat_proj with
       | NoMatch _ | FreeTyv -> s, `Continue
 
       (* head matches *)
@@ -312,7 +317,7 @@ let rw_inst
 
         let found_subs =
           List.map (fun rsub ->
-              { system with set = system_set}, 
+              se, 
               Term.mk_forall ~simpl:true vars 
                 ((* Term.mk_impls ~simpl:true conds *) 
                   (Term.subst subst rsub))
@@ -328,7 +333,7 @@ let rw_inst
         let found_instance = `Found {
             pat    = found_pat;
             right;
-            system = system_set;
+            system = se;
             subgs  = found_subs;
           } in
 
@@ -338,10 +343,9 @@ let rw_inst
 (*------------------------------------------------------------------*)
 type rw_res = Equiv.any_form * (SE.context * Term.term) list
 
-type rw_res_opt = [
-  | `Result of rw_res
-  | `Failed of error
-]
+type rw_res_opt = 
+  | RW_Result of rw_res
+  | RW_Failed of error
 
 (*------------------------------------------------------------------*)
 let rewrite
@@ -377,20 +381,20 @@ let rewrite
      this instance.
      Return: (f, subs) *)
   let rec _rewrite (mult : Args.rw_count) (f : Equiv.any_form) 
-    : Equiv.any_form * (SE.context * Term.term) list
+    : Equiv.any_form * (SE.t * Term.term) list
     =
     check_max_rewriting ();
 
     let s, f = match f with
       | `Equiv f ->
         let s, _, f = 
-          Pos.map_fold_e (rw_inst table rule system) env s f 
+          Pos.map_fold_e (rw_inst table rule) env system s f 
         in
         s, `Equiv f
 
       | `Reach f ->
         let s, _, f = 
-          Pos.map_fold (rw_inst table rule system) env s f 
+          Pos.map_fold (rw_inst table rule) env system.set s f 
         in
         s, `Reach f
     in
@@ -408,8 +412,10 @@ let rewrite
   in
 
   match _rewrite mult target with
-  | f, subs            -> `Result (f, List.rev subs)
-  | exception Failed e -> `Failed e
+  | f, subs            -> 
+    let subs = List.rev_map (fun (se, t) -> { system with set = se; }, t) subs in
+    RW_Result (f, subs)
+  | exception Failed e -> RW_Failed e
 
 let rewrite_exn   
     ~(loc   : L.t)
@@ -421,8 +427,8 @@ let rewrite_exn
     (target : Equiv.any_form) : rw_res
   =
   match rewrite table system env mult rule target with
-  | `Result r -> r
-  | `Failed e -> recast_error ~loc e
+  | RW_Result r -> r
+  | RW_Failed e -> recast_error ~loc e
 
 (*------------------------------------------------------------------*)
 (** {2 Higher-level rewrite} *)
@@ -437,7 +443,7 @@ let high_rewrite
   : Term.term 
   =
   let rw_inst : Pos.f_map = 
-    fun occ projs vars _conds p ->
+    fun occ se vars _conds p ->
       (* build the rule to apply at position [p] *)
       match mk_rule vars p with
       | None -> `Continue
@@ -452,7 +458,7 @@ let high_rewrite
             pat_term   = left;
           } 
         in
-        let system = SE.project_opt projs system in
+        let system = SE.reachability_context se in
         match Match.T.try_match table system occ pat with
         | NoMatch _ | FreeTyv ->
           begin match mode with
@@ -471,5 +477,5 @@ let high_rewrite
           `Map right
   in
 
-  let _, f = Pos.map ~mode rw_inst venv t in
+  let _, f = Pos.map ~mode rw_inst venv system t in
   f

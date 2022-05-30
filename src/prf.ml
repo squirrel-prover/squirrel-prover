@@ -50,7 +50,7 @@ type prf_occ = (Action.action * Vars.var list * Term.term) Iter.occ
 
 (** check if all instances of [o1] are instances of [o2].
     [o1] and [o2] actions must have the same action name *)
-let prf_occ_incl table system (o1 : prf_occ) (o2 : prf_occ) : bool =
+let prf_occ_incl table sexpr (o1 : prf_occ) (o2 : prf_occ) : bool =
   let a1, is1, t1 = o1.occ_cnt in
   let a2, is2, t2 = o2.occ_cnt in
 
@@ -60,7 +60,7 @@ let prf_occ_incl table system (o1 : prf_occ) (o2 : prf_occ) : bool =
   (* build a dummy term, which we used to match in one go all elements of
      the two occurrences *)
   let mk_dum a is cond t =
-    let action = SE.action_to_term table system a in
+    let action = SE.action_to_term table sexpr a in
     Term.mk_ands ~simpl:false
       ((Term.mk_atom `Eq Term.init action) ::
        (Term.mk_indices_eq ~simpl:false is is) ::
@@ -74,7 +74,8 @@ let prf_occ_incl table system (o1 : prf_occ) (o2 : prf_occ) : bool =
     }
   in
 
-  match Match.T.try_match table (system:>SE.t) (mk_dum a1 is1 cond1 t1) pat2 with
+  let system = SE.reachability_context sexpr in
+  match Match.T.try_match table system (mk_dum a1 is1 cond1 t1) pat2 with
   | Match.FreeTyv | Match.NoMatch _ -> false
   | Match.Match _ -> true
 
@@ -176,7 +177,9 @@ let mk_prf_phi_proj cntxt env param frame hash =
 
   let frame_hashes : Iter.hash_occs =
     List.fold_left (fun acc t ->
-        Iter.get_f_messages_ext ~mode:(`Delta cntxt) 
+        (* TODO: wrong system below? *)
+        Iter.get_f_messages_ext
+          ~mode:(`Delta cntxt) (cntxt.system :> SE.arbitrary)
           param.h_fn param.h_key.s_symb t @ acc
       ) [] frame
   in
@@ -195,7 +198,9 @@ let mk_prf_phi_proj cntxt env param frame hash =
         let fv = (Sv.elements iocc.iocc_vars) in
 
         let new_cases =
-          Iter.get_f_messages_ext ~mode:(`Delta cntxt)
+          Iter.get_f_messages_ext 
+            (* TODO: wrong system below? *)
+            ~mode:(`Delta cntxt) (cntxt.system :> SE.arbitrary)
             ~fv param.h_fn param.h_key.s_symb t
         in
         let new_cases =

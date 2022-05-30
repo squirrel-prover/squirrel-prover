@@ -348,7 +348,7 @@ let fa_select_felems (pat : Term.term Match.pat) (s : sequent) : int option =
   let option = { Match.default_match_option with allow_capture = true; } in
   let system = match (ES.system s).pair with
     | None -> soft_failure (Failure "underspecified system")
-    | Some p -> (p:>SE.t)
+    | Some p -> SE.reachability_context p
   in
   List.find_mapi (fun i e ->
       match Match.T.try_match ~option (ES.table s) system e pat with
@@ -811,7 +811,11 @@ let fresh i s =
   let biframe = List.rev_append before after in
   (* expand the biframe to improve precision when computing the freshness
      condition *)
-  let biframe_exp = List.map (fun t -> EquivLT.expand_all_macros t s) biframe in
+  let biframe_exp = 
+    List.map (fun t ->
+        EquivLT.expand_all_macros t (oget (ES.system s).pair :> SE.arbitrary) s
+      ) biframe 
+  in
   let cntxt   = ES.mk_trace_cntxt s in
   let env     = ES.vars s in
   try
@@ -1253,12 +1257,14 @@ let global_diff_eq (s : ES.t) =
            them; anyway it is useless to do so if we project immediately
            afterwards. *)
         let s1 = 
+          let sexpr1 = SE.project [p1] (ES.system s).set in
           Term.project1 p1
-            (EquivLT.expand_all_macros ~force_happens:true s1 s) 
+            (EquivLT.expand_all_macros ~force_happens:true s1 sexpr1 s) 
         in
         let s2 = 
+          let sexpr2 = SE.project [p2] (ES.system s).set in
           Term.project1 p2
-            (EquivLT.expand_all_macros ~force_happens:true s2 s)
+            (EquivLT.expand_all_macros ~force_happens:true s2 sexpr2 s)
         in
         Goal.Trace ES.(to_trace_sequent
                          (set_reach_goal

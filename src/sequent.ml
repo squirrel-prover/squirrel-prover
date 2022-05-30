@@ -345,14 +345,12 @@ module Mk (Args : MkArgs) : S with
             | Equiv.Local_t ->
               Match.T.try_match 
                 ~ty_env ~mv
-                (* TODO double-check all uses of context.set below
-                     it is likely that try_match should take a full context *)
-                (S.table s) (S.system s).set pat1.pat_term pat_f1
+                (S.table s) (S.system s) pat1.pat_term pat_f1
 
             | Equiv.Global_t ->
               Match.E.try_match 
                 ~ty_env ~mv
-                (S.table s) (S.system s).set pat1.pat_term pat_f1
+                (S.table s) (S.system s) pat1.pat_term pat_f1
 
             | Equiv.Any_t -> 
               match f1, pat1.pat_term with
@@ -361,14 +359,14 @@ module Mk (Args : MkArgs) : S with
                 let pat_f1 = { pat1 with pat_term = f1 } in
                 Match.T.try_match 
                   ~ty_env ~mv
-                  (S.table s) (S.system s).set pat1.pat_term pat_f1
+                  (S.table s) (S.system s) pat1.pat_term pat_f1
 
               | `Equiv f1, `Equiv t1  -> 
                 let pat1   = { pat1 with pat_term = t1 } in
                 let pat_f1 = { pat1 with pat_term = f1 } in
                 Match.E.try_match 
                   ~ty_env ~mv
-                  (S.table s) (S.system s).set pat1.pat_term pat_f1
+                  (S.table s) (S.system s) pat1.pat_term pat_f1
 
               | _ -> (* TODO: improve error message *)
                 hard_failure ~loc:(L.loc pt.p_pt_head) (Failure "kind error");

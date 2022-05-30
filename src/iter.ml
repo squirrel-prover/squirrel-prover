@@ -413,6 +413,7 @@ let get_f_messages_ext
     ?(fun_wrap_key = None)
     ?(fv    : Vars.vars = [])
     ~(mode:[`Delta of Constr.trace_cntxt | `NoDelta])
+    (sexpr  : SE.arbitrary)
     (f      : Term.fname)
     (k      : Term.name)
     (t      : Term.term)
@@ -422,7 +423,7 @@ let get_f_messages_ext
   
   let func : hash_occs Pos.f_map_fold = fun
     (t : Term.term)
-    (projs : Term.projs option) (fv : Vars.vars) (cond : Term.terms) pos
+    (se : SE.arbitrary) (fv : Vars.vars) (cond : Term.terms) pos
     (occs : hash_occs) ->
     match t with
       | Term.Fun ((f',_),_, [m;k']) as m_full when f' = f ->
@@ -467,9 +468,7 @@ let get_f_messages_ext
         begin
           match mode with 
           | `Delta cntxt ->
-            let cntxt =
-              { cntxt with system = SE.project_opt projs cntxt.system }
-            in
+            let cntxt = { cntxt with system = SE.to_fset se } in
             try_unfold cntxt m ts occs
           | `NoDelta -> occs, `Continue
         end
@@ -478,7 +477,7 @@ let get_f_messages_ext
   in
 
   let occs, _, _ =
-    Pos.map_fold ~mode:(`TopDown true) func (Vars.of_list fv) [] t
+    Pos.map_fold ~mode:(`TopDown true) func (Vars.of_list fv) sexpr [] t
   in
   occs
 
@@ -735,7 +734,7 @@ end = struct
     let join_ms = Term.mk_isymb a_ms.s_symb a_ms.s_typ join_is in
     mk ~env:Sv.empty ~msymb:join_ms ~indices:(!indices_r)
 
-  let incl table (system:SystemExpr.fset) (s1 : t) (s2 : t) : bool =
+  let incl table (sexpr : SE.fset) (s1 : t) (s2 : t) : bool =
     let tv = Vars.make_new Type.Timestamp "t" in
     let term1 = Term.mk_macro s1.msymb [] (Term.mk_var tv) in
     let term2 = Term.mk_macro s2.msymb [] (Term.mk_var tv) in
@@ -745,7 +744,8 @@ end = struct
               pat_tyvars = [];
               pat_vars = Sv.of_list1 s2.indices;}
     in
-    match Match.T.try_match table (system:>SystemExpr.t) term1 pat2 with
+    let system = SE.reachability_context sexpr in
+    match Match.T.try_match table system term1 pat2 with
     | Match _ -> true
     | FreeTyv | NoMatch _ -> false
 

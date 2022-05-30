@@ -66,6 +66,10 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       else try _expand_head_once st t with NoExp -> t, false
 
     and _expand_head_once (st : state) (t : Term.term) : Term.term * bool = 
+      let se = 
+        try SE.to_fset st.system.set 
+        with SE.Error _ -> raise NoExp (* nothing to expand if not a [fset] *)
+      in
       match t with
       | Term.Macro (ms, l, ts) ->
         assert (l = []);
@@ -83,7 +87,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
       | Fun (fs, _, ts) 
         when Operator.is_operator (S.table s) fs -> 
-        Operator.unfold (S.mk_trace_cntxt ?projs:None s) fs ts, true
+        Operator.unfold (S.mk_trace_cntxt ~se s) fs ts, true
 
       | _ -> raise NoExp
 

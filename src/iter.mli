@@ -1,5 +1,7 @@
 module Sv = Vars.Sv
 
+module SE = SystemExpr
+
 (*------------------------------------------------------------------*)
 (** Iterate over all subterms.
     Bound variables are represented as newly generated fresh variables.
@@ -152,6 +154,7 @@ val get_f_messages_ext :
   ?fun_wrap_key:(Term.fname -> bool) option ->
   ?fv:Vars.vars ->
   mode:[`Delta of Constr.trace_cntxt | `NoDelta] ->
+  SE.arbitrary ->
   Term.fname -> 
   Term.name -> 
   Term.term -> 

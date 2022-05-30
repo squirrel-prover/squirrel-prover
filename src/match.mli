@@ -44,9 +44,9 @@ module Pos : sig
 
   (*------------------------------------------------------------------*)
   (** [f] of type ['a f_map_fold] is a function that, given 
-      [t projs vars conds p acc] where:
+      [t se vars conds p acc] where:
       - [t] is sub-term of the term we are mapping one
-      - [projs] are the projections applying to [t], if any
+      - [se] is the system expr applying to [t]
       - [vars] are the free variable bound above [t]'s occurrence
       - [conds] are conditions above [t]'s occurrence
       - [p] is the position of [t]'s occurrence
@@ -56,14 +56,14 @@ module Pos : sig
       - [`Continue], we keep looking for positions downwards. *)
   type 'a f_map_fold =
     Term.term ->
-    Term.projs option -> Vars.vars -> Term.term list -> pos ->
+    SE.arbitrary -> Vars.vars -> Term.term list -> pos ->
     'a ->
     'a * [`Map of Term.term | `Continue]
 
   (** Same as [f_map_fold], but just for a map. *)
   type f_map =
     Term.term ->
-    Term.projs option -> Vars.vars -> Term.term list -> pos -> 
+    SE.arbitrary -> Vars.vars -> Term.term list -> pos -> 
     [`Map of Term.term | `Continue]
 
   (*------------------------------------------------------------------*)
@@ -77,6 +77,7 @@ module Pos : sig
     ?mode:[`TopDown of bool | `BottomUp] -> 
     'a f_map_fold ->            (* folding function *)
     Vars.env ->                 (* for clean variable naming *)
+    SE.arbitrary ->
     'a ->                       (* folding value *)
     Term.term -> 
     'a * bool * Term.term       (* folding value, `Map found, term *)
@@ -86,6 +87,7 @@ module Pos : sig
     ?mode:[`TopDown of bool | `BottomUp] -> 
     'a f_map_fold ->            (* folding function *)
     Vars.env ->                 (* for clean variable naming *)
+    SE.context ->
     'a ->                       (* folding value *)
     Equiv.form -> 
     'a * bool * Equiv.form      (* folding value, `Map found, term *)
@@ -97,6 +99,7 @@ module Pos : sig
     ?mode:[`TopDown of bool | `BottomUp] ->
     f_map ->
     Vars.env ->
+    SE.arbitrary ->
     Term.term ->
     bool * Term.term
 
@@ -106,6 +109,7 @@ module Pos : sig
     ?mode:[`TopDown of bool | `BottomUp] ->
     f_map ->
     Vars.env ->
+    SE.context ->
     Equiv.form ->
     bool * Equiv.form
 end
@@ -236,7 +240,7 @@ module type S = sig
     ?mv:Mvar.t ->
     ?ty_env:Type.Infer.env ->
     Symbols.table ->
-    SystemExpr.t -> (* TODO generalize into context *)
+    SE.context -> 
     t -> 
     t pat ->
     match_res
@@ -246,7 +250,7 @@ module type S = sig
   val find : 
     ?option:match_option ->
     Symbols.table ->
-    SystemExpr.t ->
+    SE.context ->
     Vars.env ->
     Term.term pat -> 
     t -> 

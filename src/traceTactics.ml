@@ -594,7 +594,8 @@ let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool =
     }
   in
 
-  match Match.T.try_match table (system:>SE.t) (mk_dum a1 is1 cond1) pat2 with
+  let context = SE.reachability_context system in
+  match Match.T.try_match table context (mk_dum a1 is1 cond1) pat2 with
   | Match.FreeTyv | Match.NoMatch _ -> false
   | Match.Match _ -> true
 
@@ -751,7 +752,7 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.term =
 let fresh (m : lsymb) s =
   try
     let id,hyp = Hyps.by_name m s in
-    let hyp = TraceLT.expand_all_macros hyp s in
+    let hyp = TraceLT.expand_all_macros hyp (TS.system s).set s in
     let table = TS.table s in
     let env   = TS.vars s in
 

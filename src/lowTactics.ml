@@ -201,23 +201,32 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Macro and term unfolding} *)
 
+  (** [unfold_term_exn t se s] unfolds [t] w.r.t. the system [se].
+      The sequent [s] is used to discharge Happens subgoals. 
+      If [se] is not a [SE.fset], the unfolding fail by raising an exception.*)
   let unfold_term_exn 
       ?(force_happens=false)
       (t     : Term.term)
-      (projs : Term.projs option) 
+      (se    : SE.arbitrary) 
       (s     : S.sequent)
     : Term.term 
     =
+    (* TODO: change *)
+    let se =
+      if SE.is_fset se then SE.to_fset se 
+      else soft_failure (Tactics.Failure "nothing to expand")
+    in
+    
     match t with
     | Macro (ms,l,a) ->
       if not (force_happens) && not (S.query_happens ~precise:true s a) then
         soft_failure (Tactics.MustHappen a);
 
-      Macros.get_definition_exn (S.mk_trace_cntxt ?projs s) ms a
+      Macros.get_definition_exn (S.mk_trace_cntxt ~se s) ms a
 
     | Fun (fs, _, ts) 
       when Operator.is_operator (S.table s) fs -> 
-      Operator.unfold (S.mk_trace_cntxt ?projs s) fs ts
+      Operator.unfold (S.mk_trace_cntxt ~se s) fs ts
       
     | _ ->
       soft_failure (Tactics.Failure "nothing to expand")
@@ -227,11 +236,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
       ?(force_happens=false)
       ~(strict:bool)
       (t     : Term.term)
-      (projs : Term.projs option) 
+      (se    : SE.arbitrary) 
       (s     : S.sequent) 
     : Term.term option
     =
-    try Some (unfold_term_exn ~force_happens t projs s) with
+    try Some (unfold_term_exn ~force_happens t se s) with
     | Tactics.Tactic_soft_failure _ when not strict -> None
 
   let found_occ_macro target ms occ =
@@ -269,8 +278,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
       | `Mterm _ -> true
       | `Fsymb _ | `Msymb _ | `Any -> false
     in
-    let unfold (projs : Term.projs option) occ s = 
-      match unfold_term ~strict occ projs s with
+    let unfold (se : SE.arbitrary) occ s = 
+      match unfold_term ~strict occ se s with
       | None -> `Continue
       | Some t ->
         found1 := true;
@@ -278,7 +287,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
 
     let expand_inst : Match.Pos.f_map = 
-      fun occ projs _vars conds _p ->
+      fun occ se _vars conds _p ->
         let s =                 (* adds [conds] in [s] *)
           List.fold_left (fun s cond ->
               S.Hyps.add AnyName (S.unwrap_hyp (`Reach cond)) s
@@ -287,13 +296,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
         match occ with
         | Term.Macro (ms, _, _) ->
           if found_occ_macro target ms occ then
-            unfold projs occ s
+            unfold se occ s
           else
             `Continue
 
         | Term.Fun ((f,_), _, _) ->
           if found_occ_fun target f then 
-            unfold projs occ s
+            unfold se occ s
           else
             `Continue
 
@@ -303,13 +312,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
     match f with
     | `Equiv f ->
       let _, f = 
-        Match.Pos.map_e ~mode:(`TopDown m_rec) expand_inst (S.vars s) f 
+        Match.Pos.map_e
+          ~mode:(`TopDown m_rec) expand_inst (S.vars s) (S.system s) f 
       in
       !found1, `Equiv f
 
     | `Reach f ->
       let _, f = 
-        Match.Pos.map ~mode:(`TopDown m_rec) expand_inst (S.vars s) f 
+        Match.Pos.map
+          ~mode:(`TopDown m_rec) expand_inst (S.vars s) (S.system s).set f 
       in
       !found1, `Reach f
 
@@ -338,15 +349,16 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     !found1, s
 
-  (** expand all macros (not operators) in a term *)
+  (** expand all macros (not operators) in a term relatively to a system *)
   let expand_all_macros
       ?(force_happens=false)
       (f : Term.term) 
+      (sexpr : SE.arbitrary)
       (s : S.t) 
     : Term.term 
     =
     let expand_inst : Match.Pos.f_map = 
-      fun (occ : Term.term) projs _vars conds _p ->
+      fun (occ : Term.term) se _vars conds _p ->
         match occ with
         | Term.Macro (ms, l, _) ->
           begin
@@ -355,7 +367,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
                   S.Hyps.add AnyName (S.unwrap_hyp (`Reach cond)) s
                 ) s conds
             in
-            match unfold_term ~strict:false ~force_happens occ projs s with
+            match 
+              unfold_term ~strict:false ~force_happens occ se s 
+            with
             | None -> `Continue
             | Some t -> `Map t
           end
@@ -363,7 +377,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
         | _ -> `Continue
     in
     let _, f = 
-      Match.Pos.map ~mode:(`TopDown true) expand_inst (S.vars s) f 
+      Match.Pos.map 
+        ~mode:(`TopDown true) expand_inst (S.vars s) sexpr f 
     in
     f
 
@@ -492,7 +507,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         with
         | f, subs ->
           found := true;
-          f, List.map (fun (system, l) -> system, S.unwrap_conc (`Reach l)) subs
+          f, List.map (fun (se, l) -> se, S.unwrap_conc (`Reach l)) subs
 
         | exception Tactics.Tactic_soft_failure (_,NothingToRewrite) ->
           if all then f, []
@@ -1141,8 +1156,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       let match_res =
         match S.conc_kind with
-        | Local_t  -> Match.T.try_match ~option table system.set goal pat 
-        | Global_t -> Match.E.try_match ~option table system.set goal pat
+        | Local_t  -> Match.T.try_match ~option table system goal pat 
+        | Global_t -> Match.E.try_match ~option table system goal pat
         | Any_t -> assert false (* cannot happen *)
       in
 
@@ -1197,8 +1212,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
         let system = S.system s in
         let match_res =
           match S.conc_kind with
-          | Local_t  -> Match.T.try_match ~option table system.set hconcl pat
-          | Global_t -> Match.E.try_match ~option table system.set hconcl pat
+          | Local_t  -> Match.T.try_match ~option table system hconcl pat
+          | Global_t -> Match.E.try_match ~option table system hconcl pat
           | Any_t -> assert false (* cannot happen *)
         in
 
