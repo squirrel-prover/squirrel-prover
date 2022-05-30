@@ -1,5 +1,7 @@
 open Utils
 
+module SE = SystemExpr
+
 (*------------------------------------------------------------------*)
 let rev_subst subst = 
   List.map (fun (Term.ESubst (u,v)) -> Term.ESubst (v,u)) subst
@@ -28,7 +30,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
      - trace literals not updated *)
   type state = { 
     table      : Symbols.table;
-    system     : SystemExpr.t;
+    system     : SE.context;
     param      : red_param;
     hint_db    : Hint.hint_db;
     trace_lits : Term.literals;
@@ -79,6 +81,10 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
           | _ -> raise NoExp
         else raise NoExp
 
+      | Fun (fs, _, ts) 
+        when Operator.is_operator (S.table s) fs -> 
+        Operator.unfold (S.mk_trace_cntxt ?projs:None s) fs ts, true
+
       | _ -> raise NoExp
 
     (* Rewrite once at head position *)
@@ -87,7 +93,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       let hints = Match.Hm.find_dflt [] (Match.get_head t) db in
 
       let rule = List.find_map (fun Hint.{ rule } ->
-          match Rewrite.rewrite_head st.table st.system rule t with
+          match Rewrite.rewrite_head st.table st.system.set rule t with
           | None -> None
           | Some (red_t, subs) ->
             let subs_valid =  
@@ -187,7 +193,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     in
     let state = { 
       table      = S.table s;
-      system     = (S.system s).set; (* TODO quickfix might be abusive *)
+      system     = S.system s;
       param      = param;
       hint_db    = S.get_hint_db s;
       trace_lits = S.get_trace_literals s;
@@ -197,7 +203,9 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     t
 
 
-  let rec reduce_equiv (param : red_param) s e : Equiv.form =
+  let rec reduce_equiv
+      (param : red_param) (s : S.t) (e : Equiv.form) : Equiv.form 
+    =
     match e with
     | Equiv.Quant (q, vs, e) -> 
       let _, subst = Term.refresh_vars `Global vs in
@@ -221,6 +229,12 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       Equiv.Atom (Reach (reduce_term param s f))
 
     | Equiv.Atom (Equiv e) -> 
+      let system = S.system s in
+      let new_system = SE.{ 
+          set = (oget system.pair :> SE.arbitrary); 
+          pair = None; 
+        } in
+      let s = S.set_system new_system s in
       let e = List.map (reduce_term param s) e in
       Equiv.Atom (Equiv.Equiv e)
 
