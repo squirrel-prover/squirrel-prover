@@ -902,7 +902,8 @@ help_tac_i:
 | GENERALIZE { "generalize"}
 | INDUCTION  { "induction"}
 | CLEAR      { "clear"}
-| ASSERT     { "assert"}
+| ASSERT     { "have"}
+| HAVE       { "have"}
 | USE        { "use"}
 | REWRITE    { "rewrite"}
 | APPLY      { "apply"}
