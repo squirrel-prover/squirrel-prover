@@ -171,6 +171,9 @@ module Pos = struct
     [`Map of Term.term | `Continue]
 
   (*------------------------------------------------------------------*)
+  (* TODO: excplicit system in terms: conds below may not be in the correct 
+     system: they should be stated in [se] *)
+
   (** Internal *)
   let rec map_fold
       (func   : 'a f_map_fold) 
@@ -178,7 +181,7 @@ module Pos = struct
       (* - [`TopDown b]: apply [func] at top-level first, then recurse.
            [b] tells if we recurse under successful maps.
          - [`BottomUp _]: recurse, then apply [func] at top-level *)
-      
+
       ~(env   : Vars.env)          (* var env, to have clean variable names *)
       ~(se    : SE.arbitrary)      (* system expr applying the current pos. *)
       ~(vars  : Vars.var list)     (* variable bound above the current pos. *)
@@ -353,14 +356,14 @@ module Pos = struct
 
         | acc, `Continue -> rec_strict_subterm ti acc
       end
-      
+
     | `BottomUp ->
       let acc, found, ti = rec_strict_subterm ti acc in
       match func ti se vars conds p acc with
       | acc, `Map ti   -> acc, true,  ti
       | acc, `Continue -> acc, found, ti
 
-  
+
   and map_fold_l
       func mode      
       ~env ~se ~vars ~conds ~(p : pos) ~acc
@@ -1327,7 +1330,7 @@ module T (* : S with type t = Term.term *) = struct
       (* If we already saw the variable, check that the subterms are
          identical. *)
       | t' -> 
-        (* TODO: check convertible *)
+        (* FEATURE: check convertible *)
         if t <> t' then no_match () else st.mv
 
   (*------------------------------------------------------------------*)
@@ -1347,11 +1350,11 @@ module T (* : S with type t = Term.term *) = struct
     : Term.term list
     =
     let f_fold : Term.terms Pos.f_map_fold = 
-      fun e _projs _vars _conds _p acc ->
-        (* TODO: fix system *)
-      match try_match ?option table system e pat with
-      | Match _ -> e :: acc, `Continue
-      | _       -> acc, `Continue
+      fun e se _vars _conds _p acc ->
+        let subterm_system = SE.reachability_context se in
+        match try_match ?option table subterm_system e pat with
+        | Match _ -> e :: acc, `Continue
+        | _       -> acc, `Continue
     in
     let acc, _, _ = Pos.map_fold f_fold venv system.set [] t in
     acc
@@ -2545,9 +2548,9 @@ module E : S with type t = Equiv.form = struct
     : Term.terms
     =
     let f_fold : Term.terms Pos.f_map_fold = 
-      fun e _projs _vars _conds _p acc ->
-        (* TODO: fix system *)
-        match T.try_match ?option table system e pat with
+      fun e se _vars _conds _p acc ->
+        let subterm_system = SE.reachability_context se in
+        match T.try_match ?option table subterm_system e pat with
         | Match _ -> e :: acc, `Continue
         | _       ->      acc, `Continue
     in
