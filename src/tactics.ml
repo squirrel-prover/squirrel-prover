@@ -43,6 +43,7 @@ type tac_error_i =
   | NoSSC
   | NoAssumpSystem
   | Rewrite_equiv_system_mismatch
+  | Underspecified_system
   | NotDepends of string * string
   | NotDDHContext
   | SEncNoRandom
@@ -90,6 +91,8 @@ let rec tac_error_to_string = function
   | NoAssumpSystem     -> "NoAssumpSystem"
   | Rewrite_equiv_system_mismatch
                        -> "Rewrite_equiv_system_mismatch"
+  | Underspecified_system
+                       -> "Underspecified_system"
   | NotDDHContext      -> "NotDDHContext"
   | SEncNoRandom       -> "SEncNoRandom"
   | CongrFail          -> "CongrFail"
@@ -148,6 +151,9 @@ let pp_tac_error_i ppf = function
 
   | Rewrite_equiv_system_mismatch ->
       Fmt.pf ppf "equivalence cannot be used to rewrite in current system"
+
+  | Underspecified_system ->
+      Fmt.pf ppf "underspecified system"
 
   | NotDDHContext ->
       Fmt.pf ppf "the current system cannot be seen as a context \

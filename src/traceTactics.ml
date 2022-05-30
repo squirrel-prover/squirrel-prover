@@ -818,6 +818,8 @@ let fresh (m : lsymb) s =
   | Fresh.Var_found ->
     soft_failure
       (Tactics.Failure "can only be applied on ground terms")
+  | SE.(Error Expected_fset) ->
+    soft_failure Underspecified_system
 
 let fresh_tac args s =
   match TraceLT.convert_args s args (Args.Sort Args.String) with

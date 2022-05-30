@@ -57,6 +57,7 @@ type tac_error_i =
   | NoSSC
   | NoAssumpSystem
   | Rewrite_equiv_system_mismatch
+  | Underspecified_system
   | NotDepends of string * string
   | NotDDHContext
   | SEncNoRandom

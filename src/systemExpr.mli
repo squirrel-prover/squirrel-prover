@@ -71,12 +71,19 @@ val pp_error : Format.formatter -> error -> unit
 (*------------------------------------------------------------------*)
 (** {2 Conversions} *)
 
+(** Cast expr to arbitrary. Always succeeds. *)
 val to_arbitrary : 'a expr -> arbitrary
 
+(** Cast expression to fset if possible,
+    fail with [Error Expected_compatible] otherwise. *)
 val to_compatible : 'a expr -> compatible
 
+(** Cast expression to fset if possible,
+    fail with [Error Expected_fset] otherwise. *)
 val to_fset : 'a expr -> fset
 
+(** Convert expression to fset if possible,
+    fail with [Error Expected_pair] otherwise. *)
 val to_pair : 'a expr -> pair
 
 (*------------------------------------------------------------------*)

@@ -572,16 +572,12 @@ let literals_unsat_smt ?(slow=false) s =
 
 (*------------------------------------------------------------------*)
 let mk_trace_cntxt ?se s =
-  try
-    let system = odflt (SE.to_fset s.env.system.set) se in
-    Constr.{
-      table  = table s;
-      system;
-      models = Some (get_models s);
-    }
-
-  (* TODO: remove user-level exception *)
-  with SE.Error _ -> Tactics.soft_failure (Failure "underspecified system")
+  let system = odflt (SE.to_fset s.env.system.set) se in
+  Constr.{
+    table  = table s;
+    system;
+    models = Some (get_models s);
+  }
 
 let get_hint_db s = s.hint_db
 

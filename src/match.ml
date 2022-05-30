@@ -2443,7 +2443,7 @@ module E : S with type t = Equiv.form = struct
       (pat_terms : Term.term list)
       (st        : match_state) : Mvar.t
     =
-    (* if [st.support] is not empty, we cannot strengthen the invariant.
+    (* If [st.support] is not empty, we cannot strengthen the invariant.
        See explanation in [mset_mem_one]. *)
     let mset_l =
       if Sv.is_empty st.support && st.use_fadup then
@@ -2451,8 +2451,7 @@ module E : S with type t = Equiv.form = struct
           | system ->
               let msets = strengthen st.table system st.env pat_terms in
               msets_to_list msets
-          (* TODO: do not catch an arbitrary exception *)
-          | exception _ -> []
+          | exception SystemExpr.(Error Expected_fset) -> []
       else []
     in
 
