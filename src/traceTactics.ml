@@ -1,7 +1,7 @@
 (** All reachability tactics.
    Tactics are organized in three classes:
     - Logical -> relies on the logical properties of the sequent.
-    - Strucutral -> relies on properties of protocols, or of equality over
+    - Structural -> relies on properties of protocols, or of equality over
       messages,...
     - Cryptographic -> relies on a cryptographic assumptions, that must be
       assumed.
@@ -238,22 +238,58 @@ let simpl_left_tac s = match simpl_left s with
   | Some s -> [s]
 
 (*------------------------------------------------------------------*)
-(** [assumption judge sk fk] proves the sequent using the axiom rule. *)
+(** [assumption s] succeeds (with no subgoal) if the sequent [s]
+    can be proved using the axiom rule (plus some other minor rules). *)
 let assumption (s : TS.t) =
   let goal = TS.goal s in
-  let assumption_entails _ f =
-    goal = f ||
-    List.exists (fun f ->
-        goal = f || f = Term.mk_false
-      ) (decompose_ands f)
+  let assumption_entails _ = function
+    | `Equiv (Equiv.Atom (Reach f))
+    | `Reach f ->
+        goal = f ||
+        List.exists
+          (fun f -> goal = f || f = Term.mk_false)
+          (decompose_ands f)
+    | `Equiv _ -> false
   in
   if goal = Term.mk_true ||
-     (Hyps.exists assumption_entails s) then
-    let () = dbg "assumption %a" Term.pp goal in
+     TS.Hyps.exists assumption_entails s
+  then begin
+    dbg "assumption %a" Term.pp goal;
     []
+  end else soft_failure Tactics.NotHypothesis
 
-  else soft_failure Tactics.NotHypothesis
+(*------------------------------------------------------------------*)
+(** [localize h h' s sk fk] succeeds with a single subgoal if
+    the sequent [s] has a global hypothesis [h] which is a reachability
+    atom.
+    The generated subgoal is identical to [s] but with a new local
+    hypothesis [h'] corresponding to that atom. *)
+let localize h h' s =
+  match TS.Hyps.by_name h s with
+    | _,`Equiv (Equiv.Atom (Reach f)) ->
+        [TS.Hyps.add h' (`Reach f) s]
+    | _ ->
+        Tactics.(soft_failure (Failure "cannot localize this hypothesis"))
+    | exception Not_found ->
+        Tactics.(soft_failure (Failure "no hypothesis"))
 
+let () =
+  T.register_general "localize"
+    ~tactic_help:
+      {general_help = "Change a global hypothesis containing a reachability \
+                       formula to a local hypothesis.";
+       detailed_help = "";
+       usages_sorts = [Sort (Pair (String, String))];
+       tactic_group = Logical}
+    ~pq_sound:true
+    (function
+       | TacticsArgs.[String_name h; NamingPat h'] ->
+           fun s sk fk ->
+             begin match LowTactics.genfun_of_pure_tfun (localize h h') s with
+               | subgoals -> sk subgoals fk
+               | exception (Tactics.Tactic_soft_failure e) -> fk e
+             end
+       | _ -> assert false)
 
 (*------------------------------------------------------------------*)
 (** {2 Structural Tactics} *)

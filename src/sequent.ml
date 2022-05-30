@@ -87,15 +87,23 @@ module Mk (Args : MkArgs) : S with
     =
     if Hyps.mem_name (L.unloc name) s then
       let id, f = Hyps.by_name name s in
-      Goal.{ name    = `Hyp id;
-             system  = S.system s;
-             ty_vars = [];
-             formula =
-               Equiv.Babel.convert
-                 ~loc:(L.loc name)
-                 ~src:S.hyp_kind
-                 ~dst:k
-                 f }
+      let make_goal f =
+        Goal.{ name    = `Hyp id;
+               system  = S.system s;
+               ty_vars = [] ;
+               formula = f }
+      in
+      (* Convert to kind [k] with special case when
+         [k = Local_t] and [S.hyp_kind = Any_t] where we
+         allow an implicit conversion from global to local
+         hypothesis. *)
+      match k,S.hyp_kind,f with
+        | Equiv.Local_t, Equiv.Any_t, `Reach f ->
+            make_goal f
+        | Equiv.Local_t, Equiv.Any_t, `Equiv (Equiv.Atom (Reach f)) ->
+            make_goal f
+        | dst,src,f ->
+            make_goal (Equiv.Babel.convert ~loc:(L.loc name) ~src ~dst f)
     else
       let lem = Prover.get_assumption name in
       (* Verify that it applies to the current system. *)

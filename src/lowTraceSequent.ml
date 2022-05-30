@@ -137,10 +137,12 @@ let pp ppf s =
 let get_atoms_of_fhyps (forms : hyp_form list) : Term.literals =
   List.fold_left (fun acc f ->
       match f with
+      | `Reach f
+      | `Equiv Equiv.(Atom (Reach f)) ->
+        begin match Term.form_to_literals f with
+          | `Entails lits | `Equiv lits -> lits @ acc
+        end
       | `Equiv _ -> acc
-      | `Reach f ->
-        match Term.form_to_literals f with
-        | `Entails lits | `Equiv lits -> lits @ acc
     ) [] forms 
 
 let get_atoms_from_s (s : sequent) : Term.literals =
@@ -467,9 +469,8 @@ let pi projection s =
      unrolled. The next function is used to determine when we can keep
      a global formula: its local atoms need to be logically equivalent
      under the old and new annotations. We ensure this by keeping only
-     trace formulas and making sure that they do not contain diff
-     operators, which is equivalent to check that the projection leaves
-     them unchanged. *)
+     trace formulas (which implies that they do not contain diff
+     operators). *)
   let rec can_keep_global = function
     | Equiv.Quant (_,_,f) :: l ->
         can_keep_global (f::l)
@@ -477,17 +478,23 @@ let pi projection s =
         can_keep_global (f::g::l)
     | Atom (Equiv _) :: l -> can_keep_global l
     | Atom (Reach a) :: l ->
-        Term.project1 projection a = a &&
         Term.is_pure_timestamp a &&
         can_keep_global l
     | [] -> true
+  in
+  (* Special case at toplevel: we can keep a global formula when
+     its meaning under the old annotation implies its meaning under
+     the new one. *)
+  let can_keep_global = function
+    | Equiv.Atom (Reach f) -> true
+    | f -> can_keep_global [f]
   in
   H.fold
     (fun id f s ->
        match f with
          | `Reach f -> snd (AnyHyps.add_formula id f s)
          | `Equiv e ->
-             if not (can_keep_global [e]) then s else
+             if not (can_keep_global e) then s else
              let _,hyps = H.add ~force:true id f s.hyps in
              S.update ~hyps s)
     hyps s

@@ -73,7 +73,7 @@
 %token LARGE NAMEFIXEDLENGTH
 %token PERCENT
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT HAVE USE
-%token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY
+%token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY LOCALIZE
 %token SPLITSEQ CONSTSEQ MEMSEQ
 %token BY FA INTRO AS DESTRUCT REMEMBER INDUCTION
 %token PROOF QED UNDO ABORT HINT
@@ -781,6 +781,10 @@ tac:
   | l=lloc(DESTRUCT) i=lsymb AS p=and_or_pat
     { mk_abstract l "destruct" [TacticsArgs.String_name i;
                                 TacticsArgs.AndOrPat p] }
+
+  | l=lloc(LOCALIZE) i=lsymb AS p=naming_pat
+    { mk_abstract l "localize" [TacticsArgs.String_name i;
+                                TacticsArgs.NamingPat p] }
 
   | l=lloc(DEPENDS) args=tactic_params
     { mk_abstract l "depends" args }

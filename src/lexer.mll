@@ -149,6 +149,7 @@ rule token = parse
 | "try"               { TRY }
 | "repeat"            { REPEAT }
 | "assert"            { ASSERT }
+| "localize"          { LOCALIZE }
 | "have"              { HAVE }
 | "exn"               { EXN }
 | "use"               { USE }

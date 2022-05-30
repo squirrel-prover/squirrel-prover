@@ -1043,7 +1043,7 @@ Proof.
   expand kj10.
   expand FK1.
   use auth3 with i,j,k => //.
-  destruct H0.
+  destruct H0 as [k0 H0'].
   have ->: (try find il,jl,kl such that
                fst(snd(input@FI(i,j,k))) =
                encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
@@ -1052,7 +1052,7 @@ Proof.
                   exct(skex,decap(fst(snd(input@FI(i,j,k))),vkI(i)))))
              =
               F1(sid10(i,j,k)@FI(i,j,k),n_PRF(i,j,k0)).
-    + repeat destruct H0.
+    + localize H0' as H0. clear H0'. repeat destruct H0.
       expand output.
       rewrite ?snd_p in Meq0, Meq, Meq1.
       rewrite ?fst_p in  Meq0, Meq, Meq1.

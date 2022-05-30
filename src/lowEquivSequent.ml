@@ -239,17 +239,9 @@ let to_trace_sequent s =
   in
 
   let trace_s = TS.init ~env ~hint_db goal in
-
-  (* Add all relevant hypotheses.
-     TODO we could add all hypotheses as global formulas,
-     which would be stronger, though things like [get_trace_literals]
-     below might stop working without adjustments. *)
   Hyps.fold
-    (fun id hyp trace_s -> match hyp with
-      | Equiv.Atom (Equiv.Reach h) ->
-        TS.LocalHyps.add (Args.Named (Ident.name id)) h trace_s
-      | h ->
-        TS.Hyps.add (Args.Named (Ident.name id)) (`Equiv h) trace_s)
+    (fun id hyp trace_s ->
+        TS.Hyps.add (Args.Named (Ident.name id)) (`Equiv hyp) trace_s)
     s trace_s
 
 (*------------------------------------------------------------------*)

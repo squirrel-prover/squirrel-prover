@@ -193,6 +193,7 @@ type parser_arg =
   | String_name  of lsymb
   | Int_parsed   of int L.located
   | Theory       of Theory.term
+  | NamingPat    of naming_pat
   | IntroPat     of intro_pattern list
   | AndOrPat     of and_or_pat
   | SimplPat     of simpl_pat
@@ -214,6 +215,7 @@ let pp_parser_arg ppf = function
   | Int_parsed i  -> Fmt.int ppf (L.unloc i)
   | String_name s -> Fmt.string ppf (L.unloc s)
   | Theory th     -> Theory.pp ppf th
+  | NamingPat p   -> pp_naming_pat ppf p
   | IntroPat args -> pp_intro_pats ppf args
   | AndOrPat pat  -> pp_and_or_pat ppf pat
   | SimplPat pat  -> pp_simpl_pat ppf pat

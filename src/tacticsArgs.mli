@@ -122,6 +122,7 @@ type parser_arg =
   | String_name  of lsymb
   | Int_parsed   of int L.located
   | Theory       of Theory.term
+  | NamingPat    of naming_pat
   | IntroPat     of intro_pattern list
   | AndOrPat     of and_or_pat
   | SimplPat     of simpl_pat
