@@ -115,5 +115,4 @@ module type S = sig
 
   (** Smart constructors and destructors for conclusions. *)
   module Conc : Term.SmartFO with type form = conc_form
-
 end

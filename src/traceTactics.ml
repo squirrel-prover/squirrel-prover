@@ -1870,12 +1870,9 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
      while keeping all local hypotheses: however, we can keep the pure trace
      formulas from the local hypotheses.
      We already know that [ass_context.set] is compatible with the systems
-     used in the equivalence, one of which will be the system in use in [s],
-     so there is no need to check the compatibility of the systems for
-     which the kept local hypotheses are expressed. *)
+     used in the equivalence, hence we keep [s]'s context. *)
   let s' =
     s |>
-    TS.set_system SE.{ set = ass_context.set ; pair = None } |>
     TS.Hyps.filter
       (fun _ -> function
          | `Reach f -> Term.is_pure_timestamp f
@@ -1887,7 +1884,7 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
      corresponds to the current goal and new goal (projections [src,dst])
      and the expected systems before and after the transformation. *)
   let src,dst,orig_sys,new_sys =
-    let pair = Utils.oget ass_context.pair in
+    let pair = Utils.oget ass_context.SE.pair in
     let left,lsys = SE.fst pair in
     let right,rsys = SE.snd pair in
     match dir with

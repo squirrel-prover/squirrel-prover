@@ -501,7 +501,6 @@ module Mk (Args : MkArgs) : S with
     in
     name, pat
 
-
   (*------------------------------------------------------------------*)
   module Reduce = Reduction.Mk(S)
 end
