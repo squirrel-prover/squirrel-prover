@@ -240,8 +240,8 @@ val pp_maybe_paren : bool -> 'a Fmt.t -> 'a Fmt.t
 
 val maybe_paren :
   inner:'a * fixity ->
-  outer: 'a * fixity ->
-  side : assoc ->
+  outer:'a * fixity ->
+  side:assoc ->
   'b Fmt.t -> 
   'b Fmt.t
 

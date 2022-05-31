@@ -665,17 +665,45 @@ let styled_opt (err : Printer.keyword option) printer =
   | None -> printer
   | Some kw -> fun ppf t -> (Printer.kw kw ppf "%a" printer t)
 
-let ite_fixity     = `F Symbols.fs_ite  , `Prefix
-let pair_fixity    = `F Symbols.fs_pair , `NoParens
-let iff_fixity     = `Iff               , `Infix `Right
-let not_fixity     = `F Symbols.fs_not  , `Prefix
-let seq_fixity     = `Seq               , `Prefix
-let find_fixity    = `Find              , `Prefix
-let quant_fixity   = `Quant             , `NonAssoc
-let macro_fixity   = `Macro             , `NoParens
-let diff_fixity    = `Diff              , `NoParens
-let fun_fixity     = `Fun               , `NoParens
-let happens_fixity = `Happens           , `NoParens
+(*------------------------------------------------------------------*)
+let toplevel_prec = 0
+
+let quant_fixity = 5  , `Prefix
+
+(* binary *)
+let impl_fixity        = 10 , `Infix `Right
+let iff_fixity         = 12 , `Infix `Right
+let pair_fixity        = 20 , `NoParens
+let or_fixity          = 20 , `Infix `Right
+let and_fixity         = 25 , `Infix `Right
+let xor_fixity         = 26 , `Infix `Right
+let eq_fixity          = 27 , `Infix `NonAssoc
+let order_fixity       = 29 , `Infix `NonAssoc
+let ite_fixity         = 40 , `Infix `Left
+let other_infix_fixity = 50 , `Infix `Right
+
+let not_fixity   = 26 , `Prefix
+
+let seq_fixity     = 1000 , `Prefix
+let find_fixity    = 1000 , `Prefix
+let macro_fixity   = 1000 , `NoParens
+let diff_fixity    = 1000 , `NoParens
+let fun_fixity     = 1000 , `NoParens
+let happens_fixity = 1000 , `NoParens
+
+
+let get_infix_prec (f : Symbols.fname) =
+  (* *)if f = Symbols.fs_and  then fst and_fixity 
+  else if f = Symbols.fs_or   then fst or_fixity 
+  else if f = Symbols.fs_impl then fst impl_fixity 
+  else if f = Symbols.fs_xor  then fst xor_fixity 
+  else if f = Symbols.fs_eq   then fst eq_fixity 
+  else if f = Symbols.fs_neq  then fst eq_fixity 
+  else if f = Symbols.fs_leq  then fst order_fixity 
+  else if f = Symbols.fs_lt   then fst order_fixity 
+  else if f = Symbols.fs_gt   then fst order_fixity 
+  else if f = Symbols.fs_geq  then fst order_fixity 
+  else                             fst other_infix_fixity
 
 (*------------------------------------------------------------------*)
 
@@ -760,14 +788,15 @@ and _pp
   (* infix *)
   | Fun ((s,is),_,[bl;br]) when Symbols.is_infix s ->
     let assoc = Symbols.infix_assoc s in
+    let prec = get_infix_prec s in
     assert (is = []);
     let pp fmt () =
       Fmt.pf ppf "@[<0>%a %s@ %a@]"
-        (pp ((`F s, `Infix assoc), `Left)) bl
+        (pp ((prec, `Infix assoc), `Left)) bl
         (Symbols.to_string s)
-        (pp ((`F s, `Infix assoc), `Right)) br
+        (pp ((prec, `Infix assoc), `Right)) br
     in
-    maybe_paren ~outer ~side ~inner:(`F s, `Infix assoc) pp ppf ()
+    maybe_paren ~outer ~side ~inner:(prec, `Infix assoc) pp ppf ()
 
   (* not *)
   | Fun (s,_,[b]) when s = f_not ->
@@ -848,9 +877,9 @@ and _pp
     let pp fmt () =
       Fmt.pf ppf "@[<2>forall (@[%a@]),@ %a@]"
         Vars.pp_typed_list vs
-        (pp (quant_fixity, `Right))  b
+        (pp (quant_fixity, `Right)) b
     in
-    maybe_paren ~outer ~side ~inner:(`Quant, `Prefix) pp ppf ()
+    maybe_paren ~outer ~side ~inner:(fst quant_fixity, `Prefix) pp ppf ()
 
   | Exists (vs, b) ->
     let pp fmt () =
@@ -858,7 +887,7 @@ and _pp
         Vars.pp_typed_list vs
         (pp (quant_fixity, `Right)) b
     in
-    maybe_paren ~outer ~side ~inner:(`Quant, `Prefix) pp ppf ()
+    maybe_paren ~outer ~side ~inner:(fst quant_fixity, `Prefix) pp ppf ()
 
 (* Printing in a [hv] box. Print the trailing [else] of the caller. *)
 and pp_chained_ite info ppf (t : term) = 
@@ -904,10 +933,10 @@ and pp_and_happens info ppf f =
 
 (*------------------------------------------------------------------*)
 let pp_with_info (info : pp_info) (fmt : Format.formatter) (t : term) : unit =
-  pp info ((`Toplevel, `NoParens), `NonAssoc) fmt t
+  pp info ((toplevel_prec, `NoParens), `NonAssoc) fmt t
 
 let pp (fmt : Format.formatter) (t : term) : unit =
-  pp default_pp_info ((`Toplevel, `NoParens), `NonAssoc) fmt t
+  pp default_pp_info ((toplevel_prec, `NoParens), `NonAssoc) fmt t
 
 (*------------------------------------------------------------------*)
 

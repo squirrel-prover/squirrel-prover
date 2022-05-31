@@ -72,10 +72,11 @@ type form =
   | And   of form * form
   | Or    of form * form
 
-let or_fixity    = `Or    , `Infix `Right
-let and_fixity   = `And   , `Infix `Right
-let impl_fixity  = `Impl  , `Infix `Right
-let quant_fixity = `Quant , `NonAssoc
+let toplevel_prec = 0
+let quant_fixity = 5   , `NonAssoc
+let impl_fixity  = 10  , `Infix `Right
+let or_fixity    = 20  , `Infix `Right
+let and_fixity   = 25  , `Infix `Right
 
 (** Internal *)
 let rec pp 
@@ -115,11 +116,11 @@ let rec pp
         Vars.pp_typed_list vs
         (pp (quant_fixity, `Right)) f
     in
-    maybe_paren ~outer ~side ~inner:(`Quant, `Prefix) pp fmt ()
+    maybe_paren ~outer ~side ~inner:(fst quant_fixity, `Prefix) pp fmt ()
 
 
 let pp (fmt : Format.formatter) (f : form) : unit =
-  pp ((`Toplevel, `NoParens), `NonAssoc) fmt f
+  pp ((toplevel_prec, `NoParens), `NonAssoc) fmt f
 
 (*------------------------------------------------------------------*)
 let mk_quant q evs f = match evs, f with

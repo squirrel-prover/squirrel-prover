@@ -654,7 +654,7 @@ let maybe_paren
     match fo with
     | `NoParens -> true
     | _ ->
-      (* (pi > po) || *)
+      (pi > po) ||
       match fi, side with
       | `Postfix     , `Left     -> true
       | `Prefix      , `Right    -> true
