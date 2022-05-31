@@ -665,38 +665,6 @@ let styled_opt (err : Printer.keyword option) printer =
   | None -> printer
   | Some kw -> fun ppf t -> (Printer.kw kw ppf "%a" printer t)
 
-(* -------------------------------------------------------------------- *)
-type assoc  = [`Left | `Right | `NonAssoc]
-type fixity = [`Prefix | `Postfix | `Infix of assoc | `NonAssoc | `NoParens]
-
-(* -------------------------------------------------------------------- *)
-let pp_maybe_paren (c : bool) (pp : 'a Fmt.t) : 'a Fmt.t =
-  if c then Fmt.parens pp else pp
-
-(** Parenthesis rules.
-    N.B.: the rule for infix left-associative symbols is only valid if,
-    in the parser, all prefix symbols are reduction-favored over 
-    shifting the infix symbol. *)
-let maybe_paren
-    ~(inner : 'a * fixity)
-    ~(outer : 'a * fixity)
-    ~(side  : assoc)
-    (pp : 'b Fmt.t) : 'b Fmt.t
-  =
-  let noparens (pi, fi) (po, fo) side =
-    match fo with
-    | `NoParens -> true
-    | _ ->
-      match fi, side with
-      | `Postfix     , `Left     -> true
-      | `Prefix      , `Right    -> true
-      | `Infix `Left , `Left     -> (pi = po) && (fo = `Infix `Left )
-      | `Infix `Right, `Right    -> (pi = po) && (fo = `Infix `Right)
-      | _            , `NonAssoc -> (pi = po) && (fi = fo)
-      | _            , _         -> false
-  in
-  pp_maybe_paren (not (noparens inner outer side)) pp
-
 let ite_fixity     = `F Symbols.fs_ite  , `Prefix
 let pair_fixity    = `F Symbols.fs_pair , `NoParens
 let iff_fixity     = `Iff               , `Infix `Right
@@ -738,6 +706,7 @@ and _pp
 
   | Fun (s,_,[a]) when s = f_happens -> pp_happens info ppf [a]
 
+  (* if-then-else, no else *)
   | Fun (s,_,[b;c; Fun (f,_,[])])
     when s = f_ite && f = f_zero ->
     let pp fmt () =
@@ -747,11 +716,13 @@ and _pp
     in
     maybe_paren ~outer ~side ~inner:ite_fixity pp ppf ()
 
+  (* if-then-else, true/false *)
   | Fun (s,_,[b;Fun (f1,_,[]);Fun (f2,_,[])])
     when s = f_ite && f1 = f_true && f2 = f_false ->
     Fmt.pf ppf "%a"
       (pp (ite_fixity, `NonAssoc)) b
 
+  (* if-then-else, general case *)
   | Fun (s,_,[a;b;c]) when s = f_ite ->
     let pp fmt () =
       Fmt.pf ppf "@[<hv 0>@[<hov 2>if %a@ then@ %a@]@ %a@]"
@@ -761,6 +732,7 @@ and _pp
     in
     maybe_paren ~outer ~side ~inner:ite_fixity pp ppf ()
 
+  (* pair *)
   | Fun (s,_,terms) when s = f_pair ->
     Fmt.pf ppf "%a"
       (Utils.pp_ne_list
@@ -769,7 +741,7 @@ and _pp
             (pp (pair_fixity, `NonAssoc))))
       terms
 
-
+  (* iff. <=> *)
   | Fun (fa,_,[Fun (fi1,_,[bl1;br1]);
                Fun (fi2,_,[br2;bl2])])
     when fa = f_and && fi1 = f_impl && fi2 = f_impl &&
@@ -781,9 +753,11 @@ and _pp
     in
     maybe_paren ~outer ~side ~inner:iff_fixity pp ppf ()
 
+  (* happens *)
   | Fun _ as f when is_and_happens f ->
     pp_and_happens info ppf f
 
+  (* infix *)
   | Fun ((s,is),_,[bl;br]) when Symbols.is_infix s ->
     let assoc = Symbols.infix_assoc s in
     assert (is = []);
@@ -795,20 +769,25 @@ and _pp
     in
     maybe_paren ~outer ~side ~inner:(`F s, `Infix assoc) pp ppf ()
 
+  (* not *)
   | Fun (s,_,[b]) when s = f_not ->
     Fmt.pf ppf "@[<hov 2>not(%a)@]" (pp (not_fixity, `Right)) b
 
+  (* true/false *)
   | Fun _ as tt  when tt = mk_true ->  Fmt.pf ppf "true"
   | Fun _  as tf when tf = mk_false -> Fmt.pf ppf "false"
 
+  (* constant *)
   | Fun (f,_,[]) ->
     Fmt.pf ppf "%a" pp_fsymb f
 
+  (* arity one *)
   | Fun (f,_,[a]) ->
     Fmt.pf ppf "@[<hov 2>%a(@,%a)@]"
       pp_fsymb f
       (pp (fun_fixity, `NonAssoc)) a
 
+  (* function symbol, general case *)
   | Fun (f,_,terms) ->
     Fmt.pf ppf "@[<hov>%a(%a)@]"
       pp_fsymb f
@@ -924,12 +903,10 @@ and pp_and_happens info ppf f =
   pp_happens info ppf (collect [] f)
 
 (*------------------------------------------------------------------*)
-let pp_with_info : pp_info -> Format.formatter -> term -> unit =
-  fun info fmt t ->
+let pp_with_info (info : pp_info) (fmt : Format.formatter) (t : term) : unit =
   pp info ((`Toplevel, `NoParens), `NonAssoc) fmt t
 
-let pp : Format.formatter -> term -> unit =
-  fun fmt t ->
+let pp (fmt : Format.formatter) (t : term) : unit =
   pp default_pp_info ((`Toplevel, `NoParens), `NonAssoc) fmt t
 
 (*------------------------------------------------------------------*)

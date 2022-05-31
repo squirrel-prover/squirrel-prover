@@ -631,3 +631,37 @@ let as_seq4 = function [x1; x2; x3; x4] -> (x1, x2, x3, x4)
 let (-|) f g = fun x -> f (g x)
 
 let (^~) f = fun x y -> f y x
+
+(* -------------------------------------------------------------------- *)
+type assoc  = [`Left | `Right | `NonAssoc]
+type fixity = [`Prefix | `Postfix | `Infix of assoc | `NonAssoc | `NoParens]
+
+(* -------------------------------------------------------------------- *)
+let pp_maybe_paren (c : bool) (pp : 'a Fmt.t) : 'a Fmt.t =
+  if c then Fmt.parens pp else pp
+
+(** Parenthesis rules.
+    N.B.: the rule for infix left-associative symbols is only valid if,
+    in the parser, all prefix symbols are reduction-favored over 
+    shifting the infix symbol. *)
+let maybe_paren
+    ~(inner : 'a * fixity)
+    ~(outer : 'a * fixity)
+    ~(side  : assoc)
+    (pp : 'b Fmt.t) : 'b Fmt.t
+  =
+  let noparens (pi, fi) (po, fo) side =
+    match fo with
+    | `NoParens -> true
+    | _ ->
+      (* (pi > po) || *)
+      match fi, side with
+      | `Postfix     , `Left     -> true
+      | `Prefix      , `Right    -> true
+      | `Infix `Left , `Left     -> (pi = po) && (fo = `Infix `Left )
+      | `Infix `Right, `Right    -> (pi = po) && (fo = `Infix `Right)
+      | _            , `NonAssoc -> (pi = po) && (fi = fo)
+      | _            , _         -> false
+  in
+  pp_maybe_paren (not (noparens inner outer side)) pp
+

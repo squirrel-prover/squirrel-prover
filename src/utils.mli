@@ -228,3 +228,20 @@ val as_seq4 : 'a list -> 'a * 'a * 'a * 'a
 
 val hcombine : int -> int -> int
 val hcombine_list : ('a -> int) -> int -> 'a list -> int                         
+
+(*------------------------------------------------------------------*)
+(** {2 Printing} *)
+
+type assoc  = [`Left | `Right | `NonAssoc]
+type fixity = [`Prefix | `Postfix | `Infix of assoc | `NonAssoc | `NoParens]
+
+(* -------------------------------------------------------------------- *)
+val pp_maybe_paren : bool -> 'a Fmt.t -> 'a Fmt.t 
+
+val maybe_paren :
+  inner:'a * fixity ->
+  outer: 'a * fixity ->
+  side : assoc ->
+  'b Fmt.t -> 
+  'b Fmt.t
+

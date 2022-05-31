@@ -61,6 +61,10 @@ let fv_atom = function
 
 type quant = ForAll | Exists
 
+let pp_quant fmt = function
+  | ForAll -> Fmt.pf fmt "Forall"
+  | Exists -> Fmt.pf fmt "Exists"
+
 type form =
   | Quant of quant * Vars.var list * form
   | Atom  of atom
@@ -68,26 +72,56 @@ type form =
   | And   of form * form
   | Or    of form * form
 
-let rec pp fmt = function
+let or_fixity    = `Or    , `Infix `Right
+let and_fixity   = `And   , `Infix `Right
+let impl_fixity  = `Impl  , `Infix `Right
+let quant_fixity = `Quant , `NonAssoc
+
+(** Internal *)
+let rec pp 
+    ((outer,side) : ('b * fixity) * assoc)
+    (fmt : Format.formatter)
+  = function
   | Atom at -> pp_atom fmt at
 
   | Impl (f0, f) ->
-    Fmt.pf fmt "@[<v 2>%a ->@ %a@]" pp f0 pp f
+    let pp fmt () = 
+      Fmt.pf fmt "@[<0>%a ->@ %a@]"
+        (pp (impl_fixity, `Left)) f0 
+        (pp (impl_fixity, `Right)) f
+    in
+    maybe_paren ~outer ~side ~inner:impl_fixity pp fmt ()
 
   | And (f0, f) ->
-    Fmt.pf fmt "@[<v 2>%a /\\@ %a@]" pp f0 pp f
+    let pp fmt () =     
+      Fmt.pf fmt "@[<0>%a /\\@ %a@]" 
+        (pp (and_fixity, `Left)) f0 
+        (pp (and_fixity, `Right)) f
+    in
+    maybe_paren ~outer ~side ~inner:and_fixity pp fmt ()
 
   | Or (f0, f) ->
-    Fmt.pf fmt "@[<v 2>%a \\/@ %a@]" pp f0 pp f
+    let pp fmt () = 
+      Fmt.pf fmt "@[<0>%a \\/@ %a@]"
+        (pp (or_fixity, `Left)) f0 
+        (pp (or_fixity, `Right)) f
+    in
+    maybe_paren ~outer ~side ~inner:or_fixity pp fmt ()
 
-  | Quant (ForAll, vs, f) ->
-    Fmt.pf fmt "@[<v 2>Forall (@[%a@]),@ %a@]"
-      Vars.pp_typed_list vs pp f
+  | Quant (bd, vs, f) ->
+    let pp fmt () = 
+      Fmt.pf fmt "@[<2>%a (@[%a@]),@ %a@]"
+        pp_quant bd
+        Vars.pp_typed_list vs
+        (pp (quant_fixity, `Right)) f
+    in
+    maybe_paren ~outer ~side ~inner:(`Quant, `Prefix) pp fmt ()
 
-  | Quant (Exists, vs, f) ->
-    Fmt.pf fmt "@[<v 2>Exists (@[%a@]),@ %a@]"
-      Vars.pp_typed_list vs pp f
 
+let pp (fmt : Format.formatter) (f : form) : unit =
+  pp ((`Toplevel, `NoParens), `NonAssoc) fmt f
+
+(*------------------------------------------------------------------*)
 let mk_quant q evs f = match evs, f with
   | [], _ -> f
   | _, Quant (q, evs', f) -> Quant (q, evs @ evs', f)

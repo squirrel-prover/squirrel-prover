@@ -211,10 +211,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (s     : S.sequent)
     : Term.term 
     =
-    (* TODO: change *)
     let se =
       if SE.is_fset se then SE.to_fset se 
-      else soft_failure (Tactics.Failure "nothing to expand")
+      else soft_failure 
+          (Tactics.Failure "nothing to expand: the system is too general")
     in
     
     match t with
