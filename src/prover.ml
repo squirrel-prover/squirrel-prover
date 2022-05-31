@@ -344,7 +344,7 @@ module ProverTactics = struct
 
       | Goal.Equiv e -> ES.env e, `Equiv (ES.goal e)
     in
-    TacticsArgs.convert_args env parser_args tactic_type conc
+    HighTacticsArgs.convert_args env parser_args tactic_type conc
 
   let register id ~tactic_help ?(pq_sound=false) f =
     register_general id ~tactic_help ~pq_sound

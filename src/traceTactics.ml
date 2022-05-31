@@ -10,10 +10,10 @@
 open Term
 open Utils
 
-module T = Prover.ProverTactics
-module Args = TacticsArgs
-module L = Location
-module SE = SystemExpr
+module T    = Prover.ProverTactics
+module Args = HighTacticsArgs
+module L    = Location
+module SE   = SystemExpr
 
 module TS = TraceSequent
 
@@ -623,7 +623,7 @@ let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool =
        (Term.mk_indices_eq ~simpl:false is is) ::
        [cond])
   in
-  let pat2 = Match.{
+  let pat2 = Term.{
       pat_tyvars = [];
       pat_vars   = Sv.of_list o2.occ_vars;
       pat_term   = mk_dum a2 is2 cond2;

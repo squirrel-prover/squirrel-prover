@@ -1784,6 +1784,79 @@ let match_infos_to_pp_info (minfos : match_infos) : pp_info =
   in
   { styler }
 
+
+(*------------------------------------------------------------------*)
+(** {2 Term heads} *)
+
+type term_head =
+  | HExists
+  | HForAll
+  | HSeq
+  | HFind
+  | HFun   of Symbols.fname 
+  | HMacro of Symbols.macro 
+  | HName  of Symbols.name  
+  | HDiff
+  | HVar
+  | HAction
+
+let pp_term_head fmt = function
+  | HExists   -> Fmt.pf fmt "Exists"
+  | HForAll   -> Fmt.pf fmt "Forall"
+  | HSeq      -> Fmt.pf fmt "Seq"
+  | HFind     -> Fmt.pf fmt "Find"
+  | HFun   f  -> Fmt.pf fmt "Fun %a"   Symbols.pp f
+  | HMacro m  -> Fmt.pf fmt "Macro %a" Symbols.pp m
+  | HName  n  -> Fmt.pf fmt "Name %a"  Symbols.pp n
+  | HDiff     -> Fmt.pf fmt "Diff"
+  | HVar      -> Fmt.pf fmt "Var"
+  | HAction   -> Fmt.pf fmt "Action"
+
+let get_head : term -> term_head = function
+  | Exists _          -> HExists
+  | ForAll _          -> HForAll
+  | Seq _             -> HSeq
+  | Fun ((f,_),_,_)   -> HFun f
+  | Find _            -> HFind
+  | Macro (m1,_,_)    -> HMacro m1.s_symb
+  | Name n1           -> HName n1.s_symb
+  | Diff _            -> HDiff
+  | Var _             -> HVar
+  | Action _          -> HAction
+
+module Hm = Map.Make(struct
+    type t = term_head
+    let compare = Stdlib.compare
+  end)
+
+(*------------------------------------------------------------------*)
+(** {2 Patterns} *)
+
+(** A pattern is a list of free type variables, a term [t] and a subset
+    of [t]'s free variables that must be matched.
+    The free type variables must be inferred. *)
+type 'a pat = {
+  pat_tyvars : Type.tvars;
+  pat_vars   : Vars.Sv.t;
+  pat_term   : 'a;
+}
+
+let pat_of_form (t : term) =
+  let vs, t = decompose_forall t in
+  let vs, s = refresh_vars `Global vs in
+  let t = subst s t in
+
+  { pat_tyvars = [];
+    pat_vars = Vars.Sv.of_list vs;
+    pat_term = t; }
+
+let project_tpat (projs : projs) (pat : term pat) : term pat =
+  { pat with pat_term = project projs pat.pat_term; }
+
+let project_tpat_opt (projs : projs option) (pat : term pat) : term pat 
+  =
+  omap_dflt pat (project_tpat ^~ pat) projs
+
 (*------------------------------------------------------------------*)
 (** {2 Tests} *)
 

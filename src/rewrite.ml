@@ -1,92 +1,15 @@
 open Utils
 
-module L    = Location
 module Args = TacticsArgs
-module SE   = SystemExpr
 module Pos  = Match.Pos
+module Sv   = Vars.Sv
+
+(*------------------------------------------------------------------*)
+include LowRewrite
 
 (*------------------------------------------------------------------*)
 let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
-
-(*------------------------------------------------------------------*)
-(** A rewrite rule.
-    Invariant: if
-    [{ rw_tyvars = tyvars; rw_vars = sv; rw_conds = φ; rw_rw = (l,r); }]
-    is a rewrite rule, then:
-    - sv ⊆ FV(l) *)
-type rw_rule = {
-  rw_tyvars : Type.tvars;            (** type variables *)
-  rw_system : SE.t;                  (** systems the rule applies to *)
-  rw_vars   : Vars.Sv.t;             (** term variables *)
-  rw_conds  : Term.term list;        (** premises *)
-  rw_rw     : Term.term * Term.term; (** pair (source, destination) *)
-}
-
-let pp_rw_rule fmt (rw : rw_rule) =
-  let pp_tys fmt tys = 
-    if tys = [] then () else
-      Fmt.pf fmt "[%a] " (Fmt.list Type.pp_tvar) tys
-  in
-  let pp_vars fmt vars = 
-    if Vars.Sv.is_empty vars then () else
-      Fmt.pf fmt "%a " Vars.pp_typed_list (Vars.Sv.elements vars)
-  in
-  let pp_conds fmt conds =
-    if conds = [] then () else
-      Fmt.pf fmt " when %a" (Fmt.list Term.pp) conds
-  in
-  
-  let src, dst = rw.rw_rw in
-  Fmt.pf fmt "%a%a: %a -> %a%a"
-    pp_tys rw.rw_tyvars
-    pp_vars rw.rw_vars
-    Term.pp src Term.pp dst
-    pp_conds rw.rw_conds
-
-(*------------------------------------------------------------------*)
-(** Check that the rule is correct. *)
-let check_rule (rule : rw_rule) : unit =
-  let l, r = rule.rw_rw in
-
-  if not (Vars.Sv.subset rule.rw_vars (Term.fv l)) then
-    Tactics.hard_failure Tactics.BadRewriteRule;
-  ()
-
-(** Make a rewrite rule from a formula *)
-let pat_to_rw_rule ?loc 
-    ~(destr_eq : Term.term -> (Term.term * Term.term) option)
-    (system    : SE.arbitrary) 
-    (dir       : [< `LeftToRight | `RightToLeft ])
-    (p         : Term.term Match.pat) 
-  : rw_rule 
-  =
-  let subs, f = Term.decompose_impls_last p.pat_term in
-
-  let e = match destr_eq f with
-    | Some (t1, t2) -> t1,t2
-    | _ -> Tactics.hard_failure ?loc (Tactics.Failure "not an equality")
-  in
-
-  let e = match dir with
-    | `LeftToRight -> e
-    | `RightToLeft ->
-      let t1,t2 = e in
-      t2,t1
-  in
-
-  let rule = {
-    rw_tyvars = p.pat_tyvars;
-    rw_system = system;
-    rw_vars   = p.pat_vars;
-    rw_conds  = subs;
-    rw_rw     = e;
-  } in
-
-  (* We check that the rule is valid *)
-  check_rule rule;
-
-  rule
 
 (*------------------------------------------------------------------*)
 (** Internal exception *)
@@ -105,7 +28,7 @@ let _rewrite_head
 
   let l, r = rule.rw_rw in
 
-  let pat = Match.{ 
+  let pat = Term.{ 
       pat_tyvars = rule.rw_tyvars; 
       pat_vars   = rule.rw_vars; 
       pat_term   = l; }
@@ -136,14 +59,14 @@ let rewrite_head
     - [right]: right term instantiated with the instance found
     - [system]: systems applying to the instance found *) 
 type found = { 
-  pat    : Term.term Match.pat; 
+  pat    : Term.term Term.pat; 
   right  : Term.term;
   system : SE.t; 
   subgs  : (SE.t * Term.term) list;
 }
 
 type rw_state = { 
-  init_pat   : Term.term Match.pat;
+  init_pat   : Term.term Term.pat;
   init_subs  : Term.term list;
   init_right : Term.term;
 
@@ -252,7 +175,7 @@ let mk_state
   let mk_form f =
     Term.project_opt projs (Term.subst_projs psubst f)
   in
-  { init_pat = Match.{ 
+  { init_pat = Term.{ 
         pat_tyvars = rule.rw_tyvars; 
         pat_vars   = rule.rw_vars; 
         pat_term   = mk_form left;
@@ -298,7 +221,7 @@ let rw_inst
 
     | `False ->
       (* project the pattern *)
-      let pat_proj = Match.project_tpat_opt projs s.init_pat in
+      let pat_proj = Term.project_tpat_opt projs s.init_pat in
     
       let context = SE.reachability_context se in
       match Match.T.try_match table context occ pat_proj with
@@ -321,7 +244,7 @@ let rw_inst
             ) s.init_subs
         in
 
-        let found_pat = Match.{ 
+        let found_pat = Term.{ 
             pat_term   = left;
             pat_tyvars = [];
             pat_vars   = Sv.empty; 
@@ -449,7 +372,7 @@ let high_rewrite
 
         (* TODO : project the pattern somehow *)
         let left,right = rule.rw_rw in
-        let pat : Term.term Match.pat = Match.{ 
+        let pat : Term.term Term.pat = Term.{ 
             pat_tyvars = rule.rw_tyvars; 
             pat_vars   = rule.rw_vars; 
             pat_term   = left;

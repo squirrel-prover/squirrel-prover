@@ -191,9 +191,3 @@ val cast:  'a sort -> 'b arg -> 'a arg
 (*------------------------------------------------------------------*)
 val pp_esort : Format.formatter -> esort -> unit
 
-(*------------------------------------------------------------------*)
-(** {2 Argument conversion} *)
-
-val convert_as_lsymb : parser_arg list -> lsymb option
-
-val convert_args : Env.t -> parser_arg list -> esort -> Equiv.any_form -> earg

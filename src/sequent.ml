@@ -37,13 +37,13 @@ module type S = sig
     ?close_pats:bool ->
     Theory.p_pt -> 
     'a Equiv.f_kind -> t ->
-    ghyp * SE.context * 'a Match.pat
+    ghyp * SE.context * 'a Term.pat
 
   val convert_pt :
     ?close_pats:bool ->
     Theory.p_pt ->
     'a Equiv.f_kind -> t -> 
-    ghyp * 'a Match.pat
+    ghyp * 'a Term.pat
 end
 
 (*------------------------------------------------------------------*)
@@ -287,7 +287,7 @@ module Mk (Args : MkArgs) : S with
     Theory.p_pt ->
     a Equiv.f_kind ->
     S.t ->
-    ghyp * SE.context * a Match.pat * Match.Mvar.t
+    ghyp * SE.context * a Term.pat * Match.Mvar.t
     = fun ?(check_compatibility=false) ty_env mv pt f_kind s ->
       let table = S.table s in
       let lem =
@@ -343,7 +343,7 @@ module Mk (Args : MkArgs) : S with
 
           let subst = Match.Mvar.to_subst ~mode:`Unif mv in
           let f1 = Equiv.Babel.subst f_kind subst f1 in
-          let pat_f1 = Match.{
+          let pat_f1 = Term.{
               pat_vars = !pat_vars;
               pat_term = f1;
               pat_tyvars = [];
@@ -403,7 +403,7 @@ module Mk (Args : MkArgs) : S with
               do_var (subst, f) (pt_arg_as_term p_arg)
           ) (mv, f) pt.p_pt_args
       in
-      let pat = Match.{ 
+      let pat = Term.{ 
           pat_tyvars = [];
           pat_vars = !pat_vars;
           pat_term = f; } 
@@ -416,8 +416,8 @@ module Mk (Args : MkArgs) : S with
     ~(mode:[`Match | `Unif])
     (mv : Match.Mvar.t)
     (f_kind : a Equiv.f_kind)
-    (pat : a Match.pat)
-    : a Match.pat
+    (pat : a Term.pat)
+    : a Term.pat
     =
     (* clear infered variables from [pat_vars] *)
     let pat_vars = 
@@ -449,7 +449,7 @@ module Mk (Args : MkArgs) : S with
       (pt     : Theory.p_pt)
       (f_kind : a Equiv.f_kind) 
       (s      : S.t) 
-    : ghyp * SE.context * a Match.pat
+    : ghyp * SE.context * a Term.pat
     =
     (* resolve the proof-term in [s] *)
     let pt = resolve_pt s pt in
@@ -485,7 +485,7 @@ module Mk (Args : MkArgs) : S with
       List.fold_left (fun pat_vars v -> Sv.add v pat_vars) pat_vars f_args
     in
 
-    let pat = Match.{ 
+    let pat = Term.{ 
         pat_tyvars;
         pat_vars;
         pat_term = f; } 
@@ -500,7 +500,7 @@ module Mk (Args : MkArgs) : S with
       (pt :  Theory.p_pt)
       (f_kind : a Equiv.f_kind)
       (s : S.t)
-    : ghyp * a Match.pat 
+    : ghyp * a Term.pat 
     = 
     let name, se, pat = 
       convert_pt_gen ~check_compatibility:true ?close_pats pt f_kind s 

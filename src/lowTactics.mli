@@ -1,4 +1,4 @@
-module Args = TacticsArgs
+module Args = HighTacticsArgs
 module L = Location
 module T = Prover.ProverTactics
 module SE = SystemExpr

@@ -739,10 +739,10 @@ end = struct
     let term1 = Term.mk_macro s1.msymb [] (Term.mk_var tv) in
     let term2 = Term.mk_macro s2.msymb [] (Term.mk_var tv) in
 
-    let pat2 =
-      Match.{ pat_term = term2;
-              pat_tyvars = [];
-              pat_vars = Sv.of_list1 s2.indices;}
+    let pat2 = Term.{ 
+        pat_term   = term2;
+        pat_tyvars = [];
+        pat_vars   = Sv.of_list1 s2.indices;}
     in
     let system = SE.reachability_context sexpr in
     match Match.T.try_match table system term1 pat2 with

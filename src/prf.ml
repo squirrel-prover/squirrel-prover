@@ -67,7 +67,7 @@ let prf_occ_incl table sexpr (o1 : prf_occ) (o2 : prf_occ) : bool =
        cond ::
        [Term.mk_atom `Eq t (Term.mk_witness (Term.ty t))])
   in
-  let pat2 = Match.{
+  let pat2 = Term.{
       pat_tyvars = [];
       pat_vars   = Sv.of_list o2.occ_vars;
       pat_term   = mk_dum a2 is2 cond2 t2;

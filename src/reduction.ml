@@ -69,43 +69,15 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
   and expand_head_once (st : state) (t : Term.term) : Term.term * bool = 
     if not st.param.delta 
     then t, false 
-    else try _expand_head_once st t with NoExp -> t, false
-
-  and _expand_head_once (st : state) (t : Term.term) : Term.term * bool = 
-    let se = 
-      try SE.to_fset st.sexpr
-      with SE.Error _ -> raise NoExp (* nothing to expand if not a [fset] *)
-    in
-    let models = (* evaluates the models only if needed *)
-      lazy (match Constr.models_conjunct (Lazy.force st.trace_lits) with
-          | Utils.Timeout -> raise NoExp
-          | Utils.Result models -> models)
-    in 
-    let cntxt () = Constr.{ 
-        table  = st.table; 
-        system = se; 
-        models = Some (Lazy.force models);
-      } in
-    match t with
-    | Term.Macro (ms, l, ts) ->
-      assert (l = []);
-
-      if Constr.query ~precise:true (Lazy.force models) [`Pos, `Happens ts] then
-        match Macros.get_definition (cntxt ()) ms ts with
-        | `Def mdef -> mdef, true
-        | _ -> raise NoExp
-      else raise NoExp
-
-    | Fun (fs, _, ts) 
-      when Operator.is_operator st.table fs -> 
-      Operator.unfold (cntxt ()) fs ts, true
-
-    | _ -> raise NoExp
+    else 
+      try 
+        Match.expand_head_once ~exn:NoExp st.table st.sexpr st.trace_lits t
+      with NoExp -> t, false
 
   (* Rewrite once at head position *)
   and rewrite_head_once (st : state) (t : Term.term) : Term.term * bool = 
     let db = Hint.get_rewrite_db st.hint_db in
-    let hints = Match.Hm.find_dflt [] (Match.get_head t) db in
+    let hints = Term.Hm.find_dflt [] (Term.get_head t) db in
 
     let rule = List.find_map (fun Hint.{ rule } ->
         match Rewrite.rewrite_head st.table st.sexpr rule t with

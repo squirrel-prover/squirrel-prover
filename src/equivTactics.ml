@@ -10,7 +10,7 @@
 open Utils
 
 module T    = Prover.ProverTactics
-module Args = TacticsArgs
+module Args = HighTacticsArgs
 module L    = Location
 module SE   = SystemExpr
 
@@ -344,7 +344,7 @@ let () =
 (** Function application *)
 
 (** Select a frame element matching a pattern. *)
-let fa_select_felems (pat : Term.term Match.pat) (s : sequent) : int option =
+let fa_select_felems (pat : Term.term Term.pat) (s : sequent) : int option =
   let option = { Match.default_match_option with allow_capture = true; } in
   let system = match (ES.system s).pair with
     | None -> soft_failure (Failure "underspecified system")
@@ -428,7 +428,7 @@ let do_fa_tac (args : Args.fa_arg list) (s : sequent) : sequent list =
         let pat_vars =
           Vars.Sv.filter (fun v -> Vars.is_pat v) (Term.fv t)
         in
-        let pat = Match.{
+        let pat = Term.{
             pat_tyvars = [];
             pat_vars;
             pat_term = t; }
@@ -439,7 +439,7 @@ let do_fa_tac (args : Args.fa_arg list) (s : sequent) : sequent list =
 
   let rec do1 
       (s    : sequent) 
-      ((mult, loc, pat) : Args.rw_count * L.t * Term.term Match.pat)
+      ((mult, loc, pat) : Args.rw_count * L.t * Term.term Term.pat)
     : sequent 
     =
     match fa_select_felems pat s with

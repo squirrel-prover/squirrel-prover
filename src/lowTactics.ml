@@ -1,6 +1,6 @@
 open Utils
 
-module Args = TacticsArgs
+module Args = HighTacticsArgs
 module L = Location
 
 module T = Prover.ProverTactics
@@ -911,7 +911,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           (Hyps.by_id id s)
       in
       let s = Hyps.remove id s in
-      let pat = Match.pat_of_form f in
+      let pat = Term.pat_of_form f in
       let erule = pat_to_rw_rule s ~loc (S.system s).set (L.unloc dir) pat in
       let s, subgoals =
         rewrite ~loc ~all:false [T_conc] (`Once, Some id, erule) s
@@ -1144,13 +1144,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
     * with other tactics that would have to generate global sequents
     * as premisses. *)
 
-  let apply ~use_fadup (pat : S.conc_form Match.pat) (s : S.t) : S.t list =
+  let apply ~use_fadup (pat : S.conc_form Term.pat) (s : S.t) : S.t list =
     let option =
       { Match.default_match_option with mode = `EntailRL; use_fadup }
     in
     let table, system, goal = S.table s, S.system s, S.goal s in
 
-    let rec _apply (subs : S.conc_form list) (pat : S.conc_form Match.pat) =
+    let rec _apply (subs : S.conc_form list) (pat : S.conc_form Term.pat) =
       if not (Vars.Sv.subset pat.pat_vars (S.fv_conc pat.pat_term)) then
         soft_failure ApplyBadInst;
 
@@ -1190,7 +1190,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       `H2 : A` by `H2 : B`. *)
   let apply_in
       ~use_fadup
-      (pat : S.conc_form Match.pat)
+      (pat : S.conc_form Term.pat)
       (hyp : Ident.t)
       (s : S.t) : S.t list
     =
@@ -1269,7 +1269,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** Parse apply tactic arguments. *)
   let p_apply_args
       (args : Args.parser_arg list)
-      (s : S.sequent) : bool * S.conc_form Match.pat * target
+      (s : S.sequent) : bool * S.conc_form Term.pat * target
     =
     let nargs, pat, in_opt =
       match args with

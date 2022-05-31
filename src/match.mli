@@ -115,46 +115,6 @@ module Pos : sig
 end
 
 (*------------------------------------------------------------------*)
-(** {2 Term heads} *)
-
-type term_head =
-  | HExists
-  | HForAll
-  | HSeq
-  | HFind
-  | HFun   of Symbols.fname 
-  | HMacro of Symbols.macro 
-  | HName  of Symbols.name  
-  | HDiff
-  | HVar
-  | HAction
-
-val pp_term_head : Format.formatter -> term_head -> unit
-
-val get_head : Term.term -> term_head
-
-module Hm : Map.S with type key = term_head
-
-(*------------------------------------------------------------------*)
-(** {2 Patterns} *)
-
-(** A pattern is a list of free type variables, a term [t] and a subset
-    of [t]'s free variables that must be matched.
-    The free type variables must be inferred. *)
-type 'a pat = {
-  pat_tyvars : Type.tvars;
-  pat_vars : Sv.t;
-  pat_term : 'a;
-}
-
-val project_tpat     : Term.projs        -> Term.term pat -> Term.term pat
-val project_tpat_opt : Term.projs option -> Term.term pat -> Term.term pat
-
-(** Make a pattern out of a formula: all universally quantified variables
-    are added to [pat_vars]. *)
-val pat_of_form : Term.term -> Term.term pat
-
-(*------------------------------------------------------------------*)
 (** {2 Matching variable assignment} *)
 
 module Mvar : sig
@@ -214,18 +174,18 @@ module type S = sig
 
   val pp_pat :
     (Format.formatter -> 'a -> unit) ->
-    Format.formatter -> 'a pat -> unit
+    Format.formatter -> 'a Term.pat -> unit
 
   val unify :
     ?mv:Mvar.t ->
     Symbols.table ->
-    t pat -> t pat ->
+    t Term.pat -> t Term.pat ->
     [`FreeTyv | `NoMgu | `Mgu of Mvar.t]
 
   val unify_opt :
     ?mv:Mvar.t ->
     Symbols.table ->
-    t pat -> t pat ->
+    t Term.pat -> t Term.pat ->
     Mvar.t option
 
   (** [try_match ... t p] tries to match [p] with [t] (at head position).
@@ -242,7 +202,7 @@ module type S = sig
     Symbols.table ->
     SE.context -> 
     t -> 
-    t pat ->
+    t Term.pat ->
     match_res
 
   (** [find pat t] returns the list of occurences in t that match the
@@ -252,10 +212,21 @@ module type S = sig
     Symbols.table ->
     SE.context ->
     Vars.env ->
-    Term.term pat -> 
+    Term.term Term.pat -> 
     t -> 
     Term.term list
 end
+
+(*------------------------------------------------------------------*)
+(** {2 Reduction utilities} *)
+
+(** Expand once at head position. 
+    Throw [exn] in case of failure. *)
+val expand_head_once :
+  exn:exn -> 
+  Symbols.table -> SE.t -> Term.literals Lazy.t ->
+  Term.term ->
+  Term.term * bool 
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and unification} *)

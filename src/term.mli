@@ -6,6 +6,8 @@
     representations necessary for the front-end involving
     processes, axioms, etc. *)
 
+open Utils
+
 (*------------------------------------------------------------------*)
 (** {2 Symbols}
 
@@ -516,3 +518,43 @@ val pp_match_info : Format.formatter -> match_info -> unit
 val pp_match_infos : Format.formatter -> match_infos -> unit
 
 val match_infos_to_pp_info : match_infos -> pp_info
+
+(*------------------------------------------------------------------*)
+(** {2 Term heads} *)
+
+type term_head =
+  | HExists
+  | HForAll
+  | HSeq
+  | HFind
+  | HFun   of Symbols.fname 
+  | HMacro of Symbols.macro 
+  | HName  of Symbols.name  
+  | HDiff
+  | HVar
+  | HAction
+
+val pp_term_head : Format.formatter -> term_head -> unit
+
+val get_head : term -> term_head
+
+module Hm : Map.S with type key = term_head
+
+(*------------------------------------------------------------------*)
+(** {2 Patterns} *)
+
+(** A pattern is a list of free type variables, a term [t] and a subset
+    of [t]'s free variables that must be matched.
+    The free type variables must be inferred. *)
+type 'a pat = {
+  pat_tyvars : Type.tvars;
+  pat_vars : Vars.Sv.t;
+  pat_term : 'a;
+}
+
+val project_tpat     : projs        -> term pat -> term pat
+val project_tpat_opt : projs option -> term pat -> term pat
+
+(** Make a pattern out of a formula: all universally quantified variables
+    are added to [pat_vars]. *)
+val pat_of_form : term -> term pat

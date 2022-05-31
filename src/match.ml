@@ -512,80 +512,6 @@ module Pos = struct
 end
 
 (*------------------------------------------------------------------*)
-(** {2 Term heads} *)
-
-type term_head =
-  | HExists
-  | HForAll
-  | HSeq
-  | HFind
-  | HFun   of Symbols.fname 
-  | HMacro of Symbols.macro 
-  | HName  of Symbols.name  
-  | HDiff
-  | HVar
-  | HAction
-
-let pp_term_head fmt = function
-  | HExists   -> Fmt.pf fmt "Exists"
-  | HForAll   -> Fmt.pf fmt "Forall"
-  | HSeq      -> Fmt.pf fmt "Seq"
-  | HFind     -> Fmt.pf fmt "Find"
-  | HFun   f  -> Fmt.pf fmt "Fun %a"   Symbols.pp f
-  | HMacro m  -> Fmt.pf fmt "Macro %a" Symbols.pp m
-  | HName  n  -> Fmt.pf fmt "Name %a"  Symbols.pp n
-  | HDiff     -> Fmt.pf fmt "Diff"
-  | HVar      -> Fmt.pf fmt "Var"
-  | HAction   -> Fmt.pf fmt "Action"
-
-let get_head : term -> term_head = function
-  | Term.Exists _          -> HExists
-  | Term.ForAll _          -> HForAll
-  | Term.Seq _             -> HSeq
-  | Term.Fun ((f,_),_,_)   -> HFun f
-  | Term.Find _            -> HFind
-  | Term.Macro (m1,_,_)    -> HMacro m1.Term.s_symb
-  | Term.Name n1           -> HName n1.Term.s_symb
-  | Term.Diff _            -> HDiff
-  | Term.Var _             -> HVar
-  | Term.Action _          -> HAction
-
-module Hm = Map.Make(struct
-    type t = term_head
-    let compare = Stdlib.compare
-  end)
-
-(*------------------------------------------------------------------*)
-(** {2 Patterns} *)
-
-(** A pattern is a list of free type variables, a term [t] and a subset
-    of [t]'s free variables that must be matched.
-    The free type variables must be inferred. *)
-type 'a pat = {
-  pat_tyvars : Type.tvars;
-  pat_vars   : Vars.Sv.t;
-  pat_term   : 'a;
-}
-
-let pat_of_form (t : term) =
-  let vs, t = decompose_forall t in
-  let vs, s = refresh_vars `Global vs in
-  let t = subst s t in
-
-  { pat_tyvars = [];
-    pat_vars = Vars.Sv.of_list vs;
-    pat_term = t; }
-
-let project_tpat (projs : Term.projs) (pat : Term.term pat) : Term.term pat =
-  { pat with pat_term = Term.project projs pat.pat_term; }
-
-let project_tpat_opt
-    (projs : Term.projs option) (pat : Term.term pat) 
-  : Term.term pat 
-  =
-  omap_dflt pat (project_tpat ^~ pat) projs
-
-(*------------------------------------------------------------------*)
 (** {2 Matching variable assignment} *)
 
 module Mvar : sig[@warning "-32"]
@@ -770,6 +696,48 @@ exception NoMatch of (term list * match_infos) option
 let no_match ?infos () = raise (NoMatch infos)
 
 (*------------------------------------------------------------------*)
+(** {2 Reduction utilities} *)
+
+(** Expand once at head position. 
+    Throw [exn] in case of failure. *)
+let expand_head_once
+    ~(exn : exn) 
+    (table : Symbols.table) (sexpr : SE.t) 
+    (lits : Term.literals Lazy.t) 
+    (* (s : LowTraceSequent.t) *)
+    (t : Term.term) 
+  : Term.term * bool 
+  = 
+  let se = 
+    try SE.to_fset sexpr
+    with SE.Error _ -> raise exn (* nothing to expand if not a [fset] *)
+  in
+  let models = (* evaluates the models only if needed *)
+    lazy (match Constr.models_conjunct (Lazy.force lits) with
+        | Utils.Timeout -> raise exn
+        | Utils.Result models -> models)
+  in 
+  let cntxt () = Constr.{ 
+      table; system = se; 
+      models = Some (Lazy.force models);
+    } in
+  match t with
+  | Term.Macro (ms, l, ts) ->
+    assert (l = []);
+
+    if Constr.query ~precise:true (Lazy.force models) [`Pos, `Happens ts] then
+      match Macros.get_definition (cntxt ()) ms ts with
+      | `Def mdef -> mdef, true
+      | _ -> raise exn
+    else raise exn
+
+  | Fun (fs, _, ts) 
+    when Operator.is_operator table fs -> 
+    Operator.unfold (cntxt ()) fs ts, true
+
+  | _ -> raise exn
+
+(*------------------------------------------------------------------*)
 (** {2 Matching and unification internal states} *)
 
 (** (Descending) state used in the matching algorithm. *)
@@ -782,7 +750,7 @@ type match_state = {
 
   ty_env  : Type.Infer.env;
   table   : Symbols.table;
-  system  : SE.context;
+  system  : SE.context; (** system context applying at the current position *)
 
   use_fadup     : bool;
   allow_capture : bool;
@@ -920,6 +888,7 @@ let try_match_gen (type a)
 
     table; system; env; support; ty_env;
 
+    (* lits = lazy (assert false); *)
     use_fadup     = option.use_fadup;
     allow_capture = option.allow_capture; 
   } in
@@ -1246,7 +1215,21 @@ module T (* : S with type t = Term.term *) = struct
       let pat = subst s' pat in
       tmatch t pat st
 
-    | _, _ -> no_match ()
+    | _, _ -> try_reduce_head1 t pat st
+
+  (* try to reduce one step at head position in [t] or [pat], 
+     and resume matching *)
+  and try_reduce_head1 (t : term) (pat : term) (st : match_state) : Mvar.t =
+    match t, pat with
+    | Fun _, Fun _ -> 
+      (* let _t = expand_head_once ~exn:(NoMatch None) st.table st.system.set in *)
+      no_match ()
+
+    | Macro (m, terms, ts), _ -> no_match ()
+    | _, Macro (m, terms, ts) -> no_match ()
+    | Var _, _ -> no_match ()
+    | _, Var v when not (Sv.mem v st.support) -> no_match ()
+    | _ -> no_match ()
 
   (* Return: left subst, right subst, match state *)
   and match_bnds (vs : Vars.vars) (vs' : Vars.vars) st :
@@ -1310,7 +1293,8 @@ module T (* : S with type t = Term.term *) = struct
   and vmatch (t : term) (v : Vars.var) (st : match_state) : Mvar.t =
     if not (Sv.mem v st.support)
     then (* [v] not in the pattern *)
-      if t = mk_var v then st.mv else no_match ()
+      (* FEATURE: conversion *)
+      if t <> mk_var v then try_reduce_head1 t (mk_var v) st else st.mv
 
     else (* [v] in the pattern *)
       match Mvar.find v st.mv with

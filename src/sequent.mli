@@ -31,7 +31,7 @@ module type S = sig
     ?close_pats:bool ->
     Theory.p_pt ->
     'a Equiv.f_kind -> t ->
-    ghyp * SystemExpr.context * 'a Match.pat
+    ghyp * SystemExpr.context * 'a Term.pat
 
   (** Same as [convert_pt_gen], when the system is the current system of
       the sequent. *)
@@ -39,7 +39,7 @@ module type S = sig
     ?close_pats:bool ->
     Theory.p_pt ->
     'a Equiv.f_kind -> t ->
-    ghyp * 'a Match.pat
+    ghyp * 'a Term.pat
 
 end
 

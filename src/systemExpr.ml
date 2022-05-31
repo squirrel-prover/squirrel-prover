@@ -128,6 +128,10 @@ let project_opt (projs : Term.projs option) t : fset =
   match t, projs with
   | List l, Some projs ->
     (* we only project over a subset of [l]'s projs *)
+    (* REM *)
+    if not (List.for_all (fun x -> List.mem_assoc x l) projs) then
+      Fmt.epr "error: @[%a@] and @[%a@]@." Term.pp_projs projs Term.pp_projs (List.map fst l);
+
     assert (List.for_all (fun x -> List.mem_assoc x l) projs);
 
     List (List.filter (fun (x,_) -> List.mem x projs) l)

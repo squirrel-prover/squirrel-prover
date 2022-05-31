@@ -3,13 +3,13 @@ type lsymb = Theory.lsymb
 (*------------------------------------------------------------------*)
 type rw_hint = { 
   name : string; 
-  rule : Rewrite.rw_rule;
+  rule : LowRewrite.rw_rule;
 }
 
 val pp_rw_hint : Format.formatter -> rw_hint -> unit
 
 (*------------------------------------------------------------------*)
-type rewrite_db = rw_hint list Match.Hm.t
+type rewrite_db = rw_hint list Term.Hm.t
 
 val pp_rewrite_db : Format.formatter -> rewrite_db -> unit
 

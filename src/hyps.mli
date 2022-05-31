@@ -58,11 +58,12 @@ module type S = sig
 
 end
 
+(*------------------------------------------------------------------*)
 (** Functor for building an implementation of contexts
   * for a particular kind of hypotheses. *)
 module Mk (Hyp : Hyp) : S with type hyp = Hyp.t
 
-
+(*------------------------------------------------------------------*)
 (** Signature for sequents with hypotheses. *)
 module type HypsSeq = sig
   (** Hypothesis *)
