@@ -95,6 +95,7 @@ type name_occs = name_occ list
    [UnderEqual]: we're in the "v ^ …" in an equality test, so yeah *)
 type allowed_occs = NotAllowed | OneInProduct | UnderEqual
 
+  
 (** Used to find occurrences not allowed by CDH or GDH, depending on 
    the "gdh_oracles" boolean 
    Finds all possible occurrences of n in t (ground), except
@@ -105,6 +106,9 @@ type allowed_occs = NotAllowed | OneInProduct | UnderEqual
       where no element of excl appear in "…" or "something"  ONLY if 
    oracles is set to true *)
 (** we assume n is in excl *)
+(** action is the action that produced the term where we're looking
+    (None for direct occ, Some for indirect occ)
+    we just use it for printing *)
 let get_name_except_allowed
     (gdh_oracles : bool)
     ?(fv=[])
@@ -197,6 +201,22 @@ let get_name_except_allowed
 
 
 
+
+let print_dh_name
+      ?(action : term option=None)
+      ?(term : term option=None)
+      (n : nsymb)
+      (m : nsymb)
+    : unit
+  =
+  Printer.pr "  @[<hv 2>%a @,(collision with %a) " Term.pp_nsymb n Term.pp_nsymb m;
+  if action <> None then
+    Printer.pr "@,in action %a " Term.pp (Utils.oget action);
+  if term <> None then
+    Printer.pr "@,@[<hov 2>in term@ @[%a@]@]" Term.pp (Utils.oget term);
+  Printer.pr "@]@;@;"
+
+  
 (** Constructs the formula
     "exists free vars.
       (exists t1.occ_vars. action ≤ t1.occ_cnt || 
@@ -215,8 +235,11 @@ let get_name_except_allowed
     The free vars of action should be there too, which holds if it is
     produced by tfold_macro_support. 
     The free vars of ts should be in env.
-    Everything is renamed nicely wrt env. *)    
+    Everything is renamed nicely wrt env. *)
+(** The term option is the term where the occ was found,
+    it's only here for printing purposes *)    
 let occurrence_formula
+    ?(term:term option=None)
     ?(action:term option=None)
     (ts  : Fresh.ts_occs)
     (env : Vars.env)
@@ -246,16 +269,22 @@ let occurrence_formula
         ) ts
     in
     let phi_time = mk_ors ~simpl:true phis_time in
+    print_dh_name ~term:(Option.map (subst sigma) term)
+      ~action:(Some renamed_action)
+      (Term.mk_isymb n.s_symb n.s_typ renamed_indices) n;
     mk_exists ~simpl:true vars (mk_and ~simpl:true phi_time phi_eq)
 
   | None -> (* direct occurrence *)
+    print_dh_name ~term:term (Term.mk_isymb n.s_symb n.s_typ occ.occ_cnt) n;
     mk_exists ~simpl:true vars phi_eq
 
 
 (** Constructs the proof obligation (sequents) for direct or indirect 
    occurrences stating that it suffices to prove the goal assuming
    the occurrence occ is equal to n. *)
+(** The term option is the term where the occ was found, it's only here for printing purposes *)    
 let occurrence_sequent
+    ?(term:term option=None)
     ?(action:term option=None)
     (ts  : Fresh.ts_occs)
     (s   : sequent)
@@ -265,7 +294,7 @@ let occurrence_sequent
   = 
   TS.set_goal
     (mk_impl ~simpl:false
-       (occurrence_formula ~action:action ts (TS.vars s) n occ)
+       (occurrence_formula ~term:term ~action:action ts (TS.vars s) n occ)
        (TS.goal s))
     s
 
@@ -384,6 +413,10 @@ let cgdh
     let ts = Fresh.get_macro_actions cntxt [t] in
 
     (* direct occurrences of a and b in the wrong places *)
+    Printer.pr "@[<v 0>@[<hv 2>Bad occurrences of %a and %a found@ directly in %a:@]@;"
+      Term.pp_nsymb na
+      Term.pp_nsymb nb
+      Term.pp t;
     let na_dir_occ =
       get_name_except_allowed
         gdh_oracles cntxt nas excl gen exp_s mult_s t
@@ -400,7 +433,10 @@ let cgdh
     in
 
     (* indirect occurrences and their proof obligations *)
-    let indirect_sequents =
+    Printer.pr "@;@;@[<hv 2>Bad occurrences of %a and %a found in other actions:@]@;"
+      Term.pp_nsymb na
+      Term.pp_nsymb nb;
+   let indirect_sequents =
       Iter.fold_macro_support (fun iocc indirect_sequents ->
           let t = iocc.iocc_cnt in
           let fv = iocc.iocc_vars in
@@ -420,12 +456,14 @@ let cgdh
           in
 
           (* proof obligations for the indirect occurrences *)
-          (List.map (occurrence_sequent ~action:oa ts s na) na_in_occ) @
-          (List.map (occurrence_sequent ~action:oa ts s nb) nb_in_occ) @
+          (List.map (occurrence_sequent ~term:(Some t) ~action:oa ts s na) na_in_occ) @
+          (List.map (occurrence_sequent ~term:(Some t) ~action:oa ts s nb) nb_in_occ) @
           indirect_sequents)
         cntxt env [t] []
     in
-    direct_sequents @ indirect_sequents
+    Printer.pr "@;Total: %d bad occurrences@;@]"
+      ((List.length direct_sequents) + (List.length indirect_sequents));
+    direct_sequents @ List.rev indirect_sequents
   with
   | Fresh.Var_found ->
     soft_failure
