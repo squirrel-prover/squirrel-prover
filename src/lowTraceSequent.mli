@@ -61,24 +61,24 @@ val constraints_valid : sequent -> bool
     derivable from its hypothesis. 
     May timeout. *)
 val get_ts_equalities :
-  precise:bool -> sequent -> Term.term list list
+  precise:bool -> sequent -> Term.terms list
 
 (** [get_ind_equalities s] returns all the equalities between indices
     derivable from its hypothesis. 
     May timeout. *)
 val get_ind_equalities :
-  precise:bool -> sequent -> Vars.var list list 
+  precise:bool -> sequent -> Vars.vars list 
 
 (** [maximal_elems s ts] returns the maximal elements of the timestamps,
     according to their ordering derived from the hypothesis in [s]. 
     May timeout. *)
 val maximal_elems : 
-  precise:bool -> sequent -> Term.term list -> 
-  Term.term list 
+  precise:bool -> sequent -> Term.terms -> 
+  Term.terms 
 
 (** [get_all_messages s] returns all the messages appearing at toplevel
     in [s]. *)
-val get_all_messages : sequent -> Term.term list
+val get_all_messages : sequent -> Term.terms
 
 (** [literals_unsat_smt] checks whether the conclusion of the sequent follows
     from some "simple" literals in the hypotheses + the formulas declared by

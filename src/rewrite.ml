@@ -17,10 +17,10 @@ exception NoRW
 
 (*------------------------------------------------------------------*)
 let _rewrite_head
-    (table  : Symbols.table)
+    (table : Symbols.table)
     (sexpr : SE.t)
-    (rule   : rw_rule)
-    (t      : Term.term) : Term.term * Term.term list
+    (rule  : rw_rule)
+    (t     : Term.term) : Term.term * Term.term list
   =
   (* FEATURE: allow [rewrite_head] to rewrite rules that do not apply to 
      all systems. *)
@@ -46,10 +46,10 @@ let _rewrite_head
   r, subs
 
 let rewrite_head
-    (table  : Symbols.table)
+    (table : Symbols.table)
     (sexpr : SE.t)
-    (rule   : rw_rule)
-    (t      : Term.term) : (Term.term * Term.term list) option
+    (rule  : rw_rule)
+    (t     : Term.term) : (Term.term * Term.term list) option
   =
   try Some (_rewrite_head table sexpr rule t) with NoRW -> None
 
@@ -191,9 +191,12 @@ let mk_state
    bound above the matched occurrences are universally quantified in
    the generated sub-goals. *)
 let rw_inst
-    (table : Symbols.table) (rule : rw_rule) : rw_state Pos.f_map_fold 
+    (table : Symbols.table) (hyps : Hyps.TraceHyps.hyps) 
+    (rule : rw_rule) 
+  : rw_state Pos.f_map_fold 
   = 
   fun occ se vars conds _p (s : rw_state) ->
+  let hyps = lazy hyps in
 
   let projs = 
     if SE.is_fset se then Some (SE.to_projs (SE.to_fset se)) else None
@@ -211,7 +214,7 @@ let rw_inst
         s, `Continue 
       else
         let context = SE.reachability_context se in
-        begin match Match.T.try_match table context occ inst.pat with
+        begin match Match.T.try_match ~hyps table context occ inst.pat with
           | NoMatch _ | FreeTyv -> s, `Continue
           | Match mv -> 
             (* project the already found instance with the projections
@@ -224,7 +227,7 @@ let rw_inst
       let pat_proj = Term.project_tpat_opt projs s.init_pat in
     
       let context = SE.reachability_context se in
-      match Match.T.try_match table context occ pat_proj with
+      match Match.T.try_match ~hyps table context occ pat_proj with
       | NoMatch _ | FreeTyv -> s, `Continue
 
       (* head matches *)
@@ -272,6 +275,7 @@ let rewrite
     (table  : Symbols.table)
     (system : SE.context)
     (env    : Vars.env)
+    (hyps   : Hyps.TraceHyps.hyps)
     (mult   : Args.rw_count)
     (rule   : rw_rule)
     (target : Equiv.any_form) : rw_res_opt
@@ -308,13 +312,13 @@ let rewrite
     let s, f = match f with
       | `Equiv f ->
         let s, _, f = 
-          Pos.map_fold_e (rw_inst table rule) env system s f 
+          Pos.map_fold_e (rw_inst table hyps rule) env system s f 
         in
         s, `Equiv f
 
       | `Reach f ->
         let s, _, f = 
-          Pos.map_fold (rw_inst table rule) env system.set s f 
+          Pos.map_fold (rw_inst table hyps rule) env system.set s f 
         in
         s, `Reach f
     in
@@ -342,11 +346,12 @@ let rewrite_exn
     (table  : Symbols.table)
     (system : SE.context)
     (env    : Vars.env)
+    (hyps   : Hyps.TraceHyps.hyps)
     (mult   : Args.rw_count)
     (rule   : rw_rule)
     (target : Equiv.any_form) : rw_res
   =
-  match rewrite table system env mult rule target with
+  match rewrite table system env hyps mult rule target with
   | RW_Result r -> r
   | RW_Failed e -> recast_error ~loc e
 

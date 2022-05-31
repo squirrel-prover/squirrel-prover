@@ -224,3 +224,60 @@ module type HypsSeq = sig
   val pp     : Format.formatter -> sequent -> unit
   val pp_dbg : Format.formatter -> sequent -> unit
 end
+
+(*------------------------------------------------------------------*)
+(** {2 Trace Hyps} *)
+
+module TraceHyps = Mk(struct
+    type t = Equiv.any_form
+    let pp_hyp = Equiv.Any.pp
+    let htrue = `Reach Term.mk_true
+  end)
+
+
+(*------------------------------------------------------------------*)
+(** Collect specific local hypotheses *)
+  
+let get_atoms_of_hyps (hyps : TraceHyps.hyps) : Term.literals =
+  TraceHyps.fold (fun _ f acc ->
+      match f with
+      | `Reach f
+      | `Equiv Equiv.(Atom (Reach f)) ->
+        begin match Term.form_to_literals f with
+          | `Entails lits | `Equiv lits -> lits @ acc
+        end
+      | `Equiv _ -> acc
+    ) hyps [] 
+
+let get_message_atoms (hyps : TraceHyps.hyps) : Term.xatom list =
+  let do1 (at : Term.literal) : Term.xatom option =
+    match Term.ty_lit at with
+    | Type.Timestamp | Type.Index -> None
+    | _ ->
+      (* FIXME: move simplifications elsewhere *)
+      match at with 
+      | `Pos, (`Comp _ as at)       -> Some at
+      | `Neg, (`Comp (`Eq, t1, t2)) -> Some (`Comp (`Neq, t1, t2))
+      | _ -> None
+  in
+  List.filter_map do1 (get_atoms_of_hyps hyps)
+
+let get_trace_literals (hyps : TraceHyps.hyps) : Term.literals =
+  let do1 (lit : Term.literal) : Term.literal option =
+    match Term.ty_lit lit with 
+    | Type.Index | Type.Timestamp -> Some lit
+    | _ -> None
+  in
+  List.filter_map do1 (get_atoms_of_hyps hyps)
+
+let get_eq_atoms (hyps : TraceHyps.hyps) : Term.xatom list =
+  let do1 (lit : Term.literal) : Term.xatom option =
+    match lit with 
+    | `Pos, (`Comp ((`Eq | `Neq), _, _) as at) -> Some at
+
+    | `Neg, (`Comp (`Eq,  t1, t2)) -> Some (`Comp (`Neq, t1, t2))
+    | `Neg, (`Comp (`Neq, t1, t2)) -> Some (`Comp (`Eq,  t1, t2))
+
+    | _ -> None
+  in
+  List.filter_map do1 (get_atoms_of_hyps hyps)

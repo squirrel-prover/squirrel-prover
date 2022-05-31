@@ -48,13 +48,10 @@ let choose_name = function
       in
     sort ^ ord
 
+
 (*------------------------------------------------------------------*)
-module H = Hyps.Mk(struct
-    type t = hyp_form
-    let pp_hyp = Equiv.Any.pp
-    let htrue = `Reach Term.mk_true
-  end)
-    
+module H = Hyps.TraceHyps
+
 (*------------------------------------------------------------------*)
 module S : sig
   type t = private {
@@ -130,60 +127,9 @@ let pp ppf s =
   (* Print conclusion formula and close box. *)
   pf ppf "@;%a@]" Term.pp s.conclusion
 
-
 (*------------------------------------------------------------------*)
-(** Collect specific local hypotheses *)
-  
-let get_atoms_of_fhyps (forms : hyp_form list) : Term.literals =
-  List.fold_left (fun acc f ->
-      match f with
-      | `Reach f
-      | `Equiv Equiv.(Atom (Reach f)) ->
-        begin match Term.form_to_literals f with
-          | `Entails lits | `Equiv lits -> lits @ acc
-        end
-      | `Equiv _ -> acc
-    ) [] forms 
-
-let get_atoms_from_s (s : sequent) : Term.literals =
-  let fhyps = H.fold (fun _ f acc -> f :: acc) s.hyps [] in
-  get_atoms_of_fhyps fhyps
-
-let get_message_atoms (s : sequent) : Term.xatom list =
-  let do1 (at : Term.literal) : Term.xatom option =
-    match Term.ty_lit at with
-    | Type.Timestamp | Type.Index -> None
-    | _ ->
-      (* FIXME: move simplifications elsewhere *)
-      match at with 
-      | `Pos, (`Comp _ as at)       -> Some at
-      | `Neg, (`Comp (`Eq, t1, t2)) -> Some (`Comp (`Neq, t1, t2))
-      | _ -> None
-  in
-  List.filter_map do1 (get_atoms_from_s s)
-
-let get_trace_literals (s : sequent) : Term.literals =
-  let do1 (lit : Term.literal) : Term.literal option =
-    match Term.ty_lit lit with 
-    | Type.Index | Type.Timestamp -> Some lit
-    | _ -> None
-  in
-  List.filter_map do1 (get_atoms_from_s s)
-
-let get_eq_atoms (s : sequent) : Term.xatom list =
-  let do1 (lit : Term.literal) : Term.xatom option =
-    match lit with 
-    | `Pos, (`Comp ((`Eq | `Neq), _, _) as at) -> Some at
-
-    | `Neg, (`Comp (`Eq,  t1, t2)) -> Some (`Comp (`Neq, t1, t2))
-    | `Neg, (`Comp (`Neq, t1, t2)) -> Some (`Comp (`Eq,  t1, t2))
-
-    | _ -> None
-  in
-  List.filter_map do1 (get_atoms_from_s s)
-
-let get_all_messages s =
-  let atoms = get_message_atoms s in
+let get_all_messages (s : sequent) =
+  let atoms = Hyps.get_message_atoms s.hyps in
   let atoms =
     match Term.form_to_xatom s.conclusion with
       | Some at -> at :: atoms
@@ -197,11 +143,11 @@ let get_all_messages s =
 (*------------------------------------------------------------------*)
 (** Prepare constraints or TRS query *)
 
-let get_models_t s : Constr.models Utils.timeout_r =
-  let trace_literals = get_trace_literals s in
-  Constr.models_conjunct trace_literals 
+let _get_models (hyps : H.hyps) =
+  let trace_literals = Hyps.get_trace_literals hyps in
+  Tactics.timeout_get (Constr.models_conjunct trace_literals)
 
-let get_models s = Tactics.timeout_get (get_models_t s)
+let get_models (s : sequent) = _get_models s.hyps
 
 let query ~precise s q =
   let models = get_models s in
@@ -215,13 +161,13 @@ let maximal_elems ~precise s tss =
 
 let get_ts_equalities ~precise s =
   let models = get_models s in
-    let ts = List.map (fun (_,x) -> x) (get_trace_literals s)
+    let ts = List.map (fun (_,x) -> x) (Hyps.get_trace_literals s.hyps)
              |>  Atom.trace_atoms_ts in
     Constr.get_ts_equalities ~precise models ts
 
 let get_ind_equalities ~precise s =
   let models = get_models s in
-  let inds = List.map (fun (_,x) -> x) (get_trace_literals s)
+  let inds = List.map (fun (_,x) -> x) (Hyps.get_trace_literals s.hyps)
              |> Atom.trace_atoms_ind in
   Constr.get_ind_equalities ~precise models inds
 
@@ -533,19 +479,17 @@ let get_eqs_neqs s =
       | `Comp (`Eq,  a, b) -> Term.ESubst (a,b) :: eqs, neqs
       | `Comp (`Neq, a, b) -> eqs, Term.ESubst (a,b) :: neqs
       | _ -> assert false
-    ) ([],[]) (get_eq_atoms s)
+    ) ([],[]) (Hyps.get_eq_atoms s)
 
-let get_trs_t s : Completion.state Utils.timeout_r =
-  let eqs,_ = get_eqs_neqs s in
-  Completion.complete s.env.table eqs 
-
-let get_trs s = Tactics.timeout_get (get_trs_t s)
+let get_trs s = 
+  let eqs,_ = get_eqs_neqs s.hyps in
+  Tactics.timeout_get (Completion.complete s.env.table eqs)
 
 let eq_atoms_valid s =
   let trs = get_trs s in
   let () = dbg "trs: %a" Completion.pp_state trs in
 
-  let _, neqs = get_eqs_neqs s in
+  let _, neqs = get_eqs_neqs s.hyps in
   List.exists (fun (Term.ESubst (a, b)) ->
       if Completion.check_equalities trs [(a,b)] then
         let () = dbg "dis-equality %a ≠ %a violated" Term.pp a Term.pp b in
@@ -561,8 +505,8 @@ let literals_unsat_smt ?(slow=false) s =
     s.env.table
     (SystemExpr.to_fset s.env.system.set) (* TODO handle failure *)
     (Vars.to_list s.env.vars)
-    (get_message_atoms s)
-    (get_trace_literals s)
+    (Hyps.get_message_atoms s.hyps)
+    (Hyps.get_trace_literals s.hyps)
     (* TODO: now that we can pass more general formulas than lists of atoms,
      * we don't actually need to decompose message atoms / trace literals *)
     (* since we didn't move the conclusion into the premises,
@@ -579,7 +523,11 @@ let mk_trace_cntxt ?se s =
     models = Some (get_models s);
   }
 
+(*------------------------------------------------------------------*)
 let get_hint_db s = s.hint_db
+
+(*------------------------------------------------------------------*)
+let get_trace_hyps s = s.hyps
 
 (*------------------------------------------------------------------*)
 let mem_felem _ _ = false

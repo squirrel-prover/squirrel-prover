@@ -37,12 +37,12 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
      - conds ignored for now.
      - trace literals not updated *)
   type state = { 
-    table      : Symbols.table;
-    sexpr      : SE.arbitrary;
-    param      : red_param;
-    hint_db    : Hint.hint_db;
-    trace_lits : Term.literals Lazy.t;
-    conds      : Term.term list;     (* accumulated conditions *)
+    table   : Symbols.table;
+    sexpr   : SE.arbitrary;
+    param   : red_param;
+    hint_db : Hint.hint_db;
+    hyps    : Hyps.TraceHyps.hyps Lazy.t;
+    conds   : Term.term list;     (* accumulated conditions *)
   }
 
   (** Internal *)
@@ -71,7 +71,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     then t, false 
     else 
       try 
-        Match.expand_head_once ~exn:NoExp st.table st.sexpr st.trace_lits t
+        Match.expand_head_once ~exn:NoExp st.table st.sexpr st.hyps t
       with NoExp -> t, false
 
   (* Rewrite once at head position *)
@@ -190,11 +190,11 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
   (** [se] is the system of the term being reduced. *)
   (* computation must be fast *)
   let mk_state ~se (param : red_param) (s : S.t) : state = 
-    { table      = S.table s;
-      sexpr      = se;
+    { table   = S.table s;
+      sexpr   = se;
       param;
-      hint_db    = S.get_hint_db s;
-      trace_lits = lazy (S.get_trace_literals s);
+      hint_db = S.get_hint_db s;
+      hyps    = lazy (S.get_trace_hyps s);
       conds      = []; } 
 
 (*------------------------------------------------------------------*)

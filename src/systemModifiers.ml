@@ -1113,7 +1113,7 @@ let do_rewrite
   let mult, rw_erule = rw in
   match
     Rewrite.rewrite_exn 
-      ~loc (TS.table s) (TS.system s) (TS.vars s)
+      ~loc (TS.table s) (TS.system s) (TS.vars s) (TS.get_trace_hyps s)
       mult rw_erule (`Reach t)
   with
   | `Reach t, subs ->

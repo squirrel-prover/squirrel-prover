@@ -703,17 +703,20 @@ let no_match ?infos () = raise (NoMatch infos)
 let expand_head_once
     ~(exn : exn) 
     (table : Symbols.table) (sexpr : SE.t) 
-    (lits : Term.literals Lazy.t) 
-    (* (s : LowTraceSequent.t) *)
+    (hyps : Hyps.TraceHyps.hyps Lazy.t)
     (t : Term.term) 
   : Term.term * bool 
   = 
   let se = 
     try SE.to_fset sexpr
-    with SE.Error _ -> raise exn (* nothing to expand if not a [fset] *)
+    with SE.Error _ -> raise exn
+    (* FIXME: we are throwing this exception too early, since in the
+       Operator case, we may unfold even if [sexpr = any]. *)
   in
   let models = (* evaluates the models only if needed *)
-    lazy (match Constr.models_conjunct (Lazy.force lits) with
+    lazy (
+      let lits = Hyps.get_trace_literals (Lazy.force hyps) in
+      match Constr.models_conjunct lits with
         | Utils.Timeout -> raise exn
         | Utils.Result models -> models)
   in 
@@ -751,6 +754,8 @@ type match_state = {
   ty_env  : Type.Infer.env;
   table   : Symbols.table;
   system  : SE.context; (** system context applying at the current position *)
+
+  hyps : Hyps.TraceHyps.hyps Lazy.t;
 
   use_fadup     : bool;
   allow_capture : bool;
@@ -820,6 +825,7 @@ module type S = sig
     ?option:match_option ->
     ?mv:Mvar.t ->
     ?ty_env:Type.Infer.env ->
+    ?hyps:Hyps.TraceHyps.hyps Lazy.t ->
     Symbols.table ->
     SE.context ->
     t -> 
@@ -849,6 +855,7 @@ let try_match_gen (type a)
     ?(option=default_match_option)
     ?(mv     : Mvar.t option)
     ?(ty_env : Type.Infer.env option)
+    ?(hyps   : Hyps.TraceHyps.hyps Lazy.t = lazy (Hyps.TraceHyps.empty))
     (table   : Symbols.table)
     (system  : SE.context)
     (t       : a)
@@ -886,7 +893,7 @@ let try_match_gen (type a)
     bvs = Sv.empty;
     mv = mv_init;
 
-    table; system; env; support; ty_env;
+    table; system; env; support; ty_env; hyps;
 
     (* lits = lazy (assert false); *)
     use_fadup     = option.use_fadup;
@@ -962,10 +969,10 @@ module T (* : S with type t = Term.term *) = struct
     | Action (s,is), Action (s',is') -> sunif (s,is) (s',is') st
 
     | Diff (Explicit l), Diff (Explicit l') ->
-      if List.length l <> List.length l' then no_match ();
+      if List.length l <> List.length l' then raise NoMgu;
       
       List.fold_left2 (fun mv (lt,t) (lpat, pat) ->
-          if lt <> lpat then no_match ();
+          if lt <> lpat then raise NoMgu;
           
           unif t pat { st with mv }
         ) st.mv l l'
@@ -1175,14 +1182,15 @@ module T (* : S with type t = Term.term *) = struct
     match t, pat with
     | _, Var v' -> vmatch t v' st
 
-    | Fun (symb, fty, terms), Fun (symb', fty', terms') ->
+    | Fun ((fn , _) as symb, fty, terms), 
+      Fun ((fn', _) as symb', fty', terms') when fn = fn' ->
       let mv = smatch symb symb' st in
       tmatch_l terms terms' { st with mv }
 
     | Name s, Name s' -> isymb_match s s' st
 
     | Macro (s, terms, ts),
-      Macro (s', terms', ts') ->
+      Macro (s', terms', ts') when s.s_symb = s'.s_symb ->
       let mv = isymb_match s s' st in
       assert (Type.equal s.s_typ s'.s_typ);
 
@@ -1217,18 +1225,33 @@ module T (* : S with type t = Term.term *) = struct
 
     | _, _ -> try_reduce_head1 t pat st
 
+  and m_expand_head_once (st : match_state) (t : term) : term * bool =
+    expand_head_once ~exn:(NoMatch None) st.table st.system.set st.hyps t 
+
   (* try to reduce one step at head position in [t] or [pat], 
      and resume matching *)
   and try_reduce_head1 (t : term) (pat : term) (st : match_state) : Mvar.t =
     match t, pat with
-    | Fun _, Fun _ -> 
-      (* let _t = expand_head_once ~exn:(NoMatch None) st.table st.system.set in *)
-      no_match ()
+    | (Macro _ | Fun _), (Macro _ | Fun _) -> 
+      let t, t_red = m_expand_head_once st t in
+      if t_red then tmatch t pat st
+      else
+        let pat, pat_red = m_expand_head_once st pat in
+        if pat_red then tmatch t pat st
+        else no_match ()
 
-    | Macro (m, terms, ts), _ -> no_match ()
-    | _, Macro (m, terms, ts) -> no_match ()
-    | Var _, _ -> no_match ()
-    | _, Var v when not (Sv.mem v st.support) -> no_match ()
+    | Macro _, _ | Fun _, _ -> 
+      let t, t_red = m_expand_head_once st t in
+      if t_red then tmatch t pat st
+      else no_match ()
+
+    | _, Macro _ | _, Fun _ -> 
+      let pat, pat_red = m_expand_head_once st pat in
+      if pat_red then tmatch t pat st
+      else no_match ()
+
+    | Var _, _ -> no_match ()   (* FEATURE *)
+    | _, Var v when not (Sv.mem v st.support) -> no_match () (* FEATURE *)
     | _ -> no_match ()
 
   (* Return: left subst, right subst, match state *)

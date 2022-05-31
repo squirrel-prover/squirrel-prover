@@ -245,8 +245,8 @@ let to_trace_sequent s =
     s trace_s
 
 (*------------------------------------------------------------------*)
-let get_trace_literals s =
-  TS.get_trace_literals (to_trace_sequent (set_reach_goal Term.mk_false s))
+let get_trace_hyps s =
+  TS.get_trace_hyps (to_trace_sequent (set_reach_goal Term.mk_false s))
 
 (*------------------------------------------------------------------*)
 let get_models (s : t) =

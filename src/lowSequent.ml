@@ -18,6 +18,8 @@ module L = Location
 
 module SE = SystemExpr
 
+module TraceHyps = Hyps.TraceHyps
+
 (*------------------------------------------------------------------*)
 module type S = sig
 
@@ -84,7 +86,7 @@ module type S = sig
       Option projections to restrict the systems considered. *)
   val mk_trace_cntxt : ?se:SE.fset -> t -> Constr.trace_cntxt
 
-  val get_trace_literals : t -> Term.literal list
+  val get_trace_hyps : t -> TraceHyps.hyps
 
   val get_hint_db : t -> Hint.hint_db
 

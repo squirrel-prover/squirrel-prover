@@ -286,7 +286,7 @@ Proof.
                  assert decap(   encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(skI(il)))  , skI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(skI(il0))) , skI(il)).
                  auto.
                  simpl.
-                 case H2 => //.
+                 case H1 => //.
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
         ++ intro [H1 _].
@@ -303,7 +303,7 @@ Proof.
                  assert decap(   encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(skI(il)))  , skI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(skI(il0))) , skI(il)).
                  auto.
                  simpl.
-                 case H2 => //.
+                 case H1 => //.
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
         ++ intro [H1 _].
