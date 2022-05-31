@@ -15,9 +15,17 @@ let rp_full = { delta = true; }
 module type S = sig
   type t                        (* type of sequent *)
 
-  val reduce_term  : red_param -> t -> Term.term -> Term.term     
-  val reduce_equiv : red_param -> t -> Equiv.form -> Equiv.form
-  val reduce       : red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
+  val reduce_term  : 
+    ?se:SE.t -> red_param -> t -> Term.term -> Term.term     
+
+  val reduce_equiv : 
+    ?system:SE.context -> red_param -> t -> Equiv.form -> Equiv.form
+
+  val reduce : 
+    ?system:SE.context -> red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
+
+  val expand_head_once :
+    ?se:SE.t -> red_param -> t -> Term.term -> Term.term * bool
 
   val destr_eq : 
     t -> 'a Equiv.f_kind -> 'a -> (Term.term * Term.term) option
@@ -33,7 +41,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     sexpr      : SE.arbitrary;
     param      : red_param;
     hint_db    : Hint.hint_db;
-    trace_lits : Term.literals;
+    trace_lits : Term.literals Lazy.t;
     conds      : Term.term list;     (* accumulated conditions *)
   }
 
@@ -68,8 +76,8 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       try SE.to_fset st.sexpr
       with SE.Error _ -> raise NoExp (* nothing to expand if not a [fset] *)
     in
-    let models = 
-      lazy (match Constr.models_conjunct st.trace_lits with
+    let models = (* evaluates the models only if needed *)
+      lazy (match Constr.models_conjunct (Lazy.force st.trace_lits) with
           | Utils.Timeout -> raise NoExp
           | Utils.Result models -> models)
     in 
@@ -206,24 +214,43 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       in
       t, has_red
 
+(*------------------------------------------------------------------*)
   (** [se] is the system of the term being reduced. *)
+  (* computation must be fast *)
   let mk_state ~se (param : red_param) (s : S.t) : state = 
     { table      = S.table s;
       sexpr      = se;
-      param      = param;
+      param;
       hint_db    = S.get_hint_db s;
-      trace_lits = S.get_trace_literals s;
+      trace_lits = lazy (S.get_trace_literals s);
       conds      = []; } 
 
-  (** Reduce a term in a given context. 
-      The sequent's hypotheses must be used sparsingly *)
-  let reduce_term (param : red_param) (s : S.t) (t : Term.term) : Term.term = 
-    let state = mk_state ~se:(S.system s).set param s in
+(*------------------------------------------------------------------*)
+  (** Exported. *)
+  let expand_head_once
+      ?(se : SE.arbitrary option)
+      (param : red_param) (s : S.t)
+      (t : Term.term) : Term.term * bool 
+    = 
+    let se = odflt (S.system s).set se in
+    let state = mk_state ~se param s in
+    expand_head_once state t
+
+(*------------------------------------------------------------------*)
+  (** Exported. *)
+  let reduce_term
+      ?(se : SE.arbitrary option)
+      (param : red_param) (s : S.t)
+      (t : Term.term) : Term.term 
+    = 
+    let se = odflt (S.system s).set se in
+    let state = mk_state ~se param s in
     let t, _ = reduce state t in
     t
 
-
+  (** Exported. *)
   let rec reduce_equiv
+      ?(system : SE.context option)
       (param : red_param) (s : S.t) (e : Equiv.form) : Equiv.form 
     =
     match e with
@@ -249,7 +276,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       Equiv.Atom (Reach (reduce_term param s f))
 
     | Equiv.Atom (Equiv e) -> 
-      let system = S.system s in
+      let system = odflt (S.system s) system in
       let e_se = (oget system.pair :> SE.arbitrary) in
       let state = mk_state ~se:e_se param s in
 
@@ -258,15 +285,17 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
   (** We need type introspection there *)
   let reduce (type a) 
+      ?(system : SE.context option)
       (param : red_param) (s : S.t) (k : a Equiv.f_kind) (x : a) : a 
     =
+    let se = omap (fun system -> system.SE.set) system in
     match k with
-    | Local_t  -> reduce_term  param s x
-    | Global_t -> reduce_equiv param s x
+    | Local_t  -> reduce_term  ?se     param s x
+    | Global_t -> reduce_equiv ?system param s x
     | Any_t ->
        match x with
-         | `Reach x -> `Reach (reduce_term param  s x)
-         | `Equiv x -> `Equiv (reduce_equiv param s x)
+         | `Reach x -> `Reach (reduce_term  ?se     param s x)
+         | `Equiv x -> `Equiv (reduce_equiv ?system param s x)
 
  (*------------------------------------------------------------------*)
   (* FIXME: use [s] to reduce [x] if necessary *)

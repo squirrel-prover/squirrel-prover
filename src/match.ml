@@ -1330,7 +1330,7 @@ module T (* : S with type t = Term.term *) = struct
       (* If we already saw the variable, check that the subterms are
          identical. *)
       | t' -> 
-        (* FEATURE: check convertible *)
+      (* FEATURE: conversion *)
         if t <> t' then no_match () else st.mv
 
   (*------------------------------------------------------------------*)

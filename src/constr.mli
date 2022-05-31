@@ -6,7 +6,7 @@ type models
 (*------------------------------------------------------------------*)
 (** [models_conunct l] returns the list of minimal models of the conjunction of
     atoms. *)
-val models_conjunct : Term.literal list -> models Utils.timeout_r
+val models_conjunct : Term.literals -> models Utils.timeout_r
 
 val m_is_sat : models -> bool
 
@@ -22,15 +22,15 @@ val query : precise:bool -> models -> Term.literals -> bool
     This can only be over-approximated, and our result may not be the best.
     This function may be non-deterministic. *)
 val maximal_elems :
-  precise:bool -> models -> Term.term list -> Term.term list
+  precise:bool -> models -> Term.terms -> Term.terms
 
 (** [get_ts_equalities models ts], given a list of models [models] and a list
     of timespoints [ts], gives back the classes for equality in all models. *)
 val get_ts_equalities :
-  precise:bool -> models -> Term.term list -> Term.term list list
+  precise:bool -> models -> Term.terms -> Term.terms list
 
 val get_ind_equalities :
-  precise:bool -> models -> Vars.var list -> Vars.var list list
+  precise:bool -> models -> Vars.vars -> Vars.vars list
 
 (** [find_eq_action models t] looks for an action [ts] equal to [t]. *)
 val find_eq_action : models -> Term.term -> Term.term option
