@@ -45,9 +45,12 @@ let run_prover ?limit_opt task =
     | None   -> Config.solver_timeout ()
     | Some x -> x
   in
+  let opam_prefix = Sys.getenv "OPAM_SWITCH_PREFIX" in
   Utils.omap (fun (env, prover, driver) ->
       Why3.Call_provers.wait_on_call
         (Why3.Driver.prove_task
+           ~libdir:(Filename.concat opam_prefix "/lib/why3")
+           ~datadir:(Filename.concat opam_prefix "/share/why3")
            ~limit:{ Why3.Call_provers.empty_limit with limit_time = limit }
            ~command:prover.Why3.Whyconf.command
            driver task))
