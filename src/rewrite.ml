@@ -257,7 +257,7 @@ let mk_state
         pat_vars   = rule.rw_vars; 
         pat_term   = mk_form left;
       };
-    init_right = mk_form right;
+    init_right     = mk_form right;
     init_subs      = List.map mk_form rule.rw_conds;
     found_instance = `False; } 
 
@@ -268,8 +268,7 @@ let mk_state
    bound above the matched occurrences are universally quantified in
    the generated sub-goals. *)
 let rw_inst
-    (table : Symbols.table) (rule : rw_rule) 
-  : rw_state Pos.f_map_fold 
+    (table : Symbols.table) (rule : rw_rule) : rw_state Pos.f_map_fold 
   = 
   fun occ se vars conds _p (s : rw_state) ->
 
@@ -314,14 +313,12 @@ let rw_inst
           let right_proj = Term.project_opt projs s.init_right in
           Term.subst subst right_proj
         in
-
         let found_subs =
           List.map (fun rsub ->
+              let rsub = Term.project_opt projs rsub in
               se, 
-              Term.mk_forall ~simpl:true vars 
-                ((* Term.mk_impls ~simpl:true conds *) 
-                  (Term.subst subst rsub))
-            ) rule.rw_conds
+              Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
+            ) s.init_subs
         in
 
         let found_pat = Match.{ 
