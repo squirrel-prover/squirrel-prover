@@ -190,9 +190,40 @@ let vars j = j.env.vars
 let set_vars vars j = update ~vars j
 
 let system j = j.env.system
-let set_system system j =
-  let env = Env.set_system j.env system in
-  { j with env }
+
+let set_goal_in_context ?update_local system conc s =
+
+  assert (update_local = None);
+
+  if system = s.env.system then { s with goal = conc } else
+
+  (* Change the context in the sequent's environment. *)
+  let env = Env.update ~system s.env in
+  let s = { s with env } in
+
+  (* Update hypotheses.
+     We add back manually all formulas, to ensure that definitions are
+     unrolled. TODO really necessary? *)
+  let update_local,update_global =
+    LowSequent.setup_set_goal_in_context
+      ~table:s.env.table
+      ~old_context:s.env.system
+      ~new_context:system
+  in
+  let s =
+    H.fold
+      (fun id f s ->
+         match update_global f with
+           | Some f ->
+               let _,hyps = H.add ~force:true id f s.hyps in
+               { s with hyps }
+           | None -> s)
+      s.hyps
+      { s with hyps = H.empty }
+  in
+
+  (* Finally set the new conclusion. *)
+  { s with goal = conc }
 
 let table j = j.env.table
 let set_table table j = update ~table j

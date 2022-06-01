@@ -380,70 +380,7 @@ let set_table table s =
   let env = Env.update ~table s.env in
   S.update ~env s
 
-let set_system system s = 
-  let env = Env.update ~system s.env in
-  S.update ~env s
-
 (*------------------------------------------------------------------*)
-let filter_map_hyps func hyps =
-  H.map (fun f -> func f) hyps
-    
-(*------------------------------------------------------------------*)
-(** [pi proj s] returns the projection of [s] along [proj].
-    Fails if [s.system.set] cannot be projected. *)
-let pi projection s =
-  let pi = function
-    | `Reach t -> `Reach (Term.project1 projection t)
-    | h -> h (* Leave it untouched, we'll take care of it later. *)
-  in
-  let hyps = filter_map_hyps pi s.hyps in
-  let new_env =
-    let context = s.env.system in
-    let fset = SystemExpr.to_fset context.set in
-    let new_set = SystemExpr.((project [projection] fset :> arbitrary)) in
-    let context = { context with set = new_set } in
-    Env.update ~system:context s.env
-  in
-  let s =
-    S.update
-      ~env:new_env
-      ~conclusion:(Term.project1 projection s.conclusion)
-      ~hyps:H.empty
-      s
-  in
-  (* We add back manually all formulas, to ensure that definitions are
-     unrolled. The next function is used to determine when we can keep
-     a global formula: its local atoms need to be logically equivalent
-     under the old and new annotations. We ensure this by keeping only
-     trace formulas (which implies that they do not contain diff
-     operators). *)
-  let rec can_keep_global = function
-    | Equiv.Quant (_,_,f) :: l ->
-        can_keep_global (f::l)
-    | Impl (f,g) :: l | Equiv.And (f,g) :: l | Or (f,g) :: l ->
-        can_keep_global (f::g::l)
-    | Atom (Equiv _) :: l -> can_keep_global l
-    | Atom (Reach a) :: l ->
-        Term.is_pure_timestamp a &&
-        can_keep_global l
-    | [] -> true
-  in
-  (* Special case at toplevel: we can keep a global formula when
-     its meaning under the old annotation implies its meaning under
-     the new one. *)
-  let can_keep_global = function
-    | Equiv.Atom (Reach f) -> true
-    | f -> can_keep_global [f]
-  in
-  H.fold
-    (fun id f s ->
-       match f with
-         | `Reach f -> snd (AnyHyps.add_formula id f s)
-         | `Equiv e ->
-             if not (can_keep_global e) then s else
-             let _,hyps = H.add ~force:true id f s.hyps in
-             S.update ~hyps s)
-    hyps s
 
 let set_goal a s =
   let s = S.update ~conclusion:a s in
@@ -454,6 +391,65 @@ let set_goal a s =
         AnyHyps.add_macro_defs s a
       | _ -> s
 
+let set_goal_in_context ?update_local system conc s =
+
+  if system = s.env.system && update_local = None then
+    set_goal conc s
+  else
+
+  (* Change the context in the sequent's environment. *)
+  let env = Env.update ~system s.env in
+  let s = S.update ~env s in
+
+  (* Update hypotheses.
+     We add back manually all formulas, to ensure that definitions are
+     unrolled. TODO really necessary? *)
+  let default_update_local,update_global =
+    LowSequent.setup_set_goal_in_context
+      ~table:s.env.table
+      ~old_context:s.env.system
+      ~new_context:system
+  in
+  let update_local = match update_local with
+    | None -> default_update_local
+    | Some f -> f
+  in
+  let s =
+    H.fold
+      (fun id f s ->
+         match f with
+           | `Reach f ->
+               begin match update_local f with
+                 | Some f -> snd (AnyHyps.add_formula id f s)
+                 | None -> s
+               end
+           | `Equiv e ->
+               begin match update_global e with
+                 | Some e ->
+                     let _,hyps = H.add ~force:true id f s.hyps in
+                     S.update ~hyps s
+                 | None -> s
+               end)
+      s.hyps (S.update ~hyps:H.empty s)
+  in
+
+  (* Finally set the new conclusion. *)
+  set_goal conc s
+
+(** [pi proj s] returns the projection of [s] along [proj].
+    Fails if [s.system.set] cannot be projected. *)
+let pi projection s =
+  let new_context =
+    let context = s.env.system in
+    let fset = SystemExpr.to_fset context.set in
+    let new_set = SystemExpr.((project [projection] fset :> arbitrary)) in
+    { context with set = new_set }
+  in
+  set_goal_in_context
+    new_context
+    (Term.project1 projection s.conclusion)
+    s
+
 let init ~env ~hint_db conclusion =
   init_sequent ~env ~hint_db ~conclusion
 
@@ -462,7 +458,7 @@ let goal s = s.conclusion
 (*------------------------------------------------------------------*)
 let subst subst s =
   if subst = [] then s else
-    let hyps = filter_map_hyps (Equiv.Any.subst subst) s.hyps in
+    let hyps = H.map (Equiv.Any.subst subst) s.hyps in
     let s =
       S.update
         ~hyps:hyps

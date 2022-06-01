@@ -61,8 +61,21 @@ module type S = sig
   val set_goal : conc_form -> t -> t
 
   val system : t -> SystemExpr.context
-  val set_system : SystemExpr.context -> t -> t
-    (* TODO double-check all uses now that contexts are used *)
+
+  (** Change the context of a sequent and its conclusion at the same time.
+      The new conclusion is understood in the new context.
+
+      Hypotheses of the returned sequent (understood wrt the new context)
+      are logical consequences of hypotheses of the original sequent
+      (understood wrt its own context): some hypotheses will thus be dropped
+      while others will be projected.
+
+      The optional [update_local] function can be used to override the
+      treatment of local hypotheses, i.e. to determine when they can be
+      kept (possibly with modifications) or if they should be dropped. *)
+  val set_goal_in_context :
+    ?update_local:(Term.form -> Term.form option) ->
+    SystemExpr.context -> conc_form -> t -> t
 
   val table : t -> Symbols.table
   val set_table : Symbols.table -> t -> t
@@ -118,3 +131,78 @@ module type S = sig
   (** Smart constructors and destructors for conclusions. *)
   module Conc : Term.SmartFO with type form = conc_form
 end
+
+(** {2 Common utilities for sequent implementations} *)
+
+(** Common setup for [set_goal_in_context].
+    For each kind of hypothesis we need an update function that
+    returns [None] if the hypothesis must be dropped, and [Some f]
+    if it must be changed to [f].
+    The [setup_set_goal_in_context] returns the pair of local and
+    global update functions. *)
+let setup_set_goal_in_context ~old_context ~new_context ~table =
+
+  (* It would make sense to require that the new system expression
+     is compatible with the old one.
+     For now we only handle the case where the new system expression
+     is a subset of the old one. *)
+  assert (SE.subset table new_context.SE.set old_context.SE.set);
+  assert (new_context.SE.pair = old_context.SE.pair ||
+          new_context.SE.pair = None);
+
+  (* Flags indicating which parts of the context are changed. *)
+  let set_unchanged = new_context.SE.set = old_context.SE.set in
+  let pair_unchanged = new_context.SE.pair = old_context.SE.pair in
+
+  (* Can we project formulas from the old to the new context? *)
+  let set_projections =
+    if SE.is_any_or_any_comp old_context.set then Some (fun f -> f) else
+      if SE.subset table new_context.set old_context.set then
+        match SE.(to_projs (to_fset new_context.set)) with
+          | projs -> Some (fun f -> Term.project projs f)
+          | exception SE.(Error Expected_fset) -> assert false
+      else
+        None
+  in
+
+  (* For local hypotheses, the following criteria are used:
+     - Pure trace formulas are kept.
+       These formulas cannot contain diff operators and thus don't need
+       to be projected.
+     - Other local hypotheses can be kept with a projection from the old
+       to the new system, when it exists. *)
+  let update_local f =
+    if Term.is_pure_timestamp f then
+      Some f
+    else
+      Utils.omap (fun project -> project f) set_projections
+  in
+
+  (* For global hypotheses:
+    - Reachability atoms are handled as local hypotheses.
+    - Other global hypotheses can be kept if their meaning is unchanged
+      in the new annotation. This is ensured in [can_keep_global]
+      by checking the following conditions on atoms:
+      + Reachability atoms are unconstrained if the set annotation
+        has not changed. Otherwise they must be pure trace formulas.
+      + Equivalence atoms are only allowed if the trace annotation has
+        not changed. *)
+  let rec can_keep_global = function
+    | Equiv.Quant (_,_,f) :: l ->
+        can_keep_global (f::l)
+    | Impl (f,g) :: l | Equiv.And (f,g) :: l | Or (f,g) :: l ->
+        can_keep_global (f::g::l)
+    | Atom (Equiv _) :: l -> pair_unchanged && can_keep_global l
+    | Atom (Reach a) :: l ->
+        (Term.is_pure_timestamp a || set_unchanged) && can_keep_global l
+    | [] -> true
+  in
+  let update_global f =
+    if can_keep_global [f] then Some f else
+      match f with
+        | Equiv.Atom (Reach f) ->
+            Utils.omap (fun f -> Equiv.Atom (Reach f)) (update_local f)
+        | _ -> None
+  in
+
+  update_local, update_global

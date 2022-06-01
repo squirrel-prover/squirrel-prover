@@ -174,9 +174,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     let f,subs = doit (f,tgt_id) in
     let subs : S.sequent list =
-      List.map (fun (sub_system, sub) -> 
-          S.set_system sub_system (S.set_goal sub s)
-        ) subs
+      List.map
+        (fun (sub_system, sub) -> S.set_goal_in_context sub_system sub s)
+        subs
     in
 
     match t, f with

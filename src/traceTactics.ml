@@ -1948,20 +1948,21 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
       "Cannot transform %a: it will be dropped.@." Term.pp t
   in
 
-  let rewrite (h : Term.term) : Term.term =
-    (* Attempt to transform. If the transformation can't
-     * be applied we can simply drop the hypothesis rather
-     * than failing completely. *)
-    try rewrite_equiv_transform ~src ~dst ~s biframe h with
-    | Invalid -> warn_unsupported h; Term.mk_true
+  (* Attempt to transform. If the transformation can't
+   * be applied we can simply drop the hypothesis rather
+   * than failing completely. *)
+  let rewrite (h : Term.term) : Term.term option =
+    try Some (rewrite_equiv_transform ~src ~dst ~s biframe h) with
+    | Invalid -> warn_unsupported h; None
   in
 
   let goal =
-    TS.LocalHyps.map rewrite s
-    |> TS.set_system updated_context
-    |> TS.set_goal
+    TS.set_goal_in_context
+      ~update_local:rewrite
+      updated_context
       (try rewrite_equiv_transform ~src ~dst ~s biframe (TS.goal s) with
        | Invalid -> warn_unsupported (TS.goal s); Term.mk_false)
+      s
   in
   subgoals @ [goal]
 
