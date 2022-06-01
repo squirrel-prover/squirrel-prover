@@ -36,8 +36,12 @@ module List : sig
   val take : int -> 'a list -> 'a list
 
   (** [drop n l] returns [l] without the first [n] elements, or the empty list 
-      if [l]  have less than n elements. *)
+      if [l] has less than n elements. *)
   val drop : int -> 'a list -> 'a list
+
+  (** [drop_right n l] returns [l] without the last [n] elements, or the empty list 
+      if [l] has less than n elements. *)
+  val drop_right : int -> 'a list -> 'a list
 
   (** [takedrop n l] returns the a result equal to [take n l, drop n l]. *)
   val takedrop : int -> 'a list -> 'a list * 'a list

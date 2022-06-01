@@ -205,7 +205,7 @@ let get_bad_occurrences
     | Fun (f, _, _) when f = exp ->
        let (m, pows) = powers exp mult info contx t in
        (* we're sure pows isn't empty, so no risk of looping in illegal powers *)
-       get_illegal_powers m pows ~fv ~cond ~st
+       get_illegal_powers m pows ~fv ~cond ~st:t
 
     | Fun (f, _, [t1; t2]) when f = f_eq && gdh_oracles ->
        (* u^p1…pn = v^q1…qn *)
@@ -216,8 +216,10 @@ let get_bad_occurrences
        let (v, qows) = powers exp mult info contx t2 in
        let (bad_pows, other_pows) = partition_powers nab pows in
        let (bad_qows, other_qows) = partition_powers nab qows in
-       let bad_pows_minus_1 = List.drop 1 bad_pows in
-       let bad_qows_minus_1 = List.drop 1 bad_qows in
+       let bad_pows_minus_1 = List.drop_right 1 bad_pows in
+       let bad_qows_minus_1 = List.drop_right 1 bad_qows in
+       (* allow the last one on both sides of =. arbitrary, would be better
+          to generate a disjunction goal. *)
        get_illegal_powers u (bad_pows_minus_1 @ other_pows) ~fv ~cond ~st:t
        @ get_illegal_powers v (bad_qows_minus_1 @ other_qows) ~fv ~cond ~st:t
 
@@ -232,7 +234,7 @@ let get_bad_occurrences
       
     | _ ->
       Iter.tfold_occ ~mode:`NoDelta (* not delta since macros are handled separately *)
-        (fun ~fv ~cond t' occs -> (get t' ~fv ~cond ~st) @ occs)
+        (fun ~fv ~cond t' occs -> occs @ (get t' ~fv ~cond ~st))
         ~fv ~cond t []
   in
   get t ~fv ~cond:[] ~st:t
@@ -443,6 +445,10 @@ let cgdh
     (* proof obligations from the direct occurrences *)
     let direct_sequents = List.map (occurrence_sequent ts s) nab_dir_occ in
 
+    if List.length direct_sequents = 0 then
+      Printer.pr "  (no occurrences)@;";
+                                            
+
     (* indirect occurrences and their proof obligations *)
     Printer.pr "@;@;@[<hv 2>Bad occurrences of %a and %a found in other actions:@]@;"
       Term.pp_nsymb na
@@ -465,8 +471,12 @@ let cgdh
           indirect_sequents)
         cntxt env [t] []
     in
-    Printer.pr "@;Total: %d bad occurrences@;@]"
-      ((List.length direct_sequents) + (List.length indirect_sequents));
+
+    if List.length indirect_sequents = 0 then
+      Printer.pr "  (no occurrences)@;";
+
+    let nseq = (List.length direct_sequents) + (List.length indirect_sequents) in
+    Printer.pr "@;Total: %d bad occurrence%s@;@]" nseq (if nseq = 1 then "" else "s");
     direct_sequents @ List.rev indirect_sequents
   with
   | Fresh.Var_found ->

@@ -107,6 +107,9 @@ module List = struct
     if i < 0 then failwith "invalid argument";
     drop0 i l
 
+  let drop_right i l =
+    rev (drop i (rev l))
+
   (*------------------------------------------------------------------*)
   let rec take0 i l =
     if i = 0 then []
