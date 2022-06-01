@@ -26,195 +26,218 @@ let wrap_fail = TraceLT.wrap_fail
 let soft_failure = Tactics.soft_failure
 let hard_failure = Tactics.hard_failure
 
-(** Checks that t can never be of the form … * n * … for any n in excl.
-    Sufficient check, not necessary (eg if t is a macro we say false
-    as it could potentially expand to a term of that form,
-    without checking whether that can actually happen) *)
-let rec not_occurs_mult
-    ?(fv=Sv.empty)
-    (contx : Constr.trace_cntxt)
-    (mult  : fsymb option)
-    (t     : term)
-    (excl  : name list)
-  : bool
-  =
-  match t with
-  | Name ns -> not (List.mem (ns.s_symb) excl)
+(*------------------------------------------------------------------*)
+(* utility functions for lists of nsymbs *)
 
-  | Fun (f, _, _) when Some f <> mult ->
-    true
+(** looks for a name with the same symbol in the list *)
+let exists_symb (n:nsymb) (ns:nsymb list) : bool =
+  List.exists (fun nn -> n.s_symb = nn.s_symb) ns
 
-  | Fun (f, _, [t1; t2]) when Some f = mult ->
-    not_occurs_mult ~fv:fv contx mult t1 excl &&
-    not_occurs_mult ~fv:fv contx mult t2 excl
-
-  | _ -> false
-
-       
-(** Checks that term t is of the form g ^ … ^ something,
-   where no element of excl can ever occur in "…" or "something".
-   Sufficient check, not necessary. Eg if t is g ^ (a macro), we say false,
-   as it could potentially expand to g ^ (some excluded name), without checking
-   whether that can actually happen *)
-let rec check_pow_g
-    ?(fv=Sv.empty)
-    (contx : Constr.trace_cntxt)
-    (g     : term)
-    (exp   : fsymb)
-    (mult  : fsymb option)
-    (t     : term)
-    (excl  : name list)
-  : bool
-  =
-  match t with
-  | tt when tt = g -> true
-
-  | Term.(Fun (f, _, [t1; t2])) when f = exp ->
-    let m = not_occurs_mult ~fv:fv contx mult t2 excl in
-    let p = check_pow_g ~fv:fv contx g exp mult t1 excl in
-    p && m
-
-  | _ -> false
+(** finds a name with the same symbol in the list *)
+let find_symb (n:nsymb) (ns:nsymb list) : nsymb =
+  List.find (fun nn -> n.s_symb = nn.s_symb) ns
 
 
 (*------------------------------------------------------------------*)
-(* occurrence of a name -- when we use it we know 
-   which name symbol we're looking for,
-   so we only record the indices in the occurrence *)
-type name_occ = Vars.var list Iter.occ
+
+(* information used to check if a macro can be expanded in a term.
+  - the current sequent, for direct occurrences; 
+  - the action for the iocc that produced the term, for indirect ones. *)
+type expand_info = EI_direct of sequent | EI_indirect of term
+
+let get_action (info:expand_info) : term option =
+  match info with
+  | EI_indirect a -> Some a
+  | _ -> None
+
+(** expand t if it is a macro and we can check that its timestamp happens
+    using info *)
+let expand_macro_check (info:expand_info) (contx:Constr.trace_cntxt)
+                       (t:term) : term option =
+  match t with
+    | Macro (m, l, ts) ->
+       if match info with
+          | EI_direct s -> TS.query_happens ~precise:true s ts
+          | EI_indirect a -> ts = a
+       then
+         match Macros.get_definition contx m ts with
+         | `Def t' -> Some t'
+         | `Undef | `MaybeDef -> None
+       else
+         None
+    | _ -> None
+
+
+(** returns the list of factors of t for the given multiplication
+    (if mult = none then t is its own only factor)
+    (unfolds the macros when possible) *)
+let rec factors (mult:fsymb option) (info:expand_info) (contx:Constr.trace_cntxt)
+                (t:term) : (term list) =
+  match t with
+  | Fun (f, _, [t1; t2]) when mult = Some f ->
+     factors mult info contx t1 @ factors mult info contx t2
+  | Macro _ ->
+     begin
+       match expand_macro_check info contx t with
+       | Some t' -> factors mult info contx t'
+       | None -> [t]
+     end
+  | _ -> [t]
+
+
+(** returns (m, [p1,…,pn]) such that t = m ^ (p1*…*pn)
+    and m is not itself an exponential.
+    (unfolds the macros when possible) *) 
+let rec powers (exp:fsymb) (mult:fsymb option)
+               (info:expand_info) (contx:Constr.trace_cntxt)
+               (t:term) : term * (term list) =
+  match t with
+  | Fun (f, _, [t1; t2]) when f = exp ->
+     let (m, ps) = powers exp mult info contx t1 in
+     let fs = factors mult info contx t2 in
+     (m, ps@fs)
+  | Macro _ ->
+     begin
+       match expand_macro_check info contx t with
+       | Some t' -> powers exp mult info contx t'
+       | None -> (t, [])
+     end
+  | _ -> (t, [])
+
+
+
+(*------------------------------------------------------------------*)
+(* information used to remember where an occurrence was found.
+   - the name it's in collision with,
+   - a subterm where it was found,
+   - optionally the action producing the iocc where
+     it was found, for indirect occs *) 
+type occ_info = {oi_name:nsymb; oi_subterm:term; oi_action:term option}
+
+let mk_oinfo (m:nsymb) (st:term) (ac:term option) : occ_info =
+  {oi_name = m; oi_subterm = st; oi_action = ac}
+
+(* occurrence of a name *)
+type name_occ = (nsymb * occ_info) Iter.occ
 type name_occs = name_occ list
 
+let mk_nocc (n:nsymb) (info:occ_info) (fv:Vars.vars) (cond:terms) (pos:Sp.t) : name_occ =
+  Iter.{occ_cnt = (n, info); occ_vars = fv; occ_cond = cond; occ_pos = pos;}
+
+
+(** prints a description of the occurrence *)
+let print_dh_name_occ (occ:name_occ) : unit =
+  let (n, oinfo) = occ.occ_cnt in
+  Printer.pr "  @[<hv 2>%a @,(collision with %a) " Term.pp_nsymb n Term.pp_nsymb oinfo.oi_name;
+  if oinfo.oi_action <> None then
+    Printer.pr "@,in action %a " Term.pp (oget oinfo.oi_action);
+  Printer.pr "@,@[<hov 2>in term@ @[%a@]@]" Term.pp oinfo.oi_subterm;
+  Printer.pr "@]@;@;"
+
 
 (*------------------------------------------------------------------*)
-(** [allowed_occs] describes what occurrences are tolerated in a term t we 
-   consider.
-   [NotAllowed]: default, we're in the toplevel term, no occurrences 
-   allowed directly here
-   [OneInProduct]: we're on top of a g^…, or in u = v ^ …, so
-                 occurrences are allowed directly or under *, but only once
-   [UnderEqual]: we're in the "v ^ …" in an equality test, so yeah *)
-type allowed_occs = NotAllowed | OneInProduct | UnderEqual
+(** Separate pows between occs of elements in nab and the rest *)
+let partition_powers (nab:nsymb list) (pows:term list) : 
+      (term list) * (term list) =
+  List.partition
+    (fun tt ->
+      match tt with
+      | Name nn -> exists_symb nn nab
+      | _ -> false)
+    pows
 
-  
-(** Used to find occurrences not allowed by CDH or GDH, depending on 
-   the "gdh_oracles" boolean 
-   Finds all possible occurrences of n in t (ground), except
-   occurrences appearing in subterms of the form
-    - g ^ … ^ (something * n * something else),
-      where no element of excl appear in "…" or "something"  
-    - u = v ^ (something * a * something else) ^ …,
-      where no element of excl appear in "…" or "something"  ONLY if 
-   oracles is set to true *)
-(** we assume n is in excl *)
-(** action is the action that produced the term where we're looking
-    (None for direct occ, Some for indirect occ)
-    we just use it for printing *)
-let get_name_except_allowed
-    (gdh_oracles : bool)
-    ?(fv=[])
-    (contx       : Constr.trace_cntxt)
-    (n           : name)
-    (excl        : name list)
-    (g           : term)
-    (exp         : fsymb)
-    (mult        : fsymb option)
-    (t           : Term.term)
-  : name_occs
-  =
-  let rec get
-      (allowed : allowed_occs)
-      (t       : term)
-      ~(fv     : Vars.vars)
-      ~(cond   : terms)
-    : name_occs
-    =
+
+(* future work: return a tree of and/or of name_occs and generate the goals accordingly *)
+(** Used to find occurrences of names in nab not allowed by CDH or GDH
+    (depending on gdh_oracles).
+   Finds all possible occurrences of nab in t (ground), except
+   1) in g ^ p1…pn: one pi is allowed to be a or b
+   2) in u^p1…pn = v^q1…qm: if GDH, one pi and one qi are allowed to be a or b
+   3) in macros that can't be expanded (according to info): these macros
+   will correspond to another iocc generated by fold_macro_support, and will thus be
+   handled in a separate call *)
+let get_bad_occurrences
+      (gdh_oracles:bool) ?(fv=[]) (info:expand_info) (contx:Constr.trace_cntxt)
+      (g:term) (exp:fsymb) (mult:fsymb option)
+      (nab:nsymb list) (t:term) : name_occs =
+  (* get all bad occurrences in m ^ (p1 * … * pn) *)
+  (* st is the current subterm, to be recorded in the occurrence *)
+  let rec get_illegal_powers
+            (m:term) (pows:terms)
+            ~(fv:Vars.vars) ~(cond:terms)
+            ~(st:term) : name_occs =
+    if m <> g then (* all occs in m, pows are bad *)
+      (get m ~fv ~cond ~st:m) @ 
+        (List.concat_map (fun tt -> get tt ~fv ~cond ~st) pows)
+    (* note: might be that m is a macro that unfolds to g and we don't see it.
+       then we generate useless bad occs, but that's still sound *)    
+    
+    else (* 1 bad pi is allowed.
+            bad occs = all bad pi except 1 + bad occs in other pis *)
+     let (bad_pows, other_pows) = partition_powers nab pows in
+     let bad_pows_minus_1 = List.drop 1 bad_pows in
+     (* allow the first one. arbitrary, would be better to generate a disjunction goal *)
+     let bad_pows_occs =
+       List.map
+         (fun tt -> 
+           match tt with
+           | Name nn ->  (* find should always succeed *)
+              let oinfo = mk_oinfo (find_symb nn nab) st (get_action info) in 
+              mk_nocc nn oinfo fv cond Sp.empty
+           | _ -> assert false)
+         (* pos is not set right here, could be bad if we wanted to use it later *)
+         bad_pows_minus_1
+     in
+     bad_pows_occs @ List.concat_map (fun tt -> get tt ~fv ~cond ~st) other_pows
+     
+
+  (* get all bad occurrences in t *)
+  (* st is the current subterm, to be recorded in the occurrence *)
+  and get (t: term) ~(fv:Vars.vars) ~(cond:terms) ~(st:term): name_occs =
     match t with
     | Var v when not (Type.is_finite (Vars.ty v)) ->
       raise Fresh.Var_found
 
-    | Name ns when allowed <> OneInProduct && ns.s_symb = n ->
-      let occ = Iter.{
-          occ_cnt  = ns.s_indices;
-          occ_vars = fv;
-          occ_cond = cond;
-          occ_pos  = Sp.empty; }
-      in
-      [occ]
+    | Name n when exists_symb n nab ->
+       let oinfo = mk_oinfo (find_symb n nab) st (get_action info) in
+       [mk_nocc n oinfo fv cond Sp.empty]
+ 
+    | Fun (f, _, _) when f = exp ->
+       let (m, pows) = powers exp mult info contx t in
+       (* we're sure pows isn't empty, so no risk of looping in illegal powers *)
+       get_illegal_powers m pows ~fv ~cond ~st
 
-    | Fun (f, _, [t1; t2]) when f = exp && allowed <> UnderEqual ->
-      let occs_t1 = get NotAllowed t1 ~fv ~cond in
-      let is_pow = check_pow_g ~fv:(Sv.of_list fv) contx g exp mult t1 excl in
-      let all = if is_pow then OneInProduct else NotAllowed in
-      let occs_t2 = get all t2 ~fv ~cond in
-      occs_t1 @ occs_t2
+    | Fun (f, _, [t1; t2]) when f = f_eq && gdh_oracles ->
+       (* u^p1…pn = v^q1…qn *)
+       (* one bad pow is allowed in u, and one in v.
+          Then we recurse on the rest, using illegal powers
+          so we don't need to reconstruct the term *)
+       let (u, pows) = powers exp mult info contx t1 in
+       let (v, qows) = powers exp mult info contx t2 in
+       let (bad_pows, other_pows) = partition_powers nab pows in
+       let (bad_qows, other_qows) = partition_powers nab qows in
+       let bad_pows_minus_1 = List.drop 1 bad_pows in
+       let bad_qows_minus_1 = List.drop 1 bad_qows in
+       get_illegal_powers u (bad_pows_minus_1 @ other_pows) ~fv ~cond ~st:t
+       @ get_illegal_powers v (bad_qows_minus_1 @ other_qows) ~fv ~cond ~st:t
 
-    | Fun (f, _, [t1; t2]) when f = exp && allowed = UnderEqual ->
-      let not_bad_mult = not_occurs_mult ~fv:(Sv.of_list fv) contx mult t2 excl in
-      if not_bad_mult then
-        (* t2 is not a bad product -> we check t1 with UnderEqual and 
-           t2 with NotAllowed *)
-        let occs_t1 = get UnderEqual t1 ~fv ~cond in
-        let occs_t2 = get NotAllowed t2 ~fv ~cond in
-        occs_t1 @ occs_t2
-      else
-        (* t2 may be a bad product -> we can't let t1 be v'^occurrence, 
-           so back to NotAllowed for t1
-           and we allow one nonce in t2 so OneInProduct *)
-        let occs_t1 = get NotAllowed t1 ~fv ~cond in
-        let occs_t2 = get OneInProduct t2 ~fv ~cond in
-        occs_t1 @ occs_t2
-
-
-    | Fun (f, _, [t1; t2]) when Some f = mult && allowed = OneInProduct ->
-      let not_bad_mult1 = not_occurs_mult ~fv:(Sv.of_list fv) contx mult t1 excl in
-      (* detail of how the parameters are chosen *)
-      (* if t1 is not a bad product: we allow one occ in t2, and we know 
-         none are in t1 if it can be a bad product: we allow one occ in t1, 
-         and none in t2.
-         We could check if t2 is not a bad product in the first case, 
-         to know whether we expect to find occurrences or not, 
-         but it's not very useful *)
-      if not_bad_mult1 then
-        get NotAllowed t1 ~fv ~cond @ get OneInProduct t2 ~fv ~cond
-      else
-        (* Note the imprecision here: maybe there was actually no bad 
-           things in t1 and we still disallowed in t2 *)
-        get OneInProduct t1 ~fv ~cond @ get NotAllowed t2 ~fv ~cond
-
-    | Fun (f1, _, [t1; Fun (f2, l, ll)])
-      when f1 = f_eq && f2 = exp && gdh_oracles ->
-      get NotAllowed t1 ~fv ~cond @ get UnderEqual (mk_fun0 f2 l ll) ~fv ~cond
-
-    | Fun (f1, _, [Fun (f2, l, ll); t2])
-      when f1 = f_eq && f2 = exp && gdh_oracles ->
-      get NotAllowed t2 ~fv ~cond @ get UnderEqual (mk_fun0 f2 l ll) ~fv ~cond
-
+    | Macro _ -> (* expand if possible *)
+       begin
+         match expand_macro_check info contx t with
+         | Some t' -> get t' ~fv ~cond ~st
+         | None -> [] (* if we can't expand, fold_macro_support will create
+                         another iocc for that macro, and it will be checked
+                         separately *)
+       end
+      
     | _ ->
-      Iter.tfold_occ ~mode:(`Delta contx)
-        (fun ~fv ~cond t' occs ->
-           (* macros and their expansions have the same flag. *)
-           let allow = if Term.is_macro t then allowed else NotAllowed in
-           get allow t' ~fv ~cond @ occs
-        ) ~fv ~cond t []
+      Iter.tfold_occ ~mode:`NoDelta (* not delta since macros are handled separately *)
+        (fun ~fv ~cond t' occs -> (get t' ~fv ~cond ~st) @ occs)
+        ~fv ~cond t []
   in
-  get NotAllowed t ~fv ~cond:[]
+  get t ~fv ~cond:[] ~st:t
 
 
-
-
-let print_dh_name
-      ?(action : term option=None)
-      ?(term : term option=None)
-      (n : nsymb)
-      (m : nsymb)
-    : unit
-  =
-  Printer.pr "  @[<hv 2>%a @,(collision with %a) " Term.pp_nsymb n Term.pp_nsymb m;
-  if action <> None then
-    Printer.pr "@,in action %a " Term.pp (Utils.oget action);
-  if term <> None then
-    Printer.pr "@,@[<hov 2>in term@ @[%a@]@]" Term.pp (Utils.oget term);
-  Printer.pr "@]@;@;"
 
   
 (** Constructs the formula
@@ -236,23 +259,20 @@ let print_dh_name
     produced by tfold_macro_support. 
     The free vars of ts should be in env.
     Everything is renamed nicely wrt env. *)
-(** The term option is the term where the occ was found,
-    it's only here for printing purposes *)    
 let occurrence_formula
-    ?(term:term option=None)
-    ?(action:term option=None)
     (ts  : Fresh.ts_occs)
     (env : Vars.env)
-    (n   : nsymb)
     (occ : name_occ)
   : term
   =
   let updated_env, vars, sigma =
     refresh_vars_env env occ.occ_vars
   in
-  let renamed_indices = List.map (subst_var sigma) occ.occ_cnt in
-  let phi_eq = mk_indices_eq ~simpl:true (n.s_indices) renamed_indices in
-  match action with
+  let n, oinfo = occ.occ_cnt in
+  let na = oinfo.oi_name in
+  let renamed_indices = List.map (subst_var sigma) n.s_indices in
+  let phi_eq = mk_indices_eq ~simpl:true (na.s_indices) renamed_indices in
+  match oinfo.oi_action with
   | Some a -> (* indirect occurrence *)
     let renamed_action = subst sigma a in
     (* don't substitute ts since the variables we renamed should not occur 
@@ -269,13 +289,17 @@ let occurrence_formula
         ) ts
     in
     let phi_time = mk_ors ~simpl:true phis_time in
-    print_dh_name ~term:(Option.map (subst sigma) term)
-      ~action:(Some renamed_action)
-      (Term.mk_isymb n.s_symb n.s_typ renamed_indices) n;
+
+    (* print the renamed occurrence *)
+    let renamed_n = mk_isymb n.s_symb n.s_typ renamed_indices in
+    let renamed_oinfo = mk_oinfo na (subst sigma oinfo.oi_subterm) (Some renamed_action) in 
+    let renamed_occ = mk_nocc renamed_n renamed_oinfo renamed_indices occ.occ_cond occ.occ_pos in
+    print_dh_name_occ renamed_occ;
+
     mk_exists ~simpl:true vars (mk_and ~simpl:true phi_time phi_eq)
 
   | None -> (* direct occurrence *)
-    print_dh_name ~term:term (Term.mk_isymb n.s_symb n.s_typ occ.occ_cnt) n;
+    print_dh_name_occ occ;
     mk_exists ~simpl:true vars phi_eq
 
 
@@ -284,17 +308,14 @@ let occurrence_formula
    the occurrence occ is equal to n. *)
 (** The term option is the term where the occ was found, it's only here for printing purposes *)    
 let occurrence_sequent
-    ?(term:term option=None)
-    ?(action:term option=None)
     (ts  : Fresh.ts_occs)
     (s   : sequent)
-    (n   : nsymb)
     (occ : name_occ)
   : sequent
   = 
   TS.set_goal
     (mk_impl ~simpl:false
-       (occurrence_formula ~term:term ~action:action ts (TS.vars s) n occ)
+       (occurrence_formula ts (TS.vars s) occ)
        (TS.goal s))
     s
 
@@ -310,12 +331,14 @@ let has_cdh (g : lsymb) (tbl : Symbols.table) : bool =
 
   | _ -> false
 
+
 (** Checks whether g has an associated GDH assumption *)
 let has_gdh (g : lsymb) (tbl : Symbols.table) : bool =
   let gen_n = Symbols.Function.of_lsymb g tbl in
   match Symbols.Function.get_def gen_n tbl with
   | _, Symbols.DHgen l -> List.mem Symbols.DH_GDH l
   | _ -> false
+
 
 (** Finds the parameters of the group (generator, exponentiation, 
    multiplication of exponents), as well as t (term), a, and b (names)
@@ -405,10 +428,6 @@ let cgdh
   in
   let gen = Term.mk_fun table (fst gen_s) [] [] in
 
-  let nas  = na.s_symb  in
-  let nbs  = nb.s_symb  in
-  let excl = [nas; nbs] in
-
   try
     let ts = Fresh.get_macro_actions cntxt [t] in
 
@@ -417,20 +436,12 @@ let cgdh
       Term.pp_nsymb na
       Term.pp_nsymb nb
       Term.pp t;
-    let na_dir_occ =
-      get_name_except_allowed
-        gdh_oracles cntxt nas excl gen exp_s mult_s t
-    in
-    let nb_dir_occ =
-      get_name_except_allowed
-        gdh_oracles cntxt nbs excl gen exp_s mult_s t
+    let nab_dir_occ =
+      get_bad_occurrences gdh_oracles (EI_direct s) cntxt gen exp_s mult_s [na; nb] t
     in
 
     (* proof obligations from the direct occurrences *)
-    let direct_sequents =
-      (List.map (occurrence_sequent ts s na) na_dir_occ) @
-      (List.map (occurrence_sequent ts s nb) nb_dir_occ)
-    in
+    let direct_sequents = List.map (occurrence_sequent ts s) nab_dir_occ in
 
     (* indirect occurrences and their proof obligations *)
     Printer.pr "@;@;@[<hv 2>Bad occurrences of %a and %a found in other actions:@]@;"
@@ -440,24 +451,17 @@ let cgdh
       Iter.fold_macro_support (fun iocc indirect_sequents ->
           let t = iocc.iocc_cnt in
           let fv = iocc.iocc_vars in
-          let oa =
-            mk_action iocc.iocc_aname (Action.get_indices iocc.iocc_action)
-            |> some
-          in
+          let a = mk_action iocc.iocc_aname (Action.get_indices iocc.iocc_action) in
 
           (* indirect occurrences in iocc *)
-          let na_in_occ =
-            get_name_except_allowed
-              gdh_oracles ~fv:(Sv.elements fv) cntxt nas excl gen exp_s mult_s t
-          in
-          let nb_in_occ =
-            get_name_except_allowed
-              gdh_oracles ~fv:(Sv.elements fv) cntxt nbs excl gen exp_s mult_s t
+          let nab_in_occ =
+            get_bad_occurrences
+              gdh_oracles ~fv:(Sv.elements fv)
+              (EI_indirect a) cntxt gen exp_s mult_s [na; nb] t
           in
 
           (* proof obligations for the indirect occurrences *)
-          (List.map (occurrence_sequent ~term:(Some t) ~action:oa ts s na) na_in_occ) @
-          (List.map (occurrence_sequent ~term:(Some t) ~action:oa ts s nb) nb_in_occ) @
+          (List.map (occurrence_sequent ts s) nab_in_occ) @
           indirect_sequents)
         cntxt env [t] []
     in
