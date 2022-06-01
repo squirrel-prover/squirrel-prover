@@ -1119,7 +1119,7 @@ let do_rewrite
   | `Reach t, subs ->
     let subs =
       List.map (fun (sub_system, sub) -> 
-          TS.set_system sub_system (TS.set_goal sub s)
+          TS.set_goal_in_context sub_system sub s
         ) subs
     in
     t, subs
