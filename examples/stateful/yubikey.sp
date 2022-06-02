@@ -348,8 +348,8 @@ Then, the unicity is proved using lemmas on counter values.
 Proof.
   intro Hap Hexec.
   executable S(ii,i) => //.
-  intro Hexec'.
-  expand exec, cond.
+  intro Hexec'. 
+  rewrite /exec /cond in Hexec.
   destruct Hexec as [Hexecpred [Mneq Hcpt] Hpid].
   (** We apply the INT-CTXT assumption, which directly gives the existence
   of an action `Press(i,j)` that happens before `S(ii,i)`. **)

@@ -215,6 +215,19 @@ module Pos = struct
         let ti' = Term.mk_ite ~simpl:false c t e in
         acc, found, if found then ti' else ti
 
+      (* [φ => ψ] *)
+      | Term.Fun ((fs, []), fty, [t1; t2]) when fs = Symbols.fs_impl ->
+        let acc, found1, t1 = 
+          map_fold ~se ~conds               ~p:(0 :: p) ~acc t1
+        in
+        let acc, found2, t2 = 
+          map_fold ~se ~conds:(t1 :: conds) ~p:(1 :: p) ~acc t2
+        in
+        let found = found1 || found2 in
+
+        let ti' = Term.mk_fun0 (fs, []) fty [t1; t2] in
+        acc, found, if found then ti' else ti
+
       (* [φ && ψ] is handled as [φ && (φ => ψ)] *)
       | Term.Fun ((fs, []), fty, [t1; t2]) when fs = Symbols.fs_and ->
         let conds2 = t1 :: conds in

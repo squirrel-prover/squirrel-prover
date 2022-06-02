@@ -170,7 +170,7 @@ Proof.
   induction t => t IH0 i j Hap [Ht Hexec].
   rewrite Ht in *; clear Ht.
 
-  expand exec, cond.
+  rewrite /exec /cond in Hexec.
   destruct Hexec as [H1 Meq].
   euf Meq => Clt * /=.
 
