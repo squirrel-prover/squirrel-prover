@@ -1421,22 +1421,27 @@ let dump_nodes ppf cntxt g =
   in
   let pp_vertex ppf v =
     (*DEBUG*) (*Printer.pr "%a\n" pp_ut v;*)
-    Format.fprintf ppf "\"id\": 'n%d',@;" v.hash;
-    Format.fprintf ppf "\"children\": [%a],@;" pp_child (get_children g v);
-    Format.fprintf ppf "\"name\": \'%a\',@;" (Printer.html Term.pp) (ut_to_term v);
-    begin
-      match find_eq_action (Utils.oget cntxt.models) (ut_to_term v) with
-      | Some Term.Action (asymb, idx) ->
-        let action = Action.of_term asymb idx cntxt.table in
-        let descr = SystemExpr.descr_of_action cntxt.table cntxt.system action in
-        Format.fprintf ppf "\"cond\": \'%a\',@;" (Printer.html Term.pp) (snd descr.condition);
-        let pp_states = Format.pp_print_list 
-          ~pp_sep:(fun ppf () -> Format.fprintf ppf "@;")
-          (fun ppf (state,term) -> Format.fprintf ppf "%a := %a" Term.pp_msymb state Term.pp term) in
-        Format.fprintf ppf "\"state\": \'%a\',@;" (Printer.html pp_states) descr.updates;
-        Format.fprintf ppf "\"output\": \'%a\'" (Printer.html Term.pp) (snd descr.output)
-      | _ -> ()
-    end
+    Format.fprintf ppf "\"id\": 'n%d',@;\"children\": [%a],@;\"name\": \'%a\'"
+      v.hash
+      pp_child (get_children g v)
+      (Printer.html Term.pp) (ut_to_term v);
+    match find_eq_action (Utils.oget cntxt.models) (ut_to_term v) with
+    | Some Term.Action (asymb, idx) ->
+      let action = Action.of_term asymb idx cntxt.table in
+      let descr = SystemExpr.descr_of_action cntxt.table cntxt.system action in
+      let pp_states = Format.pp_print_list 
+        ~pp_sep:(fun ppf () -> Format.fprintf ppf "@;")
+        (fun ppf (state,term) -> Format.fprintf ppf "%a := %a" Term.pp_msymb state Term.pp term) in
+      if not (Term.f_triv (snd descr.condition)) then
+        Format.fprintf ppf ",@;\"cond\": \'%a\'" (Printer.html Term.pp) (snd descr.condition);
+      if descr.updates <> [] then
+        Format.fprintf ppf ",@;\"state\": \'%a\'"
+          (Printer.html pp_states) descr.updates;
+      if fst descr.output <> Symbols.dummy_channel then
+        Format.fprintf ppf ",@;\"output\": \'%a\'"
+          (Printer.html Term.pp) (snd descr.output)
+    | _ -> ()
+    
   in
   let pp_vertexes = Format.pp_print_list
     ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@;")
