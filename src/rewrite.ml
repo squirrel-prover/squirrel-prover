@@ -18,6 +18,7 @@ exception NoRW
 (*------------------------------------------------------------------*)
 let _rewrite_head
     (table : Symbols.table)
+    (hyps  : Hyps.TraceHyps.hyps Lazy.t)
     (sexpr : SE.t)
     (rule  : rw_rule)
     (t     : Term.term) : Term.term * Term.term list
@@ -36,7 +37,7 @@ let _rewrite_head
 
   let system = SE.reachability_context sexpr in
   let mv =
-    match Match.T.try_match table system t pat with
+    match Match.T.try_match table ~hyps system t pat with
     | FreeTyv | NoMatch _ -> raise NoRW
     | Match mv -> mv
   in
@@ -47,11 +48,12 @@ let _rewrite_head
 
 let rewrite_head
     (table : Symbols.table)
+    (hyps  : Hyps.TraceHyps.hyps Lazy.t)
     (sexpr : SE.t)
     (rule  : rw_rule)
     (t     : Term.term) : (Term.term * Term.term list) option
   =
-  try Some (_rewrite_head table sexpr rule t) with NoRW -> None
+  try Some (_rewrite_head table hyps sexpr rule t) with NoRW -> None
 
 (*------------------------------------------------------------------*)
 (** as an instance been found:

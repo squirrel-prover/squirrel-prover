@@ -587,7 +587,6 @@ Proof.
     (* rewrite the content of the then branch *)
     rewrite /otp_dec /aead_dec if_aux /= in 2. 
     fa 2.
-    rewrite /AEAD /= in 2.
     rewrite /aead /otp in 1,2.
     fa !(_ && _). fa 1.
     memseq 1 6; 1: by exists pid; rewrite if_true.

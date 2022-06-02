@@ -13,6 +13,7 @@ type error =
 (** Try to do a rewrite at head position in a term.  *)
 val rewrite_head :
   Symbols.table ->
+  Hyps.TraceHyps.hyps Lazy.t ->
   SystemExpr.t ->
   rw_rule ->
   Term.term ->

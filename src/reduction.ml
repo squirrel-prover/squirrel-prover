@@ -80,7 +80,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     let hints = Term.Hm.find_dflt [] (Term.get_head t) db in
 
     let rule = List.find_map (fun Hint.{ rule } ->
-        match Rewrite.rewrite_head st.table st.sexpr rule t with
+        match Rewrite.rewrite_head st.table st.hyps st.sexpr rule t with
         | None -> None
         | Some (red_t, subs) ->
           let subs_valid =  

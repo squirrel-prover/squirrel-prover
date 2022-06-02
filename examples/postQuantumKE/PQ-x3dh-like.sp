@@ -959,8 +959,6 @@ Proof.
            simpl.
            use sufcma with  (xor(ktilde10(i,j,l)@FI(i,j,l),snd(snd(input@FI(i,j,l))))),  sid10(i,j,l)@FI(i,j,l)  ,  skR(j); try auto .
            expand output.
-           rewrite snd_pair.
-           rewrite snd_pair.
 
            use xorconcel with ktilde8(j,k,i)@SR(j,k,i), ktilde8(j,k,i)@SR(j,k,i), sign(sid8(j,k,i)@SR(j,k,i),skR(j)) => //.
            rewrite -Meq in Meq0.
