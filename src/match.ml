@@ -217,11 +217,12 @@ module Pos = struct
 
       (* [φ => ψ] *)
       | Term.Fun ((fs, []), fty, [t1; t2]) when fs = Symbols.fs_impl ->
+        let conds2 = t1 :: conds in
         let acc, found1, t1 = 
-          map_fold ~se ~conds               ~p:(0 :: p) ~acc t1
+          map_fold ~se ~conds        ~p:(0 :: p) ~acc t1
         in
         let acc, found2, t2 = 
-          map_fold ~se ~conds:(t1 :: conds) ~p:(1 :: p) ~acc t2
+          map_fold ~se ~conds:conds2 ~p:(1 :: p) ~acc t2
         in
         let found = found1 || found2 in
 

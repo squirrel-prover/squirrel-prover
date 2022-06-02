@@ -98,8 +98,9 @@ have -> : if exec@pred(B) && A < B then
   intro [Neg _] => //.
 }
 simpl.
-fa 5. fadup 5.
-fa 5. fadup 5.
+(* FIXME: I do not know what we are trying to test here *)
+(* fa 5. fadup 5. *)
+(* fa 5. fadup 5. *)
 (* prf 5 *)
 
 admit.

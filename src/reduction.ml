@@ -2,6 +2,8 @@ open Utils
 
 module SE = SystemExpr
 
+module THyps = Hyps.TraceHyps
+                 
 (*------------------------------------------------------------------*)
 let rev_subst subst = 
   List.map (fun (Term.ESubst (u,v)) -> Term.ESubst (v,u)) subst
@@ -33,21 +35,21 @@ end
 
 (*------------------------------------------------------------------*)
 module Mk (S : LowSequent.S) : S with type t := S.t = struct
-  (* FEATURE: 
-     - conds ignored for now.
-     - trace literals not updated *)
   type state = { 
     table   : Symbols.table;
     sexpr   : SE.arbitrary;
     param   : red_param;
     hint_db : Hint.hint_db;
-    hyps    : Hyps.TraceHyps.hyps Lazy.t;
-    conds   : Term.term list;     (* accumulated conditions *)
+    hyps    : THyps.hyps;
   }
 
   (** Internal *)
   exception NoExp 
 
+  let add_hyp (f : Term.term) hyps : THyps.hyps =
+    THyps.add TacticsArgs.AnyName (`Reach f) hyps
+
+  
   (* Invariant: we must ensure that fv(reduce(u)) ⊆ fv(t)
      Return: reduced term, reduction occurred *)
   (* FEATURE: memoisation *)
@@ -71,7 +73,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     then t, false 
     else 
       try 
-        Match.expand_head_once ~exn:NoExp st.table st.sexpr st.hyps t
+        Match.expand_head_once ~exn:NoExp st.table st.sexpr (lazy st.hyps) t
       with NoExp -> t, false
 
   (* Rewrite once at head position *)
@@ -80,7 +82,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     let hints = Term.Hm.find_dflt [] (Term.get_head t) db in
 
     let rule = List.find_map (fun Hint.{ rule } ->
-        match Rewrite.rewrite_head st.table st.hyps st.sexpr rule t with
+        match Rewrite.rewrite_head st.table (lazy st.hyps) st.sexpr rule t with
         | None -> None
         | Some (red_t, subs) ->
           let subs_valid =  
@@ -103,7 +105,6 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     | Term.ForAll (evs, t0) -> 
       let _, subst = Term.refresh_vars `Global evs in
       let t0 = Term.subst subst t0 in
-      (* let st = { st with subst = subst @ st.subst; } in *)
       let red_t0, has_red = reduce st t0 in
 
       if not has_red then t, false
@@ -121,7 +122,6 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     | Term.Seq (is, t0) ->
       let _, subst = Term.refresh_vars `Global is in
       let t0 = Term.subst subst t0 in
-      (* let st = { st with subst = subst @ st.subst; } in *)
       let red_t0, has_red = reduce st t0 in
 
       if not has_red then t, false
@@ -131,31 +131,63 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
         let red_t = Term.mk_seq0 is red_t0 in
         red_t, true
 
-    | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite -> 
+    (* if-then-else *)
+    | Term.Fun (fs, fty, [c;t;e]) when fs = Term.f_ite -> 
       let c, has_red0 = reduce st c in
 
-      let conds_t = c :: st.conds in
-      let conds_f = (Term.mk_not ~simpl:true c) :: st.conds in
+      let hyps_t = add_hyp c st.hyps in
+      let hyps_f = add_hyp (Term.mk_not ~simpl:true c) st.hyps in
 
-      let t, has_red1 = reduce { st with conds = conds_t } t in
-      let e, has_red2 = reduce { st with conds = conds_f } e in
+      let t, has_red1 = reduce { st with hyps = hyps_t } t in
+      let e, has_red2 = reduce { st with hyps = hyps_f } e in
 
-      Term.mk_ite ~simpl:false c t e,
+      Term.mk_fun0 fs fty [c; t; e],
       has_red0 || has_red1 || has_red2
 
+    (* [φ => ψ] *)
+    | Term.Fun (fs, fty, [f1;f2]) when fs = Term.f_impl -> 
+      let hyps2 = add_hyp f1 st.hyps in
+
+      let f1, has_red1 = reduce st f1 in
+      let f2, has_red2 = reduce { st with hyps = hyps2 } f2 in      
+
+      Term.mk_fun0 fs fty [f1;f2],
+      has_red1 || has_red2
+
+    (* [φ && ψ] is handled as [φ && (φ => ψ)] *)
+    | Term.Fun (fs, fty, [f1;f2]) when fs = Term.f_and -> 
+      let hyps2 = add_hyp f1 st.hyps in
+
+      let f1, has_red1 = reduce st f1 in
+      let f2, has_red2 = reduce { st with hyps = hyps2 } f2 in      
+
+      Term.mk_fun0 fs fty [f1;f2],
+      has_red1 || has_red2
+
+    (* [φ || ψ] is handled as [φ || (¬ φ => ψ)] *)
+    | Term.Fun (fs, fty, [f1;f2]) when fs = Term.f_or -> 
+      let hyps2 = add_hyp (Term.mk_not f1) st.hyps in
+
+      let f1, has_red1 = reduce st f1 in
+      let f2, has_red2 = reduce { st with hyps = hyps2 } f2 in      
+
+      Term.mk_fun0 fs fty [f1;f2],
+      has_red1 || has_red2
+      
     | Term.Find (is, c, t, e) -> 
       let _, subst = Term.refresh_vars `Global is in
       let c, t = Term.subst subst c, Term.subst subst t in
-      (* let st1 = { st with subst = subst @ st.subst; } in *)
       let st1 = st in
 
       let c, has_red0 = reduce st1 c in
 
-      let conds_t = c :: st.conds in
-      let conds_f = (Term.mk_not ~simpl:true c) :: st.conds in
+      let hyps_t = add_hyp c st.hyps in
+      let hyps_f =
+        add_hyp (Term.mk_forall is (Term.mk_not ~simpl:true c)) st.hyps
+      in
 
-      let t, has_red1 = reduce { st1 with conds = conds_t } t in
-      let e, has_red2 = reduce { st  with conds = conds_f } e in
+      let t, has_red1 = reduce { st1 with hyps = hyps_t } t in
+      let e, has_red2 = reduce { st  with hyps = hyps_f } e in
 
       let r_subst = rev_subst subst in
       let c, t = Term.subst r_subst c, Term.subst r_subst t in
@@ -194,8 +226,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       sexpr   = se;
       param;
       hint_db = S.get_hint_db s;
-      hyps    = lazy (S.get_trace_hyps s);
-      conds      = []; } 
+      hyps    = S.get_trace_hyps s; } 
 
 (*------------------------------------------------------------------*)
   (** Exported. *)
