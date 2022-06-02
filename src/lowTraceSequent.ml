@@ -20,12 +20,12 @@ let dbg ?(force=false) s =
   Printer.prt mode s
 
 (*------------------------------------------------------------------*)
+(* TODO:remove duplicate *)
 let get_ord (at : Term.xatom ) : Term.ord = match at with
   | `Comp (ord,_,_) -> ord
   | `Happens _      -> assert false
 
-(** Chooses a name for a formula, depending on an old name (if any), and the
-    formula shape. *)
+(* TODO:remove duplicate *)
 let choose_name = function
   | `Equiv _ -> "G"
   | `Reach f ->
@@ -46,8 +46,7 @@ let choose_name = function
         | `Lt  -> "lt"
         | `Gt  -> "gt"
       in
-    sort ^ ord
-
+      sort ^ ord
 
 (*------------------------------------------------------------------*)
 module H = Hyps.TraceHyps
@@ -120,7 +119,7 @@ let pp ppf s =
     pf ppf "@[Variables: %a@]@;" Vars.pp_env s.env.vars ;
 
   (* Print hypotheses *)
-  H.pps ppf s.hyps ;
+  H.pp ppf s.hyps ;
 
   (* Print separation between hyps and conclusion *)
   Printer.kws `Separation ppf (String.make 40 '-') ;
@@ -187,23 +186,8 @@ module AnyHyps = struct
   let pp_hyp = Term.pp 
   let pp_ldecl = H.pp_ldecl
 
-  let fresh_id ?(approx=false) name s =
-    let id = H.fresh_id name s.hyps in
-    if (not approx) && Ident.name id <> name && name <> "_"
-    then Tactics.soft_failure (Tactics.HypAlreadyExists name)
-    else id
-
-  let fresh_ids ?(approx=false) names s =
-    let ids = H.fresh_ids names s.hyps in
-    
-    if approx then ids else
-      begin
-        List.iter2 (fun id name ->
-            if Ident.name id <> name && name <> "_"
-            then Tactics.soft_failure (Tactics.HypAlreadyExists name)
-          ) ids names;
-        ids
-      end
+  let fresh_id  ?approx name  s = H.fresh_id  ?approx name  s.hyps
+  let fresh_ids ?approx names s = H.fresh_ids ?approx names s.hyps
 
   let is_hyp f s = H.is_hyp f s.hyps
 
@@ -278,7 +262,7 @@ module AnyHyps = struct
       | None -> H.fresh_id "D" s.hyps
       | Some id -> id in
 
-    let id, hyps = H.add ~force id (`Reach f) s.hyps in
+    let id, hyps = H._add ~force id (`Reach f) s.hyps in
     let s = S.update ~hyps s in
     
     (* [recurse] boolean to avoid looping *)
@@ -288,7 +272,7 @@ module AnyHyps = struct
 
   let add_happens ?(force=false) id (s : sequent) ts =
     let f = Term.mk_happens ts in
-    let id, hyps = H.add ~force id (`Reach f) s.hyps in
+    let id, hyps = H._add ~force id (`Reach f) s.hyps in
     let s = S.update ~hyps s in
     id, s
 
@@ -300,7 +284,7 @@ module AnyHyps = struct
 
     | _ -> add_form_aux ~force (Some id) s f
 
-  let add_i npat f s =
+  let add_i npat f s = 
     let force, approx, name = match npat with
       | Args.Unnamed  -> true, true, "_"
       | Args.AnyName  -> false, true, choose_name f
@@ -311,7 +295,7 @@ module AnyHyps = struct
     match f with
       | `Reach f -> add_formula ~force id f s
       | _ ->
-         let id,hyps = H.add ~force id f s.hyps in
+         let id,hyps = H._add ~force id f s.hyps in
          id, S.update ~hyps s
 
   let add npat f s = snd (add_i npat f s)
@@ -346,11 +330,12 @@ module AnyHyps = struct
           | `Reach f ->
               snd (add_formula ~force:true id f s)
           | _ ->
-              let _,hyps = H.add ~force:true id f s.hyps in
+              let _,hyps = H._add ~force:true id f s.hyps in
               S.update ~hyps s)
       s.hyps s
 
   (*------------------------------------------------------------------*)
+  (* override [clear_triv] *)
   let clear_triv s =
     let s = reload s in
     let not_triv _ = function
@@ -359,8 +344,8 @@ module AnyHyps = struct
     in
     S.update ~hyps:(H.filter not_triv s.hyps) s
 
-  let pp fmt s = H.pps fmt s.hyps
-  let pp_dbg fmt s = H.pps ~dbg:true fmt s.hyps
+  let pp     fmt s = H.pp     fmt s.hyps
+  let pp_dbg fmt s = H.pp_dbg fmt s.hyps
 end
 
 (*------------------------------------------------------------------*)
@@ -422,7 +407,7 @@ let set_goal_in_context ?update_local system conc s =
            | `Equiv e ->
                begin match update_global e with
                  | Some e ->
-                     let _,hyps = H.add ~force:true id f s.hyps in
+                     let _,hyps = H._add ~force:true id f s.hyps in
                      S.update ~hyps s
                  | None -> s
                end)

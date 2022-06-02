@@ -15,6 +15,9 @@ module H = Hyps.Mk
       type t = Equiv.form
 
       let pp_hyp = Equiv.pp
+
+      let choose_name f = "H"
+        
       let htrue = Equiv.Atom (Equiv.Equiv [])
     end)
 
@@ -68,7 +71,7 @@ let pp ppf j =
   if j.env.vars <> Vars.empty_env then
     Fmt.pf ppf "@[Variables: %a@]@;" Vars.pp_env j.env.vars ;
 
-  H.pps ppf j.hyps ;
+  H.pp ppf j.hyps ;
 
   (* Print separation between hyps and conclusion *)
   Printer.kws `Separation ppf (String.make 40 '-') ;
@@ -96,24 +99,8 @@ module Hyps
   let pp_hyp = Term.pp
   let pp_ldecl = H.pp_ldecl
 
-  (* FIXME: move in hyps.ml, and get rid of duplicate in traceSequent.ml *)
-  let fresh_id ?(approx=false) name s =
-    let id = H.fresh_id name s.hyps in
-    if (not approx) && Ident.name id <> name && name <> "_"
-    then Tactics.soft_failure (T.HypAlreadyExists name)
-    else id
-
-  let fresh_ids ?(approx=false) names s =
-    let ids = H.fresh_ids names s.hyps in
-
-    if approx then ids else
-      begin
-        List.iter2 (fun id name ->
-            if Ident.name id <> name && name <> "_"
-            then Tactics.soft_failure (T.HypAlreadyExists name)
-          ) ids names;
-        ids
-      end
+  let fresh_id  ?approx name  s = H.fresh_id  ?approx name  s.hyps
+  let fresh_ids ?approx names s = H.fresh_ids ?approx names s.hyps
 
   let is_hyp f s = H.is_hyp f s.hyps
 
@@ -131,8 +118,8 @@ module Hyps
 
   let exists func s = H.exists func s.hyps
 
-  let add_formula ~force id (h : hyp)(s : sequent) =
-    let id, hyps = H.add ~force id h s.hyps in
+  let add_formula ~force id (h : hyp) (s : sequent) =
+    let id, hyps = H._add ~force id h s.hyps in
     id, { s with hyps = hyps }
 
   let add_i npat f s =
@@ -166,10 +153,10 @@ module Hyps
 
   let filter f s = { s with hyps = H.filter f s.hyps }
 
-  let clear_triv s = s
+  let clear_triv s = { s with hyps = H.clear_triv s.hyps }
 
-  let pp fmt s = H.pps fmt s.hyps
-  let pp_dbg fmt s = H.pps ~dbg:true fmt s.hyps
+  let pp     fmt s = H.pp     fmt s.hyps
+  let pp_dbg fmt s = H.pp_dbg fmt s.hyps
 end
 
 (*------------------------------------------------------------------*)
@@ -211,7 +198,7 @@ let set_goal_in_context ?update_local system conc s =
       (fun id f s ->
          match update_global f with
            | Some f ->
-               let _,hyps = H.add ~force:true id f s.hyps in
+               let _,hyps = H._add ~force:true id f s.hyps in
                { s with hyps }
            | None -> s)
       s.hyps
@@ -326,7 +313,7 @@ let init ~env ~hint_db ?hyp goal =
   let hyps = match hyp with
     | None -> hyps
     | Some h ->
-        snd (H.add ~force:false (H.fresh_id "H" hyps) h hyps)
+        snd (H._add ~force:false (H.fresh_id "H" hyps) h hyps)
   in
   let new_sequent = { env; hint_db; hyps; goal } in
   if Config.post_quantum () then
