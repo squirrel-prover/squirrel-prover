@@ -203,7 +203,7 @@ let rec pp_term_i ppf t = match t with
       pp_ts ts
 
   | Seq (vs, b) ->
-      Fmt.pf ppf "@[%a(@[%a->%a@])@]"
+      Fmt.pf ppf "@[<hov 2>%a(%a->@,@[%a@])@]"
         (Printer.kws `TermSeq) "seq"
         pp_var_list vs
         pp_term b
