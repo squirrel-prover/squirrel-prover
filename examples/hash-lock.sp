@@ -9,7 +9,6 @@ T --> R : < nT, h(<nR,nT>,kT) >
 R --> T : ok
 *******************************************************************************)
 
-set autoIntro = false.
 set postQuantumSound = true.
 
 hash h

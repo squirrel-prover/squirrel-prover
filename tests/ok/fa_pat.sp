@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 (* remove automatic FADup, for tests *)
 set autoFADup=false.

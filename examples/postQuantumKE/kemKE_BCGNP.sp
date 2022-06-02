@@ -64,7 +64,6 @@ party could potentially compute the key.
 
 
 *******************************************************************************)
-set autoIntro = false.
 set postQuantumSound = true.
 
 include Basic.

@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 (* Testing euf's behaviour when bound variables are used in indirect cases. *)
 

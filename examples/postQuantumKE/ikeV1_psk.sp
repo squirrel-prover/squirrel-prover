@@ -46,7 +46,6 @@ The attacker does not have any pre-shared key.
 *******************************************************************************)
 
 set postQuantumSound = true.
-set autoIntro = false.
 
 (* include Basic. *)
 

@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 (* Similar to euf_let test but not at toplevel:
  * Testing that macros induced by a let definition

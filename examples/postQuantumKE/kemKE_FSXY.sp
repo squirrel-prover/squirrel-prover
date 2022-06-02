@@ -343,12 +343,12 @@ Proof.
   enrich  seq(i,j,k:index->DdkT(i,j,k)).
   enrich  seq(i:index->dkR(i)).
 
-  induction t.
+  induction t => //.
     + expandall.
       by fa 14.
 
     + expandall.
-      fa 14.
+      by fa 14.
       
     + (* First output of R *)
       expandall.

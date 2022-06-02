@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 senc enc,dec
 name k1 : message

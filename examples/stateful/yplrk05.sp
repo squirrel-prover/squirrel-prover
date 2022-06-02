@@ -29,8 +29,6 @@ SECURITY PROPERTIES
 - authentication
 *******************************************************************************)
 
-set autoIntro = false.
-
 hash h1
 hash h2
 

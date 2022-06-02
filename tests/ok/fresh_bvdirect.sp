@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 (* Checking the treatment of bound variables in direct cases for fresh. *)
 

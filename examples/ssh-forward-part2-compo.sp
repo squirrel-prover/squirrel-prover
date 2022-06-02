@@ -43,7 +43,6 @@ tion: a technique for protocol composition with long term shared secrets.
 In Proceedings of the 2020 ACM SIGSAC Conference on Computer and
 Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
-set autoIntro=false.
 
 include Basic.
 

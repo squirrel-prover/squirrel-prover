@@ -48,7 +48,6 @@ The 3 security properties as stated in [1].
 computational model’, 2014.
 *******************************************************************************)
 
-set autoIntro = false.
 set timeout=12.
 
 (** Public constants (`abstract`) and names used in the protocol. **)

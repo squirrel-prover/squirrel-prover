@@ -51,7 +51,6 @@ secrecy of the keys.
 *******************************************************************************)
 set timeout = 10.
 set postQuantumSound = true.
-set autoIntro = false.
 
 include Basic.
 

@@ -31,7 +31,6 @@ tion: a technique for protocol composition with long term shared secrets.
 In Proceedings of the 2020 ACM SIGSAC Conference on Computer and
 Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
-set autoIntro=false.
 
 include Basic.
 
@@ -134,8 +133,6 @@ process S2 =
                out(cP, g^b1^a(l)))
 
 system [secret] ( P2 | S2).
-
-set autoIntro=false.
 
 (** Prove that the condition above the only diff term inside S is never true. **)
 goal [auth] S1_charac :

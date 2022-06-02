@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 (* set debugConstr=true. *)
 
 aenc enc,dec,pk

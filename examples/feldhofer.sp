@@ -29,7 +29,6 @@ This is a "light" model without the last check of T.
 
 *)
 
-set autoIntro=false.
 set timeout=4.
 set postQuantumSound=true.
 

@@ -2,7 +2,7 @@
    conditions under which the rewriting can occur must be correctly 
    projected. *)
 
-set autoIntro=false.
+
 
 system [a] null.
 system [b] null.

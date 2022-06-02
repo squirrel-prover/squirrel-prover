@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 set postQuantumSound=true.
 
 hash h

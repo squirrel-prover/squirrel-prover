@@ -49,7 +49,6 @@ In the following model, we remove multiple layers of integrity and encryption, k
 *******************************************************************************)
 set timeout=10.
 set postQuantumSound = true.
-set autoIntro=false.
 
 include Basic.
 

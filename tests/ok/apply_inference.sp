@@ -1,5 +1,5 @@
 (* test apply argument inference *)
-set autoIntro=false.
+
 
 system null.
 

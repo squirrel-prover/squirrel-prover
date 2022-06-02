@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 (* Check `assert (ip := pt)` tactic *)
 

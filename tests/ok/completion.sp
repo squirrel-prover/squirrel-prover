@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 abstract m1 : message
 abstract m2 : message

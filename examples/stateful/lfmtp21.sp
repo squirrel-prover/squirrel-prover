@@ -1,5 +1,3 @@
-set autoIntro = false.
-
 hash H.
 hash G.
 name k : message.

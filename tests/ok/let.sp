@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 (* Test macros associated to let definition,
  * even when they are used in subsequent actions. *)

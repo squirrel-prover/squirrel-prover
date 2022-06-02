@@ -22,8 +22,6 @@ SECURITY PROPERTIES
 - injectivity
 *******************************************************************************)
 
-set autoIntro = false.
-
 hash hmac
 
 name sk : index -> message

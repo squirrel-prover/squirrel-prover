@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 (* This file contains an unsound axiom, dummy_false_axiom.
    It is a test of application of an axiom with existential variables *)

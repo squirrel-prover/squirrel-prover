@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 (* Simple *)
 name n1:message

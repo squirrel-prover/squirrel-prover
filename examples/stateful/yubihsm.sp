@@ -66,7 +66,6 @@ between the real system and the ideal one, and then the property
 is proved on the ideal system. The reach equiv
 tactic allows one to combine these two steps, and to conclude.
 *******************************************************************************)
-set autoIntro=false.
 set timeout=6.
 
 (* AEAD symmetric encryption scheme: IND-CCA + INT-CTXT *)

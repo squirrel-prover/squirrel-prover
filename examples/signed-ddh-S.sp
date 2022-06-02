@@ -19,8 +19,6 @@ one agent for the role S) and show the strong secrecy of the shared key.
 [G] ISO/IEC 9798-3:2019, IT Security techniques – Entity authentication –
 Part 3: Mechanisms using digital signature techniques.
 *******************************************************************************)
-set autoIntro=false. 
-
 
 (**
 Declarations are identical to the ones in `signed-ddh-P.sp`.

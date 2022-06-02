@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 channel c
 system in(c,x); if False then A: out(c,x).

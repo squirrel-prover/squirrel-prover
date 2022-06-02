@@ -16,8 +16,6 @@ SECURITY PROPERTIES
 - equivalence between real and ideal systems
 *******************************************************************************)
 
-set autoIntro = false.
-
 hash hkey
 
 abstract ok : message

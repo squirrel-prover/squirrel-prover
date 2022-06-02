@@ -30,9 +30,6 @@ HELPING LEMMAS
 SECURITY PROPERTIES
 - strong secrecy
 *******************************************************************************)
-
-set autoIntro  = false.
-
 hash H.
 hash G.
 name k : message.
