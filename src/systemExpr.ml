@@ -101,6 +101,19 @@ let subset table e1 e2 = match e1,e2 with
 
 let equal table s1 s2 = subset table s1 s2 && subset table s2 s1
 
+(** Get system that is compatible with all systems of an expresion. *)
+let get_compatible_sys = function
+  | Any -> None
+  | Any_compatible_with s -> Some s
+  | List ((_,s)::_) -> Some s.System.Single.system
+  | List [] -> assert false
+
+(** Check that all systems in [e1] are compatible with all systems in [e2]. *)
+let compatible table e1 e2 =
+  match get_compatible_sys e1, get_compatible_sys e2 with
+    | Some s1, Some s2 -> System.compatible table s1 s2
+    | _ -> false
+
 (*------------------------------------------------------------------*)
 (** {2 Finite sets} *)
 

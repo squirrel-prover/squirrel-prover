@@ -397,10 +397,6 @@ let set_goal_in_context ?update_local system conc s =
     set_goal conc s
   else
 
-  (* Change the context in the sequent's environment. *)
-  let env = Env.update ~system s.env in
-  let s = S.update ~env s in
-
   (* Update hypotheses.
      We add back manually all formulas, to ensure that definitions are
      unrolled. TODO really necessary? *)
@@ -432,6 +428,10 @@ let set_goal_in_context ?update_local system conc s =
                end)
       s.hyps (S.update ~hyps:H.empty s)
   in
+
+  (* Change the context in the sequent's environment. *)
+  let env = Env.update ~system s.env in
+  let s = S.update ~env s in
 
   (* Finally set the new conclusion. *)
   set_goal conc s
