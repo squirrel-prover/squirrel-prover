@@ -8,36 +8,32 @@ const margin = 20
 /***** Initialisation *****/
 
 /* Create properties in each nodes which will be necessary later */
-function enrich_data(data) {
-  data.forEach((level,i,levels) => {
-    level.forEach((node,j,nodes) => {
-      node.level = level;
+function make_data(json) {
+  const dic = {};
+  json.nodes.forEach(node => {
+    dic[node.id] = node;
+  });
+  const data = [];
+  json.layout.forEach(level => {
+    console.log(level);
+    const dataLevel = [];
+    level.forEach(nodeId => {
+      const node = dic[nodeId.id];
+      node.level = dataLevel;
       node.lineWidth = {};
       node.lineHeight = {};
       node.lineDisplay = {};
+      dataLevel.push(node);
     });
-  });
-}
-
-/* Create an array which contains all edges. */
-function make_links(data) {
-  const dic = {};
-  data.forEach(level => {
-    level.forEach(node => {
-      dic[node.id] = node;
-    });
+    data.push(dataLevel);
   });
   const links = [];
-  data.forEach(level => {
-    level.forEach(node => {
-      node.children.forEach(child => {
-        links.push({"parent": node, "child": dic[child]})
-      });
+  json.nodes.forEach(node => {
+    node.children.forEach(child => {
+      links.push({"parent": node, "child": dic[child]})
     });
   });
-  console.log(dic);
-  console.log(links);
-  return links
+  return [data, links]
 }
 
   
@@ -70,13 +66,12 @@ function computePositions(data) {
 
 /* Upadte position of DOM element corresponding to a line inside a node */
 function updateLine(selection, kind, previousKind, delay) {
-    console.log('A', kind);
   selectionNodes.select("g." + kind)
     .transition().duration(delay)
     .attr("transform", d => `translate(0,${previousKind ? d.lineHeight[previousKind] : 0})`);
   selectionNodes.select("rect." + kind)
     .transition().duration(delay)
-    .attr("width", d => {console.log(d.id, d.width); return d.width})
+    .attr("width", d => d.width)
     .attr("height", d => d.lineHeight[kind]);
   selectionNodes.select("foreignObject." + kind)
     .transition().duration(delay)
@@ -231,7 +226,8 @@ var svg = d3.select("body")
   .append("svg")
   .style('background-color', 'lightgrey')
 /* Initialisation */
-enrich_data(data);
-var links = make_links(data);
+const [data, links] = make_data(json);
+console.log(data);
+console.log(links);
 /* Plot */
 plot(data, links, svg);

@@ -1400,82 +1400,85 @@ type trace_cntxt = {
 
 (*------------------------------------------------------------------*)
 
-(** Print the graph is JSON format *)
-let get_children g v =
-  let succ_of_succ = List.concat_map (fun w -> UtG.succ g w) (UtG.succ g v) in
-  List.filter (fun w -> not (List.mem w succ_of_succ)) (UtG.succ g v)
-
+(** Print information for each nodes in [g] in JSON *)
 let dump_nodes ppf cntxt g =
+  let get_children g v =
+    let succ_of_succ = List.concat_map (fun w -> UtG.succ g w) (UtG.succ g v) in
+    List.filter (fun w -> not (List.mem w succ_of_succ)) (UtG.succ g v)
+  in
   let rec pp_child ppf l =
     match l with
     | [] -> ()
     | v :: l' -> 
-      Format.fprintf ppf "\'%a\'" (Printer.html pp_ut) v;
+      Format.fprintf ppf "\'n%d\'" v.hash;
       pp_childs ppf l'
   and pp_childs ppf l =
     match l with
     | [] -> ()
     | v :: l' -> 
-      Format.fprintf ppf ", \'%a\'" (Printer.html pp_ut) v;
+      Format.fprintf ppf ", \'n%d\'" v.hash;
       pp_childs ppf l'
   in
-  let pp_vertex v =
+  let pp_vertex ppf v =
     (*DEBUG*) (*Printer.pr "%a\n" pp_ut v;*)
-    Format.fprintf ppf "const n%d = {\n" v.hash;
-    Format.fprintf ppf "  \"id\": '%a',\n" (Printer.html pp_ut) v;
-    Format.fprintf ppf "  \"children\": [%a],\n" pp_child (get_children g v);
-    Format.fprintf ppf "  \"name\": \'%a\',\n" (Printer.html Term.pp) (ut_to_term v);
+    Format.fprintf ppf "\"id\": 'n%d',@;" v.hash;
+    Format.fprintf ppf "\"children\": [%a],@;" pp_child (get_children g v);
+    Format.fprintf ppf "\"name\": \'%a\',@;" (Printer.html Term.pp) (ut_to_term v);
     begin
       match find_eq_action (Utils.oget cntxt.models) (ut_to_term v) with
       | Some Term.Action (asymb, idx) ->
         let action = Action.of_term asymb idx cntxt.table in
         let descr = SystemExpr.descr_of_action cntxt.table cntxt.system action in
-        Format.fprintf ppf "  \"cond\": \'%a\',\n" (Printer.html Term.pp) (snd descr.condition);
+        Format.fprintf ppf "\"cond\": \'%a\',@;" (Printer.html Term.pp) (snd descr.condition);
         let pp_states = Format.pp_print_list 
-          ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
+          ~pp_sep:(fun ppf () -> Format.fprintf ppf "@;")
           (fun ppf (state,term) -> Format.fprintf ppf "%a := %a" Term.pp_msymb state Term.pp term) in
-        Format.fprintf ppf "  \"state\": \'%a\',\n" (Printer.html pp_states) descr.updates;
-        Format.fprintf ppf "  \"output\": \'%a\'\n" (Printer.html Term.pp) (snd descr.output)
+        Format.fprintf ppf "\"state\": \'%a\',@;" (Printer.html pp_states) descr.updates;
+        Format.fprintf ppf "\"output\": \'%a\'" (Printer.html Term.pp) (snd descr.output)
       | _ -> ()
-    end;
-    Format.fprintf ppf "}\n\n@?"
+    end
   in
-  UtG.iter_vertex pp_vertex g
+  let pp_vertexes = Format.pp_print_list
+    ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@;")
+    (fun ppf v -> Format.fprintf ppf "@[<v 2>{@;%a@]@;}" pp_vertex v)
+  in
+  let l = UtG.fold_vertex (fun v l -> v :: l) g [] in
+  Format.fprintf ppf "@[<v 2>\"nodes\": [@;%a@]@;]," pp_vertexes l
 
-let first_layer g v =
-  let degree = UtG.in_degree g v in
-  degree = 0 || (degree = 1 && UtG.mem_edge g v v)
-
+(** Compute and print in JSON a layout for [g] *)
 let dump_layout ppf g =
-  (* Remove vertex [v] from the graph and print it, if it has no predecessor *)
-  let comma = ref false in
-  let filter g v acc =
-    if first_layer g v then begin
-      if !comma then
-        Format.fprintf ppf ","
-      else
-        comma := true;
-      Format.fprintf ppf "n%d" v.hash;
-      UtG.remove_vertex acc v
-    end
+  (*Return [true] if [v] has no predecessor, execpt possibly itself*)
+  let top_layer g v =
+    let degree = UtG.in_degree g v in
+    degree = 0 || (degree = 1 && UtG.mem_edge g v v)
+  in
+  (*Return the list of vertex in top layer*)
+  let get_top_layer g =
+    UtG.fold_vertex 
+      (fun v l -> if top_layer g v then v :: l else l)
+      g
+      []
+  in
+  (*Get the list of all layers*)
+  let rec get_layers g =
+    if UtG.is_empty g then
+      []
     else
-      acc
+      let layer = get_top_layer g in
+      let new_g = List.fold_left (fun g v -> UtG.remove_vertex g v) g layer in
+      layer :: (get_layers new_g)
   in
-  let rec pp_layers g first =
-    if not (UtG.is_empty g) then begin
-      if first then
-        Format.fprintf ppf "["
-      else
-        Format.fprintf ppf ",[";
-      let new_g = UtG.fold_vertex (filter g) g g in
-      comma := false;
-      Format.fprintf ppf "]";
-      pp_layers new_g false
-    end
+  (*Printer of one layer*)
+  let pp_layer = Format.pp_print_list
+    ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+    (fun ppf v -> Format.fprintf ppf "{\"id\": \"n%d\"}" v.hash)
   in
-  Format.fprintf ppf "const data = [";
-  pp_layers g true;
-  Format.fprintf ppf "]\n@?"
+  (*Printer of a list of layers*)
+  let pp_layers = Format.pp_print_list
+    ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@;")
+    (fun ppf layer -> Format.fprintf ppf "[%a]" pp_layer layer)
+  in
+  Format.fprintf ppf "@[<v 2>\"layout\": [@;%a@]@;]" pp_layers (get_layers g)
   
 (** Print the model in JSON format if there is one non-empty model *)
 let dump ppf cntxt =
@@ -1486,10 +1489,11 @@ let dump ppf cntxt =
       (*DEBUG*) Printer.kw `Error (Printer.get_std()) "Empty model"
     else begin
       (*DEBUG*) Printer.kw `Error (Printer.get_std()) "MODEL %d" (UtG.nb_vertex g);
-      Format.fprintf ppf "// %d noeuds.\n@?" (UtG.nb_vertex g);
-      Format.fprintf ppf "// %d arrêtes.\n\n@?" (UtG.nb_edges g);
+      Format.fprintf ppf "@[<v 2>json = {@;";
       dump_nodes ppf cntxt g;
-      dump_layout ppf g
+      Format.fprintf ppf "@;";
+      dump_layout ppf g;
+      Format.fprintf ppf "@]@;}@.";
     end
   | Some _ -> (*DEBUG*) Printer.kw `Error (Printer.get_std()) "Several models"
   | None -> (*DEBUG*) Printer.kw `Error (Printer.get_std()) "Don't know this case"
