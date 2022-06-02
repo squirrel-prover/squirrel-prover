@@ -64,6 +64,7 @@ module type S = sig
 
   (** Change the context of a sequent and its conclusion at the same time.
       The new conclusion is understood in the new context.
+      The new context must be compatible with the old one.
 
       Hypotheses of the returned sequent (understood wrt the new context)
       are logical consequences of hypotheses of the original sequent
@@ -142,13 +143,13 @@ end
     global update functions. *)
 let setup_set_goal_in_context ~old_context ~new_context ~table =
 
-  (* It would make sense to require that the new system expression
-     is compatible with the old one.
-     For now we only handle the case where the new system expression
-     is a subset of the old one. *)
-  assert (SE.subset table new_context.SE.set old_context.SE.set);
-  assert (new_context.SE.pair = old_context.SE.pair ||
-          new_context.SE.pair = None);
+  assert (SE.compatible table new_context.SE.set old_context.SE.set);
+  assert (match new_context.SE.pair with
+            | Some p -> SE.compatible table new_context.SE.set p
+            | None -> true);
+  assert (match old_context.SE.pair with
+            | Some p -> SE.compatible table old_context.SE.set p
+            | None -> true);
 
   (* Flags indicating which parts of the context are changed. *)
   let set_unchanged = new_context.SE.set = old_context.SE.set in

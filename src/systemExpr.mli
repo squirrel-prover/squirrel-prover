@@ -52,7 +52,10 @@ val equal : Symbols.table -> 'a expr -> 'a expr -> bool
 val is_fset : t -> bool
 
 val is_any_or_any_comp : t -> bool
-  
+
+(** Check that all systems in two expressions are compatible. *)
+val compatible : Symbols.table -> 'a expr -> 'b expr -> bool
+
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
