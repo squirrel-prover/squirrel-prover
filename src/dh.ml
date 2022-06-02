@@ -58,7 +58,9 @@ let expand_macro_check (info:expand_info) (contx:Constr.trace_cntxt)
     | Macro (m, l, ts) ->
        if match info with
           | EI_direct s -> TS.query_happens ~precise:true s ts
-          | EI_indirect a -> ts = a
+          | EI_indirect a -> true (* ts = a is unsound *)
+                               (* we need to know that if a macro does not expand here,
+                                  then it will be handled by another iocc *)
        then
          match Macros.get_definition contx m ts with
          | `Def t' -> Some t'
@@ -167,7 +169,7 @@ let get_bad_occurrences
             ~(fv:Vars.vars) ~(cond:terms)
             ~(st:term) : name_occs =
     if m <> g then (* all occs in m, pows are bad *)
-      (get m ~fv ~cond ~st:m) @ 
+      (get m ~fv ~cond ~st) @ 
         (List.concat_map (fun tt -> get tt ~fv ~cond ~st) pows)
     (* note: might be that m is a macro that unfolds to g and we don't see it.
        then we generate useless bad occs, but that's still sound *)    
@@ -205,7 +207,7 @@ let get_bad_occurrences
     | Fun (f, _, _) when f = exp ->
        let (m, pows) = powers exp mult info contx t in
        (* we're sure pows isn't empty, so no risk of looping in illegal powers *)
-       get_illegal_powers m pows ~fv ~cond ~st:t
+       get_illegal_powers m pows ~fv ~cond ~st
 
     | Fun (f, _, [t1; t2]) when f = f_eq && gdh_oracles ->
        (* u^p1…pn = v^q1…qn *)
@@ -234,7 +236,9 @@ let get_bad_occurrences
       
     | _ ->
       Iter.tfold_occ ~mode:`NoDelta (* not delta since macros are handled separately *)
-        (fun ~fv ~cond t' occs -> occs @ (get t' ~fv ~cond ~st))
+        (fun ~fv ~cond t' occs ->
+          let sst = if is_binder t then t' else st in            
+          occs @ (get t' ~fv ~cond ~st:sst))
         ~fv ~cond t []
   in
   get t ~fv ~cond:[] ~st:t
