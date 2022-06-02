@@ -43,7 +43,7 @@ module type S = sig
   val conc_kind : conc_form Equiv.f_kind
 
   (*------------------------------------------------------------------*)
-  module Hyps : Hyps.HypsSeq with type hyp = hyp_form and type sequent = t
+  module Hyps : Hyps.S1 with type hyp = hyp_form and type hyps := t
 
   (** {2 Access to sequent components}
     *

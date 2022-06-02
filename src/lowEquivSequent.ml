@@ -88,15 +88,15 @@ let pp_init ppf j =
 
 (** Built on top of [H] *)
 module Hyps
-  : Hyps.HypsSeq with type hyp = Equiv.form and type sequent = t
+  : Hyps.S1 with type hyp = Equiv.form and type hyps := t
  = struct
   type hyp = Equiv.form
 
   type ldecl = Ident.t * hyp
 
   type sequent = t
-
-  let pp_hyp = Term.pp
+    
+  let pp_hyp = Equiv.pp
   let pp_ldecl = H.pp_ldecl
 
   let fresh_id  ?approx name  s = H.fresh_id  ?approx name  s.hyps
@@ -114,9 +114,15 @@ module Hyps
 
   let find_map func s = H.find_map func s.hyps
 
+  let find_all func s = H.find_all func s.hyps
+      
   let to_list s = H.to_list s.hyps
 
   let exists func s = H.exists func s.hyps
+
+  let _add ~(force:bool) id hyp s =
+    let id, hyps = H._add ~force id hyp s.hyps in
+    id, { s with hyps }
 
   let add_i npat f s =
     let id, hyps = H.add_i npat f s.hyps in

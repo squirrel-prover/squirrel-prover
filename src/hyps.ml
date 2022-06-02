@@ -20,7 +20,7 @@ module type Hyp = sig
 end
 
 (*------------------------------------------------------------------*) 
-module type S = sig
+module type S1 = sig
   (** Hypothesis *)
   type hyp 
 
@@ -30,19 +30,12 @@ module type S = sig
   type hyps
 
   (*------------------------------------------------------------------*) 
-  val empty : hyps
-
-  (*------------------------------------------------------------------*) 
   (** [by_id id s] returns the hypothesis with id [id] in [s]. *)
   val by_id : Ident.t -> hyps -> hyp
 
   (** Same as [by_id], but does a look-up by name and returns the full local 
       declaration. *)
   val by_name : lsymb   -> hyps -> ldecl
-
-  (*------------------------------------------------------------------*) 
-  val hyp_by_name : lsymb -> hyps -> hyp
-  val id_by_name  : lsymb -> hyps -> Ident.t
 
   (*------------------------------------------------------------------*) 
   val fresh_id  : ?approx:bool -> string      -> hyps -> Ident.t
@@ -111,6 +104,12 @@ module type S = sig
   val pp_dbg   : Format.formatter -> hyps -> unit
 end
 
+(*------------------------------------------------------------------*)
+(** [S1] with [empty] *)
+module type S = sig
+  include S1
+  val empty : hyps
+end
 
 (*------------------------------------------------------------------*)
 module Mk (Hyp : Hyp) : S with type hyp = Hyp.t = struct 
@@ -170,9 +169,6 @@ module Mk (Hyp : Hyp) : S with type hyp = Hyp.t = struct
     match find_opt (fun id _ -> Ident.name id = L.unloc name) hyps with
     | Some (id,f) -> id, f
     | None -> hyp_error ~loc:(Some (L.loc name)) (T.HypUnknown (L.unloc name))
-
-  let hyp_by_name name hyps = snd (by_name name hyps)
-  let id_by_name name hyps  = fst (by_name name hyps)
 
   let filter f hyps = Mid.filter (fun id a -> f id a) hyps
  
@@ -278,57 +274,6 @@ module Mk (Hyp : Hyp) : S with type hyp = Hyp.t = struct
   let fold func hyps init = Mid.fold func hyps init
 
   let clear_triv hyps = hyps
-end
-
-(*------------------------------------------------------------------*)
-(** {2 Signature of hypotheses of some sequent} *)
-
-module type HypsSeq = sig
-  type hyp 
-  type ldecl = Ident.t * hyp
-
-  type sequent
-
-  val add   : Args.naming_pat -> hyp -> sequent -> sequent
-  val add_i : Args.naming_pat -> hyp -> sequent -> Ident.t * sequent
-
-  val add_i_list : (Args.naming_pat * hyp) list -> sequent -> Ident.t list * sequent
-  val add_list   : (Args.naming_pat * hyp) list -> sequent -> sequent
-
-  val pp_hyp   : Format.formatter -> Term.term -> unit
-  val pp_ldecl : ?dbg:bool -> Format.formatter -> ldecl -> unit
-
-  val fresh_id  : ?approx:bool -> string -> sequent -> Ident.t
-  val fresh_ids : ?approx:bool -> string list -> sequent -> Ident.t list
-
-  val is_hyp : hyp -> sequent -> bool
-
-  val by_id   : Ident.t -> sequent -> hyp
-  val by_name : lsymb   -> sequent -> ldecl
-
-  val mem_id   : Ident.t -> sequent -> bool
-  val mem_name : string -> sequent -> bool
-
-  val to_list : sequent -> ldecl list
-
-  val find_opt : (Ident.t -> hyp -> bool) -> sequent -> ldecl option
-  val find_map : (Ident.t -> hyp -> 'a option) -> sequent -> 'a option
-
-  val exists : (Ident.t -> hyp -> bool) -> sequent -> bool
-
-  val map  : (hyp -> hyp) -> sequent -> sequent
-  val mapi : (Ident.t -> hyp ->  hyp) -> sequent -> sequent
-
-  val remove : Ident.t -> sequent -> sequent
-
-  val fold : (Ident.t -> hyp -> 'a -> 'a) -> sequent -> 'a -> 'a
-
-  val filter : (Ident.ident -> hyp -> bool) -> sequent -> sequent
-
-  val clear_triv : sequent -> sequent
-
-  val pp     : Format.formatter -> sequent -> unit
-  val pp_dbg : Format.formatter -> sequent -> unit
 end
 
 (*------------------------------------------------------------------*)

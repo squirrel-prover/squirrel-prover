@@ -16,7 +16,7 @@ module type Hyp = sig
 end
 
 (*------------------------------------------------------------------*) 
-module type S = sig
+module type S1 = sig
   (** Hypothesis *)
   type hyp 
 
@@ -26,19 +26,12 @@ module type S = sig
   type hyps
 
   (*------------------------------------------------------------------*) 
-  val empty : hyps
-
-  (*------------------------------------------------------------------*) 
   (** [by_id id s] returns the hypothesis with id [id] in [s]. *)
   val by_id : Ident.t -> hyps -> hyp
 
   (** Same as [by_id], but does a look-up by name and returns the full local 
       declaration. *)
   val by_name : Theory.lsymb -> hyps -> ldecl
-
-  (*------------------------------------------------------------------*) 
-  val hyp_by_name : Theory.lsymb -> hyps -> hyp
-  val id_by_name  : Theory.lsymb -> hyps -> Ident.t
 
   (*------------------------------------------------------------------*) 
   val fresh_id  : ?approx:bool -> string      -> hyps -> Ident.t
@@ -108,65 +101,16 @@ module type S = sig
 end
 
 (*------------------------------------------------------------------*)
+(** [S1] with [empty] *)
+module type S = sig
+  include S1
+  val empty : hyps
+end
+
+(*------------------------------------------------------------------*)
 (** Functor for building an implementation of contexts
   * for a particular kind of hypotheses. *)
 module Mk (Hyp : Hyp) : S with type hyp = Hyp.t
-
-(*------------------------------------------------------------------*)
-(** Signature for sequents with hypotheses. *)
-module type HypsSeq = sig
-  type hyp 
-
-  type ldecl = Ident.t * hyp
-
-  type sequent
-
-  val add   : TacticsArgs.naming_pat -> hyp -> sequent -> sequent
-
-  val add_i : TacticsArgs.naming_pat -> hyp -> sequent -> Ident.t * sequent
-
-  val add_i_list :
-    (TacticsArgs.naming_pat * hyp) list -> sequent -> Ident.t list * sequent
-  val add_list   : (TacticsArgs.naming_pat * hyp) list -> sequent -> sequent
-
-  val pp_hyp   : Format.formatter -> Term.term -> unit
-  val pp_ldecl : ?dbg:bool -> Format.formatter -> ldecl -> unit
-
-  val fresh_id  : ?approx:bool -> string -> sequent -> Ident.t
-  val fresh_ids : ?approx:bool -> string list -> sequent -> Ident.t list
-
-  val is_hyp : hyp -> sequent -> bool
-
-  val by_id : Ident.t -> sequent -> hyp
-
-  val by_name : Theory.lsymb -> sequent -> ldecl
-
-  val mem_id : Ident.t -> sequent -> bool
-
-  val mem_name : string -> sequent -> bool
-
-  val to_list : sequent -> ldecl list
-
-  val find_opt : (Ident.t -> hyp -> bool) -> sequent -> ldecl option
-
-  val find_map : (Ident.t -> hyp -> 'a option) -> sequent -> 'a option
-
-  val exists : (Ident.t -> hyp -> bool) -> sequent -> bool
-
-  val map : (hyp -> hyp) -> sequent -> sequent
-  val mapi : (Ident.t -> hyp ->  hyp) -> sequent -> sequent
-
-  val remove : Ident.t -> sequent -> sequent
-
-  val fold : (Ident.t -> hyp -> 'a -> 'a) -> sequent -> 'a -> 'a
-
-  val filter : (Ident.ident -> hyp -> bool) -> sequent -> sequent
-
-  val clear_triv : sequent -> sequent
-    
-  val pp     : Format.formatter -> sequent -> unit
-  val pp_dbg : Format.formatter -> sequent -> unit
-end
 
 
 (*------------------------------------------------------------------*)

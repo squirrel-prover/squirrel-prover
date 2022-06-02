@@ -5,9 +5,9 @@
 type trace_sequent
 
 (** Wrapper for manipulating local hypotheses only. *)
-module LocalHyps : Hyps.HypsSeq
+module LocalHyps : Hyps.S1
   with type hyp = Equiv.local_form
-   and type sequent = trace_sequent
+   and type hyps := trace_sequent
 
 (*------------------------------------------------------------------*)  
 include LowSequent.S

@@ -146,15 +146,17 @@ let constraints_valid s =
   not (Constr.m_is_sat models)
 
 (*------------------------------------------------------------------*)  
-module AnyHyps = struct
-  
+module AnyHyps
+  : Hyps.S1 with type hyp = Equiv.any_form and type hyps := t
+= struct
+
   type sequent = t
 
   type hyp = Equiv.any_form
 
   type ldecl = Ident.t * hyp
-
-  let pp_hyp = Term.pp 
+    
+  let pp_hyp = Equiv.pp_any_form
   let pp_ldecl = H.pp_ldecl
 
   let fresh_id  ?approx name  s = H.fresh_id  ?approx name  s.hyps
@@ -173,8 +175,14 @@ module AnyHyps = struct
   let find_opt func s = H.find_opt func s.hyps
 
   let find_map func s = H.find_map func s.hyps
+
+  let find_all func s = H.find_all func s.hyps
       
   let exists func s = H.exists func s.hyps
+
+  let _add ~(force:bool) id hyp s =
+    let id, hyps = H._add ~force id hyp s.hyps in
+    id, S.update ~hyps s
 
   let add_i npat f s =
     let id, hyps = H.add_i npat f s.hyps in
@@ -432,16 +440,17 @@ module Hyp  = Equiv.Any.Smart
 type trace_sequent = t
 
 module LocalHyps
-  : Hyps.HypsSeq with type hyp = Equiv.local_form and type sequent = t
+  : Hyps.S1 with type hyp = Equiv.local_form and type hyps := trace_sequent
 = struct
   type hyp = Equiv.local_form
   type ldecl = Ident.t * hyp
-  type sequent = trace_sequent
-
+    
   let (!!) = function
     | `Reach h -> h
     | `Equiv _ -> assert false
 
+  let _add ~force p h s = AnyHyps._add ~force p (`Reach h) s
+      
   let add p h s = AnyHyps.add p (`Reach h) s
 
   let add_i p h s = AnyHyps.add_i p (`Reach h) s
@@ -494,6 +503,13 @@ module LocalHyps
     in
     AnyHyps.find_map f s
 
+  let find_all f s =
+    let f id = function
+      | `Reach h -> f id h
+      | `Equiv _ -> false
+    in
+    List.map (fun (id, h) -> id, Equiv.any_to_reach h) (AnyHyps.find_all f s)
+      
   let exists f s =
     let f id = function
       | `Reach h -> f id h
@@ -530,5 +546,5 @@ end
 
 (*------------------------------------------------------------------*)
 module Hyps
-  : Hyps.HypsSeq with type hyp = Equiv.any_form and type sequent = t
+  : Hyps.S1 with type hyp = Equiv.any_form and type hyps := t
 = AnyHyps
