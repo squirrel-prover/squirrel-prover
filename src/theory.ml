@@ -306,7 +306,7 @@ let pp_error_i ppf = function
     Fmt.pf ppf "%a %s is undefined" Symbols.pp_namespace n s
 
   | Type_error (s, ty) ->
-    Fmt.pf ppf "Term %a is not of type %a" pp_i s Type.pp ty
+    Fmt.pf ppf "@[<hov 0>Term@;<1 2>@[%a@]@ is not of type @[%a@]@]" pp_i s Type.pp ty
 
   | Timestamp_expected t ->
     Fmt.pf ppf "The term %a must be given a timestamp" pp_i t
@@ -377,7 +377,7 @@ let pp_error_i ppf = function
 
       
 let pp_error pp_loc_err ppf (loc,e) =
-  Fmt.pf ppf "%a%a"
+  Fmt.pf ppf "%a@[<hov 2>Conversion error:@, %a@]"
     pp_loc_err loc
     pp_error_i e
 

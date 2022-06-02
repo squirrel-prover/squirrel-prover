@@ -69,7 +69,7 @@ let pp_loc_error state ppf loc =
       let lexbuf = Lexing.from_channel stdin in
       let startpos = lexbuf.Lexing.lex_curr_p.pos_cnum in
       Fmt.pf ppf
-        "[error-%d-%d]"
+        "[error-%d-%d]@;"
         (max 0 (loc.L.loc_bchar - startpos))
         (max 0 (loc.L.loc_echar - startpos))
     | `File f ->

@@ -240,7 +240,7 @@ let simpl_left_tac s = match simpl_left s with
 (*------------------------------------------------------------------*)
 (** [assumption s] succeeds (with no subgoal) if the sequent [s]
     can be proved using the axiom rule (plus some other minor rules). *)
-let assumption (s : TS.t) =
+let assumption (s : TS.t) = 
   let goal = TS.goal s in
   let assumption_entails _ = function
     | `Equiv (Equiv.Atom (Reach f))

@@ -239,7 +239,7 @@ let pp_pref (ty : pp) =
   | `Prompt  -> pr "@[[> "
   | `Start   -> pr "@[[start> "
   | `Result  -> pr "@["
-  | `Error   -> pr "@[[error> "
+  | `Error   -> pr "@[<v 0>[error> " (* vertical box, for nice errors in Emacs mode *)
   | `Dbg     -> pr "@[[dbg> "
   | `Warning -> pr "@[[warning> "
   | `Ignore  -> ()

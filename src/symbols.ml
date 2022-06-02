@@ -217,7 +217,7 @@ let pp_symb_error_i fmt = function
     Fmt.pf fmt "symbol %s already declared" s
 
 let pp_symb_error pp_loc_err fmt (loc,e) =
-  Fmt.pf fmt "%a%a."
+  Fmt.pf fmt "%aError: %a"
     pp_loc_err loc
     pp_symb_error_i e
 

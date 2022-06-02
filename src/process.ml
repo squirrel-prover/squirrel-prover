@@ -164,7 +164,7 @@ let pp_proc_error_i fmt = function
       Term.pp_projs ps2
 
 let pp_proc_error pp_loc_err fmt (loc,e) =
-  Fmt.pf fmt "%aproc error: %a."
+  Fmt.pf fmt "%aProcess error: @[%a@]."
     pp_loc_err loc
     pp_proc_error_i e
 

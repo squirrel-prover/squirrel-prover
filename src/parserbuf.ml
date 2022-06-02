@@ -19,13 +19,13 @@ let pp_error pp_loc pp_pref_loc e = match e with
   | Parser.Error ->
       Some (fun ppf () ->
               Fmt.pf ppf
-                "@[%aSyntax error %a.@]@."
+                "%aSyntax error: @[%a@]."
                 pp_pref_loc ()
                 pp_loc ())
   | Failure s ->
       Some (fun ppf () ->
               Fmt.pf ppf
-                "@[%aError %a: @,%s.@]@."
+                "%aError: @[%a@]: @,%s."
                 pp_pref_loc ()
                 pp_loc ()
                 s)
@@ -55,7 +55,7 @@ let pp_loc interactive filename lexbuf ppf () =
 let pp_pref_loc interactive lexbuf ppf () =
   if interactive then
     Fmt.pf ppf
-      "[error-%d-%d]"
+      "[error-%d-%d]@;"
       (Lexing.lexeme_start_p lexbuf).pos_cnum
       (Lexing.lexeme_end_p lexbuf).pos_cnum
 
