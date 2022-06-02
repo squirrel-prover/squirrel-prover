@@ -1,5 +1,9 @@
 (** Generic hypotheses, used in all kinds of sequents. *)
 
+
+module Args = TacticsArgs
+  
+(*------------------------------------------------------------------*) 
 (** Signature for hypothesis data-type. *)
 module type Hyp = sig 
   type t 
@@ -11,6 +15,7 @@ module type Hyp = sig
   val htrue : t
 end
 
+(*------------------------------------------------------------------*) 
 module type S = sig
   (** Hypothesis *)
   type hyp 
@@ -42,16 +47,16 @@ module type S = sig
   (*------------------------------------------------------------------*) 
   val _add : force:bool -> Ident.t -> hyp -> hyps -> Ident.t * hyps
 
-  (* (\** Adds a hypothesis, and name it according to a naming pattern. *\)
-   * val add : Args.naming_pat -> hyp -> hyps -> hyps
-   * 
-   * (\** Same as [add], but also returns the ident of the added hypothesis. *\)
-   * val add_i : Args.naming_pat -> hyp -> hyps -> Ident.t * hyps
-   * 
-   * val add_i_list :
-   *   (Args.naming_pat * hyp) list -> hyps -> Ident.t list * hyps
-   * 
-   * val add_list   : (Args.naming_pat * hyp) list -> hyps -> hyps *)
+  (** Adds a hypothesis, and name it according to a naming pattern. *)
+  val add : Args.naming_pat -> hyp -> hyps -> hyps
+  
+  (** Same as [add], but also returns the ident of the added hypothesis. *)
+  val add_i : Args.naming_pat -> hyp -> hyps -> Ident.t * hyps
+  
+  val add_i_list :
+    (Args.naming_pat * hyp) list -> hyps -> Ident.t list * hyps
+  
+  val add_list   : (Args.naming_pat * hyp) list -> hyps -> hyps
 
   (*------------------------------------------------------------------*)
   (** Find the first local declaration satisfying a predicate. *)

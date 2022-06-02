@@ -118,31 +118,17 @@ module Hyps
 
   let exists func s = H.exists func s.hyps
 
-  let add_formula ~force id (h : hyp) (s : sequent) =
-    let id, hyps = H._add ~force id h s.hyps in
-    id, { s with hyps = hyps }
-
   let add_i npat f s =
-    let force, approx, name = match npat with
-      | Args.Unnamed  -> true, true, "_"
-      | Args.AnyName  -> false, true, "H"
-      | Args.Named s  -> true, false, s
-      | Args.Approx s -> true, true, s
-    in
-    let id = fresh_id ~approx name s in
+    let id, hyps = H.add_i npat f s.hyps in
+    id, { s with hyps }
 
-    add_formula ~force id f s
-
-  let add npat (f : hyp) s : sequent = snd (add_i npat f s)
+  let add npat (f : hyp) s : sequent = { s with hyps = H.add npat f s.hyps }
 
   let add_i_list l (s : sequent) =
-    let s, ids = List.fold_left (fun (s, ids) (npat,f) ->
-        let id, s = add_i npat f s in
-        s, id :: ids
-      ) (s,[]) l in
-    List.rev ids, s
+    let ids, hyps = H.add_i_list l s.hyps in
+    ids, { s with hyps }
 
-  let add_list l s = snd (add_i_list l s)
+  let add_list l s = { s with hyps = H.add_list l s.hyps }
 
   let remove id s = { s with hyps = H.remove id s.hyps }
 

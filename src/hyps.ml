@@ -51,16 +51,16 @@ module type S = sig
   (*------------------------------------------------------------------*) 
   val _add : force:bool -> Ident.t -> hyp -> hyps -> Ident.t * hyps
 
-  (* (\** Adds a hypothesis, and name it according to a naming pattern. *\)
-   * val add : Args.naming_pat -> hyp -> hyps -> hyps
-   * 
-   * (\** Same as [add], but also returns the ident of the added hypothesis. *\)
-   * val add_i : Args.naming_pat -> hyp -> hyps -> Ident.t * hyps
-   * 
-   * val add_i_list :
-   *   (Args.naming_pat * hyp) list -> hyps -> Ident.t list * hyps
-   * 
-   * val add_list   : (Args.naming_pat * hyp) list -> hyps -> hyps *)
+  (** Adds a hypothesis, and name it according to a naming pattern. *)
+  val add : Args.naming_pat -> hyp -> hyps -> hyps
+  
+  (** Same as [add], but also returns the ident of the added hypothesis. *)
+  val add_i : Args.naming_pat -> hyp -> hyps -> Ident.t * hyps
+  
+  val add_i_list :
+    (Args.naming_pat * hyp) list -> hyps -> Ident.t list * hyps
+  
+  val add_list   : (Args.naming_pat * hyp) list -> hyps -> hyps
 
   (*------------------------------------------------------------------*)
   (** Find the first local declaration satisfying a predicate. *)
@@ -239,6 +239,33 @@ module Mk (Hyp : Hyp) : S with type hyp = Hyp.t = struct
     match find_opt (fun _ hyp' -> hyp = hyp') hyps with
     | Some (id',_) when not force -> id', hyps  
     | _ -> id, Mid.add id hyp hyps
+
+
+  let add_formula ~force id (h : hyp) (hyps : hyps) =
+    let id, hyps = _add ~force id h hyps in
+    id, hyps
+
+  let add_i npat f hyps =
+    let force, approx, name = match npat with
+      | Args.Unnamed  -> true, true, "_"
+      | Args.AnyName  -> false, true, Hyp.choose_name f
+      | Args.Named s  -> true, false, s
+      | Args.Approx s -> true, true, s
+    in
+    let id = fresh_id ~approx name hyps in
+
+    add_formula ~force id f hyps
+
+  let add npat (f : hyp) hyps : hyps = snd (add_i npat f hyps)
+
+  let add_i_list l (hyps : hyps) =
+    let hyps, ids = List.fold_left (fun (hyps, ids) (npat,f) ->
+        let id, hyps = add_i npat f hyps in
+        hyps, id :: ids
+      ) (hyps,[]) l in
+    List.rev ids, hyps
+
+  let add_list l s = snd (add_i_list l s)
 
   (*------------------------------------------------------------------*)
   let mem_id id hyps = Mid.mem id hyps

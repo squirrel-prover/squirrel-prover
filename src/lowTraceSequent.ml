@@ -20,35 +20,6 @@ let dbg ?(force=false) s =
   Printer.prt mode s
 
 (*------------------------------------------------------------------*)
-(* TODO:remove duplicate *)
-let get_ord (at : Term.xatom ) : Term.ord = match at with
-  | `Comp (ord,_,_) -> ord
-  | `Happens _      -> assert false
-
-(* TODO:remove duplicate *)
-let choose_name = function
-  | `Equiv _ -> "G"
-  | `Reach f ->
-    match Term.form_to_xatom f with
-    | None -> "H"
-    | Some (`Happens _) -> "Hap"
-    | Some at ->
-      let sort = match Term.ty_xatom at with
-        | Type.Timestamp -> "C"
-        | Type.Index     -> "I"
-        | _              -> "M" 
-      in
-      let ord = match get_ord at with
-        | `Eq  -> "eq"
-        | `Neq -> "neq"
-        | `Leq -> "le"
-        | `Geq -> "ge"
-        | `Lt  -> "lt"
-        | `Gt  -> "gt"
-      in
-      sort ^ ord
-
-(*------------------------------------------------------------------*)
 module H = Hyps.TraceHyps
 
 (*------------------------------------------------------------------*)
@@ -205,107 +176,15 @@ module AnyHyps = struct
       
   let exists func s = H.exists func s.hyps
 
-  class iter_macros ~cntxt f = object (self)
-    inherit Iter.iter ~cntxt as super
-    method visit_message t =
-      match t with
-      | Term.Macro (ms,[],a) ->
-        if List.for_all
-            Vars.(fun v -> not (is_new v))
-            (Term.get_vars t) 
-        then begin
-          match Macros.get_definition cntxt ms a with
-          | `Def def ->
-            f a (`Message (t, def)) ;
-            self#visit_message def
-          | _ -> ()
-        end
+  let add_i npat f s =
+    let id, hyps = H.add_i npat f s.hyps in
+    id, S.update ~hyps s
 
-      | t -> super#visit_message t
-  end
-
-  (** Add to [s] equalities corresponding to the expansions of all macros
-    * occurring in [f], if [f] happened. *)
-  let rec add_macro_defs (s : sequent) f =
-    let macro_eqs : (Term.term * Term.term) list ref = ref [] in
-    match SystemExpr.to_fset s.env.system.set with
-    | exception _ -> s
-    | system ->
-
-    let cntxt =
-      Constr.make_context ~table:s.env.table ~system
-    in
-
-    let iter =
-      new iter_macros
-        ~cntxt
-        (fun a el -> match el with
-           |`Message (t,t') ->
-             if Term.ty t <> Type.Boolean then
-               macro_eqs := (a, Term.mk_atom `Eq t t') :: !macro_eqs
-        ) in
-    
-    iter#visit_message f ;
-    
-    List.fold_left (fun s (a,f) -> 
-        if query_happens ~precise:true s a 
-        then snd (add_form_aux None s f)
-        else s
-      ) s !macro_eqs
-
-  and add_form_aux
-      ?(force=false) (id : Ident.t option) (s : sequent) (f : Term.term) =
-    let recurse =
-      (not (H.is_hyp (`Reach f) s.hyps)) && (Config.auto_intro ()) in
-
-    let id = match id with       
-      | None -> H.fresh_id "D" s.hyps
-      | Some id -> id in
-
-    let id, hyps = H._add ~force id (`Reach f) s.hyps in
-    let s = S.update ~hyps s in
-    
-    (* [recurse] boolean to avoid looping *)
-    let s = if recurse then add_macro_defs s f else s in
-
-    id, s
-
-  let add_happens ?(force=false) id (s : sequent) ts =
-    let f = Term.mk_happens ts in
-    let id, hyps = H._add ~force id (`Reach f) s.hyps in
-    let s = S.update ~hyps s in
-    id, s
-
-  (** if [force], we add the formula to [Hyps] even if it already exists. *)
-  let add_formula ?(force=false) id f (s : sequent) =
-    match f with
-    | Term.Fun (f, _, [ts]) when f = Term.f_happens -> 
-      add_happens ~force id s ts
-
-    | _ -> add_form_aux ~force (Some id) s f
-
-  let add_i npat f s = 
-    let force, approx, name = match npat with
-      | Args.Unnamed  -> true, true, "_"
-      | Args.AnyName  -> false, true, choose_name f
-      | Args.Named s  -> true, false, s 
-      | Args.Approx s -> true, true, s 
-    in
-    let id = fresh_id ~approx name s in
-    match f with
-      | `Reach f -> add_formula ~force id f s
-      | _ ->
-         let id,hyps = H._add ~force id f s.hyps in
-         id, S.update ~hyps s
-
-  let add npat f s = snd (add_i npat f s)
+  let add npat f s = S.update ~hyps:H.(add npat f s.hyps) s
 
   let add_i_list l (s : sequent) =
-    let s, ids = List.fold_left (fun (s, ids) (npat,f) ->
-        let id, s = add_i npat f s in
-        s, id :: ids
-      ) (s,[]) l in
-    List.rev ids, s
+    let ids, hyps = H.add_i_list l s.hyps in
+    ids, S.update ~hyps s
 
   let add_list l s = snd (add_i_list l s)
   
@@ -319,25 +198,8 @@ module AnyHyps = struct
   let filter f s = S.update ~hyps:(H.filter f s.hyps) s
 
   (*------------------------------------------------------------------*)
-  (* We add back manually all formulas, to ensure that definitions are 
-     unrolled. *)
-  (* FIXME: this seems very ineficient *)
-  let reload s =
-    H.fold
-      (fun id f s ->
-        let s = remove id s in
-        match f with
-          | `Reach f ->
-              snd (add_formula ~force:true id f s)
-          | _ ->
-              let _,hyps = H._add ~force:true id f s.hyps in
-              S.update ~hyps s)
-      s.hyps s
-
-  (*------------------------------------------------------------------*)
   (* override [clear_triv] *)
   let clear_triv s =
-    let s = reload s in
     let not_triv _ = function
       | `Reach f -> not (Term.f_triv f)
       | _ -> true
@@ -367,13 +229,44 @@ let set_table table s =
 
 (*------------------------------------------------------------------*)
 
+(** Add to [s] equalities corresponding to the expansions of all macros
+  * occurring in [f], if [f] happened. *)
+let rec add_macro_defs (s : sequent) f =
+  let macro_eqs : (Term.term * Term.term) list ref = ref [] in
+  match SystemExpr.to_fset s.env.system.set with
+  | exception _ -> s
+  | system ->
+
+    List.fold_left (fun s (a,f) -> 
+        if query_happens ~precise:true s a 
+        then snd (add_form_aux None s f)
+        else s
+      ) s !macro_eqs
+
+and add_form_aux
+    ?(force=false) (id : Ident.t option) (s : sequent) (f : Term.term) =
+  let recurse =
+    (not (H.is_hyp (`Reach f) s.hyps)) && (Config.auto_intro ()) in
+
+  let id = match id with       
+    | None -> H.fresh_id "D" s.hyps
+    | Some id -> id in
+
+  let id, hyps = H._add ~force id (`Reach f) s.hyps in
+  let s = S.update ~hyps s in
+
+  (* [recurse] boolean to avoid looping *)
+  let s = if recurse then add_macro_defs s f else s in
+
+  id, s
+
 let set_goal a s =
   let s = S.update ~conclusion:a s in
     match Term.form_to_xatom a with
       | Some at 
         when Term.ty_xatom at = Type.Message && 
              Config.auto_intro () -> 
-        AnyHyps.add_macro_defs s a
+        add_macro_defs s a
       | _ -> s
 
 let set_goal_in_context ?update_local system conc s =
@@ -401,13 +294,15 @@ let set_goal_in_context ?update_local system conc s =
          match f with
            | `Reach f ->
                begin match update_local f with
-                 | Some f -> snd (AnyHyps.add_formula id f s)
+                 | Some f ->
+                   let _,hyps = H._add ~force:true id (`Reach f) s.hyps in
+                   S.update ~hyps s
                  | None -> s
                end
            | `Equiv e ->
                begin match update_global e with
                  | Some e ->
-                     let _,hyps = H._add ~force:true id f s.hyps in
+                     let _,hyps = H._add ~force:true id (`Equiv e) s.hyps in
                      S.update ~hyps s
                  | None -> s
                end)
@@ -450,7 +345,7 @@ let subst subst s =
         ~conclusion:(Term.subst subst s.conclusion)
         s in
 
-    AnyHyps.reload s
+    s
 
 (*------------------------------------------------------------------*)
 (** TRS *)
