@@ -172,7 +172,7 @@ let include_get_file (state : main_state) (name : Theory.lsymb) : file =
 open Tactics
 
 (** check if an exception is handled *)
-let is_toplevel_error ~test (e : exn) : bool =
+let is_toplevel_error ~test interactive (e : exn) : bool =
   match e with
   | Parserbuf.Error         _
   | Prover.ParseError       _
@@ -186,8 +186,11 @@ let is_toplevel_error ~test (e : exn) : bool =
   | Tactic_soft_failure     _
   | Tactic_hard_failure     _ -> not test
 
+  | e when interactive -> not test
+
   | _ -> false
 
+(** [is_toplevel_error] must be synchronized with [pp_toplevel_error] *)
 let pp_toplevel_error
     ~test
     (state : main_state)
@@ -235,6 +238,9 @@ let pp_toplevel_error
       pp_loc_error_opt l
       Tactics.pp_tac_error_i e
 
+  | e when state.interactive ->
+    Fmt.pf fmt "Anomaly, please report: %s" (Printexc.to_string e)
+    
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
@@ -426,7 +432,7 @@ let rec do_include
                        check_mode = state.check_mode; }
 
   (* include failed, revert state *)
-  with e when is_toplevel_error ~test e ->
+  with e when is_toplevel_error ~test state.interactive e ->
     let err_mess fmt =
       Fmt.pf fmt "@[<v 0>include %s failed:@;@[%a@]@]"
         (L.unloc i.th_name)
@@ -521,7 +527,7 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
     (main_loop[@tailrec]) ~test new_state
 
   (* error handling *)
-  | exception e when is_toplevel_error ~test e ->
+  | exception e when is_toplevel_error ~test state.interactive e ->
     Printer.prt `Error "%a" (pp_toplevel_error ~test state) e;
     main_loop_error ~test state
 
