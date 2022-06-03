@@ -2,6 +2,7 @@
    Data is an array of levels, and levels are non-empty array of nodes*/
 
 const margin = 20
+const margin2 = 10
 
 
 
@@ -125,8 +126,9 @@ function click(data, selectionLevels, selectionNodes, selectionLinks, delay) {
       span.html(d[kind]);
     }
     d.lineDisplay[kind] = !d.lineDisplay[kind];
-    d.lineWidth[kind] = span.node().offsetWidth;
-    d.lineHeight[kind] = span.node().offsetHeight;
+    d.lineWidth[kind] = span.node().offsetWidth + margin2;
+    d.lineHeight[kind] = span.node().offsetHeight + margin2;
+    console.log(span.node().offsetHeight);
     computePositions(data);
     updateAll(selectionLevels, selectionNodes, selectionLinks, delay);
   };
@@ -154,7 +156,6 @@ function plot_line(selection, kind, mutable, text, partialClick) {
     .classed(kind, true)
     .attr("x", 0)
     .attr("y", 0)
-    .style("fill", "none")
     .style("stroke", "black");
   FOSelection = validSelection.append("foreignObject")
     .classed(kind, true);
@@ -164,12 +165,14 @@ function plot_line(selection, kind, mutable, text, partialClick) {
       updateAll(selectionLevels, selectionNodes, selectionLinks, 500);
     })
   }
-  FOSelection.append("xhtml:span")
-      .html(d => mutable ? text : d[kind])
-      .each(function(d) {
-        d.lineWidth[kind] = this.offsetWidth;
-        d.lineHeight[kind] = this.offsetHeight;
-      });
+  FOSelection.append("xhtml:div")
+    .append("xhtml:span")
+    .classed(kind, true)
+    .html(d => mutable ? text : d[kind])
+    .each(function(d) {
+      d.lineWidth[kind] = this.offsetWidth + margin2;
+      d.lineHeight[kind] = this.offsetHeight + margin2;
+    });
   /* We return the created selection. */
   return newSelection
 }
@@ -224,7 +227,7 @@ function plot(data, links, svg) {
 /* Declare the main svg */
 var svg = d3.select("body")
   .append("svg")
-  .style('background-color', 'lightgrey')
+  .style('border', 'solid')
 /* Initialisation */
 const [data, links] = make_data(json);
 console.log(data);

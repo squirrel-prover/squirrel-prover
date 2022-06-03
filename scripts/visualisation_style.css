@@ -1,3 +1,21 @@
+
+rect.name {
+  fill: #cccccc;
+}
+rect.cond, rect.state, rect.output {
+  fill: #eeeeee;
+}
+div {
+  padding: 5px;
+}
+span.name {
+  display: table;
+  margin: 0 auto;
+  font-weight: bold;
+}
+
+/* keyword Classes from Squirrel */
+
 .pn, .pv, .pio, .pk, .gm, .gf, .sep, .ht, .hf{
   font-weight:bold;
 }
