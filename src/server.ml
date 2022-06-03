@@ -1,13 +1,39 @@
 module S = Tiny_httpd
 
+(* Utilities for reading files from script/ directory,
+   whose location is determined from the binary's path. *)
+
+let read_whole_file filename =
+  let ch = open_in filename in
+  let s = really_input_string ch (in_channel_length ch) in
+  close_in ch;
+  s
+
+let make_absolute path =
+  if Filename.is_relative path then
+    Filename.concat Filename.current_dir_name path
+  else
+    path
+
+let repository = Filename.dirname (make_absolute Sys.argv.(0))
+
+let read_file filename =
+  read_whole_file
+    (Filename.concat repository (Filename.concat "scripts" filename))
+
+(* Function to send update events. It will be updated when creating
+   the corresponding route in the server. *)
+
 let update = ref (fun () -> ())
+
+(* Server setup and launching in a new thread *)
 
 let start () =
   let port = 8080 in
   S._enable_debug false;
   let server = S.create ~port () in
 
-  (* HTML page for showing goals *)
+  (* Hardcoded HTML pages *)
 
   let goals_page = "\
 <html>
@@ -31,11 +57,43 @@ let start () =
   <body>
 </html>"
   in
+
   S.add_route_handler ~meth:`GET server
     S.Route.(exact "goals" @/ return)
     (fun _req -> S.Response.make_string (Ok goals_page));
 
+  let default_page =
+    "<html><body><p>\
+      Try <a href=\"goals\">this</a> \
+      or <a href=\"visualisation.html\">that</a>.\
+     </p></body></html>"
+  in
+  S.add_route_handler ~meth:`GET server
+    S.Route.return
+    (fun _req -> S.Response.make_string (Ok default_page));
+
+  (* Serving files from scripts directory *)
+
+  List.iter
+    (fun filename ->
+       S.add_route_handler ~meth:`GET server
+         S.Route.(exact filename @/ return)
+         (fun _req -> S.Response.make_string (Ok (read_file filename))))
+    ["visualisation.html";"visualisation_style.css";"visualisation_script.js"];
+
   (* Data *)
+
+  S.add_route_handler ~meth:`GET server
+    S.Route.(exact "dump.js" @/ return)
+    (fun _req ->
+       match Prover.get_first_subgoal () with
+         | Trace j ->
+             let json =
+               Format.asprintf "%a"
+                 Constr.dump (LowTraceSequent.mk_trace_cntxt j)
+             in
+             S.Response.make_string (Ok json)
+         | _ | exception _ -> S.Response.fail ~code:503 "No data for now");
 
   S.add_route_handler ~meth:`GET server
     S.Route.(exact "goal" @/ return)

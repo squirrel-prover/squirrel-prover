@@ -36,7 +36,7 @@ val abort : unit -> unit
 val get_state : prover_mode -> Symbols.table -> proof_state
 
 (** Get the first subgoal.
-    Fail if there is no subgoal or current goal. *)
+    @raise Not_found if there is no subgoal or current goal. *)
 val get_first_subgoal : unit -> Goal.t
 
 (** Restore a proof state. *)
