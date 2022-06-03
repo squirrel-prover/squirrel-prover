@@ -117,6 +117,7 @@ let rec tac_error_to_string = function
   | NotDepends (s1, s2)   -> "NotDepends, "^s1^", "^s2
   | FailWithUnexpected te -> "FailWithUnexpected, "^(tac_error_to_string te)
   | ApplyMatchFailure _   -> "ApplyMatchFailure"
+
   | HypAlreadyExists  _    -> "HypAlreadyExists"
   | HypUnknown        _    -> "HypUnknown"
   | GoalBadShape      _    -> "GoalBadShape"

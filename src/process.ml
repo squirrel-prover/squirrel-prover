@@ -1025,7 +1025,8 @@ let declare_system table system_name (projs : Term.projs) (proc : process) =
   let env = Env.init ~table () in
   check_proc env projs proc ;
 
-  let projections = [Term.left_proj; Term.right_proj] in (* TODO *)
+  (* FEATURE: allow user to define more than bi-system *)
+  let projections = [Term.left_proj; Term.right_proj] in
   let system_name = match system_name with
     | Some lsymb -> lsymb
     | None -> L.mk_loc Location._dummy "default"

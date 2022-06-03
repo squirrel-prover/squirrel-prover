@@ -125,10 +125,13 @@ module ProverTactics : sig
         ?pq_sound:bool ->
     TacticsArgs.parser_arg Tactics.ast -> unit
 
-(* The remaining functions allows to easily register a tactic, without having to
-   manage type conversions, or the tail recursvity. It is simply required to
-   give a function over judgments, expecting some arguments of the given
-   sort. *)
+  (* The remaining functions allow to easily register a tactic,
+     without having to manage type conversions, or worry about the
+     proper use of continuations in the tactics type.
+     It is simply required to give a function over judgments,
+     either without arguments (for [register])
+     or with typed arguments (for [register_typed]). *)
+
   val register : string -> tactic_help:tactic_help ->
     ?pq_sound:bool ->
     (judgment -> judgment list) -> unit

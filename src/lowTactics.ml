@@ -82,7 +82,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** build a pattern from a rewriting rule using S.Reduce to get the equality *)
   let pat_to_rw_rule s =
     Rewrite.pat_to_rw_rule
-      ~destr_eq:(S.Reduce.destr_eq s Equiv.Local_t) 
+      ~destr_eq:(S.Reduce.destr_eq s Equiv.Local_t)
 
   (*------------------------------------------------------------------*)
   let wrap_fail f (s: S.sequent) sk fk =
@@ -107,7 +107,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   let convert_args (s : S.sequent) args sort =
     Args.convert_args (S.env s) args sort (S.wrap_conc (S.goal s))
-  
+
   let convert (s : S.sequent) term =
     let cenv = Theory.{ env = S.env s; cntxt = InGoal; } in
     Theory.convert cenv term
@@ -155,10 +155,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** Apply some function [doit] to a single target. *)
   let do_target
       (doit : (
-          (Equiv.any_form * Ident.t option) -> 
+          (Equiv.any_form * Ident.t option) ->
           (Equiv.any_form * (SE.context * S.conc_form) list)))
-      (s : S.sequent) (t : target) 
-    : S.sequent * S.sequent list 
+      (s : S.sequent) (t : target)
+    : S.sequent * S.sequent list
     =
     let f, s, tgt_id = match t with
       | T_conc ->
@@ -181,13 +181,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     match t, f with
     | T_conc, f -> S.set_goal (S.unwrap_conc f) s, subs
-    | T_hyp id, f -> 
+    | T_hyp id, f ->
       Hyps.add (Args.Named (Ident.name id)) (S.unwrap_hyp f) s, subs
     | T_felem i, `Reach f -> S.change_felem i [f] s, subs
     | _ -> assert false
 
-  let do_targets doit (s : S.sequent) (targets : target list) 
-    : S.sequent * S.sequent list 
+  let do_targets doit (s : S.sequent) (targets : target list)
+    : S.sequent * S.sequent list
     =
     let s, subs =
       List.fold_left (fun (s,subs) target ->
@@ -202,21 +202,21 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Macro and term unfolding} *)
 
   (** [unfold_term_exn t se s] unfolds [t] w.r.t. the system [se].
-      The sequent [s] is used to discharge Happens subgoals. 
+      The sequent [s] is used to discharge Happens subgoals.
       If [se] is not a [SE.fset], the unfolding fail by raising an exception.*)
-  let unfold_term_exn 
+  let unfold_term_exn
       ?(force_happens=false)
       (t     : Term.term)
-      (se    : SE.arbitrary) 
+      (se    : SE.arbitrary)
       (s     : S.sequent)
-    : Term.term 
+    : Term.term
     =
     let se =
-      if SE.is_fset se then SE.to_fset se 
-      else soft_failure 
+      if SE.is_fset se then SE.to_fset se
+      else soft_failure
           (Tactics.Failure "nothing to expand: the system is too general")
     in
-    
+
     match t with
     | Macro (ms,l,a) ->
       if not (force_happens) && not (S.query_happens ~precise:true s a) then
@@ -224,10 +224,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       Macros.get_definition_exn (S.mk_trace_cntxt ~se s) ms a
 
-    | Fun (fs, _, ts) 
-      when Operator.is_operator (S.table s) fs -> 
+    | Fun (fs, _, ts)
+      when Operator.is_operator (S.table s) fs ->
       Operator.unfold (S.mk_trace_cntxt ~se s) fs ts
-      
+
     | _ ->
       soft_failure (Tactics.Failure "nothing to expand")
 
@@ -236,8 +236,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
       ?(force_happens=false)
       ~(strict:bool)
       (t     : Term.term)
-      (se    : SE.arbitrary) 
-      (s     : S.sequent) 
+      (se    : SE.arbitrary)
+      (s     : S.sequent)
     : Term.term option
     =
     try Some (unfold_term_exn ~force_happens t se s) with
@@ -256,14 +256,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | `Fsymb fname        -> fs = fname
     | `Msymb _ | `Mterm _ -> false
 
-  type expand_kind = [ 
+  type expand_kind = [
     | `Msymb of Symbols.macro
-    | `Fsymb of Symbols.fname 
+    | `Fsymb of Symbols.fname
     | `Mterm of Term.term
     | `Any
   ]
- 
-  let expand_term 
+
+  let expand_term
       ?(m_rec = false)
       (target : expand_kind)
       (s : S.sequent)
@@ -271,14 +271,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
     =
     let found1 = ref false in
 
-    (* unfold_macro is not allowed to fail if we try to expand a 
+    (* unfold_macro is not allowed to fail if we try to expand a
        specific term *)
     let strict =
       match target with
       | `Mterm _ -> true
       | `Fsymb _ | `Msymb _ | `Any -> false
     in
-    let unfold (se : SE.arbitrary) occ s = 
+    let unfold (se : SE.arbitrary) occ s =
       match unfold_term ~strict occ se s with
       | None -> `Continue
       | Some t ->
@@ -286,7 +286,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         `Map t
     in
 
-    let expand_inst : Match.Pos.f_map = 
+    let expand_inst : Match.Pos.f_map =
       fun occ se _vars conds _p ->
         let s =                 (* adds [conds] in [s] *)
           List.fold_left (fun s cond ->
@@ -301,7 +301,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
             `Continue
 
         | Term.Fun ((f,_), _, _) ->
-          if found_occ_fun target f then 
+          if found_occ_fun target f then
             unfold se occ s
           else
             `Continue
@@ -311,16 +311,16 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     match f with
     | `Equiv f ->
-      let _, f = 
+      let _, f =
         Match.Pos.map_e
-          ~mode:(`TopDown m_rec) expand_inst (S.vars s) (S.system s) f 
+          ~mode:(`TopDown m_rec) expand_inst (S.vars s) (S.system s) f
       in
       !found1, `Equiv f
 
     | `Reach f ->
-      let _, f = 
+      let _, f =
         Match.Pos.map
-          ~mode:(`TopDown m_rec) expand_inst (S.vars s) (S.system s).set f 
+          ~mode:(`TopDown m_rec) expand_inst (S.vars s) (S.system s).set f
       in
       !found1, `Reach f
 
@@ -336,8 +336,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     (* applies [doit] to all subterms of the target [f] *)
     let doit
-        ((f,_) : Equiv.any_form * Ident.t option) 
-      : Equiv.any_form * (SE.context * S.conc_form) list 
+        ((f,_) : Equiv.any_form * Ident.t option)
+      : Equiv.any_form * (SE.context * S.conc_form) list
       =
       let found1', f = expand_term ~m_rec target s f in
       found1 := found1' || !found1;
@@ -352,12 +352,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** expand all macros (not operators) in a term relatively to a system *)
   let expand_all_macros
       ?(force_happens=false)
-      (f : Term.term) 
+      (f : Term.term)
       (sexpr : SE.arbitrary)
-      (s : S.t) 
-    : Term.term 
+      (s : S.t)
+    : Term.term
     =
-    let expand_inst : Match.Pos.f_map = 
+    let expand_inst : Match.Pos.f_map =
       fun (occ : Term.term) se _vars conds _p ->
         match occ with
         | Term.Macro (ms, l, _) ->
@@ -367,18 +367,18 @@ module MkCommonLowTac (S : Sequent.S) = struct
                   S.Hyps.add AnyName (S.unwrap_hyp (`Reach cond)) s
                 ) s conds
             in
-            match 
-              unfold_term ~strict:false ~force_happens occ se s 
+            match
+              unfold_term ~strict:false ~force_happens occ se s
             with
             | None -> `Continue
             | Some t -> `Map t
           end
-          
+
         | _ -> `Continue
     in
-    let _, f = 
-      Match.Pos.map 
-        ~mode:(`TopDown true) expand_inst (S.vars s) sexpr f 
+    let _, f =
+      Match.Pos.map
+        ~mode:(`TopDown true) expand_inst (S.vars s) sexpr f
     in
     f
 
@@ -393,7 +393,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     [expand_all targets s]
 
   (** parse a expand argument *)
-  let p_rw_expand_arg (s : S.t) (arg : Theory.term) : expand_kind = 
+  let p_rw_expand_arg (s : S.t) (arg : Theory.term) : expand_kind =
     let tbl = S.table s in
     match Args.convert_as_lsymb [Args.Theory arg] with
     | Some m ->
@@ -401,13 +401,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
         `Msymb (Symbols.Macro.of_lsymb m tbl)
       else if Symbols.Function.mem m tbl then
         `Fsymb (Symbols.Function.of_lsymb m tbl)
-      else 
+      else
         soft_failure ~loc:(L.loc arg) (Failure "not a macro or operator");
 
     | _ ->
       match convert_args s [Args.Theory arg] Args.(Sort Message) with
       | Args.Arg (Args.Message (f, _)) -> `Mterm f
-                                            
+
       | _ ->
         hard_failure ~loc:(L.loc arg)
           (Tactics.Failure "expected a term of sort message")
@@ -493,15 +493,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     let mult, id_opt, rw_erule = rw in
 
-    let doit_tgt 
-        (f,tgt_id : Equiv.any_form * Ident.t option) 
-      : Equiv.any_form * (SE.context * S.conc_form) list 
+    let doit_tgt
+        (f,tgt_id : Equiv.any_form * Ident.t option)
+      : Equiv.any_form * (SE.context * S.conc_form) list
       =
       if hyp_is_same id_opt tgt_id
       then f, []
       else
         match
-          Rewrite.rewrite_exn 
+          Rewrite.rewrite_exn
             ~loc (S.table s) (S.system s) (S.vars s) (S.get_trace_hyps s)
             mult rw_erule f
         with
@@ -523,11 +523,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** Parse rewrite tactic arguments as rewrite rules. *)
   let p_rw_item (rw_arg : Args.rw_item) (s : S.t) : rw_earg =
     let p_rw_rule dir (p_pt : Theory.p_pt) : Rewrite.rw_rule * Ident.t option =
-      let ghyp, pat_system, pat = 
+      let ghyp, pat_system, pat =
         S.convert_pt_gen
           ~check_compatibility:false
           ~close_pats:false
-          p_pt Equiv.Local_t s 
+          p_pt Equiv.Local_t s
       in
       let id_opt = match ghyp with `Hyp id -> Some id | _ -> None in
 
@@ -1131,18 +1131,21 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (*------------------------------------------------------------------*)
   (** {3 Apply}
-    *
-    * In local and global sequents, we can apply an hypothesis
-    * to derive the goal or to derive the conclusion of an hypothesis.
-    * The former corresponds to [apply] below and the latter corresponds
-    * to [apply_in].
-    *
-    * We impose in both that the hypotheses involved here are of the same
-    * kind as conclusion formulas: this is immediate for global sequents
-    * and, in the case of local sequents, means that we only consider
-    * local hypotheses. This might be generalized later, or complemented
-    * with other tactics that would have to generate global sequents
-    * as premisses. *)
+
+      In local and global sequents, we can apply an hypothesis
+      to derive the goal or to derive the conclusion of an hypothesis.
+      The former corresponds to [apply] below and the latter corresponds
+      to [apply_in].
+
+      TODO update [apply] and [apply_in] to make sure that they properly
+        handle global and local hypotheses, and system annotations
+
+      We impose in both that the hypotheses involved here are of the same
+      kind as conclusion formulas: this is immediate for global sequents
+      and, in the case of local sequents, means that we only consider
+      local hypotheses. This might be generalized later, or complemented
+      with other tactics that would have to generate global sequents
+      as premisses. *)
 
   let apply ~use_fadup (pat : S.conc_form Term.pat) (s : S.t) : S.t list =
     let option =
@@ -1156,12 +1159,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       let match_res =
         match S.conc_kind with
-        | Local_t  -> Match.T.try_match ~option table system goal pat 
+        | Local_t  -> Match.T.try_match ~option table system goal pat
         | Global_t -> Match.E.try_match ~option table system goal pat
         | Any_t -> assert false (* cannot happen *)
       in
 
-      (* Check that [pat] entails [S.goal s]. TODO system.set abusive? *)
+      (* Check that [pat] entails [S.goal s]. *)
       match match_res with
       (* match failed by [pat] is a product: retry with the rhs *)
       | (NoMatch _ | FreeTyv) when S.Conc.is_impl pat.pat_term ->
@@ -1217,7 +1220,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           | Any_t -> assert false (* cannot happen *)
         in
 
-        (* Check that [hconcl] entails [pat]. TODO _.set abusive *)
+        (* Check that [hconcl] entails [pat]. *)
         match match_res with
         | NoMatch _ | FreeTyv -> None
         | Match mv -> Some mv
@@ -1932,7 +1935,7 @@ let rec do_intros_ip
       let s = do_naming_pat handler Args.AnyName s in
       do_intros_ip simpl (Args.Star loc :: intros) s
 
-    with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> 
+    with Tactics.Tactic_soft_failure (_,NothingToIntroduce) ->
       do_intros_ip simpl intros s
 
 and do_intros_ip_list

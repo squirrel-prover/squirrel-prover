@@ -27,7 +27,7 @@ module type S = sig
       inferred remains (default to [true]).
       Also return the head of the proof term as a [ghyp]. *)
   val convert_pt_gen :
-    ?check_compatibility:bool ->
+    check_compatibility:bool ->
     ?close_pats:bool ->
     Theory.p_pt ->
     'a Equiv.f_kind -> t ->
