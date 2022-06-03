@@ -294,16 +294,15 @@ module Smart : Term.SmartFO with type form = _form = struct
 
   let destr_quant q = function
     | Quant (q', es, f) when q = q' -> Some (es, f)
+
     | Atom (Reach f) when Term.is_pure_timestamp f && q = Exists ->
         begin match Term.Smart.destr_exists f with
           | Some (es,f) -> Some (es, Atom (Reach f))
           | None -> None
         end
 
-    (* For a local meta-formula f,
-       (Forall x. [f]) is equivalent to [forall x. f]. *)
     | Atom (Reach f) when q = ForAll ->
-      begin match Term.Smart.destr_forall f with
+        begin match Term.Smart.destr_forall f with
           | Some (es,f) -> Some (es, Atom (Reach f))
           | None -> None
         end
@@ -340,39 +339,37 @@ module Smart : Term.SmartFO with type form = _form = struct
   let destr_true  f = todo ()
   let destr_not   f = todo ()
 
-  (** Lifts a destructor over [Impl], [And] or [Or] when one of the
-      two formulas is a pure trace model formula. *)
-  let destr_lift = function
-    | Some (f1,f2)
-      when Term.is_pure_timestamp f1 || Term.is_pure_timestamp f2 ->
-      Some (Atom (Reach f1), Atom (Reach f2))
-    | _ -> None
-
   let destr_and = function
     | And (f1, f2) -> Some (f1, f2)
-    | Atom (Reach f) -> destr_lift (Term.Smart.destr_and f)
+    | Atom (Reach f) ->
+        begin match Term.Smart.destr_and f with
+          | Some (f1,f2) -> Some (Atom (Reach f1), Atom (Reach f2))
+          | None -> None
+        end
     | _ -> None
 
   let destr_or = function
     | Or (f1, f2) -> Some (f1, f2)
-    | Atom (Reach f) -> destr_lift (Term.Smart.destr_or f)
+    | Atom (Reach f) ->
+       begin match Term.Smart.destr_or f with
+         | Some (f1,f2) when
+           Term.is_pure_timestamp f1 || Term.is_pure_timestamp f2 ->
+             Some (Atom (Reach f1), Atom (Reach f2))
+         | _ -> None
+       end
     | _ -> None
 
   let destr_impl = function
     | Impl (f1, f2) -> Some (f1, f2)
-    | Atom (Reach f) -> destr_lift (Term.Smart.destr_impl f)
+    | Atom (Reach f) ->
+       begin match Term.Smart.destr_impl f with
+         | Some (f1,f2) when Term.is_pure_timestamp f1 ->
+             Some (Atom (Reach f1), Atom (Reach f2))
+         | _ -> None
+       end
     | _ -> None
 
   (*------------------------------------------------------------------*)
-
-  (** Lifts a (many) destructor over [Impl], [And] or [Or] when one of the
-      two formulas is a pure trace model formula. *)
-  let destr_lift_many = function
-    | None -> None
-    | Some l ->
-      if not (List.for_all Term.is_pure_timestamp l)
-      then None
-      else Some (List.map (fun f -> Atom (Reach f)) l)
 
   (** left-associative *)
   let[@warning "-32"] mk_destr_left f_destr =
@@ -396,23 +393,11 @@ module Smart : Term.SmartFO with type form = _form = struct
     in
     destr
 
-  let destr_ands i f =
-    match f with
-    | Atom (Reach f) ->
-      destr_lift_many (Term.Smart.destr_ands i f)
-    | _ -> mk_destr_right destr_and i f
+  let destr_ands i f = mk_destr_right destr_and i f
 
-  let destr_ors i f =
-    match f with
-    | Atom (Reach f) ->
-      destr_lift_many (Term.Smart.destr_ors i f)
-    | _ -> mk_destr_right destr_or i f
+  let destr_ors i f = mk_destr_right destr_or i f
 
-  let destr_impls i f =
-    match f with
-    | Atom (Reach f) ->
-      destr_lift_many (Term.Smart.destr_impls i f)
-    | _ -> mk_destr_right destr_impl i f
+  let destr_impls i f = mk_destr_right destr_impl i f
 
   let destr_eq = function
     | Atom (Reach f) -> Term.destr_eq f
