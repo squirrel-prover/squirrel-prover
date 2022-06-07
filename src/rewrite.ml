@@ -151,7 +151,7 @@ let mk_state
    bound above the matched occurrences are universally quantified in
    the generated sub-goals. *)
 let rw_inst
-    (table : Symbols.table) (hyps : Hyps.TraceHyps.hyps) 
+    (table : Symbols.table) (hyps : Hyps.TraceHyps.hyps Lazy.t) 
   : rw_state Pos.f_map_fold 
   = 
   let doit
@@ -159,8 +159,6 @@ let rw_inst
       (se : SE.t) (vars : Vars.vars) (conds : Term.terms) _p
       (s : rw_state) 
     =
-    let hyps = lazy hyps in
-
     let projs : Term.projs option = 
       if SE.is_fset se then Some (SE.to_projs (SE.to_fset se)) else None
     in
@@ -239,7 +237,7 @@ let rewrite_head
   =
   let systems = SE.to_list_any sexpr in
   let s = mk_state rule systems in
-  match rw_inst table (Lazy.force hyps) t sexpr [] [] Pos.root s with
+  match rw_inst table hyps t sexpr [] [] Pos.root s with
   | _, `Continue -> None
   | { found_instance = `Found inst }, `Map t -> Some (t, inst.subgs)
   | _ -> assert false
@@ -283,6 +281,8 @@ let rewrite
     in
     mk_state rule target_systems
   in
+
+  let hyps = lazy hyps in
 
   (* Attempt to find an instance of [left], and rewrites all occurrences of
      this instance.
@@ -351,38 +351,15 @@ let high_rewrite
   : Term.term 
   =
   let rw_inst : Pos.f_map = 
-    fun occ se vars _conds p ->
-      (* build the rule to apply at position [p] *)
+    fun occ se vars conds p ->
+      (* build the rule to apply at position [p] using mk_rule *)
       match mk_rule vars p with
       | None -> `Continue
       | Some rule ->
         assert (rule.rw_conds = []);
 
-        (* TODO : project the pattern somehow *)
-        let left,right = rule.rw_rw in
-        let pat : Term.term Term.pat = Term.{ 
-            pat_tyvars = rule.rw_tyvars; 
-            pat_vars   = rule.rw_vars; 
-            pat_term   = left;
-          } 
-        in
-        let system = SE.reachability_context se in
-        match Match.T.try_match table system occ pat with
-        | NoMatch _ | FreeTyv ->
-          begin match mode with
-            | `TopDown _ -> `Continue
-            | `BottomUp  -> 
-              assert (Term.is_macro occ); `Continue
-              (* in bottom-up mode, we build rules that always succeed. *)
-          end
-
-        (* head matches *)
-        | Match mv ->
-          let subst = Match.Mvar.to_subst ~mode:`Match mv in
-          let left = Term.subst subst left in
-          let right = Term.subst subst right in
-          assert (left = occ);
-          `Map right
+        let state = mk_state rule (SE.to_list_any se) in
+        snd (rw_inst table (lazy Hyps.TraceHyps.empty) occ se vars conds p state)
   in
 
   let _, f = Pos.map ~mode rw_inst venv system t in
