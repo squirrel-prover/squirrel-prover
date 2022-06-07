@@ -1258,15 +1258,8 @@ module T (* : S with type t = Term.term *) = struct
      and resume matching *)
   and try_reduce_head1 (t : term) (pat : term) (st : match_state) : Mvar.t =
     match t, pat with
-    | (Macro _ | Fun _), (Macro _ | Fun _) -> 
-      let b = match t with
-        | Macro (ms, _, _) when Symbols.to_string ms.s_symb = "mA" ->
-          Fmt.epr "%a and %a (mode = %a)@." Term.pp t Term.pp pat Fmt.bool (st.expand_context = InSequent); true
-        | _ -> false
-      in
-      
+    | (Macro _ | Fun _), (Macro _ | Fun _) ->      
       let t, t_red = m_expand_head_once st t in
-      if b then Fmt.epr "t_red %a : %a@." Fmt.bool t_red Term.pp t;
 
       if t_red then tmatch t pat st 
       else
