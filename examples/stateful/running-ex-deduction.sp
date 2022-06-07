@@ -22,9 +22,6 @@ COMMENTS
   on a minimal example.
 
 *******************************************************************************)
-
-set autoIntro = false.
-
 hash H
 hash G
 name k : message
@@ -33,7 +30,7 @@ name k' : message
 name s0  : index -> message
 name s0b : index -> message     (* renamed identities *)
 
-mutable sT(i:index) : message = diff(s0(i),s0b(i))
+mutable sT(i:index) : message = empty
 
 abstract ok : message
 channel cT
@@ -42,7 +39,9 @@ process tag(i:index) =
   sT(i):=H(sT(i),k);
   out(cT,G(sT(i),k'))
 
-system !_i !_j T: tag(i).
+system !_i sT(i):=diff(s0(i),s0b(i)); !_j T: tag(i).
+
+include Basic.
 
 set showStrengthenedHyp=true.
 
@@ -78,16 +77,21 @@ Proof.
   intro Hap.
   induction t.
 
-  fresh 1.
-  expand frame; apply fresh_names.
+  (* Init *)
+  + fresh 1.
+    expand frame; apply fresh_names.
 
-  expandall. fa 0. fa 1. fa 1.
-  prf 1; yesif 1.
-    split; 1: auto.
-    intro i0 j0 H Heq. use h_unique with i0, i, j0, j; 2: auto.
-    destruct H0; auto.
-  fresh 1.
-  apply IH.
+  (* A: initialize sT *)
+  + expandall. fa !<_,_>. apply IH.
+
+  + expandall. fa !<_,_>, (if _ then _).
+    prf 1; rewrite if_true.
+      split; 1: auto.
+      intro i0 j0 H Heq. use
+      h_unique with i0, i, j0, j; 2: auto.
+      by destruct H0.
+    fresh 1.
+    by apply IH.
 Qed.
 
 (* With apply ~inductive we easily obtain all the past values of sT
@@ -103,9 +107,6 @@ Qed.
 (* We now illustrate how the proof could go without the use of
    `apply ~inductive`. *)
 
-(* We need some basic utilities. *)
-include Basic.
-
 goal neq_leq_lemma (t,t':timestamp): ((not(t=t')) && t<=t') = (t<=pred(t')).
 Proof.
  rewrite eq_iff.
@@ -119,19 +120,30 @@ Proof.
   intro Hap.
   induction t.
 
+  ++
   (* The base case requires rewriting inside the sequence. *)
-  equivalent seq(i:index,t':timestamp -> if t'<=init then sT(i)@t'),
-             seq(i:index,t':timestamp -> if t'<=init then diff(s0(i),s0b(i))).
-    by fa; fa.
+  have -> :
+     (seq(i:index,t':timestamp -> if t'<=init then sT(i)@t')) =
+     (seq(i:index,t':timestamp -> if t'<=init then empty));
+  1: by fa; fa.
   expand frame; apply fresh_names_k.
 
+  ++
+  (* Case A *)
+  (* TODO Complete this case or make it possible to initialize sT differently
+     for each single system.
+     This has changed since the acceptance of the CSF'22 paper. *)
+  admit.
+
+  ++
+  (* Case T *)
   expandall.
-  fa 0. fa 1. fa 1.
+  fa !<_,_>, if _ then _.
   (* Get rid of item 1 using PRF, as before. *)
-  prf 1; yesif 1.
+  prf 1; rewrite if_true.
     split; 1: auto.
-    intro i0 j0 H Heq. use h_unique with i0, i, j0, j; 2: auto.
-    destruct H0; auto.
+    intro i0 j0 H Heq. 
+    by use h_unique with i0, i, j0, j.
   fresh 1.
   (* We now have to work on our sequence to remove the last element.
      This is done using splitseq to single out some elements,
@@ -146,17 +158,23 @@ Proof.
   splitseq 2: (fun (i0:index,t':timestamp) -> i0=i).
   rewrite !if_then_then.
   (* More rewriting inside sequences. *)
-  equivalent
-    seq(i0:index,t':timestamp-> if i0=i && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@t'),
-    seq(i0:index,t':timestamp-> if i0=i && (t'=T(i,j) && t'<=T(i,j)) then H(sT(i0)@pred(t'),k));
+
+  have -> :
+    (seq(i0:index,t':timestamp-> 
+      if i0=i && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@t')) =
+    (seq(i0:index,t':timestamp-> 
+      if i0=i && (t'=T(i,j) && t'<=T(i,j)) then H(sT(i0)@pred(t'),k)));
   1: by fa; fa.
-  equivalent
-    seq(i0:index,t':timestamp-> if not(i0=i) && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@t'),
-    seq(i0:index,t':timestamp-> if not(i0=i) && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@pred(t')).
-    fa. fa; try auto. intro [H1 [H2 H3]]. rewrite H2. expand sT.
-    by noif.
+
+  have -> :
+    (seq(i0:index,t':timestamp-> 
+      if not(i0=i) && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@t')) =
+    (seq(i0:index,t':timestamp->
+      if not(i0=i) && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@pred(t'))).
+    + fa; fa => // [H1 [H2 H3]]. 
+      by rewrite H2 /sT if_false. 
   (* At this point our automatic bi-deduction checker cannot verify that
      items 2 and 3 are bi-deducible. Its implementation could be improved
      to complete this tedious proof. *)
-  admit.
+    + admit.
 Qed.

@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 system null.
 axiom exists_idx : exists i:index, True.
 goal absurdity : False.

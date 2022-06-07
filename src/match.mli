@@ -1,20 +1,120 @@
+open Utils
+
 module Sv = Vars.Sv
 
+module SE = SystemExpr
+
 (*------------------------------------------------------------------*)
-(** {2 Patterns} *)
+(** {2 Positions} *)
 
-(** A pattern is a list of free type variables, a term [t] and a subset
-    of [t]'s free variables that must be matched.
-    The free type variables must be inferred. *)
-type 'a pat = {
-  pat_tyvars : Type.tvars;
-  pat_vars : Sv.t;
-  pat_term : 'a;
-}
+module Pos : sig
 
-(** Make a pattern out of a formula: all universally quantified variables
-    are added to [pat_vars]. *)
-val pat_of_form : Term.message -> Term.message pat
+  (** A position in a term *)
+  type pos
+
+  val pp : Format.formatter -> pos -> unit
+
+  val root : pos
+
+  (** set of positions *)
+  module Sp : Set.S with type elt = pos
+
+  (*------------------------------------------------------------------*)
+  (** strict prefix comparison over positions *)
+  val lt : pos -> pos -> bool
+    
+  (*------------------------------------------------------------------*)
+  (** [f] of type [f_sel] is a function that, given [t projs vars conds] where:
+      - [t] is sub-term of the term we are mapping one
+      - [projs] are the projections applying to [t], if any
+      - [vars] are the free variable bound above [t]'s occurrence
+      - [conds] are conditions above [t]'s occurrence
+
+      If [f t vars conds = `Select], we found a position.
+      If [f t vars conds = `Continue], we keep looking for positions downwards. *)
+  type f_sel =
+    Term.term -> Term.projs option -> Vars.vars -> Term.term list ->
+    [`Select | `Continue]
+
+  (*------------------------------------------------------------------*)
+  (** [select f t] compute the positions in [t] selected by [f]. *)
+  val select : f_sel -> Term.term -> Sp.t
+
+  (** Same as [select], except that is acts on [Equiv.form]. Note that we 
+      can only select [Term.term] positions. *)
+  val select_e : f_sel -> Equiv.form -> Sp.t
+
+  (*------------------------------------------------------------------*)
+  (** [f] of type ['a f_map_fold] is a function that, given 
+      [t se vars conds p acc] where:
+      - [t] is sub-term of the term we are mapping one
+      - [se] is the system expr applying to [t]
+      - [vars] are the free variable bound above [t]'s occurrence
+      - [conds] are conditions above [t]'s occurrence
+      - [p] is the position of [t]'s occurrence
+
+      If [f t projs vars conds p acc =]:
+      - [`Select], we found a position.
+      - [`Continue], we keep looking for positions downwards. *)
+  type 'a f_map_fold =
+    Term.term ->
+    SE.arbitrary -> Vars.vars -> Term.term list -> pos ->
+    'a ->
+    'a * [`Map of Term.term | `Continue]
+
+  (** Same as [f_map_fold], but just for a map. *)
+  type f_map =
+    Term.term ->
+    SE.arbitrary -> Vars.vars -> Term.term list -> pos -> 
+    [`Map of Term.term | `Continue]
+
+  (*------------------------------------------------------------------*)
+  (** [map_fold ?mode func env acc t] applies [func] at all position in [t].
+
+      Tree traversal can be controlled using [mode]:
+      - [`TopDown b]: apply [func] at top-level first, then recurse.
+        [b] tells if we recurse under successful maps.
+      - [`BottomUp _]: recurse, then apply [func] at top-level *)
+  val map_fold : 
+    ?mode:[`TopDown of bool | `BottomUp] -> 
+    'a f_map_fold ->            (* folding function *)
+    Vars.env ->                 (* for clean variable naming *)
+    SE.arbitrary ->
+    'a ->                       (* folding value *)
+    Term.term -> 
+    'a * bool * Term.term       (* folding value, `Map found, term *)
+
+  (** Same as [map_fold] for [Equiv.form]. *)
+  val map_fold_e : 
+    ?mode:[`TopDown of bool | `BottomUp] -> 
+    'a f_map_fold ->            (* folding function *)
+    Vars.env ->                 (* for clean variable naming *)
+    SE.context ->
+    'a ->                       (* folding value *)
+    Equiv.form -> 
+    'a * bool * Equiv.form      (* folding value, `Map found, term *)
+
+  (*------------------------------------------------------------------*)
+  (** Same as [map_fold], but only a map. 
+      Return: `Map found, term *)
+  val map : 
+    ?mode:[`TopDown of bool | `BottomUp] ->
+    f_map ->
+    Vars.env ->
+    SE.arbitrary ->
+    Term.term ->
+    bool * Term.term
+
+  (** Same as [map_fold_e], but only a map.
+      Return: `Map found, term *)
+  val map_e :
+    ?mode:[`TopDown of bool | `BottomUp] ->
+    f_map ->
+    Vars.env ->
+    SE.context ->
+    Equiv.form ->
+    bool * Equiv.form
+end
 
 (*------------------------------------------------------------------*)
 (** {2 Matching variable assignment} *)
@@ -29,17 +129,17 @@ module Mvar : sig
   val union : t -> t -> t
 
   (** remove a variable assignment *)
-  val remove : Vars.evar -> t -> t
+  val remove : Vars.var -> t -> t
 
   (** add a variable assignment *)
-  val add : Vars.evar -> Term.eterm -> t -> t
+  val add : Vars.var -> Term.term -> t -> t
 
   (** check if a variable is assigned *)
-  val mem : Vars.evar -> t -> bool
+  val mem : Vars.var -> t -> bool
 
-  val filter : (Vars.evar -> Term.eterm -> bool) -> t -> t
+  val filter : (Vars.var -> Term.term -> bool) -> t -> t
 
-  val fold : (Vars.evar -> Term.eterm -> 'b -> 'b) -> t -> 'b -> 'b
+  val fold : (Vars.var -> Term.term -> 'b -> 'b) -> t -> 'b -> 'b
 
   val to_subst : mode:[`Match | `Unif] -> t -> Term.subst
 
@@ -51,19 +151,8 @@ end
 
 type match_res =
   | FreeTyv
-  | NoMatch of (Term.messages * Term.match_infos) option
+  | NoMatch of (Term.terms * Term.match_infos) option
   | Match   of Mvar.t
-
-(** [f] of type [fmap] is a function that, given [t vars conds] where:
-    - [t] is sub-term of the term we are mapping one
-    - [vars] are the free variable bound above [t]'s occurrence
-    - [conds] are conditions above [t]'s occurrence
-
-    If [f t vars conds = `Continue], we keep looking for an occurrence.
-    If [f t vars conds = `Map t'], we replace [t] by [t']. *)
-type f_map =
-  Term.eterm -> Vars.evars -> Term.message list ->
-  [`Map of Term.eterm | `Continue]
 
 (** matching algorithm options *)
 type match_option = {
@@ -87,23 +176,23 @@ module type S = sig
 
   val pp_pat :
     (Format.formatter -> 'a -> unit) ->
-    Format.formatter -> 'a pat -> unit
+    Format.formatter -> 'a Term.pat -> unit
 
   val unify :
     ?mv:Mvar.t ->
     Symbols.table ->
-    t pat -> t pat ->
+    t Term.pat -> t Term.pat ->
     [`FreeTyv | `NoMgu | `Mgu of Mvar.t]
 
   val unify_opt :
     ?mv:Mvar.t ->
     Symbols.table ->
-    t pat -> t pat ->
+    t Term.pat -> t Term.pat ->
     Mvar.t option
 
-  (** [try_match t p] tries to match [p] with [t] (at head position).
+  (** [try_match ... t p] tries to match [p] with [t] (at head position).
       If it succeeds, it returns a map [θ] instantiating the variables
-      [p.pat_vars] as substerms of [t], and:
+      [p.pat_vars] as subterms of [t], and:
 
       - if [mode = `Eq] then [t = pθ] (default mode);
       - if [mode = `EntailLR] then [t = pθ] or [t ⇒ pθ] (boolean case).
@@ -112,43 +201,38 @@ module type S = sig
     ?option:match_option ->
     ?mv:Mvar.t ->
     ?ty_env:Type.Infer.env ->
+    ?hyps:Hyps.TraceHyps.hyps Lazy.t ->
     Symbols.table ->
-    SystemExpr.t ->
+    SE.context -> 
     t -> 
-    t pat ->
+    t Term.pat ->
     match_res
-
-  (** Same as [try_match], but specialized for terms. *)
-  val try_match_term :
-    ?option:match_option ->
-    ?mv:Mvar.t ->
-    ?ty_env:Type.Infer.env ->
-    Symbols.table ->
-    SystemExpr.t ->
-    'a Term.term -> 
-    'b Term.term pat ->
-    match_res
-
-
-  (** [map ?m_rec func env t] applies [func] at all position in [t].
-      If [m_rec] is true, recurse after applying [func].
-      [m_rec] default to [false].*)
-  val map : ?m_rec:bool -> f_map -> Vars.env -> t -> t option
 
   (** [find pat t] returns the list of occurences in t that match the
      pattern. *)
   val find : 
     ?option:match_option ->
     Symbols.table ->
-    SystemExpr.t ->
+    SE.context ->
     Vars.env ->
-    'a Term.term pat -> 
+    Term.term Term.pat -> 
     t -> 
-    Term.eterm list
+    Term.term list
 end
 
 (*------------------------------------------------------------------*)
+(** {2 Reduction utilities} *)
+
+(** Expand once at head position. 
+    Throw [exn] in case of failure. *)
+val expand_head_once :
+  exn:exn -> 
+  Symbols.table -> SE.t -> Hyps.TraceHyps.hyps Lazy.t ->
+  Term.term ->
+  Term.term * bool 
+
+(*------------------------------------------------------------------*)
 (** {2 Matching and unification} *)
-module T : S with type t = Term.message
+module T : S with type t = Term.term
 
 module E : S with type t = Equiv.form

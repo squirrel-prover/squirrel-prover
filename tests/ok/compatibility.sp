@@ -39,9 +39,10 @@ Proof.
   checkfail use ax2 exn NoAssumpSystem.
   checkfail use ax1l exn NoAssumpSystem.
   project.
-    checkfail use ax1l exn NoAssumpSystem.
-    apply ax1r.
-    apply ax1l.
+    + checkfail use ax1l exn NoAssumpSystem.
+      apply ax1r.
+    + checkfail use ax1r exn NoAssumpSystem.
+      apply ax1l.
 Qed.
 
 global goal [s1/right,s1/left] _ (x:message) : [x=a] -> equiv(diff(x,b)).

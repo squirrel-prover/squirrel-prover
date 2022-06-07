@@ -50,6 +50,8 @@ In the following model, we remove multiple layers of integrity and encryption, k
 set timeout=10.
 set postQuantumSound = true.
 
+include Basic.
+
 hash h
 
 (* pre-shared keys *)
@@ -215,94 +217,90 @@ system [core]  out(cI, seedpubkey); ((!_k !_l R: ResponderRor(k,l)) | (!_i !_j I
 system core2 = [core/left] with gprf (il,jl,kl,ll:index),
  prfd(  hseed( < <Ni(il,jl),Nr(kl,ll)>,  exp(exp(g,xr(kl,ll)),xi(il,jl))>, seedpubkey  )(* SKEYSEED *), psk(ll,kl)).
 
-system core3 =  [core2/left] with rename forall (l,k,i,j:index), equiv(diff( n_PRF(l,k,j,i),  idealkeys(l,k,j,i))).
+system core3 = [core2] with rename forall (l,k,i,j:index), equiv(diff( n_PRF(l,k,j,i),  idealkeys(l,k,j,i))).
 
 
 
-goal [core3/left,core/right] authR : forall (i,j:index),
+goal [core3,core/right] authR (i,j:index):
        happens(FR(i,j)) => exec@FR(i,j) =>
            exists (l:index), SI(j,l) < FR(i,j) &&
                       fst(input@R(i,j)) = exp(g,xi(j,l)) &&
                       snd(input@R(i,j)) = Ni(j,l).
 Proof.
-intro i j.
-expand exec.
-executable  pred(FR(i,j)).
-depends  SR(i,j),FR(i,j).
-use H1 with SR(i,j).
-expand exec. expand cond.
-euf H3.
-exists j0.
-case H0. depends R(i,j),FR(i,j).
+  intro H H1.
+  expand exec.
+  executable  pred(FR(i,j)); 1,2: auto.
+  intro Hexec.
+  depends SR(i,j),FR(i,j) by auto.
+  intro C.
+  use Hexec with SR(i,j); 2: auto.
+  expand exec. 
+  destruct H0 as [H0 H3]. expand cond.
+  euf H3 => ? ? ?.
+  exists j0.
+  by case H2; depends R(i,j),FR(i,j).
 Qed.
 
-goal [core3/left,core/right] authI : forall (i,j:index),
+goal [core3,core/right] authI (i,j:index):
        happens(FI(i,j)) => exec@FI(i,j) =>
                       SR(j,i) < FI(i,j) &&
                       fst(input@SI(i,j)) = exp(g,xr(j,i)) &&
                       snd(input@SI(i,j)) = Nr(j,i).
 Proof.
-intro i j.
-expand exec. expand cond.
-euf H0.
-
-depends SI(i,j), FI(i,j).
-
-assert SR(j,l) < FI(i,j).
-case H1.
-executable pred(FI(i,j)).
-use H2 with SR(j,l).
-expand exec.
-expand cond.
-by euf H4.
+  intro H @/exec [H0 H1]. 
+  expand cond.
+  euf H1 => ? ? ?.
+  
+  depends SI(i,j), FI(i,j) by auto.
+  intro C.
+  assert SR(j,l) < FI(i,j) by case H2.
+  executable pred(FI(i,j)); 1,2: auto.
+  intro Hexec.
+  use Hexec with SR(j,l); 2: auto.
+  expand exec.
+  expand cond.
+  destruct H3 as [? H4].
+  by case H2; euf H4.
 Qed.
 
 
-axiom [core3/left,core/right] ddhcommu : forall (i,j,k,l:index), exp(exp(g,xi(i,j)),xr(k,l)) =  exp(exp(g,xr(k,l)),xi(i,j)) .
+axiom [core3,core/right] ddhcommu (i,j,k,l:index):
+ exp(exp(g,xi(i,j)),xr(k,l)) =  exp(exp(g,xr(k,l)),xi(i,j)) .
 
-equiv [core3/left,core/right] final.
+equiv [core3,core/right] final.
 Proof.
 
-diffeq.
-
-
-
-(* I part *)
-use authI with i,j.
-
-case try find il,jl,kl,ll such that _ in idealkeys(il,jl,kl,ll) else _.
-rewrite Meq1.
-collision.
-
-case try find jf,kf such that _
-in _ else fail.
-rewrite Meq5.
-
-by use H2 with jl,il.
-
-by use H2 with i,j,j,i.
-
-
-(* R part *)
-use authR with k,l.
-case try find il,jl,kl,ll such that _
- in  idealkeys(il,jl,kl,ll)
- else _.
-
-rewrite Meq1.
-collision.
-
-case try find jf,kf such that _ in _ else fail.
-rewrite Meq5.
-
-by use H2 with l,jl.
-
-expand input .
-rewrite Meq in H2.
-rewrite Meq0 in H2.
-
-use H2 with l,l0,k ,l.
-
-
-use ddhcommu with l,l0,k,l.
+  diffeq.
+  
+  (* I part *)
+  + intro i j H0 H1 Hap Hap0.
+    use authI with i,j as [Clt Meq0 Meq]; 2,3: auto.
+    
+    case try find il,jl,kl,ll such that _ in idealkeys(il,jl,kl,ll) else _.
+    intro [il jl ? ? [[Meq1 [? ?]] Meq2]]. 
+    rewrite Meq2.
+    by collision.
+    
+    intro [H2 ?].
+    by use H2 with i,j,j,i.
+  
+  (* R part *)
+  + intro k l H0 H1 Hap Hap0.
+    use authR with k,l as [l0 [Clt Meq0 Meq]]; 2,3: auto.
+    case try find il,jl,kl,ll such that _
+     in  idealkeys(il,jl,kl,ll)
+     else _.
+    
+    intro [il jl ? ? [[Meq1 [? ?]] Meq2]]. 
+    rewrite Meq2.
+    by collision.
+    intro [H2 Meq1].
+    
+    expand input .
+    rewrite Meq in H2.
+    rewrite Meq0 in H2.
+    
+    use H2 with l,l0,k ,l.
+    
+    by use ddhcommu with l,l0,k,l.
 Qed.

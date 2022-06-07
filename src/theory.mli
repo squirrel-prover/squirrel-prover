@@ -19,10 +19,7 @@ type p_ty_i =
 
 type p_ty = p_ty_i L.located
     
-val parse_p_ty0 : Symbols.table -> Type.tvar list -> p_ty -> Type.ety 
-
-val parse_p_ty : 
-  Symbols.table -> Type.tvar list -> p_ty -> 'a Type.kind -> 'a Type.ty 
+val parse_p_ty : Env.t -> p_ty -> Type.ty 
 
 val pp_p_ty : Format.formatter -> p_ty -> unit
 
@@ -46,12 +43,10 @@ type bnds = bnd list
   * function applications, macros, variables, names etc. *)
 
 type term_i =
-  | Tinit
   | Tpat  
-  | Tpred of term
   | Diff  of term * term
   | Seq   of bnds * term
-  | Find  of lsymb list * term * term * term
+  | Find  of bnds * term * term * term
 
   | App of lsymb * term list
   (** An application of a symbol to some arguments which as not been
@@ -65,14 +60,11 @@ type term_i =
     * disambiguated yet.
     * [AppAt(f,t1 :: ... :: tn,tau)] is [f (t1, ..., tn)\@tau] *)
                  
-  | Compare of Term.ord * term * term
-  | Happens of term list
   | ForAll  of bnds * term
   | Exists  of bnds * term
 
 and term = term_i L.located
 
-type formula = term
 
 val pp_i : Format.formatter -> term_i -> unit
 val pp   : Format.formatter -> term   -> unit
@@ -99,7 +91,7 @@ type global_formula = global_formula_i Location.located
 
 and global_formula_i =
   | PEquiv  of equiv
-  | PReach  of formula
+  | PReach  of term
   | PImpl   of global_formula * global_formula
   | PAnd    of global_formula * global_formula
   | POr     of global_formula * global_formula
@@ -114,18 +106,21 @@ and global_formula_i =
 val declare_hash :
   Symbols.table ->
   ?index_arity:int ->
-  ?m_ty:Type.message Type.ty ->
-  ?k_ty:Type.message Type.ty ->
-  ?h_ty:Type.message Type.ty ->
+  ?m_ty:Type.ty ->
+  ?k_ty:Type.ty ->
+  ?h_ty:Type.ty ->
   lsymb ->
   Symbols.table
 
-(** DDH assumption on a group with generator gen and exponentiation exp. *)
-val declare_ddh :
+(** DH assumption given by h on a group with generator gen, exponentiation exp, optionnally multiplication mult. *)
+val declare_dh :
   Symbols.table ->
-  ?group_ty:Type.message Type.ty ->
-  ?exp_ty:Type.message Type.ty ->
-  lsymb -> lsymb -> Symbols.symb_type -> 
+  Symbols.dh_hyp list ->
+  ?group_ty:Type.ty ->
+  ?exp_ty:Type.ty ->
+  lsymb ->
+  lsymb * Symbols.symb_type -> 
+  (lsymb * Symbols.symb_type) option -> 
   Symbols.table
 
 (** Asymmetric encryption function symbols are defined by the triplet
@@ -133,11 +128,11 @@ val declare_ddh :
     It models an authenticated encryption. *)
 val declare_aenc :
   Symbols.table ->
-  ?ptxt_ty:Type.message Type.ty ->
-  ?ctxt_ty:Type.message Type.ty ->
-  ?rnd_ty:Type.message Type.ty ->
-  ?sk_ty:Type.message Type.ty ->
-  ?pk_ty:Type.message Type.ty ->
+  ?ptxt_ty:Type.ty ->
+  ?ctxt_ty:Type.ty ->
+  ?rnd_ty:Type.ty ->
+  ?sk_ty:Type.ty ->
+  ?pk_ty:Type.ty ->
   lsymb -> lsymb -> lsymb ->
   Symbols.table
 
@@ -146,10 +141,10 @@ val declare_aenc :
     It models an authenticated encryption. *)
 val declare_senc :
   Symbols.table ->
-  ?ptxt_ty:Type.message Type.ty ->
-  ?ctxt_ty:Type.message Type.ty ->
-  ?rnd_ty:Type.message Type.ty ->
-  ?k_ty:Type.message Type.ty ->
+  ?ptxt_ty:Type.ty ->
+  ?ctxt_ty:Type.ty ->
+  ?rnd_ty:Type.ty ->
+  ?k_ty:Type.ty ->
   lsymb -> lsymb ->
   Symbols.table
 
@@ -158,10 +153,10 @@ val declare_senc :
     It models an authenticated encryption, jointly secure with hashes of the key.*)
 val declare_senc_joint_with_hash :
   Symbols.table ->
-  ?ptxt_ty:Type.message Type.ty ->
-  ?ctxt_ty:Type.message Type.ty ->
-  ?rnd_ty:Type.message Type.ty ->
-  ?k_ty:Type.message Type.ty ->
+  ?ptxt_ty:Type.ty ->
+  ?ctxt_ty:Type.ty ->
+  ?rnd_ty:Type.ty ->
+  ?k_ty:Type.ty ->
   lsymb -> lsymb -> lsymb ->
   Symbols.table
 
@@ -169,11 +164,11 @@ val declare_senc_joint_with_hash :
     It satisfies EUF. *)
 val declare_signature :
   Symbols.table ->
-  ?m_ty:Type.message Type.ty ->
-  ?sig_ty:Type.message Type.ty ->
-  ?check_ty:Type.message Type.ty ->
-  ?sk_ty:Type.message Type.ty ->
-  ?pk_ty:Type.message Type.ty ->
+  ?m_ty:Type.ty ->
+  ?sig_ty:Type.ty ->
+  ?check_ty:Type.ty ->
+  ?sk_ty:Type.ty ->
+  ?pk_ty:Type.ty ->
   lsymb -> lsymb -> lsymb ->
   Symbols.table
 
@@ -192,7 +187,7 @@ val declare_state :
 (** [get_init_states] returns all the initial values of declared state symbols,
     used to register the init action *)
 val get_init_states :
-  Symbols.table -> (Term.state * Term.message) list
+  Symbols.table -> (Term.state * Term.term) list
 
 (** [declare_abstract n i m] declares a new function symbol
   * of type [index^i -> message^m -> message]. *)
@@ -200,8 +195,8 @@ val declare_abstract :
   Symbols.table -> 
   index_arity:int ->
   ty_args:Type.tvar list ->
-  in_tys:Type.message Type.ty list ->
-  out_ty:Type.message Type.ty ->
+  in_tys:Type.ty list ->
+  out_ty:Type.ty ->
   lsymb -> Symbols.symb_type ->
   Symbols.table
 
@@ -226,24 +221,26 @@ type conversion_error_i =
   | Index_error          of string*int*int
   | Undefined            of string
   | UndefinedOfKind      of string * Symbols.namespace
-  | Type_error           of term_i * Type.ety
+  | Type_error           of term_i * Type.ty
   | Timestamp_expected   of term_i
   | Timestamp_unexpected of term_i
-  (* | Untypable_equality   of term_i *)
   | Unsupported_ord      of term_i
   | String_expected      of term_i
   | Int_expected         of term_i
   | Tactic_type          of string
-  | Index_not_var        of term_i
+  | NotVar
   | Assign_no_state      of string
   | BadNamespace         of string * Symbols.namespace
   | Freetyunivar
   | UnknownTypeVar       of string
-  | BadPty               of Type.ekind list
+  | BadPty               of Type.ty list
   | BadInfixDecl
   | PatNotAllowed
   | ExplicitTSInProc 
-    
+  | UndefInSystem        of SystemExpr.t
+  | MissingSystem
+  | BadProjInSubterm     of Term.projs * Term.projs
+                              
 type conversion_error = L.t * conversion_error_i
 
 exception Conv of conversion_error
@@ -255,11 +252,12 @@ val pp_error :
   Format.formatter -> conversion_error -> unit
 
 val check : 
-  Symbols.table -> ?local:bool -> ?pat:bool ->
-  Type.Infer.env -> Vars.env -> term -> Type.ety
-  -> unit
+  Env.t -> ?local:bool -> ?pat:bool ->
+  Type.Infer.env -> Term.projs ->
+  term -> Type.ty ->
+  unit
 
-val check_state : Symbols.table -> lsymb -> int -> Type.tmessage
+val check_state : Symbols.table -> lsymb -> int -> Type.ty
 
 (* Returns true if the given function names corresponds to some associated
    checksign and pk functions, returns Some sign, where sign is the
@@ -272,7 +270,7 @@ val check_signature :
 
 val subst : term -> (string * term_i) list -> term
 
-type esubst = ESubst : string * 'a Term.term -> esubst
+type esubst = ESubst : string * Term.term -> esubst
 
 type subst = esubst list
 
@@ -280,57 +278,46 @@ type subst = esubst list
 (** {2 Conversions}
   * Convert terms inside the theory to terms of the prover. *)
 
-val parse_subst :
-  Symbols.table -> Type.tvars -> Vars.env -> Vars.evar list -> term list ->
-  Term.subst
+val parse_subst : Env.t -> Vars.var list -> term list -> Term.subst
 
-val convert_index : Symbols.table -> Type.tvars -> Vars.env -> term -> Vars.index
-
-(** Conversion context.
-  * - [InGoal]: we are converting a term in a goal (or tactic). All
-  *   timestamps must be explicitely given.
-  * - [InProc ts]: we are converting a term in a process at an implicit
-  *   timestamp [ts]. *)
+(** Conversion contexts.
+    - [InGoal]: converting a term in a goal (or tactic). All
+      timestamps must be explicitely given.
+    - [InProc (projs, ts)]: converting a term in a process at an implicit
+      timestamp [ts], with projections [projs]. *)
 type conv_cntxt =
-  | InProc of Term.timestamp
+  | InProc of Term.projs * Term.term
   | InGoal
 
-type conv_env = { table : Symbols.table;
-                  cntxt : conv_cntxt; }
+type conv_env = { 
+  env   : Env.t;
+  cntxt : conv_cntxt; 
+}
 
-(** converts and infer the type (must be a subtype of Message). *)
-val convert_i : 
-  ?ty_env:Type.Infer.env ->
-  ?pat:bool ->
-  conv_env -> Type.tvars -> Vars.env -> term -> 
-  Term.message * Type.tmessage
-
+(** Converts and infers the type.
+    Only the [set] part of the [SystemExpr.context] inside the environment
+    is useful. *)
 val convert : 
+  ?ty:Type.ty ->
   ?ty_env:Type.Infer.env -> 
   ?pat:bool ->
-  conv_env -> Type.tvars -> Vars.env -> 
-  term -> 'a Type.ty
-  -> 'a Term.term
+  conv_env -> 
+  term ->
+  Term.term * Type.ty
 
-val convert_p_bnds :
-  Symbols.table -> Type.tvar list -> Vars.env -> bnds -> 
-  Vars.env * Vars.evar list
+val convert_p_bnds : Env.t -> bnds -> Env.t * Vars.var list
 
 val convert_ht :
   ?ty_env:Type.Infer.env -> 
   ?pat:bool ->
-  conv_env -> Type.tvars -> Vars.env -> hterm -> Type.hty * Term.hterm
+  conv_env -> 
+  hterm -> 
+  Type.hty * Term.hterm
 
-val convert_global_formula :
-  conv_env -> Type.tvars -> Vars.env -> global_formula -> Equiv.form
-
-(** Existantial type wrapping a converted term and its sort.
-    The location is the location of the original [Theory.term].  *)
-type eterm = ETerm : 'a Type.ty * 'a Term.term * L.t -> eterm
-
-(** Convert a term to any sort (tries sequentially all conversions).
-    Should return the most precise sort (i.e. [Boolean] before [Message]). *)
-val econvert : conv_env -> Type.tvars -> Vars.env -> term -> eterm option
+(** Converts and infers the type.
+    Each part of the [SystemExpr.context] inside the environment
+    is used when converting the corresponding kind of atom. *)
+val convert_global_formula : conv_env -> global_formula -> Equiv.form
 
 (** [find_app_terms t names] returns the sublist of [names] for which there
   * exists a subterm [Theory.App(name,_)] or [Theory.AppAt(name,_,_)] in the

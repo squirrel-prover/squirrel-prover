@@ -28,21 +28,28 @@ module List : sig
   val remove_duplicate : ('a -> 'a -> bool) -> 'a list -> 'a list
 
   val inclusion : 'a list -> 'a list -> bool
+
+  (** [diff a b] is [a] minus [b]'s elements  *)
+  val diff : 'a list -> 'a list -> 'a list
  
   (** [take n l] returns up to the [n] first elements from list [l], if available. *)
   val take : int -> 'a list -> 'a list
 
   (** [drop n l] returns [l] without the first [n] elements, or the empty list 
-      if [l]  have less than n elements. *)
+      if [l] has less than n elements. *)
   val drop : int -> 'a list -> 'a list
+
+  (** [drop_right n l] returns [l] without the last [n] elements, or the empty list 
+      if [l] has less than n elements. *)
+  val drop_right : int -> 'a list -> 'a list
 
   (** [takedrop n l] returns the a result equal to [take n l, drop n l]. *)
   val takedrop : int -> 'a list -> 'a list * 'a list
 
   (** When [0 <= i < List.length l], [splitat i l] returns [before,e,after]
-   * such that [List.rev_append before (e::after) = l] and
-   * [List.length before = i].
-   * @raise Out_of_range when [i] is out of range. *)
+      such that [List.rev_append before (e::after) = l] and
+      [List.length before = i].
+      @raise Out_of_range when [i] is out of range. *)
   val splitat : int -> 'a list -> 'a list * 'a * 'a list
 
   (** Update in an associative list *)
@@ -60,8 +67,11 @@ module List : sig
   
   val mapi_fold : (int -> 'a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
 
-  exception Out_of_range
+  val foldi : (int -> 'a -> 'b -> 'a) -> 'a -> 'b list -> 'a
 
+  val find_mapi : (int -> 'a -> 'b option) -> 'a list -> 'b option 
+
+  exception Out_of_range
 end
 
 (*------------------------------------------------------------------*)
@@ -79,6 +89,7 @@ module Map : sig
     include Map.S
 
     val add_list : (key * 'a) list -> 'a t -> 'a t 
+    val find_dflt : 'a -> key -> 'a t -> 'a
   end
 
   module Make(O : Map.OrderedType) : S with type key = O.t
@@ -167,6 +178,7 @@ val obind     : ('a -> 'b option) -> 'a option -> 'b option
 val omap      : ('a -> 'b) -> 'a option -> 'b option
 val omap_dflt : 'b -> ('a -> 'b) -> 'a option -> 'b
 val oiter     : ('a -> unit) -> 'a option -> unit
+val oequal    : ('a -> 'b -> bool) -> 'a option -> 'b option -> bool
 
 (*------------------------------------------------------------------*)
 (** [classes f_eq l] returns the equivalence classes of [l] modulo [f_eq],
@@ -198,6 +210,17 @@ type 'a timeout_r =
 val timeout : int -> ('a -> 'b) -> 'a -> 'b timeout_r
 
 (*------------------------------------------------------------------*)
+val fst_map : ('a -> 'c) -> 'a * 'b -> 'c
+val snd_map : ('b -> 'c) -> 'a * 'b -> 'c
+
+(*------------------------------------------------------------------*)
+(** composition *)
+val (-|) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
+
+(** inverse arguments *)
+val (^~) : ('a -> 'b -> 'c) -> ('b -> 'a -> 'c)
+  
+(*------------------------------------------------------------------*)
 val as_seq0 : 'a list -> unit
 val as_seq1 : 'a list -> 'a
 val as_seq2 : 'a list -> 'a * 'a
@@ -209,3 +232,20 @@ val as_seq4 : 'a list -> 'a * 'a * 'a * 'a
 
 val hcombine : int -> int -> int
 val hcombine_list : ('a -> int) -> int -> 'a list -> int                         
+
+(*------------------------------------------------------------------*)
+(** {2 Printing} *)
+
+type assoc  = [`Left | `Right | `NonAssoc]
+type fixity = [`Prefix | `Postfix | `Infix of assoc | `NonAssoc | `NoParens]
+
+(* -------------------------------------------------------------------- *)
+val pp_maybe_paren : bool -> 'a Fmt.t -> 'a Fmt.t 
+
+val maybe_paren :
+  inner:'a * fixity ->
+  outer:'a * fixity ->
+  side:assoc ->
+  'b Fmt.t -> 
+  'b Fmt.t
+

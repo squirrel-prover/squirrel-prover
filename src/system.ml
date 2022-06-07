@@ -1,136 +1,137 @@
-module L = Location
-type lsymb = Symbols.lsymb
+type t = Symbols.system 
 
 (*------------------------------------------------------------------*)
-include Symbols.System
-
-type system_name = Symbols.system Symbols.t
+let of_lsymb table s = Symbols.System.of_lsymb s table
 
 (*------------------------------------------------------------------*)
-type system_error =
-  | SE_ShapeError
+type error =
+  | Shape_error
+  | Invalid_projection
 
-let pp_system_error fmt = function
-  | SE_ShapeError ->
-    Fmt.pf fmt "cannot register a shape twice with distinct indices"
+let pp_error fmt = function
+  | Shape_error ->
+    Format.fprintf fmt "cannot register a shape twice with distinct indices"
+  | Invalid_projection ->
+    Format.fprintf fmt "invalid projection"
 
-exception SystemError of system_error
+exception Error of error
 
-let system_err e = raise (SystemError e)
+let error e = raise (Error e)
+
 (*------------------------------------------------------------------*)
-module ShapeCmp = struct
-  type t = Action.shape
-  let rec compare (u : t) (v : t) = Stdlib.compare u v
-end
 
-module Msh = Map.Make (ShapeCmp)
+module Msh = Map.Make (Action.Shape)
 
-(** For each system we maintain two tables:
-  * the first one associates to each valid shape the corresponding
-  * action description;
-  * the second one maps each shapes of valid actions to
-  * their corresponding symbols. *)
-type Symbols.data += System_data of Action.descr Msh.t *
-                                    Symbols.action Symbols.t Msh.t
+(** For each system we store the list of projections (which defines
+    the system's arity) and a map from action shapes to action descriptions,
+    which also contain action symbols. *)
+type data = {
+  projections : Term.proj list;
+  actions     : Action.descr Msh.t
+}
 
-let of_string (name : lsymb) (table : Symbols.table) =
-  Symbols.System.of_lsymb name table
+type Symbols.data += System_data of data
 
-let declare_empty table system_name =
+let declare_empty table system_name projections =
+  assert (List.length (List.sort_uniq Stdlib.compare projections) =
+          List.length projections);
   let def = () in
-  let data = System_data (Msh.empty,Msh.empty) in
+  let data = System_data {projections;actions=Msh.empty} in
   Symbols.System.declare_exact table system_name ~data def
 
-(*------------------------------------------------------------------*)
 let get_data table s_symb =
   match Symbols.System.get_data s_symb table with
-    | System_data (m,d) -> m,d
+    | System_data data -> data
     | _ -> assert false
 
-let descrs table s = Msh.map Action.refresh_descr (fst (get_data table s))
+let projections table s = (get_data table s).projections
 
-let symbs table s =
-  Msh.map (fun d -> d.Action.name) (fst (get_data table s))
+let valid_projection table s proj = List.mem proj (projections table s)
+
+let descrs table s = Msh.map Action.refresh_descr (get_data table s).actions
+
+let symbs table s = Msh.map (fun d -> d.Action.name) (get_data table s).actions
+
+let compatible table s1 s2 =
+  Msh.equal (=) (symbs table s1) (symbs table s2) &&
+  let d1 = descrs table s1 in
+  let d2 = descrs table s2 in
+  Msh.for_all
+    (fun shape d1 ->
+       let d2 = Msh.find shape d2 in
+       let d2 =
+         let subst =
+           List.map2
+             (fun i j -> Term.ESubst (Term.mk_var i, Term.mk_var j))
+             d2.Action.indices d1.Action.indices
+         in
+         Action.subst_descr subst d2
+       in
+       Action.strongly_compatible_descr d1 d2)
+    d1
 
 let pp_system table fmt s =
-  let descrs, symbs = get_data table s in
-  let descrs = Msh.bindings descrs in
-    Printer.pr "System %a registered with actions %a.@."
-      Symbols.pp s
-      (Utils.pp_list (fun fmt (_,d) -> Symbols.pp fmt d.Action.name)) descrs
-
+  let {actions} = get_data table s in
+  let descrs = Msh.bindings actions in
+  Format.fprintf fmt
+    "System %a registered with actions %a.@."
+    Symbols.pp s
+    (Utils.pp_list (fun fmt (_,d) -> Symbols.pp fmt d.Action.name)) descrs
 
 let pp_systems fmt table =
   Symbols.System.iter (fun sys _ _ -> pp_system table fmt sys) table
 
 (*------------------------------------------------------------------*)
-let add_action
-    (table : Symbols.table) (s_symb : Symbols.system Symbols.t)
-    (shape : Action.shape)  (action : Symbols.action Symbols.t)
-    (descr : Action.descr) =
-  (* Sanity checks *)
-  assert (shape = Action.get_shape descr.action);
-  assert (Action.get_indices descr.action = descr.indices);
-  assert (action = descr.name);
-  let descrs,symbs = get_data table s_symb in
-  assert (not (Msh.mem shape descrs || Msh.mem shape symbs));
-  let descrs = Msh.add shape descr descrs in
-  let symbs = Msh.add shape descr.name symbs in
-  let data = System_data (descrs,symbs) in
-  Symbols.System.redefine table s_symb ~data ()
+let add_action table system descr =
+  (* Sanity check *)
+  assert (Action.valid_descr descr);
+
+  let shape = Action.get_shape descr.action in
+  let { actions } as data = get_data table system in
+  assert (not (Msh.mem shape actions));
+  let actions = Msh.add shape descr actions in
+  let data = System_data { data with actions } in
+  Symbols.System.redefine table system ~data ()
 
 (*------------------------------------------------------------------*)
-let descr_of_shape table (system : Symbols.system Symbols.t) shape =
-  let descrs,_ = get_data table system in
-  Action.refresh_descr (Msh.find shape descrs)
+let descr_of_shape table system shape =
+  let {actions} = get_data table system in
+  let descr = Msh.find shape actions in
+  assert (Action.valid_descr descr);
 
-(** We look whether the shape already has a name in another system,
-    with the same number of indices.
-    If that is the case, use the same symbol. *)
+  Action.refresh_descr descr
+
+(** [find_shape table shape] returns [Some (name,indices)] if some
+    action with name [n] and indices [i] and shape [shape] is registered
+    in [table]. Return [None] if no such action exists. *)
 let find_shape table shape =
-  let exception Found of Symbols.action Symbols.t * Vars.index list in
-  try Symbols.System.iter (fun system () data ->
+  let exception Found of Symbols.action * Vars.var list in
+  try
+    Symbols.System.iter (fun system () data ->
       let descrs = match data with
-        | System_data (descrs,_) -> descrs
+        | System_data {actions} -> actions
         | _ -> assert false
       in
-
-      if Msh.mem shape descrs then
-        let descr = Msh.find shape descrs in
-        raise (Found (descr.name, descr.indices))
-      else ()
+      match Msh.find_opt shape descrs with
+        | Some descr -> raise (Found (descr.name,descr.indices))
+        | None -> ()
     ) table;
-
     None
   with Found (x,y) -> Some (x,y)
 
-(** We look whether the dummy shape already has a name in another system.
-    If that is the case, use the same symbol. *)
-let find_dum_shape table shape =
-  let exception Found of Symbols.action Symbols.t in
-  try Symbols.System.iter (fun system () data ->
-      let symbs = match data with
-        | System_data (_,symbs) -> symbs
-        | _ -> assert false
-      in
-
-      if Msh.mem shape symbs then
-        let symb = Msh.find shape symbs in
-        raise (Found symb)
-      else ()
-    ) table;
-
-    None
-  with Found x -> Some x
-
-
-
 (*------------------------------------------------------------------*)
-let register_action table system_symb symb indices action descr =
+let register_action table system_symb descr =
+  let Action.{action;name=symb;indices} = descr in
   let shape = Action.get_shape action in
   match find_shape table shape with
+
+  | None ->
+    let table = Action.define_symbol table symb indices action in
+    let table = add_action table system_symb descr in
+    table, symb, descr
+
   | Some (symb2, is) when List.length indices <> List.length is ->
-      system_err SE_ShapeError
+    error Shape_error
 
   | Some (symb2, is) ->
     let subst_action =
@@ -146,14 +147,37 @@ let register_action table system_symb symb indices action descr =
     in
     let descr = Action.subst_descr subst_is descr in
     let descr = { descr with name = symb2 } in
-    let table = add_action table system_symb shape symb2 descr in
+    let table = add_action table system_symb descr in
 
     table, symb2, descr
 
-  | None ->
-    (* Define the already existing symbol. *)
-    let table = Action.define_symbol table symb indices action in
-    (* Add action description to system. *)
-    let table = add_action table system_symb shape symb descr in
+(*------------------------------------------------------------------*)
+(* Single systems *)
 
-    table, symb, descr
+module Single = struct
+
+  type t = {
+    system     : Symbols.system ;
+    projection : Term.proj
+  }
+
+  let make table system projection =
+    if valid_projection table system projection then
+      {system;projection}
+    else
+      error Invalid_projection
+
+  let pp fmt {system;projection} =
+    if Term.proj_to_string projection = "ε" then
+      (* Convention typically used for single system. *)
+      Format.fprintf fmt "%a" Symbols.pp system
+    else
+      Format.fprintf fmt "%a/%a"
+        Symbols.pp system
+        Term.pp_proj projection
+
+  let descr_of_shape table {system;projection} shape =
+    let multi_descr = descr_of_shape table system shape in
+    Action.project_descr projection multi_descr
+
+end

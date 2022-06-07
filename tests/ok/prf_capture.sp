@@ -1,4 +1,6 @@
-set autoIntro=false.
+
+
+include Basic.
 
 hash h
 
@@ -29,15 +31,15 @@ by intro *.
 
 (* t = T(j) *)
 intro H1.
-expandall.
+expand frame, exec, output, cond, kT. 
 
 fa 0.
 fa 1.
 fa 1.
-prf 1. 
-yesif 1; simpl.
-by intro > _; apply H. 
-fresh 1. 
-admit 0.
-auto.
+prf 1.
+simpl. 
+rewrite if_true in 1. 
+by intro > _ @/kT; apply H. 
+fresh 1.
+by apply IH. 
 Qed.

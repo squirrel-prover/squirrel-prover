@@ -1,6 +1,6 @@
 (** This module defines a notion of symbol with a global table of symbols,
-  * separated into namespaces, and where each symbol is attached to a
-  * definition whose type depends on the namespace. *)
+    separated into namespaces, and where each symbol is attached to a
+    definition whose type depends on the namespace. *)
 
 type lsymb = string Location.located
 
@@ -8,7 +8,9 @@ type lsymb = string Location.located
 (** Type of a function symbol (Prefix or Infix)
     - infix symbols must start by a character in [infix_first_chars]
     - infix symbols must be without index parameters *)
-type symb_type = [ `Prefix | `Infix ]
+
+type assoc = [`Right | `Left | `NonAssoc]
+type symb_type = [ `Prefix | `Infix of assoc ]
 
 val infix_fist_chars : char list
 
@@ -19,30 +21,39 @@ type 'a t
 val hash : 'a t -> int
 
 (** Symbol groups:
-  * symbols with the same name can exist in different groups.
-  * Groups are usually called namespaces, but what we (improperly)
-  * call namespaces here is different: it's more of a name kind. *)
+    symbols with the same name can exist in different groups.
+    Groups are usually called namespaces, but what we (improperly)
+    call namespaces here is different: it's more of a name kind. *)
 type group
 
 (** Type of tables of persistent symbol definitions.
-  * It is currently ineffective. *)
+    It is currently ineffective. *)
 type table
 
 (** Associates a unique tag to a table. For memoisation. *)
 val tag : table -> int
 
 (** Each possible namespace is represented by an abstract datatype.
-  * Their names are descriptive; [fname] is for function symbols. *)
+    Their names are descriptive; [fname] is for function symbols. *)
 
 (*------------------------------------------------------------------*)
-type channel
-type name
-type action
-type fname
-type macro
-type system
-type process
-type btype
+type _channel
+type _name
+type _action
+type _fname
+type _macro
+type _system
+type _process
+type _btype
+
+type channel = _channel t
+type name    = _name    t
+type action  = _action  t
+type fname   = _fname   t
+type macro   = _macro   t
+type system  = _system  t
+type process = _process t
+type btype   = _btype   t
 
 (*------------------------------------------------------------------*)
 type namespace =
@@ -61,13 +72,21 @@ val get_namespace : ?group:group -> table -> string -> namespace option
 
 (*------------------------------------------------------------------*)
 (** {2 Symbol definitions}
-  *
-  * Each symbol is defined by some data,
-  * whose type depends on the namespace. *)
+
+    Each symbol is defined by some data,
+    whose type depends on the namespace. *)
+
+(*------------------------------------------------------------------*)
+(** Different variants on the Diffie-Hellman crypto assumption      *)
+                          
+type dh_hyp =
+  | DH_DDH
+  | DH_CDH
+  | DH_GDH
 
 type function_def =
   | Hash
-  | DDHgen
+  | DHgen of dh_hyp list
   | AEnc
   | ADec
   | SEnc
@@ -76,10 +95,11 @@ type function_def =
   | CheckSign
   | PublicKey
   | Abstract of symb_type
+  | Operator                    (* definition in associated data *)
 
 (** Indicates if a function symbol has been defined with
-  * the specified definition. *)
-val is_ftype : fname t -> function_def -> table -> bool
+    the specified definition. *)
+val is_ftype : fname -> function_def -> table -> bool
 
 (*------------------------------------------------------------------*)
 type bty_info = 
@@ -89,34 +109,32 @@ type bty_info =
 type bty_def = bty_info list
 
 (*------------------------------------------------------------------*)
-type name_def = { 
-  n_iarr : int;                  (* index arity *)
-  n_ty   : Type.message Type.ty; (* type *)
+type name_def = {
+  n_fty   : Type.ftype; (** restricted to: (Index | Timestamp)^* -> ty *)
 }
 
 (*------------------------------------------------------------------*)
 type macro_def =
   | Input | Output | Cond | Exec | Frame
-  | State of int * Type.tmessage
-    (** Macro that expands to the content of a state at a given
-      * timestamp. *)
-  | Global of int * Type.tmessage
+  | State of int * Type.ty
+    (** Macro that expands to the content of a state at a given timestamp. *)
+  | Global of int * Type.ty
     (** Global macros are used to encapsulate let-definitions.
-      * They are indexed. *)
+        They are indexed. *)
 
 (*------------------------------------------------------------------*)
 (** Information about symbol definitions, depending on the namespace.
-  * Integers refer to the index arity of symbols. *)
+    Integers refer to the index arity of symbols. *)
 type _ def =
-  | Channel  : unit      -> channel def
-  | Name     : name_def  -> name    def
-  | Action   : int       -> action  def
-  | Macro    : macro_def -> macro   def
-  | System   : unit      -> system  def
-  | Process  : unit      -> process def
-  | BType    : bty_def   -> btype   def
+  | Channel  : unit      -> _channel def
+  | Name     : name_def  -> _name    def
+  | Action   : int       -> _action  def
+  | Macro    : macro_def -> _macro   def
+  | System   : unit      -> _system  def
+  | Process  : unit      -> _process def
+  | BType    : bty_def   -> _btype   def
         
-  | Function : (Type.ftype * function_def) -> fname def
+  | Function : (Type.ftype * function_def) -> _fname def
         
 type edef =
   | Exists : 'a def -> edef
@@ -124,16 +142,16 @@ type edef =
 
 (*------------------------------------------------------------------*)
 (** {2 Data}
-  * In addition to their definition data, some more data can be attached
-  * to symbols. This is used for data that is defined in modules that
-  * depend on this module, through an extensible datatype. *)
+    In addition to their definition data, some more data can be attached
+    to symbols. This is used for data that is defined in modules that
+    depend on this module, through an extensible datatype. *)
 
 (** Extensible type for data associated to symbols.
-  * Due to circular dependencies, this is not type-safe, but
-  * at least avoids having multiple hashtables for symbols. *)
+    Due to circular dependencies, this is not type-safe, but
+    at least avoids having multiple hashtables for symbols. *)
 type data = ..
 type data += Empty
-type data += AssociatedFunctions of (fname t) list
+type data += AssociatedFunctions of fname list
 
 (*------------------------------------------------------------------*)
 (** {2 Basic namespace-independent operations} *)
@@ -145,7 +163,7 @@ val to_string : 'a t -> string
 val pp : Format.formatter -> 'a t -> unit
 
 (** [def_of_lsymb s] returns the definition of the symbol named [s].
-  * @raise Unbound_identifier if no such symbol has been defined. *)
+    @raise Unbound_identifier if no such symbol has been defined. *)
 val def_of_lsymb : ?group:group -> lsymb -> table -> edef
 
 val is_defined : ?group:group -> string -> table -> bool
@@ -153,8 +171,8 @@ val is_defined : ?group:group -> string -> table -> bool
 type wrapped = Wrapped : 'a t * 'a def -> wrapped
 
 (** [of_lsymb s] returns the symbol associated to [s]
-  * together with its defining data.
-  * @raise Unbound_identifier if no such symbol has been defined. *)
+    together with its defining data.
+    @raise Unbound_identifier if no such symbol has been defined. *)
 val of_lsymb : ?group:group -> lsymb -> table -> wrapped
 
 (** [of_lsymb_opt s] is the same as [of_lsymb_opt s], but return [None]
@@ -173,34 +191,42 @@ module type Namespace = sig
   (** Type of values defining the symbols of this namespace. *)
   type def
 
+  val remove : table -> ns t -> table
+    
   (** Reserve a fresh symbol name, resembling the given string. *)
   val reserve : table -> lsymb -> table * ns t
 
   (** Reserve a fresh symbol name. *)
   val reserve_exact : table -> lsymb -> table * ns t
 
+  (** Release a reserved symbol. *)
+  val release : table -> ns t -> table
+    
   (** Define a symbol name that has been previously reserved
-    * using [fresh]. *)
+      using [fresh]. *)
   val define : table -> ns t -> ?data:data -> def -> table
 
   (** Redefine a symbol name that has been previously defined. *)
   val redefine : table -> ns t -> ?data:data -> def -> table
 
   (** Declare a new symbol, with a name resembling the given string,
-    * defined by the given value. *)
+      defined by the given value. *)
   val declare :
     table -> lsymb -> ?data:data -> def -> table * ns t
 
   (** Like declare, but use the exact string as symbol name.
-    * @raise Multiple_declarations if the name is not available. *)
+      @raise Multiple_declarations if the name is not available. *)
   val declare_exact :
     table -> lsymb -> ?data:data -> def -> table * ns t
 
+  (** [mem s table] checks if [s] exists in this namespace. *)
+  val mem : lsymb -> table -> bool
+
   (** [of_lsymb s] returns [s] as a symbol, if it exists in this namespace.
-    * @raise Unbound_identifier otherwise. *)
+      @raise Unbound_identifier otherwise. *)
   val of_lsymb : lsymb -> table -> ns t
 
-  (** [of_lsymb s] returns [Some s] as a symbol, if it exists in this
+  (** [of_lsymb_opt s] returns [Some s] as a symbol, if it exists in this
       namespace, and None otherwise. *)
   val of_lsymb_opt : lsymb -> table -> ns t option
 
@@ -227,19 +253,22 @@ module type Namespace = sig
 
   (** Fold over the defined symbols of this namespace. *)
   val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> table -> 'a
+
+  (** Map over the defined symbols of this namespace. *)
+  val map : (ns t -> def -> data -> (def * data)) -> table -> table
 end
 
-module Channel  : Namespace with type def = unit    with type ns = channel
-module BType    : Namespace with type def = bty_def with type ns = btype
-module Action   : Namespace with type def = int     with type ns = action
-module System   : Namespace with type def = unit    with type ns = system
-module Process  : Namespace with type def = unit    with type ns = process
+module Channel  : Namespace with type def = unit    with type ns = _channel
+module BType    : Namespace with type def = bty_def with type ns = _btype
+module Action   : Namespace with type def = int     with type ns = _action
+module System   : Namespace with type def = unit    with type ns = _system
+module Process  : Namespace with type def = unit    with type ns = _process
 
 module Function : Namespace
-  with type def = Type.ftype * function_def with type ns = fname
+  with type def = Type.ftype * function_def with type ns = _fname
 
-module Macro    : Namespace with type def = macro_def with type ns = macro
-module Name     : Namespace with type def = name_def with type ns = name
+module Macro    : Namespace with type def = macro_def with type ns = _macro
+module Name     : Namespace with type def = name_def with type ns = _name
 
 (*------------------------------------------------------------------*)
 (** {2 Error Handling} *)
@@ -260,11 +289,15 @@ exception SymbError of symb_err
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)
 
-val get_bty_info   : table -> Type.tmessage -> bty_info list
-val check_bty_info : table -> Type.tmessage -> bty_info -> bool
+val get_bty_info   : table -> Type.ty -> bty_info list
+val check_bty_info : table -> Type.ty -> bty_info -> bool
 
-val is_infix     : fname t -> bool 
+val is_infix     : fname -> bool 
 val is_infix_str : string  -> bool 
+
+val infix_assoc : fname -> assoc
+
+val is_global : macro_def -> bool
 
 (*------------------------------------------------------------------*)
 (** {2 Builtins} *)
@@ -272,81 +305,100 @@ val is_infix_str : string  -> bool
 val builtins_table : table
 
 (** Returns the type of a builtin function *)
-val ftype_builtin : fname t -> Type.ftype
+val ftype_builtin : fname -> Type.ftype
 
 (** Returns the type of a function *)
-val ftype : table -> fname t -> Type.ftype
+val ftype : table -> fname -> Type.ftype
 
 (*------------------------------------------------------------------*)
 (** {3 Action builtins} *)
 
-val init_action : action t
+val init_action : action
 
+(*------------------------------------------------------------------*)
 (** {3 Macro builtins} *)
 
-val inp   : macro t
-val out   : macro t
-val cond  : macro t
-val exec  : macro t
-val frame : macro t
+val inp   : macro
+val out   : macro
+val cond  : macro
+val exec  : macro
+val frame : macro
 
+(*------------------------------------------------------------------*)
 (** {3 Channel builtins} *)
 
 val dummy_channel_lsymb : lsymb
-val dummy_channel : channel t
+val dummy_channel : channel
 
+(*------------------------------------------------------------------*)
 (** {3 Function symbols builtins} *)
 
-val fs_diff   : fname t
+val fs_diff : fname
+
+(** Happens *)
+
+val fs_happens : fname
+
+(** Pred *)
+
+val fs_pred : fname
 
 (** Boolean connectives *)
 
-val fs_true   : fname t
-val fs_false  : fname t
-val fs_and    : fname t
-val fs_or     : fname t
-val fs_impl   : fname t
-val fs_not    : fname t
-val fs_ite    : fname t
+val fs_true  : fname
+val fs_false : fname
+val fs_and   : fname
+val fs_or    : fname
+val fs_impl  : fname
+val fs_not   : fname
+val fs_ite   : fname
+
+(** Comparison *)
+val fs_eq  : fname
+val fs_neq : fname
+val fs_leq : fname
+val fs_lt  : fname
+val fs_geq : fname
+val fs_gt  : fname
 
 (** Witness *)
 
-val fs_witness : fname t
+val fs_witness : fname
 
 (** Successor over natural numbers *)
 
-val fs_succ   : fname t
+val fs_succ : fname
 
 (** Adversary function *)
 
-val fs_att    : fname t
+val fs_att : fname
 
 (** Fail *)
 
-val fs_fail   : fname t
+val fs_fail : fname
 
 (** Xor and its unit *)
 
-val fs_xor    : fname t
-val fs_zero   : fname t
+val fs_xor  : fname
+val fs_zero : fname
 
 (** Pairing *)
 
-val fs_pair   : fname t
-val fs_fst    : fname t
-val fs_snd    : fname t
+val fs_pair : fname
+val fs_fst  : fname
+val fs_snd  : fname
 
 (** Boolean to Message *)
-val fs_of_bool : fname t
+val fs_of_bool : fname
 
 (** Empty *)
 
-val fs_empty  : fname t
+val fs_empty  : fname
 
 (** Length *)
 
-val fs_len    : fname t
-val fs_zeroes : fname t
+val fs_len    : fname
+val fs_zeroes : fname
 
 (*------------------------------------------------------------------*)
 module Ss (S : Namespace) : Set.S with type elt := S.ns t 

@@ -109,7 +109,7 @@ equiv unreach.
 
    expand frame@S2(j).
 
-     equivalent  exec@S2(j),False.
+     have ->:  exec@S2(j) <=> False.
     simpl.
 
      expand exec@S2(j).
@@ -126,6 +126,6 @@ equiv unreach.
      use H2 with S(j).
 
      fa 2.
-     noif 3.
+     rewrite if_false 3.
      simpl.
      Qed.

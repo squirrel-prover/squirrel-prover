@@ -1,11 +1,11 @@
-set autoIntro=false.
+
 
 channel c
 
 abstract ok : message
 abstract ko : message
 
-system null.
+system (A: out(c,ok)).
 
 equiv e : diff(ok,ko).
 Proof.

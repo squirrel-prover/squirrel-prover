@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 (* Checking the treatment of bound variables in direct cases for fresh. *)
 
@@ -7,18 +7,17 @@ name m : index->message
 
 system null.
 
+include Basic.
+
 (* The main test, with a non-empty list of bound variables. *)
 equiv nonempty (i:index) : seq(i:index ->n(i)), diff(n(i),m(i)).
 Proof.
   fresh 1.
   (* Check that the right formula has been produced,
-     using an incorrect equivalence that we admit. *)
-  equivalent
-    (forall i0:index, i<>i0),
-    True.
-  admit.
-  nosimpl(yesif 1).
-  true.
+     using an incorrect formula that we admit. *)
+  assert (forall i0:index, i<>i0) by admit.
+  nosimpl(rewrite if_true in 1).
+  assumption.
   refl.
 Qed.
 
@@ -28,12 +27,9 @@ equiv empty (i:index) : n(i), diff(n(i),m(i)).
 Proof.
   fresh 1.
   (* Check that the right formula has been produced,
-     using an incorrect equivalence that we admit. *)
-  equivalent
-    (i<>i),
-    True.
-  admit.
-  nosimpl(yesif 1).
-  true.
+     using an incorrect formula that we admit. *)
+  assert (i<>i) by admit.
+  nosimpl(rewrite if_true in 1).
+  assumption.
   refl.
 Qed.

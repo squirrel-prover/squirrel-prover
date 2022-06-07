@@ -4,106 +4,554 @@ open Term
 module Sv = Vars.Sv
 module Mv = Vars.Mv
 
+module SE = SystemExpr
+  
 let dbg ?(force=false) s =
   if force then Printer.prt `Dbg s
   else Printer.prt `Ignore s
 
 (*------------------------------------------------------------------*)
-(** {2 Patterns} *)
+(** {2 Positions} *)
 
-type term_head =
-  | HExists
-  | HForAll
-  | HSeq
-  | HFind
-  | HFun   of Symbols.fname Symbols.t
-  | HMacro of Symbols.macro Symbols.t
-  | HName  of Symbols.name  Symbols.t
-  | HDiff
-  | HVar
-  | HPred
-  | HAction
-  | HAtom of Term.ord
-  | HHappens
+module Pos = struct
+  (** A position, represented by a list of integer.
+      The position [pos @ [i]] of [f(t0,...,tn)] is the position 
+      [pos] of [ti]. 
+      If [i < 0] or [t > n], the position is invalid. 
+  
+      Note that the list is in reversed order compared to the intuitive 
+      representation. Since we build an use positions in that order, this
+      is more efficient. *)
+  type pos = int list
 
-let pp_term_head fmt = function
-  | HExists   -> Fmt.pf fmt "Exists"
-  | HForAll   -> Fmt.pf fmt "Forall"
-  | HSeq      -> Fmt.pf fmt "Seq"
-  | HFind     -> Fmt.pf fmt "Find"
-  | HFun   f  -> Fmt.pf fmt "Fun %a"   Symbols.pp f
-  | HMacro m  -> Fmt.pf fmt "Macro %a" Symbols.pp m
-  | HName  n  -> Fmt.pf fmt "Name %a"  Symbols.pp n
-  | HDiff     -> Fmt.pf fmt "Diff"
-  | HVar      -> Fmt.pf fmt "Var"
-  | HPred     -> Fmt.pf fmt "Pred"
-  | HAction   -> Fmt.pf fmt "Action"
-  | HAtom ord -> Fmt.pf fmt "Atom %a" Term.pp_ord ord
-  | HHappens  -> Fmt.pf fmt "Happens"
+  let root = []
 
-let get_head : type a. a term -> term_head = function
-  | Term.Exists _        -> HExists
-  | Term.ForAll _        -> HForAll
-  | Term.Seq _           -> HSeq
-  | Term.Fun ((f,_),_,_) -> HFun f
-  | Term.Find _          -> HFind
-  | Term.Macro (m1,_,_)  -> HMacro m1.Term.s_symb
-  | Term.Name n1         -> HName n1.Term.s_symb
-  | Term.Diff _          -> HDiff
-  | Term.Var _           -> HVar
-  | Term.Pred _          -> HPred
-  | Term.Action _        -> HAction
-  | Term.Atom (`Message   (ord, _, _)) -> HAtom (ord :> Term.ord)
-  | Term.Atom (`Timestamp (ord, _, _)) -> HAtom (ord :> Term.ord)
-  | Term.Atom (`Index     (ord, _, _)) -> HAtom (ord :> Term.ord)
-  | Term.Atom (`Happens _) -> HHappens
+  let pp (fmt : Format.formatter) (pos : pos) : unit =
+    if pos = [] then Fmt.pf fmt "ε"
+    else Fmt.list ~sep:(Fmt.any ".") Fmt.int fmt pos
 
-(*------------------------------------------------------------------*)
-(** {2 Patterns} *)
+  (*------------------------------------------------------------------*)
+  let rec lt (p1 : pos) (p2 : pos) : bool =
+    match p1, p2 with
+    | x1 :: p1, x2 :: p2 -> x1 = x2 && lt p1 p2
+    | [], _ -> true
+    | _, [] -> false
+  
+  (*------------------------------------------------------------------*)
+  module Sp = Set.Make (struct
+      type t = pos
+      let compare = Stdlib.compare
+    end)
 
-(** A pattern is a list of free type variables, a term [t] and a subset
-    of [t]'s free variables that must be matched.
-    The free type variables must be inferred. *)
-type 'a pat = {
-  pat_tyvars : Type.tvars;
-  pat_vars   : Vars.Sv.t;
-  pat_term   : 'a;
-}
+  (*------------------------------------------------------------------*)
+  type f_sel =
+    Term.term -> Term.projs option -> Vars.vars -> Term.term list ->
+    [`Select | `Continue]
 
-let pat_of_form (t : 'a term) =
-  let vs, t = decompose_forall t in
-  let vs, s = erefresh_vars `Global vs in
-  let t = subst s t in
+  (*------------------------------------------------------------------*)
+  (* [p] is the current position *)
+  let rec sel
+      (fsel : f_sel) (sp : Sp.t)
+      ~projs ~vars ~conds ~(p : pos)
+      (t : Term.term)
+    = 
+    match fsel t projs vars conds with
+    | `Select -> Sp.add p sp
+    | `Continue -> 
+      match t with
+      | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite ->
+        assert (snd fs = []);
 
-  { pat_tyvars = [];
-    pat_vars = Vars.Sv.of_list vs;
-    pat_term = t; }
+        let conds_t =             c :: conds in
+        let conds_e = Term.mk_not c :: conds in
+
+        let sp = sel fsel sp ~projs ~vars ~conds         ~p:(0 :: p) c in
+        let sp = sel fsel sp ~projs ~vars ~conds:conds_t ~p:(1 :: p) t in
+        (*    *) sel fsel sp ~projs ~vars ~conds:conds_e ~p:(2 :: p) e 
+
+      | Term.Fun ((_, l1), _, l2) ->
+        let l = (List.map Term.mk_var l1) @ l2 in
+        sel_l fsel sp ~projs ~vars ~conds ~p l
+
+      | Term.Name ns ->
+        let l = List.map Term.mk_var ns.s_indices in
+        sel_l fsel sp ~projs ~vars ~conds ~p l
+
+      | Term.Macro (ms, terms, ts) ->
+        assert (terms = []);
+
+        let l = (List.map Term.mk_var ms.s_indices) @ [ts] in
+        sel_l fsel sp ~projs ~vars ~conds ~p l
+
+      | Term.Action (_, is) ->
+        let l = List.map Term.mk_var is in
+        sel_l fsel sp ~projs ~vars ~conds ~p l
+
+      | Term.Var _ -> sp
+
+      | Term.ForAll (is, t)
+      | Term.Exists (is, t)
+      | Term.Seq    (is, t) -> 
+        let is, subst = Term.refresh_vars `Global is in
+        let t = Term.subst subst t in
+        let vars = List.rev_append is vars in
+        sel fsel sp ~projs ~vars ~conds ~p:(0 :: p) t
+
+      | Term.Diff (Explicit l) ->
+        List.foldi (fun i sp (label,t) ->
+            sel fsel sp ~projs:(Some [label]) ~vars ~conds ~p:(i :: p) t
+          ) sp l
+
+      | Term.Find (is, c, t, e) ->
+        let is, subst = Term.refresh_vars `Global is in
+        let c = Term.subst subst c in
+        let t = Term.subst subst t in
+
+        let vars1 = List.rev_append is vars in
+
+        let conds_t = c :: conds in 
+        let conds_e =      conds in (* could be improved *)
+
+        let sp = sel fsel sp ~projs ~vars:vars1 ~conds         ~p:(0 :: p) c in
+        let sp = sel fsel sp ~projs ~vars:vars1 ~conds:conds_t ~p:(1 :: p) t in
+        (*    *) sel fsel sp ~projs ~vars       ~conds:conds_e ~p:(2 :: p) e 
+
+  and sel_l fsel (sp : Sp.t) ~projs ~vars ~conds ~(p : pos) (l : Term.term list) = 
+    List.foldi (fun i sp t -> sel fsel sp ~projs ~vars ~conds ~p:(i :: p) t) sp l 
+
+
+  (** Exported *)
+  let select (fsel : f_sel) (t : Term.term) : Sp.t =
+    sel fsel Sp.empty ~projs:None ~vars:[] ~conds:[] ~p:[] t
+
+  (*------------------------------------------------------------------*)
+  (** Exported *)
+  let select_e (fsel : f_sel) (t : Equiv.form) : Sp.t =
+    
+    (* [p] is the current position *)
+    let rec sel_e (sp : Sp.t) ~projs ~vars ~conds ~(p : pos) (t : Equiv.form) =  
+      match t with
+      | Equiv.Quant (q, is, t0) ->
+        let is, subst = Term.refresh_vars `Global is in
+        let t0 = Equiv.subst subst t0 in
+        let vars = List.rev_append is vars in
+        sel_e sp ~projs ~vars ~conds ~p:(0 :: p) t0
+
+      | Equiv.Atom (Reach t) ->
+        let projs = Some [Term.left_proj; Term.right_proj] in
+        sel fsel sp ~projs ~vars ~conds ~p:(0 :: 0 :: p) t
+
+      | Equiv.Atom (Equiv e) -> 
+        sel_l fsel sp ~projs ~vars ~conds ~p:(0 :: 0 :: p) e
+
+      | Equiv.Impl (f1, f2)
+      | Equiv.And  (f1, f2)
+      | Equiv.Or   (f1, f2) -> 
+        sel_e_l sp ~projs ~vars ~conds ~p [f1; f2]
+        
+    and sel_e_l (sp : Sp.t) ~projs ~vars ~conds ~(p : pos) (l : Equiv.form list) = 
+      List.foldi (fun i sp t -> sel_e sp ~projs ~vars ~conds ~p:(i :: p) t) sp l 
+    in 
+    
+    sel_e Sp.empty ~projs:None ~vars:[] ~conds:[] ~p:[] t
+
+
+  (*------------------------------------------------------------------*)
+  let destr_vars (l : Term.term list) : Vars.var list =
+    List.map (fun x -> oget (Term.destr_var x)) l
+
+  (*------------------------------------------------------------------*)
+  type 'a f_map_fold =
+    Term.term ->
+    SE.arbitrary -> Vars.vars -> Term.term list -> pos ->
+    'a ->
+    'a * [`Map of Term.term | `Continue]
+
+  type f_map =
+    Term.term ->
+    SE.arbitrary -> Vars.vars -> Term.term list -> pos -> 
+    [`Map of Term.term | `Continue]
+
+  (*------------------------------------------------------------------*)
+  (* TODO: excplicit system in terms: conds below may not be in the correct 
+     system: they should be stated in [se] *)
+
+  (** Internal *)
+  let rec map_fold
+      (func   : 'a f_map_fold) 
+      (mode   : [`TopDown of bool | `BottomUp])
+      (* - [`TopDown b]: apply [func] at top-level first, then recurse.
+           [b] tells if we recurse under successful maps.
+         - [`BottomUp _]: recurse, then apply [func] at top-level *)
+
+      ~(env   : Vars.env)          (* var env, to have clean variable names *)
+      ~(se    : SE.arbitrary)      (* system expr applying the current pos. *)
+      ~(vars  : Vars.var list)     (* variable bound above the current pos. *)
+      ~(conds : Term.term list)    (* conditions above the current pos. *)
+      ~(p     : pos)               (* current position *)
+      ~(acc   : 'a)                (* folding value *)
+      (ti     : Term.term)         
+    : 'a * bool * Term.term        (* folding value, `Map found, term *)
+    =
+    let map_fold ~se ?(env = env) ?(vars = vars) ?(conds = conds) = 
+      map_fold func mode ~env ~se ~vars ~conds 
+    in
+    let map_fold_l ~se ?(env = env) ?(vars = vars) ?(conds = conds) =
+      map_fold_l func mode ~env ~se ~vars ~conds 
+    in
+
+    (* recurse strictly one level below *)
+    let rec_strict_subterm ti acc =
+      match ti with
+      | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite ->
+        assert (snd fs = []);
+
+        let conds_t =             c :: conds in
+        let conds_e = Term.mk_not c :: conds in
+
+        let acc, foundc, c = map_fold ~se ~conds         ~p:(0 :: p) ~acc c in
+        let acc, foundt, t = map_fold ~se ~conds:conds_t ~p:(1 :: p) ~acc t in
+        let acc, founde, e = map_fold ~se ~conds:conds_e ~p:(2 :: p) ~acc e in
+        let found = foundc || foundt || founde in
+
+        let ti' = Term.mk_ite ~simpl:false c t e in
+        acc, found, if found then ti' else ti
+
+      (* [φ => ψ] *)
+      | Term.Fun ((fs, []), fty, [t1; t2]) when fs = Symbols.fs_impl ->
+        let conds2 = t1 :: conds in
+        let acc, found1, t1 = 
+          map_fold ~se ~conds        ~p:(0 :: p) ~acc t1
+        in
+        let acc, found2, t2 = 
+          map_fold ~se ~conds:conds2 ~p:(1 :: p) ~acc t2
+        in
+        let found = found1 || found2 in
+
+        let ti' = Term.mk_fun0 (fs, []) fty [t1; t2] in
+        acc, found, if found then ti' else ti
+
+      (* [φ && ψ] is handled as [φ && (φ => ψ)] *)
+      | Term.Fun ((fs, []), fty, [t1; t2]) when fs = Symbols.fs_and ->
+        let conds2 = t1 :: conds in
+        let acc, found1, t1 = 
+          map_fold ~se ~conds        ~p:(0 :: p) ~acc t1
+        in
+        let acc, found2, t2 = 
+          map_fold ~se ~conds:conds2 ~p:(1 :: p) ~acc t2
+        in
+        let found = found1 || found2 in
+
+        let ti' = Term.mk_fun0 (fs, []) fty [t1; t2] in
+        acc, found, if found then ti' else ti
+
+      (* [φ || ψ] is handled as [φ || (¬ φ => ψ)] *)
+      | Term.Fun ((fs, []), fty, [t1; t2]) when fs = Symbols.fs_or ->
+        let conds2 = (Term.mk_not t1) :: conds in
+
+        let acc, found1, t1 = 
+          map_fold ~se ~conds        ~p:(0 :: p) ~acc t1
+        in
+        let acc, found2, t2 = 
+          map_fold ~se ~conds:conds2 ~p:(1 :: p) ~acc t2
+        in
+        let found = found1 || found2 in
+
+        let ti' = Term.mk_fun0 (fs, []) fty [t1; t2] in
+        acc, found, if found then ti' else ti
+
+      | Term.Fun ((fs, l1), fty, l2) ->
+        let l = (List.map Term.mk_var l1) @ l2 in
+
+        let acc, found, l = map_fold_l ~se ~p ~acc l in
+
+        let l1, l2 = List.takedrop (List.length l1) l in
+        let l1 = destr_vars l1 in
+
+        let ti' = Term.mk_fun0 (fs, l1) fty l2 in
+        acc, found, if found then ti' else ti
+
+      | Term.Name ns ->
+        let l = List.map Term.mk_var ns.s_indices in
+
+        let acc, found, l = map_fold_l ~se ~p ~acc l in
+        let l = destr_vars l in
+
+        let ti' = Term.mk_name (Term.mk_isymb ns.s_symb ns.s_typ l) in
+        acc, found, if found then ti' else ti
+
+      | Term.Macro (ms, terms, ts) ->
+        assert (terms = []);
+
+        let l = (List.map Term.mk_var ms.s_indices) @ [ts] in
+
+        let acc, found, l = map_fold_l ~se ~vars ~conds ~p ~acc l in
+
+        let l1, ts = List.takedrop (List.length ms.s_indices) l in
+        let l1 = destr_vars l1 in
+        let ts = as_seq1 ts in
+
+        let ti' = Term.mk_macro (Term.mk_isymb ms.s_symb ms.s_typ l1) [] ts in
+        acc, found, if found then ti' else ti
+
+      | Term.Action (a, is) ->
+        let l = List.map Term.mk_var is in
+
+        let acc, found, l = map_fold_l ~se ~vars ~conds ~p ~acc l in
+
+        let l = destr_vars l in
+
+        let ti' = Term.mk_action a l in
+        acc, found, if found then ti' else ti
+
+      | Term.Var _ -> acc, false, ti
+
+      | Term.ForAll (is, t0)
+      | Term.Exists (is, t0)
+      | Term.Seq    (is, t0) -> 
+        let env, is, subst = Term.refresh_vars_env env is in
+        let t0 = Term.subst subst t0 in
+        let vars = List.rev_append is vars in
+
+        let acc, found, t0 = map_fold ~se ~env ~vars ~p:(0 :: p) ~acc t0 in
+
+        let ti' = 
+          match ti with
+          | Term.ForAll _ -> Term.mk_forall is t0
+          | Term.Exists _ -> Term.mk_exists is t0
+          | Term.Seq    _ -> Term.mk_seq0   is t0
+
+          | _ -> assert false
+        in
+
+        acc, found, if found then ti' else ti
+
+      | Term.Diff (Explicit l) ->
+        let acc, found, l' =
+          map_fold_l ~se ~p ~acc ~projlabels:(List.map fst l) (List.map snd l)
+        in
+        let l = List.map2 (fun (lbl,_) t -> lbl,t) l l' in
+        let ti' = Term.mk_diff l in
+        acc, found, if found then ti' else ti
+
+      | Term.Find (is, c, t, e) ->
+        let env, is, subst = Term.refresh_vars_env env is in
+        let c = Term.subst subst c in
+        let t = Term.subst subst t in
+
+        let vars1 = List.rev_append is vars in
+
+        let conds_t = c :: conds in 
+        let conds_e =      conds in (* could be improved *)
+
+        let acc, foundc, c = 
+          map_fold ~se ~env ~vars:vars1 ~conds         ~p:(0 :: p) ~acc c 
+        in
+        let acc, foundt, t = 
+          map_fold ~se ~env ~vars:vars1 ~conds:conds_t ~p:(1 :: p) ~acc t 
+        in
+        let acc, founde, e = 
+          map_fold ~se ~env ~vars       ~conds:conds_e ~p:(2 :: p) ~acc e 
+        in
+        let found = foundc || foundt || founde in
+
+        let ti' = Term.mk_find is c t e in
+        acc, found, if found then ti' else ti
+    in
+
+    match mode with
+    | `TopDown b ->
+      begin
+        match func ti se vars conds p acc with
+        | acc, `Map t -> 
+          if b then
+            let acc, _, t = map_fold ~se ~p ~acc:acc t in
+            acc, true, t
+          else
+            acc, true, t
+
+        | acc, `Continue -> rec_strict_subterm ti acc
+      end
+
+    | `BottomUp ->
+      let acc, found, ti = rec_strict_subterm ti acc in
+      match func ti se vars conds p acc with
+      | acc, `Map ti   -> acc, true,  ti
+      | acc, `Continue -> acc, found, ti
+
+
+  and map_fold_l
+      func mode      
+      ~env ~se ~vars ~conds ~(p : pos) ~acc
+      ?projlabels            (* optional list of projection labels *)
+      (l : Term.terms)
+    =
+    let (acc, found), l =
+      List.mapi_fold (fun i (acc, found) ti ->
+          let se = match projlabels with
+            | None -> se
+            | Some labels -> SE.project [List.nth labels i] se
+          in
+          let acc, found', ti =
+            map_fold func mode ~env ~se ~vars ~conds ~p:(i :: p) ~acc ti
+          in
+          (acc, found || found'), ti
+        ) (acc, false) l 
+    in
+    acc, found, l
+
+  (*------------------------------------------------------------------*)
+  (** Internal *)
+  let rec map_fold_e
+      (func   : 'a f_map_fold) 
+      (mode   : [`TopDown of bool | `BottomUp])
+      (* - [`TopDown b]: apply [func] at top-level first, then recurse.
+           [b] tells if we recurse under successful maps.
+         - [`BottomUp _]: recurse, then apply [func] at top-level *)
+
+      ~(env    : Vars.env)      (* var env, to have clean variable names *)
+      ~(system : SE.context)    (* context applying the current pos. *)
+      ~(vars   : Vars.vars)     (* variable bound above the current position *)
+      ~(conds  : Term.terms)    (* conditions above the current position *)
+      ~(p      : pos)           (* current position *)
+      ~(acc    : 'a)            (* folding value *)
+      (ti      : Equiv.form)       
+    : 'a * bool * Equiv.form    (* folding value, `Map found, term *)
+    = 
+    let map_fold_e ?(env = env) ?(system = system) ?(vars = vars) ?(conds = conds) = 
+      map_fold_e func mode ~env ~system ~vars ~conds 
+    in
+    let map_fold_e_l ?(env = env) ?(system = system) ?(vars = vars) ?(conds = conds) = 
+      map_fold_e_l func mode ~env ~system ~vars ~conds 
+    in
+
+    match ti with
+    | Equiv.Quant (q, is, t0) ->
+      let env, is, subst = Term.refresh_vars_env env is in
+      let t0 = Equiv.subst subst t0 in
+      let vars = List.rev_append is vars in
+
+      let acc, found, t0 = map_fold_e ~env ~vars ~p:(0 :: p) ~acc t0 in
+
+      let ti' = Equiv.mk_quant q is t0 in
+      acc, found, if found then ti' else ti
+
+    | Equiv.Atom (Reach t) -> 
+      let se = system.set in
+      let acc, found, t =
+        map_fold func mode ~env ~se ~vars ~conds ~p:(0 :: 0 :: p) ~acc t 
+      in
+      let ti' = Equiv.Atom (Reach t) in
+      acc, found, if found then ti' else ti
+
+    | Equiv.Atom (Equiv e) -> 
+      let se = (oget system.pair :> SE.arbitrary) in
+      let acc, found, l = 
+        map_fold_l func mode ~env ~se ~vars ~conds ~p:(0 :: 0 :: p) ~acc e 
+      in
+      let ti' = Equiv.Atom (Equiv l) in
+      acc, found, if found then ti' else ti
+
+    | Equiv.Impl (f1, f2)
+    | Equiv.And  (f1, f2)
+    | Equiv.Or   (f1, f2) -> 
+      let acc, found, l = map_fold_e_l ~env ~vars ~conds ~p ~acc [f1; f2] in
+      let f1, f2 = as_seq2 l in
+      let ti' = 
+        match ti with
+        | Equiv.Impl _ -> Equiv.Impl (f1, f2)
+        | Equiv.And  _ -> Equiv.And  (f1, f2)
+        | Equiv.Or   _ -> Equiv.Or   (f1, f2)
+        | _ -> assert false
+      in
+      acc, found, if found then ti' else ti
+
+  and map_fold_e_l func mode ~env ~system ~vars ~conds ~p ~acc (l : Equiv.form list) =
+    let (acc, found), l =
+      List.mapi_fold (fun i (acc, found) ti -> 
+          let acc, found', ti = 
+            map_fold_e func mode ~env ~system ~vars ~conds ~p:(i :: p) ~acc ti
+          in
+          (acc, found || found'), ti
+        ) (acc, false) l 
+    in
+    acc, found, l
+
+
+  (*------------------------------------------------------------------*)
+  (** Exported *)
+  let map
+      ?(mode=`TopDown false) (func : f_map)
+      (env : Vars.env) (se : SE.arbitrary) (t : Term.term)
+    : bool * Term.term
+    =
+    let func : unit f_map_fold = 
+      fun t projs vars conds p () -> (), func t projs vars conds p 
+    in
+    let (), found, t =
+      map_fold func mode ~env ~se ~vars:[] ~conds:[] ~p:[] ~acc:() t
+    in
+    found, t
+
+  (** Exported *)
+  let map_e
+      ?(mode=`TopDown false) (func : f_map)
+      (env : Vars.env) (system : SE.context) (t : Equiv.form)
+    : bool * Equiv.form
+    =
+    let func : unit f_map_fold = 
+      fun t projs vars conds p () -> (), func t projs vars conds p 
+    in
+    let (), found, t = 
+      map_fold_e func mode ~env ~system ~vars:[] ~conds:[] ~p:[] ~acc:() t
+    in
+    found, t
+
+  (*------------------------------------------------------------------*)
+  (** Exported *)
+  let map_fold
+      ?(mode=`TopDown false) 
+      (func : 'a f_map_fold)
+      (env : Vars.env) (se : SE.arbitrary) 
+      (acc : 'a) (t : Term.term) 
+    =
+    map_fold func mode ~env ~se ~vars:[] ~conds:[] ~p:[] ~acc t
+
+  (** Exported *)
+  let map_fold_e 
+      ?(mode=`TopDown false) 
+      (func : 'a f_map_fold)
+      (env : Vars.env) (system : SE.context) 
+      (acc : 'a) (t : Equiv.form) 
+    =
+    map_fold_e func mode ~env ~system ~vars:[] ~conds:[] ~p:[] ~acc t
+end
 
 (*------------------------------------------------------------------*)
 (** {2 Matching variable assignment} *)
 
-module Mvar : sig
+module Mvar : sig[@warning "-32"]
   type t
 
-  val make : eterm Mv.t -> t
+  val make : term Mv.t -> t
 
   val empty : t
 
   val union : t -> t -> t
 
-  val add : Vars.evar -> eterm -> t -> t
+  val add : Vars.var -> term -> t -> t
 
-  val remove : Vars.evar -> t -> t
+  val remove : Vars.var -> t -> t
 
-  val mem : Vars.evar -> t -> bool
+  val mem : Vars.var -> t -> bool
 
-  val find : Vars.evar -> t -> eterm
+  val find : Vars.var -> t -> term
 
   val is_empty : t -> bool
 
-  val filter : (Vars.evar -> eterm -> bool) -> t -> t
+  val filter : (Vars.var -> term -> bool) -> t -> t
 
-  val fold : (Vars.evar -> eterm -> 'b -> 'b) -> t -> 'b -> 'b
+  val fold : (Vars.var -> term -> 'b -> 'b) -> t -> 'b -> 'b
 
   val to_subst : mode:[`Match|`Unif] -> t -> subst
 
@@ -111,33 +559,33 @@ module Mvar : sig
 end = struct
   (** [id] is a unique identifier used to do memoisation. *)
   type t = { id    : int;
-             subst : eterm Mv.t; }
+             subst : term Mv.t; }
 
   let cpt = ref 0
-  let make subst = { id = (incr cpt; !cpt); subst }
+  let make subst = incr cpt; { id = !cpt; subst }
 
   let pp fmt (mv : t) : unit =
-    let pp_binding fmt (Vars.EVar v, Term.ETerm t) =
+    let pp_binding fmt (v, t) =
       Fmt.pf fmt "@[%a → %a@]" Vars.pp v Term.pp t
     in
 
     Fmt.pf fmt "@[<v 2>{id:%d@;%a}@]" mv.id
       (Fmt.list ~sep:Fmt.cut pp_binding) (Mv.bindings mv.subst)
 
-  let empty = make (Mv.empty)
+  let empty = make Mv.empty
 
   let union mv1 mv2 =
     make (Mv.union (fun _ _ _ -> assert false) mv1.subst mv2.subst)
 
-  let add (v : Vars.evar) (t : eterm) (m : t) : t =
+  let add (v : Vars.var) (t : term) (m : t) : t =
     make (Mv.add v t m.subst)
 
-  let remove (v : Vars.evar) (m : t) : t =
+  let remove (v : Vars.var) (m : t) : t =
     make (Mv.remove v m.subst)
 
-  let mem (v : Vars.evar) (m : t) : bool = Mv.mem v m.subst
+  let mem (v : Vars.var) (m : t) : bool = Mv.mem v m.subst
 
-  let find (v : Vars.evar) (m : t) = Mv.find v m.subst
+  let find (v : Vars.var) (m : t) = Mv.find v m.subst
 
   let is_empty (m : t) = Mv.is_empty m.subst
 
@@ -149,8 +597,8 @@ end = struct
     let s =
       Mv.fold (fun v t subst ->
           match v, t with
-          | Vars.EVar v, ETerm t ->
-            ESubst (mk_var v, cast (Vars.kind v) t) :: subst
+          | v, t ->
+            ESubst (mk_var v, t) :: subst
         ) mv.subst []
     in
 
@@ -212,19 +660,19 @@ let minfos_update new_v old_v =
 
     | MR_ok, MR_ok -> Some MR_ok
 
-let minfos_ok (term : Term.message) (minfos : match_infos) : match_infos =
-  Mt.update (Term.ETerm term) (minfos_update MR_ok) minfos
+let minfos_ok (term : Term.term) (minfos : match_infos) : match_infos =
+  Mt.update term (minfos_update MR_ok) minfos
 
-let minfos_failed (term : Term.message) (minfos : match_infos) : match_infos =
-  Mt.update (Term.ETerm term) (minfos_update MR_failed) minfos
+let minfos_failed (term : Term.term) (minfos : match_infos) : match_infos =
+  Mt.update term (minfos_update MR_failed) minfos
 
 let minfos_check_st
-    (term : Term.message)
-    (st : message list)
+    (term : Term.term)
+    (st   : Term.term list)
     (minfos : match_infos)
   : match_infos
   =
-  Mt.update (Term.ETerm term) (minfos_update (MR_check_st st)) minfos
+  Mt.update term (minfos_update (MR_check_st st)) minfos
 
 (*------------------------------------------------------------------*)
 (** Normalize a match information map, by making a term tagged
@@ -232,26 +680,26 @@ let minfos_check_st
     -     at least one of its subterms is tagged [MR_ok]
     - and at least one of its subterms is tagged [MR_fail]. *)
 let minfos_norm (minit : match_infos) : match_infos =
-  let rec norm (ETerm t as et) mfinal : match_info * match_infos =
-    if Mt.mem et mfinal
-    then Mt.find et mfinal, mfinal
-    else match Mt.find et minit with
-      | MR_ok | MR_failed as r -> r, Mt.add et r mfinal
+  let rec norm t mfinal : match_info * match_infos =
+    if Mt.mem t mfinal
+    then Mt.find t mfinal, mfinal
+    else match Mt.find t minit with
+      | MR_ok | MR_failed as r -> r, Mt.add t r mfinal
       | MR_check_st st ->
         let infos, mfinal =
           List.fold_left (fun (infos, mfinal) t ->
-              let i, mfinal = norm (ETerm t) mfinal in
+              let i, mfinal = norm t mfinal in
               i :: infos, mfinal
             ) ([], mfinal) st
         in
         (* special case for binders, because alpha-renamed subterms
            cannot be checked later *)
-        (* TODO: fix it to have an improved printing *)
+        (* FEATURE: fix it to have an improved printing *)
         if List.for_all (fun x -> x = MR_ok) infos
-        then MR_ok, Mt.add et MR_ok mfinal
+        then MR_ok, Mt.add t MR_ok mfinal
         else if Term.is_binder t
-        then MR_failed, Mt.add et MR_failed mfinal
-        else MR_check_st st, Mt.add et (MR_check_st st) mfinal
+        then MR_failed, Mt.add t MR_failed mfinal
+        else MR_check_st st, Mt.add t (MR_check_st st) mfinal
   in
 
   Mt.fold (fun et _ mfinal ->
@@ -259,9 +707,54 @@ let minfos_norm (minit : match_infos) : match_infos =
       mfinal) minit Mt.empty
 
 (*------------------------------------------------------------------*)
-exception NoMatch of (message list * match_infos) option
+exception NoMatch of (term list * match_infos) option
 
 let no_match ?infos () = raise (NoMatch infos)
+
+(*------------------------------------------------------------------*)
+(** {2 Reduction utilities} *)
+
+(** Expand once at head position. 
+    Throw [exn] in case of failure. *)
+let expand_head_once
+    ~(exn : exn) 
+    (table : Symbols.table) (sexpr : SE.t) 
+    (hyps : Hyps.TraceHyps.hyps Lazy.t)
+    (t : Term.term) 
+  : Term.term * bool 
+  = 
+  let se = 
+    try SE.to_fset sexpr
+    with SE.Error _ -> raise exn
+    (* FIXME: we are throwing this exception too early, since in the
+       Operator case, we may unfold even if [sexpr = any]. *)
+  in
+  let models = (* evaluates the models only if needed *)
+    lazy (
+      let lits = Hyps.get_trace_literals (Lazy.force hyps) in
+      match Constr.models_conjunct lits with
+        | Utils.Timeout -> raise exn
+        | Utils.Result models -> models)
+  in 
+  let cntxt () = Constr.{ 
+      table; system = se; 
+      models = Some (Lazy.force models);
+    } in
+  match t with
+  | Term.Macro (ms, l, ts) ->
+    assert (l = []);
+
+    if Constr.query ~precise:true (Lazy.force models) [`Pos, `Happens ts] then
+      match Macros.get_definition (cntxt ()) ms ts with
+      | `Def mdef -> mdef, true
+      | _ -> raise exn
+    else raise exn
+
+  | Fun (fs, _, ts) 
+    when Operator.is_operator table fs -> 
+    Operator.unfold (cntxt ()) fs ts, true
+
+  | _ -> raise exn
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and unification internal states} *)
@@ -271,12 +764,14 @@ type match_state = {
   mv  : Mvar.t;          (** inferred variable assignment *)
   bvs : Sv.t;            (** bound variables "above" the current position *)
 
-  support  : Sv.t;       (** free variable which we are trying to match *)
-  env      : Sv.t;       (** rigid free variables (disjoint from [support]) *)
+  support : Sv.t;       (** free variable which we are trying to match *)
+  env     : Sv.t;       (** rigid free variables (disjoint from [support]) *)
 
-  ty_env   : Type.Infer.env;
-  table    : Symbols.table;
-  system   : SystemExpr.t;
+  ty_env  : Type.Infer.env;
+  table   : Symbols.table;
+  system  : SE.context; (** system context applying at the current position *)
+
+  hyps : Hyps.TraceHyps.hyps Lazy.t;
 
   use_fadup     : bool;
   allow_capture : bool;
@@ -302,11 +797,8 @@ type unif_state = {
 
 type match_res =
   | FreeTyv
-  | NoMatch of (messages * match_infos) option
+  | NoMatch of (terms * match_infos) option
   | Match   of Mvar.t
-
-type f_map =
-  eterm -> Vars.evars -> Term.message list -> [`Map of eterm | `Continue]
 
 (** matching algorithm options *)
 type match_option = {
@@ -349,48 +841,119 @@ module type S = sig
     ?option:match_option ->
     ?mv:Mvar.t ->
     ?ty_env:Type.Infer.env ->
+    ?hyps:Hyps.TraceHyps.hyps Lazy.t ->
     Symbols.table ->
-    SystemExpr.t ->
+    SE.context ->
     t -> 
     t pat ->
     match_res
 
-  val try_match_term :
-    ?option:match_option ->
-    ?mv:Mvar.t ->
-    ?ty_env:Type.Infer.env ->
-    Symbols.table ->
-    SystemExpr.t ->
-    'a term -> 
-    'b term pat ->
-    match_res
-
-  val map : ?m_rec:bool -> f_map -> Vars.env -> t -> t option
-
   val find : 
     ?option:match_option ->
     Symbols.table ->
-    SystemExpr.t ->
+    SE.context ->
     Vars.env ->
-    ('a Term.term pat) -> 
+    (Term.term pat) -> 
     t -> 
-    Term.eterm list
+    Term.term list
 end
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and unification} *)
 
+(** Exported 
+    Generic matching function, built upon [Term.term] or [Equiv.form] 
+    matching. *)
+let try_match_gen (type a)
+    (f_kind  : a Equiv.f_kind)
+    (fmatch  : 
+       mode:[`Contravar | `Covar | `Eq] -> a -> a -> match_state -> Mvar.t) 
+    ?(option=default_match_option)
+    ?(mv     : Mvar.t option)
+    ?(ty_env : Type.Infer.env option)
+    ?(hyps   : Hyps.TraceHyps.hyps Lazy.t = lazy (Hyps.TraceHyps.empty))
+    (table   : Symbols.table)
+    (system  : SE.context)
+    (t       : a)
+    (p       : a pat) 
+  : match_res 
+  =
+  (* [must_close] state if [ty_env] must be closed at the end of 
+     the matching *)
+  let must_close, ty_env = match ty_env with
+    | Some e -> false, e
+    | None   -> true,  Type.Infer.mk_env () 
+  in
+
+  let univars, ty_subst = Type.Infer.open_tvars ty_env p.pat_tyvars in
+  let pat = Equiv.Babel.tsubst f_kind ty_subst p.pat_term in
+
+  (* substitute back the univars by the corresponding tvars *)
+  let ty_subst_rev =
+    List.fold_left2 (fun s tv tu ->
+        Type.tsubst_add_univar s tu (Type.TVar tv)
+      ) Type.tsubst_empty p.pat_tyvars univars
+  in
+
+  let support = Sv.map (Vars.tsubst ty_subst) p.pat_vars in
+  let env = 
+    Sv.diff 
+      (Sv.union
+         (Equiv.Babel.fv f_kind t) 
+         (Equiv.Babel.fv f_kind pat)) 
+      support 
+  in
+
+  let mv_init = odflt Mvar.empty mv in
+  let st_init : match_state = { 
+    bvs = Sv.empty;
+    mv = mv_init;
+
+    table; system; env; support; ty_env; hyps;
+
+    (* lits = lazy (assert false); *)
+    use_fadup     = option.use_fadup;
+    allow_capture = option.allow_capture; 
+  } in
+
+  (* Term matching ignores [mode]. Matching in [Equiv] does not. *)
+  let mode = match option.mode with
+    | `Eq -> `Eq
+    | `EntailRL -> `Covar
+    | `EntailLR -> `Contravar
+  in
+
+  try
+    let mv = fmatch ~mode t pat st_init in
+
+    if not must_close then 
+      Match mv 
+    else if not (Type.Infer.is_closed ty_env) then 
+      FreeTyv
+    else
+      (* FIXME: shouldn't we substitute type variables in Mv co-domain ? *)
+      let mv =
+        Mvar.fold (fun v t mv ->
+            let v = Vars.tsubst ty_subst_rev v in
+            Mvar.add v t mv
+          ) mv Mvar.empty
+      in
+      Match mv
+
+  with
+  | NoMatch minfos -> NoMatch minfos
+
 (*------------------------------------------------------------------*)
 (** {3 Term matching and unification} *)
 
-module T (* : S with type t = message *) = struct
-  type t = message
+module T (* : S with type t = Term.term *) = struct
+  type t = term
 
   let pp_pat pp_t fmt p =
     Fmt.pf fmt "@[<hov 0>{term = @[%a@];@ tyvars = @[%a@];@ vars = @[%a@]}@]"
       pp_t p.pat_term
       (Fmt.list ~sep:Fmt.sp Type.pp_tvar) p.pat_tyvars
-      (Fmt.list ~sep:Fmt.sp Vars.pp_e) (Sv.elements p.pat_vars)
+      (Fmt.list ~sep:Fmt.sp Vars.pp) (Sv.elements p.pat_vars)
 
   (*------------------------------------------------------------------*)
   exception NoMgu
@@ -400,8 +963,7 @@ module T (* : S with type t = message *) = struct
      - [st.bvs] is the set of variables bound above [t].
      - [st.bvs] must be disjoint from the free variables of the terms in the
        co-domain of [mv]. *)
-  let rec unif : type a. a term -> a term -> unif_state -> Mvar.t =
-    fun t1 t2 st ->
+  let rec unif (t1 : term) (t2 : term) (st : unif_state) : Mvar.t =
     match t1, t2 with
     | Var v, t | t, Var v ->
       vunif t v st
@@ -420,18 +982,18 @@ module T (* : S with type t = message *) = struct
       let mv = unif_l terms (terms') { st with mv } in
       unif ts ts' { st with mv }
 
-    | Pred ts, Pred ts' -> unif ts ts' st
-
     | Action (s,is), Action (s',is') -> sunif (s,is) (s',is') st
 
-    | Diff (a,b), Diff (a', b') ->
-      unif_l [a;b] [a';b'] st
-
-    | Atom at, Atom at' -> atunif at at' st
+    | Diff (Explicit l), Diff (Explicit l') ->
+      if List.length l <> List.length l' then raise NoMgu;
+      
+      List.fold_left2 (fun mv (lt,t) (lpat, pat) ->
+          if lt <> lpat then raise NoMgu;
+          
+          unif t pat { st with mv }
+        ) st.mv l l'
 
     | Find (is, c, t, e), Find (is', pat_c, pat_t, pat_e) ->
-      let is  = List.map Vars.evar is
-      and is' = List.map Vars.evar is' in
       let s, s', st = unif_bnds is is' st in
 
       let c    ,     t = subst s      c, subst s      t
@@ -449,29 +1011,27 @@ module T (* : S with type t = message *) = struct
     | _, _ -> raise NoMgu
 
   (* Return: left subst, right subst, unification state *)
-  and unif_bnds (vs : Vars.evars) (vs' : Vars.evars) st :
+  and unif_bnds (vs : Vars.vars) (vs' : Vars.vars) st :
     esubst list * esubst list * unif_state =
     if List.length vs <> List.length vs' then
       raise NoMgu;
 
     (* check that types are compatible *)
-    List.iter2 (fun (Vars.EVar v) (Vars.EVar v') ->
+    List.iter2 (fun v v' ->
         let ty, ty' = Vars.ty v, Vars.ty v' in
-        match Type.equal_w ty ty' with
-        | None -> raise NoMgu
-        | Some Type.Type_eq ->
-          if Type.Infer.unify_eq st.ty_env ty ty' = `Fail then
-            raise NoMgu;
+        if not (Type.equal ty ty') then raise NoMgu;
+
+        if Type.Infer.unify_eq st.ty_env ty ty' = `Fail then
+          raise NoMgu;
       ) vs vs';
 
     (* refresh [vs] *)
-    let vs, s = erefresh_vars `Global vs in
+    let vs, s = refresh_vars `Global vs in
 
     (* refresh [vs'] using the same renaming *)
-    let s' = List.map2 (fun (ESubst (_, new_v)) (Vars.EVar v') ->
-        match Type.equal_w (ty new_v) (Vars.ty v') with
-        | None -> assert false
-        | Some Type.Type_eq -> ESubst (mk_var v', new_v)
+    let s' = List.map2 (fun (ESubst (_, new_v)) v' ->
+        assert (Type.equal (ty new_v) (Vars.ty v'));
+        ESubst (mk_var v', new_v)
       ) (List.rev s)          (* reversed ! *)
         vs'
     in
@@ -482,13 +1042,12 @@ module T (* : S with type t = message *) = struct
     s, s', st
 
   (* unify a variable and a term. *)
-  and vunif : type a. a term -> a Vars.var -> unif_state -> Mvar.t =
-    fun t v st ->
+  and vunif (t : term) (v : Vars.var) (st : unif_state) : Mvar.t =
     let v, t = match t with
       | Var v' ->
-        if not (Sv.mem (Vars.evar v) st.support) then
+        if not (Sv.mem v st.support) then
           v', mk_var v
-        else if not (Sv.mem (Vars.evar v') st.support) then
+        else if not (Sv.mem v' st.support) then
           v, t
         else if Vars.compare v v' < 0 then
           v, t
@@ -497,16 +1056,14 @@ module T (* : S with type t = message *) = struct
 
       | _ -> v, t
     in
-    let ev = Vars.EVar v in
-
     if t = mk_var v then
       st.mv
 
-    else if not (Sv.mem ev st.support) then
+    else if not (Sv.mem v st.support) then
       raise NoMgu
 
     else (* [v] in the support, and [v] smaller than [v'] if [t = Var v'] *)
-      match Mvar.find ev st.mv with
+      match Mvar.find v st.mv with
       (* first time we see [v]: store the substitution and add the
          type information. *)
       | exception Not_found ->
@@ -517,59 +1074,36 @@ module T (* : S with type t = message *) = struct
            bound variables. *)
         if not (Sv.disjoint (fv t) st.bvs) then raise NoMgu;
 
-        (Mvar.add ev (ETerm t) st.mv)
+        (Mvar.add v t st.mv)
 
       (* If we already saw the variable, check that there is no cycle, and
          call back [unif]. *)
-      | ETerm t' -> match cast (kind t) t' with
-        | exception Uncastable -> raise NoMgu
-        | t' ->
-          if Sv.mem ev st.subst_vs then raise NoMgu
-          else
-            let st =
-              { st with subst_vs = Sv.add ev st.subst_vs }
-            in
-            unif t t' st
+      | t' -> 
+        if Sv.mem v st.subst_vs then raise NoMgu
+        else
+          let st =
+            { st with subst_vs = Sv.add v st.subst_vs }
+          in
+          unif t t' st
 
-  (** unifies an atom *)
-  and atunif (at : generic_atom) (at' : generic_atom) st : Mvar.t =
-    match at, at' with
-    | `Message (ord, t1, t2), `Message (ord', t1', t2') ->
-      if ord <> ord' then raise NoMgu;
-      unif_l [t1;t2] [t1';t2'] st
-
-    | `Timestamp (ord, t1, t2), `Timestamp (ord', t1', t2') ->
-      if ord <> ord' then raise NoMgu;
-      unif_l [t1;t2] [t1';t2'] st
-
-    | `Index (ord, t1, t2), `Index (ord', t1', t2') ->
-      if ord <> ord' then raise NoMgu;
-      unif_l [mk_var t1; mk_var t2] [mk_var t1'; mk_var t2'] st
-
-    | `Happens ts, `Happens ts' -> unif ts ts' st
-
-    | _, _ -> raise NoMgu
-
-  and unif_l : type a.
-    a term list -> a term list -> unif_state -> Mvar.t =
-    fun tl1 tl2 st ->
+  and unif_l (tl1 : term list) (tl2 : term list) (st: unif_state) : Mvar.t =
     List.fold_left2 (fun mv t1 t2 ->
         unif t1 t2 { st with mv }
       ) st.mv tl1 tl2
 
   (** unif an [i_symb].
       Note: types are not checked. *)
-  and isymb_unif : type a b c.
-    ((a Symbols.t, b) isymb) ->
-    ((a Symbols.t, c) isymb) ->
+  and isymb_unif : type a.
+    ((a Symbols.t) isymb) ->
+    ((a Symbols.t) isymb) ->
     unif_state -> Mvar.t =
     fun s s' st ->
     sunif (s.s_symb,s.s_indices) (s'.s_symb, s'.s_indices) st
 
   (** unif a symbol (with some indices) *)
   and sunif : type a.
-    (a Symbols.t * Vars.index list) ->
-    (a Symbols.t * Vars.index list) ->
+    (a Symbols.t * Vars.var list) ->
+    (a Symbols.t * Vars.var list) ->
     unif_state -> Mvar.t =
     fun (fn, is) (fn', is') st ->
     if fn <> fn' then raise NoMgu;
@@ -578,19 +1112,16 @@ module T (* : S with type t = message *) = struct
         vunif (mk_var i) i' { st with mv }
       ) st.mv is is'
 
-  (* (*------------------------------------------------------------------*)
-   * (** Unify two lists of terms (pair-wise). *)
-   * let rec unif : type a. a term -> a term -> unif_state -> Mvar.t =
-   *   fun t1 t2 st -> *)
 
   (*------------------------------------------------------------------*)
   (** Exported *)
-  let unify : type a.
-    ?mv:Mvar.t -> Symbols.table -> a term pat -> a term pat ->
-    [`FreeTyv | `NoMgu | `Mgu of Mvar.t]
+  let unify 
+      ?mv
+      (table : Symbols.table)
+      (t1    : term pat)
+      (t2    : term pat) 
+    : [`FreeTyv | `NoMgu | `Mgu of Mvar.t]
     =
-    fun ?mv table t1 t2 ->
-
     (* [ty_env] must be closed at the end of the matching *)
     let ty_env = Type.Infer.mk_env () in
 
@@ -612,8 +1143,8 @@ module T (* : S with type t = message *) = struct
         ) tysubst t2.pat_tyvars univars2
     in
 
-    let supp1 = Sv.map (Vars.tsubst_e ty_subst1) t1.pat_vars in
-    let supp2 = Sv.map (Vars.tsubst_e ty_subst2) t2.pat_vars in
+    let supp1 = Sv.map (Vars.tsubst ty_subst1) t1.pat_vars in
+    let supp2 = Sv.map (Vars.tsubst ty_subst2) t2.pat_vars in
     let support = Sv.union supp1 supp2 in
 
     assert (Sv.disjoint supp1 supp2);
@@ -634,9 +1165,9 @@ module T (* : S with type t = message *) = struct
       then `FreeTyv
       else
         let mv =
-          Mvar.fold (fun (Vars.EVar v) t mv ->
+          Mvar.fold (fun v t mv ->
               let v = Vars.tsubst ty_subst_rev v in
-              Mvar.add (Vars.EVar v) t mv
+              Mvar.add v t mv
             ) mv Mvar.empty
         in
         `Mgu mv
@@ -646,10 +1177,13 @@ module T (* : S with type t = message *) = struct
 
   (*------------------------------------------------------------------*)
   (** Exported *)
-  let unify_opt : type a.
-    ?mv:Mvar.t -> Symbols.table -> a term pat -> a term pat -> Mvar.t option
+  let unify_opt 
+      ?mv
+      (table : Symbols.table)
+      (t1    : term pat)
+      (t2    : term pat) 
+    : Mvar.t option
     =
-    fun ?mv table t1 t2 ->
     match unify ?mv table t1 t2 with
     | `FreeTyv | `NoMgu -> None
     | `Mgu mv -> Some mv
@@ -660,42 +1194,37 @@ module T (* : S with type t = message *) = struct
      - [st.bvs] is the set of variables bound above [t].
      - [st.bvs] must be disjoint from the free variables of the terms in the
        co-domain of [mv]. *)
-  let rec tmatch : type a b. a term -> b term -> match_state -> Mvar.t =
-    fun t pat st ->
+  let rec tmatch (t : term) (pat : term) (st : match_state) : Mvar.t =
     match t, pat with
-    | _, Var v' ->
-      begin
-        match cast (Vars.kind v') t with
-        | exception Uncastable -> no_match ()
-        | t -> vmatch t v' st
-      end
+    | _, Var v' -> vmatch t v' st
 
-    | Fun (symb, fty, terms), Fun (symb', fty', terms') ->
+    | Fun ((fn , _) as symb, fty, terms), 
+      Fun ((fn', _) as symb', fty', terms') when fn = fn' ->
       let mv = smatch symb symb' st in
       tmatch_l terms terms' { st with mv }
 
     | Name s, Name s' -> isymb_match s s' st
 
     | Macro (s, terms, ts),
-      Macro (s', terms', ts') ->
+      Macro (s', terms', ts') when s.s_symb = s'.s_symb ->
       let mv = isymb_match s s' st in
       assert (Type.equal s.s_typ s'.s_typ);
 
       let mv = tmatch_l terms terms' { st with mv } in
       tmatch ts ts' { st with mv }
 
-    | Pred ts, Pred ts' -> tmatch ts ts' st
-
     | Action (s,is), Action (s',is') -> smatch (s,is) (s',is') st
 
-    | Diff (a,b), Diff (a', b') ->
-      tmatch_l [a;b] [a';b'] st
-
-    | Atom at, Atom at' -> atmatch at at' st
+    | Diff (Explicit l), Diff (Explicit l') ->
+      if List.length l <> List.length l' then no_match ();
+      
+      List.fold_left2 (fun mv (lt,t) (lpat, pat) ->
+          if lt <> lpat then no_match ();
+          
+          tmatch t pat { st with mv; system = SE.project_set [lt] st.system }
+        ) st.mv l l'
 
     | Find (is, c, t, e), Find (is', pat_c, pat_t, pat_e) ->
-      let is  = List.map Vars.evar is
-      and is' = List.map Vars.evar is' in
       let s, s', st = match_bnds is is' st in
 
       let c    ,     t = subst s      c, subst s      t
@@ -710,32 +1239,59 @@ module T (* : S with type t = message *) = struct
       let pat = subst s' pat in
       tmatch t pat st
 
-    | _, _ -> no_match ()
+    | _, _ -> try_reduce_head1 t pat st
+
+  and m_expand_head_once (st : match_state) (t : term) : term * bool =
+    expand_head_once ~exn:(NoMatch None) st.table st.system.set st.hyps t 
+
+  (* try to reduce one step at head position in [t] or [pat], 
+     and resume matching *)
+  and try_reduce_head1 (t : term) (pat : term) (st : match_state) : Mvar.t =
+    match t, pat with
+    | (Macro _ | Fun _), (Macro _ | Fun _) -> 
+      let t, t_red = m_expand_head_once st t in
+      if t_red then tmatch t pat st
+      else
+        let pat, pat_red = m_expand_head_once st pat in
+        if pat_red then tmatch t pat st
+        else no_match ()
+
+    | Macro _, _ | Fun _, _ -> 
+      let t, t_red = m_expand_head_once st t in
+      if t_red then tmatch t pat st
+      else no_match ()
+
+    | _, Macro _ | _, Fun _ -> 
+      let pat, pat_red = m_expand_head_once st pat in
+      if pat_red then tmatch t pat st
+      else no_match ()
+
+    | Var _, _ -> no_match ()   (* FEATURE *)
+    | _, Var v when not (Sv.mem v st.support) -> no_match () (* FEATURE *)
+    | _ -> no_match ()
 
   (* Return: left subst, right subst, match state *)
-  and match_bnds (vs : Vars.evars) (vs' : Vars.evars) st :
+  and match_bnds (vs : Vars.vars) (vs' : Vars.vars) st :
     esubst list * esubst list * match_state =
     if List.length vs <> List.length vs' then
       no_match ();
 
     (* check that types are compatible *)
-    List.iter2 (fun (Vars.EVar v) (Vars.EVar v') ->
+    List.iter2 (fun v v' ->
         let ty, ty' = Vars.ty v, Vars.ty v' in
-        match Type.equal_w ty ty' with
-        | None -> no_match ()
-        | Some Type.Type_eq ->
-          if Type.Infer.unify_eq st.ty_env ty ty' = `Fail then
-            no_match ();
+        if not (Type.equal ty ty') then no_match ();
+
+        if Type.Infer.unify_eq st.ty_env ty ty' = `Fail then
+          no_match ();
       ) vs vs';
 
     (* refresh [vs] *)
-    let vs, s = erefresh_vars `Global vs in
+    let vs, s = refresh_vars `Global vs in
 
     (* refresh [vs'] using the same renaming *)
-    let s' = List.map2 (fun (ESubst (_, new_v)) (Vars.EVar v') ->
-        match Type.equal_w (ty new_v) (Vars.ty v') with
-        | None -> assert false
-        | Some Type.Type_eq -> ESubst (mk_var v', new_v)
+    let s' = List.map2 (fun (ESubst (_, new_v)) v' ->
+        assert (Type.equal (ty new_v) (Vars.ty v'));
+        ESubst (mk_var v', new_v)
       ) (List.rev s)          (* reversed ! *)
         vs'
     in
@@ -745,26 +1301,24 @@ module T (* : S with type t = message *) = struct
 
     s, s', st
 
-  and tmatch_l : type a b.
-    a term list -> b term list -> match_state -> Mvar.t =
-    fun tl patl st ->
+  and tmatch_l (tl : terms) (patl : terms) (st : match_state) : Mvar.t =
     List.fold_left2 (fun mv t pat ->
         tmatch t pat { st with mv }
       ) st.mv tl patl
-
+ 
   (* match an [i_symb].
      Note: types are not checked. *)
-  and isymb_match : type a b c.
-    ((a Symbols.t, b) isymb) ->
-    ((a Symbols.t, c) isymb) ->
+  and isymb_match : type a.
+    ((a Symbols.t) isymb) ->
+    ((a Symbols.t) isymb) ->
     match_state -> Mvar.t =
     fun s s' st ->
     smatch (s.s_symb,s.s_indices) (s'.s_symb, s'.s_indices) st
 
   (* match a symbol (with some indices) *)
   and smatch : type a.
-    (a Symbols.t * Vars.index list) ->
-    (a Symbols.t * Vars.index list) ->
+    (a Symbols.t * Vars.var list) ->
+    (a Symbols.t * Vars.var list) ->
     match_state -> Mvar.t =
     fun (fn, is) (fn', is') st ->
     if fn <> fn' then no_match ();
@@ -775,16 +1329,14 @@ module T (* : S with type t = message *) = struct
 
 
   (* Match a variable of the pattern with a term. *)
-  and vmatch : type a. a term -> a Vars.var -> match_state -> Mvar.t =
-    fun t v st ->
-    let ev = Vars.EVar v in
-
-    if not (Sv.mem ev st.support)
+  and vmatch (t : term) (v : Vars.var) (st : match_state) : Mvar.t =
+    if not (Sv.mem v st.support)
     then (* [v] not in the pattern *)
-      if t = mk_var v then st.mv else no_match ()
+      (* FEATURE: conversion *)
+      if t <> mk_var v then try_reduce_head1 t (mk_var v) st else st.mv
 
     else (* [v] in the pattern *)
-      match Mvar.find ev st.mv with
+      match Mvar.find v st.mv with
       (* If this is the first time we see the variable, store the subterm
          and add the type information. *)
       | exception Not_found ->
@@ -796,221 +1348,39 @@ module T (* : S with type t = message *) = struct
         if not (Sv.disjoint (fv t) st.bvs) && not st.allow_capture then 
           no_match ();
 
-        Mvar.add ev (ETerm t) st.mv
+        Mvar.add v t st.mv
 
       (* If we already saw the variable, check that the subterms are
          identical. *)
-      | ETerm t' -> match cast (kind t) t' with
-        | exception Uncastable -> no_match ()
-        (* TODO: check convertible *)
-        | t' -> if t <> t' then no_match () else st.mv
-
-  (* matches an atom *)
-  and atmatch (at : generic_atom) (at' : generic_atom) st : Mvar.t =
-    match at, at' with
-    | `Message (ord, t1, t2), `Message (ord', t1', t2') ->
-      if ord <> ord' then no_match ();
-      tmatch_l [t1;t2] [t1';t2'] st
-
-    | `Timestamp (ord, t1, t2), `Timestamp (ord', t1', t2') ->
-      if ord <> ord' then no_match ();
-      tmatch_l [t1;t2] [t1';t2'] st
-
-    | `Index (ord, t1, t2), `Index (ord', t1', t2') ->
-      if ord <> ord' then no_match ();
-      tmatch_l [mk_var t1; mk_var t2] [mk_var t1'; mk_var t2'] st
-
-    | `Happens ts, `Happens ts' -> tmatch ts ts' st
-
-    | _, _ -> no_match ()
+      | t' -> 
+      (* FEATURE: conversion *)
+        if t <> t' then no_match () else st.mv
 
   (*------------------------------------------------------------------*)
+  (** Exported 
+      Remark: term matching ignores [mode]. *)
+  let try_match = try_match_gen Equiv.Local_t (fun ~mode -> tmatch)
 
-  (* TODO: factorize with the other exported function [try_match] for 
-     [Equiv.form] *)
+  (*------------------------------------------------------------------*)
   (** Exported *)
-  let try_match_term (type a b)
-    ?(option=default_match_option)
-    ?(mv     : Mvar.t option)
-    ?(ty_env : Type.Infer.env option)
-    (table   : Symbols.table)
-    (system  : SystemExpr.t)
-    (t       : a term)
-    (p       : b term pat) 
-    : match_res 
-    =
-    (* Term matching ignores [mode]. Matching in [Equiv] does not. *)
-
-    (* [must_close] state if [ty_env] must be closed at the end of 
-       the matching *)
-    let must_close, ty_env = match ty_env with
-      | Some e -> false, e
-      | None   -> true,  Type.Infer.mk_env () 
-    in
-
-    let univars, ty_subst = Type.Infer.open_tvars ty_env p.pat_tyvars in
-    let pat = tsubst ty_subst p.pat_term in
-
-    (* substitute back the univars by the corresponding tvars *)
-    let ty_subst_rev =
-      List.fold_left2 (fun s tv tu ->
-          Type.tsubst_add_univar s tu (Type.TVar tv)
-        ) Type.tsubst_empty p.pat_tyvars univars
-    in
-
-    let support = Sv.map (Vars.tsubst_e ty_subst) p.pat_vars in
-    let env = Sv.diff (Sv.union (Term.fv t) (Term.fv pat)) support in
-
-    let mv_init = odflt Mvar.empty mv in
-    let st_init : match_state = { 
-      bvs = Sv.empty;
-      mv = mv_init;
-
-      table; system; env; support; ty_env;
-
-      use_fadup     = option.use_fadup;
-      allow_capture = option.allow_capture; 
-    } in
-
-    try
-      let mv = tmatch t pat st_init in
-
-      if not must_close then 
-        Match mv 
-      else if not (Type.Infer.is_closed ty_env) then 
-        FreeTyv
-      else
-        (* FIXME: shouldn't we substitute type variables in Mv co-domain ? *)
-        let mv =
-          Mvar.fold (fun (Vars.EVar v) t mv ->
-              let v = Vars.tsubst ty_subst_rev v in
-              Mvar.add (Vars.EVar v) t mv
-            ) mv Mvar.empty
-        in
-        Match mv
-
-    with
-    | NoMatch minfos -> NoMatch minfos
-
-
-  let try_match = try_match_term
-
-  let _map : type a.
-    m_rec:bool ->
-    f_map ->
-    Vars.env ->
-    vars:Vars.evars ->
-    conds:Term.message list ->
-    a term -> bool * a term
-    =
-    fun ~m_rec func env ~vars ~conds t ->
-
-    (* the return boolean indicates whether a match was found in the subterm. *)
-    let rec map : type a.
-      Vars.env ->
-      Vars.evars ->
-      Term.message list ->
-      a term ->
-      bool * a term
-      =
-      fun env vars conds t ->
-        match func (ETerm t) vars conds with
-        (* head matches *)
-        | `Map (ETerm t') ->
-          let t' =
-            let t' = cast (kind t) t' in
-            if m_rec then snd (map env vars conds t') else t'
-          in
-          true, t'
-
-        (* head does not match, recurse with a special handling of binders and if *)
-        | `Continue ->
-          match t with
-          | ForAll (vs, b) ->
-            let env, vs, s = erefresh_vars_env env vs in
-            let b = Term.subst s b in
-            let vars = List.rev_append vs vars in
-            let found, b = map env vars conds b in
-            let t' = Term.mk_forall ~simpl:false vs b in
-
-            if found then true, t' else false, t
-
-          | Exists (vs, b) ->
-            let env, vs, s = erefresh_vars_env env vs in
-            let b = Term.subst s b in
-            let vars = List.rev_append vs vars in
-            let found, b = map env vars conds b in
-            let t' = Term.mk_exists ~simpl:false vs b in
-
-            if found then true, t' else false, t
-
-          | Find (b, c, d, e) ->
-            let env1, vs, s = refresh_vars_env env b in
-            let c, d = Term.subst s c, Term.subst s d in
-            let vars1 = List.rev_append (List.map Vars.evar b) vars in
-            let dconds = c :: conds in
-            let found0, c = map env1 vars1 conds  c in
-            let found1, d = map env1 vars1 dconds d in
-            let found2, e = map env  vars  conds  e in
-            let t' = Term.mk_find vs c d e in
-            let found = found0 || found1 || found2 in
-
-            if found then true, t' else false, t
-
-          | Seq (vs, b) ->
-            let env, vs, s = erefresh_vars_env env vs in
-            let b = Term.subst s b in
-            let vars = List.rev_append vs vars in
-            let found, b = map env vars conds b in
-            let t' = Term.mk_seq0 vs b in
-
-            if found then true, t' else false, t
-
-          | Term.Fun (fs, _, [c;ft;fe]) when fs = Term.f_ite ->
-            let tconds = c :: conds in
-            let econds = Term.mk_not ~simpl:false c :: conds in
-            let found0, c  = map env vars conds  c in
-            let found1, ft = map env vars tconds ft in
-            let found2, fe = map env vars econds fe in
-            let t' = Term.mk_ite ~simpl:false c ft fe in
-            let found = found0 || found1 || found2 in
-
-            if found then true, t' else false, t
-
-          | _ ->
-            tmap_fold (fun found (ETerm t) ->
-                let found', t = map env vars conds t in
-                found || found', Term.ETerm t
-              ) false t
-    in
-
-    map env vars conds t
-
-  (** Exported *)
-  let map : type a.
-    ?m_rec:bool -> f_map -> Vars.env -> a term -> a term option
-    =
-    fun ?(m_rec=false) func env t ->
-    let found, t = _map ~m_rec func env ~vars:[] ~conds:[] t in
-    match found with
-    | false -> None
-    | true  -> Some t
-
   let find
       ?option
-      (table : Symbols.table) 
-      (expr  : SystemExpr.t) 
-      (env   : Vars.env)
-      (pat   : 'a term pat) 
-      (t     : t) 
+      (table  : Symbols.table) 
+      (system : SE.context) 
+      (venv   : Vars.env)
+      (pat    : term pat) 
+      (t      : t) 
+    : Term.term list
     =
-    let acc = ref [] in 
-    ignore (map (fun (ETerm e) v conds -> 
-        match try_match ?option table expr e pat with
-        | Match _ -> acc := ETerm e ::!acc ; `Continue
-        | _ -> `Continue
-      ) env t);
-    !acc
+    let f_fold : Term.terms Pos.f_map_fold = 
+      fun e se _vars _conds _p acc ->
+        let subterm_system = SE.reachability_context se in
+        match try_match ?option table subterm_system e pat with
+        | Match _ -> e :: acc, `Continue
+        | _       -> acc, `Continue
+    in
+    let acc, _, _ = Pos.map_fold f_fold venv system.set [] t in
+    acc
 end
 
 (*------------------------------------------------------------------*)
@@ -1018,26 +1388,26 @@ end
 
 (*------------------------------------------------------------------*)
 (** Set of terms over some index or timestamp variables with pending substitution.
-    If the type variable ['a] is [Term.message list], then
+    If the type variable ['a] is [Term.term list], then
       [{ term  = [t1; ...; tn];
          subst = θ;
          vars  = vars;
          cond  = φ; }]
     represents the set of tuples of terms [\{(t1, ..., tn)θ | ∀ vars s.t. φθ \}].
 
-    The case ['a = Term.message] is identical to the case where
-    ['a = Term.message list] and the list is of length 1.
+    The case ['a = Term.term] is identical to the case where
+    ['a = Term.term list] and the list is of length 1.
 
     Note: [θ] supports is *not* always included in [vars]. *)
 type 'a cand_set_g = {
   term  : 'a;
   subst : Mvar.t;
-  vars  : Vars.evars;
-  cond  : Term.message;
+  vars  : Vars.vars;
+  cond  : Term.term;
 }
 
-type cand_set       = Term.message  cand_set_g
-type cand_tuple_set = Term.messages cand_set_g
+type cand_set       = Term.term  cand_set_g
+type cand_tuple_set = Term.terms cand_set_g
 
 type cand_sets       = cand_set       list
 type cand_tuple_sets = cand_tuple_set list
@@ -1050,16 +1420,16 @@ type cand_tuple_sets = cand_tuple_set list
          cond    = ψ; }]
     represents the set of terms [\{t | ∀ vars, s.t. ψ \}]. *)
 type known_set = {
-  term : Term.message;
-  vars : Vars.evars;            (* sort index or timestamp *)
-  cond : Term.message;
+  term : Term.term;
+  vars : Vars.vars;            (* sort index or timestamp *)
+  cond : Term.term;
 }
 
 (** association list sorting [known_sets] by the head of the term *)
 type known_sets = (term_head * known_set list) list
 
 (*------------------------------------------------------------------*)
-module MCset : sig
+module MCset : sig[@warning "-32"]
   (** Set of macros over some indices, with a conditional.
         [{ msymb   = m;
            indices = vars;
@@ -1070,15 +1440,15 @@ module MCset : sig
       is no trace model constraint. *)
   type t = private {
     msymb   : Term.msymb;
-    indices : Vars.index list;
-    cond_le : Term.timestamp option;
+    indices : Vars.var list;
+    cond_le : Term.term option;
   }
 
   val mk :
     env:Sv.t ->
     msymb:Term.msymb ->
-    indices:(Vars.index list) ->
-    cond_le:(Term.timestamp option) ->
+    indices:(Vars.var list) ->
+    cond_le:(Term.term option) ->
     t
 
   val pp       : Format.formatter -> t      -> unit
@@ -1088,8 +1458,8 @@ module MCset : sig
 end = struct
   type t = {
     msymb   : Term.msymb;
-    indices : Vars.index list;
-    cond_le : Term.timestamp option;
+    indices : Vars.var list;
+    cond_le : Term.term option;
   }
 
   let mk ~env ~msymb ~indices ~cond_le : t =
@@ -1099,9 +1469,7 @@ end = struct
         (Utils.omap_dflt Sv.empty Term.fv cond_le));
 
     let indices = Sv.diff (Sv.of_list1 indices) env in
-    let indices =
-      List.map (fun ev -> Vars.ecast ev Type.KIndex) (Sv.elements indices)
-    in
+    let indices = Sv.elements indices in
     { msymb; indices; cond_le; }
 
   let _pp ~dbg fmt (mset : t) =
@@ -1129,9 +1497,7 @@ end = struct
         Fmt.pf fmt "@[τ ≤ %a@]"
           Term.pp cond_le
     in
-
-    let vars = List.map Vars.evar mset.indices in
-    match vars with
+    match mset.indices with
     | [] ->
       Fmt.pf fmt "@[<hv 2>{ @[%a@]@τ |@ ∀ τ. %a}@]"
         Term.pp_msymb mset.msymb
@@ -1140,7 +1506,7 @@ end = struct
     | _ ->
       Fmt.pf fmt "@[<hv 2>{ @[%a@]@τ |@ ∀ @[τ,%a@]. s.t. %a}@]"
         Term.pp_msymb mset.msymb
-        (Fmt.list ~sep:Fmt.comma Vars.pp_e) vars
+        (Fmt.list ~sep:Fmt.comma Vars.pp) mset.indices
         pp_cond mset.cond_le
 
   let pp_dbg = _pp ~dbg:true
@@ -1169,7 +1535,7 @@ let pp_msets fmt (msets : msets) =
   MCset.pp_l fmt mset_l
 
 (*------------------------------------------------------------------*)
-let pp_cand_set pp_term fmt (cand : 'a cand_set_g) =
+let[@warning "-32"] pp_cand_set pp_term fmt (cand : 'a cand_set_g) =
   let pp_subst fmt mv =
     let s = Mvar.to_subst ~mode:`Unif mv in
     if s = [] then ()
@@ -1181,7 +1547,7 @@ let pp_cand_set pp_term fmt (cand : 'a cand_set_g) =
   Fmt.pf fmt "@[<hv 2>{ @[%a@]@[%a@] |@ @[%a@]@ @[%a@]}@]"
     pp_term cand.term
     pp_subst cand.subst
-    (Fmt.list ~sep:Fmt.comma Vars.pp_e) vars
+    (Fmt.list ~sep:Fmt.comma Vars.pp) vars
     Term.pp cand.cond
 
 (*------------------------------------------------------------------*)
@@ -1190,7 +1556,7 @@ let pp_known_set fmt (known : known_set) =
     | [] -> ()
     | _ ->
       Fmt.pf fmt "∀@[%a@].@ "
-        (Fmt.list ~sep:Fmt.comma Vars.pp_e) vars
+        (Fmt.list ~sep:Fmt.comma Vars.pp) vars
   in
   Fmt.pf fmt "@[<hv 2>{ @[%a@] |@ %a@[%a@]}@]"
     Term.pp known.term
@@ -1222,10 +1588,10 @@ let known_sets_union (s1 : known_sets) (s2 : known_sets) : known_sets =
     ) s s2
 
 (*------------------------------------------------------------------*)
-let known_set_of_term (term : Term.message) : known_set =
+let known_set_of_term (term : Term.term) : known_set =
   let vars, term = match term with
     | Seq (vars, term) ->
-      let vars, s = Term.erefresh_vars `Global vars in
+      let vars, s = Term.refresh_vars `Global vars in
       let term = Term.subst s term in
       vars, term
 
@@ -1245,7 +1611,7 @@ let known_set_add_frame (k : known_set) : known_set list =
     assert (l = []);
     let tv' = Vars.make_new Type.Timestamp "t" in
     let ts' = Term.mk_var tv' in
-    let vars = Vars.EVar tv' :: k.vars in
+    let vars = tv' :: k.vars in
 
     let term_frame = Term.mk_macro ms [] ts' in
     let term_exec  = Term.mk_macro Term.exec_macro [] ts' in
@@ -1278,12 +1644,12 @@ let known_set_process_pair_inj (k : known_set) : known_set list =
   | _ -> [k]
 
 (** Given a term, return some corresponding known_sets.  *)
-let known_set_list_of_term (term : Term.message) : known_set list =
+let known_set_list_of_term (term : Term.term) : known_set list =
   let k = known_set_of_term term in
   let k_seq = known_set_add_frame k in
   List.concat_map known_set_process_pair_inj (k :: k_seq)
 
-let known_sets_of_terms (terms : Term.message list) : known_sets =
+let known_sets_of_terms (terms : Term.term list) : known_sets =
   let ks_l = List.concat_map known_set_list_of_term terms in
   List.fold_left (fun ks k -> known_sets_add k ks) [] ks_l
 
@@ -1310,7 +1676,7 @@ let known_set_of_mset
     Term.mk_and ~simpl:true cond_le extra_cond_le
   in
   { term = term;
-    vars = Vars.EVar t :: List.map Vars.evar mset.indices;
+    vars = t :: mset.indices;
     cond; }
 
 let known_sets_of_mset_l
@@ -1325,7 +1691,7 @@ let known_sets_of_mset_l
 (*------------------------------------------------------------------*)
 (* return: substitution, condition, pattern *)
 let pat_of_cand_set
-    (cand : cand_set) : Mvar.t * Term.message * Term.message pat
+    (cand : cand_set) : Mvar.t * Term.term * Term.term pat
   =
   cand.subst,
   cand.cond,
@@ -1334,7 +1700,7 @@ let pat_of_cand_set
     pat_tyvars = []; }
 
 (* return: condition, pattern *)
-let pat_of_known_set (known : known_set) : Term.message * Term.message pat =
+let pat_of_known_set (known : known_set) : Term.term * Term.term pat =
   known.cond,
   { pat_term   = known.term;
     pat_vars   = Sv.of_list known.vars;
@@ -1342,7 +1708,7 @@ let pat_of_known_set (known : known_set) : Term.message * Term.message pat =
 
 (*------------------------------------------------------------------*)
 let refresh_known_set (known : known_set) : known_set =
-  let vars, subst = Term.erefresh_vars `Global known.vars in
+  let vars, subst = Term.refresh_vars `Global known.vars in
   { vars;
     term = Term.subst subst known.term;
     cond = Term.subst subst known.cond; }
@@ -1356,7 +1722,9 @@ let msets_add (mset : MCset.t) (msets : msets) : msets =
 
 (** [mset_incl tbl system s1 s2] check if all terms in [s1] are
     members of [s2]. *)
-let mset_incl table system (s1 : MCset.t) (s2 : MCset.t) : bool
+let mset_incl 
+    (table : Symbols.table) (system : SE.arbitrary) 
+    (s1 : MCset.t) (s2 : MCset.t) : bool
   =
   let tv = Vars.make_new Type.Timestamp "t" in
   let term1 = Term.mk_macro s1.msymb [] (Term.mk_var tv) in
@@ -1369,14 +1737,18 @@ let mset_incl table system (s1 : MCset.t) (s2 : MCset.t) : bool
       pat_tyvars = [];
       pat_vars = Sv.of_list1 s2.indices;}
   in
+  let context = SE.{ set = system; pair = None; } in
   (* FIXME: cleanup with unification of list of terms *)
-  match T.try_match table system term1 (mk_pat2 term2) with
+  match T.try_match table context term1 (mk_pat2 term2) with
   | FreeTyv | NoMatch _ -> false
   | Match mv -> true
 
 
 (** [msets_incl tbl system s1 s2] check if [msets] is included in [msets2] *)
-let msets_incl table system (msets1 : msets) (msets2 : msets) : bool =
+let msets_incl 
+    (table : Symbols.table) (system : SE.arbitrary)
+    (msets1 : msets) (msets2 : msets) : bool 
+  =
   List.for_all (fun (mname, mset1_l) ->
       let mset2_l = List.assoc_opt mname msets2 in
       let mset2_l = odflt [] mset2_l in
@@ -1390,7 +1762,10 @@ let msets_incl table system (msets1 : msets) (msets2 : msets) : bool =
 
 
 (** remove any set which is subsumed by some other set. *)
-let mset_list_simplify table system (msets : MCset.t list) : MCset.t list =
+let mset_list_simplify 
+    (table : Symbols.table) (system : SE.arbitrary)
+    (msets : MCset.t list) : MCset.t list 
+  =
   let rec clear_entailed before after =
     match after with
     | [] -> List.rev before
@@ -1476,7 +1851,7 @@ let mset_list_inter
 
 (*------------------------------------------------------------------*)
 (** [{term; cond;}] is the term [term] whenever [cond] holds. *)
-type cond_term = { term : Term.message; cond : Term.message }
+type cond_term = { term : Term.term; cond : Term.term }
 
 
 (*------------------------------------------------------------------*)
@@ -1490,12 +1865,14 @@ module E : S with type t = Equiv.form = struct
   type t = Equiv.form
 
   (*------------------------------------------------------------------*)
-  let leq_tauto table (t : Term.timestamp) (t' : Term.timestamp) : bool =
+  let leq_tauto table (t : Term.term) (t' : Term.term) : bool =
     let rec leq t t' =
       match t,t' with
       | _ when t = t' -> true
-      | Pred t, Pred t' -> leq t t'
-      | Pred t,      t' -> leq t t'
+      | Fun (f,_, [t]), Fun (f',_, [t']) 
+        when f = f_pred && f' = f_pred ->
+        leq t t'
+      | Fun (f,_, [t]), t' when f = f_pred -> leq t t'
 
       | Action (n,is), Action (n',is') ->
         Action.depends
@@ -1511,25 +1888,26 @@ module E : S with type t = Equiv.form = struct
       for now. *)
   let known_set_check_impl
       (table : Symbols.table)
-      (hyp : Term.message)
-      (cond : Term.message) : bool
+      (hyp : Term.term)
+      (cond : Term.term) : bool
     =
     let hyps = Term.decompose_ands hyp in
 
     let check_one cond =
       match cond with
-      | Term.Atom (`Timestamp ((`Lt | `Leq as ord), t1, t2)) ->
+      | Term.Fun (fs, _, [t1;t2]) 
+        when (fs = Term.f_lt || fs = Term.f_leq)
+          && Term.ty t1 = Type.Timestamp ->
         let t2' =
-          match ord with
-          | `Lt -> Term.mk_pred t2
-          | `Leq -> t2
+          if fs = Term.f_lt then Term.mk_pred t2 else t2
         in
 
         let check_direct = leq_tauto table t1 t2' in
         let check_indirect =
           List.exists (fun hyp ->
               match hyp with
-              | Term.Atom (`Timestamp (`Leq, ta, tb)) -> (* ≤ *)
+              | Term.Fun (fs, _, [ta;tb]) 
+                when fs = Term.f_leq && Term.ty t1 = Type.Timestamp -> (* ≤ *)
 
                 (* checks whether [ta ≤ tb] implies [t1 ≤ t2'] *)
                 leq_tauto table t1 ta && leq_tauto table tb t2'
@@ -1612,7 +1990,7 @@ module E : S with type t = Equiv.form = struct
       the Function Application rule. *)
   let rec deduce
       (table  : Symbols.table)
-      (system : SystemExpr.t)
+      (system : SystemExpr.fset)
       (cand : cand_set)
       (known_sets : known_sets) : cand_sets
     =
@@ -1625,7 +2003,7 @@ module E : S with type t = Equiv.form = struct
       [terms] and [pseqs]. *)
   and deduce_list
       (table  : Symbols.table)
-      (system : SystemExpr.t)
+      (system : SystemExpr.fset)
       (cand : cand_tuple_set)
       (known_sets : known_sets) : cand_tuple_sets
     =
@@ -1654,7 +2032,7 @@ module E : S with type t = Equiv.form = struct
       Does not include direct specialization. *)
   and deduce_fa
       (table  : Symbols.table)
-      (system : SystemExpr.t)
+      (system : SystemExpr.fset)
       (cand : cand_set)
       (known_sets : known_sets) : cand_sets
     =
@@ -1668,7 +2046,7 @@ module E : S with type t = Equiv.form = struct
     | Term.Macro (ms, l, a) ->
       assert (l = []);
       begin
-        let cntxt = Constr.{ system; table; models = None; } in
+        let cntxt = Constr.make_context ~system ~table in
         match Macros.get_definition cntxt ms a with
         | `Undef | `MaybeDef -> []
         | `Def body ->
@@ -1684,16 +2062,6 @@ module E : S with type t = Equiv.form = struct
             term = Term.mk_fun0 fs fty (f_terms_ded.term) }
         ) f_terms_deds
 
-    (* similar to the [Fun _] case *)
-    | Term.Atom (`Message (ord, t1, t2)) ->
-      let f_terms_cand = { cand with term = [t1;t2] } in
-      let f_terms_deds = deduce_list table system f_terms_cand known_sets in
-      List.map (fun (f_terms_ded : cand_tuple_set) ->
-          let t1, t2 = Utils.as_seq2 f_terms_ded.term in
-          { f_terms_ded with
-            term = Term.mk_atom (ord :> Term.ord) t1 t2 }
-        ) f_terms_deds
-
     | _ -> []
 
   (*------------------------------------------------------------------*)
@@ -1701,14 +2069,14 @@ module E : S with type t = Equiv.form = struct
       invariant on deducible messages which contains [terms]. *)
   let strengthen
       (table  : Symbols.table)
-      (system : SystemExpr.t)
+      (system : SystemExpr.fset)
       (env    : Sv.t)
-      (init_terms : Term.messages) : msets
+      (init_terms : Term.terms) : msets
     =
-    (** Return a list of specialization of [cand] deducible from
-        [init_terms, known_sets] for action [a] at time [a]. *)
+    (* Return a list of specialization of [cand] deducible from
+       [init_terms, known_sets] for action [a] at time [a]. *)
     let filter_deduce_action
-        (a : Symbols.action Symbols.t)
+        (a : Symbols.action)
         (cand : MCset.t)
         (init_terms : known_sets)              (* initial terms *)
         (known_sets : MCset.t list)            (* induction *)
@@ -1720,7 +2088,7 @@ module E : S with type t = Equiv.form = struct
       let ts = Term.mk_action a is in
 
       (* we unroll the definition of [cand] at time [ts] *)
-      let cntxt = Constr.{ system; table; models = None; } in
+      let cntxt = Constr.make_context ~system ~table in
       match Macros.get_definition cntxt cand.msymb ts with
       | `Undef | `MaybeDef -> []
 
@@ -1733,7 +2101,7 @@ module E : S with type t = Equiv.form = struct
 
         let cand_set = {
           term  = body;
-          vars  = List.map Vars.evar (cand.indices @ is);
+          vars  = cand.indices @ is;
           subst = Mvar.empty;
           cond; }
         in
@@ -1755,7 +2123,7 @@ module E : S with type t = Equiv.form = struct
               (* sanity check *)
               let () =
                 assert (match ded_set.cond with
-                    | Term.Atom (`Timestamp (`Leq, _, c)) ->
+                    | Term.Fun (fs, _, [_; c]) when fs = Term.f_leq ->
                       Some c = cand.cond_le
                     | Term.Fun (fs,_,_) -> None = cand.cond_le
                     | _ -> false)
@@ -1764,11 +2132,11 @@ module E : S with type t = Equiv.form = struct
               mset :: mset_l
             ) [] ded_sets
         in
-        mset_list_simplify table system mset_l
+        mset_list_simplify table (system:>SystemExpr.t) mset_l
     in
 
     let filter_deduce_action_list
-        (a : Symbols.action Symbols.t)
+        (a : Symbols.action)
         (cands : msets)
         (init_terms : known_sets)              (* initial terms *)
         (known_sets : MCset.t list)            (* induction *)
@@ -1780,7 +2148,7 @@ module E : S with type t = Equiv.form = struct
                 filter_deduce_action a cand init_terms known_sets
               ) cand_l
           in
-          (mname, mset_list_inter table system env cand_l mset_l)
+          (mname, mset_list_inter table (system:>SystemExpr.t) env cand_l mset_l)
         ) cands
   in
 
@@ -1809,7 +2177,7 @@ module E : S with type t = Equiv.form = struct
       dbg "deduce_fixpoint:@.%a@." pp_msets cands';
 
       (* check if [cands] is included in [cands'] *)
-      if msets_incl table system cands cands'
+      if msets_incl table (system:>SystemExpr.t) cands cands'
       then cands'
       else deduce_fixpoint cands' init_terms
     in
@@ -1861,7 +2229,7 @@ module E : S with type t = Equiv.form = struct
   (* memoisation *)
   let strengthen =
     let module M = struct
-      type t = Symbols.table * SystemExpr.t * Sv.t * Term.messages
+      type t = Symbols.table * SystemExpr.fset * Sv.t * Term.terms
 
       let hash (tbl, s, e, terms) =
         hcombine_list Term.hash
@@ -1905,10 +2273,10 @@ module E : S with type t = Equiv.form = struct
 
   (** [term_match ?vars term pat st] match [term] with [pat] w.r.t.
       variables [vars]. *)
-  let term_match_opt : type a b.
+  let term_match_opt : 
     ?vars:Sv.t ->
-    a Term.term ->
-    b Term.term ->
+    Term.term ->
+    Term.term ->
     match_state ->
     Mvar.t option
     = fun ?(vars=Sv.empty) term elem st ->
@@ -1948,13 +2316,13 @@ module E : S with type t = Equiv.form = struct
         Some (Mvar.filter (fun v _ -> not (Sv.mem v vars)) mv)
     with NoMatch _ -> None
 
-  (** FIXME *)
   let deduce_mem_one
       (cterm : cond_term)
       (known : known_set)
       (st    : match_state) : Mvar.t option
     =
-    (* if [st.support] is not empty, then we need to find [mv] such that:
+    (* FIXME:
+       if [st.support] is not empty, then we need to find [mv] such that:
        - [mv] represents a substitution θ whose support is included in
          [st.support] ∪ [known.vars]
        - for any v ∈ [st.support], (fv(θ(v)) ∩ st.bvs = ∅)
@@ -2007,12 +2375,8 @@ module E : S with type t = Equiv.form = struct
     | Term.Fun (_, _, terms) ->
       Some (List.map (fun term -> st, { cterm with term } ) terms)
 
-    | Term.Atom (`Message (_, t1, t2)) ->
-      Some (List.map (fun t -> st, t) [{ cterm with term = t1; };
-                                       { cterm with term = t2; }])
-
     | Term.Seq (is, term) ->
-      let is, subst = Term.erefresh_vars `Global is in
+      let is, subst = Term.refresh_vars `Global is in
       let term = Term.subst subst term in
 
       let st = { st with bvs = Sv.union st.bvs (Sv.of_list is); } in
@@ -2020,12 +2384,11 @@ module E : S with type t = Equiv.form = struct
 
     | Term.Exists (es, term)
     | Term.ForAll (es, term)
-      when List.for_all (fun (Vars.EVar v) ->
-          let k = Vars.kind v in
-          Type.equalk k Type.KIndex || Type.equalk k Type.KTimestamp
+      when List.for_all (fun v ->
+          Vars.ty v = Type.Index || Vars.ty v = Type.Timestamp
         ) es
       ->
-      let es, subst = Term.erefresh_vars `Global es in
+      let es, subst = Term.refresh_vars `Global es in
       let term = Term.subst subst term in
 
       let st = { st with bvs = Sv.union st.bvs (Sv.of_list es); } in
@@ -2041,7 +2404,7 @@ module E : S with type t = Equiv.form = struct
       let e_cond =
         Term.mk_and
           cterm.cond
-          (Term.mk_forall (List.map Vars.evar is) (Term.mk_not c))
+          (Term.mk_forall is (Term.mk_not c))
       in
 
       let c = { term = c; cond = cterm.cond; }
@@ -2099,16 +2462,19 @@ module E : S with type t = Equiv.form = struct
   (** Greedily check entailment through an inclusion check of [terms] in
       [pat_terms]. *)
   let match_equiv_incl
-      (terms     : Term.message list)
-      (pat_terms : Term.message list)
+      (terms     : Term.term list)
+      (pat_terms : Term.term list)
       (st        : match_state) : Mvar.t
     =
-    (* if [st.support] is not empty, we cannot strengthen the invariant.
+    (* If [st.support] is not empty, we cannot strengthen the invariant.
        See explanation in [mset_mem_one]. *)
     let mset_l =
       if Sv.is_empty st.support && st.use_fadup then
-        let msets = strengthen st.table st.system st.env pat_terms in
-        msets_to_list msets
+        match SystemExpr.to_fset (oget st.system.pair) with
+          | system ->
+              let msets = strengthen st.table system st.env pat_terms in
+              msets_to_list msets
+          | exception SystemExpr.(Error Expected_fset) -> []
       else []
     in
 
@@ -2134,9 +2500,9 @@ module E : S with type t = Equiv.form = struct
 
 
   (*------------------------------------------------------------------*)
-  let rec match_equiv_eq
-      (terms     : Term.message list)
-      (pat_terms : Term.message list)
+  let match_equiv_eq
+      (terms     : Term.term list)
+      (pat_terms : Term.term list)
       (st        : match_state) : Mvar.t
     =
     if List.length terms <> List.length pat_terms then no_match ();
@@ -2151,8 +2517,8 @@ module E : S with type t = Equiv.form = struct
       - [Contravar]: [es] entails [pat_es] *)
   let tmatch_e
       ~(mode     : [`Eq | `Covar | `Contravar])
-      (terms     : Term.messages)
-      (pat_terms : Term.messages)
+      (terms     : Term.terms)
+      (pat_terms : Term.terms)
       (st        : match_state) : Mvar.t
     =
     match mode with
@@ -2190,148 +2556,26 @@ module E : S with type t = Equiv.form = struct
 
   (*------------------------------------------------------------------*)
   (** Exported *)
-  let try_match
-      ?(option=default_match_option)
-      ?(mv     : Mvar.t option)
-      ?(ty_env : Type.Infer.env option)
-      (table   : Symbols.table)
-      (system  : SystemExpr.t)
-      (t       : t)
-      (p       : t pat) 
-    : match_res
-    =
-    (* [must_close] state if [ty_env] must be closed at the end of 
-       the matching *)
-    let must_close, ty_env = match ty_env with
-      | Some e -> false, e
-      | None   -> true,  Type.Infer.mk_env () 
-    in
-
-    let univars, ty_subst  = Type.Infer.open_tvars ty_env p.pat_tyvars in
-    let pat = Equiv.tsubst ty_subst p.pat_term in
-
-    (* substitute back the univars by the corresponding tvars *)
-    let ty_subst_rev =
-      List.fold_left2 (fun s tv tu ->
-          Type.tsubst_add_univar s tu (Type.TVar tv)
-        ) Type.tsubst_empty p.pat_tyvars univars
-    in
-
-    let support = Sv.map (Vars.tsubst_e ty_subst) p.pat_vars in
-    let env = Sv.diff (Sv.union (Equiv.fv t) (Equiv.fv pat)) support in
-
-    let mv_init = odflt Mvar.empty mv in
-    let st_init : match_state = {
-      bvs = Sv.empty;
-      mv = mv_init;
-      
-      table; system; support; env; ty_env;
-      
-      use_fadup     = option.use_fadup; 
-      allow_capture = option.allow_capture; 
-    } in
-
-    let mode = match option.mode with
-      | `Eq -> `Eq
-      | `EntailRL -> `Covar
-      | `EntailLR -> `Contravar
-    in
-
-    try
-      let mv = fmatch ~mode t pat st_init in
-
-      if not must_close then 
-        Match mv 
-      else if not (Type.Infer.is_closed ty_env) then 
-        FreeTyv
-      else
-        (* FIXME: shouldn't we substitute type variables in Mv co-domain ? *)
-        let mv =
-          Mvar.fold (fun (Vars.EVar v) t mv ->
-              let v = Vars.tsubst ty_subst_rev v in
-              Mvar.add (Vars.EVar v) t mv
-            ) mv Mvar.empty
-        in
-        Match mv
-
-    with NoMatch infos -> NoMatch infos
-
+  let try_match = try_match_gen Equiv.Global_t fmatch
 
   (*------------------------------------------------------------------*)
-  let map
-      ?(m_rec=false)
-      (func : f_map)
-      (env : Vars.env)
-      (e : Equiv.form) : Equiv.form option
-    =
-
-    let rec map
-        (env : Vars.env)
-        (vars : Vars.evars)
-        (conds : Term.message list)
-        (e : Equiv.form) : bool * Equiv.form
-      =
-      match e with
-      | Atom (Reach f) ->
-        let found, f = T._map ~m_rec func env ~vars ~conds f in
-        let e' = Equiv.Atom (Reach f) in
-
-        if found then true, e' else false, e
-
-      | Atom (Equiv frame) ->
-        let found, frame = List.fold_left (fun (found,acc) f ->
-            let found0, f = T._map ~m_rec func env ~vars ~conds f in
-            found0 || found, f :: acc
-          ) (false,[]) frame
-        in
-        let frame = List.rev frame in
-        let e' = Equiv.Atom (Equiv frame) in
-
-        if found then true, e' else false, e
-
-      | Or   (e1, e2)
-      | And  (e1, e2)
-      | Impl (e1, e2) ->
-        let found1, e1 = map env vars conds e1
-        and found2, e2 = map env vars conds e2 in
-        let e' = match e with
-          | Or  _  -> Equiv.Or (e1, e2)
-          | And  _ -> Equiv.And (e1, e2)
-          | Impl _ -> Equiv.Impl (e1, e2)
-          | _ -> assert false
-        in
-        let found = found1 || found2 in
-
-        if found then true, e' else false, e
-
-      | Quant (q,vs,e0) ->
-        let env, vs, s = erefresh_vars_env env vs in
-        let vars = List.rev_append vs vars in
-        let e0 = Equiv.subst s e0 in
-        let found, b = map env vars conds e0 in
-        let e' = Equiv.Quant (q,vs,b) in
-
-        if found then true, e' else false, e
-    in
-
-    let found, e = map env [] [] e in
-    match found with
-    | false -> None
-    | true  -> Some e
-
+  (** Exported *)
   let find
       ?option
-      (table : Symbols.table) 
-      (expr  : SystemExpr.t) 
-      (env   : Vars.env)
-      (pat   : 'a term pat) 
-      (t     : Equiv.form) 
+      (table  : Symbols.table) 
+      (system : SE.context) 
+      (venv   : Vars.env)
+      (pat    : term pat) 
+      (t      : Equiv.form) 
+    : Term.terms
     =
-    let acc = ref [] in
-    ignore (map (fun (ETerm e) v conds -> 
-        match try_match_term table expr e pat with
-        | Match _ -> acc := ETerm e :: !acc ; `Continue
-        | _ -> `Continue
-      ) env t);
-    !acc
+    let f_fold : Term.terms Pos.f_map_fold = 
+      fun e se _vars _conds _p acc ->
+        let subterm_system = SE.reachability_context se in
+        match T.try_match ?option table subterm_system e pat with
+        | Match _ -> e :: acc, `Continue
+        | _       ->      acc, `Continue
+    in
+    let acc, _, _ = Pos.map_fold_e f_fold venv system [] t in
+    acc
 end

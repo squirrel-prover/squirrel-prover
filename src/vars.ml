@@ -1,28 +1,17 @@
 open Utils
 
-type 'a var = {
+type var = {
   name     : string;
   s_prefix : string;
   i_suffix : int; 
   is_new   : bool;
-  var_type : 'a Type.t
+  var_type : Type.ty
 }
 
-type 'a vars = 'a var list
+type vars = var list
 
 (* [i_suffix] is stored to avoid recomputing it.
    we use it as a unique counter for new and pat variables. *)
-
-type index     = Type.index     var
-type message   = Type.message   var
-type boolean   = Type.message   var
-type timestamp = Type.timestamp var
-
-type evar = EVar : 'a var -> evar
-
-type evars = evar list
-
-let evar v = EVar v
 
 (*------------------------------------------------------------------*)
 let is_new v = v.is_new
@@ -32,103 +21,83 @@ let is_pat v = String.sub v.name 0 1 = "_"
 let name v = (if v.is_new then "#" else "") ^ v.name
 
 let hash v  = Hashtbl.hash (name v)
-let ehash (EVar v) = hash v
 
 let ty v = v.var_type
-let ety (EVar v) = Type.ETy v.var_type
 
-let norm_ty : type a. Type.Infer.env -> a var -> a var =
-  fun env v ->
+let norm_ty (env : Type.Infer.env) (v : var) : var =
   { v with var_type = Type.Infer.norm env v.var_type }
 
-let enorm_ty env (EVar v) = EVar (norm_ty env v)
-             
-let kind v = Type.kind (v.var_type)
-
 let tsubst s v = { v with var_type = Type.tsubst s v.var_type }
-let tsubst_e s (EVar v) = EVar (tsubst s v)
 
 (*------------------------------------------------------------------*)
 let pp ppf v = 
   Fmt.pf ppf "%s%s" (name v) (if v.is_new then string_of_int v.i_suffix else "")
 
-let pp_e ppf (EVar v) = pp ppf v
-
 let pp_list ppf l =
   Fmt.pf ppf "@[<hov>%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") pp) l
 
-let pp_typed_list ppf (vars:evar list) =
+let pp_typed_list ppf (vars : var list) =
   let rec aux cur_vars cur_type = function
-    | EVar v::vs when Type.ETy v.var_type = cur_type ->
-        aux (EVar v::cur_vars) cur_type vs
+    | v::vs when v.var_type = cur_type ->
+        aux (v :: cur_vars) cur_type vs
     | vs ->
         if cur_vars <> [] then begin
           Fmt.list
             ~sep:(fun fmt () -> Fmt.pf fmt ",")
-            pp_e ppf (List.rev cur_vars) ;
-          Fmt.pf ppf ":%a" Type.pp_e cur_type ;
+            pp ppf (List.rev cur_vars) ;
+          Fmt.pf ppf ":%a" Type.pp cur_type ;
           if vs <> [] then Fmt.pf ppf ",@,"
         end ;
         match vs with
           | [] -> ()
-          | EVar v::vs -> aux [EVar v] (Type.ETy v.var_type) vs
+          | v :: vs -> aux [v] (v.var_type) vs
   in
-  aux [] Type.(ETy Message) vars
+  aux [] Type.Message vars
 
 
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)
 
-exception CastError
-
-let cast : type a b. a var -> b Type.kind -> b var = 
-  fun x s -> match Type.equalk_w (kind x) s with
-    | Some Type.Type_eq -> x
-    | None -> raise CastError
-
-let ecast : type a. evar -> a Type.kind -> a var = 
-  fun (EVar v) s -> cast v s
-
-let equal : type a b. a var -> b var -> bool = fun v v' ->
-  match Type.equal_w (ty v) (ty v') with
-  | None -> false
-  | Some Type.Type_eq -> v = v'
+let equal (v : var) (v' : var) : bool = v = v'
 
 (** Time-consistent: if [v] was created before [v'], then [compare v v' ≤ 0]. *)
 let compare x y =
   if equal x y then 0
   else if x.i_suffix <= y.i_suffix then -1 else 1
 
+let check_type_vars (vars : vars) (allowed_types : Type.ty list) (error : unit -> unit) = 
+  List.iter (fun v ->
+      if not (List.mem (ty v) allowed_types) then error ()
+    ) vars
 
 (*------------------------------------------------------------------*)
 (** {2 Set and Maps} *)
 
+let _compare (a : var) (b : var) = 
+  Stdlib.compare 
+    (a.name, a.s_prefix, a.is_new, a.i_suffix) 
+    (b.name, b.s_prefix, b.is_new, b.i_suffix) 
+
 module Sv = struct
   include Set.Make(struct
-      type t = evar
-      let compare (EVar a) (EVar b) = 
-        Stdlib.compare 
-          (a.name, a.s_prefix, a.is_new, a.i_suffix) 
-          (b.name, b.s_prefix, b.is_new, b.i_suffix) 
+      type t = var
+      let compare = _compare
     end)
 
   let hash (set : t) : int =
-    fold (fun v h -> hcombine (ehash v) h) set 0
+    fold (fun v h -> hcombine (hash v) h) set 0
 
   let add_list sv vars =
-    List.fold_left (fun sv v -> add (EVar v) sv) sv vars
+    List.fold_left (fun sv v -> add v sv) sv vars
 
   let of_list1 vars = add_list empty vars
 end
 
 module Mv = struct
   include Map.Make(struct
-      type t = evar
-      let compare (EVar a) (EVar b) = 
-        Stdlib.compare 
-          (a.name, a.s_prefix, a.is_new, a.i_suffix) 
-          (b.name, b.s_prefix, b.is_new, b.i_suffix) 
+      type t = var
+      let compare = _compare
     end)
 end
 
@@ -137,7 +106,7 @@ end
 
 module M = Utils.Ms
 
-type env = evar M.t
+type env = var M.t
 
 let hash_env (e : env) : int =
   M.fold (fun s _ h -> hcombine (Hashtbl.hash s) h) e 0
@@ -155,46 +124,27 @@ let empty_env : env = M.empty
 
 let mem (e : env) var : bool = M.mem (name var) e
 
-let mem_e (e : env) (EVar var) : bool = M.mem (name var) e
-
 let mem_s (e : env) (s : string) : bool = M.mem s e
 
-let find : type a. env -> string -> a Type.kind -> a var = 
-  fun e name k -> 
-  (* let EVar v = 
-   *   let found = ref None in
-   *   let exception Found in
-   *   try
-   *     let () = 
-   *       M.iter (fun id v -> 
-   *           if id = name then 
-   *             let () = found := Some v in
-   *             raise Found) e 
-   *     in
-   *     raise Not_found
-   * 
-   *   with Found -> oget !found
-   * in *)
-  let EVar v = M.find name e in
-  cast v k
+let find (e : env) (name : string) : var = M.find name e 
 
-let of_list l : env =
-  List.fold_left (fun e (EVar v) -> 
-      M.add (name v) (EVar v) e
-    ) empty_env l
+let add_var v e : env = M.add (name v) v e
+
+let add_vars vs e : env =
+  List.fold_left (fun e v -> 
+      add_var v e
+    ) e vs
+
+let of_list vs : env = add_vars vs empty_env
 
 let of_set s : env = 
-  Sv.fold (fun (EVar v) e -> 
-      M.add (name v) (EVar v) e
+  Sv.fold (fun v e -> 
+      add_var v e
     ) s empty_env 
 
-let rm_var e v = M.remove (name v) e
+let rm_var v e : env = M.remove (name v) e
 
-let rm_vars e vs = List.fold_left rm_var e vs
-
-let rm_evar e (EVar v) = rm_var e v
-
-let rm_evars e vs = List.fold_left rm_evar e vs
+let rm_vars vs e : env = List.fold_left (fun e v -> rm_var v e) e vs
 
 let prefix_count_regexp = Pcre.regexp "#*(_*.*[^0-9])([0-9]*)$"
 
@@ -233,13 +183,13 @@ let make_pat typ =
 
 let mem_i_suffix (e : env) (i : int) (prefix : string) : bool =
   assert (prefix <> "_");
-  M.exists (fun _ (EVar v') ->      
+  M.exists (fun _ v' ->      
       prefix = v'.s_prefix && i = v'.i_suffix
     ) e
                         
 let max_suffix (e : env) (prefix : string) : int option=
   assert (prefix <> "_");
-  M.fold (fun _ (EVar v') m ->      
+  M.fold (fun _ v' m ->      
       if prefix = v'.s_prefix then
         match m with
         | None -> Some (v'.i_suffix)
@@ -284,7 +234,7 @@ let make ?(allow_pat=false) opt (env : env) typ s_name =
   in
   assert (name v = v.name);
 
-  let env = M.add v.name (EVar v) env in
+  let env = M.add v.name v env in
   env, v 
 
 let make_r ?allow_pat opt (e:env ref) var_type s_prefix =

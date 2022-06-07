@@ -6,11 +6,12 @@
   * do it separately for equivalences. *)
 
 
+(*------------------------------------------------------------------*)
 (** Processes, using terms and facts from [Theory] *)
 
 type term = Theory.term
 
-type formula = Theory.formula
+type formula = Theory.term
 
 type lsymb = Theory.lsymb
 
@@ -20,11 +21,11 @@ type lsymb = Theory.lsymb
 
 (** The kind of a process gives, for each of its input variables,
   * the expected kind for that variable. *)
-type proc_ty = (string * Type.ety) list
+type proc_ty = (string * Type.ty) list
 
 val pp_proc_ty : proc_ty Fmt.t
 
-
+(*------------------------------------------------------------------*)
 (** {2 Front-end processes}
   * The computational semantics is action-deterministic
   * (e.g. existential lookup is arbitrarily made deterministic) but in the tool
@@ -71,18 +72,22 @@ and process = process_i Location.located
 
 val pp_process : Format.formatter -> process -> unit
 
+(*------------------------------------------------------------------*)
 (** Check that a process is well-typed in some environment. *)
-val check_proc : Symbols.table -> Vars.env -> process -> unit
+val check_proc : Env.t -> Term.projs -> process -> unit
 
 (** Declare a named process. The body of the definition is type-checked. *)
-val declare : Symbols.table -> lsymb -> proc_ty -> process -> Symbols.table
+val declare :
+  Symbols.table -> lsymb -> proc_ty -> Term.projs -> process ->
+  Symbols.table
 
+(*------------------------------------------------------------------*)
 (** Final declaration of the system under consideration,
   * which triggers the computation of its internal representation
   * as a set of actions. In that process, name creations are compiled away.
   * Other constructs are grouped into action descriptions. *)
 val declare_system :
-  Symbols.table -> lsymb -> process -> Symbols.table
+  Symbols.table -> lsymb option -> Term.projs -> process -> Symbols.table
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling}*)
@@ -92,6 +97,7 @@ type proc_error_i =
   | StrictAliasError of string
   | DuplicatedUpdate of string
   | Freetyunivar
+  | ProjsMismatch    of Term.projs * Term.projs
   
 type proc_error = Location.t * proc_error_i
 

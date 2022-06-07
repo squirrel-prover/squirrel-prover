@@ -48,7 +48,7 @@ The 3 security properties as stated in [1].
 computational model’, 2014.
 *******************************************************************************)
 
-set autoIntro = false.
+set timeout=12.
 
 (** Public constants (`abstract`) and names used in the protocol. **)
 abstract startplug  : message
@@ -178,7 +178,7 @@ goal counterIncrease (t:timestamp, i : index) :
   happens(t) =>
     (t > init && exec@t) =>
       (SCpt(i)@pred(t) ~< SCpt(i)@t = orderOk) ||
-        (SCpt(i)@t = SCpt(i)@pred(t)).
+       SCpt(i)@t = SCpt(i)@pred(t).
 Proof.
   (** After having introduced the hypotheses, we perform a case analysis
   on all possible values that the timestamp `t` can take.
@@ -194,17 +194,17 @@ Proof.
   We distinguish two cases: `i = i0` and `i <> i0`. **)
   intro [ii i0 _].
   case (i = i0) => _.
-    (** The case `i = i0` corresponds to the left disjunct, which is a
-    direct consequence of the condition of the action `SCpt(i)`.
-    This is done automatically by Squirrel. **)
-    by left.
-    (** The case `i <> i0` corresponds to the right disjunct. When expanding
-    the macro `SCpt(i)@t`, we notice that it is an `if _ then _ else _` term
-    with a condition that is always false. This can be simplified using the
-    `rewrite` tactic with lemma `if_false` (which is included in the `Basic`
-    library. **)
-    right.
-    expand SCpt(i)@t. by rewrite if_false.
+    + (** The case `i = i0` corresponds to the left disjunct, which is a
+      direct consequence of the condition of the action `SCpt(i)`.
+      This is done automatically by Squirrel. **)
+      by left.
+    + (** The case `i <> i0` corresponds to the right disjunct. When expanding
+      the macro `SCpt(i)@t`, we notice that it is an `if _ then _ else _` term
+      with a condition that is always false. This can be simplified using the
+      `rewrite` tactic with lemma `if_false` (which is included in the `Basic`
+      library. **)
+      right.
+      expand SCpt(i)@t. by rewrite if_false.
     (** The two previous tactics can be merged into a single one:
     by rewrite /SCpt if_false. **)
 Qed.
@@ -228,34 +228,34 @@ Proof.
     1: constraints.
   case H0.
 
-  (** Case `t' = pred(t)`.
-  We first rewrite the conclusion using the equality in H0. The `!` mark is
-  here to indicate that the rewriting must be done as much as possible and
-  at least once.
-  Then, it is a direct consequence of the `counterIncrease` lemma. **)
-  rewrite !H0.
-  by apply counterIncrease.
+  + (** Case `t' = pred(t)`.
+    We first rewrite the conclusion using the equality in H0. The `!` mark is
+    here to indicate that the rewriting must be done as much as possible and
+    at least once.
+    Then, it is a direct consequence of the `counterIncrease` lemma. **)
+    rewrite !H0.
+    by apply counterIncrease.
 
-  (** Case t' < pred(t).
-  We first apply the induction hypothesis with `t' < pred(t)` to obtain a
-  relation between `SCpt(i)@t'` and `SCpt(i)@pred(t)`.
-  We then use the `counterIncrease` lemma, this time to obtain a relation
-  between `SCpt(i)@pred(t)` and `SCpt(i)@t`.
-  We will then be able to conclude by transitivity.
-  **)
-  use IH0 with pred(t),t',i as H1 => //.
-  use counterIncrease with t,i as H3 => //.
-  case H1 => //.
-    (* case H1 - 1/2 *)
-    case H3 => //.
-    by left; apply orderTrans _ (SCpt(i)@pred(t)) _.
-    (* case H1 - 2/2 *)
-    by case H3; [1: left | 2 : right].
-  (** It remains to show that the premises of the induction hypothesis IH0
-  were satisfied, relying on the fact that `exec@t => exec@pred(t)`. **)
-  simpl.
-  executable t => // H1.
-  by apply H1.
+  + (** Case t' < pred(t).
+    We first apply the induction hypothesis with `t' < pred(t)` to obtain a
+    relation between `SCpt(i)@t'` and `SCpt(i)@pred(t)`.
+    We then use the `counterIncrease` lemma, this time to obtain a relation
+    between `SCpt(i)@pred(t)` and `SCpt(i)@t`.
+    We will then be able to conclude by transitivity.
+    **)
+    use IH0 with pred(t),t',i as H1 => //.
+      - use counterIncrease with t,i as H3 => //.
+        case H1 => //.
+        * (* case H1 - 1/2 *)
+          case H3 => //.
+          by left; apply orderTrans _ (SCpt(i)@pred(t)) _.
+        * (* case H1 - 2/2 *)
+          by case H3; [1: left | 2 : right].
+     - (** It remains to show that the premises of the induction hypothesis IH0
+       were satisfied, relying on the fact that `exec@t => exec@pred(t)`. **)
+       simpl.
+       executable t => // H1.
+       by apply H1.
 Qed.
 
 (** SECURITY PROPERTIES
@@ -283,8 +283,8 @@ compared to the last time the server accepted for this YubiKey.
 **)
 goal noreplayInv (ii, ii1, i:index):
   happens(S(ii1,i),S(ii,i)) =>
-    exec@S(ii1,i) && S(ii,i) < S(ii1,i) =>
-      SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk.
+  exec@S(ii1,i) && S(ii,i) < S(ii1,i) =>
+  SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk.
 (** The proof relies on the previous helping lemmas reasoning on counter
 values. **)
 Proof.
@@ -292,13 +292,13 @@ Proof.
   assert (S(ii,i) = pred(S(ii1,i)) || S(ii,i) < pred(S(ii1,i))) as H1;
     1: constraints.
   case H1.
-    (* Case S(ii,i) = pred(S(ii1,i)). *)
-    use counterIncreaseStrictly with ii1, i as M0 => //.
-    congruence.
-    (* Case S(ii,i) < pred(S(ii1,i)). *)
-    use counterIncreaseBis with pred(S(ii1,i)),S(ii,i),i as H2 => //.
-    case H2 => //.
-    by apply orderTrans _ (SCpt(i)@pred(S(ii1,i))) _.
+    + (* Case S(ii,i) = pred(S(ii1,i)). *)
+      by use counterIncreaseStrictly with ii1, i as M0.
+
+    + (* Case S(ii,i) < pred(S(ii1,i)). *)
+      use counterIncreaseBis with pred(S(ii1,i)),S(ii,i),i as H2 => //.
+      case H2 => //.
+      by apply orderTrans _ (SCpt(i)@pred(S(ii1,i))) _.
 Qed.
 
 goal noreplay (ii, ii1, i:index):
@@ -330,11 +330,14 @@ the use of the INT-CTXT cryptographic assumption.
 **)
 goal injective_correspondence (ii,i:index):
   happens(S(ii,i)) =>
-    exec@S(ii,i) =>
-      exists (j:index),
-        Press(i,j) < S(ii,i) && cpt(i,j)@Press(i,j) = SCpt(i)@S(ii,i)
-        && forall (ii1:index), happens(S(ii1,i)) => exec@S(ii1,i) =>
-             cpt(i,j)@Press(i,j) = SCpt(i)@S(ii1,i) => ii1 = ii.
+  exec@S(ii,i) =>
+  exists (j:index),
+    Press(i,j) < S(ii,i) && cpt(i,j)@Press(i,j) = SCpt(i)@S(ii,i) && 
+    forall (ii1:index), 
+      happens(S(ii1,i)) => 
+      exec@S(ii1,i) =>
+      cpt(i,j)@Press(i,j) = SCpt(i)@S(ii1,i) => 
+      ii1 = ii.
 (** The high-level idea of this proof is to use the INT-CTXT assumption:
 if the message received by the server is a valid ciphertext, then it must
 be equal to an encryption that took place before.
@@ -345,18 +348,20 @@ Then, the unicity is proved using lemmas on counter values.
 Proof.
   intro Hap Hexec.
   executable S(ii,i) => //.
-  intro Hexec'.
-  expand exec, cond.
-  destruct Hexec as [Hexecpred [Mneq Hcpt Hpid]].
+  intro Hexec'. 
+  rewrite /exec /cond in Hexec.
+  destruct Hexec as [Hexecpred [Mneq Hcpt] Hpid].
   (** We apply the INT-CTXT assumption, which directly gives the existence
   of an action `Press(i,j)` that happens before `S(ii,i)`. **)
   intctxt Mneq => //.
   intro Ht M1 *.
   exists j.
+
   (** The two first conjucts of the conclusion are automatically proved
   by Squirrel (the equality of counter values is a consequence of M1 once
   we have expanded the macros `cpt` and `SCpt`. **)
-  split => //.
+  simpl. 
+  split; 1: auto.
   (** It now remains to show that the counter value `cpt(i,j)@Press(i,j)` is
   not involved in another successful login.
   We first show if this second successful login `S(ii',i)` had happened, then
@@ -370,41 +375,41 @@ Proof.
   assert (S(ii,i) = S(ii',i) || S(ii,i) < S(ii',i) || S(ii,i) > S(ii',i)) => //.
   case H => //.
 
-    (* 1st case: S(ii,i) < S(ii',i) *)
-    assert (S(ii,i) = pred(S(ii',i)) || S(ii,i) < pred(S(ii',i))) => //.
-    case H0 => //.
+    + (* 1st case: S(ii,i) < S(ii',i) *)
+      assert (S(ii,i) = pred(S(ii',i)) || S(ii,i) < pred(S(ii',i))) => //.
+      case H0 => //.
 
-      (* S(ii,i) = pred(S(ii',i) < S(ii',i) *)
-      use counterIncreaseStrictly with ii',i => //.
-      subst  S(ii,i), pred(S(ii',i)) => //.
-      by use orderStrict with SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //.
+        - (* S(ii,i) = pred(S(ii',i) < S(ii',i) *)
+          use counterIncreaseStrictly with ii',i => //.
+          subst  S(ii,i), pred(S(ii',i)) => //.
+          by use orderStrict with SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //.
 
-      (* S(ii,i) < pred(S(ii',i))  < S(ii',i) *)
-      use counterIncreaseStrictly with ii',i => //.
-      use counterIncreaseBis with pred(S(ii',i)), S(ii,i), i => //.
-      case H1.
-        use orderTrans with SCpt(i)@S(ii,i), SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //.
-        by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //.
-        subst SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii,i).
-        by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //.
+        - (* S(ii,i) < pred(S(ii',i))  < S(ii',i) *)
+          use counterIncreaseStrictly with ii',i => //.
+          use counterIncreaseBis with pred(S(ii',i)), S(ii,i), i => //.
+          case H1.
+            * use orderTrans with SCpt(i)@S(ii,i), SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //.
+              by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //.
+            * subst SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii,i).
+              by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //.
 
-    (* 2nd case: S(ii,i) > S(ii',i) *)
-    assert (pred(S(ii,i)) = S(ii',i) || pred(S(ii,i)) > S(ii',i)) => //.
-    case H0 => //.
+    + (* 2nd case: S(ii,i) > S(ii',i) *)
+      assert (pred(S(ii,i)) = S(ii',i) || pred(S(ii,i)) > S(ii',i)) => //.
+      case H0 => //.
 
-      (* S(ii,i) > pred(S(ii,i)) = S(ii',i) *)
-      use counterIncreaseStrictly with ii,i => //.
-      subst S(ii',i), pred(S(ii,i)).
-      by use orderStrict with SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //.
+        - (* S(ii,i) > pred(S(ii,i)) = S(ii',i) *)
+          use counterIncreaseStrictly with ii,i => //.
+          subst S(ii',i), pred(S(ii,i)).
+          by use orderStrict with SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //.
 
-      (* S(ii,i) > pred(S(ii,i)) >  S(ii',i) *)
-      use counterIncreaseStrictly with ii,i => //.
-      use counterIncreaseBis with pred(S(ii,i)), S(ii',i), i => //.
-      case H1.
-        use orderTrans with SCpt(i)@S(ii',i), SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //.
-        by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //.
-        subst SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii',i).
-        by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //.
+        - (* S(ii,i) > pred(S(ii,i)) >  S(ii',i) *)
+          use counterIncreaseStrictly with ii,i => //.
+          use counterIncreaseBis with pred(S(ii,i)), S(ii',i), i => //.
+          case H1.
+            * use orderTrans with SCpt(i)@S(ii',i), SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //.
+              by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //.
+            * subst SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii',i).
+              by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //.
 Qed.
 
 
@@ -430,15 +435,15 @@ Proof.
   1: constraints.
   case Ht.
 
-  (* case S(ii,i) = S(ii1,i) *)
-  by use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii,i).
+  + (* case S(ii,i) = S(ii1,i) *)
+    by use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii,i).
 
-  (* case S(ii,i) < S(ii1,i) *)
-  assumption.
+  + (* case S(ii,i) < S(ii1,i) *)
+    assumption.
 
-  (* case S(ii,i) > S(ii1,i) *)
-  use noreplayInv with ii1, ii, i as Meq => //.
-  use orderTrans with SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i), SCpt(i)@S(ii,i) => //.
-  by use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii,i).
+  + (* case S(ii,i) > S(ii1,i) *)
+    use noreplayInv with ii1, ii, i as Meq => //.
+    use orderTrans with SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i), SCpt(i)@S(ii,i) => //.
+    by use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii,i).
 Qed.
 

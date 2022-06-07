@@ -25,6 +25,7 @@
   "Proof"
   "Qed"
   "equiv"
+  "any"
 ))
 
 (defvar squirrel-dangerous-keywords '(
@@ -38,6 +39,7 @@
   "hash"
   "senc"
   "abstract"
+  "op"
   "system"
   "type"
   "name"
@@ -80,6 +82,7 @@
   "namelength"
   "with"
   "assert"
+  "have"
   "case"
   "collision"
   "depends"
@@ -124,6 +127,8 @@
   "true"
   "cca1"
   "ddh"
+  "gdh"
+  "cdh"
   "enckp"
   "enrich"
   "equivalent"

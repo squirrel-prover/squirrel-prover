@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 (** Euf Test Suite  *)
 
@@ -77,15 +77,15 @@ Abort.
 (* h and euf cannot both use the same key *)
 system [joint] (out(c,h(m,k)) | ( in(c,x); if checksign(x,pk(k))=n then out(c,x))).
 
-goal [ joint] _ (tau:timestamp): happens(A3) => cond@A3 => False.
+goal [ joint] _ (tau:timestamp): happens(A2) => cond@A2 => False.
 Proof.
   intro Hap Hcond.
-  expand cond@A3.
+  expand cond@A2.
   checkfail euf Hcond exn BadSSCDetailed.
 Abort.
 
 
-goal [ joint] _ (tau:timestamp): output@A4<>h(m,k).
+goal [ joint] _ (tau:timestamp): output@A3<>h(m,k).
 Proof.
   intro Heq.
   checkfail euf Heq exn BadSSCDetailed.

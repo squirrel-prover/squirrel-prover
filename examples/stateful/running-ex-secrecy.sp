@@ -6,8 +6,6 @@ reachability by showing a proof of (weak) secrecy using a strong secrecy
 property as hypothesis.
 *******************************************************************************)
 
-set autoIntro  = false.
-
 (**
 We first declare:
 * an indexed name `s0(i)` used to initialize the mutable state `s`;

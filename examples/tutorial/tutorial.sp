@@ -14,10 +14,10 @@ Concretely, a message is either
 In __Squirrel__, a function symbol without any assumption can be defined with:
 
 ```*)
-  abstract ok : message
-  abstract ko : message
-  abstract f1 : message -> message
-  abstract f2 : message -> message -> message.
+abstract ok : message
+abstract ko : message
+abstract f1 : message -> message
+abstract f2 : message -> message -> message.
 
 (*```
 
@@ -35,9 +35,9 @@ by any number of indices.
 In the tool, one can declare names and indexed names with the following.
 
 ```*)
-  name n : message
-  name n1 : index -> message
-  name n2 : index -> index -> message.
+name n : message
+name n1 : index -> message
+name n2 : index -> index -> message.
 
 (*```
 
@@ -167,6 +167,7 @@ before the reader, and such the input of the reader corresonds to the name of
 T(i,k).
 
 ```*)
+
 goal wa :
   forall (i:index, j:index),
   happens(R(j,i)) =>
@@ -179,13 +180,12 @@ We write bellow the simple proof of this statement. Once inside a proof context,
 
 ```*)
 Proof.
-help.
-help simpl.
-
-simpl.
-expand cond.
-euf H.
-by exists k.
+  help.
+  help intro.
+  intro i j Hh Hc.
+  expand cond.
+  euf Hc.
+  intro *; by exists k.
 Qed.
 
 (*```

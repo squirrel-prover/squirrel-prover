@@ -1,5 +1,5 @@
 (* test apply argument inference *)
-set autoIntro=false.
+
 
 system null.
 
@@ -14,7 +14,7 @@ goal _ (x, y : message) :
     false.
 Proof.
   intro H A.
-  by assert (G := H _ A).
+  by have G := H _ A.
 Qed.
 
 (* same with a type variable *)
@@ -24,7 +24,7 @@ goal _ ['a] (x, y : 'a) :
     false.
 Proof.
   intro H A.
-  by assert (G := H _ A).
+  by have G := H _ A.
 Qed.
 
 goal _ ['a] (x, y : 'a) : 
@@ -33,7 +33,7 @@ goal _ ['a] (x, y : 'a) :
     false.
 Proof.
   intro H A. 
-  checkfail by try assert (G := H _ A) exn GoalNotClosed.
+  checkfail by try have G := H _ A exn GoalNotClosed.
 Abort.
 
 
@@ -53,7 +53,7 @@ Qed.
 
 goal _ (y : message) :
   (forall (x : message), P (x ++ x) => Q (x)) =>
-  (P(y ++ zero ++ (y ++ zero))) =>
+  (P((y ++ zero) ++ (y ++ zero))) =>
   Q (y ++ zero).
 Proof.
   intro H G.
@@ -84,7 +84,7 @@ goal _ (y,z : message) :
  g (<y,z>) = f (<y,z>).
 Proof.
   intro H G.
-  assert (U := H _ (%G <y,z>)).
+  have U := H _ (%G <y,z>).
   clear H G.
   assumption.
 Qed.

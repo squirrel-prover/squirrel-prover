@@ -4,9 +4,8 @@ module L = Location
 module Args = TacticsArgs
 module T = Tactics
 
+module SE = SystemExpr
 module TS = LowTraceSequent
-
-type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
 (** {2 Hypotheses for equivalence sequents} *)
@@ -16,13 +15,14 @@ module H = Hyps.Mk
       type t = Equiv.form
 
       let pp_hyp = Equiv.pp
+
+      let choose_name f = "H"
+        
       let htrue = Equiv.Atom (Equiv.Equiv [])
     end)
 
 let subst_hyps (subst : Term.subst) (hyps : H.hyps) : H.hyps =
   H.map (Equiv.subst subst) hyps
-
-type hyps = H.hyps
 
 (*------------------------------------------------------------------*)
 (** {2 Equivalence sequent} *)
@@ -42,12 +42,9 @@ let conc_kind = Equiv.Global_t
   * to two frames, interpreting macros wrt the left and right systems
   * respectively. *)
 type t = {
-  env     : Vars.env;
-  table   : Symbols.table;
-  ty_vars : Type.tvars;
+  env     : Env.t;
   hyps    : H.hyps;
   goal    : Equiv.form;
-  system  : SystemExpr.t;
   hint_db : Hint.hint_db;
 }
 
@@ -65,24 +62,24 @@ let pp_goal fmt = function
 let pp ppf j =
   Fmt.pf ppf "@[<v 0>" ;
   Fmt.pf ppf "@[Systems: %a@]@;"
-    SystemExpr.pp j.system;
+    SystemExpr.pp_context j.env.system;
 
-  if j.ty_vars <> [] then
+  if j.env.ty_vars <> [] then
     Fmt.pf ppf "@[Type variables: %a@]@;"
-      (Fmt.list ~sep:Fmt.comma Type.pp_tvar) j.ty_vars ;
+      (Fmt.list ~sep:Fmt.comma Type.pp_tvar) j.env.ty_vars ;
 
-  if j.env <> Vars.empty_env then
-    Fmt.pf ppf "@[Variables: %a@]@;" Vars.pp_env j.env ;
+  if j.env.vars <> Vars.empty_env then
+    Fmt.pf ppf "@[Variables: %a@]@;" Vars.pp_env j.env.vars ;
 
-  H.pps ppf j.hyps ;
+  H.pp ppf j.hyps ;
 
   (* Print separation between hyps and conclusion *)
   Printer.kws `Separation ppf (String.make 40 '-') ;
   Fmt.pf ppf "@;%a@]" pp_goal j.goal
 
 let pp_init ppf j =
-  if j.env <> Vars.empty_env then
-    Fmt.pf ppf "forall %a,@ " Vars.pp_env j.env ;
+  if j.env.vars <> Vars.empty_env then
+    Fmt.pf ppf "forall %a,@ " Vars.pp_env j.env.vars ;
   Fmt.pf ppf "%a" Equiv.pp j.goal
 
 
@@ -91,35 +88,19 @@ let pp_init ppf j =
 
 (** Built on top of [H] *)
 module Hyps
-  : Hyps.HypsSeq with type hyp = Equiv.form and type sequent = t
+  : Hyps.S1 with type hyp = Equiv.form and type hyps := t
  = struct
   type hyp = Equiv.form
 
   type ldecl = Ident.t * hyp
 
   type sequent = t
-
-  let pp_hyp = Term.pp
+    
+  let pp_hyp = Equiv.pp
   let pp_ldecl = H.pp_ldecl
 
-  (* FIXME: move in hyps.ml, and get rid of duplicate in traceSequent.ml *)
-  let fresh_id ?(approx=false) name s =
-    let id = H.fresh_id name s.hyps in
-    if (not approx) && Ident.name id <> name && name <> "_"
-    then Tactics.soft_failure (T.HypAlreadyExists name)
-    else id
-
-  let fresh_ids ?(approx=false) names s =
-    let ids = H.fresh_ids names s.hyps in
-
-    if approx then ids else
-      begin
-        List.iter2 (fun id name ->
-            if Ident.name id <> name && name <> "_"
-            then Tactics.soft_failure (T.HypAlreadyExists name)
-          ) ids names;
-        ids
-      end
+  let fresh_id  ?approx name  s = H.fresh_id  ?approx name  s.hyps
+  let fresh_ids ?approx names s = H.fresh_ids ?approx names s.hyps
 
   let is_hyp f s = H.is_hyp f s.hyps
 
@@ -133,35 +114,27 @@ module Hyps
 
   let find_map func s = H.find_map func s.hyps
 
+  let find_all func s = H.find_all func s.hyps
+      
   let to_list s = H.to_list s.hyps
 
   let exists func s = H.exists func s.hyps
 
-  let add_formula ~force id (h : hyp)(s : sequent) =
-    let id, hyps = H.add ~force id h s.hyps in
-    id, { s with hyps = hyps }
+  let _add ~(force:bool) id hyp s =
+    let id, hyps = H._add ~force id hyp s.hyps in
+    id, { s with hyps }
 
   let add_i npat f s =
-    let force, approx, name = match npat with
-      | Args.Unnamed  -> true, true, "_"
-      | Args.AnyName  -> false, true, "H"
-      | Args.Named s  -> true, false, s
-      | Args.Approx s -> true, true, s
-    in
-    let id = fresh_id ~approx name s in
+    let id, hyps = H.add_i npat f s.hyps in
+    id, { s with hyps }
 
-    add_formula ~force id f s
-
-  let add npat (f : hyp) s : sequent = snd (add_i npat f s)
+  let add npat (f : hyp) s : sequent = { s with hyps = H.add npat f s.hyps }
 
   let add_i_list l (s : sequent) =
-    let s, ids = List.fold_left (fun (s, ids) (npat,f) ->
-        let id, s = add_i npat f s in
-        s, id :: ids
-      ) (s,[]) l in
-    List.rev ids, s
+    let ids, hyps = H.add_i_list l s.hyps in
+    ids, { s with hyps }
 
-  let add_list l s = snd (add_i_list l s)
+  let add_list l s = { s with hyps = H.add_list l s.hyps }
 
   let remove id s = { s with hyps = H.remove id s.hyps }
 
@@ -170,43 +143,81 @@ module Hyps
   let map  f s = { s with hyps = H.map f s.hyps }
   let mapi f s = { s with hyps = H.mapi f s.hyps }
 
-  let clear_triv s = s
+  let filter f s = { s with hyps = H.filter f s.hyps }
 
-  let pp fmt s = H.pps fmt s.hyps
-  let pp_dbg fmt s = H.pps ~dbg:true fmt s.hyps
+  let clear_triv s = { s with hyps = H.clear_triv s.hyps }
+
+  let pp     fmt s = H.pp     fmt s.hyps
+  let pp_dbg fmt s = H.pp_dbg fmt s.hyps
 end
 
 (*------------------------------------------------------------------*)
 (** {2 Accessors and utils} *)
 
+let update ?table ?ty_vars ?vars ?hyps ?goal t =
+  let env  = Env.update ?table ?ty_vars ?vars t.env
+  and hyps = Utils.odflt t.hyps hyps
+  and goal = Utils.odflt t.goal goal in
+  { t with env; hyps; goal; } 
+
 let env j = j.env
 
-let set_env e j = {j with env = e}
+let set_env env s = { s with env }
 
-let system j = j.system
-let set_system system j = { j with system }
+let vars j = j.env.vars
 
-let table j = j.table
-let set_table table j = { j with table = table }
+let set_vars vars j = update ~vars j
+
+let system j = j.env.system
+
+let set_goal_in_context ?update_local system conc s =
+
+  assert (update_local = None);
+
+  if system = s.env.system then { s with goal = conc } else
+
+  (* Update hypotheses.
+     We add back manually all formulas, to ensure that definitions are
+     unrolled. TODO really necessary? *)
+  let update_local,update_global =
+    LowSequent.setup_set_goal_in_context
+      ~table:s.env.table
+      ~old_context:s.env.system
+      ~new_context:system
+  in
+  let s =
+    H.fold
+      (fun id f s ->
+         match update_global f with
+           | Some f ->
+               let _,hyps = H._add ~force:true id f s.hyps in
+               { s with hyps }
+           | None -> s)
+      s.hyps
+      { s with hyps = H.empty }
+  in
+
+  (* Change the context in the sequent's environment. *)
+  let env = Env.update ~system s.env in
+  let s = { s with env } in
+
+  (* Finally set the new conclusion. *)
+  { s with goal = conc }
+
+let table j = j.env.table
+let set_table table j = update ~table j
 
 let goal j = j.goal
 
-let ty_vars j = j.ty_vars
-
-let hyps j = j.hyps
-
-let set_hyps hyps j = { j with hyps }
+let ty_vars j = j.env.ty_vars
 
 let set_goal goal j = { j with goal }
 
-
 let set_reach_goal f s = set_goal Equiv.(Atom (Reach f)) s
-
-let set_ty_vars ty_vars j = { j with ty_vars }
 
 let get_frame proj j = match j.goal with
   | Equiv.Atom (Equiv.Equiv e) ->
-    Some (List.map (Equiv.pi_term proj) e)
+    Some (List.map (Term.project1 proj) e)
   | _ -> None
 
 let subst subst s =
@@ -224,24 +235,10 @@ let goal_as_equiv s = match goal s with
     Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
 
 (*------------------------------------------------------------------*)
-(** Convert global sequent to local sequent.
-  * Assume that the conclusion of the input sequent is a local formula.
-  * The semantics of the system expression differs from global and
-  * local sequents: for the former we need two systems to make sense
-  * of equivalences; for the latter we are checking that a local
-  * formula holds for all projections of the system expression.
-  * For now (without system annotations in global formulas) we can
-  * only keep global formula hypotheses in a restricted case: the two
-  * projections are the same. *)
+(** Convert global sequent to local sequent, assuming
+    that the conclusion of the input sequent is a local formula. *)
 let to_trace_sequent s =
-  let env = env s in
-  let system = system s in
-  let keep_global_hyps =
-    SystemExpr.project Term.PLeft  system =
-    SystemExpr.project Term.PRight system
-  in
-  let table   = table s in
-  let ty_vars = ty_vars s in
+  let env = s.env in
   let hint_db = s.hint_db in
 
   let goal = match s.goal with
@@ -251,38 +248,31 @@ let to_trace_sequent s =
         (Tactics.GoalBadShape "expected a reachability formula")
   in
 
-  let trace_s = TS.init ~system ~table ~hint_db ~ty_vars ~env goal in
-
-  (* Add all relevant hypotheses. *)
+  let trace_s = TS.init ~env ~hint_db goal in
   Hyps.fold
-    (fun id hyp trace_s -> match hyp with
-      | Equiv.Atom (Equiv.Reach h) ->
-        TS.LocalHyps.add (Args.Named (Ident.name id)) h trace_s
-      | h ->
-        if keep_global_hyps then
-          TS.Hyps.add (Args.Named (Ident.name id)) (`Equiv h) trace_s
-        else
-          trace_s)
+    (fun id hyp trace_s ->
+        TS.Hyps.add (Args.Named (Ident.name id)) (`Equiv hyp) trace_s)
     s trace_s
 
 (*------------------------------------------------------------------*)
-let get_trace_literals s =
-  TS.get_trace_literals (to_trace_sequent (set_reach_goal Term.mk_false s))
+let get_trace_hyps s =
+  TS.get_trace_hyps (to_trace_sequent (set_reach_goal Term.mk_false s))
 
 (*------------------------------------------------------------------*)
 let get_models (s : t) =
   let s = to_trace_sequent (set_reach_goal Term.mk_false s) in
   TS.get_models s
 
-let mk_trace_cntxt (s : t) =
+let mk_trace_cntxt ?(se : SE.fset option) (s : t) =
+  let system = odflt (SE.to_fset s.env.system.set) se in
   Constr.{
-    table  = s.table;
-    system = s.system;
+    table  = s.env.table;
+    system;
     models = Some (get_models s);
   }
 
 (*------------------------------------------------------------------*)
-let query_happens ~precise (s : t) (a : Term.timestamp) =
+let query_happens ~precise (s : t) (a : Term.term) =
   let s = to_trace_sequent (set_reach_goal Term.mk_false s) in
   TS.query_happens ~precise s a
 
@@ -291,7 +281,11 @@ let check_pq_sound_sequent s =
   match goal s with
   | Atom (Equiv.Equiv e) ->
       let models = get_models s in
-      let cntxt = mk_trace_cntxt s in
+      let cntxt = Constr.{
+        table = s.env.table;
+        system = (Utils.oget s.env.system.pair:>SystemExpr.fset);
+        models = Some (get_models s)
+      } in
       if not (PostQuantum.is_attacker_call_synchronized cntxt models e) then
         Tactics.hard_failure Tactics.GoalNotPQSound
       else
@@ -306,14 +300,14 @@ let set_equiv_goal e j =
   else new_sequent
 
 
-let init ~system ~table ~hint_db ~ty_vars ~env ?hyp goal =
+let init ~env ~hint_db ?hyp goal =
   let hyps = H.empty in
   let hyps = match hyp with
     | None -> hyps
     | Some h ->
-        snd (H.add ~force:false (H.fresh_id "H" hyps) h hyps)
+        snd (H._add ~force:false (H.fresh_id "H" hyps) h hyps)
   in
-  let new_sequent = { table; hint_db; system; ty_vars; env; hyps; goal } in
+  let new_sequent = { env; hint_db; hyps; goal } in
   if Config.post_quantum () then
    check_pq_sound_sequent new_sequent
   else new_sequent
@@ -351,9 +345,6 @@ let fv s : Vars.Sv.t =
       ) s Vars.Sv.empty
   in
   Vars.Sv.union h_vars (Equiv.fv (goal s))
-
-(*------------------------------------------------------------------*)
-module MatchF = Match.E
 
 (*------------------------------------------------------------------*)
 module Conc  = Equiv.Smart

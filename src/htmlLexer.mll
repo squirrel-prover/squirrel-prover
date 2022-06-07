@@ -1,5 +1,5 @@
 {
-  open Lexing
+  (* open Lexing *)
   open HtmlParser
   
   let counter = ref 0

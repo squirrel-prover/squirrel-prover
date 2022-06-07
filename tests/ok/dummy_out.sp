@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 channel c
 system X: in(c,x).

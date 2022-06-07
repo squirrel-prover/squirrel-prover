@@ -1,121 +1,102 @@
-OCB_FLAGS = -use-ocamlfind -use-menhir -I src \
-			-pkgs fmt,fmt.tty,alcotest,ocamlgraph,pcre \
-
-OCB = ocamlbuild $(OCB_FLAGS)
-
 GITHASH := $(shell scripts/git-hash)
 
 PREFIX = ~/.local
+
+ECHO = /bin/echo
 
 default: squirrel
 
 all: squirrel test
 
+test: alcotest okfail example
+
+.PHONY: okfail okfail_end example examples_end alcotest squirrel
+
+# Directory for logging test runs on "*.sp" files.
+RUNLOGDIR=_build/squirrel_log
+
+# Make sure the "echo" commands in okfail below are updated
+# to reflect the content of these variables.
 PROVER_TESTS = $(wildcard tests/ok/*.sp) $(wildcard tests/fail/*.sp)
 PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $(wildcard examples/stateful/*.sp)  $(wildcard examples/postQuantumKE/*.sp)
 
-test: squirrel alcotest okfail_test
-
-.PHONY: ok_test ok_test_end alcotest test.byte squirrel squirrel.byte
-
-# Directory for logging test runs
-RUNLOGDIR=_build/log
-okfail_test:
+okfail: squirrel
 	rm -rf $(RUNLOGDIR)
-	@$(MAKE) -j8 okfail_test_end
+	@$(ECHO) "Running tests/ok/*.sp and tests/fail/*.sp."
+	@$(MAKE) -j8 okfail_end
+
+# Run PROVER_TESTS as a dependency, then check for errors.
+okfail_end: $(PROVER_TESTS:.sp=.ok)
+	@$(ECHO)
+	@if test -f tests/tests.ko ; then \
+	  $(ECHO) Some tests failed: ; \
+	  cat tests/tests.ko | sort ; rm -f tests/tests.ko ; exit 1 ; \
+	 else $(ECHO) All tests passed successfully. ; fi
+
+example: squirrel
+	rm -rf `$(RUNLOGDIR)/examples`
+	@$(ECHO) "Running examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 	@$(MAKE) -j4 examples_end
 
-okfail_test_end: $(PROVER_TESTS:.sp=.ok)
-	@echo
-	@if test -f tests/tests.ko ; then \
-	  echo Some tests failed: ; \
-	  cat tests/tests.ko ; rm -f tests/tests.ko ; exit 1 ; \
-	 else echo All tests passed successfully. ; fi
-
+# Run PROVER_EXAMPLES as a dependency, then check for errors.
 examples_end: $(PROVER_EXAMPLES:.sp=.ok)
-	@echo
-	@rm -f tests/test_prologue.ok
+	@$(ECHO)
 	@if test -f tests/tests.ko ; then \
-	  echo Some tests failed: ; \
-	  cat tests/tests.ko ; rm -f tests/tests.ko ; exit 1 ; \
-	 else echo All tests passed successfully. ; fi
+	  $(ECHO) Some tests failed: ; \
+	  cat tests/tests.ko | sort ; rm -f tests/tests.ko ; exit 1 ; \
+	 else $(ECHO) All tests passed successfully. ; fi
 
-tests/test_prologue.ok:
-	@echo "Running tests/ok/*.sp, tests/fail/*.sp, examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
-%.ok: tests/test_prologue.ok %.sp
+%.ok: %.sp
 	@mkdir -p `dirname $(RUNLOGDIR)/$(@:.ok=.sp)`
 	@if ./squirrel $(@:.ok=.sp) \
 	  > $(RUNLOGDIR)/$(@:.ok=.sp) \
 	  2> $(RUNLOGDIR)/$(@:.ok=.sp.stderr) \
-	 ; then echo -n . ; \
-	 else echo "[FAIL] $(@:.ok=.sp)" >> tests/tests.ko ; echo -n '!' ; fi
+	 ; then $(ECHO) -n . ; \
+	 else $(ECHO) "[FAIL] $(@:.ok=.sp)" >> tests/tests.ko ; $(ECHO) -n '!' ; fi
 
-test.byte: version sanity
-	$(OCB) test.byte
-
-alcotest: test.byte
-	@mkdir -p ./_build/_tests
-	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
-	./test.byte --compact
+# Only executes tests if dependencies have changed,
+# relying on dune file to know (possibly runtime) dependencies.
+alcotest: version
+	dune runtest
 
 clean:
-	$(OCB) -clean
+	dune clean
 	@rm -f squirrel
-	rm -f *.coverage
 	rm -rf _coverage
 
-squirrel.byte: version sanity
-	$(OCB) squirrel.byte
+squirrel: version
+	dune build squirrel.exe
+	cp -f _build/default/squirrel.exe squirrel
 
-debug: version sanity
-	$(OCB) -tags debug squirrel.native
+# Run tests (forcing a re-run) with bisect_ppx instrumentation on
+# to get coverage files, and generate an HTML report from them.
+# TODO also generate coverage report when running squirrel on *.sp files,
+# with two options:
+# 1. The instrumentation option could be passed to dune exec squirrel,
+#    but the latter does not work (theories are not installed).
+# 2. These tests could be ran as dune tests rather than through this
+#    Makefile, which would render instrumentation available and would
+#    also avoid re-runnning tests when unnecessary.
+coverage:
+	rm -rf _coverage
+	dune runtest --force --instrument-with bisect_ppx
+	find . -name '*.coverage' | \
+	  xargs bisect-ppx-report html --ignore-missing-files
+	find . -name '*.coverage' | xargs rm -f
+	@$(ECHO) "Coverage report available: _coverage/index.html"
 
+# The install target should probably be changed to using dune,
+# so that dune exec could work.
+install: squirrel
+	cp -f squirrel $(PREFIX)/bin/squirrel
+	cp -r theories $(PREFIX)/bin/theories
 
-squirrel: squirrel.byte
-	@ln -s -f squirrel.byte squirrel
-
-makecoverage: version sanity
-	BISECT_COVERAGE=YES $(OCB) test.byte
-	@mkdir -p ./_build/_tests
-	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
-	./test.byte --compact
-	BISECT_COVERAGE=YES $(OCB) squirrel.byte
-	@ln -s -f squirrel.byte squirrel
-
-coverage: makecoverage ok_test
-	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
-	bisect-ppx-report html --ignore-missing-files
-	rm -f *.coverage
-
-%.cmo: sanity
-	$(OCB) $@
-
-install: version squirrel
-	cp squirrel.byte $(PREFIX)/bin/squirrel.byte
-
-doc: squirrel
-	$(OCB) -ocamldoc "ocamldoc -stars" squirrel.docdir/index.html
-
-sanity: _build/requirements
+doc:
+	dune build @doc
+	@$(ECHO) "Documentation available: _build/default/_doc/_html/squirrel/index.html"
 
 version:
 	rm -f src/commit.ml
 	sed 's/GITHASH/$(GITHASH)/' < src/commit.ml.in > src/commit.ml
 
-# check that requirements are installed
-PLEASE="Please install $$pkg, e.g. using \"opam install $$pkg\"."
-_build/requirements: Makefile
-	@(echo -n "Checking for menhir... " ; \
-	  which menhir ) || ( \
-	  pkg=menhir ; echo $(PLEASE) ; \
-	  false )
-	@for pkg in fmt ocamlgraph alcotest pcre ; do \
-	  (echo -n "Checking for $$pkg... " ; \
-	   ocamlfind query $$pkg ) || ( \
-	   pkg=$$pkg ; echo $(PLEASE) ; \
-	   false ) ; \
-	done
-	mkdir -p _build
-	touch _build/requirements
-
-.PHONY: version clean sanity
+.PHONY: version clean

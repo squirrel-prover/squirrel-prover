@@ -1,5 +1,7 @@
-set autoIntro=false.
+
 (* set debugTactics=true. *)
+
+include Basic.
 
 abstract ok : message
 abstract ko : message
@@ -18,15 +20,15 @@ axiom len_ko_m : len(ko XOR m) = len(k).
 equiv testXorOneArg : diff(f(ok),f(ok)),diff(n,m) XOR k.
 Proof.
   nosimpl(xor 1).
-  nosimpl(yesif 1).
-  by namelength k,n; namelength k,m.
+  rewrite if_true in 1.
+  by namelength k,n; namelength k,m. 
   auto.
 Qed.
 
 equiv testXorTwoArg : diff(f(ok),f(ok)),diff(ko,ko) XOR diff(n,m) XOR k.
 Proof.
   nosimpl(xor 1, k).
-  nosimpl(yesif 1).
+  nosimpl(rewrite if_true in 1).
   by use len_ko_n; use len_ko_m.
   auto.
 Qed.

@@ -36,10 +36,10 @@ type ssc_error_c =
   | E_message
   | E_elem
   | E_indirect of
-      Symbols.action Symbols.t *
-      [`Cond | `Output | `Update of Symbols.macro Symbols.t]
+      Symbols.action *
+      [`Cond | `Output | `Update of Symbols.macro | `Global of Symbols.macro]
 
-type ssc_error = Term.message * ssc_error_c
+type ssc_error = Term.term * ssc_error_c
 
 val pp_ssc_error  : Format.formatter -> ssc_error      -> unit
 val pp_ssc_errors : Format.formatter -> ssc_error list -> unit
@@ -56,6 +56,8 @@ type tac_error_i =
   | BadSSCDetailed of ssc_error list
   | NoSSC
   | NoAssumpSystem
+  | Rewrite_equiv_system_mismatch
+  | Underspecified_system
   | NotDepends of string * string
   | NotDDHContext
   | SEncNoRandom
@@ -70,16 +72,14 @@ type tac_error_i =
   | GoalBadShape of string
   | GoalNotPQSound
   | TacticNotPQSound
-  | SystemError     of System.system_error
-  | SystemExprError of SystemExpr.system_expr_err
   | CongrFail
   | GoalNotClosed
   | NothingToIntroduce
   | NothingToRewrite
   | BadRewriteRule
-  | MustHappen of Term.timestamp
+  | MustHappen of Term.term
   | NotHypothesis
-  | ApplyMatchFailure of (Term.messages * Term.match_infos) option
+  | ApplyMatchFailure of (Term.terms * Term.match_infos) option
   | ApplyBadInst
   | NoCollision
   | HypAlreadyExists of string
@@ -205,4 +205,4 @@ val timeout_get : 'a Utils.timeout_r -> 'a
 val hard_failure : ?loc:Location.t -> tac_error_i -> 'a
 
 (** Print the system to the user. *)
-val print_system : Symbols.table -> SystemExpr.t -> unit
+val print_system : Symbols.table -> _ SystemExpr.expr -> unit

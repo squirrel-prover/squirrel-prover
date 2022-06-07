@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 abstract ok : index->message
 channel c

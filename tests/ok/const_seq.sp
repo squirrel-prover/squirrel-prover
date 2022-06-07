@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 abstract ok : index->message
 channel c
@@ -32,7 +32,7 @@ Proof.
     (fun (t':timestamp) -> t' < t) (ok(i)) 
     (fun (t':timestamp) -> not (t' < t)) zero.
   auto. 
-  rewrite Hi.
+  rewrite Hi Hi.
   split => t' _.
   by rewrite if_true; project. 
   by rewrite if_false; project. 

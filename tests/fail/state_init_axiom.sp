@@ -12,7 +12,7 @@ axiom exists_idx : exists i:index, True.
 goal absurdity : False.
 Proof.
   use exists_idx.
-  simpl_left.
+  destruct H as [i H].
   use stateReaderInit with i.
   (* It should not be possible to conclude using fresh,
   because n(i) appears in action descriptions parsed by

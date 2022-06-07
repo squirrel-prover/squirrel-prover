@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 abstract a : message
 abstract b : message
@@ -22,17 +22,17 @@ axiom foog (x : message) : gg(x,b) = c.
 (*------------------------------------------------------------------*)
 (* rewrite all instances of only the first occurrence found. *)
 goal _ (x, y, z : message) :
-((a = z && a = y) && (f(z) = z || z = y)) =>
-(f(x) = z && f(x) = y && (f(z) = z || z = y)).
+  (a = z && a = y && (f(z) = z || z = y)) =>
+  (f(x) = z && f(x) = y && (f(z) = z || z = y)).
 Proof.
-  intro H.
+  intro H. 
   rewrite foo.
   assumption.
 Qed.
 
 (* rewrite the first occurrence found. *)
 goal _ (x, y, z : message) : 
-((a = z && f(z) = y) && (f(z) = z || z = y)) =>
+(a = z && f(z) = y && (f(z) = z || z = y)) =>
 (f(x) = z && f(z) = y && (f(z) = z || z = y)).
 Proof.
   intro H.
@@ -47,7 +47,7 @@ Qed.
 
 (* same but through an already proved goal. *)
 goal _ (x, y, z : message) : 
-((a = z && f(z) = y) && (f(z) = z || z = y)) =>
+(a = z && f(z) = y && (f(z) = z || z = y)) =>
 (f(x) = z && f(z) = y && (f(z) = z || z = y)).
 Proof.
   intro H.
@@ -59,7 +59,7 @@ Qed.
    hypotheses have priority over lemmas and axioms). *)
 goal _ (x, y, z : message) : 
 (forall (x : message), f(x) = d) =>
-((d = z && f(z) = y) && (f(z) = z || z = y)) =>
+(d = z && f(z) = y && (f(z) = z || z = y)) =>
 (f(x) = z && f(z) = y && (f(z) = z || z = y)).
 Proof.
   intro foo H.
@@ -81,7 +81,7 @@ Abort.
 (*------------------------------------------------------------------*)
 (* can rewrite all instances using ! *)
 goal _ (x, y, z : message) : 
-((a = z && a = y) && (a = z || z = y)) =>
+(a = z && a = y && (a = z || z = y)) =>
 (f(x) = z && f(x) = y && (f(z) = z || z = y)).
 Proof.
   intro H.
@@ -91,7 +91,7 @@ Qed.
 
 (* can also rewrite all instances using ? (including zero instances) *)
 goal _ (x, y, z : message) : 
-((a = z && a = y) && (a = z || z = y)) =>
+(a = z && a = y && (a = z || z = y)) =>
 (f(x) = z && f(x) = y && (f(z) = z || z = y)).
 Proof.
   intro H.
@@ -102,7 +102,7 @@ Qed.
 (*------------------------------------------------------------------*)
 (* new goal using `g` and `foog` *)
 goal _ (x, y, z : message) : 
-((c = z && c = y) && (c = z || z = y)) =>
+(c = z && c = y && (c = z || z = y)) =>
 (gg(x,b) = z && gg(x,b) = y && (gg(z,b) = z || z = y)).
 Proof.
   intro H.
@@ -454,5 +454,12 @@ equiv(x, gg(x,c)) -> equiv(gg(x,c)).
 Proof. 
   intro H.
   rewrite ?foog.
+  assumption.
+Qed.
+
+(*------------------------------------------------------------------*)
+goal _ : (<f(a),b> = c) => (a = f(a)) => <a,b> = c.
+Proof.
+  intro H ->.
   assumption.
 Qed.

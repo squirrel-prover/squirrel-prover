@@ -25,8 +25,6 @@ SECURITY PROPERTIES
 - authentication (reader and tag)
 *******************************************************************************)
 
-set autoIntro = false.
-
 hash h
 hash h1
 hash h2

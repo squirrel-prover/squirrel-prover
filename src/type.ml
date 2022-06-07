@@ -1,21 +1,4 @@
-(* We provide explicit constructor to the types, so that the typing system,
-   when outside of the module, knows that they are distinct. Else, some pattern
-   matching for GADT built using those types are considered as non
-   exhaustive. *)
-
-(*------------------------------------------------------------------*)
-type message   = [`Message]
-type index     = [`Index]
-type timestamp = [`Timestamp]
-
-(*------------------------------------------------------------------*)
-(** Kinds of types *)
-type _ kind =
-  | KMessage   : message   kind
-  | KIndex     : index     kind
-  | KTimestamp : timestamp kind
-
-type ekind = EKind : 'a kind -> ekind
+open Utils
 
 (*------------------------------------------------------------------*)
 (** Type variables *)
@@ -38,120 +21,70 @@ let pp_univar fmt u = Fmt.pf fmt "'_%a" Ident.pp u
   
 (*------------------------------------------------------------------*)
 (** Types of terms *)
-type _ ty =
-  (** Built-in types *)
-  | Message   : message   ty
-  | Boolean   : message   ty
-  | Index     : index     ty
-  | Timestamp : timestamp ty
+type ty =
+  (* Built-in types *)
+  | Message
+  | Boolean
+  | Index  
+  | Timestamp
 
+  | TBase   of string
   (** User-defined types *)
-  | TBase     : string -> message ty
         
+  | TVar    of tvar
   (** Type variable *)
-  | TVar      : tvar   -> message ty
 
+  | TUnivar of univar
   (** Type unification variable *)
-  | TUnivar   : univar -> message ty
-
-(*------------------------------------------------------------------*)
-type 'a t = 'a ty
-
-type ety = ETy : 'a ty -> ety
-
-(*------------------------------------------------------------------*)
-type tmessage   = message   ty
-type ttimestamp = timestamp ty
-type tindex     = index     ty
 
 (*------------------------------------------------------------------*)
 (** Higher-order *)
-type hty =
-  | Lambda of ety list * tmessage 
+type hty = Lambda of ty list * ty
 
 (*------------------------------------------------------------------*)
-let eboolean   = ETy Boolean
-let emessage   = ETy Message
-let etimestamp = ETy Timestamp
-let eindex     = ETy Index
+let tboolean   = Boolean
+let tmessage   = Message
+let ttimestamp = Timestamp
+let tindex     = Index
 
-let ebase s   = ETy (TBase s)
-
-(*------------------------------------------------------------------*)
-let kind : type a. a ty -> a kind = function
-  | Boolean   -> KMessage
-  | Index     -> KIndex
-  | Timestamp -> KTimestamp
-
-  | TVar _    -> KMessage
-  | TBase _   -> KMessage
-  | Message   -> KMessage
-  | TUnivar u -> KMessage
-  
-(*------------------------------------------------------------------*)
-(** Equality witness for types and kinds *)
-type (_,_) type_eq = Type_eq : ('a, 'a) type_eq
+let base s   = TBase s
 
 (*------------------------------------------------------------------*)
-(** Equality relation, and return a (Ocaml) type equality witness *)
-let equal_w : type a b. a ty -> b ty -> (a,b) type_eq option =
- fun a b -> match a,b with
-   | Boolean,   Boolean   -> Some Type_eq
-   | Index,     Index     -> Some Type_eq
-   | Timestamp, Timestamp -> Some Type_eq
-   | Message,   Message   -> Some Type_eq
+(** Equality relation *)
+let equal (a : ty) (b : ty) : bool =
+  match a,b with
+   | Boolean,   Boolean   -> true
+   | Index,     Index     -> true
+   | Timestamp, Timestamp -> true
+   | Message,   Message   -> true
                                
-   | TVar s, TVar s' when Ident.equal s s' ->
-     Some Type_eq
+   | TVar s, TVar s'  -> Ident.equal s s'
 
-   | TBase s, TBase s' when s = s' ->
-     Some Type_eq
+   | TBase s, TBase s' -> s = s'
 
-   | TUnivar u, TUnivar u' when Ident.equal u u' ->
-     Some Type_eq
+   | TUnivar u, TUnivar u' -> Ident.equal u u'
      
-   | _ -> None
-
-let equal : type a b. a ty -> b ty -> bool =
-  fun a b -> equal_w a b <> None
-
-let eequal (ETy t1) (ETy t2) = equal t1 t2
+   | _ -> false
 
 let ht_equal ht ht' = match ht, ht' with
   | Lambda (es1, t1), Lambda (es2, t2) ->
     List.length es1 = List.length es2 &&
-    List.for_all2 eequal es1 es2 &&
+    List.for_all2 equal es1 es2 &&
     equal t1 t2
 
 (*------------------------------------------------------------------*)
-(** Equality relation, and return a (Ocaml) type equality witness *)
-let equalk_w : type a b. a kind -> b kind -> (a,b) type_eq option =
- fun a b -> match a,b with
-   | KIndex,     KIndex     -> Some Type_eq
-   | KTimestamp, KTimestamp -> Some Type_eq
-   | KMessage,   KMessage   -> Some Type_eq
-     
-   | _ -> None
-
-let equalk : type a b. a kind -> b kind -> bool =
-  fun a b -> equalk_w a b <> None
+(** Sub-typing relation *)
+let subtype (a : ty) (b : ty) : bool =
+  equal a b ||
+  begin 
+    match a, b with
+    | TVar  _ , Message -> true
+    | TBase _,  Message -> true
+    | _ -> false
+  end
 
 (*------------------------------------------------------------------*)
-(** Sub-typing relation, and return a (Ocaml) type equality witness *)
-let subtype_w : type a b. a ty -> b ty -> (a,b) type_eq option =
-  fun a b -> match equal_w a b with
-    | Some Type_eq -> Some Type_eq
-    | None -> match a, b with
-      | TVar  _ , Message -> Some Type_eq
-      | TBase _,  Message -> Some Type_eq 
-                               
-      | _ -> None
-
-let subtype : type a b. a ty -> b ty -> bool =
-  fun a b -> subtype_w a b <> None 
-
-(*------------------------------------------------------------------*)
-let pp : type a. Format.formatter -> a ty -> unit = fun ppf -> function
+let pp (ppf : Format.formatter) : ty -> unit = function
   | Message   -> Fmt.pf ppf "message"
   | Index     -> Fmt.pf ppf "index"
   | Timestamp -> Fmt.pf ppf "timestamp"
@@ -160,31 +93,26 @@ let pp : type a. Format.formatter -> a ty -> unit = fun ppf -> function
   | TVar id   -> pp_tvar ppf id
   | TUnivar u -> pp_univar ppf u
 
-let pp_e ppf (ETy t) = pp ppf t
+(*------------------------------------------------------------------*)
+let is_finite : ty -> bool = function
+  | Index | Timestamp -> true
+  | _ -> false
 
-
+let is_tuni = function TUnivar _ -> true | _ -> false
+  
 (*------------------------------------------------------------------*)
 let pp_ht fmt ht = 
   let pp_seq fmt () = Fmt.pf fmt " * " in
 
-  let pp_ets fmt (ets : ety list) =
+  let pp_ets fmt (ets : ty list) =
     match ets with
     | [] -> Fmt.pf fmt "()"
-    | [ety] -> pp_e fmt ety
-    | _ -> Fmt.pf fmt "@[<hv 2>(%a)@]" (Fmt.list ~sep:pp_seq pp_e) ets 
+    | [ety] -> pp fmt ety
+    | _ -> Fmt.pf fmt "@[<hv 2>(%a)@]" (Fmt.list ~sep:pp_seq pp) ets 
   in
   match ht with
   | Lambda (ets, ty) -> 
     Fmt.pf fmt "@[<hv 2>fun %a ->@ %a@]" pp_ets ets pp ty
-
-
-(*------------------------------------------------------------------*)
-let pp_kind : type a. Format.formatter -> a kind -> unit = fun ppf -> function
-  | KMessage   -> Fmt.pf ppf "message"
-  | KIndex     -> Fmt.pf ppf "index"
-  | KTimestamp -> Fmt.pf ppf "timestamp"
-
-let pp_kinde ppf (EKind t) = pp_kind ppf t
 
 
 (*------------------------------------------------------------------*)
@@ -196,10 +124,10 @@ let pp_kinde ppf (EKind t) = pp_kind ppf t
     Invariant: [fty_out] tvars and univars must be bounded by [fty_vars].
 *)
 type 'a ftype_g = {
-  fty_iarr : int;             (** i *)
-  fty_vars : 'a list;         (** 'a₁ ... 'aₙ *)  
-  fty_args : message ty list; (** τ₁ × ... × τₙ *)
-  fty_out  : message ty;      (** τ *)
+  fty_iarr : int;     (** i *)
+  fty_vars : 'a list; (** 'a₁ ... 'aₙ *)  
+  fty_args : ty list; (** τ₁ × ... × τₙ *)
+  fty_out  : ty;      (** τ *)
 }
 
 (** A [ftype] uses [tvar] for quantified type variables. *)
@@ -223,8 +151,8 @@ module Sid = Ident.Sid
                
 (** A type substitution*)
 type tsubst = {
-  ts_univar : message ty Ident.Mid.t;
-  ts_tvar   : message ty Ident.Mid.t;
+  ts_univar : ty Ident.Mid.t;
+  ts_tvar   : ty Ident.Mid.t;
 }
 
 let tsubst_empty =
@@ -234,7 +162,7 @@ let tsubst_empty =
 let tsubst_add_tvar   s tv ty = { s with ts_tvar   = Mid.add tv ty s.ts_tvar; }
 let tsubst_add_univar s tu ty = { s with ts_univar = Mid.add tu ty s.ts_univar; }
   
-let tsubst : type a. tsubst -> a ty -> a ty = fun s t ->
+let tsubst (s : tsubst) (t : ty) : ty = 
   match t with
   | Message   -> Message
   | Boolean   -> Boolean
@@ -255,11 +183,9 @@ let tsubst : type a. tsubst -> a ty -> a ty = fun s t ->
       with Not_found -> t
     end
 
-let tsubst_e s (ETy ty) = ETy (tsubst s ty)
-
 let tsubst_ht (ts : tsubst) (ht : hty) : hty =
   match ht with
-  | Lambda (vs, f) -> Lambda (List.map (tsubst_e ts) vs, tsubst ts f)
+  | Lambda (vs, f) -> Lambda (List.map (tsubst ts) vs, tsubst ts f)
 
 (*------------------------------------------------------------------*)
 (** {2 Type inference } *)
@@ -274,12 +200,11 @@ module Infer : sig
 
   val open_tvars : env -> tvars -> univars * tsubst
 
-  val norm   : env -> 'a ty -> 'a ty
-  val enorm  : env ->   ety ->   ety
-  val htnorm : env ->   hty ->   hty
+  val norm   : env -> ty  -> ty
+  val htnorm : env -> hty -> hty
                          
-  val unify_eq  : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
-  val unify_leq : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
+  val unify_eq  : env -> ty -> ty -> [`Fail | `Ok]
+  val unify_leq : env -> ty -> ty -> [`Fail | `Ok]
 
   val is_closed     : env -> bool
   val close         : env -> tsubst
@@ -288,7 +213,7 @@ end = struct
   module Mid = Ident.Mid
                  
   (* an unification environment *)
-  type env = message ty Mid.t ref
+  type env = ty Mid.t ref
  
   let mk_env () = ref Mid.empty 
 
@@ -314,28 +239,22 @@ end = struct
 
 
   (* Univar are maximal for this ordering *)
-  let compare : type a b. a ty -> b ty -> int =
-    fun t t' -> match t, t' with
+  let compare (t : ty) (t' : ty) : int =
+    match t, t' with
       | TUnivar u, TUnivar u' -> Ident.compare u u'
       | TUnivar _, _ -> 1
       | _, TUnivar _ -> -1
-      | _, _ -> Stdlib.compare (ETy t) (ETy t')
-
-  let compare_e et et' = match et, et' with
-    | ETy t, ETy t' -> compare t t'
+      | _, _ -> Stdlib.compare t t'
     
-  let rec norm : type a. env -> a ty -> a ty =
-    fun env t ->
+  let rec norm (env : env) (t : ty) : ty =
     match t with
     | TUnivar u ->
-      let u' = Mid.find u !env in
+      let u' = Mid.find_dflt t u !env in
       if t = u' then u' else norm env u'        
     | _ -> t
 
-  let enorm env (ETy ty) = ETy (norm env ty)
-
   let htnorm env ht = match ht with
-    | Lambda (evs, ty) -> Lambda (List.map (enorm env) evs, norm env ty)
+    | Lambda (evs, ty) -> Lambda (List.map (norm env) evs, norm env ty)
 
   let norm_env (env : env) : unit = 
     env := Mid.map (norm env) !env
@@ -377,25 +296,21 @@ end = struct
     (* close the resulting environment *)
     gen_tvars, close env
 
-  let unify_eq : type a b. env -> a ty -> b ty -> [`Fail | `Ok] =
-    fun env t t' ->
+  let unify_eq (env : env) (t : ty) (t' : ty) : [`Fail | `Ok] =
     let t  = norm env t
     and t' = norm env t' in
 
-    match equalk_w (kind t) (kind t') with
-    | None -> `Fail
-    | Some Type_eq ->
-      let t, t' = if compare t t' < 0 then t', t else t, t' in
+    let t, t' = if compare t t' < 0 then t', t else t, t' in
+    
+    if equal t t'
+    then `Ok
+    else match t, t' with
+      | TUnivar u, _ -> env := Mid.add u t' !env; `Ok
+      | _ -> `Fail
 
-      if equal t t'
-      then `Ok
-      else match t, t' with
-        | TUnivar u, _ -> env := Mid.add u t' !env; `Ok
-        | _ -> `Fail
-
-  (* TODO: improve type inference by not handling subtyping constraint as
-     type equality constraints. *)
-  let unify_leq env (t : 'a ty) (t' : 'b ty) : [`Fail | `Ok] =
+  (* FEATURE: subtype: improve type inference by not handling
+     subtyping constraint as type equality constraints. *)
+  let unify_leq env (t : ty) (t' : ty) : [`Fail | `Ok] =
     unify_eq env t t'
 end
 

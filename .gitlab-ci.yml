@@ -1,8 +1,15 @@
 before_script:
+ - opam update
  - opam switch -y remove gitrunner ||  echo "Opam environment clean up"
- - opam switch -y create gitrunner ocaml-base-compiler.4.10.0
+ - opam switch -y create gitrunner ocaml-base-compiler.4.13.1
  - opam install . -y --deps-only
+ - opam pin -y alt-ergo-lib https://github.com/OCamlPro/alt-ergo/archive/refs/heads/next.zip
+ - opam pin -y alt-ergo-parsers https://github.com/OCamlPro/alt-ergo/archive/refs/heads/next.zip 
+ - opam pin -y alt-ergo https://github.com/OCamlPro/alt-ergo/archive/refs/heads/next.zip
+ - opam install -y alt-ergo why3 odoc
+
  - eval $(opam env)
+ - why3 config detect
 build:
   stage: build
   script:

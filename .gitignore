@@ -3,6 +3,7 @@ _build/*
 *.native
 todo
 *.byte
+*.exe
 output.tex
 *.aux
 *.bbl
@@ -22,3 +23,5 @@ sanity
 _coverage/
 *.coverage
 /src/commit.ml
+.DS_Store
+\#*\#

@@ -1,5 +1,4 @@
-(** Module instantiating parsing from buffers.
- *)
+(** Module instantiating parsing from buffers. *)
 
 let () = Printexc.record_backtrace true
 
@@ -16,23 +15,23 @@ exception Error of string
   *
   * For bad, internal errors that should be
   * reported with a backtrace, return [None]. *)
-(** Pretty-printer for parsing locations. *)
 let pp_error pp_loc pp_pref_loc e = match e with
   | Parser.Error ->
       Some (fun ppf () ->
               Fmt.pf ppf
-                "@[%aSyntax error %a.@]@."
+                "%aSyntax error: @[%a@]."
                 pp_pref_loc ()
                 pp_loc ())
   | Failure s ->
       Some (fun ppf () ->
               Fmt.pf ppf
-                "@[%aError %a: @,%s.@]@."
+                "%aError: @[%a@]: @,%s."
                 pp_pref_loc ()
                 pp_loc ()
                 s)
   | _ -> None
 
+(** Pretty-printer for parsing locations. *)
 let pp_loc interactive filename lexbuf ppf () =
   if not interactive then
     Fmt.pf ppf
@@ -56,7 +55,7 @@ let pp_loc interactive filename lexbuf ppf () =
 let pp_pref_loc interactive lexbuf ppf () =
   if interactive then
     Fmt.pf ppf
-      "[error-%d-%d]"
+      "[error-%d-%d]@;"
       (Lexing.lexeme_start_p lexbuf).pos_cnum
       (Lexing.lexeme_end_p lexbuf).pos_cnum
 
@@ -75,7 +74,7 @@ let parse_from_buf
     | Some pp_error ->
       if test then raise e else
       if interactive then
-        let msg = Fmt.strf "%a" pp_error () in
+        let msg = Fmt.str "%a" pp_error () in
         raise (Error msg)
       else begin
         Printer.prt `Error "%a" pp_error () ;
@@ -100,7 +99,11 @@ let parse_theory_buf ?(test=false) lexbuf filename =
 let parse_theory_test ?(test=false) filename =
   let lexbuf = Lexing.from_channel (Stdlib.open_in filename) in
   let decls = parse_theory_buf ~test lexbuf filename in
-  Prover.declare_list Symbols.builtins_table Hint.empty_hint_db decls
+  let table, subgs =
+    ProcessDecl.declare_list Symbols.builtins_table Hint.empty_hint_db decls
+  in
+  assert (subgs = []);
+  table
 
 let parse parser parser_name string =
   let lexbuf = Lexing.from_string string in
@@ -112,10 +115,11 @@ let parse parser parser_name string =
       parser_name (Lexing.lexeme lexbuf) ;
     raise e
 
-let parse_process table ?(typecheck=false) str =
+let parse_process (env : Env.t) ?(typecheck=false) str =
   let p = parse Parser.top_process "process" str in
-    if typecheck then Process.check_proc table Vars.empty_env p ;
-    p
+  let projs = [ Term.left_proj; Term.right_proj; ] in
+  if typecheck then Process.check_proc env projs p ;
+  p
 
 let parse_formula = parse Parser.top_formula "formula"
 
@@ -136,10 +140,6 @@ let () =
       check "False"
     end ;
     "Boolean connectives", `Quick, begin fun () ->
-      (* TODO improve without parentheses:
-       * the pretty-printer should ideally be aware of precedences
-       * between connectives (and quantifiers) and only insert parentheses
-       * and boxes when precedences require it  *)
       check "not(True)" ;
       check "(True => False)" ;
       check "(True || False)" ;
@@ -147,7 +147,7 @@ let () =
     end ;
     "Quantifiers", `Quick, begin fun () ->
       check "forall (x:index), True" ;
-      check "forall (x:index), (x = x && x <> x)" ;
+      check "forall (x:index), ((x = x) && (x <> x))" ;
       check "exists (x:index), True" ;
       check "exists (x:index,y:message,z:index,t:timestamp), True" ;
       eqf "exists x:index, True" "exists (x:index) True" ;
@@ -158,33 +158,34 @@ let () =
 
 let () =
   let table = Channel.declare Symbols.builtins_table (L.mk_loc L._dummy "c") in
+  let env = Env.init ~table () in
 
   Checks.add_suite "Process parsing" [
     "Null", `Quick, begin fun () ->
-      ignore (parse_process table "null" : Process.process)
+      ignore (parse_process env "null" : Process.process)
     end ;
     "Simple", `Quick, begin fun () ->
-      ignore (parse_process table "in(c,x);out(c,x);null" : Process.process) ;
-      ignore (parse_process table "in(c,x);out(c,x)" : Process.process) ;
+      ignore (parse_process env "in(c,x);out(c,x);null" : Process.process) ;
+      ignore (parse_process env "in(c,x);out(c,x)" : Process.process) ;
       Alcotest.check_raises "fails" Parser.Error
         (fun () ->
-           ignore (parse_process table "in(c,x) then null" : Process.process)) ;
+           ignore (parse_process env "in(c,x) then null" : Process.process)) ;
       begin
         match
-          Location.unloc (parse_process table "(in(c,x);out(c,x) | in(c,x))")
+          Location.unloc (parse_process env "(in(c,x);out(c,x) | in(c,x))")
         with
         | Process.Parallel _ -> ()
         | _ -> assert false
       end ;
-      ignore (parse_process table
+      ignore (parse_process env
                 "if u=true then if True then null else null else null"
               : Process.process)
     end ;
     "Pairs", `Quick, begin fun () ->
-      ignore (parse_process table "in(c,x);out(c,<x,x>)" : Process.process)
+      ignore (parse_process env "in(c,x);out(c,<x,x>)" : Process.process)
     end ;
     "If", `Quick, begin fun () ->
-      let table =
+      let table, _ =
         let decl_i =
           Decl.Decl_abstract {
             name = L.mk_loc L._dummy "error";
@@ -193,12 +194,13 @@ let () =
             abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
         in
         let decl = Location.mk_loc Location._dummy decl_i in
-        Prover.declare table Hint.empty_hint_db decl in
-      ignore (parse_process table "in(c,x); out(c, if x=x then x else error)"
+        ProcessDecl.declare table Hint.empty_hint_db decl in
+      let env = { env with table } in
+      ignore (parse_process env "in(c,x); out(c, if x=x then x else error)"
               : Process.process)
     end ;
     "Try", `Quick, begin fun () ->
-      let table =
+      let table, _ =
         let decl_i =
           Decl.Decl_abstract
             { name = L.mk_loc L._dummy "ok";
@@ -207,10 +209,10 @@ let () =
               abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
         in
         let decl = Location.mk_loc Location._dummy decl_i in
-        Prover.declare table Hint.empty_hint_db decl
+        ProcessDecl.declare table Hint.empty_hint_db decl
       in
       
-      let table =
+      let table, _ =
         let decl_i =
           Decl.Decl_abstract
             { name = L.mk_loc L._dummy "error";
@@ -220,15 +222,16 @@ let () =
         in
         
         let decl = Location.mk_loc Location._dummy decl_i in
-        Prover.declare table Hint.empty_hint_db decl
+        ProcessDecl.declare table Hint.empty_hint_db decl
       in
-      ignore (parse_process table
+      let env = { env with table } in
+      ignore (parse_process env
                 "in(c,x); \
                  try find i such that x = x in \
                  out(c,ok)\
                  else out(c,error)"
               : Process.process) ;
-      ignore (parse_process table
+      ignore (parse_process env
                 "in(c,x); \
                  out(c, try find i such that x = x in ok \
                  else error)"

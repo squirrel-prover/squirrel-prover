@@ -7,7 +7,7 @@ type s_item =
   | Tryautosimpl of Location.t    (** '//' *)
   | Simplify     of Location.t    (** '//=' *)
 
-let rec pp_s_item fmt = function
+let pp_s_item fmt = function
   | Simplify      _ -> Fmt.pf fmt "/="
   | Tryauto       _ -> Fmt.pf fmt "//"
   | Tryautosimpl  _ -> Fmt.pf fmt "//="
@@ -90,6 +90,10 @@ let pp_rw_arg ppf rw_arg = match rw_arg with
   | R_item r -> Fmt.pf ppf "..."
 
 (*------------------------------------------------------------------*)
+(** Function application argument *)
+type fa_arg = rw_count * Theory.term
+
+(*------------------------------------------------------------------*)
 type apply_in = lsymb option
 
 let pp_apply_in ppf = function
@@ -119,7 +123,7 @@ type and_or_pat =
 and simpl_pat =
   | SAndOr of and_or_pat
   | SNamed of naming_pat
-  | Srewrite of rw_dir                    (** -> or <-*)
+  | Srewrite of rw_dir      (** -> or <-*)
 
 type intro_pattern =
   | Star   of Location.t    (** '*' *)
@@ -154,7 +158,7 @@ and pp_simpl_pat fmt = function
   | Srewrite L.{ pl_desc = `RightToLeft } -> Fmt.pf fmt "<-"
 
 
-let rec pp_intro_pat fmt = function
+let pp_intro_pat fmt = function
   | SItem s    -> pp_s_item fmt s
   | Star     _ -> Fmt.pf fmt "*"
   | StarV    _ -> Fmt.pf fmt ">"
@@ -169,7 +173,7 @@ let pp_intro_pats fmt args =
 (*------------------------------------------------------------------*)
 (** handler for intro pattern application *)
 type ip_handler = [
-  | `Var of Vars.evar (* Careful, the variable is not added to the env  *)
+  | `Var of Vars.var (* Careful, the variable is not added to the env  *)
   | `Hyp of Ident.t
 ]
 
@@ -189,6 +193,7 @@ type parser_arg =
   | String_name  of lsymb
   | Int_parsed   of int L.located
   | Theory       of Theory.term
+  | NamingPat    of naming_pat
   | IntroPat     of intro_pattern list
   | AndOrPat     of and_or_pat
   | SimplPat     of simpl_pat
@@ -201,6 +206,7 @@ type parser_arg =
   | MemSeq       of int L.located * int L.located
   | Remember     of Theory.term * lsymb
   | Generalize   of Theory.term list * naming_pat list option
+  | Fa           of fa_arg list
   | TermPat      of int * Theory.term
 
 type parser_args = parser_arg list
@@ -209,6 +215,7 @@ let pp_parser_arg ppf = function
   | Int_parsed i  -> Fmt.int ppf (L.unloc i)
   | String_name s -> Fmt.string ppf (L.unloc s)
   | Theory th     -> Theory.pp ppf th
+  | NamingPat p   -> pp_naming_pat ppf p
   | IntroPat args -> pp_intro_pats ppf args
   | AndOrPat pat  -> pp_and_or_pat ppf pat
   | SimplPat pat  -> pp_simpl_pat ppf pat
@@ -253,23 +260,23 @@ let pp_parser_arg ppf = function
   | TermPat (sel, term) ->
     Fmt.pf ppf "{%i}(%a)" sel Theory.pp term
 
+  | Fa l ->
+    let pp_el ppf (count, term) =
+      Fmt.pf ppf "%a%a" pp_rw_count count Theory.pp term
+    in
+    Fmt.pf ppf "@[<hov> %a@]" (Fmt.list ~sep:Fmt.sp pp_el) l
+      
 (*------------------------------------------------------------------*)
-type ('a, 'b) pair
-
-
-type boolean = [`Boolean]
-
-(*------------------------------------------------------------------*)
-(* The types are explicit, in order to type the tactics. *)
+(** Tactic arguments sorts *)
 type _ sort =
   | None      : unit sort
 
-  | Message   : Type.message   sort
-  | Boolean   :      boolean   sort
-  | Timestamp : Type.timestamp sort
-  | Index     : Type.index     sort
+  | Message   : Type.ty sort
+  | Boolean   : Type.ty sort
+  | Timestamp : Type.ty sort
+  | Index     : [`Index] sort
 
-  | ETerm     : Theory.eterm    sort
+  | Term      : [`Term] sort
   (** Boolean, timestamp or message *)
 
   | Int       : int L.located sort
@@ -278,16 +285,17 @@ type _ sort =
   | Opt       : 'a sort -> ('a option) sort
 
 (*------------------------------------------------------------------*)
+
+(** Tactic arguments *)
 type _ arg =
   | None      : unit arg
 
-  | Message   : Term.message * Type.tmessage -> Type.message arg
+  | Message   : Term.term * Type.ty -> Type.ty arg
 
-  | Boolean   : Term.message   ->      boolean   arg
-  | Timestamp : Term.timestamp -> Type.timestamp arg
-  | Index     : Vars.index     -> Type.index     arg
+  | Index     : Vars.var -> [`Index] arg
 
-  | ETerm     : 'a Type.ty * 'a Term.term * Location.t -> Theory.eterm arg
+  | Term      : Type.ty * Term.term * Location.t -> [`Term] arg
+  (** A [Term.term] with its sorts. *)
 
   | Int       : int L.located -> int L.located arg
   | String    : lsymb -> lsymb arg
@@ -295,18 +303,6 @@ type _ arg =
   | Opt       : ('a sort * 'a arg option) -> ('a option) arg
 
 (*------------------------------------------------------------------*)
-let rec sort : type a. a arg -> a sort =
-  function
-  | None        -> None
-  | Message _   -> Message
-  | Boolean _   -> Boolean
-  | Timestamp _ -> Timestamp
-  | Index _     -> Index
-  | Int _       -> Int
-  | String _    -> String
-  | Pair (a, b) -> Pair (sort a, sort b)
-  | Opt (s,_)   -> Opt s
-  | ETerm _     -> ETerm
 
 type esort = Sort : ('a sort) -> esort
 
@@ -319,17 +315,17 @@ let rec cast: type a b. a sort -> b arg -> a arg =
   fun kind t ->
   match kind, t with
   | Pair (a,b), Pair (c,d) -> Pair (cast a c, cast b d)
-  | Opt s, Opt (r, None) -> Opt(s,None)
+  | Opt s, Opt (r, None)   -> Opt(s, None)
   | Opt s, Opt (r, Some q) -> Opt(s, Some (cast s q))
   | _ -> begin
-      match kind, sort t with
-      | Message  , Message   -> t
-      | Boolean  , Boolean   -> t
-      | Timestamp, Timestamp -> t
-      | Index    , Index     -> t
-      | ETerm    , ETerm     -> t
-      | Int      , Int       -> t
-      | String   , String    -> t
+      match kind, t with
+      | Message  , Message _ -> t
+      | Boolean  , Message _ -> t
+      | Timestamp, Message _ -> t
+      | Index    , Index   _ -> t
+      | Term     , Term    _ -> t
+      | Int      , Int     _ -> t
+      | String   , String  _ -> t
       | None     , None      -> t
       | _ -> raise Uncastable
     end
@@ -341,22 +337,15 @@ let sort_to_string  : type a. a sort -> string = function
   | Boolean   -> "f"
   | Timestamp -> "ts"
   | Index     -> "idx"
-  | ETerm     -> "t"
+  | Term      -> "t"
   | Int       -> "i"
   | String    -> "H"
   | Pair _
   | Opt _ -> assert false
 
 (*------------------------------------------------------------------*)
-type counters = { message : int;
-                  boolean : int;
-                  timestamp : int;
-                  index : int;
-                  int : int;
-                  string : int}
 
 module Ms = Map.Make (struct type t = esort let compare = Stdlib.compare end)
-
 
 type table = int Ms.t
 
@@ -372,7 +361,7 @@ let rec setup_counters : type a. table -> a sort -> table =
   | Boolean
   | Timestamp
   | Index
-  | ETerm
+  | Term
   | Int
   | String ->
     begin
@@ -392,7 +381,7 @@ let has_multiple_occurences  : type a. table -> a sort -> bool =
   | Boolean
   | Timestamp
   | Index
-  | ETerm
+  | Term
   | Int
   | String ->
     begin
@@ -411,7 +400,7 @@ let rec pp_aux_sort : type a. table -> table ref -> bool -> Format.formatter -> 
   | Boolean
   | Timestamp
   | Index
-  | ETerm
+  | Term
   | Int
   | String ->
     if has_multiple_occurences init_table s then
@@ -427,160 +416,12 @@ let rec pp_aux_sort : type a. table -> table ref -> bool -> Format.formatter -> 
       Fmt.pf ppf (if printopt then "[%s]" else  "%s") (sort_to_string s)
 
   | Opt a -> pp_aux_sort init_table counter_table true ppf a
-  | Pair (a, b) -> Fmt.pf ppf "%a %a"
-                     (pp_aux_sort init_table counter_table printopt) a
-                     (pp_aux_sort init_table counter_table printopt) b
+  | Pair (a, b) ->
+      Fmt.pf ppf "%a, %a"
+        (pp_aux_sort init_table counter_table printopt) a
+        (pp_aux_sort init_table counter_table printopt) b
 
 let pp_esort ppf (Sort s) =
   let init_table = setup_counters (empty_table) s in
   let counter_table = ref empty_table in
-  Fmt.pf ppf "%a" (pp_aux_sort init_table counter_table false) s
-
-
-(*------------------------------------------------------------------*)
-type tac_arg_error_i =
-  | CannotConvETerm
-
-type tac_arg_error = L.t * tac_arg_error_i
-
-exception TacArgError of tac_arg_error
-
-let pp_tac_arg_error_i ppf = function
-  | CannotConvETerm -> Fmt.pf ppf "cannot convert the term as a message, \
-                                   timestamp, boolean or an index"
-
-let pp_tac_arg_error pp_loc_err ppf (loc,e) =
-  Fmt.pf ppf "%a%a"
-    pp_loc_err loc
-    pp_tac_arg_error_i e
-
-let tac_arg_error loc e = raise (TacArgError (loc,e))
-
-(*------------------------------------------------------------------*)
-
-let convert_as_lsymb parser_args = match parser_args with
-  | [Theory (L.{ pl_desc = App (p,[]) } )] ->
-    Some p
-  | _ -> None
-
-let convert_pat_arg sel sexpr conv_cntxt tyvars env p conc =
-  let t, ty =
-    Theory.convert_i ~pat:true conv_cntxt tyvars env p
-  in
-  let pat_vars =
-    Vars.Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
-  in
-  let pat = Match.{
-      pat_tyvars = [];
-      pat_vars;
-      pat_term = t; }
-  in
-  let option = { Match.default_match_option with allow_capture = true; } in
-  let res = match conc with
-    | `Reach form -> Match.T.find ~option (conv_cntxt.table) sexpr env pat form
-    | `Equiv form -> Match.E.find ~option (conv_cntxt.table) sexpr env pat form
-  in
-  let message = match List.nth res (sel-1) with
-    | Term.ETerm et -> Term.cast (Term.kind t) et
-    | exception _ -> raise Theory.(Conv (L._dummy,
-                                         Tactic_type
-                                           ("Could not extract the element "
-                                            ^string_of_int (sel)
-                                            ^" out of "^string_of_int (List.length res)
-                                            ^" matches found")))
-
-  in
-  (message, ty)
-
-
-let convert_args sexpr table tyvars env parser_args tactic_type conc =
-  let conv_cntxt = Theory.{ table = table; cntxt = InGoal; } in
-
-  let rec conv_args parser_args tactic_type env =
-    match parser_args, tactic_type with
-    | [Theory p], Sort Timestamp ->
-      Arg (Timestamp (Theory.convert conv_cntxt tyvars env p Type.Timestamp))
-
-    | [TermPat (sel, p)], Sort Message ->
-      let (m, ty) = convert_pat_arg sel sexpr conv_cntxt tyvars env p conc in
-        Arg (Message (m, ty))
-
-    | [Theory p], Sort Message ->
-      begin match Theory.convert_i conv_cntxt tyvars env p with
-        | (t, ty) -> Arg (Message (t, ty))
-        | exception Theory.(Conv (_,PatNotAllowed)) ->
-          let (m, ty) = convert_pat_arg 1 sexpr conv_cntxt tyvars env p conc in
-            Arg (Message (m, ty))
-      end
-    | [Theory p], Sort Boolean ->
-      Arg (Boolean   (Theory.convert conv_cntxt tyvars env p Type.Boolean))
-
-    | [Theory p], Sort ETerm ->
-      let et = match Theory.econvert conv_cntxt tyvars env p with
-        | Some (Theory.ETerm (s,t,l)) -> ETerm (s,t,l)
-        (* FIXME: this does not give any conversion error to the user. *)
-        | None -> tac_arg_error (L.loc p) CannotConvETerm
-        | exception Theory.(Conv (_,PatNotAllowed)) ->
-          let (m,ty) = convert_pat_arg 1 sexpr conv_cntxt tyvars env p conc in
-          ETerm (ty, m, L.loc p)
-      in
-      Arg et
-
-    | [Theory (L.{ pl_desc = App (p,[]) } )], Sort String ->
-      Arg (String p)
-
-    | [Int_parsed i], Sort Int ->
-      Arg (Int i)
-
-    | [Theory t], Sort String ->
-      raise Theory.(Conv (L.loc t, String_expected (L.unloc t)))
-
-    | [Theory t], Sort Int ->
-      raise Theory.(Conv (L.loc t, Int_expected (L.unloc t)))
-
-    | [Theory p], Sort Index ->
-      Arg (Index (Theory.convert_index table tyvars env p))
-
-    | th1::q, Sort (Pair (Opt s1, s2)) ->
-      begin match conv_args [th1] (Sort (Opt s1)) env with
-        | Arg arg1 ->
-          let Arg arg2 = conv_args q (Sort s2) env in
-          Arg (Pair (arg1, arg2))
-        | exception Theory.(Conv _) ->
-          let Arg arg2 = conv_args (th1::q) (Sort s2) env in
-          Arg (Pair (Opt (s1, None), arg2))
-      end
-
-    | th1::q, Sort (Pair (s1, s2)) ->
-      let Arg arg1 = conv_args [th1] (Sort s1) env in
-      let Arg arg2 = conv_args q (Sort s2) env in
-      Arg (Pair (arg1, arg2))
-
-    | [], Sort (Opt a) ->
-      Arg (Opt (a, None))
-
-    | [], Sort (Pair (Opt a, b)) ->
-      let Arg arg2 = conv_args [] (Sort b) env in
-      Arg (Pair (Opt (a, None), arg2))
-
-    | [th], Sort (Opt a) ->
-      let Arg arg = conv_args [th] (Sort a) env in
-      Arg (Opt
-             (a,
-              (Some (cast a arg))
-             )
-          )
-
-    | [], Sort None -> Arg None
-
-    (* TODO: location *)
-    | [], _ -> raise Theory.(Conv (L._dummy, Tactic_type "more arguments expected"))
-
-    (* TODO: location *)
-    | p, _  ->
-      raise Theory.(Conv (L._dummy,
-                          Tactic_type "tactic argument error \
-                                       (maybe you gave too many arguments?)"))
-
-  in
-  conv_args parser_args tactic_type env
+  pp_aux_sort init_table counter_table false ppf s

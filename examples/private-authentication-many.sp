@@ -12,7 +12,6 @@ B -> A : enc(<nA,nB>,rB,pkA)
 This is a "light" model without the last check of A.
 *******************************************************************************)
 set postQuantumSound=true.
-set autoIntro=false.
 
 channel cA
 channel cB

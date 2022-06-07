@@ -26,8 +26,6 @@ SECURITY PROPERTIES
 - secrecy (as a reachability property)
 *******************************************************************************)
 
-set autoIntro = false.
-
 hash h
 
 name secret : message
@@ -89,8 +87,7 @@ goal counterIncreasePred (t:timestamp):
 Proof.
   intro Hc.
   use orderSucc with d@pred(t).
-  case t; 2,3,4: auto.
-  constraints.
+  case t => //.
 Qed.
 
 (**
@@ -107,22 +104,22 @@ Proof.
   assert (t' < pred(t) || t' >= pred(t)) as H0 by case t.
   case H0.
 
-    (** Case where t' < pred(t).
-    We first apply the induction hypothesis on `t'` to get `d@t' ~< d@pred(t)`,
-    then use the lemma counterIncreasePred with `t` to get `d@pred(t) ~< d@t`.
-    It then remains to conclude by transitivity (applying `orderTrans`).
-    **)
-    apply Hind in H0 => //.
-    use counterIncreasePred with t; 2: by constraints.
-    by apply orderTrans _ (d@pred(t)).
+    +  (** Case where t' < pred(t).
+       We first apply the induction hypothesis on `t'` to get `d@t' ~< d@pred(t)`,
+       then use the lemma counterIncreasePred with `t` to get `d@pred(t) ~< d@t`.
+       It then remains to conclude by transitivity (applying `orderTrans`).
+       **)
+       apply Hind in H0 => //.
+       use counterIncreasePred with t; 2: by constraints.
+       by apply orderTrans _ (d@pred(t)).
 
-    (** Case where t' >= pred(t).
-    Since `t' < t` we can deduce that `t' = pred(t)`. It is then directly
-    a consequence of the counterIncreasePred lemma.
-    **)
-    assert t' = pred(t) as Ceq by constraints.
-    use counterIncreasePred with t; 2: auto.
-    by rewrite Ceq; auto.
+    +  (** Case where t' >= pred(t).
+       Since `t' < t` we can deduce that `t' = pred(t)`. It is then directly
+       a consequence of the counterIncreasePred lemma.
+       **)
+       assert t' = pred(t) as Ceq by constraints.
+       use counterIncreasePred with t; 2: auto.
+       by rewrite Ceq; auto.
 Qed.
 
 (**

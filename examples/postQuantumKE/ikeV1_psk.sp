@@ -47,6 +47,8 @@ The attacker does not have any pre-shared key.
 
 set postQuantumSound = true.
 
+(* include Basic. *)
+
 hash h
 
 (* pre-shared keys *)
@@ -120,24 +122,24 @@ process InitiatorI(i:index) =
   try find j such that fst(snd(snd(m)))(*RIdR*) = IdR(j) in
     if  snd(snd(snd(m)))(*HashR*) =  h(<  fst(m)(*gB*), < exp(g,a(i))  , IdR(j)> > ,
         (* idealized key computation *)
-        try find il, jl such that   (<Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
-         (il = i && jl = j)) in
+        try find il, jl such that <Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
+         il = i && jl = j in
              Ininr(i,j)
         else
              IgarbI(i,j)
           ) then
        let finalkey = h( exp( fst(m)(*gB*) ,a(i)),
         (* idealized key computation *)
-        try find il, jl such that   (<Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
-         (il = i && jl = j)) in
+        try find il, jl such that <Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
+         il = i && jl = j in
              Ininr(i,j)
         else
              IgarbI(i,j)
        ) in
        out(cI,  h(<exp(g,a(i)), < fst(m)(*gB*) , IdI(i)> > ,
         (* idealized key computation *)
-        try find il, jl such that   (<Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
-         (il = i && jl = j)) in
+        try find il, jl such that <Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
+         il = i && jl = j in
              Ininr(i,j)
         else
              IgarbI(i,j)
@@ -150,8 +152,8 @@ process ResponderI(j:index) =
   try find i such that snd(snd(m))(*RIdi*) = IdI(i) in
     out(cR, <exp(g,b(j)), <Nr(j), < IdR(j)  ,  h(<exp(g,b(j)), <fst(m)(*gA*), IdR(j)> > ,
         (* idealized key computation *)
-        try find il, jl such that   (< fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
-         (il = i && jl = j)) in
+        try find il, jl such that < fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
+         il = i && jl = j in
              Ininr(i,j)
         else
              IgarbR(i,j)
@@ -160,8 +162,8 @@ process ResponderI(j:index) =
     in(cR, m2);
     if m2 =  h(<fst(m)(*gA*), <exp(g,b(j)), IdI(i)> > ,
         (* idealized key computation *)
-        try find il, jl such that   (< fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
-         (il = i && jl = j)) in
+        try find il, jl such that < fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
+         il = i && jl = j in
              Ininr(i,j)
         else
              IgarbR(i,j)
@@ -176,99 +178,119 @@ system [Ideal1] ((!_j R: ResponderI(j)) | (!_i I: InitiatorI(i))).
 
 (* We start with 3 global prf applications, renaming the prf name to the one we want after each application. *)
 system Main1 = [Main/left] with gprf (il,jl:index),  h(<Ni(il), Nr(jl) > ,psk(il,jl)).
-system Main2 = [Main1/left] with rename forall (i,j:index), equiv(diff(n_PRF(i,j), Ininr(i,j))).
+system Main2 = [Main1] with rename forall (i,j:index), equiv(diff(n_PRF(i,j), Ininr(i,j))).
 
 
-system Main3 = [Main2/left] with gprf (il,jl:index),  h(<Ni(il), fst(snd(input@I1(il,jl))) > ,psk(il,jl)).
-system Main4 = [Main3/left] with rename forall (i,j:index), equiv(diff(n_PRF1(i,j), IgarbI(i,j))).
+system Main3 = [Main2] with gprf (il,jl:index),  h(<Ni(il), fst(snd(input@I1(il,jl))) > ,psk(il,jl)).
+system Main4 = [Main3] with rename forall (i,j:index), equiv(diff(n_PRF1(i,j), IgarbI(i,j))).
 
-system Main5 = [Main4/left] with gprf (il,jl:index),  h(<fst(snd(input@R(jl,il))),Nr(jl) > ,psk(il,jl)).
-system Main6 = [Main5/left] with rename forall (i,j:index), equiv(diff(n_PRF2(i,j), IgarbR(i,j))).
+system Main5 = [Main4] with gprf (il,jl:index),  h(<fst(snd(input@R(jl,il))),Nr(jl) > ,psk(il,jl)).
+system Main6 = [Main5] with rename forall (i,j:index), equiv(diff(n_PRF2(i,j), IgarbR(i,j))).
 
 
-axiom  [Main6/left,Ideal1/right] tryfind : forall (i,j:index), pred(I1(i,j)) = pred(I2(i,j)).
+axiom  [Main6,Ideal1/right] tryfind : forall (i,j:index), pred(I1(i,j)) = pred(I2(i,j)).
 
-equiv [Main6/left,Ideal1/right] test.
+equiv [Main6,Ideal1/right] test.
 Proof.
 
-diffeq.
-(* From here, we need to prove that we indede get ideal keys everywhere. Mostly dumb manipulations of all the conditions introduced by the prf tactic, that are all contractory.
- *)
+  diffeq.
+  (* From here, we need to prove that we indede get ideal keys everywhere. Mostly dumb manipulations of all the conditions introduced by the prf tactic, that are all contractory.
+     *)
+    + intro *. 
+      case  try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
+        ++ intro [il jl [_ ->]]. 
+           fa; auto. print goal tryfind.
+        ++ rewrite tryfind. 
+           intro [Abs TFeq].
+           use Abs with i,j; auto.
 
-case  try find il0,jl0 such that
-    _
-   in IgarbI(il0,jl0)
-   else
-    _.
-rewrite Meq.
-fa.
-use H3 with i,j.
-rewrite tryfind.
+    + intro *.
+      case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
+        ++ intro [il jl [_ ->]].
+           fa; auto.
+        ++ intro [Abs TFeq].
+           use Abs with i,j; auto.
 
+    + intro *.
+      case  try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
+        ++ intro [il jl [_ ->]]. 
+           fa; auto.
+        ++ intro [Abs TFeq].
+           use Abs with i,j; auto.
 
-case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-rewrite Meq.
-fa.
-use H3 with i,j.
+    + intro *.
+      case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
+        ++ intro [il jl [[_ _ _] ->]]. 
+           case try find il0,jl0 such that _  in Ininr(il0,jl0) else _.
+             +++ intro [i j [_ ->]]. 
+                 auto.
+             +++ intro [Abs TFeq2].
+                 use Abs with il,jl; auto.
+        ++ intro [Abs TFeq].
+           case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
+             +++ intro [il jl [_ TFeq2]]. 
+                 use Abs with i,j.
+                 auto.
+             +++ intro [Abs2 TFeq2].
+                 case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
+                   - intro [il jl [_ _]]. 
+                     use Abs with i,j.
+                     auto.
+                   - intro [Abs3 TFeq3].
+                     case try find il,jl such that _ in IgarbR(il,jl) else _.
+                       -- intro [il jl [_ ->]]. 
+                          auto.
+                       -- intro [[Abs4] TFeq4].
+                          use Abs4 with i,j.
+                          auto.
 
-case  try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-rewrite Meq.
-fa.
-use H3 with i,j.
+    + intro *.
+      case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
+        ++ intro [il jl [[_ _ _] ->]]. 
+           case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
+             +++ intro [i j [_ ->]]. 
+                 auto.
+             +++ intro [Abs _].
+                 use Abs with il,jl.
+                 auto.
+        ++ case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
+             +++ intro [il jl [_ ->]]. 
+                 intro [Abs _].
+                 use Abs with i,j.
+                 auto.
+             +++ intro [Abs _].
+                 intro [Abs2 _].
+                 case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
+                   - intro [il jl [_ ->]]. 
+                     use Abs with i,j; auto.
+                   - case try find il,jl such that _ in IgarbR(il,jl) else _.
+                       -- intro [il jl [_ ->]]. 
+                          auto.
+                       -- intro [Abs3 _].
+                          use Abs3 with i,j; auto.
 
-expand exec.
+    + intro *.
+      case try find il,jl such that _ in IgarbR(il,jl) else _.
+        ++ intro [il jl [[_ _ _] ->]]. 
+           case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
+             +++ intro [il jl [[_ _ _] ->]]. 
+                 case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
+                   - intro [i j [_ ->]]. 
+                     auto.
+                   - intro [Abs _].
+                     use Abs with il,jl; auto.
 
-case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
-rewrite Meq.
-
-case try find il0,jl0 such that _  in Ininr(il0,jl0) else _.
-
-
-use H8 with il,jl.
-
-
-case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
-use H8 with i,j.
-
-case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-use H9 with i,j.
-
-case try find il,jl such that _ in IgarbR(il,jl) else _.
-use H11 with i,j.
-
-case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
-rewrite Meq.
-
-case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
-rewrite Meq1.
-use H4 with il,jl.
-
-case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
-use H4 with i,j.
-
-case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-use H5 with i,j.
-
-case try find il,jl such that _ in IgarbR(il,jl) else _.
-case try find il,jl such that _ in IgarbR(il,jl) else _.
-rewrite Meq3.
-
-use H7 with i,j.
-use H7 with i,j.
-
-case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
-rewrite Meq.
-case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
-use H3 with il,jl.
-
-case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
-use H3 with i,j.
-
-case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-use H4 with i,j.
-
-case try find il,jl such that _ in IgarbR(il,jl) else _.
-use H6 with i,j.
+             +++ intro [Abs _].
+                 case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
+                   - intro [il jl [_ ->]]. 
+                     use Abs with i,j; auto.
+                   - intro [Abs2 _].
+                     case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
+                       -- intro [il jl [_ ->]]. 
+                          use Abs2 with i,j; auto.
+                       -- intro [Abs3 _]; auto.
+        ++ intro [Abs _].
+           use Abs with i,j; auto.
 Qed.
 
 
@@ -285,16 +307,16 @@ process InitiatorI2(i:index) =
   try find j such that fst(snd(snd(m)))(*RIdR*) = IdR(j) in
     if  snd(snd(snd(m)))(*HashR*) =
         (* idealized key computation *)
-        try find jl, il such that   (<Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
-         (il = i && jl = j)) in
+        try find jl, il such that <Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
+         il = i && jl = j in
          h(<  fst(m)(*gB*), < exp(g,a(i))  , IdR(j)> > ,    Ininr(j,i))
         else
            h(<  fst(m)(*gB*), < exp(g,a(i))  , IdR(j)> > ,  IgarbI(j,i))
            then
        out(cI,
         (* idealized key computation *)
-        try find jl, il such that   (<Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
-         (il = i && jl = j)) in
+        try find jl, il such that <Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
+         il = i && jl = j in
              h(<exp(g,a(i)), < fst(m)(*gB*) , IdI(i)> > ,Ininr(j,i))
         else
             h(<exp(g,a(i)), < fst(m)(*gB*) , IdI(i)> > , IgarbI(j,i))
@@ -307,8 +329,8 @@ process ResponderI2(j:index) =
   try find i such that snd(snd(m))(*RIdi*) = IdI(i) in
     out(cR, <exp(g,b(j)), <Nr(j), < IdR(j)  ,
         (* idealized key computation *)
-        try find jl, il such that   (< fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
-         (il = i && jl = j)) in
+        try find jl, il such that < fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
+         il = i && jl = j in
             h(<exp(g,b(j)), <fst(m)(*gA*), IdR(j)> > ,   Ininr(j,i))
         else
           h(<exp(g,b(j)), <fst(m)(*gA*), IdR(j)> > ,     IgarbR(j,i))
@@ -317,8 +339,8 @@ process ResponderI2(j:index) =
     in(cR, m2);
     if m2 =
         (* idealized key computation *)
-        try find jl, il such that   (< fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
-         (il = i && jl = j)) in
+        try find jl, il such that < fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
+         il = i && jl = j in
             h(<fst(m)(*gA*), <exp(g,b(j)), IdI(i)> > ,  Ininr(j,i))
         else
             h(<fst(m)(*gA*), <exp(g,b(j)), IdI(i)> > ,  IgarbR(j,i))
@@ -328,12 +350,6 @@ process ResponderI2(j:index) =
 system [Ideal2] ((!_j R: ResponderI2(j)) | (!_i I: InitiatorI2(i))).
 
 (* We now prove the authentication on this ideal system. *)
-goal [Ideal2] fst_pair (x,y : message) : fst (<x, y >) = x.
-Proof. auto. Qed.
-hint rewrite fst_pair.
-goal [Ideal2] snd_pair (x,y : message) : snd (<x, y >) = y.
-Proof. auto. Qed.
-hint rewrite fst_pair.
 
 goal [Ideal2] wa_1 :
   forall (i,j:index),
@@ -348,29 +364,32 @@ goal [Ideal2] wa_1 :
      ).
 Proof.
  intro i j.
-
+ intro Hap Cond.
  expand cond.
 
-case  try find jl,il such that
-       (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> &&
-        (il = i && jl = j))
-     in h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,Ininr(j,i))
-     else h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,IgarbI(j,i)).
+  case  try find jl,il such that
+         (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> &&
+          (il = i && jl = j))
+       in h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,Ininr(j,i))
+       else h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,IgarbI(j,i)).
+    + (* Case 1 -> honnest skeyid *)
+      intro [il jl [[A [_ _]] B]].
+      rewrite B in Cond.
+      destruct Cond as [EUF _].
+      euf EUF.
+        ++ intro Ord Eq [_ _].
+           exists jl.
+           assert happens(R(il,jl)) => //.
+           assert happens(I(jl)) => //.
+           depends I(jl), I1(jl,il) => //.
+        ++ auto.
 
- (* Case 1 -> honnest skeyid *)
-substeq Meq1.
-euf Meq.
-
-exists il.
-expand output. repeat split.
-by rewrite fst_pair.
-by rewrite snd_pair fst_pair.
-by rewrite snd_pair snd_pair fst_pair.
-by depends I(il), I1(il,jl).
-
- (* Case 2 -> dishonnest skeyid, trivial as no one else computes this key *)
-substeq Meq1.
-euf Meq.
+    +  (* Case 2 -> dishonnest skeyid, trivial as no one else computes this key *)
+       intro [Abs Meq].
+       rewrite Meq in Cond.
+       destruct Cond as [EUF _].
+       euf EUF.
+       intro Ord //.
 Qed.
 
 goal [Ideal2] wa_2 :
@@ -383,29 +402,31 @@ goal [Ideal2] wa_2 :
    snd(snd(input@R(j,i))) = snd(snd(output@I(i))).
 
 Proof.
- intro i j.
-expand exec.
- expand cond.
-
-case  try find jl,il such that
-      (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il),Nr(jl)> && (il = i && jl = j))
-    in h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i))
-    else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i)).
-substeq Meq.
-
-  (* honest case *)
-  euf H0.
-
-  depends I(il), I1(il,jl).
-  by case H1.
-
-  executable pred(R1(jl,il)).
-  depends R(jl,il), R1(jl,il).
-  use H2 with R(jl,il).
-  expand exec. expand cond.
-
-substeq Meq.
- euf H0.
+  intro i j Hap Ex.
+  expand exec.
+  expand cond.
+  destruct Ex as [_ EUF].
+  depends R(j,i), R1(j,i) => //.
+  intro OrdR.
+  case try find jl,il such that
+        <fst(snd(input@R(j,i))),Nr(j)> = <Ni(il),Nr(jl)> && il = i && jl = j
+       in   h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i))
+       else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i)).
+    + intro [jl il [[Cond _ _] Meq]].
+      rewrite Meq in EUF.
+      euf EUF => //.
+      intro OrdI Meq2 [_ _].
+      depends I(il), I1(il,jl).
+      case OrdI; auto. 
+      intro OrdI2.
+      executable pred(R1(jl,il)) => //.
+      intro Exec.
+       use Exec with R(jl,il) => //.
+    + intro Abs.
+      destruct Abs as [Abs Meq2].
+      rewrite Meq2 in EUF.
+      euf EUF.
+      auto.
 Qed.
 
 
@@ -493,25 +514,26 @@ goal [Ror] helper_wa :
 .
 
 Proof.
- intro i j.
- expand exec.
- expand cond.
- case try find il,jl such that
-      (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il),Nr(jl)> && (il = i && jl = j))
-    in h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i))
-    else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i)).
-
-substeq Meq.
-euf H0.
-case H1.
-depends R(jl,il), R1(jl,il).
-
-by use ddhnotuple with  fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>, fst(input@I1(il,jl)),a(il).
-
-substeq Meq.
-euf H0.
-case H2.
-depends R(j,i), R1(j,i).
+  intro i j Hap Exec.
+  expand exec.
+  destruct Exec as [Pred Cond].
+  expand cond.
+  case try find il,jl such that
+       (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il),Nr(jl)> && (il = i && jl = j))
+     in h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i))
+     else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i)).
+    + intro [il jl [[Eq1 [_ _]] Eq2]].
+      rewrite Eq2 in Cond.  
+      euf Cond => //.
+      depends R(jl,il), R1(jl,il) => //.
+      intro Ord1 Ord2. case Ord2; auto.
+      by use ddhnotuple with  fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>, fst(input@I1(il,jl)),a(il).
+    + intro [Abs Meq].
+      rewrite Meq in Cond.
+      euf Cond.
+      intro Ord. case Ord; auto.
+      depends R(j,i), R1(j,i). auto. 
+      intro Ord Ord2. case Ord2; auto.
 Qed.
 
 
@@ -526,82 +548,80 @@ goal [Ror] helper_wa2 :
       exp(g,b(j)) = fst(input@I1(i,j))
      .
 Proof.
- intro i j.
- expand exec.
- expand cond.
-
- case    try find il,jl such that
-       (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> &&
-        (il = i && jl = j))
-     in h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,Ininr(j,i))
-     else h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,IgarbI(j,i)).
-substeq Meq1.
-euf Meq.
-by use ddhnotuple with fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>, fst(input@R(jl,il)),b(jl).
-by depends I1(il,jl),I14(il,jl).
-
-substeq Meq1.
-euf Meq.
-by use ddhnotuple with fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>, fst(input@I1(i,j)),a(i).
+  intro i j Hap Exec.
+  expand exec.
+  expand cond.
+  destruct Exec as [_ [CondTF _]].
+  case    try find il,jl such that
+        (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> &&
+         (il = i && jl = j))
+      in h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,Ininr(j,i))
+      else h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,IgarbI(j,i)).
+    + intro [il jl [[Eq [_ _]] Meq]].
+      rewrite Meq in CondTF.
+      euf CondTF => //.
+        ++ by use ddhnotuple with fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>, fst(input@R(jl,il)),b(jl).
+        ++ intro OrdI.
+           by depends I1(il,jl),I4(il,jl).
+    + intro [Abs Meq].
+      rewrite Meq in CondTF.
+      euf CondTF.
+      auto.
+      intro OrdI.
+      by use ddhnotuple with fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>, fst(input@I1(i,j)),a(i).
 Qed.
 
 system Ror2 = [Ror/left] with gprf (il,jl:index),   h( exp(exp(g,a(il)),b(jl)), Ininr(jl,il))   .
-system Ror3 =  [Ror2/left] with rename forall (i,j:index), equiv(diff(n_PRF3(i,j), idealkeys(i,j))).
+system Ror3 =  [Ror2] with rename forall (i,j:index), equiv(diff(n_PRF3(i,j), idealkeys(i,j))).
 
-
-
-axiom  [Ror3/left, Ror/right] ddhcommu2 : forall (i,j:index), exp(exp(g,a(i)),b(j)) =  exp(exp(g,b(j)),a(i)) .
-axiom  [Ror3/left, Ror/right] ddhnotuple1 : forall (m1,m2,m3,m4:message), exp(m3,m4) <> <m1,m2>.
+axiom  [Ror3, Ror/right] ddhcommu2 : forall (i,j:index), exp(exp(g,a(i)),b(j)) =  exp(exp(g,b(j)),a(i)) .
+axiom  [Ror3, Ror/right] ddhnotuple1 : forall (m1,m2,m3,m4:message), exp(m3,m4) <> <m1,m2>.
 
 
 (* By transitivity, we inherit the lemma on Ror to Ror2 *)
-global goal [Ror/left,Ror2/left] helper_wa_equiv (i, j:index):
-    [happens(R1(j,i))] ->
-   equiv(
-  exec@R1(j,i) =>
-     input@R1(j,i) = input@R1(j,i) &&
+global goal [Ror/left,Ror2] helper_wa_equiv (i, j:index):
+  [happens(R1(j,i))] ->
+  equiv(
+    exec@R1(j,i) =>
+    input@R1(j,i) = input@R1(j,i) &&
     (fst(snd(input@R(j,i))) = Ni(i) &&
     fst(input@R(j,i)) = exp(g,a(i)))
-).
+  ).
 Proof.
-intro H2.
-lemmas.
-use prf_from_Ror_to_Ror2 with <a(i),Ni(i)>.
-cycle 1.
-intro i0 j0.
-fresh 1.
-use H with R(j,i) => //.
-use H with R1(j,i) => //.
-fa 0.
-enrich frame@R(j,i).
-enrich frame@R1(j,i).
-repeat fa 1.
-repeat fa 2.
-repeat fa 3.
-apply H1.
-
-depends R(j,i), R1(j,i).
+  intro H2.
+  use prf_from_Ror_to_Ror2 with <a(i),Ni(i)>.
+    + use H with R(j,i) => //.
+      use H with R1(j,i) => //.
+      fa 0.
+      enrich frame@R(j,i).
+      enrich frame@R1(j,i).
+      repeat fa 1.
+      repeat fa 2.
+      repeat fa 3.
+      apply H1.
+      depends R(j,i), R1(j,i) => //.
+    + intro i0 j0.
+      by fresh 1.
 Qed.
 
-goal [Ror2/left] helper_wa_aux3 :
+goal [Ror2] helper_wa_aux3 :
   forall (i,j:index),
     happens(R1(j,i)) =>
     exec@R1(j,i) =>
-     input@R1(j,i) = input@R1(j,i) &&
+    input@R1(j,i) = input@R1(j,i) &&
     (fst(snd(input@R(j,i))) = Ni(i) &&
-    fst(input@R(j,i)) = exp(g,a(i)))
-.
+    fst(input@R(j,i)) = exp(g,a(i))).
 Proof.
-
-nosimpl(intro i j Hap).
-rewrite equiv helper_wa_equiv  i j.
-
-use helper_wa with i,j.
+  nosimpl(intro i j Hap).
+  rewrite equiv -helper_wa_equiv i j.
+  auto.
+  intro Ex.
+  use helper_wa with i,j; auto.
 Qed.
 
 
 
-global goal [Ror2/left,Ror3/left] helper_wa_equiv1 (i, j:index):
+global goal [Ror2,Ror3] helper_wa_equiv1 (i, j:index):
   [happens(R1(j,i))] ->
    equiv(
   exec@R1(j,i) =>
@@ -611,25 +631,23 @@ input@R1(j,i) = input@R1(j,i) &&
 ).
 Proof.
 
-intro H2.
-use rename_from_Ror2_to_Ror3 with <a(i),Ni(i)>.
-cycle 1.
-intro i0 j0.
-fresh 1.
-use H with R(j,i) => //.
-use H with R1(j,i) => //.
-fa 0.
-enrich frame@R(j,i).
-enrich frame@R1(j,i).
-repeat fa 1.
-repeat fa 2.
-apply H1.
-
-depends R(j,i), R1(j,i).
+  intro H2.
+  use rename_from_Ror2_to_Ror3 with <a(i),Ni(i)>.
+    + use H with R(j,i) => //.
+      use H with R1(j,i) => //.
+      fa 0.
+      enrich frame@R(j,i).
+      enrich frame@R1(j,i).
+      repeat fa 1.
+      repeat fa 2.
+      apply H1.
+      depends R(j,i), R1(j,i); auto.
+    + intro i0 j0.
+      by fresh 1.
 Qed.
 
 
-goal [Ror3/left] helper_wa_aux4 :
+goal [Ror3] helper_wa_aux4 :
   forall (i,j:index),
     happens(R1(j,i)) =>
     exec@R1(j,i) =>
@@ -638,17 +656,15 @@ goal [Ror3/left] helper_wa_aux4 :
     fst(input@R(j,i)) = exp(g,a(i)))
 .
 Proof.
-
-nosimpl(intro i j Hap).
-rewrite equiv helper_wa_equiv1  i j.
-
-use helper_wa_aux3 with i,j.
+  nosimpl(intro i j Hap).
+  rewrite equiv -helper_wa_equiv1  i j.
+  auto.
+  intro Exec.
+  use helper_wa_aux3 with i,j; auto.
 Qed.
 
 
-
-
-goal [Ror3/left, Ror/right] helper_wa3 :
+goal [Ror3, Ror/right] helper_wa3 :
   forall (i,j:index),
     happens(R1(j,i)) =>
     exec@R1(j,i) =>
@@ -656,44 +672,76 @@ goal [Ror3/left, Ror/right] helper_wa3 :
     fst(input@R(j,i)) = exp(g,a(i))
 .
 Proof.
-intro i j.
-project.
-use helper_wa_aux4 with i,j.
-
-use helper_wa with i,j.
+  intro i j.
+  project.
+  intro Hap Ex.
+  use helper_wa_aux4 with i,j; auto.
+  intro Hap Ex.
+  use helper_wa with i,j; auto.
 Qed.
 
 
 (* We now export helper wa 2 all the way to Ror3 *)
-global goal [Ror/left,Ror2/left] helper_wa_equiv_2 :
+global goal [Ror/left,Ror2] helper_wa_equiv_2 :
+  forall (i,j:index),
+  [happens(I1(i,j))] ->
+  equiv(
+    exec@I1(i,j) =>
+      Nr(j) = fst(snd(input@I1(i,j))) &&
+      exp(g,b(j)) = fst(input@I1(i,j))
+  ).
+Proof.
+  intro i j Hap.
+  use prf_from_Ror_to_Ror2 with <b(j),Nr(j)>.
+    + use H with I1(i,j) => //.
+      fa 0.
+      repeat fa 1.
+      repeat fa 2.
+      repeat fa 3.
+      enrich frame@I1(i,j).
+      apply H0.
+    + intro i0 j0.
+      by fresh 1.
+Qed.
+
+
+goal [Ror2] helper_wa_aux2 :
+  forall (i,j:index),
+    happens(I1(i,j)) =>
+    exec@I1(i,j) =>
+      Nr(j) = fst(snd(input@I1(i,j))) &&
+      exp(g,b(j)) = fst(input@I1(i,j)).
+Proof.
+  nosimpl(intro i j Hap).
+  rewrite equiv -helper_wa_equiv_2  i j.
+  auto.
+  intro Ex.
+  by use helper_wa2 with i, j.
+Qed.
+
+global goal [Ror2,Ror3] helper_wa_equiv_3 :
   forall (i,j:index),
     [happens(I1(i,j))] ->
-   equiv(
-    exec@I1(i,j) =>
-
-      Nr(j) = fst(snd(input@I1(i,j))) &&
-      exp(g,b(j)) = fst(input@I1(i,j))
-)
-     .
+    equiv(
+      exec@I1(i,j) =>
+        Nr(j) = fst(snd(input@I1(i,j))) &&
+        exp(g,b(j)) = fst(input@I1(i,j))
+    ).
 Proof.
-intro i j Hap.
-use prf_from_Ror_to_Ror2 with <b(j),Nr(j)>.
-cycle 1.
-intro i0 j0.
-fresh 1.
-use H with I1(i,j) => //.
-fa 0.
-repeat fa 1.
-repeat fa 2.
-repeat fa 3.
-
-enrich frame@I1(i,j).
-
-apply H0.
+  intro i j Hap.
+  use rename_from_Ror2_to_Ror3 with <b(j),Nr(j)>.
+    + use H with I1(i,j) => //.
+      fa 0.
+      repeat fa 1.
+      repeat fa 2.
+      repeat fa 3.
+      enrich frame@I1(i,j).
+      apply H0.
+    + intro i0 j0.
+      by fresh 1.
 Qed.
 
-
-goal [Ror2/left] helper_wa_aux2 :
+goal [Ror3] helper_wa_aux5 :
   forall (i,j:index),
     happens(I1(i,j)) =>
     exec@I1(i,j) =>
@@ -702,147 +750,111 @@ goal [Ror2/left] helper_wa_aux2 :
       exp(g,b(j)) = fst(input@I1(i,j))
      .
 Proof.
-
-nosimpl(intro i j Hap).
-rewrite equiv helper_wa_equiv_2  i j.
-use helper_wa2 with i, j.
+  nosimpl(intro i j Hap).
+  rewrite equiv -helper_wa_equiv_3  i j.
+  auto.
+  intro Ex.
+  by use helper_wa_aux2 with i, j.
 Qed.
 
-global goal [Ror2/left,Ror3/left] helper_wa_equiv_3 :
-  forall (i,j:index),
-    [happens(I1(i,j))] ->
-   equiv(
-    exec@I1(i,j) =>
 
-      Nr(j) = fst(snd(input@I1(i,j))) &&
-      exp(g,b(j)) = fst(input@I1(i,j))
-)
-     .
-Proof.
-intro i j Hap.
-use rename_from_Ror2_to_Ror3 with <b(j),Nr(j)>.
-cycle 1.
-intro i0 j0.
-fresh 1.
-use H with I1(i,j) => //.
-fa 0.
-repeat fa 1.
-repeat fa 2.
-repeat fa 3.
-
-enrich frame@I1(i,j).
-apply H0.
-Qed.
-
-goal [Ror3/left] helper_wa_aux5 :
+goal [Ror3, Ror/right] helper_wa4 :
   forall (i,j:index),
     happens(I1(i,j)) =>
     exec@I1(i,j) =>
-
       Nr(j) = fst(snd(input@I1(i,j))) &&
-      exp(g,b(j)) = fst(input@I1(i,j))
-     .
+      exp(g,b(j)) = fst(input@I1(i,j)).
 Proof.
-
-nosimpl(intro i j Hap).
-rewrite equiv helper_wa_equiv_3  i j.
-use helper_wa_aux2 with i, j.
+  intro i j.
+  project.
+  intro Hap Ex.
+  by use helper_wa_aux5 with i,j.
+  intro Hap Ex.
+  by use helper_wa2 with i,j.
 Qed.
 
-
-goal [Ror3/left, Ror/right] helper_wa4 :
-  forall (i,j:index),
-    happens(I1(i,j)) =>
-    exec@I1(i,j) =>
-
-      Nr(j) = fst(snd(input@I1(i,j))) &&
-      exp(g,b(j)) = fst(input@I1(i,j))
-     .
+equiv [Ror3,Ror/right] final.
 Proof.
-intro i j.
-project.
+  diffeq.
+    + intro *.
+      case try find il,jl such that _ in idealkeys(il,jl) else _.
+        - by use ddhnotuple1 with  fst(input@I2(i,j)),<exp(g,a(i)),IdR(j)>, exp(g,a(i)),b(j).
+        -  intro *.
+           fa; try auto.
 
-use helper_wa_aux5 with i,j.
-use helper_wa2 with i,j.
-Qed.
+    + intro *.
+      use helper_wa4 with i,j; try auto.
+      case  try find il,jl such that _ in idealkeys(il,jl) else _.
+        - intro [il jl [[Exp [_ _]] ->]].
+          case try find il0,jl0 such that _ in idealkeys(i,j) else _.
+          auto.
+          intro [Abs _].
+          by use Abs with i,j.
+       - case try find il0,jl0 such that _ in  h(exp(fst(att(frame@pred(I1(i,j)))),a(i)),Ininr(j,i))
+                  else _.
+         intro Ex [Abs _].
+         use Abs with i,j.
+         by rewrite ddhcommu2.
+         intro [Abs _] [Abs2 _].
+         by use Abs with i,j.
 
-equiv [Ror3/left,Ror/right] final.
-Proof.
+    + intro *.
+      expand exec.
+      case try find il,jl such that _
+         in idealkeys(il,jl)
+         else _.
+      intro [il jl [[_ [_ _]] ->]].
+      by use ddhnotuple1 with  fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>, exp(g,a(i)),b(j).
+      intro _.
+      by fa.
 
+    + intro *.
+      case try find il,jl such that _
+         in idealkeys(il,jl)
+         else _.
+      by use ddhnotuple1 with  exp(g,a(i)),<fst(input@I1(i,j)),IdI(i)>, exp(g,a(i)),b(j).
+      intro _.
+      by fa.
 
-
-diffeq.
-
-case    try find il,jl such that
-_
-   in idealkeys(il,jl)
-   else _.
-by use ddhnotuple1 with  fst(input@I2(i,j)),<exp(g,a(i)),IdR(j)>, exp(g,a(i)),b(j).
-
-fa.
-
-
-use helper_wa4 with i,j.
-
-case  try find il,jl such that _ in idealkeys(il,jl) else _.
-rewrite Meq1.
-
-case try find il0,jl0 such that _ in idealkeys(i,j) else _.
-use H2 with i,j.
-
-case try find il0,jl0 such that _ in  h(exp(fst(att(frame@pred(I1(i,j)))),a(i)),Ininr(j,i))
- else _.
-
-use H2 with i,j.
-rewrite ddhcommu2.
-
-use H3 with i,j.
-expand exec.
-
-case try find il,jl such that _
-   in idealkeys(il,jl)
-   else _.
-rewrite Meq.
-by use ddhnotuple1 with  fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>, exp(g,a(i)),b(j).
-by fa.
-
-case    try find il,jl such that _
-   in idealkeys(il,jl)
-   else _.
-by use ddhnotuple1 with  exp(g,a(i)),<fst(input@I1(i,j)),IdI(i)>, exp(g,a(i)),b(j).
-by fa.
-
-case    try find il,jl such that
+    + intro *.
+      case try find il,jl such that
        _
-   in idealkeys(il,jl)
-   else _.
-by use ddhnotuple1 with  fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>, exp(g,a(i)),b(j).
-by fa.
+         in idealkeys(il,jl)
+         else _.
+      by use ddhnotuple1 with  fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>, exp(g,a(i)),b(j).
+      intro _.
+      by fa.
 
-case    try find il,jl such that _
-   in idealkeys(il,jl)
-   else _.
-by use ddhnotuple1 with  fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>, exp(g,a(i)),b(j).
-by fa.
+    + intro *.
+      case try find il,jl such that _
+         in idealkeys(il,jl)
+         else _.
+      by use ddhnotuple1 with  fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>, exp(g,a(i)),b(j).
+      intro _.
+      by fa.
 
+    + intro *.
+      use helper_wa3 with i,j; try auto.
+      case try find il0,jl0 such that
+         _
+       in
+         _
+       else  h(exp(fst(att(frame@pred(R(j,i)))),b(j)),IgarbR(j,i)).
+        - intro [il jl [[_ _ _] ->]].
+          case (try find il,jl such that _
+           in idealkeys(il,jl) else _).
+          intro [i j [[_ _ _] ->]].
+         auto.
+         intro [Abs _].
+         by use Abs with il,jl.
+        - intro [Abs _].
+          by use Abs with i,j.
 
-use helper_wa3 with i,j.
-case try find il0,jl0 such that
-   _
- in
-   _
- else  h(exp(fst(att(frame@pred(R(j,i)))),b(j)),IgarbR(j,i)).
-rewrite Meq1.
-
-case (try find il,jl such that _
- in idealkeys(il,jl) else _).
-use H2 with i,j.
-use H2 with i,j.
-
-case    try find il,jl such that _
-   in idealkeys(il,jl)
-   else _.
-by use ddhnotuple1 with exp(g,b(j)),<fst(input@R(j,i)),IdR(j)>,exp(g,a(i)),b(j).
-
-fa.
+    + intro *.
+      case try find il,jl such that _
+         in idealkeys(il,jl)
+         else _.
+      by use ddhnotuple1 with exp(g,b(j)),<fst(input@R(j,i)),IdR(j)>,exp(g,a(i)),b(j).
+      intro *.
+      by fa.
 Qed.

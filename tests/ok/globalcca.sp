@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 (* set debugConstr=true. *)
 
 aenc enc,dec,pk
@@ -14,6 +14,8 @@ name ideal:message
 system null.
 
 abstract ok : message.
+
+include Basic.
 
 system [test]
    (A:
@@ -33,32 +35,25 @@ system testCCA = [test/left] with gcca, enc(n,r,pk(kenc)).
 system testCCAR = [test/right] with gcca, enc(n,r,pk(kenc)).
 
 (* we map the fresh value of testCCAr to the one of testCCA *)
-system testCCAf = [testCCAR/left] with rename equiv(diff(n_CCA1,n_CCA)).
+system testCCAf = [testCCAR] with rename equiv(diff(n_CCA1,n_CCA)).
 
-axiom  [testCCA/left,testCCAf/right] fst_pair: forall (x,y:message), fst(<x,y>)=x.
-axiom  [testCCA/left,testCCAf/right] snd_pair: forall (x,y:message), snd(<x,y>)=y.
-
-equiv [testCCA/left,testCCAf/right] tests.
+equiv [testCCA,testCCAf] tests.
 Proof.
 print.
 enrich pk(kenc), n_CCA, r, h(enc(n_CCA,r,pk(kenc)),khash).
 
 induction t.
 prf 0.
-yesif 0 => //.
+rewrite if_true // in 0.
 
 expandall.
-equivalent  try find  such that n = n
-          in enc(n_CCA,r,pk(kenc)) else enc(n,r,pk(kenc)),
-  enc(n_CCA,r,pk(kenc)) .
-case (try find  such that n = n in enc(n_CCA,r,pk(kenc)) else enc(n,r,pk(kenc))) => //.
 fa 4.
 auto.
 
 expand frame.
 fa 4.
 fa 5.
-equivalent  exec@B, exec@pred(B) && (A<B && fst(input@B) = fst(output@A)  && snd(input@B) = snd(output@A)).
+have -> : exec@B <=> (exec@pred(B) && (A<B && fst(input@B) = fst(output@A)  && snd(input@B) = snd(output@A))).
 split.
 expand exec,cond.
 intro [ex Ha].
@@ -76,33 +71,36 @@ split => //.
 
 
 fadup 5.
-expand output.
+expand output@B.
 
 ifeq 5,fst(input@B), fst(output@A).
 intro _ => //.
-help.
-ifcond 5, exec@pred(B) && A<B => //.
 
+have ->: forall (b, b', b'' : boolean, x, y : message),
+ if b && b' && b'' then diff(x,y) =
+ if b && b' && b'' then diff(if b && b' then x, if b && b' then y).
+by intro ?? b''; case b''; project.
 
-
-equivalent        if exec@pred(B) && A < B then
+have -> : if exec@pred(B) && A < B then
          h(ok,
          try find  such that fst(output@A) = enc(n_CCA,r,pk(kenc))
-         in n else dec(fst(output@A),kenc)),
+         in n else dec(fst(output@A),kenc)) =
        if exec@pred(B) && A < B then
-         h(ok,n).
-fa => //.
-intro Ord.
-
-expand output.
-rewrite fst_pair.
-case try find such that _ in n else _.
-intro [_ Meq].
-auto.
-intro [Neg _] => //.
-
-fa 5. fadup 5.
-fa 5. fadup 5.
+         h(ok,n). {
+  fa => //.
+  intro Ord.
+  
+  expand output.
+  rewrite fst_pair.
+  case try find such that _ in n else _.
+  intro [_ Meq].
+  auto.
+  intro [Neg _] => //.
+}
+simpl.
+(* FIXME: I do not know what we are trying to test here *)
+(* fa 5. fadup 5. *)
+(* fa 5. fadup 5. *)
 (* prf 5 *)
 
 admit.

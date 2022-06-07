@@ -57,12 +57,15 @@ module List = struct
 
   let rec split3 = function
     | [] -> ([], [], [])
-    | (x,y,z)::l ->
+    | (x,y,z)::l -> 
       let (rx, ry, rz) = split3 l in (x::rx, y::ry, z::rz)
 
   let inclusion a b =
-    List.for_all (fun x -> List.mem x b)  a
+    List.for_all (fun x -> List.mem x b) a
 
+  let diff a b =
+    List.filter (fun x -> not (List.mem x b)) a
+                            
   let rec assoc_up s f = function
     | [] -> raise Not_found
     | (a,b) :: t ->
@@ -94,19 +97,32 @@ module List = struct
       match l with
       | _ :: t -> drop0 (i-1) t
       | [] -> l
-        
+
+  let%test _ = drop0 0 [1;2] = [1;2]
+  let%test _ = drop0 1 [1;2] = [2]
+  let%test _ = drop0 2 [1;2] = []
+  let%test _ = drop0 3 [1;2] = []
+
   let drop i l =
     if i < 0 then failwith "invalid argument";
     drop0 i l
+
+  let drop_right i l =
+    rev (drop i (rev l))
 
   (*------------------------------------------------------------------*)
   let rec take0 i l =
     if i = 0 then []
     else match l with
       | [] -> []
-      | x :: t -> x :: take0 (i - 1) l
-                    
-  let rec take i l =
+      | x :: t -> x :: take0 (i - 1) t
+
+  let%test _ = take0 0 [1;2] = []
+  let%test _ = take0 1 [1;2] = [1]
+  let%test _ = take0 2 [1;2] = [1;2]
+  let%test _ = take0 3 [1;2] = [1;2]
+
+  let take i l =
     if i < 0 then failwith "invalid argument";
     take0 i l
 
@@ -116,6 +132,11 @@ module List = struct
     else match r with
       | [] -> List.rev l, r
       | x :: t -> takedrop0 (x :: l) (i - 1) t
+
+  let %test _ = takedrop0 [] 0 [1;2] = ([],[1;2])
+  let %test _ = takedrop0 [] 1 [1;2] = ([1],[2])
+  let %test _ = takedrop0 [] 2 [1;2] = ([1;2],[])
+  let %test _ = takedrop0 [] 3 [1;2] = ([1;2],[])
 
   let takedrop i l =
     if i < 0 then failwith "invalid argument";
@@ -159,6 +180,22 @@ module List = struct
     : 'a * 'c list 
     =
     mapi_fold (fun (_ : int) x -> f x) a xs
+
+  let foldi (f : (int -> 'a -> 'b -> 'a)) (acc : 'a) (l : 'b list) : 'a =
+    let acc, _ = 
+      List.fold_left (fun (acc, i) x -> f i acc x, i + 1) (acc,0) l 
+    in
+    acc
+
+  let find_mapi (type b) (f : int -> 'a -> b option) (l : 'a list) : b option =
+    let exception Found of b option in
+    try ignore (mapi (fun i e ->  
+        match f i e with
+        | None -> () 
+        | Some _ as res -> raise (Found res)
+      ) l);
+      None
+    with Found res -> res
 end
 
 (*------------------------------------------------------------------*)
@@ -194,6 +231,7 @@ module Map = struct
     include Map.S
 
     val add_list : (key * 'a) list -> 'a t -> 'a t 
+    val find_dflt : 'a -> key -> 'a t -> 'a
   end
 
   module Make(O : OrderedType) : S with type key = O.t = struct
@@ -201,6 +239,10 @@ module Map = struct
 
     let add_list (l : (key * 'a) list) (m : 'a t) : 'a t = 
       List.fold_left (fun m (k,v) -> add k v m) m l
+
+    let find_dflt dflt k (m : 'a t) : 'a =
+      try find k m with
+      | Not_found -> dflt
   end
 end
 
@@ -273,6 +315,12 @@ let oiter f a = match a with
   | None -> ()
   | Some x -> f x
 
+let oequal eq a b =
+  match a, b with
+  | None, None -> true
+  | Some a, Some b -> eq a b
+  | _ -> false
+
 (*------------------------------------------------------------------*)
 module type Ordered = sig
   type t
@@ -312,7 +360,7 @@ end = struct
       size = n;
       max_size = 2 * n }
 
-  let print ppf t =
+  let[@warning "-32"] print ppf t =
     for i = 0 to t.max_size - 1 do
       let ri = Puf.find t.uf i in
       Fmt.pf ppf "@[%d->%d @]"
@@ -412,8 +460,6 @@ module Uf (Ord: Ordered) = struct
         ( 0, Vmap.empty, Mi.empty ) l
     in
     Smart.mk ~map:m ~rmap:rm ~cpt:0 (Smart.empty (List.length l))
-
-  let id t = t.id
 
   (** [extend t v] add the element [v] to [t], if necessary. *)
   let extend t v =
@@ -572,6 +618,10 @@ let timeout timeout f x =
   | exn     -> finish (); raise exn
 
 (* -------------------------------------------------------------------- *)
+let fst_map f (x,_) = f x
+let snd_map f (_,y) = f y
+
+(* -------------------------------------------------------------------- *)
 let as_seq0 = function [] -> ()                     | _ -> assert false
 let as_seq1 = function [x] -> x                     | _ -> assert false
 let as_seq2 = function [x1; x2] -> (x1, x2)         | _ -> assert false
@@ -579,4 +629,42 @@ let as_seq3 = function [x1; x2; x3] -> (x1, x2, x3) | _ -> assert false
 
 let as_seq4 = function [x1; x2; x3; x4] -> (x1, x2, x3, x4)
   | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
+let (-|) f g = fun x -> f (g x)
+
+let (^~) f = fun x y -> f y x
+
+(* -------------------------------------------------------------------- *)
+type assoc  = [`Left | `Right | `NonAssoc]
+type fixity = [`Prefix | `Postfix | `Infix of assoc | `NonAssoc | `NoParens]
+
+(* -------------------------------------------------------------------- *)
+let pp_maybe_paren (c : bool) (pp : 'a Fmt.t) : 'a Fmt.t =
+  if c then Fmt.parens pp else pp
+
+(** Parenthesis rules.
+    N.B.: the rule for infix left-associative symbols is only valid if,
+    in the parser, all prefix symbols are reduction-favored over 
+    shifting the infix symbol. *)
+let maybe_paren
+    ~(inner : 'a * fixity)
+    ~(outer : 'a * fixity)
+    ~(side  : assoc)
+    (pp : 'b Fmt.t) : 'b Fmt.t
+  =
+  let noparens (pi, fi) (po, fo) side =
+    match fo with
+    | `NoParens -> true
+    | _ ->
+      (pi > po) ||
+      match fi, side with
+      | `Postfix     , `Left     -> true
+      | `Prefix      , `Right    -> true
+      | `Infix `Left , `Left     -> (pi = po) && (fo = `Infix `Left )
+      | `Infix `Right, `Right    -> (pi = po) && (fo = `Infix `Right)
+      | _            , `NonAssoc -> (pi = po) && (fi = fo)
+      | _            , _         -> false
+  in
+  pp_maybe_paren (not (noparens inner outer side)) pp
 

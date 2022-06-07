@@ -11,7 +11,7 @@
   *    pi-calculus.
   *  - We associate to each such action an "action description"
   *    (type [descr]) which carries the semantics of the action.
-  *  - Finally, we have action symbols (type [Symbols.action Symbols.t]).
+  *  - Finally, we have action symbols (type [Symbols.action]).
   *
   * Our prover allows to declare and reason about several systems.
   * Actions and symbols exist independently of a system, but descriptions
@@ -43,13 +43,13 @@ type 'a t = ('a item) list
 
 (** Actions are lists of items where infinite choices are represented
   * by index lists. *)
-type action = (Vars.index list) t
+type action = (Vars.var list) t
 
 (** Shapes represent classes of actions differing only in their indices:
   * they are obtained by replacing lists of indices by their lengths. *)
 type shape = int t
 
-val get_indices : action -> Vars.index list
+val get_indices : action -> Vars.var list
 
 val fv_action : action -> Vars.Sv.t
 
@@ -75,7 +75,7 @@ val same_shape : action -> action -> Term.subst option
 
 (** Convert [Action] parameters to an action. *)
 val of_term :
-  Symbols.action Symbols.t -> Vars.index list ->
+  Symbols.action -> Vars.var list ->
   Symbols.table ->
   action
 
@@ -89,26 +89,24 @@ val dummy : shape -> action
   * They are indexed and are associated to an action using the argument
   * indices. *)
 
-type Symbols.data += Data of Vars.index list * action
-
 (** Get a fresh symbol whose name starts with the given prefix.
     If [exact] is true, the symbol must be exactly the argument. *)
 val fresh_symbol :
   Symbols.table -> exact:bool -> Symbols.lsymb ->
-  Symbols.table * Symbols.action Symbols.t
+  Symbols.table * Symbols.action 
 
 val define_symbol :
   Symbols.table ->
-  Symbols.Action.ns Symbols.t -> Vars.index list -> action ->
+  Symbols.action -> Vars.var list -> action ->
   Symbols.table
 
-val find_symbol : Symbols.lsymb -> Symbols.table -> Vars.index list * action
+val find_symbol : Symbols.lsymb -> Symbols.table -> Vars.var list * action
 
 val of_symbol :
-  Symbols.action Symbols.t -> Symbols.table ->
-  Vars.index list * action
+  Symbols.action -> Symbols.table ->
+  Vars.var list * action
 
-val arity : Symbols.action Symbols.t -> Symbols.table -> int
+val arity : Symbols.action -> Symbols.table -> int
 
 (*------------------------------------------------------------------*)
 (** {2 Action descriptions}
@@ -118,25 +116,46 @@ val arity : Symbols.action Symbols.t -> Symbols.table -> int
 
 (** Type of action descriptions. *)
 type descr = {
-  name      : Symbols.action Symbols.t ;
+  name      : Symbols.action ;
   action    : action ;
   input     : Channel.t * string ;
-  indices   : Vars.index list ;
-  condition : Vars.index list * Term.message ;
-  updates   : (Term.state * Term.message) list ;
-  output    : Channel.t * Term.message;
-  globals : Symbols.macro Symbols.t list;
+  indices   : Vars.var list ;
+  condition : Vars.var list * Term.term ;
+  updates   : (Term.state * Term.term) list ;
+    (** State updates, at most one per state symbol. *)
+  output    : Channel.t * Term.term;
+  globals   : Symbols.macro list;
+    (** List of global macros declared at [action]. *)
 }
 
-(** [pi_descr s a] returns the projection of the description. As descriptions
-   are only obtained for a system, one can when this system is without
-   projection, validly project to obtain the left or the right descriptions,
-   that in fact corresponds to the left or the right base_sytem projection of
-   the action.  *)
-val pi_descr : Term.projection -> descr -> descr
+(** Check that an action description is well-formed. *)
+val valid_descr : descr -> bool
 
-(** Refresh (globally) binded variables in a description. *)
+(** Refresh (globally) bound variables in a description. *)
 val refresh_descr : descr -> descr
+
+(** [project_descr proj descr] returns the projection of the description. *)
+val project_descr : Term.proj -> descr -> descr
+
+(** Strong notion of compatibility, more restrictive (and syntactical) than
+    what system compatibility alone would require, which helps to combine
+    descriptions. Does not rename indices, i.e. not stable by alpha
+    renaming. *)
+val strongly_compatible_descr : descr -> descr -> bool
+
+(** Takes a labelled list of single-system descriptions
+    and combines them into a multi-system description.
+    Requires that descriptions are pairwise strongly compatible. *)
+val combine_descrs : (Term.proj * descr) list -> descr
+
+(*------------------------------------------------------------------*)
+(** {2 Action shapes} *)
+
+module Shape : sig
+  type t = shape
+  val pp : Format.formatter -> t -> unit
+  val compare : t -> t -> int
+end
 
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printing} *)
@@ -149,6 +168,8 @@ val pp_descr_short : Format.formatter -> descr -> unit
 
 (** Formatter for descriptions. *)
 val pp_descr : Format.formatter -> descr -> unit
+
+val pp_descr_dbg : Format.formatter -> descr -> unit
 
 (** Formatter for actions shapes. *)
 val pp_shape : Format.formatter -> shape -> unit
@@ -169,8 +190,11 @@ val subst_action : Term.subst -> action -> action
 (** Apply a substitution to a description. *)
 val subst_descr : Term.subst -> descr -> descr
 
-(** Apply an iterator to the terms of a description. *)
-val apply_descr : (Vars.env -> Term.message -> Term.message) -> descr -> descr
+(** Map a function over a descriptor. *)
+val descr_map :
+  (Vars.env -> Symbols.macro -> Term.term -> Term.term) ->
+  descr ->
+  descr
 
 
 (*------------------------------------------------------------------*)
@@ -183,12 +207,12 @@ val apply_descr : (Vars.env -> Term.message -> Term.message) -> descr -> descr
     - or if [t] is [exec\@t] with [frame\@t'] appearing in [terms]
       where with [t <= t']. *)
 val is_dup :
-  Symbols.table -> Term.message -> Term.message list
+  Symbols.table -> Term.term -> Term.term list
   -> bool
 
 (** Same as [is_dup], but instead of checking term equality, checks
     that term matchs. *)
 val is_dup_match :
-  (Term.eterm -> Term.eterm -> 'a -> 'a option) -> 'a ->
-  Symbols.table -> Term.message -> Term.message list
+  (Term.term -> Term.term -> 'a -> 'a option) -> 'a ->
+  Symbols.table -> Term.term -> Term.term list
   -> 'a option

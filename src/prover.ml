@@ -1,4 +1,5 @@
 (** State in proof mode. *)
+
 open Utils
 
 module L    = Location
@@ -20,92 +21,91 @@ let soft_failure = Tactics.soft_failure
 let bad_args () = hard_failure (Failure "improper arguments")
 
 (*------------------------------------------------------------------*)
-(** {Error handling} *)
+type proved_goal = { 
+  stmt : Goal.statement;
+  kind : [`Axiom | `Lemma] 
+} 
 
-type decl_error_i =
-  | BadEquivForm
-  | InvalidAbsType
-  | InvalidCtySpace of string list
-  | DuplicateCty of string
-
-  (* TODO: remove these errors, catch directly at top-level *)
-  | SystemError     of System.system_error
-  | SystemExprError of SE.system_expr_err
-
-type dkind = KDecl | KGoal
-
-type decl_error =  L.t * dkind * decl_error_i
-
-let pp_decl_error_i fmt = function
-  | BadEquivForm ->
-    Fmt.pf fmt "equivalence goal ill-formed"
-
-  | InvalidAbsType ->
-    Fmt.pf fmt "invalid type, must be of the form:@ \n \
-                Indexⁿ → Messageᵐ → Message"
-
-  | InvalidCtySpace kws ->
-    Fmt.pf fmt "invalid space@ (allowed: @[<hov 2>%a@])"
-      (Fmt.list ~sep:Fmt.comma Fmt.string) kws
-
-  | DuplicateCty s -> Fmt.pf fmt "duplicated entry %s" s
-
-  | SystemExprError e -> SE.pp_system_expr_err fmt e
-
-  | SystemError e -> System.pp_system_error fmt e
-
-let pp_decl_error pp_loc_err fmt (loc,k,e) =
-  let pp_k fmt = function
-    | KDecl -> Fmt.pf fmt "declaration"
-    | KGoal -> Fmt.pf fmt "goal declaration" in
-
-  Fmt.pf fmt "@[<v 2>%a%a failed: %a.@]"
-    pp_loc_err loc
-    pp_k k
-    pp_decl_error_i e
-
-exception Decl_error of decl_error
-
-let decl_error loc k e = raise (Decl_error (loc,k,e))
-
-let error_handler loc k f a =
-  let decl_error = decl_error loc k in
-  try f a with
-  | System.SystemError e -> decl_error (SystemError e)
-  | SE.BiSystemError e -> decl_error (SystemExprError e)
-
+let pp_kind fmt = function
+  | `Axiom -> Printer.kw `Goal fmt "axiom"
+  | `Lemma -> Printer.kw `Goal fmt "goal"
 
 (*------------------------------------------------------------------*)
-(** {2 Prover state} *)
+(** {2 Prover state}
 
-let goals        : (Goal.statement * Goal.t) list   ref = ref []
-let current_goal : (Goal.statement * Goal.t) option ref = ref None
-let subgoals     : Goal.t list ref = ref []
-let goals_proved : Goal.statement list ref = ref []
+    The term "goal" refers to two things below:
+
+    - A toplevel goal declaration (i.e. a lemma/theorem)
+      which is represented (with some redundancy) by a [Goal.statement]
+      and a [Goal.t] which is the associated sequent that has to be
+      proved, i.e. the root of the required proof tree.
+
+    - A sequent that has to be proved (i.e. a node in a proof tree)
+      which is represented by a [Goal.t].
+
+    For now we use the adjectives toplevel and inner to distinguish
+    the two kinds of goals. *)
+
+type pending_proof = 
+  | ProofObl of Goal.t          
+  (** proof obligation *)
+
+  | UnprovedLemma of Goal.statement * Goal.t
+  (** lemma remaining to be proved *)
+
+(** Toplevel goals declared in scripts, possibly not yet proved. *)
+let goals : pending_proof list ref = ref []
+
+(** Currently proved toplevel goal. *)
+let current_goal : pending_proof option ref = ref None
+
+(** Current inner goals that have to be proved. *)
+let subgoals : Goal.t list ref = ref []
+
+(** Bullets for current proof. *)
+let bullets : Bullets.path ref = ref Bullets.empty_path
+
+(** Proved toplevel goals. *)
+let goals_proved : proved_goal list ref = ref []
 
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
 (*------------------------------------------------------------------*)
-(** {2 Options} *)
+let get_current_goal () = !current_goal
+
+(*------------------------------------------------------------------*)
+let get_current_system () =
+  match get_current_goal () with
+  | None -> None
+  | Some (ProofObl g)
+  | Some (UnprovedLemma (_, g)) -> Some (Goal.system g )
+
+(*------------------------------------------------------------------*)
+(** {2 Options}
+
+    TODO [option_defs] and [hint_db] are not directly related to
+    this module and should be moved elsewhere, e.g. [Main] could
+    deal with them through the table. *)
 
 type option_name =
   | Oracle_for_symbol of string
 
 type option_val =
-  | Oracle_formula of Term.message
+  | Oracle_formula of Term.term
 
 type option_def = option_name * option_val
 
-let option_defs : option_def list ref= ref []
+let option_defs : option_def list ref = ref []
 
 let hint_db : Hint.hint_db ref = ref Hint.empty_hint_db
 
 type proof_state = {
-  goals        : (Goal.statement * Goal.t) list;
+  goals        : pending_proof list;
   table        : Symbols.table;
-  current_goal : (Goal.statement * Goal.t) option;
+  current_goal : pending_proof option;
   subgoals     : Goal.t list;
-  goals_proved : Goal.statement list;
+  bullets      : Bullets.path;
+  goals_proved : proved_goal list;
   option_defs  : option_def list;
   params       : Config.params;
   prover_mode  : prover_mode;
@@ -121,12 +121,14 @@ let pt_history_stack : proof_history list ref = ref []
 
 let abort () =
     current_goal := None;
+    bullets := Bullets.empty_path;
     subgoals := []
 
 let reset () =
     pt_history := [];
     goals := [];
     current_goal := None;
+    bullets := Bullets.empty_path;
     subgoals := [];
     goals_proved := [];
     option_defs := [];
@@ -136,6 +138,7 @@ let get_state mode table =
   { goals        = !goals;
     table        = table;
     current_goal = !current_goal;
+    bullets      = !bullets;
     subgoals     = !subgoals;
     goals_proved = !goals_proved;
     option_defs  = !option_defs;
@@ -149,6 +152,7 @@ let save_state mode table =
 let reset_from_state (p : proof_state) =
   goals := p.goals;
   current_goal := p.current_goal;
+  bullets := p.bullets;
   subgoals := p.subgoals;
   goals_proved := p.goals_proved;
   option_defs := p.option_defs;
@@ -158,6 +162,9 @@ let reset_from_state (p : proof_state) =
 
   ( p.prover_mode, p.table )
 
+(* TODO if [n] is too large [pt_history] will be changed to the empty list
+   but [reset_from_state] won't be called to change the actual state, which
+   seems undesirable: forbid this? *)
 let rec reset_state n =
   match (!pt_history,n) with
   | [],_ -> (GoalMode, Symbols.builtins_table)
@@ -213,46 +220,34 @@ let add_option ((opt_name,opt_val):option_def) =
 exception ParseError of string
 
 type tactic_groups =
-  | Logical   (* A logic tactic is a tactic that relies on the sequence calculus
-                 logical properties. *)
-  | Structural (* A structural tactic relies on properties inherent to protocol,
-                  on equality between messages, behaviour of if _ then _ else _,
-                  action dependencies... *)
-  | Cryptographic (* Cryptographic assumptions rely on ... a cryptographic assumption ! *)
+  | Logical
+  (** Sequence calculus logical properties. *)
+
+  | Structural
+  (** Properties inherent to protocol, on equality between messages, behaviour 
+     of if _ then _ else _, action dependencies... *)
+
+  | Cryptographic
+  (** Cryptographic assumptions. *)
 
 
-(* The record for a detailed help tactic. *)
-type tactic_help = { general_help : string;
+(** The record for a detailed help tactic. *)
+type tactic_help = { general_help  : string;
                      detailed_help : string;
-                     usages_sorts : TacticsArgs.esort list;
-                     tactic_group : tactic_groups;
+                     usages_sorts  : TacticsArgs.esort list;
+                     tactic_group  : tactic_groups;
                    }
 
 type 'a tac_infos = {
-  maker : TacticsArgs.parser_arg list -> 'a Tactics.tac ;
+  maker    : TacticsArgs.parser_arg list -> 'a Tactics.tac ;
   pq_sound : bool;
-  help : tactic_help ;
+  help     : tactic_help ;
 }
 
 type 'a table = (string, 'a tac_infos) Hashtbl.t
 
 let pp_usage tacname fmt esort =
-   Fmt.pf fmt "%s %a" tacname TacticsArgs.pp_esort esort
-
-let pp_help fmt (th, tac_name) =
-  let usages_string =
-    Fmt.strf "%a"
-      (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",\n") (pp_usage tac_name))
-      th.usages_sorts
- in
-  let res_string =
-    Fmt.strf "%s \n %s: @[ %s  @] " th.general_help
-      (if List.length th.usages_sorts = 0 then ""
-       else if List.length th.usages_sorts =1 then "Usage"
-       else "Usages")
-      usages_string
- in
-  Format.pp_print_text fmt res_string
+  Fmt.pf fmt "%s %a" tacname TacticsArgs.pp_esort esort
 
 (*------------------------------------------------------------------*)
 (** Basic tactic tables, without registration *)
@@ -260,22 +255,20 @@ let pp_help fmt (th, tac_name) =
 module Table : sig
   val table : Goal.t table
 
-  val get : string -> TacticsArgs.parser_arg list -> Goal.t Tactics.tac
+  val get : L.t -> string -> TacticsArgs.parser_arg list -> Goal.t Tactics.tac
 
   val pp_goal_concl : Format.formatter -> Goal.t -> unit
 end = struct
-  type judgment = Goal.t
   let table = Hashtbl.create 97
 
-  (* TODO:location *)
-  let get id =
-    try let tac = (Hashtbl.find table id) in
+  let get loc id =
+    try let tac = Hashtbl.find table id in
       if not(tac.pq_sound) && Config.post_quantum () then
         Tactics.hard_failure Tactics.TacticNotPQSound
       else
         tac.maker
     with
-      | Not_found -> hard_failure
+      | Not_found -> hard_failure ~loc
              (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
 
   let pp_goal_concl ppf j = match j with
@@ -296,7 +289,7 @@ module AST :
 
   let pp_arg = TacticsArgs.pp_parser_arg
 
-  let autosimpl () = Table.get "autosimpl" []
+  let autosimpl () = Table.get L._dummy "autosimpl" []
   let autosimpl = Lazy.from_fun autosimpl
 
   let re_raise_tac loc tac s sk fk : Tactics.a =
@@ -306,14 +299,13 @@ module AST :
 
   let eval_abstract mods (id : lsymb) args : judgment Tactics.tac =
     let loc, id = L.loc id, L.unloc id in
-    let tac = re_raise_tac loc (Table.get id args) in
+    let tac = re_raise_tac loc (Table.get loc id args) in
     match mods with
       | "nosimpl" :: _ -> tac
       | [] -> Tactics.andthen tac (Lazy.force autosimpl)
       | _ -> assert false
 
-  (* a printer for tactics that follows a specific syntax.
-     TODO: tactics with "as" for intro pattern are not printed correctly.*)
+  (* a printer for tactics that follows a specific syntax. *)
   let pp_abstract ~pp_args s args ppf =
     (* match s,args with
      *   | "use", TacticsArgs.String_name id :: l ->
@@ -346,12 +338,13 @@ module ProverTactics = struct
                            pq_sound}
 
   let convert_args j parser_args tactic_type =
-    let table, env, ty_vars, conc, sexpr =
+    let env, conc =
       match j with
-      | Goal.Trace t -> TS.table t, TS.env t, TS.ty_vars t, `Reach (TS.goal t), TS.system t
-      | Goal.Equiv e -> ES.table e, ES.env e, ES.ty_vars e, `Equiv (ES.goal e), ES.system e
+      | Goal.Trace t -> TS.env t, `Reach (TS.goal t)
+
+      | Goal.Equiv e -> ES.env e, `Equiv (ES.goal e)
     in
-    TacticsArgs.convert_args sexpr table ty_vars env parser_args tactic_type conc
+    HighTacticsArgs.convert_args env parser_args tactic_type conc
 
   let register id ~tactic_help ?(pq_sound=false) f =
     register_general id ~tactic_help ~pq_sound
@@ -360,15 +353,12 @@ module ProverTactics = struct
           fun s sk fk -> begin match f s with
               | subgoals -> sk subgoals fk
               | exception Tactics.Tactic_soft_failure e -> fk e
-              | exception System.SystemError e ->
-                hard_failure (Tactics.SystemError e)
-              | exception SE.BiSystemError e ->
-                hard_failure (Tactics.SystemExprError e)
             end
         | _ -> hard_failure (Tactics.Failure "no argument allowed"))
 
   let register_typed id
-      ~general_help ~detailed_help  ~tactic_group ?(pq_sound=false) ?(usages_sorts)
+      ~general_help ~detailed_help
+      ~tactic_group ?(pq_sound=false) ?(usages_sorts)
       f sort =
     let usages_sorts = match usages_sorts with
       | None -> [TacticsArgs.Sort sort]
@@ -379,23 +369,19 @@ module ProverTactics = struct
       ~pq_sound
       (fun args s sk fk ->
          match convert_args s args (TacticsArgs.Sort sort) with
-         | TacticsArgs.Arg (th)  ->
+         | TacticsArgs.Arg th  ->
            try
              let th = TacticsArgs.cast sort th in
              begin
-               match f (th) s with
+               match f th s with
                | subgoals -> sk subgoals fk
                | exception Tactics.Tactic_soft_failure e -> fk e
-               | exception System.SystemError e ->
-                 hard_failure (Tactics.SystemError e)
-               | exception SE.BiSystemError e ->
-                 hard_failure (Tactics.SystemExprError e)
              end
            with TacticsArgs.Uncastable ->
-             hard_failure (Tactics.Failure "ill-formed arguments")
-      )
+             hard_failure (Tactics.Failure "ill-formed arguments"))
 
-  let register_macro id ?(modifiers=["nosimpl"])  ~tactic_help ?(pq_sound=false) m =
+  let register_macro
+        id ?(modifiers=["nosimpl"]) ~tactic_help ?(pq_sound=false) m =
     register_general id ~tactic_help ~pq_sound
       (fun args s sk fk ->
          if args = [] then AST.eval modifiers m s sk fk else
@@ -491,7 +477,9 @@ let get_help (tac_name : lsymb) =
 
   let print_lemmas fmt () =
     let goals = !goals_proved in
-    List.iter (fun g -> Fmt.pf fmt "%s: %a@;" g.Goal.name Equiv.Any.pp g.Goal.formula) goals
+    List.iter (fun (g : proved_goal) -> 
+        Fmt.pf fmt "%s: %a@;" g.stmt.name Equiv.Any.pp g.stmt.formula
+      ) goals
 
 
 
@@ -545,9 +533,9 @@ let () =
 
 (*------------------------------------------------------------------*)
 let get_assumption_opt gname : Goal.statement option =
-  match List.find_opt (fun s -> s.Goal.name = gname) !goals_proved with
+  match List.find_opt (fun s -> s.stmt.name = gname) !goals_proved with
   | None -> None
-  | Some s -> Some s
+  | Some s -> Some s.stmt
 
 (*------------------------------------------------------------------*)
 let is_assumption gname : bool = get_assumption_opt gname <> None
@@ -576,80 +564,101 @@ let get_reach_assumption gname =
 let get_equiv_assumption gname =
   Goal.to_equiv_statement ~loc:(L.loc gname) (get_assumption gname)
 
+(*------------------------------------------------------------------*)
+let get_assumption_kind (gname : string) : [`Axiom | `Lemma] option =
+  match List.find_opt (fun s -> s.stmt.name = gname) !goals_proved with
+  | None -> None
+  | Some s -> Some s.kind
 
 (*------------------------------------------------------------------*)
+(** {2 User printing query} *)
+
+(** User printing query *)
+type print_query =
+  | Pr_system    of SE.parsed_t option (* [None] means current system *)
+  | Pr_statement of lsymb
+  
+(*------------------------------------------------------------------*)
 (** {2 Declare Goals And Proofs} *)
+
+type include_param = { th_name : lsymb; params : lsymb list }
 
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
   | ParsedSetOption  of Config.p_set_param
-  | ParsedTactic     of TacticsArgs.parser_arg Tactics.ast
-  | ParsedUndo       of int
-  | ParsedGoal       of Goal.Parsed.t Location.located
-  | ParsedInclude    of lsymb
+
+  | ParsedTactic of [ `Bullet of string 
+                    | `Brace of [`Open|`Close] 
+                    | `Tactic of TacticsArgs.parser_arg Tactics.ast ] list
+
+  | ParsedPrint   of print_query
+  | ParsedUndo    of int
+  | ParsedGoal    of Goal.Parsed.t Location.located
+  | ParsedInclude of include_param
   | ParsedProof
   | ParsedQed
   | ParsedAbort
-  | ParsedHint       of Hint.p_hint
+  | ParsedHint of Hint.p_hint
   | EOF
 
+(*------------------------------------------------------------------*)
 let unnamed_goal () =
   L.mk_loc L._dummy ("unnamedgoal" ^ string_of_int (List.length !goals_proved))
 
-let declare_new_goal_i table hint_db parsed_goal =
+(*------------------------------------------------------------------*)
+let add_new_goal_i table hint_db parsed_goal =
   let name = match parsed_goal.Goal.Parsed.name with
     | None -> unnamed_goal ()
     | Some s -> s
   in
   if is_assumption (L.unloc name) then
     raise (ParseError "a goal or axiom with this name already exists");
+
   let parsed_goal = { parsed_goal with Goal.Parsed.name = Some name } in
   let statement,goal = Goal.make table hint_db parsed_goal in
-  goals :=  (statement,goal) :: !goals;
+  goals :=  UnprovedLemma (statement,goal) :: !goals;
   L.unloc name, goal
 
-let declare_new_goal table hint_db parsed_goal =
-  let loc = L.loc parsed_goal in
+let add_new_goal table hint_db parsed_goal =
+  if !goals <> [] then
+    raise (ParseError "cannot add new goal: proof obligations remaining");
+
   let parsed_goal = L.unloc parsed_goal in
-  error_handler loc KGoal (declare_new_goal_i table hint_db) parsed_goal
+  add_new_goal_i table hint_db parsed_goal
 
-let add_proved_goal gconcl =
+let add_proof_obl (goal : Goal.t) : unit = 
+  goals :=  ProofObl (goal) :: !goals
+
+(*------------------------------------------------------------------*)
+let add_proved_goal (kind : [`Axiom | `Lemma]) (gconcl : Goal.statement) =
   if is_assumption gconcl.Goal.name then
-    raise (ParseError "a formula with this name alread exists");
-  goals_proved := gconcl :: !goals_proved
+    raise (ParseError "a goal or axiom with this name already exists");
+  goals_proved := { stmt = gconcl; kind } :: !goals_proved
 
-let define_oracle_tag_formula table (h : lsymb) f =
-  let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-  let formula = Theory.convert conv_env [] Vars.empty_env f Type.Boolean in
-    match formula with
-     |  Term.ForAll ([Vars.EVar uvarm;Vars.EVar uvarkey],f) ->
-         begin match Vars.ty uvarm,Vars.ty uvarkey with
-         | Type.(Message, Message) ->
-           add_option (Oracle_for_symbol (L.unloc h), Oracle_formula formula)
-         | _ -> raise @@ ParseError "The tag formula must be of \
-                                     the form forall (m:message,sk:message)"
-         end
-     | _ -> raise @@ ParseError "The tag formula must be of \
-                                 the form forall (m:message,sk:message)"
-
-
+(*------------------------------------------------------------------*)
 let get_oracle_tag_formula h =
   match get_option (Oracle_for_symbol h) with
   | Some (Oracle_formula f) -> f
   | None -> Term.mk_false
 
-let is_proof_completed () = !subgoals = []
+(** Check that all goals and braces have been closed. *)
+let is_proof_completed () =
+  !subgoals = [] && Bullets.is_empty !bullets
 
 let complete_proof () =
   assert (is_proof_completed ());
-  try
-    let gc, _ = Utils.oget !current_goal in
-    add_proved_goal gc;
-    current_goal := None;
-    subgoals := []
-  with Not_found ->
+
+  if !current_goal = None then
     hard_failure
-      (Tactics.Failure "cannot complete proof: no current goal")
+      (Tactics.Failure "cannot complete proof: no current goal");
+
+  let () = match oget !current_goal with
+    | ProofObl _ -> ()
+    | UnprovedLemma (gc, _) -> add_proved_goal `Lemma gc;
+  in
+  current_goal := None;
+  bullets := Bullets.empty_path;
+  subgoals := []
 
 let pp_goal ppf () = match !current_goal, !subgoals with
   | None,[] -> assert false
@@ -660,14 +669,32 @@ let pp_goal ppf () = match !current_goal, !subgoals with
       Goal.pp j
   | _ -> assert false
 
-(** [eval_tactic_focus tac] applies [tac] to the focused goal.
-  * @return [true] if there are no subgoals remaining. *)
+(** [eval_tactic_focus tac] applies [tac] to the focused goal. *)
 let eval_tactic_focus tac = match !subgoals with
   | [] -> assert false
   | judge :: ejs' ->
+    if not (Bullets.tactic_allowed !bullets) then
+      Tactics.(hard_failure (Failure "bullet needed before tactic"));
+    
     let new_j = AST.eval_judgment tac judge in
     subgoals := new_j @ ejs';
-    is_proof_completed ()
+    
+    begin try
+      bullets := Bullets.expand_goal (List.length new_j) !bullets ;
+    with _ -> Tactics.(hard_failure (Failure "bullet error")) end
+
+let open_bullet bullet =
+  assert (bullet <> "");
+  try bullets := Bullets.open_bullet bullet !bullets with
+    | _ -> Tactics.(hard_failure (Failure "invalid bullet"))
+
+let open_brace bullet =
+  try bullets := Bullets.open_brace !bullets with
+    | _ -> Tactics.(hard_failure (Failure "invalid brace"))
+
+let close_brace bullet =
+  try bullets := Bullets.close_brace !bullets with
+    | _ -> Tactics.(hard_failure (Failure "invalid brace"))
 
 let cycle i_l l =
   let i, loc = L.unloc i_l, L.loc i_l in
@@ -682,15 +709,34 @@ let cycle i_l l =
 
 let eval_tactic utac = match utac with
   | Tactics.Abstract (L.{ pl_desc = "cycle"}, [TacticsArgs.Int_parsed i]) ->
-    subgoals := cycle i !subgoals; false
+    (* TODO do something more for bullets?
+       Cycling the list of subgoals does not change its length so
+       nothing will break (fail) wrt bullets, but the result will
+       be meaningless: we may want to warn the user, forbid cycles
+       accross opened bullets, or even update the Bullets.path to
+       reflect cycles. *)
+    subgoals := cycle i !subgoals
   | _ -> eval_tactic_focus utac
 
-let start_proof () = match !current_goal, !goals with
-  | None, (gname,goal) :: _ ->
+let start_proof (check : [`NoCheck | `Check]) = 
+  match !current_goal, !goals with
+  | None, pending_proof :: remaining_goals ->
     assert (!subgoals = []);
-    current_goal := Some (gname,goal);
-    subgoals := [goal];
+
+    goals := remaining_goals;
+
+    let goal = match pending_proof with
+        | ProofObl goal
+        | UnprovedLemma (_,goal) -> goal
+    in
+
+    current_goal := Some pending_proof;
+    begin match check with
+      | `Check -> subgoals := [goal] ; bullets := Bullets.initial_path
+      | `NoCheck -> subgoals := [] ; bullets := Bullets.empty_path
+    end;
     None
+
   | Some _,_ ->
     Some "Cannot start a new proof (current proof is not done)."
 
@@ -698,203 +744,11 @@ let start_proof () = match !current_goal, !goals with
     Some "Cannot start a new proof (no goal remaining to prove)."
 
 let current_goal_name () =
-  omap (fun (stmt,_) -> stmt.Goal.name) !current_goal
+  omap (function 
+      | UnprovedLemma (stmt,_) -> stmt.Goal.name
+      | ProofObl _ -> "proof obligation" ) !current_goal
 
 let current_hint_db () = !hint_db
 
 let set_hint_db db = hint_db := db
-
-(*------------------------------------------------------------------*)
-(** {2 Declaration parsing} *)
-
-let parse_abstract_decl table (decl : Decl.abstract_decl) =
-    let in_tys, out_ty =
-      List.takedrop (List.length decl.abs_tys - 1) decl.abs_tys
-    in
-    let out_ty = as_seq1 out_ty in
-
-    let ty_args = List.map (fun l ->
-        Type.mk_tvar (L.unloc l)
-      ) decl.ty_args
-    in
-
-    let in_tys =
-      List.map (fun pty ->
-          L.loc pty, Theory.parse_p_ty0 table ty_args pty
-        ) in_tys
-    in
-
-    let rec parse_in_tys p_tys : Type.message Type.ty list  =
-      match p_tys with
-      | [] -> []
-      | (loc, Type.ETy ty) :: in_tys -> match Type.kind ty with
-        | Type.KMessage -> ty :: parse_in_tys in_tys
-        | Type.KIndex     -> decl_error loc KDecl InvalidAbsType
-        | Type.KTimestamp -> decl_error loc KDecl InvalidAbsType
-    in
-
-    let rec parse_index_prefix iarr in_tys = match in_tys with
-      | [] -> iarr, []
-      | (_, Type.ETy ty) :: in_tys as in_tys0 ->
-        match Type.kind ty with
-        | Type.KIndex -> parse_index_prefix (iarr + 1) in_tys
-        | _ -> iarr, parse_in_tys in_tys0
-    in
-
-    let iarr, in_tys = parse_index_prefix 0 in_tys in
-
-    let out_ty : Type.message Type.ty =
-      Theory.parse_p_ty table ty_args out_ty Type.KMessage
-    in
-
-    Theory.declare_abstract
-      table
-      ~index_arity:iarr
-      ~ty_args
-      ~in_tys
-      ~out_ty
-      decl.name
-      decl.symb_type
-
-let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
-  (* check for duplicate *)
-  let _ : string list = List.fold_left (fun acc cty ->
-      let sp = L.unloc cty.Decl.cty_space in
-      if List.mem sp acc then
-        decl_error (L.loc cty.Decl.cty_space) KDecl (DuplicateCty sp);
-      sp :: acc
-    ) [] ctys in
-
-  (* check that we only use allowed keyword *)
-  List.map (fun cty ->
-      let sp = L.unloc cty.Decl.cty_space in
-      if not (List.mem sp kws) then
-        decl_error (L.loc cty.Decl.cty_space) KDecl (InvalidCtySpace kws);
-
-      let ty = Theory.parse_p_ty table [] cty.Decl.cty_ty Type.KMessage in
-      (sp, ty)
-    ) ctys
-
-(*------------------------------------------------------------------*)
-(** {2 Declaration processing}
-  *
-  * TODO We should probably either merge Prover.parsed_input and
-  *   Decl.declaration or, if we decide that declarations have nothing
-  *   to do with the prover, move Decl_axiom to Prover.parsed_input and
-  *   process declarations somewhere else than Prover. *)
-
-let declare_i table hint_db decl = match L.unloc decl with
-  | Decl.Decl_channel s            -> Channel.declare table s
-  | Decl.Decl_process (id,pkind,p) ->
-    let pkind = List.map (fun (x,t) ->
-        let t = Theory.parse_p_ty0 table [] t in
-        L.unloc x, t
-      ) pkind in
-    Process.declare table id pkind p
-
-  | Decl.Decl_axiom parsed_goal ->
-    let parsed_goal =
-      match parsed_goal.Goal.Parsed.name with
-        | Some n -> parsed_goal
-        | None ->
-            { parsed_goal with Goal.Parsed.name = Some (unnamed_goal ()) }
-    in
-    let gc,_ = Goal.make table hint_db parsed_goal in
-    add_proved_goal gc;
-    table
-
-  | Decl.Decl_system sdecl ->
-    let name = match sdecl.sname with
-      | None -> SE.default_system_name
-      | Some n -> n
-    in
-    Process.declare_system table name sdecl.sprocess
-
-  | Decl.Decl_system_modifier sdecl ->
-    let new_axiom_name, enrich, make_conclusion, new_system, table = SystemModifiers.declare_system table sdecl in
-    let `Equiv formula, _ = Goal.make_obs_equiv ~enrich table hint_db new_axiom_name new_system in
-    let formula = make_conclusion formula in
-    let statement = Goal.{ name=new_axiom_name; system=new_system; ty_vars=[]; formula} in
-    goals_proved :=  statement :: !goals_proved;
-    table
-
-  | Decl.Decl_ddh (g, (exp, f_info), ctys) ->
-    let ctys = parse_ctys table ctys ["group"; "exposants"] in
-    let group_ty = List.assoc_opt "group"     ctys
-    and exp_ty   = List.assoc_opt "exposants" ctys in
-
-    Theory.declare_ddh table ?group_ty ?exp_ty g exp f_info
-
-  | Decl.Decl_hash (a, n, tagi, ctys) ->
-    let () = Utils.oiter (define_oracle_tag_formula table n) tagi in
-
-    let ctys = parse_ctys table ctys ["m"; "h"; "k"] in
-    let m_ty = List.assoc_opt  "m" ctys
-    and h_ty = List.assoc_opt  "h" ctys
-    and k_ty  = List.assoc_opt "k" ctys in
-
-    Theory.declare_hash table ?m_ty ?h_ty ?k_ty ?index_arity:a n
-
-  | Decl.Decl_aenc (enc, dec, pk, ctys) ->
-    let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "rnd"; "sk"; "pk"] in
-    let ptxt_ty = List.assoc_opt "ptxt" ctys
-    and ctxt_ty = List.assoc_opt "ctxt" ctys
-    and rnd_ty  = List.assoc_opt "rnd"  ctys
-    and sk_ty   = List.assoc_opt "sk"   ctys
-    and pk_ty   = List.assoc_opt "pk"   ctys in
-
-    Theory.declare_aenc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?sk_ty ?pk_ty enc dec pk
-
-  | Decl.Decl_senc (senc, sdec, ctys) ->
-    let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "rnd"; "k"] in
-    let ptxt_ty = List.assoc_opt "ptxt" ctys
-    and ctxt_ty = List.assoc_opt "ctxt" ctys
-    and rnd_ty  = List.assoc_opt "rnd"  ctys
-    and k_ty   = List.assoc_opt  "k"    ctys in
-
-    Theory.declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty senc sdec
-
-  | Decl.Decl_name (s, a, pty) ->
-    let ty = Theory.parse_p_ty table [] pty Type.KMessage in
-    Theory.declare_name table s Symbols.{ n_iarr = a; n_ty = ty; }
-
-  | Decl.Decl_state (s, args, k, t) ->
-    Theory.declare_state table s args k t
-
-  | Decl.Decl_senc_w_join_hash (senc, sdec, h) ->
-    Theory.declare_senc_joint_with_hash table senc sdec h
-
-  | Decl.Decl_sign (sign, checksign, pk, tagi, ctys) ->
-    let () = Utils.oiter (define_oracle_tag_formula table sign) tagi in
-
-    let ctys = parse_ctys table ctys ["m"; "sig"; "check"; "sk"; "pk"] in
-    let m_ty     = List.assoc_opt "m"     ctys
-    and sig_ty   = List.assoc_opt "sig"   ctys
-    and check_ty = List.assoc_opt "check" ctys
-    and sk_ty    = List.assoc_opt "sk"    ctys
-    and pk_ty    = List.assoc_opt "pk"    ctys in
-
-    Theory.declare_signature table
-      ?m_ty ?sig_ty ?check_ty ?sk_ty ?pk_ty sign checksign pk
-
-  | Decl.Decl_abstract decl -> parse_abstract_decl table decl
-  | Decl.Decl_bty bty_decl ->
-    let table, _ =
-      Symbols.BType.declare_exact
-        table
-        bty_decl.bty_name
-        bty_decl.bty_infos
-    in
-    table
-
-let declare table hint_db decl =
-  let loc = L.loc decl in
-  error_handler loc KDecl (declare_i table hint_db) decl
-
-let declare_list table hint_db decls =
-  List.fold_left (fun table d -> declare table hint_db d) table decls
-
-(*------------------------------------------------------------------*)
-let add_hint_rewrite (s : lsymb) db =
-  let lem = get_reach_assumption s in
-  Hint.add_hint_rewrite s lem.Goal.ty_vars lem.Goal.formula db
+  

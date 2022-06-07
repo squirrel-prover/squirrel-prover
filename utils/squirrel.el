@@ -39,7 +39,7 @@
 
 (proof-easy-config 'squirrel "squirrel"
 
- proof-prog-name		     "squirrel.byte -i"  ;; or your program
+ proof-prog-name		     "squirrel -i"  ;; or your program
  proof-terminal-string                 "."   ;; end of commands
 
  proof-script-comment-start             "(*"	;; comments
@@ -102,12 +102,12 @@
 
 
 (defun squirrel-get-last-error-location ()
-  "Remove [error] in the error message and extract the position and
+  "Remove `[error> [error]` in the error message and extract the position and
 length of the error."
   (proof-with-current-buffer-if-exists proof-response-buffer
 
      (goto-char (point-max))
-     (when (re-search-backward "\\[error-\\([0-9]+\\)-\\([0-9]+\\)\\]" nil t)
+     (when (re-search-backward "\\[error> \\[error-\\([0-9]+\\)-\\([0-9]+\\)\\]\n" nil t)
         (let* ((inhibit-read-only t)
                (pos1 (string-to-number (match-string 1)))
                (pos2 (string-to-number (match-string 2)))

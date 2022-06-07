@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 channel c
 abstract ok:message
@@ -13,13 +13,13 @@ auto.
 
 expand frame@A.
 expand exec@A.
-equivalent cond@A, False.
+have -> : cond@A <=> False.
 by expand cond@A. 
 by fa 0.
 
 expand frame@A1.
 expand exec@A1.
-equivalent cond@A1, True.
+have -> : cond@A1 <=> True.
 by expand cond@A1.
 
 by fa 0.

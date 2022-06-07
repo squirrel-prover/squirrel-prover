@@ -38,6 +38,7 @@ type keyword = [
   | `ProcessName      (* [reader], [tag], [null] *)
   | `ProcessVariable  (* [x] in [in(cT,x)] *)
   | `ProcessCondition (* [if], [find], [else] *)
+  | `Goal             (* [goal], [global goal], [axiom] *)
   | `ProcessInOut     (* [in], [out] *)
   | `ProcessChannel   (* [cT] *)
   | `ProcessKeyword   (* [let], [set], [new] *)
@@ -81,6 +82,7 @@ let kw_ansi (keyword : keyword) : string =
   | `ProcessName -> "1;34"
   | `ProcessVariable -> "1;35"
   | `ProcessCondition -> "4;31"
+  | `Goal -> "31"
   | `ProcessInOut -> "1"
   | `ProcessChannel -> ""
   | `ProcessKeyword -> "1"
@@ -92,7 +94,7 @@ let kw_ansi (keyword : keyword) : string =
   | `HelpType -> "1;31"
   | `HelpFunction -> "1;35"
   | `Test -> "1;3;4;35"
-  | `Error -> "101"
+  | `Error -> "41"
 
 (* Defines the string that will be outputed when a semantic tag is opened *)
 let kw_ansi_pref (stag : Format.stag) : string =
@@ -149,6 +151,7 @@ let kw_html_attributes (keyword : keyword) : string =
   | `GoalName -> " class=\x1B\"gn\x1B\" style=\x1B\"color: #AA5500\x1B\""
   | `Separation -> " class=\x1B\"sep\x1B\" style=\x1B\"font-weight: bold\x1B\""
   | `HelpType -> " class=\x1B\"ht\x1B\" style=\x1B\"font-weight: bold; color: #AA0000\x1B\""
+  | `Goal -> " class=\x1B\"ht\x1B\" style=\x1B\"color: #AA0000\x1B\""
   | `HelpFunction -> " class=\x1B\"hf\x1B\" style=\x1B\"font-weight: bold; color: #AA00AA\x1B\""
   | `Test -> ""
   | `Error -> " class=\x1B\"err\x1B\" style=\x1B\"background-color: red\x1B\""
@@ -201,7 +204,7 @@ let init (mode : printer_mode) : unit =
   match mode with
   | File | Interactive ->
       Fmt.set_style_renderer
-        (get_std ()) Fmt.(`Ansi_tty);
+        (get_std ()) `Ansi_tty;
       Format.pp_set_mark_tags
         (get_std ()) true;
       pp_set_formatter_stag_functions
@@ -216,8 +219,6 @@ let init (mode : printer_mode) : unit =
 
 
 (** {2 Printing functions} **)
-
-let strf = Fmt.strf
 
 let pr x = Fmt.pf (get_std ()) x
 
@@ -238,30 +239,30 @@ let pp_pref (ty : pp) =
   | `Prompt  -> pr "@[[> "
   | `Start   -> pr "@[[start> "
   | `Result  -> pr "@["
-  | `Error   -> pr "@[[error> "
+  | `Error   -> pr "@[<v 0>[error> " (* vertical box, for nice errors in Emacs mode *)
   | `Dbg     -> pr "@[[dbg> "
   | `Warning -> pr "@[[warning> "
   | `Ignore  -> ()
   | `Goal    -> pr "@[[goal> "
   | `Default -> ()
 
-let pp_suf (ty : pp) =
+let pp_suf fmt (ty : pp) =
   match ty with
-  | `Prompt  -> pr "@;@]@."
-  | `Start   -> pr "@;<]@]@."
-  | `Result  -> pr "@;@]@."
-  | `Error   -> pr "@;@]@."
-  | `Dbg     -> pr "@;<]@]@."
-  | `Warning -> pr "@;<]@]@."
+  | `Prompt  -> Fmt.pf fmt "@;@]@."
+  | `Start   -> Fmt.pf fmt "@;<]@]@."
+  | `Result  -> Fmt.pf fmt "@;@]@."
+  | `Error   -> Fmt.pf fmt "@;@]@."
+  | `Dbg     -> Fmt.pf fmt "@;<]@]@."
+  | `Warning -> Fmt.pf fmt "@;<]@]@."
   | `Ignore  -> ()
-  | `Goal    -> pr "@;@]@."
+  | `Goal    -> Fmt.pf fmt "@;@]@."
   | `Default -> ()
 
 let prt ty fmt = 
   let out = match ty with
     | `Ignore -> dummy_fmt
     | _ -> get_std () in
-    pp_pref ty; Fmt.kpf (fun fmt -> pp_suf ty) out fmt
+    pp_pref ty; Fmt.kpf (fun fmt -> pp_suf fmt ty) out fmt
 
 let pr fmt = prt `Default fmt
 

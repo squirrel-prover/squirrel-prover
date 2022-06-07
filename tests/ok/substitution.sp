@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 hash h
 name k:message
@@ -17,12 +17,13 @@ system O: out(ch,cst); (
   | (C: !_c out(ch,h(<nc(c),mc(c)>,k)))
 ).
 
+set debugConstr=true.
 goal unforgeable_1 (a : index, b : index, c : index):
   happens (A(b)) => b <> a && c=a=>
   output@A(b) <> h(na(c),k).
 
 Proof.
- nosimpl(intro Hap [H G] Hneq).
+ nosimpl(intro Hap [H G] Hneq). 
  subst a, c.
  expand output.
  collision. 

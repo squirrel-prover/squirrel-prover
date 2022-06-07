@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 channel c.
 
@@ -14,19 +14,7 @@ process B(i,j : index) =
 
 system !_i !_j B(i, j).
 
-goal if_true0 (x,y : message):
- if true then x else y = x.
-Proof.
-  yesif => //.
-Qed.
-hint rewrite if_true0.
-
-goal if_false0 (x,y : message):
- if false then x else y = y.
-Proof.
-  noif => //.
-Qed.
-hint rewrite if_false0.
+include Basic.
 
 (*------------------------------------------------------------------*)
 (* macro expantion under binders *)

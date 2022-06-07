@@ -21,6 +21,29 @@ You can also just build the prover with `make squirrel`, test with `make test`.
 
 The documentation for developers may be built with `make doc`.
 
+### Dependencies for the `smt` tactic (optional)
+
+(If those dependencies are not installed, Squirrel will still compile, but the
+`smt` tactic won't work. You will need to recompile Squirrel *after* the `why3`
+package has been installed.)
+
+First install Why3 and Alt-Ergo using opam:
+```
+$ opam install why3 alt-ergo
+```
+
+This also installs the Why3 OCaml library used by Squirrel.
+
+Then tell Why3 to automatically detect that Alt-Ergo is installed and update its
+configuration accordingly:
+```
+$ why3 config detect
+```
+
+Why3 is also able to find SMT solvers installed using the system package manager
+(e.g. `sudo dnf install z3` on Fedora) but those aren't supported by our code
+yet.
+
 ## Use
 
 ### Standalone
