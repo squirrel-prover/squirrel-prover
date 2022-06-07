@@ -14,6 +14,8 @@ module Pos : sig
 
   val pp : Format.formatter -> pos -> unit
 
+  val root : pos
+
   (** set of positions *)
   module Sp : Set.S with type elt = pos
 

@@ -10,14 +10,15 @@ type error =
   | RuleBadSystems of string
 
 (*------------------------------------------------------------------*)
-(** Try to do a rewrite at head position in a term.  *)
+(** Try to do a rewrite at head position in a term.
+    Return: rewritten term, proof obligations *)
 val rewrite_head :
   Symbols.table ->
   Hyps.TraceHyps.hyps Lazy.t ->
   SystemExpr.t ->
   rw_rule ->
   Term.term ->
-  (Term.term * Term.term list) option
+  (Term.term * (SE.arbitrary * Term.term) list) option
 
 (*------------------------------------------------------------------*)
 type rw_res = Equiv.any_form * (SE.context * Term.term) list

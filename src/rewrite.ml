@@ -12,50 +12,6 @@ let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
-(** Internal exception *)
-exception NoRW
-
-(*------------------------------------------------------------------*)
-let _rewrite_head
-    (table : Symbols.table)
-    (hyps  : Hyps.TraceHyps.hyps Lazy.t)
-    (sexpr : SE.t)
-    (rule  : rw_rule)
-    (t     : Term.term) : Term.term * Term.term list
-  =
-  (* FEATURE: allow [rewrite_head] to rewrite rules that do not apply to 
-     all systems. *)
-  assert (SE.subset table rule.rw_system SE.any);
-
-  let l, r = rule.rw_rw in
-
-  let pat = Term.{ 
-      pat_tyvars = rule.rw_tyvars; 
-      pat_vars   = rule.rw_vars; 
-      pat_term   = l; }
-  in
-
-  let system = SE.reachability_context sexpr in
-  let mv =
-    match Match.T.try_match table ~hyps system t pat with
-    | FreeTyv | NoMatch _ -> raise NoRW
-    | Match mv -> mv
-  in
-  let subst = Match.Mvar.to_subst ~mode:`Match mv in
-  let r = Term.subst subst r in
-  let subs = List.map (Term.subst subst) rule.rw_conds in
-  r, subs
-
-let rewrite_head
-    (table : Symbols.table)
-    (hyps  : Hyps.TraceHyps.hyps Lazy.t)
-    (sexpr : SE.t)
-    (rule  : rw_rule)
-    (t     : Term.term) : (Term.term * Term.term list) option
-  =
-  try Some (_rewrite_head table hyps sexpr rule t) with NoRW -> None
-
-(*------------------------------------------------------------------*)
 (** as an instance been found:
     - [pat]: pattern of the instance found (no free variables left)
     - [right]: right term instantiated with the instance found
@@ -68,6 +24,7 @@ type found = {
 }
 
 type rw_state = { 
+  rl_system  : SE.t;
   init_pat   : Term.term Term.pat;
   init_subs  : Term.term list;
   init_right : Term.term;
@@ -177,7 +134,8 @@ let mk_state
   let mk_form f =
     Term.project_opt projs (Term.subst_projs psubst f)
   in
-  { init_pat = Term.{ 
+  { rl_system = rule.rw_system;
+    init_pat = Term.{ 
         pat_tyvars = rule.rw_tyvars; 
         pat_vars   = rule.rw_vars; 
         pat_term   = mk_form left;
@@ -194,78 +152,101 @@ let mk_state
    the generated sub-goals. *)
 let rw_inst
     (table : Symbols.table) (hyps : Hyps.TraceHyps.hyps) 
-    (rule : rw_rule) 
   : rw_state Pos.f_map_fold 
   = 
-  fun occ se vars conds _p (s : rw_state) ->
-  let hyps = lazy hyps in
+  let doit
+      (occ : Term.term)
+      (se : SE.t) (vars : Vars.vars) (conds : Term.terms) _p
+      (s : rw_state) 
+    =
+    let hyps = lazy hyps in
 
-  let projs = 
-    if SE.is_fset se then Some (SE.to_projs (SE.to_fset se)) else None
-  in
+    let projs : Term.projs option = 
+      if SE.is_fset se then Some (SE.to_projs (SE.to_fset se)) else None
+    in
 
-  if not (SE.subset table se rule.rw_system) then 
-    s, `Continue
-  else 
-    match s.found_instance with
-    | `Found inst -> 
-      (* we already found the rewrite instance earlier *)
+    if not (SE.subset table se s.rl_system) then 
+      s, `Continue
+    else 
+      match s.found_instance with
+      | `Found inst -> 
+        (* we already found the rewrite instance earlier *)
 
-      (* check if the same system apply to the subterm *)
-      if not (SE.subset table se inst.system) then 
-        s, `Continue 
-      else
+        (* check if the same system apply to the subterm *)
+        if not (SE.subset table se inst.system) then 
+          s, `Continue 
+        else
+          let context = SE.reachability_context se in
+          begin match Match.T.try_match ~hyps table context occ inst.pat with
+            | NoMatch _ | FreeTyv -> s, `Continue
+            | Match mv -> 
+              (* project the already found instance with the projections
+                 applying to the current subterm *)
+              s, `Map (Term.project_opt projs inst.right)
+          end
+
+      | `False ->
+        (* project the pattern *)
+        let pat_proj = Term.project_tpat_opt projs s.init_pat in
+
         let context = SE.reachability_context se in
-        begin match Match.T.try_match ~hyps table context occ inst.pat with
-          | NoMatch _ | FreeTyv -> s, `Continue
-          | Match mv -> 
-            (* project the already found instance with the projections
-               applying to the current subterm *)
-            s, `Map (Term.project_opt projs inst.right)
-        end
+        match Match.T.try_match ~hyps table context occ pat_proj with
+        | NoMatch _ | FreeTyv -> s, `Continue
 
-    | `False ->
-      (* project the pattern *)
-      let pat_proj = Term.project_tpat_opt projs s.init_pat in
-    
-      let context = SE.reachability_context se in
-      match Match.T.try_match ~hyps table context occ pat_proj with
-      | NoMatch _ | FreeTyv -> s, `Continue
+        (* head matches *)
+        | Match mv -> 
+          (* we found the rewrite instance *)
+          let subst = Match.Mvar.to_subst ~mode:`Match mv in
+          let left = Term.subst subst pat_proj.pat_term in
+          let right = 
+            let right_proj = Term.project_opt projs s.init_right in
+            Term.subst subst right_proj
+          in
+          let found_subs =
+            List.map (fun rsub ->
+                let rsub = Term.project_opt projs rsub in
+                se, 
+                Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
+              ) s.init_subs
+          in
 
-      (* head matches *)
-      | Match mv -> 
-        (* we found the rewrite instance *)
-        let subst = Match.Mvar.to_subst ~mode:`Match mv in
-        let left = Term.subst subst pat_proj.pat_term in
-        let right = 
-          let right_proj = Term.project_opt projs s.init_right in
-          Term.subst subst right_proj
-        in
-        let found_subs =
-          List.map (fun rsub ->
-              let rsub = Term.project_opt projs rsub in
-              se, 
-              Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
-            ) s.init_subs
-        in
+          let found_pat = Term.{ 
+              pat_term   = left;
+              pat_tyvars = [];
+              pat_vars   = Sv.empty; 
+            } in
 
-        let found_pat = Term.{ 
-            pat_term   = left;
-            pat_tyvars = [];
-            pat_vars   = Sv.empty; 
-          } in
+          let found_instance = `Found {
+              pat    = found_pat;
+              right;
+              system = se;
+              subgs  = found_subs;
+            } in
 
-        let found_instance = `Found {
-            pat    = found_pat;
-            right;
-            system = se;
-            subgs  = found_subs;
-          } in
-
-        { s with found_instance }, `Map right
-
+          { s with found_instance }, `Map right
+  in
+  doit
 
 (*------------------------------------------------------------------*)
+(** {2 Rewrite at head position} *)
+
+let rewrite_head
+    (table : Symbols.table)
+    (hyps  : Hyps.TraceHyps.hyps Lazy.t)
+    (sexpr : SE.t)
+    (rule  : rw_rule)
+    (t     : Term.term) : (Term.term * (SE.arbitrary * Term.term) list) option
+  =
+  let systems = SE.to_list_any sexpr in
+  let s = mk_state rule systems in
+  match rw_inst table (Lazy.force hyps) t sexpr [] [] Pos.root s with
+  | _, `Continue -> None
+  | { found_instance = `Found inst }, `Map t -> Some (t, inst.subgs)
+  | _ -> assert false
+
+(*------------------------------------------------------------------*)
+(** {2 Whole-term rewriting} *)
+
 type rw_res = Equiv.any_form * (SE.context * Term.term) list
 
 type rw_res_opt = 
@@ -314,13 +295,13 @@ let rewrite
     let s, f = match f with
       | `Equiv f ->
         let s, _, f = 
-          Pos.map_fold_e (rw_inst table hyps rule) env system s f 
+          Pos.map_fold_e (rw_inst table hyps) env system s f 
         in
         s, `Equiv f
 
       | `Reach f ->
         let s, _, f = 
-          Pos.map_fold (rw_inst table hyps rule) env system.set s f 
+          Pos.map_fold (rw_inst table hyps) env system.set s f 
         in
         s, `Reach f
     in

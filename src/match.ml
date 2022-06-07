@@ -24,6 +24,8 @@ module Pos = struct
       is more efficient. *)
   type pos = int list
 
+  let root = []
+
   let pp (fmt : Format.formatter) (pos : pos) : unit =
     if pos = [] then Fmt.pf fmt "ε"
     else Fmt.list ~sep:(Fmt.any ".") Fmt.int fmt pos

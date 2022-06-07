@@ -86,8 +86,10 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
         | None -> None
         | Some (red_t, subs) ->
           let subs_valid =  
-            List.for_all (fun sub -> 
-                fst (reduce { st with param = rp_full } sub) = Term.mk_true
+            List.for_all (fun (sexpr, sub) -> 
+                (* FEATURE: conversion *)
+                fst (reduce { st with sexpr; param = rp_full } sub) = 
+                Term.mk_true
               ) subs 
           in              
           if subs_valid then Some red_t else None            
