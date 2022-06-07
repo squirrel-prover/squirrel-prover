@@ -249,3 +249,9 @@ val maybe_paren :
   'b Fmt.t -> 
   'b Fmt.t
 
+(*------------------------------------------------------------------*)
+module Lazy : sig
+  include module type of Lazy
+      
+  val map : ('a -> 'b) -> 'a t -> 'b t
+end

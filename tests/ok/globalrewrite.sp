@@ -25,7 +25,7 @@ system [Q] !_i (in(c,x); A: out(c, a)).
 
 system Q1 = [Q/left] with rewrite foo.
 
-goal [Q1] _ (i : index) :  
+goal [Q1] _ (i : index) :
   happens(A(i)) => output@A(i) = b.
 Proof.
   auto.
@@ -41,7 +41,7 @@ system E1 = [E/left] with rewrite !barP foo.
 Proof. by have ? := check_ax0. Qed.
 Proof. by have ? := check_ax1. Qed.
 
-goal [E1] _ (i : index) :  
+goal [E1] _ (i : index) :
   happens(A(i)) => output@A(i) = b.
 Proof.
   auto.
@@ -52,10 +52,10 @@ system [P] !_i (in(c,x); A: out(c, g2(x))).
 
 system P1 = [P/left] with rewrite /g2.
 
-goal [P1] _ (i : index) :  
+goal [P1] _ (i : index) :
   happens(A(i)) => output@A(i) = g(input@A(i),input@A(i)).
 Proof.
-  intro H. 
+  intro H.
   rewrite /output.
   rewrite (eq_refl (g(input@A(i),input@A(i)))).
   assumption.
@@ -67,7 +67,7 @@ system [R] !_i (in(c,x); A: out(c, f(f(f(g(a,d)))))).
 
 system R1 = [R/left] with rewrite ?bar foo.
 
-goal [R1] _ (i : index) :  
+goal [R1] _ (i : index) :
   happens(A(i)) => output@A(i) = g(b,d).
 Proof.
   auto.
@@ -85,9 +85,9 @@ system G1 = [G/left] with rewrite !barP foo.
 Proof. by have ? := check_ax_n0 i. Qed.
 Proof. by have ? := check_ax_n1 i. Qed.
 
-goal [G1] _ (i : index) :  
+goal [G1] _ (i : index) :
   happens(A(i)) => output@A(i) = n(i).
-Proof. 
+Proof.
   auto.
 Qed.
 
@@ -96,10 +96,96 @@ system [H] !_i (in(c,x); let y = <x, zero> in A: out(c, y)).
 
 system H1 = [H/left] with rewrite /y.
 
-goal [H1] _ (i : index) :  
-  happens(A(i)) => output@A(i) = <input@A(i), zero>. 
-Proof. 
-  intro Hap @/output. 
+goal [H1] _ (i : index) :
+  happens(A(i)) => output@A(i) = <input@A(i), zero>.
+Proof.
+  intro Hap @/output.
+  rewrite eq_refl.
+  assumption.
+Qed.
+
+(*------------------------------------------------------------------*)
+system [W]
+  !_i (in(c,x);
+       let y1 = <x, a> in
+       if x = zero then
+         A: out(c, y1)
+       else
+         C: out(c, y1)).
+
+system W1 = [W/left] with rewrite !foo.
+
+goal [W1] _ (i : index) :
+  happens(A(i)) => output@A(i) = <input@A(i), b>.
+Proof.
+  intro Hap @/output @/y1.
+  rewrite eq_refl.
+  assumption.
+Qed.
+
+(*------------------------------------------------------------------*)
+system [X]
+  !_i (in(c,x);
+       let w = <x, a> in
+       let w1 = <w, f(d)> in
+       A: out(c, w1)).
+
+system X1 = [X/left] with rewrite /w.
+
+goal [X1] _ (i : index) :
+  happens(A(i)) => output@A(i) = <<input@A(i), a>, f(d)>.
+Proof.
+  intro Hap @/output @/w1.
+  rewrite eq_refl.
+  assumption.
+Qed.
+
+(*------------------------------------------------------------------*)
+system [Z]
+  !_i (in(c,x);
+       let z = <x, a> in
+       let z1 = <z, f(d)> in
+       if x = zero then
+         A: out(c, z1)
+       else
+         C: out(c, z1)).
+
+system Z1 = [Z/left] with rewrite !foo !bar.
+
+goal [Z1] _ (i : index) :
+  happens(A(i)) => output@A(i) = <<input@A(i), b>, d>.
+Proof.
+  intro Hap @/output @/z1 @/z.
+  rewrite eq_refl.
+  assumption.
+Qed.
+
+system Z2 = [Z/left] with rewrite /z.
+
+goal [Z2] _ (i : index) :
+  happens(A(i)) => output@A(i) = <<input@A(i), a>, f(d)>.
+Proof.
+  intro Hap @/output @/z1.
+  rewrite eq_refl.
+  assumption.
+Qed.
+
+(*------------------------------------------------------------------*)
+system [T]
+  !_i (let p = a in
+       in(c,x);
+       let p1 = <x, <p, f(d)>> in
+       if x = zero then
+         A: out(c, p1)
+       else
+         C: out(c, p1)).
+
+system T1 = [T/left] with rewrite /p.
+
+goal [T1] _ (i : index) :
+  happens(A(i)) => output@A(i) = <input@A(i), <a, f(d)>>.
+Proof.
+  intro Hap @/output @/p1.
   rewrite eq_refl.
   assumption.
 Qed.

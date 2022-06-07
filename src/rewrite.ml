@@ -151,6 +151,7 @@ let mk_state
    bound above the matched occurrences are universally quantified in
    the generated sub-goals. *)
 let rw_inst
+    (expand_context : Macros.expand_context)
     (table : Symbols.table) (hyps : Hyps.TraceHyps.hyps Lazy.t) 
   : rw_state Pos.f_map_fold 
   = 
@@ -159,6 +160,14 @@ let rw_inst
       (se : SE.t) (vars : Vars.vars) (conds : Term.terms) _p
       (s : rw_state) 
     =
+    let hyps =                 (* adds [conds] in [hyps] *)
+      Lazy.map (fun hyps ->
+          List.fold_left (fun hyps cond ->
+              Hyps.TraceHyps.add AnyName (`Reach cond) hyps
+            ) hyps conds
+        ) hyps
+    in
+
     let projs : Term.projs option = 
       if SE.is_fset se then Some (SE.to_projs (SE.to_fset se)) else None
     in
@@ -175,7 +184,10 @@ let rw_inst
           s, `Continue 
         else
           let context = SE.reachability_context se in
-          begin match Match.T.try_match ~hyps table context occ inst.pat with
+          begin
+            match 
+              Match.T.try_match ~expand_context ~hyps table context occ inst.pat 
+            with
             | NoMatch _ | FreeTyv -> s, `Continue
             | Match mv -> 
               (* project the already found instance with the projections
@@ -188,7 +200,9 @@ let rw_inst
         let pat_proj = Term.project_tpat_opt projs s.init_pat in
 
         let context = SE.reachability_context se in
-        match Match.T.try_match ~hyps table context occ pat_proj with
+        match 
+          Match.T.try_match ~expand_context ~hyps table context occ pat_proj 
+        with
         | NoMatch _ | FreeTyv -> s, `Continue
 
         (* head matches *)
@@ -230,6 +244,7 @@ let rw_inst
 
 let rewrite_head
     (table : Symbols.table)
+    (expand_context : Macros.expand_context)
     (hyps  : Hyps.TraceHyps.hyps Lazy.t)
     (sexpr : SE.t)
     (rule  : rw_rule)
@@ -237,7 +252,7 @@ let rewrite_head
   =
   let systems = SE.to_list_any sexpr in
   let s = mk_state rule systems in
-  match rw_inst table hyps t sexpr [] [] Pos.root s with
+  match rw_inst expand_context table hyps t sexpr [] [] Pos.root s with
   | _, `Continue -> None
   | { found_instance = `Found inst }, `Map t -> Some (t, inst.subgs)
   | _ -> assert false
@@ -255,6 +270,7 @@ type rw_res_opt =
 let rewrite
     (table  : Symbols.table)
     (system : SE.context)
+    (expand_context : Macros.expand_context)
     (env    : Vars.env)
     (hyps   : Hyps.TraceHyps.hyps)
     (mult   : Args.rw_count)
@@ -295,13 +311,13 @@ let rewrite
     let s, f = match f with
       | `Equiv f ->
         let s, _, f = 
-          Pos.map_fold_e (rw_inst table hyps) env system s f 
+          Pos.map_fold_e (rw_inst expand_context table hyps) env system s f 
         in
         s, `Equiv f
 
       | `Reach f ->
         let s, _, f = 
-          Pos.map_fold (rw_inst table hyps) env system.set s f 
+          Pos.map_fold (rw_inst expand_context table hyps) env system.set s f 
         in
         s, `Reach f
     in
@@ -328,13 +344,14 @@ let rewrite_exn
     ~(loc   : L.t)
     (table  : Symbols.table)
     (system : SE.context)
+    (expand_context : Macros.expand_context)
     (env    : Vars.env)
     (hyps   : Hyps.TraceHyps.hyps)
     (mult   : Args.rw_count)
     (rule   : rw_rule)
     (target : Equiv.any_form) : rw_res
   =
-  match rewrite table system env hyps mult rule target with
+  match rewrite table system expand_context env hyps mult rule target with
   | RW_Result r -> r
   | RW_Failed e -> recast_error ~loc e
 
@@ -350,6 +367,8 @@ let high_rewrite
     (t       : Term.term)
   : Term.term 
   =
+  let hyps = lazy Hyps.TraceHyps.empty in
+
   let rw_inst : Pos.f_map = 
     fun occ se vars conds p ->
       (* build the rule to apply at position [p] using mk_rule *)
@@ -359,7 +378,7 @@ let high_rewrite
         assert (rule.rw_conds = []);
 
         let state = mk_state rule (SE.to_list_any se) in
-        snd (rw_inst table (lazy Hyps.TraceHyps.empty) occ se vars conds p state)
+        snd (rw_inst InSequent table hyps occ se vars conds p state)
   in
 
   let _, f = Pos.map ~mode rw_inst venv system t in

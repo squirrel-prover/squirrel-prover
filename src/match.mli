@@ -202,6 +202,7 @@ module type S = sig
     ?mv:Mvar.t ->
     ?ty_env:Type.Infer.env ->
     ?hyps:Hyps.TraceHyps.hyps Lazy.t ->
+    ?expand_context:Macros.expand_context ->
     Symbols.table ->
     SE.context -> 
     t -> 
@@ -227,6 +228,7 @@ end
     Throw [exn] in case of failure. *)
 val expand_head_once :
   exn:exn -> 
+  mode:Macros.expand_context ->
   Symbols.table -> SE.t -> Hyps.TraceHyps.hyps Lazy.t ->
   Term.term ->
   Term.term * bool 

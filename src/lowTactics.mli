@@ -112,7 +112,9 @@ module MkCommonLowTac (S : Sequent.S) : sig
   val p_rw_expand_arg : S.t -> Theory.term -> expand_kind 
 
   val expand_term :
-    ?m_rec:bool -> expand_kind -> S.sequent -> Equiv.any_form -> 
+    ?m_rec:bool -> 
+    mode:Macros.expand_context ->
+    expand_kind -> S.sequent -> Equiv.any_form -> 
     bool * Equiv.any_form
 
   (*------------------------------------------------------------------*)

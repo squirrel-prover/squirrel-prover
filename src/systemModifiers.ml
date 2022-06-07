@@ -1105,6 +1105,7 @@ let global_prf_t
 
 let do_rewrite
     ~(loc : L.t)
+    (expand_context : Macros.expand_context)
     (rw : Args.rw_count * Rewrite.rw_rule)
     (s  : TS.sequent)
     (t  : Term.term)
@@ -1113,7 +1114,8 @@ let do_rewrite
   let mult, rw_erule = rw in
   match
     Rewrite.rewrite_exn 
-      ~loc (TS.table s) (TS.system s) (TS.vars s) (TS.get_trace_hyps s)
+      ~loc (TS.table s) (TS.system s) expand_context
+      (TS.vars s) (TS.get_trace_hyps s)
       mult rw_erule (`Reach t)
   with
   | `Reach t, subs ->
@@ -1130,49 +1132,57 @@ let do_rewrite
 
 
 (** Applies a rewrite item *)
-let do_rw_item (rw_item : Args.rw_item) (s : TS.t) (t : Term.term) 
+let do_rw_item
+    (expand_context : Macros.expand_context)
+    (rw_item : Args.rw_item) (s : TS.t) (t : Term.term) 
   : Term.term * TS.t list 
   =
   let rw_c,rw_arg = TLT.p_rw_item rw_item s in
 
   match rw_arg with
-  | Rw_rw (loc, _, erule) -> do_rewrite ~loc (rw_c, erule) s t 
+  | Rw_rw (loc, _, erule) -> do_rewrite ~loc expand_context (rw_c, erule) s t 
 
   | Rw_expand p_arg -> 
     let arg = TLT.p_rw_expand_arg s p_arg in
-    let _, t = TLT.expand_term arg s (`Reach t) in
+    let _, t = TLT.expand_term ~mode:expand_context arg s (`Reach t) in
     Equiv.any_to_reach t, []
   
   | Rw_expandall _ ->
-    let _, t = TLT.expand_term `Any s (`Reach t) in
+    let _, t = TLT.expand_term ~mode:expand_context `Any s (`Reach t) in
     Equiv.any_to_reach t, []    
 
-let do_s_item (s_item : Args.s_item) (s : TS.t) (t : Term.term) : Term.term =
+let do_s_item
+    (expand_context : Macros.expand_context)
+    (s_item : Args.s_item) (s : TS.t) (t : Term.term) 
+  : Term.term 
+  =
   match s_item with
-  | Args.Simplify l -> TS.Reduce.reduce_term Reduction.{ delta = false; } s t
+  | Args.Simplify l -> 
+    let param = Reduction.{ delta = false; } in
+    TS.Reduce.reduce_term ~expand_context param s t 
 
   | Args.Tryauto l | Args.Tryautosimpl l ->
     soft_failure ~loc:l (Failure "cannot use // or /= in global rewriting")
 
-let do_rw_arg (rw_arg : Args.rw_arg) (s : TS.t) (t : Term.term) 
+let do_rw_arg
+    (expand_context : Macros.expand_context)
+    (rw_arg : Args.rw_arg) (s : TS.t) (t : Term.term) 
   : Term.term * TS.t list
   =
   match rw_arg with
-  | Args.R_item rw_item  -> do_rw_item rw_item s t
-  | Args.R_s_item s_item -> do_s_item s_item s t, []
+  | Args.R_item rw_item  -> do_rw_item expand_context rw_item s t
+  | Args.R_s_item s_item -> do_s_item  expand_context s_item s t, []
 
 let do_rw_args
+    (expand_context : Macros.expand_context)
     (rw_args : Args.rw_arg list) (s : TS.t) (t : Term.term) 
   : Term.term * TS.t list
   =
   List.fold_left (fun (t,subgs) rw_arg ->
-      let t, subgs' = do_rw_arg rw_arg s t in
+      let t, subgs' = do_rw_arg expand_context rw_arg s t in
       t, subgs @ subgs'
     ) (t, []) rw_args
 
-
-(* let mk_rewrite_cond (arg : system_map_arg) (ms : Symbols.macro) = *)
-  
 
 let global_rewrite
     (table   : Symbols.table)
@@ -1192,14 +1202,16 @@ let global_rewrite
   let fmap (arg : system_map_arg) (ms : Symbols.macro) (t : Term.term) 
     : Term.term 
     =
-    let vars, ts = match arg with
+    let vars, ts, expand_context = match arg with
       | Macros.ADescr d -> 
         Vars.of_list d.indices, 
-        Term.mk_action d.name d.indices
+        Term.mk_action d.name d.indices,
+        Macros.InSequent
 
-      | Macros.AGlobal { is; ts; } -> 
-        Vars.of_list (ts :: is), 
-        Term.mk_var ts 
+      | Macros.AGlobal { is; ts; inputs} -> 
+        Vars.of_list (ts :: is @ inputs), 
+        Term.mk_var ts,
+        Macros.InGlobal { inputs }
     in
     let hyp_hap = Term.mk_happens ts in
     
@@ -1207,7 +1219,7 @@ let global_rewrite
     let s = TS.init ~env ~hint_db Term.mk_false in
     let s = TS.LocalHyps.add AnyName hyp_hap s in
 
-    let t, subgs' = do_rw_args rw s t in
+    let t, subgs' = do_rw_args expand_context rw s t in
     let subgs' = List.map (fun s -> 
         TS.set_goal (Term.mk_impl hyp_hap (TS.goal s)) s
       ) subgs'

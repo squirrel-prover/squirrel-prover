@@ -9,7 +9,9 @@ let rev_subst subst =
   List.map (fun (Term.ESubst (u,v)) -> Term.ESubst (v,u)) subst
 
 (*------------------------------------------------------------------*)
-type red_param = { delta : bool; }
+type red_param = { 
+  delta : bool;  
+}
 
 let rp_full = { delta = true; }
 
@@ -17,17 +19,22 @@ let rp_full = { delta = true; }
 module type S = sig
   type t                        (* type of sequent *)
 
-  val reduce_term  : 
+  val reduce_term : 
+    ?expand_context:Macros.expand_context ->
     ?se:SE.t -> red_param -> t -> Term.term -> Term.term     
 
   val reduce_equiv : 
+    ?expand_context:Macros.expand_context ->
     ?system:SE.context -> red_param -> t -> Equiv.form -> Equiv.form
 
   val reduce : 
+    ?expand_context:Macros.expand_context ->
     ?system:SE.context -> red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
   val expand_head_once :
-    ?se:SE.t -> red_param -> t -> Term.term -> Term.term * bool
+    ?expand_context:Macros.expand_context ->
+    ?se:SE.t -> 
+    red_param -> t -> Term.term -> Term.term * bool
 
   val destr_eq : 
     t -> 'a Equiv.f_kind -> 'a -> (Term.term * Term.term) option
@@ -41,6 +48,9 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     param   : red_param;
     hint_db : Hint.hint_db;
     hyps    : THyps.hyps;
+
+    expand_context : Macros.expand_context;
+    (** expantion mode for macros. See [Macros.expand_context]. *)
   }
 
   (** Internal *)
@@ -73,7 +83,9 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     then t, false 
     else 
       try 
-        Match.expand_head_once ~exn:NoExp st.table st.sexpr (lazy st.hyps) t
+        Match.expand_head_once 
+          ~mode:st.expand_context ~exn:NoExp
+          st.table st.sexpr (lazy st.hyps) t
       with NoExp -> t, false
 
   (* Rewrite once at head position *)
@@ -82,7 +94,11 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     let hints = Term.Hm.find_dflt [] (Term.get_head t) db in
 
     let rule = List.find_map (fun Hint.{ rule } ->
-        match Rewrite.rewrite_head st.table (lazy st.hyps) st.sexpr rule t with
+        match 
+          Rewrite.rewrite_head
+            st.table st.expand_context (lazy st.hyps) st.sexpr 
+            rule t 
+        with
         | None -> None
         | Some (red_t, subs) ->
           let subs_valid =  
@@ -223,41 +239,46 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 (*------------------------------------------------------------------*)
   (** [se] is the system of the term being reduced. *)
   (* computation must be fast *)
-  let mk_state ~se (param : red_param) (s : S.t) : state = 
+  let mk_state ~expand_context ~se (param : red_param) (s : S.t) : state = 
     { table   = S.table s;
       sexpr   = se;
       param;
       hint_db = S.get_hint_db s;
-      hyps    = S.get_trace_hyps s; } 
+      hyps    = S.get_trace_hyps s; 
+      expand_context; } 
 
 (*------------------------------------------------------------------*)
   (** Exported. *)
   let expand_head_once
+      ?(expand_context : Macros.expand_context = InSequent)
       ?(se : SE.arbitrary option)
       (param : red_param) (s : S.t)
       (t : Term.term) : Term.term * bool 
     = 
     let se = odflt (S.system s).set se in
-    let state = mk_state ~se param s in
+    let state = mk_state ~expand_context ~se param s in
     expand_head_once state t
 
 (*------------------------------------------------------------------*)
   (** Exported. *)
   let reduce_term
+      ?(expand_context : Macros.expand_context = InSequent)
       ?(se : SE.arbitrary option)
       (param : red_param) (s : S.t)
       (t : Term.term) : Term.term 
     = 
     let se = odflt (S.system s).set se in
-    let state = mk_state ~se param s in
+    let state = mk_state ~expand_context ~se param s in
     let t, _ = reduce state t in
     t
 
   (** Exported. *)
   let rec reduce_equiv
+      ?(expand_context : Macros.expand_context = InSequent)
       ?(system : SE.context option)
       (param : red_param) (s : S.t) (e : Equiv.form) : Equiv.form 
     =
+    let reduce_equiv = reduce_equiv ~expand_context in
     match e with
     | Equiv.Quant (q, vs, e) -> 
       let _, subst = Term.refresh_vars `Global vs in
@@ -283,24 +304,25 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     | Equiv.Atom (Equiv e) -> 
       let system = odflt (S.system s) system in
       let e_se = (oget system.pair :> SE.arbitrary) in
-      let state = mk_state ~se:e_se param s in
+      let state = mk_state ~expand_context ~se:e_se param s in
 
       let e = List.map (fst -| reduce state) e in
       Equiv.Atom (Equiv.Equiv e)
 
   (** We need type introspection there *)
   let reduce (type a) 
+      ?(expand_context : Macros.expand_context = InSequent)
       ?(system : SE.context option)
       (param : red_param) (s : S.t) (k : a Equiv.f_kind) (x : a) : a 
     =
     let se = omap (fun system -> system.SE.set) system in
     match k with
-    | Local_t  -> reduce_term  ?se     param s x
-    | Global_t -> reduce_equiv ?system param s x
+    | Local_t  -> reduce_term  ~expand_context ?se     param s x
+    | Global_t -> reduce_equiv ~expand_context ?system param s x
     | Any_t ->
-       match x with
-         | `Reach x -> `Reach (reduce_term  ?se     param s x)
-         | `Equiv x -> `Equiv (reduce_equiv ?system param s x)
+      match x with
+      | `Reach x -> `Reach (reduce_term  ~expand_context ?se     param s x)
+      | `Equiv x -> `Equiv (reduce_equiv ~expand_context ?system param s x)
 
  (*------------------------------------------------------------------*)
   (* FIXME: use [s] to reduce [x] if necessary *)

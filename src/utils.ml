@@ -668,3 +668,9 @@ let maybe_paren
   in
   pp_maybe_paren (not (noparens inner outer side)) pp
 
+(*------------------------------------------------------------------*)
+module Lazy = struct
+  include Lazy
+      
+  let map f x = lazy (f (Lazy.force x))
+end

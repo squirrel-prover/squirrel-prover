@@ -6,6 +6,34 @@ module SE = SystemExpr
 let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
+(** {2 Utilities} *)
+
+let ty_out (table : Symbols.table) (ms : Symbols.macro) : Type.ty =
+  match Symbols.Macro.get_def ms table with
+    | Symbols.Global (_, ty) -> ty
+
+    | Input | Output | Frame -> Type.tmessage
+
+    | Cond | Exec -> Type.tboolean
+
+    | Symbols.State (_,ty) -> ty
+
+let ty_args (table : Symbols.table) (ms : Symbols.macro) : Type.ty list =
+  match Symbols.Macro.get_def ms table with
+    | Symbols.Global (arity, ty) ->
+      List.init arity (fun _ -> Type.tindex)
+
+    | Input | Output | Frame | Cond | Exec -> []
+
+    | Symbols.State (arity,ty) ->
+      List.init arity (fun _ -> Type.tindex)
+
+let is_global table (ms : Symbols.macro) : bool =
+  match Symbols.Macro.get_def ms table with
+  | Symbols.Global (_, _) -> true
+  | _ -> false
+
+(*------------------------------------------------------------------*)
 (** {2 Global macro definitions} *)
 
 (** Data associated with global macro symbols.
@@ -56,25 +84,22 @@ type Symbols.data += Global_data of global_data
 (*------------------------------------------------------------------*)
 (** Get body of a global macro for a single system. *)
 let get_single_body (single : S.Single.t) (data : global_data) : Term.term =
-  (* Fmt.epr "single : %a@.data: %a@." S.Single.pp single pp data; *)
   try List.assoc single data.bodies with
     | Not_found -> Term.empty
 
 (*------------------------------------------------------------------*)
 (** Get body of a global macro for a system expression. *)
-let get_body system data : Term.term =
+let get_body (system : SE.fset) (data : global_data) : Term.term =
   Term.combine
     (List.map
        (fun (lbl,single_system) -> lbl, get_single_body single_system data)
        (SE.to_list system))
 
-let is_tuni = function Type.TUnivar _ -> true | _ -> false
-
 (*------------------------------------------------------------------*)
 (** Exported *)
 let declare_global
       table system macro ~suffix ~action ~inputs ~indices ~ts body ty =
-  assert (not (is_tuni ty));
+  assert (not (Type.is_tuni ty));
   let bodies =
     List.map
       (fun projection ->
@@ -129,8 +154,34 @@ let is_defined (name : Symbols.macro) (a : Term.term) table =
     | Symbols.Global _, _ -> assert false
 
 (*------------------------------------------------------------------*)
-type def_result = [ `Def of Term.term | `Undef | `MaybeDef ]
+(** Give the **internal** definition of a global macro. 
+    Meaningless when working in a sequent. 
+    Used for global rewriting, when rewriting in another global macro. *)
+let get_def_glob_internal
+    (table : Symbols.table) (system : SE.fset) 
+    (symb : Term.msymb) 
+    (inputs : Vars.vars) (ts : Term.term)
+  : Term.term 
+  =
+  assert (is_global table symb.s_symb);
 
+  let data = 
+    match Symbols.Macro.get_data symb.s_symb table with
+    | Global_data data -> data 
+    | _ -> assert false 
+  in
+  let body = get_body system data in
+  let prefix_inputs = List.take (List.length data.inputs) inputs in
+  let subst =
+    List.map2
+      (fun i i' -> Term.ESubst (Term.mk_var i, Term.mk_var i'))
+      (data.indices @ data.inputs)
+      (symb.s_indices @ prefix_inputs)
+  in
+  let subst = Term.ESubst (Term.mk_var data.ts, ts) :: subst in
+  Term.subst subst body
+
+(*------------------------------------------------------------------*)
 (** Give the definition of the global macro [symb] at timestamp [a]
     corresponding to action [action].
     All prefixes of [action] must be valid actions of the system, except if:
@@ -169,12 +220,10 @@ let get_def_glob
            then a
            else SE.action_to_term table system (List.rev action_prefix)
          in
-         let in_tm =
-           Term.mk_macro Term.in_macro [] a_ts
-         in
-         Term.ESubst (Term.mk_var x,in_tm) :: subst,
+         let in_tm = Term.mk_macro Term.in_macro [] a_ts in
+         Term.ESubst (Term.mk_var x, in_tm) :: subst,
          List.tl action_prefix)
-      (ts_subst::idx_subst,rev_action)
+      (ts_subst :: idx_subst, rev_action)
       data.inputs
   in
 
@@ -278,7 +327,14 @@ let get_definition_nocntxt
 
   |  _ -> assert false
 
-let get_definition
+(*------------------------------------------------------------------*)
+type def_result = [ `Def of Term.term | `Undef | `MaybeDef ]
+
+(** See [.mli] *)
+type expand_context = InSequent | InGlobal of { inputs : Vars.vars }
+
+(** Not exported *)
+let get_definition_in_sequent
     (cntxt : Constr.trace_cntxt)
     (symb  : Term.msymb)
     (ts    : Term.term)
@@ -304,12 +360,31 @@ let get_definition
       end
     | _ -> `MaybeDef
 
+  (*------------------------------------------------------------------*)
+(** Exported *)
+let get_definition
+    ?(mode : expand_context = InSequent)
+    (cntxt : Constr.trace_cntxt)
+    (symb  : Term.msymb)
+    (ts    : Term.term)
+  : def_result
+  =
+  (* first try to get the definition as in a sequent. *)
+  match get_definition_in_sequent cntxt symb ts, mode with 
+  | `MaybeDef, InGlobal { inputs } 
+    when is_global cntxt.table symb.Term.s_symb -> 
+    (* if that fails, and if we are in [InGlobal] mode, get the internal def. *)
+    `Def (get_def_glob_internal cntxt.table cntxt.system symb inputs ts)
+  | res, _ -> res
+
+(** Exported *)
 let get_definition_exn
+    ?(mode : expand_context = InSequent)
     (cntxt : Constr.trace_cntxt)
     (symb  : Term.msymb)
     (ts    : Term.term) : Term.term
   =
-  match get_definition cntxt symb ts with
+  match get_definition ~mode cntxt symb ts with
   | `Undef ->
     soft_failure (Failure "cannot expand this macro: macro is undefined");
 
@@ -352,7 +427,7 @@ let get_dummy_definition
 (*------------------------------------------------------------------*)
 type system_map_arg =
   | ADescr  of Action.descr 
-  | AGlobal of { is : Vars.vars; ts : Vars.var; }
+  | AGlobal of { is : Vars.vars; ts : Vars.var; inputs : Vars.vars }
 
 (*------------------------------------------------------------------*)
 (** Given the name [ns] of a macro as well as a function [f] over
@@ -376,9 +451,14 @@ let update_global_data
   match Symbols.Macro.get_data ms table with
   | Global_data data when List.mem_assoc old_system data.bodies ->
     assert (not (List.mem_assoc new_system data.bodies));
-    let body = get_single_body old_system data in
     let body = 
-      func (AGlobal { is = data.indices; ts = data.ts; }) ms body 
+      let body = get_single_body old_system data in
+      let aglob = AGlobal { 
+          is = data.indices; 
+          ts = data.ts; 
+          inputs = data.inputs 
+        } in
+      func aglob ms body 
     in
     let data =
       Global_data { data with
@@ -388,32 +468,4 @@ let update_global_data
 
   | _ -> table
 
-
-(*------------------------------------------------------------------*)
-(** {2 Utilities} *)
-
-let ty_out (table : Symbols.table) (ms : Symbols.macro) : Type.ty =
-  match Symbols.Macro.get_def ms table with
-    | Symbols.Global (_, ty) -> ty
-
-    | Input | Output | Frame -> Type.tmessage
-
-    | Cond | Exec -> Type.tboolean
-
-    | Symbols.State (_,ty) -> ty
-
-let ty_args (table : Symbols.table) (ms : Symbols.macro) : Type.ty list =
-  match Symbols.Macro.get_def ms table with
-    | Symbols.Global (arity, ty) ->
-      List.init arity (fun _ -> Type.tindex)
-
-    | Input | Output | Frame | Cond | Exec -> []
-
-    | Symbols.State (arity,ty) ->
-      List.init arity (fun _ -> Type.tindex)
-
-let is_global table (ms : Symbols.macro) : bool =
-  match Symbols.Macro.get_def ms table with
-  | Symbols.Global (_, _) -> true
-  | _ -> false
   

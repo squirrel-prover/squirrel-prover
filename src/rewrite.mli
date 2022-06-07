@@ -14,6 +14,7 @@ type error =
     Return: rewritten term, proof obligations *)
 val rewrite_head :
   Symbols.table ->
+  Macros.expand_context ->
   Hyps.TraceHyps.hyps Lazy.t ->
   SystemExpr.t ->
   rw_rule ->
@@ -31,6 +32,7 @@ type rw_res_opt =
 val rewrite :
   Symbols.table ->
   SystemExpr.context ->
+  Macros.expand_context ->
   Vars.env ->
   Hyps.TraceHyps.hyps ->
   TacticsArgs.rw_count ->
@@ -45,6 +47,7 @@ val rewrite_exn :
   loc:L.t ->
   Symbols.table ->
   SystemExpr.context ->
+  Macros.expand_context ->
   Vars.env ->
   Hyps.TraceHyps.hyps ->
   TacticsArgs.rw_count ->

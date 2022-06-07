@@ -492,11 +492,6 @@ type macro_occs = macro_occ list
 
 exception Var_found
 
-let is_global ms table =
-  match Symbols.Macro.get_def ms.Term.s_symb table with
-  | Symbols.Global _ -> true
-  | _ -> false
-
 (** Looks for macro occurrences in a term.
     - [mode = `FullDelta]: all macros that can be expanded are ignored.
     - [mode = `Delta]: only Global macros are expanded (and ignored)
@@ -521,7 +516,7 @@ let get_macro_occs
            occ_pos  = Sp.empty; }]
       in
 
-      if mode = `FullDelta || is_global ms constr.table then
+      if mode = `FullDelta || Macros.is_global constr.table ms.Term.s_symb then
         match Macros.get_definition constr ms ts with
         | `Def t -> get t ~fv ~cond
         | `Undef | `MaybeDef -> default ()

@@ -1,5 +1,7 @@
 (** Declaring and unfolding macros *)
 
+module SE = SystemExpr
+
 (*------------------------------------------------------------------*)
 (** {2 Global macro definitions} *)
 
@@ -24,6 +26,16 @@ val declare_global :
 (*------------------------------------------------------------------*)
 (** {2 Macro expansions} *)
 
+type def_result = [ `Def of Term.term | `Undef | `MaybeDef ]
+
+(** A expand context:
+    - [InSequent]: when in a sequent. Most common mode.
+    - [InGlobal {inputs}]: when in a global macro definition.
+      In that case, [inputs] are the inputs variables of the global 
+      macro we are doing the expansion in. *)
+type expand_context = InSequent | InGlobal of { inputs : Vars.vars }
+
+(*------------------------------------------------------------------*)
 (** [get_definition context macro t] returns the expansion of [macro] at [t],
     if the macro can be expanded.
     Does *not* check that the timestamp happens!
@@ -35,13 +47,15 @@ val declare_global :
     and [`MaybeDef] if the status is unknown (typically
     because [t] is unknown). *)
 val get_definition :
+  ?mode:expand_context ->
   Constr.trace_cntxt ->
   Term.msymb -> Term.term ->
-  [ `Def of Term.term | `Undef | `MaybeDef ]
+  def_result
 
 (** Same as [get_definition] but raises a soft failure if the macro
     cannot be expanded. *)
 val get_definition_exn :
+  ?mode:expand_context ->
   Constr.trace_cntxt ->
   Term.msymb -> Term.term ->
   Term.term
@@ -52,7 +66,7 @@ val get_definition_exn :
     since we can always determine whether a macro is defined or not at
     a given action. *)
 val get_definition_nocntxt :
-  SystemExpr.fset -> Symbols.table ->
+  SE.fset -> Symbols.table ->
   Term.msymb -> Symbols.action -> Vars.vars ->
   [ `Def of Term.term | `Undef ]
 
@@ -61,12 +75,12 @@ val get_definition_nocntxt :
     would be obtained with [get_definition m li ts] for some [ts],
     except that it will feature meaningless action names in some places. *)
 val get_dummy_definition :
-  Symbols.table -> SystemExpr.fset -> Term.msymb -> Term.term
+  Symbols.table -> SE.fset -> Term.msymb -> Term.term
 
 (*------------------------------------------------------------------*)
 type system_map_arg =
   | ADescr  of Action.descr 
-  | AGlobal of { is : Vars.vars; ts : Vars.var; }
+  | AGlobal of { is : Vars.vars; ts : Vars.var; inputs : Vars.vars }
 
 (*------------------------------------------------------------------*)
 (** Given the name [ns] of a macro as well as a function [f] over
@@ -93,3 +107,4 @@ val ty_out : Symbols.table -> Symbols.macro -> Type.ty
 val ty_args : Symbols.table -> Symbols.macro -> Type.ty list 
 
 val is_global : Symbols.table -> Symbols.macro -> bool
+

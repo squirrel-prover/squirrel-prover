@@ -718,6 +718,7 @@ let no_match ?infos () = raise (NoMatch infos)
     Throw [exn] in case of failure. *)
 let expand_head_once
     ~(exn : exn) 
+    ~(mode : Macros.expand_context)
     (table : Symbols.table) (sexpr : SE.t) 
     (hyps : Hyps.TraceHyps.hyps Lazy.t)
     (t : Term.term) 
@@ -745,10 +746,10 @@ let expand_head_once
     assert (l = []);
 
     if Constr.query ~precise:true (Lazy.force models) [`Pos, `Happens ts] then
-      match Macros.get_definition (cntxt ()) ms ts with
+      match Macros.get_definition ~mode (cntxt ()) ms ts with
       | `Def mdef -> mdef, true
-      | _ -> raise exn
-    else raise exn
+      | _ -> raise exn 
+    else raise exn 
 
   | Fun (fs, _, ts) 
     when Operator.is_operator table fs -> 
@@ -766,6 +767,9 @@ type match_state = {
 
   support : Sv.t;       (** free variable which we are trying to match *)
   env     : Sv.t;       (** rigid free variables (disjoint from [support]) *)
+
+  expand_context : Macros.expand_context; 
+  (** expantion mode for macros. See [Macros.expand_context]. *)
 
   ty_env  : Type.Infer.env;
   table   : Symbols.table;
@@ -811,9 +815,9 @@ type match_option = {
 }
 
 let default_match_option = { 
-  mode          = `Eq; 
-  use_fadup     = false; 
-  allow_capture = false; 
+  mode           = `Eq; 
+  use_fadup      = false; 
+  allow_capture  = false; 
 }
 
 (** Module signature of matching.
@@ -842,6 +846,7 @@ module type S = sig
     ?mv:Mvar.t ->
     ?ty_env:Type.Infer.env ->
     ?hyps:Hyps.TraceHyps.hyps Lazy.t ->
+    ?expand_context:Macros.expand_context ->
     Symbols.table ->
     SE.context ->
     t -> 
@@ -872,6 +877,7 @@ let try_match_gen (type a)
     ?(mv     : Mvar.t option)
     ?(ty_env : Type.Infer.env option)
     ?(hyps   : Hyps.TraceHyps.hyps Lazy.t = lazy (Hyps.TraceHyps.empty))
+    ?(expand_context : Macros.expand_context = InSequent)
     (table   : Symbols.table)
     (system  : SE.context)
     (t       : a)
@@ -908,6 +914,8 @@ let try_match_gen (type a)
   let st_init : match_state = { 
     bvs = Sv.empty;
     mv = mv_init;
+
+    expand_context;
 
     table; system; env; support; ty_env; hyps;
 
@@ -1242,15 +1250,25 @@ module T (* : S with type t = Term.term *) = struct
     | _, _ -> try_reduce_head1 t pat st
 
   and m_expand_head_once (st : match_state) (t : term) : term * bool =
-    expand_head_once ~exn:(NoMatch None) st.table st.system.set st.hyps t 
+    expand_head_once
+      ~mode:st.expand_context ~exn:(NoMatch None) 
+      st.table st.system.set st.hyps t 
 
   (* try to reduce one step at head position in [t] or [pat], 
      and resume matching *)
   and try_reduce_head1 (t : term) (pat : term) (st : match_state) : Mvar.t =
     match t, pat with
     | (Macro _ | Fun _), (Macro _ | Fun _) -> 
+      let b = match t with
+        | Macro (ms, _, _) when Symbols.to_string ms.s_symb = "mA" ->
+          Fmt.epr "%a and %a (mode = %a)@." Term.pp t Term.pp pat Fmt.bool (st.expand_context = InSequent); true
+        | _ -> false
+      in
+      
       let t, t_red = m_expand_head_once st t in
-      if t_red then tmatch t pat st
+      if b then Fmt.epr "t_red %a : %a@." Fmt.bool t_red Term.pp t;
+
+      if t_red then tmatch t pat st 
       else
         let pat, pat_red = m_expand_head_once st pat in
         if pat_red then tmatch t pat st
@@ -1375,7 +1393,8 @@ module T (* : S with type t = Term.term *) = struct
     let f_fold : Term.terms Pos.f_map_fold = 
       fun e se _vars _conds _p acc ->
         let subterm_system = SE.reachability_context se in
-        match try_match ?option table subterm_system e pat with
+        match try_match ~expand_context:InSequent 
+                ?option table subterm_system e pat with
         | Match _ -> e :: acc, `Continue
         | _       -> acc, `Continue
     in
@@ -1739,7 +1758,10 @@ let mset_incl
   in
   let context = SE.{ set = system; pair = None; } in
   (* FIXME: cleanup with unification of list of terms *)
-  match T.try_match table context term1 (mk_pat2 term2) with
+  (* FIXME: use better expand_context mode when possible *)
+  match 
+    T.try_match ~expand_context:InSequent table context term1 (mk_pat2 term2) 
+  with
   | FreeTyv | NoMatch _ -> false
   | Match mv -> true
 
@@ -2572,7 +2594,10 @@ module E : S with type t = Equiv.form = struct
     let f_fold : Term.terms Pos.f_map_fold = 
       fun e se _vars _conds _p acc ->
         let subterm_system = SE.reachability_context se in
-        match T.try_match ?option table subterm_system e pat with
+        match 
+          T.try_match ~expand_context:InSequent
+            ?option table subterm_system e pat 
+        with
         | Match _ -> e :: acc, `Continue
         | _       ->      acc, `Continue
     in
