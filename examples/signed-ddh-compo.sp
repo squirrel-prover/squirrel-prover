@@ -31,7 +31,8 @@ tion: a technique for protocol composition with long term shared secrets.
 In Proceedings of the 2020 ACM SIGSAC Conference on Computer and
 Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
-set autoIntro=false.
+
+include Basic.
 
 abstract ok : message
 abstract ko : message
@@ -133,8 +134,6 @@ process S2 =
 
 system [secret] ( P2 | S2).
 
-set autoIntro=false.
-
 (** Prove that the condition above the only diff term inside S is never true. **)
 goal [auth] S1_charac :
   happens(S1,S4) => cond@S1 => (cond@S4 => False).
@@ -199,7 +198,7 @@ Proof.
    + (* P4 *)
      expand frame, exec. fa 6.
 
-     equivalent exec@pred(P4) && cond@P4, False.
+     have ->: (exec@pred(P4) && cond@P4) <=> False.
      {split => //. intro [Hexec Hcond].
       depends P1, P4 => //. 
       executable pred(P4) => //.
@@ -208,7 +207,7 @@ Proof.
       expand exec.
       by use P1_charac.}
 
-   by fa 7; noif 7.
+   by fa 7; rewrite if_false in 7.
 
    + (* A *)
      by expandall; fa 6.
@@ -231,7 +230,7 @@ Proof.
    + (* S4 *)
      expand frame, exec.
 
-     equivalent exec@pred(S4) && cond@S4, False.
+     have ->: (exec@pred(S4) && cond@S4) <=> False.
      {split => //. intro [Hexec Hcond]. 
       depends S1, S4 => //.
       executable pred(S4) => //.
@@ -240,7 +239,7 @@ Proof.
       expand exec.
       by use S1_charac.}
 
-      by fa 6; fa 7; noif 7.
+      by fa 6; fa 7; rewrite if_false in 7.
 
    + (* A2 *)
      by expandall; fa 6.

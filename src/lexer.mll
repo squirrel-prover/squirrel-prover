@@ -127,8 +127,6 @@ rule token = parse
 | "where"             { WHERE }
 | "time"              { TIME }
 | "diff"              { DIFF }
-| "left"              { LEFT }
-| "right"             { RIGHT }
 | "forall"            { FORALL }
 | "exists"            { EXISTS }
 | "splitseq"          { SPLITSEQ }
@@ -151,6 +149,8 @@ rule token = parse
 | "try"               { TRY }
 | "repeat"            { REPEAT }
 | "assert"            { ASSERT }
+| "localize"          { LOCALIZE }
+| "have"              { HAVE }
 | "exn"               { EXN }
 | "use"               { USE }
 | "rewrite"           { REWRITE }

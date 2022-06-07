@@ -19,8 +19,6 @@ one agent for the role S) and show the strong secrecy of the shared key.
 [G] ISO/IEC 9798-3:2019, IT Security techniques – Entity authentication –
 Part 3: Mechanisms using digital signature techniques.
 *******************************************************************************)
-set autoIntro=false. 
-
 
 (**
 We first declare some public constants, the secret keys for roles P and S,
@@ -153,7 +151,7 @@ Proof.
     skP, skS,
     seq(i:index ->g^a(i)),
     seq(j:index ->g^b(j)),
-    seq(i,j:index ->diff(g^a(i)^b(j),g^k(i,j))).
+    seq(i,j:index ->diff( g ^ a(i), g) ^ diff( b(j), k(i,j))).
 
   (** We now apply the `induction` tactic, which generates several cases,
   one for each possible value that can be taken by the timestamp `t`.
@@ -166,24 +164,25 @@ Proof.
       We use here the DDH assumption. **)
       expandall.
       by ddh g,a,b,k.
-
+    
     + (** Case where `t = Pchall3(i)`.
       We will show that this case is not possible, by showing that the formula
       `exec@pred(Pchall3(i)) && cond@Pchall3(i)` is equivalent to `False`, relying
       on the previous property `P_charac`. **)
       expand frame, exec, output.
-      equivalent exec@pred(Pchall3(i)) && cond@Pchall3(i), False.
-      {split => //.
-       intro [Hexec Hcond].
-       expand cond.
-       depends Pchall1(i), Pchall3(i) => //.
-       intro Ord.
-       executable pred(Pchall3(i)) => //. 
-       intro Hexec'.
-       use Hexec' with Pchall1(i) as Hexec1 => //.
-       expand exec.
-       use P_charac with i as [j0 Hyp] => //.
-       by use Hcond with j0.}
+      have ->: (exec@pred(Pchall3(i)) && cond@Pchall3(i)) <=> false. {
+        split => //.
+        intro [Hexec Hcond].
+        expand cond.
+        depends Pchall1(i), Pchall3(i) => //.
+        intro Ord.
+        executable pred(Pchall3(i)) => //. 
+        intro Hexec'.
+        use Hexec' with Pchall1(i) as Hexec1 => //.
+        expand exec.
+        use P_charac with i as [j0 Hyp] => //.
+        by use Hcond with j0.
+      }
 
       fa 5. fa 6.
       (** It now remains to simplify `if false then diff(ok,ko)`. **)

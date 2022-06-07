@@ -1,14 +1,16 @@
-set autoIntro=false.
 
-name a : index -> message
-name b : index -> message
-name k : index -> message
 
-ddh g, (^) where group:message exponents:message.
+type E[large].
+
+name a : index -> E
+name b : index -> E
+name k : index -> E
+
+ddh g, (^) where group:message exponents:E.
 
 channel c
 
-system !_i ( out(c, diff((g^a(i))^b(i),g^k(i)))).
+system !_i ( out(c, diff(g^a(i)^b(i),g^k(i)))).
 
 
 equiv ddh_goal.

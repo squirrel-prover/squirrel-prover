@@ -4,11 +4,20 @@ open Utils
 
 module Sv = Vars.Sv
 module Sp = Match.Pos.Sp
-              
+
+(*------------------------------------------------------------------*)
+(** Exception raised when a forbidden occurrence of a name is found. *)
 exception Name_found
+
+(** Exception raised when a forbidden occurrence of a message variable
+    is found. *)
 exception Var_found
+
+(** Exception raised when attempting to apply a tactic on something
+    that should be a name but isn't. *)
 exception Not_name
 
+(*------------------------------------------------------------------*)
 class find_name ~(cntxt:Constr.trace_cntxt) exact name = object (self)
   inherit Iter.iter_approx_macros ~exact ~cntxt as super
 
@@ -107,8 +116,8 @@ let clear_dup_mtso_le (occs : ts_occs) : ts_occs =
   let subsumes (occ1 : ts_occ) (occ2 : ts_occ) =
     (* for now, positions not allowed here *)
     assert (Sp.is_empty occ1.occ_pos && Sp.is_empty occ2.occ_pos);
-    
-    (* TODO: alpha-renaming *)
+
+    (* FEATURE: alpha-renaming *)
     List.length occ1.occ_vars = List.length occ2.occ_vars &&
     List.for_all2 (=) occ1.occ_vars occ2.occ_vars &&
     occ1.occ_cond = occ2.occ_cond &&

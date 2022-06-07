@@ -12,11 +12,11 @@ k2.
 
 R -> T : r1
 T -> R : h(kT1+r1+k)
-         kT1 := k1+h(k2)
-         kT2 := k2+h(k1+r1+k)
+         kT1 := kT1+h(kT2)
+         kT2 := kT2+h(kT1+r1+k)
 R -> T : h(kR2)
-         kR1 := k1+h(k2)
-         kR2 := k2+h(k1+r1+k)
+         kR1 := kR1+h(kR2)
+         kR2 := kR2+h(kR1+r1+k)
 
 COMMENTS
 - In this model we use 2 different keyed hash functions, instead of a single
@@ -28,8 +28,6 @@ HELPING LEMMAS
 SECURITY PROPERTIES
 - authentication
 *******************************************************************************)
-
-set autoIntro = false.
 
 hash h1
 hash h2
@@ -46,7 +44,7 @@ name k1init : index -> message
 name k2init : index -> message
 
 mutable kT(i:index) : message = <k1init(i),k2init(i)>
-mutable kR(ii:index) : message = <k1init(ii),k2init(ii)>
+mutable kR(i:index) : message = <k1init(i),k2init(i)>
 
 channel cT
 channel cR
@@ -98,7 +96,7 @@ Proof.
   generalize i j.
   induction t => t IH0 i j Hap [H1 H2].
   case t => He;
-  try by (simpl_left; expand kT(i)@t; apply IH0).
+  try by (repeat destruct He as [_ He]; expand kT(i)@t; apply IH0).
 
   auto.
 
@@ -172,7 +170,7 @@ Proof.
   induction t => t IH0 i j Hap [Ht Hexec].
   rewrite Ht in *; clear Ht.
 
-  expand exec, cond.
+  rewrite /exec /cond in Hexec.
   destruct Hexec as [H1 Meq].
   euf Meq => Clt * /=.
 

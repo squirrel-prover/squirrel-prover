@@ -36,6 +36,8 @@ KIR := h(s,kI2) XOR h(s,kR2)
 
 *******************************************************************************)
 
+include Basic.
+
 (***********************)
 (* Global Declarations *)
 (***********************)
@@ -114,7 +116,7 @@ action Initiator1, the key stored in the state sIR@Initiator1 is
 indistinguishable from ikIR.  Remark that this holds even if the encryption
 received by the initiator is dishonnest, because the attacker cannot compute kI.
  *)
-global goal [mainCCAkR] resp_key: [happens(Initiator1)] -> equiv(frame@Initiator1, diff(sIR@Initiator1, ikIR)).
+global goal [mainCCAkR, mainCCAkR] resp_key: [happens(Initiator1)] -> equiv(frame@Initiator1, diff(sIR@Initiator1, ikIR)).
 Proof.
   intro Hap .
 
@@ -128,16 +130,16 @@ Proof.
   (* The condition for the validity of the PRF application is trivial, as kI is
   hidden from the attacker through the CCA application. *) (* We thus simplify the
   trivial conditional. *) 
-  yesif 1.
+  rewrite if_true // in 1.
   (* We now use the one-time pad property of the xor. *)
   xor 1.
   (* We show that the condition of the introduced conditional is always true. *)
-  yesif 1.
+  rewrite if_true in 1.
   (* First by using the axiom saying that the length of the hash output is equal
   to the length of the public name s. *)
   rewrite len_hashes.
   (* Then using the assumption that all names of the same length. *)
-  namelength s,n_PRF.
+  by namelength s,n_PRF.
 
   (* Finally, we have to prove that two completely fresh names are
   indistinguishable. This is done with the fresh tactic. *)

@@ -1,4 +1,6 @@
-set autoIntro=false.
+
+
+include Basic.
 
 name n1 : message
 
@@ -18,6 +20,6 @@ fa 1.
 fa 1.
 fa 1.
 xor 2.
-noif 2; 1: auto.
+rewrite if_false in 2; 1: auto.
 simpl.
 Qed.

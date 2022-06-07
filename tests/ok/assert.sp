@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 abstract a:message
 abstract b:message
@@ -15,7 +15,7 @@ Qed.
 
 goal assert_msg2 (i:message) : a=b.
 Proof.
-  assert (T: i=i) by auto.
+  assert T: i=i by auto.
   by use ax.
 Qed.
 

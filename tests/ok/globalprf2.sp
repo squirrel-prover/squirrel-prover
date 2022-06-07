@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 (* set debugConstr=true. *)
 
 hash H
@@ -48,18 +48,20 @@ system t2 = [t/left] with gprf time, H(_, k).
 
 print system [t2].
 
-goal [t2/left] _ (i : index) : 
+goal [t2] _ (i : index) : 
   happens(U(i)) => 
   output@U(i) = 
     seq(j:index->
       (try find t:timestamp such that
          (exists (i0,j0:index),
-            ((n2(i,j) = n2(i0,j0)) && (t = U(i0)) &&
-             ((t < U(i)) || ((t = U(i)) && (j0 < j)))))
+            (t = U(i0)) && 
+            ((t < U(i)) || ((t = U(i)) && (j0 < j))) &&
+            (n2(i,j) = n2(i0,j0)))
        in
          try find i0,j0:index such that
-           ((n2(i,j) = n2(i0,j0)) && (t = U(i0)) &&
-            ((t < U(i)) || ((t = U(i)) && (j0 < j))))
+           (t = U(i0)) && 
+           ((t < U(i)) || ((t = U(i)) && (j0 < j))) && 
+           (n2(i,j) = n2(i0,j0))
          in n_PRF3(i0,j0) else error2 else n_PRF3(i,j))).
 Proof.
   intro Hap @/output. 
@@ -85,16 +87,16 @@ system p2 = [p/left] with gprf time, H(_, k).
 
 print system [p2].
 
-goal [p2/left] _ (i : index) : 
+goal [p2] _ (i : index) : 
   happens(U(i)) => 
   m1(i)@U(i) = 
   (try find t:timestamp such that
-    (exists (i0:index), ((n1p(i) = n1p(i0)) && (t = U(i0)) && (t < U(i))))
+    (exists (i0:index), ((t = U(i0)) && (t < U(i)) && (n1p(i) = n1p(i0))))
      in
      try find i0:index such that
-    ((n1p(i) = n1p(i0)) && (t = U(i0)) && (t < U(i)))
+    ((t = U(i0)) && (t < U(i)) && (n1p(i) = n1p(i0)))
      in n_PRF5(i0) else error4 else n_PRF5(i)).
-Proof. intro Hap @/m1. auto. Qed.
+Proof. intro Hap @/m1. congruence. Qed.
 
 (*------------------------------------------------------------------*)
 (* system with two nested hashes and a global macro *)
@@ -105,39 +107,39 @@ system q2 = [q/left] with gprf time, H(_, k).
 
 print system [q2].
 
-goal [q2/left] _ (i : index) : 
+goal [q2] _ (i : index) : 
   happens(U(i)) => 
   output@U(i) = 
   (try find t:timestamp such that
-     ((exists (i0:index), ((n1(i) = n1p(i0)) && (t = U(i0)) && (t <= U(i)))) ||
+     ((exists (i0:index), ((t = U(i0)) && (t <= U(i)) && (n1(i) = n1p(i0)))) ||
       exists (i0:index),
-        ((n1(i) = n1(i0)) && (t = U(i0)) && (t < U(i))))
+        ((t = U(i0)) && (t < U(i)) && (n1(i) = n1(i0))))
    in
      try find i0:index such that
-       ((n1(i) = n1p(i0)) && (t = U(i0)) && (t <= U(i)))
+       ((t = U(i0)) && (t <= U(i)) && (n1(i) = n1p(i0)))
      in n_PRF7(i0)
      else
        try find i0:index such that
-         ((n1(i) = n1(i0)) && (t = U(i0)) && (t < U(i)))
+         ((t = U(i0)) && (t < U(i)) && (n1(i) = n1(i0)))
        in n_PRF6(i0) else error5 else n_PRF6(i)).
 Proof.
   intro Hap @/output.
   auto.
 Qed.
 
-goal [q2/left] _ (i : index) : 
+goal [q2] _ (i : index) : 
   happens(U(i)) => 
   mq(i)@U(i) = 
   (try find t:timestamp such that
-     ((exists (i0:index), ((n1p(i) = n1p(i0)) && (t = U(i0)) && (t < U(i)))) ||
-      exists (i0:index), ((n1p(i) = n1(i0)) && (t = U(i0)) && (t < U(i))))
+     ((exists (i0:index), ((t = U(i0)) && (t < U(i)) && (n1p(i) = n1p(i0)))) ||
+      exists (i0:index), ((t = U(i0)) && (t < U(i)) && (n1p(i) = n1(i0))))
    in
      try find i0:index such that
-       ((n1p(i) = n1p(i0)) && (t = U(i0)) && (t < U(i)))
+       ((t = U(i0)) && (t < U(i)) && (n1p(i) = n1p(i0)))
      in n_PRF7(i0)
      else
        try find i0:index such that
-         ((n1p(i) = n1(i0)) && (t = U(i0)) && (t < U(i)))
+         ((t = U(i0)) && (t < U(i)) && (n1p(i) = n1(i0)))
        in n_PRF6(i0) else error5 else n_PRF7(i)).
 Proof.
   intro Hap @/mq. 
@@ -155,13 +157,3 @@ Qed.
 (* system v2 = [v/left] with gprf time, H(_, k). *)
 
 (* print system [v2]. *)
-
-(* (*------------------------------------------------------------------*) *)
-(* (* system with two nested hashes *) *)
-
-(* system [x] (!_i U: out(c, H(<n1(i),H(n2(i,i),k)>,k))). *)
-
-(* system x2 = [x/left] with gprf time, H(_, k). *)
-
-(* print system [x2]. *)
-(* (* TODO: hash not fully substituted ... *) *)

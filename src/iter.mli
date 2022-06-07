@@ -1,5 +1,7 @@
 module Sv = Vars.Sv
 
+module SE = SystemExpr
+
 (*------------------------------------------------------------------*)
 (** Iterate over all subterms.
     Bound variables are represented as newly generated fresh variables.
@@ -152,22 +154,11 @@ val get_f_messages_ext :
   ?fun_wrap_key:(Term.fname -> bool) option ->
   ?fv:Vars.vars ->
   mode:[`Delta of Constr.trace_cntxt | `NoDelta] ->
+  SE.arbitrary ->
   Term.fname -> 
   Term.name -> 
   Term.term -> 
   hash_occs
-
-
-(*------------------------------------------------------------------*)
-(** {2 If-Then-Else} *)
-
-type ite_occ = (Term.term * Term.term * Term.term) occ
-
-type ite_occs = ite_occ list
-
-(** Does not remove duplicates.
-    Does not look below macros. *)
-val get_ite_term : Constr.trace_cntxt -> Term.term -> ite_occs
 
 (*------------------------------------------------------------------*)
 (** {2 Macros} *)
@@ -201,7 +192,7 @@ val fold_descr :
     'a                -> (* folding accumulator *)
     'a) ->
   Symbols.table -> 
-  SystemExpr.t -> 
+  SystemExpr.fset ->
   Action.descr -> 
   'a -> 
   'a
@@ -242,16 +233,16 @@ val pp_iocc : Format.formatter -> iocc -> unit
 
     [List.fold_left func init occs]
 
-    where [occs] is a list of indirect occurrences of sort [iocc]
+    where [occs] is a list of indirect occurrences of type [iocc]
     that, roughly, "covers" all subterms of any expansion of [terms],
     in the following sense:
     
-    TODO: the description below is completely accurrante, as only indirect
+    TODO: the description below is not completely acurrate, as only indirect
     occurrences are covered!
 
     [∀ trace model T, ∀ s ∈ st( ([terms])^T ), ∃ occ ∈ [occs]] and:
 
-     - [∃ s₀ ∈ st([occ.occ_cnt])]
+     - [∃ s₀ ∈ st([occ.iocc_cnt])]
 
      - [∃ σ : (F_{s₀} ↦ T_I)]
        a valuation of [s₀]'s free variables, w.r.t. [env], in the trace

@@ -1,16 +1,15 @@
-open Utils
-
 (** Equivalence formulas.  *)
 
+open Utils
+    
 module Sv = Vars.Sv
 module Mv = Vars.Mv
 
+module SE = SystemExpr
+  
 (*------------------------------------------------------------------*)
 (** {2 Equivalence} *)
 
-let pi_term projection tm = Term.pi_term ~projection tm
-
-(*------------------------------------------------------------------*)
 type equiv = Term.term list
 
 let pp_equiv ppf (l : equiv) =
@@ -62,6 +61,10 @@ let fv_atom = function
 
 type quant = ForAll | Exists
 
+let pp_quant fmt = function
+  | ForAll -> Fmt.pf fmt "Forall"
+  | Exists -> Fmt.pf fmt "Exists"
+
 type form =
   | Quant of quant * Vars.var list * form
   | Atom  of atom
@@ -69,26 +72,57 @@ type form =
   | And   of form * form
   | Or    of form * form
 
-let rec pp fmt = function
+let toplevel_prec = 0
+let quant_fixity = 5   , `NonAssoc
+let impl_fixity  = 10  , `Infix `Right
+let or_fixity    = 20  , `Infix `Right
+let and_fixity   = 25  , `Infix `Right
+
+(** Internal *)
+let rec pp 
+    ((outer,side) : ('b * fixity) * assoc)
+    (fmt : Format.formatter)
+  = function
   | Atom at -> pp_atom fmt at
 
   | Impl (f0, f) ->
-    Fmt.pf fmt "@[<v 2>%a ->@ %a@]" pp f0 pp f
+    let pp fmt () = 
+      Fmt.pf fmt "@[<0>%a ->@ %a@]"
+        (pp (impl_fixity, `Left)) f0 
+        (pp (impl_fixity, `Right)) f
+    in
+    maybe_paren ~outer ~side ~inner:impl_fixity pp fmt ()
 
   | And (f0, f) ->
-    Fmt.pf fmt "@[<v 2>%a /\\@ %a@]" pp f0 pp f
+    let pp fmt () =     
+      Fmt.pf fmt "@[<0>%a /\\@ %a@]" 
+        (pp (and_fixity, `Left)) f0 
+        (pp (and_fixity, `Right)) f
+    in
+    maybe_paren ~outer ~side ~inner:and_fixity pp fmt ()
 
   | Or (f0, f) ->
-    Fmt.pf fmt "@[<v 2>%a \\/@ %a@]" pp f0 pp f
+    let pp fmt () = 
+      Fmt.pf fmt "@[<0>%a \\/@ %a@]"
+        (pp (or_fixity, `Left)) f0 
+        (pp (or_fixity, `Right)) f
+    in
+    maybe_paren ~outer ~side ~inner:or_fixity pp fmt ()
 
-  | Quant (ForAll, vs, f) ->
-    Fmt.pf fmt "@[<v 2>Forall (@[%a@]),@ %a@]"
-      Vars.pp_typed_list vs pp f
+  | Quant (bd, vs, f) ->
+    let pp fmt () = 
+      Fmt.pf fmt "@[<2>%a (@[%a@]),@ %a@]"
+        pp_quant bd
+        Vars.pp_typed_list vs
+        (pp (quant_fixity, `Right)) f
+    in
+    maybe_paren ~outer ~side ~inner:(fst quant_fixity, `Prefix) pp fmt ()
 
-  | Quant (Exists, vs, f) ->
-    Fmt.pf fmt "@[<v 2>Exists (@[%a@]),@ %a@]"
-      Vars.pp_typed_list vs pp f
 
+let pp (fmt : Format.formatter) (f : form) : unit =
+  pp ((toplevel_prec, `NoParens), `NonAssoc) fmt f
+
+(*------------------------------------------------------------------*)
 let mk_quant q evs f = match evs, f with
   | [], _ -> f
   | _, Quant (q, evs', f) -> Quant (q, evs @ evs', f)
@@ -145,6 +179,13 @@ let rec get_terms = function
   | Impl (e1, e2) -> get_terms e1 @ get_terms e2
   | Quant _ -> []
 
+(*------------------------------------------------------------------*)
+let rec project (projs : Term.proj list) (f : form) : form =
+  match f with
+  | Atom (Reach f) -> Atom (Reach (Term.project projs f))
+
+  | _ -> tmap (project projs) f
+    
 (*------------------------------------------------------------------*)
 (** {2 Substitution} *)
 
@@ -253,16 +294,15 @@ module Smart : Term.SmartFO with type form = _form = struct
 
   let destr_quant q = function
     | Quant (q', es, f) when q = q' -> Some (es, f)
+
     | Atom (Reach f) when Term.is_pure_timestamp f && q = Exists ->
         begin match Term.Smart.destr_exists f with
           | Some (es,f) -> Some (es, Atom (Reach f))
           | None -> None
         end
 
-    (* For a local meta-formula f,
-       (Forall x. [f]) is equivalent to [forall x. f]. *)
     | Atom (Reach f) when q = ForAll ->
-      begin match Term.Smart.destr_forall f with
+        begin match Term.Smart.destr_forall f with
           | Some (es,f) -> Some (es, Atom (Reach f))
           | None -> None
         end
@@ -299,39 +339,37 @@ module Smart : Term.SmartFO with type form = _form = struct
   let destr_true  f = todo ()
   let destr_not   f = todo ()
 
-  (** Lifts a destructor over [Impl], [And] or [Or] when one of the
-      two formulas is a pure trace model formula. *)
-  let destr_lift = function
-    | Some (f1,f2)
-      when Term.is_pure_timestamp f1 || Term.is_pure_timestamp f2 ->
-      Some (Atom (Reach f1), Atom (Reach f2))
-    | _ -> None
-
   let destr_and = function
     | And (f1, f2) -> Some (f1, f2)
-    | Atom (Reach f) -> destr_lift (Term.Smart.destr_and f)
+    | Atom (Reach f) ->
+        begin match Term.Smart.destr_and f with
+          | Some (f1,f2) -> Some (Atom (Reach f1), Atom (Reach f2))
+          | None -> None
+        end
     | _ -> None
 
   let destr_or = function
     | Or (f1, f2) -> Some (f1, f2)
-    | Atom (Reach f) -> destr_lift (Term.Smart.destr_or f)
+    | Atom (Reach f) ->
+       begin match Term.Smart.destr_or f with
+         | Some (f1,f2) when
+           Term.is_pure_timestamp f1 || Term.is_pure_timestamp f2 ->
+             Some (Atom (Reach f1), Atom (Reach f2))
+         | _ -> None
+       end
     | _ -> None
 
   let destr_impl = function
     | Impl (f1, f2) -> Some (f1, f2)
-    | Atom (Reach f) -> destr_lift (Term.Smart.destr_impl f)
+    | Atom (Reach f) ->
+       begin match Term.Smart.destr_impl f with
+         | Some (f1,f2) when Term.is_pure_timestamp f1 ->
+             Some (Atom (Reach f1), Atom (Reach f2))
+         | _ -> None
+       end
     | _ -> None
 
   (*------------------------------------------------------------------*)
-
-  (** Lifts a (many) destructor over [Impl], [And] or [Or] when one of the
-      two formulas is a pure trace model formula. *)
-  let destr_lift_many = function
-    | None -> None
-    | Some l ->
-      if not (List.for_all Term.is_pure_timestamp l)
-      then None
-      else Some (List.map (fun f -> Atom (Reach f)) l)
 
   (** left-associative *)
   let[@warning "-32"] mk_destr_left f_destr =
@@ -355,23 +393,11 @@ module Smart : Term.SmartFO with type form = _form = struct
     in
     destr
 
-  let destr_ands i f =
-    match f with
-    | Atom (Reach f) ->
-      destr_lift_many (Term.Smart.destr_ands i f)
-    | _ -> mk_destr_right destr_and i f
+  let destr_ands i f = mk_destr_right destr_and i f
 
-  let destr_ors i f =
-    match f with
-    | Atom (Reach f) ->
-      destr_lift_many (Term.Smart.destr_ors i f)
-    | _ -> mk_destr_right destr_or i f
+  let destr_ors i f = mk_destr_right destr_or i f
 
-  let destr_impls i f =
-    match f with
-    | Atom (Reach f) ->
-      destr_lift_many (Term.Smart.destr_impls i f)
-    | _ -> mk_destr_right destr_impl i f
+  let destr_impls i f = mk_destr_right destr_impl i f
 
   let destr_eq = function
     | Atom (Reach f) -> Term.destr_eq f
@@ -451,20 +477,33 @@ module Smart : Term.SmartFO with type form = _form = struct
     last forms
 end
 
+let destr_reach = function
+  | Atom (Reach f) -> Some f
+  | _ -> None
+
 (*------------------------------------------------------------------*)
 (** {2 Generalized formulas} *)
 
-type gform = [`Equiv of form | `Reach of Term.term]
+type any_form = [`Equiv of form | `Reach of Term.term]
 
-let pp_gform fmt (f : gform) =
+let pp_any_form fmt (f : any_form) =
   match f with
   | `Equiv e -> pp fmt e
   | `Reach f -> Term.pp fmt f
 
+let any_to_reach (f : any_form) : Term.term =
+  match f with
+  | `Equiv _ -> assert false
+  | `Reach f -> f
+
+let any_to_equiv (f : any_form) : form =
+  match f with
+  | `Equiv f -> f
+  | `Reach _ -> assert false
+
 (*------------------------------------------------------------------*)
 type local_form = Term.term
 type global_form = form
-type any_form = gform
 
 type _ f_kind =
   | Local_t  : local_form f_kind
@@ -476,15 +515,15 @@ module PreAny = struct
   type t = any_form
   let pp fmt = function
     | `Reach f -> Term.pp fmt f
-    | `Equiv f -> pp fmt f
+    | `Equiv f ->      pp fmt f
 
   let subst s = function
     | `Reach f -> `Reach (Term.subst s f)
-    | `Equiv f -> `Equiv (subst s f)
+    | `Equiv f -> `Equiv (     subst s f)
 
   let tsubst s = function
     | `Reach f -> `Reach (Term.tsubst s f)
-    | `Equiv f -> `Equiv (tsubst s f)
+    | `Equiv f -> `Equiv (     tsubst s f)
 
   let fv = function
     | `Reach f -> Term.fv f
@@ -493,6 +532,10 @@ module PreAny = struct
   let get_terms = function
     | `Reach f -> [f]
     | `Equiv f -> get_terms f
+
+  let project p = function
+    | `Reach f -> `Reach (Term.project p f)
+    | `Equiv f -> `Equiv (     project p f)
 end
 
 module Babel = struct
@@ -513,7 +556,7 @@ module Babel = struct
       | Global_t, Global_t -> f
       | Any_t,    Any_t    -> f
 
-      (* Injections into gform *)
+      (* Injections into [any_form] *)
       | Local_t,  Any_t -> `Reach f
       | Global_t, Any_t -> `Equiv f
 
@@ -539,31 +582,36 @@ module Babel = struct
          end
 
   let subst : type a. a f_kind -> Term.subst -> a -> a = function
-    | Local_t -> Term.subst
+    | Local_t  -> Term.subst
     | Global_t -> subst
-    | Any_t -> PreAny.subst
+    | Any_t    -> PreAny.subst
 
   let tsubst : type a. a f_kind -> Type.tsubst -> a -> a = function
-    | Local_t -> Term.tsubst
+    | Local_t  -> Term.tsubst
     | Global_t -> tsubst
-    | Any_t -> PreAny.tsubst
+    | Any_t    -> PreAny.tsubst
 
   let fv : type a. a f_kind -> a -> Vars.Sv.t = function
-    | Local_t -> Term.fv
+    | Local_t  -> Term.fv
     | Global_t -> fv
-    | Any_t -> PreAny.fv
+    | Any_t    -> PreAny.fv
 
   let term_get_terms x = [x]
 
   let get_terms : type a. a f_kind -> a -> Term.term list = function
-    | Local_t -> term_get_terms
+    | Local_t  -> term_get_terms
     | Global_t -> get_terms
-    | Any_t -> PreAny.get_terms
+    | Any_t    -> PreAny.get_terms
 
   let pp : type a. a f_kind -> Format.formatter -> a -> unit = function
-    | Local_t -> Term.pp
+    | Local_t  -> Term.pp
     | Global_t -> pp
-    | Any_t -> PreAny.pp
+    | Any_t    -> PreAny.pp
+
+  let project : type a. a f_kind -> Term.proj list -> a -> a = function
+    | Local_t  -> Term.project
+    | Global_t -> project
+    | Any_t    -> PreAny.project
 
 end
 

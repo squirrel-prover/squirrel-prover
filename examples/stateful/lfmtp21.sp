@@ -1,5 +1,3 @@
-set autoIntro = false.
-
 hash H.
 hash G.
 name k : message.
@@ -148,7 +146,7 @@ Proof.
   expand frame@init.
   use lastupdate_pure with tau' as [Hinit | [i HA]].
 
-  + use lastupdate_init with tau' as H; try auto.
+  + use lastupdate_init with tau' as H; try auto. 
     rewrite H; expand s@init; fresh 0; auto.
 
   + use lastupdate_A with tau',i as H; try auto.

@@ -36,6 +36,7 @@ type bty_decl = {
 (*------------------------------------------------------------------*)
 type system_decl = {
   sname    : Theory.lsymb option;
+  sprojs   : lsymb list option;
   sprocess : Process.process;
 }
 
@@ -49,13 +50,14 @@ let pp_system_decl fmt sys =
 
 (*------------------------------------------------------------------*)
 type global_rule =
-  | Rename of Theory.global_formula
-  | PRF    of Theory.bnds * Theory.term
-  | PRFt   of Theory.bnds * Theory.term (* gPRF, with time *)
-  | CCA    of Theory.bnds * Theory.term
+  | Rename  of Theory.global_formula
+  | PRF     of Theory.bnds * Theory.term
+  | PRFt    of Theory.bnds * Theory.term (* gPRF, with time *)
+  | CCA     of Theory.bnds * Theory.term
+  | Rewrite of TacticsArgs.rw_arg list
 
 type system_modifier = { 
-  from_sys : SystemExpr.p_system_expr;
+  from_sys : SystemExpr.parsed_t;
   modifier : global_rule;
   name     : Theory.lsymb
 }
@@ -71,19 +73,29 @@ type operator_decl = {
 }
 
 (*------------------------------------------------------------------*)
-type orcl_tag_info = Theory.formula
+type proc_decl = {
+  id    : lsymb;
+  projs : lsymb list option;
+  args  : Theory.bnds;
+  proc  : Process.process;
+}
+
+(*------------------------------------------------------------------*)
+type orcl_tag_info = Theory.term
 
 let pp_orcl_tag_info = Theory.pp
 
 (*------------------------------------------------------------------*)
 type declaration_i =
   | Decl_channel of lsymb
-  | Decl_process of lsymb * Theory.bnds * Process.process
+  | Decl_process of proc_decl
   | Decl_axiom   of Goal.Parsed.t
   | Decl_system  of system_decl
   | Decl_system_modifier  of system_modifier
 
-  | Decl_dh of Symbols.dh_hyp list * lsymb * (lsymb * Symbols.symb_type) * (lsymb * Symbols.symb_type) option * c_tys
+  | Decl_dh of Symbols.dh_hyp list * lsymb *
+               (lsymb * Symbols.symb_type) * 
+               (lsymb * Symbols.symb_type) option * c_tys
 
   | Decl_hash of int option * lsymb * orcl_tag_info option * c_tys
 

@@ -82,6 +82,10 @@ party could potentially compute the key.
 
 *******************************************************************************)
 set postQuantumSound = true.
+
+include Basic.
+set autoIntro=true.
+
 hash F
 
 hash F2
@@ -339,12 +343,12 @@ Proof.
   enrich  seq(i,j,k:index->DdkT(i,j,k)).
   enrich  seq(i:index->dkR(i)).
 
-  induction t.
+  induction t => //.
     + expandall.
-      fa 14.
+      by fa 14.
 
     + expandall.
-      fa 14.
+      by fa 14.
       
     + (* First output of R *)
       expandall.
@@ -356,14 +360,14 @@ Proof.
       expandseq  seq(i,j,k:index-> kT(i,j,k)), i,j,k.
       expandseq  seq(i,j,k:index-> rTI(i,j,k)), i,j,k.
       prf 18.
-      yesif 18.
+      rewrite if_true // in 18.
       xor 18, xor(F(rR(i,j,k),skR(j)),n_PRF), n_PRF.
-      yesif 18.
+      rewrite if_true in 18.
       use len_F with rR(i,j,k), skR(j).
       namelength n_PRF,s.
       fa 18. fa 18.
       fresh 19.
-      yesif 19.
+      rewrite if_true // in 19.
       expandseq  seq(i,j,k:index-> kR(i,j,k)), i,j,k.
       expandseq  seq(i:index-> dkI(i)), i.
 
@@ -382,9 +386,9 @@ Proof.
        expandseq  seq(j,k:index-> DkR(j,k)), j,k.
        expandseq  seq(j,k:index-> DrTI(j,k)), j,k.
        expandseq  seq(j,k:index-> DkT(j,k)), j,k.
-       prf 16; yesif 16.
+       prf 16; rewrite if_true // in 16.
        xor 16, n_PRF.
-       yesif 16.
+       rewrite if_true // in 16.
        use len_F with DrR(j,k), skR(j).
        namelength n_PRF,s.
        fresh 16.
@@ -403,14 +407,14 @@ Proof.
       fa 16.
       expandseq seq(i,j,k:index-> dkT(i,j,k)),i,j,k.
       prf 15.
-      yesif 15.
+      rewrite if_true // in 15.
       xor 15, xor(F(rI(i,j,k),skI(i)),n_PRF), n_PRF.
-      yesif 15.
+      rewrite if_true // in 15.
       use len_F with rI(i,j,k), skI(i).
       by namelength n_PRF,s.
       fa 15.
       fresh 16.
-      yesif 16.
+      rewrite if_true // in 16.
       expandseq  seq(i,j,k:index->kI(i,j,k)),i,j,k.
       expandseq  seq(i,j,k:index->dkT(i,j,k)),i,j,k.
       expandseq  seq(i:index->dkR(i)),j.
@@ -430,9 +434,9 @@ Proof.
       fa 15.
       expandseq seq(i,j,k:index-> DdkT(i,j,k)),i,j,k.
       prf 17.
-      yesif 17.
+      rewrite if_true // in 17.
       xor 17, xor(F(DrI(i,j,k),skI(i)),n_PRF), n_PRF.
-      yesif 17.
+      rewrite if_true // in 17.
       use len_F with DrI(i,j,k), skI(i).
       by namelength n_PRF,s.
       fresh 17.
@@ -448,7 +452,7 @@ Qed.
 
 system mainCCAkR = [main_rand/right] with gcca (il,jl,kl:index),  encap(kR(il,jl,kl), rR(il,jl,kl), pk(dkI(il))).
 
-system mainCCAkI = [mainCCAkR/right] with gcca (il,jl,kl:index),  encap(kI(il,jl,kl), rI(il,jl,kl) ,pk(dkR(jl))).
+system mainCCAkI = [mainCCAkR] with gcca (il,jl,kl:index),  encap(kI(il,jl,kl), rI(il,jl,kl) ,pk(dkR(jl))).
 
 
 (******* Strong secrecy  ******)
@@ -572,9 +576,9 @@ in
 
 system [idealized] out(cI,s); ((!_j !_k R: Responder3(j,k)) | (!_i !_j !_k I: Initiator3(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised3(i,j,k))).
 
-axiom [mainCCAkI/right,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,pk(z)),z)=x.
+axiom [mainCCAkI,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,pk(z)),z)=x.
 
-equiv [mainCCAkI/right,idealized/left] ideal.
+equiv [mainCCAkI,idealized/left] ideal.
 Proof.
   diffeq.
 
@@ -615,12 +619,12 @@ Proof.
   intro Hap .
   use reflex with R2(i,j,k) => //.
   expandall.
-  prf 1, kdf(s,kR(k,i,j)); yesif 1.
-  prf 1, G(_,n_PRF); yesif 1.
-  xor 1,  xor(n_PRF1,_), n_PRF1; yesif 1.
+  prf 1, kdf(s,kR(k,i,j)); rewrite if_true // in 1.
+  prf 1, G(_,n_PRF); rewrite if_true // in 1.
+  xor 1,  xor(n_PRF1,_), n_PRF1; rewrite if_true // in 1.
   rewrite len_G.
   namelength s, n_PRF1.
-  xor 1,  n_XOR; yesif 1.
+  xor 1,  n_XOR; rewrite if_true // in 1.
   rewrite len_G.
   namelength s, n_XOR.
   fresh 1.
@@ -636,9 +640,9 @@ Proof.
   intro i j k Hap .
   use reflex with I1(i,j,k) => //.
   expandall.
-  prf 1, kdf(s,kI(i,j,k)); yesif 1.
-  prf 1, G(_, n_PRF); yesif 1.
-  xor 1, n_PRF1; yesif 1.
+  prf 1, kdf(s,kI(i,j,k)); rewrite if_true // in 1.
+  prf 1, G(_, n_PRF); rewrite if_true // in 1.
+  xor 1, n_PRF1; rewrite if_true // in 1.
   rewrite len_xor.
   by rewrite !len_G.
   rewrite len_G.

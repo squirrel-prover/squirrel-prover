@@ -43,7 +43,7 @@ In Proceedings of the 2020 ACM SIGSAC Conference on Computer and
 Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
 
-set autoIntro=false.
+include Basic.
 
 abstract ok : message
 abstract ko : message
@@ -262,31 +262,33 @@ Proof.
    + (* Pfail *)
      expand frame.
 
-     equivalent exec@Pfail, False.
-     {expand exec.
-     split; 2: by auto => _.
-     depends Pok, Pfail => // _.
-     executable pred(Pfail); 1,2: by auto.
-     intro He; use He with Pok; 2: by auto.
+     have -> : exec@Pfail <=> false. {
+       expand exec.
+       split; 2: by auto => _.
+       depends Pok, Pfail => // _.
+       executable pred(Pfail); 1,2: by auto.
+       intro He; use He with Pok; 2: by auto.
+       
+       expand exec.
+       by use P_charac.
+     }
 
-     expand exec.
-     by use P_charac.}
-
-     by noif 7.
+     by rewrite if_false in 7.
 
    + (* Sfail *)
      expand frame.
 
-     equivalent exec@Sfail, False.
-     {expand exec.
-     split; 2: by auto => _.
-     depends Sok, Sfail => // _.
-     executable pred(Sfail); 1,2: by auto.
-     intro He; use He with Sok; 2: by auto.
+     have -> : exec@Sfail <=> False. {
+       expand exec.
+       split; 2: by auto => _.
+       depends Sok, Sfail => // _.
+       executable pred(Sfail); 1,2: by auto.
+       intro He; use He with Sok; 2: by auto.
+       
+       expand exec.
+       by use S_charac.
+     }
 
-     expand exec.
-     by use S_charac.}
-
-     by noif 7.
+     by rewrite if_false in 7.
 
 Qed.

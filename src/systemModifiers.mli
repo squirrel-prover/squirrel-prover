@@ -6,10 +6,13 @@
 
 module SE = SystemExpr
 
-(** Returns the updated table, and the indistinguishability axiom 
-    created by the tactic. *)  
+(*------------------------------------------------------------------*)
+(** Return:
+    - the updated table,
+    - the indistinguishability axiom created by the tactic
+    - some proof obligations *)  
 val declare_system :
   Symbols.table ->
   Hint.hint_db ->
   Decl.system_modifier ->
-  Goal.statement option * Symbols.table
+  Goal.statement option * Goal.t list * Symbols.table

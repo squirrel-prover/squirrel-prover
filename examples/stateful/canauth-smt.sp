@@ -22,8 +22,7 @@ SECURITY PROPERTIES
 - injectivity
 *******************************************************************************)
 
-set timeout=4.
-set autoIntro = false.
+set timeout=8.
 
 hash hmac
 

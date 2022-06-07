@@ -10,7 +10,7 @@
 open Utils
 
 module T    = Prover.ProverTactics
-module Args = TacticsArgs
+module Args = HighTacticsArgs
 module L    = Location
 module SE   = SystemExpr
 
@@ -61,7 +61,7 @@ let check_no_macro_or_var t =
 let refl (e : Equiv.equiv) (s : ES.t) =
   if not (List.for_all check_no_macro_or_var e)
   then `NoReflMacroVar
-  else if ES.get_frame PLeft s = ES.get_frame PRight s
+  else if ES.get_frame Term.left_proj s = ES.get_frame Term.right_proj s
   then `True
   else `NoRefl
 
@@ -241,7 +241,11 @@ let induction Args.(Message (ts,_)) s =
     (* Remove ts from the sequent, as it will become unused. *)
     let s = ES.set_vars (Vars.rm_var t env) s in
     let table  = ES.table s in
-    let system = ES.system s in
+    let system =
+      match SE.get_compatible_expr (ES.env s).system with
+        | Some expr -> expr
+        | None -> soft_failure (Failure "underspecified system")
+    in
     let subst = [Term.ESubst (ts, Term.mk_pred ts)] in
     let goal = ES.goal s in
 
@@ -255,36 +259,33 @@ let induction Args.(Message (ts,_)) s =
     let init_s = ES.set_goal init_goal s in
     let init_s = intro_back init_s in
 
-    let goals = ref [] in
-    (* [add_action _action descr] adds to goals the goal corresponding to the
-     * case where [t] is instantiated by [descr]. *)
-    let add_action descr =
-      if descr.Action.name = Symbols.init_action
-      then ()
-      else
-        begin
-          let env = ref @@ ES.vars induc_s in
-          let subst =
-            List.map
-              (fun i ->
-                 let i' = Vars.fresh_r env i in
-                 Term.ESubst (Term.mk_var i, Term.mk_var i'))
-              descr.Action.indices
-          in
-          let name =
-            SystemExpr.action_to_term table system
-              (Action.subst_action subst descr.Action.action)
-          in
-          let ts_subst = [Term.ESubst(ts,name)] in
-          goals := (ES.subst ts_subst induc_s
-                    |> ES.set_vars !env)
-                   ::!goals
-        end
+    (* Creates the goal corresponding to the case
+       where [t] is instantiated by [action]. *)
+    let case_of_action (action,symbol,indices) =
+      let env = ref @@ ES.vars induc_s in
+      let subst =
+        List.map
+          (fun i ->
+             let i' = Vars.fresh_r env i in
+             Term.ESubst (Term.mk_var i, Term.mk_var i'))
+          indices
+      in
+      let name =
+        SystemExpr.action_to_term table system
+          (Action.subst_action subst action)
+      in
+      let ts_subst = [Term.ESubst(ts,name)] in
+      ES.subst ts_subst induc_s |> ES.set_vars !env
+    in
+    let case_of_action (action,symbol,indices) =
+      if symbol = Symbols.init_action then None else
+        Some (case_of_action (action,symbol,indices))
     in
 
-    SystemExpr.iter_descrs table system add_action ;
+    let goals =
+      List.filter_map case_of_action (SystemExpr.actions table system) in
 
-    List.map simpl_impl (init_s :: List.rev !goals)
+    List.map simpl_impl (init_s :: goals)
 
   | _  ->
     soft_failure
@@ -343,10 +344,14 @@ let () =
 (** Function application *)
 
 (** Select a frame element matching a pattern. *)
-let fa_select_felems (pat : Term.term Match.pat) (s : sequent) : int option =
+let fa_select_felems (pat : Term.term Term.pat) (s : sequent) : int option =
   let option = { Match.default_match_option with allow_capture = true; } in
+  let system = match (ES.system s).pair with
+    | None -> soft_failure (Failure "underspecified system")
+    | Some p -> SE.reachability_context p
+  in
   List.find_mapi (fun i e ->
-      match Match.T.try_match ~option (ES.table s) (ES.system s) e pat with
+      match Match.T.try_match ~option (ES.table s) system e pat with
       | NoMatch _ | FreeTyv -> None
       | Match _             -> Some i
     ) (ES.goal_as_equiv s)
@@ -354,23 +359,18 @@ let fa_select_felems (pat : Term.term Match.pat) (s : sequent) : int option =
 
 exception No_FA of [`HeadDiff | `HeadNoFun]
 
-let fa_expand t =
-  let aux : Term.term -> Equiv.equiv = function
+let fa_expand (t:Term.t) =
+  let l = match Term.head_normal_biterm t with
     | Fun (f,_,l) -> l
     | Diff _      -> raise (No_FA `HeadDiff)
     | _           -> raise (No_FA `HeadNoFun)
   in
-
-  (* FIXME: this may no longer be necessary (type changes) *)
-  (* Remve of_bool(b) coming from expansion of frame macro *)
-  let filterBoolAsMsg =
-    List.map
-      (fun x -> match x with
-         | Term.Fun (f,_,[c])
-           when f = Term.f_of_bool -> c
-         | _ -> x)
-  in
-  filterBoolAsMsg (aux (Term.head_normal_biterm t))
+  (* Remove of_bool(b) coming from expansion of frame macro. *)
+  List.map
+    (function
+       | Term.Fun (f,_,[c]) when f = Term.f_of_bool -> c
+       | x -> x)
+    l
 
 (** Applies Function Application on a given frame element *)
 let do_fa_felem (i : int L.located) (s : sequent) : sequent =
@@ -415,14 +415,20 @@ let fa_felem (i : int L.located) (s : sequent) : sequent list =
     soft_failure ~loc:(L.loc i) (Tactics.Failure "FA not applicable")
 
 let do_fa_tac (args : Args.fa_arg list) (s : sequent) : sequent list =
-  let args = 
-    let cntxt = Theory.{ env = ES.env s; cntxt = InGoal; } in
+  let args =
+    let env =
+      let env = ES.env s in
+      let pair = Utils.oget env.system.pair in
+      Env.set_system env
+        SE.{ set = (pair:>SE.arbitrary) ; pair = None }
+    in
+    let cntxt = Theory.{ env; cntxt = InGoal; } in
     List.map (fun (mult, tpat) ->
         let t, ty = Theory.convert ~pat:true cntxt tpat in
         let pat_vars =
           Vars.Sv.filter (fun v -> Vars.is_pat v) (Term.fv t)
         in
-        let pat = Match.{
+        let pat = Term.{
             pat_tyvars = [];
             pat_vars;
             pat_term = t; }
@@ -433,7 +439,7 @@ let do_fa_tac (args : Args.fa_arg list) (s : sequent) : sequent list =
 
   let rec do1 
       (s    : sequent) 
-      ((mult, loc, pat) : Args.rw_count * L.t * Term.term Match.pat)
+      ((mult, loc, pat) : Args.rw_count * L.t * Term.term Term.pat)
     : sequent 
     =
     match fa_select_felems pat s with
@@ -723,10 +729,10 @@ let mk_phi_proj
     (cntxt : Constr.trace_cntxt)
     (env : Vars.env)
     (n : Term.nsymb)
-    (proj : Term.projection)
+    (proj : Term.proj)
     (biframe : Term.term list) : Term.term list
   =
-  let frame = List.map (Equiv.pi_term proj) biframe in
+  let frame = List.map (Term.project1 proj) biframe in
   try
     let frame_indices : Fresh.name_occs =
       List.fold_left (fun acc t ->
@@ -767,18 +773,19 @@ let mk_phi_proj
 
 let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe : Term.term =
   let n_left, n_right =
-    match Term.pi_term ~projection:PLeft t, Term.pi_term ~projection:PRight t with
+    match Term.project1 Term.left_proj  t,
+          Term.project1 Term.right_proj t with
     | (Name nl, Name nr) -> nl, nr
     | _ -> raise Fresh.Not_name
   in
 
-  let system_left = SE.project PLeft cntxt.system in
+  let system_left = SE.project [Term.left_proj] cntxt.system in
   let cntxt_left = { cntxt with system = system_left } in
-  let phi_left = mk_phi_proj cntxt_left env n_left PLeft biframe in
+  let phi_left = mk_phi_proj cntxt_left env n_left Term.left_proj biframe in
 
-  let system_right = SE.project PRight cntxt.system in
+  let system_right = SE.project [Term.right_proj] cntxt.system in
   let cntxt_right = { cntxt with system = system_right } in
-  let phi_right = mk_phi_proj cntxt_right env n_right PRight biframe in
+  let phi_right = mk_phi_proj cntxt_right env n_right Term.right_proj biframe in
 
   Term.mk_ands
     (* remove duplicates, and then concatenate *)
@@ -804,7 +811,11 @@ let fresh i s =
   let biframe = List.rev_append before after in
   (* expand the biframe to improve precision when computing the freshness
      condition *)
-  let biframe_exp = List.map (fun t -> EquivLT.expand_all_macros t s) biframe in
+  let biframe_exp = 
+    List.map (fun t ->
+        EquivLT.expand_all_macros t (oget (ES.system s).pair :> SE.arbitrary) s
+      ) biframe 
+  in
   let cntxt   = ES.mk_trace_cntxt s in
   let env     = ES.vars s in
   try
@@ -892,129 +903,15 @@ let () = T.register_general "expandseq"
     (LowTactics.gentac_of_etac_arg expand_seq_tac)
 
 
-(*------------------------------------------------------------------*)
-(** Replace all occurrences of [t1] by [t2] inside of [s],
-  * and add a subgoal to prove that [t1 <=> t2]. *)
-let equiv_formula f1 f2 (s : ES.t) =
-  (* goal for the equivalence of t1 and t2 *)
-  let f =
-    Term.mk_and ~simpl:false
-      (Term.mk_impl ~simpl:false f1 f2)
-      (Term.mk_impl ~simpl:false f2 f1)
-  in
-  let trace_sequent = ES.(to_trace_sequent (set_reach_goal f s)) in
-
-  let subgoals =
-    [ Goal.Trace trace_sequent;
-      Goal.Equiv
-        (ES.subst [Term.ESubst (f1,f2)] s) ]
-  in
-  subgoals
-
-(** Replace all occurrences of [m1] by [m2] inside of [s],
-  * and add a subgoal to prove that [Eq(m1, m2)]. *)
-let equiv_message m1 m2 (s : ES.t) =
-  (* goal for the equivalence of t1 and t2 *)
-  let trace_sequent =
-    ES.(to_trace_sequent
-         (set_reach_goal (Term.mk_atom `Eq m1 m2) s))
-  in
-  let subgoals =
-    [ Goal.Trace trace_sequent;
-      Goal.Equiv
-        (ES.subst [Term.ESubst (m1,m2)] s) ]
-  in
-  subgoals
-
-(* TODO: subsumed by rewrite *)
-let equivalent arg s = match arg with
-  | Args.Pair (t1,t2) ->
-    match t1, t2 with
-    | Args.Term (ty1, f1, _), Args.Term (ty2, f2, _) ->
-      if ty1 = ty2 then
-        (* TODO: subtypes: unify ty1 and ty2 *)
-        if ty1 = Type.Boolean
-        then equiv_formula f1 f2 s
-        else equiv_message f1 f2 s
-      else
-        hard_failure
-          (Tactics.Failure ("expected a pair of messages of the same types"))
-
-let () = T.register_typed "equivalent"
-    ~general_help:"Replace all occurrences of a formula by another, and ask to \
-                   prove that they are equivalent."
-    ~detailed_help:"This can be used on messages equality or formulas \
-                    equivalence."
-    ~tactic_group:Structural
-    ~pq_sound:true
-    ~usages_sorts:[Args.(Sort (Pair (Message, Message)));
-                   Args.(Sort (Pair (Boolean, Boolean)))]
-    (LowTactics.genfun_of_efun_arg equivalent)
-    Args.(Pair (Term, Term))
-
-
-(*------------------------------------------------------------------*)
-let simplify_ite b s cond positive_branch negative_branch =
-  if b then
-    (* replace in the biframe the ite by its positive branch *)
-    (* ask to prove that the cond of the ite is True *)
-    let trace_s = ES.(to_trace_sequent (set_reach_goal cond s)) in
-    (positive_branch, trace_s)
-  else
-    (* replace in the biframe the ite by its negative branch *)
-    (* ask to prove that the cond of the ite implies False *)
-    let trace_s =
-      ES.(to_trace_sequent
-            (set_reach_goal (Term.mk_impl cond Term.mk_false) s)) in
-    (negative_branch, trace_s)
-
-
-let get_ite ~cntxt elem =
-  match Iter.get_ite_term cntxt elem with
-  | [] -> None
-  | occ :: _ ->
-    (* Context with bound variables (eg try find) are not supported. *)
-    if not (occ.Iter.occ_vars = []) then
-      soft_failure (Tactics.Failure "cannot be applied in a under a binder");
-
-    Some (occ.Iter.occ_cnt)
-
-let yes_no_if b i s =
-  let cntxt = ES.mk_trace_cntxt s in
-
-  let before, elem, after = split_equiv_goal i s in
-
-  (* search for the first occurrence of an if-then-else in [elem] *)
-  match get_ite ~cntxt elem with
-  | None ->
-    soft_failure
-      (Tactics.Failure
-         "can only be applied on a term with at least one occurrence \
-          of an if-then-else term")
-
-  | Some (c,t,e) ->
-    let branch, trace_sequent = simplify_ite b s c t e in
-    let new_elem =
-      Equiv.subst_equiv
-        [Term.ESubst (Term.mk_ite ~simpl:false c t e,branch)]
-        [elem]
-    in
-    let biframe = List.rev_append before (new_elem @ after) in
-    [ Goal.Trace trace_sequent;
-      Goal.Equiv (ES.set_equiv_goal biframe s) ]
-
-let yes_no_if_args b args s : Goal.t list =
-    match args with
-    | [Args.Int_parsed arg] -> yes_no_if b arg s
-    | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)
 exception Not_ifcond
 
-(** Push the formula [f] in the message [term].
-  * Goes under function symbol, diff, seq and find. If [j]=Some jj, will push
-  * the formula only in the jth subterm of the then branch (if it exists,
-  * otherwise raise an error). *)
+(** Push the formula [f] in the message [term] -- or rather, push a
+    conditional with [f] as a condition.
+    Goes under function symbol, diff, seq and find. If [j = Some jj], will push
+    the formula only in the [jj]th subterm (and an error will be raised
+    if it does not exist). *)
 let push_formula (j: 'a option) f term =
   let f_vars = Term.fv f in
   let not_in_f_vars vs = Sv.disjoint vs f_vars in
@@ -1044,14 +941,20 @@ let push_formula (j: 'a option) f term =
             (Tactics.Failure "out-of-bound position")
     end
 
-  | Term.Diff (a, b) ->
+  | Term.(Diff (Explicit l)) ->
     begin match j with
-      | None -> Term.mk_diff (mk_ite a) (mk_ite b)
-      | Some (Args.Int { L.pl_desc = 0}) -> Term.mk_diff (mk_ite a) b
-      | Some (Args.Int { L.pl_desc = 1}) -> Term.mk_diff a (mk_ite b)
+      | None ->
+        let l = List.map (fun (proj,t) -> proj, mk_ite t) l in
+        Term.mk_diff l
       | Some (Args.Int j) ->
-        soft_failure ~loc:(L.loc j)
-          (Failure "expected value of 0 or 1 for diff terms")
+        let loc, j = L.loc j, L.unloc j in
+        if j < List.length l then
+          let l =
+            List.mapi (fun i (lbl,t) -> lbl, if i=j then mk_ite t else t) l in
+          Term.mk_diff l
+        else
+          soft_failure ~loc
+            (Tactics.Failure "out-of-bound position")
     end
 
   | Term.Seq (vs, t) ->
@@ -1064,92 +967,11 @@ let push_formula (j: 'a option) f term =
 
   | _ -> mk_ite term
 
-let ifcond Args.(Pair (Int i, Pair (Opt (Int, j), Message (f,_)))) s =
-  let before, e, after = split_equiv_goal i s in
 
-  let cond, positive_branch, negative_branch =
-    match e with
-    | Term.Fun (fs,_,[c;t;e]) when fs = Term.f_ite -> (c, t, e)
-    | _ ->  soft_failure
-              (Tactics.Failure "can only be applied to a conditional")
-  in
-
-  try
-    let new_elem =
-      Term.mk_ite ~simpl:false
-        cond (push_formula j f positive_branch) negative_branch
-    in
-    let biframe = List.rev_append before (new_elem :: after) in
-    let trace_sequent =
-      ES.(to_trace_sequent
-            (set_reach_goal Term.(mk_impl ~simpl:false cond f) s))
-    in
-
-    [ Goal.Trace trace_sequent;
-      Goal.Equiv (ES.set_equiv_goal biframe s) ]
-  with
-  | Not_ifcond ->
-    soft_failure
-      (Tactics.Failure "the formula contains variables that overlap with \
-                        variables bound by \
-                        a seq or a try find construct")
-
-
-let () =
-  T.register_typed "ifcond"
-    ~general_help: "If the given conditional implies that the given formula f is \
-                    true, push the formula f at top-level in all the subterms of \
-                    the then branch. "
-    ~detailed_help:"A message m in the positive branch will become of the form \
-                    `if f then m else 0`. If the int parameter j is given, will \
-                    push the formula only in the jth subterm of the then branch \
-                    (zero-based)."
-    ~pq_sound:true
-   ~tactic_group:Structural
-   (LowTactics.genfun_of_efun_arg ifcond) Args.(Pair (Int, Pair( Opt Int, Boolean)))
 
 
 (*------------------------------------------------------------------*)
-(* TODO: should be a rewriting rule *)
-let trivial_if (Args.Int i) (s : ES.sequent) =
-  let cntxt = ES.mk_trace_cntxt s in
-
-  let before, elem, after = split_equiv_goal i s in
-
-  (* search for the first occurrence of an if-then-else in [elem] *)
-  match get_ite ~cntxt elem with
-  | None ->
-    soft_failure
-      (Tactics.Failure
-         "can only be applied on a term with at least one occurrence \
-          of an if then else term")
-  | Some (c,t,e) ->
-    let trace_seq =
-      ES.(to_trace_sequent
-           (set_reach_goal (Term.mk_atom `Eq t e) s))
-    in
-    let trace_goal  = Goal.Trace trace_seq in
-
-    let new_elem =
-      Equiv.subst_equiv
-        [Term.ESubst (Term.mk_ite c t e,t)]
-        [elem]
-    in
-    let biframe = List.rev_append before (new_elem @ after) in
-    [ trace_goal;
-      Goal.Equiv (ES.set_equiv_goal biframe s) ]
-
-let () =
- T.register_typed "trivialif"
-   ~general_help:"Simplify a conditional when the two branches are equal."
-   ~detailed_help:""
-   ~tactic_group:Structural
-   ~pq_sound:true
-   (LowTactics.genfun_of_efun_arg trivial_if) Args.Int
-
-
-(*------------------------------------------------------------------*)
-(* TODO: should be a rewriting rule *)
+(* TODO: remove this tactic *)
 let ifeq Args.(Pair (Int i, Pair (Message (t1,ty1), Message (t2,ty2)))) s =
 
   (* check that types are equal *)
@@ -1315,8 +1137,8 @@ let prf arg s =
 
   (* The formula, without the oracle condition. *)
   let formula =
-    let cond_l = Prf.prf_condition_side PLeft  cntxt env biframe e hash
-    and cond_r = Prf.prf_condition_side PRight cntxt env biframe e hash in
+    let cond_l = Prf.prf_condition_side Term.left_proj  cntxt env biframe e hash in
+    let cond_r = Prf.prf_condition_side Term.right_proj cntxt env biframe e hash in
 
     match cond_l, cond_r with
     | None, None -> assert false
@@ -1391,38 +1213,37 @@ let () =
 
 let global_diff_eq (s : ES.t) =
   let frame = ES.goal_as_equiv s in
+  let system = Utils.oget (ES.system s).pair in
   let cntxt = ES.mk_trace_cntxt s in
-  (* collect all Diff *)
+  (* Collect in ocs the list of diff terms that occur (directly or not)
+     in [frame]. All these terms are relative to [system]. *)
   let ocs = ref [] in
   let iter x y t = ocs := ( List.map (fun u -> (x,y,u))
                             (Iter.get_diff ~cntxt (Term.simple_bi_term t)))
                         @ !ocs in
   List.iter (iter [] []) frame;
 
-  SystemExpr.iter_descrs cntxt.table cntxt.system (
-    fun action_descr ->
-      let miter = iter [action_descr.Action.name]  action_descr.Action.indices in
+  SystemExpr.iter_descrs cntxt.table system
+  (fun action_descr ->
+     let miter = iter [action_descr.Action.name] action_descr.Action.indices in
      miter (snd action_descr.Action.output) ;
      miter (snd action_descr.Action.condition) ;
      List.iter (fun (_,m) -> miter m) action_descr.Action.updates) ;
 
-  List.map (fun (vs,is,t) ->
-      let cond = Term.mk_ands (List.rev t.Iter.occ_cond) in
-      match t.Iter.occ_cnt with
-      | (Term.Diff(s1,s2) as subt)->
+  (* Function converting each occurrence to the corresponding subgoal. *)
+  let subgoal_of_occ (vs,is,t) = 
+    let cond = Term.mk_ands (List.rev t.Iter.occ_cond) in
+    match t.Iter.occ_cnt with
+    | Term.Diff (Explicit [p1,s1; p2,s2]) as subterm
+      when p1 = Term.left_proj && p2 = Term.right_proj ->
         let fvars =
-          t.Iter.occ_vars @ Vars.Sv.elements (Term.fv subt)
+          t.Iter.occ_vars @ Vars.Sv.elements (Term.fv subterm)
         in
         let pred_ts_list =
           let iter = new Fresh.get_actions ~cntxt in
-          match Term.ty subt with
-          | Type.Index -> []
-          | Type.Timestamp -> (iter#visit_message cond;
-                                s1 :: s2 :: iter#get_actions)
-          | _ ->
-            (iter#visit_message subt;
-             iter#visit_message cond;
-             iter#get_actions)
+          iter#visit_message subterm;
+          iter#visit_message cond;
+          iter#get_actions
         in
         (* Remark that the get_actions add pred to all timestamps, to simplify. *)
         let ts_list = (List.map (fun v -> Term.mk_action v is) vs)
@@ -1430,13 +1251,20 @@ let global_diff_eq (s : ES.t) =
                           | Term.Fun (fs, _, [tau]) when fs = Term.f_pred -> tau
                           | t -> t
                         ) pred_ts_list in
+        (* XXX the expansions that come next are inefficient (and may become
+           in incorrect if we allow richer diff operators): s1 and s2 only make
+           sense in projected systems, so we should not expand macros wrt s in
+           them; anyway it is useless to do so if we project immediately
+           afterwards. *)
         let s1 = 
-          Term.pi_term ~projection:PLeft 
-            (EquivLT.expand_all_macros ~force_happens:true s1 s) 
+          let sexpr1 = SE.project [p1] (ES.system s).set in
+          Term.project1 p1
+            (EquivLT.expand_all_macros ~force_happens:true s1 sexpr1 s) 
         in
         let s2 = 
-          Term.pi_term ~projection:PRight 
-            (EquivLT.expand_all_macros ~force_happens:true s2 s)
+          let sexpr2 = SE.project [p2] (ES.system s).set in
+          Term.project1 p2
+            (EquivLT.expand_all_macros ~force_happens:true s2 sexpr2 s)
         in
         Goal.Trace ES.(to_trace_sequent
                          (set_reach_goal
@@ -1449,7 +1277,8 @@ let global_diff_eq (s : ES.t) =
                             )
                             s))
       | _ -> assert false
-    ) !ocs
+  in
+  List.map subgoal_of_occ !ocs
 
 let () =
   T.register "diffeq"
@@ -1905,9 +1734,7 @@ let enckp arg (s : ES.t) =
              Cca.symenc_key_ssc
                ~cntxt fnenc fndec
                ~elems:(ES.goal_as_equiv s) sk.Term.s_symb;
-             Cca.symenc_rnd_ssc ~cntxt env fnenc sk biframe;
-             ()
-          ),
+             Cca.symenc_rnd_ssc ~cntxt env fnenc sk biframe),
           (fun x -> x),
           k
         | _ -> assert false
@@ -1932,7 +1759,7 @@ let enckp arg (s : ES.t) =
               when fnpk = fnpk' && indices = indices' -> sk
             | _ ->
               soft_failure
-                (Tactics.Failure
+                (Failure
                    "The first encryption is not used \
                     with the correct public key function")
           end
@@ -1941,8 +1768,8 @@ let enckp arg (s : ES.t) =
     in
     let project = function
       | Term.Name n -> n,n
-      | Term.(Diff (Name l, Name r)) -> l,r
-      | _ -> soft_failure (Tactics.Failure "Secret keys must be names")
+      | Term.(Diff (Explicit [_,Name l; _,Name r])) -> l,r
+      | _ -> soft_failure (Failure "Secret keys must be names")
     in
 
     let skl, skr = project sk in
@@ -1960,9 +1787,12 @@ let enckp arg (s : ES.t) =
       try
         (* For each key we actually only need to verify the SSC
          * wrt. the appropriate projection of the system. *)
-        let sysl = SystemExpr.(project PLeft cntxt.system) in
-        let sysr = SystemExpr.(project PRight cntxt.system) in
-        List.iter ssc
+        let system = Utils.oget (ES.system s).pair in
+        let sysl = SystemExpr.(project [Term.left_proj] system) in
+        let sysr = SystemExpr.(project [Term.right_proj] system) in
+        List.iter (fun (ns, system) ->
+            ssc (ns, (system :> SE.fset))
+          )
           (List.sort_uniq Stdlib.compare
              [(skl, sysl); (skr, sysr); (new_skl, sysl); (new_skr, sysr)]) ;
         let context =
@@ -2065,15 +1895,15 @@ let remove_name_occ ns l = match l with
 
 let mk_xor_phi_base (cntxt : Constr.trace_cntxt) env biframe
     (n_left, l_left, n_right, l_right, term) =
-  let biframe = Term.mk_diff l_left l_right :: biframe in
+  let biframe = Term.mk_diff [Term.left_proj,l_left;Term.right_proj,l_right] :: biframe in
 
-  let system_left = SystemExpr.(project PLeft cntxt.system) in
+  let system_left = SystemExpr.project [Term.left_proj] cntxt.system in
   let cntxt_left = { cntxt with system = system_left } in
-  let phi_left = mk_phi_proj cntxt_left env n_left PLeft biframe in
+  let phi_left = mk_phi_proj cntxt_left env n_left Term.left_proj biframe in
 
-  let system_right = SystemExpr.(project PRight cntxt.system) in
+  let system_right = SystemExpr.project [Term.right_proj] cntxt.system in
   let cntxt_right = { cntxt with system = system_right } in
-  let phi_right = mk_phi_proj cntxt_right env n_right PRight biframe in
+  let phi_right = mk_phi_proj cntxt_right env n_right Term.right_proj biframe in
 
   let len_left =
     Term.(mk_atom `Eq (mk_len l_left) (mk_len (mk_name n_left)))
@@ -2095,13 +1925,15 @@ let mk_xor_phi_base (cntxt : Constr.trace_cntxt) env biframe
   phi
 
 let is_xored_diff t =
-  match Term.pi_term ~projection:PLeft t, Term.pi_term ~projection:PRight t with
+  match Term.project1 Term.left_proj  t,
+        Term.project1 Term.right_proj t with
   | (Fun (fl,_,ll),Fun (fr,_,lr))
     when (fl = Term.f_xor && fr = Term.f_xor) -> true
   | _ -> false
 
 let is_name_diff mess_name =
-  match Term.pi_term ~projection:PLeft mess_name, Term.pi_term ~projection:PRight mess_name with
+  match Term.project1 Term.left_proj  mess_name,
+        Term.project1 Term.right_proj mess_name with
   | Name nl, Name nr -> true
   | _ -> false
 
@@ -2136,7 +1968,9 @@ let xor arg s =
 
   (* the biframe to consider when checking the freshness *)
   let biframe = List.rev_append before after in
-  let cntxt = ES.mk_trace_cntxt s in
+  let cntxt =
+    { (ES.mk_trace_cntxt s) with
+        system = (Utils.oget (ES.system s).pair :> SE.fset) } in
   let env = ES.vars s in
 
   let xor_occ =
@@ -2169,7 +2003,8 @@ let xor arg s =
     match opt_n with
     | None ->
       begin
-        match Term.pi_term ~projection:PLeft t, Term.pi_term ~projection:PRight t with
+        match Term.project1 Term.left_proj  t,
+              Term.project1 Term.right_proj t with
         | (Fun (fl, _, [Term.Name nl;ll]),
            Fun (fr, _, [Term.Name nr;lr]))
           when (fl = Term.f_xor && fr = Term.f_xor) ->
@@ -2179,9 +2014,11 @@ let xor arg s =
       end
     | Some mess_name ->
       begin
-        match Term.pi_term ~projection:PLeft mess_name, Term.pi_term ~projection:PRight mess_name with
+        match Term.project1 Term.left_proj  mess_name,
+              Term.project1 Term.right_proj mess_name with
         | Name nl, Name nr ->
-          begin match Term.pi_term ~projection:PLeft t, Term.pi_term ~projection:PRight t with
+          begin match Term.project1 Term.left_proj  t,
+                      Term.project1 Term.right_proj t with
             | (Fun (fl,_,ll),Fun (fr,_,lr))
               when (fl = Term.f_xor && fr = Term.f_xor) ->
               (nl,remove_name_occ nl ll,
@@ -2243,28 +2080,32 @@ class ddh_context ~(cntxt:Constr.trace_cntxt) ~gen ~exp exact a b c
      we may want to use functions from dh.ml written for cdh/gdh,
      that do this in a more general way *)
   method visit_message t =
-    match t with
-    (* any name n can occur as g^n *)
-    | Term.Fun (f, _, [g1; Name n]) when f = exp && g1 = gen -> ()
-
-    (* any names a b can occur as g^a^b *)
-    | Term.(Diff(Term.(Fun (f1,_, [(Fun (f2,_, [g1; Name n1]));
-                                   Name n2])),
-                 Term.Fun (f, _, [g3; Name n3])))
+    match Term.project1 Term.left_proj t, 
+          Term.project1 Term.right_proj t with
+    (* left:  a b can occur as g^a^b 
+       right: c can occur as g^c *)
+    | Term.(Fun (f1,_, [(Fun (f2,_, [g1; Name n1])); Name n2])),
+      Term.(Fun (f, _, [g3; Name n3])) 
       when f1 = exp && f2 = exp && g1 = gen && g3 = gen && n3.s_symb = c &&
            ((n1.s_symb = a && n2.s_symb = b) ||
             (n1.s_symb = b && n2.s_symb = a)) -> ()
 
-    (* if a name a, b, c appear anywhere else, fail *)
-    | Term.Name n when List.mem n.s_symb [a; b; c] -> raise Not_context
+    | _ ->
+      match t with
+      (* any name n can occur as g^n *)
+      | Term.Fun (f, _, [g1; Name n]) when f = exp && g1 = gen -> ()
 
-    (* if a diff is not over a valid ddh diff, we fail  *)
-    | Term.Diff _ -> raise Not_context
+      (* if a name a, b, c appear anywhere else, fail *)
+      | Term.Name n when List.mem n.s_symb [a; b; c] -> raise Not_context
 
-    | _ -> super#visit_message t
+      (* if a diff is not over a valid ddh diff, we fail  *)
+      | Term.Diff _ -> raise Not_context
+
+      | _ -> super#visit_message t
 
 end
 
+(*------------------------------------------------------------------*)
 exception Macro_found
 
 class find_macros ~(cntxt:Constr.trace_cntxt) exact = object (self)
@@ -2279,8 +2120,8 @@ end
 
 
 (** If all the terms of a system can be seen as a context of the terms, where
-   all the names appearing inside the terms are only used inside those, returns
-   true. *)
+    all the names appearing inside the terms are only used inside those, returns
+    true. *)
 let is_ddh_context (cntxt : Constr.trace_cntxt) ~gen ~exp a b c elem_list =
   let a,b,c = Symbols.Name.of_lsymb a cntxt.table,
               Symbols.Name.of_lsymb b cntxt.table,
@@ -2307,11 +2148,13 @@ let is_ddh_context (cntxt : Constr.trace_cntxt) ~gen ~exp a b c elem_list =
     true
   with Not_context | Fresh.Name_found -> false
 
+(*------------------------------------------------------------------*)
 let is_ddh_gen tbl gen =
   match Symbols.Function.get_def gen tbl with
   | _, Symbols.DHgen l -> List.mem Symbols.DH_DDH l
   | _ -> false
 
+(*------------------------------------------------------------------*)
 let ddh (lgen : lsymb) (na : lsymb) (nb : lsymb) (nc : lsymb) s sk fk =
   let tbl = ES.table s in
   let gen_symb = Symbols.Function.of_lsymb lgen tbl in
@@ -2350,7 +2193,9 @@ let () = T.register_general "ddh"
                         uses the names in a correct way. Can be used \
                         in collaboration with some transitivity to \
                         obtain a system where ddh can be applied.";
-                  usages_sorts = [Sort (Pair (String, Pair (String, Pair( String, String))))];
+                  usages_sorts = [Sort (Pair (String, 
+                                              Pair (String, 
+                                                    Pair( String, String))))];
                   tactic_group = Cryptographic}
     (function
        | [Args.String_name gen;

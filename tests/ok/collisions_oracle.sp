@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 name k:message
 

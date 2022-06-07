@@ -16,7 +16,7 @@ type in_target = [`Goal | `All | `Hyps of lsymb list]
 (*------------------------------------------------------------------*)
 (** {2 Parsed arguments for rewrite} *)
 
-type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
+type rw_count = [`Once | `Many | `Any ] (** ε | ! | ? *)
 
 type rw_dir = [`LeftToRight | `RightToLeft ] L.located
 
@@ -64,7 +64,7 @@ type naming_pat =
   | Unnamed   (** '_' *)
   | AnyName   (** '?' *)
   | Named of string
-  | Approx  of string        (* only used internally *)
+  | Approx  of string        (** only used internally *)
 
 type and_or_pat =
   | Or      of simpl_pat list
@@ -122,6 +122,7 @@ type parser_arg =
   | String_name  of lsymb
   | Int_parsed   of int L.located
   | Theory       of Theory.term
+  | NamingPat    of naming_pat
   | IntroPat     of intro_pattern list
   | AndOrPat     of and_or_pat
   | SimplPat     of simpl_pat
@@ -190,9 +191,3 @@ val cast:  'a sort -> 'b arg -> 'a arg
 (*------------------------------------------------------------------*)
 val pp_esort : Format.formatter -> esort -> unit
 
-(*------------------------------------------------------------------*)
-(** {2 Argument conversion} *)
-
-val convert_as_lsymb : parser_arg list -> lsymb option
-
-val convert_args : Env.t -> parser_arg list -> esort -> Equiv.any_form -> earg

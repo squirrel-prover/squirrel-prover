@@ -126,14 +126,16 @@ let pp_sum_choice_f f d ppf (k,a) =
   * relying on the formatter [f] for ['a], and ignoring
   * the default sum choice [d]. *)
 let pp_action_f f d ppf a =
-  Fmt.list
-    ~sep:(fun fmt () -> Fmt.pf fmt "_")
-    (fun ppf {par_choice;sum_choice} ->
-       Fmt.pf ppf "%a%a"
-         (pp_par_choice_f f) par_choice
-         (pp_sum_choice_f f d) sum_choice)
-    ppf
-    a
+  if a = [] then Fmt.pf ppf "ε" 
+  else
+    Fmt.list
+      ~sep:(fun fmt () -> Fmt.pf fmt "_")
+      (fun ppf {par_choice;sum_choice} ->
+         Fmt.pf ppf "%a%a"
+           (pp_par_choice_f f) par_choice
+           (pp_sum_choice_f f d) sum_choice)
+      ppf
+      a
 
 let pp_action_structure ppf a =
   Printer.kw `GoalAction ppf "%a" (pp_action_f pp_indices (0,[])) a
@@ -180,6 +182,11 @@ type descr = {
   output    : Channel.t * Term.term;
   globals   : Symbols.macro list;
 }
+
+(** Minimal validation function. Could be improved to check for free
+    variables, valid diff operators, etc. *)
+let valid_descr d =
+  d.indices = get_indices d.action
 
 (*------------------------------------------------------------------*)
 (** Apply a substitution to an action description.
@@ -283,12 +290,66 @@ let refresh_descr descr =
 
   descr
   
-let pi_descr s d =
-  let pi_term t = Term.pi_term ~projection:s t in
+let project_descr (s : Term.proj) d =
+  let project1 t = Term.project1 s t in
   { d with
-    condition = (let is,t = d.condition in is, pi_term t);
-    updates = List.map (fun (st, m) -> st, pi_term m) d.updates;
-    output = (let c,m = d.output in c, pi_term m) }
+    condition = (let is,t = d.condition in is, project1 t);
+    updates   = List.map (fun (st, m) -> st, project1 m) d.updates;
+    output    = (let c,m = d.output in c, project1 m) }
+
+let strongly_compatible_descr d1 d2 =
+  d1.name    = d2.name &&
+  d1.action  = d2.action &&
+  d1.input   = d2.input &&
+  d1.indices = d2.indices &&
+  fst d1.condition = fst d2.condition &&
+  List.map fst d1.updates = List.map fst d2.updates &&
+  fst d1.output = fst d2.output
+
+let combine_descrs (descrs : (Term.proj * descr) list) : descr =
+
+  let (p1,d1),rest =
+    match descrs with
+      | hd::tl -> hd,tl
+      | [] -> raise (Invalid_argument "combine_descrs")
+  in
+  (* Rename indices of descriptions in [rest] to agree with [d1]. *)
+  let rest =
+    List.map
+      (fun (proj,d2) ->
+         let subst =
+           List.map2
+             (fun i j -> Term.ESubst (Term.mk_var i, Term.mk_var j))
+             d2.indices d1.indices
+         in
+         proj, subst_descr subst d2)
+      rest
+  in
+  let descrs = (p1,d1)::rest in
+
+  assert (List.for_all (fun (_,d2) -> strongly_compatible_descr d1 d2) rest);
+
+  let map f = List.map (fun (lbl,descr) -> (lbl, f descr)) descrs in
+
+  { name    = d1.name;
+    action  = d1.action;
+    input   = d1.input;
+    indices = d1.indices;
+    condition =
+      fst d1.condition,
+      Term.combine (map (fun descr -> snd descr.condition));
+    updates =
+      List.map
+        (fun (st,_) ->
+           st,
+           Term.combine (map (fun descr -> List.assoc st descr.updates)))
+        d1.updates;
+    output =
+      fst d1.output, 
+      Term.combine (map (fun descr -> snd descr.output));
+    globals =
+      List.sort_uniq Stdlib.compare
+        (List.concat (List.map (fun (_,d) -> d.globals) descrs)) }
 
 (*------------------------------------------------------------------*)
 let debug = false
@@ -321,7 +382,16 @@ let rec dummy (shape : shape) : action =
     :: dummy l
 
 (*------------------------------------------------------------------*)
-(** {2 FA-DUP } *)
+(** {2 Shapes} *)
+
+module Shape = struct
+  type t = shape
+  let pp = pp_shape
+  let compare (u : t) (v : t) = Stdlib.compare u v
+end
+
+(*------------------------------------------------------------------*)
+(** {2 FA-DUP} *)
 
 let is_dup_match
     (is_match : Term.term -> Term.term -> 'a -> 'a option)

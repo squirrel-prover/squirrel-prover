@@ -43,7 +43,8 @@ tion: a technique for protocol composition with long term shared secrets.
 In Proceedings of the 2020 ACM SIGSAC Conference on Computer and
 Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
-set autoIntro=false.
+
+include Basic.
 
 abstract ok : message
 abstract ko : message
@@ -456,23 +457,25 @@ Proof.
 
   + (* Sfail *)
      expand frame.
-     equivalent exec@Sfail, false.
-     { split => //.
+     have -> : exec@Sfail <=> false. {
+       split => //.
        intro Hfail.
        use S_charac; try auto.
        depends Sok, Sfail => // _.
        executable Sfail; 1,2: auto.
-       by intro H0; use H0 with Sok.}
-     by noif 17.
+       by intro H0; use H0 with Sok.
+     }
+     by rewrite if_false in 17.
 
   + (* Pfail *)
     expand frame.
-    equivalent exec@Pfail, false.
-    { split => //.
+    have -> : exec@Pfail <=> false. {
+      split => //.
       intro Hfail.
       use P_charac; try auto.
       depends PDIS5, Pfail => // _.
       executable Pfail; 1,2: auto.
-      by intro H0; use H0 with PDIS5.}
-  by noif 17.
+      by intro H0; use H0 with PDIS5.
+  }
+  by rewrite if_false in 17.
 Qed.

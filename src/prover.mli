@@ -12,9 +12,7 @@ type lsymb = Theory.lsymb
 (** Return the name of the goal currently being proved, if any. *)
 val current_goal_name : unit -> string option
 
-val get_current_goal : unit -> (Goal.statement * Goal.t) option
-
-val get_current_system : unit -> SE.t option
+val get_current_system : unit -> SE.context option
 
 (** Current mode of the prover:
     - [GoalMode] : waiting for the next goal.
@@ -27,6 +25,7 @@ type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 val current_hint_db : unit -> Hint.hint_db
 val set_hint_db : Hint.hint_db -> unit
 
+val unnamed_goal : unit -> lsymb
 
 (*------------------------------------------------------------------*)
 (** {2 History management} *)
@@ -83,22 +82,21 @@ val get_option : option_name -> option_val option
 
 val add_option : option_def -> unit
 
+val add_proved_goal : [ `Axiom | `Lemma ] -> Goal.statement -> unit
+
 (*------------------------------------------------------------------*)
 (** {2 Tactics syntax trees} *)
 (** Prover tactics, and tables for storing them. *)
 
-(* TODO module AST : Tactics.AST_sig
-   with type arg = tac_arg and type judgment = Sequent.t *)
-
 
 (* Define formats of help informations for tactics *)
 type tactic_groups =
-  | Logical   (* A logic tactic is a tactic that relies on the sequence calculus
-                 logical properties. *)
-  | Structural (* A structural tactic relies on properties inherent to protocol,
-                  on equality between messages, behaviour of if _ then _ else _,
-                  action dependencies... *)
-  | Cryptographic (* Cryptographic assumptions rely on ... a cryptographic assumption ! *)
+  | Logical       (* A logic tactic is a tactic that relies on the sequence calculus
+                     logical properties. *)
+  | Structural    (* A structural tactic relies on properties inherent to protocol,
+                     on equality between messages, behaviour of ifthenelse,
+                     action dependencies... *)
+  | Cryptographic (* Cryptographic assumptions *)
 
 
 (* The record for a detailed help tactic. *)
@@ -127,10 +125,13 @@ module ProverTactics : sig
         ?pq_sound:bool ->
     TacticsArgs.parser_arg Tactics.ast -> unit
 
-(* The remaining functions allows to easily register a tactic, without having to
-   manage type conversions, or the tail recursvity. It is simply required to
-   give a function over judgments, expecting some arguments of the given
-   sort. *)
+  (* The remaining functions allow to easily register a tactic,
+     without having to manage type conversions, or worry about the
+     proper use of continuations in the tactics type.
+     It is simply required to give a function over judgments,
+     either without arguments (for [register])
+     or with typed arguments (for [register_typed]). *)
+
   val register : string -> tactic_help:tactic_help ->
     ?pq_sound:bool ->
     (judgment -> judgment list) -> unit
@@ -143,7 +144,7 @@ module ProverTactics : sig
     ('a TacticsArgs.arg -> judgment -> judgment list) ->
     'a TacticsArgs.sort  -> unit
 
-  val get : string -> TacticsArgs.parser_arg list -> tac
+  val get : L.t -> string -> TacticsArgs.parser_arg list -> tac
   val pp : bool -> Format.formatter -> lsymb -> unit
 
   (* Print all tactics with their help. Do not print tactics without help
@@ -175,7 +176,7 @@ val pp_kind : Format.formatter -> [`Axiom | `Lemma] -> unit
 
 (** User printing query *)
 type print_query =
-  | Pr_system    of SE.p_system_expr option (* [None] means current system *)
+  | Pr_system    of SE.parsed_t option (* [None] means current system *)
   | Pr_statement of lsymb
 
 (*------------------------------------------------------------------*)
@@ -205,11 +206,13 @@ type parsed_input =
   | EOF
 
 (** Declare a new goal to the current goals, and returns it. *)
-val declare_new_goal :
+val add_new_goal :
   Symbols.table ->
   Hint.hint_db ->
   Goal.Parsed.t Location.located ->
   string * Goal.t
+
+val add_proof_obl : Goal.t -> unit
 
 (** From the name of the function, returns the corresponding formula. If no tag
    formula was defined, returns False. *)
@@ -236,42 +239,3 @@ val close_brace : unit -> unit
 
 (** Initialize the prover state try to prove the first of the unproved goal. *)
 val start_proof : [`NoCheck | `Check] -> string option
-
-(*------------------------------------------------------------------*)
-(** {2 Error handling} *)
-
-type decl_error_i =
-  | BadEquivForm
-  | InvalidAbsType
-  | InvalidCtySpace of string list
-  | DuplicateCty of string
-  | NotTSOrIndex
-
-  | NonDetOp
-  | SystemError     of System.system_error
-  | SystemExprError of SE.system_expr_err
-
-type dkind = KDecl | KGoal
-
-type decl_error =  L.t * dkind * decl_error_i
-
-exception Decl_error of decl_error
-
-val pp_decl_error :
-  (Format.formatter -> L.t -> unit) ->
-  Format.formatter -> decl_error -> unit
-
-(*------------------------------------------------------------------*)
-(** {2 Declaration processing} *)
-
-(** Process a declaration. *)
-val declare :
-  Symbols.table -> Hint.hint_db -> Decl.declaration  -> Symbols.table
-
-(** Process a list of declaration. *)
-val declare_list :
-  Symbols.table -> Hint.hint_db -> Decl.declarations -> Symbols.table
-
-(*------------------------------------------------------------------*)
-val add_hint_rewrite : lsymb -> Hint.hint_db -> Hint.hint_db
-val add_hint_smt     : lsymb -> Hint.hint_db -> Hint.hint_db

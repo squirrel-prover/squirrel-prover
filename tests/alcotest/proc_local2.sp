@@ -1,4 +1,4 @@
-(* set autoIntro=false. *)
+(*  *)
 
 name n : message
 channel c

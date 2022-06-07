@@ -1,6 +1,5 @@
 system null.
 
-set autoIntro = false.
 
 goal dummy : True.
 Proof.

@@ -48,7 +48,6 @@ The 3 security properties as stated in [1].
 computational model’, 2014.
 *******************************************************************************)
 
-set autoIntro = false.
 set timeout=12.
 
 (** Public constants (`abstract`) and names used in the protocol. **)
@@ -349,8 +348,8 @@ Then, the unicity is proved using lemmas on counter values.
 Proof.
   intro Hap Hexec.
   executable S(ii,i) => //.
-  intro Hexec'.
-  expand exec, cond.
+  intro Hexec'. 
+  rewrite /exec /cond in Hexec.
   destruct Hexec as [Hexecpred [Mneq Hcpt] Hpid].
   (** We apply the INT-CTXT assumption, which directly gives the existence
   of an action `Press(i,j)` that happens before `S(ii,i)`. **)

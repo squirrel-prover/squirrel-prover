@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 abstract a : message -> message
 
@@ -53,3 +53,17 @@ Proof.
   admit.
 Qed.
 
+(*------------------------------------------------------------------*)
+abstract ok : message
+
+system [s1] in(c,x); let S=diff(<x,ok>,x) in A : out(c,S).
+
+system [s2] in(c,x); let St=diff(x,<x,ok>) in A : out(c,St).
+
+(* sanity checks *)
+print system [s1/left, s2/right].
+print system [s2/left, s1/right].
+print system [s1/left].
+print system [s2/left].
+print system [s1/right].
+print system [s2/right].

@@ -217,7 +217,7 @@ let pp_symb_error_i fmt = function
     Fmt.pf fmt "symbol %s already declared" s
 
 let pp_symb_error pp_loc_err fmt (loc,e) =
-  Fmt.pf fmt "%a%a."
+  Fmt.pf fmt "%aError: %a"
     pp_loc_err loc
     pp_symb_error_i e
 
@@ -541,9 +541,7 @@ let is_ftype s ftype table =
   match Function.get_def s table with
     | _,t when t = ftype -> true
     | _ -> false
-    | exception Not_found ->
-      (* TODO: this should be an assert false *)
-      symb_err L._dummy (Unbound_identifier s.name)
+    | exception Not_found -> assert false
 
 module Macro = Make (struct
   type ns = _macro

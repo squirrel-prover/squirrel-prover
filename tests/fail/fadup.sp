@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 abstract foo : message
 system null.

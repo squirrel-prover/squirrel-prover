@@ -308,8 +308,8 @@ end = struct
       | TUnivar u, _ -> env := Mid.add u t' !env; `Ok
       | _ -> `Fail
 
-  (* TODO: improve type inference by not handling subtyping constraint as
-     type equality constraints. *)
+  (* FEATURE: subtype: improve type inference by not handling
+     subtyping constraint as type equality constraints. *)
   let unify_leq env (t : ty) (t' : ty) : [`Fail | `Ok] =
     unify_eq env t t'
 end

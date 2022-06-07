@@ -66,7 +66,6 @@ between the real system and the ideal one, and then the property
 is proved on the ideal system. The reach equiv
 tactic allows one to combine these two steps, and to conclude.
 *******************************************************************************)
-set autoIntro=false.
 set timeout=6.
 
 (* AEAD symmetric encryption scheme: IND-CCA + INT-CTXT *)
@@ -221,6 +220,19 @@ axiom pair_ne_fail (x,y: message) : <x,y> <> fail.
 abstract c_pair : message.
 abstract (++) : message -> message -> message.
 axiom len_pair (x, y : message) : len(<x,y>) = (len(x) ++ len(y) ++ c_pair).
+
+(* Utilities for simplifying some diff expressions. *)
+
+goal len_diff (x,y:message) : len(diff(x,y)) = diff(len(x),len(y)).
+Proof.
+  by project.
+Qed.
+
+goal diff_refl (x:message) : diff(x,x) = x.
+Proof.
+  by project.
+Qed.
+hint rewrite diff_refl.
 
 (*------------------------------------------------------------------*)
 (* LIBRAIRIES *)
@@ -560,7 +572,7 @@ Proof.
       rewrite !len_pair len_diff in 2.
       namelength k(pid), k_dummy(pid)=> -> /=.
       rewrite /* in 0.
-      by apply  Hind (pred(t)).
+      by apply Hind (pred(t)).
 
   + (* Decode(pid,j) *)
     repeat destruct Eq as [_ Eq].
@@ -574,7 +586,6 @@ Proof.
     (* rewrite the content of the then branch *)
     rewrite /otp_dec /aead_dec if_aux /= in 2. 
     fa 2.
-    rewrite /AEAD /= in 2.
     rewrite /aead /otp in 1,2.
     fa !(_ && _). fa 1.
     memseq 1 6; 1: by exists pid; rewrite if_true.
@@ -702,7 +713,7 @@ Qed.
 
 (*------------------------------------------------------------------*)
 (* The final proof of injective correspondence. *)
-goal [left] injective_correspondence (j, pid:index):
+goal [default/left] injective_correspondence (j, pid:index):
    happens(Server(pid,j)) =>
    exec@Server(pid,j) =>
      exists (i:index),

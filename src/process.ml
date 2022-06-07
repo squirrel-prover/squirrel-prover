@@ -17,7 +17,7 @@ let pp_proc_ty =
 type lsymb = Theory.lsymb
 
 type term = Theory.term
-type formula = Theory.formula
+type formula = Theory.term
 
 (*------------------------------------------------------------------*)
 type process_i =
@@ -141,6 +141,7 @@ type proc_error_i =
   | StrictAliasError of string
   | DuplicatedUpdate of string
   | Freetyunivar
+  | ProjsMismatch    of Term.projs * Term.projs
 
 type proc_error = L.t * proc_error_i
 
@@ -154,11 +155,16 @@ let pp_proc_error_i fmt = function
   | DuplicatedUpdate s -> 
     Fmt.pf fmt "state %s can only be updated once in an action" s
 
-  | Freetyunivar -> Fmt.pf fmt "some type variable(s) could not \
-                                be instantiated"
+  | Freetyunivar -> 
+    Fmt.pf fmt "some type variable(s) could not be instantiated"
+
+  | ProjsMismatch (ps1, ps2) ->
+    Fmt.pf fmt "projections mismatch: @[%a@] ≠ @[%a@]"
+      Term.pp_projs ps1
+      Term.pp_projs ps2
 
 let pp_proc_error pp_loc_err fmt (loc,e) =
-  Fmt.pf fmt "%aproc error: %a."
+  Fmt.pf fmt "%aProcess error: @[%a@]."
     pp_loc_err loc
     pp_proc_error_i e
 
@@ -169,16 +175,16 @@ let proc_err loc e = raise (ProcError (loc,e))
 (*------------------------------------------------------------------*)
 (** We extend the symbols data with (bi)-processus descriptions and
     their types. *)
-type Symbols.data += Process_data of proc_ty * process
+type Symbols.data += Process_data of proc_ty * Term.projs * process
 
-let declare_nocheck table name (kind : proc_ty) proc =
-    let data = Process_data (kind,proc) in
+let declare_nocheck table name (kind : proc_ty) projs proc =
+    let data = Process_data (kind,projs,proc) in
     let def = () in
     Symbols.Process.declare_exact table name ~data def
 
 let find_process table pname =
   match Symbols.Process.get_all pname table with
-  | (), Process_data (kind,proc) -> kind,proc
+  | (), Process_data (kind, projs, proc) -> kind,projs,proc
   | _ -> assert false
   (* The data associated to a process must be a [Process_data _]. *)
 
@@ -191,7 +197,7 @@ let check_channel table (s : lsymb) =
 
 (*------------------------------------------------------------------*)
 (** Type checking for processes *)
-let check_proc (env : Env.t) p =
+let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
   let rec check_p (ty_env : Type.Infer.env) (env : Env.t) proc =
     let loc = L.loc proc in
     match L.unloc proc with
@@ -205,7 +211,7 @@ let check_proc (env : Env.t) p =
     | In (c,x,p) -> 
       check_channel env.table c;
 
-      (* TODO: subtypes*)
+      (* FEATURE: subtypes*)
       let vars, _ = Vars.make `Shadow env.vars (Type.Message) (L.unloc x) in
       check_p ty_env { env with vars } p
 
@@ -218,9 +224,9 @@ let check_proc (env : Env.t) p =
       if is_out proc && (Config.strict_alias_mode ())
       then proc_err loc (StrictAliasError "missing alias")
       else
-        (* TODO: subtypes *)
+        (* FEATURE: subtypes *)
         let () = 
-          Theory.check env ~local:true ty_env m Type.tmessage 
+          Theory.check env ~local:true ty_env projs m Type.tmessage 
         in
         check_p ty_env env p
 
@@ -228,10 +234,10 @@ let check_proc (env : Env.t) p =
 
     | Set (s, l, m, p) ->
       let k = Theory.check_state env.table s (List.length l) in
-      Theory.check env ~local:true ty_env m k ;
+      Theory.check env ~local:true ty_env projs m k ;
       List.iter (fun x ->
           Theory.check 
-            env ~local:true ty_env (Theory.var_of_lsymb x) Type.tindex
+            env ~local:true ty_env projs (Theory.var_of_lsymb x) Type.tindex
         ) l ;
       check_p ty_env  env p
 
@@ -243,7 +249,7 @@ let check_proc (env : Env.t) p =
         | Some pty -> Theory.parse_p_ty env pty 
       in
       
-      Theory.check env ~local:true ty_env t ty ;
+      Theory.check env ~local:true ty_env projs t ty ;
       let vars, _ = Vars.make `Shadow env.vars ty (L.unloc x) in
       check_p ty_env { env with vars } p
 
@@ -260,17 +266,21 @@ let check_proc (env : Env.t) p =
           ) env.vars vs 
       in
       let env = { env with vars } in
-      Theory.check env ~local:true ty_env test Type.tboolean ;
+      Theory.check env ~local:true ty_env projs test Type.tboolean ;
       check_p ty_env  env p
 
     | Apply (id, ts) ->
-      let kind,_ = find_process_lsymb env.table id in
+      let kind, projs', _ = find_process_lsymb env.table id in
+
+      if projs <> projs' then
+        proc_err (L.loc proc) (ProjsMismatch (projs, projs'));
+
       if List.length kind <> List.length ts then
         proc_err loc (Arity_error (L.unloc id,
                                    List.length ts,
                                    List.length kind));
       List.iter2
-        (fun (_, k) t -> Theory.check env ~local:true ty_env t k)
+        (fun (_, k) t -> Theory.check env ~local:true ty_env projs t k)
         kind ts
   in
 
@@ -284,7 +294,11 @@ let check_proc (env : Env.t) p =
   ()
 
 
-let declare table (id : lsymb) (args : proc_ty) proc =
+let declare
+    (table : Symbols.table)
+    (id : lsymb) (args : proc_ty) (projs : Term.projs)
+    (proc : process)
+  =
   let vars = 
     List.fold_left (fun vars (v, ty) ->
         let vars, _ = Vars.make `Shadow vars ty v in
@@ -294,8 +308,8 @@ let declare table (id : lsymb) (args : proc_ty) proc =
   let env = Env.init ~vars ~table () in
 
   (* type-check and declare *)
-  check_proc env proc ;
-  let table, _ = declare_nocheck env.table id args proc in
+  check_proc env projs proc ;
+  let table, _ = declare_nocheck env.table id args projs proc in
   table
 
 (*------------------------------------------------------------------*)
@@ -326,6 +340,9 @@ let print_msubst msubst =
 type p_env = {
   ty_env : Type.Infer.env;
 
+  projs : Term.projs;
+  (* valid projections for the process being parsed *)
+  
   alias : lsymb ;
   (* current alias used for action names in the process *)
 
@@ -339,9 +356,7 @@ type p_env = {
   (* substitution for index variables (Repl, Exists, Apply)
    * mapping each variable from the original process (before refresh)
    * to the associated refreshed variables
-   * as Theory.term and as a Vars.var suitable for use in Term.term
-   * TODO items are always of the form (i, Theory.Var (Vars.name i'), i')
-   *      why not keep (i,i') for simplicity? *)
+   * as Theory.term and as a Vars.var suitable for use in Term.term *)
 
   msubst : (string * Theory.term_i * Term.term) list ;
   (* substitution for message variables (New, Let, In, Apply)
@@ -374,7 +389,7 @@ type p_env = {
 
 }
 
-let parse_proc (system_name : System.system_name) init_table proc =
+let parse_proc (system_name : System.t) init_table init_projs proc =
 
   (* Initial env with special variables registered.
    * The special variables should never be visible to the user,
@@ -420,7 +435,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
     =
     let t, _ = 
       Theory.convert ~ty_env:penv.ty_env 
-        { env = penv.env; cntxt = InProc ts; } ~ty t 
+        { env = penv.env; cntxt = InProc (penv.projs,ts); } ~ty t 
     in
     let subst = create_subst penv.env.vars penv.isubst penv.msubst in
     Term.subst subst t
@@ -509,7 +524,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
     let output = match output with
       | Some (c,t) ->
         let t = 
-          (* TODO: subtypes *)
+          (* FEATURE: subtypes *)
           Term.subst (subst_ts @ subst_input)
             (conv_term penv action_term t Type.Message) 
         in
@@ -530,7 +545,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
     in
 
     let table, new_a, action_descr =
-      System.register_action table system_name a' indices action action_descr
+      System.register_action table system_name action_descr
     in
 
     let table =
@@ -561,7 +576,10 @@ let parse_proc (system_name : System.system_name) init_table proc =
       (* Keep explicit alias if there is one,
        * otherwise use id as the new alias. *)
       let a' = match L.unloc proc with Alias (_,a) -> a | _ -> id in
-      let proc_ty, p = find_process_lsymb penv.env.table id in
+      let proc_ty, projs', p = find_process_lsymb penv.env.table id in
+
+      if penv.projs <> projs' then
+        proc_err (L.loc proc) (ProjsMismatch (penv.projs, projs'));
 
       let new_env, isubst', msubst' =
         (* TODO avoid or handle conflicts with variables already
@@ -666,7 +684,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
     let shape = Action.get_shape (List.rev penv.action) in
     let table,x' =
       let suffix = if in_update then `Large else `Strict in
-      Macros.declare_global penv.env.table x
+      Macros.declare_global penv.env.table system_name x
         ~suffix
         ~action:shape ~inputs:invars
         ~indices:(List.rev penv.indices) ~ts body ty
@@ -746,7 +764,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
     | In (c,x,p) ->
       let ch = Channel.of_lsymb c penv.env.table in
-      (* TODO: subtypes*)
+      (* FEATURE: subtypes *)
       let penv,x' = make_fresh `Shadow penv Type.Message (L.unloc x) in
       let in_th = Theory.var_i dum (Vars.name x') in
       let in_tm = Term.mk_var x' in
@@ -977,6 +995,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
   let env = Env.init ~table:init_table ~vars:env_ts () in
   let penv =
     { ty_env   = Type.Infer.mk_env ();
+      projs    = init_projs;
       alias    = L.mk_loc L._dummy "A" ;
       indices  = [] ;
       env;
@@ -998,15 +1017,21 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
   (proc, table)
 
-let declare_system table (system_name : lsymb) proc =
+let declare_system table system_name (projs : Term.projs) (proc : process) =
   Printer.pr
     "@[<v 2>System before processing:@;@;@[%a@]@]@.@."
     pp_process proc ;
 
   let env = Env.init ~table () in
-  check_proc env proc ;
+  check_proc env projs proc ;
 
-  let table, system_name = System.declare_empty table system_name in
+  (* FEATURE: allow user to define more than bi-system *)
+  let projections = [Term.left_proj; Term.right_proj] in
+  let system_name = match system_name with
+    | Some lsymb -> lsymb
+    | None -> L.mk_loc Location._dummy "default"
+  in
+  let table,system_name = System.declare_empty table system_name projections in
 
   (* before parsing the system, we register the init action,
   using for the updates the initial values declared when declaring
@@ -1024,10 +1049,10 @@ let declare_system table (system_name : lsymb) proc =
       globals   = []; }
   in
   let table, _, _ =
-    System.register_action table system_name a' [] [] action_descr
+    System.register_action table system_name action_descr
   in
 
-  let proc,table = parse_proc system_name table proc in
+  let proc,table = parse_proc system_name table projs proc in
   Printer.pr "@[<v 2>System after processing:@;@;@[%a@]@]@.@." pp_process proc ;
   Printer.pr "%a" System.pp_systems table;
   table

@@ -26,8 +26,6 @@ SECURITY PROPERTIES
 - secrecy (as a reachability property)
 *******************************************************************************)
 
-set autoIntro = false.
-
 hash h
 
 name secret : message

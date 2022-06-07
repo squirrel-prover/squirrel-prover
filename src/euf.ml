@@ -25,11 +25,9 @@ class check_key
     | Term.Fun ((fn,_), _, [m1;m2;Term.Name _]) when fn = head_fn ->
       self#visit_message m1; self#visit_message m2
         
-    | Term.Fun ((fn,_), _, [Term.Name _])
-    | Term.Fun ((fn,_), _, [Term.Diff (Term.Name _, Term.Name _)])
-    | Term.Fun ((fn,_), _, [_; Term.Name _])
-    | Term.Fun ((fn,_), _, [_; Term.Diff (Term.Name _, Term.Name _)])
-      when allow_functions fn -> ()
+    | Term.Fun ((fn,_), _, [k])
+    | Term.Fun ((fn,_), _, [_;k])
+      when allow_functions fn && Term.diff_names k -> ()
                                  
     | Term.Name n when n.s_symb = key_n -> raise Bad_ssc_
                                              

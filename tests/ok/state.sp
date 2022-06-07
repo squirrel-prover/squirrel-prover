@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 mutable s : message = empty
 abstract v : message

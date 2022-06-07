@@ -1,14 +1,16 @@
-val is_prefix : [`Strict | `Large] -> Action.shape -> Action.shape -> bool
+(** Declaring and unfolding macros *)
 
 (*------------------------------------------------------------------*)
 (** {2 Global macro definitions} *)
 
-(** Declare a global (timestamp-dependent) macro,
+(** Declare a global macro (whose meaning is the same accross
+    several actions, which is useful to model let-expressions)
     given a term abstracted over input variables, indices,
     and some timestamp.
     A fresh name is generated for the macro if needed. *)
 val declare_global :
   Symbols.table ->
+  System.t ->
   Symbols.lsymb ->
   suffix:[`Large | `Strict] ->
   action:Action.shape ->
@@ -22,35 +24,44 @@ val declare_global :
 (*------------------------------------------------------------------*)
 (** {2 Macro expansions} *)
 
-type def_result = [ `Def of Term.term | `Undef | `MaybeDef ]
-
-(** Return the term corresponding to the declared macro,
+(** [get_definition context macro t] returns the expansion of [macro] at [t],
     if the macro can be expanded.
     Does *not* check that the timestamp happens!
-    Internally defined using [get_definition_nocntxt] below *)
+    The [context] is only used to determine whether [t] is equal
+    to some action in the trace model.
+
+    Returns [`Def body] when the macro expands to [body],
+    [`Undef] if the macro has no meaning at [t],
+    and [`MaybeDef] if the status is unknown (typically
+    because [t] is unknown). *)
 val get_definition :
-  Constr.trace_cntxt -> Term.msymb -> Term.term -> def_result
+  Constr.trace_cntxt ->
+  Term.msymb -> Term.term ->
+  [ `Def of Term.term | `Undef | `MaybeDef ]
 
+(** Same as [get_definition] but raises a soft failure if the macro
+    cannot be expanded. *)
 val get_definition_exn :
-  Constr.trace_cntxt -> Term.msymb -> Term.term -> Term.term
+  Constr.trace_cntxt ->
+  Term.msymb -> Term.term ->
+  Term.term
 
-(*------------------------------------------------------------------*)
-(** Variant of [get_definition] without dependency on Constr module.
-    When the Term.term argument is not of the form "Term.Action something",
-    either returns [`MaybeDef] or raises [Not_found] (the latter happens when
-    symb.s_symb is among [Symbols.{Output,Cond,State}] - TODO: why?),
-    whereas [get_definition] does some clever stuff to find a "Term.Action sth"
-    equal to the given timestamp. *)
+(** Variant of [get_definition] without dependency on [Constr] module,
+    where the timestamp is directly passed as an action.
+    Unlike [get_definition] it only returns [`Def body] or [`Undef]
+    since we can always determine whether a macro is defined or not at
+    a given action. *)
 val get_definition_nocntxt :
-  SystemExpr.t -> Symbols.table -> Term.msymb -> Symbols.action 
-  -> Vars.vars -> [ `Def of Term.term | `Undef ]
+  SystemExpr.fset -> Symbols.table ->
+  Term.msymb -> Symbols.action -> Vars.vars ->
+  [ `Def of Term.term | `Undef ]
 
 (** When [m] is a global macro symbol,
     [get_definition se table m li] return a term which resembles the one that
     would be obtained with [get_definition m li ts] for some [ts],
     except that it will feature meaningless action names in some places. *)
 val get_dummy_definition :
-  Symbols.table -> SystemExpr.t -> Term.msymb -> Term.term
+  Symbols.table -> SystemExpr.fset -> Term.msymb -> Term.term
 
 (*------------------------------------------------------------------*)
 type system_map_arg =
@@ -67,15 +78,11 @@ val update_global_data :
   Symbols.table -> 
   Symbols.macro -> 
   Symbols.macro_def -> 
-  SystemExpr.single_system ->
-  SystemExpr.single_system ->
+  System.Single.t ->
+  System.Single.t ->
   (system_map_arg -> Symbols.macro -> Term.term -> Term.term) -> 
   Symbols.table
     
-(*------------------------------------------------------------------*)
-(** Remove all macro definition associated with a system *)
-val remove_system : Symbols.table -> SystemExpr.single_system -> Symbols.table
-
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
 

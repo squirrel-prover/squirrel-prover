@@ -1,7 +1,7 @@
 (** All reachability tactics.
    Tactics are organized in three classes:
     - Logical -> relies on the logical properties of the sequent.
-    - Strucutral -> relies on properties of protocols, or of equality over
+    - Structural -> relies on properties of protocols, or of equality over
       messages,...
     - Cryptographic -> relies on a cryptographic assumptions, that must be
       assumed.
@@ -10,10 +10,10 @@
 open Term
 open Utils
 
-module T = Prover.ProverTactics
-module Args = TacticsArgs
-module L = Location
-module SE = SystemExpr
+module T    = Prover.ProverTactics
+module Args = HighTacticsArgs
+module L    = Location
+module SE   = SystemExpr
 
 module TS = TraceSequent
 
@@ -201,23 +201,6 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
 let case_tac args = wrap_fail (do_case_tac args)
 
 (*------------------------------------------------------------------*)
-(* TODO: remove, as it is subsumed by the tactic `assumption` ? *)
-let false_left s =
-  if Hyps.exists (fun _ f -> Term.is_false f) s
-  then []
-  else Tactics.(soft_failure (Failure "no False assumption"))
-
-let () =
-  T.register "false_left"
-     ~tactic_help:{general_help = "Closes a goal when False is among its assumptions.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                   tactic_group = Logical}
-    ~pq_sound:true
-    (LowTactics.genfun_of_pure_tfun false_left)
-
-
-(*------------------------------------------------------------------*)
 
 let rec simpl_left s =
   let func _ f = match f with
@@ -254,33 +237,59 @@ let simpl_left_tac s = match simpl_left s with
   | None -> []
   | Some s -> [s]
 
-let () =
-  T.register "simpl_left"
-    ~tactic_help:{general_help = "Introduce all conjunctions, existentials and \
-                                  false hypotheses.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
-    ~pq_sound:true
-    (LowTactics.genfun_of_pure_tfun simpl_left_tac)
-
 (*------------------------------------------------------------------*)
-(** [assumption judge sk fk] proves the sequent using the axiom rule. *)
-let assumption (s : TS.t) =
+(** [assumption s] succeeds (with no subgoal) if the sequent [s]
+    can be proved using the axiom rule (plus some other minor rules). *)
+let assumption (s : TS.t) = 
   let goal = TS.goal s in
-  let assumption_entails _ f =
-    goal = f ||
-    List.exists (fun f ->
-        goal = f || f = Term.mk_false
-      ) (decompose_ands f)
+  let assumption_entails _ = function
+    | `Equiv (Equiv.Atom (Reach f))
+    | `Reach f ->
+        goal = f ||
+        List.exists
+          (fun f -> goal = f || f = Term.mk_false)
+          (decompose_ands f)
+    | `Equiv _ -> false
   in
   if goal = Term.mk_true ||
-     (Hyps.exists assumption_entails s) then
-    let () = dbg "assumption %a" Term.pp goal in
+     TS.Hyps.exists assumption_entails s
+  then begin
+    dbg "assumption %a" Term.pp goal;
     []
+  end else soft_failure Tactics.NotHypothesis
 
-  else soft_failure Tactics.NotHypothesis
+(*------------------------------------------------------------------*)
+(** [localize h h' s sk fk] succeeds with a single subgoal if
+    the sequent [s] has a global hypothesis [h] which is a reachability
+    atom.
+    The generated subgoal is identical to [s] but with a new local
+    hypothesis [h'] corresponding to that atom. *)
+let localize h h' s =
+  match TS.Hyps.by_name h s with
+    | _,`Equiv (Equiv.Atom (Reach f)) ->
+        [TS.Hyps.add h' (`Reach f) s]
+    | _ ->
+        Tactics.(soft_failure (Failure "cannot localize this hypothesis"))
+    | exception Not_found ->
+        Tactics.(soft_failure (Failure "no hypothesis"))
 
+let () =
+  T.register_general "localize"
+    ~tactic_help:
+      {general_help = "Change a global hypothesis containing a reachability \
+                       formula to a local hypothesis.";
+       detailed_help = "";
+       usages_sorts = [Sort (Pair (String, String))];
+       tactic_group = Logical}
+    ~pq_sound:true
+    (function
+       | TacticsArgs.[String_name h; NamingPat h'] ->
+           fun s sk fk ->
+             begin match LowTactics.genfun_of_pure_tfun (localize h h') s with
+               | subgoals -> sk subgoals fk
+               | exception (Tactics.Tactic_soft_failure e) -> fk e
+             end
+       | _ -> assert false)
 
 (*------------------------------------------------------------------*)
 (** {2 Structural Tactics} *)
@@ -614,14 +623,15 @@ let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool =
        (Term.mk_indices_eq ~simpl:false is is) ::
        [cond])
   in
-  let pat2 = Match.{
+  let pat2 = Term.{
       pat_tyvars = [];
       pat_vars   = Sv.of_list o2.occ_vars;
       pat_term   = mk_dum a2 is2 cond2;
     }
   in
 
-  match Match.T.try_match table system (mk_dum a1 is1 cond1) pat2 with
+  let context = SE.reachability_context system in
+  match Match.T.try_match table context (mk_dum a1 is1 cond1) pat2 with
   | Match.FreeTyv | Match.NoMatch _ -> false
   | Match.Match _ -> true
 
@@ -778,12 +788,12 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.term =
 let fresh (m : lsymb) s =
   try
     let id,hyp = Hyps.by_name m s in
-    let hyp = TraceLT.expand_all_macros hyp s in
+    let hyp = TraceLT.expand_all_macros hyp (TS.system s).set s in
     let table = TS.table s in
     let env   = TS.vars s in
 
     begin
-      match Term.destr_eq hyp with
+      match TS.Reduce.destr_eq s Local_t hyp with
       | Some (m1,m2) ->
         let (ns,t) = fresh_param m1 m2 in
 
@@ -808,6 +818,8 @@ let fresh (m : lsymb) s =
   | Fresh.Var_found ->
     soft_failure
       (Tactics.Failure "can only be applied on ground terms")
+  | SE.(Error Expected_fset) ->
+    soft_failure Underspecified_system
 
 let fresh_tac args s =
   match TraceLT.convert_args s args (Args.Sort Args.String) with
@@ -1058,7 +1070,7 @@ let fa s =
   let unsupported () =
     Tactics.(soft_failure (Failure "equality expected")) in
 
-  let u, v = match Term.destr_eq (TS.goal s) with
+  let u, v = match TS.Reduce.destr_eq s Local_t (TS.goal s) with
     | Some (u,v) -> u, v
     | None -> unsupported ()
   in
@@ -1296,14 +1308,12 @@ let tac_autosimpl s = tac_auto ~close:false ~strong:(Config.auto_intro ()) s
   * to distinct goals for each projected system. *)
 
 let project s =
-  let system = TS.system s in
-  match system with
-  | Single _ ->
+  match SE.to_list (SE.to_fset (TS.system s).set) with
+  | [_] ->
     soft_failure (Tactics.Failure "goal already deals with a \
                                            single process")
-  | _ ->
-    [TS.pi PLeft s;
-     TS.pi PRight s]
+  | l ->
+    List.map (fun (lbl,_) -> TS.pi lbl s) l
 
 let () =
   T.register "project"
@@ -1316,40 +1326,6 @@ let () =
        tactic_group = Structural}
     ~pq_sound:true
      (LowTactics.genfun_of_pure_tfun project)
-
-(*------------------------------------------------------------------*)
-(** Replacing a conditional by the then branch (resp. the else branch) if the
- * condition is true (resp. false). *)
-
-let yes_no_if b s =
-  let cntxt = TS.mk_trace_cntxt s in
-  let conclusion = TS.goal s in
-  (* search for the first occurrence of an if-then-else in [elem] *)
-  match Iter.get_ite_term cntxt conclusion with
-  | [] ->
-    soft_failure
-      (Tactics.Failure
-         "the conclusion must contain at least \
-          one occurrence of an if term")
-
-  | occ :: _ ->
-    (* Context with bound variables (eg try find) are not supported. *)
-    if not (occ.Iter.occ_vars = []) then
-      soft_failure (Tactics.Failure "cannot be applied in a under a binder");
-
-    let c,t,e = occ.occ_cnt in
-
-    let branch, trace_sequent =
-      if b then (t, TS.set_goal c s)
-      else (e, TS.set_goal (Term.mk_not c) s)
-    in
-    let subst = [Term.ESubst (Term.mk_ite ~simpl:false c t e,branch)] in
-    [ Goal.Trace trace_sequent; Goal.Trace (TS.subst subst s) ]
-
-let yes_no_if_args b args s : Goal.t list =
-    match args with
-    | [] -> yes_no_if b s
-    | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)
 (** {2 Cryptographic Tactics} *)
@@ -1460,7 +1436,7 @@ let euf_apply_schema sequent (_, key, m, s, _, _, _, _) case =
       key.s_indices case.key_indices
   in
 
-  let system = TS.system sequent in
+  let system = SE.to_fset (TS.system sequent).set in
   let table  = TS.table sequent in
 
   (* Now, we need to add the timestamp constraints. *)
@@ -1719,13 +1695,12 @@ let non_malleability arg (s : TS.t) =
   (try
      (* Remark: if we start considering C[dec(m,sk)], we will need to also
         check the SSC for C. *)
-     SystemExpr.(iter_descrs cntxt.table cntxt.system
-                   (fun action_descr ->
-                      ssc#visit_message (snd action_descr.output) ;
-                      List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
-   with Name_not_hidden -> soft_failure
-                             Tactics.NameNotUnderEnc
-  );
+     SystemExpr.iter_descrs
+       cntxt.table cntxt.system
+       (fun action_descr ->
+          ssc#visit_message (snd action_descr.output) ;
+          List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates)
+  with Name_not_hidden -> soft_failure Tactics.NameNotUnderEnc);
   let neq_goals = match mess1, opt_m with
     | Term.Name name, None -> [] (* we have nothing to do, a name will always be
                                     not equal to another fres name *)
@@ -1809,7 +1784,7 @@ let collision_resistance TacticsArgs.(Opt (String, i)) (s : TS.t) =
     | None -> top_level_hashes s
     | Some (String j) -> 
       let _, h = Hyps.by_name j s in
-      match Term.destr_eq h with
+      match TS.Reduce.destr_eq s Local_t h with
       | Some (t1, t2) ->
         let cntxt = TS.mk_trace_cntxt s in
         if not (valid_hash cntxt t1) || not (valid_hash cntxt t2) then
@@ -1861,15 +1836,15 @@ exception Invalid
   * of some biframe element are replaced by the corresponding [dst]
   * projection. *)
 let rewrite_equiv_transform
-    ~(src:Term.projection)
-    ~(dst:Term.projection)
+    ~(src:Term.proj)
+    ~(dst:Term.proj)
     ~(s:TS.t)
     (biframe : Term.term list)
     (term : Term.term) : Term.term
   =
   let assoc (t : Term.term) : Term.term option =
-    match List.find_opt (fun e -> (Term.pi_term ~projection:src e) = t) biframe with
-    | Some e -> Some (Term.pi_term ~projection:dst e)
+    match List.find_opt (fun e -> Term.project1 src e = t) biframe with
+    | Some e -> Some (Term.project1 dst e)
     | None -> None
   in
   let rec aux : term -> term = fun t ->
@@ -1887,6 +1862,9 @@ let rewrite_equiv_transform
     | Fun (fsymb,ftype,args) ->
       let args = List.map aux args in
       Term.mk_fun0 fsymb ftype args
+
+    | Diff (Explicit l) ->
+      Term.mk_diff (List.map (fun (p,t) -> p, aux t) l)
 
     (* We can support input@ts (and keep it unchanged) if
      * for some ts' such that ts'>=pred(ts),
@@ -1910,7 +1888,13 @@ let rewrite_equiv_transform
   in
   aux term
 
-let rewrite_equiv (ass_sys, ass) (s : TS.t) : TS.t list =
+(* Rewrite equiv rule on sequent [s] with direction [dir],
+   using assumption [ass] wrt system [ass_context]. *)
+let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
+
+  (* Decompose [ass] as [subgoal_1 => .. => subgoal_N => equiv(biframe)].
+     We currently require subgoals to be reachability formulas,
+     for simplicity. *)
   let subgoals, biframe =
     let rec aux = function
       | Equiv.(Atom (Equiv bf)) -> [],bf
@@ -1918,59 +1902,67 @@ let rewrite_equiv (ass_sys, ass) (s : TS.t) : TS.t list =
       | _ -> Tactics.(soft_failure (Failure "invalid assumption"))
     in aux ass
   in
-  let subgoals = List.map (fun f -> TS.set_goal f s) subgoals in
 
-  let cur_sys = TS.system s in
-
-  (* Identify which projection of the assumptions conclusion
-   * corresponds to the current goal (projection [src]) and
-   * what will be the new system after the transformation. *)
-  let src, new_sys = match cur_sys with
-    | SystemExpr.Single _ ->
-      if SystemExpr.project Term.PLeft ass_sys = cur_sys then
-        PLeft,
-        SystemExpr.project Term.PRight ass_sys
-      else if SystemExpr.project Term.PRight ass_sys = cur_sys then
-        PRight,
-        SystemExpr.project Term.PLeft ass_sys
-      else
-        Tactics.(soft_failure NoAssumpSystem)
-    | se ->
-      (* Support only a useful particular case for now.
-       * This could be generalized, e.g. to use an equivalence
-       * that is not between the current system and itself.
-       * I'm leaving this for when we have system annotations
-       * in global meta formulas, and perhaps more general system
-       * expressions. *)
-      if se <> ass_sys then
-        Tactics.(soft_failure NoAssumpSystem);
-
-      if SE.project Term.PLeft se <> SE.project Term.PRight se then
-        Tactics.(soft_failure NoAssumpSystem);
-
-      (* TODO the user might want the reverse direction *)
-      PLeft, se
+  (* Subgoals are relative to [ass_context.set].
+     They are proved in theory as global formulas, immediately changed in
+     the tactic to local formulas. These local formulas cannot be proved
+     while keeping all local hypotheses: however, we can keep the pure trace
+     formulas from the local hypotheses.
+     We already know that [ass_context.set] is compatible with the systems
+     used in the equivalence, hence we keep [s]'s context. *)
+  let s' =
+    s |>
+    TS.Hyps.filter
+      (fun _ -> function
+         | `Reach f -> Term.is_pure_timestamp f
+         | `Equiv  _ -> true)
   in
-  let dst = if src = PLeft then PRight else PLeft in
+  let subgoals = List.map (fun f -> TS.set_goal f s') subgoals in
+
+  (* Identify which projection of the assumption's conclusion
+     corresponds to the current goal and new goal (projections [src,dst])
+     and the expected systems before and after the transformation. *)
+  let src,dst,orig_sys,new_sys =
+    let pair = Utils.oget ass_context.SE.pair in
+    let left,lsys = SE.fst pair in
+    let right,rsys = SE.snd pair in
+    match dir with
+      | `LeftToRight -> left,right,lsys,rsys
+      | `RightToLeft -> right,left,rsys,lsys
+  in
+
+  (* Compute new set annotation, checking by the way
+     that rewrite equiv applies to sequent [s]. *)
+  let updated_set =
+    SE.to_list (SE.to_fset (TS.system s).set) |>
+    List.map (fun (p,s) ->
+                if s = orig_sys then p, new_sys else
+                  Tactics.(soft_failure Rewrite_equiv_system_mismatch)) |>
+    SE.of_list
+  in
+  let updated_context =
+    { (TS.system s) with set = (updated_set:>SE.arbitrary) } in
+
   let warn_unsupported t =
     Printer.prt `Warning
       "Cannot transform %a: it will be dropped.@." Term.pp t
   in
 
-  let rewrite (h : Term.term) : Term.term =
-    (* Attempt to transform. If the transformation can't
-     * be applied we can simply drop the hypothesis rather
-     * than failing completely. *)
-    try rewrite_equiv_transform ~src ~dst ~s biframe h with
-    | Invalid -> warn_unsupported h; Term.mk_true
+  (* Attempt to transform. If the transformation can't
+   * be applied we can simply drop the hypothesis rather
+   * than failing completely. *)
+  let rewrite (h : Term.term) : Term.term option =
+    try Some (rewrite_equiv_transform ~src ~dst ~s biframe h) with
+    | Invalid -> warn_unsupported h; None
   in
 
   let goal =
-    TS.LocalHyps.map rewrite s
-    |> TS.set_system new_sys
-    |> TS.set_goal
+    TS.set_goal_in_context
+      ~update_local:rewrite
+      updated_context
       (try rewrite_equiv_transform ~src ~dst ~s biframe (TS.goal s) with
        | Invalid -> warn_unsupported (TS.goal s); Term.mk_false)
+      s
   in
   subgoals @ [goal]
 

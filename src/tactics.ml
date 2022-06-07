@@ -42,6 +42,8 @@ type tac_error_i =
   | BadSSCDetailed of ssc_error list
   | NoSSC
   | NoAssumpSystem
+  | Rewrite_equiv_system_mismatch
+  | Underspecified_system
   | NotDepends of string * string
   | NotDDHContext
   | SEncNoRandom
@@ -56,10 +58,6 @@ type tac_error_i =
   | GoalBadShape of string
   | GoalNotPQSound
   | TacticNotPQSound
-
-  (* TODO: remove these errors, catch directly at top-level *)
-  | SystemError     of System.system_error
-  | SystemExprError of SystemExpr.system_expr_err
 
   | CongrFail
   | GoalNotClosed
@@ -91,6 +89,10 @@ let rec tac_error_to_string = function
   | Bad_SSC            -> "BadSSC"
   | NoSSC              -> "NoSSC"
   | NoAssumpSystem     -> "NoAssumpSystem"
+  | Rewrite_equiv_system_mismatch
+                       -> "Rewrite_equiv_system_mismatch"
+  | Underspecified_system
+                       -> "Underspecified_system"
   | NotDDHContext      -> "NotDDHContext"
   | SEncNoRandom       -> "SEncNoRandom"
   | CongrFail          -> "CongrFail"
@@ -115,13 +117,12 @@ let rec tac_error_to_string = function
   | NotDepends (s1, s2)   -> "NotDepends, "^s1^", "^s2
   | FailWithUnexpected te -> "FailWithUnexpected, "^(tac_error_to_string te)
   | ApplyMatchFailure _   -> "ApplyMatchFailure"
+
   | HypAlreadyExists  _    -> "HypAlreadyExists"
   | HypUnknown        _    -> "HypUnknown"
-  | SystemExprError   _    -> "SystemExpr_Error"
   | GoalBadShape      _    -> "GoalBadShape"
   | GoalNotPQSound         -> "GoalNotPQSound"
   | TacticNotPQSound       -> "TacticNotPQSound"
-  | SystemError       _    -> "System_Error"
   | PatNumError       _    -> "PatNumError"
   | MustHappen        _    -> "MustHappen"
   | BadSSCDetailed    _    -> "BadSSCDetailed"
@@ -149,13 +150,15 @@ let pp_tac_error_i ppf = function
   | NoAssumpSystem ->
       Fmt.pf ppf "assumption does not apply to the current system"
 
+  | Rewrite_equiv_system_mismatch ->
+      Fmt.pf ppf "equivalence cannot be used to rewrite in current system"
+
+  | Underspecified_system ->
+      Fmt.pf ppf "underspecified system"
+
   | NotDDHContext ->
       Fmt.pf ppf "the current system cannot be seen as a context \
                   of the given DDH shares"
-
-  | SystemExprError e -> SystemExpr.pp_system_expr_err ppf e
-
-  | SystemError e -> System.pp_system_error ppf e
 
   | SEncNoRandom ->
     Fmt.string ppf "an encryption is performed without a random name"
@@ -730,11 +733,16 @@ let timeout_get = function
 
 
 (*------------------------------------------------------------------*)
-let print_system table (system : SystemExpr.t) = 
-  Printer.prt `Result "@[<v>System @[[%a]@]@;@[%a@]@;@[%a@]@;@]%!"
-    SystemExpr.pp system
-    (SystemExpr.pp_descrs table) system
-    (if Config.print_trs_equations ()
-     then Completion.print_init_trs
-     else (fun _fmt _ -> ()))
-    table
+let print_system (table : Symbols.table) (system : _ SystemExpr.expr) : unit =
+  try
+    let system = SystemExpr.to_fset system in
+    Printer.prt `Result "@[<v>System @[[%a]@]@;@[%a@]@;@[%a@]@;@]%!"
+      SystemExpr.pp system
+      (SystemExpr.pp_descrs table) system
+      (if Config.print_trs_equations ()
+       then Completion.print_init_trs
+       else (fun _fmt _ -> ()))
+      table
+  with _ ->
+    Printer.prt `Result "@.Cannot print action descriptions for system %a@."
+      SystemExpr.pp system

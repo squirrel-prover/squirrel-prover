@@ -50,7 +50,7 @@ type prf_occ = (Action.action * Vars.var list * Term.term) Iter.occ
 
 (** check if all instances of [o1] are instances of [o2].
     [o1] and [o2] actions must have the same action name *)
-let prf_occ_incl table system (o1 : prf_occ) (o2 : prf_occ) : bool =
+let prf_occ_incl table sexpr (o1 : prf_occ) (o2 : prf_occ) : bool =
   let a1, is1, t1 = o1.occ_cnt in
   let a2, is2, t2 = o2.occ_cnt in
 
@@ -60,20 +60,21 @@ let prf_occ_incl table system (o1 : prf_occ) (o2 : prf_occ) : bool =
   (* build a dummy term, which we used to match in one go all elements of
      the two occurrences *)
   let mk_dum a is cond t =
-    let action = SE.action_to_term table system a in
+    let action = SE.action_to_term table sexpr a in
     Term.mk_ands ~simpl:false
       ((Term.mk_atom `Eq Term.init action) ::
        (Term.mk_indices_eq ~simpl:false is is) ::
        cond ::
        [Term.mk_atom `Eq t (Term.mk_witness (Term.ty t))])
   in
-  let pat2 = Match.{
+  let pat2 = Term.{
       pat_tyvars = [];
       pat_vars   = Sv.of_list o2.occ_vars;
       pat_term   = mk_dum a2 is2 cond2 t2;
     }
   in
 
+  let system = SE.reachability_context sexpr in
   match Match.T.try_match table system (mk_dum a1 is1 cond1 t1) pat2 with
   | Match.FreeTyv | Match.NoMatch _ -> false
   | Match.Match _ -> true
@@ -176,7 +177,9 @@ let mk_prf_phi_proj cntxt env param frame hash =
 
   let frame_hashes : Iter.hash_occs =
     List.fold_left (fun acc t ->
-        Iter.get_f_messages_ext ~mode:(`Delta cntxt) 
+        (* TODO: wrong system below? *)
+        Iter.get_f_messages_ext
+          ~mode:(`Delta cntxt) (cntxt.system :> SE.arbitrary)
           param.h_fn param.h_key.s_symb t @ acc
       ) [] frame
   in
@@ -195,7 +198,9 @@ let mk_prf_phi_proj cntxt env param frame hash =
         let fv = (Sv.elements iocc.iocc_vars) in
 
         let new_cases =
-          Iter.get_f_messages_ext ~mode:(`Delta cntxt)
+          Iter.get_f_messages_ext 
+            (* TODO: wrong system below? *)
+            ~mode:(`Delta cntxt) (cntxt.system :> SE.arbitrary)
             ~fv param.h_fn param.h_key.s_symb t
         in
         let new_cases =
@@ -230,17 +235,19 @@ let mk_prf_phi_proj cntxt env param frame hash =
 (** Build the PRF condition on one side, if the hash occurs on this side.
     Return [None] if the hash does not occurs. *)
 let prf_condition_side
-    (proj : Term.projection)
-    (cntxt : Constr.trace_cntxt)
-    (env : Vars.env)
+    (proj    : Term.proj)
+    (cntxt   : Constr.trace_cntxt)
+    (env     : Vars.env)
     (biframe : Equiv.equiv)
-    (e : Term.term)
-    (hash : Term.term) : (Term.form * Term.form) option
+    (e       : Term.term)
+    (hash    : Term.term)
+  : (Term.form * Term.form) option
   =
   let exception HashNoOcc in
   try
-    let cntxt = { cntxt with system = SE.project proj cntxt.system } in
-    let param = prf_param (Term.pi_term ~projection:proj hash) in
+    let system = SE.(project [proj] cntxt.system) in
+    let cntxt = { cntxt with system } in
+    let param = prf_param (Term.project1 proj hash) in
 
     (* Create the frame on which we will iterate to compute the PRF formulas *)
     let hash_ty = param.h_fty.fty_out in
@@ -249,7 +256,7 @@ let prf_condition_side
     let e_without_hash =
       Term.subst [Term.ESubst (hash,Term.mk_var v)] e
     in
-    let e_without_hash = Term.pi_term ~projection:proj e_without_hash in
+    let e_without_hash = Term.project1 proj e_without_hash in
 
     (* [hash] does not appear on this side *)
     if not (Sv.mem v (Term.fv e_without_hash)) then
@@ -262,7 +269,7 @@ let prf_condition_side
     in
 
     let frame =
-      param.h_cnt :: e_without_hash :: List.map (Equiv.pi_term proj) (biframe)
+      param.h_cnt :: e_without_hash :: List.map (Term.project1 proj) (biframe)
     in
     Some (mk_prf_phi_proj cntxt env param frame hash)
 
@@ -290,4 +297,5 @@ let combine_conj_formulas p q =
   Term.mk_and
     (Term.mk_ands common)
     (Term.head_normal_biterm
-       (Term.mk_diff (Term.mk_ands new_p) (Term.mk_ands (List.rev !aux_q))))
+       (Term.mk_diff [Term.left_proj,  Term.mk_ands new_p;
+                      Term.right_proj, Term.mk_ands (List.rev !aux_q)]))

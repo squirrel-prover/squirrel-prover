@@ -1,3 +1,5 @@
+include Basic.
+
 hash h
 
 abstract ok : message
@@ -163,7 +165,7 @@ expandall.
     expand seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), i, j.
 
    expand frame@P3(i); expand exec@P3(i); expand output@P3(i).
-   equivalent cond@P3(i), False.
+   have ->: cond@P3(i) <=> False.
    expand cond@P3(i).
    executable pred(P3(i)).
 
@@ -172,7 +174,7 @@ expandall.
    use P1_charac with i.
    use H0 with s.
 
-   expand gb(i)@P3(i). fa 5.  noif 6. simpl.
+   expand gb(i)@P3(i). fa 5.  rewrite if_false 6. simpl.
 
    expand gb(i)@A(i);
    expand  seq(i->g^a(i)), i.
@@ -189,7 +191,7 @@ expandall.
 
    expand frame@S3(j); expand exec@S3(j).
    (* Unreachability of S3  *)
-   equivalent cond@S3(j), False.
+   have ->: cond@S3(j) <=> False.
    expand cond@S3(j).
    executable pred(S3(j)).
    depends S1(j), S3(j).
@@ -198,7 +200,7 @@ expandall.
    use H0 with s.
 
    fa 5.
-   noif 6. simpl.
+   rewrite if_false in 6. simpl.
 
    expand  seq(i->g^b(i)), j.
 

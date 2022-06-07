@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 (* Test that it is possible to undo the first system declaration. *)
 channel c

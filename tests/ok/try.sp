@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 name k : index -> message
 
@@ -31,17 +31,17 @@ Proof.
   auto.
   expandall.
   fa 0. fa 1. fa 1.
-  assert (->:
+  assert ->:
     diff(try find j,j2 such that (j = i && j = j2) in <mess(i),mess(j2)>,
          try find l,l2 such that (l = i && l2 = i) in <mess(i),mess(l2)>)
     =
-    try find j,j2 such that (j = i && j = j2) in <mess(i),mess(j2)>).
+    try find j,j2 such that (j = i && j = j2) in <mess(i),mess(j2)>.
   by project; fa.
   
-  assert (->:
+  assert ->:
     try find j,j2 such that (j = i && j = j2) in <mess(i),mess(j2)> 
     = 
-    <mess(i),mess(i)>). {
+    <mess(i),mess(i)>. {
     case  try find j,j2 such that (j = i && j = j2) in <mess(i),mess(j2)>.
     + auto.
   

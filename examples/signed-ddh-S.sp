@@ -19,8 +19,6 @@ one agent for the role S) and show the strong secrecy of the shared key.
 [G] ISO/IEC 9798-3:2019, IT Security techniques – Entity authentication –
 Part 3: Mechanisms using digital signature techniques.
 *******************************************************************************)
-set autoIntro=false. 
-
 
 (**
 Declarations are identical to the ones in `signed-ddh-P.sp`.
@@ -107,7 +105,7 @@ Proof.
     skP, skS,
     seq(i:index ->g^a(i)),
     seq(j:index ->g^b(j)),
-    seq(i,j:index ->diff(g^a(i)^b(j),g^k(i,j))).
+    seq(i,j:index ->diff( g ^ a(i), g) ^ diff( b(j), k(i,j))).
 
   induction t; try (by expandall; apply IH).
 
@@ -117,7 +115,7 @@ Proof.
 
     + (* Schall3 *)
       expand frame, exec, output.
-      equivalent exec@pred(Schall3(j)) && cond@Schall3(j), False.
+      have ->: (exec@pred(Schall3(j)) && cond@Schall3(j)) <=> False.
       {split => //. 
        intro [Hexec Hcond].
        expand cond.

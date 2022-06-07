@@ -21,15 +21,15 @@ system PP = [default/left]
 print system [PP].
 
 (* global macros in mutually exclusive branches re-use the same name *)
-goal [PP/left] _ : 
+goal [PP] _ : 
   happens(P) => 
   x@P = 
   try find t:timestamp such that
-    (((m = m) && (t = Q) && (t < P)) || ((m = m) && (t = P) && (t < P)))
+    (((t = Q) && (t < P) && (m = m)) || ((t = P) && (t < P) && (m = m)))
   in
-    try find  such that ((m = m) && (t = Q) && (t < P))
+    try find  such that ((t = Q) && (t < P) && (m = m))
     in n_PRF
-    else try find  such that ((m = m) && (t = P) && (t < P))
+    else try find  such that ((t = P) && (t < P) && (m = m))
     in n_PRF
     else error
   else n_PRF.
@@ -39,15 +39,15 @@ print system [PP].
 
 
 (* global macros in mutually exclusive branches re-use the same name *)
-goal [PP/left] _ (i : index): 
+goal [PP] _ (i : index): 
   happens(Q) => 
   x@Q = 
   try find t:timestamp such that
-    (((m = m) && (t = Q) && (t < Q)) || ((m = m) && (t = P) && (t < Q)))
+    (((t = Q) && (t < Q) && (m = m)) || ((t = P) && (t < Q) && (m = m)))
   in
-    try find  such that ((m = m) && (t = Q) && (t < Q))
+    try find  such that ((t = Q) && (t < Q) && (m = m))
     in n_PRF
-    else try find  such that ((m = m) && (t = P) && (t < Q))
+    else try find  such that ((t = P) && (t < Q) && (m = m))
     in n_PRF
     else error
   else n_PRF.

@@ -51,7 +51,8 @@ secrecy of the keys.
 *******************************************************************************)
 set timeout = 10.
 set postQuantumSound = true.
-set autoIntro = false.
+
+include Basic.
 
 hash exct
 
@@ -268,12 +269,11 @@ process InitiatorToCompromised2(i,j,k:index) =
 
 system [idealized]  out(cI,skex); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k)) | (!_i !_j !_k I: InitiatorToCompromised2(i,j,k))).
 
-axiom [mainCCAkR/left,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,epk(z)),z)=x.
+axiom [mainCCAkR,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,epk(z)),z)=x.
 
 (* We prove that the original game, after transitivity to mainCCAkI, is equivalent to idealized. *)
-equiv [mainCCAkR/left,idealized/left] test.
+equiv [mainCCAkR,idealized/left] test.
 Proof.
-
   diffeq => //.
     + intro *.
       case try find il,jl,kl such that _ in k(il,jl,kl) else _.
@@ -283,7 +283,6 @@ Proof.
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
               simpl.
-              case H1 => //.
               by case H2.
 
             * intro [Abs _].
@@ -304,7 +303,6 @@ Proof.
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
               simpl.
-              case H1 => //.
               by case H2.
 
             * intro [Abs _].
@@ -325,7 +323,6 @@ Proof.
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
               simpl.
-              case H1 => //.
               by case H2.
 
             * intro [Abs _].
@@ -345,7 +342,6 @@ Proof.
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
               simpl.
-              case H1 => //.
               by case H2.
 
             * intro [Abs _].
@@ -365,7 +361,6 @@ Proof.
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
               simpl.
-              case H1 => //.
               by case H2.
               
             * intro [Abs _].
@@ -386,7 +381,6 @@ Proof.
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
               simpl.
-              case H1 => //.
               by case H2.
 
             * intro [Abs _].
@@ -498,12 +492,12 @@ process InitiatorToCompromised3(i,j,k:index) =
 
 system [idealized3]  out(cI,skex); ((!_j !_k R: Responder3(j,k)) | (!_i !_j !_k I: Initiator3(i,j,k)) | (!_i !_j !_k I: InitiatorToCompromised3(i,j,k))).
 
-axiom [idealized3/left,idealized2/left] ifte (i,j,k:index): att(frame@pred(FI(i,j,k))) =  att(frame@pred(I1(i,j,k))).
+axiom [idealized3/left,idealized2] ifte (i,j,k:index): att(frame@pred(FI(i,j,k))) =  att(frame@pred(I1(i,j,k))).
 
-axiom [idealized3/left,idealized2/left] ifteD (i,j,k:index): att(frame@pred(DFI(i,j,k))) =  att(frame@pred(DI1(i,j,k))).
+axiom [idealized3/left,idealized2] ifteD (i,j,k:index): att(frame@pred(DFI(i,j,k))) =  att(frame@pred(DI1(i,j,k))).
 
 
-goal  [idealized3/left,idealized2/left] trans_eq (i,j,k:index):
+goal  [idealized3/left,idealized2] trans_eq (i,j,k:index):
 xor(try find il,jl,kl such that
       fst(snd(att(frame@pred(I1(i,j,k))))) =
       encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
@@ -571,7 +565,6 @@ Proof.
                decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
                auto.
                simpl.
-               case H => //.
                by case H0.
           +++ intro [Abs _].
               by use Abs with il0,jl0,kl0.
@@ -593,7 +586,7 @@ Proof.
 Qed.
 
 
-goal  [idealized3/left,idealized2/left] trans_eqD (i,j,k:index):
+goal  [idealized3/left,idealized2] trans_eqD (i,j,k:index):
 xor(try find il,jl,kl such that
       (fst(snd(att(frame@pred(DI1(i,j,k))))) =
        encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))))
@@ -662,7 +655,6 @@ Proof.
                 decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
                 auto.
                 simpl.
-                case H => //.
                 by case H0.
             +++ intro [Abs _].
                 by use Abs with il0,jl0,kl0.
@@ -682,10 +674,10 @@ Proof.
 Qed.
 
 
-axiom [idealized3/left,idealized2/left]  fasign : forall (m1,m2,m3:message), m1=m2 => checksign(m1,m3) = checksign(m2,m3).
+axiom [idealized3/left,idealized2]  fasign : forall (m1,m2,m3:message), m1=m2 => checksign(m1,m3) = checksign(m2,m3).
 
 
-goal  [idealized3/left,idealized2/left] trans_eq2 (i,j,k:index):
+goal  [idealized3/left,idealized2] trans_eq2 (i,j,k:index):
 xor(try find il,jl,kl such that
       fst(snd(att(frame@pred(FI(i,j,k))))) =
       encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
@@ -761,7 +753,6 @@ Proof.
                  decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
                  auto.
                  simpl.
-                 case H => //.
                  by case H0.
 
              +++ intro [Abs _].
@@ -786,7 +777,7 @@ Qed.
 
 
 
-goal  [idealized3/left,idealized2/left] trans_eq2D (i,j,k:index):
+goal  [idealized3/left,idealized2] trans_eq2D (i,j,k:index):
 xor(try find il,jl,kl such that
       (fst(snd(att(frame@pred(DFI(i,j,k))))) =
        encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))))
@@ -856,7 +847,6 @@ Proof.
                  decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
                  auto.
                  simpl.
-                 case H => //.
                  by case H0.
 
              +++ intro [Abs _].
@@ -878,7 +868,7 @@ Proof.
 Qed.
 
 
-equiv [idealized3/left,idealized2/left] transitivity.
+equiv [idealized3/left,idealized2] transitivity.
 Proof.
   diffeq => //.
   + intro *.
@@ -933,8 +923,6 @@ axiom [idealized3] xorconcel : forall (m1,m2,m3:message) m1=m2 => xor(m1,xor(m2,
 
 axiom [idealized3] rcheck : forall (m1,m2,sk:message), m1=m2 => checksign(sign(m1,sk),spk(sk)) = m2.
 
-axiom [idealized3] snd_pair (x,y : message) : snd (<x, y >) = y.
-
 goal [idealized3/left] auth :  forall (i,j,l:index) ,
    happens(FI(i,j,l)) =>
         exec@FI(i,j,l) =>
@@ -970,8 +958,6 @@ Proof.
            simpl.
            use sufcma with  (xor(ktilde10(i,j,l)@FI(i,j,l),snd(snd(input@FI(i,j,l))))),  sid10(i,j,l)@FI(i,j,l)  ,  skR(j); try auto .
            expand output.
-           rewrite snd_pair.
-           rewrite snd_pair.
 
            use xorconcel with ktilde8(j,k,i)@SR(j,k,i), ktilde8(j,k,i)@SR(j,k,i), sign(sid8(j,k,i)@SR(j,k,i),skR(j)) => //.
            rewrite -Meq in Meq0.
@@ -991,7 +977,6 @@ Proof.
                  decap( encap(n_CCA(i,j,k),rk(i,j,k),epk(vkI(i))), vkI(il)).
                  auto.
                  simpl.
-                 case H1 => //.
                  by case H2.
 
                  intro [Abs _].
@@ -1055,14 +1040,16 @@ Proof.
   expand kj10.
   expand FK1.
   use auth3 with i,j,k => //.
-  destruct H0.
-  equivalent try find il,jl,kl such that
+  destruct H0 as [k0 H0'].
+  have ->: (try find il,jl,kl such that
                fst(snd(input@FI(i,j,k))) =
                encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
              in F1(sid10(i,j,k)@FI(i,j,k),n_PRF(il,jl,kl))
-             else _,
+             else F1(sid10(i,j,k)@FI(i,j,k),
+                  exct(skex,decap(fst(snd(input@FI(i,j,k))),vkI(i)))))
+             =
               F1(sid10(i,j,k)@FI(i,j,k),n_PRF(i,j,k0)).
-    + repeat destruct H0.
+    + localize H0' as H0. clear H0'. repeat destruct H0.
       expand output.
       rewrite ?snd_p in Meq0, Meq, Meq1.
       rewrite ?fst_p in  Meq0, Meq, Meq1.
@@ -1079,8 +1066,8 @@ decap(encap(n_CCA(i,j,k0),rk(i,j,k0),epk(vkI(i))), vkI(i1)) .
            use I with i,j,k0.
            auto.
     + rewrite multprf.
-      prf 1, F1(_,n_PRF2(i,j,k0)); yesif 1 => //.
-      xor 1; yesif 1.
+      prf 1, F1(_,n_PRF2(i,j,k0)); rewrite if_true in 1 => //.
+      xor 1; rewrite if_true in 1.
       rewrite len_F.
       namelength skex,n_PRF1.
       auto.
@@ -1099,8 +1086,8 @@ Proof.
   expand kj8.
 
   rewrite multprf.
-  prf 1, F1(_,n_PRF2(i,j,k)); yesif 1 => //.
-  xor 1; yesif 1.
+  prf 1, F1(_,n_PRF2(i,j,k)); rewrite if_true in 1 => //.
+  xor 1; rewrite if_true in 1.
   rewrite len_F.
   namelength skex,n_PRF1.
   auto.

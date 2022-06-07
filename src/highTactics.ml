@@ -35,33 +35,6 @@ let () =
     ~pq_sound:true
     (LT.gentac_of_any_tac_arg TraceTactics.case_tac EquivTactics.case_tac)
 
-(*------------------------------------------------------------------*)
-let yes_no_if_tac b (args : TacticsArgs.parser_args) s =
-  match s with
-  | Goal.Trace s -> LT.wrap_fail (TraceTactics.yes_no_if_args b args) s
-  | Goal.Equiv s -> LT.wrap_fail (EquivTactics.yes_no_if_args b args) s
-
-(* TODO: remove tactics (subsumed by `rewrite`) *)
-let () =
-  T.register_general "noif"
-    ~tactic_help:{
-      general_help = "Simplify conditional by showing that its condition is False.";
-      detailed_help = "";
-      tactic_group = Structural;
-      usages_sorts = [Sort None] }
-    ~pq_sound:true
-   (yes_no_if_tac false)
-
-let () =
-  T.register_general "yesif"
-    ~tactic_help:{
-      general_help = "Simplify conditional by showing that its condition is True.";
-      detailed_help = "";
-      tactic_group = Structural;
-      usages_sorts = [Sort None] }
-    ~pq_sound:true
-   (yes_no_if_tac true)
-
 
 (*------------------------------------------------------------------*)
 let () =

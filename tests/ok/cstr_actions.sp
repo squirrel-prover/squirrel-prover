@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 channel c
 system !_i A: in(c,x); out(c,x).

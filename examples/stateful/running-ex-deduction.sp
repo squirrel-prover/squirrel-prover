@@ -22,9 +22,6 @@ COMMENTS
   on a minimal example.
 
 *******************************************************************************)
-
-set autoIntro = false.
-
 hash H
 hash G
 name k : message
@@ -33,7 +30,7 @@ name k' : message
 name s0  : index -> message
 name s0b : index -> message     (* renamed identities *)
 
-mutable sT(i:index) : message = diff(s0(i),s0b(i))
+mutable sT(i:index) : message = empty
 
 abstract ok : message
 channel cT
@@ -42,7 +39,7 @@ process tag(i:index) =
   sT(i):=H(sT(i),k);
   out(cT,G(sT(i),k'))
 
-system !_i !_j T: tag(i).
+system !_i sT(i):=diff(s0(i),s0b(i)); !_j T: tag(i).
 
 include Basic.
 
@@ -80,17 +77,21 @@ Proof.
   intro Hap.
   induction t.
 
-  fresh 1.
-  expand frame; apply fresh_names.
+  (* Init *)
+  + fresh 1.
+    expand frame; apply fresh_names.
 
-  expandall. fa 0. fa 1. fa 1.
-  prf 1; rewrite if_true.
-    split; 1: auto.
-    intro i0 j0 H Heq. use
-    h_unique with i0, i, j0, j; 2: auto.
-    by destruct H0.
-  fresh 1.
-  by apply IH.
+  (* A: initialize sT *)
+  + expandall. fa !<_,_>. apply IH.
+
+  + expandall. fa !<_,_>, (if _ then _).
+    prf 1; rewrite if_true.
+      split; 1: auto.
+      intro i0 j0 H Heq. use
+      h_unique with i0, i, j0, j; 2: auto.
+      by destruct H0.
+    fresh 1.
+    by apply IH.
 Qed.
 
 (* With apply ~inductive we easily obtain all the past values of sT
@@ -119,15 +120,25 @@ Proof.
   intro Hap.
   induction t.
 
+  ++
   (* The base case requires rewriting inside the sequence. *)
-  assert (-> :
+  have -> :
      (seq(i:index,t':timestamp -> if t'<=init then sT(i)@t')) =
-     (seq(i:index,t':timestamp -> if t'<=init then diff(s0(i),s0b(i)))));
+     (seq(i:index,t':timestamp -> if t'<=init then empty));
   1: by fa; fa.
   expand frame; apply fresh_names_k.
 
+  ++
+  (* Case A *)
+  (* TODO Complete this case or make it possible to initialize sT differently
+     for each single system.
+     This has changed since the acceptance of the CSF'22 paper. *)
+  admit.
+
+  ++
+  (* Case T *)
   expandall.
-  fa 0. fa 1. fa 1.
+  fa !<_,_>, if _ then _.
   (* Get rid of item 1 using PRF, as before. *)
   prf 1; rewrite if_true.
     split; 1: auto.
@@ -148,18 +159,18 @@ Proof.
   rewrite !if_then_then.
   (* More rewriting inside sequences. *)
 
-  assert (-> :
+  have -> :
     (seq(i0:index,t':timestamp-> 
       if i0=i && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@t')) =
     (seq(i0:index,t':timestamp-> 
-      if i0=i && (t'=T(i,j) && t'<=T(i,j)) then H(sT(i0)@pred(t'),k))));
+      if i0=i && (t'=T(i,j) && t'<=T(i,j)) then H(sT(i0)@pred(t'),k)));
   1: by fa; fa.
 
-  assert (-> :
+  have -> :
     (seq(i0:index,t':timestamp-> 
       if not(i0=i) && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@t')) =
     (seq(i0:index,t':timestamp->
-      if not(i0=i) && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@pred(t')))).
+      if not(i0=i) && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@pred(t'))).
     + fa; fa => // [H1 [H2 H3]]. 
       by rewrite H2 /sT if_false. 
   (* At this point our automatic bi-deduction checker cannot verify that

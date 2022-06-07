@@ -46,6 +46,7 @@ type bty_decl = {
 (** Information for a system declaration *)
 type system_decl = {
   sname    : Theory.lsymb option;
+  sprojs   : lsymb list option;
   sprocess : Process.process;
 }
 
@@ -56,16 +57,17 @@ val pp_system_decl : Format.formatter -> system_decl -> unit
 
 (** Global cryptographic rules *)
 type global_rule =
-  | Rename of Theory.global_formula
-  | PRF    of Theory.bnds * Theory.term
-  | PRFt   of Theory.bnds * Theory.term (* gPRF, with time *)
-  | CCA    of Theory.bnds * Theory.term
+  | Rename  of Theory.global_formula
+  | PRF     of Theory.bnds * Theory.term
+  | PRFt    of Theory.bnds * Theory.term (* gPRF, with time *)
+  | CCA     of Theory.bnds * Theory.term
+  | Rewrite of TacticsArgs.rw_arg list
 
 (** System modifier, comprising:
     the original system, the global rule to apply, and the name of 
     the new system. *)
 type system_modifier = { 
-  from_sys : SystemExpr.p_system_expr;
+  from_sys : SystemExpr.parsed_t;
   modifier : global_rule;
   name     : Theory.lsymb
 }
@@ -81,12 +83,21 @@ type operator_decl = {
 }
 
 (*------------------------------------------------------------------*)
+(** Processus declaration *)
+type proc_decl = {
+  id    : lsymb;
+  projs : lsymb list option;
+  args  : Theory.bnds;
+  proc  : Process.process;
+}
+
+(*------------------------------------------------------------------*)
 (** Additional oracle tagging information
     Allows to define the tag formula corresponding to some function.
     Defining a function with such a tag, is equivalent to giving to the
     attacker a backdoor, allowing to compute the ouput of the function on
     all messages that satisfy the tag. *)
-type orcl_tag_info = Theory.formula
+type orcl_tag_info = Theory.term
 
 val pp_orcl_tag_info : Format.formatter -> orcl_tag_info -> unit
 
@@ -95,12 +106,14 @@ val pp_orcl_tag_info : Format.formatter -> orcl_tag_info -> unit
 
 type declaration_i =
   | Decl_channel of lsymb
-  | Decl_process of lsymb * Theory.bnds * Process.process
+  | Decl_process of proc_decl
   | Decl_axiom   of Goal.Parsed.t
   | Decl_system  of system_decl
   | Decl_system_modifier  of system_modifier
 
-  | Decl_dh of Symbols.dh_hyp list * lsymb * (lsymb * Symbols.symb_type) * (lsymb * Symbols.symb_type) option * c_tys
+  | Decl_dh of Symbols.dh_hyp list * lsymb * 
+               (lsymb * Symbols.symb_type) * 
+               (lsymb * Symbols.symb_type) option * c_tys
 
   | Decl_hash of int option * lsymb * orcl_tag_info option * c_tys
 

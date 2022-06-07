@@ -25,6 +25,7 @@
   "Proof"
   "Qed"
   "equiv"
+  "any"
 ))
 
 (defvar squirrel-dangerous-keywords '(
@@ -81,6 +82,7 @@
   "namelength"
   "with"
   "assert"
+  "have"
   "case"
   "collision"
   "depends"

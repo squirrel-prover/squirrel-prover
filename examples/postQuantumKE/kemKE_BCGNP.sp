@@ -64,8 +64,9 @@ party could potentially compute the key.
 
 
 *******************************************************************************)
-set autoIntro = false.
 set postQuantumSound = true.
+
+include Basic.
 
 hash exct
 
@@ -179,7 +180,7 @@ system [main] out(cI,skex); ((!_j !_k R: Responder(j,k)) | (!_i !_j !_k I: Initi
 
 system mainCCAkR = [main/left] with gcca (il,jl,kl:index),  encap(kR(il,jl,kl), rR(il,jl,kl), pk(skI(il))).
 
-system mainCCAkI = [mainCCAkR/left] with gcca (il,jl,kl:index),  encap(kI(il,jl,kl), rI(il,jl,kl) ,pk(skR(jl))).
+system mainCCAkI = [mainCCAkR] with gcca (il,jl,kl:index),  encap(kI(il,jl,kl), rI(il,jl,kl) ,pk(skR(jl))).
 
 
 (* After two transitivity, kR and kI only occurs in key position. We make it explicit in the idealized version of the protocol *)
@@ -268,10 +269,10 @@ process InitiatorToCompromised2(i,j,k:index) =
 
 system [idealized] out(cI,skex); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised2(i,j,k))).
 
-axiom [mainCCAkI/left,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,pk(z)),z)=x.
+axiom [mainCCAkI,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,pk(z)),z)=x.
 
 (* We prove that the original game, after transitivity to mainCCAkI, is equivalent to idealized. *)
-equiv [mainCCAkI/left,idealized/left] test.
+equiv [mainCCAkI,idealized/left] test.
 Proof.
 
   diffeq => //.
@@ -285,7 +286,6 @@ Proof.
                  auto.
                  simpl.
                  case H1 => //.
-                 case H2 => //.
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
         ++ intro [H1 _].
@@ -303,7 +303,6 @@ Proof.
                  auto.
                  simpl.
                  case H1 => //.
-                 case H2 => //.
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
         ++ intro [H1 _].
@@ -320,7 +319,6 @@ Proof.
                  assert decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))  , skR(jl)) = decap(   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(skR(jl0))) , skR(jl)).
                  auto.
                  simpl.
-                 case H1 => //.
                  case H2 => //.
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
@@ -338,7 +336,6 @@ Proof.
                  assert decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))  , skR(jl)) = decap                 (   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(skR(jl0))) , skR(jl)).
                  auto.
                  simpl.
-                 case H1 => //.
                  case H2 => //.
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
@@ -369,9 +366,9 @@ Proof.
   intro i j k Hap .
   use reflex with R2(i,j,k) => //.
   expandall.
-  prf 1, exct(skex,kR(k,i,j)); yesif 1.
+  prf 1, exct(skex,kR(k,i,j)); rewrite if_true in 1.
   auto.
-  prf 1; yesif 1.
+  prf 1; rewrite if_true in 1.
   auto.
   xor 1,   xor(expd(<pk(skI(k)),
                <input@R1(i,j,k),
@@ -383,7 +380,7 @@ Proof.
   rewrite len_expd.
   namelength n_PRF1, skex.
   intro Len.
-  yesif 1.
+  rewrite if_true in 1.
   auto.
   fresh 1.
   auto.
@@ -402,17 +399,17 @@ Proof.
   intro i j k Hap .
   use reflex with I1(i,j,k) => //.
   expandall.
-  prf 1, exct(skex,kI(i,j,k)); yesif 1.
+  prf 1, exct(skex,kI(i,j,k)); rewrite if_true in 1.
   auto.
   prf 1, expd(<pk(skI(i)),
                <encap(n_CCA1(i,j,k),rI(i,j,k),pk(skR(j))),
-                <pk(skR(j)),att(frame@pred(I1(i,j,k)))>>>,n_PRF) ; yesif 1.
+                <pk(skR(j)),att(frame@pred(I1(i,j,k)))>>>,n_PRF) ; rewrite if_true in 1.
   auto.
   xor 1, n_PRF1.
   rewrite len_expd.
   namelength n_PRF1, skex.
   intro Len.
-  yesif 1.
+  rewrite if_true in 1.
   auto.
   fresh 1.
   auto.

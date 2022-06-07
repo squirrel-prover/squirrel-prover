@@ -31,6 +31,10 @@ Verification of Privacy for RFID Systems. pages 75–88, July 2010.
     also sound for quantum attackers. *)
 set postQuantumSound=true.
 
+(** Include basic standard library, important helper lemmas and
+    setting proof mode to autoIntro=false. *)
+include Basic.
+
 (** We start by declaring the function symbol `h` for the hash function,
     as well as two public constants `ok` and `ko` (used by the reader). *)
 
@@ -89,11 +93,7 @@ process reader(j:index) =
     * two actions for the reader, corresponding to the two branches of the
       conditional (respectively `R` and `R1`). *)
 
-system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
-
-(** Include basic standard library, important helper lemmas and
-    setting proof mode to autoIntro=false. *)
-include Basic.
+system [BasicHash] ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
 (** Whenever a reader accepts a message (_i.e._ the condition of the action
     `R(j)` evaluates to `true`), there exists an action `T(i,k)` that has been
@@ -107,7 +107,7 @@ include Basic.
     Note that we express our correspondence property on each projection of the
     pair. Indeed, for some implementations of the pairing primitive, the
     equality of projections does not imply the equality of pairs. *)
-goal wa_R :
+goal [BasicHash] wa_R :
   forall (tau:timestamp),
     happens(tau) =>
     ((exists (i,k:index),
@@ -156,7 +156,7 @@ Qed.
     projection of `frame@t` (_i.e._ the real system) is indistinguishable from
     the right projection of `frame@t` (_i.e._ the ideal system). *)
 
-equiv unlinkability.
+equiv [BasicHash] unlinkability.
 (** The high-level idea of the proof is as follows:
 
     * if `t` corresponds to a reader's action, we show that the outcome of the

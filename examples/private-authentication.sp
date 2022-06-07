@@ -31,7 +31,6 @@ for the proof is also sound for quantum attackers.
 **)
 set postQuantumSound=true.
 
-set autoIntro=false.
 
 (**
 We first declare the communication channels, the function symbols for the public

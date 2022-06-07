@@ -16,8 +16,6 @@ SECURITY PROPERTIES
 - equivalence between real and ideal systems
 *******************************************************************************)
 
-set autoIntro = false.
-
 hash hkey
 
 abstract ok : message
@@ -60,7 +58,7 @@ Proof.
     by auto.
 
   + (* t = T(i0,j) *)
-    intro Texists; simpl_left.
+    intro [i0 j Ceq]. 
     assert (i=i0 || i<>i0) as H0 => //.
     case H0.
       - (* i=i0 *)

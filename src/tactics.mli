@@ -56,6 +56,8 @@ type tac_error_i =
   | BadSSCDetailed of ssc_error list
   | NoSSC
   | NoAssumpSystem
+  | Rewrite_equiv_system_mismatch
+  | Underspecified_system
   | NotDepends of string * string
   | NotDDHContext
   | SEncNoRandom
@@ -70,8 +72,6 @@ type tac_error_i =
   | GoalBadShape of string
   | GoalNotPQSound
   | TacticNotPQSound
-  | SystemError     of System.system_error
-  | SystemExprError of SystemExpr.system_expr_err
   | CongrFail
   | GoalNotClosed
   | NothingToIntroduce
@@ -205,4 +205,4 @@ val timeout_get : 'a Utils.timeout_r -> 'a
 val hard_failure : ?loc:Location.t -> tac_error_i -> 'a
 
 (** Print the system to the user. *)
-val print_system : Symbols.table -> SystemExpr.t -> unit
+val print_system : Symbols.table -> _ SystemExpr.expr -> unit
