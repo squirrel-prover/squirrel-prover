@@ -1303,6 +1303,31 @@ let tac_auto ~close ~strong args s sk (fk : Tactics.fk) =
 
 let tac_autosimpl s = tac_auto ~close:false ~strong:(Config.auto_intro ()) s
 
+
+(* tries to close the goal with simpl *)
+(* returns true if the goal was closed, false otherwise *)
+let tryauto_closes (g:sequent) : bool =
+  (* exception to get out of the continuations *)
+  let exception Res of bool in
+  try
+    let _:Tactics.a =
+      simpl ~strong:true ~close:true g
+        (* if simpl succeeds: it closes the goal, so l = [] *)
+        (fun l _ -> assert (l = []); raise (Res true)) 
+        (* otherwise: leave the goal unchanged *)
+        (fun _ -> raise (Res false))
+    in
+    assert false (* impossible: simpl never returns, it runs its continuations *)
+  with
+  | Res b -> b
+   
+
+(* returns gs without the goals that can be closed automatically *)
+let tryauto (gs:sequent list) : sequent list =
+  List.filter (fun g -> not (tryauto_closes g)) gs
+
+
+
 (*------------------------------------------------------------------*)
 (** Projecting a goal on a bi-system
   * to distinct goals for each projected system. *)

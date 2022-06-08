@@ -218,7 +218,7 @@ let rw_inst
             List.map (fun rsub ->
                 let rsub = Term.project_opt projs rsub in
                 se, 
-                Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
+                Term.mk_forall ~simpl:true vars (Term.mk_impls ~simpl:true conds (Term.subst subst rsub))
               ) s.init_subs
           in
 

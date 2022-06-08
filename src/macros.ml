@@ -41,8 +41,8 @@ let is_global table (ms : Symbols.macro) : bool =
     if action descriptions, but directly in the symbols table. *)
 type global_data = {
   action : [`Strict | `Large] * Action.shape;
-  (** The global macro is defined at any action which is a strict or large
-      suffix of some action shape.  *)
+  (** The global macro is defined at any action which has
+      the action shape as a strict or large prefix *)
 
   inputs : Vars.var list;
   (** Inputs of the macro, as variables, in order. *)

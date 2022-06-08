@@ -1162,7 +1162,7 @@ let do_s_item
     TS.Reduce.reduce_term ~expand_context param s t 
 
   | Args.Tryauto l | Args.Tryautosimpl l ->
-    soft_failure ~loc:l (Failure "cannot use // or /= in global rewriting")
+    soft_failure ~loc:l (Failure "cannot use // or //= in a global rewriting")
 
 let do_rw_arg
     (expand_context : Macros.expand_context)
@@ -1213,18 +1213,27 @@ let global_rewrite
         Term.mk_var ts,
         Macros.InGlobal { inputs }
     in
+    (* hypothesis: the timestamp the macro is at happens *)
     let hyp_hap = Term.mk_happens ts in
     
+    (* new empty sequent *)
     let env = Env.init ~table ~vars ~system:context () in
     let s = TS.init ~env ~hint_db Term.mk_false in
-    let s = TS.LocalHyps.add AnyName hyp_hap s in
-
-    let t, subgs' = do_rw_args expand_context rw s t in
-    let subgs' = List.map (fun s -> 
-        TS.set_goal (Term.mk_impl hyp_hap (TS.goal s)) s
-      ) subgs'
+ 
+    (* add hyp_hap as hypothesis, so it's available when do_rewrite tries to rewrite *)
+    let (hyp_hap_id, s_hap) = TS.LocalHyps.add_i AnyName hyp_hap s in 
+    
+    (* rewrite, generate subgoals *)
+    let t, subgs' = do_rw_args expand_context rw s_hap t in
+    let subgs' = TraceTactics.tryauto subgs' in (* auto close easy goals *)
+    let subgs' = (* move hyp_hap back to the goal, we don't want hyps *)
+      List.map   (* w/ auto generated names *)
+        (fun g ->
+          let gg = TS.LocalHyps.remove hyp_hap_id g in
+          TS.set_goal (Term.mk_impl hyp_hap (TS.goal gg)) gg)
+        subgs'
     in
-    subgs := subgs' @ !subgs;   (* new subgoals *)
+    subgs := subgs' @ !subgs;   (* add new subgoals *)
     t
   in
 
