@@ -629,6 +629,8 @@ let destr_var : term -> Vars.var option = function
   | Var v -> Some v
   | _ -> None
 
+let is_var (t:term) : bool = destr_var t <> None
+
 (*------------------------------------------------------------------*)
 let destr_action = function
   | Action (s,is) -> Some (s,is)

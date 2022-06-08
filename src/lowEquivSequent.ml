@@ -224,6 +224,15 @@ let subst subst s =
   { s with goal = Equiv.subst subst s.goal;
            hyps = subst_hyps subst s.hyps; }
 
+
+let rename (u:Vars.var) (v:Vars.var) (s:t) : t =
+  assert (not (Vars.mem s.env.vars v));
+  let s = subst [Term.ESubst (Term.mk_var u, Term.mk_var v)] s in
+  {s with
+    env = Env.update
+             ~vars:(Vars.add_var v (Vars.rm_var u s.env.vars))
+             s.env;}
+
 (*------------------------------------------------------------------*)
 let goal_is_equiv s = match goal s with
   | Atom (Equiv.Equiv e) -> true

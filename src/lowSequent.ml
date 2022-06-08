@@ -116,7 +116,11 @@ module type S = sig
   (** [subst subst s] returns the sequent [s] where the substitution has
       been applied to all hypotheses and the goal.
       It removes trivial equalities (e.g x=x). *)
-  val subst      : Term.subst -> t -> t
+  val subst : Term.subst -> t -> t
+
+  (** [rename u v s] returns the sequent [s] where
+      free variable u is replaced with v *)
+  val rename : Vars.var -> Vars.var -> t -> t
 
   (** {2 Free variables} *)
 

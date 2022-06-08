@@ -449,6 +449,7 @@ val is_name : term -> bool
 
 val destr_var : term -> Vars.var option
 
+val is_var : term -> bool
 (*------------------------------------------------------------------*)
 val destr_action : term -> (Symbols.action * Vars.var list) option
 

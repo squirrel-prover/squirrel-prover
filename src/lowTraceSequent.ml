@@ -355,6 +355,16 @@ let subst subst s =
 
     s
 
+let rename (u:Vars.var) (v:Vars.var) (s:t) : t =
+  assert (not (Vars.mem s.env.vars v));
+  let s = subst [Term.ESubst (Term.mk_var u, Term.mk_var v)] s in
+  S.update
+    ~env:(Env.update
+            ~vars:(Vars.add_var v (Vars.rm_var u s.env.vars))
+            s.env)
+    s
+
+
 (*------------------------------------------------------------------*)
 (** TRS *)
 

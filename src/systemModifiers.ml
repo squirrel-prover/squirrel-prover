@@ -1204,14 +1204,14 @@ let global_rewrite
     =
     let vars, ts, expand_context = match arg with
       | Macros.ADescr d -> 
-        Vars.of_list d.indices, 
-        Term.mk_action d.name d.indices,
-        Macros.InSequent
-
-      | Macros.AGlobal { is; ts; inputs} -> 
-        Vars.of_list (ts :: is @ inputs), 
-        Term.mk_var ts,
-        Macros.InGlobal { inputs }
+         Vars.of_list d.indices, 
+         Term.mk_action d.name d.indices,
+         Macros.InSequent
+        
+      | Macros.AGlobal { is; ts; inputs} ->
+         Vars.of_list (ts :: is @ inputs), 
+         Term.mk_var ts,
+         Macros.InGlobal { inputs }
     in
     (* hypothesis: the timestamp the macro is at happens *)
     let hyp_hap = Term.mk_happens ts in
@@ -1229,8 +1229,15 @@ let global_rewrite
     let subgs' = (* move hyp_hap back to the goal, we don't want hyps *)
       List.map   (* w/ auto generated names *)
         (fun g ->
-          let gg = TS.LocalHyps.remove hyp_hap_id g in
-          TS.set_goal (Term.mk_impl hyp_hap (TS.goal gg)) gg)
+          let gg = LowTactics.TraceLT.revert hyp_hap_id g in
+          let gg = 
+            match arg with
+            | Macros.AGlobal {is; ts; inputs } ->
+               let _, new_ts = Vars.make `Approx (TS.vars g) Type.Timestamp "t" in 
+               TS.rename ts new_ts gg
+            | _ -> gg
+          in
+          gg)
         subgs'
     in
     subgs := subgs' @ !subgs;   (* add new subgoals *)

@@ -285,7 +285,7 @@ let rewrite
       incr cpt_occ;
   in
 
-  (* Built the rewrite state corresponding the rewrite rule [rule] and the 
+  (* Build the rewrite state corresponding to the rewrite rule [rule] and the 
      systems applying to [target].
      This may require renaming projections in [rule], and removing some
      projections from [rule]. *)
