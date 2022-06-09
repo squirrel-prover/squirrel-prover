@@ -267,7 +267,8 @@ type rw_res_opt =
   | RW_Failed of error
 
 (*------------------------------------------------------------------*)
-let rewrite
+(** Internal *)
+let do_rewrite
     (table  : Symbols.table)
     (system : SE.context)
     (expand_context : Macros.expand_context)
@@ -275,7 +276,7 @@ let rewrite
     (hyps   : Hyps.TraceHyps.hyps)
     (mult   : Args.rw_count)
     (rule   : rw_rule)
-    (target : Equiv.any_form) : rw_res_opt
+    (target : Equiv.any_form) : rw_res
   =
   let check_max_rewriting : unit -> unit =
     let cpt_occ = ref 0 in
@@ -334,12 +335,31 @@ let rewrite
     | `Once, `Found inst -> f, inst.subgs
   in
 
-  match _rewrite mult target with
-  | f, subs            -> 
-    let subs = List.rev_map (fun (se, t) -> { system with set = se; }, t) subs in
-    RW_Result (f, subs)
-  | exception Failed e -> RW_Failed e
+  let f, subs = _rewrite mult target in
+  let subs = List.rev_map (fun (se, t) -> { system with set = se; }, t) subs in
+  f, subs
 
+(*------------------------------------------------------------------*)
+(** Exported *)
+let rewrite
+    (table  : Symbols.table)
+    (system : SE.context)
+    (expand_context : Macros.expand_context)
+    (env    : Vars.env)
+    (hyps   : Hyps.TraceHyps.hyps)
+    (mult   : Args.rw_count)
+    (rule   : rw_rule)
+    (target : Equiv.any_form) : rw_res_opt
+  =
+  try
+    let r =
+      do_rewrite table system expand_context env hyps mult rule target
+    in
+    RW_Result r
+  with
+  | Failed e -> RW_Failed e
+
+(** Exported *)
 let rewrite_exn   
     ~(loc   : L.t)
     (table  : Symbols.table)
@@ -351,9 +371,10 @@ let rewrite_exn
     (rule   : rw_rule)
     (target : Equiv.any_form) : rw_res
   =
-  match rewrite table system expand_context env hyps mult rule target with
-  | RW_Result r -> r
-  | RW_Failed e -> recast_error ~loc e
+  try
+    do_rewrite table system expand_context env hyps mult rule target
+  with
+  | Failed e -> recast_error ~loc e
 
 (*------------------------------------------------------------------*)
 (** {2 Higher-level rewrite} *)
