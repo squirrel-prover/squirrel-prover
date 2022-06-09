@@ -1425,10 +1425,9 @@ let dump_nodes ppf cntxt g =
   in
   let pp_vertex ppf v =
     (*DEBUG*) (*Printer.pr "%a\n" pp_ut v;*)
-    Format.fprintf ppf "\"id\": 'n%d',@;\"children\": [%a],@;\"name\": \'%a\'"
+    Format.fprintf ppf "\"id\": 'n%d',@;\"children\": [%a]"
       v.hash
-      pp_child (get_children g v)
-      (Printer.html Term.pp) (ut_to_term v);
+      pp_child (get_children g v);
     match find_eq_action (Utils.oget cntxt.models) (ut_to_term v) with
     | Some Term.Action (asymb, idx) ->
       let action = Action.of_term asymb idx cntxt.table in
@@ -1436,6 +1435,7 @@ let dump_nodes ppf cntxt g =
       let pp_states = Format.pp_print_list 
         ~pp_sep:(fun ppf () -> Format.fprintf ppf "@;")
         (fun ppf (state,term) -> Format.fprintf ppf "%a := %a" Term.pp_msymb state Term.pp term) in
+      Format.fprintf ppf ",@;\"name\": \'%a\'" (Printer.html Action.pp_descr_short) descr;
       if not (Term.f_triv (snd descr.condition)) then
         Format.fprintf ppf ",@;\"cond\": \'%a\'" (Printer.html Term.pp) (snd descr.condition);
       if descr.updates <> [] then
@@ -1444,7 +1444,7 @@ let dump_nodes ppf cntxt g =
       if fst descr.output <> Symbols.dummy_channel then
         Format.fprintf ppf ",@;\"output\": \'%a\'"
           (Printer.html Term.pp) (snd descr.output)
-    | _ -> ()
+    | _ -> Format.fprintf ppf ",@;\"name\": \'%a\'" (Printer.html Term.pp) (ut_to_term v);
     
   in
   let pp_vertexes = Format.pp_print_list
