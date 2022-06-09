@@ -31,6 +31,14 @@ Proof.
 Qed.
 hint rewrite false_true.
 
+goal [any] eq_true (b:boolean) : (b = true) = b.
+Proof. by case b. Qed.
+hint rewrite eq_true.
+
+goal [any] eq_true2 (b:boolean) : (true = b) = b.
+Proof. by case b. Qed.
+hint rewrite eq_true2.
+
 (*------------------------------------------------------------------*)
 (* not *)
 
@@ -58,6 +66,11 @@ Proof.
 by rewrite eq_iff. 
 Qed.
 hint rewrite not_neq.
+
+goal [any] not_eqfalse (b:boolean) : (b = false) = not(b).
+Proof.
+ by case b.
+Qed.
 
 (*------------------------------------------------------------------*)
 (* disequality *)
@@ -252,3 +265,63 @@ Proof.
  by rewrite -eq_iff. 
 Qed.
 hint rewrite false_iff_true.
+
+
+
+
+(*------------------------------------------------------------------*)
+(* exists *)
+
+goal [any] exists_false1 ['a]:
+(exists (a:'a), false) = false.
+Proof. by rewrite not_eqfalse. Qed.
+
+goal [any] exists_false2 ['a 'b]:
+(exists (a:'a, b:'b), false) = false.
+Proof. by rewrite not_eqfalse. Qed.
+
+goal [any] exists_false3 ['a 'b 'c]:
+(exists (a:'a, b:'b, c:'c), false) = false.
+Proof. by rewrite not_eqfalse. Qed.
+
+goal [any] exists_false4 ['a 'b 'c 'd]:
+(exists (a:'a, b:'b, c:'c, d:'d), false) = false.
+Proof. by rewrite not_eqfalse. Qed.
+
+goal [any] exists_false5 ['a 'b 'c 'd 'e]:
+(exists (a:'a, b:'b, c:'c, d:'d, e:'e), false) = false.
+Proof. by rewrite not_eqfalse. Qed.
+
+goal [any] exists_false6 ['a 'b 'c 'd 'e 'f]:
+(exists (a:'a, b:'b, c:'c, d:'d, e:'e, f:'f), false) = false.
+Proof. by rewrite not_eqfalse. Qed.
+
+
+
+(*------------------------------------------------------------------*)
+(* forall *)
+
+
+goal [any] forall_true1 ['a]:
+(forall (a:'a), true) = true.
+Proof. auto. Qed.
+
+goal [any] forall_true2 ['a 'b]:
+(forall (a:'a, b:'b), true) = true.
+Proof. auto. Qed.
+
+goal [any] forall_true3 ['a 'b 'c]:
+(forall (a:'a, b:'b, c:'c), true) = true.
+Proof. auto. Qed.
+
+goal [any] forall_true4 ['a 'b 'c 'd]:
+(forall (a:'a, b:'b, c:'c, d:'d), true) = true.
+Proof. auto. Qed.
+
+goal [any] forall_true5 ['a 'b 'c 'd 'e]:
+(forall (a:'a, b:'b, c:'c, d:'d, e:'e), true) = true.
+Proof. auto. Qed.
+
+goal [any] forall_true6 ['a 'b 'c 'd 'e 'f]:
+(forall (a:'a, b:'b, c:'c, d:'d, e:'e, f:'f), true) = true.
+Proof. auto. Qed.
