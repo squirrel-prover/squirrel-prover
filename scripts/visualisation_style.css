@@ -1,7 +1,3 @@
-
-rect.name {
-  fill: #cccccc;
-}
 rect.cond, rect.state, rect.output {
   fill: #eeeeee;
 }

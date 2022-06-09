@@ -16,7 +16,6 @@ function make_data(json) {
   });
   const data = [];
   json.layout.forEach(level => {
-    console.log(level);
     const dataLevel = [];
     level.forEach(nodeId => {
       const node = dic[nodeId.id];
@@ -24,6 +23,7 @@ function make_data(json) {
       node.lineWidth = {};
       node.lineHeight = {};
       node.lineDisplay = {};
+      node.color = Math.floor(Math.random() * 360);
       dataLevel.push(node);
     });
     data.push(dataLevel);
@@ -128,7 +128,6 @@ function click(data, selectionLevels, selectionNodes, selectionLinks, delay) {
     d.lineDisplay[kind] = !d.lineDisplay[kind];
     d.lineWidth[kind] = span.node().offsetWidth + margin2;
     d.lineHeight[kind] = span.node().offsetHeight + margin2;
-    console.log(span.node().offsetHeight);
     computePositions(data);
     updateAll(selectionLevels, selectionNodes, selectionLinks, delay);
   };
@@ -152,11 +151,14 @@ function plot_line(selection, kind, mutable, text, partialClick) {
   /* If the datum has a property [kind],
      then we fill the newly created <g> with the expected information. */
   validSelection = newSelection.filter(d => d.hasOwnProperty(kind));
-  validSelection.append("rect")
+  rectSelection = validSelection.append("rect")
     .classed(kind, true)
     .attr("x", 0)
     .attr("y", 0)
     .style("stroke", "black");
+  if (!mutable) {
+    rectSelection.style("fill", d => "hsl(" + d.color + ", 50%, 90%)");
+  }
   FOSelection = validSelection.append("foreignObject")
     .classed(kind, true);
   if (mutable) {
@@ -200,7 +202,7 @@ function plot(data, links, svg) {
     .data(links)
     .enter()
     .append("path")
-      .attr("stroke", "red")
+      .attr("stroke", d => "hsl(" + d.parent.color + ", 100%, 50%)")
       .attr("stroke-width", "2")
       .attr("fill", "none");
   
@@ -230,7 +232,7 @@ var svg = d3.select("body")
   .style('border', 'solid')
 /* Initialisation */
 const [data, links] = make_data(json);
-console.log(data);
-console.log(links);
+console.log("Data", data);
+console.log("Links", links);
 /* Plot */
 plot(data, links, svg);
