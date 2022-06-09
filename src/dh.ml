@@ -107,6 +107,20 @@ let rec powers (exp:fsymb) (mult:fsymb option)
   | _ -> (t, [])
 
 
+(** returns (u, v) such that t = (u = v), or None if not possible.
+    (unfolds the macros when possible) *) 
+let rec destr_eq_expand
+          (info:expand_info) (contx:Constr.trace_cntxt)
+          (t:term) : (term * term) option =
+  if Term.is_macro t then
+    begin
+       match expand_macro_check info contx t with
+       | Some t' -> destr_eq_expand info contx t'
+       | None -> None
+    end
+  else
+    if not (Term.is_eq t) then None
+    else Term.destr_eq t
 
 (*------------------------------------------------------------------*)
 (* information used to remember where an occurrence was found.
@@ -348,21 +362,25 @@ let has_gdh (g : lsymb) (tbl : Symbols.table) : bool =
 
 (** Finds the parameters of the group (generator, exponentiation, 
    multiplication of exponents), as well as t (term), a, and b (names)
-   such that the equality m1 = m2 is t = g^{a**b}.
+   such that the hyp is t = g^{a**b}.
    Also checks the group has the CDH (if gdh_oracles = false) or GDH 
-   (if true) hyp *)
+   (if true) assumption *)
 let dh_param
-    ~(hyp_loc    : L.t)
+    ~(hyp_loc : L.t)
     (gdh_oracles : bool)
-    (m1  : term)
-    (m2  : term)
-    (g   : lsymb)
+    (s : sequent)
+    (contx : Constr.trace_cntxt)
+    (hyp : term)
+    (g : lsymb)
     (tbl : Symbols.table)
   : fsymb * fsymb * fsymb option * term * nsymb * nsymb
   =
-  (* generator *)
+  (* get generator *)
   let gen_n = Symbols.Function.of_lsymb g tbl in
+  let gen_s = (gen_n, []) in
+  let gen = Term.mk_fun tbl gen_n [] [] in
 
+  (* check DH assumption *)
   if not gdh_oracles && not (has_cdh g tbl) then
     soft_failure
       ~loc:(L.loc g)
@@ -373,31 +391,31 @@ let dh_param
       ~loc:(L.loc g)
       (Tactics.Failure "DH group generator: no GDH assumption");
 
-  let gen_s = (gen_n, []) in
-  let gen = Term.mk_fun tbl gen_n [] [] in
 
-  (* exponentiation *)
-  let (exp_n, omult_n) = match Symbols.Function.get_data gen_n tbl with
+  (* get exponentiation and (if defined) multiplication *)
+  let (exp_n, mult_n) = match Symbols.Function.get_data gen_n tbl with
     | Symbols.AssociatedFunctions [e] -> (e, None)
     | Symbols.AssociatedFunctions [e ; m] -> (e, Some m)
     | _ -> assert false (* not possible since gen is a dh generator *)
   in
   let exp_s = (exp_n, []) in
-  let omult_s = Option.map (fun x -> (x, [])) omult_n in
+  let mult_s = Option.map (fun x -> (x, [])) mult_n in
 
-  (* t, a and b *)
-  let (t, a, b) = match (m1,m2) with
-    | (_, Fun (f1, _, [Fun (f2, _, [t1; Name n1]); Name n2]))
-      when f1 = exp_s && f2 = exp_s && t1 = gen ->
+
+  (* write hyp as t = g^(a*b) *)
+  let info = EI_direct s in
+  let m1, m2 = match destr_eq_expand info contx hyp with
+    | Some (u, v) -> (u,v)
+    | None -> soft_failure ~loc:hyp_loc
+                (Tactics.Failure "can only be applied on equality hypothesis")
+  in
+  let (u, pows) = powers exp_s mult_s info contx m1 in
+  let (v, qows) = powers exp_s mult_s info contx m2 in
+
+  let (t, a, b) = match (u,pows,v,qows) with
+    | (_, _, _, [Name n1; Name n2]) when v = gen ->
       (m1, n1, n2)
-    | (Fun (f1, _, [Fun (f2, _, [t1; Name n1]); Name n2]), _)
-      when f1 = exp_s && f2 = exp_s && t1 = gen ->
-      (m2, n1, n2)
-    | (_, Fun (f1, _, [t1; Fun (f2, _, [Name n1; Name n2])])) 
-      when f1 = exp_s && Some f2 = omult_s && t1 = gen ->
-      (m1, n1, n2)
-    | (Fun (f1, _, [t1; Fun (f2, _, [Name n1; Name n2])]), _) 
-      when f1 = exp_s && Some f2 = omult_s && t1 = gen ->
+    | (_, [Name n1; Name n2], _, _) when u = gen ->
       (m2, n1, n2)
     | _ ->
       soft_failure
@@ -405,7 +423,7 @@ let dh_param
         (Tactics.Failure "hypothesis must be of the form \
                           t=g^ab or g^ab=t")
   in
-  (gen_s, exp_s, omult_s, t, a, b)
+  (gen_s, exp_s, mult_s, t, a, b)
 
 
 (** Applies the CDH or GDH hypothesis (depending on 
@@ -423,14 +441,9 @@ let cgdh
   let env   = TS.vars s in
   let cntxt = TS.mk_trace_cntxt s in
 
-  if not (Term.is_eq hyp) then
-    soft_failure ~loc:(L.loc m)
-      (Tactics.Failure "can only be applied on equality hypothesis");
-
-  let m1, m2 = oget (Term.destr_eq hyp) in
 
   let (gen_s, exp_s, mult_s, t, na, nb) =
-    dh_param ~hyp_loc:(L.loc m) gdh_oracles m1 m2 g table
+    dh_param ~hyp_loc:(L.loc m) gdh_oracles s cntxt hyp g table
   in
   let gen = Term.mk_fun table (fst gen_s) [] [] in
 
