@@ -176,7 +176,7 @@ Proof.
       The other cases correspond to the 3 different actions of the protocol. *)
   induction t; 1: auto.
 
-  (** Case where t = R(j).
+  (** **Case where t = R(j):**
       We start by expanding the macros and splitting the pairs. *)
   + expand frame, exec, output. fa !<_,_>.
     (** Using the authentication goal `wa_R` previously proved, we replace the
@@ -184,20 +184,20 @@ Proof.
         a tag `T(i,k)` has played before and that the output of this tag is
         the message inputted by the reader. *)
     rewrite /cond (wa_R (R(j)) H).
-    (** We are now able to remove this formula from the frame because
-        the attacker is able to compute it using information obtained
-        in the past. Indeed, each element of this formula is already available
-        in `frame@pred(R(j))`. This is done by the `fadup` tactic. *)
+  (** We are now able to remove this formula from the frame because
+  the attacker is able to compute it using information obtained
+  in the past. Indeed, each element of this formula is already available
+  in `frame@pred(R(j))`. This is done by the `fadup` tactic. *)
     by fadup 1.
-
-  (** Case where t = R1(j).
+    
+  (** **Case where t = R1(j):**  
       This case is similar to the previous one. *)
   + expand frame, exec, output. fa !<_,_>.
     rewrite /cond (wa_R (R1(j)) H).
     by fadup 1.
 
-  (** Case where t = T(i,k).
-      We start by expanding the macros and splitting the pairs. *)
+  (** **Case where t = T(i,k):**  
+  We start by expanding the macros and splitting the pairs. *)
   + expand frame, exec, cond, output.
     fa !<_,_>, if _ then _, <_,_>.
     (** We now apply the `prf` tactic, in order to replace the hash by a fresh
@@ -207,22 +207,23 @@ Proof.
         `true`. *)
     prf 2. rewrite if_true. {
       split; 1: true.
-      (** Several conjuncts must now be proved, the same tactic can be
-          used on all of them. Here are representative cases:
+  (** Several conjuncts must now be proved, the same tactic can be
+  used on all of them. Here are representative cases:
 
-          - In one case, `nT(i,k)` cannot occur in `input@R(j)`
-            because `R(j) < T(i,k)`.
-          - In another case, `nT(i,k) = nT(i0,k0)` implies that `i=i0` and
-            `k=k0`, contradicting `T(i0,k0)<T(i,k)`.
+  - In one case, `nT(i,k)` cannot occur in `input@R(j)`
+    because `R(j) < T(i,k)`.
+  - In another case, `nT(i,k) = nT(i0,k0)` implies that `i=i0` and `k=k0`,
+    contradicting `T(i0,k0)<T(i,k)`.
 
-          In both cases, the reasoning is performed by the fresh tactic on the
-          message equality hypothesis `Meq` whose negation must initially be
-          proved.
-          To be able to use (split and) fresh, we first project the goal into
-          into one goal for the left projection and one goal for the right
-          projection of the initial bi-system. *)
+  In both cases, the reasoning is performed by the fresh tactic on the
+  message equality hypothesis `Meq` whose negation must initially be
+  proved.
+  To be able to use (split and) fresh, we first project the goal into
+  into one goal for the left projection and one goal for the right
+  projection of the initial bi-system. *)
       project; repeat split; intro *; by fresh Meq.
     }.
+
 
     (** We have now replaced the hash by a fresh name occurring nowhere else,
         so we can remove it using the `fresh` tactic. *)

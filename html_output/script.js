@@ -26,7 +26,7 @@ function init() {
       com.innerHTML = comContent[0].innerHTML;
       com.collapse = false;
       com.text = com.innerHTML;
-      com.addEventListener("click", function() { collapseBox(this); } );
+      com.addEventListener("dblclick", function() { collapseBox(this); } );
       inLine.appendChild(com);
       stepBegin.push(com);
     } else {
@@ -38,11 +38,12 @@ function init() {
   }
 }
 
-function goView(j, stepVector, top) {
+function goView(j, stepVector) {
+  options = {behavior: "smooth", block: "nearest", inline: "nearest"}
   if (j <= 1) {
-    stepVector[0].scrollIntoView(top);
+    stepVector[0].scrollIntoView(options);
   } else {
-    stepVector[j-1].scrollIntoView(top);
+    stepVector[j-1].scrollIntoView(options);
   }
 }
 
@@ -70,12 +71,12 @@ function gotoLine(j) {
 
 function gotoUp() {
   gotoLine(i+1);
-  goView(i, stepEnd, false);
+  goView(i, stepEnd);
 }
 
 function gotoDown() {
   gotoLine(i-1);
-  goView(i, stepBegin, true);
+  goView(i, stepBegin);
 }
 
 function key(event) {
@@ -86,11 +87,13 @@ function key(event) {
 
 function help() {
   if (panel) {
-    document.getElementById("help-panel").style.right = "-20%";
+    document.getElementById("help-panel").style.width = "0";
+    document.getElementById("help-panel").style.padding = "3.5rem 0 0.5rem";
     document.getElementById("main").style.width = "100%";
     panel = false;
   } else {
-    document.getElementById("help-panel").style.right = "0";
+    document.getElementById("help-panel").style.width = "20%";
+    document.getElementById("help-panel").style.padding = "3.5rem 0.5rem 0.5rem";
     document.getElementById("main").style.width = "80%";
     panel = true;
   }
@@ -115,6 +118,23 @@ function highlightOn(id) {
 
 function highlightOff(id) {
   document.getElementById(id).style.backgroundColor = "white";
+}
+
+function hidePrec() {
+  
+  button = document.getElementById('prec-button');
+  if (button.status) {
+    document.getElementById('out-zone').style.height = "55%";
+    document.getElementById('prec-zone').style.display = "block";
+    button.innerHTML = "Hide";
+    button.status = false;
+  } else {
+    document.getElementById('out-zone').style.height = "100%";
+    document.getElementById('prec-zone').style.display = "none";
+    button.innerHTML = "Show";
+    button.status = true;
+  }
+  
 }
 
 init()

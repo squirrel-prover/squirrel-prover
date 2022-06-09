@@ -1,12 +1,12 @@
-(*******************************************************************************
-SIGNED DDH
+(**
+# SIGNED DDH
 
 The signed DDH protocol as described in [G] features two roles, P and S.
 Each role is associated to a secret key (skP and skS).
 
-P -> S : <pk(skP), g^a>
-S -> P : <pk(skS),g^b>,sign(<<g^a,g^b>,pk(skP)>,skS)
-P -> S : sign(<<g^b,g^a>,pk(skS)>,skP)
+* P -> S : <pk(skP), g^a>
+* S -> P : <pk(skS),g^b>,sign(<<g^a,g^b>,pk(skP)>,skS)
+* P -> S : sign(<<g^b,g^a>,pk(skS)>,skP)
 
 We consider multiple sessions but two agents only (one agent for the role P and
 one agent for the role S) and show the strong secrecy of the shared key.
@@ -18,12 +18,13 @@ one agent for the role S) and show the strong secrecy of the shared key.
 
 [G] ISO/IEC 9798-3:2019, IT Security techniques – Entity authentication –
 Part 3: Mechanisms using digital signature techniques.
-*******************************************************************************)
+
+*****************************************************************)
 
 (**
 We first declare some public constants, the secret keys for roles P and S,
 the channels used by these two roles.
-**)
+*)
 abstract ok : message
 abstract ko : message
 
@@ -31,39 +32,41 @@ name skP : message
 name skS : message
 
 channel cP
-channel cS
+channel cS.
 
 (**
 Names `a` and `b` represent the random numbers used by roles P and S.
 They are indexed so that each new session uses a new random name.
-**)
+*)
 name a : index -> message
-name b : index -> message
+name b : index -> message.
 (**
 The name `k` represents the random number used in the strong secrecy property.
 It has 2 as index arity to model the fact that each interaction between
 session `i` of role P and session `j` of role S uses a new random name.
-**)
-name k :  index -> index -> message
+*)
+name k :  index -> index -> message.
 
 (**
 We declare a DDH context, using `g` for the generator element and `^` for the
 power operator.
-**)
+*)
 ddh g, (^) where group:message exponents:message.
 
 (**
 We also declare a signature scheme by specifying 3 function symbols.
-**)
-signature sign,checksign,pk
+*)
+signature sign,checksign,pk.
 
 (**
 In the system `secretP`, we add an output at the end of the role of P.
 This output is actually a bi-term:
+
 * the left side of the system outputs the shared key as computed by P,
 * the right side of the system outputs `g^k(i,j)` where `k(i,j)` is fresh.
+
 The goal will be to prove that these two sides are indistinguishable.
-**)
+*)
 process Pchall(i:index) =
   out(cP, <pk(skP),g^a(i)>);
   in(cP, x2);
@@ -79,7 +82,7 @@ process Pchall(i:index) =
         but this else branch should never be reachable.
         We thus output a bi-term with distinct public constants so that
         the equivalence for the strong secrecy could not hold if this else
-        branch is reached. **)
+        branch is reached. *)
         out(cP, diff(ok,ko))
 
 process S(j:index) =
@@ -100,7 +103,7 @@ include Basic.
 In the proof of strong secrecy for the system `secretP`, we will use
 the following property, stating that whenever P accepts a message from S,
 this message is of the form `<<_,x>,_>` where `x = g^b(j)`.
-**)
+*)
 goal  P_charac (i:index):
   happens(Pchall1(i)) =>
     cond@Pchall1(i) =>
@@ -109,20 +112,20 @@ goal  P_charac (i:index):
 The high-level idea of the proof is to use the EUF cryptographic axiom:
 only S can forge a correct signature that will be accepted by P since
 the secret key is not known by the attacker.
-**)
+*)
 Proof.
-  (** We start by introducing the hypotheses and expanding the macros. **)
+  (** We start by introducing the hypotheses and expanding the macros. *)
   intro Hap Hcond.
   expand cond, pkS(i)@Pchall1(i).
   destruct Hcond as [Meq Meq0].
 
-  (** We then rewrite Meq using the message equality Meq0. **)
+  (** We then rewrite Meq using the message equality Meq0. *)
   rewrite Meq0 in Meq.
   (** We are now able to apply the `euf` tactic, which will search for
   occurences of signatures with `skS`: the only possibility is the output
-  of an action `S(j)`.  **)
+  of an action `S(j)`.  *)
   euf Meq.
-  (** The conclusion is now trivial from the Meq1 and D1 hypotheses. **)
+  (** The conclusion is now trivial from the Meq1 and D1 hypotheses. *)
    intro *.
   by exists j.
 Qed.
@@ -133,7 +136,7 @@ expressed by the logic formula `forall t:timestamp, frame@t` where `frame@t`
 is actually a bi-frame. We will prove that the left projection of `frame@t`
 (_i.e._ where the shared key `g^a^b` is outputted) is indistinguishable from the
 right projection of `frame@t` (_i.e._ where `g^k` is outputted).
-**)
+*)
 equiv strongSecP.
 (**
 The proof is done by induction, after having enriched the frame with some
@@ -141,12 +144,13 @@ additional (bi-)terms. Intuitively, the idea of enriching the frame is to
 simplify the cases that are contexts built using applications of public
 function symbols and terms added in the enriched frame.
 It then remains to prove:
+
 * the base case, _i.e._ prove that the enriched bi-frame is indistinguishable;
 * the case corresponding to the output `diff(ok,ko)`, _i.e._ prove that this
 output is never reached using the previous `P_charac` property.
-**)
+*)
 Proof.
-  (** We start by enriching the frame. **)
+  (** We start by enriching the frame. *)
   enrich
     skP, skS,
     seq(i:index ->g^a(i)),
@@ -155,21 +159,22 @@ Proof.
 
   (** We now apply the `induction` tactic, which generates several cases,
   one for each possible value that can be taken by the timestamp `t`.
+
   For most cases, applying the induction hypothesis `IH` allows to conclude
   because `frame@t` can be built from `frame@pred(t)` and elements added to
-  the frame by the tactic `enrich`. **)
+  the frame by the tactic `enrich`. *)
   induction t; try (by expandall; apply IH).
 
-    + (** Case where `t = init`.
-      We use here the DDH assumption. **)
-      expandall.
+      (** Case where `t = init`.
+      We use here the DDH assumption. *)
+    + expandall.
       by ddh g,a,b,k.
     
-    + (** Case where `t = Pchall3(i)`.
+      (** Case where `t = Pchall3(i)`.
       We will show that this case is not possible, by showing that the formula
       `exec@pred(Pchall3(i)) && cond@Pchall3(i)` is equivalent to `False`, relying
-      on the previous property `P_charac`. **)
-      expand frame, exec, output.
+      on the previous property `P_charac`. *)
+    + expand frame, exec, output.
       have ->: (exec@pred(Pchall3(i)) && cond@Pchall3(i)) <=> false. {
         split => //.
         intro [Hexec Hcond].
@@ -185,6 +190,6 @@ Proof.
       }
 
       fa 5. fa 6.
-      (** It now remains to simplify `if false then diff(ok,ko)`. **)
+      (** It now remains to simplify `if false then diff(ok,ko)`. *)
       by rewrite if_false.
 Qed.

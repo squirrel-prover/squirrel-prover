@@ -3,6 +3,7 @@
 }
 
 body {
+  -moz-overflow: -moz-hidden-unscrollable;
   overflow: clip;
 }
 
@@ -60,11 +61,11 @@ body {
 .help-panel {
   position: absolute;
   top: 0;
-  right: -20%;
+  right: 0;
   z-index: 2;
   height: 100%;
-  width: 20%;
-  padding: 3.5rem 0.5rem 0.5rem;
+  width: 0;
+  padding: 3.5rem 0 0.5rem;
 	border-style: none none none solid;
 	border-width: 4px;
 	border-color: #8B0000;
@@ -97,12 +98,12 @@ body {
 	float: left;
 	width: 50%;
 	height: 100%;
-	overflow: auto;
 }
 
 .example-col-left{
 	border-right: 2px solid #8B0000;
   scroll-behavior: smooth;
+	overflow: auto;
 }
 
 .example-col-right{
@@ -110,23 +111,35 @@ body {
 }
 
 .example-code{
-	width: 100%;
 	margin: 0;
 	padding: 1.5rem 1.5rem;
 	font: 1rem Consolas, "Liberation Mono", Menlo, Courier, monospace;
 	color: #567482;
 	white-space: pre;
-	overflow: auto;
 	word-wrap: normal;
 }
-
+.example-code-right{
+	overflow: auto;
+}
 .example-line{
   display: flex;
   align-items: stretch;
 }
 
-.expand-button{
-  width : 1rem;
+.prec-button{
+  position: absolute;
+  float:left;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width : 3rem;
+  padding: 0;
+  margin: auto;
+	border-style: none solid solid;
+	border-width: 1px;
+	border-color: #8B0000;
+  background-color: #ffffeb;
+	border-radius: 0 0 4px 4px;
 }
 
 .input-line:hover {

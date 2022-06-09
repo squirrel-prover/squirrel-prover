@@ -23,9 +23,9 @@
 <div class="help-panel" id="help-panel">
   Press the left and right arrows to do and undo an instruction.
   <br><br>
-  Alternatively, you can double-click or an instruction.
+  Alternatively, you can double-click on an instruction.
   <br><br>
-  <span style="color: #8B0000;" onmouseenter="highlightOn('in-zone')" onmouseleave="highlightOff('in-zone')">This zone</span> shows a Squirrel file. You can click on a comment to collapse it for better readabilility.
+  <span style="color: #8B0000;" onmouseenter="highlightOn('in-zone')" onmouseleave="highlightOff('in-zone')">This zone</span> shows a Squirrel file. You can double-click on a comment to collapse it for better readabilility.
   <br><br>
   <span style="color: #8B0000;" onmouseenter="highlightOn('out-zone')" onmouseleave="highlightOff('out-zone')">This zone</span> shows the output given by Squirrel.
   <br><br>
@@ -35,12 +35,15 @@
 <div class="mainsection" id="main">
   <div class="example-grid">
     <div class="example-col example-col-left" id="in-zone">
-      <div class="example-code"><span id="in-line"></span></div>
+      <p class="example-code"><span id="in-line"></span></p>
     </div>
     <div class="example-col example-col-right">
-      <div class="example-code" style="height: 45%;	border-bottom: 4px double #8B0000;" id="prec-zone"><span>Previously:</span><br><br><span id="prec-line"></span>
+      <div class="example-code example-code-right" style="height: 45%;	border-bottom: 4px double #8B0000;" id="prec-zone"><span>Previously:</span><br><br><span id="prec-line"></span>
       </div>
-      <div class="example-code" style="height: 55%;" id="out-zone"><span id="out-line"></span>
+      <div style="position: relative;">
+      <button type="button" class="prec-button" onclick="hidePrec()" id="prec-button" >Hide</button>
+      </div>
+      <div class="example-code example-code-right" style="height: 55%;" id="out-zone"><span id="out-line"></span>
       </div>
     </div>
   </div>
