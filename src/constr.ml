@@ -1402,9 +1402,13 @@ type trace_cntxt = {
 
 (** Print information for each nodes in [g] in JSON *)
 let dump_nodes ppf cntxt g =
+  let get_strict_succ g v =
+    let l = UtG.succ g v in
+    List.filter (fun w -> w <> v) l
+  in
   let get_children g v =
-    let succ_of_succ = List.concat_map (fun w -> UtG.succ g w) (UtG.succ g v) in
-    List.filter (fun w -> not (List.mem w succ_of_succ)) (UtG.succ g v)
+    let succ_of_succ = List.concat_map (fun w -> get_strict_succ g w) (get_strict_succ g v) in
+    List.filter (fun w -> not (List.mem w succ_of_succ) && w <> v) (UtG.succ g v)
   in
   let rec pp_child ppf l =
     match l with
