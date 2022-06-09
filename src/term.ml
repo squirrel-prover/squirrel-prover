@@ -257,8 +257,6 @@ let mk_diff l =
   | [_, t] -> t
   | _      -> Diff (Explicit l)
 
-let mk_find is c t e = Find (is, c, t, e)
-
 (*------------------------------------------------------------------*)
 let mk_fun0 fs fty terms = Fun (fs, fty, terms)
 
@@ -382,6 +380,10 @@ let mk_of_bool t = mk_fbuiltin Symbols.fs_of_bool [] [t]
 let mk_witness ty =
   let fty = Type.mk_ftype 0 [] [] ty in
   Fun (f_witness, fty, [])
+
+let mk_find ?(simpl=false) is c t e =
+  if not simpl then Find (is, c, t, e)
+  else if c = mk_false then e else Find (is, c, t, e)
 
 
 (*------------------------------------------------------------------*)

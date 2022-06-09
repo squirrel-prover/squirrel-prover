@@ -1027,7 +1027,6 @@ module T (* : S with type t = Term.term *) = struct
     (* check that types are compatible *)
     List.iter2 (fun v v' ->
         let ty, ty' = Vars.ty v, Vars.ty v' in
-        if not (Type.equal ty ty') then raise NoMgu;
 
         if Type.Infer.unify_eq st.ty_env ty ty' = `Fail then
           raise NoMgu;
@@ -1038,7 +1037,6 @@ module T (* : S with type t = Term.term *) = struct
 
     (* refresh [vs'] using the same renaming *)
     let s' = List.map2 (fun (ESubst (_, new_v)) v' ->
-        assert (Type.equal (ty new_v) (Vars.ty v'));
         ESubst (mk_var v', new_v)
       ) (List.rev s)          (* reversed ! *)
         vs'
@@ -1290,7 +1288,6 @@ module T (* : S with type t = Term.term *) = struct
     (* check that types are compatible *)
     List.iter2 (fun v v' ->
         let ty, ty' = Vars.ty v, Vars.ty v' in
-        if not (Type.equal ty ty') then no_match ();
 
         if Type.Infer.unify_eq st.ty_env ty ty' = `Fail then
           no_match ();
@@ -1301,7 +1298,6 @@ module T (* : S with type t = Term.term *) = struct
 
     (* refresh [vs'] using the same renaming *)
     let s' = List.map2 (fun (ESubst (_, new_v)) v' ->
-        assert (Type.equal (ty new_v) (Vars.ty v'));
         ESubst (mk_var v', new_v)
       ) (List.rev s)          (* reversed ! *)
         vs'

@@ -210,7 +210,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       let r_subst = rev_subst subst in
       let c, t = Term.subst r_subst c, Term.subst r_subst t in
 
-      Term.mk_find is c t e,
+      Term.mk_find ~simpl:true is c t e,
       has_red0 || has_red1 || has_red2
 
     | Term.Diff (Explicit l) -> 
