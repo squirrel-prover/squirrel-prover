@@ -16,6 +16,8 @@ system A: !_i in(ch,x);out(ch,<ok(i),x>).
 
 system [bis] !_i in(ch,x);if x = a then out(ch,<ok(i),x>).
 
+include Basic.
+
 axiom foo (x : message) : f(x) = a.
 axiom foog (x : message) : gg(x,b) = c.
 
@@ -463,3 +465,21 @@ Proof.
   intro H ->.
   assumption.
 Qed.
+
+(*------------------------------------------------------------------*)
+(* test type infer in matching *)
+
+goal [any] if_false1 ['a] : (exists (x : 'a), false) = false.
+Proof. by rewrite eq_iff. Qed.
+
+goal [any] _ : (exists (i : index), false) = false.
+Proof. by rewrite if_false1. Qed.
+
+goal [any] _ : (exists (i : message), false) = false.
+Proof. by rewrite if_false1. Qed.
+
+goal [any] _ : (exists (i : timestamp), false) = false.
+Proof. by rewrite if_false1. Qed.
+
+goal [any] _ ['a] : (exists (i : 'a), false) = false.
+Proof. by rewrite if_false1. Qed.

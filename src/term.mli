@@ -397,7 +397,7 @@ val mk_name    : nsymb -> term
 val mk_macro   : msymb -> term list -> term -> term
 val mk_diff    : (proj * term) list -> term
 
-val mk_find : Vars.var list -> term -> term -> term -> term
+val mk_find : ?simpl:bool -> Vars.var list -> term -> term -> term -> term
 
 val destr_iff : term -> (term * term) option
 
