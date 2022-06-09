@@ -25,9 +25,6 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-goal [any] exists_false1 ['a] : (exists (x : 'a), false) = false.
-Proof. by rewrite eq_iff. Qed.
-
 (* false axiom in general, true only if the type 'a is not empty. *)
 axiom [any] exists_true1 ['a] : (exists (x : 'a), true) = true.
 

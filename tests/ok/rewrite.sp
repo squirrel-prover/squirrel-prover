@@ -469,9 +469,6 @@ Qed.
 (*------------------------------------------------------------------*)
 (* test type infer in matching *)
 
-goal [any] exists_false1 ['a] : (exists (x : 'a), false) = false.
-Proof. by rewrite eq_iff. Qed.
-
 goal [any] _ : (exists (i : index), false) = false.
 Proof. by rewrite exists_false1. Qed.
 
