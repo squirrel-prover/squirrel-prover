@@ -349,7 +349,7 @@ let snd = function
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
-(* Contexts *)
+(** {2 Contexts} *)
 
 type context = {
   set  : arbitrary expr ;
@@ -390,3 +390,20 @@ let project_set (projs : Term.projs) (c : context) : context =
 
 let project_set_opt (projs : Term.projs option) (c : context) : context =
   { c with set = project_opt projs c.set }
+
+(*------------------------------------------------------------------*)
+(** {2 Misc} *)
+  
+let print_system (table : Symbols.table) (system : _ expr) : unit =
+  try
+    let system = to_fset system in
+    Printer.prt `Result "@[<v>System @[[%a]@]@;@[%a@]@;@[%a@]@;@]%!"
+      pp system
+      (pp_descrs table) system
+      (if Config.print_trs_equations ()
+       then Completion.print_init_trs
+       else (fun _fmt _ -> ()))
+      table
+  with _ ->
+    Printer.prt `Result "@.Cannot print action descriptions for system %a@."
+      pp system

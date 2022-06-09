@@ -308,7 +308,7 @@ module Form = struct
         [form]
 
       (* Type.Index *)
-      | `Neg, `Comp ((`Leq|`Lt|`Geq|`Gt), _, _) -> assert false
+      | `Neg, `Comp ((`Leq|`Lt|`Geq|`Gt), _, _) -> raise Unsupported
     in
     doit lit
 
@@ -1241,8 +1241,18 @@ let models_conjunct =
       res
 
 (** Time-out information *)
-let models_conjunct (l : Term.literals) : models timeout_r =
-  Utils.timeout (Config.solver_timeout ()) models_conjunct l
+let models_conjunct
+    ?(exn = Tactics.Tactic_hard_failure (None, TacTimeout))
+    (l : Term.terms) : models
+  =
+  let lits =
+    List.fold_left (fun acc f ->
+        match Term.form_to_literals f with
+        | `Entails lits | `Equiv lits -> lits @ acc
+      ) [] l 
+  in
+  
+  Utils.timeout exn (Config.solver_timeout ()) models_conjunct lits
 
 
 (*------------------------------------------------------------------*)
@@ -1455,21 +1465,19 @@ and pb_eq8 = (`Comp (`Eq,tau, mk_pred tau'))
              :: (`Comp (`Eq,tau', mk_pred tau''))
              :: [`Comp (`Eq,tau'', tau3)]
 
-(* let () = Printexc.record_backtrace true *)
-
 let () =
   let exception Unsat in
   let exception Sat in
-  let exception Timeout in
   let test = function
-    | Result [] -> raise Unsat
-    | Result _ -> raise Sat
-    | Timeout -> raise Timeout in
+    | [] -> raise Unsat
+    | _ -> raise Sat in
+  let mk (l : Term.xatom list) =
+    List.map (fun x -> lit_to_form (`Pos, x)) l
+  in
 
   Checks.add_suite "Constr" [
     ("Cycles", `Quick,
      fun () ->
-       let mk l = List.map (fun x -> `Pos, x) l in
        let successes = [pb_eq1; pb_eq2; pb_eq3; pb_eq6; pb_eq7; pb_eq8]
        and failures = [pb_eq4; pb_eq5] in
 
@@ -1485,7 +1493,6 @@ let () =
 
     ("Graph", `Quick,
      fun () ->
-       let mk l = List.map (fun x -> `Pos, x) l in
        let successes = [(`Comp (`Leq, tau, tau'')) :: pb_eq1;
 
                         (`Comp (`Neq, tau, tau3)) ::

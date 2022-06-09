@@ -301,7 +301,7 @@ let do_print (state : main_state) (q : Prover.print_query) : main_state =
 
       | Some s -> SystemExpr.parse state.table s
     in
-    Tactics.print_system state.table system;
+    SystemExpr.print_system state.table system;
     state
 
 (*------------------------------------------------------------------*)

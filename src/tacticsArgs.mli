@@ -5,13 +5,28 @@ module L = Location
 
 type lsymb = Theory.lsymb
 
-type s_item =
+(*------------------------------------------------------------------*)
+(** Tactic target. *)
+type in_target = [`Goal | `All | `Hyps of lsymb list]
+
+
+(*------------------------------------------------------------------*)
+(** {2 Tactics named arguments} *)
+
+type named_arg =
+  | NArg of lsymb               (** '~id' *)
+
+type named_args = named_arg list
+
+(*------------------------------------------------------------------*)
+(** {2 Simplification item} *)
+
+type s_item_body =
   | Tryauto      of Location.t    (** '//' *)
   | Tryautosimpl of Location.t    (** '//' *)
   | Simplify     of Location.t    (** '//=' *)
 
-(** Tactic target. *)
-type in_target = [`Goal | `All | `Hyps of lsymb list]
+type s_item = s_item_body * named_args
 
 (*------------------------------------------------------------------*)
 (** {2 Parsed arguments for rewrite} *)
@@ -102,14 +117,6 @@ type ip_handler = [
   | `Var of Vars.var (* Careful, the variable is not added to the env  *)
   | `Hyp of Ident.t
 ]
-
-(*------------------------------------------------------------------*)
-(** {2 Tactics named arguments} *)
-
-type named_arg =
-  | NArg of lsymb               (** '~id' *)
-
-type named_args = named_arg list
 
 (*------------------------------------------------------------------*)
 (** {2 Tactic arguments types} *)

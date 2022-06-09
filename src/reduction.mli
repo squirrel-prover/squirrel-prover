@@ -1,12 +1,18 @@
 module SE = SystemExpr
-
+module Args = TacticsArgs
+  
 (*------------------------------------------------------------------*)
 type red_param = { 
-  delta : bool; 
+  delta  : bool;
+  constr : bool;
 }
 
-val rp_full : red_param
+val rp_default : red_param
+val rp_full    : red_param
 
+val parse_simpl_args : red_param -> Args.named_args -> red_param 
+
+(*------------------------------------------------------------------*)
 module type S = sig
   type t                        (* type of sequent *)
 

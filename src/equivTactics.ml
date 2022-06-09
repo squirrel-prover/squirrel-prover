@@ -188,7 +188,7 @@ let simpl_impl s =
 
 (*------------------------------------------------------------------*)
 (* Simplification function doing nothing. *)
-let simpl_ident : LowTactics.f_simpl = fun ~strong ~close s sk fk ->
+let simpl_ident : LowTactics.f_simpl = fun ~red_param ~strong ~close s sk fk ->
   if close then fk (None, GoalNotClosed) else sk [s] fk
 
 (*------------------------------------------------------------------*)
@@ -1025,61 +1025,70 @@ let goal_is_reach s =
   | Equiv.Atom (Reach _) -> true
   | _ -> false
 
-let rec auto ~strong ~close s sk (fk : Tactics.fk) =
-  let open Tactics in
-  match s with
-  | Goal.Trace t ->
-    let sk l fk = sk (List.map (fun s -> Goal.Trace s) l) fk in
-    TraceTactics.simpl ~close ~strong t sk fk
+let auto ~red_param ~strong ~close s sk (fk : Tactics.fk) =
+  let rec auto_rec s sk fk =
+    let open Tactics in
+    match s with
+    | Goal.Trace t ->
+      let sk l fk = sk (List.map (fun s -> Goal.Trace s) l) fk in
+      TraceTactics.simpl ~red_param ~close ~strong t sk fk
 
-  | Goal.Equiv s when goal_is_reach s ->
-    auto ~close ~strong (byequiv s) sk fk
+    | Goal.Equiv s when goal_is_reach s ->
+      auto_rec (byequiv s) sk fk
 
-  | Goal.Equiv s ->
-    let sk l _ =
-      sk (List.map (fun s -> Goal.Equiv s) l) fk
-    and fk _ =
-      if close
-      then fk (None, GoalNotClosed)
-      else sk [Equiv s] fk
-    in
+    | Goal.Equiv s ->
+      let sk l _ =
+        sk (List.map (fun s -> Goal.Equiv s) l) fk
+      and fk _ =
+        if close
+        then fk (None, GoalNotClosed)
+        else sk [Equiv s] fk
+      in
 
-    let wfadup s sk fk =
-      if strong || (Config.auto_fadup ()) then
-        let fk _ = sk [s] fk in
-        wrap_fail (fadup (Args.Opt (Args.Int, None))) s sk fk
-      else sk [s] fk
-    in
+      let wfadup s sk fk =
+        if strong || (Config.auto_fadup ()) then
+          let fk _ = sk [s] fk in
+          wrap_fail (fadup (Args.Opt (Args.Int, None))) s sk fk
+        else sk [s] fk
+      in
 
-    let conclude s sk fk  =
-      if close || Config.auto_intro () then
-        let fk = if Config.auto_intro () then fun _ -> sk [s] fk else fk in
-        andthen_list ~cut:true
-          [wrap_fail (EquivLT.expand_all_l `All);
-           try_tac wfadup;
-           orelse_list [wrap_fail refl_tac;
-                        wrap_fail assumption]] s sk fk
-      else sk [s] fk
-    in
+      let conclude s sk fk  =
+        if close || Config.auto_intro () then
+          let fk = if Config.auto_intro () then fun _ -> sk [s] fk else fk in
+          andthen_list ~cut:true
+            [wrap_fail (EquivLT.expand_all_l `All);
+             try_tac wfadup;
+             orelse_list [wrap_fail refl_tac;
+                          wrap_fail assumption]] s sk fk
+        else sk [s] fk
+      in
 
-    let reduce s sk fk =
-      if strong
-      then sk [EquivLT.reduce_sequent Reduction.{ delta = false } s] fk
-      else sk [s] fk
-    in
+      let reduce s sk fk =
+        if strong
+        then sk
+            [EquivLT.reduce_sequent red_param s]
+            fk
+        else sk [s] fk
+      in
 
-    andthen_list ~cut:true
-      [try_tac reduce;
-       try_tac wfadup;
-       conclude]
-      s sk fk
-
+      andthen_list ~cut:true
+        [try_tac reduce;
+         try_tac wfadup;
+         conclude]
+        s sk fk
+  in
+  auto_rec s sk fk
+    
 let tac_auto ~close ~strong args s sk (fk : Tactics.fk) =
   match args with
   | [] -> auto ~close ~strong s sk fk
   | _ -> hard_failure (Tactics.Failure "no argument allowed")
 
-let tac_autosimpl s = tac_auto ~close:false ~strong:false s
+let tac_autosimpl s = 
+  tac_auto
+    ~red_param:Reduction.rp_default
+    ~close:false
+    ~strong:false s
 
 
 (*------------------------------------------------------------------*)

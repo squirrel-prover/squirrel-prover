@@ -727,22 +727,4 @@ module AST (M:S) = struct
 end
 
 
-let timeout_get = function
-  | Utils.Result a -> a
-  | Utils.Timeout -> hard_failure TacTimeout
 
-
-(*------------------------------------------------------------------*)
-let print_system (table : Symbols.table) (system : _ SystemExpr.expr) : unit =
-  try
-    let system = SystemExpr.to_fset system in
-    Printer.prt `Result "@[<v>System @[[%a]@]@;@[%a@]@;@[%a@]@;@]%!"
-      SystemExpr.pp system
-      (SystemExpr.pp_descrs table) system
-      (if Config.print_trs_equations ()
-       then Completion.print_init_trs
-       else (fun _fmt _ -> ()))
-      table
-  with _ ->
-    Printer.prt `Result "@.Cannot print action descriptions for system %a@."
-      SystemExpr.pp system

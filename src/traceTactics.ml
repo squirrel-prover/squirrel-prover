@@ -1176,8 +1176,8 @@ let fa_tac args = match args with
 (*------------------------------------------------------------------*)
 (** New goal simplification *)
 
-let new_simpl ~congr ~constr s =
-  let s = TraceLT.reduce_sequent Reduction.{ delta = false } s in
+let new_simpl ~red_param ~congr ~constr s =
+  let s = TraceLT.reduce_sequent red_param s in
 
   let goals = Term.decompose_ands (TS.goal s) in
   let s = TS.set_goal Term.mk_false s in
@@ -1210,7 +1210,7 @@ let new_simpl ~congr ~constr s =
 let clear_triv s sk fk = sk [Hyps.clear_triv s] fk
 
 (** Simplify goal. *)
-let _simpl ~close ~strong =
+let _simpl ~red_param ~close ~strong =
   let open Tactics in
   let intro = Config.auto_intro () in
 
@@ -1218,7 +1218,7 @@ let _simpl ~close ~strong =
 
   let new_simpl ~congr ~constr =
     if strong && not intro
-    then [wrap_fail (new_simpl ~congr ~constr)] @ assumption
+    then [wrap_fail (new_simpl ~red_param ~congr ~constr)] @ assumption
     else []
   in
 
@@ -1261,47 +1261,54 @@ let do_conclude =
 
 (* If [close] then tries to automatically prove the goal,
  * otherwise it may also be reduced to a single subgoal. *)
-let rec simpl ~strong ~close : TS.t Tactics.tac =
-  let open Tactics in
-  let (>>) = andthen ~cut:true in
-  (* if [close], we introduce as much as possible to help. *)
-  _simpl ~close ~strong >>
+let simpl ~red_param ~strong ~close : TS.t Tactics.tac =
+  let rec simpl_aux ~close = 
+    let open Tactics in
+    let (>>) = andthen ~cut:true in
+    (* if [close], we introduce as much as possible to help. *)
+    _simpl ~red_param ~strong ~close >>
 
-  if not strong
-  then (fun g sk fk -> sk [g] fk)
-  else
-    (if close || Config.auto_intro ()
-     then try_tac do_conclude else Tactics.id) >>
-    fun g sk fk ->
-    (* If we still have a goal, we can try to split a conjunction
-     * and prove the remaining subgoals, or return this goal,
-     * but we must respect [close]. *)
-    let fk =
-      if close
-      then fun _ -> fk (None, GoalNotClosed)
-      else fun _ -> sk [g] fk
-    in
-    (wrap_fail TraceLT.goal_and_right) g
-      (fun l _ -> match l with
-         | [g1;g2] ->
-           simpl ~strong ~close g1
-             (fun l' _ ->
-                if l'=[] then
-                  simpl ~strong ~close g2 sk fk
-                else
-                  simpl ~strong ~close:true g2
-                    (fun l'' fk -> assert (l'' = []) ; sk l' fk)
-                    fk)
-             fk
-         | _ -> assert false)
-      fk
-
-let tac_auto ~close ~strong args s sk (fk : Tactics.fk) =
+    if not strong
+    then (fun g sk fk -> sk [g] fk)
+    else
+      (if close || Config.auto_intro ()
+       then try_tac do_conclude else Tactics.id) >>
+      fun g sk fk ->
+      (* If we still have a goal, we can try to split a conjunction
+       * and prove the remaining subgoals, or return this goal,
+       * but we must respect [close]. *)
+      let fk =
+        if close
+        then fun _ -> fk (None, GoalNotClosed)
+        else fun _ -> sk [g] fk
+      in
+      (wrap_fail TraceLT.goal_and_right) g
+        (fun l _ -> match l with
+           | [g1;g2] ->
+             simpl_aux ~close g1
+               (fun l' _ ->
+                  if l'=[] then
+                    simpl_aux ~close g2 sk fk
+                  else
+                    simpl_aux ~close:true g2
+                      (fun l'' fk -> assert (l'' = []) ; sk l' fk)
+                      fk)
+               fk
+           | _ -> assert false)
+        fk
+  in
+  simpl_aux ~close
+    
+let tac_auto args ~red_param ~strong ~close s sk (fk : Tactics.fk) =
   match args with
-  | [] -> simpl ~close ~strong s sk fk
+  | [] -> simpl ~red_param ~close ~strong s sk fk
   | _ -> hard_failure (Tactics.Failure "no argument allowed")
 
-let tac_autosimpl s = tac_auto ~close:false ~strong:(Config.auto_intro ()) s
+let tac_autosimpl s =
+  tac_auto
+    ~red_param:Reduction.rp_default
+    ~close:false
+    ~strong:(Config.auto_intro ()) s
 
 
 (* tries to close the goal with simpl *)
@@ -1309,9 +1316,10 @@ let tac_autosimpl s = tac_auto ~close:false ~strong:(Config.auto_intro ()) s
 let tryauto_closes (g:sequent) : bool =
   (* exception to get out of the continuations *)
   let exception Res of bool in
+  let red_param = Reduction.rp_default in
   try
     let _:Tactics.a =
-      simpl ~strong:true ~close:true g
+      simpl ~red_param ~strong:true ~close:true g
         (* if simpl succeeds: it closes the goal, so l = [] *)
         (fun l _ -> assert (l = []); raise (Res true)) 
         (* otherwise: leave the goal unchanged *)

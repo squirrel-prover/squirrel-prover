@@ -2,16 +2,7 @@ module L = Location
 
 type lsymb = Theory.lsymb
 
-type s_item =
-  | Tryauto      of Location.t    (** '//' *)
-  | Tryautosimpl of Location.t    (** '//' *)
-  | Simplify     of Location.t    (** '//=' *)
-
-let pp_s_item fmt = function
-  | Simplify      _ -> Fmt.pf fmt "/="
-  | Tryauto       _ -> Fmt.pf fmt "//"
-  | Tryautosimpl  _ -> Fmt.pf fmt "//="
-
+(*------------------------------------------------------------------*)
 (** Tactic target. *)
 type in_target = [
   | `Goal
@@ -26,6 +17,34 @@ let pp_in_target ppf (in_t : in_target) =
   | `Hyps symb ->
     Fmt.pf ppf " in %a"
       (Fmt.list ~sep:Fmt.comma Fmt.string) (L.unlocs symb)
+
+(*------------------------------------------------------------------*)
+(** {2 Tactics named args} *)
+
+type named_arg =
+  | NArg of lsymb               (** '~id' *)
+
+type named_args = named_arg list
+
+(*------------------------------------------------------------------*)
+(** {2 Simplification item} *)
+    
+type s_item_body =
+  | Tryauto      of Location.t    (** '//' *)
+  | Tryautosimpl of Location.t    (** '//' *)
+  | Simplify     of Location.t    (** '//=' *)
+
+type s_item = s_item_body * named_args
+              
+let pp_s_item_body fmt = function
+  | Simplify      _ -> Fmt.pf fmt "/="
+  | Tryauto       _ -> Fmt.pf fmt "//"
+  | Tryautosimpl  _ -> Fmt.pf fmt "//="
+
+let pp_s_item fmt (s, named_args) =
+  if named_args = [] then pp_s_item_body fmt s
+  else
+    Fmt.pf fmt "[%a ...]" pp_s_item_body s
 
 (*------------------------------------------------------------------*)
 (** {2 Parsed arguments for rewrite} *)
@@ -80,10 +99,10 @@ let pp_rw_type ppf = function
   | `ExpandAll _ -> Fmt.pf ppf "/*"
 
 let pp_rw_item ppf rw_item =
-  Fmt.pf ppf "%a%a%a"
-    pp_rw_dir   rw_item.rw_dir
-    pp_rw_count rw_item.rw_mult
-    pp_rw_type  rw_item.rw_type
+    Fmt.pf ppf "%a%a%a"
+      pp_rw_dir   rw_item.rw_dir
+      pp_rw_count rw_item.rw_mult
+      pp_rw_type  rw_item.rw_type
 
 let pp_rw_arg ppf rw_arg = match rw_arg with
   | R_s_item s -> pp_s_item ppf s
@@ -177,13 +196,6 @@ type ip_handler = [
   | `Hyp of Ident.t
 ]
 
-(*------------------------------------------------------------------*)
-(** {2 Tactics named args} *)
-
-type named_arg =
-  | NArg of lsymb               (** '~id' *)
-
-type named_args = named_arg list
 
 (*------------------------------------------------------------------*)
 (** {2 Tactics args} *)

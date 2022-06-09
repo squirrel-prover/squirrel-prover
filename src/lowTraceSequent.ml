@@ -114,8 +114,14 @@ let get_all_messages (s : sequent) =
 (** Prepare constraints or TRS query *)
 
 let _get_models (hyps : H.hyps) =
-  let trace_literals = Hyps.get_trace_literals hyps in
-  Tactics.timeout_get (Constr.models_conjunct trace_literals)
+  let hyps = H.fold (fun _ f acc ->
+      match f with
+      | `Reach f
+      | `Equiv Equiv.(Atom (Reach f)) -> f :: acc
+      | `Equiv _ -> acc
+    ) hyps [] 
+  in
+  Constr.models_conjunct hyps
 
 let get_models (s : sequent) = _get_models s.hyps
 
@@ -131,9 +137,9 @@ let maximal_elems ~precise s tss =
 
 let get_ts_equalities ~precise s =
   let models = get_models s in
-    let ts = List.map (fun (_,x) -> x) (Hyps.get_trace_literals s.hyps)
+  let ts = List.map (fun (_,x) -> x) (Hyps.get_trace_literals s.hyps)
              |>  Atom.trace_atoms_ts in
-    Constr.get_ts_equalities ~precise models ts
+  Constr.get_ts_equalities ~precise models ts
 
 let get_ind_equalities ~precise s =
   let models = get_models s in
@@ -377,7 +383,7 @@ let get_eqs_neqs s =
 
 let get_trs s = 
   let eqs,_ = get_eqs_neqs s.hyps in
-  Tactics.timeout_get (Completion.complete s.env.table eqs)
+  Completion.complete s.env.table eqs
 
 let eq_atoms_valid s =
   let trs = get_trs s in

@@ -469,17 +469,17 @@ Qed.
 (*------------------------------------------------------------------*)
 (* test type infer in matching *)
 
-goal [any] if_false1 ['a] : (exists (x : 'a), false) = false.
+goal [any] exists_false1 ['a] : (exists (x : 'a), false) = false.
 Proof. by rewrite eq_iff. Qed.
 
 goal [any] _ : (exists (i : index), false) = false.
-Proof. by rewrite if_false1. Qed.
+Proof. by rewrite exists_false1. Qed.
 
 goal [any] _ : (exists (i : message), false) = false.
-Proof. by rewrite if_false1. Qed.
+Proof. by rewrite exists_false1. Qed.
 
 goal [any] _ : (exists (i : timestamp), false) = false.
-Proof. by rewrite if_false1. Qed.
+Proof. by rewrite exists_false1. Qed.
 
 goal [any] _ ['a] : (exists (i : 'a), false) = false.
-Proof. by rewrite if_false1. Qed.
+Proof. by rewrite exists_false1. Qed.

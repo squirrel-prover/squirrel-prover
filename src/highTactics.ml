@@ -112,13 +112,15 @@ let tac_autosimpl args s sk fk = match s with
     TraceTactics.tac_autosimpl args s sk fk
   | Goal.Equiv _ -> EquivTactics.tac_autosimpl args s sk fk
 
-let tac_auto ~strong ~close args s sk fk = match s with
+let tac_auto : 'a list -> LowTactics.f_simpl =
+  fun args ~red_param ~strong ~close s sk fk -> 
+  match s with
   | Goal.Trace s ->
     let sk l fk =
       sk (List.map (fun s -> Goal.Trace s) l) fk
     in
-    TraceTactics.tac_auto ~close ~strong args s sk fk
-  | Goal.Equiv _ -> EquivTactics.tac_auto ~close ~strong args s sk fk
+    TraceTactics.tac_auto ~red_param ~close ~strong args s sk fk
+  | Goal.Equiv _ -> EquivTactics.tac_auto ~red_param ~close ~strong args s sk fk
 
 let () =
   T.register_general "autosimpl"
@@ -131,22 +133,26 @@ let () =
     tac_autosimpl
 
 let () =
+  (* FEATURE: allow user to change [red_param] *)
+  let red_param = Reduction.rp_default in
   T.register_general "simpl"
     ~tactic_help:{general_help = "Simplifies a goal, without closing it.";
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Structural}
     ~pq_sound:true
-    (tac_auto ~close:false ~strong:true)
+    (tac_auto ~red_param ~close:false ~strong:true)
 
 let () =
+  (* FEATURE: allow user to change [red_param] *)
+  let red_param = Reduction.rp_default in
   T.register_general "auto"
     ~tactic_help:{general_help = "Closes a goal.";
                   detailed_help = "Stronger automation than simpl.";
                   usages_sorts = [Sort None];
                   tactic_group = Structural}
     ~pq_sound:true
-    (tac_auto ~close:true ~strong:true)
+    (tac_auto ~red_param ~close:true ~strong:true)
 
 (*------------------------------------------------------------------*)
 let () =

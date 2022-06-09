@@ -583,14 +583,7 @@ let pp_list pp_item ppf l =
 let fst3 (a, b, c) = a
 
 (*------------------------------------------------------------------*)
-type 'a timeout_r = 
-  | Result of 'a 
-  | Timeout
-  
-(** [timeout t f x] executes [f x] for at most [t] seconds.
-    Returns [Result (f x)] if the computation terminated in the imparted
-    time, and [Timeout] otherwise. *)
-let timeout timeout f x =
+ let timeout exn timeout f x = 
   assert (timeout > 0);
 
   let exception Timeout in
@@ -612,10 +605,10 @@ let timeout timeout f x =
 
     let res = f x in
     finish ();
-    Result res
+    res
   with
-  | Timeout -> finish (); Timeout
-  | exn     -> finish (); raise exn
+  | Timeout -> finish (); raise exn
+  | e     -> finish (); raise e
 
 (* -------------------------------------------------------------------- *)
 let fst_map f (x,_) = f x

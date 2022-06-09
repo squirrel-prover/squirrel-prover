@@ -197,12 +197,6 @@ module AST (M:S) : AST_sig
 (** Raise a soft failure. *)
 val soft_failure : ?loc:Location.t -> tac_error_i -> 'a
 
-(** Unwrap the result of a computation that may timeout, or raise a soft
-    timeout failure. *)
-val timeout_get : 'a Utils.timeout_r -> 'a
-
 (** Raise a hard failure. *)
 val hard_failure : ?loc:Location.t -> tac_error_i -> 'a
 
-(** Print the system to the user. *)
-val print_system : Symbols.table -> _ SystemExpr.expr -> unit

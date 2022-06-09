@@ -4,9 +4,11 @@
 type models
 
 (*------------------------------------------------------------------*)
-(** [models_conunct l] returns the list of minimal models of the conjunction of
-    atoms. *)
-val models_conjunct : Term.literals -> models Utils.timeout_r
+(** [models_conunct ?exn l] returns the list of minimal models of 
+    the conjunction of atoms.
+    - [exn] is thrown if the tactic timeout.
+      Default to [Tactics.Tactic_hard_failure TacTimeout]. *)
+val models_conjunct : ?exn:exn -> Term.terms -> models 
 
 val m_is_sat : models -> bool
 

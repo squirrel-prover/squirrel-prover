@@ -1400,8 +1400,7 @@ module Memo = Hashtbl.Make2
       let hash l = Utils.hcombine_list hash_p 0 l
     end)
 
-let complete table (l : Term.esubst list) 
-  : state timeout_r =
+let complete table (l : Term.esubst list) : state =
   let l =
     List.fold_left
       (fun l (Term.ESubst (u,v)) ->
@@ -1414,10 +1413,10 @@ let complete table (l : Term.esubst list)
       []
       l
   in
-  Utils.timeout (Config.solver_timeout ()) (complete_cterms table) l 
+  complete_cterms table l 
 
 (** With memoisation *)
-let complete : Symbols.table -> Term.esubst list -> state Utils.timeout_r =
+let complete : Symbols.table -> Term.esubst list -> state =
   let memo = Memo.create 256 in
   fun table l ->
     try Memo.find memo (table,l) with
@@ -1425,7 +1424,12 @@ let complete : Symbols.table -> Term.esubst list -> state Utils.timeout_r =
       let res = complete table l in
       Memo.add memo (table,l) res;
       res
-  
+
+let complete
+    ?(exn = Tactics.Tactic_hard_failure (None, TacTimeout))
+    table l : state =
+  Utils.timeout exn (Config.solver_timeout ()) (complete table) l 
+        
 let print_init_trs fmt table =
   Fmt.pf fmt "@[<v 2>Rewriting rules:@;%a@]"
     pp_e_rules (init_erules table)

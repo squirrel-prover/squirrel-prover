@@ -1,19 +1,34 @@
 open Utils
 
+module L = Location
 module SE = SystemExpr
-
+module Args = TacticsArgs
 module THyps = Hyps.TraceHyps
-                 
+
 (*------------------------------------------------------------------*)
 let rev_subst subst = 
   List.map (fun (Term.ESubst (u,v)) -> Term.ESubst (v,u)) subst
 
 (*------------------------------------------------------------------*)
 type red_param = { 
-  delta : bool;  
+  delta  : bool;
+  constr : bool;
 }
 
-let rp_full = { delta = true; }
+let rp_default = { delta = false; constr = false; }
+
+let rp_full = { delta = true; constr = false; }
+
+let parse_simpl_args
+    (param : red_param) (args : Args.named_args) : red_param
+  =
+  List.fold_left (fun param arg ->
+      match arg with
+      | Args.NArg l ->
+        if Location.unloc l = "constr" then { param with constr = true; }
+        else
+          Tactics.hard_failure ~loc:(L.loc l) (Failure "unknown argument")
+    ) param args
 
 (*------------------------------------------------------------------*)
 module type S = sig
@@ -75,12 +90,27 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
   (* Reduce once at head position *)
   and reduce_head_once (st : state) (t : Term.term) : Term.term * bool = 
     let t, has_red  = expand_head_once st t in
-    if has_red then t, true else rewrite_head_once st t 
+    if has_red then t, true else
+      let t, has_red = rewrite_head_once st t in
+      if has_red then t, true else
+      if Term.ty t <> Type.Boolean then t, false
+      else reduce_constr st t
+
+  (* Try to show using [Constr] that [t] is [false] or [true] *)
+  and reduce_constr (st : state) (t : Term.term) : Term.term * bool =
+    if not st.param.constr then t, false
+    else
+      try
+        if not Constr.(m_is_sat (models_conjunct ~exn:NoExp [t]))
+        then Term.mk_false, true
+        else if not Constr.(m_is_sat (models_conjunct ~exn:NoExp [Term.mk_not t]))
+        then Term.mk_true, true
+        else t, false
+      with NoExp -> t, false
 
   (* Expand once at head position *)
   and expand_head_once (st : state) (t : Term.term) : Term.term * bool = 
-    if not st.param.delta 
-    then t, false 
+    if not st.param.delta then t, false 
     else 
       try 
         Match.expand_head_once 
@@ -104,7 +134,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
           let subs_valid =  
             List.for_all (fun (sexpr, sub) -> 
                 (* FEATURE: conversion *)
-                fst (reduce { st with sexpr; param = rp_full } sub) = 
+                fst (reduce { st with sexpr; param = rp_default } sub) = 
                 Term.mk_true
               ) subs 
           in              

@@ -271,7 +271,10 @@ module EquivLT : module type of MkCommonLowTac(ES)
 (*------------------------------------------------------------------*)
 (** {3 Rewrite} *)
 
-type f_simpl = strong:bool -> close:bool -> Goal.t Tactics.tac
+type f_simpl =
+  red_param:Reduction.red_param ->
+  strong:bool -> close:bool ->
+  Goal.t Tactics.tac
 
 val do_intros_ip :
   f_simpl -> Args.intro_pattern list -> Goal.t -> Goal.t list

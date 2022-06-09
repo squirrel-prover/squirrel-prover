@@ -637,10 +637,14 @@ simpl_pat:
 | ao_ip=and_or_pat { TacticsArgs.SAndOr ao_ip }
 | d=loc(ip_rw_dir) { TacticsArgs.Srewrite d }
 
-s_item:
+s_item_body:
 | l=loc(SLASHSLASH)      { TacticsArgs.Tryauto      (L.loc l)}
 | l=loc(SLASHEQUAL)      { TacticsArgs.Simplify     (L.loc l)}
 | l=loc(SLASHSLASHEQUAL) { TacticsArgs.Tryautosimpl (L.loc l)}
+
+%inline s_item:
+| s=s_item_body { s,[] }
+| LBRACKET s=s_item_body a=named_args RBRACKET { s, a }
 
 intro_pat:
 | s=s_item      { TacticsArgs.SItem (s) }

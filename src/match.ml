@@ -732,10 +732,14 @@ let expand_head_once
   in
   let models = (* evaluates the models only if needed *)
     lazy (
-      let lits = Hyps.get_trace_literals (Lazy.force hyps) in
-      match Constr.models_conjunct lits with
-        | Utils.Timeout -> raise exn
-        | Utils.Result models -> models)
+      let lits = Hyps.TraceHyps.fold (fun _ f acc ->
+          match f with
+          | `Reach f
+          | `Equiv Equiv.(Atom (Reach f)) -> f :: acc
+          | `Equiv _ -> acc
+        ) (Lazy.force hyps) [] 
+      in
+      Constr.models_conjunct ~exn lits)
   in 
   let cntxt () = Constr.{ 
       table; system = se; 

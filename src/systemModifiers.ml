@@ -1157,11 +1157,12 @@ let do_s_item
   : Term.term 
   =
   match s_item with
-  | Args.Simplify l -> 
-    let param = Reduction.{ delta = false; } in
+  | Args.Simplify l, args -> 
+    let param = Reduction.rp_default in
+    let param = Reduction.parse_simpl_args param args in
     TS.Reduce.reduce_term ~expand_context param s t 
 
-  | Args.Tryauto l | Args.Tryautosimpl l ->
+  | Args.Tryauto l, _ | Args.Tryautosimpl l, _ ->
     soft_failure ~loc:l (Failure "cannot use // or //= in a global rewriting")
 
 let do_rw_arg

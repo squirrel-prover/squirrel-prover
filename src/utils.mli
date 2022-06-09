@@ -199,15 +199,10 @@ val pp_list :
 val fst3 : 'a * 'b * 'c -> 'a
 
 (*------------------------------------------------------------------*)
-type 'a timeout_r = 
-  | Result of 'a 
-  | Timeout
-
-  
-(** [timeout t f x] executes [f x] for at most [t] seconds.
-    Returns [Result (f x)] if the computation terminated in the imparted
-    time, and [Timeout] otherwise. *)
-val timeout : int -> ('a -> 'b) -> 'a -> 'b timeout_r
+(** [timeout exn t f x] executes [f x] for at most [t] seconds.
+    Returns [f x] if the computation terminated in the imparted
+    time, and [exn] otherwise. *)
+val timeout : exn -> int -> ('a -> 'b) -> 'a -> 'b 
 
 (*------------------------------------------------------------------*)
 val fst_map : ('a -> 'c) -> 'a * 'b -> 'c

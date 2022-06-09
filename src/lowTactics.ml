@@ -1806,27 +1806,33 @@ module EquivLT = MkCommonLowTac (ES)
 (*------------------------------------------------------------------*)
 (** {3 Rewrite} *)
 
-type f_simpl = strong:bool -> close:bool -> Goal.t Tactics.tac
+type f_simpl =
+  red_param:Reduction.red_param ->
+  strong:bool -> close:bool ->
+  Goal.t Tactics.tac
 
 let do_s_item
     (simpl : f_simpl)
     (s_item : Args.s_item)
     (s : Goal.t) : Goal.t list
   =
-  match s_item with
+  let s_item_body, args = s_item in
+  let red_param = Reduction.rp_default in
+  let red_param = Reduction.parse_simpl_args red_param args in
+  match s_item_body with
   | Args.Simplify l ->
-    let tac = simpl ~strong:true ~close:false in
+    let tac = simpl ~red_param ~strong:true ~close:false in
     Tactics.run tac s
 
   | Args.Tryauto l ->
-    let tac = Tactics.try_tac (simpl ~strong:true ~close:true) in
+    let tac = Tactics.try_tac (simpl ~red_param ~strong:true ~close:true) in
     Tactics.run tac s
 
   | Args.Tryautosimpl l ->
     let tac =
       Tactics.andthen         (* FIXME: inneficient *)
-        (Tactics.try_tac (simpl ~strong:true ~close:true))
-        (simpl ~strong:true ~close:false)
+        (Tactics.try_tac (simpl ~red_param ~strong:true ~close:true))
+        (simpl ~red_param ~strong:true ~close:false)
     in
     Tactics.run tac s
 
