@@ -80,7 +80,10 @@ val get_dummy_definition :
 (*------------------------------------------------------------------*)
 type system_map_arg =
   | ADescr  of Action.descr 
-  | AGlobal of { is : Vars.vars; ts : Vars.var; inputs : Vars.vars }
+  | AGlobal of { is : Vars.vars; ts : Vars.var;
+                 ac_descrs : Action.descr list; inputs : Vars.vars }
+(* ac_descrs is the list of actions that have a shape where the macro
+   is defined *)
 
 (*------------------------------------------------------------------*)
 (** Given the name [ns] of a macro as well as a function [f] over

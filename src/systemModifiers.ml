@@ -1200,7 +1200,7 @@ let global_rewrite
   let subgs = ref [] in
 
   let fmap (arg : system_map_arg) (ms : Symbols.macro) (t : Term.term) 
-    : Term.term 
+      : Term.term 
     =
     let vars, ts, expand_context = match arg with
       | Macros.ADescr d -> 
@@ -1208,32 +1208,59 @@ let global_rewrite
          Term.mk_action d.name d.indices,
          Macros.InSequent
         
-      | Macros.AGlobal { is; ts; inputs} ->
+      | Macros.AGlobal { is; ts; ac_descrs; inputs } ->
          Vars.of_list (ts :: is @ inputs), 
          Term.mk_var ts,
          Macros.InGlobal { inputs }
     in
-    (* hypothesis: the timestamp the macro is at happens *)
-    let hyp_hap = Term.mk_happens ts in
-    
     (* new empty sequent *)
     let env = Env.init ~table ~vars ~system:context () in
     let s = TS.init ~env ~hint_db Term.mk_false in
- 
+
+    (* hypothesis: the timestamp the macro is at happens *)
+    let hyp_hap = Term.mk_happens ts in
     (* add hyp_hap as hypothesis, so it's available when do_rewrite tries to rewrite *)
     let (hyp_hap_id, s_hap) = TS.LocalHyps.add_i AnyName hyp_hap s in 
+
+    (* hypothesis for global macros: ts is one of the shapes where the action is defined *)
+    let (hyp_hap2_oid, s_hap2) =
+      match arg with
+      | Macros.AGlobal { is; ts; ac_descrs; inputs } ->
+         let lex =
+           List.map
+             (fun (acd:Action.descr) -> (* formula: exists indices. ts = ac(indices) *)
+               let tts = Term.mk_var ts in
+               let _,ind,_ = Term.refresh_vars_env (TS.vars s_hap) acd.indices in 
+               let tac = Action.(Term.mk_action acd.name ind) in
+               let eq = Term.mk_eq ~simpl:true tts tac in
+               let ex = Term.mk_exists ~simpl:true ind eq in
+               ex)
+             ac_descrs
+         in
+         let hyp_hap2 = Term.mk_ors ~simpl:true lex in
+         let (hyp_hap2_id, s_hap2) = TS.LocalHyps.add_i AnyName hyp_hap2 s_hap in
+         (Some hyp_hap2_id, s_hap2)
+      | _ -> (None, s_hap)
+    in
     
     (* rewrite, generate subgoals *)
-    let t, subgs' = do_rw_args expand_context rw s_hap t in
+    let t, subgs' = do_rw_args expand_context rw s_hap2 t in
     let subgs' = TraceTactics.tryauto subgs' in (* auto close easy goals *)
-    let subgs' = (* move hyp_hap back to the goal, we don't want hyps *)
-      List.map   (* w/ auto generated names *)
+    let subgs' = 
+      List.map  
         (fun g ->
-          let gg = LowTactics.TraceLT.revert hyp_hap_id g in
+          let gg = (* if global macro: revert hyp_hap2 *)
+            match hyp_hap2_oid with
+            | Some i -> LowTactics.TraceLT.revert i g
+            | None -> g
+          in
+          (* revert hyp_hap *)
+          let gg = LowTactics.TraceLT.revert hyp_hap_id gg in
+          (* rename the timestamp variable *)
           let gg = 
             match arg with
-            | Macros.AGlobal {is; ts; inputs } ->
-               let _, new_ts = Vars.make `Approx (TS.vars g) Type.Timestamp "t" in 
+            | Macros.AGlobal {is; ts; ac_descrs; inputs} ->
+               let _, new_ts = Vars.make `Approx (TS.vars gg) Type.Timestamp "t" in 
                TS.rename ts new_ts gg
             | _ -> gg
           in

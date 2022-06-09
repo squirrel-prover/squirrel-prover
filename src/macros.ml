@@ -123,7 +123,7 @@ let get_action_symb = function Term.Action (a,_) -> a | _ -> assert false
 
 let is_prefix strict a b =
   match Action.distance a b with
-  | None -> false     (* [a] and [b] incomparable *)
+  | None -> false     (* [a] not prefix of [b] *)
   | Some i -> match strict with
     | `Large -> true
     | `Strict -> i > 0
@@ -427,7 +427,8 @@ let get_dummy_definition
 (*------------------------------------------------------------------*)
 type system_map_arg =
   | ADescr  of Action.descr 
-  | AGlobal of { is : Vars.vars; ts : Vars.var; inputs : Vars.vars }
+  | AGlobal of { is : Vars.vars; ts : Vars.var; 
+                 ac_descrs : Action.descr list; inputs : Vars.vars }
 
 (*------------------------------------------------------------------*)
 (** Given the name [ns] of a macro as well as a function [f] over
@@ -452,11 +453,25 @@ let update_global_data
   | Global_data data when List.mem_assoc old_system data.bodies ->
     assert (not (List.mem_assoc new_system data.bodies));
     let body = 
+      (* old body *)
       let body = get_single_body old_system data in
+      (* find all actions in the old system that have a shape where
+         the macro is defined *)
+      let actions_map = System.descrs table old_system.system in
+      let strict, prefix_shape = data.action in
+      let possible_actions = 
+        S.Msh.fold
+          (fun shape act acs->
+            let right_shape = is_prefix strict prefix_shape shape in
+            if right_shape then act::acs else acs)
+        actions_map
+        []
+      in
       let aglob = AGlobal { 
           is = data.indices; 
           ts = data.ts; 
-          inputs = data.inputs 
+          ac_descrs = possible_actions;
+          inputs = data.inputs ;
         } in
       func aglob ms body 
     in
