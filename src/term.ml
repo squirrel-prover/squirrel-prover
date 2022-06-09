@@ -822,7 +822,7 @@ and _pp
 
   (* function symbol, general case *)
   | Fun (f,_,terms) ->
-    Fmt.pf ppf "@[<hov>%a(%a)@]"
+    Fmt.pf ppf "@[<hov 2>%a(%a)@]"
       pp_fsymb f
       (Utils.pp_ne_list
          "%a"
