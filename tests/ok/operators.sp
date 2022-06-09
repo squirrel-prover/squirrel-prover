@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 op triple (x, y, z : message) : message = <x, <y, z>>.
 

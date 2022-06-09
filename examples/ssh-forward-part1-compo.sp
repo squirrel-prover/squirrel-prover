@@ -43,7 +43,7 @@ In Proceedings of the 2020 ACM SIGSAC Conference on Computer and
 Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
 
-set autoIntro=false.
+include Basic.
 
 abstract ok : message
 abstract ko : message
@@ -66,7 +66,7 @@ name k : index -> index -> message
 abstract enc : message -> message -> message
 abstract dec : message -> message -> message
 
-ddh g, (^) where group:message exposants:message.
+ddh g, (^) where group:message exponents:message.
 
 (* As ssh uses a non keyed hash function, we rely on a fixed key hKey known to the attacker *)
 (* Note that hKey has to be a name and not a constant and the attacker can compute h values with the oracle.  *)
@@ -205,20 +205,22 @@ Proof.
   destruct HcOk as [Hpk HcOk].
   rewrite !Hpk in HcOk.
   euf HcOk => Euf.
-  destruct Euf as [H [_|[i x1 x2 H1]]]; 1: by auto.
-  expand sidP1; destruct H1 as [_|[x3 H1]].
+    + destruct Euf as [H [_|[i x1 x2 H1]]]; 1: by auto.
+      expand sidP1; destruct H1 as [_|[x3 H1]].
 
-  collision => _; use HcFail with i.
-  by auto.
+        - collision => _; use HcFail with i.
+          by auto.
 
-  by use hashnotfor with <<g^a1,input@P1>,input@P1^a1>, x3.
+        - by use hashnotfor with <<g^a1,input@P1>,input@P1^a1>, x3.
 
-  intro Heq.
-  expand sidP1; case Euf; expand sidS1; collision => _;
-  use freshindex as [l _];
-  use HcFail with l.
-  by auto.
-  by auto.
+    + intro Heq.
+      expand sidP1. case Euf. 
+      - expand sidS1. collision => _.
+        use freshindex as [l _].
+        use HcFail with l => //.
+      - expand sidS1. collision => _.
+        use freshindex as [l _].
+        use HcFail with l => //.
 Qed.
 
 (** Prove that the condition above the only diff term inside P is never true. **)
@@ -230,18 +232,17 @@ Proof.
   expand cond.
   expand sidS1; euf HcOk => Euf.
 
-  destruct Euf as [[_|H1] H2]; 1: by auto.
-  destruct H1 as [i x x1 [_|[x2 H1]]].
+    + destruct Euf as [[_|H1] H2]; 1: by auto.
+      destruct H1 as [i x x1 [_|[x2 H1]]].
 
-  use HcFail with i.
-  by collision.
+       - use HcFail with i.
+         by collision.
 
-  by use hashnotfor with <<input@S,g^b1>,input@S^b1>, x2.
+       - by use hashnotfor with <<input@S,g^b1>,input@S^b1>, x2.
 
-  intro _; case Euf; expand sidP1; collision => _;
-  use freshindex as [l _];
-  use HcFail with l;
-  auto.
+    + intro _; case Euf.
+        - expand sidP1; collision => _; use freshindex as [l _]; use HcFail with l => //.
+        - expand sidP1; collision => _; use freshindex as [l _]; use HcFail with l => //.
 Qed.
 
 
@@ -255,37 +256,39 @@ Proof.
 
    induction t; try (by expandall; apply IH).
 
-   (* init *)
-   auto.
+   + (* init *)
+     auto.
 
-   (* Pfail *)
-   expand frame.
+   + (* Pfail *)
+     expand frame.
 
-   equivalent exec@Pfail, False.
-     expand exec.
-     split; 2: by auto => _.
-     depends Pok, Pfail => // _.
-     executable pred(Pfail); 1,2: by auto.
-     intro He; use He with Pok; 2: by auto.
+     have -> : exec@Pfail <=> false. {
+       expand exec.
+       split; 2: by auto => _.
+       depends Pok, Pfail => // _.
+       executable pred(Pfail); 1,2: by auto.
+       intro He; use He with Pok; 2: by auto.
+       
+       expand exec.
+       by use P_charac.
+     }
 
-     expand exec.
-     by use P_charac.
+     by rewrite if_false in 7.
 
-   by noif 7.
+   + (* Sfail *)
+     expand frame.
 
-   (* Sfail *)
-   expand frame.
+     have -> : exec@Sfail <=> False. {
+       expand exec.
+       split; 2: by auto => _.
+       depends Sok, Sfail => // _.
+       executable pred(Sfail); 1,2: by auto.
+       intro He; use He with Sok; 2: by auto.
+       
+       expand exec.
+       by use S_charac.
+     }
 
-   equivalent exec@Sfail, False.
-     expand exec.
-     split; 2: by auto => _.
-     depends Sok, Sfail => // _.
-     executable pred(Sfail); 1,2: by auto.
-     intro He; use He with Sok; 2: by auto.
-
-     expand exec.
-     by use S_charac.
-
-   by noif 7.
+     by rewrite if_false in 7.
 
 Qed.

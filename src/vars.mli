@@ -83,11 +83,14 @@ val mem_s : env -> string -> bool
 (** Note: pattern variables are not uniquely characterized by a string *)
 val find : env -> string -> var 
 
+val add_var  : var  -> env -> env
+val add_vars : vars -> env -> env
+
 (** [rm_var env v] returns [env] minus the variable [v].
   * returns the same [env] if no variable is found. *)
-val rm_var : env -> var -> env
+val rm_var : var -> env -> env
 
-val rm_vars : env -> var list -> env
+val rm_vars : vars -> env ->  env
 
 
 (*------------------------------------------------------------------*)

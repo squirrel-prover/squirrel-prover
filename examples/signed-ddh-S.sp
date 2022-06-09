@@ -37,7 +37,7 @@ name a : index -> message
 name b : index -> message
 name k :  index -> index -> message
 
-ddh g, (^) where group:message exposants:message.
+ddh g, (^) where group:message exponents:message.
 
 signature sign,checksign,pk
 
@@ -70,27 +70,30 @@ process Schall(j:index) =
       else
         out(cS, diff(ok,ko))
 
-system [secretS] (!_i P(i) | !_j Schall(j)).
+system  (!_i P(i) | !_j Schall(j)).
+
+include Basic.
 
 (**
 In the proof of strong secrecy for the system `secretS`, we will use
 the following property, stating that whenever S accepts a message from P,
 this message is of the form `<<_,x>,_>` where `x = g^a(i)`.
 *)
-goal [secretS] S_charac (j:index):
+goal  S_charac (j:index):
   happens(Schall1(j)) =>
     exec@Schall1(j) =>
       exists (i:index), snd(input@Schall(j)) = g^a(i).
 Proof.
   intro Hap Hexec.
-  expand exec.
-  executable pred(Schall1(j)).
-  depends Schall(j), Schall1(j).
-  use H1 with Schall(j).
+  executable pred(Schall1(j)) => //.
+  depends Schall(j), Schall1(j) => //.
+  intro Ord Hexec'.
+  use Hexec' with Schall(j) as Hyp => //.
   expand exec, cond, pkp(j)@Schall1(j).
-  assert fst(input@Schall(j)) = pk(skP) as Meq'.
-  rewrite Meq' in H0.
-  euf H0.
+  assert fst(input@Schall(j)) = pk(skP) as Meq' => //.
+  rewrite Meq' in Hexec. destruct Hexec as [Hexec Hcheck].
+  euf Hcheck.
+  intro *.
   by exists i.
 Qed.
 
@@ -98,29 +101,35 @@ Qed.
 We show the counterpart of the property `strongSecP`, this time for the
 system `secretS`. The proof is carried out exactly in the same way.
 *)
-equiv [secretS] strongSecS.
+equiv strongSecS.
 Proof.
   enrich
     skP, skS,
     seq(i:index ->g^a(i)),
     seq(j:index ->g^b(j)),
-    seq(i,j:index ->diff(g^a(i)^b(j),g^k(i,j))).
+    seq(i,j:index ->diff( g ^ a(i), g) ^ diff( b(j), k(i,j))).
 
   induction t; try (by expandall; apply IH).
 
-  (* init *)
-  expandall.
-  by ddh g,a,b,k.
+    + (* init *)
+      expandall.
+      by ddh g,a,b,k.
 
-  (* Schall3 *)
-  expand frame, exec, output.
-  equivalent exec@pred(Schall3(j)) && cond@Schall3(j), False.
-    expand cond.
-    executable pred(Schall3(j)).
-    depends Schall1(j), Schall3(j).
-    use H2 with Schall1(j).
-    use S_charac with j.
-    by use H1 with i.
+    + (* Schall3 *)
+      expand frame, exec, output.
+      have ->: (exec@pred(Schall3(j)) && cond@Schall3(j)) <=> False.
+      {split => //. 
+       intro [Hexec Hcond].
+       expand cond.
+       depends Schall1(j), Schall3(j) => //.
+       intro Ord.
+       executable pred(Schall3(j)) => //.
+       intro Hexec'.
+       use Hexec' with Schall1(j) as Hexec1 => //.
+       expand exec.
+       use S_charac with j as [j0 Hyp] => //.
+       by use Hcond with j0.}
+
   fa 5. fa 6.
-  by noif 6.
+  by rewrite if_false.
 Qed.

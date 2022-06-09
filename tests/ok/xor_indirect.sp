@@ -1,4 +1,6 @@
-set autoIntro=false.
+
+
+include Basic.
 
 channel c
 
@@ -22,7 +24,7 @@ Proof.
   expand output@A(i,j).
   expand output@A(ii,jj). 
   xor 1.
-  nosimpl(yesif 1).
+  nosimpl(rewrite if_true in 1).
   use len_ok with ii,jj.
   by use len_ok with i,j.
   admit. (* Induction hypothesis.*)
@@ -38,7 +40,7 @@ Proof.
   expand output@A(i,j).
   expand output@A(ii,jj).
   xor 1, diff(b(i,j),b(ii,jj)).
-  nosimpl(yesif 1).
+  nosimpl(rewrite if_true in 1).
   by use len_ok with i,j; use len_ok with ii,jj.
   admit. (* Induction hypothesis.*)
 Qed.

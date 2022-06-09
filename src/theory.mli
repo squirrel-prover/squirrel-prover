@@ -46,7 +46,7 @@ type term_i =
   | Tpat  
   | Diff  of term * term
   | Seq   of bnds * term
-  | Find  of lsymb list * term * term * term
+  | Find  of bnds * term * term * term
 
   | App of lsymb * term list
   (** An application of a symbol to some arguments which as not been
@@ -65,7 +65,6 @@ type term_i =
 
 and term = term_i L.located
 
-type formula = term
 
 val pp_i : Format.formatter -> term_i -> unit
 val pp   : Format.formatter -> term   -> unit
@@ -92,7 +91,7 @@ type global_formula = global_formula_i Location.located
 
 and global_formula_i =
   | PEquiv  of equiv
-  | PReach  of formula
+  | PReach  of term
   | PImpl   of global_formula * global_formula
   | PAnd    of global_formula * global_formula
   | POr     of global_formula * global_formula
@@ -113,12 +112,15 @@ val declare_hash :
   lsymb ->
   Symbols.table
 
-(** DDH assumption on a group with generator gen and exponentiation exp. *)
-val declare_ddh :
+(** DH assumption given by h on a group with generator gen, exponentiation exp, optionnally multiplication mult. *)
+val declare_dh :
   Symbols.table ->
+  Symbols.dh_hyp list ->
   ?group_ty:Type.ty ->
   ?exp_ty:Type.ty ->
-  lsymb -> lsymb -> Symbols.symb_type -> 
+  lsymb ->
+  lsymb * Symbols.symb_type -> 
+  (lsymb * Symbols.symb_type) option -> 
   Symbols.table
 
 (** Asymmetric encryption function symbols are defined by the triplet
@@ -222,12 +224,11 @@ type conversion_error_i =
   | Type_error           of term_i * Type.ty
   | Timestamp_expected   of term_i
   | Timestamp_unexpected of term_i
-  (* | Untypable_equality   of term_i *)
   | Unsupported_ord      of term_i
   | String_expected      of term_i
   | Int_expected         of term_i
   | Tactic_type          of string
-  | Index_not_var        of term_i
+  | NotVar
   | Assign_no_state      of string
   | BadNamespace         of string * Symbols.namespace
   | Freetyunivar
@@ -236,8 +237,10 @@ type conversion_error_i =
   | BadInfixDecl
   | PatNotAllowed
   | ExplicitTSInProc 
-  | UndefInSystem of SystemExpr.t
-    
+  | UndefInSystem        of SystemExpr.t
+  | MissingSystem
+  | BadProjInSubterm     of Term.projs * Term.projs
+                              
 type conversion_error = L.t * conversion_error_i
 
 exception Conv of conversion_error
@@ -250,8 +253,9 @@ val pp_error :
 
 val check : 
   Env.t -> ?local:bool -> ?pat:bool ->
-  Type.Infer.env -> term -> Type.ty
-  -> unit
+  Type.Infer.env -> Term.projs ->
+  term -> Type.ty ->
+  unit
 
 val check_state : Symbols.table -> lsymb -> int -> Type.ty
 
@@ -276,13 +280,13 @@ type subst = esubst list
 
 val parse_subst : Env.t -> Vars.var list -> term list -> Term.subst
 
-(** Conversion context.
-  * - [InGoal]: we are converting a term in a goal (or tactic). All
-  *   timestamps must be explicitely given.
-  * - [InProc ts]: we are converting a term in a process at an implicit
-  *   timestamp [ts]. *)
+(** Conversion contexts.
+    - [InGoal]: converting a term in a goal (or tactic). All
+      timestamps must be explicitely given.
+    - [InProc (projs, ts)]: converting a term in a process at an implicit
+      timestamp [ts], with projections [projs]. *)
 type conv_cntxt =
-  | InProc of Term.term
+  | InProc of Term.projs * Term.term
   | InGoal
 
 type conv_env = { 
@@ -290,7 +294,9 @@ type conv_env = {
   cntxt : conv_cntxt; 
 }
 
-(** Converts and infer the type. *)
+(** Converts and infers the type.
+    Only the [set] part of the [SystemExpr.context] inside the environment
+    is useful. *)
 val convert : 
   ?ty:Type.ty ->
   ?ty_env:Type.Infer.env -> 
@@ -308,6 +314,9 @@ val convert_ht :
   hterm -> 
   Type.hty * Term.hterm
 
+(** Converts and infers the type.
+    Each part of the [SystemExpr.context] inside the environment
+    is used when converting the corresponding kind of atom. *)
 val convert_global_formula : conv_env -> global_formula -> Equiv.form
 
 (** [find_app_terms t names] returns the sublist of [names] for which there

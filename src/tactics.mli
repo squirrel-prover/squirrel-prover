@@ -36,8 +36,8 @@ type ssc_error_c =
   | E_message
   | E_elem
   | E_indirect of
-      Symbols.action Symbols.t *
-      [`Cond | `Output | `Update of Symbols.macro Symbols.t]
+      Symbols.action *
+      [`Cond | `Output | `Update of Symbols.macro | `Global of Symbols.macro]
 
 type ssc_error = Term.term * ssc_error_c
 
@@ -56,6 +56,8 @@ type tac_error_i =
   | BadSSCDetailed of ssc_error list
   | NoSSC
   | NoAssumpSystem
+  | Rewrite_equiv_system_mismatch
+  | Underspecified_system
   | NotDepends of string * string
   | NotDDHContext
   | SEncNoRandom
@@ -70,8 +72,6 @@ type tac_error_i =
   | GoalBadShape of string
   | GoalNotPQSound
   | TacticNotPQSound
-  | SystemError     of System.system_error
-  | SystemExprError of SystemExpr.system_expr_err
   | CongrFail
   | GoalNotClosed
   | NothingToIntroduce
@@ -197,12 +197,6 @@ module AST (M:S) : AST_sig
 (** Raise a soft failure. *)
 val soft_failure : ?loc:Location.t -> tac_error_i -> 'a
 
-(** Unwrap the result of a computation that may timeout, or raise a soft
-    timeout failure. *)
-val timeout_get : 'a Utils.timeout_r -> 'a
-
 (** Raise a hard failure. *)
 val hard_failure : ?loc:Location.t -> tac_error_i -> 'a
 
-(** Print the system to the user. *)
-val print_system : Symbols.table -> SystemExpr.t -> unit

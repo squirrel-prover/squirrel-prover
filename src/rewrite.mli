@@ -1,48 +1,73 @@
-(** A rewrite rule.
-    Invariant: if
-    [{ rw_tyvars = tyvars; rw_vars = sv; rw_conds = φ; rw_rw = (l,r); }]
-    is a rewrite rule, then:
-    - sv ⊆ FV(l)
-    - ((FV(r) ∪ FV(φ)) ∩ sv) ⊆ FV(l) *)
-type rw_erule = {
-  rw_tyvars : Type.tvars;     (** type variables *)
-  rw_vars   : Vars.Sv.t;      (** term variables *)
-  rw_conds  : Term.term list; (** premisses *)
-  rw_rw     : Term.esubst;    (** pair (source, destination) *)
-}
-
-val pp_rw_erule : Format.formatter -> rw_erule -> unit
+module Pos  = Match.Pos
 
 (*------------------------------------------------------------------*)
-val check_erule : rw_erule -> unit
-
-val pat_to_rw_erule :
-  ?loc:Location.t ->
-  [< `LeftToRight | `RightToLeft ] ->
-  Term.term Match.pat ->
-  rw_erule
+include module type of LowRewrite
 
 (*------------------------------------------------------------------*)
-(** Try to do a rewrite at head position in a term.  *)
+type error = 
+  | NothingToRewrite
+  | MaxNestedRewriting
+  | RuleBadSystems of string
+
+(*------------------------------------------------------------------*)
+(** Try to do a rewrite at head position in a term.
+    Return: rewritten term, proof obligations *)
 val rewrite_head :
   Symbols.table ->
+  Macros.expand_context ->
+  Hyps.TraceHyps.hyps Lazy.t ->
   SystemExpr.t ->
-  rw_erule ->
+  rw_rule ->
   Term.term ->
-  (Term.term * Term.term list) option
+  (Term.term * (SE.arbitrary * Term.term) list) option
 
 (*------------------------------------------------------------------*)
-type rw_res = [
-  | `Result of Equiv.any_form * Term.term list
-  | `NothingToRewrite
-  | `MaxNestedRewriting
-]
+type rw_res = Equiv.any_form * (SE.context * Term.term) list
+
+type rw_res_opt = 
+  | RW_Result of rw_res
+  | RW_Failed of error
 
 (*------------------------------------------------------------------*)
 val rewrite :
   Symbols.table ->
-  SystemExpr.t ->
+  SystemExpr.context ->
+  Macros.expand_context ->
   Vars.env ->
+  Hyps.TraceHyps.hyps ->
   TacticsArgs.rw_count ->
-  rw_erule ->
-  Equiv.any_form -> rw_res
+  rw_rule ->
+  Equiv.any_form -> 
+  rw_res_opt
+
+(*------------------------------------------------------------------*)
+(** Same as [rewrite], but throws a user-level [Tactic] error if
+    the rewriting fails  *)
+val rewrite_exn :
+  loc:L.t ->
+  Symbols.table ->
+  SystemExpr.context ->
+  Macros.expand_context ->
+  Vars.env ->
+  Hyps.TraceHyps.hyps ->
+  TacticsArgs.rw_count ->
+  rw_rule ->
+  Equiv.any_form -> 
+  rw_res
+
+(*------------------------------------------------------------------*)
+(** {2 Higher-level rewrite} *)
+
+(** Rewrite a rule as much as possible, allowing to do it in a top-down or 
+    bottom-up fashion.
+    - the rewriting rule can depend on the position in the term. 
+    - the rule conditions [rw_cond] and system [rw_system] must be, 
+      resp., empty and the [system] we are rewriting in. *)
+val high_rewrite :
+  mode : [`TopDown of bool | `BottomUp] ->
+  Symbols.table ->
+  SE.t ->
+  Vars.env ->
+  (Vars.vars -> Pos.pos -> rw_rule option) ->
+  Term.term ->
+  Term.term 

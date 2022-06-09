@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 channel ch
 abstract ok : message
@@ -43,7 +43,7 @@ Proof.
 Qed.
 
 goal _ (i : index, j: index, k : index) :
-  (False || False || False) => False.
+  (false || false || false) => false.
 Proof.
  intro [_|_|_]; assumption.
 Qed.
@@ -54,7 +54,7 @@ goal _ (i : index, j: index, k : index) :
    ((a = b && a = c && c = d) => c = d)).
 Proof.
  split;
- 1: split.
+ 2: split.
  intro [_ _ _]; assumption.
  intro [_ _ _]; assumption.
  intro [_ _ _]; assumption.

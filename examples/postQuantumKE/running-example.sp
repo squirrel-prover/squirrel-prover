@@ -36,6 +36,8 @@ KIR := h(s,kI2) XOR h(s,kR2)
 
 *******************************************************************************)
 
+include Basic.
+
 (***********************)
 (* Global Declarations *)
 (***********************)
@@ -69,7 +71,6 @@ channel cR.
 (* Protocol Agents Declarations *)
 (********************************)
 
-
 process Initiator =
  (* Fresh ephemeral secret share. *)
  new kI;
@@ -101,7 +102,6 @@ the previous one. *)
 system mainCCAkR = [main/left] with gcca, enc(kI, rI,
 pk(skR)).
 
-
 (*******************************************)
 (*** Strong Secrecy of the derived key ***)
 (*******************************************)
@@ -111,50 +111,42 @@ name ikIR : message.
 
 (* And we must assume that hashes are of the same length as the expected length of secret keys.  *)
 axiom  [mainCCAkR] len_hashes (x1,x2:message) : len(h(x1,x2)) = len(s).
-
-
 (* And we prove that whenever the initiator terminates, which correspond to
 action Initiator1, the key stored in the state sIR@Initiator1 is
 indistinguishable from ikIR.  Remark that this holds even if the encryption
 received by the initiator is dishonnest, because the attacker cannot compute kI.
  *)
-global goal [mainCCAkR] resp_key: [happens(Initiator1)] -> equiv(frame@Initiator1, diff(sIR@Initiator1, ikIR)).
+global goal [mainCCAkR, mainCCAkR] resp_key: [happens(Initiator1)] -> equiv(frame@Initiator1, diff(sIR@Initiator1, ikIR)).
 Proof.
-intro Hap .
+  intro Hap .
 
-(* We expand all the macros. *)
-expandall.
+  (* We expand all the macros. *)
+  expandall.
+  (* This action has a trivial output, so we can simplify it with function applications *)
+  fa 0.
 
-(* This action has a trivial output, so we can simplify it with function applications *)
-fa 0.
+  (* We apply the prf assumption. *)
+  prf 1, h(s,kI).
+  (* The condition for the validity of the PRF application is trivial, as kI is
+  hidden from the attacker through the CCA application. *) (* We thus simplify the
+  trivial conditional. *) 
+  rewrite if_true // in 1.
+  (* We now use the one-time pad property of the xor. *)
+  xor 1.
+  (* We show that the condition of the introduced conditional is always true. *)
+  rewrite if_true in 1.
+  (* First by using the axiom saying that the length of the hash output is equal
+  to the length of the public name s. *)
+  rewrite len_hashes.
+  (* Then using the assumption that all names of the same length. *)
+  by namelength s,n_PRF.
 
-(* We apply the prf assumption. *)
-prf 1, h(s,kI).
+  (* Finally, we have to prove that two completely fresh names are
+  indistinguishable. This is done with the fresh tactic. *)
+  fresh 1.
 
-(* The condition for the validity of the PRF application is trivial, as kI is
-hidden from the attacker through the CCA application. *) (* We thus simplify the
-trivial conditional. *) yesif 1.
-
-(* We now use the one-time pad property of the xor. *)
-xor 1.
-
-(* We show that the condition of the introduced conditional is always true. *)
-yesif 1.
-
-(* First by using the axiom saying that the length of the hash output is equal
-to the length of the public name s. *)
-rewrite len_hashes.
-(* Then using the assumption that all names of the same length. *)
-namelength s,n_PRF.
-
-(* Finally, we have to prove that two completely fresh names are
-indistinguishable. This is done with the fresh tactic. *)
-fresh 1.
-
-
-(* We only have left to prove that before the computation of the key, the
-protocol was indistinguishable, which is trivial because it did not contain any
-diff operations. *)
-diffeq.
-
+  (* We only have left to prove that before the computation of the key, the
+  protocol was indistinguishable, which is trivial because it did not contain any
+  diff operations. *)
+  diffeq.
 Qed.

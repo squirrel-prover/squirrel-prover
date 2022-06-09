@@ -1,4 +1,4 @@
-(* set autoIntro=false. *)
+(*  *)
 
 (* Testing block creation, input terms and index management *)
 channel c

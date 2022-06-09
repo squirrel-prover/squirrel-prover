@@ -23,3 +23,5 @@ sanity
 _coverage/
 *.coverage
 /src/commit.ml
+.DS_Store
+\#*\#

@@ -4,11 +4,12 @@ type state
 
 val pp_state : Format.formatter -> state -> unit
 
-(** [complete l] construct a complete term rewritting system from the set of
+(** [complete ?exn l] construct a complete term rewritting system from the set of
     equations inside l.
-    May timeout. *)
+    - [exn] is thrown if the tactic timeout.
+      Default to [Tactics.Tactic_hard_failure TacTimeout]. *)
 val complete : 
-  Symbols.table -> Term.esubst list -> state Utils.timeout_r
+  ?exn:exn -> Symbols.table -> Term.esubst list -> state 
 
 (** [check_equalities s l] checks that all equalities inside [l] hold
     w.r.t [s] *)

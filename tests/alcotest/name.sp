@@ -1,4 +1,4 @@
-(* set autoIntro=false. *)
+(*  *)
 
 (* Testing name declarations *)
 name n:message

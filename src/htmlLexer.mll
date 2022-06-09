@@ -13,7 +13,7 @@ rule token = parse
                     Buffer.reset buf;
                     DOT(contents) }
 | "(**"             { incr counter;
-                    comment lexbuf }
+                    comment_begin_line lexbuf }
 | _ as l          { CHAR(l) }
 
 and comment = parse

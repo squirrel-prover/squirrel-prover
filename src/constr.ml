@@ -1,10 +1,10 @@
 (** - Huet's unification algorithm using union-find.
      See "Unification: A Multidisciplinary Survey" by Kevin Knight.
-    
+
     - Note that there is difficulty in the handling of names, which is not
     standard. Basically, they should behave as function symbols that dont have
     to be unified, except with other names.
-    
+
     - Also, note that during the unification and graph-based inequality
     constraints solving, the union-find structure contains an
     *under-approximation* of equality equivalence classes. *)
@@ -19,15 +19,15 @@ let dbg s = Printer.prt (if Config.debug_constr () then `Dbg else `Ignore) s
 
 (*------------------------------------------------------------------*)
 module TraceLits : sig[@warning "-32"]
-  type t = Term.literal 
+  type t = Term.literal
   val compare : t -> t -> int
   val equal : t -> t -> bool
   val hash : t -> int
   val mk : Term.literals -> t array
   module Memo : Ephemeron.S with type key = t array
 end = struct
-  type t = Term.literal 
- 
+  type t = Term.literal
+
   let mk l = Array.of_list (List.sort_uniq Stdlib.compare l)
 
   let compare = Stdlib.compare
@@ -35,14 +35,14 @@ end = struct
   let equal t t' = t = t'
 
   (* FIXME: term hashconsing *)
-  let hash ((l,t) : Term.literal) = 
+  let hash ((l,t) : Term.literal) =
     let h = match l with
         | `Neg -> 0
         | `Pos -> 1
     in
     hcombine h (Term.hash (Term.xatom_to_form t))
 
-  module Memo = Ephemeron.Kn.Make(struct 
+  module Memo = Ephemeron.Kn.Make(struct
       type _t = t
       type t = _t
       let equal = equal
@@ -52,6 +52,8 @@ end
 
 
 (*------------------------------------------------------------------*)
+exception Unsupported
+  
 module Utv : sig
   type ut = { hash : int;
               cnt  : ut_cnt }
@@ -59,17 +61,17 @@ module Utv : sig
   and ut_cnt = private
     | UVar  of Vars.var
     | UPred of ut
-    | UName of Symbols.action Symbols.t * ut list
+    | UName of Symbols.action * ut list
     | UInit
     | UUndef                    (* (x <> UUndef) iff. (Happens x) *)
 
   val uts    : Term.term -> ut
-  val uname  : Symbols.action Symbols.t -> ut list -> ut
+  val uname  : Symbols.action -> ut list -> ut
   val upred  : ut -> ut
   val uinit  : ut
   val uundef : ut
 
-  val ut_to_term : ut -> Term.term 
+  val ut_to_term : ut -> Term.term
 
   module Ut : Hashtbl.HashedType with type t = ut
 
@@ -80,7 +82,7 @@ end = struct
   and ut_cnt =
     | UVar  of Vars.var
     | UPred of ut
-    | UName of Symbols.action Symbols.t * ut list
+    | UName of Symbols.action * ut list
     | UInit
     | UUndef
 
@@ -95,24 +97,24 @@ end = struct
       | UInit -> 1
       | UUndef -> 2
       | UVar uv -> Utils.hcombine 3 (Hashtbl.hash uv)
-      | UName (a,ts) -> 
+      | UName (a,ts) ->
         Utils.hcombine_list (fun x -> x.hash) (Hashtbl.hash a) ts
 
     let equal t t' = match t.cnt, t'.cnt with
       | UPred t, UPred t' -> t.hash = t'.hash
-      | UInit, UInit 
+      | UInit, UInit
       | UUndef, UUndef -> true
       | UVar uv, UVar uv' -> uv = uv'
-      | UName (a,ts), UName (a',ts') -> 
+      | UName (a,ts), UName (a',ts') ->
         a = a' &&
         List.for_all2 (fun x y -> x.hash = y.hash) ts ts'
       | _ -> false
-      
+
   end
   module Hut = Ephemeron.K1.Make(Ut)
 
   let hcons_cpt = ref 0
-  let ht = Hut.create 256 
+  let ht = Hut.create 256
 
   let make cnt =
     let ut = { hash = !hcons_cpt ; cnt = cnt } in
@@ -128,8 +130,8 @@ end = struct
 
   let uinit = UInit |> make
 
-  let uundef = UUndef |> make              
-              
+  let uundef = UUndef |> make
+
   let upred u =
     if u.cnt = UInit || u.cnt = UUndef then uundef
     else UPred u |> make
@@ -139,17 +141,17 @@ end = struct
     | Term.Fun (fs, _, [ts]) when fs = Term.f_pred -> upred (uts ts)
     | Term.Action (s,_) when s = Symbols.init_action -> uinit
     | Term.Action (s,l) -> uname s (List.map uvar l)
-    | _ -> failwith "Not implemented"
+    | _ -> raise Unsupported      
 
   let ut_to_var (ut : ut) : Vars.var =
     match ut.cnt with
     | UVar v -> v
     | _ -> assert false
 
-  let rec ut_to_term (ut : ut) : Term.term = 
+  let rec ut_to_term (ut : ut) : Term.term =
     match ut.cnt with
     | UVar v -> Term.mk_var v
-    | UName (a, is) -> 
+    | UName (a, is) ->
       Term.mk_action a (List.map ut_to_var is)
     | UPred ut -> Term.mk_pred (ut_to_term ut)
     | UInit  -> Term.init
@@ -158,7 +160,7 @@ end
 
 open Utv
 
-let pp_uvar = Vars.pp 
+let pp_uvar = Vars.pp
 
 let rec pp_ut_cnt ppf = function
   | UVar uv  -> pp_uvar ppf uv
@@ -166,7 +168,7 @@ let rec pp_ut_cnt ppf = function
   | UName (a,is) ->
     Fmt.pf ppf "@[%a[%a]@]"
       Fmt.string (Symbols.to_string a)
-      (Fmt.list pp_ut_cnt) (List.map (fun x -> x.cnt) is)
+      (Fmt.list ~sep:Fmt.comma pp_ut_cnt) (List.map (fun x -> x.cnt) is)
   | UInit  -> Fmt.pf ppf "init"
   | UUndef -> Fmt.pf ppf "⊥"
 
@@ -193,19 +195,19 @@ module Form = struct
 
   (** Literals *)
   type lit = ord * ut * ut
-             
+
   (** Subset of formulas we use. *)
   type form =
     | Lit  of lit
     | Disj of form list        (* of length > 1 *)
     | Conj of form list        (* of length > 1 *)
-             
+
   (** Conjunction of formulas *)
   type conjunction = form list
 
   (** Disjunction of formulas *)
   type disjunction = form list
-      
+
   (*------------------------------------------------------------------*)
   (** Pretty printers *)
 
@@ -232,7 +234,7 @@ module Form = struct
 
   (*------------------------------------------------------------------*)
   (** Smart constructors *)
-      
+
   let disj = function
     | [] -> assert false
     | [f] -> f
@@ -255,7 +257,7 @@ module Form = struct
     | `Lt  -> (`Leq, l, r) :: [(`Neq, l, r)]
     | `Gt  -> (`Leq, r, l) :: [(`Neq, r, l)]
 
-  
+
   let not_ord o = match o with
     | `Eq  -> `Neq
     | `Neq -> `Eq
@@ -277,7 +279,7 @@ module Form = struct
     let rec doit (lit : Term.literal) : form list = match lit with
       | `Neg, `Happens t -> [Lit (`Eq,  uts t, uundef)]
       | `Pos, `Happens t -> [Lit (`Neq, uts t, uundef)]
-                            
+
       | `Pos, (`Comp ((_, t, _) as atom)) -> _mk atom
 
       (* We rewrite the negative literal as a positive literal, and recurse. *)
@@ -289,12 +291,12 @@ module Form = struct
         let lit = `Pos, `Comp (`Eq, t1, t2) in
         doit lit
 
-      (* Here, we need to build a disjunction to account for potentially 
-         undefined elements. 
+      (* Here, we need to build a disjunction to account for potentially
+         undefined elements.
          Indeed, when ⋄ ∈ {≤, <, ≥, >}, we have:
          ¬ (x ⋄ y) ⇔ (undef(x) ∨ undef(y) ∨ (x □ y))
          where □ is the standard negation of ⋄ (e.g. if ⋄ = ≤, then □ = >) *)
-      | `Neg, `Comp ((`Leq|`Lt|`Geq|`Gt) as ord, u, v) 
+      | `Neg, `Comp ((`Leq|`Lt|`Geq|`Gt) as ord, u, v)
         when Term.ty u = Type.Timestamp ->
         let nord = not_ord ord in
         let form =
@@ -306,11 +308,12 @@ module Form = struct
         [form]
 
       (* Type.Index *)
-      | `Neg, `Comp ((`Leq|`Lt|`Geq|`Gt), _, _) -> assert false
+      | `Neg, `Comp ((`Leq|`Lt|`Geq|`Gt), _, _) -> raise Unsupported
     in
     doit lit
-      
-  let mk_list l : conjunction = List.map mk l |> List.flatten 
+
+  let mk_list l : conjunction =
+    List.concat_map (fun t -> try mk t with Unsupported -> []) l
 end
 
 
@@ -318,7 +321,7 @@ end
 type constr_instance = {
   eqs     : (ut * ut) list;
   neqs    : (ut * ut) list;
-  leqs    : (ut * ut) list; 
+  leqs    : (ut * ut) list;
   clauses : Form.disjunction list;   (* clauses that have not yet been split *)
   uf      : Uuf.t;
 }
@@ -328,8 +331,8 @@ let pp_constr_instance ~full fmt inst =
   let pp_el s fmt (ut1, ut2) =
     Fmt.pf fmt "%a %s %a" pp_ut ut1 s pp_ut ut2 in
 
-  let pp_uf fmt =   
-    if full then 
+  let pp_uf fmt =
+    if full then
       Fmt.pf fmt "@[<hov 2>uf:@ %a@]@;" Uuf.print inst.uf
     else () in
 
@@ -347,16 +350,16 @@ let pp_constr_instance ~full fmt inst =
     (Fmt.list ~sep:Fmt.comma Form.pp_disj) inst.clauses
 
 (*------------------------------------------------------------------*)
-let term_lit acc (_,ut1,ut2) = ut1 :: ut2 :: acc 
+let term_lit acc (_,ut1,ut2) = ut1 :: ut2 :: acc
 
 let rec terms_form acc = function
   | Form.Lit lit -> term_lit acc lit
   | Form.Disj l
   | Form.Conj l -> terms_forms acc l
 
-and terms_forms acc l = List.fold_left terms_form acc l 
+and terms_forms acc l = List.fold_left terms_form acc l
 
-let all_terms (inst : constr_instance) =  
+let all_terms (inst : constr_instance) =
   (* init, undef *)
   let terms = [uundef; uinit] in
 
@@ -373,7 +376,7 @@ let rec subterms acc x = match x.cnt with
   | UPred y      -> subterms (x :: acc) y
   | UVar _
   | UInit
-  | UUndef -> x :: acc 
+  | UUndef -> x :: acc
 
 (*------------------------------------------------------------------*)
 let extends inst uts =
@@ -381,8 +384,8 @@ let extends inst uts =
             |> List.sort_uniq ut_compare in
   let uf = List.fold_left Uuf.extend inst.uf uts in
   { inst with uf = uf }
-  
-let add_elem el l = if List.mem el l then l else el :: l 
+
+let add_elem el l = if List.mem el l then l else el :: l
 
 let add_eqs ?(extend=true) inst (ut1,ut2) =
   let inst = if extend then extends inst [ut1;ut2] else inst in
@@ -398,11 +401,11 @@ let add_leqs ?(extend=true) inst (ut1,ut2) =
 
 let add_clause ?(extend=true) inst c =
   let uts = terms_forms [] c in
-  let inst = if extend then extends inst uts else inst in  
-  { inst with clauses = c :: inst.clauses } 
+  let inst = if extend then extends inst uts else inst in
+  { inst with clauses = c :: inst.clauses }
 
 (** Add a formula to a constraint solving instance *)
-let rec add_form ?(extend=true) (inst : constr_instance) (form : Form.form) = 
+let rec add_form ?(extend=true) (inst : constr_instance) (form : Form.form) =
 
   match form with
   | Form.Lit (`Eq,  ut1, ut2) -> add_eqs  ~extend inst (ut1,ut2)
@@ -414,7 +417,7 @@ let rec add_form ?(extend=true) (inst : constr_instance) (form : Form.form) =
   | Form.Conj l -> List.fold_left (add_form ~extend) inst l
 
 (** Add formulas to a constraint solving instance *)
-let add_forms ?(extend=true) inst forms = 
+let add_forms ?(extend=true) inst forms =
   List.fold_left add_form inst forms
 
 (*------------------------------------------------------------------*)
@@ -427,7 +430,7 @@ let mk_instance (l : Form.form list) : constr_instance =
   in
   let l = Form.Lit (`Neq, uinit, uundef) :: l in
   let inst = List.fold_left (add_form ~extend:false) inst l in
-  
+
   let elems = List.fold_left subterms [] (all_terms inst)
               |> List.sort_uniq ut_compare in
 
@@ -455,7 +458,7 @@ let mgu (uf : Uuf.t) (ut : ut) =
     else match ut.cnt with
       | UVar _ | UUndef | UInit ->
         let rut = Uuf.find uf ut in
-        
+
         if ut_equal rut ut then (uf, rut)
         else mgu_ uf rut (ut :: lv)
 
@@ -487,7 +490,7 @@ let mgu (uf : Uuf.t) (ut : ut) =
         let rpnut' = Uuf.find uf pnut' in
         if ut_equal rpnut' pnut' then (uf, rpnut')
         else mgu_ uf rpnut' (ut :: lv)
-  in 
+  in
 
   mgu_ uf ut []
 
@@ -515,10 +518,10 @@ let get_class uf u =
   List.find (fun classe ->
       List.exists (ut_equal u) classe
     ) classes
-  
+
 
 (* memoisation *)
-let get_class = 
+let get_class =
   let module Memo = Uuf.Memo2 (Ut) in
   let memo = Memo.create 256 in
   fun uf (ut : ut) ->
@@ -534,7 +537,7 @@ let is_not_init uf neqs (u : ut) =
   let uf, u = mgu uf u in
 
   (* Looks for an action [A(_)] in the equivalent class of [u].
-     Note that, because [Pred _] is larger than [Name _] in [norm_ut_compare], 
+     Note that, because [Pred _] is larger than [Name _] in [norm_ut_compare],
      we need to go through [u]'s full class. *)
   let u_class = get_class uf u in
   List.exists (fun u' -> match u'.cnt with
@@ -546,10 +549,10 @@ let is_not_init uf neqs (u : ut) =
   List.exists (fun (ut1,ut2) ->
       let uf,ut1 = mgu uf ut1
       and _, ut2 = mgu uf ut2 in
-      (ut_equal ut2 uinit && ut_equal ut1 u) || 
-      (ut_equal ut1 uinit && ut_equal ut2 u) 
+      (ut_equal ut2 uinit && ut_equal ut1 u) ||
+      (ut_equal ut1 uinit && ut_equal ut2 u)
     ) neqs
-  
+
 (*------------------------------------------------------------------*)
 (** [decomp u] returns the pair [(k,x]) where [k] is the maximal integer
     such that [u] equals [P^k(x)]. *)
@@ -570,11 +573,11 @@ let is_kpred uf u v =
 
 (** [is_undef uf ut] returns [true] if [ut] must be undefined in [uf]. *)
 let is_undef uf ut = snd (mgu uf ut) = uundef
-(* Remark: [uf] under-approximate equalities, hence any equality it contains 
+(* Remark: [uf] under-approximate equalities, hence any equality it contains
    is sound. *)
 
 (** [is_undef uf ut] returns [true] if [ut] must be defined in [uf],
-    under dis-equalities [neqs]. 
+    under dis-equalities [neqs].
     This does not look for instances of the axiom:
     ∀τ, (happens(τ) ∧ τ ≠ init) ⇒ happens(pred(τ))
 *)
@@ -588,9 +591,9 @@ let is_def ?explain:(explain=false) uf neqs ut =
   let init_is_kpred = is_kpred uf uinit ut in
   if explain && init_is_kpred then
     dbg "is_def(%a): %a is its k-predecessor" pp_ut ut pp_ut uinit;
-  
+
   (* Remark: we cannot use [uf] alone, as it is an under-approximation.
-     Instead, we look for a contradiction in the conjunction of [uf] and 
+     Instead, we look for a contradiction in the conjunction of [uf] and
      known inequalities [neqs]. *)
   let swap u v = if ut_equal u uundef then v, u else u, v in
   let in_neqs = List.exists (fun (u,v) ->
@@ -601,10 +604,10 @@ let is_def ?explain:(explain=false) uf neqs ut =
       (* ∃ k ≥ 0, u = P^k(ut) ∧ u ≠ undef  *)
 
       if explain && b then
-        dbg "is_def(%a): is equal to %a, and %a ≠ %a" 
+        dbg "is_def(%a): is equal to %a, and %a ≠ %a"
           pp_ut ut pp_ut u pp_ut u pp_ut uundef;
       b
-    ) neqs     
+    ) neqs
 
   in is_init || init_is_kpred || in_neqs
 
@@ -629,12 +632,12 @@ let norm_ut_compare x y = match x.cnt, y.cnt with
   | UInit, _       -> true
   | _, UInit       -> false
   | UUndef, UUndef -> true
- 
-(** [let sx,sy = swap x y] guarantees that [x] is greater than [y] for the 
+
+(** [let sx,sy = swap x y] guarantees that [x] is greater than [y] for the
    ordering [norm_ut_compare]. We use this to choose the representents in
    the union-find. *)
 let swap x y = if norm_ut_compare x y then x, y else y, x
-                                                    
+
 let no_mgu (x,defx) (y,defy) = match x.cnt, y.cnt with
   | UName (a,_), UName (a',_) ->
     if a <> a' && (defx || defy) then raise No_unif else ()
@@ -648,7 +651,7 @@ let unif inst eqs =
     | [] -> uf
     | (x,y) :: eqs ->
       let rx,ry = Uuf.find uf x, Uuf.find uf y in
-      if ut_equal rx ry then unif uf eqs 
+      if ut_equal rx ry then unif uf eqs
       else
         let defrx = is_def uf inst.neqs rx
         and defry = is_def uf inst.neqs ry in
@@ -748,15 +751,15 @@ let fpt_unif_idx inst =
     let uf = merge_eq_class inst.uf in
     let finished, inst = unif_idx { inst with uf = uf } in
     if finished then inst else do_fpt inst in
-  do_fpt inst 
-  
+  do_fpt inst
+
 (*------------------------------------------------------------------*)
 (** {2 Final unification algorithm} *)
 
 let elems uf = List.flatten (Uuf.classes uf)
 
 (** Returns the mgu for [eqs], starting from the mgu [uf] *)
-let unify inst eqs =  
+let unify inst eqs =
   let inst = unif inst eqs |> fpt_unif_idx in
   (* We compute all mgu's, to check for cycles. *)
   let uf,_ = mgus inst.uf (elems inst.uf) in
@@ -814,9 +817,9 @@ let build_graph (uf : Uuf.t) neqs leqs =
 
 (*------------------------------------------------------------------*)
 let pp_scc fmt scc =
-  Fmt.pf fmt "@[<hv 2>%a@]" 
+  Fmt.pf fmt "@[<hv 2>%a@]"
     (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt " =@ ") pp_ut) scc
-    
+
 let log_cycles sccs =
   let sccs = List.filter (fun scc -> List.length scc > 1) sccs in
   if List.length sccs > 0 then
@@ -828,9 +831,9 @@ let log_cycles sccs =
     x=x_1 /\ ... /\ x = x_n   *)
 let cycle_eqs g =
   let sccs = Scc.scc_list g in
-  
+
   log_cycles sccs;
-  
+
   List.fold_left (fun acc scc -> match scc with
       | [] -> raise (Failure "Constraints: Empty SCC")
       | x :: scc' -> List.fold_left (fun acc y -> (x,y) :: acc) acc scc')
@@ -844,11 +847,11 @@ let cycle_eqs g =
 let rec leq_unify inst =
   let uf, g = build_graph inst.uf inst.neqs inst.leqs in
   let inst = { inst with uf = uf; } in
-  let cycles = cycle_eqs g in 
+  let cycles = cycle_eqs g in
   let inst' = unify inst cycles in
 
   if Uuf.union_count inst.uf = Uuf.union_count inst'.uf then inst',g
-  else leq_unify inst' 
+  else leq_unify inst'
 
 
 (*------------------------------------------------------------------*)
@@ -868,7 +871,7 @@ let min_pred uf g u x =
   minp uf 0 x
 
 (** [max_pred uf g u x] returns [j] where [j] is the largest integer such
-   that [u <= P^j(x)] in the graph [g], if it exists, with a particular case 
+   that [u <= P^j(x)] in the graph [g], if it exists, with a particular case
    if init occurs.
    Precond: [g] must be a transitive graph, [u] normalized and [x] basic. *)
 let max_pred uf g u x =
@@ -945,9 +948,9 @@ let neq_sat inst g : bool =
   List.for_all (fun (u,v) ->
       let violation = ut_equal (mgu uf u |> snd) (mgu uf v |> snd) in
 
-      if violation then 
+      if violation then
         dbg "dis-equality %a ≠ %a violated" pp_ut u pp_ut v;
-      
+
       not violation
     ) inst.neqs
   &&
@@ -955,18 +958,18 @@ let neq_sat inst g : bool =
   (* Looks for elements in undef equivalence class that are defined. *)
   (not (is_def ~explain:true uf inst.neqs uundef)) &&
 
-  (* Look for contradiction in [g], i.e. an edge [u ≤ v] such that one of 
-     the following holds: 
+  (* Look for contradiction in [g], i.e. an edge [u ≤ v] such that one of
+     the following holds:
      - 1) [u = P^k(u)] and [v = P^k'(u)] for [k < k'].
      - 2) *)
   for_all (fun u v ->
       (* FIXME: we are recomputing mgu multiple times below *)
       let uf, u = mgu uf u in
-      let uf, v = mgu uf v in 
-      
+      let uf, v = mgu uf v in
+
       let violation1 = is_kpred uf v u in
 
-      if violation1 then 
+      if violation1 then
         dbg "contradiction: @[<hov>%a ≤ %a@] and@ \
              @[<hov>is_kpred %a %a@]"
           pp_ut u pp_ut v
@@ -978,20 +981,20 @@ let neq_sat inst g : bool =
         let x = if is_undef uf u then u else v in
         dbg "contradiction: @[<hov>%a ≤ %a@] and@ \
              @[<hov>is_undef %a@]"
-          pp_ut u pp_ut v pp_ut x 
+          pp_ut u pp_ut v pp_ut x
       end;
 
       not (violation1 || violation2)
     ) g
-    
-  
+
+
 (*------------------------------------------------------------------*)
 
 let get_basics uf elems =
   List.map (fun x -> mgu uf x |> snd) elems
   |> List.filter (fun x -> match x.cnt with UPred _ -> false | _ -> true)
   |> List.sort_uniq ut_compare
-    
+
 (*------------------------------------------------------------------*)
 let log_segment_eq eq =
   dbg "@[<v 2>Adding segment equality:@, %a@]"
@@ -1000,32 +1003,32 @@ let log_segment_eq eq =
 
 let log_split f =
   dbg "@[<v 2>Splitting clause:@, %a@]" Form.pp_disj f
-    
+
 let log_new_eqs eqs =
   let pp_eq fmt (ut1, ut2) =
     Fmt.pf fmt "%a = %a" pp_ut ut1 pp_ut ut2 in
-  
-  let pp_eqs fmt eqs =    
-    Fmt.pf fmt "@[<hv 2>%a@]" 
+
+  let pp_eqs fmt eqs =
+    Fmt.pf fmt "@[<hv 2>%a@]"
       (Fmt.list ~sep:Fmt.comma pp_eq) eqs in
-      
+
   dbg "@[<v 2>Adding new equalities:@, %a@]"
     pp_eqs eqs
 
 let log_new_neqs neqs =
   let pp_neq fmt (ut1, ut2) =
     Fmt.pf fmt "%a ≠ %a" pp_ut ut1 pp_ut ut2 in
-  
-  let pp_neqs fmt eqs =    
-    Fmt.pf fmt "@[<hv 2>%a@]" 
+
+  let pp_neqs fmt eqs =
+    Fmt.pf fmt "@[<hv 2>%a@]"
       (Fmt.list ~sep:Fmt.comma pp_neq) eqs in
-      
+
   dbg "@[<v 2>Adding new dis-equalities:@, %a@]"
     pp_neqs neqs
 
 let log_done () = dbg "@[<v 2>Model done@]"
 
-let log_instr inst = 
+let log_instr inst =
   dbg "@[<v 2>Solving:@ %a@]" (pp_constr_instance ~full:false) inst
 
 (*------------------------------------------------------------------*)
@@ -1053,10 +1056,10 @@ let find_segment_disj instance g =
 (*------------------------------------------------------------------*)
 (** Looks for instances of the rule:
     ∀ τ, (happens(τ) ∧ ¬happens(pred(τ))) ⇒ τ = init *)
-let find_eq_init (inst : constr_instance) =  
+let find_eq_init (inst : constr_instance) =
   let uf = inst.uf in
 
-  List.filter_map (fun (ut1, ut2) ->     
+  List.filter_map (fun (ut1, ut2) ->
       let uf, uts = mgus uf [ut1;ut2] in
       let ut1, ut2 = Utils.as_seq2 uts in
 
@@ -1070,73 +1073,73 @@ let find_eq_init (inst : constr_instance) =
            (not (ut_equal ut uinit))
         then Some (ut, uinit)
         else None
-    ) inst.neqs 
+    ) inst.neqs
 
 (*------------------------------------------------------------------*)
 (** Looks for instances of the rule:
     ∀ τ τ', τ ≤ τ' ∧ pred(τ') = ⊥ ⇒ τ = τ' *)
-let find_pred_undef (inst : constr_instance) graph =  
+let find_pred_undef (inst : constr_instance) graph =
   let uf = inst.uf in
 
   UtG.fold_edges (fun t t' new_eqs ->
       let uf, uts = mgus uf [t;t'] in
       let t, t' = Utils.as_seq2 uts in
 
-      if is_undef uf (upred t') && 
+      if is_undef uf (upred t') &&
          not (ut_equal t t')    (* do not add existing equalities *)
-      then (t, t') :: new_eqs 
+      then (t, t') :: new_eqs
       else new_eqs
     ) graph []
 
-let find_new_eqs inst graph = 
+let find_new_eqs inst graph =
   let uf = inst.uf in
   let new_eqs = find_eq_init inst @ find_pred_undef inst graph in
-  let new_eqs = 
+  let new_eqs =
     (* we remove already known equalities *)
-    List.filter (fun (t,t') -> 
+    List.filter (fun (t,t') ->
       let uf, uts = mgus uf [t;t'] in
       let t, t' = Utils.as_seq2 uts in
 
         not (ut_equal t t')
-      ) new_eqs 
+      ) new_eqs
   in
   if new_eqs = [] then None else Some new_eqs
 
 (*------------------------------------------------------------------*)
 (** Check  *)
 let undef_is_new inst ut =
-  let uf, ut = mgu inst.uf ut in  
+  let uf, ut = mgu inst.uf ut in
   not (is_def uf inst.neqs ut)
 
-let remove_dups inst uts = 
+let remove_dups inst uts =
   (* we remove duplicates *)
-  let _, uts = List.fold_left (fun (uf,acc) x -> 
+  let _, uts = List.fold_left (fun (uf,acc) x ->
       let uf, x = mgu uf x in uf, x :: acc
     ) (inst.uf,[]) uts in
   List.sort_uniq ut_compare uts
 
 
 (** Looks for new undefined elements. *)
-let find_new_undef inst g = 
+let find_new_undef inst g =
   let uf = inst.uf in
   let elems = elems uf in
 
   (* Looks for new instances of the rule:
      ∀τ, (happens(τ) ∧ τ ≠ init) ⇒ happens(pred(τ)) *)
-  let undefs0 = 
-    List.filter_map (fun ut -> 
-        if is_not_init uf inst.neqs ut && 
-           is_def uf inst.neqs ut && 
+  let undefs0 =
+    List.filter_map (fun ut ->
+        if is_not_init uf inst.neqs ut &&
+           is_def uf inst.neqs ut &&
            undef_is_new inst (upred ut)
         then Some (upred ut)
         else None
-      ) elems 
+      ) elems
   in
 
   (* Looks for new instances of the rule:
      ∀τ τ', τ ≤ τ' ⇒ happens(τ,τ') *)
-  let undefs1 = 
-    UtG.fold_edges (fun ut1 ut2 undefs -> 
+  let undefs1 =
+    UtG.fold_edges (fun ut1 ut2 undefs ->
         (if undef_is_new inst ut1 then [ut1] else []) @
         (if undef_is_new inst ut2 then [ut2] else []) @
         undefs
@@ -1144,35 +1147,35 @@ let find_new_undef inst g =
   in
 
   remove_dups inst (undefs0 @ undefs1)
-  
+
 (*------------------------------------------------------------------*)
 (** [split instance] return a disjunction of satisfiable and normalized instances
     equivalent to [instance]. *)
 let rec split (instance : constr_instance) : model list =
   try
     log_instr instance;
-    
-    let instance = unify instance instance.eqs in    
+
+    let instance = unify instance instance.eqs in
     let instance,g = leq_unify instance in
-    
+
     let g = UtGOp.transitive_closure g in
 
     begin match find_new_eqs instance g with
       | Some new_eqs ->
         log_new_eqs new_eqs;
         split { instance with eqs = new_eqs @ instance.eqs; }
-        
+
       | None -> match find_new_undef instance g with
         | _ :: _ as undefs ->
           let new_neqs = List.map (fun ut -> ut, uundef) undefs in
           log_new_neqs new_neqs;
           split { instance with neqs = new_neqs @ instance.neqs; }
-          
-        
+
+
         | [] -> match neq_sat instance g with
           | false -> [] (* dis-equalities violated *)
 
-          | true -> (* no violations for now *)        
+          | true -> (* no violations for now *)
             (* Looking for segment disjunctions, e.g. if
                pred(τ) ≤ τ' ≤ τ
                then we know that (τ' = pred(τ) ∨ τ' = τ) *)
@@ -1186,7 +1189,7 @@ let rec split (instance : constr_instance) : model list =
 
             | None -> (* no new segment disjunction *)
 
-              (* we look whether all initial clauses of the problem have 
+              (* we look whether all initial clauses of the problem have
                  already been split *)
               match instance.clauses with
               | [] ->             (* no clause left, we are done *)
@@ -1208,7 +1211,7 @@ let rec split (instance : constr_instance) : model list =
 
 let split_models instance =
   let models = split instance in
-  
+
   dbg "@[<v 1>final models (%d models):@;%a@]"
     (List.length models)
     (Fmt.list (pp_constr_instance ~full:false))
@@ -1224,12 +1227,12 @@ type models = model list
 let models_conjunct (l : Term.literals) : models =
   let l = Form.mk_list l in
   let instance = mk_instance l in
-  split_models instance 
+  split_models instance
 
 (** Memoisation *)
 let models_conjunct =
   let memo = TraceLits.Memo.create 256 in
-  fun (l : Term.literals) -> 
+  fun (l : Term.literals) ->
     let lits = TraceLits.mk l in
     try TraceLits.Memo.find memo lits with
     | Not_found ->
@@ -1238,8 +1241,18 @@ let models_conjunct =
       res
 
 (** Time-out information *)
-let models_conjunct (l : Term.literals) : models timeout_r =
-  Utils.timeout (Config.solver_timeout ()) models_conjunct l
+let models_conjunct
+    ?(exn = Tactics.Tactic_hard_failure (None, TacTimeout))
+    (l : Term.terms) : models
+  =
+  let lits =
+    List.fold_left (fun acc f ->
+        match Term.form_to_literals f with
+        | `Entails lits | `Equiv lits -> lits @ acc
+      ) [] l 
+  in
+  
+  Utils.timeout exn (Config.solver_timeout ()) models_conjunct lits
 
 
 (*------------------------------------------------------------------*)
@@ -1295,20 +1308,20 @@ let query ~precise (models : models) (ats : Term.literals) =
     ) ats);
 
   (* if the conjunction of trace literals is  *)
-  if List.for_all (fun model -> List.for_all (query_one model) ats) models 
+  if List.for_all (fun model -> List.for_all (query_one model) ats) models
   then true
-  else if not precise then false 
+  else if not precise then false
   else
     let forms = List.map (fun at -> Form.mk (Term.neg_lit at)) ats
-                |> List.flatten in   
+                |> List.flatten in
     let insts = List.map (fun model ->
-        add_forms model.inst forms 
+        add_forms model.inst forms
       ) models in
     List.for_all (fun inst -> split_models inst = []) insts
 
 (* adds debugging information *)
 let query ~precise models ats =
-  dbg "%squery: %a" 
+  dbg "%squery: %a"
     (if precise then "precise " else "") Term.pp_literals ats;
   let b = query ~precise models ats in
   dbg "query result: %a : %a" Term.pp_literals ats Fmt.bool b;
@@ -1345,13 +1358,13 @@ let maximal_elems ~precise (models : models) (elems : Term.term list) =
   (* Now, we try to remove duplicates, i.e. elements which are in [maxs]
      and are equal in every model of [models], by picking an arbitrary
      element in each equivalence class. *)
-  Utils.classes (fun ts ts' -> 
+  Utils.classes (fun ts ts' ->
       query ~precise models [`Pos, `Comp (`Eq,ts,ts')]
     ) maxs
   |> List.map List.hd
 
 let get_ts_equalities ~precise (models : models) ts =
-  Utils.classes (fun ts ts' -> 
+  Utils.classes (fun ts ts' ->
       query ~precise models [`Pos, `Comp (`Eq,ts,ts')]
     ) ts
 
@@ -1382,8 +1395,8 @@ let find_eq_action (models : models) (t : Term.term) =
     | None -> None
     | Some term ->
       (* check that [t] = [term] in all models. *)
-      if query ~precise:true models [`Pos, `Comp (`Eq,t,term)] 
-      then Some term 
+      if query ~precise:true models [`Pos, `Comp (`Eq,t,term)]
+      then Some term
       else None
 
 
@@ -1391,21 +1404,24 @@ let find_eq_action (models : models) (t : Term.term) =
 (** Context of an trace model *)
 type trace_cntxt = {
   table  : Symbols.table;
-  system : SystemExpr.t;
+  system : SystemExpr.fset;
 
   (* used to find an action occuring at a given timestamp *)
   models : models option;
 }
 
+let make_context ~table ~system =
+  { table ; system ; models = None }
+
 (*------------------------------------------------------------------*)
 (** Tests Suites *)
 
 open Term
-    
-let env = ref Vars.empty_env 
 
-let mk_var   v = Term.mk_var (Vars.make_r `Approx env Timestamp v) 
-let mk_var_i v = Vars.make_r `Approx env Index     v 
+let env = ref Vars.empty_env
+
+let mk_var   v = Term.mk_var (Vars.make_r `Approx env Timestamp v)
+let mk_var_i v = Vars.make_r `Approx env Index     v
 
 let tau = mk_var "tau"
 and tau' = mk_var "tau"
@@ -1433,7 +1449,7 @@ and pb_eq4 = (`Comp (`Eq,Term.init, mk_pred tau))
 and pb_eq5 = (`Comp (`Eq,Term.init, mk_pred tau))
              :: (`Comp (`Eq,tau, mk_pred tau'))
              :: (`Comp (`Eq,tau', mk_action a [i']))
-             :: (`Comp (`Eq,tau, mk_action a [i]))                 
+             :: (`Comp (`Eq,tau, mk_action a [i]))
              :: (`Comp (`Eq,tau'', mk_action a [i]))
              :: [`Comp (`Eq,tau'', mk_action a [i'])]
 and pb_eq6 = (`Comp (`Eq,tau, mk_pred tau'))
@@ -1449,21 +1465,19 @@ and pb_eq8 = (`Comp (`Eq,tau, mk_pred tau'))
              :: (`Comp (`Eq,tau', mk_pred tau''))
              :: [`Comp (`Eq,tau'', tau3)]
 
-(* let () = Printexc.record_backtrace true *)
-
 let () =
   let exception Unsat in
   let exception Sat in
-  let exception Timeout in
   let test = function
-    | Result [] -> raise Unsat
-    | Result _ -> raise Sat
-    | Timeout -> raise Timeout in
+    | [] -> raise Unsat
+    | _ -> raise Sat in
+  let mk (l : Term.xatom list) =
+    List.map (fun x -> lit_to_form (`Pos, x)) l
+  in
 
   Checks.add_suite "Constr" [
     ("Cycles", `Quick,
      fun () ->
-       let mk l = List.map (fun x -> `Pos, x) l in
        let successes = [pb_eq1; pb_eq2; pb_eq3; pb_eq6; pb_eq7; pb_eq8]
        and failures = [pb_eq4; pb_eq5] in
 
@@ -1479,7 +1493,6 @@ let () =
 
     ("Graph", `Quick,
      fun () ->
-       let mk l = List.map (fun x -> `Pos, x) l in
        let successes = [(`Comp (`Leq, tau, tau'')) :: pb_eq1;
 
                         (`Comp (`Neq, tau, tau3)) ::

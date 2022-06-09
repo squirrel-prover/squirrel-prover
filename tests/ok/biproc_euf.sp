@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 name ok : message
 name ko : message

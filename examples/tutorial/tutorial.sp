@@ -167,7 +167,6 @@ before the reader, and such the input of the reader corresonds to the name of
 T(i,k).
 
 ```*)
-set autoIntro = false.
 
 goal wa :
   forall (i:index, j:index),

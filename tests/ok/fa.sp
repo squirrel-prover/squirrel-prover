@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 abstract f : message->message->message
 abstract a : message

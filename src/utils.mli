@@ -28,13 +28,20 @@ module List : sig
   val remove_duplicate : ('a -> 'a -> bool) -> 'a list -> 'a list
 
   val inclusion : 'a list -> 'a list -> bool
+
+  (** [diff a b] is [a] minus [b]'s elements  *)
+  val diff : 'a list -> 'a list -> 'a list
  
   (** [take n l] returns up to the [n] first elements from list [l], if available. *)
   val take : int -> 'a list -> 'a list
 
   (** [drop n l] returns [l] without the first [n] elements, or the empty list 
-      if [l]  have less than n elements. *)
+      if [l] has less than n elements. *)
   val drop : int -> 'a list -> 'a list
+
+  (** [drop_right n l] returns [l] without the last [n] elements, or the empty list 
+      if [l] has less than n elements. *)
+  val drop_right : int -> 'a list -> 'a list
 
   (** [takedrop n l] returns the a result equal to [take n l, drop n l]. *)
   val takedrop : int -> 'a list -> 'a list * 'a list
@@ -61,6 +68,8 @@ module List : sig
   val mapi_fold : (int -> 'a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
 
   val foldi : (int -> 'a -> 'b -> 'a) -> 'a -> 'b list -> 'a
+
+  val find_mapi : (int -> 'a -> 'b option) -> 'a list -> 'b option 
 
   exception Out_of_range
 end
@@ -169,6 +178,7 @@ val obind     : ('a -> 'b option) -> 'a option -> 'b option
 val omap      : ('a -> 'b) -> 'a option -> 'b option
 val omap_dflt : 'b -> ('a -> 'b) -> 'a option -> 'b
 val oiter     : ('a -> unit) -> 'a option -> unit
+val oequal    : ('a -> 'b -> bool) -> 'a option -> 'b option -> bool
 
 (*------------------------------------------------------------------*)
 (** [classes f_eq l] returns the equivalence classes of [l] modulo [f_eq],
@@ -189,16 +199,22 @@ val pp_list :
 val fst3 : 'a * 'b * 'c -> 'a
 
 (*------------------------------------------------------------------*)
-type 'a timeout_r = 
-  | Result of 'a 
-  | Timeout
+(** [timeout exn t f x] executes [f x] for at most [t] seconds.
+    Returns [f x] if the computation terminated in the imparted
+    time, and [exn] otherwise. *)
+val timeout : exn -> int -> ('a -> 'b) -> 'a -> 'b 
 
+(*------------------------------------------------------------------*)
+val fst_map : ('a -> 'c) -> 'a * 'b -> 'c
+val snd_map : ('b -> 'c) -> 'a * 'b -> 'c
+
+(*------------------------------------------------------------------*)
+(** composition *)
+val (-|) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
+
+(** inverse arguments *)
+val (^~) : ('a -> 'b -> 'c) -> ('b -> 'a -> 'c)
   
-(** [timeout t f x] executes [f x] for at most [t] seconds.
-    Returns [Result (f x)] if the computation terminated in the imparted
-    time, and [Timeout] otherwise. *)
-val timeout : int -> ('a -> 'b) -> 'a -> 'b timeout_r
-
 (*------------------------------------------------------------------*)
 val as_seq0 : 'a list -> unit
 val as_seq1 : 'a list -> 'a
@@ -211,3 +227,26 @@ val as_seq4 : 'a list -> 'a * 'a * 'a * 'a
 
 val hcombine : int -> int -> int
 val hcombine_list : ('a -> int) -> int -> 'a list -> int                         
+
+(*------------------------------------------------------------------*)
+(** {2 Printing} *)
+
+type assoc  = [`Left | `Right | `NonAssoc]
+type fixity = [`Prefix | `Postfix | `Infix of assoc | `NonAssoc | `NoParens]
+
+(* -------------------------------------------------------------------- *)
+val pp_maybe_paren : bool -> 'a Fmt.t -> 'a Fmt.t 
+
+val maybe_paren :
+  inner:'a * fixity ->
+  outer:'a * fixity ->
+  side:assoc ->
+  'b Fmt.t -> 
+  'b Fmt.t
+
+(*------------------------------------------------------------------*)
+module Lazy : sig
+  include module type of Lazy
+      
+  val map : ('a -> 'b) -> 'a t -> 'b t
+end

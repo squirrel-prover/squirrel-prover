@@ -29,7 +29,6 @@ This is a "light" model without the last check of T.
 
 *)
 
-set autoIntro=false.
 set timeout=4.
 set postQuantumSound=true.
 
@@ -80,6 +79,8 @@ process Tag(i:index, j:index) =
 
 system (!_k Reader(k) | !_i !_j Tag(i,j)).
 
+include Basic.
+
 axiom tags_neq : tagR <> tagT
 
 axiom fail_not_pair (x,y:message): fail <> <x,y>.
@@ -97,7 +98,7 @@ Proof.
   depends Reader(k), Reader1(k); 1: auto.
   intro C.
   expand exec, cond.
-  split => [_ [i j [[H _] _]]].
+  split => [_ [i j [H [_ _]]]].
 
   (* Direction => *)
   + project; use tags_neq as _.
@@ -133,7 +134,7 @@ Proof.
   split.
 
   (* Direction => is the obvious one *)
-  + intro [_ H0] => /= [i j [[H1 _] _]].
+  + intro [_ H0] => /= [i j [H1 [_ _]]].
     notleft H0.
     use H0 with i,j; case H1.
     clear H0.
@@ -142,7 +143,7 @@ Proof.
     by case H.
 
   (* Direction <= *)
-  + intro [_ H0] => /= [i j [[H1 _] _]].
+  + intro [_ H0] => /= [i j [H1 [_ _]]].
     notleft H0.
     use tags_neq.
     project.
@@ -210,42 +211,36 @@ Proof.
   (* Action 2/4: Reader1 *)
 
   + expand frame.
-    equivalent
-      exec@Reader1(k),
-      exec@pred(Reader1(k)) &&
-      exists (i,j:index),
-        Tag(i,j) < Reader1(k) && Reader(k) < Reader1(k)  &&
-        output@Tag(i,j) = input@Reader1(k) &&
-        input@Tag(i,j) = output@Reader(k);
-    1: by use wa_Reader1 with k.
+    rewrite wa_Reader1; 1:auto. 
 
-    expand output.
+    expand output@Reader1(k).
     fa 2. fa 3. fadup 3.
 
-    equivalent
+    have ->:
       (if
          exec@pred(Reader1(k)) &&
          (exists (i,j:index),
-           ((Tag(i,j) < Reader1(k) &&
-             Reader(k) < Reader1(k)) &&
-            output@Tag(i,j) = input@Reader1(k)) &&
+           Tag(i,j) < Reader1(k) &&
+           Reader(k) < Reader1(k) &&
+           output@Tag(i,j) = input@Reader1(k) &&
            input@Tag(i,j) = output@Reader(k))
        then
          (try find i,j such that
-            (dec(input@Reader1(k),diff(kE(i),kbE(i,j))) <> fail &&
-             fst(dec(input@Reader1(k),diff(kE(i),kbE(i,j)))) = tagT) &&
+            dec(input@Reader1(k),diff(kE(i),kbE(i,j))) <> fail &&
+            fst(dec(input@Reader1(k),diff(kE(i),kbE(i,j)))) = tagT &&
             fst(snd(dec(input@Reader1(k),diff(kE(i),kbE(i,j))))) = nr(k)
           in
             enc(<tagR,<snd(snd(dec(input@Reader1(k),diff(kE(i),kbE(i,j))))),
                        nr(k)>>,
                 rr(k),
-                diff(kE(i),kbE(i,j))))),
+                diff(kE(i),kbE(i,j)))))
+      =
       (if
          exec@pred(Reader1(k)) &&
          (exists (i,j:index),
-           ((Tag(i,j) < Reader1(k) &&
-             Reader(k) < Reader1(k)) &&
-            output@Tag(i,j) = input@Reader1(k)) &&
+           Tag(i,j) < Reader1(k) &&
+           Reader(k) < Reader1(k) &&
+           output@Tag(i,j) = input@Reader1(k) &&
            input@Tag(i,j) = output@Reader(k))
        then
          (try find i,j such that
@@ -291,20 +286,13 @@ Proof.
     fa 3; fadup 3.
     fa 3; fadup 3.
     enckp 3, k_fresh; 1: auto.
-    fa 3. fresh 4; yesif 4; 1: auto. fresh 4.
+    fa 3. fresh 4; rewrite if_true; 1: auto. fresh 4.
     apply IH.
 
   (* Action 3/4: Reader2 *)
 
   + expand frame.
-
-    equivalent
-      exec@Reader2(k),
-      exec@pred(Reader2(k)) && not (exists (i,j:index),
-        Tag(i,j) < Reader2(k) && Reader(k) < Reader2(k)  &&
-        output@Tag(i,j) = input@Reader2(k) &&
-        input@Tag(i,j) = output@Reader(k)).
-    by use wa_Reader2 with k.
+    rewrite wa_Reader2; 1:auto.
 
     fa 2.
     fa 3; fadup 3.
@@ -319,6 +307,6 @@ Proof.
 
     fa 3.
     fresh 5.
-    fresh 4; yesif 4; 1: auto.
+    fresh 4; rewrite if_true; 1: auto.
     apply IH.
 Qed.

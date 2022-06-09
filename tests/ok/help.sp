@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 system null.
 
@@ -10,4 +10,6 @@ Proof.
   help rewrite equiv.
   help dependent induction.
   help generalize dependent.
+  help have.
+  help assert.
 Abort.

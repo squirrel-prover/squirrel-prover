@@ -1,4 +1,4 @@
-(* set autoIntro=false. *)
+(*  *)
 
 (* test process definition *)
 (* Disable this for now. It used to be possible but was causing confusion

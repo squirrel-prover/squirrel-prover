@@ -22,9 +22,9 @@ Qed.
 
 goal [default] _ : happens(A) => input@A = s@B => False.
 Proof.
-  checkfail rewrite equiv ax_ground exn NoAssumpSystem.
-  checkfail rewrite equiv ax_ground_left exn NoAssumpSystem.
-  checkfail rewrite equiv ax_ground_rev exn NoAssumpSystem.
+  checkfail rewrite equiv ax_ground exn Rewrite_equiv_system_mismatch.
+  checkfail rewrite equiv ax_ground_left exn Rewrite_equiv_system_mismatch.
+  checkfail rewrite equiv ax_ground_rev exn Rewrite_equiv_system_mismatch.
 Abort.
 
 (* Check that timestamp atoms are not dropped by rewrite equiv. *)
@@ -52,7 +52,7 @@ Qed.
 goal [default/left] _ : happens(A) => input@A = s@B => False.
 Proof.
   intro H.
-  rewrite equiv ax_ground_rev.
+  rewrite equiv -ax_ground_rev.
   use check_right.
   by use m_fresh with A.
 Qed.
@@ -60,7 +60,7 @@ Qed.
 goal [default/right] _ : happens(A) => input@A = s@B => False.
 Proof.
   intro H.
-  checkfail rewrite equiv ax_ground_left exn NoAssumpSystem.
+  checkfail rewrite equiv ax_ground_left exn Rewrite_equiv_system_mismatch.
   rewrite equiv ax_ground_ver.
   use check_left.
   by use m_fresh with A.
@@ -69,7 +69,7 @@ Qed.
 goal [default] _ : happens(A) => input@A = s@B => False.
 Proof.
   intro H.
-  checkfail rewrite equiv ax_ground_left exn NoAssumpSystem.
+  checkfail rewrite equiv ax_ground_left exn Rewrite_equiv_system_mismatch.
   project; [1: rewrite equiv ax_ground | 2: rewrite equiv ax_ground_ver];
   by use m_fresh with A.
 Qed.
