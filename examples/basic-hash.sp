@@ -112,7 +112,7 @@ goal [BasicHash] wa_R :
     happens(tau) =>
     ((exists (i,k:index),
        snd(input@tau) = h(fst(input@tau),diff(key(i),key'(i,k))))
-     =
+     <=>
      (exists (i,k:index), T(i,k) < tau &&
        fst(output@T(i,k)) = fst(input@tau) &&
        snd(output@T(i,k)) = snd(input@tau))).
@@ -124,13 +124,10 @@ goal [BasicHash] wa_R :
     The converse implication is trivial because any honest tag output is
     accepted by the reader. *)
 Proof.
-  (** We start by introducing the variable `j` and the hypothesis
-      `happens(R(j))`, before unfolding the definiton of the `cond` macro,
-      which corresponds to an existential quantification.*)
   intro tau Hap.
   (** We have to prove two implications (`<=>`): we thus split the proof
       in two parts. We now have two different goals to prove.*)
-  rewrite eq_iff; split => [i k Meq].
+  split => [i k Meq].
   (** For the first implication (=>), we actually prove it separately for the
       real system (left) and the ideal system (right).*)
   + project.

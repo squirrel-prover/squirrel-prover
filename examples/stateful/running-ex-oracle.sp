@@ -132,10 +132,11 @@ Proof.
 Qed.
 
 
-goal lastupdate_A: forall (i:index, j:index, tau:timestamp), (happens(tau) &&
-  A(i,j)<=tau && forall jj:index, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))
+goal lastupdate_A: forall (i:index, j:index, tau:timestamp),
+  (happens(tau) &&
+   A(i,j)<=tau &&
+   forall jj:index, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))
   => s(i)@tau = s(i)@A(i,j).
-
 Proof.
   intro i j.
   induction => tau IH [Hp Ord Hyp].
@@ -187,7 +188,7 @@ Proof.
       use lastupdate_A with i, j, tau => //.
 Qed.
 
-(** The contents of the memory cell never repeats. *)
+(** The contents of distinct memory cells never coincide. *)
 
 goal disjoint_chains :
   forall (tau',tau:timestamp,i',i:index) happens(tau',tau) =>
@@ -217,26 +218,25 @@ goal monotonic_chain :
     => s(i)@tau' <> s(i)@tau).
 Proof.
   induction => tau IH tau' i j Hap [H1 H2 H3] Meq.
-  assert s(i)@tau' = s(i)@A(i,j) as Meq'; 1: auto.
+  assert s(i)@tau' = s(i)@A(i,j) as Meq' by auto.
   expand s(i)@A(i,j).
   euf Meq'.
   intro Heuf Meuf *.
-  assert i=i0 || i<>i0 as H0; 1: auto.
-  case H0.
-    + (* i = i0 *)
-      use lastupdate with i,pred(A(i,j)) as H4; 2: by auto.
-      case H4.
-        - (* case H4 - init *)
-          destruct H4 as [H4 H4'].
-          use H4' with j0; 1,2: case Heuf; auto.
-        - (* case H1 - general *)
-          destruct H4 as [j1 [Meq1 H4 H5]].
-          use IH with pred(A(i,j)),pred(A(i,j0)),i,j1 as H; try auto.
-          repeat split => //.
-          use H5 with j0; 1,2: case Heuf; auto.
-    + (* case i<>i0 *)
-      use disjoint_chains with pred(A(i0,j0)),pred(A(i,j)),i0,i => //.
-      by case Heuf.
+  assert i=i0 || i<>i0 as [H0|H0] by auto.
+  + (* i = i0 *)
+    use lastupdate with i,pred(A(i,j)) as H4; 2: by auto.
+    case H4.
+      - (* case H4 - init *)
+        destruct H4 as [H4 H4'].
+        use H4' with j0; 1,2: case Heuf; auto.
+      - (* case H1 - general *)
+        destruct H4 as [j1 [Meq1 H4 H5]].
+        use IH with pred(A(i,j)),pred(A(i,j0)),i,j1 as H; try auto.
+        repeat split => //.
+        use H5 with j0; 1,2: case Heuf; auto.
+  + (* case i<>i0 *)
+    use disjoint_chains with pred(A(i0,j0)),pred(A(i,j)),i0,i => //.
+    by case Heuf.
 Qed.
 
 
@@ -273,14 +273,14 @@ Proof.
      fa !<_,_>, if _ then _, (_ && _), <_,_>.
      prf 1; rewrite if_true; 2: fresh 1. {
        simpl; split.
-       * intro j0 H; try destruct H as [H|H].
-         apply unique_queries; auto.
+       * intro j0 H.
+         by apply unique_queries.
        * intro i0 j0.
          project.
-           ** intro H; destruct H as [H1|H2].
-              *** rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
-              *** rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
-           ** intro  H. rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
+         ** intro H; destruct H as [H1|H2].
+            *** rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
+            *** rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
+         ** intro  H. rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
      }.
      prf 1; rewrite if_true; 2: fresh 1; by apply IH.
      simpl; split.
