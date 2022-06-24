@@ -1,3 +1,6 @@
+module SE = SystemExpr
+
+(*------------------------------------------------------------------*)
 (** - Huet's unification algorithm using union-find.
      See "Unification: A Multidisciplinary Survey" by Kevin Knight.
 
@@ -1404,9 +1407,7 @@ let find_eq_action (models : models) (t : Term.term) =
 (** Context of an trace model *)
 type trace_cntxt = {
   table  : Symbols.table;
-  system : SystemExpr.fset;
-
-  (* used to find an action occuring at a given timestamp *)
+  system : SE.fset;
   models : models option;
 }
 
@@ -1423,13 +1424,13 @@ let env = ref Vars.empty_env
 let mk_var   v = Term.mk_var (Vars.make_r `Approx env Timestamp v)
 let mk_var_i v = Vars.make_r `Approx env Index     v
 
-let tau = mk_var "tau"
-and tau' = mk_var "tau"
+let tau   = mk_var "tau"
+and tau'  = mk_var "tau"
 and tau'' = mk_var "tau"
-and tau3 = mk_var "tau"
-and tau4 = mk_var "tau"
-and i =  mk_var_i "i"
-and i' = mk_var_i "i"
+and tau3  = mk_var "tau"
+and tau4  = mk_var "tau"
+and i     = mk_var_i "i"
+and i'    = mk_var_i "i"
 
 let _, a = Symbols.Action.declare Symbols.builtins_table (L.mk_loc L._dummy "a") 1
 

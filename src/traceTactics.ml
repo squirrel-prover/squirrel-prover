@@ -1454,9 +1454,7 @@ let intctxt_param table (t : Term.term) : unforgeabiliy_param =
 
 
 
-let euf_apply_schema sequent (_, key, m, s, _, _, _, _) case =
-  let open Euf in
-
+let euf_apply_schema sequent (_, key, m, s, _, _, _, _) (case : Euf.euf_schema) =
   (* Equality between hashed messages *)
   let new_f = Term.mk_atom `Eq case.message m in
 
@@ -1548,7 +1546,7 @@ let euf_apply_facts drop_head s
 
   (* check that the SSCs hold *)
   let errors =
-    Euf.key_ssc ~globals:false ~messages:[mess;sign]
+    Euf.key_ssc ~globals:true ~messages:[mess;sign]
       ~allow_functions ~cntxt head_fn key.s_symb
   in
   if errors <> [] then

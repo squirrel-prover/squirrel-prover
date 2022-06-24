@@ -166,7 +166,7 @@ let add_prf_case
 let mk_prf_phi_proj cntxt env param frame hash =
   (* Check syntactic side condition. *)
   let errors =
-    Euf.key_ssc ~globals:false
+    Euf.key_ssc ~globals:true
       ~elems:frame ~allow_functions:(fun x -> false)
       ~cntxt param.h_fn param.h_key.s_symb
   in

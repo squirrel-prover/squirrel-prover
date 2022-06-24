@@ -262,7 +262,7 @@ let global_prf
 
   (* Check syntactic side condition. *)
   let errors =
-    Euf.key_ssc ~globals:false
+    Euf.key_ssc ~globals:true
       ~elems:[] ~allow_functions:(fun x -> false)
       ~cntxt param.h_fn param.h_key.s_symb
   in
@@ -395,7 +395,7 @@ let global_cca
     | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = enc_pk ->
       (* Check syntactic side condition. *)
       let errors =
-        Euf.key_ssc ~globals:false
+        Euf.key_ssc ~globals:true
           ~messages:[enc] ~allow_functions:(fun x -> x = enc_pk)
           ~cntxt fndec enc_key.s_symb
       in
