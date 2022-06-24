@@ -724,16 +724,20 @@ constseq_arg:
 | ASSERT {}
 | HAVE   {}
 
+/* local or global formula */
+%inline any_term:
+  | f=term           { Theory.Local f }
+  | g=global_formula { Theory.Global g }
+
+tac_any_term:
+| f=any_term %prec tac_prec { f }
+
 %inline have_tac:
 | l=lloc(have_kw) p=tac_term ip=as_ip?
-    { let ip = match ip with
-        | None -> []
-        | Some ip -> [TacticsArgs.SimplPat ip] in
-      mk_abstract l "have" (TacticsArgs.Theory p :: ip) }
+    { mk_abstract l "have" [TacticsArgs.Have (ip, Theory.Local p)] }
 
-| l=lloc(have_kw) ip=simpl_pat COLON p=tac_term 
-    { let ip = [TacticsArgs.SimplPat ip] in
-      mk_abstract l "have" (TacticsArgs.Theory p :: ip) }
+| l=lloc(have_kw) ip=simpl_pat COLON p=tac_any_term 
+    { mk_abstract l "have" [TacticsArgs.Have (Some ip, p)] }
 
 (*------------------------------------------------------------------*)
 /* tactics named arguments */
@@ -845,12 +849,12 @@ tac:
     { T.AndThenSel (t, [[1], T.By (t1,l)]) }
 
   | l=lloc(USE) pt=pt_use_tac ip=as_ip?
-    { mk_abstract l "have" [TacticsArgs.AssertPt (pt, ip, `IntroImpl)] }
+    { mk_abstract l "have" [TacticsArgs.HavePt (pt, ip, `IntroImpl)] }
 
   (*------------------------------------------------------------------*)
   /* assert a proof term */
   | l=lloc(HAVE) ip=simpl_pat? COLONEQ pt=p_pt 
-    { mk_abstract l "have" [TacticsArgs.AssertPt (pt, ip, `None)] }
+    { mk_abstract l "have" [TacticsArgs.HavePt (pt, ip, `None)] }
 
   (*------------------------------------------------------------------*)
   | l=lloc(REWRITE) p=rw_args w=in_target

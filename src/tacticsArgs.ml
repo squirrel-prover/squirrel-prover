@@ -212,7 +212,8 @@ type parser_arg =
   | RewriteIn    of rw_arg list * in_target
   | RewriteEquiv of rw_equiv_item
   | ApplyIn      of named_args * Theory.p_pt * apply_in
-  | AssertPt     of Theory.p_pt * simpl_pat option * [`IntroImpl | `None]
+  | Have         of simpl_pat option * Theory.any_term
+  | HavePt       of Theory.p_pt * simpl_pat option * [`IntroImpl | `None]
   | SplitSeq     of int L.located * Theory.hterm
   | ConstSeq     of int L.located * (Theory.hterm * Theory.term) list
   | MemSeq       of int L.located * int L.located
@@ -243,11 +244,11 @@ let pp_parser_arg ppf = function
   | ApplyIn (_, _, in_opt) ->
     Fmt.pf ppf "... %a" pp_apply_in in_opt
 
-  | AssertPt (_, ip, `IntroImpl) ->
+  | HavePt (_, ip, `IntroImpl) ->
     Fmt.pf ppf "... as %a"
       (Fmt.option ~none:Fmt.nop pp_simpl_pat) ip
 
-  | AssertPt (_, ip, `None) ->
+  | HavePt (_, ip, `None) ->
     Fmt.pf ppf "(%a := ...)"
       (Fmt.option ~none:Fmt.nop pp_simpl_pat) ip
 
@@ -277,6 +278,9 @@ let pp_parser_arg ppf = function
       Fmt.pf ppf "%a%a" pp_rw_count count Theory.pp term
     in
     Fmt.pf ppf "@[<hov> %a@]" (Fmt.list ~sep:Fmt.sp pp_el) l
+
+  | Have _ ->
+    Fmt.pf ppf "..."
       
 (*------------------------------------------------------------------*)
 (** Tactic arguments sorts *)

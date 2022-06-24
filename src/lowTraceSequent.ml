@@ -424,7 +424,7 @@ let mk_trace_cntxt ?se s =
   }
 
 (*------------------------------------------------------------------*)
-let get_hint_db s = s.hint_db
+let hint_db s = s.hint_db
 
 (*------------------------------------------------------------------*)
 let get_trace_hyps s = s.hyps

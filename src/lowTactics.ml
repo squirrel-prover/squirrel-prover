@@ -7,6 +7,9 @@ module T = Prover.ProverTactics
 
 module SE = SystemExpr
 
+module TS = TraceSequent
+module ES = EquivSequent
+  
 module St = Term.St
 module Sv = Vars.Sv
 
@@ -112,6 +115,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let convert (s : S.sequent) term =
     let cenv = Theory.{ env = S.env s; cntxt = InGoal; } in
     Theory.convert cenv term
+
+  let convert_any (s : S.sequent) (term : Theory.any_term) =
+    let cenv = Theory.{ env = S.env s; cntxt = InGoal; } in
+    Theory.convert_any cenv term
 
   let convert_ht (s : S.sequent)  ht =
     let conv_env = Theory.{ env = S.env s; cntxt = InGoal; } in
@@ -1402,9 +1409,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let exists_intro_tac args = wrap_fail (exists_intro_args args)
 
   (*------------------------------------------------------------------*)
-  (** {3 Use} *)
+  (** {3 Have Proof-Term} *)
 
-  (** [use ip name ths s] applies the formula named [name] in sequent [s],
+  (** [have_pt ip name ths s] applies the formula named [name] in sequent [s],
     * eliminating its universally quantified variables using [ths],
     * eliminating implications (and negations) underneath.
     * If given an introduction pattern [ip], applies it to the generated
@@ -1412,7 +1419,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     * As with apply, we require that the hypothesis (or lemma) is
     * of the kind of conclusion formulas: for local sequents this means
     * that we cannot use a global hypothesis or lemma. *)
-  let use ~(mode:[`IntroImpl | `None]) ip (pt : Theory.p_pt) (s : S.t) =
+  let have_pt ~(mode:[`IntroImpl | `None]) ip (pt : Theory.p_pt) (s : S.t) =
     let _, pat = S.convert_pt pt S.conc_kind s in
 
     if pat.pat_tyvars <> [] then
@@ -1461,39 +1468,63 @@ module MkCommonLowTac (S : Sequent.S) = struct
     aux [] f
 
   (*------------------------------------------------------------------*)
-  (** {3 Assert} *)
+  (** {3 Have Formula} *)
 
-  (** [tac_assert f j sk fk] generates two subgoals, one where [f] needs
+  (** [have_form f j sk fk] generates two subgoals, one where [f] needs
     * to be proved, and the other where [f] is assumed.
     * We only consider the case here where [f] is a local formula
     * (which is then converted to conclusion and hypothesis formulae)
     * more general forms should be allowed here or elsewhere. *)
-  let have_form (args : Args.parser_arg list) s : S.t list =
-    let ip, f = match args with
-      | [f] -> None, f
-      | [f; Args.SimplPat ip] -> Some ip, f
-      | _ -> bad_args () in
-
-    let f = match convert_args s [f] Args.(Sort Boolean) with
-      | Args.(Arg (Message (f,_))) -> f
-      | _ -> bad_args ()
+  let have_form
+      (ip : Args.simpl_pat option)
+      (f : Theory.any_term)
+      (s : S.t) : Goal.t list
+    =
+    let loc = match f with
+      | Local f -> L.loc f
+      | Global f -> L.loc f
     in
-    let f_conc =
-      Equiv.Babel.convert f ~src:Equiv.Local_t ~dst:S.conc_kind in
-    let f_hyp =
-      Equiv.Babel.convert f ~src:Equiv.Local_t ~dst:S.hyp_kind in
+    
+    let f = convert_any s f in
 
-    let s1 = S.set_goal f_conc s in
+    (* Prove that [f] holds:
+       - if [f] is a local formula, we handle it identically in local and 
+         global sequent.  
+       - if [f] is a global formula, we cast the sequent into a global 
+         sequent (clearing local hypotheses that no longer apply) before
+         proving it. *)
+    let s1 =
+      match f with
+      | `Reach _ ->
+        let f_conc =
+          Equiv.Babel.convert ~loc f ~src:Equiv.Any_t ~dst:S.conc_kind in
+        S.to_general_sequent (S.set_goal f_conc s)
+          
+      | `Equiv _ ->
+        let es = S.to_global_sequent s in
+        let f_conc =
+          Equiv.Babel.convert ~loc f ~src:Equiv.Any_t ~dst:ES.conc_kind in
+        Goal.Equiv (ES.set_goal f_conc es)
+    in
+
+    (* add [f] as an hypothesis *)
+    let f_hyp =
+      Equiv.Babel.convert ~loc f ~src:Equiv.Any_t ~dst:S.hyp_kind in
     let id, s2 = Hyps.add_i Args.AnyName f_hyp s in
     let s2 = match ip with
       | Some ip -> do_simpl_pat (`Hyp id) ip s2
       | None -> [s2]
     in
+    let s2 = List.map S.to_general_sequent s2 in
+    
     s1 :: s2
 
-  let have_args = function
-    | [Args.AssertPt (pt, ip, mode)] -> use ~mode ip pt
-    | _ as args -> have_form args
+  let have_args args (s : S.t) : Goal.t list =
+    match args with
+    | [Args.HavePt (pt, ip, mode)] ->
+      List.map S.to_general_sequent (have_pt ~mode ip pt s)
+    | [Args.Have (ip, f)] -> have_form ip f s
+    | _ -> bad_args ()
 
   let have_tac args = wrap_fail (have_args args)
 
@@ -1597,9 +1628,6 @@ end
 
 (*------------------------------------------------------------------*)
 (** {2 Wrapper lifting sequence functions or tactics to general tactics} *)
-
-module TS = TraceSequent
-module ES = EquivSequent
 
 
 (** Function over a [Goal.t], returning an arbitrary value. *)
@@ -2088,27 +2116,6 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-let () =
-  T.register_general "have"
-    ~tactic_help:
-      {general_help = "Add a new hypothesis.";
-       detailed_help =
-         "- have form:\n\
-         \  Add `form` to the hypotheses, and produce a subgoal to prove \
-          `form`. \n\
-          - have form as intro_pat:\n\
-         \  Idem, except that `intro_pat` is applied to `form`.\n\
-          - have intro_pat := proof_term:\n\
-         \  Compute the formula corresponding to `proof_term`, and\n\
-         \  apply `intro_pat` to it.\n\
-         \  Exemples: * `have H := H0 i i2`\n\
-         \            * `have H := H0 _ i2`";
-       usages_sorts = [];
-       tactic_group = Logical}
-    ~pq_sound:true
-    (gentac_of_any_tac_arg TraceLT.have_tac EquivLT.have_tac)
-
-(*------------------------------------------------------------------*)
 (* The `use` tacitcs now rely on the same code as the `assert` tactic.
    We still register a tactic to have the tactic help working correctly. *)
 let () =
@@ -2233,3 +2240,32 @@ let () = T.register "split"
     (genfun_of_any_pure_fun
        TraceLT.goal_and_right
        EquivLT.goal_and_right)
+
+(*------------------------------------------------------------------*)
+    
+let have_tac args s =
+  match s with
+  | Goal.Trace s -> TraceLT.have_tac args s
+  | Goal.Equiv s -> EquivLT.have_tac args s
+                      
+let () =
+  T.register_general "have"
+    ~tactic_help:
+      {general_help = "Add a new hypothesis.";
+       detailed_help =
+         "- have form:\n\
+         \  Add `form` to the hypotheses, and produce a subgoal to prove \
+          `form`. \n\
+          - have form as intro_pat:\n\
+         \  Idem, except that `intro_pat` is applied to `form`.\n\
+          - have intro_pat : local_or_global_form :\n\
+         \  Idem, except that both local and global formulas are supported.\n\
+          - have intro_pat := proof_term:\n\
+         \  Compute the formula corresponding to `proof_term`, and\n\
+         \  apply `intro_pat` to it.\n\
+         \  Exemples: * `have H := H0 i i2`\n\
+         \            * `have H := H0 _ i2`";
+       usages_sorts = [];
+       tactic_group = Logical}
+    ~pq_sound:true
+    have_tac

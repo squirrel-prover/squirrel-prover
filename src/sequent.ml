@@ -31,6 +31,8 @@ module type S = sig
   (*------------------------------------------------------------------*)
   val to_general_sequent : t -> Goal.t
 
+  val to_global_sequent : t -> LowEquivSequent.t
+                                 
   (*------------------------------------------------------------------*)
   val convert_pt_gen :
     check_compatibility:bool ->
@@ -49,7 +51,9 @@ end
 (*------------------------------------------------------------------*)
 module type MkArgs = sig
   module S : LowSequent.S
+
   val to_general_sequent : S.t -> Goal.t
+  val to_global_sequent  : S.t -> LowEquivSequent.t
 end
 
 
@@ -62,6 +66,7 @@ module Mk (Args : MkArgs) : S with
   include S
 
   let to_general_sequent = Args.to_general_sequent
+  let to_global_sequent = Args.to_global_sequent
 
   let is_assumption (name : lsymb) (s : S.t) =
     Hyps.mem_name (L.unloc name) s || Prover.is_assumption (L.unloc name)

@@ -273,7 +273,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     { table   = S.table s;
       sexpr   = se;
       param;
-      hint_db = S.get_hint_db s;
+      hint_db = S.hint_db s;
       hyps    = S.get_trace_hyps s; 
       expand_context; } 
 

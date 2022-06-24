@@ -544,12 +544,8 @@ module Babel = struct
     call : 'a. 'a f_kind -> 'a -> 'a
   }
 
-  let convert :
-    type a b. ?loc:Location.t ->
-              src:(a f_kind) ->
-              dst:(b f_kind) ->
-              a -> b
-    = fun ?loc ~src ~dst f ->
+  let convert (type a b) ?loc ~(src:a f_kind) ~(dst:b f_kind) (f : a) : b
+    = 
     match src,dst with
       (* Identity cases *)
       | Local_t,  Local_t  -> f

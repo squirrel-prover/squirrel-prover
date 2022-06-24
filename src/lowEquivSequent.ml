@@ -339,7 +339,7 @@ let get_felem ?loc i s =
   with List.Out_of_range ->
     Tactics.soft_failure ?loc (Tactics.Failure "out of range position")
 
-let get_hint_db s = s.hint_db
+let hint_db s = s.hint_db
 
 (*------------------------------------------------------------------*)
 let map f s : sequent =
