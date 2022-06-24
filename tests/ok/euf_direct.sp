@@ -12,11 +12,3 @@ Proof.
   auto.
 Qed.
 
-
-(* goal [any] _ : *)
-(*   h(n,k) = <f(n),h(f(n),k)> => f(n) = n. *)
-(* Proof. *)
-(*   intro Heq. *)
-(*   euf Heq.  *)
-(*   auto. *)
-(* Qed. *)
