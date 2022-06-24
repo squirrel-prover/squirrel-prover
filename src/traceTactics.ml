@@ -1364,7 +1364,9 @@ let () =
 (** {2 Cryptographic Tactics} *)
 
 (*------------------------------------------------------------------*)
-(** Unforgeability Axioms *)
+(** {3 Create integrity rules parameters } *)
+type integrity_rule = Euf | Intctxt | NonMalleability
+
 
 type unforgeabiliy_param = Term.fname * Term.nsymb * Term.term
                            * Term.term
@@ -1407,6 +1409,7 @@ let euf_param table (t : Term.term) : unforgeabiliy_param =
 
   | _ -> bad_param ()
 
+(*------------------------------------------------------------------*)
 let intctxt_param table (t : Term.term) : unforgeabiliy_param =
   let bad_param () =
     soft_failure
@@ -1451,10 +1454,56 @@ let intctxt_param table (t : Term.term) : unforgeabiliy_param =
 
   | _ -> bad_param ()
 
+(*------------------------------------------------------------------*)
+let non_malleability_param
+    (table : Symbols.table) (t : Term.term) : unforgeabiliy_param
+  =
+  let bad_param () =
+    soft_failure
+      (Tactics.Failure
+         "NM can only be applied to an hypothesis of the form
+          sdec(s,sk) = m (or symmetrically) ") 
+  in
 
+  let t1, t2 = match Term.destr_eq t with
+    | Some (t1, t2) -> t1, t2
+    | _ -> bad_param () 
+  in
 
+  let param_dec adec key m s =
+    match Symbols.Function.get_data adec table with
+    | Symbols.AssociatedFunctions [aenc; pk] ->
+      (aenc, key, m, s,  (fun x -> x = adec || x = pk),
+       [ ], false, Some (fun x -> x=pk))
 
-let euf_apply_schema sequent (_, key, m, s, _, _, _, _) (case : Euf.euf_schema) =
+    | _ -> assert false in
+
+  match t1, t2 with
+  | (Fun ((adec, _), _, [m; Name key]), s)
+    when Symbols.is_ftype adec Symbols.ADec table ->
+    param_dec adec key m s
+
+  | (s, Fun ((adec, _), _, [m; Name key]))
+    when Symbols.is_ftype adec Symbols.ADec table ->
+    param_dec adec key m s
+
+  | _ -> bad_param ()
+
+(*------------------------------------------------------------------*)
+let mk_integrity_rule_param
+    (rule : integrity_rule)
+  : Symbols.table -> Term.term -> unforgeabiliy_param =
+  match rule with
+  | Euf             -> euf_param
+  | Intctxt         -> intctxt_param
+  | NonMalleability -> non_malleability_param
+    
+(*------------------------------------------------------------------*)
+(** Unforgeability Axioms *)
+
+let euf_apply_schema
+    sequent (_, key, m, s, _, _, _, _) (case : Euf.euf_schema)
+  =
   (* Equality between hashed messages *)
   let new_f = Term.mk_atom `Eq case.message m in
 
@@ -1577,7 +1626,7 @@ let euf_apply_facts drop_head s
 
 (** Tag EUFCMA - for composition results *)
 let euf_apply
-    (get_params : Symbols.table -> Term.term -> unforgeabiliy_param)
+    (rule_kind : integrity_rule)
     (Args.String hyp_name)
     (s : TS.t)
   =
@@ -1585,7 +1634,9 @@ let euf_apply
   let id, at = Hyps.by_name hyp_name s in
 
 
-  let (h,key,m,_,_,extra_goals,drop_head,_) as p = get_params table at in
+  let (h,key,m,_,_,extra_goals,drop_head,_) as p =
+    mk_integrity_rule_param rule_kind table at
+  in
   let extra_goals = List.map (fun x ->
       TS.set_goal (Term.mk_impl x (TS.goal s)) s
     ) extra_goals in
@@ -1616,6 +1667,8 @@ let euf_apply
   let honest_s = euf_apply_facts drop_head s p in
   (tag_s @ honest_s @ extra_goals)
 
+
+(*------------------------------------------------------------------*)
 let () =
   T.register_typed "euf"
     ~general_help:"Apply the euf axiom to the given hypothesis name."
@@ -1627,7 +1680,7 @@ let () =
                     f(mess,sk), of the form forall (m:message,sk:message)."
     ~tactic_group:Cryptographic
     ~pq_sound:true
-    (LowTactics.genfun_of_pure_tfun_arg (euf_apply euf_param))
+    (LowTactics.genfun_of_pure_tfun_arg (euf_apply Euf))
     Args.String
 
 let () =
@@ -1636,43 +1689,11 @@ let () =
     ~detailed_help:"Conditions are similar to euf."
     ~tactic_group:Cryptographic
     ~pq_sound:true
-    (LowTactics.genfun_of_pure_tfun_arg (euf_apply intctxt_param))
+    (LowTactics.genfun_of_pure_tfun_arg (euf_apply Intctxt))
     Args.String
 
 
-let non_malleability_param table (t : Term.term) : unforgeabiliy_param =
-  let bad_param () =
-    soft_failure
-      (Tactics.Failure
-         "NM can only be applied to an hypothesis of the form
-          sdec(s,sk) = m (or symmetrically) ") 
-  in
-
-  let t1, t2 = match Term.destr_eq t with
-    | Some (t1, t2) -> t1, t2
-    | _ -> bad_param () 
-  in
-
-  let param_dec adec key m s =
-    match Symbols.Function.get_data adec table with
-    | Symbols.AssociatedFunctions [aenc; pk] ->
-      (aenc, key, m, s,  (fun x -> x = adec || x = pk),
-       [ ], false, Some (fun x -> x=pk))
-
-    | _ -> assert false in
-
-  match t1, t2 with
-  | (Fun ((adec, _), _, [m; Name key]), s)
-    when Symbols.is_ftype adec Symbols.ADec table ->
-    param_dec adec key m s
-
-  | (s, Fun ((adec, _), _, [m; Name key]))
-    when Symbols.is_ftype adec Symbols.ADec table ->
-    param_dec adec key m s
-
-  | _ -> bad_param ()
-
-
+(*------------------------------------------------------------------*)
 exception Name_not_hidden
 
 class name_under_enc (cntxt:Constr.trace_cntxt) enc is_pk target_n key_n
@@ -1701,7 +1722,7 @@ let non_malleability arg (s : TS.t) =
   in
 
   let enc_occurences_goals =
-    euf_apply non_malleability_param (Args.String hyp_name) s in
+    euf_apply NonMalleability (Args.String hyp_name) s in
   let table = TS.table s in
   let id, at = Hyps.by_name hyp_name s in
   let (enc, key_n, _, mess1, mess2 , _ , _, is_pk) = 
@@ -1860,8 +1881,6 @@ let () = T.register_typed "collision"
 
 (*------------------------------------------------------------------*)
 
-exception Invalid
-
 (** Transform a term according to some equivalence given as a biframe.
   * Macros in the term occurring (at toplevel) on the [src] projection
   * of some biframe element are replaced by the corresponding [dst]
@@ -1871,8 +1890,10 @@ let rewrite_equiv_transform
     ~(dst:Term.proj)
     ~(s:TS.t)
     (biframe : Term.term list)
-    (term : Term.term) : Term.term
+    (term : Term.term) : Term.term option
   =
+  let exception Invalid in
+
   let assoc (t : Term.term) : Term.term option =
     match List.find_opt (fun e -> Term.project1 src e = t) biframe with
     | Some e -> Some (Term.project1 dst e)
@@ -1917,7 +1938,7 @@ let rewrite_equiv_transform
 
     | _ -> raise Invalid
   in
-  aux term
+  try Some (aux term) with Invalid -> None
 
 (* Rewrite equiv rule on sequent [s] with direction [dir],
    using assumption [ass] wrt system [ass_context]. *)
@@ -1983,16 +2004,18 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
    * be applied we can simply drop the hypothesis rather
    * than failing completely. *)
   let rewrite (h : Term.term) : Term.term option =
-    try Some (rewrite_equiv_transform ~src ~dst ~s biframe h) with
-    | Invalid -> warn_unsupported h; None
+    match rewrite_equiv_transform ~src ~dst ~s biframe h with
+    | None -> warn_unsupported h; None
+    | x -> x
   in
 
   let goal =
     TS.set_goal_in_context
       ~update_local:rewrite
       updated_context
-      (try rewrite_equiv_transform ~src ~dst ~s biframe (TS.goal s) with
-       | Invalid -> warn_unsupported (TS.goal s); Term.mk_false)
+      (match rewrite_equiv_transform ~src ~dst ~s biframe (TS.goal s) with
+       | Some t -> t
+       | None -> warn_unsupported (TS.goal s); Term.mk_false)
       s
   in
   subgoals @ [goal]
