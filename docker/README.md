@@ -23,7 +23,7 @@ This will populate the `MyComputer` folder, next to the `examples` one, with the
 The simplest way to display a gui emacs is by using a webserver, using a second docker image. Obtain it with:
 $ docker pull jare/x11-bridge:latest
 
-Then, run one after another the commands:
+Then, run one after another the following commands inside a terminal (if you are on MAC OS, you will need to have `docker-desktop` running in the background, cf. https://docs.docker.com/desktop/mac/install/):
 ```
 docker run -d \
  --name x11-bridge \
