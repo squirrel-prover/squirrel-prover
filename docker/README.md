@@ -31,7 +31,7 @@ docker run -d \
  -e XPRA_HTML="yes" \
  -e DISPLAY=:14 \
  -e XPRA_PASSWORD=111 \
- --net=host \
+ -p 10000:10000 \
  jare/x11-bridge
 
 docker run -d \
@@ -52,7 +52,7 @@ docker run -d \
  -e DISPLAY=:14 \
  -e XPRA_PASSWORD=111 \
  -v <path_to_your_workspace>:/opt/squirrel-prover/MyComputer \
- --net=host \
+ -p 10000:10000 \
  jare/x11-bridge
  
 docker run -d \
