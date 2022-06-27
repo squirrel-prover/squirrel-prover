@@ -1,6 +1,6 @@
 # Running docker
 
-The docker image with squirrel preinstalled can be obtained with
+After installing Docker (https://docs.docker.com/engine/install/), the docker image with squirrel preinstalled can be obtained with
 
 $ docker pull cjacomme/squirrel-prover:latest
 
