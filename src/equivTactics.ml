@@ -59,7 +59,14 @@ let check_no_macro_or_var t =
 (** Closes the goal if it is an equivalence
   * where the two frames are identical. *)
 let refl (e : Equiv.equiv) (s : ES.t) =
-  if not (List.for_all check_no_macro_or_var e)
+  let refl_system =
+    let pair = Utils.oget ((ES.env s).system.pair) in
+    snd (SE.fst pair) = snd (SE.snd pair)
+  in
+  (* TODO do we really need to check for variables?
+     They could be an issue since they can currently
+     be instantiated by terms containing diff operators. *)
+  if not refl_system && not (List.for_all check_no_macro_or_var e)
   then `NoReflMacroVar
   else if ES.get_frame Term.left_proj s = ES.get_frame Term.right_proj s
   then `True
