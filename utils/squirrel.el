@@ -1,25 +1,26 @@
 ;;; squirrel.el --- Proof General for the Squirrel Prover.
 
-;; 0. Clone the git repository of proof general inside your ~/.emacs/lisp:
+;; 0. Clone the git repository of proof general inside your `~/.emacs.d/lisp`:
 ;;    # cd ~/.emacs.d/lisp/
 ;;    # git clone https://github.com/ProofGeneral/PG
 
-;; 1. Create a squirrel subdirectory:
+;; 1. Create a squirrel sub-directory:
 ;;    # mkdir ~/.emacs.d/lisp/PG/squirrel
 
-;; 2. Copy and paste this file, and squirrel-syntax.el inside it:
+;; 2. Copy and paste this file, and `squirrel-syntax.el` inside it:
 ;;    # cp squirrel.el squirrel-syntax.el ~/.emacs.d/lisp/PG/squirrel
 
-;; 3. Moreover, in the file ~/.emacs.d/lisp/PG/generic/proof-site.el,
-;;    add to the list proof-assistant-table-default the following line:
+;; 3. Moreover, in the file `~/.emacs.d/lisp/PG/generic/proof-site.el`,
+;;    add to the list `proof-assistant-table-default` the following line:
 ;;      (squirrel "squirrel" "sp")
 ;;    Then erase the outdated compiled version of this file:
 ;;    # rm ~/.emacs.d/lisp/PG/generic/proof-site.elc
 
-;; 4. Add the following two lines to your .emacs, the second one
-;;    with the correct path to your proof general folder:
-;;    (require 'ansi-color)
-;;    (load "~/.emacs.d/lisp/PG/generic/proof-site")
+;; 4. Add the following two lines to your `.emacs` (usually located
+;;    at `~/.emacs`), the second one with the correct path to your 
+;;    proof general folder:
+;;     (require 'ansi-color)
+;;     (load "~/.emacs.d/lisp/PG/generic/proof-site")
 
 ;; 5. Run emacs from the squirrel repository on some example file,
 ;;    with the squirrel repository in the path:
@@ -39,10 +40,10 @@
 
 (proof-easy-config 'squirrel "squirrel"
 
- proof-prog-name		     "squirrel -i"  ;; or your program
- proof-terminal-string                 "."   ;; end of commands
+ proof-prog-name		                   "squirrel -i"  ;; your program
+ proof-terminal-string                 "."            ;; end of commands
 
- proof-script-comment-start             "(*"	;; comments
+ proof-script-comment-start             "(*"	        ;; comments
  proof-script-comment-end               "*)"
 
  proof-shell-strip-crs-from-input       nil
@@ -66,13 +67,13 @@
  proof-shell-eager-annotation-start "\\[start>\\|\\[dbg>\\|\\[warning>"
  proof-shell-eager-annotation-end "<\\]"
 
- proof-shell-interrupt-regexp    "Interrupted"
+ proof-shell-interrupt-regexp "Interrupted"
 
- proof-shell-start-goals-regexp         "\\[goal>"
- proof-shell-end-goals-regexp           nil  ; up to next prompt
+ proof-shell-start-goals-regexp "\\[goal>"
+ proof-shell-end-goals-regexp nil  ; up to next prompt
 
-;; proof-shell-font-lock-keywords         squirrel-font-lock-keywords
- proof-script-font-lock-keywords         squirrel-font-lock-keywords
+;; proof-shell-font-lock-keywords squirrel-font-lock-keywords
+ proof-script-font-lock-keywords squirrel-font-lock-keywords
 
  proof-undo-n-times-cmd "undo %s."
  proof-count-undos-fn 'proof-generic-count-undos
