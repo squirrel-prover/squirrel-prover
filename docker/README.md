@@ -1,29 +1,54 @@
 # Running docker
 
-After installing Docker (https://docs.docker.com/engine/install/), the docker image with squirrel preinstalled can be obtained with
+After installing Docker (https://docs.docker.com/engine/install/), the
+docker image with Squirrel pre-installed can be obtained with
 
-$ docker pull cjacomme/squirrel-prover:latest
+```
+docker pull cjacomme/squirrel-prover:latest
+```
 
-One can then go inside the docker image with
+The docker image can then be run with
 
-$ docker run -it cjacomme/squirrel-prover:latest bash
+```
+docker run -it cjacomme/squirrel-prover:latest bash
+```
 
-This should open a bash *inside* the docker, which means that you are inside a virtual linux machine separate from your computer. You should land inside a folder with access to the `examples` folder of the squirrel prover repository. You can then move inside this folder `cd examples` and then run one of the examples with `emacs basic-hash.sp`. You will through this basic command only have access to emacs inside the terminal, and not have access to files on your computer.
+This should open a bash *inside* the docker, which means that you are
+inside a virtual linux machine separated from your computer. You should
+land inside a folder with access to the `examples` folder of the
+Squirrel prover repository. You can then move inside this folder (`cd
+examples`) and run one of the examples, e.g. with `emacs
+basic-hash.sp`. 
+
+Note that this gives you a basic access to Emacs using the
+command-line interface of the terminal (no mouse support). Also, this
+is a sandbox: the other files on your computer are not accessible.
 
 ## Accessing files from outside the docker
 
-To access files from a folder on your computer at `<path_to_your_workspace>`, run 
-$ docker run -it -v <path_to_your_workspace>:/opt/squirrel-prover/MyComputer cjacomme/squirrel-prover:latest bash 
+To access files from a folder on your computer at
+`<path_to_your_workspace>`, run 
+```
+docker run -it -v \
+ <path_to_your_workspace>:/opt/squirrel-prover/MyComputer \
+ cjacomme/squirrel-prover:latest bash
+```
 
-This will populate the `MyComputer` folder, next to the `examples` one, with the given path.
+This populates the `MyComputer` folder, next to the `examples` one,
+with the given path.
 
 
-## Runing emacs in GUI mode
+## Runing Emacs in GUI mode in the browser
 
-The simplest way to display a gui emacs is by using a webserver, using a second docker image. Obtain it with:
-$ docker pull jare/x11-bridge:latest
+The simplest way to display a gui Emacs is by using a webserver, using
+a second docker image. Obtain it with:
+```
+docker pull jare/x11-bridge:latest
+```
 
-Then, run one after another the following commands inside a terminal (if you are on MAC OS, you will need to have `docker-desktop` running in the background, cf. https://docs.docker.com/desktop/mac/install/):
+Then, run the two following commands inside a terminal (if you are on
+MAC OS, you need to have `docker-desktop` running in the
+background, see https://docs.docker.com/desktop/mac/install/):
 ```
 docker run -d \
  --name x11-bridge \
@@ -41,9 +66,17 @@ docker run -d \
  cjacomme/squirrel-prover emacs
  ```
 
-Then, visit `http://localhost:10000/index.html?encoding=rgb32&password=111` to obtain a display of a gui emacs, in which you can open files inside the docker. Before opening a file, we recomend that you resize the emacs window to be larger by a drag and drop on the top left corner of the emacs window (inside the browser). Making the window full screen may lead to low resolution and lags.
+Then, visit
+`http://localhost:10000/index.html?encoding=rgb32&password=111` to
+obtain a display of a GUI Emacs, in which you can open files inside
+the docker. Before opening a file, we recomend that you resize the
+Emacs window to be larger by a drag and drop on the top left corner of
+the Emacs window (inside the browser). Making the window full screen
+may lead to low resolution and lags.
 
-To kill the dockers, simply run `docker rm -f x11-bridge emacs-sp` (kills both dockers). You can add your own folder in a similar fashion as before, by replacing the commands with
+To kill the dockers, simply run `docker rm -f x11-bridge emacs-sp`
+(this kills both dockers). You can add your own folder as before, 
+by replacing the commands above with
 ```
 docker run -d \
  --name x11-bridge \
@@ -64,9 +97,15 @@ docker run -d \
 
 # Compiling and pushing the docker
 
-Run `./docker/build.sh` to build from scratch the image. `docker/res` contains the .emacs used by the docker, as well as the updated `proof-site.el` file from a fixed commit of PG.
+Run `./docker/build.sh` to build from scratch the image. `docker/res`
+contains the `.emacs` used by the docker, as well as the updated
+`proof-site.el` file from a fixed commit of PG.
 
-To publish the image, see @Charlie JACOMME (Dockerhub does not support free organizations...), which is then done by running:
-$ docker tag sp/squirel-prover cjacomme/squirrel-prover:latest; docker push cjacomme/squirrel-prover:latest
-
+To publish the image, see @Charlie JACOMME (Dockerhub does not support
+free organizations...), which is then done by running:
+```
+docker tag sp/squirel-prover \
+ cjacomme/squirrel-prover:latest; \
+ docker push cjacomme/squirrel-prover:latest
+```
 
