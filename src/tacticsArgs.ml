@@ -211,6 +211,7 @@ type parser_arg =
   | SimplPat     of simpl_pat
   | RewriteIn    of rw_arg list * in_target
   | RewriteEquiv of rw_equiv_item
+  | SystemAnnot  of (Symbols.table -> SystemExpr.context)
   | ApplyIn      of named_args * Theory.p_pt * apply_in
   | Have         of simpl_pat option * Theory.any_term
   | HavePt       of Theory.p_pt * simpl_pat option * [`IntroImpl | `None]
@@ -239,6 +240,9 @@ let pp_parser_arg ppf = function
       pp_in_target in_opt
 
   | RewriteEquiv rw_arg ->
+    Fmt.pf ppf "..."
+
+  | SystemAnnot _ ->
     Fmt.pf ppf "..."
 
   | ApplyIn (_, _, in_opt) ->

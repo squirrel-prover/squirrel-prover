@@ -52,7 +52,7 @@
 %token <string> RIGHTINFIXSYMB   /* right infix function symbols */
 %token <string> BANG
 
-%token AT 
+%token AT TRANS
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
 %token LBRACE RBRACE
@@ -857,6 +857,10 @@ tac:
     { mk_abstract l "have" [TacticsArgs.HavePt (pt, ip, `None)] }
 
   (*------------------------------------------------------------------*)
+  | l=lloc(TRANS) annot=system_annot
+    { let annot table = global_context table annot in
+      mk_abstract l "trans" [TacticsArgs.SystemAnnot annot] }
+
   | l=lloc(REWRITE) p=rw_args w=in_target
     { mk_abstract l "rewrite" [TacticsArgs.RewriteIn (p, w)] }
 
@@ -918,6 +922,7 @@ help_tac_i:
 | HAVE       { "have"}
 | USE        { "use"}
 | REWRITE    { "rewrite"}
+| TRANS      { "trans"}
 | APPLY      { "apply"}
 | SPLITSEQ   { "splitseq"}
 | CONSTSEQ   { "constseq"}

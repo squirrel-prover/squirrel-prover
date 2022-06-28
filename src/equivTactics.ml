@@ -94,6 +94,125 @@ let () =
     (LowTactics.genfun_of_efun refl_tac)
 
 (*------------------------------------------------------------------*)
+
+let sym_tac (s : ES.t) : Goal.t list =
+  let equiv_left = ES.get_frame Term.left_proj s |> Utils.oget in
+  let equiv_right = ES.get_frame Term.right_proj s |> Utils.oget in
+  let old_context = (ES.env s).system in
+  let old_pair = Utils.oget old_context.pair in
+  let new_pair =
+    SE.make_pair (snd (SE.snd old_pair)) (snd (SE.fst old_pair)) in
+  let new_context = { old_context with pair = Some new_pair } in
+  let diff l r = Term.combine [Term.left_proj,l; Term.right_proj,r] in
+  [ Goal.Equiv
+      (ES.set_goal_in_context
+         new_context
+         (Atom (Equiv (List.map2 diff equiv_right equiv_left)))
+         s) ]
+
+let () =
+  let tactic_help =
+    let open Prover in
+    { general_help = "Prove an equivalence by symmetry.";
+      detailed_help =
+        "Turn a goal whose conclusion is an equivalence \
+         into a subgoal whose conclusion is the symmetric equivalence.\
+         \n\n\
+         As a side effect the system annotation must be changed, \
+         which might cause the dropping of some hypotheses.";
+      usages_sorts = [Sort None];
+      tactic_group = Logical }
+  in
+  T.register "sym" ~tactic_help ~pq_sound:true
+    (LowTactics.genfun_of_efun sym_tac)
+
+(*------------------------------------------------------------------*)
+
+(** Prove a sequent s whose conclusion is an equivalence
+    from s1,s2,s3 where:
+
+     - s1 shows that the left projections of the equivalence
+       are equivalent for the old and new left systems;
+
+     - s3 shows that the right projections of the equivalence
+       are equivalent for the old and new right systems;
+
+     - s2 proves the same equivalence as s1 but for the new systems.
+
+    For convenience a new context is passed and not just a new pair.
+    This allows to change the set annotations for s2 by the way. *)
+let transitivity_systems new_context s =
+
+  (* Extract data from initial sequent. *)
+  let equiv_left = ES.get_frame Term.left_proj s |> Utils.oget in
+  let equiv_right = ES.get_frame Term.right_proj s |> Utils.oget in
+  let old_context = (ES.env s).system in
+  let old_pair = Utils.oget old_context.pair in
+
+  (* Extract data from new context. *)
+  let new_left = snd (SE.fst (Utils.oget new_context.SE.pair)) in
+  let new_right = snd (SE.snd (Utils.oget new_context.SE.pair)) in
+
+  (* Create new system annotations for s1 and s3.
+     The order of single systems in {left,right}_systems does not
+     matter for soundness but the choice below seems most natural
+     to understand the chain of transitivities, and it also maximizes
+     the chances that the context does not change in new sequents,
+     which will allow set_goal_in_context to keep a maximum of hypotheses. *)
+  let left_systems = SE.make_pair (snd (SE.fst old_pair)) new_left in
+  let right_systems = SE.make_pair new_right (snd (SE.snd old_pair)) in
+
+  let s1 =
+    ES.set_goal_in_context
+      { old_context with pair = Some left_systems }
+      (Atom (Equiv equiv_left))
+      s
+  in
+  let s3 =
+    ES.set_goal_in_context
+      { old_context with pair = Some right_systems }
+      (Atom (Equiv equiv_right))
+      s
+  in
+  let s2 = ES.set_goal_in_context new_context (ES.goal s) s in
+
+  [Goal.Equiv s1;Goal.Equiv s2;Goal.Equiv s3]
+
+let () =
+
+  let tactic_help = Prover.{
+    general_help = "Prove an equivalence by transitivity.";
+    detailed_help =
+      "When trying to prove an equivalence with respect to an initial \
+       pair of systems, the tactic `trans [new_annotation]` will reduce \
+       the goal to three new subgoals. Each subgoal will have as conclusion \
+       an equivalence, and by transitivity the three equivalences imply \
+       the initial equivalence. \
+       The second subgoal will establish an equivalence that is syntactically \
+       identical to the initial one, but understood with respect to \
+       the new system annotation.\
+       \n\n\
+       The three subgoals will in general have different system annotations \
+       than the initial goal. This change might force the dropping \
+       of some hypotheses. Other than that, hypotheses are unchanged.";
+    usages_sorts = [];
+    tactic_group = Logical }
+  in
+
+  T.register_general "trans"
+    ~tactic_help ~pq_sound:true
+    (LowTactics.genfun_of_efun_arg
+       (fun args s -> match args with
+          | [TacticsArgs.SystemAnnot annot] ->
+              let context = annot (ES.env s).table in
+                fun sk fk ->
+                  begin match transitivity_systems context s with
+                    | l -> sk l fk
+                    | exception Tactics.Tactic_soft_failure e -> fk e
+                  end
+          | _ -> Tactics.(hard_failure (Failure "invalid arguments"))))
+
+(*------------------------------------------------------------------*)
 let do_case_tac (args : Args.parser_arg list) s : sequent list =
   match Args.convert_as_lsymb args with
   | Some str when Hyps.mem_name (L.unloc str) s ->

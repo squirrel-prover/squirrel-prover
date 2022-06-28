@@ -154,6 +154,7 @@ rule token = parse
 | "exn"               { EXN }
 | "use"               { USE }
 | "rewrite"           { REWRITE }
+| "trans"             { TRANS }
 | "apply"             { APPLY }
 | "revert"            { REVERT }
 | "generalize"        { GENERALIZE }
