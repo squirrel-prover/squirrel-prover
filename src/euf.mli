@@ -1,5 +1,6 @@
 (** Module for the euf axiom application *)
 
+(*------------------------------------------------------------------*)
 (** Type of an euf axiom case schema.
     [e] of type [euf_schema] represents the fact that the message [e.message]
     has been hashed.
@@ -17,7 +18,7 @@ type euf_schema = {
 
 val pp_euf_schema : Format.formatter -> euf_schema -> unit
 
-
+(*------------------------------------------------------------------*)
 (** Type of a direct euf axiom case.
     [e] of type [euf_case] represents the fact that the message [e.m]
     has been hashed, and the key indices were [e.eindices]. *)
@@ -28,6 +29,7 @@ type euf_direct = {
 
 val pp_euf_direct : Format.formatter -> euf_direct -> unit
 
+(*------------------------------------------------------------------*)
 (** Type of an euf axiom rule:
     - [hash] stores the hash function name.
     - [key] stores the key considered in this rule.
@@ -42,13 +44,14 @@ type euf_rule = {
 
 val pp_euf_rule : Format.formatter -> euf_rule -> unit
 
-
+(*------------------------------------------------------------------*)
 (** Check the syntactic side conditions of the key in the protocol and
     the messages.
     When [global] is true, also checks in global macros. *)
 val key_ssc :
   globals:bool ->
-  ?messages:(Term.term list) -> ?elems:Equiv.equiv ->
+  ?messages:(Term.term list) ->
+  ?elems:Equiv.equiv ->
   allow_functions:(Symbols.fname -> bool) ->
   cntxt:Constr.trace_cntxt ->
   Term.fname -> Term.name -> Tactics.ssc_error list

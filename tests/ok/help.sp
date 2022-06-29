@@ -1,5 +1,3 @@
-
-
 system null.
 
 goal _ : False.
@@ -12,4 +10,8 @@ Proof.
   help generalize dependent.
   help have.
   help assert.
+  help trans.
+  help sym.
+  help apply.
+  help use.
 Abort.

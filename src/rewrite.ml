@@ -163,7 +163,7 @@ let rw_inst
     let hyps =                 (* adds [conds] in [hyps] *)
       Lazy.map (fun hyps ->
           List.fold_left (fun hyps cond ->
-              Hyps.TraceHyps.add AnyName (`Reach cond) hyps
+              Hyps.TraceHyps.add AnyName (Local cond) hyps
             ) hyps conds
         ) hyps
     in
@@ -218,7 +218,8 @@ let rw_inst
             List.map (fun rsub ->
                 let rsub = Term.project_opt projs rsub in
                 se, 
-                Term.mk_forall ~simpl:true vars (Term.mk_impls ~simpl:true conds (Term.subst subst rsub))
+                Term.mk_forall ~simpl:true vars
+                  (Term.mk_impls ~simpl:true conds (Term.subst subst rsub))
               ) s.init_subs
           in
 
@@ -293,8 +294,8 @@ let do_rewrite
   let s = 
     let target_systems =
       match target with
-      | `Equiv _ -> Some (SE.to_list (oget system.pair))
-      | `Reach _ -> SE.to_list_any system.set
+      | Global _ -> Some (SE.to_list (oget system.pair))
+      | Local _ -> SE.to_list_any system.set
     in
     mk_state rule target_systems
   in
@@ -310,17 +311,17 @@ let do_rewrite
     check_max_rewriting ();
 
     let s, f = match f with
-      | `Equiv f ->
+      | Global f ->
         let s, _, f = 
           Pos.map_fold_e (rw_inst expand_context table hyps) env system s f 
         in
-        s, `Equiv f
+        s, Equiv.Global f
 
-      | `Reach f ->
+      | Local f ->
         let s, _, f = 
           Pos.map_fold (rw_inst expand_context table hyps) env system.set s f 
         in
-        s, `Reach f
+        s, Equiv.Local f
     in
 
     match mult, s.found_instance with

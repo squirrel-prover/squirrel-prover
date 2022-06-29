@@ -120,8 +120,9 @@ let mk_equiv_statement
   : Goal.statement
   =
   let context = SE.equivalence_context ~set:new_system new_system in
-  let `Equiv formula, _ =
-    Goal.make_obs_equiv ~enrich table hint_db context
+  let formula =
+    fst (Goal.make_obs_equiv ~enrich table hint_db context)
+    |> Equiv.any_to_equiv
   in
   let formula = make_conclusion formula in
   Goal.{ name    = new_axiom_name; 
@@ -224,7 +225,7 @@ let global_rename
                         Term.mk_diff [Term.left_proj,n1;Term.right_proj,n2]])),
         equiv)
     in
-    `Equiv (Equiv.mk_forall [fresh_x_var] fimpl)
+    Equiv.Global (Equiv.mk_forall [fresh_x_var] fimpl)
   in
   let lemma =
     mk_equiv_statement
@@ -262,7 +263,7 @@ let global_prf
 
   (* Check syntactic side condition. *)
   let errors =
-    Euf.key_ssc ~globals:false
+    Euf.key_ssc ~globals:true
       ~elems:[] ~allow_functions:(fun x -> false)
       ~cntxt param.h_fn param.h_key.s_symb
   in
@@ -339,7 +340,7 @@ let global_prf
       Equiv.mk_forall [fresh_x_var]
         (Equiv.Smart.mk_impl ~simpl:false (Equiv.mk_forall is atom) equiv)
     in
-    `Equiv concl
+    Equiv.Global concl
   in
 
   let lemma =
@@ -395,7 +396,7 @@ let global_cca
     | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = enc_pk ->
       (* Check syntactic side condition. *)
       let errors =
-        Euf.key_ssc ~globals:false
+        Euf.key_ssc ~globals:true
           ~messages:[enc] ~allow_functions:(fun x -> x = enc_pk)
           ~cntxt fndec enc_key.s_symb
       in
@@ -516,7 +517,7 @@ let global_cca
                   Term.right_proj, Term.mk_name @@ Term.mk_isymb r Message is] ])
     in
     let concl = Equiv.Impl (Equiv.mk_forall is atom, equiv) in      
-    `Equiv (Equiv.mk_forall [fresh_x_var] concl)
+    Equiv.Global (Equiv.mk_forall [fresh_x_var] concl)
   in
 
   let lemma =
@@ -1116,9 +1117,9 @@ let do_rewrite
     Rewrite.rewrite_exn 
       ~loc (TS.table s) (TS.system s) expand_context
       (TS.vars s) (TS.get_trace_hyps s)
-      mult rw_erule (`Reach t)
+      mult rw_erule (Local t)
   with
-  | `Reach t, subs ->
+  | Local t, subs ->
     let subs =
       List.map (fun (sub_system, sub) -> 
           TS.set_goal_in_context sub_system sub s
@@ -1126,7 +1127,7 @@ let do_rewrite
     in
     t, subs
 
-  | `Equiv _, _ -> assert false
+  | Global _, _ -> assert false
 
   | exception Tactics.Tactic_soft_failure (_,NothingToRewrite) -> t, []
 
@@ -1144,11 +1145,11 @@ let do_rw_item
 
   | Rw_expand p_arg -> 
     let arg = TLT.p_rw_expand_arg s p_arg in
-    let _, t = TLT.expand_term ~mode:expand_context arg s (`Reach t) in
+    let _, t = TLT.expand_term ~mode:expand_context arg s (Local t) in
     Equiv.any_to_reach t, []
   
   | Rw_expandall _ ->
-    let _, t = TLT.expand_term ~mode:expand_context `Any s (`Reach t) in
+    let _, t = TLT.expand_term ~mode:expand_context `Any s (Local t) in
     Equiv.any_to_reach t, []    
 
 let do_s_item

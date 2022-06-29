@@ -1,5 +1,3 @@
-
-
 abstract a : message -> message
 
 name n : index -> message
@@ -15,18 +13,18 @@ system [bis] null.
 type T.
 abstract ( -- ) : T -> T -> boolean.
 
-axiom trans (x,y,z : T) : x -- y => y -- z => x -- z.
+axiom mtrans (x,y,z : T) : x -- y => y -- z => x -- z.
 
 goal trans2 (x,y,z : T) : x -- y => y -- z => x -- z.
 Proof. admit. Qed.
 
 (*------------------------------------------------------------------*)
-print goal trans.
+print goal mtrans.
 print goal trans2.
 
 goal _ : false.
 Proof.
-  print goal trans.
+  print goal mtrans.
   print goal trans2.
 Abort.
 

@@ -52,7 +52,7 @@
 %token <string> RIGHTINFIXSYMB   /* right infix function symbols */
 %token <string> BANG
 
-%token AT 
+%token AT TRANS
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
 %token LBRACE RBRACE
@@ -65,7 +65,7 @@
 %token NEW OUT PARALLEL NULL
 %token CHANNEL PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT OP TYPE FUN
 %token MUTABLE SYSTEM SET
-%token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW RARROW
+%token INDEX MESSAGE BOOL BOOLEAN TIMESTAMP ARROW RARROW
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token LOCAL GLOBAL
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH SLASHSLASHEQUAL ATSLASH
@@ -393,6 +393,7 @@ p_ty_i:
 | INDEX        { Theory.P_index }
 | TIMESTAMP    { Theory.P_timestamp }
 | BOOLEAN      { Theory.P_boolean }
+| BOOL         { Theory.P_boolean }
 | tv=ty_var    { Theory.P_tvar tv }
 | l=lsymb      { Theory.P_tbase l }
 
@@ -724,16 +725,20 @@ constseq_arg:
 | ASSERT {}
 | HAVE   {}
 
+/* local or global formula */
+%inline any_term:
+  | f=term           { Theory.Local f }
+  | g=global_formula { Theory.Global g }
+
+tac_any_term:
+| f=any_term %prec tac_prec { f }
+
 %inline have_tac:
 | l=lloc(have_kw) p=tac_term ip=as_ip?
-    { let ip = match ip with
-        | None -> []
-        | Some ip -> [TacticsArgs.SimplPat ip] in
-      mk_abstract l "have" (TacticsArgs.Theory p :: ip) }
+    { mk_abstract l "have" [TacticsArgs.Have (ip, Theory.Local p)] }
 
-| l=lloc(have_kw) ip=simpl_pat COLON p=tac_term 
-    { let ip = [TacticsArgs.SimplPat ip] in
-      mk_abstract l "have" (TacticsArgs.Theory p :: ip) }
+| l=lloc(have_kw) ip=simpl_pat COLON p=tac_any_term 
+    { mk_abstract l "have" [TacticsArgs.Have (Some ip, p)] }
 
 (*------------------------------------------------------------------*)
 /* tactics named arguments */
@@ -845,14 +850,18 @@ tac:
     { T.AndThenSel (t, [[1], T.By (t1,l)]) }
 
   | l=lloc(USE) pt=pt_use_tac ip=as_ip?
-    { mk_abstract l "have" [TacticsArgs.AssertPt (pt, ip, `IntroImpl)] }
+    { mk_abstract l "have" [TacticsArgs.HavePt (pt, ip, `IntroImpl)] }
 
   (*------------------------------------------------------------------*)
   /* assert a proof term */
   | l=lloc(HAVE) ip=simpl_pat? COLONEQ pt=p_pt 
-    { mk_abstract l "have" [TacticsArgs.AssertPt (pt, ip, `None)] }
+    { mk_abstract l "have" [TacticsArgs.HavePt (pt, ip, `None)] }
 
   (*------------------------------------------------------------------*)
+  | l=lloc(TRANS) annot=system_annot
+    { let annot table = global_context table annot in
+      mk_abstract l "trans" [TacticsArgs.SystemAnnot annot] }
+
   | l=lloc(REWRITE) p=rw_args w=in_target
     { mk_abstract l "rewrite" [TacticsArgs.RewriteIn (p, w)] }
 
@@ -914,6 +923,7 @@ help_tac_i:
 | HAVE       { "have"}
 | USE        { "use"}
 | REWRITE    { "rewrite"}
+| TRANS      { "trans"}
 | APPLY      { "apply"}
 | SPLITSEQ   { "splitseq"}
 | CONSTSEQ   { "constseq"}

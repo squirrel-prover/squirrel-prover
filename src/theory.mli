@@ -97,6 +97,12 @@ and global_formula_i =
   | POr     of global_formula * global_formula
   | PQuant  of pquant * bnds * global_formula
 
+
+(*------------------------------------------------------------------*)
+(** {2 Any term: local or global} *)
+
+type any_term = Global of global_formula | Local of term
+
 (*------------------------------------------------------------------*)
 (** {2 Declaration of new symbols} *)
 
@@ -319,11 +325,16 @@ val convert_ht :
     is used when converting the corresponding kind of atom. *)
 val convert_global_formula : conv_env -> global_formula -> Equiv.form
 
+val convert_any : conv_env -> any_term -> Equiv.any_form
+
+(*------------------------------------------------------------------*)
+(** {2 Misc} *)
+
 (** [find_app_terms t names] returns the sublist of [names] for which there
   * exists a subterm [Theory.App(name,_)] or [Theory.AppAt(name,_,_)] in the
   * term [t]. *)
 val find_app_terms : term -> string list -> string list
-
+  
 (*------------------------------------------------------------------*)
 (** {2 Proof terms} *)
 

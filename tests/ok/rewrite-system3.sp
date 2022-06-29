@@ -2,8 +2,6 @@
    conditions under which the rewriting can occur must be correctly 
    projected. *)
 
-
-
 system [a] null.
 system [b] null.
 

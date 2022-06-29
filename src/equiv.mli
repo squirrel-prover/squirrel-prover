@@ -84,7 +84,7 @@ type local_form = Term.term
 
 type global_form = form
 
-type any_form = [`Equiv of form | `Reach of Term.term]
+type any_form = Global of form | Local of Term.term
 
 val pp_any_form : Format.formatter -> any_form -> unit
 
@@ -137,3 +137,8 @@ end
 module Smart : Term.SmartFO with type form = global_form
 
 val destr_reach : form -> Term.term option
+val destr_equiv : form -> equiv option
+  
+val is_equiv : form -> bool
+val is_reach : form -> bool
+

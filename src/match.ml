@@ -784,9 +784,9 @@ let expand_head_once
     lazy (
       let lits = Hyps.TraceHyps.fold (fun _ f acc ->
           match f with
-          | `Reach f
-          | `Equiv Equiv.(Atom (Reach f)) -> f :: acc
-          | `Equiv _ -> acc
+          | Local f
+          | Global Equiv.(Atom (Reach f)) -> f :: acc
+          | Global _ -> acc
         ) (Lazy.force hyps) [] 
       in
       Constr.models_conjunct ~exn lits)

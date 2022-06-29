@@ -340,9 +340,9 @@ module ProverTactics = struct
   let convert_args j parser_args tactic_type =
     let env, conc =
       match j with
-      | Goal.Trace t -> TS.env t, `Reach (TS.goal t)
+      | Goal.Trace t -> TS.env t, Equiv.Local (TS.goal t)
 
-      | Goal.Equiv e -> ES.env e, `Equiv (ES.goal e)
+      | Goal.Equiv e -> ES.env e, Equiv.Global (ES.goal e)
     in
     HighTacticsArgs.convert_args env parser_args tactic_type conc
 
@@ -401,7 +401,8 @@ module ProverTactics = struct
       Format.pp_print_text
       help.general_help
       Format.pp_print_text
-      (if details then "\n"^help.detailed_help^"\n" else "")
+      (if details && help.detailed_help <> "" then
+         "\n" ^ help.detailed_help ^ "\n" else "")
       (if List.length help.usages_sorts = 0 then ""
        else if List.length help.usages_sorts =1 then "Usage:"
        else "Usages:")

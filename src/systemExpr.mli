@@ -213,7 +213,6 @@ val fst : <pair:unit;..> expr -> Term.proj * System.Single.t
 
 val snd : <pair:unit;..> expr -> Term.proj * System.Single.t
 
-
 (*------------------------------------------------------------------*)
 (** {2 Parsing, printing, and conversions} *)
 

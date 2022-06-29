@@ -21,6 +21,13 @@ You can also just build the prover with `make squirrel`, test with `make test`.
 
 The documentation for developers may be built with `make doc`.
 
+### Installing the Proof General mode for Emacs (optional, recommanded)
+
+The required `.el` files are inside the `utils` folder. The
+`utils/squirrel.el` file contains comments detailing the installation
+of Squirrel for Proof General.  We recommend installing Proof General
+from the git repository.
+
 ### Dependencies for the `smt` tactic (optional)
 
 (If those dependencies are not installed, Squirrel will still compile, but the
@@ -52,12 +59,10 @@ You can check a proof development by simply passing the file to `squirrel`:
 ```
 $ ./squirrel examples/basic-hash.sp
 ```
-
-### With proof general
-
-The required `.el` files are inside the `utils` folder. The `squirrel.el` file
-contains comments detailing the installation of squirrel for ProofGeneral.
-We recommend installing ProofGeneral from the git repository.
+or using Emacs with the Proof General mode (if installed)
+```
+$ emacs examples/basic-hash.sp
+```
 
 ## Examples
 Examples of developments in Squirrel can be found in:

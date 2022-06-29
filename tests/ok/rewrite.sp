@@ -480,3 +480,21 @@ Proof. by rewrite exists_false1. Qed.
 
 goal [any] _ ['a] : (exists (i : 'a), false) = false.
 Proof. by rewrite exists_false1. Qed.
+
+(*------------------------------------------------------------------*)
+(* check that `rewrite` exploits conditions when rewriting *)
+
+goal [any] _ (b : boolean, x, y, z : message) : 
+  (b => x = y) => if b then x else z = if b then y else z.
+Proof.
+  intro H.
+  by rewrite H.
+Qed.
+
+goal [any] _ (b : boolean, x, y, z : message) : 
+  (not b => z = y) => if b then x else z = if b then x else y.
+Proof.
+  intro H.
+  rewrite H //. 
+  by intro H1; apply H1.
+Qed.

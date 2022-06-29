@@ -83,6 +83,7 @@ module type S = sig
 
   val ty_vars : t -> Type.tvars
 
+  (*------------------------------------------------------------------*) 
   (** {2 Manipulation of bi-frame elements}
     *
     * These functionalities only make sense for equivalence sequents. *)
@@ -91,6 +92,7 @@ module type S = sig
   val change_felem : ?loc:L.t -> int -> Term.term list -> t -> t
   val get_felem    : ?loc:L.t -> int -> t -> Term.term
 
+  (*------------------------------------------------------------------*) 
   (** {2 Automated reasoning} *)
 
   val query_happens : precise:bool -> t -> Term.term -> bool
@@ -102,7 +104,7 @@ module type S = sig
 
   val get_trace_hyps : t -> TraceHyps.hyps
 
-  val get_hint_db : t -> Hint.hint_db
+  val hint_db : t -> Hint.hint_db
 
   (** [get_models s] returns a set of minimal models corresponding to the
       trace atoms in the sequent [s].
@@ -111,6 +113,7 @@ module type S = sig
          with parameter {!Tactics.TacTimeout} in case of timeout. *)
   val get_models : t -> Constr.models
 
+  (*------------------------------------------------------------------*) 
   (** {2 Substitution} *)
 
   (** [subst subst s] returns the sequent [s] where the substitution has
@@ -122,10 +125,12 @@ module type S = sig
       free variable u is replaced with v *)
   val rename : Vars.var -> Vars.var -> t -> t
 
+  (*------------------------------------------------------------------*) 
   (** {2 Free variables} *)
 
   val fv : t -> Vars.Sv.t
 
+  (*------------------------------------------------------------------*) 
   (** {2 Misc} *)
 
   val map : Equiv.Babel.mapper -> t -> t
@@ -137,6 +142,7 @@ module type S = sig
   module Conc : Term.SmartFO with type form = conc_form
 end
 
+(*------------------------------------------------------------------*) 
 (** {2 Common utilities for sequent implementations} *)
 
 (** Common setup for [set_goal_in_context].

@@ -124,9 +124,6 @@ class iter_approx_macros ~exact ~(cntxt:Constr.trace_cntxt) = object (self)
   method visit_message = function
     | Macro (ms,[],a) -> self#visit_macro ms a
     | m -> super#visit_message m
-
-  method has_visited_macro mn = List.mem mn checked_macros
-
 end
 
 (** Collect occurrences of [f(_,k(_))] or [f(_,_,k(_))] for a function name [f]

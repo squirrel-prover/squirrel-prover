@@ -9,7 +9,7 @@ let convert_as_lsymb parser_args = match parser_args with
   | _ -> None
 
 (*------------------------------------------------------------------*)
-let convert_pat_arg sel conv_cntxt p conc =
+let convert_pat_arg sel conv_cntxt p (conc : Equiv.any_form) =
   let t, ty = Theory.convert ~pat:true conv_cntxt p in
   let pat_vars =
     Vars.Sv.filter (fun v -> Vars.is_pat v) (Term.fv t)
@@ -24,8 +24,8 @@ let convert_pat_arg sel conv_cntxt p conc =
   and system = conv_cntxt.env.system
   and vars  = conv_cntxt.env.vars in
   let res = match conc with
-    | `Reach form -> Match.T.find ~option table system vars pat form
-    | `Equiv form -> Match.E.find ~option table system vars pat form
+    | Local form -> Match.T.find ~option table system vars pat form
+    | Global form -> Match.E.find ~option table system vars pat form
   in
   let message = match List.nth res (sel-1) with
     | et -> et

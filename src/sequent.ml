@@ -31,6 +31,8 @@ module type S = sig
   (*------------------------------------------------------------------*)
   val to_general_sequent : t -> Goal.t
 
+  val to_global_sequent : t -> LowEquivSequent.t
+                                 
   (*------------------------------------------------------------------*)
   val convert_pt_gen :
     check_compatibility:bool ->
@@ -49,7 +51,9 @@ end
 (*------------------------------------------------------------------*)
 module type MkArgs = sig
   module S : LowSequent.S
+
   val to_general_sequent : S.t -> Goal.t
+  val to_global_sequent  : S.t -> LowEquivSequent.t
 end
 
 
@@ -62,6 +66,7 @@ module Mk (Args : MkArgs) : S with
   include S
 
   let to_general_sequent = Args.to_general_sequent
+  let to_global_sequent = Args.to_global_sequent
 
   let is_assumption (name : lsymb) (s : S.t) =
     Hyps.mem_name (L.unloc name) s || Prover.is_assumption (L.unloc name)
@@ -101,9 +106,9 @@ module Mk (Args : MkArgs) : S with
          allow an implicit conversion from global to local
          hypothesis. *)
       match k,S.hyp_kind,f with
-        | Equiv.Local_t, Equiv.Any_t, `Reach f ->
+        | Equiv.Local_t, Equiv.Any_t, Local f ->
             make_goal f
-        | Equiv.Local_t, Equiv.Any_t, `Equiv (Equiv.Atom (Reach f)) ->
+        | Equiv.Local_t, Equiv.Any_t, Global (Equiv.Atom (Reach f)) ->
             make_goal f
         | dst,src,f ->
             make_goal (Equiv.Babel.convert ~loc:(L.loc name) ~src ~dst f)
@@ -148,8 +153,8 @@ module Mk (Args : MkArgs) : S with
     | Equiv.Global_t -> Equiv.Smart.is_impl f
     | Equiv.Any_t ->
       match f with
-      | `Reach f -> Term.Smart.is_impl f |
-        `Equiv f -> Equiv.Smart.is_impl f
+      | Local f -> Term.Smart.is_impl f |
+        Global f -> Equiv.Smart.is_impl f
 
   let destr_impl_k
       (type a)
@@ -162,10 +167,15 @@ module Mk (Args : MkArgs) : S with
     | Equiv.Global_t -> Equiv.Smart.destr_impl f
     | Equiv.Any_t ->
       match f with
-      | `Reach f ->
-        omap (fun (v,f) -> `Reach v, `Reach f) (Term.Smart.destr_impl f)
-      | `Equiv f ->
-        omap (fun (v,f) -> `Equiv v, `Equiv f) (Equiv.Smart.destr_impl f)
+      | Local f ->
+        omap
+          (fun (v,f) -> Equiv.Local v, Equiv.Local f)
+          (Term.Smart.destr_impl f)
+          
+      | Global f ->
+        omap
+          (fun (v,f) -> Equiv.Global v, Equiv.Global f)
+          (Equiv.Smart.destr_impl f)
 
   let destr_forall1_k
       (type a)
@@ -178,10 +188,10 @@ module Mk (Args : MkArgs) : S with
     | Equiv.Global_t -> Equiv.Smart.destr_forall1 f
     | Equiv.Any_t ->
       match f with
-      | `Reach f ->
-        omap (fun (v,f) -> v, `Reach f) (Term.Smart.destr_forall1 f)
-      | `Equiv f ->
-        omap (fun (v,f) -> v, `Equiv f) (Equiv.Smart.destr_forall1 f)
+      | Local f ->
+        omap (fun (v,f) -> v, Equiv.Local f) (Term.Smart.destr_forall1 f)
+      | Global f ->
+        omap (fun (v,f) -> v, Equiv.Global f) (Equiv.Smart.destr_forall1 f)
 
   let decompose_forall_k
       (type a)
@@ -194,10 +204,10 @@ module Mk (Args : MkArgs) : S with
     | Equiv.Global_t -> Equiv.Smart.decompose_forall f
     | Equiv.Any_t ->
       match f with
-      | `Reach f ->
-        let vs,f = Term.Smart.decompose_forall f in vs, `Reach f
-      | `Equiv f ->
-        let vs,f = Equiv.Smart.decompose_forall f in vs, `Equiv f
+      | Local f ->
+        let vs,f = Term.Smart.decompose_forall f in vs, Local f
+      | Global f ->
+        let vs,f = Equiv.Smart.decompose_forall f in vs, Global f
 
   (*------------------------------------------------------------------*)
   (** Return the location of a proof term argument. *)
@@ -366,14 +376,14 @@ module Mk (Args : MkArgs) : S with
 
             | Equiv.Any_t ->
               match f1, pat1.pat_term with
-              |  `Reach f1, `Reach t1 ->
+              |  Local f1, Local t1 ->
                 let pat1   = { pat1 with pat_term = t1 } in
                 let pat_f1 = { pat1 with pat_term = f1 } in
                 Match.T.try_match
                   ~ty_env ~mv
                   (S.table s) (S.system s) pat1.pat_term pat_f1
 
-              | `Equiv f1, `Equiv t1  ->
+              | Global f1, Global t1  ->
                 let pat1   = { pat1 with pat_term = t1 } in
                 let pat_f1 = { pat1 with pat_term = f1 } in
                 Match.E.try_match

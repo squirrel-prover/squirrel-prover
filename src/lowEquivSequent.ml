@@ -260,7 +260,7 @@ let to_trace_sequent s =
   let trace_s = TS.init ~env ~hint_db goal in
   Hyps.fold
     (fun id hyp trace_s ->
-        TS.Hyps.add (Args.Named (Ident.name id)) (`Equiv hyp) trace_s)
+        TS.Hyps.add (Args.Named (Ident.name id)) (Global hyp) trace_s)
     s trace_s
 
 (*------------------------------------------------------------------*)
@@ -339,7 +339,14 @@ let get_felem ?loc i s =
   with List.Out_of_range ->
     Tactics.soft_failure ?loc (Tactics.Failure "out of range position")
 
-let get_hint_db s = s.hint_db
+let hint_db s = s.hint_db
+
+(*------------------------------------------------------------------*)
+let get_system_pair t = oget (system t).pair
+
+let get_system_pair_projs t : Term.proj * Term.proj =
+  let p = get_system_pair t in
+  fst (SE.fst p), fst (SE.snd p)
 
 (*------------------------------------------------------------------*)
 let map f s : sequent =

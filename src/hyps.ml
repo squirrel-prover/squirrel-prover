@@ -287,11 +287,11 @@ let get_ord (at : Term.xatom ) : Term.ord = match at with
 module TraceHyps = Mk(struct
     type t = Equiv.any_form
     let pp_hyp = Equiv.Any.pp
-    let htrue = `Reach Term.mk_true
+    let htrue = Equiv.Local Term.mk_true
 
-    let choose_name = function
-      | `Equiv _ -> "G"
-      | `Reach f ->
+    let choose_name : Equiv.any_form -> string = function
+      | Global _ -> "G"
+      | Local f ->
         match Term.form_to_xatom f with
         | None -> "H"
         | Some (`Happens _) -> "Hap"
@@ -319,12 +319,12 @@ module TraceHyps = Mk(struct
 let get_atoms_of_hyps (hyps : TraceHyps.hyps) : Term.literals =
   TraceHyps.fold (fun _ f acc ->
       match f with
-      | `Reach f
-      | `Equiv Equiv.(Atom (Reach f)) ->
+      | Local f
+      | Global Equiv.(Atom (Reach f)) ->
         begin match Term.form_to_literals f with
           | `Entails lits | `Equiv lits -> lits @ acc
         end
-      | `Equiv _ -> acc
+      | Global _ -> acc
     ) hyps [] 
 
 let get_message_atoms (hyps : TraceHyps.hyps) : Term.xatom list =

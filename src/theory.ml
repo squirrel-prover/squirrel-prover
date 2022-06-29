@@ -257,6 +257,11 @@ and global_formula_i =
   | PQuant  of pquant * bnds * global_formula
 
 (*------------------------------------------------------------------*)
+(** {2 Any term: local or global} *)
+
+type any_term = Global of global_formula | Local of term
+                  
+(*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
 type conversion_error_i =
@@ -1307,6 +1312,14 @@ let convert_global_formula (cenv : conv_env) (p : global_formula) =
 
   conve cenv p
 
+(*------------------------------------------------------------------*)
+(** {2 Convert any} *)
+
+let convert_any (cenv : conv_env) (p : any_term) : Equiv.any_form =
+  match p with
+  | Local  p -> Local (fst (convert ~ty:Type.Boolean cenv p))
+  | Global p -> Global (convert_global_formula cenv p)
+  
 (*------------------------------------------------------------------*)
 (** {2 State and substitution parsing} *)
 

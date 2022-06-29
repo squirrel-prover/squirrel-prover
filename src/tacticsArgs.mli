@@ -135,8 +135,10 @@ type parser_arg =
   | SimplPat     of simpl_pat
   | RewriteIn    of rw_arg list * in_target
   | RewriteEquiv of rw_equiv_item
+  | SystemAnnot  of (Symbols.table -> SystemExpr.context)
   | ApplyIn      of named_args * Theory.p_pt * apply_in
-  | AssertPt     of Theory.p_pt * simpl_pat option * [`IntroImpl | `None]
+  | Have         of simpl_pat option * Theory.any_term
+  | HavePt       of Theory.p_pt * simpl_pat option * [`IntroImpl | `None]
   | SplitSeq     of int L.located * Theory.hterm
   | ConstSeq     of int L.located * (Theory.hterm * Theory.term) list
   | MemSeq       of int L.located * int L.located

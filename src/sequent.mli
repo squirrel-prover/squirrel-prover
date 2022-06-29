@@ -20,6 +20,11 @@ module type S = sig
   (*------------------------------------------------------------------*) 
   val to_general_sequent : t -> Goal.t
 
+  (** Transform any sequent into a global sequent. Drop local
+      hypotheses that no longer apply.
+      Conclusion defaults to [Equiv.False]. *)
+  val to_global_sequent : t -> LowEquivSequent.t
+
   (*------------------------------------------------------------------*) 
   (** Convert a proof term into a pattern and the system it applies to.
       The pattern is the conclusion of the proof term.
@@ -46,7 +51,9 @@ end
 (*------------------------------------------------------------------*)
 module type MkArgs = sig
   module S : LowSequent.S
+
   val to_general_sequent : S.t -> Goal.t
+  val to_global_sequent  : S.t -> LowEquivSequent.t
 end
 
 (** Functor building a {!Sequent.S} from a {!LowSequent.S}. *)

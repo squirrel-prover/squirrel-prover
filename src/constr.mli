@@ -1,4 +1,6 @@
+module SE = SystemExpr
 
+(*------------------------------------------------------------------*)
 (** The minimal models a of constraint.
     Here, minimality means inclusion w.r.t. the predicates. *)
 type models

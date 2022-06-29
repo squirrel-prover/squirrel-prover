@@ -33,7 +33,6 @@ class iter_approx_macros :
   cntxt:Constr.trace_cntxt ->
   object
     val mutable checked_macros : Term.mname list
-    method has_visited_macro : Term.mname -> bool
     method visit_macro : Term.msymb -> Term.term -> unit
     method visit_message : Term.term -> unit
   end
@@ -54,7 +53,6 @@ class get_f_messages :
     val mutable checked_macros : Term.mname list
     val mutable occurrences : (Vars.var list * Term.term) list
     method get_occurrences : (Vars.var list * Term.term) list
-    method has_visited_macro : Term.mname -> bool
     method visit_macro : Term.msymb -> Term.term -> unit
     method visit_message : Term.term -> unit
   end

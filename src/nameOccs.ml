@@ -38,7 +38,7 @@ let clear_subsumed_timestamps (occs : ts_occs) : ts_occs =
     (* for now, positions are not allowed here. *)
     assert (Sp.is_empty occ1.occ_pos && Sp.is_empty occ2.occ_pos);
 
-    (* FEATURE: alpha-renaming *) (* ¿I don't see how that's alpha-renaming? looks to me like we only remove t when there's also pred(t)*) 
+    (* FUTURE WORK: alpha-renaming *)
     List.length occ1.occ_vars = List.length occ2.occ_vars &&
                                   List.for_all2 (=) occ1.occ_vars occ2.occ_vars &&
                                     occ1.occ_cond = occ2.occ_cond &&
@@ -67,7 +67,7 @@ let get_actions_ext (contx : Constr.trace_cntxt) (t : Term.term) : ts_occs =
          in
          let occ = Iter.{
                occ_cnt  = ts;
-               occ_vars = List.rev fv; (* why rev though? *)
+               occ_vars = List.rev fv;
                occ_cond = cond;
                occ_pos  = Sp.empty; }
          in

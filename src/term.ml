@@ -1718,18 +1718,18 @@ let rec make_normal_biterm (dorec : bool) (t : term) : term =
 
   | Name n, Name n' when n=n' -> Name n
 
-  | Macro (m,l,ts), Macro (m',l',ts') when m=m' && ts=ts' ->
+  | Macro (m,l,ts), Macro (m',l',ts') when m = m' && ts = ts' ->
       Macro (m, List.map2 mdiff l l', ts)
 
-  | Action (a,is), Action (a',is') when a=a' && is=is' -> Action (a,is)
+  | Action (a,is), Action (a',is') when a = a' && is = is' -> Action (a,is)
 
   | Var x, Var x' when x=x' -> Var x
 
-  | Find (is,c,t,e), Find (is',c',t',e') when is=is' ->
+  | Find (is,c,t,e), Find (is',c',t',e') when is = is' ->
       Find (is, mdiff c c', mdiff t t', mdiff e e')
 
-  | ForAll (vs,f), ForAll (vs',f') when vs=vs' -> ForAll (vs, mdiff f f')
-  | Exists (vs,f), Exists (vs',f') when vs=vs' -> Exists (vs, mdiff f f')
+  | ForAll (vs,f), ForAll (vs',f') when vs = vs' -> ForAll (vs, mdiff f f')
+  | Exists (vs,f), Exists (vs',f') when vs = vs' -> Exists (vs, mdiff f f')
 
   | t1,t2 -> diff t1 t2
 

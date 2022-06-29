@@ -61,7 +61,9 @@ type reach_statement = (string, Term.term     ) abstract_statement
 let pp_statement fmt (g : statement) : unit =
   let pp_tyvars fmt tyvs = 
     if tyvs = [] then () 
-    else Fmt.list ~sep:Fmt.sp Type.pp_tvar fmt tyvs
+    else
+      Fmt.pf fmt " [%a]"
+        (Fmt.list ~sep:Fmt.sp Type.pp_tvar) tyvs
   in
   Fmt.pf fmt "[%a] %s%a :@ %a"
     SE.pp_context g.system
@@ -73,13 +75,13 @@ let pp_statement fmt (g : statement) : unit =
 
 let is_reach_statement (stmt : (_, Equiv.any_form) abstract_statement) : bool =
   match stmt.formula with
-  | `Equiv _ -> false
-  | `Reach _ -> true
+  | Global _ -> false
+  | Local _ -> true
 
 let is_equiv_statement stmt : bool =
   match stmt.formula with
-  | `Equiv _ -> true
-  | `Reach _ -> false
+  | Equiv.Global _ -> true
+  | Equiv.Local _ -> false
 
 let to_reach_statement ?loc stmt =
   { stmt with formula = Equiv.Any.convert_to ?loc Equiv.Local_t stmt.formula }
@@ -93,9 +95,9 @@ let to_equiv_statement ?loc stmt =
 module Parsed = struct
 
   type contents =
-  | Local     of Theory.term
-  | Global    of Theory.global_formula
-  | Obs_equiv   (** All the information is in the system expression. *)
+    | Local     of Theory.term
+    | Global    of Theory.global_formula
+    | Obs_equiv   (** All the information is in the system expression. *)
 
   type t = {
     name    : Theory.lsymb option;
@@ -123,7 +125,7 @@ let make_obs_equiv ?(enrich=[]) table hint_db system =
   
   let s = ES.init ~env ~hint_db ~hyp goal in
   
-  `Equiv (Equiv.mk_forall [ts] (Equiv.(Impl (hyp,goal)))),
+  Equiv.Global (Equiv.mk_forall [ts] (Equiv.(Impl (hyp,goal)))),
   Equiv s
 
 
@@ -145,13 +147,13 @@ let make table hint_db parsed_goal : statement * t =
     | Local f ->
       let f,_ = Theory.convert conv_env ~ty:Type.Boolean f in
       let s = TS.init ~env ~hint_db f in
-      let formula = `Reach (Term.mk_forall vs f) in
+      let formula = Equiv.Local (Term.mk_forall vs f) in
       formula, Trace s
 
     | Global f ->
       let f = Theory.convert_global_formula conv_env f in
       let s = ES.init ~env ~hint_db f in
-      let formula = `Equiv (Equiv.mk_forall vs f) in
+      let formula = Equiv.Global (Equiv.mk_forall vs f) in
       formula, Equiv s
 
     | Obs_equiv ->
