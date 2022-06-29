@@ -1870,17 +1870,18 @@ let mset_inter table env (s1 : MCset.t) (s2 : MCset.t) : MCset.t option =
   let term1 = Term.mk_macro s1.msymb [] (Term.mk_var tv) in
   let term2 = Term.mk_macro s2.msymb [] (Term.mk_var tv) in
 
-  let mk_pat1 : type a. a -> a pat = fun u ->
-    { pat_term = u;
-      pat_tyvars = [];
-      pat_vars = Sv.of_list1 s1.indices;} in
-  let mk_pat2 : type a. a -> a pat = fun u ->
-    { pat_term = u;
-      pat_tyvars = [];
-      pat_vars = Sv.of_list1 s2.indices;}
+  let pat1 = {
+    pat_term = term1;
+    pat_tyvars = [];
+    pat_vars = Sv.of_list1 s1.indices;}
+  in
+  let pat2 = {
+    pat_term = term2;
+    pat_tyvars = [];
+    pat_vars = Sv.of_list1 s2.indices;}
   in
   (* FIXME: cleanup with unification of list of terms *)
-  match T.unify_opt table (mk_pat1 term1) (mk_pat2 term2) with
+  match T.unify_opt table pat1 pat2 with
   | None -> None
   | Some mv ->
 
@@ -2482,11 +2483,11 @@ module E : S with type t = Equiv.form = struct
     | _ -> None
 
   (*------------------------------------------------------------------*)
-  (** Check that [term] can be deduced from [pat_terms] and [mset_mem].
+  (** Check that [cterm] can be deduced from [pat_terms].
       This check is modulo:
       - Restr: all elements may not be used;
       - Sequence expantion: sequences may be expanded;
-      - Function Application: [term] may be decomposed into smaller terms. *)
+      - Function Application: [cterm] may be decomposed into smaller terms. *)
   let rec match_term_incl
       (cterm     : cond_term)
       (pat_terms : known_sets)
@@ -2500,7 +2501,7 @@ module E : S with type t = Equiv.form = struct
          rule, and recurse. *)
       fa_match_term_incl cterm pat_terms st minfos
 
-  (** Check that [term] can be deduced from [pat_terms] and [mset_l]. *)
+  (** Check that [cterm] can be deduced from [pat_terms]. *)
   and fa_match_term_incl
       (cterm     : cond_term)
       (pat_terms : known_sets)
@@ -2535,15 +2536,14 @@ module E : S with type t = Equiv.form = struct
        See explanation in [mset_mem_one]. *)
     let mset_l =
       if Sv.is_empty st.support && st.use_fadup then
-        match SystemExpr.to_fset (oget st.system.pair) with
-          | system ->
-              let msets = strengthen st.table system st.env pat_terms in
-              msets_to_list msets
-          | exception SystemExpr.(Error Expected_fset) -> []
+        let system = SE.to_fset (oget st.system.pair) in
+        let msets = strengthen st.table system st.env pat_terms in
+        msets_to_list msets
       else []
     in
 
-    if Sv.is_empty st.support && st.use_fadup && Config.show_strengthened_hyp () then
+    if Sv.is_empty st.support && st.use_fadup &&
+       Config.show_strengthened_hyp () then
       (dbg ~force:true) "strengthened hypothesis:@;%a@;" MCset.pp_l mset_l;
 
     let pat_terms =
@@ -2551,7 +2551,7 @@ module E : S with type t = Equiv.form = struct
         (known_sets_of_mset_l mset_l)
         (known_sets_of_terms pat_terms)
     in
-
+    
     let mv, minfos =
       List.fold_left (fun (mv, minfos) term ->
           let cterm = { term; cond = Term.mk_true; } in

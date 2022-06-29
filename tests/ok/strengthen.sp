@@ -1,4 +1,4 @@
-
+set showStrengthenedHyp=true.
 
 channel c.
 
