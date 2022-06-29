@@ -481,6 +481,14 @@ let destr_reach = function
   | Atom (Reach f) -> Some f
   | _ -> None
 
+let is_reach f = destr_reach f <> None
+                 
+let destr_equiv = function
+  | Atom (Equiv e) -> Some e
+  | _ -> None
+
+let is_equiv f = destr_equiv f <> None
+
 (*------------------------------------------------------------------*)
 (** {2 Generalized formulas} *)
 

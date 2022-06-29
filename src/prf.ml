@@ -245,7 +245,7 @@ let prf_condition_side
   =
   let exception HashNoOcc in
   try
-    let system = SE.(project [proj] cntxt.system) in
+    let system = SE.project [proj] cntxt.system in
     let cntxt = { cntxt with system } in
     let param = prf_param (Term.project1 proj hash) in
 

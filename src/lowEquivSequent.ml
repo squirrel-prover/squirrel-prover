@@ -342,6 +342,13 @@ let get_felem ?loc i s =
 let hint_db s = s.hint_db
 
 (*------------------------------------------------------------------*)
+let get_system_pair t = oget (system t).pair
+
+let get_system_pair_projs t : Term.proj * Term.proj =
+  let p = get_system_pair t in
+  fst (SE.fst p), fst (SE.snd p)
+
+(*------------------------------------------------------------------*)
 let map f s : sequent =
   let f x = f.Equiv.Babel.call Equiv.Global_t x in
   set_goal (f (goal s)) (Hyps.map f s)

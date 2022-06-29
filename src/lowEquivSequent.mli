@@ -2,6 +2,8 @@
     or more accurately global sequents whose conclusion
     is a global meta-formula. *)
 
+module SE = SystemExpr
+  
 (*------------------------------------------------------------------*)
 include LowSequent.S with
   type  hyp_form = Equiv.global_form and
@@ -26,6 +28,12 @@ val init :
 (** Special pretty-printer for initial sequents.
     It does not display hypotheses, which might be misleading. *)
 val pp_init : Format.formatter -> t -> unit
+
+(*------------------------------------------------------------------*)
+(** {2 Misc} *)
+  
+val get_system_pair : t -> SE.pair
+val get_system_pair_projs : t -> Term.proj * Term.proj
 
 (*------------------------------------------------------------------*)
 (** {2 Utilities for equivalence sequents}

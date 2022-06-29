@@ -137,3 +137,8 @@ end
 module Smart : Term.SmartFO with type form = global_form
 
 val destr_reach : form -> Term.term option
+val destr_equiv : form -> equiv option
+  
+val is_equiv : form -> bool
+val is_reach : form -> bool
+

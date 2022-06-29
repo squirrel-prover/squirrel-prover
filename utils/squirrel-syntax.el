@@ -68,6 +68,7 @@
   "index"
   "message"
   "boolean"
+  "bool"
   "timestamp"
 
   "large"
