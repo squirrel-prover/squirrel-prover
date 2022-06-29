@@ -30,5 +30,4 @@ goal _ (tau : timestamp) : m(tau) = m1(tau) => false.
 Proof. 
   intro H. 
   fresh H => U. 
-  assumption.
 Qed.

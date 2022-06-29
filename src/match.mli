@@ -47,15 +47,15 @@ module Pos : sig
   (*------------------------------------------------------------------*)
   (** [f] of type ['a f_map_fold] is a function that, given 
       [t se vars conds p acc] where:
-      - [t] is sub-term of the term we are mapping one
+      - [t] is sub-term of the term we are mapping on
       - [se] is the system expr applying to [t]
       - [vars] are the free variable bound above [t]'s occurrence
       - [conds] are conditions above [t]'s occurrence
       - [p] is the position of [t]'s occurrence
 
       If [f t projs vars conds p acc =]:
-      - [`Select], we found a position.
-      - [`Continue], we keep looking for positions downwards. *)
+      - [`Map t'], we found a position and replace it with [t'].
+      - [`Continue], we keep looking for positions downwards or upwards. *)
   type 'a f_map_fold =
     Term.term ->
     SE.arbitrary -> Vars.vars -> Term.term list -> pos ->
@@ -67,6 +67,14 @@ module Pos : sig
     Term.term ->
     SE.arbitrary -> Vars.vars -> Term.term list -> pos -> 
     [`Map of Term.term | `Continue]
+
+  (** Same as [f_map_fold], but just for a fold. *)
+  type 'a f_fold =
+    Term.term ->
+    SE.arbitrary -> Vars.vars -> Term.term list -> pos ->
+    'a ->
+    'a
+
 
   (*------------------------------------------------------------------*)
   (** [map_fold ?mode func env acc t] applies [func] at all position in [t].
@@ -114,6 +122,42 @@ module Pos : sig
     SE.context ->
     Equiv.form ->
     bool * Equiv.form
+
+  (*------------------------------------------------------------------*)
+  (** Same as [map_fold], but only a fold. *)
+  val fold : 
+    ?mode:[`TopDown of bool | `BottomUp] -> 
+    'a f_fold ->
+    Vars.env ->
+    SE.arbitrary ->
+    'a ->
+    Term.term -> 
+    'a
+
+  (** Same as [map_fold_e], but only a fold. *)
+  val fold_e : 
+    ?mode:[`TopDown of bool | `BottomUp] -> 
+    'a f_fold ->
+    Vars.env ->
+    SE.context ->
+    'a ->
+    Equiv.form -> 
+    'a
+
+  (*------------------------------------------------------------------*)
+  (** Same as [fold], but only folds on subterms at depth 1.
+      Takes as additional input the condition at the current point,
+      to propagate it when folding *)
+  val fold_shallow : 
+    'a f_fold ->          (* function to apply on each subterm at depth 1 *)
+    env:Vars.env ->       (* environment for the larger term (for renaming) *)
+    se:SE.arbitrary ->    (* system expr for the current position *)
+    fv:Vars.vars ->       (* variables bound above the current position *)
+    cond:Term.terms ->    (* conditions for the current position *)
+    p:pos ->              (* current position *)
+    'a ->                 (* folding value *)
+    Term.term ->          (* current term *)
+    'a                    (* new folding value *)
 end
 
 (*------------------------------------------------------------------*)

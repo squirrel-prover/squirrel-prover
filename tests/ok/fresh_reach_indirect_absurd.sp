@@ -10,5 +10,4 @@ goal _ (tau:timestamp): happens(tau) => n = f(frame@tau) => False.
 Proof.
   nosimpl(intro Hap Heq).
   nosimpl(fresh Heq).
-  auto.
 Qed.

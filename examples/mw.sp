@@ -84,7 +84,9 @@ Proof.
       * by use tags_neq.
       * exists i,t0; simpl.
         assert (input@T(i,t0) = nr(r)) as F by auto.
-        fresh F => [_|_|_] //.
+        fresh F => _ //.
+        ** by depends R(r), R1(r).
+        ** by depends R(r), R1(r).
         ** by depends R(r), R1(r).
         ** by depends R(r), R2(r).
     (* right *)
@@ -92,7 +94,9 @@ Proof.
       * by use tags_neq.
       * exists i,t; simpl.
         assert (input@T(i,t) = nr(r)) as F by auto.
-        fresh F => [_|_|_] //.
+        fresh F => _ //.
+        ** by depends R(r),R1(r).
+        ** by depends R(r),R1(r).
         ** by depends R(r),R1(r).
         ** by depends R(r),R2(r).
 
@@ -118,8 +122,8 @@ Proof.
   intro Meq; euf Meq => _ _ _; 1: auto.
   exists t; simpl.
   assert input@T(i,t) = nr(r) as F by auto.
-  fresh F => C.
-  by case C; 3:depends R(r), R2(r).
+  by (fresh F => C;
+  5:depends R(r), R2(r)).
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
@@ -136,8 +140,8 @@ Proof.
   rewrite eq_iff; split; 2: by intro [_ _]; expand output.
   intro Meq; euf Meq => _ _ _; 1: auto.
   assert input@T(i,t) = nr(r) as F by auto.
-  fresh F => C.
-  by case C; 3:depends R(r), R2(r).
+  by (fresh F => C;
+  5:depends R(r), R2(r)).
 Qed.
 
 (** Equality used to rewrite the try-find in R1

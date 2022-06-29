@@ -563,42 +563,10 @@ let () = T.register "eqtrace"
     ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun eq_trace)
 
-(*------------------------------------------------------------------*)
-let fresh_param m1 m2 = match m1,m2 with
-  | Name ns, _ -> (ns, m2)
-  | _, Name ns -> (ns, m1)
-  | _ ->
-    soft_failure
-      (Tactics.Failure "can only be applied on hypothesis of the form \
-                        t=n or n=t")
-
-(* Direct cases - names appearing in the term [t] *)
-let mk_fresh_direct (cntxt : Constr.trace_cntxt) env ns t =
-  (* iterate over [t] to search subterms of [t] equal to a name *)
-  let list_of_indices =
-    let iter = new Fresh.get_name_indices ~cntxt false ns.s_symb in
-    iter#visit_message t ;
-    iter#get_indices
-  in
-
-  (* build the formula expressing that there exists a name subterm of [t]
-   * equal to the name ([n],[is]) *)
-  let mk_case (js : Vars.var list) =
-    (* select bound variables *)
-    let bv = List.filter (fun i -> not (Vars.mem env i)) js in
-
-    let env = ref env in
-    let bv, subst = Term.refresh_vars (`InEnv env) bv in
-
-    let js = List.map (Term.subst_var subst) js in
-
-    Term.mk_exists bv (Term.mk_indices_eq ns.s_indices js)
-  in
-
-  let cases = List.map mk_case list_of_indices in
-  Term.mk_ors (List.sort_uniq Stdlib.compare cases)
 
 (*------------------------------------------------------------------*)
+(* no longer used for trace fresh (trace fresh is now in newfresh.ml *)
+(* left here temporarily, for compatibility with equiv fresh *)
 (** triple of the action and the name indices *)
 type fresh_occ = (Action.action * Vars.var list) Iter.occ
 
@@ -705,126 +673,6 @@ let mk_fresh_indirect_cases
   (* we keep only action names in which the name occurs *)
   List.filter (fun (_, occs) -> occs <> []) macro_cases
 
-
-let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.term =
-  (* TODO: bug, handle free variables *)
-  let term_actions =
-    let iter = new Fresh.get_actions ~cntxt in
-    iter#visit_message t ;
-    iter#get_actions
-  in
-
-  let sv_env = Vars.to_set env in
-
-  let macro_cases = mk_fresh_indirect_cases cntxt env ns [t] in
-
-  (* the one case occuring in [a] with indices [is_a].
-     For [n(is)] to be equal to [n(is_a)], we must have [is=is_a]. *)
-  let mk_case ((a, is_a) : Action.action * Vars.var list) : Term.term =
-    let fv =
-      Sv.diff (Sv.union (Action.fv_action a) (Sv.of_list1 is_a)) sv_env
-    in
-    let fv = Sv.elements fv in
-
-    (* refresh existantially quantified variables. *)
-    let fv, subst = Term.refresh_vars (`InEnv (ref env)) fv in
-    let a = Action.subst_action subst a in
-    let is_a = List.map (Term.subst_var subst) is_a in
-
-    (* now, since [is_a = is], we substitute free indices of [is_a]
-       by the corresponding indices in [is].
-       we do this after refresh, to avoid shadowing issues etc. *)
-    let subst =
-      List.map2
-        (fun i i' ->
-           if List.mem i fv
-           then Some (ESubst (Term.mk_var i, Term.mk_var i'))
-           else None
-        ) is_a ns.s_indices
-    in
-    let subst = List.filter_map (fun x -> x) subst in
-
-    let a = Action.subst_action subst a in
-
-    (* we now built the freshness condition *)
-    let a_term = SystemExpr.action_to_term cntxt.table cntxt.system a in
-    let timestamp_inequalities =
-      Term.mk_ors
-        (List.map (fun action_from_term ->
-             (Term.mk_timestamp_leq a_term action_from_term)
-           ) term_actions)
-    in
-
-    (* Remark that the equations below are not redundant.
-       Indeed, assume is = (i,j) and is_a = (i',i').
-       Then, the substitution [subst] will map i' to i
-       (the second substitution i->j is shadowed)
-       But, by substituting in the vector of equalities, we correctly retrieve
-       that i = j. *)
-    let idx_eqs =
-      Term.mk_indices_eq ns.s_indices (List.map (Term.subst_var subst) is_a)
-    in
-
-    Term.mk_exists ~simpl:true
-      fv
-      (Term.mk_and
-         timestamp_inequalities
-         idx_eqs)
-  in
-
-  (* Do all cases of action [a] *)
-  let mk_cases_descr (_, cases) =
-    List.map (fun case -> mk_case case.Iter.occ_cnt) (List.rev cases)
-  in
-
-  let cases = List.map mk_cases_descr macro_cases
-              |> List.flatten
-              |> List.sort_uniq Stdlib.compare
-  in
-
-  mk_ors cases
-
-
-let fresh (m : lsymb) s =
-  try
-    let id,hyp = Hyps.by_name m s in
-    let hyp = TraceLT.expand_all_macros hyp (TS.system s).set s in
-    let table = TS.table s in
-    let env   = TS.vars s in
-
-    begin
-      match TS.Reduce.destr_eq s Local_t hyp with
-      | Some (m1,m2) ->
-        let (ns,t) = fresh_param m1 m2 in
-
-        let ty = ns.s_typ in
-        if not Symbols.(check_bty_info table ty Ty_large) then
-          Tactics.soft_failure
-            (Failure "the type of this term is not [large]");
-
-        let cntxt = TS.mk_trace_cntxt s in
-        let phi_direct = mk_fresh_direct cntxt env ns t in
-        let phi_indirect = mk_fresh_indirect cntxt env ns t in
-
-        let phi = Term.mk_or phi_direct phi_indirect in
-
-        let goal = Term.mk_impl ~simpl:false phi (TS.goal s) in
-        [TS.set_goal goal s]
-
-      | None -> soft_failure
-                  (Tactics.Failure "can only be applied on message hypothesis")
-    end
-  with
-  | Fresh.Var_found ->
-    soft_failure
-      (Tactics.Failure "can only be applied on ground terms")
-  | SE.(Error Expected_fset) ->
-    soft_failure Underspecified_system
-
-let fresh_tac args s =
-  match TraceLT.convert_args s args (Args.Sort Args.String) with
-  | Args.Arg (Args.String str) -> wrap_fail (fresh str) s
-  | _ -> bad_args ()
 
 
 

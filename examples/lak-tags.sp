@@ -78,19 +78,19 @@ Proof.
     - euf H => _ _ _ //.
       exists i,j0.
       assert input@T(i,j0)=nR(k) as Meq1 by auto.
-      fresh Meq1 => C /=.
-      case C => //.
-      * by depends R(k),R1(k).
-      * by depends R(k),R2(k).
+      fresh Meq1 => C /=;
+      [1: auto
+      |2,3,4: by depends R(k),R1(k)
+      |5: by depends R(k),R2(k)].
 
     (* RIGHT *)
     - euf H => _ _ _ //.
       exists i,j.
       assert input@T(i,j)=nR(k) as Meq1 by auto.
-      fresh Meq1 => C /=.
-      case C => //.
-      * by depends R(k),R1(k).
-      * by depends R(k),R2(k).
+      fresh Meq1 => C /=;
+      [1: auto
+      |2,3,4: by depends R(k),R1(k)
+      |5: by depends R(k),R2(k)].
 
   (* WA => COND *)
   + intro [i j _]; exists i,j.
@@ -121,9 +121,10 @@ Proof.
   euf Meq => _ _ _ //.
   exists j.
   assert input@T(i,j) = nR(k) as Meq1 by auto.
-  fresh Meq1 => C /=.
-  case C => //.
-  by depends R(k),R2(k).
+  fresh Meq1 => C /=;
+   [1: auto
+   |2,3,4: by depends R(k),R1(k)
+   |5: by depends R(k),R2(k)].
 Qed.
 
 goal [default/right] wa_R1_right (i,j,k:index):
@@ -142,9 +143,10 @@ Proof.
   use tags_neq.
   euf Meq => _ _ _ //.
   assert input@T(i,j) = nR(k) as Meq1 by auto.
-  fresh Meq1 => C /=.
-  case C => //.
-  by depends R(k),R2(k).
+  fresh Meq1 => C /=;
+   [1: auto
+   |2,3,4: by depends R(k),R1(k)
+   |5: by depends R(k),R2(k)].
 Qed.
 
 (** Equality used to rewrite the try-find in R1

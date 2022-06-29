@@ -68,7 +68,7 @@ Proof.
       exists i,k0.
       repeat split; [ 1,4: auto | 3: by apply injective_pairing ].
       assert input@T(i,k0)=nR(j) as Meq1 by auto.
-      fresh Meq1 => [C|C|C] //.
+      fresh Meq1; intro C; try auto. 
       * by depends R(j),R1(j).
       * by depends R(j),R2(j).
 
@@ -77,7 +77,7 @@ Proof.
       exists i,k.
       repeat split; [ 1,4: auto | 3: by apply injective_pairing ].
       assert input@T(i,k)=nR(j) as Meq1 by auto.
-      fresh Meq1 => [C|C|C] //.
+      fresh Meq1 => C //.
       * by depends R(j),R1(j).
       * by depends R(j),R2(j).
 

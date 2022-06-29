@@ -172,6 +172,11 @@ module Pos = struct
     SE.arbitrary -> Vars.vars -> Term.term list -> pos -> 
     [`Map of Term.term | `Continue]
 
+  type 'a f_fold =
+    Term.term ->
+    SE.arbitrary -> Vars.vars -> Term.term list -> pos ->
+    'a ->
+    'a
   (*------------------------------------------------------------------*)
   (* TODO: excplicit system in terms: conds below may not be in the correct 
      system: they should be stated in [se] *)
@@ -506,6 +511,51 @@ module Pos = struct
       map_fold_e func mode ~env ~system ~vars:[] ~conds:[] ~p:[] ~acc:() t
     in
     found, t
+    
+  (*------------------------------------------------------------------*)
+  (** Exported *)
+  let fold
+        ?(mode=`TopDown false) 
+        (func : 'a f_fold)
+        (env : Vars.env) (se : SE.arbitrary) 
+        (acc : 'a) (t : Term.term) 
+    =
+    let f:'a f_map_fold =
+      fun t se v ts p acc -> (func t se v ts p acc, `Continue)
+    in
+    let a, _, _ = map_fold f mode ~env ~se ~vars:[] ~conds:[] ~p:[] ~acc t in
+    a
+
+  (** Exported *)
+  let fold_e 
+      ?(mode=`TopDown false) 
+      (func : 'a f_fold)
+      (env : Vars.env) (system : SE.context) 
+      (acc : 'a) (t : Equiv.form) 
+    =
+    let f:'a f_map_fold =
+      fun t se v ts p acc -> (func t se v ts p acc, `Continue)
+    in   
+    let a, _, _ = map_fold_e f mode ~env ~system ~vars:[] ~conds:[] ~p:[] ~acc t in
+    a
+  (*------------------------------------------------------------------*)
+  (** Exported *)
+  let fold_shallow
+        (func : 'a f_fold)
+        ~(env : Vars.env) ~(se : SE.arbitrary)
+        ~(fv:Vars.vars)
+        ~(cond:Term.terms)
+        ~(p:pos)
+        (acc : 'a) (t : Term.term) 
+    =
+    let f tt se v c p acc =
+      if tt = t then
+        acc, `Continue
+      else
+        func tt se v c p acc, `Map tt
+    in
+    let a, _, _ = map_fold f (`TopDown false) ~env ~se ~vars:fv ~conds:cond ~p ~acc t in
+    a 
 
   (*------------------------------------------------------------------*)
   (** Exported *)
@@ -516,13 +566,13 @@ module Pos = struct
       (acc : 'a) (t : Term.term) 
     =
     map_fold func mode ~env ~se ~vars:[] ~conds:[] ~p:[] ~acc t
-
+    
   (** Exported *)
   let map_fold_e 
-      ?(mode=`TopDown false) 
-      (func : 'a f_map_fold)
-      (env : Vars.env) (system : SE.context) 
-      (acc : 'a) (t : Equiv.form) 
+        ?(mode=`TopDown false) 
+        (func : 'a f_map_fold)
+        (env : Vars.env) (system : SE.context) 
+        (acc : 'a) (t : Equiv.form) 
     =
     map_fold_e func mode ~env ~system ~vars:[] ~conds:[] ~p:[] ~acc t
 end

@@ -49,6 +49,7 @@ type state = msymb
 
 val pp_name  : Format.formatter -> name -> unit
 val pp_nsymb : Format.formatter -> nsymb -> unit
+val pp_nsymbs : Format.formatter -> nsymb list -> unit
 
 val pp_fname : Format.formatter -> fname -> unit
 val pp_fsymb : Format.formatter -> fsymb -> unit

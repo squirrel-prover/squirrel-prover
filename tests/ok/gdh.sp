@@ -84,15 +84,13 @@ goal [default/left] test_gdh (t:timestamp) (i,j : index) :
   false.
 Proof.
   intro HC HC2 Hhap H.
-  gdh H, g ; intro HH; destruct HH as [i0 j0 HH].
-  use corruptleak with i0, j0 as H';
-    [1:destruct HH; rewrite H' in HC; by rewrite -HC | 2: by constraints].  
-  use corruptleak with i0, j0 as H';
-    [1:destruct HH; rewrite H' in HC2; by rewrite -HC2 | 2: by constraints].  
-  use corruptleak2 with i0, j0 as H';
-    [1:destruct HH; rewrite H' in HC; by rewrite -HC | 2: by constraints].  
-  use corruptleak with i0, j0 as H';
-    [1:destruct HH; rewrite H' in HC; by rewrite -HC | 2: by constraints].  
+  gdh H, g ; intro HH; destruct HH as [j0 HH].
+  use corruptleak with i, j0 as H';
+    [1: by rewrite -HC H' | 2:by constraints].  
+  use corruptleak2 with j0, i as H';
+    [1:by rewrite -HC H' | 2: by constraints].  
+  use corruptleak with j, j0 as H';
+    [1:by rewrite -HC2 H' | 2: by constraints].  
 Qed.
 
 
@@ -165,7 +163,6 @@ Proof.
   rewrite -HC.
   checkfail (gdh H,gg) exn Failure.
   cdh H, gg; intro HH.
-  destruct HH as [i0 [HH HHH]].      
   by rewrite corruptleak3.
 Qed.
 
@@ -177,6 +174,6 @@ goal [system3/left] test_cdh3 (t:timestamp) (i,j : index) :
   false.
 Proof.
   intro HC Hhap H.
-  checkfail (by cdh H, gg  ; intro HH; destruct HH as [i0 [HH HHH]]) exn GoalNotClosed.
+  checkfail (by cdh H, gg  ; intro HH) exn GoalNotClosed.
 Abort.
 

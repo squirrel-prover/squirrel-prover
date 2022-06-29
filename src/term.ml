@@ -51,6 +51,10 @@ let pp_nsymb ppf (ns : nsymb) =
   then Fmt.pf ppf "%a(%a)" pp_name ns.s_symb Vars.pp_list ns.s_indices
   else Fmt.pf ppf "%a" pp_name ns.s_symb
 
+let pp_nsymbs ppf (l : nsymb list) =
+  Fmt.pf ppf "@[<hov>%a@]"
+    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ", ") pp_nsymb) l
+
 let pp_fname ppf s = (Printer.kws `GoalFunction) ppf (Symbols.to_string s)
 
 let pp_fsymb ppf (fn,is) = match is with

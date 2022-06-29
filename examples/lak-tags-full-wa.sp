@@ -58,9 +58,11 @@ Proof.
   + by use tags_neq.
   + exists j.
     assert (nR(k) = input@T(i,j)) as Mfresh by auto.
-    fresh Mfresh => [Hfresh | Hfresh | [i' Hfresh]] //.
-    - by depends R(k), R2(k).
+    fresh Mfresh; intro Hfresh; try destruct Hfresh as [i' Hfresh].
+    - auto.
     - by depends R(k), R1(k,i').
+    - by depends R(k), R1(k,i').
+    - by depends R(k), R2(k).
 Qed.
 
 goal executable_R1 (t:timestamp) (k,i:index) :
@@ -102,7 +104,9 @@ Proof.
     as Hcoll by auto.
   collision Hcoll => Hcoll'.
   assert (input@T(i,j) = nR(k)) as Hfresh by auto.
-  fresh Hfresh => [Hfresh' | Hfresh' | [i0 Hfresh']] //.
-  + by depends R(k), R2(k).
+  fresh Hfresh; intro Hfresh'; try destruct Hfresh' as [i0 Hfresh'].
+  + auto.
   + by depends R(k), R1(k,i0).
+  + by depends R(k), R1(k,i0).
+  + by depends R(k), R2(k).
 Qed.

@@ -17,6 +17,8 @@ module SE   = SystemExpr
 module ES   = EquivSequent
 module Hyps = ES.Hyps
 
+module NO = NameOccs
+
 type sequent = ES.sequent
 
 type lsymb = Theory.lsymb

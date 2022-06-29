@@ -9,6 +9,5 @@ goal _ (i:index,t:timestamp) :
 Proof.
   intro Heq.
   fresh Heq. intro [k G].
-  exists k.
-  assumption.
+  exists k. constraints.
 Qed.
