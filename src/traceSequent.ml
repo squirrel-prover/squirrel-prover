@@ -19,8 +19,8 @@ include Sequent.Mk(struct
       let es =
         S.Hyps.fold (fun id hyp es ->
             match hyp with
-            | `Equiv f -> ES.Hyps.add (Args.Named (Ident.name id)) f es
-            | `Reach f ->
+            | Global f -> ES.Hyps.add (Args.Named (Ident.name id)) f es
+            | Local f ->
               if Term.is_pure_timestamp f then
                 ES.Hyps.add
                   (Args.Named (Ident.name id)) (Equiv.mk_reach_atom f) es

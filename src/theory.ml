@@ -1317,8 +1317,8 @@ let convert_global_formula (cenv : conv_env) (p : global_formula) =
 
 let convert_any (cenv : conv_env) (p : any_term) : Equiv.any_form =
   match p with
-  | Local  p -> `Reach (fst (convert ~ty:Type.Boolean cenv p))
-  | Global p -> `Equiv (convert_global_formula cenv p)
+  | Local  p -> Local (fst (convert ~ty:Type.Boolean cenv p))
+  | Global p -> Global (convert_global_formula cenv p)
   
 (*------------------------------------------------------------------*)
 (** {2 State and substitution parsing} *)

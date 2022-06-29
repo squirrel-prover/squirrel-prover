@@ -72,7 +72,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
   exception NoExp 
 
   let add_hyp (f : Term.term) hyps : THyps.hyps =
-    THyps.add TacticsArgs.AnyName (`Reach f) hyps
+    THyps.add TacticsArgs.AnyName (Local f) hyps
 
   
   (* Invariant: we must ensure that fv(reduce(u)) ⊆ fv(t)
@@ -351,8 +351,8 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     | Global_t -> reduce_equiv ~expand_context ?system param s x
     | Any_t ->
       match x with
-      | `Reach x -> `Reach (reduce_term  ~expand_context ?se     param s x)
-      | `Equiv x -> `Equiv (reduce_equiv ~expand_context ?system param s x)
+      | Local x -> Local (reduce_term  ~expand_context ?se     param s x)
+      | Global x -> Global (reduce_equiv ~expand_context ?system param s x)
 
  (*------------------------------------------------------------------*)
   (* FIXME: use [s] to reduce [x] if necessary *)
@@ -372,7 +372,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     | Global_t -> e_destr_eq x
     | Any_t ->
       match x with
-      | `Reach x ->   destr_eq x
-      | `Equiv x -> e_destr_eq x
+      | Local x ->   destr_eq x
+      | Global x -> e_destr_eq x
 end
 

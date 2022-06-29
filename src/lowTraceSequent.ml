@@ -116,9 +116,9 @@ let get_all_messages (s : sequent) =
 let _get_models (hyps : H.hyps) =
   let hyps = H.fold (fun _ f acc ->
       match f with
-      | `Reach f
-      | `Equiv Equiv.(Atom (Reach f)) -> f :: acc
-      | `Equiv _ -> acc
+      | Local f
+      | Global Equiv.(Atom (Reach f)) -> f :: acc
+      | Global _ -> acc
     ) hyps [] 
   in
   Constr.models_conjunct hyps
@@ -215,7 +215,7 @@ module AnyHyps
   (* override [clear_triv] *)
   let clear_triv s =
     let not_triv _ = function
-      | `Reach f -> not (Term.f_triv f)
+      | Equiv.Local f -> not (Term.f_triv f)
       | _ -> true
     in
     S.update ~hyps:(H.filter not_triv s.hyps) s
@@ -260,13 +260,13 @@ let rec add_macro_defs (s : sequent) f =
 and add_form_aux
     ?(force=false) (id : Ident.t option) (s : sequent) (f : Term.term) =
   let recurse =
-    (not (H.is_hyp (`Reach f) s.hyps)) && (Config.auto_intro ()) in
+    (not (H.is_hyp (Local f) s.hyps)) && (Config.auto_intro ()) in
 
   let id = match id with       
     | None -> H.fresh_id "D" s.hyps
     | Some id -> id in
 
-  let id, hyps = H._add ~force id (`Reach f) s.hyps in
+  let id, hyps = H._add ~force id (Local f) s.hyps in
   let s = S.update ~hyps s in
 
   (* [recurse] boolean to avoid looping *)
@@ -306,17 +306,17 @@ let set_goal_in_context ?update_local system conc s =
     H.fold
       (fun id f s ->
          match f with
-           | `Reach f ->
+           | Local f ->
                begin match update_local f with
                  | Some f ->
-                   let _,hyps = H._add ~force:true id (`Reach f) s.hyps in
+                   let _,hyps = H._add ~force:true id (Local f) s.hyps in
                    S.update ~hyps s
                  | None -> s
                end
-           | `Equiv e ->
+           | Global e ->
                begin match update_global e with
                  | Some e ->
-                     let _,hyps = H._add ~force:true id (`Equiv e) s.hyps in
+                     let _,hyps = H._add ~force:true id (Global e) s.hyps in
                      S.update ~hyps s
                  | None -> s
                end)
@@ -462,29 +462,29 @@ module LocalHyps
   type ldecl = Ident.t * hyp
     
   let (!!) = function
-    | `Reach h -> h
-    | `Equiv _ -> assert false
+    | Equiv.Local h -> h
+    | Equiv.Global _ -> assert false
 
-  let _add ~force p h s = AnyHyps._add ~force p (`Reach h) s
+  let _add ~force p h s = AnyHyps._add ~force p (Local h) s
       
-  let add p h s = AnyHyps.add p (`Reach h) s
+  let add p h s = AnyHyps.add p (Local h) s
 
-  let add_i p h s = AnyHyps.add_i p (`Reach h) s
+  let add_i p h s = AnyHyps.add_i p (Local h) s
 
   let add_i_list l s =
-    let l = List.map (fun (p,h) -> p,`Reach h) l in
+    let l = List.map (fun (p,h) -> p, Equiv.Local h) l in
     AnyHyps.add_i_list l s
 
   let add_list l s = snd (add_i_list l s)
 
   let pp_hyp = Term.pp
 
-  let pp_ldecl ?dbg fmt (id,h) = AnyHyps.pp_ldecl ?dbg fmt (id,`Reach h)
+  let pp_ldecl ?dbg fmt (id,h) = AnyHyps.pp_ldecl ?dbg fmt (id,Local h)
 
   let fresh_id = AnyHyps.fresh_id
   let fresh_ids = AnyHyps.fresh_ids
 
-  let is_hyp h s = AnyHyps.is_hyp (`Reach h) s
+  let is_hyp h s = AnyHyps.is_hyp (Local h) s
 
   let by_id id s = !!(AnyHyps.by_id id s)
 
@@ -498,59 +498,65 @@ module LocalHyps
   let to_list s =
     List.filter_map
       (function
-         | l, `Reach h -> Some (l,h)
-         | l, `Equiv _ -> None)
+         | l, Equiv.Local h -> Some (l,h)
+         | l, Equiv.Global _ -> None)
       (AnyHyps.to_list s)
 
   let find_opt f s =
     let f id = function
-      | `Reach h -> f id h
-      | `Equiv _ -> false
+      | Equiv.Local h -> f id h
+      | Equiv.Global _ -> false
     in
     match AnyHyps.find_opt f s with
       | None -> None
-      | Some (id,`Reach h) -> Some (id,h)
+      | Some (id,Local h) -> Some (id,h)
       | _ -> assert false
 
   let find_map f s =
     let f id = function
-      | `Reach h -> f id h
-      | `Equiv _ -> None
+      | Equiv.Local h -> f id h
+      | Equiv.Global _ -> None
     in
     AnyHyps.find_map f s
 
   let find_all f s =
     let f id = function
-      | `Reach h -> f id h
-      | `Equiv _ -> false
+      | Equiv.Local h -> f id h
+      | Equiv.Global _ -> false
     in
     List.map (fun (id, h) -> id, Equiv.any_to_reach h) (AnyHyps.find_all f s)
       
   let exists f s =
     let f id = function
-      | `Reach h -> f id h
-      | `Equiv _ -> false
+      | Equiv.Local h -> f id h
+      | Equiv.Global _ -> false
     in
     AnyHyps.exists f s
 
   let map f s =
-    let f = function `Equiv h -> `Equiv h | `Reach h -> `Reach (f h) in
+    let f = function
+      | Equiv.Global h -> Equiv.Global h
+      | Equiv.Local h  -> Equiv.Local (f h)
+    in
     AnyHyps.map f s
 
   let mapi f s =
-    let f i = function `Equiv h -> `Equiv h | `Reach h -> `Reach (f i h) in
+    let f i = function
+      | Equiv.Global h -> Equiv.Global h
+      | Equiv.Local h  -> Equiv.Local (f i h)
+    in
     AnyHyps.mapi f s
 
   let filter f s =
-    let f i = function `Equiv h -> true | `Reach h -> f i h in
+    let f i = function Equiv.Global h -> true | Equiv.Local h -> f i h in
     AnyHyps.filter f s
     
   let remove = AnyHyps.remove
 
   let fold f s =
     let f id h acc = match h with
-      | `Equiv _ -> acc
-      | `Reach h -> f id h acc
+      | Equiv.Global _ -> acc
+      | Equiv.Local  h -> f id h acc
     in
     AnyHyps.fold f s
 

@@ -122,9 +122,8 @@ let sym_tac (s : ES.t) : Goal.t list =
          s) ]
 
 let () =
-  let tactic_help =
-    let open Prover in
-    { general_help = "Prove an equivalence by symmetry.";
+  let tactic_help = Prover.{
+      general_help = "Prove an equivalence by symmetry.";
       detailed_help =
         "Turn a goal whose conclusion is an equivalence \
          into a subgoal whose conclusion is the symmetric equivalence.\
@@ -455,7 +454,7 @@ let enrich ty f l (s : ES.t) =
 
 let enrich_a arg s =
   match 
-    Args.convert_args (ES.env s) [arg] Args.(Sort Term) (`Equiv (ES.goal s)) 
+    Args.convert_args (ES.env s) [arg] Args.(Sort Term) (Global (ES.goal s)) 
   with
   | Args.Arg (Term (ty, t, l)) -> enrich ty t l s
   | _ -> bad_args ()

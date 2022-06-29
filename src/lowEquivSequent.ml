@@ -260,7 +260,7 @@ let to_trace_sequent s =
   let trace_s = TS.init ~env ~hint_db goal in
   Hyps.fold
     (fun id hyp trace_s ->
-        TS.Hyps.add (Args.Named (Ident.name id)) (`Equiv hyp) trace_s)
+        TS.Hyps.add (Args.Named (Ident.name id)) (Global hyp) trace_s)
     s trace_s
 
 (*------------------------------------------------------------------*)

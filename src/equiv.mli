@@ -84,7 +84,7 @@ type local_form = Term.term
 
 type global_form = form
 
-type any_form = [`Equiv of form | `Reach of Term.term]
+type any_form = Global of form | Local of Term.term
 
 val pp_any_form : Format.formatter -> any_form -> unit
 

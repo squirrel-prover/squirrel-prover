@@ -104,7 +104,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   let happens_premise (s : S.t) (a : Term.term) : S.t =
     let form = Term.mk_happens a in
-    S.set_goal (S.unwrap_conc (`Reach form)) s
+    S.set_goal (S.unwrap_conc (Local form)) s
 
   (*------------------------------------------------------------------*)
   (** {3 Conversion} *)
@@ -176,7 +176,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let f = S.wrap_hyp (Hyps.by_id id s) in
           f, Hyps.remove id s, Some id
       | T_felem i ->
-          let f = `Reach (S.get_felem i s) in
+          let f = Equiv.Local (S.get_felem i s) in
           f, s, None
     in
 
@@ -191,7 +191,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | T_conc, f -> S.set_goal (S.unwrap_conc f) s, subs
     | T_hyp id, f ->
       Hyps.add (Args.Named (Ident.name id)) (S.unwrap_hyp f) s, subs
-    | T_felem i, `Reach f -> S.change_felem i [f] s, subs
+    | T_felem i, Local f -> S.change_felem i [f] s, subs
     | _ -> assert false
 
   let do_targets doit (s : S.sequent) (targets : target list)
@@ -301,7 +301,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       fun occ se _vars conds _p ->
         let s =                 (* adds [conds] in [s] *)
           List.fold_left (fun s cond ->
-              S.Hyps.add AnyName (S.unwrap_hyp (`Reach cond)) s
+              S.Hyps.add AnyName (S.unwrap_hyp (Local cond)) s
             ) s conds
         in
         match occ with
@@ -321,19 +321,19 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
 
     match f with
-    | `Equiv f ->
+    | Global f ->
       let _, f =
         Match.Pos.map_e
           ~mode:(`TopDown m_rec) expand_inst (S.vars s) (S.system s) f
       in
-      !found1, `Equiv f
+      !found1, Global f
 
-    | `Reach f ->
+    | Local f ->
       let _, f =
         Match.Pos.map
           ~mode:(`TopDown m_rec) expand_inst (S.vars s) (S.system s).set f
       in
-      !found1, `Reach f
+      !found1, Local f
 
 
   (** If [m_rec = true], recurse on expanded sub-terms. *)
@@ -375,7 +375,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           begin
             let s =             (* add [conds] in [s] *)
               List.fold_left (fun s cond ->
-                  S.Hyps.add AnyName (S.unwrap_hyp (`Reach cond)) s
+                  S.Hyps.add AnyName (S.unwrap_hyp (Local cond)) s
                 ) s conds
             in
             match
@@ -519,7 +519,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         with
         | f, subs ->
           found := true;
-          f, List.map (fun (se, l) -> se, S.unwrap_conc (`Reach l)) subs
+          f, List.map (fun (se, l) -> se, S.unwrap_conc (Local l)) subs
 
         | exception Tactics.Tactic_soft_failure (_,NothingToRewrite) ->
           if all then f, []
@@ -665,7 +665,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         let goal = S.subst_conc ts_subst (S.goal s) in
         let prem =
           S.Conc.mk_exists ~simpl:false indices
-            (S.unwrap_conc (`Reach (Term.mk_atom `Eq ts ts_case)))
+            (S.unwrap_conc (Local (Term.mk_atom `Eq ts ts_case)))
         in
         S.set_goal (S.Conc.mk_impl ~simpl:false prem goal) s
       ) cases
@@ -817,14 +817,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
         begin
           match S.Reduce.destr_eq s S.hyp_kind form with
           | Some (a,b) ->
-            let a1, a2 = get_destr ~orig:(`Reach a) (Term.destr_pair a)
-            and b1, b2 = get_destr ~orig:(`Reach b) (Term.destr_pair b) in
+            let a1, a2 = get_destr ~orig:(Local a) (Term.destr_pair a)
+            and b1, b2 = get_destr ~orig:(Local b) (Term.destr_pair b) in
 
             let f1 = Term.mk_atom `Eq a1 b1
             and f2 = Term.mk_atom `Eq a2 b2 in
 
             let forms =
-              List.map (fun x -> Args.Unnamed, S.unwrap_hyp (`Reach x)) [f1;f2]
+              List.map (fun x -> Args.Unnamed, S.unwrap_hyp (Local x)) [f1;f2]
             in
             let ids, s = Hyps.add_i_list forms s in
             List.map (fun id -> `Hyp id) ids, s
@@ -995,7 +995,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       begin
         let u, v = oget (S.Conc.destr_neq form) in
         let h = Term.mk_atom `Eq u v in
-        let h = S.unwrap_hyp (`Reach h) in
+        let h = S.unwrap_hyp (Local h) in
         let id, s = Hyps.add_i Args.Unnamed h s in
         let s = S.set_goal S.Conc.mk_false s in
         `Hyp id, s
@@ -1495,12 +1495,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
          proving it. *)
     let s1 =
       match f with
-      | `Reach _ ->
+      | Local _ ->
         let f_conc =
           Equiv.Babel.convert ~loc f ~src:Equiv.Any_t ~dst:S.conc_kind in
         S.to_general_sequent (S.set_goal f_conc s)
           
-      | `Equiv _ ->
+      | Global _ ->
         let es = S.to_global_sequent s in
         let f_conc =
           Equiv.Babel.convert ~loc f ~src:Equiv.Any_t ~dst:ES.conc_kind in

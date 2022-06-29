@@ -243,13 +243,13 @@ let simpl_left_tac s = match simpl_left s with
 let assumption (s : TS.t) = 
   let goal = TS.goal s in
   let assumption_entails _ = function
-    | `Equiv (Equiv.Atom (Reach f))
-    | `Reach f ->
+    | Equiv.Global (Equiv.Atom (Reach f))
+    | Equiv.Local f ->
         goal = f ||
         List.exists
           (fun f -> goal = f || f = Term.mk_false)
           (decompose_ands f)
-    | `Equiv _ -> false
+    | Equiv.Global _ -> false
   in
   if goal = Term.mk_true ||
      TS.Hyps.exists assumption_entails s
@@ -266,8 +266,8 @@ let assumption (s : TS.t) =
     hypothesis [h'] corresponding to that atom. *)
 let localize h h' s =
   match TS.Hyps.by_name h s with
-    | _,`Equiv (Equiv.Atom (Reach f)) ->
-        [TS.Hyps.add h' (`Reach f) s]
+    | _,Global (Equiv.Atom (Reach f)) ->
+        [TS.Hyps.add h' (Local f) s]
     | _ ->
         Tactics.(soft_failure (Failure "cannot localize this hypothesis"))
     | exception Not_found ->
@@ -1966,8 +1966,8 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
     s |>
     TS.Hyps.filter
       (fun _ -> function
-         | `Reach f -> Term.is_pure_timestamp f
-         | `Equiv  _ -> true)
+         | Local f -> Term.is_pure_timestamp f
+         | Global  _ -> true)
   in
   let subgoals = List.map (fun f -> TS.set_goal f s') subgoals in
 

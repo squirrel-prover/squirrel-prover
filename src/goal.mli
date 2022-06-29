@@ -78,7 +78,7 @@ val make_obs_equiv :
   Symbols.table ->
   Hint.hint_db ->
   SystemExpr.context ->
-  [> `Equiv of Equiv.form ] * t
+  Equiv.any_form * t
 
 val make :
   Symbols.table -> Hint.hint_db -> Parsed.t ->
