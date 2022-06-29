@@ -1,5 +1,3 @@
-
-
 system null.
 
 axiom [default] toto : diff(true,false) = true.

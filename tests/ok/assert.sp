@@ -1,3 +1,5 @@
+include Basic.
+
 abstract a:message
 abstract b:message
 abstract c:message
@@ -85,3 +87,28 @@ Proof.
   have H3 := H2.
 Abort.
 
+
+
+(*------------------------------------------------------------------*)
+hash h.
+name k : message.
+name n : message. 
+name m : message. 
+
+(* test a global assert followed by a rewrite equiv *)
+global goal [set:default/left; equiv:default] _ : 
+  [a <> b] -> [h(a,k) <> h(b,k)].
+Proof.
+  intro U.
+  have H : equiv(diff(h(a,k),n),diff(h(b,k),m)). 
+  prf 0.
+  rewrite if_true // in 0. 
+  prf 1.
+  rewrite if_true // in 1. 
+  fresh 0; fresh 1.
+  refl.
+
+  rewrite equiv H. 
+  intro H1.
+  by fresh H1.
+Qed.

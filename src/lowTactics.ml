@@ -176,7 +176,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let f = S.wrap_hyp (Hyps.by_id id s) in
           f, Hyps.remove id s, Some id
       | T_felem i ->
-          let f = Equiv.Local (S.get_felem i s) in
+          let f = Equiv.Global (Equiv.Atom (Equiv [S.get_felem i s])) in
           f, s, None
     in
 
@@ -191,7 +191,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | T_conc, f -> S.set_goal (S.unwrap_conc f) s, subs
     | T_hyp id, f ->
       Hyps.add (Args.Named (Ident.name id)) (S.unwrap_hyp f) s, subs
-    | T_felem i, Local f -> S.change_felem i [f] s, subs
+    | T_felem i, Global (Atom (Equiv [f])) -> S.change_felem i [f] s, subs
     | _ -> assert false
 
   let do_targets doit (s : S.sequent) (targets : target list)
