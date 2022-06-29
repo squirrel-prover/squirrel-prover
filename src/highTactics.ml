@@ -89,7 +89,7 @@ let () =
 let () = T.register_general "induction"
     ~tactic_help:{
       general_help = "Apply the induction scheme to the conclusion.";
-      detailed_help = "";
+      detailed_help = "Only support induction over timestamps.";
       usages_sorts = [Sort None];
       tactic_group = Logical}
     ~pq_sound:true
@@ -160,10 +160,9 @@ let () =
     ~tactic_help:{
       general_help =
         "If t1 = t2, rewrite all occurences of t1 into t2 in the goal.\n\
-         Usage: rewrite Hyp Lemma Axiom (forall (x:message), t = t').\n       \
-         rewrite Lemma Axiom (t=t').\n       \
-         rewrite (forall (x:message), t = t').\n       \
-         rewrite (t = t') Lemma in H.";
+         Usage: rewrite Hyp Lemma Axiom.\n       \
+         rewrite Lemma Axiom.\n       \
+         rewrite Lemma in H.";
       detailed_help = "";
       usages_sorts  = [];
       tactic_group  = Structural;}

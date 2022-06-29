@@ -13,11 +13,16 @@ Proof. by rewrite eq_iff. Qed.
 goal [any] neq_sym ['a] (x,y : 'a) : (x <> y) = (y <> x).
 Proof. by rewrite eq_iff. Qed.
 
-goal [any] eq_refl ['a] (x : 'a) : (x = x) = true.
-Proof. 
-  by rewrite eq_iff. 
+goal [any] eq_refl_e ['a] (x : 'a) : (x = x) = true.
+Proof.
+  by rewrite eq_iff.
 Qed.
-hint rewrite eq_refl.
+hint rewrite eq_refl_e.
+
+goal [any] eq_refl ['a] (x : 'a) : x = x.
+Proof. 
+  by rewrite eq_refl_e.
+Qed.
 
 (*------------------------------------------------------------------*)
 (* true/false *)

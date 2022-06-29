@@ -61,7 +61,9 @@ type reach_statement = (string, Term.term     ) abstract_statement
 let pp_statement fmt (g : statement) : unit =
   let pp_tyvars fmt tyvs = 
     if tyvs = [] then () 
-    else Fmt.list ~sep:Fmt.sp Type.pp_tvar fmt tyvs
+    else
+      Fmt.pf fmt " [%a]"
+        (Fmt.list ~sep:Fmt.sp Type.pp_tvar) tyvs
   in
   Fmt.pf fmt "[%a] %s%a :@ %a"
     SE.pp_context g.system

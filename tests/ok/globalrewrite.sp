@@ -1,5 +1,3 @@
-
-
 include Basic.
 
 channel c
@@ -57,7 +55,7 @@ goal [P1] _ (i : index) :
 Proof.
   intro H.
   rewrite /output.
-  rewrite (eq_refl (g(input@A(i),input@A(i)))).
+  rewrite (eq_refl_e (g(input@A(i),input@A(i)))).
   assumption.
 Qed.
 
@@ -100,8 +98,7 @@ goal [H1] _ (i : index) :
   happens(A(i)) => output@A(i) = <input@A(i), zero>.
 Proof.
   intro Hap @/output.
-  rewrite eq_refl.
-  assumption.
+  apply eq_refl.
 Qed.
 
 (*------------------------------------------------------------------*)
@@ -119,8 +116,7 @@ goal [W1] _ (i : index) :
   happens(A(i)) => output@A(i) = <input@A(i), b>.
 Proof.
   intro Hap @/output @/y1.
-  rewrite eq_refl.
-  assumption.
+  apply eq_refl.
 Qed.
 
 (*------------------------------------------------------------------*)
@@ -136,8 +132,7 @@ goal [X1] _ (i : index) :
   happens(A(i)) => output@A(i) = <<input@A(i), a>, f(d)>.
 Proof.
   intro Hap @/output @/w1.
-  rewrite eq_refl.
-  assumption.
+  apply eq_refl.
 Qed.
 
 (*------------------------------------------------------------------*)
@@ -156,8 +151,7 @@ goal [Z1] _ (i : index) :
   happens(A(i)) => output@A(i) = <<input@A(i), b>, d>.
 Proof.
   intro Hap @/output @/z1 @/z.
-  rewrite eq_refl.
-  assumption.
+  apply eq_refl.
 Qed.
 
 system Z2 = [Z/left] with rewrite /z.
@@ -166,8 +160,7 @@ goal [Z2] _ (i : index) :
   happens(A(i)) => output@A(i) = <<input@A(i), a>, f(d)>.
 Proof.
   intro Hap @/output @/z1.
-  rewrite eq_refl.
-  assumption.
+  apply eq_refl.
 Qed.
 
 (*------------------------------------------------------------------*)
@@ -186,6 +179,5 @@ goal [T1] _ (i : index) :
   happens(A(i)) => output@A(i) = <input@A(i), <a, f(d)>>.
 Proof.
   intro Hap @/output @/p1.
-  rewrite eq_refl.
-  assumption.
+  apply eq_refl.
 Qed.

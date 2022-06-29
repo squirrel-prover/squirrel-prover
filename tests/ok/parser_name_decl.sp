@@ -21,8 +21,7 @@ goal _ (tau,tau' : timestamp) : m1(tau) = m1(tau') => tau = tau'.
 Proof. 
   intro H. 
   fresh H => U. 
-  rewrite eq_refl.
-  assumption.
+  apply eq_refl.
 Qed.
 
 

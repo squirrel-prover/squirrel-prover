@@ -401,7 +401,8 @@ module ProverTactics = struct
       Format.pp_print_text
       help.general_help
       Format.pp_print_text
-      (if details then "\n"^help.detailed_help^"\n" else "")
+      (if details && help.detailed_help <> "" then
+         "\n" ^ help.detailed_help ^ "\n" else "")
       (if List.length help.usages_sorts = 0 then ""
        else if List.length help.usages_sorts =1 then "Usage:"
        else "Usages:")

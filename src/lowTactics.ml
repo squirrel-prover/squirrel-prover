@@ -2122,8 +2122,9 @@ let () =
   T.register_general "use"
     ~tactic_help:
       {general_help = "Instantiate a lemma or hypothesis on some arguments.\n\n\
-                       Usages: use H with v1, ..., vn\n\
-                      \        use H with v1 as intro_pat";
+                       Usage:\n\
+                       \  use H with v1, ..., vn.\n\
+                       \  use H with v1 as intro_pat.";
        detailed_help = "";
        usages_sorts = [];
        tactic_group = Logical}
@@ -2137,10 +2138,13 @@ let () =
     ~tactic_help:{
       general_help=
         "Matches the goal with the conclusion of the formula F provided \
-         (directly, using lemma, or using an axiom), trying to instantiate \
-         F variables. Creates one subgoal for each premises of F.\n\
-         Usage: apply my_lem.\n
-         apply my_axiom.";
+         (F can be an hypothesis, a lemma, an axiom, or a proof term), trying \
+         to instantiate F variables by matching. \
+         Creates one subgoal for each premises of F.\n\
+         Usage:\n\
+         \  apply H.
+         \  apply lemma.\n\
+         \  apply axiom.";
       detailed_help="";
       usages_sorts=[];
       tactic_group=Structural}
@@ -2150,7 +2154,7 @@ let () =
 (*------------------------------------------------------------------*)
 let () = T.register_general "dependent induction"
     ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
-                  detailed_help = "";
+                  detailed_help = "Only supports induction over timestamps.";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
     (gentac_of_any_tac_arg
@@ -2253,18 +2257,18 @@ let () =
     ~tactic_help:
       {general_help = "Add a new hypothesis.";
        detailed_help =
-         "- have form:\n\
+         "- have form\n\
          \  Add `form` to the hypotheses, and produce a subgoal to prove \
           `form`. \n\
-          - have form as intro_pat:\n\
+          - have form as intro_pat\n\
          \  Idem, except that `intro_pat` is applied to `form`.\n\
-          - have intro_pat : local_or_global_form :\n\
+          - have intro_pat : local_or_global_form\n\
          \  Idem, except that both local and global formulas are supported.\n\
-          - have intro_pat := proof_term:\n\
+          - have intro_pat := proof_term\n\
          \  Compute the formula corresponding to `proof_term`, and\n\
          \  apply `intro_pat` to it.\n\
-         \  Exemples: * `have H := H0 i i2`\n\
-         \            * `have H := H0 _ i2`";
+         \  Exemples: `have H := H0 i i2`\n\
+         \            `have H := H0 _ i2`";
        usages_sorts = [];
        tactic_group = Logical}
     ~pq_sound:true

@@ -119,6 +119,7 @@ rule token = parse
 | "message"           { MESSAGE }
 | "channel"           { CHANNEL }
 | "boolean"           { BOOLEAN }
+| "bool"              { BOOL }
 | "timestamp"         { TIMESTAMP }
 | "null"              { NULL }
 | "seq"               { SEQ }
