@@ -1,7 +1,7 @@
-(* Generic functions to search illegal occurrences of names,
-   and generate the appropriate proof obligations.
-   Building upon Iter and Match.
-   For use when writing tactics, eg gdh, fresh. *)
+(** Generic functions to search illegal occurrences of names,
+    and generate the appropriate proof obligations.
+    Building upon Iter and Match.
+    For use when writing tactics, eg gdh, fresh. *)
 
 open Term
 
@@ -20,8 +20,8 @@ module SE = SystemExpr
     is found. *)
 exception Var_found
 
-(* Functions to find all timestamps occurring in a term *)
-(* type of a timestamp occurrence *)
+(** Functions to find all timestamps occurring in a term 
+    type of a timestamp occurrence *)
 type ts_occ = Term.term Iter.occ
 
 type ts_occs = ts_occ list
@@ -32,14 +32,18 @@ val get_macro_actions : Constr.trace_cntxt -> Term.terms -> ts_occs
 
 
 (*------------------------------------------------------------------*)
-(* Occurrence of a name *)
+(** {2 Occurrence of a name} *)
 
-(* information used to remember where an occurrence was found.
-   - the name it's in collision with,
-   - a subterm where it was found (for printing),
-   - optionally the action producing the iocc where
-     it was found, for indirect occs *) 
-type occ_info = {oi_name:nsymb; oi_subterm:term; oi_action:term option}
+(** information used to remember where an occurrence was found.
+    - the name it's in collision with,
+    - a subterm where it was found (for printing),
+    - optionally the action producing the iocc where
+      it was found, for indirect occs *) 
+type occ_info = { 
+  oi_name    : nsymb; 
+  oi_subterm : term; 
+  oi_action  : term option;
+}
 
 (** constructs an occ_info *)
 val mk_oinfo : ?ac:term option -> nsymb -> term -> occ_info
@@ -170,21 +174,22 @@ val occurrence_sequents :
     They don't need to unfold macros, that's handled separately. *)
 type f_fold_occs = 
   (unit -> name_occs) -> (* continuation: give up and try again on subterms *)
-  (fv:Vars.vars ->       (* continuation: to be called on strict subterms (for rec calls) *)
+  (fv:Vars.vars ->       (* continuation: to be called on strict subterms 
+                            (for rec calls) *)
    cond:terms ->
    p:MP.pos ->           
    se:SE.arbitrary ->   
    st:term ->            
    term ->               
    name_occs) ->         
-  se:SE.arbitrary ->        (* system at the current position *)
-  info:expand_info ->       (* info to expand macros *)
-  fv:Vars.vars ->           (* variables bound above the current position *)
-  cond:terms ->             (* condition at the current position *)
-  p:MP.pos ->               (* current position*)
-  st:term ->                (* a subterm we're currently in (for printing purposes) *)
-  term ->                   (* term at the current position *)
-  name_occs                 (* found occurrences *)
+  se:SE.arbitrary ->    (* system at the current position *)
+  info:expand_info ->   (* info to expand macros *)
+  fv:Vars.vars ->       (* variables bound above the current position *)
+  cond:terms ->         (* condition at the current position *)
+  p:MP.pos ->           (* current position*)
+  st:term ->            (* a subterm we're currently in (for printing purposes) *)
+  term ->               (* term at the current position *)
+  name_occs             (* found occurrences *)
 
   
 (** given a f_fold_occs function get_bad_occs,
@@ -193,10 +198,12 @@ type f_fold_occs =
     get_bad_occs calls its first continuation (ie gives up)
     by 1) unfolding the term, if it's a macro that can be unfolded
        2) doing nothing, if it's a macro that can't be unfolded
-          (in that case, fold_macro_support will generate a separate iocc for that)
+          (in that case, fold_macro_support will generate a separate iocc
+          for that)
        2) using Match.Pos.fold_shallow, to recurse on subterms at depth 1. *)
 val fold_bad_occs :
-  f_fold_occs -> se:SE.arbitrary -> env:Vars.env -> ?fv:Vars.vars -> expand_info ->
+  f_fold_occs -> 
+  se:SE.arbitrary -> env:Vars.env -> ?fv:Vars.vars -> expand_info ->
   term -> name_occs
 
 
@@ -204,7 +211,8 @@ val fold_bad_occs :
     - a f_fold_occs function get_bad_occs;
     - the sequent s of the current goal;
     - the term t where we look for occurrences;
-    - optionally, a printer that prints a description of what we're looking for;
+    - optionally, a printer that prints a description of what 
+      we're looking for;
   computes the list of proof obligations: we now have to prove s
   under the assumption that at least one of the found occurrences must
   be an actual collision.*)
