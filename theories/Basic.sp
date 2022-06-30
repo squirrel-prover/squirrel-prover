@@ -330,3 +330,41 @@ Proof. auto. Qed.
 goal [any] forall_true6 ['a 'b 'c 'd 'e 'f]:
 (forall (a:'a, b:'b, c:'c, d:'d, e:'e, f:'f), true) = true.
 Proof. auto. Qed.
+
+
+(*------------------------------------------------------------------*)
+(* length *)
+
+axiom [any] len_zeroes (x:message) : len(zeroes(x)) = len(x).
+hint rewrite len_zeroes.
+
+
+(*------------------------------------------------------------------*)
+(* exec and cond *)
+
+(* Squirrel can only expand exec for specific actions.
+   This action allows to go beyond this. It would be provable
+   in any system, by performing a case analysis on tau. *)
+axiom [any] exec_not_init (tau:timestamp) :
+  init < tau => exec@tau = (exec@pred(tau) && cond@tau).
+
+axiom [any] exec_init (tau:timestamp) : tau = init => exec@tau = true.
+axiom [any] cond_init (tau:timestamp) : tau = init => cond@tau = true.
+
+goal [any] exec_le (tau,tau':timestamp) : tau' <= tau => exec@tau => exec@tau'.
+Proof.
+  induction tau => tau IH Hle Hexec.
+  case (tau = tau').
+  + auto.
+  + intro Hneq.
+    rewrite exec_not_init // in Hexec.
+    by apply IH (pred(tau)).
+Qed.
+
+goal [any] exec_cond (tau:timestamp) : happens(tau) => exec@tau => cond@tau.
+Proof.
+  intro Hap Hexec.
+  case (init < tau) => _.
+  - by rewrite exec_not_init in Hexec.
+  - by rewrite cond_init.
+Qed.
