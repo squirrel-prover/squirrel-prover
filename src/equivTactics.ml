@@ -1677,7 +1677,7 @@ let cca1 Args.(Int i) s =
           ->
           begin
             let errors =
-              Euf.key_ssc ~globals:true
+              Euf.key_ssc ~globals:true ~elems:(ES.goal_as_equiv s)
                 ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
                 ~cntxt fndec sk.s_symb
             in
