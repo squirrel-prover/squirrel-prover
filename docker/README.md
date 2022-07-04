@@ -104,7 +104,7 @@ contains the `.emacs` used by the docker, as well as the updated
 To publish the image, see @Charlie JACOMME (Dockerhub does not support
 free organizations...), which is then done by running:
 ```
-docker tag sp/squirel-prover \
+docker tag sp/squirrel-prover \
  cjacomme/squirrel-prover:latest; \
  docker push cjacomme/squirrel-prover:latest
 ```

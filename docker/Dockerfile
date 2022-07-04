@@ -56,58 +56,7 @@ COPY docker/res/.emacs /root/.emacs
 
 WORKDIR /opt/squirrel-prover
 
-# ENV PATH=${PATH}:/opt/build/bin
-# RUN apt-get update
-# RUN apt-get install -y --no-install-recommends \
-#     libc
-#     #general stuff
-#     libncurses5 \
-#     bc \
-#     locales \
-#     python3 \
-#     && rm -rf /var/lib/apt/lists/*
-
-# # set locales so haskell can do its thing
-# # https://stackoverflow.com/questions/28405902/how-to-set-the-locale-inside-a-debian-ubuntu-docker-container
-# # The following does NOT work -> locale-gen --no-purge en_US.UTF-8
-# RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
-# ENV LANG en_US.UTF-8
-# ENV LANGUAGE en_US:en
-# ENV LC_ALL en_US.UTF-8
-
-# # TODO turn variables above into ARGS ..
-# # https://stackoverflow.com/questions/52904847/how-do-i-copy-variables-between-stages-of-multi-stage-docker-build
-# ENV PROVERIF_DIR_NAME="proverif2.04"
-# ENV GSVERIF_DIR_NAME="gsverif"
-# ENV DEEPSEC_DIR_NAME="deepsec"
-# ENV RES="etc/docker/res"
-# ENV CONFIG="etc/docker/config"
-
-
-
-
-# # # Install new maude maude version (not necessary, part of tamarin docker)
-# # ENV PRELUDE_MAUDE="${RES}/prelude.maude"
-# # ENV MAUDE="${RES}/maude"
-# # COPY ${MAUDE} /opt/build/bin/
-# # COPY ${PRELUDE_MAUDE} /opt/build/bin/
-
-# COPY ${RES}/proverif-tamarin .
-# COPY ${RES}/progsverif-tamarin .
-# COPY ${RES}/deepsec-tamarin .
-# COPY ${RES}/proverif-tamarin-diff .
-# COPY examples/sapic/export examples
-# # ENV EXPORT=examples/sapic/export/ExistingSapicModels
-# # COPY ${EXPORT}/AC.spthy ${EXPORT}/AC_counter_with_attack.spthy ${EXPORT}/AC_sid_with_attack.spthy ${EXPORT}/AKE.spthy ${EXPORT}/OTP.spthy ${EXPORT}/nsl-no_as-untagged.spthy examples/ExistingSapicModels/
-# # COPY examples/sapic/fast examples/fast
-# # COPY examples/sapic/slow examples/slow
-# # COPY ${RES}/README ${RES}/README-long ${RES}/.bashrc ./
-# COPY ${RES}/README-platform ${RES}/.bashrc ./
-
-# ENV PATH=${PATH}:/opt/build/bin:/opt/protocolplatform
-# # TODO Do we need this???
-# # ENV DEEPSEC_DIR=$DEEPSEC_DIR_IMAGE/deepsec
-
+COPY docker/README.md /opt
 # EXPOSE 3001
 ENTRYPOINT [] # remove entrypoint from parent image 
-CMD ["cat", "/opt/protocolplatform/README-platform"]
+CMD ["cat", "/opt/README.md"]
