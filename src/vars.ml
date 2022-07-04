@@ -66,7 +66,11 @@ let compare x y =
   if equal x y then 0
   else if x.i_suffix <= y.i_suffix then -1 else 1
 
-let check_type_vars (vars : vars) (allowed_types : Type.ty list) (error : unit -> unit) = 
+let check_type_vars
+    (vars : vars)
+    (allowed_types : Type.ty list)
+    (error : unit -> unit)
+  = 
   List.iter (fun v ->
       if not (List.mem (ty v) allowed_types) then error ()
     ) vars
