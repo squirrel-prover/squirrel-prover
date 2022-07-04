@@ -190,7 +190,9 @@ let occ_incl
   let context = SE.reachability_context system in
   match Match.T.try_match table context (mk_dummy o1) pat2 with
   | Match.FreeTyv | Match.NoMatch _ -> false
-  | Match.Match _ -> true
+  | Match.Match _ -> (* we still need to check they are in collision with the same name *)
+     let (_, oi1),(_, oi2) = o1.occ_cnt, o2.occ_cnt in 
+     oi1.oi_name = oi2.oi_name
 
 
 (** Add occ to occs, if it is not redundant.
