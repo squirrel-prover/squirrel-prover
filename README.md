@@ -27,23 +27,23 @@ The required `.el` files are inside the `utils` folder.
 We recommend installing Proof General from the git repository.
 
 
-- 0. Clone the git repository of proof general inside your `~/.emacs.d/lisp`:
+- Clone the git repository of proof general inside your `~/.emacs.d/lisp`:
 ```
 mkdir -p ~/.emacs.d/lisp/ && cd ~/.emacs.d/lisp/
 git clone https://github.com/ProofGeneral/PG
 ```
 
-- 1. Create a squirrel sub-directory:
+- Create a squirrel sub-directory:
 ```
 mkdir -p ~/.emacs.d/lisp/PG/squirrel
 ```
 
-- 2. Copy and paste this file, and `squirrel-syntax.el` inside it:
+- Copy and paste this file, and `squirrel-syntax.el` inside it:
 ```
 cp squirrel.el squirrel-syntax.el ~/.emacs.d/lisp/PG/squirrel
 ```
 
-- 3. Moreover, in the file `~/.emacs.d/lisp/PG/generic/proof-site.el`,
+- Moreover, in the file `~/.emacs.d/lisp/PG/generic/proof-site.el`,
    add to the list `proof-assistant-table-default` the following line:
 ```
  (squirrel "squirrel" "sp")
@@ -53,12 +53,12 @@ Then erase the outdated compiled version of this file:
 rm ~/.emacs.d/lisp/PG/generic/proof-site.elc
 ```
 
-- 4. Run the following command to configure emacs:
+- Run the following command to configure emacs:
 ```
 echo -e "(require 'ansi-color)\n(load \"~/.emacs.d/lisp/PG/generic/proof-site\")" >> ~/.emacs
 ```
 
-5. Run emacs from the squirrel repository on some example file,
+- Run emacs from the squirrel repository on some example file,
 with the squirrel repository in the path:
 ```
 export PATH=$PATH:/path/to/squirrel
