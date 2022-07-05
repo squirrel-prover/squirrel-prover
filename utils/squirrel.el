@@ -1,32 +1,5 @@
 ;;; squirrel.el --- Proof General for the Squirrel Prover.
 
-;; 0. Clone the git repository of proof general inside your `~/.emacs.d/lisp`:
-;;    # cd ~/.emacs.d/lisp/
-;;    # git clone https://github.com/ProofGeneral/PG
-
-;; 1. Create a squirrel sub-directory:
-;;    # mkdir ~/.emacs.d/lisp/PG/squirrel
-
-;; 2. Copy and paste this file, and `squirrel-syntax.el` inside it:
-;;    # cp squirrel.el squirrel-syntax.el ~/.emacs.d/lisp/PG/squirrel
-
-;; 3. Moreover, in the file `~/.emacs.d/lisp/PG/generic/proof-site.el`,
-;;    add to the list `proof-assistant-table-default` the following line:
-;;      (squirrel "squirrel" "sp")
-;;    Then erase the outdated compiled version of this file:
-;;    # rm ~/.emacs.d/lisp/PG/generic/proof-site.elc
-
-;; 4. Add the following two lines to your `.emacs` (usually located
-;;    at `~/.emacs`), the second one with the correct path to your 
-;;    proof general folder:
-;;     (require 'ansi-color)
-;;     (load "~/.emacs.d/lisp/PG/generic/proof-site")
-
-;; 5. Run emacs from the squirrel repository on some example file,
-;;    with the squirrel repository in the path:
-;;    # export PATH=$PATH:/path/to/squirrel
-;;    # emacs examples/<file>.sp
-
 (require 'span)
 (require 'proof)
 (require 'proof-site)
