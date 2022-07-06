@@ -714,7 +714,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         | Some cases -> cases
     in
 
-    if cases = [] then destr_err ();
+    if List.length cases = 1 then destr_err ();
 
     List.map (fun g ->
         let ng = Ident.name id in
