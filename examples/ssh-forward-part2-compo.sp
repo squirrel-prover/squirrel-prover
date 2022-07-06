@@ -408,8 +408,8 @@ Proof.
     executable pred(Sok); 1,2: by auto => H2.
 
     depends SDIS, Sok => // _.
-    assert happens(SDIS); 1: auto.
-    assert happens(P3(i)); 1: case Euf; auto.
+    have _: happens(SDIS); 1: auto.
+    have _: happens(P3(i)); 1: case Euf; auto.
     expand x3(i)@P3(i).
     use H2 with P3(i) as H3; 2: case Euf; auto.
     expand exec, cond.
@@ -425,10 +425,10 @@ Proof.
         by use difftags.
       - (* Honest case *)
         intro H4 Meq1.
-        assert happens(PDIS5); 1: case H4; auto.
+        assert happens(PDIS5) as U; 1: by case Euf.
         expand x3(i)@P3(i), sidPa.
         assert PDIS5 <= Sok;
-        1: by case H4; case Euf.
+        1: by case Euf.
         use H2 with PDIS5; 2: by auto.
         expand exec, cond.
         use Hc with i.

@@ -136,11 +136,10 @@ Proof.
   (* Direction => is the obvious one *)
   + intro [_ H0] => /= [i j [H1 [_ _]]].
     notleft H0.
-    use H0 with i,j; case H1.
+    use H0 with i,j as H2; case H2 => //.
     clear H0.
     expand output, cipher.
-    use fail_not_pair with tagT, <input@Tag(i,j), nt(i,j)>.
-    by case H.
+    by use fail_not_pair with tagT, <input@Tag(i,j), nt(i,j)>.
 
   (* Direction <= *)
   + intro [_ H0] => /= [i j [H1 [_ _]]].
