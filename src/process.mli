@@ -11,8 +11,6 @@
 
 type term = Theory.term
 
-type formula = Theory.term
-
 type lsymb = Theory.lsymb
 
 (** {2 Kinds}
@@ -54,7 +52,7 @@ type process_i =
       (** [Repl (x,p)] is the parallel composition of [p[x:=i]]
         * for all indices [i]. *)
   
-  | Exists of lsymb list * formula * process * process
+  | Exists of lsymb list * term * process * process
       (** [Exists (vars,test,p,q)] evalues to [p[vars:=indices]]
         * if there exists [indices] such that [test[vars:=indices]]
         * is true, and [q] otherwise. Note that this construct

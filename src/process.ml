@@ -17,7 +17,6 @@ let pp_proc_ty =
 type lsymb = Theory.lsymb
 
 type term = Theory.term
-type formula = Theory.term
 
 (*------------------------------------------------------------------*)
 type process_i =
@@ -29,7 +28,7 @@ type process_i =
   | Set      of lsymb * lsymb list * term * process
   | Let      of lsymb * term * Theory.p_ty option * process
   | Repl     of lsymb * process
-  | Exists   of lsymb list * formula * process * process
+  | Exists   of lsymb list * term * process * process
   | Apply    of lsymb * term list
   | Alias    of process * lsymb
 
@@ -682,7 +681,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
     let invars = List.map snd penv.inputs in
     let shape = Action.get_shape (List.rev penv.action) in
-    let table,x' =
+    let table, x' =
       let suffix = if in_update then `Large else `Strict in
       Macros.declare_global penv.env.table system_name x
         ~suffix
@@ -708,7 +707,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
                   msubst = (L.unloc x,x'_th,x'_tm) :: penv.msubst;
                   globals = x' :: penv.globals; }
     in
-    (x',t',penv,p)
+    (x', t', penv, p)
 
   | _ -> assert false
 

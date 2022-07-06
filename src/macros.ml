@@ -85,7 +85,7 @@ type Symbols.data += Global_data of global_data
 (** Get body of a global macro for a single system. *)
 let get_single_body (single : S.Single.t) (data : global_data) : Term.term =
   try List.assoc single data.bodies with
-    | Not_found -> Term.empty
+  | Not_found -> Term.empty
 
 (*------------------------------------------------------------------*)
 (** Get body of a global macro for a system expression. *)
