@@ -206,6 +206,12 @@ val declare_abstract :
   lsymb -> Symbols.symb_type ->
   Symbols.table
 
+(** Sanity checks for a function symbol declaration. *)
+val check_fun_symb :
+  Symbols.table ->
+  Type.tvar list -> Type.ty list -> int ->
+  lsymb -> Symbols.symb_type -> unit
+  
 (*------------------------------------------------------------------*)
 (** {2 Term builders } *)
 

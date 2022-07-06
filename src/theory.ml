@@ -1163,19 +1163,27 @@ let check_signature table checksign pk =
 let declare_name table s ndef =
   fst (Symbols.Name.declare_exact table s ndef)
 
+(*------------------------------------------------------------------*)
+(** Sanity checks for a function symbol declaration. *)
+let check_fun_symb
+    table
+    (ty_args : Type.tvar list) (in_tys : Type.ty list) (index_arity : int)
+    (s : lsymb) (f_info : Symbols.symb_type) : unit
+  =
+  match f_info with
+  | `Prefix -> ()
+  | `Infix side ->
+    if not (index_arity = 0) ||
+       not (List.length ty_args = 0) ||
+       not (List.length in_tys = 2) then
+      conv_err (L.loc s) BadInfixDecl
+
 let declare_abstract 
     table ~index_arity ~ty_args ~in_tys ~out_ty 
     (s : lsymb) (f_info : Symbols.symb_type) 
   =
   (* if we declare an infix symbol, run some sanity checks *)
-  let () = match f_info with
-    | `Prefix -> ()
-    | `Infix side ->
-      if not (index_arity = 0) ||
-         not (List.length ty_args = 0) ||
-         not (List.length in_tys = 2) then
-        conv_err (L.loc s) BadInfixDecl;
-  in
+  check_fun_symb table ty_args in_tys index_arity s f_info;
 
   let ftype = Type.mk_ftype index_arity ty_args in_tys out_ty in
   fst (Symbols.Function.declare_exact table s (ftype, Symbols.Abstract f_info))

@@ -63,13 +63,13 @@ type 'a rw_item_g = {
 (** Rewrite or expand item *)
 type rw_item = [
   | `Rw        of Theory.p_pt
-  | `Expand    of Theory.term
+  | `Expand    of lsymb
   | `ExpandAll of Location.t
 ] rw_item_g
 
 (** Expand item *)
 type expnd_item = [
-  | `Expand    of Theory.term
+  | `Expand    of lsymb
   | `ExpandAll of Location.t
 ] rw_item_g
 
@@ -95,7 +95,7 @@ let pp_rw_dir ppf d = match L.unloc d with
 
 let pp_rw_type ppf = function
   | `Form f      -> Theory.pp ppf f
-  | `Expand t    -> Fmt.pf ppf "/%a" Theory.pp t
+  | `Expand s    -> Fmt.pf ppf "/%s" (L.unloc s)
   | `ExpandAll _ -> Fmt.pf ppf "/*"
 
 let pp_rw_item ppf rw_item =

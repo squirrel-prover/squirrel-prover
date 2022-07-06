@@ -1,5 +1,3 @@
-
-
 op triple (x, y, z : message) : message = <x, <y, z>>.
 
 (* implicit return type *)
@@ -21,3 +19,9 @@ Proof.
   rewrite /gtriple /triple !gpair_ax. 
   auto.
 Qed.
+
+(*------------------------------------------------------------------*)
+op (~<) (x : message, y : message) : message = zero.
+
+goal _ (x, y : message) : x ~< y = zero.
+Proof. by rewrite /(~<). Qed.

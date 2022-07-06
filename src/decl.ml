@@ -65,11 +65,12 @@ type system_modifier = {
 
 (*------------------------------------------------------------------*)
 type operator_decl = { 
-  op_name   : Theory.lsymb;
-  op_tyargs : lsymb list;
-  op_args   : Theory.bnds;
-  op_tyout  : Theory.p_ty option;
-  op_body   : Theory.term;
+  op_name      : Theory.lsymb;
+  op_symb_type : Symbols.symb_type;
+  op_tyargs    : lsymb list;
+  op_args      : Theory.bnds;
+  op_tyout     : Theory.p_ty option;
+  op_body      : Theory.term;
 }
 
 (*------------------------------------------------------------------*)

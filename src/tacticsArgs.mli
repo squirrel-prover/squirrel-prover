@@ -45,13 +45,13 @@ type 'a rw_item_g = {
 (** Rewrite or expand item *)
 type rw_item = [
   | `Rw        of Theory.p_pt
-  | `Expand    of Theory.term
+  | `Expand    of lsymb
   | `ExpandAll of Location.t
 ] rw_item_g
 
 (** Expand item *)
 type expnd_item = [
-  | `Expand    of Theory.term
+  | `Expand    of lsymb
   | `ExpandAll of Location.t
 ] rw_item_g
 

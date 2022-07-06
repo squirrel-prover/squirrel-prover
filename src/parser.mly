@@ -189,12 +189,12 @@ sterm_i:
 
 
 %inline infix_s:
-| AND         { "&&"  }
-| OR          { "||"   }
+| AND              { "&&"  }
+| OR               { "||"   }
 | s=LEFTINFIXSYMB  { s }
 | s=RIGHTINFIXSYMB { s }
-| XOR         { "xor"  }
-| DARROW      { "=>" }
+| XOR              { "xor"  }
+| DARROW           { "=>" }
 
 /* ambiguous term */
 term_i:
@@ -501,13 +501,15 @@ declaration_i:
                 abs_tys   = t; }) }
 
 
-| OP name=lsymb tyargs=ty_args args=opt_arg_list tyo=p_out_ty? EQ t=term
-    { Decl.(Decl_operator
-              { op_name   = name;
-                op_tyargs = tyargs;
-                op_args   = args;
-                op_tyout  = tyo;
-                op_body   = t; }) }
+| OP e=lsymb_decl tyargs=ty_args args=opt_arg_list tyo=p_out_ty? EQ t=term
+    { let symb_type, name = e in
+      Decl.(Decl_operator
+              { op_name      = name;
+                op_symb_type = symb_type;
+                op_tyargs    = tyargs;
+                op_args      = args;
+                op_tyout     = tyo;
+                op_body      = t; }) }
 
 | MUTABLE e=lsymb args=opt_arg_list COLON typ=p_ty EQ t=term
                           { Decl.Decl_state (e, args, typ, t) }
@@ -567,12 +569,12 @@ rw_dir:
 | MINUS { `RightToLeft }
 
 rw_type:
-| pt=spt             { `Rw pt }
-| SLASH t=sterm      { `Expand t }
-| SLASH l=lloc(STAR)  { `ExpandAll l }
+| pt=spt                        { `Rw pt }
+| SLASH s=lsymb_decl            { `Expand (snd s) }
+| SLASH l=lloc(STAR)            { `ExpandAll l }
 
 expnd_type:
-| ATSLASH t=sterm      { `Expand t }
+| ATSLASH s=lsymb       { `Expand s }
 | ATSLASH l=lloc(STAR)  { `ExpandAll l }
 
 rw_item:

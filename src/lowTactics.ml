@@ -554,11 +554,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let rule, id_opt = p_rw_rule dir f in
           Rw_rw (f.p_pt_loc, id_opt, rule)
 
-        | `Expand t ->
+        | `Expand s ->
           if L.unloc rw_arg.rw_dir <> `LeftToRight then
             hard_failure ~loc:(L.loc rw_arg.rw_dir)
               (Failure "expand cannot take a direction");
 
+          let t = L.mk_loc (L.loc s) (Theory.App (s, [])) in
+          
           Rw_expand t
 
         | `ExpandAll loc -> Rw_expandall loc
