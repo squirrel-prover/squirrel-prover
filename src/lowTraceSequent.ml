@@ -52,7 +52,6 @@ end = struct
   type t = {
     env        : Env.t;
     hint_db    : Hint.hint_db;
-    (* hind_db    : Reduction. *)
     hyps       : H.hyps;
     conclusion : Term.term;
   }

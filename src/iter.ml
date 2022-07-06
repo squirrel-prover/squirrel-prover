@@ -978,11 +978,16 @@ let _fold_macro_support
                 ) m_is m_is'
             in
 
+            let iocc_cnt = Term.subst subst t in
+            let iocc_action = Action.subst_action subst descr.action in
+            let iocc_fv = 
+              Sv.union (Action.fv_action iocc_action) (Term.fv iocc_cnt) 
+            in
             let iocc = {
               iocc_aname   = descr.name;
-              iocc_vars    = Sv.diff (Term.fv t) env;
-              iocc_action  = Action.subst_action subst descr.action;
-              iocc_cnt     = Term.subst subst t;
+              iocc_vars    = Sv.diff iocc_fv env;
+              iocc_action;
+              iocc_cnt;
               iocc_sources = srcs;
             } in
 

@@ -6,10 +6,10 @@ module Sp = Match.Pos.Sp
 
 (*------------------------------------------------------------------*)
 type prf_param = {
-  h_fn  : Term.fname;  (** function name *)
-  h_fty : Type.ftype;  (** Hash function type *)
-  h_cnt : Term.term;   (** contents, i.e. hashed message *)
-  h_key : Term.nsymb;  (** key *)
+  h_fn  : Term.fname; 
+  h_fty : Type.ftype; 
+  h_cnt : Term.term;  
+  h_key : Term.nsymb; 
 }
 
 let prf_param hash : prf_param =
@@ -177,7 +177,6 @@ let mk_prf_phi_proj cntxt env param frame hash =
 
   let frame_hashes : Iter.hash_occs =
     List.fold_left (fun acc t ->
-        (* TODO: wrong system below? *)
         Iter.get_f_messages_ext
           ~mode:(`Delta cntxt) (cntxt.system :> SE.arbitrary)
           param.h_fn param.h_key.s_symb t @ acc
@@ -195,11 +194,14 @@ let mk_prf_phi_proj cntxt env param frame hash =
     Iter.fold_macro_support (fun iocc macro_cases ->
         let name = iocc.iocc_aname in
         let t = iocc.iocc_cnt in
-        let fv = (Sv.elements iocc.iocc_vars) in
+        let fv = Sv.elements iocc.iocc_vars in
 
+        assert (Sv.subset
+                  (Term.fv iocc.iocc_cnt)
+                  (Sv.union iocc.iocc_vars (Vars.to_set env)));
+        
         let new_cases =
           Iter.get_f_messages_ext 
-            (* TODO: wrong system below? *)
             ~mode:(`Delta cntxt) (cntxt.system :> SE.arbitrary)
             ~fv param.h_fn param.h_key.s_symb t
         in
@@ -231,7 +233,7 @@ let mk_prf_phi_proj cntxt env param frame hash =
 
   Term.mk_ands ~simpl:true phi_direct, Term.mk_ands ~simpl:true phi_indirect
 
-
+(*------------------------------------------------------------------*)
 (** Build the PRF condition on one side, if the hash occurs on this side.
     Return [None] if the hash does not occurs. *)
 let prf_condition_side
@@ -276,8 +278,9 @@ let prf_condition_side
   with
   | HashNoOcc -> None
 
-(* From two conjunction formulas p and q, produce a minimal diff(p, q),
- * of the form (p inter q) && diff (p minus q, q minus p). *)
+(*------------------------------------------------------------------*)
+(** From two conjunction formulas p and q, produce a minimal diff(p, q),
+    of the form (p inter q) && diff (p minus q, q minus p). *)
 let combine_conj_formulas p q =
   (* Turn the conjunctions into lists. *)
   let p, q = Term.decompose_ands p, Term.decompose_ands q in
