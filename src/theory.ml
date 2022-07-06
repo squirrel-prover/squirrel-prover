@@ -1357,9 +1357,10 @@ let declare_state
   let env, indices = convert_p_bnds env typed_args in
   let conv_env = { conv_env with env } in
 
-  (* TODO: bad location error *)
-  Vars.check_type_vars indices [Type.tindex]
-    (fun () -> conv_err (L.loc pty) (BadPty [Type.tindex]));
+  List.iter2 (fun v (_, pty) ->
+      if not (Type.equal (Vars.ty v) Type.tindex) then
+        conv_err (L.loc pty) (BadPty [Type.tindex])
+    ) indices typed_args;
 
   (* parse the macro type *)
   let ty = parse_p_ty env pty in
