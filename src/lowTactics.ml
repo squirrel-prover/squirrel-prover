@@ -220,22 +220,22 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (s     : S.sequent)
     : Term.term
     =
-    let se =
-      if SE.is_fset se then SE.to_fset se
-      else soft_failure
-          (Tactics.Failure "nothing to expand: the system is too general")
-    in
-
     match t with
     | Macro (ms,l,a) ->
       if not (force_happens) && not (S.query_happens ~precise:true s a) then
         soft_failure (Tactics.MustHappen a);
 
+      let se =
+        if SE.is_fset se then SE.to_fset se
+        else soft_failure
+            (Tactics.Failure "nothing to expand: the system is too general")
+      in
+
       Macros.get_definition_exn ?mode (S.mk_trace_cntxt ~se s) ms a 
 
     | Fun (fs, _, ts)
       when Operator.is_operator (S.table s) fs ->
-      Operator.unfold (S.mk_trace_cntxt ~se s) fs ts
+      Operator.unfold (S.table s) se fs ts
 
     | _ ->
       soft_failure (Tactics.Failure "nothing to expand")

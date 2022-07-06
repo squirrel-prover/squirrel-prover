@@ -1,3 +1,6 @@
+module SE = SystemExpr
+
+(*------------------------------------------------------------------*)
 type operator
 
 val pp_operator : Format.formatter -> operator -> unit
@@ -17,4 +20,5 @@ val ftype : operator -> Type.ftype
 
 val is_operator : Symbols.table -> Term.fsymb -> bool
 
-val unfold : Constr.trace_cntxt -> Term.fsymb -> Term.term list -> Term.term
+val unfold : 
+  Symbols.table -> SE.arbitrary -> Term.fsymb -> Term.term list -> Term.term

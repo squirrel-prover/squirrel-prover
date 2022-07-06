@@ -774,12 +774,6 @@ let expand_head_once
     (t : Term.term) 
   : Term.term * bool 
   = 
-  let se = 
-    try SE.to_fset sexpr
-    with SE.Error _ -> raise exn
-    (* FIXME: we are throwing this exception too early, since in the
-       Operator case, we may unfold even if [sexpr = any]. *)
-  in
   let models = (* evaluates the models only if needed *)
     lazy (
       let lits = Hyps.TraceHyps.fold (fun _ f acc ->
@@ -791,7 +785,9 @@ let expand_head_once
       in
       Constr.models_conjunct ~exn lits)
   in 
-  let cntxt () = Constr.{ 
+  let cntxt () = 
+    let se = try SE.to_fset sexpr with SE.Error _ -> raise exn in
+    Constr.{ 
       table; system = se; 
       models = Some (Lazy.force models);
     } in
@@ -807,7 +803,7 @@ let expand_head_once
 
   | Fun (fs, _, ts) 
     when Operator.is_operator table fs -> 
-    Operator.unfold (cntxt ()) fs ts, true
+    Operator.unfold table sexpr fs ts, true
 
   | _ -> raise exn
 

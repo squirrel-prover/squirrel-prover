@@ -2,6 +2,7 @@ open Utils
 
 module SE = SystemExpr
 
+(*------------------------------------------------------------------*)
 (** operator body *)
 type body = Term.term
 
@@ -68,7 +69,8 @@ let is_operator (table : Symbols.table) (fsymb : Term.fsymb) : bool =
   | _ -> false
 
 let unfold 
-    (cntxt  : Constr.trace_cntxt)
+    (table  : Symbols.table)
+    (se     : SE.arbitrary)
     (opsymb : Term.fsymb)
     (args   : Term.term list)
   : Term.term
@@ -76,11 +78,11 @@ let unfold
   let opname, opindices = opsymb in
   assert (opindices = []);
   let op = 
-    match Symbols.Function.get_data opname cntxt.table with
+    match Symbols.Function.get_data opname table with
     | Operator op -> op
     | _ -> assert false
   in
-  let body = get_body cntxt.system op.body in
+  let body = get_body se op.body in
 
   let subst = 
     List.map2 (fun x y -> 
