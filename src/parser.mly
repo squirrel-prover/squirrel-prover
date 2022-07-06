@@ -687,7 +687,6 @@ p_pt_arg:
    later, using the judgement hypotheses. */
 
 | LPAREN PERCENT pt=p_pt RPAREN  { Theory.PT_sub pt }
-| l=lloc(TICKUNDERSCORE)         { Theory.PT_obl l }
 
 p_pt:
 | head=lsymb args=slist(p_pt_arg,empty)

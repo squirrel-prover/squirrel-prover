@@ -215,7 +215,6 @@ module Mk (Args : MkArgs) : S with
     match p_arg with
     | PT_term t -> L.loc t
     | PT_sub pt -> pt.p_pt_loc
-    | PT_obl l  -> l
 
   let pt_arg_as_term (p_arg : Theory.p_pt_arg) : Theory.term =
     match p_arg with
@@ -277,7 +276,6 @@ module Mk (Args : MkArgs) : S with
       the context. *)
   let rec resolve_pt_arg (s : S.t) (pt_arg : Theory.p_pt_arg) : Theory.p_pt_arg =
     match pt_arg with
-    | Theory.PT_obl _   -> pt_arg
     | Theory.PT_sub sub -> PT_sub (resolve_pt s sub)
     | Theory.PT_term t  ->
       match L.unloc t with

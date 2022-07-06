@@ -355,4 +355,3 @@ type p_pt = {
 and p_pt_arg =
   | PT_term of term
   | PT_sub  of p_pt             (* sub proof term *)
-  | PT_obl  of L.t              (* generate a proof obligation *)
