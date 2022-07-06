@@ -311,7 +311,7 @@ let congruence (s : TS.t) : bool =
         ) [] conclusions
     in
     let s = List.fold_left (fun s f ->
-        Hyps.add Args.AnyName f s
+        Hyps.add Args.Unnamed f s
       ) s term_conclusions
     in
     TS.eq_atoms_valid s
@@ -361,7 +361,7 @@ let constraints (s : TS.t) =
         ) [] conclusions
     in
     let s = List.fold_left (fun s f ->
-        Hyps.add Args.AnyName f s
+        Hyps.add Args.Unnamed f s
       ) s trace_conclusions
     in
     TS.constraints_valid s
@@ -480,7 +480,7 @@ let eq_names (s : TS.t) =
   let s =
     List.fold_left (fun s c ->
         let () = dbg "new name equality (indep): %a" Term.pp c in
-        Hyps.add Args.AnyName c s
+        Hyps.add Args.Unnamed c s
       ) s new_eqs in
 
   (* we now collect equalities between timestamp implied by equalities between
@@ -492,7 +492,7 @@ let eq_names (s : TS.t) =
   let s =
     List.fold_left (fun s c ->
         let () = dbg "new equalities (names): %a" Term.pp c in
-        Hyps.add Args.AnyName c s
+        Hyps.add Args.Unnamed c s
       ) s cnstrs
   in
   [s]
@@ -547,7 +547,7 @@ let eq_trace (s : TS.t) =
   let s =
     List.fold_left (fun s c ->
         let () = dbg "new trace equality: %a" Term.pp c in
-        Hyps.add Args.AnyName c s
+        Hyps.add Args.Unnamed c s
       ) s facts
   in
   [s]

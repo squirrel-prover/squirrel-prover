@@ -64,6 +64,8 @@ name skex : message
 
 aenc encap,decap,epk
 
+axiom [any] decap_encap (x,y,z : message) : decap(encap(x,y,epk(z)),z) = x.
+
 (* sign *)
 
 signature sign,checksign,spk
@@ -282,8 +284,8 @@ Proof.
             * intro [il0 jl0 kl0 [Eq2 ->]].
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
-              simpl.
-              by case H2.
+              rewrite !decap_encap in Meq. 
+              by fresh Meq.
 
             * intro [Abs _].
               use Abs with il,jl,kl.
@@ -302,8 +304,8 @@ Proof.
             * intro [il0 jl0 kl0 [Eq2 ->]].
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
-              simpl.
-              by case H2.
+              rewrite !decap_encap in Meq. 
+              by fresh Meq.
 
             * intro [Abs _].
               use Abs with il,jl,kl.
@@ -322,8 +324,8 @@ Proof.
             * intro [il0 jl0 kl0 [Eq2 ->]].
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
-              simpl.
-              by case H2.
+              rewrite !decap_encap in Meq. 
+              by fresh Meq.
 
             * intro [Abs _].
               use Abs with il,jl,kl.
@@ -341,8 +343,8 @@ Proof.
             * intro [il0 jl0 kl0 [Eq2 ->]].
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
-              simpl.
-              by case H2.
+              rewrite !decap_encap in Meq. 
+              by fresh Meq.
 
             * intro [Abs _].
               use Abs with il,jl,kl.
@@ -360,8 +362,8 @@ Proof.
             * intro [il0 jl0 kl0 [Eq2 ->]].
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
-              simpl.
-              by case H2.
+              rewrite !decap_encap in Meq. 
+              by fresh Meq.
               
             * intro [Abs _].
               use Abs with il,jl,kl.
@@ -380,8 +382,8 @@ Proof.
             * intro [il0 jl0 kl0 [Eq2 ->]].
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
-              simpl.
-              by case H2.
+              rewrite !decap_encap in Meq. 
+              by fresh Meq.
 
             * intro [Abs _].
               use Abs with il,jl,kl.
@@ -564,8 +566,9 @@ Proof.
                assert decap( encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))), vkI(il)) =
                decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
                auto.
-               simpl.
-               by case H0.
+              rewrite !decap_encap in Meq. 
+              by fresh Meq.
+
           +++ intro [Abs _].
               by use Abs with il0,jl0,kl0.
         ++ intro [Abs _].
@@ -654,8 +657,9 @@ Proof.
                 assert decap( encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))), vkI(il)) =
                 decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
                 auto.
-                simpl.
-                by case H0.
+                rewrite !decap_encap in Meq. 
+                by fresh Meq.
+
             +++ intro [Abs _].
                 by use Abs with il0,jl0,kl0.
         ++ intro [Abs _].
@@ -752,8 +756,8 @@ Proof.
                  assert decap( encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))), vkI(il)) =
                  decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
                  auto.
-                 simpl.
-                 by case H0.
+                 rewrite !decap_encap in Meq. 
+                 by fresh Meq.
 
              +++ intro [Abs _].
                  by use Abs with il0,jl0,kl0.
@@ -846,8 +850,8 @@ Proof.
                  assert decap( encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))), vkI(il)) =
                  decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
                  auto.
-                 simpl.
-                 by case H0.
+                 rewrite !decap_encap in Meq. 
+                 by fresh Meq.
 
              +++ intro [Abs _].
                  by use Abs with il0,jl0,kl0.
@@ -973,11 +977,12 @@ Proof.
                        F2(sid10(i,j,l)@FI(i,j,l),
                        exct(skex,decap(fst(snd(input@FI(i,j,l))),vkI(i)))).
                  intro [il jl kl [ _ ->]].
-                 assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))), vkI(il)) =
-                 decap( encap(n_CCA(i,j,k),rk(i,j,k),epk(vkI(i))), vkI(il)).
+                 have U :
+                 decap(encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))), vkI(il)) =
+                 decap(encap(n_CCA(i,j,k),rk(i,j,k),epk(vkI(i))), vkI(il)).
                  auto.
-                 simpl.
-                 by case H2.
+                 rewrite !decap_encap in U. 
+                 by fresh U.
 
                  intro [Abs _].
                  by use Abs with i,j,k.
@@ -1057,22 +1062,20 @@ Proof.
       case try find il,jl,kl such that _ in  F1(sid10(i,j,k)@FI(i,j,k),n_PRF(il,jl,kl)) else _.
         ++ intro [i1 j1 k1 [I1 I2]].
            rewrite I2.
-           assert decap(   encap(n_CCA(i1,j1,k1),rk(i1,j1,k1),epk(vkI(i1))), vkI(i1)) =
-decap(encap(n_CCA(i,j,k0),rk(i,j,k0),epk(vkI(i))), vkI(i1)) .
-           auto.
-           simpl.
-           case H1 => //.
-        ++ intro [I F].
-           use I with i,j,k0.
-           auto.
+           have U :
+           decap(encap(n_CCA(i1,j1,k1),rk(i1,j1,k1),epk(vkI(i1))), vkI(i1)) =
+           decap(encap(n_CCA(i,j,k0),rk(i,j,k0),epk(vkI(i))), vkI(i1)) by auto.
+           rewrite !decap_encap in U. 
+           by fresh U.
+
+        ++ intro [I F]. 
+           by use I with i,j,k0.
+
     + rewrite multprf.
       prf 1, F1(_,n_PRF2(i,j,k0)); rewrite if_true in 1 => //.
       xor 1; rewrite if_true in 1.
-      rewrite len_F.
-      namelength skex,n_PRF1.
-      auto.
-      fresh 1.
-      auto.
+      rewrite len_F; 1: by namelength skex,n_PRF1.
+      by fresh 1.
 Qed.
 
 

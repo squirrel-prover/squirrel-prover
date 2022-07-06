@@ -80,6 +80,8 @@ name skex : message
 
 aenc encap,decap,pk
 
+axiom [any] decap_encap (x,y,z : message) : decap(encap(x,y,pk(z)),z) = x.
+
 (* long term key of I *)
 
 name skI : index-> message
@@ -282,10 +284,13 @@ Proof.
         ++ intro [il jl kl [A ->]].
            case try find il,jl,kl such that _ in exct(skex, kR(il,jl,kl)) else _.
              +++ intro [il0 jl0 kl0 [B ->]].
-                 assert decap(   encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(skI(il)))  , skI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(skI(il0))) , skI(il)).
+                 have U :
+                 decap(encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(skI(il))), skI(il)) = 
+                 decap(encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(skI(il0))), skI(il)).
                  auto.
-                 simpl.
-                 case H1 => //.
+                 rewrite !decap_encap in U. 
+                 by fresh U.
+
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
         ++ intro [H1 _].
@@ -299,10 +304,11 @@ Proof.
         ++ intro [il jl kl [A ->]].
            case try find il,jl,kl such that _ in exct(skex, kR(il,jl,kl)) else _.
              +++ intro [il0 jl0 kl0 [B ->]].
-                 assert decap(   encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(skI(il)))  , skI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(skI(il0))) , skI(il)).
+                 have U : decap(   encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(skI(il)))  , skI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(skI(il0))) , skI(il)).
                  auto.
-                 simpl.
-                 case H1 => //.
+                 rewrite !decap_encap in U. 
+                 by fresh U.
+
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
         ++ intro [H1 _].
@@ -316,10 +322,11 @@ Proof.
         ++ intro [il jl kl [A ->]].
            case try find il,jl,kl such that _ in exct(skex, kI(il,jl,kl)) else _.
              +++ intro [il0 jl0 kl0 [B ->]].
-                 assert decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))  , skR(jl)) = decap(   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(skR(jl0))) , skR(jl)).
+                 have U : decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))  , skR(jl)) = decap(   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(skR(jl0))) , skR(jl)).
                  auto.
-                 simpl.
-                 case H2 => //.
+                 rewrite !decap_encap in U. 
+                 by fresh U.
+
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
         ++ intro [H1 _].
@@ -333,10 +340,11 @@ Proof.
         ++ intro [il jl kl [A ->]].
            case try find il,jl,kl such that _ in exct(skex, kI(il,jl,kl)) else _.
              +++ intro [il0 jl0 kl0 [B ->]].
-                 assert decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))  , skR(jl)) = decap                 (   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(skR(jl0))) , skR(jl)).
+                 have U : decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))  , skR(jl)) = decap                 (   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(skR(jl0))) , skR(jl)).
                  auto.
-                 simpl.
-                 case H2 => //.
+                 rewrite !decap_encap in U. 
+                 by fresh U.
+
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
          ++ intro [H1 _].
