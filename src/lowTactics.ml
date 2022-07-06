@@ -474,8 +474,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** {3 Rewriting types and functions} *)
 
   type rw_arg =
-    | Rw_rw of L.t * Ident.t option * Rewrite.rw_rule
-    (** The ident is the ident of the hyp the rule came from (if any) *)
+    | Rw_rw of { 
+        hyp_id : Ident.t option;
+        loc    : L.t;               
+        subgs  : Term.term list;  
+        rule   : Rewrite.rw_rule;  
+      }
 
     | Rw_expand    of Theory.term
     | Rw_expandall of Location.t
@@ -534,8 +538,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** Parse rewrite tactic arguments as rewrite rules. *)
   let p_rw_item (rw_arg : Args.rw_item) (s : S.t) : rw_earg =
-    let p_rw_rule dir (p_pt : Theory.p_pt) : Rewrite.rw_rule * Ident.t option =
-      let ghyp, pat_system, pat =
+    let p_rw_rule
+        dir (p_pt : Theory.p_pt) 
+      : Term.term list * Rewrite.rw_rule * Ident.t option 
+      =
+      let ghyp, pat_system, subgs, pat =
         S.convert_pt_gen
           ~check_compatibility:false
           ~close_pats:false
@@ -543,7 +550,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       in
       let id_opt = match ghyp with `Hyp id -> Some id | _ -> None in
 
-      pat_to_rw_rule s pat_system.set dir pat, id_opt
+      subgs, pat_to_rw_rule s pat_system.set dir pat, id_opt
     in
 
     let p_rw_item (rw_arg : Args.rw_item) : rw_earg =
@@ -551,8 +558,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
         | `Rw f ->
           let dir = L.unloc rw_arg.rw_dir in
           (* (rewrite rule, subgols, hyp id) if applicable *)
-          let rule, id_opt = p_rw_rule dir f in
-          Rw_rw (f.p_pt_loc, id_opt, rule)
+          let subgs, rule, id_opt = p_rw_rule dir f in
+          Rw_rw { loc = f.p_pt_loc; subgs; hyp_id = id_opt; rule }
 
         | `Expand s ->
           if L.unloc rw_arg.rw_dir <> `LeftToRight then
@@ -581,8 +588,17 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let rw_c,rw_arg = p_rw_item rw_item s in
 
     match rw_arg with
-    | Rw_rw (loc, id, erule) ->
-      let s, subs = rewrite ~loc ~all targets (rw_c, id, erule) s in
+    | Rw_rw {loc; subgs = r_subgs; hyp_id; rule} ->
+      let s, subs = rewrite ~loc ~all targets (rw_c, hyp_id, rule) s in
+
+      let r_subgs = 
+        List.map (fun g -> 
+            let g = S.unwrap_conc (Equiv.Local g) in
+            S.set_goal g s
+          ) r_subgs
+      in
+
+      r_subgs @
       subs @                      (* prove instances premisses *)
       [s]                         (* final sequent *)
 
@@ -593,14 +609,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Rewrite Equiv} *)
 
-  (** Parameter for "rewrite equiv" tactic:
-      - a global formula that is a chain of implications concluding
-        with an equivalence atom;
-      - the corresponding system expression;
-      - the rewriting direction.
-      The rewrite equiv tactic corresponds to the ReachEquiv rule of CSF'22. *)
+  (** C.f. [.mli] *)
   type rw_equiv =
-    SystemExpr.context * Equiv.global_form * [ `LeftToRight | `RightToLeft ]
+    SystemExpr.context * 
+    S.t list * 
+    Equiv.global_form *
+    [ `LeftToRight | `RightToLeft ]
 
   (** Parse rewrite equiv arguments. *)
   let p_rw_equiv (rw_arg : Args.rw_equiv_item) (s : S.t) : rw_equiv =
@@ -608,7 +622,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | `Rw f ->
       let dir = L.unloc rw_arg.rw_dir in
 
-      let _, context, pat =
+      let _, context, subgs, pat =
         S.convert_pt_gen ~check_compatibility:false f Equiv.Global_t s
       in
 
@@ -622,9 +636,17 @@ module MkCommonLowTac (S : Sequent.S) = struct
         hard_failure (Failure "multiplicity information not allowed for \
                                rewrite equiv") ;
 
+
+      let subgs = 
+        List.map (fun g -> 
+            let g = S.unwrap_conc (Equiv.Global g) in
+            S.set_goal g s
+          ) subgs
+      in
+
       let f = pat.pat_term in
 
-      context,f,dir
+      context, subgs, f, dir
 
   (*------------------------------------------------------------------*)
   (** {3 Case tactic} *)
@@ -1286,13 +1308,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** Parse apply tactic arguments. *)
   let p_apply_args
       (args : Args.parser_arg list)
-      (s : S.sequent) : bool * S.conc_form Term.pat * target
+      (s : S.sequent) : bool * S.conc_form list * S.conc_form Term.pat * target
     =
-    let nargs, pat, in_opt =
+    let nargs, subgs, pat, in_opt =
       match args with
       | [Args.ApplyIn (nargs, pt,in_opt)] ->
-        let _, pat = S.convert_pt ~close_pats:false pt S.conc_kind s in
-        nargs, pat, in_opt
+        let _, subgs, pat = S.convert_pt ~close_pats:false pt S.conc_kind s in
+        nargs, subgs, pat, in_opt
 
       | _ -> bad_args ()
     in
@@ -1303,15 +1325,25 @@ module MkCommonLowTac (S : Sequent.S) = struct
       | Some lsymb -> T_hyp (fst (Hyps.by_name lsymb s))
       | None       -> T_conc
     in
-    use_fadup, pat, target
+    use_fadup, subgs, pat, target
 
 
   let apply_tac_args (args : Args.parser_arg list) s : S.t list =
-    let use_fadup, pat, target = p_apply_args args s in
-    match target with
-    | T_conc    -> apply    ~use_fadup pat s
-    | T_hyp id  -> apply_in ~use_fadup pat id s
-    | T_felem _ -> assert false
+    let use_fadup, subgs, pat, target = p_apply_args args s in
+
+    (* sub-goals resulting from the convertion of the proof term 
+       in [args] *)
+    let subgs = List.map (fun g -> S.set_goal g s) subgs in
+
+    (* subg-goals from the application itself *)
+    let subgs' = 
+      match target with
+      | T_conc    -> apply    ~use_fadup pat s
+      | T_hyp id  -> apply_in ~use_fadup pat id s
+      | T_felem _ -> assert false
+    in
+
+    subgs @ subgs'
 
   let apply_tac args = wrap_fail (apply_tac_args args)
 
@@ -1421,8 +1453,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
     * As with apply, we require that the hypothesis (or lemma) is
     * of the kind of conclusion formulas: for local sequents this means
     * that we cannot use a global hypothesis or lemma. *)
-  let have_pt ~(mode:[`IntroImpl | `None]) ip (pt : Theory.p_pt) (s : S.t) =
-    let _, pat = S.convert_pt pt S.conc_kind s in
+  let have_pt
+      ~(mode:[`IntroImpl | `None]) ip (pt : Theory.p_pt) (s : S.t) : S.t list 
+    =
+    let _, pt_subgs, pat = S.convert_pt pt S.conc_kind s in
+
+    (* sub-goals resulting from the convertion of the proof term [pt] *)
+    let pt_subgs = List.map (fun g -> S.set_goal g s) pt_subgs in
 
     if pat.pat_tyvars <> [] then
       soft_failure (Failure "free type variables remaining") ;
@@ -1467,7 +1504,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         end
     in
 
-    aux [] f
+    pt_subgs @ (aux [] f)
 
   (*------------------------------------------------------------------*)
   (** {3 Have Formula} *)

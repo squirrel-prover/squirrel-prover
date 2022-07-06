@@ -37,3 +37,38 @@ Proof.
  apply H.
  assumption.
 Qed.
+
+(*------------------------------------------------------------------*)
+
+abstract P : bool.
+abstract Q : bool.
+abstract R : bool.
+
+goal _ (ma : message) : (P => Q => R) => P => Q => R.
+Proof.
+  intro H1 H2 H3.
+  have M := H1 _.
+  + clear H1 H3. 
+    assumption. 
+  + clear H1 H2. 
+    apply M. 
+    assumption. 
+Qed.
+
+abstract Pi : index -> bool.
+abstract Qi : index -> index -> bool.
+abstract Ri : index -> index -> bool.
+
+goal _ (ma : message, j : index) : 
+  (forall (i : index), Pi(i) => Qi(i,i) => Ri(i,i)) => 
+  Qi(j,j) =>
+  Pi(j) =>
+  Ri(j,j).
+Proof.
+  intro H1 H2 H3.
+  have M := H1 _ _ H2. 
+  + clear H1 H2.
+    assumption.
+  + clear H1 H2 H3.
+    assumption.
+Qed.

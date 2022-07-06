@@ -30,13 +30,14 @@ module type S = sig
       The pattern is the conclusion of the proof term.
       If [close_pats] is [false], pattern variables that cannot be
       inferred remains (default to [true]).
-      Also return the head of the proof term as a [ghyp]. *)
+      Also return the head of the proof term as a [ghyp], and
+      subgoals to prove. *)
   val convert_pt_gen :
     check_compatibility:bool ->
     ?close_pats:bool ->
     Theory.p_pt ->
     'a Equiv.f_kind -> t ->
-    ghyp * SystemExpr.context * 'a Term.pat
+    ghyp * SystemExpr.context * 'a list * 'a Term.pat
 
   (** Same as [convert_pt_gen], when the system is the current system of
       the sequent. *)
@@ -44,7 +45,7 @@ module type S = sig
     ?close_pats:bool ->
     Theory.p_pt ->
     'a Equiv.f_kind -> t ->
-    ghyp * 'a Term.pat
+    ghyp * 'a list * 'a Term.pat
 
 end
 

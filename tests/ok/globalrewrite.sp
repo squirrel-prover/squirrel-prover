@@ -30,6 +30,20 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
+(* check that subgoals are correctly generated from proof terms. *)
+
+abstract Pa : bool.
+
+axiom [any] Pa_impl_foo : Pa => a = b.
+axiom [any] Pa_ax : Pa.
+
+system Q2 = [Q/left] with rewrite (Pa_impl_foo _).
+Proof. by intro *; apply Pa_ax. Qed.
+Proof. by intro *; apply Pa_ax. Qed.
+Proof. by intro *; apply Pa_ax. Qed.
+Proof. by intro *; apply Pa_ax. Qed.
+
+(*------------------------------------------------------------------*)
 axiom [any] check_ax0 : check(f(a)).
 axiom [any] check_ax1 : check(a).
 

@@ -1868,11 +1868,11 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
   in
   subgoals @ [goal]
 
-let rewrite_equiv_args args s =
+let rewrite_equiv_args args (s : TS.t) : TS.t list =
   match args with
   | [TacticsArgs.RewriteEquiv rw] ->
-    let rw_equiv = TraceLT.p_rw_equiv rw s in
-    rewrite_equiv rw_equiv s
+    let ass_context, subgs, ass, dir = TraceLT.p_rw_equiv rw s in
+    subgs @ rewrite_equiv (ass_context, ass, dir) s
   | _ -> bad_args ()
 
 let rewrite_equiv_tac args = wrap_fail (rewrite_equiv_args args)

@@ -1141,7 +1141,11 @@ let do_rw_item
   let rw_c,rw_arg = TLT.p_rw_item rw_item s in
 
   match rw_arg with
-  | Rw_rw (loc, _, erule) -> do_rewrite ~loc expand_context (rw_c, erule) s t 
+  | Rw_rw {loc; subgs; rule} -> 
+    let subgs = List.map (fun x -> TS.set_goal x s) subgs in
+
+    let t, subgs' = do_rewrite ~loc expand_context (rw_c, rule) s t in
+    t, subgs @ subgs'
 
   | Rw_expand p_arg -> 
     let arg = TLT.p_rw_expand_arg s p_arg in
