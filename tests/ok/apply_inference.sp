@@ -74,8 +74,7 @@ Proof.
   intro H G F.
   rewrite (H _ (%G <_,_>)).
   rewrite (H _ (%G y)). 
-  clear H G.
-  assumption.
+  assumption F.
 Qed.
 
 goal _ (y,z : message) :
@@ -85,6 +84,5 @@ goal _ (y,z : message) :
 Proof.
   intro H G.
   have U := H _ (%G <y,z>).
-  clear H G.
-  assumption.
+  assumption U.
 Qed.

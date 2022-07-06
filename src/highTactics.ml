@@ -38,13 +38,16 @@ let () =
 
 (*------------------------------------------------------------------*)
 let () =
-  T.register "assumption"
-    ~tactic_help:{general_help = "look for the goal in the hypotheses.";
+  T.register_general "assumption"
+    ~tactic_help:{general_help = "Concludes if the goal or false appears \
+                                  in the hypotheses.";
                   detailed_help = "";
-                  usages_sorts = [Sort None];
+                  usages_sorts = [Sort None; Sort String];
                   tactic_group = Logical}
     ~pq_sound:true
-    (LT.genfun_of_any_fun TraceTactics.assumption EquivTactics.assumption)
+    (LT.gentac_of_any_tac_arg
+       TraceTactics.assumption_tac
+       EquivTactics.assumption_tac)
 
 (*------------------------------------------------------------------*)
 let () =

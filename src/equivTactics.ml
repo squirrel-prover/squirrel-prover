@@ -254,8 +254,9 @@ let case_tac (args : Args.parser_args) : LT.etac =
 
 (*------------------------------------------------------------------*)
 (** For each element of the biframe, checks that it is a member of the
-  * hypothesis biframe. If so, close the goal. *)
-let assumption s =
+  * hypothesis biframe. If so, close the goal.
+    If [hyp = Some id], only checks for hypothesis [id].  *)
+let assumption ?hyp s =
   let goal = ES.goal s in
 
   let in_atom =
@@ -271,7 +272,9 @@ let assumption s =
     else (fun at -> Equiv.Atom at = goal)
   in
 
-  let in_hyp _ = function
+  let in_hyp id f = 
+    (hyp = None || hyp = Some id) &&
+    match f with
     | Equiv.Atom at -> in_atom at
     | _ as f -> f = goal
   in
@@ -279,6 +282,16 @@ let assumption s =
   if Hyps.exists in_hyp s
   then []
   else Tactics.soft_failure Tactics.NotHypothesis
+
+let do_assumption_tac args s : ES.t list =
+  let hyp =
+    match Args.convert_as_lsymb args with
+    | Some str -> Some (fst (Hyps.by_name str s))
+    | None -> None 
+  in
+  assumption ?hyp s
+
+let assumption_tac args = wrap_fail (do_assumption_tac args)
 
 (*------------------------------------------------------------------*)
 let byequiv s = Goal.Trace (ES.to_trace_sequent s)

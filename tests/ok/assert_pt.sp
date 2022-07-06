@@ -48,11 +48,9 @@ goal _ (ma : message) : (P => Q => R) => P => Q => R.
 Proof.
   intro H1 H2 H3.
   have M := H1 _.
-  + clear H1 H3. 
-    assumption. 
-  + clear H1 H2. 
-    apply M. 
-    assumption. 
+  + assumption H2. 
+  + apply M. 
+    assumption H3. 
 Qed.
 
 abstract Pi : index -> bool.
@@ -67,8 +65,6 @@ goal _ (ma : message, j : index) :
 Proof.
   intro H1 H2 H3.
   have M := H1 _ _ H2. 
-  + clear H1 H2.
-    assumption.
-  + clear H1 H2 H3.
-    assumption.
+  + assumption H3.
+  + assumption M.
 Qed.

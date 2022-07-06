@@ -238,11 +238,14 @@ let simpl_left_tac s = match simpl_left s with
   | Some s -> [s]
 
 (*------------------------------------------------------------------*)
-(** [assumption s] succeeds (with no subgoal) if the sequent [s]
-    can be proved using the axiom rule (plus some other minor rules). *)
-let assumption (s : TS.t) = 
+(** [any_assumption s] succeeds (with no subgoal) if the sequent [s]
+    can be proved using the axiom rule (plus some other minor rules). 
+    If [hyp = Some id], only checks for hypothesis [id]. *)
+let assumption ?hyp (s : TS.t) = 
   let goal = TS.goal s in
-  let assumption_entails _ = function
+  let assumption_entails id f = 
+    (hyp = None || hyp = Some id) &&
+    match f with
     | Equiv.Global (Equiv.Atom (Reach f))
     | Equiv.Local f ->
         goal = f ||
@@ -257,6 +260,16 @@ let assumption (s : TS.t) =
     dbg "assumption %a" Term.pp goal;
     []
   end else soft_failure Tactics.NotHypothesis
+
+let do_assumption_tac args s : TS.t list =
+  let hyp =
+    match Args.convert_as_lsymb args with
+    | Some str -> Some (fst (Hyps.by_name str s))
+    | None -> None 
+  in
+  assumption ?hyp s
+
+let assumption_tac args = wrap_fail (do_assumption_tac args)
 
 (*------------------------------------------------------------------*)
 (** [localize h h' s sk fk] succeeds with a single subgoal if
