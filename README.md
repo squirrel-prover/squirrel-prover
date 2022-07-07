@@ -108,15 +108,37 @@ Examples of developments in Squirrel can be found in:
 Those include classical and post-quantum sound proofs of protocols.
 See `examples/README.md` for details.
 
-## Quick guide
+## Tutorial
 
 For a first introduction to the syntax, we recommend to open with ProofGeneral
-the `examples/tutorial/tutorial.sp`, that provides a run through of the syntax
+the `examples/basic-tutorial/tutorial.sp`, that provides a run through of the syntax
 with executables snippets. Then, browsing the `examples` folder should provide a
 wide variety of examples, starting e.g. with `basic-hash.sp`.
 
-As a next step, a more advanced tutorial is available in
-`examples/tutorial/tutorial-avanced.sp`.
+### Detailed Tutorial
+
+A more complete tutorial is available in
+```
+examples/tutorial/
+```
+
+This tutorial consists in a series of exercises of increasing
+difficulty, and covers the basic logical constructs and tactics
+manipulating them, several cryptographic assumptions, accessibility
+properties (authentication, injective authentication), equivalence
+properties (unlinkability), stateful protocol, and protocol
+composition.
+
+- [0-logic](examples/tutorial/0-logic.sp)
+- [1-crypto-hash](examples/tutorial/1-crypto-hash.sp)
+- [2-crypto-enc](examples/tutorial/2-crypto-enc.sp)
+- [3-hash-lock-auth](examples/tutorial/3-hash-lock-auth.sp)
+- [4-hash-lock-unlink](examples/tutorial/4-hash-lock-unlink.sp)
+- [5-stateful](examples/tutorial/5-stateful.sp)
+- [6-key-establishment](examples/tutorial/6-key-establishment.sp)
+
+
+## Quick syntax guide
 
 Squirrel developments are conventionally written in `.sp` files. They start
 with a system description, followed by some lemmas corresponding to trace
