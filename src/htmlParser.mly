@@ -4,7 +4,8 @@
 %}
 
 %token <char> CHAR 
-%token <string> DOT
+%token <string> STR 
+%token DOT
 %token <string> COM
 
 %start main
@@ -15,6 +16,8 @@
 main:
 | CHAR main   { let (line, coms) = $2 in
                 ((String.make 1 $1) ^ line, coms) }
+| STR main    { let (line, coms) = $2 in
+                ($1 ^ line, coms) }
 | COM main    { let (line, coms) = $2 in
                 (line, $1 :: coms) }
-| DOT         { ($1, []) }
+| DOT         { (".", []) }
