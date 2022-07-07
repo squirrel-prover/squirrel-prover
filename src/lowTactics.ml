@@ -2181,7 +2181,7 @@ let () =
          to instantiate F variables by matching. \
          Creates one subgoal for each premises of F.\n\
          Usage:\n\
-         \  apply H.
+         \  apply H.\n\
          \  apply lemma.\n\
          \  apply axiom.";
       detailed_help="";
