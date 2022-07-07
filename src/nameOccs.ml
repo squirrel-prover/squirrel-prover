@@ -16,6 +16,87 @@ module MP = Match.Pos
 module Sp = MP.Sp
 module SE = SystemExpr
 
+
+(*------------------------------------------------------------------*)
+(* Functions handling macro expansion in terms, when allowed *)
+
+(* information used to check if a macro can be expanded in a term.
+     - the current sequent, for direct occurrences; 
+     - the action for the iocc that produced the term, for indirect ones;
+     - and in any case the trace context. *)
+type expand_info = 
+  | EI_direct   of TS.sequent * Constr.trace_cntxt
+  | EI_indirect of term * Constr.trace_cntxt
+
+(** gets the sequent for the direct occurrence we're looking at *)
+let get_sequent (info:expand_info) : TS.sequent option =
+  match info with
+  | EI_direct (s,_) -> Some s
+  | _ -> None
+
+(** gets the action for the iocc that produced the term we're looking at *)
+let get_action (info:expand_info) : term option =
+  match info with
+  | EI_indirect (a,_) -> Some a
+  | _ -> None
+
+(** gets the trace context *)
+let get_context (info:expand_info) : Constr.trace_cntxt =
+  match info with
+  | EI_indirect (_, c) -> c
+  | EI_direct (_, c) -> c
+
+
+(** expands t if it is a macro and we can check that its timestamp happens
+    using info (not recursively).
+    Returns Some t' if t expands to t', None if no expansion was performed *)
+let expand_macro_check_once (info:expand_info) (t:term) : term option =
+  match t with
+  | Macro (m, l, ts) ->
+     if match info with
+        | EI_direct (s, _) -> TS.query_happens ~precise:true s ts
+        | EI_indirect (a, _) -> true (* ts = a is unsound *)
+     (* checking the shape may be better?
+         as long as we call on ioccs produced by fold_macro_support,
+         invariant: expansion is always allowed *)
+     (* we need to know that if a macro does not expand here,
+         then it will be handled by another iocc *)
+     then
+       match Macros.get_definition (get_context info) m ts with
+       | `Def t' -> Some t'
+       | `Undef | `MaybeDef -> None
+     else
+       None
+  | _ -> None
+
+(** expands t as much as possible, recursively
+    (only at toplevel, not in subterms) *)
+let rec expand_macro_check_all (info:expand_info) (t:term) : term =
+  match t with
+  | Macro (m, l, ts) ->
+     if match info with
+        | EI_direct (s, _) -> TS.query_happens ~precise:true s ts
+        | EI_indirect (a, _) -> true
+     then
+       match Macros.get_definition (get_context info) m ts with
+       | `Def t' -> expand_macro_check_all info t'
+       | `Undef | `MaybeDef -> t
+     else
+       t
+  | _ -> t
+
+
+(** returns (u, v) such that t = (u = v), or None if not possible.
+    (unfolds the macros when possible) *) 
+let destr_eq_expand
+      (info:expand_info)
+      (t:term) : (term * term) option =
+  let t' = expand_macro_check_all info t in
+  if not (Term.is_eq t') then None
+  else Term.destr_eq t'
+
+
+
 (*------------------------------------------------------------------*)
 (* taken directly from the old fresh.ml *)
 
@@ -38,12 +119,12 @@ let clear_subsumed_timestamps (occs : ts_occs) : ts_occs =
     (* for now, positions are not allowed here. *)
     assert (Sp.is_empty occ1.occ_pos && Sp.is_empty occ2.occ_pos);
 
-    (* FEATURE: alpha-renaming *)
+    (* Future work: alpha-renaming *)
     List.length occ1.occ_vars = 
-    List.length occ2.occ_vars &&
-    List.for_all2 (=) occ1.occ_vars occ2.occ_vars &&
-    occ1.occ_cond = occ2.occ_cond &&
-    (occ1.occ_cnt = occ2.occ_cnt || occ1.occ_cnt = Term.mk_pred occ2.occ_cnt)
+      List.length occ2.occ_vars &&
+        List.for_all2 (=) occ1.occ_vars occ2.occ_vars &&
+          occ1.occ_cond = occ2.occ_cond &&
+            (occ1.occ_cnt = occ2.occ_cnt || occ1.occ_cnt = Term.mk_pred occ2.occ_cnt)
   in
   let occs =
     List.fold_left (fun acc occ ->
@@ -57,45 +138,53 @@ let clear_subsumed_timestamps (occs : ts_occs) : ts_occs =
 
 
 (** Gathers all timestamps at which macros occur in a term. *)
-let get_actions_ext (contx : Constr.trace_cntxt) (t : Term.term) : ts_occs =
-  let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.terms) : ts_occs =
+let get_actions_ext
+      (contx : Constr.trace_cntxt)
+      (t : Term.term)
+      ?(fv:Vars.vars=[])
+      (info:expand_info)
+      ~(env:Vars.env) (* for fold_shallow for renaming *)
+    : ts_occs =
+  let system = contx.system in
+  let se = (SE.reachability_context system).set in
+  let rec get (t : term)
+            ~(fv:Vars.vars) ~(cond:Term.terms) ~(p:MP.pos) ~(se:SE.arbitrary)
+          : ts_occs =
     match t with
-    | Term.Macro (m, l, ts) ->
-      let get_macro_default () =
-        let ts = match Symbols.Macro.get_def m.s_symb contx.table with
-          | Symbols.Input -> Term.mk_pred ts
-          | _             -> ts
-        in
-        let occ = Iter.{
-            occ_cnt  = ts;
-            occ_vars = List.rev fv;
-            occ_cond = cond;
-            occ_pos  = Sp.empty; }
-        in
-        [occ] @ get ~fv ~cond ts
-      in
-
-      begin
-        match Macros.get_definition contx m ts with
-        | `Def t -> get ~fv ~cond t
-        | `Undef | `MaybeDef -> get_macro_default ()
-      end
-
+    | Macro (m, l, ts) ->
+       begin
+         match expand_macro_check_once info t with
+         | Some t' -> get ~fv ~cond ~p ~se t'
+         | None -> 
+            let ts = match Symbols.Macro.get_def m.s_symb contx.table with
+              | Symbols.Input -> Term.mk_pred ts
+              | _             -> ts
+            in
+            let occ = Iter.{
+                  occ_cnt  = ts;
+                  occ_vars = List.rev fv;
+                  occ_cond = cond;
+                  occ_pos  = Sp.empty; } (* we don't handle positions here for now *)
+            in
+            [occ] @ get ~fv ~cond ~p ~se ts
+       end
     | _ ->
-      Iter.tfold_occ ~mode:`NoDelta
-        (fun ~fv ~cond t occs -> get t ~fv ~cond @ occs)
-        ~fv ~cond t []
+       MP.fold_shallow
+         (fun t' se fv cond p occs ->
+           occs @ (get t' ~fv ~cond ~p ~se))
+         ~env ~se ~fv ~p ~cond [] t
   in
-  get t ~fv:[] ~cond:[]
+  get t ~fv ~cond:[] ~p:MP.root ~se
 
 
 (** Return timestamps occuring in macros in a list of terms *)
 let get_macro_actions
-    (contx : Constr.trace_cntxt)
-    (sources : Term.terms) : ts_occs
+      (contx : Constr.trace_cntxt)
+      ~(env: Vars.env)
+      (sources : (term * expand_info) list) : ts_occs
   =
   let actions =
-    List.concat_map (get_actions_ext contx) sources
+    List.concat_map (fun (t, ei) -> get_actions_ext contx t ei ~env) sources
   in
   clear_subsumed_timestamps actions
 
@@ -120,7 +209,7 @@ type name_occs = name_occ list
 
 (** constructs a name occurrence *)
 let mk_nocc (n:nsymb) (info:occ_info) 
-    (fv:Vars.vars) (cond:terms) (pos:Sp.t) : name_occ =
+      (fv:Vars.vars) (cond:terms) (pos:Sp.t) : name_occ =
   Iter.{occ_cnt = (n, info);
         occ_vars = fv;
         occ_cond = cond;
@@ -132,18 +221,18 @@ let pp_internal (ppf:Format.formatter) (occ:name_occ) : unit =
   let (n, oinfo) = occ.occ_cnt in
   match oinfo.oi_action with
   | Some a ->
-    Fmt.pf ppf
-      "%a @,(collision with %a)@ in action %a@ @[<hov 2>in term@ @[%a@]@]"
-      Term.pp_nsymb n 
-      Term.pp_nsymb oinfo.oi_name
-      Term.pp a
-      Term.pp oinfo.oi_subterm
+     Fmt.pf ppf
+       "%a @,(collision with %a)@ in action %a@ @[<hov 2>in term@ @[%a@]@]"
+       Term.pp_nsymb n 
+       Term.pp_nsymb oinfo.oi_name
+       Term.pp a
+       Term.pp oinfo.oi_subterm
   | None ->
-    Fmt.pf ppf
-      "%a @,(collision with %a)@ @[<hov 2>in term@ @[%a@]@]"
-      Term.pp_nsymb n 
-      Term.pp_nsymb oinfo.oi_name
-      Term.pp oinfo.oi_subterm
+     Fmt.pf ppf
+       "%a @,(collision with %a)@ @[<hov 2>in term@ @[%a@]@]"
+       Term.pp_nsymb n 
+       Term.pp_nsymb oinfo.oi_name
+       Term.pp oinfo.oi_subterm
 
 (** prints a description of the occurrence *)
 let pp (ppf:Format.formatter) (occ:name_occ) : unit =
@@ -161,11 +250,11 @@ let pp_sub (ppf:Format.formatter) (occ:name_occ) : unit =
 (** checks if all instances of [o1] are instances of [o2].
     [o1] and [o2] actions must have the same action name *)
 let occ_incl
-    (table : Symbols.table)
-    (system : SE.fset)
-    (o1 : name_occ)
-    (o2 : name_occ)
-  : bool =
+      (table : Symbols.table)
+      (system : SE.fset)
+      (o1 : name_occ)
+      (o2 : name_occ)
+    : bool =
   (* for now, positions not allowed here *)
   assert (Sp.is_empty o1.occ_pos && Sp.is_empty o2.occ_pos);
 
@@ -182,10 +271,10 @@ let occ_incl
     Term.mk_ands ~simpl:false [phi_ac; phi_n; phi_cond]
   in
   let pat2 = Term.{
-      pat_tyvars = [];
-      pat_vars   = Vars.Sv.of_list o2.occ_vars;
-      pat_term   = mk_dummy o2;
-    }
+        pat_tyvars = [];
+        pat_vars   = Vars.Sv.of_list o2.occ_vars;
+        pat_term   = mk_dummy o2;
+             }
   in  
   let context = SE.reachability_context system in
   match Match.T.try_match table context (mk_dummy o1) pat2 with
@@ -199,12 +288,12 @@ let occ_incl
     Removes from occs all occurrences subsumed by occ.
     Returns the new occurrence list, and a list of now subsumed occurrences *)
 let add_occ
-    (table : Symbols.table)
-    (system : SE.fset)
-    (occ : name_occ)
-    (occs : name_occs)
-    (subsumed_occs : name_occs)
-  : name_occs * name_occs
+      (table : Symbols.table)
+      (system : SE.fset)
+      (occ : name_occ)
+      (occs : name_occs)
+      (subsumed_occs : name_occs)
+    : name_occs * name_occs
   =
   if List.exists (fun occ' -> occ_incl table system occ occ') occs
   then (occs, occ::subsumed_occs)
@@ -213,10 +302,10 @@ let add_occ
     let (l,ll) =
       List.fold_left
         (fun (notsubs, newsubs) occ' ->
-           if occ_incl table system occ' occ then
-             (notsubs, occ' :: newsubs)
-           else
-             (occ'::notsubs, newsubs))
+          if occ_incl table system occ' occ then
+            (notsubs, occ' :: newsubs)
+          else
+            (occ'::notsubs, newsubs))
         ([], [])
         occs
     in
@@ -229,14 +318,14 @@ let add_occ
     such that all occurrences in subsumed_occs are subsumed by some occ in occs',
     and none of occs' is. *)
 let partition_subsumed_occs
-    (table : Symbols.table)
-    (system : SE.fset)
-    (occs : name_occs) 
-  : name_occs * name_occs
+      (table : Symbols.table)
+      (system : SE.fset)
+      (occs : name_occs) 
+    : name_occs * name_occs
   =
   List.fold_left
     (fun (occs', subsumed) occ ->
-       add_occ table system occ occs' subsumed)
+      add_occ table system occ occs' subsumed)
     ([], [])
     occs
 
@@ -278,10 +367,10 @@ let find_symb (n:nsymb) (ns:nsymb list) : nsymb list =
     quantify them. The free vars of ts should be in env.
     Everything is renamed nicely wrt env. *)
 let occurrence_formula
-    (ts  : ts_occs)
-    (env : Vars.env)
-    (occ : name_occ)
-  : term
+      (ts  : ts_occs)
+      (env : Vars.env)
+      (occ : name_occ)
+    : term
   =
   (* add to the occurrence's free variables the action
      and condition's free variables that are not already in env *)
@@ -315,9 +404,9 @@ let occurrence_formula
     List.filter_map (fun x -> x)
       (List.map2
          (fun i_n i_na ->
-            if List.mem i_n fv' then
-              Some (ESubst (Term.mk_var i_n, Term.mk_var i_na))
-            else None)
+           if List.mem i_n fv' then
+             Some (ESubst (Term.mk_var i_n, Term.mk_var i_na))
+           else None)
          indices' na.s_indices)
   in
   let sub'' t = subst sigma' (sub' t) in
@@ -334,45 +423,45 @@ let occurrence_formula
 
   match oinfo.oi_action with
   | Some a ->
-    (* indirect occurrence: we also generate the timestamp inequalities *)
-    let a' = sub' a in
-    let a'' = sub'' a in
-    (* no need to substitute ts since the variables we renamed do not 
+     (* indirect occurrence: we also generate the timestamp inequalities *)
+     let a' = sub' a in
+     let a'' = sub'' a in
+     (* no need to substitute ts since the variables we renamed do not 
        occur in ts *)
-    let phis_time =
-      List.map (fun (ti:ts_occ) ->
-          let (_, vars''', sigma'') =
-            refresh_vars_env env' ti.occ_vars
-          in
-          let ti''' = subst sigma'' ti.occ_cnt in
-          mk_exists ~simpl:true
-            vars'''
-            (mk_leq ~simpl:true a'' ti''')
-        ) ts
-    in
-    let phi_time = mk_ors ~simpl:true phis_time in
+     let phis_time =
+       List.map (fun (ti:ts_occ) ->
+           let (_, vars''', sigma'') =
+             refresh_vars_env env' ti.occ_vars
+           in
+           let ti''' = subst sigma'' ti.occ_cnt in
+           mk_exists ~simpl:true
+             vars'''
+             (mk_leq ~simpl:true a'' ti''')
+         ) ts
+     in
+     let phi_time = mk_ors ~simpl:true phis_time in
 
-    (* print the renamed occurrence *)
-    let oinfo' =
-      mk_oinfo na (sub' oinfo.oi_subterm) ~ac:(Some a') in 
-    let occ' =
-      mk_nocc n' oinfo' indices' (List.map sub' occ.occ_cond) occ.occ_pos 
-    in
-    Printer.pr "%a" pp occ';
+     (* print the renamed occurrence *)
+     let oinfo' =
+       mk_oinfo na (sub' oinfo.oi_subterm) ~ac:(Some a') in 
+     let occ' =
+       mk_nocc n' oinfo' indices' (List.map sub' occ.occ_cond) occ.occ_pos 
+     in
+     Printer.pr "%a" pp occ';
 
-    mk_exists ~simpl:true fv' (mk_and ~simpl:true phi_time phi_cond_eq)
+     mk_exists ~simpl:true fv' (mk_and ~simpl:true phi_time phi_cond_eq)
 
   | None -> (* direct occurrence *)
-    let oinfo' =
-      mk_oinfo na (sub' oinfo.oi_subterm) ~ac:None 
-    in 
-    let occ' = 
-      mk_nocc n' oinfo' indices' (List.map sub' occ.occ_cond) occ.occ_pos 
-    in
+     let oinfo' =
+       mk_oinfo na (sub' oinfo.oi_subterm) ~ac:None 
+     in 
+     let occ' = 
+       mk_nocc n' oinfo' indices' (List.map sub' occ.occ_cond) occ.occ_pos 
+     in
 
-    Printer.pr "%a" pp occ';
+     Printer.pr "%a" pp occ';
 
-    mk_exists ~simpl:true fv' phi_cond_eq
+     mk_exists ~simpl:true fv' phi_cond_eq
 
 
 
@@ -380,10 +469,10 @@ let occurrence_formula
     occurrence, stating that it suffices to prove the goal assuming
     the occurrence occ is equal to the name it collides with. *)
 let occurrence_sequent
-    (ts  : ts_occs)
-    (s   : TS.sequent)
-    (occ : name_occ)
-  : TS.sequent
+      (ts  : ts_occs)
+      (s   : TS.sequent)
+      (occ : name_occ)
+    : TS.sequent
   = 
   TS.set_goal
     (mk_impl ~simpl:false
@@ -414,86 +503,8 @@ let print_subsumed_occ (env:Vars.env) (occ:name_occ) : unit =
   let renamed_occ = 
     mk_nocc renamed_n renamed_oinfo renamed_indices occ.occ_cond occ.occ_pos 
   in
-  Printer.pr "%a" pp_sub renamed_occ;
+  Printer.pr "%a" pp_sub renamed_occ
 
-
-  (*------------------------------------------------------------------*)
-  (* Functions handling macro expansion in terms, when allowed *)
-
-  (* information used to check if a macro can be expanded in a term.
-     - the current sequent, for direct occurrences; 
-     - the action for the iocc that produced the term, for indirect ones;
-     - and in any case the trace context. *)
-type expand_info = 
-  | EI_direct   of TS.sequent * Constr.trace_cntxt
-  | EI_indirect of term * Constr.trace_cntxt
-
-(** gets the sequent for the direct occurrence we're looking at *)
-let get_sequent (info:expand_info) : TS.sequent option =
-  match info with
-  | EI_direct (s,_) -> Some s
-  | _ -> None
-
-(** gets the action for the iocc that produced the term we're looking at *)
-let get_action (info:expand_info) : term option =
-  match info with
-  | EI_indirect (a,_) -> Some a
-  | _ -> None
-
-(** gets the trace context *)
-let get_context (info:expand_info) : Constr.trace_cntxt =
-  match info with
-  | EI_indirect (_, c) -> c
-  | EI_direct (_, c) -> c
-
-
-(** expands t if it is a macro and we can check that its timestamp happens
-    using info (not recursively).
-    Returns Some t' if t expands to t', None if no expansion was performed *)
-let expand_macro_check_once (info:expand_info) (t:term) : term option =
-  match t with
-  | Macro (m, l, ts) ->
-    if match info with
-      | EI_direct (s, _) -> TS.query_happens ~precise:true s ts
-      | EI_indirect (a, _) -> true (* ts = a is unsound *)
-      (* checking the shape may be better?
-         as long as we call on ioccs produced by fold_macro_support,
-         invariant: expansion is always allowed *)
-      (* we need to know that if a macro does not expand here,
-         then it will be handled by another iocc *)
-    then
-      match Macros.get_definition (get_context info) m ts with
-      | `Def t' -> Some t'
-      | `Undef | `MaybeDef -> None
-    else
-      None
-  | _ -> None
-
-(** expands t as much as possible, recursively
-    (only at toplevel, not in subterms) *)
-let rec expand_macro_check_all (info:expand_info) (t:term) : term =
-  match t with
-  | Macro (m, l, ts) ->
-    if match info with
-      | EI_direct (s, _) -> TS.query_happens ~precise:true s ts
-      | EI_indirect (a, _) -> true
-    then
-      match Macros.get_definition (get_context info) m ts with
-      | `Def t' -> expand_macro_check_all info t'
-      | `Undef | `MaybeDef -> t
-    else
-      t
-  | _ -> t
-
-
-(** returns (u, v) such that t = (u = v), or None if not possible.
-    (unfolds the macros when possible) *) 
-let destr_eq_expand
-    (info:expand_info)
-    (t:term) : (term * term) option =
-  let t' = expand_macro_check_all info t in
-  if not (Term.is_eq t') then None
-  else Term.destr_eq t'
 
 
 
@@ -511,16 +522,16 @@ let destr_eq_expand
       occurrences must be an actual collision.
       Relies on fold_macro_support to look through all macros in the term. *)
 let occurrence_sequents
-    ?(pp_ns: (unit Fmt.t) option=None)
-    (find_occs : 
-       se:SE.arbitrary ->
-     env:Vars.env ->
-     ?fv:Vars.vars ->
-     expand_info ->
-     term ->
-     name_occs)
-    (s : TS.sequent)
-    (t : Term.term) : TS.sequents 
+      ?(pp_ns: (unit Fmt.t) option=None)
+      (find_occs : 
+         se:SE.arbitrary ->
+         env:Vars.env ->
+         ?fv:Vars.vars ->
+         expand_info ->
+         term ->
+         name_occs)
+      (s : TS.sequent)
+      (t : Term.term) : TS.sequents 
   =
   let table = TS.table s in
   let contx = TS.mk_trace_cntxt s in
@@ -532,7 +543,7 @@ let occurrence_sequents
     | Some x -> Fmt.pf ppf "of %a " x ()
     | None   -> Fmt.pf ppf ""
   in
-  let ts = get_macro_actions contx [t] in
+  let ts = get_macro_actions contx ~env [t, EI_direct (s, contx)] in
 
   (* direct occurrences of names in the wrong places *)
   Printer.pr "@[<v 0>@[<hv 2>Bad occurrences %afound@ directly in %a:@]@;"
@@ -578,8 +589,8 @@ let occurrence_sequents
 
         (* proof obligations for the indirect occurrences *)
         let ss = List.rev_append 
-            (List.map (occurrence_sequent ts s) ind_occs)
-            indirect_sequents
+                   (List.map (occurrence_sequent ts s) ind_occs)
+                   indirect_sequents
         in
 
         (* print subsumed occs *)
@@ -645,38 +656,38 @@ type f_fold_occs =
           for that)
        2) using Match.Pos.fold_shallow, to recurse on subterms at depth 1. *)
 let fold_bad_occs
-    (get_bad_occs: f_fold_occs)
-    ~(se:SE.arbitrary)
-    ~(env:Vars.env) (* for fold_shallow for renaming *)
-    ?(fv:Vars.vars=[])
-    (info:expand_info)
-    (t:term) : name_occs 
+      (get_bad_occs: f_fold_occs)
+      ~(se:SE.arbitrary)
+      ~(env:Vars.env) (* for fold_shallow for renaming *)
+      ?(fv:Vars.vars=[])
+      (info:expand_info)
+      (t:term) : name_occs 
   =
   let rec get
-      ~(fv:Vars.vars) ~(cond:Term.terms) ~(p:MP.pos) ~(se:SE.arbitrary) 
-      ~(st:Term.term) 
-      (t:term) : name_occs 
+            ~(fv:Vars.vars) ~(cond:Term.terms) ~(p:MP.pos) ~(se:SE.arbitrary) 
+            ~(st:Term.term) 
+            (t:term) : name_occs 
     =
     (* the continuation to be passed to get_bad_occs for cases it does 
        not handle *)
     let retry_on_subterms () : name_occs =
       match t with
       | Macro _ -> (* expand if possible *)
-        begin
-          match expand_macro_check_once info t with
-          | Some t' -> get ~fv ~cond ~p ~se ~st t'
-          | None -> []
-          (* if we can't expand, fold_macro_support will create
+         begin
+           match expand_macro_check_once info t with
+           | Some t' -> get ~fv ~cond ~p ~se ~st t'
+           | None -> []
+         (* if we can't expand, fold_macro_support will create
              another iocc for that macro, and it will be checked
              separately *)
-        end
+         end
 
       | _ -> 
-        MP.fold_shallow
-          (fun t' se fv cond p occs ->
+         MP.fold_shallow
+           (fun t' se fv cond p occs ->
              let sst = if is_binder t then t' else st in
              occs @ (get t' ~fv ~cond ~p ~se ~st:sst))
-          ~env ~se ~fv ~p ~cond [] t
+           ~env ~se ~fv ~p ~cond [] t
     in
     get_bad_occs retry_on_subterms get ~info ~fv ~cond ~p ~se ~st t 
   in
@@ -693,9 +704,9 @@ let fold_bad_occs
       under the assumption that at least one of the found occurrences must
       be an actual collision.*)
 let occurrence_goals
-    ?(pp_ns: (unit Fmt.t) option=None)
-    (get_bad_occs: f_fold_occs)
-    (s:TS.sequent)
-    (t:term) : TS.sequents 
+      ?(pp_ns: (unit Fmt.t) option=None)
+      (get_bad_occs: f_fold_occs)
+      (s:TS.sequent)
+      (t:term) : TS.sequents 
   =
   occurrence_sequents (fold_bad_occs get_bad_occs) s t

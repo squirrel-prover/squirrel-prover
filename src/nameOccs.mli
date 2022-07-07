@@ -15,6 +15,41 @@ module MP = Match.Pos
 module Sp = MP.Sp
 module SE = SystemExpr
 
+          
+(*------------------------------------------------------------------*)
+(* Functions handling macro expansion in terms, when allowed *)
+
+(* information used to check if a macro can be expanded in a term.
+  - the current sequent, for direct occurrences; 
+  - the action for the iocc that produced the term, for indirect ones;
+  - and in any case the trace context. *)
+type expand_info = EI_direct of TS.sequent * Constr.trace_cntxt
+                 | EI_indirect of term * Constr.trace_cntxt
+
+(** gets the sequent for the direct occurrence we're looking at *)
+val get_sequent : expand_info -> TS.sequent option
+
+(** gets the action for the iocc that produced the term we're looking at *)
+val get_action : expand_info -> term option
+  
+(** gets the trace context *)
+val get_context : expand_info -> Constr.trace_cntxt
+
+(** expands t if it is a macro and we can check that its timestamp happens
+    using info (not recursively).
+    Returns Some t' if t expands to t', None if no expansion was performed *)
+val expand_macro_check_once : expand_info -> term -> term option
+
+(** expands t as much as possible, recursively
+    (only at toplevel, not in subterms) *)
+val expand_macro_check_all : expand_info -> term -> term
+
+(** returns (u, v) such that t = (u = v), or None if not possible.
+    (unfolds the macros when possible) *) 
+val destr_eq_expand : expand_info -> term -> (term * term) option
+
+
+  
 (*------------------------------------------------------------------*)
 (** Exception raised when a forbidden occurrence of a message variable
     is found. *)
@@ -28,7 +63,7 @@ type ts_occs = ts_occ list
 
 
 (** Return timestamps occuring in macros in a list of terms *)
-val get_macro_actions : Constr.trace_cntxt -> Term.terms -> ts_occs
+val get_macro_actions : Constr.trace_cntxt -> env:Vars.env -> (Term.term * expand_info) list -> ts_occs
 
 
 (*------------------------------------------------------------------*)
@@ -100,38 +135,6 @@ val occurrence_formula : ts_occs -> Vars.env -> name_occ -> term
    the occurrence occ is equal to the name it collides with. *)
 val occurrence_sequent : ts_occs -> TS.sequent -> name_occ -> TS.sequent
 
-
-(*------------------------------------------------------------------*)
-(* Functions handling macro expansion in terms, when allowed *)
-
-(* information used to check if a macro can be expanded in a term.
-  - the current sequent, for direct occurrences; 
-  - the action for the iocc that produced the term, for indirect ones;
-  - and in any case the trace context. *)
-type expand_info = EI_direct of TS.sequent * Constr.trace_cntxt
-                 | EI_indirect of term * Constr.trace_cntxt
-
-(** gets the sequent for the direct occurrence we're looking at *)
-val get_sequent : expand_info -> TS.sequent option
-
-(** gets the action for the iocc that produced the term we're looking at *)
-val get_action : expand_info -> term option
-  
-(** gets the trace context *)
-val get_context : expand_info -> Constr.trace_cntxt
-
-(** expands t if it is a macro and we can check that its timestamp happens
-    using info (not recursively).
-    Returns Some t' if t expands to t', None if no expansion was performed *)
-val expand_macro_check_once : expand_info -> term -> term option
-
-(** expands t as much as possible, recursively
-    (only at toplevel, not in subterms) *)
-val expand_macro_check_all : expand_info -> term -> term
-
-(** returns (u, v) such that t = (u = v), or None if not possible.
-    (unfolds the macros when possible) *) 
-val destr_eq_expand : expand_info -> term -> (term * term) option
 
   
 (*------------------------------------------------------------------*)
