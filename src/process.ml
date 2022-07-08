@@ -1,3 +1,5 @@
+open Utils
+
 module L = Location
 
 let dum : L.t = L._dummy
@@ -411,12 +413,14 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
   let create_subst (venv : Vars.env) isubst msubst =
     List.map (fun (x,_,tm) -> 
-        let v = Vars.find venv x in
+        let v = as_seq1 (Vars.find venv x) in
+        (* cannot have two variables with the same name since previous 
+           definitions must have been shadowed *)
         Term.ESubst (Term.mk_var v, Term.mk_var tm)
       ) isubst
     @
     List.map (fun (x,_,tm) -> 
-        let v = Vars.find venv x in
+        let v = as_seq1 (Vars.find venv x) in (* idem *)
         Term.ESubst (Term.mk_var v, tm)
       ) msubst
   in

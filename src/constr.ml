@@ -1300,28 +1300,32 @@ let rec query_form model (form : Form.form) = match form with
   | Form.Disj forms -> List.exists  (query_form model) forms
   | Form.Conj forms -> List.for_all (query_form model) forms
 
-let query_one (model : model) (at : Term.literal) =
-  let cnf = Form.mk at in
-  List.for_all (query_form model) cnf
+let query_one (model : model) (at : Term.literal) : bool =
+  try
+    let cnf = Form.mk at in
+    List.for_all (query_form model) cnf
+  with Unsupported -> false
 
 let query ~precise (models : models) (ats : Term.literals) =
-  assert (List.for_all (fun lit ->
-      let ty = Term.ty_lit lit in
-      ty = Type.Index || ty = Type.Timestamp
-    ) ats);
+  try
+    assert (List.for_all (fun lit ->
+        let ty = Term.ty_lit lit in
+        ty = Type.Index || ty = Type.Timestamp
+      ) ats);
 
-  (* if the conjunction of trace literals is  *)
-  if List.for_all (fun model -> List.for_all (query_one model) ats) models
-  then true
-  else if not precise then false
-  else
-    let forms = List.map (fun at -> Form.mk (Term.neg_lit at)) ats
-                |> List.flatten in
-    let insts = List.map (fun model ->
-        add_forms model.inst forms
-      ) models in
-    List.for_all (fun inst -> split_models inst = []) insts
-
+    (* if the conjunction of trace literals is  *)
+    if List.for_all (fun model -> List.for_all (query_one model) ats) models
+    then true
+    else if not precise then false
+    else
+      let forms = List.map (fun at -> Form.mk (Term.neg_lit at)) ats
+                  |> List.flatten in
+      let insts = List.map (fun model ->
+          add_forms model.inst forms
+        ) models in
+      List.for_all (fun inst -> split_models inst = []) insts
+  with Unsupported -> false
+    
 (* adds debugging information *)
 let query ~precise models ats =
   dbg "%squery: %a"

@@ -266,17 +266,20 @@ let assumption ?hyp s =
       let goal = ES.goal_as_equiv s in
       (function
         | Equiv.Equiv equiv  ->
-          List.for_all (fun elem -> List.mem elem equiv) goal
+          List.for_all (fun elem ->
+              List.exists (ES.Reduce.conv_term s elem)
+                equiv
+            ) goal
         | Equiv.Reach _ -> false)
 
-    else (fun at -> Equiv.Atom at = goal)
+    else (fun at -> ES.Reduce.conv_equiv s (Equiv.Atom at) goal)
   in
 
   let in_hyp id f = 
     (hyp = None || hyp = Some id) &&
     match f with
     | Equiv.Atom at -> in_atom at
-    | _ as f -> f = goal
+    | _ as f -> ES.Reduce.conv_equiv s f goal
   in
 
   if Hyps.exists in_hyp s
@@ -1189,6 +1192,36 @@ let tac_autosimpl s =
 (*------------------------------------------------------------------*)
 (** PRF axiom *)
 
+(** From two conjunction formulas p and q, produce a minimal diff(p, q),
+    of the form (p inter q) && diff (p minus q, q minus p). *)
+
+let combine_conj_formulas (s : ES.t) p q =
+  (* Turn the conjunctions into lists. *)
+  let p, q = Term.decompose_ands p, Term.decompose_ands q in
+  let aux_q = ref q in
+  let (common, new_p) =
+    List.fold_left (fun (common, r_p) p ->
+        (* If an element of p is inside aux_q, remove it from aux_q and
+         * add it to common, else add it to r_p. *)
+        if List.exists (ES.Reduce.conv_term s p) !aux_q then
+          (aux_q :=
+             List.filter (fun e -> not (ES.Reduce.conv_term s e p)) !aux_q;
+           (p::common, r_p))
+        else
+          (common, p::r_p))
+      ([], []) p
+  in
+  (* [common] is the intersection of p and q,
+   * [aux_q] is the remainder of q and
+   * [new_p] the remainder of p. *)
+  Term.mk_and
+    (Term.mk_ands common)
+    (Term.head_normal_biterm
+       (Term.mk_diff [Term.left_proj,  Term.mk_ands new_p;
+                      Term.right_proj, Term.mk_ands (List.rev !aux_q)]))
+
+
+(*------------------------------------------------------------------*)
 (** Application of PRF tactic on biframe element number i,
   * optionally specifying which subterm m1 should be considered. *)
 let prf arg (s : ES.t) : ES.t list =
@@ -1252,8 +1285,8 @@ let prf arg (s : ES.t) : ES.t list =
       (* the hash occurs on both side *)
     | Some (direct_l, indirect_l), Some (direct_r, indirect_r) ->
       Term.mk_and ~simpl:false
-        (Prf.combine_conj_formulas   direct_l   direct_r)
-        (Prf.combine_conj_formulas indirect_l indirect_r)
+        (combine_conj_formulas s  direct_l   direct_r)
+        (combine_conj_formulas s indirect_l indirect_r)
   in
 
   (* Check that there are no type variables. *)

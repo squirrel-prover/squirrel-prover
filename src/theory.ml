@@ -754,7 +754,9 @@ let convert_var
   : Term.term
   =
   try
-    let v = Vars.find state.env.vars (L.unloc st) in
+    let v = as_seq1 (Vars.find state.env.vars (L.unloc st)) in
+    (* cannot have two variables with the same name since previous 
+       definitions must have been shadowed *)
 
     let of_t = var_of_lsymb st in
 

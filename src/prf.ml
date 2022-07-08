@@ -278,27 +278,3 @@ let prf_condition_side
   with
   | HashNoOcc -> None
 
-(*------------------------------------------------------------------*)
-(** From two conjunction formulas p and q, produce a minimal diff(p, q),
-    of the form (p inter q) && diff (p minus q, q minus p). *)
-let combine_conj_formulas p q =
-  (* Turn the conjunctions into lists. *)
-  let p, q = Term.decompose_ands p, Term.decompose_ands q in
-  let aux_q = ref q in
-  let (common, new_p) = List.fold_left (fun (common, r_p) p ->
-      (* If an element of p is inside aux_q, remove it from aux_q and
-       * add it to common, else add it to r_p. *)
-      if List.mem p !aux_q then
-        (aux_q := List.filter (fun e -> e <> p) !aux_q; (p::common, r_p))
-      else
-        (common, p::r_p))
-      ([], []) p
-  in
-  (* [common] is the intersection of p and q,
-   * [aux_q] is the remainder of q and
-   * [new_p] the remainder of p. *)
-  Term.mk_and
-    (Term.mk_ands common)
-    (Term.head_normal_biterm
-       (Term.mk_diff [Term.left_proj,  Term.mk_ands new_p;
-                      Term.right_proj, Term.mk_ands (List.rev !aux_q)]))

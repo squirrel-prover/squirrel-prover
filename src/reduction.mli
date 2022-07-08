@@ -16,6 +16,9 @@ val parse_simpl_args : red_param -> Args.named_args -> red_param
 module type S = sig
   type t                        (* type of sequent *)
 
+  (*------------------------------------------------------------------*)
+  (** {2 reduction } *)
+    
   val reduce_term  :
     ?expand_context:Macros.expand_context -> 
     ?se:SE.t -> 
@@ -31,6 +34,9 @@ module type S = sig
     ?system:SE.context -> 
     red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
+  (*------------------------------------------------------------------*)
+  (** {2 expantion and destruction modulo } *)
+    
   val expand_head_once :
     ?expand_context:Macros.expand_context ->
     ?se:SE.t -> 
@@ -38,6 +44,31 @@ module type S = sig
 
   val destr_eq : 
     t -> 'a Equiv.f_kind -> 'a -> (Term.term * Term.term) option
+
+  (*------------------------------------------------------------------*)
+  (** {2 conversion } *)
+      
+  val conv_term  :
+    ?expand_context:Macros.expand_context -> 
+    ?se:SE.t -> 
+    ?param:red_param ->
+    t ->
+    Term.term -> Term.term -> bool
+
+  val conv_equiv : 
+    ?expand_context:Macros.expand_context ->
+    ?system:SE.context -> 
+    ?param:red_param ->
+    t ->
+    Equiv.form -> Equiv.form -> bool
+
+  val conv : 
+    ?expand_context:Macros.expand_context ->
+    ?system:SE.context -> 
+    ?param:red_param ->
+    t -> 'a Equiv.f_kind ->
+    'a -> 'a -> bool
+
 end
 
 (*------------------------------------------------------------------*)

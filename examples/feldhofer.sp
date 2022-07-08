@@ -105,7 +105,7 @@ Proof.
 
     (* First projection. *)
     - intctxt H => // _ _ _ /=.
-      by exists i, j0.
+      by exists i, j.
 
     (* Second projection. *)
     - intctxt H => // _ _ _ /=.
@@ -148,7 +148,7 @@ Proof.
     project.
 
     - intctxt H1 => // _ _ _.
-      use H0 with i,j0 as C1.
+      use H0 with i,j as C1.
       clear H0.
       by expand output, cipher; case C1.
 

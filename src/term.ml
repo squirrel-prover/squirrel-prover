@@ -663,9 +663,15 @@ let rec is_and_happens = function
 
 (*------------------------------------------------------------------*)
 (** Additional printing information *)
-type pp_info = { styler : pp_info -> term -> Printer.keyword option * pp_info; }
+type pp_info = {
+  styler : pp_info -> term -> Printer.keyword option * pp_info;
+  var_names : string Mv.t;
+}
 
-let default_pp_info = { styler = fun info _ -> None, info; }
+let default_pp_info = {
+  styler = (fun info _ -> None, info);
+  var_names = Mv.empty;
+}
 
 
 let styled_opt (err : Printer.keyword option) printer =
@@ -1706,35 +1712,80 @@ let diff a b =
   if a = b then a else
     Diff (Explicit [left_proj,a; right_proj,b])
 
-let rec make_normal_biterm (dorec : bool) (t : term) : term = 
-  let mdiff (t : term) (t' : term) : term = 
-    if dorec then make_normal_biterm dorec (diff t t')
-    else diff t t'
+let rec make_normal_biterm (dorec : bool) (s : subst) (t : term) : term = 
+  let mdiff (s : subst) (t : term) (t' : term) : term = 
+    if dorec then make_normal_biterm dorec s (diff t t')
+    else diff t (subst s t')
   in
-  (* TODO generalize to non-binary diff *)
-  match head_pi_term left_proj t, head_pi_term right_proj t with
-  | Fun (f,fty,l), Fun (f',fty',l') when f = f' ->
-    Fun (f, fty, List.map2 mdiff l l')
 
-  | Name n, Name n' when n=n' -> Name n
+  let exception AlphaFailed in
 
-  | Macro (m,l,ts), Macro (m',l',ts') when m = m' && ts = ts' ->
-      Macro (m, List.map2 mdiff l l', ts)
+  let alpha_var (s : subst) (v1 : Vars.var) (v2 : Vars.var) : unit =
+    if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then raise AlphaFailed;
+    if not (Vars.equal (subst_var s v2) v1) then raise AlphaFailed;
+  in
+  let alpha_vars (s : subst) (vs1 : Vars.vars) (vs2 : Vars.vars) : unit =
+    List.iter2 (alpha_var s) vs1 vs2
+  in
+  
+  let alpha_bnd (s : subst) (v1 : Vars.var) (v2 : Vars.var) : subst =
+    if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then
+      raise AlphaFailed 
+    else
+      ESubst (mk_var v2, mk_var v1) :: s
+  in
+  let alpha_bnds (s : subst) (vs1 : Vars.vars) (vs2 : Vars.vars) : subst =
+    List.fold_left2 alpha_bnd s vs1 vs2
+  in
 
-  | Action (a,is), Action (a',is') when a = a' && is = is' -> Action (a,is)
+  let t1 = head_pi_term left_proj t
+  and t2 = head_pi_term right_proj t in
 
-  | Var x, Var x' when x=x' -> Var x
+  let doit () =
+    (* TODO generalize to non-binary diff *)
+    match t1, t2 with
+    | Fun ((f,is), fty, l), Fun ((f',is'), fty', l') when f = f' ->
+      alpha_vars s is is';
+      Fun ((f,is), fty, List.map2 (mdiff s) l l')
 
-  | Find (is,c,t,e), Find (is',c',t',e') when is = is' ->
-      Find (is, mdiff c c', mdiff t t', mdiff e e')
+    | Name n, Name n' when n.s_symb = n'.s_symb ->
+      alpha_vars s n.s_indices n'.s_indices;
+      Name n
 
-  | ForAll (vs,f), ForAll (vs',f') when vs = vs' -> ForAll (vs, mdiff f f')
-  | Exists (vs,f), Exists (vs',f') when vs = vs' -> Exists (vs, mdiff f f')
+    | Macro (m,l,ts), Macro (m',l',ts') when m.s_symb = m'.s_symb ->
+      assert (l = [] && l' = []);
+      alpha_vars s m.s_indices m'.s_indices;
+      Macro (m, List.map2 (mdiff s) l l', mdiff s ts ts')
 
-  | t1,t2 -> diff t1 t2
+    | Action (a,is), Action (a',is') when a = a' ->
+      alpha_vars s is is';
+      Action (a,is)
 
-let simple_bi_term     : term -> term = make_normal_biterm true
-let head_normal_biterm : term -> term = make_normal_biterm false 
+    | Var x, Var x' ->
+      alpha_var s x x';
+      Var x
+
+    | Find (is,c,t,e), Find (is',c',t',e')
+      when List.length is = List.length is' ->
+      let s' = alpha_bnds s is is' in
+      Find (is, mdiff s' c c', mdiff s' t t', mdiff s e e')
+
+    | ForAll (vs,f), ForAll (vs',f')
+      when List.length vs = List.length vs' ->
+      let s = alpha_bnds s vs vs' in
+      ForAll (vs, mdiff s f f')
+
+    | Exists (vs,f), Exists (vs',f')
+      when List.length vs = List.length vs' ->
+      let s = alpha_bnds s vs vs' in
+      Exists (vs, mdiff s f f')
+
+    | t1,t2 -> diff t1 (subst s t2)
+  in
+  try doit () with AlphaFailed -> diff t1 (subst s t2)
+
+let simple_bi_term     : term -> term = make_normal_biterm true  []
+let head_normal_biterm : term -> term = make_normal_biterm false []
 
 (*------------------------------------------------------------------*)
 let combine = function
@@ -1790,7 +1841,7 @@ let match_infos_to_pp_info (minfos : match_infos) : pp_info =
     | Some MR_check_st _ -> None, info
     | Some MR_failed     -> Some `Error,    info
   in
-  { styler }
+  { styler; var_names = Mv.empty; }
 
 
 (*------------------------------------------------------------------*)

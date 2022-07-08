@@ -248,10 +248,11 @@ let assumption ?hyp (s : TS.t) =
     match f with
     | Equiv.Global (Equiv.Atom (Reach f))
     | Equiv.Local f ->
-        goal = f ||
-        List.exists
-          (fun f -> goal = f || f = Term.mk_false)
-          (decompose_ands f)
+      TS.Reduce.conv_term s goal f ||
+      List.exists (fun f ->
+          TS.Reduce.conv_term s goal f ||
+          TS.Reduce.conv_term s f Term.mk_false
+        ) (decompose_ands f)
     | Equiv.Global _ -> false
   in
   if goal = Term.mk_true ||

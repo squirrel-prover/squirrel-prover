@@ -15,7 +15,7 @@ type vars = var list
 (** {2 Pretty-Printing} *)
   
 (** Print a variable, only showing its name. *)
-val pp   : Format.formatter -> var -> unit
+val pp : Format.formatter -> var -> unit
 
 (** Print a list of variables, only showing their names. *)
 val pp_list : Format.formatter -> var list -> unit
@@ -81,7 +81,7 @@ val mem   : env -> var -> bool
 val mem_s : env -> string -> bool
 
 (** Note: pattern variables are not uniquely characterized by a string *)
-val find : env -> string -> var 
+val find : env -> string -> var list
 
 val add_var  : var  -> env -> env
 val add_vars : vars -> env -> env
@@ -103,10 +103,6 @@ val rm_vars : vars -> env ->  env
   * the user. *)
 val make_new_from : var -> var
 val make_new : Type.ty -> string -> var
-
-(** [is_new v] returns [true] iff variable [v] has been created
-  * using [make_new_from]. *)
-val is_new : var -> bool
 
 (** Check if a variable is a pattern hole. *)
 val is_pat : var -> bool
