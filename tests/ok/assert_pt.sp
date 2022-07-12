@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 (* Check `assert (ip := pt)` tactic *)
 
@@ -10,7 +10,7 @@ axiom axiom1 (ma : message): exists (m:message), k = m && m = ma.
 
 goal _ (ma : message) : ma = k.
 Proof.
- assert (H := axiom1 ma). 
+ have H := axiom1 ma. 
  destruct H as [m [H1 H2]].
  rewrite -H2 -H1.
  clear H1 H2.
@@ -20,7 +20,7 @@ Qed.
 (* with an intro pattern *)
 goal _ (ma : message) : ma = k.
 Proof.
- assert ([m [H1 H2]] := axiom1 ma). 
+ have [m [H1 H2]] := axiom1 ma. 
  rewrite -H2 -H1.
  clear H1 H2.
  congruence.
@@ -33,7 +33,38 @@ axiom axiom2 (ma : message): ma = k => k = ma.
 goal _ (ma : message) : ma = k => k = ma.
 Proof.
  intro Hyp.
- assert (H := axiom2 ma). 
+ have H := axiom2 ma. 
  apply H.
  assumption.
+Qed.
+
+(*------------------------------------------------------------------*)
+
+abstract P : bool.
+abstract Q : bool.
+abstract R : bool.
+
+goal _ (ma : message) : (P => Q => R) => P => Q => R.
+Proof.
+  intro H1 H2 H3.
+  have M := H1 _.
+  + assumption H2. 
+  + apply M. 
+    assumption H3. 
+Qed.
+
+abstract Pi : index -> bool.
+abstract Qi : index -> index -> bool.
+abstract Ri : index -> index -> bool.
+
+goal _ (ma : message, j : index) : 
+  (forall (i : index), Pi(i) => Qi(i,i) => Ri(i,i)) => 
+  Qi(j,j) =>
+  Pi(j) =>
+  Ri(j,j).
+Proof.
+  intro H1 H2 H3.
+  have M := H1 _ _ H2. 
+  + assumption H3.
+  + assumption M.
 Qed.

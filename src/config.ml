@@ -87,7 +87,7 @@ let s_show_strengthened_hyp = "showStrengthenedHyp"
 let v_show_strengthened_hyp = Param_bool false
 
 let s_auto_intro = "autoIntro"
-let v_auto_intro = Param_bool true
+let v_auto_intro = Param_bool false
 
 let s_auto_fadup = "autoFADup"
 let v_auto_fadup = Param_bool true

@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 abstract a : message
 abstract b : message
@@ -71,7 +71,7 @@ Qed.
 type T.
 abstract ( -- ) : T -> T -> boolean.
 
-axiom trans (x,y,z : T) : x -- y => y -- z => x -- z.
+axiom mtrans (x,y,z : T) : x -- y => y -- z => x -- z.
 
 axiom mrefl (x : T) : x -- x.
 axiom sym (x,y : T) : x -- y => y -- x.
@@ -79,9 +79,9 @@ axiom sym (x,y : T) : x -- y => y -- x.
 goal _ (x,y,z,w : T) : x -- y => y -- z => z -- w => x -- w.
 Proof.
   intro _ _ _.
-  apply trans _ y _.
+  apply mtrans _ y _.
   assumption.
-  apply trans _ z _.
+  apply mtrans _ z _.
   assumption.
   assumption.
 Qed.

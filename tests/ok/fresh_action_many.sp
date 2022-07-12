@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 (* Test that the fresh tactic creates the correct formula when
  * several instances of the name are found in an action. *)

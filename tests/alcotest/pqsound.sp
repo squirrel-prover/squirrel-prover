@@ -1,6 +1,6 @@
 set postQuantumSound=true.
 
-ddh g, (^) where group:message exposants:message.
+ddh g, (^) where group:message exponents:message.
 
 name a : message
 

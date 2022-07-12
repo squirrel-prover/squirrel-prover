@@ -1,4 +1,4 @@
-(* set autoIntro=false. *)
+(*  *)
 
 (* A realistic and relatively full-featured model definition *)
 

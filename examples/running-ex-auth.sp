@@ -18,7 +18,6 @@ process reader(j:index) =
 
 system (!_j R: reader(j) | !_i !_j T: tag(i,j)).
 
-set autoIntro = false.
 
 goal auth (i:index, j:index):
   happens(R(j,i)) =>

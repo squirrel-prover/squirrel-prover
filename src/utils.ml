@@ -57,12 +57,15 @@ module List = struct
 
   let rec split3 = function
     | [] -> ([], [], [])
-    | (x,y,z)::l ->
+    | (x,y,z)::l -> 
       let (rx, ry, rz) = split3 l in (x::rx, y::ry, z::rz)
 
   let inclusion a b =
-    List.for_all (fun x -> List.mem x b)  a
+    List.for_all (fun x -> List.mem x b) a
 
+  let diff a b =
+    List.filter (fun x -> not (List.mem x b)) a
+                            
   let rec assoc_up s f = function
     | [] -> raise Not_found
     | (a,b) :: t ->
@@ -103,6 +106,9 @@ module List = struct
   let drop i l =
     if i < 0 then failwith "invalid argument";
     drop0 i l
+
+  let drop_right i l =
+    rev (drop i (rev l))
 
   (*------------------------------------------------------------------*)
   let rec take0 i l =
@@ -180,6 +186,16 @@ module List = struct
       List.fold_left (fun (acc, i) x -> f i acc x, i + 1) (acc,0) l 
     in
     acc
+
+  let find_mapi (type b) (f : int -> 'a -> b option) (l : 'a list) : b option =
+    let exception Found of b option in
+    try ignore (mapi (fun i e ->  
+        match f i e with
+        | None -> () 
+        | Some _ as res -> raise (Found res)
+      ) l);
+      None
+    with Found res -> res
 end
 
 (*------------------------------------------------------------------*)
@@ -298,6 +314,12 @@ let omap_dflt dflt f a = match a with
 let oiter f a = match a with
   | None -> ()
   | Some x -> f x
+
+let oequal eq a b =
+  match a, b with
+  | None, None -> true
+  | Some a, Some b -> eq a b
+  | _ -> false
 
 (*------------------------------------------------------------------*)
 module type Ordered = sig
@@ -561,14 +583,7 @@ let pp_list pp_item ppf l =
 let fst3 (a, b, c) = a
 
 (*------------------------------------------------------------------*)
-type 'a timeout_r = 
-  | Result of 'a 
-  | Timeout
-  
-(** [timeout t f x] executes [f x] for at most [t] seconds.
-    Returns [Result (f x)] if the computation terminated in the imparted
-    time, and [Timeout] otherwise. *)
-let timeout timeout f x =
+ let timeout exn timeout f x = 
   assert (timeout > 0);
 
   let exception Timeout in
@@ -590,10 +605,14 @@ let timeout timeout f x =
 
     let res = f x in
     finish ();
-    Result res
+    res
   with
-  | Timeout -> finish (); Timeout
-  | exn     -> finish (); raise exn
+  | Timeout -> finish (); raise exn
+  | e     -> finish (); raise e
+
+(* -------------------------------------------------------------------- *)
+let fst_map f (x,_) = f x
+let snd_map f (_,y) = f y
 
 (* -------------------------------------------------------------------- *)
 let as_seq0 = function [] -> ()                     | _ -> assert false
@@ -604,3 +623,47 @@ let as_seq3 = function [x1; x2; x3] -> (x1, x2, x3) | _ -> assert false
 let as_seq4 = function [x1; x2; x3; x4] -> (x1, x2, x3, x4)
   | _ -> assert false
 
+(* -------------------------------------------------------------------- *)
+let (-|) f g = fun x -> f (g x)
+
+let (^~) f = fun x y -> f y x
+
+(* -------------------------------------------------------------------- *)
+type assoc  = [`Left | `Right | `NonAssoc]
+type fixity = [`Prefix | `Postfix | `Infix of assoc | `NonAssoc | `NoParens]
+
+(* -------------------------------------------------------------------- *)
+let pp_maybe_paren (c : bool) (pp : 'a Fmt.t) : 'a Fmt.t =
+  if c then Fmt.parens pp else pp
+
+(** Parenthesis rules.
+    N.B.: the rule for infix left-associative symbols is only valid if,
+    in the parser, all prefix symbols are reduction-favored over 
+    shifting the infix symbol. *)
+let maybe_paren
+    ~(inner : 'a * fixity)
+    ~(outer : 'a * fixity)
+    ~(side  : assoc)
+    (pp : 'b Fmt.t) : 'b Fmt.t
+  =
+  let noparens (pi, fi) (po, fo) side =
+    match fo with
+    | `NoParens -> true
+    | _ ->
+      (pi > po) ||
+      match fi, side with
+      | `Postfix     , `Left     -> true
+      | `Prefix      , `Right    -> true
+      | `Infix `Left , `Left     -> (pi = po) && (fo = `Infix `Left )
+      | `Infix `Right, `Right    -> (pi = po) && (fo = `Infix `Right)
+      | _            , `NonAssoc -> (pi = po) && (fi = fo)
+      | _            , _         -> false
+  in
+  pp_maybe_paren (not (noparens inner outer side)) pp
+
+(*------------------------------------------------------------------*)
+module Lazy = struct
+  include Lazy
+      
+  let map f x = lazy (f (Lazy.force x))
+end

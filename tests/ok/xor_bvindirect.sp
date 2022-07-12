@@ -1,4 +1,6 @@
-set autoIntro=false.
+
+
+include Basic.
 
 (* Checking the treatment of bound variables in indirect cases for xor. *)
 
@@ -27,7 +29,7 @@ Proof.
   xor 1.
   rewrite H.
   (* Check that the right formula has been produced using H. *)
-  nosimpl(yesif 1).
+  rewrite if_true in 1.
 
   by namelength n(i),m(i); use len_ok with i.
   fresh 1.
@@ -44,7 +46,7 @@ Proof.
   xor 1, n(i).
   rewrite H.
   (* Check that the right formula has been produced using H. *)
-  nosimpl(yesif 1).
+  rewrite if_true in 1.
 
   by namelength n(i),m(i); use len_ok with i.
   fresh 1.

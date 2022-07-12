@@ -1,5 +1,3 @@
-set autoIntro=false.
-
 op triple (x, y, z : message) : message = <x, <y, z>>.
 
 (* implicit return type *)
@@ -14,10 +12,30 @@ op foo ['a] (x : 'a) = gtriple (x,x,x).
 
 system null.
 
-axiom gpair_ax (x,y : message) : gpair (x,y) = <x,y>.
+axiom [any] gpair_ax (x,y : message) : gpair (x,y) = <x,y>.
 
+(*------------------------------------------------------------------*)
 goal _ (a,b,c : message) : gtriple(a,b,c) = triple(a,b,c).
 Proof.
   rewrite /gtriple /triple !gpair_ax. 
   auto.
 Qed.
+
+(* same goal with [any] *)
+goal [any] _ (a,b,c : message) : gtriple(a,b,c) = triple(a,b,c).
+Proof.
+  rewrite /gtriple /triple !gpair_ax. 
+  auto.
+Qed.
+
+(*------------------------------------------------------------------*)
+(* check unfolding of infix operators *)
+
+op (~<) (x : message, y : message) : message = zero.
+
+goal _ (x, y : message) : x ~< y = zero.
+Proof. by rewrite /(~<). Qed.
+
+(* same goal with [any] *)
+goal [any] _ (x, y : message) : x ~< y = zero.
+Proof. by rewrite /(~<). Qed.

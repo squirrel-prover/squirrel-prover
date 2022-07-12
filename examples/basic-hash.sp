@@ -31,6 +31,10 @@ Verification of Privacy for RFID Systems. pages 75–88, July 2010.
     also sound for quantum attackers. *)
 set postQuantumSound=true.
 
+(** Include basic standard library, important helper lemmas and
+    setting proof mode to autoIntro=false. *)
+include Basic.
+
 (** We start by declaring the function symbol `h` for the hash function,
     as well as two public constants `ok` and `ko` (used by the reader). *)
 
@@ -80,8 +84,8 @@ process reader(j:index) =
   else
     out(cR,ko).
 
-(** The system is finally defined by putting an unbounded number of tag's and
-    reader's processes in parallel.
+(** The system is finally defined by putting an unbounded number of tag and
+    reader processes in parallel.
     This system is automatically translated to a set of actions:
 
     * the initial action (`init`);
@@ -89,11 +93,7 @@ process reader(j:index) =
     * two actions for the reader, corresponding to the two branches of the
       conditional (respectively `R` and `R1`). *)
 
-system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
-
-(** Include basic standard library, important helper lemmas and
-    setting proof mode to autoIntro=false. *)
-include Basic.
+system [BasicHash] ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
 (** Whenever a reader accepts a message (_i.e._ the condition of the action
     `R(j)` evaluates to `true`), there exists an action `T(i,k)` that has been
@@ -107,12 +107,12 @@ include Basic.
     Note that we express our correspondence property on each projection of the
     pair. Indeed, for some implementations of the pairing primitive, the
     equality of projections does not imply the equality of pairs. *)
-goal wa_R :
+goal [BasicHash] wa_R :
   forall (tau:timestamp),
     happens(tau) =>
     ((exists (i,k:index),
        snd(input@tau) = h(fst(input@tau),diff(key(i),key'(i,k))))
-     =
+     <=>
      (exists (i,k:index), T(i,k) < tau &&
        fst(output@T(i,k)) = fst(input@tau) &&
        snd(output@T(i,k)) = snd(input@tau))).
@@ -121,16 +121,13 @@ goal wa_R :
     is not known by the attacker.
     Therefore, any message accepted by the reader must come from a tag that has
     played before.
-    The converse implication is trivial because any honest tag's output is
+    The converse implication is trivial because any honest tag output is
     accepted by the reader. *)
 Proof.
-  (** We start by introducing the variable `j` and the hypothesis
-      `happens(R(j))`, before unfolding the definiton of the `cond` macro,
-      which corresponds to an existential quantification.*)
   intro tau Hap.
   (** We have to prove two implications (`<=>`): we thus split the proof
       in two parts. We now have two different goals to prove.*)
-  rewrite eq_iff; split => [i k Meq].
+  split => [i k Meq].
   (** For the first implication (=>), we actually prove it separately for the
       real system (left) and the ideal system (right).*)
   + project.
@@ -156,7 +153,7 @@ Qed.
     projection of `frame@t` (_i.e._ the real system) is indistinguishable from
     the right projection of `frame@t` (_i.e._ the ideal system). *)
 
-equiv unlinkability.
+equiv [BasicHash] unlinkability.
 (** The high-level idea of the proof is as follows:
 
     * if `t` corresponds to a reader's action, we show that the outcome of the
@@ -176,14 +173,13 @@ Proof.
       The other cases correspond to the 3 different actions of the protocol. *)
   induction t; 1: auto.
 
-  (** Case where t = R(j).
-  We start by expanding the macros and splitting the pairs. *)
-  + expand frame. fa 0. fa 1.
-    expand exec, output.
-  (** Using the authentication goal `wa_R` previously proved, we replace the
-  formula `cond@R(j)` by an equivalent formula expressing the fact that
-  a tag `T(i,k)` has played before and that the output of this tag is
-  the message inputted by the reader. *)
+  (** **Case where t = R(j):**
+      We start by expanding the macros and splitting the pairs. *)
+  + expand frame, exec, output. fa !<_,_>.
+    (** Using the authentication goal `wa_R` previously proved, we replace the
+        formula `cond@R(j)` by an equivalent formula expressing the fact that
+        a tag `T(i,k)` has played before and that the output of this tag is
+        the message inputted by the reader. *)
     rewrite /cond (wa_R (R(j)) H).
   (** We are now able to remove this formula from the frame because
   the attacker is able to compute it using information obtained
@@ -192,20 +188,20 @@ Proof.
     by fadup 1.
     
   (** **Case where t = R1(j):**  
-  This case is similar to the previous one. *)
-  + expand frame. fa 0. fa 1.
-    expand exec, output.
+      This case is similar to the previous one. *)
+  + expand frame, exec, output. fa !<_,_>.
     rewrite /cond (wa_R (R1(j)) H).
     by fadup 1.
 
   (** **Case where t = T(i,k):**  
   We start by expanding the macros and splitting the pairs. *)
   + expand frame, exec, cond, output.
-    fa 0; fa 1; fa 1; fa 1.
-  (** We now apply the `prf` tactic, in order to replace the hash by a fresh
-  name. The tactic actually replaces the hash by a conditional term in which
-  the then branch is the fresh name.
-  The goal is now to prove that this condition always evaluate to `true`. *)
+    fa !<_,_>, if _ then _, <_,_>.
+    (** We now apply the `prf` tactic, in order to replace the hash by a fresh
+        name. The tactic actually replaces the hash by a conditional term in
+        which the then branch is the fresh name.
+        The goal is now to prove that this condition always evaluates to
+        `true`. *)
     prf 2. rewrite if_true. {
       split; 1: true.
   (** Several conjuncts must now be proved, the same tactic can be
@@ -223,7 +219,7 @@ Proof.
   into one goal for the left projection and one goal for the right
   projection of the initial bi-system. *)
       project; repeat split; intro *; by fresh Meq.
-    }
+    }.
 
 
     (** We have now replaced the hash by a fresh name occurring nowhere else,

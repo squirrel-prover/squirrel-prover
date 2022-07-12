@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 abstract f : index->message
 

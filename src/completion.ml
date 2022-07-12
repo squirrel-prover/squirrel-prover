@@ -16,14 +16,18 @@ module Cst = struct
     (** Flattening of the successor of a constant *)
 
     | Cgfuncst of [
-        | `N of Symbols.name   Symbols.t * Type.ty
-        | `F of Symbols.fname  Symbols.t
-        | `A of Symbols.action Symbols.t
+        | `N of Symbols.name * Type.ty
+        | `F of Symbols.fname
+        | `A of Symbols.action 
       ]
     (** function symbol, name or action of arity zero *)
 
-    | Cmvar   of Vars.var
-
+    | Cmvar of Vars.var
+    (** Variable *)
+  
+    | Cboxed of Term.term
+    (** Boxed term, for unsupported terms (e.g. binders) *)
+  
   let cst_cpt = ref 0
 
   let mk_flat () =
@@ -41,7 +45,8 @@ module Cst = struct
     | Cgfuncst (`F f) -> Symbols.pp ppf f
     | Cgfuncst (`N (n,_)) -> Symbols.pp ppf n
     | Cgfuncst (`A a) -> Symbols.pp ppf a
-
+    | Cboxed  t -> Fmt.pf ppf "Box(@[%a@])" Term.pp t
+                     
   (* The successor function symbol is the second smallest in the precedence
       used for the LPO (0 is the smallest element).  *)
   let rec compare c c' = match c,c' with
@@ -70,12 +75,12 @@ let nilpotence_norm compare l =
 
 (*------------------------------------------------------------------*)
 (** Generalized function symbols, for [Term.fsymb], [Term.msymb] and 
-    [Symbols.action Symbols.t]. *)
+    [Symbols.action]. *)
 type gfsymb = 
-  | F of Symbols.fname  Symbols.t           (* function symbol *)
-  | M of Symbols.macro  Symbols.t * Type.ty (* macro *)
-  | N of Symbols.name   Symbols.t * Type.ty (* name *)
-  | A of Symbols.action Symbols.t           (* action *)
+  | F of Symbols.fname           (* function symbol *)
+  | M of Symbols.macro * Type.ty (* macro *)
+  | N of Symbols.name  * Type.ty (* name *)
+  | A of Symbols.action          (* action *)
 
 let hash_gfs = function
   | M (m, _) -> Hashtbl.hash m
@@ -238,8 +243,6 @@ let mk_var () =
   let () = incr var_cpt in
   cvar !var_cpt
 
-exception Unsupported_conversion
-
 (** Translation from [term] to [cterm] *)
 let rec cterm_of_term : Term.term -> cterm = fun c ->
   let open Term in
@@ -266,19 +269,26 @@ let rec cterm_of_term : Term.term -> cterm = fun c ->
 
   | Var m  -> ccst (Cst.Cmvar m)
 
-  | Diff(c,d) -> cfun (F Symbols.fs_diff) 0 [cterm_of_term c; cterm_of_term d]
+  | Diff (Explicit l) ->
+      let l = List.sort (fun (l1,_) (l2,_) -> Stdlib.compare l1 l2) l in
+      let l = List.map (fun (_,tm) -> cterm_of_term tm) l in
+      cfun (F Symbols.fs_diff) 0 l
 
-  | _ -> raise Unsupported_conversion
+  (* default case *)
+  | t -> ccst (Cst.Cboxed t)
 
 and cterm_of_var i = ccst (Cst.Cmvar i)
 
 
 (*------------------------------------------------------------------*)
-let index_of_cterm i = match i.cnt with
-  | Ccst (Cst.Cmvar m) -> assert (Vars.ty m = Type.Index); m
+let i_or_ts_of_cterm i = match i.cnt with
+  | Ccst (Cst.Cmvar m) ->
+    assert (Type.equal (Vars.ty m) Type.tindex ||
+            Type.equal (Vars.ty m) Type.ttimestamp);
+    m
   | _ -> assert false
     
-let indices_of_cterms cis = List.map index_of_cterm cis
+let i_or_ts_of_cterms cis = List.map i_or_ts_of_cterm cis
 
 let term_of_cterm : Symbols.table -> cterm -> Term.term =
   fun table c ->  
@@ -287,24 +297,24 @@ let term_of_cterm : Symbols.table -> cterm -> Term.term =
       match c.cnt with 
       | Cfun (F f, ari, cterms) -> 
         let cis, cterms = List.takedrop ari cterms in
-        let is = indices_of_cterms cis in
+        let is = i_or_ts_of_cterms cis in
         let terms = terms_of_cterms cterms in
         Term.mk_fun table f is terms 
 
       | Cfun (M (m,ek), ari, cterms) -> 
         let cis, cts = List.takedrop ari cterms in
         let cts = as_seq1 cts in
-        let m = Term.mk_isymb m ek (indices_of_cterms cis) in
+        let m = Term.mk_isymb m ek (i_or_ts_of_cterms cis) in
         Term.mk_macro m [] (term_of_cterm cts) 
 
       | Cfun (A a, ari, is) -> 
         assert (ari = List.length is);
-        let is = indices_of_cterms is in
+        let is = i_or_ts_of_cterms is in
         Term.mk_action a is
 
       | Cfun (N (n,nty), ari, is) -> 
         assert (ari = List.length is);
-        let is = indices_of_cterms is in
+        let is = i_or_ts_of_cterms is in
         let ns = Term.mk_isymb n nty is in
         Term.mk_name ns
 
@@ -320,6 +330,8 @@ let term_of_cterm : Symbols.table -> cterm -> Term.term =
         let ns = Term.mk_isymb n nty [] in
         Term.mk_name ns
 
+      | Ccst (Cst.Cboxed t) -> t
+        
       | (Ccst (Cflat _|Csucc _)|Cvar _|Cxor _) -> assert false
 
   and terms_of_cterms (cterms : cterm list) : Term.term list =
@@ -1388,29 +1400,23 @@ module Memo = Hashtbl.Make2
       let hash l = Utils.hcombine_list hash_p 0 l
     end)
 
-let complete table (l : Term.esubst list) 
-  : state timeout_r =
+let complete table (l : Term.esubst list) : state =
   let l =
     List.fold_left
       (fun l (Term.ESubst (u,v)) ->
-         try
-           let cu, cv = cterm_of_term u, cterm_of_term v in
+         let cu, cv = cterm_of_term u, cterm_of_term v in
 
-           dbg "Completion: %a = %a added as %a = %a"
-             Term.pp u Term.pp v pp_cterm cu pp_cterm cv; 
+         dbg "Completion: %a = %a added as %a = %a"
+           Term.pp u Term.pp v pp_cterm cu pp_cterm cv; 
 
-           (cu, cv):: l 
-
-         with Unsupported_conversion -> 
-           dbg "Completion: %a = %a ignored (unsupported)" Term.pp u Term.pp v; 
-           l)
+         (cu, cv):: l )
       []
       l
   in
-  Utils.timeout (Config.solver_timeout ()) (complete_cterms table) l 
+  complete_cterms table l 
 
 (** With memoisation *)
-let complete : Symbols.table -> Term.esubst list -> state Utils.timeout_r =
+let complete : Symbols.table -> Term.esubst list -> state =
   let memo = Memo.create 256 in
   fun table l ->
     try Memo.find memo (table,l) with
@@ -1418,7 +1424,12 @@ let complete : Symbols.table -> Term.esubst list -> state Utils.timeout_r =
       let res = complete table l in
       Memo.add memo (table,l) res;
       res
-  
+
+let complete
+    ?(exn = Tactics.Tactic_hard_failure (None, TacTimeout))
+    table l : state =
+  Utils.timeout exn (Config.solver_timeout ()) (complete table) l 
+        
 let print_init_trs fmt table =
   Fmt.pf fmt "@[<v 2>Rewriting rules:@;%a@]"
     pp_e_rules (init_erules table)
@@ -1453,9 +1464,7 @@ let check_disequality_cterm state neqs (u,v) =
   || (is_ground_term u && is_ground_term v && (u <> v))
 
 let check_disequality state neqs (u,v) =
-  try check_disequality_cterm state neqs (cterm_of_term u, cterm_of_term v)
-  with
-  | Unsupported_conversion -> false
+  check_disequality_cterm state neqs (cterm_of_term u, cterm_of_term v)
 
 (** [check_disequalities s neqs l] checks that all disequalities inside [l]
     are implied by inequalities inside [neqs], wrt [s]. *)
@@ -1472,18 +1481,13 @@ let check_equality_cterm state (u,v) =
   normalize ~print:true state v
 
 let check_equality state (u,v) =
-  try
-    let cu, cv = cterm_of_term u, cterm_of_term v in
-    let bool = check_equality_cterm state (cu, cv) in
+  let cu, cv = cterm_of_term u, cterm_of_term v in
+  let bool = check_equality_cterm state (cu, cv) in
 
-    dbg "check_equality: %a = %a as %a = %a: %a"
-      Term.pp u Term.pp v pp_cterm cu pp_cterm cv Fmt.bool bool;
+  dbg "check_equality: %a = %a as %a = %a: %a"
+    Term.pp u Term.pp v pp_cterm cu pp_cterm cv Fmt.bool bool;
 
-    bool
-
-  with Unsupported_conversion -> 
-    dbg "check_equality: %a = %a ignored (unsupported)" Term.pp u Term.pp v;
-    false
+  bool
 
 let check_equalities state l = List.for_all (check_equality state) l
 
@@ -1507,7 +1511,7 @@ let star_apply f = function
 
 let x_index_cnstrs state l select f_cnstr =
   List.fold_left
-    (fun l t -> try cterm_of_term t :: l with Unsupported_conversion -> l)
+    (fun l t -> cterm_of_term t :: l)
     [] l
   |> subterms
   |> List.filter select
@@ -1523,7 +1527,7 @@ let x_index_cnstrs state l select f_cnstr =
     rewrite relation in [state], and add the corresponding index equalities.
     Only applies to names with \[large\] types.
     E.g., if n(i,j) and n(k,l) are equal, then i = k and j = l.*)
-let name_index_cnstrs table state l =
+let name_index_cnstrs table state l : Term.term list =
   let n_cnstr a b = match a.cnt,b.cnt with
     | Ccst (Cst.Cgfuncst (`N n)), Ccst (Cst.Cgfuncst (`N n')) ->
       if n <> n' then [Term.mk_false] else []
@@ -1535,8 +1539,8 @@ let name_index_cnstrs table state l =
         assert (ari = ari');
         List.map2 (fun x y -> 
             Term.mk_atom `Eq 
-              (Term.mk_var (index_of_cterm x))
-              (Term.mk_var (index_of_cterm y))
+              (Term.mk_var (i_or_ts_of_cterm x))
+              (Term.mk_var (i_or_ts_of_cterm y))
           ) is is'
       end
 
@@ -1545,7 +1549,8 @@ let name_index_cnstrs table state l =
       assert (ari <> 0 && n <> n');
       [Term.mk_false] 
 
-    | _ -> assert false in
+    | _ -> assert false
+  in
 
   x_index_cnstrs state l (is_lname table) n_cnstr
 

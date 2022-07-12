@@ -1,5 +1,7 @@
-set autoIntro=false.
+
 (* set debugConstr=true. *)
+
+include Basic.
 
 hash h
 name k:message
@@ -22,17 +24,19 @@ system [test2] (A: out(c, <ok,<n,n>>) | B: out(c, n)).
 (* we start with a first transitivity, from test/left to testPrf *)
 system testPrf = [test/left] with gprf, h(ok,k).
 
+print system [testPrf].
+
 (* Then, second transitivity, from testprf to testRenamed *)
-system testRenamed = [testPrf/left] with rename equiv(diff(n_PRF,n)).
+system testRenamed = [testPrf] with rename equiv(diff(n_PRF,n)).
 
 
-axiom [testRenamed/left,test2/right] tf : forall ( p, n:message), try find such that true in p else n =p .
+axiom [testRenamed,test2/right] tf : forall ( p, n:message), try find such that true in p else n =p .
 
-axiom [testRenamed/left,test2/right] ref : forall ( n:message), diff(n,n)=n .
+axiom [testRenamed,test2/right] ref : forall ( n:message), diff(n,n)=n .
 
 
 
-equiv [testRenamed/left,test2/right] test2.
+equiv [testRenamed,test2/right] test2.
 Proof.
 
 enrich n.
@@ -43,7 +47,7 @@ auto.
 expandall.
 fa 1.
 repeat fa 2.
-equivalent  diff(try find  such that ok = ok in n else h(ok,k),n), n.
+have -> : diff(try find  such that ok = ok in n else h(ok,k),n) = n.
 project.
 
 case (try find  such that ok = ok in n else h(ok,k)); auto.
@@ -55,18 +59,10 @@ expandall.
 fa 1.
 repeat fa 2.
 
-
-equivalent ok=ok,true.
-auto.
+simpl. 
 rewrite tf in 2.
 rewrite ref in 2.
-equivalent  diff(try find  such that ok = ok in n else h(ok,k),n), n.
-project.
-
-case (try find  such that ok = ok in n else h(ok,k)); auto.
 auto.
-auto.
-
 Qed.
 
 
@@ -84,11 +80,11 @@ system [testi2] (!_i A: out(c, <ok, idn(i)>) | !_i B: out(c,  idn(i))).
 system testiPrf = [testi/left] with gprf (j:index), h(msg(j),key(j)).
 
 (* Then, second transitivity, from testiPrf to testiRenamed *)
-system testiRenamed = [testiPrf/left] with rename forall (i:index), equiv(diff(n_PRF1(i),idn(i))).
+system testiRenamed = [testiPrf] with rename forall (i:index), equiv(diff(n_PRF1(i),idn(i))).
 (* equiv [testiPrf] t. Proof. print. admit. Qed *)
 
 
-equiv [testiRenamed/left,testi2/right] test3.
+equiv [testiRenamed,testi2/right] test3.
 Proof.
 enrich seq(i:index-> idn(i)).
 induction t.
@@ -100,8 +96,8 @@ expandall.
 fa 1. repeat fa 2.
 
 
-equivalent      try find j such that (msg(i) = msg(j) && i = j)
-     in idn(j) else h(msg(i),key(i)),
+have ->:      try find j such that (msg(i) = msg(j) && i = j)
+     in idn(j) else h(msg(i),key(i)) =
      idn(i).
 case      try find j such that (msg(i) = msg(j) && i = j)
      in idn(j) else h(msg(i),key(i)).
@@ -115,15 +111,15 @@ destruct H2.
 use H0 with i.
 auto.
 
-equivalent  diff(idn(i),idn(i)), idn(i).
+have ->:  diff(idn(i),idn(i)) = idn(i).
 project; auto.
 expandseq seq(i:index->idn(i)), i.
 auto.
 
 
 expandall.
-equivalent   try find j such that (msg(i) = msg(j) && i = j)
-         in idn(j) else h(msg(i),key(i)),
+have ->:   try find j such that (msg(i) = msg(j) && i = j)
+         in idn(j) else h(msg(i),key(i)) =
          idn(i).
 case  try find j such that (msg(i) = msg(j) && i = j)
          in idn(j) else h(msg(i),key(i)).
@@ -137,7 +133,7 @@ destruct H2.
 use H0 with i.
 auto.
 
-equivalent  diff(idn(i),idn(i)), idn(i).
+have ->:  diff(idn(i),idn(i)) = idn(i).
 project; auto.
 expandseq seq(i:index->idn(i)), i.
 fa 2.
@@ -146,30 +142,26 @@ auto.
 Qed.
 
 (*------------------------------------------------------------------*)
-include Basic.
-
 system [test_ok2] (A: out(c, <ok,<h(ok,k),h(ok2,k)>>) | B: out(c, h(ok,k))).
 (* we start with a first transitivity, from test/left to testPrf *)
 system test_ok2G = [test_ok2/left] with gprf, h(ok,k).
 
 axiom [test_ok2G] ok_ok2 : ok = ok2.
 
-goal [test_ok2G/left] _ :
+goal [test_ok2G] _ :
   happens(A) =>
   ok = ok2 =>
   output@A = <ok, <n_PRF2,n_PRF2>>.
 Proof.
-  intro Hap ok_ok2 @/output.
-  case (try find such that (ok = ok) in n_PRF2 else _) => [_ _] //.
-  case (try find such that (ok2 = ok) in n_PRF2 else _) => [H _] //.
+  intro Hap ok_ok2 @/output. 
+  by case (try find such that (ok = ok) in n_PRF2 else _) => [_ _].
 Qed.
 
-goal [test_ok2G/left] _ :
+goal [test_ok2G] _ :
   happens(A) =>
   ok <> ok2 =>
   output@A = <ok, <n_PRF2,h(ok2, k)>>.
 Proof.
   intro Hap ok_ok2 @/output.
-  case (try find such that (ok = ok) in n_PRF2 else _) => [_ _] //.
-  case (try find such that (ok2 = ok) in n_PRF2 else _) => [H _] //.
+  by case (try find such that (ok = ok) in n_PRF2 else _) => [_ _].
 Qed.

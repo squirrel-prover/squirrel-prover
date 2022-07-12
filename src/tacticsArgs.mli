@@ -5,18 +5,33 @@ module L = Location
 
 type lsymb = Theory.lsymb
 
-type s_item =
+(*------------------------------------------------------------------*)
+(** Tactic target. *)
+type in_target = [`Goal | `All | `Hyps of lsymb list]
+
+
+(*------------------------------------------------------------------*)
+(** {2 Tactics named arguments} *)
+
+type named_arg =
+  | NArg of lsymb               (** '~id' *)
+
+type named_args = named_arg list
+
+(*------------------------------------------------------------------*)
+(** {2 Simplification item} *)
+
+type s_item_body =
   | Tryauto      of Location.t    (** '//' *)
   | Tryautosimpl of Location.t    (** '//' *)
   | Simplify     of Location.t    (** '//=' *)
 
-(** Tactic target. *)
-type in_target = [`Goal | `All | `Hyps of lsymb list]
+type s_item = s_item_body * named_args
 
 (*------------------------------------------------------------------*)
 (** {2 Parsed arguments for rewrite} *)
 
-type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
+type rw_count = [`Once | `Many | `Any ] (** ε | ! | ? *)
 
 type rw_dir = [`LeftToRight | `RightToLeft ] L.located
 
@@ -30,13 +45,13 @@ type 'a rw_item_g = {
 (** Rewrite or expand item *)
 type rw_item = [
   | `Rw        of Theory.p_pt
-  | `Expand    of Theory.term
+  | `Expand    of lsymb
   | `ExpandAll of Location.t
 ] rw_item_g
 
 (** Expand item *)
 type expnd_item = [
-  | `Expand    of Theory.term
+  | `Expand    of lsymb
   | `ExpandAll of Location.t
 ] rw_item_g
 
@@ -45,11 +60,15 @@ type rw_equiv_item = [
   | `Rw of Theory.p_pt
 ] rw_item_g
 
-(** Rewrite argument, which is a rewrite or simplification item*)
+(** Rewrite argument, which is a rewrite or simplification item *)
 type rw_arg =
   | R_item   of rw_item
   | R_s_item of s_item
 
+(*------------------------------------------------------------------*)
+(** Function application argument *)
+type fa_arg = rw_count * Theory.term
+                           
 (*------------------------------------------------------------------*)
 type apply_in = lsymb option
 
@@ -60,7 +79,7 @@ type naming_pat =
   | Unnamed   (** '_' *)
   | AnyName   (** '?' *)
   | Named of string
-  | Approx  of string        (* only used internally *)
+  | Approx  of string        (** only used internally *)
 
 type and_or_pat =
   | Or      of simpl_pat list
@@ -100,14 +119,6 @@ type ip_handler = [
 ]
 
 (*------------------------------------------------------------------*)
-(** {2 Tactics named arguments} *)
-
-type named_arg =
-  | NArg of lsymb               (** '~id' *)
-
-type named_args = named_arg list
-
-(*------------------------------------------------------------------*)
 (** {2 Tactic arguments types} *)
 
 
@@ -118,18 +129,22 @@ type parser_arg =
   | String_name  of lsymb
   | Int_parsed   of int L.located
   | Theory       of Theory.term
+  | NamingPat    of naming_pat
   | IntroPat     of intro_pattern list
   | AndOrPat     of and_or_pat
   | SimplPat     of simpl_pat
   | RewriteIn    of rw_arg list * in_target
   | RewriteEquiv of rw_equiv_item
+  | SystemAnnot  of (Symbols.table -> SystemExpr.context)
   | ApplyIn      of named_args * Theory.p_pt * apply_in
-  | AssertPt     of Theory.p_pt * simpl_pat option * [`IntroImpl | `None]
+  | Have         of simpl_pat option * Theory.any_term
+  | HavePt       of Theory.p_pt * simpl_pat option * [`IntroImpl | `None]
   | SplitSeq     of int L.located * Theory.hterm
   | ConstSeq     of int L.located * (Theory.hterm * Theory.term) list
   | MemSeq       of int L.located * int L.located
   | Remember     of Theory.term * lsymb
   | Generalize   of Theory.term list * naming_pat list option
+  | Fa           of fa_arg list
   | TermPat      of int * Theory.term
 
 type parser_args = parser_arg list
@@ -185,9 +200,3 @@ val cast:  'a sort -> 'b arg -> 'a arg
 (*------------------------------------------------------------------*)
 val pp_esort : Format.formatter -> esort -> unit
 
-(*------------------------------------------------------------------*)
-(** {2 Argument conversion} *)
-
-val convert_as_lsymb : parser_arg list -> lsymb option
-
-val convert_args : Env.t -> parser_arg list -> esort -> Equiv.any_form -> earg

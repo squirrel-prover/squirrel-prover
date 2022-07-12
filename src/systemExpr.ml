@@ -1,124 +1,254 @@
 open Utils
 module L = Location
 
-type lsymb = Symbols.lsymb
+type error =
+  | Invalid_projection
+  | Missing_projection
+  | Incompatible_systems
+  | Expected_compatible
+  | Expected_fset
+  | Expected_pair
+
+exception Error of error
+
+let error e = raise (Error e)
+
+let pp_error fmt = function
+  | Invalid_projection -> Format.fprintf fmt "invalid projection"
+  | Missing_projection -> Format.fprintf fmt "missing projection"
+  | Incompatible_systems -> Format.fprintf fmt "incompatible systems"
+  | Expected_compatible -> Format.fprintf fmt "expected a compatible expr"
+  | Expected_fset -> Format.fprintf fmt "expected a finite set expr"
+  | Expected_pair -> Format.fprintf fmt "expected a pair expr"
 
 (*------------------------------------------------------------------*)
-type single_system =
-  | Left  of Symbols.system Symbols.t
-  | Right of Symbols.system Symbols.t
+(** {2 Expressions} *)
 
-let get_proj = function
-  | Left _ -> Term.PLeft
-  | Right _ -> Term.PRight
-
-let get_id = function
-  | Left id | Right id -> id
-
-let hash_single = function
-  | Left t  -> hcombine 0 (Symbols.hash t)
-  | Right t -> hcombine 1 (Symbols.hash t)
-
-(*------------------------------------------------------------------*)
 type t =
-  | Single     of single_system
-  | SimplePair of Symbols.system Symbols.t
-  | Pair       of single_system * single_system
-  | Empty
+  | Any
+  | Any_compatible_with of System.t
+  | List of (Term.proj * System.Single.t) list
+      (** Each single system is identified by a label.
+          The list cannot be empty. All single systems are compatible. *)
 
-let hash = function
-  | Single s -> hash_single s
-  | SimplePair str -> hcombine 2 (Symbols.hash str)
-  | Pair (s1, s2) -> hcombine (hash_single s1) (hash_single s2)
-  | Empty -> 1
+type 'a expr = t
 
-let pp_single fmt = function
-  | Left id  -> Fmt.pf fmt "%s/left"  (Symbols.to_string id)
-  | Right id -> Fmt.pf fmt "%s/right" (Symbols.to_string id)
+type arbitrary  = < > expr
+type compatible = < symbols : unit > expr
+type fset       = < symbols : unit ; fset : unit > expr
+type pair       = < symbols : unit ; fset : unit ; pair : unit > expr
 
-let pp fmt = function
-  | Single s      -> Fmt.pf fmt "%a" pp_single s
-  | SimplePair id -> Fmt.pf fmt "%s" (Symbols.to_string id)
-  | Pair (s1, s2) -> Fmt.pf fmt "%a,%a" pp_single s1 pp_single s2
-  | Empty         -> Fmt.pf fmt "empty" 
+type equiv_t = pair expr
 
 (*------------------------------------------------------------------*)
-type ssymb_pair = System.system_name *
-                  System.system_name
-
-type system_expr_err =
-  | SE_NotABiProcess of System.system_name option
-  | SE_NoneProject
-  | SE_InvalidAction of t * Action.shape
-  | SE_IncompatibleAction   of ssymb_pair * string
-  | SE_DifferentControlFlow of ssymb_pair
-
-let pp_system_expr_err fmt = function
-  | SE_NotABiProcess s ->
-    Fmt.pf fmt "cannot project system [%a], which is not a bi-process"
-      (Fmt.option Fmt.string) (omap Symbols.to_string s)
-
-  | SE_NoneProject ->
-    Fmt.pf fmt "cannot project a system with None"
-
-  | SE_InvalidAction (t, sh) ->
-    Fmt.pf fmt "@[<v>system %a has no action with shape:@;  @[%a@]"
-      pp t
-      Action.pp_shape sh
-
-  | SE_IncompatibleAction ((s1,s2),s) ->
-    Fmt.pf fmt "systems [%s] and [%s] are not compatible: %s"
-      (Symbols.to_string s1) (Symbols.to_string s2) s
-
-  | SE_DifferentControlFlow (s1,s2) ->
-    Fmt.pf fmt "systems [%s] and [%s] have distinct control flow"
-      (Symbols.to_string s1) (Symbols.to_string s2)
-
-exception BiSystemError of system_expr_err
-
-let bisystem_error e = raise (BiSystemError e)
-
-let incompatible_error s1 s2 s =
-  raise (BiSystemError (SE_IncompatibleAction ((s1,s2),s)))
-
+let hash : 'a expr -> int = Hashtbl.hash
 
 (*------------------------------------------------------------------*)
+let any = Any
 
-(** [single_compatible s s'] checks that the single system [s]
-  * is one of the projections of the system [s']. *)
-let single_compatible (s : single_system) (s' : t) : bool = match s,s' with
-  | s, Single s' -> s = s'
-  | Left s, SimplePair s' -> s = s'
-  | Right s, SimplePair s' -> s = s'
-  | s, Pair (s1,s2) -> s = s1 || s = s2
-  | _, Empty -> false
-
-(** [systems_compatible s1 s2] checks that all projections of [s1]
-  * are projections of [s2]. *)
-let systems_compatible s1 s2 =
-  if s1 = s2 then true else
-    match s1 with
-      | Single s -> single_compatible s s2
-      | SimplePair s ->
-          single_compatible (Left s) s2 &&
-          single_compatible (Right s) s2
-      | Pair (s',s'') ->
-          single_compatible s' s2 &&
-          single_compatible s'' s2
-      | Empty -> true
+let any_compatible_with s = Any_compatible_with s
 
 (*------------------------------------------------------------------*)
-(** {2 Misc } *)
+let is_fset : t -> bool = function List _ -> true | _ -> false
+
+let is_any_or_any_comp : t -> bool = function
+  | Any | Any_compatible_with _ -> true
+  | _ -> false
+
+(*------------------------------------------------------------------*)
+let pp fmt : 'a expr -> unit = function
+  | Any -> Format.fprintf fmt "any"
+  | Any_compatible_with s -> Format.fprintf fmt "any/%a" Symbols.pp s
+  | List l ->
+      Fmt.list
+        ~sep:Fmt.comma
+        (fun fmt (label,single_sys) ->
+           if Term.proj_to_string label = "ε" then
+             System.Single.pp fmt single_sys
+           else
+             Format.fprintf fmt "%a:%a"
+               Term.pp_proj label
+               System.Single.pp single_sys)
+        fmt
+        l
+
+let to_arbitrary : type a. a expr -> arbitrary expr = fun x -> x
+
+let to_compatible = function
+  | Any -> error Expected_compatible
+  | x -> x
+
+let to_fset = function
+  | List _ as x -> x
+  | _ -> error Expected_fset
+
+let to_pair = function
+  | List [_;_] as x -> x
+  | _ -> error Expected_pair
+
+let subset table e1 e2 = match e1,e2 with
+  | Any_compatible_with s1, Any_compatible_with s2 ->
+    System.compatible table s1 s2
+      
+  | List l, Any_compatible_with s ->
+    System.compatible table (snd (List.hd l)).system s
+      
+  | List l1, List l2 ->
+    List.for_all (fun (_,s1) -> List.exists (fun (_,s2) -> s1 = s2) l2) l1
+      
+  | _, Any -> true
+  | _ -> false
+
+let equal table s1 s2 = subset table s1 s2 && subset table s2 s1
+
+(** Get system that is compatible with all systems of an expresion. *)
+let get_compatible_sys = function
+  | Any -> None
+  | Any_compatible_with s -> Some s
+  | List ((_,s)::_) -> Some s.System.Single.system
+  | List [] -> assert false
+
+(** Check that all systems in [e1] are compatible with all systems in [e2]. *)
+let compatible table e1 e2 =
+  match get_compatible_sys e1, get_compatible_sys e2 with
+    | Some s1, Some s2 -> System.compatible table s1 s2
+    | _ -> false
+
+(*------------------------------------------------------------------*)
+(** {2 Finite sets} *)
+
+let to_list = function
+  | List l -> l
+  | _ -> assert false
+
+let of_list l = List l
+
+let to_projs t = List.map fst (to_list t)
+
+(*------------------------------------------------------------------*)    
+let to_list_any (t : _ expr) : (Term.proj * System.Single.t) list option =
+  match t with
+  | List l -> Some l
+  | Any | Any_compatible_with _ -> None
+
+let to_projs_any (t : _ expr) : Term.projs option =
+  match t with
+  | List l -> Some (List.map fst l)
+  | Any | Any_compatible_with _ -> None
+
+(*------------------------------------------------------------------*)
+let project_opt (projs : Term.projs option) t : fset =
+  match t, projs with
+  | List l, Some projs ->
+    (* we only project over a subset of [l]'s projs *)
+    assert (List.for_all (fun x -> List.mem_assoc x l) projs);
+
+    List (List.filter (fun (x,_) -> List.mem x projs) l)
+
+  | (Any | Any_compatible_with _), Some projs -> assert false
+  (* should this be [List projs] ? *)
+
+  | _, None -> t
+    
+let project (projs : Term.projs) t = project_opt (Some projs) t
+
+(*------------------------------------------------------------------*)  
+let singleton s = List [Term.proj_from_string "ε",s]
+
+let of_system table s : t =
+  let projections = System.projections table s in
+  List
+    (List.map (fun proj -> proj, System.Single.make table s proj) projections)
+
+(*------------------------------------------------------------------*)
+let default_labels : int -> Term.proj list = function
+  | 1 -> [Term.proj_from_string "ε"]
+  | 2 -> [Term.left_proj;Term.right_proj]
+  | n -> List.init n (fun i -> Term.proj_from_string (string_of_int (i+1)))
+
+(*------------------------------------------------------------------*)
+let make_fset table ~labels (l : System.Single.t list) : t =
+  (* Check for compatibility. *)
+  let () = match l with
+    | [] -> assert false
+    | { System.Single.system = hd_system } :: tl ->
+      List.iter
+        (fun {System.Single.system} ->
+           if not (System.compatible table hd_system system) then
+             error Incompatible_systems)
+        tl
+  in
+  (* Build labelled list using a mix of default and provided labels. *)
+  let len = List.length l in
+  assert (List.length labels = len);
+
+  let labels =
+    List.map2 (fun default -> function
+        | None -> default
+        | Some x -> x
+      )
+      (default_labels len)
+      labels
+  in
+  List (List.combine labels l)
+
+(*------------------------------------------------------------------*)
+(** {2 Parsing} *)
+
+type parse_item = {
+  system     : Symbols.lsymb;
+  projection : Symbols.lsymb option;
+  alias      : Symbols.lsymb option
+}
+
+type parsed_t = parse_item list Location.located
+
+let parse_single table item =
+  if item.alias <> None then
+    raise (Invalid_argument "SystemExpr.Single.parse");
+  let sys = System.of_lsymb table item.system in
+  match item.projection with
+    | None ->
+        begin match System.projections table sys with
+          | [p] -> System.Single.make table sys p
+          | _ -> error Missing_projection
+        end
+    | Some p ->
+        System.Single.make table sys (Term.proj_from_string (L.unloc p))
+
+let parse table p = match Location.unloc p with
+  | [] ->
+      (* Default system annotation. We might make it mean "any" eventually
+         but for now "default" avoids changing most files. *)
+      of_system table
+        (System.of_lsymb table (Location.mk_loc Location._dummy "default"))
+
+  | [{ system = { pl_desc = "any" }; projection = None; alias = None}] ->
+      any
+
+  | [{ system = { pl_desc = "any" }; projection = Some system}] ->
+      any_compatible_with (System.of_lsymb table system)
+
+  | [{ system; projection = None; alias = None}] ->
+      of_system table (System.of_lsymb table system)
+
+  | l ->
+    let labels =
+      List.map (fun i ->
+          Utils.omap (Term.proj_from_string -| L.unloc) i.alias
+        ) l 
+    in
+    let l =
+      List.map (fun i -> parse_single table { i with alias = None }) l
+    in
+    make_fset table ~labels l
+
+(*------------------------------------------------------------------*)
+(** Action symbols and terms *)
 
 let symbs table = function
-  | SimplePair s
-  | Pair (Left s,_) 
-  | Pair (Right s,_)
-  | Single (Left s)
-  | Single (Right s) -> 
-    System.symbs table s
-
-  | Empty -> System.Msh.empty
+  | List ((_,{System.Single.system})::_) -> System.symbs table system
+  | _ -> assert false
 
 let action_to_term table system a =
   let msymbs = symbs table system in
@@ -126,165 +256,46 @@ let action_to_term table system a =
   Term.mk_action symb (Action.get_indices a)
 
 (*------------------------------------------------------------------*)
-let project proj = function
-  | Empty -> bisystem_error (SE_NotABiProcess None)
-  | Single s -> bisystem_error (SE_NotABiProcess (Some (get_id s)))
+(** Action descriptions *)
 
-  | SimplePair id ->
-    begin
-      match proj with
-      | Term.PLeft  -> Single (Left id)
-      | Term.PRight -> Single (Right id)
-      | Term.PNone  -> bisystem_error SE_NoneProject
-    end
-  | Pair (s1, s2) ->
-    begin
-      match proj with
-      | Term.PLeft  -> Single s1
-      | Term.PRight -> Single s2
-      | Term.PNone  -> bisystem_error SE_NoneProject
-    end
+(** Compute action description of some system expression for a given shape. *)
+let descr_of_shape table expr shape =
+  let expr = to_list expr in
+  (* TODO refreshing in descr_of_shape useless before combine_descrs *)
+  Action.combine_descrs
+    (List.map
+       (fun (lbl,sys) -> lbl, System.Single.descr_of_shape table sys shape)
+       expr)
 
-(*------------------------------------------------------------------*)
-let make_bi_descr s1 s2 (d1 : Action.descr) (d2 : Action.descr) : Action.descr =
-  let incompatible s = incompatible_error s1 s2 s in
-
-  if List.length d1.indices <> List.length d2.indices then
-    incompatible "cannot merge two actions with different number of indices";
-
-  (* Note: d1 and d2 must have globally refreshed indices *)
-  let subst = List.map2 (fun i1 i2 ->
-      Term.ESubst (Term.mk_var i1, Term.mk_var i2)
-    ) d2.indices d1.indices
-  in
-  let d2 = Action.subst_descr subst d2 in
-
-  if not ( d1.name = d2.name ) then
-    incompatible "cannot merge two actions with disctinct names";
-
-  if not ( d1.input = d2.input ) then
-    incompatible "cannot merge two actions with disctinct inputs";
-
-  if Action.same_shape d1.action d2.action = None then
-    incompatible "cannot merge two actions with different shapes";
-
-  let condition =
-    let is1,t1 = d1.condition
-    and is2,t2 = d2.condition in
-    if is1 <> is2 then
-      incompatible "cannot merge two actions with disctinct \
-                    condition indexes";
-    is1, Term.make_bi_term t1 t2 in
-
-  let updates =
-    List.map2 (fun (st1, m1) (st2, m2) ->
-        if st1 <> st2 then
-          incompatible "cannot merge two actions with disctinct \
-                        states";
-        st1,Term.make_bi_term m1 m2)
-      d1.updates d2.updates in
-
-  let output =
-    let c1,m1 = d1.output and c2,m2 = d2.output in
-    if c1 <> c2 then
-      incompatible "cannot merge two actions with disctinct \
-                    ouput channels";
-    c1, Term.make_bi_term m1 m2 in
-
-  { name = d1.name;
-    action = d1.action;
-    input = d1.input;
-    indices = d1.indices;
-    globals = List.sort_uniq Stdlib.compare (d1.globals @ d2.globals);
-    condition;
-    updates;
-    output; }
-
-let descr_of_shape table (se : t) shape =
-  let getd s_symb = System.descr_of_shape table s_symb shape in
-
-  match se with
-  | Empty -> bisystem_error (SE_InvalidAction (se, shape))
-
-  (* we simply project the description according to the projection *)
-  | Single s ->
-    let descr = getd (get_id s) in
-    Action.pi_descr (get_proj s) descr
-
-  | SimplePair id ->
-    let descr = getd id in
-    Action.pi_descr Term.PNone descr
-
-  (* else we need to obtain the two corresponding sets of shapes,
-     project them correctly, and combine them into a single term. *)
-  | Pair (s1, s2) ->
-    let sname1 = get_id s1 in
-    let sname2 = get_id s2 in
-    let left_a  = getd sname1 in
-    let right_a = getd sname2 in
-    make_bi_descr sname1 sname2
-      (Action.pi_descr (get_proj s1) left_a)
-      (Action.pi_descr (get_proj s2) right_a)
-
-let descr_of_action table (system : t) a =
-  let descr = descr_of_shape table system (Action.get_shape a) in
+let descr_of_action table expr a =
+  let descr = descr_of_shape table expr (Action.get_shape a) in
   let d_indices = descr.indices in
   let a_indices = Action.get_indices a in
   let subst =
-    List.map2 (fun v v' ->
-        Term.ESubst (Term.mk_var v, Term.mk_var v')
-      ) d_indices a_indices
+    List.map2
+      (fun v v' -> Term.ESubst (Term.mk_var v, Term.mk_var v'))
+      d_indices a_indices
   in
-
   Action.subst_descr subst descr
 
-let descrs table se =
-  let same_shapes descrs1 descrs2 =
-    System.Msh.for_all (fun shape d1 ->
-        System.Msh.mem shape descrs2) descrs1 &&
-    System.Msh.for_all (fun shape _ ->
-        System.Msh.mem shape descrs1) descrs2
-  in
-
-  (* We built the new action descriptions *)
-  match se with
-  | Empty -> System.Msh.empty
-  | Pair (s1, s2) ->
-    (* we must check that the two systems have the same set of shapes *)
-    let sname1 = get_id s1
-    and sname2 = get_id s2 in
-    let left_descrs  = System.descrs table sname1 in
-    let right_descrs = System.descrs table sname2 in
-
-    if not (same_shapes left_descrs right_descrs) then
-      bisystem_error (SE_DifferentControlFlow (sname1,sname2));
-
-    System.Msh.mapi
-      (fun shape _ -> descr_of_shape table se shape)
-      left_descrs
-
-  | SimplePair id ->
-    let fds = System.descrs table id in
-    System.Msh.mapi
-      (fun shape descr -> Action.pi_descr Term.PNone descr)
-      fds
-
-  | Single s ->
-    (* we must project before iterating *)
-    let sname = get_id s in
-    let shapes = System.descrs table sname in
-    System.Msh.mapi
-      (fun shape descr -> Action.pi_descr (get_proj s) descr)
-      shapes
+let descrs table (se:fset expr) : Action.descr System.Msh.t =
+  let symbs = symbs table se in
+  System.Msh.mapi
+    (fun shape _ -> descr_of_shape table se shape)
+    symbs
 
 (*------------------------------------------------------------------*)
-let iter_descrs
-    table system
-    (f : Action.descr -> unit) =
+
+let iter_descrs table system (f : Action.descr -> unit) =
   let f _ a = f a in
   System.Msh.iter f (descrs table system)
 
-let map_descrs (f : Action.descr -> 'a) table system =
+let map_descrs (f : Action.descr -> 'a) table system : 'a list =
+  let m = System.Msh.map f (descrs table system) in
+  List.map snd (System.Msh.bindings m)
+
+let actions table system : 'a list =
+  let f Action.{action;name;indices} = (action,name,indices) in
   let m = System.Msh.map f (descrs table system) in
   List.map snd (System.Msh.bindings m)
 
@@ -292,81 +303,107 @@ let fold_descrs (f : Action.descr -> 'a -> 'a) table system init =
   let f _ a = f a in
   System.Msh.fold f (descrs table system) init
 
-
-(*------------------------------------------------------------------*)
-(** Check that a system expression is valid. This is not obvious only
-    in the [Pair _] case, in which case we check that the two single
-    systems are compatible. *)
-let check_system_expr table se = iter_descrs table se (fun _ -> ())
-(* computing the system description has the side-effect of checking that
-   the systems are compatible *)
-
-(*------------------------------------------------------------------*)
-(** {2 Smart constructor } *)
-
-let empty = Empty
-
-let single _table a = Single a
-
-let simple_pair _table s = SimplePair s
-
-(* This is the only case where we have to check that the system are
-   compatible. *)
-let pair table a b =
-  if a = b then Pair (a,a) else
-    let se = Pair (a,b) in
-    check_system_expr table se;
-    se
-
 (*------------------------------------------------------------------*)
 
-let pp_descrs table ppf system =
+let pp_descrs (table : Symbols.table) ppf (system : t) =
   Fmt.pf ppf "@[<v 2>Available actions:@;@;";
   iter_descrs table system (fun descr ->
-      Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
-        Action.pp_descr descr) ;
+    Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
+      Action.pp_descr descr) ;
   Fmt.pf ppf "@]%!@."
 
+(*------------------------------------------------------------------*)
 
-let clone_system_iter table original_system new_system iterdescr =
-  let odescrs = descrs table original_system in
-  let symbs = symbs table original_system in
-  let ndescrs = System.Msh.map iterdescr odescrs in
-  let data = System.System_data (ndescrs,symbs) in
-  Symbols.System.declare_exact table new_system ~data ()
+let clone_system 
+    (table      : Symbols.table)
+    (old_system : t)
+    (new_system : Symbols.lsymb)
+    (map        : Action.descr -> Action.descr)
+  : Symbols.table * Symbols.system 
+  =
+  let projections = List.map fst (to_list old_system) in
+  let old_actions = descrs table old_system in
+  let table, new_system = System.declare_empty table new_system projections in
+  let table =
+    System.Msh.fold
+      (fun _ descr table ->
+         let descr = map descr in
+         let table,_,_ = System.register_action table new_system descr in
+         table)
+      old_actions
+      table
+  in
+  table, new_system
 
 (*------------------------------------------------------------------*)
-(** {2 Parser types } *)
+(* Pairs *)
 
-let default_system_name = L.mk_loc Location._dummy "default"
+let make_pair a b = List [Term.left_proj,a; Term.right_proj,b]
 
-type p_single_system =
-  | P_Left  of lsymb
-  | P_Right of lsymb
+let fst = function
+  | List [x;_] -> x
+  | _ -> assert false
 
-type p_system_expr_i =
-  | P_Single     of p_single_system
-  | P_SimplePair of lsymb
-  | P_Pair       of p_single_system * p_single_system
+let snd = function
+  | List [_;x] -> x
+  | _ -> assert false
 
-type p_system_expr = p_system_expr_i L.located 
+(*------------------------------------------------------------------*)
+(** {2 Contexts} *)
 
-let pp_p_single fmt = function
-  | P_Left id  -> Fmt.pf fmt "%s/left"  (L.unloc id)
-  | P_Right id -> Fmt.pf fmt "%s/right" (L.unloc id)
+type context = {
+  set  : arbitrary expr ;
+  pair : pair expr option
+}
 
-let pp_p_system fmt (s : p_system_expr) = 
-  match L.unloc s with
-  | P_Single s      -> Fmt.pf fmt "%a" pp_p_single s
-  | P_SimplePair id -> Fmt.pf fmt "%s" (L.unloc id)
-  | P_Pair (s1, s2) -> Fmt.pf fmt "%a,%a" pp_p_single s1 pp_p_single s2
+let context_any = { set = any ; pair = None }
 
-let parse_single table = function
-  | P_Left a  -> Left  (System.of_lsymb a table)
-  | P_Right a -> Right (System.of_lsymb a table)
+let equivalence_context ?set pair =
+  let set = match set with
+    | Some s -> s
+    | None ->
+       begin match pair with
+         | List ((_,ss)::_) -> any_compatible_with ss.system
+         | _ -> assert false
+       end
+  in
+  { pair = Some pair ; set }
 
-let parse_se table p_se = match L.unloc p_se with
-  | P_Single s       -> single table (parse_single table s)
-  | P_SimplePair str -> simple_pair table (System.of_lsymb str table)
-  | P_Pair (a,b)     ->
-    pair table (parse_single table a) (parse_single table b)
+let reachability_context set = { set ; pair = None }
+
+let pp_context fmt = function
+  | { set; pair = None   } -> pp fmt set
+  | { set; pair = Some p } ->
+      if set = p then
+        Format.fprintf fmt "%a@ (same for equivalences)" pp set
+      else
+        Format.fprintf fmt "%a@ (@[<2>equivalences:@ %a@])" pp set pp p
+
+let pp_context fmt c = Format.fprintf fmt "@[%a@]" pp_context c
+
+let get_compatible_expr = function
+  | { set = Any } -> None
+  | { set = expr } -> Some expr
+
+let project_set (projs : Term.projs) (c : context) : context =
+  { c with set = project projs c.set }
+
+let project_set_opt (projs : Term.projs option) (c : context) : context =
+  { c with set = project_opt projs c.set }
+
+(*------------------------------------------------------------------*)
+(** {2 Misc} *)
+  
+let print_system (table : Symbols.table) (system : _ expr) : unit =
+  try
+    let system = to_fset system in
+    Printer.prt `Result "@[<v>System @[[%a]@]@;@[%a@]@;@[%a@]@;@]%!"
+      pp system
+      (pp_descrs table) system
+      (if Config.print_trs_equations ()
+       then Completion.print_init_trs
+       else (fun _fmt _ -> ()))
+      table
+  with _ ->
+    Printer.prt `Result "@.Cannot print action descriptions for system %a@."
+      pp system

@@ -8,21 +8,21 @@
   (instrumentation (backend bisect_ppx))
   (inline_tests)
   (preprocess (pps ppx_inline_test))
-  (libraries fmt fmt.tty alcotest ocamlgraph pcre tiny_httpd
+  (libraries fmt fmt.tty alcotest ocamlgraph pcre menhirLib tiny_httpd
     (select smt.ml from
       (why3  -> smt.why3api.ml)
       (!why3 -> smt.stub.ml))))
 
 (ocamllex lexer htmlLexer)
 (menhir
-  (modules parser htmlParser))
+  (modules parser htmlParser)
+   (flags --table --explain))
 
-;; Too many warnings, so we make them non-fatal
-;; ignore irrelevant warnings:
+;; We decide to ignore the following warnings:
 ;; 7:  method overriden
 ;; 9:  unbound label in record pattern
 ;; 27: unused variable
 ;; 36: unused ancestor variable super
 (env
   (dev
-    (flags (:standard -warn-error -A -w -7-9-27-36))))
+    (flags (:standard -w -7-9-27-36))))

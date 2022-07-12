@@ -1,4 +1,6 @@
-set autoIntro=false.
+
+
+include Basic.
 
 (* Checking the treatment of bound variables in direct cases for prf. *)
 
@@ -15,11 +17,11 @@ Proof.
   prf 1.
   (* Check that the right formula has been produced,
      using an incorrect equivalence that we admit. *)
-  equivalent
-    (forall (i0:index), (diff(n(i) <> n(i0), m(i) <> n(i0)))),
-    True.
+  have ->:
+    (forall (i0:index), (diff(n(i) <> n(i0), m(i) <> n(i0)))) =
+    true.
   admit. 
-  by yesif 1.
+  by rewrite if_true in 1.
 Qed.
 
 (* Secondary test, without any bound variable, just to check
@@ -29,9 +31,8 @@ Proof.
   prf 1.
   (* Check that the right formula has been produced,
      using an incorrect equivalence that we admit. *)
-  equivalent
-    (diff(n(i), m(i)) <> n(i)),
-    True.
+  have ->:
+    (diff(n(i), m(i)) <> n(i)) = true.
   admit.
-  by yesif 1.
+  by rewrite if_true in 1.
 Qed.

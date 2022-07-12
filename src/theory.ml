@@ -1,6 +1,7 @@
 open Utils
 open Env
 
+module SE = SystemExpr
 module L = Location
 
 type lsymb = string L.located
@@ -40,9 +41,9 @@ type bnds = (lsymb * p_ty) list
 
 type term_i =
   | Tpat
-  | Diff  of term * term
-  | Seq   of bnds * term
-  | Find  of lsymb list * term * term * term
+  | Diff of term * term (* TODO generalize *)
+  | Seq  of bnds * term
+  | Find of bnds * term * term * term
 
   | App of lsymb * term list
   (** An application of a symbol to some arguments which as not been
@@ -61,8 +62,6 @@ type term_i =
 
 and term = term_i L.located
 
-type formula = term
-
 (*------------------------------------------------------------------*)
 let equal_p_ty t t' = match L.unloc t, L.unloc t' with
   | P_message  , P_message
@@ -76,6 +75,11 @@ let equal_p_ty t t' = match L.unloc t, L.unloc t' with
   | _, _ -> false
 
 (*------------------------------------------------------------------*)
+let equal_bnds l l' =
+  List.for_all2 (fun (s,k) (s',k') ->
+      L.unloc s = L.unloc s' && equal_p_ty k k'
+    ) l l'
+
 let rec equal t t' = match L.unloc t, L.unloc t' with
   | Diff (a,b), Diff (a',b') ->
     equal a a' && equal b b'
@@ -84,17 +88,13 @@ let rec equal t t' = match L.unloc t, L.unloc t' with
   | ForAll (l, a), ForAll (l', a')
   | Exists (l, a), Exists (l', a') ->
     List.length l = List.length l' &&
-    List.for_all2 (fun (s,k) (s',k') ->
-        L.unloc s = L.unloc s' && equal_p_ty k k'
-      ) l l'
-    && equal a a'
+    equal_bnds l l' &&
+    equal a a'
 
   | Find (l, a, b, c), Find (l', a', b', c') ->
     List.length l = List.length l' &&
-    List.for_all2 (fun s s' ->
-        L.unloc s = L.unloc s'
-      ) l l'
-    && equals [a; b; c] [a'; b'; c']
+    equal_bnds l l' &&
+    equals [a; b; c] [a'; b'; c']
 
   | AppAt (s, ts, t), AppAt (s', ts', t') ->
     L.unloc s = L.unloc s' &&
@@ -146,7 +146,7 @@ let rec pp_term_i ppf t = match t with
       Fmt.pf ppf
         "@[%a@ %a@ %a@ %a@ %a@ %a@ %a@ %a@]"
         (Printer.kws `TermCondition) "try find"
-        (Utils.pp_list Fmt.string) (L.unlocs vs)
+        pp_var_list vs
         (Printer.kws `TermCondition) "such that"
         pp_term c
         (Printer.kws `TermCondition) "in"
@@ -203,7 +203,7 @@ let rec pp_term_i ppf t = match t with
       pp_ts ts
 
   | Seq (vs, b) ->
-      Fmt.pf ppf "@[%a(@[%a->%a@])@]"
+      Fmt.pf ppf "@[<hov 2>%a(%a->@,@[%a@])@]"
         (Printer.kws `TermSeq) "seq"
         pp_var_list vs
         pp_term b
@@ -250,12 +250,17 @@ type global_formula = global_formula_i Location.located
 
 and global_formula_i =
   | PEquiv  of equiv
-  | PReach  of formula
+  | PReach  of term
   | PImpl   of global_formula * global_formula
   | PAnd    of global_formula * global_formula
   | POr     of global_formula * global_formula
   | PQuant  of pquant * bnds * global_formula
 
+(*------------------------------------------------------------------*)
+(** {2 Any term: local or global} *)
+
+type any_term = Global of global_formula | Local of term
+                  
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
@@ -268,12 +273,11 @@ type conversion_error_i =
   | Type_error           of term_i * Type.ty
   | Timestamp_expected   of term_i
   | Timestamp_unexpected of term_i
-  (* | Untypable_equality   of term_i *)
   | Unsupported_ord      of term_i
-  | String_expected      of term_i (* TODO: move *)
-  | Int_expected         of term_i (* TODO: move *)
-  | Tactic_type          of string (* TODO: move *)
-  | Index_not_var        of term_i
+  | String_expected      of term_i
+  | Int_expected         of term_i
+  | Tactic_type          of string
+  | NotVar
   | Assign_no_state      of string
   | BadNamespace         of string * Symbols.namespace
   | Freetyunivar
@@ -282,7 +286,9 @@ type conversion_error_i =
   | BadInfixDecl
   | PatNotAllowed
   | ExplicitTSInProc
-  | UndefInSystem of SystemExpr.t
+  | UndefInSystem        of SE.t
+  | MissingSystem
+  | BadProjInSubterm     of Term.projs * Term.projs
 
 type conversion_error = L.t * conversion_error_i
 
@@ -305,7 +311,7 @@ let pp_error_i ppf = function
     Fmt.pf ppf "%a %s is undefined" Symbols.pp_namespace n s
 
   | Type_error (s, ty) ->
-    Fmt.pf ppf "Term %a is not of type %a" pp_i s Type.pp ty
+    Fmt.pf ppf "@[<hov 0>Term@;<1 2>@[%a@]@ is not of type @[%a@]@]" pp_i s Type.pp ty
 
   | Timestamp_expected t ->
     Fmt.pf ppf "The term %a must be given a timestamp" pp_i t
@@ -332,9 +338,8 @@ let pp_error_i ppf = function
   | Tactic_type s ->
     Fmt.pf ppf "The tactic arguments could not be parsed: %s" s
 
-  | Index_not_var i ->
-    Fmt.pf ppf "An index must be a variable, the term %a \
-                cannot be seen as an index" pp_i i
+  | NotVar ->
+    Fmt.pf ppf "must be a variable" 
 
   | Assign_no_state s ->
     Fmt.pf ppf "Only mutables can be assigned values, and the \
@@ -364,10 +369,20 @@ let pp_error_i ppf = function
 
   | UndefInSystem t ->
     Fmt.pf ppf "action not defined in system @[%a@]"
-      SystemExpr.pp t
+      SE.pp t
 
+  | MissingSystem ->
+    Fmt.pf ppf "missing system annotation"
+
+  | BadProjInSubterm (ps1, ps2) ->
+    Fmt.pf ppf "@[<v 2>invalid projection:@;missing projections: %a@;\
+                unknown projections: %a@]"
+      Term.pp_projs ps1
+      Term.pp_projs ps2
+
+      
 let pp_error pp_loc_err ppf (loc,e) =
-  Fmt.pf ppf "%a%a"
+  Fmt.pf ppf "%a@[<hov 2>Conversion error:@, %a@]"
     pp_loc_err loc
     pp_error_i e
 
@@ -376,10 +391,10 @@ let pp_error pp_loc_err ppf (loc,e) =
 
 let parse_p_ty (env : Env.t) (pty : p_ty) : Type.ty =
   match L.unloc pty with
-  | P_message        -> Message  
-  | P_boolean        -> Boolean  
-  | P_index          -> Index    
-  | P_timestamp      -> Timestamp
+  | P_message        -> Type.tmessage  
+  | P_boolean        -> Type.tboolean  
+  | P_index          -> Type.tindex    
+  | P_timestamp      -> Type.ttimestamp
 
   | P_tvar tv_l ->
     let tv =
@@ -439,11 +454,11 @@ let function_kind table (f : lsymb) : mf_type =
       `Macro (targs, ty)
 
     | Macro (Input|Output|Frame) ->
-      (* TODO: subtypes*)
-      `Macro ([], Type.Message)
+      (* FEATURE: subtypes*)
+      `Macro ([], Type.tmessage)
 
     | Macro (Cond|Exec) ->
-      `Macro ([], Type.Boolean)
+      `Macro ([], Type.tboolean)
 
     | _ -> conv_err (L.loc f) (Untyped_symbol (L.unloc f))
 
@@ -455,11 +470,11 @@ let check_state table (s : lsymb) n : Type.ty =
 
     | _ -> conv_err (L.loc s) (Assign_no_state (L.unloc s))
 
-let check_name table (s : lsymb) n : Type.ty =
-    let ndef = Symbols.Name.def_of_lsymb s table in
-    let arity = ndef.n_iarr in
+let check_name table (s : lsymb) n : Type.ftype =
+    let fty = (Symbols.Name.def_of_lsymb s table).n_fty in
+    let arity = List.length fty.fty_args in
     if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity));
-    ndef.n_ty
+    fty
 
 let check_action (env : Env.t) (s : lsymb) (n : int) : unit =
   let l,action = Action.find_symbol s env.table in
@@ -467,11 +482,10 @@ let check_action (env : Env.t) (s : lsymb) (n : int) : unit =
 
   if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity));
 
-  let _ = 
-    try SystemExpr.descr_of_action env.table env.system action with
-    | Not_found -> conv_err (L.loc s) (UndefInSystem env.system)
-  in
-  ()
+  try
+    let system = SE.to_compatible env.system.set in
+    ignore (SE.action_to_term env.table system action)
+  with _ -> conv_err (L.loc s) (UndefInSystem env.system.set)
 
 
 (*------------------------------------------------------------------*)
@@ -566,7 +580,7 @@ let make_app_i table cntxt (lsymb : lsymb) (l : term list) : app_i =
 
     | Symbols.Name ndef ->
       if is_at cntxt then ts_unexpected ();
-      check_arity lsymb (List.length l) ndef.n_iarr ;
+      check_arity lsymb (List.length l) (List.length ndef.n_fty.fty_args) ;
       Name (lsymb,l)
 
     | Symbols.Macro (Symbols.State (arity,_)) ->
@@ -649,12 +663,12 @@ let subst t (s : (string * term_i) list) =
 (** {2 Conversion contexts and states} *)
 
 (** Conversion contexts.
-  * - [InGoal]: we are converting a term in a goal (or tactic). All
-  *   timestamps must be explicitely given.
-  * - [InProc ts]: we are converting a term in a process at an implicit
-  *   timestamp [ts]. *)
+    - [InGoal]: converting a term in a goal (or tactic). All
+      timestamps must be explicitely given.
+    - [InProc (projs, ts)]: converting a term in a process at an implicit
+      timestamp [ts], with projections [projs]. *)
 type conv_cntxt =
-  | InProc of Term.term
+  | InProc of Term.projs * Term.term
   | InGoal
 
 let is_in_proc = function InProc _ -> true | InGoal -> false
@@ -701,6 +715,34 @@ let check_ty_leq state ~of_t (t_ty : Type.ty) (ty : Type.ty) : unit =
 
 let check_term_ty state ~of_t (t : Term.term) (ty : Type.ty) : unit =
   check_ty_leq state ~of_t (Term.ty ~ty_env:state.ty_env t) ty
+
+(*------------------------------------------------------------------*)
+(** {2 System projections} *)
+
+(** check that projection alive at a given subterm w.r.t. projections
+    used in a diff operator application. *)
+let check_system_projs loc (state : conv_state) (projs : Term.projs) : unit =
+  let current_projs =
+    match state.cntxt with
+    | InProc (ps, _) -> ps
+    | InGoal ->
+      if not (SE.is_fset state.env.system.set) then
+        conv_err loc MissingSystem;
+
+      let fset = SE.to_fset state.env.system.set in
+      SE.to_projs fset
+  in
+
+  let diff1 = List.diff current_projs projs
+  and diff2 = List.diff projs current_projs in
+
+  if diff1 <> [] || diff2 <> [] then
+    conv_err loc (BadProjInSubterm (diff1, diff2))
+
+let proj_state (projs : Term.projs) (state : conv_state) : conv_state =
+  match state.cntxt with 
+  | InProc (ps, ts) -> { state with cntxt = InProc ([Term.left_proj], ts) }
+  | InGoal -> { state with env = projs_set [Term.left_proj ] state.env }
 
 (*------------------------------------------------------------------*)
 (** {2 Conversion} *)
@@ -815,8 +857,8 @@ and convert0
     (* otherwise build the application and convert it. *)
     else
       let app_cntxt = match state.cntxt with
-        | InGoal -> NoTS |
-          InProc ts -> MaybeAt ts in
+        | InGoal -> NoTS
+        | InProc (_, ts) -> MaybeAt ts in
 
       conv_app state app_cntxt
         (tm, make_app loc state.env.table app_cntxt f terms)
@@ -830,23 +872,30 @@ and convert0
       (tm, make_app loc state.env.table app_cntxt f terms)
       ty
 
-  | Diff (l,r) -> Term.mk_diff (conv ty l) (conv ty r)
+  | Diff (l,r) ->
+    check_system_projs loc state [Term.left_proj; Term.right_proj];
+    
+    let statel = proj_state [Term.left_proj ] state in
+    let stater = proj_state [Term.right_proj] state in
+      
+    Term.mk_diff [Term.left_proj , convert statel l ty;
+                  Term.right_proj, convert stater r ty; ] 
 
   | Find (vs,c,t,e) ->
     let env, is =
-      convert_bnds state.env (List.map (fun x -> x, Type.tindex) vs)
+      convert_p_bnds state.env vs
     in
     
-    Vars.check_type_vars is [Type.Index] type_error;
+    Vars.check_type_vars is [Type.tindex; Type.ttimestamp] type_error;
 
-    let c = conv ~env Type.Boolean c in
+    let c = conv ~env Type.tboolean c in
     let t = conv ~env ty t in
     let e = conv ty e in
     Term.mk_find is c t e
 
   | ForAll (vs,f) | Exists (vs,f) ->
     let env, evs = convert_p_bnds state.env vs in
-    let f = conv ~env Type.Boolean f in
+    let f = conv ~env Type.tboolean f in
     begin match L.unloc tm with
       | ForAll _ -> Term.mk_forall evs f
       | Exists _ -> Term.mk_exists evs f
@@ -861,15 +910,17 @@ and convert0
     let t = conv ~env (Type.TUnivar tyv) t in
 
     let () =
-      Vars.check_type_vars evs [Type.Index; Type.Timestamp] type_error
+      Vars.check_type_vars evs [Type.tindex; Type.ttimestamp] type_error
     in
     Term.mk_seq0 ~simpl:false evs t
 
-and conv_index state t = 
-  match convert state t Type.Index with
+and conv_var state t ty = 
+  match convert state t ty with
     | Term.Var x -> x
-    | _ -> conv_err (L.loc t) (Index_not_var (L.unloc t))
+    | _ -> conv_err (L.loc t) NotVar
 
+and conv_vars state ts tys = List.map2 (conv_var state) ts tys
+    
 (* The term [tm] in argument is here for error messages. *)
 and conv_app 
     (state     : conv_state)
@@ -908,7 +959,7 @@ and conv_app
 
       let l_indices, l_messages = List.takedrop fty_op.Type.fty_iarr l in
       let indices =
-        List.map (fun x -> conv_index state x) l_indices
+        List.map (fun x -> conv_var state x Type.tindex) l_indices
       in
 
       let rmessages =
@@ -938,14 +989,18 @@ and conv_app
         | Symbols.State _ -> assert false
 
         | Symbols.Global _ ->
-          assert (List.for_all (fun x -> x = Type.Index) ty_args);
-          let indices = List.map (conv_index state) l in
+          assert (List.for_all (fun x -> x = Type.tindex) ty_args);
+          let indices =
+            List.map (fun x ->
+                conv_var state x Type.tindex
+              ) l
+          in
           let ms = Term.mk_isymb s ty_out indices in
           Term.mk_macro ms [] (get_at ts_opt)
 
         | Input | Output | Frame ->
           check_arity_i (L.loc f) "input" (List.length l) 0 ;
-          (* TODO: subtypes *)
+          (* FEATURE: subtypes *)
           let ms = Term.mk_isymb s ty_out [] in
           Term.mk_macro ms [] (get_at ts_opt)
 
@@ -967,10 +1022,9 @@ and conv_app
 
   | Get (s,opt_ts,is) ->
     let k = check_state state.env.table s (List.length is) in
-    let is = List.map (conv_index state) is in
+    let is = List.map (fun i -> conv_var state i Type.tindex) is in
     let s = get_macro state.env s in
     let ts =
-      (* TODO: check this *)
       match opt_ts with
       | Some ts -> ts
       | None -> conv_err loc (Timestamp_expected t_i)
@@ -979,16 +1033,17 @@ and conv_app
     Term.mk_macro ms [] ts
 
   | Name (s, is) ->
-    let sty = check_name state.env.table s (List.length is) in
-    let is = List.map (conv_index state) is in
-    let ns = Term.mk_isymb (get_name state.env.table s) sty is in
+    let s_fty = check_name state.env.table s (List.length is) in
+    assert (s_fty.fty_iarr = 0 && s_fty.fty_vars = []);
+    let is = conv_vars state is s_fty.fty_args in
+    let ns = Term.mk_isymb (get_name state.env.table s) s_fty.fty_out is in
     Term.mk_name ns
 
   | Taction (a,is) ->
     check_action state.env a (List.length is) ;
     Term.mk_action
       (get_action state.env a)
-      (List.map (conv_index state) is)
+      (List.map (fun x -> conv_var state x Type.tindex) is)
 
 (*------------------------------------------------------------------*)
 (** convert HO terms *)
@@ -1012,17 +1067,32 @@ let conv_ht (state : conv_state) (t : hterm) : Type.hty * Term.hterm =
 (** {2 Function declarations} *)
 
 let mk_ftype iarr vars args out =
-  let mdflt ty = odflt Type.Message ty in
+  let mdflt ty = odflt Type.tmessage ty in
   Type.mk_ftype iarr vars (List.map mdflt args) (mdflt out)
 
-let declare_ddh table ?group_ty ?exp_ty gen exp (f_info : Symbols.symb_type) =
+let declare_dh
+      (table : Symbols.table)
+      (h : Symbols.dh_hyp list)
+      ?group_ty ?exp_ty
+      (gen : lsymb)
+      ((exp, f_info) : lsymb * Symbols.symb_type)
+      (omult : (lsymb * Symbols.symb_type) option)
+    : Symbols.table =
   let open Symbols in
   let gen_fty = mk_ftype 0 [] [] group_ty in
   let exp_fty = mk_ftype 0 [] [group_ty; exp_ty] group_ty in
-
-  let table, exp = Function.declare_exact table exp (exp_fty,Abstract f_info) in
-  let data = AssociatedFunctions [exp] in
-  fst (Function.declare_exact table ~data gen (gen_fty,DDHgen))
+  let table, exp = Function.declare_exact table exp (exp_fty, Abstract f_info) in
+  let (table, af) = match omult with
+    | None -> (table, [exp])
+    | Some (mult, mf_info) ->
+       let mult_fty = mk_ftype 0 [] [exp_ty; exp_ty] exp_ty in
+       let (table, mult) =
+         Function.declare_exact table mult (mult_fty, Abstract mf_info)
+       in
+       (table, [exp; mult])
+  in
+  let data = AssociatedFunctions af in
+  fst (Function.declare_exact table ~data gen (gen_fty, DHgen h))
 
 let declare_hash table ?index_arity ?m_ty ?k_ty ?h_ty s =
   let index_arity = odflt 0 index_arity in
@@ -1069,7 +1139,6 @@ let declare_signature table
   let open Symbols in
   let sig_fty   = mk_ftype 0 [] [m_ty; sk_ty] sig_ty in
 
-  (* TODO: change output type to booleans ? *)
   let check_fty = mk_ftype 0 [] [sig_ty; pk_ty] check_ty in
 
   let pk_fty    = mk_ftype 0 [] [sk_ty] pk_ty in
@@ -1094,19 +1163,27 @@ let check_signature table checksign pk =
 let declare_name table s ndef =
   fst (Symbols.Name.declare_exact table s ndef)
 
+(*------------------------------------------------------------------*)
+(** Sanity checks for a function symbol declaration. *)
+let check_fun_symb
+    table
+    (ty_args : Type.tvar list) (in_tys : Type.ty list) (index_arity : int)
+    (s : lsymb) (f_info : Symbols.symb_type) : unit
+  =
+  match f_info with
+  | `Prefix -> ()
+  | `Infix side ->
+    if not (index_arity = 0) ||
+       not (List.length ty_args = 0) ||
+       not (List.length in_tys = 2) then
+      conv_err (L.loc s) BadInfixDecl
+
 let declare_abstract 
     table ~index_arity ~ty_args ~in_tys ~out_ty 
     (s : lsymb) (f_info : Symbols.symb_type) 
   =
   (* if we declare an infix symbol, run some sanity checks *)
-  let () = match f_info with
-    | `Prefix -> ()
-    | `Infix ->
-      if not (index_arity = 0) ||
-         not (List.length ty_args = 0) ||
-         not (List.length in_tys = 2) then
-        conv_err (L.loc s) BadInfixDecl;
-  in
+  check_fun_symb table ty_args in_tys index_arity s f_info;
 
   let ftype = Type.mk_ftype index_arity ty_args in_tys out_ty in
   fst (Symbols.Function.declare_exact table s (ftype, Symbols.Abstract f_info))
@@ -1153,13 +1230,14 @@ let convert_ht
 let check
     (env : Env.t) ?(local=false) ?(pat=false) 
     (ty_env : Type.Infer.env)
-    t (s : Type.ty) 
+    (projs : Term.projs)
+    (t : term) (s : Type.ty) 
   : unit 
   =
   let dummy_var s =
     Term.mk_var (snd (Vars.make `Approx Vars.empty_env s "#dummy"))
   in
-  let cntxt = if local then InProc (dummy_var Type.Timestamp) else InGoal in
+  let cntxt = if local then InProc (projs, (dummy_var Type.Timestamp)) else InGoal in
   
   let state = mk_state env cntxt pat ty_env in
   ignore (convert state t s)
@@ -1215,10 +1293,18 @@ let convert_global_formula (cenv : conv_env) (p : global_formula) =
     | POr   (f1, f2) -> Equiv.Or   (conve f1, conve f2)
 
     | PEquiv e ->
-      Equiv.Atom (Equiv.Equiv (convert_equiv cenv e))
+      begin match cenv.env.system with
+      | SE.{ pair = Some p } ->
+        let system = SE.{ set = (p :> SE.t) ; pair = None } in
+        let env = Env.update ~system cenv.env in
+        let cenv = { cenv with env } in
+        Equiv.Atom (Equiv.Equiv (convert_equiv cenv e))
+      | _ ->
+        conv_err (L.loc p) MissingSystem
+      end
 
     | PReach f ->
-      let f, _ = convert ~ty:Type.Boolean cenv f in
+      let f, _ = convert ~ty:Type.tboolean cenv f in
       Equiv.Atom (Equiv.Reach f)
 
 
@@ -1234,6 +1320,14 @@ let convert_global_formula (cenv : conv_env) (p : global_formula) =
 
   conve cenv p
 
+(*------------------------------------------------------------------*)
+(** {2 Convert any} *)
+
+let convert_any (cenv : conv_env) (p : any_term) : Equiv.any_form =
+  match p with
+  | Local  p -> Local (fst (convert ~ty:Type.Boolean cenv p))
+  | Global p -> Global (convert_global_formula cenv p)
+  
 (*------------------------------------------------------------------*)
 (** {2 State and substitution parsing} *)
 
@@ -1258,13 +1352,15 @@ let declare_state
   let ts_init = Term.mk_action Symbols.init_action [] in
   
   let env = Env.init ~table () in
-  let conv_env = { env; cntxt = InProc ts_init; } in
+  let conv_env = { env; cntxt = InProc ([], ts_init); } in
 
   let env, indices = convert_p_bnds env typed_args in
   let conv_env = { conv_env with env } in
-  
-  Vars.check_type_vars indices [Type.Index]
-    (fun () -> conv_err (L.loc pty) (BadPty [Type.Index]));
+
+  List.iter2 (fun v (_, pty) ->
+      if not (Type.equal (Vars.ty v) Type.tindex) then
+        conv_err (L.loc pty) (BadPty [Type.tindex])
+    ) indices typed_args;
 
   (* parse the macro type *)
   let ty = parse_p_ty env pty in
@@ -1289,8 +1385,6 @@ let get_init_states table : (Term.state * Term.term) list =
       | _ -> acc
     ) [] table
 
-(* TODO could be generalized into a generic fold function
- * fold : (term -> 'a -> 'a) -> term -> 'a -> 'a *)
 let find_app_terms t (names : string list) =
   let rec aux (name : string) acc t = match L.unloc t with
     | App (x',l) ->
@@ -1304,7 +1398,6 @@ let find_app_terms t (names : string list) =
     | Exists (_,t')
     | ForAll (_,t') -> aux name acc t'
 
-    (* FIXME: I think some cases may be missing *)
     | _                 -> acc
 
   and aux_list name acc l =
@@ -1327,7 +1420,6 @@ type p_pt = {
 and p_pt_arg =
   | PT_term of term
   | PT_sub  of p_pt             (* sub proof term *)
-  | PT_obl  of L.t              (* generate a proof obligation *)
 
 (*------------------------------------------------------------------*)
 (** {2 Tests} *)
@@ -1374,17 +1466,17 @@ let () =
       let y = mk (App (mk "y", [])) in
 
       let vars = Vars.empty_env in
-      let vars, _ = Vars.make `Approx vars Type.Message "x" in
-      let vars, _ = Vars.make `Approx vars Type.Message "y" in
+      let vars, _ = Vars.make `Approx vars Type.tmessage "x" in
+      let vars, _ = Vars.make `Approx vars Type.tmessage "y" in
       let env = Env.init ~vars ~table () in
 
       let t_i = App (mk "e", [mk (App (mk "h", [x;y]));x;y]) in
       let t = mk t_i in
       let ty_env = Type.Infer.mk_env () in
-      check env ty_env t Type.tmessage ;
+      check env ty_env [] t Type.tmessage ;
       Alcotest.check_raises
         "message is not a boolean"
         (Conv (L._dummy, Type_error (t_i, Type.tboolean)))
-        (fun () -> check env ty_env t Type.tboolean)
+        (fun () -> check env ty_env [] t Type.tboolean)
     end
   ]

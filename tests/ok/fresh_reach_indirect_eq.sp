@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 name n : index->message
 
@@ -10,8 +10,8 @@ goal _ (j:index,t:timestamp) : n(j) = input@t => A(j) < t.
 Proof.
   nosimpl(intro Heq).
   nosimpl(fresh Heq).
-  nosimpl(intro H). 
-  nosimpl(assumption).
+  nosimpl(intro H).
+  constraints.
 Qed.
 
 (* we check that this implies that A(j) happened. *)

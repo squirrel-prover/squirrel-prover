@@ -1,4 +1,4 @@
-set autoIntro=false.
+set showStrengthenedHyp=true.
 
 channel c.
 

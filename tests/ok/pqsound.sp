@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 set postQuantumSound=true.
 
 hash h
@@ -53,16 +53,15 @@ global goal [attT] _  :
  [happens(O)] -> equiv(frame@pred(O))-> equiv(frame@pred(O), diff(cond@O, False)).
 Proof.
   intro t Ind.
-  equivalent cond@O, False.
-  expand cond.help.
-  simpl.
-  intro eq1.
-  destruct eq1 as [P N].
-  euf P.
-  intro ts eq.
-  depends A2,O.
-  auto.
-  auto.
+  have ->: cond@O <=> false. {
+    expand cond.
+    simpl.
+    intro eq1.
+    destruct eq1 as [P N].
+    euf P.
+    intro ts eq.
+    by depends A2,O.
+  }
 
   auto.
 Qed.

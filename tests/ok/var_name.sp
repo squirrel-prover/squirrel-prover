@@ -1,6 +1,6 @@
 system null.
 
-set autoIntro=false.
+
 
 (* check that variable naming allows to use any available variable name *)
 

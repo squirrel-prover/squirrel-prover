@@ -16,7 +16,6 @@ This is a "full" model with the last check of T, but our tool lacks a notion of
 induction over sequences to complete the proof.
 *******************************************************************************)
 
-set autoIntro = false.
 set postQuantumSound = true.
 
 hash H
@@ -93,14 +92,14 @@ Proof.
     - euf Meq => _ _ _; 1: auto.
       exists i,t0; simpl.
       assert (input@T(i,t0) = nr(r)) as F; 1: auto.
-      fresh F => C.
-      by case C; 3: depends R(r), R2(r).
+      by (fresh F => C;
+      5: depends R(r), R2(r)).
     (* right *)
     - euf Meq => _ _ _; 1:auto.
       exists i,t; simpl.
       assert (input@T(i,t) = nr(r)) as F; 1: auto.
-      fresh F => C.
-      by case C; 3: depends R(r), R2(r).
+      by (fresh F => C;
+      5: depends R(r), R2(r)).
 
   (* WA => Cond *)
   + by intro [i t _]; expand output; exists i,t.
@@ -110,7 +109,7 @@ Qed.
 (** Same as before, but more precise wrt i, for the left process.
     There has to remain an existential quantification on t,
     because it is not involved in the condition. *)
-goal [left] wa_R1_left (i,r:index):
+goal [default/left] wa_R1_left (i,r:index):
   xor(id(i),snd(input@R1(r))) =
   H(<tag0,<nr(r),fst(input@R1(r))>>,key(i))
   <=>
@@ -125,12 +124,12 @@ Proof.
   intro Meq; euf Meq => _ _ _; 1: auto.
   exists t; simpl.
   assert input@T(i,t) = nr(r) as F; 1: auto.
-  fresh F => C.
-  by case C; 3:depends R(r), R2(r).
+  by (fresh F => C;
+  5:depends R(r), R2(r)).
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
-goal [right] wa_R1_right (i,t,r:index):
+goal [default/right] wa_R1_right (i,t,r:index):
   xor(id'(i,t),snd(input@R1(r))) =
   H(<tag0,<nr(r),fst(input@R1(r))>>,key'(i,t))
   <=>
@@ -143,8 +142,8 @@ Proof.
   split; 2: by intro [_ _]; expand output.
   intro Meq; euf Meq => _ _ _; 1: auto.
   assert input@T(i,t) = nr(r) as F; 1: auto.
-  fresh F => C.
-  by case C; 3:depends R(r), R2(r).
+  by (fresh F => C;
+  5: by depends R(r), R2(r)).
 Qed.
 
 equiv unlinkability.
@@ -192,41 +191,33 @@ Proof.
 
   (* Case R1  WIP *)
   + expand frame, exec, cond, output.
-    fa 4; fa 5.
-
-    equivalent
-      (exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
-                           H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))),
-      (exists (i,t:index), T(i,t) < R1(r) &&
-       snd(output@T(i,t)) = snd(input@R1(r)) &&
-       fst(output@T(i,t)) = fst(input@R1(r)) &&
-       R(r) < T(i,t) &&
-       output@R(r) = input@T(i,t)).
-    by use wa_R1 with r.
+    fa 4; fa 5. 
+    rewrite wa_R1.
 
     fadup 5.
 
-    equivalent
+    have -> :
       (if
-          (exec@pred(R1(r)) &&
-           exists (i,t:index),
-           ((((T(i,t) < R1(r) && snd(output@T(i,t)) = snd(input@R1(r))) &&
-              fst(output@T(i,t)) = fst(input@R1(r)))
-             && R(r) < T(i,t))
-            && output@R(r) = input@T(i,t)))
+          exec@pred(R1(r)) &&
+          exists (i,t:index),
+          T(i,t) < R1(r) && snd(output@T(i,t)) = snd(input@R1(r)) &&
+          fst(output@T(i,t)) = fst(input@R1(r)) && 
+          R(r) < T(i,t) && 
+          output@R(r) = input@T(i,t)
         then
           (try find i,t such that
              xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
              H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))) in
              xor(diff(id(i),id'(i,t)),
-                 H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))))),
+                 H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))))))
+      =
       (if
-          (exec@pred(R1(r)) &&
-           exists (i,t:index),
-           ((((T(i,t) < R1(r) && snd(output@T(i,t)) = snd(input@R1(r))) &&
-              fst(output@T(i,t)) = fst(input@R1(r)))
-             && R(r) < T(i,t))
-            && output@R(r) = input@T(i,t)))
+          exec@pred(R1(r)) &&
+          exists (i,t:index),
+          T(i,t) < R1(r) && snd(output@T(i,t)) = snd(input@R1(r)) &&
+             fst(output@T(i,t)) = fst(input@R1(r))
+            && R(r) < T(i,t)
+           && output@R(r) = input@T(i,t)
           then
           (try find i,t such that
              exec@pred(R1(r)) &&
@@ -269,9 +260,10 @@ Proof.
 
     (* Same as wa_R1 but with @R2 instead of @R1,
        and the equivalence is used under a negation. *)
-    equivalent
+    have -> :
       (exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R2(r))) =
-                     H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t)))),
+                     H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t))))
+      <=>
       (exists (i,t:index), T(i,t) < R2(r) &&
         snd(output@T(i,t)) = snd(input@R2(r)) &&
         fst(output@T(i,t)) = fst(input@R2(r)) &&
@@ -288,15 +280,15 @@ Proof.
         - euf Meq => _ _ _; 1:auto.
           exists i,t0; simpl.
           assert (nr(r) = input@T(i,t0)) as F; 1:auto.
-          fresh F => C.
-          by case C; 2:depends R(r), R1(r).
+          fresh F => C; [1:auto];
+          by depends R(r), R1(r). 
 
         (* right *)
         - euf Meq => _ _ _; 1:auto.
           exists i,t; simpl.
           assert (nr(r) = input@T(i,t)) as F; 1:auto.
-          fresh F => C.
-          by case C; 2:depends R(r), R1(r).
+          fresh F => C; [1:auto];
+          by depends R(r), R1(r).
 
       (* proof of lemma: WA => Cond *)
       * by intro [i t _]; expand output; exists i,t.
@@ -311,16 +303,18 @@ Proof.
   + expand frame, exec.
     fa 4. fa 5.
 
-    equivalent exec@pred(T1(i,t)) && cond@T1(i,t),
-      exec@pred(T1(i,t)) &&
-      exists r:index,
+    have ->:
+    (exec@pred(T1(i,t)) && cond@T1(i,t)) 
+    <=>
+    (exec@pred(T1(i,t)) &&
+     exists r:index,
       R1(r) < T1(i,t) &&
       input@T1(i,t) = output@R1(r) &&
       T(i,t) < R1(r) &&
       fst(input@R1(r)) = fst(output@T(i,t)) &&
       snd(input@R1(r)) = snd(output@T(i,t)) &&
       R(r) < T(i,t) &&
-      input@T(i,t) = output@R(r).
+      input@T(i,t) = output@R(r)).
     {
       expand cond; split.
       (* Cond => Honest *)
@@ -369,9 +363,9 @@ Proof.
           exists r; simpl.
           assert R(r) < T(i,t) as _. {
             assert nr(r) = input@T(i,t) as HF; 1:auto.
-            fresh HF => C.
-            by case C; [3: depends R(r),R2(r) |
-                        2: depends R(r),R1(r)].
+            fresh HF => C;
+            [5: by depends R(r),R2(r)];
+            auto.
           }
           simpl.
           case output@R1(r) => Meq1.
@@ -395,19 +389,20 @@ Proof.
   (* Case T2 *)
   + expand frame, exec, cond.
     fa 4. fa 5.
-    equivalent
+    have ->:
       (exec@pred(T2(i,t)) &&
        not(input@T2(i,t) =
-           diff(id(i),id'(i,t)) XOR H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t))))),
-      exec@pred(T2(i,t)) &&
-      not(exists r:index,
+           diff(id(i),id'(i,t)) XOR H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t)))))
+      <=>
+      (exec@pred(T2(i,t)) &&
+       not(exists r:index,
           R1(r) < T2(i,t) &&
           input@T2(i,t) = output@R1(r) &&
           T(i,t) < R1(r) &&
           fst(input@R1(r)) = fst(output@T(i,t)) &&
           snd(input@R1(r)) = snd(output@T(i,t)) &&
           R(r) < T(i,t) &&
-          input@T(i,t) = output@R(r)).
+          input@T(i,t) = output@R(r))).
     {
       split; intro [_ H1]; simpl.
 
@@ -442,8 +437,9 @@ Proof.
           exists r; simpl.
           assert R(r) < T(i,t). {
             assert nr(r) = input@T(i,t) as HF; 1: auto.
-            fresh HF => C.
-            by case C; 3: depends R(r),R2(r).
+            fresh HF => C;
+            [5: by depends R(r),R2(r)];
+            auto.
           }
           simpl.
           case output@R1(r) => Meq1.
@@ -467,8 +463,9 @@ Proof.
           exists r; simpl.
           assert R(r) < T(i,t) as _. {
             assert nr(r) = input@T(i,t) as HF; 1: auto.
-            fresh HF => C.
-            by case C; 3: depends R(r),R2(r).
+            fresh HF => C;
+            [5: by depends R(r),R2(r)];
+            auto.
           }
           simpl.
 

@@ -2,6 +2,8 @@
     or more accurately global sequents whose conclusion
     is a global meta-formula. *)
 
+module SE = SystemExpr
+  
 (*------------------------------------------------------------------*)
 include LowSequent.S with
   type  hyp_form = Equiv.global_form and
@@ -28,6 +30,12 @@ val init :
 val pp_init : Format.formatter -> t -> unit
 
 (*------------------------------------------------------------------*)
+(** {2 Misc} *)
+  
+val get_system_pair : t -> SE.pair
+val get_system_pair_projs : t -> Term.proj * Term.proj
+
+(*------------------------------------------------------------------*)
 (** {2 Utilities for equivalence sequents}
     Equivalence sequents are global sequents whose conclusion
     is an equivalence atom. *)
@@ -38,7 +46,7 @@ val set_equiv_goal : Equiv.equiv -> t -> t
     as a list of terms where diff operators have been fully
     eliminated.
     @return [None] if the conclusion is not an equivalence atom. *)
-val get_frame : Term.projection -> t -> Equiv.equiv option
+val get_frame : Term.proj -> t -> Equiv.equiv option
 
 val goal_is_equiv : t -> bool
 

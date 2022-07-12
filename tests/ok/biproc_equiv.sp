@@ -1,4 +1,6 @@
-set autoIntro=false.
+
+
+include Basic.
 
 channel c
 system A: in(c,x);out(c,zero);
@@ -24,9 +26,9 @@ by fa 0.
 expand frame@B.
 fa 0; fa 1.
 expand exec@B.
-equivalent cond@B, False.
+assert -> : cond@B = False.
 by expand cond@B. 
-by noif 1.
+by rewrite if_false in 1.
 
 expand frame@B1.
 by fa 0.

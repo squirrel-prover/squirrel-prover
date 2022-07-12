@@ -4,7 +4,6 @@
  * reader action R1(j,i) reveals which tag i has been identified. *)
 
 set postQuantumSound=true.
-set autoIntro=false.
 
 hash h
 

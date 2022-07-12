@@ -1,4 +1,6 @@
-set autoIntro=false.
+
+
+include Basic.
 
 abstract ok : message
 abstract ko : message
@@ -29,9 +31,9 @@ auto.
 
 nosimpl(expandall).
 fa 0. fa 1.
-by equivalent ok=ok, True.
+auto. 
 
 nosimpl(expandall).
 fa 0; fa 1.
-by equivalent ok=ok, True.
+auto.
 Qed.

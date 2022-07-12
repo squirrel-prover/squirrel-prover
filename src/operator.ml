@@ -2,13 +2,14 @@ open Utils
 
 module SE = SystemExpr
 
+(*------------------------------------------------------------------*)
 (** operator body *)
 type body = Term.term
 
 type[@warning "-37"] op_body =
-  | SingleDef of body                           (** same for all systems *)
+  | SingleDef of body                      (** same for all systems *)
   
-  | ManyDefs  of (SE.single_system * body) list (** system by system *)
+  | ManyDefs  of (System.Single.t * body) list (** system by system *)
   (* TODO: unused for now *)
 
 type operator = {
@@ -27,7 +28,7 @@ let pp_op_body fmt body =
   | SingleDef t -> Fmt.pf fmt "%a" Term.pp t
   | ManyDefs  l -> 
     Fmt.pf fmt "@[<v 0>%a@]"
-      (Fmt.list (Fmt.pair ~sep:Fmt.comma SE.pp_single Term.pp)) l
+      (Fmt.list (Fmt.pair ~sep:Fmt.comma System.Single.pp Term.pp)) l
 
 let pp_operator fmt op =
   let pp_tyvars fmt tyvars =
@@ -56,7 +57,7 @@ let mk ~name ~ty_vars ~args ~out_ty ~body =
 let ftype (op : operator) : Type.ftype = 
   Type.mk_ftype 0 op.ty_vars (List.map Vars.ty op.args) op.out_ty
 
-let get_body (system : SystemExpr.t) (op_body : op_body) : body =
+let get_body (system : 'a SystemExpr.expr) (op_body : op_body) : body =
   match op_body with
     | SingleDef body -> body
     | ManyDefs defs -> assert false (* TODO *)
@@ -68,7 +69,8 @@ let is_operator (table : Symbols.table) (fsymb : Term.fsymb) : bool =
   | _ -> false
 
 let unfold 
-    (cntxt  : Constr.trace_cntxt)
+    (table  : Symbols.table)
+    (se     : SE.arbitrary)
     (opsymb : Term.fsymb)
     (args   : Term.term list)
   : Term.term
@@ -76,11 +78,11 @@ let unfold
   let opname, opindices = opsymb in
   assert (opindices = []);
   let op = 
-    match Symbols.Function.get_data opname cntxt.table with
+    match Symbols.Function.get_data opname table with
     | Operator op -> op
     | _ -> assert false
   in
-  let body = get_body cntxt.system op.body in
+  let body = get_body se op.body in
 
   let subst = 
     List.map2 (fun x y -> 

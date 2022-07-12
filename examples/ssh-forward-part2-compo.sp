@@ -43,7 +43,8 @@ tion: a technique for protocol composition with long term shared secrets.
 In Proceedings of the 2020 ACM SIGSAC Conference on Computer and
 Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
-set autoIntro=false.
+
+include Basic.
 
 abstract ok : message
 abstract ko : message
@@ -77,7 +78,7 @@ name r3 : message
 name r4 : message
 name r5 : message
 
-ddh g, (^) where group:message exposants:message.
+ddh g, (^) where group:message exponents:message.
 
 (* As ssh uses a non keyed hash function, we rely on a fixed key hKey known to the attacker *)
 (* Note that hKey has to be a name and not a constant and this key is revealed at the beginning *)
@@ -350,30 +351,28 @@ Proof.
   expand sidPa.
   euf Hchk => Euf.
 
-  (* oracle case *)
-  destruct Euf as [_ [_|[i m m1 [H1|[i1 H2]]]]];
-  1: by auto.
-  by use hashlengthnotpair with
-   <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1> as HH.
-  (* rewrite H1 in HH. *)
+    + (* oracle case *)
+      destruct Euf as [_ [_|[i m m1 [H1|[i1 H2]]]]] => //.
+        - by use hashlengthnotpair with
+          <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1> as HH.
+     
+        - use signnottag with sidPa@P2, kP.
+          use Hc with i1.
+          destruct H2 as [m2 m3 H2]. 
+          right; right.
+          by collision.
 
-  use signnottag with sidPa@P2, kP.
-  use Hc with i1.
-  destruct H2 as [m2 [m3 H2]].
-  left; right.
-  by collision.
+    + (* honest case SDIS *)
+      intro Heq.
+      use freshindex as [l _].
+      use Hc with l.
+      by case Euf; expand sidSa; collision => _.
 
-  (* honest case SDIS *)
-  intro Heq.
-  use freshindex as [l _].
-  use Hc with l.
-  by case Euf; expand sidSa; collision => _.
-
-  intro Heq.
-  use freshindex as [l _].
-  use Hc with l.
-  right.
-  by case Euf; expand sidS3; collision => _.
+    + intro Heq.
+      use freshindex as [l _].
+      use Hc with l.
+      right.
+      by case Euf; expand sidS3; collision => _.
 Qed.
 
 
@@ -389,61 +388,56 @@ Proof.
   expand sidSa, x4.
   euf Hchk => Euf.
 
-(* oracle clase *)
-  destruct Euf as [[_|[i m m1 H1]] H2]; 1: by auto.
-  destruct H1 as [H1| [i1 m2 m3 H1]].
-(* sub case with wrong tag *)
-  use Hc with i.
-  assert h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey) = h(<<g^a(i),m>,m1>,hKey);
-  1: by auto.
-  by collision.
-  by use hashlengthnotpair with <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake1(i1),m2>,m3>.
+  + (* oracle clase *)
+    destruct Euf as [[_|[i m m1 H1]] H2]=> //.
+    destruct H1 as [H1| [i1 m2 m3 H1]].
+      - (* sub case with wrong tag *)
+        use Hc with i.
+        assert h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey) = h(<<g^a(i),m>,m1>,hKey) => //.
+        by collision.
+      - by use hashlengthnotpair with <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake1(i1),m2>,m3>.
 
-(* else, it comes from P2, and is not well tagged *)
+  + (* else, it comes from P2, and is not well tagged *)
+    by use hashlengthnotpair with
+    <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake11,input@P1>,k11> as Hlen;
+    intro *; case Euf; expand sidPaF.
 
- by use hashlengthnotpair with
-  <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake11,input@P1>,k11> as Hlen;
- intro *; case Euf; expand sidPaF.
+  + (* Honest case of signature produced by Fa.
+    We need to prove that the sign req received by FA comes from PDIS. *)
+    intro Meq.
+    executable pred(Sok); 1,2: by auto => H2.
 
-(* Honest case of signature produced by Fa.
-   We need to prove that the sign req received by FA comes from PDIS. *)
+    depends SDIS, Sok => // _.
+    have _: happens(SDIS); 1: auto.
+    have _: happens(P3(i)); 1: case Euf; auto.
+    expand x3(i)@P3(i).
+    use H2 with P3(i) as H3; 2: case Euf; auto.
+    expand exec, cond.
+    destruct H3 as [H3 [Mneq Meq0]].
 
-  intro Meq.
-  executable pred(Sok); 1,2: by auto => H2.
+    assert (x3(i)@P3(i) = dec(input@P3(i),k11)) as D1 => //.
+    (* We have that x3 is a message encrypted with the secret key, we use the intctxt of encryption *)
+    intctxt D1 => //.
 
-  depends SDIS, Sok => // _.
-  assert happens(SDIS); 1: auto.
-  assert happens(P3(i)); 1: case Euf; auto.
-  expand x3(i)@P3(i).
-  use H2 with P3(i) as H3; 2: case Euf; auto.
-  expand exec, cond.
-  destruct H3 as [H3 [Mneq Meq0]].
-
-  assert (x3(i)@P3(i) = dec(input@P3(i),k11)) as D1;
-  1: by auto.
-(* We have that x3 is a message encrypted with the secret key, we use the intctxt of encryption *)
-  intctxt D1; 4: by auto.
-
-(* Ill-tagged cases *)
-  by use signnottag with sidPaF@P2,kP.
-  by use difftags.
-
-(* Honest case *)
-  intro H4 Meq1.
-  assert happens(PDIS5); 1: case H4; auto.
-  expand x3(i)@P3(i), sidPa.
-  assert PDIS5 <= Sok;
-  1: by case H4; case Euf.
-  use H2 with PDIS5; 2: by auto.
-  expand exec, cond.
-  use Hc with i.
-  right.
-  expand pkSa, sidPa.
-  assert (h(<<g^a1,input@PDIS4>,input@PDIS4^a1>,hKey) =
-          h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey)) as Hcol;
-  1: auto.
-  collision => [[A _] _].
-  by rewrite A.
+      - (* Ill-tagged case 1 *)
+        by use signnottag with sidPaF@P2,kP.
+      - (* Ill-tagged case 2 *)
+        by use difftags.
+      - (* Honest case *)
+        intro H4 Meq1.
+        assert happens(PDIS5) as U; 1: by case Euf.
+        expand x3(i)@P3(i), sidPa.
+        assert PDIS5 <= Sok;
+        1: by case Euf.
+        use H2 with PDIS5; 2: by auto.
+        expand exec, cond.
+        use Hc with i.
+        right.
+        expand pkSa, sidPa.
+        assert (h(<<g^a1,input@PDIS4>,input@PDIS4^a1>,hKey) =
+          h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey)) as Hcol => //.
+        collision => [[A _] _].
+        by rewrite A.
 Qed.
 
 (* The equivalence for authentication is obtained by using the unreachability
@@ -458,28 +452,30 @@ Proof.
 
   induction t; try (expandall; apply IH).
 
-  (* Init *)
-  auto.
+  + (* Init *)
+    auto.
 
-  (* Sfail *)
-  expand frame.
-  equivalent exec@Sfail, false.
-    split; 2: by auto.
-    intro Hfail.
-    use S_charac; try auto.
-    depends Sok, Sfail => // _.
-    executable Sfail; 1,2: auto.
-    by intro H0; use H0 with Sok.
-  by noif 17.
+  + (* Sfail *)
+     expand frame.
+     have -> : exec@Sfail <=> false. {
+       split => //.
+       intro Hfail.
+       use S_charac; try auto.
+       depends Sok, Sfail => // _.
+       executable Sfail; 1,2: auto.
+       by intro H0; use H0 with Sok.
+     }
+     by rewrite if_false in 17.
 
-  (* Pfail *)
-  expand frame.
-  equivalent exec@Pfail, false.
-    split; 2: by auto.
-    intro Hfail.
-    use P_charac; try auto.
-    depends PDIS5, Pfail => // _.
-    executable Pfail; 1,2: auto.
-    by intro H0; use H0 with PDIS5.
-  by noif 17.
+  + (* Pfail *)
+    expand frame.
+    have -> : exec@Pfail <=> false. {
+      split => //.
+      intro Hfail.
+      use P_charac; try auto.
+      depends PDIS5, Pfail => // _.
+      executable Pfail; 1,2: auto.
+      by intro H0; use H0 with PDIS5.
+  }
+  by rewrite if_false in 17.
 Qed.

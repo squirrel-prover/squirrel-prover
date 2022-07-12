@@ -69,7 +69,7 @@ let pp_loc_error state ppf loc =
       let lexbuf = Lexing.from_channel stdin in
       let startpos = lexbuf.Lexing.lex_curr_p.pos_cnum in
       Fmt.pf ppf
-        "[error-%d-%d]"
+        "[error-%d-%d]@;"
         (max 0 (loc.L.loc_bchar - startpos))
         (max 0 (loc.L.loc_echar - startpos))
     | `File f ->
@@ -126,38 +126,38 @@ let file_from_stdin () : file =
   { f_name = "#stdin";
     f_path = `Stdin;
     f_lexbuf = Lexing.from_channel stdin; }
+    
 
-let file_from_path (dir : load_path) (name : string) : file option =
-  let filename = name ^ ".sp" in
-
+let file_from_path (dir : load_path) (partial_path : string) : file option =
+  let partial_path_ext = partial_path ^ ".sp" in
   try
     let path = match dir with
-      | LP_none    -> filename
-      | LP_dir dir -> Filename.concat dir filename
+      | LP_none    -> partial_path_ext
+      | LP_dir dir -> Filename.concat dir partial_path_ext
     in
 
     let chan = Stdlib.open_in path in
     let lexbuf = Lexing.from_channel chan in
 
-    Some { f_name   = name;
-           f_path   = `File filename;
+    Some { f_name   = partial_path;
+           f_path   = `File path;
            f_lexbuf = lexbuf; }
   with
   | Sys_error _ -> None
 
-(** try to locate a file according to some loading paths *)
+(** try to locate a file according to some loading paths *) 
 let locate (lds : load_paths) (name : string) : file =
   if not (Pcre.pmatch ~rex:valid_theory_regexp name) then
-    cmd_error (InvalidTheoryName name);  (* FIXME: location *)
+    cmd_error (InvalidTheoryName name);  (* FIXME: location *)  
 
   let rec try_dirs (dirs : load_paths) : file =
     match dirs with
     | [] -> cmd_error (IncludeNotFound name)
-    | dir :: dirs -> match file_from_path dir name with
-      | Some file -> file
-      | None -> try_dirs dirs
+    | dir :: dirs ->
+       match file_from_path dir name with
+       | Some file -> file
+       | None -> try_dirs dirs
   in
-
   try_dirs lds
 
 
@@ -172,20 +172,25 @@ let include_get_file (state : main_state) (name : Theory.lsymb) : file =
 open Tactics
 
 (** check if an exception is handled *)
-let is_toplevel_error ~test (e : exn) : bool =
+let is_toplevel_error ~test interactive (e : exn) : bool =
   match e with
   | Parserbuf.Error         _
   | Prover.ParseError       _
   | Cmd_error               _
   | Process.ProcError       _
-  | Prover.Decl_error       _
+  | ProcessDecl.Decl_error  _
   | Theory.Conv             _
   | Symbols.SymbError       _
+  | System.Error            _
+  | SystemExpr.Error        _
   | Tactic_soft_failure     _
   | Tactic_hard_failure     _ -> not test
 
+  | e when interactive -> not test
+
   | _ -> false
 
+(** [is_toplevel_error] must be synchronized with [pp_toplevel_error] *)
 let pp_toplevel_error
     ~test
     (state : main_state)
@@ -208,14 +213,20 @@ let pp_toplevel_error
   | Process.ProcError e ->
     (Process.pp_proc_error pp_loc_error) fmt e
 
-  | Prover.Decl_error e when not test ->
-    (Prover.pp_decl_error pp_loc_error) fmt e
+  | ProcessDecl.Decl_error e when not test ->
+    (ProcessDecl.pp_decl_error pp_loc_error) fmt e
 
   | Theory.Conv e when not test ->
     (Theory.pp_error pp_loc_error) fmt e
 
   | Symbols.SymbError e when not test ->
     (Symbols.pp_symb_error pp_loc_error) fmt e
+
+  | System.Error e when not test ->
+    Format.fprintf fmt "System error: %a" System.pp_error e
+
+  | SystemExpr.Error e when not test ->
+    Format.fprintf fmt "System error: %a" SystemExpr.pp_error e
 
   | Tactic_soft_failure (l,e) when not test ->
     Fmt.pf fmt "%aTactic failed: %a"
@@ -227,6 +238,9 @@ let pp_toplevel_error
       pp_loc_error_opt l
       Tactics.pp_tac_error_i e
 
+  | e when state.interactive ->
+    Fmt.pf fmt "Anomaly, please report: %s" (Printexc.to_string e)
+    
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
@@ -254,69 +268,109 @@ let do_undo (state : main_state) (nb_undo : int) : main_state =
     | AllDone -> assert false in
   { state with mode = new_mode; table = new_table; }
 
+(*------------------------------------------------------------------*)
 let do_decls (state : main_state) (decls : Decl.declarations) : main_state =
   let hint_db = Prover.current_hint_db () in
-  let table = Prover.declare_list state.table hint_db decls in
+  let table, proof_obls = ProcessDecl.declare_list state.table hint_db decls in
+
+  if proof_obls <> [] then
+    Printer.pr "@[<v 2>proof obligations:@;%a@]"
+      (Fmt.list ~sep:Fmt.cut Goal.pp_init) proof_obls;
+
+  List.iter Prover.add_proof_obl proof_obls;
+
   { state with mode = GoalMode; table = table; }
 
-let do_tactic (state : main_state) bullet brace utac : main_state =
-  let () = 
-    match state.check_mode with
+(*------------------------------------------------------------------*)
+let do_print (state : main_state) (q : Prover.print_query) : main_state =
+  match q with
+  | Prover.Pr_statement l -> 
+    let g = Prover.get_assumption l in
+    let k = oget (Prover.get_assumption_kind (L.unloc l)) in
+    Printer.prt `Default "@[<2>%a %a@]" Prover.pp_kind k Goal.pp_statement g;
+    state
+
+  | Prover.Pr_system s_opt ->
+    let system = 
+      match s_opt with
+      | None   -> 
+        begin match Prover.get_current_system () with
+          | Some s -> s.set
+          | None -> hard_failure (Failure "no default system");
+        end
+
+      | Some s -> SystemExpr.parse state.table s
+    in
+    SystemExpr.print_system state.table system;
+    state
+
+(*------------------------------------------------------------------*)
+let do_tactic (state : main_state) l : main_state =
+  begin match state.check_mode with
     | `NoCheck -> assert (state.mode = WaitQed)
     | `Check   -> 
       if state.mode <> Prover.ProofMode then
         cmd_error Unexpected_command;
-  in
+  end;
 
   if not state.interactive then begin
     let lnum = state.file.f_lexbuf.lex_curr_p.pos_lnum in
-    Printer.prt `Prompt "Line %d: %a" lnum Prover.pp_ast utac
+    match List.filter_map (function `Tactic t -> Some t | _ -> None) l with
+      | [utac] ->
+          Printer.prt `Prompt "Line %d: %a" lnum Prover.pp_ast utac
+      | _ ->
+          Printer.prt `Prompt "Line %d: ??" lnum
   end;
 
   match state.check_mode with
   | `NoCheck -> state
   | `Check   ->
-    begin match brace with
-      | `Open -> Prover.open_brace ()
-      | `Close -> Prover.close_brace ()
-      | `None -> ()
+    let prover_state = Prover.get_state state.mode state.table in
+    begin try
+      List.iter
+        (function
+           | `Bullet bl    -> Prover.open_bullet bl 
+           | `Brace `Open  -> Prover.open_brace ()
+           | `Brace `Close -> Prover.close_brace ()
+           | `Tactic utac  -> Prover.eval_tactic utac)
+        l
+    with
+      | e -> ignore (Prover.reset_from_state prover_state) ; raise e
     end ;
-    if bullet <> "" then Prover.open_bullet bullet;
-    let proof_done = Prover.eval_tactic utac in
-    if proof_done then
-      begin
-        Printer.prt `Goal "Goal %s is proved" 
-          (Utils.oget (Prover.current_goal_name ()));
-               
-        { state with mode = WaitQed }
-      end
-    else
-      begin
-        Printer.pr "%a" Prover.pp_goal ();
-        Visualisation.dump ();
-        Server.update ();
-        { state with mode = ProofMode }
-      end
+    if Prover.is_proof_completed () then begin
+      Printer.prt `Goal "Goal %s is proved"
+        (Utils.oget (Prover.current_goal_name ()));
+      { state with mode = WaitQed }
+    end else begin
+      Printer.pr "%a" Prover.pp_goal ();
+      Visualisation.dump ();
+      Server.update ();
+      { state with mode = ProofMode }
+    end
 
+(*------------------------------------------------------------------*)
 let do_qed (state : main_state) : main_state =
   Prover.complete_proof ();
   Printer.prt `Result "Exiting proof mode.@.";
   { state with mode = GoalMode }
 
+(*------------------------------------------------------------------*)
 let do_add_hint (state : main_state) (h : Hint.p_hint) : main_state =
   let db = Prover.current_hint_db () in
   let db =
     match h with
-    | Hint.Hint_rewrite id -> Prover.add_hint_rewrite id db
-    | Hint.Hint_smt     id -> Prover.add_hint_smt     id db
+    | Hint.Hint_rewrite id -> ProcessDecl.add_hint_rewrite state.table id db
+    | Hint.Hint_smt     id -> ProcessDecl.add_hint_smt     state.table id db
   in
   Prover.set_hint_db db;
   state
 
+(*------------------------------------------------------------------*)
 let do_set_option (state : main_state) (sp : Config.p_set_param) : main_state =
   Config.set_param sp;
   state
 
+(*------------------------------------------------------------------*)
 let do_add_goal 
     (state : main_state)
     (g : Goal.Parsed.t Location.located) 
@@ -324,13 +378,12 @@ let do_add_goal
   =
   let hint_db = Prover.current_hint_db () in
   let i,f =
-    Prover.declare_new_goal state.table hint_db g
+    Prover.add_new_goal state.table hint_db g
   in
-  Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
-    i
-    Goal.pp_init f;
+  Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@." i Goal.pp_init f;
   state
 
+(*------------------------------------------------------------------*)
 let do_start_proof (state : main_state) : main_state =
   match Prover.start_proof state.check_mode with
   | None ->
@@ -342,12 +395,12 @@ let do_start_proof (state : main_state) : main_state =
     { state with mode }
   | Some es -> cmd_error (StartProofError es)
 
+(*------------------------------------------------------------------*)
 let do_eof (state : main_state) : main_state =
   assert (state.file_stack = []);
   { state with mode = AllDone; }
 
 (*------------------------------------------------------------------*)
-
 let rec do_include 
     ~test
     (state : main_state)
@@ -381,13 +434,13 @@ let rec do_include
                        check_mode = state.check_mode; }
 
   (* include failed, revert state *)
-  with e when is_toplevel_error ~test e ->
+  with e when is_toplevel_error ~test state.interactive e ->
     let err_mess fmt =
       Fmt.pf fmt "@[<v 0>include %s failed:@;@[%a@]@]"
         (L.unloc i.th_name)
         (pp_toplevel_error ~test incl_state) e
     in
-
+    Prover.pop_pt_history ();
     let _ : Prover.prover_mode * Symbols.table =
       Prover.reset_from_state prover_state
     in
@@ -404,9 +457,11 @@ and do_command
 
     | GoalMode, ParsedInputDescr decls -> do_decls state decls
 
-    | _, ParsedTactic (bl,br,utac)     -> do_tactic state bl br utac
+    | _,        ParsedTactic l         -> do_tactic state l
 
-    | WaitQed, ParsedQed               -> do_qed state
+    | _,        ParsedPrint q          -> do_print state q
+
+    | WaitQed,  ParsedQed              -> do_qed state
 
     | GoalMode, ParsedHint h           -> do_add_hint state h
 
@@ -474,7 +529,7 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
     (main_loop[@tailrec]) ~test new_state
 
   (* error handling *)
-  | exception e when is_toplevel_error ~test e ->
+  | exception e when is_toplevel_error ~test state.interactive e ->
     Printer.prt `Error "%a" (pp_toplevel_error ~test state) e;
     main_loop_error ~test state
 
@@ -753,12 +808,6 @@ let () =
            try run ~test "tests/alcotest/fadup_input.sp" with
            | Tactic_soft_failure (_,Tactics.NoReflMacroVar) -> raise Ok)
     end ;
-    "XOR", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok
-        (fun () ->
-           try run ~test "tests/alcotest/xor.sp" with
-           | Unfinished -> raise Ok)
-    end ;
     "XOR2", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
@@ -782,13 +831,6 @@ let () =
            try run ~test "tests/alcotest/pred.sp" with
            | Unfinished -> raise Ok)
     end ;
-    "ES.to_trace_sequent", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok
-        (fun () ->
-           try run ~test "tests/alcotest/equiv_to_trace.sp" with
-           | Tactic_soft_failure
-               (_, HypUnknown "H") -> raise Ok)
-    end;
     "DDH not PQ Sound", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->

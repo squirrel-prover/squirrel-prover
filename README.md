@@ -21,6 +21,50 @@ You can also just build the prover with `make squirrel`, test with `make test`.
 
 The documentation for developers may be built with `make doc`.
 
+### Installing the Proof General mode for Emacs (optional, recommanded)
+
+The required `.el` files are inside the `utils` folder. 
+We recommend installing Proof General from the git repository.
+
+
+- Clone the git repository of proof general inside your `~/.emacs.d/lisp`:
+```
+mkdir -p ~/.emacs.d/lisp/ && cd ~/.emacs.d/lisp/
+git clone https://github.com/ProofGeneral/PG
+```
+
+- Create a squirrel sub-directory:
+```
+mkdir -p ~/.emacs.d/lisp/PG/squirrel
+```
+
+- Copy and paste this file, and `squirrel-syntax.el` inside it:
+```
+cp squirrel.el squirrel-syntax.el ~/.emacs.d/lisp/PG/squirrel
+```
+
+- Moreover, in the file `~/.emacs.d/lisp/PG/generic/proof-site.el`,
+   add to the list `proof-assistant-table-default` the following line:
+```
+ (squirrel "squirrel" "sp")
+```
+Then erase the outdated compiled version of this file:
+```
+rm ~/.emacs.d/lisp/PG/generic/proof-site.elc
+```
+
+- Run the following command to configure emacs:
+```
+echo -e "(require 'ansi-color)\n(load \"~/.emacs.d/lisp/PG/generic/proof-site\")" >> ~/.emacs
+```
+
+- Run emacs from the squirrel repository on some example file,
+with the squirrel repository in the path:
+```
+export PATH=$PATH:/path/to/squirrel
+emacs examples/<file>.sp
+```
+
 ### Dependencies for the `smt` tactic (optional)
 
 (If those dependencies are not installed, Squirrel will still compile, but the
@@ -52,12 +96,10 @@ You can check a proof development by simply passing the file to `squirrel`:
 ```
 $ ./squirrel examples/basic-hash.sp
 ```
-
-### With proof general
-
-The required `.el` files are inside the `utils` folder. The `squirrel.el` file
-contains comments detailing the installation of squirrel for ProofGeneral.
-We recommend installing ProofGeneral from the git repository.
+or using Emacs with the Proof General mode (if installed)
+```
+$ emacs examples/basic-hash.sp
+```
 
 ## Examples
 Examples of developments in Squirrel can be found in:
@@ -66,15 +108,37 @@ Examples of developments in Squirrel can be found in:
 Those include classical and post-quantum sound proofs of protocols.
 See `examples/README.md` for details.
 
-## Quick guide
+## Tutorial
 
 For a first introduction to the syntax, we recommend to open with ProofGeneral
-the `examples/tutorial/tutorial.sp`, that provides a run through of the syntax
+the `examples/basic-tutorial/tutorial.sp`, that provides a run through of the syntax
 with executables snippets. Then, browsing the `examples` folder should provide a
 wide variety of examples, starting e.g. with `basic-hash.sp`.
 
-As a next step, a more advanced tutorial is available in
-`examples/tutorial/tutorial-avanced.sp`.
+### Detailed Tutorial
+
+A more complete tutorial is available in
+```
+examples/tutorial/
+```
+
+This tutorial consists in a series of exercises of increasing
+difficulty, and covers the basic logical constructs and tactics
+manipulating them, several cryptographic assumptions, accessibility
+properties (authentication, injective authentication), equivalence
+properties (unlinkability), stateful protocol, and protocol
+composition.
+
+- [0-logic](examples/tutorial/0-logic.sp)
+- [1-crypto-hash](examples/tutorial/1-crypto-hash.sp)
+- [2-crypto-enc](examples/tutorial/2-crypto-enc.sp)
+- [3-hash-lock-auth](examples/tutorial/3-hash-lock-auth.sp)
+- [4-hash-lock-unlink](examples/tutorial/4-hash-lock-unlink.sp)
+- [5-stateful](examples/tutorial/5-stateful.sp)
+- [6-key-establishment](examples/tutorial/6-key-establishment.sp)
+
+
+## Quick syntax guide
 
 Squirrel developments are conventionally written in `.sp` files. They start
 with a system description, followed by some lemmas corresponding to trace

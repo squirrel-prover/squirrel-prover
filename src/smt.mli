@@ -1,7 +1,7 @@
 val literals_unsat :
   slow:bool ->
   Symbols.table ->
-  SystemExpr.t ->
+  SystemExpr.fset ->
   Vars.var list ->
   Term.xatom list ->
   Term.literals ->

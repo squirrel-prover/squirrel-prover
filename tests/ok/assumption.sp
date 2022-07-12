@@ -1,5 +1,3 @@
-set autoIntro=false.
-
 channel c.
 system !_i R: in(c,x); out(c,x).
 
@@ -7,6 +5,13 @@ goal _ (x,y : message) : x = y => x = y.
 Proof.
  intro H. 
  assumption.
+Qed.
+
+goal _ (x,y,z : message) : x = y => x = z => x = y.
+Proof.
+ intro H H'. 
+ checkfail assumption H' exn NotHypothesis.
+ assumption H.
 Qed.
 
 goal _ (x,y : message) : x = y => True.

@@ -22,9 +22,6 @@ SECURITY PROPERTIES
 - injectivity
 *******************************************************************************)
 
-set timeout=4.
-set autoIntro = false.
-
 hash hmac
 
 name sk : index -> message
@@ -103,25 +100,41 @@ axiom orderEqSucc (n1,n2:message):
   (n1 ~< mySucc(n2)) => ((n1 = n2) || n1 ~< n2).
 
 
-hint smt orderSucc.
-hint smt orderTrans.
-hint smt orderStrict.
-hint smt orderEqSucc.
-
 (* HELPING LEMMAS *)
 
 goal orderBetween (n1,n2:message) :
  (n1 ~< n2) => (n2 ~< mySucc(n1)) => false.
 Proof.
-  smt.
-  (* intro Ord1 Ord2. *)
-  (* use orderEqSucc with n2, n1. *)
-  (* case H. *)
-  (* by apply orderStrict in Ord1. *)
-  (* use orderTrans with n1, n2, n1 => //. *)
-  (* by apply orderStrict in H0. *)
-  (* auto. *)
+  intro Ord1 Ord2. 
+  use orderEqSucc with n2, n1 => //.
+  case H. 
+    + by apply orderStrict in Ord1. 
+    + use orderTrans with n1, n2, n1 => //. 
+      by apply orderStrict in H0. 
 Qed.
+
+
+(* The counter cellA(i) strictly increases 
+   at each action SenderA(i,j) / ReceiverA(i,j). *)
+
+goal counterIncreaseUpdateSA(i,j:index):
+  happens(SenderA(i,j)) =>
+  cond@SenderA(i,j) =>
+  cellA(i)@pred(SenderA(i,j)) ~< cellA(i)@SenderA(i,j).
+Proof.
+  intro Hap Hcond @/cellA.
+  by apply orderSucc.
+Qed.
+
+goal counterIncreaseUpdateRA(i,j:index):
+  happens(ReceiverA(i,j)) =>
+  cond@ReceiverA(i,j) =>
+  cellA(i)@pred(ReceiverA(i,j)) ~< cellA(i)@ReceiverA(i,j).
+Proof.
+  intro Hap Hcond @/cellA.
+  by apply orderSucc.
+Qed.
+
 
 (* The counter cellB(i) strictly increases
    at each action SenderB(i,j) / ReceiveB(i,j). *)
@@ -132,8 +145,7 @@ goal counterIncreaseUpdateSB(i,j:index):
   cellB(i)@pred(SenderB(i,j)) ~< cellB(i)@SenderB(i,j).
 Proof.
   intro Hap Hcond @/cellB.
-  smt.
-  (* by apply orderSucc. *)
+  by apply orderSucc. 
 Qed.
 
 goal counterIncreaseUpdateRB(i,j:index):
@@ -142,15 +154,12 @@ goal counterIncreaseUpdateRB(i,j:index):
   cellB(i)@pred(ReceiverB(i,j)) ~< cellB(i)@ReceiverB(i,j).
 Proof.
   intro Hap Hcond @/cellB.
-  smt.
-  (* by apply orderSucc. *)
+  by apply orderSucc. 
 Qed.
 
 
 (* The counter cellB(i) at t is either equal to cellB(i)@pred(t) or +1,
    and similarly for cellA(i). *)
-(* NOTE: it seems that ScounterIncreasePred{A,B} were only useful to *)
-(*       establish counterIncreasePred{A,B} later, we don't need them anymore *)
 
 goal ScounterIncreasePredB(t:timestamp, i:index):
   happens(t) =>
@@ -159,29 +168,52 @@ goal ScounterIncreasePredB(t:timestamp, i:index):
   (cellB(i)@t = mySucc(cellB(i)@pred(t)) || cellB(i)@t= cellB(i)@pred(t)).
 Proof.
   intro Hap Ht Hexec.
-  case t => // [i0 j _]; expandall; smt.
-
-  (* case t => // [i0 j _]. *)
-  (* case (i = i0) => _. *)
-  (* (*   i = i0 *) *)
-  (*   left. *)
-  (*   (* the line below can be replaced by "auto" *) *)
-  (*   by use orderSucc with cellB(i)@pred(t). *)
-  (* (*   i <> i0 *) *)
-  (*   right. *)
-  (*   by rewrite /cellB if_false. *)
-
-  (* (* Sender *) *)
-  (* case (i = i0) => _. *)
-  (* (*   i = i0 *) *)
-  (*   left. *)
-  (*   by use orderSucc with cellB(i)@pred(t). *)
-  (* (*   i <> i0 *) *)
-  (*   right. *)
-  (*   by rewrite /cellB if_false. *)
+  case t => // [i0 j _]. 
+    (* Receiver *)
+    + case (i = i0) => _. 
+      - left. auto.
+      - right. by rewrite /cellB if_false. 
+    (* Sender *) 
+    + case (i = i0) => _. 
+      - left. auto.
+      - right. by rewrite /cellB if_false. 
 Qed.
 
+
+goal ScounterIncreasePredA(t:timestamp, i:index):
+  happens(t) =>
+  t > init =>
+  exec@t =>
+  (cellA(i)@t = mySucc(cellA(i)@pred(t)) || cellA(i)@t= cellA(i)@pred(t)).
+Proof.
+  intro Hap Ht Hexec.
+  case t => // [i0 j _].
+  (* Receiver *)
+    + case (i = i0) => _.
+      - left. auto.
+      - right. by rewrite /cellA if_false.
+  (* Sender *)
+    + case (i = i0) => _.
+      - left. auto.
+      - right. by rewrite /cellA if_false.
+Qed.
+
+
+
 (* The counter increases (not strictly) between t and pred(t). *)
+
+goal counterIncreasePredA(t:timestamp, i:index):
+  happens(t) => (t > init && exec@t) =>
+    ( cellA(i)@pred(t) ~< cellA(i)@t
+      || cellA(i)@pred(t) = cellA(i)@t ).
+Proof.
+  intro Hap [Ht Hexec].
+  use ScounterIncreasePredA with t, i => //.
+  case H.
+    + by left; rewrite H; apply orderSucc.
+    + by right.
+Qed.
+
 
 goal counterIncreasePredB(t:timestamp, i:index):
   happens(t) => (t > init && exec@t) =>
@@ -189,13 +221,10 @@ goal counterIncreasePredB(t:timestamp, i:index):
       || cellB(i)@pred(t) = cellB(i)@t ).
 Proof.
   intro Hap [Ht Hexec].
-  case t => // [i0 j _]; expandall; smt.
-
-(*   (* use ScounterIncreasePredB with t, i => //. *) *)
-(*   (* revert H. smt. *) *)
-(*   (* case H. *) *)
-(*   (* by left; rewrite H; apply orderSucc. *) *)
-(*   (* by right. *) *)
+     use ScounterIncreasePredB with t, i => //. 
+     case H. 
+       + by left; rewrite H; apply orderSucc.
+       + by right. 
 Qed.
 
 (* The counter increases (not strictly) between t' and t when t' < t. *)
@@ -207,10 +236,28 @@ goal counterIncreaseA (t, t':timestamp, i:index):
   ( cellA(i)@t' ~< cellA(i)@t ||
     cellA(i)@t' = cellA(i)@t).
 Proof.
-  induction t => t IH0 Hap Hexec Ht'. revert IH0 Hexec.
-  case t => // [i_ j_ _]; expandall; smt.
-  (* see below for old code *)
+  induction t => t IH0 Hap Hexec Ht'.
+  assert (t' = pred(t) || t' < pred(t)) as H0;
+  1: case t; constraints.
+  case H0.
+
+    + (* case t' = pred(t) *)
+      rewrite !H0.
+      by apply counterIncreasePredA.
+
+     + (* case t' < pred(t) *)
+       apply IH0 in H0 => //=.
+         - executable t => // H1; by apply H1.
+         - use counterIncreasePredA with t,i as H3 => //.
+           case H0.
+           *  by case H3;
+              [1: left; apply orderTrans _ (cellA(i)@pred(t)) _ |
+               2: rewrite H3 in H0; left].
+
+           * rewrite H0.
+             by case H3; [1: left | 2 : right].
 Qed.
+
 
 goal counterIncreaseB (t, t':timestamp, i:index):
   happens(t) =>
@@ -223,36 +270,39 @@ Proof.
   assert (t' = pred(t) || t' < pred(t)) as H0;
   1: case t; constraints.
   case H0.
+    + (* case t' = pred(t) *)
+      rewrite !H0.
+      by apply counterIncreasePredB.
 
-  (* case t' = pred(t) *)
-  rewrite !H0.
-  by apply counterIncreasePredB.
-
-  (* case t' < pred(t) *)
-  apply IH0 in H0 => //=.
-    executable t => // H1; by apply H1.
-    use counterIncreasePredB with t,i as H3 => //.
-    case H0.
-      (* case H1 - 1/2 *)
-      by case H3;
-        [1: left; apply orderTrans _ (cellB(i)@pred(t)) _ |
-         2: rewrite H3 in H0; left].
-
-      (* case H1 - 2/2 *)
-      rewrite H0.
-      by case H3; [1: left | 2 : right].
+    + (* case t' < pred(t) *)
+      apply IH0 in H0 => //=.
+        - executable t => // H1; by apply H1.
+        - use counterIncreasePredB with t,i as H3 => //. case H0.
+          *  by case H3;
+             [1: left; apply orderTrans _ (cellB(i)@pred(t)) _ |
+              2: rewrite H3 in H0; left].
+          * rewrite H0. by case H3; [1: left | 2 : right].
 Qed.
+
 
 (* The counter cellA(i) strictly increases between t and t'
    when t < t' and (t' = SenderA(i,j1) or t' = ReceiverA(i,j1)). *)
 
-goal counterIncreaseStrictSRA(i,j1:index, t,t':timestamp):
-  happens(t') => (t' = SenderA(i,j1) || t' = ReceiverA(i,j1)) =>
-    (t < t' && exec@t') => cellA(i)@t ~< cellA(i)@t'.
+goal counterIncreaseStrictSA(i,j1:index, t:timestamp):
+  happens(SenderA(i,j1)) =>
+    (t < SenderA(i,j1) && exec@SenderA(i,j1)) =>
+      cellA(i)@t ~< cellA(i)@SenderA(i,j1).
 Proof.
-  intro Happens H. use counterIncreaseA as CIA. revert CIA.
-  case H; expand cellA(i)@t'; smt.
-  (* see counterIncreaseStrict{S,R}B for old code *)
+ intro Hap [Ht Hexec].
+ use counterIncreaseUpdateSA with i,j1 as Meq => //.
+ assert (
+   t < pred(SenderA(i,j1))
+   || t = pred(SenderA(i,j1))) as H => //.
+
+ case H; 2: by rewrite H.
+ use counterIncreaseA with pred(SenderA(i,j1)),t,i as H0 => //.
+ case H0; 2: by rewrite H0.
+ by apply orderTrans _ (cellA(i)@pred(SenderA(i,j1))).
 Qed.
 
 goal counterIncreaseStrictRA (i,j1:index, t:timestamp):
@@ -260,9 +310,16 @@ goal counterIncreaseStrictRA (i,j1:index, t:timestamp):
     (t < ReceiverA(i,j1) && exec@ReceiverA(i,j1)) =>
       cellA(i)@t ~< cellA(i)@ReceiverA(i,j1).
 Proof.
-  intro H. expand cellA(i)@ReceiverA(i,j1).
-  use counterIncreaseA as CIA. revert CIA. smt.
- (* see counterIncreaseStrictRB for old code *)
+ intro Hap [Ht Hexec].
+  use counterIncreaseUpdateRA with i,j1 as Meq => //.
+  assert (
+    t < pred(ReceiverA(i,j1))
+    || t = pred(ReceiverA(i,j1))) as H => //.
+
+  case H; 2: by rewrite H.
+  use counterIncreaseA with pred(ReceiverA(i,j1)),t,i as H0 => //.
+  case H0; 2: by rewrite H0.
+  by apply orderTrans _ (cellA(i)@pred(ReceiverA(i,j1))).
 Qed.
 
 (* The counter cellB(i) strictly increases between t and t'
@@ -303,6 +360,8 @@ Proof.
 Qed.
 
 
+
+
 (* SECURITY PROPERTIES *)
 
 (* 1st property w.r.t. A *)
@@ -312,8 +371,6 @@ Qed.
    Moreover, we use this 1st property (authentication) to prove the
    2nd property (injectivity). *)
 
-(* hint axiom counterIncreaseStrictRA. *)
-(* hint axiom counterIncreaseStrictRB. *)
 
 goal authA (i,j:index) :
   happens(ReceiverA(i,j)) => exec@ReceiverA(i,j) =>
@@ -325,12 +382,19 @@ goal authA (i,j:index) :
     && cellA(i)@pred(ReceiverA(i,j)) ~< cellB(i)@SenderB(i,j')).
 Proof.
   intro Hap @/exec @/cond [Hexecpred [H1 H2 H3]].
-  revert H2 Hexecpred.
   euf H3.
-  (* interestingly, the following timeouts if we replace RA by SRA *)
-  use counterIncreaseStrictRA as Hyp. revert Hyp. smt.
-  smt.
+    + intro H4 [H5 _] _. rewrite -H5 in H2.
+      use counterIncreaseStrictRA with i,j, SenderA(i,j0) as Hyp => //;
+      2: by rewrite /exec /cond /= -H5.
+      expand cellA(i)@ReceiverA(i,j).
+      by apply orderBetween in H2.
+
+    + intro H4 [H5 _] _.
+      exists j0.
+      rewrite -H5 in H2.
+      auto.
 Qed.
+
 
 (* 1st property w.r.t. B *)
 goal authB(i,j:index) :
@@ -344,18 +408,17 @@ goal authB(i,j:index) :
 Proof.
   intro Hap @/exec @/cond [Hexecpred [H1 H2 H3]].
   euf H3.
+  + intro H4 [H5 _] _.
+    exists j0.
+    rewrite -H5 in H2.
+    auto.
 
-  intro H4 [H5 _] _.
-  exists j0.
-  rewrite -H5 in H2.
-  auto.
-
-  intro H4 [H5 _] _.
-  rewrite -H5 in H2.
-  use counterIncreaseStrictRB with i,j, SenderB(i,j0) as Hyp => //;
-  2: by rewrite /exec /cond /= -H5.
-  expand cellB(i)@ReceiverB(i,j).
-  by apply orderBetween in H2.
+  + intro H4 [H5 _] _.
+    rewrite -H5 in H2.
+    use counterIncreaseStrictRB with i,j, SenderB(i,j0) as Hyp => //;
+    2: by rewrite /exec /cond /= -H5.
+    expand cellB(i)@ReceiverB(i,j).
+    by apply orderBetween in H2.
 Qed.
 
 
@@ -369,48 +432,37 @@ goal injectivity(i,j,j':index) :
   (fst(fst(input@ReceiverA(i,j))) <> fst(fst(input@ReceiverA(i,j')))
    && snd(snd(fst(input@ReceiverA(i,j)))) <> snd(snd(fst(input@ReceiverA(i,j'))))).
 
+
+
 Proof.
   intro [Hap Hap'] [Hexec Hexec'].
-
   use authA with i,j as H => //.
   destruct H as [j1 [Ord Eq0  Eq1 Eq2 HCpt]].
   use authA with i,j' as H => //.
   destruct H as [j1' [Ord' Eq0' Eq1' Eq2' HCpt']].
-  (* expand output. *)
-  (* simpl. *)
+  expand output.
+  simpl.
 
   case (j1 = j1') => H.
-  (* case j1 = j1' *)
-  smt. (* by left. *)
+    + by left.
+    + right.
+      split;
+      1: by rewrite -Eq1 -Eq1' in *.
+      rewrite -Eq2 -Eq2' in *.
+      assert (SenderB(i,j1) < SenderB(i,j1') ||
+              SenderB(i,j1') < SenderB(i,j1)) as H0 by auto.
+      case H0.
+   
+        (* SenderB(i,j1) < SenderB(i,j1') *)
+        - use counterIncreaseStrictSB with i, j1', SenderB(i,j1) => //=.
+          intro U; by apply orderStrict in U.
+          executable ReceiverA(i,j') => // HexecPred'.
+          by apply HexecPred'.
 
-  (*use counterIncreaseStrictSB as CIB. revert CIB Hexec Hexec' HCpt HCpt'.*)
-
-  (* case j1 <>j1' *)
-  right.
-  split. smt. (* split; *) (* 1: by rewrite -Eq1 -Eq1' in *. *)
-
-  (* Sadly this still timeouts... *)
-  (* use counterIncreaseStrictSB as CIB. revert CIB Hexec Hexec' HCpt HCpt'. slowsmt. *)
-
-  rewrite -Eq2 -Eq2' in *.
-
-  assert (SenderB(i,j1) < SenderB(i,j1') ||
-          SenderB(i,j1') < SenderB(i,j1)) as H0 by auto.
-  case H0.
-
-  (* SenderB(i,j1) < SenderB(i,j1') *)
-  use counterIncreaseStrictSB with i, j1', SenderB(i,j1) => //=.
-  (* revert H1 Hexec Hexec' HCpt HCpt'. smt. *) (* TODO: this timeouts, why? *)
-
-    intro U; by apply orderStrict in U.
-    executable ReceiverA(i,j') => // HexecPred'.
-    by apply HexecPred'.
-
-  (* SenderB(i,j1') < SenderB(i,j1) *)
-  use counterIncreaseStrictSB with i, j1, SenderB(i,j1') => //=.
-    intro U; rewrite eq_sym in U; by apply orderStrict in U.
-    executable ReceiverA(i,j) => // HexecPred.
-    by apply HexecPred.
+        (* SenderB(i,j1') < SenderB(i,j1) *)
+        - use counterIncreaseStrictSB with i, j1, SenderB(i,j1') => //=.
+           * intro U. rewrite eq_sym in U; by apply orderStrict in U.
+           * executable ReceiverA(i,j) => // HexecPred. by apply HexecPred.
 Qed.
 
 
@@ -442,50 +494,38 @@ Proof.
           ReceiverB(i,j') < SenderB(i,j1)) as H by auto.
   case H.
 
-  (* SenderB(i,j1) < ReceiverB(i,j') *)
-  use counterIncreaseStrictRB with i, j',SenderB(i,j1) as Meq => //.
-  expand cellB(i)@ReceiverB(i,j').
-  apply orderEqSucc in Meq.
-  case Meq.
-    rewrite -Meq in HCpt'.
-    intro U.
-    by apply orderStrict in U.
+    + (* SenderB(i,j1) < ReceiverB(i,j') *)
+      use counterIncreaseStrictRB with i, j',SenderB(i,j1) as Meq => //.
+      expand cellB(i)@ReceiverB(i,j').
+      apply orderEqSucc in Meq.
+      case Meq.
+ 
+      - rewrite -Meq in HCpt'.
+        intro U.
+        by apply orderStrict in U.
 
-    use orderTrans with
-      cellB(i)@SenderB(i,j1),
-      cellB(i)@pred(ReceiverB(i,j')),
-      cellA(i)@SenderA(i,j1');
-    [1: by intro U; apply orderStrict in U |
-     2: auto].
+      - use orderTrans with cellB(i)@SenderB(i,j1), cellB(i)@pred(ReceiverB(i,j')), cellA(i)@SenderA(i,j1') => //.
+        by intro U; apply orderStrict in U.
 
-  (* ReceiverB(i,j') <  SenderB(i,j1) *)
-  assert (SenderA(i,j1') <ReceiverA(i,j) ||
-          ReceiverA(i,j) <SenderA(i,j1')) as H0 by auto.
-  case H0.
+    + (* ReceiverB(i,j') <  SenderB(i,j1) *)
+      assert (SenderA(i,j1') <ReceiverA(i,j) || ReceiverA(i,j) <SenderA(i,j1')) as H0 by auto.
+      case H0.
 
-    (* SenderA(i,j1') < ReceiverA(i,j) *)
-    (* as in the previous case *)
-    use counterIncreaseStrictRA with i, j,SenderA(i,j1') as Meq => //.
-    expand cellA(i)@ReceiverA(i,j).
-    apply orderEqSucc in Meq.
-    case Meq.
-    rewrite -Meq in HCpt.
-    intro U.
-    rewrite eq_sym in U.
-    by apply orderStrict in U.
+       - (* SenderA(i,j1') < ReceiverA(i,j) *)
+         use counterIncreaseStrictRA with i, j,SenderA(i,j1') as Meq => //.
+         expand cellA(i)@ReceiverA(i,j).
+         apply orderEqSucc in Meq.
+         case Meq.
+    
+           * rewrite -Meq in HCpt. intro U. rewrite eq_sym in U. by apply orderStrict in U.
+           * use orderTrans with cellA(i)@SenderA(i,j1'), cellA(i)@pred(ReceiverA(i,j)), cellB(i)@SenderB(i,j1) => //.
+             intro U.
+             rewrite eq_sym in U.
+             by apply orderStrict in U.
 
-    use orderTrans with
-      cellA(i)@SenderA(i,j1'),
-      cellA(i)@pred(ReceiverA(i,j)),
-      cellB(i)@SenderB(i,j1);
-    2: auto.
-    intro U.
-    rewrite eq_sym in U.
-    by apply orderStrict in U.
-
-  (* ReceiverA(i,j) < SenderA(i,j1') *)
-  (* We have SendB < ReceiveA < SendA < ReceiveB < SendB ==> contradiction *)
-  auto.
+       - (* ReceiverA(i,j) < SenderA(i,j1') *)
+         (* We have SendB < ReceiveA < SendA < ReceiveB < SendB ==> contradiction *)
+          auto.
 Qed.
 
 

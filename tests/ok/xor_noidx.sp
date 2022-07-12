@@ -1,4 +1,6 @@
-set autoIntro=false.
+
+
+include Basic.
 
 channel c
 
@@ -18,7 +20,7 @@ Proof.
   expandall.
   fa 0; fa 1; fa 1.
   xor 1.
-  yesif 1.
+  rewrite if_true in 1.
   simpl.
   by use len_ok.
   fresh 1.

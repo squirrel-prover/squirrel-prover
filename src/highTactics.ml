@@ -35,43 +35,19 @@ let () =
     ~pq_sound:true
     (LT.gentac_of_any_tac_arg TraceTactics.case_tac EquivTactics.case_tac)
 
-(*------------------------------------------------------------------*)
-let yes_no_if_tac b (args : TacticsArgs.parser_args) s =
-  match s with
-  | Goal.Trace s -> LT.wrap_fail (TraceTactics.yes_no_if_args b args) s
-  | Goal.Equiv s -> LT.wrap_fail (EquivTactics.yes_no_if_args b args) s
-
-(* TODO: remove tactics (subsumed by `rewrite`) *)
-let () =
-  T.register_general "noif"
-    ~tactic_help:{
-      general_help = "Simplify conditional by showing that its condition is False.";
-      detailed_help = "";
-      tactic_group = Structural;
-      usages_sorts = [Sort None] }
-    ~pq_sound:true
-   (yes_no_if_tac false)
-
-let () =
-  T.register_general "yesif"
-    ~tactic_help:{
-      general_help = "Simplify conditional by showing that its condition is True.";
-      detailed_help = "";
-      tactic_group = Structural;
-      usages_sorts = [Sort None] }
-    ~pq_sound:true
-   (yes_no_if_tac true)
-
 
 (*------------------------------------------------------------------*)
 let () =
-  T.register "assumption"
-    ~tactic_help:{general_help = "look for the goal in the hypotheses.";
+  T.register_general "assumption"
+    ~tactic_help:{general_help = "Concludes if the goal or false appears \
+                                  in the hypotheses.";
                   detailed_help = "";
-                  usages_sorts = [Sort None];
+                  usages_sorts = [Sort None; Sort String];
                   tactic_group = Logical}
     ~pq_sound:true
-    (LT.genfun_of_any_fun TraceTactics.assumption EquivTactics.assumption)
+    (LT.gentac_of_any_tac_arg
+       TraceTactics.assumption_tac
+       EquivTactics.assumption_tac)
 
 (*------------------------------------------------------------------*)
 let () =
@@ -86,7 +62,7 @@ let () =
                        To prove that a goal containing f(u1,...,un) is \
                        diff-equivalent, one can prove that the goal containing the \
                        sequence u1,...,un is diff-equivalent.";
-      usages_sorts = [Sort None; Sort Int];
+      usages_sorts = [Sort None; Sort Int; Sort Term];
       tactic_group = Structural}
     ~pq_sound:true
     (LT.gentac_of_any_tac_arg TraceTactics.fa_tac EquivTactics.fa_tac)
@@ -110,13 +86,13 @@ let () =
       usages_sorts = [Sort String; Sort Int];
       tactic_group=Structural }
     ~pq_sound:true
-    (LT.gentac_of_any_tac_arg TraceTactics.fresh_tac EquivTactics.fresh_tac)
+    (LT.gentac_of_any_tac_arg Newfresh.fresh_tac EquivTactics.fresh_tac)
 
 (*------------------------------------------------------------------*)
 let () = T.register_general "induction"
     ~tactic_help:{
       general_help = "Apply the induction scheme to the conclusion.";
-      detailed_help = "";
+      detailed_help = "Only support induction over timestamps.";
       usages_sorts = [Sort None];
       tactic_group = Logical}
     ~pq_sound:true
@@ -139,13 +115,15 @@ let tac_autosimpl args s sk fk = match s with
     TraceTactics.tac_autosimpl args s sk fk
   | Goal.Equiv _ -> EquivTactics.tac_autosimpl args s sk fk
 
-let tac_auto ~strong ~close args s sk fk = match s with
+let tac_auto : 'a list -> LowTactics.f_simpl =
+  fun args ~red_param ~strong ~close s sk fk -> 
+  match s with
   | Goal.Trace s ->
     let sk l fk =
       sk (List.map (fun s -> Goal.Trace s) l) fk
     in
-    TraceTactics.tac_auto ~close ~strong args s sk fk
-  | Goal.Equiv _ -> EquivTactics.tac_auto ~close ~strong args s sk fk
+    TraceTactics.tac_auto ~red_param ~close ~strong args s sk fk
+  | Goal.Equiv _ -> EquivTactics.tac_auto ~red_param ~close ~strong args s sk fk
 
 let () =
   T.register_general "autosimpl"
@@ -158,22 +136,26 @@ let () =
     tac_autosimpl
 
 let () =
+  (* FEATURE: allow user to change [red_param] *)
+  let red_param = Reduction.rp_default in
   T.register_general "simpl"
     ~tactic_help:{general_help = "Simplifies a goal, without closing it.";
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Structural}
     ~pq_sound:true
-    (tac_auto ~close:false ~strong:true)
+    (tac_auto ~red_param ~close:false ~strong:true)
 
 let () =
+  (* FEATURE: allow user to change [red_param] *)
+  let red_param = Reduction.rp_default in
   T.register_general "auto"
     ~tactic_help:{general_help = "Closes a goal.";
                   detailed_help = "Stronger automation than simpl.";
                   usages_sorts = [Sort None];
                   tactic_group = Structural}
     ~pq_sound:true
-    (tac_auto ~close:true ~strong:true)
+    (tac_auto ~red_param ~close:true ~strong:true)
 
 (*------------------------------------------------------------------*)
 let () =
@@ -181,10 +163,9 @@ let () =
     ~tactic_help:{
       general_help =
         "If t1 = t2, rewrite all occurences of t1 into t2 in the goal.\n\
-         Usage: rewrite Hyp Lemma Axiom (forall (x:message), t = t').\n       \
-         rewrite Lemma Axiom (t=t').\n       \
-         rewrite (forall (x:message), t = t').\n       \
-         rewrite (t = t') Lemma in H.";
+         Usage: rewrite Hyp Lemma Axiom.\n       \
+         rewrite Lemma Axiom.\n       \
+         rewrite Lemma in H.";
       detailed_help = "";
       usages_sorts  = [];
       tactic_group  = Structural;}

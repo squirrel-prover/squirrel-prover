@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 set newInduction=true.
 
 channel c

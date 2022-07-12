@@ -38,6 +38,7 @@ type keyword = [
   | `ProcessName      (* [reader], [tag], [null] *)
   | `ProcessVariable  (* [x] in [in(cT,x)] *)
   | `ProcessCondition (* [if], [find], [else] *)
+  | `Goal             (* [goal], [global goal], [axiom] *)
   | `ProcessInOut     (* [in], [out] *)
   | `ProcessChannel   (* [cT] *)
   | `ProcessKeyword   (* [let], [set], [new] *)
@@ -81,6 +82,7 @@ let kw_ansi (keyword : keyword) : string =
   | `ProcessName -> "1;34"
   | `ProcessVariable -> "1;35"
   | `ProcessCondition -> "4;31"
+  | `Goal -> "31"
   | `ProcessInOut -> "1"
   | `ProcessChannel -> ""
   | `ProcessKeyword -> "1"
@@ -149,6 +151,7 @@ let kw_html_attributes (keyword : keyword) : string =
   | `GoalName -> " class=\x1B\"gn\x1B\""
   | `Separation -> " class=\x1B\"sep\x1B\""
   | `HelpType -> " class=\x1B\"ht\x1B\""
+  | `Goal -> " class=\x1B\"goal\x1B\" style=\x1B\"color: #AA0000\x1B\""
   | `HelpFunction -> " class=\x1B\"hf\x1B\""
   | `Test -> " class=\x1B\"test\x1B\""
   | `Error -> " class=\x1B\"err\x1B\""
@@ -267,30 +270,30 @@ let pp_pref (ty : pp) =
   | `Prompt  -> pr "@[[> "
   | `Start   -> pr "@[[start> "
   | `Result  -> pr "@["
-  | `Error   -> pr "@[[error> "
+  | `Error   -> pr "@[<v 0>[error> " (* vertical box, for nice errors in Emacs mode *)
   | `Dbg     -> pr "@[[dbg> "
   | `Warning -> pr "@[[warning> "
   | `Ignore  -> ()
   | `Goal    -> pr "@[[goal> "
   | `Default -> ()
 
-let pp_suf (ty : pp) =
+let pp_suf fmt (ty : pp) =
   match ty with
-  | `Prompt  -> pr "@;@]@."
-  | `Start   -> pr "@;<]@]@."
-  | `Result  -> pr "@;@]@."
-  | `Error   -> pr "@;@]@."
-  | `Dbg     -> pr "@;<]@]@."
-  | `Warning -> pr "@;<]@]@."
+  | `Prompt  -> Fmt.pf fmt "@;@]@."
+  | `Start   -> Fmt.pf fmt "@;<]@]@."
+  | `Result  -> Fmt.pf fmt "@;@]@."
+  | `Error   -> Fmt.pf fmt "@;@]@."
+  | `Dbg     -> Fmt.pf fmt "@;<]@]@."
+  | `Warning -> Fmt.pf fmt "@;<]@]@."
   | `Ignore  -> ()
-  | `Goal    -> pr "@;@]@."
+  | `Goal    -> Fmt.pf fmt "@;@]@."
   | `Default -> ()
 
 let prt ty fmt = 
   let out = match ty with
     | `Ignore -> dummy_fmt
     | _ -> get_std () in
-    pp_pref ty; Fmt.kpf (fun fmt -> pp_suf ty) out fmt
+    pp_pref ty; Fmt.kpf (fun fmt -> pp_suf fmt ty) out fmt
 
 let pr fmt = prt `Default fmt
 

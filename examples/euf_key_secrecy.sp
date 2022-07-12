@@ -3,7 +3,6 @@
   * Here we carry out this argument formally in Squirrel. *)
 
 set postQuantumSound=true.
-set autoIntro=false.
 
 hash h
 name k : message

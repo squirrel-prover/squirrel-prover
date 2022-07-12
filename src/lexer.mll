@@ -23,15 +23,22 @@ let int = ['0'-'9'] ['0'-'9']*
 
 
 (* Hard-coded in Symbols.ml ! Do not change. *)
-let infix_char_first = ['^' '+' '-' '*' '|' '&' '~']
-let infix_char = infix_char_first | ['<' '>']
-let infix_symb = infix_char_first ( infix_char* | (['0'-'9']* infix_char+) )
+let right_infix_char_first = ['+' '-' '*' '|' '&' '~']
+let  left_infix_char_first = ['^']
+
+let infix_char = right_infix_char_first | left_infix_char_first | ['<' '>']
+
+let left_infix_symb = 
+   left_infix_char_first  ( infix_char* | (['0'-'9']* infix_char+) )
+let right_infix_symb = 
+   right_infix_char_first ( infix_char* | (['0'-'9']* infix_char+) )
 
 rule token = parse
 | [' ' '\t']              { token lexbuf }
 | '\n'                    { newline lexbuf ; token lexbuf }
 | "(*" { comment lexbuf; token lexbuf }
-| "!_" (name as i)  { BANG i }
+
+| "!_" (name as i)    { BANG i }
 | "&&"                { AND }
 | "/\\"               { GAND }
 | "\\/"               { GOR }
@@ -77,7 +84,6 @@ rule token = parse
 | '+'                 { PLUS }
 | '\''                { TICK }
 | '%'                 { PERCENT }
-| infix_symb as s     { INFIXSYMB s }
 | int as i            { INT (int_of_string i) }
 | "if"                { IF }
 | "then"              { THEN }
@@ -107,11 +113,13 @@ rule token = parse
 | "signature"         { SIGNATURE }
 | "intro"             { INTRO }
 | "destruct"          { DESTRUCT }
+| "fa"                { FA }
 | "as"                { AS }
 | "index"             { INDEX }
 | "message"           { MESSAGE }
 | "channel"           { CHANNEL }
 | "boolean"           { BOOLEAN }
+| "bool"              { BOOL }
 | "timestamp"         { TIMESTAMP }
 | "null"              { NULL }
 | "seq"               { SEQ }
@@ -120,8 +128,6 @@ rule token = parse
 | "where"             { WHERE }
 | "time"              { TIME }
 | "diff"              { DIFF }
-| "left"              { LEFT }
-| "right"             { RIGHT }
 | "forall"            { FORALL }
 | "exists"            { EXISTS }
 | "splitseq"          { SPLITSEQ }
@@ -144,9 +150,12 @@ rule token = parse
 | "try"               { TRY }
 | "repeat"            { REPEAT }
 | "assert"            { ASSERT }
+| "localize"          { LOCALIZE }
+| "have"              { HAVE }
 | "exn"               { EXN }
 | "use"               { USE }
 | "rewrite"           { REWRITE }
+| "trans"             { TRANS }
 | "apply"             { APPLY }
 | "revert"            { REVERT }
 | "generalize"        { GENERALIZE }
@@ -154,6 +163,8 @@ rule token = parse
 | "depends"           { DEPENDS }
 | "clear"             { CLEAR }
 | "ddh"               { DDH }
+| "cdh"               { CDH }
+| "gdh"               { GDH }
 | "nosimpl"           { NOSIMPL }
 | "rename"            { RENAME }
 | "gprf"              { GPRF }
@@ -161,12 +172,17 @@ rule token = parse
 | "checkfail"         { CHECKFAIL }
 | "include"           { INCLUDE }
 | "smt"               { SMT }
+| "print"             { PRINT }
 | name as n           { ID n }
 | eof                 { EOF }
+
+|  left_infix_symb as s { LEFTINFIXSYMB s  }
+| right_infix_symb as s { RIGHTINFIXSYMB s }
+
 
 and comment = parse
   | "*)"        { () }
   | "(*"        { comment lexbuf; comment lexbuf }
-  | "\n"     { new_line lexbuf; comment lexbuf }
+  | "\n"        { new_line lexbuf; comment lexbuf }
   | eof         { unterminated_comment () }
   | _           { comment lexbuf }

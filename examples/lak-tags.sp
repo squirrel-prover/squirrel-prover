@@ -6,8 +6,8 @@ unbounded verification of privacy-type properties. Journal of Computer
 Security, 27(3):277–342, 2019.
 
 R --> T : nR
-T --> R : <nT,h(<<nR,nT>,tag1>,kT)>
-R --> T : h(<<h(<<nR,nT>,tag1>,kT),nR>,tag2>,kR)
+T --> R : <nT,h(<<nR,nT>,tag1>,k)>
+R --> T : h(<<h(<<nR,nT>,tag1>,k),nR>,tag2>,k)
 
 We consider tags in the messages (tag1 and tag2) to ease the proof.
 
@@ -30,13 +30,13 @@ name key': index->index->message
 channel cT
 channel cR
 
-process tag(i:index,k:index) =
+process tag(i,j:index) =
   new nT;
   in(cR,nR);
-  let m2 = h(<<nR,nT>,tag1>,diff(key(i),key'(i,k))) in
+  let m2 = h(<<nR,nT>,tag1>,diff(key(i),key'(i,j))) in
   out(cT,<nT,m2>)
 
-process reader(j:index) =
+process reader =
   new nR;
   out(cR,nR);
   in(cT,x);
@@ -50,50 +50,50 @@ process reader(j:index) =
   else
     out(cR,ko)
 
-system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
+system ((!_k R: reader) | (!_i !_j T: tag(i,j))).
 
 include Basic.
 
 axiom tags_neq : tag1 <> tag2.
 
-goal wa_R1_R2 (tau:timestamp,j:index):
+goal wa_R1_R2 (tau:timestamp,k:index):
   happens(tau) =>
-  (exists (i,k:index)
-     snd(input@tau) = h(<<nR(j),fst(input@tau)>,tag1>,diff(key(i),key'(i,k))))
+  (exists (i,j:index)
+     snd(input@tau) = h(<<nR(k),fst(input@tau)>,tag1>,diff(key(i),key'(i,j))))
   =
-  (exists (i,k:index),
-     T(i,k) < tau && R(j) < T(i,k) &&
-     snd(output@T(i,k)) = snd(input@tau) &&
-     fst(output@T(i,k)) = fst(input@tau) &&
-     input@T(i,k) = output@R(j)).
+  (exists (i,j:index),
+     T(i,j) < tau && R(k) < T(i,j) &&
+     snd(output@T(i,j)) = snd(input@tau) &&
+     fst(output@T(i,j)) = fst(input@tau) &&
+     input@T(i,j) = output@R(k)).
 Proof.
   intro Hap.
   rewrite eq_iff; split.
 
   (* COND => WA *)
-  + intro [i k H].
+  + intro [i j H].
     use tags_neq; project.
 
     (* LEFT *)
     - euf H => _ _ _ //.
-      exists i,k0.
-      assert input@T(i,k0)=nR(j) as Meq1; 1: auto.
-      fresh Meq1 => C /=.
-      case C => //.
-      * by depends R(j),R1(j).
-      * by depends R(j),R2(j).
+      exists i,j0.
+      assert input@T(i,j0)=nR(k) as Meq1 by auto.
+      fresh Meq1 => C /=;
+      [1: auto
+      |2,3,4: by depends R(k),R1(k)
+      |5: by depends R(k),R2(k)].
 
     (* RIGHT *)
     - euf H => _ _ _ //.
-      exists i,k.
-      assert input@T(i,k)=nR(j) as Meq1; 1: by auto.
-      fresh Meq1 => C /=.
-      case C => //.
-      * by depends R(j),R1(j).
-      * by depends R(j),R2(j).
+      exists i,j.
+      assert input@T(i,j)=nR(k) as Meq1 by auto.
+      fresh Meq1 => C /=;
+      [1: auto
+      |2,3,4: by depends R(k),R1(k)
+      |5: by depends R(k),R2(k)].
 
   (* WA => COND *)
-  + intro [i k _]; exists i,k.
+  + intro [i j _]; exists i,j.
     by expand output, m2.
 Qed.
 
@@ -103,94 +103,83 @@ Qed.
     lemmas are almost identical, but their statements differ in the treatment
     of index k, and they deal with distinct systems. *)
 
-goal [left] wa_R1_left (i,j:index):
-  happens(R1(j)) =>
-  (snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key(i)))
+goal [default/left] wa_R1_left (i,k:index):
+  happens(R1(k)) =>
+  (snd(input@R1(k)) = h(<<nR(k),fst(input@R1(k))>,tag1>,key(i)))
   =
-  (exists k:index,
-     T(i,k) < R1(j) && R(j) < T(i,k) &&
-     snd(output@T(i,k)) = snd(input@R1(j)) &&
-     fst(output@T(i,k)) = fst(input@R1(j)) &&
-     input@T(i,k) = output@R(j)).
+  (exists j:index,
+     T(i,j) < R1(k) && R(k) < T(i,j) &&
+     snd(output@T(i,j)) = snd(input@R1(k)) &&
+     fst(output@T(i,j)) = fst(input@R1(k)) &&
+     input@T(i,j) = output@R(k)).
 Proof.
   intro Hap.
-  rewrite eq_iff; split; 2: by intro [k _]; expand output, m2.
+  rewrite eq_iff; split; 2: by intro [j _]; expand output, m2.
 
   intro Meq.
   use tags_neq.
   euf Meq => _ _ _ //.
-  exists k.
-  assert input@T(i,k) = nR(j) as Meq1; 1: auto.
-  fresh Meq1 => C /=.
-  case C => //.
-  by depends R(j),R2(j).
+  exists j.
+  assert input@T(i,j) = nR(k) as Meq1 by auto.
+  fresh Meq1 => C /=;
+   [1: auto
+   |2,3,4: by depends R(k),R1(k)
+   |5: by depends R(k),R2(k)].
 Qed.
 
-goal [right] wa_R1_right (i,j,k:index):
-  happens(R1(j)) =>
-  (snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key'(i,k)))
+goal [default/right] wa_R1_right (i,j,k:index):
+  happens(R1(k)) =>
+  (snd(input@R1(k)) = h(<<nR(k),fst(input@R1(k))>,tag1>,key'(i,j)))
   =
-  (T(i,k) < R1(j) && R(j) < T(i,k) &&
-   snd(output@T(i,k)) = snd(input@R1(j)) &&
-   fst(output@T(i,k)) = fst(input@R1(j)) &&
-   input@T(i,k) = output@R(j)).
+  (T(i,j) < R1(k) && R(k) < T(i,j) &&
+   snd(output@T(i,j)) = snd(input@R1(k)) &&
+   fst(output@T(i,j)) = fst(input@R1(k)) &&
+   input@T(i,j) = output@R(k)).
 Proof.
   intro Hap.
-  rewrite eq_iff; split; 2: by intro [k _]; expand output, m2.
+  rewrite eq_iff; split; 2: by intro [j _]; expand output, m2.
 
   intro Meq.
   use tags_neq.
   euf Meq => _ _ _ //.
-  assert input@T(i,k) = nR(j) as Meq1; 1: auto.
-  fresh Meq1 => C /=.
-  case C => //.
-  by depends R(j),R2(j).
+  assert input@T(i,j) = nR(k) as Meq1 by auto.
+  fresh Meq1 => C /=;
+   [1: auto
+   |2,3,4: by depends R(k),R1(k)
+   |5: by depends R(k),R2(k)].
 Qed.
 
 (** Equality used to rewrite the try-find in R1
     so that its condition can be discharged using fadup. *)
-goal wa_R1_tryfind (j:index) : happens(R1(j)) =>
-  (if exec@pred(R1(j)) && cond@R1(j) then
-   try find i,k such that
-     snd(input@R1(j)) =
-     h(<<nR(j),fst(input@R1(j))>,tag1>,diff(key(i),key'(i,k)))
-   in h(<<snd(input@R1(j)),nR(j)>,tag2>,diff(key(i),key'(i,k))))
+goal wa_R1_tryfind (k:index) : happens(R1(k)) =>
+  (if exec@pred(R1(k)) && cond@R1(k) then
+   try find i,j such that
+     snd(input@R1(k)) =
+     h(<<nR(k),fst(input@R1(k))>,tag1>,diff(key(i),key'(i,j)))
+   in h(<<snd(input@R1(k)),nR(k)>,tag2>,diff(key(i),key'(i,j))))
   =
-  (if exec@pred(R1(j)) && cond@R1(j) then
-   try find i,k such that
-     exec@pred(R1(j)) &&
-     (T(i,k) < R1(j) && R(j) < T(i,k) &&
-      snd(output@T(i,k)) = snd(input@R1(j)) &&
-      fst(output@T(i,k)) = fst(input@R1(j)) &&
-      input@T(i,k) = output@R(j))
+  (if exec@pred(R1(k)) && cond@R1(k) then
+   try find i,j such that
+     exec@pred(R1(k)) &&
+     (T(i,j) < R1(k) && R(k) < T(i,j) &&
+      snd(output@T(i,j)) = snd(input@R1(k)) &&
+      fst(output@T(i,j)) = fst(input@R1(k)) &&
+      input@T(i,j) = output@R(k))
    in
-   h(<<snd(input@R1(j)),nR(j)>,tag2>,diff(key(i),key'(i,k)))).
+   h(<<snd(input@R1(k)),nR(k)>,tag2>,diff(key(i),key'(i,j)))).
 Proof.
   intro Hap.
-  case exec@pred(R1(j)) => Hexec; 2: auto.
-  case cond@R1(j) => Hcond; 2: auto.
+  case exec@pred(R1(k)) => Hexec; 2: auto.
+  case cond@R1(k) => Hcond; 2: auto.
   simpl.
-
-  expand cond; rewrite wa_R1_R2 in Hcond => //.
-  destruct Hcond as [i0 k0 Hcond].
-
   (* It is important to project before using "fa" on
      the "try find" construct so that the redundant
      index k on the left is treated smartly. *)
   project.
-
-  + fa; try auto.
-    intro Heq.
-    rewrite wa_R1_left in Heq; 1: auto.
-    destruct Heq as [k1 Heq].
-    assert nT(i0,k0) = nT(i,k1); 1: auto.
-    eqnames.
-    by exists k0.
-
-  + fa; try auto.
-    intro Heq.
+  + fa => // Heq.
+    by rewrite wa_R1_left in Heq.
+  + fa => // Heq.
     by rewrite wa_R1_right in Heq.
-
 Qed.
 
 equiv unlinkability.
@@ -202,7 +191,7 @@ Proof.
 
   (* Case R *)
   + expand frame, exec, cond, output.
-    fa 0; fa 1; fa 1.
+    fa !<_,_>, if _ then _.
     fresh 1; rewrite if_true. {
       repeat split => // j0 H1.
       by depends R(j0),R2(j0).
@@ -212,9 +201,9 @@ Proof.
 
   (* Case R1 *)
   + expand frame, exec, output.
-    fa 0; fa 1.
-    rewrite wa_R1_tryfind; 1: auto.
-    expand cond; rewrite wa_R1_R2 => //.
+    fa !<_,_>.
+    rewrite wa_R1_tryfind; 1: auto. 
+    expand cond; rewrite wa_R1_R2; 1: auto. 
     fa 2; fadup 1.
     fa 1; fadup 1.
     prf 1.
@@ -224,14 +213,14 @@ Proof.
 
   (* Case R2 *)
   + expand frame, exec, output.
-    fa 0; fa 1.
-    expand cond; rewrite wa_R1_R2; 1: auto.
+    fa !<_,_>.
+    expand cond; rewrite wa_R1_R2; 1: auto. 
     by fadup 1.
 
   (* Case T *)
   + expand frame, exec, cond, output.
-    expand m2(i,k)@T(i,k).
-    fa 0. fa 1. fa 1. fa 1.
+    expand m2(i,j)@T(i,j).
+    fa !<_,_>, if _ then _, <_,_>.
     prf 2.
     rewrite if_true. {
       simpl.

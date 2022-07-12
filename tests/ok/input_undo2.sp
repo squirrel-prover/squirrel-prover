@@ -1,4 +1,4 @@
-set autoIntro=false.
+
 
 (* Test that it is possible to undo the second block of declarations. *)
 channel c.

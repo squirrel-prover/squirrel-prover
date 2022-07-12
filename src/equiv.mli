@@ -3,8 +3,6 @@
 (*------------------------------------------------------------------*)
 (** {2 Equivalence} *)
 
-val pi_term : Term.projection -> Term.term -> Term.term
-
 (*------------------------------------------------------------------*)
 type equiv = Term.term list
 
@@ -65,6 +63,10 @@ val tmap_fold  : ('b -> form -> 'b * form) -> 'b -> form -> 'b * form
 val get_terms : form -> Term.term list
 
 (*------------------------------------------------------------------*)
+(** Project the reachability formulas in a global formula. *)
+val project : Term.proj list -> form -> form 
+  
+(*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
 
 val subst : Term.subst -> form -> form
@@ -82,9 +84,14 @@ type local_form = Term.term
 
 type global_form = form
 
-type gform = [`Equiv of form | `Reach of Term.term]
-type any_form = gform
+type any_form = Global of form | Local of Term.term
 
+val pp_any_form : Format.formatter -> any_form -> unit
+
+val any_to_reach : any_form -> Term.term 
+val any_to_equiv : any_form -> form 
+
+(*------------------------------------------------------------------*)
 type _ f_kind =
   | Local_t  : local_form f_kind
   | Global_t : global_form f_kind
@@ -97,6 +104,8 @@ module Any : sig
   val subst : Term.subst -> t -> t
   val fv : t -> Vars.Sv.t
 
+  val project : Term.proj list -> t -> t
+    
   (** Convert any formula kind to [any_form]. *)
   val convert_from : 'a f_kind -> 'a -> any_form
 
@@ -120,8 +129,16 @@ module Babel : sig
   val fv     : 'a f_kind -> 'a -> Vars.Sv.t
   val get_terms : 'a f_kind -> 'a -> Term.term list
   val pp : 'a f_kind -> Format.formatter -> 'a -> unit
+  val project : 'a f_kind -> Term.proj list -> 'a -> 'a
 end
 
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructots} *)
 module Smart : Term.SmartFO with type form = global_form
+
+val destr_reach : form -> Term.term option
+val destr_equiv : form -> equiv option
+  
+val is_equiv : form -> bool
+val is_reach : form -> bool
+
