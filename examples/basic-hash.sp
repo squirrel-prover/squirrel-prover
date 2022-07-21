@@ -127,7 +127,7 @@ Proof.
   intro tau Hap.
   (** We have to prove two implications (`<=>`): we thus split the proof
       in two parts. We now have two different goals to prove.*)
-  split => [i k Meq].
+  split; intro [i k Meq].
   (** For the first implication (=>), we actually prove it separately for the
       real system (left) and the ideal system (right).*)
   + project.
@@ -181,10 +181,10 @@ Proof.
         a tag `T(i,k)` has played before and that the output of this tag is
         the message inputted by the reader. *)
     rewrite /cond (wa_R (R(j)) H).
-  (** We are now able to remove this formula from the frame because
-  the attacker is able to compute it using information obtained
-  in the past. Indeed, each element of this formula is already available
-  in `frame@pred(R(j))`. This is done by the `fadup` tactic. *)
+    (** We are now able to remove this formula from the frame because
+        the attacker is able to compute it using information obtained
+        in the past. Indeed, each element of this formula is already available
+        in `frame@pred(R(j))`. This is done by the `fadup` tactic. *)
     by fadup 1.
     
   (** **Case where t = R1(j):**  
