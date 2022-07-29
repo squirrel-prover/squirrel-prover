@@ -343,8 +343,6 @@ let do_tactic (state : main_state) l : main_state =
       { state with mode = WaitQed }
     end else begin
       Printer.pr "%a" Prover.pp_goal ();
-      Visualisation.dump ();
-      Server.update ();
       { state with mode = ProofMode }
     end
 
@@ -516,6 +514,7 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
     let cmd = next_input ~test state in
     let new_state = do_command ~test state cmd
     in
+    Server.update ();
     new_state, new_state.mode
   with
   (* exit prover *)

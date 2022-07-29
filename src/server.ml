@@ -29,13 +29,15 @@ let update = ref (fun () -> ())
 (* Server setup and launching in a new thread *)
 
 let start () =
-  let port = 8080 in
-  S._enable_debug false;
-  let server = S.create ~port () in
+  if Sys.getenv_opt("SP_VISU") = Some("ok") then
+  begin
+    let port = 8080 in
+    S._enable_debug false;
+    let server = S.create ~port () in
 
-  (* Hardcoded HTML pages *)
+    (* Hardcoded HTML pages *)
 
-  let goals_page = "\
+    let goals_page = "\
 <html>
   <head><script>
      const es = new EventSource(\"events\");
@@ -58,75 +60,79 @@ let start () =
 </html>"
   in
 
-  S.add_route_handler ~meth:`GET server
-    S.Route.(exact "goals" @/ return)
-    (fun _req -> S.Response.make_string (Ok goals_page));
+    S.add_route_handler ~meth:`GET server
+      S.Route.(exact "goals" @/ return)
+      (fun _req -> S.Response.make_string (Ok goals_page));
 
-  let default_page =
-    "<html><body><p>\
-      Try <a href=\"goals\">this</a> \
-      or <a href=\"visualisation.html\">that</a>.\
-     </p></body></html>"
-  in
-  S.add_route_handler ~meth:`GET server
-    S.Route.return
-    (fun _req -> S.Response.make_string (Ok default_page));
+    let default_page =
+      "<html><body><p>\
+        Try <a href=\"goals\">this</a> \
+        or <a href=\"visualisation.html\">that</a>.\
+       </p></body></html>"
+    in
+    S.add_route_handler ~meth:`GET server
+      S.Route.return
+      (fun _req -> S.Response.make_string (Ok default_page));
 
-  (* Serving files from scripts directory *)
+    (* Serving files from scripts directory *)
 
-  List.iter
-    (fun filename ->
-       S.add_route_handler ~meth:`GET server
-         S.Route.(exact filename @/ return)
-         (fun _req -> S.Response.make_string (Ok (read_file filename))))
-    ["visualisation.html";"visualisation_style.css";"visualisation_script.js"];
+    List.iter
+      (fun filename ->
+         S.add_route_handler ~meth:`GET server
+           S.Route.(exact filename @/ return)
+           (fun _req -> S.Response.make_string (Ok (read_file filename)))) ["visualisation.html";"visualisation2.html";"visualisation_style.css";"visualisation_script.js";"visualisation_script2.js";"favicon.ico"];
 
-  (* Data *)
+    (* Data *)
+  
+    let headers = [("Content-Type", "text/plain")] in
+    S.add_route_handler ~meth:`GET server
+      S.Route.(exact "dump.json" @/ return)
+      (fun _req ->
+         match Prover.get_first_subgoal () with
+           | Trace j ->
+               let json =
+                 Format.asprintf "%a"
+                   Constr.dump (LowTraceSequent.mk_trace_cntxt j)
+               in
+               if json <> "" then
+                 S.Response.make_string ~headers:headers (Ok json)
+               else
+                 S.Response.fail ~headers:headers ~code:503 "No data for now"
+           | _ | exception _ -> S.Response.fail ~headers:headers ~code:503 "No data for now");
 
-  S.add_route_handler ~meth:`GET server
-    S.Route.(exact "dump.js" @/ return)
-    (fun _req ->
-       match Prover.get_first_subgoal () with
-         | Trace j ->
-             let json =
-               Format.asprintf "%a"
-                 Constr.dump (LowTraceSequent.mk_trace_cntxt j)
-             in
-             S.Response.make_string (Ok json)
-         | _ | exception _ -> S.Response.fail ~code:503 "No data for now");
+    S.add_route_handler ~meth:`GET server
+      S.Route.(exact "goal" @/ return)
+      (fun _req ->
+         try
+           let goal = Prover.get_first_subgoal () in
+           S.Response.make_string (Ok (Format.asprintf "%a" Goal.pp goal))
+         with _ ->
+           S.Response.make_string (Ok "none"));
 
-  S.add_route_handler ~meth:`GET server
-    S.Route.(exact "goal" @/ return)
-    (fun _req ->
-       try
-         let goal = Prover.get_first_subgoal () in
-         S.Response.make_string (Ok (Format.asprintf "%a" Goal.pp goal))
-       with _ ->
-         S.Response.make_string (Ok "none"));
+    (* Events *)
 
-  (* Events *)
+    let extra_headers = [
+      "Access-Control-Allow-Origin", "*";
+      "Access-Control-Allow-Methods", "POST, GET, OPTIONS";
+    ] in
+    S.add_route_server_sent_handler server S.Route.(exact "events" @/ return)
+      (fun _req (module EV : S.SERVER_SENT_GENERATOR) ->
+         S._debug (fun k -> k "new connection");
+         EV.set_headers extra_headers;
+         update := begin fun () ->
+           S._debug (fun k -> k "update event %.2f" (Unix.gettimeofday ()));
+           EV.send_event ~event:"update" ~data:"" ();
+         end;
+         while true do Unix.sleepf 60. done);
 
-  let extra_headers = [
-    "Access-Control-Allow-Origin", "*";
-    "Access-Control-Allow-Methods", "POST, GET, OPTIONS";
-  ] in
-  S.add_route_server_sent_handler server S.Route.(exact "events" @/ return)
-    (fun _req (module EV : S.SERVER_SENT_GENERATOR) ->
-       S._debug (fun k -> k "new connection");
-       EV.set_headers extra_headers;
-       update := begin fun () ->
-         S._debug (fun k -> k "update event %.2f" (Unix.gettimeofday ()));
-         EV.send_event ~event:"update" ~data:"" ();
-       end;
-       while true do Unix.sleepf 60. done);
-
-  let run () =
-    Printf.printf "Listening on http://localhost:%d/\n%!" (S.port server);
-    match S.run server with
-      | Ok () -> ()
-      | Error e ->
-          Printf.eprintf "error: %s\n%!" (Printexc.to_string e); exit 1
-  in
-  ignore (Thread.create run ())
+    let run () =
+      Printf.printf "Listening on http://localhost:%d/\n%!" (S.port server);
+      match S.run server with
+        | Ok () -> ()
+        | Error e ->
+            Printf.eprintf "error: %s\n%!" (Printexc.to_string e); exit 1
+    in
+    ignore (Thread.create run ())
+  end
 
 let update () = !update ()

@@ -1,238 +1,304 @@
-/* [data] is declared in another file 
-   Data is an array of levels, and levels are non-empty array of nodes*/
+/***** Parameters *****/
 
 const margin = 20
-const margin2 = 10
+const margin2 = 5
+
+
+
+/***** Read file *****/
+
+function loadJSONFile(filePath) {
+  var result = null;
+  var xmlhttp = new XMLHttpRequest();
+  xmlhttp.open("GET", filePath, false);
+  xmlhttp.send();
+  if (xmlhttp.status==200) {
+    result = JSON.parse(xmlhttp.responseText);
+  } else {
+    result = { "nodes": [], "layout": [] };
+  }
+  return result;
+}
 
 
 
 /***** Initialisation *****/
 
 /* Create properties in each nodes which will be necessary later */
-function make_data(json) {
-  const dic = {};
+function formatData(json) {
+  // Create a mapping from id to the node designated by the id
+  const map = {};
   json.nodes.forEach(node => {
-    dic[node.id] = node;
+    map[node.id] = node;
   });
-  const data = [];
-  json.layout.forEach(level => {
-    const dataLevel = [];
-    level.forEach(nodeId => {
-      const node = dic[nodeId.id];
-      node.level = dataLevel;
-      node.lineWidth = {};
-      node.lineHeight = {};
-      node.lineDisplay = {};
+  // result will contain two fields
+  const result = new Object();
+  // result.nodes contains the nodes in a list of list representing the layout
+  result.nodes = json.layout.map((nodes,lineNumber) => {
+    return nodes.map((layoutNode, columnNumber) => {
+      const node = map[layoutNode.id];
       node.color = Math.floor(Math.random() * 360);
-      dataLevel.push(node);
+      return node;
     });
-    data.push(dataLevel);
   });
-  const links = [];
+  // result.links contains the set of inequalities between nodes
+  result.links = [];
   json.nodes.forEach(node => {
-    node.children.forEach(child => {
-      links.push({"parent": node, "child": dic[child]})
+    node.children.forEach(childId => {
+      result.links.push({"parent": node, "child": map[childId]})
     });
   });
-  return [data, links]
+  return result;
 }
 
-  
+
 
 /***** Layout *****/
 
-/* Compute height, width, x and y of nodes and levels in data
-   Use heights and widths of each sub-elements inside nodes
-   (i.e. values inside properties lineHeight and lineWidth). */
-function computePositions(data) {
-  svgWidth = margin;
-  svgHeight = margin;
-  data.forEach((level,i,levels) => {
-    level.width = margin;
-    level.height = 0;
-    level.forEach((node,j,nodes) => {
-      node.width = Math.max(...Object.values(node.lineWidth));
-      node.height = Object.values(node.lineHeight).reduce((x,y) => x+y, 0);
-      node.x = j > 0 ? (nodes[j-1].x + nodes[j-1].width + margin) : margin;
-      node.y = 0;
-      node.level.width += node.width + margin;
-      node.level.height = Math.max(node.level.height, node.height);
+function computeNodeSize(domNode) {
+  var width = 0;
+  var height = 0;
+  d3.select(domNode)
+    .selectAll(".line")
+    .each((d,i,nodes) => {
+      const domLine = nodes[i];
+      const domSpan = d3.select(domLine).select("span").node();
+      lineWidth = domSpan.offsetWidth + 2*margin2;
+      lineHeight = domSpan.offsetHeight + 2*margin2;
+      size.set(domLine, {"width": lineWidth, "height": lineHeight});
+      width = Math.max(width, lineWidth);
+      height += lineHeight;
     });
-    level.x = 0;
-    level.y = i > 0 ? (levels[i-1].y + levels[i-1].height + margin) : margin;
-    svgWidth = Math.max(svgWidth, level.width);
-    svgHeight += level.height + margin;
+  size.set(domNode, {"width": width, "height": height});
+}
+
+function applyLineSize(domLine, nodeWidth, currentHeight, delay) {
+  const selection = d3.select(domLine);
+  const lineHeight = size.get(domLine).height;
+  selection
+    .transition().duration(delay)
+    .attr("transform", d => `translate(0,${currentHeight})`);
+  selection.select("rect")
+    .transition().duration(delay)
+    .attr("width", nodeWidth)
+    .attr("height", lineHeight);
+  selection.select("foreignObject")
+    .transition().duration(delay)
+    .attr("width", nodeWidth)
+    .attr("height", lineHeight);
+}
+
+function applyNodeSize(domNode, delay) {
+  const nodeWidth = size.get(domNode).width;
+  var currentHeight = 0;
+  d3.select(domNode)
+    .selectAll(".line")
+    .each((d,i,nodes) => {
+      const domLine = nodes[i];
+      applyLineSize(domLine, nodeWidth, currentHeight, delay);
+      currentHeight += size.get(domLine).height;
+    });
+}
+
+function computeAllPositions(data) {
+  var maxX = margin;
+  var x = margin;
+  var y = margin;
+  data.nodes.forEach(line => {
+    var nextY = y + margin;
+    line.forEach(node => {
+      domNode = d3.select("#" + node.id).node();
+      position.set(domNode, {"x": x, "y": y});
+      x += margin + size.get(domNode).width;
+      nextY = Math.max(nextY, y + margin + size.get(domNode).height);
+    });
+    maxX = Math.max(maxX, x);
+    x = margin;
+    y = nextY;
   });
+  maxY = y;
+  domSVG = d3.select("svg").node();
+  size.set(domSVG, {"width": maxX, "height": maxY});
 }
 
-/* Upadte position of DOM element corresponding to a line inside a node */
-function updateLine(selection, kind, previousKind, delay) {
-  selectionNodes.select("g." + kind)
-    .transition().duration(delay)
-    .attr("transform", d => `translate(0,${previousKind ? d.lineHeight[previousKind] : 0})`);
-  selectionNodes.select("rect." + kind)
-    .transition().duration(delay)
-    .attr("width", d => d.width)
-    .attr("height", d => d.lineHeight[kind]);
-  selectionNodes.select("foreignObject." + kind)
-    .transition().duration(delay)
-    .attr("width", d => d.width)
-    .attr("height", d => d.lineHeight[kind]);
-}
-
-/* Update positions of each element in the SVG */
-function updateAll(selectionLevels, selectionNodes, selectionLinks, delay) {
+function applySVGPosition(delay) {
   // Resize svg window
+  domSVG = d3.select("svg").node();
+  sizeSVG = size.get(domSVG);
   d3.select("svg")
     .transition().duration(delay)
-    .attr("width", svgWidth)
-    .attr("height", svgHeight)
-  // Place levels, nodes, and links
-  selectionLevels
-    .transition().duration(delay)
-    .attr("transform", d => `translate(${d.x},${d.y})`);
-  selectionNodes
-    .transition().duration(delay)
-    .attr("x", d => d.x)
-    .attr("y", d => d.y)
-    .attr("transform", d => `translate(${d.x},${d.y})`);
-  selectionLinks
-    .transition().duration(delay)
-    .attr("d", d => {
-      const pX = d.parent.x + (d.parent.width/2);
-      const pY = d.parent.level.y + d.parent.y + d.parent.height;
-      const cX = d.child.x + (d.child.width/2);
-      const cY = d.child.y + d.child.level.y;
-      return `M ${pX} ${pY} C ${pX} ${cY}, ${cX} ${pY}, ${cX} ${cY}`
-    });
-  // Use height and width to put all attributes for the differents part of a node
-  updateLine(selectionNodes, "name", null, delay);
-  updateLine(selectionNodes, "cond", "name", delay);
-  updateLine(selectionNodes, "state", "cond", delay);
-  updateLine(selectionNodes, "output", "state", delay);
+    .attr("width", sizeSVG.width)
+    .attr("height", sizeSVG.height);
 }
 
+function applyNodePosition(selection, delay) {
+  selection
+    .transition().duration(delay)
+    .attr("transform", (d,i,nodes) => {
+      domNode = nodes[i];
+      positionNode = position.get(domNode);
+      return `translate(${positionNode.x},${positionNode.y})`;
+    });
+}
 
+function applyLinkPosition(selection, delay) {
+  selection
+    .transition().duration(delay)
+    .attr("d", d => {
+      domParent = d3.select("#" + d.parent.id).node();
+      domChild = d3.select("#" + d.child.id).node();
+      const pX = position.get(domParent).x + (size.get(domParent).width/2);
+      const pY = position.get(domParent).y + size.get(domParent).height;
+      const cX = position.get(domChild).x + (size.get(domChild).width/2);
+      const cY = position.get(domChild).y;
+      return `M ${pX} ${pY} C ${pX} ${cY}, ${cX} ${pY}, ${cX} ${cY}`
+    });
+}
 
-/***** Interaction *****/
-
-/* Expand or reduce the output line */
-function click(data, selectionLevels, selectionNodes, selectionLinks, delay) {
-  return function(d, element, kind, text) {
-    span = d3.select(element).select("span");
-    if (d.lineDisplay[kind]) {
-      span.html(text);
-    } else {
-      span.html(d[kind]);
-    }
-    d.lineDisplay[kind] = !d.lineDisplay[kind];
-    d.lineWidth[kind] = span.node().offsetWidth + margin2;
-    d.lineHeight[kind] = span.node().offsetHeight + margin2;
-    computePositions(data);
-    updateAll(selectionLevels, selectionNodes, selectionLinks, delay);
-  };
+function applyAllPositions(selectionNodes, selectionLinks, delay) {
+  applySVGPosition(delay);
+  applyNodePosition(selectionNodes, delay);
+  applyLinkPosition(selectionLinks, delay);
 }
 
 
 
 /***** Plot *****/
 
-/* Add a sub-elements to each nodes in the SVG
-   (if the nodes contains the property [kind]) */
-function plot_line(selection, kind, mutable, text, partialClick) {
+function enterLine(selection, kind, mutable, text, partialClick) {
   /* Create a new <g> for each nodes */
-  newSelection = selection
-    .append("g")
-    .attr("class", kind)
-    .each(function(d) {
-      d.lineWidth[kind] = 0;
-      d.lineHeight[kind] = 0;
-    });
   /* If the datum has a property [kind],
      then we fill the newly created <g> with the expected information. */
-  validSelection = newSelection.filter(d => d.hasOwnProperty(kind));
-  rectSelection = validSelection.append("rect")
-    .classed(kind, true)
+  addLineSelection = selection.filter(d => d.hasOwnProperty(kind))
+    .append("g")
+      .classed("line", true)
+      .classed(kind, true)
+    .each((d,i,nodes) => {
+      if (mutable) {
+        expand.set(nodes[i], false);
+      }
+    });
+  rectSelection = addLineSelection.append("rect")
     .attr("x", 0)
     .attr("y", 0)
-    .style("stroke", "black");
+    .style("stroke", "black")
+    .style("fill", "none");
   if (!mutable) {
     rectSelection.style("fill", d => "hsl(" + d.color + ", 50%, 90%)");
   }
-  FOSelection = validSelection.append("foreignObject")
-    .classed(kind, true);
+  ForeignSelection = addLineSelection.append("foreignObject")
   if (mutable) {
-    FOSelection.on("click", function(d) {
-      partialClick(d, this, kind, text);
-      updateAll(selectionLevels, selectionNodes, selectionLinks, 500);
+    ForeignSelection.on("click", function(d) {
+      domLine = this.parentNode;
+      span = d3.select(this).select("span");
+      if (expand.get(domLine)) {
+          span.html(text);
+      } else {
+        span.html(d[kind]);
+      }
+      expand.set(domLine, !expand.get(domLine));
+      computeNodeSize(domLine.parentNode);
+      applyNodeSize(domLine.parentNode, 200);
+      computeAllPositions(data);
+      applyAllPositions(d3.selectAll(".node"), d3.selectAll(".link"), 200);
+      return;
     })
   }
-  FOSelection.append("xhtml:div")
+  ForeignSelection.append("xhtml:div") //TODO Ajouter la marge dans le js
     .append("xhtml:span")
-    .classed(kind, true)
-    .html(d => mutable ? text : d[kind])
-    .each(function(d) {
-      d.lineWidth[kind] = this.offsetWidth + margin2;
-      d.lineHeight[kind] = this.offsetHeight + margin2;
-    });
-  /* We return the created selection. */
-  return newSelection
+    .html(d => mutable ? text : d[kind]);
+}
+
+function enterNode(selection) {
+  result = selection.append("g")
+    .classed("node", true)
+    .attr("id", d => d.id);
+  partialClick = null;
+  enterLine(result, "name", false);
+  enterLine(result, "cond", true, "Condition", partialClick);
+  enterLine(result, "state", true, "States", partialClick);
+  enterLine(result, "output", true, "Output", partialClick);
+  result.each((d,i,node) => {
+    const domNode = node[i];
+    computeNodeSize(domNode);
+    applyNodeSize(domNode, 0);
+  });
+  return result;
+}
+
+function enterLink(selection) {
+  return selection.append("path")
+    .classed("link", true)
+    .attr("stroke", d => "hsl(" + d.parent.color + ", 100%, 50%)")
+    .attr("stroke-width", "2")
+    .attr("fill", "none");
+}
+
+function updateNode(selection) {
+  return selection
+}
+
+function updateLink(selection) {
+  return selection
 }
 
 /* Create elements corresponding to the initial data in the svg */
-function plot(data, links, svg) {
-  // First we crete all the selections.
-  // This will crete groups in the DOM of the SVG.
-  // The selection will link these groups to data.
-  // SelectionLevel connect levels to an element <g> which will contain element of a line of nodes
-  selectionLevels = svg.selectAll("g")
-    .data(data)
-    .enter()
-    .append("g")
-      .attr("id", (d,i) => `lvl${i}`);
-  // SelectionNodes connect nodes to an element <g> which will contain element of the node
-  selectionNodes = selectionLevels.selectAll("g")
-    .data(function(d) { return d; })
-    .enter()
-    .append("g")
-      .attr("class", "node")
-      .attr("id", d => d.id);
-  // SelectionLinks connect links to elements <path>
+function plot(svg, data) {
+  selectionNodes = svg.selectAll("g.node")
+    .data(data.nodes.flat(), d => d.id)
+    .join(
+      enter => enterNode(enter),
+      update => updateNode(update),
+      exit => exit.remove()
+    );
+
   selectionLinks = svg.selectAll("path")
-    .data(links)
-    .enter()
-    .append("path")
-      .attr("stroke", d => "hsl(" + d.parent.color + ", 100%, 50%)")
-      .attr("stroke-width", "2")
-      .attr("fill", "none");
-  
-  // Create all the elements inside a node
-  partialClick = click(data, selectionLevels, selectionNodes, selectionLinks, 2000)
-  selectionName = plot_line(selectionNodes, "name", false);
-  selectionCond = plot_line(selectionName, "cond", true, "Condition", partialClick);
-  selectionState = plot_line(selectionCond, "state", true, "States", partialClick);
-  selectionOutput = plot_line(selectionState, "output", true, "Output", partialClick);
-  
-  // Since textual element are created in <foreignObject>,
-  // we can now compute height and width of each nodes
-  // and x of each nodes and y of each levels
-  computePositions(data);
-  
-  // Use height and width to put all attributes for the differents part of a node
-  updateAll(selectionLevels, selectionNodes, selectionLinks, 0);
+    .data(data.links, d => d.parent.id + d.child.id)
+    .join(
+      enter => enterLink(enter),
+      update => updateLink(update),
+      exit => exit.remove()
+    );
+
+  svgSize = computeAllPositions(data);
+  applySVGPosition(0);
+  applyAllPositions(selectionNodes, selectionLinks, 0);
 }
+
 
 
 
 /***** Execution *****/
 
+/**/
+var size = d3.local();
+var position = d3.local();
+var expand = d3.local();
 /* Declare the main svg */
+d3.select("body")
+  .append("xhtml:div");
 var svg = d3.select("body")
   .append("svg")
   .style('border', 'solid')
+var svgWidth;
+var svgHeight;
+
 /* Initialisation */
-const [data, links] = make_data(json);
-console.log("Data", data);
-console.log("Links", links);
-/* Plot */
-plot(data, links, svg);
+var json = loadJSONFile("http://localhost:8080/dump.json");
+d3.select("div")
+  .html(json.layout.flat().map(x => x.id).toString());
+var data = formatData(json);
+
+plot(svg, data);
+
+/* Events */
+const es = new EventSource('events');
+es.addEventListener('update',
+  function(event){
+    json = loadJSONFile("http://localhost:8080/dump.json");
+    var text = json.layout.flat().map(x => x.id).toString();
+    d3.select("div")
+      .html(text ? text : "No data");
+    data = formatData(json);
+    plot(svg, data);
+  });

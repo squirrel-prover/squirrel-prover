@@ -1430,18 +1430,18 @@ let dump_nodes ppf cntxt g =
     match l with
     | [] -> ()
     | v :: l' -> 
-      Format.fprintf ppf "\'n%d\'" v.hash;
+      Format.fprintf ppf "\"n%d\"" v.hash;
       pp_childs ppf l'
   and pp_childs ppf l =
     match l with
     | [] -> ()
     | v :: l' -> 
-      Format.fprintf ppf ", \'n%d\'" v.hash;
+      Format.fprintf ppf ", \"n%d\"" v.hash;
       pp_childs ppf l'
   in
   let pp_vertex ppf v =
     (*DEBUG*) (*Printer.pr "%a\n" pp_ut v;*)
-    Format.fprintf ppf "\"id\": 'n%d',@;\"children\": [%a]"
+    Format.fprintf ppf "\"id\": \"n%d\",@;\"children\": [%a]"
       v.hash
       pp_child (get_children g v);
     match find_eq_action (Utils.oget cntxt.models) (ut_to_term v) with
@@ -1451,16 +1451,16 @@ let dump_nodes ppf cntxt g =
       let pp_states = Format.pp_print_list 
         ~pp_sep:(fun ppf () -> Format.fprintf ppf "@;")
         (fun ppf (state,term) -> Format.fprintf ppf "%a := %a" Term.pp_msymb state Term.pp term) in
-      Format.fprintf ppf ",@;\"name\": \'%a\'" (Printer.html Action.pp_descr_short) descr;
+      Format.fprintf ppf ",@;\"name\": \"%a\"" (Printer.html Action.pp_descr_short) descr;
       if not (Term.f_triv (snd descr.condition)) then
-        Format.fprintf ppf ",@;\"cond\": \'%a\'" (Printer.html Term.pp) (snd descr.condition);
+        Format.fprintf ppf ",@;\"cond\": \"%a\"" (Printer.html Term.pp) (snd descr.condition);
       if descr.updates <> [] then
-        Format.fprintf ppf ",@;\"state\": \'%a\'"
+        Format.fprintf ppf ",@;\"state\": \"%a\""
           (Printer.html pp_states) descr.updates;
       if fst descr.output <> Symbols.dummy_channel then
-        Format.fprintf ppf ",@;\"output\": \'%a\'"
+        Format.fprintf ppf ",@;\"output\": \"%a\""
           (Printer.html Term.pp) (snd descr.output)
-    | _ -> Format.fprintf ppf ",@;\"name\": \'%a\'" (Printer.html Term.pp) (ut_to_term v);
+    | _ -> Format.fprintf ppf ",@;\"name\": \"%a\"" (Printer.html Term.pp) (ut_to_term v);
     
   in
   let pp_vertexes = Format.pp_print_list
@@ -1510,18 +1510,15 @@ let dump ppf cntxt =
   match cntxt.models with
   | Some [model] -> 
     let g = model.tr_graph in
-    if UtG.is_empty g then
-      (*DEBUG*) Printer.kw `Error (Printer.get_std()) "Empty model"
-    else begin
-      (*DEBUG*) Printer.kw `Error (Printer.get_std()) "MODEL %d" (UtG.nb_vertex g);
-      Format.fprintf ppf "@[<v 2>json = {@;";
+    if not (UtG.is_empty g) then begin
+      Format.fprintf ppf "@[<v 2>{@;";
       dump_nodes ppf cntxt g;
       Format.fprintf ppf "@;";
       dump_layout ppf g;
       Format.fprintf ppf "@]@;}@.";
     end
-  | Some _ -> (*DEBUG*) Printer.kw `Error (Printer.get_std()) "Several models"
-  | None -> (*DEBUG*) Printer.kw `Error (Printer.get_std()) "Don't know this case"
+  | Some _ -> ()
+  | None -> ()
   
 
 (*------------------------------------------------------------------*)
