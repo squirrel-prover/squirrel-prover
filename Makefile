@@ -29,8 +29,9 @@ okfail: squirrel
 okfail_end: $(PROVER_TESTS:.sp=.ok)
 	@$(ECHO)
 	@if test -f tests/tests.ko ; then \
-	  $(ECHO) Some tests failed: ; \
-	  cat tests/tests.ko | sort ; rm -f tests/tests.ko ; exit 1 ; \
+	  wc -l tests/tests.ko | cut -z -f 1 -d " "; $(ECHO) " tests failed:" ; \
+	  cat tests/tests.ko | sort ; \
+    rm -f tests/tests.ko ; exit 1 ; \
 	 else $(ECHO) All tests passed successfully. ; fi
 
 example: squirrel
