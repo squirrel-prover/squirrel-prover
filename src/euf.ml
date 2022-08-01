@@ -183,7 +183,7 @@ let mk_rule ~elems ~drop_head ~fun_wrap_key
     let subst_fresh =
       List.map (fun i ->
           Term.(ESubst (mk_var i,
-                        mk_var (Vars.fresh_r env i))))
+                        mk_var (Vars.make_approx_r env i))))
         (List.filter
            (fun x -> not (List.mem x safe_is))
            action_descr.Action.indices)
@@ -215,7 +215,7 @@ let mk_rule ~elems ~drop_head ~fun_wrap_key
       List.map
         (fun v ->
            Term.(ESubst (mk_var v,
-                         mk_var (Vars.fresh_r env v))))
+                         mk_var (Vars.make_approx_r env v))))
         vars
     in
 

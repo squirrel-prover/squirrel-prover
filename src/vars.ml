@@ -145,11 +145,11 @@ let rm_vars vs (e : env) : env = List.fold_left (fun e v -> rm_var v e) e vs
 (*------------------------------------------------------------------*)
 (** {2 Create new and pattern variables} *)
     
-let make_new ty name = 
+let make_fresh ty name = 
   { id = Ident.create name;
     ty; }
 
-let make_new_from v =
+let refresh v =
   { id = Ident.create v.id.name;
     ty = v.ty; }
 
@@ -163,23 +163,23 @@ let make ?(allow_pat=false) mode (e : env) ty name =
     | `Approx -> e
     | `Shadow -> M.filter (fun n _ -> n <> name) e
   in
-  let v = make_new ty name in
+  let v = make_fresh ty name in
   add_var v e, v
 
 (*------------------------------------------------------------------*)
 let make_exact (e : env) ty name =
   if M.mem name e then None
   else
-    let v = make_new ty name in
+    let v = make_fresh ty name in
     Some (add_var v e, v)
 
 (*------------------------------------------------------------------*)
-let fresh (e : env) v =
-  let v' = make_new_from v in
+let make_approx (e : env) v =
+  let v' = refresh v in
   add_var v' e, v'
 
-let fresh_r (e : env ref) v =
-  let v' = make_new_from v in
+let make_approx_r (e : env ref) v =
+  let v' = refresh v in
   e := add_var v' !e;
   v'
 

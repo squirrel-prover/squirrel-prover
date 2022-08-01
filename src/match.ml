@@ -1667,7 +1667,7 @@ let known_set_add_frame (k : known_set) : known_set list =
   match k.term with
   | Term.Macro (ms, l, ts) when ms = Term.frame_macro ->
     assert (l = []);
-    let tv' = Vars.make_new Type.Timestamp "t" in
+    let tv' = Vars.make_fresh Type.Timestamp "t" in
     let ts' = Term.mk_var tv' in
     let vars = tv' :: k.vars in
 
@@ -1718,7 +1718,7 @@ let known_set_of_mset
     ?extra_cond_le
     (mset : MCset.t) : known_set
   =
-  let t = Vars.make_new Type.Timestamp "t" in
+  let t = Vars.make_fresh Type.Timestamp "t" in
   let term = Term.mk_macro mset.msymb [] (Term.mk_var t) in
   let cond =
     let cond_le = match mset.cond_le with
@@ -1784,7 +1784,7 @@ let mset_incl
     (table : Symbols.table) (system : SE.arbitrary) 
     (s1 : MCset.t) (s2 : MCset.t) : bool
   =
-  let tv = Vars.make_new Type.Timestamp "t" in
+  let tv = Vars.make_fresh Type.Timestamp "t" in
   let term1 = Term.mk_macro s1.msymb [] (Term.mk_var tv) in
   let term2 = Term.mk_macro s2.msymb [] (Term.mk_var tv) in
 
@@ -1862,7 +1862,7 @@ let mset_subst env subst (mset : MCset.t) : MCset.t =
 let mset_inter table env (s1 : MCset.t) (s2 : MCset.t) : MCset.t option =
   let s1, s2 = mset_refresh env s1, mset_refresh env s2 in
 
-  let tv = Vars.make_new Type.Timestamp "t" in
+  let tv = Vars.make_fresh Type.Timestamp "t" in
   let term1 = Term.mk_macro s1.msymb [] (Term.mk_var tv) in
   let term2 = Term.mk_macro s2.msymb [] (Term.mk_var tv) in
 
@@ -2146,7 +2146,7 @@ module E : S with type t = Equiv.form = struct
       =
       (* we create the timestamp at which we are *)
       let i = Action.arity a table in
-      let is = List.init i (fun _ -> Vars.make_new Type.Index "i") in
+      let is = List.init i (fun _ -> Vars.make_fresh Type.Index "i") in
       let ts = Term.mk_action a is in
 
       (* we unroll the definition of [cand] at time [ts] *)
@@ -2268,7 +2268,7 @@ module E : S with type t = Equiv.form = struct
               | Symbols.Global _ -> assert false
 
               | Symbols.State (i, ty) ->
-                ty, List.init i (fun _ -> Vars.make_new Type.Index "i")
+                ty, List.init i (fun _ -> Vars.make_fresh Type.Index "i")
 
               | Symbols.Cond ->
                 Type.Boolean, []

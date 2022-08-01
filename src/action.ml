@@ -377,8 +377,8 @@ let rec dummy (shape : shape) : action =
   match shape with
   | [] -> []
   | { par_choice = (p,lp) ; sum_choice = (s,ls) } :: l ->
-    { par_choice = (p, List.init lp (fun _ -> Vars.make_new Type.Index "i")) ;
-      sum_choice = (s, List.init ls (fun _ -> Vars.make_new Type.Index "i")) }
+    { par_choice = (p, List.init lp (fun _ -> Vars.make_fresh Type.Index "i")) ;
+      sum_choice = (s, List.init ls (fun _ -> Vars.make_fresh Type.Index "i")) }
     :: dummy l
 
 (*------------------------------------------------------------------*)

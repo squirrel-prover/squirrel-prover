@@ -464,7 +464,7 @@ module Mk (Args : MkArgs) : S with
        to avoir having variable named '_' in the rest of the prover. *)
     let subst, pat_vars =
         Sv.map_fold (fun subst v ->
-          let new_v = Vars.make_new (Vars.ty v) "x" in
+          let new_v = Vars.make_fresh (Vars.ty v) "x" in
           Term.ESubst (Term.mk_var v, Term.mk_var new_v) :: subst,
           new_v
           ) [] pat_vars

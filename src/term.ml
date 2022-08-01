@@ -1325,7 +1325,7 @@ and subst_binding : Vars.var -> subst -> Vars.var * subst =
   let var, s =
     if Sv.mem var right_fv
     then
-      let new_v = Vars.fresh_r env var in
+      let new_v = Vars.make_approx_r env var in
       let s = (ESubst (Var var,Var new_v)) :: s in
       ( new_v, s)
     else ( var, s ) in
@@ -1393,8 +1393,8 @@ type refresh_arg = [`Global | `InEnv of Vars.env ref ]
 
 let refresh_var (arg : refresh_arg) v =
   match arg with
-  | `Global    -> Vars.make_new_from v
-  | `InEnv env -> Vars.fresh_r env v
+  | `Global    -> Vars.refresh v
+  | `InEnv env -> Vars.make_approx_r env v
 
 (* The substitution must be built reversed w.r.t. vars, to handle capture. *)
 let refresh_vars (arg : refresh_arg) evars =

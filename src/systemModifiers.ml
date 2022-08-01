@@ -214,7 +214,7 @@ let global_rename
   in
 
   (* we now create the lhs of the obtained conclusion *)
-  let fresh_x_var = Vars.make_new Type.Message "mess" in
+  let fresh_x_var = Vars.make_fresh Type.Message "mess" in
   let enrich = [Term.mk_var fresh_x_var] in
 
   let make_conclusion equiv =
@@ -279,7 +279,7 @@ let global_prf
     | _ -> assert false
   in
   (* We create the pattern for the hash *)
-  let fresh_x_var = Vars.make_new Type.Message "x" in
+  let fresh_x_var = Vars.make_fresh Type.Message "x" in
   let hash_pattern =
     Term.mk_fun table param.h_fn [] [Term.mk_var fresh_x_var; left_key ]
   in
@@ -326,7 +326,7 @@ let global_prf
   in
 
   (* we now create the lhs of the obtained conclusion *)
-  let fresh_x_var = Vars.make_new Type.Message "mess" in
+  let fresh_x_var = Vars.make_fresh Type.Message "mess" in
   let enrich = [Term.mk_var fresh_x_var] in
   let make_conclusion equiv =
     let atom =
@@ -419,7 +419,7 @@ let global_cca
   let is1, left_subst = Term.refresh_vars (`Global) is in
 
   (* The dec must match all decryption with the corresponding secret key *)
-  let fresh_x_var = Vars.make_new Type.Message "x" in
+  let fresh_x_var = Vars.make_fresh Type.Message "x" in
   let dec_pattern =
     Term.mk_fun table dec_fn [] [ Term.mk_var fresh_x_var;
                                   Term.mk_name enc_key ]
@@ -493,7 +493,7 @@ let global_cca
   in
 
   (* we now create the lhs of the obtained conclusion *)
-  let fresh_x_var = Vars.make_new Type.Message "mess" in
+  let fresh_x_var = Vars.make_fresh Type.Message "mess" in
   let rdef =
     let ty_args = List.map Vars.ty is in
     Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args Type.Message ; }
@@ -663,7 +663,7 @@ let xo_lt
         y.x_msymb
         (Macros.ty_out table y.x_msymb)
         (List.map (fun ty ->
-             Vars.make_new ty "a"
+             Vars.make_fresh ty "a"
            ) (Macros.ty_args table y.x_msymb))
     in
     let a_y = Term.mk_action y.x_a y.x_a_is in
@@ -868,7 +868,7 @@ let global_prf_t
   let occs = List.remove_duplicate (=) occs in
 
   (* fresh variable representing the hashed message to rewrite *)
-  let x = Vars.make_new m_ty "x" in
+  let x = Vars.make_fresh m_ty "x" in
   let x_t = Term.mk_var x in
   
   (* timestamp at which [H(x,k)] occurs  *)

@@ -426,7 +426,7 @@ let induction Args.(Message (ts,_)) s =
       let subst =
         List.map
           (fun i ->
-             let i' = Vars.fresh_r env i in
+             let i' = Vars.make_approx_r env i in
              Term.ESubst (Term.mk_var i, Term.mk_var i'))
           indices
       in
@@ -539,7 +539,7 @@ let do_fa_felem (i : int L.located) (s : ES.t) : ES.t =
   match e with
   | Find (vars,c,t,e) ->
     let env = ref (ES.vars s) in
-    let vars' = List.map (Vars.fresh_r env) vars in
+    let vars' = List.map (Vars.make_approx_r env) vars in
     let subst =
       List.map2
         (fun i i' -> Term.ESubst (Term.mk_var i, Term.mk_var i'))

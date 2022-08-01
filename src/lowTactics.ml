@@ -967,7 +967,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       begin
         match S.Conc.decompose_forall form with
         | x :: vs, f ->
-          let x' = Vars.make_new_from x in
+          let x' = Vars.refresh x in
 
           let subst = [Term.ESubst (Term.mk_var x, Term.mk_var x')] in
 
@@ -1072,7 +1072,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     S.set_vars env s
 
   let _generalize ~dependent t s : Vars.var * S.t =
-    let v = Vars.make_new (Term.ty t) "_x" in
+    let v = Vars.make_fresh (Term.ty t) "_x" in
 
     let subst = [Term.ESubst (t, Term.mk_var v)] in
 
@@ -1368,7 +1368,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Type.Timestamp ->
       begin
         let env = Vars.of_list vs0 in
-        let _,v' = Vars.fresh env v in
+        let _,v' = Vars.make_approx env v in
 
         let ih =
           let atom_lt =

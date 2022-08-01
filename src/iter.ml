@@ -703,12 +703,12 @@ end = struct
                  - otherwise, we must use a fresh universally quantified var. *)
               if v_a = v_b
               then false, v_a
-              else true, Vars.make_new Type.Index "i"
+              else true, Vars.make_fresh Type.Index "i"
 
             (* [v_a] or [v_b] is not a constant.
                In that case, use a universally quantified variable. *)
-            | true, _ -> true, Vars.make_new_from v_a
-            | _, true -> true, Vars.make_new_from v_b
+            | true, _ -> true, Vars.refresh v_a
+            | _, true -> true, Vars.refresh v_b
           in
 
           (* update [indices_r] *)
@@ -727,7 +727,7 @@ end = struct
     mk ~env:Sv.empty ~msymb:join_ms ~indices:(!indices_r)
 
   let incl table (sexpr : SE.fset) (s1 : t) (s2 : t) : bool =
-    let tv = Vars.make_new Type.Timestamp "t" in
+    let tv = Vars.make_fresh Type.Timestamp "t" in
     let term1 = Term.mk_macro s1.msymb [] (Term.mk_var tv) in
     let term2 = Term.mk_macro s2.msymb [] (Term.mk_var tv) in
 

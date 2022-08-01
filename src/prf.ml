@@ -253,7 +253,7 @@ let prf_condition_side
 
     (* Create the frame on which we will iterate to compute the PRF formulas *)
     let hash_ty = param.h_fty.fty_out in
-    let v = Vars.make_new hash_ty "v" in
+    let v = Vars.make_fresh hash_ty "v" in
 
     let e_without_hash =
       Term.subst [Term.ESubst (hash,Term.mk_var v)] e

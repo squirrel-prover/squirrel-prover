@@ -222,7 +222,7 @@ let rec simpl_left s =
         List.map
           (fun v ->
              Term.ESubst  (Term.mk_var v,
-                           Term.mk_var (Vars.fresh_r env v)))
+                           Term.mk_var (Vars.make_approx_r env v)))
           vs
       in
       let f = Term.subst subst f in
@@ -1421,7 +1421,7 @@ let euf_apply_direct s (_, key, m, _, _, _, _, _) Euf.{d_key_indices;d_message} 
     List.fold_left
       (fun (subst,env) v ->
          if Vars.mem init_env v then subst,env else
-         let env,v' = Vars.fresh env v in
+         let env,v' = Vars.make_approx env v in
          let subst = Term.(ESubst (mk_var v, mk_var v')) :: subst in
          subst,env)
       ([],init_env)

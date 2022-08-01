@@ -98,14 +98,6 @@ val rm_vars : vars -> env ->  env
 (*------------------------------------------------------------------*)
 (** {2 Create variables} *)
 
-(** [make_new_from v] generates a new variable of the same sort as
-  * [v] guaranteed to not appear anywhere else so far.
-  *
-  * The variables generated in this way are not meant to be seen by
-  * the user. *)
-val make_new_from : var -> var
-val make_new : Type.ty -> string -> var
-
 (*------------------------------------------------------------------*)
 (** [make env sort name] creates a variable of sort [sort] in [env].
     - [~opt = `Approx], appends some suffix to [name] to get a new variable.
@@ -119,10 +111,24 @@ val make :
 val make_exact : env -> Type.ty -> string -> (env * var) option
 
 (*------------------------------------------------------------------*)
-(** Create a fresh variable resembling the one given in argument. *)
-val fresh : env -> var -> env * var
+(** Create a new variable whose name resemble the one given in argument. *)
+val make_approx : env -> var -> env * var
 
-(** Stateful version of [refresh]. *)
-val fresh_r : env ref -> var -> var
+(** Stateful version of [make_approx]. *)
+val make_approx_r : env ref -> var -> var
+
+(*------------------------------------------------------------------*)
+(** [refresh v] generates a new variable of the same type as
+    [v] guaranteed to not appear anywhere else so far.
+  
+    The variable generated uses is referred to by the same string as 
+    [v] (though with a different identifier).
+    Hence such variables must not be exported to the top-level, or 
+    different variables would be printed with the same string (with the 
+    exception of pattern holes [_]) *)
+val refresh : var -> var
+
+(** Make a new variable with a given name. Caveats of [refresh] applies! *)
+val make_fresh : Type.ty -> string -> var
 
 
