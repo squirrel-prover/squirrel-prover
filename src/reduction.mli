@@ -45,6 +45,9 @@ module type S = sig
   val destr_eq : 
     t -> 'a Equiv.f_kind -> 'a -> (Term.term * Term.term) option
 
+  val destr_and : 
+    t -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
+
   (*------------------------------------------------------------------*)
   (** {2 conversion } *)
       

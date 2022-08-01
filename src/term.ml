@@ -188,6 +188,7 @@ let f_true   = mk Symbols.fs_true
 let f_and    = mk Symbols.fs_and
 let f_or     = mk Symbols.fs_or
 let f_impl   = mk Symbols.fs_impl
+let f_iff    = mk Symbols.fs_iff
 let f_not    = mk Symbols.fs_not
 let f_ite    = mk Symbols.fs_ite
 
@@ -285,6 +286,7 @@ module SmartConstructors = struct
   let mk_and_ns  t0 t1 = mk_fbuiltin Symbols.fs_and  [] [t0;t1]
   let mk_or_ns   t0 t1 = mk_fbuiltin Symbols.fs_or   [] [t0;t1]
   let mk_impl_ns t0 t1 = mk_fbuiltin Symbols.fs_impl [] [t0;t1]
+  let mk_iff_ns  t0 t1 = mk_fbuiltin Symbols.fs_iff  [] [t0;t1]
 
   let mk_eq_ns  t0 t1 = mk_fbuiltin Symbols.fs_eq  [] [t0;t1]
   let mk_neq_ns t0 t1 = mk_fbuiltin Symbols.fs_neq [] [t0;t1]
@@ -339,6 +341,11 @@ module SmartConstructors = struct
     | tf, _ when tf = mk_false && simpl -> mk_true
     | tt, t when tt = mk_true && simpl -> t
     | t1,t2 -> mk_impl_ns t1 t2
+
+  let mk_iff ?(simpl=true) t1 t2 = match t1,t2 with
+    | tf, _ when tf = mk_true && simpl -> t2
+    | _, tf when tf = mk_true && simpl -> t1
+    | t1,t2 -> mk_iff_ns t1 t2
 
   let mk_impls ?(simpl=true) ts t =
     List.fold_left (fun tres t0 -> (mk_impl ~simpl) t0 tres) t ts
@@ -524,14 +531,7 @@ module SmartDestructors = struct
   let destr_impl f = oas_seq2 (destr_fun ~fs:f_impl f)
   let destr_pair f = oas_seq2 (destr_fun ~fs:f_pair f)
 
-  let destr_iff f = 
-    match f with
-    | Fun (fs, _, [Fun (fs1, _, [t1 ; t2]);
-                   Fun (fs2, _, [t2'; t1'])]) 
-      when fs = f_and && fs1 = f_impl && fs2 = f_impl ->
-      if t1 = t1' && t2 = t2' then Some (t1, t2) else None
-
-    | _ -> None 
+  let destr_iff f = oas_seq2 (destr_fun ~fs:f_iff f)
 
   (*------------------------------------------------------------------*)
   (* let destr_neq f = oas_seq2 (obind (destr_fun ~fs:f_eq) (destr_not f)) *)
@@ -709,7 +709,8 @@ let happens_fixity = 1000 , `NoParens
 let get_infix_prec (f : Symbols.fname) =
   (* *)if f = Symbols.fs_and  then fst and_fixity 
   else if f = Symbols.fs_or   then fst or_fixity 
-  else if f = Symbols.fs_impl then fst impl_fixity 
+  else if f = Symbols.fs_impl then fst impl_fixity
+  else if f = Symbols.fs_iff  then fst iff_fixity 
   else if f = Symbols.fs_xor  then fst xor_fixity 
   else if f = Symbols.fs_eq   then fst eq_fixity 
   else if f = Symbols.fs_neq  then fst eq_fixity 
@@ -782,18 +783,6 @@ and _pp
          (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,")
             (pp (pair_fixity, `NonAssoc))))
       terms
-
-  (* iff. <=> *)
-  | Fun (fa,_,[Fun (fi1,_,[bl1;br1]);
-               Fun (fi2,_,[br2;bl2])])
-    when fa = f_and && fi1 = f_impl && fi2 = f_impl &&
-         bl1 = bl2 && br1 = br2 ->
-    let pp fmt () =
-      Fmt.pf ppf "@[%a@ <=>@ %a@]"
-        (pp (iff_fixity, `Left)) bl1
-        (pp (iff_fixity, `Right)) br1
-    in
-    maybe_paren ~outer ~side ~inner:iff_fixity pp ppf ()
 
   (* happens *)
   | Fun _ as f when is_and_happens f ->

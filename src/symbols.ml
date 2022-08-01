@@ -680,9 +680,10 @@ let fs_pred =
 
 let fs_false = mk_fsymb ~bool:true "false" 0
 let fs_true  = mk_fsymb ~bool:true "true" 0
-let fs_and   = mk_fsymb ~bool:true ~f_info:(`Infix `Right) "&&" 2
-let fs_or    = mk_fsymb ~bool:true ~f_info:(`Infix `Right) "||" 2
-let fs_impl  = mk_fsymb ~bool:true ~f_info:(`Infix `Right) "=>" 2
+let fs_and   = mk_fsymb ~bool:true ~f_info:(`Infix `Right)    "&&"  2
+let fs_or    = mk_fsymb ~bool:true ~f_info:(`Infix `Right)    "||"  2
+let fs_impl  = mk_fsymb ~bool:true ~f_info:(`Infix `Right)    "=>"  2
+let fs_iff   = mk_fsymb ~bool:true ~f_info:(`Infix `NonAssoc) "<=>" 2
 let fs_not   = mk_fsymb ~bool:true "not" 1
 
 let fs_ite =

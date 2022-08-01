@@ -60,6 +60,9 @@ module type S = sig
   val destr_eq : 
     t -> 'a Equiv.f_kind -> 'a -> (Term.term * Term.term) option
 
+  val destr_and : 
+    t -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
+
   (*------------------------------------------------------------------*)
   (** {2 conversion } *)
       
@@ -385,7 +388,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       | Global x -> Global (reduce_equiv ~expand_context ?system param s x)
 
  (*------------------------------------------------------------------*)
-  (* FIXME: use [s] to reduce [x] if necessary *)
+  (* FEATURE: use [s] to reduce [x] if necessary *)
   let destr_eq (type a)
       (s : S.t) (k : a Equiv.f_kind)
       (x : a) : (Term.term * Term.term) option
@@ -404,6 +407,34 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       match x with
       | Local x  ->   destr_eq x
       | Global x -> e_destr_eq x
+
+  (* FEATURE: use [s] to reduce [x] if necessary *)
+  let destr_and (type a)
+      (s : S.t) (k : a Equiv.f_kind)
+      (x : a) : (a * a) option
+    =
+    let destr_and x =
+      match Term.destr_and x with
+      | Some _ as res -> res
+      | None ->
+        match Term.destr_iff x with
+        | Some (t1, t2) ->
+          Some (Term.mk_impl ~simpl:false t1 t2,
+                Term.mk_impl ~simpl:false t2 t1)
+            
+        | None -> None
+    in
+    let e_destr_and x = Equiv.Smart.destr_and x in
+
+    match k with
+    | Local_t  ->   destr_and x
+    | Global_t -> e_destr_and x
+    | Any_t ->
+      match x with
+      | Local x ->
+        omap (fun (x,y) -> Equiv.Local x, Equiv.Local y) (destr_and x)
+      | Global x ->
+        omap (fun (x,y) -> Equiv.Global x, Equiv.Global y) (e_destr_and x)
 
   (*------------------------------------------------------------------*)
   (** Conversion state *)

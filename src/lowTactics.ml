@@ -1656,7 +1656,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** Split a conjunction conclusion, creating one subgoal per conjunct. *)
   let goal_and_right (s : S.t) : S.t list =
-    match S.Conc.destr_and (S.goal s) with
+    match S.Reduce.destr_and s S.conc_kind (S.goal s) with
     | Some (lformula, rformula) ->
       [ S.set_goal lformula s ;
         S.set_goal rformula s ]

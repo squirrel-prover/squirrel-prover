@@ -266,8 +266,9 @@ val f_pred : fsymb
 val f_true  : fsymb
 val f_false : fsymb
 val f_and   : fsymb
-val f_impl  : fsymb
 val f_or    : fsymb
+val f_impl  : fsymb
+val f_iff   : fsymb
 val f_not   : fsymb
 val f_ite   : fsymb
 
@@ -400,6 +401,8 @@ val mk_diff    : (proj * term) list -> term
 
 val mk_find : ?simpl:bool -> Vars.var list -> term -> term -> term -> term
 
+val mk_iff   : ?simpl:bool -> form -> form -> form
+  
 val destr_iff : term -> (term * term) option
 
 (*------------------------------------------------------------------*)
