@@ -166,24 +166,14 @@ let make ?(allow_pat=false) mode (e : env) ty name =
   let v = make_new ty name in
   add_var v e, v
 
-let make_r ?allow_pat opt (e : env ref) ty name =
-  let e', v = make ?allow_pat opt !e ty name in
-  e := e';
-  v
-  
+(*------------------------------------------------------------------*)
 let make_exact (e : env) ty name =
   if M.mem name e then None
   else
     let v = make_new ty name in
     Some (add_var v e, v)
 
-let make_exact_r (e : env ref) ty name =
-  if M.mem name !e then None
-  else
-    let v = make_new ty name in
-    e := add_var v !e;
-    Some v
-
+(*------------------------------------------------------------------*)
 let fresh (e : env) v =
   let v' = make_new_from v in
   add_var v' e, v'

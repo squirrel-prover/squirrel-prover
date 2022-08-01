@@ -94,7 +94,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Tactics.Tactic_soft_failure e -> fk e
 
   (*------------------------------------------------------------------*)
-  let make_exact ?loc env ty name =
+  let make_exact_var ?loc env ty name =
     match Vars.make_exact env ty name with
     | None ->
       hard_failure ?loc
@@ -794,7 +794,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Args.Unnamed
     | Args.AnyName     -> Vars.make `Approx env ty dflt_name
     | Args.Approx name -> Vars.make `Approx env ty name
-    | Args.Named name  -> make_exact env ty name
+    | Args.Named name  -> make_exact_var env ty name
 
   (*------------------------------------------------------------------*)
   (** Apply a naming pattern to a variable or hypothesis. *)
@@ -1636,7 +1636,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   let remember (id : Theory.lsymb) (term : Theory.term) s =
     let t, ty = convert s term in
-    let env, x = make_exact ~loc:(L.loc id) (S.vars s) ty (L.unloc id) in
+    let env, x = make_exact_var ~loc:(L.loc id) (S.vars s) ty (L.unloc id) in
     let subst = [Term.ESubst (t, Term.mk_var x)] in
 
     let s = S.subst subst (S.set_vars env s) in

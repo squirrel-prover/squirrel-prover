@@ -43,6 +43,9 @@ val compare : var -> var -> int
 
 val check_type_vars : vars -> Type.ty list -> (unit -> unit) -> unit
 
+(** Check if a variable is a pattern hole. *)
+val is_pat : var -> bool
+
 (*------------------------------------------------------------------*)
 (** {2 Set and Maps} *)
 
@@ -92,7 +95,6 @@ val rm_var : var -> env -> env
 
 val rm_vars : vars -> env ->  env
 
-
 (*------------------------------------------------------------------*)
 (** {2 Create variables} *)
 
@@ -104,9 +106,7 @@ val rm_vars : vars -> env ->  env
 val make_new_from : var -> var
 val make_new : Type.ty -> string -> var
 
-(** Check if a variable is a pattern hole. *)
-val is_pat : var -> bool
-
+(*------------------------------------------------------------------*)
 (** [make env sort name] creates a variable of sort [sort] in [env].
     - [~opt = `Approx], appends some suffix to [name] to get a new variable.
     - [~opt = `Shadow], uses [name], and shadows any pre-existing definition. *)
@@ -114,17 +114,11 @@ val make :
   ?allow_pat:bool -> [`Approx | `Shadow] -> 
   env -> Type.ty -> string -> env * var
 
-(** Stateful version of [make] *)
-val make_r : 
-  ?allow_pat:bool -> [`Approx | `Shadow] -> 
-  env ref -> Type.ty -> string -> var
-
+(*------------------------------------------------------------------*)
 (** Same than [make], but uses the exact name *)
 val make_exact : env -> Type.ty -> string -> (env * var) option
 
-(** Stateful version of [make_exact] *)
-val make_exact_r : env ref -> Type.ty -> string -> var option
-
+(*------------------------------------------------------------------*)
 (** Create a fresh variable resembling the one given in argument. *)
 val fresh : env -> var -> env * var
 

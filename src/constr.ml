@@ -1425,8 +1425,15 @@ open Term
 
 let env = ref Vars.empty_env
 
-let mk_var   v = Term.mk_var (Vars.make_r `Approx env Timestamp v)
-let mk_var_i v = Vars.make_r `Approx env Index     v
+let mk_var v : Term.term =
+  let env', v = Vars.make `Approx !env Timestamp v in
+  env := env';
+  Term.mk_var v
+  
+let mk_var_i v : Vars.var =
+  let env', v = Vars.make `Approx !env Index v in
+  env := env';
+  v
 
 let tau   = mk_var "tau"
 and tau'  = mk_var "tau"
