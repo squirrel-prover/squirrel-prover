@@ -141,6 +141,7 @@
   "intctxt"
   "splitseq"
   "constseq"
+  "localize"
   "memseq"
   "byequiv"
   "diffeq"
