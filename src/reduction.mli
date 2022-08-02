@@ -1,5 +1,7 @@
 module SE = SystemExpr
 module Args = TacticsArgs
+
+module THyps = Hyps.TraceHyps
   
 (*------------------------------------------------------------------*)
 type red_param = { 
@@ -11,6 +13,24 @@ val rp_default : red_param
 val rp_full    : red_param
 
 val parse_simpl_args : red_param -> Args.named_args -> red_param 
+
+(*------------------------------------------------------------------*)
+
+(** Conversion state *)
+type cstate
+
+(** Built a convertion state *)
+val mk_cstate :
+  Symbols.table -> Hint.hint_db -> 
+  SE.context -> 
+  Macros.expand_context -> 
+  THyps.hyps ->
+  red_param -> 
+  cstate
+
+(** Conversion functions using a [cstate] *)
+val conv   : cstate -> Term.term  -> Term.term  -> bool 
+val conv_e : cstate -> Equiv.form -> Equiv.form -> bool 
 
 (*------------------------------------------------------------------*)
 module type S = sig
@@ -49,9 +69,9 @@ module type S = sig
     t -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
 
   (*------------------------------------------------------------------*)
-  (** {2 conversion } *)
-      
-  val conv_term  :
+  (** {2 conversion from a sequent } *)
+
+  val conv_term :
     ?expand_context:Macros.expand_context -> 
     ?se:SE.t -> 
     ?param:red_param ->
@@ -65,7 +85,7 @@ module type S = sig
     t ->
     Equiv.form -> Equiv.form -> bool
 
-  val conv : 
+  val conv_kind : 
     ?expand_context:Macros.expand_context ->
     ?system:SE.context -> 
     ?param:red_param ->

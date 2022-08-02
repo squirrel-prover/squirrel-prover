@@ -302,6 +302,12 @@ let do_print (state : main_state) (q : Prover.print_query) : main_state =
       | Some s -> SystemExpr.parse state.table s
     in
     SystemExpr.print_system state.table system;
+
+    if Config.print_trs_equations ()
+    then
+      Printer.prt `Result "@[<v>@;%a@;@]%!"
+        Completion.print_init_trs state.table;
+
     state
 
 (*------------------------------------------------------------------*)

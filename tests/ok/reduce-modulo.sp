@@ -40,6 +40,6 @@ goal [A] _ (t : timestamp, i : index) :
   (seq (t : timestamp -> happens(t) => t = O(i) => fst(output@t) = b)
    = empty).
 Proof.
-  intro H /=.
-  apply H. 
+  intro H. 
+  auto. 
 Qed.

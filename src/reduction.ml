@@ -30,6 +30,151 @@ let parse_simpl_args
           Tactics.hard_failure ~loc:(L.loc l) (Failure "unknown argument")
     ) param args
 
+
+(*------------------------------------------------------------------*)
+(** {2 Conversion} *)
+
+(** Conversion state *)
+(* FEATURE: conversion modulo *)
+type cstate = { 
+  table   : Symbols.table;
+  system  : SE.context;
+  param   : red_param;
+  hint_db : Hint.hint_db;
+  hyps    : THyps.hyps;
+
+  subst   : Term.subst;
+  (** pending variable to variable substitution (left -> right) *)
+
+  expand_context : Macros.expand_context;
+  (** expantion mode for macros. See [Macros.expand_context]. *)
+}
+
+
+(** Make a cstate directly *)
+let mk_cstate table hint_db system expand_context hyps param : cstate =
+  { table; system; param; hint_db; hyps; expand_context;
+    subst = []; }
+
+(*------------------------------------------------------------------*)
+(** Internal *)
+exception NotConv
+
+let not_conv () = raise NotConv
+
+let conv_ty (ty1 : Type.ty) (ty2 : Type.ty) : unit =
+  if not (Type.equal ty1 ty2) then not_conv ()
+
+let conv_tys (tys1 : Type.ty list) (tys2 : Type.ty list) : unit =
+  List.iter2 conv_ty tys1 tys2
+
+let conv_ftype (ft1 : Type.ftype) (ft2 : Type.ftype) : unit =
+  if ft1.fty_iarr <> ft2.fty_iarr then not_conv ();
+  conv_ty  ft1.fty_out  ft2.fty_out;
+  conv_tys ft1.fty_args ft2.fty_args;
+  List.iter2 (fun tv1 tv2 ->
+      if not (tv1 = tv2) then not_conv ()
+    ) ft1.fty_vars ft2.fty_vars
+
+let conv_var (st : cstate) (v1 : Vars.var) (v2 : Vars.var) : unit =
+  if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then not_conv ();
+  if not (Vars.equal (Term.subst_var st.subst v1) v2) then not_conv ()
+
+let conv_vars (st : cstate) (vs1 : Vars.vars) (vs2 : Vars.vars) : unit =
+  List.iter2 (conv_var st) vs1 vs2
+
+let conv_bnd (st : cstate) (v1 : Vars.var) (v2 : Vars.var) : cstate =
+  if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then not_conv ();
+  { st with subst = Term.ESubst (Term.mk_var v1, Term.mk_var v2) :: st.subst }
+
+let conv_bnds (st : cstate) (vs1 : Vars.vars) (vs2 : Vars.vars) : cstate =
+  List.fold_left2 conv_bnd st vs1 vs2
+
+let rec conv (st : cstate) (t1 : Term.term) (t2 : Term.term) : unit =
+  match t1, t2 with
+  | Term.Fun ((fs1, li1), fty1, l1), Term.Fun ((fs2, li2), fty2, l2)
+    when fs1 = fs2 ->
+    conv_ftype fty1 fty2;
+    conv_vars st li1 li2;
+    conv_l st l1 l2
+
+  | Term.Name ns1, Term.Name ns2 when ns1.s_symb = ns2.s_symb ->
+    conv_vars st ns1.s_indices ns2.s_indices
+
+  | Term.Action (a1, is1), Term.Action (a2, is2) when a1 = a2 ->
+    conv_vars st is1 is2
+
+  | Term.Diff (Explicit l1), Term.Diff (Explicit l2) ->
+    List.iter2 (fun (p1, t1) (p2, t2) ->
+        if p1 <> p2 then not_conv ();
+        conv st t1 t2
+      ) l1 l2
+
+  | Term.Macro (ms1, terms1, ts1), Term.Macro (ms2, terms2, ts2)
+    when ms1.s_symb = ms2.s_symb ->
+    conv_vars st ms1.s_indices ms2.s_indices;
+    conv_l st (ts1 :: terms1) (ts2 :: terms2)
+
+  | Term.ForAll (is1, t1), Term.ForAll (is2, t2)
+  | Term.Exists (is1, t1), Term.Exists (is2, t2)
+  | Term.Seq    (is1, t1), Term.Seq    (is2, t2) ->
+    if List.length is1 <> List.length is2 then not_conv ();
+    let st = conv_bnds st is1 is2 in
+    conv st t1 t2
+
+  | Term.Find (is1, c1, t1, e1), Term.Find (is2, c2, t2, e2) ->
+    if List.length is1 <> List.length is2 then not_conv ();
+    let st' = conv_bnds st is1 is2 in
+    conv_l st' [c1; t1] [c2; t2];
+    conv st e1 e2
+
+  | Term.Var v1, Term.Var v2 -> conv_var st v1 v2
+
+  | _, _ -> not_conv ()
+
+and conv_l (st : cstate) (ts1 : Term.terms) (ts2 : Term.terms) : unit =
+  List.iter2 (conv st) ts1 ts2
+
+let rec conv_e (st : cstate) (e1 : Equiv.form) (e2 : Equiv.form) : unit =
+  Fmt.epr "e1: @[%a@]@.e2: @[%a@]@." Equiv.pp e1 Equiv.pp e2;
+  match e1, e2 with
+  | Equiv.Quant (q1, vs1, e1), Equiv.Quant (q2, vs2, e2) when q1 = q2 ->
+    if List.length vs1 <> List.length vs2 then not_conv ();
+    let st = conv_bnds st vs1 vs2 in
+    conv_e st e1 e2
+
+  | Equiv.And  (el1, er1), Equiv.And  (el2, er2)
+  | Equiv.Or   (el1, er1), Equiv.Or   (el2, er2)
+  | Equiv.Impl (el1, er1), Equiv.Impl (el2, er2)->
+    conv_e_l st [el1; er1] [el2; er2]
+
+  | Equiv.Atom (Reach f1), Equiv.Atom (Reach f2) ->
+    let system = SE.{set = st.system.set; pair = None; } in
+    conv { st with system } f1 f2
+
+  | Equiv.Atom (Equiv ts1), Equiv.Atom (Equiv ts2) ->
+    let system =
+      SE.{set = (oget st.system.pair :> SE.arbitrary); pair = None; }
+    in
+    conv_l { st with system } ts1 ts2
+
+  | _, _ -> not_conv ()
+
+and conv_e_l
+    (st : cstate) (es1 : Equiv.form list) (es2 : Equiv.form list) : unit
+  =
+  List.iter2 (conv_e st) es1 es2
+
+
+(*------------------------------------------------------------------*)
+(** Exported *)
+let conv (s : cstate) (t1 : Term.term) (t2 : Term.term) : bool =
+  try conv s t1 t2; true with NotConv -> false
+
+(** Exported *)
+let conv_e (s : cstate) (t1 : Equiv.form) (t2 : Equiv.form) : bool =
+  try conv_e s t1 t2; true with NotConv -> false
+
 (*------------------------------------------------------------------*)
 module type S = sig
   type t                        (* type of sequent *)
@@ -65,7 +210,7 @@ module type S = sig
 
   (*------------------------------------------------------------------*)
   (** {2 conversion } *)
-      
+
   val conv_term  :
     ?expand_context:Macros.expand_context -> 
     ?se:SE.t -> 
@@ -80,7 +225,7 @@ module type S = sig
     t ->
     Equiv.form -> Equiv.form -> bool
 
-  val conv : 
+  val conv_kind : 
     ?expand_context:Macros.expand_context ->
     ?system:SE.context -> 
     ?param:red_param ->
@@ -101,16 +246,17 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     (** expantion mode for macros. See [Macros.expand_context]. *)
   }
 
-  (** Internal *)
-  exception NoExp 
-
+  (*------------------------------------------------------------------*)
   let add_hyp (f : Term.term) hyps : THyps.hyps =
     THyps.add TacticsArgs.AnyName (Local f) hyps
 
-  
+  (*------------------------------------------------------------------*)  
+  (** Internal *)
+  exception NoExp 
+
   (* Invariant: we must ensure that fv(reduce(u)) ⊆ fv(t)
      Return: reduced term, reduction occurred *)
-  (* FEATURE: memoisation *)
+  (* FEATURE: memoisation? *)
   let rec reduce (st : state) (t : Term.term) : Term.term * bool = 
     let t, has_red = reduce_head_once st t in
 
@@ -437,23 +583,12 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
         omap (fun (x,y) -> Equiv.Global x, Equiv.Global y) (e_destr_and x)
 
   (*------------------------------------------------------------------*)
-  (** Conversion state *)
-  (* FEATURE: conversion modulo *)
-  type cstate = { 
-    table   : Symbols.table;
-    system  : SE.context;
-    param   : red_param;
-    hint_db : Hint.hint_db;
-    hyps    : THyps.hyps;
-    
-    subst   : Term.subst;
-    (** pending variable to variable substitution (left -> right) *)
-    
-    expand_context : Macros.expand_context;
-    (** expantion mode for macros. See [Macros.expand_context]. *)
-  }
-
-  let mk_cstate ~expand_context ~system (param : red_param) (s : S.t) : cstate =
+  (** Make a cstate from a sequent *)
+  let cstate_of_seq
+      (expand_context : Macros.expand_context)
+      (system : SE.context) 
+      (param : red_param) (s : S.t) : cstate 
+    =
     { table   = S.table s;
       system;
       param;
@@ -461,115 +596,6 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       hyps    = S.get_trace_hyps s; 
       expand_context;
       subst   = []; } 
-      
-  (** Internal *)
-  exception NotConv
-
-  let not_conv () = raise NotConv
-
-  let conv_ty (ty1 : Type.ty) (ty2 : Type.ty) : unit =
-    if not (Type.equal ty1 ty2) then not_conv ()
-
-  let conv_tys (tys1 : Type.ty list) (tys2 : Type.ty list) : unit =
-    List.iter2 conv_ty tys1 tys2
-
-  let conv_ftype (ft1 : Type.ftype) (ft2 : Type.ftype) : unit =
-    if ft1.fty_iarr <> ft2.fty_iarr then not_conv ();
-    conv_ty  ft1.fty_out  ft2.fty_out;
-    conv_tys ft1.fty_args ft2.fty_args;
-    List.iter2 (fun tv1 tv2 ->
-        if not (tv1 = tv2) then not_conv ()
-      ) ft1.fty_vars ft2.fty_vars
-
-  let conv_var (st : cstate) (v1 : Vars.var) (v2 : Vars.var) : unit =
-    if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then not_conv ();
-    if not (Vars.equal (Term.subst_var st.subst v1) v2) then not_conv ()
-
-  let conv_vars (st : cstate) (vs1 : Vars.vars) (vs2 : Vars.vars) : unit =
-    List.iter2 (conv_var st) vs1 vs2
-
-  let conv_bnd (st : cstate) (v1 : Vars.var) (v2 : Vars.var) : cstate =
-    if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then not_conv ();
-    { st with subst = Term.ESubst (Term.mk_var v1, Term.mk_var v2) :: st.subst }
-
-  let conv_bnds (st : cstate) (vs1 : Vars.vars) (vs2 : Vars.vars) : cstate =
-    List.fold_left2 conv_bnd st vs1 vs2
-    
-  let rec conv (st : cstate) (t1 : Term.term) (t2 : Term.term) : unit =
-    match t1, t2 with
-    | Term.Fun ((fs1, li1), fty1, l1), Term.Fun ((fs2, li2), fty2, l2)
-      when fs1 = fs2 ->
-      conv_ftype fty1 fty2;
-      conv_vars st li1 li2;
-      conv_l st l1 l2
-
-    | Term.Name ns1, Term.Name ns2 when ns1.s_symb = ns2.s_symb ->
-      conv_vars st ns1.s_indices ns2.s_indices
-
-    | Term.Action (a1, is1), Term.Action (a2, is2) when a1 = a2 ->
-      conv_vars st is1 is2
-
-    | Term.Diff (Explicit l1), Term.Diff (Explicit l2) ->
-      List.iter2 (fun (p1, t1) (p2, t2) ->
-          if p1 <> p2 then not_conv ();
-          conv st t1 t2
-        ) l1 l2
-
-    | Term.Macro (ms1, terms1, ts1), Term.Macro (ms2, terms2, ts2)
-      when ms1.s_symb = ms2.s_symb ->
-      conv_vars st ms1.s_indices ms2.s_indices;
-      conv_l st (ts1 :: terms1) (ts2 :: terms2)
-
-    | Term.ForAll (is1, t1), Term.ForAll (is2, t2)
-    | Term.Exists (is1, t1), Term.Exists (is2, t2)
-    | Term.Seq    (is1, t1), Term.Seq    (is2, t2) ->
-      if List.length is1 <> List.length is2 then not_conv ();
-      let st = conv_bnds st is1 is2 in
-      conv st t1 t2
-
-    | Term.Find (is1, c1, t1, e1), Term.Find (is2, c2, t2, e2) ->
-      if List.length is1 <> List.length is2 then not_conv ();
-      let st' = conv_bnds st is1 is2 in
-      conv_l st' [c1; t1] [c2; t2];
-      conv st e1 e2
-      
-    | Term.Var v1, Term.Var v2 -> conv_var st v1 v2
-
-    | _, _ -> not_conv ()
-
-  and conv_l (st : cstate) (ts1 : Term.terms) (ts2 : Term.terms) : unit =
-    List.iter2 (conv st) ts1 ts2
-
-  let rec conv_e (st : cstate) (e1 : Equiv.form) (e2 : Equiv.form) : unit =
-    Fmt.epr "e1: @[%a@]@.e2: @[%a@]@." Equiv.pp e1 Equiv.pp e2;
-    match e1, e2 with
-    | Equiv.Quant (q1, vs1, e1), Equiv.Quant (q2, vs2, e2) when q1 = q2 ->
-      if List.length vs1 <> List.length vs2 then not_conv ();
-      let st = conv_bnds st vs1 vs2 in
-      conv_e st e1 e2
-        
-    | Equiv.And  (el1, er1), Equiv.And  (el2, er2)
-    | Equiv.Or   (el1, er1), Equiv.Or   (el2, er2)
-    | Equiv.Impl (el1, er1), Equiv.Impl (el2, er2)->
-      conv_e_l st [el1; er1] [el2; er2]
-      
-    | Equiv.Atom (Reach f1), Equiv.Atom (Reach f2) ->
-      let system = SE.{set = st.system.set; pair = None; } in
-      conv { st with system } f1 f2
-
-    | Equiv.Atom (Equiv ts1), Equiv.Atom (Equiv ts2) ->
-      let system =
-        SE.{set = (oget st.system.pair :> SE.arbitrary); pair = None; }
-      in
-      conv_l { st with system } ts1 ts2
-  
-    | _, _ -> not_conv ()
-
-  and conv_e_l
-      (st : cstate) (es1 : Equiv.form list) (es2 : Equiv.form list) : unit
-    =
-    List.iter2 (conv_e st) es1 es2
-
   
   (*------------------------------------------------------------------*)
   (** Exported. *)
@@ -582,8 +608,8 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     =
     let se = odflt (S.system s).set se in
     let system = SE.{set = se; pair = None; } in
-    let state = mk_cstate ~expand_context ~system param s in
-    try conv state t1 t2; true with NotConv -> false
+    let state = cstate_of_seq expand_context system param s in
+    conv state t1 t2
 
   (** Exported. *)
   let conv_equiv
@@ -593,11 +619,11 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       (s : S.t)
       (e1 : Equiv.form) (e2 : Equiv.form) : bool
     =
-    let state = mk_cstate ~expand_context ~system:(S.system s) param s in
-    try conv_e state e1 e2; true with NotConv -> false
+    let state = cstate_of_seq expand_context (S.system s) param s in
+    conv_e state e1 e2
 
   (** We need type introspection there *)
-  let conv (type a) 
+  let conv_kind (type a) 
       ?(expand_context : Macros.expand_context = InSequent)
       ?(system : SE.context option)
       ?(param : red_param = rp_default)
