@@ -21,11 +21,12 @@ type cstate
 
 (** Built a convertion state *)
 val mk_cstate :
-  Symbols.table -> Hint.hint_db -> 
-  SE.context -> 
-  Macros.expand_context -> 
-  THyps.hyps ->
-  red_param -> 
+  ?system:SE.context -> 
+  ?hint_db:Hint.hint_db -> 
+  ?expand_context:Macros.expand_context -> 
+  ?hyps:THyps.hyps ->
+  ?param:red_param -> 
+  Symbols.table -> 
   cstate
 
 (** Conversion functions using a [cstate] *)

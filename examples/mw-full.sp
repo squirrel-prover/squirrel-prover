@@ -227,8 +227,7 @@ Proof.
               R(r) < T(i,t) &&
               output@R(r) = input@T(i,t)) in
              xor(diff(id(i),id'(i,t)),
-                 H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))))).
-    {
+                 H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))))). {
       project.
 
       (* Left *)

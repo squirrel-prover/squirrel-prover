@@ -254,12 +254,7 @@ type ct_memo = {
 }
 
 let mk_ct_memo table : ct_memo = 
-  let cstate = 
-    Reduction.mk_cstate
-      table 
-      Hint.empty_hint_db SystemExpr.context_any Macros.InSequent
-      Hyps.TraceHyps.empty Reduction.rp_default
-  in
+  let cstate = Reduction.mk_cstate table in
   { cstate; memo = Mt.empty; }
 
 (** Box a term. 

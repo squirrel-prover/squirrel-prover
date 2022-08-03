@@ -921,8 +921,13 @@ let mk_phi_proj
           cases @ forms
         ) [] macro_cases
     in
-
-    List.remove_duplicate (=) (phi_frame @ phi_actions)
+    let cstate = 
+      let context = 
+        SE.{ set = (cntxt.system :> SE.arbitrary); pair = None; } 
+      in
+      Reduction.mk_cstate cntxt.table ~system:context 
+    in
+    List.remove_duplicate (Reduction.conv cstate) (phi_frame @ phi_actions)
 
   with
   | Fresh.Name_found ->
@@ -951,11 +956,10 @@ let fresh_cond (s : ES.t) t biframe : Term.term =
   let cntxt_right = { cntxt with system = system_right } in
   let phi_right = mk_phi_proj cntxt_right env n_right r_proj biframe in
 
+  let cstate = Reduction.mk_cstate cntxt.table in
   Term.mk_ands
-    (* remove duplicates, and then concatenate *)
-    ((List.filter (fun x -> not (List.mem x phi_right)) phi_left)
-     @
-     phi_right)
+    (* concatenate and remove duplicates *)
+    (List.remove_duplicate (Reduction.conv cstate) (phi_left @ phi_right))
 
 
 (** Returns the term [if (phi_left && phi_right) then 0 else diff(nL,nR)]. *)

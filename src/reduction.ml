@@ -52,7 +52,15 @@ type cstate = {
 
 
 (** Make a cstate directly *)
-let mk_cstate table hint_db system expand_context hyps param : cstate =
+let mk_cstate 
+    ?(system = SystemExpr.context_any)
+    ?(hint_db = Hint.empty_hint_db)
+    ?(expand_context = Macros.InSequent)
+    ?(hyps = THyps.empty)
+    ?(param = rp_default)
+    table 
+  : cstate 
+  =
   { table; system; param; hint_db; hyps; expand_context;
     subst = []; }
 

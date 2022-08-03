@@ -1790,19 +1790,20 @@ let mset_incl
 
   assert (s1.cond_le = s2.cond_le);
 
-  let mk_pat2 u =
-    { pat_term = u;
-      pat_tyvars = [];
-      pat_vars = Sv.of_list1 s2.indices;}
-  in
+  let pat2 = {
+    pat_term = term2;
+    pat_tyvars = [];
+    pat_vars = Sv.of_list1 s2.indices;
+  } in
+  
   let context = SE.{ set = system; pair = None; } in
   (* FIXME: cleanup with unification of list of terms *)
   (* FIXME: use better expand_context mode when possible *)
   match 
-    T.try_match ~expand_context:InSequent table context term1 (mk_pat2 term2) 
+    T.try_match ~expand_context:InSequent table context term1 pat2
   with
   | FreeTyv | NoMatch _ -> false
-  | Match mv -> true
+  | Match _ -> true
 
 
 (** [msets_incl tbl system s1 s2] check if [msets] is included in [msets2] *)
