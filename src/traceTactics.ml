@@ -958,7 +958,7 @@ let fa s =
         s |> set_goal (Term.mk_impl c' c) ;
 
         s |> set_goal (Term.mk_impls
-                         (if c = c' then [c] else [c;c'])
+                         (if TS.Reduce.conv_term s c c' then [c] else [c;c'])
                          (Term.mk_atom `Eq t t'));
 
         s |> set_goal (Term.mk_impls
@@ -1387,7 +1387,7 @@ let mk_integrity_rule_param
 (** Unforgeability Axioms *)
 
 let euf_apply_schema
-    sequent (_, key, m, s, _, _, _, _) (case : Euf.euf_schema)
+    sequent (_, key, m, s, _, _, _, _) (case : Euf.euf_schema) : sequent
   =
   (* Equality between hashed messages *)
   let new_f = Term.mk_atom `Eq case.message m in
@@ -1518,7 +1518,6 @@ let euf_apply
   let table = TS.table s in
   let id, at = Hyps.by_name hyp_name s in
 
-
   let (h,key,m,_,_,extra_goals,drop_head,_) as p =
     mk_integrity_rule_param rule_kind table at
   in
@@ -1540,13 +1539,16 @@ let euf_apply
         | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
         | _ -> assert false
       in
+
       match Vars.ty uvarm,Vars.ty uvarkey with
       | Type.(Message, Message) -> let f = Term.subst [
           ESubst (Term.mk_var uvarm,m);
           ESubst (Term.mk_var uvarkey,Term.mk_name key);] f in
         [TS.set_goal
            (Term.mk_impl f (TS.goal s)) s]
-      | _ -> assert false in
+
+      | _ -> assert false 
+  in
 
   (* we create the honest sources using the classical eufcma tactic *)
   let honest_s = euf_apply_facts drop_head s p in

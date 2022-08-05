@@ -349,6 +349,7 @@ module type SmartFO = sig
   val destr_and   : form -> (form * form) option
   val destr_or    : form -> (form * form) option
   val destr_impl  : form -> (form * form) option
+  val destr_iff   : form -> (form * form) option
 
   (*------------------------------------------------------------------*)
   val is_false  : form -> bool
@@ -358,6 +359,7 @@ module type SmartFO = sig
   val is_and    : form -> bool
   val is_or     : form -> bool
   val is_impl   : form -> bool
+  val is_iff    : form -> bool
   val is_forall : form -> bool
   val is_exists : form -> bool
 
@@ -403,8 +405,6 @@ val mk_find : ?simpl:bool -> Vars.var list -> term -> term -> term -> term
 
 val mk_iff   : ?simpl:bool -> form -> form -> form
   
-val destr_iff : term -> (term * term) option
-
 (*------------------------------------------------------------------*)
 val mk_fun0 : fsymb -> Type.ftype -> term list -> term
 

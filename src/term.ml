@@ -529,9 +529,8 @@ module SmartDestructors = struct
   let destr_or   f = oas_seq2 (destr_fun ~fs:f_or   f)
   let destr_and  f = oas_seq2 (destr_fun ~fs:f_and  f)
   let destr_impl f = oas_seq2 (destr_fun ~fs:f_impl f)
+  let destr_iff  f = oas_seq2 (destr_fun ~fs:f_iff f)
   let destr_pair f = oas_seq2 (destr_fun ~fs:f_pair f)
-
-  let destr_iff f = oas_seq2 (destr_fun ~fs:f_iff f)
 
   (*------------------------------------------------------------------*)
   (* let destr_neq f = oas_seq2 (obind (destr_fun ~fs:f_eq) (destr_not f)) *)
@@ -611,6 +610,8 @@ module SmartDestructors = struct
   let is_or   f = destr_or   f <> None
   let is_and  f = destr_and  f <> None
   let is_impl f = destr_impl f <> None
+  let is_iff  f = destr_iff  f <> None
+
   (* is_pair is unused but having it seems to make sense *)
   let[@warning "-32"] is_pair f = destr_pair f <> None
 
@@ -1449,6 +1450,7 @@ module type SmartFO = sig
   val destr_and   : form -> (form * form) option
   val destr_or    : form -> (form * form) option
   val destr_impl  : form -> (form * form) option
+  val destr_iff   : form -> (form * form) option
 
   (*------------------------------------------------------------------*)
   val is_false  : form -> bool
@@ -1458,6 +1460,7 @@ module type SmartFO = sig
   val is_and    : form -> bool
   val is_or     : form -> bool
   val is_impl   : form -> bool
+  val is_iff    : form -> bool
   val is_forall : form -> bool
   val is_exists : form -> bool
 

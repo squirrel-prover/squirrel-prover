@@ -369,6 +369,15 @@ module Smart : Term.SmartFO with type form = _form = struct
        end
     | _ -> None
 
+  let destr_iff = function
+    | Atom (Reach f) ->
+       begin match Term.Smart.destr_iff f with
+         | Some (f1,f2) ->
+             Some (Atom (Reach f1), Atom (Reach f2))
+         | _ -> None
+       end
+    | _ -> None
+
   (*------------------------------------------------------------------*)
 
   (** left-associative *)
@@ -423,6 +432,7 @@ module Smart : Term.SmartFO with type form = _form = struct
   let is_and   f = destr_and  f <> None
   let is_or    f = destr_or   f <> None
   let is_impl  f = destr_impl f <> None
+  let is_iff   f = destr_iff  f <> None
 
   let is_forall = function Quant (ForAll, _, _) -> true | _ -> false
   let is_exists = function
@@ -736,68 +746,81 @@ module Any = struct
           omap (fun (x,y) -> Local x, Local y) (Term.Smart.destr_and f)
       | Global f ->
           omap (fun (x,y) -> Global x, Global y) (Smart.destr_and f)
+
     let destr_or = function
       | Local f ->
           omap (fun (x,y) -> Local x, Local y) (Term.Smart.destr_or f)
       | Global f ->
           omap (fun (x,y) -> Global x, Global y) (Smart.destr_or f)
+
     let destr_impl = function
       | Local f ->
           omap (fun (x,y) -> Local x, Local y) (Term.Smart.destr_impl f)
       | Global f ->
           omap (fun (x,y) -> Global x, Global y) (Smart.destr_impl f)
 
+    let destr_iff =  function
+      | Local f ->
+          omap (fun (x,y) -> Local x, Local y) (Term.Smart.destr_iff f)
+      | Global f ->
+          omap (fun (x,y) -> Global x, Global y) (Smart.destr_iff f)
+
+
     (*------------------------------------------------------------------*)
     let is_false = function
-      | Local f -> Term.Smart.is_false f
+      | Local  f -> Term.Smart.is_false f
       | Global f ->      Smart.is_false f
 
     let is_true = function
-      | Local f -> Term.Smart.is_true f
+      | Local  f -> Term.Smart.is_true f
       | Global f ->      Smart.is_true f
 
     let is_zero = function
-      | Local f -> Term.Smart.is_zero f
+      | Local  f -> Term.Smart.is_zero f
       | Global f ->      Smart.is_zero f
 
     let is_not = function
-      | Local f -> Term.Smart.is_not f
+      | Local  f -> Term.Smart.is_not f
       | Global f ->      Smart.is_not f
 
     let is_and = function
-      | Local f -> Term.Smart.is_and f
+      | Local  f -> Term.Smart.is_and f
       | Global f ->      Smart.is_and f
 
     let is_or = function
-      | Local f -> Term.Smart.is_or f
+      | Local  f -> Term.Smart.is_or f
       | Global f ->      Smart.is_or f
 
     let is_impl = function
-      | Local f -> Term.Smart.is_impl f
+      | Local  f -> Term.Smart.is_impl f
       | Global f ->      Smart.is_impl f
 
+    let is_iff = function
+      | Local  f -> Term.Smart.is_iff f
+      | Global f ->      Smart.is_iff f
+
     let is_forall = function
-      | Local f -> Term.Smart.is_forall f
+      | Local  f -> Term.Smart.is_forall f
       | Global f ->      Smart.is_forall f
 
     let is_exists = function
-      | Local f -> Term.Smart.is_exists f
+      | Local  f -> Term.Smart.is_exists f
       | Global f ->      Smart.is_exists f
 
     let is_eq = function
-      | Local f -> Term.Smart.is_eq f
+      | Local  f -> Term.Smart.is_eq f
       | Global f ->      Smart.is_eq f
 
     let is_neq = function
-      | Local f -> Term.Smart.is_neq f
+      | Local  f -> Term.Smart.is_neq f
       | Global f ->      Smart.is_neq f
 
     let is_leq = function
-      | Local f -> Term.Smart.is_leq f
+      | Local  f -> Term.Smart.is_leq f
       | Global f ->      Smart.is_leq f
 
     let is_lt = function
-      | Local f -> Term.Smart.is_lt f
+      | Local  f -> Term.Smart.is_lt f
       | Global f ->      Smart.is_lt f
 
     (*------------------------------------------------------------------*)
@@ -826,19 +849,19 @@ module Any = struct
             (Smart.destr_impls i f)
 
     let destr_eq = function
-      | Local f -> Term.Smart.destr_eq f
+      | Local  f -> Term.Smart.destr_eq f
       | Global f ->      Smart.destr_eq f
 
     let destr_neq = function
-      | Local f -> Term.Smart.destr_neq f
+      | Local  f -> Term.Smart.destr_neq f
       | Global f ->      Smart.destr_neq f
 
     let destr_leq = function
-      | Local f -> Term.Smart.destr_leq f
+      | Local  f -> Term.Smart.destr_leq f
       | Global f ->      Smart.destr_leq f
 
     let destr_lt = function
-      | Local f -> Term.Smart.destr_lt f
+      | Local  f -> Term.Smart.destr_lt f
       | Global f ->      Smart.destr_lt f
 
     (*------------------------------------------------------------------*)

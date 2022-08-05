@@ -866,6 +866,21 @@ module MkCommonLowTac (S : Sequent.S) = struct
           List.map (fun id -> `Hyp id) ids, s
         end
 
+      else if S.Hyp.is_iff form then
+        begin 
+          if len <> 2 then destr_fail "expected 2 patterns";
+
+          let f1, f2 =
+            get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_iff form)
+          in
+          let forms = [S.Hyp.mk_impl f1 f2; S.Hyp.mk_impl f2 f1] in
+          let forms =
+            List.map (fun x -> Args.Unnamed, x) forms
+          in
+          let ids, s = Hyps.add_i_list forms s in
+          List.map (fun id -> `Hyp id) ids, s
+        end
+
       else if S.Hyp.is_exists form then
         begin
           let vs, f =
