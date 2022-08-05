@@ -1,5 +1,3 @@
-
-
 abstract f : message->message->message
 abstract a : message
 abstract b : message

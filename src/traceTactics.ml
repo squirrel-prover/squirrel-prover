@@ -929,8 +929,20 @@ let () =
   * [C] that congruence closure does not support: conditionals,
   * sequences, etc. *)
 let fa s =
-  let unsupported () =
-    Tactics.(soft_failure (Failure "equality expected")) in
+  let unsupported () = soft_failure (Failure "equality expected") in
+
+  let check_vars vars vars' =
+    if List.length vars <> List.length vars' then
+      soft_failure (Failure "FA: sequences with different lengths");
+
+    let tys_compatible = 
+      List.for_all2 (fun v1 v2 -> 
+          Type.equal (Vars.ty v1) (Vars.ty v2)
+        ) vars vars'
+    in
+    if not tys_compatible then
+      soft_failure (Failure "FA: sequences with different types");
+  in
 
   let u, v = match TS.Reduce.destr_eq s Local_t (TS.goal s) with
     | Some (u,v) -> u, v
@@ -956,8 +968,19 @@ let fa s =
     in
     subgoals
 
-  | Term.Seq (vars,t),
-    Term.Seq (vars',t') when vars = vars' ->
+  | Term.Seq (vars,t), Term.Seq (vars',t') -> 
+    check_vars vars vars';
+
+    (* have [t'] use the same variables names than [t] *)
+    let t' = 
+      let subst = 
+        List.map2 (fun v' v -> 
+            Term.ESubst (Term.mk_var v', Term.mk_var v)
+          ) vars' vars
+      in
+      Term.subst subst t'
+    in
+
     let env = ref (TS.vars s) in
     let vars, subst = Term.refresh_vars (`InEnv env) vars in
     let s = TS.set_vars !env s in
