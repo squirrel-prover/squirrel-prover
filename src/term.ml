@@ -533,7 +533,6 @@ module SmartDestructors = struct
   let destr_pair f = oas_seq2 (destr_fun ~fs:f_pair f)
 
   (*------------------------------------------------------------------*)
-  (* let destr_neq f = oas_seq2 (obind (destr_fun ~fs:f_eq) (destr_not f)) *)
   let destr_neq f = oas_seq2 (destr_fun ~fs:f_neq f)
   let destr_eq  f = oas_seq2 (destr_fun ~fs:f_eq  f)
   let destr_leq f = oas_seq2 (destr_fun ~fs:f_leq f)
@@ -1692,6 +1691,74 @@ let project_opt (projs : projs option) (term : term) : term =
   omap_dflt term (project ^~ term) projs 
 
 (*------------------------------------------------------------------*)
+exception AlphaFailed
+
+let alpha_var (s : subst) (v1 : Vars.var) (v2 : Vars.var) : unit =
+  if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then raise AlphaFailed;
+  if not (Vars.equal v1 (subst_var s v2)) then raise AlphaFailed
+
+let alpha_vars (s : subst) (vs1 : Vars.vars) (vs2 : Vars.vars) : unit =
+  List.iter2 (alpha_var s) vs1 vs2
+
+let alpha_bnd (s : subst) (v1 : Vars.var) (v2 : Vars.var) : subst =
+  if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then
+    raise AlphaFailed 
+  else
+    ESubst (mk_var v2, mk_var v1) :: s
+
+let alpha_bnds (s : subst) (vs1 : Vars.vars) (vs2 : Vars.vars) : subst =
+  List.fold_left2 alpha_bnd s vs1 vs2
+
+let alpha_conv ?(subst=[]) (t1 : term) (t2 : term) : bool =
+  let rec doit (s : subst) t1 t2 : unit =
+    match t1, t2 with
+    | Fun ((f,is), fty, l), Fun ((f',is'), fty', l') when f = f' ->
+      alpha_vars s is is';
+      doits s l l'
+
+    | Name n, Name n' when n.s_symb = n'.s_symb ->
+      alpha_vars s n.s_indices n'.s_indices
+
+    | Macro (m,l,ts), Macro (m',l',ts') when m.s_symb = m'.s_symb ->
+      alpha_vars s m.s_indices m'.s_indices;
+      doits s (ts :: l) (ts' :: l')
+
+    | Action (a,is), Action (a',is') when a = a' ->
+      alpha_vars s is is'
+
+    | Var x, Var x' ->
+      alpha_var s x x'
+
+    | Find (is,c,t,e), Find (is',c',t',e')
+      when List.length is = List.length is' ->
+      let s' = alpha_bnds s is is' in
+      doit s e e';
+      doits s' [c;t] [c';t']
+
+    | Seq    (vs,f), Seq    (vs',f')
+    | Exists (vs,f), Exists (vs',f')
+    | ForAll (vs,f), ForAll (vs',f')
+      when List.length vs = List.length vs' ->
+      let s = alpha_bnds s vs vs' in
+      doit s f f'
+
+    | Diff (Explicit l), Diff (Explicit l') ->
+      if List.length l <> List.length l' then raise AlphaFailed;
+      List.iter2 (fun (lab, x) (lab', x') -> 
+          if lab <> lab' then raise AlphaFailed;
+          doit s x x'
+        ) l l'
+
+    | t1,t2 -> raise AlphaFailed
+
+  and doits s l l' = 
+    List.iter2 (doit s) l l' 
+  in
+
+  try doit subst t1 t2; true with AlphaFailed -> false
+
+
+(*------------------------------------------------------------------*)
 (** Evaluate topmost diff operators for a given proj of a biterm.
     For example [head_pi_term left (diff(a,b))] is [a]
     and [head_pi_term left f(diff(a,b),c)] is [f(diff(a,b),c)]. *)
@@ -1709,27 +1776,6 @@ let rec make_normal_biterm (dorec : bool) (s : subst) (t : term) : term =
     if dorec then make_normal_biterm dorec s (diff t t')
     else diff t (subst s t')
   in
-
-  let exception AlphaFailed in
-
-  let alpha_var (s : subst) (v1 : Vars.var) (v2 : Vars.var) : unit =
-    if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then raise AlphaFailed;
-    if not (Vars.equal (subst_var s v2) v1) then raise AlphaFailed;
-  in
-  let alpha_vars (s : subst) (vs1 : Vars.vars) (vs2 : Vars.vars) : unit =
-    List.iter2 (alpha_var s) vs1 vs2
-  in
-  
-  let alpha_bnd (s : subst) (v1 : Vars.var) (v2 : Vars.var) : subst =
-    if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then
-      raise AlphaFailed 
-    else
-      ESubst (mk_var v2, mk_var v1) :: s
-  in
-  let alpha_bnds (s : subst) (vs1 : Vars.vars) (vs2 : Vars.vars) : subst =
-    List.fold_left2 alpha_bnd s vs1 vs2
-  in
-
   let t1 = head_pi_term left_proj t
   and t2 = head_pi_term right_proj t in
 
@@ -1771,6 +1817,8 @@ let rec make_normal_biterm (dorec : bool) (s : subst) (t : term) : term =
       when List.length vs = List.length vs' ->
       let s = alpha_bnds s vs vs' in
       Exists (vs, mdiff s f f')
+
+    (* FIXME: seq case missing *)
 
     | t1,t2 -> diff t1 (subst s t2)
   in

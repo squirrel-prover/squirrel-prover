@@ -563,3 +563,19 @@ val project_tpat_opt : projs option -> term pat -> term pat
 (** Make a pattern out of a formula: all universally quantified variables
     are added to [pat_vars]. *)
 val pat_of_form : term -> term pat
+
+(*------------------------------------------------------------------*)
+(** {2 Misc} *)
+
+exception AlphaFailed
+
+(** [alpha_conv ~subst t1 t2] check that [t1] and [t2] are 
+    alpha-convertible.
+    - [subst] optional substitution from [t2] variables to [t1] 
+      variables. *)
+val alpha_conv : ?subst:subst -> term -> term -> bool 
+
+(** Process binder variables during alpha-renaming, updating the
+    alpha-renaming substitution (see [alpha_conv]).
+    Raise if alpha-conversion fails. *)
+val alpha_bnds : subst -> Vars.vars -> Vars.vars -> subst 

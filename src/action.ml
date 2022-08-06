@@ -197,9 +197,8 @@ let subst_descr subst descr =
   let subst_term = Term.subst subst in
   let indices = Term.subst_vars subst descr.indices  in
   let condition =
-    (* FIXME: do we need to substitute ? *)
-     fst descr.condition,
-     Term.subst subst (snd descr.condition) in
+    Term.subst_vars subst (fst descr.condition),
+    Term.subst subst (snd descr.condition) in
   let updates =
     List.map (fun (ss,t) ->
         Term.subst_isymb subst ss, subst_term t
@@ -297,14 +296,33 @@ let project_descr (s : Term.proj) d =
     updates   = List.map (fun (st, m) -> st, project1 m) d.updates;
     output    = (let c,m = d.output in c, project1 m) }
 
-let strongly_compatible_descr d1 d2 =
-  d1.name    = d2.name &&
-  d1.action  = d2.action &&
-  d1.input   = d2.input &&
-  d1.indices = d2.indices &&
-  fst d1.condition = fst d2.condition &&
-  List.map fst d1.updates = List.map fst d2.updates &&
-  fst d1.output = fst d2.output
+let strongly_compatible_descr d1 d2 : bool =
+  if List.length d1.indices <> List.length d2.indices ||
+     List.exists2 (fun i1 i2 -> 
+         not (Type.equal (Vars.ty i1) (Vars.ty i2))
+       ) d1.indices d2.indices
+  then false
+  else
+    let subst = 
+      List.map2 (fun v1 v2 -> 
+          Term.ESubst (Term.mk_var v2, Term.mk_var v1)
+        ) d1.indices d2.indices
+    in
+    Fmt.epr "d1:@.%a@.d2:@.%a@."
+      (pp_descr ~debug:true) d1
+      (pp_descr ~debug:true) d2;
+
+    let d2 = subst_descr subst d2 in
+    assert (d1.indices = d2.indices);
+    Fmt.epr "d2':@.%a@."
+      (pp_descr ~debug:true) d2;
+
+    d1.name    = d2.name &&
+    d1.action  = d2.action &&
+    d1.input   = d2.input &&
+    fst d1.condition = fst d2.condition &&
+    List.map fst d1.updates = List.map fst d2.updates &&
+    fst d1.output = fst d2.output
 
 let combine_descrs (descrs : (Term.proj * descr) list) : descr =
 
