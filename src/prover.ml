@@ -682,6 +682,7 @@ let eval_tactic_focus tac = match !subgoals with
     
     begin try
       bullets := Bullets.expand_goal (List.length new_j) !bullets ;
+      (* TODO: remove catch-all exception *)
     with _ -> Tactics.(hard_failure (Failure "bullet error")) end
 
 let open_bullet bullet =

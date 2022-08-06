@@ -370,6 +370,7 @@ module Make (N:S) : Namespace
                 ~loc:(Some (L.loc name))
                 (fst (Msymb.find symb table.cnt))) ;
       true
+    (* TODO: remove catch-all exception *)
     with _ -> false
 
   let of_lsymb (name : lsymb) (table : table) =

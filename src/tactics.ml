@@ -666,6 +666,7 @@ module AST (M:S) = struct
       let i = L.unloc i in
         begin try
           pp_abstract ~pp_args i args ppf
+          (* TODO: remove catch-all exception *)
         with _ ->
           if args = [] then Fmt.string ppf i else
             Fmt.pf ppf "@[(%s@ %a)@]" i pp_args args
