@@ -1772,6 +1772,7 @@ let diff a b =
     Diff (Explicit [left_proj,a; right_proj,b])
 
 let rec make_normal_biterm (dorec : bool) (s : subst) (t : term) : term = 
+  (* [s] is a pending substitution from [t'] variables to [t] variables. *)
   let mdiff (s : subst) (t : term) (t' : term) : term = 
     if dorec then make_normal_biterm dorec s (diff t t')
     else diff t (subst s t')

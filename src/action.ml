@@ -186,7 +186,20 @@ type descr = {
 (** Minimal validation function. Could be improved to check for free
     variables, valid diff operators, etc. *)
 let valid_descr d =
-  d.indices = get_indices d.action
+  d.indices = get_indices d.action &&
+  if d.name = Symbols.init_action then true else
+    begin
+      let _, cond = d.condition
+      and _, outp = d.output in
+
+      let dfv = Vars.Sv.of_list d.indices in
+
+      Vars.Sv.subset (Term.fv cond) dfv &&
+      Vars.Sv.subset (Term.fv outp) dfv &&
+      List.for_all (fun (_, state) ->
+          Vars.Sv.subset (Term.fv state) dfv
+        ) d.updates
+    end
 
 (*------------------------------------------------------------------*)
 (** Apply a substitution to an action description.
@@ -308,14 +321,9 @@ let strongly_compatible_descr d1 d2 : bool =
           Term.ESubst (Term.mk_var v2, Term.mk_var v1)
         ) d1.indices d2.indices
     in
-    Fmt.epr "d1:@.%a@.d2:@.%a@."
-      (pp_descr ~debug:true) d1
-      (pp_descr ~debug:true) d2;
 
     let d2 = subst_descr subst d2 in
     assert (d1.indices = d2.indices);
-    Fmt.epr "d2':@.%a@."
-      (pp_descr ~debug:true) d2;
 
     d1.name    = d2.name &&
     d1.action  = d2.action &&

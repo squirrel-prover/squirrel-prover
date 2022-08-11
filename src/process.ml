@@ -316,7 +316,7 @@ let declare
 (*------------------------------------------------------------------*)
 (* Enable/disable debug messages by setting debug to debug_on/off. *)
 
-let debug_off fmt = Format.fprintf Printer.dummy_fmt fmt
+let[@warning "-32"] debug_off fmt = Format.fprintf Printer.dummy_fmt fmt
 let[@warning "-32"] debug_on fmt =
   Format.printf "[DEBUG] " ;
   Format.printf fmt
@@ -462,7 +462,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
     let action = List.rev penv.action in
     let in_ch, in_var = match penv.inputs with
-    | (c,v)::_ -> (c,Vars.name v)
+    | (c,v) :: _ -> c, Vars.name v
     | _ -> assert false
     in
     let indices = List.rev penv.indices in
@@ -477,7 +477,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     (* override previous term substitution for input variable
     * to use the known action *)
     let subst_input =
-      try [Term.ESubst (snd (list_assoc (in_var) penv.msubst), in_tm)]
+      try [Term.ESubst (snd (list_assoc in_var penv.msubst), in_tm)]
       with Not_found -> []
     in
 
@@ -507,8 +507,9 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       List.rev penv.evars,
       Term.subst
         (subst_ts @ subst_input)
-        (Term.mk_ands penv.facts)
+        (Term.mk_ands penv.facts) 
     in
+    debug "condition = %a.@." Term.pp (snd condition);
 
     let updates =
       List.map (fun (s,l,ty,t) ->
