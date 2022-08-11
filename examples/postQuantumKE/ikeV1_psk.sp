@@ -198,8 +198,8 @@ Proof.
      *)
     + intro *. 
       case  try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-        ++ intro [il jl [_ ->]]. 
-           fa; auto. print goal tryfind.
+        ++ intro [il jl [_ ->]].
+           fa; auto. 
         ++ rewrite tryfind. 
            intro [Abs TFeq].
            use Abs with i,j; auto.

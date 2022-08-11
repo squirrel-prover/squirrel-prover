@@ -1782,11 +1782,14 @@ let rewrite_equiv_transform
   let exception Invalid in
 
   let assoc (t : Term.term) : Term.term option =
-    match List.find_opt (fun e -> Term.project1 src e = t) biframe with
+    match List.find_opt (fun e -> 
+        TS.Reduce.conv_term s (Term.project1 src e) t
+      ) biframe 
+    with
     | Some e -> Some (Term.project1 dst e)
     | None -> None
   in
-  let rec aux : term -> term = fun t ->
+  let rec aux (t : term) : term = 
     match Term.ty t with
     | Type.Timestamp | Type.Index -> t
     | _ ->

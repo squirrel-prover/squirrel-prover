@@ -633,39 +633,42 @@ let fa_tac args = match args with
    seen as duplicates, or context of duplicates, are removed. All elements that
    can be seen as context of duplicates and assumptions are removed, but
    replaced by the assumptions that appear as there subterms. *)
-let rec filter_fa_dup table res assump (elems : Equiv.equiv) =
-  let rec is_fa_dup acc elems e =
-    (* if an element is a duplicate wrt. elems, we remove it directly *)
-    if Action.is_dup table e elems then
-      (true,[])
-    (* if an element is an assumption, we succeed, but do not remove it *)
-    else if List.mem e assump then
-      (true,[e])
-    (* otherwise, we go recursively inside the sub-terms produced by function
-       application *)
-    else try
-      let new_els = fa_expand e in
-      List.fold_left
-        (fun (aux1,aux2) e ->
-          let (fa_succ,fa_rem) = is_fa_dup acc elems e in
-          fa_succ && aux1, fa_rem @ aux2)
-        (true,[]) new_els
-    with No_FA _ -> (false,[])
-  in
-  match elems with
-  | [] -> res
-  | e :: els ->
-    let (fa_succ,fa_rem) =  is_fa_dup [] (res@els) e in
-    if fa_succ then filter_fa_dup table (fa_rem@res) assump els
-    else filter_fa_dup table (e::res) assump els
+let filter_fa_dup (s : ES.t) assump (elems : Equiv.equiv) =
+  let table = ES.table s in
 
-(** This tactic filters the biframe through filter_fa_dup, passing the set of
+  let rec doit res (elems : Equiv.equiv) =
+    let rec is_fa_dup acc elems e =
+      (* if an element is a duplicate wrt. elems, we remove it directly *)
+      if Action.is_dup ~eq:(ES.Reduce.conv_term s) table e elems then
+        (true,[])
+        (* if an element is an assumption, we succeed, but do not remove it *)
+      else if List.mem_cmp ~eq:(ES.Reduce.conv_term s) e assump then
+        (true,[e])
+        (* otherwise, we go recursively inside the sub-terms produced by function
+           application *)
+      else try
+          let new_els = fa_expand e in
+          List.fold_left
+            (fun (aux1,aux2) e ->
+               let (fa_succ,fa_rem) = is_fa_dup acc elems e in
+               fa_succ && aux1, fa_rem @ aux2)
+            (true,[]) new_els
+        with No_FA _ -> (false,[])
+    in
+    match elems with
+    | [] -> res
+    | e :: els ->
+      let (fa_succ,fa_rem) =  is_fa_dup [] (res@els) e in
+      if fa_succ then doit (fa_rem@res) els
+      else doit (e::res) els
+  in
+  doit [] elems
+
+(** This tactic filters the biframe through [filter_fa_dup], passing the set of
    hypotheses to it.  This is applied automatically, and essentially leaves only
    assumptions, or elements that contain a subterm which is neither a duplicate
    nor an assumption. *)
-let fa_dup s =
-  let table = ES.table s in
-
+let fa_dup (s : ES.t) : ES.t list =
   (* TODO: allow to choose the hypothesis through its id *)
   let hyp = Hyps.find_map (fun _id hyp -> match hyp with
       | Equiv.(Atom (Equiv e)) -> Some e
@@ -675,7 +678,7 @@ let fa_dup s =
 
   let biframe = ES.goal_as_equiv s
                 |> List.rev
-                |> filter_fa_dup table [] hyp
+                |> filter_fa_dup s hyp
   in
   [ES.set_equiv_goal biframe s]
 
@@ -1349,6 +1352,7 @@ let () =
     (LT.genfun_of_pure_efun_arg prf)
     Args.(Pair(Int, Opt Message))
 
+(*------------------------------------------------------------------*)
 let global_diff_eq (s : ES.t) =
   let frame = ES.goal_as_equiv s in
   let system = Utils.oget (ES.system s).pair in
@@ -1358,9 +1362,11 @@ let global_diff_eq (s : ES.t) =
   (* Collect in ocs the list of diff terms that occur (directly or not)
      in [frame]. All these terms are relative to [system]. *)
   let ocs = ref [] in
-  let iter x y t = ocs := ( List.map (fun u -> (x,y,u))
-                            (Iter.get_diff ~cntxt (Term.simple_bi_term t)))
-                        @ !ocs in
+  let iter x y t = 
+    ocs := ( List.map (fun u -> (x,y,u))
+               (Iter.get_diff ~cntxt (Term.simple_bi_term t)))
+           @ !ocs 
+  in
   List.iter (iter [] []) frame;
 
   SE.iter_descrs cntxt.table system
@@ -1386,11 +1392,13 @@ let global_diff_eq (s : ES.t) =
           iter#get_actions
         in
         (* Remark that the get_actions add pred to all timestamps, to simplify. *)
-        let ts_list = (List.map (fun v -> Term.mk_action v is) vs)
-                      @ List.map (function
-                          | Term.Fun (fs, _, [tau]) when fs = Term.f_pred -> tau
-                          | t -> t
-                        ) pred_ts_list in
+        let ts_list = 
+          (List.map (fun v -> Term.mk_action v is) vs)
+          @ List.map (function
+              | Term.Fun (fs, _, [tau]) when fs = Term.f_pred -> tau
+              | t -> t
+            ) pred_ts_list 
+        in
         (* XXX the expansions that come next are inefficient (and may become
            in incorrect if we allow richer diff operators): s1 and s2 only make
            sense in projected systems, so we should not expand macros wrt s in
@@ -1406,17 +1414,19 @@ let global_diff_eq (s : ES.t) =
           Term.project1 p2
             (EquivLT.expand_all_macros ~force_happens:true s2 sexpr2 s)
         in
-        Goal.Trace ES.(to_trace_sequent
-                         (set_reach_goal
-                            Term.(
-                              mk_forall fvars
-                                (mk_impls (List.map mk_happens ts_list
-                                           @ List.map (fun t -> mk_macro exec_macro [] t) ts_list
-                                           @ [cond])
-                              (mk_atom `Eq s1 s2))
-                            )
-                            s))
-      | _ -> assert false
+        Goal.Trace 
+          ES.(to_trace_sequent
+                (set_reach_goal
+                   Term.(
+                     mk_forall fvars
+                       (mk_impls 
+                          (List.map mk_happens ts_list
+                           @ List.map (fun t -> mk_macro exec_macro [] t) ts_list
+                           @ [cond])
+                          (mk_atom `Eq s1 s2))
+                   )
+                   s))
+    | _ -> assert false
   in
   List.map subgoal_of_occ !ocs
 
@@ -2153,7 +2163,7 @@ let xor arg (s : ES.t) =
           when (fl = Term.f_xor && fr = Term.f_xor) ->
           (nl,ll,nr,lr,t)
 
-        | _ -> assert false
+        | _ -> soft_failure (Failure "ill-formed arguments")
       end
     | Some mess_name ->
       begin
@@ -2167,9 +2177,9 @@ let xor arg (s : ES.t) =
               (nl,remove_name_occ nl ll,
                nr,remove_name_occ nr lr,
                t)
-            | _ -> assert false
+            | _ -> soft_failure (Failure "ill-formed arguments")
           end
-        | _ -> assert false
+        | _ -> soft_failure (Failure "ill-formed arguments")
       end
   in
   let phi =

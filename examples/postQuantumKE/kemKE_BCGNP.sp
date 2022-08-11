@@ -378,13 +378,7 @@ Proof.
   auto.
   prf 1; rewrite if_true in 1.
   auto.
-  xor 1,   xor(expd(<pk(skI(k)),
-               <input@R1(i,j,k),
-                <pk(skR(i)),encap(n_CCA(k,i,j),rR(k,i,j),pk(skI(k)))>>>,
-         try find il,jl,kl such that
-           input@R1(i,j,k) = encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))
-         in exct(skex,kI(il,jl,kl))
-         else exct(skex,decap(input@R1(i,j,k),skR(i)))),n_PRF1), n_PRF1.
+  xor 1, xor(_,_), n_PRF1. 
   rewrite len_expd.
   namelength n_PRF1, skex.
   intro Len.

@@ -461,8 +461,8 @@ let is_dup_match
 
     | _ -> None
 
-let is_dup table t t' : bool =
-  let is_match t t' () = if t = t' then Some () else None in
+let is_dup ~eq table t t' : bool =
+  let is_match t t' () = if eq t t' then Some () else None in
   match is_dup_match is_match () table t t' with
   | None    -> false
   | Some () -> true

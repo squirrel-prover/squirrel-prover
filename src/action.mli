@@ -207,6 +207,7 @@ val descr_map :
     - or if [t] is [exec\@t] with [frame\@t'] appearing in [terms]
       where with [t <= t']. *)
 val is_dup :
+  eq:(Term.term -> Term.term -> bool) ->
   Symbols.table -> Term.term -> Term.term list
   -> bool
 

@@ -174,11 +174,12 @@ Proof.
   destruct Hexec as [H1 Meq].
   euf Meq => Clt * /=.
 
-    (* case 1/2: equality with hashed message in output@R1 *)
+    (* case 1/3 and 2/3: equality with hashed message in output@R1 *)
     (* honest case *)
   + by exists jj.
+  + by exists jj.
 
-    (* case 2/2: equality with hashed message in update@T1 *)
+    (* case 3/3: equality with hashed message in update@T1 *)
   + use IH0 with T1(i,j0),i,j0 as [jj _] => //. {
      exists jj => /=.
      executable pred(T1(i,j)) => // H.
