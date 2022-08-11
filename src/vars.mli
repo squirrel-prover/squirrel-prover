@@ -14,6 +14,9 @@ type vars = var list
 (*------------------------------------------------------------------*)
 (** {2 Pretty-Printing} *)
   
+(** Print a variable name and identifier. *)
+val pp_dbg : Format.formatter -> var -> unit
+
 (** Print a variable, only showing its name. *)
 val pp : Format.formatter -> var -> unit
 

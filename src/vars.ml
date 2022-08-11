@@ -22,8 +22,11 @@ let norm_ty (env : Type.Infer.env) (v : var) : var =
 let tsubst s v = { v with ty = Type.tsubst s v.ty }
 
 (*------------------------------------------------------------------*)
-let pp ppf v = 
+let pp_dbg ppf v = 
   Fmt.pf ppf "%s%d" (name v) (hash v)
+
+let pp ppf v = 
+  Fmt.pf ppf "%s" (name v)
 
 let pp_list ppf l =
   Fmt.pf ppf "@[<hov>%a@]"
@@ -165,8 +168,8 @@ let split_var_name (name : string) : string * string =
   let s = Pcre.get_substring substrings 1 in
 
   let i = Pcre.get_substring substrings 2 in
+
   let i = if i = "" then "-1" else i in
-      
   s, i
 
 let int_suffix_to_string (i : int) : string =
