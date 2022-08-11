@@ -1,5 +1,3 @@
-
-
 channel c
 
 system !_i in(c,x);out(c,x);in(c,x);out(c,x).

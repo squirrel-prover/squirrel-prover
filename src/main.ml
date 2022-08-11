@@ -740,7 +740,7 @@ let () =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/depends.sp" with
-           | Tactic_soft_failure (_, Tactics.NotDepends ("A1(i)","A1(i)"))
+           | Tactic_soft_failure (_, Tactics.NotDepends _)
              -> raise Ok)
     end ;
     "Fresh Not Ground", `Quick, begin fun () ->
