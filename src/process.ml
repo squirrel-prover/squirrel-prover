@@ -548,7 +548,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
         condition; updates; output; } 
     in
 
-    let table, new_a, action_descr =
+    let table, new_a, _ =
       System.register_action table system_name action_descr
     in
 
@@ -557,8 +557,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     in
 
     debug "descr = %a@." Action.pp_descr action_descr ;
-    let new_indices = action_descr.indices in
-    let new_action_term = Term.mk_action new_a new_indices in
+    let new_action_term = Term.mk_action new_a action_descr.indices in
     let new_in_tm = Term.mk_macro Term.in_macro [] new_action_term in
     let penv =
       { penv with

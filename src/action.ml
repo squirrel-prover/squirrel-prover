@@ -183,9 +183,8 @@ type descr = {
   globals   : Symbols.macro list;
 }
 
-(** Minimal validation function. Could be improved to check for free
-    variables, valid diff operators, etc. *)
-let valid_descr d =
+(** Validation function for action description: checks for free variables. *)
+let check_descr d =
   d.indices = get_indices d.action &&
   if d.name = Symbols.init_action then true else
     begin
@@ -251,25 +250,6 @@ let pp_descr ~debug ppf descr =
        (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ";@ ") Symbols.pp))
     descr.globals
     Term.pp (snd descr.output)
-
-(*------------------------------------------------------------------*)
-(* well-formedness check for a description: check free variables *)
-let check_descr (d : descr) : bool =
-  (* special case for [init], which does not satisfy the free variables
-     condition. *)
-  if d.name = Symbols.init_action then true else
-    begin
-      let _, cond = d.condition
-      and _, outp = d.output in
-
-      let dfv = Vars.Sv.of_list d.indices in
-
-      Vars.Sv.subset (Term.fv cond) dfv &&
-      Vars.Sv.subset (Term.fv outp) dfv &&
-      List.for_all (fun (_, state) ->
-          Vars.Sv.subset (Term.fv state) dfv
-        ) d.updates
-    end
 
 (*------------------------------------------------------------------*)
 let descr_map
