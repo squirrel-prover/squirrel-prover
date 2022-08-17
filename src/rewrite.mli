@@ -67,7 +67,6 @@ val high_rewrite :
   mode : [`TopDown of bool | `BottomUp] ->
   Symbols.table ->
   SE.t ->
-  Vars.env ->
   (Vars.vars -> Pos.pos -> rw_rule option) ->
   Term.term ->
   Term.term 

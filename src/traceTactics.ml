@@ -110,8 +110,7 @@ let () =
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
   * This can be used with [vars = []] if orig is an [if-then-else] term. *)
 let case_cond orig vars c t e s : sequent list =
-  let env = ref (TS.vars s) in
-  let vars, subst = Term.refresh_vars (`InEnv env) vars in
+  let vars, subst = Term.refresh_vars `Global vars in
   let then_c = Term.subst subst c in
   let else_c = Term.mk_forall vars (Term.mk_not then_c) in
 

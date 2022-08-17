@@ -324,14 +324,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Global f ->
       let _, f =
         Match.Pos.map_e
-          ~mode:(`TopDown m_rec) expand_inst (S.vars s) (S.system s) f
+          ~mode:(`TopDown m_rec) expand_inst (S.system s) f
       in
       !found1, Global f
 
     | Local f ->
       let _, f =
         Match.Pos.map
-          ~mode:(`TopDown m_rec) expand_inst (S.vars s) (S.system s).set f
+          ~mode:(`TopDown m_rec) expand_inst (S.system s).set f
       in
       !found1, Local f
 
@@ -389,7 +389,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
     let _, f =
       Match.Pos.map
-        ~mode:(`TopDown true) expand_inst (S.vars s) sexpr f
+        ~mode:(`TopDown true) expand_inst sexpr f
     in
     f
 

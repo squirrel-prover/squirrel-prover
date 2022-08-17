@@ -234,12 +234,11 @@ let get_macro_actions
 (** [mk_le_ts_occ env ts0 occ] build a condition stating that [ts0] occurs
     before the macro timestamp occurrence [occ]. *)
 let mk_le_ts_occ
-    (env : Vars.env)
     (ts0 : Term.term)
     (occ : ts_occ) : Term.term
   =
   let occ_vars = occ.Iter.occ_vars in
-  let occ_vars, occ_subst = Term.refresh_vars (`InEnv (ref env)) occ_vars in
+  let occ_vars, occ_subst = Term.refresh_vars `Global occ_vars in
   let subst = occ_subst in
   let ts   = Term.subst subst occ.occ_cnt  in
 
@@ -252,9 +251,8 @@ let mk_le_ts_occ
        (Term.mk_ands cond))
 
 let mk_le_ts_occs
-    (env : Vars.env)
     (ts0 : Term.term)
     (occs : ts_occs) : Term.terms
   =
-  List.map (mk_le_ts_occ env ts0) occs |>
+  List.map (mk_le_ts_occ ts0) occs |>
   List.remove_duplicate (=)

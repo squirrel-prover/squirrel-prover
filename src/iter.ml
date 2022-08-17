@@ -474,7 +474,7 @@ let get_f_messages_ext
   in
 
   let occs, _, _ =
-    Pos.map_fold ~mode:(`TopDown true) func (Vars.of_list fv) sexpr [] t
+    Pos.map_fold ~mode:(`TopDown true) func sexpr [] t
   in
   occs
 

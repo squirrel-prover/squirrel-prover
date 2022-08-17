@@ -149,7 +149,6 @@ val destr_eq_expand : expand_info -> term -> (term * term) option
 val occurrence_sequents :
       ?pp_ns: (unit Fmt.t) option ->
       (se:SE.arbitrary ->
-       env:Vars.env ->
        ?fv:Vars.vars ->
        expand_info ->
        term ->
@@ -203,7 +202,7 @@ type f_fold_occs =
        2) using Match.Pos.fold_shallow, to recurse on subterms at depth 1. *)
 val fold_bad_occs :
   f_fold_occs -> 
-  se:SE.arbitrary -> env:Vars.env -> ?fv:Vars.vars -> expand_info ->
+  se:SE.arbitrary -> ?fv:Vars.vars -> expand_info ->
   term -> name_occs
 
 

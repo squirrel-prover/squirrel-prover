@@ -313,13 +313,13 @@ let do_rewrite
     let s, f = match f with
       | Global f ->
         let s, _, f = 
-          Pos.map_fold_e (rw_inst expand_context table hyps) env system s f 
+          Pos.map_fold_e (rw_inst expand_context table hyps) system s f 
         in
         s, Equiv.Global f
 
       | Local f ->
         let s, _, f = 
-          Pos.map_fold (rw_inst expand_context table hyps) env system.set s f 
+          Pos.map_fold (rw_inst expand_context table hyps) system.set s f 
         in
         s, Equiv.Local f
     in
@@ -384,7 +384,6 @@ let high_rewrite
     ~(mode   : [`TopDown of bool | `BottomUp])
     (table   : Symbols.table)
     (system  : SE.t)
-    (venv    : Vars.env)         (* for clean variable naming *)
     (mk_rule : Vars.vars -> Pos.pos -> rw_rule option) 
     (t       : Term.term)
   : Term.term 
@@ -403,5 +402,5 @@ let high_rewrite
         snd (rw_inst InSequent table hyps occ se vars conds p state)
   in
 
-  let _, f = Pos.map ~mode rw_inst venv system t in
+  let _, f = Pos.map ~mode rw_inst system t in
   f

@@ -22,14 +22,12 @@ let prf_param hash : prf_param =
 (*------------------------------------------------------------------*)
 (** Compute conjunct of PRF condition for a direct case,
   * that is an explicit occurrence of the hash in the frame. *)
-let prf_mk_direct env (param : prf_param) (occ : Iter.hash_occ) =
+let prf_mk_direct (param : prf_param) (occ : Iter.hash_occ) =
   (* select bound variables in key indices [is] and in message [m]
      to quantify universally over them *)
-  let env = ref env in
-
   let vars = occ.occ_vars in
 
-  let vars, subst = Term.refresh_vars (`InEnv env) vars in
+  let vars, subst = Term.refresh_vars `Global vars in
 
   let is, m = occ.occ_cnt in
   let is = List.map (Term.subst_var subst) is in
@@ -82,16 +80,13 @@ let prf_occ_incl table sexpr (o1 : prf_occ) (o2 : prf_occ) : bool =
 (** Compute conjunct of PRF condition for an indirect case,
   * that is an occurence of the hash in actions of the system. *)
 let prf_mk_indirect
-    (env           : Vars.env)
     (cntxt         : Constr.trace_cntxt)
     (param         : prf_param)
     (frame_actions : Fresh.ts_occs)
     (hash_occ      : prf_occ) : Term.term
   =
-  let env = ref env in
-  
   let vars = hash_occ.Iter.occ_vars in
-  let vars, subst = Term.refresh_vars (`InEnv env) vars in
+  let vars, subst = Term.refresh_vars `Global vars in
 
   let action, hash_is, hash_m = hash_occ.Iter.occ_cnt in
 
@@ -107,11 +102,9 @@ let prf_mk_indirect
 
   let hash_cond = Term.mk_ands (List.rev hash_cond) in
 
-  (* save the environment after having renamed all free variables until now. *)
-  let env0 = !env in
   (* condition stating that [action] occurs before a macro timestamp
      occurencing in the frame *)
-  let disj = Term.mk_ors (Fresh.mk_le_ts_occs env0 action frame_actions) in
+  let disj = Term.mk_ors (Fresh.mk_le_ts_occs action frame_actions) in
 
   (* then if key indices are equal then hashed messages differ *)
   let form =
@@ -184,7 +177,7 @@ let mk_prf_phi_proj cntxt env param frame hash =
   in
   let frame_hashes = List.sort_uniq Stdlib.compare frame_hashes in
   let phi_direct =
-    List.map (prf_mk_direct env param) frame_hashes
+    List.map (prf_mk_direct param) frame_hashes
   in
 
   (* Indirect cases: potential occurrences through macro expansions. *)
@@ -225,7 +218,7 @@ let mk_prf_phi_proj cntxt env param frame hash =
     List.map (fun (action, hash_occs) ->
         List.map (fun (hash_occ, srcs) ->
             let frame_actions = Fresh.get_macro_actions cntxt srcs in
-            prf_mk_indirect env cntxt param frame_actions hash_occ
+            prf_mk_indirect cntxt param frame_actions hash_occ
           ) (List.rev hash_occs)
       ) (List.rev macro_cases)
   in

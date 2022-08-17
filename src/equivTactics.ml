@@ -834,12 +834,10 @@ let () =
 (** Fresh *)
 
 let fresh_mk_direct
-    (env : Vars.env)
     (n : Term.nsymb)
     (occ : Fresh.name_occ) : Term.term
   =
-  let env = ref env in
-  let bv, subst = Term.refresh_vars (`InEnv env) occ.occ_vars in
+  let bv, subst = Term.refresh_vars `Global occ.occ_vars in
   let cond = List.map (Term.subst subst) occ.occ_cond in
 
   let cond = Term.mk_ands (List.rev cond) in
@@ -863,8 +861,7 @@ let fresh_mk_indirect
              (Action.fv_action action)
              (Sv.union (Vars.to_set env) (Sv.of_list bv)));
 
-  let env = ref env in
-  let bv, subst = Term.refresh_vars (`InEnv env) bv in
+  let bv, subst = Term.refresh_vars `Global bv in
 
   (* apply [subst] to the action and to the list of
    * indices of our name's occurrences *)
@@ -875,11 +872,9 @@ let fresh_mk_indirect
 
   let occ = List.map (Term.subst_var subst) occ in
 
-  (* environement with all new variables *)
-  let env0 = !env in
   (* condition stating that [action] occurs before a macro timestamp
      occurencing in the frame *)
-  let disj = Term.mk_ors (Fresh.mk_le_ts_occs env0 action frame_actions) in
+  let disj = Term.mk_ors (Fresh.mk_le_ts_occs action frame_actions) in
 
   (* condition stating that indices of name in [action] and [name] differ *)
   let form = Term.mk_indices_neq occ n.s_indices in
@@ -905,7 +900,7 @@ let mk_phi_proj
     let frame_indices = List.sort_uniq Stdlib.compare frame_indices in
 
     (* direct cases (for explicit occurrences of [name] in the frame) *)
-    let phi_frame = List.map (fresh_mk_direct env n) frame_indices in
+    let phi_frame = List.map (fresh_mk_direct n) frame_indices in
 
     let frame_actions : Fresh.ts_occs = Fresh.get_macro_actions cntxt frame in
 
@@ -1524,8 +1519,7 @@ let mem_seq (i_l : int L.located) (j_l : int L.located) s : Goal.t list =
   check_ty_eq (Term.ty t) (Term.ty seq_term);
 
   (* refresh the sequence *)
-  let env = ref (ES.vars s) in
-  let seq_vars, subst = Term.refresh_vars (`InEnv env) seq_vars in
+  let seq_vars, subst = Term.refresh_vars `Global seq_vars in
   let seq_term = Term.subst subst seq_term in
 
   let subgoal =
@@ -1596,8 +1590,7 @@ let const_seq
   in
 
   (* refresh variables *)
-  let env = ref (ES.vars s) in
-  let e_is, subst = Term.refresh_vars (`InEnv env) e_is in
+  let e_is, subst = Term.refresh_vars `Global e_is in
   let e_ti = Term.subst subst e_ti in
 
   (* instantiate all boolean [hterms] in [b_t_terms] using [e_is] *)

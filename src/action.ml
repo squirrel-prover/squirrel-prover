@@ -226,8 +226,7 @@ let pp_descr_short ppf descr =
 
 (*------------------------------------------------------------------*)
 let pp_descr ~debug ppf descr =
-  let e = ref (Vars.of_list []) in
-  let _, s = Term.refresh_vars (`InEnv e) descr.indices in
+  let _, s = Term.refresh_vars `Global descr.indices in
   let descr = if debug then descr else subst_descr s descr in
 
   Fmt.pf ppf "@[<v 0>action name: @[<hov>%a@]@;\
