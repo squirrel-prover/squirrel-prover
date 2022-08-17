@@ -495,14 +495,19 @@ val project_opt : projs option -> term -> term
     subterms have topmost different constructors, and they do not
     start with diffs themselves.
 
-    TODO: Constraint below no longer applies. What was it used for?
-    // Macros with different timestamps do not count as a common
-    // constructor: [head_normal_biterm (Diff(Macro(m,l,ts),Macro(m,l,ts')))]
-    // will be [Diff(Macro(m,l,ts),Macro(m,l,ts'))] and not
-    // [Macro(m,l,Diff(ts,ts'))]. *)
+    TODO: What is the constraint below used for?
+    Macros with different timestamps do not count as a common
+    constructor: [head_normal_biterm (Diff(Macro(m,l,ts),Macro(m,l,ts')))]
+    will be [Diff(Macro(m,l,ts),Macro(m,l,ts'))] and not
+    [Macro(m,l,Diff(ts,ts'))]. *)
 val head_normal_biterm : term -> term
 
 val simple_bi_term : term -> term
+
+(** Same as [simple_bi_term], but does not try to normalize try-finds. 
+    Ad-hoc fix to keep diffeq tactic working properly. 
+    FIXME: remove it. *)
+val simple_bi_term_no_alpha_find : term -> term
 
 val combine : (proj * term) list -> term
 

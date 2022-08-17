@@ -1795,10 +1795,13 @@ let diff a b =
   if a = b then a else
     Diff (Explicit [left_proj,a; right_proj,b])
 
-let rec make_normal_biterm (dorec : bool) (s : subst) (t : term) : term = 
+let rec make_normal_biterm
+    (dorec : bool) ?(alpha_find = true)
+    (s : subst) (t : term) : term
+  =  
   (* [s] is a pending substitution from [t'] variables to [t] variables. *)
   let mdiff (s : subst) (t : term) (t' : term) : term = 
-    if dorec then make_normal_biterm dorec s (diff t t')
+    if dorec then make_normal_biterm dorec ~alpha_find s (diff t t')
     else diff t (subst s t')
   in
   let t1 = head_pi_term left_proj t
@@ -1815,10 +1818,11 @@ let rec make_normal_biterm (dorec : bool) (s : subst) (t : term) : term =
       alpha_vars s n.s_indices n'.s_indices;
       Name n
 
-    | Macro (m,l,ts), Macro (m',l',ts') when m.s_symb = m'.s_symb ->
+    | Macro (m,l,ts), Macro (m',l',ts')
+      when m.s_symb = m'.s_symb && ts = subst s ts' ->
       assert (l = [] && l' = []);
       alpha_vars s m.s_indices m'.s_indices;
-      Macro (m, List.map2 (mdiff s) l l', mdiff s ts ts')
+      Macro (m, List.map2 (mdiff s) l l', ts)
 
     | Action (a,is), Action (a',is') when a = a' ->
       alpha_vars s is is';
@@ -1829,7 +1833,7 @@ let rec make_normal_biterm (dorec : bool) (s : subst) (t : term) : term =
       Var x
 
     | Find (is,c,t,e), Find (is',c',t',e')
-      when List.length is = List.length is' ->
+      when List.length is = List.length is' && alpha_find ->
       let s' = alpha_bnds s is is' in
       Find (is, mdiff s' c c', mdiff s' t t', mdiff s e e')
 
@@ -1852,6 +1856,10 @@ let rec make_normal_biterm (dorec : bool) (s : subst) (t : term) : term =
 let simple_bi_term     : term -> term = make_normal_biterm true  []
 let head_normal_biterm : term -> term = make_normal_biterm false []
 
+(* Ad-hoc fix to keep diffeq tactic working properly. *)
+let simple_bi_term_no_alpha_find : term -> term =
+  make_normal_biterm true ~alpha_find:false []
+    
 (*------------------------------------------------------------------*)
 let combine = function
   | [_,t] -> t
@@ -1987,15 +1995,15 @@ let project_tpat_opt (projs : projs option) (pat : term pat) : term pat
 let () =
   let mkvar x s = Var (snd (Vars.make `Approx Vars.empty_env s x)) in
   Checks.add_suite "Head normalization" [
-    (* "Macro, different ts", `Quick, begin fun () ->
-     *   let ts = mkvar "ts" Type.Timestamp in
-     *   let ts' = mkvar "ts'" Type.Timestamp in
-     *   let m = in_macro in
-     *   let t = diff (Macro (m,[],ts)) (Macro (m,[],ts')) in
-     *   let r = head_normal_biterm t in
-     *   Fmt.epr "PP@.%a@.%a@." pp t pp r;
-     *   assert (r = t)
-     * end ; *)
+    "Macro, different ts", `Quick, begin fun () ->
+      let ts = mkvar "ts" Type.Timestamp in
+      let ts' = mkvar "ts'" Type.Timestamp in
+      let m = in_macro in
+      let t = diff (Macro (m,[],ts)) (Macro (m,[],ts')) in
+      let r = head_normal_biterm t in
+      Fmt.epr "PP@.%a@.%a@." pp t pp r;
+      assert (r = t)
+    end ;
     "Boolean operator", `Quick, begin fun () ->
       let f = mkvar "f" Type.Boolean in
       let g = mkvar "g" Type.Boolean in

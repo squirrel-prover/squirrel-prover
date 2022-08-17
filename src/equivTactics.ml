@@ -1362,9 +1362,13 @@ let global_diff_eq (s : ES.t) =
   (* Collect in ocs the list of diff terms that occur (directly or not)
      in [frame]. All these terms are relative to [system]. *)
   let ocs = ref [] in
-  let iter x y t = 
+  let iter x y t =
+    (* rebuild a term with top-level diffs, before using 
+       [simple_bi_term_no_alpha_find] to normalize it in a particular way. *)
+    let t = Term.mk_diff [l_proj, Term.project1 l_proj t;
+                          r_proj, Term.project1 r_proj t] in
     ocs := ( List.map (fun u -> (x,y,u))
-               (Iter.get_diff ~cntxt (Term.simple_bi_term t)))
+               (Iter.get_diff ~cntxt (Term.simple_bi_term_no_alpha_find t)))
            @ !ocs 
   in
   List.iter (iter [] []) frame;

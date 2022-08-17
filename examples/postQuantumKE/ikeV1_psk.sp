@@ -193,8 +193,8 @@ axiom  [Main6,Ideal1/right] tryfind : forall (i,j:index), pred(I1(i,j)) = pred(I
 equiv [Main6,Ideal1/right] test.
 Proof.
 
-  diffeq.
-  (* From here, we need to prove that we indede get ideal keys everywhere. Mostly dumb manipulations of all the conditions introduced by the prf tactic, that are all contractory.
+  diffeq. 
+   (* From here, we need to prove that we indede get ideal keys everywhere. Mostly dumb manipulations of all the conditions introduced by the prf tactic, that are all contractory.
      *)
     + intro *. 
       case  try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
@@ -222,10 +222,9 @@ Proof.
       case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
         ++ intro [il jl [[_ _ _] ->]]. 
            case try find il0,jl0 such that _  in Ininr(il0,jl0) else _.
-             +++ intro [i j [_ ->]]. 
-                 auto.
+             +++ auto. 
              +++ intro [Abs TFeq2].
-                 use Abs with il,jl; auto.
+                 use Abs with i,j; auto.
         ++ intro [Abs TFeq].
            case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
              +++ intro [il jl [_ TFeq2]]. 
@@ -248,10 +247,9 @@ Proof.
       case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
         ++ intro [il jl [[_ _ _] ->]]. 
            case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
-             +++ intro [i j [_ ->]]. 
-                 auto.
-             +++ intro [Abs _].
-                 use Abs with il,jl.
+             +++ auto. 
+             +++ intro [Abs _]. 
+                 use Abs with i,j.
                  auto.
         ++ case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
              +++ intro [il jl [_ ->]]. 
@@ -275,10 +273,9 @@ Proof.
            case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
              +++ intro [il jl [[_ _ _] ->]]. 
                  case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
-                   - intro [i j [_ ->]]. 
-                     auto.
+                   - auto. 
                    - intro [Abs _].
-                     use Abs with il,jl; auto.
+                     use Abs with i,j; auto.
 
              +++ intro [Abs _].
                  case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
@@ -378,10 +375,10 @@ Proof.
       destruct Cond as [EUF _].
       euf EUF.
         ++ intro Ord Eq [_ _].
-           exists jl.
-           assert happens(R(il,jl)) => //.
-           assert happens(I(jl)) => //.
-           depends I(jl), I1(jl,il) => //.
+           exists i.
+           assert happens(R(j,i)) => //.
+           assert happens(I(i)) => //.
+           depends I(i), I1(i,j) => //.
         ++ auto.
 
     +  (* Case 2 -> dishonnest skeyid, trivial as no one else computes this key *)
@@ -416,12 +413,12 @@ Proof.
       rewrite Meq in EUF.
       euf EUF => //.
       intro OrdI Meq2 [_ _].
-      depends I(il), I1(il,jl).
+      depends I(i), I1(i,j).
       case OrdI; auto. 
       intro OrdI2.
-      executable pred(R1(jl,il)) => //.
+      executable pred(R1(j,i)) => //.
       intro Exec.
-       use Exec with R(jl,il) => //.
+       use Exec with R(j,i) => //.
     + intro Abs.
       destruct Abs as [Abs Meq2].
       rewrite Meq2 in EUF.
@@ -522,12 +519,12 @@ Proof.
        (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il),Nr(jl)> && (il = i && jl = j))
      in h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i))
      else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i)).
-    + intro [il jl [[Eq1 [_ _]] Eq2]].
+    + intro [?? [[Eq1 [_ _]] Eq2]].
       rewrite Eq2 in Cond.  
       euf Cond => //.
-      depends R(jl,il), R1(jl,il) => //.
+      depends R(j,i), R1(j,i) => //.
       intro Ord1 Ord2. case Ord2; auto.
-      by use ddhnotuple with  fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>, fst(input@I1(il,jl)),a(il).
+      by use ddhnotuple with  fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>, fst(input@I1(i,j)),a(i).
     + intro [Abs Meq].
       rewrite Meq in Cond.
       euf Cond.
@@ -557,12 +554,12 @@ Proof.
          (il = i && jl = j))
       in h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,Ininr(j,i))
       else h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,IgarbI(j,i)).
-    + intro [il jl [[Eq [_ _]] Meq]].
+    + intro [?? [[Eq [_ _]] Meq]].
       rewrite Meq in CondTF.
       euf CondTF => //.
-        ++ by use ddhnotuple with fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>, fst(input@R(jl,il)),b(jl).
+        ++ by use ddhnotuple with fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>, fst(input@R(j,i)),b(j).
         ++ intro OrdI.
-           by depends I1(il,jl),I4(il,jl).
+           by depends I1(i,j),I4(i,j).
     + intro [Abs Meq].
       rewrite Meq in CondTF.
       euf CondTF.
@@ -843,10 +840,9 @@ Proof.
         - intro [il jl [[_ _ _] ->]].
           case (try find il,jl such that _
            in idealkeys(il,jl) else _).
-          intro [i j [[_ _ _] ->]].
-         auto.
-         intro [Abs _].
-         by use Abs with il,jl.
+          ** auto. 
+          ** intro [Abs _].
+             by use Abs with i,j.
         - intro [Abs _].
           by use Abs with i,j.
 
