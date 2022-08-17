@@ -1184,10 +1184,10 @@ and _pp
     Fmt.pf ppf "@[<hov 2>seq(%a->@,%a)@]"
       Vars.pp_typed_list vs (pp (seq_fixity, `NonAssoc)) b
 
-  | Find (b, c, d, Fun (f,_,[])) when f = f_zero ->
+  | Find (vs, c, d, Fun (f,_,[])) when f = f_zero ->
     let _, vs, s = (* rename quantified vars. to avoid name clashes *)
-      let fv_cd = List.fold_left ((^~) Sv.remove) (Sv.union (fv c) (fv d)) b in
-      refresh_vars_env (Vars.of_set fv_cd) b
+      let fv_cd = List.fold_left ((^~) Sv.remove) (Sv.union (fv c) (fv d)) vs in
+      refresh_vars_env (Vars.of_set fv_cd) vs
     in
     let c, d = subst s c, subst s d in
 
@@ -1195,16 +1195,16 @@ and _pp
       Fmt.pf ppf "@[<hv 0>\
                   @[<hov 2>try find %a such that@ %a@]@;<1 0>\
                   @[<hov 2>in@ %a@]@]"
-        Vars.pp_typed_list b
+        Vars.pp_typed_list vs
         (pp (find_fixity, `NonAssoc)) c
         (pp (find_fixity, `Right)) d
     in
     maybe_paren ~outer ~side ~inner:find_fixity pp ppf ()
 
-  | Find (b, c, d, e) ->
+  | Find (vs, c, d, e) ->
     let _, vs, s = (* rename quantified vars. to avoid name clashes *)
-      let fv_cd = List.fold_left ((^~) Sv.remove) (Sv.union (fv c) (fv d)) b in
-      refresh_vars_env (Vars.of_set fv_cd) b
+      let fv_cd = List.fold_left ((^~) Sv.remove) (Sv.union (fv c) (fv d)) vs in
+      refresh_vars_env (Vars.of_set fv_cd) vs
     in
     let c, d = subst s c, subst s d in
 
@@ -1213,7 +1213,7 @@ and _pp
                   @[<hov 2>try find %a such that@ %a@]@;<1 0>\
                   @[<hov 2>in@ %a@]@;<1 0>\
                   %a@]"
-        Vars.pp_typed_list b
+        Vars.pp_typed_list vs
         (pp (find_fixity, `NonAssoc)) c
         (pp (find_fixity, `NonAssoc)) d
         (pp_chained_find info)        e (* prints the [else] *)
