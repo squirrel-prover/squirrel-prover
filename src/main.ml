@@ -90,6 +90,7 @@ type cmd_error =
   | IncludeCycle      of string
   | IncludeNotFound   of string
   | IncludeFailed     of (Format.formatter -> unit)
+  | InvalidSetOption  of string
 
 exception Cmd_error of cmd_error
 
@@ -109,6 +110,8 @@ let pp_cmd_error fmt = function
   | InvalidExtention s   -> Fmt.pf fmt "invalid extention (not a .sp): %s" s
 
   | IncludeFailed err    -> Fmt.pf fmt "%t" err
+
+  | InvalidSetOption s   -> Fmt.pf fmt "set failed: %s" s
 
 let cmd_error e = raise (Cmd_error e)
 
@@ -365,8 +368,9 @@ let do_add_hint (state : main_state) (h : Hint.p_hint) : main_state =
 
 (*------------------------------------------------------------------*)
 let do_set_option (state : main_state) (sp : Config.p_set_param) : main_state =
-  Config.set_param sp;
-  state
+  match Config.set_param sp with
+  | `Failed s -> cmd_error (InvalidSetOption s)
+  | `Success -> state
 
 (*------------------------------------------------------------------*)
 let do_add_goal 
