@@ -144,7 +144,6 @@ and conv_l (st : cstate) (ts1 : Term.terms) (ts2 : Term.terms) : unit =
   List.iter2 (conv st) ts1 ts2
 
 let rec conv_e (st : cstate) (e1 : Equiv.form) (e2 : Equiv.form) : unit =
-  Fmt.epr "e1: @[%a@]@.e2: @[%a@]@." Equiv.pp e1 Equiv.pp e2;
   match e1, e2 with
   | Equiv.Quant (q1, vs1, e1), Equiv.Quant (q2, vs2, e2) when q1 = q2 ->
     if List.length vs1 <> List.length vs2 then not_conv ();

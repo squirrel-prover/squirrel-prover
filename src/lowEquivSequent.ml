@@ -48,13 +48,23 @@ type t = {
   hint_db : Hint.hint_db;
 }
 
-
-
 type sequent = t
 
 type sequents = sequent list
 
+(*------------------------------------------------------------------*)
+let fv (s : t) : Vars.Sv.t =
+  let h_vars =
+    H.fold (fun _ f vars ->
+        Vars.Sv.union (Equiv.fv f) vars
+      ) s.hyps Vars.Sv.empty
+  in
+  Vars.Sv.union h_vars (Equiv.fv s.goal)
 
+let sanity_check (s : t) : unit =
+  assert (Vars.Sv.subset (fv s) (Vars.to_set s.env.Env.vars))
+
+(*------------------------------------------------------------------*)
 let pp_goal fmt = function
   | Equiv.Atom (Equiv.Equiv e) -> Equiv.pp_equiv_numbered fmt e
   | _  as f -> Equiv.pp fmt f
@@ -317,6 +327,8 @@ let init ~env ~hint_db ?hyp goal =
         snd (H._add ~force:false (H.fresh_id "H" hyps) h hyps)
   in
   let new_sequent = { env; hint_db; hyps; goal } in
+  sanity_check new_sequent;
+
   if Config.post_quantum () then
    check_pq_sound_sequent new_sequent
   else new_sequent
@@ -352,15 +364,6 @@ let get_system_pair_projs t : Term.proj * Term.proj =
 let map f s : sequent =
   let f x = f.Equiv.Babel.call Equiv.Global_t x in
   set_goal (f (goal s)) (Hyps.map f s)
-
-(*------------------------------------------------------------------*)
-let fv s : Vars.Sv.t =
-  let h_vars =
-    Hyps.fold (fun _ f vars ->
-        Vars.Sv.union (Equiv.fv f) vars
-      ) s Vars.Sv.empty
-  in
-  Vars.Sv.union h_vars (Equiv.fv (goal s))
 
 (*------------------------------------------------------------------*)
 module Conc  = Equiv.Smart

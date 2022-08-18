@@ -1,4 +1,3 @@
-
 (* set debugConstr=true. *)
 
 aenc enc,dec,pk

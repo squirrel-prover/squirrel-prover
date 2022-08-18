@@ -42,6 +42,10 @@ module S : sig
     conclusion:Term.term ->
     t
 
+  val fv : t -> Vars.Sv.t
+
+  val sanity_check : t -> unit
+                     
   val update :
     ?env:Env.t ->
     ?hyps:H.hyps ->
@@ -56,12 +60,26 @@ end = struct
     conclusion : Term.term;
   }
 
-  let init_sequent ~env ~hint_db ~conclusion = {
-    env ;
-    hint_db;
-    hyps = H.empty;
-    conclusion;
-  }
+  let fv (s : t) : Vars.Sv.t = 
+    let h_vars = 
+      H.fold (fun _ f vars -> 
+          Vars.Sv.union (Equiv.Any.fv f) vars
+        ) s.hyps Vars.Sv.empty
+    in
+    Vars.Sv.union h_vars (Term.fv s.conclusion)
+
+  let sanity_check s : unit =
+  assert (Vars.Sv.subset (fv s) (Vars.to_set s.env.Env.vars))
+
+  let init_sequent ~env ~hint_db ~conclusion =
+    let s = {
+      env ;
+      hint_db;
+      hyps = H.empty;
+      conclusion; 
+    } in
+    sanity_check s;
+    s
 
   let update ?env ?hyps ?conclusion t =
     let env        = Utils.odflt t.env env
@@ -437,15 +455,6 @@ let get_felem ?loc _ _ = assert false
 let map f s : sequent =
   let f' x = f.Equiv.Babel.call Equiv.Any_t x in
   set_goal (f.Equiv.Babel.call Equiv.Local_t (goal s)) (AnyHyps.map f' s)
-
-(*------------------------------------------------------------------*)
-let fv s : Vars.Sv.t = 
-  let h_vars = 
-    AnyHyps.fold (fun _ f vars -> 
-        Vars.Sv.union (Equiv.Any.fv f) vars
-      ) s Vars.Sv.empty
-  in
-  Vars.Sv.union h_vars (Term.fv (goal s))
 
 (*------------------------------------------------------------------*)
 module Conc = Term.Smart

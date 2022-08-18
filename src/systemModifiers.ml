@@ -483,13 +483,14 @@ let global_cca
     clone_system_map table old_single_system sdecl.Decl.name fmap
   in
 
-  let axiom_name =
-    let old_system_name = Symbols.to_string old_single_system.system in
-    "cca_from_" ^ old_system_name ^ "_to_" ^ Location.unloc sdecl.name
-  in
+  (* Note: the added lemma was bugged, commented out for now. *)
+  (* let axiom_name =
+   *   let old_system_name = Symbols.to_string old_single_system.system in
+   *   "cca_from_" ^ old_system_name ^ "_to_" ^ Location.unloc sdecl.name
+   * in *)
 
   (* we now create the lhs of the obtained conclusion *)
-  let fresh_x_var = Vars.make_fresh Type.Message "mess" in
+  (* let fresh_x_var = Vars.make_fresh Type.Message "mess" in *)
   let rdef =
     let ty_args = List.map Vars.ty is in
     Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args Type.Message ; }
@@ -498,30 +499,30 @@ let global_cca
     Symbols.Name.declare table (L.mk_loc L._dummy "r_CCA") rdef
   in
 
-  let enrich = [Term.mk_var fresh_x_var] in
-  let make_conclusion equiv =
-    let atom =
-      Equiv.Atom (
-        Equiv [ Term.mk_var fresh_x_var;
-                
-                Term.mk_diff
-                  [Term.left_proj, Term.mk_name enc_key;
-                   Term.right_proj, Term.mk_name @@ Term.mk_isymb n Message is];
-                
-               Term.mk_diff
-                 [Term.left_proj, Term.mk_name enc_rnd;
-                  Term.right_proj, Term.mk_name @@ Term.mk_isymb r Message is] ])
-    in
-    let concl = Equiv.Impl (Equiv.mk_forall is atom, equiv) in      
-    Equiv.Global (Equiv.mk_forall [fresh_x_var] concl)
-  in
+  (* let enrich = [Term.mk_var fresh_x_var] in
+   * let make_conclusion equiv =
+   *   let atom =
+   *     Equiv.Atom (
+   *       Equiv [ Term.mk_var fresh_x_var;
+   *               
+   *               Term.mk_diff
+   *                 [Term.left_proj, Term.mk_name enc_key;
+   *                  Term.right_proj, Term.mk_name @@ Term.mk_isymb n Message is];
+   *               
+   *              Term.mk_diff
+   *                [Term.left_proj, Term.mk_name enc_rnd;
+   *                 Term.right_proj, Term.mk_name @@ Term.mk_isymb r Message is] ])
+   *   in
+   *   let concl = Equiv.Impl (Equiv.mk_forall is atom, equiv) in      
+   *   Equiv.Global (Equiv.mk_forall [fresh_x_var] concl)
+   * in *)
 
-  let lemma =
-    mk_equiv_statement
-      table hint_db
-      axiom_name enrich make_conclusion old_new_pair
-  in
-  Some lemma, [], table
+  (* let lemma =
+   *   mk_equiv_statement
+   *     table hint_db
+   *     axiom_name enrich make_conclusion old_new_pair
+   * in *)
+  (* Some lemma *) None, [], table
 
 (*------------------------------------------------------------------*)
 (** {2 Global PRF with time} *)
