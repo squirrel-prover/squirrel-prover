@@ -1398,6 +1398,24 @@ let global_diff_eq (s : ES.t) =
               | t -> t
             ) pred_ts_list 
         in
+
+        (* free vars of [ts_list], minus [fvars] *)
+        let fv_ts_list =
+          let s =
+            List.fold_left (fun sv ts -> 
+                Sv.union sv (Term.fv ts)
+              ) Sv.empty ts_list
+          in
+          Sv.diff s (Sv.of_list fvars)
+        in
+
+        (* add correctly the new free variables in [s] *)
+        let env, _, subst = 
+          Term.refresh_vars_env (ES.vars s) (Sv.elements fv_ts_list)
+        in
+        let ts_list = List.map (Term.subst subst) ts_list in
+        let s = ES.set_vars env s in
+
         (* XXX the expansions that come next are inefficient (and may become
            in incorrect if we allow richer diff operators): s1 and s2 only make
            sense in projected systems, so we should not expand macros wrt s in

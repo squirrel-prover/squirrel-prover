@@ -198,7 +198,7 @@ Proof.
      *)
     + intro *. 
       case  try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-        ++ intro [il jl [_ ->]].
+        ++ intro [?? [_ ->]].
            fa; auto. 
         ++ rewrite tryfind. 
            intro [Abs TFeq].
@@ -206,38 +206,38 @@ Proof.
 
     + intro *.
       case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-        ++ intro [il jl [_ ->]].
+        ++ intro [?? [_ ->]]. 
            fa; auto.
         ++ intro [Abs TFeq].
            use Abs with i,j; auto.
 
     + intro *.
       case  try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-        ++ intro [il jl [_ ->]]. 
+        ++ intro [?? [_ ->]]. 
            fa; auto.
         ++ intro [Abs TFeq].
            use Abs with i,j; auto.
 
     + intro *.
       case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
-        ++ intro [il jl [[_ _ _] ->]]. 
+        ++ intro [?? [[_ _ _] ->]]. 
            case try find il0,jl0 such that _  in Ininr(il0,jl0) else _.
              +++ auto. 
              +++ intro [Abs TFeq2].
                  use Abs with i,j; auto.
         ++ intro [Abs TFeq].
            case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
-             +++ intro [il jl [_ TFeq2]]. 
+             +++ intro [?? [_ TFeq2]]. 
                  use Abs with i,j.
                  auto.
              +++ intro [Abs2 TFeq2].
                  case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-                   - intro [il jl [_ _]]. 
+                   - intro [?? [_ _]]. 
                      use Abs with i,j.
                      auto.
                    - intro [Abs3 TFeq3].
                      case try find il,jl such that _ in IgarbR(il,jl) else _.
-                       -- intro [il jl [_ ->]]. 
+                       -- intro [?? [_ ->]]. 
                           auto.
                        -- intro [[Abs4] TFeq4].
                           use Abs4 with i,j.
@@ -245,33 +245,33 @@ Proof.
 
     + intro *.
       case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
-        ++ intro [il jl [[_ _ _] ->]]. 
+        ++ intro [?? [[_ _ _] ->]]. 
            case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
              +++ auto. 
              +++ intro [Abs _]. 
                  use Abs with i,j.
                  auto.
         ++ case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
-             +++ intro [il jl [_ ->]]. 
+             +++ intro [?? [_ ->]]. 
                  intro [Abs _].
                  use Abs with i,j.
                  auto.
              +++ intro [Abs _].
                  intro [Abs2 _].
                  case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-                   - intro [il jl [_ ->]]. 
+                   - intro [?? [_ ->]]. 
                      use Abs with i,j; auto.
                    - case try find il,jl such that _ in IgarbR(il,jl) else _.
-                       -- intro [il jl [_ ->]]. 
+                       -- intro [?? [_ ->]]. 
                           auto.
                        -- intro [Abs3 _].
                           use Abs3 with i,j; auto.
 
     + intro *.
       case try find il,jl such that _ in IgarbR(il,jl) else _.
-        ++ intro [il jl [[_ _ _] ->]]. 
+        ++ intro [?? [[_ _ _] ->]]. 
            case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
-             +++ intro [il jl [[_ _ _] ->]]. 
+             +++ intro [?? [[_ _ _] ->]]. 
                  case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
                    - auto. 
                    - intro [Abs _].
@@ -279,11 +279,11 @@ Proof.
 
              +++ intro [Abs _].
                  case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
-                   - intro [il jl [_ ->]]. 
+                   - intro [?? [_ ->]]. 
                      use Abs with i,j; auto.
                    - intro [Abs2 _].
                      case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-                       -- intro [il jl [_ ->]]. 
+                       -- intro [?? [_ ->]]. 
                           use Abs2 with i,j; auto.
                        -- intro [Abs3 _]; auto.
         ++ intro [Abs _].
@@ -370,7 +370,7 @@ Proof.
        in h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,Ininr(j,i))
        else h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,IgarbI(j,i)).
     + (* Case 1 -> honnest skeyid *)
-      intro [il jl [[A [_ _]] B]].
+      intro [?? [[A [_ _]] B]].
       rewrite B in Cond.
       destruct Cond as [EUF _].
       euf EUF.
@@ -782,7 +782,7 @@ Proof.
     + intro *.
       use helper_wa4 with i,j; try auto.
       case  try find il,jl such that _ in idealkeys(il,jl) else _.
-        - intro [il jl [[Exp [_ _]] ->]].
+        - intro [?? [[Exp [_ _]] ->]].
           case try find il0,jl0 such that _ in idealkeys(i,j) else _.
           auto.
           intro [Abs _].
@@ -800,7 +800,7 @@ Proof.
       case try find il,jl such that _
          in idealkeys(il,jl)
          else _.
-      intro [il jl [[_ [_ _]] ->]].
+      intro [?? [[_ [_ _]] ->]].
       by use ddhnotuple1 with  fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>, exp(g,a(i)),b(j).
       intro _.
       by fa.
@@ -837,7 +837,7 @@ Proof.
        in
          _
        else  h(exp(fst(att(frame@pred(R(j,i)))),b(j)),IgarbR(j,i)).
-        - intro [il jl [[_ _ _] ->]].
+        - intro [?? [[_ _ _] ->]].
           case (try find il,jl such that _
            in idealkeys(il,jl) else _).
           ** auto. 
