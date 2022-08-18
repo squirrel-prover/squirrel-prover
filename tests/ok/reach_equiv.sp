@@ -1,5 +1,3 @@
-set autoIntro = false.
-
 name s0 : message.
 mutable s : message = s0.
 channel c.
