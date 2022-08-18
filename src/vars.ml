@@ -22,17 +22,19 @@ let norm_ty (env : Type.Infer.env) (v : var) : var =
 let tsubst s v = { v with ty = Type.tsubst s v.ty }
 
 (*------------------------------------------------------------------*)
-let pp_dbg ppf v = 
-  Fmt.pf ppf "%s%d" (name v) (hash v)
+(** {2 Pretty-printing} *)
 
-let pp ppf v = 
-  Fmt.pf ppf "%s" (name v)
+let _pp ~dbg ppf v = 
+  if dbg then
+    Fmt.pf ppf "%s/%d" (name v) (hash v)
+  else
+    Fmt.pf ppf "%s" (name v)
 
-let pp_list ppf l =
+let _pp_list ~dbg ppf l =
   Fmt.pf ppf "@[<hov>%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") pp) l
+    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") (_pp ~dbg)) l
 
-let pp_typed_list ppf (vars : var list) =
+let _pp_typed_list ~dbg ppf (vars : var list) =
   let rec aux cur_vars cur_type = function
     | v::vs when v.ty = cur_type ->
         aux (v :: cur_vars) cur_type vs
@@ -40,7 +42,7 @@ let pp_typed_list ppf (vars : var list) =
         if cur_vars <> [] then begin
           Fmt.list
             ~sep:(fun fmt () -> Fmt.pf fmt ",")
-            pp ppf (List.rev cur_vars) ;
+            (_pp ~dbg) ppf (List.rev cur_vars) ;
           Fmt.pf ppf ":%a" Type.pp cur_type ;
           if vs <> [] then Fmt.pf ppf ",@,"
         end ;
@@ -49,6 +51,20 @@ let pp_typed_list ppf (vars : var list) =
           | v :: vs -> aux [v] v.ty vs
   in
   aux [] Type.Message vars
+
+(*------------------------------------------------------------------*)
+(** Exported *)
+let pp            = _pp            ~dbg:false
+let pp_list       = _pp_list       ~dbg:false
+let pp_typed_list = _pp_typed_list ~dbg:false
+
+(*------------------------------------------------------------------*)
+(** {2 Debug printing} *)
+
+(** Exported *)
+let pp_dbg            = _pp            ~dbg:true
+let pp_list_dbg       = _pp_list       ~dbg:true
+let pp_typed_list_dbg = _pp_typed_list ~dbg:true
 
 
 (*------------------------------------------------------------------*)

@@ -884,10 +884,9 @@ let autosubst s =
 
       let () = dbg "subst %a by %a" Vars.pp x Vars.pp y in
 
-      let s =
-        TS.set_vars (Vars.rm_var x (TS.vars s)) s
-      in
-      TS.subst [Term.ESubst (Term.mk_var x, Term.mk_var y)] s
+      let s = TS.subst [Term.ESubst (Term.mk_var x, Term.mk_var y)] s in
+      TS.set_vars (Vars.rm_var x (TS.vars s)) s
+
   in
   [process x y]
 
@@ -1409,7 +1408,9 @@ let euf_apply_schema
     SystemExpr.action_to_term table system case.action
   in
  let ts_list =
-    let iter = new Fresh.get_actions ~cntxt:(TS.mk_trace_cntxt sequent) in
+    let iter = 
+      new Fresh.deprecated_get_actions ~cntxt:(TS.mk_trace_cntxt sequent) 
+    in
     List.iter iter#visit_message [s; m];
     iter#get_actions
   in
@@ -1585,7 +1586,7 @@ exception Name_not_hidden
 class name_under_enc (cntxt:Constr.trace_cntxt) enc is_pk target_n key_n
   = object (self)
 
- inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
+ inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
 
  method visit_message t =
     match t with

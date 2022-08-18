@@ -168,7 +168,7 @@ let global_rename
   let cntxt =
     Constr.make_context ~table ~system:(SE.singleton old_single_system)
   in
-  let iter = new Fresh.find_name ~cntxt true ns2.s_symb in
+  let iter = new Fresh.deprecated_find_name ~cntxt true ns2.s_symb in
   let () =
     try
       SystemExpr.iter_descrs

@@ -6,44 +6,48 @@ open Utils
 exception Bad_ssc_
 
 (** Iterate on terms, raise Bad_ssc if the hash key occurs other than
-  * in key position or if a message variable is used.
-  *
-  * We use the inexact version of [iter_approx_macros]: it allows
-  * some macros to be undefined, though such instaces will not be
-  * supported when collecting hashes; more importantly, it avoids
-  * inspecting each of the multiple expansions of a same macro. *)
+    in key position or if a message variable is used.
+  
+    We use the inexact version of [deprecated_iter_approx_macros]: it allows
+    some macros to be undefined, though such instaces will not be
+    supported when collecting hashes; more importantly, it avoids
+    inspecting each of the multiple expansions of a same macro. *)
 class check_key
     ~allow_functions
     ~cntxt head_fn key_n = object (self)
-                                  
-  inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
-    
+
+  inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
+
   method visit_message t = match t with
     | Term.Fun ((fn,_), _, [m;Term.Name _]) when fn = head_fn ->
       self#visit_message m
-        
+
     | Term.Fun ((fn,_), _, [m1;m2;Term.Name _]) when fn = head_fn ->
       self#visit_message m1; self#visit_message m2
-        
+
     | Term.Fun ((fn,_), _, [k])
     | Term.Fun ((fn,_), _, [_;k])
       when allow_functions fn && Term.diff_names k -> ()
-                                 
+
     | Term.Name n when n.s_symb = key_n -> raise Bad_ssc_
-                                             
+
     | Term.Var m -> 
       let ty = Vars.ty m in
       if ty <> Type.tindex && ty <> Type.ttimestamp then
         raise Bad_ssc_;
-          
+
     | _ -> super#visit_message t
 end
 
 (** Collect occurences of some function and key,
-  * as in [Iter.get_f_messages] but ignoring boolean terms,
-  * cf. Koutsos' PhD. *)
-class get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n = object (self)
-  inherit Iter.get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n as super
+    as in [Iter.deprecated_get_f_messages] but ignoring boolean terms,
+    cf. Koutsos' PhD. *)
+class deprecated_get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n = 
+  object (self)
+
+  inherit Iter.deprecated_get_f_messages
+      ~fun_wrap_key ~drop_head ~cntxt head_fn key_n as super
+
   method visit_message t =
     if Term.ty t = Type.Boolean then () else super#visit_message t
 end
@@ -239,7 +243,8 @@ let mk_rule ~elems ~drop_head ~fun_wrap_key
          * in *)
 
         let iter =
-          new get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n
+          new deprecated_get_f_messages
+            ~fun_wrap_key ~drop_head ~cntxt head_fn key_n
         in
         iter#visit_message t;
         let new_hashes = iter#get_occurrences in
@@ -274,7 +279,8 @@ let mk_rule ~elems ~drop_head ~fun_wrap_key
   let cases_direct =
     let hashes =
       let iter =
-        new get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n
+        new deprecated_get_f_messages
+          ~fun_wrap_key ~drop_head ~cntxt head_fn key_n
       in
       iter#visit_message mess ;
       iter#visit_message sign ;

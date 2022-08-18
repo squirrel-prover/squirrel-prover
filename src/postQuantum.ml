@@ -15,7 +15,7 @@ module Stt = Set.Make (Tt)
 class collect_max_ts ~(cntxt:Constr.trace_cntxt) = object (self)
   (* We fold over the terms, collecting all the timestamps, and maintaining a
      list of timestamps that are smaller than another timestamp. *)
-  inherit [Sts.t * Sts.t] Iter.fold ~cntxt as super
+  inherit [Sts.t * Sts.t] Iter.deprecated_fold ~cntxt as super
 
   method extract_ts_atoms phi =
     List.partition (fun t ->
@@ -76,7 +76,7 @@ end
 class collect_macros ~(cntxt:Constr.trace_cntxt) = object (self)
   (* We fold over the terms, collecting all the timestamps, and maintaining a
      list of timestamps that are smaller than another timestamp. *)
-  inherit [Stt.t] Iter.fold ~cntxt as super
+  inherit [Stt.t] Iter.deprecated_fold ~cntxt as super
 
   (* We collect all the macro  occuring inside terms, that are not under
      a diff. *)
@@ -91,7 +91,7 @@ end
 class check_att ~(cntxt:Constr.trace_cntxt) = object (self)
   (* We fold over the terms, collecting all the timestamps, and maintaining a
      list of timestamps that are smaller than another timestamp. *)
-  inherit [bool] Iter.fold ~cntxt as super
+  inherit [bool] Iter.deprecated_fold ~cntxt as super
 
   (* We collect all the macro timestamps occuring inside terms, that are not
      explitely smaller than other timestamps. *)
@@ -100,11 +100,12 @@ class check_att ~(cntxt:Constr.trace_cntxt) = object (self)
       ms = Term.frame_macro
     | Fun ((sf,_), _, _) when sf = Symbols.fs_att -> false
     | Macro (ms,l,a) ->
-      if l<>[] then failwith "Not implemented" ;
-      (match Macros.get_definition cntxt ms a with
+      assert (l = []);
+      begin
+        match Macros.get_definition cntxt ms a with
         | `Undef | `MaybeDef -> true
         | `Def t -> super#fold_message aux t
-      )
+      end
     | _ -> super#fold_message aux t
 end
 

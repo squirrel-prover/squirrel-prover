@@ -687,7 +687,7 @@ exception Not_FADUP_iter
 
 class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
 
-  inherit [Term.term list] Iter.fold ~cntxt as super
+  inherit [Term.term list] Iter.deprecated_fold ~cntxt as super
 
   method check_formula f = ignore (self#fold_message [Term.mk_pred tau] f)
  
@@ -1385,7 +1385,7 @@ let global_diff_eq (s : ES.t) =
           t.Iter.occ_vars @ Vars.Sv.elements (Term.fv subterm)
         in
         let pred_ts_list =
-          let iter = new Fresh.get_actions ~cntxt in
+          let iter = new Fresh.deprecated_get_actions ~cntxt in
           iter#visit_message subterm;
           iter#visit_message cond;
           iter#get_actions
@@ -2236,7 +2236,7 @@ class ddh_context
     ~(cntxt:Constr.trace_cntxt) ~gen ~exp ~l_proj ~r_proj exact a b c
   = object (self)
 
- inherit Iter.iter_approx_macros ~exact ~cntxt as super
+ inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
 
   method visit_macro ms a =
     match Symbols.Macro.get_def ms.s_symb cntxt.table with
@@ -2278,7 +2278,7 @@ end
 exception Macro_found
 
 class find_macros ~(cntxt:Constr.trace_cntxt) exact = object (self)
- inherit Iter.iter_approx_macros ~exact ~cntxt as super
+ inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
 
   method visit_macro ms a =
     match Symbols.Macro.get_def ms.s_symb cntxt.table with

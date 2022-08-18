@@ -20,8 +20,9 @@ exception Var_found
 exception Not_name
 
 (*------------------------------------------------------------------*)
-class find_name ~(cntxt:Constr.trace_cntxt) exact name = object (self)
-  inherit Iter.iter_approx_macros ~exact ~cntxt as super
+(** Deprecated. *)
+class deprecated_find_name ~(cntxt:Constr.trace_cntxt) exact name = object (self)
+  inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
 
   method visit_message t = match t with
     | Term.Name ns -> if ns.s_symb = name then raise Name_found
@@ -31,23 +32,9 @@ class find_name ~(cntxt:Constr.trace_cntxt) exact name = object (self)
     | _ -> super#visit_message t
 end
 
-class get_name_indices ~(cntxt:Constr.trace_cntxt) exact name = object (self)
-  inherit Iter.iter_approx_macros ~exact ~cntxt as super
-
-  val mutable indices : (Vars.var list) list = []
-  method get_indices = List.sort_uniq Stdlib.compare indices
-
-  method visit_message t = match t with
-    | Term.Name ns ->
-      if ns.s_symb = name then indices <- ns.s_indices :: indices
-
-    | Term.Var m -> raise Var_found
-
-    | _ -> super#visit_message t
-end
-
-class get_actions ~(cntxt:Constr.trace_cntxt) = object (self)
-  inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
+(** Deprecated, use [get_actions_ext]. *)
+class deprecated_get_actions ~(cntxt:Constr.trace_cntxt) = object (self)
+  inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
 
   val mutable actions : Term.term list = []
   method get_actions = actions

@@ -1,5 +1,20 @@
 (** Basic module for variables, providing local environments to store
-    variables. *)
+    variables. 
+
+    A variable is built upon a string (used for printing) and an integer 
+    identifier. This allows to have several different variables with the
+    same string. 
+    - in user-level terms (e.g. in a sequent), there should be only one 
+      free variable associated with a given string (since the identifier 
+      is not printing). 
+      Note that bound variables can safely re-use a string. E.g. if `x/0` 
+      is a variable with string `x` and identifier `0`, then the formula:
+        `forall (x/1 : int), x/0 = x/1`
+      will be correctly printed to the user (the term pretty-printer 
+      takes care of renaming `x/1` into some variable `x1/???`).
+    - internal intermediate terms (e.g. during matching) can safely have 
+      several variables with the same string. This allows to easily 
+      refresh variables (to avoid capture issues). *)
 
 open Utils
 
@@ -12,10 +27,7 @@ type var
 type vars = var list
 
 (*------------------------------------------------------------------*)
-(** {2 Pretty-Printing} *)
-  
-(** Print a variable name and identifier. *)
-val pp_dbg : Format.formatter -> var -> unit
+(** {2 Pretty-printing} *)
 
 (** Print a variable, only showing its name. *)
 val pp : Format.formatter -> var -> unit
@@ -25,6 +37,18 @@ val pp_list : Format.formatter -> var list -> unit
 
 (** Print a list of variables, showing their names and sorts. *)
 val pp_typed_list : Format.formatter -> var list -> unit
+
+(*------------------------------------------------------------------*)
+(** {2 Debug printing} *)
+  
+(** Debug version of [pp]: also print the identifier. *)
+val pp_dbg : Format.formatter -> var -> unit
+
+(** Debug version of [pp_list]: also print the identifier. *)
+val pp_list_dbg : Format.formatter -> var list -> unit
+
+(** Debug version of [pp_typed_list_dbg]: also print the identifier. *)
+val pp_typed_list_dbg : Format.formatter -> var list -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Functions on variables} *)
