@@ -281,7 +281,7 @@ module Form = struct
     (* Get a normalized trace literal. *)
     let rec doit (lit : Term.literal) : form list = match lit with
       | `Neg, `Happens t -> [Lit (`Eq,  uts t, uundef)]
-      | `Pos, `Happens t -> [Lit (`Neq, uts t, uundef)]
+      | `Pos, `Happens t -> [Lit (`Neq, uts t, uundef); Lit (`Leq, uinit, uts t)]
 
       | `Pos, (`Comp ((_, t, _) as atom)) -> _mk atom
 
