@@ -97,6 +97,10 @@ module Mv : Map.S with type key = var
 (** Local environment containg a set of variables of arbitrary sorts. *)
 type env
 
+(** Well-formedness check for **toplevel** environment.
+    Check that each string corresponds to at most one variable. *)
+val sanity_check : env -> unit
+
 val hash_env : env -> int
 
 (** Print an environment, showing variables names and sorts. *)

@@ -29,7 +29,7 @@ val init :
     It does not display hypotheses, which might be misleading. *)
 val pp_init : Format.formatter -> t -> unit
 
-(** Free variables sanity check *)
+(** Free variables + var env **toplevel** sanity check *)
 val sanity_check : t -> unit
 
 (*------------------------------------------------------------------*)

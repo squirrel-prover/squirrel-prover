@@ -129,6 +129,9 @@ let to_list (env : env) : var list =
 
 let to_set (env : env) : Sv.t = Sv.of_list (to_list env)
 
+let sanity_check (e : env) = 
+  assert (M.for_all (fun _ l -> List.length l = 1) e)
+
 (*------------------------------------------------------------------*)
 let _pp_env ~dbg ppf e =
   _pp_typed_list ~dbg ppf (to_list e)

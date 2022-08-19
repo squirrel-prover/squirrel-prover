@@ -24,7 +24,7 @@ val init :
   Term.term ->
   sequent
   
-(** Free variables sanity check *)
+(** Free variables + var env **toplevel** sanity check *)
 val sanity_check : trace_sequent -> unit
 
 (** Project diff-operators occurring in a sequent;

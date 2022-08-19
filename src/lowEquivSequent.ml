@@ -64,6 +64,7 @@ let fv (s : t) : Vars.Sv.t =
   Vars.Sv.union h_vars (Equiv.fv s.goal)
 
 let sanity_check (s : t) : unit =
+  Vars.sanity_check s.env.Env.vars;
   assert (Vars.Sv.subset (fv s) (Vars.to_set s.env.Env.vars))
 
 (*------------------------------------------------------------------*)
