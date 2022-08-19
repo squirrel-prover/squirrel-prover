@@ -25,29 +25,29 @@ goal lastupdate_pure : forall tau:timestamp,
     (exists i:index, happens(A(i)) && A(i) <=tau &&
      forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i))).
 Proof.
-induction.
-intro tau IH Hp.
-case tau.
-
-(* init *)
-intro Eq; left; intro j Hpj; by auto.
-
-(* O(i) *)
-intro [i Eq]; subst tau, O(i); use IH with pred(O(i)) => //.
-destruct H as [H1 | [i0 H2]].
-left; intro j Hpj; by use H1 with j => //.
-right; exists i0; repeat split =>//.
-destruct H2 as [H21 H22 H23].
-intro j [Hpj Ord].
-case (A(j) <= pred( O(i))) => //.
-use H23 with j => //.
-
-(* A(i) *)
-intro [i Eq]; subst tau, A(i); use IH with pred(A(i)) => //.
-destruct H as [H1 | [i0 H2]];
-try (right;
-exists i;
-repeat split => //).
+  induction.
+  intro tau IH Hp.
+  case tau.
+  
+  (* init *)
+  - intro Eq; left; intro j Hpj; by auto.
+  
+    (* O(i) *)
+  - intro [i Eq]; subst tau, O(i); use IH with pred(O(i)) => //.
+    destruct H as [H1 | [i0 H2]].
+    left; intro j Hpj; by use H1 with j => //.
+    right; exists i0; repeat split =>//.
+    destruct H2 as [H21 H22 H23].
+    intro j [Hpj Ord].
+    case (A(j) <= pred( O(i))) => //.
+    use H23 with j => //.
+    
+    (* A(i) *)
+  - intro [i Eq]; subst tau, A(i); use IH with pred(A(i)) => //.
+    destruct H as [H1 | [i0 H2]];
+    try (right;
+    exists i;
+    repeat split => //).
 Qed.
 
 
@@ -60,14 +60,14 @@ Proof.
   induction => tau IH _ Htau.
   case tau.
 
-  auto.
+  - auto.
 
-  intro [i Hi]; rewrite Hi in *; expand s@O(i).
-  apply IH => //.
-  intro j Hp; by use Htau with j.
-
-  intro [i Hi]; rewrite Hi in *.
-  by use Htau with i.
+  - intro [i Hi]; rewrite Hi in *; expand s@O(i).
+    apply IH => //.
+    intro j Hp; by use Htau with j.
+    
+  - intro [i Hi]; rewrite Hi in *.
+    by use Htau with i.
 Qed.
 
 goal lastupdate_A :
@@ -81,14 +81,14 @@ Proof.
 
   case tau.
 
-  intro H; rewrite H in Hinf; auto.
-
-  intro [j Hj]; rewrite Hj in *; expand s@O(j).
-  apply IH => //=.
-  intro k Hk; by use Hsup with k.
-
-  intro [j Hj]; rewrite Hj in *.
-  assert i=j; [2: auto | 1: by use Hsup with j].
+  - intro H; rewrite H in Hinf; auto.
+    
+  - intro [j Hj]; rewrite Hj in *; expand s@O(j).
+    apply IH => //=.
+    intro k Hk; by use Hsup with k.
+    
+  - intro [j Hj]; rewrite Hj in *.
+    assert i=j; [2: auto | 1: by use Hsup with j].
 Qed.
 
 goal lastupdate :
@@ -143,48 +143,48 @@ Proof.
   induction tau => tau' Htau Htau'.
 
   (* Init *)
-  expand frame@init.
-  use lastupdate_pure with tau' as [Hinit | [i HA]].
-
-  + use lastupdate_init with tau' as H; try auto. 
-    rewrite H; expand s@init; fresh 0; auto.
-
-  + use lastupdate_A with tau',i as H; try auto.
-    rewrite H in *; expand s@A(i).
-    prf 0; rewrite if_true; [2: by fresh 0].
-    intro /= i' HAi'.
-    use non_repeating with pred(A(i)),pred(A(i')) => //.
-    by exists i'.
-
-  + by assumption.
+  - expand frame@init.
+    use lastupdate_pure with tau' as [Hinit | [i HA]].
+    
+    + use lastupdate_init with tau' as H; try auto. 
+      rewrite H; expand s@init; fresh 0; auto.
+    
+    + use lastupdate_A with tau',i as H; try auto.
+      rewrite H in *; expand s@A(i).
+      prf 0; rewrite if_true; [2: by fresh 0].
+      intro /= i' HAi'.
+      use non_repeating with pred(A(i)),pred(A(i')) => //.
+      by exists i'.
+    
+    + by assumption.
 
   (* Oracle *)
-  expand frame, output, exec, cond.
-  fa 0. fa 1. fa 1. fa 1.
-  prf 1; rewrite if_true /=.
-  + split; project; intro i' H; try destruct H as [H|H];
-    try by apply unique_queries.
-    rewrite equiv IH (pred(A(i'))) => //.
-      intro Hf; by fresh Hf.
-    rewrite equiv IH (pred(A(i'))) => // Hf; by fresh Hf.
-    rewrite equiv IH (pred(A(i'))) => // Hf; by fresh Hf.
-
-  + fresh 1.
+  - expand frame, output, exec, cond.
+    fa 0. fa 1. fa 1. fa 1.
     prf 1; rewrite if_true /=.
-    - split; project; intro i' H; try destruct H as [H|H];
+    + split; project; intro i' H; try destruct H as [H|H];
       try by apply unique_queries.
-      rewrite equiv IH (A(i')) => // Hf; by fresh Hf.
-      rewrite equiv IH (A(i')) => // Hf; by fresh Hf.
-
-    - by fresh 1; apply IH.
-
-  (* Tag *)
-  expand frame, exec, cond, output.
-  fa 0. fa 1. fa 1.
-  prf 1; rewrite if_true /=; 2: fresh 1; by apply IH.
+      rewrite equiv IH (pred(A(i'))) => //.
+        intro Hf; by fresh Hf.
+      rewrite equiv IH (pred(A(i'))) => // Hf; by fresh Hf.
+      rewrite equiv IH (pred(A(i'))) => // Hf; by fresh Hf.
+    
+    + fresh 1.
+      prf 1; rewrite if_true /=.
+      * split; project; intro i' H; try destruct H as [H|H];
+        try by apply unique_queries.
+        rewrite equiv IH (A(i')) => // Hf; by fresh Hf.
+        rewrite equiv IH (A(i')) => // Hf; by fresh Hf.
+    
+      * by fresh 1; apply IH.
+    
+    (* Tag *)
+  - expand frame, exec, cond, output.
+    fa 0. fa 1. fa 1.
+    prf 1; rewrite if_true /=; 2: fresh 1; by apply IH.
     split; project; intro i' H; try destruct H as [H|H].
-    rewrite equiv IH (A(i)) => // Hf; by fresh Hf.
-    rewrite equiv IH (A(i)) => // Hf; by fresh Hf.
-    use non_repeating with A(i),A(i') => //; by exists i.
-    use non_repeating with A(i),A(i') => //; by exists i.
+    * rewrite equiv IH (A(i)) => // Hf; by fresh Hf.
+    * rewrite equiv IH (A(i)) => // Hf; by fresh Hf.
+    * use non_repeating with A(i),A(i') => //; by exists i.
+    * use non_repeating with A(i),A(i') => //; by exists i.
 Qed.

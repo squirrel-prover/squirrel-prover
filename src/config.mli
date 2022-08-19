@@ -61,4 +61,4 @@ val post_quantum : unit -> bool
 (*------------------------------------------------------------------*)
 (** {2  set functions} *)
 
-val set_param : p_set_param -> unit
+val set_param : p_set_param -> [`Failed of string | `Success]

@@ -1,7 +1,7 @@
-
-
 channel c
-abstract ok:message
+
+abstract ok:message.
+
 system ((A:out(c,ok))|(B: !_i out(c,ok))).
 
 goal _ (t:timestamp,tau:timestamp): t <= pred(t) => t = init.
@@ -27,6 +27,12 @@ Qed.
 goal _: happens (A) => pred(A) <> init.
 Proof. 
  checkfail auto exn GoalNotClosed. 
+Abort.
+
+set debugConstr=true.
+goal _: happens (A) => init < A => pred(A) <> init.
+Proof. 
+  checkfail auto exn GoalNotClosed.
 Abort.
 
 (* True thanks to the property of trace models:
