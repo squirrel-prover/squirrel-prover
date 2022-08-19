@@ -341,7 +341,8 @@ let do_tactic (state : main_state) l : main_state =
            | `Tactic utac  -> Prover.eval_tactic utac)
         l
     with
-      | e -> ignore (Prover.reset_from_state prover_state) ; raise e
+      | e -> 
+        ignore (Prover.reset_from_state prover_state) ; raise e
     end ;
     if Prover.is_proof_completed () then begin
       Printer.prt `Goal "Goal %s is proved"

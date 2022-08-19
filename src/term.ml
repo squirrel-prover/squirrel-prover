@@ -46,31 +46,41 @@ type state = msymb
 (*------------------------------------------------------------------*)
 let pp_name ppf s = (Printer.kws `GoalName) ppf (Symbols.to_string s)
 
-let pp_nsymb ppf (ns : nsymb) =
+(*------------------------------------------------------------------*)
+let _pp_nsymb ~dbg ppf (ns : nsymb) =
   if ns.s_indices <> []
-  then Fmt.pf ppf "%a(%a)" pp_name ns.s_symb Vars.pp_list ns.s_indices
+  then Fmt.pf ppf "%a(%a)" pp_name ns.s_symb (Vars._pp_list ~dbg) ns.s_indices
   else Fmt.pf ppf "%a" pp_name ns.s_symb
 
-let pp_nsymbs ppf (l : nsymb list) =
+let _pp_nsymbs ~dbg ppf (l : nsymb list) =
   Fmt.pf ppf "@[<hov>%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ", ") pp_nsymb) l
+    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ", ") (_pp_nsymb ~dbg)) l
 
+let pp_nsymb  = _pp_nsymb  ~dbg:false
+let pp_nsymbs = _pp_nsymbs ~dbg:false
+
+(*------------------------------------------------------------------*)
 let pp_fname ppf s = (Printer.kws `GoalFunction) ppf (Symbols.to_string s)
 
-let pp_fsymb ppf (fn,is) = match is with
+let _pp_fsymb ~dbg ppf (fn,is) = match is with
   | [] -> Fmt.pf ppf "%a" pp_fname fn
-  | _ -> Fmt.pf ppf "%a(%a)" pp_fname fn Vars.pp_list is
+  | _ -> Fmt.pf ppf "%a(%a)" pp_fname fn (Vars._pp_list ~dbg) is
 
+let pp_fsymb = _pp_fsymb ~dbg:false
+
+(*------------------------------------------------------------------*)
 let pp_mname_s ppf s =
   (Printer.kws `GoalMacro) ppf s
 
 let pp_mname ppf s =
   pp_mname_s ppf (Symbols.to_string s)
 
-let pp_msymb ppf (ms : msymb) =
+let _pp_msymb ~dbg ppf (ms : msymb) =
   Fmt.pf ppf "%a%a"
     pp_mname ms.s_symb
-    (Utils.pp_ne_list "(%a)" Vars.pp_list) ms.s_indices
+    (Utils.pp_ne_list "(%a)" (Vars._pp_list ~dbg)) ms.s_indices
+
+let pp_msymb = _pp_msymb ~dbg:false
 
 (*------------------------------------------------------------------*)
 (** {2 Atoms and terms} *)
@@ -970,8 +980,8 @@ let subst_projs (s : (proj * proj) list) (t : term) : term =
 
 (*------------------------------------------------------------------*)
 (** {2 Printing} *)
-let pp_indices ppf l =
-  if l <> [] then Fmt.pf ppf "(%a)" Vars.pp_list l
+let _pp_indices ~dbg ppf l =
+  if l <> [] then Fmt.pf ppf "(%a)" (Vars._pp_list ~dbg) l
 
 let pp_ord ppf = function
   | `Eq -> Fmt.pf ppf "="
@@ -991,12 +1001,12 @@ let rec is_and_happens = function
 (** Additional printing information *)
 type pp_info = {
   styler : pp_info -> term -> Printer.keyword option * pp_info;
-  var_names : string Mv.t;
+  dbg : bool;
 }
 
 let default_pp_info = {
   styler = (fun info _ -> None, info);
-  var_names = Mv.empty;
+  dbg = false;
 }
 
 
@@ -1071,7 +1081,7 @@ and _pp
   let pp = pp info in
 
   match t with
-  | Var m -> Fmt.pf ppf "%a" Vars.pp m
+  | Var m -> Fmt.pf ppf "%a" (Vars._pp ~dbg:info.dbg) m
 
   | Fun (s,_,[a]) when s = f_happens -> pp_happens info ppf [a]
 
@@ -1142,31 +1152,33 @@ and _pp
   (* arity one *)
   | Fun (f,_,[a]) ->
     Fmt.pf ppf "@[<hov 2>%a(@,%a)@]"
-      pp_fsymb f
+      (_pp_fsymb ~dbg:info.dbg) f
       (pp (fun_fixity, `NonAssoc)) a
 
   (* function symbol, general case *)
   | Fun (f,_,terms) ->
     Fmt.pf ppf "@[<hov 2>%a(%a)@]"
-      pp_fsymb f
+      (_pp_fsymb ~dbg:info.dbg) f
       (Utils.pp_ne_list
          "%a"
          (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,")
             (pp (fun_fixity, `NonAssoc))))
       terms
 
-  | Name n -> pp_nsymb ppf n
+  | Name n -> _pp_nsymb ~dbg:info.dbg ppf n
 
   | Macro (m, l, ts) ->
     Fmt.pf ppf "@[%a%a@%a@]"
-      pp_msymb m
+      (_pp_msymb ~dbg:info.dbg) m
       (Utils.pp_ne_list
          "(@[<hov>%a@])"
          (Fmt.list ~sep:Fmt.comma (pp (macro_fixity, `NonAssoc)))) l
       (pp (macro_fixity, `NonAssoc)) ts
 
   | Action (symb,indices) ->
-    Printer.kw `GoalAction ppf "%s%a" (Symbols.to_string symb) pp_indices indices
+    Printer.kw `GoalAction ppf "%s%a" 
+      (Symbols.to_string symb)
+      (_pp_indices ~dbg:info.dbg) indices
 
   | Diff (Explicit l) ->
     Fmt.pf ppf "@[<hov 2>diff(@,%a)@]"
@@ -1182,7 +1194,7 @@ and _pp
     let b = subst s b in
 
     Fmt.pf ppf "@[<hov 2>seq(%a->@,%a)@]"
-      Vars.pp_typed_list vs (pp (seq_fixity, `NonAssoc)) b
+      (Vars._pp_typed_list ~dbg:info.dbg) vs (pp (seq_fixity, `NonAssoc)) b
 
   | Find (vs, c, d, Fun (f,_,[])) when f = f_zero ->
     let _, vs, s = (* rename quantified vars. to avoid name clashes *)
@@ -1195,7 +1207,7 @@ and _pp
       Fmt.pf ppf "@[<hv 0>\
                   @[<hov 2>try find %a such that@ %a@]@;<1 0>\
                   @[<hov 2>in@ %a@]@]"
-        Vars.pp_typed_list vs
+        (Vars._pp_typed_list ~dbg:info.dbg) vs
         (pp (find_fixity, `NonAssoc)) c
         (pp (find_fixity, `Right)) d
     in
@@ -1213,7 +1225,7 @@ and _pp
                   @[<hov 2>try find %a such that@ %a@]@;<1 0>\
                   @[<hov 2>in@ %a@]@;<1 0>\
                   %a@]"
-        Vars.pp_typed_list vs
+        (Vars._pp_typed_list ~dbg:info.dbg) vs
         (pp (find_fixity, `NonAssoc)) c
         (pp (find_fixity, `NonAssoc)) d
         (pp_chained_find info)        e (* prints the [else] *)
@@ -1237,7 +1249,7 @@ and _pp
     let pp fmt () =
       Fmt.pf ppf "@[<2>%s (@[%a@]),@ %a@]"
         quant_string
-        Vars.pp_typed_list vs
+        (Vars._pp_typed_list ~dbg:info.dbg) vs
         (pp (quant_fixity, `Right)) b
     in
     maybe_paren ~outer ~side ~inner:(fst quant_fixity, `Prefix) pp ppf ()
@@ -1260,7 +1272,7 @@ and pp_chained_find info ppf (t : term) =
     Fmt.pf ppf "@[<hov 2>else try find %a such that@ %a@]@;<1 0>\
                 @[<hov 2>in@ %a@]@;<1 0>\
                 %a"
-      Vars.pp_typed_list b
+      (Vars._pp_typed_list ~dbg:info.dbg) b
       (pp info (find_fixity, `NonAssoc)) c
       (pp info (find_fixity, `NonAssoc)) d
       (pp_chained_find info)             e
@@ -1285,18 +1297,24 @@ and pp_and_happens info ppf f =
   pp_happens info ppf (collect [] f)
 
 (*------------------------------------------------------------------*)
-let pp_with_info (info : pp_info) (fmt : Format.formatter) (t : term) : unit =
+let pp_toplevel ~dbg (info : pp_info) (fmt : Format.formatter) (t : term) : unit =
   pp info ((toplevel_prec, `NoParens), `NonAssoc) fmt t
 
-let pp (fmt : Format.formatter) (t : term) : unit =
-  pp default_pp_info ((toplevel_prec, `NoParens), `NonAssoc) fmt t
+(** Exported *)
+let pp_with_info = pp_toplevel ~dbg:false
+let pp           = pp_toplevel ~dbg:false default_pp_info
+let _pp ~dbg     = pp_toplevel ~dbg:false { default_pp_info with dbg }
+let pp_dbg       = pp_toplevel ~dbg:false { default_pp_info with dbg = true }
 
 (*------------------------------------------------------------------*)
 
-let pp_hterm fmt = function
+let _pp_hterm ~dbg fmt = function
   | Lambda (evs, t) ->
     Fmt.pf fmt "@[<v 2>fun (@[%a@]) ->@ %a@]"
-      Vars.pp_typed_list evs pp t
+      (Vars._pp_typed_list ~dbg) evs pp t
+
+let pp_hterm     = _pp_hterm ~dbg:false
+let pp_hterm_dbg = _pp_hterm ~dbg:true
 
 (*------------------------------------------------------------------*)
 let pp_esubst ppf (ESubst (t1,t2)) =
@@ -1914,7 +1932,7 @@ let match_infos_to_pp_info (minfos : match_infos) : pp_info =
     | Some MR_check_st _ -> None, info
     | Some MR_failed     -> Some `Error,    info
   in
-  { styler; var_names = Mv.empty; }
+  { styler; dbg = false; }
 
 
 (*------------------------------------------------------------------*)

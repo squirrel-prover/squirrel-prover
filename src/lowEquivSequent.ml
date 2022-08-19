@@ -14,7 +14,9 @@ module H = Hyps.Mk
     (struct
       type t = Equiv.form
 
-      let pp_hyp = Equiv.pp
+      let pp_hyp     = Equiv.pp
+      let _pp_hyp    = Equiv._pp
+      let pp_hyp_dbg = Equiv.pp_dbg
 
       let choose_name f = "H"
         
@@ -65,11 +67,12 @@ let sanity_check (s : t) : unit =
   assert (Vars.Sv.subset (fv s) (Vars.to_set s.env.Env.vars))
 
 (*------------------------------------------------------------------*)
-let pp_goal fmt = function
-  | Equiv.Atom (Equiv.Equiv e) -> Equiv.pp_equiv_numbered fmt e
-  | _  as f -> Equiv.pp fmt f
+let _pp_goal ~dbg fmt = function
+  | Equiv.Atom (Equiv.Equiv e) -> (Equiv._pp_equiv_numbered ~dbg) fmt e
+  | _  as f -> Equiv._pp ~dbg fmt f
 
-let pp ppf j =
+(*------------------------------------------------------------------*)
+let _pp ~dbg ppf j =
   Fmt.pf ppf "@[<v 0>" ;
   Fmt.pf ppf "@[Systems: %a@]@;"
     SystemExpr.pp_context j.env.system;
@@ -79,14 +82,18 @@ let pp ppf j =
       (Fmt.list ~sep:Fmt.comma Type.pp_tvar) j.env.ty_vars ;
 
   if j.env.vars <> Vars.empty_env then
-    Fmt.pf ppf "@[Variables: %a@]@;" Vars.pp_env j.env.vars ;
+    Fmt.pf ppf "@[Variables: %a@]@;" (Vars._pp_env ~dbg) j.env.vars ;
 
-  H.pp ppf j.hyps ;
+  H._pp ~dbg ppf j.hyps ;
 
   (* Print separation between hyps and conclusion *)
   Printer.kws `Separation ppf (String.make 40 '-') ;
-  Fmt.pf ppf "@;%a@]" pp_goal j.goal
+  Fmt.pf ppf "@;%a@]" (_pp_goal ~dbg) j.goal
 
+let pp     = _pp ~dbg:false
+let pp_dbg = _pp ~dbg:true
+
+(*------------------------------------------------------------------*)
 let pp_init ppf j =
   if j.env.vars <> Vars.empty_env then
     Fmt.pf ppf "forall %a,@ " Vars.pp_env j.env.vars ;
@@ -107,6 +114,7 @@ module Hyps
   type sequent = t
     
   let pp_hyp = Equiv.pp
+
   let pp_ldecl = H.pp_ldecl
 
   let fresh_id  ?approx name  s = H.fresh_id  ?approx name  s.hyps
@@ -157,8 +165,9 @@ module Hyps
 
   let clear_triv s = { s with hyps = H.clear_triv s.hyps }
 
-  let pp     fmt s = H.pp     fmt s.hyps
-  let pp_dbg fmt s = H.pp_dbg fmt s.hyps
+  let pp          fmt s = H.pp          fmt s.hyps
+  let _pp    ~dbg fmt s = H._pp    ~dbg fmt s.hyps
+  let pp_dbg      fmt s = H.pp_dbg      fmt s.hyps
 end
 
 (*------------------------------------------------------------------*)

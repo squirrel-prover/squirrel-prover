@@ -168,7 +168,9 @@ val lit_to_form   : literal -> term
 
 type hterm = Lambda of Vars.vars * term
 
-val pp_hterm : Format.formatter -> hterm -> unit
+val pp_hterm     :             Format.formatter -> hterm -> unit
+val _pp_hterm    : dbg:bool -> Format.formatter -> hterm -> unit
+val pp_hterm_dbg :             Format.formatter -> hterm -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printer and cast} *)
@@ -178,7 +180,9 @@ type pp_info
 
 val default_pp_info : pp_info
 
-val pp : Format.formatter -> term -> unit
+val pp     :             Format.formatter -> term -> unit
+val _pp    : dbg:bool -> Format.formatter -> term -> unit
+val pp_dbg :             Format.formatter -> term -> unit
 
 val pp_with_info : pp_info -> Format.formatter -> term -> unit
 

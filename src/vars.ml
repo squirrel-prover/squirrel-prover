@@ -129,9 +129,14 @@ let to_list (env : env) : var list =
 
 let to_set (env : env) : Sv.t = Sv.of_list (to_list env)
 
-let pp_env ppf e =
-  pp_typed_list ppf (to_list e)
+(*------------------------------------------------------------------*)
+let _pp_env ~dbg ppf e =
+  _pp_typed_list ~dbg ppf (to_list e)
 
+let pp_env     = _pp_env ~dbg:false
+let pp_env_dbg = _pp_env ~dbg:true
+
+(*------------------------------------------------------------------*)
 let empty_env : env = M.empty
 
 let mem (e : env) var : bool = M.mem (name var) e

@@ -12,16 +12,23 @@ module SE = SystemExpr
 
 type equiv = Term.term list
 
-let pp_equiv ppf (l : equiv) =
+(*------------------------------------------------------------------*)
+let _pp_equiv ~dbg ppf (l : equiv) =
   Fmt.pf ppf "@[%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") Term.pp)
+    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") (Term._pp ~dbg))
     l
 
-let pp_equiv_numbered ppf (l : equiv) =
+let pp_equiv = _pp_equiv ~dbg:false
+
+(*------------------------------------------------------------------*)
+let _pp_equiv_numbered ~dbg ppf (l : equiv) =
   List.iteri (fun i elem ->
-      Fmt.pf ppf "%i: @[%a@]@;" i Term.pp elem
+      Fmt.pf ppf "%i: @[%a@]@;" i (Term._pp ~dbg) elem
     ) l
 
+let pp_equiv_numbered = _pp_equiv_numbered ~dbg:false
+
+(*------------------------------------------------------------------*)
 let subst_equiv (subst : Term.subst) (e : equiv) : equiv =
   List.map (Term.subst subst) e
 
@@ -41,14 +48,20 @@ type atom =
   | Reach of Term.term
   (** Reach(φ) corresponds to (φ)^left ~ ⊤ ∧ (φ)^right ~ ⊤ *)
 
-let pp_atom fmt = function
-  | Equiv e -> Fmt.pf fmt "equiv(%a)" pp_equiv e
-  | Reach f -> Fmt.pf fmt "@[[%a]@]" Term.pp f
+(*------------------------------------------------------------------*)
+let _pp_atom ~dbg fmt = function
+  | Equiv e -> Fmt.pf fmt "equiv(%a)" (_pp_equiv ~dbg) e
+  | Reach f -> 
+    Fmt.pf fmt "@[[%a]@]" (Term._pp ~dbg) f
 
+let pp_atom = _pp_atom ~dbg:false
+
+(*------------------------------------------------------------------*)
 let subst_atom (subst : Term.subst) (a : atom) : atom =
   match a with
   | Equiv e -> Equiv (subst_equiv subst e)
   | Reach f -> Reach (Term.subst subst f)
+
 
 (** Free variables of an [atom]. *)
 let fv_atom = function
@@ -72,55 +85,14 @@ type form =
   | And   of form * form
   | Or    of form * form
 
-let toplevel_prec = 0
-let quant_fixity = 5   , `NonAssoc
-let impl_fixity  = 10  , `Infix `Right
-let or_fixity    = 20  , `Infix `Right
-let and_fixity   = 25  , `Infix `Right
-
-(** Internal *)
-let rec pp 
-    ((outer,side) : ('b * fixity) * assoc)
-    (fmt : Format.formatter)
-  = function
-  | Atom at -> pp_atom fmt at
-
-  | Impl (f0, f) ->
-    let pp fmt () = 
-      Fmt.pf fmt "@[<0>%a ->@ %a@]"
-        (pp (impl_fixity, `Left)) f0 
-        (pp (impl_fixity, `Right)) f
-    in
-    maybe_paren ~outer ~side ~inner:impl_fixity pp fmt ()
-
-  | And (f0, f) ->
-    let pp fmt () =     
-      Fmt.pf fmt "@[<0>%a /\\@ %a@]" 
-        (pp (and_fixity, `Left)) f0 
-        (pp (and_fixity, `Right)) f
-    in
-    maybe_paren ~outer ~side ~inner:and_fixity pp fmt ()
-
-  | Or (f0, f) ->
-    let pp fmt () = 
-      Fmt.pf fmt "@[<0>%a \\/@ %a@]"
-        (pp (or_fixity, `Left)) f0 
-        (pp (or_fixity, `Right)) f
-    in
-    maybe_paren ~outer ~side ~inner:or_fixity pp fmt ()
-
-  | Quant (bd, vs, f) ->
-    let pp fmt () = 
-      Fmt.pf fmt "@[<2>%a (@[%a@]),@ %a@]"
-        pp_quant bd
-        Vars.pp_typed_list vs
-        (pp (quant_fixity, `Right)) f
-    in
-    maybe_paren ~outer ~side ~inner:(fst quant_fixity, `Prefix) pp fmt ()
-
-
-let pp (fmt : Format.formatter) (f : form) : unit =
-  pp ((toplevel_prec, `NoParens), `NonAssoc) fmt f
+(*------------------------------------------------------------------*)
+(** Free variables. *)
+let rec fv = function
+  | Atom at -> fv_atom at
+  | And  (f, f0)
+  | Or   (f, f0)
+  | Impl (f,f0) -> Sv.union (fv f) (fv f0)
+  | Quant (_, evs, b) -> Sv.diff (fv b) (Sv.of_list evs)
 
 (*------------------------------------------------------------------*)
 let mk_quant q evs f = match evs, f with
@@ -171,31 +143,8 @@ let tfold : (form -> 'b -> 'b) -> form -> 'b -> 'b =
   titer fi t;
   !vref
 
-let rec get_terms = function
-  | Atom (Reach f) -> [f]
-  | Atom (Equiv e) -> e
-  | And  (e1, e2)
-  | Or   (e1, e2)
-  | Impl (e1, e2) -> get_terms e1 @ get_terms e2
-  | Quant _ -> []
-
-(*------------------------------------------------------------------*)
-let rec project (projs : Term.proj list) (f : form) : form =
-  match f with
-  | Atom (Reach f) -> Atom (Reach (Term.project projs f))
-
-  | _ -> tmap (project projs) f
-    
 (*------------------------------------------------------------------*)
 (** {2 Substitution} *)
-
-(** Free variables. *)
-let rec fv = function
-  | Atom at -> fv_atom at
-  | And  (f, f0)
-  | Or   (f, f0)
-  | Impl (f,f0) -> Sv.union (fv f) (fv f0)
-  | Quant (_, evs, b) -> Sv.diff (fv b) (Sv.of_list evs)
 
 let rec subst s (f : form) =
   if s = [] ||
@@ -230,6 +179,91 @@ let tsubst (ts : Type.tsubst) (t : form) =
   in
 
   tsubst t
+
+(*------------------------------------------------------------------*)
+(** {2 Pretty printing} *)
+
+let toplevel_prec = 0
+let quant_fixity = 5   , `NonAssoc
+let impl_fixity  = 10  , `Infix `Right
+let or_fixity    = 20  , `Infix `Right
+let and_fixity   = 25  , `Infix `Right
+
+(** Internal *)
+let pp ~(dbg:bool) = 
+  let rec pp 
+      ((outer,side) : ('b * fixity) * assoc)
+      (fmt : Format.formatter)
+    = function
+      | Atom at -> _pp_atom ~dbg fmt at
+
+      | Impl (f0, f) ->
+        let pp fmt () = 
+          Fmt.pf fmt "@[<0>%a ->@ %a@]"
+            (pp (impl_fixity, `Left)) f0 
+            (pp (impl_fixity, `Right)) f
+        in
+        maybe_paren ~outer ~side ~inner:impl_fixity pp fmt ()
+
+      | And (f0, f) ->
+        let pp fmt () =     
+          Fmt.pf fmt "@[<0>%a /\\@ %a@]" 
+            (pp (and_fixity, `Left)) f0 
+            (pp (and_fixity, `Right)) f
+        in
+        maybe_paren ~outer ~side ~inner:and_fixity pp fmt ()
+
+      | Or (f0, f) ->
+        let pp fmt () = 
+          Fmt.pf fmt "@[<0>%a \\/@ %a@]"
+            (pp (or_fixity, `Left)) f0 
+            (pp (or_fixity, `Right)) f
+        in
+        maybe_paren ~outer ~side ~inner:or_fixity pp fmt ()
+
+      | Quant (bd, vs, f) ->
+        let _, vs, s = (* rename quantified vars. to avoid name clashes *)
+          let fv_f = List.fold_left ((^~) Sv.remove) (fv f) vs in
+          Term.refresh_vars_env (Vars.of_set fv_f) vs 
+        in
+        let f = subst s f in
+
+        let pp fmt () = 
+          Fmt.pf fmt "@[<2>%a (@[%a@]),@ %a@]"
+            pp_quant bd
+            (Vars._pp_typed_list ~dbg) vs
+            (pp (quant_fixity, `Right)) f
+        in
+        maybe_paren ~outer ~side ~inner:(fst quant_fixity, `Prefix) pp fmt ()
+  in
+  pp
+
+let pp_toplevel ~dbg (fmt : Format.formatter) (f : form) : unit =
+  pp ~dbg ((toplevel_prec, `NoParens), `NonAssoc) fmt f
+    
+(** Exported *)
+let _pp    = pp_toplevel
+let pp     = pp_toplevel ~dbg:false
+let pp_dbg = pp_toplevel ~dbg:true
+
+(*------------------------------------------------------------------*)
+(** {2 Misc} *)
+
+let rec get_terms = function
+  | Atom (Reach f) -> [f]
+  | Atom (Equiv e) -> e
+  | And  (e1, e2)
+  | Or   (e1, e2)
+  | Impl (e1, e2) -> get_terms e1 @ get_terms e2
+  | Quant _ -> []
+
+(*------------------------------------------------------------------*)
+let rec project (projs : Term.proj list) (f : form) : form =
+  match f with
+  | Atom (Reach f) -> Atom (Reach (Term.project projs f))
+
+  | _ -> tmap (project projs) f
+    
 
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructors} *)
@@ -532,27 +566,35 @@ type _ f_kind =
 module PreAny = struct
   type t = any_form
   let pp fmt = function
-    | Local f -> Term.pp fmt f
+    | Local  f -> Term.pp fmt f
     | Global f ->      pp fmt f
 
+  let _pp ~dbg fmt = function
+    | Local  f -> Term._pp ~dbg fmt f
+    | Global f ->      _pp ~dbg fmt f
+
+  let pp_dbg fmt = function
+    | Local  f -> Term.pp_dbg fmt f
+    | Global f ->      pp_dbg fmt f
+
   let subst s = function
-    | Local f -> Local (Term.subst s f)
+    | Local f  -> Local  (Term.subst s f)
     | Global f -> Global (     subst s f)
 
   let tsubst s = function
-    | Local f -> Local (Term.tsubst s f)
+    | Local f  -> Local  (Term.tsubst s f)
     | Global f -> Global (     tsubst s f)
 
   let fv = function
-    | Local f -> Term.fv f
+    | Local f  -> Term.fv f
     | Global f -> fv f
 
   let get_terms = function
-    | Local f -> [f]
+    | Local f  -> [f]
     | Global f -> get_terms f
 
   let project p = function
-    | Local f -> Local (Term.project p f)
+    | Local f  -> Local  (Term.project p f)
     | Global f -> Global (     project p f)
 end
 

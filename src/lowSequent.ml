@@ -27,7 +27,9 @@ module type S = sig
   type sequent = t
   type sequents = sequent list
 
-  val pp : Format.formatter -> t -> unit
+  val pp     :             Format.formatter -> t -> unit
+  val _pp    : dbg:bool -> Format.formatter -> t -> unit
+  val pp_dbg :             Format.formatter -> t -> unit
 
   (*------------------------------------------------------------------*)
 

@@ -734,8 +734,13 @@ let start_proof (check : [`NoCheck | `Check]) =
 
     current_goal := Some pending_proof;
     begin match check with
-      | `Check -> subgoals := [goal] ; bullets := Bullets.initial_path
-      | `NoCheck -> subgoals := [] ; bullets := Bullets.empty_path
+      | `Check -> 
+        subgoals := [goal] ; 
+        bullets := Bullets.initial_path
+
+      | `NoCheck -> 
+        subgoals := [] ; 
+        bullets := Bullets.empty_path
     end;
     None
 

@@ -7,7 +7,10 @@ module Args = TacticsArgs
 (** Signature for hypothesis data-type. *)
 module type Hyp = sig 
   type t 
-  val pp_hyp : Format.formatter -> t -> unit
+
+  val pp_hyp     :             Format.formatter -> t -> unit
+  val _pp_hyp    : dbg:bool -> Format.formatter -> t -> unit
+  val pp_hyp_dbg :             Format.formatter -> t -> unit
 
   (** Chooses a name for a formula, depending on the formula shape. *)
   val choose_name : t -> string
@@ -96,8 +99,10 @@ module type S1 = sig
   val pp_ldecl : ?dbg:bool -> Format.formatter -> ldecl -> unit
 
   val pp_hyp   : Format.formatter -> hyp  -> unit
-  val pp       : Format.formatter -> hyps -> unit
-  val pp_dbg   : Format.formatter -> hyps -> unit
+
+  val pp       :             Format.formatter -> hyps -> unit
+  val _pp      : dbg:bool -> Format.formatter -> hyps -> unit
+  val pp_dbg   :             Format.formatter -> hyps -> unit
 end
 
 (*------------------------------------------------------------------*)

@@ -93,7 +93,7 @@ include S
 type sequent = S.t
 type sequents = sequent list
 
-let pp ppf s =
+let _pp ~dbg ppf s =
   let open Fmt in
   pf ppf "@[<v 0>" ;
   pf ppf "@[System: %a@]@;"
@@ -104,15 +104,18 @@ let pp ppf s =
       (Fmt.list ~sep:Fmt.comma Type.pp_tvar) s.env.ty_vars ;
 
   if s.env.vars <> Vars.empty_env then
-    pf ppf "@[Variables: %a@]@;" Vars.pp_env s.env.vars ;
+    pf ppf "@[Variables: %a@]@;" (Vars._pp_env ~dbg) s.env.vars ;
 
   (* Print hypotheses *)
-  H.pp ppf s.hyps ;
+  H._pp ~dbg ppf s.hyps ;
 
   (* Print separation between hyps and conclusion *)
   Printer.kws `Separation ppf (String.make 40 '-') ;
   (* Print conclusion formula and close box. *)
-  pf ppf "@;%a@]" Term.pp s.conclusion
+  pf ppf "@;%a@]" (Term._pp ~dbg) s.conclusion
+
+let pp     = _pp ~dbg:false
+let pp_dbg = _pp ~dbg:true
 
 (*------------------------------------------------------------------*)
 let get_all_messages (s : sequent) =
@@ -237,8 +240,9 @@ module AnyHyps
     in
     S.update ~hyps:(H.filter not_triv s.hyps) s
 
-  let pp     fmt s = H.pp     fmt s.hyps
-  let pp_dbg fmt s = H.pp_dbg fmt s.hyps
+  let pp          fmt s = H.pp          fmt s.hyps
+  let _pp    ~dbg fmt s = H._pp    ~dbg fmt s.hyps
+  let pp_dbg      fmt s = H.pp_dbg      fmt s.hyps
 end
 
 (*------------------------------------------------------------------*)
@@ -570,7 +574,8 @@ module LocalHyps
 
   let clear_triv = AnyHyps.clear_triv
 
-  let pp = AnyHyps.pp
+  let pp     = AnyHyps.pp
+  let _pp    = AnyHyps._pp
   let pp_dbg = AnyHyps.pp_dbg
 end
 

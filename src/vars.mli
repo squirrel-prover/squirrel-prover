@@ -41,14 +41,17 @@ val pp_typed_list : Format.formatter -> var list -> unit
 (*------------------------------------------------------------------*)
 (** {2 Debug printing} *)
   
-(** Debug version of [pp]: also print the identifier. *)
-val pp_dbg : Format.formatter -> var -> unit
+(** Debug versions of [pp]: also print the identifier. *)
+val _pp    : dbg:bool -> Format.formatter -> var -> unit
+val pp_dbg :             Format.formatter -> var -> unit
 
-(** Debug version of [pp_list]: also print the identifier. *)
-val pp_list_dbg : Format.formatter -> var list -> unit
+(** Debug versions of [pp_list]: also print the identifier. *)
+val _pp_list    : dbg:bool -> Format.formatter -> var list -> unit
+val pp_list_dbg :             Format.formatter -> var list -> unit
 
-(** Debug version of [pp_typed_list_dbg]: also print the identifier. *)
-val pp_typed_list_dbg : Format.formatter -> var list -> unit
+(** Debug versions of [pp_typed_list_dbg]: also print the identifier. *)
+val _pp_typed_list    : dbg:bool -> Format.formatter -> var list -> unit
+val pp_typed_list_dbg :             Format.formatter -> var list -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Functions on variables} *)
@@ -97,7 +100,9 @@ type env
 val hash_env : env -> int
 
 (** Print an environment, showing variables names and sorts. *)
-val pp_env : Format.formatter -> env -> unit
+val  pp_env    :             Format.formatter -> env -> unit
+val _pp_env    : dbg:bool -> Format.formatter -> env -> unit
+val pp_env_dbg :             Format.formatter -> env -> unit
 
 val empty_env : env
 
