@@ -2019,7 +2019,6 @@ let () =
       let m = in_macro in
       let t = diff (Macro (m,[],ts)) (Macro (m,[],ts')) in
       let r = head_normal_biterm t in
-      Fmt.epr "PP@.%a@.%a@." pp t pp r;
       assert (r = t)
     end ;
     "Boolean operator", `Quick, begin fun () ->

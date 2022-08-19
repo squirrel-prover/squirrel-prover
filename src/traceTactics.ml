@@ -1439,21 +1439,20 @@ let euf_apply_direct s (_, key, m, _, _, _, _, _) Euf.{d_key_indices;d_message} 
    * not in the current environment: this happens when the case is extracted
    * from under a binder, e.g. a Seq or ForAll construct. We need to add
    * such variables to the environment. *)
-  let init_env = TS.vars s in
-  let subst,env =
-    List.fold_left
-      (fun (subst,env) v ->
-         if Vars.mem init_env v then subst,env else
-         let env,v' = Vars.make_approx env v in
-         let subst = Term.(ESubst (mk_var v, mk_var v')) :: subst in
-         subst,env)
-      ([],init_env)
+  let subst, env =
+    List.fold_left (fun (subst,env) v ->
+        if Vars.mem env v then subst, env else
+          let env,v' = Vars.make_approx env v in
+          let subst = Term.(ESubst (mk_var v, mk_var v')) :: subst in
+          subst,env)
+      ([], TS.vars s)
       (List.sort_uniq Stdlib.compare
          (d_key_indices @
           Term.get_vars d_message))
   in
   let s = TS.set_vars env s in
   let d_message = Term.subst subst d_message in
+  let d_key_indices = Term.subst_vars subst d_key_indices in
 
   (* Equality between hashed messages. *)
   let eq_hashes = Term.mk_atom `Eq d_message m in
@@ -1462,7 +1461,6 @@ let euf_apply_direct s (_, key, m, _, _, _, _, _) Euf.{d_key_indices;d_message} 
   let eq_indices =
     List.fold_left2
       (fun cnstr i i' ->
-         let i' = Term.subst_var subst i' in
          Term.mk_and ~simpl:false cnstr (Term.mk_atom `Eq (mk_var i) (mk_var i')))
       Term.mk_true
       key.s_indices d_key_indices
@@ -1552,6 +1550,7 @@ let euf_apply
 
   (* we create the honest sources using the classical eufcma tactic *)
   let honest_s = euf_apply_facts drop_head s p in
+
   (tag_s @ honest_s @ extra_goals)
 
 

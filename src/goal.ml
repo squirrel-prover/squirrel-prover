@@ -23,9 +23,10 @@ let system = function
   | Equiv j -> ES.system j
 
 (*------------------------------------------------------------------*)
+(* when printing, we run some well-formedness checks on the sequents *)
 let pp ch = function
-  | Trace j -> TS.pp ch j
-  | Equiv j -> ES.pp ch j
+  | Trace j -> TS.sanity_check j; TS.pp ch j
+  | Equiv j -> ES.sanity_check j; ES.pp ch j
 
 let pp_init ch = function
   | Trace j -> Term.pp ch (TS.goal j)

@@ -139,7 +139,9 @@ let pp_env_dbg = _pp_env ~dbg:true
 (*------------------------------------------------------------------*)
 let empty_env : env = M.empty
 
-let mem (e : env) var : bool = M.mem (name var) e
+let mem (e : env) var : bool = 
+  let l = M.find_dflt [] (name var) e in
+  List.mem var l
 
 let mem_s (e : env) (s : string) : bool = M.mem s e
 
@@ -162,7 +164,12 @@ let of_set s : env =
       add_var v e
     ) s empty_env 
 
-let rm_var v (e : env) : env = M.remove (name v) e
+let rm_var v (e : env) : env = 
+  assert (mem e v);
+  let v_name = name v in
+  let l = M.find_dflt [] v_name e in
+  let l = List.filter (fun v' -> not (Ident.equal v.id v'.id)) l in
+  if l <> [] then M.add v_name l e else M.remove v_name e
 
 let rm_vars vs (e : env) : env = List.fold_left (fun e v -> rm_var v e) e vs
 
