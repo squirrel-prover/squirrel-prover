@@ -7,6 +7,8 @@ module ES = LowEquivSequent
 
 module SE = SystemExpr
 
+module Sv = Vars.Sv
+
 (*------------------------------------------------------------------*)
 (** {2 Goals} *)
 
@@ -21,9 +23,10 @@ let system = function
   | Equiv j -> ES.system j
 
 (*------------------------------------------------------------------*)
+(* when printing, we run some well-formedness checks on the sequents *)
 let pp ch = function
-  | Trace j -> TS.pp ch j
-  | Equiv j -> ES.pp ch j
+  | Trace j -> TS.sanity_check j; TS.pp ch j
+  | Equiv j -> ES.sanity_check j; ES.pp ch j
 
 let pp_init ch = function
   | Trace j -> Term.pp ch (TS.goal j)
@@ -112,18 +115,32 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Create trace and equivalence goals} *)
 
+(* FIXME: the [enrich] additional argument must be removed. *)
 let make_obs_equiv ?(enrich=[]) table hint_db system =
   let vars,ts = Vars.make `Approx Vars.empty_env Type.Timestamp "t" in
   let term = Term.mk_macro Term.frame_macro [] (Term.mk_var ts) in
 
   let goal = Equiv.(Atom (Equiv (term :: enrich))) in
+
+  (* refresh free variables in [enrich], and add them to the environment *)
+  let vars,_,subst = 
+    let fv = 
+      List.fold_left (fun s t -> Sv.union s (Term.fv t)) Sv.empty enrich
+      |> Sv.elements
+    in
+    Term.refresh_vars_env vars fv 
+  in
+  let enrich_s = List.map (Term.subst subst) enrich in
+  (* alternative version of [goal], where [enrich] free vars have been 
+     renamed. *)
+  let goal_s = Equiv.(Atom (Equiv (term :: enrich_s))) in
   
   let happens = Term.mk_happens (Term.mk_var ts) in
   let hyp = Equiv.(Atom (Reach happens)) in
   
   let env = Env.init ~system ~table ~vars () in
   
-  let s = ES.init ~env ~hint_db ~hyp goal in
+  let s = ES.init ~env ~hint_db ~hyp goal_s in
   
   Equiv.Global (Equiv.mk_forall [ts] (Equiv.(Impl (hyp,goal)))),
   Equiv s

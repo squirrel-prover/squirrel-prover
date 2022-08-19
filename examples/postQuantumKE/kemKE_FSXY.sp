@@ -340,12 +340,12 @@ Proof.
   enrich seq(j,k:index->DrTI(j,k));
   enrich seq(j,k:index-> DkR(j,k));
   enrich seq(j,k:index-> DrR(j,k));
-  enrich  seq(i,j,k:index->DkI(i,j,k)).
-  enrich  seq(i,j,k:index->DdkT(i,j,k)).
-  enrich  seq(i:index->dkR(i)).
+  enrich seq(i,j,k:index->DkI(i,j,k)).
+  enrich seq(i,j,k:index->DdkT(i,j,k)).
+  enrich seq(i:index->dkR(i)).
 
   induction t => //.
-    + expandall.
+    + expandall. 
       by fa 14.
 
     + expandall.
@@ -371,6 +371,7 @@ Proof.
       rewrite if_true // in 19.
       expandseq  seq(i,j,k:index-> kR(i,j,k)), i,j,k.
       expandseq  seq(i:index-> dkI(i)), i.
+      by apply IH.
 
     + (* Second output of R *)
       expandall.
@@ -393,11 +394,11 @@ Proof.
        use len_F with DrR(j,k), skR(j).
        namelength n_PRF,s.
        fresh 16.
+       by apply IH.
 
     + (* Second output of R with dishonnest talker *)
       expandall.
-      fa 14.
-
+      by fa 14.
 
     + (* First output of I *)
       expandall.
@@ -419,10 +420,11 @@ Proof.
       expandseq  seq(i,j,k:index->kI(i,j,k)),i,j,k.
       expandseq  seq(i,j,k:index->dkT(i,j,k)),i,j,k.
       expandseq  seq(i:index->dkR(i)),j.
+      by apply IH.
 
     + (* Second output of I *)
       expandall.
-      fa 14.
+      by fa 14.
 
 
 
@@ -442,6 +444,7 @@ Proof.
       by namelength n_PRF,s.
       fresh 17.
       expandseq  seq(i,j,k:index->DkI(i,j,k)),i,j,k.
+      by apply IH.
 
     + (* Second output of DI *)
       expandall.

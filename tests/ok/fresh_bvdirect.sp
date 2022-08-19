@@ -17,7 +17,7 @@ Proof.
      using an incorrect formula that we admit. *)
   assert (forall i0:index, i<>i0) by admit.
   nosimpl(rewrite if_true in 1).
-  assumption.
+  assumption H.
   refl.
 Qed.
 

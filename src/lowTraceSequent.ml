@@ -42,6 +42,10 @@ module S : sig
     conclusion:Term.term ->
     t
 
+  val fv : t -> Vars.Sv.t
+
+  val sanity_check : t -> unit
+                     
   val update :
     ?env:Env.t ->
     ?hyps:H.hyps ->
@@ -56,12 +60,27 @@ end = struct
     conclusion : Term.term;
   }
 
-  let init_sequent ~env ~hint_db ~conclusion = {
-    env ;
-    hint_db;
-    hyps = H.empty;
-    conclusion;
-  }
+  let fv (s : t) : Vars.Sv.t = 
+    let h_vars = 
+      H.fold (fun _ f vars -> 
+          Vars.Sv.union (Equiv.Any.fv f) vars
+        ) s.hyps Vars.Sv.empty
+    in
+    Vars.Sv.union h_vars (Term.fv s.conclusion)
+
+  let sanity_check s : unit =
+  Vars.sanity_check s.env.Env.vars;
+  assert (Vars.Sv.subset (fv s) (Vars.to_set s.env.Env.vars))
+
+  let init_sequent ~env ~hint_db ~conclusion =
+    let s = {
+      env ;
+      hint_db;
+      hyps = H.empty;
+      conclusion; 
+    } in
+    sanity_check s;
+    s
 
   let update ?env ?hyps ?conclusion t =
     let env        = Utils.odflt t.env env
@@ -75,7 +94,7 @@ include S
 type sequent = S.t
 type sequents = sequent list
 
-let pp ppf s =
+let _pp ~dbg ppf s =
   let open Fmt in
   pf ppf "@[<v 0>" ;
   pf ppf "@[System: %a@]@;"
@@ -86,15 +105,18 @@ let pp ppf s =
       (Fmt.list ~sep:Fmt.comma Type.pp_tvar) s.env.ty_vars ;
 
   if s.env.vars <> Vars.empty_env then
-    pf ppf "@[Variables: %a@]@;" Vars.pp_env s.env.vars ;
+    pf ppf "@[Variables: %a@]@;" (Vars._pp_env ~dbg) s.env.vars ;
 
   (* Print hypotheses *)
-  H.pp ppf s.hyps ;
+  H._pp ~dbg ppf s.hyps ;
 
   (* Print separation between hyps and conclusion *)
   Printer.kws `Separation ppf (String.make 40 '-') ;
   (* Print conclusion formula and close box. *)
-  pf ppf "@;%a@]" Term.pp s.conclusion
+  pf ppf "@;%a@]" (Term._pp ~dbg) s.conclusion
+
+let pp     = _pp ~dbg:false
+let pp_dbg = _pp ~dbg:true
 
 (*------------------------------------------------------------------*)
 let get_all_messages (s : sequent) =
@@ -219,8 +241,9 @@ module AnyHyps
     in
     S.update ~hyps:(H.filter not_triv s.hyps) s
 
-  let pp     fmt s = H.pp     fmt s.hyps
-  let pp_dbg fmt s = H.pp_dbg fmt s.hyps
+  let pp          fmt s = H.pp          fmt s.hyps
+  let _pp    ~dbg fmt s = H._pp    ~dbg fmt s.hyps
+  let pp_dbg      fmt s = H.pp_dbg      fmt s.hyps
 end
 
 (*------------------------------------------------------------------*)
@@ -439,15 +462,6 @@ let map f s : sequent =
   set_goal (f.Equiv.Babel.call Equiv.Local_t (goal s)) (AnyHyps.map f' s)
 
 (*------------------------------------------------------------------*)
-let fv s : Vars.Sv.t = 
-  let h_vars = 
-    AnyHyps.fold (fun _ f vars -> 
-        Vars.Sv.union (Equiv.Any.fv f) vars
-      ) s Vars.Sv.empty
-  in
-  Vars.Sv.union h_vars (Term.fv (goal s))
-
-(*------------------------------------------------------------------*)
 module Conc = Term.Smart
 module Hyp  = Equiv.Any.Smart
 
@@ -561,7 +575,8 @@ module LocalHyps
 
   let clear_triv = AnyHyps.clear_triv
 
-  let pp = AnyHyps.pp
+  let pp     = AnyHyps.pp
+  let _pp    = AnyHyps._pp
   let pp_dbg = AnyHyps.pp_dbg
 end
 

@@ -396,14 +396,10 @@ let project_set_opt (projs : Term.projs option) (c : context) : context =
   
 let print_system (table : Symbols.table) (system : _ expr) : unit =
   try
-    let system = to_fset system in
-    Printer.prt `Result "@[<v>System @[[%a]@]@;@[%a@]@;@[%a@]@;@]%!"
+  let system = to_fset system in
+    Printer.prt `Result "@[<v>System @[[%a]@]@;@[%a@]@]%!"
       pp system
       (pp_descrs table) system
-      (if Config.print_trs_equations ()
-       then Completion.print_init_trs
-       else (fun _fmt _ -> ()))
-      table
-  with _ ->
-    Printer.prt `Result "@.Cannot print action descriptions for system %a@."
+  with Error Expected_fset ->
+    Printer.prt `Result "@[No action descriptions for system %a@]%!"
       pp system

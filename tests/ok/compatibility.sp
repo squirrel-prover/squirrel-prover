@@ -2,8 +2,6 @@
   * Currently compatibility verification is different for "rewrite" and "use"
   * so we should have separate tests for "rewrite". *)
 
-set autoIntro = false.
-
 abstract a : message
 abstract b : message
 system [s1] null.

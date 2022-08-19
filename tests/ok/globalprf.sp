@@ -113,8 +113,7 @@ auto.
 
 have ->:  diff(idn(i),idn(i)) = idn(i).
 project; auto.
-expandseq seq(i:index->idn(i)), i.
-auto.
+by apply IH. 
 
 
 expandall.
@@ -135,9 +134,7 @@ auto.
 
 have ->:  diff(idn(i),idn(i)) = idn(i).
 project; auto.
-expandseq seq(i:index->idn(i)), i.
-fa 2.
-auto.
+by apply IH.
 
 Qed.
 

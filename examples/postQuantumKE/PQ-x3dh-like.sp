@@ -551,20 +551,20 @@ Proof.
               <fst(snd(att(frame@pred(I1(i,j,k))))),
                fst(att(frame@pred(I1(i,j,k))))>>>>,n_PRF(il,jl,kl))
       else _.
-    + intro [il jl kl [_ ->]]. 
+    + intro [il jl kl [U ->]]. 
       case   try find il,jl,kl such that
             fst(snd(att(frame@pred(I1(i,j,k))))) =
             encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
           in
        _
           else exct(skex,decap(fst(snd(att(frame@pred(I1(i,j,k))))),vkI(i))).
-        ++ intro [il0 jl0 kl0 [_ ->]]. 
+        ++ intro [il0 jl0 kl0 [V ->]]. 
            case  try find iv,jv,kv such that
                  (skex = skex && (il0 = iv && jl0 = jv && kl0 = kv))
                  in n_PRF(iv,jv,kv) else exct(skex,k(il0,jl0,kl0)).
-           +++ intro [iv jv kv [[_ [_ _ _]] ->]]. 
+           +++ intro [??? [[_ [_ _ _]] ->]].
                assert decap( encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))), vkI(il)) =
-               decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
+               decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))), vkI(il)).
                auto.
               rewrite !decap_encap in Meq. 
               by fresh Meq.
@@ -653,9 +653,8 @@ Proof.
           case   try find iv,jv,kv such that
                 (skex = skex && (il0 = iv && jl0 = jv && kl0 = kv))
               in n_PRF(iv,jv,kv) else exct(skex,k(il0,jl0,kl0)).
-            +++ intro [iv jv kv [[_ [_ _ _]] ->]]. 
-                assert decap( encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))), vkI(il)) =
-                decap(   encap(n_CCA(iv,jv,kv),rk(iv,jv,kv),epk(vkI(iv))), vkI(il)).
+            +++ intro [??? [Eq2 ->]].
+                assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
                 auto.
                 rewrite !decap_encap in Meq. 
                 by fresh Meq.

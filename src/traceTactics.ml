@@ -110,10 +110,9 @@ let () =
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
   * This can be used with [vars = []] if orig is an [if-then-else] term. *)
 let case_cond orig vars c t e s : sequent list =
-  let env = ref (TS.vars s) in
-  let vars, subst = Term.refresh_vars (`InEnv env) vars in
+  let vars, subst = Term.refresh_vars `Global vars in
   let then_c = Term.subst subst c in
-  let else_c = Term.mk_forall vars (Term.mk_not c) in
+  let else_c = Term.mk_forall vars (Term.mk_not then_c) in
 
   let then_t = Term.subst subst t in
   let else_t = e in
@@ -222,7 +221,7 @@ let rec simpl_left s =
         List.map
           (fun v ->
              Term.ESubst  (Term.mk_var v,
-                           Term.mk_var (Vars.fresh_r env v)))
+                           Term.mk_var (Vars.make_approx_r env v)))
           vs
       in
       let f = Term.subst subst f in
@@ -248,10 +247,11 @@ let assumption ?hyp (s : TS.t) =
     match f with
     | Equiv.Global (Equiv.Atom (Reach f))
     | Equiv.Local f ->
-        goal = f ||
-        List.exists
-          (fun f -> goal = f || f = Term.mk_false)
-          (decompose_ands f)
+      TS.Reduce.conv_term s goal f ||
+      List.exists (fun f ->
+          TS.Reduce.conv_term s goal f ||
+          TS.Reduce.conv_term s f Term.mk_false
+        ) (decompose_ands f)
     | Equiv.Global _ -> false
   in
   if goal = Term.mk_true ||
@@ -884,10 +884,9 @@ let autosubst s =
 
       let () = dbg "subst %a by %a" Vars.pp x Vars.pp y in
 
-      let s =
-        TS.set_vars (Vars.rm_var x (TS.vars s)) s
-      in
-      TS.subst [Term.ESubst (Term.mk_var x, Term.mk_var y)] s
+      let s = TS.subst [Term.ESubst (Term.mk_var x, Term.mk_var y)] s in
+      TS.set_vars (Vars.rm_var x (TS.vars s)) s
+
   in
   [process x y]
 
@@ -928,8 +927,20 @@ let () =
   * [C] that congruence closure does not support: conditionals,
   * sequences, etc. *)
 let fa s =
-  let unsupported () =
-    Tactics.(soft_failure (Failure "equality expected")) in
+  let unsupported () = soft_failure (Failure "equality expected") in
+
+  let check_vars vars vars' =
+    if List.length vars <> List.length vars' then
+      soft_failure (Failure "FA: sequences with different lengths");
+
+    let tys_compatible = 
+      List.for_all2 (fun v1 v2 -> 
+          Type.equal (Vars.ty v1) (Vars.ty v2)
+        ) vars vars'
+    in
+    if not tys_compatible then
+      soft_failure (Failure "FA: sequences with different types");
+  in
 
   let u, v = match TS.Reduce.destr_eq s Local_t (TS.goal s) with
     | Some (u,v) -> u, v
@@ -945,7 +956,7 @@ let fa s =
         s |> set_goal (Term.mk_impl c' c) ;
 
         s |> set_goal (Term.mk_impls
-                         (if c = c' then [c] else [c;c'])
+                         (if TS.Reduce.conv_term s c c' then [c] else [c;c'])
                          (Term.mk_atom `Eq t t'));
 
         s |> set_goal (Term.mk_impls
@@ -955,8 +966,19 @@ let fa s =
     in
     subgoals
 
-  | Term.Seq (vars,t),
-    Term.Seq (vars',t') when vars = vars' ->
+  | Term.Seq (vars,t), Term.Seq (vars',t') -> 
+    check_vars vars vars';
+
+    (* have [t'] use the same variables names than [t] *)
+    let t' = 
+      let subst = 
+        List.map2 (fun v' v -> 
+            Term.ESubst (Term.mk_var v', Term.mk_var v)
+          ) vars' vars
+      in
+      Term.subst subst t'
+    in
+
     let env = ref (TS.vars s) in
     let vars, subst = Term.refresh_vars (`InEnv env) vars in
     let s = TS.set_vars !env s in
@@ -1363,7 +1385,7 @@ let mk_integrity_rule_param
 (** Unforgeability Axioms *)
 
 let euf_apply_schema
-    sequent (_, key, m, s, _, _, _, _) (case : Euf.euf_schema)
+    sequent (_, key, m, s, _, _, _, _) (case : Euf.euf_schema) : sequent
   =
   (* Equality between hashed messages *)
   let new_f = Term.mk_atom `Eq case.message m in
@@ -1386,7 +1408,9 @@ let euf_apply_schema
     SystemExpr.action_to_term table system case.action
   in
  let ts_list =
-    let iter = new Fresh.get_actions ~cntxt:(TS.mk_trace_cntxt sequent) in
+    let iter = 
+      new Fresh.deprecated_get_actions ~cntxt:(TS.mk_trace_cntxt sequent) 
+    in
     List.iter iter#visit_message [s; m];
     iter#get_actions
   in
@@ -1415,21 +1439,20 @@ let euf_apply_direct s (_, key, m, _, _, _, _, _) Euf.{d_key_indices;d_message} 
    * not in the current environment: this happens when the case is extracted
    * from under a binder, e.g. a Seq or ForAll construct. We need to add
    * such variables to the environment. *)
-  let init_env = TS.vars s in
-  let subst,env =
-    List.fold_left
-      (fun (subst,env) v ->
-         if Vars.mem init_env v then subst,env else
-         let env,v' = Vars.fresh env v in
-         let subst = Term.(ESubst (mk_var v, mk_var v')) :: subst in
-         subst,env)
-      ([],init_env)
+  let subst, env =
+    List.fold_left (fun (subst,env) v ->
+        if Vars.mem env v then subst, env else
+          let env,v' = Vars.make_approx env v in
+          let subst = Term.(ESubst (mk_var v, mk_var v')) :: subst in
+          subst,env)
+      ([], TS.vars s)
       (List.sort_uniq Stdlib.compare
          (d_key_indices @
           Term.get_vars d_message))
   in
   let s = TS.set_vars env s in
   let d_message = Term.subst subst d_message in
+  let d_key_indices = Term.subst_vars subst d_key_indices in
 
   (* Equality between hashed messages. *)
   let eq_hashes = Term.mk_atom `Eq d_message m in
@@ -1438,7 +1461,6 @@ let euf_apply_direct s (_, key, m, _, _, _, _, _) Euf.{d_key_indices;d_message} 
   let eq_indices =
     List.fold_left2
       (fun cnstr i i' ->
-         let i' = Term.subst_var subst i' in
          Term.mk_and ~simpl:false cnstr (Term.mk_atom `Eq (mk_var i) (mk_var i')))
       Term.mk_true
       key.s_indices d_key_indices
@@ -1494,7 +1516,6 @@ let euf_apply
   let table = TS.table s in
   let id, at = Hyps.by_name hyp_name s in
 
-
   let (h,key,m,_,_,extra_goals,drop_head,_) as p =
     mk_integrity_rule_param rule_kind table at
   in
@@ -1516,16 +1537,20 @@ let euf_apply
         | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
         | _ -> assert false
       in
+
       match Vars.ty uvarm,Vars.ty uvarkey with
       | Type.(Message, Message) -> let f = Term.subst [
           ESubst (Term.mk_var uvarm,m);
           ESubst (Term.mk_var uvarkey,Term.mk_name key);] f in
         [TS.set_goal
            (Term.mk_impl f (TS.goal s)) s]
-      | _ -> assert false in
+
+      | _ -> assert false 
+  in
 
   (* we create the honest sources using the classical eufcma tactic *)
   let honest_s = euf_apply_facts drop_head s p in
+
   (tag_s @ honest_s @ extra_goals)
 
 
@@ -1560,7 +1585,7 @@ exception Name_not_hidden
 class name_under_enc (cntxt:Constr.trace_cntxt) enc is_pk target_n key_n
   = object (self)
 
- inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
+ inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
 
  method visit_message t =
     match t with
@@ -1756,11 +1781,14 @@ let rewrite_equiv_transform
   let exception Invalid in
 
   let assoc (t : Term.term) : Term.term option =
-    match List.find_opt (fun e -> Term.project1 src e = t) biframe with
+    match List.find_opt (fun e -> 
+        TS.Reduce.conv_term s (Term.project1 src e) t
+      ) biframe 
+    with
     | Some e -> Some (Term.project1 dst e)
     | None -> None
   in
-  let rec aux : term -> term = fun t ->
+  let rec aux (t : term) : term = 
     match Term.ty t with
     | Type.Timestamp | Type.Index -> t
     | _ ->

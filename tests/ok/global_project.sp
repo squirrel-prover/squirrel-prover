@@ -5,8 +5,6 @@ abstract b : message
 
 system out(c,diff(a,b)).
 
-set autoIntro = false.
-
 axiom [any] refl (x:message) : x = x.
 
 global goal _ :

@@ -266,17 +266,20 @@ let assumption ?hyp s =
       let goal = ES.goal_as_equiv s in
       (function
         | Equiv.Equiv equiv  ->
-          List.for_all (fun elem -> List.mem elem equiv) goal
+          List.for_all (fun elem ->
+              List.exists (ES.Reduce.conv_term s elem)
+                equiv
+            ) goal
         | Equiv.Reach _ -> false)
 
-    else (fun at -> Equiv.Atom at = goal)
+    else (fun at -> ES.Reduce.conv_equiv s (Equiv.Atom at) goal)
   in
 
   let in_hyp id f = 
     (hyp = None || hyp = Some id) &&
     match f with
     | Equiv.Atom at -> in_atom at
-    | _ as f -> f = goal
+    | _ as f -> ES.Reduce.conv_equiv s f goal
   in
 
   if Hyps.exists in_hyp s
@@ -423,7 +426,7 @@ let induction Args.(Message (ts,_)) s =
       let subst =
         List.map
           (fun i ->
-             let i' = Vars.fresh_r env i in
+             let i' = Vars.make_approx_r env i in
              Term.ESubst (Term.mk_var i, Term.mk_var i'))
           indices
       in
@@ -536,7 +539,7 @@ let do_fa_felem (i : int L.located) (s : ES.t) : ES.t =
   match e with
   | Find (vars,c,t,e) ->
     let env = ref (ES.vars s) in
-    let vars' = List.map (Vars.fresh_r env) vars in
+    let vars' = List.map (Vars.make_approx_r env) vars in
     let subst =
       List.map2
         (fun i i' -> Term.ESubst (Term.mk_var i, Term.mk_var i'))
@@ -630,39 +633,42 @@ let fa_tac args = match args with
    seen as duplicates, or context of duplicates, are removed. All elements that
    can be seen as context of duplicates and assumptions are removed, but
    replaced by the assumptions that appear as there subterms. *)
-let rec filter_fa_dup table res assump (elems : Equiv.equiv) =
-  let rec is_fa_dup acc elems e =
-    (* if an element is a duplicate wrt. elems, we remove it directly *)
-    if Action.is_dup table e elems then
-      (true,[])
-    (* if an element is an assumption, we succeed, but do not remove it *)
-    else if List.mem e assump then
-      (true,[e])
-    (* otherwise, we go recursively inside the sub-terms produced by function
-       application *)
-    else try
-      let new_els = fa_expand e in
-      List.fold_left
-        (fun (aux1,aux2) e ->
-          let (fa_succ,fa_rem) = is_fa_dup acc elems e in
-          fa_succ && aux1, fa_rem @ aux2)
-        (true,[]) new_els
-    with No_FA _ -> (false,[])
-  in
-  match elems with
-  | [] -> res
-  | e :: els ->
-    let (fa_succ,fa_rem) =  is_fa_dup [] (res@els) e in
-    if fa_succ then filter_fa_dup table (fa_rem@res) assump els
-    else filter_fa_dup table (e::res) assump els
+let filter_fa_dup (s : ES.t) assump (elems : Equiv.equiv) =
+  let table = ES.table s in
 
-(** This tactic filters the biframe through filter_fa_dup, passing the set of
+  let rec doit res (elems : Equiv.equiv) =
+    let rec is_fa_dup acc elems e =
+      (* if an element is a duplicate wrt. elems, we remove it directly *)
+      if Action.is_dup ~eq:(ES.Reduce.conv_term s) table e elems then
+        (true,[])
+        (* if an element is an assumption, we succeed, but do not remove it *)
+      else if List.mem_cmp ~eq:(ES.Reduce.conv_term s) e assump then
+        (true,[e])
+        (* otherwise, we go recursively inside the sub-terms produced by function
+           application *)
+      else try
+          let new_els = fa_expand e in
+          List.fold_left
+            (fun (aux1,aux2) e ->
+               let (fa_succ,fa_rem) = is_fa_dup acc elems e in
+               fa_succ && aux1, fa_rem @ aux2)
+            (true,[]) new_els
+        with No_FA _ -> (false,[])
+    in
+    match elems with
+    | [] -> res
+    | e :: els ->
+      let (fa_succ,fa_rem) =  is_fa_dup [] (res@els) e in
+      if fa_succ then doit (fa_rem@res) els
+      else doit (e::res) els
+  in
+  doit [] elems
+
+(** This tactic filters the biframe through [filter_fa_dup], passing the set of
    hypotheses to it.  This is applied automatically, and essentially leaves only
    assumptions, or elements that contain a subterm which is neither a duplicate
    nor an assumption. *)
-let fa_dup s =
-  let table = ES.table s in
-
+let fa_dup (s : ES.t) : ES.t list =
   (* TODO: allow to choose the hypothesis through its id *)
   let hyp = Hyps.find_map (fun _id hyp -> match hyp with
       | Equiv.(Atom (Equiv e)) -> Some e
@@ -672,7 +678,7 @@ let fa_dup s =
 
   let biframe = ES.goal_as_equiv s
                 |> List.rev
-                |> filter_fa_dup table [] hyp
+                |> filter_fa_dup s hyp
   in
   [ES.set_equiv_goal biframe s]
 
@@ -681,7 +687,7 @@ exception Not_FADUP_iter
 
 class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
 
-  inherit [Term.term list] Iter.fold ~cntxt as super
+  inherit [Term.term list] Iter.deprecated_fold ~cntxt as super
 
   method check_formula f = ignore (self#fold_message [Term.mk_pred tau] f)
  
@@ -828,12 +834,10 @@ let () =
 (** Fresh *)
 
 let fresh_mk_direct
-    (env : Vars.env)
     (n : Term.nsymb)
     (occ : Fresh.name_occ) : Term.term
   =
-  let env = ref env in
-  let bv, subst = Term.refresh_vars (`InEnv env) occ.occ_vars in
+  let bv, subst = Term.refresh_vars `Global occ.occ_vars in
   let cond = List.map (Term.subst subst) occ.occ_cond in
 
   let cond = Term.mk_ands (List.rev cond) in
@@ -857,8 +861,7 @@ let fresh_mk_indirect
              (Action.fv_action action)
              (Sv.union (Vars.to_set env) (Sv.of_list bv)));
 
-  let env = ref env in
-  let bv, subst = Term.refresh_vars (`InEnv env) bv in
+  let bv, subst = Term.refresh_vars `Global bv in
 
   (* apply [subst] to the action and to the list of
    * indices of our name's occurrences *)
@@ -869,11 +872,9 @@ let fresh_mk_indirect
 
   let occ = List.map (Term.subst_var subst) occ in
 
-  (* environement with all new variables *)
-  let env0 = !env in
   (* condition stating that [action] occurs before a macro timestamp
      occurencing in the frame *)
-  let disj = Term.mk_ors (Fresh.mk_le_ts_occs env0 action frame_actions) in
+  let disj = Term.mk_ors (Fresh.mk_le_ts_occs action frame_actions) in
 
   (* condition stating that indices of name in [action] and [name] differ *)
   let form = Term.mk_indices_neq occ n.s_indices in
@@ -899,7 +900,7 @@ let mk_phi_proj
     let frame_indices = List.sort_uniq Stdlib.compare frame_indices in
 
     (* direct cases (for explicit occurrences of [name] in the frame) *)
-    let phi_frame = List.map (fresh_mk_direct env n) frame_indices in
+    let phi_frame = List.map (fresh_mk_direct n) frame_indices in
 
     let frame_actions : Fresh.ts_occs = Fresh.get_macro_actions cntxt frame in
 
@@ -918,8 +919,13 @@ let mk_phi_proj
           cases @ forms
         ) [] macro_cases
     in
-
-    List.remove_duplicate (=) (phi_frame @ phi_actions)
+    let cstate = 
+      let context = 
+        SE.{ set = (cntxt.system :> SE.arbitrary); pair = None; } 
+      in
+      Reduction.mk_cstate cntxt.table ~system:context 
+    in
+    List.remove_duplicate (Reduction.conv cstate) (phi_frame @ phi_actions)
 
   with
   | Fresh.Name_found ->
@@ -948,11 +954,10 @@ let fresh_cond (s : ES.t) t biframe : Term.term =
   let cntxt_right = { cntxt with system = system_right } in
   let phi_right = mk_phi_proj cntxt_right env n_right r_proj biframe in
 
+  let cstate = Reduction.mk_cstate cntxt.table in
   Term.mk_ands
-    (* remove duplicates, and then concatenate *)
-    ((List.filter (fun x -> not (List.mem x phi_right)) phi_left)
-     @
-     phi_right)
+    (* concatenate and remove duplicates *)
+    (List.remove_duplicate (Reduction.conv cstate) (phi_left @ phi_right))
 
 
 (** Returns the term [if (phi_left && phi_right) then 0 else diff(nL,nR)]. *)
@@ -1189,6 +1194,36 @@ let tac_autosimpl s =
 (*------------------------------------------------------------------*)
 (** PRF axiom *)
 
+(** From two conjunction formulas p and q, produce a minimal diff(p, q),
+    of the form (p inter q) && diff (p minus q, q minus p). *)
+
+let combine_conj_formulas (s : ES.t) p q =
+  (* Turn the conjunctions into lists. *)
+  let p, q = Term.decompose_ands p, Term.decompose_ands q in
+  let aux_q = ref q in
+  let (common, new_p) =
+    List.fold_left (fun (common, r_p) p ->
+        (* If an element of p is inside aux_q, remove it from aux_q and
+         * add it to common, else add it to r_p. *)
+        if List.exists (ES.Reduce.conv_term s p) !aux_q then
+          (aux_q :=
+             List.filter (fun e -> not (ES.Reduce.conv_term s e p)) !aux_q;
+           (p::common, r_p))
+        else
+          (common, p::r_p))
+      ([], []) p
+  in
+  (* [common] is the intersection of p and q,
+   * [aux_q] is the remainder of q and
+   * [new_p] the remainder of p. *)
+  Term.mk_and
+    (Term.mk_ands common)
+    (Term.head_normal_biterm
+       (Term.mk_diff [Term.left_proj,  Term.mk_ands new_p;
+                      Term.right_proj, Term.mk_ands (List.rev !aux_q)]))
+
+
+(*------------------------------------------------------------------*)
 (** Application of PRF tactic on biframe element number i,
   * optionally specifying which subterm m1 should be considered. *)
 let prf arg (s : ES.t) : ES.t list =
@@ -1252,8 +1287,8 @@ let prf arg (s : ES.t) : ES.t list =
       (* the hash occurs on both side *)
     | Some (direct_l, indirect_l), Some (direct_r, indirect_r) ->
       Term.mk_and ~simpl:false
-        (Prf.combine_conj_formulas   direct_l   direct_r)
-        (Prf.combine_conj_formulas indirect_l indirect_r)
+        (combine_conj_formulas s  direct_l   direct_r)
+        (combine_conj_formulas s indirect_l indirect_r)
   in
 
   (* Check that there are no type variables. *)
@@ -1312,6 +1347,7 @@ let () =
     (LT.genfun_of_pure_efun_arg prf)
     Args.(Pair(Int, Opt Message))
 
+(*------------------------------------------------------------------*)
 let global_diff_eq (s : ES.t) =
   let frame = ES.goal_as_equiv s in
   let system = Utils.oget (ES.system s).pair in
@@ -1321,9 +1357,15 @@ let global_diff_eq (s : ES.t) =
   (* Collect in ocs the list of diff terms that occur (directly or not)
      in [frame]. All these terms are relative to [system]. *)
   let ocs = ref [] in
-  let iter x y t = ocs := ( List.map (fun u -> (x,y,u))
-                            (Iter.get_diff ~cntxt (Term.simple_bi_term t)))
-                        @ !ocs in
+  let iter x y t =
+    (* rebuild a term with top-level diffs, before using 
+       [simple_bi_term_no_alpha_find] to normalize it in a particular way. *)
+    let t = Term.mk_diff [l_proj, Term.project1 l_proj t;
+                          r_proj, Term.project1 r_proj t] in
+    ocs := ( List.map (fun u -> (x,y,u))
+               (Iter.get_diff ~cntxt (Term.simple_bi_term_no_alpha_find t)))
+           @ !ocs 
+  in
   List.iter (iter [] []) frame;
 
   SE.iter_descrs cntxt.table system
@@ -1343,17 +1385,37 @@ let global_diff_eq (s : ES.t) =
           t.Iter.occ_vars @ Vars.Sv.elements (Term.fv subterm)
         in
         let pred_ts_list =
-          let iter = new Fresh.get_actions ~cntxt in
+          let iter = new Fresh.deprecated_get_actions ~cntxt in
           iter#visit_message subterm;
           iter#visit_message cond;
           iter#get_actions
         in
         (* Remark that the get_actions add pred to all timestamps, to simplify. *)
-        let ts_list = (List.map (fun v -> Term.mk_action v is) vs)
-                      @ List.map (function
-                          | Term.Fun (fs, _, [tau]) when fs = Term.f_pred -> tau
-                          | t -> t
-                        ) pred_ts_list in
+        let ts_list = 
+          (List.map (fun v -> Term.mk_action v is) vs)
+          @ List.map (function
+              | Term.Fun (fs, _, [tau]) when fs = Term.f_pred -> tau
+              | t -> t
+            ) pred_ts_list 
+        in
+
+        (* free vars of [ts_list], minus [fvars] *)
+        let fv_ts_list =
+          let s =
+            List.fold_left (fun sv ts -> 
+                Sv.union sv (Term.fv ts)
+              ) Sv.empty ts_list
+          in
+          Sv.diff s (Sv.of_list fvars)
+        in
+
+        (* add correctly the new free variables in [s] *)
+        let env, _, subst = 
+          Term.refresh_vars_env (ES.vars s) (Sv.elements fv_ts_list)
+        in
+        let ts_list = List.map (Term.subst subst) ts_list in
+        let s = ES.set_vars env s in
+
         (* XXX the expansions that come next are inefficient (and may become
            in incorrect if we allow richer diff operators): s1 and s2 only make
            sense in projected systems, so we should not expand macros wrt s in
@@ -1369,17 +1431,19 @@ let global_diff_eq (s : ES.t) =
           Term.project1 p2
             (EquivLT.expand_all_macros ~force_happens:true s2 sexpr2 s)
         in
-        Goal.Trace ES.(to_trace_sequent
-                         (set_reach_goal
-                            Term.(
-                              mk_forall fvars
-                                (mk_impls (List.map mk_happens ts_list
-                                           @ List.map (fun t -> mk_macro exec_macro [] t) ts_list
-                                           @ [cond])
-                              (mk_atom `Eq s1 s2))
-                            )
-                            s))
-      | _ -> assert false
+        Goal.Trace 
+          ES.(to_trace_sequent
+                (set_reach_goal
+                   Term.(
+                     mk_forall fvars
+                       (mk_impls 
+                          (List.map mk_happens ts_list
+                           @ List.map (fun t -> mk_macro exec_macro [] t) ts_list
+                           @ [cond])
+                          (mk_atom `Eq s1 s2))
+                   )
+                   s))
+    | _ -> assert false
   in
   List.map subgoal_of_occ !ocs
 
@@ -1473,8 +1537,7 @@ let mem_seq (i_l : int L.located) (j_l : int L.located) s : Goal.t list =
   check_ty_eq (Term.ty t) (Term.ty seq_term);
 
   (* refresh the sequence *)
-  let env = ref (ES.vars s) in
-  let seq_vars, subst = Term.refresh_vars (`InEnv env) seq_vars in
+  let seq_vars, subst = Term.refresh_vars `Global seq_vars in
   let seq_term = Term.subst subst seq_term in
 
   let subgoal =
@@ -1545,8 +1608,7 @@ let const_seq
   in
 
   (* refresh variables *)
-  let env = ref (ES.vars s) in
-  let e_is, subst = Term.refresh_vars (`InEnv env) e_is in
+  let e_is, subst = Term.refresh_vars `Global e_is in
   let e_ti = Term.subst subst e_ti in
 
   (* instantiate all boolean [hterms] in [b_t_terms] using [e_is] *)
@@ -2116,7 +2178,7 @@ let xor arg (s : ES.t) =
           when (fl = Term.f_xor && fr = Term.f_xor) ->
           (nl,ll,nr,lr,t)
 
-        | _ -> assert false
+        | _ -> soft_failure (Failure "ill-formed arguments")
       end
     | Some mess_name ->
       begin
@@ -2130,9 +2192,9 @@ let xor arg (s : ES.t) =
               (nl,remove_name_occ nl ll,
                nr,remove_name_occ nr lr,
                t)
-            | _ -> assert false
+            | _ -> soft_failure (Failure "ill-formed arguments")
           end
-        | _ -> assert false
+        | _ -> soft_failure (Failure "ill-formed arguments")
       end
   in
   let phi =
@@ -2174,7 +2236,7 @@ class ddh_context
     ~(cntxt:Constr.trace_cntxt) ~gen ~exp ~l_proj ~r_proj exact a b c
   = object (self)
 
- inherit Iter.iter_approx_macros ~exact ~cntxt as super
+ inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
 
   method visit_macro ms a =
     match Symbols.Macro.get_def ms.s_symb cntxt.table with
@@ -2216,7 +2278,7 @@ end
 exception Macro_found
 
 class find_macros ~(cntxt:Constr.trace_cntxt) exact = object (self)
- inherit Iter.iter_approx_macros ~exact ~cntxt as super
+ inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
 
   method visit_macro ms a =
     match Symbols.Macro.get_def ms.s_symb cntxt.table with

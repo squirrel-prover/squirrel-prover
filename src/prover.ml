@@ -682,6 +682,7 @@ let eval_tactic_focus tac = match !subgoals with
     
     begin try
       bullets := Bullets.expand_goal (List.length new_j) !bullets ;
+      (* TODO: remove catch-all exception *)
     with _ -> Tactics.(hard_failure (Failure "bullet error")) end
 
 let open_bullet bullet =
@@ -733,8 +734,13 @@ let start_proof (check : [`NoCheck | `Check]) =
 
     current_goal := Some pending_proof;
     begin match check with
-      | `Check -> subgoals := [goal] ; bullets := Bullets.initial_path
-      | `NoCheck -> subgoals := [] ; bullets := Bullets.empty_path
+      | `Check -> 
+        subgoals := [goal] ; 
+        bullets := Bullets.initial_path
+
+      | `NoCheck -> 
+        subgoals := [] ; 
+        bullets := Bullets.empty_path
     end;
     None
 

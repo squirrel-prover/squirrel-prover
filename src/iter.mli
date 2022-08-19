@@ -3,19 +3,14 @@ module Sv = Vars.Sv
 module SE = SystemExpr
 
 (*------------------------------------------------------------------*)
-(** Iterate over all subterms.
-    Bound variables are represented as newly generated fresh variables.
-    When a macro is encountered, its expansion is visited as well. *)
-class iter :
-  cntxt:Constr.trace_cntxt ->
-  object method visit_message : Term.term -> unit end
-
 (** Fold over all subterms.
     Bound variables are represented as newly generated fresh variables.
     When a macro is encountered, its expansion is visited as well.
     Note that [iter] could be obtained as a derived class of [fold],
-    but this would break the way we modify the iteration using inheritance. *)
-class ['a] fold :
+    but this would break the way we modify the iteration using inheritance. 
+
+    Deprecated: use [Match.Pos.fold] or [fold_macro_support] instead. *)
+class ['a] deprecated_fold :
   cntxt:Constr.trace_cntxt ->
   object method fold_message : 'a -> Term.term -> 'a end
 
@@ -27,8 +22,10 @@ class ['a] fold :
     any guarantee on the indices and action used for that expansion,
     because [get_dummy_definition] is used -- this behaviour is disabled
     with [exact], in which case all macros will be expanded and must
-    thus be defined. *)
-class iter_approx_macros :
+    thus be defined.
+
+    Deprecated: use [Match.Pos.fold] or [fold_macro_support]. *)
+class deprecated_iter_approx_macros :
   exact:bool ->
   cntxt:Constr.trace_cntxt ->
   object
@@ -38,12 +35,15 @@ class iter_approx_macros :
   end
 
 (*------------------------------------------------------------------*)
-(** Collect occurrences of [f(_,k(_))] or [f(_,_,k(_))] for a function name [f]
-    and name [k]. We use the exact version of [iter_approx_macros], otherwise we
-    might obtain meaningless terms provided by [get_dummy_definition].
-    Patterns must be of the form [f(_,_,g(k(_)))] if allow_funs is defined
-    and [allows_funs g] returns true. *)
-class get_f_messages :
+(** Collect occurrences of [f(_,k(_))] or [f(_,_,k(_))] for a function
+    name [f] and name [k]. We use the exact version of
+    [deprecated_iter_approx_macros], otherwise we might obtain
+    meaningless terms provided by [get_dummy_definition].  Patterns
+    must be of the form [f(_,_,g(k(_)))] if allow_funs is defined and
+    [allows_funs g] returns true.
+
+    Deprecated: use [get_f_messages_ext] *)
+class deprecated_get_f_messages :
   ?drop_head:bool ->
   ?fun_wrap_key:(Term.fname -> bool) option ->
   cntxt:Constr.trace_cntxt ->

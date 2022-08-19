@@ -94,7 +94,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Tactics.Tactic_soft_failure e -> fk e
 
   (*------------------------------------------------------------------*)
-  let make_exact ?loc env ty name =
+  let make_exact_var ?loc env ty name =
     match Vars.make_exact env ty name with
     | None ->
       hard_failure ?loc
@@ -324,14 +324,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Global f ->
       let _, f =
         Match.Pos.map_e
-          ~mode:(`TopDown m_rec) expand_inst (S.vars s) (S.system s) f
+          ~mode:(`TopDown m_rec) expand_inst (S.system s) f
       in
       !found1, Global f
 
     | Local f ->
       let _, f =
         Match.Pos.map
-          ~mode:(`TopDown m_rec) expand_inst (S.vars s) (S.system s).set f
+          ~mode:(`TopDown m_rec) expand_inst (S.system s).set f
       in
       !found1, Local f
 
@@ -389,7 +389,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
     let _, f =
       Match.Pos.map
-        ~mode:(`TopDown true) expand_inst (S.vars s) sexpr f
+        ~mode:(`TopDown true) expand_inst sexpr f
     in
     f
 
@@ -794,7 +794,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Args.Unnamed
     | Args.AnyName     -> Vars.make `Approx env ty dflt_name
     | Args.Approx name -> Vars.make `Approx env ty name
-    | Args.Named name  -> make_exact env ty name
+    | Args.Named name  -> make_exact_var env ty name
 
   (*------------------------------------------------------------------*)
   (** Apply a naming pattern to a variable or hypothesis. *)
@@ -863,6 +863,21 @@ module MkCommonLowTac (S : Sequent.S) = struct
           in
           let ands = List.map (fun x -> Args.Unnamed, x) ands in
           let ids, s = Hyps.add_i_list ands s in
+          List.map (fun id -> `Hyp id) ids, s
+        end
+
+      else if S.Hyp.is_iff form then
+        begin 
+          if len <> 2 then destr_fail "expected 2 patterns";
+
+          let f1, f2 =
+            get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_iff form)
+          in
+          let forms = [S.Hyp.mk_impl f1 f2; S.Hyp.mk_impl f2 f1] in
+          let forms =
+            List.map (fun x -> Args.Unnamed, x) forms
+          in
+          let ids, s = Hyps.add_i_list forms s in
           List.map (fun id -> `Hyp id) ids, s
         end
 
@@ -967,7 +982,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       begin
         match S.Conc.decompose_forall form with
         | x :: vs, f ->
-          let x' = Vars.make_new_from x in
+          let x' = Vars.refresh x in
 
           let subst = [Term.ESubst (Term.mk_var x, Term.mk_var x')] in
 
@@ -1072,7 +1087,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     S.set_vars env s
 
   let _generalize ~dependent t s : Vars.var * S.t =
-    let v = Vars.make_new (Term.ty t) "_x" in
+    let v = Vars.make_fresh (Term.ty t) "_x" in
 
     let subst = [Term.ESubst (t, Term.mk_var v)] in
 
@@ -1368,7 +1383,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Type.Timestamp ->
       begin
         let env = Vars.of_list vs0 in
-        let _,v' = Vars.fresh env v in
+        let _,v' = Vars.make_approx env v in
 
         let ih =
           let atom_lt =
@@ -1636,7 +1651,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   let remember (id : Theory.lsymb) (term : Theory.term) s =
     let t, ty = convert s term in
-    let env, x = make_exact ~loc:(L.loc id) (S.vars s) ty (L.unloc id) in
+    let env, x = make_exact_var ~loc:(L.loc id) (S.vars s) ty (L.unloc id) in
     let subst = [Term.ESubst (t, Term.mk_var x)] in
 
     let s = S.subst subst (S.set_vars env s) in
@@ -1656,7 +1671,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** Split a conjunction conclusion, creating one subgoal per conjunct. *)
   let goal_and_right (s : S.t) : S.t list =
-    match S.Conc.destr_and (S.goal s) with
+    match S.Reduce.destr_and s S.conc_kind (S.goal s) with
     | Some (lformula, rformula) ->
       [ S.set_goal lformula s ;
         S.set_goal rformula s ]

@@ -71,6 +71,8 @@ module List : sig
 
   val find_mapi : (int -> 'a -> 'b option) -> 'a list -> 'b option 
 
+  val mem_cmp : eq:('a -> 'a -> bool) -> 'a -> 'a list -> bool
+
   exception Out_of_range
 end
 

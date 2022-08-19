@@ -2,6 +2,8 @@
 
 open Utils
 
+module SE = SystemExpr
+
 module Sv = Vars.Sv
 module Sp = Match.Pos.Sp
 
@@ -18,8 +20,9 @@ exception Var_found
 exception Not_name
 
 (*------------------------------------------------------------------*)
-class find_name ~(cntxt:Constr.trace_cntxt) exact name = object (self)
-  inherit Iter.iter_approx_macros ~exact ~cntxt as super
+(** Deprecated. *)
+class deprecated_find_name ~(cntxt:Constr.trace_cntxt) exact name = object (self)
+  inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
 
   method visit_message t = match t with
     | Term.Name ns -> if ns.s_symb = name then raise Name_found
@@ -29,23 +32,9 @@ class find_name ~(cntxt:Constr.trace_cntxt) exact name = object (self)
     | _ -> super#visit_message t
 end
 
-class get_name_indices ~(cntxt:Constr.trace_cntxt) exact name = object (self)
-  inherit Iter.iter_approx_macros ~exact ~cntxt as super
-
-  val mutable indices : (Vars.var list) list = []
-  method get_indices = List.sort_uniq Stdlib.compare indices
-
-  method visit_message t = match t with
-    | Term.Name ns ->
-      if ns.s_symb = name then indices <- ns.s_indices :: indices
-
-    | Term.Var m -> raise Var_found
-
-    | _ -> super#visit_message t
-end
-
-class get_actions ~(cntxt:Constr.trace_cntxt) = object (self)
-  inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
+(** Deprecated, use [get_actions_ext]. *)
+class deprecated_get_actions ~(cntxt:Constr.trace_cntxt) = object (self)
+  inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
 
   val mutable actions : Term.term list = []
   method get_actions = actions
@@ -110,19 +99,63 @@ type ts_occs = ts_occ list
 
 let pp_ts_occ fmt (occ : ts_occ) : unit = Iter.pp_occ Term.pp fmt occ
 
+(** Check if [t1] is included in the patterm [pat2], i.e. [t1 ∈ occ2]. *)
+let pat_subsumes
+    table (context : SE.context)
+    ?(mv : Match.Mvar.t = Match.Mvar.empty)
+    (t1 : Term.term) (pat2 : Term.term Term.pat) 
+  : Match.Mvar.t option
+  =
+  match Match.T.try_match ~mv table context t1 pat2
+  with
+  | FreeTyv | NoMatch _ -> None
+  | Match mv -> Some mv
 
-(** remove duplicates from occs for some subsuming relation. *)
-let clear_dup_mtso_le (occs : ts_occs) : ts_occs =
-  let subsumes (occ1 : ts_occ) (occ2 : ts_occ) =
-    (* for now, positions not allowed here *)
-    assert (Sp.is_empty occ1.occ_pos && Sp.is_empty occ2.occ_pos);
+(** Check if the term occurrence [occ2] subsumes [occ1], i.e. [occ1 ⊆ occ2]. *)
+let term_occ_subsumes
+    table (context : SE.context)
+    ?(mv : Match.Mvar.t = Match.Mvar.empty)
+    (occ1 : Term.term Iter.occ) (occ2 : Term.term Iter.occ) 
+  : bool
+  =
+  (* for now, positions not allowed here *)
+  assert (Sp.is_empty occ1.occ_pos && Sp.is_empty occ2.occ_pos);
 
-    (* FEATURE: alpha-renaming *)
-    List.length occ1.occ_vars = List.length occ2.occ_vars &&
-    List.for_all2 (=) occ1.occ_vars occ2.occ_vars &&
-    occ1.occ_cond = occ2.occ_cond &&
-    (occ1.occ_cnt = occ2.occ_cnt || occ1.occ_cnt = Term.mk_pred occ2.occ_cnt)
+  let pat2 = Term.{
+      pat_term = occ2.occ_cnt;
+      pat_tyvars = [];
+      pat_vars = Sv.of_list1 occ2.occ_vars; 
+    } in
+  match pat_subsumes table context occ1.occ_cnt pat2 with
+  | None -> false
+  | Some mv ->
+    (* start from the matching substutition [mv], and try to match all
+       conditions of [pat1.occ_conds] with a conditions of
+       [pat2.occ_conds], updating [mv] along the way if successful. *)
+    let mv = ref mv in
+
+    let mk_cond2 cond2 = Term.{ pat2 with pat_term = cond2; } in
+    List.for_all (fun cond1 ->
+        List.exists (fun cond2 ->
+            match 
+              pat_subsumes ~mv:(!mv) table context cond1 (mk_cond2 cond2)
+            with 
+            | None -> false
+            | Some mv' -> mv := mv'; true
+          ) occ2.occ_cond
+      ) occ1.occ_cond
+
+
+(** remove duplicates from [occs] using a subsuming relation. *)
+let remove_duplicate_term_occs
+    table (system : SE.arbitrary)
+    (occs : Term.term Iter.occs) : Term.term Iter.occs
+  =
+  let subsumes (occ1 : Term.term Iter.occ) (occ2 : ts_occ) =
+    let context = SE.{ set = system; pair = None; } in
+    term_occ_subsumes table context occ1 occ2
   in
+
   let occs =
     List.fold_left (fun acc occ ->
         let acc = List.filter (fun occ' -> not (subsumes occ occ')) acc in
@@ -182,17 +215,17 @@ let get_macro_actions
   let actions =
     List.concat_map (get_actions_ext cntxt) sources
   in
-  clear_dup_mtso_le actions
+  remove_duplicate_term_occs
+    cntxt.table (cntxt.system :> SE.arbitrary) actions
 
 (** [mk_le_ts_occ env ts0 occ] build a condition stating that [ts0] occurs
     before the macro timestamp occurrence [occ]. *)
 let mk_le_ts_occ
-    (env : Vars.env)
     (ts0 : Term.term)
     (occ : ts_occ) : Term.term
   =
   let occ_vars = occ.Iter.occ_vars in
-  let occ_vars, occ_subst = Term.refresh_vars (`InEnv (ref env)) occ_vars in
+  let occ_vars, occ_subst = Term.refresh_vars `Global occ_vars in
   let subst = occ_subst in
   let ts   = Term.subst subst occ.occ_cnt  in
 
@@ -205,9 +238,8 @@ let mk_le_ts_occ
        (Term.mk_ands cond))
 
 let mk_le_ts_occs
-    (env : Vars.env)
     (ts0 : Term.term)
     (occs : ts_occs) : Term.terms
   =
-  List.map (mk_le_ts_occ env ts0) occs |>
+  List.map (mk_le_ts_occ ts0) occs |>
   List.remove_duplicate (=)

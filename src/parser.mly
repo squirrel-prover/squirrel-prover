@@ -195,6 +195,7 @@ sterm_i:
 | s=RIGHTINFIXSYMB { s }
 | XOR              { "xor"  }
 | DARROW           { "=>" }
+| DEQUIVARROW      { "<=>" }
 
 /* ambiguous term */
 term_i:
@@ -204,13 +205,6 @@ term_i:
 | id=lsymb terms=term_list1 AT ts=term       { Theory.AppAt (id,terms,ts) }
 
 | t=term s=loc(infix_s) t0=term             { Theory.App (s, [t;t0]) }
-
-| f=term l=lloc(DEQUIVARROW) f0=term
-    { let loc = L.make $startpos $endpos in
-      let fi = L.mk_loc l "=>" in
-      let fa = L.mk_loc l "&&"  in
-      Theory.App (fa, [L.mk_loc loc (Theory.App (fi, [f;f0]));
-                       L.mk_loc loc (Theory.App (fi, [f0;f]))]) }
 
 | IF b=term THEN t=term t0=else_term
     { let fsymb = sloc $startpos $endpos "if" in

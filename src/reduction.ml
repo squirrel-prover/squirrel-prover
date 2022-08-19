@@ -30,9 +30,164 @@ let parse_simpl_args
           Tactics.hard_failure ~loc:(L.loc l) (Failure "unknown argument")
     ) param args
 
+
+(*------------------------------------------------------------------*)
+(** {2 Conversion} *)
+
+(** Conversion state *)
+(* FEATURE: conversion modulo *)
+type cstate = { 
+  table   : Symbols.table;
+  system  : SE.context;
+  param   : red_param;
+  hint_db : Hint.hint_db;
+  hyps    : THyps.hyps;
+
+  subst   : Term.subst;
+  (** pending variable to variable substitution (left -> right) *)
+
+  expand_context : Macros.expand_context;
+  (** expantion mode for macros. See [Macros.expand_context]. *)
+}
+
+
+(** Make a cstate directly *)
+let mk_cstate 
+    ?(system = SystemExpr.context_any)
+    ?(hint_db = Hint.empty_hint_db)
+    ?(expand_context = Macros.InSequent)
+    ?(hyps = THyps.empty)
+    ?(param = rp_default)
+    table 
+  : cstate 
+  =
+  { table; system; param; hint_db; hyps; expand_context;
+    subst = []; }
+
+(*------------------------------------------------------------------*)
+(** Internal *)
+exception NotConv
+
+let not_conv () = raise NotConv
+
+let conv_ty (ty1 : Type.ty) (ty2 : Type.ty) : unit =
+  if not (Type.equal ty1 ty2) then not_conv ()
+
+let conv_tys (tys1 : Type.ty list) (tys2 : Type.ty list) : unit =
+  List.iter2 conv_ty tys1 tys2
+
+let conv_ftype (ft1 : Type.ftype) (ft2 : Type.ftype) : unit =
+  if ft1.fty_iarr <> ft2.fty_iarr then not_conv ();
+  conv_ty  ft1.fty_out  ft2.fty_out;
+  conv_tys ft1.fty_args ft2.fty_args;
+  List.iter2 (fun tv1 tv2 ->
+      if not (tv1 = tv2) then not_conv ()
+    ) ft1.fty_vars ft2.fty_vars
+
+let conv_var (st : cstate) (v1 : Vars.var) (v2 : Vars.var) : unit =
+  if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then not_conv ();
+  if not (Vars.equal (Term.subst_var st.subst v1) v2) then not_conv ()
+
+let conv_vars (st : cstate) (vs1 : Vars.vars) (vs2 : Vars.vars) : unit =
+  List.iter2 (conv_var st) vs1 vs2
+
+let conv_bnd (st : cstate) (v1 : Vars.var) (v2 : Vars.var) : cstate =
+  if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then not_conv ();
+  { st with subst = Term.ESubst (Term.mk_var v1, Term.mk_var v2) :: st.subst }
+
+let conv_bnds (st : cstate) (vs1 : Vars.vars) (vs2 : Vars.vars) : cstate =
+  List.fold_left2 conv_bnd st vs1 vs2
+
+let rec conv (st : cstate) (t1 : Term.term) (t2 : Term.term) : unit =
+  match t1, t2 with
+  | Term.Fun ((fs1, li1), fty1, l1), Term.Fun ((fs2, li2), fty2, l2)
+    when fs1 = fs2 ->
+    conv_ftype fty1 fty2;
+    conv_vars st li1 li2;
+    conv_l st l1 l2
+
+  | Term.Name ns1, Term.Name ns2 when ns1.s_symb = ns2.s_symb ->
+    conv_vars st ns1.s_indices ns2.s_indices
+
+  | Term.Action (a1, is1), Term.Action (a2, is2) when a1 = a2 ->
+    conv_vars st is1 is2
+
+  | Term.Diff (Explicit l1), Term.Diff (Explicit l2) ->
+    List.iter2 (fun (p1, t1) (p2, t2) ->
+        if p1 <> p2 then not_conv ();
+        conv st t1 t2
+      ) l1 l2
+
+  | Term.Macro (ms1, terms1, ts1), Term.Macro (ms2, terms2, ts2)
+    when ms1.s_symb = ms2.s_symb ->
+    conv_vars st ms1.s_indices ms2.s_indices;
+    conv_l st (ts1 :: terms1) (ts2 :: terms2)
+
+  | Term.ForAll (is1, t1), Term.ForAll (is2, t2)
+  | Term.Exists (is1, t1), Term.Exists (is2, t2)
+  | Term.Seq    (is1, t1), Term.Seq    (is2, t2) ->
+    if List.length is1 <> List.length is2 then not_conv ();
+    let st = conv_bnds st is1 is2 in
+    conv st t1 t2
+
+  | Term.Find (is1, c1, t1, e1), Term.Find (is2, c2, t2, e2) ->
+    if List.length is1 <> List.length is2 then not_conv ();
+    let st' = conv_bnds st is1 is2 in
+    conv_l st' [c1; t1] [c2; t2];
+    conv st e1 e2
+
+  | Term.Var v1, Term.Var v2 -> conv_var st v1 v2
+
+  | _, _ -> not_conv ()
+
+and conv_l (st : cstate) (ts1 : Term.terms) (ts2 : Term.terms) : unit =
+  List.iter2 (conv st) ts1 ts2
+
+let rec conv_e (st : cstate) (e1 : Equiv.form) (e2 : Equiv.form) : unit =
+  match e1, e2 with
+  | Equiv.Quant (q1, vs1, e1), Equiv.Quant (q2, vs2, e2) when q1 = q2 ->
+    if List.length vs1 <> List.length vs2 then not_conv ();
+    let st = conv_bnds st vs1 vs2 in
+    conv_e st e1 e2
+
+  | Equiv.And  (el1, er1), Equiv.And  (el2, er2)
+  | Equiv.Or   (el1, er1), Equiv.Or   (el2, er2)
+  | Equiv.Impl (el1, er1), Equiv.Impl (el2, er2)->
+    conv_e_l st [el1; er1] [el2; er2]
+
+  | Equiv.Atom (Reach f1), Equiv.Atom (Reach f2) ->
+    let system = SE.{set = st.system.set; pair = None; } in
+    conv { st with system } f1 f2
+
+  | Equiv.Atom (Equiv ts1), Equiv.Atom (Equiv ts2) ->
+    let system =
+      SE.{set = (oget st.system.pair :> SE.arbitrary); pair = None; }
+    in
+    conv_l { st with system } ts1 ts2
+
+  | _, _ -> not_conv ()
+
+and conv_e_l
+    (st : cstate) (es1 : Equiv.form list) (es2 : Equiv.form list) : unit
+  =
+  List.iter2 (conv_e st) es1 es2
+
+
+(*------------------------------------------------------------------*)
+(** Exported *)
+let conv (s : cstate) (t1 : Term.term) (t2 : Term.term) : bool =
+  try conv s t1 t2; true with NotConv -> false
+
+(** Exported *)
+let conv_e (s : cstate) (t1 : Equiv.form) (t2 : Equiv.form) : bool =
+  try conv_e s t1 t2; true with NotConv -> false
+
 (*------------------------------------------------------------------*)
 module type S = sig
   type t                        (* type of sequent *)
+
+  (*------------------------------------------------------------------*)
+  (** {2 reduction } *)
 
   val reduce_term : 
     ?expand_context:Macros.expand_context ->
@@ -46,6 +201,9 @@ module type S = sig
     ?expand_context:Macros.expand_context ->
     ?system:SE.context -> red_param -> t -> 'a Equiv.f_kind -> 'a -> 'a
 
+  (*------------------------------------------------------------------*)
+  (** {2 expantion and destruction modulo } *)
+
   val expand_head_once :
     ?expand_context:Macros.expand_context ->
     ?se:SE.t -> 
@@ -53,6 +211,33 @@ module type S = sig
 
   val destr_eq : 
     t -> 'a Equiv.f_kind -> 'a -> (Term.term * Term.term) option
+
+  val destr_and : 
+    t -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
+
+  (*------------------------------------------------------------------*)
+  (** {2 conversion } *)
+
+  val conv_term  :
+    ?expand_context:Macros.expand_context -> 
+    ?se:SE.t -> 
+    ?param:red_param ->
+    t ->
+    Term.term -> Term.term -> bool
+
+  val conv_equiv : 
+    ?expand_context:Macros.expand_context ->
+    ?system:SE.context -> 
+    ?param:red_param ->
+    t ->
+    Equiv.form -> Equiv.form -> bool
+
+  val conv_kind : 
+    ?expand_context:Macros.expand_context ->
+    ?system:SE.context -> 
+    ?param:red_param ->
+    t -> 'a Equiv.f_kind ->
+    'a -> 'a -> bool
 end
 
 (*------------------------------------------------------------------*)
@@ -68,16 +253,17 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     (** expantion mode for macros. See [Macros.expand_context]. *)
   }
 
-  (** Internal *)
-  exception NoExp 
-
+  (*------------------------------------------------------------------*)
   let add_hyp (f : Term.term) hyps : THyps.hyps =
     THyps.add TacticsArgs.AnyName (Local f) hyps
 
-  
+  (*------------------------------------------------------------------*)  
+  (** Internal *)
+  exception NoExp 
+
   (* Invariant: we must ensure that fv(reduce(u)) ⊆ fv(t)
      Return: reduced term, reduction occurred *)
-  (* FEATURE: memoisation *)
+  (* FEATURE: memoisation? *)
   let rec reduce (st : state) (t : Term.term) : Term.term * bool = 
     let t, has_red = reduce_head_once st t in
 
@@ -266,7 +452,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       in
       t, has_red
 
-(*------------------------------------------------------------------*)
+  (*------------------------------------------------------------------*)
   (** [se] is the system of the term being reduced. *)
   (* computation must be fast *)
   let mk_state ~expand_context ~se (param : red_param) (s : S.t) : state = 
@@ -277,7 +463,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       hyps    = S.get_trace_hyps s; 
       expand_context; } 
 
-(*------------------------------------------------------------------*)
+  (*------------------------------------------------------------------*)
   (** Exported. *)
   let expand_head_once
       ?(expand_context : Macros.expand_context = InSequent)
@@ -288,8 +474,8 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     let se = odflt (S.system s).set se in
     let state = mk_state ~expand_context ~se param s in
     expand_head_once state t
-
-(*------------------------------------------------------------------*)
+      
+  (*------------------------------------------------------------------*)
   (** Exported. *)
   let reduce_term
       ?(expand_context : Macros.expand_context = InSequent)
@@ -351,11 +537,11 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     | Global_t -> reduce_equiv ~expand_context ?system param s x
     | Any_t ->
       match x with
-      | Local x -> Local (reduce_term  ~expand_context ?se     param s x)
+      | Local x   -> Local (reduce_term  ~expand_context ?se     param s x)
       | Global x -> Global (reduce_equiv ~expand_context ?system param s x)
 
  (*------------------------------------------------------------------*)
-  (* FIXME: use [s] to reduce [x] if necessary *)
+  (* FEATURE: use [s] to reduce [x] if necessary *)
   let destr_eq (type a)
       (s : S.t) (k : a Equiv.f_kind)
       (x : a) : (Term.term * Term.term) option
@@ -372,7 +558,94 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     | Global_t -> e_destr_eq x
     | Any_t ->
       match x with
-      | Local x ->   destr_eq x
+      | Local x  ->   destr_eq x
       | Global x -> e_destr_eq x
+
+  (* FEATURE: use [s] to reduce [x] if necessary *)
+  let destr_and (type a)
+      (s : S.t) (k : a Equiv.f_kind)
+      (x : a) : (a * a) option
+    =
+    let destr_and x =
+      match Term.destr_and x with
+      | Some _ as res -> res
+      | None ->
+        match Term.destr_iff x with
+        | Some (t1, t2) ->
+          Some (Term.mk_impl ~simpl:false t1 t2,
+                Term.mk_impl ~simpl:false t2 t1)
+            
+        | None -> None
+    in
+    let e_destr_and x = Equiv.Smart.destr_and x in
+
+    match k with
+    | Local_t  ->   destr_and x
+    | Global_t -> e_destr_and x
+    | Any_t ->
+      match x with
+      | Local x ->
+        omap (fun (x,y) -> Equiv.Local x, Equiv.Local y) (destr_and x)
+      | Global x ->
+        omap (fun (x,y) -> Equiv.Global x, Equiv.Global y) (e_destr_and x)
+
+  (*------------------------------------------------------------------*)
+  (** Make a cstate from a sequent *)
+  let cstate_of_seq
+      (expand_context : Macros.expand_context)
+      (system : SE.context) 
+      (param : red_param) (s : S.t) : cstate 
+    =
+    { table   = S.table s;
+      system;
+      param;
+      hint_db = S.hint_db s;
+      hyps    = S.get_trace_hyps s; 
+      expand_context;
+      subst   = []; } 
+  
+  (*------------------------------------------------------------------*)
+  (** Exported. *)
+  let conv_term
+      ?(expand_context : Macros.expand_context = InSequent)
+      ?(se : SE.arbitrary option)
+      ?(param : red_param = rp_default)
+      (s : S.t)
+      (t1 : Term.term) (t2 : Term.term) : bool
+    =
+    let se = odflt (S.system s).set se in
+    let system = SE.{set = se; pair = None; } in
+    let state = cstate_of_seq expand_context system param s in
+    conv state t1 t2
+
+  (** Exported. *)
+  let conv_equiv
+      ?(expand_context : Macros.expand_context = InSequent)
+      ?(system : SE.context option)
+      ?(param : red_param = rp_default)
+      (s : S.t)
+      (e1 : Equiv.form) (e2 : Equiv.form) : bool
+    =
+    let state = cstate_of_seq expand_context (S.system s) param s in
+    conv_e state e1 e2
+
+  (** We need type introspection there *)
+  let conv_kind (type a) 
+      ?(expand_context : Macros.expand_context = InSequent)
+      ?(system : SE.context option)
+      ?(param : red_param = rp_default)
+      (s : S.t) (k : a Equiv.f_kind)
+      (x1 : a) (x2 : a) : bool
+    =
+    let se = omap (fun system -> system.SE.set) system in
+    match k with
+    | Local_t  -> conv_term  ~expand_context ?se     ~param s x1 x2
+    | Global_t -> conv_equiv ~expand_context ?system ~param s x1 x2
+    | Any_t ->
+      match x1, x2 with
+      | Local  x1, Local  x2 -> conv_term  ~expand_context ?se     ~param s x1 x2
+      | Global x1, Global x2 -> conv_equiv ~expand_context ?system ~param s x1 x2
+      | _, _ -> false
+
 end
 

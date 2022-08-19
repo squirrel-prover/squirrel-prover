@@ -8,10 +8,7 @@ module Sp = Pos.Sp
 module SE = SystemExpr
   
 (*------------------------------------------------------------------*)
-(** Iterate over all subterms.
-  * Bound variables are represented as newly generated fresh variables.
-  * When a macro is encountered, its expansion is visited as well. *)
-class iter ~(cntxt:Constr.trace_cntxt) = object (self)
+class deprecated_iter ~(cntxt:Constr.trace_cntxt) = object (self)
   method visit_message (t : Term.term) = match t with
     | Fun (_, _,l) -> List.iter self#visit_message l
 
@@ -47,12 +44,8 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
     | Term.Action _ -> ()
 end
 
-(** Fold over all subterms.
-  * Bound variables are represented as newly generated fresh variables.
-  * When a macro is encountered, its expansion is visited as well.
-  * Note that [iter] could be obtained as a derived class of [fold],
-  * but this would break the way we modify the iteration using inheritance.  *)
-class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
+(*------------------------------------------------------------------*)
+class ['a] deprecated_fold ~(cntxt:Constr.trace_cntxt) = object (self)
   method fold_message (x : 'a) (t : Term.term) : 'a = match t with
     | Fun (_, _,l) -> List.fold_left self#fold_message x l
 
@@ -90,17 +83,11 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
 
 end
 
-(** Iterator that does not visit macro expansions but guarantees that,
-  * for macro symbols [m] other that input, output, cond, exec, frame
-  * and states, if [m(...)@..] occurs in the visited terms then
-  * a specific expansion of [m] will have been visited, without
-  * any guarantee on the indices and action used for that expansion,
-  * because [get_dummy_definition] is used -- this behaviour is disabled
-  * with [exact], in which case all macros will be expanded and must
-  * thus be defined. *)
-class iter_approx_macros ~exact ~(cntxt:Constr.trace_cntxt) = object (self)
+(*------------------------------------------------------------------*)
+class deprecated_iter_approx_macros ~exact ~(cntxt:Constr.trace_cntxt) = 
+  object (self)
 
-  inherit iter ~cntxt as super
+  inherit deprecated_iter ~cntxt as super
 
   val mutable checked_macros = []
 
@@ -126,15 +113,11 @@ class iter_approx_macros ~exact ~(cntxt:Constr.trace_cntxt) = object (self)
     | m -> super#visit_message m
 end
 
-(** Collect occurrences of [f(_,k(_))] or [f(_,_,k(_))] for a function name [f]
-    and name [k]. We use the exact version of [iter_approx_macros], otherwise we
-    might obtain meaningless terms provided by [get_dummy_definition].
-    Patterns must be of the form [f(_,_,g(k(_)))] if allow_funs is defined
-    and [allows_funs g] returns true. *)
-class get_f_messages ?(drop_head=true)
+(*------------------------------------------------------------------*)
+class deprecated_get_f_messages ?(drop_head=true)
     ?(fun_wrap_key=None)
     ~(cntxt:Constr.trace_cntxt) f k = object (self)
-  inherit iter_approx_macros ~exact:true ~cntxt as super
+  inherit deprecated_iter_approx_macros ~exact:true ~cntxt as super
   val mutable occurrences : (Vars.var list * Term.term) list = []
   method get_occurrences = occurrences
   method visit_message = function
@@ -474,7 +457,7 @@ let get_f_messages_ext
   in
 
   let occs, _, _ =
-    Pos.map_fold ~mode:(`TopDown true) func (Vars.of_list fv) sexpr [] t
+    Pos.map_fold ~mode:(`TopDown true) func sexpr [] t
   in
   occs
 
@@ -703,12 +686,12 @@ end = struct
                  - otherwise, we must use a fresh universally quantified var. *)
               if v_a = v_b
               then false, v_a
-              else true, Vars.make_new Type.Index "i"
+              else true, Vars.make_fresh Type.Index "i"
 
             (* [v_a] or [v_b] is not a constant.
                In that case, use a universally quantified variable. *)
-            | true, _ -> true, Vars.make_new_from v_a
-            | _, true -> true, Vars.make_new_from v_b
+            | true, _ -> true, Vars.refresh v_a
+            | _, true -> true, Vars.refresh v_b
           in
 
           (* update [indices_r] *)
@@ -727,7 +710,7 @@ end = struct
     mk ~env:Sv.empty ~msymb:join_ms ~indices:(!indices_r)
 
   let incl table (sexpr : SE.fset) (s1 : t) (s2 : t) : bool =
-    let tv = Vars.make_new Type.Timestamp "t" in
+    let tv = Vars.make_fresh Type.Timestamp "t" in
     let term1 = Term.mk_macro s1.msymb [] (Term.mk_var tv) in
     let term2 = Term.mk_macro s2.msymb [] (Term.mk_var tv) in
 

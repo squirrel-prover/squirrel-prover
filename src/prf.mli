@@ -18,7 +18,3 @@ val prf_condition_side :
   Term.term ->
   Term.term ->
   (Term.form * Term.form) option
-
-(** From two conjunction formulas p and q, produce a minimal diff(p, q),
-    of the form (p inter q) && diff (p minus q, q minus p). *)
-val combine_conj_formulas : Term.term -> Term.term -> Term.term

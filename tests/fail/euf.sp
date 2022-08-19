@@ -1,11 +1,8 @@
-
-
 (** Euf Test Suite  *)
 
-
 hash h
-name k:message
-name cst:message
+name k : message
+name cst : message.
 
 signature sign, checksign, pk
 
@@ -25,7 +22,6 @@ channel c
 (** SSC Failures checking *)
 (**************************)
 system null.
-
 
 
 (** BEGIN TEST -- AUTOMATICALLY INCLUDED IN MANUAL **)

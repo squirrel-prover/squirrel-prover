@@ -7,8 +7,11 @@
 type equiv = Term.term list
 
 val pp_equiv : Format.formatter -> equiv -> unit
-val pp_equiv_numbered : Format.formatter -> equiv -> unit
 
+val  pp_equiv_numbered :             Format.formatter -> equiv -> unit
+val _pp_equiv_numbered : dbg:bool -> Format.formatter -> equiv -> unit
+
+(*------------------------------------------------------------------*)
 val subst_equiv : Term.subst -> equiv -> equiv
 
 (** Free variables of an [equiv]. *)
@@ -44,7 +47,9 @@ type form =
   | And   of form * form
   | Or    of form * form
 
-val pp : Format.formatter -> form -> unit
+val pp     :             Format.formatter -> form -> unit
+val _pp    : dbg:bool -> Format.formatter -> form -> unit
+val pp_dbg :             Format.formatter -> form -> unit
 
 val mk_quant  : quant -> Vars.var list -> form -> form
 val mk_forall :          Vars.var list -> form -> form
@@ -100,7 +105,10 @@ type _ f_kind =
 module Any : sig
   type t = any_form
 
-  val pp : Format.formatter -> t -> unit
+  val pp     :             Format.formatter -> t -> unit
+  val _pp    : dbg:bool -> Format.formatter -> t -> unit
+  val pp_dbg :             Format.formatter -> t -> unit
+
   val subst : Term.subst -> t -> t
   val fv : t -> Vars.Sv.t
 

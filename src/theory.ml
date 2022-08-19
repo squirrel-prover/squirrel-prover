@@ -485,6 +485,7 @@ let check_action (env : Env.t) (s : lsymb) (n : int) : unit =
   try
     let system = SE.to_compatible env.system.set in
     ignore (SE.action_to_term env.table system action)
+  (* TODO: remove catch-all exception *)
   with _ -> conv_err (L.loc s) (UndefInSystem env.system.set)
 
 
@@ -754,7 +755,9 @@ let convert_var
   : Term.term
   =
   try
-    let v = Vars.find state.env.vars (L.unloc st) in
+    let v = as_seq1 (Vars.find state.env.vars (L.unloc st)) in
+    (* cannot have two variables with the same name since previous 
+       definitions must have been shadowed *)
 
     let of_t = var_of_lsymb st in
 

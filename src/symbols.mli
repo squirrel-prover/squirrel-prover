@@ -350,6 +350,7 @@ val fs_false : fname
 val fs_and   : fname
 val fs_or    : fname
 val fs_impl  : fname
+val fs_iff   : fname
 val fs_not   : fname
 val fs_ite   : fname
 

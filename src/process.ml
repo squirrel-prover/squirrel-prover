@@ -1,3 +1,5 @@
+open Utils
+
 module L = Location
 
 let dum : L.t = L._dummy
@@ -314,7 +316,7 @@ let declare
 (*------------------------------------------------------------------*)
 (* Enable/disable debug messages by setting debug to debug_on/off. *)
 
-let debug_off fmt = Format.fprintf Printer.dummy_fmt fmt
+let[@warning "-32"] debug_off fmt = Format.fprintf Printer.dummy_fmt fmt
 let[@warning "-32"] debug_on fmt =
   Format.printf "[DEBUG] " ;
   Format.printf fmt
@@ -411,12 +413,14 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
   let create_subst (venv : Vars.env) isubst msubst =
     List.map (fun (x,_,tm) -> 
-        let v = Vars.find venv x in
+        let v = as_seq1 (Vars.find venv x) in
+        (* cannot have two variables with the same name since previous 
+           definitions must have been shadowed *)
         Term.ESubst (Term.mk_var v, Term.mk_var tm)
       ) isubst
     @
     List.map (fun (x,_,tm) -> 
-        let v = Vars.find venv x in
+        let v = as_seq1 (Vars.find venv x) in (* idem *)
         Term.ESubst (Term.mk_var v, tm)
       ) msubst
   in
@@ -458,7 +462,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
     let action = List.rev penv.action in
     let in_ch, in_var = match penv.inputs with
-    | (c,v)::_ -> (c,Vars.name v)
+    | (c,v) :: _ -> c, Vars.name v
     | _ -> assert false
     in
     let indices = List.rev penv.indices in
@@ -473,7 +477,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     (* override previous term substitution for input variable
     * to use the known action *)
     let subst_input =
-      try [Term.ESubst (snd (list_assoc (in_var) penv.msubst), in_tm)]
+      try [Term.ESubst (snd (list_assoc in_var penv.msubst), in_tm)]
       with Not_found -> []
     in
 
@@ -503,8 +507,9 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       List.rev penv.evars,
       Term.subst
         (subst_ts @ subst_input)
-        (Term.mk_ands penv.facts)
+        (Term.mk_ands penv.facts) 
     in
+    debug "condition = %a.@." Term.pp (snd condition);
 
     let updates =
       List.map (fun (s,l,ty,t) ->
@@ -543,7 +548,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
         condition; updates; output; } 
     in
 
-    let table, new_a, action_descr =
+    let table, new_a, _ =
       System.register_action table system_name action_descr
     in
 
@@ -552,8 +557,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     in
 
     debug "descr = %a@." Action.pp_descr action_descr ;
-    let new_indices = action_descr.indices in
-    let new_action_term = Term.mk_action new_a new_indices in
+    let new_action_term = Term.mk_action new_a action_descr.indices in
     let new_in_tm = Term.mk_macro Term.in_macro [] new_action_term in
     let penv =
       { penv with

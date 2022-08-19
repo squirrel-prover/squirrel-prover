@@ -196,6 +196,11 @@ module List = struct
       ) l);
       None
     with Found res -> res
+
+  let rec mem_cmp ~eq x = function
+      [] -> false
+    | a::l -> eq a x || mem_cmp ~eq x l
+
 end
 
 (*------------------------------------------------------------------*)

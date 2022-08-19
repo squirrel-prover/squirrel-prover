@@ -38,6 +38,6 @@ goal independency_bis (i:index,j:index):
   h(m1(i),k) <> m1(j).
 Proof.
  intro Hneq Heq /=. 
- have H : m1(i) = m1(j) || k = m1(j) by auto.
+ have H : k = m1(j) || m1(i) = m1(j) by auto.
  by case H.
 Qed.

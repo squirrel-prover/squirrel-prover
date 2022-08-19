@@ -86,7 +86,6 @@ module Pos : sig
   val map_fold : 
     ?mode:[`TopDown of bool | `BottomUp] -> 
     'a f_map_fold ->            (* folding function *)
-    Vars.env ->                 (* for clean variable naming *)
     SE.arbitrary ->
     'a ->                       (* folding value *)
     Term.term -> 
@@ -96,7 +95,6 @@ module Pos : sig
   val map_fold_e : 
     ?mode:[`TopDown of bool | `BottomUp] -> 
     'a f_map_fold ->            (* folding function *)
-    Vars.env ->                 (* for clean variable naming *)
     SE.context ->
     'a ->                       (* folding value *)
     Equiv.form -> 
@@ -108,7 +106,6 @@ module Pos : sig
   val map : 
     ?mode:[`TopDown of bool | `BottomUp] ->
     f_map ->
-    Vars.env ->
     SE.arbitrary ->
     Term.term ->
     bool * Term.term
@@ -118,7 +115,6 @@ module Pos : sig
   val map_e :
     ?mode:[`TopDown of bool | `BottomUp] ->
     f_map ->
-    Vars.env ->
     SE.context ->
     Equiv.form ->
     bool * Equiv.form
@@ -128,7 +124,6 @@ module Pos : sig
   val fold : 
     ?mode:[`TopDown of bool | `BottomUp] -> 
     'a f_fold ->
-    Vars.env ->
     SE.arbitrary ->
     'a ->
     Term.term -> 
@@ -138,7 +133,6 @@ module Pos : sig
   val fold_e : 
     ?mode:[`TopDown of bool | `BottomUp] -> 
     'a f_fold ->
-    Vars.env ->
     SE.context ->
     'a ->
     Equiv.form -> 
@@ -150,7 +144,6 @@ module Pos : sig
       to propagate it when folding *)
   val fold_shallow : 
     'a f_fold ->          (* function to apply on each subterm at depth 1 *)
-    env:Vars.env ->       (* environment for the larger term (for renaming) *)
     se:SE.arbitrary ->    (* system expr for the current position *)
     fv:Vars.vars ->       (* variables bound above the current position *)
     cond:Term.terms ->    (* conditions for the current position *)
@@ -259,7 +252,6 @@ module type S = sig
     ?option:match_option ->
     Symbols.table ->
     SE.context ->
-    Vars.env ->
     Term.term Term.pat -> 
     t -> 
     Term.term list

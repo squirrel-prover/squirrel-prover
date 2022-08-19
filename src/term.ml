@@ -46,31 +46,41 @@ type state = msymb
 (*------------------------------------------------------------------*)
 let pp_name ppf s = (Printer.kws `GoalName) ppf (Symbols.to_string s)
 
-let pp_nsymb ppf (ns : nsymb) =
+(*------------------------------------------------------------------*)
+let _pp_nsymb ~dbg ppf (ns : nsymb) =
   if ns.s_indices <> []
-  then Fmt.pf ppf "%a(%a)" pp_name ns.s_symb Vars.pp_list ns.s_indices
+  then Fmt.pf ppf "%a(%a)" pp_name ns.s_symb (Vars._pp_list ~dbg) ns.s_indices
   else Fmt.pf ppf "%a" pp_name ns.s_symb
 
-let pp_nsymbs ppf (l : nsymb list) =
+let _pp_nsymbs ~dbg ppf (l : nsymb list) =
   Fmt.pf ppf "@[<hov>%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ", ") pp_nsymb) l
+    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ", ") (_pp_nsymb ~dbg)) l
 
+let pp_nsymb  = _pp_nsymb  ~dbg:false
+let pp_nsymbs = _pp_nsymbs ~dbg:false
+
+(*------------------------------------------------------------------*)
 let pp_fname ppf s = (Printer.kws `GoalFunction) ppf (Symbols.to_string s)
 
-let pp_fsymb ppf (fn,is) = match is with
+let _pp_fsymb ~dbg ppf (fn,is) = match is with
   | [] -> Fmt.pf ppf "%a" pp_fname fn
-  | _ -> Fmt.pf ppf "%a(%a)" pp_fname fn Vars.pp_list is
+  | _ -> Fmt.pf ppf "%a(%a)" pp_fname fn (Vars._pp_list ~dbg) is
 
+let pp_fsymb = _pp_fsymb ~dbg:false
+
+(*------------------------------------------------------------------*)
 let pp_mname_s ppf s =
   (Printer.kws `GoalMacro) ppf s
 
 let pp_mname ppf s =
   pp_mname_s ppf (Symbols.to_string s)
 
-let pp_msymb ppf (ms : msymb) =
+let _pp_msymb ~dbg ppf (ms : msymb) =
   Fmt.pf ppf "%a%a"
     pp_mname ms.s_symb
-    (Utils.pp_ne_list "(%a)" Vars.pp_list) ms.s_indices
+    (Utils.pp_ne_list "(%a)" (Vars._pp_list ~dbg)) ms.s_indices
+
+let pp_msymb = _pp_msymb ~dbg:false
 
 (*------------------------------------------------------------------*)
 (** {2 Atoms and terms} *)
@@ -188,6 +198,7 @@ let f_true   = mk Symbols.fs_true
 let f_and    = mk Symbols.fs_and
 let f_or     = mk Symbols.fs_or
 let f_impl   = mk Symbols.fs_impl
+let f_iff    = mk Symbols.fs_iff
 let f_not    = mk Symbols.fs_not
 let f_ite    = mk Symbols.fs_ite
 
@@ -285,6 +296,7 @@ module SmartConstructors = struct
   let mk_and_ns  t0 t1 = mk_fbuiltin Symbols.fs_and  [] [t0;t1]
   let mk_or_ns   t0 t1 = mk_fbuiltin Symbols.fs_or   [] [t0;t1]
   let mk_impl_ns t0 t1 = mk_fbuiltin Symbols.fs_impl [] [t0;t1]
+  let mk_iff_ns  t0 t1 = mk_fbuiltin Symbols.fs_iff  [] [t0;t1]
 
   let mk_eq_ns  t0 t1 = mk_fbuiltin Symbols.fs_eq  [] [t0;t1]
   let mk_neq_ns t0 t1 = mk_fbuiltin Symbols.fs_neq [] [t0;t1]
@@ -339,6 +351,11 @@ module SmartConstructors = struct
     | tf, _ when tf = mk_false && simpl -> mk_true
     | tt, t when tt = mk_true && simpl -> t
     | t1,t2 -> mk_impl_ns t1 t2
+
+  let mk_iff ?(simpl=true) t1 t2 = match t1,t2 with
+    | tf, _ when tf = mk_true && simpl -> t2
+    | _, tf when tf = mk_true && simpl -> t1
+    | t1,t2 -> mk_iff_ns t1 t2
 
   let mk_impls ?(simpl=true) ts t =
     List.fold_left (fun tres t0 -> (mk_impl ~simpl) t0 tres) t ts
@@ -522,19 +539,10 @@ module SmartDestructors = struct
   let destr_or   f = oas_seq2 (destr_fun ~fs:f_or   f)
   let destr_and  f = oas_seq2 (destr_fun ~fs:f_and  f)
   let destr_impl f = oas_seq2 (destr_fun ~fs:f_impl f)
+  let destr_iff  f = oas_seq2 (destr_fun ~fs:f_iff f)
   let destr_pair f = oas_seq2 (destr_fun ~fs:f_pair f)
 
-  let destr_iff f = 
-    match f with
-    | Fun (fs, _, [Fun (fs1, _, [t1 ; t2]);
-                   Fun (fs2, _, [t2'; t1'])]) 
-      when fs = f_and && fs1 = f_impl && fs2 = f_impl ->
-      if t1 = t1' && t2 = t2' then Some (t1, t2) else None
-
-    | _ -> None 
-
   (*------------------------------------------------------------------*)
-  (* let destr_neq f = oas_seq2 (obind (destr_fun ~fs:f_eq) (destr_not f)) *)
   let destr_neq f = oas_seq2 (destr_fun ~fs:f_neq f)
   let destr_eq  f = oas_seq2 (destr_fun ~fs:f_eq  f)
   let destr_leq f = oas_seq2 (destr_fun ~fs:f_leq f)
@@ -611,6 +619,8 @@ module SmartDestructors = struct
   let is_or   f = destr_or   f <> None
   let is_and  f = destr_and  f <> None
   let is_impl f = destr_impl f <> None
+  let is_iff  f = destr_iff  f <> None
+
   (* is_pair is unused but having it seems to make sense *)
   let[@warning "-32"] is_pair f = destr_pair f <> None
 
@@ -643,456 +653,18 @@ let destr_action = function
   | _ -> None
 
 (*------------------------------------------------------------------*)
-(** {2 Printing} *)
-let pp_indices ppf l =
-  if l <> [] then Fmt.pf ppf "(%a)" Vars.pp_list l
-
-let pp_ord ppf = function
-  | `Eq -> Fmt.pf ppf "="
-  | `Neq -> Fmt.pf ppf "<>"
-  | `Leq -> Fmt.pf ppf "<="
-  | `Geq -> Fmt.pf ppf ">="
-  | `Lt -> Fmt.pf ppf "<"
-  | `Gt -> Fmt.pf ppf ">"
-
-let rec is_and_happens = function
-  | Fun (f, _, [t]) when f = f_happens -> true
-  | _ as f ->  match destr_and f with
-    | Some (l,r) -> is_and_happens l && is_and_happens r
-    | _ -> false
-
-(*------------------------------------------------------------------*)
-(** Additional printing information *)
-type pp_info = { styler : pp_info -> term -> Printer.keyword option * pp_info; }
-
-let default_pp_info = { styler = fun info _ -> None, info; }
-
-
-let styled_opt (err : Printer.keyword option) printer =
-  match err with
-  | None -> printer
-  | Some kw -> fun ppf t -> (Printer.kw kw ppf "%a" printer t)
-
-(*------------------------------------------------------------------*)
-let toplevel_prec = 0
-
-let quant_fixity = 5  , `Prefix
-
-(* binary *)
-let impl_fixity        = 10 , `Infix `Right
-let iff_fixity         = 12 , `Infix `Right
-let pair_fixity        = 20 , `NoParens
-let or_fixity          = 20 , `Infix `Right
-let and_fixity         = 25 , `Infix `Right
-let xor_fixity         = 26 , `Infix `Right
-let eq_fixity          = 27 , `Infix `NonAssoc
-let order_fixity       = 29 , `Infix `NonAssoc
-let ite_fixity         = 40 , `Infix `Left
-let other_infix_fixity = 50 , `Infix `Right
-
-let not_fixity   = 26 , `Prefix
-
-let seq_fixity     = 1000 , `Prefix
-let find_fixity    = 1000 , `Prefix
-let macro_fixity   = 1000 , `NoParens
-let diff_fixity    = 1000 , `NoParens
-let fun_fixity     = 1000 , `NoParens
-let happens_fixity = 1000 , `NoParens
-
-
-let get_infix_prec (f : Symbols.fname) =
-  (* *)if f = Symbols.fs_and  then fst and_fixity 
-  else if f = Symbols.fs_or   then fst or_fixity 
-  else if f = Symbols.fs_impl then fst impl_fixity 
-  else if f = Symbols.fs_xor  then fst xor_fixity 
-  else if f = Symbols.fs_eq   then fst eq_fixity 
-  else if f = Symbols.fs_neq  then fst eq_fixity 
-  else if f = Symbols.fs_leq  then fst order_fixity 
-  else if f = Symbols.fs_lt   then fst order_fixity 
-  else if f = Symbols.fs_gt   then fst order_fixity 
-  else if f = Symbols.fs_geq  then fst order_fixity 
-  else                             fst other_infix_fixity
-
-(*------------------------------------------------------------------*)
-
-(** Applies the styling info in [info]
-    NOTE: this is *not* the [pp] exported by the module, it is shadowed later *)
-let rec pp
-    (info         : pp_info)
-    ((outer,side) : ('b * fixity) * assoc)
-    (ppf          : Format.formatter)
-    (t            : term)
-  : unit
-  =
-  let err_opt, info = info.styler info t in
-  styled_opt err_opt (_pp info (outer, side)) ppf t
-
-(** Core printing function *)
-and _pp
-    (info         : pp_info)
-    ((outer,side) : ('b * fixity) * assoc)
-    (ppf          : Format.formatter)
-    (t            : term)
-  : unit
-  =
-  let pp = pp info in
-
-  match t with
-  | Var m -> Fmt.pf ppf "%a" Vars.pp m
-
-  | Fun (s,_,[a]) when s = f_happens -> pp_happens info ppf [a]
-
-  (* if-then-else, no else *)
-  | Fun (s,_,[b;c; Fun (f,_,[])])
-    when s = f_ite && f = f_zero ->
-    let pp fmt () =
-      Fmt.pf ppf "@[<hov 2>if %a@ then@ %a@]"
-        (pp (ite_fixity, `NonAssoc)) b
-        (pp (ite_fixity, `Right)) c
-    in
-    maybe_paren ~outer ~side ~inner:ite_fixity pp ppf ()
-
-  (* if-then-else, true/false *)
-  | Fun (s,_,[b;Fun (f1,_,[]);Fun (f2,_,[])])
-    when s = f_ite && f1 = f_true && f2 = f_false ->
-    Fmt.pf ppf "%a"
-      (pp (ite_fixity, `NonAssoc)) b
-
-  (* if-then-else, general case *)
-  | Fun (s,_,[a;b;c]) when s = f_ite ->
-    let pp fmt () =
-      Fmt.pf ppf "@[<hv 0>@[<hov 2>if %a@ then@ %a@]@ %a@]"
-        (pp (ite_fixity, `NonAssoc)) a
-        (pp (ite_fixity, `NonAssoc)) b
-        (pp_chained_ite info)        c (* prints the [else] *)
-    in
-    maybe_paren ~outer ~side ~inner:ite_fixity pp ppf ()
-
-  (* pair *)
-  | Fun (s,_,terms) when s = f_pair ->
-    Fmt.pf ppf "%a"
-      (Utils.pp_ne_list
-         "<@[<hov>%a@]>"
-         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,")
-            (pp (pair_fixity, `NonAssoc))))
-      terms
-
-  (* iff. <=> *)
-  | Fun (fa,_,[Fun (fi1,_,[bl1;br1]);
-               Fun (fi2,_,[br2;bl2])])
-    when fa = f_and && fi1 = f_impl && fi2 = f_impl &&
-         bl1 = bl2 && br1 = br2 ->
-    let pp fmt () =
-      Fmt.pf ppf "@[%a@ <=>@ %a@]"
-        (pp (iff_fixity, `Left)) bl1
-        (pp (iff_fixity, `Right)) br1
-    in
-    maybe_paren ~outer ~side ~inner:iff_fixity pp ppf ()
-
-  (* happens *)
-  | Fun _ as f when is_and_happens f ->
-    pp_and_happens info ppf f
-
-  (* infix *)
-  | Fun ((s,is),_,[bl;br]) when Symbols.is_infix s ->
-    let assoc = Symbols.infix_assoc s in
-    let prec = get_infix_prec s in
-    assert (is = []);
-    let pp fmt () =
-      Fmt.pf ppf "@[<0>%a %s@ %a@]"
-        (pp ((prec, `Infix assoc), `Left)) bl
-        (Symbols.to_string s)
-        (pp ((prec, `Infix assoc), `Right)) br
-    in
-    maybe_paren ~outer ~side ~inner:(prec, `Infix assoc) pp ppf ()
-
-  (* not *)
-  | Fun (s,_,[b]) when s = f_not ->
-    Fmt.pf ppf "@[<hov 2>not(%a)@]" (pp (not_fixity, `Right)) b
-
-  (* true/false *)
-  | Fun _ as tt  when tt = mk_true ->  Fmt.pf ppf "true"
-  | Fun _  as tf when tf = mk_false -> Fmt.pf ppf "false"
-
-  (* constant *)
-  | Fun (f,_,[]) ->
-    Fmt.pf ppf "%a" pp_fsymb f
-
-  (* arity one *)
-  | Fun (f,_,[a]) ->
-    Fmt.pf ppf "@[<hov 2>%a(@,%a)@]"
-      pp_fsymb f
-      (pp (fun_fixity, `NonAssoc)) a
-
-  (* function symbol, general case *)
-  | Fun (f,_,terms) ->
-    Fmt.pf ppf "@[<hov 2>%a(%a)@]"
-      pp_fsymb f
-      (Utils.pp_ne_list
-         "%a"
-         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,")
-            (pp (fun_fixity, `NonAssoc))))
-      terms
-
-  | Name n -> pp_nsymb ppf n
-
-  | Macro (m, l, ts) ->
-    Fmt.pf ppf "@[%a%a@%a@]"
-      pp_msymb m
-      (Utils.pp_ne_list
-         "(@[<hov>%a@])"
-         (Fmt.list ~sep:Fmt.comma (pp (macro_fixity, `NonAssoc)))) l
-      (pp (macro_fixity, `NonAssoc)) ts
-
-  | Seq (vs, b) ->
-    Fmt.pf ppf "@[<hov 2>seq(%a->@,%a)@]"
-      Vars.pp_typed_list vs (pp (seq_fixity, `NonAssoc)) b
-
-  | Action (symb,indices) ->
-    Printer.kw `GoalAction ppf "%s%a" (Symbols.to_string symb) pp_indices indices
-
-  | Diff (Explicit l) ->
-    Fmt.pf ppf "@[<hov 2>diff(@,%a)@]"
-      (Fmt.list ~sep:(fun fmt () -> Format.fprintf fmt ",@ ")
-         (pp (diff_fixity, `NonAssoc)))
-      (List.map snd l) (* TODO labels *)
-
-  | Find (b, c, d, Fun (f,_,[])) when f = f_zero ->
-    let pp fmt () =
-      Fmt.pf ppf "@[<hv 0>\
-                  @[<hov 2>try find %a such that@ %a@]@;<1 0>\
-                  @[<hov 2>in@ %a@]@]"
-        Vars.pp_typed_list b
-        (pp (find_fixity, `NonAssoc)) c
-        (pp (find_fixity, `Right)) d
-    in
-    maybe_paren ~outer ~side ~inner:find_fixity pp ppf ()
-
-  | Find (b, c, d, e) ->
-    let pp fmt () =
-      Fmt.pf ppf "@[<hv 0>\
-                  @[<hov 2>try find %a such that@ %a@]@;<1 0>\
-                  @[<hov 2>in@ %a@]@;<1 0>\
-                  %a@]"
-        Vars.pp_typed_list b
-        (pp (find_fixity, `NonAssoc)) c
-        (pp (find_fixity, `NonAssoc)) d
-        (pp_chained_find info)        e (* prints the [else] *)
-    in
-    maybe_paren ~outer ~side ~inner:find_fixity pp ppf ()
-
-  | ForAll (vs, b) ->
-    let pp fmt () =
-      Fmt.pf ppf "@[<2>forall (@[%a@]),@ %a@]"
-        Vars.pp_typed_list vs
-        (pp (quant_fixity, `Right)) b
-    in
-    maybe_paren ~outer ~side ~inner:(fst quant_fixity, `Prefix) pp ppf ()
-
-  | Exists (vs, b) ->
-    let pp fmt () =
-      Fmt.pf ppf "@[<2>exists (@[%a@]),@ %a@]"
-        Vars.pp_typed_list vs
-        (pp (quant_fixity, `Right)) b
-    in
-    maybe_paren ~outer ~side ~inner:(fst quant_fixity, `Prefix) pp ppf ()
-
-(* Printing in a [hv] box. Print the trailing [else] of the caller. *)
-and pp_chained_ite info ppf (t : term) = 
-  match t with
-  | Fun (s,_,[a;b;c]) when s = f_ite ->
-    Fmt.pf ppf "@[<hov 2>else if %a@ then@ %a@]@ %a"
-      (pp info (ite_fixity, `NonAssoc)) a
-      (pp info (ite_fixity, `NonAssoc)) b
-      (pp_chained_ite info)             c
-
-  | _ -> Fmt.pf ppf "@[<hov 2>else@ %a@]" (pp info (ite_fixity, `Right)) t
-
-(* Printing in a [hv] box. Print the trailing [else] of the caller. *)
-and pp_chained_find info ppf (t : term) = 
-  match t with
-  | Find (b, c, d, e) ->
-    Fmt.pf ppf "@[<hov 2>else try find %a such that@ %a@]@;<1 0>\
-                @[<hov 2>in@ %a@]@;<1 0>\
-                %a"
-      Vars.pp_typed_list b
-      (pp info (find_fixity, `NonAssoc)) c
-      (pp info (find_fixity, `NonAssoc)) d
-      (pp_chained_find info)             e
-
-  | _ -> Fmt.pf ppf "@[<hov 2>else@ %a@]" (pp info (find_fixity, `Right)) t
-
-
-and pp_happens info ppf (ts : term list) =
-  Fmt.pf ppf "@[<hv 2>%a(%a)@]"
-    pp_mname_s "happens"
-    (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ")
-       (pp info (happens_fixity, `NonAssoc))) ts
-
-and pp_and_happens info ppf f =
-  let rec collect acc = function
-    | Fun (s, _, [ts]) when s = f_happens -> ts :: acc
-    | _ as f ->
-      let l, r = oget (destr_and f) in
-      collect (collect acc l) r
-  in
-
-  pp_happens info ppf (collect [] f)
-
-(*------------------------------------------------------------------*)
-let pp_with_info (info : pp_info) (fmt : Format.formatter) (t : term) : unit =
-  pp info ((toplevel_prec, `NoParens), `NonAssoc) fmt t
-
-let pp (fmt : Format.formatter) (t : term) : unit =
-  pp default_pp_info ((toplevel_prec, `NoParens), `NonAssoc) fmt t
-
-(*------------------------------------------------------------------*)
-
-let pp_hterm fmt = function
-  | Lambda (evs, t) ->
-    Fmt.pf fmt "@[<v 2>fun (@[%a@]) ->@ %a@]"
-      Vars.pp_typed_list evs pp t
-
-(*------------------------------------------------------------------*)
-(** Literals. *)
-
-type ord    = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
-type ord_eq = [ `Eq | `Neq ]
-
-type ('a,'b) _atom = 'a * 'b * 'b
-
-type xatom = [
-  | `Comp    of (ord,term) _atom
-  | `Happens of term
-]
-
-type literal = [`Neg | `Pos] * xatom
-
-type literals = literal list
-
-let pp_xatom ppf = function
-  | `Comp (o,tl,tr) ->
-    Fmt.pf ppf "@[%a %a@ %a@]" pp tl pp_ord o pp tr
-  
-  | `Happens a -> pp_happens default_pp_info ppf [a]
-
-let pp_literal fmt ((pn,at) : literal) =
-  match pn with
-  | `Pos -> Fmt.pf fmt "%a"    pp_xatom at
-  | `Neg -> Fmt.pf fmt "¬(%a)" pp_xatom at
-
-let pp_literals fmt (l : literal list) =
-  let sep fmt () = Fmt.pf fmt " ∧ " in
-  (Fmt.list ~sep pp_literal) fmt l
-
-let ty_xatom = function
-  | `Happens t -> Type.Timestamp
-  | `Comp (_, t1, t2) ->
-    let ty1 = ty t1 in
-    assert (ty1 = ty t2);
-    ty1
-
-let ty_lit ((_, at) : literal) : Type.ty = ty_xatom at
-
-let neg_lit ((pn, at) : literal) : literal =
-  let pn = match pn with
-    | `Pos -> `Neg
-    | `Neg -> `Pos in
-  (pn, at)
-
-let form_to_xatom (form : term) : xatom option =
-  match form with
-  | Fun (f, _, [a]) when f = f_happens -> Some (`Happens a)
-
-  | Fun (fseq,  _, [a;b]) when fseq  = f_eq  -> Some (`Comp (`Eq,  a, b))
-  | Fun (fsneq, _, [a;b]) when fsneq = f_neq -> Some (`Comp (`Neq, a, b))
-  | Fun (fsleq, _, [a;b]) when fsleq = f_leq -> Some (`Comp (`Leq, a, b))
-  | Fun (fslt,  _, [a;b]) when fslt  = f_lt  -> Some (`Comp (`Lt,  a, b))
-  | Fun (fsgeq, _, [a;b]) when fsgeq = f_geq -> Some (`Comp (`Geq, a, b))
-  | Fun (fsgt,  _, [a;b]) when fsgt  = f_gt  -> Some (`Comp (`Gt,  a, b))
-  | _ -> None
-
-let rec form_to_literal (form : term) : literal option =
-  match form with
-  | Fun (fnot, _, [f]) when fnot = f_not -> omap neg_lit (form_to_literal f)
-  | _ -> omap (fun at -> (`Pos, at)) (form_to_xatom form)
-
-let disjunction_to_literals f : literal list option =
-  let exception Not_a_disjunction in
-
-  let rec aux_l = function
-    | tf when tf = mk_false -> []
-    | Fun (fsor,_, [a; b]) when fsor = f_or -> aux_l a @ aux_l b
-    | f -> match form_to_literal f with
-        | Some f -> [f] 
-        | None   -> raise Not_a_disjunction
-  in
-
-  try Some (aux_l f) with Not_a_disjunction -> None
-
-(*------------------------------------------------------------------*)
-let form_to_literals
-    (form : term) 
-  : [`Entails of literal list | `Equiv of literal list]
-  =
-  let partial = ref false in
-  let lits : literal list =
-    List.fold_left (fun acc f -> 
-        match form_to_literal f with
-        | Some at -> at :: acc
-        | None    -> partial := true; acc
-      ) [] (decompose_ands form)
-  in
-  if !partial then `Entails lits else `Equiv lits
-
-
-
-(*------------------------------------------------------------------*)
-let eq_triv f = match destr_eq f with
-  | Some (t1,t2) when t1=t2 ->
-    (match t1 with
-       Find _ -> false
-     | _ -> true)
-  | _ -> false
-
-let f_triv = function
-  | tt when tt = mk_true -> true
-  | f -> eq_triv f
-
-
-(*------------------------------------------------------------------*)
-(** Declare input and output macros. *)
-
-let mk s k = { s_symb = s; s_typ = k; s_indices = []; }
-
-let in_macro    : msymb = mk Symbols.inp   Type.Message
-let out_macro   : msymb = mk Symbols.out   Type.Message
-let frame_macro : msymb = mk Symbols.frame Type.Message
-
-let cond_macro : msymb = mk Symbols.cond Type.Boolean
-let exec_macro : msymb = mk Symbols.exec Type.Boolean
-
-(*------------------------------------------------------------------*)
 (** Substitutions *)
 
 type esubst = ESubst of term * term 
 
 type subst = esubst list
 
-
-let rec assoc : subst -> term -> term =
-  fun subst term ->
+(*------------------------------------------------------------------*)
+let rec assoc (subst : subst) (term : term) : term =
   match subst with
   | [] -> term
   | ESubst (t1,t2)::q ->
     if term = t1 then t2 else assoc q term
-
-let pp_esubst ppf (ESubst (t1,t2)) =
-  Fmt.pf ppf "%a->%a" pp t1 pp t2
-
-let pp_subst ppf s =
-  Fmt.pf ppf "@[<hv 0>%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_esubst) s
 
 let subst_var (subst : subst) (var : Vars.var) : Vars.var =
   match assoc subst (Var var) with
@@ -1144,6 +716,30 @@ let fv (term : term) : Sv.t =
   fv term
 
 let get_vars t = fv t |> Sv.elements
+
+(*------------------------------------------------------------------*)
+type refresh_arg = [`Global | `InEnv of Vars.env ref ]
+
+let refresh_var (arg : refresh_arg) v =
+  match arg with
+  | `Global    -> Vars.refresh v
+  | `InEnv env -> Vars.make_approx_r env v
+
+(* The substitution must be built reversed w.r.t. vars, to handle capture. *)
+let refresh_vars (arg : refresh_arg) evars =
+  let l =
+    List.rev_map (fun v ->
+        let v' = refresh_var arg v in
+        v', ESubst (Var v, Var v')
+      ) evars
+  in
+  let vars, subst = List.split l in
+  List.rev vars, subst
+
+let refresh_vars_env env vs =
+  let env = ref env in
+  let vs, s = refresh_vars (`InEnv env) vs in
+  !env, vs, s
 
 (*------------------------------------------------------------------*)
 (** {2 Iterators} *)
@@ -1319,7 +915,7 @@ and subst_binding : Vars.var -> subst -> Vars.var * subst =
   let var, s =
     if Sv.mem var right_fv
     then
-      let new_v = Vars.fresh_r env var in
+      let new_v = Vars.make_approx_r env var in
       let s = (ESubst (Var var,Var new_v)) :: s in
       ( new_v, s)
     else ( var, s ) in
@@ -1383,28 +979,469 @@ let subst_projs (s : (proj * proj) list) (t : term) : term =
   do_subst t
 
 (*------------------------------------------------------------------*)
-type refresh_arg = [`Global | `InEnv of Vars.env ref ]
+(** {2 Printing} *)
+let _pp_indices ~dbg ppf l =
+  if l <> [] then Fmt.pf ppf "(%a)" (Vars._pp_list ~dbg) l
 
-let refresh_var (arg : refresh_arg) v =
-  match arg with
-  | `Global    -> Vars.make_new_from v
-  | `InEnv env -> Vars.fresh_r env v
+let pp_ord ppf = function
+  | `Eq -> Fmt.pf ppf "="
+  | `Neq -> Fmt.pf ppf "<>"
+  | `Leq -> Fmt.pf ppf "<="
+  | `Geq -> Fmt.pf ppf ">="
+  | `Lt -> Fmt.pf ppf "<"
+  | `Gt -> Fmt.pf ppf ">"
 
-(* The substitution must be built reversed w.r.t. vars, to handle capture. *)
-let refresh_vars (arg : refresh_arg) evars =
-  let l =
-    List.rev_map (fun v ->
-        let v' = refresh_var arg v in
-        v', ESubst (Var v, Var v')
-      ) evars
+let rec is_and_happens = function
+  | Fun (f, _, [t]) when f = f_happens -> true
+  | _ as f ->  match destr_and f with
+    | Some (l,r) -> is_and_happens l && is_and_happens r
+    | _ -> false
+
+(*------------------------------------------------------------------*)
+(** Additional printing information *)
+type pp_info = {
+  styler : pp_info -> term -> Printer.keyword option * pp_info;
+  dbg : bool;
+}
+
+let default_pp_info = {
+  styler = (fun info _ -> None, info);
+  dbg = false;
+}
+
+
+let styled_opt (err : Printer.keyword option) printer =
+  match err with
+  | None -> printer
+  | Some kw -> fun ppf t -> (Printer.kw kw ppf "%a" printer t)
+
+(*------------------------------------------------------------------*)
+let toplevel_prec = 0
+
+let quant_fixity = 5  , `Prefix
+
+(* binary *)
+let impl_fixity        = 10 , `Infix `Right
+let iff_fixity         = 12 , `Infix `Right
+let pair_fixity        = 20 , `NoParens
+let or_fixity          = 20 , `Infix `Right
+let and_fixity         = 25 , `Infix `Right
+let xor_fixity         = 26 , `Infix `Right
+let eq_fixity          = 27 , `Infix `NonAssoc
+let order_fixity       = 29 , `Infix `NonAssoc
+let ite_fixity         = 40 , `Infix `Left
+let other_infix_fixity = 50 , `Infix `Right
+
+let not_fixity   = 26 , `Prefix
+
+let seq_fixity     = 1000 , `Prefix
+let find_fixity    = 1000 , `Prefix
+let macro_fixity   = 1000 , `NoParens
+let diff_fixity    = 1000 , `NoParens
+let fun_fixity     = 1000 , `NoParens
+let happens_fixity = 1000 , `NoParens
+
+
+let get_infix_prec (f : Symbols.fname) =
+  (* *)if f = Symbols.fs_and  then fst and_fixity 
+  else if f = Symbols.fs_or   then fst or_fixity 
+  else if f = Symbols.fs_impl then fst impl_fixity
+  else if f = Symbols.fs_iff  then fst iff_fixity 
+  else if f = Symbols.fs_xor  then fst xor_fixity 
+  else if f = Symbols.fs_eq   then fst eq_fixity 
+  else if f = Symbols.fs_neq  then fst eq_fixity 
+  else if f = Symbols.fs_leq  then fst order_fixity 
+  else if f = Symbols.fs_lt   then fst order_fixity 
+  else if f = Symbols.fs_gt   then fst order_fixity 
+  else if f = Symbols.fs_geq  then fst order_fixity 
+  else                             fst other_infix_fixity
+
+(*------------------------------------------------------------------*)
+
+(** Applies the styling info in [info]
+    NOTE: this is *not* the [pp] exported by the module, it is shadowed later *)
+let rec pp
+    (info         : pp_info)
+    ((outer,side) : ('b * fixity) * assoc)
+    (ppf          : Format.formatter)
+    (t            : term)
+  : unit
+  =
+  let err_opt, info = info.styler info t in
+  styled_opt err_opt (_pp info (outer, side)) ppf t
+
+(** Core printing function *)
+and _pp
+    (info         : pp_info)
+    ((outer,side) : ('b * fixity) * assoc)
+    (ppf          : Format.formatter)
+    (t            : term)
+  : unit
+  =
+  let pp = pp info in
+
+  match t with
+  | Var m -> Fmt.pf ppf "%a" (Vars._pp ~dbg:info.dbg) m
+
+  | Fun (s,_,[a]) when s = f_happens -> pp_happens info ppf [a]
+
+  (* if-then-else, no else *)
+  | Fun (s,_,[b;c; Fun (f,_,[])])
+    when s = f_ite && f = f_zero ->
+    let pp fmt () =
+      Fmt.pf ppf "@[<hov 2>if %a@ then@ %a@]"
+        (pp (ite_fixity, `NonAssoc)) b
+        (pp (ite_fixity, `Right)) c
+    in
+    maybe_paren ~outer ~side ~inner:ite_fixity pp ppf ()
+
+  (* if-then-else, true/false *)
+  | Fun (s,_,[b;Fun (f1,_,[]);Fun (f2,_,[])])
+    when s = f_ite && f1 = f_true && f2 = f_false ->
+    Fmt.pf ppf "%a"
+      (pp (ite_fixity, `NonAssoc)) b
+
+  (* if-then-else, general case *)
+  | Fun (s,_,[a;b;c]) when s = f_ite ->
+    let pp fmt () =
+      Fmt.pf ppf "@[<hv 0>@[<hov 2>if %a@ then@ %a@]@ %a@]"
+        (pp (ite_fixity, `NonAssoc)) a
+        (pp (ite_fixity, `NonAssoc)) b
+        (pp_chained_ite info)        c (* prints the [else] *)
+    in
+    maybe_paren ~outer ~side ~inner:ite_fixity pp ppf ()
+
+  (* pair *)
+  | Fun (s,_,terms) when s = f_pair ->
+    Fmt.pf ppf "%a"
+      (Utils.pp_ne_list
+         "<@[<hov>%a@]>"
+         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,")
+            (pp (pair_fixity, `NonAssoc))))
+      terms
+
+  (* happens *)
+  | Fun _ as f when is_and_happens f ->
+    pp_and_happens info ppf f
+
+  (* infix *)
+  | Fun ((s,is),_,[bl;br]) when Symbols.is_infix s ->
+    let assoc = Symbols.infix_assoc s in
+    let prec = get_infix_prec s in
+    assert (is = []);
+    let pp fmt () =
+      Fmt.pf ppf "@[<0>%a %s@ %a@]"
+        (pp ((prec, `Infix assoc), `Left)) bl
+        (Symbols.to_string s)
+        (pp ((prec, `Infix assoc), `Right)) br
+    in
+    maybe_paren ~outer ~side ~inner:(prec, `Infix assoc) pp ppf ()
+
+  (* not *)
+  | Fun (s,_,[b]) when s = f_not ->
+    Fmt.pf ppf "@[<hov 2>not(%a)@]" (pp (not_fixity, `Right)) b
+
+  (* true/false *)
+  | Fun _ as tt  when tt = mk_true ->  Fmt.pf ppf "true"
+  | Fun _  as tf when tf = mk_false -> Fmt.pf ppf "false"
+
+  (* constant *)
+  | Fun (f,_,[]) ->
+    Fmt.pf ppf "%a" pp_fsymb f
+
+  (* arity one *)
+  | Fun (f,_,[a]) ->
+    Fmt.pf ppf "@[<hov 2>%a(@,%a)@]"
+      (_pp_fsymb ~dbg:info.dbg) f
+      (pp (fun_fixity, `NonAssoc)) a
+
+  (* function symbol, general case *)
+  | Fun (f,_,terms) ->
+    Fmt.pf ppf "@[<hov 2>%a(%a)@]"
+      (_pp_fsymb ~dbg:info.dbg) f
+      (Utils.pp_ne_list
+         "%a"
+         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,")
+            (pp (fun_fixity, `NonAssoc))))
+      terms
+
+  | Name n -> _pp_nsymb ~dbg:info.dbg ppf n
+
+  | Macro (m, l, ts) ->
+    Fmt.pf ppf "@[%a%a@%a@]"
+      (_pp_msymb ~dbg:info.dbg) m
+      (Utils.pp_ne_list
+         "(@[<hov>%a@])"
+         (Fmt.list ~sep:Fmt.comma (pp (macro_fixity, `NonAssoc)))) l
+      (pp (macro_fixity, `NonAssoc)) ts
+
+  | Action (symb,indices) ->
+    Printer.kw `GoalAction ppf "%s%a" 
+      (Symbols.to_string symb)
+      (_pp_indices ~dbg:info.dbg) indices
+
+  | Diff (Explicit l) ->
+    Fmt.pf ppf "@[<hov 2>diff(@,%a)@]"
+      (Fmt.list ~sep:(fun fmt () -> Format.fprintf fmt ",@ ")
+         (pp (diff_fixity, `NonAssoc)))
+      (List.map snd l) (* TODO labels *)
+
+  | Seq (vs, b) ->
+    let _, vs, s = (* rename quantified vars. to avoid name clashes *)
+      let fv_b = List.fold_left ((^~) Sv.remove) (fv b) vs in
+      refresh_vars_env (Vars.of_set fv_b) vs 
+    in
+    let b = subst s b in
+
+    Fmt.pf ppf "@[<hov 2>seq(%a->@,%a)@]"
+      (Vars._pp_typed_list ~dbg:info.dbg) vs (pp (seq_fixity, `NonAssoc)) b
+
+  | Find (vs, c, d, Fun (f,_,[])) when f = f_zero ->
+    let _, vs, s = (* rename quantified vars. to avoid name clashes *)
+      let fv_cd = List.fold_left ((^~) Sv.remove) (Sv.union (fv c) (fv d)) vs in
+      refresh_vars_env (Vars.of_set fv_cd) vs
+    in
+    let c, d = subst s c, subst s d in
+
+    let pp fmt () =
+      Fmt.pf ppf "@[<hv 0>\
+                  @[<hov 2>try find %a such that@ %a@]@;<1 0>\
+                  @[<hov 2>in@ %a@]@]"
+        (Vars._pp_typed_list ~dbg:info.dbg) vs
+        (pp (find_fixity, `NonAssoc)) c
+        (pp (find_fixity, `Right)) d
+    in
+    maybe_paren ~outer ~side ~inner:find_fixity pp ppf ()
+
+  | Find (vs, c, d, e) ->
+    let _, vs, s = (* rename quantified vars. to avoid name clashes *)
+      let fv_cd = List.fold_left ((^~) Sv.remove) (Sv.union (fv c) (fv d)) vs in
+      refresh_vars_env (Vars.of_set fv_cd) vs
+    in
+    let c, d = subst s c, subst s d in
+
+    let pp fmt () =
+      Fmt.pf ppf "@[<hv 0>\
+                  @[<hov 2>try find %a such that@ %a@]@;<1 0>\
+                  @[<hov 2>in@ %a@]@;<1 0>\
+                  %a@]"
+        (Vars._pp_typed_list ~dbg:info.dbg) vs
+        (pp (find_fixity, `NonAssoc)) c
+        (pp (find_fixity, `NonAssoc)) d
+        (pp_chained_find info)        e (* prints the [else] *)
+    in
+    maybe_paren ~outer ~side ~inner:find_fixity pp ppf ()
+
+  | Exists (vs, b) 
+  | ForAll (vs, b) ->
+    let _, vs, s = (* rename quantified vars. to avoid name clashes *)
+      let fv_b = List.fold_left ((^~) Sv.remove) (fv b) vs in
+      refresh_vars_env (Vars.of_set fv_b) vs 
+    in
+    let b = subst s b in
+
+    let quant_string = 
+      match t with
+      | Exists _ -> "exists"
+      | ForAll _ -> "forall"
+      | _ -> assert false
+    in
+    let pp fmt () =
+      Fmt.pf ppf "@[<2>%s (@[%a@]),@ %a@]"
+        quant_string
+        (Vars._pp_typed_list ~dbg:info.dbg) vs
+        (pp (quant_fixity, `Right)) b
+    in
+    maybe_paren ~outer ~side ~inner:(fst quant_fixity, `Prefix) pp ppf ()
+
+(* Printing in a [hv] box. Print the trailing [else] of the caller. *)
+and pp_chained_ite info ppf (t : term) = 
+  match t with
+  | Fun (s,_,[a;b;c]) when s = f_ite ->
+    Fmt.pf ppf "@[<hov 2>else if %a@ then@ %a@]@ %a"
+      (pp info (ite_fixity, `NonAssoc)) a
+      (pp info (ite_fixity, `NonAssoc)) b
+      (pp_chained_ite info)             c
+
+  | _ -> Fmt.pf ppf "@[<hov 2>else@ %a@]" (pp info (ite_fixity, `Right)) t
+
+(* Printing in a [hv] box. Print the trailing [else] of the caller. *)
+and pp_chained_find info ppf (t : term) = 
+  match t with
+  | Find (b, c, d, e) ->
+    Fmt.pf ppf "@[<hov 2>else try find %a such that@ %a@]@;<1 0>\
+                @[<hov 2>in@ %a@]@;<1 0>\
+                %a"
+      (Vars._pp_typed_list ~dbg:info.dbg) b
+      (pp info (find_fixity, `NonAssoc)) c
+      (pp info (find_fixity, `NonAssoc)) d
+      (pp_chained_find info)             e
+
+  | _ -> Fmt.pf ppf "@[<hov 2>else@ %a@]" (pp info (find_fixity, `Right)) t
+
+
+and pp_happens info ppf (ts : term list) =
+  Fmt.pf ppf "@[<hv 2>%a(%a)@]"
+    pp_mname_s "happens"
+    (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ")
+       (pp info (happens_fixity, `NonAssoc))) ts
+
+and pp_and_happens info ppf f =
+  let rec collect acc = function
+    | Fun (s, _, [ts]) when s = f_happens -> ts :: acc
+    | _ as f ->
+      let l, r = oget (destr_and f) in
+      collect (collect acc l) r
   in
-  let vars, subst = List.split l in
-  List.rev vars, subst
 
-let refresh_vars_env env vs =
-  let env = ref env in
-  let vs, s = refresh_vars (`InEnv env) vs in
-  !env, vs, s
+  pp_happens info ppf (collect [] f)
+
+(*------------------------------------------------------------------*)
+let pp_toplevel ~dbg (info : pp_info) (fmt : Format.formatter) (t : term) : unit =
+  pp info ((toplevel_prec, `NoParens), `NonAssoc) fmt t
+
+(** Exported *)
+let pp_with_info = pp_toplevel ~dbg:false
+let pp           = pp_toplevel ~dbg:false default_pp_info
+let _pp ~dbg     = pp_toplevel ~dbg:false { default_pp_info with dbg }
+let pp_dbg       = pp_toplevel ~dbg:false { default_pp_info with dbg = true }
+
+(*------------------------------------------------------------------*)
+
+let _pp_hterm ~dbg fmt = function
+  | Lambda (evs, t) ->
+    Fmt.pf fmt "@[<v 2>fun (@[%a@]) ->@ %a@]"
+      (Vars._pp_typed_list ~dbg) evs pp t
+
+let pp_hterm     = _pp_hterm ~dbg:false
+let pp_hterm_dbg = _pp_hterm ~dbg:true
+
+(*------------------------------------------------------------------*)
+let pp_esubst ppf (ESubst (t1,t2)) =
+  Fmt.pf ppf "%a->%a" pp t1 pp t2
+
+let pp_subst ppf s =
+  Fmt.pf ppf "@[<hv 0>%a@]"
+    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_esubst) s
+
+(*------------------------------------------------------------------*)
+(** Literals. *)
+
+type ord    = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
+type ord_eq = [ `Eq | `Neq ]
+
+type ('a,'b) _atom = 'a * 'b * 'b
+
+type xatom = [
+  | `Comp    of (ord,term) _atom
+  | `Happens of term
+]
+
+type literal = [`Neg | `Pos] * xatom
+
+type literals = literal list
+
+let pp_xatom ppf = function
+  | `Comp (o,tl,tr) ->
+    Fmt.pf ppf "@[%a %a@ %a@]" pp tl pp_ord o pp tr
+  
+  | `Happens a -> pp_happens default_pp_info ppf [a]
+
+let pp_literal fmt ((pn,at) : literal) =
+  match pn with
+  | `Pos -> Fmt.pf fmt "%a"    pp_xatom at
+  | `Neg -> Fmt.pf fmt "¬(%a)" pp_xatom at
+
+let pp_literals fmt (l : literal list) =
+  let sep fmt () = Fmt.pf fmt " ∧ " in
+  (Fmt.list ~sep pp_literal) fmt l
+
+let ty_xatom = function
+  | `Happens t -> Type.Timestamp
+  | `Comp (_, t1, t2) ->
+    let ty1 = ty t1 in
+    assert (ty1 = ty t2);
+    ty1
+
+let ty_lit ((_, at) : literal) : Type.ty = ty_xatom at
+
+let neg_lit ((pn, at) : literal) : literal =
+  let pn = match pn with
+    | `Pos -> `Neg
+    | `Neg -> `Pos in
+  (pn, at)
+
+let form_to_xatom (form : term) : xatom option =
+  match form with
+  | Fun (f, _, [a]) when f = f_happens -> Some (`Happens a)
+
+  | Fun (fseq,  _, [a;b]) when fseq  = f_eq  -> Some (`Comp (`Eq,  a, b))
+  | Fun (fsneq, _, [a;b]) when fsneq = f_neq -> Some (`Comp (`Neq, a, b))
+  | Fun (fsleq, _, [a;b]) when fsleq = f_leq -> Some (`Comp (`Leq, a, b))
+  | Fun (fslt,  _, [a;b]) when fslt  = f_lt  -> Some (`Comp (`Lt,  a, b))
+  | Fun (fsgeq, _, [a;b]) when fsgeq = f_geq -> Some (`Comp (`Geq, a, b))
+  | Fun (fsgt,  _, [a;b]) when fsgt  = f_gt  -> Some (`Comp (`Gt,  a, b))
+  | _ -> None
+
+let rec form_to_literal (form : term) : literal option =
+  match form with
+  | Fun (fnot, _, [f]) when fnot = f_not -> omap neg_lit (form_to_literal f)
+  | _ -> omap (fun at -> (`Pos, at)) (form_to_xatom form)
+
+let disjunction_to_literals f : literal list option =
+  let exception Not_a_disjunction in
+
+  let rec aux_l = function
+    | tf when tf = mk_false -> []
+    | Fun (fsor,_, [a; b]) when fsor = f_or -> aux_l a @ aux_l b
+    | f -> match form_to_literal f with
+        | Some f -> [f] 
+        | None   -> raise Not_a_disjunction
+  in
+
+  try Some (aux_l f) with Not_a_disjunction -> None
+
+(*------------------------------------------------------------------*)
+let form_to_literals
+    (form : term) 
+  : [`Entails of literal list | `Equiv of literal list]
+  =
+  let partial = ref false in
+  let lits : literal list =
+    List.fold_left (fun acc f -> 
+        match form_to_literal f with
+        | Some at -> at :: acc
+        | None    -> partial := true; acc
+      ) [] (decompose_ands form)
+  in
+  if !partial then `Entails lits else `Equiv lits
+
+
+
+(*------------------------------------------------------------------*)
+let eq_triv f = match destr_eq f with
+  | Some (t1,t2) when t1=t2 ->
+    (match t1 with
+       Find _ -> false
+     | _ -> true)
+  | _ -> false
+
+let f_triv = function
+  | tt when tt = mk_true -> true
+  | f -> eq_triv f
+
+
+(*------------------------------------------------------------------*)
+(** Declare input and output macros. *)
+
+let mk s k = { s_symb = s; s_typ = k; s_indices = []; }
+
+let in_macro    : msymb = mk Symbols.inp   Type.Message
+let out_macro   : msymb = mk Symbols.out   Type.Message
+let frame_macro : msymb = mk Symbols.frame Type.Message
+
+let cond_macro : msymb = mk Symbols.cond Type.Boolean
+let exec_macro : msymb = mk Symbols.exec Type.Boolean
 
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructors -- Part 2} *)
@@ -1454,6 +1491,7 @@ module type SmartFO = sig
   val destr_and   : form -> (form * form) option
   val destr_or    : form -> (form * form) option
   val destr_impl  : form -> (form * form) option
+  val destr_iff   : form -> (form * form) option
 
   (*------------------------------------------------------------------*)
   val is_false  : form -> bool
@@ -1463,6 +1501,7 @@ module type SmartFO = sig
   val is_and    : form -> bool
   val is_or     : form -> bool
   val is_impl   : form -> bool
+  val is_iff    : form -> bool
   val is_forall : form -> bool
   val is_exists : form -> bool
 
@@ -1694,6 +1733,74 @@ let project_opt (projs : projs option) (term : term) : term =
   omap_dflt term (project ^~ term) projs 
 
 (*------------------------------------------------------------------*)
+exception AlphaFailed
+
+let alpha_var (s : subst) (v1 : Vars.var) (v2 : Vars.var) : unit =
+  if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then raise AlphaFailed;
+  if not (Vars.equal v1 (subst_var s v2)) then raise AlphaFailed
+
+let alpha_vars (s : subst) (vs1 : Vars.vars) (vs2 : Vars.vars) : unit =
+  List.iter2 (alpha_var s) vs1 vs2
+
+let alpha_bnd (s : subst) (v1 : Vars.var) (v2 : Vars.var) : subst =
+  if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then
+    raise AlphaFailed 
+  else
+    ESubst (mk_var v2, mk_var v1) :: s
+
+let alpha_bnds (s : subst) (vs1 : Vars.vars) (vs2 : Vars.vars) : subst =
+  List.fold_left2 alpha_bnd s vs1 vs2
+
+let alpha_conv ?(subst=[]) (t1 : term) (t2 : term) : bool =
+  let rec doit (s : subst) t1 t2 : unit =
+    match t1, t2 with
+    | Fun ((f,is), fty, l), Fun ((f',is'), fty', l') when f = f' ->
+      alpha_vars s is is';
+      doits s l l'
+
+    | Name n, Name n' when n.s_symb = n'.s_symb ->
+      alpha_vars s n.s_indices n'.s_indices
+
+    | Macro (m,l,ts), Macro (m',l',ts') when m.s_symb = m'.s_symb ->
+      alpha_vars s m.s_indices m'.s_indices;
+      doits s (ts :: l) (ts' :: l')
+
+    | Action (a,is), Action (a',is') when a = a' ->
+      alpha_vars s is is'
+
+    | Var x, Var x' ->
+      alpha_var s x x'
+
+    | Find (is,c,t,e), Find (is',c',t',e')
+      when List.length is = List.length is' ->
+      let s' = alpha_bnds s is is' in
+      doit s e e';
+      doits s' [c;t] [c';t']
+
+    | Seq    (vs,f), Seq    (vs',f')
+    | Exists (vs,f), Exists (vs',f')
+    | ForAll (vs,f), ForAll (vs',f')
+      when List.length vs = List.length vs' ->
+      let s = alpha_bnds s vs vs' in
+      doit s f f'
+
+    | Diff (Explicit l), Diff (Explicit l') ->
+      if List.length l <> List.length l' then raise AlphaFailed;
+      List.iter2 (fun (lab, x) (lab', x') -> 
+          if lab <> lab' then raise AlphaFailed;
+          doit s x x'
+        ) l l'
+
+    | t1,t2 -> raise AlphaFailed
+
+  and doits s l l' = 
+    List.iter2 (doit s) l l' 
+  in
+
+  try doit subst t1 t2; true with AlphaFailed -> false
+
+
+(*------------------------------------------------------------------*)
 (** Evaluate topmost diff operators for a given proj of a biterm.
     For example [head_pi_term left (diff(a,b))] is [a]
     and [head_pi_term left f(diff(a,b),c)] is [f(diff(a,b),c)]. *)
@@ -1706,36 +1813,71 @@ let diff a b =
   if a = b then a else
     Diff (Explicit [left_proj,a; right_proj,b])
 
-let rec make_normal_biterm (dorec : bool) (t : term) : term = 
-  let mdiff (t : term) (t' : term) : term = 
-    if dorec then make_normal_biterm dorec (diff t t')
-    else diff t t'
+let rec make_normal_biterm
+    (dorec : bool) ?(alpha_find = true)
+    (s : subst) (t : term) : term
+  =  
+  (* [s] is a pending substitution from [t'] variables to [t] variables. *)
+  let mdiff (s : subst) (t : term) (t' : term) : term = 
+    if dorec then make_normal_biterm dorec ~alpha_find s (diff t t')
+    else diff t (subst s t')
   in
-  (* TODO generalize to non-binary diff *)
-  match head_pi_term left_proj t, head_pi_term right_proj t with
-  | Fun (f,fty,l), Fun (f',fty',l') when f = f' ->
-    Fun (f, fty, List.map2 mdiff l l')
+  let t1 = head_pi_term left_proj t
+  and t2 = head_pi_term right_proj t in
 
-  | Name n, Name n' when n=n' -> Name n
+  let doit () =
+    (* TODO generalize to non-binary diff *)
+    match t1, t2 with
+    | Fun ((f,is), fty, l), Fun ((f',is'), fty', l') when f = f' ->
+      alpha_vars s is is';
+      Fun ((f,is), fty, List.map2 (mdiff s) l l')
 
-  | Macro (m,l,ts), Macro (m',l',ts') when m = m' && ts = ts' ->
-      Macro (m, List.map2 mdiff l l', ts)
+    | Name n, Name n' when n.s_symb = n'.s_symb ->
+      alpha_vars s n.s_indices n'.s_indices;
+      Name n
 
-  | Action (a,is), Action (a',is') when a = a' && is = is' -> Action (a,is)
+    | Macro (m,l,ts), Macro (m',l',ts')
+      when m.s_symb = m'.s_symb && ts = subst s ts' ->
+      assert (l = [] && l' = []);
+      alpha_vars s m.s_indices m'.s_indices;
+      Macro (m, List.map2 (mdiff s) l l', ts)
 
-  | Var x, Var x' when x=x' -> Var x
+    | Action (a,is), Action (a',is') when a = a' ->
+      alpha_vars s is is';
+      Action (a,is)
 
-  | Find (is,c,t,e), Find (is',c',t',e') when is = is' ->
-      Find (is, mdiff c c', mdiff t t', mdiff e e')
+    | Var x, Var x' ->
+      alpha_var s x x';
+      Var x
 
-  | ForAll (vs,f), ForAll (vs',f') when vs = vs' -> ForAll (vs, mdiff f f')
-  | Exists (vs,f), Exists (vs',f') when vs = vs' -> Exists (vs, mdiff f f')
+    | Find (is,c,t,e), Find (is',c',t',e')
+      when List.length is = List.length is' && alpha_find ->
+      let s' = alpha_bnds s is is' in
+      Find (is, mdiff s' c c', mdiff s' t t', mdiff s e e')
 
-  | t1,t2 -> diff t1 t2
+    | ForAll (vs,f), ForAll (vs',f')
+      when List.length vs = List.length vs' ->
+      let s = alpha_bnds s vs vs' in
+      ForAll (vs, mdiff s f f')
 
-let simple_bi_term     : term -> term = make_normal_biterm true
-let head_normal_biterm : term -> term = make_normal_biterm false 
+    | Exists (vs,f), Exists (vs',f')
+      when List.length vs = List.length vs' ->
+      let s = alpha_bnds s vs vs' in
+      Exists (vs, mdiff s f f')
 
+    (* FIXME: seq case missing *)
+
+    | t1,t2 -> diff t1 (subst s t2)
+  in
+  try doit () with AlphaFailed -> diff t1 (subst s t2)
+
+let simple_bi_term     : term -> term = make_normal_biterm true  []
+let head_normal_biterm : term -> term = make_normal_biterm false []
+
+(* Ad-hoc fix to keep diffeq tactic working properly. *)
+let simple_bi_term_no_alpha_find : term -> term =
+  make_normal_biterm true ~alpha_find:false []
+    
 (*------------------------------------------------------------------*)
 let combine = function
   | [_,t] -> t
@@ -1766,9 +1908,9 @@ module St = Set.Make (T)
 (** {2 Matching information for error messages} *)
 
 type match_info =
-  | MR_ok                         (* term matches *)
+  | MR_ok                      (* term matches *)
   | MR_check_st of term list   (* need to look at subterms *)
-  | MR_failed                     (* term does not match *)
+  | MR_failed                  (* term does not match *)
 
 type match_infos = match_info Mt.t
 
@@ -1790,7 +1932,7 @@ let match_infos_to_pp_info (minfos : match_infos) : pp_info =
     | Some MR_check_st _ -> None, info
     | Some MR_failed     -> Some `Error,    info
   in
-  { styler }
+  { styler; dbg = false; }
 
 
 (*------------------------------------------------------------------*)

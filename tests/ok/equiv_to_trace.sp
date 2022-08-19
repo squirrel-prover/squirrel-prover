@@ -3,8 +3,6 @@ abstract a : message
 
 system null.
 
-set autoIntro = false.
-
 global goal [default/left,default/left] _ (x:message) : [x=empty] -> ([x=empty] -> equiv(diff(false,true))) -> [False].
 Proof.
   nosimpl intro H1 H2.

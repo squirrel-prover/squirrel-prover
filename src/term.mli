@@ -168,7 +168,9 @@ val lit_to_form   : literal -> term
 
 type hterm = Lambda of Vars.vars * term
 
-val pp_hterm : Format.formatter -> hterm -> unit
+val pp_hterm     :             Format.formatter -> hterm -> unit
+val _pp_hterm    : dbg:bool -> Format.formatter -> hterm -> unit
+val pp_hterm_dbg :             Format.formatter -> hterm -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printer and cast} *)
@@ -178,7 +180,9 @@ type pp_info
 
 val default_pp_info : pp_info
 
-val pp : Format.formatter -> term -> unit
+val pp     :             Format.formatter -> term -> unit
+val _pp    : dbg:bool -> Format.formatter -> term -> unit
+val pp_dbg :             Format.formatter -> term -> unit
 
 val pp_with_info : pp_info -> Format.formatter -> term -> unit
 
@@ -266,8 +270,9 @@ val f_pred : fsymb
 val f_true  : fsymb
 val f_false : fsymb
 val f_and   : fsymb
-val f_impl  : fsymb
 val f_or    : fsymb
+val f_impl  : fsymb
+val f_iff   : fsymb
 val f_not   : fsymb
 val f_ite   : fsymb
 
@@ -348,6 +353,7 @@ module type SmartFO = sig
   val destr_and   : form -> (form * form) option
   val destr_or    : form -> (form * form) option
   val destr_impl  : form -> (form * form) option
+  val destr_iff   : form -> (form * form) option
 
   (*------------------------------------------------------------------*)
   val is_false  : form -> bool
@@ -357,6 +363,7 @@ module type SmartFO = sig
   val is_and    : form -> bool
   val is_or     : form -> bool
   val is_impl   : form -> bool
+  val is_iff    : form -> bool
   val is_forall : form -> bool
   val is_exists : form -> bool
 
@@ -400,8 +407,8 @@ val mk_diff    : (proj * term) list -> term
 
 val mk_find : ?simpl:bool -> Vars.var list -> term -> term -> term -> term
 
-val destr_iff : term -> (term * term) option
-
+val mk_iff   : ?simpl:bool -> form -> form -> form
+  
 (*------------------------------------------------------------------*)
 val mk_fun0 : fsymb -> Type.ftype -> term list -> term
 
@@ -492,6 +499,7 @@ val project_opt : projs option -> term -> term
     subterms have topmost different constructors, and they do not
     start with diffs themselves.
 
+    TODO: What is the constraint below used for?
     Macros with different timestamps do not count as a common
     constructor: [head_normal_biterm (Diff(Macro(m,l,ts),Macro(m,l,ts')))]
     will be [Diff(Macro(m,l,ts),Macro(m,l,ts'))] and not
@@ -499,6 +507,11 @@ val project_opt : projs option -> term -> term
 val head_normal_biterm : term -> term
 
 val simple_bi_term : term -> term
+
+(** Same as [simple_bi_term], but does not try to normalize try-finds. 
+    Ad-hoc fix to keep diffeq tactic working properly. 
+    FIXME: remove it. *)
+val simple_bi_term_no_alpha_find : term -> term
 
 val combine : (proj * term) list -> term
 
@@ -560,3 +573,19 @@ val project_tpat_opt : projs option -> term pat -> term pat
 (** Make a pattern out of a formula: all universally quantified variables
     are added to [pat_vars]. *)
 val pat_of_form : term -> term pat
+
+(*------------------------------------------------------------------*)
+(** {2 Misc} *)
+
+exception AlphaFailed
+
+(** [alpha_conv ~subst t1 t2] check that [t1] and [t2] are 
+    alpha-convertible.
+    - [subst] optional substitution from [t2] variables to [t1] 
+      variables. *)
+val alpha_conv : ?subst:subst -> term -> term -> bool 
+
+(** Process binder variables during alpha-renaming, updating the
+    alpha-renaming substitution (see [alpha_conv]).
+    Raise if alpha-conversion fails. *)
+val alpha_bnds : subst -> Vars.vars -> Vars.vars -> subst 

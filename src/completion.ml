@@ -2,6 +2,8 @@ open Utils
 
 module L = Location
 
+module Mt = Term.Mt
+
 (*------------------------------------------------------------------*)
 let dbg s = 
   Printer.prt (if Config.debug_completion () then `Dbg else `Ignore) s
@@ -237,57 +239,87 @@ end
 
 open CTerm
 
-let var_cpt = ref 0
+let mk_var =
+  let var_cpt = ref 0 in
+  fun () ->
+    let () = incr var_cpt in
+    cvar !var_cpt
 
-let mk_var () =
-  let () = incr var_cpt in
-  cvar !var_cpt
+(*------------------------------------------------------------------*)
+(** Stateful memoization for conversion of [Term.term] to [cterm] *)
+type ct_memo = { 
+  cstate       : Reduction.cstate;  (** State to check for convertability 
+                                        (w.r.t. [Reduction.conv]) *)
+  mutable memo : cterm Mt.t;        (** Memoized results *)
+}
 
-(** Translation from [term] to [cterm] *)
-let rec cterm_of_term : Term.term -> cterm = fun c ->
-  let open Term in
-  match c with
-  | Fun ((f,is),_,terms) ->
-    let is = List.map cterm_of_var is
-    and terms = List.map cterm_of_term terms in
-    cfun (F f) (List.length is) (is @ terms)
+let mk_ct_memo table : ct_memo = 
+  let cstate = Reduction.mk_cstate table in
+  { cstate; memo = Mt.empty; }
 
-  | Macro (ms,l,ts) -> 
-    assert (l = []); 
-    let is = List.map cterm_of_var ms.s_indices in
-    cfun
-      (M (ms.s_symb, ms.s_typ))
-      (List.length is) (is @ [cterm_of_term ts])
+(** Box a term. 
+    Uses memoization: convertible terms are boxed identically. *)
+let box_term (ct_memo : ct_memo) (t : Term.term) : cterm = 
+  let found = ref None in
+  Mt.iter (fun t' res ->
+      if Reduction.conv ct_memo.cstate t t' then found := Some res
+    ) ct_memo.memo;
+  match !found with
+  | None -> 
+    let res = ccst (Cst.Cboxed t) in
+    ct_memo.memo <- Mt.add t res ct_memo.memo;
+    res
+  | Some res -> res
 
-  | Term.Action (a,is) ->
-    let is = List.map cterm_of_var is in
-    cfun (A a) (List.length is) is
+(*------------------------------------------------------------------*)
+(** Translation from [term] to [cterm] with memoization *)
+let rec cterm_of_term (ct_memo : ct_memo) (c : Term.term) : cterm = 
+  let rec cterm_of_term (c : Term.term) : cterm = 
+    match c with
+    | Fun ((f,is),_,terms) ->
+      let is = List.map cterm_of_var is
+      and terms = List.map cterm_of_term terms in
+      cfun (F f) (List.length is) (is @ terms)
 
-  | Name ns -> 
-    let is = List.map cterm_of_var ns.s_indices in
-    cfun (N (ns.s_symb,ns.s_typ)) (List.length is) is
+    | Macro (ms,l,ts) -> 
+      assert (l = []); 
+      let is = List.map cterm_of_var ms.s_indices in
+      cfun
+        (M (ms.s_symb, ms.s_typ))
+        (List.length is) (is @ [cterm_of_term ts])
 
-  | Var m  -> ccst (Cst.Cmvar m)
+    | Term.Action (a,is) ->
+      let is = List.map cterm_of_var is in
+      cfun (A a) (List.length is) is
 
-  | Diff (Explicit l) ->
+    | Name ns -> 
+      let is = List.map cterm_of_var ns.s_indices in
+      cfun (N (ns.s_symb,ns.s_typ)) (List.length is) is
+
+    | Var m  -> ccst (Cst.Cmvar m)
+
+    | Diff (Explicit l) ->
       let l = List.sort (fun (l1,_) (l2,_) -> Stdlib.compare l1 l2) l in
       let l = List.map (fun (_,tm) -> cterm_of_term tm) l in
       cfun (F Symbols.fs_diff) 0 l
 
-  (* default case *)
-  | t -> ccst (Cst.Cboxed t)
+    (* default case *)
+    | t -> box_term ct_memo t
+  in
+  cterm_of_term c
 
 and cterm_of_var i = ccst (Cst.Cmvar i)
 
 
 (*------------------------------------------------------------------*)
-let i_or_ts_of_cterm i = match i.cnt with
+let i_or_ts_of_cterm i = 
+  match i.cnt with
   | Ccst (Cst.Cmvar m) ->
     assert (Type.equal (Vars.ty m) Type.tindex ||
             Type.equal (Vars.ty m) Type.ttimestamp);
     m
   | _ -> assert false
-    
+
 let i_or_ts_of_cterms cis = List.map i_or_ts_of_cterm cis
 
 let term_of_cterm : Symbols.table -> cterm -> Term.term =
@@ -609,7 +641,8 @@ type state = { id            : int;
                sat_xor_rules : (Cset.t list * int) option;
                grnd_rules    : grnd_rules;
                e_rules       : e_rules; 
-               completed     : bool }
+               completed     : bool;
+               ct_memo       : ct_memo; }
 
 (*------------------------------------------------------------------*)
 (** {2 Pretty Printers} *)
@@ -1366,13 +1399,16 @@ let complete_cterms table (l : (cterm * cterm) list) : state =
 
   let grnd_rules = add_rules Mct.empty grnd_rules in
 
-  let state = { id = (incr state_id; !state_id); 
-                uf = Cuf.create [];
-                grnd_rules = grnd_rules;
-                xor_rules = xor_rules;
-                sat_xor_rules = None;
-                e_rules = init_erules table;
-                completed = false  } in
+  let state = { 
+    id            = (incr state_id; !state_id); 
+    uf            = Cuf.create [];
+    grnd_rules    = grnd_rules;
+    xor_rules     = xor_rules;
+    sat_xor_rules = None;
+    e_rules       = init_erules table;
+    completed     = false;
+    ct_memo       = mk_ct_memo table; } 
+  in
 
   complete_state state
   |> finalize_completion
@@ -1386,9 +1422,11 @@ module Memo = Hashtbl.Make2
     end)
     (struct 
       type t = Term.esubst list
+
       let equal_p (Term.ESubst (t0, t1)) (Term.ESubst (t0', t1')) = 
         Type.equal (Term.ty t0) (Term.ty t0') &&
         t0 = t0' && t1 = t1'
+
       let equal l l' = 
         let l, l' = List.sort_uniq Stdlib.compare l,
                     List.sort_uniq Stdlib.compare l' in
@@ -1397,14 +1435,17 @@ module Memo = Hashtbl.Make2
 
       let hash_p (Term.ESubst (t0, t1)) =
         Utils.hcombine (Hashtbl.hash t0) (Hashtbl.hash t1)
+
       let hash l = Utils.hcombine_list hash_p 0 l
     end)
 
 let complete table (l : Term.esubst list) : state =
+  let ct_memo = mk_ct_memo table in
+
   let l =
     List.fold_left
       (fun l (Term.ESubst (u,v)) ->
-         let cu, cv = cterm_of_term u, cterm_of_term v in
+         let cu, cv = cterm_of_term ct_memo u, cterm_of_term ct_memo v in
 
          dbg "Completion: %a = %a added as %a = %a"
            Term.pp u Term.pp v pp_cterm cu pp_cterm cv; 
@@ -1427,7 +1468,9 @@ let complete : Symbols.table -> Term.esubst list -> state =
 
 let complete
     ?(exn = Tactics.Tactic_hard_failure (None, TacTimeout))
-    table l : state =
+    table l 
+  : state 
+  =
   Utils.timeout exn (Config.solver_timeout ()) (complete table) l 
         
 let print_init_trs fmt table =
@@ -1464,13 +1507,18 @@ let check_disequality_cterm state neqs (u,v) =
   || (is_ground_term u && is_ground_term v && (u <> v))
 
 let check_disequality state neqs (u,v) =
-  check_disequality_cterm state neqs (cterm_of_term u, cterm_of_term v)
+  let ct_memo = state.ct_memo in
+  check_disequality_cterm
+    state neqs
+    (cterm_of_term ct_memo u, cterm_of_term ct_memo v)
 
 (** [check_disequalities s neqs l] checks that all disequalities inside [l]
     are implied by inequalities inside [neqs], wrt [s]. *)
 let check_disequalities state neqs l =
+  let ct_memo = state.ct_memo in
+
   let neqs = List.map (fun (x, y) ->
-         cterm_of_term x, cterm_of_term y) neqs in
+         cterm_of_term ct_memo x, cterm_of_term ct_memo y) neqs in
   List.for_all (check_disequality state neqs) l
 
 (** [check_equality_cterm state (u,v)]
@@ -1481,7 +1529,9 @@ let check_equality_cterm state (u,v) =
   normalize ~print:true state v
 
 let check_equality state (u,v) =
-  let cu, cv = cterm_of_term u, cterm_of_term v in
+  let ct_memo = state.ct_memo in
+
+  let cu, cv = cterm_of_term ct_memo u, cterm_of_term ct_memo v in
   let bool = check_equality_cterm state (cu, cv) in
 
   dbg "check_equality: %a = %a as %a = %a: %a"
@@ -1510,8 +1560,10 @@ let star_apply f = function
     star [] l
 
 let x_index_cnstrs state l select f_cnstr =
+  let ct_memo = state.ct_memo in
+
   List.fold_left
-    (fun l t -> cterm_of_term t :: l)
+    (fun l t -> cterm_of_term ct_memo t :: l)
     [] l
   |> subterms
   |> List.filter select

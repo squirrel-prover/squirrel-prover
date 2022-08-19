@@ -305,6 +305,12 @@ let do_print (state : main_state) (q : Prover.print_query) : main_state =
       | Some s -> SystemExpr.parse state.table s
     in
     SystemExpr.print_system state.table system;
+
+    if Config.print_trs_equations ()
+    then
+      Printer.prt `Result "@[<v>@;%a@;@]%!"
+        Completion.print_init_trs state.table;
+
     state
 
 (*------------------------------------------------------------------*)
@@ -338,7 +344,8 @@ let do_tactic (state : main_state) l : main_state =
            | `Tactic utac  -> Prover.eval_tactic utac)
         l
     with
-      | e -> ignore (Prover.reset_from_state prover_state) ; raise e
+      | e -> 
+        ignore (Prover.reset_from_state prover_state) ; raise e
     end ;
     if Prover.is_proof_completed () then begin
       Printer.prt `Goal "Goal %s is proved"
@@ -738,7 +745,7 @@ let () =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/depends.sp" with
-           | Tactic_soft_failure (_, Tactics.NotDepends ("A1(i)","A1(i)"))
+           | Tactic_soft_failure (_, Tactics.NotDepends _)
              -> raise Ok)
     end ;
     "Fresh Not Ground", `Quick, begin fun () ->

@@ -417,7 +417,7 @@ let get_dummy_definition
         prefix @ [dummy_end]
     in
 
-    let tvar = Vars.make_new Type.Timestamp "dummy" in
+    let tvar = Vars.make_fresh Type.Timestamp "dummy" in
     let ts = Term.mk_var tvar in
 
     get_def_glob ~allow_dummy:true system table symb ts dummy_action gdata

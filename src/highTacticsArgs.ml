@@ -21,11 +21,10 @@ let convert_pat_arg sel conv_cntxt p (conc : Equiv.any_form) =
   in
   let option = { Match.default_match_option with allow_capture = true; } in
   let table = conv_cntxt.env.table
-  and system = conv_cntxt.env.system
-  and vars  = conv_cntxt.env.vars in
+  and system = conv_cntxt.env.system in
   let res = match conc with
-    | Local form -> Match.T.find ~option table system vars pat form
-    | Global form -> Match.E.find ~option table system vars pat form
+    | Local form -> Match.T.find ~option table system pat form
+    | Global form -> Match.E.find ~option table system pat form
   in
   let message = match List.nth res (sel-1) with
     | et -> et

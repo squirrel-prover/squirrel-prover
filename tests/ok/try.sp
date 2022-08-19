@@ -1,5 +1,3 @@
-
-
 name k : index -> message
 
 abstract ok : message
@@ -30,10 +28,10 @@ Proof.
   induction t.
   auto.
   expandall.
-  fa 0. fa 1. fa 1.
+  fa 0; fa 1; fa 1.
   assert ->:
-    diff(try find j,j2 such that (j = i && j = j2) in <mess(i),mess(j2)>,
-         try find l,l2 such that (l = i && l2 = i) in <mess(i),mess(l2)>)
+    try find j,j2 such that (j = i && diff(j,j2) = diff(j2, i)) in 
+     <mess(i),mess(j2)>
     =
     try find j,j2 such that (j = i && j = j2) in <mess(i),mess(j2)>.
   by project; fa.
@@ -46,7 +44,7 @@ Proof.
     + auto.
   
     + intro [H0 _].
-      by use H0 with i,i.
+      by use H0 with i,i. 
   }.
   
   auto.

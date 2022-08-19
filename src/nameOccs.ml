@@ -172,7 +172,7 @@ let get_actions_ext
        MP.fold_shallow
          (fun t' se fv cond p occs ->
            occs @ (get t' ~fv ~cond ~p ~se))
-         ~env ~se ~fv ~p ~cond [] t
+         ~se ~fv ~p ~cond [] t
   in
   get t ~fv ~cond:[] ~p:MP.root ~se
 
@@ -392,11 +392,6 @@ let occurrence_formula
   (* fv = all free variables in occ, cond, action not in env *)
   let fv = Vars.Sv.elements sfv in 
 
-  (* refresh the free variables before quantifying them existentially *)
-  let env', fv', sigma = refresh_vars_env env fv in
-  let sub' t = subst sigma t in
-  let indices' = List.map (subst_var sigma) n.s_indices in
-
   (* in addition to generating an equality formula for all indices of n and na, 
      we directly substitute those that are free variables *)
   (* produces logically equivalent, but simpler, formulas *)
@@ -404,64 +399,56 @@ let occurrence_formula
     List.filter_map (fun x -> x)
       (List.map2
          (fun i_n i_na ->
-           if List.mem i_n fv' then
-             Some (ESubst (Term.mk_var i_n, Term.mk_var i_na))
-           else None)
-         indices' na.s_indices)
+            if List.mem i_n fv then
+              Some (ESubst (Term.mk_var i_n, Term.mk_var i_na))
+            else None)
+         n.s_indices na.s_indices)
   in
-  let sub'' t = subst sigma' (sub' t) in
-  let indices'' = List.map (subst_var sigma') indices' in
-  let n' = mk_isymb n.s_symb n.s_typ indices' in
+  let sub'' t = subst sigma' t in
+  let indices'' = List.map (subst_var sigma') n.s_indices in
+  let n' = mk_isymb n.s_symb n.s_typ n.s_indices in
   let cond'' = List.map sub'' cond in
 
   (* the equality formula is still needed, as eg if na.s_indices = (i, j)
      and indices' = (i', i'), having the substitution i' -> i loses the 
      fact that j = i' = i.
      So we keep all the equalities. Some become trivial but that's ok. *)
-  let phi_eq = mk_indices_eq ~simpl:true (na.s_indices) indices'' in
-  let phi_cond_eq = mk_ands ~simpl:true (cond''@[phi_eq]) in
+  let phi_eq = mk_indices_eq ~simpl:true na.s_indices indices'' in
+  let phi_cond_eq = mk_ands ~simpl:true (cond'' @ [phi_eq]) in
 
   match oinfo.oi_action with
   | Some a ->
-     (* indirect occurrence: we also generate the timestamp inequalities *)
-     let a' = sub' a in
-     let a'' = sub'' a in
-     (* no need to substitute ts since the variables we renamed do not 
+    (* indirect occurrence: we also generate the timestamp inequalities *)
+    let a'' = sub'' a in
+    (* no need to substitute ts since the variables we renamed do not 
        occur in ts *)
-     let phis_time =
-       List.map (fun (ti:ts_occ) ->
-           let (_, vars''', sigma'') =
-             refresh_vars_env env' ti.occ_vars
-           in
-           let ti''' = subst sigma'' ti.occ_cnt in
-           mk_exists ~simpl:true
-             vars'''
-             (mk_leq ~simpl:true a'' ti''')
-         ) ts
-     in
-     let phi_time = mk_ors ~simpl:true phis_time in
+    let phis_time =
+      List.map (fun (ti:ts_occ) ->
+          mk_exists ~simpl:true
+            ti.occ_vars
+            (mk_leq ~simpl:true a'' ti.occ_cnt)
+        ) ts
+    in
+    let phi_time = mk_ors ~simpl:true phis_time in
 
-     (* print the renamed occurrence *)
-     let oinfo' =
-       mk_oinfo na (sub' oinfo.oi_subterm) ~ac:(Some a') in 
-     let occ' =
-       mk_nocc n' oinfo' indices' (List.map sub' occ.occ_cond) occ.occ_pos 
-     in
-     Printer.pr "%a" pp occ';
+    (* print the renamed occurrence *)
+    let oinfo' = mk_oinfo na oinfo.oi_subterm ~ac:(Some a) in 
+    let occ' =
+      mk_nocc n' oinfo' n.s_indices occ.occ_cond occ.occ_pos 
+    in
+    Printer.pr "%a" pp occ';
 
-     mk_exists ~simpl:true fv' (mk_and ~simpl:true phi_time phi_cond_eq)
+    mk_exists ~simpl:true fv (mk_and ~simpl:true phi_time phi_cond_eq)
 
   | None -> (* direct occurrence *)
-     let oinfo' =
-       mk_oinfo na (sub' oinfo.oi_subterm) ~ac:None 
-     in 
-     let occ' = 
-       mk_nocc n' oinfo' indices' (List.map sub' occ.occ_cond) occ.occ_pos 
-     in
+    let oinfo' = mk_oinfo na oinfo.oi_subterm ~ac:None in 
+    let occ' = 
+      mk_nocc n' oinfo' n.s_indices occ.occ_cond occ.occ_pos 
+    in
+    
+    Printer.pr "%a" pp occ';
 
-     Printer.pr "%a" pp occ';
-
-     mk_exists ~simpl:true fv' phi_cond_eq
+    mk_exists ~simpl:true fv phi_cond_eq
 
 
 
@@ -522,16 +509,15 @@ let print_subsumed_occ (env:Vars.env) (occ:name_occ) : unit =
       occurrences must be an actual collision.
       Relies on fold_macro_support to look through all macros in the term. *)
 let occurrence_sequents
-      ?(pp_ns: (unit Fmt.t) option=None)
-      (find_occs : 
-         se:SE.arbitrary ->
-         env:Vars.env ->
-         ?fv:Vars.vars ->
-         expand_info ->
-         term ->
-         name_occs)
-      (s : TS.sequent)
-      (t : Term.term) : TS.sequents 
+    ?(pp_ns: (unit Fmt.t) option=None)
+    (find_occs : 
+       (se:SE.arbitrary ->
+        ?fv:Vars.vars ->
+        expand_info ->
+        term ->
+        name_occs))
+    (s : TS.sequent)
+    (t : Term.term) : TS.sequents 
   =
   let table = TS.table s in
   let contx = TS.mk_trace_cntxt s in
@@ -550,7 +536,7 @@ let occurrence_sequents
     ppp ()
     Term.pp t;
 
-  let all_dir_occs = find_occs ~se ~env (EI_direct (s,contx)) t in
+  let all_dir_occs = find_occs ~se (EI_direct (s,contx)) t in
   (* remove occs that are subsumed by another *) 
   let dir_occs, subsumed_dir_occs =
     partition_subsumed_occs table system all_dir_occs 
@@ -579,7 +565,7 @@ let occurrence_sequents
 
         (* indirect occurrences in iocc *)
         let all_ind_occs =
-          find_occs ~se ~env ~fv:(Vars.Sv.elements fv)
+          find_occs ~se ~fv:(Vars.Sv.elements fv)
             (EI_indirect (a, contx)) t
         in
 
@@ -656,12 +642,11 @@ type f_fold_occs =
           for that)
        2) using Match.Pos.fold_shallow, to recurse on subterms at depth 1. *)
 let fold_bad_occs
-      (get_bad_occs: f_fold_occs)
-      ~(se:SE.arbitrary)
-      ~(env:Vars.env) (* for fold_shallow for renaming *)
-      ?(fv:Vars.vars=[])
-      (info:expand_info)
-      (t:term) : name_occs 
+    (get_bad_occs: f_fold_occs)
+    ~(se:SE.arbitrary)
+    ?(fv:Vars.vars=[])
+    (info:expand_info)
+    (t:term) : name_occs 
   =
   let rec get
             ~(fv:Vars.vars) ~(cond:Term.terms) ~(p:MP.pos) ~(se:SE.arbitrary) 
@@ -687,7 +672,7 @@ let fold_bad_occs
            (fun t' se fv cond p occs ->
              let sst = if is_binder t then t' else st in
              occs @ (get t' ~fv ~cond ~p ~se ~st:sst))
-           ~env ~se ~fv ~p ~cond [] t
+           ~se ~fv ~p ~cond [] t
     in
     get_bad_occs retry_on_subterms get ~info ~fv ~cond ~p ~se ~st t 
   in
