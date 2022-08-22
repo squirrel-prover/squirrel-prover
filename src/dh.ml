@@ -201,7 +201,7 @@ let dh_param
   =
   (* get generator *)
   let gen_n = Symbols.Function.of_lsymb g tbl in
-  let gen = Term.mk_fun tbl gen_n [] [] in
+  let gen = Term.mk_fun tbl gen_n [] in
   
   (* check DH assumption *)
   if not (has_cgdh gdh_oracles g tbl) then
@@ -216,9 +216,6 @@ let dh_param
     | Symbols.AssociatedFunctions [e ; m] -> (e, Some m)
     | _ -> assert false (* not possible since gen is a dh generator *)
   in
-  let exp_s = (exp_n, []) in
-  let mult_s = Option.map (fun x -> (x, [])) mult_n in
-
 
   (* write hyp as t = g^(a*b) *)
   let m1, m2 = match NO.destr_eq_expand info hyp with
@@ -226,8 +223,8 @@ let dh_param
     | None -> soft_failure ~loc:hyp_loc
                 (Tactics.Failure "can only be applied on an equality hypothesis")
   in
-  let (u, pows) = powers exp_s mult_s info m1 in
-  let (v, qows) = powers exp_s mult_s info m2 in
+  let (u, pows) = powers exp_n mult_n info m1 in
+  let (v, qows) = powers exp_n mult_n info m2 in
 
   let (t, a, b) = match (u,pows,v,qows) with
     | (_, _, _, [Name n1; Name n2]) when v = gen ->
@@ -240,7 +237,7 @@ let dh_param
          (Tactics.Failure "hypothesis must be of the form \
                            t=g^ab or g^ab=t")
   in
-  (gen, exp_s, mult_s, t, a, b)
+  (gen, exp_n, mult_n, t, a, b)
 
 
 

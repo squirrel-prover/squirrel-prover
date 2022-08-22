@@ -111,7 +111,6 @@ type any_term = Global of global_formula | Local of term
     satisfies PRF, and thus collision-resistance and EUF. *)
 val declare_hash :
   Symbols.table ->
-  ?index_arity:int ->
   ?m_ty:Type.ty ->
   ?k_ty:Type.ty ->
   ?h_ty:Type.ty ->
@@ -199,7 +198,6 @@ val get_init_states :
   * of type [index^i -> message^m -> message]. *)
 val declare_abstract :
   Symbols.table -> 
-  index_arity:int ->
   ty_args:Type.tvar list ->
   in_tys:Type.ty list ->
   out_ty:Type.ty ->
@@ -209,7 +207,7 @@ val declare_abstract :
 (** Sanity checks for a function symbol declaration. *)
 val check_fun_symb :
   Symbols.table ->
-  Type.tvar list -> Type.ty list -> int ->
+  Type.tvar list -> Type.ty list -> 
   lsymb -> Symbols.symb_type -> unit
   
 (*------------------------------------------------------------------*)

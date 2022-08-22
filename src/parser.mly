@@ -80,7 +80,6 @@
 %token RENAME GPRF GCCA
 %token INCLUDE PRINT
 %token SMT
-%token TICKUNDERSCORE
 %token EOF
 
 %right COMMA
@@ -378,10 +377,6 @@ opt_arg_list:
 ty_var:
 | TICK id=lsymb     { id }
 
-index_arity:
-|                                { 0 }
-| LPAREN i=INT RPAREN            { i }
-
 p_ty_i:
 | MESSAGE      { Theory.P_message }
 | INDEX        { Theory.P_index }
@@ -449,11 +444,11 @@ system_modifier:
 
 
 declaration_i:
-| HASH e=lsymb a=index_arity ctys=c_tys
-                          { Decl.Decl_hash (Some a, e, None, ctys) }
+| HASH e=lsymb ctys=c_tys
+                          { Decl.Decl_hash (e, None, ctys) }
 
 | HASH e=lsymb WITH ORACLE f=term
-                          { Decl.Decl_hash (None, e, Some f, []) }
+                          { Decl.Decl_hash (e, Some f, []) }
 
 | AENC e=lsymb COMMA d=lsymb COMMA p=lsymb ctys=c_tys
                           { Decl.Decl_aenc (e, d, p, ctys) }

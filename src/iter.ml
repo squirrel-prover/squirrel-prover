@@ -121,7 +121,7 @@ class deprecated_get_f_messages ?(drop_head=true)
   val mutable occurrences : (Vars.var list * Term.term) list = []
   method get_occurrences = occurrences
   method visit_message = function
-    | Term.Fun ((f',_),_, [m;k']) as m_full when f' = f ->
+    | Term.Fun (f',_, [m;k']) as m_full when f' = f ->
       begin match k' with
         | Term.Name s' when s'.s_symb = k ->
           let ret_m = if drop_head then m else m_full in
@@ -130,19 +130,20 @@ class deprecated_get_f_messages ?(drop_head=true)
       end ;
       self#visit_message m ; self#visit_message k'
 
-    | Term.Fun ((f',_), _,[m;r;k']) as m_full when f' = f ->
+    | Term.Fun (f', _,[m;r;k']) as m_full when f' = f ->
       begin match k', fun_wrap_key with
         | Term.Name s', None when s'.s_symb = k ->
           let ret_m = if drop_head then m else m_full in
           occurrences <- (s'.s_indices,ret_m) :: occurrences
-        |Term.Fun ((f',_), _, [Term.Name s']), Some is_pk
+        |Term.Fun (f', _, [Term.Name s']), Some is_pk
           when is_pk f' && s'.s_symb = k ->
           let ret_m = if drop_head then m else m_full in
           occurrences <- (s'.s_indices,ret_m) :: occurrences
         | _ -> ()
       end ;
       self#visit_message m ; self#visit_message k'
-    | Term.Var m -> assert false (* SSC must have been checked first *)
+    | Term.Var m when not (Type.is_finite (Vars.ty m)) ->
+      assert false (* SSC must have been checked first *)
     | m -> super#visit_message m
 end
 
@@ -258,8 +259,8 @@ type fsymb_matcher =
   | Type of Symbols.function_def
   | Symbol of Term.fsymb
 
-let matching table (fn,vs) = function
-  | Symbol fsymb -> fsymb = (fn,vs)
+let matching table fn = function
+  | Symbol fsymb -> fsymb = fn
   | Type symtype -> Symbols.is_ftype fn symtype table
 
 
@@ -282,9 +283,9 @@ let get_f
     in
 
     match t with
-    | Term.Fun ((fn,vs),_,l)  ->
+    | Term.Fun (fn,_,l)  ->
       let head_occ =
-        if matching table (fn,vs) symtype
+        if matching table fn symtype
         then [{ occ_cnt  = t;
                 occ_vars = List.rev fv;
                 occ_cond = cond;
@@ -406,7 +407,7 @@ let get_f_messages_ext
     (se : SE.arbitrary) (fv : Vars.vars) (cond : Term.terms) pos
     (occs : hash_occs) ->
     match t with
-      | Term.Fun ((f',_),_, [m;k']) as m_full when f' = f ->
+      | Term.Fun (f',_, [m;k']) as m_full when f' = f ->
         let occs' =
           match k' with
           | Term.Name s' when s'.s_symb = k ->
@@ -419,7 +420,7 @@ let get_f_messages_ext
         in
         occs' @ occs, `Continue
 
-      | Term.Fun ((f',_), _, [m;r;k']) as m_full when f' = f ->
+      | Term.Fun (f', _, [m;r;k']) as m_full when f' = f ->
         let occs' =
           match k', fun_wrap_key with
           | Term.Name s', None when s'.s_symb = k ->
@@ -429,7 +430,7 @@ let get_f_messages_ext
                occ_cond = cond;
                occ_pos  = Sp.singleton pos; }]
 
-          |Term.Fun ((f',_), _, [Term.Name s']), Some is_pk
+          |Term.Fun (f', _, [Term.Name s']), Some is_pk
             when is_pk f' && s'.s_symb = k ->
             let ret_m = if drop_head then m else m_full in
             [{ occ_cnt  = s'.s_indices,ret_m;

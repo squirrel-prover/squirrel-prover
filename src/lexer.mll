@@ -61,7 +61,6 @@ rule token = parse
 | ';'                 { SEMICOLON }
 | '*'                 { STAR }
 | '_'                 { UNDERSCORE }
-| "`_"                { TICKUNDERSCORE }
 | "//"                { SLASHSLASH }
 | "/="                { SLASHEQUAL }
 | "//="               { SLASHSLASHEQUAL }

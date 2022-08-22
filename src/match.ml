@@ -60,8 +60,6 @@ module Pos = struct
     | `Continue -> 
       match t with
       | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite ->
-        assert (snd fs = []);
-
         let conds_t =             c :: conds in
         let conds_e = Term.mk_not c :: conds in
 
@@ -69,8 +67,7 @@ module Pos = struct
         let sp = sel fsel sp ~projs ~vars ~conds:conds_t ~p:(1 :: p) t in
         (*    *) sel fsel sp ~projs ~vars ~conds:conds_e ~p:(2 :: p) e 
 
-      | Term.Fun ((_, l1), _, l2) ->
-        let l = (List.map Term.mk_var l1) @ l2 in
+      | Term.Fun (_, _, l) ->
         sel_l fsel sp ~projs ~vars ~conds ~p l
 
       | Term.Name ns ->
@@ -208,8 +205,6 @@ module Pos = struct
     let rec_strict_subterm ti acc =
       match ti with
       | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite ->
-        assert (snd fs = []);
-
         let conds_t =             c :: conds in
         let conds_e = Term.mk_not c :: conds in
 
@@ -222,7 +217,7 @@ module Pos = struct
         acc, found, if found then ti' else ti
 
       (* [φ => ψ] *)
-      | Term.Fun ((fs, []), fty, [t1; t2]) when fs = Symbols.fs_impl ->
+      | Term.Fun (fs, fty, [t1; t2]) when fs = Symbols.fs_impl ->
         let conds2 = t1 :: conds in
         let acc, found1, t1 = 
           map_fold ~se ~conds        ~p:(0 :: p) ~acc t1
@@ -232,11 +227,11 @@ module Pos = struct
         in
         let found = found1 || found2 in
 
-        let ti' = Term.mk_fun0 (fs, []) fty [t1; t2] in
+        let ti' = Term.mk_fun0 fs fty [t1; t2] in
         acc, found, if found then ti' else ti
 
       (* [φ && ψ] is handled as [φ && (φ => ψ)] *)
-      | Term.Fun ((fs, []), fty, [t1; t2]) when fs = Symbols.fs_and ->
+      | Term.Fun (fs, fty, [t1; t2]) when fs = Symbols.fs_and ->
         let conds2 = t1 :: conds in
         let acc, found1, t1 = 
           map_fold ~se ~conds        ~p:(0 :: p) ~acc t1
@@ -246,11 +241,11 @@ module Pos = struct
         in
         let found = found1 || found2 in
 
-        let ti' = Term.mk_fun0 (fs, []) fty [t1; t2] in
+        let ti' = Term.mk_fun0 fs fty [t1; t2] in
         acc, found, if found then ti' else ti
 
       (* [φ || ψ] is handled as [φ || (¬ φ => ψ)] *)
-      | Term.Fun ((fs, []), fty, [t1; t2]) when fs = Symbols.fs_or ->
+      | Term.Fun (fs, fty, [t1; t2]) when fs = Symbols.fs_or ->
         let conds2 = (Term.mk_not t1) :: conds in
 
         let acc, found1, t1 = 
@@ -261,18 +256,13 @@ module Pos = struct
         in
         let found = found1 || found2 in
 
-        let ti' = Term.mk_fun0 (fs, []) fty [t1; t2] in
+        let ti' = Term.mk_fun0 fs fty [t1; t2] in
         acc, found, if found then ti' else ti
 
-      | Term.Fun ((fs, l1), fty, l2) ->
-        let l = (List.map Term.mk_var l1) @ l2 in
-
+      | Term.Fun (fs, fty, l) ->
         let acc, found, l = map_fold_l ~se ~p ~acc l in
 
-        let l1, l2 = List.takedrop (List.length l1) l in
-        let l1 = destr_vars l1 in
-
-        let ti' = Term.mk_fun0 (fs, l1) fty l2 in
+        let ti' = Term.mk_fun0 fs fty l in
         acc, found, if found then ti' else ti
 
       | Term.Name ns ->
@@ -1023,9 +1013,9 @@ module T (* : S with type t = Term.term *) = struct
     | Var v, t | t, Var v ->
       vunif t v st
 
-    | Fun (symb, _, terms), Fun (symb', _, terms') ->
-      let mv = sunif symb symb' st in
-      unif_l terms terms' { st with mv }
+    | Fun (fn, _, terms), Fun (fn', _, terms') ->
+      if fn <> fn' then raise NoMgu;
+      unif_l terms terms' st
 
     | Name s, Name s' -> isymb_unif s s' st
 
@@ -1251,10 +1241,9 @@ module T (* : S with type t = Term.term *) = struct
     match t, pat with
     | _, Var v' -> vmatch t v' st
 
-    | Fun ((fn , _) as symb, fty, terms), 
-      Fun ((fn', _) as symb', fty', terms') when fn = fn' ->
-      let mv = smatch symb symb' st in
-      tmatch_l terms terms' { st with mv }
+    | Fun (fn , fty, terms), 
+      Fun (fn', fty', terms') when fn = fn' ->
+      tmatch_l terms terms' st
 
     | Name s, Name s' -> isymb_match s s' st
 

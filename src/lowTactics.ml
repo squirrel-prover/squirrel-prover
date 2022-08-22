@@ -311,7 +311,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           else
             `Continue
 
-        | Term.Fun ((f,_), _, _) ->
+        | Term.Fun (f, _, _) ->
           if found_occ_fun target f then
             unfold se occ s
           else

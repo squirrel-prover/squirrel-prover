@@ -624,7 +624,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
   | New (n, pty, p) ->
     let ty = Theory.parse_p_ty penv.env pty in
 
-    let n_fty = Type.mk_ftype 0 [] (List.map Vars.ty penv.indices) ty in
+    let n_fty = Type.mk_ftype [] (List.map Vars.ty penv.indices) ty in
     let ndef = Symbols.{ n_fty } in
 
     let table,n' = Symbols.Name.declare penv.env.table n ndef in

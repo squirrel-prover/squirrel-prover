@@ -521,7 +521,13 @@ exception No_FA of [`HeadDiff | `HeadNoFun]
 
 let fa_expand (t:Term.t) =
   let l = match Term.head_normal_biterm t with
-    | Fun (f,_,l) -> l
+    | Fun (f,_,l) ->
+      if List.for_all (fun t ->
+          Term.is_var t && Type.is_finite (Term.ty t)
+        ) l
+      then []
+      else l
+        
     | Diff _      -> raise (No_FA `HeadDiff)
     | _           -> raise (No_FA `HeadNoFun)
   in
@@ -630,9 +636,11 @@ let fa_tac args = match args with
 
 (*------------------------------------------------------------------*)
 (** This function goes over all elements inside elems.  All elements that can be
-   seen as duplicates, or context of duplicates, are removed. All elements that
-   can be seen as context of duplicates and assumptions are removed, but
-   replaced by the assumptions that appear as there subterms. *)
+    seen as duplicates, or context of duplicates, are removed. All elements that
+    can be seen as context of duplicates and assumptions are removed, but
+    replaced by the assumptions that appear as there subterms. 
+
+    Used in automatic simplification. *)
 let filter_fa_dup (s : ES.t) assump (elems : Equiv.equiv) =
   let table = ES.table s in
 
@@ -1264,7 +1272,7 @@ let prf arg (s : ES.t) : ES.t list =
             (Tactics.Failure "the given hash does not occur in the term")
   in
   let fn, ftyp, m, key, hash = match hash_occ.Iter.occ_cnt with
-    | Term.Fun ((fn,_), ftyp, [m; key]) as hash ->
+    | Term.Fun (fn, ftyp, [m; key]) as hash ->
       fn, ftyp, m, key, hash
     | _ -> assert false
   in
@@ -1295,7 +1303,7 @@ let prf arg (s : ES.t) : ES.t list =
   assert (ftyp.fty_vars = []);
 
   let nty = ftyp.fty_out in
-  let ndef = Symbols.{ n_fty = Type.mk_ftype 0 [] [] nty; } in
+  let ndef = Symbols.{ n_fty = Type.mk_ftype [] [] nty; } in
   let table,n =
     Symbols.Name.declare (ES.table s) (L.mk_loc L._dummy "n_PRF") ndef
   in
@@ -1679,7 +1687,7 @@ let cca1 Args.(Int i) s =
 
   let e = Term.head_normal_biterm e in
 
-  let get_subst_hide_enc enc fnenc m fnpk sk fndec r eis is_top_level
+  let get_subst_hide_enc enc fnenc m fnpk sk fndec r is_top_level
     : Goal.t * Term.esubst
     =
     (* we check that the random is fresh, and the key satisfy the
@@ -1699,13 +1707,13 @@ let cca1 Args.(Int i) s =
         let new_m = Term.mk_zeroes (Term.mk_len m) in
         let enc_sk =
           match fnpk with
-          | Some (fnpk,pkis) ->
-            Term.mk_fun table fnpk pkis [Term.mk_name sk]
+          | Some fnpk ->
+            Term.mk_fun table fnpk [Term.mk_name sk]
 
           | None -> Term.mk_name sk
         in
         let new_term =
-          Term.mk_fun table fnenc eis [new_m; Term.mk_name r; enc_sk]
+          Term.mk_fun table fnenc [new_m; Term.mk_name r; enc_sk]
         in
         Term.ESubst (enc, new_term)
     in
@@ -1717,13 +1725,13 @@ let cca1 Args.(Int i) s =
      - else, we will replace the plaintext by its length *)
   let is_top_level : bool =
     match e with
-    | Term.Fun ((fnenc,eis), _,
+    | Term.Fun (fnenc, _,
                 [m; Term.Name r;
-                 Term.Fun ((fnpk,is), _, [Term.Name sk])])
+                 Term.Fun (fnpk, _, [Term.Name sk])])
       when (Symbols.is_ftype fnpk Symbols.PublicKey cntxt.table
             && Symbols.is_ftype fnenc Symbols.AEnc table) -> true
 
-    | Term.Fun ((fnenc,eis), _, [m; Term.Name r; Term.Name sk])
+    | Term.Fun (fnenc, _, [m; Term.Name r; Term.Name sk])
       when Symbols.is_ftype fnenc Symbols.SEnc table -> true
 
     | _ -> false
@@ -1738,9 +1746,9 @@ let cca1 Args.(Int i) s =
       soft_failure (Tactics.Failure "cannot be applied in a under a binder");
 
     match occ.Iter.occ_cnt with
-    | (Term.Fun ((fnenc,eis), _,
+    | (Term.Fun (fnenc, _,
                  [m; Term.Name r;
-                  Term.Fun ((fnpk,is), _, [Term.Name sk])])
+                  Term.Fun (fnpk, _, [Term.Name sk])])
        as enc)
       when (Symbols.is_ftype fnpk Symbols.PublicKey table
             && Symbols.is_ftype fnenc Symbols.AEnc table) ->
@@ -1760,7 +1768,7 @@ let cca1 Args.(Int i) s =
               soft_failure (Tactics.BadSSCDetailed errors);
 
             if not (List.mem
-                      (Term.mk_fun table fnpk is [Term.mk_name sk])
+                      (Term.mk_fun table fnpk [Term.mk_name sk])
                       biframe) then
               soft_failure
                 (Tactics.Failure
@@ -1768,8 +1776,8 @@ let cca1 Args.(Int i) s =
                     use CCA1");
 
             get_subst_hide_enc
-              enc fnenc m (Some (fnpk,is))
-              sk fndec r eis is_top_level
+              enc fnenc m (Some fnpk)
+              sk fndec r is_top_level
           end
 
         | _ ->
@@ -1779,7 +1787,7 @@ let cca1 Args.(Int i) s =
                 public key function.")
       end
 
-    | (Term.Fun ((fnenc,eis), _, [m; Term.Name r; Term.Name sk])
+    | (Term.Fun (fnenc, _, [m; Term.Name r; Term.Name sk])
        as enc) when Symbols.is_ftype fnenc Symbols.SEnc table
       ->
       begin
@@ -1796,7 +1804,7 @@ let cca1 Args.(Int i) s =
                  biframe, except for the encryptions we are looking at, which
                  is checked by adding a fresh reachability goal. *)
               Cca.symenc_rnd_ssc ~cntxt env fnenc sk biframe;
-              get_subst_hide_enc enc fnenc m (None) sk fndec r eis is_top_level
+              get_subst_hide_enc enc fnenc m (None) sk fndec r is_top_level
 
             with Cca.Bad_ssc ->  soft_failure Tactics.Bad_SSC
           end
@@ -1874,14 +1882,13 @@ let enckp arg (s : ES.t) =
 
   (* Apply tactic to replace key(s) in [enc] using [new_key].
    * Precondition:
-   * [enc = Term.Fun ((fnenc,indices), [m; Term.Name r; k])].
+   * [enc = Term.Fun (fnenc, [m; Term.Name r; k])].
    * Verify that the encryption primitive is used correctly,
    * that the randomness is fresh and that the keys satisfy their SSC. *)
-  let apply
+  let apply_kp
       ~(enc     : Term.term)
       ~(new_key : Term.term option)
       ~(fnenc   : Term.fname)
-      ~(indices : 'a)
       ~(m       : 'b)
       ~(r       : Term.nsymb)
       ~(k       : Term.term)
@@ -1916,12 +1923,12 @@ let enckp arg (s : ES.t) =
              in
              if errors <> [] then
                soft_failure (Tactics.BadSSCDetailed errors)),
-          (fun x -> Term.mk_fun table fnpk indices [x]),
+          (fun x -> Term.mk_fun table fnpk [x]),
           begin match k with
-            | Term.Fun ((fnpk',indices'), _, [sk])
-              when fnpk = fnpk' && indices = indices' -> sk
-            | Term.Fun ((fnpk',indices'), _, [sk])
-              when fnpk = fnpk' && indices = indices' -> sk
+            | Term.Fun (fnpk', _, [sk])
+              when fnpk = fnpk' -> sk
+            | Term.Fun (fnpk', _, [sk])
+              when fnpk = fnpk' -> sk
             | _ ->
               soft_failure
                 (Failure
@@ -1972,7 +1979,7 @@ let enckp arg (s : ES.t) =
 
     (* Equivalence goal where [enc] is modified using [new_key]. *)
     let new_enc =
-      Term.mk_fun table fnenc indices [m; Term.mk_name r; wrap_pk new_key]
+      Term.mk_fun table fnenc [m; Term.mk_name r; wrap_pk new_key]
     in
     let new_elem =
       Equiv.subst_equiv [Term.ESubst (enc,new_enc)] [e]
@@ -1990,7 +1997,7 @@ let enckp arg (s : ES.t) =
 
     | Some (Message (m1, _)), None ->
       begin match m1 with
-        | Term.Fun ((f,_),_,[_;_;_]) -> Some m1, None
+        | Term.Fun (f,_,[_;_;_]) -> Some m1, None
         | _ -> None, Some m1
       end
     | None, None -> None, None
@@ -1998,8 +2005,8 @@ let enckp arg (s : ES.t) =
   in
 
   match target with
-  | Some (Term.Fun ((fnenc,indices), _, [m; Term.Name r; k]) as enc) ->
-    apply ~enc ~new_key ~fnenc ~indices ~m ~r ~k
+  | Some (Term.Fun (fnenc, _, [m; Term.Name r; k]) as enc) ->
+    apply_kp ~enc ~new_key ~fnenc ~m ~r ~k
   | Some _ ->
     soft_failure
       (Tactics.Failure ("Target must be of the form enc(_,r,_) where \
@@ -2022,9 +2029,9 @@ let enckp arg (s : ES.t) =
         if not (occ.Iter.occ_vars = []) then find occs
         else
         begin match occ.Iter.occ_cnt with
-          | Term.Fun ((fnenc,indices), _, [m; Term.Name r; k]) as enc
+          | Term.Fun (fnenc, _, [m; Term.Name r; k]) as enc
             when diff_key k ->
-            apply ~enc ~new_key ~fnenc ~indices ~m ~r ~k
+            apply_kp ~enc ~new_key ~fnenc ~m ~r ~k
 
           | _ -> find occs
         end
@@ -2200,7 +2207,7 @@ let xor arg (s : ES.t) =
   let phi =
     mk_xor_phi_base s biframe (n_left, l_left, n_right, l_right, term)
   in
-  let ndef = Symbols.{ n_fty = Type.mk_ftype 0 [] [] Message ; } in
+  let ndef = Symbols.{ n_fty = Type.mk_ftype [] [] Message ; } in
   let table,n =
     Symbols.Name.declare (ES.table s) (L.mk_loc L._dummy "n_XOR") ndef
   in
@@ -2340,8 +2347,8 @@ let ddh (lgen : lsymb) (na : lsymb) (nb : lsymb) (nc : lsymb) s sk fk =
     | _ -> assert false
   in
 
-  let gen = Term.mk_fun tbl gen_symb [] [] in
-  let exp = (exp_symb, []) in
+  let gen = Term.mk_fun tbl gen_symb [] in
+  let exp = exp_symb in
 
   let cntxt = mk_pair_trace_cntxt s in
   let l_proj, r_proj = ES.get_system_pair_projs s in

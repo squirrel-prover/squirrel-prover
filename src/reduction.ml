@@ -77,7 +77,6 @@ let conv_tys (tys1 : Type.ty list) (tys2 : Type.ty list) : unit =
   List.iter2 conv_ty tys1 tys2
 
 let conv_ftype (ft1 : Type.ftype) (ft2 : Type.ftype) : unit =
-  if ft1.fty_iarr <> ft2.fty_iarr then not_conv ();
   conv_ty  ft1.fty_out  ft2.fty_out;
   conv_tys ft1.fty_args ft2.fty_args;
   List.iter2 (fun tv1 tv2 ->
@@ -100,10 +99,9 @@ let conv_bnds (st : cstate) (vs1 : Vars.vars) (vs2 : Vars.vars) : cstate =
 
 let rec conv (st : cstate) (t1 : Term.term) (t2 : Term.term) : unit =
   match t1, t2 with
-  | Term.Fun ((fs1, li1), fty1, l1), Term.Fun ((fs2, li2), fty2, l2)
+  | Term.Fun (fs1, fty1, l1), Term.Fun (fs2, fty2, l2)
     when fs1 = fs2 ->
     conv_ftype fty1 fty2;
-    conv_vars st li1 li2;
     conv_l st l1 l2
 
   | Term.Name ns1, Term.Name ns2 when ns1.s_symb = ns2.s_symb ->

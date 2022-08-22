@@ -55,7 +55,7 @@ let mk ~name ~ty_vars ~args ~out_ty ~body =
   { name; ty_vars; args; out_ty; body }
 
 let ftype (op : operator) : Type.ftype = 
-  Type.mk_ftype 0 op.ty_vars (List.map Vars.ty op.args) op.out_ty
+  Type.mk_ftype op.ty_vars (List.map Vars.ty op.args) op.out_ty
 
 let get_body (system : 'a SystemExpr.expr) (op_body : op_body) : body =
   match op_body with
@@ -63,8 +63,7 @@ let get_body (system : 'a SystemExpr.expr) (op_body : op_body) : body =
     | ManyDefs defs -> assert false (* TODO *)
 
 let is_operator (table : Symbols.table) (fsymb : Term.fsymb) : bool =
-  let f, _ = fsymb in
-  match Symbols.Function.get_data f table with
+  match Symbols.Function.get_data fsymb table with
   | Operator op -> true
   | _ -> false
 
@@ -75,10 +74,8 @@ let unfold
     (args   : Term.term list)
   : Term.term
   =
-  let opname, opindices = opsymb in
-  assert (opindices = []);
   let op = 
-    match Symbols.Function.get_data opname table with
+    match Symbols.Function.get_data opsymb table with
     | Operator op -> op
     | _ -> assert false
   in

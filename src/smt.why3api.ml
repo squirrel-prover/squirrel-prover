@@ -290,7 +290,7 @@ let build_task_bis
     | (`Pos, x) ->        atom_to_fmla x
     | (`Neg, x) -> t_not (atom_to_fmla x)
   and find_fn f = Hashtbl.find functions_tbl (Symbols.to_string f)
-  (* in thne function below I guess t_app_infer invokes the Why3 typechecker
+  (* in the function below I guess t_app_infer invokes the Why3 typechecker
    * to ensure that messages and timestamps are not mixed up
    * but this is not reflected in our OCaml types
    * the function subsumes timestamp_to_wterm from build_task (constraints) *)
@@ -300,7 +300,8 @@ let build_task_bis
     (* TODO lots of t_app_infer + Hashtbl.find + Symbols.to_string
      *      -> factor into common utility function *)
     match c with (* cases taken from Completion.cterm_of_term *)
-    | Fun ((f,is),_,terms) -> begin match terms with
+    | Fun (f,_,terms) ->
+      begin match terms with
         | [t1; t2] when f = Symbols.fs_xor ->
           t_app_infer xor_symb [msg_to_wterm t1; msg_to_wterm t2]
         | [cond; t1; t2] when f = Symbols.fs_ite ->
@@ -309,8 +310,7 @@ let build_task_bis
            * but also to translate the condition into a formula (this avoids the
            *  need for a conversion from atoms to why3 terms of type message) *)
           t_if (msg_to_fmla cond) (msg_to_wterm t1) (msg_to_wterm t2)
-        | _ ->  t_app_infer (find_fn f) (ilist_to_wterm is
-                                         :: List.map msg_to_wterm terms)
+        | _ ->  t_app_infer (find_fn f) (List.map msg_to_wterm terms)
       end
 
     | Macro (ms,l,ts) ->

@@ -1271,8 +1271,8 @@ let euf_param table (t : Term.term) : unforgeabiliy_param =
   in
 
   match t1, t2 with
-  | (Fun ((checksign, _),    _, [s; Fun ((pk,_), _, [Name key])]), m)
-  | (m, Fun ((checksign, _), _, [s; Fun ((pk,_), _, [Name key])])) ->
+  | (Fun (checksign,    _, [s; Fun (pk, _, [Name key])]), m)
+  | (m, Fun (checksign, _, [s; Fun (pk, _, [Name key])])) ->
     begin match Theory.check_signature table checksign pk with
       | None ->
         soft_failure
@@ -1282,11 +1282,11 @@ let euf_param table (t : Term.term) : unforgeabiliy_param =
       | Some sign -> (sign, key, m, s,  (fun x -> x=pk), [], true, None)
     end
 
-  | (Fun ((hash, _), _, [m; Name key]), s)
+  | (Fun (hash, _, [m; Name key]), s)
     when Symbols.is_ftype hash Symbols.Hash table ->
     (hash, key, m, s, (fun x -> false), [], true, None)
 
-  | (s, Fun ((hash, _), _, [m; Name key]))
+  | (s, Fun (hash, _, [m; Name key]))
     when Symbols.is_ftype hash Symbols.Hash table ->
     (hash, key, m, s, (fun x -> false), [], true, None)
 
@@ -1319,19 +1319,19 @@ let intctxt_param table (t : Term.term) : unforgeabiliy_param =
     | _ -> assert false in
 
   match at with
-  | (`Eq, Fun ((sdec, _), _, [m; Name key]), s)
+  | (`Eq, Fun (sdec, _, [m; Name key]), s)
     when Symbols.is_ftype sdec Symbols.SDec table ->
     param_dec sdec key m s
 
-  | (`Eq, s, Fun ((sdec, is), _, [m; Name key]))
+  | (`Eq, s, Fun (sdec, _, [m; Name key]))
     when Symbols.is_ftype sdec Symbols.SDec table ->
     param_dec sdec key m s
 
-  | (`Neq, (Fun ((sdec, _), _, [m; Name key]) as s), Fun (fail, _, _))
+  | (`Neq, (Fun (sdec, _, [m; Name key]) as s), Fun (fail, _, _))
     when Symbols.is_ftype sdec Symbols.SDec table && fail = Term.f_fail->
     param_dec sdec key m s
 
-  | (`Neq, Fun (fail, _, _), (Fun ((sdec, is), _, [m; Name key]) as s))
+  | (`Neq, Fun (fail, _, _), (Fun (sdec, _, [m; Name key]) as s))
     when Symbols.is_ftype sdec Symbols.SDec table && fail = Term.f_fail ->
     param_dec sdec key m s
 
@@ -1362,11 +1362,11 @@ let non_malleability_param
     | _ -> assert false in
 
   match t1, t2 with
-  | (Fun ((adec, _), _, [m; Name key]), s)
+  | (Fun (adec, _, [m; Name key]), s)
     when Symbols.is_ftype adec Symbols.ADec table ->
     param_dec adec key m s
 
-  | (s, Fun ((adec, _), _, [m; Name key]))
+  | (s, Fun (adec, _, [m; Name key]))
     when Symbols.is_ftype adec Symbols.ADec table ->
     param_dec adec key m s
 
@@ -1590,7 +1590,7 @@ class name_under_enc (cntxt:Constr.trace_cntxt) enc is_pk target_n key_n
  method visit_message t =
     match t with
     (* any name n can occur as enc(_,_,pk(k)) *)
-    | Term.Fun ((f, _), _, [_; m; Term.Fun ((g,_), _ , [Term.Name k]) ])
+    | Term.Fun (f, _, [_; m; Term.Fun (g, _ , [Term.Name k]) ])
       when f = enc && is_pk g && k.s_symb = key_n->  super#visit_message m
     | Term.Name name when name.s_symb = target_n -> raise Name_not_hidden
     | Term.Var m -> raise Name_not_hidden
@@ -1644,7 +1644,7 @@ let non_malleability arg (s : TS.t) =
                                     not equal to another fres name *)
   | m, Some (Message (Term.Name n as name,ty)) ->
     (* we now create the inequality to be checked *)
-    let ndef = Symbols.{ n_fty = Type.mk_ftype 0 [] [] ty; } in
+    let ndef = Symbols.{ n_fty = Type.mk_ftype [] [] ty; } in
     let table,n =
       Symbols.Name.declare table (L.mk_loc L._dummy "n_NM") ndef
     in
@@ -1672,7 +1672,7 @@ let () =
 (*------------------------------------------------------------------*)
 let valid_hash (cntxt : Constr.trace_cntxt) (t : Term.term) =
   match t with
-  | Fun ((hash, _), _, [m; Name key]) ->
+  | Fun (hash, _, [m; Name key]) ->
     Symbols.is_ftype hash Symbols.Hash cntxt.table
 
   | _ -> false
@@ -1736,8 +1736,8 @@ let collision_resistance TacticsArgs.(Opt (String, i)) (s : TS.t) =
     List.fold_left
       (fun acc (h1,h2) ->
          match h1, h2 with
-         | Fun ((hash1, _), _, [m1; Name key1]),
-           Fun ((hash2, _), _, [m2; Name key2])
+         | Fun (hash1, _, [m1; Name key1]),
+           Fun (hash2, _, [m2; Name key2])
            when hash1 = hash2 && key1 = key2 ->
            Term.mk_atom `Eq m1 m2 :: acc
          | _ -> acc)

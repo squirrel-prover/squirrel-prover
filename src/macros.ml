@@ -250,7 +250,7 @@ let get_definition_nocntxt
   match Symbols.Macro.get_all symb.s_symb table with
   | Symbols.Input, _ ->
     init_or_generic Term.empty (fun a ->
-        Term.mk_fun table Symbols.fs_att []
+        Term.mk_fun table Symbols.fs_att 
           [Term.mk_macro Term.frame_macro [] (Term.mk_pred a)])
 
   | Symbols.Output, _ ->

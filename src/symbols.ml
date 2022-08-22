@@ -649,7 +649,7 @@ let () = builtin_ref := table
 
 (** makes simple function types of [ty^arity] to [ty] *)
 let mk_fty arity (ty : Type.ty) =
-  Type.mk_ftype 0 [] (List.init arity (fun _ -> ty)) ty
+  Type.mk_ftype [] (List.init arity (fun _ -> ty)) ty
 
 let mk_fsymb ?fty ?(bool=false) ?(f_info=`Prefix) (f : string) arity =
   let fty = match fty with
@@ -669,13 +669,13 @@ let fs_diff  = mk_fsymb "diff" 2
 (** Happens *)
 
 let fs_happens = 
-  let fty = Type.mk_ftype 0 [] [Type.Timestamp] Type.Boolean in
+  let fty = Type.mk_ftype [] [Type.Timestamp] Type.Boolean in
   mk_fsymb ~fty "happens" (-1)
 
 (** Pred *)
 
 let fs_pred = 
-  let fty = Type.mk_ftype 0 [] [Type.Timestamp] Type.Timestamp in
+  let fty = Type.mk_ftype [] [Type.Timestamp] Type.Timestamp in
   mk_fsymb ~fty "pred" (-1)
 
 (** Boolean connectives *)
@@ -692,8 +692,8 @@ let fs_ite =
   let tyv = Type.mk_tvar "t" in
   let tyvar = Type.TVar tyv in
   let fty = Type.mk_ftype
-      0 [tyv]
-      [Type.Boolean; tyvar; tyvar]
+      [tyv]
+      [Type.tboolean; tyvar; tyvar]
       tyvar in
   mk_fsymb ~fty "if" (-1)
 
@@ -705,7 +705,7 @@ let mk_comp name =
   let tyvar = Type.TVar tyv in
   let fty = 
     Type.mk_ftype
-      0 [tyv]
+      [tyv]
       [tyvar; tyvar]
       Type.Boolean
   in
@@ -723,7 +723,7 @@ let fs_gt  = mk_comp ">"
 let fs_witness =
   let tyv = Type.mk_tvar "t" in
   let tyvar = Type.TVar tyv in
-  let fty = Type.mk_ftype 0 [tyv] [] tyvar in
+  let fty = Type.mk_ftype [tyv] [] tyvar in
   mk_fsymb ~fty "witness" (-1)
 
 (** Fail *)
@@ -752,7 +752,7 @@ let fs_snd  = mk_fsymb "snd" 1
 
 (** Boolean to Message *)
 let fs_of_bool  =
-  let fty = Type.mk_ftype 0 [] [Type.Boolean] Type.Message in
+  let fty = Type.mk_ftype [] [Type.Boolean] Type.Message in
   mk_fsymb ~fty "of_bool" (-1)
 
 (** Empty *)
@@ -765,7 +765,7 @@ let fs_len =
   let tyv = Type.mk_tvar "t" in
   let tyvar = Type.TVar tyv in
 
-  let fty = Type.mk_ftype 0 [tyv] [tyvar] Type.Message
+  let fty = Type.mk_ftype [tyv] [tyvar] Type.Message
   in
   mk_fsymb ~fty "len" 1
 

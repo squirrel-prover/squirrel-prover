@@ -33,7 +33,7 @@ type nsymb = name isymb
 (** Function symbols, may represent primitives or abstract functions. *)
 
 type fname = Symbols.fname 
-type fsymb = fname * Vars.var list
+type fsymb = fname
 
 (** Macros are used to represent inputs, outputs, contents of state
     variables, and let definitions: everything that is expanded when
@@ -415,7 +415,6 @@ val mk_fun0 : fsymb -> Type.ftype -> term list -> term
 val mk_fun :
   Symbols.table ->
   fname ->
-  Vars.var list ->
   term list ->
   term
 

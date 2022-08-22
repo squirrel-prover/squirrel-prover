@@ -46,7 +46,7 @@ Proof.
     + intro [H0 _].
       by use H0 with i,i. 
   }.
-  
+
   auto.
 Qed.
 

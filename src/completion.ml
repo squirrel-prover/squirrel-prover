@@ -112,7 +112,7 @@ module CTerm : sig
   }
 
   and cterm_cnt = private
-    | Cfun of gfsymb * int * cterm list (* the integer is index arity *)
+    | Cfun of gfsymb * cterm list (* the integer is index arity *)
     | Ccst of Cst.t
     | Cvar of varname
     | Cxor of cterm list
@@ -123,8 +123,7 @@ module CTerm : sig
 
   (** Smart constructors. *)
 
-  (** [cfun g i ts], [i] is the index arity *)
-  val cfun : gfsymb -> int -> cterm list -> cterm 
+  val cfun : gfsymb -> cterm list -> cterm 
 
   val ccst : Cst.t -> cterm
   val cvar : varname -> cterm
@@ -139,7 +138,7 @@ end = struct
   }
 
   and cterm_cnt = 
-    | Cfun of gfsymb * int * cterm list 
+    | Cfun of gfsymb * cterm list 
     | Ccst of Cst.t
     | Cvar of varname
     | Cxor of cterm list
@@ -153,17 +152,17 @@ end = struct
 
     let hash t = match t.cnt with
       | Cxor ts -> Utils.hcombine_list (fun x -> x.hash) 0 ts
-      | Cfun (f,i,ts) ->
+      | Cfun (f,ts) ->
         Utils.hcombine_list (fun x -> x.hash) 
-          (Utils.hcombine i (hcombine 1 (hash_gfs f)))
+          (hcombine 1 (hash_gfs f))
           ts
       | Ccst c -> hcombine 2 (Cst.hash c)
       | Cvar v -> hcombine 3 v
 
     let equal t t' = match t.cnt, t'.cnt with
       | Cxor ts, Cxor ts' -> List.for_all2 (fun x y -> x.hash = y.hash) ts ts'
-      | Cfun (f,i,ts), Cfun (f',i',ts') ->
-        equal_gfs f f' && i = i' &&
+      | Cfun (f,ts), Cfun (f',ts') ->
+        equal_gfs f f' && 
         List.for_all2 (fun x y -> x.hash = y.hash) ts ts'
       | Ccst c, Ccst c' -> c = c'
       | Cvar v, Cvar v' -> v = v'
@@ -196,7 +195,7 @@ end = struct
   (** Smart constructors *)
 
   let simplify_set t = match t with
-    | Cxor [] -> make (Cfun (F Symbols.fs_zero, 0, []))
+    | Cxor [] -> make (Cfun (F Symbols.fs_zero, []))
     | Cxor [t] -> t
     | _ -> make t
 
@@ -204,7 +203,7 @@ end = struct
 
   let cvar v = make (Cvar v)
 
-  let rec cfun f i (ts : cterm list) : cterm = 
+  let rec cfun f (ts : cterm list) : cterm = 
     if f = F Symbols.fs_succ
     then begin match List.map (fun x -> x.cnt) ts with
       | [Ccst cst] -> make (Ccst (Cst.Csucc cst))
@@ -214,19 +213,18 @@ end = struct
     else if ts = []
     then 
       begin
-        assert (i = 0);
         match f with
         | F f -> make (Ccst (Cgfuncst (`F f)))
         | A a -> make (Ccst (Cgfuncst (`A a)))
         | N (n,t) -> make (Ccst (Cgfuncst (`N (n,t))))
         | M _ -> assert false
       end
-    else make (Cfun (f, i, ts))
+    else make (Cfun (f, ts))
 
   and cxor (ts : cterm list) : cterm =
     (* We group the xor *)
     let ts = List.fold_left (fun ts t -> match t.cnt with
-        | Cfun (f,_,_) when f = F Symbols.fs_xor -> 
+        | Cfun (f,_) when f = F Symbols.fs_xor -> 
           assert false
 
         | Cxor ts' -> ts' @ ts
@@ -276,32 +274,30 @@ let box_term (ct_memo : ct_memo) (t : Term.term) : cterm =
 let rec cterm_of_term (ct_memo : ct_memo) (c : Term.term) : cterm = 
   let rec cterm_of_term (c : Term.term) : cterm = 
     match c with
-    | Fun ((f,is),_,terms) ->
-      let is = List.map cterm_of_var is
-      and terms = List.map cterm_of_term terms in
-      cfun (F f) (List.length is) (is @ terms)
+    | Fun (f,_,terms) ->
+      let terms = List.map cterm_of_term terms in
+      cfun (F f) terms
 
     | Macro (ms,l,ts) -> 
       assert (l = []); 
       let is = List.map cterm_of_var ms.s_indices in
       cfun
-        (M (ms.s_symb, ms.s_typ))
-        (List.length is) (is @ [cterm_of_term ts])
+        (M (ms.s_symb, ms.s_typ)) (is @ [cterm_of_term ts])
 
     | Term.Action (a,is) ->
       let is = List.map cterm_of_var is in
-      cfun (A a) (List.length is) is
+      cfun (A a) is
 
     | Name ns -> 
       let is = List.map cterm_of_var ns.s_indices in
-      cfun (N (ns.s_symb,ns.s_typ)) (List.length is) is
+      cfun (N (ns.s_symb,ns.s_typ)) is
 
     | Var m  -> ccst (Cst.Cmvar m)
 
     | Diff (Explicit l) ->
       let l = List.sort (fun (l1,_) (l2,_) -> Stdlib.compare l1 l2) l in
       let l = List.map (fun (_,tm) -> cterm_of_term tm) l in
-      cfun (F Symbols.fs_diff) 0 l
+      cfun (F Symbols.fs_diff) l
 
     (* default case *)
     | t -> box_term ct_memo t
@@ -322,30 +318,24 @@ let i_or_ts_of_cterm i =
 
 let i_or_ts_of_cterms cis = List.map i_or_ts_of_cterm cis
 
-let term_of_cterm : Symbols.table -> cterm -> Term.term =
-  fun table c ->  
-  let rec term_of_cterm : cterm -> Term.term = 
-    fun c -> 
+let term_of_cterm (table : Symbols.table) (c : cterm) : Term.term =
+  let rec term_of_cterm (c : cterm) : Term.term = 
       match c.cnt with 
-      | Cfun (F f, ari, cterms) -> 
-        let cis, cterms = List.takedrop ari cterms in
-        let is = i_or_ts_of_cterms cis in
+      | Cfun (F f, cterms) -> 
         let terms = terms_of_cterms cterms in
-        Term.mk_fun table f is terms 
+        Term.mk_fun table f terms 
 
-      | Cfun (M (m,ek), ari, cterms) -> 
-        let cis, cts = List.takedrop ari cterms in
+      | Cfun (M (m,ek), cterms) -> 
+        let cis, cts = List.takedrop (List.length cterms - 1) cterms in
         let cts = as_seq1 cts in
         let m = Term.mk_isymb m ek (i_or_ts_of_cterms cis) in
         Term.mk_macro m [] (term_of_cterm cts) 
 
-      | Cfun (A a, ari, is) -> 
-        assert (ari = List.length is);
+      | Cfun (A a, is) -> 
         let is = i_or_ts_of_cterms is in
         Term.mk_action a is
 
-      | Cfun (N (n,nty), ari, is) -> 
-        assert (ari = List.length is);
+      | Cfun (N (n,nty), is) -> 
         let is = i_or_ts_of_cterms is in
         let ns = Term.mk_isymb n nty is in
         Term.mk_name ns
@@ -353,7 +343,7 @@ let term_of_cterm : Symbols.table -> cterm -> Term.term =
       | Ccst (Cst.Cmvar m) -> Term.mk_var m
 
       | Ccst (Cst.Cgfuncst (`F f)) ->
-        Term.mk_fun table f [] []
+        Term.mk_fun table f []
           
       | Ccst (Cst.Cgfuncst (`A a)) ->
         Term.mk_action a []
@@ -383,7 +373,7 @@ let rec pp_cterm ppf t = match t.cnt with
   | Cvar v -> Fmt.pf ppf "v#%d" v
   | Ccst c -> Cst.print ppf c
 
-  | Cfun (gf, _, ts) ->
+  | Cfun (gf, ts) ->
     Fmt.pf ppf "%a(@[<hov 1>%a@])"
       pp_gsymb gf
       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp_cterm) ts
@@ -395,16 +385,16 @@ let rec pp_cterm ppf t = match t.cnt with
 let rec is_ground_cterm t = match t.cnt with
   | Ccst _ -> true
   | Cvar _ -> false
-  | Cxor ts | Cfun (_, _, ts) -> List.for_all is_ground_cterm ts
+  | Cxor ts | Cfun (_, ts) -> List.for_all is_ground_cterm ts
 
 let rec no_macros t = match t.cnt with
-  | Cfun (M _, _, ts) -> false
+  | Cfun (M _, ts) -> false
 
   | Ccst _ | Cvar _ -> true
 
   | Cxor ts -> List.for_all no_macros ts
 
-  | Cfun ((A _ | F _ | N _), _, ts) -> List.for_all no_macros ts
+  | Cfun ((A _ | F _ | N _), ts) -> List.for_all no_macros ts
 
 let is_cst t = match t.cnt with
   | Ccst _ -> true
@@ -415,12 +405,12 @@ let is_cfun t = match t.cnt with
   | _      -> false
 
 let is_name t = match t.cnt with
-  | Cfun (N _, _, _)
+  | Cfun (N _, _)
   | Ccst (Cst.Cgfuncst (`N _)) -> true
   | _ -> false
 
 let name_ty t = match t.cnt with
-  | Cfun (N (_,nty), _, _)
+  | Cfun (N (_,nty), _)
   | Ccst (Cst.Cgfuncst (`N (_,nty))) -> nty
   | _ -> assert false
 
@@ -444,7 +434,7 @@ let subterms l =
     | [] -> acc
     | x :: l -> match x.cnt with
       | Ccst _ | Cvar _ -> subs (x :: acc) l
-      | Cfun (_,_,fl) -> subs (x :: acc) (fl @ l)
+      | Cfun (_, fl) -> subs (x :: acc) (fl @ l)
       | Cxor xl -> subs (x :: acc) (xl @ l) in
   subs [] l
 
@@ -457,30 +447,30 @@ module Theories = struct
     assert (arity = List.length projs);
     List.mapi (fun i proj ->
         let vars = List.init arity (fun _ -> mk_var ()) in
-        (cfun proj 0 [cfun pair 0 vars], List.nth vars i)
+        (cfun proj [cfun pair vars], List.nth vars i)
       ) projs
 
   (** Asymmetric encryption.
       dec(enc(m, r, pk(k)), k) -> m *)
   let mk_aenc enc dec pk =
     let m, r, k = mk_var (), mk_var (), mk_var () in
-    let t_pk = cfun pk 0 [k] in
-    ( cfun dec 0 [cfun enc 0 [m; r; t_pk]; k], m )
+    let t_pk = cfun pk [k] in
+    ( cfun dec [cfun enc [m; r; t_pk]; k], m )
 
   (** Symmetric encryption.
       dec(enc(m, r, k), k) -> m *)
   let mk_senc enc dec =
     let m, r, k = mk_var (),  mk_var (), mk_var () in
-    ( cfun dec 0 [cfun enc 0 [m; r; k]; k], m )
+    ( cfun dec [cfun enc [m; r; k]; k], m )
 
-  let t_true  = cfun (F Symbols.fs_true) 0 []
+  let t_true  = cfun (F Symbols.fs_true) []
 
   (** Signature.
       mcheck(msig(m, k), pk(k)) -> true *)
   let mk_sig msig mcheck pk =
     let m, k = mk_var (), mk_var () in
-    let t_pk = cfun pk 0 [k] in
-    ( cfun mcheck 0 [cfun msig 0 [m; k]; t_pk], t_true )
+    let t_pk = cfun pk [k] in
+    ( cfun mcheck [cfun msig [m; k]; t_pk], t_true )
 end
 
 
@@ -526,10 +516,10 @@ end
 
 (* Flatten a ground term, introducing new constants and rewrite rules. *)
 let rec flatten t = match t.cnt with
-  | Cfun (F f, _, _) when f = Symbols.fs_succ ->
+  | Cfun (F f, _) when f = Symbols.fs_succ ->
     assert false
 
-  | Cfun (F f, _, _) when f = Symbols.fs_xor ->
+  | Cfun (F f, _) when f = Symbols.fs_xor ->
     assert false
 
   | Cxor ts ->
@@ -542,11 +532,11 @@ let rec flatten t = match t.cnt with
       new_rule :: List.flatten xeqss,
       a )
 
-  | Cfun (f, ari, ts) ->
+  | Cfun (f, ts) ->
     let eqss, xeqss, csts = List.map flatten ts |> List.split3 in
     let a = Cst.mk_flat () in
 
-    ( (cfun f ari (List.map (fun x -> ccst x) csts), a)
+    ( (cfun f (List.map (fun x -> ccst x) csts), a)
       :: List.flatten eqss,
       List.flatten xeqss,
       a )
@@ -723,7 +713,7 @@ let pp_state ppf s =
 (** {2 Normalization} *)
 
 let rec term_uf_normalize uf t = match t.cnt with
-  | Cfun (f,ari,ts) -> cfun f ari (List.map (term_uf_normalize uf) ts)
+  | Cfun (f,ts) -> cfun f (List.map (term_uf_normalize uf) ts)
   | Cxor ts -> cxor (List.map (term_uf_normalize uf) ts)
   | Ccst c -> ccst (Cuf.find uf c)
   | Cvar _ -> t
@@ -964,7 +954,7 @@ module Unify = struct
   (** [subst_apply t sigma] applies [sigma] to [t], checking for cycles. *)
   let subst_apply t sigma =
     let rec aux sigma occurs t = match t.cnt with
-      | Cfun (f, ari, ts) -> cfun f ari (List.map (aux sigma occurs) ts)
+      | Cfun (f, ts) -> cfun f (List.map (aux sigma occurs) ts)
       | Cxor ts -> cxor (List.map (aux sigma occurs) ts)
       | Ccst _ -> t
       | Cvar v ->
@@ -981,10 +971,9 @@ module Unify = struct
     | [] -> Mgu sigma
     | (u,v) :: eqs' ->
       match subst_apply u sigma, subst_apply v sigma with
-      | { cnt = Cfun (f,ari,ts)}, { cnt = Cfun (g,ari',ts')} ->
+      | { cnt = Cfun (f,ts)}, { cnt = Cfun (g,ts')} ->
         if f <> g then No_mgu
         else begin
-          assert (ari = ari'); 
           unify_aux ((List.combine ts ts') @ eqs') sigma
         end
 
@@ -1083,7 +1072,7 @@ end = struct
       | Ccst _ | Cvar _ -> ( state, acc )
       | Cxor _ -> assert false
 
-      | Cfun (fn, ari, ts) ->
+      | Cfun (fn, ts) ->
         let state, acc = match Unify.unify state.uf lst t with
           | Unify.No_mgu -> ( state, acc )
           | Unify.Mgu sigma ->
@@ -1110,7 +1099,7 @@ end = struct
           let (state, acc), _, _ =
             List.fold_left (fun ((state,acc),left,right) lst' ->
                 let f_cntxt' hole =
-                  f_cntxt (cfun fn ari ((List.rev left) @ [hole] @ right)) in
+                  f_cntxt (cfun fn ((List.rev left) @ [hole] @ right)) in
 
                 let right' = if right = [] then [] else List.tl right in
 
@@ -1227,10 +1216,10 @@ let rec term_grnd_normalize (state : state) (u : cterm) : cterm =
 
     cxor (csts_norm @ fterms1)
 
-  | Cfun (fn, ari, ts) ->
+  | Cfun (fn, ts) ->
     assert (ts <> []);
     let nts = List.map (term_grnd_normalize state) ts in
-    let u' = cfun fn ari nts in
+    let u' = cfun fn nts in
 
     (* TODO: storing rules by head function symbols would help here. *)
     if List.for_all (fun c -> not (is_cfun c)) nts then
@@ -1246,9 +1235,9 @@ let rec term_e_normalize state u = match u.cnt with
 
   | Cxor ts -> cxor ( List.map (term_e_normalize state) ts)
 
-  | Cfun (fn, ari, ts) ->
+  | Cfun (fn, ts) ->
     let nts = List.map (term_e_normalize state) ts in
-    let u = cfun fn ari nts in
+    let u = cfun fn nts in
 
     let find_unif (l,r) =
       match Unify.unify state.uf u l with
@@ -1280,7 +1269,7 @@ let normalize ?(print=false) state u =
 
   
 let rec normalize_csts state t = match t.cnt with
-  | Cfun (fn,ari,ts) -> cfun fn ari (List.map (normalize_csts state) ts)
+  | Cfun (fn,ts) -> cfun fn (List.map (normalize_csts state) ts)
   | Cvar _ -> t
   | Ccst _ | Cxor _ -> normalize state t
 
@@ -1338,13 +1327,6 @@ let rec complete_state state =
 
 let complete_state = Prof.mk_unary "complete_state" complete_state
 
-let check_zero_arity table fname =
-  let fty, _ = Symbols.Function.get_def fname table in
-  assert (fty.Type.fty_iarr = 0)
-
-let check_zero_arities table fnames =
-  List.iter (check_zero_arity table) fnames
-
 let dec_pk table f1 f2 =
   match Symbols.Function.get_def f1 table, Symbols.Function.get_def f2 table with
   | (_, Symbols.ADec), (_, Symbols.PublicKey) -> f1, f2
@@ -1364,20 +1346,14 @@ let init_erules table =
   Symbols.Function.fold (fun fname def data erules -> match def, data with
       | (_, Symbols.AEnc), Symbols.AssociatedFunctions [f1; f2] ->
         let dec, pk = dec_pk table f1 f2 in
-        (* We only allow an index arity of zero for crypto primitives *)
-        check_zero_arities table [fname; dec; pk];
         add_erule erules (Theories.mk_aenc (F fname) (F dec) (F pk)) 
 
       | (_, Symbols.SEnc), Symbols.AssociatedFunctions [sdec] ->
         is_sdec table sdec;
-        (* We only allow an index arity of zero for crypto primitives *)
-        check_zero_arities table [fname; sdec];
         add_erule erules (Theories.mk_senc (F fname) (F sdec)) 
 
       | (_, Symbols.CheckSign), Symbols.AssociatedFunctions [f1; f2] ->
         let msig, pk = sig_pk table f1 f2 in
-        (* We only allow an index arity of zero for crypto primitives *)
-        check_zero_arities table [fname; msig; pk];
         add_erule erules (Theories.mk_sig (F msig) (F fname) (F pk)) 
 
       | _ -> erules
@@ -1483,14 +1459,14 @@ let print_init_trs fmt table =
 (** Returns true if the cterm corresponds to a ground term, e.g without macros
     and vars. *)
 let rec is_ground_term t = match t.cnt with
-  | Cfun (M _, _, _) 
+  | Cfun (M _, _) 
   | Ccst (Cst.Cmvar _) 
   | Cvar _ -> false
 
   | Ccst _ -> true
 
   | Cxor ts 
-  | Cfun ((A _ | F _ | N _), _, ts) -> List.for_all is_ground_term ts
+  | Cfun ((A _ | F _ | N _), ts) -> List.for_all is_ground_term ts
 
 
 let check_disequality_cterm state neqs (u,v) =
@@ -1584,11 +1560,9 @@ let name_index_cnstrs table state l : Term.term list =
     | Ccst (Cst.Cgfuncst (`N n)), Ccst (Cst.Cgfuncst (`N n')) ->
       if n <> n' then [Term.mk_false] else []
       
-    | Cfun (N (n,_), ari, is), Cfun (N (n',_), ari', is') ->
-      assert (ari > 0 && ari' > 0);
+    | Cfun (N (n,_), is), Cfun (N (n',_), is') ->
       if n <> n' then [Term.mk_false]
       else begin
-        assert (ari = ari');
         List.map2 (fun x y -> 
             Term.mk_atom `Eq 
               (Term.mk_var (i_or_ts_of_cterm x))
@@ -1596,9 +1570,9 @@ let name_index_cnstrs table state l : Term.term list =
           ) is is'
       end
 
-    | Cfun (N (n,_), ari, _), Ccst (Cst.Cgfuncst (`N (n',_)))
-    | Ccst (Cst.Cgfuncst (`N (n,_))), Cfun (N (n',_), ari, _) ->
-      assert (ari <> 0 && n <> n');
+    | Cfun (N (n,_), _), Ccst (Cst.Cgfuncst (`N (n',_)))
+    | Ccst (Cst.Cgfuncst (`N (n,_))), Cfun (N (n',_), _) ->
+      assert (n <> n');
       [Term.mk_false] 
 
     | _ -> assert false
@@ -1653,21 +1627,21 @@ let name_indep_cnstrs table state l =
 
 let mk_cst () = ccst (Cst.mk_flat ())
 
-let (++) a b = cfun (F Symbols.fs_xor) 0 [a;b]
+let (++) a b = cfun (F Symbols.fs_xor) [a;b]
 
 let () =
   let mk c = L.mk_loc Location._dummy c in
   Checks.add_suite "Completion" [
     ("Basic", `Quick,
      fun () ->
-       let fi = Type.mk_ftype 0 [] [] Type.Message, Symbols.Abstract `Prefix in
+       let fi = Type.mk_ftype [] [] Type.Message, Symbols.Abstract `Prefix in
        let table,ffs =
          Symbols.Function.declare_exact Symbols.builtins_table (mk "f") fi in
        let table,hfs =
          Symbols.Function.declare_exact table (mk "h") fi in
        let ffs,hfs = F ffs, F hfs in
-       let f a b = cfun ffs 0 [a;b] in
-       let h a b = cfun hfs 0 [a;b] in
+       let f a b = cfun ffs [a;b] in
+       let h a b = cfun hfs [a;b] in
 
        let e', e, d, c, b, a = mk_cst (), mk_cst (), mk_cst (),
                               mk_cst (), mk_cst (), mk_cst () in

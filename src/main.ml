@@ -768,12 +768,6 @@ let () =
            try run ~test "tests/alcotest/idx_abs.sp" with
            | Tactic_soft_failure (_,Tactics.GoalNotClosed) -> raise Ok)
     end ;
-    "Indexed collision", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok
-        (fun () ->
-           try run ~test "tests/alcotest/idx_collision.sp" with
-           | Unfinished -> raise Ok)
-    end ;
     "Find equality", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->

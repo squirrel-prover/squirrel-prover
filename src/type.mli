@@ -113,13 +113,12 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Function symbols type} *)
 
-(** Type of a function symbol of index arity i: 
+(** Type of a function symbol: 
     ∀'a₁ ... 'aₙ, τ₁ × ... × τₙ → τ 
 
     Invariant: [fty_out] tvars and univars must be bounded by [fty_vars].
 *)
 type 'a ftype_g = private {
-  fty_iarr : int;     (** i *)
   fty_vars : 'a list; (** 'a₁ ... 'aₙ *)  
   fty_args : ty list; (** τ₁ × ... × τₙ *)
   fty_out  : ty;      (** τ *)
@@ -131,7 +130,7 @@ type ftype = tvar ftype_g
 (** An opened [ftype], using [univar] for quantified type varibales *)
 type ftype_op = univar ftype_g
   
-val mk_ftype : int -> tvar list -> ty list -> ty -> ftype
+val mk_ftype : tvar list -> ty list -> ty -> ftype
 
 (** [open_ftype fty] opens an [ftype] by refreshes its quantified 
     type variables. *)

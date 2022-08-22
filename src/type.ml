@@ -118,13 +118,12 @@ let pp_ht fmt ht =
 (*------------------------------------------------------------------*)
 (** {2 Function symbols type} *)
 
-(** Type of a function symbol of index arity i: 
+(** Type of a function symbol: 
     ∀'a₁ ... 'aₙ, τ₁ × ... × τₙ → τ 
 
     Invariant: [fty_out] tvars and univars must be bounded by [fty_vars].
 *)
 type 'a ftype_g = {
-  fty_iarr : int;     (** i *)
   fty_vars : 'a list; (** 'a₁ ... 'aₙ *)  
   fty_args : ty list; (** τ₁ × ... × τₙ *)
   fty_out  : ty;      (** τ *)
@@ -136,8 +135,7 @@ type ftype = tvar ftype_g
 (** An opened [ftype], using [univar] for quantified type varibales *)
 type ftype_op = univar ftype_g
 
-let mk_ftype iarr vars args out : ftype = {
-  fty_iarr = iarr;
+let mk_ftype vars args out : ftype = {
   fty_vars = vars;
   fty_args = args;
   fty_out  = out;
@@ -322,7 +320,7 @@ let open_ftype (ty_env : Infer.env) (fty : ftype) : ftype_op =
   let vars_f, ts = Infer.open_tvars ty_env fty.fty_vars in
 
   (* compute the new function type *)
-  { fty with fty_vars = vars_f;
-             fty_args = List.map (tsubst ts) fty.fty_args;
-             fty_out  = tsubst ts fty.fty_out; }
+  { fty_vars = vars_f;
+    fty_args = List.map (tsubst ts) fty.fty_args;
+    fty_out  = tsubst ts fty.fty_out; }
   

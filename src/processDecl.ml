@@ -76,21 +76,12 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
   let env = Env.init ~table ~ty_vars:ty_args () in
   let in_tys = List.map (Theory.parse_p_ty env) in_tys in
 
-  let rec parse_index_prefix iarr in_tys = 
-    match in_tys with
-    | Type.Index :: in_tys -> 
-      parse_index_prefix (iarr + 1) in_tys
-    | _ -> iarr, in_tys
-  in
-
-  let iarr, in_tys = parse_index_prefix 0 in_tys in
-
   let out_ty = Theory.parse_p_ty env p_out_ty in
 
   check_fun_out_ty (L.loc p_out_ty) out_ty;
 
   Theory.declare_abstract table
-    ~index_arity:iarr ~ty_args ~in_tys ~out_ty
+    ~ty_args ~in_tys ~out_ty
     decl.name decl.symb_type
 
 (*------------------------------------------------------------------*)
@@ -122,7 +113,7 @@ let parse_operator_decl table (decl : Decl.operator_decl) =
     let in_tys = List.map Vars.ty args in
 
     (* sanity checks on infix symbols *)
-    Theory.check_fun_symb table ty_vars in_tys 0 decl.op_name decl.op_symb_type;
+    Theory.check_fun_symb table ty_vars in_tys decl.op_name decl.op_symb_type;
     
     let table, _ = 
       Symbols.Function.declare_exact 
@@ -233,7 +224,7 @@ let declare table hint_db decl =
      and exp_ty   = List.assoc_opt "exponents" ctys in
      Theory.declare_dh table h ?group_ty ?exp_ty g ex om, []
 
-  | Decl.Decl_hash (a, n, tagi, ctys) ->
+  | Decl.Decl_hash (n, tagi, ctys) ->
     let () = Utils.oiter (define_oracle_tag_formula table n) tagi in
 
     let ctys = parse_ctys table ctys ["m"; "h"; "k"] in
@@ -241,7 +232,7 @@ let declare table hint_db decl =
     and h_ty = List.assoc_opt  "h" ctys
     and k_ty  = List.assoc_opt "k" ctys in
 
-    Theory.declare_hash table ?m_ty ?h_ty ?k_ty ?index_arity:a n, []
+    Theory.declare_hash table ?m_ty ?h_ty ?k_ty n, []
 
   | Decl.Decl_aenc (enc, dec, pk, ctys) ->
     let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "rnd"; "sk"; "pk"] in
@@ -270,7 +261,7 @@ let declare table hint_db decl =
     let args_tys = List.map (Theory.parse_p_ty env) p_args_tys in
     let out_ty = Theory.parse_p_ty env p_out_ty in
     
-    let n_fty = Type.mk_ftype 0 [] args_tys out_ty in
+    let n_fty = Type.mk_ftype [] args_tys out_ty in
 
     List.iter2 (fun ty pty ->
         if not (Type.equal ty Type.ttimestamp) &&

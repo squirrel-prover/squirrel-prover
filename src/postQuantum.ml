@@ -96,9 +96,9 @@ class check_att ~(cntxt:Constr.trace_cntxt) = object (self)
   (* We collect all the macro timestamps occuring inside terms, that are not
      explitely smaller than other timestamps. *)
   method fold_message aux t = match t with
-    | Fun ((sf,_), _, [Macro (ms,_,_)]) when sf = Symbols.fs_att ->
+    | Fun (sf, _, [Macro (ms,_,_)]) when sf = Symbols.fs_att ->
       ms = Term.frame_macro
-    | Fun ((sf,_), _, _) when sf = Symbols.fs_att -> false
+    | Fun (sf, _, _) when sf = Symbols.fs_att -> false
     | Macro (ms,l,a) ->
       assert (l = []);
       begin

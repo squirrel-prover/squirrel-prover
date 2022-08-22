@@ -98,7 +98,7 @@ type declaration_i =
                (lsymb * Symbols.symb_type) * 
                (lsymb * Symbols.symb_type) option * c_tys
 
-  | Decl_hash of int option * lsymb * orcl_tag_info option * c_tys
+  | Decl_hash of lsymb * orcl_tag_info option * c_tys
 
   | Decl_aenc of lsymb * lsymb * lsymb * c_tys
 

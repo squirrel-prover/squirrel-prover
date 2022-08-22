@@ -429,8 +429,8 @@ type mtype = Type.ty list * Type.ty (* args, out *)
 (** Macro or function type *)
 type mf_type = [`Fun of Type.ftype | `Macro of mtype]
 
-let ftype_arity (fty : Type.ftype) =
-  fty.Type.fty_iarr + (List.length fty.Type.fty_args)
+let ftype_arity (fty : Type.ftype) : int =
+  List.length fty.Type.fty_args
 
 let mf_type_arity (ty : mf_type) =
   match ty with
@@ -949,7 +949,7 @@ and conv_app
     | None, Some ts -> ts
     | None, None -> conv_err loc (Timestamp_expected (L.unloc tm))
   in
-  let conv_fapp (f : lsymb) l ts_opt : Term.term =
+  let conv_fapp (f : lsymb) (l : term list) ts_opt : Term.term =
     let mfty = function_kind state.env.table f in
     let () = check_arity f (List.length l) (mf_type_arity mfty) in
 
@@ -962,20 +962,15 @@ and conv_app
       (* refresh all type variables in [fty] *)
       let fty_op = Type.open_ftype state.ty_env fty in
 
-      let l_indices, l_messages = List.takedrop fty_op.Type.fty_iarr l in
-      let indices =
-        List.map (fun x -> conv_var state x Type.tindex) l_indices
-      in
-
       let rmessages =
         List.fold_left2 (fun rmessages t ty ->
             let t = conv ty t in
             t :: rmessages
-          ) [] l_messages fty_op.Type.fty_args
+          ) [] l fty_op.Type.fty_args
       in
       let messages = List.rev rmessages in
 
-      let t = Term.mk_fun0 (symb,indices) fty messages in
+      let t = Term.mk_fun0 symb fty messages in
 
       (* additional type check between the type of [t] and the output
          type in [fty].
@@ -1039,7 +1034,7 @@ and conv_app
 
   | Name (s, is) ->
     let s_fty = check_name state.env.table s (List.length is) in
-    assert (s_fty.fty_iarr = 0 && s_fty.fty_vars = []);
+    assert (s_fty.fty_vars = []);
     let is = conv_vars state is s_fty.fty_args in
     let ns = Term.mk_isymb (get_name state.env.table s) s_fty.fty_out is in
     Term.mk_name ns
@@ -1071,9 +1066,9 @@ let conv_ht (state : conv_state) (t : hterm) : Type.hty * Term.hterm =
 (*------------------------------------------------------------------*)
 (** {2 Function declarations} *)
 
-let mk_ftype iarr vars args out =
+let mk_ftype vars args out =
   let mdflt ty = odflt Type.tmessage ty in
-  Type.mk_ftype iarr vars (List.map mdflt args) (mdflt out)
+  Type.mk_ftype vars (List.map mdflt args) (mdflt out)
 
 let declare_dh
       (table : Symbols.table)
@@ -1084,13 +1079,13 @@ let declare_dh
       (omult : (lsymb * Symbols.symb_type) option)
     : Symbols.table =
   let open Symbols in
-  let gen_fty = mk_ftype 0 [] [] group_ty in
-  let exp_fty = mk_ftype 0 [] [group_ty; exp_ty] group_ty in
+  let gen_fty = mk_ftype [] [] group_ty in
+  let exp_fty = mk_ftype [] [group_ty; exp_ty] group_ty in
   let table, exp = Function.declare_exact table exp (exp_fty, Abstract f_info) in
   let (table, af) = match omult with
     | None -> (table, [exp])
     | Some (mult, mf_info) ->
-       let mult_fty = mk_ftype 0 [] [exp_ty; exp_ty] exp_ty in
+       let mult_fty = mk_ftype [] [exp_ty; exp_ty] exp_ty in
        let (table, mult) =
          Function.declare_exact table mult (mult_fty, Abstract mf_info)
        in
@@ -1099,17 +1094,16 @@ let declare_dh
   let data = AssociatedFunctions af in
   fst (Function.declare_exact table ~data gen (gen_fty, DHgen h))
 
-let declare_hash table ?index_arity ?m_ty ?k_ty ?h_ty s =
-  let index_arity = odflt 0 index_arity in
-  let ftype = mk_ftype index_arity [] [m_ty; k_ty] h_ty in
+let declare_hash table ?m_ty ?k_ty ?h_ty s =
+  let ftype = mk_ftype [] [m_ty; k_ty] h_ty in
   let def = ftype, Symbols.Hash in
   fst (Symbols.Function.declare_exact table s def)
 
 let declare_aenc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?sk_ty ?pk_ty enc dec pk =
   let open Symbols in
-  let dec_fty = mk_ftype 0 [] [ctxt_ty; sk_ty] ptxt_ty in
-  let enc_fty = mk_ftype 0 [] [ptxt_ty; rnd_ty; pk_ty] ctxt_ty in
-  let pk_fty  = mk_ftype 0 [] [sk_ty] pk_ty in
+  let dec_fty = mk_ftype [] [ctxt_ty; sk_ty] ptxt_ty in
+  let enc_fty = mk_ftype [] [ptxt_ty; rnd_ty; pk_ty] ctxt_ty in
+  let pk_fty  = mk_ftype [] [sk_ty] pk_ty in
 
   let table, pk = Function.declare_exact table pk (pk_fty,PublicKey) in
   let dec_data = AssociatedFunctions [Function.cast_of_string (L.unloc enc); pk] in
@@ -1120,8 +1114,8 @@ let declare_aenc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?sk_ty ?pk_ty enc dec pk =
 let declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty enc dec =
   let open Symbols in
   let data = AssociatedFunctions [Function.cast_of_string (L.unloc enc)] in
-  let dec_fty = mk_ftype 0 [] [ctxt_ty; k_ty] ptxt_ty in
-  let enc_fty = mk_ftype 0 [] [ptxt_ty; rnd_ty; k_ty] ctxt_ty in
+  let dec_fty = mk_ftype [] [ctxt_ty; k_ty] ptxt_ty in
+  let enc_fty = mk_ftype [] [ptxt_ty; rnd_ty; k_ty] ctxt_ty in
 
   let table, dec = Function.declare_exact table dec ~data (dec_fty,SDec) in
   let data = AssociatedFunctions [dec] in
@@ -1132,8 +1126,8 @@ let declare_senc_joint_with_hash
   let open Symbols in
   let data = AssociatedFunctions [Function.cast_of_string (L.unloc enc);
                                   get_fun table h] in
-  let dec_fty = mk_ftype 0 [] [ctxt_ty; k_ty] ptxt_ty in
-  let enc_fty = mk_ftype 0 [] [ptxt_ty; rnd_ty; k_ty] ctxt_ty in
+  let dec_fty = mk_ftype [] [ctxt_ty; k_ty] ptxt_ty in
+  let enc_fty = mk_ftype [] [ptxt_ty; rnd_ty; k_ty] ctxt_ty in
   let table, dec = Function.declare_exact table dec ~data (dec_fty,SDec) in
   let data = AssociatedFunctions [dec] in
   fst (Function.declare_exact table enc ~data (enc_fty,SEnc))
@@ -1142,11 +1136,9 @@ let declare_signature table
     ?m_ty ?sig_ty ?check_ty ?sk_ty ?pk_ty
     sign checksign pk =
   let open Symbols in
-  let sig_fty   = mk_ftype 0 [] [m_ty; sk_ty] sig_ty in
-
-  let check_fty = mk_ftype 0 [] [sig_ty; pk_ty] check_ty in
-
-  let pk_fty    = mk_ftype 0 [] [sk_ty] pk_ty in
+  let sig_fty   = mk_ftype [] [m_ty; sk_ty]   sig_ty in
+  let check_fty = mk_ftype [] [sig_ty; pk_ty] check_ty in
+  let pk_fty    = mk_ftype [] [sk_ty]         pk_ty in
 
   let table,sign = Function.declare_exact table sign (sig_fty, Sign) in
   let table,pk = Function.declare_exact table pk (pk_fty,PublicKey) in
@@ -1172,25 +1164,24 @@ let declare_name table s ndef =
 (** Sanity checks for a function symbol declaration. *)
 let check_fun_symb
     table
-    (ty_args : Type.tvar list) (in_tys : Type.ty list) (index_arity : int)
+    (ty_args : Type.tvar list) (in_tys : Type.ty list) 
     (s : lsymb) (f_info : Symbols.symb_type) : unit
   =
   match f_info with
   | `Prefix -> ()
   | `Infix side ->
-    if not (index_arity = 0) ||
-       not (List.length ty_args = 0) ||
+    if not (List.length ty_args = 0) ||
        not (List.length in_tys = 2) then
       conv_err (L.loc s) BadInfixDecl
 
 let declare_abstract 
-    table ~index_arity ~ty_args ~in_tys ~out_ty 
+    table ~ty_args ~in_tys ~out_ty 
     (s : lsymb) (f_info : Symbols.symb_type) 
   =
   (* if we declare an infix symbol, run some sanity checks *)
-  check_fun_symb table ty_args in_tys index_arity s f_info;
+  check_fun_symb table ty_args in_tys s f_info;
 
-  let ftype = Type.mk_ftype index_arity ty_args in_tys out_ty in
+  let ftype = Type.mk_ftype ty_args in_tys out_ty in
   fst (Symbols.Function.declare_exact table s (ftype, Symbols.Abstract f_info))
 
 

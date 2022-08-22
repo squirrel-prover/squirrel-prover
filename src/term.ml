@@ -36,7 +36,7 @@ type name = Symbols.name
 type nsymb = name isymb
 
 type fname = Symbols.fname
-type fsymb = fname * Vars.var list
+type fsymb = fname
 
 type mname = Symbols.macro
 type msymb = mname isymb
@@ -62,9 +62,8 @@ let pp_nsymbs = _pp_nsymbs ~dbg:false
 (*------------------------------------------------------------------*)
 let pp_fname ppf s = (Printer.kws `GoalFunction) ppf (Symbols.to_string s)
 
-let _pp_fsymb ~dbg ppf (fn,is) = match is with
-  | [] -> Fmt.pf ppf "%a" pp_fname fn
-  | _ -> Fmt.pf ppf "%a(%a)" pp_fname fn (Vars._pp_list ~dbg) is
+let _pp_fsymb ~dbg ppf (fn : fsymb) = 
+  Fmt.pf ppf "%a" pp_fname fn
 
 let pp_fsymb = _pp_fsymb ~dbg:false
 
@@ -131,9 +130,8 @@ type terms = term list
 let rec hash : term -> int = function
   | Name n -> hcombine 0 (hash_isymb n)
 
-  | Fun ((f, is),_,terms) ->
+  | Fun (f,_,terms) ->
     let h = Symbols.hash f in
-    let h = hcombine_list Vars.hash h is in
     hcombine 1 (hash_l terms h)
 
   | Macro (m, l, ts)  ->
@@ -181,7 +179,7 @@ type hterm = Lambda of Vars.vars * term
 (*------------------------------------------------------------------*)
 (** {2 Builtins function symbols} *)
 
-let mk f : fsymb = (f,[])
+let mk f : fsymb = f
 
 let f_diff = mk Symbols.fs_diff
 
@@ -275,9 +273,9 @@ let mk_diff l =
 (*------------------------------------------------------------------*)
 let mk_fun0 fs fty terms = Fun (fs, fty, terms)
 
-let mk_fun table fname indices terms =
+let mk_fun table fname terms =
   let fty = Symbols.ftype table fname in
-  Fun ((fname,indices), fty, terms)
+  Fun (fname, fty, terms)
 
 let mk_fbuiltin = mk_fun Symbols.builtins_table
 
@@ -287,23 +285,23 @@ let mk_fbuiltin = mk_fun Symbols.builtins_table
 (** Smart constructors.
     The module is included after its definition. *)
 module SmartConstructors = struct
-  let mk_true  = mk_fbuiltin Symbols.fs_true  [] []
-  let mk_false = mk_fbuiltin Symbols.fs_false [] []
+  let mk_true  = mk_fbuiltin Symbols.fs_true  [] 
+  let mk_false = mk_fbuiltin Symbols.fs_false [] 
   (** Some smart constructors are redefined later, after substitutions. *)
 
-  let mk_not_ns term  = mk_fbuiltin Symbols.fs_not [] [term]
+  let mk_not_ns term  = mk_fbuiltin Symbols.fs_not [term]
 
-  let mk_and_ns  t0 t1 = mk_fbuiltin Symbols.fs_and  [] [t0;t1]
-  let mk_or_ns   t0 t1 = mk_fbuiltin Symbols.fs_or   [] [t0;t1]
-  let mk_impl_ns t0 t1 = mk_fbuiltin Symbols.fs_impl [] [t0;t1]
-  let mk_iff_ns  t0 t1 = mk_fbuiltin Symbols.fs_iff  [] [t0;t1]
+  let mk_and_ns  t0 t1 = mk_fbuiltin Symbols.fs_and  [t0;t1]
+  let mk_or_ns   t0 t1 = mk_fbuiltin Symbols.fs_or   [t0;t1]
+  let mk_impl_ns t0 t1 = mk_fbuiltin Symbols.fs_impl [t0;t1]
+  let mk_iff_ns  t0 t1 = mk_fbuiltin Symbols.fs_iff  [t0;t1]
 
-  let mk_eq_ns  t0 t1 = mk_fbuiltin Symbols.fs_eq  [] [t0;t1]
-  let mk_neq_ns t0 t1 = mk_fbuiltin Symbols.fs_neq [] [t0;t1]
-  let mk_leq_ns t0 t1 = mk_fbuiltin Symbols.fs_leq [] [t0;t1]
-  let mk_lt_ns  t0 t1 = mk_fbuiltin Symbols.fs_lt  [] [t0;t1]
-  let mk_geq_ns t0 t1 = mk_fbuiltin Symbols.fs_geq [] [t0;t1]
-  let mk_gt_ns  t0 t1 = mk_fbuiltin Symbols.fs_gt  [] [t0;t1]
+  let mk_eq_ns  t0 t1 = mk_fbuiltin Symbols.fs_eq  [t0;t1]
+  let mk_neq_ns t0 t1 = mk_fbuiltin Symbols.fs_neq [t0;t1]
+  let mk_leq_ns t0 t1 = mk_fbuiltin Symbols.fs_leq [t0;t1]
+  let mk_lt_ns  t0 t1 = mk_fbuiltin Symbols.fs_lt  [t0;t1]
+  let mk_geq_ns t0 t1 = mk_fbuiltin Symbols.fs_geq [t0;t1]
+  let mk_gt_ns  t0 t1 = mk_fbuiltin Symbols.fs_gt  [t0;t1]
 
   let mk_not ?(simpl=true) t1 = match t1 with
     | Fun (fs,_,[t]) when fs = f_not && simpl -> t
@@ -372,9 +370,9 @@ module SmartConstructors = struct
       | Exists (l', f) -> Exists (l @ l', f)
       | _ -> Exists (l, f)
 
-  let mk_happens t = mk_fbuiltin Symbols.fs_happens [] [t]
+  let mk_happens t = mk_fbuiltin Symbols.fs_happens [t]
 
-  let mk_pred t = mk_fbuiltin Symbols.fs_pred [] [t]
+  let mk_pred t = mk_fbuiltin Symbols.fs_pred [t]
 end
 
 include SmartConstructors
@@ -382,24 +380,24 @@ include SmartConstructors
 (*------------------------------------------------------------------*)
 (** {3 For terms} *)
 
-let mk_zero  = mk_fbuiltin Symbols.fs_zero  [] []
-let mk_fail  = mk_fbuiltin Symbols.fs_fail  [] []
+let mk_zero  = mk_fbuiltin Symbols.fs_zero []
+let mk_fail  = mk_fbuiltin Symbols.fs_fail []
 
-let mk_len term    = mk_fbuiltin Symbols.fs_len    [] [term]
-let mk_zeroes term = mk_fbuiltin Symbols.fs_zeroes [] [term]
+let mk_len term    = mk_fbuiltin Symbols.fs_len    [term]
+let mk_zeroes term = mk_fbuiltin Symbols.fs_zeroes [term]
 
-let mk_pair t0 t1 = mk_fbuiltin Symbols.fs_pair [] [t0;t1]
+let mk_pair t0 t1 = mk_fbuiltin Symbols.fs_pair [t0;t1]
 
 let mk_ite ?(simpl=true) c t e =
   match c with
   | t when t = mk_true  && simpl -> t
   | t when t = mk_false && simpl -> e
-  | _ -> mk_fbuiltin Symbols.fs_ite [] [c;t;e]
+  | _ -> mk_fbuiltin Symbols.fs_ite [c;t;e]
 
-let mk_of_bool t = mk_fbuiltin Symbols.fs_of_bool [] [t]
+let mk_of_bool t = mk_fbuiltin Symbols.fs_of_bool [t]
 
 let mk_witness ty =
-  let fty = Type.mk_ftype 0 [] [] ty in
+  let fty = Type.mk_ftype [] [] ty in
   Fun (f_witness, fty, [])
 
 let mk_find ?(simpl=false) is c t e =
@@ -688,8 +686,7 @@ let fv (term : term) : Sv.t =
     match t with
     | Action (_,indices) -> Sv.of_list indices
     | Var tv -> Sv.singleton tv
-    | Fun ((_,indices), _,lt) ->
-      Sv.union (Sv.of_list indices) (fvs lt)
+    | Fun (_, _,lt) -> fvs lt
 
     | Macro (s, l, ts) ->
       Sv.union
@@ -835,8 +832,8 @@ let rec subst (s : subst) (t : term) : term =
   else
     let new_term =
       match t with
-      | Fun ((fs,is), fty, lt) ->
-        Fun ((fs, subst_vars s is), fty, List.map (subst s) lt)
+      | Fun (fs, fty, lt) ->
+        Fun (fs, fty, List.map (subst s) lt)
 
       | Name symb ->
         Name { symb with s_indices = subst_vars s symb.s_indices}
@@ -1125,10 +1122,9 @@ and _pp
     pp_and_happens info ppf f
 
   (* infix *)
-  | Fun ((s,is),_,[bl;br]) when Symbols.is_infix s ->
+  | Fun (s,_,[bl;br]) when Symbols.is_infix s ->
     let assoc = Symbols.infix_assoc s in
     let prec = get_infix_prec s in
-    assert (is = []);
     let pp fmt () =
       Fmt.pf ppf "@[<0>%a %s@ %a@]"
         (pp ((prec, `Infix assoc), `Left)) bl
@@ -1754,8 +1750,7 @@ let alpha_bnds (s : subst) (vs1 : Vars.vars) (vs2 : Vars.vars) : subst =
 let alpha_conv ?(subst=[]) (t1 : term) (t2 : term) : bool =
   let rec doit (s : subst) t1 t2 : unit =
     match t1, t2 with
-    | Fun ((f,is), fty, l), Fun ((f',is'), fty', l') when f = f' ->
-      alpha_vars s is is';
+    | Fun (f, fty, l), Fun (f', fty', l') when f = f' ->
       doits s l l'
 
     | Name n, Name n' when n.s_symb = n'.s_symb ->
@@ -1828,9 +1823,8 @@ let rec make_normal_biterm
   let doit () =
     (* TODO generalize to non-binary diff *)
     match t1, t2 with
-    | Fun ((f,is), fty, l), Fun ((f',is'), fty', l') when f = f' ->
-      alpha_vars s is is';
-      Fun ((f,is), fty, List.map2 (mdiff s) l l')
+    | Fun (f, fty, l), Fun (f', fty', l') when f = f' ->
+      Fun (f, fty, List.map2 (mdiff s) l l')
 
     | Name n, Name n' when n.s_symb = n'.s_symb ->
       alpha_vars s n.s_indices n'.s_indices;
@@ -1963,16 +1957,16 @@ let pp_term_head fmt = function
   | HAction   -> Fmt.pf fmt "Action"
 
 let get_head : term -> term_head = function
-  | Exists _          -> HExists
-  | ForAll _          -> HForAll
-  | Seq _             -> HSeq
-  | Fun ((f,_),_,_)   -> HFun f
-  | Find _            -> HFind
-  | Macro (m1,_,_)    -> HMacro m1.s_symb
-  | Name n1           -> HName n1.s_symb
-  | Diff _            -> HDiff
-  | Var _             -> HVar
-  | Action _          -> HAction
+  | Exists _       -> HExists
+  | ForAll _       -> HForAll
+  | Seq _          -> HSeq
+  | Fun (f,_,_)    -> HFun f
+  | Find _         -> HFind
+  | Macro (m1,_,_) -> HMacro m1.s_symb
+  | Name n1        -> HName n1.s_symb
+  | Diff _         -> HDiff
+  | Var _          -> HVar
+  | Action _       -> HAction
 
 module Hm = Map.Make(struct
     type t = term_head

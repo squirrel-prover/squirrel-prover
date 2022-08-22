@@ -14,7 +14,7 @@ type prf_param = {
 
 let prf_param hash : prf_param =
   match hash with
-  | Term.Fun ((h_fn, _), h_fty, [h_cnt; Name h_key]) ->
+  | Term.Fun (h_fn, h_fty, [h_cnt; Name h_key]) ->
     { h_fn; h_cnt; h_fty; h_key }
 
   | _ -> Tactics.soft_failure Tactics.Bad_SSC
