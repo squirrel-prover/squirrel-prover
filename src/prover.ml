@@ -305,16 +305,6 @@ module AST :
       | [] -> Tactics.andthen tac (Lazy.force autosimpl)
       | _ -> assert false
 
-  (* a printer for tactics that follows a specific syntax. *)
-  let pp_abstract ~pp_args s args ppf =
-    (* match s,args with
-     *   | "use", TacticsArgs.String_name id :: l ->
-     *       let l = List.map (function
-     *         | TacticsArgs.Theory t -> t
-     *         | _ -> assert false) l in
-     *       Fmt.pf ppf "use %s with %a" (L.unloc id) (Utils.pp_list Theory.pp) l
-     *   | _ ->  *)raise Not_found
-
 end)
 
 module ProverTactics = struct
@@ -675,28 +665,29 @@ let eval_tactic_focus tac = match !subgoals with
   | [] -> assert false
   | judge :: ejs' ->
     if not (Bullets.tactic_allowed !bullets) then
-      Tactics.(hard_failure (Failure "bullet needed before tactic"));
+      Tactics.hard_failure (Failure "bullet needed before tactic");
     
     let new_j = AST.eval_judgment tac judge in
     subgoals := new_j @ ejs';
     
-    begin try
-      bullets := Bullets.expand_goal (List.length new_j) !bullets ;
-      (* TODO: remove catch-all exception *)
-    with _ -> Tactics.(hard_failure (Failure "bullet error")) end
+    begin
+      try
+        bullets := Bullets.expand_goal (List.length new_j) !bullets 
+      with Bullets.Error _ -> Tactics.(hard_failure (Failure "bullet error"))
+    end
 
 let open_bullet bullet =
   assert (bullet <> "");
   try bullets := Bullets.open_bullet bullet !bullets with
-    | _ -> Tactics.(hard_failure (Failure "invalid bullet"))
+  | Bullets.Error _ -> Tactics.(hard_failure (Failure "invalid bullet"))
 
 let open_brace bullet =
   try bullets := Bullets.open_brace !bullets with
-    | _ -> Tactics.(hard_failure (Failure "invalid brace"))
+  | Bullets.Error _ -> Tactics.(hard_failure (Failure "invalid brace"))
 
 let close_brace bullet =
   try bullets := Bullets.close_brace !bullets with
-    | _ -> Tactics.(hard_failure (Failure "invalid brace"))
+  | Bullets.Error _ -> Tactics.(hard_failure (Failure "invalid brace"))
 
 let cycle i_l l =
   let i, loc = L.unloc i_l, L.loc i_l in

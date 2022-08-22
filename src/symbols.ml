@@ -370,8 +370,9 @@ module Make (N:S) : Namespace
                 ~loc:(Some (L.loc name))
                 (fst (Msymb.find symb table.cnt))) ;
       true
-    (* TODO: remove catch-all exception *)
-    with _ -> false
+    with
+    | SymbError (_,Incorrect_namespace _)
+    | Not_found -> false
 
   let of_lsymb (name : lsymb) (table : table) =
     let symb = { group; name = L.unloc name } in

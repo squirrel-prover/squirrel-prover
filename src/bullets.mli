@@ -16,17 +16,22 @@ val is_empty : path -> bool
 
 val tactic_allowed : path -> bool
 
-exception Decoration_not_allowed
+(*------------------------------------------------------------------*)
+type bullet_error =
+  | Decoration_not_allowed
   (** Multiple bullets or braces, bullet after brace,
       closing brace on unclosed goal or on goal without an open brace,
       or attempt to decorate empty path. *)
 
-exception Closing_brace_needed
+  | Closing_brace_needed
   (** Raised if some operation is attempted when a closing brace is needed. *)
 
-exception Bullet_expected
+  | Bullet_expected
   (** Raised if some operation is attempted when a bullet is expected. *)
 
+exception Error of bullet_error
+
+(*------------------------------------------------------------------*)
 (** Close current subgoal. *)
 val close_goal : path -> path
 

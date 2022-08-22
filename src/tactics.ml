@@ -589,9 +589,6 @@ module type S = sig
   type judgment
 
   val eval_abstract : string list -> lsymb -> arg list -> judgment tac
-  val pp_abstract : pp_args:(Format.formatter -> arg list -> unit) ->
-    string -> arg list -> Format.formatter -> unit
-
 end
 
 (** AST for tactics, with abstract leaves corresponding to prover-specific
@@ -664,13 +661,9 @@ module AST (M:S) = struct
   let rec pp ppf = function
     | Abstract (i,args) ->
       let i = L.unloc i in
-        begin try
-          pp_abstract ~pp_args i args ppf
-          (* TODO: remove catch-all exception *)
-        with _ ->
-          if args = [] then Fmt.string ppf i else
-            Fmt.pf ppf "@[(%s@ %a)@]" i pp_args args
-        end
+      if args = [] then Fmt.string ppf i else
+        Fmt.pf ppf "@[(%s@ %a)@]" i pp_args args
+          
     | Modifier (i,t) -> Fmt.pf ppf "(%s(%a))" i pp t
 
     | AndThen ts ->

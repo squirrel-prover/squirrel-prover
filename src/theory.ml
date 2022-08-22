@@ -484,9 +484,11 @@ let check_action (env : Env.t) (s : lsymb) (n : int) : unit =
 
   try
     let system = SE.to_compatible env.system.set in
-    ignore (SE.action_to_term env.table system action)
-  (* TODO: remove catch-all exception *)
-  with _ -> conv_err (L.loc s) (UndefInSystem env.system.set)
+    ignore (SE.action_to_term env.table system action : Term.term)
+  with
+  | Not_found
+  | SE.Error Expected_compatible ->
+    conv_err (L.loc s) (UndefInSystem env.system.set)
 
 
 (*------------------------------------------------------------------*)

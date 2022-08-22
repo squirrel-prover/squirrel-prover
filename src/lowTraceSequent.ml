@@ -268,7 +268,7 @@ let set_table table s =
 let rec add_macro_defs (s : sequent) f =
   let macro_eqs : (Term.term * Term.term) list ref = ref [] in
   match SystemExpr.to_fset s.env.system.set with
-  | exception _ -> s
+  | exception (SE.Error Expected_fset) -> s
   | system ->
 
     List.fold_left (fun s (a,f) -> 

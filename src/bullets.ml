@@ -90,36 +90,43 @@ let empty_path = Empty
 (** Indicates that there is no remaining subgoal. *)
 let is_empty p = p = Empty
 
-exception Decoration_not_allowed
+(*------------------------------------------------------------------*)
+type bullet_error =
+  | Decoration_not_allowed
   (** Multiple bullets or braces, bullet after brace,
       closing brace on unclosed goal or on goal without an open brace,
       or attempt to decorate empty path. *)
 
-exception Closing_brace_needed
+  | Closing_brace_needed
   (** Raised if some operation is attempted when a closing brace is needed. *)
 
-exception Bullet_expected
+  | Bullet_expected
   (** Raised if some operation is attempted when a bullet is expected. *)
+  
+exception Error of bullet_error
 
+let error e = raise (Error e)
+
+(*------------------------------------------------------------------*)
 (** Update path by opening a brace. *)
 let open_brace = function
-  | Empty -> raise Decoration_not_allowed
-  | Brace_needed _ -> raise Closing_brace_needed
+  | Empty -> error Decoration_not_allowed
+  | Brace_needed _ -> error Closing_brace_needed
   | Step s ->
-      if s.brace then raise Decoration_not_allowed ;
+      if s.brace then error Decoration_not_allowed ;
       Step { s with brace = true }
 
 (** Update path by opening a bullet. *)
 let open_bullet b = function
-  | Empty -> raise Decoration_not_allowed
-  | Brace_needed _ -> raise Closing_brace_needed
+  | Empty -> error Decoration_not_allowed
+  | Brace_needed _ -> error Closing_brace_needed
   | Step s ->
-      if s.brace = true then raise Decoration_not_allowed ;
+      if s.brace = true then error Decoration_not_allowed ;
       match s.bullet with
         | `None when s.position = 1 && unused_bullet b s.path ->
             Step { s with bullet = `After b }
         | `Before b' when b = b' -> Step { s with bullet = `After b }
-        | _ -> raise Decoration_not_allowed
+        | _ -> error Decoration_not_allowed
 
 (** Indicates whether [close_goal] and [expand_goal] are allowed,
     i.e. if a tactic can be evaluated on the current goal. *)
@@ -131,7 +138,7 @@ let tactic_allowed = function
     brace has been closed. *)
 let close_brace = function
   | Brace_needed p -> p
-  | _ -> raise Decoration_not_allowed
+  | _ -> error Decoration_not_allowed
 
 (** Return path to next goal after closing current goal.
     This involves going up the tree for an arbitrary number
@@ -140,11 +147,11 @@ let close_brace = function
     to be closed. *)
 let rec close_goal = function
   | Empty -> Empty
-  | Brace_needed _ -> raise Closing_brace_needed
+  | Brace_needed _ -> error Closing_brace_needed
   | Step {path;position;width;bullet;brace} ->
       if position = width then
         match bullet with
-          | `Before _ -> raise Bullet_expected
+          | `Before _ -> error Bullet_expected
           | _ ->
             let newpath = close_goal path in
               if brace then Brace_needed newpath else newpath
@@ -152,7 +159,7 @@ let rec close_goal = function
         let newpath =
           Step { path ; width ; position = position+1 ; brace = false ;
                  bullet = match bullet with
-                   | `Before _ -> raise Bullet_expected
+                   | `Before _ -> error Bullet_expected
                    | `After b -> `Before b
                    | `None -> `None }
         in
@@ -160,7 +167,7 @@ let rec close_goal = function
 
 let expand_goal width = function
   | path when width = 0 -> close_goal path
-  | Step { bullet = `Before _ } -> raise Bullet_expected
+  | Step { bullet = `Before _ } -> error Bullet_expected
   | path ->
       Step { path ; position = 1 ; width ; bullet = `None ; brace = false }
 
@@ -234,21 +241,21 @@ let%test_unit _ =
   (* If used, bullets must be used for previous sibling. *)
   initial_path |> expand_goal 2
     |> expand_goal 1 |> expand_goal 1 |> close_goal
-    |> check_fail Decoration_not_allowed (open_bullet "*")
+    |> check_fail (Error Decoration_not_allowed) (open_bullet "*")
 
 let%test_unit _ =
   (* If used, bullets must be used before expanding next sibling. *)
   initial_path |> expand_goal 2
     |> open_bullet "*"
     |> expand_goal 1 |> expand_goal 1 |> close_goal
-    |> check_fail Bullet_expected (expand_goal 1)
+    |> check_fail (Error Bullet_expected) (expand_goal 1)
 
 let%test_unit _ =
   (* If used, bullets must be used before closing next sibling. *)
   initial_path |> expand_goal 2
     |> open_bullet "*"
     |> expand_goal 1 |> expand_goal 1 |> close_goal
-    |> check_fail Bullet_expected close_goal
+    |> check_fail (Error Bullet_expected) close_goal
 
 let%test_unit _ =
   (* Nested bullets with different symbols are allowed. *)
@@ -267,7 +274,7 @@ let%test_unit _ =
     |> expand_goal 2
     |> open_bullet "*" |> close_goal
     |> open_bullet "*" |> expand_goal 3
-      |> check_fail Decoration_not_allowed (open_bullet "*")
+      |> check_fail (Error Decoration_not_allowed) (open_bullet "*")
 
 let%test_unit _ =
   (* Disjoint bullets with same symbol are allowed. *)
@@ -286,7 +293,7 @@ let%test_unit _ =
   (* An opened brace must be closed. *)
   initial_path |> expand_goal 2
     |> open_brace |> close_goal
-    |> check_fail Closing_brace_needed close_goal
+    |> check_fail (Error Closing_brace_needed) close_goal
 
 let%test_unit _ =
   (* Braces can be used directly inside a bullet. *)
@@ -296,12 +303,12 @@ let%test_unit _ =
 let%test_unit _ =
   (* Braces cannot be used directly outside a bullet. *)
   initial_path |> open_brace
-    |> check_fail Decoration_not_allowed (open_bullet "*")
+    |> check_fail (Error Decoration_not_allowed) (open_bullet "*")
 
 let%test_unit _ =
   (* A brace cannot be opened directly after another. *)
   initial_path |> open_brace |>
-    check_fail Decoration_not_allowed open_brace
+    check_fail (Error Decoration_not_allowed) open_brace
 
 let%test_unit _ =
   (* Braces can be nested. *)
@@ -320,4 +327,4 @@ let%test_unit _ =
   initial_path |> expand_goal 2
     |> open_brace |> expand_goal 1 |> open_brace
       |> close_goal |> close_brace
-    |> check_fail Closing_brace_needed close_goal
+    |> check_fail (Error Closing_brace_needed) close_goal

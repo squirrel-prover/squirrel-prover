@@ -148,9 +148,6 @@ module type S = sig
   type judgment
 
   val eval_abstract : string list -> lsymb -> arg list -> judgment tac
-  val pp_abstract : pp_args:(Format.formatter -> arg list -> unit) ->
-    string -> arg list -> Format.formatter -> unit
-
 end
 
 type selector = int list

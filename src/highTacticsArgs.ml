@@ -28,7 +28,7 @@ let convert_pat_arg sel conv_cntxt p (conc : Equiv.any_form) =
   in
   let message = match List.nth res (sel-1) with
     | et -> et
-    | exception _ -> 
+    | exception (Invalid_argument _) -> 
       raise Theory.(Conv (L._dummy,
                           Tactic_type
                             ("Could not extract the element "
