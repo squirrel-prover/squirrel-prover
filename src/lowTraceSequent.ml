@@ -1,9 +1,7 @@
 open Utils
 
-module List = Utils.List
-
-module SE = SystemExpr
-
+module L    = Location
+module SE   = SystemExpr
 module Args = TacticsArgs
 
 (*------------------------------------------------------------------*)
@@ -474,10 +472,6 @@ module LocalHyps
   type hyp = Equiv.local_form
   type ldecl = Ident.t * hyp
     
-  let (!!) = function
-    | Equiv.Local h -> h
-    | Equiv.Global _ -> assert false
-
   let _add ~force p h s = AnyHyps._add ~force p (Local h) s
       
   let add p h s = AnyHyps.add p (Local h) s
@@ -499,11 +493,18 @@ module LocalHyps
 
   let is_hyp h s = AnyHyps.is_hyp (Local h) s
 
-  let by_id id s = !!(AnyHyps.by_id id s)
+  let by_id id s =
+    match AnyHyps.by_id id s with
+    | Equiv.Local h -> h
+    | Equiv.Global _ -> assert false
 
   let by_name name s =
     let l,h = AnyHyps.by_name name s in
-    l,!!h
+    match h with
+    | Equiv.Local h -> l, h
+    | Equiv.Global _ ->
+      Tactics.soft_failure
+        ~loc:(L.loc name) (Failure "expected a local hypotheses")
 
   let mem_id = AnyHyps.mem_id
 

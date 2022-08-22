@@ -35,8 +35,9 @@ Proof.
   assumption H2.
 Qed.
 
-(* global goal _ (x, y : boolean) : [x <=> y] -> [x => y]. *)
-(* Proof. *)
-(*   intro [H1 H2]. *)
-(*   assumption H1. *)
-(* Qed. *)
+global goal _ (x, y : boolean) : [x <=> y] -> [x => y].
+Proof. intro H1.
+  localize H1 as H2. 
+  destruct H2 as [H2 H3].
+  assumption H2.
+Qed.
