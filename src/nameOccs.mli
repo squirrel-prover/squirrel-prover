@@ -63,7 +63,7 @@ type ts_occs = ts_occ list
 
 
 (** Return timestamps occuring in macros in a list of terms *)
-val get_macro_actions : Constr.trace_cntxt -> env:Vars.env -> (Term.term * expand_info) list -> ts_occs
+val get_macro_actions : Constr.trace_cntxt -> (Term.term * expand_info) list -> ts_occs
 
 
 (*------------------------------------------------------------------*)
@@ -92,10 +92,7 @@ val mk_nocc : nsymb -> occ_info -> Vars.vars -> terms -> Sp.t -> name_occ
 
 (** prints a description of the occurrence *)
 val pp : Format.formatter -> name_occ -> unit
-  
-(** prints a description of a subsumed occurrence *)
-val pp_sub : Format.formatter -> name_occ -> unit
-
+ 
 (*------------------------------------------------------------------*)
 (* utility functions for lists of nsymbs *)
 
@@ -105,61 +102,6 @@ val exists_symb : nsymb -> nsymb list -> bool
 (** finds all names with the same symbol in the list *)
 val find_symb : nsymb -> nsymb list -> nsymb list
 
-(*------------------------------------------------------------------*)
-(* Proof obligations for a name occurrence *)
-
-(** Constructs the formula
-    "exists free vars.
-      (exists t1.occ_vars. action ≤ t1.occ_cnt || 
-       … || 
-       exists tn.occ_vars. action ≤ tn.occ_cnt) &&
-      conditions of occ && 
-      indices of n = indices of occ"
-    which will be the condition of the proof obligation when finding the 
-    occurrence occ.
-    action is the action producing the occ (optional, for direct occs)
-    ts=[t1, …, tn] are intended to be the timestamp occurrences in t.
-    The free vars of occ.occ_cnt should be in env \uplus occ.occ_vars,
-    which is the case if occ was produced correctly
-    (ie by Match.fold given either empty (for direct occurrences)
-     or iocc_vars (for indirect occurrences).
-    Not all free vars of action and condition are there: there may be some indices
-    in them that don't appear in the occurrence -> we existentially quantify them. 
-    The free vars of ts should be in env.
-    Everything is renamed nicely wrt env. *)
-val occurrence_formula : ts_occs -> Vars.env -> name_occ -> term
-
-
-(** Constructs the proof obligation (trace sequent) for a direct or indirect 
-   occurrence, stating that it suffices to prove the goal assuming
-   the occurrence occ is equal to the name it collides with. *)
-val occurrence_sequent : ts_occs -> TS.sequent -> name_occ -> TS.sequent
-
-
-  
-(*------------------------------------------------------------------*)
-(** given
-    - a function find_occs that generates a list of occurrences found in
-      a term, expanding macros when possible according to expand_info but not 
-      otherwise (undef and maybedef macros will be handled by fold_macro_support);
-    - the sequent s of the current goal;
-    - the term t where we look for occurrences;
-    - optionally, a printer that prints a description of what we're looking for; 
-  computes the list of corresponding proof obligations: we now have to prove s
-  under the assumption that at least one of the found occurrences must
-  be an actual collision.
-  Relies on fold_macro_support to look through all macros in the term. *)
-val occurrence_sequents :
-      ?pp_ns: (unit Fmt.t) option ->
-      (se:SE.arbitrary ->
-       ?fv:Vars.vars ->
-       expand_info ->
-       term ->
-       name_occs) ->
-      TS.sequent ->
-      Term.term ->
-      TS.sequents
-  
 
 (*------------------------------------------------------------------*)
 (* Functions to look for illegal name occurrences in a term *)
@@ -205,7 +147,7 @@ type f_fold_occs =
        2) using Match.Pos.fold_shallow, to recurse on subterms at depth 1. *)
 val fold_bad_occs :
   f_fold_occs -> 
-  se:SE.arbitrary -> ?fv:Vars.vars -> expand_info ->
+  se:SE.arbitrary -> fv:Vars.vars -> expand_info ->
   term -> name_occs
 
 

@@ -98,22 +98,22 @@ let destr_eq_expand
 
 
 (*------------------------------------------------------------------*)
-(* taken directly from the old fresh.ml *)
+(* Functions to find all timestamps occurring in a term *)
 
 (** Exception raised when a forbidden occurrence of a message variable
     is found. *)
 exception Var_found
 
-(* Functions to find all timestamps occurring in a term *)
 
-(* type of a timestamp occurrence *)
+(* Type of a timestamp occurrence *)
 type ts_occ = Term.term Iter.occ
 
 type ts_occs = ts_occ list
 
 
-(** remove from occs occurrences that are subsumed by another.
-    occ1 subsumes occ2 if they are equal or if occ1 is essentially pred(occ2) *)
+(** removes from occs all occurrences that are subsumed by another.
+    occ1 subsumes occ2 if they are equal
+    or if occ1 is essentially pred(occ2) *)
 let clear_subsumed_timestamps (occs : ts_occs) : ts_occs =
   let subsumes (occ1 : ts_occ) (occ2 : ts_occ) =
     (* for now, positions are not allowed here. *)
@@ -137,13 +137,12 @@ let clear_subsumed_timestamps (occs : ts_occs) : ts_occs =
   List.rev occs
 
 
-(** Gathers all timestamps at which macros occur in a term. *)
+(** gathers all timestamps at which macros occur in a term. *)
 let get_actions_ext
       (contx : Constr.trace_cntxt)
       (t : Term.term)
       ?(fv:Vars.vars=[])
       (info:expand_info)
-      ~(env:Vars.env) (* for fold_shallow for renaming *)
     : ts_occs =
   let system = contx.system in
   let se = (SE.reachability_context system).set in
@@ -177,16 +176,18 @@ let get_actions_ext
   get t ~fv ~cond:[] ~p:MP.root ~se
 
 
-(** Return timestamps occuring in macros in a list of terms *)
+  
+(** returns all timestamps occuring in macros in a list of terms *)
 let get_macro_actions
       (contx : Constr.trace_cntxt)
-      ~(env: Vars.env)
       (sources : (term * expand_info) list) : ts_occs
   =
   let actions =
-    List.concat_map (fun (t, ei) -> get_actions_ext contx t ei ~env) sources
+    List.concat_map (fun (t, ei) -> get_actions_ext contx t ei) sources
   in
   clear_subsumed_timestamps actions
+
+
 
 
 (*------------------------------------------------------------------*)
@@ -239,16 +240,16 @@ let pp (ppf:Format.formatter) (occ:name_occ) : unit =
   Printer.pr "  @[<hv 2>%a@]@;@;" pp_internal occ
 
 (** prints a description of a subsumed occurrence *)
-let pp_sub (ppf:Format.formatter) (occ:name_occ) : unit =
+let pp_sub (ppf:Format.formatter) (occ:name_occ) : unit =            
   Printer.pr "  @[<hv 2>(subsumed) %a@]@;@;" pp_internal occ
-
-
+  
 
 (*------------------------------------------------------------------*)
 (* Occurrence subsumption (aka inclusion) *)
 
 (** checks if all instances of [o1] are instances of [o2].
-    [o1] and [o2] actions must have the same action name *)
+    [o1] and [o2] actions must have the same action name,
+    [o1] and [o2] must also collide with the same name *)
 let occ_incl
       (table : Symbols.table)
       (system : SE.fset)
@@ -284,8 +285,8 @@ let occ_incl
      oi1.oi_name = oi2.oi_name
 
 
-(** Add occ to occs, if it is not redundant.
-    Removes from occs all occurrences subsumed by occ.
+(** adds [occ] to [occs], if it is not redundant.
+    Removes from [occs] all occurrences subsumed by [occ].
     Returns the new occurrence list, and a list of now subsumed occurrences *)
 let add_occ
       (table : Symbols.table)
@@ -313,10 +314,10 @@ let add_occ
 
 
 
-(** Removes from occs some occurrences that are subsumed by another.
-    Returns (occs', subsumed_occs) that form a partition of occs
-    such that all occurrences in subsumed_occs are subsumed by some occ in occs',
-    and none of occs' is. *)
+(** Removes from [occs] some occurrences that are subsumed by another.
+    Returns [(occs', subsumed_occs)] that form a partition of [occs]
+    such that all occurrences in [subsumed_occs] are subsumed by some [occ] in [occs'],
+    and none of [occs'] is. *)
 let partition_subsumed_occs
       (table : Symbols.table)
       (system : SE.fset)
@@ -331,7 +332,7 @@ let partition_subsumed_occs
 
 
 (*------------------------------------------------------------------*)
-(* utility functions for lists of nsymbs *)
+(* Utility functions for lists of nsymbs *)
 
 (** looks for a name with the same symbol in the list *)
 let exists_symb (n:nsymb) (ns:nsymb list) : bool =
@@ -356,46 +357,30 @@ let find_symb (n:nsymb) (ns:nsymb list) : nsymb list =
       indices of n = indices of occ"
     which will be the condition of the proof obligation when finding the 
     occurrence occ.
-    action is the action producing the occ (optional, for direct occs)
+    action is the action producing the occ (optional, none for direct occs)
     ts=[t1, …, tn] are intended to be the timestamp occurrences in t.
-    The free vars of occ.occ_cnt should be in env \uplus occ.occ_vars,
+    The free vars of occ.occ_cnt, action, and cond
+    not bound in the sequent's env should be in occ.occ_vars,
     which is the case if occ was produced correctly
     (ie by Match.fold given either empty (for direct occurrences)
      or iocc_vars (for indirect occurrences).
-    Not all free vars of action and condition are there: there may be some
-    indices in them that don't appear in the occurrence -> we existentially 
-    quantify them. The free vars of ts should be in env.
-    Everything is renamed nicely wrt env. *)
+    The free vars of ts should be all be bound in the sequent's env. *)
 let occurrence_formula
       (ts  : ts_occs)
-      (env : Vars.env)
       (occ : name_occ)
     : term
   =
-  (* add to the occurrence's free variables the action
-     and condition's free variables that are not already in env *)
   let n, oinfo = occ.occ_cnt in
   let n_fv = Vars.Sv.of_list1 occ.occ_vars in
   let na = oinfo.oi_name in
-  let ac_fv = match oinfo.oi_action with
-    | Some a -> Vars.Sv.of_list1 (Term.get_vars a)
-    | None -> Vars.Sv.empty
-  in
+
   let cond = occ.occ_cond in
-  let cond_fv = Vars.Sv.of_list1 (List.concat_map Term.get_vars cond) in
-  (* is cond_fv useful or are they already in ac_fv? *)
-  let sfv =
-    Vars.Sv.diff
-      (Vars.Sv.union (Vars.Sv.union ac_fv cond_fv) n_fv)
-      (Vars.to_set env)
-  in
-  (* fv = all free variables in occ, cond, action not in env *)
-  let fv = Vars.Sv.elements sfv in 
+  let fv = Vars.Sv.elements n_fv in
 
   (* in addition to generating an equality formula for all indices of n and na, 
      we directly substitute those that are free variables *)
   (* produces logically equivalent, but simpler, formulas *)
-  let sigma' = 
+  let sigma = 
     List.filter_map (fun x -> x)
       (List.map2
          (fun i_n i_na ->
@@ -404,51 +389,38 @@ let occurrence_formula
             else None)
          n.s_indices na.s_indices)
   in
-  let sub'' t = subst sigma' t in
-  let indices'' = List.map (subst_var sigma') n.s_indices in
-  let n' = mk_isymb n.s_symb n.s_typ n.s_indices in
-  let cond'' = List.map sub'' cond in
+  let sub t = subst sigma t in
+  let indices' = List.map (subst_var sigma) n.s_indices in
+  let cond' = List.map sub cond in
 
   (* the equality formula is still needed, as eg if na.s_indices = (i, j)
-     and indices' = (i', i'), having the substitution i' -> i loses the 
+     and n.s_indices' = (i', i'), having the substitution i' -> i loses the 
      fact that j = i' = i.
      So we keep all the equalities. Some become trivial but that's ok. *)
-  let phi_eq = mk_indices_eq ~simpl:true na.s_indices indices'' in
-  let phi_cond_eq = mk_ands ~simpl:true (cond'' @ [phi_eq]) in
+  let phi_eq = mk_indices_eq ~simpl:true na.s_indices indices' in
+  let phi_cond_eq = mk_ands ~simpl:true (cond' @ [phi_eq]) in
 
   match oinfo.oi_action with
   | Some a ->
     (* indirect occurrence: we also generate the timestamp inequalities *)
-    let a'' = sub'' a in
+    let a' = sub a in
     (* no need to substitute ts since the variables we renamed do not 
        occur in ts *)
     let phis_time =
       List.map (fun (ti:ts_occ) ->
           mk_exists ~simpl:true
             ti.occ_vars
-            (mk_leq ~simpl:true a'' ti.occ_cnt)
+            (mk_leq ~simpl:true a' ti.occ_cnt)
         ) ts
     in
     let phi_time = mk_ors ~simpl:true phis_time in
-
-    (* print the renamed occurrence *)
-    let oinfo' = mk_oinfo na oinfo.oi_subterm ~ac:(Some a) in 
-    let occ' =
-      mk_nocc n' oinfo' n.s_indices occ.occ_cond occ.occ_pos 
-    in
-    Printer.pr "%a" pp occ';
-
+    (* print the occurrence *)
+    Printer.pr "%a" pp occ;
     mk_exists ~simpl:true fv (mk_and ~simpl:true phi_time phi_cond_eq)
 
   | None -> (* direct occurrence *)
-    let oinfo' = mk_oinfo na oinfo.oi_subterm ~ac:None in 
-    let occ' = 
-      mk_nocc n' oinfo' n.s_indices occ.occ_cond occ.occ_pos 
-    in
-    
-    Printer.pr "%a" pp occ';
-
-    mk_exists ~simpl:true fv phi_cond_eq
+       Printer.pr "%a" pp occ;
+       mk_exists ~simpl:true fv phi_cond_eq
 
 
 
@@ -463,36 +435,9 @@ let occurrence_sequent
   = 
   TS.set_goal
     (mk_impl ~simpl:false
-       (occurrence_formula ts (TS.vars s) occ)
+       (occurrence_formula ts occ)
        (TS.goal s))
     s
-
-
-(** Prints a subsumed name occurrence.
-    Done in a separate function, since subsumed occs will not be
-    passed to occurrence_formula, which prints normal occurrences *)
-let print_subsumed_occ (env:Vars.env) (occ:name_occ) : unit =
-  let updated_env, vars, sigma =
-    refresh_vars_env env occ.occ_vars
-  in
-  let n, oinfo = occ.occ_cnt in
-  let na = oinfo.oi_name in
-  let renamed_indices = List.map (subst_var sigma) n.s_indices in
-  let renamed_n = mk_isymb n.s_symb n.s_typ renamed_indices in
-  let renamed_action =
-    match oinfo.oi_action with
-    | Some a -> Some (subst sigma a)
-    | None -> None
-  in
-  let renamed_oinfo =
-    mk_oinfo na (subst sigma oinfo.oi_subterm) ~ac:renamed_action 
-  in 
-  let renamed_occ = 
-    mk_nocc renamed_n renamed_oinfo renamed_indices occ.occ_cond occ.occ_pos 
-  in
-  Printer.pr "%a" pp_sub renamed_occ
-
-
 
 
 (*------------------------------------------------------------------*)
@@ -504,7 +449,8 @@ let print_subsumed_occ (env:Vars.env) (occ:name_occ) : unit =
     - the sequent s of the current goal;
     - the term t where we look for occurrences;
     - optionally, a printer that prints a description of what we're looking
-      for; computes the list of corresponding proof obligations: we now have 
+      for;
+   computes the list of corresponding proof obligations: we now have 
       to prove s under the assumption that at least one of the found 
       occurrences must be an actual collision.
       Relies on fold_macro_support to look through all macros in the term. *)
@@ -512,7 +458,7 @@ let occurrence_sequents
     ?(pp_ns: (unit Fmt.t) option=None)
     (find_occs : 
        (se:SE.arbitrary ->
-        ?fv:Vars.vars ->
+        fv:Vars.vars ->
         expand_info ->
         term ->
         name_occs))
@@ -529,14 +475,14 @@ let occurrence_sequents
     | Some x -> Fmt.pf ppf "of %a " x ()
     | None   -> Fmt.pf ppf ""
   in
-  let ts = get_macro_actions contx ~env [t, EI_direct (s, contx)] in
+  let ts = get_macro_actions contx [t, EI_direct (s, contx)] in
 
   (* direct occurrences of names in the wrong places *)
   Printer.pr "@[<v 0>@[<hv 2>Bad occurrences %afound@ directly in %a:@]@;"
     ppp ()
     Term.pp t;
 
-  let all_dir_occs = find_occs ~se (EI_direct (s,contx)) t in
+  let all_dir_occs = find_occs ~se ~fv:[] (EI_direct (s,contx)) t in
   (* remove occs that are subsumed by another *) 
   let dir_occs, subsumed_dir_occs =
     partition_subsumed_occs table system all_dir_occs 
@@ -545,8 +491,8 @@ let occurrence_sequents
   (* proof obligations from the direct occurrences *)
   let direct_sequents = List.map (occurrence_sequent ts s) dir_occs in
 
-  (* print subsumed occs *)
-  List.iter (print_subsumed_occ env) subsumed_dir_occs;
+  (* print subsumed occs separately *)
+  List.iter (Printer.pr "%a" pp_sub) subsumed_dir_occs;
 
   if List.length all_dir_occs = 0 then
     Printer.pr "  (no occurrences)@;";
@@ -558,14 +504,16 @@ let occurrence_sequents
   let indirect_sequents, nsub =
     Iter.fold_macro_support (fun iocc (indirect_sequents, nsub) ->
         let t = iocc.iocc_cnt in
-        let fv = iocc.iocc_vars in
+        let sfv = iocc.iocc_vars in
         let a =
           mk_action iocc.iocc_aname (Action.get_indices iocc.iocc_action) 
         in
-
+        (* a's free variables should always be in fv *)
+        assert (Vars.Sv.subset (Vars.Sv.of_list (get_vars a)) (Vars.Sv.union sfv (Vars.to_set env))); 
+        
         (* indirect occurrences in iocc *)
         let all_ind_occs =
-          find_occs ~se ~fv:(Vars.Sv.elements fv)
+          find_occs ~se ~fv:(Vars.Sv.elements sfv)
             (EI_indirect (a, contx)) t
         in
 
@@ -579,8 +527,8 @@ let occurrence_sequents
                    indirect_sequents
         in
 
-        (* print subsumed occs *)
-        List.iter (print_subsumed_occ env) subsumed_ind_occs;
+        (* print subsumed occs separately *)
+        List.iter (Printer.pr "%a" pp_sub) subsumed_ind_occs;
         (ss, nsub + (List.length subsumed_ind_occs)))
       contx env [t] ([], List.length subsumed_dir_occs)
   in
@@ -601,6 +549,7 @@ let occurrence_sequents
 
 (*------------------------------------------------------------------*)
 (* Functions to look for illegal name occurrences in a term *)
+(* Useful to construct the find_occs function for occurrence_sequents *)
 
 (** type of a function that takes a term, and generates
     a list of occurrences in it, using
@@ -644,7 +593,7 @@ type f_fold_occs =
 let fold_bad_occs
     (get_bad_occs: f_fold_occs)
     ~(se:SE.arbitrary)
-    ?(fv:Vars.vars=[])
+    ~(fv:Vars.vars)
     (info:expand_info)
     (t:term) : name_occs 
   =
