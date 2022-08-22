@@ -179,7 +179,7 @@ let define_oracle_tag_formula table (h : lsymb) f =
 (*------------------------------------------------------------------*)
 (** {2 Declaration processing} *)
 
-let declare table hint_db decl = 
+let declare table decl = 
   match L.unloc decl with
   | Decl.Decl_channel s -> Channel.declare table s, []
 
@@ -200,7 +200,7 @@ let declare table hint_db decl =
       | None ->
         { pgoal with Goal.Parsed.name = Some (Prover.unnamed_goal ()) }
     in
-    let gc,_ = Goal.make table hint_db pgoal in
+    let gc,_ = Goal.make table pgoal in
     Prover.add_proved_goal `Axiom gc;
     table, []
 
@@ -211,7 +211,7 @@ let declare table hint_db decl =
 
   | Decl.Decl_system_modifier sdecl ->
     let new_lemma, proof_obls, table = 
-      SystemModifiers.declare_system table hint_db sdecl 
+      SystemModifiers.declare_system table sdecl 
     in
     oiter (Prover.add_proved_goal `Lemma) new_lemma;
     table, proof_obls
@@ -302,9 +302,9 @@ let declare table hint_db decl =
     in
     table, []
 
-let declare_list table hint_db decls =
+let declare_list table decls =
   let table, subgs = 
-    List.map_fold (fun table d -> declare table hint_db d) table decls
+    List.map_fold (fun table d -> declare table d) table decls
   in
   table, List.flatten subgs
 

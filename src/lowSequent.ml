@@ -106,8 +106,6 @@ module type S = sig
 
   val get_trace_hyps : t -> TraceHyps.hyps
 
-  val hint_db : t -> Hint.hint_db
-
   (** [get_models s] returns a set of minimal models corresponding to the
       trace atoms in the sequent [s].
       See module {!Constr}.

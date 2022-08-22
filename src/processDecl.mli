@@ -29,14 +29,13 @@ val pp_decl_error :
 
 (** Process a declaration. *)
 val declare :
-  Symbols.table -> Hint.hint_db -> Decl.declaration -> 
-  Symbols.table * Goal.t list
+  Symbols.table -> Decl.declaration -> Symbols.table * Goal.t list
 
 (** Process a list of declaration *)
 val declare_list :
-  Symbols.table -> Hint.hint_db -> Decl.declarations -> 
+  Symbols.table -> Decl.declarations -> 
   Symbols.table * Goal.t list (* new table, proof obligation *)
 
 (*------------------------------------------------------------------*)
-val add_hint_rewrite : Symbols.table -> lsymb -> Hint.hint_db -> Hint.hint_db
-val add_hint_smt     : Symbols.table -> lsymb -> Hint.hint_db -> Hint.hint_db
+val add_hint_rewrite : Symbols.table -> lsymb -> Symbols.table -> Symbols.table
+val add_hint_smt     : Symbols.table -> lsymb -> Symbols.table -> Symbols.table

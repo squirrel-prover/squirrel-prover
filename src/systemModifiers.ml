@@ -111,13 +111,13 @@ let conv_term ?pat table system ~bnds (term : Theory.term)
 
 (*------------------------------------------------------------------*)
 let mk_equiv_statement
-    table hint_db
+    table 
     new_axiom_name enrich make_conclusion new_system
   : Goal.statement
   =
   let context = SE.equivalence_context ~set:new_system new_system in
   let formula =
-    fst (Goal.make_obs_equiv ~enrich table hint_db context)
+    fst (Goal.make_obs_equiv ~enrich table context)
     |> Equiv.any_to_equiv
   in
   let formula = make_conclusion formula in
@@ -131,7 +131,7 @@ let mk_equiv_statement
 (** {2 Renaming} *)
 
 let global_rename
-    (table : Symbols.table) (hint_db : Hint.hint_db)
+    (table : Symbols.table) 
     sdecl (gf : Theory.global_formula)
   =
   let old_system, old_single_system =
@@ -225,7 +225,7 @@ let global_rename
   in
   let lemma =
     mk_equiv_statement
-      table hint_db
+      table
       axiom_name enrich make_conclusion old_new_pair
   in
   (Some lemma, [], table)
@@ -236,7 +236,6 @@ let global_rename
 
 let global_prf
     (table : Symbols.table)
-    (hint_db : Hint.hint_db)
     (sdecl : Decl.system_modifier)
     (bnds  : Theory.bnds)
     (hash  : Theory.term)
@@ -341,7 +340,7 @@ let global_prf
 
   let lemma =
     mk_equiv_statement
-      table hint_db
+      table
       axiom_name enrich make_conclusion old_new_pair
   in
 
@@ -354,7 +353,7 @@ let global_prf
 
   
 let global_cca
-    (table : Symbols.table) (hint_db : Hint.hint_db)
+    (table : Symbols.table) 
     sdecl bnds (p_enc : Theory.term)
   =
   let old_system, old_single_system =
@@ -761,7 +760,6 @@ let check_uniq table (map : XO.t list) =
 (*------------------------------------------------------------------*)
 let global_prf_t
     (table   : Symbols.table)
-    (hint_db : Hint.hint_db)
     (sdecl   : Decl.system_modifier)
     (bnds    : Theory.bnds)
     (hash    : Theory.term)
@@ -1181,7 +1179,6 @@ let do_rw_args
 
 let global_rewrite
     (table   : Symbols.table)
-    (hint_db : Hint.hint_db)
     (sdecl   : Decl.system_modifier)
     (rw      : Args.rw_arg list)
   : Goal.statement option * Goal.t list * Symbols.table
@@ -1210,7 +1207,7 @@ let global_rewrite
     in
     (* new empty sequent *)
     let env = Env.init ~table ~vars ~system:context () in
-    let s = TS.init ~env ~hint_db Term.mk_false in
+    let s = TS.init ~env Term.mk_false in
 
     (* hypothesis: the timestamp the macro is at happens *)
     let hyp_hap = Term.mk_happens ts in
@@ -1277,13 +1274,12 @@ let global_rewrite
 (*------------------------------------------------------------------*)
 let declare_system
     (table   : Symbols.table)
-    (hint_db : Hint.hint_db)
     (sdecl   : Decl.system_modifier)
   : Goal.statement option * Goal.t list * Symbols.table
   =
   match sdecl.Decl.modifier with
-  | Rename gf         -> global_rename  table hint_db sdecl        gf
-  | PRF  (bnds, hash) -> global_prf     table hint_db sdecl bnds hash
-  | PRFt (bnds, hash) -> global_prf_t   table hint_db sdecl bnds hash
-  | CCA  (bnds, enc)  -> global_cca     table hint_db sdecl bnds  enc
-  | Rewrite rw        -> global_rewrite table hint_db sdecl rw
+  | Rename gf         -> global_rename  table sdecl        gf
+  | PRF  (bnds, hash) -> global_prf     table sdecl bnds hash
+  | PRFt (bnds, hash) -> global_prf_t   table sdecl bnds hash
+  | CCA  (bnds, enc)  -> global_cca     table sdecl bnds  enc
+  | Rewrite rw        -> global_rewrite table sdecl rw

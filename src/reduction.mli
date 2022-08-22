@@ -22,7 +22,6 @@ type cstate
 (** Built a convertion state *)
 val mk_cstate :
   ?system:SE.context -> 
-  ?hint_db:Hint.hint_db -> 
   ?expand_context:Macros.expand_context -> 
   ?hyps:THyps.hyps ->
   ?param:red_param -> 

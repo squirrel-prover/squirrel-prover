@@ -40,7 +40,6 @@ type cstate = {
   table   : Symbols.table;
   system  : SE.context;
   param   : red_param;
-  hint_db : Hint.hint_db;
   hyps    : THyps.hyps;
 
   subst   : Term.subst;
@@ -54,14 +53,13 @@ type cstate = {
 (** Make a cstate directly *)
 let mk_cstate 
     ?(system = SystemExpr.context_any)
-    ?(hint_db = Hint.empty_hint_db)
     ?(expand_context = Macros.InSequent)
     ?(hyps = THyps.empty)
     ?(param = rp_default)
     table 
   : cstate 
   =
-  { table; system; param; hint_db; hyps; expand_context;
+  { table; system; param; hyps; expand_context;
     subst = []; }
 
 (*------------------------------------------------------------------*)
@@ -244,7 +242,6 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     table   : Symbols.table;
     sexpr   : SE.arbitrary;
     param   : red_param;
-    hint_db : Hint.hint_db;
     hyps    : THyps.hyps;
 
     expand_context : Macros.expand_context;
@@ -304,7 +301,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
   (* Rewrite once at head position *)
   and rewrite_head_once (st : state) (t : Term.term) : Term.term * bool = 
-    let db = Hint.get_rewrite_db st.hint_db in
+    let db = Hint.get_rewrite_db st.table in
     let hints = Term.Hm.find_dflt [] (Term.get_head t) db in
 
     let rule = List.find_map (fun Hint.{ rule } ->
@@ -457,7 +454,6 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     { table   = S.table s;
       sexpr   = se;
       param;
-      hint_db = S.hint_db s;
       hyps    = S.get_trace_hyps s; 
       expand_context; } 
 
@@ -597,7 +593,6 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     { table   = S.table s;
       system;
       param;
-      hint_db = S.hint_db s;
       hyps    = S.get_trace_hyps s; 
       expand_context;
       subst   = []; } 

@@ -47,7 +47,6 @@ type t = {
   env     : Env.t;
   hyps    : H.hyps;
   goal    : Equiv.form;
-  hint_db : Hint.hint_db;
 }
 
 type sequent = t
@@ -178,7 +177,7 @@ let update ?table ?ty_vars ?vars ?hyps ?goal t =
   let env  = Env.update ?table ?ty_vars ?vars t.env
   and hyps = Utils.odflt t.hyps hyps
   and goal = Utils.odflt t.goal goal in
-  { t with env; hyps; goal; } 
+  { env; hyps; goal; } 
 
 let env j = j.env
 
@@ -268,7 +267,6 @@ let goal_as_equiv s = match goal s with
     that the conclusion of the input sequent is a local formula. *)
 let to_trace_sequent s =
   let env = s.env in
-  let hint_db = s.hint_db in
 
   let goal = match s.goal with
     | Equiv.Atom (Equiv.Reach f) -> f
@@ -277,7 +275,7 @@ let to_trace_sequent s =
         (Tactics.GoalBadShape "expected a reachability formula")
   in
 
-  let trace_s = TS.init ~env ~hint_db goal in
+  let trace_s = TS.init ~env goal in
   Hyps.fold
     (fun id hyp trace_s ->
         TS.Hyps.add (Args.Named (Ident.name id)) (Global hyp) trace_s)
@@ -329,14 +327,14 @@ let set_equiv_goal e j =
   else new_sequent
 
 
-let init ~env ~hint_db ?hyp goal =
+let init ~env ?hyp goal =
   let hyps = H.empty in
   let hyps = match hyp with
     | None -> hyps
     | Some h ->
         snd (H._add ~force:false (H.fresh_id "H" hyps) h hyps)
   in
-  let new_sequent = { env; hint_db; hyps; goal } in
+  let new_sequent = { env; hyps; goal } in
   sanity_check new_sequent;
 
   if Config.post_quantum () then
@@ -360,8 +358,6 @@ let get_felem ?loc i s =
     let _, t, _ = List.splitat i (goal_as_equiv s) in t
   with List.Out_of_range ->
     Tactics.soft_failure ?loc (Tactics.Failure "out of range position")
-
-let hint_db s = s.hint_db
 
 (*------------------------------------------------------------------*)
 let get_system_pair t = oget (system t).pair

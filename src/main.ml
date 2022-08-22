@@ -273,8 +273,7 @@ let do_undo (state : main_state) (nb_undo : int) : main_state =
 
 (*------------------------------------------------------------------*)
 let do_decls (state : main_state) (decls : Decl.declarations) : main_state =
-  let hint_db = Prover.current_hint_db () in
-  let table, proof_obls = ProcessDecl.declare_list state.table hint_db decls in
+  let table, proof_obls = ProcessDecl.declare_list state.table decls in
 
   if proof_obls <> [] then
     Printer.pr "@[<v 2>proof obligations:@;%a@]"
@@ -364,14 +363,13 @@ let do_qed (state : main_state) : main_state =
 
 (*------------------------------------------------------------------*)
 let do_add_hint (state : main_state) (h : Hint.p_hint) : main_state =
-  let db = Prover.current_hint_db () in
-  let db =
+  let module PD = ProcessDecl in
+  let table =
     match h with
-    | Hint.Hint_rewrite id -> ProcessDecl.add_hint_rewrite state.table id db
-    | Hint.Hint_smt     id -> ProcessDecl.add_hint_smt     state.table id db
+    | Hint.Hint_rewrite id -> PD.add_hint_rewrite state.table id state.table
+    | Hint.Hint_smt     id -> PD.add_hint_smt     state.table id state.table
   in
-  Prover.set_hint_db db;
-  state
+  { state with table; }
 
 (*------------------------------------------------------------------*)
 let do_set_option (state : main_state) (sp : Config.p_set_param) : main_state =
@@ -385,10 +383,7 @@ let do_add_goal
     (g : Goal.Parsed.t Location.located) 
   : main_state 
   =
-  let hint_db = Prover.current_hint_db () in
-  let i,f =
-    Prover.add_new_goal state.table hint_db g
-  in
+  let i,f = Prover.add_new_goal state.table g in
   Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@." i Goal.pp_init f;
   state
 

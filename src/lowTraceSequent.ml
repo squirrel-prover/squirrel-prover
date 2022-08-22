@@ -24,8 +24,6 @@ module H = Hyps.TraceHyps
 module S : sig
   type t = private {
     env : Env.t;
-
-    hint_db : Hint.hint_db;
     
     hyps : H.hyps;
     (** Hypotheses *)
@@ -36,7 +34,6 @@ module S : sig
 
   val init_sequent :
     env:Env.t ->
-    hint_db:Hint.hint_db ->
     conclusion:Term.term ->
     t
 
@@ -53,7 +50,6 @@ module S : sig
 end = struct
   type t = {
     env        : Env.t;
-    hint_db    : Hint.hint_db;
     hyps       : H.hyps;
     conclusion : Term.term;
   }
@@ -70,10 +66,9 @@ end = struct
   Vars.sanity_check s.env.Env.vars;
   assert (Vars.Sv.subset (fv s) (Vars.to_set s.env.Env.vars))
 
-  let init_sequent ~env ~hint_db ~conclusion =
+  let init_sequent ~env ~conclusion =
     let s = {
       env ;
-      hint_db;
       hyps = H.empty;
       conclusion; 
     } in
@@ -84,7 +79,7 @@ end = struct
     let env        = Utils.odflt t.env env
     and hyps       = Utils.odflt t.hyps hyps
     and conclusion = Utils.odflt t.conclusion conclusion in
-    { t with env; hyps; conclusion; } 
+    { env; hyps; conclusion; } 
 end
 
 include S
@@ -364,8 +359,8 @@ let pi projection s =
     (Term.project1 projection s.conclusion)
     s
 
-let init ~env ~hint_db conclusion =
-  init_sequent ~env ~hint_db ~conclusion
+let init ~env conclusion =
+  init_sequent ~env ~conclusion
 
 let goal s = s.conclusion
 
@@ -431,7 +426,7 @@ let literals_unsat_smt ?(slow=false) s =
      * we don't actually need to decompose message atoms / trace literals *)
     (* since we didn't move the conclusion into the premises,
      * handle it here *)
-    (Term.mk_not s.conclusion :: Hint.get_smt_db s.hint_db)
+    (Term.mk_not s.conclusion :: Hint.get_smt_db s.env.table)
 
 
 (*------------------------------------------------------------------*)
@@ -442,9 +437,6 @@ let mk_trace_cntxt ?se s =
     system;
     models = Some (get_models s);
   }
-
-(*------------------------------------------------------------------*)
-let hint_db s = s.hint_db
 
 (*------------------------------------------------------------------*)
 let get_trace_hyps s = s.hyps

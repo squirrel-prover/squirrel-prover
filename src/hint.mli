@@ -14,12 +14,8 @@ type rewrite_db = rw_hint list Term.Hm.t
 val pp_rewrite_db : Format.formatter -> rewrite_db -> unit
 
 (*------------------------------------------------------------------*)
-type hint_db
-
-val empty_hint_db : hint_db 
-
-val get_rewrite_db : hint_db -> rewrite_db
-val get_smt_db     : hint_db -> Term.term list
+val get_rewrite_db : Symbols.table -> rewrite_db
+val get_smt_db     : Symbols.table -> Term.term list
 
 (*------------------------------------------------------------------*)
 type p_hint =
@@ -27,6 +23,6 @@ type p_hint =
   | Hint_smt     of lsymb
 
 val add_hint_rewrite : 
-  lsymb -> Type.tvars -> Term.term -> hint_db -> hint_db
+  lsymb -> Type.tvars -> Term.term -> Symbols.table -> Symbols.table
 
-val add_hint_smt : Term.term -> hint_db -> hint_db
+val add_hint_smt : Term.term -> Symbols.table -> Symbols.table

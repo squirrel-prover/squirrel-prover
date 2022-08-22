@@ -22,9 +22,6 @@ val get_current_system : unit -> SE.context option
 *)
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
-val current_hint_db : unit -> Hint.hint_db
-val set_hint_db : Hint.hint_db -> unit
-
 val unnamed_goal : unit -> lsymb
 
 (*------------------------------------------------------------------*)
@@ -192,8 +189,8 @@ type parsed_input =
   | ParsedSetOption  of Config.p_set_param
 
   | ParsedTactic of [ `Bullet of string |
-                          `Brace of [`Open|`Close] |
-                          `Tactic of TacticsArgs.parser_arg Tactics.ast ] list
+                      `Brace of [`Open|`Close] |
+                      `Tactic of TacticsArgs.parser_arg Tactics.ast ] list
 
   | ParsedPrint   of print_query
   | ParsedUndo    of int
@@ -207,10 +204,7 @@ type parsed_input =
 
 (** Declare a new goal to the current goals, and returns it. *)
 val add_new_goal :
-  Symbols.table ->
-  Hint.hint_db ->
-  Goal.Parsed.t Location.located ->
-  string * Goal.t
+  Symbols.table -> Goal.Parsed.t Location.located -> string * Goal.t
 
 val add_proof_obl : Goal.t -> unit
 

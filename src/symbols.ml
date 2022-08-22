@@ -18,7 +18,8 @@ type namespace =
   | NMacro
   | NSystem
   | NProcess
-  | NBType
+  | NBType      (** type declarations *)
+  | NHintDB
 
 let pp_namespace fmt = function
   | NChannel  -> Fmt.pf fmt "channel"
@@ -29,6 +30,7 @@ let pp_namespace fmt = function
   | NSystem   -> Fmt.pf fmt "system"
   | NProcess  -> Fmt.pf fmt "process"
   | NBType    -> Fmt.pf fmt "type"
+  | NHintDB   -> Fmt.pf fmt "hint database"
 
 (*------------------------------------------------------------------*)
 (** Type of symbols.
@@ -94,6 +96,7 @@ type _macro
 type _system
 type _process
 type _btype
+type _hintdb
 
 type channel = _channel t
 type name    = _name    t
@@ -103,6 +106,8 @@ type macro   = _macro   t
 type system  = _system  t
 type process = _process t
 type btype   = _btype   t
+type hintdb  = _hintdb  t
+    
 (*------------------------------------------------------------------*)
 type _ def =
   | Channel  : unit      -> _channel def
@@ -112,7 +117,8 @@ type _ def =
   | System   : unit      -> _system  def
   | Process  : unit      -> _process def
   | BType    : bty_def   -> _btype   def
-
+  | HintDB   : unit      -> _hintdb  def
+        
   | Function : (Type.ftype * function_def) -> _fname def
 
 type edef =
@@ -189,7 +195,8 @@ let edef_namespace : edef -> namespace = fun e ->
   | Exists (Macro    _) -> NMacro
   | Exists (System   _) -> NSystem
   | Exists (Process  _) -> NProcess
-  | Exists (BType  _)   -> NBType
+  | Exists (BType    _) -> NBType
+  | Exists (HintDB   _) -> NHintDB
   | Reserved n          -> n
 
 let get_namespace ?(group=default_group) (table : table) s =
@@ -555,6 +562,19 @@ module Macro = Make (struct
   let construct d = Macro d
   let deconstruct ~loc s = match s with
     | Exists (Macro d) -> d
+    | _ as c -> namespace_err loc c namespace
+end)
+
+module HintDB = Make (struct
+  type ns = _hintdb
+  type local_def = unit
+
+  let namespace = NHintDB
+
+  let group = "hint-db"
+  let construct d = HintDB d
+  let deconstruct ~loc s = match s with
+    | Exists (HintDB d) -> d
     | _ as c -> namespace_err loc c namespace
 end)
 

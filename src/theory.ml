@@ -607,6 +607,7 @@ let make_app_i table cntxt (lsymb : lsymb) (l : term list) : app_i =
 
     | Symbols.Channel _
     | Symbols.BType _
+    | Symbols.HintDB  _
     | Symbols.Process _
     | Symbols.System  _ ->
       let s = L.unloc lsymb in

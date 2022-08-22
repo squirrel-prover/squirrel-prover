@@ -100,7 +100,7 @@ let parse_theory_test ?(test=false) filename =
   let lexbuf = Lexing.from_channel (Stdlib.open_in filename) in
   let decls = parse_theory_buf ~test lexbuf filename in
   let table, subgs =
-    ProcessDecl.declare_list Symbols.builtins_table Hint.empty_hint_db decls
+    ProcessDecl.declare_list Symbols.builtins_table decls
   in
   assert (subgs = []);
   table
@@ -194,7 +194,7 @@ let () =
             abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
         in
         let decl = Location.mk_loc Location._dummy decl_i in
-        ProcessDecl.declare table Hint.empty_hint_db decl in
+        ProcessDecl.declare table decl in
       let env = { env with table } in
       ignore (parse_process env "in(c,x); out(c, if x=x then x else error)"
               : Process.process)
@@ -209,7 +209,7 @@ let () =
               abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
         in
         let decl = Location.mk_loc Location._dummy decl_i in
-        ProcessDecl.declare table Hint.empty_hint_db decl
+        ProcessDecl.declare table decl
       in
       
       let table, _ =
@@ -222,7 +222,7 @@ let () =
         in
         
         let decl = Location.mk_loc Location._dummy decl_i in
-        ProcessDecl.declare table Hint.empty_hint_db decl
+        ProcessDecl.declare table decl
       in
       let env = { env with table } in
       ignore (parse_process env

@@ -116,7 +116,7 @@ end
 (** {2 Create trace and equivalence goals} *)
 
 (* FIXME: the [enrich] additional argument must be removed. *)
-let make_obs_equiv ?(enrich=[]) table hint_db system =
+let make_obs_equiv ?(enrich=[]) table system =
   let vars,ts = Vars.make `Approx Vars.empty_env Type.Timestamp "t" in
   let term = Term.mk_macro Term.frame_macro [] (Term.mk_var ts) in
 
@@ -140,13 +140,13 @@ let make_obs_equiv ?(enrich=[]) table hint_db system =
   
   let env = Env.init ~system ~table ~vars () in
   
-  let s = ES.init ~env ~hint_db ~hyp goal_s in
+  let s = ES.init ~env ~hyp goal_s in
   
   Equiv.Global (Equiv.mk_forall [ts] (Equiv.(Impl (hyp,goal)))),
   Equiv s
 
 
-let make table hint_db parsed_goal : statement * t =
+let make table parsed_goal : statement * t =
 
   let Parsed.{name; system; ty_vars; vars; formula} = parsed_goal in
 
@@ -163,19 +163,19 @@ let make table hint_db parsed_goal : statement * t =
     match formula with
     | Local f ->
       let f,_ = Theory.convert conv_env ~ty:Type.Boolean f in
-      let s = TS.init ~env ~hint_db f in
+      let s = TS.init ~env f in
       let formula = Equiv.Local (Term.mk_forall vs f) in
       formula, Trace s
 
     | Global f ->
       let f = Theory.convert_global_formula conv_env f in
-      let s = ES.init ~env ~hint_db f in
+      let s = ES.init ~env f in
       let formula = Equiv.Global (Equiv.mk_forall vs f) in
       formula, Equiv s
 
     | Obs_equiv ->
       assert (vs = [] && ty_vars = []) ;
-      make_obs_equiv table hint_db system
+      make_obs_equiv table system
   in
 
   { name; system; ty_vars; formula },

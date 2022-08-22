@@ -76,10 +76,7 @@ end
 val make_obs_equiv :
   ?enrich:Term.term list ->
   Symbols.table ->
-  Hint.hint_db ->
   SystemExpr.context ->
   Equiv.any_form * t
 
-val make :
-  Symbols.table -> Hint.hint_db -> Parsed.t ->
-  statement * t
+val make : Symbols.table -> Parsed.t -> statement * t

@@ -45,7 +45,8 @@ type _macro
 type _system
 type _process
 type _btype
-
+type _hintdb
+  
 type channel = _channel t
 type name    = _name    t
 type action  = _action  t
@@ -54,7 +55,8 @@ type macro   = _macro   t
 type system  = _system  t
 type process = _process t
 type btype   = _btype   t
-
+type hintdb  = _hintdb  t
+    
 (*------------------------------------------------------------------*)
 type namespace =
   | NChannel
@@ -64,8 +66,9 @@ type namespace =
   | NMacro
   | NSystem
   | NProcess
-  | NBType
-
+  | NBType      (** type declarations *)
+  | NHintDB
+    
 val pp_namespace : Format.formatter -> namespace -> unit
 
 val get_namespace : ?group:group -> table -> string -> namespace option
@@ -133,6 +136,7 @@ type _ def =
   | System   : unit      -> _system  def
   | Process  : unit      -> _process def
   | BType    : bty_def   -> _btype   def
+  | HintDB   : unit      -> _hintdb  def
         
   | Function : (Type.ftype * function_def) -> _fname def
         
@@ -263,7 +267,8 @@ module BType    : Namespace with type def = bty_def with type ns = _btype
 module Action   : Namespace with type def = int     with type ns = _action
 module System   : Namespace with type def = unit    with type ns = _system
 module Process  : Namespace with type def = unit    with type ns = _process
-
+module HintDB   : Namespace with type def = unit    with type ns = _hintdb
+                                                           
 module Function : Namespace
   with type def = Type.ftype * function_def with type ns = _fname
 

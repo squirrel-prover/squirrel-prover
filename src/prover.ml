@@ -83,8 +83,8 @@ let get_current_system () =
 (*------------------------------------------------------------------*)
 (** {2 Options}
 
-    TODO [option_defs] and [hint_db] are not directly related to
-    this module and should be moved elsewhere, e.g. [Main] could
+    TODO [option_defs] is not directly related to
+    this module and should be moved elsewhere, e.g. [Main] could
     deal with them through the table. *)
 
 type option_name =
@@ -97,8 +97,6 @@ type option_def = option_name * option_val
 
 let option_defs : option_def list ref = ref []
 
-let hint_db : Hint.hint_db ref = ref Hint.empty_hint_db
-
 type proof_state = {
   goals        : pending_proof list;
   table        : Symbols.table;
@@ -109,7 +107,6 @@ type proof_state = {
   option_defs  : option_def list;
   params       : Config.params;
   prover_mode  : prover_mode;
-  hint_db      : Hint.hint_db;
 }
 
 type proof_history = proof_state list
@@ -144,7 +141,7 @@ let get_state mode table =
     option_defs  = !option_defs;
     params       = Config.get_params ();
     prover_mode  = mode;
-    hint_db      = !hint_db; }
+  }
 
 let save_state mode table =
   pt_history := get_state mode table :: (!pt_history)
@@ -157,8 +154,6 @@ let reset_from_state (p : proof_state) =
   goals_proved := p.goals_proved;
   option_defs := p.option_defs;
   Config.set_params p.params;
-
-  hint_db := p.hint_db;
 
   ( p.prover_mode, p.table )
 
@@ -597,7 +592,7 @@ let unnamed_goal () =
   L.mk_loc L._dummy ("unnamedgoal" ^ string_of_int (List.length !goals_proved))
 
 (*------------------------------------------------------------------*)
-let add_new_goal_i table hint_db parsed_goal =
+let add_new_goal_i table parsed_goal =
   let name = match parsed_goal.Goal.Parsed.name with
     | None -> unnamed_goal ()
     | Some s -> s
@@ -606,16 +601,16 @@ let add_new_goal_i table hint_db parsed_goal =
     raise (ParseError "a goal or axiom with this name already exists");
 
   let parsed_goal = { parsed_goal with Goal.Parsed.name = Some name } in
-  let statement,goal = Goal.make table hint_db parsed_goal in
+  let statement,goal = Goal.make table parsed_goal in
   goals :=  UnprovedLemma (statement,goal) :: !goals;
   L.unloc name, goal
 
-let add_new_goal table hint_db parsed_goal =
+let add_new_goal table parsed_goal =
   if !goals <> [] then
     raise (ParseError "cannot add new goal: proof obligations remaining");
 
   let parsed_goal = L.unloc parsed_goal in
-  add_new_goal_i table hint_db parsed_goal
+  add_new_goal_i table parsed_goal
 
 let add_proof_obl (goal : Goal.t) : unit = 
   goals :=  ProofObl (goal) :: !goals
@@ -746,7 +741,4 @@ let current_goal_name () =
       | UnprovedLemma (stmt,_) -> stmt.Goal.name
       | ProofObl _ -> "proof obligation" ) !current_goal
 
-let current_hint_db () = !hint_db
-
-let set_hint_db db = hint_db := db
   
