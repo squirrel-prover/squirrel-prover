@@ -13,6 +13,7 @@ val pp_init : Format.formatter -> t -> unit
 (*------------------------------------------------------------------*)
 val vars   : t -> Vars.env
 val system : t -> SystemExpr.context
+val table  : t -> Symbols.table
 
 (*------------------------------------------------------------------*)
 val map      : (TS.t -> TS.t)      -> (ES.t -> ES.t)      -> t -> t

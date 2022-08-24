@@ -287,9 +287,9 @@ let do_decls (state : main_state) (decls : Decl.declarations) : main_state =
 let do_print (state : main_state) (q : Prover.print_query) : main_state =
   match q with
   | Prover.Pr_statement l -> 
-    let g = Prover.get_assumption l in
-    let k = oget (Prover.get_assumption_kind (L.unloc l)) in
-    Printer.prt `Default "@[<2>%a %a@]" Prover.pp_kind k Goal.pp_statement g;
+    let g = Lemma.find l state.table in
+    let k = Lemma.find_kind l state.table in
+    Printer.prt `Default "@[<2>%a %a@]" Lemma.pp_kind k Goal.pp_statement g;
     state
 
   | Prover.Pr_system s_opt ->
@@ -357,9 +357,9 @@ let do_tactic (state : main_state) l : main_state =
 
 (*------------------------------------------------------------------*)
 let do_qed (state : main_state) : main_state =
-  Prover.complete_proof ();
+  let table = Prover.complete_proof state.table in
   Printer.prt `Result "Exiting proof mode.@.";
-  { state with mode = GoalMode }
+  { state with table; mode = GoalMode }
 
 (*------------------------------------------------------------------*)
 let do_add_hint (state : main_state) (h : Hint.p_hint) : main_state =

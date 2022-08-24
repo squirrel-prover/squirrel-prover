@@ -69,13 +69,16 @@ module Mk (Args : MkArgs) : S with
   let to_global_sequent = Args.to_global_sequent
 
   let is_assumption (name : lsymb) (s : S.t) =
-    Hyps.mem_name (L.unloc name) s || Prover.is_assumption (L.unloc name)
+    Hyps.mem_name (L.unloc name) s ||
+    Lemma.mem name (S.table s)
 
   let is_equiv_assumption (name : lsymb) (s : sequent) =
-    Hyps.mem_name (L.unloc name) s || Prover.is_equiv_assumption (L.unloc name)
+    Hyps.mem_name (L.unloc name) s ||
+    Lemma.mem_equiv name (S.table s)
 
   let is_reach_assumption (name : lsymb) (s : sequent) =
-    Hyps.mem_name (L.unloc name) s || Prover.is_reach_assumption (L.unloc name)
+    Hyps.mem_name (L.unloc name) s ||
+    Lemma.mem_reach name (S.table s)
 
   (* Get assumption by name.
      If required, check for compatibility, i.e. ensure that the assumption
@@ -106,14 +109,19 @@ module Mk (Args : MkArgs) : S with
          allow an implicit conversion from global to local
          hypothesis. *)
       match k,S.hyp_kind,f with
-        | Equiv.Local_t, Equiv.Any_t, Local f ->
-            make_goal f
-        | Equiv.Local_t, Equiv.Any_t, Global (Equiv.Atom (Reach f)) ->
-            make_goal f
-        | dst,src,f ->
-            make_goal (Equiv.Babel.convert ~loc:(L.loc name) ~src ~dst f)
+      | Equiv.Local_t, Equiv.Any_t, Local f ->
+        make_goal f
+      | Equiv.Local_t, Equiv.Any_t, Global (Equiv.Atom (Reach f)) ->
+        make_goal f
+      | dst,src,f ->
+        make_goal (Equiv.Babel.convert ~loc:(L.loc name) ~src ~dst f)
+          
+    else if not (Lemma.mem name (S.table s)) then
+      soft_failure ~loc:(L.loc name)
+        (Failure ("no proved goal named " ^ L.unloc name))
+
     else
-      let lem = Prover.get_assumption name in
+      let lem = Lemma.find name (S.table s) in
       (* Verify that it applies to the current system. *)
       if check_compatibility then begin
         match k with

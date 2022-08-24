@@ -22,6 +22,10 @@ let system = function
   | Trace j -> TS.system j
   | Equiv j -> ES.system j
 
+let table = function
+  | Trace j -> TS.table j
+  | Equiv j -> ES.table j
+
 (*------------------------------------------------------------------*)
 (* when printing, we run some well-formedness checks on the sequents *)
 let pp ch = function

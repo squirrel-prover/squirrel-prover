@@ -46,6 +46,7 @@ type _system
 type _process
 type _btype
 type _hintdb
+type _lemma
   
 type channel = _channel t
 type name    = _name    t
@@ -56,6 +57,7 @@ type system  = _system  t
 type process = _process t
 type btype   = _btype   t
 type hintdb  = _hintdb  t
+type lemma   = _lemma   t
     
 (*------------------------------------------------------------------*)
 type namespace =
@@ -68,6 +70,7 @@ type namespace =
   | NProcess
   | NBType      (** type declarations *)
   | NHintDB
+  | NLemma
     
 val pp_namespace : Format.formatter -> namespace -> unit
 
@@ -137,6 +140,7 @@ type _ def =
   | Process  : unit      -> _process def
   | BType    : bty_def   -> _btype   def
   | HintDB   : unit      -> _hintdb  def
+  | Lemma    : unit      -> _lemma   def
         
   | Function : (Type.ftype * function_def) -> _fname def
         
@@ -268,6 +272,7 @@ module Action   : Namespace with type def = int     with type ns = _action
 module System   : Namespace with type def = unit    with type ns = _system
 module Process  : Namespace with type def = unit    with type ns = _process
 module HintDB   : Namespace with type def = unit    with type ns = _hintdb
+module Lemma    : Namespace with type def = unit    with type ns = _lemma
                                                            
 module Function : Namespace
   with type def = Type.ftype * function_def with type ns = _fname
@@ -281,7 +286,7 @@ module Name     : Namespace with type def = name_def with type ns = _name
 type symb_err_i = 
   | Unbound_identifier    of string
   | Incorrect_namespace   of namespace * namespace (* expected, got *)
-  | Multiple_declarations of string
+  | Multiple_declarations of string * namespace * group
 
 type symb_err = Location.t * symb_err_i
 

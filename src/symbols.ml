@@ -20,6 +20,7 @@ type namespace =
   | NProcess
   | NBType      (** type declarations *)
   | NHintDB
+  | NLemma
 
 let pp_namespace fmt = function
   | NChannel  -> Fmt.pf fmt "channel"
@@ -31,6 +32,7 @@ let pp_namespace fmt = function
   | NProcess  -> Fmt.pf fmt "process"
   | NBType    -> Fmt.pf fmt "type"
   | NHintDB   -> Fmt.pf fmt "hint database"
+  | NLemma    -> Fmt.pf fmt "lemma"
 
 (*------------------------------------------------------------------*)
 (** Type of symbols.
@@ -97,6 +99,7 @@ type _system
 type _process
 type _btype
 type _hintdb
+type _lemma
 
 type channel = _channel t
 type name    = _name    t
@@ -107,6 +110,7 @@ type system  = _system  t
 type process = _process t
 type btype   = _btype   t
 type hintdb  = _hintdb  t
+type lemma   = _lemma   t
     
 (*------------------------------------------------------------------*)
 type _ def =
@@ -118,6 +122,7 @@ type _ def =
   | Process  : unit      -> _process def
   | BType    : bty_def   -> _btype   def
   | HintDB   : unit      -> _hintdb  def
+  | Lemma    : unit      -> _lemma   def
         
   | Function : (Type.ftype * function_def) -> _fname def
 
@@ -197,6 +202,7 @@ let edef_namespace : edef -> namespace = fun e ->
   | Exists (Process  _) -> NProcess
   | Exists (BType    _) -> NBType
   | Exists (HintDB   _) -> NHintDB
+  | Exists (Lemma    _) -> NLemma
   | Reserved n          -> n
 
 let get_namespace ?(group=default_group) (table : table) s =
@@ -210,7 +216,7 @@ let get_namespace ?(group=default_group) (table : table) s =
 type symb_err_i =
   | Unbound_identifier    of string
   | Incorrect_namespace   of namespace * namespace (* expected, got *)
-  | Multiple_declarations of string
+  | Multiple_declarations of string * namespace * group
 
 type symb_err = L.t * symb_err_i
 
@@ -220,8 +226,9 @@ let pp_symb_error_i fmt = function
     Fmt.pf fmt "should be a %a but is a %a"
       pp_namespace n1 pp_namespace n2
 
-  | Multiple_declarations s ->
-    Fmt.pf fmt "symbol %s already declared" s
+  | Multiple_declarations (s, n, g) ->
+    Fmt.pf fmt "%a symbol %s already declared (%s group)"
+      pp_namespace n s g
 
 let pp_symb_error pp_loc_err fmt (loc,e) =
   Fmt.pf fmt "%aError: %a"
@@ -325,7 +332,8 @@ module Make (N:S) : Namespace
   let reserve_exact (table : table) (name : lsymb) =
     let symb = { group; name = L.unloc name } in
     if Msymb.mem symb table.cnt then
-      symb_err (L.loc name) (Multiple_declarations (L.unloc name));
+      symb_err (L.loc name)
+        (Multiple_declarations (L.unloc name, N.namespace, group));
 
     let table_c = Msymb.add symb (Reserved N.namespace,Empty) table.cnt in
     mk table_c, symb
@@ -354,7 +362,9 @@ module Make (N:S) : Namespace
   let declare_exact (table : table) (name : lsymb) ?(data=Empty) value =
     let symb = { group; name = L.unloc name } in
     if Msymb.mem symb table.cnt then
-      symb_err (L.loc name) (Multiple_declarations (L.unloc name));
+      symb_err (L.loc name)
+        (Multiple_declarations (L.unloc name, N.namespace, group));
+    
     let table_c =
       table_add table.cnt symb (Exists (N.construct value), data)
     in
@@ -575,6 +585,19 @@ module HintDB = Make (struct
   let construct d = HintDB d
   let deconstruct ~loc s = match s with
     | Exists (HintDB d) -> d
+    | _ as c -> namespace_err loc c namespace
+end)
+
+module Lemma = Make (struct
+  type ns = _lemma
+  type local_def = unit
+
+  let namespace = NLemma
+
+  let group = "lemma"
+  let construct d = Lemma d
+  let deconstruct ~loc s = match s with
+    | Exists (Lemma d) -> d
     | _ as c -> namespace_err loc c namespace
 end)
 

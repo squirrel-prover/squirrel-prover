@@ -274,10 +274,11 @@ let () =
     "Multiple declarations", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
-           try ignore (parse_theory_test ~test "tests/alcotest/multiple.sp"
-                       : Symbols.table )
-           with (Symbols.SymbError (_,
-                                    Multiple_declarations "c")) -> raise Ok)
+           try
+             ignore (parse_theory_test ~test "tests/alcotest/multiple.sp"
+                     : Symbols.table )
+           with Symbols.SymbError (_, Multiple_declarations ("c",_,_)) ->
+             raise Ok)
     end ;
     "Let in actions", `Quick, begin fun () ->
       ignore (parse_theory_test ~test "tests/alcotest/action_let.sp"
@@ -356,7 +357,8 @@ let () =
            try ignore (parse_theory_test ~test "tests/alcotest/process_mult.sp"
                        : Symbols.table )
            with Symbols.SymbError (_,
-                                   Symbols.Multiple_declarations "C") -> raise Ok)
+                                   Symbols.Multiple_declarations ("C",_,_)) ->
+             raise Ok)
     end ;
     "Duplicated State Update", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok

@@ -1,5 +1,5 @@
 (** Infrastructure for interactive proofs:
-    proved lemmas, current lemma, current goals.
+    current lemma, current goals.
     It contains the state of the proof and the history as mutable states. *)
 
 module L = Location
@@ -79,8 +79,6 @@ val get_option : option_name -> option_val option
 
 val add_option : option_def -> unit
 
-val add_proved_goal : [ `Axiom | `Lemma ] -> Goal.statement -> unit
-
 (*------------------------------------------------------------------*)
 (** {2 Tactics syntax trees} *)
 (** Prover tactics, and tables for storing them. *)
@@ -153,22 +151,6 @@ end
 val pp_ast : Format.formatter -> TacticsArgs.parser_arg Tactics.ast -> unit
 
 (*------------------------------------------------------------------*)
-(** {2 Misc} *)
-
-(** Get proved or assumed statement. *)
-val get_assumption       : lsymb -> Goal.statement
-val get_reach_assumption : lsymb -> Goal.reach_statement
-val get_equiv_assumption : lsymb -> Goal.equiv_statement
-
-val is_assumption       : string -> bool
-val is_reach_assumption : string -> bool
-val is_equiv_assumption : string -> bool
-
-(*------------------------------------------------------------------*)
-val get_assumption_kind : string -> [`Axiom | `Lemma] option 
-val pp_kind : Format.formatter -> [`Axiom | `Lemma] -> unit
-
-(*------------------------------------------------------------------*)
 (** {2 User printing query} *)
 
 (** User printing query *)
@@ -217,7 +199,7 @@ val pp_goal : Format.formatter -> unit -> unit
 val is_proof_completed : unit -> bool
 
 (** Complete the proofs, resetting the current goal to None. *)
-val complete_proof : unit -> unit
+val complete_proof : Symbols.table -> Symbols.table
 
 (** [eval_tactic utac] applies the tactic [utac]. *)
 val eval_tactic : TacticsArgs.parser_arg Tactics.ast -> unit

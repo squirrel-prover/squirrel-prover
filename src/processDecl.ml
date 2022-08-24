@@ -159,7 +159,6 @@ let parse_projs (p_projs : lsymb list option) : Term.projs =
 
 (*------------------------------------------------------------------*)
 let define_oracle_tag_formula table (h : lsymb) f =
-  let open Prover in
   let env = Env.init ~table () in
   let conv_env = Theory.{ env; cntxt = InGoal; } in
   let form, _ = Theory.convert conv_env ~ty:Type.Boolean f in
@@ -167,13 +166,14 @@ let define_oracle_tag_formula table (h : lsymb) f =
      | Term.ForAll ([uvarm; uvarkey],f) ->
        begin match Vars.ty uvarm,Vars.ty uvarkey with
          | Type.(Message, Message) ->
-           add_option (Oracle_for_symbol (L.unloc h), Oracle_formula form)
-         | _ -> raise @@ ParseError "The tag formula must be of \
-                                     the form forall (m:message,sk:message)"
+           Prover.add_option (Oracle_for_symbol (L.unloc h), Oracle_formula form)
+         | _ ->
+           raise @@ Prover.ParseError "The tag formula must be of \
+                                       the form forall (m:message,sk:message)"
        end
 
-     | _ -> raise @@ ParseError "The tag formula must be of \
-                                 the form forall (m:message,sk:message)"
+     | _ -> raise @@ Prover.ParseError "The tag formula must be of \
+                                        the form forall (m:message,sk:message)"
 
 
 (*------------------------------------------------------------------*)
@@ -200,20 +200,19 @@ let declare table decl =
       | None ->
         { pgoal with Goal.Parsed.name = Some (Prover.unnamed_goal ()) }
     in
+    let loc = L.loc (oget pgoal.Goal.Parsed.name) in
     let gc,_ = Goal.make table pgoal in
-    Prover.add_proved_goal `Axiom gc;
-    table, []
-
+    Lemma.add_lemma ~loc `Axiom gc table, []
 
   | Decl.Decl_system sdecl ->
     let projs = parse_projs sdecl.sprojs in
     Process.declare_system table sdecl.sname projs sdecl.sprocess, []
 
   | Decl.Decl_system_modifier sdecl ->
-    let new_lemma, proof_obls, table = 
+    let new_lemma, proof_obls, table =
       SystemModifiers.declare_system table sdecl 
     in
-    oiter (Prover.add_proved_goal `Lemma) new_lemma;
+    let table = omap_dflt table (Lemma.add_lemma `Lemma ^~ table) new_lemma in
     table, proof_obls
 
   | Decl.Decl_dh (h, g, ex, om, ctys) ->
@@ -310,7 +309,7 @@ let declare_list table decls =
 
 (*------------------------------------------------------------------*)
 let add_hint_rewrite table (s : lsymb) db =
-  let lem = Prover.get_reach_assumption s in
+  let lem = Lemma.find_reach s table in
   
   if not (SE.subset table lem.system.set SE.any) then
     Tactics.hard_failure ~loc:(L.loc s)
@@ -319,7 +318,7 @@ let add_hint_rewrite table (s : lsymb) db =
   Hint.add_hint_rewrite s lem.Goal.ty_vars lem.Goal.formula db
 
 let add_hint_smt table (s : lsymb) db =
-  let lem = Prover.get_reach_assumption s in
+  let lem = Lemma.find_reach s table in
 
   if not (SE.subset table lem.system.set SE.any) then
     Tactics.hard_failure ~loc:(L.loc s)

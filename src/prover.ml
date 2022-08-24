@@ -21,21 +21,11 @@ let soft_failure = Tactics.soft_failure
 let bad_args () = hard_failure (Failure "improper arguments")
 
 (*------------------------------------------------------------------*)
-type proved_goal = { 
-  stmt : Goal.statement;
-  kind : [`Axiom | `Lemma] 
-} 
-
-let pp_kind fmt = function
-  | `Axiom -> Printer.kw `Goal fmt "axiom"
-  | `Lemma -> Printer.kw `Goal fmt "goal"
-
-(*------------------------------------------------------------------*)
 (** {2 Prover state}
 
     The term "goal" refers to two things below:
 
-    - A toplevel goal declaration (i.e. a lemma/theorem)
+    - A toplevel goal declaration (i.e. a lemma)
       which is represented (with some redundancy) by a [Goal.statement]
       and a [Goal.t] which is the associated sequent that has to be
       proved, i.e. the root of the required proof tree.
@@ -64,9 +54,6 @@ let subgoals : Goal.t list ref = ref []
 
 (** Bullets for current proof. *)
 let bullets : Bullets.path ref = ref Bullets.empty_path
-
-(** Proved toplevel goals. *)
-let goals_proved : proved_goal list ref = ref []
 
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
@@ -103,7 +90,6 @@ type proof_state = {
   current_goal : pending_proof option;
   subgoals     : Goal.t list;
   bullets      : Bullets.path;
-  goals_proved : proved_goal list;
   option_defs  : option_def list;
   params       : Config.params;
   prover_mode  : prover_mode;
@@ -127,7 +113,6 @@ let reset () =
     current_goal := None;
     bullets := Bullets.empty_path;
     subgoals := [];
-    goals_proved := [];
     option_defs := [];
     Config.reset_params ()
 
@@ -137,7 +122,6 @@ let get_state mode table =
     current_goal = !current_goal;
     bullets      = !bullets;
     subgoals     = !subgoals;
-    goals_proved = !goals_proved;
     option_defs  = !option_defs;
     params       = Config.get_params ();
     prover_mode  = mode;
@@ -151,7 +135,6 @@ let reset_from_state (p : proof_state) =
   current_goal := p.current_goal;
   bullets := p.bullets;
   subgoals := p.subgoals;
-  goals_proved := p.goals_proved;
   option_defs := p.option_defs;
   Config.set_params p.params;
 
@@ -461,13 +444,6 @@ let get_help (tac_name : lsymb) =
     Printer.prt `Result "%a" (ProverTactics.pp true) tac_name;
   Tactics.id
 
-  let print_lemmas fmt () =
-    let goals = !goals_proved in
-    List.iter (fun (g : proved_goal) -> 
-        Fmt.pf fmt "%s: %a@;" g.stmt.name Equiv.Any.pp g.stmt.formula
-      ) goals
-
-
 
 let () =
   ProverTactics.register_general "lemmas"
@@ -477,7 +453,8 @@ let () =
                   tactic_group = Logical}
     ~pq_sound:true
     (fun _ s sk fk ->
-       Printer.prt `Result "%a" print_lemmas ();
+       let table = Goal.table s in
+       Printer.prt `Result "%a" Lemma.print_all table;
        sk [s] fk)
 
 let () =
@@ -518,45 +495,6 @@ let () =
     (fun _ -> Tactics.id)
 
 (*------------------------------------------------------------------*)
-let get_assumption_opt gname : Goal.statement option =
-  match List.find_opt (fun s -> s.stmt.name = gname) !goals_proved with
-  | None -> None
-  | Some s -> Some s.stmt
-
-(*------------------------------------------------------------------*)
-let is_assumption gname : bool = get_assumption_opt gname <> None
-
-let is_reach_assumption gname : bool =
-  match get_assumption_opt gname with
-  | None -> false
-  | Some s -> Goal.is_reach_statement s
-
-let is_equiv_assumption gname : bool =
-  match get_assumption_opt gname with
-  | None -> false
-  | Some s -> Goal.is_equiv_statement s
-
-(*------------------------------------------------------------------*)
-let get_assumption gname : Goal.statement =
-  match get_assumption_opt (L.unloc gname) with
-  | Some s -> s
-  | None ->
-    soft_failure ~loc:(L.loc gname)
-      (Failure ("no proved goal named " ^ L.unloc gname))
-
-let get_reach_assumption gname =
-  Goal.to_reach_statement ~loc:(L.loc gname) (get_assumption gname)
-
-let get_equiv_assumption gname =
-  Goal.to_equiv_statement ~loc:(L.loc gname) (get_assumption gname)
-
-(*------------------------------------------------------------------*)
-let get_assumption_kind (gname : string) : [`Axiom | `Lemma] option =
-  match List.find_opt (fun s -> s.stmt.name = gname) !goals_proved with
-  | None -> None
-  | Some s -> Some s.kind
-
-(*------------------------------------------------------------------*)
 (** {2 User printing query} *)
 
 (** User printing query *)
@@ -588,8 +526,11 @@ type parsed_input =
   | EOF
 
 (*------------------------------------------------------------------*)
-let unnamed_goal () =
-  L.mk_loc L._dummy ("unnamedgoal" ^ string_of_int (List.length !goals_proved))
+let unnamed_goal =
+  let cpt = ref 0 in
+  fun () ->
+    incr cpt;
+    L.mk_loc L._dummy ("unnamedgoal" ^ string_of_int !cpt)
 
 (*------------------------------------------------------------------*)
 let add_new_goal_i table parsed_goal =
@@ -597,7 +538,7 @@ let add_new_goal_i table parsed_goal =
     | None -> unnamed_goal ()
     | Some s -> s
   in
-  if is_assumption (L.unloc name) then
+  if Lemma.mem name table then
     raise (ParseError "a goal or axiom with this name already exists");
 
   let parsed_goal = { parsed_goal with Goal.Parsed.name = Some name } in
@@ -615,11 +556,6 @@ let add_new_goal table parsed_goal =
 let add_proof_obl (goal : Goal.t) : unit = 
   goals :=  ProofObl (goal) :: !goals
 
-(*------------------------------------------------------------------*)
-let add_proved_goal (kind : [`Axiom | `Lemma]) (gconcl : Goal.statement) =
-  if is_assumption gconcl.Goal.name then
-    raise (ParseError "a goal or axiom with this name already exists");
-  goals_proved := { stmt = gconcl; kind } :: !goals_proved
 
 (*------------------------------------------------------------------*)
 let get_oracle_tag_formula h =
@@ -631,20 +567,21 @@ let get_oracle_tag_formula h =
 let is_proof_completed () =
   !subgoals = [] && Bullets.is_empty !bullets
 
-let complete_proof () =
+let complete_proof table : Symbols.table =
   assert (is_proof_completed ());
 
   if !current_goal = None then
     hard_failure
       (Tactics.Failure "cannot complete proof: no current goal");
 
-  let () = match oget !current_goal with
-    | ProofObl _ -> ()
-    | UnprovedLemma (gc, _) -> add_proved_goal `Lemma gc;
+  let table = match oget !current_goal with
+    | ProofObl _ -> table
+    | UnprovedLemma (gc, _) -> Lemma.add_lemma `Lemma gc table
   in
   current_goal := None;
   bullets := Bullets.empty_path;
-  subgoals := []
+  subgoals := [];
+  table
 
 let pp_goal ppf () = match !current_goal, !subgoals with
   | None,[] -> assert false

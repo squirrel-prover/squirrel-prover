@@ -607,7 +607,8 @@ let make_app_i table cntxt (lsymb : lsymb) (l : term list) : app_i =
 
     | Symbols.Channel _
     | Symbols.BType _
-    | Symbols.HintDB  _
+    | Symbols.HintDB _
+    | Symbols.Lemma  _ 
     | Symbols.Process _
     | Symbols.System  _ ->
       let s = L.unloc lsymb in
@@ -1425,18 +1426,24 @@ let () =
   Checks.add_suite "Theory" [
     "Declarations", `Quick,
     begin fun () ->
+      let exception Ok in
+      
       ignore (declare_hash Symbols.builtins_table (mk "h") : Symbols.table);
       let table = declare_hash Symbols.builtins_table (mk "h") in
       Alcotest.check_raises
-        "h cannot be defined twice"
-        (Symbols.SymbError (L._dummy, Multiple_declarations "h"))
-        (fun () -> ignore (declare_hash table (mk "h") : Symbols.table)) ;
+        "h cannot be defined twice" Ok
+        (fun () ->
+           try ignore (declare_hash table (mk "h") : Symbols.table) with
+           | Symbols.SymbError (_, Multiple_declarations ("h",_,_)) -> raise Ok
+        ) ;
       let table = declare_hash Symbols.builtins_table (mk "h") in
       Alcotest.check_raises
-        "h cannot be defined twice"
-        (Symbols.SymbError (L._dummy, Multiple_declarations "h"))
-        (fun () -> ignore (declare_aenc table (mk "h") (mk "dec") (mk "pk")
-                           : Symbols.table) )
+        "h cannot be defined twice" Ok
+        (fun () ->
+           try ignore (declare_aenc table (mk "h") (mk "dec") (mk "pk")
+                       : Symbols.table) with
+           | Symbols.SymbError (_, Multiple_declarations ("h",_,_)) -> raise Ok
+        )
     end;
 
     "Term building", `Quick,
