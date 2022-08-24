@@ -1551,13 +1551,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
       match f with
       | Local _ ->
         let f_conc =
-          Equiv.Babel.convert ~loc f ~src:Equiv.Any_t ~dst:S.conc_kind in
+          Equiv.Babel.convert ~loc f ~src:Equiv.Any_t ~dst:S.conc_kind
+        in
         S.to_general_sequent (S.set_goal f_conc s)
           
       | Global _ ->
         let es = S.to_global_sequent s in
         let f_conc =
-          Equiv.Babel.convert ~loc f ~src:Equiv.Any_t ~dst:ES.conc_kind in
+          Equiv.Babel.convert ~loc f ~src:Equiv.Any_t ~dst:ES.conc_kind
+        in
         Goal.Equiv (ES.set_goal f_conc es)
     in
 

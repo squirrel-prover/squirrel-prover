@@ -150,8 +150,8 @@ let make_obs_equiv ?(enrich=[]) table system =
   Equiv s
 
 
+(*------------------------------------------------------------------*)
 let make table parsed_goal : statement * t =
-
   let Parsed.{name; system; ty_vars; vars; formula} = parsed_goal in
 
   let name = L.unloc (oget name) in

@@ -1,19 +1,3 @@
-(** Definition of a general sequent data-type,
-  * which covers both local and global sequents
-  * (and thus equivalence sequents).
-  *
-  * A sequent is made of:
-  * - a set of hypotheses;
-  * - a goal formula;
-  * - an environment containing the sequent free variables.
-  *
-  * The signature defined here does not include functionalities
-  * relying on the list of the already proved goals, to avoid
-  * any dependency on {!Prover}. Such functionalities will be
-  * added in {!Sequent}. *)
-
-(** {2 Module type for sequents} *)
-
 module L = Location
 
 module SE = SystemExpr
@@ -32,14 +16,9 @@ module type S = sig
   val pp_dbg :             Format.formatter -> t -> unit
 
   (*------------------------------------------------------------------*)
-
-  (** Type of formulas used for sequent hypotheses. *)
   type hyp_form
 
-  (** Type of formulas used for sequent conclusions. *)
   type conc_form
-
-  (** The kinds of hypothesis and conclusion formulas. *)
 
   val hyp_kind : hyp_form Equiv.f_kind
   val conc_kind : conc_form Equiv.f_kind
@@ -47,11 +26,7 @@ module type S = sig
   (*------------------------------------------------------------------*)
   module Hyps : Hyps.S1 with type hyp = hyp_form and type hyps := t
 
-  (** {2 Access to sequent components}
-    *
-    * Each sequent consist of
-    * a system, table, environment, type variables,
-    * goal formula, and hypotheses. *)
+  (** {2 Access to sequent components} *)
 
   val env : t -> Env.t
   val set_env : Env.t -> t -> t
@@ -64,18 +39,6 @@ module type S = sig
 
   val system : t -> SystemExpr.context
 
-  (** Change the context of a sequent and its conclusion at the same time.
-      The new conclusion is understood in the new context.
-      The new context must be compatible with the old one.
-
-      Hypotheses of the returned sequent (understood wrt the new context)
-      are logical consequences of hypotheses of the original sequent
-      (understood wrt its own context): some hypotheses will thus be dropped
-      while others will be projected.
-
-      The optional [update_local] function can be used to override the
-      treatment of local hypotheses, i.e. to determine when they can be
-      kept (possibly with modifications) or if they should be dropped. *)
   val set_goal_in_context :
     ?update_local:(Term.form -> Term.form option) ->
     SystemExpr.context -> conc_form -> t -> t
@@ -99,30 +62,17 @@ module type S = sig
 
   val query_happens : precise:bool -> t -> Term.term -> bool
 
-  (** Returns trace context, corresponding to [s.env.system.set] for
-      both kinds of sequents. 
-      Option projections to restrict the systems considered. *)
   val mk_trace_cntxt : ?se:SE.fset -> t -> Constr.trace_cntxt
 
   val get_trace_hyps : t -> TraceHyps.hyps
 
-  (** [get_models s] returns a set of minimal models corresponding to the
-      trace atoms in the sequent [s].
-      See module {!Constr}.
-      @raise Tactics.Tactic_hard_failure
-         with parameter {!Tactics.TacTimeout} in case of timeout. *)
   val get_models : t -> Constr.models
 
   (*------------------------------------------------------------------*) 
   (** {2 Substitution} *)
 
-  (** [subst subst s] returns the sequent [s] where the substitution has
-      been applied to all hypotheses and the goal.
-      It removes trivial equalities (e.g x=x). *)
   val subst : Term.subst -> t -> t
 
-  (** [rename u v s] returns the sequent [s] where
-      free variable u is replaced with v *)
   val rename : Vars.var -> Vars.var -> t -> t
 
   (*------------------------------------------------------------------*) 
@@ -135,22 +85,14 @@ module type S = sig
 
   val map : Equiv.Babel.mapper -> t -> t
 
-  (** Smart constructors and destructors for hypotheses. *)
   module Hyp : Term.SmartFO with type form = hyp_form
 
-  (** Smart constructors and destructors for conclusions. *)
   module Conc : Term.SmartFO with type form = conc_form
 end
 
 (*------------------------------------------------------------------*) 
 (** {2 Common utilities for sequent implementations} *)
 
-(** Common setup for [set_goal_in_context].
-    For each kind of hypothesis we need an update function that
-    returns [None] if the hypothesis must be dropped, and [Some f]
-    if it must be changed to [f].
-    The [setup_set_goal_in_context] returns the pair of local and
-    global update functions. *)
 let setup_set_goal_in_context ~old_context ~new_context ~table =
 
   assert (SE.compatible table new_context.SE.set old_context.SE.set);
