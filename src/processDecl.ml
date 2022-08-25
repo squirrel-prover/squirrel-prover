@@ -163,7 +163,7 @@ let define_oracle_tag_formula table (h : lsymb) f =
   let conv_env = Theory.{ env; cntxt = InGoal; } in
   let form, _ = Theory.convert conv_env ~ty:Type.Boolean f in
     match form with
-     | Term.ForAll ([uvarm; uvarkey],f) ->
+     | Term.Quant (ForAll, [uvarm; uvarkey], f) ->
        begin match Vars.ty uvarm,Vars.ty uvarkey with
          | Type.(Message, Message) ->
            Prover.add_option (Oracle_for_symbol (L.unloc h), Oracle_formula form)

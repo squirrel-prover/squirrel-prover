@@ -87,12 +87,16 @@ val right_proj : proj
 type 'a diff_args =
   | Explicit of (proj * 'a) list
 
+(*------------------------------------------------------------------*)
+type quant = ForAll | Exists | Seq
+
+val pp_quant : Format.formatter -> quant -> unit
+
+(*------------------------------------------------------------------*)
 type term = private
   | Fun   of fsymb * Type.ftype * term list
   | Name  of nsymb
   | Macro of msymb * term list * term
-
-  | Seq    of Vars.var list * term
 
   | Action of Symbols.action * Vars.var list 
 
@@ -102,9 +106,8 @@ type term = private
 
   | Find of Vars.var list * term * term * term
 
-  | ForAll of Vars.var list * term
-  | Exists of Vars.var list * term
-
+  | Quant of quant * Vars.var list * term
+             
 type t = term
 
 type terms = term list
@@ -407,6 +410,8 @@ val mk_diff    : (proj * term) list -> term
 
 val mk_find : ?simpl:bool -> Vars.var list -> term -> term -> term -> term
 
+val mk_quant : ?simpl:bool -> quant -> Vars.vars -> form -> form
+  
 val mk_iff   : ?simpl:bool -> form -> form -> form
   
 (*------------------------------------------------------------------*)
@@ -440,10 +445,7 @@ val mk_indices_eq  : ?simpl:bool -> Vars.var list -> Vars.var list -> term
 val mk_atom : ord -> term -> term -> term
 val mk_happens : term -> term
 
-val mk_seq0 : ?simpl:bool -> Vars.vars -> term -> term
-
-(** Refresh variables *)
-val mk_seq : Vars.env -> Vars.vars -> term -> term
+val mk_seq : ?simpl:bool -> Vars.vars -> term -> term
 
 (*------------------------------------------------------------------*)
 (** {3 Destructors} *)

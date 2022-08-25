@@ -204,7 +204,7 @@ let case_tac args = wrap_fail (do_case_tac args)
 let rec simpl_left s =
   let func _ f = match f with
     | Fun (fs, _,_) when fs = Term.f_false || fs = Term.f_and -> true
-    | Term.Exists _ -> true
+    | Term.Quant (Exists, _, _) -> true
     | _ -> false
   in
 
@@ -214,7 +214,7 @@ let rec simpl_left s =
     match f with
     | tf when tf = Term.mk_false -> None
 
-    | Exists (vs,f) ->
+    | Quant (Exists,vs,f) ->
       let s = Hyps.remove id s in
       let env = ref @@ TS.vars s in
       let subst =
@@ -966,7 +966,9 @@ let fa s =
     in
     subgoals
 
-  | Term.Seq (vars,t), Term.Seq (vars',t') -> 
+  (* FIXME: allow ForAll and Exists? *)
+  | Term.Quant (Seq, vars,t), Term.Quant (Seq, vars',t')
+    when List.for_all (Type.is_finite -| Vars.ty) vars -> 
     check_vars vars vars';
 
     (* have [t'] use the same variables names than [t] *)
@@ -990,7 +992,9 @@ let fa s =
     subgoals
 
   | Term.Find (vs,c,t,e),
-    Term.Find (vars',c',t',e') when List.length vs = List.length vars' ->
+    Term.Find (vars',c',t',e')
+    when List.for_all (Type.is_finite -| Vars.ty) vs &&
+         List.length vs = List.length vars' ->
     (* We verify that [e = e'],
      * and that [t = t'] and [c <=> c'] for fresh index variables.
      *
@@ -1534,7 +1538,7 @@ let euf_apply
     else
       (* else, we create a goal where m,sk satisfy the axiom *)
       let uvarm, uvarkey,f = match f with
-        | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
+        | Quant (ForAll,[uvarm;uvarkey],f) -> uvarm,uvarkey,f
         | _ -> assert false
       in
 

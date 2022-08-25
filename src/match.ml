@@ -86,9 +86,7 @@ module Pos = struct
 
       | Term.Var _ -> sp
 
-      | Term.ForAll (is, t)
-      | Term.Exists (is, t)
-      | Term.Seq    (is, t) -> 
+      | Term.Quant (_, is, t) -> 
         let is, subst = Term.refresh_vars `Global is in
         let t = Term.subst subst t in
         let vars = List.rev_append is vars in
@@ -300,23 +298,14 @@ module Pos = struct
 
       | Term.Var _ -> acc, false, ti
 
-      | Term.ForAll (is, t0)
-      | Term.Exists (is, t0)
-      | Term.Seq    (is, t0) -> 
+      | Term.Quant (q, is, t0) -> 
         let is, subst = Term.refresh_vars `Global is in
         let t0 = Term.subst subst t0 in
         let vars = List.rev_append is vars in
 
         let acc, found, t0 = map_fold ~se ~vars ~p:(0 :: p) ~acc t0 in
 
-        let ti' = 
-          match ti with
-          | Term.ForAll _ -> Term.mk_forall is t0
-          | Term.Exists _ -> Term.mk_exists is t0
-          | Term.Seq    _ -> Term.mk_seq0   is t0
-
-          | _ -> assert false
-        in
+        let ti' = Term.mk_quant q is t0 in
 
         acc, found, if found then ti' else ti
 
@@ -1045,9 +1034,7 @@ module T (* : S with type t = Term.term *) = struct
       and pat_c, pat_t = subst s' pat_c, subst s' pat_t in
       unif_l [c; t; e] [pat_c; pat_t; pat_e] st
 
-    | Seq (vs, t),   Seq (vs', pat)
-    | Exists (vs,t), Exists (vs', pat)
-    | ForAll (vs,t), ForAll (vs', pat) ->
+    | Quant (q,vs,t), Quant(q',vs', pat) when q = q' ->
       let s, s', st = unif_bnds vs vs' st in
       let t   = subst s    t in
       let pat = subst s' pat in
@@ -1273,9 +1260,7 @@ module T (* : S with type t = Term.term *) = struct
       and pat_c, pat_t = subst s' pat_c, subst s' pat_t in
       tmatch_l [c; t; e] [pat_c; pat_t; pat_e] st
 
-    | Seq (vs, t),   Seq (vs', pat)
-    | Exists (vs,t), Exists (vs', pat)
-    | ForAll (vs,t), ForAll (vs', pat) ->
+    | Quant (q, vs,t), Quant (q', vs', pat) when q = q' ->
       let s, s', st = match_bnds vs vs' st in
       let t   = subst s    t in
       let pat = subst s' pat in
@@ -1633,7 +1618,7 @@ let known_sets_union (s1 : known_sets) (s2 : known_sets) : known_sets =
 (*------------------------------------------------------------------*)
 let known_set_of_term (term : Term.term) : known_set =
   let vars, term = match term with
-    | Seq (vars, term) ->
+    | Quant (Seq, vars, term) ->
       let vars, s = Term.refresh_vars `Global vars in
       let term = Term.subst s term in
       vars, term
@@ -2423,19 +2408,8 @@ module E : S with type t = Equiv.form = struct
     | Term.Fun (_, _, terms) ->
       Some (List.map (fun term -> st, { cterm with term } ) terms)
 
-    | Term.Seq (is, term) ->
-      let is, subst = Term.refresh_vars `Global is in
-      let term = Term.subst subst term in
-
-      let st = { st with bvs = Sv.union st.bvs (Sv.of_list is); } in
-      Some [(st, { cterm with term; } )]
-
-    | Term.Exists (es, term)
-    | Term.ForAll (es, term)
-      when List.for_all (fun v ->
-          Vars.ty v = Type.Index || Vars.ty v = Type.Timestamp
-        ) es
-      ->
+    | Term.Quant (_, es, term)
+      when List.for_all (fun v -> Type.is_finite (Vars.ty v)) es ->
       let es, subst = Term.refresh_vars `Global es in
       let term = Term.subst subst term in
 

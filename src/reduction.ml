@@ -119,9 +119,7 @@ let rec conv (st : cstate) (t1 : Term.term) (t2 : Term.term) : unit =
     conv_vars st ms1.s_indices ms2.s_indices;
     conv_l st (ts1 :: terms1) (ts2 :: terms2)
 
-  | Term.ForAll (is1, t1), Term.ForAll (is2, t2)
-  | Term.Exists (is1, t1), Term.Exists (is2, t2)
-  | Term.Seq    (is1, t1), Term.Seq    (is2, t2) ->
+  | Term.Quant  (q, is1, t1), Term.Quant (q', is2, t2) when q = q' ->
     if List.length is1 <> List.length is2 then not_conv ();
     let st = conv_bnds st is1 is2 in
     conv st t1 t2
@@ -330,8 +328,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
   (* Reduce all strict subterms *)
   and reduce_subterms (st : state) (t : Term.term) : Term.term * bool = 
     match t with
-    | Term.Exists (evs, t0) 
-    | Term.ForAll (evs, t0) -> 
+    | Term.Quant (q, evs, t0) -> 
       let _, subst = Term.refresh_vars `Global evs in
       let t0 = Term.subst subst t0 in
       let red_t0, has_red = reduce st t0 in
@@ -340,24 +337,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       else
         let r_subst = rev_subst subst in
         let red_t0 = Term.subst r_subst red_t0 in
-        let red_t : Term.term = 
-          match t with
-          | Term.Exists _ -> Term.mk_exists ~simpl:false evs red_t0 
-          | Term.ForAll _ -> Term.mk_forall ~simpl:false evs red_t0 
-          | _ -> assert false
-        in
-        red_t, true
-
-    | Term.Seq (is, t0) ->
-      let _, subst = Term.refresh_vars `Global is in
-      let t0 = Term.subst subst t0 in
-      let red_t0, has_red = reduce st t0 in
-
-      if not has_red then t, false
-      else
-        let r_subst = rev_subst subst in
-        let red_t0 = Term.subst r_subst red_t0 in
-        let red_t = Term.mk_seq0 is red_t0 in
+        let red_t = Term.mk_quant ~simpl:false q evs red_t0 in
         red_t, true
 
     (* if-then-else *)

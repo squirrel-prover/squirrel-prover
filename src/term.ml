@@ -105,12 +105,19 @@ type 'a diff_args =
   | Explicit of (proj * 'a) list
 
 (*------------------------------------------------------------------*)
+type quant = ForAll | Exists | Seq
+
+let pp_quant fmt = function
+  | ForAll -> Fmt.pf fmt "forall"
+  | Exists -> Fmt.pf fmt "exists"                
+  | Seq    -> Fmt.pf fmt "seq"
+                
+(*------------------------------------------------------------------*)
 type term =
   | Fun    of fsymb * Type.ftype * term list
   | Name   of nsymb
   | Macro  of msymb * term list * term
 
-  | Seq    of Vars.var list * term
   | Action of Symbols.action * Vars.var list 
 
   | Var    of Vars.var
@@ -119,14 +126,18 @@ type term =
 
   | Find of Vars.var list * term * term * term 
 
-  | ForAll of Vars.var list * term 
-  | Exists of Vars.var list * term 
+  | Quant of quant * Vars.var list * term 
 
 type t = term
 
 type terms = term list
 
 (*------------------------------------------------------------------*)
+let hash_quant : quant -> int = function
+  | ForAll -> 0
+  | Exists -> 1
+  | Seq    -> 2
+
 let rec hash : term -> int = function
   | Name n -> hcombine 0 (hash_isymb n)
 
@@ -138,23 +149,15 @@ let rec hash : term -> int = function
     let h = hcombine_list hash (hash_isymb m) l in
     hcombine 2 (hcombine h (hash ts))
 
-  | Seq (vars, b) ->
-    let h = hcombine_list Vars.hash (hash b) vars in
-    hcombine 3 h
-
   | Diff (Explicit l) -> hcombine 5 (hash_l (List.map snd l) 3)
 
   | Find (b, c, d, e) ->
     let h = hcombine_list Vars.hash 6 b in
     hash_l [c;d;e] h
 
-  | ForAll (vs, b) ->
+  | Quant (q, vs, b) ->
     let h = hcombine_list Vars.hash (hash b) vs in
-    hcombine 7 h
-
-  | Exists (vs, b) ->
-    let h = hcombine_list Vars.hash (hash b) vs in
-    hcombine 8 h
+    hcombine 7 (hcombine (hash_quant q) h)
 
   | Var v -> hcombine 10 (Vars.hash v)
 
@@ -358,17 +361,11 @@ module SmartConstructors = struct
   let mk_impls ?(simpl=true) ts t =
     List.fold_left (fun tres t0 -> (mk_impl ~simpl) t0 tres) t ts
 
-  let mk_forall l f =
+  let mk_quant_ns q l f =
     if l = [] then f
     else match f with
-      | ForAll (l', f) -> ForAll (l @ l', f)
-      | _ -> ForAll (l, f)
-
-  let mk_exists l f =
-    if l = [] then f
-    else match f with
-      | Exists (l', f) -> Exists (l @ l', f)
-      | _ -> Exists (l, f)
+      | Quant (q', l', f) when q = q' -> Quant (q, l @ l', f)
+      | _ -> Quant (q, l, f)
 
   let mk_happens t = mk_fbuiltin Symbols.fs_happens [t]
 
@@ -454,13 +451,16 @@ let ty ?ty_env (t : term) : Type.ty =
     | Name ns        -> ns.s_typ
     | Macro (s,_,_)  -> s.s_typ
 
-    | Seq _                -> Type.Message
     | Var v                -> Vars.ty v
     | Action _             -> Type.Timestamp
     | Diff (Explicit l)    -> ty (snd (List.hd l))
+
     | Find (a, b, c, d)    -> ty c
-    | ForAll _             -> Type.Boolean
-    | Exists _             -> Type.Boolean
+
+    | Quant (q, _, _) ->
+      match q with
+      | ForAll | Exists -> Type.Boolean
+      | Seq             -> Type.Message
   in
 
   let tty = ty t in
@@ -488,43 +488,37 @@ let oas_seq2 = omap as_seq2
 (** Smart destrucrots.
     The module is included after its definition. *)
 module SmartDestructors = struct
-  let destr_exists1 = function
-    | Exists (v :: vs, f) -> Some (v, mk_exists vs f)
-    | _ -> None
 
-  let rec destr_exists = function
-    | Exists (vs, f) ->
+  (*------------------------------------------------------------------*)
+  let destr_quant1 q = function
+    | Quant (q', v :: vs, f) when q = q' -> Some (v, mk_quant_ns q vs f)
+    | _ -> None
+  
+  let destr_forall1 = destr_quant1 ForAll
+  let destr_exists1 = destr_quant1 Exists
+
+  (*------------------------------------------------------------------*)
+  let rec destr_quant q = function
+    | Quant (q', vs, f) when q = q' ->
       begin
-        match destr_exists f with
+        match destr_quant q f with
         | Some (vs', f) -> Some (vs @ vs', f)
         | None -> Some (vs, f)
       end
     | _ -> None
 
-  let rec decompose_exists = function
-    | Exists (vs, f) ->
-      let vs', f0 = decompose_exists f in
+  let destr_forall = destr_quant ForAll
+  let destr_exists = destr_quant Exists
+
+  (*------------------------------------------------------------------*)
+  let rec decompose_quant q = function
+    | Quant (q', vs, f) when q = q' ->
+      let vs', f0 = decompose_quant q f in
       vs @ vs', f0
     | _ as f -> [], f
 
-  let destr_forall1 = function
-    | ForAll (v :: vs, f) -> Some (v, mk_forall vs f)
-    | _ -> None
-
-  let rec destr_forall = function
-    | ForAll (vs, f) ->
-      begin
-        match destr_forall f with
-        | Some (vs', f) -> Some (vs @ vs', f)
-        | None -> Some (vs, f)
-      end
-    | _ -> None
-
-  let rec decompose_forall = function
-    | ForAll (vs, f) ->
-      let vs', f0 = decompose_forall f in
-      vs @ vs', f0
-    | _ as f -> [], f
+  let decompose_forall = decompose_quant ForAll
+  let decompose_exists = decompose_quant Exists
 
   (*------------------------------------------------------------------*)
   let destr_false f = oas_seq0 (destr_fun ~fs:f_false f)
@@ -702,9 +696,7 @@ let fv (term : term) : Sv.t =
         (Sv.diff (fvs [b;c]) (Sv.of_list a))
         (fv d)
 
-    | Seq    (a, b)
-    | ForAll (a, b)
-    | Exists (a, b) -> Sv.diff (fv b) (Sv.of_list a)
+    | Quant (_, a, b) -> Sv.diff (fv b) (Sv.of_list a)
 
   and fvs (terms : term list) : Sv.t = 
     List.fold_left (fun sv x -> Sv.union (fv x) sv) Sv.empty terms
@@ -750,7 +742,6 @@ let tmap (func : term -> term) (t : term) : term =
 
   | Fun (f,fty,terms) -> Fun (f, fty, List.map func terms)
   | Macro (m, l, ts)  -> Macro (m, List.map func l, func ts)
-  | Seq (vs, b)       -> Seq (vs, func b)
 
   | Diff (Explicit l) ->
     Diff (Explicit (List.map (fun (lbl,tm) -> lbl, func tm) l))
@@ -761,8 +752,7 @@ let tmap (func : term -> term) (t : term) : term =
     and e = func e in
     Find (b, c, d, e)
 
-  | ForAll (vs, b) -> ForAll (vs, func b)
-  | Exists (vs, b) -> Exists (vs, func b)
+  | Quant (q, vs, b) -> Quant (q, vs, func b)
 
 let tmap_fold (func : 'b -> term -> 'b * term) (b : 'b) (t : term) : 'b * term =
   let bref = ref b in
@@ -817,7 +807,7 @@ let subst_support s =
     Sv.union supp (fv t)) Sv.empty s
 
 let is_binder : term -> bool = function
-  | Seq _ | ForAll _ | Exists _ | Find _ -> true
+  | Quant _ | Find _ -> true
   | _ -> false
 
 let is_macro : term -> bool = function
@@ -848,34 +838,12 @@ let rec subst (s : subst) (t : term) : term =
       | Diff (Explicit l) ->
         Diff (Explicit (List.map (fun (lbl,tm) -> lbl, subst s tm) l))
 
-      | Seq ([], f) -> Seq ([], subst s f)
+      | Quant (q, [], f) -> subst s f
 
-      | Seq ([a], f) ->
+      | Quant (q, a :: vs, f) ->
         let a, s = subst_binding a s in
-        let f = subst s f in
-        Seq ([a],f)
-
-      | Seq (a :: vs, f) ->
-        let a, s = subst_binding a s in
-        let f = subst s (Seq (vs,f)) in
-        let vs, f = match f with
-          | Seq (vs, f) -> vs, f
-          | _ -> assert false in
-        Seq (a :: vs,f)
-
-      | ForAll ([], f) -> subst s f
-
-      | ForAll (a :: vs, f) ->
-        let a, s = subst_binding a s in
-        let f = subst s (ForAll (vs,f)) in
-        mk_forall [a] f
-
-      | Exists ([], f) -> subst s f
-
-      | Exists (a :: vs, f) ->
-        let a, s = subst_binding a s in
-        let f = subst s (Exists (vs,f)) in
-        mk_exists [a] f
+        let f = subst s (Quant (q,vs,f)) in
+        mk_quant_ns q [a] f
 
       | Find ([], b, c, d) -> Find ([], subst s b, subst s c, subst s d)
 
@@ -891,8 +859,7 @@ let rec subst (s : subst) (t : term) : term =
     in
     assoc s new_term
 
-and subst_binding : Vars.var -> subst -> Vars.var * subst =
-  fun var s ->
+and subst_binding (var : Vars.var) (s : subst) : Vars.var * subst =
   (* clear [v] entries in [s] *)
   let s = filter_subst var s in
 
@@ -935,11 +902,15 @@ let subst_macros_ts table l ts t =
     | Diff (Explicit l) ->
       Diff (Explicit (List.map (fun (lbl,tm) -> lbl, subst_term tm) l))
 
-    | Fun (f,fty,terms)  -> Fun    (f, fty, List.map subst_term terms)
-    | Seq (a, b)         -> Seq    (a, subst_term b)
-    | Find (vs, b, t, e) -> Find   (vs, subst_term b, subst_term t, subst_term e)
-    | ForAll (vs, b)     -> ForAll (vs, subst_term b)
-    | Exists (vs, b)     -> Exists (vs, subst_term b)
+    | Fun (f,fty,terms) ->
+      Fun (f, fty, List.map subst_term terms)
+
+    | Find (vs, b, t, e) ->
+      Find (vs, subst_term b, subst_term t, subst_term e)
+                              
+    | Quant (q, vs, b) ->
+      Quant (q, vs, subst_term b)
+                            
     | Name _ | Action _ | Var _ -> t
   in
 
@@ -1182,16 +1153,6 @@ and _pp
          (pp (diff_fixity, `NonAssoc)))
       (List.map snd l) (* TODO labels *)
 
-  | Seq (vs, b) ->
-    let _, vs, s = (* rename quantified vars. to avoid name clashes *)
-      let fv_b = List.fold_left ((^~) Sv.remove) (fv b) vs in
-      refresh_vars_env (Vars.of_set fv_b) vs 
-    in
-    let b = subst s b in
-
-    Fmt.pf ppf "@[<hov 2>seq(%a->@,%a)@]"
-      (Vars._pp_typed_list ~dbg:info.dbg) vs (pp (seq_fixity, `NonAssoc)) b
-
   | Find (vs, c, d, Fun (f,_,[])) when f = f_zero ->
     let _, vs, s = (* rename quantified vars. to avoid name clashes *)
       let fv_cd = List.fold_left ((^~) Sv.remove) (Sv.union (fv c) (fv d)) vs in
@@ -1228,27 +1189,28 @@ and _pp
     in
     maybe_paren ~outer ~side ~inner:find_fixity pp ppf ()
 
-  | Exists (vs, b) 
-  | ForAll (vs, b) ->
+  | Quant (q, vs, b) ->
     let _, vs, s = (* rename quantified vars. to avoid name clashes *)
       let fv_b = List.fold_left ((^~) Sv.remove) (fv b) vs in
       refresh_vars_env (Vars.of_set fv_b) vs 
     in
     let b = subst s b in
 
-    let quant_string = 
-      match t with
-      | Exists _ -> "exists"
-      | ForAll _ -> "forall"
-      | _ -> assert false
-    in
-    let pp fmt () =
-      Fmt.pf ppf "@[<2>%s (@[%a@]),@ %a@]"
-        quant_string
-        (Vars._pp_typed_list ~dbg:info.dbg) vs
-        (pp (quant_fixity, `Right)) b
-    in
-    maybe_paren ~outer ~side ~inner:(fst quant_fixity, `Prefix) pp ppf ()
+    begin
+      match q with
+      | Exists | ForAll ->
+        let pp fmt () =
+          Fmt.pf ppf "@[<2>%a (@[%a@]),@ %a@]"
+            pp_quant q
+            (Vars._pp_typed_list ~dbg:info.dbg) vs
+            (pp (quant_fixity, `Right)) b
+        in
+        maybe_paren ~outer ~side ~inner:(fst quant_fixity, `Prefix) pp ppf ()
+
+      | Seq ->
+        Fmt.pf ppf "@[<hov 2>seq(%a->@,%a)@]"
+          (Vars._pp_typed_list ~dbg:info.dbg) vs (pp (seq_fixity, `NonAssoc)) b
+    end
 
 (* Printing in a [hv] box. Print the trailing [else] of the caller. *)
 and pp_chained_ite info ppf (t : term) = 
@@ -1525,32 +1487,27 @@ module type SmartFO = sig
   val decompose_impls_last : form -> form list * form
 end
 
+(*------------------------------------------------------------------*)
+let mk_quant ?(simpl=false) q l f =
+  let l =
+    if simpl then
+      let fv = fv f in
+      List.filter (fun v -> Sv.mem v fv) l
+    else l
+  in
+  mk_quant_ns q l f
+
+let mk_seq ?simpl = mk_quant ?simpl Seq
+    
+(*------------------------------------------------------------------*)
 module Smart : SmartFO with type form = term = struct
   type form = term
 
   include SmartConstructors
   include SmartDestructors
 
-  (* FIXME: improve variable naming (see mk_seq) *)
-  let mk_forall ?(simpl=false) l f =
-    let l =
-      if simpl then
-        let fv = fv f in
-        List.filter (fun v -> Sv.mem v fv) l
-      else l
-    in
-    mk_forall l f
-
-  (* FIXME: improve variable naming (see mk_seq) *)
-  let mk_exists ?(simpl=false) l f =
-    let l =
-      if simpl then
-        let fv = fv f in
-        List.filter (fun v -> Sv.mem v fv) l
-      else l
-    in
-    mk_exists l f
-
+  let mk_forall ?simpl = mk_quant ?simpl ForAll
+  let mk_exists ?simpl = mk_quant ?simpl Exists
 end
 
 include Smart
@@ -1574,35 +1531,6 @@ let lit_to_form (l : literal) : term =
   | `Pos, at -> xatom_to_form at
   | `Neg, at -> mk_not (xatom_to_form at) 
 
-let mk_seq0 ?(simpl=false) (is : Vars.vars) term =
-  let is =
-    if simpl then
-      let term_fv = fv term in
-      List.filter (fun i ->
-          Sv.mem i term_fv
-        ) is
-    else is
-  in
-  match is with
-  | [] -> term
-  | _ -> Seq (is, term)
-
-(* only refresh necessary vars, hence we need an environment *)
-let mk_seq env (is : Vars.vars) term =
-  let env =
-    let env_vars = Sv.of_list (Vars.to_list env) in
-    let term_vars = fv term in
-    let vars = Sv.elements (Sv.inter env_vars term_vars) in
-    ref (Vars.of_list vars)
-  in
-
-  let is, s = refresh_vars (`InEnv env) is in
-  let term = subst s term in
-
-  match is with
-  | [] -> term
-  | _ -> Seq (is, term)
-
 
 (*------------------------------------------------------------------*)
 (** {2 Apply} *)
@@ -1621,7 +1549,6 @@ let apply_ht (ht : hterm) (terms : term list) = match ht with
     subst_ht s_app ht
 
 
-
 (*------------------------------------------------------------------*)
 (** {2 Type substitution} *)
 
@@ -1629,8 +1556,11 @@ let tsubst (ts : Type.tsubst) (t : term) : term =
   (* no need to substitute in the types of [Name], [Macro], [Fun] *)
   let rec tsubst : term -> term = function
     | Var v -> Var (Vars.tsubst ts v)
-    | ForAll (vs, f) -> ForAll (List.map (Vars.tsubst ts) vs, tsubst f)
-    | Exists (vs, f) -> Exists (List.map (Vars.tsubst ts) vs, tsubst f)
+    | Quant (q, vs, f) -> Quant (q, List.map (Vars.tsubst ts) vs, tsubst f)
+
+    | Find (vs, a,b,c) ->
+      Find (List.map (Vars.tsubst ts) vs, tsubst a, tsubst b, tsubst c)
+        
     | _ as term -> tmap (fun t -> tsubst t) term
   in
 
@@ -1644,8 +1574,8 @@ let tsubst_ht (ts : Type.tsubst) (ht : hterm) : hterm =
 (** {2 Simplification} *)
 
 let rec not_simpl = function
-    | Exists (vs, f) -> ForAll(vs, not_simpl f)
-    | ForAll (vs, f) -> Exists(vs, not_simpl f)
+    | Quant (Exists, vs, f) -> Quant (ForAll, vs, not_simpl f)
+    | Quant (ForAll, vs, f) -> Quant (Exists, vs, not_simpl f)
     | tt when tt = mk_true  -> mk_false
     | tf when tf = mk_false -> mk_true
     | Fun (fs, _, [a;b]) when fs = f_and  -> mk_or  (not_simpl a) (not_simpl b)
@@ -1684,8 +1614,7 @@ let is_pure_timestamp (t : term) =
 
     | Fun (fs, _, []) -> true
 
-    | ForAll (_, t)
-    | Exists (_, t) -> pure_ts t
+    | Quant (_, _, t) -> pure_ts t
 
     | Action _ -> true
 
@@ -1772,10 +1701,8 @@ let alpha_conv ?(subst=[]) (t1 : term) (t2 : term) : bool =
       doit s e e';
       doits s' [c;t] [c';t']
 
-    | Seq    (vs,f), Seq    (vs',f')
-    | Exists (vs,f), Exists (vs',f')
-    | ForAll (vs,f), ForAll (vs',f')
-      when List.length vs = List.length vs' ->
+    | Quant (q, vs,f), Quant (q', vs',f')
+      when q = q' && List.length vs = List.length vs' ->
       let s = alpha_bnds s vs vs' in
       doit s f f'
 
@@ -1849,17 +1776,10 @@ let rec make_normal_biterm
       let s' = alpha_bnds s is is' in
       Find (is, mdiff s' c c', mdiff s' t t', mdiff s e e')
 
-    | ForAll (vs,f), ForAll (vs',f')
-      when List.length vs = List.length vs' ->
+    | Quant (q,vs,f), Quant (q',vs',f')
+      when q = q' && List.length vs = List.length vs'->
       let s = alpha_bnds s vs vs' in
-      ForAll (vs, mdiff s f f')
-
-    | Exists (vs,f), Exists (vs',f')
-      when List.length vs = List.length vs' ->
-      let s = alpha_bnds s vs vs' in
-      Exists (vs, mdiff s f f')
-
-    (* FIXME: seq case missing *)
+      Quant (q, vs, mdiff s f f')
 
     | t1,t2 -> diff t1 (subst s t2)
   in
@@ -1957,9 +1877,10 @@ let pp_term_head fmt = function
   | HAction   -> Fmt.pf fmt "Action"
 
 let get_head : term -> term_head = function
-  | Exists _       -> HExists
-  | ForAll _       -> HForAll
-  | Seq _          -> HSeq
+  | Quant (Exists, _, _) -> HExists
+  | Quant (ForAll, _, _) -> HForAll
+  | Quant (Seq,    _, _) -> HSeq
+
   | Fun (f,_,_)    -> HFun f
   | Find _         -> HFind
   | Macro (m1,_,_) -> HMacro m1.s_symb

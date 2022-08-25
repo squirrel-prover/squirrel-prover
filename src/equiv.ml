@@ -281,40 +281,44 @@ module Smart : Term.SmartFO with type form = _form = struct
 
   let mk_not ?simpl f = todo ()
 
+  (*------------------------------------------------------------------*)
   let mk_and ?simpl f1 f2 = And (f1, f2)
-  let rec mk_ands ?simpl forms = match forms with
+
+  let rec mk_ands ?simpl forms =
+    match forms with
     | [] -> mk_true
     | [f0] -> f0
     | f0 :: forms -> And (f0, mk_ands forms)
 
+  (*------------------------------------------------------------------*)
   let mk_or ?simpl f1 f2 = Or (f1, f2)
-  let rec mk_ors ?simpl forms = match forms with
+
+  let rec mk_ors ?simpl forms =
+    match forms with
     | [] -> mk_false
     | [f0] -> f0
     | f0 :: forms -> Or (f0, mk_ors forms)
 
+  (*------------------------------------------------------------------*)
   let mk_impl ?simpl f1 f2 = Impl (f1, f2)
-  let rec mk_impls ?simpl l f = match l with
+
+  let rec mk_impls ?simpl l f =
+    match l with
     | [] -> f
     | f0 :: impls -> Impl (f0, mk_impls impls f)
 
-  let mk_forall ?(simpl=false) l f =
+  (*------------------------------------------------------------------*)
+  let mk_quant ?(simpl=false) q l f =
     let l =
       if simpl then
         let fv = fv f in
         List.filter (fun v -> Sv.mem v fv) l
       else l
     in
-    mk_forall l f
+    mk_quant q l f
 
-  let mk_exists ?(simpl=false) l f =
-    let l =
-      if simpl then
-        let fv = fv f in
-        List.filter (fun v -> Sv.mem v fv) l
-      else l
-    in
-    mk_exists l f
+  let mk_forall ?simpl = mk_quant ?simpl ForAll
+  let mk_exists ?simpl = mk_quant ?simpl Exists
 
   (*------------------------------------------------------------------*)
   let mk_eq  ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_eq  ?simpl f1 f2))

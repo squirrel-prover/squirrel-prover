@@ -551,7 +551,7 @@ let do_fa_felem (i : int L.located) (s : ES.t) : ES.t =
         (fun i i' -> Term.ESubst (Term.mk_var i, Term.mk_var i'))
         vars vars'
     in
-    let c' = Term.mk_seq0 vars c in
+    let c' = Term.mk_seq vars c in
     let t' = Term.subst subst t in
     let biframe =
       List.rev_append before
@@ -559,12 +559,12 @@ let do_fa_felem (i : int L.located) (s : ES.t) : ES.t =
     in
     ES.set_vars !env (ES.set_equiv_goal biframe s) 
 
-  | Seq(vars,t) ->
+  | Quant (Seq,vars,t) ->
     let terms = fa_expand t in
     let biframe =
       List.rev_append
         before
-        ((List.map (fun t' -> Term.mk_seq0 ~simpl:true vars t') terms) @ after)
+        ((List.map (fun t' -> Term.mk_seq ~simpl:true vars t') terms) @ after)
     in
     ES.set_equiv_goal biframe s 
 
@@ -756,8 +756,8 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
         && (Term.ty t1 = Type.Index || Term.ty t1 = Type.Timestamp) ->
       timestamps
 
-    | Fun _ | Seq _ | Find _
-    | ForAll _ | Exists _ -> super#fold_message timestamps t
+    | Fun _ | Find _
+    | Quant (_,_,_) -> super#fold_message timestamps t
 
     | Action _
     | Macro _ | Name _ | Var _ | Diff _ -> raise Not_FADUP_iter
@@ -774,7 +774,8 @@ let fa_dup_int (i : int L.located) s =
       let f,g = match e with
         | Term.Fun (fs,_, [f;g]) when fs = Term.f_and -> f,g
 
-        | Term.Seq (vars, Term.Fun (fs,_, [f;g])) when fs = Term.f_and ->
+        | Term.Quant (Seq, vars, Term.Fun (fs,_, [f;g]))
+          when fs = Term.f_and ->
           let _, subst = Term.refresh_vars `Global vars in
           Term.subst subst f,
           Term.subst subst g
@@ -1009,7 +1010,7 @@ let fresh_tac args = match args with
 let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
   match EquivLT.convert s term with
   (* we expect term to be a sequence *)
-  | (Seq (vs, t) as term_seq), ty ->
+  | (Quant (Seq, vs, t) as term_seq), ty ->
     (* we parse the arguments ths, to create a substution for variables vs *)
     let subst = Theory.parse_subst (ES.env s) vs ths in
 
@@ -1320,7 +1321,7 @@ let prf arg (s : ES.t) : ES.t list =
     else
       let uvarm, uvarkey, f =
         match oracle_formula with
-        | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
+        | Quant (ForAll, [uvarm;uvarkey], f) -> uvarm,uvarkey,f
         | _ -> assert false
       in
       match Vars.ty uvarm, Vars.ty uvarkey with
@@ -1474,7 +1475,7 @@ let split_seq (li : int L.located) ht s : ES.sequent =
   let i = L.unloc li in
 
   let is, ti = match t with
-    | Seq (is, ti) -> is, ti
+    | Quant (Seq, is, ti) -> is, ti
     | _ ->
       soft_failure ~loc:(L.loc li) (Failure (string_of_int i ^ " is not a seq"))
   in
@@ -1510,9 +1511,8 @@ let split_seq (li : int L.located) ht s : ES.sequent =
   let ti_t = Term.mk_ite cond               ti else_branch in
   let ti_f = Term.mk_ite (Term.mk_not cond) ti else_branch in
 
-  let env = ES.vars s in
-  let frame = List.rev_append before ([Term.mk_seq env is ti_t;
-                                       Term.mk_seq env is ti_f] @ after) in
+  let frame = List.rev_append before ([Term.mk_seq is ti_t;
+                                       Term.mk_seq is ti_f] @ after) in
   ES.set_equiv_goal frame s
 
 let split_seq_args args s : ES.sequent list =
@@ -1536,7 +1536,7 @@ let mem_seq (i_l : int L.located) (j_l : int L.located) s : Goal.t list =
   let _, seq, _ = split_equiv_goal j_l s in
 
   let seq_vars, seq_term = match seq with
-    | Seq (vs, t) -> vs, t
+    | Quant (Seq, vs, t) -> vs, t
     | _ ->
       soft_failure ~loc:(L.loc j_l)
         (Failure (string_of_int (L.unloc j_l) ^ " is not a seq"))
@@ -1586,7 +1586,7 @@ let const_seq
   let i = L.unloc li in
 
   let e_is, e_ti = match e with
-    | Seq (is, ti) -> is, ti
+    | Quant (Seq, is, ti) -> is, ti
     | _ ->
       soft_failure ~loc:(L.loc li) (Failure (string_of_int i ^ " is not a seq"))
   in

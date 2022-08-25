@@ -25,18 +25,13 @@ class deprecated_iter ~(cntxt:Constr.trace_cntxt) = object (self)
     | Diff (Explicit l) ->
       List.iter (fun (_,tm) -> self#visit_message tm) l
 
-    | Seq (a, b) ->
-      let _, s = Term.refresh_vars `Global a in
-      let b = Term.subst s b in
-      self#visit_message b
-
     | Find (a, b, c, d) ->
       let _, subst = Term.refresh_vars `Global a in
       let b = Term.subst subst b in
       let c = Term.subst subst c in
       self#visit_message b; self#visit_message c; self#visit_message d
 
-    | ForAll (vs,l) | Exists (vs,l) ->
+    | Quant (_,vs,l) ->
       let _, subst = Term.refresh_vars `Global vs in
       let l = Term.subst subst l in
       self#visit_message l
@@ -62,11 +57,6 @@ class ['a] deprecated_fold ~(cntxt:Constr.trace_cntxt) = object (self)
     | Diff (Explicit l) ->
       List.fold_left (fun x (_,tm) -> self#fold_message x tm) x l
 
-    | Seq (a, b) ->
-      let _, s = Term.refresh_vars `Global a in
-      let b = Term.subst s b in
-      self#fold_message x b
-
     | Find (a, b, c, d) ->
       let _, s = Term.refresh_vars `Global a in
       let b = Term.subst s b in
@@ -74,7 +64,7 @@ class ['a] deprecated_fold ~(cntxt:Constr.trace_cntxt) = object (self)
       let d = Term.subst s d in
       self#fold_message (self#fold_message (self#fold_message x b) c) d
 
-    | ForAll (vs,l) | Exists (vs,l) ->
+    | Quant (_,vs,l) ->
       let _, s = Term.refresh_vars `Global vs in
       let l = Term.subst s l in
       self#fold_message x l
@@ -186,17 +176,10 @@ let tfold_occ
   : 'a 
   =
   match t with
-  | Term.ForAll (evs, t)
-  | Term.Exists (evs, t) ->
+  | Term.Quant (_, evs, t) ->
     let evs, subst = Term.refresh_vars `Global evs in
     let t = Term.subst subst t in
     let fv = List.rev_append evs fv in
-    func ~fv ~cond t acc
-
-  | Term.Seq (is, t) ->
-    let is, subst = Term.refresh_vars `Global is in
-    let t = Term.subst subst t in
-    let fv = List.rev_append is fv in
     func ~fv ~cond t acc
 
   | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite ->

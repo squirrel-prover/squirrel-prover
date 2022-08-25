@@ -919,7 +919,7 @@ and convert0
     let () =
       Vars.check_type_vars evs [Type.tindex; Type.ttimestamp] type_error
     in
-    Term.mk_seq0 ~simpl:false evs t
+    Term.mk_seq ~simpl:false evs t
 
 and conv_var state t ty = 
   match convert state t ty with
