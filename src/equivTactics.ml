@@ -834,12 +834,13 @@ let () =
    (LT.genfun_of_pure_efun_arg fadup) Args.(Opt Int)
 
 
+
 (*------------------------------------------------------------------*)
 (** Fresh *)
 
-let fresh_mk_direct
+let deprecated_fresh_mk_direct
     (n : Term.nsymb)
-    (occ : Fresh.name_occ) : Term.term
+    (occ : OldFresh.deprecated_name_occ) : Term.term
   =
   let bv, subst = Term.refresh_vars `Global occ.occ_vars in
   let cond = List.map (Term.subst subst) occ.occ_cond in
@@ -850,12 +851,12 @@ let fresh_mk_direct
   Term.mk_forall ~simpl:true bv
     (Term.mk_impl cond (Term.mk_indices_neq n.s_indices j))
 
-let fresh_mk_indirect
+let deprecated_fresh_mk_indirect
     (cntxt : Constr.trace_cntxt)
     (env : Vars.env)
     (n : Term.nsymb)
-    (frame_actions : Fresh.ts_occs)
-    (occ : TraceTactics.fresh_occ) : Term.term
+    (frame_actions : OldFresh.deprecated_ts_occs)
+    (occ : TraceTactics.deprecated_fresh_occ) : Term.term
   =  
   (* for each action [a] in which [name] occurs with indices from [occ] *)
   let bv = occ.Iter.occ_vars in
@@ -878,7 +879,7 @@ let fresh_mk_indirect
 
   (* condition stating that [action] occurs before a macro timestamp
      occurencing in the frame *)
-  let disj = Term.mk_ors (Fresh.mk_le_ts_occs action frame_actions) in
+  let disj = Term.mk_ors (OldFresh.deprecated_mk_le_ts_occs action frame_actions) in
 
   (* condition stating that indices of name in [action] and [name] differ *)
   let form = Term.mk_indices_neq occ n.s_indices in
@@ -886,8 +887,9 @@ let fresh_mk_indirect
   Term.mk_forall ~simpl:true bv (Term.mk_impl disj form)
 
 
+(* kept for cca, enckp and xor. *)
 (** Construct the formula expressing freshness for some projection. *)
-let mk_phi_proj
+let deprecated_mk_phi_proj
     (cntxt : Constr.trace_cntxt)
     (env : Vars.env)
     (n : Term.nsymb)
@@ -896,20 +898,20 @@ let mk_phi_proj
   =
   let frame = List.map (Term.project1 proj) biframe in
   try
-    let frame_indices : Fresh.name_occs =
+    let frame_indices : OldFresh.deprecated_name_occs =
       List.fold_left (fun acc t ->
-          Fresh.get_name_indices_ext cntxt n.s_symb t @ acc
+          OldFresh.deprecated_get_name_indices_ext cntxt n.s_symb t @ acc
         ) [] frame
     in
     let frame_indices = List.sort_uniq Stdlib.compare frame_indices in
 
     (* direct cases (for explicit occurrences of [name] in the frame) *)
-    let phi_frame = List.map (fresh_mk_direct n) frame_indices in
+    let phi_frame = List.map (deprecated_fresh_mk_direct n) frame_indices in
 
-    let frame_actions : Fresh.ts_occs = Fresh.get_macro_actions cntxt frame in
+    let frame_actions : OldFresh.deprecated_ts_occs = OldFresh.deprecated_get_macro_actions cntxt frame in
 
     let macro_cases =
-      TraceTactics.mk_fresh_indirect_cases cntxt env n biframe
+      TraceTactics.deprecated_mk_fresh_indirect_cases cntxt env n biframe
     in
 
     (* indirect cases (occurrences of [name] in actions of the system) *)
@@ -917,7 +919,7 @@ let mk_phi_proj
       List.fold_left (fun forms (_, cases) ->
           let cases =
             List.map
-              (fresh_mk_indirect cntxt env n frame_actions)
+              (deprecated_fresh_mk_indirect cntxt env n frame_actions)
               cases
           in
           cases @ forms
@@ -932,13 +934,13 @@ let mk_phi_proj
     List.remove_duplicate (Reduction.conv cstate) (phi_frame @ phi_actions)
 
   with
-  | Fresh.Name_found ->
+  | OldFresh.Deprecated_Name_found ->
     soft_failure (Tactics.Failure "name not fresh")
-  | Fresh.Var_found ->
+  | OldFresh.Deprecated_Var_found ->
     soft_failure
       (Failure "cannot apply fresh: the formula contains a term variable")
 
-let fresh_cond (s : ES.t) t biframe : Term.term =
+let deprecated_fresh_cond (s : ES.t) t biframe : Term.term =
   let cntxt = mk_pair_trace_cntxt s in
   let env = ES.vars s in
   let l_proj, r_proj = ES.get_system_pair_projs s in
@@ -947,57 +949,21 @@ let fresh_cond (s : ES.t) t biframe : Term.term =
     match Term.project1 l_proj  t,
           Term.project1 r_proj t with
     | (Name nl, Name nr) -> nl, nr
-    | _ -> raise Fresh.Not_name
+    | _ -> raise OldFresh.Deprecated_Not_name
   in
 
   let system_left = SE.project [l_proj] cntxt.system in
   let cntxt_left = { cntxt with system = system_left } in
-  let phi_left = mk_phi_proj cntxt_left env n_left l_proj biframe in
+  let phi_left = deprecated_mk_phi_proj cntxt_left env n_left l_proj biframe in
 
   let system_right = SE.project [r_proj] cntxt.system in
   let cntxt_right = { cntxt with system = system_right } in
-  let phi_right = mk_phi_proj cntxt_right env n_right r_proj biframe in
+  let phi_right = deprecated_mk_phi_proj cntxt_right env n_right r_proj biframe in
 
   let cstate = Reduction.mk_cstate cntxt.table in
   Term.mk_ands
     (* concatenate and remove duplicates *)
     (List.remove_duplicate (Reduction.conv cstate) (phi_left @ phi_right))
-
-
-(** Returns the term [if (phi_left && phi_right) then 0 else diff(nL,nR)]. *)
-let fresh_mk_if_term (s : ES.t) t biframe =
-  if not Symbols.(check_bty_info (ES.table s) (Term.ty t) Ty_large) then
-    soft_failure
-      (Failure "name is of a type that is not [large]");
-
-  let phi = fresh_cond s t biframe in
-  Term.mk_ite phi Term.mk_zero t
-
-
-let fresh i (s : ES.t) =
-  let before, e, after = split_equiv_goal i s in
-
-  (* the biframe to consider when checking the freshness *)
-  let biframe = List.rev_append before after in
-  (* expand the biframe to improve precision when computing the freshness
-     condition *)
-  let biframe_exp = 
-    List.map (fun t ->
-        EquivLT.expand_all_macros t (oget (ES.system s).pair :> SE.arbitrary) s
-      ) biframe 
-  in
-  try
-    let if_term = fresh_mk_if_term s e biframe_exp in
-    let biframe = List.rev_append before (if_term :: after) in
-    [ES.set_equiv_goal biframe s]
-
-  with Fresh.Not_name ->
-    soft_failure
-      (Tactics.Failure "Can only apply fresh tactic on names")
-
-let fresh_tac args = match args with
-  | [Args.Int_parsed i] -> wrap_fail (fresh i)
-  | _ -> bad_args ()
 
 
 (*------------------------------------------------------------------*)
@@ -1389,7 +1355,7 @@ let global_diff_eq (s : ES.t) =
           t.Iter.occ_vars @ Vars.Sv.elements (Term.fv subterm)
         in
         let pred_ts_list =
-          let iter = new Fresh.deprecated_get_actions ~cntxt in
+          let iter = new OldFresh.deprecated_get_actions ~cntxt in
           iter#visit_message subterm;
           iter#visit_message cond;
           iter#get_actions
@@ -1690,7 +1656,7 @@ let cca1 Args.(Int i) s =
 
     (* we create the fresh cond reachability goal *)
     let fresh_goal : Goal.t =
-      let form = fresh_cond s (Term.mk_name r) biframe in
+      let form = deprecated_fresh_cond s (Term.mk_name r) biframe in
       let seq = ES.to_trace_sequent (ES.set_reach_goal form s) in
       Goal.Trace seq
     in
@@ -1966,7 +1932,7 @@ let enckp arg (s : ES.t) =
         let context =
           Equiv.subst_equiv [Term.ESubst (enc,Term.empty)] [e]
         in
-        fresh_cond s (Term.mk_name r) (context@biframe)
+        deprecated_fresh_cond s (Term.mk_name r) (context@biframe)
       with Cca.Bad_ssc -> soft_failure Tactics.Bad_SSC
     in
     let fresh_goal =
@@ -2071,11 +2037,11 @@ let mk_xor_phi_base (s : ES.t) biframe
 
   let system_left = SE.project [l_proj] cntxt.system in
   let cntxt_left = { cntxt with system = system_left } in
-  let phi_left = mk_phi_proj cntxt_left env n_left l_proj biframe in
+  let phi_left = deprecated_mk_phi_proj cntxt_left env n_left l_proj biframe in
 
   let system_right = SE.project [r_proj] cntxt.system in
   let cntxt_right = { cntxt with system = system_right } in
-  let phi_right = mk_phi_proj cntxt_right env n_right r_proj biframe in
+  let phi_right = deprecated_mk_phi_proj cntxt_right env n_right r_proj biframe in
 
   let len_left =
     Term.(mk_atom `Eq (mk_len l_left) (mk_len (mk_name n_left)))
@@ -2320,7 +2286,7 @@ let is_ddh_context
    (* we then check inside the frame *)
     List.iter iter#visit_message elem_list;
     true
-  with Not_context | Fresh.Name_found -> false
+  with Not_context | OldFresh.Deprecated_Name_found -> false
 
 (*------------------------------------------------------------------*)
 let is_ddh_gen tbl gen =

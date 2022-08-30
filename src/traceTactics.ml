@@ -578,14 +578,14 @@ let () = T.register "eqtrace"
 
 
 (*------------------------------------------------------------------*)
-(* no longer used for trace fresh (trace fresh is now in newfresh.ml *)
-(* left here temporarily, for compatibility with equiv fresh *)
+(* no longer used for fresh. 
+   left here temporarily, for compatibility *)
 (** triple of the action and the name indices *)
-type fresh_occ = (Action.action * Vars.var list) Iter.occ
+type deprecated_fresh_occ = (Action.action * Vars.var list) Iter.occ
 
 (** check if all instances of [o1] are instances of [o2].
     [o1] and [o2] actions must have the same action name *)
-let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool =
+let deprecated_fresh_occ_incl table system (o1 : deprecated_fresh_occ) (o2 : deprecated_fresh_occ) : bool =
   (* for now, positions not allowed here *)
   assert (Sp.is_empty o1.occ_pos && Sp.is_empty o2.occ_pos);
   
@@ -617,32 +617,32 @@ let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool =
   | Match.Match _ -> true
 
 (** Add a new fresh rule case, if it is not redundant. *)
-let add_fresh_case
+let deprecated_add_fresh_case
     table system
-    (c : fresh_occ)
-    (l : fresh_occ list) : fresh_occ list
+    (c : deprecated_fresh_occ)
+    (l : deprecated_fresh_occ list) : deprecated_fresh_occ list
   =
-  if List.exists (fun c' -> fresh_occ_incl table system c c') l
+  if List.exists (fun c' -> deprecated_fresh_occ_incl table system c c') l
   then l
   else
     (* remove any old case which is subsumed by [c] *)
     let l' =
       List.filter (fun c' ->
-          not (fresh_occ_incl table system c' c)
+          not (deprecated_fresh_occ_incl table system c' c)
         ) l
     in
     c :: l'
 
 (** Add many new fresh rule cases, if they are not redundant. *)
-let add_fresh_cases
+let deprecated_add_fresh_cases
     table system
-    (l1 : fresh_occ list)
-    (l2 : fresh_occ list) : fresh_occ list
+    (l1 : deprecated_fresh_occ list)
+    (l2 : deprecated_fresh_occ list) : deprecated_fresh_occ list
   =
-  List.fold_left (fun l2 c -> add_fresh_case table system c l2) l2 l1
+  List.fold_left (fun l2 c -> deprecated_add_fresh_case table system c l2) l2 l1
 
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
-let mk_fresh_indirect_cases
+let deprecated_mk_fresh_indirect_cases
     (cntxt : Constr.trace_cntxt)
     (env : Vars.env)
     (ns : Term.nsymb)
@@ -667,10 +667,10 @@ let mk_fresh_indirect_cases
 
         let new_cases =
           let fv = List.rev (Sv.elements fv) in
-          Fresh.get_name_indices_ext ~fv cntxt ns.s_symb t
+          OldFresh.deprecated_get_name_indices_ext ~fv cntxt ns.s_symb t
         in
         let new_cases =
-          List.map (fun (case : Fresh.name_occ) ->
+          List.map (fun (case : OldFresh.deprecated_name_occ) ->
               { case with
                 occ_cnt = (a, case.occ_cnt);
                 occ_cond = case.occ_cond; }
@@ -679,7 +679,7 @@ let mk_fresh_indirect_cases
 
         List.assoc_up_dflt action_name []
           (fun l ->
-             add_fresh_cases cntxt.table cntxt.system new_cases l
+             deprecated_add_fresh_cases cntxt.table cntxt.system new_cases l
           ) macro_cases
       ) cntxt env terms []
   in
@@ -1413,7 +1413,7 @@ let euf_apply_schema
   in
  let ts_list =
     let iter = 
-      new Fresh.deprecated_get_actions ~cntxt:(TS.mk_trace_cntxt sequent) 
+      new OldFresh.deprecated_get_actions ~cntxt:(TS.mk_trace_cntxt sequent) 
     in
     List.iter iter#visit_message [s; m];
     iter#get_actions

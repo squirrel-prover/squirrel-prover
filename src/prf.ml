@@ -82,7 +82,7 @@ let prf_occ_incl table sexpr (o1 : prf_occ) (o2 : prf_occ) : bool =
 let prf_mk_indirect
     (cntxt         : Constr.trace_cntxt)
     (param         : prf_param)
-    (frame_actions : Fresh.ts_occs)
+    (frame_actions : OldFresh.deprecated_ts_occs)
     (hash_occ      : prf_occ) : Term.term
   =
   let vars = hash_occ.Iter.occ_vars in
@@ -104,7 +104,7 @@ let prf_mk_indirect
 
   (* condition stating that [action] occurs before a macro timestamp
      occurencing in the frame *)
-  let disj = Term.mk_ors (Fresh.mk_le_ts_occs action frame_actions) in
+  let disj = Term.mk_ors (OldFresh.deprecated_mk_le_ts_occs action frame_actions) in
 
   (* then if key indices are equal then hashed messages differ *)
   let form =
@@ -217,7 +217,7 @@ let mk_prf_phi_proj cntxt env param frame hash =
   let phi_indirect =
     List.map (fun (action, hash_occs) ->
         List.map (fun (hash_occ, srcs) ->
-            let frame_actions = Fresh.get_macro_actions cntxt srcs in
+            let frame_actions = OldFresh.deprecated_get_macro_actions cntxt srcs in
             prf_mk_indirect cntxt param frame_actions hash_occ
           ) (List.rev hash_occs)
       ) (List.rev macro_cases)

@@ -168,7 +168,7 @@ let global_rename
   let cntxt =
     Constr.make_context ~table ~system:(SE.singleton old_single_system)
   in
-  let iter = new Fresh.deprecated_find_name ~cntxt true ns2.s_symb in
+  let iter = new OldFresh.deprecated_find_name ~cntxt true ns2.s_symb in
   let () =
     try
       SystemExpr.iter_descrs
@@ -177,7 +177,7 @@ let global_rename
            iter#visit_message (snd action_descr.output) ;
            iter#visit_message (snd action_descr.condition) ;
            List.iter (fun (_,m) -> iter#visit_message m) action_descr.updates)
-    with Fresh.Name_found ->
+    with OldFresh.Deprecated_Name_found ->
       Tactics.hard_failure
         (Tactics.Failure "The name on the right-hand side already \
                           occurs in the left-hand side.")

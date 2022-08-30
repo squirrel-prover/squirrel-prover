@@ -9,15 +9,14 @@ module Sp = Match.Pos.Sp
 
 (*------------------------------------------------------------------*)
 (** Exception raised when a forbidden occurrence of a name is found. *)
-exception Name_found
-
+exception Deprecated_Name_found
 (** Exception raised when a forbidden occurrence of a message variable
     is found. *)
-exception Var_found
+exception Deprecated_Var_found
 
 (** Exception raised when attempting to apply a tactic on something
     that should be a name but isn't. *)
-exception Not_name
+exception Deprecated_Not_name
 
 (*------------------------------------------------------------------*)
 (** Deprecated. *)
@@ -25,10 +24,10 @@ class deprecated_find_name ~(cntxt:Constr.trace_cntxt) exact name = object (self
   inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
 
   method visit_message t = match t with
-    | Term.Name ns -> if ns.s_symb = name then raise Name_found
+    | Term.Name ns -> if ns.s_symb = name then raise Deprecated_Name_found
     | Term.Var m
         when Vars.ty m <> Type.Timestamp && Vars.ty m <> Type.Index -> 
-        raise Var_found
+        raise Deprecated_Var_found
     | _ -> super#visit_message t
 end
 
@@ -54,26 +53,26 @@ class deprecated_get_actions ~(cntxt:Constr.trace_cntxt) = object (self)
 
 (*------------------------------------------------------------------*)
 (** occurrence of a name [n(i,...,j)] *)
-type name_occ = Vars.var list Iter.occ
+type deprecated_name_occ = Vars.var list Iter.occ
 
-type name_occs = name_occ list
+type deprecated_name_occs = deprecated_name_occ list
 
-let pp_name_occ fmt (occ : name_occ) : unit =
+let deprecated_pp_name_occ fmt (occ : deprecated_name_occ) : unit =
   Iter.pp_occ (Fmt.list ~sep:Fmt.comma Vars.pp) fmt occ
 
 (** Looks for indices at which a name occurs.
     @raise Var_found if a term variable occurs in the term. *)
-let get_name_indices_ext 
+let deprecated_get_name_indices_ext 
     ?(fv=[])
     (constr : Constr.trace_cntxt)
     (nsymb : Symbols.name)
     (t : Term.term)
-  : name_occs
+  : deprecated_name_occs
   =
-  let rec get (t : Term.term) ~(fv : Vars.vars) ~(cond : Term.terms) : name_occs =
+  let rec get (t : Term.term) ~(fv : Vars.vars) ~(cond : Term.terms) : deprecated_name_occs =
     match t with
     | Term.Var v when not (Type.is_finite (Vars.ty v)) ->
-      raise Var_found
+      raise Deprecated_Var_found
 
     | Term.Name ns when ns.s_symb = nsymb ->
       let occ = Iter.{
@@ -93,14 +92,14 @@ let get_name_indices_ext
   get t ~fv ~cond:[]
 
 (*------------------------------------------------------------------*)
-type ts_occ = Term.term Iter.occ
+type deprecated_ts_occ = Term.term Iter.occ
 
-type ts_occs = ts_occ list
+type deprecated_ts_occs = deprecated_ts_occ list
 
-let pp_ts_occ fmt (occ : ts_occ) : unit = Iter.pp_occ Term.pp fmt occ
+let deprecated_pp_ts_occ fmt (occ : deprecated_ts_occ) : unit = Iter.pp_occ Term.pp fmt occ
 
 (** Check if [t1] is included in the patterm [pat2], i.e. [t1 ∈ occ2]. *)
-let pat_subsumes
+let deprecated_pat_subsumes
     table (context : SE.context)
     ?(mv : Match.Mvar.t = Match.Mvar.empty)
     (t1 : Term.term) (pat2 : Term.term Term.pat) 
@@ -112,7 +111,7 @@ let pat_subsumes
   | Match mv -> Some mv
 
 (** Check if the term occurrence [occ2] subsumes [occ1], i.e. [occ1 ⊆ occ2]. *)
-let term_occ_subsumes
+let deprecated_term_occ_subsumes
     table (context : SE.context)
     ?(mv : Match.Mvar.t = Match.Mvar.empty)
     (occ1 : Term.term Iter.occ) (occ2 : Term.term Iter.occ) 
@@ -126,7 +125,7 @@ let term_occ_subsumes
       pat_tyvars = [];
       pat_vars = Sv.of_list1 occ2.occ_vars; 
     } in
-  match pat_subsumes table context occ1.occ_cnt pat2 with
+  match deprecated_pat_subsumes table context occ1.occ_cnt pat2 with
   | None -> false
   | Some mv ->
     (* start from the matching substutition [mv], and try to match all
@@ -138,7 +137,7 @@ let term_occ_subsumes
     List.for_all (fun cond1 ->
         List.exists (fun cond2 ->
             match 
-              pat_subsumes ~mv:(!mv) table context cond1 (mk_cond2 cond2)
+              deprecated_pat_subsumes ~mv:(!mv) table context cond1 (mk_cond2 cond2)
             with 
             | None -> false
             | Some mv' -> mv := mv'; true
@@ -147,13 +146,13 @@ let term_occ_subsumes
 
 
 (** remove duplicates from [occs] using a subsuming relation. *)
-let remove_duplicate_term_occs
+let deprecated_remove_duplicate_term_occs
     table (system : SE.arbitrary)
     (occs : Term.term Iter.occs) : Term.term Iter.occs
   =
-  let subsumes (occ1 : Term.term Iter.occ) (occ2 : ts_occ) =
+  let subsumes (occ1 : Term.term Iter.occ) (occ2 : deprecated_ts_occ) =
     let context = SE.{ set = system; pair = None; } in
-    term_occ_subsumes table context occ1 occ2
+    deprecated_term_occ_subsumes table context occ1 occ2
   in
 
   let occs =
@@ -167,9 +166,9 @@ let remove_duplicate_term_occs
   List.rev occs
 
 (** Looks for timestamps at which macros occur in a term. *)
-let get_actions_ext (constr : Constr.trace_cntxt) (t : Term.term) : ts_occs =
+let deprecated_get_actions_ext (constr : Constr.trace_cntxt) (t : Term.term) : deprecated_ts_occs =
 
-  let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.terms) : ts_occs =
+  let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.terms) : deprecated_ts_occs =
     match t with
     | Term.Macro (m, l, ts) ->
       if l <> [] then failwith "Not implemented" ;
@@ -208,21 +207,21 @@ let get_actions_ext (constr : Constr.trace_cntxt) (t : Term.term) : ts_occs =
 (** Macro occurrence utility functions *)
 
 (** Return timestamps occuring in macros in a set of terms *)
-let get_macro_actions
+let deprecated_get_macro_actions
     (cntxt : Constr.trace_cntxt)
-    (sources : Term.terms) : ts_occs
+    (sources : Term.terms) : deprecated_ts_occs
   =
   let actions =
-    List.concat_map (get_actions_ext cntxt) sources
+    List.concat_map (deprecated_get_actions_ext cntxt) sources
   in
-  remove_duplicate_term_occs
+  deprecated_remove_duplicate_term_occs
     cntxt.table (cntxt.system :> SE.arbitrary) actions
 
 (** [mk_le_ts_occ env ts0 occ] build a condition stating that [ts0] occurs
     before the macro timestamp occurrence [occ]. *)
-let mk_le_ts_occ
+let deprecated_mk_le_ts_occ
     (ts0 : Term.term)
-    (occ : ts_occ) : Term.term
+    (occ : deprecated_ts_occ) : Term.term
   =
   let occ_vars = occ.Iter.occ_vars in
   let occ_vars, occ_subst = Term.refresh_vars `Global occ_vars in
@@ -237,9 +236,9 @@ let mk_le_ts_occ
        (Term.mk_timestamp_leq ts0 ts)
        (Term.mk_ands cond))
 
-let mk_le_ts_occs
+let deprecated_mk_le_ts_occs
     (ts0 : Term.term)
-    (occs : ts_occs) : Term.terms
+    (occs : deprecated_ts_occs) : Term.terms
   =
-  List.map (mk_le_ts_occ ts0) occs |>
+  List.map (deprecated_mk_le_ts_occ ts0) occs |>
   List.remove_duplicate (=)
