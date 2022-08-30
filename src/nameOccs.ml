@@ -418,7 +418,7 @@ let find_occurrences
   let dir_occs =
     List.concat_map
       (fun t -> (* find direct occurrences in t *)
-         Printer.pr "@[<v 0>@[<hv 2>Bad occurrences %afound@ directly in %a:@]@;"
+         Printer.pr "@[<hv 2>Bad occurrences %afound@ directly in %a:@]@;"
            ppp ()
            Term.pp t;
          (* timestamps occurring in t *)
@@ -477,7 +477,7 @@ let find_occurrences
 
   Printer.pr "@;Total: @[<v 0>%d bad occurrence%s@;" loccs (if loccs = 1 then "" else "s");
   Printer.pr "%d of them %s subsumed by another@;" lsub (if lsub = 1 then "is" else "are");
-  Printer.pr "%d bad occurrence%s remaining@;@]@]" loccs' (if loccs' = 1 then "" else "s");
+  Printer.pr "%d bad occurrence%s remaining@;@]@;" loccs' (if loccs' = 1 then "" else "s");
   occs
 
 

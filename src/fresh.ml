@@ -117,7 +117,7 @@ let fresh_trace (m : lsymb) (s : TS.sequent) : TS.sequent list =
    
     Printer.pr "Freshness of %a:@; @[<v 0>" pp_n ();
     let phis = NO.occurrence_formulas ~pp_ns:(Some pp_n) get_bad contx env [t] in
-    Printer.pr "@]";
+    Printer.pr "@]@;";
 
     let g = TS.goal s in
     List.map
@@ -194,12 +194,12 @@ let fresh_equiv (i : int L.located) (s : ES.sequent) : ES.sequents =
   let before, t, after = split_equiv_goal i s in
   let biframe = List.rev_append before after in
   
-  Printer.pr "@[<v 0>Freshness on the left side:@;";
+  Printer.pr "@[<v 0>Freshness on the left side:@; @[<v 0>";
   let phi_l = phi_proj loc contx env t biframe proj_l in
 
-  Printer.pr "@;@;Freshness on the right side:@;";
+  Printer.pr "@]@,Freshness on the right side:@; @[<v 0>";
   let phi_r = phi_proj loc contx env t biframe proj_r in
-  Printer.pr "@]";
+  Printer.pr "@]@]@;";
 
   (* Removing duplicates. We already did that for occurrences, but
      only within phi_l and phi_r, not across both *)
