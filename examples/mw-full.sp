@@ -93,13 +93,13 @@ Proof.
       exists i,t0; simpl.
       assert (input@T(i,t0) = nr(r)) as F; 1: auto.
       by (fresh F => C;
-      5: depends R(r), R2(r)).
+      4: depends R(r), R2(r)).
     (* right *)
     - euf Meq => _ _ _; 1:auto.
       exists i,t; simpl.
       assert (input@T(i,t) = nr(r)) as F; 1: auto.
       by (fresh F => C;
-      5: depends R(r), R2(r)).
+      4: depends R(r), R2(r)).
 
   (* WA => Cond *)
   + by intro [i t _]; expand output; exists i,t.
@@ -125,7 +125,7 @@ Proof.
   exists t; simpl.
   assert input@T(i,t) = nr(r) as F; 1: auto.
   by (fresh F => C;
-  5:depends R(r), R2(r)).
+  4:depends R(r), R2(r)).
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
@@ -143,7 +143,7 @@ Proof.
   intro Meq; euf Meq => _ _ _; 1: auto.
   assert input@T(i,t) = nr(r) as F; 1: auto.
   by (fresh F => C;
-  5: by depends R(r), R2(r)).
+  4: by depends R(r), R2(r)).
 Qed.
 
 equiv unlinkability.
@@ -363,7 +363,7 @@ Proof.
           assert R(r) < T(i,t) as _. {
             assert nr(r) = input@T(i,t) as HF; 1:auto.
             fresh HF => C;
-            [5: by depends R(r),R2(r)];
+            [4: by depends R(r),R2(r)];
             auto.
           }
           simpl.
@@ -437,7 +437,7 @@ Proof.
           assert R(r) < T(i,t). {
             assert nr(r) = input@T(i,t) as HF; 1: auto.
             fresh HF => C;
-            [5: by depends R(r),R2(r)];
+            [4: by depends R(r),R2(r)];
             auto.
           }
           simpl.
@@ -463,7 +463,7 @@ Proof.
           assert R(r) < T(i,t) as _. {
             assert nr(r) = input@T(i,t) as HF; 1: auto.
             fresh HF => C;
-            [5: by depends R(r),R2(r)];
+            [4: by depends R(r),R2(r)];
             auto.
           }
           simpl.

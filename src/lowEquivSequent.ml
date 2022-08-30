@@ -371,6 +371,17 @@ let map f s : sequent =
   let f x = f.Equiv.Babel.call Equiv.Global_t x in
   set_goal (f (goal s)) (Hyps.map f s)
 
+
+(*------------------------------------------------------------------*)
+let mk_pair_trace_cntxt (s : sequent) : Constr.trace_cntxt =
+  let se = (Utils.oget ((env s).system.pair) :> SE.fset) in
+  mk_trace_cntxt ~se s 
+
+let check_goal_is_equiv (s : sequent) : unit =
+  if not (Equiv.is_equiv (goal s)) then
+    Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
+
+
 (*------------------------------------------------------------------*)
 module Conc  = Equiv.Smart
 module Hyp   = Equiv.Smart

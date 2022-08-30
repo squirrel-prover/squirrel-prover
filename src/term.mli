@@ -439,7 +439,7 @@ val mk_ite : ?simpl:bool -> term -> term -> term -> term
 
 val mk_timestamp_leq : term -> term -> term
 
-val mk_indices_neq :                Vars.var list -> Vars.var list -> term
+val mk_indices_neq : ?simpl:bool -> Vars.var list -> Vars.var list -> term
 val mk_indices_eq  : ?simpl:bool -> Vars.var list -> Vars.var list -> term
 
 val mk_atom : ord -> term -> term -> term
@@ -590,3 +590,15 @@ val alpha_conv : ?subst:subst -> term -> term -> bool
     alpha-renaming substitution (see [alpha_conv]).
     Raise if alpha-conversion fails. *)
 val alpha_bnds : subst -> Vars.vars -> Vars.vars -> subst 
+
+
+(*------------------------------------------------------------------*)
+(* utility functions for lists of nsymbs *)
+
+(** looks for a name with the same symbol in the list *)
+val exists_symb : nsymb -> nsymb list -> bool
+
+(** finds all names with the same symbol in the list *)
+val find_symb : nsymb -> nsymb list -> nsymb list
+
+

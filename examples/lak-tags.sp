@@ -80,8 +80,8 @@ Proof.
       assert input@T(i,j0)=nR(k) as Meq1 by auto.
       fresh Meq1 => C /=;
       [1: auto
-      |2,3,4: by depends R(k),R1(k)
-      |5: by depends R(k),R2(k)].
+      |2,3: by depends R(k),R1(k)
+      |4: by depends R(k),R2(k)].
 
     (* RIGHT *)
     - euf H => _ _ _ //.
@@ -89,8 +89,8 @@ Proof.
       assert input@T(i,j)=nR(k) as Meq1 by auto.
       fresh Meq1 => C /=;
       [1: auto
-      |2,3,4: by depends R(k),R1(k)
-      |5: by depends R(k),R2(k)].
+      |2,3: by depends R(k),R1(k)
+      |4: by depends R(k),R2(k)].
 
   (* WA => COND *)
   + intro [i j _]; exists i,j.
@@ -123,8 +123,8 @@ Proof.
   assert input@T(i,j) = nR(k) as Meq1 by auto.
   fresh Meq1 => C /=;
    [1: auto
-   |2,3,4: by depends R(k),R1(k)
-   |5: by depends R(k),R2(k)].
+   |2,3: by depends R(k),R1(k)
+   |4: by depends R(k),R2(k)].
 Qed.
 
 goal [default/right] wa_R1_right (i,j,k:index):
@@ -145,8 +145,8 @@ Proof.
   assert input@T(i,j) = nR(k) as Meq1 by auto.
   fresh Meq1 => C /=;
    [1: auto
-   |2,3,4: by depends R(k),R1(k)
-   |5: by depends R(k),R2(k)].
+   |2,3: by depends R(k),R1(k)
+   |4: by depends R(k),R2(k)].
 Qed.
 
 (** Equality used to rewrite the try-find in R1
@@ -193,9 +193,9 @@ Proof.
   + expand frame, exec, cond, output.
     fa !<_,_>, if _ then _.
     fresh 1; rewrite if_true. {
-      repeat split => // j0 H1.
-      by depends R(j0),R2(j0).
-      by depends R(j0),R1(j0).
+      repeat split => * //;
+      [1,2,4:by depends R(k),R1(k)].
+      by depends R(k),R2(k). 
     }
     auto.
 

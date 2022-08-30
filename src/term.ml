@@ -410,10 +410,10 @@ let mk_timestamp_leq t1 t2 = match t1,t2 with
   | _ -> mk_leq t1 t2
 
 (** Operations on vectors of indices of the same length. *)
-let mk_indices_neq (vect_i : Vars.var list) vect_j =
+let mk_indices_neq ?(simpl=false) (vect_i : Vars.var list) vect_j =
   mk_ors ~simpl:true
     (List.map2 (fun i j -> 
-         mk_neq (mk_var i) (mk_var j)
+         mk_neq ~simpl (mk_var i) (mk_var j)
        ) vect_i vect_j)
     
 let mk_indices_eq ?(simpl=true) vect_i vect_j =
@@ -1945,3 +1945,18 @@ let () =
         assert (head_normal_biterm t = mk_and (diff f f') (diff g g'))
     end ;
   ] 
+
+
+
+(*------------------------------------------------------------------*)
+(* Utility functions for lists of nsymbs *)
+
+(** looks for a name with the same symbol in the list *)
+let exists_symb (n:nsymb) (ns:nsymb list) : bool =
+  List.exists (fun nn -> n.s_symb = nn.s_symb) ns
+
+
+(** finds all names with the same symbol in the list *)
+let find_symb (n:nsymb) (ns:nsymb list) : nsymb list =
+  List.filter (fun nn -> n.s_symb = nn.s_symb) ns
+

@@ -87,7 +87,6 @@ Proof.
         fresh F => _ //.
         ** by depends R(r), R1(r).
         ** by depends R(r), R1(r).
-        ** by depends R(r), R1(r).
         ** by depends R(r), R2(r).
     (* right *)
     - euf Meq => _ _ _.
@@ -95,7 +94,6 @@ Proof.
       * exists i,t; simpl.
         assert (input@T(i,t) = nr(r)) as F by auto.
         fresh F => _ //.
-        ** by depends R(r),R1(r).
         ** by depends R(r),R1(r).
         ** by depends R(r),R1(r).
         ** by depends R(r),R2(r).
@@ -122,8 +120,8 @@ Proof.
   intro Meq; euf Meq => _ _ _; 1: auto.
   exists t; simpl.
   assert input@T(i,t) = nr(r) as F by auto.
-  by (fresh F => C;
-  5:depends R(r), R2(r)).
+  by (fresh F => C ;
+  4:depends R(r), R2(r)).
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
@@ -141,7 +139,7 @@ Proof.
   intro Meq; euf Meq => _ _ _; 1: auto.
   assert input@T(i,t) = nr(r) as F by auto.
   by (fresh F => C;
-  5:depends R(r), R2(r)).
+  4:depends R(r), R2(r)).
 Qed.
 
 (** Equality used to rewrite the try-find in R1
@@ -189,10 +187,9 @@ Proof.
     fa !<_,_>, if _ then _.
     fresh 1.
     rewrite if_true //.
-    by (repeat split => r0 _;
-        try (depends R(r0), R1(r0) by auto);
-        try (depends R(r0), R2(r0) by auto)).
-
+    repeat split => *;
+    try by depends R(r), R1(r);
+    try by depends R(r), R2(r).
   (* Case R1 *)
   + expand frame, exec, output.
     fa !<_,_>.

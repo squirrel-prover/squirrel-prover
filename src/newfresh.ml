@@ -5,6 +5,7 @@ open Term
 module NO = NameOccs
 
 module TS = TraceSequent
+module ES = EquivSequent
 
 module Hyps = TS.LocalHyps
 
@@ -14,25 +15,68 @@ module Sp = Match.Pos.Sp
 open LowTactics
 
 (*------------------------------------------------------------------*)
-let wrap_fail = TraceLT.wrap_fail
+let wrap_fail_trace = TraceLT.wrap_fail
+let wrap_fail_equiv = EquivLT.wrap_fail
+
 let soft_failure = Tactics.soft_failure
 (* let hard_failure = Tactics.hard_failure *)
 
 type lsymb = Theory.lsymb
 
-type sequent = TS.sequent
+(*------------------------------------------------------------------*)
+(* Look for occurrences using NameOccs *)
+
+(** A NO.f_fold_occs function, for use with NO.occurrence_goals.
+    Looks for occurrences of n in t (ground):
+    - if t is n: returns the occurrence
+    - otherwise: asks to be called recursively on subterms *)
+let get_bad_occs
+    (n:nsymb) 
+    (retry_on_subterms : unit -> (NO.n_occ * nsymb * term) list)
+    (rec_call_on_subterms : 
+       (fv:Vars.vars ->
+        cond:terms ->
+        p:MP.pos ->
+        info:NO.expand_info ->
+        st:term -> 
+        term ->
+        (NO.n_occ * nsymb * term) list))
+    ~(info:NO.expand_info)
+    ~(fv:Vars.vars)
+    ~(cond:terms)
+    ~(p:MP.pos)
+    ~(st:term)
+    (t:term) : (NO.n_occ * nsymb * term) list 
+  =
+  (* handles a few cases, using rec_call_on_subterm for rec calls,
+     and calls retry_on_subterm for the rest *)
+  match t with
+  | Var v when not (Type.is_finite (Vars.ty v)) ->
+    soft_failure
+      (Tactics.Failure "can only be applied on ground terms")
+
+  | Name nn when nn.s_symb = n.s_symb ->    
+    [NO.mk_nocc nn fv cond Sp.empty, n, st]
+
+  | _ -> retry_on_subterms ()
+
+
+
 
 (*------------------------------------------------------------------*)
+(** Fresh trace tactic *)
+
 (** Computes parameters for the fresh trace tactic:
     returns n, t such that hyp is n = t or t = n
     (looks under macros if possible *)
-let fresh_param
+let fresh_trace_param
     ~(hyp_loc : L.t) 
     (info : NO.expand_info) 
     (hyp : term)
-    (table : Symbols.table)
   : nsymb * term
   =
+  let _, contx = info in
+  let table = contx.table in
   let m1, m2 = match NO.destr_eq_expand info hyp with
     | Some (u, v) -> (u,v)
     | None -> 
@@ -57,66 +101,119 @@ let fresh_param
   (n, t)
 
 
-(** A NameOccs.f_fold_occs function, for use with NO.occurrence_goals.
-    Looks for occurrences of n in t (ground):
-    - if t is n: returns the occurrence
-    - otherwise: asks to be called recursively on subterms *)
-let get_bad_occs
-    (n:nsymb) 
-    (retry_on_subterms : unit -> NO.name_occs)
-    (rec_call_on_subterms : 
-       (fv:Vars.vars -> cond:terms -> p:MP.pos -> se:SE.arbitrary -> 
-        st:term -> 
-        term -> NO.name_occs))
-    ~(se:SE.arbitrary)
-    ~(info:NO.expand_info)
-    ~(fv:Vars.vars)
-    ~(cond:terms)
-    ~(p:MP.pos)
-    ~(st:term)
-    (t:term) : NO.name_occs 
-  =
-  (* handles a few cases, using rec_call_on_subterm for rec calls,
-     and calls retry_on_subterm for the rest *)
-  match t with
-  | Var v when not (Type.is_finite (Vars.ty v)) ->
-    raise NO.Var_found
-
-  | Name nn when nn.s_symb = n.s_symb ->
-    let oinfo = NO.mk_oinfo n st ~ac:(NO.get_action info) in
-    [NO.mk_nocc nn oinfo fv cond Sp.empty]
-
-  | _ -> retry_on_subterms ()
-
-
-(** Applies fresh to the sequent s and hypothesis m:
-    calls fresh_param and then NO.occurrence_goals with get_bad_occs,
-    returns the list of produced subgoals *)
-let fresh (m : lsymb) (s : sequent) : sequent list =
+(** Applies fresh to the trace sequent s and hypothesis m:
+    returns the list of subgoals with the added hyp that there is a collision *)
+let fresh_trace (m : lsymb) (s : TS.sequent) : TS.sequent list =
   let id, hyp = Hyps.by_name m s in
   try
     let contx = TS.mk_trace_cntxt s in
-    let table = TS.table s in
+    let env = (TS.env s).vars in
     let (n, t) =
-      fresh_param ~hyp_loc:(L.loc m) (NO.EI_direct (s, contx)) hyp table
+      fresh_trace_param ~hyp_loc:(L.loc m) (NO.EI_direct, contx) hyp
     in
 
-    let pp_n ppf () = Fmt.pf ppf "%a" Term.pp_nsymb n
-    in
+    let pp_n ppf () = Fmt.pf ppf "%a" Term.pp_nsymb n in
     let get_bad = get_bad_occs n in
+   
+    Printer.pr "Freshness of %a:@; @[<v 0>" pp_n ();
+    let phis = NO.occurrence_formulas ~pp_ns:(Some pp_n) get_bad contx env [t] in
+    Printer.pr "@]";
 
-    NO.occurrence_goals ~pp_ns:(Some pp_n) get_bad s t
+    let g = TS.goal s in
+    List.map
+      (fun phi ->
+         TS.set_goal (mk_impl ~simpl:false phi g) s)
+      phis
   with
-  | NO.Var_found ->
-    soft_failure
-      (Tactics.Failure "can only be applied on ground terms")
   | SE.(Error Expected_fset) ->
     soft_failure Underspecified_system
 
 
+
 (** fresh trace tactic *)
-let fresh_tac args s =
+let fresh_trace_tac args s =
   match TraceLT.convert_args s args (Args.Sort Args.String) with
-  | Args.Arg (Args.String str) -> wrap_fail (fresh str) s
+  | Args.Arg (Args.String str) -> wrap_fail_trace (fresh_trace str) s
   | _ -> bad_args ()
 
+
+
+
+
+(*------------------------------------------------------------------*)
+(** Fresh equiv tactic *)
+(* Constructs the formula expressing the freshness
+   of the proj of t in the proj of the biframe,
+   provided it is a name member of a large type *)
+let phi_proj
+    (loc:L.t)
+    (contx:Constr.trace_cntxt)
+    (env:Vars.env)
+    (t:term)
+    (biframe:terms)
+    (proj:proj) :
+  terms
+  =
+  let table = contx.table in
+  let system_p = SE.project [proj] contx.system in
+  let contx_p = { contx with system = system_p } in
+  let info_p = (NO.EI_direct, contx_p) in
+  let t_p = NO.expand_macro_check_all info_p (Term.project1 proj t) in
+  let n_p  = match t_p with
+    | Name np -> np
+    | _ -> soft_failure ~loc
+             (Tactics.Failure "Can only be applied to diff(n_L, n_R)")
+  in
+  let ty_p = n_p.s_typ in
+  if not Symbols.(check_bty_info table ty_p Ty_large) then
+    Tactics.soft_failure ~loc
+      (Tactics.Failure "the type of this term is not [large]");
+  let frame_p = List.map (Term.project1 proj) biframe in
+  let pp_n_p ppf () = Fmt.pf ppf "%a" Term.pp_nsymb n_p in
+  let get_bad_p = get_bad_occs n_p in
+  
+  (* the biframe is used in the old fresh for indirect cases. why? *)
+  (* should env be projected? *)
+  let phi_p = NO.occurrence_formulas ~negate:true ~pp_ns:(Some pp_n_p) get_bad_p contx_p env frame_p in
+  (* not removing duplicates here, as we already do that on occurrences. *)
+  (* probably fine, but we'll need to remove duplicates between phi_l and phi_r *)
+  phi_p
+
+
+
+(* Constructs the sequent where goal i, if of the form diff(n_l, n_r),
+   is replaced with if phi then zero else diff(n_l, n_r),
+   where phi expresses the freshness of n_l on the left, and n_r on the right *)
+let fresh_equiv (i : int L.located) (s : ES.sequent) : ES.sequents =
+  let contx = ES.mk_pair_trace_cntxt s in
+  let env = ES.vars s in
+  let loc = L.loc i in
+
+  let proj_l, proj_r = ES.get_system_pair_projs s in
+
+  let before, t, after = split_equiv_goal i s in
+  let biframe = List.rev_append before after in
+  
+  Printer.pr "@[<v 0>Freshness on the left side:@;";
+  let phi_l = phi_proj loc contx env t biframe proj_l in
+
+  Printer.pr "@;@;Freshness on the right side:@;";
+  let phi_r = phi_proj loc contx env t biframe proj_r in
+  Printer.pr "@]";
+
+  (* Removing duplicates. We already did that for occurrences, but
+     only within phi_l and phi_r, not across both *)
+  let cstate = Reduction.mk_cstate contx.table in
+  let phis = Utils.List.remove_duplicate (Reduction.conv cstate) (phi_l @ phi_r) in
+
+  let phi = mk_ands ~simpl:true phis in
+  let new_t = mk_ite ~simpl:true phi mk_zero t in
+  let new_biframe = List.rev_append before (new_t::after) in
+  [ES.set_equiv_goal new_biframe s]
+
+
+
+(* fresh equiv tactic *)
+let fresh_equiv_tac args = match args with
+  | [Args.Int_parsed i] -> wrap_fail_equiv (fresh_equiv i)
+  | _ -> bad_args ()

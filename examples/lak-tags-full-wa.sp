@@ -61,7 +61,6 @@ Proof.
     fresh Mfresh; intro Hfresh; try destruct Hfresh as [i' Hfresh].
     - auto.
     - by depends R(k), R1(k,i').
-    - by depends R(k), R1(k,i').
     - by depends R(k), R2(k).
 Qed.
 
@@ -106,7 +105,6 @@ Proof.
   assert (input@T(i,j) = nR(k)) as Hfresh by auto.
   fresh Hfresh; intro Hfresh'; try destruct Hfresh' as [i0 Hfresh'].
   + auto.
-  + by depends R(k), R1(k,i0).
   + by depends R(k), R1(k,i0).
   + by depends R(k), R2(k).
 Qed.

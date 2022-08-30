@@ -65,3 +65,11 @@ val to_trace_sequent : t -> LowTraceSequent.t
 (** {2 Automated reasoning} *)
 
 val query_happens : precise:bool -> t -> Term.term -> bool
+
+(** Utility *)
+
+(* Constructs the trace context for the pair of systems *)
+val mk_pair_trace_cntxt : sequent -> Constr.trace_cntxt
+
+(* Fails if the goal is not an equivalence *)
+val check_goal_is_equiv : sequent -> unit

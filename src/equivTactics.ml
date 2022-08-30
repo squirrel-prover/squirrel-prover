@@ -38,14 +38,9 @@ let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
-let mk_pair_trace_cntxt (s : ES.t) : Constr.trace_cntxt =
-  let se = (Utils.oget ((ES.env s).system.pair) :> SE.fset) in
-  ES.mk_trace_cntxt ~se s 
+let mk_pair_trace_cntxt = ES.mk_pair_trace_cntxt
 
-let check_goal_is_equiv (s : ES.t) : unit =
-  if not (Equiv.is_equiv (ES.goal s)) then
-    Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
-
+let check_goal_is_equiv = ES.check_goal_is_equiv
 (*------------------------------------------------------------------*)
 (** {2 Logical Tactics} *)
 
