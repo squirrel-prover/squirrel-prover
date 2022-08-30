@@ -86,7 +86,7 @@ let () =
       usages_sorts = [Sort String; Sort Int];
       tactic_group=Structural }
     ~pq_sound:true
-    (LT.gentac_of_any_tac_arg Newfresh.fresh_trace_tac Newfresh.fresh_equiv_tac)
+    (LT.gentac_of_any_tac_arg Fresh.fresh_trace_tac Fresh.fresh_equiv_tac)
 
 (*------------------------------------------------------------------*)
 let () = T.register_general "induction"

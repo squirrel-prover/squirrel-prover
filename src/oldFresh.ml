@@ -1,3 +1,4 @@
+(** Deprecated, kept temporarily for use in older functions *)
 (** Utilities for tactics exploiting a name's freshness. *)
 
 open Utils
