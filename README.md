@@ -101,6 +101,80 @@ or using Emacs with the Proof General mode (if installed)
 $ emacs examples/basic-hash.sp
 ```
 
+### Data visualisation (with Proof General)
+
+To have a graphical representation of the state of the proof,
+set the variable `SP_VISU` to `ok` in your environnement.
+Then, launch a Squirrel file with Emacs:
+
+```
+$ export SP_VISU=ok
+$ emacs examples/basic-hash.sp
+```
+
+You need to validate at least one line in Emacs to launch the local server.
+Then, you can access the visualisation at: [http://localhost:8080/visualisation.html](http://localhost:8080/visualisation.html)
+
+### Export in HTML format (needs [pandoc](https://pandoc.org/)
+
+To convert a Squirrel development to HTML, you need:
+
+* A **Squirrel file** `PATH1/squirrel_name.sp`
+* An **HTML template file** `PATH2/page.html` containing a line:
+`<!--HERE-->` (without spaces or tabulations)
+
+A default HTML template can be found at `scripts/html_export/page.html`.
+
+
+```
+./squirrel PATH1/squirrel_name.sp --html PATH2/page.html
+```
+
+The previous command will create a copy of `page.html` in the same directory pointed
+by `PATH1` named `squirrel_name.html`. **Beware** that, if a file already
+exists with this name, it will be deleted by this operation.
+
+This new file will have the output of Squirrel formatted in HTML and placed
+where the `<!--HERE-->` tag is.
+
+Squirrel will put its results between span tags that will not be displayed. This result can later be processed, with javascript for example.
+
+Each instruction in the Squirrel file is translated into an item
+of the following form (with `_i` in the tags' id replaced by the number of the instuction):
+
+```
+<span class="squirrel-step" id="step_i">
+  <span class="input-line" id="in_i">
+    Input
+  </span>
+  <span class="output-line" id="out_i">
+    Output
+  </span>
+  <span class="com-line" id="com_i">
+    Comment
+  </span>
+</span>
+```
+
+The "Comment" part will be filled by comments in the Squirrel file starting with `(**` and ending with `*)`.
+It is possible to format these comment with pandoc's Markdown (detailled [here](https://pandoc.org/MANUAL.html#pandocs-markdown)).
+Others comments will be left in the "Input" part.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Examples
 Examples of developments in Squirrel can be found in:
 - `examples/`

@@ -1,12 +1,101 @@
-/***** Parameters *****/
+/***** Global parameters *****/
 
+/**
+ * Margin between nodes
+ * @const
+ * @type {number}
+ */
 const margin = 20
+/**
+ * Margin inside a node
+ * @const
+ * @type {number}
+ */
 const margin2 = 5
 
 
 
+
+
+/***** Overview of the code *****/
+
+/*** Overview of D3 ***/
+// D3 use an object named "selection".
+// A selection links a object with a DOM element.
+// We will have two kind of selections :
+// - one for nodes which represent timestamps
+// - one for links which represent timestamp inequalities
+
+/*** Nodes ***/
+// A node, the object representing a timestamp, have this type:
+// {
+//   "id": String,
+//   "name": String,
+//   "cond": String (optional),
+//   "state": String (optional),
+//   "output": String (optional)
+// }
+
+// One the other hand, the associated DOM element has this structure: 
+// <g class="node" id={String} transform="translate({Number}, {Number})">
+//   <g class="line name" transform="translate({Number}, {Number})"> [...] </g>
+//   <g class="line cond" transform="translate({Number}, {Number})"> [...] </g> (optional)
+//   <g class="line state" transform="translate({Number}, {Number})"> [...] </g> (optional)
+//   <g class="line output" transform="translate({Number}, {Number})"> [...] </g> (optional)
+// </g>
+
+// Each line is built like this:
+// <g class="line {String}" transform="translate({Number}, {Number})">
+//   <rect x="0" y="0" style="stroke: black; fill: none;" width="{Number}" height="{Number}"></rect>
+//   <foreignObject width="{Number}" height="{Number}">
+//     <div>
+//       <span> {String} </span>
+//     </div>
+//   </foreignObject>
+// </g>
+
+/*** Links ***/
+// The object representing a timestamp inequality is:
+// {
+//   "parent": node,
+//   "child": node
+// }
+
+// The associated DOM element is a path:
+// <path class="link" d="M {Number} {Number} C {Number} {Number}, {Number} {Number}, {Number} {Number}"></path>
+
+/*** D3's joints ***/
+// D3 
+//
+
 /***** Read file *****/
 
+/**
+ * @typedef {Object} Node
+ * @property {string} id - Id of the node (unique)
+ * @property {string} name - Name of the timestamp
+ * @property {string} [cond] - Condition of the timestamp
+ * @property {string} [state] - State modified at the timestamp
+ * @property {string} [output] - Output of the timestamp
+ */
+
+/**
+ * @typedef {Object} Node
+ * @property {string} id - Id of the node (unique)
+ * @property {string} name - Name of the timestamp
+ * @property {string} [cond] - Condition of the timestamp
+ * @property {string} [state] - State modified at the timestamp
+ * @property {string} [output] - Output of the timestamp
+ */
+
+
+/** 
+ * Send a request to read a JSON file.
+ * If the request fails, return an object representing an empty graph.
+ 
+ * @param {string} filePath - File's address 
+ * @type {number}
+ */
 function loadJSONFile(filePath) {
   var result = null;
   var xmlhttp = new XMLHttpRequest();
@@ -20,28 +109,26 @@ function loadJSONFile(filePath) {
   return result;
 }
 
-
-
-/***** Initialisation *****/
-
-/* Create properties in each nodes which will be necessary later */
+// [formatData(json)] takes the raw data obtains from the json file.
+// Return an object containing two fields:
+// - [layout] contains a list of list of nodes.
+//   This structure represents the layout.
+// - [links] is a list of pairs of nodes, one [parent] and a one [child]. */
 function formatData(json) {
   // Create a mapping from id to the node designated by the id
   const map = {};
   json.nodes.forEach(node => {
     map[node.id] = node;
   });
-  // result will contain two fields
   const result = new Object();
-  // result.nodes contains the nodes in a list of list representing the layout
   result.nodes = json.layout.map((nodes,lineNumber) => {
     return nodes.map((layoutNode, columnNumber) => {
       const node = map[layoutNode.id];
+      // We add a random to each node to help distinguish them
       node.color = Math.floor(Math.random() * 360);
       return node;
     });
   });
-  // result.links contains the set of inequalities between nodes
   result.links = [];
   json.nodes.forEach(node => {
     node.children.forEach(childId => {
@@ -50,6 +137,8 @@ function formatData(json) {
   });
   return result;
 }
+
+
 
 
 
@@ -163,6 +252,8 @@ function applyAllPositions(selectionNodes, selectionLinks, delay) {
 
 
 
+
+
 /***** Plot *****/
 
 function enterLine(selection, kind, mutable, text, partialClick) {
@@ -219,6 +310,7 @@ function enterNode(selection) {
   enterLine(result, "state", true, "States", partialClick);
   enterLine(result, "output", true, "Output", partialClick);
   result.each((d,i,node) => {
+    console.log(d);
     const domNode = node[i];
     computeNodeSize(domNode);
     applyNodeSize(domNode, 0);

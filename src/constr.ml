@@ -1524,8 +1524,10 @@ let dump ppf cntxt =
       dump_layout ppf g;
       Format.fprintf ppf "@]@;}@.";
     end
-  | Some _ -> ()
-  | None -> ()
+    else
+      Format.fprintf ppf "{\"error\": \"Model is empty\"}@.";
+  | Some _ -> Format.fprintf ppf "{\"error\": \"Several models\"}@.";
+  | None -> Format.fprintf ppf "{\"error\": \"No model\"}@.";
   
 
 (*------------------------------------------------------------------*)

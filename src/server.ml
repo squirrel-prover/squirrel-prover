@@ -19,7 +19,7 @@ let repository = Filename.dirname (make_absolute Sys.argv.(0))
 
 let read_file filename =
   read_whole_file
-    (Filename.concat repository (Filename.concat "scripts" filename))
+    (Filename.concat repository (Filename.concat "scripts/visualisation" filename))
 
 (* Function to send update events. It will be updated when creating
    the corresponding route in the server. *)
@@ -80,7 +80,7 @@ let start () =
       (fun filename ->
          S.add_route_handler ~meth:`GET server
            S.Route.(exact filename @/ return)
-           (fun _req -> S.Response.make_string (Ok (read_file filename)))) ["visualisation.html";"visualisation2.html";"visualisation_style.css";"visualisation_script.js";"visualisation_script2.js";"favicon.ico"];
+           (fun _req -> S.Response.make_string (Ok (read_file filename)))) ["visualisation.html";"visualisation_style.css";"visualisation_script.js";"favicon.ico"];
 
     (* Data *)
   
@@ -94,11 +94,10 @@ let start () =
                  Format.asprintf "%a"
                    Constr.dump (LowTraceSequent.mk_trace_cntxt j)
                in
-               if json <> "" then
-                 S.Response.make_string ~headers:headers (Ok json)
-               else
-                 S.Response.fail ~headers:headers ~code:503 "No data for now"
-           | _ | exception _ -> S.Response.fail ~headers:headers ~code:503 "No data for now");
+               S.Response.make_string ~headers:headers (Ok json)
+           | _ | exception _ -> 
+               let json = "{\"error\": \"Nothing to visualise\"}" in
+               S.Response.make_string ~headers:headers (Ok json));
 
     S.add_route_handler ~meth:`GET server
       S.Route.(exact "goal" @/ return)

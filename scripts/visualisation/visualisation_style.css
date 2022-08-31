@@ -1,9 +1,6 @@
 rect.cond, rect.state, rect.output {
   fill: #eeeeee;
 }
-div {
-  padding: 5px;
-}
 span.name {
   display: table;
   margin: 0 auto;
