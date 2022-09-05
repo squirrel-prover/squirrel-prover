@@ -26,13 +26,14 @@ type lsymb = Theory.lsymb
 (*------------------------------------------------------------------*)
 (* Look for occurrences using NameOccs *)
 
-(** A NO.f_fold_occs function, for use with NO.occurrence_goals.
+(** A unit NO.f_fold_occs function, for use with NO.occurrence_goals.
     Looks for occurrences of n in t (ground):
     - if t is n: returns the occurrence
-    - otherwise: asks to be called recursively on subterms *)
+    - otherwise: asks to be called recursively on subterms.
+   uses not accumulator, so returns an empty unit list. *)
 let get_bad_occs
     (n:nsymb) 
-    (retry_on_subterms : unit -> (NO.n_occ * nsymb * term) list)
+    (retry_on_subterms : unit -> (NO.n_occ * nsymb * term) list * unit list)
     (rec_call_on_subterms : 
        (fv:Vars.vars ->
         cond:terms ->
@@ -40,13 +41,13 @@ let get_bad_occs
         info:NO.expand_info ->
         st:term -> 
         term ->
-        (NO.n_occ * nsymb * term) list))
+        (NO.n_occ * nsymb * term) list * unit list))
     ~(info:NO.expand_info)
     ~(fv:Vars.vars)
     ~(cond:terms)
     ~(p:MP.pos)
     ~(st:term)
-    (t:term) : (NO.n_occ * nsymb * term) list 
+    (t:term) : (NO.n_occ * nsymb * term) list * unit list
   =
   (* handles a few cases, using rec_call_on_subterm for rec calls,
      and calls retry_on_subterm for the rest *)
@@ -56,7 +57,7 @@ let get_bad_occs
       (Tactics.Failure "can only be applied on ground terms")
 
   | Name nn when nn.s_symb = n.s_symb ->    
-    [NO.mk_nocc nn fv cond Sp.empty, n, st]
+    [NO.mk_nocc nn fv cond Sp.empty, n, st], []
 
   | _ -> retry_on_subterms ()
 
@@ -73,11 +74,12 @@ let fresh_trace_param
     ~(hyp_loc : L.t) 
     (info : NO.expand_info) 
     (hyp : term)
+    (s : TS.sequent)
   : nsymb * term
   =
   let _, contx = info in
   let table = contx.table in
-  let m1, m2 = match NO.destr_eq_expand info hyp with
+  let m1, m2 = match TS.Reduce.destr_eq s Equiv.Local_t hyp with
     | Some (u, v) -> (u,v)
     | None -> 
       soft_failure ~loc:hyp_loc
@@ -109,14 +111,14 @@ let fresh_trace (m : lsymb) (s : TS.sequent) : TS.sequent list =
     let contx = TS.mk_trace_cntxt s in
     let env = (TS.env s).vars in
     let (n, t) =
-      fresh_trace_param ~hyp_loc:(L.loc m) (NO.EI_direct, contx) hyp
+      fresh_trace_param ~hyp_loc:(L.loc m) (NO.EI_direct, contx) hyp s
     in
 
     let pp_n ppf () = Fmt.pf ppf "%a" Term.pp_nsymb n in
     let get_bad = get_bad_occs n in
    
     Printer.pr "Freshness of %a:@; @[<v 0>" pp_n ();
-    let phis = NO.occurrence_formulas ~pp_ns:(Some pp_n) get_bad contx env [t] in
+    let phis, _ = NO.occurrence_formulas ~pp_ns:(Some pp_n) get_bad contx env [t] in
     Printer.pr "@]@;";
 
     let g = TS.goal s in
@@ -174,7 +176,7 @@ let phi_proj
   
   (* the biframe is used in the old fresh for indirect cases. why? *)
   (* should env be projected? *)
-  let phi_p = NO.occurrence_formulas ~negate:true ~pp_ns:(Some pp_n_p) get_bad_p contx_p env frame_p in
+  let phi_p, _ = NO.occurrence_formulas ~negate:true ~pp_ns:(Some pp_n_p) get_bad_p contx_p env frame_p in
   (* not removing duplicates here, as we already do that on occurrences. *)
   (* probably fine, but we'll need to remove duplicates between phi_l and phi_r *)
   phi_p

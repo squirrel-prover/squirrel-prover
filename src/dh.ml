@@ -80,18 +80,19 @@ let partition_powers (nab:nsymb list) (pows:term list) :
 
 (*------------------------------------------------------------------*)
 (* future work: return a tree of and/or of name_occs and generate the goals accordingly *)
-(** A NO.f_fold_occs function, for use with NO.occurrence_goals.
+(** A unit NO.f_fold_occs function, for use with NO.occurrence_goals.
     Looks for occurrences of names in nab not allowed by CDH or GDH (depending on gdh_oracles).
     Finds all possible occurrences of nab in t (ground), except
     1) in g ^ p1…pn: one pi is allowed to be a or b
     2) in u^p1…pn = v^q1…qm: if GDH, one pi and one qi are allowed to be a or b
     If t is of the form something^something, looks directly for occurrences in t,
     and uses the provided continuation for the rec calls on its subterms.
-    Otherwise, gives up, and asks occurrence_goals to call it again on subterms. *)
+    Otherwise, gives up, and asks occurrence_goals to call it again on subterms.
+   Does not use any accumulator, so returns an empty unit list. *)
 let get_bad_occs
     (gdh_oracles:bool) (g:term) (exp:fsymb) (mult:fsymb option)
     (nab:nsymb list) 
-    (retry_on_subterms : (unit -> (NO.n_occ * nsymb * term) list))
+    (retry_on_subterms : (unit -> (NO.n_occ * nsymb * term) list * unit list))
     (rec_call_on_subterms :
        (fv:Vars.vars ->
         cond:terms ->
@@ -99,14 +100,14 @@ let get_bad_occs
         info:NO.expand_info ->
         st:term ->
         term ->
-        (NO.n_occ * nsymb * term) list))
+        (NO.n_occ * nsymb * term) list * unit list))
     ~(info:NO.expand_info)
     ~(fv:Vars.vars)
     ~(cond:terms)
     ~(p:MP.pos)
     ~(st:term)
     (t:term) 
-  : (NO.n_occ * nsymb * term) list =
+  : (NO.n_occ * nsymb * term) list * unit list =
   (* get all bad occurrences in m ^ (p1 * … * pn) *)
   (* st is the current subterm, to be recorded in the occurrence *)
   let get_illegal_powers
@@ -114,8 +115,8 @@ let get_bad_occs
       ~(fv:Vars.vars) ~(cond:terms) ~(p:MP.pos) ~(info:NO.expand_info)
       ~(st:term) : (NO.n_occ * nsymb * term) list =
     if m <> g then (* all occs in m, pows are bad *)
-      (rec_call_on_subterms m ~fv ~cond ~p ~info ~st) @ 
-      (List.concat_map (fun tt -> rec_call_on_subterms tt ~fv ~cond ~p ~info ~st) pows)
+      (fst (rec_call_on_subterms m ~fv ~cond ~p ~info ~st)) @ 
+      (List.concat_map (fun tt -> fst (rec_call_on_subterms tt ~fv ~cond ~p ~info ~st)) pows)
       (* p is not kept up to date. update if we decide to use it *) 
 
     else (* 1 bad pi is allowed.
@@ -135,7 +136,7 @@ let get_bad_occs
           (* pos is not set right here, could be bad if we wanted to use it later *)
           bad_pows_minus_1
       in
-      bad_pows_occs @ List.concat_map (fun tt -> rec_call_on_subterms tt ~fv ~cond ~p ~info ~st) other_pows
+      bad_pows_occs @ List.concat_map (fun tt -> fst (rec_call_on_subterms tt ~fv ~cond ~p ~info ~st)) other_pows
   in 
 
   (* handle a few cases, using rec_call_on_subterm for rec calls, and calls retry_on_subterm for the rest *)
@@ -145,14 +146,15 @@ let get_bad_occs
       (Tactics.Failure "can only be applied on ground terms")
 
   | Name n when exists_symb n nab ->
-    List.map
+    (List.map
       (fun nn -> (NO.mk_nocc n fv cond Sp.empty, nn, st))
-      (find_symb n nab)
+      (find_symb n nab),
+     [])
 
   | Fun (f, _, _) when f = exp ->
     let (m, pows) = powers exp mult info t in
     (* we're sure pows isn't empty, so no risk of looping in illegal powers *)
-    get_illegal_powers m pows ~fv ~cond ~p ~info ~st
+    get_illegal_powers m pows ~fv ~cond ~p ~info ~st, []
 
   | Fun (f, _, [t1; t2]) when f = f_eq && gdh_oracles ->
     (* u^p1…pn = v^q1…qn *)
@@ -167,8 +169,9 @@ let get_bad_occs
     let bad_qows_minus_1 = List.drop_right 1 bad_qows in
     (* allow the last one on both sides of =. arbitrary, would be better
        to generate a disjunction goal. *)
-    get_illegal_powers u (bad_pows_minus_1 @ other_pows) ~fv ~cond ~p ~info ~st:t
-    @ get_illegal_powers v (bad_qows_minus_1 @ other_qows) ~fv ~cond ~p ~info ~st:t
+   ((get_illegal_powers u (bad_pows_minus_1 @ other_pows) ~fv ~cond ~p ~info ~st:t
+      @ get_illegal_powers v (bad_qows_minus_1 @ other_qows) ~fv ~cond ~p ~info ~st:t),
+     [])
 
   | _ -> retry_on_subterms ()
 
@@ -200,6 +203,7 @@ let dh_param
     (info : NO.expand_info)
     (hyp : term)
     (g : lsymb)
+    (s : TS.sequent)
   : term * fsymb * fsymb option * term * nsymb * nsymb
   =
 
@@ -224,7 +228,7 @@ let dh_param
   in
 
   (* write hyp as t = g^(a*b) *)
-  let m1, m2 = match NO.destr_eq_expand info hyp with
+  let m1, m2 = match TS.Reduce.destr_eq s Equiv.Local_t hyp with
     | Some (u, v) -> (u,v)
     | None -> soft_failure ~loc:hyp_loc
                 (Tactics.Failure "can only be applied on an equality hypothesis")
@@ -263,14 +267,14 @@ let cgdh
   let env = (TS.env s).vars in
 
   let (gen, exp_s, mult_s, t, na, nb) =
-    dh_param ~hyp_loc:(L.loc m) gdh_oracles (NO.EI_direct, contx) hyp g
+    dh_param ~hyp_loc:(L.loc m) gdh_oracles (NO.EI_direct, contx) hyp g s
   in
   let pp_nab =
     fun ppf () -> Fmt.pf ppf "%a and %a" Term.pp_nsymb na Term.pp_nsymb nb
   in
-  let get_bad = get_bad_occs gdh_oracles gen exp_s mult_s [na; nb] in
+  let get_bad:(unit NO.f_fold_occs)  = get_bad_occs gdh_oracles gen exp_s mult_s [na; nb] in
 
-  let phis = NO.occurrence_formulas ~pp_ns:(Some pp_nab) get_bad contx env [t] in
+  let phis, _ = NO.occurrence_formulas ~pp_ns:(Some pp_nab) get_bad contx env [t] in
 
   let g = TS.goal s in
   List.map
