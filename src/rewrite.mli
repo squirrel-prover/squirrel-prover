@@ -62,9 +62,12 @@ val rewrite_exn :
     bottom-up fashion.
     - the rewriting rule can depend on the position in the term. 
     - the rule conditions [rw_cond] and system [rw_system] must be, 
-      resp., empty and the [system] we are rewriting in. *)
+      resp., empty and the [system] we are rewriting in. 
+
+    If [strict] is true, rewriting cannot fail. *)
 val high_rewrite :
   mode : [`TopDown of bool | `BottomUp] ->
+  strict : bool ->
   Symbols.table ->
   SE.t ->
   (Vars.vars -> Pos.pos -> rw_rule option) ->

@@ -18,7 +18,7 @@ let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
 (** Simple case of [rewrite], without recursion and with a single rewriting 
-    rule. *)
+    rule. Rewriting can fail (hence [strict=false]). *)
 let high_rewrite_norec
     (table  : Symbols.table)
     (system : SE.t)
@@ -27,7 +27,7 @@ let high_rewrite_norec
   : Term.term 
   =
   let mk_rule = fun _ _ -> Some rule in
-  Rewrite.high_rewrite ~mode:(`TopDown false) table system mk_rule t
+  Rewrite.high_rewrite ~mode:(`TopDown false) ~strict:false table system mk_rule t
     
 
 (*------------------------------------------------------------------*)
@@ -1078,8 +1078,11 @@ let global_prf_t
     =
     (* To keep meaningful positions, we need to do the rewriting bottom-up.
        Indeed, this ensures that a rewriting does not modify the positions
-       of the sub-terms above the position the rewriting occurs at. *)
-    Rewrite.high_rewrite ~mode:`BottomUp
+       of the sub-terms above the position the rewriting occurs at. 
+
+       We set [strict] to true, to make sure that we indeed rewrite at
+       all necessary positions. *)
+    Rewrite.high_rewrite ~mode:`BottomUp ~strict:true
       table (old_system :> SE.t) (mk_rw_rule arg ms) t
   in
 
