@@ -92,7 +92,7 @@ let start () =
            | Trace j ->
                let json =
                  Format.asprintf "%a"
-                   Constr.dump (LowTraceSequent.mk_trace_cntxt j)
+                   Visualisation.pp j
                in
                S.Response.make_string ~headers:headers (Ok json)
            | _ | exception _ -> 

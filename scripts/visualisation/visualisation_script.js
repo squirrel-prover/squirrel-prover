@@ -50,17 +50,17 @@
 /** @typedef {Object} Data
   * @property {Array.<NodeDatum>} nodes - List of nodes
   * @property {Array.<Array.<string>>} layout - List of lists of identifiers.
-    Represent the layout.
+    Represents the layout.
   */
 
 /** Datum associated with a link
   * @typedef NodeDatum
   * @property {string} id - Identifier of the node. Unique for each node.
-  * @property {Array.<string>} children - List of identifiers of children of this node.
   * @property {string} name - Content for the line `name`.
   * @property {?string} cond - Content for the line `cond`.
   * @property {?string} state - Content for the line `state`.
   * @property {?string} output - Content for the line `output`.
+  * @property {Array.<string>} children - List of identifiers of children of this node.
   */
 
 /** Object describing an error in the data
@@ -550,7 +550,7 @@ class Scene {
     * @param {Data} data - Data sent by the reader.
     */
   createLayout(data) {
-    this.layout = data.layout.map(row => row.map(node => this.nodes[node.id]));
+    this.layout = data.layout.map(row => row.map(nodeId => this.nodes[nodeId]));
   }
   
   /** Set the properties `x`, `y`, `width` and `height` in each node.

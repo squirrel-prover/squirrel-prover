@@ -54,7 +54,3 @@ val make_context :
   table:Symbols.table ->
   system:SystemExpr.fset ->
   trace_cntxt
-
-(*------------------------------------------------------------------*)
-(** Print the model in JSON format if there is one non-empty model *)
-val dump : Format.formatter -> trace_cntxt -> unit
