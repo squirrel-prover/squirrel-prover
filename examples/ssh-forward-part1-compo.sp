@@ -61,10 +61,10 @@ name b1 : message
 name k11 : message
 name a : index -> message
 name b : index -> message
-name k : index -> index -> message
+name k : index * index -> message
 
-abstract enc : message -> message -> message
-abstract dec : message -> message -> message
+abstract enc : message * message -> message
+abstract dec : message * message -> message
 
 ddh g, (^) where group:message exponents:message.
 
@@ -252,7 +252,7 @@ some simple enriching of the induction hypothesis, and then dup applications. *)
 
 equiv [auth] auth.
 Proof.
-   enrich a1, b1, seq(i:index -> g^b(i)), seq(i:index -> g^a(i)), kP, kS, hKey.
+   enrich a1, b1, seq(i:index => g^b(i)), seq(i:index => g^a(i)), kP, kS, hKey.
 
    induction t; try (by expandall; apply IH).
 

@@ -86,23 +86,23 @@ name skR : index ->  message
 
 
 (* session randomess of I *)
-name dkt : index-> index -> index -> message
+name dkt : index * index * index -> message.
 
 
 (* session randomess of R *)
-name kt : index  -> index  -> index ->message
-name k : index  -> index  -> index -> message
-name rkt : index  -> index  -> index ->message
-name rk : index  -> index  -> index -> message
+name kt  : index * index * index -> message
+name k   : index * index * index -> message
+name rkt : index * index * index -> message
+name rk  : index * index * index -> message
 
 (* session randomess of R with dishonnest I *)
-name Dkt :  index  -> index ->message
-name Dk :  index  -> index -> message
-name Drkt :  index  -> index ->message
-name Drk :  index  -> index -> message
+name Dkt  : index * index -> message
+name Dk   : index * index -> message
+name Drkt : index * index -> message
+name Drk  : index * index -> message
 
 (* session randomess of I with dishonest R*)
-name Ddkt : index-> index -> index -> message
+name Ddkt : index * index * index -> message.
 
 (* long term compromised keys *)
 abstract DvkR : index ->  message
@@ -115,7 +115,7 @@ mutable DsRI(j,k:index) : message =  zero
 mutable DsIR(i,j,k:index) : message =  zero
 
 (* ideal keys *)
-name ikIR : index -> index -> index -> message
+name ikIR : index * index * index -> message
 
 
 abstract ok:message
@@ -515,8 +515,8 @@ xor(try find il,jl,kl such that
            <epk(dkt(i,j,k)),
             <fst(snd(att(frame@pred(I1(i,j,k))))),
              fst(att(frame@pred(I1(i,j,k))))>>>>,
-      exct(skex,decap(fst(snd(att(frame@pred(I1(i,j,k))))),vkI(i)))),
-F2(<epk(vkI(i)),
+      exct(skex,decap(fst(snd(att(frame@pred(I1(i,j,k))))),vkI(i)))))
+(F2(<epk(vkI(i)),
     <epk(vkR(j)),
      <epk(dkt(i,j,k)),
       <fst(snd(att(frame@pred(I1(i,j,k))))),fst(att(frame@pred(I1(i,j,k))))>>>>,
@@ -533,8 +533,8 @@ xor(F2(<epk(vkI(i)),
       try find iv,jv,kv such that
         (skex = skex && (il = iv && jl = jv && kl = kv))
       in n_PRF(iv,jv,kv) else exct(skex,k(il,jl,kl))
-    else exct(skex,decap(fst(snd(att(frame@pred(I1(i,j,k))))),vkI(i)))),
-F2(<epk(vkI(i)),
+    else exct(skex,decap(fst(snd(att(frame@pred(I1(i,j,k))))),vkI(i)))))
+(F2(<epk(vkI(i)),
     <epk(vkR(j)),
      <epk(dkt(i,j,k)),
       <fst(snd(att(frame@pred(I1(i,j,k))))),fst(att(frame@pred(I1(i,j,k))))>>>>,
@@ -605,8 +605,8 @@ xor(try find il,jl,kl such that
            <epk(Ddkt(i,j,k)),
             <fst(snd(att(frame@pred(DI1(i,j,k))))),
              fst(att(frame@pred(DI1(i,j,k))))>>>>,
-      exct(skex,decap(fst(snd(att(frame@pred(DI1(i,j,k))))),vkI(i)))),
-F2(<epk(vkI(i)),
+      exct(skex,decap(fst(snd(att(frame@pred(DI1(i,j,k))))),vkI(i)))))
+(F2(<epk(vkI(i)),
     <epk(DvkR(j)),
      <epk(Ddkt(i,j,k)),
       <fst(snd(att(frame@pred(DI1(i,j,k))))),fst(att(frame@pred(DI1(i,j,k))))>>>>,
@@ -623,8 +623,8 @@ xor(F2(<epk(vkI(i)),
       try find iv,jv,kv such that
         ((skex = skex) && ((il = iv) && (jl = jv) && (kl = kv)))
       in n_PRF(iv,jv,kv) else exct(skex,k(il,jl,kl))
-    else exct(skex,decap(fst(snd(att(frame@pred(DI1(i,j,k))))),vkI(i)))),
-F2(<epk(vkI(i)),
+    else exct(skex,decap(fst(snd(att(frame@pred(DI1(i,j,k))))),vkI(i)))))
+(F2(<epk(vkI(i)),
     <epk(DvkR(j)),
      <epk(Ddkt(i,j,k)),
       <fst(snd(att(frame@pred(DI1(i,j,k))))),fst(att(frame@pred(DI1(i,j,k))))>>>>,
@@ -696,8 +696,8 @@ xor(try find il,jl,kl such that
            <epk(dkt(i,j,k)),
             <fst(snd(att(frame@pred(FI(i,j,k))))),
              fst(att(frame@pred(FI(i,j,k))))>>>>,
-      exct(skex,decap(fst(snd(att(frame@pred(FI(i,j,k))))),vkI(i)))),
-F1(<epk(vkI(i)),
+      exct(skex,decap(fst(snd(att(frame@pred(FI(i,j,k))))),vkI(i)))))
+(F1(<epk(vkI(i)),
     <epk(vkR(j)),
      <epk(dkt(i,j,k)),
       <fst(snd(att(frame@pred(FI(i,j,k))))),fst(att(frame@pred(FI(i,j,k))))>>>>,
@@ -714,8 +714,8 @@ xor(F1(<epk(vkI(i)),
       try find iv,jv,kv such that
         (skex = skex && (il = iv && jl = jv && kl = kv))
       in n_PRF(iv,jv,kv) else exct(skex,k(il,jl,kl))
-    else exct(skex,decap(fst(snd(att(frame@pred(FI(i,j,k))))),vkI(i)))),
-F1(<epk(vkI(i)),
+    else exct(skex,decap(fst(snd(att(frame@pred(FI(i,j,k))))),vkI(i)))))
+(F1(<epk(vkI(i)),
     <epk(vkR(j)),
      <epk(dkt(i,j,k)),
       <fst(snd(att(frame@pred(FI(i,j,k))))),fst(att(frame@pred(FI(i,j,k))))>>>>,
@@ -796,8 +796,8 @@ xor(try find il,jl,kl such that
            <epk(Ddkt(i,j,k)),
             <fst(snd(att(frame@pred(DFI(i,j,k))))),
              fst(att(frame@pred(DFI(i,j,k))))>>>>,
-      exct(skex,decap(fst(snd(att(frame@pred(DFI(i,j,k))))),vkI(i)))),
-F1(<epk(vkI(i)),
+      exct(skex,decap(fst(snd(att(frame@pred(DFI(i,j,k))))),vkI(i)))))
+(F1(<epk(vkI(i)),
     <epk(DvkR(j)),
      <epk(Ddkt(i,j,k)),
       <fst(snd(att(frame@pred(DFI(i,j,k))))),fst(att(frame@pred(DFI(i,j,k))))>>>>,
@@ -814,8 +814,8 @@ xor(F1(<epk(vkI(i)),
       try find iv,jv,kv such that
         ((skex = skex) && ((il = iv) && (jl = jv) && (kl = kv)))
       in n_PRF(iv,jv,kv) else exct(skex,k(il,jl,kl))
-    else exct(skex,decap(fst(snd(att(frame@pred(DFI(i,j,k))))),vkI(i)))),
-F1(<epk(vkI(i)),
+    else exct(skex,decap(fst(snd(att(frame@pred(DFI(i,j,k))))),vkI(i)))))
+(F1(<epk(vkI(i)),
     <epk(DvkR(j)),
      <epk(Ddkt(i,j,k)),
       <fst(snd(att(frame@pred(DFI(i,j,k))))),fst(att(frame@pred(DFI(i,j,k))))>>>>,
@@ -922,7 +922,8 @@ axiom [idealized3] uniqepk : forall (m1,m2:message), epk(m1) =epk(m2) => m1=m2.
 
 axiom [idealized3] sufcma : forall (m1,m2,sk:message), checksign(m1,spk(sk)) = m2 => m1 =sign(m2,sk).
 
-axiom [idealized3] xorconcel : forall (m1,m2,m3:message) m1=m2 => xor(m1,xor(m2,m3)) = m3.
+axiom [idealized3] xorconcel : forall (m1,m2,m3:message) m1=m2 => 
+  xor m1 (xor m2 m3) = m3.
 
 axiom [idealized3] rcheck : forall (m1,m2,sk:message), m1=m2 => checksign(sign(m1,sk),spk(sk)) = m2.
 
@@ -959,7 +960,7 @@ Proof.
            depends I(i,j,l), FI(i,j,l) => //.
            intro OrdIFI.
            simpl.
-           use sufcma with  (xor(ktilde10(i,j,l)@FI(i,j,l),snd(snd(input@FI(i,j,l))))),  sid10(i,j,l)@FI(i,j,l)  ,  skR(j); try auto .
+           use sufcma with (xor(ktilde10(i,j,l)@FI(i,j,l)) (snd(snd(input@FI(i,j,l))))),  sid10(i,j,l)@FI(i,j,l)  ,  skR(j); try auto .
            expand output.
 
            use xorconcel with ktilde8(j,k,i)@SR(j,k,i), ktilde8(j,k,i)@SR(j,k,i), sign(sid8(j,k,i)@SR(j,k,i),skR(j)) => //.
@@ -1002,19 +1003,16 @@ Proof.
 Qed.
 (* As I1 is the converse of FI, we also have freely that *)
 
-
-global axiom  [idealized3/left,idealized3/left]auth3 :  forall (i,j,l:index) ,
+global axiom [idealized3/left,idealized3/left]auth3 (i,j,l:index):
    [happens(FI(i,j,l))] ->
        [exec@FI(i,j,l)] ->
-        exists (k:index),
+        Exists (k:index),
           [I(i,j,l) < FI(i,j,l) &&
           SR(j,k,i) < FI(i,j,l) &&
           input@SR(j,k,i) =  output@I(i,j,l) &&
           fst(output@SR(j,k,i)) = fst(input@FI(i,j,l)) &&
           fst(snd(output@SR(j,k,i))) = fst(snd(input@FI(i,j,l))) &&
-          snd(snd(output@SR(j,k,i))) = snd(snd(input@FI(i,j,l)))]
-.
-
+          snd(snd(output@SR(j,k,i))) = snd(snd(input@FI(i,j,l)))].
 
 equiv  [idealized3/left,idealized3/left] dummy.
 Proof.
@@ -1028,17 +1026,19 @@ Qed.
 axiom  [idealized3/left,idealized3/left]  fst_p: forall (x,y:message) fst(<x,y>)=x.
 axiom  [idealized3/left,idealized3/left]  snd_p: forall (x,y:message) snd(<x,y>)=y.
 
-name n_PRF2 : index -> index -> index -> message.
+name n_PRF2 : index * index * index -> message.
  (* multi PRF assumption, F1(_,n) and F2(_,n) can be seen as F1(_,n') and F2(_,n) *)
 axiom  [idealized3/left,idealized3/left] multprf (i,j,k:index,m:message): F1(m,n_PRF(i,j,k)) = F1(m,n_PRF2(i,j,k)).
 
 axiom   [idealized3/left,idealized3/left] len_F (x1,x2:message) : len(F1(x1,x2)) = len(skex).
 
 (* In idealized, we prove that at the end of I, the derived key is strongly secret. *)
-global goal [idealized3/left,idealized3/left] resp_key: forall (i,j,k:index), [happens(FI(i,j,k))] -> [exec@FI(i,j,k)] -> equiv(frame@FI(i,j,k), diff(sIR(i,j,k)@FI(i,j,k), ikIR(i,j,k))) .
+global goal [idealized3/left,idealized3/left] resp_key (i,j,k:index):
+ [happens(FI(i,j,k))] -> 
+ [exec@FI(i,j,k)] -> 
+ equiv(frame@FI(i,j,k), diff(sIR i j k@FI(i,j,k), ikIR(i,j,k))) .
 Proof.
-
-  intro i j k Hap Ex.
+  intro Hap Ex.
   use dummy with FI(i,j,k) => //.
   expand sIR.
   expand kj10.
@@ -1079,10 +1079,12 @@ Qed.
 
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
-global goal [idealized3/left,idealized3/left] init_key: forall (i,j,k:index), [happens(SR(j,k,i))] -> [exec@SR(j,k,i)] -> equiv(frame@SR(j,k,i), diff(sRI(i,j,k)@SR(j,k,i), ikIR(j,k,i))) .
+global goal [idealized3/left,idealized3/left] init_key (i,j,k:index):
+ [happens(SR(j,k,i))] -> 
+ [exec@SR(j,k,i)] -> 
+ equiv(frame@SR(j,k,i), diff(sRI i j k@SR(j,k,i), ikIR(j,k,i))).
 Proof.
-
-  intro i j k Hap Ex.
+  intro Hap Ex.
   use dummy with SR(j,k,i) => //.
   expand sRI.
   expand kj8.

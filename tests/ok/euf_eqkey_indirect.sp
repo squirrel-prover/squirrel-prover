@@ -6,7 +6,7 @@
 channel c
 hash h
 name n : message
-name k : index->index->message
+name k : index * index -> message
 
 system !_i out(c,h(n,k(i,i))).
 

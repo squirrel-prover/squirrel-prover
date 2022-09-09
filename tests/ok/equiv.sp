@@ -1,9 +1,7 @@
-
-
 abstract ok : message
 abstract ko : message
 
-abstract f : message->message
+abstract f : message -> message
 
 name n : message
 name m : message

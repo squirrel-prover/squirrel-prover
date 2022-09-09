@@ -50,7 +50,7 @@ abstract ko : message.
     system so that each new session of a tag uses a new key. *)
 
 name key  : index -> message
-name key' : index -> index -> message
+name key' : index * index -> message
 
 (** Finally, we declare the channels used by the protocol. *)
 

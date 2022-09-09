@@ -90,28 +90,28 @@ name skI : index-> message
 name skR : index->  message
 
 (* session randomess of I *)
-name kI : index -> index -> index -> message
-name rI : index -> index -> index -> message
+name kI : index * index * index -> message
+name rI : index * index * index -> message
 
 (* session randomess of R *)
-name kR : index -> index -> index -> message
-name rR : index -> index -> index -> message
+name kR : index * index * index -> message
+name rR : index * index * index -> message
 
 (* session randomess of R for Dishonest cases*)
-name DkR :  index -> index -> message
-name DrR :  index -> index -> message
+name DkR :  index * index -> message
+name DrR :  index * index -> message
 
 
 (* compromised long term key of R *)
 name DskR : index->  message
 
 (* session randomess of I talking to compromised *)
-name DkI : index -> index -> index -> message
-name DrI : index -> index -> index -> message
+name DkI : index * index * index -> message
+name DrI : index * index * index -> message
 
 
 (* ideal keys *)
-name ikIR : index -> index -> index -> message
+name ikIR : index * index * index -> message
 
 mutable sIR(i,j,k:index) : message =  zero
 mutable sRI(i,j,k:index) : message =  zero
@@ -369,7 +369,7 @@ axiom  [idealized/left,idealized/left] len_expd (x1,x2:message) : len(expd(x1,x2
 
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
-global goal [idealized/left,idealized/left] resp_key: forall (i,j,k:index), [happens(R2(i,j,k))] -> equiv(frame@R2(i,j,k), diff(sRI(i,j,k)@R2(i,j,k), ikIR(i,j,k))) .
+global goal [idealized/left,idealized/left] resp_key: Forall (i,j,k:index), [happens(R2(i,j,k))] -> equiv(frame@R2(i,j,k), diff(sRI i j k@R2(i,j,k), ikIR(i,j,k))) .
 Proof.
   intro i j k Hap .
   use reflex with R2(i,j,k) => //.
@@ -378,7 +378,7 @@ Proof.
   auto.
   prf 1; rewrite if_true in 1.
   auto.
-  xor 1, xor(_,_), n_PRF1. 
+  xor 1, xor _ _, n_PRF1. 
   rewrite len_expd.
   namelength n_PRF1, skex.
   intro Len.
@@ -396,7 +396,7 @@ Qed.
 
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
-global goal [idealized/left,idealized/left] right_key: forall (i,j,k:index), [happens(I1(i,j,k))] -> equiv(frame@I1(i,j,k), diff(sIR(i,j,k)@I1(i,j,k), ikIR(i,j,k))) .
+global goal [idealized/left,idealized/left] right_key: Forall (i,j,k:index), [happens(I1(i,j,k))] -> equiv(frame@I1(i,j,k), diff(sIR i j k@I1(i,j,k), ikIR(i,j,k))) .
 Proof.
   intro i j k Hap .
   use reflex with I1(i,j,k) => //.

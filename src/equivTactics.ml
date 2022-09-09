@@ -514,24 +514,31 @@ let fa_select_felems (pat : Term.term Term.pat) (s : ES.t) : int option =
 
 exception No_FA of [`HeadDiff | `HeadNoFun]
 
-let fa_expand (t:Term.t) =
-  let l = match Term.head_normal_biterm t with
-    | Fun (f,_,l) ->
-      if List.for_all (fun t ->
-          Term.is_var t && Type.is_finite (Term.ty t)
-        ) l
-      then []
-      else l
-        
+let fa_expand (t : Term.t) : Term.terms =
+  let is_finite_vars l =
+    List.for_all (fun t ->
+        Term.is_var t && Type.is_finite (Term.ty t)
+      ) l
+  in
+  let l =
+    match Term.head_normal_biterm t with
+    | Tuple l
+    | Fun (_,_,[Tuple l]) 
+    | Fun (_,_,l) ->
+      if is_finite_vars l then [] else l
+
+    | Proj (_,t) -> if is_finite_vars [t] then [] else [t]
+
+    | App (t,l) -> if is_finite_vars (t :: l) then [] else t :: l
+
     | Diff _      -> raise (No_FA `HeadDiff)
     | _           -> raise (No_FA `HeadNoFun)
   in
   (* Remove of_bool(b) coming from expansion of frame macro. *)
-  List.map
-    (function
-       | Term.Fun (f,_,[c]) when f = Term.f_of_bool -> c
-       | x -> x)
-    l
+  List.map (function
+      | Term.Fun (f,_,[c]) when f = Term.f_of_bool -> c
+      | x -> x
+    ) l
 
 (** Applies Function Application on a given frame element *)
 let do_fa_felem (i : int L.located) (s : ES.t) : ES.t =
@@ -635,12 +642,12 @@ let fa_tac args = match args with
     can be seen as context of duplicates and assumptions are removed, but
     replaced by the assumptions that appear as there subterms. 
 
-    Used in automatic simplification. *)
+    Used in automatic simplification with FA. *)
 let filter_fa_dup (s : ES.t) assump (elems : Equiv.equiv) =
   let table = ES.table s in
 
   let rec doit res (elems : Equiv.equiv) =
-    let rec is_fa_dup acc elems e =
+    let rec is_fa_dup acc (elems : Term.terms) (e : Term.term) =
       (* if an element is a duplicate wrt. elems, we remove it directly *)
       if Action.is_dup ~eq:(ES.Reduce.conv_term s) table e elems then
         (true,[])
@@ -661,16 +668,16 @@ let filter_fa_dup (s : ES.t) assump (elems : Equiv.equiv) =
     match elems with
     | [] -> res
     | e :: els ->
-      let (fa_succ,fa_rem) =  is_fa_dup [] (res@els) e in
-      if fa_succ then doit (fa_rem@res) els
-      else doit (e::res) els
+      let fa_succ, fa_rem =  is_fa_dup [] (res @ els) e in
+      if fa_succ then doit (fa_rem @ res) els
+      else doit (e :: res) els
   in
   doit [] elems
 
 (** This tactic filters the biframe through [filter_fa_dup], passing the set of
-   hypotheses to it.  This is applied automatically, and essentially leaves only
-   assumptions, or elements that contain a subterm which is neither a duplicate
-   nor an assumption. *)
+    hypotheses to it.  This is applied automatically, and essentially leaves only
+    assumptions, or elements that contain a subterm which is neither a duplicate
+    nor an assumption. *)
 let fa_dup (s : ES.t) : ES.t list =
   (* TODO: allow to choose the hypothesis through its id *)
   let hyp = Hyps.find_map (fun _id hyp -> match hyp with
@@ -716,7 +723,8 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
       timestamps
       atoms
 
-  method fold_message timestamps t = match t with
+  method fold_message timestamps t = 
+    match t with
     | Macro (ms,[],a)
       when (ms = Term.in_macro && (a = tau || List.mem a timestamps)) ||
            (ms = Term.out_macro && List.mem a timestamps) ->
@@ -751,6 +759,8 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
         && (Term.ty t1 = Type.Index || Term.ty t1 = Type.Timestamp) ->
       timestamps
 
+    | App _
+    | Tuple _ | Proj _
     | Fun _ | Find _
     | Quant (_,_,_) -> super#fold_message timestamps t
 
@@ -1233,9 +1243,14 @@ let prf arg (s : ES.t) : ES.t list =
           soft_failure
             (Tactics.Failure "the given hash does not occur in the term")
   in
-  let fn, ftyp, m, key, hash = match hash_occ.Iter.occ_cnt with
-    | Term.Fun (fn, ftyp, [m; key]) as hash ->
-      fn, ftyp, m, key, hash
+  let fn, ftyp, m, key, hash =
+    match hash_occ.Iter.occ_cnt with
+    | Term.Fun (fn, ftyp, [tuple]) as hash ->
+      begin
+        match Term.head_normal_biterm tuple with
+        | Tuple [m; key] -> fn, ftyp, m, key, hash
+        | _ -> assert false
+      end
     | _ -> assert false
   in
 
@@ -1674,7 +1689,7 @@ let cca1 Args.(Int i) s =
           | None -> Term.mk_name sk
         in
         let new_term =
-          Term.mk_fun table fnenc [new_m; Term.mk_name r; enc_sk]
+          Term.mk_fun_tuple table fnenc [new_m; Term.mk_name r; enc_sk]
         in
         Term.ESubst (enc, new_term)
     in
@@ -1687,12 +1702,12 @@ let cca1 Args.(Int i) s =
   let is_top_level : bool =
     match e with
     | Term.Fun (fnenc, _,
-                [m; Term.Name r;
-                 Term.Fun (fnpk, _, [Term.Name sk])])
+                [Tuple [m; Term.Name r;
+                        Term.Fun (fnpk, _, [Term.Name sk])]])
       when (Symbols.is_ftype fnpk Symbols.PublicKey cntxt.table
             && Symbols.is_ftype fnenc Symbols.AEnc table) -> true
 
-    | Term.Fun (fnenc, _, [m; Term.Name r; Term.Name sk])
+    | Term.Fun (fnenc, _, [Tuple [m; Term.Name r; Term.Name sk]])
       when Symbols.is_ftype fnenc Symbols.SEnc table -> true
 
     | _ -> false
@@ -1707,73 +1722,75 @@ let cca1 Args.(Int i) s =
       soft_failure (Tactics.Failure "cannot be applied in a under a binder");
 
     match occ.Iter.occ_cnt with
-    | (Term.Fun (fnenc, _,
-                 [m; Term.Name r;
-                  Term.Fun (fnpk, _, [Term.Name sk])])
-       as enc)
-      when (Symbols.is_ftype fnpk Symbols.PublicKey table
-            && Symbols.is_ftype fnenc Symbols.AEnc table) ->
-      begin
-        match Symbols.Function.get_data fnenc table with
-        (* we check that the encryption function is used with the associated
-           public key *)
-        | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk
-          ->
-          begin
-            let errors =
-              Euf.key_ssc ~globals:true ~elems:(ES.goal_as_equiv s)
-                ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
-                ~cntxt fndec sk.s_symb
-            in
-            if errors <> [] then
-              soft_failure (Tactics.BadSSCDetailed errors);
+    | Term.Fun (fnenc, _, [arg]) as enc
+      when Symbols.is_ftype fnenc Symbols.AEnc table ->
 
-            if not (List.mem
-                      (Term.mk_fun table fnpk [Term.mk_name sk])
-                      biframe) then
+      let m, r, sk, fnpk, fndec =
+        match Term.head_normal_biterm arg with
+        | Tuple [m; Term.Name r; Term.Fun (fnpk, _, [Term.Name sk])] ->
+          (* we check that the encryption function is used with the associated
+             public key *)
+          let fndec = match Symbols.Function.get_data fnenc table with
+            | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk ->
+              assert (Symbols.is_ftype fnpk Symbols.PublicKey table);
+              fndec
+                
+            | _ ->
               soft_failure
-                (Tactics.Failure
-                   "The public key must be inside the frame in order to \
-                    use CCA1");
-
-            get_subst_hide_enc
-              enc fnenc m (Some fnpk)
-              sk fndec r is_top_level
-          end
-
+                (Failure "the first encryption does not use the corresponding \
+                          public key.")
+          in
+          m, r, sk, fnpk, fndec
         | _ ->
-          soft_failure
-            (Tactics.Failure
-               "The first encryption symbol is not used with the correct \
-                public key function.")
-      end
+          soft_failure (Failure "cannot determine the arguments of the \
+                                 first encryptions")
+      in
+      let errors =
+        Euf.key_ssc ~globals:true ~elems:(ES.goal_as_equiv s)
+          ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
+          ~cntxt fndec sk.s_symb
+      in
+      if errors <> [] then
+        soft_failure (Tactics.BadSSCDetailed errors);
 
-    | (Term.Fun (fnenc, _, [m; Term.Name r; Term.Name sk])
-       as enc) when Symbols.is_ftype fnenc Symbols.SEnc table
-      ->
-      begin
+      if not (List.mem
+                (Term.mk_fun table fnpk [Term.mk_name sk])
+                biframe) then
+        soft_failure
+          (Tactics.Failure
+             "The public key must be inside the frame in order to \
+              use CCA1");
+
+      get_subst_hide_enc
+        enc fnenc m (Some fnpk)
+        sk fndec r is_top_level
+
+    | Term.Fun (fnenc, _, [args]) as enc 
+      when Symbols.is_ftype fnenc Symbols.SEnc table ->
+      let m, r, sk =
+        match Term.head_normal_biterm args with
+        | Tuple [m; Term.Name r; Term.Name sk] -> m, r, sk
+        | _ ->
+          soft_failure (Failure "cannot determine the arguments of the \
+                                 first encryptions")
+      in
+
+      let fndec =
         match Symbols.Function.get_data fnenc table with
-        (* we check that the encryption function is used with the associated
-           public key *)
-        | Symbols.AssociatedFunctions [fndec]
-          ->
-          begin
-            try
-              Cca.symenc_key_ssc ~elems:(ES.goal_as_equiv s) ~messages:[enc]
-                ~cntxt fnenc fndec sk.s_symb;
-              (* we check that the randomness is ok in the system and the
-                 biframe, except for the encryptions we are looking at, which
-                 is checked by adding a fresh reachability goal. *)
-              Cca.symenc_rnd_ssc ~cntxt env fnenc sk biframe;
-              get_subst_hide_enc enc fnenc m (None) sk fndec r is_top_level
+        | Symbols.AssociatedFunctions [fndec] -> fndec
+        | _ -> assert false
+      in
+      begin
+        try
+          Cca.symenc_key_ssc ~elems:(ES.goal_as_equiv s) ~messages:[enc]
+            ~cntxt fnenc fndec sk.s_symb;
+          (* we check that the randomness is ok in the system and the
+               biframe, except for the encryptions we are looking at, which
+               is checked by adding a fresh reachability goal. *)
+          Cca.symenc_rnd_ssc ~cntxt env fnenc sk biframe;
+          get_subst_hide_enc enc fnenc m (None) sk fndec r is_top_level
 
-            with Cca.Bad_ssc ->  soft_failure Tactics.Bad_SSC
-          end
-        | _ ->
-          soft_failure
-            (Tactics.Failure
-               "The first encryption symbol is not used with the correct public \
-                key function.")
+        with Cca.Bad_ssc -> soft_failure Tactics.Bad_SSC
       end
 
     | _ ->
@@ -1843,7 +1860,7 @@ let enckp arg (s : ES.t) =
 
   (* Apply tactic to replace key(s) in [enc] using [new_key].
    * Precondition:
-   * [enc = Term.Fun (fnenc, [m; Term.Name r; k])].
+   * [enc = Term.Fun (fnenc, [Tuple [m; Term.Name r; k])]].
    * Verify that the encryption primitive is used correctly,
    * that the randomness is fresh and that the keys satisfy their SSC. *)
   let apply_kp
@@ -1878,6 +1895,7 @@ let enckp arg (s : ES.t) =
           (fun (sk,system) ->
              let cntxt = Constr.{ cntxt with system } in
              let errors =
+               (* TODO: set globals to true *)
                Euf.key_ssc ~globals:false
                  ~cntxt ~elems:(ES.goal_as_equiv s)
                  ~allow_functions:(fun x -> x = fnpk) fndec sk.s_symb
@@ -1940,7 +1958,7 @@ let enckp arg (s : ES.t) =
 
     (* Equivalence goal where [enc] is modified using [new_key]. *)
     let new_enc =
-      Term.mk_fun table fnenc [m; Term.mk_name r; wrap_pk new_key]
+      Term.mk_fun_tuple table fnenc [m; Term.mk_name r; wrap_pk new_key]
     in
     let new_elem =
       Equiv.subst_equiv [Term.ESubst (enc,new_enc)] [e]
@@ -1958,7 +1976,7 @@ let enckp arg (s : ES.t) =
 
     | Some (Message (m1, _)), None ->
       begin match m1 with
-        | Term.Fun (f,_,[_;_;_]) -> Some m1, None
+        | Term.Fun (f,_,[Tuple [_;_;_]]) -> Some m1, None
         | _ -> None, Some m1
       end
     | None, None -> None, None
@@ -1966,7 +1984,7 @@ let enckp arg (s : ES.t) =
   in
 
   match target with
-  | Some (Term.Fun (fnenc, _, [m; Term.Name r; k]) as enc) ->
+  | Some (Term.Fun (fnenc, _, [Tuple [m; Term.Name r; k]]) as enc) ->
     apply_kp ~enc ~new_key ~fnenc ~m ~r ~k
   | Some _ ->
     soft_failure
@@ -1990,7 +2008,7 @@ let enckp arg (s : ES.t) =
         if not (occ.Iter.occ_vars = []) then find occs
         else
         begin match occ.Iter.occ_cnt with
-          | Term.Fun (fnenc, _, [m; Term.Name r; k]) as enc
+          | Term.Fun (fnenc, _, [Tuple [m; Term.Name r; k]]) as enc
             when diff_key k ->
             apply_kp ~enc ~new_key ~fnenc ~m ~r ~k
 

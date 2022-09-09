@@ -35,16 +35,16 @@ abstract error : message
 
 abstract TSinit : message
 abstract TSorderOk : message
-abstract TSorder : message->message->message
-abstract TSnext : message->message
+abstract TSorder : message * message -> message
+abstract TSnext : message -> message
 
 name k : message
 
-name key1 : index->message
-name key2 : index->message
-name key3 : index->message
-name pin : index->message
-name idinit : index->message
+name key1 : index -> message
+name key2 : index -> message
+name key3 : index -> message
+name pin : index -> message
+name idinit : index -> message
 
 mutable kT(i:index) : message = <idinit(i),TSinit>
 mutable kR(ii:index) : message = idinit(ii)

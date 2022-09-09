@@ -14,7 +14,7 @@ channel c
 
 abstract one : message.
 
-system !_i out(c,<h(<zero,n(i)>,k),seq(i:index ->h(<one,n(i)>,k))>).
+system !_i out(c,<h(<zero,n(i)>,k),seq(i:index => h(<one,n(i)>,k))>).
 
 (* The main test, with a non-empty list of bound variables. *)
 global goal _ (tau:timestamp,i:index) : 
@@ -40,7 +40,7 @@ Qed.
 (* same system, but using [one] both times: therefore, the occurrence outside 
    the sequences is redundant, and should not appear when applying the PRF 
    rule. *)
-system [bis] !_i out(c,<h(<one,n(i)>,k),seq(i:index ->h(<one,n(i)>,k))>).
+system [bis] !_i out(c,<h(<one,n(i)>,k),seq(i:index => h(<one,n(i)>,k))>).
 
 (* The main test, with a non-empty list of bound variables. *)
 global goal [bis] _ (tau:timestamp,i:index) :

@@ -55,7 +55,7 @@ Qed.
     a predicate over pairs of indices. It could mean, for example,
     that the second index is larger than the first, or that they are
     distinct. *)
-abstract b : index -> index -> bool.
+abstract b : index * index -> bool.
 
 goal basic_2 :
   (forall (i,j:index), b(i,j)) =>
@@ -438,7 +438,7 @@ Proof.
   apply Hequiv.
 Qed.
 
-global axiom f_equiv : forall (x:message) equiv(diff(f(x), cst)).
+global axiom f_equiv : Forall (x:message) equiv(diff(f(x), cst)).
 
 abstract cst' : message.
 

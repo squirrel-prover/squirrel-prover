@@ -70,7 +70,7 @@ name b1 : message
 name c11 : message
 name a : index -> message
 name b : index -> message
-name k : index -> index -> message
+name k : index * index -> message.
 
 name r : message
 name r2 : index -> message
@@ -446,9 +446,9 @@ Qed.
 
 equiv [auth] auth.
 Proof.
-  enrich a1, b1, seq(i:index -> b(i)), seq(i:index -> a(i)), kP, kS;
-  enrich ake11, bke11, seq(i:index -> bke1(i)), seq(i:index -> ake1(i)), k11, hKey, r,
-   seq(i:index ->r2(i)), r3, r4, r5.
+  enrich a1, b1, seq(i:index => b(i)), seq(i:index => a(i)), kP, kS;
+  enrich ake11, bke11, seq(i:index => bke1(i)), seq(i:index => ake1(i)), k11, hKey, r,
+   seq(i:index =>r2(i)), r3, r4, r5.
 
   induction t; try (expandall; apply IH).
 

@@ -205,7 +205,7 @@ let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
     | Null -> ()
 
     | New (x, ty, p) -> 
-      let ty = Theory.parse_p_ty env ty in 
+      let ty = Theory.convert_ty env ty in 
       let vars, _ = Vars.make `Shadow env.vars ty (L.unloc x) in
       check_p ty_env { env with vars } p
 
@@ -247,7 +247,7 @@ let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
     | Let (x, t, ptyo, p) ->
       let ty : Type.ty = match ptyo with
         | None -> TUnivar (Type.Infer.mk_univar ty_env)
-        | Some pty -> Theory.parse_p_ty env pty 
+        | Some pty -> Theory.convert_ty env pty 
       in
       
       Theory.check env ~local:true ty_env projs t ty ;
@@ -622,17 +622,17 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       (penv,p)
 
   | New (n, pty, p) ->
-    let ty = Theory.parse_p_ty penv.env pty in
+    let ty = Theory.convert_ty penv.env pty in
 
-    let n_fty = Type.mk_ftype [] (List.map Vars.ty penv.indices) ty in
+    let n_fty = Type.mk_ftype_tuple [] (List.map Vars.ty penv.indices) ty in
     let ndef = Symbols.{ n_fty } in
 
     let table,n' = Symbols.Name.declare penv.env.table n ndef in
     let n'_th =
       let n' = L.mk_loc (L.loc n) (Symbols.to_string n') in
-      Theory.App
-        ( n',
-          List.rev_map (fun i -> Theory.var dum (Vars.name i)) penv.indices )
+      Theory.mk_app_i
+        (Theory.mk_symb n')
+        (List.rev_map (fun i -> Theory.var dum (Vars.name i)) penv.indices)
     in    
     let n'_s = Term.mk_isymb n' ty (List.rev penv.indices) in
     let n'_tm = Term.mk_name n'_s in
@@ -661,7 +661,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
   | Let (x,t,ptyo,p) ->
     let ty : Type.ty = match ptyo with
       | None -> TUnivar (Type.Infer.mk_univar penv.ty_env)
-      | Some pty -> Theory.parse_p_ty penv.env pty 
+      | Some pty -> Theory.convert_ty penv.env pty 
     in
 
     let t' = Theory.subst t (to_tsubst penv.isubst @ to_tsubst penv.msubst) in
@@ -698,7 +698,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       let is =
         List.rev_map (fun i -> Theory.var dum (Vars.name i)) penv.indices
       in
-      Theory.App (x', is)
+      Theory.mk_app_i (Theory.mk_symb x') is
     in
 
     let n'_s = Term.mk_isymb x' ty (List.rev penv.indices) in

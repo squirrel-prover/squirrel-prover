@@ -5,7 +5,7 @@
 
 hash h
 name n : message
-name k : index->index->message
+name k : index * index -> message
 
 system null.
 

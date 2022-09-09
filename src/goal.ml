@@ -160,7 +160,7 @@ let make table parsed_goal : statement * t =
   let ty_vars = List.map (fun ls -> Type.mk_tvar (L.unloc ls)) ty_vars in
   let env = Env.init ~system ~ty_vars ~table () in
 
-  let env,vs = Theory.convert_p_bnds env vars in
+  let env,vs = Theory.convert_bnds env vars in
 
   let conv_env = Theory.{ env; cntxt = InGoal } in
   let formula, goal =

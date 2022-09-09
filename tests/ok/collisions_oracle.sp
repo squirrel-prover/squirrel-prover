@@ -1,5 +1,3 @@
-
-
 name k:message
 
 hash h with oracle forall (m:message,sk:message) sk=k

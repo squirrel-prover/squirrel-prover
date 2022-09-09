@@ -56,6 +56,7 @@ rule token = parse
 | ','                 { COMMA }
 | "!"                 { BANGU }
 | '.'                 { DOT }
+| '#'                 { SHARP }
 | ':'                 { COLON }
 | ":="                { COLONEQ }
 | ';'                 { SEMICOLON }
@@ -129,6 +130,8 @@ rule token = parse
 | "diff"              { DIFF }
 | "forall"            { FORALL }
 | "exists"            { EXISTS }
+| "Forall"            { UFORALL }
+| "Exists"            { UEXISTS }
 | "splitseq"          { SPLITSEQ }
 | "constseq"          { CONSTSEQ }
 | "memseq"            { MEMSEQ }

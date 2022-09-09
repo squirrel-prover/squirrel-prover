@@ -651,17 +651,17 @@ let maybe_paren
     ~(side  : assoc)
     (pp : 'b Fmt.t) : 'b Fmt.t
   =
-  let noparens (pi, fi) (po, fo) side =
-    match fo with
+  let noparens (prio_in, fix_in) (prio_out, fix_out) side =
+    match fix_out with
     | `NoParens -> true
     | _ ->
-      (pi > po) ||
-      match fi, side with
+      (prio_in > prio_out) ||
+      match fix_in, side with
       | `Postfix     , `Left     -> true
       | `Prefix      , `Right    -> true
-      | `Infix `Left , `Left     -> (pi = po) && (fo = `Infix `Left )
-      | `Infix `Right, `Right    -> (pi = po) && (fo = `Infix `Right)
-      | _            , `NonAssoc -> (pi = po) && (fi = fo)
+      | `Infix `Left , `Left     -> prio_in = prio_out && fix_out = `Infix `Left 
+      | `Infix `Right, `Right    -> prio_in = prio_out && fix_out = `Infix `Right
+      | _            , `NonAssoc -> prio_in = prio_out && fix_out = fix_in
       | _            , _         -> false
   in
   pp_maybe_paren (not (noparens inner outer side)) pp

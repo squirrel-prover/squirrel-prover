@@ -111,7 +111,7 @@ Qed.
 (** The contents of the memory cell never repeats. *)
 
 goal non_repeating :
-  forall (beta,alpha:timestamp) happens(beta) =>
+  forall (beta,alpha:timestamp), happens(beta) =>
   (exists i:index, alpha < A(i) && A(i) <= beta) =>
   s@alpha <> s@beta.
 Proof.
@@ -132,12 +132,13 @@ Qed.
 
 (** Strong secrecy *)
 
-axiom unique_queries : forall (i,j:index) i <> j => input@O(i) <> input@O(j).
+axiom unique_queries (i,j:index) : i <> j => input@O(i) <> input@O(j).
 
 name m : message.
 
 global goal [default/left,default/left]
-  strong_secrecy (tau:timestamp) : forall (tau':timestamp),
+  strong_secrecy (tau:timestamp) : 
+    Forall (tau':timestamp),
     [happens(tau)] -> [happens(tau')] -> equiv(frame@tau, diff(s@tau',m)).
 Proof.
   induction tau => tau' Htau Htau'.

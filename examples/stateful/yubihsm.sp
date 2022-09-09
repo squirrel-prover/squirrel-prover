@@ -66,7 +66,7 @@ between the real system and the ideal one, and then the property
 is proved on the ideal system. The reach equiv
 tactic allows one to combine these two steps, and to conclude.
 *******************************************************************************)
-set timeout=6.
+set timeout=100.
 
 (* AEAD symmetric encryption scheme: IND-CCA + INT-CTXT *)
 senc enc,dec
@@ -126,8 +126,8 @@ process yubikeyplug (pid:index) =
   YCtr(pid) := mySucc(YCtr(pid));
   out(cY,endplug).
 
-name nonce : index -> index -> message
-name npr : index -> index -> message
+name nonce : index * index -> message
+name npr : index * index -> message
 
 (* When the key is pressed on the `j`-th session of yubikey `pid`:
    - an otp is sent with the current value of the counter,
@@ -523,13 +523,13 @@ global goal equiv_real_ideal_enrich (t : timestamp):
   [happens(t)] ->
   equiv(
     frame@t,
-    seq(pid:index -> AEAD(pid)@t),
-    seq(pid:index -> if Setup(pid) <= t then AEAD(pid)@Setup(pid)),
-    seq(pid:index -> sid(pid)),
-    seq(pid,j:index -> npr(pid,j)),
-    seq(pid,j:index -> nonce(pid,j)),
-    seq(pid:index -> k(pid)),
-    seq(pid:index -> k_dummy(pid))
+    seq(pid:index => AEAD(pid)@t),
+    seq(pid:index => if Setup(pid) <= t then AEAD(pid)@Setup(pid)),
+    seq(pid:index => sid(pid)),
+    seq(pid,j:index => npr(pid,j)),
+    seq(pid,j:index => nonce(pid,j)),
+    seq(pid:index => k(pid)),
+    seq(pid:index => k_dummy(pid))
   ).
 Proof.
   dependent induction t => t Hind Hap.
@@ -613,14 +613,14 @@ axiom max_ts :
   (forall (t : timestamp), happens(t) => t <= tmax).
 
 global goal equiv_real_ideal_enrich_tmax0 :
-  exists (t : timestamp),
+  Exists (t : timestamp),
   ([happens(t)] /\
    [forall (t' : timestamp), happens(t') => t' <= t] /\
     equiv(
      frame@t,
-     seq(t':timestamp -> if t' <= t then exec@t' else false),
-     seq(i:index, t':timestamp -> if t' <= t then YCtr(i)@t'),
-     seq(i:index, t':timestamp -> if t' <= t then SCtr(i)@t')
+     seq(t':timestamp => if t' <= t then exec@t' else false),
+     seq(i:index, t':timestamp => if t' <= t then YCtr(i)@t'),
+     seq(i:index, t':timestamp => if t' <= t then SCtr(i)@t')
   )).
 Proof.
   use max_ts as [tmax [_ U]].
@@ -644,14 +644,14 @@ axiom exec_nhap (t' : timestamp) :
    not (happens(t')) => exec@t' = exec_dflt.
 
 global goal equiv_real_ideal_enrich_tmax :
-  exists (t : timestamp),
+  Exists (t : timestamp),
   ([happens(t)] /\
    [forall (t' : timestamp), happens(t') => t' <= t] /\
     equiv(
       frame@t,
-      seq(t':timestamp -> exec@t'),
-      seq(i:index, t':timestamp -> YCtr(i)@t'),
-      seq(i:index, t':timestamp -> SCtr(i)@t')
+      seq(t':timestamp => exec@t'),
+      seq(i:index, t':timestamp => YCtr(i)@t'),
+      seq(i:index, t':timestamp => SCtr(i)@t')
   )).
 Proof.
   use equiv_real_ideal_enrich_tmax0 as [tmax [Hap C U]].

@@ -53,15 +53,35 @@ Proof.
     assumption H3. 
 Qed.
 
+(*------------------------------------------------------------------*)
 abstract Pi : index -> bool.
 abstract Qi : index -> index -> bool.
 abstract Ri : index -> index -> bool.
 
 goal _ (ma : message, j : index) : 
-  (forall (i : index), Pi(i) => Qi(i,i) => Ri(i,i)) => 
-  Qi(j,j) =>
-  Pi(j) =>
-  Ri(j,j).
+  (forall (i : index), Pi i => Qi i i => Ri i i) => 
+  Qi j j =>
+  Pi j =>
+  Ri j j.
+Proof.
+  intro H1 H2 H3.
+  have M := H1 _ _ H2. 
+  + assumption H3.
+  + assumption M.
+Qed.
+
+
+(*------------------------------------------------------------------*)
+(* same, with tuples *)
+abstract PiT : index -> bool.
+abstract QiT : index * index -> bool.
+abstract RiT : index * index -> bool.
+
+goal _ (ma : message, j : index) : 
+  (forall (i : index), PiT(i) => QiT (i,i) => RiT(i,i)) => 
+  QiT(j,j) =>
+  PiT(j) =>
+  RiT(j,j).
 Proof.
   intro H1 H2 H3.
   have M := H1 _ _ H2. 

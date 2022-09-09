@@ -11,14 +11,19 @@ type c_ty = {
 type c_tys = c_ty list
 
 (*------------------------------------------------------------------*)
-type macro_decl = lsymb * Theory.bnds * Theory.p_ty * Theory.term
+type macro_decl = {
+  name      : lsymb;
+  args      : Theory.bnds;
+  out_ty    : Theory.p_ty option;
+  init_body : Theory.term;
+}
 
 (*------------------------------------------------------------------*)
 type abstract_decl = {
   name      : lsymb;
   symb_type : Symbols.symb_type;
   ty_args   : lsymb list;          (** type variables *)
-  abs_tys   : Theory.p_ty list;
+  abs_tys   : Theory.p_ty;
 }
 
 (*------------------------------------------------------------------*)
@@ -68,7 +73,7 @@ type operator_decl = {
   op_name      : Theory.lsymb;
   op_symb_type : Symbols.symb_type;
   op_tyargs    : lsymb list;
-  op_args      : Theory.bnds;
+  op_args      : Theory.ext_bnds;
   op_tyout     : Theory.p_ty option;
   op_body      : Theory.term;
 }
@@ -83,8 +88,6 @@ type proc_decl = {
 
 (*------------------------------------------------------------------*)
 type orcl_tag_info = Theory.term
-
-let pp_orcl_tag_info = Theory.pp
 
 (*------------------------------------------------------------------*)
 type declaration_i =
@@ -107,7 +110,7 @@ type declaration_i =
 
   | Decl_sign of lsymb * lsymb * lsymb * orcl_tag_info option * c_tys
 
-  | Decl_name     of lsymb * Theory.p_ty list
+  | Decl_name     of lsymb * Theory.p_ty option * Theory.p_ty
   | Decl_state    of macro_decl
   | Decl_operator of operator_decl
   | Decl_abstract of abstract_decl

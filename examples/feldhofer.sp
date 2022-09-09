@@ -36,7 +36,7 @@ channel cR
 channel cT
 
 name kE : index -> message
-name kbE : index -> index -> message
+name kbE : index * index -> message
 
 (** Fresh key used for ENC-KP applications. *)
 name k_fresh : message
@@ -47,9 +47,9 @@ abstract tagR : message
 abstract tagT : message
 
 name nr : index  -> message
-name nt : index -> index -> message
+name nt : index * index -> message
 
-name rt : index -> index -> message
+name rt : index * index -> message
 name rr : index -> message
 
 abstract ok : message
@@ -195,7 +195,7 @@ Qed.
 
 equiv unlinkability.
 Proof.
-  enrich seq(k:index -> nr(k)), seq(i,j:index -> nt(i,j)).
+  enrich seq(k:index => nr(k)), seq(i,j:index => nt(i,j)).
 
   induction t.
 

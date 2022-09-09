@@ -88,12 +88,13 @@ type 'a diff_args =
   | Explicit of (proj * 'a) list
 
 (*------------------------------------------------------------------*)
-type quant = ForAll | Exists | Seq
+type quant = ForAll | Exists | Seq | Lambda
 
 val pp_quant : Format.formatter -> quant -> unit
 
 (*------------------------------------------------------------------*)
 type term = private
+  | App   of term * term list
   | Fun   of fsymb * Type.ftype * term list
   | Name  of nsymb
   | Macro of msymb * term list * term
@@ -101,6 +102,9 @@ type term = private
   | Action of Symbols.action * Vars.var list 
 
   | Var of Vars.var
+
+  | Tuple of term list
+  | Proj of int * term
 
   | Diff of term diff_args
 
@@ -404,6 +408,9 @@ include module type of Smart
 val mk_pred    : term -> term
 val mk_var     : Vars.var -> term
 val mk_action  : Symbols.action -> Vars.var list -> term
+val mk_tuple   : term list -> term
+val mk_app     : term -> term list -> term
+val mk_proj    : int -> term -> term
 val mk_name    : nsymb -> term
 val mk_macro   : msymb -> term list -> term -> term
 val mk_diff    : (proj * term) list -> term
@@ -417,12 +424,13 @@ val mk_iff   : ?simpl:bool -> form -> form -> form
 (*------------------------------------------------------------------*)
 val mk_fun0 : fsymb -> Type.ftype -> term list -> term
 
-val mk_fun :
-  Symbols.table ->
-  fname ->
-  term list ->
-  term
+val mk_fun : Symbols.table -> fname -> term list -> term
 
+(** Declare a function of arity one (all arguments are grouped 
+    into a tuple). *)
+val mk_fun_tuple : Symbols.table -> fname -> term list -> term
+
+(*------------------------------------------------------------------*)
 val mk_zero    : term
 val mk_fail    : term
 val mk_len     : term -> term
@@ -445,7 +453,8 @@ val mk_indices_eq  : ?simpl:bool -> Vars.var list -> Vars.var list -> term
 val mk_atom : ord -> term -> term -> term
 val mk_happens : term -> term
 
-val mk_seq : ?simpl:bool -> Vars.vars -> term -> term
+val mk_seq    : ?simpl:bool -> Vars.vars -> term -> term
+val mk_lambda : ?simpl:bool -> Vars.vars -> term -> term
 
 (*------------------------------------------------------------------*)
 (** {3 Destructors} *)
@@ -458,7 +467,13 @@ val is_name : term -> bool
 
 val destr_var : term -> Vars.var option
 
-val is_var : term -> bool
+val destr_tuple : term -> term list option
+val destr_proj : term -> (int * term) option
+
+val is_var   : term -> bool
+val is_tuple : term -> bool
+val is_proj  : term -> bool
+
 (*------------------------------------------------------------------*)
 val destr_action : term -> (Symbols.action * Vars.var list) option
 
@@ -539,9 +554,13 @@ val match_infos_to_pp_info : match_infos -> pp_info
 (** {2 Term heads} *)
 
 type term_head =
+  | HApp
   | HExists
   | HForAll
   | HSeq
+  | HLambda
+  | HTuple
+  | HProj
   | HFind
   | HFun   of Symbols.fname 
   | HMacro of Symbols.macro 

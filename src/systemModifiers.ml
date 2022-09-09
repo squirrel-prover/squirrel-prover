@@ -93,7 +93,7 @@ let conv_term ?pat table system ~bnds (term : Theory.term)
   : Vars.vars * Term.term
   =
   let env = Env.init ~table ~system:system () in
-  let env,is = Theory.convert_p_bnds env bnds in
+  let env,is = Theory.convert_bnds env bnds in
 
   Vars.check_type_vars is [Type.Index]
     (fun () ->
@@ -276,13 +276,13 @@ let global_prf
   (* We create the pattern for the hash *)
   let fresh_x_var = Vars.make_fresh Type.Message "x" in
   let hash_pattern =
-    Term.mk_fun table param.h_fn [Term.mk_var fresh_x_var; left_key ]
+    Term.mk_fun_tuple table param.h_fn [Term.mk_var fresh_x_var; left_key ]
   in
 
   (* Instantiation of the fresh name *)
   let ndef =
     let ty_args = List.map Vars.ty is in
-    Symbols.{ n_fty = Type.mk_ftype [] ty_args Type.Message ; }
+    Symbols.{ n_fty = Type.mk_ftype_tuple [] ty_args Type.Message ; }
   in
   let table,n =
     Symbols.Name.declare table (L.mk_loc L._dummy "n_PRF") ndef
@@ -372,8 +372,8 @@ let global_cca
   let enc_fn, enc_key, plaintext, enc_pk, enc_rnd =
     match enc with
     | Term.Fun (fnenc, _,
-                [m; Term.Name r;
-                 Term.Fun (fnpk, _, [Term.Name sk])])
+                [Tuple [m; Term.Name r;
+                        Term.Fun (fnpk, _, [Term.Name sk])]])
       when Symbols.is_ftype fnpk Symbols.PublicKey table &&
            Symbols.is_ftype fnenc Symbols.AEnc table ->
       fnenc, sk, m, fnpk, r
@@ -416,15 +416,15 @@ let global_cca
   (* The dec must match all decryption with the corresponding secret key *)
   let fresh_x_var = Vars.make_fresh Type.Message "x" in
   let dec_pattern =
-    Term.mk_fun table dec_fn [ Term.mk_var fresh_x_var;
-                               Term.mk_name enc_key ]
+    Term.mk_fun_tuple table dec_fn [ Term.mk_var fresh_x_var;
+                                     Term.mk_name enc_key ]
   in
   let dec_pattern = Term.subst left_subst dec_pattern in
 
   (* Instantiation of the fresh replacement *)
   let ndef =
     let ty_args = List.map Vars.ty enc_rnd.s_indices in
-    Symbols.{ n_fty = Type.mk_ftype [] ty_args Type.Message ; }
+    Symbols.{ n_fty = Type.mk_ftype_tuple [] ty_args Type.Message ; }
   in
   let table,n =
     Symbols.Name.declare table (L.mk_loc L._dummy "n_CCA") ndef
@@ -439,9 +439,9 @@ let global_cca
 
   let new_enc =
     let t_pk = Term.mk_fun table enc_pk [Term.mk_name enc_key]  in
-    Term.mk_fun table enc_fn [ mess_replacement;
-                               Term.mk_name enc_rnd;
-                               t_pk ]
+    Term.mk_fun_tuple table enc_fn [ mess_replacement;
+                                     Term.mk_name enc_rnd;
+                                     t_pk ]
   in
 
   (* We replace
@@ -492,7 +492,7 @@ let global_cca
   (* let fresh_x_var = Vars.make_fresh Type.Message "mess" in *)
   let rdef =
     let ty_args = List.map Vars.ty is in
-    Symbols.{ n_fty = Type.mk_ftype [] ty_args Type.Message ; }
+    Symbols.{ n_fty = Type.mk_ftype_tuple [] ty_args Type.Message ; }
   in
   let table,r =
     Symbols.Name.declare table (L.mk_loc L._dummy "r_CCA") rdef
@@ -793,7 +793,10 @@ let global_prf_t
     soft_failure (Tactics.BadSSCDetailed errors);
 
   (* type of the hash function input *)
-  let m_ty = List.hd (param.h_fty.fty_args) in
+  let m_ty = match param.h_fty.fty_args with
+    | [Type.Tuple [m_ty; _]] -> m_ty
+    | _ -> assert false
+  in
 
   let mk_occ_name
       (table : Symbols.table)
@@ -818,7 +821,7 @@ let global_prf_t
     with Not_found ->
       let ndef =
         let ty_args = List.map Vars.ty occ.Iter.occ_vars in
-        Symbols.{ n_fty = Type.mk_ftype [] ty_args m_ty ; }
+        Symbols.{ n_fty = Type.mk_ftype_tuple [] ty_args m_ty ; }
       in
       Symbols.Name.declare table (L.mk_loc L._dummy "n_PRF") ndef
   in
@@ -873,7 +876,7 @@ let global_prf_t
 
   (* term to rewrite *)
   let to_rw =
-    Term.mk_fun table param.h_fn [x_t; key ]
+    Term.mk_fun_tuple table param.h_fn [x_t; key ]
   in
 
   (* name term associated to a hash occurrence. *)

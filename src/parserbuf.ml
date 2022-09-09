@@ -121,41 +121,6 @@ let parse_process (env : Env.t) ?(typecheck=false) str =
   if typecheck then Process.check_proc env projs p ;
   p
 
-let parse_formula = parse Parser.top_formula "formula"
-
-let () =
-  let check s =
-    Alcotest.(check string) "round-trip" s
-      (Format.asprintf "%a" Theory.pp (parse_formula s))
-  in
-  let eqf s ss =
-    let f = parse_formula s in
-    let ff = parse_formula ss in
-    Alcotest.(check bool) "equal formulas" true
-      (Theory.equal f ff)
-  in 
-  Checks.add_suite "Formula parsing" [
-    "Boolean constants", `Quick, begin fun () ->
-      check "True" ;
-      check "False"
-    end ;
-    "Boolean connectives", `Quick, begin fun () ->
-      check "not(True)" ;
-      check "(True => False)" ;
-      check "(True || False)" ;
-      check "((True && True) => False)" ;
-    end ;
-    "Quantifiers", `Quick, begin fun () ->
-      check "forall (x:index), True" ;
-      check "forall (x:index), ((x = x) && (x <> x))" ;
-      check "exists (x:index), True" ;
-      check "exists (x:index,y:message,z:index,t:timestamp), True" ;
-      eqf "exists x:index, True" "exists (x:index) True" ;
-      check "exists (x,y:index,z:message,\
-                     k:index,u,v:timestamp), True" ;
-    end
-  ]
-
 let () =
   let table = Channel.declare Symbols.builtins_table (L.mk_loc L._dummy "c") in
   let env = Env.init ~table () in
@@ -178,7 +143,7 @@ let () =
         | _ -> assert false
       end ;
       ignore (parse_process env
-                "if u=true then if True then null else null else null"
+                "if u=true then if true then null else null else null"
               : Process.process)
     end ;
     "Pairs", `Quick, begin fun () ->
@@ -191,7 +156,7 @@ let () =
             name = L.mk_loc L._dummy "error";
             symb_type = `Prefix;
             ty_args = [];
-            abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
+            abs_tys = L.mk_loc L._dummy Theory.P_message; }
         in
         let decl = Location.mk_loc Location._dummy decl_i in
         ProcessDecl.declare table decl in
@@ -206,7 +171,7 @@ let () =
             { name = L.mk_loc L._dummy "ok";
               symb_type = `Prefix;
               ty_args = [];
-              abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
+              abs_tys = L.mk_loc L._dummy Theory.P_message; }
         in
         let decl = Location.mk_loc Location._dummy decl_i in
         ProcessDecl.declare table decl
@@ -218,7 +183,7 @@ let () =
             { name = L.mk_loc L._dummy "error";
               symb_type = `Prefix;
               ty_args = [];
-              abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
+              abs_tys = L.mk_loc L._dummy Theory.P_message; }
         in
         
         let decl = Location.mk_loc Location._dummy decl_i in

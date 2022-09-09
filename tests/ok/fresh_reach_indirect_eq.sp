@@ -1,5 +1,3 @@
-
-
 name n : index->message
 
 channel c

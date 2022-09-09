@@ -24,8 +24,8 @@ abstract ko : message
 abstract tag1 : message
 abstract tag2 : message
 
-name key : index->message
-name key': index->index->message
+name key : index -> message
+name key': index * index -> message
 
 channel cT
 channel cR

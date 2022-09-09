@@ -18,7 +18,7 @@ RUNLOGDIR=_build/squirrel_log
 # Make sure the "echo" commands in okfail below are updated
 # to reflect the content of these variables.
 PROVER_TESTS = $(wildcard tests/ok/*.sp) $(wildcard tests/fail/*.sp)
-PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $(wildcard examples/stateful/*.sp)  $(wildcard examples/postQuantumKE/*.sp)
+PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $(wildcard examples/tutorial/solutions/*.sp) $(wildcard examples/stateful/*.sp)  $(wildcard examples/postQuantumKE/*.sp)
 
 okfail: squirrel
 	rm -rf $(RUNLOGDIR)

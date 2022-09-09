@@ -293,7 +293,7 @@ let set_goal a s =
   let s = S.update ~conclusion:a s in
     match Term.form_to_xatom a with
       | Some at 
-        when Term.ty_xatom at = Type.Message && 
+        when Type.equal (Term.ty_xatom at) Type.tmessage && 
              Config.auto_intro () -> 
         add_macro_defs s a
       | _ -> s

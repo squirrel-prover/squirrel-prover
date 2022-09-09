@@ -12,12 +12,13 @@ let rev_subst subst =
 (*------------------------------------------------------------------*)
 type red_param = { 
   delta  : bool;
+  beta   : bool;
   constr : bool;
 }
 
-let rp_default = { delta = false; constr = false; }
+let rp_default = { beta = true; delta = false; constr = false; }
 
-let rp_full = { delta = true; constr = false; }
+let rp_full = { beta = true; delta = true; constr = false; }
 
 let parse_simpl_args
     (param : red_param) (args : Args.named_args) : red_param
@@ -132,6 +133,17 @@ let rec conv (st : cstate) (t1 : Term.term) (t2 : Term.term) : unit =
 
   | Term.Var v1, Term.Var v2 -> conv_var st v1 v2
 
+  | Term.App (u1, v1), Term.App (u2, v2) ->
+    conv st u1 u2;
+    conv_l st v1 v2
+    
+  | Term.Tuple l1, Term.Tuple l2 ->
+    conv_l st l1 l2
+
+  | Term.Proj (i1, t1), Term.Proj (i2, t2) ->
+    if i1 <> i2 then not_conv ();
+    conv st t1 t2
+    
   | _, _ -> not_conv ()
 
 and conv_l (st : cstate) (ts1 : Term.terms) (ts2 : Term.terms) : unit =
@@ -268,16 +280,23 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
   (* Reduce once at head position *)
   and reduce_head_once (st : state) (t : Term.term) : Term.term * bool = 
-    let t, has_red  = expand_head_once st t in
-    if has_red then t, true else
-      let t, has_red = rewrite_head_once st t in
-      if has_red then t, true else
-      if Term.ty t <> Type.Boolean then t, false
-      else reduce_constr st t
+    let rec try_red red_funcs =
+      match red_funcs with
+      | [] -> t, false
+      | red_f :: red_funcs ->
+        let t, has_red = red_f st t in
+        if has_red then t, true
+        else try_red red_funcs
+    in
+    try_red [expand_head_once; 
+             rewrite_head_once;
+             reduce_beta;
+             reduce_proj;
+             reduce_constr; ]
 
   (* Try to show using [Constr] that [t] is [false] or [true] *)
   and reduce_constr (st : state) (t : Term.term) : Term.term * bool =
-    if not st.param.constr then t, false
+    if not st.param.constr || Term.ty t <> Type.Boolean then t, false
     else
       try
         if not Constr.(m_is_sat (models_conjunct ~exn:NoExp [t]))
@@ -286,6 +305,35 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
         then Term.mk_true, true
         else t, false
       with NoExp -> t, false
+
+  (* projection reduction *)
+  and reduce_proj (st : state) (t : Term.term) : Term.term * bool =
+    match t with
+    | Term.Proj (i, t) ->
+      begin
+        match t with
+        | Term.Tuple ts -> List.nth ts (i - 1), true
+        | _ -> t, false
+      end
+
+    | _ -> t, false
+
+  (* β-reduction *)
+  and reduce_beta (st : state) (t : Term.term) : Term.term * bool =
+    match t with
+    | Term.App (t, arg :: args) -> 
+      begin
+        match t with
+        | Term.Quant (Term.Lambda, v :: evs, t0) ->
+          let evs, subst = Term.refresh_vars `Global evs in
+          let t0 = Term.subst (Term.ESubst (Term.mk_var v, arg) :: subst) t0 in
+
+          Term.mk_app (Term.mk_lambda evs t0) args, true
+
+        | _ -> Term.mk_app t (arg :: args), false
+      end 
+
+    | _ -> t, false
 
   (* Expand once at head position *)
   and expand_head_once (st : state) (t : Term.term) : Term.term * bool = 
@@ -382,7 +430,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
       Term.mk_fun0 fs fty [f1;f2],
       has_red1 || has_red2
-      
+
     | Term.Find (is, c, t, e) -> 
       let _, subst = Term.refresh_vars `Global is in
       let c, t = Term.subst subst c, Term.subst subst t in
@@ -413,7 +461,10 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
           ) false l
       in
       Term.mk_diff l, has_red
-        
+
+    | Term.Proj   _
+    | Term.App    _ 
+    | Term.Tuple  _
     | Term.Macro  _
     | Term.Name   _
     | Term.Fun    _

@@ -32,10 +32,10 @@ abstract ko : message
 name key : index -> message
 
 (* `keyS(i,k)` is the key of the tag `i,k` in the SINGLE-session scenario *)
-name keyS : index -> index -> message
+name keyS : index * index -> message
 
 (* channel for tag messages *)
-channel cT
+channel cT.
 
 (* channel for reader messages *)
 channel cR

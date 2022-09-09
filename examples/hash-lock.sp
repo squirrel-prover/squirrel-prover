@@ -16,8 +16,8 @@ hash h
 abstract ok : message
 abstract ko : message
 
-name key  : index          -> message
-name key' : index -> index -> message
+name key  : index         -> message
+name key' : index * index -> message
 
 channel cT
 channel cR

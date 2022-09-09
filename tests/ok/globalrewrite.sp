@@ -7,7 +7,7 @@ abstract b : message
 abstract d : message
 
 abstract f : message -> message
-abstract g : message -> message -> message
+abstract g : message * message -> message
 
 op g2 (x : message) = g(x,x).
 

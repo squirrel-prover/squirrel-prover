@@ -60,7 +60,7 @@ abstract accept     : message
 abstract pid        : index -> message
 
 name sid  : index -> message
-name nonce: index -> index -> message.
+name nonce: index * index -> message.
 
 (**
 Symmetric encryption scheme, using the secret key `k` (with index arity 1
@@ -69,7 +69,7 @@ arity 2 so that each session of a YubiKey uses a new random name).
 *)
 senc enc,dec
 name k  : index -> message
-name npr: index -> index -> message.
+name npr: index * index -> message.
 
 (**
 Public constants and public functions used to model counter values.

@@ -67,8 +67,10 @@
 %token MUTABLE SYSTEM SET
 %token INDEX MESSAGE BOOL BOOLEAN TIMESTAMP ARROW RARROW
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
+%token UEXISTS UFORALL
 %token LOCAL GLOBAL
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH SLASHSLASHEQUAL ATSLASH
+%token SHARP
 %token TIME WHERE WITH ORACLE EXN
 %token LARGE NAMEFIXEDLENGTH
 %token PERCENT
@@ -86,17 +88,17 @@
 
 %nonassoc QUANTIF
 %right ARROW
-%right DARROW
+%right DARROW 
 %right DEQUIVARROW
 %right AND OR
 %right GAND GOR
-
-%nonassoc TRUE SEQ NOT LPAREN ID UNDERSCORE FALSE DIFF
 
 %nonassoc EQ NEQ GEQ LEQ LANGLE RANGLE
 
 %nonassoc empty_else
 %nonassoc ELSE
+
+%left SHARP
 
 %right RIGHTINFIXSYMB
 %left  LEFTINFIXSYMB
@@ -138,7 +140,9 @@
 %inline lloc(X):
 | X { L.make $startpos $endpos }
 
+(*------------------------------------------------------------------*)
 (* Lists *)
+
 %inline empty:
 | { () }
 
@@ -148,6 +152,11 @@
 %inline slist1(X, S):
 | l=separated_nonempty_list(S, X) { l }
 
+(*------------------------------------------------------------------*)
+%inline paren(X):
+| LPAREN x=X RPAREN { x }
+
+(*------------------------------------------------------------------*)
 (* DH flags *)
 dh_flag:
 | DDH { Symbols.DH_DDH }
@@ -157,35 +166,11 @@ dh_flag:
 dh_flags:
 | l=slist1(dh_flag, COMMA) { l }
 
-
+(*------------------------------------------------------------------*)
 (* Terms *)
+
 lsymb:
 | id=loc(ID) { id }
-
-/* non-ambiguous term */
-sterm_i:
-| LPAREN t=term_i RPAREN        { t }
-| id=lsymb                      { Theory.App (id, []) }
-| UNDERSCORE                    { Theory.Tpat }
-
-| LANGLE t=term COMMA t0=term RANGLE
-    { let fsymb = sloc $startpos $endpos "pair" in
-      Theory.App (fsymb, [t;t0]) }
-
-/* formula */
-
-| DIFF LPAREN t=term COMMA t0=term RPAREN { Theory.Diff (t,t0) }
-
-| SEQ LPAREN vs=arg_list ARROW t=term RPAREN    { Theory.Seq (vs,t) }
-
-| l=loc(NOT) f=sterm
-    { let fsymb = L.mk_loc (L.loc l) "not" in
-      Theory.App (fsymb,[f]) }
-
-| l=lloc(FALSE)  { Theory.App (L.mk_loc l "false",[]) }
-
-| l=lloc(TRUE)   { Theory.App (L.mk_loc l "true",[]) }
-
 
 %inline infix_s:
 | AND              { "&&"  }
@@ -196,42 +181,78 @@ sterm_i:
 | DARROW           { "=>" }
 | DEQUIVARROW      { "<=>" }
 
+(*------------------------------------------------------------------*)
+/* non-ambiguous term */
+sterm_i:
+| id=lsymb                      { Theory.Symb id }
+| UNDERSCORE                    { Theory.Tpat }
+
+/* formula */
+
+| DIFF LPAREN t=term COMMA t0=term RPAREN { Theory.Diff (t,t0) }
+
+| SEQ LPAREN vs=ext_arg_list DARROW t=term RPAREN { Theory.Quant (Seq,vs,t) }
+
+| l=loc(NOT) f=sterm
+    { let fsymb = L.mk_loc (L.loc l) "not" in
+      Theory.mk_app_i (Theory.mk_symb fsymb) [f] }
+
+| l=lloc(FALSE)  { Theory.Symb (L.mk_loc l "false") }
+
+| l=lloc(TRUE)   { Theory.Symb (L.mk_loc l "true") }
+
+| l=paren(slist1(term,COMMA))
+    { match l with
+      | [t] -> L.unloc t
+      | _ -> Theory.Tuple l }
+
 /* ambiguous term */
 term_i:
-| f=sterm_i                                  { f }
-| id=lsymb terms=term_list1                  { Theory.App (id, terms) }
-| id=lsymb AT ts=term                        { Theory.AppAt (id,[],ts) }
-| id=lsymb terms=term_list1 AT ts=term       { Theory.AppAt (id,terms,ts) }
+| f=sterm_i                         { f }
 
-| t=term s=loc(infix_s) t0=term             { Theory.App (s, [t;t0]) }
+| t=term AT ts=term                 { Theory.AppAt (t, ts) }
+| t=sterm l=slist1(sterm,empty)     { Theory.App (t,l) }
+
+| LANGLE t=term COMMA t0=term RANGLE
+   { let fsymb = sloc $startpos $endpos "pair" in
+     Theory.mk_app_i (Theory.mk_symb fsymb) [t;t0] }
+
+| t=term s=loc(infix_s) t0=term       
+   { Theory.mk_app_i (Theory.mk_symb s) [t;t0] }
+
+| t=term SHARP i=loc(INT)
+    { Theory.Proj (i,t) }
 
 | IF b=term THEN t=term t0=else_term
     { let fsymb = sloc $startpos $endpos "if" in
-      Theory.App (fsymb,  [b;t;t0]) }
+      Theory.mk_app_i (Theory.mk_symb fsymb) [b;t;t0] }
 
 | FIND vs=tf_arg_list SUCHTHAT b=term IN t=term t0=else_term
                                  { Theory.Find (vs,b,t,t0) }
 
 | f=term o=loc(ord) f0=term                
-    { Theory.App (o,[f;f0]) }
+    { Theory.mk_app_i (Theory.mk_symb o) [f;f0] }
 
-| EXISTS LPAREN vs=arg_list RPAREN sep f=term %prec QUANTIF
-                                 { Theory.Exists (vs,f)  }
+| FUN LPAREN vs=ext_arg_list RPAREN DARROW f=term
+                                 { Theory.Quant (Lambda,vs,f)  }
 
-| FORALL LPAREN vs=arg_list RPAREN sep f=term %prec QUANTIF
-                                 { Theory.ForAll (vs,f)  }
+| EXISTS LPAREN vs=ext_arg_list RPAREN sep f=term %prec QUANTIF
+                                 { Theory.Quant (Exists,vs,f)  }
 
-| EXISTS a=arg sep f=term %prec QUANTIF
-                                 { Theory.Exists (a,f)  }
+| FORALL LPAREN vs=ext_arg_list RPAREN sep f=term %prec QUANTIF
+                                 { Theory.Quant (ForAll,vs,f)  }
 
-| FORALL a=arg sep f=term %prec QUANTIF
-                                 { Theory.ForAll (a,f)  }
+| EXISTS a=ext_arg COMMA f=term %prec QUANTIF
+                                 { Theory.Quant (Exists,a,f)  }
+
+| FORALL a=ext_arg COMMA f=term %prec QUANTIF
+                                 { Theory.Quant (ForAll,a,f)  }
 
 /* non-ambiguous term */
 %inline else_term:
 | %prec empty_else   { let loc = L.make $startpos $endpos in
                        let fsymb = L.mk_loc loc "zero" in
-                       L.mk_loc loc (Theory.App (fsymb, [])) }
+                       L.mk_loc loc (Theory.Symb fsymb) }
 | ELSE t=term       { t }
 
 sterm:
@@ -240,20 +261,12 @@ sterm:
 term:
 | t=loc(term_i) { t }
 
+(*------------------------------------------------------------------*)
 term_list:
-|                                    { [] }
-| LPAREN RPAREN                      { [] }
-| LPAREN t=term terms=tm_list RPAREN { t::terms }
+|                            { [] }
+| t=paren(slist(term,COMMA)) { t }
 
-term_list1:
-| LPAREN t=term terms=tm_list RPAREN { t::terms }
-
-tm_list:
-|                           { [] }
-| COMMA tm=term tms=tm_list { tm::tms }
-
-(* Facts, aka booleans *)
-
+(*------------------------------------------------------------------*)
 %inline ord:
 | EQ                             { "=" }
 | NEQ                            { "<>" }
@@ -262,20 +275,48 @@ tm_list:
 | GEQ                            { ">=" }
 | RANGLE                         { ">" }
 
+(*------------------------------------------------------------------*)
 arg:
-| is=ids COLON k=p_ty                     { List.map (fun x -> x,k) is }
+| is=ids COLON k=ty   { List.map (fun x -> x,k) is }
 
 arg_list:
 | args=slist(arg,COMMA) { List.flatten args }
 
+opt_arg_list:
+| LPAREN args=arg_list RPAREN    { args }
+|                                { [] }
+
+(*------------------------------------------------------------------*)
+%inline ext_id:
+| id=lsymb                              { `Simpl id }
+| LPAREN ids=slist1(lsymb,COMMA) RPAREN { `Tuple ids }
+
+ext_arg:
+| is=slist1(ext_id,COMMA) COLON k=ty   
+    { List.map (function
+        | `Simpl id  -> Theory.Bnd_simpl (id,  k)
+        | `Tuple ids -> Theory.Bnd_tuple (ids, k)
+      ) is 
+    }
+
+ext_arg_list:
+| args=slist1(ext_arg, COMMA) { List.flatten args }
+
+opt_ext_arg_list:
+| LPAREN args=ext_arg_list RPAREN    { args }
+|                                    { [] }
+
+(*------------------------------------------------------------------*)
 /* argument whose type defaults to Index */
 tf_arg:
-| is=ids COLON k=p_ty { List.map (fun x -> x,k) is }
-| is=ids              { List.map (fun x -> x,sloc $startpos $endpos Theory.P_index) is }
+| is=ids COLON k=ty { List.map (fun x -> x,k) is }
+| is=ids
+  { List.map (fun x -> x,sloc $startpos $endpos Theory.P_index) is }
 
 tf_arg_list:
 | args=slist(tf_arg,COMMA) { List.flatten args }
 
+(*------------------------------------------------------------------*)
 /* precedent rule for COMMA favors shifting COMMAs */
 ids:
 | id=lsymb                %prec COMMA  { [id] }
@@ -284,7 +325,7 @@ ids:
 top_formula:
 | f=term EOF                    { f }
 
-sep:
+%inline sep:
 |       {()}
 | COMMA {()}
 
@@ -302,7 +343,7 @@ top_process:
 | p=process EOF                    { p }
 
 colon_ty:
-| COLON t=p_ty { t }
+| COLON t=ty { t }
 
 process_i:
 | NULL                             { Process.Null }
@@ -334,7 +375,7 @@ process_i:
 
 | id=lsymb terms=term_list COLONEQ t=term p=process_cont
     { let to_idx t = match L.unloc t with
-        | Theory.App(x,[]) -> x
+        | Theory.Symb x -> x
         | ti -> raise @@ Theory.Conv (L.loc t, Theory.NotVar)
       in
       let l = List.map to_idx terms in
@@ -363,21 +404,17 @@ indices:
 | id=lsymb                          { [id] }
 | id=lsymb COMMA ids=indices        { id::ids }
 
-
 opt_indices:
 |                                   { [] }
 | id=lsymb                          { [id] }
 | id=lsymb COMMA ids=indices        { id::ids }
 
-
-opt_arg_list:
-| LPAREN args=arg_list RPAREN    { args }
-|                                { [] }
-
 ty_var:
 | TICK id=lsymb     { id }
 
-p_ty_i:
+(*------------------------------------------------------------------*)
+/* base type, no arrows */
+p_base_ty_i:
 | MESSAGE      { Theory.P_message }
 | INDEX        { Theory.P_index }
 | TIMESTAMP    { Theory.P_timestamp }
@@ -386,19 +423,33 @@ p_ty_i:
 | tv=ty_var    { Theory.P_tvar tv }
 | l=lsymb      { Theory.P_tbase l }
 
-p_ty:
-| ty=loc(p_ty_i) { ty }
+p_base_ty:
+| ty=loc(p_base_ty_i) { ty }
 
-fun_ty:
-| l=slist1(p_ty,ARROW)      { l }
 
-p_out_ty:
-| COLON ty=p_ty { ty }
+(*------------------------------------------------------------------*)
+/* general types */
 
+ty_i:
+| ty=sty_i                          { ty }
+| t1=ty ARROW t2=ty                 { Theory.P_fun (t1, t2) }
+| t1=sty STAR tys=slist1(sty, STAR) { Theory.P_tuple (t1 :: tys) }
+
+sty_i:
+| t=p_base_ty_i                  { t }
+| LPAREN ty=ty_i RPAREN          { ty }
+
+sty:
+| ty=loc(sty_i) { ty }
+
+ty:
+| ty=loc(ty_i) { ty }
+
+(*------------------------------------------------------------------*)
 /* crypto assumption typed space */
 c_ty:
-| l=lsymb COLON ty=p_ty { Decl.{ cty_space = l;
-                                 cty_ty    = ty; } }
+| l=lsymb COLON ty=p_base_ty { Decl.{ cty_space = l;
+                                      cty_ty    = ty; } }
 
 /* crypto assumption typed space */
 c_tys:
@@ -475,13 +526,16 @@ declaration_i:
       let m, m_info = mm in
       Decl.Decl_dh (h, g, (f_info, e), Some (m_info, m), ctys) }
 
-| NAME e=lsymb COLON t=fun_ty
-                          { Decl.Decl_name (e, t) }
+| NAME e=lsymb COLON targs=ty ARROW tout=p_base_ty
+                          { Decl.Decl_name (e, Some targs, tout) }
+
+| NAME e=lsymb COLON tout=p_base_ty
+                          { Decl.Decl_name (e, None, tout) }
 
 | TYPE e=lsymb infos=bty_infos
                           { Decl.Decl_bty { bty_name = e; bty_infos = infos; } }
 
-| ABSTRACT e=lsymb_decl a=ty_args COLON t=fun_ty
+| ABSTRACT e=lsymb_decl a=ty_args COLON t=ty
     { let symb_type, name = e in
       Decl.(Decl_abstract
               { name      = name;
@@ -490,7 +544,7 @@ declaration_i:
                 abs_tys   = t; }) }
 
 
-| OP e=lsymb_decl tyargs=ty_args args=opt_arg_list tyo=p_out_ty? EQ t=term
+| OP e=lsymb_decl tyargs=ty_args args=opt_ext_arg_list tyo=colon_ty? EQ t=term
     { let symb_type, name = e in
       Decl.(Decl_operator
               { op_name      = name;
@@ -500,8 +554,8 @@ declaration_i:
                 op_tyout     = tyo;
                 op_body      = t; }) }
 
-| MUTABLE e=lsymb args=opt_arg_list COLON typ=p_ty EQ t=term
-                          { Decl.Decl_state (e, args, typ, t) }
+| MUTABLE name=lsymb args=opt_arg_list out_ty=colon_ty? EQ init_body=term
+                          { Decl.Decl_state {name; args; out_ty; init_body; }}
 
 | CHANNEL e=lsymb         { Decl.Decl_channel e }
 
@@ -941,8 +995,8 @@ biframe:
 | ei=term COMMA eis=biframe { ei::eis }
 
 %inline quant:
-| FORALL { Theory.PForAll }
-| EXISTS { Theory.PExists }
+| UFORALL { Theory.PForAll }
+| UEXISTS { Theory.PExists }
 
 global_formula_i:
 | LBRACKET f=term RBRACKET         { Theory.PReach f }

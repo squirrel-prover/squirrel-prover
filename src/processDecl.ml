@@ -62,9 +62,15 @@ let check_fun_out_ty loc ty =
     decl_error loc KDecl InvalidAbsType
   else ()
 
+let rec split_ty (ty : Theory.p_ty) : Theory.p_ty list =
+  match L.unloc ty with
+  | Theory.P_fun (t1, t2) -> t1 :: split_ty t2
+  | _ -> [ty]
+         
 let parse_abstract_decl table (decl : Decl.abstract_decl) =
   let in_tys, out_ty =
-    List.takedrop (List.length decl.abs_tys - 1) decl.abs_tys
+    let tys = split_ty decl.abs_tys in
+    List.takedrop (List.length tys - 1) tys
   in
   let p_out_ty = as_seq1 out_ty in
 
@@ -74,9 +80,9 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
   in
 
   let env = Env.init ~table ~ty_vars:ty_args () in
-  let in_tys = List.map (Theory.parse_p_ty env) in_tys in
+  let in_tys = List.map (Theory.convert_ty env) in_tys in
 
-  let out_ty = Theory.parse_p_ty env p_out_ty in
+  let out_ty = Theory.convert_ty env p_out_ty in
 
   check_fun_out_ty (L.loc p_out_ty) out_ty;
 
@@ -94,14 +100,16 @@ let parse_operator_decl table (decl : Decl.operator_decl) =
     in
 
     let env = Env.init ~table ~ty_vars () in
-    let env, args = Theory.convert_p_bnds env decl.op_args in
+    let env, subst, args = Theory.convert_ext_bnds env decl.op_args in
 
-    let out_ty = omap (Theory.parse_p_ty env) decl.op_tyout in
+    let out_ty = omap (Theory.convert_ty env) decl.op_tyout in
 
     let body, out_ty = 
       Theory.convert ?ty:out_ty { env; cntxt = InGoal } decl.op_body 
     in
-    
+    let body = Term.subst subst body in
+
+    (* not sure this is necessary *)
     check_fun_out_ty (L.loc decl.op_body) out_ty;
 
     if not (Term.is_deterministic body) then
@@ -147,7 +155,7 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
       if not (List.mem sp kws) then
         decl_error (L.loc cty.Decl.cty_space) KDecl (InvalidCtySpace kws);
 
-      let ty = Theory.parse_p_ty env cty.Decl.cty_ty in
+      let ty = Theory.convert_ty env cty.Decl.cty_ty in
       (sp, ty)
     ) ctys
 
@@ -186,7 +194,7 @@ let declare table decl =
   | Decl.Decl_process { id; projs; args; proc} ->
     let env = Env.init ~table () in
     let args = List.map (fun (x,t) ->
-        L.unloc x, Theory.parse_p_ty env t
+        L.unloc x, Theory.convert_ty env t
       ) args
     in
     let projs = parse_projs projs in
@@ -252,15 +260,19 @@ let declare table decl =
 
     Theory.declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty senc sdec, []
 
-  | Decl.Decl_name (s, ptys) ->
+  | Decl.Decl_name (s, p_args_ty, p_out_ty) ->
     let env = Env.init ~table () in
-    let p_args_tys, p_out_ty = List.takedrop (List.length ptys - 1) ptys in
-    let p_out_ty = as_seq1 p_out_ty in
 
-    let args_tys = List.map (Theory.parse_p_ty env) p_args_tys in
-    let out_ty = Theory.parse_p_ty env p_out_ty in
+    let p_args_tys = match p_args_ty with
+      | Some { pl_desc = Theory.P_tuple p_tys} -> p_tys
+      | Some p_ty -> [p_ty]
+      | None -> []
+    in
+
+    let args_tys = List.map (Theory.convert_ty env) p_args_tys in
+    let out_ty = Theory.convert_ty env p_out_ty in
     
-    let n_fty = Type.mk_ftype [] args_tys out_ty in
+    let n_fty = Type.mk_ftype_tuple [] args_tys out_ty in
 
     List.iter2 (fun ty pty ->
         if not (Type.equal ty Type.ttimestamp) &&
@@ -270,7 +282,8 @@ let declare table decl =
     
     Theory.declare_name table s Symbols.{ n_fty }, []
 
-  | Decl.Decl_state (s, args, k, t) -> Theory.declare_state table s args k t, []
+  | Decl.Decl_state { name; args; out_ty; init_body; } ->
+    Theory.declare_state table name args out_ty init_body, []
 
   | Decl.Decl_senc_w_join_hash (senc, sdec, h) ->
     Theory.declare_senc_joint_with_hash table senc sdec h, []

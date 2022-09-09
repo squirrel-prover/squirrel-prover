@@ -241,7 +241,11 @@ module Mk (Args : MkArgs) : S with
     | Theory.PT_sub pt -> `Pt pt
 
     (* if we gave a term, re-interpret it as a proof term *)
-    | Theory.PT_term ({ pl_desc = App (head, terms) } as t) ->
+    | Theory.PT_term ({ pl_desc = Symb head } as t) 
+    | Theory.PT_term ({ pl_desc = App ({ pl_desc = Symb head }, _) } as t) ->
+      let f, terms = Theory.decompose_app t in
+      assert (Theory.equal_i (Theory.Symb head) (L.unloc f));
+
       let pt = Theory.{
           p_pt_head = head;
           p_pt_args = List.map (fun x -> PT_term x) terms ;
@@ -287,7 +291,7 @@ module Mk (Args : MkArgs) : S with
     | Theory.PT_sub sub -> PT_sub (resolve_pt s sub)
     | Theory.PT_term t  ->
       match L.unloc t with
-      | Theory.App (h, args) ->
+      | Theory.App ({ pl_desc = Theory.Symb h}, args) ->
         if S.Hyps.mem_name (L.unloc h) s then
           let p_pt_args =
             List.map (fun a -> resolve_pt_arg s (Theory.PT_term a)) args

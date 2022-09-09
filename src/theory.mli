@@ -16,10 +16,12 @@ type p_ty_i =
   | P_timestamp
   | P_tbase of lsymb
   | P_tvar  of lsymb
-
-type p_ty = p_ty_i L.located
+  | P_fun   of p_ty * p_ty
+  | P_tuple of p_ty list
+             
+and p_ty = p_ty_i L.located
     
-val parse_p_ty : Env.t -> p_ty -> Type.ty 
+val convert_ty : Env.t -> p_ty -> Type.ty 
 
 val pp_p_ty : Format.formatter -> p_ty -> unit
 
@@ -27,49 +29,68 @@ val pp_p_ty : Format.formatter -> p_ty -> unit
 (** Parsed binder *)
 type bnd  = lsymb * p_ty
 
-(** Parsed binders *)
-type bnds = bnd list
+type bnds = (lsymb * p_ty) list
+
+(*------------------------------------------------------------------*)
+(** Extended binders.
+    Support binders with destruct, e.g. [(x,y) : bool * bool] *)
+type ext_bnd =
+  | Bnd_simpl of bnd
+  | Bnd_tuple of lsymb list * p_ty
+
+type ext_bnds = ext_bnd list
 
 (*------------------------------------------------------------------*)
 (** {2 Terms}
-  *
-  * We define here terms used for parsing. Their variables are strings,
-  * they are not attached to sorts. It will be the job of the typechecker
-  * to make sure that types make sense, and of the conversion to replace
-  * strings by proper sorted variables.
-  *
-  * Symbols cannot be disambiguated at parsing time, hence we use very
-  * permissives [App] and [AppAt] constructors which represents
-  * function applications, macros, variables, names etc. *)
+   
+    We define here terms used for parsing. Their variables are strings,
+    they are not attached to sorts. It will be the job of the typechecker
+    to make sure that types make sense, and of the conversion to replace
+    strings by proper sorted variables.
+   
+    Symbols cannot be disambiguated at parsing time, hence we use very
+    permissives [App] and [AppAt] constructors which represents
+    function applications, macros, variables, names etc. *)
+
+type quant = Term.quant
 
 type term_i =
   | Tpat  
   | Diff  of term * term
-  | Seq   of bnds * term
   | Find  of bnds * term * term * term
 
-  | App of lsymb * term list
-  (** An application of a symbol to some arguments which as not been
-    * disambiguated yet (it can be a name, a function symbol
-    * application, a variable, ...)
-    * [App(f,t1 :: ... :: tn)] is [f (t1, ..., tn)] *)
+  | Tuple of term list
+  | Proj of int L.located * term
 
-  | AppAt of lsymb * term list * term
-  (** An application of a symbol to some arguments, at a given
-    * timestamp.  As for [App _], the head function symbol has not been
-    * disambiguated yet.
-    * [AppAt(f,t1 :: ... :: tn,tau)] is [f (t1, ..., tn)\@tau] *)
-                 
-  | ForAll  of bnds * term
-  | Exists  of bnds * term
+  | Symb of lsymb 
+
+  | App of term * term list
+  (** Application of a term to another. 
+      [AppTerm (t, [t1 ... tn])] is [t t1 ... tn]. *)
+
+  | AppAt of term * term
+  (** An application of a symbol to special timestamp arguments.
+      [AppAt(t1, t2)] is [t1 \@ t2] *)
+
+  | Quant of quant * ext_bnds * term
 
 and term = term_i L.located
 
-
+(*------------------------------------------------------------------*)
 val pp_i : Format.formatter -> term_i -> unit
 val pp   : Format.formatter -> term   -> unit
 
-val equal : term -> term -> bool
+(*------------------------------------------------------------------*)
+val mk_symb : lsymb -> term 
+
+val mk_app   : term -> term list -> term 
+val mk_app_i : term -> term list -> term_i
+
+val decompose_app : term -> term * term list
+
+(*------------------------------------------------------------------*)
+val equal   : term   -> term   -> bool
+val equal_i : term_i -> term_i -> bool
 
 (*------------------------------------------------------------------*)
 (** {2 Higher-order terms.} *)
@@ -187,7 +208,7 @@ val declare_name : Symbols.table -> lsymb -> Symbols.name_def -> Symbols.table
     such that value of [s(t1,...,tn)] for init timestamp
     expands to [t\[x1:=t1,...,xn:=tn\]]. *)
 val declare_state : 
-  Symbols.table -> lsymb -> bnds -> p_ty -> term -> Symbols.table
+  Symbols.table -> lsymb -> bnds -> p_ty option -> term -> Symbols.table
        
 (** [get_init_states] returns all the initial values of declared state symbols,
     used to register the init action *)
@@ -228,12 +249,11 @@ val destr_var : term_i -> lsymb option
 type conversion_error_i =
   | Arity_error          of string*int*int
   | Untyped_symbol       of string
-  | Index_error          of string*int*int
   | Undefined            of string
   | UndefinedOfKind      of string * Symbols.namespace
-  | Type_error           of term_i * Type.ty
-  | Timestamp_expected   of term_i
-  | Timestamp_unexpected of term_i
+  | Type_error           of term_i * Type.ty * Type.ty (* expected, got *)
+  | Timestamp_expected   of term
+  | Timestamp_unexpected of term
   | Unsupported_ord      of term_i
   | String_expected      of term_i
   | Int_expected         of term_i
@@ -244,6 +264,13 @@ type conversion_error_i =
   | Freetyunivar
   | UnknownTypeVar       of string
   | BadPty               of Type.ty list
+
+  | BadTermProj          of int * int (* tuple length, given proj *)
+  | NotTermProj
+
+  | ExpectedTupleTy
+  | BadTupleLength       of int * int (* expected, got *)
+
   | BadInfixDecl
   | PatNotAllowed
   | ExplicitTSInProc 
@@ -251,6 +278,8 @@ type conversion_error_i =
   | MissingSystem
   | BadProjInSubterm     of Term.projs * Term.projs
                               
+  | Failure              of string
+
 type conversion_error = L.t * conversion_error_i
 
 exception Conv of conversion_error
@@ -315,7 +344,9 @@ val convert :
   term ->
   Term.term * Type.ty
 
-val convert_p_bnds : Env.t -> bnds -> Env.t * Vars.var list
+val convert_bnds : Env.t -> bnds -> Env.t * Vars.var list
+
+val convert_ext_bnds : Env.t -> ext_bnds -> Env.t * Term.subst * Vars.vars
 
 val convert_ht :
   ?ty_env:Type.Infer.env -> 

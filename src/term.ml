@@ -44,7 +44,7 @@ type msymb = mname isymb
 type state = msymb
 
 (*------------------------------------------------------------------*)
-let pp_name ppf s = (Printer.kws `GoalName) ppf (Symbols.to_string s)
+let pp_name ppf s = Printer.kws `GoalName ppf (Symbols.to_string s)
 
 (*------------------------------------------------------------------*)
 let _pp_nsymb ~dbg ppf (ns : nsymb) =
@@ -60,7 +60,7 @@ let pp_nsymb  = _pp_nsymb  ~dbg:false
 let pp_nsymbs = _pp_nsymbs ~dbg:false
 
 (*------------------------------------------------------------------*)
-let pp_fname ppf s = (Printer.kws `GoalFunction) ppf (Symbols.to_string s)
+let pp_fname ppf s = Printer.kws `GoalFunction ppf (Symbols.to_string s)
 
 let _pp_fsymb ~dbg ppf (fn : fsymb) = 
   Fmt.pf ppf "%a" pp_fname fn
@@ -68,8 +68,7 @@ let _pp_fsymb ~dbg ppf (fn : fsymb) =
 let pp_fsymb = _pp_fsymb ~dbg:false
 
 (*------------------------------------------------------------------*)
-let pp_mname_s ppf s =
-  (Printer.kws `GoalMacro) ppf s
+let pp_mname_s ppf s = Printer.kws `GoalMacro ppf s
 
 let pp_mname ppf s =
   pp_mname_s ppf (Symbols.to_string s)
@@ -105,22 +104,27 @@ type 'a diff_args =
   | Explicit of (proj * 'a) list
 
 (*------------------------------------------------------------------*)
-type quant = ForAll | Exists | Seq
+type quant = ForAll | Exists | Seq | Lambda
 
 let pp_quant fmt = function
   | ForAll -> Fmt.pf fmt "forall"
   | Exists -> Fmt.pf fmt "exists"                
   | Seq    -> Fmt.pf fmt "seq"
-                
+  | Lambda -> Fmt.pf fmt "fun"                
+
 (*------------------------------------------------------------------*)
 type term =
+  | App    of term * term list
   | Fun    of fsymb * Type.ftype * term list
   | Name   of nsymb
   | Macro  of msymb * term list * term
 
   | Action of Symbols.action * Vars.var list 
 
-  | Var    of Vars.var
+  | Var of Vars.var
+
+  | Tuple of term list
+  | Proj of int * term
 
   | Diff of term diff_args
 
@@ -137,8 +141,13 @@ let hash_quant : quant -> int = function
   | ForAll -> 0
   | Exists -> 1
   | Seq    -> 2
+  | Lambda -> 3
 
 let rec hash : term -> int = function
+  | App (f,terms) ->
+    let h = hash f in
+    hcombine (-1) (hash_l terms h)
+
   | Name n -> hcombine 0 (hash_isymb n)
 
   | Fun (f,_,terms) ->
@@ -158,6 +167,12 @@ let rec hash : term -> int = function
   | Quant (q, vs, b) ->
     let h = hcombine_list Vars.hash (hash b) vs in
     hcombine 7 (hcombine (hash_quant q) h)
+
+  | Tuple ts -> 
+    hcombine 8 (hcombine_list hash 0 ts)
+
+  | Proj (i,t) -> 
+    hcombine 9 (hcombine i (hash t))
 
   | Var v -> hcombine 10 (Vars.hash v)
 
@@ -259,6 +274,27 @@ let mk_var (v : Vars.var) : term = Var v
 
 let mk_action a is = Action (a,is)
 
+let mk_tuple l = match l with
+  | [] -> assert false
+  | [a] -> a
+  | _ -> Tuple l
+
+let mk_app t l =
+  if l = [] then t else
+    match t with
+    | Fun (f, fty, l') ->
+      let l1, l2 = List.takedrop (List.length fty.fty_args) (l' @ l) in
+      assert (l1 @ l2 = l' @ l);
+      if l2 = [] then
+        Fun (f, fty, l1)
+      else
+        App(Fun (f, fty, l1), l2)
+      
+    | App (t, l') -> App (t, l' @ l)
+    | _ -> App (t, l)
+
+let mk_proj i t = Proj (i,t)
+
 let mk_name n = Name n
 
 let mk_macro ms l t = Macro (ms, l, t)
@@ -280,6 +316,8 @@ let mk_fun table fname terms =
   let fty = Symbols.ftype table fname in
   Fun (fname, fty, terms)
 
+let mk_fun_tuple table fname terms = mk_fun table fname [mk_tuple terms]
+    
 let mk_fbuiltin = mk_fun Symbols.builtins_table
 
 (*------------------------------------------------------------------*)
@@ -426,51 +464,6 @@ let mk_lambda evs ht = match ht with
   | Lambda (evs', t) -> Lambda (evs @ evs', t)
 
 (*------------------------------------------------------------------*)
-(** {2 Typing} *)
-
-(*------------------------------------------------------------------*)
-let ty ?ty_env (t : term) : Type.ty =
-  let must_close, ty_env = match ty_env with
-    | None        -> true, Type.Infer.mk_env ()
-    | Some ty_env -> false, ty_env
-  in
-
-  let rec ty (t : term) : Type.ty =
-    match t with
-    | Fun (_,fty,terms) ->
-      let fty = Type.open_ftype ty_env fty in
-      let () =
-        List.iter2 (fun arg arg_ty ->
-            match Type.Infer.unify_leq ty_env (ty arg) arg_ty with
-            | `Ok -> ()
-            | `Fail -> assert false
-          ) terms fty.Type.fty_args
-      in
-      fty.Type.fty_out
-
-    | Name ns        -> ns.s_typ
-    | Macro (s,_,_)  -> s.s_typ
-
-    | Var v                -> Vars.ty v
-    | Action _             -> Type.Timestamp
-    | Diff (Explicit l)    -> ty (snd (List.hd l))
-
-    | Find (a, b, c, d)    -> ty c
-
-    | Quant (q, _, _) ->
-      match q with
-      | ForAll | Exists -> Type.Boolean
-      | Seq             -> Type.Message
-  in
-
-  let tty = ty t in
-
-  if must_close
-  then Type.tsubst (Type.Infer.close ty_env) tty (* ty_env should be closed *)
-  else tty
-
-
-(*------------------------------------------------------------------*)
 (** {2 Destructors} *)
 
 let destr_fun ?fs = function
@@ -478,6 +471,18 @@ let destr_fun ?fs = function
   | Fun (fs', _, l) when fs = Some fs' -> Some l
   | _ -> None
 
+let destr_tuple = function
+  | Tuple ts -> Some ts
+  | _ -> None
+
+let destr_proj = function
+  | Proj (i,t) -> Some (i,t)
+  | _ -> None
+
+let is_tuple t = destr_tuple t <> None
+let is_proj  t = destr_proj  t <> None
+
+(*------------------------------------------------------------------*)
 let oas_seq0 = omap as_seq0
 let oas_seq1 = omap as_seq1
 let oas_seq2 = omap as_seq2
@@ -681,6 +686,7 @@ let fv (term : term) : Sv.t =
     | Action (_,indices) -> Sv.of_list indices
     | Var tv -> Sv.singleton tv
     | Fun (_, _,lt) -> fvs lt
+    | App (t, l) -> fvs (t :: l)
 
     | Macro (s, l, ts) ->
       Sv.union
@@ -688,6 +694,9 @@ let fv (term : term) : Sv.t =
         (Sv.union (fv ts) (fvs l))
 
     | Name s -> Sv.of_list s.s_indices
+
+    | Tuple ts -> fvs ts
+    | Proj (_, t) -> fv t
 
     | Diff (Explicit l) -> fvs (List.map snd l)
 
@@ -742,6 +751,10 @@ let tmap (func : term -> term) (t : term) : term =
 
   | Fun (f,fty,terms) -> Fun (f, fty, List.map func terms)
   | Macro (m, l, ts)  -> Macro (m, List.map func l, func ts)
+  | App (t, l)  -> App (func t, List.map func l)
+
+  | Tuple ts -> Tuple (List.map func ts)
+  | Proj (i,t) -> Proj (i, func t)
 
   | Diff (Explicit l) ->
     Diff (Explicit (List.map (fun (lbl,tm) -> lbl, func tm) l))
@@ -825,6 +838,8 @@ let rec subst (s : subst) (t : term) : term =
       | Fun (fs, fty, lt) ->
         Fun (fs, fty, List.map (subst s) lt)
 
+      | App (t, l) -> App (subst s t, List.map (subst s) l)
+
       | Name symb ->
         Name { symb with s_indices = subst_vars s symb.s_indices}
 
@@ -834,6 +849,9 @@ let rec subst (s : subst) (t : term) : term =
       | Var m -> Var m
 
       | Action (a,indices) -> Action (a, subst_vars s indices)
+
+      | Tuple ts -> Tuple (List.map (subst s) ts)
+      | Proj (i, t) -> Proj (i, subst s t)
 
       | Diff (Explicit l) ->
         Diff (Explicit (List.map (fun (lbl,tm) -> lbl, subst s tm) l))
@@ -912,6 +930,10 @@ let subst_macros_ts table l ts t =
       Quant (q, vs, subst_term b)
                             
     | Name _ | Action _ | Var _ -> t
+
+    (* FIXME: use tmap in all cases *)
+    | App _
+    | Tuple _ | Proj _ -> tmap subst_term t
   in
 
   subst_term t
@@ -1000,15 +1022,15 @@ let order_fixity       = 29 , `Infix `NonAssoc
 let ite_fixity         = 40 , `Infix `Left
 let other_infix_fixity = 50 , `Infix `Right
 
-let not_fixity   = 26 , `Prefix
-
 let seq_fixity     = 1000 , `Prefix
 let find_fixity    = 1000 , `Prefix
 let macro_fixity   = 1000 , `NoParens
 let diff_fixity    = 1000 , `NoParens
-let fun_fixity     = 1000 , `NoParens
 let happens_fixity = 1000 , `NoParens
+let tuple_fixity   = 1000 , `NoParens
 
+let proj_fixity  = 1000 , `Postfix
+let app_fixity   = 10000, `Infix `Left
 
 let get_infix_prec (f : Symbols.fname) =
   (* *)if f = Symbols.fs_and  then fst and_fixity 
@@ -1038,7 +1060,7 @@ let rec pp
   let err_opt, info = info.styler info t in
   styled_opt err_opt (_pp info (outer, side)) ppf t
 
-(** Core printing function *)
+(** Core term pretty-printing function *)
 and _pp
     (info         : pp_info)
     ((outer,side) : ('b * fixity) * assoc)
@@ -1056,7 +1078,7 @@ and _pp
   (* if-then-else, no else *)
   | Fun (s,_,[b;c; Fun (f,_,[])])
     when s = f_ite && f = f_zero ->
-    let pp fmt () =
+    let pp ppf () =
       Fmt.pf ppf "@[<hov 2>if %a@ then@ %a@]"
         (pp (ite_fixity, `NonAssoc)) b
         (pp (ite_fixity, `Right)) c
@@ -1071,7 +1093,7 @@ and _pp
 
   (* if-then-else, general case *)
   | Fun (s,_,[a;b;c]) when s = f_ite ->
-    let pp fmt () =
+    let pp ppf () =
       Fmt.pf ppf "@[<hv 0>@[<hov 2>if %a@ then@ %a@]@ %a@]"
         (pp (ite_fixity, `NonAssoc)) a
         (pp (ite_fixity, `NonAssoc)) b
@@ -1096,7 +1118,7 @@ and _pp
   | Fun (s,_,[bl;br]) when Symbols.is_infix s ->
     let assoc = Symbols.infix_assoc s in
     let prec = get_infix_prec s in
-    let pp fmt () =
+    let pp ppf () =
       Fmt.pf ppf "@[<0>%a %s@ %a@]"
         (pp ((prec, `Infix assoc), `Left)) bl
         (Symbols.to_string s)
@@ -1104,33 +1126,30 @@ and _pp
     in
     maybe_paren ~outer ~side ~inner:(prec, `Infix assoc) pp ppf ()
 
-  (* not *)
-  | Fun (s,_,[b]) when s = f_not ->
-    Fmt.pf ppf "@[<hov 2>not(%a)@]" (pp (not_fixity, `Right)) b
-
-  (* true/false *)
-  | Fun _ as tt  when tt = mk_true ->  Fmt.pf ppf "true"
-  | Fun _  as tf when tf = mk_false -> Fmt.pf ppf "false"
-
   (* constant *)
   | Fun (f,_,[]) ->
     Fmt.pf ppf "%a" pp_fsymb f
 
-  (* arity one *)
-  | Fun (f,_,[a]) ->
-    Fmt.pf ppf "@[<hov 2>%a(@,%a)@]"
-      (_pp_fsymb ~dbg:info.dbg) f
-      (pp (fun_fixity, `NonAssoc)) a
-
   (* function symbol, general case *)
-  | Fun (f,_,terms) ->
-    Fmt.pf ppf "@[<hov 2>%a(%a)@]"
-      (_pp_fsymb ~dbg:info.dbg) f
-      (Utils.pp_ne_list
-         "%a"
-         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,")
-            (pp (fun_fixity, `NonAssoc))))
-      terms
+  | Fun (f,_,l) ->
+    let pp ppf () =
+      Fmt.pf ppf "@[<hov 2>%a %a@]"
+        (_pp_fsymb ~dbg:info.dbg) f
+        (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt "@ ")
+           (pp (app_fixity, `Right)))
+        l
+    in
+    maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
+
+  | App (t, l) ->
+    let pp ppf () =
+      Fmt.pf ppf "@[<hov 2>%a %a@]"
+        (pp (app_fixity, `Left)) t
+        (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt "@ ")
+           (pp (app_fixity, `Right)))
+        l
+    in
+    maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
 
   | Name n -> _pp_nsymb ~dbg:info.dbg ppf n
 
@@ -1143,15 +1162,34 @@ and _pp
       (pp (macro_fixity, `NonAssoc)) ts
 
   | Action (symb,indices) ->
-    Printer.kw `GoalAction ppf "%s%a" 
-      (Symbols.to_string symb)
-      (_pp_indices ~dbg:info.dbg) indices
-
+    let pp ppf () =
+      Printer.kw `GoalAction ppf "%s%a" 
+        (Symbols.to_string symb)
+        (_pp_indices ~dbg:info.dbg) indices
+    in
+    maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
+    
   | Diff (Explicit l) ->
     Fmt.pf ppf "@[<hov 2>diff(@,%a)@]"
-      (Fmt.list ~sep:(fun fmt () -> Format.fprintf fmt ",@ ")
+      (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ")
          (pp (diff_fixity, `NonAssoc)))
       (List.map snd l) (* TODO labels *)
+
+  | Tuple ts ->
+    (* let pp ppf () = *)
+      Fmt.pf ppf "@[<hov 2>(%a)@]"
+        (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ")
+           (pp (tuple_fixity, `NonAssoc)))
+        ts
+    (* in
+     * maybe_paren ~outer ~side ~inner:tuple_fixity pp ppf () *)
+      
+  | Proj (i, t) -> 
+    let pp ppf () =
+      Fmt.pf ppf "@[<hov 2>%a#%d@]"
+        (pp (proj_fixity, `Left)) t i
+    in
+    maybe_paren ~outer ~side ~inner:proj_fixity pp ppf ()
 
   | Find (vs, c, d, Fun (f,_,[])) when f = f_zero ->
     let _, vs, s = (* rename quantified vars. to avoid name clashes *)
@@ -1160,7 +1198,7 @@ and _pp
     in
     let c, d = subst s c, subst s d in
 
-    let pp fmt () =
+    let pp ppf () =
       Fmt.pf ppf "@[<hv 0>\
                   @[<hov 2>try find %a such that@ %a@]@;<1 0>\
                   @[<hov 2>in@ %a@]@]"
@@ -1177,7 +1215,7 @@ and _pp
     in
     let c, d = subst s c, subst s d in
 
-    let pp fmt () =
+    let pp ppf () =
       Fmt.pf ppf "@[<hv 0>\
                   @[<hov 2>try find %a such that@ %a@]@;<1 0>\
                   @[<hov 2>in@ %a@]@;<1 0>\
@@ -1199,7 +1237,7 @@ and _pp
     begin
       match q with
       | Exists | ForAll ->
-        let pp fmt () =
+        let pp ppf () =
           Fmt.pf ppf "@[<2>%a (@[%a@]),@ %a@]"
             pp_quant q
             (Vars._pp_typed_list ~dbg:info.dbg) vs
@@ -1210,6 +1248,13 @@ and _pp
       | Seq ->
         Fmt.pf ppf "@[<hov 2>seq(%a->@,%a)@]"
           (Vars._pp_typed_list ~dbg:info.dbg) vs (pp (seq_fixity, `NonAssoc)) b
+
+      | Lambda ->
+        let pp ppf () =
+          Fmt.pf ppf "@[<hov 2>fun (@[%a@]) =>@ %a@]"
+            (Vars._pp_typed_list ~dbg:info.dbg) vs (pp (quant_fixity, `Right)) b
+        in
+        maybe_paren ~outer ~side ~inner:(fst quant_fixity, `Prefix) pp ppf ()
     end
 
 (* Printing in a [hv] box. Print the trailing [else] of the caller. *)
@@ -1281,6 +1326,76 @@ let pp_esubst ppf (ESubst (t1,t2)) =
 let pp_subst ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_esubst) s
+
+(*------------------------------------------------------------------*)
+(** {2 Typing} *)
+
+(*------------------------------------------------------------------*)
+let ty ?ty_env (t : term) : Type.ty =
+  let must_close, ty_env = match ty_env with
+    | None        -> true, Type.Infer.mk_env ()
+    | Some ty_env -> false, ty_env
+  in
+
+  let rec ty (t : term) : Type.ty =
+    match t with
+    | Fun (_,fty,terms) ->
+      let fty = Type.open_ftype ty_env fty in
+      
+      let ty_args, ty_out =
+        let arrow_ty = Type.fun_l fty.fty_args fty.fty_out in
+        Type.destr_funs arrow_ty (List.length terms)
+      in
+      check_tys terms ty_args;
+      ty_out
+
+    | App (t1, l) ->
+      let tys, t_out = Type.destr_funs (ty t1) (List.length l) in      
+      check_tys l tys;
+      t_out
+
+    | Name ns        -> ns.s_typ
+    | Macro (s,_,_)  -> s.s_typ
+
+    | Tuple ts -> 
+      Type.Tuple (List.map ty ts)
+
+    | Proj (i,t) -> 
+      begin
+        match ty t with
+        | Type.Tuple tys -> List.nth tys (i - 1)
+        | _ -> assert false
+      end
+
+    | Var v                -> Vars.ty v
+    | Action _             -> Type.Timestamp
+    | Diff (Explicit l)    -> ty (snd (List.hd l))
+
+    | Find (a, b, c, d)    -> ty c
+
+    | Quant (q, vs, t) ->
+      match q with
+      | ForAll | Exists -> Type.Boolean
+      | Seq             -> Type.Message
+      | Lambda          -> 
+        let tys = List.map Vars.ty vs in
+        let ty_out = ty t in
+        Type.fun_l tys ty_out
+
+
+  and check_tys (terms : term list) (tys : Type.ty list) =
+    List.iter2 (fun term arg_ty ->
+        match Type.Infer.unify_leq ty_env (ty term) arg_ty with
+        | `Ok -> ()
+        | `Fail -> assert false
+      ) terms tys
+  in
+
+  let tty = ty t in
+
+  if must_close
+  then Type.tsubst (Type.Infer.close ty_env) tty (* ty_env should be closed *)
+  else tty
 
 (*------------------------------------------------------------------*)
 (** Literals. *)
@@ -1498,6 +1613,7 @@ let mk_quant ?(simpl=false) q l f =
   mk_quant_ns q l f
 
 let mk_seq ?simpl = mk_quant ?simpl Seq
+let mk_lambda ?simpl = mk_quant ?simpl Lambda
     
 (*------------------------------------------------------------------*)
 module Smart : SmartFO with type form = term = struct
@@ -1614,12 +1730,23 @@ let is_pure_timestamp (t : term) =
 
     | Fun (fs, _, []) -> true
 
+    | Proj(_,t) -> pure_ts t
+
+    | Tuple l -> List.for_all pure_ts l
+
+    | App (t, l) -> List.for_all pure_ts (t :: l)
+
+    | Find (_, a,b,c) -> pure_ts a && pure_ts b && pure_ts c
+
     | Quant (_, _, t) -> pure_ts t
 
     | Action _ -> true
 
     | Var v -> let ty = Vars.ty v in ty = Type.Timestamp || ty = Type.Index
-    | _ -> false
+
+    | Fun _ -> false            (* because of adversarial sumbols! *)
+
+    | Name _ | Diff _ | Macro _ -> false
   in
   pure_ts t
 
@@ -1680,6 +1807,19 @@ let alpha_conv ?(subst=[]) (t1 : term) (t2 : term) : bool =
   let rec doit (s : subst) t1 t2 : unit =
     match t1, t2 with
     | Fun (f, fty, l), Fun (f', fty', l') when f = f' ->
+      doits s l l'
+
+    | Proj (i, t), Proj (i', t') -> 
+      if i <> i' then raise AlphaFailed;
+      doit s t t'
+
+    | Tuple l, Tuple l' -> 
+      if List.length l <> List.length l' then raise AlphaFailed;
+      doits s l l'
+
+    | App (f, l), App (f', l') -> 
+      if List.length l <> List.length l' then raise AlphaFailed;
+      doit s f f';
       doits s l l'
 
     | Name n, Name n' when n.s_symb = n'.s_symb ->
@@ -1752,6 +1892,14 @@ let rec make_normal_biterm
     match t1, t2 with
     | Fun (f, fty, l), Fun (f', fty', l') when f = f' ->
       Fun (f, fty, List.map2 (mdiff s) l l')
+
+    | Proj (i, t), Proj (i', t') when i = i' -> Proj (i, mdiff s t t')
+
+    | Tuple l, Tuple l' when List.length l = List.length l' -> 
+      Tuple (List.map2 (mdiff s) l l')
+
+    | App (f, l), App (f', l') when List.length l = List.length l' ->
+      App (mdiff s f f', List.map2 (mdiff s) l l')
 
     | Name n, Name n' when n.s_symb = n'.s_symb ->
       alpha_vars s n.s_indices n'.s_indices;
@@ -1853,9 +2001,13 @@ let match_infos_to_pp_info (minfos : match_infos) : pp_info =
 (** {2 Term heads} *)
 
 type term_head =
+  | HApp
   | HExists
   | HForAll
   | HSeq
+  | HLambda
+  | HTuple
+  | HProj
   | HFind
   | HFun   of Symbols.fname 
   | HMacro of Symbols.macro 
@@ -1865,10 +2017,14 @@ type term_head =
   | HAction
 
 let pp_term_head fmt = function
+  | HApp      -> Fmt.pf fmt "App"
   | HExists   -> Fmt.pf fmt "Exists"
   | HForAll   -> Fmt.pf fmt "Forall"
   | HSeq      -> Fmt.pf fmt "Seq"
+  | HLambda   -> Fmt.pf fmt "Lambda"
   | HFind     -> Fmt.pf fmt "Find"
+  | HTuple    -> Fmt.pf fmt "Tuple"
+  | HProj     -> Fmt.pf fmt "Proj"
   | HFun   f  -> Fmt.pf fmt "Fun %a"   Symbols.pp f
   | HMacro m  -> Fmt.pf fmt "Macro %a" Symbols.pp m
   | HName  n  -> Fmt.pf fmt "Name %a"  Symbols.pp n
@@ -1877,10 +2033,14 @@ let pp_term_head fmt = function
   | HAction   -> Fmt.pf fmt "Action"
 
 let get_head : term -> term_head = function
+  | App _                -> HApp
   | Quant (Exists, _, _) -> HExists
   | Quant (ForAll, _, _) -> HForAll
   | Quant (Seq,    _, _) -> HSeq
+  | Quant (Lambda, _, _) -> HLambda
 
+  | Tuple _        -> HTuple
+  | Proj _         -> HProj
   | Fun (f,_,_)    -> HFun f
   | Find _         -> HFind
   | Macro (m1,_,_) -> HMacro m1.s_symb

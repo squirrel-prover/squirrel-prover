@@ -6,6 +6,7 @@ module THyps = Hyps.TraceHyps
 (*------------------------------------------------------------------*)
 type red_param = { 
   delta  : bool;
+  beta   : bool;
   constr : bool;
 }
 

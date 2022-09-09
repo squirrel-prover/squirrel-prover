@@ -21,9 +21,9 @@ hash hkey
 abstract ok : message
 abstract ko : message
 
-name key : index->message
-name seed : index->message
-name n : index->index->message
+name key : index -> message
+name seed : index -> message
+name n : index * index -> message
 
 mutable kT(i:index) : message = seed(i)
 

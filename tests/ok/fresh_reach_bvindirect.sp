@@ -2,7 +2,7 @@
 
 (* Checking the treatment of bound variables in indirect cases for fresh. *)
 
-name n : index -> index -> message
+name n : index * index -> message
 
 abstract mtest : index -> boolean
 

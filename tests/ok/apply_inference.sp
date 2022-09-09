@@ -4,9 +4,8 @@
 system null.
 
 abstract nt ['a] : 'a -> 'a.
-abstract ft ['a] : 'a -> 'a -> 'a.
-abstract gt ['a] : 'a -> 'a -> boolean.
-
+abstract ft ['a] : 'a * 'a -> 'a.
+abstract gt ['a] : 'a * 'a -> bool.
 
 goal _ (x, y : message) : 
     (forall (z : message), gt(nt(x),z) => false) => 
@@ -72,7 +71,7 @@ goal _ (y,z : message) :
  g (y) = g (<y,z>).
 Proof.
   intro H G F.
-  rewrite (H _ (%G <_,_>)).
+  rewrite (H _ (%G (<_,_>))).
   rewrite (H _ (%G y)). 
   assumption F.
 Qed.
@@ -83,6 +82,6 @@ goal _ (y,z : message) :
  g (<y,z>) = f (<y,z>).
 Proof.
   intro H G.
-  have U := H _ (%G <y,z>).
+  have U := H _ (%G (<y,z>)).
   assumption U.
 Qed.

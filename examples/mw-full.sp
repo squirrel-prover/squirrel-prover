@@ -20,11 +20,11 @@ set postQuantumSound = true.
 
 hash H
 
-abstract id : index->message
-abstract id': index->index->message
+abstract id : index -> message
+abstract id': index * index -> message
 
-name key : index->message
-name key': index->index->message
+name key : index -> message
+name key': index * index -> message
 
 abstract ok : message
 abstract ko : message
@@ -37,26 +37,26 @@ channel c
 process tag(i:index, t:index)=
   in(c,x);
   new nt;
-  out(c,<nt,xor(diff(id(i),id'(i,t)),H(<tag0,<x,nt>>,diff(key(i),key'(i,t))))>);
+  out(c,<nt,xor (diff(id(i),id'(i,t))) (H(<tag0,<x,nt>>,diff(key(i),key'(i,t))))>);
   in(c,y);
-  if y = xor(diff(id(i),id'(i,t)),H(<tag1,<x,nt>>,diff(key(i),key'(i,t))))
+  if y = xor (diff(id(i),id'(i,t))) (H(<tag1,<x,nt>>,diff(key(i),key'(i,t))))
   then out(c,ok)
-  else out(c,ko)
+  else out(c,ko).
 
 process reader =
   new nr;
   out(c,nr);
   in(c,m);
   if exists (i,t:index),
-     xor(diff(id(i),id'(i,t)),snd(m)) =
+     xor(diff(id(i),id'(i,t))) (snd(m)) =
      H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t)))
   then
     out(c, try find i,t such that
-             xor(diff(id(i),id'(i,t)),snd(m)) =
+             xor(diff(id(i),id'(i,t))) (snd(m)) =
              H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t)))
            in
-             xor(diff(id(i),id'(i,t)),
-                 H(<tag1,<nr,fst(m)>>,diff(key(i),key'(i,t)))))
+             xor (diff(id(i),id'(i,t)))
+                 (H(<tag1,<nr,fst(m)>>,diff(key(i),key'(i,t)))))
   else
     out(c,error)
 
@@ -73,7 +73,7 @@ Qed.
    way with respect to the involved indices. *)
 goal wa_R1 (r:index) :
   (exists (i,t:index),
-   xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
+   xor(diff(id(i),id'(i,t))) (snd(input@R1(r))) =
    H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))))
   <=>
   (exists (i,t:index),
@@ -110,7 +110,7 @@ Qed.
     There has to remain an existential quantification on t,
     because it is not involved in the condition. *)
 goal [default/left] wa_R1_left (i,r:index):
-  xor(id(i),snd(input@R1(r))) =
+  xor(id(i)) (snd(input@R1(r))) =
   H(<tag0,<nr(r),fst(input@R1(r))>>,key(i))
   <=>
   exists t:index,
@@ -130,7 +130,7 @@ Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
 goal [default/right] wa_R1_right (i,t,r:index):
-  xor(id'(i,t),snd(input@R1(r))) =
+  xor(id'(i,t)) (snd(input@R1(r))) =
   H(<tag0,<nr(r),fst(input@R1(r))>>,key'(i,t))
   <=>
   T(i,t) < R1(r) &&
@@ -175,11 +175,11 @@ Proof.
      - we can finally get rid of the nonces nr and nt in the first
        two sequences using fresh. *)
 
-  enrich seq(r:index -> nr(r)),
-         seq(i,t:index -> nt(i,t)),
-         seq(i,t:index -> diff(id(i),id'(i,t)) XOR
+  enrich seq(r:index => nr(r)),
+         seq(i,t:index => nt(i,t)),
+         seq(i,t:index => diff(id(i),id'(i,t)) XOR
                     H(<tag0,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t)))),
-         seq(i,r,t:index -> diff(id(i),id'(i,t)) XOR
+         seq(i,r,t:index => diff(id(i),id'(i,t)) XOR
                       H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))).
   induction t.
 
@@ -206,10 +206,10 @@ Proof.
           output@R(r) = input@T(i,t)
         then
           (try find i,t such that
-             xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
+             xor(diff(id(i),id'(i,t))) (snd(input@R1(r))) =
              H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))) in
-             xor(diff(id(i),id'(i,t)),
-                 H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))))))
+             xor(diff(id(i),id'(i,t)))
+                 (H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))))))
       =
       (if
           exec@pred(R1(r)) &&
@@ -226,8 +226,8 @@ Proof.
               fst(output@T(i,t)) = fst(input@R1(r)) &&
               R(r) < T(i,t) &&
               output@R(r) = input@T(i,t)) in
-             xor(diff(id(i),id'(i,t)),
-                 H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))))). {
+             xor(diff(id(i),id'(i,t)))
+                (H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))))). {
       project.
 
       (* Left *)
@@ -260,7 +260,7 @@ Proof.
     (* Same as wa_R1 but with @R2 instead of @R1,
        and the equivalence is used under a negation. *)
     have -> :
-      (exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R2(r))) =
+      (exists (i,t:index), xor(diff(id(i),id'(i,t))) (snd(input@R2(r))) =
                      H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t))))
       <=>
       (exists (i,t:index), T(i,t) < R2(r) &&

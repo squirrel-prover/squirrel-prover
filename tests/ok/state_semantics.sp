@@ -1,5 +1,3 @@
-
-
 set processStrictAliasMode=true.
 
 hash h

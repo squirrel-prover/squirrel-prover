@@ -70,6 +70,9 @@ module Pos = struct
       | Term.Fun (_, _, l) ->
         sel_l fsel sp ~projs ~vars ~conds ~p l
 
+      | Term.App (t1, l) ->
+        sel_l fsel sp ~projs ~vars ~conds ~p (t1 :: l)
+
       | Term.Name ns ->
         let l = List.map Term.mk_var ns.s_indices in
         sel_l fsel sp ~projs ~vars ~conds ~p l
@@ -86,16 +89,22 @@ module Pos = struct
 
       | Term.Var _ -> sp
 
-      | Term.Quant (_, is, t) -> 
-        let is, subst = Term.refresh_vars `Global is in
-        let t = Term.subst subst t in
-        let vars = List.rev_append is vars in
+      | Term.Tuple ts ->
+        sel_l fsel sp ~projs ~vars ~conds ~p ts
+
+      | Term.Proj (_, t) ->
         sel fsel sp ~projs ~vars ~conds ~p:(0 :: p) t
 
       | Term.Diff (Explicit l) ->
         List.foldi (fun i sp (label,t) ->
             sel fsel sp ~projs:(Some [label]) ~vars ~conds ~p:(i :: p) t
           ) sp l
+
+      | Term.Quant (_, is, t) -> 
+        let is, subst = Term.refresh_vars `Global is in
+        let t = Term.subst subst t in
+        let vars = List.rev_append is vars in
+        sel fsel sp ~projs ~vars ~conds ~p:(0 :: p) t
 
       | Term.Find (is, c, t, e) ->
         let is, subst = Term.refresh_vars `Global is in
@@ -257,11 +266,22 @@ module Pos = struct
         let ti' = Term.mk_fun0 fs fty [t1; t2] in
         acc, found, if found then ti' else ti
 
+      (* [Fun _], general case *)
       | Term.Fun (fs, fty, l) ->
         let acc, found, l = map_fold_l ~se ~p ~acc l in
 
         let ti' = Term.mk_fun0 fs fty l in
         acc, found, if found then ti' else ti
+
+      | Term.App (t1, l) ->
+        let acc, found, t1_l = map_fold_l ~se ~p ~acc (t1 :: l) in
+
+        let t1, l = List.takedrop 1 t1_l in
+        let t1 = as_seq1 t1 in
+
+        let ti' = Term.mk_app t1 l in
+        acc, found, if found then ti' else ti
+        
 
       | Term.Name ns ->
         let l = List.map Term.mk_var ns.s_indices in
@@ -297,6 +317,16 @@ module Pos = struct
         acc, found, if found then ti' else ti
 
       | Term.Var _ -> acc, false, ti
+
+      | Term.Tuple l ->
+        let acc, found, l = map_fold_l ~se ~vars ~conds ~p ~acc l in
+        let ti' = Term.mk_tuple l in
+        acc, found, if found then ti' else ti
+
+      | Term.Proj (i,t) ->
+        let acc, found, t = map_fold ~se ~vars ~conds ~p:(0 :: p) ~acc t in
+        let ti' = Term.mk_proj i t in
+        acc, found, if found then ti' else ti
 
       | Term.Quant (q, is, t0) -> 
         let is, subst = Term.refresh_vars `Global is in
@@ -780,7 +810,11 @@ let expand_head_once
 
   | Fun (fs, _, ts) 
     when Operator.is_operator table fs -> 
-    Operator.unfold table sexpr fs ts, true
+    begin
+      match Operator.unfold table sexpr fs ts with
+      | `Ok t -> t, true
+      | `FreeTyv -> raise exn
+    end
 
   | _ -> raise exn
 
@@ -1001,6 +1035,16 @@ module T (* : S with type t = Term.term *) = struct
     match t1, t2 with
     | Var v, t | t, Var v ->
       vunif t v st
+
+    | Tuple l, Tuple l' ->
+      if List.length l <> List.length l' then no_match ();
+      unif_l l l' st
+
+    | Proj (i,t), Proj (i',t') when i = i' ->
+      unif t t' st
+
+    | App (f, l), App(f', l') when List.length l = List.length l' ->
+      unif_l (f :: l) (f' :: l') st
 
     | Fun (fn, _, terms), Fun (fn', _, terms') ->
       if fn <> fn' then raise NoMgu;
@@ -1227,6 +1271,17 @@ module T (* : S with type t = Term.term *) = struct
   let rec tmatch (t : term) (pat : term) (st : match_state) : Mvar.t =
     match t, pat with
     | _, Var v' -> vmatch t v' st
+
+    | Tuple l, Tuple l' ->
+      if List.length l <> List.length l' then no_match ();
+      tmatch_l l l' st
+
+    | Proj (i,t), Proj (i',t') when i = i' ->
+      tmatch t t' st
+
+    (* FEATURE: try to reduce if match failed *)
+    | App (f, l), App(f', l') when List.length l = List.length l' ->
+      tmatch_l (f :: l) (f' :: l') st
 
     | Fun (fn , fty, terms), 
       Fun (fn', fty', terms') when fn = fn' ->
@@ -2069,6 +2124,20 @@ module E : S with type t = Equiv.form = struct
       (cand : cand_set)
       (known_sets : known_sets) : cand_sets
     =
+    (* [mk_cand_of_terms] build back the know terms from the known 
+       sub-terms. *)
+    let comp_deds
+        (mk_cand_of_terms : terms -> term) (terms : Term.terms) 
+      : cand_sets 
+      =
+      let terms_cand = { cand with term = terms } in
+      let terms_deds = deduce_list table system terms_cand known_sets in
+      List.map (fun (terms_ded : cand_tuple_set) ->
+          { terms_ded with
+            term = mk_cand_of_terms terms_ded.term }
+        ) terms_deds
+    in
+
     (* decompose the term using Function Application,
        find a deducible specialization of its tuple of arguments,
        and build the deducible specialization of the initial term. *)
@@ -2086,14 +2155,21 @@ module E : S with type t = Equiv.form = struct
           deduce table system { cand with term = body } known_sets
       end
 
+    | Term.Proj (i,t) -> 
+      comp_deds (fun t -> Term.mk_proj i (as_seq1 t)) [t]
+
+    | Term.Tuple f_terms -> 
+      comp_deds (fun f_terms -> Term.mk_tuple f_terms) f_terms
 
     | Term.Fun (fs, fty, f_terms) ->
-      let f_terms_cand = { cand with term = f_terms } in
-      let f_terms_deds = deduce_list table system f_terms_cand known_sets in
-      List.map (fun (f_terms_ded : cand_tuple_set) ->
-          { f_terms_ded with
-            term = Term.mk_fun0 fs fty (f_terms_ded.term) }
-        ) f_terms_deds
+      comp_deds (fun f_terms -> Term.mk_fun0 fs fty f_terms) f_terms
+
+    | Term.App (t, l) -> 
+      comp_deds (fun t_l ->
+          let t, l = List.takedrop 1 t_l in
+          let t = as_seq1 t in
+          Term.mk_app t l
+        ) [t]
 
     | _ -> []
 
@@ -2398,6 +2474,7 @@ module E : S with type t = Equiv.form = struct
     match cterm.term with
     | t when is_pure_timestamp t -> Some []
 
+    (* function: if-then-else *)
     | Term.Fun (f, _, [b; t1; t2] ) when f = Term.f_ite ->
       let cond1 = Term.mk_and b cterm.cond
       and cond2 = Term.mk_and b (Term.mk_not cterm.cond) in
@@ -2405,8 +2482,16 @@ module E : S with type t = Equiv.form = struct
       Some (List.map (fun t -> st, t) [{ term = t1; cond = cond1; };
                                        { term = t2; cond = cond2; }])
 
+    (* function: general case + tuples *)
+    | Term.Tuple terms
     | Term.Fun (_, _, terms) ->
       Some (List.map (fun term -> st, { cterm with term } ) terms)
+
+    | Term.Proj (_, t) ->
+      Some [st, { cterm with term = t }]
+
+    | Term.App (t, terms) ->
+      Some (List.map (fun term -> st, { cterm with term } ) (t :: terms))
 
     | Term.Quant (_, es, term)
       when List.for_all (fun v -> Type.is_finite (Vars.ty v)) es ->

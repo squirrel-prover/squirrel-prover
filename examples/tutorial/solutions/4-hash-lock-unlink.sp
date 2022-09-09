@@ -32,7 +32,7 @@ abstract ko : message
 name key : index -> message
 
 (* `keyS(i,k)` is the key of the tag `i,k` in the SINGLE-session scenario *)
-name keyS : index -> index -> message
+name keyS : index * index -> message
 
 (* channel for tag messages *)
 channel cT
@@ -207,8 +207,8 @@ Proof.
     fa !<_,_>; fa 1.
     fresh 1; rewrite if_true.
     repeat split => j0 _ //.
-    by depends R(j0), R2(j0).
     by depends R(j0), R1(j0).
+    by depends R(j0), R2(j0).
     auto.
 
   (* Case R1 *)

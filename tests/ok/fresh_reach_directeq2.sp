@@ -1,5 +1,5 @@
 name n : index -> message
-abstract f : message -> message -> message
+abstract f : message * message -> message
 
 system null.
 

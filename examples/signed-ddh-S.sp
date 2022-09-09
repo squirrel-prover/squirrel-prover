@@ -35,7 +35,7 @@ channel cS
 
 name a : index -> message
 name b : index -> message
-name k :  index -> index -> message
+name k : index * index -> message.
 
 ddh g, (^) where group:message exponents:message.
 
@@ -105,9 +105,9 @@ equiv strongSecS.
 Proof.
   enrich
     skP, skS,
-    seq(i:index ->g^a(i)),
-    seq(j:index ->g^b(j)),
-    seq(i,j:index ->diff( g ^ a(i), g) ^ diff( b(j), k(i,j))).
+    seq(i:index =>g^a(i)),
+    seq(j:index =>g^b(j)),
+    seq(i,j:index =>diff( g ^ a(i), g) ^ diff( b(j), k(i,j))).
 
   induction t; try (by expandall; apply IH).
 

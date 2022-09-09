@@ -45,7 +45,7 @@ The name `k` represents the random number used in the strong secrecy property.
 It has 2 as index arity to model the fact that each interaction between
 session `i` of role P and session `j` of role S uses a new random name.
 *)
-name k :  index -> index -> message.
+name k :  index * index -> message.
 
 (**
 We declare a DDH context, using `g` for the generator element and `^` for the
@@ -153,9 +153,9 @@ Proof.
   (** We start by enriching the frame. *)
   enrich
     skP, skS,
-    seq(i:index ->g^a(i)),
-    seq(j:index ->g^b(j)),
-    seq(i,j:index ->diff( g ^ a(i), g) ^ diff( b(j), k(i,j))).
+    seq(i:index =>g^a(i)),
+    seq(j:index =>g^b(j)),
+    seq(i,j:index =>diff( g ^ a(i), g) ^ diff( b(j), k(i,j))).
 
   (** We now apply the `induction` tactic, which generates several cases,
   one for each possible value that can be taken by the timestamp `t`.

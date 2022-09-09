@@ -80,13 +80,13 @@ system [testi2] (!_i A: out(c, <ok, idn(i)>) | !_i B: out(c,  idn(i))).
 system testiPrf = [testi/left] with gprf (j:index), h(msg(j),key(j)).
 
 (* Then, second transitivity, from testiPrf to testiRenamed *)
-system testiRenamed = [testiPrf] with rename forall (i:index), equiv(diff(n_PRF1(i),idn(i))).
+system testiRenamed = [testiPrf] with rename Forall (i:index), equiv(diff(n_PRF1(i),idn(i))).
 (* equiv [testiPrf] t. Proof. print. admit. Qed *)
 
 
 equiv [testiRenamed,testi2/right] test3.
 Proof.
-enrich seq(i:index-> idn(i)).
+enrich seq(i:index => idn(i)).
 induction t.
 
 expandall.

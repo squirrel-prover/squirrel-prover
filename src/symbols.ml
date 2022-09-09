@@ -45,7 +45,7 @@ type symb = { group: string; name: string }
 type 'a t = symb
 
 type group = string
-let default_group = ""
+let default_group = "default"
 
 let hash s = hcombine (Hashtbl.hash s.group) (Hashtbl.hash s.name)
 

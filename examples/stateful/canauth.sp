@@ -25,8 +25,8 @@ SECURITY PROPERTIES
 hash hmac
 
 name sk : index -> message
-name msgA : index -> index -> message
-name msgB : index -> index -> message
+name msgA : index * index -> message
+name msgB : index * index -> message
 
 abstract SIGN : message
 abstract myZero : message
@@ -42,7 +42,7 @@ channel cS
 abstract mySucc : message -> message
 
 (* order relation for counter *)
-abstract (~<) : message -> message -> boolean
+abstract (~<) : message -> message -> bool
 
 (* PROCESSES *)
 

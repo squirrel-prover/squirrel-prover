@@ -11,7 +11,7 @@ name m:message
 system null.
 
 (* Test direct case *)
-equiv test : h(diff(m,n),k),h(diff(n,m),k) .
+equiv test : h (diff(m,n), k), h(diff(n,m), k) .
 Proof.
 prf 1.
 
@@ -27,9 +27,9 @@ Qed.
 system [test]
   in(c,x);
   let surp = diff(m,n) in
-  let mac = h(<x,surp>,k) in
+  let mac = h (<x,surp>, k) in
   out(c,mac);
-  out(c,h(diff(<x,n>,<x,m>),k)).
+  out(c,h (diff(<x,n>,<x,m>), k)).
 
 equiv [test] test2.
 Proof.
@@ -66,7 +66,7 @@ system [failing]
   in(c,x);
   let key=x in
   let surp = diff(m,n) in
-  let mac = h(k,key) in
+  let mac = h (k, key) in
   out(c,<mac, diff(m,n)>).
 
 equiv [failing] testfail.

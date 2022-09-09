@@ -235,8 +235,17 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     | Fun (fs, _, ts)
       when Operator.is_operator (S.table s) fs ->
-      Operator.unfold (S.table s) se fs ts
-
+      begin
+        match Operator.unfold (S.table s) se fs ts with
+        | `Ok t -> t
+        | `FreeTyv ->
+          let err_str =
+            Fmt.str "cannot expand operator %a: free type variable remaining"
+              Term.pp_fsymb fs
+          in
+          soft_failure (Tactics.Failure err_str)
+      end
+      
     | _ ->
       soft_failure (Tactics.Failure "nothing to expand")
 
@@ -566,7 +575,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
             hard_failure ~loc:(L.loc rw_arg.rw_dir)
               (Failure "expand cannot take a direction");
 
-          let t = L.mk_loc (L.loc s) (Theory.App (s, [])) in
+          let t = Theory.mk_symb s in
           
           Rw_expand t
 

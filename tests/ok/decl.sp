@@ -15,7 +15,6 @@ abstract from_N : N -> message.
 
 abstract N_to_T : N -> T.
 
-abstract ggi ['a] : index -> 'a -> 'a.
 abstract gg  ['a] : 'a -> 'a.
 
 name nn : index -> NL.

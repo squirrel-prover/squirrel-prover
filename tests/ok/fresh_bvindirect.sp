@@ -7,7 +7,7 @@ name m : index->message
 
 channel c
 
-system !_i out(c,<n(i),seq(i:index ->n(i))>).
+system !_i out(c,<n(i),seq(i:index => n(i))>).
 
 include Basic.
 

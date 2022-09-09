@@ -1,6 +1,4 @@
-
-
-name n : index -> index -> message
+name n : index * index -> message
 
 system null.
 

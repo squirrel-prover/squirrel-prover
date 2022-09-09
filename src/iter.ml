@@ -9,8 +9,14 @@ module SE = SystemExpr
   
 (*------------------------------------------------------------------*)
 class deprecated_iter ~(cntxt:Constr.trace_cntxt) = object (self)
-  method visit_message (t : Term.term) = match t with
+  method visit_message (t : Term.term) = 
+    match t with
+    | Tuple l
     | Fun (_, _,l) -> List.iter self#visit_message l
+
+    | App (t, l) -> List.iter self#visit_message (t :: l)
+
+    | Proj (_, t) -> self#visit_message t
 
     | Macro (ms,l,a) ->
       if l <> [] then failwith "Not implemented" ;
@@ -41,8 +47,14 @@ end
 
 (*------------------------------------------------------------------*)
 class ['a] deprecated_fold ~(cntxt:Constr.trace_cntxt) = object (self)
-  method fold_message (x : 'a) (t : Term.term) : 'a = match t with
+  method fold_message (x : 'a) (t : Term.term) : 'a = 
+    match t with
+    | Tuple l
     | Fun (_, _,l) -> List.fold_left self#fold_message x l
+
+    | App (t, l) -> List.fold_left self#fold_message x (t :: l)
+
+    | Proj (_, t) -> self#fold_message x t
 
     | Macro (ms,l,a) ->
       if l<>[] then failwith "Not implemented" ;
@@ -111,7 +123,7 @@ class deprecated_get_f_messages ?(drop_head=true)
   val mutable occurrences : (Vars.var list * Term.term) list = []
   method get_occurrences = occurrences
   method visit_message = function
-    | Term.Fun (f',_, [m;k']) as m_full when f' = f ->
+    | Term.Fun (f',_, [Tuple [m;k']]) as m_full when f' = f ->
       begin match k' with
         | Term.Name s' when s'.s_symb = k ->
           let ret_m = if drop_head then m else m_full in
@@ -120,7 +132,7 @@ class deprecated_get_f_messages ?(drop_head=true)
       end ;
       self#visit_message m ; self#visit_message k'
 
-    | Term.Fun (f', _,[m;r;k']) as m_full when f' = f ->
+    | Term.Fun (f', _,[Tuple [m;r;k']]) as m_full when f' = f ->
       begin match k', fun_wrap_key with
         | Term.Name s', None when s'.s_symb = k ->
           let ret_m = if drop_head then m else m_full in
@@ -214,6 +226,9 @@ let tfold_occ
         | `Undef | `MaybeDef -> default ()
     end
 
+  | Term.App    _
+  | Term.Tuple  _
+  | Term.Proj   _
   | Term.Name   _
   | Term.Fun    _
   | Term.Action _
@@ -390,7 +405,7 @@ let get_f_messages_ext
     (se : SE.arbitrary) (fv : Vars.vars) (cond : Term.terms) pos
     (occs : hash_occs) ->
     match t with
-      | Term.Fun (f',_, [m;k']) as m_full when f' = f ->
+      | Term.Fun (f',_, [Tuple [m;k']]) as m_full when f' = f ->
         let occs' =
           match k' with
           | Term.Name s' when s'.s_symb = k ->
@@ -403,7 +418,7 @@ let get_f_messages_ext
         in
         occs' @ occs, `Continue
 
-      | Term.Fun (f', _, [m;r;k']) as m_full when f' = f ->
+      | Term.Fun (f', _, [Tuple [m;r;k']]) as m_full when f' = f ->
         let occs' =
           match k', fun_wrap_key with
           | Term.Name s', None when s'.s_symb = k ->

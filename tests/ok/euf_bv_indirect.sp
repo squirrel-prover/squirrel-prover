@@ -1,14 +1,12 @@
-
-
 (* Testing euf's behaviour when bound variables are used in indirect cases. *)
 
 hash h
-name k : index->index->message
-name n : index->index->message
+name k : index * index -> message
+name n : index * index -> message
 
 channel c
 
-system out(c,seq(a,b:index -> h(n(a,a),k(b,b)))).
+system out(c,seq(a,b:index => h(n(a,a),k(b,b)))).
 
 (* Here, there should be single direct case in euf tactic,
  * where the same variable v is introduced to represent the bound

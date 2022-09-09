@@ -52,14 +52,14 @@ set postQuantumSound = true.
 hash h
 
 (* pre-shared keys *)
-name psk : index -> index -> message
+name psk : index * index -> message.
 
 (* DDH randomnesses *)
 name a : index -> message
 name b : index -> message
 
 abstract g : message
-abstract exp : message -> message -> message
+abstract exp : message * message -> message
 
 (* fresh randomness *)
 name Ni : index -> message
@@ -110,9 +110,9 @@ system [Main] ((!_j R: Responder(j)) | (!_i I: Initiator(i))).
 (* The keys obtained with the first prf application are all randoms. Some are
 honest and shared by the two parties, and some correspond to garbage keys. *)
 
-name Ininr : index -> index  -> message
-name IgarbI : index -> index -> message
-name IgarbR : index -> index -> message
+name Ininr  : index * index  -> message
+name IgarbI : index * index -> message
+name IgarbR : index * index -> message
 
 process InitiatorI(i:index) =
   out(cI, <exp(g,a(i)), < Ni(i), IdI(i) >>);
@@ -178,14 +178,14 @@ system [Ideal1] ((!_j R: ResponderI(j)) | (!_i I: InitiatorI(i))).
 
 (* We start with 3 global prf applications, renaming the prf name to the one we want after each application. *)
 system Main1 = [Main/left] with gprf (il,jl:index),  h(<Ni(il), Nr(jl) > ,psk(il,jl)).
-system Main2 = [Main1] with rename forall (i,j:index), equiv(diff(n_PRF(i,j), Ininr(i,j))).
+system Main2 = [Main1] with rename Forall (i,j:index), equiv(diff(n_PRF(i,j), Ininr(i,j))).
 
 
 system Main3 = [Main2] with gprf (il,jl:index),  h(<Ni(il), fst(snd(input@I1(il,jl))) > ,psk(il,jl)).
-system Main4 = [Main3] with rename forall (i,j:index), equiv(diff(n_PRF1(i,j), IgarbI(i,j))).
+system Main4 = [Main3] with rename Forall (i,j:index), equiv(diff(n_PRF1(i,j), IgarbI(i,j))).
 
 system Main5 = [Main4] with gprf (il,jl:index),  h(<fst(snd(input@R(jl,il))),Nr(jl) > ,psk(il,jl)).
-system Main6 = [Main5] with rename forall (i,j:index), equiv(diff(n_PRF2(i,j), IgarbR(i,j))).
+system Main6 = [Main5] with rename Forall (i,j:index), equiv(diff(n_PRF2(i,j), IgarbR(i,j))).
 
 
 axiom  [Main6,Ideal1/right] tryfind : forall (i,j:index), pred(I1(i,j)) = pred(I2(i,j)).
@@ -432,7 +432,7 @@ Qed.
 
 (* this is ideal 2, where in addition each party IdI(i) in the end either outputs the derived key, or an idealied key ideal(i,j) if it thinks it is talking to party IdR(j). *)
 
-name idealkeys : index -> index -> message
+name idealkeys : index * index -> message.
 
 process InitiatorRoR(i:index) =
   out(cI, <exp(g,a(i)), < Ni(i), IdI(i) >>);
@@ -569,7 +569,7 @@ Proof.
 Qed.
 
 system Ror2 = [Ror/left] with gprf (il,jl:index),   h( exp(exp(g,a(il)),b(jl)), Ininr(jl,il))   .
-system Ror3 =  [Ror2] with rename forall (i,j:index), equiv(diff(n_PRF3(i,j), idealkeys(i,j))).
+system Ror3 =  [Ror2] with rename Forall (i,j:index), equiv(diff(n_PRF3(i,j), idealkeys(i,j))).
 
 axiom  [Ror3, Ror/right] ddhcommu2 : forall (i,j:index), exp(exp(g,a(i)),b(j)) =  exp(exp(g,b(j)),a(i)) .
 axiom  [Ror3, Ror/right] ddhnotuple1 : forall (m1,m2,m3,m4:message), exp(m3,m4) <> <m1,m2>.
@@ -680,7 +680,7 @@ Qed.
 
 (* We now export helper wa 2 all the way to Ror3 *)
 global goal [Ror/left,Ror2] helper_wa_equiv_2 :
-  forall (i,j:index),
+  Forall (i,j:index),
   [happens(I1(i,j))] ->
   equiv(
     exec@I1(i,j) =>
@@ -717,7 +717,7 @@ Proof.
 Qed.
 
 global goal [Ror2,Ror3] helper_wa_equiv_3 :
-  forall (i,j:index),
+  Forall (i,j:index),
     [happens(I1(i,j))] ->
     equiv(
       exec@I1(i,j) =>

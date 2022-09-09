@@ -114,10 +114,10 @@ name skR : index -> message
 name sk2R : index -> message
 
 (* session randomess of I talking to compromised R *)
-name DkI : index -> index -> index -> message
-name DrI : index -> index -> index -> message
-name DrI2 : index -> index -> index -> message
-name DdkT : index -> index -> index -> message
+name DkI : index * index * index -> message
+name DrI : index * index * index -> message
+name DrI2 : index * index * index -> message
+name DdkT : index * index * index -> message
 
 (* long term keys of compromised R *)
 abstract DdkR : index -> message
@@ -125,30 +125,30 @@ abstract DskR : index -> message
 abstract Dsk2R : index -> message
 
 (* session randomess of I *)
-name kI : index -> index -> index -> message
-name rI : index -> index -> index -> message
-name rI2 : index -> index -> index -> message
-name dkT : index -> index -> index -> message
+name kI : index * index * index -> message
+name rI : index * index * index -> message
+name rI2 : index * index * index -> message
+name dkT : index * index * index -> message
 
 
 abstract ok : message
 
 
 (* session randomess of R *)
-name kR : index -> index -> index -> message
-name rR : index -> index -> index -> message
-name rR2 : index -> index -> index -> message
-name rTI : index -> index -> index -> message
-name kT : index -> index -> index -> message
+name kR : index * index * index -> message
+name rR : index * index * index -> message
+name rR2 : index * index * index -> message
+name rTI : index * index * index -> message
+name kT : index * index * index -> message
 
-name DkR :  index -> index -> message
-name DrR :  index -> index -> message
-name DrR2 : index -> index -> message
-name DrTI : index -> index -> message
-name DkT :  index -> index -> message
+name DkR :  index * index -> message
+name DrR :  index * index -> message
+name DrR2 : index * index -> message
+name DrTI : index * index -> message
+name DkT :  index * index -> message
 
 
-name kIR : index -> index -> index -> message
+name kIR : index * index * index -> message
 
 mutable sIR(i,j,k:index) : message =  zero
 mutable sRI(i,j,k:index) : message =  zero
@@ -181,7 +181,7 @@ process Initiator(i,j,k:index) =
  let K3 = kdf(s,kT) in
 
  let ST = <pk(dkI(i)),<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
- sIR(i,j,k) := xor(G(ST,K1), xor( G(ST,K2), G(ST,K3))).
+ sIR(i,j,k) := xor(G(ST,K1)) (xor (G(ST,K2)) (G(ST,K3))).
 
 
 
@@ -205,7 +205,7 @@ process Responder(j,k:index) =
      let K3 = kdf(s,kT(i,j,k)) in
 
      let ST = <pk(dkI(i)),<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
-     sRI(j,k,i) := xor(G(ST,K1), xor( G(ST,K2), G(ST,K3)))
+     sRI(j,k,i) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3)))
   else
      let ctI = fst(messR) in
      let ekT = snd(messR) in
@@ -220,7 +220,7 @@ process Responder(j,k:index) =
      let K3 = kdf(s,DkT(j,k)) in
 
      let ST = <pkI,<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
-     DsRI(j,k) := xor(G(ST,K1), xor( G(ST,K2), G(ST,K3))).
+     DsRI(j,k) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
 
 
 
@@ -243,7 +243,7 @@ process InitiatorToCompromised(i,j,k:index) =
  let K3 = kdf(s,kT) in
 
  let ST = <pk(dkI(i)),<pk(DdkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
- sIR(i,j,k) := xor(G(ST,K1), xor( G(ST,K2), G(ST,K3))).
+ sIR(i,j,k) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
 
 
 
@@ -277,7 +277,7 @@ process Initiator2(i,j,k:index) =
  let K3 = kdf(s,kT) in
 
  let ST = <pk(dkI(i)),<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
- sIR(i,j,k) := xor(G(ST,K1), xor( G(ST,K2), G(ST,K3))).
+ sIR(i,j,k) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
 
 
 
@@ -301,7 +301,7 @@ process Responder2(j,k:index) =
      let K3 = kdf(s,kT(i,j,k)) in
 
      let ST = <pk(dkI(i)),<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
-     sRI(j,k,i) := xor(G(ST,K1), xor( G(ST,K2), G(ST,K3)))
+     sRI(j,k,i) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3)))
   else
      let ctI = fst(messR) in
      let ekT = snd(messR) in
@@ -316,7 +316,7 @@ process Responder2(j,k:index) =
      let K3 = kdf(s,DkT(j,k)) in
 
      let ST = <pkI,<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
-     DsRI(j,k) := xor(G(ST,K1), xor( G(ST,K2), G(ST,K3))).
+     DsRI(j,k) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
 
 
 system [main_rand] out(cI,s); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k))
@@ -329,20 +329,20 @@ axiom [main_rand] len_F (x1,x2:message) : len(F(x1,x2)) = len(s).
 
 equiv [main_rand] trans_auth.
 Proof.
-  enrich seq(i:index->dkI(i)); enrich seq(i:index-> dkR(i)); enrich s.
-  enrich seq(i,j,k:index-> kT(i,j,k)); enrich seq(i,j,k:index->rTI(i,j,k));
-  enrich seq(i,j,k:index-> dkT(i,j,k));
-  enrich seq(i,j,k:index-> kR(i,j,k));
-  enrich seq(i,j,k:index-> kI(i,j,k)).
+  enrich seq(i:index=>dkI(i)); enrich seq(i:index=> dkR(i)); enrich s.
+  enrich seq(i,j,k:index=> kT(i,j,k)); enrich seq(i,j,k:index=>rTI(i,j,k));
+  enrich seq(i,j,k:index=> dkT(i,j,k));
+  enrich seq(i,j,k:index=> kR(i,j,k));
+  enrich seq(i,j,k:index=> kI(i,j,k)).
 
   (* enrich of the dishonest randoms *)
-  enrich seq(j,k:index-> DkT(j,k)); 
-  enrich seq(j,k:index->DrTI(j,k));
-  enrich seq(j,k:index-> DkR(j,k));
-  enrich seq(j,k:index-> DrR(j,k));
-  enrich seq(i,j,k:index->DkI(i,j,k)).
-  enrich seq(i,j,k:index->DdkT(i,j,k)).
-  enrich seq(i:index->dkR(i)).
+  enrich seq(j,k:index=> DkT(j,k)); 
+  enrich seq(j,k:index=>DrTI(j,k));
+  enrich seq(j,k:index=> DkR(j,k));
+  enrich seq(j,k:index=> DrR(j,k));
+  enrich seq(i,j,k:index=>DkI(i,j,k)).
+  enrich seq(i,j,k:index=>DdkT(i,j,k)).
+  enrich seq(i:index=>dkR(i)).
 
   induction t => //.
     + expandall. 
@@ -358,19 +358,19 @@ Proof.
       fa 15.
       fa 15.
       fa 16.
-      expandseq  seq(i,j,k:index-> kT(i,j,k)), i,j,k.
-      expandseq  seq(i,j,k:index-> rTI(i,j,k)), i,j,k.
+      expandseq  seq(i,j,k:index=> kT(i,j,k)), i,j,k.
+      expandseq  seq(i,j,k:index=> rTI(i,j,k)), i,j,k.
       prf 18.
       rewrite if_true // in 18.
-      xor 18, xor(F(rR(i,j,k),skR(j)),n_PRF), n_PRF.
+      xor 18, xor(F(rR(i,j,k),skR(j))) n_PRF, n_PRF.
       rewrite if_true in 18.
       use len_F with rR(i,j,k), skR(j).
       namelength n_PRF,s.
       fa 18. fa 18.
       fresh 19.
       rewrite if_true // in 19.
-      expandseq  seq(i,j,k:index-> kR(i,j,k)), i,j,k.
-      expandseq  seq(i:index-> dkI(i)), i.
+      expandseq  seq(i,j,k:index=> kR(i,j,k)), i,j,k.
+      expandseq  seq(i:index=> dkI(i)), i.
       by apply IH.
 
     + (* Second output of R *)
@@ -385,9 +385,9 @@ Proof.
        admit 15. (* this is a dumb fadup weakness, as all the dkI(i) are in the frame, the forall is obviously ok. *)
        repeat fa 15.
        fa 17.
-       expandseq  seq(j,k:index-> DkR(j,k)), j,k.
-       expandseq  seq(j,k:index-> DrTI(j,k)), j,k.
-       expandseq  seq(j,k:index-> DkT(j,k)), j,k.
+       expandseq  seq(j,k:index=> DkR(j,k)), j,k.
+       expandseq  seq(j,k:index=> DrTI(j,k)), j,k.
+       expandseq  seq(j,k:index=> DkT(j,k)), j,k.
        prf 16; rewrite if_true // in 16.
        xor 16, n_PRF.
        rewrite if_true // in 16.
@@ -407,19 +407,19 @@ Proof.
       fa 15.
       fa 15.
       fa 16.
-      expandseq seq(i,j,k:index-> dkT(i,j,k)),i,j,k.
+      expandseq seq(i,j,k:index=> dkT(i,j,k)),i,j,k.
       prf 15.
       rewrite if_true // in 15.
-      xor 15, xor(F(rI(i,j,k),skI(i)),n_PRF), n_PRF.
+      xor 15, xor(F(rI(i,j,k),skI(i))) n_PRF, n_PRF.
       rewrite if_true // in 15.
       use len_F with rI(i,j,k), skI(i).
       by namelength n_PRF,s.
       fa 15.
       fresh 16.
       rewrite if_true // in 16.
-      expandseq  seq(i,j,k:index->kI(i,j,k)),i,j,k.
-      expandseq  seq(i,j,k:index->dkT(i,j,k)),i,j,k.
-      expandseq  seq(i:index->dkR(i)),j.
+      expandseq  seq(i,j,k:index=>kI(i,j,k)),i,j,k.
+      expandseq  seq(i,j,k:index=>dkT(i,j,k)),i,j,k.
+      expandseq  seq(i:index=>dkR(i)),j.
       by apply IH.
 
     + (* Second output of I *)
@@ -435,15 +435,15 @@ Proof.
       fa 15.
       fa 15.
       fa 15.
-      expandseq seq(i,j,k:index-> DdkT(i,j,k)),i,j,k.
+      expandseq seq(i,j,k:index=> DdkT(i,j,k)),i,j,k.
       prf 17.
       rewrite if_true // in 17.
-      xor 17, xor(F(DrI(i,j,k),skI(i)),n_PRF), n_PRF.
+      xor 17, xor(F(DrI(i,j,k),skI(i))) n_PRF, n_PRF.
       rewrite if_true // in 17.
       use len_F with DrI(i,j,k), skI(i).
       by namelength n_PRF,s.
       fresh 17.
-      expandseq  seq(i,j,k:index->DkI(i,j,k)),i,j,k.
+      expandseq  seq(i,j,k:index=>DkI(i,j,k)),i,j,k.
       by apply IH.
 
     + (* Second output of DI *)
@@ -490,7 +490,7 @@ in
  let K3 = kdf(s,kT) in
 
  let ST = <pk(dkI(i)),<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
- sIR(i,j,k) := xor(G(ST,K1), xor( G(ST,K2), G(ST,K3))).
+ sIR(i,j,k) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
 
 
 
@@ -522,7 +522,7 @@ process Responder3(j,k:index) =
      let K3 = kdf(s,kT(i,j,k)) in
 
      let ST = <pk(dkI(i)),<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
-     sRI(j,k,i) := xor(G(ST,K1), xor( G(ST,K2), G(ST,K3)))
+     sRI(j,k,i) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3)))
   else
      let ctI = fst(messR) in
      let ekT = snd(messR) in
@@ -545,7 +545,7 @@ in
      let K3 = kdf(s,DkT(j,k)) in
 
      let ST = <pkI,<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
-     DsRI(j,k) := xor(G(ST,K1), xor( G(ST,K2), G(ST,K3))).
+     DsRI(j,k) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
 
 
 (* k-th copy of initiator with key dkI(i) trying to communicate with compromised responder with key pk(DdkR(j)) *)
@@ -575,7 +575,7 @@ in
  let K3 = kdf(s,kT) in
 
  let ST = <pk(dkI(i)),<pk(DdkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
- sIR(i,j,k) := xor(G(ST,K1), xor( G(ST,K2), G(ST,K3))).
+ sIR(i,j,k) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3))).
 
 
 system [idealized] out(cI,s); ((!_j !_k R: Responder3(j,k)) | (!_i !_j !_k I: Initiator3(i,j,k))  | (!_i !_j !_k DI: InitiatorToCompromised3(i,j,k))).
@@ -607,7 +607,7 @@ Qed.
 
 axiom  [idealized/left,idealized/left]  len_G (x1,x2:message) : len(G(x1,x2)) = len(s).
 
-axiom  [idealized/left,idealized/left]  len_xor (x1,x2:message) : len(x1) = len(x2) => len(xor(x1,x2)) = len(x1).
+axiom  [idealized/left,idealized/left]  len_xor (x1,x2:message) : len(x1) = len(x2) => len(xor x1 x2) = len(x1).
 
 (*******************************************)
 (*** Strong Secrecy of the responder key ***)
@@ -617,7 +617,7 @@ axiom  [idealized/left,idealized/left]  len_xor (x1,x2:message) : len(x1) = len(
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
 global goal [idealized/left,idealized/left] resp_key (i,j,k:index):
  [happens(R2(i,j,k))] -> 
- equiv(frame@R2(i,j,k), diff(sRI(i,j,k)@R2(i,j,k), kIR(i,j,k))) .
+ equiv(frame@R2(i,j,k), diff(sRI i j k@R2(i,j,k), kIR(i,j,k))) .
 Proof.
 
   intro Hap .
@@ -625,7 +625,7 @@ Proof.
   expandall.
   prf 1, kdf(s,kR(k,i,j)); rewrite if_true // in 1.
   prf 1, G(_,n_PRF); rewrite if_true // in 1.
-  xor 1,  xor(n_PRF1,_), n_PRF1; rewrite if_true // in 1.
+  xor 1,  xor n_PRF1 _, n_PRF1; rewrite if_true // in 1.
   rewrite len_G.
   namelength s, n_PRF1.
   xor 1,  n_XOR; rewrite if_true // in 1.
@@ -639,7 +639,7 @@ Qed.
 (*******************************************)
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
-global goal [idealized/left,idealized/left] right_key: forall (i,j,k:index), [happens(I1(i,j,k))] -> equiv(frame@I1(i,j,k), diff(sIR(i,j,k)@I1(i,j,k), kIR(i,j,k))) .
+global goal [idealized/left,idealized/left] right_key: Forall (i,j,k:index), [happens(I1(i,j,k))] -> equiv(frame@I1(i,j,k), diff(sIR i j k@I1(i,j,k), kIR(i,j,k))) .
 Proof.
   intro i j k Hap .
   use reflex with I1(i,j,k) => //.

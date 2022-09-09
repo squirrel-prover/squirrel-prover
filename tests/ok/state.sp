@@ -1,5 +1,3 @@
-
-
 mutable s : message = empty
 abstract v : message
 
@@ -15,3 +13,7 @@ goal _ (a:index):   happens(A(a)) => s@A(a) = <s@pred(A(a)),input@A(a)>.
 Proof.
  auto.
 Qed.
+
+(*------------------------------------------------------------------*)
+(* check that mutable types are inferred *)
+mutable s2 = empty.

@@ -124,7 +124,7 @@ Proof.
   cca1 2.
   rewrite len_diff len_a len_b.
   refl.
-  auto.
+  admit.  (* goal false because of the encryption randomness. *)
   admit.  (* goal false because of the encryption randomness. *)
   (* END EXO *)
 Qed.

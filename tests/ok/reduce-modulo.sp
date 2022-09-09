@@ -34,10 +34,10 @@ Proof.
 Abort.
 
 goal [A] _ (t : timestamp, i : index) :
-  (seq (t : timestamp -> happens(t) => t = O(i) => input@t = b) 
+  (seq (t : timestamp => happens(t) => t = O(i) => input@t = b) 
    = empty)
   =>
-  (seq (t : timestamp -> happens(t) => t = O(i) => fst(output@t) = b)
+  (seq (t : timestamp => happens(t) => t = O(i) => fst(output@t) = b)
    = empty).
 Proof.
   intro H. 

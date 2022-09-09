@@ -398,9 +398,8 @@ let high_rewrite
       | None -> `Continue
       | Some rule ->
         assert (rule.rw_conds = []);
-
+        
         let state = mk_state rule (SE.to_list_any se) in
-        (* snd (rw_inst InSequent table hyps occ se vars conds p state) *)
         match rw_inst InSequent table hyps occ se vars conds p state with
         | _, `Continue -> assert (not strict); `Continue
         | _, `Map t -> `Map t

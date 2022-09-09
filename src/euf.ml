@@ -19,14 +19,16 @@ class check_key
   inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
 
   method visit_message t = match t with
-    | Term.Fun (fn, _, [m;Term.Name _]) when fn = head_fn ->
+    | Term.Fun (fn, _, [Tuple [m;Term.Name _]]) when fn = head_fn ->
       self#visit_message m
 
-    | Term.Fun (fn, _, [m1;m2;Term.Name _]) when fn = head_fn ->
+    | Term.Fun (fn, _, [Tuple [m1;m2;Term.Name _]]) when fn = head_fn ->
       self#visit_message m1; self#visit_message m2
 
+    | Term.Fun (fn, _, [Tuple [_;k]])
+      when allow_functions fn && Term.diff_names k -> ()
+                                                      
     | Term.Fun (fn, _, [k])
-    | Term.Fun (fn, _, [_;k])
       when allow_functions fn && Term.diff_names k -> ()
 
     | Term.Name n when n.s_symb = key_n -> raise Bad_ssc_
