@@ -667,7 +667,7 @@ let () =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/existsintro_fail.sp" with
-           | Theory.(Conv (_, Undefined "a1")) -> raise Ok)
+           | Symbols.(SymbError (_, Unbound_identifier "a1")) -> raise Ok)
     end ;
     "TS not leq", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok

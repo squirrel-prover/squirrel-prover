@@ -44,3 +44,5 @@ Proof. auto. Qed.
 
 goal [any] _ (x, z : T): (fun (y : T) => y) x = (fun (y : T) => z) x.
 Proof. checkfail auto exn GoalNotClosed. Abort. 
+
+axiom [any] _ ['a 'b] (f : 'a -> 'b) (x,y : 'a) : x = y => f x = f y.
