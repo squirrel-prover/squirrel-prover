@@ -63,8 +63,8 @@ end = struct
     Vars.Sv.union h_vars (Term.fv s.conclusion)
 
   let sanity_check s : unit =
-  Vars.sanity_check s.env.Env.vars;
-  assert (Vars.Sv.subset (fv s) (Vars.to_set s.env.Env.vars))
+    Vars.sanity_check s.env.Env.vars;
+    assert (Vars.Sv.subset (fv s) (Vars.to_set s.env.Env.vars))
 
   let init_sequent ~env ~conclusion =
     let s = {

@@ -39,7 +39,7 @@ let declare_empty table system_name projections =
   let data = System_data {projections;actions=Msh.empty} in
   Symbols.System.declare_exact table system_name ~data def
 
-let get_data table s_symb =
+let get_data table (s_symb : Symbols.system) =
   match Symbols.System.get_data s_symb table with
     | System_data data -> data
     | _ -> assert false
@@ -154,9 +154,9 @@ let register_action table system_symb (descr : Action.descr) =
     let table = add_action table system_symb descr in
 
     table, symb2, descr
-
+  
 (*------------------------------------------------------------------*)
-(* Single systems *)
+(** Single systems *)
 
 module Single = struct
 

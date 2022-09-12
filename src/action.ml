@@ -7,14 +7,47 @@ type 'a item = {
 
 type 'a t = 'a item list
 
+(*------------------------------------------------------------------*)
+type shape = int t
+
+type action = (Vars.var list) t
+
+(*------------------------------------------------------------------*)
 (** Strict dependency [a < b]. *)
 let depends a b =
   let rec aux a b = match a, b with
     | [], _::_ -> true
-    | hda::tla, hdb::tlb when hda = hdb -> aux tla tlb
+    | hda :: tla, hdb :: tlb when hda = hdb -> aux tla tlb
     | _ -> false
   in aux a b
 
+(*------------------------------------------------------------------*)
+(** Internal, not exported in the [.mli] *)
+exception NotMutex
+  
+(** Compute the number of common variable choices between two
+    mutually exclusive actions.
+    Raise [NotMutex] if actions are not mutually exclusives. *)
+let mutex_common_vars a b =
+  let rec aux a b =
+    match a, b with
+    | hda :: tla, hdb :: tlb ->
+      if hda = hdb then
+        fst hda.par_choice + fst hda.sum_choice + aux tla tlb
+      else
+        if
+          hda.par_choice = hdb.par_choice &&
+          fst hda.sum_choice <> fst hdb.sum_choice
+        then fst hda.par_choice
+        else raise NotMutex
+    | _ -> raise NotMutex
+  in aux a b
+
+(** Mutually exclusive actions *)
+let mutex a b =
+  try ignore(mutex_common_vars a b : int); true with NotMutex -> false
+
+(*------------------------------------------------------------------*)  
 (** Distance in control-flow graph. Return [None] when there is no
   * dependency, and [Some 0] when the actions are equal. *)
 let distance a b =
@@ -23,10 +56,6 @@ let distance a b =
     | hda::tla, hdb::tlb when hda = hdb -> aux tla tlb
     | _ -> None
   in aux a b
-
-type shape = int t
-
-type action = (Vars.var list) t
 
 let rec get_shape = function
   | [] -> []

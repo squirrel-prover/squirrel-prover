@@ -1020,6 +1020,108 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
   (proc, table)
 
+(*------------------------------------------------------------------*)
+(* Builds the sequential dependency lemma between [descr] and [descr'] *)
+let mk_depends_lemma
+    table
+    (system : Symbols.system)
+    (descr : Action.descr) (descr' : Action.descr)
+  : Goal.statement
+  =
+  assert (Action.depends
+            (Action.get_shape descr.action)
+            (Action.get_shape descr'.action));
+  
+  let sys_expr = SystemExpr.of_system table system in
+  let a' = Term.mk_action descr'.name descr'.indices in
+  let a =
+    let indices =
+      List.take (List.length descr.indices) descr'.indices
+    in
+    Term.mk_action descr.name indices
+  in
+  let tvar = Vars.make_fresh Type.ttimestamp "t" in
+  let tau = Term.mk_var tvar in
+  let form =
+    Term.mk_forall ~simpl:false (tvar :: descr'.indices)
+      (Term.mk_impls
+         [Term.mk_happens tau;
+          Term.mk_eq tau a' ]
+         (Term.mk_lt a a'))
+  in
+  let name =
+    Fmt.str "depends_%s_%s_%s"
+      (Symbols.to_string system)
+      (Symbols.to_string descr.name)
+      (Symbols.to_string descr'.name)
+  in
+  Goal.{
+    name;
+    ty_vars = [];
+    system = SystemExpr.reachability_context sys_expr;
+    formula = Equiv.Local form;
+  } 
+
+(*------------------------------------------------------------------*)
+(* Builds the mutual exlusivity lemma between [descr] and [descr'] *)
+let mk_mutex_lemma
+    table
+    (system : Symbols.system)
+    (descr : Action.descr) (descr' : Action.descr)
+  : Goal.statement
+  =
+  let shape  = Action.get_shape  descr.action in
+  let shape' = Action.get_shape descr'.action in
+  assert (Action.mutex shape shape');
+
+  let sys_expr = SystemExpr.of_system table system in
+
+  (* number of common variables between mutually exclusives actions
+     of [descr] and [descr'] *)
+  let i_common = Action.mutex_common_vars shape shape' in
+  
+  let is_common, is_rem  = List.takedrop i_common  descr.indices in
+  let _        , is_rem' = List.takedrop i_common descr'.indices in
+
+  let a = Term.mk_action descr.name (is_common @ is_rem) in
+  let a' = Term.mk_action descr'.name (is_common @ is_rem') in
+
+  let form =
+    Term.mk_forall ~simpl:false (is_common @ is_rem @ is_rem')
+      (Term.mk_or
+         (Term.mk_not (Term.mk_happens a))
+         (Term.mk_not (Term.mk_happens a')))
+  in
+  let name =
+    Fmt.str "mutex_%s_%s_%s"
+      (Symbols.to_string system)
+      (Symbols.to_string descr.name)
+      (Symbols.to_string descr'.name)
+  in
+  Goal.{
+    name;
+    ty_vars = [];
+    system = SystemExpr.reachability_context sys_expr;
+    formula = Equiv.Local form;
+  }
+
+(*------------------------------------------------------------------*)
+let get_depends_mutex
+    table (system : Symbols.system) : Goal.statement list
+  =
+  let descrs = System.descrs table system in
+  System.Msh.fold (fun shape (descr : Action.descr) lems ->
+      System.Msh.fold (fun shape' (descr' : Action.descr) lems ->
+          if Action.depends shape shape' then
+            mk_depends_lemma table system descr descr' :: lems
+          else if Action.mutex shape shape' then
+            mk_mutex_lemma   table system descr descr' :: lems
+          else lems
+        ) descrs lems
+    ) descrs []
+
+
+(*------------------------------------------------------------------*)
 let declare_system table system_name (projs : Term.projs) (proc : process) =
   Printer.pr
     "@[<v 2>System before processing:@;@;@[%a@]@]@.@."
@@ -1036,26 +1138,35 @@ let declare_system table system_name (projs : Term.projs) (proc : process) =
   in
   let table,system_name = System.declare_empty table system_name projections in
 
-  (* before parsing the system, we register the init action,
-  using for the updates the initial values declared when declaring
-  a mutable construct *)
-  let a' = Symbols.init_action in
-  let updates = Theory.get_init_states table in
-  let action_descr = Action.{ 
-      name      = a';
+  (* we register the init action before parsing the system *)
+  let init_descr = Action.{ 
+      name      = Symbols.init_action;
       action    = [];
       input     = (Symbols.dummy_channel,"$dummyInp");
       indices   = [];
       condition = ([], Term.mk_true);
-      updates;
+      updates   = Theory.get_init_states table;
       output    = (Symbols.dummy_channel, Term.empty);
       globals   = []; }
   in
   let table, _, _ =
-    System.register_action table system_name action_descr
+    System.register_action table system_name init_descr
   in
 
+  (* parse the processus *)
   let proc,table = parse_proc system_name table projs proc in
+
+  (* add axioms related to action dependancies *)
+  let lems = get_depends_mutex table system_name in
+  Printer.pr "@[<v 0>Added action dependencies lemmas:@;";
+  let table =
+    List.fold_left (fun table lem ->
+        Printer.pr "%a@;" Goal.pp_statement lem;
+        Lemma.add_lemma `Axiom lem table
+      ) table lems
+  in
+  Printer.pr "@]";
+  
   Printer.pr "@[<v 2>System after processing:@;@;@[%a@]@]@.@." pp_process proc ;
   Printer.pr "%a" System.pp_systems table;
   table
