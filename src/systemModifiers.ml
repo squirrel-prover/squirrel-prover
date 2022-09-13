@@ -33,6 +33,37 @@ let high_rewrite_norec
 (*------------------------------------------------------------------*)
 type system_map_arg = Macros.system_map_arg
 
+
+(*------------------------------------------------------------------*)
+(** Low-level system cloning function.
+    [clone_system table old new f] registers a new system [new],
+    obtained by modifying the actions of [old] with [f].
+    Returns the updated table and system symbol.
+    Does not clone global macros. *)
+let clone_system 
+    (table      : Symbols.table)
+    (old_system : SE.fset)
+    (new_system : Symbols.lsymb)
+    (map        : Action.descr -> Action.descr)
+  : Symbols.table * Symbols.system 
+  =
+  let projections = List.map fst (SE.to_list old_system) in
+  let old_actions = SE.descrs table old_system in
+  let table, new_system = System.declare_empty table new_system projections in
+  let table =
+    System.Msh.fold
+      (fun _ descr table ->
+         let descr = map descr in
+         let table,_,_ = System.register_action table new_system descr in
+         table)
+      old_actions
+      table
+  in
+
+  let table = Lemma.add_depends_mutex_lemmas table new_system in
+
+  table, new_system
+
 (*------------------------------------------------------------------*)
 (** High-level system cloning function. *)
 let clone_system_map
@@ -48,7 +79,7 @@ let clone_system_map
   =
   (* We declare the system *)
   let table, new_system =
-    SystemExpr.clone_system
+    clone_system
       table (SE.singleton system) new_name
       (fun descr -> 
          let _, s  = Term.refresh_vars `Global descr.indices in

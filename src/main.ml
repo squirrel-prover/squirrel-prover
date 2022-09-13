@@ -287,9 +287,8 @@ let do_decls (state : main_state) (decls : Decl.declarations) : main_state =
 let do_print (state : main_state) (q : Prover.print_query) : main_state =
   match q with
   | Prover.Pr_statement l -> 
-    let g = Lemma.find l state.table in
-    let k = Lemma.find_kind l state.table in
-    Printer.prt `Default "@[<2>%a %a@]" Lemma.pp_kind k Goal.pp_statement g;
+    let lem = Lemma.find l state.table in
+    Printer.prt `Default "%a" Lemma.pp lem;
     state
 
   | Prover.Pr_system s_opt ->

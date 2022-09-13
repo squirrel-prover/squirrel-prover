@@ -313,29 +313,6 @@ let pp_descrs (table : Symbols.table) ppf (system : t) =
   Fmt.pf ppf "@]%!@."
 
 (*------------------------------------------------------------------*)
-
-let clone_system 
-    (table      : Symbols.table)
-    (old_system : t)
-    (new_system : Symbols.lsymb)
-    (map        : Action.descr -> Action.descr)
-  : Symbols.table * Symbols.system 
-  =
-  let projections = List.map fst (to_list old_system) in
-  let old_actions = descrs table old_system in
-  let table, new_system = System.declare_empty table new_system projections in
-  let table =
-    System.Msh.fold
-      (fun _ descr table ->
-         let descr = map descr in
-         let table,_,_ = System.register_action table new_system descr in
-         table)
-      old_actions
-      table
-  in
-  table, new_system
-
-(*------------------------------------------------------------------*)
 (* Pairs *)
 
 let make_pair a b = List [Term.left_proj,a; Term.right_proj,b]

@@ -121,7 +121,7 @@ module Mk (Args : MkArgs) : S with
         (Failure ("no proved goal named " ^ L.unloc name))
 
     else
-      let lem = Lemma.find name (S.table s) in
+      let lem = Lemma.find_stmt name (S.table s) in
       (* Verify that it applies to the current system. *)
       if check_compatibility then begin
         match k with

@@ -122,6 +122,8 @@ val descr_of_shape :
 val descr_of_action :
   Symbols.table -> <fset:unit;..> expr -> Action.action -> Action.descr
 
+val descrs : Symbols.table -> fset -> Action.descr System.Msh.t 
+
 (** Iterate over all action descriptions in [system].
     Only one representative of each action shape will be passed
     to the function, with indices that are guaranteed to be fresh. *)
@@ -191,18 +193,6 @@ val to_projs_any : _ expr -> Term.projs option
 (** Project a system according to the given projections. *)
 val project     : Term.projs        -> 'a expr -> 'a expr
 val project_opt : Term.projs option -> 'a expr -> 'a expr
-
-(** [clone_system table sys name f] registers a new system named [name],
-    obtained by modifying the actions of the system expression [sys]
-    with [f].
-    Returns the newly enriched table and [name] as a system symbol.
-    Does not clone global macros. *)
-val clone_system :
-  Symbols.table ->
-  <fset:unit;..> expr ->
-  Symbols.lsymb ->
-  (Action.descr -> Action.descr) ->
-  Symbols.table * System.t
 
 (*------------------------------------------------------------------*)
 (** {2 Operations on pairs} *)

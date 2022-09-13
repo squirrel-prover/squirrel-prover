@@ -1509,7 +1509,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     (* If [mode=`IntroImpl], compute subgoals by introducing implications
        on the left. *)
-    let rec aux subgoals form =
+    let rec aux subgoals form : S.t list =
       if S.Conc.is_impl form && mode = `IntroImpl then
         begin
           let h, c = oget (S.Conc.destr_impl form) in
@@ -1541,7 +1541,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     pt_subgs @ (aux [] f)
 
   (*------------------------------------------------------------------*)
-  (** {3 Have Formula} *)
+  (** {3 Have tactic} *)
 
   (** [have_form f j sk fk] generates two subgoals, one where [f] needs
     * to be proved, and the other where [f] is assumed.
@@ -1603,7 +1603,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   let have_tac args = wrap_fail (have_args args)
 
-
   (*------------------------------------------------------------------*)
   (** {3 Depends} *)
 
@@ -1638,7 +1637,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (*------------------------------------------------------------------*)
   (** {3 Namelength} *)
-
 
   let namelength
       Args.(Pair (Message (tn, tyn), Message (tm, tym)))
