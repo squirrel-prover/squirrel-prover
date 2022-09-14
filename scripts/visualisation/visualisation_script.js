@@ -10,16 +10,16 @@
     Selections are object in D3 used to group elements of the DOM and pair them with data.
     We do not use them that way here: `selection` contains only one element.
     Using a selection and not directly the element allows us to use D3's readable syntax to modify attributes and styles of this element.
-    Moreover `selecetion` is not paired with any data, since binding new data would erase the previous ones.
+    Moreover `selection` is not paired with any data, since binding new data would erase the previous ones.
     To store data refering to an element, we use properties of the object and not the selection.<br />
     These objects' methods share the same nomenclature: When a property's value depends from another one and a method recomptute the first one in case the second one changed, this method is named `update`. When we modify the DOM element of `selection` to fit changes in the object's property, the method is named `refreshElement`.
     </p>
     
   * <p><b>D3's joins</b><br />
     To link data with DOM elements, we use D3's data joins.<br />
-    D3 find all elements of a certain class.
-    On the other hand, it get an array of data.
-    To pair them, D3 need a key: we use `id`.
+    D3 finds all elements of a certain class.
+    On the other hand, it gets an array of data.
+    To pair them, D3 needs a key: we use `id`.
     That is why all elements and data used for joins must have ids.<br />
     D3 will then create three selections: `enter` for data without element sharing the same id, `update` for element paired with a datum  and `exit` for elements without data.
     The methods `join` takes three functions as argument, each one describing what to do with these three selections.
@@ -70,7 +70,7 @@
 
 /* -------------------------------------------------------------------------- */
     
-/** Store variables common to each elements of the visualisation
+/** Store variables common to all elements of the visualisation
   * @property {string} address - Address of the local server.
   * @property {number} margin - Margin between nodes.
   * @property {number} padding - Margin used inside nodes.
@@ -102,7 +102,7 @@ class Reader {
   /** @param {string} address - Address of the local server.
     */
   constructor(address) {
-    this.adress = address;
+    this.address = address;
   }
   
   /** Get the JSON data from the local server or an error object.
@@ -111,7 +111,7 @@ class Reader {
   get data() {
     let result = null;
     let xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("GET", this.adress, false);
+    xmlhttp.open("GET", this.address, false);
     xmlhttp.send();
     if (xmlhttp.status==200) {
       result = JSON.parse(xmlhttp.responseText);
@@ -467,7 +467,7 @@ class Scene {
   
   /** Use D3's data join to create and remove nodes and links.
       Then, we compute sizes and positions
-      and refresh all the element of the scene.
+      and refresh all elements of the scene.
     * @param {Data} data - Data sent by the reader.
     */
   plot(data) {
@@ -481,7 +481,7 @@ class Scene {
   /** Joins the list of nodes in `data`
       with the list of elements <g> of class `node`.
       For each datum in the `enter` selection, we create a new Node
-      and add it to the dictionnary `nodes`.
+      and add it to the dictionary `nodes`.
       Each element in the `exit` selection is removed from the dom
       and from `nodes`.
     * @param {Data} data - Data sent by the reader.
@@ -619,7 +619,7 @@ class Visualisation {
   }
   
   /** Get data from the reader.
-    * Update content of the title and the scene accordigly.
+    * Update content of the title and the scene accordingly.
     */
   importData() {
     const data = this.reader.data;

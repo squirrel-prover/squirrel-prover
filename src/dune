@@ -8,10 +8,13 @@
   (instrumentation (backend bisect_ppx))
   (inline_tests)
   (preprocess (pps ppx_inline_test))
-  (libraries fmt fmt.tty alcotest ocamlgraph pcre menhirLib tiny_httpd
+  (libraries fmt fmt.tty alcotest ocamlgraph pcre menhirLib
     (select smt.ml from
       (why3  -> smt.why3api.ml)
-      (!why3 -> smt.stub.ml))))
+      (!why3 -> smt.stub.ml))
+    (select server.ml from
+      (tiny_httpd  -> server.real.ml)
+      (!tiny_httpd -> server.stub.ml))))
 
 (ocamllex lexer htmlLexer)
 (menhir

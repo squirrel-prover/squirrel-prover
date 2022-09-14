@@ -1,8 +1,21 @@
 (** {2 Nodes list} 
-    Comptute the list of timestamps happening and group them into equality classes. *)
 
-(** Get the non-repeating list of timestamps appearing in hypotheses of sequent [j], plus init.
-    TODO: When adding a term, add all the terms such that the former temr depends on.*)
+    Compute the list of timestamps happening and group them into equality
+    classes.
+
+    TODO:
+    - when adding a term, add all the terms on which the former term depends;
+    - when there is no model, do not compute anything but report a useful
+      message to the user;
+    - provide the user with the ability to visualize all the elements of
+      an equality class;
+    - dump more precise information about relationships: currently we only
+      document non-strict inequalities, but it would be useful to visualize
+      when they are strict.
+*)
+
+(** Get the non-repeating list of timestamps appearing in hypotheses of sequent
+    [j], plus init. *)
 let get_timstamps (j : LowTraceSequent.t) : Term.terms =
   let load (set : Term.St.t) (lit : Term.literal) =
     match Term.ty_lit lit, lit with
@@ -17,8 +30,9 @@ let get_timstamps (j : LowTraceSequent.t) : Term.terms =
   let set = List.fold_left load (Term.St.singleton Term.init) atoms in
   Term.St.elements set
 
-(** [get_classes_rep models terms] find the equivalences classes [terms] according to [models].
-    In each class, a term is chosen as representant.
+(** [get_classes_rep models terms] finds the equivalence classes [terms]
+    according to [models].
+    In each class, a term is chosen as representative.
     This choice follows this priority : Action > Pred(_) > Variable *)
 let get_classes_rep (models : Constr.models) (terms : Term.terms) : Term.terms =
   let rec best_candidate (var_candidate : Term.term option) (pred_candidate : Term.term option)
