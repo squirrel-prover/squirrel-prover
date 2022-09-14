@@ -519,6 +519,7 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
     let cmd = next_input ~test state in
     let new_state = do_command ~test state cmd
     in
+    Server.update ();
     new_state, new_state.mode
   with
   (* exit prover *)
@@ -608,6 +609,7 @@ let interactive_prover () =
   Printer.prt `Start "Squirrel Prover interactive mode.";
   Printer.prt `Start "Git commit: %s" Commit.hash_commit;
   Printer.init Printer.Interactive;
+  Server.start ();
   try start_main_loop ~html:false ~main_mode:`Stdin ()
   with End_of_file -> Printer.prt `Error "End of file, exiting."
 

@@ -46,6 +46,9 @@ val dummy_fmt : Format.formatter
 (** Define a standard formatter for the printer w.r.t. printer_mode. *)
 val get_std : unit -> Format.formatter
 
+(** Initialisation of a formatter. *)
+val init_ppf : Format.formatter -> printer_mode -> unit
+
 (** Initialisation of the standard formatter. *)
 val init : printer_mode -> unit
 
@@ -67,3 +70,9 @@ val kw : keyword -> Format.formatter -> ('a, Format.formatter, unit) format -> '
 
 (** Like [kw] but with a string. *)
 val kws : keyword -> Format.formatter -> string -> unit
+
+
+(** {2 HTML printing} *)
+
+(** [html pp] return a printing function which apply [pp] with HTML tags and escaping special characters *)
+val html : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a -> unit

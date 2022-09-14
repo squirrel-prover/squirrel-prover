@@ -93,7 +93,7 @@ let kw_ansi (keyword : keyword) : string =
   | `Separation -> "1"
   | `HelpType -> "1;31"
   | `HelpFunction -> "1;35"
-  | `Test -> "1;3;4;35"
+  | `Test -> "103"
   | `Error -> "41"
 
 (* Defines the string that will be outputed when a semantic tag is opened *)
@@ -139,22 +139,22 @@ let kw_html_attributes (keyword : keyword) : string =
   | `TermBool -> ""
   | `TermQuantif -> ""
   | `TermAction -> ""
-  | `ProcessName -> " class=\x1B\"pn\x1B\" style=\x1B\"font-weight:bold; color: #0000AA\x1B\""
-  | `ProcessVariable -> " class=\x1B\"pv\x1B\" style=\x1B\"font-weight: bold; color: #AA00AA\x1B\""
-  | `ProcessCondition -> " class=\x1B\"pc\x1B\" style=\x1B\"text-decoration: underline; color: #AA0000\x1B\""
-  | `ProcessInOut -> " class=\x1B\"pio\x1B\" style=\x1B\"font-weight: bold\x1B\""
-  | `ProcessChannel -> " class=\x1B\"pc\x1B\""
-  | `ProcessKeyword -> " class=\x1B\"pk\x1B\" style=\x1B\"font-weight: bold\x1B\""
-  | `GoalMacro -> " class=\x1B\"gm\x1B\" style=\x1B\"font-weight: bold; color: #AA00AA\x1B\""
-  | `GoalAction -> " class=\x1B\"ga\x1B\" style=\x1B\"color: #00AA00\x1B\""
-  | `GoalFunction -> " class=\x1B\"gf\x1B\" style=\x1B\"font-weight: bold\x1B\""
-  | `GoalName -> " class=\x1B\"gn\x1B\" style=\x1B\"color: #AA5500\x1B\""
-  | `Separation -> " class=\x1B\"sep\x1B\" style=\x1B\"font-weight: bold\x1B\""
-  | `HelpType -> " class=\x1B\"ht\x1B\" style=\x1B\"font-weight: bold; color: #AA0000\x1B\""
-  | `Goal -> " class=\x1B\"ht\x1B\" style=\x1B\"color: #AA0000\x1B\""
-  | `HelpFunction -> " class=\x1B\"hf\x1B\" style=\x1B\"font-weight: bold; color: #AA00AA\x1B\""
-  | `Test -> ""
-  | `Error -> " class=\x1B\"err\x1B\" style=\x1B\"background-color: red\x1B\""
+  | `ProcessName -> " class=\x1B'pn\x1B'"
+  | `ProcessVariable -> " class=\x1B'pv\x1B'"
+  | `ProcessCondition -> " class=\x1B'pc\x1B'"
+  | `ProcessInOut -> " class=\x1B'pio\x1B'"
+  | `ProcessChannel -> ""
+  | `ProcessKeyword -> " class=\x1B'pk\x1B'"
+  | `GoalMacro -> " class=\x1B'gm\x1B'"
+  | `GoalAction -> " class=\x1B'ga\x1B'"
+  | `GoalFunction -> " class=\x1B'gf\x1B'"
+  | `GoalName -> " class=\x1B'gn\x1B'"
+  | `Separation -> " class=\x1B'sep\x1B'"
+  | `HelpType -> " class=\x1B'ht\x1B'"
+  | `Goal -> " class=\x1B'goal\x1B' style=\x1B'color: #AA0000\x1B'"
+  | `HelpFunction -> " class=\x1B'hf\x1B'"
+  | `Test -> " class=\x1B'test\x1B'"
+  | `Error -> " class=\x1B'err\x1B'"
 
 (* Defines the string that will be outputed when a semantic tag is opened *)
 let kw_html_pref (stag : Format.stag) : string =
@@ -184,8 +184,8 @@ let kw_html_stag_funs : Format.formatter_stag_functions =
   (** ANSI **)
 
 (* Another function to assure that all styling stops if the formatter is flushed *)
-let ansi_out_funs =
-  let base_funs = pp_get_formatter_out_functions (get_std ()) () in
+let ansi_out_funs ppf =
+  let base_funs = pp_get_formatter_out_functions ppf () in
   { out_string = base_funs.out_string ;
     out_flush = (fun () ->
       base_funs.out_string "\x1B[0m" 0 4;
@@ -194,28 +194,59 @@ let ansi_out_funs =
     out_spaces = base_funs.out_spaces ;
     out_indent = base_funs.out_indent ; }
 
+  (** HTML **)
+
+(* Change the out put function to escape HTML special character *)
+let html_out_funs ppf =
+  let base_funs = pp_get_formatter_out_functions ppf () in
+  let html_out_char (escaping : bool ref) c =
+    if !escaping then
+      match c with
+      | '\x1B' -> escaping := false
+      | '\n' -> base_funs.out_string "<br>" 0 4
+      | '<' -> base_funs.out_string "&lt;" 0 4
+      | '>' -> base_funs.out_string "&gt;" 0 4
+      | '"' -> base_funs.out_string "&quot;" 0 6
+      | '\'' -> base_funs.out_string "&apos;" 0 6
+      | '&' -> base_funs.out_string "&amp;" 0 5
+      | c -> base_funs.out_string (String.make 1 c) 0 1
+    else begin
+      base_funs.out_string (String.make 1 c) 0 1;
+      escaping := true
+    end
+  in
+  { out_string = (fun s i j -> String.iter (html_out_char (ref true)) (String.sub s i j)) ;
+    out_flush = base_funs.out_flush ;
+    out_newline = base_funs.out_newline ;
+    out_spaces = base_funs.out_spaces ;
+    out_indent = base_funs.out_indent ; }
+
 
 (** Printer initialization **)
 
-
-(* Initialisation of the printer giving it a mode *)
-let init (mode : printer_mode) : unit =
-  printer_mode := mode;
+(* Initialisation of a given formatter giving it a mode *)
+let init_ppf (ppf : formatter) (mode : printer_mode) : unit =
   match mode with
   | File | Interactive ->
       Fmt.set_style_renderer
-        (get_std ()) `Ansi_tty;
-      Format.pp_set_mark_tags
-        (get_std ()) true;
+        ppf `Ansi_tty;
+      pp_set_mark_tags ppf true;
       pp_set_formatter_stag_functions
-        (get_std ()) kw_ansi_stag_funs ;
+        ppf kw_ansi_stag_funs ;
       pp_set_formatter_out_functions
-        (get_std ()) ansi_out_funs
+        ppf (ansi_out_funs ppf)
   | Html ->
-      Format.pp_set_mark_tags (get_std ()) true;
+      pp_set_mark_tags ppf true;
       pp_set_formatter_stag_functions
-        (get_std ()) kw_html_stag_funs
+        ppf kw_html_stag_funs;
+      pp_set_formatter_out_functions
+        ppf (html_out_funs ppf)
   | Test -> ()
+
+(* Initialisation of the standard formatter giving it a mode *)
+let init (mode : printer_mode) : unit =
+  printer_mode := mode;
+  init_ppf (get_std ()) mode
 
 
 (** {2 Printing functions} **)
@@ -272,3 +303,16 @@ let kw (keyword : keyword) ppf fmt =
 
 let kws (keyword : keyword) ppf (s : string) =
   kw keyword ppf "%s" s
+
+
+(** {2 HTML printing} **)
+
+let html_buffer = Buffer.create 80
+let html_formatter = formatter_of_buffer html_buffer
+let _ = init_ppf html_formatter Html
+
+let html (pp : formatter -> 'a -> unit) ppf x =
+  Format.fprintf html_formatter "%a@?" pp x;
+  let s = Buffer.contents html_buffer in
+  Buffer.reset html_buffer;
+  Format.fprintf ppf "%s" s

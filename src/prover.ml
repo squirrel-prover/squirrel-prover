@@ -127,6 +127,11 @@ let get_state mode table =
     prover_mode  = mode;
   }
 
+let get_first_subgoal () =
+  match !current_goal, !subgoals with
+  | Some _, j :: _ -> j
+  | _ -> raise Not_found
+
 let save_state mode table =
   pt_history := get_state mode table :: (!pt_history)
 
