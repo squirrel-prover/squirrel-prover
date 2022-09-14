@@ -1151,15 +1151,20 @@ and _pp
     in
     maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
 
-  | Name n -> _pp_nsymb ~dbg:info.dbg ppf n
+  | Name n ->
+    let pp ppf () = _pp_nsymb ~dbg:info.dbg ppf n in
+    maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
 
   | Macro (m, l, ts) ->
-    Fmt.pf ppf "@[%a%a@%a@]"
-      (_pp_msymb ~dbg:info.dbg) m
-      (Utils.pp_ne_list
-         "(@[<hov>%a@])"
-         (Fmt.list ~sep:Fmt.comma (pp (macro_fixity, `NonAssoc)))) l
-      (pp (macro_fixity, `NonAssoc)) ts
+    let pp ppf () =
+      Fmt.pf ppf "@[%a%a@%a@]"
+        (_pp_msymb ~dbg:info.dbg) m
+        (Utils.pp_ne_list
+           "(@[<hov>%a@])"
+           (Fmt.list ~sep:Fmt.comma (pp (macro_fixity, `NonAssoc)))) l
+        (pp (macro_fixity, `NonAssoc)) ts
+    in
+    maybe_paren ~outer ~side ~inner:macro_fixity pp ppf ()
 
   | Action (symb,indices) ->
     let pp ppf () =
@@ -1176,13 +1181,10 @@ and _pp
       (List.map snd l) (* TODO labels *)
 
   | Tuple ts ->
-    (* let pp ppf () = *)
-      Fmt.pf ppf "@[<hov 2>(%a)@]"
-        (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ")
-           (pp (tuple_fixity, `NonAssoc)))
-        ts
-    (* in
-     * maybe_paren ~outer ~side ~inner:tuple_fixity pp ppf () *)
+    Fmt.pf ppf "@[<hov 2>(%a)@]"
+      (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ")
+         (pp (tuple_fixity, `NonAssoc)))
+      ts
       
   | Proj (i, t) -> 
     let pp ppf () =
