@@ -845,16 +845,16 @@ type match_state = {
 (*------------------------------------------------------------------*)
 (** (Descending) state used in the unification algorithm. *)
 type unif_state = {
-  mv       : Mvar.t;     (** inferred variable assignment *)
-  bvs      : Sv.t;       (** bound variables "above" the current position *)
+  mv  : Mvar.t;     (** inferred variable assignment *)
+  bvs : Sv.t;       (** bound variables "above" the current position *)
 
   subst_vs : Sv.t;       (** vars already substituted (for cycle detection) *)
 
-  support  : Sv.t;       (** free variable which we are trying to unify *)
-  env      : Sv.t;       (** rigid free variables (disjoint from [support]) *)
+  support : Sv.t;       (** free variable which we are trying to unify *)
+  env     : Sv.t;       (** rigid free variables (disjoint from [support]) *)
 
-  ty_env   : Type.Infer.env;
-  table    : Symbols.table;
+  ty_env : Type.Infer.env;
+  table  : Symbols.table;
 }
 
 (*------------------------------------------------------------------*)
@@ -1263,6 +1263,11 @@ module T (* : S with type t = Term.term *) = struct
     | `Mgu mv -> Some mv
 
   (*------------------------------------------------------------------*)
+  let is_bvs (st : match_state) = function
+    | Var v0' -> Sv.mem v0' st.bvs
+    | _ -> false
+
+  (*------------------------------------------------------------------*)
   (* Invariants:
      - [st.mv] supports in included in [p.pat_vars].
      - [st.bvs] is the set of variables bound above [t].
@@ -1279,10 +1284,19 @@ module T (* : S with type t = Term.term *) = struct
     | Proj (i,t), Proj (i',t') when i = i' ->
       tmatch t t' st
 
-    (* FEATURE: try to reduce if match failed *)
-    | App (f, l), App(f', l') when List.length l = List.length l' ->
-      tmatch_l (f :: l) (f' :: l') st
+    | _, App(f', l') ->
+      assert (l' <> []);
+      begin
+        match t with
+        | App (f, l) when List.length l = List.length l' ->
+          begin
+            try tmatch_l (f :: l) (f' :: l') st with
+            | NoMatch _ -> tmatch_eta_expand st t (f', l')
+          end
 
+        | _ -> tmatch_eta_expand st t (f', l')
+      end
+          
     | Fun (fn , fty, terms), 
       Fun (fn', fty', terms') when fn = fn' ->
       tmatch_l terms terms' st
@@ -1322,6 +1336,45 @@ module T (* : S with type t = Term.term *) = struct
       tmatch t pat st
 
     | _, _ -> try_reduce_head1 t pat st
+
+  (* Try to match [t] with [(f' l')].
+     Use a higher-order matching heuristic When [f'] is a variable
+     to be inferred (i.e. [f' ∈ st.support]) and [l'] are all
+     bound variables, as follows:
+     - generalize [l'] in [t] as [tgen]
+         [tgen := (λvₗ ↦ t{l' → vₗ}) l']
+     - matches [tgen] and [(f' l')] *)
+  and tmatch_eta_expand
+      (st : match_state) (t : term) ((f', l') : term * term list)
+    =
+    if not (List.for_all (is_bvs st) l')
+    then try_reduce_head1 t (Term.mk_app f' l') st
+    else
+      match f' with  
+      | Var v' when Sv.mem v' st.support ->
+        (* vₗ *)
+        let v_fresh_l' = 
+          List.map (fun t_v -> Vars.make_fresh (Term.ty t_v) "y") l'
+        in
+        
+        (* [t_body = t{l' → vₗ}] *)
+        let t_body =
+          Term.subst (List.map2 (fun v_0 t_v0 ->
+              Term.ESubst (t_v0, Term.mk_var v_0)
+            ) v_fresh_l' l')
+            t
+        in
+        
+        (* Match
+             [(λvₗ ↦ t{l' → vₗ}) l'] and [(f' l')]
+           by simply matching the bodies
+             [λvₗ ↦ t{l' → vₗ}] and [f'] *)
+        tmatch
+          (Term.mk_lambda ~simpl:false v_fresh_l' t_body)
+          f' st
+
+      | _ -> try_reduce_head1 t (Term.mk_app f' l') st
+
 
   and m_expand_head_once (st : match_state) (t : term) : term * bool =
     expand_head_once
@@ -1437,7 +1490,7 @@ module T (* : S with type t = Term.term *) = struct
          identical. *)
       | t' -> 
       (* FEATURE: conversion *)
-        if t <> t' then no_match () else st.mv
+        if not (Term.alpha_conv t t') then no_match () else st.mv
 
   (*------------------------------------------------------------------*)
   (** Exported 

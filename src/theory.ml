@@ -1026,8 +1026,8 @@ and convert0
 
     List.iter2 (fun v (p_v, _) ->
         let tyv = Vars.ty v in
-        if not (Type.equal tyv Type.tindex || Type.equal tyv Type.ttimestamp) then
-          conv_err (L.loc p_v) (BadPty [Type.tindex; Type.ttimestamp]);
+        if not (Type.is_finite tyv) then
+          conv_err (L.loc p_v) (Failure "type must be finite");
       ) is vs;
 
     let c = conv ~env Type.tboolean c in
@@ -1050,14 +1050,13 @@ and convert0
     in
     let t = Term.subst subst t in
 
-    (* for now, seq are only over index and timestamps *)
+    (* seq are only over finite types *)
     List.iter2 (fun v ebnd ->
         match ebnd with
         | Bnd_simpl (p_v, _) ->
           let tyv = Vars.ty v in
-          if not (Type.equal tyv Type.tindex ||
-                  Type.equal tyv Type.ttimestamp) then
-            conv_err (L.loc p_v) (BadPty [Type.tindex; Type.ttimestamp])
+          if not (Type.is_finite tyv) then
+            conv_err (L.loc p_v) (Failure "type must be finite")
           
         | Bnd_tuple (l,_) -> 
           conv_err (L.mergeall (List.map L.loc l))
