@@ -123,7 +123,8 @@ Proof.
   (* We now have alpha < A(i) <= A(j) < beta
    * and no A(_) between A(j) and beta. *)
 
-  assert s@alpha = s@A(j) as Meuf => //; expand s@A(j); euf Meuf => Heuf.
+  assert s@alpha = s@A(j) as Meuf => //; expand s@A(j).
+  euf Meuf => [i0 [Heuf _]].
 
   use IH with pred(A(j)),pred(A(i0)) => //.
   by case Heuf; exists i0.

@@ -74,7 +74,7 @@ process B(spkA:message) =
   (* Get the symmetric key. *)
   Brecv:
   in(c,x);
-  if checksign(snd(x),spkA) = fst(x) then
+  if checksign(fst(x),snd(x),spkA) then
     (* Send message using received key on the left,
        or magically known key on the right. *)
     in(c,y);
@@ -110,15 +110,16 @@ goal [default/left] correct_key :
   happens(Bout) => exec@Bout =>
   asym_dec(fst(input@Brecv),skB) = sk.
 Proof.
-  (* You can use `euf` with a signature on an equality of the
-     form `checksign(u,sign_pk(k)) = v`. *)
+  (* You can use `euf` with a signature on a hypothesis of the
+     form `checksign(v,u,sign_pk(k))`. *)
   (* BEGIN EXO *)
   intro _ H.
   depends Brecv, Bout; 1: auto.
   intro _.
   have H0 : exec@Brecv by apply exec_le Bout.
   have H1 : cond@Brecv by apply exec_cond.
-  rewrite /cond /spkA in H1; euf H1 => _ H1'.
+  rewrite /cond /spkA in H1.
+  euf H1. intro [_ H1'].
   rewrite /m in H1'.
   auto.
   (* END EXO *)

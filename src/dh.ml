@@ -80,7 +80,7 @@ let partition_powers (nab:nsymb list) (pows:term list) :
 
 (*------------------------------------------------------------------*)
 (* future work: return a tree of and/or of name_occs and generate the goals accordingly *)
-(** A unit NO.f_fold_occs function, for use with NO.occurrence_goals.
+(** A (unit,unit) NO.f_fold_occs function, for use with NO.occurrence_goals.
     Looks for occurrences of names in nab not allowed by CDH or GDH (depending on gdh_oracles).
     Finds all possible occurrences of nab in t (ground), except
     1) in g ^ p1…pn: one pi is allowed to be a or b
@@ -92,7 +92,7 @@ let partition_powers (nab:nsymb list) (pows:term list) :
 let get_bad_occs
     (gdh_oracles:bool) (g:term) (exp:fsymb) (mult:fsymb option)
     (nab:nsymb list) 
-    (retry_on_subterms : (unit -> (NO.n_occ * nsymb * term) list * unit list))
+    (retry_on_subterms : (unit -> NO.n_occs * NO.empty_occs))
     (rec_call_on_subterms :
        (fv:Vars.vars ->
         cond:terms ->
@@ -100,20 +100,20 @@ let get_bad_occs
         info:NO.expand_info ->
         st:term ->
         term ->
-        (NO.n_occ * nsymb * term) list * unit list))
+        NO.n_occs * NO.empty_occs))
     ~(info:NO.expand_info)
     ~(fv:Vars.vars)
     ~(cond:terms)
     ~(p:MP.pos)
     ~(st:term)
     (t:term) 
-  : (NO.n_occ * nsymb * term) list * unit list =
+  : NO.n_occs * NO.empty_occs =
   (* get all bad occurrences in m ^ (p1 * … * pn) *)
   (* st is the current subterm, to be recorded in the occurrence *)
   let get_illegal_powers
       (m:term) (pows:terms)
       ~(fv:Vars.vars) ~(cond:terms) ~(p:MP.pos) ~(info:NO.expand_info)
-      ~(st:term) : (NO.n_occ * nsymb * term) list =
+      ~(st:term) : NO.n_occs =
     if m <> g then (* all occs in m, pows are bad *)
       (fst (rec_call_on_subterms m ~fv ~cond ~p ~info ~st)) @ 
       (List.concat_map (fun tt -> fst (rec_call_on_subterms tt ~fv ~cond ~p ~info ~st)) pows)
@@ -130,7 +130,7 @@ let get_bad_occs
              match tt with
              | Name nn ->
                List.map
-                 (fun nnn -> (NO.mk_nocc nn fv cond Sp.empty, nnn, st))
+                 (fun nnn -> NO.mk_nocc nn nnn fv cond st)
                  (find_symb nn nab)
              | _ -> assert false (* should always be a name *))
           (* pos is not set right here, could be bad if we wanted to use it later *)
@@ -147,7 +147,7 @@ let get_bad_occs
 
   | Name n when exists_symb n nab ->
     (List.map
-      (fun nn -> (NO.mk_nocc n fv cond Sp.empty, nn, st))
+      (fun nn -> NO.mk_nocc n nn fv cond st)
       (find_symb n nab),
      [])
 
@@ -200,14 +200,14 @@ let has_cgdh (gdh_oracles : bool) (g : lsymb) (table : Symbols.table) : bool =
 let dh_param
     ~(hyp_loc : L.t)
     (gdh_oracles : bool)
-    (info : NO.expand_info)
+    (contx : Constr.trace_cntxt)
     (hyp : term)
     (g : lsymb)
     (s : TS.sequent)
   : term * fsymb * fsymb option * term * nsymb * nsymb
   =
 
-  let _, contx = info in
+  let info = NO.EI_direct, contx in
   let table = contx.table in
   (* get generator *)
   let gen_n = Symbols.Function.of_lsymb g table in
@@ -267,14 +267,21 @@ let cgdh
   let env = (TS.env s).vars in
 
   let (gen, exp_s, mult_s, t, na, nb) =
-    dh_param ~hyp_loc:(L.loc m) gdh_oracles (NO.EI_direct, contx) hyp g s
+    dh_param ~hyp_loc:(L.loc m) gdh_oracles contx hyp g s
   in
   let pp_nab =
     fun ppf () -> Fmt.pf ppf "%a and %a" Term.pp_nsymb na Term.pp_nsymb nb
   in
-  let get_bad:(unit NO.f_fold_occs)  = get_bad_occs gdh_oracles gen exp_s mult_s [na; nb] in
+  let get_bad:((unit,unit) NO.f_fold_occs) =
+    get_bad_occs gdh_oracles gen exp_s mult_s [na; nb]
+  in
 
-  let phis, _ = NO.occurrence_formulas ~pp_ns:(Some pp_nab) get_bad contx env [t] in
+  let phis, ephi =
+    NO.occurrence_formulas ~pp_ns:(Some pp_nab)
+      NO.empty_converter NO.empty_occ_formula
+      get_bad contx env [t]
+  in
+  assert (ephi = []);
 
   let g = TS.goal s in
   List.map

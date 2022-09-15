@@ -138,7 +138,7 @@ Proof.
         The only possibility is that this hash comes from the output of a tag
         that has played before (thus the new hypothesis on timestamps).*)
     ++ (* LEFT *)
-       euf Meq => *. by exists i,k0.
+       euf Meq => [k0 _]. by exists i,k0.
     ++ (* RIGHT *)
        euf Meq => *. by exists i,k.
   (** For the second implication (<=), the conclusion of the goal can directly

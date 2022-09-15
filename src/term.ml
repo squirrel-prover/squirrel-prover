@@ -444,8 +444,8 @@ let mk_find ?(simpl=false) is c t e =
 (** {3 For formulas} *)
 
 let mk_timestamp_leq t1 t2 = match t1,t2 with
-  | _, Fun (f,_, [t2']) when f = f_pred -> mk_lt t1 t2'
-  | _ -> mk_leq t1 t2
+  | _, Fun (f,_, [t2']) when f = f_pred -> mk_lt ~simpl:true t1 t2'
+  | _ -> mk_leq ~simpl:true t1 t2
 
 (** Operations on vectors of indices of the same length. *)
 let mk_indices_neq ?(simpl=false) (vect_i : Vars.var list) vect_j =

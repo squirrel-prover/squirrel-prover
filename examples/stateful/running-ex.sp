@@ -419,7 +419,7 @@ goal authentication (jj,ii:index):
 Proof.
   intro Hap @/cond Hcond.
   euf Hcond.
-  intro Ht M.
+  intro [i j [Ht M]].
   case (i=ii) => _; 1: by exists j.
   rewrite /sT in M.
   collision.

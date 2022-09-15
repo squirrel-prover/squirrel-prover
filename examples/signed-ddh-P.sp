@@ -72,7 +72,7 @@ process Pchall(i:index) =
   in(cP, x2);
   let gS = snd(fst(x2)) in
   let pkS = fst(fst(x2)) in
-  if checksign(snd(x2),pkS) = <<g^a(i),gS>,pk(skP)> && pkS = pk(skS) then
+  if checksign(<<g^a(i),gS>,pk(skP)>,snd(x2),pkS) && pkS = pk(skS) then
     out(cP,sign(<<gS,g^a(i)>,pkS>,skP));
     in(cP, challenge);
       try find j such that gS = g^b(j) in
@@ -92,7 +92,7 @@ process S(j:index) =
   if pkP = pk(skP) then
     out(cS, < <pk(skS),g^b(j)>, sign(<<gP,g^b(j)>,pkP>,skS)>);
     in(cS, x3);
-    if checksign(x3,pkP) = <<g^b(j),gP>,pk(skS)> then
+    if checksign(<<g^b(j),gP>,pk(skS)>,x3,pkP) then
       out(cS,ok)
 
 system (!_i Pchall(i) | !_j S(j)).
@@ -126,7 +126,7 @@ Proof.
   of an action `S(j)`.  *)
   euf Meq.
   (** The conclusion is now trivial from the Meq1 and D1 hypotheses. *)
-   intro *.
+   intro [j _].
   by exists j.
 Qed.
 

@@ -4,6 +4,7 @@
 (* T --> R: nT, h(<nR, nT, tag1>, k)              *)
 (* R --> T: h(<h(<nR, nT, tag1>, k), nr, tag2>, k)*)
 
+include Basic.
 set postQuantumSound = true.
 
 hash h
@@ -54,10 +55,24 @@ goal wa_R:
   output@R(k) = input@T(i,j).
 Proof.
   intro k i _ Hc.
-  rewrite /cond in Hc. euf Hc => // _ _ _.
+  rewrite /cond in Hc. euf Hc => // [l [_ _]].
   + by use tags_neq.
-  + exists j.
-    assert (nR(k) = input@T(i,j)) as Mfresh by auto.
+  + exists l.
+    assert (nR(k) = input@T(i,l)) as Mfresh by auto.
+    fresh Mfresh; intro Hfresh; try destruct Hfresh as [i' Hfresh].
+    - auto.
+    - by depends R(k), R1(k,i').
+    - by depends R(k), R2(k).
+  + exists l.
+    assert (nR(k) = input@T(i,l)) as Mfresh by auto.
+    depends T(i,l), T1(i,l); [1:auto | 2:intro _].
+    fresh Mfresh; intro Hfresh; try destruct Hfresh as [i' Hfresh].
+    - auto.
+    - by depends R(k), R1(k,i').
+    - by depends R(k), R2(k).
+  + exists l.
+    assert (nR(k) = input@T(i,l)) as Mfresh by auto.
+    depends T(i,l), T2(i,l); [1:auto | 2:intro _].
     fresh Mfresh; intro Hfresh; try destruct Hfresh as [i' Hfresh].
     - auto.
     - by depends R(k), R1(k,i').
@@ -91,20 +106,27 @@ Proof.
   intro i j Hh He.
   assert cond@T1(i,j) as Hc by auto.
   use tags_neq as _.
-  rewrite /cond in Hc; euf Hc => // H1t H1m _.
+  rewrite /cond in Hc; euf Hc => // [k [H1t H1m]]. 
   assert (snd(input@R1(k,i)) = h(<<input@T(i,j),nT(i,j)>,tag1>,key(i)))
     as Heuf by auto.
-  euf Heuf => // H2t H2m _.
-  case H1t; case H2t; try auto.
-  exists k.
-  use executable_R1 with T1(i,j),k,i as [He' Hc'] => //.
-  assert h(<<nR(k),fst(input@R1(k,i))>,tag1>,key(i)) =
+  euf Heuf => // [l [H2t H2m]];
+  assert (nT(i,j)=nT(i,l)) as Hf; [1: auto | 2:fresh Hf; intro _].
+  * case H1t; case H2t; try auto.
+    exists k.
+    use executable_R1 with T1(i,j),k,i as [He' Hc'] => //.
+    assert h(<<nR(k),fst(input@R1(k,i))>,tag1>,key(i)) =
          h(<<input@T(i,j),nT(i,j)>,tag1>,key(i))
-    as Hcoll by auto.
-  collision Hcoll => Hcoll'.
-  assert (input@T(i,j) = nR(k)) as Hfresh by auto.
-  fresh Hfresh; intro Hfresh'; try destruct Hfresh' as [i0 Hfresh'].
-  + auto.
-  + by depends R(k), R1(k,i0).
-  + by depends R(k), R2(k).
+      as Hcoll by auto.
+    collision Hcoll => Hcoll'.
+    assert (input@T(i,j) = nR(k)) as Hfresh by auto.
+    fresh Hfresh; intro Hfresh'; try destruct Hfresh' as [i0 Hfresh'].
+    + auto.
+    + by depends R(k), R1(k,i0).
+    + by depends R(k), R2(k).
+  * depends T(i,j), T1(i,j); [1:auto | 2:intro _].
+   case H1t; case H2t; try auto.
+  * case H1t; case H2t; depends T(i,j), T2(i,j); try auto.
+    intro _; assert T2(i,j) < T1(i,j); [1:auto].
+    use mutex_default_T1_T2 with i,j,j. by case H.
 Qed.
+

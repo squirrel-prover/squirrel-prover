@@ -139,7 +139,7 @@ process Initiator(i,j,k:index) =
    let K2 = exct(skex,KT) in
    let kj = F1(sid,K1) XOR F1(sid,K2) in
    let ktilde = F2(sid,K1) XOR F2(sid,K2) in
-   if checksign( ktilde XOR snd(snd(m)), spk(skR(j))) = sid then
+   if checksign(sid, ktilde XOR snd(snd(m)), spk(skR(j))) then
     FI :  sIR(i,j,k) := kj.
 
 process Responder(j,k:index) =
@@ -180,7 +180,7 @@ process InitiatorToCompromised(i,j,k:index) =
    let K2 = exct(skex,KT) in
    let kj = F1(sid,K1) XOR F1(sid,K2) in
    let ktilde = F2(sid,K1) XOR F2(sid,K2) in
-   if checksign( ktilde XOR snd(snd(m)), spk(DskR(j))) = sid then
+   if checksign(sid, ktilde XOR snd(snd(m)), spk(DskR(j))) then
     DFI :  sIR(i,j,k) := kj.
 
 
@@ -216,7 +216,7 @@ process Initiator2(i,j,k:index) =
    let K2 = exct(skex,KT) in
    let kj = F1(sid,K1) XOR F1(sid,K2) in
    let ktilde = F2(sid,K1) XOR F2(sid,K2) in
-   if checksign( ktilde XOR snd(snd(m)), spk(skR(j))) = sid then
+   if checksign(sid, ktilde XOR snd(snd(m)), spk(skR(j))) then
      FI:  sIR(i,j,k) := kj.
 
 process Responder2(j,k:index) =
@@ -263,7 +263,7 @@ process InitiatorToCompromised2(i,j,k:index) =
    let K2 = exct(skex,KT) in
    let kj = F1(sid,K1) XOR F1(sid,K2) in
    let ktilde = F2(sid,K1) XOR F2(sid,K2) in
-   if checksign( ktilde XOR snd(snd(m)), spk(DskR(j))) = sid then
+   if checksign(sid, ktilde XOR snd(snd(m)), spk(DskR(j))) then
     DFI :  sIR(i,j,k) := kj.
 
 system [idealized]  out(cI,skex); ((!_j !_k R: Responder2(j,k)) | (!_i !_j !_k I: Initiator2(i,j,k)) | (!_i !_j !_k I: InitiatorToCompromised2(i,j,k))).
@@ -426,7 +426,7 @@ process Initiator3(i,j,k:index) =
    let K2 = exct(skex,KT) in
    let kj = FK1 XOR F1(sid,K2) in
    let ktilde = FK2 XOR F2(sid,K2) in
-   if checksign( ktilde XOR snd(snd(m)), spk(skR(j))) = sid then
+   if checksign(sid, ktilde XOR snd(snd(m)), spk(skR(j))) then
      FI:  sIR(i,j,k) := kj.
 
 process Responder3(j,k:index) =
@@ -484,7 +484,7 @@ process InitiatorToCompromised3(i,j,k:index) =
    let K2 = exct(skex,KT) in
    let kj = FK1 XOR F1(sid,K2) in
    let ktilde = FK2 XOR F2(sid,K2) in
-   if checksign( ktilde XOR snd(snd(m)), spk(DskR(j))) = sid then
+   if checksign(sid, ktilde XOR snd(snd(m)), spk(DskR(j))) then
      FI:  sIR(i,j,k) := kj.
 
 
@@ -674,7 +674,9 @@ Proof.
 Qed.
 
 
-axiom [idealized3/left,idealized2]  fasign : forall (m1,m2,m3:message), m1=m2 => checksign(m1,m3) = checksign(m2,m3).
+axiom [idealized3/left,idealized2]  fasign :
+  forall (s1,s2,m1,m2,k:message),
+  s1=s2 => checksign(m1,s1,k) => checksign(m2,s2,k) => m1 = m2.
 
 
 goal  [idealized3/left,idealized2] trans_eq2 (i,j,k:index):
@@ -917,12 +919,14 @@ Qed.
 
 axiom [idealized3] uniqepk : forall (m1,m2:message), epk(m1) =epk(m2) => m1=m2.
 
-axiom [idealized3] sufcma : forall (m1,m2,sk:message), checksign(m1,spk(sk)) = m2 => m1 =sign(m2,sk).
+axiom [idealized3] sufcma :
+forall (m,s,sk:message), checksign(m,s,spk(sk)) => s = sign(m,sk).
 
 axiom [idealized3] xorconcel : forall (m1,m2,m3:message) m1=m2 => 
   xor m1 (xor m2 m3) = m3.
 
-axiom [idealized3] rcheck : forall (m1,m2,sk:message), m1=m2 => checksign(sign(m1,sk),spk(sk)) = m2.
+axiom [idealized3] rcheck :
+ forall (m1,m2,sk:message), m1=m2 => checksign(m1, sign(m2,sk),spk(sk)).
 
 goal [idealized3/left] auth :  forall (i,j,l:index) ,
    happens(FI(i,j,l)) =>
@@ -943,7 +947,7 @@ Proof.
   destruct Exec as [_ EUF].
 
   euf EUF.
-    + intro Ord.
+    + intro [k i0 [Ord Meq]].
       assert ( SR(j,k,i0) <= FI(i,j,l) || SR(j,k,i0) < FI(i,j,l)) <=>  SR(j,k,i0) < FI(i,j,l).
         ++ split.
            intro H.
@@ -951,17 +955,16 @@ Proof.
            auto.
         ++ destruct H.
            use H => //.
-           intro Meq _.
            use uniqepk with vkI(i),vkI(i0) => //.
            exists k.
            depends I(i,j,l), FI(i,j,l) => //.
            intro OrdIFI.
            simpl.
-           use sufcma with (xor(ktilde10(i,j,l)@FI(i,j,l)) (snd(snd(input@FI(i,j,l))))),  sid10(i,j,l)@FI(i,j,l)  ,  skR(j); try auto .
+           use sufcma with sid10(i,j,l)@FI(i,j,l), (xor(ktilde10(i,j,l)@FI(i,j,l)) (snd(snd(input@FI(i,j,l)))))  ,  skR(j); try auto .
            expand output.
 
            use xorconcel with ktilde8(j,k,i)@SR(j,k,i), ktilde8(j,k,i)@SR(j,k,i), sign(sid8(j,k,i)@SR(j,k,i),skR(j)) => //.
-           rewrite -Meq in Meq0.
+           rewrite Meq in Meq0.
            rewrite -Meq0.
            expand sid10,sid8, C4,CT4.
            simpl.
@@ -986,17 +989,15 @@ Proof.
              +++ rewrite Meq2.
                  by use xorconcel with ktilde10(i,j,l)@FI(i,j,l), ktilde10(i,j,l)@FI(i,j,l),snd(snd(input@FI(i,j,l))) .
 
-    + intro Ord Eqsid _.
+    + intro [k [Ord Eqsid]].
       executable pred(FI(i,j,l)) => //.
       intro Exec.
       use Exec with DSR(j,k) => //.
-      assert happens(DSR(j,k)).
-      by case Ord.
+      assert happens(DSR(j,k)); [1:auto].
       expand  exec@DSR(j,k).
       expand cond.
       destruct H as [_ Conc].
       by use Conc with i.
-      by case Ord.
 Qed.
 (* As I1 is the converse of FI, we also have freely that *)
 

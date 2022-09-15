@@ -13,7 +13,7 @@ include Basic.
 
 (* The main test, with a non-empty list of bound variables. *)
 global goal nonempty (tau:timestamp,i:index) :
-  [(forall (i0,i1:index), (A(i0) <= tau => i <> i1))
+  [(forall (i1,i0:index), (A(i0) <= tau => i <> i1))
    = true ] ->
   equiv(output@tau) ->
   equiv(output@tau, diff(n(i),m(i))).

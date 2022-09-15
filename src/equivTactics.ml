@@ -1746,7 +1746,7 @@ let cca1 Args.(Int i) s =
                                  first encryptions")
       in
       let errors =
-        Euf.key_ssc ~globals:true ~elems:(ES.goal_as_equiv s)
+        OldEuf.key_ssc ~globals:true ~elems:(ES.goal_as_equiv s)
           ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
           ~cntxt fndec sk.s_symb
       in
@@ -1896,7 +1896,7 @@ let enckp arg (s : ES.t) =
              let cntxt = Constr.{ cntxt with system } in
              let errors =
                (* TODO: set globals to true *)
-               Euf.key_ssc ~globals:false
+               OldEuf.key_ssc ~globals:false
                  ~cntxt ~elems:(ES.goal_as_equiv s)
                  ~allow_functions:(fun x -> x = fnpk) fndec sk.s_symb
              in

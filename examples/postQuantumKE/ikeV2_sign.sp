@@ -105,13 +105,14 @@ process Initiator(i,j:index) =
                    >>>,  skI(i)  )
      );
   in(cI,signed);
-  if checksign( signed, pk(skR(j))) =
+  if checksign(
       < fst(m)(*gI*)
                , <snd(m)(*Nr*),
                   <Ni(i,j)(*Ni*),
                    prfp(  hseed( < <Ni(i,j),snd(m)(*Nr*)>,   exp(fst(m),xi(i,j))>, seedpubkey ) (* SKEYSEED *),
                   <Ni(i,j),snd(m)(*Nr*)> )
-                   >>> then
+                   >>>,
+      signed, pk(skR(j))) then
      FI :  out(cR, ok).
 
 
@@ -120,13 +121,14 @@ process Responder(i,j:index) =
   out(cR, <exp(g,xr(i,j)), Nr(i,j)>);
 
   in(cR, signed);
-  if checksign( signed, pk(skI(j))) =
+  if checksign(
       < fst(m)(*gI*)
                , <snd(m)(*Ni*),
                   <Nr(i,j)(*Nr*),
                    prfp(  hseed(< <snd(m)(*Ni*),Nr(i,j)>,  exp(fst(m),xr(i,j))>, seedpubkey)(* SKEYSEED *),
                    <snd(m)(*Ni*),Nr(i,j)> )
-                   >>> then
+                   >>>,
+      signed, pk(skI(j))) then
     SR:  out(cR,
       sign(  < exp(g,xr(i,j))
                , <Nr(i,j),
@@ -165,13 +167,14 @@ process InitiatorRoR(i,j:index) =
                    >>>,  skI(i)  )
      );
   in(cI,signed);
-  if checksign( signed, pk(skR(j))) =
+  if checksign( 
       < fst(m)(*gI*)
                , <snd(m)(*Nr*),
                   <Ni(i,j)(*Ni*),
                    prfp(  hseed( < <Ni(i,j),snd(m)(*Nr*)>,   exp(fst(m),xi(i,j))>, seedpubkey ) (* SKEYSEED *),
                   <Ni(i,j),snd(m)(*Nr*)> )
-                   >>> then
+                   >>>,
+      signed, pk(skR(j))) then
 
 
     FI :   out(cR,
@@ -187,13 +190,14 @@ process ResponderRor(i,j:index) =
   out(cR, <exp(g,xr(i,j)), Nr(i,j)>);
 
   in(cR, signed);
-  if checksign( signed, pk(skI(j))) =
+  if checksign(
       < fst(m)(*gI*)
                , <snd(m)(*Ni*),
                   <Nr(i,j)(*Nr*),
                    prfp(  hseed(< <snd(m)(*Ni*),Nr(i,j)>,  exp(fst(m),xr(i,j))>, seedpubkey)(* SKEYSEED *),
                    <snd(m)(*Ni*),Nr(i,j)> )
-                   >>> then
+                   >>>,
+       signed, pk(skI(j)))  then
     SR:  out(cR,
       sign(  < exp(g,xr(i,j))
                , <Nr(i,j),
@@ -236,7 +240,7 @@ Proof.
   use Hexec with SR(i,j); 2: auto.
   expand exec. 
   destruct H0 as [H0 H3]. expand cond.
-  euf H3 => ? ? ?.
+  euf H3. intro [j0 [H2 HE]].
   exists j0.
   by case H2; depends R(i,j),FR(i,j).
 Qed.
@@ -249,7 +253,7 @@ goal [core3,core/right] authI (i,j:index):
 Proof.
   intro H @/exec [H0 H1]. 
   expand cond.
-  euf H1 => ? ? ?.
+  euf H1. intro [l [H2 HE]].
   
   depends SI(i,j), FI(i,j) by auto.
   intro C.

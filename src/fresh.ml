@@ -26,14 +26,14 @@ type lsymb = Theory.lsymb
 (*------------------------------------------------------------------*)
 (* Look for occurrences using NameOccs *)
 
-(** A unit NO.f_fold_occs function, for use with NO.occurrence_goals.
+(** A (unit,unit) NO.f_fold_occs function, for use with NO.occurrence_goals.
     Looks for occurrences of n in t (ground):
     - if t is n: returns the occurrence
     - otherwise: asks to be called recursively on subterms.
    uses not accumulator, so returns an empty unit list. *)
 let get_bad_occs
     (n:nsymb) 
-    (retry_on_subterms : unit -> (NO.n_occ * nsymb * term) list * unit list)
+    (retry_on_subterms : unit -> NO.n_occs * NO.empty_occs)
     (rec_call_on_subterms : 
        (fv:Vars.vars ->
         cond:terms ->
@@ -41,13 +41,13 @@ let get_bad_occs
         info:NO.expand_info ->
         st:term -> 
         term ->
-        (NO.n_occ * nsymb * term) list * unit list))
+        NO.n_occs * NO.empty_occs))
     ~(info:NO.expand_info)
     ~(fv:Vars.vars)
     ~(cond:terms)
     ~(p:MP.pos)
     ~(st:term)
-    (t:term) : (NO.n_occ * nsymb * term) list * unit list
+    (t:term) : NO.n_occs * NO.empty_occs
   =
   (* handles a few cases, using rec_call_on_subterm for rec calls,
      and calls retry_on_subterm for the rest *)
@@ -56,8 +56,8 @@ let get_bad_occs
     soft_failure
       (Tactics.Failure "can only be applied on ground terms")
 
-  | Name nn when nn.s_symb = n.s_symb ->    
-    [NO.mk_nocc nn fv cond Sp.empty, n, st], []
+  | Name nn when nn.s_symb = n.s_symb ->
+    [NO.mk_nocc nn n fv cond st], []
 
   | _ -> retry_on_subterms ()
 
@@ -118,7 +118,12 @@ let fresh_trace (m : lsymb) (s : TS.sequent) : TS.sequent list =
     let get_bad = get_bad_occs n in
    
     Printer.pr "Freshness of %a:@; @[<v 0>" pp_n ();
-    let phis, _ = NO.occurrence_formulas ~pp_ns:(Some pp_n) get_bad contx env [t] in
+    let phis, ephis =
+      NO.occurrence_formulas ~pp_ns:(Some pp_n)
+        NO.empty_converter NO.empty_occ_formula
+        get_bad contx env [t]
+    in
+    assert (ephis = []); (* should always be empty *)
     Printer.pr "@]@;";
 
     let g = TS.goal s in
@@ -176,7 +181,14 @@ let phi_proj
   
   (* the biframe is used in the old fresh for indirect cases. why? *)
   (* should env be projected? *)
-  let phi_p, _ = NO.occurrence_formulas ~negate:true ~pp_ns:(Some pp_n_p) get_bad_p contx_p env frame_p in
+  let phi_p, ephi =
+    NO.occurrence_formulas
+      ~negate:true ~pp_ns:(Some pp_n_p)
+      NO.empty_converter NO.empty_occ_formula
+      get_bad_p contx_p env frame_p
+  in
+  assert (ephi = []);
+
   (* not removing duplicates here, as we already do that on occurrences. *)
   (* probably fine, but we'll need to remove duplicates between phi_l and phi_r *)
   phi_p

@@ -160,6 +160,25 @@ module List = struct
     in
     List.rev l_rev  
 
+
+  (** Removes from l all elements that are subsumed by another.
+      [included x y] iff x included in y, ie y subsumes x. *)
+  let clear_subsumed
+      (included : 'a -> 'a -> bool)
+      (l : 'a list) :
+    'a list =
+    let ll =
+      fold_left (fun acc x ->
+          if exists (included x) acc then
+            acc
+          else
+            let acc =
+              filter (fun y -> not (included y x)) acc in
+            x :: acc
+        ) [] l
+    in
+    rev ll
+
   (*------------------------------------------------------------------*)
   let mapi_fold 
       (f  : int -> 'a -> 'b -> 'a * 'c) 

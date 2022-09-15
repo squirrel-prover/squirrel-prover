@@ -291,15 +291,14 @@ let declare table decl =
   | Decl.Decl_sign (sign, checksign, pk, tagi, ctys) ->
     let () = Utils.oiter (define_oracle_tag_formula table sign) tagi in
 
-    let ctys = parse_ctys table ctys ["m"; "sig"; "check"; "sk"; "pk"] in
+    let ctys = parse_ctys table ctys ["m"; "sig"; "sk"; "pk"] in
     let m_ty     = List.assoc_opt "m"     ctys
     and sig_ty   = List.assoc_opt "sig"   ctys
-    and check_ty = List.assoc_opt "check" ctys
     and sk_ty    = List.assoc_opt "sk"    ctys
     and pk_ty    = List.assoc_opt "pk"    ctys in
 
     Theory.declare_signature table
-      ?m_ty ?sig_ty ?check_ty ?sk_ty ?pk_ty sign checksign pk,
+      ?m_ty ?sig_ty ?sk_ty ?pk_ty sign checksign pk,
     []
 
   | Decl.Decl_abstract decl -> parse_abstract_decl table decl, []

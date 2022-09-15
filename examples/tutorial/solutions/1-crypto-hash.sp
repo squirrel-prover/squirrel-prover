@@ -57,8 +57,8 @@ goal _ : <h(b,k), h(c,k)> = h(a,k) => a = b || a = c.
 Proof.
   intro H.
   (* The euf tactic must be invoked on an assumption
-     of the form `h(v,k) = u` (or the converse).
-     From this it deduces that `v` must be equal to one
+     of the form `h(u,k) = v` (or the converse).
+     From this it deduces that `u` must be equal to one
      of the messages that is hashed (using `k`) inside
      `u` or `v`: for each case in this disjunction it introduces
      a new subgoal with corresponding hypotheses.
@@ -84,16 +84,15 @@ Proof.
      Be careful: a straightforward application of `euf` in this
      case does not bring any extra hypothesis. *)
   (* BEGIN EXO *)
-  intro H. 
+  intro H.
   have H' : h(h(a,k),k) = h(a,k) by auto.
   euf H' => H''.
-  + auto.
-  + auto.
+  auto.
   (* END EXO *)
 Qed.
 
 (* The euf tactic also reasons about indices.
-   For the equality `u = h(v,k(i))`, it needs to consider all possibles
+   For the equality `h(u,k(i)) = v`, it needs to consider all possibles
    hashes `h(w,k(j))`, under the assumption that `i = j`.
    This allows to prove the next goal. *)
 goal hash_4 (i,j:index) : h(a, k'(i)) = h(a, k'(j)) => i = j.
@@ -101,7 +100,6 @@ Proof.
   (* BEGIN EXO *)
   intro H.
   euf H.
-  intro H' H''.
   auto.
   (* END EXO *)
 Qed.

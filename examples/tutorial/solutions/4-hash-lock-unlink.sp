@@ -164,7 +164,7 @@ Proof.
     project.
 
     (* LEFT *)
-    - euf H => _ _ _ //.
+    - euf H. intro [k0 [_ _]].
       have Meq1: input@T(i,k0)=nR(j) by auto.
       exists i,k0 => /=.
       fresh Meq1 => // ?.
@@ -172,7 +172,7 @@ Proof.
       * by depends R(j),R2(j). 
 
     (* RIGHT *)
-    - euf H => _ _ _ //.
+    - euf H. intro [_ _].
       have Meq1: input@T(i,k)=nR(j) by auto.
       exists i,k => /=.
       fresh Meq1 => // ?.

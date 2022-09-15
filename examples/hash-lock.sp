@@ -64,7 +64,7 @@ Proof.
     project.
 
     (* LEFT *)
-    - euf H => _ _ _ //.
+    - euf H => [k0 [_ _]] //.
       exists i,k0.
       repeat split; [ 1,4: auto | 3: by apply injective_pairing ].
       assert input@T(i,k0)=nR(j) as Meq1 by auto.
@@ -73,7 +73,7 @@ Proof.
       * by depends R(j),R2(j).
 
     (* RIGHT *)
-    - euf H => _ _ _ //.
+    - euf H => [_ _] //.
       exists i,k.
       repeat split; [ 1,4: auto | 3: by apply injective_pairing ].
       assert input@T(i,k)=nR(j) as Meq1 by auto.

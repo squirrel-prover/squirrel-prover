@@ -498,11 +498,11 @@ module Theories = struct
   let t_true  = cfun_tuple (F Symbols.fs_true) []
 
   (** Signature.
-      mcheck(msig(m, k), pk(k)) -> true *)
+      mcheck(m, sign(m,k), pk(k)) -> true *)
   let mk_sig msig mcheck pk =
     let m, k = mk_var (), mk_var () in
     let t_pk = cfun_tuple pk [k] in
-    ( cfun_tuple mcheck [cfun_tuple msig [m; k]; t_pk], t_true )
+    ( cfun_tuple mcheck [m; cfun_tuple msig [m; k]; t_pk], t_true )
 end
 
 

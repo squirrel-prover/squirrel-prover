@@ -96,7 +96,7 @@ Proof.
   subst t, T(i,j).
   expand kT(i)@T(i,j).
   euf Mneq.
-  intro Ht Meq *.
+  intro [ j0 [Ht Meq]].
 
   (* T(i,j0) < T(i,j)
      kT(i)@pred(T(i,j0)) = kT(i)@pred(T(i,j))

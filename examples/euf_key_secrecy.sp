@@ -15,5 +15,5 @@ Proof.
   intro _ _.
   assert h(fresh,input@t) = h(fresh,k) as Heuf; 1: auto.
   euf Heuf.
-  intro _ H; by fresh H.
+  intro [i [_ H]]; by fresh H.
 Qed.

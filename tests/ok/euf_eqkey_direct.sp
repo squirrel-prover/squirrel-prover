@@ -17,5 +17,5 @@ Proof.
   euf Heq. 
   (* There should be one direct case,
    * where index i should be equal to both a and b. *)
-  intro _ _; auto.
+  intro [_ _]; auto.
 Qed.

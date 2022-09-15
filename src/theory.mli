@@ -192,7 +192,6 @@ val declare_signature :
   Symbols.table ->
   ?m_ty:Type.ty ->
   ?sig_ty:Type.ty ->
-  ?check_ty:Type.ty ->
   ?sk_ty:Type.ty ->
   ?pk_ty:Type.ty ->
   lsymb -> lsymb -> lsymb ->

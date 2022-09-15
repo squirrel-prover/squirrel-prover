@@ -172,7 +172,7 @@ Proof.
 
   (* COND => WA *)
   intro [i H].
-  euf H => _ _ _ //.
+  euf H. intro [k [_ _]].
   have ?: happens(R(j)) by depends R(j), R1(j). 
   exists i,k => /=.
   by apply fresh_nR.

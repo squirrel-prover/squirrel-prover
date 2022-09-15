@@ -80,21 +80,21 @@ Proof.
   + intro [i t Meq].
     project.
     (* left *)
-    - euf Meq => _ _ _.
+    - euf Meq; simpl.
       * by use tags_neq.
-      * exists i,t0; simpl.
+      * intro [t0 H].
+        exists i,t0; simpl.
         assert (input@T(i,t0) = nr(r)) as F by auto.
         fresh F => _ //.
         ** by depends R(r), R1(r).
-        ** by depends R(r), R1(r).
         ** by depends R(r), R2(r).
     (* right *)
-    - euf Meq => _ _ _.
+    - euf Meq; simpl. 
       * by use tags_neq.
-      * exists i,t; simpl.
+      * intro H.
+        exists i,t; simpl.
         assert (input@T(i,t) = nr(r)) as F by auto.
         fresh F => _ //.
-        ** by depends R(r),R1(r).
         ** by depends R(r),R1(r).
         ** by depends R(r),R2(r).
 
@@ -117,11 +117,11 @@ goal [default/left] wa_R1_left (i,r:index):
    output@R(r) = input@T(i,t)).
 Proof.
   rewrite eq_iff; split; 2: by intro [_ _]; expand output.
-  intro Meq; euf Meq => _ _ _; 1: auto.
-  exists t; simpl.
+  intro Meq; euf Meq. auto.
+  intro [t _]. exists t; simpl.
   assert input@T(i,t) = nr(r) as F by auto.
   by (fresh F => C ;
-  4:depends R(r), R2(r)).
+  3:depends R(r), R2(r)).
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
@@ -136,10 +136,11 @@ goal [default/right] wa_R1_right (i,t,r:index):
    output@R(r) = input@T(i,t)).
 Proof.
   rewrite eq_iff; split; 2: by intro [_ _]; expand output.
-  intro Meq; euf Meq => _ _ _; 1: auto.
+  intro Meq; euf Meq. auto.
+  intro _.
   assert input@T(i,t) = nr(r) as F by auto.
   by (fresh F => C;
-  4:depends R(r), R2(r)).
+  3:depends R(r), R2(r)).
 Qed.
 
 (** Equality used to rewrite the try-find in R1

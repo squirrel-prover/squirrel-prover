@@ -221,22 +221,16 @@ Proof.
   assert s(i)@tau' = s(i)@A(i,j) as Meq' by auto.
   expand s(i)@A(i,j).
   euf Meq'.
-  intro Heuf Meuf *.
-  assert i=i0 || i<>i0 as [H0|H0] by auto.
-  + (* i = i0 *)
+  intro [j0 [Heuf Meuf]].
     use lastupdate with i,pred(A(i,j)) as H4; 2: by auto.
     case H4.
       - (* case H4 - init *)
         destruct H4 as [H4 H4'].
-        use H4' with j0; 1,2: case Heuf; auto.
+        use H4' with j0; by case Heuf. 
       - (* case H1 - general *)
         destruct H4 as [j1 [Meq1 H4 H5]].
-        use IH with pred(A(i,j)),pred(A(i,j0)),i,j1 as H; try auto.
-        repeat split => //.
-        use H5 with j0; 1,2: case Heuf; auto.
-  + (* case i<>i0 *)
-    use disjoint_chains with pred(A(i0,j0)),pred(A(i,j)),i0,i => //.
-    by case Heuf.
+        use IH with pred(A(i,j)), pred(A(i,j0)),i,j1 as H; try auto.
+        use H5 with j0; by case Heuf.
 Qed.
 
 

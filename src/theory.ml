@@ -1344,12 +1344,12 @@ let declare_senc_joint_with_hash
   fst (Function.declare_exact table enc ~data (enc_fty,SEnc))
 
 let declare_signature table
-    ?m_ty ?sig_ty ?check_ty ?sk_ty ?pk_ty
+    ?m_ty ?sig_ty ?sk_ty ?pk_ty
     sign checksign pk =
   let open Symbols in
-  let sig_fty   = mk_ftype_tuple [] [m_ty; sk_ty]   sig_ty in
-  let check_fty = mk_ftype_tuple [] [sig_ty; pk_ty] check_ty in
-  let pk_fty    = mk_ftype_tuple [] [sk_ty]         pk_ty in
+  let sig_fty   = mk_ftype_tuple [] [m_ty; sk_ty        ] sig_ty               in
+  let check_fty = mk_ftype_tuple [] [m_ty; sig_ty; pk_ty] (Some Type.tboolean) in
+  let pk_fty    = mk_ftype_tuple [] [sk_ty              ] pk_ty                in
 
   let table,sign = Function.declare_exact table sign (sig_fty, Sign) in
   let table,pk = Function.declare_exact table pk (pk_fty,PublicKey) in

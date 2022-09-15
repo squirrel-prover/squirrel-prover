@@ -75,22 +75,22 @@ Proof.
     use tags_neq; project.
 
     (* LEFT *)
-    - euf H => _ _ _ //.
+    - euf H => [j0 [_ _]] //.
       exists i,j0.
       assert input@T(i,j0)=nR(k) as Meq1 by auto.
       fresh Meq1 => C /=;
       [1: auto
-      |2,3: by depends R(k),R1(k)
-      |4: by depends R(k),R2(k)].
+      |2: by depends R(k),R1(k)
+      |3: by depends R(k),R2(k)].
 
     (* RIGHT *)
-    - euf H => _ _ _ //.
+    - euf H => [l [_ _]] //.
       exists i,j.
       assert input@T(i,j)=nR(k) as Meq1 by auto.
       fresh Meq1 => C /=;
       [1: auto
-      |2,3: by depends R(k),R1(k)
-      |4: by depends R(k),R2(k)].
+      |2: by depends R(k),R1(k)
+      |3: by depends R(k),R2(k)].
 
   (* WA => COND *)
   + intro [i j _]; exists i,j.
@@ -118,13 +118,13 @@ Proof.
 
   intro Meq.
   use tags_neq.
-  euf Meq => _ _ _ //.
+  euf Meq => [j [_ _]] //.
   exists j.
   assert input@T(i,j) = nR(k) as Meq1 by auto.
   fresh Meq1 => C /=;
    [1: auto
-   |2,3: by depends R(k),R1(k)
-   |4: by depends R(k),R2(k)].
+   |2: by depends R(k),R1(k)
+   |3: by depends R(k),R2(k)].
 Qed.
 
 goal [default/right] wa_R1_right (i,j,k:index):
@@ -141,12 +141,12 @@ Proof.
 
   intro Meq.
   use tags_neq.
-  euf Meq => _ _ _ //.
+  euf Meq => [l [_ _]] //.
   assert input@T(i,j) = nR(k) as Meq1 by auto.
   fresh Meq1 => C /=;
    [1: auto
-   |2,3: by depends R(k),R1(k)
-   |4: by depends R(k),R2(k)].
+   |2: by depends R(k),R1(k)
+   |3: by depends R(k),R2(k)].
 Qed.
 
 (** Equality used to rewrite the try-find in R1
@@ -194,8 +194,8 @@ Proof.
     fa !<_,_>, if _ then _.
     fresh 1; rewrite if_true. {
       repeat split => * //;
-      [1,2,4:by depends R(k),R1(k)].
-      by depends R(k),R2(k). 
+      [1: by depends R(k),R1(k)
+      |2: by depends R(k),R2(k)]. 
     }
     auto.
 

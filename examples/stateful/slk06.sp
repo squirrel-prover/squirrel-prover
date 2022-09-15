@@ -91,7 +91,7 @@ goal auth_R1 (jj,ii:index):
 Proof.
   intro Hap @/cond Hcond.
   euf Hcond.
-  intro *.
+  intro [j _].
   by exists j.
 Qed.
 
@@ -103,6 +103,6 @@ goal auth_T1 (i,j:index):
 Proof.
   intro Hap @/cond Hcond.
   euf Hcond.
-  intro *.
+  intro [jj _].
   by exists jj.
 Qed.

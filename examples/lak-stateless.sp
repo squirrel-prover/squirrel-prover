@@ -55,34 +55,38 @@ Proof.
   induction => t IH i j jj _ _ _ _ _.
   use executable_R1 with R1(j,i), jj, i as [_ _] => //.
   assert(nR(j) = h(<nR(jj),fst(input@R1(jj,i))>,key(i))) as Meq_R1jj; 1: auto.
-  euf Meq_R1jj => _ _ _.
+  euf Meq_R1jj => [l [_ _]].
 
-  (* EUF case 1/2: R1(j0,i)
-   * We have R1(j0,i) < R1(jj,i) < R1(j,i)
+  (* EUF case 1/4: R1(l,i)
+   * We have R1(l,i) < R1(jj,i) < R1(j,i)
    * we will appeal to to the induction hypothesis with
-   * t = R1(jj,i) and jj = j0. *)
-  + by use IH with R1(jj,i),i,jj,j0.
+   * t = R1(jj,i) and jj = l. *)
+  + by use IH with R1(jj,i),i,jj,l.
 
-  (* EUF case 2/2: T(i,k)
+  (* EUF case 2,3,4/4: T(i,l), T1(i,l), T2(i,l).
+     All three are the same.
 
      We are looking at the following situation,
      where indices i are omitted and all hashes use key(i).
 
-     T(i,k) < R1(jj) < R1(j)
+     T(i,l) < R1(jj) < R1(j)
 
      action:     input -> output
      ----------------------------------------------------
      R(j):             -> nR(j)
      R(jj):            -> nR(jj)
-     T(i,k):    nR(jj) -> <nT(i,k),h(<nR(jj),nT(i,k)>)> = M
+     T(i,l):    nR(jj) -> <nT(i,l),h(<nR(jj),nT(i,l)>)> = M
      R1(jj):         M -> h(<h(<nR(jj)...>),nR(jj)>) = N
      R1(j): <nR(jj),N> -> ..
-       executes because <h(<nR(jj),nT(i,k)>),nR(jj)> = <nR(j),nR(jj)>
-       but then we have nR(j)=h(<nR(jj),nT(i,j)>) with j<>jj
+       executes because <h(<nR(jj),nT(i,l)>),nR(jj)> = <nR(j),nR(jj)>
+       but then we have nR(j)=h(<nR(jj),nT(i,l)>) with j<>jj
        which can only happen with negligible probability. *)
-  + assert (nR(j)=h(<nR(jj),nT(i,k)>,key(i))) as Hfresh; 1: auto.
+  + assert (nR(j)=h(<nR(jj),nT(i,l)>,key(i))) as Hfresh; 1: auto.
     by fresh Hfresh.
-
+  + assert (nR(j)=h(<nR(jj),nT(i,l)>,key(i))) as Hfresh; 1:auto.
+    by fresh Hfresh.
+  + assert (nR(j)=h(<nR(jj),nT(i,l)>,key(i))) as Hfresh; 1:auto.
+    by fresh Hfresh.
 Qed.
 
 goal wa :
@@ -95,9 +99,11 @@ goal wa :
 Proof.
   intro i j Hh He.
   rewrite /exec /cond in He; destruct He as [He Hc].
-  euf Hc => _ _ _.
-  (* 1/2: R1(j0,i) *)
-  + use no_confusion with R1(j,i),i,j,j0 => //.
-  (* 2/2: T(i,k) *)
-  + by exists i,k.
+  euf Hc => [l [_ _]].
+  (* 1/4: R1(j0,i) *)
+  + use no_confusion with R1(j,i),i,j,l => //.
+  (* 2,3,4/4: T(i,l), T1(i,l), T2(i,l) *)
+  + by exists i,l.
+  + depends T(i,l), T1(i,l); [1:auto| 2:intro _]. by exists i,l.
+  + depends T(i,l), T2(i,l); [1:auto| 2:intro _]. by exists i,l.
 Qed.

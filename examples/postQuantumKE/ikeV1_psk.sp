@@ -373,20 +373,22 @@ Proof.
       intro [?? [[A [_ _]] B]].
       rewrite B in Cond.
       destruct Cond as [EUF _].
-      euf EUF.
-        ++ intro Ord Eq [_ _].
+      euf EUF; try auto.
+        ++ intro [il jl [Ord _ Eq]].
            exists i.
            assert happens(R(j,i)) => //.
            assert happens(I(i)) => //.
            depends I(i), I1(i,j) => //.
-        ++ auto.
+        ++ intro [il jl [Ord _ Eq]].
+           use mutex_Ideal2_I1_I2 with i,j,j as H; by case H.
 
     +  (* Case 2 -> dishonnest skeyid, trivial as no one else computes this key *)
        intro [Abs Meq].
        rewrite Meq in Cond.
        destruct Cond as [EUF _].
-       euf EUF.
-       intro Ord //.
+       euf EUF; try auto.
+       intro [Ord E] //.
+       use mutex_Ideal2_I1_I2 with i,j,j as H; by case H.
 Qed.
 
 goal [Ideal2] wa_2 :
@@ -411,19 +413,25 @@ Proof.
        else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i)).
     + intro [jl il [[Cond _ _] Meq]].
       rewrite Meq in EUF.
-      euf EUF => //.
-      intro OrdI Meq2 [_ _].
-      depends I(i), I1(i,j).
-      case OrdI; auto. 
-      intro OrdI2.
-      executable pred(R1(j,i)) => //.
-      intro Exec.
-       use Exec with R(j,i) => //.
+      euf EUF; try auto.
+      ++ intro [_ _ [H _]].
+         case H.
+         * by depends R(j,i), R2(j,i).
+         * use mutex_Ideal2_R1_R2 with j,i,j,i as H2; by case H2.
+      ++ intro [il jl [OrdI Meq2 _]].
+         depends I(i), I1(i,j).
+         case OrdI; auto. 
+         intro OrdI2.
+         executable pred(R1(j,i)) => //.
+         intro Exec.
+         use Exec with R(j,i) => //.
     + intro Abs.
       destruct Abs as [Abs Meq2].
       rewrite Meq2 in EUF.
-      euf EUF.
-      auto.
+      euf EUF; try auto.
+      intro H; case H.
+       * by depends R(j,i), R2(j,i).
+       * use mutex_Ideal2_R1_R2 with j,i,j,i as H2; by case H2.
 Qed.
 
 
@@ -522,15 +530,21 @@ Proof.
     + intro [?? [[Eq1 [_ _]] Eq2]].
       rewrite Eq2 in Cond.  
       euf Cond => //.
-      depends R(j,i), R1(j,i) => //.
-      intro Ord1 Ord2. case Ord2; auto.
+      * by depends R(j,i), R1(j,i). 
+      * by depends R(j,i), R1(j,i). 
+      * intro [_ _ [H _]]; case H.
+        by depends R(j,i), R2(j,i). 
+        use mutex_Ror_R2_R1 with j,i,j,i as HH; by case HH.             
+      * intro [jl il [Ord1 Ord2 _]]. 
       by use ddhnotuple with  fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>, fst(input@I1(i,j)),a(i).
     + intro [Abs Meq].
       rewrite Meq in Cond.
-      euf Cond.
-      intro Ord. case Ord; auto.
-      depends R(j,i), R1(j,i). auto. 
-      intro Ord Ord2. case Ord2; auto.
+      euf Cond; try auto.
+      * by depends R(j,i), R1(j,i).
+      * by depends R(j,i), R1(j,i).
+      * intro H; case H.
+        by depends R(j,i), R2(j,i). 
+        use mutex_Ror_R2_R1 with j,i,j,i as HH; by case HH.             
 Qed.
 
 
@@ -560,12 +574,12 @@ Proof.
         ++ by use ddhnotuple with fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>, fst(input@R(j,i)),b(j).
         ++ intro OrdI.
            by depends I1(i,j),I4(i,j).
+        ++ use mutex_Ror_I2_I1 with i,j,j as HH; by case HH.
     + intro [Abs Meq].
       rewrite Meq in CondTF.
-      euf CondTF.
-      auto.
-      intro OrdI.
-      by use ddhnotuple with fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>, fst(input@I1(i,j)),a(i).
+      euf CondTF; try auto.
+      ++ by use ddhnotuple with fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>, fst(input@I1(i,j)),a(i).
+      ++ use mutex_Ror_I2_I1 with i,j,j as HH; by case HH.
 Qed.
 
 system Ror2 = [Ror/left] with gprf (il,jl:index),   h( exp(exp(g,a(il)),b(jl)), Ininr(jl,il))   .

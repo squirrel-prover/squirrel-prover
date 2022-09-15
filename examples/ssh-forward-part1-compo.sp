@@ -98,7 +98,7 @@ process P =
   in(cP,t);
   let sidP = h(<<g^a1,gB>,gB^a1>, hKey) in
   let pkS = fst(t) in
-  if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
+  if pkS = pk(kS) && checksign(sidP, snd(t), pkS) then
     Pok : out(cP, enc(sign(sidP,kP),gB^a1))
 
 
@@ -113,7 +113,7 @@ process S =
   let sidS = h(<<gP,g^b1>,gP^b1>, hKey) in
   out(cS, <pk(kS),sign(sidS, kS)>);
   in(cS, encP );
-  if checksign(dec(encP,gP^b1),pk(kP)) = sidS then
+  if checksign(sidS, dec(encP,gP^b1), pk(kP)) then
     Sok : out(cS,ok)
 
 system [fullSSH] K: ( P | S).
@@ -160,7 +160,7 @@ process Pauth =
   in(cP,t);
   let sidP = h(<<g^a1,gB>,gB^a1>, hKey) in
   let pkS = fst(t) in
-  if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
+  if pkS = pk(kS) && checksign(sidP, snd(t), pkS) then
      out(cP, enc(sign(sidP,kP),gB^a1));
      in(cP,challenge);
      try find i such that gB = g^b(i) || gB = g^b1 in
@@ -179,7 +179,7 @@ process Sauth =
   let sidS = h(<<gP,g^b1>,gP^b1>, hKey) in
   out(cS, <pk(kS),sign(sidS, kS)>);
   in(cS, encP );
-  if checksign(dec(encP,gP^b1),pk(kP)) = sidS then
+  if checksign(sidS, dec(encP,gP^b1), pk(kP)) then
       out(cS,ok);
      in(cS,challenge);
      try find i such that gP = g^a(i) || gP = g^a1 in
@@ -204,8 +204,8 @@ Proof.
   expand cond, pkS1.
   destruct HcOk as [Hpk HcOk].
   rewrite !Hpk in HcOk.
-  euf HcOk => Euf.
-    + destruct Euf as [H [_|[i x1 x2 H1]]]; 1: by auto.
+  euf HcOk.
+    + intro Euf. destruct Euf as [H [_|[i x1 x2 H1]]]; 1: by auto.
       expand sidP1; destruct H1 as [_|[x3 H1]].
 
         - collision => _; use HcFail with i.
@@ -213,7 +213,7 @@ Proof.
 
         - by use hashnotfor with <<g^a1,input@P1>,input@P1^a1>, x3.
 
-    + intro Heq.
+    + intro [Euf Heq].
       expand sidP1. case Euf. 
       - expand sidS1. collision => _.
         use freshindex as [l _].
@@ -230,9 +230,9 @@ Proof.
   intro Hap HcOk HcFail.
   depends Sok, Sfail => // _.
   expand cond.
-  expand sidS1; euf HcOk => Euf.
+  expand sidS1; euf HcOk.
 
-    + destruct Euf as [[_|H1] H2]; 1: by auto.
+    + intro Euf. destruct Euf as [[_|H1] H2]; 1: by auto.
       destruct H1 as [i x x1 [_|[x2 H1]]].
 
        - use HcFail with i.
@@ -240,7 +240,7 @@ Proof.
 
        - by use hashnotfor with <<input@S,g^b1>,input@S^b1>, x2.
 
-    + intro _; case Euf.
+    + intro [Euf _]; case Euf.
         - expand sidP1; collision => _; use freshindex as [l _]; use HcFail with l => //.
         - expand sidP1; collision => _; use freshindex as [l _]; use HcFail with l => //.
 Qed.

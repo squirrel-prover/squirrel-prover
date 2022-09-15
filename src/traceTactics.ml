@@ -1390,7 +1390,7 @@ let mk_integrity_rule_param
 (** Unforgeability Axioms *)
 
 let euf_apply_schema
-    sequent (_, key, m, s, _, _, _, _) (case : Euf.euf_schema) : sequent
+    sequent (_, key, m, s, _, _, _, _) (case : OldEuf.euf_schema) : sequent
   =
   (* Equality between hashed messages *)
   let new_f = Term.mk_atom `Eq case.message m in
@@ -1439,7 +1439,7 @@ let euf_apply_schema
   in
   TS.set_goal goal sequent
 
-let euf_apply_direct s (_, key, m, _, _, _, _, _) Euf.{d_key_indices;d_message} =
+let euf_apply_direct s (_, key, m, _, _, _, _, _) OldEuf.{d_key_indices;d_message} =
   (* The components of the direct case may feature variables that are
    * not in the current environment: this happens when the case is extracted
    * from under a binder, e.g. a Seq or ForAll construct. We need to add
@@ -1483,7 +1483,7 @@ let euf_apply_facts drop_head s
 
   (* check that the SSCs hold *)
   let errors =
-    Euf.key_ssc ~globals:true ~messages:[mess;sign]
+    OldEuf.key_ssc ~globals:true ~messages:[mess;sign]
       ~allow_functions ~cntxt head_fn key.s_symb
   in
   if errors <> [] then
@@ -1491,24 +1491,24 @@ let euf_apply_facts drop_head s
 
   (* build the rule *)
   let rule =
-    Euf.mk_rule
+    OldEuf.mk_rule
       ~elems:[] ~drop_head ~allow_functions ~fun_wrap_key
       ~cntxt ~env ~mess ~sign
       ~head_fn ~key_n:key.s_symb ~key_is:key.s_indices
   in
 
   let schemata_premises =
-    List.map (fun case -> euf_apply_schema s p case) rule.Euf.case_schemata
+    List.map (fun case -> euf_apply_schema s p case) rule.OldEuf.case_schemata
 
   and direct_premises =
-    List.map (fun case -> euf_apply_direct s p case) rule.Euf.cases_direct
+    List.map (fun case -> euf_apply_direct s p case) rule.OldEuf.cases_direct
   in
 
   if Symbols.is_ftype head_fn Symbols.SEnc cntxt.table
   || Symbols.is_ftype head_fn Symbols.AEnc cntxt.table then
     Cca.check_encryption_randomness
       ~cntxt
-      rule.Euf.case_schemata rule.Euf.cases_direct head_fn [mess;sign] [];
+      rule.OldEuf.case_schemata rule.OldEuf.cases_direct head_fn [mess;sign] [];
 
   schemata_premises @ direct_premises
 
@@ -1558,21 +1558,6 @@ let euf_apply
 
   (tag_s @ honest_s @ extra_goals)
 
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_typed "euf"
-    ~general_help:"Apply the euf axiom to the given hypothesis name."
-    ~detailed_help:"If the hash has been declared with a tag formula, applies \
-                    the tagged version.  given tag. Tagged eufcma, with a tag T, \
-                    says that, under the syntactic side condition, a hashed \
-                    message either satisfies the tag T, or was honestly \
-                    produced. The tag T must refer to a previously defined axiom \
-                    f(mess,sk), of the form forall (m:message,sk:message)."
-    ~tactic_group:Cryptographic
-    ~pq_sound:true
-    (LowTactics.genfun_of_pure_tfun_arg (euf_apply Euf))
-    Args.String
 
 let () =
   T.register_typed "intctxt"

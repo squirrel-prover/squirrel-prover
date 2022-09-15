@@ -89,17 +89,17 @@ Proof.
   + intro [i t Meq].
     project.
     (* left *)
-    - euf Meq => _ _ _; 1: auto.
-      exists i,t0; simpl.
-      assert (input@T(i,t0) = nr(r)) as F; 1: auto.
-      by (fresh F => C;
-      4: depends R(r), R2(r)).
+    - euf Meq => [t0 [_ _]]; try (by use tags_neq).
+        exists i,t0; simpl.
+        assert (input@T(i,t0) = nr(r)) as F; 1: auto.
+        by (fresh F => C;
+        3: depends R(r), R2(r)).
     (* right *)
-    - euf Meq => _ _ _; 1:auto.
+    - euf Meq => [t0 [_ _]]; try (by use tags_neq).
       exists i,t; simpl.
       assert (input@T(i,t) = nr(r)) as F; 1: auto.
       by (fresh F => C;
-      4: depends R(r), R2(r)).
+      3: depends R(r), R2(r)).
 
   (* WA => Cond *)
   + by intro [i t _]; expand output; exists i,t.
@@ -121,11 +121,11 @@ goal [default/left] wa_R1_left (i,r:index):
   output@R(r) = input@T(i,t).
 Proof.
   split; 2: by intro [_ _]; expand output.
-  intro Meq; euf Meq => _ _ _; 1: auto.
+  intro Meq; euf Meq => [t [_ _]]; try (by use tags_neq).
   exists t; simpl.
   assert input@T(i,t) = nr(r) as F; 1: auto.
   by (fresh F => C;
-  4:depends R(r), R2(r)).
+  3:depends R(r), R2(r)). 
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
@@ -140,10 +140,10 @@ goal [default/right] wa_R1_right (i,t,r:index):
   output@R(r) = input@T(i,t).
 Proof.
   split; 2: by intro [_ _]; expand output.
-  intro Meq; euf Meq => _ _ _; 1: auto.
+  intro Meq; euf Meq => [r0 [_ _]]; try (by use tags_neq).
   assert input@T(i,t) = nr(r) as F; 1: auto.
   by (fresh F => C;
-  4: by depends R(r), R2(r)).
+  3: by depends R(r), R2(r)).
 Qed.
 
 equiv unlinkability.
@@ -276,14 +276,14 @@ Proof.
         project.
 
         (* left *)
-        - euf Meq => _ _ _; 1:auto.
-          exists i,t0; simpl.
-          assert (nr(r) = input@T(i,t0)) as F; 1:auto.
+        - euf Meq => [r0 [_ _]]; try (by use tags_neq).
+          exists i,r0; simpl.
+          assert (nr(r) = input@T(i,r0)) as F; 1:auto.
           fresh F => C; [1:auto];
           by depends R(r), R1(r). 
 
         (* right *)
-        - euf Meq => _ _ _; 1:auto.
+        - euf Meq => [r0 [_ _]]; try (by use tags_neq).
           exists i,t; simpl.
           assert (nr(r) = input@T(i,t)) as F; 1:auto.
           fresh F => C; [1:auto];
@@ -324,7 +324,8 @@ Proof.
         use tags_neq; project.
         (* Left *)
         - simpl.
-          euf Meq0 => Ctrace [_ [A B]] _; 2:auto.
+          euf Meq0; 2:auto.
+          intro [r [Ctrace A B]].
           assert R1(r) < T1(i,t) as HClt;
           1: by case Ctrace; depends T(i,t),T1(i,t).
           clear Ctrace.
@@ -334,7 +335,7 @@ Proof.
           }
           expand cond.
           destruct Hcond as [i1 t1 Hcond].
-          euf Hcond => _ [_ [_ _]] _; 1:auto.
+          euf Hcond => [r0 [_ _]] ; try (by use tags_neq).
           exists r; simpl.
           assert R(r) < T(i,t) as _.
             admit. (* WIP *)
@@ -345,10 +346,21 @@ Proof.
 
           destruct Meq1 as [H0 _].
           by use H0 with i,t.
+           
+          intro [t0 [Ctrace A]].
+          assert (nt(i,t) = nt(i,t0)); [1:auto]. simpl.
+          case Ctrace; by depends T(i,t), T1(i,t).
+
+          intro [t0 [Ctrace A]].
+          assert (nt(i,t) = nt(i,t0)); [1:auto]. simpl.
+          case Ctrace.
+          by depends T(i,t), T2(i,t).
+          use mutex_default_T2_T1 with i, t, t as H1; by case H1.
 
         (* Right *)
-        - euf Meq0 => Ctrace [_ [A B]] [? ?]; 2: auto.
+        - euf Meq0; [2:auto].
           simpl.
+          intro [r [Ctrace A B]].
           assert R1(r) < T1(i,t) as Clt.
           by case Ctrace; depends T(i,t),T1(i,t).
           clear Ctrace.
@@ -358,12 +370,12 @@ Proof.
           }
           expand cond.
           destruct Hcond as [i1 t1 Hcond].
-          euf Hcond => Clt1 [_ [D F]] [? ?]; [1:auto].
+          euf Hcond => [r0 HH]; try auto. 
           exists r; simpl.
           assert R(r) < T(i,t) as _. {
             assert nr(r) = input@T(i,t) as HF; 1:auto.
             fresh HF => C;
-            [4: by depends R(r),R2(r)];
+            [3: by depends R(r),R2(r)];
             auto.
           }
           simpl.
@@ -372,6 +384,12 @@ Proof.
              by euf Meq1 => A0 [A1 _] [_ _].
           -- destruct Meq1 as [H0 _].
              by use H0 with i,t.
+       
+          by depends T(i,t), T1(i,t).
+
+          intro HH.
+          case HH. by depends T(i,t), T2(i,t).
+          use mutex_default_T2_T1 with i,t,t as H3; by case H3.
 
       (* Honest => Cond *)
       * intro [_ [r H1]]; simpl.
@@ -422,7 +440,7 @@ Proof.
         use tags_neq; project.
 
         (* Left *)
-        * euf Meq0 => Ct _ _; 2:auto.
+        * euf Meq0 => [r [Ct _]]; try auto.
           assert R1(r) < T2(i,t) as _.
             by case Ct; try depends T(i,t),T2(i,t).
           clear Ct.
@@ -432,12 +450,12 @@ Proof.
           }
           expand cond.
           destruct Hcond as [i1 t1 Hcond].
-          euf Hcond => _ _ _; 1: auto.
+          euf Hcond => [_ [_ _]]; try auto.
           exists r; simpl.
           assert R(r) < T(i,t). {
             assert nr(r) = input@T(i,t) as HF; 1: auto.
             fresh HF => C;
-            [4: by depends R(r),R2(r)];
+            [3: by depends R(r),R2(r)];
             auto.
           }
           simpl.
@@ -447,8 +465,18 @@ Proof.
           -- destruct Meq1 as [H0 _].
              by use H0 with i,t.
 
+         assert (nt(i,t)=nt(i,r)); [1:auto].
+         case Ct. 
+         by depends T(i,t), T1(i,t).
+         use mutex_default_T1_T2 with i,t,t as HH; by case HH.
+
+         assert (nt(i,t)=nt(i,r)); [1:auto].
+         case Ct;
+         by depends T(i,t), T2(i,t).
+
         (* Right *)
-        * euf Meq0 => Ct _ [_ _]; 2:auto.
+        * euf Meq0; 2:auto.
+          intro [r [Ct _]].
           assert R1(r) < T2(i,t) as _.
             by case Ct; depends T(i,t),T2(i,t).
           clear Ct.
@@ -458,12 +486,13 @@ Proof.
           }
           expand cond.
           destruct Hcond as [i1 t1 Hcond].
-          euf Hcond; 1: auto => _ _ [_ _].
+          euf Hcond; try auto. 
+          intro [_ _].
           exists r; simpl.
           assert R(r) < T(i,t) as _. {
             assert nr(r) = input@T(i,t) as HF; 1: auto.
             fresh HF => C;
-            [4: by depends R(r),R2(r)];
+            [3: by depends R(r),R2(r)];
             auto.
           }
           simpl.
@@ -473,6 +502,13 @@ Proof.
              by euf Meq1.
           -- destruct Meq1 as [H0 _].
              by use H0 with i,t.
+        
+          intro H2. case H2.
+          by depends T(i,t), T1(i,t).
+          use mutex_default_T1_T2 with i,t,t as HH; by case HH.
+
+          by depends T(i,t), T2(i,t).
+
     }
     fa 6.
     by fadup 5.

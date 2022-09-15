@@ -184,11 +184,9 @@ Proof.
     as Meq0;
     1: by expand output, cipher.
     intctxt Meq0 => C //.
-    - case C => //.
-      assert dec(output@Tag(i0,j0),kbE(i,j)) = <tagT,<input@Tag(i,j),nt(i,j)>> as Meq2;
+    - assert dec(output@Tag(i0,j0),kbE(i,j)) = <tagT,<input@Tag(i,j),nt(i,j)>> as Meq2;
       1: by expand output, cipher.
       intctxt Meq2 => C1 //.
-      by case C1.
       by use fail_not_pair with tagT,<input@Tag(i,j),nt(i,j)>.
     - by use fail_not_pair with tagT,<input@Tag(i0,j0),nt(i0,j0)>.
 Qed.

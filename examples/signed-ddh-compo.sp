@@ -63,7 +63,7 @@ process P =
   in(cP, t);
   let gS = snd(fst(t)) in
   let pkS = fst(fst(t)) in
-  if checksign(snd(t),pkS) = <<g^a1,gS>,pk(kP)> then
+  if checksign(<<g^a1,gS>,pk(kP)>,snd(t),pkS) then
     out(cP,sign(<<gS,g^a1>,pkS>,kP));
     in(cP, challenge);
     if pkS= pk(kS) then
@@ -83,7 +83,7 @@ process S =
   let pkP = fst(sP) in
   out(cS, < <pk(kS),g^b1>, sign(<<gP,g^b1>,pkP>,kS)>);
   in(cS, signed);
-  if checksign(signed,pkP) = <<g^b1,gP>,pk(kS)> then
+  if checksign(<<g^b1,gP>,pk(kS)>,signed,pkP) then
     out(cS,ok);
     in(cS, challenge);
     if pkP=pk(kP) then
@@ -106,7 +106,7 @@ process P2 =
   let gS = snd(fst(t)) in
   let pkS = fst(fst(t)) in
 
-  if checksign(snd(t),pkS) = <<g^a1,gS>,pk(kP)> then
+  if checksign(<<g^a1,gS>,pk(kP)>,snd(t),pkS) then
     out(cP,sign(<<gS,g^a1>,pkS>,kP));
     in(cP, challenge);
     if pkS= pk(kS) then
@@ -122,7 +122,7 @@ process S2 =
 	let pkP = fst(sP) in
 	out(cS, < <pk(kS),g^b1>, sign(<<gP,g^b1>,pkP>,kS)>);
 	in(cS, signed);
-        if checksign(signed,pkP) = <<g^b1,gP>,pk(kS)> then
+        if checksign(<<g^b1,gP>,pk(kS)>,signed,pkP) then
 	out(cS,ok);
 	in(cS, challenge);
 	if pkP=pk(kP) then

@@ -1,6 +1,6 @@
 (** Utilities for CCA-based tactics. *)
 
-(* TODO: better error message, see [Euf] *)
+(* TODO: better error message, see [OldEuf] *)
 exception Bad_ssc
 
 class check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)
@@ -68,7 +68,7 @@ let random_ssc
        List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates)
 
 
-  (* Given cases produced by an Euf.mk_rule for some symmetric encryption
+  (* Given cases produced by an OldEuf.mk_rule for some symmetric encryption
      scheme, check that all occurences of the encryption use a dedicated
      randomness.
      It checks that:
@@ -80,17 +80,17 @@ let random_ssc
 
      This could be refined into a tactic where we ask to prove that encryptions
      that use the same randomness are done on the same plaintext. This is why we
-     based ourselves on messages produced by Euf.mk_rule, which should simplify
+     based ourselves on messages produced by OldEuf.mk_rule, which should simplify
      such extension if need. *)
 let check_encryption_randomness
     ~cntxt case_schemata cases_direct enc_fn messages elems =
   let encryptions : (Term.term * Vars.var list) list =
     List.map (fun case ->
-        case.Euf.message,
-        Action.get_indices case.Euf.action
+        case.OldEuf.message,
+        Action.get_indices case.OldEuf.action
       ) case_schemata
     @
-    List.map (fun case -> case.Euf.d_message, []) cases_direct
+    List.map (fun case -> case.OldEuf.d_message, []) cases_direct
   in
   let encryptions = List.sort_uniq Stdlib.compare encryptions in
 
@@ -136,7 +136,7 @@ let check_encryption_randomness
 
 let symenc_rnd_ssc ~cntxt env head_fn key elems =
   let rule =
-    Euf.mk_rule
+    OldEuf.mk_rule
       ~fun_wrap_key:None
       ~elems ~drop_head:false
       ~allow_functions:(fun x -> false)
@@ -144,4 +144,4 @@ let symenc_rnd_ssc ~cntxt env head_fn key elems =
       ~head_fn ~key_n:key.Term.s_symb ~key_is:key.s_indices
   in
   check_encryption_randomness ~cntxt
-    rule.Euf.case_schemata rule.Euf.cases_direct head_fn [] elems
+    rule.OldEuf.case_schemata rule.OldEuf.cases_direct head_fn [] elems
