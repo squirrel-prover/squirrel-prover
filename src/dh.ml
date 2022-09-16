@@ -276,12 +276,10 @@ let cgdh
     get_bad_occs gdh_oracles gen exp_s mult_s [na; nb]
   in
 
-  let phis, ephi =
-    NO.occurrence_formulas ~pp_ns:(Some pp_nab)
-      NO.empty_converter NO.empty_occ_formula
+  let phis =
+    NO.name_occurrence_formulas ~pp_ns:(Some pp_nab)
       get_bad contx env [t]
   in
-  assert (ephi = []);
 
   let g = TS.goal s in
   List.map

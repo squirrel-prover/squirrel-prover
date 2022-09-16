@@ -73,7 +73,14 @@ val name_converter : (nsymb, unit) converter
 (** Dummy converter for empty occurrences *)
 val empty_converter : (unit, unit) converter
 
-(** extended occurrences not exposed, hopefully they can remain hidden inside nameOccs *)
+(** Extended occurrence, with additional info about where it was found *)
+type ('a, 'b) ext_occ =
+  {eo_occ       : ('a, 'b) simple_occ;
+   eo_occtype   : occ_type;             (* direct/indirect+action *)
+   eo_source    : terms;                (* original term where the occ was found *) 
+   eo_source_ts : ts_occs }             (* timestamps occurring in the source term *)
+
+type ('a, 'b) ext_occs = (('a, 'b) ext_occ) list
 
 
 
@@ -114,6 +121,8 @@ val get_macro_actions : Constr.trace_cntxt -> term list -> ts_occs
 type n_occ = (nsymb, unit) simple_occ
 type n_occs = n_occ list
 
+type name_occ = (nsymb, unit) ext_occ
+type name_occs = name_occ list
 
 (** Constructs a name occurrence *)
 val mk_nocc : 
@@ -203,3 +212,29 @@ val occurrence_formulas :
   Vars.env ->
   terms ->
   terms * terms
+
+(** occurrence_formula instantiated for the case where we only look for names *)
+(** eg fresh *)
+val name_occurrence_formulas :
+  ?negate : bool ->
+  ?pp_ns: (unit Fmt.t) option ->
+  (unit, unit) f_fold_occs ->
+  Constr.trace_cntxt ->
+  Vars.env ->
+  terms ->
+  terms
+
+
+(** variant of occurrence_formula that returns
+    all found occurrences as well as the formulas,
+    for more complex use cases (eg intctxt) *)
+val occurrence_formulas_with_occs :
+  ?negate : bool ->
+  ?pp_ns: (unit Fmt.t) option ->
+  ('a, 'b) converter ->
+  ('a, 'b) occ_formula ->
+  ('a, 'b) f_fold_occs ->
+  Constr.trace_cntxt ->
+  Vars.env ->
+  terms ->
+  terms * terms * name_occs * ('a, 'b) ext_occs

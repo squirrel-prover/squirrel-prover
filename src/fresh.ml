@@ -118,12 +118,10 @@ let fresh_trace (m : lsymb) (s : TS.sequent) : TS.sequent list =
     let get_bad = get_bad_occs n in
    
     Printer.pr "Freshness of %a:@; @[<v 0>" pp_n ();
-    let phis, ephis =
-      NO.occurrence_formulas ~pp_ns:(Some pp_n)
-        NO.empty_converter NO.empty_occ_formula
+    let phis  =
+      NO.name_occurrence_formulas ~pp_ns:(Some pp_n)
         get_bad contx env [t]
     in
-    assert (ephis = []); (* should always be empty *)
     Printer.pr "@]@;";
 
     let g = TS.goal s in
@@ -181,13 +179,11 @@ let phi_proj
   
   (* the biframe is used in the old fresh for indirect cases. why? *)
   (* should env be projected? *)
-  let phi_p, ephi =
-    NO.occurrence_formulas
+  let phi_p =
+    NO.name_occurrence_formulas
       ~negate:true ~pp_ns:(Some pp_n_p)
-      NO.empty_converter NO.empty_occ_formula
       get_bad_p contx_p env frame_p
   in
-  assert (ephi = []);
 
   (* not removing duplicates here, as we already do that on occurrences. *)
   (* probably fine, but we'll need to remove duplicates between phi_l and phi_r *)

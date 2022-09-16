@@ -205,7 +205,7 @@ let aux_ts_occ_incl
   | None -> f ~mv ts1 {ts2 with so_cnt = mk_pred ts2.so_cnt}
               (* if ts1 not incl in ts2, also try ts1 incl in pred(ts2) *)
               (* as "t <= pred(ts2) \/ t <= ts2" is the same as "t <= ts2" *)
-              (* TODO MAKE SURE THIS IS SOUND, IT HAS BEEN WRONG BEFORE *)
+              (* TODO read this carefully to make sure it does what we want *)
               
 
 (** Inclusion for timestamp occurrences:
@@ -805,6 +805,28 @@ let name_occurrence_formula = occurrence_formula name_occ_formula
 (*------------------------------------------------------------------*)
 (* Proof obligations for name occurrences *)
 
+
+
+(** variant of occurrence_formula that returns
+    all found occurrences as well as the formulas,
+    for more complex use cases (eg intctxt) *)
+let occurrence_formulas_with_occs
+    ?(negate : bool=false)
+    ?(pp_ns: (unit Fmt.t) option=None)
+    (conv : ('a, 'b) converter)
+    (phi_acc : ('a, 'b) occ_formula)
+    (get_bad_occs: ('a, 'b) f_fold_occs)
+    (contx : Constr.trace_cntxt)
+    (env : Vars.env)
+    (sources : terms)
+  : terms * terms * name_occs * ('a, 'b) ext_occs
+  =
+  let occs, accs = find_all_occurrences ~pp_ns conv get_bad_occs contx env sources in
+  let foccs = List.map (name_occurrence_formula ~negate) occs in
+  let faccs = List.map (occurrence_formula ~negate phi_acc) accs in
+  (foccs, faccs, occs, accs)
+
+
 (** given
    - a f_fold_occs function (see above)
    - a context (in particular, that includes the systems we want to use)
@@ -828,9 +850,28 @@ let occurrence_formulas
     (sources : terms)
   : terms * terms
   =
-  let occs, accs = find_all_occurrences ~pp_ns conv get_bad_occs contx env sources in
-  let occs = List.map (name_occurrence_formula ~negate) occs in
-  let accs = List.map (occurrence_formula ~negate phi_acc) accs in
+  let (occs, accs, _, _) =
+    occurrence_formulas_with_occs
+      ~negate ~pp_ns conv phi_acc
+      get_bad_occs contx env sources
+  in
   (occs, accs)
 
  
+(** occurrence_formula instantiated for the case where we only look for names *)
+(** eg fresh *)
+let name_occurrence_formulas
+    ?(negate : bool=false)
+    ?(pp_ns: (unit Fmt.t) option=None)
+    (get_bad_occs: (unit, unit) f_fold_occs)
+    (contx : Constr.trace_cntxt)
+    (env : Vars.env)
+    (sources : terms)
+  : terms =  
+  let (occs, _) =
+    occurrence_formulas
+      ~negate ~pp_ns empty_converter empty_occ_formula
+      get_bad_occs contx env sources
+  in
+  occs
+
