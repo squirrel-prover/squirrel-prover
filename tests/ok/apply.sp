@@ -307,12 +307,33 @@ Abort.
 (*------------------------------------------------------------------*)
 (* with pairs *)
 
-global goal _ : equiv(<m1, m2>) -> equiv(m1, m2).
+global goal _ : 
+  equiv(<m1, m2>) -> equiv(m1, m2).
 Proof.
  intro H; apply H.
 Qed.
 
-global goal _ (i : index) : equiv(n1(i), <m1, m2>) -> equiv(n1(i), m1, m2).
+global goal _ (i : index) : 
+  equiv(n1(i), <m1, m2>) -> equiv(n1(i), m1, m2).
 Proof.
  intro H; apply H.
+Qed.
+
+name m3 : message.
+
+global goal _ (i : index) :
+  equiv(n1(i), <m1, <m2, m3>>) -> equiv(n1(i), m1, m2, m3).
+Proof.
+ intro H; apply H.
+Qed.
+
+(*------------------------------------------------------------------*)
+(* with tuples *)
+
+name k : message.
+
+global goal _ (t:timestamp) :
+  equiv(frame@t,(k,k)) -> equiv(frame@t,k).
+Proof.
+  intro H; apply H.
 Qed.
