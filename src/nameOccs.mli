@@ -18,6 +18,14 @@ module SE = SystemExpr
     with associated data and conditions, source timestamps, etc. *)
 (* probably somewhat redundant with Iter.occ… but more specific to the use case here *)
 
+(** Label indicating whether an occurrence is direct or indirect, and
+   if so which action produced it *)
+type occ_type =
+  | EI_direct
+  | EI_indirect of term
+
+val subst_occtype : subst -> occ_type -> occ_type
+
 
 (** Simple occurrence of an element of type 'a, with additional data of type 'b *)
 (* Remarks:
@@ -34,6 +42,7 @@ type ('a, 'b) simple_occ =
    so_ad      : 'b;        (* additional data, if needed *)
    so_vars    : Vars.vars; (* variables bound above the occurrence *)
    so_cond    : terms;     (* condition above the occurrence *)
+   so_occtype : occ_type;  (* occurrence type *)
    so_subterm : term;      (* a subterm where the occurrence was found (for printing) *)
   }
 
@@ -41,7 +50,7 @@ type ('a, 'b) simple_occs = (('a, 'b) simple_occ) list
 
 
 (** constructs a simple occurrence *)
-val mk_simple_occ : 'a -> 'a -> 'b -> Vars.vars -> terms -> term -> ('a, 'b) simple_occ
+val mk_simple_occ : 'a -> 'a -> 'b -> Vars.vars -> terms -> occ_type -> term -> ('a, 'b) simple_occ
 
 
 (** Type of a timestamp occurrence *)
@@ -54,12 +63,6 @@ type ts_occs = ts_occ list
 type empty_occ = (unit, unit) simple_occ
 type empty_occs = empty_occ list
 
-
-(** Label indicating whether an occurrence is direct or indirect, and
-   if so which action produced it *)
-type occ_type =
-  | EI_direct
-  | EI_indirect of term
 
 
 (** Functions to turn content and data into terms, so they can be 
@@ -76,7 +79,6 @@ val empty_converter : (unit, unit) converter
 (** Extended occurrence, with additional info about where it was found *)
 type ('a, 'b) ext_occ =
   {eo_occ       : ('a, 'b) simple_occ;
-   eo_occtype   : occ_type;             (* direct/indirect+action *)
    eo_source    : terms;                (* original term where the occ was found *) 
    eo_source_ts : ts_occs }             (* timestamps occurring in the source term *)
 
@@ -130,6 +132,7 @@ val mk_nocc :
   nsymb -> (* name it collides with *)
   Vars.vars -> (* vars bound above *)
   terms -> (* condition above *)
+  occ_type -> (* occurrence type *)
   term -> (* subterm (for printing) *)
   n_occ
 

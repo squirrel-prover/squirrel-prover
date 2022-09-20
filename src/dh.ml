@@ -130,7 +130,7 @@ let get_bad_occs
              match tt with
              | Name nn ->
                List.map
-                 (fun nnn -> NO.mk_nocc nn nnn fv cond st)
+                 (fun nnn -> NO.mk_nocc nn nnn fv cond (fst info) st)
                  (find_symb nn nab)
              | _ -> assert false (* should always be a name *))
           (* pos is not set right here, could be bad if we wanted to use it later *)
@@ -147,7 +147,7 @@ let get_bad_occs
 
   | Name n when exists_symb n nab ->
     (List.map
-      (fun nn -> NO.mk_nocc n nn fv cond st)
+      (fun nn -> NO.mk_nocc n nn fv cond (fst info) st)
       (find_symb n nab),
      [])
 

@@ -31,8 +31,8 @@ type int_occs = int_occ list
 
 let mk_int_occ
     (t:term) (tcoll:term) (k:nsymb) (kcoll:nsymb)
-    (cond:terms) (v:Vars.vars) (st:term) : int_occ =
-  NO.mk_simple_occ (t,k) (tcoll,kcoll) () v cond st
+    (cond:terms) (v:Vars.vars) (ot:NO.occ_type) (st:term) : int_occ =
+  NO.mk_simple_occ (t,k) (tcoll,kcoll) () v cond ot st
 
 
 (*------------------------------------------------------------------*)
@@ -67,7 +67,7 @@ let get_bad_occs
       (Tactics.Failure "can only be applied on ground terms")
 
   | Name k' when k'.s_symb = k.s_symb ->
-    [NO.mk_nocc k' k fv cond st],
+    [NO.mk_nocc k' k fv cond (fst info) st],
     []
 
   | Fun (f, _, [tk']) when pk_f = Some f -> (* public key *)
@@ -99,9 +99,14 @@ let get_bad_occs
       (* record this hash occurrence, but allow the key *)
       (* todo: actually why don't we always do this, even if it's the wrong key? *)
       | Name k' when k.s_symb = k'.s_symb  ->
-        let occs, acc = rec_call_on_subterms ~fv ~cond ~p ~info ~st m' in 
+        let fvv, sigma = refresh_vars `Global fv in
+        let m' = subst sigma m' in
+        let k' = subst_isymb sigma k' in
+        let cond = List.map (subst sigma) cond in
+        let ot = NO.subst_occtype sigma (fst info) in
+        let occs, acc = rec_call_on_subterms ~fv ~cond ~p ~info ~st m' in
         occs,
-        acc @ [mk_int_occ m' m k' k  cond fv st]
+        acc @ [mk_int_occ m' m k' k  cond fvv ot st]
 
       (* if we can't be sure it could be the key *)
       (* don't record the hash occ, but look for bad occurrences in m and tk *)

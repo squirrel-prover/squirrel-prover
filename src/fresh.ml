@@ -57,7 +57,7 @@ let get_bad_occs
       (Tactics.Failure "can only be applied on ground terms")
 
   | Name nn when nn.s_symb = n.s_symb ->
-    [NO.mk_nocc nn n fv cond st], []
+    [NO.mk_nocc nn n fv cond (fst info) st], []
 
   | _ -> retry_on_subterms ()
 

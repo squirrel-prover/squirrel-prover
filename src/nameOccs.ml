@@ -19,6 +19,19 @@ module SE = SystemExpr
     with associated data and conditions, source timestamps, etc. *)
 (* probably somewhat redundant with Iter.occ… but more specific to the use case here *)
 
+(** Label indicating whether an occurrence is direct or indirect, and
+   if so which action produced it *)
+type occ_type =
+  | EI_direct
+  | EI_indirect of term
+
+
+(** Applies a substitution to an occ_type *)
+let subst_occtype (sigma:subst) (ot:occ_type) : occ_type =
+  match ot with
+  | EI_direct -> EI_direct
+  | EI_indirect a -> EI_indirect (subst sigma a)
+
 
 (** Simple occurrence of an element of type 'a, with additional data of type 'b *)
 (* Remarks:
@@ -35,6 +48,7 @@ type ('a, 'b) simple_occ =
    so_ad      : 'b;        (* additional data, if needed *)
    so_vars    : Vars.vars; (* variables bound above the occurrence *)
    so_cond    : terms;     (* condition above the occurrence *)
+   so_occtype : occ_type;  (* occurrence type *)
    so_subterm : term;      (* a subterm where the occurrence was found (for printing) *)
   }
 
@@ -44,8 +58,8 @@ type ('a, 'b) simple_occs = (('a, 'b) simple_occ) list
 (** constructs a simple occurrence *)
 let mk_simple_occ
     (cnt:'a) (coll:'a) (ad:'b)
-    (vars:Vars.vars) (cond:terms) (st:term) : ('a, 'b) simple_occ = 
-  {so_cnt=cnt; so_coll=coll; so_ad=ad; so_cond=cond; so_vars=vars; so_subterm=st}
+    (vars:Vars.vars) (cond:terms) (ot:occ_type) (st:term) : ('a, 'b) simple_occ = 
+  {so_cnt=cnt; so_coll=coll; so_ad=ad; so_vars=vars; so_cond=cond; so_occtype=ot; so_subterm=st}
 
 
 (** Type of a timestamp occurrence *)
@@ -58,17 +72,9 @@ type empty_occ = (unit, unit) simple_occ
 type empty_occs = empty_occ list
 
 
-(** Label indicating whether an occurrence is direct or indirect, and
-   if so which action produced it *)
-type occ_type =
-  | EI_direct
-  | EI_indirect of term
-
-
 (** Extended occurrence, with additional info about where it was found *)
 type ('a, 'b) ext_occ =
   {eo_occ       : ('a, 'b) simple_occ;
-   eo_occtype   : occ_type;             (* direct/indirect+action *)
    eo_source    : terms;                (* original term where the occ was found *) 
    eo_source_ts : ts_occs }             (* timestamps occurring in the source term *)
 
@@ -139,7 +145,11 @@ let aux_occ_incl
     let phi_coll = mk_eq ~simpl:false (conv.conv_cnt o.so_coll) (conv.conv_cnt o.so_coll) in
     (* usually when we use it there are no fv in coll, but it should still work *)
     let phi_ad = mk_eq ~simpl:false (conv.conv_ad o.so_ad) (conv.conv_ad o.so_ad) in
-    Term.mk_ands ~simpl:false [phi_cnt; phi_coll; phi_ad]
+    let phi_ac = match o.so_occtype with
+        | EI_direct -> mk_eq ~simpl:false mk_false mk_false
+        | EI_indirect a -> mk_eq ~simpl:false a a
+    in
+    Term.mk_ands ~simpl:false [phi_cnt; phi_coll; phi_ad; phi_ac]
   in
   let pat2 = Term.{
       pat_tyvars = [];
@@ -236,34 +246,18 @@ let ext_occ_incl
   | None -> false
   | Some mv -> (* still have to check occ_type and source_ts *)
     (* we ignore the source itself: it's fine if it's different, as long as the timestamps are the same *)
-    let mv =
-      match occ1.eo_occtype, occ2.eo_occtype with
-      | EI_direct, EI_direct -> Some mv
-      | EI_indirect a1, EI_indirect a2 ->
-        let pat2 = Term.{
-            pat_tyvars = [];
-            pat_vars   = Vars.Sv.of_list occ2.eo_occ.so_vars;
-            pat_term   = a2;
-          }
-        in 
-        pat_subsumes table system ~mv a1 pat2
-      | _ -> None
-    in
-    match mv with
-    | None -> false
-    | Some mv ->
-      let mv = ref mv in
+    let mv = ref mv in
+    
+    List.for_all (fun ts1 ->
+        List.exists (fun ts2 ->
+            match 
+              aux_ts_occ_incl ~mv:(!mv) table system ts1 ts2
+            with 
+            | None -> false
+            | Some mv' -> mv := mv'; true
+          ) occ2.eo_source_ts
+      ) occ1.eo_source_ts
       
-      List.for_all (fun ts1 ->
-          List.exists (fun ts2 ->
-              match 
-                aux_ts_occ_incl ~mv:(!mv) table system ts1 ts2
-              with 
-              | None -> false
-              | Some mv' -> mv := mv'; true
-            ) occ2.eo_source_ts
-        ) occ1.eo_source_ts
-        
 
 (** Removes subsumed timestamps occurrences from a list *)
 let clear_subsumed_ts
@@ -363,6 +357,7 @@ let get_actions_ext
               so_ad = (); (* unused *)
               so_vars = List.rev fv;
               so_cond = cond;
+              so_occtype = EI_direct;
               so_subterm = mk_false} (* unused *)
           in
           [occ] @ get ~fv ~cond ~p ~se ts
@@ -404,9 +399,14 @@ type n_occs = n_occ list
 type name_occ = (nsymb, unit) ext_occ
 type name_occs = name_occ list
 
-(** Constructs a name occurrence *)
-let mk_nocc (n:nsymb) (ncoll:nsymb) (fv:Vars.vars) (cond:terms) (st:term) : n_occ =
-  mk_simple_occ n ncoll () fv cond st
+(** Constructs a name occurrence. *)
+(** we do not refresh ncoll's variables, ie it's assumed to be at toplevel *)
+let mk_nocc (n:nsymb) (ncoll:nsymb) (fv:Vars.vars) (cond:terms) (ot:occ_type) (st:term) : n_occ =
+  let fv, sigma = refresh_vars `Global fv in
+  let n = subst_isymb sigma n in
+  let cond = List.map (subst sigma) cond in
+  let ot = subst_occtype sigma ot in
+  mk_simple_occ n ncoll () fv cond ot st
 
 
 (** Removes from occs all occurrences subsumed by another *)
@@ -421,7 +421,7 @@ let clear_subsumed_nameoccs
 (** Internally used to print a description of the occurrence *)
 let pp_internal (ppf:Format.formatter) (occ:name_occ) : unit =
   let o = occ.eo_occ in
-  match occ.eo_occtype with
+  match o.so_occtype with
   | EI_indirect a ->
     Fmt.pf ppf
       "%a @,(collision with %a)@ in action %a@ @[<hov 2>in term@ @[%a@]@]"
@@ -571,8 +571,8 @@ let find_occurrences
          (* name occurrences in t *)
          let noccs, acc = find_occs ~fv:[] (EI_direct, contx) t in
          (* add the info to the occurrences *)
-         let occs = List.map (fun o -> {eo_occ=o; eo_occtype=EI_direct; eo_source=[t]; eo_source_ts=ts}) noccs in
-         let acc = List.map (fun o -> {eo_occ=o; eo_occtype=EI_direct; eo_source=[t]; eo_source_ts=ts}) acc in
+         let occs = List.map (fun o -> {eo_occ=o; eo_source=[t]; eo_source_ts=ts}) noccs in
+         let acc = List.map (fun o -> {eo_occ=o; eo_source=[t]; eo_source_ts=ts}) acc in
          (* printing *)
          List.iter (Printer.pr "%a" pp) occs;
          if occs = [] then
@@ -604,8 +604,8 @@ let find_occurrences
         (* indirect occurrences in iocc *)
         let noccs, acc = find_occs ~fv:(Vars.Sv.elements sfv) (EI_indirect a, contx) t in
         (* add the info *)
-        let occs = List.map (fun o -> {eo_occ=o; eo_occtype=(EI_indirect a); eo_source=src; eo_source_ts=ts}) noccs in
-        let acc = List.map (fun o -> {eo_occ=o; eo_occtype=(EI_indirect a); eo_source=src; eo_source_ts=ts}) acc in
+        let occs = List.map (fun o -> {eo_occ=o; eo_source=src; eo_source_ts=ts}) noccs in
+        let acc = List.map (fun o -> {eo_occ=o; eo_source=src; eo_source_ts=ts}) acc in
         ind_occs @ occs, ind_acc @ acc)
       contx env sources ([], [])
   in
@@ -768,7 +768,7 @@ let occurrence_formula
       mk_impl ~simpl:true (mk_ands ~simpl:true cond) phi_cnt
   in 
 
-  match occ.eo_occtype with
+  match o.so_occtype with
   | EI_indirect a ->
     (* indirect occurrence: we also generate the timestamp inequalities *)
     let a = sub a in
@@ -779,9 +779,13 @@ let occurrence_formula
        but that's tricky, as it also means these vars can't be used to unify when subsuming timestamps *)
     let phis_time =
       List.map (fun (ti:ts_occ) ->
+          (* refresh probably not necessary, but doesn't hurt *)
+          let tivs, s = refresh_vars `Global ti.so_vars in
+          let ticnt = subst s ti.so_cnt in
+          let ticond = List.map (subst s) ti.so_cond in
           mk_exists ~simpl:true
-            ti.so_vars
-            (mk_ands ~simpl:true ((mk_timestamp_leq a ti.so_cnt)::ti.so_cond))
+            tivs
+            (mk_ands ~simpl:true ((mk_timestamp_leq a ticnt)::ticond))
         ) ts
     in
     let phi_time = mk_ors ~simpl:true phis_time in
