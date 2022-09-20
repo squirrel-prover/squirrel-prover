@@ -1767,23 +1767,32 @@ let known_set_add_frame (k : known_set) : known_set list =
 
   | _ -> []
 
-(** Exploit the pair symbol injectivity.
-    If [k] is a pair, we can replace [k] by its left and right
-    composants w.l.o.g. *)
-let known_set_process_pair_inj (k : known_set) : known_set list =
+(** Give a set of known terms [k], decompose it as a set of set of know 
+    termes [k1, ..., kn] such that:
+    - for all i, [ki] is deducible from [k]
+    - [k] is deducible from [(k1, ..., kn)] *)
+let rec known_set_decompose (k : known_set) : known_set list =
   match k.term with
+  (* Exploit the pair symbol injectivity.
+      If [k] is a pair, we can replace [k] by its left and right
+      composants w.l.o.g. *)
   | Term.Fun (fs, _, [a;b]) when fs = Term.f_pair ->
     let kl = { k with term = a; }
     and kr = { k with term = b; } in
-    kl :: [kr]
+    List.concat_map known_set_decompose (kl :: [kr])
+
+  (* Idem for tuples. *)
+  | Term.Tuple l ->
+    let kl = List.map (fun a -> { k with term = a; } ) l in
+    List.concat_map known_set_decompose kl
 
   | _ -> [k]
 
-(** Given a term, return some corresponding known_sets.  *)
+(** Given a term, return some corresponding [known_sets].  *)
 let known_set_list_of_term (term : Term.term) : known_set list =
   let k = known_set_of_term term in
   let k_seq = known_set_add_frame k in
-  List.concat_map known_set_process_pair_inj (k :: k_seq)
+  List.concat_map known_set_decompose (k :: k_seq)
 
 let known_sets_of_terms (terms : Term.term list) : known_sets =
   let ks_l = List.concat_map known_set_list_of_term terms in
