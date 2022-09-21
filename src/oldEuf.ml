@@ -154,46 +154,15 @@ let mk_rule ~elems ~drop_head ~fun_wrap_key
     ~allow_functions ~cntxt ~env ~mess ~sign ~head_fn ~key_n ~key_is =
 
   let mk_of_hash action_descr (is,m) =
-    (* Indices [key_is] from [env] must correspond to [is],
-     * which contains indices from [action_descr.indices]
-     * but also bound variables.
-     *
-     * Rather than refreshing all action indices, and generating
-     * new variable names for bound variables, we avoid it in
-     * simple cases: if a variable only occurs once in
-     * [is] then the only equality constraint on it is that
-     * it must be equal to the corresponding variable of [key_is],
-     * hence we can replace it by that variable rather
-     * than creating a new variable and an equality constraint.
-     * This is not sound with multiple occurrences in [is] since
-     * they induce equalities on the indices that pre-exist in
-     * [key_is].
-     *
-     * We compute next the list [safe_is] of simple cases,
-     * and the substitution for them. *)
+    (* Legacy refresh of variables, probably unnecessarily complex. *)
     let env = ref env in
 
-    let safe_is,subst_is =
-      let multiple i =
-        let n = List.length (List.filter ((=) i) is) in
-        assert (n > 0) ;
-        n > 1
-      in
-      List.fold_left2 (fun (safe_is,subst) i j ->
-          if multiple i then safe_is,subst else
-            i::safe_is,
-            Term.(ESubst (mk_var i, mk_var j))::subst
-        ) ([],[]) is key_is
-    in
-
-    (* Refresh action indices other than [safe_is] indices. *)
+    (* Refresh action indices. *)
     let subst_fresh =
       List.map (fun i ->
           Term.(ESubst (mk_var i,
                         mk_var (Vars.make_approx_r env i))))
-        (List.filter
-           (fun x -> not (List.mem x safe_is))
-           action_descr.Action.indices)
+        action_descr.Action.indices
     in
 
     (* Refresh bound variables from m and is, except those already
@@ -209,7 +178,6 @@ let mk_rule ~elems ~drop_head ~fun_wrap_key
       in
       (* Remove already handled variables, create substitution. *)
       let index_not_seen i =
-        not (List.mem i safe_is) &&
         not (List.mem i action_descr.Action.indices)
       in
       let not_seen = fun v ->
@@ -226,7 +194,7 @@ let mk_rule ~elems ~drop_head ~fun_wrap_key
         vars
     in
 
-    let subst = subst_fresh @ subst_is @ subst_bv in
+    let subst = subst_fresh @ subst_bv in
     let action = Action.subst_action subst action_descr.action in
     { action_name = action_descr.name;     
       action;
