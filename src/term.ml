@@ -1225,7 +1225,8 @@ and _pp
         (Vars._pp_typed_list ~dbg:info.dbg) vs
         (pp (find_fixity, `NonAssoc)) c
         (pp (find_fixity, `NonAssoc)) d
-        (pp_chained_find info)        e (* prints the [else] *)
+        (pp_chained_find info)        e 
+        (* prints the [else], chaining nicely nested try-finds *)
     in
     maybe_paren ~outer ~side ~inner:find_fixity pp ppf ()
 
@@ -1273,11 +1274,17 @@ and pp_chained_ite info ppf (t : term) =
 (* Printing in a [hv] box. Print the trailing [else] of the caller. *)
 and pp_chained_find info ppf (t : term) = 
   match t with
-  | Find (b, c, d, e) ->
+  | Find (vs, c, d, e) ->
+    let _, vs, s = (* rename quantified vars. to avoid name clashes *)
+      let fv_cd = List.fold_left ((^~) Sv.remove) (Sv.union (fv c) (fv d)) vs in
+      refresh_vars_env (Vars.of_set fv_cd) vs
+    in
+    let c, d = subst s c, subst s d in
+
     Fmt.pf ppf "@[<hov 2>else try find %a such that@ %a@]@;<1 0>\
                 @[<hov 2>in@ %a@]@;<1 0>\
                 %a"
-      (Vars._pp_typed_list ~dbg:info.dbg) b
+      (Vars._pp_typed_list ~dbg:info.dbg) vs
       (pp info (find_fixity, `NonAssoc)) c
       (pp info (find_fixity, `NonAssoc)) d
       (pp_chained_find info)             e
