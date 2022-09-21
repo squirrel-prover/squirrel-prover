@@ -322,8 +322,8 @@ module Smart : Term.SmartFO with type form = _form = struct
 
   (*------------------------------------------------------------------*)
   let mk_eq  ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_eq  ?simpl f1 f2))
-  let mk_leq ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_leq ?simpl f1 f2))
-  let mk_geq ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_geq ?simpl f1 f2))
+  let mk_leq        f1 f2 = Atom (Reach (Term.Smart.mk_leq        f1 f2))
+  let mk_geq        f1 f2 = Atom (Reach (Term.Smart.mk_geq        f1 f2))
   let mk_lt  ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_lt  ?simpl f1 f2))
   let mk_gt  ?simpl f1 f2 = Atom (Reach (Term.Smart.mk_gt  ?simpl f1 f2))
 
@@ -744,8 +744,8 @@ module Any = struct
       | _ -> assert false
 
     let mk_eq  ?simpl f g = Local (Term.Smart.mk_eq  ?simpl f g)
-    let mk_leq ?simpl f g = Local (Term.Smart.mk_leq ?simpl f g)
-    let mk_geq ?simpl f g = Local (Term.Smart.mk_geq ?simpl f g)
+    let mk_leq        f g = Local (Term.Smart.mk_leq        f g)
+    let mk_geq        f g = Local (Term.Smart.mk_geq        f g)
     let mk_lt  ?simpl f g = Local (Term.Smart.mk_lt  ?simpl f g)
     let mk_gt  ?simpl f g = Local (Term.Smart.mk_gt  ?simpl f g)
 

@@ -323,8 +323,8 @@ module type SmartFO = sig
   val mk_false : form
 
   val mk_eq  : ?simpl:bool -> term -> term -> form
-  val mk_leq : ?simpl:bool -> term -> term -> form
-  val mk_geq : ?simpl:bool -> term -> term -> form
+  val mk_leq :                term -> term -> form
+  val mk_geq :                term -> term -> form
   val mk_lt  : ?simpl:bool -> term -> term -> form
   val mk_gt  : ?simpl:bool -> term -> term -> form
 

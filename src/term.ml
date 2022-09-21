@@ -354,11 +354,11 @@ module SmartConstructors = struct
   let mk_neq ?(simpl=false) t1 t2 : term = 
     if t1 = t2 && simpl then mk_false else mk_neq_ns t1 t2
 
-  let mk_leq ?(simpl=false) t1 t2 : term = 
-    if t1 = t2 && simpl then mk_true else mk_leq_ns t1 t2
+  (* Careful: our ordering is not reflexive on timestamps! *)
+  let mk_leq t1 t2 : term = mk_leq_ns t1 t2
 
-  let mk_geq ?(simpl=false) t1 t2 : term = 
-    if t1 = t2 && simpl then mk_true else mk_geq_ns t1 t2
+  (* Careful: our ordering is not reflexive on timestamps! *)
+  let mk_geq t1 t2 : term = mk_geq_ns t1 t2
 
   let mk_lt ?(simpl=false) t1 t2 : term = 
     if t1 = t2 && simpl then mk_false else mk_lt_ns t1 t2
@@ -445,7 +445,7 @@ let mk_find ?(simpl=false) is c t e =
 
 let mk_timestamp_leq t1 t2 = match t1,t2 with
   | _, Fun (f,_, [t2']) when f = f_pred -> mk_lt ~simpl:true t1 t2'
-  | _ -> mk_leq ~simpl:true t1 t2
+  | _ -> mk_leq t1 t2
 
 (** Operations on vectors of indices of the same length. *)
 let mk_indices_neq ?(simpl=false) (vect_i : Vars.var list) vect_j =
@@ -1536,8 +1536,8 @@ module type SmartFO = sig
   val mk_false : form
 
   val mk_eq  : ?simpl:bool -> term -> term -> form
-  val mk_leq : ?simpl:bool -> term -> term -> form
-  val mk_geq : ?simpl:bool -> term -> term -> form
+  val mk_leq :                term -> term -> form
+  val mk_geq :                term -> term -> form
   val mk_lt  : ?simpl:bool -> term -> term -> form
   val mk_gt  : ?simpl:bool -> term -> term -> form
 
