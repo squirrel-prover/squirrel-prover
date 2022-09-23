@@ -98,10 +98,12 @@ val any_to_equiv : any_form -> form
 
 (*------------------------------------------------------------------*)
 type _ f_kind =
-  | Local_t  : local_form f_kind
+  | Local_t  : local_form  f_kind
   | Global_t : global_form f_kind
-  | Any_t    : any_form f_kind
+  | Any_t    : any_form    f_kind
 
+val kind_equal : 'a f_kind -> 'b f_kind -> bool
+  
 module Any : sig
   type t = any_form
 

@@ -380,13 +380,20 @@ let generalize (ts : Term.term) s =
 
 
 (*------------------------------------------------------------------*)
-(** Given a judgement [s] of the form Γ ⊢ E, and a timestamp τ,
-    produce the judgments
+(** Given a judgement [s] of the form [Γ ⊢ E], and a term [τ]
+    (of type timestamp), produce the judgments
+
     [Γ ⊢ E{ts → init}] and [(Γ, E{ts → pred τ}) ⊢ E].
-    The second one is then direclty simplified by a case on all possible
-    values of τ, producing a judgement for each one.
-    Generalizes Γ ⊢ E over τ if necessary. *)
+
+    The second judgement is then simplified by a case on [τ].
+    Generalizes [Γ ⊢ E] over [τ] if necessary. *)
 let induction Args.(Message (ts,_)) s =
+  assert (Type.equal (Term.ty ts) Type.ttimestamp);
+  
+  if not (Type.is_finite (Term.ty ts)) then
+    soft_failure
+      (Tactics.Failure "global induction supports only finite types");
+
   let env = ES.vars s in
   match ts with
   | Var t as ts ->
@@ -444,7 +451,7 @@ let induction Args.(Message (ts,_)) s =
 
   | _  ->
     soft_failure
-      (Tactics.Failure "expected a timestamp variable")
+      (Tactics.Failure "expected a variable of finite type")
 
 (*------------------------------------------------------------------*)
 (** Induction *)
@@ -454,10 +461,14 @@ let old_or_new_induction args : etac =
     (EquivLT.induction_tac ~dependent:false) args
   else
     (fun s sk fk ->
-       match EquivLT.convert_args s args (Args.Sort Args.Timestamp) with
+       match EquivLT.convert_args s args (Args.Sort Args.Message) with
        | Args.Arg (Args.Message (ts,ty)) ->
-         let ss = induction (Args.Message (ts,ty)) s in
-         sk ss fk
+         if Type.equal ty Type.ttimestamp then
+           let ss = induction (Args.Message (ts,ty)) s in
+           sk ss fk
+         else
+           (* use the new induction principle over types different from timestamp. *)
+           EquivLT.induction_tac ~dependent:false args s sk fk
        | _ -> hard_failure (Failure "ill-formed arguments")
     )
 

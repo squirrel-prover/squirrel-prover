@@ -1384,52 +1384,61 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Induction} *)
 
+  (** Induction, for both global and local sequents.
+      Global induction is sound only over finite types. *)
   let induction s =
-    let error () =
-      soft_failure
-        (Failure "conclusion must be an universal quantification \
-                  over a timestamp")
-    in
-
     let goal = S.goal s in
     let vs0, f = S.Conc.decompose_forall goal in
     let v, vs = match vs0 with
       | v :: vs -> v, vs
-      | _ -> error ()
+      | _ ->
+        soft_failure
+          (Failure "conclusion must be an universal quantification.")
     in
 
-    match Vars.ty v with
-    | Type.Timestamp ->
-      begin
-        let env = Vars.of_list vs0 in
-        let _,v' = Vars.make_approx env v in
+    let () =
+      match S.conc_kind with
+      | Equiv.Local_t ->
+        (* FEATURE: allow local induction over well-founded types, not 
+           just finite types.*)
+        if not (Type.is_finite (Vars.ty v)) then
+          soft_failure
+            (Failure "local induction supports only finite types")
+            
+      | Equiv.Global_t | Equiv.Any_t ->
+        if not (Type.is_finite (Vars.ty v)) then
+          soft_failure
+            (Failure "global induction supports only finite types")
+    in
 
-        let ih =
-          let atom_lt =
-            Equiv.Babel.convert
-              ~dst:S.conc_kind
-              ~src:Equiv.Local_t
-              (Term.mk_atom `Lt (Term.mk_var v') (Term.mk_var v))
-          in
+    let env = Vars.of_list vs0 in
+    let _,v' = Vars.make_approx env v in
 
-          S.Conc.mk_forall ~simpl:false
-            (v' :: vs)
-            (S.Conc.mk_impl ~simpl:false
-               (atom_lt)
-               (S.subst_conc [Term.ESubst (Term.mk_var v,Term.mk_var v')] f))
-        in
+    let ih =
+      let atom_lt =
+        Equiv.Babel.convert
+          ~dst:S.conc_kind
+          ~src:Equiv.Local_t
+          (Term.mk_atom `Lt (Term.mk_var v') (Term.mk_var v))
+      in
 
-        let new_goal =
-          S.Conc.mk_forall ~simpl:false
-            [v]
-            (S.Conc.mk_impl ~simpl:false
-               ih
-               (S.Conc.mk_forall ~simpl:false vs f))
-        in
+      S.Conc.mk_forall ~simpl:false
+        (v' :: vs)
+        (S.Conc.mk_impl ~simpl:false
+           (atom_lt)
+           (S.subst_conc [Term.ESubst (Term.mk_var v,Term.mk_var v')] f))
+    in
 
-        [S.set_goal new_goal s]
-      end
-    | _ -> error ()
+    let new_goal =
+      S.Conc.mk_forall ~simpl:false
+        [v]
+        (S.Conc.mk_impl ~simpl:false
+           ih
+           (S.Conc.mk_forall ~simpl:false vs f))
+    in
+
+    [S.set_goal new_goal s]
+
 
   let induction_gen ~dependent (t : Term.term) s : S.t list =
     let s = generalize ~dependent [t] [naming_pat_of_term t] s in
@@ -1440,9 +1449,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | [] -> induction s
     | [Args.Theory t] ->
       begin
-        match convert_args s args (Args.Sort Args.Timestamp) with
+        match convert_args s args (Args.Sort Args.Message) with
         | Args.Arg (Args.Message (t, _)) -> induction_gen ~dependent t s
-        | _ -> hard_failure (Failure "expected a timestamp")
+        | _ -> hard_failure (Failure "ill-formed arguments")
       end
     | _ -> bad_args ()
 

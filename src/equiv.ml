@@ -562,9 +562,16 @@ type local_form = Term.term
 type global_form = form
 
 type _ f_kind =
-  | Local_t  : local_form f_kind
+  | Local_t  : local_form  f_kind
   | Global_t : global_form f_kind
-  | Any_t    : any_form f_kind
+  | Any_t    : any_form    f_kind
+
+let kind_equal (type a b) (k1 : a f_kind) (k2 : b f_kind) : bool =
+  match k1, k2 with
+  | Local_t,  Local_t  -> true
+  | Global_t, Global_t -> true
+  | Any_t, Any_t       -> true
+  | _ -> false
 
 (** Module Any without conversion functions. *)
 module PreAny = struct
