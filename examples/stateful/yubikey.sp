@@ -369,8 +369,9 @@ Proof.
   (** We apply the INT-CTXT assumption, which directly gives the existence
   of an action `Press(i,j)` that happens before `S(ii,i)`. *)
   intctxt Mneq => //.
-  intro Ht M1 *.
-  exists j.
+  (* randomness condition *)
+  ++ intro [j [Ht M1]].  
+    exists j.
 
   (** The two first conjucts of the conclusion are automatically proved
   by Squirrel (the equality of counter values is a consequence of M1 once

@@ -1252,7 +1252,7 @@ let () =
 
 (*------------------------------------------------------------------*)
 (** {3 Create integrity rules parameters } *)
-type integrity_rule = Euf | Intctxt | NonMalleability
+type integrity_rule = NonMalleability
 
 
 type unforgeabiliy_param = Term.fname * Term.nsymb * Term.term
@@ -1261,86 +1261,7 @@ type unforgeabiliy_param = Term.fname * Term.nsymb * Term.term
                            * Term.term list * bool
                            * (Symbols.fname -> bool) option
 
-let euf_param table (t : Term.term) : unforgeabiliy_param =
-  let bad_param () =
-    soft_failure
-      (Tactics.Failure
-         "euf can only be applied to an hypothesis of the form h(t,k)=m \
-          or checksign(s,pk(k))=m \
-          for some hash or signature or decryption functions") 
-  in
 
-  let t1, t2 = match Term.destr_eq t with
-    | Some (t1, t2) -> t1, t2
-    | _ -> bad_param () 
-  in
-
-  match t1, t2 with
-  | (Fun (checksign,    _, [Tuple [s; Fun (pk, _, [Name key])]]), m)
-  | (m, Fun (checksign, _, [Tuple [s; Fun (pk, _, [Name key])]])) ->
-    begin match Theory.check_signature table checksign pk with
-      | None ->
-        soft_failure
-          (Failure "the message must be a signature check with \
-                    the associated pk")
-
-      | Some sign -> (sign, key, m, s,  (fun x -> x=pk), [], true, None)
-    end
-
-  | (Fun (hash, _, [Tuple [m; Name key]]), s)
-    when Symbols.is_ftype hash Symbols.Hash table ->
-    (hash, key, m, s, (fun x -> false), [], true, None)
-
-  | (s, Fun (hash, _, [Tuple [m; Name key]]))
-    when Symbols.is_ftype hash Symbols.Hash table ->
-    (hash, key, m, s, (fun x -> false), [], true, None)
-
-  | _ -> bad_param ()
-
-(*------------------------------------------------------------------*)
-let intctxt_param table (t : Term.term) : unforgeabiliy_param =
-  let bad_param () =
-    soft_failure
-      (Tactics.Failure
-         "intctxt can only be applied to an hypothesis of the form \
-          sdec(s,sk) <> fail \
-          or sdec(s,sk) = m (or symmetrically) \
-          for some hash or signature or decryption functions") in
-
-  let at = match Term.form_to_xatom t with
-    | Some (`Comp at) -> at
-    | _ -> bad_param () 
-  in
-
-  let param_dec sdec key m s =
-    match Symbols.Function.get_data sdec table with
-    | Symbols.AssociatedFunctions [senc] ->
-      (senc, key, m, s,  (fun x -> x = sdec),
-       [Term.mk_atom `Eq s Term.mk_fail], false, None)
-    | Symbols.AssociatedFunctions [senc; h] ->
-      (senc, key, m, s,  (fun x -> x = sdec || x = h),
-       [Term.mk_atom `Eq s Term.mk_fail], false, None)
-
-    | _ -> assert false in
-
-  match at with
-  | (`Eq, Fun (sdec, _, [Tuple [m; Name key]]), s)
-    when Symbols.is_ftype sdec Symbols.SDec table ->
-    param_dec sdec key m s
-
-  | (`Eq, s, Fun (sdec, _, [Tuple [m; Name key]]))
-    when Symbols.is_ftype sdec Symbols.SDec table ->
-    param_dec sdec key m s
-
-  | (`Neq, (Fun (sdec, _, [Tuple [m; Name key]]) as s), Fun (fail, _, _))
-    when Symbols.is_ftype sdec Symbols.SDec table && fail = Term.f_fail->
-    param_dec sdec key m s
-
-  | (`Neq, Fun (fail, _, _), (Fun (sdec, _, [Tuple [m; Name key]]) as s))
-    when Symbols.is_ftype sdec Symbols.SDec table && fail = Term.f_fail ->
-    param_dec sdec key m s
-
-  | _ -> bad_param ()
 
 (*------------------------------------------------------------------*)
 let non_malleability_param
@@ -1382,8 +1303,6 @@ let mk_integrity_rule_param
     (rule : integrity_rule)
   : Symbols.table -> Term.term -> unforgeabiliy_param =
   match rule with
-  | Euf             -> euf_param
-  | Intctxt         -> intctxt_param
   | NonMalleability -> non_malleability_param
     
 (*------------------------------------------------------------------*)
@@ -1558,15 +1477,6 @@ let euf_apply
 
   (tag_s @ honest_s @ extra_goals)
 
-
-let () =
-  T.register_typed "intctxt"
-    ~general_help:"Apply the intctxt axiom to the given hypothesis name."
-    ~detailed_help:"Conditions are similar to euf."
-    ~tactic_group:Cryptographic
-    ~pq_sound:true
-    (LowTactics.genfun_of_pure_tfun_arg (euf_apply Intctxt))
-    Args.String
 
 
 (*------------------------------------------------------------------*)

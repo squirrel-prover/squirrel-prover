@@ -40,9 +40,7 @@ goal [example] _ :
 Proof.
   intro H.
   intctxt H. 
-  + auto. 
-  + auto. 
-  + auto. 
+  auto. 
 Qed.
  
 (* ----------------------------------------------------------------- *)
@@ -207,8 +205,9 @@ Proof.
 
   + intro [H1 H2].
     rewrite /cI in H1.
-    intctxt H1 => // Ht Eq _. 
-    rewrite /cI /c -Eq dec_enc in H2. 
+    intctxt H1.
+    (* ciphertext *)
+    * intro [k [_ Eq]]. rewrite /cI /c Eq dec_enc in H2. 
     by exists k. 
 
   + intro [k [Ht Eq Hc]].

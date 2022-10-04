@@ -450,11 +450,9 @@ Proof.
 
   + (* Left => Right *)
     intro AEAD_dec.
-
     case Eq;
     expand aead_dec;
-    intctxt AEAD_dec => H //;
-    intro AEAD_eq;
+    intctxt AEAD_dec => // [pid0 AEAD_eq];
     by exists pid0.
 
   + (* Right => Left *)
@@ -732,13 +730,13 @@ Proof.
   destruct Hexec as [Hexecpred Mneq1 Mneq2 Hcpt Hpid].
   expand deccipher.
   intctxt Mneq2 => //.
-  intro Ht M1 Eq.
+  intro [j0 [Ht Eq]].
   exists j0 => /=.
   split => //.
 
   intro j' Hap' Hexec'.
 
-  intro Eq => //.
+  intro Eq2 => //.
   assert (SCtr(pid)@Server(pid,j) = SCtr(pid)@Server(pid,j')) as Meq by auto.
 
   assert (Server(pid,j) = Server(pid,j') ||
@@ -778,7 +776,7 @@ Proof.
 
     - (* Server(pid,j) > pred(Server(pid,j)) = Server(pid,j') *)
       use counterIncreaseStrictly with pid, j as H1 => //.
-      clear Eq Hexec' Mneq1 Mneq2 exec M1 Hpid Hexecpred Hcpt Hap' Hap Ht H.
+      clear Eq Hexec' Mneq1 Mneq2 exec Hpid Hexecpred Hcpt Hap' Hap Ht H.
       by apply orderStrict in H1.
 
     - (* Server(pid,j)  > pred(Server(pid,j)) >  Server(pid,j') *)

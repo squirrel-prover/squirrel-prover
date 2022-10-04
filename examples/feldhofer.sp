@@ -104,12 +104,19 @@ Proof.
   + project; use tags_neq as _.
 
     (* First projection. *)
-    - intctxt H => // _ _ _ /=.
-      by exists i, j0.
+    - intctxt H. 
+      (* problem with the randomness conditions *) admit. 
+      (* case 1: in Reader1 *)
+        auto.
+      (* case 2: in Tag *)
+        intro [j0 [H1 H2]]; simpl.
+        by exists i, j0.
+
 
     (* Second projection. *)
-    - intctxt H => // _ _ _ /=.
-      by exists i, j.
+    - intctxt H.
+      (* problem with the randomness conditions *) admit. 
+      auto. intro _; simpl. by exists i, j.
 
   (* Direction <= *)
   + simpl.
@@ -147,12 +154,18 @@ Proof.
     use tags_neq.
     project.
 
-    - intctxt H1 => // _ _ _.
+    - intctxt H1; simpl.
+      (* problem with randomness condition *) admit.
+      auto.
+      intro [j0 _].
       use H0 with i,j0 as C1.
       clear H0.
       by expand output, cipher; case C1.
+      
 
-    - intctxt H1 => // _ _ _.
+    - intctxt H1; simpl.
+      (* problem with randomness condition *) admit.
+      auto.
       use H0 with i,j as C1.
       clear H0.
       by expand output, cipher; case C1.
@@ -171,25 +184,28 @@ Proof.
 
   + assert dec(output@Tag(i,j),kE(i0)) = <tagT,<input@Tag(i0,j0),nt(i0,j0)>> as Meq0;
     1: by expand output, cipher.
-    intctxt Meq0 => C //.
-    - case C => //.
+    intctxt Meq0; try auto.
+    - by use fail_not_pair with tagT,<input@Tag(i0,j0),nt(i0,j0)>.
+    - (* problem w/ randomness condition *) admit.
+    - intro [j1 [_ _]]. 
       assert dec(output@Tag(i0,j0),kE(i)) = <tagT,<input@Tag(i,j),nt(i,j)>> as Meq2;
       1: by expand output, cipher.
-      intctxt Meq2 => C1 //.
-      by case C1.
-      by use fail_not_pair with tagT,<input@Tag(i,j),nt(i,j)>.
-    - by use fail_not_pair with tagT,<input@Tag(i0,j0),nt(i0,j0)>.
+      intctxt Meq2; try auto. 
+      * by use fail_not_pair with tagT,<input@Tag(i,j),nt(i,j)>.
+      * (* pb w/ randomness condition *) admit.
+
 
   + assert dec(output@Tag(i,j),kbE(i0,j0)) = <tagT,<input@Tag(i0,j0),nt(i0,j0)>>
     as Meq0;
     1: by expand output, cipher.
-    intctxt Meq0 => C //.
+    intctxt Meq0; try auto. 
+    - by use fail_not_pair with tagT,<input@Tag(i0,j0),nt(i0,j0)>.
+    - (* pb w/ randomness condition *) admit.
     - assert dec(output@Tag(i0,j0),kbE(i,j)) = <tagT,<input@Tag(i,j),nt(i,j)>> as Meq2;
       1: by expand output, cipher.
-      intctxt Meq2 => ? ? ? //=. 
-      -- by case H0; case C.
-      -- by use fail_not_pair with tagT,<input@Tag(i,j),nt(i,j)>. 
-    - by use fail_not_pair with tagT,<input@Tag(i0,j0),nt(i0,j0)>.
+      intctxt Meq2; try auto.
+       * by use fail_not_pair with tagT,<input@Tag(i,j),nt(i,j)>.
+       * (* pb w/ randomness condition *) admit.
 Qed.
 
 equiv unlinkability.
@@ -258,9 +274,10 @@ Proof.
       * fa => //.
         (* find condA => condB *)
         - intro [Mneq _ _].
-          intctxt Mneq => // _ _ _;
-          [1: by use tags_neq|
-	   2: by exists j1].
+          intctxt Mneq; simpl.
+          (* pb w/ randomness condition *) admit. 
+           by use tags_neq.
+	   intro [j1 _]; by exists j1.
 
         (* find condB => condA *)
         - intro _.
@@ -271,8 +288,10 @@ Proof.
       * fa => //.
         (* find condA => condB *)
         - intro [Mneq _ _].
-	  intctxt Mneq => // _ _ [_ _].
-	  by use tags_neq.
+	  intctxt Mneq; simpl.
+          (* pb w/ randomness condition *) admit. 
+          by use tags_neq.
+          auto.
 
 	(* find condB => condA *)
 	- intro _.

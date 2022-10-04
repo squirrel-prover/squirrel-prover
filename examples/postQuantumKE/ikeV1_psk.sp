@@ -374,12 +374,12 @@ Proof.
       rewrite B in Cond.
       destruct Cond as [EUF _].
       euf EUF; try auto.
-        ++ intro [il jl [Ord _ Eq]].
+        ++ intro [Ord _ Eq].
            exists i.
            assert happens(R(j,i)) => //.
            assert happens(I(i)) => //.
            depends I(i), I1(i,j) => //.
-        ++ intro [il jl [Ord _ Eq]].
+        ++ intro [Ord _ Eq].
            use mutex_Ideal2_I1_I2 with i,j,j as H; by case H.
 
     +  (* Case 2 -> dishonnest skeyid, trivial as no one else computes this key *)
@@ -414,11 +414,11 @@ Proof.
     + intro [jl il [[Cond _ _] Meq]].
       rewrite Meq in EUF.
       euf EUF; try auto.
-      ++ intro [_ _ [H _]].
+      ++ intro [H _].
          case H.
          * by depends R(j,i), R2(j,i).
          * use mutex_Ideal2_R1_R2 with j,i,j,i as H2; by case H2.
-      ++ intro [il jl [OrdI Meq2 _]].
+      ++ intro [OrdI Meq2 _].
          depends I(i), I1(i,j).
          case OrdI; auto. 
          intro OrdI2.
@@ -532,10 +532,10 @@ Proof.
       euf Cond => //.
       * by depends R(j,i), R1(j,i). 
       * by depends R(j,i), R1(j,i). 
-      * intro [_ _ [H _]]; case H.
+      * intro [H _]; case H.
         by depends R(j,i), R2(j,i). 
         use mutex_Ror_R2_R1 with j,i,j,i as HH; by case HH.             
-      * intro [jl il [Ord1 Ord2 _]]. 
+      * intro [Ord1 Ord2 _]. 
       by use ddhnotuple with  fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>, fst(input@I1(i,j)),a(i).
     + intro [Abs Meq].
       rewrite Meq in Cond.

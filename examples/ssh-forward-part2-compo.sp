@@ -419,13 +419,12 @@ Proof.
     assert (x3(i)@P3(i) = dec(input@P3(i),k11)) as D1 => //.
     (* We have that x3 is a message encrypted with the secret key, we use the intctxt of encryption *)
     intctxt D1 => //.
-
       - (* Ill-tagged case 1 *)
-        by use signnottag with sidPaF@P2,kP.
+         by use signnottag with sidPaF@P2,kP. 
       - (* Ill-tagged case 2 *)
         by use difftags.
       - (* Honest case *)
-        intro H4 Meq1.
+        intro [H4 Meq1].
         assert happens(PDIS5) as U; 1: by case Euf.
         expand x3(i)@P3(i), sidPa.
         assert PDIS5 <= Sok;

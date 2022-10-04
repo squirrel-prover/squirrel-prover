@@ -65,16 +65,23 @@ type empty_occs = empty_occ list
 
 
 
-(** Functions to turn content and data into terms, so they can be 
-    compared by matching. (we could have one function 'a -> 'a -> 'b -> term 
-    instead, if needed later *)
-type ('a, 'b) converter = { conv_cnt:'a -> term; conv_ad: 'b -> term }
+(** Type of a function generating a formula meant to say
+    "the occurrence is actually a collision" (or its negation) *)
+(** we also use this formula to compute occurrence subsumption
+     (if o1 generates a particular case of o2 then it is subsumed) *)
+type ('a, 'b) occ_formula =
+  negate:bool ->
+  'a -> (* occurrence content *)
+  'a -> (* what it potentially collides with *)
+  'b -> (* associated data *)
+  term
 
-(** Converter for names *)
-val name_converter : (nsymb, unit) converter
+(** occ_formula for name occurrences *)
+val name_occ_formula : (nsymb, unit) occ_formula
 
-(** Dummy converter for empty occurrences *)
-val empty_converter : (unit, unit) converter
+(** Dummy occ_formula for empty occurrences *)
+val empty_occ_formula : (unit, unit) occ_formula
+
 
 (** Extended occurrence, with additional info about where it was found *)
 type ('a, 'b) ext_occ =
@@ -175,30 +182,25 @@ type ('a, 'b) f_fold_occs =
 
 
 
+(** Interprets phi as phi_1 /\ … /\ phi_n,
+    and reconstructs it to simplify trivial equalities *)
+val clear_trivial_equalities : term -> term
+
+
+(** Constructs the formula "exists v1. a <= ts1 \/ … \/ exists vn. a <= tsn" *)
+(** where vi, tsi are the variables and content of the ts_occ *)
+val time_formula : term -> ts_occs -> term
+
+
 (*------------------------------------------------------------------*)
 (* Proof obligations for name occurrences *)
-
-(** Type of a function generating a formula meant to say
-    "the occurrence is actually a collision" (or its negation) *)
-type ('a, 'b) occ_formula =
-  negate:bool ->
-  'a -> (* occurrence content *)
-  'a -> (* what it potentially collides with *)
-  'b -> (* associated data *)
-  term
-
-(** occ_formula for name occurrences *)
-val name_occ_formula : (nsymb, unit) occ_formula
-
-(** Dummy occ_formula for empty occurrences *)
-val empty_occ_formula : (unit, unit) occ_formula
 
 (** given
    - a f_fold_occs function (see above)
    - a context (in particular, that includes the systems we want to use)
    - the environment
    - a list of sources where we search for occurrences
-   - conversion (for detecting duplicate) and formula functions for 'a, 'b occurrences
+   - a formula function for 'a, 'b occurrences (which we also use for subsumption)
    - optionally, a pp_ns that prints what we look for (just for pretty printing)
    
    computes two list of formulas whose disjunctions respectively mean
@@ -208,7 +210,6 @@ val empty_occ_formula : (unit, unit) occ_formula
 val occurrence_formulas :
   ?negate : bool ->
   ?pp_ns: (unit Fmt.t) option ->
-  ('a, 'b) converter ->
   ('a, 'b) occ_formula ->
   ('a, 'b) f_fold_occs ->
   Constr.trace_cntxt ->
@@ -234,7 +235,6 @@ val name_occurrence_formulas :
 val occurrence_formulas_with_occs :
   ?negate : bool ->
   ?pp_ns: (unit Fmt.t) option ->
-  ('a, 'b) converter ->
   ('a, 'b) occ_formula ->
   ('a, 'b) f_fold_occs ->
   Constr.trace_cntxt ->

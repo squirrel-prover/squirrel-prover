@@ -40,9 +40,7 @@ goal [example] _ :
 Proof.
   intro H.
   intctxt H. 
-  + auto. 
-  + auto. 
-  + auto. 
+  auto. 
 Qed.
  
 (* ----------------------------------------------------------------- *)

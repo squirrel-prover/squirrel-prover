@@ -119,10 +119,6 @@ let get_bad_occs
   | _ -> retry_on_subterms ()
 
 
-(* converts the contents of an int_occ to a term, for inclusion tests *)
-let integrity_converter : ((term * nsymb), unit) NO.converter =
-  { conv_cnt = (fun (t, n) -> mk_eq ~simpl:false (mk_tuple [t; mk_name n]) mk_zero);
-    conv_ad = (fun () -> mk_false) }
 
 (* constructs the formula expressing that an integrity occurrence m',k' is indeed in collision with m, k *)
 let integrity_formula
@@ -234,11 +230,9 @@ let euf
   let get_bad:((term*nsymb, unit) NO.f_fold_occs) = get_bad_occs m k int_f ~pk_f in
   let phis_bad, phis_int =
     NO.occurrence_formulas ~pp_ns:(Some pp_k)
-      integrity_converter integrity_formula
+      integrity_formula
       get_bad contx env [t; m]
   in
-
-  (* todo remove duplicates in occs *)
   let phis = phis_bad @ phis_int in
 
   let g = TS.goal s in 

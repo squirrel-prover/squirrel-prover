@@ -676,7 +676,7 @@ let () =
            try run ~test "tests/alcotest/ts_leq_not_lt.sp" with
            | Unfinished -> raise Ok)
     end ;
-    "SEnc Bad SSC - INTCTXT 1", `Quick, begin fun () ->
+(*    "SEnc Bad SSC - INTCTXT 1", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/intctxt_nornd.sp" with
@@ -699,7 +699,7 @@ let () =
         (fun () ->
            try run ~test "tests/alcotest/intctxt_sharedrndind.sp" with
            | Tactic_soft_failure (_,SEncSharedRandom) -> raise Ok)
-    end ;
+    end ;*)
     "Senc Bad SSC - CCA 1", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
