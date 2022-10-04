@@ -2647,7 +2647,7 @@ module E : S with type t = Equiv.form = struct
 
     if Sv.is_empty st.support && st.use_fadup &&
        Config.show_strengthened_hyp () then
-      (dbg ~force:true) "strengthened hypothesis:@;%a@;" MCset.pp_l mset_l;
+      (dbg ~force:true) "@[<v 2>strengthened hypothesis:@;%a@;@]" MCset.pp_l mset_l;
 
     let pat_terms =
       known_sets_union
