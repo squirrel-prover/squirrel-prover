@@ -1,4 +1,3 @@
-
 (* set debugConstr=true. *)
 
 include Basic.
@@ -150,8 +149,9 @@ goal [test_ok2G] _ :
   ok = ok2 =>
   output@A = <ok, <n_PRF2,n_PRF2>>.
 Proof.
-  intro Hap ok_ok2 @/output. 
-  by case (try find such that (ok = ok) in n_PRF2 else _) => [_ _].
+  intro Hap ok_ok2 @/output.
+  rewrite ok_ok2 /=. 
+  by case (try find such that _ in n_PRF2 else _) => [_ _].
 Qed.
 
 goal [test_ok2G] _ :
@@ -160,5 +160,6 @@ goal [test_ok2G] _ :
   output@A = <ok, <n_PRF2,h(ok2, k)>>.
 Proof.
   intro Hap ok_ok2 @/output.
-  by case (try find such that (ok = ok) in n_PRF2 else _) => [_ _].
+  case (try find such that (ok = ok) in n_PRF2 else _) => [_ _] //.
+  case (try find such that (ok2 = ok) in n_PRF2 else _) => [_ _] //.
 Qed.

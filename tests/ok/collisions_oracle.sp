@@ -39,7 +39,7 @@ goal unforgeable_2 (a : index, b : index):
 Proof.
  intro Hap @/output Heq.
  nosimpl(collision).
- auto.
+ by intro H; fresh H. 
 Qed.
 
 
@@ -50,7 +50,5 @@ Proof.
  intro Hap @/output Heq.
  collision.
  intro Heq2.
- eqnames.
- have H : nc(b) = na(a) || mc(b) = na(a) by auto.
- by case H.
+ by fresh Heq2. 
 Qed.

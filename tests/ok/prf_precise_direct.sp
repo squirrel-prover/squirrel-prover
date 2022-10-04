@@ -20,5 +20,6 @@ global goal _ (j : index) :
 Proof.
   intro H. 
   prf 0.
-  by rewrite if_true in 0.
+  rewrite if_true in 0 => //=.
+  by intro i H1; fresh H1.
 Qed.

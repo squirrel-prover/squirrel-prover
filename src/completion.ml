@@ -329,62 +329,6 @@ let i_or_ts_of_cterm i =
     m
   | _ -> assert false
 
-let i_or_ts_of_cterms cis = List.map i_or_ts_of_cterm cis
-
-let term_of_cterm (table : Symbols.table) (c : cterm) : Term.term =
-  let rec term_of_cterm (c : cterm) : Term.term = 
-    match c.cnt with 
-    | Cfun (F f, cterms) -> 
-      let terms = terms_of_cterms cterms in
-      Term.mk_fun table f terms 
-
-    | Cfun (T i, cterms) -> 
-      assert (List.length cterms = i);
-      let terms = terms_of_cterms cterms in
-      Term.mk_tuple terms
-
-    | Cfun (P i, cterms) -> 
-      assert (List.length cterms = 1);
-      let term = term_of_cterm (as_seq1 cterms) in
-      Term.mk_proj i term
-
-    | Cfun (M (m,ek), cterms) -> 
-      let cis, cts = List.takedrop (List.length cterms - 1) cterms in
-      let cts = as_seq1 cts in
-      let m = Term.mk_isymb m ek (i_or_ts_of_cterms cis) in
-      Term.mk_macro m [] (term_of_cterm cts) 
-
-    | Cfun (A a, is) -> 
-      let is = i_or_ts_of_cterms is in
-      Term.mk_action a is
-
-    | Cfun (N (n,nty), is) -> 
-      let is = i_or_ts_of_cterms is in
-      let ns = Term.mk_isymb n nty is in
-      Term.mk_name ns
-
-    | Ccst (Cst.Cmvar m) -> Term.mk_var m
-
-    | Ccst (Cst.Cgfuncst (`F f)) ->
-      Term.mk_fun table f []
-
-    | Ccst (Cst.Cgfuncst (`A a)) ->
-      Term.mk_action a []
-
-    | Ccst (Cst.Cgfuncst (`N (n,nty))) ->
-      let ns = Term.mk_isymb n nty [] in
-      Term.mk_name ns
-
-    | Ccst (Cst.Cboxed t) -> t
-
-    | (Ccst (Cflat _|Csucc _)|Cvar _|Cxor _) -> assert false
-
-  and terms_of_cterms (cterms : cterm list) : Term.term list =
-    List.map term_of_cterm cterms
-
-  in
-  term_of_cterm c
-
 (*------------------------------------------------------------------*)
 let pp_gsymb ppf = function
   | F x     -> Symbols.pp ppf x
@@ -411,15 +355,6 @@ let rec is_ground_cterm t = match t.cnt with
   | Ccst _ -> true
   | Cvar _ -> false
   | Cxor ts | Cfun (_, ts) -> List.for_all is_ground_cterm ts
-
-let rec no_macros t = match t.cnt with
-  | Cfun (M _, ts) -> false
-
-  | Ccst _ | Cvar _ -> true
-
-  | Cxor ts -> List.for_all no_macros ts
-
-  | Cfun ((A _ | F _ | N _ | P _ | T _), ts) -> List.for_all no_macros ts
 
 let is_cst t = match t.cnt with
   | Ccst _ -> true
@@ -454,6 +389,7 @@ let get_cst t = match t.cnt with
   | Ccst c -> c
   | _ -> assert false
 
+(* FIXME: bad sub-term computation *)
 let subterms l =
   let rec subs acc = function
     | [] -> acc
@@ -1614,47 +1550,6 @@ let name_index_cnstrs table state l : Term.term list =
   in
 
   x_index_cnstrs state l (is_lname table) n_cnstr
-
-
-(** [name_indep_cnstrs state l] looks for all name equals to a term w.r.t. the
-    rewrite relation in [state], and adds the fact that the name must be equal
-    to one of the name appearing inside the term. 
-    Only applies to names with \[large\] types. *)
-let name_indep_cnstrs table state l =
-  let n_cnstr (a : cterm) (b : cterm) = 
-    if not (is_lname table a) && not (is_lname table b) then []
-    else
-      let name, t = if is_lname table a then a, b else b, a in
-      let nty = name_ty name in
-
-      (* We keep only the names in [t] that are of the correct type. *)
-      let sub_names = subterms [t]
-                      |> List.filter (is_lname ~of_ty:nty table)
-                      |> List.sort_uniq Stdlib.compare
-      in
-
-      let rec mk_disjunction l =
-        match l with
-        | [] -> Term.mk_false
-        | [p] -> 
-          Term.mk_atom `Eq
-            (term_of_cterm table p)
-            (term_of_cterm table name)
-        | p::q ->
-          Term.mk_or
-            (Term.mk_atom `Eq 
-               (term_of_cterm table p)
-               (term_of_cterm table name))
-            (mk_disjunction q)
-      in
-      [mk_disjunction sub_names]
-  in
-
-  x_index_cnstrs state l
-    (function f -> is_ground_cterm f && no_macros f)
-    n_cnstr
-  |>  List.filter (fun f -> not (Term.is_true f)) 
-  |>  List.sort_uniq Stdlib.compare
 
 
 (*------------------------------------------------------------------*)

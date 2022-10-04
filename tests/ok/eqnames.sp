@@ -21,21 +21,4 @@ i <> j =>
 Proof.
  auto.
 Qed.
-
-goal independency :
-  h(n1,k) <> n2.
-Proof.
- intro Heq /=. 
- have H : n1 = n2 || k = n2 by auto.
- by case H.
-Qed.
-
-
-goal independency_bis (i:index,j:index):
-  i <> j =>
-  h(m1(i),k) <> m1(j).
-Proof.
- intro Hneq Heq /=. 
- have H : k = m1(j) || m1(i) = m1(j) by auto.
- by case H.
-Qed.
+ 

@@ -482,19 +482,7 @@ let () = T.register "slowsmt"
 (** Add index constraints resulting from names equalities, modulo the TRS.
     The judgment must have been completed before calling [eq_names]. *)
 let eq_names (s : TS.t) =
-  let trs   = TS.get_trs s in
   let table = TS.table s in
-  let terms = TS.get_all_messages s in
-  (* we start by collecting equalities between names implied by the indep axiom.
-  *)
-  let new_eqs =
-    Completion.name_indep_cnstrs table trs terms
-  in
-  let s =
-    List.fold_left (fun s c ->
-        let () = dbg "new name equality (indep): %a" Term.pp c in
-        Hyps.add Args.Unnamed c s
-      ) s new_eqs in
 
   (* we now collect equalities between timestamp implied by equalities between
      names. *)

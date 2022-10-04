@@ -27,11 +27,5 @@ val check_disequalities :
 val name_index_cnstrs :
   Symbols.table -> state -> Term.term list -> Term.term list
 
-(** [name_indep_cnstrs state l] looks for all name equals to a Term.term 
-    w.r.t. the rewrite relation in [state], and adds the fact that the name must 
-    be equal to one of the name appearing inside the Term.term. *)
-val name_indep_cnstrs :
-  Symbols.table -> state -> Term.term list -> Term.term list
-
 (** Print the set of rules in the initial TRS (e.g. dec(enc(x,y,r),y) -> x) *)
 val print_init_trs : Format.formatter -> Symbols.table -> unit
