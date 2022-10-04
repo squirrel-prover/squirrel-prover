@@ -127,7 +127,7 @@ val arity : Symbols.action -> Symbols.table -> int
 type descr = {
   name      : Symbols.action ;
   action    : action ;
-  input     : Channel.t * string ;
+  input     : Channel.t ;
   indices   : Vars.var list ;
   condition : Vars.var list * Term.term ;
   updates   : (Term.state * Term.term) list ;

@@ -683,6 +683,13 @@ let frame = mk_macro "frame"  Frame
 
 (** {3 Channel builtins} *)
 
+(** The symbol for the dummy channel may be displayed,
+    but it should not be possible for the user to typeset it.
+    Otherwise the user may declare the system
+      in(ø,_);out(c,ok)
+    which would be compatible with
+      out(c,ok)
+    and would easily be declared equivalent. *)
 let dummy_channel_lsymb = L.mk_loc L._dummy "ø"
 let table,dummy_channel =
   Channel.declare_exact !builtin_ref dummy_channel_lsymb ()

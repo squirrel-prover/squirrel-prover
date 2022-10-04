@@ -542,7 +542,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     let action_descr = Action.{ 
         name    = a';
         action;
-        input   = (in_ch, in_var);
+        input   = in_ch;
         indices = indices;
         globals = penv.globals; 
         condition; updates; output; } 
@@ -1043,7 +1043,7 @@ let declare_system table system_name (projs : Term.projs) (proc : process) =
   let init_descr = Action.{ 
       name      = Symbols.init_action;
       action    = [];
-      input     = (Symbols.dummy_channel,"$dummyInp");
+      input     = Symbols.dummy_channel;
       indices   = [];
       condition = ([], Term.mk_true);
       updates   = Theory.get_init_states table;

@@ -1249,7 +1249,7 @@ and _pp
         maybe_paren ~outer ~side ~inner:(fst quant_fixity, `Prefix) pp ppf ()
 
       | Seq ->
-        Fmt.pf ppf "@[<hov 2>seq(%a->@,%a)@]"
+        Fmt.pf ppf "@[<hov 2>seq(%a=>@,%a)@]"
           (Vars._pp_typed_list ~dbg:info.dbg) vs (pp (seq_fixity, `NonAssoc)) b
 
       | Lambda ->
