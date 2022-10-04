@@ -79,13 +79,16 @@ let partition_powers (nab:nsymb list) (pows:term list) :
 
 
 (*------------------------------------------------------------------*)
-(* future work: return a tree of and/or of name_occs and generate the goals accordingly *)
+(* future work: return a tree of and/or of name_occs and generate
+   the goals accordingly *)
 (** A (unit,unit) NO.f_fold_occs function, for use with NO.occurrence_goals.
-    Looks for occurrences of names in nab not allowed by CDH or GDH (depending on gdh_oracles).
+    Looks for occurrences of names in nab not allowed by CDH or GDH
+    (depending on gdh_oracles).
     Finds all possible occurrences of nab in t (ground), except
     1) in g ^ p1…pn: one pi is allowed to be a or b
     2) in u^p1…pn = v^q1…qm: if GDH, one pi and one qi are allowed to be a or b
-    If t is of the form something^something, looks directly for occurrences in t,
+    If t is of the form something^something, looks directly for occurrences
+    in t,
     and uses the provided continuation for the rec calls on its subterms.
     Otherwise, gives up, and asks occurrence_goals to call it again on subterms.
    Does not use any accumulator, so returns an empty unit list. *)
@@ -116,14 +119,17 @@ let get_bad_occs
       ~(st:term) : NO.n_occs =
     if m <> g then (* all occs in m, pows are bad *)
       (fst (rec_call_on_subterms m ~fv ~cond ~p ~info ~st)) @ 
-      (List.concat_map (fun tt -> fst (rec_call_on_subterms tt ~fv ~cond ~p ~info ~st)) pows)
+      (List.concat_map
+         (fun tt -> fst (rec_call_on_subterms tt ~fv ~cond ~p ~info ~st))
+         pows)
       (* p is not kept up to date. update if we decide to use it *) 
 
     else (* 1 bad pi is allowed.
             bad occs = all bad pi except 1 + bad occs in other pis *)
       let (bad_pows, other_pows) = partition_powers nab pows in
       let bad_pows_minus_1 = List.drop 1 bad_pows in
-      (* allow the first one. arbitrary, would be better to generate a disjunction goal *)
+      (* allow the first one. arbitrary, would be better to generate
+         a disjunction goal *)
       let bad_pows_occs =
         List.concat_map
           (fun tt -> 
@@ -133,13 +139,18 @@ let get_bad_occs
                  (fun nnn -> NO.mk_nocc nn nnn fv cond (fst info) st)
                  (find_symb nn nab)
              | _ -> assert false (* should always be a name *))
-          (* pos is not set right here, could be bad if we wanted to use it later *)
+          (* pos is not set right here, could be bad if we wanted
+             to use it later *)
           bad_pows_minus_1
       in
-      bad_pows_occs @ List.concat_map (fun tt -> fst (rec_call_on_subterms tt ~fv ~cond ~p ~info ~st)) other_pows
+      bad_pows_occs @
+      List.concat_map
+        (fun tt -> fst (rec_call_on_subterms tt ~fv ~cond ~p ~info ~st))
+        other_pows
   in 
 
-  (* handle a few cases, using rec_call_on_subterm for rec calls, and calls retry_on_subterm for the rest *)
+  (* handle a few cases, using rec_call_on_subterm for rec calls,
+     and calls retry_on_subterm for the rest *)
   match t with
   | Var v when not (Type.is_finite (Vars.ty v)) ->
     soft_failure
@@ -169,8 +180,12 @@ let get_bad_occs
     let bad_qows_minus_1 = List.drop_right 1 bad_qows in
     (* allow the last one on both sides of =. arbitrary, would be better
        to generate a disjunction goal. *)
-   ((get_illegal_powers u (bad_pows_minus_1 @ other_pows) ~fv ~cond ~p ~info ~st:t
-      @ get_illegal_powers v (bad_qows_minus_1 @ other_qows) ~fv ~cond ~p ~info ~st:t),
+    ((get_illegal_powers
+        u (bad_pows_minus_1 @ other_pows)
+        ~fv ~cond ~p ~info ~st:t
+      @ get_illegal_powers
+        v (bad_qows_minus_1 @ other_qows)
+        ~fv ~cond ~p ~info ~st:t),
      [])
 
   | _ -> retry_on_subterms ()
@@ -231,7 +246,8 @@ let dh_param
   let m1, m2 = match TS.Reduce.destr_eq s Equiv.Local_t hyp with
     | Some (u, v) -> (u,v)
     | None -> soft_failure ~loc:hyp_loc
-                (Tactics.Failure "can only be applied on an equality hypothesis")
+                (Tactics.Failure
+                   "can only be applied on an equality hypothesis")
   in
   let (u, pows) = powers exp_n mult_n info m1 in
   let (v, qows) = powers exp_n mult_n info m2 in

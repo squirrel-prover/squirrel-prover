@@ -60,7 +60,8 @@ let get_bad_occs
     ~(st:term)
     (t:term) 
   : NO.n_occs * int_occs =
-  (* handles a few cases, using rec_call_on_subterm for rec calls, and calls retry_on_subterm for the rest *)
+  (* handles a few cases, using rec_call_on_subterm for rec calls,
+     and calls retry_on_subterm for the rest *)
   match t with
   | Var v when not (Type.is_finite (Vars.ty v)) ->
     soft_failure
@@ -77,7 +78,8 @@ let get_bad_occs
       | _ -> retry_on_subterms () (* otherwise look in tk' *)
     end
     
-  (* hash verification oracle: test u = h(m', k). Search recursively in u, m', but do not record
+  (* hash verification oracle: test u = h(m', k).
+     Search recursively in u, m', but do not record
      m' as a hash occurrence. *)
   | Fun (f, _, [u; Fun (g, _, [Tuple [m'; Name k']])])
     when f = f_eq && g = int_f && pk_f = None && k'.s_symb = k.s_symb ->
@@ -97,7 +99,8 @@ let get_bad_occs
       match NO.expand_macro_check_all info tk' with
       (* hash/sign/etc w/ a name that could be the right key *) 
       (* record this hash occurrence, but allow the key *)
-      (* todo: actually why don't we always do this, even if it's the wrong key? *)
+      (* todo: actually why don't we always do this,
+               even if it's the wrong key? *)
       | Name k' when k.s_symb = k'.s_symb  ->
         let fvv, sigma = refresh_vars `Global fv in
         let m' = subst sigma m' in
@@ -110,7 +113,8 @@ let get_bad_occs
 
       (* if we can't be sure it could be the key *)
       (* don't record the hash occ, but look for bad occurrences in m and tk *)
-      (* (worst case, it was actually the key, and we'll miss the assumption that 
+      (* (worst case, it was actually the key,
+          and we'll miss the assumption that 
          the message could be m in the goal for the key's occurrence) *)
       (* IS THAT ACTUALLY SOUND?? *)
       | _ -> retry_on_subterms ()
@@ -120,14 +124,16 @@ let get_bad_occs
 
 
 
-(* constructs the formula expressing that an integrity occurrence m',k' is indeed in collision with m, k *)
+(* constructs the formula expressing that an integrity occurrence m',k'
+   is indeed in collision with m, k *)
 let integrity_formula
     ~(negate : bool)
     ((m', k') : term * nsymb)
     ((m, k) : term * nsymb)
     ()
     : term =
-  assert (k.s_symb = k'.s_symb); (* every occurrence we generated should satisfy this *)
+  assert (k.s_symb = k'.s_symb); (* every occurrence we generated
+                                    should satisfy this *)
   if not negate then 
     mk_and ~simpl:true
       (mk_eq ~simpl:true m m')
@@ -144,7 +150,8 @@ let integrity_formula
 (* EUF tactic *)
 
 (* parameters for the integrity occurrence: key, signed or hashed message,
-   signature checked or compared w/ the hash, sign/hash function, pk function if any *) 
+   signature checked or compared w/ the hash, sign/hash function,
+   pk function if any *) 
 type euf_param = {ep_key:nsymb;
                   ep_intmsg:term;
                   ep_term:term;
@@ -152,7 +159,8 @@ type euf_param = {ep_key:nsymb;
                   ep_pk_f:fsymb option;}
 
 
-(** Finds the parameters of the integrity functions used in the hypothesis, if any *)
+(** Finds the parameters of the integrity functions used in the hypothesis,
+    if any *)
 let euf_param
     ~(hyp_loc : L.t)
     (contx : Constr.trace_cntxt)
@@ -162,7 +170,8 @@ let euf_param
   =
   let fail () =
     soft_failure ~loc:hyp_loc
-      (Tactics.Failure "can only be applied on an hypothesis of the form checksign(m, s, pk(k)), hash(m, k) = t, or the symmetric equality")
+      (Tactics.Failure "can only be applied on an hypothesis of the form \
+checksign(m, s, pk(k)), hash(m, k) = t, or the symmetric equality")
   in
   let info = NO.EI_direct, contx in
   let table = contx.table in
@@ -198,7 +207,8 @@ let euf_param
         match NO.expand_macro_check_all info tpk with
         | Fun (g, _, [tk]) ->
           begin
-            match Theory.check_signature table f g, NO.expand_macro_check_all info tk with
+            match Theory.check_signature table f g,
+                  NO.expand_macro_check_all info tk with
             | Some sg, Name k ->
               {ep_key=k; ep_intmsg=m; ep_term=s; ep_int_f=sg; ep_pk_f=Some g}
             | _ -> fail ()
@@ -227,7 +237,9 @@ let euf
   let pp_k ppf () = Fmt.pf ppf "%a" Term.pp_nsymb k in
 
   (* apply euf *)
-  let get_bad:((term*nsymb, unit) NO.f_fold_occs) = get_bad_occs m k int_f ~pk_f in
+  let get_bad:((term*nsymb, unit) NO.f_fold_occs) =
+    get_bad_occs m k int_f ~pk_f
+  in
   let phis_bad, phis_int =
     NO.occurrence_formulas ~pp_ns:(Some pp_k)
       integrity_formula

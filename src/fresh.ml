@@ -186,7 +186,8 @@ let phi_proj
   in
 
   (* not removing duplicates here, as we already do that on occurrences. *)
-  (* probably fine, but we'll need to remove duplicates between phi_l and phi_r *)
+  (* probably fine, but we'll need to remove duplicates between
+     phi_l and phi_r *)
   phi_p
 
 
@@ -214,7 +215,10 @@ let fresh_equiv (i : int L.located) (s : ES.sequent) : ES.sequents =
   (* Removing duplicates. We already did that for occurrences, but
      only within phi_l and phi_r, not across both *)
   let cstate = Reduction.mk_cstate contx.table in
-  let phis = Utils.List.remove_duplicate (Reduction.conv cstate) (phi_l @ phi_r) in
+  let phis =
+    Utils.List.remove_duplicate
+      (Reduction.conv cstate) (phi_l @ phi_r)
+  in
 
   let phi = mk_ands ~simpl:true phis in
   let new_t = mk_ite ~simpl:true phi mk_zero t in

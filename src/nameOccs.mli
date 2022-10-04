@@ -16,7 +16,8 @@ module SE = SystemExpr
 (*------------------------------------------------------------------*)
 (** Generic types and functions to handle occurrences of anything,
     with associated data and conditions, source timestamps, etc. *)
-(* probably somewhat redundant with Iter.occ… but more specific to the use case here *)
+(* probably somewhat redundant with Iter.occ… but more specific
+   to the use case here *)
 
 (** Label indicating whether an occurrence is direct or indirect, and
    if so which action produced it *)
@@ -27,13 +28,16 @@ type occ_type =
 val subst_occtype : subst -> occ_type -> occ_type
 
 
-(** Simple occurrence of an element of type 'a, with additional data of type 'b *)
+(** Simple occurrence of an element of type 'a,
+    with additional data of type 'b *)
 (* Remarks:
    1) we could store a position in the term where the occ was, as in Iter.occ,
       but we don't use it anywhere for now
    2) we could store the fset at the point where the occ was found, which would
-      be more precise (we would need to prove the goal for the occ only in that fset)
-      (though since fold_macro_support does not give us the fset where the iocc is,
+      be more precise (we would need to prove the goal for the oc
+      only in that fset)
+      (though since fold_macro_support does not give us the fset
+      where the iocc is,
       we would still potentially be a little imprecise).
       we'll see if that's an issue later, for now we don't do that. *) 
 type ('a, 'b) simple_occ = 
@@ -43,14 +47,17 @@ type ('a, 'b) simple_occ =
    so_vars    : Vars.vars; (* variables bound above the occurrence *)
    so_cond    : terms;     (* condition above the occurrence *)
    so_occtype : occ_type;  (* occurrence type *)
-   so_subterm : term;      (* a subterm where the occurrence was found (for printing) *)
+   so_subterm : term;      (* a subterm where the occurrence was found
+                              (for printing) *)
   }
 
 type ('a, 'b) simple_occs = (('a, 'b) simple_occ) list
 
 
 (** constructs a simple occurrence *)
-val mk_simple_occ : 'a -> 'a -> 'b -> Vars.vars -> terms -> occ_type -> term -> ('a, 'b) simple_occ
+val mk_simple_occ :
+  'a -> 'a -> 'b -> Vars.vars -> terms -> occ_type ->
+  term -> ('a, 'b) simple_occ
 
 
 (** Type of a timestamp occurrence *)
@@ -59,7 +66,8 @@ type ts_occ = (term, unit) simple_occ
 type ts_occs = ts_occ list
 
 
-(** Type of empty simple occurrences (used as dummy parameter when they are not needed) *)
+(** Type of empty simple occurrences
+    (used as dummy parameter when they are not needed) *)
 type empty_occ = (unit, unit) simple_occ
 type empty_occs = empty_occ list
 
@@ -86,15 +94,16 @@ val empty_occ_formula : (unit, unit) occ_formula
 (** Extended occurrence, with additional info about where it was found *)
 type ('a, 'b) ext_occ =
   {eo_occ       : ('a, 'b) simple_occ;
-   eo_source    : terms;                (* original term where the occ was found *) 
-   eo_source_ts : ts_occs }             (* timestamps occurring in the source term *)
+   eo_source    : terms;  (* original term where the occ was found *) 
+   eo_source_ts : ts_occs } (* timestamps occurring in the source term *)
 
 type ('a, 'b) ext_occs = (('a, 'b) ext_occ) list
 
 
 
 (*------------------------------------------------------------------*)
-(** Occurrence subsumption/inclusion functions not exposed, we'll see if they need to be *)
+(** Occurrence subsumption/inclusion functions not exposed,
+    we'll see if they need to be *)
 
 
 (*------------------------------------------------------------------*)
@@ -147,27 +156,33 @@ val mk_nocc :
 (*------------------------------------------------------------------*)
 (* Functions to look for illegal name occurrences in a term *)
 
-(** Type of a function that takes a term, and generates a list of name occurrences in it.
+(** Type of a function that takes a term, and generates a list of
+    name occurrences in it.
     Also returns a list of ('a, 'b) simple occurrences, used to record
     information gathered during the exploration of the term
-    (typically collisions between other things than names, but with the 'b so_ad field,
-    can record anything useful).
+    (typically collisions between other things than names, but with
+    the 'b so_ad field, can record anything useful).
     Uses
     - a continuation unit -> n_occs * 'a, 'b simple_occs
        when it does not want to handle the term it's given,
        and just asks to be called again on the subterms
-    - a continuation fv -> cond -> p -> se -> st -> term -> n_occs * ('a,'b) simple_occs,
-       that calls the function again on the given parameters,
-       for when it needs to do finer things
-       (typically handle some of the subterms manually, and call this continuation
-          on the remaining ones,
-        or handle subterms at depth 1 by hand, and call the continuation on subterms at depth 2).
-      Functions of this type don't need to unfold macros, that's handled separately. *)
+    - a continuation fv -> cond -> p -> se -> st -> term ->
+      n_occs * ('a,'b) simple_occs,
+      that calls the function again on the given parameters,
+      for when it needs to do finer things
+      (typically handle some of the subterms manually, and
+       call this continuation on the remaining ones,
+       or handle subterms at depth 1 by hand, and call
+       the continuation on subterms at depth 2).
+    Functions of this type don't need to unfold macros,
+    that's handled separately. *)
 type ('a, 'b) f_fold_occs = 
-  (unit -> n_occs * ('a, 'b) simple_occs) -> (* continuation: give up and try again on subterms *)
-  (fv:Vars.vars ->       (* continuation: to be called on strict subterms (for rec calls) *)
+  (unit -> n_occs * ('a, 'b) simple_occs) -> (* continuation:
+                                   give up and try again on subterms *)
+  (fv:Vars.vars -> (* continuation:
+                      to be called on strict subterms (for rec calls) *)
    cond:terms ->
-   p:MP.pos ->           
+   p:MP.pos ->
    info:expand_info ->
    st:term ->
    term ->
@@ -176,9 +191,11 @@ type ('a, 'b) f_fold_occs =
   fv:Vars.vars ->      (* variables bound above the current position *)
   cond:terms ->        (* condition at the current position *)
   p:MP.pos ->          (* current position*)
-  st:term ->           (* a subterm we're currently in (for printing purposes) *)
+  st:term ->           (* a subterm we're currently in
+                          (for printing purposes) *)
   term ->              (* term at the current position *)
-  n_occs * ('a, 'b) simple_occs (* found name occurrences, and other occurrences *)
+  n_occs * ('a, 'b) simple_occs (* found name occurrences,
+                                   and other occurrences *)
 
 
 
@@ -200,13 +217,16 @@ val time_formula : term -> ts_occs -> term
    - a context (in particular, that includes the systems we want to use)
    - the environment
    - a list of sources where we search for occurrences
-   - a formula function for 'a, 'b occurrences (which we also use for subsumption)
-   - optionally, a pp_ns that prints what we look for (just for pretty printing)
+   - a formula function for 'a, 'b occurrences
+    (which we also use for subsumption)
+   - optionally, a pp_ns that prints what we look for
+    (just for pretty printing)
    
    computes two list of formulas whose disjunctions respectively mean
    "a bad name occurrence happens" and "an 'a, 'b occurrence is a collision"
       (or, alternatively, if negate is set to true,
-   whose conjunction means "no bad occurrence happens" and "no collision happens") *)
+    whose conjunction means "no bad occurrence happens"
+    and "no collision happens") *)
 val occurrence_formulas :
   ?negate : bool ->
   ?pp_ns: (unit Fmt.t) option ->
