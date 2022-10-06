@@ -1178,13 +1178,13 @@ and conv_app
           | [] -> []
           | [{pl_desc = Tuple args}]
           | args->
-            check_arity ~mode:`Full f
-              ~actual:(List.length args) ~expected:arity;
-
             List.map (fun x ->
                 conv_var state x Type.tindex
               ) args
         in
+        check_arity ~mode:`Full f
+          ~actual:(List.length indices) ~expected:arity;
+
         let ms = Term.mk_isymb s ty_out indices in
         Term.mk_macro ms [] (get_at ts_opt)
 
