@@ -7,13 +7,13 @@ name m : index->message
 
 channel c
 
-system !_i out(c,<n(i),seq(i:index ->n(i))>).
+system !_i out(c,<n(i),seq(i:index => n(i))>).
 
 include Basic.
 
 (* The main test, with a non-empty list of bound variables. *)
 global goal nonempty (tau:timestamp,i:index) :
-  [(forall (i0,i1:index), (A(i0) <= tau => i1 <> i))
+  [(forall (i1,i0:index), (A(i0) <= tau => i <> i1))
    = true ] ->
   equiv(output@tau) ->
   equiv(output@tau, diff(n(i),m(i))).

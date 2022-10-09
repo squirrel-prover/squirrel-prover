@@ -58,7 +58,7 @@ process Senc =
 (*------------------------------------------------------------------*)
 (* Signatures encryption *)
 
-signature sign, checksign, spk where m:T sig:C check:boolean sk:L pk:LP.
+signature sign, checksign, spk where m:T sig:C sk:L pk:LP.
 
 process Signature =
  in(c,m);
@@ -66,6 +66,6 @@ process Signature =
  new sk : L;
  let mypk : LP = spk(sk) in
  let s : C = sign(mT,sk) in
- let ch : boolean = checksign(s, mypk) in
+ let ch : boolean = checksign(mT, s, mypk) in
  out (c, empty).
 

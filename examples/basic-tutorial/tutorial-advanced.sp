@@ -221,7 +221,7 @@ Finally, universally quantified variables in rewrite rules can be partially inst
 
 *)
 
-abstract P : message -> message -> boolean.
+abstract P : message * message -> boolean.
 abstract k : message -> message.
 abstract a : message.
 abstract b : message.

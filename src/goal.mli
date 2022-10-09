@@ -13,6 +13,7 @@ val pp_init : Format.formatter -> t -> unit
 (*------------------------------------------------------------------*)
 val vars   : t -> Vars.env
 val system : t -> SystemExpr.context
+val table  : t -> Symbols.table
 
 (*------------------------------------------------------------------*)
 val map      : (TS.t -> TS.t)      -> (ES.t -> ES.t)      -> t -> t
@@ -76,10 +77,7 @@ end
 val make_obs_equiv :
   ?enrich:Term.term list ->
   Symbols.table ->
-  Hint.hint_db ->
   SystemExpr.context ->
   Equiv.any_form * t
 
-val make :
-  Symbols.table -> Hint.hint_db -> Parsed.t ->
-  statement * t
+val make : Symbols.table -> Parsed.t -> statement * t

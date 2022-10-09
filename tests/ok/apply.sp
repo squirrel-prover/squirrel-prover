@@ -12,7 +12,7 @@ name m2 : message
 
 abstract ok : index   -> message
 abstract f  : message -> message
-abstract gg : message -> message -> message
+abstract gg : message * message -> message
 abstract f0 : message -> message
 channel ch
 
@@ -139,8 +139,8 @@ Proof.
 Abort.
 
 global goal _ (x : message) :
-  equiv(seq (i:index -> <ok(i), x>)) ->
-  equiv(seq (i:index -> <ok(i), x>)).
+  equiv(seq (i:index => <ok(i), x>)) ->
+  equiv(seq (i:index => <ok(i), x>)).
 Proof.
  intro H; apply H.
 Qed.
@@ -152,7 +152,7 @@ Qed.
    `ok` is an abstract function. *)
 global goal _ (y : message) :
  equiv(empty) ->
- equiv(seq (j:index -> <ok(j), ok(j)>)).
+ equiv(seq (j:index => <ok(j), ok(j)>)).
 Proof.
  intro H; apply H.
 Qed.
@@ -161,22 +161,22 @@ Qed.
    cannot be deduce. *)
 global goal _ (y : message) :
  equiv(empty) ->
- equiv(seq (j:index -> <n1(j), n1(j)>)).
+ equiv(seq (j:index => <n1(j), n1(j)>)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 Abort.
 
 global goal _ (x : message) :
-  equiv(seq (i:index -> <n1(i), x>)) ->
-  equiv(seq (i:index -> <n1(i), x>)).
+  equiv(seq (i:index => <n1(i), x>)) ->
+  equiv(seq (i:index => <n1(i), x>)).
 Proof. 
  intro H; apply H.
 Qed.
 
 (* with alpha-renaming *)
 global goal _ (x : message) :
-  equiv(seq (i:index -> <n1(i), x>)) ->
-  equiv(seq (j:index -> <n1(j), x>)).
+  equiv(seq (i:index => <n1(i), x>)) ->
+  equiv(seq (j:index => <n1(j), x>)).
 Proof.
  intro H; apply H.
 Qed.
@@ -193,8 +193,8 @@ name nj : index -> message.
 
 (* we cannot match `x` with `nj(j)` since `j` is bound in the conclusion. *)
 global goal _ :
- (forall (x : message), equiv(seq (i:index -> <n1(i), x>))) ->
- equiv(seq (j:index -> <n1(j), nj(j)>)).
+ (Forall (x : message), equiv(seq (i:index => <n1(i), x>))) ->
+ equiv(seq (j:index => <n1(j), nj(j)>)).
 Proof.
  intro H.
  checkfail (apply H) exn ApplyMatchFailure.
@@ -202,15 +202,15 @@ Abort.
 
 (* with a sequence *)
 name m : index -> message.
-global goal _ : equiv(seq(i:index ->m(i))) -> equiv(seq(k:index -> m(k))).
+global goal _ : equiv(seq(i:index =>m(i))) -> equiv(seq(k:index => m(k))).
 Proof. 
  intro H; apply H.
 Qed.
 
 (* with a sequence over two indices *)
-name n : index -> index -> message.
+name n : index * index -> message.
 global goal _ : 
-  equiv(seq(i,j:index -> n(i,j))) -> equiv(seq(k,l:index -> n(k,l))).
+  equiv(seq(i,j:index => n(i,j))) -> equiv(seq(k,l:index => n(k,l))).
 Proof. 
  intro H; apply H.
 Qed.
@@ -307,12 +307,33 @@ Abort.
 (*------------------------------------------------------------------*)
 (* with pairs *)
 
-global goal _ : equiv(<m1, m2>) -> equiv(m1, m2).
+global goal _ : 
+  equiv(<m1, m2>) -> equiv(m1, m2).
 Proof.
  intro H; apply H.
 Qed.
 
-global goal _ (i : index) : equiv(n1(i), <m1, m2>) -> equiv(n1(i), m1, m2).
+global goal _ (i : index) : 
+  equiv(n1(i), <m1, m2>) -> equiv(n1(i), m1, m2).
 Proof.
  intro H; apply H.
+Qed.
+
+name m3 : message.
+
+global goal _ (i : index) :
+  equiv(n1(i), <m1, <m2, m3>>) -> equiv(n1(i), m1, m2, m3).
+Proof.
+ intro H; apply H.
+Qed.
+
+(*------------------------------------------------------------------*)
+(* with tuples *)
+
+name k : message.
+
+global goal _ (t:timestamp) :
+  equiv(frame@t,(k,k)) -> equiv(frame@t,k).
+Proof.
+  intro H; apply H.
 Qed.

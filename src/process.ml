@@ -1,3 +1,5 @@
+open Utils
+
 module L = Location
 
 let dum : L.t = L._dummy
@@ -17,7 +19,6 @@ let pp_proc_ty =
 type lsymb = Theory.lsymb
 
 type term = Theory.term
-type formula = Theory.term
 
 (*------------------------------------------------------------------*)
 type process_i =
@@ -29,7 +30,7 @@ type process_i =
   | Set      of lsymb * lsymb list * term * process
   | Let      of lsymb * term * Theory.p_ty option * process
   | Repl     of lsymb * process
-  | Exists   of lsymb list * formula * process * process
+  | Exists   of lsymb list * term * process * process
   | Apply    of lsymb * term list
   | Alias    of process * lsymb
 
@@ -204,7 +205,7 @@ let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
     | Null -> ()
 
     | New (x, ty, p) -> 
-      let ty = Theory.parse_p_ty env ty in 
+      let ty = Theory.convert_ty env ty in 
       let vars, _ = Vars.make `Shadow env.vars ty (L.unloc x) in
       check_p ty_env { env with vars } p
 
@@ -246,7 +247,7 @@ let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
     | Let (x, t, ptyo, p) ->
       let ty : Type.ty = match ptyo with
         | None -> TUnivar (Type.Infer.mk_univar ty_env)
-        | Some pty -> Theory.parse_p_ty env pty 
+        | Some pty -> Theory.convert_ty env pty 
       in
       
       Theory.check env ~local:true ty_env projs t ty ;
@@ -315,7 +316,7 @@ let declare
 (*------------------------------------------------------------------*)
 (* Enable/disable debug messages by setting debug to debug_on/off. *)
 
-let debug_off fmt = Format.fprintf Printer.dummy_fmt fmt
+let[@warning "-32"] debug_off fmt = Format.fprintf Printer.dummy_fmt fmt
 let[@warning "-32"] debug_on fmt =
   Format.printf "[DEBUG] " ;
   Format.printf fmt
@@ -412,12 +413,14 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
   let create_subst (venv : Vars.env) isubst msubst =
     List.map (fun (x,_,tm) -> 
-        let v = Vars.find venv x in
+        let v = as_seq1 (Vars.find venv x) in
+        (* cannot have two variables with the same name since previous 
+           definitions must have been shadowed *)
         Term.ESubst (Term.mk_var v, Term.mk_var tm)
       ) isubst
     @
     List.map (fun (x,_,tm) -> 
-        let v = Vars.find venv x in
+        let v = as_seq1 (Vars.find venv x) in (* idem *)
         Term.ESubst (Term.mk_var v, tm)
       ) msubst
   in
@@ -459,7 +462,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
     let action = List.rev penv.action in
     let in_ch, in_var = match penv.inputs with
-    | (c,v)::_ -> (c,Vars.name v)
+    | (c,v) :: _ -> c, Vars.name v
     | _ -> assert false
     in
     let indices = List.rev penv.indices in
@@ -474,7 +477,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     (* override previous term substitution for input variable
     * to use the known action *)
     let subst_input =
-      try [Term.ESubst (snd (list_assoc (in_var) penv.msubst), in_tm)]
+      try [Term.ESubst (snd (list_assoc in_var penv.msubst), in_tm)]
       with Not_found -> []
     in
 
@@ -504,8 +507,9 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       List.rev penv.evars,
       Term.subst
         (subst_ts @ subst_input)
-        (Term.mk_ands penv.facts)
+        (Term.mk_ands penv.facts) 
     in
+    debug "condition = %a.@." Term.pp (snd condition);
 
     let updates =
       List.map (fun (s,l,ty,t) ->
@@ -538,13 +542,13 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     let action_descr = Action.{ 
         name    = a';
         action;
-        input   = (in_ch, in_var);
+        input   = in_ch;
         indices = indices;
         globals = penv.globals; 
         condition; updates; output; } 
     in
 
-    let table, new_a, action_descr =
+    let table, new_a, _ =
       System.register_action table system_name action_descr
     in
 
@@ -553,8 +557,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     in
 
     debug "descr = %a@." Action.pp_descr action_descr ;
-    let new_indices = action_descr.indices in
-    let new_action_term = Term.mk_action new_a new_indices in
+    let new_action_term = Term.mk_action new_a action_descr.indices in
     let new_in_tm = Term.mk_macro Term.in_macro [] new_action_term in
     let penv =
       { penv with
@@ -619,17 +622,17 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       (penv,p)
 
   | New (n, pty, p) ->
-    let ty = Theory.parse_p_ty penv.env pty in
+    let ty = Theory.convert_ty penv.env pty in
 
-    let n_fty = Type.mk_ftype 0 [] (List.map Vars.ty penv.indices) ty in
+    let n_fty = Type.mk_ftype_tuple [] (List.map Vars.ty penv.indices) ty in
     let ndef = Symbols.{ n_fty } in
 
     let table,n' = Symbols.Name.declare penv.env.table n ndef in
     let n'_th =
       let n' = L.mk_loc (L.loc n) (Symbols.to_string n') in
-      Theory.App
-        ( n',
-          List.rev_map (fun i -> Theory.var dum (Vars.name i)) penv.indices )
+      Theory.mk_app_i
+        (Theory.mk_symb n')
+        (List.rev_map (fun i -> Theory.var dum (Vars.name i)) penv.indices)
     in    
     let n'_s = Term.mk_isymb n' ty (List.rev penv.indices) in
     let n'_tm = Term.mk_name n'_s in
@@ -658,7 +661,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
   | Let (x,t,ptyo,p) ->
     let ty : Type.ty = match ptyo with
       | None -> TUnivar (Type.Infer.mk_univar penv.ty_env)
-      | Some pty -> Theory.parse_p_ty penv.env pty 
+      | Some pty -> Theory.convert_ty penv.env pty 
     in
 
     let t' = Theory.subst t (to_tsubst penv.isubst @ to_tsubst penv.msubst) in
@@ -682,7 +685,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
     let invars = List.map snd penv.inputs in
     let shape = Action.get_shape (List.rev penv.action) in
-    let table,x' =
+    let table, x' =
       let suffix = if in_update then `Large else `Strict in
       Macros.declare_global penv.env.table system_name x
         ~suffix
@@ -695,7 +698,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       let is =
         List.rev_map (fun i -> Theory.var dum (Vars.name i)) penv.indices
       in
-      Theory.App (x', is)
+      Theory.mk_app_i (Theory.mk_symb x') is
     in
 
     let n'_s = Term.mk_isymb x' ty (List.rev penv.indices) in
@@ -708,7 +711,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
                   msubst = (L.unloc x,x'_th,x'_tm) :: penv.msubst;
                   globals = x' :: penv.globals; }
     in
-    (x',t',penv,p)
+    (x', t', penv, p)
 
   | _ -> assert false
 
@@ -1017,6 +1020,9 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
   (proc, table)
 
+(*------------------------------------------------------------------*)
+(** {2 System declaration } *)
+
 let declare_system table system_name (projs : Term.projs) (proc : process) =
   Printer.pr
     "@[<v 2>System before processing:@;@;@[%a@]@]@.@."
@@ -1033,26 +1039,26 @@ let declare_system table system_name (projs : Term.projs) (proc : process) =
   in
   let table,system_name = System.declare_empty table system_name projections in
 
-  (* before parsing the system, we register the init action,
-  using for the updates the initial values declared when declaring
-  a mutable construct *)
-  let a' = Symbols.init_action in
-  let updates = Theory.get_init_states table in
-  let action_descr = Action.{ 
-      name      = a';
+  (* we register the init action before parsing the system *)
+  let init_descr = Action.{ 
+      name      = Symbols.init_action;
       action    = [];
-      input     = (Symbols.dummy_channel,"$dummyInp");
+      input     = Symbols.dummy_channel;
       indices   = [];
       condition = ([], Term.mk_true);
-      updates;
+      updates   = Theory.get_init_states table;
       output    = (Symbols.dummy_channel, Term.empty);
       globals   = []; }
   in
   let table, _, _ =
-    System.register_action table system_name action_descr
+    System.register_action table system_name init_descr
   in
 
+  (* parse the processus *)
   let proc,table = parse_proc system_name table projs proc in
+
+  let table = Lemma.add_depends_mutex_lemmas table system_name in
+  
   Printer.pr "@[<v 2>System after processing:@;@;@[%a@]@]@.@." pp_process proc ;
   Printer.pr "%a" System.pp_systems table;
   table

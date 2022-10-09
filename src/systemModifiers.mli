@@ -13,6 +13,5 @@ module SE = SystemExpr
     - some proof obligations *)  
 val declare_system :
   Symbols.table ->
-  Hint.hint_db ->
   Decl.system_modifier ->
   Goal.statement option * Goal.t list * Symbols.table

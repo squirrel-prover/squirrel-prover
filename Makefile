@@ -18,7 +18,7 @@ RUNLOGDIR=_build/squirrel_log
 # Make sure the "echo" commands in okfail below are updated
 # to reflect the content of these variables.
 PROVER_TESTS = $(wildcard tests/ok/*.sp) $(wildcard tests/fail/*.sp)
-PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $(wildcard examples/stateful/*.sp)  $(wildcard examples/postQuantumKE/*.sp)
+PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp) $(wildcard examples/tutorial/solutions/*.sp) $(wildcard examples/stateful/*.sp)  $(wildcard examples/postQuantumKE/*.sp)
 
 okfail: squirrel
 	rm -rf $(RUNLOGDIR)
@@ -29,8 +29,9 @@ okfail: squirrel
 okfail_end: $(PROVER_TESTS:.sp=.ok)
 	@$(ECHO)
 	@if test -f tests/tests.ko ; then \
-	  $(ECHO) Some tests failed: ; \
-	  cat tests/tests.ko | sort ; rm -f tests/tests.ko ; exit 1 ; \
+	  wc -l tests/tests.ko | cut -f 1 -d " "; $(ECHO) " tests failed:" ; \
+	  cat tests/tests.ko | sort ; \
+    rm -f tests/tests.ko ; exit 1 ; \
 	 else $(ECHO) All tests passed successfully. ; fi
 
 example: squirrel
@@ -42,7 +43,7 @@ example: squirrel
 examples_end: $(PROVER_EXAMPLES:.sp=.ok)
 	@$(ECHO)
 	@if test -f tests/tests.ko ; then \
-	  $(ECHO) Some tests failed: ; \
+	  wc -l tests/tests.ko | cut -f 1 -d " "; $(ECHO) " tests failed:" ; \
 	  cat tests/tests.ko | sort ; rm -f tests/tests.ko ; exit 1 ; \
 	 else $(ECHO) All tests passed successfully. ; fi
 

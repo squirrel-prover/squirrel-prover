@@ -1,0 +1,40 @@
+rect.cond, rect.state, rect.output {
+  fill: #eeeeee;
+}
+span.name {
+  display: table;
+  margin: 0 auto;
+  font-weight: bold;
+}
+
+/* keyword Classes from Squirrel */
+
+.pn, .pv, .pio, .pk, .gm, .gf, .sep, .ht, .hf{
+  font-weight:bold;
+}
+.pc{
+  text-decoration: underline;
+}
+
+.pc, .ht{
+  color: #AA0000;
+}
+.ga{
+  color: #00AA00;
+}
+.pn{
+  color: #0000AA;
+}
+.pv, .gm, .hf{
+  color: #AA00AA;
+}
+.gn{
+  color: #AA5500;
+}
+
+.test{
+  background-color: yellow;
+}
+.err{
+  background-color: red;
+}

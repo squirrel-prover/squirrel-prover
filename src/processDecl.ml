@@ -62,9 +62,15 @@ let check_fun_out_ty loc ty =
     decl_error loc KDecl InvalidAbsType
   else ()
 
+let rec split_ty (ty : Theory.p_ty) : Theory.p_ty list =
+  match L.unloc ty with
+  | Theory.P_fun (t1, t2) -> t1 :: split_ty t2
+  | _ -> [ty]
+         
 let parse_abstract_decl table (decl : Decl.abstract_decl) =
   let in_tys, out_ty =
-    List.takedrop (List.length decl.abs_tys - 1) decl.abs_tys
+    let tys = split_ty decl.abs_tys in
+    List.takedrop (List.length tys - 1) tys
   in
   let p_out_ty = as_seq1 out_ty in
 
@@ -74,23 +80,14 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
   in
 
   let env = Env.init ~table ~ty_vars:ty_args () in
-  let in_tys = List.map (Theory.parse_p_ty env) in_tys in
+  let in_tys = List.map (Theory.convert_ty env) in_tys in
 
-  let rec parse_index_prefix iarr in_tys = 
-    match in_tys with
-    | Type.Index :: in_tys -> 
-      parse_index_prefix (iarr + 1) in_tys
-    | _ -> iarr, in_tys
-  in
-
-  let iarr, in_tys = parse_index_prefix 0 in_tys in
-
-  let out_ty = Theory.parse_p_ty env p_out_ty in
+  let out_ty = Theory.convert_ty env p_out_ty in
 
   check_fun_out_ty (L.loc p_out_ty) out_ty;
 
   Theory.declare_abstract table
-    ~index_arity:iarr ~ty_args ~in_tys ~out_ty
+    ~ty_args ~in_tys ~out_ty
     decl.name decl.symb_type
 
 (*------------------------------------------------------------------*)
@@ -103,14 +100,16 @@ let parse_operator_decl table (decl : Decl.operator_decl) =
     in
 
     let env = Env.init ~table ~ty_vars () in
-    let env, args = Theory.convert_p_bnds env decl.op_args in
+    let env, subst, args = Theory.convert_ext_bnds env decl.op_args in
 
-    let out_ty = omap (Theory.parse_p_ty env) decl.op_tyout in
+    let out_ty = omap (Theory.convert_ty env) decl.op_tyout in
 
     let body, out_ty = 
       Theory.convert ?ty:out_ty { env; cntxt = InGoal } decl.op_body 
     in
-    
+    let body = Term.subst subst body in
+
+    (* not sure this is necessary *)
     check_fun_out_ty (L.loc decl.op_body) out_ty;
 
     if not (Term.is_deterministic body) then
@@ -118,6 +117,12 @@ let parse_operator_decl table (decl : Decl.operator_decl) =
 
     let data = Operator.mk ~name ~ty_vars ~args ~out_ty ~body in
     let ftype = Operator.ftype data in
+
+    let in_tys = List.map Vars.ty args in
+
+    (* sanity checks on infix symbols *)
+    Theory.check_fun_symb table ty_vars in_tys decl.op_name decl.op_symb_type;
+    
     let table, _ = 
       Symbols.Function.declare_exact 
         table decl.op_name
@@ -150,7 +155,7 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
       if not (List.mem sp kws) then
         decl_error (L.loc cty.Decl.cty_space) KDecl (InvalidCtySpace kws);
 
-      let ty = Theory.parse_p_ty env cty.Decl.cty_ty in
+      let ty = Theory.convert_ty env cty.Decl.cty_ty in
       (sp, ty)
     ) ctys
 
@@ -162,34 +167,34 @@ let parse_projs (p_projs : lsymb list option) : Term.projs =
 
 (*------------------------------------------------------------------*)
 let define_oracle_tag_formula table (h : lsymb) f =
-  let open Prover in
   let env = Env.init ~table () in
   let conv_env = Theory.{ env; cntxt = InGoal; } in
   let form, _ = Theory.convert conv_env ~ty:Type.Boolean f in
     match form with
-     | Term.ForAll ([uvarm; uvarkey],f) ->
+     | Term.Quant (ForAll, [uvarm; uvarkey], f) ->
        begin match Vars.ty uvarm,Vars.ty uvarkey with
          | Type.(Message, Message) ->
-           add_option (Oracle_for_symbol (L.unloc h), Oracle_formula form)
-         | _ -> raise @@ ParseError "The tag formula must be of \
-                                     the form forall (m:message,sk:message)"
+           Prover.add_option (Oracle_for_symbol (L.unloc h), Oracle_formula form)
+         | _ ->
+           raise @@ Prover.ParseError "The tag formula must be of \
+                                       the form forall (m:message,sk:message)"
        end
 
-     | _ -> raise @@ ParseError "The tag formula must be of \
-                                 the form forall (m:message,sk:message)"
+     | _ -> raise @@ Prover.ParseError "The tag formula must be of \
+                                        the form forall (m:message,sk:message)"
 
 
 (*------------------------------------------------------------------*)
 (** {2 Declaration processing} *)
 
-let declare table hint_db decl = 
+let declare table decl = 
   match L.unloc decl with
   | Decl.Decl_channel s -> Channel.declare table s, []
 
   | Decl.Decl_process { id; projs; args; proc} ->
     let env = Env.init ~table () in
     let args = List.map (fun (x,t) ->
-        L.unloc x, Theory.parse_p_ty env t
+        L.unloc x, Theory.convert_ty env t
       ) args
     in
     let projs = parse_projs projs in
@@ -203,20 +208,19 @@ let declare table hint_db decl =
       | None ->
         { pgoal with Goal.Parsed.name = Some (Prover.unnamed_goal ()) }
     in
-    let gc,_ = Goal.make table hint_db pgoal in
-    Prover.add_proved_goal `Axiom gc;
-    table, []
-
+    let loc = L.loc (oget pgoal.Goal.Parsed.name) in
+    let gc,_ = Goal.make table pgoal in
+    Lemma.add_lemma ~loc `Axiom gc table, []
 
   | Decl.Decl_system sdecl ->
     let projs = parse_projs sdecl.sprojs in
     Process.declare_system table sdecl.sname projs sdecl.sprocess, []
 
   | Decl.Decl_system_modifier sdecl ->
-    let new_lemma, proof_obls, table = 
-      SystemModifiers.declare_system table hint_db sdecl 
+    let new_lemma, proof_obls, table =
+      SystemModifiers.declare_system table sdecl 
     in
-    oiter (Prover.add_proved_goal `Lemma) new_lemma;
+    let table = omap_dflt table (Lemma.add_lemma `Lemma ^~ table) new_lemma in
     table, proof_obls
 
   | Decl.Decl_dh (h, g, ex, om, ctys) ->
@@ -227,7 +231,7 @@ let declare table hint_db decl =
      and exp_ty   = List.assoc_opt "exponents" ctys in
      Theory.declare_dh table h ?group_ty ?exp_ty g ex om, []
 
-  | Decl.Decl_hash (a, n, tagi, ctys) ->
+  | Decl.Decl_hash (n, tagi, ctys) ->
     let () = Utils.oiter (define_oracle_tag_formula table n) tagi in
 
     let ctys = parse_ctys table ctys ["m"; "h"; "k"] in
@@ -235,7 +239,7 @@ let declare table hint_db decl =
     and h_ty = List.assoc_opt  "h" ctys
     and k_ty  = List.assoc_opt "k" ctys in
 
-    Theory.declare_hash table ?m_ty ?h_ty ?k_ty ?index_arity:a n, []
+    Theory.declare_hash table ?m_ty ?h_ty ?k_ty n, []
 
   | Decl.Decl_aenc (enc, dec, pk, ctys) ->
     let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "rnd"; "sk"; "pk"] in
@@ -256,15 +260,19 @@ let declare table hint_db decl =
 
     Theory.declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty senc sdec, []
 
-  | Decl.Decl_name (s, ptys) ->
+  | Decl.Decl_name (s, p_args_ty, p_out_ty) ->
     let env = Env.init ~table () in
-    let p_args_tys, p_out_ty = List.takedrop (List.length ptys - 1) ptys in
-    let p_out_ty = as_seq1 p_out_ty in
 
-    let args_tys = List.map (Theory.parse_p_ty env) p_args_tys in
-    let out_ty = Theory.parse_p_ty env p_out_ty in
+    let p_args_tys = match p_args_ty with
+      | Some { pl_desc = Theory.P_tuple p_tys} -> p_tys
+      | Some p_ty -> [p_ty]
+      | None -> []
+    in
+
+    let args_tys = List.map (Theory.convert_ty env) p_args_tys in
+    let out_ty = Theory.convert_ty env p_out_ty in
     
-    let n_fty = Type.mk_ftype 0 [] args_tys out_ty in
+    let n_fty = Type.mk_ftype_tuple [] args_tys out_ty in
 
     List.iter2 (fun ty pty ->
         if not (Type.equal ty Type.ttimestamp) &&
@@ -274,7 +282,8 @@ let declare table hint_db decl =
     
     Theory.declare_name table s Symbols.{ n_fty }, []
 
-  | Decl.Decl_state (s, args, k, t) -> Theory.declare_state table s args k t, []
+  | Decl.Decl_state { name; args; out_ty; init_body; } ->
+    Theory.declare_state table name args out_ty init_body, []
 
   | Decl.Decl_senc_w_join_hash (senc, sdec, h) ->
     Theory.declare_senc_joint_with_hash table senc sdec h, []
@@ -282,15 +291,14 @@ let declare table hint_db decl =
   | Decl.Decl_sign (sign, checksign, pk, tagi, ctys) ->
     let () = Utils.oiter (define_oracle_tag_formula table sign) tagi in
 
-    let ctys = parse_ctys table ctys ["m"; "sig"; "check"; "sk"; "pk"] in
+    let ctys = parse_ctys table ctys ["m"; "sig"; "sk"; "pk"] in
     let m_ty     = List.assoc_opt "m"     ctys
     and sig_ty   = List.assoc_opt "sig"   ctys
-    and check_ty = List.assoc_opt "check" ctys
     and sk_ty    = List.assoc_opt "sk"    ctys
     and pk_ty    = List.assoc_opt "pk"    ctys in
 
     Theory.declare_signature table
-      ?m_ty ?sig_ty ?check_ty ?sk_ty ?pk_ty sign checksign pk,
+      ?m_ty ?sig_ty ?sk_ty ?pk_ty sign checksign pk,
     []
 
   | Decl.Decl_abstract decl -> parse_abstract_decl table decl, []
@@ -305,15 +313,15 @@ let declare table hint_db decl =
     in
     table, []
 
-let declare_list table hint_db decls =
+let declare_list table decls =
   let table, subgs = 
-    List.map_fold (fun table d -> declare table hint_db d) table decls
+    List.map_fold (fun table d -> declare table d) table decls
   in
   table, List.flatten subgs
 
 (*------------------------------------------------------------------*)
 let add_hint_rewrite table (s : lsymb) db =
-  let lem = Prover.get_reach_assumption s in
+  let lem = Lemma.find_stmt_reach s table in
   
   if not (SE.subset table lem.system.set SE.any) then
     Tactics.hard_failure ~loc:(L.loc s)
@@ -322,7 +330,7 @@ let add_hint_rewrite table (s : lsymb) db =
   Hint.add_hint_rewrite s lem.Goal.ty_vars lem.Goal.formula db
 
 let add_hint_smt table (s : lsymb) db =
-  let lem = Prover.get_reach_assumption s in
+  let lem = Lemma.find_stmt_reach s table in
 
   if not (SE.subset table lem.system.set SE.any) then
     Tactics.hard_failure ~loc:(L.loc s)

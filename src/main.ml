@@ -90,6 +90,7 @@ type cmd_error =
   | IncludeCycle      of string
   | IncludeNotFound   of string
   | IncludeFailed     of (Format.formatter -> unit)
+  | InvalidSetOption  of string
 
 exception Cmd_error of cmd_error
 
@@ -109,6 +110,8 @@ let pp_cmd_error fmt = function
   | InvalidExtention s   -> Fmt.pf fmt "invalid extention (not a .sp): %s" s
 
   | IncludeFailed err    -> Fmt.pf fmt "%t" err
+
+  | InvalidSetOption s   -> Fmt.pf fmt "set failed: %s" s
 
 let cmd_error e = raise (Cmd_error e)
 
@@ -270,8 +273,7 @@ let do_undo (state : main_state) (nb_undo : int) : main_state =
 
 (*------------------------------------------------------------------*)
 let do_decls (state : main_state) (decls : Decl.declarations) : main_state =
-  let hint_db = Prover.current_hint_db () in
-  let table, proof_obls = ProcessDecl.declare_list state.table hint_db decls in
+  let table, proof_obls = ProcessDecl.declare_list state.table decls in
 
   if proof_obls <> [] then
     Printer.pr "@[<v 2>proof obligations:@;%a@]"
@@ -285,9 +287,8 @@ let do_decls (state : main_state) (decls : Decl.declarations) : main_state =
 let do_print (state : main_state) (q : Prover.print_query) : main_state =
   match q with
   | Prover.Pr_statement l -> 
-    let g = Prover.get_assumption l in
-    let k = oget (Prover.get_assumption_kind (L.unloc l)) in
-    Printer.prt `Default "@[<2>%a %a@]" Prover.pp_kind k Goal.pp_statement g;
+    let lem = Lemma.find l state.table in
+    Printer.prt `Default "%a" Lemma.pp lem;
     state
 
   | Prover.Pr_system s_opt ->
@@ -302,6 +303,12 @@ let do_print (state : main_state) (q : Prover.print_query) : main_state =
       | Some s -> SystemExpr.parse state.table s
     in
     SystemExpr.print_system state.table system;
+
+    if Config.print_trs_equations ()
+    then
+      Printer.prt `Result "@[<v>@;%a@;@]%!"
+        Completion.print_init_trs state.table;
+
     state
 
 (*------------------------------------------------------------------*)
@@ -335,7 +342,8 @@ let do_tactic (state : main_state) l : main_state =
            | `Tactic utac  -> Prover.eval_tactic utac)
         l
     with
-      | e -> ignore (Prover.reset_from_state prover_state) ; raise e
+      | e -> 
+        ignore (Prover.reset_from_state prover_state) ; raise e
     end ;
     if Prover.is_proof_completed () then begin
       Printer.prt `Goal "Goal %s is proved"
@@ -348,25 +356,25 @@ let do_tactic (state : main_state) l : main_state =
 
 (*------------------------------------------------------------------*)
 let do_qed (state : main_state) : main_state =
-  Prover.complete_proof ();
+  let table = Prover.complete_proof state.table in
   Printer.prt `Result "Exiting proof mode.@.";
-  { state with mode = GoalMode }
+  { state with table; mode = GoalMode }
 
 (*------------------------------------------------------------------*)
 let do_add_hint (state : main_state) (h : Hint.p_hint) : main_state =
-  let db = Prover.current_hint_db () in
-  let db =
+  let module PD = ProcessDecl in
+  let table =
     match h with
-    | Hint.Hint_rewrite id -> ProcessDecl.add_hint_rewrite state.table id db
-    | Hint.Hint_smt     id -> ProcessDecl.add_hint_smt     state.table id db
+    | Hint.Hint_rewrite id -> PD.add_hint_rewrite state.table id state.table
+    | Hint.Hint_smt     id -> PD.add_hint_smt     state.table id state.table
   in
-  Prover.set_hint_db db;
-  state
+  { state with table; }
 
 (*------------------------------------------------------------------*)
 let do_set_option (state : main_state) (sp : Config.p_set_param) : main_state =
-  Config.set_param sp;
-  state
+  match Config.set_param sp with
+  | `Failed s -> cmd_error (InvalidSetOption s)
+  | `Success -> state
 
 (*------------------------------------------------------------------*)
 let do_add_goal 
@@ -374,10 +382,7 @@ let do_add_goal
     (g : Goal.Parsed.t Location.located) 
   : main_state 
   =
-  let hint_db = Prover.current_hint_db () in
-  let i,f =
-    Prover.add_new_goal state.table hint_db g
-  in
+  let i,f = Prover.add_new_goal state.table g in
   Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@." i Goal.pp_init f;
   state
 
@@ -514,6 +519,7 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
     let cmd = next_input ~test state in
     let new_state = do_command ~test state cmd
     in
+    Server.update ();
     new_state, new_state.mode
   with
   (* exit prover *)
@@ -603,6 +609,7 @@ let interactive_prover () =
   Printer.prt `Start "Squirrel Prover interactive mode.";
   Printer.prt `Start "Git commit: %s" Commit.hash_commit;
   Printer.init Printer.Interactive;
+  Server.start ();
   try start_main_loop ~html:false ~main_mode:`Stdin ()
   with End_of_file -> Printer.prt `Error "End of file, exiting."
 
@@ -661,7 +668,7 @@ let () =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/existsintro_fail.sp" with
-           | Theory.(Conv (_, Undefined "a1")) -> raise Ok)
+           | Symbols.(SymbError (_, Unbound_identifier "a1")) -> raise Ok)
     end ;
     "TS not leq", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
@@ -669,7 +676,7 @@ let () =
            try run ~test "tests/alcotest/ts_leq_not_lt.sp" with
            | Unfinished -> raise Ok)
     end ;
-    "SEnc Bad SSC - INTCTXT 1", `Quick, begin fun () ->
+(*    "SEnc Bad SSC - INTCTXT 1", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/intctxt_nornd.sp" with
@@ -692,7 +699,7 @@ let () =
         (fun () ->
            try run ~test "tests/alcotest/intctxt_sharedrndind.sp" with
            | Tactic_soft_failure (_,SEncSharedRandom) -> raise Ok)
-    end ;
+    end ;*)
     "Senc Bad SSC - CCA 1", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
@@ -734,7 +741,7 @@ let () =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/depends.sp" with
-           | Tactic_soft_failure (_, Tactics.NotDepends ("A1(i)","A1(i)"))
+           | Tactic_soft_failure (_, Tactics.NotDepends _)
              -> raise Ok)
     end ;
     "Fresh Not Ground", `Quick, begin fun () ->
@@ -756,12 +763,6 @@ let () =
         (fun () ->
            try run ~test "tests/alcotest/idx_abs.sp" with
            | Tactic_soft_failure (_,Tactics.GoalNotClosed) -> raise Ok)
-    end ;
-    "Indexed collision", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok
-        (fun () ->
-           try run ~test "tests/alcotest/idx_collision.sp" with
-           | Unfinished -> raise Ok)
     end ;
     "Find equality", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok

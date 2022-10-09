@@ -18,16 +18,14 @@ include LowSequent.S with
     equivalence goals.
     For more general cases, the global meta-formula used as conclusion
     can include implications. *)
-val init : 
-  env:Env.t->
-  hint_db:Hint.hint_db ->
-  ?hyp:Equiv.form ->
-  Equiv.form ->
-  t
+val init : env:Env.t-> ?hyp:Equiv.form -> Equiv.form -> t
 
 (** Special pretty-printer for initial sequents.
     It does not display hypotheses, which might be misleading. *)
 val pp_init : Format.formatter -> t -> unit
+
+(** Free variables + var env **toplevel** sanity check *)
+val sanity_check : t -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
@@ -67,3 +65,11 @@ val to_trace_sequent : t -> LowTraceSequent.t
 (** {2 Automated reasoning} *)
 
 val query_happens : precise:bool -> t -> Term.term -> bool
+
+(** Utility *)
+
+(* Constructs the trace context for the pair of systems *)
+val mk_pair_trace_cntxt : sequent -> Constr.trace_cntxt
+
+(* Fails if the goal is not an equivalence *)
+val check_goal_is_equiv : sequent -> unit

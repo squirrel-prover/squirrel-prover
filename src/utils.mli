@@ -27,6 +27,10 @@ module List : sig
 
   val remove_duplicate : ('a -> 'a -> bool) -> 'a list -> 'a list
 
+  (** Removes from l all elements that are subsumed by another.
+      [included x y] iff x included in y, ie y subsumes x. *)
+  val clear_subsumed : ('a -> 'a -> bool) -> 'a list -> 'a list
+
   val inclusion : 'a list -> 'a list -> bool
 
   (** [diff a b] is [a] minus [b]'s elements  *)
@@ -70,6 +74,8 @@ module List : sig
   val foldi : (int -> 'a -> 'b -> 'a) -> 'a -> 'b list -> 'a
 
   val find_mapi : (int -> 'a -> 'b option) -> 'a list -> 'b option 
+
+  val mem_cmp : eq:('a -> 'a -> bool) -> 'a -> 'a list -> bool
 
   exception Out_of_range
 end

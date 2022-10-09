@@ -81,17 +81,33 @@ module MkCommonLowTac (S : Sequent.S) : sig
   (*------------------------------------------------------------------*)
   (** {3 Rewriting equiv} *)
 
+  (** Parameter for "rewrite equiv" tactic:
+      - a global formula that is a chain of implications concluding
+        with an equivalence atom;
+      - a list of proog obligation
+      - the corresponding system expression;
+      - the rewriting direction.
+      The rewrite equiv tactic corresponds to the ReachEquiv rule of CSF'22. *)
   type rw_equiv =
-    SystemExpr.context * Equiv.global_form * [ `LeftToRight | `RightToLeft ]
+    SystemExpr.context * 
+    S.t list * 
+    Equiv.global_form *
+    [ `LeftToRight | `RightToLeft ]
 
   val p_rw_equiv : Args.rw_equiv_item -> S.t -> rw_equiv
 
   (*------------------------------------------------------------------*)
   (** {3 Rewriting and term expantion} *)
 
+
   type rw_arg =
-    | Rw_rw of L.t * Ident.t option * Rewrite.rw_rule
-    (** The ident is the ident of the hyp the rule came from (if any) *)
+    | Rw_rw of { 
+        hyp_id : Ident.t option;  (** ident of the hyp the rule 
+                                      came from (if any)  *)
+        loc   : L.t;              (** location *)
+        subgs : Term.term list;   (** subgoals *)
+        rule  : Rewrite.rw_rule;  (** rule *)
+      }
 
     | Rw_expand    of Theory.term
     | Rw_expandall of Location.t

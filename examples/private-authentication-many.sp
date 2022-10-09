@@ -16,10 +16,10 @@ set postQuantumSound=true.
 channel cA
 channel cB
 
-name kA    : index          -> message
-name kAbis : index -> index -> message
+name kA    : index         -> message
+name kAbis : index * index -> message
 
-name kB    : index          -> message
+name kB    : index         -> message
 
 aenc enc,dec,pk
 
@@ -75,9 +75,9 @@ Qed.
 equiv unlinkability.
 Proof.
   enrich
-    seq(A:index          -> pk( kA    (A  ) )),
-    seq(A:index, i:index -> pk( kAbis (A,i) )),
-    seq(A:index          -> pk( kB    (A  ) )).
+    seq(A:index          => pk( kA    (A  ) )),
+    seq(A:index, i:index => pk( kAbis (A,i) )),
+    seq(A:index          => pk( kB    (A  ) )).
 
   induction t.
 

@@ -43,11 +43,11 @@ set showStrengthenedHyp=true.
 (*------------------------------------------------------------------*)
 global goal _ (t : timestamp):
   [happens(t)] ->
-  equiv(frame@t, seq(pid:index -> k(pid))) ->
+  equiv(frame@t, seq(pid:index => k(pid))) ->
   equiv(
     frame@t,
-    seq(pid:index -> k(pid)),
-    seq(pid:index -> SCtr(pid)@t)).
+    seq(pid:index => k(pid)),
+    seq(pid:index => SCtr(pid)@t)).
 Proof.
   intro Hap H.
 
@@ -59,12 +59,12 @@ global goal _ (t : timestamp):
   [happens(t)] -> 
   equiv(
     frame@t,
-    seq(pid:index -> sid(pid)),
-    seq(pid:index -> k(pid))
+    seq(pid:index => sid(pid)),
+    seq(pid:index => k(pid))
   ).
 Proof.
   dependent induction t => t Hind Hap.
-  enrich seq(pid:index -> SCtr(pid)@t).
+  enrich seq(pid:index => SCtr(pid)@t).
 
   case t => Eq; 
   try (repeat destruct Eq as [_ Eq]; 
@@ -90,8 +90,8 @@ global goal _ (t : timestamp):
   equiv(frame@t) ->
   equiv(
     frame@t,
-    seq(pid:index -> k(pid)),
-    seq(pid:index -> SCtr(pid)@t)).
+    seq(pid:index => k(pid)),
+    seq(pid:index => SCtr(pid)@t)).
 Proof.
   intro Hap H.
   checkfail apply H exn ApplyMatchFailure.

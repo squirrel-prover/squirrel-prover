@@ -58,22 +58,22 @@ goal authentication :
      snd(att(<<nt,h(nt,k1)>,<nt',h(nt',k2)>>)) = h(nt',k2))
   ).
 Proof.
-  intro H. (* the inference ---- is as still a dotted implication *)
+  intro H. (* the inference ---- is like a local-formula implication *)
   case H.
   (* Reader recognizes valid input from T1. *)
-  + euf H => _.
-    - left. auto.
-    - left. auto.
+  + euf H.
+    - intro Heuf. left. auto.
+    - intro Heuf. left. auto.
   (* Reader recognizes valid input from T2. *)
-  + euf H => _.
-    - right. auto.
-    - right. auto.
+  + euf H.
+    - intro Heuf. right. auto.
+    - intro Heuf. right. auto.
 Qed.
 
 (* To prove an equivalence we use a global goal.
    The two sides of the equivalence are given at once,
    using diff(_,_) when the left and right sides differ. *)
-global goal privacy (i1,i2,j1,j2:index) :
+global goal privacy :
   equiv(<nt,h(nt,k1)>,
         diff(<nt',h(nt',k1)>,
              <nt',h(nt',k2)>)).

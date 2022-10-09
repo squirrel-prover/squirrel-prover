@@ -160,6 +160,25 @@ module List = struct
     in
     List.rev l_rev  
 
+
+  (** Removes from l all elements that are subsumed by another.
+      [included x y] iff x included in y, ie y subsumes x. *)
+  let clear_subsumed
+      (included : 'a -> 'a -> bool)
+      (l : 'a list) :
+    'a list =
+    let ll =
+      fold_left (fun acc x ->
+          if exists (included x) acc then
+            acc
+          else
+            let acc =
+              filter (fun y -> not (included y x)) acc in
+            x :: acc
+        ) [] l
+    in
+    rev ll
+
   (*------------------------------------------------------------------*)
   let mapi_fold 
       (f  : int -> 'a -> 'b -> 'a * 'c) 
@@ -196,6 +215,11 @@ module List = struct
       ) l);
       None
     with Found res -> res
+
+  let rec mem_cmp ~eq x = function
+      [] -> false
+    | a::l -> eq a x || mem_cmp ~eq x l
+
 end
 
 (*------------------------------------------------------------------*)
@@ -646,17 +670,17 @@ let maybe_paren
     ~(side  : assoc)
     (pp : 'b Fmt.t) : 'b Fmt.t
   =
-  let noparens (pi, fi) (po, fo) side =
-    match fo with
+  let noparens (prio_in, fix_in) (prio_out, fix_out) side =
+    match fix_out with
     | `NoParens -> true
     | _ ->
-      (pi > po) ||
-      match fi, side with
+      (prio_in > prio_out) ||
+      match fix_in, side with
       | `Postfix     , `Left     -> true
       | `Prefix      , `Right    -> true
-      | `Infix `Left , `Left     -> (pi = po) && (fo = `Infix `Left )
-      | `Infix `Right, `Right    -> (pi = po) && (fo = `Infix `Right)
-      | _            , `NonAssoc -> (pi = po) && (fi = fo)
+      | `Infix `Left , `Left     -> prio_in = prio_out && fix_out = `Infix `Left 
+      | `Infix `Right, `Right    -> prio_in = prio_out && fix_out = `Infix `Right
+      | _            , `NonAssoc -> prio_in = prio_out && fix_out = fix_in
       | _            , _         -> false
   in
   pp_maybe_paren (not (noparens inner outer side)) pp

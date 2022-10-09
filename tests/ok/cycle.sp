@@ -1,11 +1,9 @@
-
-
 hash h
 name k : message
 name n : message
 name m : message
 name t : message
-channel c
+channel c.
 
 system out(c,h(n,k)).
 

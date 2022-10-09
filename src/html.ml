@@ -1,6 +1,8 @@
 (** Global variables used in the module *)
 (*Output channel to write in the output file*)
 let current_out_c = ref stdout
+(*Formatter to write in the output file*)
+let current_ppf = ref Format.std_formatter
 (*Memorize the position of the "<!--HERE-->" tag in the template *)
 let tag_pos = ref (-1)
 (*Lexer for the input file*)
@@ -8,31 +10,8 @@ let lex = ref (Lexing.from_channel stdin)
 (*Count the number of instructions treated*)
 let counter = ref 0
 
-(** Print [c].
-  * Escape it if it is a html reserved character,
-  * unless previous character was ESC *)
-let print_esc_char (escaping : bool ref) (c : char) : unit =
-  if !escaping then begin
-    match c with
-    | '\x1B' -> escaping := false;
-    | '\n' -> output_string !current_out_c "<br>"
-    | '<' -> output_string !current_out_c "&lt;"
-    | '>' -> output_string !current_out_c "&gt;"
-    | '"' -> output_string !current_out_c "&quot;"
-    | '&' -> output_string !current_out_c "&amp;"
-    | _ -> output_char !current_out_c c
-  end
-  else begin
-    escaping := true;
-    output_char !current_out_c c
-  end
 
-(** Print [s].
-  * Escape html reserved characters *)
-let print_esc_string (s : string) : unit =
-  String.iter (print_esc_char (ref true)) s
-
-(** Return [s] without empty lines at the beginniginitial new_lines characters *)
+(** Return [s] without empty lines at the beginnig *)
 let trim (s : string) : string =
   let l = String.length s in
   let rec start_pos (pos : int) (start : int): int =
@@ -49,9 +28,10 @@ let trim (s : string) : string =
   let pos = start_pos 0 0 in
   String.sub s pos (l-pos)
 
+
 (** Print string [s], translating markdown into html
     Use pandoc *)
-let print_pandoc (s : string) : unit =
+let print_pandoc ppf (s : string) : unit =
   (*Write s into a first pipe*)
   let (pipe_out, pipe_in) = Unix.pipe() in
   let c_pipe_in = Unix.out_channel_of_descr pipe_in in
@@ -72,11 +52,11 @@ let print_pandoc (s : string) : unit =
   try
     while true do
       let line = input_line c_result in
-      output_string !current_out_c line ;
-      output_char !current_out_c '\n'
+      Format.fprintf ppf "%s\n" line
     done
   with
   | End_of_file -> close_in c_result
+
 
 (** Print the output formatted with html tag
   * Input and comments are read in [!lex]
@@ -84,41 +64,33 @@ let print_pandoc (s : string) : unit =
 let pp () =
   let (input_line, coms) = HtmlParser.main HtmlLexer.token !lex in
   let concat_com = String.concat "\n\n" coms in
-  
-  output_string !current_out_c (Format.asprintf 
-    "<span class=\"squirrel-step\" id=\"step%d\">\n"
-    !counter);
-  
-  (*Print input lines*)
-  output_string !current_out_c (Format.asprintf 
-    "<span class=\"input-line\" id=\"in%d\">"
-    !counter);
-  if concat_com <> "" then
-    print_esc_string (trim input_line)
-  else
-    print_esc_string input_line;
-  output_string !current_out_c "</span>\n";
-
-  (*Print output lines*)
-  output_string !current_out_c (Format.asprintf
-    "<span class=\"output-line\" id=\"out%d\">"
-    !counter);
+  let trimed_input_line = if concat_com <> "" then trim input_line else input_line in
   let output_line = (Format.flush_str_formatter ()) in
-  print_esc_string output_line;
-  output_string !current_out_c "</span>\n";
-  
-  (*Print comments*)
-  if concat_com <> "" then begin
-    output_string !current_out_c (Format.asprintf
-      "<span class=\"com-line\" id=\"com%d\">"
-      !counter);
-    print_pandoc concat_com;
-    output_string !current_out_c "</span>\n"
-  end ;
-  
-  output_string !current_out_c "</span>\n\n";
-  
+  (*Open a span element to encapsulated everything*)
+  Format.fprintf !current_ppf
+    "<span class=\"squirrel-step\" id=\"step%d\">\n"
+    !counter;
+  (*Print input lines*)
+  Format.fprintf !current_ppf
+    "<span class=\"input-line\" id=\"in%d\">%a</span>\n"
+    !counter
+    (Printer.html Format.pp_print_string) trimed_input_line;
+  (*Print output lines
+    Since they passed throught the str_formatter, they already have an HTML format*)
+  Format.fprintf !current_ppf
+    "<span class=\"output-line\" id=\"out%d\">%a</span>\n"
+    !counter
+    Format.pp_print_string output_line;
+  (*Print comments, if there are some*)
+  if concat_com <> "" then
+    Format.fprintf !current_ppf
+      "<span class=\"com-line\" id=\"com%d\">%a</span>\n"
+      !counter
+      print_pandoc concat_com;
+  (*Close the span element*)
+  Format.fprintf !current_ppf "</span>\n\n";
   incr counter
+
 
 (** Initialise this module.
   * Input:
@@ -139,14 +111,14 @@ let init (filename : string) (html_filename : string) : unit =
       let line = input_line html_c in
       if line = "<!--HERE-->" then begin
         tag_pos := pos_in html_c;
-        output_string out_c
-          "<span style=\"display: none;\">"
       end
       else
         output_string out_c (line ^ "\n")
     done;
     close_in html_c;
     current_out_c := out_c;
+    current_ppf := Format.formatter_of_out_channel out_c;
+    Format.fprintf !current_ppf "<span style=\"display: none;\">";
     
     let in_c = Stdlib.open_in filename in
     lex := Lexing.from_channel in_c
@@ -162,6 +134,7 @@ let init (filename : string) (html_filename : string) : unit =
       Sys.remove out_filename;
       exit 1
 
+
 (** End the output:
   * Input:
   * - [html_filename]: Name of the html template
@@ -169,17 +142,18 @@ let init (filename : string) (html_filename : string) : unit =
   * - Write the last part of the template
   * - Close channels opened by this module*)
 let close (html_filename : string) : unit =
-  output_string !current_out_c "</span>";
+  Format.fprintf !current_ppf "</span>";
   let html_c = open_in html_filename in
   seek_in html_c !tag_pos;
   try
     while true do
       let line = input_line html_c in
-      output_string !current_out_c (line ^ "\n")
+      Format.fprintf !current_ppf "%s\n" line
     done;
   with
     | End_of_file ->
       close_in html_c;
       close_out !current_out_c;
       current_out_c := stdout;
+      current_ppf := Format.std_formatter;
       tag_pos := -1

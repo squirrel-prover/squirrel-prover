@@ -8,12 +8,15 @@ module Sp = Pos.Sp
 module SE = SystemExpr
   
 (*------------------------------------------------------------------*)
-(** Iterate over all subterms.
-  * Bound variables are represented as newly generated fresh variables.
-  * When a macro is encountered, its expansion is visited as well. *)
-class iter ~(cntxt:Constr.trace_cntxt) = object (self)
-  method visit_message (t : Term.term) = match t with
+class deprecated_iter ~(cntxt:Constr.trace_cntxt) = object (self)
+  method visit_message (t : Term.term) = 
+    match t with
+    | Tuple l
     | Fun (_, _,l) -> List.iter self#visit_message l
+
+    | App (t, l) -> List.iter self#visit_message (t :: l)
+
+    | Proj (_, t) -> self#visit_message t
 
     | Macro (ms,l,a) ->
       if l <> [] then failwith "Not implemented" ;
@@ -28,18 +31,13 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
     | Diff (Explicit l) ->
       List.iter (fun (_,tm) -> self#visit_message tm) l
 
-    | Seq (a, b) ->
-      let _, s = Term.refresh_vars `Global a in
-      let b = Term.subst s b in
-      self#visit_message b
-
     | Find (a, b, c, d) ->
       let _, subst = Term.refresh_vars `Global a in
       let b = Term.subst subst b in
       let c = Term.subst subst c in
       self#visit_message b; self#visit_message c; self#visit_message d
 
-    | ForAll (vs,l) | Exists (vs,l) ->
+    | Quant (_,vs,l) ->
       let _, subst = Term.refresh_vars `Global vs in
       let l = Term.subst subst l in
       self#visit_message l
@@ -47,14 +45,16 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
     | Term.Action _ -> ()
 end
 
-(** Fold over all subterms.
-  * Bound variables are represented as newly generated fresh variables.
-  * When a macro is encountered, its expansion is visited as well.
-  * Note that [iter] could be obtained as a derived class of [fold],
-  * but this would break the way we modify the iteration using inheritance.  *)
-class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
-  method fold_message (x : 'a) (t : Term.term) : 'a = match t with
+(*------------------------------------------------------------------*)
+class ['a] deprecated_fold ~(cntxt:Constr.trace_cntxt) = object (self)
+  method fold_message (x : 'a) (t : Term.term) : 'a = 
+    match t with
+    | Tuple l
     | Fun (_, _,l) -> List.fold_left self#fold_message x l
+
+    | App (t, l) -> List.fold_left self#fold_message x (t :: l)
+
+    | Proj (_, t) -> self#fold_message x t
 
     | Macro (ms,l,a) ->
       if l<>[] then failwith "Not implemented" ;
@@ -69,11 +69,6 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
     | Diff (Explicit l) ->
       List.fold_left (fun x (_,tm) -> self#fold_message x tm) x l
 
-    | Seq (a, b) ->
-      let _, s = Term.refresh_vars `Global a in
-      let b = Term.subst s b in
-      self#fold_message x b
-
     | Find (a, b, c, d) ->
       let _, s = Term.refresh_vars `Global a in
       let b = Term.subst s b in
@@ -81,7 +76,7 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
       let d = Term.subst s d in
       self#fold_message (self#fold_message (self#fold_message x b) c) d
 
-    | ForAll (vs,l) | Exists (vs,l) ->
+    | Quant (_,vs,l) ->
       let _, s = Term.refresh_vars `Global vs in
       let l = Term.subst s l in
       self#fold_message x l
@@ -90,17 +85,11 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
 
 end
 
-(** Iterator that does not visit macro expansions but guarantees that,
-  * for macro symbols [m] other that input, output, cond, exec, frame
-  * and states, if [m(...)@..] occurs in the visited terms then
-  * a specific expansion of [m] will have been visited, without
-  * any guarantee on the indices and action used for that expansion,
-  * because [get_dummy_definition] is used -- this behaviour is disabled
-  * with [exact], in which case all macros will be expanded and must
-  * thus be defined. *)
-class iter_approx_macros ~exact ~(cntxt:Constr.trace_cntxt) = object (self)
+(*------------------------------------------------------------------*)
+class deprecated_iter_approx_macros ~exact ~(cntxt:Constr.trace_cntxt) = 
+  object (self)
 
-  inherit iter ~cntxt as super
+  inherit deprecated_iter ~cntxt as super
 
   val mutable checked_macros = []
 
@@ -126,19 +115,15 @@ class iter_approx_macros ~exact ~(cntxt:Constr.trace_cntxt) = object (self)
     | m -> super#visit_message m
 end
 
-(** Collect occurrences of [f(_,k(_))] or [f(_,_,k(_))] for a function name [f]
-    and name [k]. We use the exact version of [iter_approx_macros], otherwise we
-    might obtain meaningless terms provided by [get_dummy_definition].
-    Patterns must be of the form [f(_,_,g(k(_)))] if allow_funs is defined
-    and [allows_funs g] returns true. *)
-class get_f_messages ?(drop_head=true)
+(*------------------------------------------------------------------*)
+class deprecated_get_f_messages ?(drop_head=true)
     ?(fun_wrap_key=None)
     ~(cntxt:Constr.trace_cntxt) f k = object (self)
-  inherit iter_approx_macros ~exact:true ~cntxt as super
+  inherit deprecated_iter_approx_macros ~exact:true ~cntxt as super
   val mutable occurrences : (Vars.var list * Term.term) list = []
   method get_occurrences = occurrences
   method visit_message = function
-    | Term.Fun ((f',_),_, [m;k']) as m_full when f' = f ->
+    | Term.Fun (f',_, [Tuple [m;k']]) as m_full when f' = f ->
       begin match k' with
         | Term.Name s' when s'.s_symb = k ->
           let ret_m = if drop_head then m else m_full in
@@ -147,19 +132,20 @@ class get_f_messages ?(drop_head=true)
       end ;
       self#visit_message m ; self#visit_message k'
 
-    | Term.Fun ((f',_), _,[m;r;k']) as m_full when f' = f ->
+    | Term.Fun (f', _,[Tuple [m;r;k']]) as m_full when f' = f ->
       begin match k', fun_wrap_key with
         | Term.Name s', None when s'.s_symb = k ->
           let ret_m = if drop_head then m else m_full in
           occurrences <- (s'.s_indices,ret_m) :: occurrences
-        |Term.Fun ((f',_), _, [Term.Name s']), Some is_pk
+        |Term.Fun (f', _, [Term.Name s']), Some is_pk
           when is_pk f' && s'.s_symb = k ->
           let ret_m = if drop_head then m else m_full in
           occurrences <- (s'.s_indices,ret_m) :: occurrences
         | _ -> ()
       end ;
       self#visit_message m ; self#visit_message k'
-    | Term.Var m -> assert false (* SSC must have been checked first *)
+    | Term.Var m when not (Type.is_finite (Vars.ty m)) ->
+      assert false (* SSC must have been checked first *)
     | m -> super#visit_message m
 end
 
@@ -202,17 +188,10 @@ let tfold_occ
   : 'a 
   =
   match t with
-  | Term.ForAll (evs, t)
-  | Term.Exists (evs, t) ->
+  | Term.Quant (_, evs, t) ->
     let evs, subst = Term.refresh_vars `Global evs in
     let t = Term.subst subst t in
     let fv = List.rev_append evs fv in
-    func ~fv ~cond t acc
-
-  | Term.Seq (is, t) ->
-    let is, subst = Term.refresh_vars `Global is in
-    let t = Term.subst subst t in
-    let fv = List.rev_append is fv in
     func ~fv ~cond t acc
 
   | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite ->
@@ -247,6 +226,9 @@ let tfold_occ
         | `Undef | `MaybeDef -> default ()
     end
 
+  | Term.App    _
+  | Term.Tuple  _
+  | Term.Proj   _
   | Term.Name   _
   | Term.Fun    _
   | Term.Action _
@@ -275,8 +257,8 @@ type fsymb_matcher =
   | Type of Symbols.function_def
   | Symbol of Term.fsymb
 
-let matching table (fn,vs) = function
-  | Symbol fsymb -> fsymb = (fn,vs)
+let matching table fn = function
+  | Symbol fsymb -> fsymb = fn
   | Type symtype -> Symbols.is_ftype fn symtype table
 
 
@@ -299,9 +281,9 @@ let get_f
     in
 
     match t with
-    | Term.Fun ((fn,vs),_,l)  ->
+    | Term.Fun (fn,_,l)  ->
       let head_occ =
-        if matching table (fn,vs) symtype
+        if matching table fn symtype
         then [{ occ_cnt  = t;
                 occ_vars = List.rev fv;
                 occ_cond = cond;
@@ -423,7 +405,7 @@ let get_f_messages_ext
     (se : SE.arbitrary) (fv : Vars.vars) (cond : Term.terms) pos
     (occs : hash_occs) ->
     match t with
-      | Term.Fun ((f',_),_, [m;k']) as m_full when f' = f ->
+      | Term.Fun (f',_, [Tuple [m;k']]) as m_full when f' = f ->
         let occs' =
           match k' with
           | Term.Name s' when s'.s_symb = k ->
@@ -436,7 +418,7 @@ let get_f_messages_ext
         in
         occs' @ occs, `Continue
 
-      | Term.Fun ((f',_), _, [m;r;k']) as m_full when f' = f ->
+      | Term.Fun (f', _, [Tuple [m;r;k']]) as m_full when f' = f ->
         let occs' =
           match k', fun_wrap_key with
           | Term.Name s', None when s'.s_symb = k ->
@@ -446,7 +428,7 @@ let get_f_messages_ext
                occ_cond = cond;
                occ_pos  = Sp.singleton pos; }]
 
-          |Term.Fun ((f',_), _, [Term.Name s']), Some is_pk
+          |Term.Fun (f', _, [Term.Name s']), Some is_pk
             when is_pk f' && s'.s_symb = k ->
             let ret_m = if drop_head then m else m_full in
             [{ occ_cnt  = s'.s_indices,ret_m;
@@ -474,7 +456,7 @@ let get_f_messages_ext
   in
 
   let occs, _, _ =
-    Pos.map_fold ~mode:(`TopDown true) func (Vars.of_list fv) sexpr [] t
+    Pos.map_fold ~mode:(`TopDown true) func sexpr [] t
   in
   occs
 
@@ -703,12 +685,12 @@ end = struct
                  - otherwise, we must use a fresh universally quantified var. *)
               if v_a = v_b
               then false, v_a
-              else true, Vars.make_new Type.Index "i"
+              else true, Vars.make_fresh Type.Index "i"
 
             (* [v_a] or [v_b] is not a constant.
                In that case, use a universally quantified variable. *)
-            | true, _ -> true, Vars.make_new_from v_a
-            | _, true -> true, Vars.make_new_from v_b
+            | true, _ -> true, Vars.refresh v_a
+            | _, true -> true, Vars.refresh v_b
           in
 
           (* update [indices_r] *)
@@ -727,7 +709,7 @@ end = struct
     mk ~env:Sv.empty ~msymb:join_ms ~indices:(!indices_r)
 
   let incl table (sexpr : SE.fset) (s1 : t) (s2 : t) : bool =
-    let tv = Vars.make_new Type.Timestamp "t" in
+    let tv = Vars.make_fresh Type.Timestamp "t" in
     let term1 = Term.mk_macro s1.msymb [] (Term.mk_var tv) in
     let term2 = Term.mk_macro s2.msymb [] (Term.mk_var tv) in
 
@@ -978,11 +960,16 @@ let _fold_macro_support
                 ) m_is m_is'
             in
 
+            let iocc_cnt = Term.subst subst t in
+            let iocc_action = Action.subst_action subst descr.action in
+            let iocc_fv = 
+              Sv.union (Action.fv_action iocc_action) (Term.fv iocc_cnt) 
+            in
             let iocc = {
               iocc_aname   = descr.name;
-              iocc_vars    = Sv.diff (Term.fv t) env;
-              iocc_action  = Action.subst_action subst descr.action;
-              iocc_cnt     = Term.subst subst t;
+              iocc_vars    = Sv.diff iocc_fv env;
+              iocc_action;
+              iocc_cnt;
               iocc_sources = srcs;
             } in
 

@@ -70,7 +70,7 @@ name b1 : message
 name c11 : message
 name a : index -> message
 name b : index -> message
-name k : index -> index -> message
+name k : index * index -> message.
 
 name r : message
 name r2 : index -> message
@@ -115,7 +115,7 @@ process P1FA =
   in(cP,t);
   let sidP = h(<<g^ake11,gB>,k11>, hKey) in
   let pkS = fst(t) in
-  if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
+  if pkS = pk(kS) && checksign(sidP, snd(t), pkS) then
   out(cP, enc(sign(sidP,kP),r,k11));
   (* end P1 *)
 
@@ -138,7 +138,7 @@ process PDIS =
   let sidS0 = h(<<gP0,g^bke11>,k11>, hKey) in
   out(cS, <<pk(kS),g^bke11>,sign(sidS0, kS)>);
   in(cS, encP );
-  if checksign(dec(encP,gP0^bke11),pk(kP)) = sidS0 then
+  if checksign(sidS0, dec(encP,gP0^bke11), pk(kP)) then
       out(cS,ok);
   (* end S1 *)
   (* begin Pdis0 *)
@@ -150,7 +150,7 @@ process PDIS =
   in(cP,t);
   let sidP = h(<<g^a1,gB>,gB^a1>, hKey) in
   let pkS = fst(t) in
-  if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
+  if pkS = pk(kS) && checksign(sidP, snd(t),pkS) then
     out(cP, enc( <reqsign, sidP>,r3,k11));
     in(cP, signans);
     let y = dec(signans,k11) in
@@ -171,7 +171,7 @@ process SDIS =
   out(cS, <<pk(kS),g^b1>,sign(sidS, kS)>);
   in(cS, encP );
   let x = dec(encP,gP^b1) in
-  if checksign(x,pk(kP)) = <forwarded,sidS> then
+  if checksign(<forwarded, sidS>, x, pk(kP)) then
     Sok : out(cS,ok).
 
 system [fullSSH] K: (P1FA | SDIS | PDIS).
@@ -185,7 +185,7 @@ process P1FADDH =
   in(cP,t);
   let sidP = h(<<g^ake11,gB>,k11>, hKey) in
   let pkS = fst(t) in
-  if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
+  if pkS = pk(kS) && checksign(sidP, snd(t), pkS) then
   out(cP, enc(sign(sidP,kP),r,k11));
   (* end P1 *)
 
@@ -208,7 +208,7 @@ process PDISDDH =
   let sidS0 = h(<<gP0,g^bke11>,k11>, hKey) in
   out(cS, <<pk(kS),g^bke11>,sign(sidS0, kS)>);
   in(cS, encP );
-  if checksign(dec(encP,gP0^bke11),pk(kP)) = sidS0 then
+  if checksign(sidS0, dec(encP,gP0^bke11), pk(kP)) then
   out(cS,ok);
   (* end S1 *)
   (* begin Pdis0 *)
@@ -247,7 +247,7 @@ process P1FAauth =
   in(cP,t);
   let sidPaF = h(<<g^ake11,gB>,k11>, hKey) in
   let pkSaF = fst(t) in
-  if pkSaF = pk(kS) && checksign(snd(t),pkS) = sidPaF then
+  if pkSaF = pk(kS) && checksign(sidPaF, snd(t), pkS) then
   out(cP, enc(sign(sidPaF,kP),r,k11));
   (* end P1 *)
 
@@ -270,7 +270,7 @@ process PDISauth =
   let sidS0a = h(<<gP1,g^bke11>,k11>, hKey) in
   out(cS, <<pk(kS),g^bke11>,sign(sidS0a, kS)>);
   in(cS, encP );
-  if checksign(dec(encP,gP1^bke11),pk(kP)) = sidS0a then
+  if checksign(sidS0a, dec(encP,gP1^bke11), pk(kP)) then
   out(cS,ok);
   (* end S1 *)
   (* begin Pdis0 *)
@@ -283,7 +283,7 @@ process PDISauth =
   in(cP,t);
   let sidPa = h(<<g^a1,gB>,gB^a1>, hKey) in
   let pkSa = fst(t) in
-  if pkSa = pk(kS) && checksign(snd(t),pkSa) = sidPa then
+  if pkSa = pk(kS) && checksign(sidPa, snd(t), pkSa) then
   out(cP, enc( <reqsign, sidPa>,r3,k11));
   in(cP, signans);
   let ya = dec(signans,k11) in
@@ -309,7 +309,7 @@ process SDISauth =
   out(cS, <<pk(kS),g^b1>,sign(sidSa, kS)>);
   in(cS, encP );
   let x4 = dec(encP,gP^b1) in
-  if checksign(x4,pk(kP)) = <forwarded,sidSa> then
+  if checksign(<forwarded, sidSa>, x4, pk(kP)) then
     out(cS,ok);
     in(cS,challenge);
     try find i such that gP = g^a(i) || gP = g^a1 in
@@ -349,10 +349,10 @@ Proof.
   destruct He as [_ [He Hchk]].
   rewrite !He in *.
   expand sidPa.
-  euf Hchk => Euf.
+  euf Hchk.
 
     + (* oracle case *)
-      destruct Euf as [_ [_|[i m m1 [H1|[i1 H2]]]]] => //.
+      intro Euf. destruct Euf as [_ [_|[i m m1 [H1|[i1 H2]]]]] => //.
         - by use hashlengthnotpair with
           <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1> as HH.
      
@@ -363,12 +363,12 @@ Proof.
           by collision.
 
     + (* honest case SDIS *)
-      intro Heq.
+      intro [Euf Heq].
       use freshindex as [l _].
       use Hc with l.
       by case Euf; expand sidSa; collision => _.
 
-    + intro Heq.
+    + intro [Euf Heq].
       use freshindex as [l _].
       use Hc with l.
       right.
@@ -386,10 +386,10 @@ Proof.
   destruct He as [_ Hchk].
 
   expand sidSa, x4.
-  euf Hchk => Euf.
+  euf Hchk.
 
-  + (* oracle clase *)
-    destruct Euf as [[_|[i m m1 H1]] H2]=> //.
+  + (* oracle case *)
+    intro Euf. destruct Euf as [[_|[i m m1 H1]] H2]=> //.
     destruct H1 as [H1| [i1 m2 m3 H1]].
       - (* sub case with wrong tag *)
         use Hc with i.
@@ -398,18 +398,19 @@ Proof.
       - by use hashlengthnotpair with <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake1(i1),m2>,m3>.
 
   + (* else, it comes from P2, and is not well tagged *)
+    intro [Euf _].
     by use hashlengthnotpair with
     <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake11,input@P1>,k11> as Hlen;
     intro *; case Euf; expand sidPaF.
 
   + (* Honest case of signature produced by Fa.
     We need to prove that the sign req received by FA comes from PDIS. *)
-    intro Meq.
+    intro [i [Euf Meq]].
     executable pred(Sok); 1,2: by auto => H2.
 
     depends SDIS, Sok => // _.
-    assert happens(SDIS); 1: auto.
-    assert happens(P3(i)); 1: case Euf; auto.
+    have _: happens(SDIS); 1: auto.
+    have _: happens(P3(i)); 1: case Euf; auto.
     expand x3(i)@P3(i).
     use H2 with P3(i) as H3; 2: case Euf; auto.
     expand exec, cond.
@@ -418,17 +419,16 @@ Proof.
     assert (x3(i)@P3(i) = dec(input@P3(i),k11)) as D1 => //.
     (* We have that x3 is a message encrypted with the secret key, we use the intctxt of encryption *)
     intctxt D1 => //.
-
       - (* Ill-tagged case 1 *)
-        by use signnottag with sidPaF@P2,kP.
+         by use signnottag with sidPaF@P2,kP. 
       - (* Ill-tagged case 2 *)
         by use difftags.
       - (* Honest case *)
-        intro H4 Meq1.
-        assert happens(PDIS5); 1: case H4; auto.
+        intro [H4 Meq1].
+        assert happens(PDIS5) as U; 1: by case Euf.
         expand x3(i)@P3(i), sidPa.
         assert PDIS5 <= Sok;
-        1: by case H4; case Euf.
+        1: by case Euf.
         use H2 with PDIS5; 2: by auto.
         expand exec, cond.
         use Hc with i.
@@ -446,9 +446,9 @@ Qed.
 
 equiv [auth] auth.
 Proof.
-  enrich a1, b1, seq(i:index -> b(i)), seq(i:index -> a(i)), kP, kS;
-  enrich ake11, bke11, seq(i:index -> bke1(i)), seq(i:index -> ake1(i)), k11, hKey, r,
-   seq(i:index ->r2(i)), r3, r4, r5.
+  enrich a1, b1, seq(i:index => b(i)), seq(i:index => a(i)), kP, kS;
+  enrich ake11, bke11, seq(i:index => bke1(i)), seq(i:index => ake1(i)), k11, hKey, r,
+   seq(i:index =>r2(i)), r3, r4, r5.
 
   induction t; try (expandall; apply IH).
 

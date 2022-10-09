@@ -85,7 +85,7 @@ type Symbols.data += Global_data of global_data
 (** Get body of a global macro for a single system. *)
 let get_single_body (single : S.Single.t) (data : global_data) : Term.term =
   try List.assoc single data.bodies with
-    | Not_found -> Term.empty
+  | Not_found -> Term.empty
 
 (*------------------------------------------------------------------*)
 (** Get body of a global macro for a system expression. *)
@@ -250,7 +250,7 @@ let get_definition_nocntxt
   match Symbols.Macro.get_all symb.s_symb table with
   | Symbols.Input, _ ->
     init_or_generic Term.empty (fun a ->
-        Term.mk_fun table Symbols.fs_att []
+        Term.mk_fun table Symbols.fs_att 
           [Term.mk_macro Term.frame_macro [] (Term.mk_pred a)])
 
   | Symbols.Output, _ ->
@@ -417,7 +417,7 @@ let get_dummy_definition
         prefix @ [dummy_end]
     in
 
-    let tvar = Vars.make_new Type.Timestamp "dummy" in
+    let tvar = Vars.make_fresh Type.Timestamp "dummy" in
     let ts = Term.mk_var tvar in
 
     get_def_glob ~allow_dummy:true system table symb ts dummy_action gdata

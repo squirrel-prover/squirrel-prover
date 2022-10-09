@@ -18,12 +18,12 @@ mutable s5 (i, j : index) : message = <n(i), m(j)>.
 
 process P(i : index) = 
   in(c,x);
-  s0(i)    := f(s0(i));
-  s1(i)    := f(s1(i));
-  s2(i)    := f(s2(i));
-  s3(i, i) := f(s3(i, i));
-  s4(i)    := f(s4(i));
-  s5(i, i) := f(s5(i, i));
+  s0(i)    := f(s0 i);
+  s1(i)    := f(s1 i);
+  s2(i)    := f(s2 i);
+  s3(i, i) := f(s3 i i);
+  s4(i)    := f(s4 i);
+  s5(i, i) := f(s5 i i);
   out(c,zero).
 
 system !_i P(i).
@@ -52,7 +52,7 @@ Abort.
 
 (* using [na] and the sequence of all [n(j)], we can deduce [s0], [s1] and [s2] *)
 global goal _ (t : timestamp, i : index) :
-  equiv(na, seq(j:index -> n(j))) ->
+  equiv(na, seq(j:index => n(j))) ->
   equiv(s0(i)@t, s1(i)@t, s2(i)@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
@@ -62,11 +62,11 @@ Qed.
 
 (* idem, but with some seqs *)
 global goal _ (t : timestamp) :
-  equiv(na, seq(j:index -> n(j))) ->
+  equiv(na, seq(j:index => n(j))) ->
   equiv(
-    seq (i:index -> s0(i)@t),
-    seq (i:index -> s1(i)@t),
-    seq (i:index -> s2(i)@t)).
+    seq (i:index => s0(i)@t),
+    seq (i:index => s1(i)@t),
+    seq (i:index => s2(i)@t)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
@@ -75,8 +75,8 @@ Qed.
 
 (* idem, but with a single seq and some pairs *)
 global goal _ (t : timestamp) :
-  equiv(na, seq(j:index -> n(j))) ->
-  equiv(seq (i:index -> <s0(i)@t, <s1(i)@t, s2(i)@t>>)).
+  equiv(na, seq(j:index => n(j))) ->
+  equiv(seq (i:index => <s0(i)@t, <s1(i)@t, s2(i)@t>>)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
@@ -88,7 +88,7 @@ Qed.
 
 (* check that we can deduce terms using the FA rule *)
 global goal _ (t : timestamp, i, j : index) :
-  equiv(na, seq(j:index -> n(j))) -> equiv(s3(i, j)@t).
+  equiv(na, seq(j:index => n(j))) -> equiv(s3 i j@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
@@ -97,7 +97,7 @@ Qed.
 
 (* idem but putting everybody together *)
 global goal _ (t : timestamp, i, j : index) :
-  equiv(na, seq(j:index -> n(j))) -> equiv(s0(i)@t, s1(i)@t, s3(i, j)@t).
+  equiv(na, seq(j:index => n(j))) -> equiv(s0(i)@t, s1(i)@t, s3 i j@t).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
@@ -106,12 +106,12 @@ Qed.
 
 (* idem but with a seq *)
 global goal _ (t : timestamp) :
-  equiv(na, seq(j:index -> n(j))) ->
+  equiv(na, seq(j:index => n(j))) ->
   equiv(
-    seq (i:index -> s0(i)@t),
-    seq (i:index -> s1(i)@t),
-    seq (i:index -> s2(i)@t),
-    seq (i,j:index -> s3(i,j)@t)).
+    seq (i:index => s0 i@t),
+    seq (i:index => s1 i@t),
+    seq (i:index => s2 i@t),
+    seq (i,j:index => s3 i j@t)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
@@ -120,12 +120,12 @@ Qed.
 
 (* with spurious indices in sequences *)
 global goal _ (t : timestamp) :
-  equiv(na, seq(j:index -> n(j))) ->
+  equiv(na, seq(j:index => n(j))) ->
   equiv(
-    seq (i,k,l:index -> s0(i)@t),
-    seq (i,k,l:index -> s1(i)@t),
-    seq (i,k,l:index -> s2(i)@t),
-    seq (i,j,k,l:index -> s3(i,j)@t)).
+    seq (i,k,l:index => s0 i@t),
+    seq (i,k,l:index => s1 i@t),
+    seq (i,k,l:index => s2 i@t),
+    seq (i,j,k,l:index => s3 i j@t)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
@@ -137,14 +137,14 @@ Qed.
 
 (* with some seqs *)
 global goal _ (t : timestamp) :
-  equiv(na, seq(j:index -> n(j)), seq(j:index -> m(j))) ->
+  equiv(na, seq(j:index => n(j)), seq(j:index => m(j))) ->
   equiv(
-    seq (i:index -> s0(i)@t),
-    seq (i:index -> s1(i)@t),
-    seq (i:index -> s2(i)@t),
-    seq (i,j:index -> s3(i,j)@t),
-    seq (i:index -> s4(i)@t),
-    seq (i,j:index -> s5(i,j)@t)).
+    seq (i:index => s0 i@t),
+    seq (i:index => s1 i@t),
+    seq (i:index => s2 i@t),
+    seq (i,j:index => s3 i j@t),
+    seq (i:index => s4 i@t),
+    seq (i,j:index => s5 i j@t)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
@@ -164,8 +164,8 @@ Proof.
 Qed.
 
 global goal _ (t : timestamp, J : index) :
-  equiv(na, m(J), seq(j:index -> n(j))) ->
-  equiv(s4(J)@t, seq (i:index -> s5(i,J)@t)).
+  equiv(na, m(J), seq(j:index => n(j))) ->
+  equiv(s4(J)@t, seq (i:index => s5 i J@t)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
 
@@ -174,7 +174,7 @@ Qed.
 
 (* we cannot deduce any value of [s4] *)
 global goal _ (t : timestamp, J : index) :
-  equiv(na, m(J), seq(j:index -> n(j))) -> equiv(seq (i:index -> s4(i)@t)).
+  equiv(na, m(J), seq(j:index => n(j))) -> equiv(seq (i:index => s4 i@t)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
  checkfail (intro H; apply ~inductive H) exn ApplyMatchFailure.
@@ -182,16 +182,16 @@ Abort.
 
 (* idem for [s5] *)
 global goal _ (t : timestamp, J : index) :
-  equiv(na, m(J), seq(j:index -> n(j))) ->
-  equiv(seq (i,j:index -> s5(i,j)@t)).
+  equiv(na, m(J), seq(j:index => n(j))) ->
+  equiv(seq (i,j:index => s5 i j@t)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
  checkfail (intro H; apply ~inductive H) exn ApplyMatchFailure.
 Abort.
 
 global goal _ (t : timestamp, J : index) :
-  equiv(na, m(J), seq(j:index -> n(j))) ->
-  equiv(na, m(J), seq(j:index -> n(j)), f(<na,seq (i:index -> s4(i)@t)>)).
+  equiv(na, m(J), seq(j:index => n(j))) ->
+  equiv(na, m(J), seq(j:index => n(j)), f(<na,seq (i:index => s4 i@t)>)).
 Proof.
  checkfail (intro H; apply H) exn ApplyMatchFailure.
  checkfail (intro H; apply ~inductive H) exn ApplyMatchFailure.
@@ -210,14 +210,14 @@ Qed.
 
 global goal _ :
   equiv(zero) ->
-  equiv (seq(i,j:index -> i = j)).
+  equiv (seq(i,j:index => i = j)).
 Proof.
   intro H; apply H.
 Qed.
 
 global goal _ :
   equiv(zero) ->
-  equiv (seq(i,j:index -> if (i = j) && (j = j) then zero else empty)).
+  equiv (seq(i,j:index => if (i = j) && (j = j) then zero else empty)).
 Proof.
   intro H; apply H.
 Qed.

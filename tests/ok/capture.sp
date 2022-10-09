@@ -1,8 +1,6 @@
-
-
 abstract a : message
 abstract b : message
-abstract f : message->message
+abstract f : message -> message
 
 system null.
 

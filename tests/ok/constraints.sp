@@ -56,3 +56,13 @@ goal _ (t, t' : timestamp): (t <= pred(t')) = (t < t').
 Proof. 
   by rewrite eq_iff. 
 Qed.
+
+(* `pred(init)` does not happens *)
+goal _ : not (happens(pred(init))).
+Proof. constraints. Qed.
+
+(* surprisingly, if `pred(tau)` happens, then so does `tau` since
+   `pred(_)` sends non-happening timestamps to non-happening 
+   timestamps. *)
+goal _ (tau : timestamp) : happens(pred(tau)) => happens(tau).
+Proof. constraints. Qed.

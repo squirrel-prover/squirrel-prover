@@ -18,6 +18,6 @@ goal _: happens(A1) => output@A1 <> fail => output@A1 = m.
 Proof.
   intro Hap Hneq.
   rewrite /output /y in Hneq.
-  nosimpl(intctxt Hneq);
+  nosimpl(intctxt Hneq).
   by rewrite /output /y.
 Qed.

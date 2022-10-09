@@ -56,12 +56,12 @@ rule token = parse
 | ','                 { COMMA }
 | "!"                 { BANGU }
 | '.'                 { DOT }
+| '#'                 { SHARP }
 | ':'                 { COLON }
 | ":="                { COLONEQ }
 | ';'                 { SEMICOLON }
 | '*'                 { STAR }
 | '_'                 { UNDERSCORE }
-| "`_"                { TICKUNDERSCORE }
 | "//"                { SLASHSLASH }
 | "/="                { SLASHEQUAL }
 | "//="               { SLASHSLASHEQUAL }
@@ -130,6 +130,8 @@ rule token = parse
 | "diff"              { DIFF }
 | "forall"            { FORALL }
 | "exists"            { EXISTS }
+| "Forall"            { UFORALL }
+| "Exists"            { UEXISTS }
 | "splitseq"          { SPLITSEQ }
 | "constseq"          { CONSTSEQ }
 | "memseq"            { MEMSEQ }

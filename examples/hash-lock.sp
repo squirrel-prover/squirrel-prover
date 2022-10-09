@@ -16,8 +16,8 @@ hash h
 abstract ok : message
 abstract ko : message
 
-name key  : index          -> message
-name key' : index -> index -> message
+name key  : index         -> message
+name key' : index * index -> message
 
 channel cT
 channel cR
@@ -64,16 +64,16 @@ Proof.
     project.
 
     (* LEFT *)
-    - euf H => _ _ _ //.
+    - euf H => [k0 [_ _]] //.
       exists i,k0.
       repeat split; [ 1,4: auto | 3: by apply injective_pairing ].
       assert input@T(i,k0)=nR(j) as Meq1 by auto.
-      fresh Meq1; intro C; try auto. 
+      fresh Meq1; intro C; try auto.
       * by depends R(j),R1(j).
       * by depends R(j),R2(j).
 
     (* RIGHT *)
-    - euf H => _ _ _ //.
+    - euf H => [_ _] //.
       exists i,k.
       repeat split; [ 1,4: auto | 3: by apply injective_pairing ].
       assert input@T(i,k)=nR(j) as Meq1 by auto.
@@ -112,8 +112,8 @@ Proof.
     fa 0; fa 1; fa 1.
     fresh 1; rewrite if_true.
     repeat split => j0 _ //.
-    by depends R(j0), R2(j0).
     by depends R(j0), R1(j0).
+    by depends R(j0), R2(j0).
     auto.
 
   (* Case R1 *)

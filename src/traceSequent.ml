@@ -12,9 +12,7 @@ include Sequent.Mk(struct
     let to_general_sequent s = Goal.Trace s
     let to_global_sequent  s =
       let es =
-        ES.init
-          ~env:(S.env s) ~hint_db:(S.hint_db s)
-          Equiv.Smart.mk_false
+        ES.init ~env:(S.env s) Equiv.Smart.mk_false
       in
       let es =
         S.Hyps.fold (fun id hyp es ->

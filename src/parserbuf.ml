@@ -100,7 +100,7 @@ let parse_theory_test ?(test=false) filename =
   let lexbuf = Lexing.from_channel (Stdlib.open_in filename) in
   let decls = parse_theory_buf ~test lexbuf filename in
   let table, subgs =
-    ProcessDecl.declare_list Symbols.builtins_table Hint.empty_hint_db decls
+    ProcessDecl.declare_list Symbols.builtins_table decls
   in
   assert (subgs = []);
   table
@@ -120,41 +120,6 @@ let parse_process (env : Env.t) ?(typecheck=false) str =
   let projs = [ Term.left_proj; Term.right_proj; ] in
   if typecheck then Process.check_proc env projs p ;
   p
-
-let parse_formula = parse Parser.top_formula "formula"
-
-let () =
-  let check s =
-    Alcotest.(check string) "round-trip" s
-      (Format.asprintf "%a" Theory.pp (parse_formula s))
-  in
-  let eqf s ss =
-    let f = parse_formula s in
-    let ff = parse_formula ss in
-    Alcotest.(check bool) "equal formulas" true
-      (Theory.equal f ff)
-  in 
-  Checks.add_suite "Formula parsing" [
-    "Boolean constants", `Quick, begin fun () ->
-      check "True" ;
-      check "False"
-    end ;
-    "Boolean connectives", `Quick, begin fun () ->
-      check "not(True)" ;
-      check "(True => False)" ;
-      check "(True || False)" ;
-      check "((True && True) => False)" ;
-    end ;
-    "Quantifiers", `Quick, begin fun () ->
-      check "forall (x:index), True" ;
-      check "forall (x:index), ((x = x) && (x <> x))" ;
-      check "exists (x:index), True" ;
-      check "exists (x:index,y:message,z:index,t:timestamp), True" ;
-      eqf "exists x:index, True" "exists (x:index) True" ;
-      check "exists (x,y:index,z:message,\
-                     k:index,u,v:timestamp), True" ;
-    end
-  ]
 
 let () =
   let table = Channel.declare Symbols.builtins_table (L.mk_loc L._dummy "c") in
@@ -178,7 +143,7 @@ let () =
         | _ -> assert false
       end ;
       ignore (parse_process env
-                "if u=true then if True then null else null else null"
+                "if u=true then if true then null else null else null"
               : Process.process)
     end ;
     "Pairs", `Quick, begin fun () ->
@@ -191,10 +156,10 @@ let () =
             name = L.mk_loc L._dummy "error";
             symb_type = `Prefix;
             ty_args = [];
-            abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
+            abs_tys = L.mk_loc L._dummy Theory.P_message; }
         in
         let decl = Location.mk_loc Location._dummy decl_i in
-        ProcessDecl.declare table Hint.empty_hint_db decl in
+        ProcessDecl.declare table decl in
       let env = { env with table } in
       ignore (parse_process env "in(c,x); out(c, if x=x then x else error)"
               : Process.process)
@@ -206,10 +171,10 @@ let () =
             { name = L.mk_loc L._dummy "ok";
               symb_type = `Prefix;
               ty_args = [];
-              abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
+              abs_tys = L.mk_loc L._dummy Theory.P_message; }
         in
         let decl = Location.mk_loc Location._dummy decl_i in
-        ProcessDecl.declare table Hint.empty_hint_db decl
+        ProcessDecl.declare table decl
       in
       
       let table, _ =
@@ -218,11 +183,11 @@ let () =
             { name = L.mk_loc L._dummy "error";
               symb_type = `Prefix;
               ty_args = [];
-              abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
+              abs_tys = L.mk_loc L._dummy Theory.P_message; }
         in
         
         let decl = Location.mk_loc Location._dummy decl_i in
-        ProcessDecl.declare table Hint.empty_hint_db decl
+        ProcessDecl.declare table decl
       in
       let env = { env with table } in
       ignore (parse_process env
@@ -274,10 +239,11 @@ let () =
     "Multiple declarations", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
-           try ignore (parse_theory_test ~test "tests/alcotest/multiple.sp"
-                       : Symbols.table )
-           with (Symbols.SymbError (_,
-                                    Multiple_declarations "c")) -> raise Ok)
+           try
+             ignore (parse_theory_test ~test "tests/alcotest/multiple.sp"
+                     : Symbols.table )
+           with Symbols.SymbError (_, Multiple_declarations ("c",_,_)) ->
+             raise Ok)
     end ;
     "Let in actions", `Quick, begin fun () ->
       ignore (parse_theory_test ~test "tests/alcotest/action_let.sp"
@@ -356,7 +322,8 @@ let () =
            try ignore (parse_theory_test ~test "tests/alcotest/process_mult.sp"
                        : Symbols.table )
            with Symbols.SymbError (_,
-                                   Symbols.Multiple_declarations "C") -> raise Ok)
+                                   Symbols.Multiple_declarations ("C",_,_)) ->
+             raise Ok)
     end ;
     "Duplicated State Update", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok

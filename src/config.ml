@@ -150,14 +150,21 @@ let post_quantum () = get_bool (M.find s_post_quantum !params)
 (*------------------------------------------------------------------*)
 (** {2 set functions} *)
 
-let set_param (s,p) =
+let set_param (s,p) : [`Failed of string | `Success] =
   match M.find s !params with
   | (kind, check, _) ->
     if not (check_kind kind p) then
-      Printer.prt `Error "Bad parameter kind: %s expects a %a"
-        s pp_kind kind
+      `Failed (
+        Fmt.str "bad parameter kind: %s expects a %a"
+          s pp_kind kind
+      )
     else if not (check p) then
-      Printer.prt `Error "Parameter invalid for %s" s
-    else params := M.add s (kind, check, p) !params
+      `Failed (Fmt.str "parameter invalid for %s" s)
+    else
+      begin
+        params := M.add s (kind, check, p) !params;
+        `Success;
+      end
 
-  | exception Not_found -> Printer.prt `Error "Unknown option %s" s
+  | exception Not_found -> 
+    `Failed (Fmt.str "unknown option %s" s)

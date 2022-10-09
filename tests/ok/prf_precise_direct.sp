@@ -16,7 +16,7 @@ system !_i A(i).
 
 global goal _ (j : index) :
 [forall (i:index), (A(i) < A(j) => zero <> n(i))] ->
- equiv(h(zero,k), seq(i:index -> if A(i) < A(j) then h(n(i),k))).
+ equiv(h(zero,k), seq(i:index => if A(i) < A(j) then h(n(i),k))).
 Proof.
   intro H. 
   prf 0.

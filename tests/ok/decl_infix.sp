@@ -1,5 +1,3 @@
-
-
 type T
 
 abstract (++) : T -> T -> T.

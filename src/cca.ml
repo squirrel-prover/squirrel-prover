@@ -1,14 +1,14 @@
 (** Utilities for CCA-based tactics. *)
 
-(* TODO: better error message, see [Euf] *)
+(* TODO: better error message, see [OldEuf] *)
 exception Bad_ssc
 
 class check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)
-  inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
+  inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
   method visit_message t = match t with
-    | Term.Fun ((fn,_), _, [m;r;k]) when fn = enc_fn && Term.diff_names k ->
+    | Term.Fun (fn, _, [Tuple [m;r;k]]) when fn = enc_fn && Term.diff_names k ->
       self#visit_message m; self#visit_message r
-    | Term.Fun ((fn,_), _, [m;k]) when fn = dec_fn && Term.diff_names k ->
+    | Term.Fun (fn, _, [Tuple [m;k]]) when fn = dec_fn && Term.diff_names k ->
       self#visit_message m
     | Term.Name ns when ns.s_symb = key_n -> raise Bad_ssc
     | Term.Var m ->
@@ -33,12 +33,12 @@ let symenc_key_ssc ?(messages=[]) ?(elems=[]) ~cntxt enc_fn dec_fn key_n =
 (* Iterator to check that the given randoms are only used in random seed
    position for encryption. *)
 class check_rand ~cntxt enc_fn randoms = object (self)
-  inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
+  inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
   method visit_message t = match t with
-    | Term.Fun ((fn,_), _, [m1;Term.Name _; m2]) when fn = enc_fn ->
+    | Term.Fun (fn, _, [Tuple [m1;Term.Name _; m2]]) when fn = enc_fn ->
       self#visit_message m1; self#visit_message m2
 
-    | Term.Fun ((fn,_), _, [m1; _; m2]) when fn = enc_fn ->
+    | Term.Fun (fn, _, [Tuple [m1; _; m2]]) when fn = enc_fn ->
       raise Bad_ssc
 
     | Term.Name ns when List.mem ns.s_symb randoms ->
@@ -68,7 +68,7 @@ let random_ssc
        List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates)
 
 
-  (* Given cases produced by an Euf.mk_rule for some symmetric encryption
+  (* Given cases produced by an OldEuf.mk_rule for some symmetric encryption
      scheme, check that all occurences of the encryption use a dedicated
      randomness.
      It checks that:
@@ -80,24 +80,23 @@ let random_ssc
 
      This could be refined into a tactic where we ask to prove that encryptions
      that use the same randomness are done on the same plaintext. This is why we
-     based ourselves on messages produced by Euf.mk_rule, which should simplify
+     based ourselves on messages produced by OldEuf.mk_rule, which should simplify
      such extension if need. *)
 let check_encryption_randomness
     ~cntxt case_schemata cases_direct enc_fn messages elems =
   let encryptions : (Term.term * Vars.var list) list =
     List.map (fun case ->
-        case.Euf.message,
-        Action.get_indices case.Euf.action
+        case.OldEuf.message,
+        Action.get_indices case.OldEuf.action
       ) case_schemata
     @
-    List.map (fun case -> case.Euf.d_message, []) cases_direct
+    List.map (fun case -> case.OldEuf.d_message, []) cases_direct
   in
   let encryptions = List.sort_uniq Stdlib.compare encryptions in
 
-  let open Term in
   let randoms = List.map (function
-      | Fun ((_, _), _, [_; Name r; _]), _-> r.s_symb
-      | _ ->  Tactics.soft_failure (Tactics.SEncNoRandom))
+      | Term.Fun (_, _, [Tuple [_; Name r; _]]), _-> r.s_symb
+      | _ ->  Tactics.soft_failure Tactics.SEncNoRandom)
       encryptions
   in
   random_ssc ~elems ~messages ~cntxt enc_fn randoms;
@@ -105,7 +104,7 @@ let check_encryption_randomness
   (* we check that encrypted messages based on indices, do not depend on free
      indices instantiated by the action w.r.t the indices of the random. *)
   if List.exists (function
-      | (Fun ((_, _), _, [m; Name n; _]), (actidx:Vars.var list)) ->
+      | (Term.Fun (_, _, [Tuple [m; Name n; _]]), (actidx:Vars.var list)) ->
         let vars = Term.get_vars m in
         List.exists (fun v ->
               (match Vars.ty v with
@@ -114,14 +113,16 @@ let check_encryption_randomness
                   which is an indice instantiated by the action description,
                   and it does not appear in the random. *)
                | _ -> false)) vars
-      | _ -> assert false) encryptions then
-    Tactics.soft_failure (Tactics.SEncSharedRandom);
+      | _ -> assert false
+    ) encryptions
+  then
+    Tactics.soft_failure Tactics.SEncSharedRandom;
 
   (* we check that no encryption is shared between multiple encryptions *)
   let enc_classes = Utils.classes (fun m1 m2 ->
       match m1, m2 with
-      | (Fun ((_, _), _, [m1; Name r; k1]),_),
-        (Fun ((_, _), _, [m2; Name r2; k2]),_) ->
+      | (Term.Fun (_, _, [Tuple [m1; Name r ; k1]]),_),
+        (Term.Fun (_, _, [Tuple [m2; Name r2; k2]]),_) ->
         r.s_symb = r2.s_symb &&
         (m1 <> m2 || k1 <> k2)
       (* the patterns should match, if they match inside the declaration
@@ -130,12 +131,12 @@ let check_encryption_randomness
     ) encryptions in
 
   if List.exists (fun l -> List.length l > 1) enc_classes then
-    Tactics.soft_failure (Tactics.SEncSharedRandom)
+    Tactics.soft_failure Tactics.SEncSharedRandom
 
 
 let symenc_rnd_ssc ~cntxt env head_fn key elems =
   let rule =
-    Euf.mk_rule
+    OldEuf.mk_rule
       ~fun_wrap_key:None
       ~elems ~drop_head:false
       ~allow_functions:(fun x -> false)
@@ -143,4 +144,4 @@ let symenc_rnd_ssc ~cntxt env head_fn key elems =
       ~head_fn ~key_n:key.Term.s_symb ~key_is:key.s_indices
   in
   check_encryption_randomness ~cntxt
-    rule.Euf.case_schemata rule.Euf.cases_direct head_fn [] elems
+    rule.OldEuf.case_schemata rule.OldEuf.cases_direct head_fn [] elems

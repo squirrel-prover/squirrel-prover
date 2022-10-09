@@ -1,5 +1,5 @@
 (** Infrastructure for interactive proofs:
-    proved lemmas, current lemma, current goals.
+    current lemma, current goals.
     It contains the state of the proof and the history as mutable states. *)
 
 module L = Location
@@ -22,9 +22,6 @@ val get_current_system : unit -> SE.context option
 *)
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
-val current_hint_db : unit -> Hint.hint_db
-val set_hint_db : Hint.hint_db -> unit
-
 val unnamed_goal : unit -> lsymb
 
 (*------------------------------------------------------------------*)
@@ -37,6 +34,10 @@ val abort : unit -> unit
 
 (** Get the current prover state. *)
 val get_state : prover_mode -> Symbols.table -> proof_state
+
+(** Get the first subgoal.
+    @raise Not_found if there is no subgoal or current goal. *)
+val get_first_subgoal : unit -> Goal.t
 
 (** Restore a proof state. *)
 val reset_from_state : proof_state -> prover_mode * Symbols.table
@@ -81,8 +82,6 @@ exception Option_already_defined
 val get_option : option_name -> option_val option
 
 val add_option : option_def -> unit
-
-val add_proved_goal : [ `Axiom | `Lemma ] -> Goal.statement -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Tactics syntax trees} *)
@@ -156,22 +155,6 @@ end
 val pp_ast : Format.formatter -> TacticsArgs.parser_arg Tactics.ast -> unit
 
 (*------------------------------------------------------------------*)
-(** {2 Misc} *)
-
-(** Get proved or assumed statement. *)
-val get_assumption       : lsymb -> Goal.statement
-val get_reach_assumption : lsymb -> Goal.reach_statement
-val get_equiv_assumption : lsymb -> Goal.equiv_statement
-
-val is_assumption       : string -> bool
-val is_reach_assumption : string -> bool
-val is_equiv_assumption : string -> bool
-
-(*------------------------------------------------------------------*)
-val get_assumption_kind : string -> [`Axiom | `Lemma] option 
-val pp_kind : Format.formatter -> [`Axiom | `Lemma] -> unit
-
-(*------------------------------------------------------------------*)
 (** {2 User printing query} *)
 
 (** User printing query *)
@@ -192,8 +175,8 @@ type parsed_input =
   | ParsedSetOption  of Config.p_set_param
 
   | ParsedTactic of [ `Bullet of string |
-                          `Brace of [`Open|`Close] |
-                          `Tactic of TacticsArgs.parser_arg Tactics.ast ] list
+                      `Brace of [`Open|`Close] |
+                      `Tactic of TacticsArgs.parser_arg Tactics.ast ] list
 
   | ParsedPrint   of print_query
   | ParsedUndo    of int
@@ -207,10 +190,7 @@ type parsed_input =
 
 (** Declare a new goal to the current goals, and returns it. *)
 val add_new_goal :
-  Symbols.table ->
-  Hint.hint_db ->
-  Goal.Parsed.t Location.located ->
-  string * Goal.t
+  Symbols.table -> Goal.Parsed.t Location.located -> string * Goal.t
 
 val add_proof_obl : Goal.t -> unit
 
@@ -223,7 +203,7 @@ val pp_goal : Format.formatter -> unit -> unit
 val is_proof_completed : unit -> bool
 
 (** Complete the proofs, resetting the current goal to None. *)
-val complete_proof : unit -> unit
+val complete_proof : Symbols.table -> Symbols.table
 
 (** [eval_tactic utac] applies the tactic [utac]. *)
 val eval_tactic : TacticsArgs.parser_arg Tactics.ast -> unit

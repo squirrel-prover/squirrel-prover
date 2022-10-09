@@ -11,9 +11,9 @@ name m:message
 
 name n1  : index -> message.
 name n1p : index -> message.
-name n2  : index -> index -> message.
+name n2  : index * index -> message.
 
-name nt : timestamp -> index -> message.
+name nt : timestamp * index -> message.
 
 system null.
 
@@ -35,14 +35,14 @@ print system [u2].
 system [w] !_i ((U: out(c, H(n1(i), k) ) |
                  V: out(c, H(n2(i,i),k)) )).
 
-system w2 = [w/left] with gprf time, H(_, k).
+system w2 = [w/left] with gprf time, H (_, k).
 
 print system [w2].
 
 (*------------------------------------------------------------------*)
 (* system with one hash under binder (index) *)
 
-system [t] (!_i U: out(c, seq(j : index -> H(n2(i,j),k)))).
+system [t] (!_i U: out(c, seq(j : index => H(n2(i,j),k)))).
 
 system t2 = [t/left] with gprf time, H(_, k).
 
@@ -51,7 +51,7 @@ print system [t2].
 goal [t2] _ (i : index) : 
   happens(U(i)) => 
   output@U(i) = 
-    seq(j:index->
+    seq(j:index =>
       (try find t:timestamp such that
          (exists (i0,j0:index),
             (t = U(i0)) && 
@@ -72,7 +72,7 @@ Qed.
 (*------------------------------------------------------------------*)
 (* system with one hash under binder (timestamp) *)
 
-system [s] (!_i U: out(c, seq(t : timestamp -> H(nt(t,i),k)))).
+system [s] (!_i U: out(c, seq(t : timestamp => H(nt(t,i),k)))).
 
 system s2 = [s/left] with gprf time, H(_, k).
 

@@ -14,7 +14,9 @@ module H = Hyps.Mk
     (struct
       type t = Equiv.form
 
-      let pp_hyp = Equiv.pp
+      let pp_hyp     = Equiv.pp
+      let _pp_hyp    = Equiv._pp
+      let pp_hyp_dbg = Equiv.pp_dbg
 
       let choose_name f = "H"
         
@@ -45,21 +47,32 @@ type t = {
   env     : Env.t;
   hyps    : H.hyps;
   goal    : Equiv.form;
-  hint_db : Hint.hint_db;
 }
-
-
 
 type sequent = t
 
 type sequents = sequent list
 
+(*------------------------------------------------------------------*)
+let fv (s : t) : Vars.Sv.t =
+  let h_vars =
+    H.fold (fun _ f vars ->
+        Vars.Sv.union (Equiv.fv f) vars
+      ) s.hyps Vars.Sv.empty
+  in
+  Vars.Sv.union h_vars (Equiv.fv s.goal)
 
-let pp_goal fmt = function
-  | Equiv.Atom (Equiv.Equiv e) -> Equiv.pp_equiv_numbered fmt e
-  | _  as f -> Equiv.pp fmt f
+let sanity_check (s : t) : unit =
+  Vars.sanity_check s.env.Env.vars;
+  assert (Vars.Sv.subset (fv s) (Vars.to_set s.env.Env.vars))
 
-let pp ppf j =
+(*------------------------------------------------------------------*)
+let _pp_goal ~dbg fmt = function
+  | Equiv.Atom (Equiv.Equiv e) -> (Equiv._pp_equiv_numbered ~dbg) fmt e
+  | _  as f -> Equiv._pp ~dbg fmt f
+
+(*------------------------------------------------------------------*)
+let _pp ~dbg ppf j =
   Fmt.pf ppf "@[<v 0>" ;
   Fmt.pf ppf "@[Systems: %a@]@;"
     SystemExpr.pp_context j.env.system;
@@ -69,14 +82,18 @@ let pp ppf j =
       (Fmt.list ~sep:Fmt.comma Type.pp_tvar) j.env.ty_vars ;
 
   if j.env.vars <> Vars.empty_env then
-    Fmt.pf ppf "@[Variables: %a@]@;" Vars.pp_env j.env.vars ;
+    Fmt.pf ppf "@[Variables: %a@]@;" (Vars._pp_env ~dbg) j.env.vars ;
 
-  H.pp ppf j.hyps ;
+  H._pp ~dbg ppf j.hyps ;
 
   (* Print separation between hyps and conclusion *)
   Printer.kws `Separation ppf (String.make 40 '-') ;
-  Fmt.pf ppf "@;%a@]" pp_goal j.goal
+  Fmt.pf ppf "@;%a@]" (_pp_goal ~dbg) j.goal
 
+let pp     = _pp ~dbg:false
+let pp_dbg = _pp ~dbg:true
+
+(*------------------------------------------------------------------*)
 let pp_init ppf j =
   if j.env.vars <> Vars.empty_env then
     Fmt.pf ppf "forall %a,@ " Vars.pp_env j.env.vars ;
@@ -97,6 +114,7 @@ module Hyps
   type sequent = t
     
   let pp_hyp = Equiv.pp
+
   let pp_ldecl = H.pp_ldecl
 
   let fresh_id  ?approx name  s = H.fresh_id  ?approx name  s.hyps
@@ -147,8 +165,9 @@ module Hyps
 
   let clear_triv s = { s with hyps = H.clear_triv s.hyps }
 
-  let pp     fmt s = H.pp     fmt s.hyps
-  let pp_dbg fmt s = H.pp_dbg fmt s.hyps
+  let pp          fmt s = H.pp          fmt s.hyps
+  let _pp    ~dbg fmt s = H._pp    ~dbg fmt s.hyps
+  let pp_dbg      fmt s = H.pp_dbg      fmt s.hyps
 end
 
 (*------------------------------------------------------------------*)
@@ -158,7 +177,7 @@ let update ?table ?ty_vars ?vars ?hyps ?goal t =
   let env  = Env.update ?table ?ty_vars ?vars t.env
   and hyps = Utils.odflt t.hyps hyps
   and goal = Utils.odflt t.goal goal in
-  { t with env; hyps; goal; } 
+  { env; hyps; goal; } 
 
 let env j = j.env
 
@@ -248,7 +267,6 @@ let goal_as_equiv s = match goal s with
     that the conclusion of the input sequent is a local formula. *)
 let to_trace_sequent s =
   let env = s.env in
-  let hint_db = s.hint_db in
 
   let goal = match s.goal with
     | Equiv.Atom (Equiv.Reach f) -> f
@@ -257,7 +275,7 @@ let to_trace_sequent s =
         (Tactics.GoalBadShape "expected a reachability formula")
   in
 
-  let trace_s = TS.init ~env ~hint_db goal in
+  let trace_s = TS.init ~env goal in
   Hyps.fold
     (fun id hyp trace_s ->
         TS.Hyps.add (Args.Named (Ident.name id)) (Global hyp) trace_s)
@@ -309,14 +327,16 @@ let set_equiv_goal e j =
   else new_sequent
 
 
-let init ~env ~hint_db ?hyp goal =
+let init ~env ?hyp goal =
   let hyps = H.empty in
   let hyps = match hyp with
     | None -> hyps
     | Some h ->
         snd (H._add ~force:false (H.fresh_id "H" hyps) h hyps)
   in
-  let new_sequent = { env; hint_db; hyps; goal } in
+  let new_sequent = { env; hyps; goal } in
+  sanity_check new_sequent;
+
   if Config.post_quantum () then
    check_pq_sound_sequent new_sequent
   else new_sequent
@@ -339,8 +359,6 @@ let get_felem ?loc i s =
   with List.Out_of_range ->
     Tactics.soft_failure ?loc (Tactics.Failure "out of range position")
 
-let hint_db s = s.hint_db
-
 (*------------------------------------------------------------------*)
 let get_system_pair t = oget (system t).pair
 
@@ -353,14 +371,16 @@ let map f s : sequent =
   let f x = f.Equiv.Babel.call Equiv.Global_t x in
   set_goal (f (goal s)) (Hyps.map f s)
 
+
 (*------------------------------------------------------------------*)
-let fv s : Vars.Sv.t =
-  let h_vars =
-    Hyps.fold (fun _ f vars ->
-        Vars.Sv.union (Equiv.fv f) vars
-      ) s Vars.Sv.empty
-  in
-  Vars.Sv.union h_vars (Equiv.fv (goal s))
+let mk_pair_trace_cntxt (s : sequent) : Constr.trace_cntxt =
+  let se = (Utils.oget ((env s).system.pair) :> SE.fset) in
+  mk_trace_cntxt ~se s 
+
+let check_goal_is_equiv (s : sequent) : unit =
+  if not (Equiv.is_equiv (goal s)) then
+    Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
+
 
 (*------------------------------------------------------------------*)
 module Conc  = Equiv.Smart

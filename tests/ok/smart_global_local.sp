@@ -1,5 +1,5 @@
 abstract p : message -> boolean.
-abstract q : message -> index -> boolean.
+abstract q : message * index -> boolean.
 
 abstract f : message -> message.
 abstract a : message.
@@ -151,7 +151,7 @@ Abort.
 (* ================ QUANTIFICATION ================ *)
 
 (* Universal quantification can always be made global. *)
-global goal _ : [forall (i:index) q(n,i) = true] -> forall (i:index) [q(n,i)=true].
+global goal _ : [forall (i:index) q(n,i) = true] -> Forall (i:index) [q(n,i)=true].
 Proof.
   nosimpl intro H.
   nosimpl intro i.

@@ -248,6 +248,13 @@ hint rewrite snd_pair.
 (*------------------------------------------------------------------*)
 (* if-and-only-if *)
 
+goal [any] iff_def (x,y : boolean) : (x <=> y) = ((x => y) && (y => x)).
+Proof. 
+ rewrite eq_iff; split.
+ by intro ->. 
+ auto.
+Qed.
+
 goal [any] iff_refl (x : boolean) : (x <=> x) = true.
 Proof.
  by rewrite eq_iff. 
@@ -256,7 +263,7 @@ hint rewrite iff_refl.
 
 goal [any] iff_sym (x, y: boolean) : (x <=> y) = (y <=> x).
 Proof.
- by rewrite eq_iff. 
+ by rewrite eq_iff !iff_def.
 Qed.
 
 goal [any] true_iff_false : (true <=> false) = false.

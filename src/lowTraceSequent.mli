@@ -18,12 +18,11 @@ include LowSequent.S
 (*------------------------------------------------------------------*)
 (** {2 Sequent type and basic operations} *)
 
-val init :
-  env:Env.t ->
-  hint_db:Hint.hint_db ->
-  Term.term ->
-  sequent
+val init : env:Env.t -> Term.term -> sequent
   
+(** Free variables + var env **toplevel** sanity check *)
+val sanity_check : trace_sequent -> unit
+
 (** Project diff-operators occurring in a sequent;
   * only makes sense when a sequent for a bi-system has just
   * been narrowed to a projected system. *)

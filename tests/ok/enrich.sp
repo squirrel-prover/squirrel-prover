@@ -1,4 +1,3 @@
-
 set newInduction=true.
 
 include Basic.
@@ -16,7 +15,7 @@ system
 
 equiv simp.
 Proof.
-enrich seq(i:index ->h(ok,k(i))).
+enrich seq(i:index => h(ok,k(i))).
 
  dependent induction t => t Hind Hap. 
  case t => H.

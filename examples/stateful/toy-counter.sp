@@ -144,7 +144,7 @@ Proof.
   intro Hap Hcond.
   expand cond.
   (** Applying the `euf` tactic generates two new hypotheses, `Ht` and `Heq`. *)
-  euf Hcond => Ht Heq.
+  euf Hcond => [i [Ht Heq]].
   (** We use here the counterIncrease lemma to show that the equality `Heq` is
   not possible. *)
   assert pred(A(i)) < pred(B(j)) as H by constraints.

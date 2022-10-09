@@ -52,14 +52,14 @@ set postQuantumSound = true.
 hash h
 
 (* pre-shared keys *)
-name psk : index -> index -> message
+name psk : index * index -> message.
 
 (* DDH randomnesses *)
 name a : index -> message
 name b : index -> message
 
 abstract g : message
-abstract exp : message -> message -> message
+abstract exp : message * message -> message
 
 (* fresh randomness *)
 name Ni : index -> message
@@ -110,9 +110,9 @@ system [Main] ((!_j R: Responder(j)) | (!_i I: Initiator(i))).
 (* The keys obtained with the first prf application are all randoms. Some are
 honest and shared by the two parties, and some correspond to garbage keys. *)
 
-name Ininr : index -> index  -> message
-name IgarbI : index -> index -> message
-name IgarbR : index -> index -> message
+name Ininr  : index * index  -> message
+name IgarbI : index * index -> message
+name IgarbR : index * index -> message
 
 process InitiatorI(i:index) =
   out(cI, <exp(g,a(i)), < Ni(i), IdI(i) >>);
@@ -178,14 +178,14 @@ system [Ideal1] ((!_j R: ResponderI(j)) | (!_i I: InitiatorI(i))).
 
 (* We start with 3 global prf applications, renaming the prf name to the one we want after each application. *)
 system Main1 = [Main/left] with gprf (il,jl:index),  h(<Ni(il), Nr(jl) > ,psk(il,jl)).
-system Main2 = [Main1] with rename forall (i,j:index), equiv(diff(n_PRF(i,j), Ininr(i,j))).
+system Main2 = [Main1] with rename Forall (i,j:index), equiv(diff(n_PRF(i,j), Ininr(i,j))).
 
 
 system Main3 = [Main2] with gprf (il,jl:index),  h(<Ni(il), fst(snd(input@I1(il,jl))) > ,psk(il,jl)).
-system Main4 = [Main3] with rename forall (i,j:index), equiv(diff(n_PRF1(i,j), IgarbI(i,j))).
+system Main4 = [Main3] with rename Forall (i,j:index), equiv(diff(n_PRF1(i,j), IgarbI(i,j))).
 
 system Main5 = [Main4] with gprf (il,jl:index),  h(<fst(snd(input@R(jl,il))),Nr(jl) > ,psk(il,jl)).
-system Main6 = [Main5] with rename forall (i,j:index), equiv(diff(n_PRF2(i,j), IgarbR(i,j))).
+system Main6 = [Main5] with rename Forall (i,j:index), equiv(diff(n_PRF2(i,j), IgarbR(i,j))).
 
 
 axiom  [Main6,Ideal1/right] tryfind : forall (i,j:index), pred(I1(i,j)) = pred(I2(i,j)).
@@ -193,52 +193,51 @@ axiom  [Main6,Ideal1/right] tryfind : forall (i,j:index), pred(I1(i,j)) = pred(I
 equiv [Main6,Ideal1/right] test.
 Proof.
 
-  diffeq.
-  (* From here, we need to prove that we indede get ideal keys everywhere. Mostly dumb manipulations of all the conditions introduced by the prf tactic, that are all contractory.
+  diffeq. 
+   (* From here, we need to prove that we indede get ideal keys everywhere. Mostly dumb manipulations of all the conditions introduced by the prf tactic, that are all contractory.
      *)
     + intro *. 
       case  try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-        ++ intro [il jl [_ ->]]. 
-           fa; auto. print goal tryfind.
+        ++ intro [?? [_ ->]].
+           fa; auto. 
         ++ rewrite tryfind. 
            intro [Abs TFeq].
            use Abs with i,j; auto.
 
     + intro *.
       case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-        ++ intro [il jl [_ ->]].
+        ++ intro [?? [_ ->]]. 
            fa; auto.
         ++ intro [Abs TFeq].
            use Abs with i,j; auto.
 
     + intro *.
       case  try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-        ++ intro [il jl [_ ->]]. 
+        ++ intro [?? [_ ->]]. 
            fa; auto.
         ++ intro [Abs TFeq].
            use Abs with i,j; auto.
 
     + intro *.
       case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
-        ++ intro [il jl [[_ _ _] ->]]. 
+        ++ intro [?? [[_ _ _] ->]]. 
            case try find il0,jl0 such that _  in Ininr(il0,jl0) else _.
-             +++ intro [i j [_ ->]]. 
-                 auto.
+             +++ auto. 
              +++ intro [Abs TFeq2].
-                 use Abs with il,jl; auto.
+                 use Abs with i,j; auto.
         ++ intro [Abs TFeq].
            case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
-             +++ intro [il jl [_ TFeq2]]. 
+             +++ intro [?? [_ TFeq2]]. 
                  use Abs with i,j.
                  auto.
              +++ intro [Abs2 TFeq2].
                  case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-                   - intro [il jl [_ _]]. 
+                   - intro [?? [_ _]]. 
                      use Abs with i,j.
                      auto.
                    - intro [Abs3 TFeq3].
                      case try find il,jl such that _ in IgarbR(il,jl) else _.
-                       -- intro [il jl [_ ->]]. 
+                       -- intro [?? [_ ->]]. 
                           auto.
                        -- intro [[Abs4] TFeq4].
                           use Abs4 with i,j.
@@ -246,47 +245,45 @@ Proof.
 
     + intro *.
       case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
-        ++ intro [il jl [[_ _ _] ->]]. 
+        ++ intro [?? [[_ _ _] ->]]. 
            case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
-             +++ intro [i j [_ ->]]. 
-                 auto.
-             +++ intro [Abs _].
-                 use Abs with il,jl.
+             +++ auto. 
+             +++ intro [Abs _]. 
+                 use Abs with i,j.
                  auto.
         ++ case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
-             +++ intro [il jl [_ ->]]. 
+             +++ intro [?? [_ ->]]. 
                  intro [Abs _].
                  use Abs with i,j.
                  auto.
              +++ intro [Abs _].
                  intro [Abs2 _].
                  case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-                   - intro [il jl [_ ->]]. 
+                   - intro [?? [_ ->]]. 
                      use Abs with i,j; auto.
                    - case try find il,jl such that _ in IgarbR(il,jl) else _.
-                       -- intro [il jl [_ ->]]. 
+                       -- intro [?? [_ ->]]. 
                           auto.
                        -- intro [Abs3 _].
                           use Abs3 with i,j; auto.
 
     + intro *.
       case try find il,jl such that _ in IgarbR(il,jl) else _.
-        ++ intro [il jl [[_ _ _] ->]]. 
+        ++ intro [?? [[_ _ _] ->]]. 
            case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
-             +++ intro [il jl [[_ _ _] ->]]. 
+             +++ intro [?? [[_ _ _] ->]]. 
                  case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
-                   - intro [i j [_ ->]]. 
-                     auto.
+                   - auto. 
                    - intro [Abs _].
-                     use Abs with il,jl; auto.
+                     use Abs with i,j; auto.
 
              +++ intro [Abs _].
                  case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
-                   - intro [il jl [_ ->]]. 
+                   - intro [?? [_ ->]]. 
                      use Abs with i,j; auto.
                    - intro [Abs2 _].
                      case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
-                       -- intro [il jl [_ ->]]. 
+                       -- intro [?? [_ ->]]. 
                           use Abs2 with i,j; auto.
                        -- intro [Abs3 _]; auto.
         ++ intro [Abs _].
@@ -373,23 +370,25 @@ Proof.
        in h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,Ininr(j,i))
        else h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,IgarbI(j,i)).
     + (* Case 1 -> honnest skeyid *)
-      intro [il jl [[A [_ _]] B]].
+      intro [?? [[A [_ _]] B]].
       rewrite B in Cond.
       destruct Cond as [EUF _].
-      euf EUF.
-        ++ intro Ord Eq [_ _].
-           exists jl.
-           assert happens(R(il,jl)) => //.
-           assert happens(I(jl)) => //.
-           depends I(jl), I1(jl,il) => //.
-        ++ auto.
+      euf EUF; try auto.
+        ++ intro [Ord _ Eq].
+           exists i.
+           assert happens(R(j,i)) => //.
+           assert happens(I(i)) => //.
+           depends I(i), I1(i,j) => //.
+        ++ intro [Ord _ Eq].
+           use mutex_Ideal2_I1_I2 with i,j,j as H; by case H.
 
     +  (* Case 2 -> dishonnest skeyid, trivial as no one else computes this key *)
        intro [Abs Meq].
        rewrite Meq in Cond.
        destruct Cond as [EUF _].
-       euf EUF.
-       intro Ord //.
+       euf EUF; try auto.
+       intro [Ord E] //.
+       use mutex_Ideal2_I1_I2 with i,j,j as H; by case H.
 Qed.
 
 goal [Ideal2] wa_2 :
@@ -414,19 +413,25 @@ Proof.
        else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i)).
     + intro [jl il [[Cond _ _] Meq]].
       rewrite Meq in EUF.
-      euf EUF => //.
-      intro OrdI Meq2 [_ _].
-      depends I(il), I1(il,jl).
-      case OrdI; auto. 
-      intro OrdI2.
-      executable pred(R1(jl,il)) => //.
-      intro Exec.
-       use Exec with R(jl,il) => //.
+      euf EUF; try auto.
+      ++ intro [H _].
+         case H.
+         * by depends R(j,i), R2(j,i).
+         * use mutex_Ideal2_R1_R2 with j,i,j,i as H2; by case H2.
+      ++ intro [OrdI Meq2 _].
+         depends I(i), I1(i,j).
+         case OrdI; auto. 
+         intro OrdI2.
+         executable pred(R1(j,i)) => //.
+         intro Exec.
+         use Exec with R(j,i) => //.
     + intro Abs.
       destruct Abs as [Abs Meq2].
       rewrite Meq2 in EUF.
-      euf EUF.
-      auto.
+      euf EUF; try auto.
+      intro H; case H.
+       * by depends R(j,i), R2(j,i).
+       * use mutex_Ideal2_R1_R2 with j,i,j,i as H2; by case H2.
 Qed.
 
 
@@ -435,7 +440,7 @@ Qed.
 
 (* this is ideal 2, where in addition each party IdI(i) in the end either outputs the derived key, or an idealied key ideal(i,j) if it thinks it is talking to party IdR(j). *)
 
-name idealkeys : index -> index -> message
+name idealkeys : index * index -> message.
 
 process InitiatorRoR(i:index) =
   out(cI, <exp(g,a(i)), < Ni(i), IdI(i) >>);
@@ -522,18 +527,24 @@ Proof.
        (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il),Nr(jl)> && (il = i && jl = j))
      in h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i))
      else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i)).
-    + intro [il jl [[Eq1 [_ _]] Eq2]].
+    + intro [?? [[Eq1 [_ _]] Eq2]].
       rewrite Eq2 in Cond.  
       euf Cond => //.
-      depends R(jl,il), R1(jl,il) => //.
-      intro Ord1 Ord2. case Ord2; auto.
-      by use ddhnotuple with  fst(input@R(jl,il)),<exp(g,b(jl)),IdI(il)>, fst(input@I1(il,jl)),a(il).
+      * by depends R(j,i), R1(j,i). 
+      * by depends R(j,i), R1(j,i). 
+      * intro [H _]; case H.
+        by depends R(j,i), R2(j,i). 
+        use mutex_Ror_R2_R1 with j,i,j,i as HH; by case HH.             
+      * intro [Ord1 Ord2 _]. 
+      by use ddhnotuple with  fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>, fst(input@I1(i,j)),a(i).
     + intro [Abs Meq].
       rewrite Meq in Cond.
-      euf Cond.
-      intro Ord. case Ord; auto.
-      depends R(j,i), R1(j,i). auto. 
-      intro Ord Ord2. case Ord2; auto.
+      euf Cond; try auto.
+      * by depends R(j,i), R1(j,i).
+      * by depends R(j,i), R1(j,i).
+      * intro H; case H.
+        by depends R(j,i), R2(j,i). 
+        use mutex_Ror_R2_R1 with j,i,j,i as HH; by case HH.             
 Qed.
 
 
@@ -557,22 +568,22 @@ Proof.
          (il = i && jl = j))
       in h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,Ininr(j,i))
       else h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,IgarbI(j,i)).
-    + intro [il jl [[Eq [_ _]] Meq]].
+    + intro [?? [[Eq [_ _]] Meq]].
       rewrite Meq in CondTF.
       euf CondTF => //.
-        ++ by use ddhnotuple with fst(input@I1(il,jl)),<exp(g,a(il)),IdR(jl)>, fst(input@R(jl,il)),b(jl).
+        ++ by use ddhnotuple with fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>, fst(input@R(j,i)),b(j).
         ++ intro OrdI.
-           by depends I1(il,jl),I4(il,jl).
+           by depends I1(i,j),I4(i,j).
+        ++ use mutex_Ror_I2_I1 with i,j,j as HH; by case HH.
     + intro [Abs Meq].
       rewrite Meq in CondTF.
-      euf CondTF.
-      auto.
-      intro OrdI.
-      by use ddhnotuple with fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>, fst(input@I1(i,j)),a(i).
+      euf CondTF; try auto.
+      ++ by use ddhnotuple with fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>, fst(input@I1(i,j)),a(i).
+      ++ use mutex_Ror_I2_I1 with i,j,j as HH; by case HH.
 Qed.
 
 system Ror2 = [Ror/left] with gprf (il,jl:index),   h( exp(exp(g,a(il)),b(jl)), Ininr(jl,il))   .
-system Ror3 =  [Ror2] with rename forall (i,j:index), equiv(diff(n_PRF3(i,j), idealkeys(i,j))).
+system Ror3 =  [Ror2] with rename Forall (i,j:index), equiv(diff(n_PRF3(i,j), idealkeys(i,j))).
 
 axiom  [Ror3, Ror/right] ddhcommu2 : forall (i,j:index), exp(exp(g,a(i)),b(j)) =  exp(exp(g,b(j)),a(i)) .
 axiom  [Ror3, Ror/right] ddhnotuple1 : forall (m1,m2,m3,m4:message), exp(m3,m4) <> <m1,m2>.
@@ -683,7 +694,7 @@ Qed.
 
 (* We now export helper wa 2 all the way to Ror3 *)
 global goal [Ror/left,Ror2] helper_wa_equiv_2 :
-  forall (i,j:index),
+  Forall (i,j:index),
   [happens(I1(i,j))] ->
   equiv(
     exec@I1(i,j) =>
@@ -720,7 +731,7 @@ Proof.
 Qed.
 
 global goal [Ror2,Ror3] helper_wa_equiv_3 :
-  forall (i,j:index),
+  Forall (i,j:index),
     [happens(I1(i,j))] ->
     equiv(
       exec@I1(i,j) =>
@@ -785,7 +796,7 @@ Proof.
     + intro *.
       use helper_wa4 with i,j; try auto.
       case  try find il,jl such that _ in idealkeys(il,jl) else _.
-        - intro [il jl [[Exp [_ _]] ->]].
+        - intro [?? [[Exp [_ _]] ->]].
           case try find il0,jl0 such that _ in idealkeys(i,j) else _.
           auto.
           intro [Abs _].
@@ -803,7 +814,7 @@ Proof.
       case try find il,jl such that _
          in idealkeys(il,jl)
          else _.
-      intro [il jl [[_ [_ _]] ->]].
+      intro [?? [[_ [_ _]] ->]].
       by use ddhnotuple1 with  fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>, exp(g,a(i)),b(j).
       intro _.
       by fa.
@@ -840,13 +851,12 @@ Proof.
        in
          _
        else  h(exp(fst(att(frame@pred(R(j,i)))),b(j)),IgarbR(j,i)).
-        - intro [il jl [[_ _ _] ->]].
+        - intro [?? [[_ _ _] ->]].
           case (try find il,jl such that _
            in idealkeys(il,jl) else _).
-          intro [i j [[_ _ _] ->]].
-         auto.
-         intro [Abs _].
-         by use Abs with il,jl.
+          ** auto. 
+          ** intro [Abs _].
+             by use Abs with i,j.
         - intro [Abs _].
           by use Abs with i,j.
 

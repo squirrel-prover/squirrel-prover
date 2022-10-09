@@ -59,7 +59,7 @@ Proof.
     intro eq1.
     destruct eq1 as [P N].
     euf P.
-    intro ts eq.
+    intro [ts eq].
     by depends A2,O.
   }
 

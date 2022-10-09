@@ -7,14 +7,47 @@ type 'a item = {
 
 type 'a t = 'a item list
 
+(*------------------------------------------------------------------*)
+type shape = int t
+
+type action = (Vars.var list) t
+
+(*------------------------------------------------------------------*)
 (** Strict dependency [a < b]. *)
 let depends a b =
   let rec aux a b = match a, b with
     | [], _::_ -> true
-    | hda::tla, hdb::tlb when hda = hdb -> aux tla tlb
+    | hda :: tla, hdb :: tlb when hda = hdb -> aux tla tlb
     | _ -> false
   in aux a b
 
+(*------------------------------------------------------------------*)
+(** Internal, not exported in the [.mli] *)
+exception NotMutex
+  
+(** Compute the number of common variable choices between two
+    mutually exclusive actions.
+    Raise [NotMutex] if actions are not mutually exclusives. *)
+let mutex_common_vars a b =
+  let rec aux a b =
+    match a, b with
+    | hda :: tla, hdb :: tlb ->
+      if hda = hdb then
+        fst hda.par_choice + fst hda.sum_choice + aux tla tlb
+      else
+        if
+          hda.par_choice = hdb.par_choice &&
+          fst hda.sum_choice <> fst hdb.sum_choice
+        then fst hda.par_choice
+        else raise NotMutex
+    | _ -> raise NotMutex
+  in aux a b
+
+(** Mutually exclusive actions *)
+let mutex a b =
+  try ignore(mutex_common_vars a b : int); true with NotMutex -> false
+
+(*------------------------------------------------------------------*)  
 (** Distance in control-flow graph. Return [None] when there is no
   * dependency, and [Some 0] when the actions are equal. *)
 let distance a b =
@@ -23,10 +56,6 @@ let distance a b =
     | hda::tla, hdb::tlb when hda = hdb -> aux tla tlb
     | _ -> None
   in aux a b
-
-type shape = int t
-
-type action = (Vars.var list) t
 
 let rec get_shape = function
   | [] -> []
@@ -175,7 +204,7 @@ let pp_parsed_action ppf a = pp_action_f pp_strings (0,[]) ppf a
 type descr = {
   name      : Symbols.action ;
   action    : action ;
-  input     : Channel.t * string ;
+  input     : Channel.t ;
   indices   : Vars.var list ;
   condition : Vars.var list * Term.term ;
   updates   : (Term.state * Term.term) list ;
@@ -183,10 +212,22 @@ type descr = {
   globals   : Symbols.macro list;
 }
 
-(** Minimal validation function. Could be improved to check for free
-    variables, valid diff operators, etc. *)
-let valid_descr d =
-  d.indices = get_indices d.action
+(** Validation function for action description: checks for free variables. *)
+let check_descr d =
+  d.indices = get_indices d.action &&
+  if d.name = Symbols.init_action then true else
+    begin
+      let _, cond = d.condition
+      and _, outp = d.output in
+
+      let dfv = Vars.Sv.of_list d.indices in
+
+      Vars.Sv.subset (Term.fv cond) dfv &&
+      Vars.Sv.subset (Term.fv outp) dfv &&
+      List.for_all (fun (_, state) ->
+          Vars.Sv.subset (Term.fv state) dfv
+        ) d.updates
+    end
 
 (*------------------------------------------------------------------*)
 (** Apply a substitution to an action description.
@@ -197,9 +238,8 @@ let subst_descr subst descr =
   let subst_term = Term.subst subst in
   let indices = Term.subst_vars subst descr.indices  in
   let condition =
-    (* FIXME: do we need to substitute ? *)
-     fst descr.condition,
-     Term.subst subst (snd descr.condition) in
+    Term.subst_vars subst (fst descr.condition),
+    Term.subst subst (snd descr.condition) in
   let updates =
     List.map (fun (ss,t) ->
         Term.subst_isymb subst ss, subst_term t
@@ -215,8 +255,7 @@ let pp_descr_short ppf descr =
 
 (*------------------------------------------------------------------*)
 let pp_descr ~debug ppf descr =
-  let e = ref (Vars.of_list []) in
-  let _, s = Term.refresh_vars (`InEnv e) descr.indices in
+  let _, s = Term.refresh_vars `Global descr.indices in
   let descr = if debug then descr else subst_descr s descr in
 
   Fmt.pf ppf "@[<v 0>action name: @[<hov>%a@]@;\
@@ -239,25 +278,6 @@ let pp_descr ~debug ppf descr =
        (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ";@ ") Symbols.pp))
     descr.globals
     Term.pp (snd descr.output)
-
-(*------------------------------------------------------------------*)
-(* well-formedness check for a description: check free variables *)
-let check_descr (d : descr) : bool =
-  (* special case for [init], which does not satisfy the free variables
-     condition. *)
-  if d.name = Symbols.init_action then true else
-    begin
-      let _, cond = d.condition
-      and _, outp = d.output in
-
-      let dfv = Vars.Sv.of_list d.indices in
-
-      Vars.Sv.subset (Term.fv cond) dfv &&
-      Vars.Sv.subset (Term.fv outp) dfv &&
-      List.for_all (fun (_, state) ->
-          Vars.Sv.subset (Term.fv state) dfv
-        ) d.updates
-    end
 
 (*------------------------------------------------------------------*)
 let descr_map
@@ -297,14 +317,28 @@ let project_descr (s : Term.proj) d =
     updates   = List.map (fun (st, m) -> st, project1 m) d.updates;
     output    = (let c,m = d.output in c, project1 m) }
 
-let strongly_compatible_descr d1 d2 =
-  d1.name    = d2.name &&
-  d1.action  = d2.action &&
-  d1.input   = d2.input &&
-  d1.indices = d2.indices &&
-  fst d1.condition = fst d2.condition &&
-  List.map fst d1.updates = List.map fst d2.updates &&
-  fst d1.output = fst d2.output
+let strongly_compatible_descr d1 d2 : bool =
+  if List.length d1.indices <> List.length d2.indices ||
+     List.exists2 (fun i1 i2 -> 
+         not (Type.equal (Vars.ty i1) (Vars.ty i2))
+       ) d1.indices d2.indices
+  then false
+  else
+    let subst = 
+      List.map2 (fun v1 v2 -> 
+          Term.ESubst (Term.mk_var v2, Term.mk_var v1)
+        ) d1.indices d2.indices
+    in
+
+    let d2 = subst_descr subst d2 in
+    assert (d1.indices = d2.indices);
+
+    d1.name    = d2.name &&
+    d1.action  = d2.action &&
+    d1.input   = d2.input &&
+    fst d1.condition = fst d2.condition &&
+    List.map fst d1.updates = List.map fst d2.updates &&
+    fst d1.output = fst d2.output
 
 let combine_descrs (descrs : (Term.proj * descr) list) : descr =
 
@@ -377,8 +411,8 @@ let rec dummy (shape : shape) : action =
   match shape with
   | [] -> []
   | { par_choice = (p,lp) ; sum_choice = (s,ls) } :: l ->
-    { par_choice = (p, List.init lp (fun _ -> Vars.make_new Type.Index "i")) ;
-      sum_choice = (s, List.init ls (fun _ -> Vars.make_new Type.Index "i")) }
+    { par_choice = (p, List.init lp (fun _ -> Vars.make_fresh Type.Index "i")) ;
+      sum_choice = (s, List.init ls (fun _ -> Vars.make_fresh Type.Index "i")) }
     :: dummy l
 
 (*------------------------------------------------------------------*)
@@ -455,8 +489,8 @@ let is_dup_match
 
     | _ -> None
 
-let is_dup table t t' : bool =
-  let is_match t t' () = if t = t' then Some () else None in
+let is_dup ~eq table t t' : bool =
+  let is_match t t' () = if eq t t' then Some () else None in
   match is_dup_match is_match () table t t' with
   | None    -> false
   | Some () -> true

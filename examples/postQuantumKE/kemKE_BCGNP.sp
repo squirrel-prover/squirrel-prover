@@ -80,6 +80,8 @@ name skex : message
 
 aenc encap,decap,pk
 
+axiom [any] decap_encap (x,y,z : message) : decap(encap(x,y,pk(z)),z) = x.
+
 (* long term key of I *)
 
 name skI : index-> message
@@ -88,28 +90,28 @@ name skI : index-> message
 name skR : index->  message
 
 (* session randomess of I *)
-name kI : index -> index -> index -> message
-name rI : index -> index -> index -> message
+name kI : index * index * index -> message
+name rI : index * index * index -> message
 
 (* session randomess of R *)
-name kR : index -> index -> index -> message
-name rR : index -> index -> index -> message
+name kR : index * index * index -> message
+name rR : index * index * index -> message
 
 (* session randomess of R for Dishonest cases*)
-name DkR :  index -> index -> message
-name DrR :  index -> index -> message
+name DkR :  index * index -> message
+name DrR :  index * index -> message
 
 
 (* compromised long term key of R *)
 name DskR : index->  message
 
 (* session randomess of I talking to compromised *)
-name DkI : index -> index -> index -> message
-name DrI : index -> index -> index -> message
+name DkI : index * index * index -> message
+name DrI : index * index * index -> message
 
 
 (* ideal keys *)
-name ikIR : index -> index -> index -> message
+name ikIR : index * index * index -> message
 
 mutable sIR(i,j,k:index) : message =  zero
 mutable sRI(i,j,k:index) : message =  zero
@@ -282,10 +284,13 @@ Proof.
         ++ intro [il jl kl [A ->]].
            case try find il,jl,kl such that _ in exct(skex, kR(il,jl,kl)) else _.
              +++ intro [il0 jl0 kl0 [B ->]].
-                 assert decap(   encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(skI(il)))  , skI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(skI(il0))) , skI(il)).
+                 have U :
+                 decap(encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(skI(il))), skI(il)) = 
+                 decap(encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(skI(il0))), skI(il)).
                  auto.
-                 simpl.
-                 case H1 => //.
+                 rewrite !decap_encap in U. 
+                 by fresh U.
+
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
         ++ intro [H1 _].
@@ -299,10 +304,11 @@ Proof.
         ++ intro [il jl kl [A ->]].
            case try find il,jl,kl such that _ in exct(skex, kR(il,jl,kl)) else _.
              +++ intro [il0 jl0 kl0 [B ->]].
-                 assert decap(   encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(skI(il)))  , skI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(skI(il0))) , skI(il)).
+                 have U : decap(   encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(skI(il)))  , skI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(skI(il0))) , skI(il)).
                  auto.
-                 simpl.
-                 case H1 => //.
+                 rewrite !decap_encap in U. 
+                 by fresh U.
+
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
         ++ intro [H1 _].
@@ -316,10 +322,11 @@ Proof.
         ++ intro [il jl kl [A ->]].
            case try find il,jl,kl such that _ in exct(skex, kI(il,jl,kl)) else _.
              +++ intro [il0 jl0 kl0 [B ->]].
-                 assert decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))  , skR(jl)) = decap(   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(skR(jl0))) , skR(jl)).
+                 have U : decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))  , skR(jl)) = decap(   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(skR(jl0))) , skR(jl)).
                  auto.
-                 simpl.
-                 case H2 => //.
+                 rewrite !decap_encap in U. 
+                 by fresh U.
+
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
         ++ intro [H1 _].
@@ -333,10 +340,11 @@ Proof.
         ++ intro [il jl kl [A ->]].
            case try find il,jl,kl such that _ in exct(skex, kI(il,jl,kl)) else _.
              +++ intro [il0 jl0 kl0 [B ->]].
-                 assert decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))  , skR(jl)) = decap                 (   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(skR(jl0))) , skR(jl)).
+                 have U : decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))  , skR(jl)) = decap                 (   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(skR(jl0))) , skR(jl)).
                  auto.
-                 simpl.
-                 case H2 => //.
+                 rewrite !decap_encap in U. 
+                 by fresh U.
+
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
          ++ intro [H1 _].
@@ -361,7 +369,7 @@ axiom  [idealized/left,idealized/left] len_expd (x1,x2:message) : len(expd(x1,x2
 
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
-global goal [idealized/left,idealized/left] resp_key: forall (i,j,k:index), [happens(R2(i,j,k))] -> equiv(frame@R2(i,j,k), diff(sRI(i,j,k)@R2(i,j,k), ikIR(i,j,k))) .
+global goal [idealized/left,idealized/left] resp_key: Forall (i,j,k:index), [happens(R2(i,j,k))] -> equiv(frame@R2(i,j,k), diff(sRI i j k@R2(i,j,k), ikIR(i,j,k))) .
 Proof.
   intro i j k Hap .
   use reflex with R2(i,j,k) => //.
@@ -370,13 +378,7 @@ Proof.
   auto.
   prf 1; rewrite if_true in 1.
   auto.
-  xor 1,   xor(expd(<pk(skI(k)),
-               <input@R1(i,j,k),
-                <pk(skR(i)),encap(n_CCA(k,i,j),rR(k,i,j),pk(skI(k)))>>>,
-         try find il,jl,kl such that
-           input@R1(i,j,k) = encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))
-         in exct(skex,kI(il,jl,kl))
-         else exct(skex,decap(input@R1(i,j,k),skR(i)))),n_PRF1), n_PRF1.
+  xor 1, xor _ _, n_PRF1. 
   rewrite len_expd.
   namelength n_PRF1, skex.
   intro Len.
@@ -394,7 +396,7 @@ Qed.
 
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
-global goal [idealized/left,idealized/left] right_key: forall (i,j,k:index), [happens(I1(i,j,k))] -> equiv(frame@I1(i,j,k), diff(sIR(i,j,k)@I1(i,j,k), ikIR(i,j,k))) .
+global goal [idealized/left,idealized/left] right_key: Forall (i,j,k:index), [happens(I1(i,j,k))] -> equiv(frame@I1(i,j,k), diff(sIR i j k@I1(i,j,k), ikIR(i,j,k))) .
 Proof.
   intro i j k Hap .
   use reflex with I1(i,j,k) => //.

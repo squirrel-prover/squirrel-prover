@@ -1,9 +1,7 @@
 open Utils
 
-module List = Utils.List
-
-module SE = SystemExpr
-
+module L    = Location
+module SE   = SystemExpr
 module Args = TacticsArgs
 
 (*------------------------------------------------------------------*)
@@ -26,8 +24,6 @@ module H = Hyps.TraceHyps
 module S : sig
   type t = private {
     env : Env.t;
-
-    hint_db : Hint.hint_db;
     
     hyps : H.hyps;
     (** Hypotheses *)
@@ -38,10 +34,13 @@ module S : sig
 
   val init_sequent :
     env:Env.t ->
-    hint_db:Hint.hint_db ->
     conclusion:Term.term ->
     t
 
+  val fv : t -> Vars.Sv.t
+
+  val sanity_check : t -> unit
+                     
   val update :
     ?env:Env.t ->
     ?hyps:H.hyps ->
@@ -51,24 +50,36 @@ module S : sig
 end = struct
   type t = {
     env        : Env.t;
-    hint_db    : Hint.hint_db;
-    (* hind_db    : Reduction. *)
     hyps       : H.hyps;
     conclusion : Term.term;
   }
 
-  let init_sequent ~env ~hint_db ~conclusion = {
-    env ;
-    hint_db;
-    hyps = H.empty;
-    conclusion;
-  }
+  let fv (s : t) : Vars.Sv.t = 
+    let h_vars = 
+      H.fold (fun _ f vars -> 
+          Vars.Sv.union (Equiv.Any.fv f) vars
+        ) s.hyps Vars.Sv.empty
+    in
+    Vars.Sv.union h_vars (Term.fv s.conclusion)
+
+  let sanity_check s : unit =
+    Vars.sanity_check s.env.Env.vars;
+    assert (Vars.Sv.subset (fv s) (Vars.to_set s.env.Env.vars))
+
+  let init_sequent ~env ~conclusion =
+    let s = {
+      env ;
+      hyps = H.empty;
+      conclusion; 
+    } in
+    sanity_check s;
+    s
 
   let update ?env ?hyps ?conclusion t =
     let env        = Utils.odflt t.env env
     and hyps       = Utils.odflt t.hyps hyps
     and conclusion = Utils.odflt t.conclusion conclusion in
-    { t with env; hyps; conclusion; } 
+    { env; hyps; conclusion; } 
 end
 
 include S
@@ -76,7 +87,7 @@ include S
 type sequent = S.t
 type sequents = sequent list
 
-let pp ppf s =
+let _pp ~dbg ppf s =
   let open Fmt in
   pf ppf "@[<v 0>" ;
   pf ppf "@[System: %a@]@;"
@@ -87,15 +98,18 @@ let pp ppf s =
       (Fmt.list ~sep:Fmt.comma Type.pp_tvar) s.env.ty_vars ;
 
   if s.env.vars <> Vars.empty_env then
-    pf ppf "@[Variables: %a@]@;" Vars.pp_env s.env.vars ;
+    pf ppf "@[Variables: %a@]@;" (Vars._pp_env ~dbg) s.env.vars ;
 
   (* Print hypotheses *)
-  H.pp ppf s.hyps ;
+  H._pp ~dbg ppf s.hyps ;
 
   (* Print separation between hyps and conclusion *)
   Printer.kws `Separation ppf (String.make 40 '-') ;
   (* Print conclusion formula and close box. *)
-  pf ppf "@;%a@]" Term.pp s.conclusion
+  pf ppf "@;%a@]" (Term._pp ~dbg) s.conclusion
+
+let pp     = _pp ~dbg:false
+let pp_dbg = _pp ~dbg:true
 
 (*------------------------------------------------------------------*)
 let get_all_messages (s : sequent) =
@@ -220,8 +234,9 @@ module AnyHyps
     in
     S.update ~hyps:(H.filter not_triv s.hyps) s
 
-  let pp     fmt s = H.pp     fmt s.hyps
-  let pp_dbg fmt s = H.pp_dbg fmt s.hyps
+  let pp          fmt s = H.pp          fmt s.hyps
+  let _pp    ~dbg fmt s = H._pp    ~dbg fmt s.hyps
+  let pp_dbg      fmt s = H.pp_dbg      fmt s.hyps
 end
 
 (*------------------------------------------------------------------*)
@@ -248,7 +263,7 @@ let set_table table s =
 let rec add_macro_defs (s : sequent) f =
   let macro_eqs : (Term.term * Term.term) list ref = ref [] in
   match SystemExpr.to_fset s.env.system.set with
-  | exception _ -> s
+  | exception (SE.Error Expected_fset) -> s
   | system ->
 
     List.fold_left (fun s (a,f) -> 
@@ -278,7 +293,7 @@ let set_goal a s =
   let s = S.update ~conclusion:a s in
     match Term.form_to_xatom a with
       | Some at 
-        when Term.ty_xatom at = Type.Message && 
+        when Type.equal (Term.ty_xatom at) Type.tmessage && 
              Config.auto_intro () -> 
         add_macro_defs s a
       | _ -> s
@@ -344,8 +359,8 @@ let pi projection s =
     (Term.project1 projection s.conclusion)
     s
 
-let init ~env ~hint_db conclusion =
-  init_sequent ~env ~hint_db ~conclusion
+let init ~env conclusion =
+  init_sequent ~env ~conclusion
 
 let goal s = s.conclusion
 
@@ -411,7 +426,7 @@ let literals_unsat_smt ?(slow=false) s =
      * we don't actually need to decompose message atoms / trace literals *)
     (* since we didn't move the conclusion into the premises,
      * handle it here *)
-    (Term.mk_not s.conclusion :: Hint.get_smt_db s.hint_db)
+    (Term.mk_not s.conclusion :: Hint.get_smt_db s.env.table)
 
 
 (*------------------------------------------------------------------*)
@@ -422,9 +437,6 @@ let mk_trace_cntxt ?se s =
     system;
     models = Some (get_models s);
   }
-
-(*------------------------------------------------------------------*)
-let hint_db s = s.hint_db
 
 (*------------------------------------------------------------------*)
 let get_trace_hyps s = s.hyps
@@ -440,15 +452,6 @@ let map f s : sequent =
   set_goal (f.Equiv.Babel.call Equiv.Local_t (goal s)) (AnyHyps.map f' s)
 
 (*------------------------------------------------------------------*)
-let fv s : Vars.Sv.t = 
-  let h_vars = 
-    AnyHyps.fold (fun _ f vars -> 
-        Vars.Sv.union (Equiv.Any.fv f) vars
-      ) s Vars.Sv.empty
-  in
-  Vars.Sv.union h_vars (Term.fv (goal s))
-
-(*------------------------------------------------------------------*)
 module Conc = Term.Smart
 module Hyp  = Equiv.Any.Smart
 
@@ -461,10 +464,6 @@ module LocalHyps
   type hyp = Equiv.local_form
   type ldecl = Ident.t * hyp
     
-  let (!!) = function
-    | Equiv.Local h -> h
-    | Equiv.Global _ -> assert false
-
   let _add ~force p h s = AnyHyps._add ~force p (Local h) s
       
   let add p h s = AnyHyps.add p (Local h) s
@@ -486,11 +485,18 @@ module LocalHyps
 
   let is_hyp h s = AnyHyps.is_hyp (Local h) s
 
-  let by_id id s = !!(AnyHyps.by_id id s)
+  let by_id id s =
+    match AnyHyps.by_id id s with
+    | Equiv.Local h -> h
+    | Equiv.Global _ -> assert false
 
   let by_name name s =
     let l,h = AnyHyps.by_name name s in
-    l,!!h
+    match h with
+    | Equiv.Local h -> l, h
+    | Equiv.Global _ ->
+      Tactics.soft_failure
+        ~loc:(L.loc name) (Failure "expected a local hypotheses")
 
   let mem_id = AnyHyps.mem_id
 
@@ -562,7 +568,8 @@ module LocalHyps
 
   let clear_triv = AnyHyps.clear_triv
 
-  let pp = AnyHyps.pp
+  let pp     = AnyHyps.pp
+  let _pp    = AnyHyps._pp
   let pp_dbg = AnyHyps.pp_dbg
 end
 

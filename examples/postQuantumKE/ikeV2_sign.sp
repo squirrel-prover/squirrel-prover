@@ -55,23 +55,23 @@ include Basic.
 hash h
 
 (* pre-shared keys *)
-name psk : index -> index -> message
+name psk : index * index -> message.
 
 (* long term keys *)
-name skI :index ->  message
-name skR : index -> message
+name skI : index -> message
+name skR : index -> message.
 
 
 (* DDH randomnesses *)
-name xi :  index -> index ->  message
-name xr :  index -> index -> message
+name xi :  index * index -> message
+name xr :  index * index -> message
 
 abstract g : message
-abstract exp : message -> message -> message
+abstract exp : message * message -> message.
 
 (* fresh randomness *)
-name Ni : index -> index ->   message
-name Nr : index -> index ->   message
+name Ni : index * index ->   message
+name Nr : index * index ->   message
 
 abstract ok:message
 abstract ko:message
@@ -105,13 +105,14 @@ process Initiator(i,j:index) =
                    >>>,  skI(i)  )
      );
   in(cI,signed);
-  if checksign( signed, pk(skR(j))) =
+  if checksign(
       < fst(m)(*gI*)
                , <snd(m)(*Nr*),
                   <Ni(i,j)(*Ni*),
                    prfp(  hseed( < <Ni(i,j),snd(m)(*Nr*)>,   exp(fst(m),xi(i,j))>, seedpubkey ) (* SKEYSEED *),
                   <Ni(i,j),snd(m)(*Nr*)> )
-                   >>> then
+                   >>>,
+      signed, pk(skR(j))) then
      FI :  out(cR, ok).
 
 
@@ -120,13 +121,14 @@ process Responder(i,j:index) =
   out(cR, <exp(g,xr(i,j)), Nr(i,j)>);
 
   in(cR, signed);
-  if checksign( signed, pk(skI(j))) =
+  if checksign(
       < fst(m)(*gI*)
                , <snd(m)(*Ni*),
                   <Nr(i,j)(*Nr*),
                    prfp(  hseed(< <snd(m)(*Ni*),Nr(i,j)>,  exp(fst(m),xr(i,j))>, seedpubkey)(* SKEYSEED *),
                    <snd(m)(*Ni*),Nr(i,j)> )
-                   >>> then
+                   >>>,
+      signed, pk(skI(j))) then
     SR:  out(cR,
       sign(  < exp(g,xr(i,j))
                , <Nr(i,j),
@@ -148,7 +150,7 @@ system  out(cI, seedpubkey); ((!_k !_l R: Responder(k,l)) | (!_i !_j I: Initiato
 
 (* We simply reveal the keys in the end, they should be indistinguishable from perfect keys *)
 
-name idealkeys : index -> index -> index -> index -> message
+name idealkeys : index * index * index * index -> message
 
 process InitiatorRoR(i,j:index) =
    out(cI, <exp(g,xi(i,j)), Ni(i,j)>);
@@ -165,13 +167,14 @@ process InitiatorRoR(i,j:index) =
                    >>>,  skI(i)  )
      );
   in(cI,signed);
-  if checksign( signed, pk(skR(j))) =
+  if checksign( 
       < fst(m)(*gI*)
                , <snd(m)(*Nr*),
                   <Ni(i,j)(*Ni*),
                    prfp(  hseed( < <Ni(i,j),snd(m)(*Nr*)>,   exp(fst(m),xi(i,j))>, seedpubkey ) (* SKEYSEED *),
                   <Ni(i,j),snd(m)(*Nr*)> )
-                   >>> then
+                   >>>,
+      signed, pk(skR(j))) then
 
 
     FI :   out(cR,
@@ -187,13 +190,14 @@ process ResponderRor(i,j:index) =
   out(cR, <exp(g,xr(i,j)), Nr(i,j)>);
 
   in(cR, signed);
-  if checksign( signed, pk(skI(j))) =
+  if checksign(
       < fst(m)(*gI*)
                , <snd(m)(*Ni*),
                   <Nr(i,j)(*Nr*),
                    prfp(  hseed(< <snd(m)(*Ni*),Nr(i,j)>,  exp(fst(m),xr(i,j))>, seedpubkey)(* SKEYSEED *),
                    <snd(m)(*Ni*),Nr(i,j)> )
-                   >>> then
+                   >>>,
+       signed, pk(skI(j)))  then
     SR:  out(cR,
       sign(  < exp(g,xr(i,j))
                , <Nr(i,j),
@@ -217,7 +221,7 @@ system [core]  out(cI, seedpubkey); ((!_k !_l R: ResponderRor(k,l)) | (!_i !_j I
 system core2 = [core/left] with gprf (il,jl,kl,ll:index),
  prfd(  hseed( < <Ni(il,jl),Nr(kl,ll)>,  exp(exp(g,xr(kl,ll)),xi(il,jl))>, seedpubkey  )(* SKEYSEED *), psk(ll,kl)).
 
-system core3 = [core2] with rename forall (l,k,i,j:index), equiv(diff( n_PRF(l,k,j,i),  idealkeys(l,k,j,i))).
+system core3 = [core2] with rename Forall (l,k,i,j:index), equiv(diff( n_PRF(l,k,j,i),  idealkeys(l,k,j,i))).
 
 
 
@@ -236,7 +240,7 @@ Proof.
   use Hexec with SR(i,j); 2: auto.
   expand exec. 
   destruct H0 as [H0 H3]. expand cond.
-  euf H3 => ? ? ?.
+  euf H3. intro [j0 [H2 HE]].
   exists j0.
   by case H2; depends R(i,j),FR(i,j).
 Qed.
@@ -249,7 +253,7 @@ goal [core3,core/right] authI (i,j:index):
 Proof.
   intro H @/exec [H0 H1]. 
   expand cond.
-  euf H1 => ? ? ?.
+  euf H1. intro [l [H2 HE]].
   
   depends SI(i,j), FI(i,j) by auto.
   intro C.

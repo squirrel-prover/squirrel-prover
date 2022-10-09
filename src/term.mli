@@ -33,7 +33,7 @@ type nsymb = name isymb
 (** Function symbols, may represent primitives or abstract functions. *)
 
 type fname = Symbols.fname 
-type fsymb = fname * Vars.var list
+type fsymb = fname
 
 (** Macros are used to represent inputs, outputs, contents of state
     variables, and let definitions: everything that is expanded when
@@ -87,24 +87,31 @@ val right_proj : proj
 type 'a diff_args =
   | Explicit of (proj * 'a) list
 
+(*------------------------------------------------------------------*)
+type quant = ForAll | Exists | Seq | Lambda
+
+val pp_quant : Format.formatter -> quant -> unit
+
+(*------------------------------------------------------------------*)
 type term = private
+  | App   of term * term list
   | Fun   of fsymb * Type.ftype * term list
   | Name  of nsymb
   | Macro of msymb * term list * term
-
-  | Seq    of Vars.var list * term
 
   | Action of Symbols.action * Vars.var list 
 
   | Var of Vars.var
 
+  | Tuple of term list
+  | Proj of int * term
+
   | Diff of term diff_args
 
   | Find of Vars.var list * term * term * term
 
-  | ForAll of Vars.var list * term
-  | Exists of Vars.var list * term
-
+  | Quant of quant * Vars.var list * term
+             
 type t = term
 
 type terms = term list
@@ -168,7 +175,9 @@ val lit_to_form   : literal -> term
 
 type hterm = Lambda of Vars.vars * term
 
-val pp_hterm : Format.formatter -> hterm -> unit
+val pp_hterm     :             Format.formatter -> hterm -> unit
+val _pp_hterm    : dbg:bool -> Format.formatter -> hterm -> unit
+val pp_hterm_dbg :             Format.formatter -> hterm -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printer and cast} *)
@@ -178,7 +187,9 @@ type pp_info
 
 val default_pp_info : pp_info
 
-val pp : Format.formatter -> term -> unit
+val pp     :             Format.formatter -> term -> unit
+val _pp    : dbg:bool -> Format.formatter -> term -> unit
+val pp_dbg :             Format.formatter -> term -> unit
 
 val pp_with_info : pp_info -> Format.formatter -> term -> unit
 
@@ -266,8 +277,9 @@ val f_pred : fsymb
 val f_true  : fsymb
 val f_false : fsymb
 val f_and   : fsymb
-val f_impl  : fsymb
 val f_or    : fsymb
+val f_impl  : fsymb
+val f_iff   : fsymb
 val f_not   : fsymb
 val f_ite   : fsymb
 
@@ -311,8 +323,9 @@ module type SmartFO = sig
   val mk_false : form
 
   val mk_eq  : ?simpl:bool -> term -> term -> form
-  val mk_leq : ?simpl:bool -> term -> term -> form
-  val mk_geq : ?simpl:bool -> term -> term -> form
+  val mk_neq : ?simpl:bool -> term -> term -> form
+  val mk_leq :                term -> term -> form
+  val mk_geq :                term -> term -> form
   val mk_lt  : ?simpl:bool -> term -> term -> form
   val mk_gt  : ?simpl:bool -> term -> term -> form
 
@@ -348,6 +361,7 @@ module type SmartFO = sig
   val destr_and   : form -> (form * form) option
   val destr_or    : form -> (form * form) option
   val destr_impl  : form -> (form * form) option
+  val destr_iff   : form -> (form * form) option
 
   (*------------------------------------------------------------------*)
   val is_false  : form -> bool
@@ -357,6 +371,7 @@ module type SmartFO = sig
   val is_and    : form -> bool
   val is_or     : form -> bool
   val is_impl   : form -> bool
+  val is_iff    : form -> bool
   val is_forall : form -> bool
   val is_exists : form -> bool
 
@@ -394,24 +409,29 @@ include module type of Smart
 val mk_pred    : term -> term
 val mk_var     : Vars.var -> term
 val mk_action  : Symbols.action -> Vars.var list -> term
+val mk_tuple   : term list -> term
+val mk_app     : term -> term list -> term
+val mk_proj    : int -> term -> term
 val mk_name    : nsymb -> term
 val mk_macro   : msymb -> term list -> term -> term
 val mk_diff    : (proj * term) list -> term
 
 val mk_find : ?simpl:bool -> Vars.var list -> term -> term -> term -> term
 
-val destr_iff : term -> (term * term) option
-
+val mk_quant : ?simpl:bool -> quant -> Vars.vars -> form -> form
+  
+val mk_iff   : ?simpl:bool -> form -> form -> form
+  
 (*------------------------------------------------------------------*)
 val mk_fun0 : fsymb -> Type.ftype -> term list -> term
 
-val mk_fun :
-  Symbols.table ->
-  fname ->
-  Vars.var list ->
-  term list ->
-  term
+val mk_fun : Symbols.table -> fname -> term list -> term
 
+(** Declare a function of arity one (all arguments are grouped 
+    into a tuple). *)
+val mk_fun_tuple : Symbols.table -> fname -> term list -> term
+
+(*------------------------------------------------------------------*)
 val mk_zero    : term
 val mk_fail    : term
 val mk_len     : term -> term
@@ -428,16 +448,14 @@ val mk_ite : ?simpl:bool -> term -> term -> term -> term
 
 val mk_timestamp_leq : term -> term -> term
 
-val mk_indices_neq :                Vars.var list -> Vars.var list -> term
+val mk_indices_neq : ?simpl:bool -> Vars.var list -> Vars.var list -> term
 val mk_indices_eq  : ?simpl:bool -> Vars.var list -> Vars.var list -> term
 
 val mk_atom : ord -> term -> term -> term
 val mk_happens : term -> term
 
-val mk_seq0 : ?simpl:bool -> Vars.vars -> term -> term
-
-(** Refresh variables *)
-val mk_seq : Vars.env -> Vars.vars -> term -> term
+val mk_seq    : ?simpl:bool -> Vars.vars -> term -> term
+val mk_lambda : ?simpl:bool -> Vars.vars -> term -> term
 
 (*------------------------------------------------------------------*)
 (** {3 Destructors} *)
@@ -450,7 +468,13 @@ val is_name : term -> bool
 
 val destr_var : term -> Vars.var option
 
-val is_var : term -> bool
+val destr_tuple : term -> term list option
+val destr_proj : term -> (int * term) option
+
+val is_var   : term -> bool
+val is_tuple : term -> bool
+val is_proj  : term -> bool
+
 (*------------------------------------------------------------------*)
 val destr_action : term -> (Symbols.action * Vars.var list) option
 
@@ -492,6 +516,7 @@ val project_opt : projs option -> term -> term
     subterms have topmost different constructors, and they do not
     start with diffs themselves.
 
+    TODO: What is the constraint below used for?
     Macros with different timestamps do not count as a common
     constructor: [head_normal_biterm (Diff(Macro(m,l,ts),Macro(m,l,ts')))]
     will be [Diff(Macro(m,l,ts),Macro(m,l,ts'))] and not
@@ -499,6 +524,11 @@ val project_opt : projs option -> term -> term
 val head_normal_biterm : term -> term
 
 val simple_bi_term : term -> term
+
+(** Same as [simple_bi_term], but does not try to normalize try-finds. 
+    Ad-hoc fix to keep diffeq tactic working properly. 
+    FIXME: remove it. *)
+val simple_bi_term_no_alpha_find : term -> term
 
 val combine : (proj * term) list -> term
 
@@ -525,9 +555,13 @@ val match_infos_to_pp_info : match_infos -> pp_info
 (** {2 Term heads} *)
 
 type term_head =
+  | HApp
   | HExists
   | HForAll
   | HSeq
+  | HLambda
+  | HTuple
+  | HProj
   | HFind
   | HFun   of Symbols.fname 
   | HMacro of Symbols.macro 
@@ -560,3 +594,31 @@ val project_tpat_opt : projs option -> term pat -> term pat
 (** Make a pattern out of a formula: all universally quantified variables
     are added to [pat_vars]. *)
 val pat_of_form : term -> term pat
+
+(*------------------------------------------------------------------*)
+(** {2 Misc} *)
+
+exception AlphaFailed
+
+(** [alpha_conv ~subst t1 t2] check that [t1] and [t2] are 
+    alpha-convertible.
+    - [subst] optional substitution from [t2] variables to [t1] 
+      variables. *)
+val alpha_conv : ?subst:subst -> term -> term -> bool 
+
+(** Process binder variables during alpha-renaming, updating the
+    alpha-renaming substitution (see [alpha_conv]).
+    Raise if alpha-conversion fails. *)
+val alpha_bnds : subst -> Vars.vars -> Vars.vars -> subst 
+
+
+(*------------------------------------------------------------------*)
+(* utility functions for lists of nsymbs *)
+
+(** looks for a name with the same symbol in the list *)
+val exists_symb : nsymb -> nsymb list -> bool
+
+(** finds all names with the same symbol in the list *)
+val find_symb : nsymb -> nsymb list -> nsymb list
+
+

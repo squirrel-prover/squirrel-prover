@@ -313,29 +313,6 @@ let pp_descrs (table : Symbols.table) ppf (system : t) =
   Fmt.pf ppf "@]%!@."
 
 (*------------------------------------------------------------------*)
-
-let clone_system 
-    (table      : Symbols.table)
-    (old_system : t)
-    (new_system : Symbols.lsymb)
-    (map        : Action.descr -> Action.descr)
-  : Symbols.table * Symbols.system 
-  =
-  let projections = List.map fst (to_list old_system) in
-  let old_actions = descrs table old_system in
-  let table, new_system = System.declare_empty table new_system projections in
-  let table =
-    System.Msh.fold
-      (fun _ descr table ->
-         let descr = map descr in
-         let table,_,_ = System.register_action table new_system descr in
-         table)
-      old_actions
-      table
-  in
-  table, new_system
-
-(*------------------------------------------------------------------*)
 (* Pairs *)
 
 let make_pair a b = List [Term.left_proj,a; Term.right_proj,b]
@@ -396,14 +373,10 @@ let project_set_opt (projs : Term.projs option) (c : context) : context =
   
 let print_system (table : Symbols.table) (system : _ expr) : unit =
   try
-    let system = to_fset system in
-    Printer.prt `Result "@[<v>System @[[%a]@]@;@[%a@]@;@[%a@]@;@]%!"
+  let system = to_fset system in
+    Printer.prt `Result "@[<v>System @[[%a]@]@;@[%a@]@]%!"
       pp system
       (pp_descrs table) system
-      (if Config.print_trs_equations ()
-       then Completion.print_init_trs
-       else (fun _fmt _ -> ()))
-      table
-  with _ ->
-    Printer.prt `Result "@.Cannot print action descriptions for system %a@."
+  with Error Expected_fset ->
+    Printer.prt `Result "@[No action descriptions for system %a@]%!"
       pp system

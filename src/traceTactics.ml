@@ -110,10 +110,9 @@ let () =
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
   * This can be used with [vars = []] if orig is an [if-then-else] term. *)
 let case_cond orig vars c t e s : sequent list =
-  let env = ref (TS.vars s) in
-  let vars, subst = Term.refresh_vars (`InEnv env) vars in
+  let vars, subst = Term.refresh_vars `Global vars in
   let then_c = Term.subst subst c in
-  let else_c = Term.mk_forall vars (Term.mk_not c) in
+  let else_c = Term.mk_forall vars (Term.mk_not then_c) in
 
   let then_t = Term.subst subst t in
   let else_t = e in
@@ -205,7 +204,7 @@ let case_tac args = wrap_fail (do_case_tac args)
 let rec simpl_left s =
   let func _ f = match f with
     | Fun (fs, _,_) when fs = Term.f_false || fs = Term.f_and -> true
-    | Term.Exists _ -> true
+    | Term.Quant (Exists, _, _) -> true
     | _ -> false
   in
 
@@ -215,14 +214,14 @@ let rec simpl_left s =
     match f with
     | tf when tf = Term.mk_false -> None
 
-    | Exists (vs,f) ->
+    | Quant (Exists,vs,f) ->
       let s = Hyps.remove id s in
       let env = ref @@ TS.vars s in
       let subst =
         List.map
           (fun v ->
              Term.ESubst  (Term.mk_var v,
-                           Term.mk_var (Vars.fresh_r env v)))
+                           Term.mk_var (Vars.make_approx_r env v)))
           vs
       in
       let f = Term.subst subst f in
@@ -238,17 +237,21 @@ let simpl_left_tac s = match simpl_left s with
   | Some s -> [s]
 
 (*------------------------------------------------------------------*)
-(** [assumption s] succeeds (with no subgoal) if the sequent [s]
-    can be proved using the axiom rule (plus some other minor rules). *)
-let assumption (s : TS.t) = 
+(** [any_assumption s] succeeds (with no subgoal) if the sequent [s]
+    can be proved using the axiom rule (plus some other minor rules). 
+    If [hyp = Some id], only checks for hypothesis [id]. *)
+let assumption ?hyp (s : TS.t) = 
   let goal = TS.goal s in
-  let assumption_entails _ = function
+  let assumption_entails id f = 
+    (hyp = None || hyp = Some id) &&
+    match f with
     | Equiv.Global (Equiv.Atom (Reach f))
     | Equiv.Local f ->
-        goal = f ||
-        List.exists
-          (fun f -> goal = f || f = Term.mk_false)
-          (decompose_ands f)
+      TS.Reduce.conv_term s goal f ||
+      List.exists (fun f ->
+          TS.Reduce.conv_term s goal f ||
+          TS.Reduce.conv_term s f Term.mk_false
+        ) (decompose_ands f)
     | Equiv.Global _ -> false
   in
   if goal = Term.mk_true ||
@@ -257,6 +260,16 @@ let assumption (s : TS.t) =
     dbg "assumption %a" Term.pp goal;
     []
   end else soft_failure Tactics.NotHypothesis
+
+let do_assumption_tac args s : TS.t list =
+  let hyp =
+    match Args.convert_as_lsymb args with
+    | Some str -> Some (fst (Hyps.by_name str s))
+    | None -> None 
+  in
+  assumption ?hyp s
+
+let assumption_tac args = wrap_fail (do_assumption_tac args)
 
 (*------------------------------------------------------------------*)
 (** [localize h h' s sk fk] succeeds with a single subgoal if
@@ -311,7 +324,7 @@ let congruence (s : TS.t) : bool =
         ) [] conclusions
     in
     let s = List.fold_left (fun s f ->
-        Hyps.add Args.AnyName f s
+        Hyps.add Args.Unnamed f s
       ) s term_conclusions
     in
     TS.eq_atoms_valid s
@@ -361,7 +374,7 @@ let constraints (s : TS.t) =
         ) [] conclusions
     in
     let s = List.fold_left (fun s f ->
-        Hyps.add Args.AnyName f s
+        Hyps.add Args.Unnamed f s
       ) s trace_conclusions
     in
     TS.constraints_valid s
@@ -480,7 +493,7 @@ let eq_names (s : TS.t) =
   let s =
     List.fold_left (fun s c ->
         let () = dbg "new name equality (indep): %a" Term.pp c in
-        Hyps.add Args.AnyName c s
+        Hyps.add Args.Unnamed c s
       ) s new_eqs in
 
   (* we now collect equalities between timestamp implied by equalities between
@@ -492,7 +505,7 @@ let eq_names (s : TS.t) =
   let s =
     List.fold_left (fun s c ->
         let () = dbg "new equalities (names): %a" Term.pp c in
-        Hyps.add Args.AnyName c s
+        Hyps.add Args.Unnamed c s
       ) s cnstrs
   in
   [s]
@@ -547,7 +560,7 @@ let eq_trace (s : TS.t) =
   let s =
     List.fold_left (fun s c ->
         let () = dbg "new trace equality: %a" Term.pp c in
-        Hyps.add Args.AnyName c s
+        Hyps.add Args.Unnamed c s
       ) s facts
   in
   [s]
@@ -565,14 +578,14 @@ let () = T.register "eqtrace"
 
 
 (*------------------------------------------------------------------*)
-(* no longer used for trace fresh (trace fresh is now in newfresh.ml *)
-(* left here temporarily, for compatibility with equiv fresh *)
+(* no longer used for fresh. 
+   left here temporarily, for compatibility *)
 (** triple of the action and the name indices *)
-type fresh_occ = (Action.action * Vars.var list) Iter.occ
+type deprecated_fresh_occ = (Action.action * Vars.var list) Iter.occ
 
 (** check if all instances of [o1] are instances of [o2].
     [o1] and [o2] actions must have the same action name *)
-let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool =
+let deprecated_fresh_occ_incl table system (o1 : deprecated_fresh_occ) (o2 : deprecated_fresh_occ) : bool =
   (* for now, positions not allowed here *)
   assert (Sp.is_empty o1.occ_pos && Sp.is_empty o2.occ_pos);
   
@@ -604,32 +617,32 @@ let fresh_occ_incl table system (o1 : fresh_occ) (o2 : fresh_occ) : bool =
   | Match.Match _ -> true
 
 (** Add a new fresh rule case, if it is not redundant. *)
-let add_fresh_case
+let deprecated_add_fresh_case
     table system
-    (c : fresh_occ)
-    (l : fresh_occ list) : fresh_occ list
+    (c : deprecated_fresh_occ)
+    (l : deprecated_fresh_occ list) : deprecated_fresh_occ list
   =
-  if List.exists (fun c' -> fresh_occ_incl table system c c') l
+  if List.exists (fun c' -> deprecated_fresh_occ_incl table system c c') l
   then l
   else
     (* remove any old case which is subsumed by [c] *)
     let l' =
       List.filter (fun c' ->
-          not (fresh_occ_incl table system c' c)
+          not (deprecated_fresh_occ_incl table system c' c)
         ) l
     in
     c :: l'
 
 (** Add many new fresh rule cases, if they are not redundant. *)
-let add_fresh_cases
+let deprecated_add_fresh_cases
     table system
-    (l1 : fresh_occ list)
-    (l2 : fresh_occ list) : fresh_occ list
+    (l1 : deprecated_fresh_occ list)
+    (l2 : deprecated_fresh_occ list) : deprecated_fresh_occ list
   =
-  List.fold_left (fun l2 c -> add_fresh_case table system c l2) l2 l1
+  List.fold_left (fun l2 c -> deprecated_add_fresh_case table system c l2) l2 l1
 
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
-let mk_fresh_indirect_cases
+let deprecated_mk_fresh_indirect_cases
     (cntxt : Constr.trace_cntxt)
     (env : Vars.env)
     (ns : Term.nsymb)
@@ -654,10 +667,10 @@ let mk_fresh_indirect_cases
 
         let new_cases =
           let fv = List.rev (Sv.elements fv) in
-          Fresh.get_name_indices_ext ~fv cntxt ns.s_symb t
+          OldFresh.deprecated_get_name_indices_ext ~fv cntxt ns.s_symb t
         in
         let new_cases =
-          List.map (fun (case : Fresh.name_occ) ->
+          List.map (fun (case : OldFresh.deprecated_name_occ) ->
               { case with
                 occ_cnt = (a, case.occ_cnt);
                 occ_cond = case.occ_cond; }
@@ -666,7 +679,7 @@ let mk_fresh_indirect_cases
 
         List.assoc_up_dflt action_name []
           (fun l ->
-             add_fresh_cases cntxt.table cntxt.system new_cases l
+             deprecated_add_fresh_cases cntxt.table cntxt.system new_cases l
           ) macro_cases
       ) cntxt env terms []
   in
@@ -871,10 +884,9 @@ let autosubst s =
 
       let () = dbg "subst %a by %a" Vars.pp x Vars.pp y in
 
-      let s =
-        TS.set_vars (Vars.rm_var x (TS.vars s)) s
-      in
-      TS.subst [Term.ESubst (Term.mk_var x, Term.mk_var y)] s
+      let s = TS.subst [Term.ESubst (Term.mk_var x, Term.mk_var y)] s in
+      TS.set_vars (Vars.rm_var x (TS.vars s)) s
+
   in
   [process x y]
 
@@ -915,8 +927,20 @@ let () =
   * [C] that congruence closure does not support: conditionals,
   * sequences, etc. *)
 let fa s =
-  let unsupported () =
-    Tactics.(soft_failure (Failure "equality expected")) in
+  let unsupported () = soft_failure (Failure "equality expected") in
+
+  let check_vars vars vars' =
+    if List.length vars <> List.length vars' then
+      soft_failure (Failure "FA: sequences with different lengths");
+
+    let tys_compatible = 
+      List.for_all2 (fun v1 v2 -> 
+          Type.equal (Vars.ty v1) (Vars.ty v2)
+        ) vars vars'
+    in
+    if not tys_compatible then
+      soft_failure (Failure "FA: sequences with different types");
+  in
 
   let u, v = match TS.Reduce.destr_eq s Local_t (TS.goal s) with
     | Some (u,v) -> u, v
@@ -932,7 +956,7 @@ let fa s =
         s |> set_goal (Term.mk_impl c' c) ;
 
         s |> set_goal (Term.mk_impls
-                         (if c = c' then [c] else [c;c'])
+                         (if TS.Reduce.conv_term s c c' then [c] else [c;c'])
                          (Term.mk_atom `Eq t t'));
 
         s |> set_goal (Term.mk_impls
@@ -942,8 +966,21 @@ let fa s =
     in
     subgoals
 
-  | Term.Seq (vars,t),
-    Term.Seq (vars',t') when vars = vars' ->
+  (* FIXME: allow ForAll and Exists? *)
+  | Term.Quant (Seq, vars,t), Term.Quant (Seq, vars',t')
+    when List.for_all (Type.is_finite -| Vars.ty) vars -> 
+    check_vars vars vars';
+
+    (* have [t'] use the same variables names than [t] *)
+    let t' = 
+      let subst = 
+        List.map2 (fun v' v -> 
+            Term.ESubst (Term.mk_var v', Term.mk_var v)
+          ) vars' vars
+      in
+      Term.subst subst t'
+    in
+
     let env = ref (TS.vars s) in
     let vars, subst = Term.refresh_vars (`InEnv env) vars in
     let s = TS.set_vars !env s in
@@ -955,7 +992,9 @@ let fa s =
     subgoals
 
   | Term.Find (vs,c,t,e),
-    Term.Find (vars',c',t',e') when List.length vs = List.length vars' ->
+    Term.Find (vars',c',t',e')
+    when List.for_all (Type.is_finite -| Vars.ty) vs &&
+         List.length vs = List.length vars' ->
     (* We verify that [e = e'],
      * and that [t = t'] and [c <=> c'] for fresh index variables.
      *
@@ -1213,7 +1252,7 @@ let () =
 
 (*------------------------------------------------------------------*)
 (** {3 Create integrity rules parameters } *)
-type integrity_rule = Euf | Intctxt | NonMalleability
+type integrity_rule = NonMalleability
 
 
 type unforgeabiliy_param = Term.fname * Term.nsymb * Term.term
@@ -1222,85 +1261,7 @@ type unforgeabiliy_param = Term.fname * Term.nsymb * Term.term
                            * Term.term list * bool
                            * (Symbols.fname -> bool) option
 
-let euf_param table (t : Term.term) : unforgeabiliy_param =
-  let bad_param () =
-    soft_failure
-      (Tactics.Failure
-         "euf can only be applied to an hypothesis of the form h(t,k)=m \
-          or checksign(s,pk(k))=m \
-          for some hash or signature or decryption functions") in
 
-  let t1, t2 = match Term.destr_eq t with
-    | Some (t1, t2) -> t1, t2
-    | _ -> bad_param () 
-  in
-
-  match t1, t2 with
-  | (Fun ((checksign, _),    _, [s; Fun ((pk,_), _, [Name key])]), m)
-  | (m, Fun ((checksign, _), _, [s; Fun ((pk,_), _, [Name key])])) ->
-    begin match Theory.check_signature table checksign pk with
-      | None ->
-        soft_failure
-          (Failure "the message must be a signature check with \
-                    the associated pk")
-
-      | Some sign -> (sign, key, m, s,  (fun x -> x=pk), [], true, None)
-    end
-
-  | (Fun ((hash, _), _, [m; Name key]), s)
-    when Symbols.is_ftype hash Symbols.Hash table ->
-    (hash, key, m, s, (fun x -> false), [], true, None)
-
-  | (s, Fun ((hash, _), _, [m; Name key]))
-    when Symbols.is_ftype hash Symbols.Hash table ->
-    (hash, key, m, s, (fun x -> false), [], true, None)
-
-  | _ -> bad_param ()
-
-(*------------------------------------------------------------------*)
-let intctxt_param table (t : Term.term) : unforgeabiliy_param =
-  let bad_param () =
-    soft_failure
-      (Tactics.Failure
-         "intctxt can only be applied to an hypothesis of the form \
-          sdec(s,sk) <> fail \
-          or sdec(s,sk) = m (or symmetrically) \
-          for some hash or signature or decryption functions") in
-
-  let at = match Term.form_to_xatom t with
-    | Some (`Comp at) -> at
-    | _ -> bad_param () 
-  in
-
-  let param_dec sdec key m s =
-    match Symbols.Function.get_data sdec table with
-    | Symbols.AssociatedFunctions [senc] ->
-      (senc, key, m, s,  (fun x -> x = sdec),
-       [Term.mk_atom `Eq s Term.mk_fail], false, None)
-    | Symbols.AssociatedFunctions [senc; h] ->
-      (senc, key, m, s,  (fun x -> x = sdec || x = h),
-       [Term.mk_atom `Eq s Term.mk_fail], false, None)
-
-    | _ -> assert false in
-
-  match at with
-  | (`Eq, Fun ((sdec, _), _, [m; Name key]), s)
-    when Symbols.is_ftype sdec Symbols.SDec table ->
-    param_dec sdec key m s
-
-  | (`Eq, s, Fun ((sdec, is), _, [m; Name key]))
-    when Symbols.is_ftype sdec Symbols.SDec table ->
-    param_dec sdec key m s
-
-  | (`Neq, (Fun ((sdec, _), _, [m; Name key]) as s), Fun (fail, _, _))
-    when Symbols.is_ftype sdec Symbols.SDec table && fail = Term.f_fail->
-    param_dec sdec key m s
-
-  | (`Neq, Fun (fail, _, _), (Fun ((sdec, is), _, [m; Name key]) as s))
-    when Symbols.is_ftype sdec Symbols.SDec table && fail = Term.f_fail ->
-    param_dec sdec key m s
-
-  | _ -> bad_param ()
 
 (*------------------------------------------------------------------*)
 let non_malleability_param
@@ -1327,11 +1288,11 @@ let non_malleability_param
     | _ -> assert false in
 
   match t1, t2 with
-  | (Fun ((adec, _), _, [m; Name key]), s)
+  | (Fun (adec, _, [Tuple [m; Name key]]), s)
     when Symbols.is_ftype adec Symbols.ADec table ->
     param_dec adec key m s
 
-  | (s, Fun ((adec, _), _, [m; Name key]))
+  | (s, Fun (adec, _, [Tuple [m; Name key]]))
     when Symbols.is_ftype adec Symbols.ADec table ->
     param_dec adec key m s
 
@@ -1342,15 +1303,13 @@ let mk_integrity_rule_param
     (rule : integrity_rule)
   : Symbols.table -> Term.term -> unforgeabiliy_param =
   match rule with
-  | Euf             -> euf_param
-  | Intctxt         -> intctxt_param
   | NonMalleability -> non_malleability_param
     
 (*------------------------------------------------------------------*)
 (** Unforgeability Axioms *)
 
 let euf_apply_schema
-    sequent (_, key, m, s, _, _, _, _) (case : Euf.euf_schema)
+    sequent (_, key, m, s, _, _, _, _) (case : OldEuf.euf_schema) : sequent
   =
   (* Equality between hashed messages *)
   let new_f = Term.mk_atom `Eq case.message m in
@@ -1373,7 +1332,9 @@ let euf_apply_schema
     SystemExpr.action_to_term table system case.action
   in
  let ts_list =
-    let iter = new Fresh.get_actions ~cntxt:(TS.mk_trace_cntxt sequent) in
+    let iter = 
+      new OldFresh.deprecated_get_actions ~cntxt:(TS.mk_trace_cntxt sequent) 
+    in
     List.iter iter#visit_message [s; m];
     iter#get_actions
   in
@@ -1397,26 +1358,25 @@ let euf_apply_schema
   in
   TS.set_goal goal sequent
 
-let euf_apply_direct s (_, key, m, _, _, _, _, _) Euf.{d_key_indices;d_message} =
+let euf_apply_direct s (_, key, m, _, _, _, _, _) OldEuf.{d_key_indices;d_message} =
   (* The components of the direct case may feature variables that are
    * not in the current environment: this happens when the case is extracted
    * from under a binder, e.g. a Seq or ForAll construct. We need to add
    * such variables to the environment. *)
-  let init_env = TS.vars s in
-  let subst,env =
-    List.fold_left
-      (fun (subst,env) v ->
-         if Vars.mem init_env v then subst,env else
-         let env,v' = Vars.fresh env v in
-         let subst = Term.(ESubst (mk_var v, mk_var v')) :: subst in
-         subst,env)
-      ([],init_env)
+  let subst, env =
+    List.fold_left (fun (subst,env) v ->
+        if Vars.mem env v then subst, env else
+          let env,v' = Vars.make_approx env v in
+          let subst = Term.(ESubst (mk_var v, mk_var v')) :: subst in
+          subst,env)
+      ([], TS.vars s)
       (List.sort_uniq Stdlib.compare
          (d_key_indices @
           Term.get_vars d_message))
   in
   let s = TS.set_vars env s in
   let d_message = Term.subst subst d_message in
+  let d_key_indices = Term.subst_vars subst d_key_indices in
 
   (* Equality between hashed messages. *)
   let eq_hashes = Term.mk_atom `Eq d_message m in
@@ -1425,7 +1385,6 @@ let euf_apply_direct s (_, key, m, _, _, _, _, _) Euf.{d_key_indices;d_message} 
   let eq_indices =
     List.fold_left2
       (fun cnstr i i' ->
-         let i' = Term.subst_var subst i' in
          Term.mk_and ~simpl:false cnstr (Term.mk_atom `Eq (mk_var i) (mk_var i')))
       Term.mk_true
       key.s_indices d_key_indices
@@ -1443,7 +1402,7 @@ let euf_apply_facts drop_head s
 
   (* check that the SSCs hold *)
   let errors =
-    Euf.key_ssc ~globals:true ~messages:[mess;sign]
+    OldEuf.key_ssc ~globals:true ~messages:[mess;sign]
       ~allow_functions ~cntxt head_fn key.s_symb
   in
   if errors <> [] then
@@ -1451,24 +1410,24 @@ let euf_apply_facts drop_head s
 
   (* build the rule *)
   let rule =
-    Euf.mk_rule
+    OldEuf.mk_rule
       ~elems:[] ~drop_head ~allow_functions ~fun_wrap_key
       ~cntxt ~env ~mess ~sign
       ~head_fn ~key_n:key.s_symb ~key_is:key.s_indices
   in
 
   let schemata_premises =
-    List.map (fun case -> euf_apply_schema s p case) rule.Euf.case_schemata
+    List.map (fun case -> euf_apply_schema s p case) rule.OldEuf.case_schemata
 
   and direct_premises =
-    List.map (fun case -> euf_apply_direct s p case) rule.Euf.cases_direct
+    List.map (fun case -> euf_apply_direct s p case) rule.OldEuf.cases_direct
   in
 
   if Symbols.is_ftype head_fn Symbols.SEnc cntxt.table
   || Symbols.is_ftype head_fn Symbols.AEnc cntxt.table then
     Cca.check_encryption_randomness
       ~cntxt
-      rule.Euf.case_schemata rule.Euf.cases_direct head_fn [mess;sign] [];
+      rule.OldEuf.case_schemata rule.OldEuf.cases_direct head_fn [mess;sign] [];
 
   schemata_premises @ direct_premises
 
@@ -1480,7 +1439,6 @@ let euf_apply
   =
   let table = TS.table s in
   let id, at = Hyps.by_name hyp_name s in
-
 
   let (h,key,m,_,_,extra_goals,drop_head,_) as p =
     mk_integrity_rule_param rule_kind table at
@@ -1500,45 +1458,25 @@ let euf_apply
     else
       (* else, we create a goal where m,sk satisfy the axiom *)
       let uvarm, uvarkey,f = match f with
-        | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
+        | Quant (ForAll,[uvarm;uvarkey],f) -> uvarm,uvarkey,f
         | _ -> assert false
       in
+
       match Vars.ty uvarm,Vars.ty uvarkey with
       | Type.(Message, Message) -> let f = Term.subst [
           ESubst (Term.mk_var uvarm,m);
           ESubst (Term.mk_var uvarkey,Term.mk_name key);] f in
         [TS.set_goal
            (Term.mk_impl f (TS.goal s)) s]
-      | _ -> assert false in
+
+      | _ -> assert false 
+  in
 
   (* we create the honest sources using the classical eufcma tactic *)
   let honest_s = euf_apply_facts drop_head s p in
+
   (tag_s @ honest_s @ extra_goals)
 
-
-(*------------------------------------------------------------------*)
-let () =
-  T.register_typed "euf"
-    ~general_help:"Apply the euf axiom to the given hypothesis name."
-    ~detailed_help:"If the hash has been declared with a tag formula, applies \
-                    the tagged version.  given tag. Tagged eufcma, with a tag T, \
-                    says that, under the syntactic side condition, a hashed \
-                    message either satisfies the tag T, or was honestly \
-                    produced. The tag T must refer to a previously defined axiom \
-                    f(mess,sk), of the form forall (m:message,sk:message)."
-    ~tactic_group:Cryptographic
-    ~pq_sound:true
-    (LowTactics.genfun_of_pure_tfun_arg (euf_apply Euf))
-    Args.String
-
-let () =
-  T.register_typed "intctxt"
-    ~general_help:"Apply the intctxt axiom to the given hypothesis name."
-    ~detailed_help:"Conditions are similar to euf."
-    ~tactic_group:Cryptographic
-    ~pq_sound:true
-    (LowTactics.genfun_of_pure_tfun_arg (euf_apply Intctxt))
-    Args.String
 
 
 (*------------------------------------------------------------------*)
@@ -1547,12 +1485,12 @@ exception Name_not_hidden
 class name_under_enc (cntxt:Constr.trace_cntxt) enc is_pk target_n key_n
   = object (self)
 
- inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
+ inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
 
  method visit_message t =
     match t with
     (* any name n can occur as enc(_,_,pk(k)) *)
-    | Term.Fun ((f, _), _, [_; m; Term.Fun ((g,_), _ , [Term.Name k]) ])
+    | Term.Fun (f, _, [Tuple [_; m; Term.Fun (g, _ , [Term.Name k])]])
       when f = enc && is_pk g && k.s_symb = key_n->  super#visit_message m
     | Term.Name name when name.s_symb = target_n -> raise Name_not_hidden
     | Term.Var m -> raise Name_not_hidden
@@ -1606,7 +1544,7 @@ let non_malleability arg (s : TS.t) =
                                     not equal to another fres name *)
   | m, Some (Message (Term.Name n as name,ty)) ->
     (* we now create the inequality to be checked *)
-    let ndef = Symbols.{ n_fty = Type.mk_ftype 0 [] [] ty; } in
+    let ndef = Symbols.{ n_fty = Type.mk_ftype [] [] ty; } in
     let table,n =
       Symbols.Name.declare table (L.mk_loc L._dummy "n_NM") ndef
     in
@@ -1634,7 +1572,7 @@ let () =
 (*------------------------------------------------------------------*)
 let valid_hash (cntxt : Constr.trace_cntxt) (t : Term.term) =
   match t with
-  | Fun ((hash, _), _, [m; Name key]) ->
+  | Fun (hash, _, [Tuple [m; Name key]]) ->
     Symbols.is_ftype hash Symbols.Hash cntxt.table
 
   | _ -> false
@@ -1658,8 +1596,8 @@ let top_level_hashes s =
       List.fold_left
         (fun acc h2 ->
            match h1, h2 with
-           | Fun (hash1, _, [_; Name key1]),
-             Fun (hash2, _, [_; Name key2])
+           | Fun (hash1, _, [Tuple [_; Name key1]]),
+             Fun (hash2, _, [Tuple [_; Name key2]])
              when hash1 = hash2 && key1 = key2 -> (h1, h2) :: acc
            | _ -> acc)
         (make_eq acc q) q
@@ -1698,8 +1636,8 @@ let collision_resistance TacticsArgs.(Opt (String, i)) (s : TS.t) =
     List.fold_left
       (fun acc (h1,h2) ->
          match h1, h2 with
-         | Fun ((hash1, _), _, [m1; Name key1]),
-           Fun ((hash2, _), _, [m2; Name key2])
+         | Fun (hash1, _, [Tuple [m1; Name key1]]),
+           Fun (hash2, _, [Tuple [m2; Name key2]])
            when hash1 = hash2 && key1 = key2 ->
            Term.mk_atom `Eq m1 m2 :: acc
          | _ -> acc)
@@ -1743,11 +1681,14 @@ let rewrite_equiv_transform
   let exception Invalid in
 
   let assoc (t : Term.term) : Term.term option =
-    match List.find_opt (fun e -> Term.project1 src e = t) biframe with
+    match List.find_opt (fun e -> 
+        TS.Reduce.conv_term s (Term.project1 src e) t
+      ) biframe 
+    with
     | Some e -> Some (Term.project1 dst e)
     | None -> None
   in
-  let rec aux : term -> term = fun t ->
+  let rec aux (t : term) : term = 
     match Term.ty t with
     | Type.Timestamp | Type.Index -> t
     | _ ->
@@ -1868,11 +1809,11 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
   in
   subgoals @ [goal]
 
-let rewrite_equiv_args args s =
+let rewrite_equiv_args args (s : TS.t) : TS.t list =
   match args with
   | [TacticsArgs.RewriteEquiv rw] ->
-    let rw_equiv = TraceLT.p_rw_equiv rw s in
-    rewrite_equiv rw_equiv s
+    let ass_context, subgs, ass, dir = TraceLT.p_rw_equiv rw s in
+    subgs @ rewrite_equiv (ass_context, ass, dir) s
   | _ -> bad_args ()
 
 let rewrite_equiv_tac args = wrap_fail (rewrite_equiv_args args)

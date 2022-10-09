@@ -1,4 +1,3 @@
-
 (* set debugConstr=true. *)
 
 aenc enc,dec,pk
@@ -59,10 +58,9 @@ expand exec,cond.
 intro [ex Ha].
 euf Ha.
 
-intro Neq.
+intro [Neq Meq].
 expand output.
 rewrite fst_pair.
-intro [Meq].
 rewrite Meq => //.
 
 intro [ex [Eq Eq2 Ord]].

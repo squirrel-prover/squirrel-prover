@@ -8,7 +8,7 @@ abstract e : message
 
 abstract ok : index   -> message
 abstract f  : message -> message
-abstract gg  : message -> message -> message
+abstract gg  : message * message -> message
 abstract f0  : message -> message
 channel ch
 
@@ -313,7 +313,7 @@ Qed.
 (*------------------------------------------------------------------*)
 (* rewriting with pattern holes *)
 
-abstract P : message -> message -> boolean.
+abstract P : message * message -> boolean.
 
 goal _ (z : message) :
   (forall (x,y : message), P(x,y) => f(y) = x) =>

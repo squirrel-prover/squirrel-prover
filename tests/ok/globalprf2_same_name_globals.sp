@@ -1,5 +1,3 @@
-set autoIntro           = false.
-
 channel c.
 
 abstract m : message.

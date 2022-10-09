@@ -18,21 +18,51 @@ let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
 (** Simple case of [rewrite], without recursion and with a single rewriting 
-    rule. *)
+    rule. Rewriting can fail (hence [strict=false]). *)
 let high_rewrite_norec
     (table  : Symbols.table)
     (system : SE.t)
-    (venv   : Vars.env)         (* for clean variable naming *)
     (rule   : Rewrite.rw_rule) 
     (t      : Term.term)
   : Term.term 
   =
   let mk_rule = fun _ _ -> Some rule in
-  Rewrite.high_rewrite ~mode:(`TopDown false) table system venv mk_rule t
+  Rewrite.high_rewrite ~mode:(`TopDown false) ~strict:false table system mk_rule t
     
 
 (*------------------------------------------------------------------*)
 type system_map_arg = Macros.system_map_arg
+
+
+(*------------------------------------------------------------------*)
+(** Low-level system cloning function.
+    [clone_system table old new f] registers a new system [new],
+    obtained by modifying the actions of [old] with [f].
+    Returns the updated table and system symbol.
+    Does not clone global macros. *)
+let clone_system 
+    (table      : Symbols.table)
+    (old_system : SE.fset)
+    (new_system : Symbols.lsymb)
+    (map        : Action.descr -> Action.descr)
+  : Symbols.table * Symbols.system 
+  =
+  let projections = List.map fst (SE.to_list old_system) in
+  let old_actions = SE.descrs table old_system in
+  let table, new_system = System.declare_empty table new_system projections in
+  let table =
+    System.Msh.fold
+      (fun _ descr table ->
+         let descr = map descr in
+         let table,_,_ = System.register_action table new_system descr in
+         table)
+      old_actions
+      table
+  in
+
+  let table = Lemma.add_depends_mutex_lemmas table new_system in
+
+  table, new_system
 
 (*------------------------------------------------------------------*)
 (** High-level system cloning function. *)
@@ -49,13 +79,10 @@ let clone_system_map
   =
   (* We declare the system *)
   let table, new_system =
-    SystemExpr.clone_system
+    clone_system
       table (SE.singleton system) new_name
       (fun descr -> 
-         (* description with clean variable names *)
-         let venv, _, s  = 
-           Term.refresh_vars_env (Vars.empty_env) descr.indices 
-         in
+         let _, s  = Term.refresh_vars `Global descr.indices in
          let descr = Action.subst_descr s descr in
 
          Action.descr_map (fun _ -> fmap (ADescr descr)) descr)
@@ -94,10 +121,10 @@ let parse_single_system_name table sdecl : SE.fset * System.Single.t =
 (** Convertion of system modifiers arguments.
     - [bnds] are additional binded variables. *)
 let conv_term ?pat table system ~bnds (term : Theory.term)
-  : Vars.env * Vars.vars * Term.term
+  : Vars.vars * Term.term
   =
   let env = Env.init ~table ~system:system () in
-  let env,is = Theory.convert_p_bnds env bnds in
+  let env,is = Theory.convert_bnds env bnds in
 
   Vars.check_type_vars is [Type.Index]
     (fun () ->
@@ -111,17 +138,17 @@ let conv_term ?pat table system ~bnds (term : Theory.term)
 
   let conv_env = Theory.{ env; cntxt = InGoal } in
   let t, _ = Theory.convert ?pat conv_env term in
-  env.vars, is, t
+  is, t
 
 (*------------------------------------------------------------------*)
 let mk_equiv_statement
-    table hint_db
+    table 
     new_axiom_name enrich make_conclusion new_system
   : Goal.statement
   =
   let context = SE.equivalence_context ~set:new_system new_system in
   let formula =
-    fst (Goal.make_obs_equiv ~enrich table hint_db context)
+    fst (Goal.make_obs_equiv ~enrich table context)
     |> Equiv.any_to_equiv
   in
   let formula = make_conclusion formula in
@@ -135,7 +162,7 @@ let mk_equiv_statement
 (** {2 Renaming} *)
 
 let global_rename
-    (table : Symbols.table) (hint_db : Hint.hint_db)
+    (table : Symbols.table) 
     sdecl (gf : Theory.global_formula)
   =
   let old_system, old_single_system =
@@ -172,7 +199,7 @@ let global_rename
   let cntxt =
     Constr.make_context ~table ~system:(SE.singleton old_single_system)
   in
-  let iter = new Fresh.find_name ~cntxt true ns2.s_symb in
+  let iter = new OldFresh.deprecated_find_name ~cntxt true ns2.s_symb in
   let () =
     try
       SystemExpr.iter_descrs
@@ -181,7 +208,7 @@ let global_rename
            iter#visit_message (snd action_descr.output) ;
            iter#visit_message (snd action_descr.condition) ;
            List.iter (fun (_,m) -> iter#visit_message m) action_descr.updates)
-    with Fresh.Name_found ->
+    with OldFresh.Deprecated_Name_found ->
       Tactics.hard_failure
         (Tactics.Failure "The name on the right-hand side already \
                           occurs in the left-hand side.")
@@ -201,7 +228,7 @@ let global_rename
   in
 
   let fmap _ _ms t : Term.term =
-    high_rewrite_norec table (old_system :> SE.t) env.vars rw_rule t
+    high_rewrite_norec table (old_system :> SE.t) rw_rule t
   in
   
   let table, old_new_pair =
@@ -214,7 +241,7 @@ let global_rename
   in
 
   (* we now create the lhs of the obtained conclusion *)
-  let fresh_x_var = Vars.make_new Type.Message "mess" in
+  let fresh_x_var = Vars.make_fresh Type.Message "mess" in
   let enrich = [Term.mk_var fresh_x_var] in
 
   let make_conclusion equiv =
@@ -229,7 +256,7 @@ let global_rename
   in
   let lemma =
     mk_equiv_statement
-      table hint_db
+      table
       axiom_name enrich make_conclusion old_new_pair
   in
   (Some lemma, [], table)
@@ -240,7 +267,6 @@ let global_rename
 
 let global_prf
     (table : Symbols.table)
-    (hint_db : Hint.hint_db)
     (sdecl : Decl.system_modifier)
     (bnds  : Theory.bnds)
     (hash  : Theory.term)
@@ -250,7 +276,7 @@ let global_prf
     parse_single_system_name table sdecl
   in
 
-  let venv, is, hash =
+  let is, hash =
     let context = SE.(reachability_context (singleton old_single_system)) in
     conv_term table context ~bnds hash
   in
@@ -263,7 +289,7 @@ let global_prf
 
   (* Check syntactic side condition. *)
   let errors =
-    Euf.key_ssc ~globals:true
+    OldEuf.key_ssc ~globals:true
       ~elems:[] ~allow_functions:(fun x -> false)
       ~cntxt param.h_fn param.h_key.s_symb
   in
@@ -279,15 +305,15 @@ let global_prf
     | _ -> assert false
   in
   (* We create the pattern for the hash *)
-  let fresh_x_var = Vars.make_new Type.Message "x" in
+  let fresh_x_var = Vars.make_fresh Type.Message "x" in
   let hash_pattern =
-    Term.mk_fun table param.h_fn [] [Term.mk_var fresh_x_var; left_key ]
+    Term.mk_fun_tuple table param.h_fn [Term.mk_var fresh_x_var; left_key ]
   in
 
   (* Instantiation of the fresh name *)
   let ndef =
     let ty_args = List.map Vars.ty is in
-    Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args Type.Message ; }
+    Symbols.{ n_fty = Type.mk_ftype_tuple [] ty_args Type.Message ; }
   in
   let table,n =
     Symbols.Name.declare table (L.mk_loc L._dummy "n_PRF") ndef
@@ -313,7 +339,7 @@ let global_prf
   in
 
   let fmap _ _ms t =
-    high_rewrite_norec table (old_system :> SE.t) venv rw_rule t
+    high_rewrite_norec table (old_system :> SE.t) rw_rule t
   in
 
   let table, old_new_pair =
@@ -326,7 +352,7 @@ let global_prf
   in
 
   (* we now create the lhs of the obtained conclusion *)
-  let fresh_x_var = Vars.make_new Type.Message "mess" in
+  let fresh_x_var = Vars.make_fresh Type.Message "mess" in
   let enrich = [Term.mk_var fresh_x_var] in
   let make_conclusion equiv =
     let atom =
@@ -345,7 +371,7 @@ let global_prf
 
   let lemma =
     mk_equiv_statement
-      table hint_db
+      table
       axiom_name enrich make_conclusion old_new_pair
   in
 
@@ -358,14 +384,14 @@ let global_prf
 
   
 let global_cca
-    (table : Symbols.table) (hint_db : Hint.hint_db)
+    (table : Symbols.table) 
     sdecl bnds (p_enc : Theory.term)
   =
   let old_system, old_single_system =
     parse_single_system_name table sdecl
   in
 
-  let venv, is, enc =
+  let is, enc =
     let context = SE.(reachability_context (singleton old_single_system)) in
     conv_term table context ~bnds p_enc
   in
@@ -376,9 +402,9 @@ let global_cca
 
   let enc_fn, enc_key, plaintext, enc_pk, enc_rnd =
     match enc with
-    | Term.Fun ((fnenc,eis), _,
-                [m; Term.Name r;
-                 Term.Fun ((fnpk,is), _, [Term.Name sk])])
+    | Term.Fun (fnenc, _,
+                [Tuple [m; Term.Name r;
+                        Term.Fun (fnpk, _, [Term.Name sk])]])
       when Symbols.is_ftype fnpk Symbols.PublicKey table &&
            Symbols.is_ftype fnenc Symbols.AEnc table ->
       fnenc, sk, m, fnpk, r
@@ -396,7 +422,7 @@ let global_cca
     | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = enc_pk ->
       (* Check syntactic side condition. *)
       let errors =
-        Euf.key_ssc ~globals:true
+        OldEuf.key_ssc ~globals:true
           ~messages:[enc] ~allow_functions:(fun x -> x = enc_pk)
           ~cntxt fndec enc_key.s_symb
       in
@@ -416,20 +442,20 @@ let global_cca
   (* TODO: check randomness is used only once, and message is distinct. *)
 
   (* We first refresh globably the indices to create the left patterns *)
-  let is1, left_subst = Term.refresh_vars (`Global) is in
+  let is1, left_subst = Term.refresh_vars `Global is in
 
   (* The dec must match all decryption with the corresponding secret key *)
-  let fresh_x_var = Vars.make_new Type.Message "x" in
+  let fresh_x_var = Vars.make_fresh Type.Message "x" in
   let dec_pattern =
-    Term.mk_fun table dec_fn [] [ Term.mk_var fresh_x_var;
-                                  Term.mk_name enc_key ]
+    Term.mk_fun_tuple table dec_fn [ Term.mk_var fresh_x_var;
+                                     Term.mk_name enc_key ]
   in
   let dec_pattern = Term.subst left_subst dec_pattern in
 
   (* Instantiation of the fresh replacement *)
   let ndef =
     let ty_args = List.map Vars.ty enc_rnd.s_indices in
-    Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args Type.Message ; }
+    Symbols.{ n_fty = Type.mk_ftype_tuple [] ty_args Type.Message ; }
   in
   let table,n =
     Symbols.Name.declare table (L.mk_loc L._dummy "n_CCA") ndef
@@ -443,10 +469,10 @@ let global_cca
       Term.mk_zeroes (Term.mk_len plaintext) in
 
   let new_enc =
-    let t_pk = Term.mk_fun table enc_pk [] [Term.mk_name enc_key]  in
-    Term.mk_fun table enc_fn [] [ mess_replacement;
-                                  Term.mk_name enc_rnd;
-                                  t_pk ]
+    let t_pk = Term.mk_fun table enc_pk [Term.mk_name enc_key]  in
+    Term.mk_fun_tuple table enc_fn [ mess_replacement;
+                                     Term.mk_name enc_rnd;
+                                     t_pk ]
   in
 
   (* We replace
@@ -479,53 +505,54 @@ let global_cca
   in
 
   let fmap _ _ms t =
-    high_rewrite_norec table (old_system :> SE.t) venv enc_rw_rule t |>
-    high_rewrite_norec table (old_system :> SE.t) venv dec_rw_rule
+    high_rewrite_norec table (old_system :> SE.t) enc_rw_rule t |>
+    high_rewrite_norec table (old_system :> SE.t) dec_rw_rule
   in
 
   let table, old_new_pair =
     clone_system_map table old_single_system sdecl.Decl.name fmap
   in
 
-  let axiom_name =
-    let old_system_name = Symbols.to_string old_single_system.system in
-    "cca_from_" ^ old_system_name ^ "_to_" ^ Location.unloc sdecl.name
-  in
+  (* Note: the added lemma was bugged, commented out for now. *)
+  (* let axiom_name =
+   *   let old_system_name = Symbols.to_string old_single_system.system in
+   *   "cca_from_" ^ old_system_name ^ "_to_" ^ Location.unloc sdecl.name
+   * in *)
 
   (* we now create the lhs of the obtained conclusion *)
-  let fresh_x_var = Vars.make_new Type.Message "mess" in
+  (* let fresh_x_var = Vars.make_fresh Type.Message "mess" in *)
   let rdef =
     let ty_args = List.map Vars.ty is in
-    Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args Type.Message ; }
+    Symbols.{ n_fty = Type.mk_ftype_tuple [] ty_args Type.Message ; }
   in
   let table,r =
     Symbols.Name.declare table (L.mk_loc L._dummy "r_CCA") rdef
   in
 
-  let enrich = [Term.mk_var fresh_x_var] in
-  let make_conclusion equiv =
-    let atom =
-      Equiv.Atom (
-        Equiv [ Term.mk_var fresh_x_var;
-                
-                Term.mk_diff
-                  [Term.left_proj, Term.mk_name enc_key;
-                   Term.right_proj, Term.mk_name @@ Term.mk_isymb n Message is];
-                
-               Term.mk_diff
-                 [Term.left_proj, Term.mk_name enc_rnd;
-                  Term.right_proj, Term.mk_name @@ Term.mk_isymb r Message is] ])
-    in
-    let concl = Equiv.Impl (Equiv.mk_forall is atom, equiv) in      
-    Equiv.Global (Equiv.mk_forall [fresh_x_var] concl)
-  in
+  (* let enrich = [Term.mk_var fresh_x_var] in
+   * let make_conclusion equiv =
+   *   let atom =
+   *     Equiv.Atom (
+   *       Equiv [ Term.mk_var fresh_x_var;
+   *               
+   *               Term.mk_diff
+   *                 [Term.left_proj, Term.mk_name enc_key;
+   *                  Term.right_proj, Term.mk_name @@ Term.mk_isymb n Message is];
+   *               
+   *              Term.mk_diff
+   *                [Term.left_proj, Term.mk_name enc_rnd;
+   *                 Term.right_proj, Term.mk_name @@ Term.mk_isymb r Message is] ])
+   *   in
+   *   let concl = Equiv.Impl (Equiv.mk_forall is atom, equiv) in      
+   *   Equiv.Global (Equiv.mk_forall [fresh_x_var] concl)
+   * in *)
 
-  let lemma =
-    mk_equiv_statement
-      table hint_db
-      axiom_name enrich make_conclusion old_new_pair
-  in
-  Some lemma, [], table
+  (* let lemma =
+   *   mk_equiv_statement
+   *     table hint_db
+   *     axiom_name enrich make_conclusion old_new_pair
+   * in *)
+  (* Some lemma *) None, [], table
 
 (*------------------------------------------------------------------*)
 (** {2 Global PRF with time} *)
@@ -590,16 +617,13 @@ let subst_xocc (s : Term.subst) (o : x_hash_occ) : x_hash_occ =
   { o with x_a_is; x_occ; }
 
 
-let refresh_xocc
-    (venv : Vars.env) (o : x_hash_occ) 
-  : Vars.env * Term.subst * x_hash_occ 
-  =
+let refresh_xocc (o : x_hash_occ) : Term.subst * x_hash_occ =
   let occ = o.x_occ in
   assert (Sv.subset (Sv.of_list o.x_a_is) (Sv.of_list occ.occ_vars));
 
-  let venv, occ_vars, subst = Term.refresh_vars_env venv occ.occ_vars in
+  let occ_vars, subst = Term.refresh_vars `Global occ.occ_vars in
 
-  venv, subst, subst_xocc subst o
+  subst, subst_xocc subst o
 
 (*------------------------------------------------------------------*)
 (** Hash occurrences with unique identifiers *)
@@ -612,7 +636,7 @@ module XO : sig
 
   val subst : Term.subst -> t -> t
 
-  val refresh : Vars.env -> t -> Vars.env * Term.subst * t
+  val refresh : t -> Term.subst * t
 
   val pp : Format.formatter -> t -> unit
 end = struct
@@ -630,9 +654,9 @@ end = struct
 
   let subst s x = { x with cnt = subst_xocc s x.cnt }
 
-  let refresh venv x = 
-    let venv, subst, cnt = refresh_xocc venv x.cnt in
-    venv, subst, { x with cnt }
+  let refresh x = 
+    let subst, cnt = refresh_xocc x.cnt in
+    subst, { x with cnt }
 end
 
 (** Strict pre-ordering over hash occurrences, resulting from the 
@@ -663,7 +687,7 @@ let xo_lt
         y.x_msymb
         (Macros.ty_out table y.x_msymb)
         (List.map (fun ty ->
-             Vars.make_new ty "a"
+             Vars.make_fresh ty "a"
            ) (Macros.ty_args table y.x_msymb))
     in
     let a_y = Term.mk_action y.x_a y.x_a_is in
@@ -767,7 +791,6 @@ let check_uniq table (map : XO.t list) =
 (*------------------------------------------------------------------*)
 let global_prf_t
     (table   : Symbols.table)
-    (hint_db : Hint.hint_db)
     (sdecl   : Decl.system_modifier)
     (bnds    : Theory.bnds)
     (hash    : Theory.term)
@@ -777,7 +800,7 @@ let global_prf_t
     parse_single_system_name table sdecl
   in
 
-  let venv, is, hash =
+  let is, hash =
     let context = SE.(reachability_context (singleton old_single_system)) in
     conv_term ~pat:true table context ~bnds hash 
   in
@@ -793,7 +816,7 @@ let global_prf_t
   (* Check syntactic side condition.
      We iter over global macros too ! *)
   let errors =
-    Euf.key_ssc ~globals:true
+    OldEuf.key_ssc ~globals:true
       ~elems:[] ~allow_functions:(fun x -> false)
       ~cntxt param.h_fn param.h_key.s_symb
   in
@@ -801,7 +824,10 @@ let global_prf_t
     soft_failure (Tactics.BadSSCDetailed errors);
 
   (* type of the hash function input *)
-  let m_ty = List.hd (param.h_fty.fty_args) in
+  let m_ty = match param.h_fty.fty_args with
+    | [Type.Tuple [m_ty; _]] -> m_ty
+    | _ -> assert false
+  in
 
   let mk_occ_name
       (table : Symbols.table)
@@ -826,7 +852,7 @@ let global_prf_t
     with Not_found ->
       let ndef =
         let ty_args = List.map Vars.ty occ.Iter.occ_vars in
-        Symbols.{ n_fty = Type.mk_ftype 0 [] ty_args m_ty ; }
+        Symbols.{ n_fty = Type.mk_ftype_tuple [] ty_args m_ty ; }
       in
       Symbols.Name.declare table (L.mk_loc L._dummy "n_PRF") ndef
   in
@@ -868,20 +894,20 @@ let global_prf_t
   let occs = List.remove_duplicate (=) occs in
 
   (* fresh variable representing the hashed message to rewrite *)
-  let x = Vars.make_new m_ty "x" in
+  let x = Vars.make_fresh m_ty "x" in
   let x_t = Term.mk_var x in
   
   (* timestamp at which [H(x,k)] occurs  *)
-  let venv, tau = Vars.make `Approx venv Type.ttimestamp "t" in
+  let tau = Vars.make_fresh Type.ttimestamp "t" in
   let tau_t = Term.mk_var tau in
 
-  let venv, is, subst = Term.refresh_vars_env venv is in
+  let is, subst = Term.refresh_vars `Global is in
   let key = Term.subst subst (Term.mk_name param.h_key) in
   let key_is = List.map (Term.subst_var subst) param.h_key.s_indices in
 
   (* term to rewrite *)
   let to_rw =
-    Term.mk_fun table param.h_fn [] [x_t; key ]
+    Term.mk_fun_tuple table param.h_fn [x_t; key ]
   in
 
   (* name term associated to a hash occurrence. *)
@@ -981,11 +1007,11 @@ let global_prf_t
   in
 
   let table, err_fs = 
-    let ftype = Type.mk_ftype 0 [] [] m_ty in
+    let ftype = Type.mk_ftype [] [] m_ty in
     Symbols.Function.declare
       table (L.mk_loc L._dummy "error") (ftype,Symbols.Abstract `Prefix)
   in
-  let err_t = Term.mk_fun table err_fs [] [] in
+  let err_t = Term.mk_fun table err_fs [] in
     
   (* we rewrite [H(x,k)] at occurrence [s0] at time [tau0] into:
      [
@@ -993,17 +1019,13 @@ let global_prf_t
        then n_{occ}@tau
        else n_occ0@tau0
      ] *)
-  let rw_target
-      (venv   : Vars.env)
-      (tau0_t : Term.term)
-      (xocc0  : XO.t)
-    =
+  let rw_target (tau0_t : Term.term) (xocc0  : XO.t) =
     let cond =
       (* We check whether there exists [(tau,s)] such that:
          [(tau,s) < (tau0,s0) && x = s_x] *)
       Term.mk_ors
         (List.map (fun (xocc : XO.t) ->
-             let venv, _, xocc = XO.refresh venv xocc in
+             let _, xocc = XO.refresh xocc in
              Term.mk_exists ~simpl:true 
                xocc.cnt.x_occ.occ_vars
                (mk_xocc_collision tau_t xocc tau0_t xocc0)
@@ -1012,7 +1034,7 @@ let global_prf_t
     let t_else = mk_occ_term xocc0 in
     let t_then =
       List.fold_right (fun xocc t_then ->
-          let venv, _, xocc = XO.refresh venv xocc in
+          let _, xocc = XO.refresh xocc in
           let t_cond = mk_xocc_collision tau_t xocc tau0_t xocc0 in
           let t_occ = mk_occ_term xocc in
           Term.mk_find xocc.cnt.x_occ.occ_vars t_cond t_occ t_then
@@ -1064,7 +1086,6 @@ let global_prf_t
           ) xocc.cnt.x_occ.occ_vars (indices @ bnd_vars)
       in
       let xocc = XO.subst s xocc in
-      let venv = Vars.of_list (indices @ bnd_vars) in
 
       (* Time at which the term being rewritten in is evaluated. 
          - if we rewrite in the body of [output@A(i)] then [tau0] 
@@ -1081,7 +1102,7 @@ let global_prf_t
           rw_system = SE.any;
           rw_vars   = Sv.of_list (x :: is);
           rw_conds  = [];
-          rw_rw     = (to_rw, rw_target venv tau0 xocc); }
+          rw_rw     = (to_rw, rw_target tau0 xocc); }
       in
       Some rule
   in
@@ -1091,9 +1112,12 @@ let global_prf_t
     =
     (* To keep meaningful positions, we need to do the rewriting bottom-up.
        Indeed, this ensures that a rewriting does not modify the positions
-       of the sub-terms above the position the rewriting occurs at. *)
-    Rewrite.high_rewrite ~mode:`BottomUp
-      table (old_system :> SE.t) venv (mk_rw_rule arg ms) t
+       of the sub-terms above the position the rewriting occurs at. 
+
+       We set [strict] to true, to make sure that we indeed rewrite at
+       all necessary positions. *)
+    Rewrite.high_rewrite ~mode:`BottomUp ~strict:true
+      table (old_system :> SE.t) (mk_rw_rule arg ms) t
   in
 
   let table, _new_system_e =
@@ -1141,7 +1165,11 @@ let do_rw_item
   let rw_c,rw_arg = TLT.p_rw_item rw_item s in
 
   match rw_arg with
-  | Rw_rw (loc, _, erule) -> do_rewrite ~loc expand_context (rw_c, erule) s t 
+  | Rw_rw {loc; subgs; rule} -> 
+    let subgs = List.map (fun x -> TS.set_goal x s) subgs in
+
+    let t, subgs' = do_rewrite ~loc expand_context (rw_c, rule) s t in
+    t, subgs @ subgs'
 
   | Rw_expand p_arg -> 
     let arg = TLT.p_rw_expand_arg s p_arg in
@@ -1188,7 +1216,6 @@ let do_rw_args
 
 let global_rewrite
     (table   : Symbols.table)
-    (hint_db : Hint.hint_db)
     (sdecl   : Decl.system_modifier)
     (rw      : Args.rw_arg list)
   : Goal.statement option * Goal.t list * Symbols.table
@@ -1217,7 +1244,7 @@ let global_rewrite
     in
     (* new empty sequent *)
     let env = Env.init ~table ~vars ~system:context () in
-    let s = TS.init ~env ~hint_db Term.mk_false in
+    let s = TS.init ~env Term.mk_false in
 
     (* hypothesis: the timestamp the macro is at happens *)
     let hyp_hap = Term.mk_happens ts in
@@ -1232,7 +1259,7 @@ let global_rewrite
            List.map
              (fun (acd:Action.descr) -> (* formula: exists indices. ts = ac(indices) *)
                let tts = Term.mk_var ts in
-               let _,ind,_ = Term.refresh_vars_env (TS.vars s_hap) acd.indices in 
+               let ind,_ = Term.refresh_vars `Global acd.indices in 
                let tac = Action.(Term.mk_action acd.name ind) in
                let eq = Term.mk_eq ~simpl:true tts tac in
                let ex = Term.mk_exists ~simpl:true ind eq in
@@ -1284,13 +1311,12 @@ let global_rewrite
 (*------------------------------------------------------------------*)
 let declare_system
     (table   : Symbols.table)
-    (hint_db : Hint.hint_db)
     (sdecl   : Decl.system_modifier)
   : Goal.statement option * Goal.t list * Symbols.table
   =
   match sdecl.Decl.modifier with
-  | Rename gf         -> global_rename  table hint_db sdecl        gf
-  | PRF  (bnds, hash) -> global_prf     table hint_db sdecl bnds hash
-  | PRFt (bnds, hash) -> global_prf_t   table hint_db sdecl bnds hash
-  | CCA  (bnds, enc)  -> global_cca     table hint_db sdecl bnds  enc
-  | Rewrite rw        -> global_rewrite table hint_db sdecl rw
+  | Rename gf         -> global_rename  table sdecl        gf
+  | PRF  (bnds, hash) -> global_prf     table sdecl bnds hash
+  | PRFt (bnds, hash) -> global_prf_t   table sdecl bnds hash
+  | CCA  (bnds, enc)  -> global_cca     table sdecl bnds  enc
+  | Rewrite rw        -> global_rewrite table sdecl rw

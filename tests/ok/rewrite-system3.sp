@@ -12,8 +12,6 @@ axiom [a] ax (tau:timestamp) : diff(tau = init,False) => input@tau = diff(c,d).
 
 axiom [any] refl (x:message) : x = x.
 
-set autoIntro = false.
-
 goal [a/left] _ (tau:timestamp) : tau = init => input@tau = c.
 Proof.
   intro H.

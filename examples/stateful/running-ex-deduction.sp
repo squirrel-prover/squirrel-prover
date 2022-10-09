@@ -57,10 +57,10 @@ axiom h_unique (i,i',j,j':index):
    "fresh" tactic, but to do it within the tool we miss an induction
    principle over sequences. *)
 global axiom fresh_names :
-  equiv(seq(i:index->diff(s0(i),s0b(i)))).
+  equiv(seq(i:index=>diff(s0(i),s0b(i)))).
 
 global goal fresh_names_k :
-  equiv(k, seq(i:index->diff(s0(i),s0b(i)))).
+  equiv(k, seq(i:index=>diff(s0(i),s0b(i)))).
 Proof.
   fresh 0. apply fresh_names.
 Qed.
@@ -72,7 +72,7 @@ Qed.
    which does not depend on t. *)
 global goal equiv_with_seed (t : timestamp):
   [happens(t)] ->
-  equiv(frame@t, k, seq(i:index->diff(s0(i),s0b(i)))).
+  equiv(frame@t, k, seq(i:index=>diff(s0(i),s0b(i)))).
 Proof.
   intro Hap.
   induction t.
@@ -98,7 +98,7 @@ Qed.
    from the seeds and k. *)
 global goal equiv_with_states_inductive (t : timestamp):
   [happens(t)] ->
-  equiv(frame@t, k, seq(i:index,t':timestamp -> if t'<=t then sT(i)@t')).
+  equiv(frame@t, k, seq(i:index,t':timestamp => if t'<=t then sT(i)@t')).
 Proof.
   intro Hap.
   apply ~inductive equiv_with_seed t; assumption.
@@ -115,7 +115,7 @@ Qed.
 
 global goal equiv_with_states_manual (t : timestamp):
   [happens(t)] ->
-  equiv(frame@t, k, seq(i:index,t':timestamp -> if t'<=t then sT(i)@t')).
+  equiv(frame@t, k, seq(i:index,t':timestamp => if t'<=t then sT(i)@t')).
 Proof.
   intro Hap.
   induction t.
@@ -123,8 +123,8 @@ Proof.
   ++
   (* The base case requires rewriting inside the sequence. *)
   have -> :
-     (seq(i:index,t':timestamp -> if t'<=init then sT(i)@t')) =
-     (seq(i:index,t':timestamp -> if t'<=init then empty));
+     (seq(i:index,t':timestamp => if t'<=init then sT(i)@t')) =
+     (seq(i:index,t':timestamp => if t'<=init then empty));
   1: by fa; fa.
   expand frame; apply fresh_names_k.
 
@@ -160,16 +160,16 @@ Proof.
   (* More rewriting inside sequences. *)
 
   have -> :
-    (seq(i0:index,t':timestamp-> 
+    (seq(i0:index,t':timestamp=> 
       if i0=i && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@t')) =
-    (seq(i0:index,t':timestamp-> 
+    (seq(i0:index,t':timestamp=> 
       if i0=i && (t'=T(i,j) && t'<=T(i,j)) then H(sT(i0)@pred(t'),k)));
   1: by fa; fa.
 
   have -> :
-    (seq(i0:index,t':timestamp-> 
+    (seq(i0:index,t':timestamp=> 
       if not(i0=i) && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@t')) =
-    (seq(i0:index,t':timestamp->
+    (seq(i0:index,t':timestamp=>
       if not(i0=i) && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@pred(t'))).
     + fa; fa => // [H1 [H2 H3]]. 
       by rewrite H2 /sT if_false. 

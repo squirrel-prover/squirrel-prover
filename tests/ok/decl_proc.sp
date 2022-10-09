@@ -1,5 +1,3 @@
-
-
 channel c.
 
 type T
@@ -28,7 +26,7 @@ process B (i : index) =
  new t : T;
  let a = <x,<m,from_L(l)>> in
  let y = gg(to_L(a)) in
- let z = ggi(i,L_to_T(y)) in
+ let z = ggi i (L_to_T(y)) in
  out (c, from_T(z)).
 
 system !_i B(i).
@@ -42,7 +40,7 @@ process B2 (i : index) =
  new t : T;
  let a = <x,<m,from_L(l)>> in
  let y : L = gg(to_L(a)) in
- let z : T = ggi(i,L_to_T(y)) in
+ let z : T = ggi i (L_to_T(y)) in
  out (c, from_T(z)).
 
 system [Two] !_i B2(i).
@@ -51,7 +49,7 @@ system [Two] !_i B2(i).
 process B3 (i : index) =
  in(c,x);
  new l : L;
- let gl : L = ggi(i,l) in
+ let gl : L = ggi i l in
  out (c, from_L(gl)).
 
 system [Three] !_i B3(i).
@@ -60,7 +58,7 @@ system [Three] !_i B3(i).
 process State (i : index) =
  in(c,x);
  new l : L;
- lstate := ggi(i,l);
+ lstate := ggi i l;
  out (c, empty).
 
 system [StateTest] !_i State(i).

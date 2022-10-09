@@ -1,5 +1,3 @@
-
-
 hash h
 name k:message
 name cst:message
@@ -60,5 +58,6 @@ Proof.
  collision. 
  intro Heq2. 
  eqnames.
+ have H : nc(b) = na(a) || mc(b) = na(a) by auto.
  by case H. 
 Qed.

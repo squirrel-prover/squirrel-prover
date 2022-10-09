@@ -5,7 +5,7 @@
 
 hash h
 name n : message
-name k : index->index->message
+name k : index * index -> message
 
 system null.
 
@@ -17,5 +17,5 @@ Proof.
   euf Heq. 
   (* There should be one direct case,
    * where index i should be equal to both a and b. *)
-  intro _ _; auto.
+  intro [_ _]; auto.
 Qed.

@@ -34,8 +34,8 @@ split.
 
 (* Here, if the macros are not correclty projected, we cannot prove the goal,
 else it is automatically simplified. *)
-by project; intro H0; case H0; depends A, A1. 
-by project; intro H0; case H0; depends A, A1. 
+by project; intro H0; depends A, A1. 
+by project; intro H0; depends A, A1. 
 
 by fresh 1.
 Qed.

@@ -39,7 +39,7 @@ let declare_empty table system_name projections =
   let data = System_data {projections;actions=Msh.empty} in
   Symbols.System.declare_exact table system_name ~data def
 
-let get_data table s_symb =
+let get_data table (s_symb : Symbols.system) =
   match Symbols.System.get_data s_symb table with
     | System_data data -> data
     | _ -> assert false
@@ -84,7 +84,7 @@ let pp_systems fmt table =
 (*------------------------------------------------------------------*)
 let add_action table system descr =
   (* Sanity check *)
-  assert (Action.valid_descr descr);
+  assert (Action.check_descr descr);
 
   let shape = Action.get_shape descr.action in
   let { actions } as data = get_data table system in
@@ -97,7 +97,7 @@ let add_action table system descr =
 let descr_of_shape table system shape =
   let {actions} = get_data table system in
   let descr = Msh.find shape actions in
-  assert (Action.valid_descr descr);
+  assert (Action.check_descr descr);
 
   Action.refresh_descr descr
 
@@ -120,8 +120,8 @@ let find_shape table shape =
   with Found (x,y) -> Some (x,y)
 
 (*------------------------------------------------------------------*)
-let register_action table system_symb descr =
-  let Action.{action;name=symb;indices} = descr in
+let register_action table system_symb (descr : Action.descr) =
+  let Action.{ action; name = symb; indices } = descr in
   let shape = Action.get_shape action in
   match find_shape table shape with
 
@@ -134,6 +134,8 @@ let register_action table system_symb descr =
     error Shape_error
 
   | Some (symb2, is) ->
+    assert (Action.check_descr descr);
+
     let subst_action =
       [Term.ESubst (Term.mk_action symb indices, Term.mk_action symb2 is)]
     in
@@ -146,13 +148,15 @@ let register_action table system_symb descr =
         indices is
     in
     let descr = Action.subst_descr subst_is descr in
+    assert (Action.check_descr descr);
+
     let descr = { descr with name = symb2 } in
     let table = add_action table system_symb descr in
 
     table, symb2, descr
-
+  
 (*------------------------------------------------------------------*)
-(* Single systems *)
+(** Single systems *)
 
 module Single = struct
 

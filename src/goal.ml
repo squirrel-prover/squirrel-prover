@@ -7,6 +7,8 @@ module ES = LowEquivSequent
 
 module SE = SystemExpr
 
+module Sv = Vars.Sv
+
 (*------------------------------------------------------------------*)
 (** {2 Goals} *)
 
@@ -20,10 +22,15 @@ let system = function
   | Trace j -> TS.system j
   | Equiv j -> ES.system j
 
+let table = function
+  | Trace j -> TS.table j
+  | Equiv j -> ES.table j
+
 (*------------------------------------------------------------------*)
+(* when printing, we run some well-formedness checks on the sequents *)
 let pp ch = function
-  | Trace j -> TS.pp ch j
-  | Equiv j -> ES.pp ch j
+  | Trace j -> TS.sanity_check j; TS.pp ch j
+  | Equiv j -> ES.sanity_check j; ES.pp ch j
 
 let pp_init ch = function
   | Trace j -> Term.pp ch (TS.goal j)
@@ -65,7 +72,7 @@ let pp_statement fmt (g : statement) : unit =
       Fmt.pf fmt " [%a]"
         (Fmt.list ~sep:Fmt.sp Type.pp_tvar) tyvs
   in
-  Fmt.pf fmt "[%a] %s%a :@ %a"
+  Fmt.pf fmt "@[[%a] %s%a :@]@ %a"
     SE.pp_context g.system
     g.name
     pp_tyvars g.ty_vars
@@ -112,25 +119,39 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Create trace and equivalence goals} *)
 
-let make_obs_equiv ?(enrich=[]) table hint_db system =
+(* FIXME: the [enrich] additional argument must be removed. *)
+let make_obs_equiv ?(enrich=[]) table system =
   let vars,ts = Vars.make `Approx Vars.empty_env Type.Timestamp "t" in
   let term = Term.mk_macro Term.frame_macro [] (Term.mk_var ts) in
 
   let goal = Equiv.(Atom (Equiv (term :: enrich))) in
+
+  (* refresh free variables in [enrich], and add them to the environment *)
+  let vars,_,subst = 
+    let fv = 
+      List.fold_left (fun s t -> Sv.union s (Term.fv t)) Sv.empty enrich
+      |> Sv.elements
+    in
+    Term.refresh_vars_env vars fv 
+  in
+  let enrich_s = List.map (Term.subst subst) enrich in
+  (* alternative version of [goal], where [enrich] free vars have been 
+     renamed. *)
+  let goal_s = Equiv.(Atom (Equiv (term :: enrich_s))) in
   
   let happens = Term.mk_happens (Term.mk_var ts) in
   let hyp = Equiv.(Atom (Reach happens)) in
   
   let env = Env.init ~system ~table ~vars () in
   
-  let s = ES.init ~env ~hint_db ~hyp goal in
+  let s = ES.init ~env ~hyp goal_s in
   
   Equiv.Global (Equiv.mk_forall [ts] (Equiv.(Impl (hyp,goal)))),
   Equiv s
 
 
-let make table hint_db parsed_goal : statement * t =
-
+(*------------------------------------------------------------------*)
+let make table parsed_goal : statement * t =
   let Parsed.{name; system; ty_vars; vars; formula} = parsed_goal in
 
   let name = L.unloc (oget name) in
@@ -139,26 +160,26 @@ let make table hint_db parsed_goal : statement * t =
   let ty_vars = List.map (fun ls -> Type.mk_tvar (L.unloc ls)) ty_vars in
   let env = Env.init ~system ~ty_vars ~table () in
 
-  let env,vs = Theory.convert_p_bnds env vars in
+  let env,vs = Theory.convert_bnds env vars in
 
   let conv_env = Theory.{ env; cntxt = InGoal } in
   let formula, goal =
     match formula with
     | Local f ->
       let f,_ = Theory.convert conv_env ~ty:Type.Boolean f in
-      let s = TS.init ~env ~hint_db f in
+      let s = TS.init ~env f in
       let formula = Equiv.Local (Term.mk_forall vs f) in
       formula, Trace s
 
     | Global f ->
       let f = Theory.convert_global_formula conv_env f in
-      let s = ES.init ~env ~hint_db f in
+      let s = ES.init ~env f in
       let formula = Equiv.Global (Equiv.mk_forall vs f) in
       formula, Equiv s
 
     | Obs_equiv ->
       assert (vs = [] && ty_vars = []) ;
-      make_obs_equiv table hint_db system
+      make_obs_equiv table system
   in
 
   { name; system; ty_vars; formula },

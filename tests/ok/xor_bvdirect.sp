@@ -19,7 +19,7 @@ axiom len_ko (i:index): len(ko) = len(m(i)).
 
 (* The main test, with a non-empty list of bound variables. *)
 equiv nonempty (i:index) :
-  seq(i:index ->n(i)), diff(ok XOR ko XOR n(i),ko XOR ok XOR m(i)).
+  seq(i:index => n(i)), diff(ok XOR ko XOR n(i),ko XOR ok XOR m(i)).
 Proof.
   xor 1, diff(n(i),m(i)).
   (* Check that the right formula has been produced,

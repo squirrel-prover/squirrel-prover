@@ -60,7 +60,7 @@ abstract accept     : message
 abstract pid        : index -> message
 
 name sid  : index -> message
-name nonce: index -> index -> message.
+name nonce: index * index -> message.
 
 (**
 Symmetric encryption scheme, using the secret key `k` (with index arity 1
@@ -69,7 +69,7 @@ arity 2 so that each session of a YubiKey uses a new random name).
 *)
 senc enc,dec
 name k  : index -> message
-name npr: index -> index -> message.
+name npr: index * index -> message.
 
 (**
 Public constants and public functions used to model counter values.
@@ -369,8 +369,9 @@ Proof.
   (** We apply the INT-CTXT assumption, which directly gives the existence
   of an action `Press(i,j)` that happens before `S(ii,i)`. *)
   intctxt Mneq => //.
-  intro Ht M1 *.
-  exists j.
+  (* randomness condition *)
+  ++ intro [j [Ht M1]].  
+    exists j.
 
   (** The two first conjucts of the conclusion are automatically proved
   by Squirrel (the equality of counter values is a consequence of M1 once

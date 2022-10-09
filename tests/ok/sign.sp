@@ -12,7 +12,7 @@ channel c
 
 abstract u : message
 
-system (out(c,sign(m,k)) | ( in(c,x); if checksign(x,pk(k))=n then out(c,x))).
+system (out(c,sign(m,k)) | ( in(c,x); if checksign(n,x,pk(k)) then out(c,x))).
 
 goal _ (tau:timestamp): happens(A1) => cond@A1 => False.
 Proof.

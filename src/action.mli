@@ -58,6 +58,15 @@ val fv_action : action -> Vars.Sv.t
     take messages into account. It is not reflexive. *)
 val depends : 'a t -> 'a t -> bool
 
+(** [mutex a b] test if [a] and [b] can never occur in the same trace, 
+    as far as the control-flow is concerned. *)
+val mutex : 'a t -> 'a t -> bool
+
+(** Compute the number of common variable choices between two
+    mutually exclusive actions.
+    Must be called on mutually exclusive actions. *)
+val mutex_common_vars : shape -> shape -> int
+  
 (** Distance in control-flow graph:
   * [Some d] is returned when [a <= b] and they are at distance
   * [d] from each other in the graph (distance is zero when [a = b]);
@@ -118,7 +127,7 @@ val arity : Symbols.action -> Symbols.table -> int
 type descr = {
   name      : Symbols.action ;
   action    : action ;
-  input     : Channel.t * string ;
+  input     : Channel.t ;
   indices   : Vars.var list ;
   condition : Vars.var list * Term.term ;
   updates   : (Term.state * Term.term) list ;
@@ -129,7 +138,7 @@ type descr = {
 }
 
 (** Check that an action description is well-formed. *)
-val valid_descr : descr -> bool
+val check_descr : descr -> bool
 
 (** Refresh (globally) bound variables in a description. *)
 val refresh_descr : descr -> descr
@@ -207,6 +216,7 @@ val descr_map :
     - or if [t] is [exec\@t] with [frame\@t'] appearing in [terms]
       where with [t <= t']. *)
 val is_dup :
+  eq:(Term.term -> Term.term -> bool) ->
   Symbols.table -> Term.term -> Term.term list
   -> bool
 

@@ -66,7 +66,7 @@ between the real system and the ideal one, and then the property
 is proved on the ideal system. The reach equiv
 tactic allows one to combine these two steps, and to conclude.
 *******************************************************************************)
-set timeout=6.
+set timeout=100.
 
 (* AEAD symmetric encryption scheme: IND-CCA + INT-CTXT *)
 senc enc,dec
@@ -126,8 +126,8 @@ process yubikeyplug (pid:index) =
   YCtr(pid) := mySucc(YCtr(pid));
   out(cY,endplug).
 
-name nonce : index -> index -> message
-name npr : index -> index -> message
+name nonce : index * index -> message
+name npr : index * index -> message
 
 (* When the key is pressed on the `j`-th session of yubikey `pid`:
    - an otp is sent with the current value of the counter,
@@ -450,11 +450,9 @@ Proof.
 
   + (* Left => Right *)
     intro AEAD_dec.
-
     case Eq;
     expand aead_dec;
-    intctxt AEAD_dec => H //;
-    intro AEAD_eq;
+    intctxt AEAD_dec => // [pid0 AEAD_eq];
     by exists pid0.
 
   + (* Right => Left *)
@@ -523,13 +521,13 @@ global goal equiv_real_ideal_enrich (t : timestamp):
   [happens(t)] ->
   equiv(
     frame@t,
-    seq(pid:index -> AEAD(pid)@t),
-    seq(pid:index -> if Setup(pid) <= t then AEAD(pid)@Setup(pid)),
-    seq(pid:index -> sid(pid)),
-    seq(pid,j:index -> npr(pid,j)),
-    seq(pid,j:index -> nonce(pid,j)),
-    seq(pid:index -> k(pid)),
-    seq(pid:index -> k_dummy(pid))
+    seq(pid:index => AEAD(pid)@t),
+    seq(pid:index => if Setup(pid) <= t then AEAD(pid)@Setup(pid)),
+    seq(pid:index => sid(pid)),
+    seq(pid,j:index => npr(pid,j)),
+    seq(pid,j:index => nonce(pid,j)),
+    seq(pid:index => k(pid)),
+    seq(pid:index => k_dummy(pid))
   ).
 Proof.
   dependent induction t => t Hind Hap.
@@ -613,14 +611,14 @@ axiom max_ts :
   (forall (t : timestamp), happens(t) => t <= tmax).
 
 global goal equiv_real_ideal_enrich_tmax0 :
-  exists (t : timestamp),
+  Exists (t : timestamp),
   ([happens(t)] /\
    [forall (t' : timestamp), happens(t') => t' <= t] /\
     equiv(
      frame@t,
-     seq(t':timestamp -> if t' <= t then exec@t' else false),
-     seq(i:index, t':timestamp -> if t' <= t then YCtr(i)@t'),
-     seq(i:index, t':timestamp -> if t' <= t then SCtr(i)@t')
+     seq(t':timestamp => if t' <= t then exec@t' else false),
+     seq(i:index, t':timestamp => if t' <= t then YCtr(i)@t'),
+     seq(i:index, t':timestamp => if t' <= t then SCtr(i)@t')
   )).
 Proof.
   use max_ts as [tmax [_ U]].
@@ -644,14 +642,14 @@ axiom exec_nhap (t' : timestamp) :
    not (happens(t')) => exec@t' = exec_dflt.
 
 global goal equiv_real_ideal_enrich_tmax :
-  exists (t : timestamp),
+  Exists (t : timestamp),
   ([happens(t)] /\
    [forall (t' : timestamp), happens(t') => t' <= t] /\
     equiv(
       frame@t,
-      seq(t':timestamp -> exec@t'),
-      seq(i:index, t':timestamp -> YCtr(i)@t'),
-      seq(i:index, t':timestamp -> SCtr(i)@t')
+      seq(t':timestamp => exec@t'),
+      seq(i:index, t':timestamp => YCtr(i)@t'),
+      seq(i:index, t':timestamp => SCtr(i)@t')
   )).
 Proof.
   use equiv_real_ideal_enrich_tmax0 as [tmax [Hap C U]].
@@ -661,7 +659,7 @@ Proof.
   assert (forall (t' : timestamp), (t' <= tmax) = happens(t')) as Eq.
     {intro t'; rewrite eq_iff.
     by split; 2: intro _; apply C.}
-  rewrite Eq in U.
+  rewrite !Eq in U.
 
   splitseq 3: (fun (i : index, t' : timestamp) -> happens(t')).
   splitseq 2: (fun (i : index, t' : timestamp) -> happens(t')).
@@ -732,13 +730,13 @@ Proof.
   destruct Hexec as [Hexecpred Mneq1 Mneq2 Hcpt Hpid].
   expand deccipher.
   intctxt Mneq2 => //.
-  intro Ht M1 Eq.
+  intro [j0 [Ht Eq]].
   exists j0 => /=.
   split => //.
 
   intro j' Hap' Hexec'.
 
-  intro Eq => //.
+  intro Eq2 => //.
   assert (SCtr(pid)@Server(pid,j) = SCtr(pid)@Server(pid,j')) as Meq by auto.
 
   assert (Server(pid,j) = Server(pid,j') ||
@@ -778,7 +776,7 @@ Proof.
 
     - (* Server(pid,j) > pred(Server(pid,j)) = Server(pid,j') *)
       use counterIncreaseStrictly with pid, j as H1 => //.
-      clear Eq Hexec' Mneq1 Mneq2 exec M1 Hpid Hexecpred Hcpt Hap' Hap Ht H.
+      clear Eq Hexec' Mneq1 Mneq2 exec Hpid Hexecpred Hcpt Hap' Hap Ht H.
       by apply orderStrict in H1.
 
     - (* Server(pid,j)  > pred(Server(pid,j)) >  Server(pid,j') *)

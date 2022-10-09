@@ -10,14 +10,14 @@ system null.
 include Basic.
 
 (* The main test, with a non-empty list of bound variables. *)
-equiv nonempty (i:index) : seq(i:index ->n(i)), diff(n(i),m(i)).
+equiv nonempty (i:index) : seq(i:index => n(i)), diff(n(i),m(i)).
 Proof.
   fresh 1.
   (* Check that the right formula has been produced,
      using an incorrect formula that we admit. *)
   assert (forall i0:index, i<>i0) by admit.
   nosimpl(rewrite if_true in 1).
-  assumption.
+  assumption H.
   refl.
 Qed.
 

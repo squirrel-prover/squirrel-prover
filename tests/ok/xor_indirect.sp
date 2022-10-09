@@ -4,8 +4,8 @@ include Basic.
 
 channel c
 
-abstract ok : message
-name b : index->index->message
+abstract ok : message.
+name b : index * index -> message.
 
 system A : !_i new a; !_j out(c,b(i,j)).
 

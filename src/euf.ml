@@ -1,292 +1,317 @@
-(** {2 SSCs checking} *)
-
+(* EUF trace tactic *)
+open Term
 open Utils
-    
-(** Internal exception *)
-exception Bad_ssc_
 
-(** Iterate on terms, raise Bad_ssc if the hash key occurs other than
-  * in key position or if a message variable is used.
-  *
-  * We use the inexact version of [iter_approx_macros]: it allows
-  * some macros to be undefined, though such instaces will not be
-  * supported when collecting hashes; more importantly, it avoids
-  * inspecting each of the multiple expansions of a same macro. *)
-class check_key
-    ~allow_functions
-    ~cntxt head_fn key_n = object (self)
-                                  
-  inherit Iter.iter_approx_macros ~exact:false ~cntxt as super
-    
-  method visit_message t = match t with
-    | Term.Fun ((fn,_), _, [m;Term.Name _]) when fn = head_fn ->
-      self#visit_message m
-        
-    | Term.Fun ((fn,_), _, [m1;m2;Term.Name _]) when fn = head_fn ->
-      self#visit_message m1; self#visit_message m2
-        
-    | Term.Fun ((fn,_), _, [k])
-    | Term.Fun ((fn,_), _, [_;k])
-      when allow_functions fn && Term.diff_names k -> ()
-                                 
-    | Term.Name n when n.s_symb = key_n -> raise Bad_ssc_
-                                             
-    | Term.Var m -> 
-      let ty = Vars.ty m in
-      if ty <> Type.tindex && ty <> Type.ttimestamp then
-        raise Bad_ssc_;
-          
-    | _ -> super#visit_message t
-end
+module Args = TacticsArgs
+module L = Location
+module SE = SystemExpr
+module NO = NameOccs
 
-(** Collect occurences of some function and key,
-  * as in [Iter.get_f_messages] but ignoring boolean terms,
-  * cf. Koutsos' PhD. *)
-class get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n = object (self)
-  inherit Iter.get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n as super
-  method visit_message t =
-    if Term.ty t = Type.Boolean then () else super#visit_message t
-end
+module TS = TraceSequent
+
+module Hyps = TS.LocalHyps
+
+type sequent = TS.sequent
+
+type lsymb = Theory.lsymb
+
+module MP = Match.Pos
+module Sp = MP.Sp
+
+open LowTactics
 
 (*------------------------------------------------------------------*)
-let err_msg_of_msymb table a (ms : Symbols.macro) : Tactics.ssc_error_c =
-  let k = 
-    match Symbols.Macro.get_def ms table with
-    | Symbols.Output   -> `Output
-    | Symbols.Cond     -> `Cond
-    | Symbols.Global _ -> `Global ms
-    | Symbols.State _  -> `Update ms
-    | _ -> assert false
-  in
-  Tactics.E_indirect (a,k)
+let wrap_fail = TraceLT.wrap_fail
+let soft_failure = Tactics.soft_failure
+let hard_failure = Tactics.hard_failure
 
-(*------------------------------------------------------------------*) 
-(** Check the key syntactic side-condition in the given list of messages
-  * and in the outputs, conditions and updates of all system actions:
-  * [key_n] must appear only in key position of [head_fn].
-  * Return unit on success, raise [Bad_ssc] otherwise. *)
-let key_ssc
-    ~globals ?(messages=[]) ?(elems=[]) ~allow_functions
-    ~cntxt head_fn key_n =
-  let ssc =
-    new check_key ~allow_functions ~cntxt head_fn key_n
-  in
+(* integrity occurrence *)
+type int_occ = ((term * nsymb), unit) NO.simple_occ
+type int_occs = int_occ list
 
-  (* [e_case] is the error message to be thrown in case of error *)
-  let check e_case t : Tactics.ssc_error option=
-    try ssc#visit_message t; None
-    with Bad_ssc_ -> Some (t, e_case)
+let mk_int_occ
+    (t:term) (tcoll:term) (k:nsymb) (kcoll:nsymb)
+    (cond:terms) (v:Vars.vars) (ot:NO.occ_type) (st:term) : int_occ =
+  NO.mk_simple_occ (t,k) (tcoll,kcoll) () v cond ot st
+
+
+(*------------------------------------------------------------------*)
+(* Look for occurrences using NameOccs *)
+
+(**  *)
+let get_bad_occs
+    (m:term)
+    (k:nsymb)
+    (int_f:fsymb) (* function with integrity (hash, signature) *)
+    ?(pk_f:fsymb option=None) (* public key function. Must be None iff hash *)
+    (retry_on_subterms : (unit -> NO.n_occs * int_occs))
+    (rec_call_on_subterms :
+       (fv:Vars.vars ->
+        cond:terms ->
+        p:MP.pos ->
+        info:NO.expand_info ->
+        st:term ->
+        term ->
+        NO.n_occs * int_occs))
+    ~(info:NO.expand_info)
+    ~(fv:Vars.vars)
+    ~(cond:terms)
+    ~(p:MP.pos)
+    ~(st:term)
+    (t:term) 
+  : NO.n_occs * int_occs =
+  (* handles a few cases, using rec_call_on_subterm for rec calls,
+     and calls retry_on_subterm for the rest *)
+  match t with
+  | Var v when not (Type.is_finite (Vars.ty v)) ->
+    soft_failure
+      (Tactics.Failure "can only be applied on ground terms")
+
+  | Name k' when k'.s_symb = k.s_symb ->
+    [NO.mk_nocc k' k fv cond (fst info) st],
+    []
+
+  | Fun (f, _, [tk']) when pk_f = Some f -> (* public key *)
+    begin
+      match NO.expand_macro_check_all info tk' with
+      | Name _ -> [], [] (* pk(k'): no occ, even if k'=k *)
+      | _ -> retry_on_subterms () (* otherwise look in tk' *)
+    end
+    
+  (* hash verification oracle: test u = h(m', k).
+     Search recursively in u, m', but do not record
+     m' as a hash occurrence. *)
+  | Fun (f, _, [u; Fun (g, _, [Tuple [m'; Name k']])])
+    when f = f_eq && g = int_f && pk_f = None && k'.s_symb = k.s_symb ->
+    let (occs1, accs1) = rec_call_on_subterms ~fv ~cond ~p ~info ~st:t u in
+    let (occs2, accs2) = rec_call_on_subterms ~fv ~cond ~p ~info ~st:t m' in
+    occs1 @ occs2, accs1 @ accs2
+
+  (* hash verification oracle (symmetric case). can we avoid duplication? *)
+  | Fun (f, _, [Fun (g, _, [Tuple [m'; Name k']]); u])
+    when f = f_eq && g = int_f && pk_f = None && k'.s_symb = k.s_symb ->
+    let (occs1, accs1) = rec_call_on_subterms ~fv ~cond ~p ~info ~st:t u in
+    let (occs2, accs2) = rec_call_on_subterms ~fv ~cond ~p ~info ~st:t m' in
+    occs1 @ occs2, accs1 @ accs2
+
+  | Fun (f, _, [Tuple [m'; tk']]) when f = int_f ->
+    begin
+      match NO.expand_macro_check_all info tk' with
+      (* hash/sign/etc w/ a name that could be the right key *) 
+      (* record this hash occurrence, but allow the key *)
+      (* todo: actually why don't we always do this,
+               even if it's the wrong key? *)
+      | Name k' when k.s_symb = k'.s_symb  ->
+        let fvv, sigma = refresh_vars `Global fv in
+        let m' = subst sigma m' in
+        let k' = subst_isymb sigma k' in
+        let cond = List.map (subst sigma) cond in
+        let ot = NO.subst_occtype sigma (fst info) in
+        let occs, acc = rec_call_on_subterms ~fv ~cond ~p ~info ~st m' in
+        occs,
+        acc @ [mk_int_occ m' m k' k  cond fvv ot st]
+
+      (* if we can't be sure it could be the key *)
+      (* don't record the hash occ, but look for bad occurrences in m and tk *)
+      (* (worst case, it was actually the key,
+          and we'll miss the assumption that 
+         the message could be m in the goal for the key's occurrence) *)
+      (* IS THAT ACTUALLY SOUND?? *)
+      | _ -> retry_on_subterms ()
+    end
+
+  | _ -> retry_on_subterms ()
+
+
+
+(* constructs the formula expressing that an integrity occurrence m',k'
+   is indeed in collision with m, k *)
+let integrity_formula
+    ~(negate : bool)
+    ((m', k') : term * nsymb)
+    ((m, k) : term * nsymb)
+    ()
+    : term =
+  assert (k.s_symb = k'.s_symb); (* every occurrence we generated
+                                    should satisfy this *)
+  if not negate then 
+    mk_and ~simpl:true
+      (mk_eq ~simpl:true m m')
+      (mk_indices_eq ~simpl:true k.s_indices k'.s_indices)
+  else
+    mk_or ~simpl:true
+      (mk_not ~simpl:true (mk_eq ~simpl:true m m'))
+      (mk_indices_neq ~simpl:true k.s_indices k'.s_indices)
+
+
+
+
+(*------------------------------------------------------------------*)
+(* EUF tactic *)
+
+(* parameters for the integrity occurrence: key, signed or hashed message,
+   signature checked or compared w/ the hash, sign/hash function,
+   pk function if any *) 
+type euf_param = {ep_key:nsymb;
+                  ep_intmsg:term;
+                  ep_term:term;
+                  ep_int_f:fsymb;
+                  ep_pk_f:fsymb option;}
+
+
+(** Finds the parameters of the integrity functions used in the hypothesis,
+    if any *)
+let euf_param
+    ~(hyp_loc : L.t)
+    (contx : Constr.trace_cntxt)
+    (hyp : term)
+    (s : TS.sequent)
+  : euf_param
+  =
+  let fail () =
+    soft_failure ~loc:hyp_loc
+      (Tactics.Failure "can only be applied on an hypothesis of the form \
+checksign(m, s, pk(k)), hash(m, k) = t, or the symmetric equality")
+  in
+  let info = NO.EI_direct, contx in
+  let table = contx.table in
+
+  (* try to write hyp as u = v *)
+  match TS.Reduce.destr_eq s Equiv.Local_t hyp with
+  | Some (u, v) -> (* an equality: try to see u or v as h(m, k) *)
+    let u = NO.expand_macro_check_all info u in
+    let v = NO.expand_macro_check_all info v in
+    let try_t (t:term) (t':term) : euf_param option =
+      match t with
+      | Fun (f, _, [Tuple [m; tk]]) ->
+        begin
+          match NO.expand_macro_check_all info tk with
+          | Name k when Symbols.is_ftype f Symbols.Hash table ->
+            Some {ep_key=k; ep_intmsg=m; ep_term=t'; ep_int_f=f; ep_pk_f=None}
+          | _ -> None
+        end
+      | _ -> None
+    in
+    begin
+      match try_t u v with
+      | Some p -> p
+      | None ->
+        match try_t v u with
+        | Some p -> p
+        | None -> fail ()
+    end
+  | None -> (* not an equality: try to see if it's checksign(m,s,pk) *)
+    match NO.expand_macro_check_all info hyp with
+    | Fun (f, _, [Tuple [m; s; tpk]]) ->
+      begin
+        match NO.expand_macro_check_all info tpk with
+        | Fun (g, _, [tk]) ->
+          begin
+            match Theory.check_signature table f g,
+                  NO.expand_macro_check_all info tk with
+            | Some sg, Name k ->
+              {ep_key=k; ep_intmsg=m; ep_term=s; ep_int_f=sg; ep_pk_f=Some g}
+            | _ -> fail ()
+          end
+        | _ -> fail ()
+      end
+    | _ -> fail ()
+                   
+
+
+let euf
+    (h : lsymb)
+    (s : sequent)
+  : sequent list
+  =
+  (* find parameters *)
+  let id, hyp = Hyps.by_name h s in
+  let contx = TS.mk_trace_cntxt s in
+  let env = (TS.env s).vars in
+  
+  let {ep_key=k; ep_intmsg=m; ep_term=t; ep_int_f=int_f; ep_pk_f=pk_f} =
+    euf_param ~hyp_loc:(L.loc h) contx hyp s
   in
       
-  let errors1 = List.filter_map (check E_message) messages in
-  let errors2 = List.filter_map (check E_elem) elems in
-
-  let errors3 =
-    SystemExpr.fold_descrs (fun descr acc ->
-        let name = descr.name in
-        Iter.fold_descr ~globals (fun ms _m_is _mdef t acc ->
-            let err_msg = err_msg_of_msymb cntxt.table name ms in
-            match check err_msg t with
-            | None -> acc
-            | Some x -> x :: acc
-          ) cntxt.table cntxt.system descr acc
-      ) cntxt.table cntxt.system []
-  in
-  errors1 @ errors2 @ errors3
-
-(*------------------------------------------------------------------*)
-(** {2 Euf rules datatypes} *)
-
-type euf_schema = {
-  action_name  : Symbols.action;
-  action       : Action.action;
-  message      : Term.term;
-  key_indices  : Vars.var list;
-  env          : Vars.env;
-}
-
-let pp_euf_schema ppf case =
-  Fmt.pf ppf "@[<v>@[<hv 2>*action:@ @[<hov>%a@]@]@;\
-              @[<hv 2>*message:@ @[<hov>%a@]@]"
-    Symbols.pp case.action_name
-    Term.pp case.message
-
-(** Type of a direct euf axiom case.
-    [e] of type [euf_case] represents the fact that the message [e.m]
-    has been hashed, and the key indices were [e.eindices]. *)
-type euf_direct = { 
-  d_key_indices : Vars.var list;
-  d_message     : Term.term 
-}
-
-let pp_euf_direct ppf case =
-  Fmt.pf ppf "@[<v>@[<hv 2>*key indices:@ @[<hov>%a@]@]@;\
-              @[<hv 2>*message:@ @[<hov>%a@]@]"
-    Vars.pp_list case.d_key_indices
-    Term.pp case.d_message
-
-type euf_rule = { hash : Term.fname;
-                  key : Term.name;
-                  case_schemata : euf_schema list;
-                  cases_direct : euf_direct list }
-
-let pp_euf_rule ppf rule =
-  Fmt.pf ppf "@[<v>*hash: @[<hov>%a@]@;\
-              *key: @[<hov>%a@]@;\
-              *case schemata:@;<1;2>@[<v>%a@]@;\
-              *direct cases:@;<1;2>@[<v>%a@]@]"
-    Term.pp_fname rule.hash
-    Term.pp_name rule.key
-    (Fmt.list pp_euf_schema) rule.case_schemata
-    (Fmt.list pp_euf_direct) rule.cases_direct
-
-(*------------------------------------------------------------------*)
-(** {2 Build the Euf rule} *)
-
-let mk_rule ~elems ~drop_head ~fun_wrap_key
-    ~allow_functions ~cntxt ~env ~mess ~sign ~head_fn ~key_n ~key_is =
-
-  let mk_of_hash action_descr (is,m) =
-    (* Indices [key_is] from [env] must correspond to [is],
-     * which contains indices from [action_descr.indices]
-     * but also bound variables.
-     *
-     * Rather than refreshing all action indices, and generating
-     * new variable names for bound variables, we avoid it in
-     * simple cases: if a variable only occurs once in
-     * [is] then the only equality constraint on it is that
-     * it must be equal to the corresponding variable of [key_is],
-     * hence we can replace it by that variable rather
-     * than creating a new variable and an equality constraint.
-     * This is not sound with multiple occurrences in [is] since
-     * they induce equalities on the indices that pre-exist in
-     * [key_is].
-     *
-     * We compute next the list [safe_is] of simple cases,
-     * and the substitution for them. *)
-    let env = ref env in
-
-    let safe_is,subst_is =
-      let multiple i =
-        let n = List.length (List.filter ((=) i) is) in
-        assert (n > 0) ;
-        n > 1
-      in
-      List.fold_left2 (fun (safe_is,subst) i j ->
-          if multiple i then safe_is,subst else
-            i::safe_is,
-            Term.(ESubst (mk_var i, mk_var j))::subst
-        ) ([],[]) is key_is
-    in
-
-    (* Refresh action indices other than [safe_is] indices. *)
-    let subst_fresh =
-      List.map (fun i ->
-          Term.(ESubst (mk_var i,
-                        mk_var (Vars.fresh_r env i))))
-        (List.filter
-           (fun x -> not (List.mem x safe_is))
-           action_descr.Action.indices)
-    in
-
-    (* Refresh bound variables from m and is, except those already
-     * handled above. *)
-    let subst_bv =
-      (* Compute variables from m, add those from is
-       * while preserving unique occurrences in the list. *)
-      let vars = Term.get_vars m in
-      let vars =
-        List.fold_left (fun vars i ->
-            if List.mem i vars then vars else i :: vars
-          ) vars is
-      in
-      (* Remove already handled variables, create substitution. *)
-      let index_not_seen i =
-        not (List.mem i safe_is) &&
-        not (List.mem i action_descr.Action.indices)
-      in
-      let not_seen = fun v ->
-        match Vars.ty v with
-        | Type.Index -> index_not_seen v
-        | _ -> true
-      in
-
-      let vars = List.filter not_seen vars in
-      List.map
-        (fun v ->
-           Term.(ESubst (mk_var v,
-                         mk_var (Vars.fresh_r env v))))
-        vars
-    in
-
-    let subst = subst_fresh @ subst_is @ subst_bv in
-    let action = Action.subst_action subst action_descr.action in
-    { action_name = action_descr.name;     
-      action;
-      message = Term.subst subst m ;
-      key_indices = List.map (Term.subst_var subst) is ; 
-      env = !env }
-  in
   
-  (* TODO: we are using the less precise version of [fold_macro_support] *)
-  let hash_cases =
-    Iter.fold_macro_support1 (fun descr t hash_cases ->
-        (* TODO: use get_f_messages_ext and use conditons to improve precision *)
-        (* let fv = Vars.Sv.of_list1 descr.Action.indices in
-         * let new_hashes =
-         *   Iter.get_f_messages_ext
-         *     ~fv ~fun_wrap_key ~drop_head ~cntxt head_fn key_n t
-         * in *)
+  let pp_k ppf () = Fmt.pf ppf "%a" Term.pp_nsymb k in
 
-        let iter =
-          new get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n
-        in
-        iter#visit_message t;
-        let new_hashes = iter#get_occurrences in
-        
-        List.assoc_up_dflt descr [] (fun l -> new_hashes @ l) hash_cases
-      ) cntxt env (mess :: sign :: elems) []
+  (* apply euf *)
+  let get_bad:((term*nsymb, unit) NO.f_fold_occs) =
+    get_bad_occs m k int_f ~pk_f
   in
-  
-  (* we keep only actions in which the name occurs *)
-  let hash_cases =
-    List.filter_map (fun (descr, occs) ->
-        if occs = [] then None
-        else Some (descr, List.sort_uniq Stdlib.compare occs)
-      ) hash_cases
+  let phis_bad, phis_int =
+    NO.occurrence_formulas ~pp_ns:(Some pp_k)
+      integrity_formula
+      get_bad contx env [t; m]
   in
+  let phis = phis_bad @ phis_int in
 
-  (* indirect cases *)
-  let case_schemata =
-    List.concat_map (fun (descr, hashes) ->
-        List.map (mk_of_hash descr) hashes
-      ) hash_cases
-  in
-
-  (* remove duplicate cases *)
-  let case_schemata = List.fold_right (fun case acc ->
-      (* FIXME: use a better redundancy check *)
-      if List.mem case acc then acc else case :: acc
-    ) case_schemata [] 
-  in
-
-  (* direct cases *)
-  let cases_direct =
-    let hashes =
-      let iter =
-        new get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n
-      in
-      iter#visit_message mess ;
-      iter#visit_message sign ;
-      List.iter iter#visit_message elems ;
-      iter#get_occurrences
-    in
+  let g = TS.goal s in 
+  let integrity_goals =
     List.map
-      (fun (d_key_indices,d_message) -> {d_key_indices;d_message})
-      hashes
+    (fun phi -> TS.set_goal (mk_impl ~simpl:false phi g) s)
+    phis
   in
+  
+  (* copied from old euf, handles the composition goals *)
+  let tag_s =
+    let f =
+      Prover.get_oracle_tag_formula (Symbols.to_string int_f)
+    in
+    (* if the hash is not tagged, the formula is False, and we don't create
+       another goal. *)
+    if f = Term.mk_false
+    then []
+    else
+      (* else, we create a goal where m,sk satisfy the axiom *)
+      let uvarm, uvarkey,f = match f with
+        | Quant (ForAll,[uvarm;uvarkey],f) -> uvarm,uvarkey,f
+        | _ -> assert false
+      in
 
-  { hash          = head_fn;
-    key           = key_n;
-    case_schemata;
-    cases_direct; }
+      match Vars.ty uvarm,Vars.ty uvarkey with
+      | Type.(Message, Message) -> let f = Term.subst [
+          ESubst (Term.mk_var uvarm,m);
+          ESubst (Term.mk_var uvarkey,Term.mk_name k);] f in
+        [TS.set_goal
+           (Term.mk_impl f (TS.goal s)) s]
+
+      | _ -> assert false 
+  in
+  
+  tag_s @ integrity_goals
+
+
+  
+
+(*------------------------------------------------------------------*)
+let euf_tac args s =
+  let hyp = match args with
+    | [hyp] -> hyp
+    | _ -> 
+      hard_failure
+        (Failure "euf requires one argument: hypothesis")
+  in
+  match TraceLT.convert_args s [hyp] (Args.Sort Args.String) with
+  | Args.Arg (Args.String hyp) -> wrap_fail (euf hyp) s
+  | _ -> bad_args ()
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "euf"
+    ~tactic_help:{
+      general_help =
+        "Apply the euf axiom to the given hypothesis name.";          
+      detailed_help =
+        "If the hash has been declared with a tag formula, applies \
+         the tagged version.  given tag. Tagged eufcma, with a tag T, \
+         says that, under the syntactic side condition, a hashed \
+         message either satisfies the tag T, or was honestly \
+         produced. The tag T must refer to a previously defined axiom \
+         f(mess,sk), of the form forall (m:message,sk:message).";
+      usages_sorts = [];
+      tactic_group = Cryptographic }
+    ~pq_sound:true
+    (LowTactics.gentac_of_ttac_arg euf_tac)
+

@@ -35,7 +35,7 @@ channel cS
 
 name a : index -> message
 name b : index -> message
-name k :  index -> index -> message
+name k : index * index -> message.
 
 ddh g, (^) where group:message exponents:message.
 
@@ -52,7 +52,7 @@ process P(i:index) =
   in(cP, x2);
   let gs = snd(fst(x2)) in
   let pks = fst(fst(x2)) in
-  if checksign(snd(x2),pks) = <<g^a(i),gs>,pk(skP)> && pks = pk(skS) then
+  if checksign(<<g^a(i),gs>,pk(skP)>,snd(x2),pks) && pks = pk(skS) then
     out(cP,sign(<<gs,g^a(i)>,pks>,skP))
 
 process Schall(j:index) =
@@ -62,7 +62,7 @@ process Schall(j:index) =
   if pkp = pk(skP) then
     out(cS, < <pk(skS),g^b(j)>, sign(<<gp,g^b(j)>,pkp>,skS)>);
     in(cS, x3);
-    if checksign(x3,pkp) = <<g^b(j),gp>,pk(skS)> then
+    if checksign(<<g^b(j),gp>,pk(skS)>,x3,pkp) then
       out(cS,ok);
       in(cS, challenge);
       try find i such that gp = g^a(i) in
@@ -93,7 +93,7 @@ Proof.
   assert fst(input@Schall(j)) = pk(skP) as Meq' => //.
   rewrite Meq' in Hexec. destruct Hexec as [Hexec Hcheck].
   euf Hcheck.
-  intro *.
+  intro [i _].
   by exists i.
 Qed.
 
@@ -105,9 +105,9 @@ equiv strongSecS.
 Proof.
   enrich
     skP, skS,
-    seq(i:index ->g^a(i)),
-    seq(j:index ->g^b(j)),
-    seq(i,j:index ->diff( g ^ a(i), g) ^ diff( b(j), k(i,j))).
+    seq(i:index =>g^a(i)),
+    seq(j:index =>g^b(j)),
+    seq(i,j:index =>diff( g ^ a(i), g) ^ diff( b(j), k(i,j))).
 
   induction t; try (by expandall; apply IH).
 

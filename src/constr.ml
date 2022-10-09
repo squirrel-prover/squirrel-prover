@@ -862,6 +862,7 @@ let rec leq_unify inst =
 
 (** [min_pred uf g u x] returns [j] where [j] is the smallest integer such
     that [P^j(x) <= u] in the graph [g], if it exists.
+    (hence [P^j] is the largest predecessor of [x] smaller than [u]).
     Precond: [g] must be a transitive graph, [u] normalized and [x] basic. *)
 let min_pred uf g u x =
   let rec minp uf j cx =
@@ -874,9 +875,10 @@ let min_pred uf g u x =
   minp uf 0 x
 
 (** [max_pred uf g u x] returns [j] where [j] is the largest integer such
-   that [u <= P^j(x)] in the graph [g], if it exists, with a particular case
-   if init occurs.
-   Precond: [g] must be a transitive graph, [u] normalized and [x] basic. *)
+    that [u <= P^j(x)] in the graph [g], if it exists, with a particular case
+    if init occurs.
+    (hence [P^j] is the smallest predecessor of [x] larger than [u]).
+    Precond: [g] must be a transitive graph, [u] normalized and [x] basic. *)
 let max_pred uf g u x =
   let rec maxp uf j cx =
     let uf, ncx = mgu uf cx in
@@ -898,9 +900,12 @@ let max_pred uf g u x =
 (** [nu] must be normalized and [x] basic *)
 let no_case_disj uf nu x minj maxj =
   let nu_i, nu_y = decomp nu in
-  ut_equal (snd (mgu uf x)) uinit  ||
-  ut_equal (snd (mgu uf x)) uundef ||
+  ut_equal (snd (mgu uf x)) uinit  || (* ignore [init] as base-point *)
+  ut_equal (snd (mgu uf x)) uundef || (* ignore [⊥] as base-point *)
+  minj = maxj ||                      (* ignore segments of width 1 *)
   (nu_y = snd (mgu uf x)) && (maxj <= nu_i) && (nu_i <= minj)
+  (* ignore segments if [nu] is already of the form [P^nu_i(x)] and
+     [P^minj(x) ≤ P^nu_i(x) ≤ P^maxj(x)] *)
 
 module UtGOp = Oper.P(UtG)
 
@@ -909,8 +914,9 @@ let rec kpred x = function
   | 0 -> x
   | i -> kpred (upred x) (i - 1)
 
-(** [g] must be transitive and [x] basic *)
-let add_disj uf g u x =
+(** [g] must be transitive and [x] basic 
+    Looks for [minj], [maxj] s.t. `u ∈ [P^minj(x); ...; P^maxj(x)]`. *)
+let add_disj (uf : Uuf.t) (g : UtG.t) (u : ut) (x : ut) =
   let uf, nu = mgu uf u in
   obind (fun (uf,minj) ->
       obind (fun (uf,maxj) ->
@@ -999,7 +1005,7 @@ let get_basics uf elems =
   |> List.sort_uniq ut_compare
 
 (*------------------------------------------------------------------*)
-let log_segment_eq eq =
+let log_segment_eq (eq : ut * ut) : unit =
   dbg "@[<v 2>Adding segment equality:@, %a@]"
     (Fmt.pair ~sep:(fun ppf () -> Fmt.pf ppf ", ")
        pp_ut pp_ut) eq
@@ -1046,8 +1052,9 @@ let find_segment_disj instance g =
 
   let basics = get_basics instance.uf (elems instance.uf) in
   try
-    let () = UtG.iter_vertex (fun u ->
-        List.iter (fun x -> match add_disj instance.uf g u x with
+    let () = UtG.iter_vertex (fun (u : ut) ->
+        List.iter (fun (x : ut) ->
+            match add_disj instance.uf g u x with
             | None -> ()
             | Some (uf, l) -> raise (Found (uf,l))
           ) basics
@@ -1300,28 +1307,32 @@ let rec query_form model (form : Form.form) = match form with
   | Form.Disj forms -> List.exists  (query_form model) forms
   | Form.Conj forms -> List.for_all (query_form model) forms
 
-let query_one (model : model) (at : Term.literal) =
-  let cnf = Form.mk at in
-  List.for_all (query_form model) cnf
+let query_one (model : model) (at : Term.literal) : bool =
+  try
+    let cnf = Form.mk at in
+    List.for_all (query_form model) cnf
+  with Unsupported -> false
 
 let query ~precise (models : models) (ats : Term.literals) =
-  assert (List.for_all (fun lit ->
-      let ty = Term.ty_lit lit in
-      ty = Type.Index || ty = Type.Timestamp
-    ) ats);
+  try
+    assert (List.for_all (fun lit ->
+        let ty = Term.ty_lit lit in
+        ty = Type.Index || ty = Type.Timestamp
+      ) ats);
 
-  (* if the conjunction of trace literals is  *)
-  if List.for_all (fun model -> List.for_all (query_one model) ats) models
-  then true
-  else if not precise then false
-  else
-    let forms = List.map (fun at -> Form.mk (Term.neg_lit at)) ats
-                |> List.flatten in
-    let insts = List.map (fun model ->
-        add_forms model.inst forms
-      ) models in
-    List.for_all (fun inst -> split_models inst = []) insts
-
+    (* if the conjunction of trace literals is  *)
+    if List.for_all (fun model -> List.for_all (query_one model) ats) models
+    then true
+    else if not precise then false
+    else
+      let forms = List.map (fun at -> Form.mk (Term.neg_lit at)) ats
+                  |> List.flatten in
+      let insts = List.map (fun model ->
+          add_forms model.inst forms
+        ) models in
+      List.for_all (fun inst -> split_models inst = []) insts
+  with Unsupported -> false
+    
 (* adds debugging information *)
 let query ~precise models ats =
   dbg "%squery: %a"
@@ -1414,6 +1425,7 @@ type trace_cntxt = {
 let make_context ~table ~system =
   { table ; system ; models = None }
 
+
 (*------------------------------------------------------------------*)
 (** Tests Suites *)
 
@@ -1421,8 +1433,15 @@ open Term
 
 let env = ref Vars.empty_env
 
-let mk_var   v = Term.mk_var (Vars.make_r `Approx env Timestamp v)
-let mk_var_i v = Vars.make_r `Approx env Index     v
+let mk_var v : Term.term =
+  let env', v = Vars.make `Approx !env Timestamp v in
+  env := env';
+  Term.mk_var v
+  
+let mk_var_i v : Vars.var =
+  let env', v = Vars.make `Approx !env Index v in
+  env := env';
+  v
 
 let tau   = mk_var "tau"
 and tau'  = mk_var "tau"

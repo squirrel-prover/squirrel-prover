@@ -21,9 +21,9 @@ hash hkey
 abstract ok : message
 abstract ko : message
 
-name key : index->message
-name seed : index->message
-name n : index->index->message
+name key : index -> message
+name seed : index -> message
+name n : index * index -> message
 
 mutable kT(i:index) : message = seed(i)
 
@@ -96,7 +96,7 @@ Proof.
   subst t, T(i,j).
   expand kT(i)@T(i,j).
   euf Mneq.
-  intro Ht Meq *.
+  intro [ j0 [Ht Meq]].
 
   (* T(i,j0) < T(i,j)
      kT(i)@pred(T(i,j0)) = kT(i)@pred(T(i,j))

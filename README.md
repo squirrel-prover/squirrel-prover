@@ -23,10 +23,47 @@ The documentation for developers may be built with `make doc`.
 
 ### Installing the Proof General mode for Emacs (optional, recommanded)
 
-The required `.el` files are inside the `utils` folder. The
-`utils/squirrel.el` file contains comments detailing the installation
-of Squirrel for Proof General.  We recommend installing Proof General
-from the git repository.
+The required `.el` files are inside the `utils` folder. 
+We recommend installing Proof General from the git repository.
+
+
+- Clone the git repository of proof general inside your `~/.emacs.d/lisp`:
+```
+mkdir -p ~/.emacs.d/lisp/ && cd ~/.emacs.d/lisp/
+git clone https://github.com/ProofGeneral/PG
+```
+
+- Create a squirrel sub-directory:
+```
+mkdir -p ~/.emacs.d/lisp/PG/squirrel
+```
+
+- Copy and paste this file, and `squirrel-syntax.el` inside it:
+```
+cp squirrel.el squirrel-syntax.el ~/.emacs.d/lisp/PG/squirrel
+```
+
+- Moreover, in the file `~/.emacs.d/lisp/PG/generic/proof-site.el`,
+   add to the list `proof-assistant-table-default` the following line:
+```
+ (squirrel "squirrel" "sp")
+```
+Then erase the outdated compiled version of this file:
+```
+rm ~/.emacs.d/lisp/PG/generic/proof-site.elc
+```
+
+- Run the following command to configure emacs:
+```
+echo -e "(require 'ansi-color)\n(load \"~/.emacs.d/lisp/PG/generic/proof-site\")" >> ~/.emacs
+```
+
+- Run emacs from the squirrel repository on some example file,
+with the squirrel repository in the path:
+```
+export PATH=$PATH:/path/to/squirrel
+emacs examples/<file>.sp
+```
 
 ### Dependencies for the `smt` tactic (optional)
 
@@ -64,6 +101,80 @@ or using Emacs with the Proof General mode (if installed)
 $ emacs examples/basic-hash.sp
 ```
 
+### Data visualisation (with Proof General)
+
+To have a graphical representation of the state of the proof,
+set the variable `SP_VISU` to `ok` in your environnement.
+Then, launch a Squirrel file with Emacs:
+
+```
+$ export SP_VISU=ok
+$ emacs examples/basic-hash.sp
+```
+
+You need to validate at least one line in Emacs to launch the local server.
+Then, you can access the visualisation at: [http://localhost:8080/visualisation.html](http://localhost:8080/visualisation.html)
+
+### Export in HTML format (needs [pandoc](https://pandoc.org/)
+
+To convert a Squirrel development to HTML, you need:
+
+* A **Squirrel file** `PATH1/squirrel_name.sp`
+* An **HTML template file** `PATH2/page.html` containing a line:
+`<!--HERE-->` (without spaces or tabulations)
+
+A default HTML template can be found at `scripts/html_export/page.html`.
+
+
+```
+./squirrel PATH1/squirrel_name.sp --html PATH2/page.html
+```
+
+The previous command will create a copy of `page.html` in the same directory pointed
+by `PATH1` named `squirrel_name.html`. **Beware** that, if a file already
+exists with this name, it will be deleted by this operation.
+
+This new file will have the output of Squirrel formatted in HTML and placed
+where the `<!--HERE-->` tag is.
+
+Squirrel will put its results between span tags that will not be displayed. This result can later be processed, with javascript for example.
+
+Each instruction in the Squirrel file is translated into an item
+of the following form (with `_i` in the tags' id replaced by the number of the instuction):
+
+```
+<span class="squirrel-step" id="step_i">
+  <span class="input-line" id="in_i">
+    Input
+  </span>
+  <span class="output-line" id="out_i">
+    Output
+  </span>
+  <span class="com-line" id="com_i">
+    Comment
+  </span>
+</span>
+```
+
+The "Comment" part will be filled by comments in the Squirrel file starting with `(**` and ending with `*)`.
+It is possible to format these comment with pandoc's Markdown (detailled [here](https://pandoc.org/MANUAL.html#pandocs-markdown)).
+Others comments will be left in the "Input" part.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Examples
 Examples of developments in Squirrel can be found in:
 - `examples/`
@@ -71,15 +182,37 @@ Examples of developments in Squirrel can be found in:
 Those include classical and post-quantum sound proofs of protocols.
 See `examples/README.md` for details.
 
-## Quick guide
+## Tutorial
 
 For a first introduction to the syntax, we recommend to open with ProofGeneral
-the `examples/tutorial/tutorial.sp`, that provides a run through of the syntax
+the `examples/basic-tutorial/tutorial.sp`, that provides a run through of the syntax
 with executables snippets. Then, browsing the `examples` folder should provide a
 wide variety of examples, starting e.g. with `basic-hash.sp`.
 
-As a next step, a more advanced tutorial is available in
-`examples/tutorial/tutorial-avanced.sp`.
+### Detailed Tutorial
+
+A more complete tutorial is available in
+```
+examples/tutorial/
+```
+
+This tutorial consists in a series of exercises of increasing
+difficulty, and covers the basic logical constructs and tactics
+manipulating them, several cryptographic assumptions, accessibility
+properties (authentication, injective authentication), equivalence
+properties (unlinkability), stateful protocol, and protocol
+composition.
+
+- [0-logic](examples/tutorial/0-logic.sp)
+- [1-crypto-hash](examples/tutorial/1-crypto-hash.sp)
+- [2-crypto-enc](examples/tutorial/2-crypto-enc.sp)
+- [3-hash-lock-auth](examples/tutorial/3-hash-lock-auth.sp)
+- [4-hash-lock-unlink](examples/tutorial/4-hash-lock-unlink.sp)
+- [5-stateful](examples/tutorial/5-stateful.sp)
+- [6-key-establishment](examples/tutorial/6-key-establishment.sp)
+
+
+## Quick syntax guide
 
 Squirrel developments are conventionally written in `.sp` files. They start
 with a system description, followed by some lemmas corresponding to trace

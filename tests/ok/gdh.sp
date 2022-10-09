@@ -1,5 +1,3 @@
-set autoIntro = false.
-
 channel c
 
 type E [large].

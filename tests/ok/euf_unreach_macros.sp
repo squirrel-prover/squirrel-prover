@@ -39,7 +39,7 @@ goal _ (t : timestamp) :
  happens(t) => s@t = h(n,k) => exists(i:index), P(i) <= t && s@pred(P(i)) = n.
 Proof.
  intro Hap H. 
- euf H => H1 H2.
+ euf H => [i H1].
  by exists i.
 Qed.
 

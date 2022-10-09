@@ -4,7 +4,7 @@ include TacticsArgs
 
 (*------------------------------------------------------------------*)
 let convert_as_lsymb parser_args = match parser_args with
-  | [Theory (L.{ pl_desc = App (p,[]) } )] ->
+  | [Theory (L.{ pl_desc = Symb p } )] ->
     Some p
   | _ -> None
 
@@ -21,15 +21,15 @@ let convert_pat_arg sel conv_cntxt p (conc : Equiv.any_form) =
   in
   let option = { Match.default_match_option with allow_capture = true; } in
   let table = conv_cntxt.env.table
-  and system = conv_cntxt.env.system
-  and vars  = conv_cntxt.env.vars in
-  let res = match conc with
-    | Local form -> Match.T.find ~option table system vars pat form
-    | Global form -> Match.E.find ~option table system vars pat form
+  and system = conv_cntxt.env.system in
+  let res : Term.terms = 
+    match conc with
+    | Local  form -> Match.T.find ~option table system pat form
+    | Global form -> Match.E.find ~option table system pat form
   in
-  let message = match List.nth res (sel-1) with
-    | et -> et
-    | exception _ -> 
+  let message = match List.nth_opt res (sel-1) with
+    | Some et -> et
+    | None -> 
       raise Theory.(Conv (L._dummy,
                           Tactic_type
                             ("Could not extract the element "
@@ -75,7 +75,7 @@ let convert_args env parser_args tactic_type conc =
       in
       Arg et
 
-    | [Theory (L.{ pl_desc = App (p,[]) } )], Sort String ->
+    | [Theory (L.{ pl_desc = Symb p } )], Sort String ->
       Arg (String p)
 
     | [Int_parsed i], Sort Int ->

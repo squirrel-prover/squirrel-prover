@@ -5,120 +5,115 @@
 
 open Term
 
-module TS = TraceSequent
-
-module Hyps = TS.LocalHyps
-
 type lsymb = Theory.lsymb
 
 module MP = Match.Pos
 module Sp = MP.Sp
 module SE = SystemExpr
 
+
+
 (*------------------------------------------------------------------*)
-(** Exception raised when a forbidden occurrence of a message variable
-    is found. *)
-exception Var_found
+(** Generic types and functions to handle occurrences of anything,
+    with associated data and conditions, source timestamps, etc. *)
+(* probably somewhat redundant with Iter.occ… but more specific
+   to the use case here *)
 
-(** Functions to find all timestamps occurring in a term 
-    type of a timestamp occurrence *)
-type ts_occ = Term.term Iter.occ
+(** Label indicating whether an occurrence is direct or indirect, and
+   if so which action produced it *)
+type occ_type =
+  | EI_direct
+  | EI_indirect of term
 
+val subst_occtype : subst -> occ_type -> occ_type
+
+
+(** Simple occurrence of an element of type 'a,
+    with additional data of type 'b *)
+(* Remarks:
+   1) we could store a position in the term where the occ was, as in Iter.occ,
+      but we don't use it anywhere for now
+   2) we could store the fset at the point where the occ was found, which would
+      be more precise (we would need to prove the goal for the oc
+      only in that fset)
+      (though since fold_macro_support does not give us the fset
+      where the iocc is,
+      we would still potentially be a little imprecise).
+      we'll see if that's an issue later, for now we don't do that. *) 
+type ('a, 'b) simple_occ = 
+  {so_cnt     : 'a;        (* content of the occurrence *)
+   so_coll    : 'a;        (* thing it potentially collides with *)
+   so_ad      : 'b;        (* additional data, if needed *)
+   so_vars    : Vars.vars; (* variables bound above the occurrence *)
+   so_cond    : terms;     (* condition above the occurrence *)
+   so_occtype : occ_type;  (* occurrence type *)
+   so_subterm : term;      (* a subterm where the occurrence was found
+                              (for printing) *)
+  }
+
+type ('a, 'b) simple_occs = (('a, 'b) simple_occ) list
+
+
+(** constructs a simple occurrence *)
+val mk_simple_occ :
+  'a -> 'a -> 'b -> Vars.vars -> terms -> occ_type ->
+  term -> ('a, 'b) simple_occ
+
+
+(** Type of a timestamp occurrence *)
+(* maybe does not need to be exposed *)
+type ts_occ = (term, unit) simple_occ
 type ts_occs = ts_occ list
 
 
-(** Return timestamps occuring in macros in a list of terms *)
-val get_macro_actions : Constr.trace_cntxt -> Term.terms -> ts_occs
+(** Type of empty simple occurrences
+    (used as dummy parameter when they are not needed) *)
+type empty_occ = (unit, unit) simple_occ
+type empty_occs = empty_occ list
 
 
-(*------------------------------------------------------------------*)
-(** {2 Occurrence of a name} *)
 
-(** information used to remember where an occurrence was found.
-    - the name it's in collision with,
-    - a subterm where it was found (for printing),
-    - optionally the action producing the iocc where
-      it was found, for indirect occs *) 
-type occ_info = { 
-  oi_name    : nsymb; 
-  oi_subterm : term; 
-  oi_action  : term option;
-}
+(** Type of a function generating a formula meant to say
+    "the occurrence is actually a collision" (or its negation) *)
+(** we also use this formula to compute occurrence subsumption
+     (if o1 generates a particular case of o2 then it is subsumed) *)
+type ('a, 'b) occ_formula =
+  negate:bool ->
+  'a -> (* occurrence content *)
+  'a -> (* what it potentially collides with *)
+  'b -> (* associated data *)
+  term
 
-(** constructs an occ_info *)
-val mk_oinfo : ?ac:term option -> nsymb -> term -> occ_info
+(** occ_formula for name occurrences *)
+val name_occ_formula : (nsymb, unit) occ_formula
 
-type name_occ = (nsymb * occ_info) Iter.occ
-type name_occs = name_occ list
+(** Dummy occ_formula for empty occurrences *)
+val empty_occ_formula : (unit, unit) occ_formula
 
 
-(** constructs a name occurrence *)
-val mk_nocc : nsymb -> occ_info -> Vars.vars -> terms -> Sp.t -> name_occ
+(** Extended occurrence, with additional info about where it was found *)
+type ('a, 'b) ext_occ =
+  {eo_occ       : ('a, 'b) simple_occ;
+   eo_source    : terms;  (* original term where the occ was found *) 
+   eo_source_ts : ts_occs } (* timestamps occurring in the source term *)
 
-(** prints a description of the occurrence *)
-val pp : Format.formatter -> name_occ -> unit
-  
-(** prints a description of a subsumed occurrence *)
-val pp_sub : Format.formatter -> name_occ -> unit
+type ('a, 'b) ext_occs = (('a, 'b) ext_occ) list
 
-(*------------------------------------------------------------------*)
-(* utility functions for lists of nsymbs *)
 
-(** looks for a name with the same symbol in the list *)
-val exists_symb : nsymb -> nsymb list -> bool
-
-(** finds all names with the same symbol in the list *)
-val find_symb : nsymb -> nsymb list -> nsymb list
 
 (*------------------------------------------------------------------*)
-(* Proof obligations for a name occurrence *)
-
-(** Constructs the formula
-    "exists free vars.
-      (exists t1.occ_vars. action ≤ t1.occ_cnt || 
-       … || 
-       exists tn.occ_vars. action ≤ tn.occ_cnt) &&
-      conditions of occ && 
-      indices of n = indices of occ"
-    which will be the condition of the proof obligation when finding the 
-    occurrence occ.
-    action is the action producing the occ (optional, for direct occs)
-    ts=[t1, …, tn] are intended to be the timestamp occurrences in t.
-    The free vars of occ.occ_cnt should be in env \uplus occ.occ_vars,
-    which is the case if occ was produced correctly
-    (ie by Match.fold given either empty (for direct occurrences)
-     or iocc_vars (for indirect occurrences).
-    Not all free vars of action and condition are there: there may be some indices
-    in them that don't appear in the occurrence -> we existentially quantify them. 
-    The free vars of ts should be in env.
-    Everything is renamed nicely wrt env. *)
-val occurrence_formula : ts_occs -> Vars.env -> name_occ -> term
-
-
-(** Constructs the proof obligation (trace sequent) for a direct or indirect 
-   occurrence, stating that it suffices to prove the goal assuming
-   the occurrence occ is equal to the name it collides with. *)
-val occurrence_sequent : ts_occs -> TS.sequent -> name_occ -> TS.sequent
+(** Occurrence subsumption/inclusion functions not exposed,
+    we'll see if they need to be *)
 
 
 (*------------------------------------------------------------------*)
 (* Functions handling macro expansion in terms, when allowed *)
 
-(* information used to check if a macro can be expanded in a term.
-  - the current sequent, for direct occurrences; 
-  - the action for the iocc that produced the term, for indirect ones;
-  - and in any case the trace context. *)
-type expand_info = EI_direct of TS.sequent * Constr.trace_cntxt
-                 | EI_indirect of term * Constr.trace_cntxt
-
-(** gets the sequent for the direct occurrence we're looking at *)
-val get_sequent : expand_info -> TS.sequent option
-
-(** gets the action for the iocc that produced the term we're looking at *)
-val get_action : expand_info -> term option
-  
-(** gets the trace context *)
-val get_context : expand_info -> Constr.trace_cntxt
+(* information used to check if a macro can be expanded in a term:
+   - a tag indicating whether the occurrence is direct or indirect
+     (for an indirect occurrence, the action producing it is recorded)
+   - the trace context *)
+type expand_info = occ_type * Constr.trace_cntxt
 
 (** expands t if it is a macro and we can check that its timestamp happens
     using info (not recursively).
@@ -129,96 +124,140 @@ val expand_macro_check_once : expand_info -> term -> term option
     (only at toplevel, not in subterms) *)
 val expand_macro_check_all : expand_info -> term -> term
 
-(** returns (u, v) such that t = (u = v), or None if not possible.
-    (unfolds the macros when possible) *) 
-val destr_eq_expand : expand_info -> term -> (term * term) option
 
-  
+
 (*------------------------------------------------------------------*)
-(** given
-    - a function find_occs that generates a list of occurrences found in
-      a term, expanding macros when possible according to expand_info but not 
-      otherwise (undef and maybedef macros will be handled by fold_macro_support);
-    - the sequent s of the current goal;
-    - the term t where we look for occurrences;
-    - optionally, a printer that prints a description of what we're looking for; 
-  computes the list of corresponding proof obligations: we now have to prove s
-  under the assumption that at least one of the found occurrences must
-  be an actual collision.
-  Relies on fold_macro_support to look through all macros in the term. *)
-val occurrence_sequents :
-      ?pp_ns: (unit Fmt.t) option ->
-      (se:SE.arbitrary ->
-       env:Vars.env ->
-       ?fv:Vars.vars ->
-       expand_info ->
-       term ->
-       name_occs) ->
-      TS.sequent ->
-      Term.term ->
-      TS.sequents
-  
+(** Returns all timestamps occuring in macros in a list of terms.
+    Should only be used when sources are directly occurring,
+    not themselves produced by unfolding macros *)
+val get_macro_actions : Constr.trace_cntxt -> term list -> ts_occs
+
+
+(*------------------------------------------------------------------*)
+(** Occurrence of a name *)
+
+type n_occ = (nsymb, unit) simple_occ
+type n_occs = n_occ list
+
+type name_occ = (nsymb, unit) ext_occ
+type name_occs = name_occ list
+
+(** Constructs a name occurrence *)
+val mk_nocc : 
+  nsymb -> (* name *)
+  nsymb -> (* name it collides with *)
+  Vars.vars -> (* vars bound above *)
+  terms -> (* condition above *)
+  occ_type -> (* occurrence type *)
+  term -> (* subterm (for printing) *)
+  n_occ
+
 
 (*------------------------------------------------------------------*)
 (* Functions to look for illegal name occurrences in a term *)
 
-(** type of a function that takes a term, and generates
-    a list of occurrences in it, using
-     - a continuation unit -> name_occs
+(** Type of a function that takes a term, and generates a list of
+    name occurrences in it.
+    Also returns a list of ('a, 'b) simple occurrences, used to record
+    information gathered during the exploration of the term
+    (typically collisions between other things than names, but with
+    the 'b so_ad field, can record anything useful).
+    Uses
+    - a continuation unit -> n_occs * 'a, 'b simple_occs
        when it does not want to handle the term it's given,
        and just asks to be called again on the subterms
-     - a continuation fv -> cond -> p -> se -> st -> term -> name_occs,
-       for when it needs to do some work on the term, and needs to
-       call fold_bad_occs again on some of its subterms.
-    These functions are for use in fold_bad_occs and occurrence_goals.
-    They don't need to unfold macros, that's handled separately. *)
-type f_fold_occs = 
-  (unit -> name_occs) -> (* continuation: give up and try again on subterms *)
-  (fv:Vars.vars ->       (* continuation: to be called on strict subterms 
-                            (for rec calls) *)
+    - a continuation fv -> cond -> p -> se -> st -> term ->
+      n_occs * ('a,'b) simple_occs,
+      that calls the function again on the given parameters,
+      for when it needs to do finer things
+      (typically handle some of the subterms manually, and
+       call this continuation on the remaining ones,
+       or handle subterms at depth 1 by hand, and call
+       the continuation on subterms at depth 2).
+    Functions of this type don't need to unfold macros,
+    that's handled separately. *)
+type ('a, 'b) f_fold_occs = 
+  (unit -> n_occs * ('a, 'b) simple_occs) -> (* continuation:
+                                   give up and try again on subterms *)
+  (fv:Vars.vars -> (* continuation:
+                      to be called on strict subterms (for rec calls) *)
    cond:terms ->
-   p:MP.pos ->           
-   se:SE.arbitrary ->   
-   st:term ->            
-   term ->               
-   name_occs) ->         
-  se:SE.arbitrary ->    (* system at the current position *)
-  info:expand_info ->   (* info to expand macros *)
-  fv:Vars.vars ->       (* variables bound above the current position *)
-  cond:terms ->         (* condition at the current position *)
-  p:MP.pos ->           (* current position*)
-  st:term ->            (* a subterm we're currently in (for printing purposes) *)
-  term ->               (* term at the current position *)
-  name_occs             (* found occurrences *)
+   p:MP.pos ->
+   info:expand_info ->
+   st:term ->
+   term ->
+   n_occs * ('a, 'b) simple_occs)->         
+  info:expand_info ->  (* info to expand macros, incl. system at current pos *)
+  fv:Vars.vars ->      (* variables bound above the current position *)
+  cond:terms ->        (* condition at the current position *)
+  p:MP.pos ->          (* current position*)
+  st:term ->           (* a subterm we're currently in
+                          (for printing purposes) *)
+  term ->              (* term at the current position *)
+  n_occs * ('a, 'b) simple_occs (* found name occurrences,
+                                   and other occurrences *)
 
-  
-(** given a f_fold_occs function get_bad_occs,
-    calls get_bad_occs, is called again when get_bad_occs asks
-    for recursive calls on subterms, and handles the case where
-    get_bad_occs calls its first continuation (ie gives up)
-    by 1) unfolding the term, if it's a macro that can be unfolded
-       2) doing nothing, if it's a macro that can't be unfolded
-          (in that case, fold_macro_support will generate a separate iocc
-          for that)
-       2) using Match.Pos.fold_shallow, to recurse on subterms at depth 1. *)
-val fold_bad_occs :
-  f_fold_occs -> 
-  se:SE.arbitrary -> env:Vars.env -> ?fv:Vars.vars -> expand_info ->
-  term -> name_occs
 
+
+(** Interprets phi as phi_1 /\ … /\ phi_n,
+    and reconstructs it to simplify trivial equalities *)
+val clear_trivial_equalities : term -> term
+
+
+(** Constructs the formula "exists v1. a <= ts1 \/ … \/ exists vn. a <= tsn" *)
+(** where vi, tsi are the variables and content of the ts_occ *)
+val time_formula : term -> ts_occs -> term
+
+
+(*------------------------------------------------------------------*)
+(* Proof obligations for name occurrences *)
 
 (** given
-    - a f_fold_occs function get_bad_occs;
-    - the sequent s of the current goal;
-    - the term t where we look for occurrences;
-    - optionally, a printer that prints a description of what 
-      we're looking for;
-  computes the list of proof obligations: we now have to prove s
-  under the assumption that at least one of the found occurrences must
-  be an actual collision.*)
-val occurrence_goals :
-      ?pp_ns: (unit Fmt.t) option ->
-      f_fold_occs ->
-      TS.sequent ->
-      term ->
-      TS.sequents
+   - a f_fold_occs function (see above)
+   - a context (in particular, that includes the systems we want to use)
+   - the environment
+   - a list of sources where we search for occurrences
+   - a formula function for 'a, 'b occurrences
+    (which we also use for subsumption)
+   - optionally, a pp_ns that prints what we look for
+    (just for pretty printing)
+   
+   computes two list of formulas whose disjunctions respectively mean
+   "a bad name occurrence happens" and "an 'a, 'b occurrence is a collision"
+      (or, alternatively, if negate is set to true,
+    whose conjunction means "no bad occurrence happens"
+    and "no collision happens") *)
+val occurrence_formulas :
+  ?negate : bool ->
+  ?pp_ns: (unit Fmt.t) option ->
+  ('a, 'b) occ_formula ->
+  ('a, 'b) f_fold_occs ->
+  Constr.trace_cntxt ->
+  Vars.env ->
+  terms ->
+  terms * terms
+
+(** occurrence_formula instantiated for the case where we only look for names *)
+(** eg fresh *)
+val name_occurrence_formulas :
+  ?negate : bool ->
+  ?pp_ns: (unit Fmt.t) option ->
+  (unit, unit) f_fold_occs ->
+  Constr.trace_cntxt ->
+  Vars.env ->
+  terms ->
+  terms
+
+
+(** variant of occurrence_formula that returns
+    all found occurrences as well as the formulas,
+    for more complex use cases (eg intctxt) *)
+val occurrence_formulas_with_occs :
+  ?negate : bool ->
+  ?pp_ns: (unit Fmt.t) option ->
+  ('a, 'b) occ_formula ->
+  ('a, 'b) f_fold_occs ->
+  Constr.trace_cntxt ->
+  Vars.env ->
+  terms ->
+  terms * terms * name_occs * ('a, 'b) ext_occs

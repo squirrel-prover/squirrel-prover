@@ -17,7 +17,7 @@ In __Squirrel__, a function symbol without any assumption can be defined with:
 abstract ok : message
 abstract ko : message
 abstract f1 : message -> message
-abstract f2 : message -> message -> message.
+abstract f2 : message * message -> message.
 
 (*```
 
@@ -37,7 +37,7 @@ In the tool, one can declare names and indexed names with the following.
 ```*)
 name n : message
 name n1 : index -> message
-name n2 : index -> index -> message.
+name n2 : index * index -> message.
 
 (*```
 

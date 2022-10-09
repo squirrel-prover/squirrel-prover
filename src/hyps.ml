@@ -11,7 +11,10 @@ let hyp_error ~loc e = raise (T.Tactic_soft_failure (loc,e))
 (*------------------------------------------------------------------*) 
 module type Hyp = sig 
   type t 
-  val pp_hyp : Format.formatter -> t -> unit
+
+  val pp_hyp     :             Format.formatter -> t -> unit
+  val _pp_hyp    : dbg:bool -> Format.formatter -> t -> unit
+  val pp_hyp_dbg :             Format.formatter -> t -> unit
 
   (** Chooses a name for a formula, depending on the formula shape. *)
   val choose_name : t -> string
@@ -100,8 +103,10 @@ module type S1 = sig
   val pp_ldecl : ?dbg:bool -> Format.formatter -> ldecl -> unit
 
   val pp_hyp   : Format.formatter -> hyp  -> unit
-  val pp       : Format.formatter -> hyps -> unit
-  val pp_dbg   : Format.formatter -> hyps -> unit
+
+  val pp       :             Format.formatter -> hyps -> unit
+  val _pp      : dbg:bool -> Format.formatter -> hyps -> unit
+  val pp_dbg   :             Format.formatter -> hyps -> unit
 end
 
 (*------------------------------------------------------------------*)
@@ -130,7 +135,7 @@ module Mk (Hyp : Hyp) : S with type hyp = Hyp.t = struct
   let pp_ldecl ?(dbg=false) ppf (id,hyp) =
     Fmt.pf ppf "%a: %a@;"
       (if dbg then Ident.pp_full else Ident.pp) id
-      Hyp.pp_hyp hyp
+      (Hyp._pp_hyp ~dbg) hyp
 
   let _pp ~dbg ppf hyps =
     let pp_sep fmt () = Fmt.pf ppf "" in
@@ -286,7 +291,10 @@ let get_ord (at : Term.xatom ) : Term.ord = match at with
 (*------------------------------------------------------------------*)
 module TraceHyps = Mk(struct
     type t = Equiv.any_form
-    let pp_hyp = Equiv.Any.pp
+    let pp_hyp     = Equiv.Any.pp
+    let _pp_hyp    = Equiv.Any._pp
+    let pp_hyp_dbg = Equiv.Any.pp_dbg
+
     let htrue = Equiv.Local Term.mk_true
 
     let choose_name : Equiv.any_form -> string = function
