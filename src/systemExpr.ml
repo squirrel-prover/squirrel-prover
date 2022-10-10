@@ -253,7 +253,7 @@ let symbs table = function
 let action_to_term table system a =
   let msymbs = symbs table system in
   let symb = System.Msh.find (Action.get_shape a) msymbs in
-  Term.mk_action symb (Action.get_indices a)
+  Term.mk_action symb (Action.get_args a)
 
 (*------------------------------------------------------------------*)
 (** Action descriptions *)
@@ -267,16 +267,19 @@ let descr_of_shape table expr shape =
        (fun (lbl,sys) -> lbl, System.Single.descr_of_shape table sys shape)
        expr)
 
-let descr_of_action table expr a =
+let descr_of_action table expr (a : Action.action) : Action.descr =
   let descr = descr_of_shape table expr (Action.get_shape a) in
+  assert (Action.check_descr descr);
   let d_indices = descr.indices in
-  let a_indices = Action.get_indices a in
+  let a_indices = Action.get_args a in
   let subst =
     List.map2
-      (fun v v' -> Term.ESubst (Term.mk_var v, Term.mk_var v'))
+      (fun v t' -> Term.ESubst (Term.mk_var v, t'))
       d_indices a_indices
   in
-  Action.subst_descr subst descr
+  let descr = Action.subst_descr subst descr in
+  assert (Action.check_descr descr);
+  descr
 
 let descrs table (se:fset expr) : Action.descr System.Msh.t =
   let symbs = symbs table se in

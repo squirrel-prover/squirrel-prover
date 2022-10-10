@@ -11,7 +11,6 @@ type lsymb = Theory.lsymb
 
 type decl_error_i =
   | BadEquivForm
-  | InvalidAbsType
   | InvalidCtySpace of string list
   | DuplicateCty of string
   | NotTSOrIndex
@@ -24,9 +23,6 @@ type decl_error =  L.t * dkind * decl_error_i
 let pp_decl_error_i fmt = function
   | BadEquivForm ->
     Fmt.pf fmt "equivalence goal ill-formed"
-
-  | InvalidAbsType ->
-    Fmt.pf fmt "invalid type, return type must not be Index or Timestamp."
 
   | InvalidCtySpace kws ->
     Fmt.pf fmt "invalid space@ (allowed: @[<hov 2>%a@])"
@@ -57,11 +53,6 @@ let decl_error loc k e = raise (Decl_error (loc,k,e))
 (*------------------------------------------------------------------*)
 (** {2 Declaration parsing} *)
 
-let check_fun_out_ty loc ty =
-  if ty = Type.Index || ty = Type.Timestamp then
-    decl_error loc KDecl InvalidAbsType
-  else ()
-
 let rec split_ty (ty : Theory.p_ty) : Theory.p_ty list =
   match L.unloc ty with
   | Theory.P_fun (t1, t2) -> t1 :: split_ty t2
@@ -83,8 +74,6 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
   let in_tys = List.map (Theory.convert_ty env) in_tys in
 
   let out_ty = Theory.convert_ty env p_out_ty in
-
-  check_fun_out_ty (L.loc p_out_ty) out_ty;
 
   Theory.declare_abstract table
     ~ty_args ~in_tys ~out_ty
@@ -108,9 +97,6 @@ let parse_operator_decl table (decl : Decl.operator_decl) =
       Theory.convert ?ty:out_ty { env; cntxt = InGoal } decl.op_body 
     in
     let body = Term.subst subst body in
-
-    (* not sure this is necessary *)
-    check_fun_out_ty (L.loc decl.op_body) out_ty;
 
     if not (Term.is_deterministic body) then
       decl_error (L.loc decl.op_body) KDecl NonDetOp;

@@ -25,7 +25,7 @@ class deprecated_find_name ~(cntxt:Constr.trace_cntxt) exact name = object (self
   inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
 
   method visit_message t = match t with
-    | Term.Name ns -> if ns.s_symb = name then raise Deprecated_Name_found
+    | Term.Name (ns,_) -> if ns.s_symb = name then raise Deprecated_Name_found
     | Term.Var m
         when Vars.ty m <> Type.Timestamp && Vars.ty m <> Type.Index -> 
         raise Deprecated_Var_found
@@ -39,7 +39,7 @@ class deprecated_get_actions ~(cntxt:Constr.trace_cntxt) = object (self)
   val mutable actions : Term.term list = []
   method get_actions = actions
 
-  method visit_macro mn a =
+  method visit_macro mn _args a =
     let cleara, a' = match Symbols.Macro.get_def mn.s_symb cntxt.table with
       | Symbols.Input -> true,  Term.mk_pred a
       | _             -> false, a
@@ -54,12 +54,12 @@ class deprecated_get_actions ~(cntxt:Constr.trace_cntxt) = object (self)
 
 (*------------------------------------------------------------------*)
 (** occurrence of a name [n(i,...,j)] *)
-type deprecated_name_occ = Vars.var list Iter.occ
+type deprecated_name_occ = Term.term list Iter.occ
 
 type deprecated_name_occs = deprecated_name_occ list
 
 let deprecated_pp_name_occ fmt (occ : deprecated_name_occ) : unit =
-  Iter.pp_occ (Fmt.list ~sep:Fmt.comma Vars.pp) fmt occ
+  Iter.pp_occ (Fmt.list ~sep:Fmt.comma Term.pp) fmt occ
 
 (** Looks for indices at which a name occurs.
     @raise Var_found if a term variable occurs in the term. *)
@@ -75,9 +75,9 @@ let deprecated_get_name_indices_ext
     | Term.Var v when not (Type.is_finite (Vars.ty v)) ->
       raise Deprecated_Var_found
 
-    | Term.Name ns when ns.s_symb = nsymb ->
+    | Term.Name (ns,args) when ns.s_symb = nsymb ->
       let occ = Iter.{
-          occ_cnt  = ns.s_indices;
+          occ_cnt  = args;
           occ_vars = List.rev fv;
           occ_cond = cond;
           occ_pos  = Sp.empty; }
@@ -172,8 +172,6 @@ let deprecated_get_actions_ext (constr : Constr.trace_cntxt) (t : Term.term) : d
   let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.terms) : deprecated_ts_occs =
     match t with
     | Term.Macro (m, l, ts) ->
-      if l <> [] then failwith "Not implemented" ;
-
       let get_macro_default () =
         let ts = match Symbols.Macro.get_def m.s_symb constr.table with
           | Symbols.Input -> Term.mk_pred ts
@@ -185,10 +183,11 @@ let deprecated_get_actions_ext (constr : Constr.trace_cntxt) (t : Term.term) : d
             occ_cond = cond;
             occ_pos  = Sp.empty; }
         in
-        [occ] @ get ~fv ~cond ts
+        [occ] @ 
+        List.concat_map (get ~fv ~cond) (ts :: l)
       in
 
-      begin match Macros.get_definition constr m ts with
+      begin match Macros.get_definition constr m ~args:l ~ts with
         | `Def t -> get ~fv ~cond t
         | `Undef | `MaybeDef -> get_macro_default ()
       end

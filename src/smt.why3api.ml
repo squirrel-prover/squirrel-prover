@@ -1,3 +1,5 @@
+open Utils
+
 let filter_ty t = List.filter (fun x -> Vars.ty x = t)
 let filter_msg  = List.filter (fun x -> let t = Vars.ty x in
                                 t <> Type.Index && t <> Type.Timestamp)
@@ -252,7 +254,9 @@ let build_task_bis
       t_app_infer pred_symb [timestamp_to_wterm ts]
     | Term.Action (a, indices) -> t_app_infer act_symb [
         t_app_infer (Hashtbl.find actions_tbl (Symbols.to_string a)) [];
-        ilist_to_wterm indices
+
+        (* FIXME: Adrien: oget can fail *)
+        ilist_to_wterm (List.map (oget -| Term.destr_var) indices)
       ]
     | Var v -> Hashtbl.find timestamps_tbl (Vars.name v)
     | Diff _ -> (* TODO doesn't seem necessary? *)
@@ -314,15 +318,19 @@ let build_task_bis
       end
 
     | Macro (ms,l,ts) ->
-      assert (l = []);
       t_app_infer
         (Hashtbl.find macros_tbl (Symbols.to_string ms.s_symb))
-        [ilist_to_wterm ms.s_indices; timestamp_to_wterm ts]
 
-    | Name ns ->
+        (* FIXME: Adrien: oget can fail *)
+        [ilist_to_wterm (List.map (oget -| Term.destr_var) l);
+         timestamp_to_wterm ts]
+
+    | Name (ns,args) ->
       t_app_infer
         (Hashtbl.find names_tbl (Symbols.to_string ns.s_symb))
-        [ilist_to_wterm ns.s_indices]
+
+        (* FIXME: Adrien: oget can fail *)
+        [ilist_to_wterm (List.map (oget -| Term.destr_var) args)]
 
     | Diff _ ->
       failwith "diff of timestamps to why3 term not implemented"
@@ -530,8 +538,11 @@ let build_task_bis
                 (* for now, handle only the case where the indices of the macro
                    coincide with those of the action *)
                 let m_idx = Utils.List.take arity descr.indices in
-                match Macros.get_definition_nocntxt system table
-                        (Term.mk_isymb mn gty m_idx) descr.name descr.indices with
+                match
+                  Macros.get_definition_nocntxt system table
+                    (Term.mk_symb mn gty) ~args:(Term.mk_vars m_idx)
+                    descr.name (Term.mk_vars descr.indices)
+                with
                 | `Undef   -> None
                 | `Def msg -> Some (macro_wterm_eq
                                       (ilist_to_wterm m_idx)
@@ -549,14 +560,15 @@ let build_task_bis
                 let same_as_pred =
                   t_app_infer m_symb [ilist; t_app_infer pred_symb [ts]] in
                 try
-                  let (ns, msg) =
-                    List.find (fun (ns,_) -> ns.Term.s_symb = mn)
-                      descr.Action.updates in
+                  let (ns, ns_args, msg) =
+                    List.find (fun (ns,_,_) -> ns = mn)
+                      descr.Action.updates
+                  in
                   let expansion_ok = msg_to_wterm msg in
                   if descr.Action.name = Symbols.init_action
                   then expansion_ok
                   else
-                    t_if (t_equ ilist (ilist_to_wterm ns.s_indices))
+                    t_if (t_equ ilist (ilist_to_wterm ns_args))
                       expansion_ok
                       same_as_pred
                 with Not_found -> same_as_pred in

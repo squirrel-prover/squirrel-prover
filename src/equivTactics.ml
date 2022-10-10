@@ -18,6 +18,7 @@ module ES   = EquivSequent
 module Hyps = ES.Hyps
 
 module NO = NameOccs
+module Name = NO.Name
 
 module LT = LowTactics
   
@@ -441,11 +442,12 @@ let induction Args.(Message (ts,_)) s =
     in
     let case_of_action (action,symbol,indices) =
       if symbol = Symbols.init_action then None else
-        Some (case_of_action (action,symbol,indices))
+        Some (case_of_action ((Action.to_action action),symbol,indices))
     in
 
     let goals =
-      List.filter_map case_of_action (SE.actions table system) in
+      List.filter_map case_of_action (SE.actions table system) 
+    in
 
     List.map simpl_impl (init_s :: goals)
 
@@ -860,7 +862,7 @@ let () =
 (** Fresh *)
 
 let deprecated_fresh_mk_direct
-    (n : Term.nsymb)
+    ((n, n_args) : Term.nsymb * Term.terms)
     (occ : OldFresh.deprecated_name_occ) : Term.term
   =
   let bv, subst = Term.refresh_vars `Global occ.occ_vars in
@@ -868,14 +870,14 @@ let deprecated_fresh_mk_direct
 
   let cond = Term.mk_ands (List.rev cond) in
   
-  let j = List.map (Term.subst_var subst) occ.occ_cnt in
+  let j = List.map (Term.subst subst) occ.occ_cnt in
   Term.mk_forall ~simpl:true bv
-    (Term.mk_impl cond (Term.mk_indices_neq n.s_indices j))
+    (Term.mk_impl cond (Term.mk_neqs n_args j))
 
 let deprecated_fresh_mk_indirect
     (cntxt : Constr.trace_cntxt)
     (env : Vars.env)
-    (n : Term.nsymb)
+    ((n, n_args) : Term.nsymb * Term.terms)
     (frame_actions : OldFresh.deprecated_ts_occs)
     (occ : TraceTactics.deprecated_fresh_occ) : Term.term
   =  
@@ -896,14 +898,14 @@ let deprecated_fresh_mk_indirect
       (Action.subst_action subst action)
   in
 
-  let occ = List.map (Term.subst_var subst) occ in
+  let occ = List.map (Term.subst subst) occ in
 
   (* condition stating that [action] occurs before a macro timestamp
      occurencing in the frame *)
   let disj = Term.mk_ors (OldFresh.deprecated_mk_le_ts_occs action frame_actions) in
 
   (* condition stating that indices of name in [action] and [name] differ *)
-  let form = Term.mk_indices_neq occ n.s_indices in
+  let form = Term.mk_neqs occ n_args in
 
   Term.mk_forall ~simpl:true bv (Term.mk_impl disj form)
 
@@ -913,7 +915,7 @@ let deprecated_fresh_mk_indirect
 let deprecated_mk_phi_proj
     (cntxt : Constr.trace_cntxt)
     (env : Vars.env)
-    (n : Term.nsymb)
+    ((n,n_args) : Term.nsymb * Term.terms)
     (proj : Term.proj)
     (biframe : Term.term list) : Term.term list
   =
@@ -927,12 +929,12 @@ let deprecated_mk_phi_proj
     let frame_indices = List.sort_uniq Stdlib.compare frame_indices in
 
     (* direct cases (for explicit occurrences of [name] in the frame) *)
-    let phi_frame = List.map (deprecated_fresh_mk_direct n) frame_indices in
+    let phi_frame = List.map (deprecated_fresh_mk_direct (n,n_args)) frame_indices in
 
     let frame_actions : OldFresh.deprecated_ts_occs = OldFresh.deprecated_get_macro_actions cntxt frame in
 
     let macro_cases =
-      TraceTactics.deprecated_mk_fresh_indirect_cases cntxt env n biframe
+      TraceTactics.deprecated_mk_fresh_indirect_cases cntxt env n n_args biframe
     in
 
     (* indirect cases (occurrences of [name] in actions of the system) *)
@@ -940,7 +942,7 @@ let deprecated_mk_phi_proj
       List.fold_left (fun forms (_, cases) ->
           let cases =
             List.map
-              (deprecated_fresh_mk_indirect cntxt env n frame_actions)
+              (deprecated_fresh_mk_indirect cntxt env (n,n_args) frame_actions)
               cases
           in
           cases @ forms
@@ -966,20 +968,24 @@ let deprecated_fresh_cond (s : ES.t) t biframe : Term.term =
   let env = ES.vars s in
   let l_proj, r_proj = ES.get_system_pair_projs s in
   
-  let n_left, n_right =
+  let n_left, n_left_args, n_right, n_right_args =
     match Term.project1 l_proj  t,
           Term.project1 r_proj t with
-    | (Name nl, Name nr) -> nl, nr
+    | Name (nl, ll), Name (nr,lr) -> nl, ll, nr, lr
     | _ -> raise OldFresh.Deprecated_Not_name
   in
 
   let system_left = SE.project [l_proj] cntxt.system in
   let cntxt_left = { cntxt with system = system_left } in
-  let phi_left = deprecated_mk_phi_proj cntxt_left env n_left l_proj biframe in
+  let phi_left =
+    deprecated_mk_phi_proj cntxt_left env (n_left, n_left_args) l_proj biframe 
+  in
 
   let system_right = SE.project [r_proj] cntxt.system in
   let cntxt_right = { cntxt with system = system_right } in
-  let phi_right = deprecated_mk_phi_proj cntxt_right env n_right r_proj biframe in
+  let phi_right = 
+    deprecated_mk_phi_proj cntxt_right env (n_right, n_right_args) r_proj biframe 
+  in
 
   let cstate = Reduction.mk_cstate cntxt.table in
   Term.mk_ands
@@ -1295,7 +1301,7 @@ let prf arg (s : ES.t) : ES.t list =
   let table,n =
     Symbols.Name.declare (ES.table s) (L.mk_loc L._dummy "n_PRF") ndef
   in
-  let ns = Term.mk_isymb n nty [] in
+  let ns = Term.mk_symb n nty in
   let s = ES.set_table table s in
 
   let oracle_formula =
@@ -1324,7 +1330,7 @@ let prf arg (s : ES.t) : ES.t list =
       | _ -> assert false
   in
 
-  let if_term = Term.mk_ite final_if_formula (Term.mk_name ns) hash in
+  let if_term = Term.mk_ite final_if_formula (Term.mk_name ns []) hash in
   let new_elem =
     Equiv.subst_equiv [Term.ESubst (hash,if_term)] [e]
   in
@@ -1353,7 +1359,7 @@ let global_diff_eq (s : ES.t) =
   (* Collect in ocs the list of diff terms that occur (directly or not)
      in [frame]. All these terms are relative to [system]. *)
   let ocs = ref [] in
-  let iter x y t =
+  let iter (x : Symbols.action list) (y : Vars.vars) (t : Term.term) =
     (* rebuild a term with top-level diffs, before using 
        [simple_bi_term_no_alpha_find] to normalize it in a particular way. *)
     let t = Term.mk_diff [l_proj, Term.project1 l_proj t;
@@ -1369,10 +1375,12 @@ let global_diff_eq (s : ES.t) =
      let miter = iter [action_descr.Action.name] action_descr.Action.indices in
      miter (snd action_descr.Action.output) ;
      miter (snd action_descr.Action.condition) ;
-     List.iter (fun (_,m) -> miter m) action_descr.Action.updates) ;
+     List.iter (fun (_,_,m) -> miter m) action_descr.Action.updates) ;
 
   (* Function converting each occurrence to the corresponding subgoal. *)
-  let subgoal_of_occ (vs,is,t) = 
+  let subgoal_of_occ (vs,is,t) =
+    let is = List.map Term.mk_var is in
+    
     let cond = Term.mk_ands (List.rev t.Iter.occ_cond) in
     match t.Iter.occ_cnt with
     | Term.Diff (Explicit [p1,s1; p2,s2]) as subterm
@@ -1674,15 +1682,19 @@ let cca1 Args.(Int i) s =
 
   let e = Term.head_normal_biterm e in
 
-  let get_subst_hide_enc enc fnenc m fnpk sk fndec r is_top_level
+  let get_subst_hide_enc
+      enc fnenc m fnpk (sk : Name.t) fndec (r : Name.t) is_top_level
     : Goal.t * Term.esubst
     =
     (* we check that the random is fresh, and the key satisfy the
        side condition. *)
 
+    let term_sk = Term.mk_name sk.symb sk.args in
+    let term_r = Term.mk_name r.symb r.args in
+
     (* we create the fresh cond reachability goal *)
     let fresh_goal : Goal.t =
-      let form = deprecated_fresh_cond s (Term.mk_name r) biframe in
+      let form = deprecated_fresh_cond s (term_r) biframe in
       let seq = ES.to_trace_sequent (ES.set_reach_goal form s) in
       Goal.Trace seq
     in
@@ -1695,12 +1707,12 @@ let cca1 Args.(Int i) s =
         let enc_sk =
           match fnpk with
           | Some fnpk ->
-            Term.mk_fun table fnpk [Term.mk_name sk]
+            Term.mk_fun table fnpk [term_sk]
 
-          | None -> Term.mk_name sk
+          | None -> term_sk
         in
         let new_term =
-          Term.mk_fun_tuple table fnenc [new_m; Term.mk_name r; enc_sk]
+          Term.mk_fun_tuple table fnenc [new_m; term_r; enc_sk]
         in
         Term.ESubst (enc, new_term)
     in
@@ -1713,12 +1725,12 @@ let cca1 Args.(Int i) s =
   let is_top_level : bool =
     match e with
     | Term.Fun (fnenc, _,
-                [Tuple [m; Term.Name r;
-                        Term.Fun (fnpk, _, [Term.Name sk])]])
+                [Tuple [m; Term.Name _(* r *) ; 
+                        Term.Fun (fnpk, _, [Term.Name _ (* sk *)])]])
       when (Symbols.is_ftype fnpk Symbols.PublicKey cntxt.table
             && Symbols.is_ftype fnenc Symbols.AEnc table) -> true
 
-    | Term.Fun (fnenc, _, [Tuple [m; Term.Name r; Term.Name sk]])
+    | Term.Fun (fnenc, _, [Tuple [m; Term.Name _ (* r *); Term.Name _ (* sk *)]])
       when Symbols.is_ftype fnenc Symbols.SEnc table -> true
 
     | _ -> false
@@ -1738,20 +1750,20 @@ let cca1 Args.(Int i) s =
 
       let m, r, sk, fnpk, fndec =
         match Term.head_normal_biterm arg with
-        | Tuple [m; Term.Name r; Term.Fun (fnpk, _, [Term.Name sk])] ->
+        | Tuple [m; Term.Name _ as r; Term.Fun (fnpk, _, [Term.Name _ as sk])] ->
           (* we check that the encryption function is used with the associated
              public key *)
           let fndec = match Symbols.Function.get_data fnenc table with
             | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk ->
               assert (Symbols.is_ftype fnpk Symbols.PublicKey table);
               fndec
-                
+
             | _ ->
               soft_failure
                 (Failure "the first encryption does not use the corresponding \
                           public key.")
           in
-          m, r, sk, fnpk, fndec
+          m, Name.of_term r, Name.of_term sk, fnpk, fndec
         | _ ->
           soft_failure (Failure "cannot determine the arguments of the \
                                  first encryptions")
@@ -1759,13 +1771,13 @@ let cca1 Args.(Int i) s =
       let errors =
         OldEuf.key_ssc ~globals:true ~elems:(ES.goal_as_equiv s)
           ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
-          ~cntxt fndec sk.s_symb
+          ~cntxt fndec sk.symb.s_symb
       in
       if errors <> [] then
         soft_failure (Tactics.BadSSCDetailed errors);
 
       if not (List.mem
-                (Term.mk_fun table fnpk [Term.mk_name sk])
+                (Term.mk_fun table fnpk [Term.mk_name sk.symb sk.args])
                 biframe) then
         soft_failure
           (Tactics.Failure
@@ -1780,7 +1792,8 @@ let cca1 Args.(Int i) s =
       when Symbols.is_ftype fnenc Symbols.SEnc table ->
       let m, r, sk =
         match Term.head_normal_biterm args with
-        | Tuple [m; Term.Name r; Term.Name sk] -> m, r, sk
+        | Tuple [m; Term.Name _ as r; Term.Name _ as sk] ->
+          m, Name.of_term r, Name.of_term sk
         | _ ->
           soft_failure (Failure "cannot determine the arguments of the \
                                  first encryptions")
@@ -1794,11 +1807,11 @@ let cca1 Args.(Int i) s =
       begin
         try
           Cca.symenc_key_ssc ~elems:(ES.goal_as_equiv s) ~messages:[enc]
-            ~cntxt fnenc fndec sk.s_symb;
+            ~cntxt fnenc fndec sk.symb.s_symb;
           (* we check that the randomness is ok in the system and the
                biframe, except for the encryptions we are looking at, which
                is checked by adding a fresh reachability goal. *)
-          Cca.symenc_rnd_ssc ~cntxt env fnenc sk biframe;
+          Cca.symenc_rnd_ssc ~cntxt env fnenc ~key:sk.symb ~key_is:sk.args biframe;
           get_subst_hide_enc enc fnenc m (None) sk fndec r is_top_level
 
         with Cca.Bad_ssc -> soft_failure Tactics.Bad_SSC
@@ -1877,9 +1890,9 @@ let enckp arg (s : ES.t) =
   let apply_kp
       ~(enc     : Term.term)
       ~(new_key : Term.term option)
-      ~(fnenc   : Term.fname)
+      ~(fnenc   : Symbols.fname)
       ~(m       : 'b)
-      ~(r       : Term.nsymb)
+      ~(r       : Name.t)
       ~(k       : Term.term)
     : Goal.t list =
 
@@ -1894,8 +1907,9 @@ let enckp arg (s : ES.t) =
              let cntxt = Constr.{ cntxt with system } in
              Cca.symenc_key_ssc
                ~cntxt fnenc fndec
-               ~elems:(ES.goal_as_equiv s) sk.Term.s_symb;
-             Cca.symenc_rnd_ssc ~cntxt env fnenc sk biframe),
+               ~elems:(ES.goal_as_equiv s) sk.Name.symb.s_symb;
+             Cca.symenc_rnd_ssc
+               ~cntxt env fnenc ~key:sk.Name.symb ~key_is:sk.Name.args biframe),
           (fun x -> x),
           k
         | _ -> assert false
@@ -1909,7 +1923,7 @@ let enckp arg (s : ES.t) =
                (* TODO: set globals to true *)
                OldEuf.key_ssc ~globals:false
                  ~cntxt ~elems:(ES.goal_as_equiv s)
-                 ~allow_functions:(fun x -> x = fnpk) fndec sk.s_symb
+                 ~allow_functions:(fun x -> x = fnpk) fndec sk.Name.symb.s_symb
              in
              if errors <> [] then
                soft_failure (Tactics.BadSSCDetailed errors)),
@@ -1929,8 +1943,9 @@ let enckp arg (s : ES.t) =
 
     in
     let project = function
-      | Term.Name n -> n,n
-      | Term.(Diff (Explicit [_,Name l; _,Name r])) -> l,r
+      | Term.Name _ as n -> Name.of_term n, Name.of_term n
+      | Term.(Diff (Explicit [_, (Name _ as l); _, (Name _ as r)])) ->
+        Name.of_term l, Name.of_term r
       | _ -> soft_failure (Failure "Secret keys must be names")
     in
 
@@ -1938,7 +1953,7 @@ let enckp arg (s : ES.t) =
     let (new_skl, new_skr), new_key =
       match new_key with
       | Some k -> project k, k
-      | None -> (skl, skl), Term.mk_name skl
+      | None -> (skl, skl), Term.mk_name skl.symb skl.args
     in
 
     check_ty_eq (Term.ty new_key) (Term.ty sk);
@@ -1961,7 +1976,7 @@ let enckp arg (s : ES.t) =
         let context =
           Equiv.subst_equiv [Term.ESubst (enc,Term.empty)] [e]
         in
-        deprecated_fresh_cond s (Term.mk_name r) (context@biframe)
+        deprecated_fresh_cond s (Term.mk_name r.symb r.args) (context@biframe)
       with Cca.Bad_ssc -> soft_failure Tactics.Bad_SSC
     in
     let fresh_goal =
@@ -1969,7 +1984,7 @@ let enckp arg (s : ES.t) =
 
     (* Equivalence goal where [enc] is modified using [new_key]. *)
     let new_enc =
-      Term.mk_fun_tuple table fnenc [m; Term.mk_name r; wrap_pk new_key]
+      Term.mk_fun_tuple table fnenc [m; Term.mk_name r.symb r.args; wrap_pk new_key]
     in
     let new_elem =
       Equiv.subst_equiv [Term.ESubst (enc,new_enc)] [e]
@@ -1995,8 +2010,8 @@ let enckp arg (s : ES.t) =
   in
 
   match target with
-  | Some (Term.Fun (fnenc, _, [Tuple [m; Term.Name r; k]]) as enc) ->
-    apply_kp ~enc ~new_key ~fnenc ~m ~r ~k
+  | Some (Term.Fun (fnenc, _, [Tuple [m; Term.Name _ as r; k]]) as enc) ->
+    apply_kp ~enc ~new_key ~fnenc ~m ~r:(Name.of_term r) ~k
   | Some _ ->
     soft_failure
       (Tactics.Failure ("Target must be of the form enc(_,r,_) where \
@@ -2019,9 +2034,9 @@ let enckp arg (s : ES.t) =
         if not (occ.Iter.occ_vars = []) then find occs
         else
         begin match occ.Iter.occ_cnt with
-          | Term.Fun (fnenc, _, [Tuple [m; Term.Name r; k]]) as enc
+          | Term.Fun (fnenc, _, [Tuple [m; Term.Name _ as r; k]]) as enc
             when diff_key k ->
-            apply_kp ~enc ~new_key ~fnenc ~m ~r ~k
+            apply_kp ~enc ~new_key ~fnenc ~m ~r:(Name.of_term r) ~k
 
           | _ -> find occs
         end
@@ -2048,14 +2063,14 @@ let () =
 (** XOR *)
 
 (* Removes the first occurence of Name (n,is) in the list l. *)
-let remove_name_occ ns l = match l with
-  | [Term.Name ns'; t] when ns = ns' -> t
-  | [t; Term.Name ns'] when ns = ns' -> t
+let remove_name_occ (n,a) l = match l with
+  | [Term.Name (n',a'); t] when (n,a) = (n',a') -> t
+  | [t; Term.Name (n',a')] when (n,a) = (n',a') -> t
   | _ ->
     Tactics.(soft_failure (Failure "name is not XORed on both sides"))
 
 let mk_xor_phi_base (s : ES.t) biframe
-    (n_left, l_left, n_right, l_right, term) =
+    ((n_left, n_left_args), l_left, (n_right, n_right_args), l_right, term) =
   let cntxt = mk_pair_trace_cntxt s in
   let env = ES.vars s in
   let l_proj, r_proj = ES.get_system_pair_projs s in
@@ -2066,18 +2081,22 @@ let mk_xor_phi_base (s : ES.t) biframe
 
   let system_left = SE.project [l_proj] cntxt.system in
   let cntxt_left = { cntxt with system = system_left } in
-  let phi_left = deprecated_mk_phi_proj cntxt_left env n_left l_proj biframe in
+  let phi_left = 
+    deprecated_mk_phi_proj cntxt_left env (n_left, n_left_args) l_proj biframe 
+  in
 
   let system_right = SE.project [r_proj] cntxt.system in
   let cntxt_right = { cntxt with system = system_right } in
-  let phi_right = deprecated_mk_phi_proj cntxt_right env n_right r_proj biframe in
+  let phi_right = 
+    deprecated_mk_phi_proj cntxt_right env (n_right, n_right_args) r_proj biframe 
+  in
 
   let len_left =
-    Term.(mk_atom `Eq (mk_len l_left) (mk_len (mk_name n_left)))
+    Term.(mk_atom `Eq (mk_len l_left) (mk_len (mk_name n_left n_left_args)))
   in
 
   let len_right =
-    Term.(mk_atom `Eq (mk_len l_right) (mk_len (mk_name n_right)))
+    Term.(mk_atom `Eq (mk_len l_right) (mk_len (mk_name n_right n_right_args)))
   in
 
   let len = if len_left = len_right then [len_left] else [len_left;len_right] in
@@ -2111,7 +2130,7 @@ let xor arg (s : ES.t) =
   let is_name_diff mess_name =
     match Term.project1 l_proj  mess_name,
           Term.project1 r_proj mess_name with
-    | Name nl, Name nr -> true
+    | Name _, Name _ -> true
     | _ -> false
   in
   
@@ -2164,16 +2183,17 @@ let xor arg (s : ES.t) =
   in
   let t =  xor_occ.Iter.occ_cnt in
 
-  let n_left, l_left, n_right, l_right, term =
+  let (n_left, n_left_args), l_left, 
+      (n_right, n_right_args), l_right, term =
     match opt_n with
     | None ->
       begin
         match Term.project1 l_proj  t,
               Term.project1 r_proj t with
-        | (Fun (fl, _, [Term.Name nl;ll]),
-           Fun (fr, _, [Term.Name nr;lr]))
+        | (Fun (fl, _, [Term.Name (nl, al);ll]),
+           Fun (fr, _, [Term.Name (nr, ar);lr]))
           when (fl = Term.f_xor && fr = Term.f_xor) ->
-          (nl,ll,nr,lr,t)
+          ((nl,al),ll,(nr,ar),lr,t)
 
         | _ -> soft_failure (Failure "ill-formed arguments")
       end
@@ -2181,13 +2201,13 @@ let xor arg (s : ES.t) =
       begin
         match Term.project1 l_proj  mess_name,
               Term.project1 r_proj mess_name with
-        | Name nl, Name nr ->
-          begin match Term.project1 l_proj  t,
+        | Name (nl,al), Name (nr,ar) ->
+          begin match Term.project1 l_proj t,
                       Term.project1 r_proj t with
             | (Fun (fl,_,ll),Fun (fr,_,lr))
               when (fl = Term.f_xor && fr = Term.f_xor) ->
-              (nl,remove_name_occ nl ll,
-               nr,remove_name_occ nr lr,
+              ((nl,al),remove_name_occ (nl,al) ll,
+               (nr,ar),remove_name_occ (nr,ar) lr,
                t)
             | _ -> soft_failure (Failure "ill-formed arguments")
           end
@@ -2195,16 +2215,17 @@ let xor arg (s : ES.t) =
       end
   in
   let phi =
-    mk_xor_phi_base s biframe (n_left, l_left, n_right, l_right, term)
+    mk_xor_phi_base s biframe
+      ((n_left, n_left_args), l_left, (n_right, n_right_args), l_right, term)
   in
   let ndef = Symbols.{ n_fty = Type.mk_ftype [] [] Message ; } in
   let table,n =
     Symbols.Name.declare (ES.table s) (L.mk_loc L._dummy "n_XOR") ndef
   in
-  let ns = Term.mk_isymb n Message [] in
+  let ns = Term.mk_symb n Message in
   let s = ES.set_table table s in
 
-  let then_branch = Term.mk_name ns in
+  let then_branch = Term.mk_name ns [] in
   let else_branch = term in
   let if_term = Term.mk_ite phi then_branch else_branch in
 
@@ -2235,10 +2256,10 @@ class ddh_context
 
  inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
 
-  method visit_macro ms a =
+  method visit_macro ms args a =
     match Symbols.Macro.get_def ms.s_symb cntxt.table with
       | Symbols.(Input | Output | State _ | Cond | Exec | Frame) -> ()
-      | _ -> super#visit_macro ms a
+      | _ -> super#visit_macro ms args a
 
   (* we check if the only diff are over g^ab and g^c, and that a, b and c
      appears only as g^a, g^b and g^c. *)
@@ -2250,8 +2271,8 @@ class ddh_context
           Term.project1 r_proj t with
     (* left:  a b can occur as g^a^b 
        right: c can occur as g^c *)
-    | Term.(Fun (f1,_, [(Fun (f2,_, [g1; Name n1])); Name n2])),
-      Term.(Fun (f, _, [g3; Name n3])) 
+    | Term.(Fun (f1,_, [(Fun (f2,_, [g1; Name (n1,_)])); Name (n2,_)])),
+      Term.(Fun (f, _, [g3; Name (n3,_)])) 
       when f1 = exp && f2 = exp && g1 = gen && g3 = gen && n3.s_symb = c &&
            ((n1.s_symb = a && n2.s_symb = b) ||
             (n1.s_symb = b && n2.s_symb = a)) -> ()
@@ -2259,10 +2280,10 @@ class ddh_context
     | _ ->
       match t with
       (* any name n can occur as g^n *)
-      | Term.Fun (f, _, [g1; Name n]) when f = exp && g1 = gen -> ()
+      | Term.Fun (f, _, [g1; Name (n,_)]) when f = exp && g1 = gen -> ()
 
       (* if a name a, b, c appear anywhere else, fail *)
-      | Term.Name n when List.mem n.s_symb [a; b; c] -> raise Not_context
+      | Term.Name (n,_) when List.mem n.s_symb [a; b; c] -> raise Not_context
 
       (* if a diff is not over a valid ddh diff, we fail  *)
       | Term.Diff _ -> raise Not_context
@@ -2277,11 +2298,11 @@ exception Macro_found
 class find_macros ~(cntxt:Constr.trace_cntxt) exact = object (self)
  inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
 
-  method visit_macro ms a =
+  method visit_macro ms args a =
     match Symbols.Macro.get_def ms.s_symb cntxt.table with
     | Symbols.(Input | Output | State _ | Cond | Exec | Frame) ->
       raise Macro_found
-    | _ -> self#visit_macro ms a
+    | _ -> self#visit_macro ms args a
 end
 
 
@@ -2310,7 +2331,7 @@ let is_ddh_context
       fun d ->
         iter#visit_message (snd d.condition) ;
         iter#visit_message (snd d.output) ;
-        List.iter (fun (_,t) -> iter#visit_message t) d.updates;
+        List.iter (fun (_,_,t) -> iter#visit_message t) d.updates;
     );
    (* we then check inside the frame *)
     List.iter iter#visit_message elem_list;

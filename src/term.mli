@@ -8,6 +8,8 @@
 
 open Utils
 
+module Sv = Vars.Sv
+
 (*------------------------------------------------------------------*)
 (** {2 Symbols}
 
@@ -15,47 +17,33 @@ open Utils
     Each symbol can then be indexed.
     TODO document the more general treatment of function symbols. *)
 
-(** Ocaml type of a typed index symbol.
+(** A typed symbol.
     Invariant: [s_typ] do not contain tvar or univars. *)
 type 'a isymb = private {
   s_symb    : 'a;
-  s_indices : Vars.var list;
   s_typ     : Type.ty;
 }
 
-val mk_isymb : 'a -> Type.ty -> Vars.vars -> 'a isymb
+val mk_symb : 'a -> Type.ty -> 'a isymb
 
 (** Names represent random values of length the security parameter. *)
-
-type name = Symbols.name 
-type nsymb = name isymb
-
-(** Function symbols, may represent primitives or abstract functions. *)
-
-type fname = Symbols.fname 
-type fsymb = fname
+type nsymb = Symbols.name isymb
 
 (** Macros are used to represent inputs, outputs, contents of state
     variables, and let definitions: everything that is expanded when
     translating the meta-logic to the base logic. *)
-
-type mname = Symbols.macro 
-type msymb = mname isymb
-
-type state = msymb
+type msymb = Symbols.macro isymb
 
 (*------------------------------------------------------------------*)
 (** {3 Pretty printing} *)
 
-val pp_name  : Format.formatter -> name -> unit
-val pp_nsymb : Format.formatter -> nsymb -> unit
+val pp_nsymb  : Format.formatter -> nsymb      -> unit
 val pp_nsymbs : Format.formatter -> nsymb list -> unit
 
-val pp_fname : Format.formatter -> fname -> unit
-val pp_fsymb : Format.formatter -> fsymb -> unit
+val pp_msymb_s : Format.formatter -> Symbols.macro -> unit
+val pp_msymb   : Format.formatter -> msymb         -> unit
 
-val pp_mname :  Format.formatter -> mname -> unit
-val pp_msymb :  Format.formatter -> msymb -> unit
+val pp_fname : Format.formatter -> Symbols.fname -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Terms}
@@ -94,12 +82,12 @@ val pp_quant : Format.formatter -> quant -> unit
 
 (*------------------------------------------------------------------*)
 type term = private
-  | App   of term * term list
-  | Fun   of fsymb * Type.ftype * term list
-  | Name  of nsymb
-  | Macro of msymb * term list * term
+  | App    of term * term list
+  | Fun    of Symbols.fname * Type.ftype * term list
+  | Name   of nsymb * term list
+  | Macro  of msymb * term list * term
 
-  | Action of Symbols.action * Vars.var list 
+  | Action of Symbols.action * term list
 
   | Var of Vars.var
 
@@ -108,9 +96,9 @@ type term = private
 
   | Diff of term diff_args
 
-  | Find of Vars.var list * term * term * term
+  | Find of Vars.var list * term * term * term 
 
-  | Quant of quant * Vars.var list * term
+  | Quant of quant * Vars.var list * term 
              
 type t = term
 
@@ -201,8 +189,9 @@ val ty  : ?ty_env:Type.Infer.env -> term -> Type.ty
   * The returned list is guaranteed to have no duplicate elements. *)
 val get_vars : term -> Vars.var list
 
-(** [fv t] returns the free variables of [t]. *)
-val fv : term -> Vars.Sv.t
+(** Free variables of a term. *)
+val fv  : term -> Sv.t
+val fvs : terms -> Sv.t
 
 val f_triv : term -> bool
 
@@ -220,7 +209,7 @@ val pp_subst : Format.formatter -> subst -> unit
 
 val is_var_subst : subst -> bool
 
-val subst_support : subst -> Vars.Sv.t
+val subst_support : subst -> Sv.t
 
 val subst_binding : Vars.var -> subst -> Vars.var * subst
 
@@ -237,9 +226,6 @@ val tsubst_ht : Type.tsubst -> hterm -> hterm
 val subst_var : subst -> Vars.var -> Vars.var
 
 val subst_vars : subst -> Vars.vars -> Vars.vars
-
-(** Substitute indices in an indexed symbols. *)
-val subst_isymb : subst -> 'a isymb -> 'a isymb
 
 (** [subst_macros_ts table l ts t] replaces [ts] by [pred(ts)] in the term [t]
   * if [ts] is applied to a state macro whose name is NOT in [l]. *)
@@ -270,45 +256,45 @@ val frame_macro : msymb
 val cond_macro  : msymb
 val exec_macro  : msymb
 
-val f_happens : fsymb
+val f_happens : Symbols.fname
 
-val f_pred : fsymb
+val f_pred : Symbols.fname
 
-val f_true  : fsymb
-val f_false : fsymb
-val f_and   : fsymb
-val f_or    : fsymb
-val f_impl  : fsymb
-val f_iff   : fsymb
-val f_not   : fsymb
-val f_ite   : fsymb
+val f_true  : Symbols.fname
+val f_false : Symbols.fname
+val f_and   : Symbols.fname
+val f_or    : Symbols.fname
+val f_impl  : Symbols.fname
+val f_iff   : Symbols.fname
+val f_not   : Symbols.fname
+val f_ite   : Symbols.fname
 
-val f_eq  : fsymb
-val f_neq : fsymb
-val f_leq : fsymb
-val f_lt  : fsymb
-val f_geq : fsymb
-val f_gt  : fsymb
+val f_eq  : Symbols.fname
+val f_neq : Symbols.fname
+val f_leq : Symbols.fname
+val f_lt  : Symbols.fname
+val f_geq : Symbols.fname
+val f_gt  : Symbols.fname
 
-val f_diff : fsymb
+val f_diff : Symbols.fname
 
-val f_succ : fsymb
+val f_succ : Symbols.fname
 
-val f_att : fsymb
+val f_att : Symbols.fname
 
-val f_fail : fsymb
+val f_fail : Symbols.fname
 
-val f_xor  : fsymb
-val f_zero : fsymb
+val f_xor  : Symbols.fname
+val f_zero : Symbols.fname
 
-val f_pair : fsymb
-val f_fst  : fsymb
-val f_snd  : fsymb
+val f_pair : Symbols.fname
+val f_fst  : Symbols.fname
+val f_snd  : Symbols.fname
 
-val f_of_bool : fsymb
+val f_of_bool : Symbols.fname
 
-val f_len    : fsymb
-val f_zeroes : fsymb
+val f_len    : Symbols.fname
+val f_zeroes : Symbols.fname
 
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructors} *)
@@ -408,11 +394,12 @@ include module type of Smart
 
 val mk_pred    : term -> term
 val mk_var     : Vars.var -> term
-val mk_action  : Symbols.action -> Vars.var list -> term
+val mk_vars    : Vars.var list -> term list
+val mk_action  : Symbols.action -> term list -> term
 val mk_tuple   : term list -> term
 val mk_app     : term -> term list -> term
 val mk_proj    : int -> term -> term
-val mk_name    : nsymb -> term
+val mk_name    : nsymb -> term list -> term
 val mk_macro   : msymb -> term list -> term -> term
 val mk_diff    : (proj * term) list -> term
 
@@ -423,13 +410,13 @@ val mk_quant : ?simpl:bool -> quant -> Vars.vars -> form -> form
 val mk_iff   : ?simpl:bool -> form -> form -> form
   
 (*------------------------------------------------------------------*)
-val mk_fun0 : fsymb -> Type.ftype -> term list -> term
+val mk_fun0 : Symbols.fname -> Type.ftype -> term list -> term
 
-val mk_fun : Symbols.table -> fname -> term list -> term
+val mk_fun : Symbols.table -> Symbols.fname -> term list -> term
 
 (** Declare a function of arity one (all arguments are grouped 
     into a tuple). *)
-val mk_fun_tuple : Symbols.table -> fname -> term list -> term
+val mk_fun_tuple : Symbols.table -> Symbols.fname -> term list -> term
 
 (*------------------------------------------------------------------*)
 val mk_zero    : term
@@ -448,8 +435,8 @@ val mk_ite : ?simpl:bool -> term -> term -> term -> term
 
 val mk_timestamp_leq : term -> term -> term
 
-val mk_indices_neq : ?simpl:bool -> Vars.var list -> Vars.var list -> term
-val mk_indices_eq  : ?simpl:bool -> Vars.var list -> Vars.var list -> term
+val mk_neqs : ?simpl:bool -> terms -> terms -> term
+val mk_eqs  : ?simpl:bool -> terms -> terms -> term
 
 val mk_atom : ord -> term -> term -> term
 val mk_happens : term -> term
@@ -476,7 +463,7 @@ val is_tuple : term -> bool
 val is_proj  : term -> bool
 
 (*------------------------------------------------------------------*)
-val destr_action : term -> (Symbols.action * Vars.var list) option
+val destr_action : term -> (Symbols.action * term list) option
 
 (*------------------------------------------------------------------*)
 val destr_pair : term -> (term * term) option
@@ -584,7 +571,7 @@ module Hm : Map.S with type key = term_head
     The free type variables must be inferred. *)
 type 'a pat = {
   pat_tyvars : Type.tvars;
-  pat_vars : Vars.Sv.t;
+  pat_vars : Sv.t;
   pat_term : 'a;
 }
 
@@ -611,14 +598,5 @@ val alpha_conv : ?subst:subst -> term -> term -> bool
     Raise if alpha-conversion fails. *)
 val alpha_bnds : subst -> Vars.vars -> Vars.vars -> subst 
 
-
-(*------------------------------------------------------------------*)
-(* utility functions for lists of nsymbs *)
-
-(** looks for a name with the same symbol in the list *)
-val exists_symb : nsymb -> nsymb list -> bool
-
-(** finds all names with the same symbol in the list *)
-val find_symb : nsymb -> nsymb list -> nsymb list
 
 

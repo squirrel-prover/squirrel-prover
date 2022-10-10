@@ -10,6 +10,8 @@ system !_i s(i):=f(s(i)).
 goal update (i:index):
   happens(A(i)) => s(i)@A(i) = f(s(i)@pred(A(i))).
 Proof.
+  intro H.
+  rewrite /s.
   auto.
 Qed.
 

@@ -13,6 +13,29 @@ module Sp = MP.Sp
 module SE = SystemExpr
 
 
+(*------------------------------------------------------------------*)
+
+module Name = struct
+  (** An applied named [symb(args)] *)
+  type t = { symb : Term.nsymb; args : Term.terms; }
+
+  let subst (s : Term.subst) (n : t) : t =
+    { n with args = List.map (Term.subst s) n.args }
+
+  let pp fmt (n : t) =
+    if n.args = [] then
+      Fmt.pf fmt "%a" Symbols.pp n.symb.s_symb
+    else
+      Fmt.pf fmt "%a(%a)"
+        Symbols.pp n.symb.s_symb
+        (Fmt.list ~sep:Fmt.comma Term.pp) n.args
+
+  let of_term : Term.term -> t = function
+    | Name (symb, args) -> { symb; args; }
+    | _ -> assert false
+
+  let to_term { symb; args; } = Term.mk_name symb args
+end
 
 (*------------------------------------------------------------------*)
 (** Generic types and functions to handle occurrences of anything,
@@ -96,13 +119,15 @@ type ('a, 'b) occ_formula =
 (** occ_formula for name occurrences *)
 let name_occ_formula
     ~(negate : bool)
-    (n : nsymb)
-    (ncoll : nsymb)
-    () : term =
+    (n       : Name.t)
+    (ncoll   : Name.t)
+    () 
+  : term 
+  =
   if not negate then
-    mk_indices_eq ~simpl:true ncoll.s_indices n.s_indices
+    mk_eqs ~simpl:true ncoll.args n.args
   else
-    mk_indices_neq ~simpl:false ncoll.s_indices n.s_indices
+    mk_neqs ~simpl:false ncoll.args n.args
 
 (** occ_formula for timestamp occurrences *)
 let ts_occ_formula
@@ -133,9 +158,6 @@ type ('a, 'b) ext_occ =
    eo_source_ts : ts_occs } (* timestamps occurring in the source term *)
 
 type ('a, 'b) ext_occs = (('a, 'b) ext_occ) list
-
-
-
 
 (*------------------------------------------------------------------*)
 (** Occurrence subsumption/inclusion *)
@@ -364,7 +386,7 @@ let expand_macro_check_once ((ot, c):expand_info) (t:term) : term option =
       (* we need to know that if a macro does not expand here,
           then it will be handled by another iocc *)
     then
-      match Macros.get_definition c m ts with
+      match Macros.get_definition c m ~args:l ~ts with
       | `Def t' -> Some t'
       | `Undef | `MaybeDef -> None
     else
@@ -448,19 +470,20 @@ let get_macro_actions
 (*------------------------------------------------------------------*)
 (* Occurrence of a name *)
 
-type n_occ = (nsymb, unit) simple_occ
+type n_occ = (Name.t, unit) simple_occ
 type n_occs = n_occ list
 
-type name_occ = (nsymb, unit) ext_occ
+type name_occ = (Name.t, unit) ext_occ
 type name_occs = name_occ list
 
 (** Constructs a name occurrence. *)
 (** we do not refresh ncoll's variables, ie it's assumed to be at toplevel *)
 let mk_nocc
-    (n:nsymb) (ncoll:nsymb)
-    (fv:Vars.vars) (cond:terms) (ot:occ_type) (st:term) : n_occ =
+    (n:Name.t) (ncoll:Name.t) (fv:Vars.vars) (cond:terms)
+    (ot:occ_type) (st:term) : n_occ
+  =
   let fv, sigma = refresh_vars `Global fv in
-  let n = subst_isymb sigma n in
+  let n = Name.subst sigma n in
   let cond = List.map (subst sigma) cond in
   let ot = subst_occtype sigma ot in
   mk_simple_occ n ncoll () fv cond ot st
@@ -482,15 +505,15 @@ let pp_internal (ppf:Format.formatter) (occ:name_occ) : unit =
   | EI_indirect a ->
     Fmt.pf ppf
       "%a @,(collision with %a)@ in action %a@ @[<hov 2>in term@ @[%a@]@]"
-      Term.pp_nsymb o.so_cnt 
-      Term.pp_nsymb o.so_coll
+      Name.pp o.so_cnt 
+      Name.pp o.so_coll
       Term.pp a
       Term.pp o.so_subterm
   | EI_direct ->
     Fmt.pf ppf
       "%a @,(collision with %a)@ @[<hov 2>in term@ @[%a@]@]"
-      Term.pp_nsymb o.so_cnt
-      Term.pp_nsymb o.so_coll
+      Name.pp o.so_cnt
+      Name.pp o.so_coll
       Term.pp o.so_subterm
 
 (** Prints a description of the occurrence *)
@@ -669,7 +692,7 @@ let find_occurrences
         let sfv = iocc.iocc_vars in
         let src = iocc.iocc_sources in
         let a =
-          mk_action iocc.iocc_aname (Action.get_indices iocc.iocc_action) 
+          mk_action iocc.iocc_aname (Action.get_args iocc.iocc_action) 
         in
         (* a's free variables should always be in fv \cup env *)
         assert (Vars.Sv.subset
@@ -907,7 +930,6 @@ let clear_trivial_equalities (phi : term) : term =
   mk_ands ~simpl:true phis
 
 
-
 (** Constructs the formula "exists v1. a <= ts1 \/ … \/ exists vn. a <= tsn" *)
 (** where vi, tsi are the variables and content of the ts_occ *)
 let time_formula (a:term) (ts:ts_occs) : term =
@@ -923,7 +945,7 @@ let time_formula (a:term) (ts:ts_occs) : term =
     ) ts
   in
   mk_ors ~simpl:true phis
-    
+
 (*------------------------------------------------------------------*)
 (* Proof obligations for a name occurrence *)
 

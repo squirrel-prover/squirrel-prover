@@ -11,6 +11,8 @@ module TS = TraceSequent
 
 module Hyps = TS.LocalHyps
 
+module Name = NameOccs.Name
+
 type sequent = TS.sequent
 
 type lsymb = Theory.lsymb
@@ -30,7 +32,13 @@ let hard_failure = Tactics.hard_failure
    with some key k1 with the same symbol as k. *)
 (* additionally in 'b we store (m,r,k1,k)
    so that we won't need to compute them again later. *)
-type ctxt_aux = { ca_m:term; ca_r:nsymb; ca_k1:nsymb; ca_kcoll:nsymb }
+type ctxt_aux = { 
+  ca_m     : term ; 
+  ca_r     : Name.t ; 
+  ca_k1    : Name.t ; 
+  ca_kcoll : Name.t ;
+}
+
 type ctxt_occ = (term, ctxt_aux) NO.simple_occ
 type ctxt_occs = ctxt_occ list
 
@@ -40,17 +48,17 @@ type ectxt_occs = ectxt_occ list
 (* occurrence for c = enc(m, r, k1), colliding with ccoll which uses kcoll *)
 let mk_ctxt_occ
     (c:term) (ccoll:term)
-    (m:term) (r:nsymb)
-    (k1:nsymb) (kcoll:nsymb)
+    (m:term) (r:Name.t)
+    (k1:Name.t) (kcoll:Name.t)
     (fv:Vars.vars) (cond:terms) (ot:NO.occ_type) (st:term) :
   ctxt_occ =
   let fv, sigma = refresh_vars `Global fv in
-  let cond = List.map (subst sigma) cond in
+  let cond = List.map (Term.subst sigma) cond in
   let ot = NO.subst_occtype sigma ot in
-  let c = subst sigma c in
-  let m = subst sigma m in
-  let r = subst_isymb sigma r in
-  let k1 = subst_isymb sigma k1 in
+  let c = Term.subst sigma c in
+  let m = Term.subst sigma m in
+  let r = Name.subst sigma r in
+  let k1 = Name.subst sigma k1 in
   let st = subst sigma st in
   NO.mk_simple_occ
     c ccoll
@@ -59,24 +67,25 @@ let mk_ctxt_occ
 
 
 (* randomness occurrence *)
-(* 'a is nsymb, for the name r' which is the occurrence
+(* 'a is Name.t, for the name r' which is the occurrence
    'b contains a ectxt_occ, which is the occ enc(m,r,k1) where
    the r that r' collides with was found,
-   and optionally a pair (m',k'):term * nsymb for the
+   and optionally a pair [(m',k'):term * Name.t] for the
    case where r' was found in enc(m',r',k').
 *)
-type rand_occ = (nsymb, (ectxt_occ * (term * nsymb) option)) NO.simple_occ
+type rand_occ = (Name.t, (ectxt_occ * (term * Name.t) option)) NO.simple_occ
 type rand_occs = rand_occ list
 
 let mk_rand_occ
-    (r:nsymb) (co:ectxt_occ) (p:(term * nsymb) option)
-    (cond:terms) (fv:Vars.vars) (ot:NO.occ_type) (st:term) : rand_occ =
+    (r:Name.t) (co:ectxt_occ) (p:(term * Name.t) option)
+    (cond:terms) (fv:Vars.vars) (ot:NO.occ_type) (st:term) : rand_occ 
+  =
   let fv, sigma = refresh_vars `Global fv in
-  let r = subst_isymb sigma r in
-  let p = Option.map (fun (m,k) -> subst sigma m, subst_isymb sigma k) p in
+  let r = Name.subst sigma r in
+  let p = Option.map (fun (m,k) -> subst sigma m, Name.subst sigma k) p in
   let cond = List.map (subst sigma) cond in
   let ot = NO.subst_occtype sigma ot in
-  let st = subst sigma st in
+  let st = Term.subst sigma st in
   let rcoll = NO.(co.eo_occ.so_ad.ca_r) in 
   NO.mk_simple_occ r rcoll (co, p)
     (fv @ (co.eo_occ.so_vars)) (* add the vars of co so they are
@@ -91,11 +100,11 @@ let mk_rand_occ
 
 (** look for bad uses of the key, collect ciphertexts as well *)
 let get_bad_occs_and_ciphertexts
-    (k:nsymb) (* key k in dec(c,k) <> fail *)
+    (k:Name.t) (* key k in dec(c,k) <> fail *)
     (c:term) (* ciphertext c in dec(c,k) <> fail *)
-    (enc_f:fsymb) (* encryption function *)
-    (dec_f:fsymb) (* decryption function *)
-    ?(hash_f:fsymb option=None) (* hash function,
+    (enc_f:Symbols.fname) (* encryption function *)
+    (dec_f:Symbols.fname) (* decryption function *)
+    ?(hash_f:Symbols.fname option=None) (* hash function,
                                    when one is defined together w/ enc *)
     (retry_on_subterms : (unit -> NO.n_occs * ctxt_occs))
     (rec_call_on_subterms :
@@ -120,37 +129,39 @@ let get_bad_occs_and_ciphertexts
     soft_failure
       (Tactics.Failure "can only be applied on ground terms")
 
-  | Name k' when k'.s_symb = k.s_symb ->
-    [NO.mk_nocc k' k fv cond (fst info) st],
+  | Name (ksymb', _) as k' when ksymb'.s_symb = k.symb.s_symb ->
+    [NO.mk_nocc (Name.of_term k') k fv cond (fst info) st],
     []
 
   (* could expand macros here. todo? *)
   (* encryption with k: allowed when with a random *)
-  | Fun (f, _, [Tuple [m; Name r; Name k']]) 
-    when enc_f = f && k.s_symb = k'.s_symb -> 
+  | Fun (f, _, [Tuple [m; Name (rsymb, _) as r; Name (ksymb', _) as k']]) 
+    when enc_f = f && k.symb.s_symb = ksymb'.s_symb -> 
     (* look in m also *)
     let occs,accs = rec_call_on_subterms ~fv ~cond ~p ~info ~st m in
     (* don't forget the case where r itself is a bad occ of k *)
     let occ =
-      if r.s_symb = k.s_symb then [NO.mk_nocc r k fv cond (fst info) st]
+      if rsymb.s_symb = k.symb.s_symb then
+        [NO.mk_nocc (Name.of_term r) k fv cond (fst info) st]
       else []
     in
-    occs @ occ,
-    accs @ [mk_ctxt_occ t c m r k' k fv cond (fst info) st]
+    ( occs @ occ,
+      accs @ 
+      [mk_ctxt_occ t c m (Name.of_term r) (Name.of_term k') k fv cond (fst info) st] )
 
   (* "normal" int-ctxt only has an oracle to check dec ≠ fail, but
      when dec ≠ fail the attacker can compute the decryption himself,
      so a full dec oracle is the same *)
   (* decryption with k is allowed *)
-  | Fun (f, _, [Tuple [c; Name k']]) 
-    when dec_f = f && k.s_symb = k'.s_symb ->
+  | Fun (f, _, [Tuple [c; Name (ksymb',_) as _k']]) 
+    when dec_f = f && k.symb.s_symb = ksymb'.s_symb ->
     rec_call_on_subterms ~fv ~cond ~p ~info ~st c
 
 
   (* hash oracle: when enc has an associated hash function,
      we discard bad occurrences of k under any hash with any key
      (but keep the ciphertexts) *)
-  | Fun (f, _, [Tuple [m; Name k']])
+  | Fun (f, _, [Tuple [m; Name _ as _k']])
     when hash_f = Some f  ->
     let _, accs = rec_call_on_subterms ~fv ~cond ~p ~info ~st m in
     [], accs
@@ -166,9 +177,9 @@ let get_bad_occs_and_ciphertexts
     - if r occurs in enc(m',r',k'):
            bad occ if k1 = k and r' = r and (m' <> m or k' <> k) *)
 let get_bad_randoms
-    (k:nsymb)
+    (k:Name.t)
     (cs:ectxt_occs)
-    (enc_f:fsymb) (* encryption function *)
+    (enc_f:Symbols.fname) (* encryption function *)
     (retry_on_subterms : (unit -> NO.n_occs * rand_occs))
     (rec_call_on_subterms :
        (fv:Vars.vars ->
@@ -193,16 +204,17 @@ let get_bad_randoms
       (Tactics.Failure "can only be applied on ground terms")
 
   (* r' found on its own is a bad occ if it is one of the r in enc(m, r, k1) *)
-  | Name r' ->
+  | Name _ as r' ->
+    let r_n' = Name.of_term r' in
     let accs =
       List.filter_map
         (fun c_eocc ->
            let c_occ = NO.(c_eocc.eo_occ) in
            let r = NO.(c_occ.so_ad.ca_r) in
-           if r.s_symb = r'.s_symb then
+           if r.symb.s_symb = r_n'.symb.s_symb then
              Some 
-               (NO.mk_nocc r' r fv cond (fst info) st,
-                mk_rand_occ r' c_eocc None cond fv (fst info) st)
+               (NO.mk_nocc r_n' r fv cond (fst info) st,
+                mk_rand_occ r_n' c_eocc None cond fv (fst info) st)
                (* we also generate noccs, though we don't use them,
                   so that NameOccs prints them. not very pretty… *)
            else
@@ -213,15 +225,18 @@ let get_bad_randoms
     List.split accs
 
   (* r' found in enc(m',r',k') *)
-  | Fun (f, _, [Tuple [m'; Name r'; Name k']])
-    when enc_f = f && k'.s_symb = k.s_symb ->
+  | Fun (f, _, [Tuple [m'; Name _ as r'; Name (ksymb', _) as k']])
+    when enc_f = f && ksymb'.s_symb = k.symb.s_symb ->
+    let r_n' = Name.of_term r' in
+    let k_n' = Name.of_term k' in
+
     (* if k' <> k we have a bad occ b/c of previous case *)
     (* look in m' also *)
     let occs ,accs = rec_call_on_subterms ~fv ~cond ~p ~info ~st m' in
     (* don't forget to also check in k', it could be an r *)
     (* actually maybe not but it doesn't hurt *)
     let occs2, accs2 =
-      rec_call_on_subterms ~fv ~cond ~p ~info ~st (mk_name k')
+      rec_call_on_subterms ~fv ~cond ~p ~info ~st k'
     in
     (* and add the occurrences for r' *)
     let l3 =
@@ -229,10 +244,10 @@ let get_bad_randoms
         (fun c_eocc ->
            let c_occ = NO.(c_eocc.eo_occ) in
            let r = NO.(c_occ.so_ad.ca_r) in
-           if r.s_symb = r'.s_symb then
+           if r.symb.s_symb = r_n'.symb.s_symb then
              Some 
-               (NO.mk_nocc r' r fv cond (fst info) st,
-                mk_rand_occ r' c_eocc (Some (m', k')) cond fv (fst info) st)
+               (NO.mk_nocc r_n' r fv cond (fst info) st,
+                mk_rand_occ r_n' c_eocc (Some (m', k_n')) cond fv (fst info) st)
            else
              None)
         cs
@@ -253,22 +268,25 @@ let ciphertext_formula
     (c:term)
     (ca:ctxt_aux)
     : term =
-  let {ca_m=m'; ca_r=r'; ca_k1=k1; ca_kcoll=k} = ca in
-  let _ = (* sanity check *)
+  let {ca_m = m'; ca_r = r'; ca_k1 = k1; ca_kcoll = k} = ca in
+  let () = (* sanity check *)
     match c' with
-    | Fun (f, _, [Tuple [m'';Name r'';Name k1']])
-      when m''=m' && r''=r' && k1'=k1 && k1.s_symb = k.s_symb ->
+    | Fun (f, _, [Tuple [m''; Name _ as r''; Name _ as k1']])
+      when m'' = m' && 
+           Name.of_term r'' = r' && 
+           Name.of_term k1' = k1 && 
+           k1.symb.s_symb = k.symb.s_symb ->
       ()
     | _ -> assert false
   in
   if not negate then 
     mk_and ~simpl:true
       (mk_eq ~simpl:true c c')
-      (mk_indices_eq ~simpl:true k.s_indices k1.s_indices)
+      (mk_eqs ~simpl:true k.args k1.args)
   else (* not used I think but still *)
     mk_or ~simpl:true
       (mk_not ~simpl:true (mk_eq ~simpl:true c c'))
-      (mk_indices_neq ~simpl:true k.s_indices k1.s_indices)
+      (mk_neqs ~simpl:true k.args k1.args)
 
 
 
@@ -287,9 +305,9 @@ let ciphertext_formula
    as they were all added to the cond by mk_rand *)
 let randomness_formula
     ~(negate : bool)
-    (r':nsymb)
-    (r:nsymb)
-    ((eco, omk): (ectxt_occ * (term * nsymb) option))
+    (r':Name.t)
+    (r:Name.t)
+    ((eco, omk): (ectxt_occ * (term * Name.t) option))
       (* eco: occ where r was, omk = option (m',k') *)
   : term =
   let co = eco.eo_occ in
@@ -300,19 +318,19 @@ let randomness_formula
     | EI_direct -> mk_true
     | EI_indirect a -> NO.time_formula a eco.eo_source_ts
   in 
-  let phi_k = mk_indices_eq ~simpl:true k1.s_indices k.s_indices in
-  let phi_r = mk_indices_eq ~simpl:true r'.s_indices r.s_indices in
+  let phi_k = mk_eqs ~simpl:true k1.args k.args in
+  let phi_r = mk_eqs ~simpl:true r'.args r.args in
   let phi_km' =
     match omk, negate with
     | None, false -> mk_true
     | None, true -> mk_false
     | Some (m', k'), false ->
       mk_or ~simpl:true
-        (mk_indices_neq ~simpl:true k'.s_indices k.s_indices)
+        (mk_neqs ~simpl:true k'.args k.args)
         (mk_neq ~simpl:true  m' m)
     | Some (m', k'), true ->
       mk_and ~simpl:true
-        (mk_indices_eq ~simpl:true k'.s_indices k.s_indices)
+        (mk_eqs ~simpl:true k'.args k.args)
         (mk_eq ~simpl:true m' m)
   in
   if not negate then
@@ -324,16 +342,17 @@ let randomness_formula
 
 
 (*------------------------------------------------------------------*)
-(* INT-CTXT tactic *)
+(** INT-CTXT tactic *)
 
-(* parameters for the intctxt tactic *)
-type intctxt_param = {ip_enc:fsymb; (* encryption function *)
-                      ip_dec:fsymb; (* decryption function *)
-                      ip_hash:fsymb option; (* associated hash function *)
-                      ip_c:term; (* ciphertext being decrypted *)
-                      ip_k:nsymb; (* key *)
-                      ip_t:term option} (* t when H is dec(c,k)=t *)
-
+(** parameters for the intctxt tactic *)
+type intctxt_param = {
+  ip_enc  : Symbols.fname;        (* encryption function *)
+  ip_dec  : Symbols.fname;        (* decryption function *)
+  ip_hash : Symbols.fname option; (* associated hash function *)
+  ip_c    : term;                 (* ciphertext being decrypted *)
+  ip_k    : Name.t;               (* key *)
+  ip_t    : term option;          (* t when H is dec(c,k)=t *)
+}
 
 (** Finds the parameters of the integrity functions used in the hypothesis,
     if any *)
@@ -359,15 +378,16 @@ dec(c,k) <> fail or dec(c,k) = t (or the symmetric equalities)")
     | Fun (dec, _, [Tuple [m; tk]]) ->
       begin
         match NO.expand_macro_check_all info tk with
-        | Name k when Symbols.is_ftype dec Symbols.SDec table ->
+        | Name _ as k when Symbols.is_ftype dec Symbols.SDec table ->
           begin
             match Symbols.Function.get_data dec table with
             | Symbols.AssociatedFunctions [enc] ->
               Some {ip_enc=enc; ip_dec=dec; ip_hash=None;
-                    ip_c=m; ip_k=k; ip_t=None}
+                    ip_c=m; ip_k= Name.of_term k; ip_t=None}
+
             | Symbols.AssociatedFunctions [enc; h] ->
               Some {ip_enc=enc; ip_dec=dec; ip_hash=Some h;
-                    ip_c=m; ip_k=k; ip_t=None}
+                    ip_c=m; ip_k=Name.of_term k; ip_t=None}
             | _ -> assert false (* sanity check *)
           end
         | _ -> None
@@ -412,7 +432,7 @@ let intctxt
   in
       
   
-  let pp_k ppf () = Fmt.pf ppf "%a" Term.pp_nsymb k in
+  let pp_k ppf () = Fmt.pf ppf "%a" Name.pp k in
   let pp_rand ppf () = Fmt.pf ppf "randomness" in
 
   Printer.pr "@[<v 0>";
@@ -428,7 +448,7 @@ let intctxt
 
   Printer.pr "@;@;";
   (* get the bad randomness occurrences *)
-  let get_bad: (nsymb, ectxt_occ * ((term * nsymb) option)) NO.f_fold_occs =
+  let get_bad: (Name.t, ectxt_occ * ((term * Name.t) option)) NO.f_fold_occs =
     get_bad_randoms k ctxt_occs enc_f
   in
   let _, phis_bad_r =
@@ -490,7 +510,7 @@ let intctxt
       match Vars.ty uvarm,Vars.ty uvarkey with
       | Type.(Message, Message) -> let f = Term.subst [
           ESubst (Term.mk_var uvarm,c);
-          ESubst (Term.mk_var uvarkey,Term.mk_name k);] f in
+          ESubst (Term.mk_var uvarkey, Name.to_term k);] f in
         [TS.set_goal
            (Term.mk_impl f (TS.goal s)) s]
 

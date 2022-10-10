@@ -3,7 +3,8 @@
 open Term
 
 module NO = NameOccs
-
+module Name = NO.Name
+                
 module TS = TraceSequent
 module ES = EquivSequent
 
@@ -32,7 +33,7 @@ type lsymb = Theory.lsymb
     - otherwise: asks to be called recursively on subterms.
    uses not accumulator, so returns an empty unit list. *)
 let get_bad_occs
-    (n:nsymb) 
+    (n:Name.t) 
     (retry_on_subterms : unit -> NO.n_occs * NO.empty_occs)
     (rec_call_on_subterms : 
        (fv:Vars.vars ->
@@ -56,8 +57,8 @@ let get_bad_occs
     soft_failure
       (Tactics.Failure "can only be applied on ground terms")
 
-  | Name nn when nn.s_symb = n.s_symb ->
-    [NO.mk_nocc nn n fv cond (fst info) st], []
+  | Name (nn, nn_args) when nn.s_symb = n.Name.symb.s_symb ->
+    [NO.mk_nocc Name.{ symb = nn; args = nn_args } n fv cond (fst info) st], []
 
   | _ -> retry_on_subterms ()
 
@@ -75,7 +76,7 @@ let fresh_trace_param
     (info : NO.expand_info) 
     (hyp : term)
     (s : TS.sequent)
-  : nsymb * term
+  : Name.t * term
   =
   let _, contx = info in
   let table = contx.table in
@@ -88,14 +89,14 @@ let fresh_trace_param
   let em1 = NO.expand_macro_check_all info m1 in
   let em2 = NO.expand_macro_check_all info m2 in
   let n, t = match em1, em2 with
-    | Name ns, _ -> (ns, em2)
-    | _, Name ns -> (ns, em1)
+    | (Name _ as ns), _ -> (Name.of_term ns, em2)
+    | _, (Name _ as ns) -> (Name.of_term ns, em1)
     | _ ->
       soft_failure ~loc:hyp_loc
         (Tactics.Failure "can only be applied on an hypothesis of \
                           the form t=n or n=t")
   in
-  let ty = n.s_typ in
+  let ty = n.Name.symb.s_typ in
   if not Symbols.(check_bty_info table ty Ty_large) then
     Tactics.soft_failure
       (Failure "the type of this term is not [large]");
@@ -114,7 +115,7 @@ let fresh_trace (m : lsymb) (s : TS.sequent) : TS.sequent list =
       fresh_trace_param ~hyp_loc:(L.loc m) (NO.EI_direct, contx) hyp s
     in
 
-    let pp_n ppf () = Fmt.pf ppf "%a" Term.pp_nsymb n in
+    let pp_n ppf () = Fmt.pf ppf "%a" Name.pp n in
     let get_bad = get_bad_occs n in
    
     Printer.pr "Freshness of %a:@; @[<v 0>" pp_n ();
@@ -164,17 +165,20 @@ let phi_proj
   let contx_p = { contx with system = system_p } in
   let info_p = (NO.EI_direct, contx_p) in
   let t_p = NO.expand_macro_check_all info_p (Term.project1 proj t) in
-  let n_p  = match t_p with
-    | Name np -> np
+  let n_p  = 
+    match t_p with
+    | Name _ -> Name.of_term t_p
     | _ -> soft_failure ~loc
              (Tactics.Failure "Can only be applied to diff(n_L, n_R)")
   in
-  let ty_p = n_p.s_typ in
+
+  let ty_p = n_p.Name.symb.s_typ in
   if not Symbols.(check_bty_info table ty_p Ty_large) then
     Tactics.soft_failure ~loc
       (Tactics.Failure "the type of this term is not [large]");
+
   let frame_p = List.map (Term.project1 proj) biframe in
-  let pp_n_p ppf () = Fmt.pf ppf "%a" Term.pp_nsymb n_p in
+  let pp_n_p ppf () = Fmt.pf ppf "%a" Name.pp n_p in
   let get_bad_p = get_bad_occs n_p in
   
   (* the biframe is used in the old fresh for indirect cases. why? *)

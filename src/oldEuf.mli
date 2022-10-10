@@ -10,9 +10,9 @@
     key's indices).  *)
 type euf_schema = {
   action_name  : Symbols.action;
-  action       : Action.action;
+  action       : Action.action_v;
   message      : Term.term;
-  key_indices  : Vars.var list;
+  key_indices  : Term.terms;
   env          : Vars.env 
 }
 
@@ -24,7 +24,7 @@ val pp_euf_schema : Format.formatter -> euf_schema -> unit
     [e] of type [euf_case] represents the fact that the message [e.m]
     has been hashed, and the key indices were [e.eindices]. *)
 type euf_direct = {
-  d_key_indices : Vars.var list;
+  d_key_indices : Term.terms;
   d_message : Term.term 
 }
 
@@ -37,8 +37,8 @@ val pp_euf_direct : Format.formatter -> euf_direct -> unit
     - [case_schemata] is the list (seen as a disjunction) of case schemata.
     - [cases_direct] is the list (seen as a disjunction) of direct cases. *)
 type euf_rule = { 
-  hash : Term.fname;
-  key : Term.name;
+  hash : Symbols.fname;
+  key : Symbols.name * Term.terms ; (* k(t1, ..., tn) *)
   case_schemata : euf_schema list;
   cases_direct : euf_direct list 
 }
@@ -55,7 +55,7 @@ val key_ssc :
   ?elems:Equiv.equiv ->
   allow_functions:(Symbols.fname -> bool) ->
   cntxt:Constr.trace_cntxt ->
-  Term.fname -> Term.name -> Tactics.ssc_error list
+  Symbols.fname -> Symbols.name -> Tactics.ssc_error list
 
 (*------------------------------------------------------------------*)
 (** [mk_rule proc head_fn key_n] create the euf rule associated to an given head
@@ -68,4 +68,4 @@ val mk_rule :
   allow_functions:(Symbols.fname -> bool) ->
   cntxt:Constr.trace_cntxt ->
   env:Vars.env -> mess:Term.term -> sign:Term.term ->
-  head_fn:Term.fname -> key_n:Term.name -> key_is:Vars.var list -> euf_rule
+  head_fn:Symbols.fname -> key_n:Symbols.name -> key_is:Term.terms -> euf_rule

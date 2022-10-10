@@ -374,7 +374,7 @@ type p_env = {
   evars : Vars.var list ;
   (* variables bound by existential quantification *)
 
-  action : Action.action ;
+  action : Action.action_v ;
   (* the type [Action.action] describes the execution point in the protocol
      stored reversed *)
 
@@ -466,7 +466,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     | _ -> assert false
     in
     let indices = List.rev penv.indices in
-    let action_term = Term.mk_action a' indices in
+    let action_term = Term.mk_action a' (Term.mk_vars indices) in
     let in_th = Theory.var_i dum in_var in
     let in_tm = Term.mk_macro Term.in_macro [] action_term in
 
@@ -512,17 +512,21 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     debug "condition = %a.@." Term.pp (snd condition);
 
     let updates =
-      List.map (fun (s,l,ty,t) ->
+      List.map (fun (s,args,ty,t) ->
           let ms = Symbols.Macro.of_lsymb s penv.env.table in
-          Term.mk_isymb ms ty l,
-           Term.subst (subst_ts @ subst_input) t
+          ms,
+          args,
+          Term.subst (subst_ts @ subst_input) t
         ) penv.updates
     in
 
     debug "updates = %a.@."
       (Utils.pp_list
-         (fun ch (u,v) ->
-            Format.fprintf ch "_ := %a" Term.pp v))
+         (fun ch (u,args,v) ->
+            Format.fprintf ch "%a(%a) := %a" 
+              Symbols.pp u
+              Vars.pp_list args
+              Term.pp v))
       updates ;
 
     let output = match output with
@@ -547,6 +551,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
         globals = penv.globals; 
         condition; updates; output; } 
     in
+    assert (Action.check_descr action_descr);
 
     let table, new_a, _ =
       System.register_action table system_name action_descr
@@ -557,7 +562,9 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     in
 
     debug "descr = %a@." Action.pp_descr action_descr ;
-    let new_action_term = Term.mk_action new_a action_descr.indices in
+    let new_action_term = 
+      Term.mk_action new_a (Term.mk_vars action_descr.indices) 
+    in
     let new_in_tm = Term.mk_macro Term.in_macro [] new_action_term in
     let penv =
       { penv with
@@ -634,8 +641,8 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
         (Theory.mk_symb n')
         (List.rev_map (fun i -> Theory.var dum (Vars.name i)) penv.indices)
     in    
-    let n'_s = Term.mk_isymb n' ty (List.rev penv.indices) in
-    let n'_tm = Term.mk_name n'_s in
+    let n'_s = Term.mk_symb n' ty in
+    let n'_tm = Term.mk_name n'_s (Term.mk_vars (List.rev penv.indices)) in
 
     let vars, _ = Vars.make `Shadow penv.env.vars ty (L.unloc n) in
 
@@ -684,7 +691,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     in
 
     let invars = List.map snd penv.inputs in
-    let shape = Action.get_shape (List.rev penv.action) in
+    let shape = Action.get_shape_v (List.rev penv.action) in
     let table, x' =
       let suffix = if in_update then `Large else `Strict in
       Macros.declare_global penv.env.table system_name x
@@ -701,8 +708,9 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       Theory.mk_app_i (Theory.mk_symb x') is
     in
 
-    let n'_s = Term.mk_isymb x' ty (List.rev penv.indices) in
-    let x'_tm = Term.mk_macro n'_s [] (Term.mk_var ts) in
+    let n'_s = Term.mk_symb x' ty in
+    let args = Term.mk_vars (List.rev penv.indices) in
+    let x'_tm = Term.mk_macro n'_s args (Term.mk_var ts) in
 
     let vars, _ = Vars.make `Shadow penv.env.vars ty (L.unloc x) in
     
@@ -879,8 +887,9 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       let vars = List.rev penv.evars in
       let penv =
         { penv with
-          action = Action.{ par_choice ;
-                            sum_choice = pos, vars } :: penv.action }
+          action = Action.{ 
+              par_choice ;
+              sum_choice = pos, vars } :: penv.action }
       in
       let p',_,table = p_update_i ~penv proc in
       (p', pos + 1,table)

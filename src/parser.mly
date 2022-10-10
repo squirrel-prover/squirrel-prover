@@ -376,7 +376,7 @@ process_i:
 | id=lsymb terms=term_list COLONEQ t=term p=process_cont
     { let to_idx t = match L.unloc t with
         | Theory.Symb x -> x
-        | ti -> raise @@ Theory.Conv (L.loc t, Theory.NotVar)
+        | ti -> raise @@ Theory.Conv (L.loc t, Theory.Failure "must be a variable")
       in
       let l = List.map to_idx terms in
       Process.Set (id,l,t,p) }

@@ -328,7 +328,6 @@ type conversion_error_i =
   | String_expected      of term_i
   | Int_expected         of term_i
   | Tactic_type          of string
-  | NotVar
   | Assign_no_state      of string
   | BadNamespace         of string * Symbols.namespace
   | Freetyunivar
@@ -401,9 +400,6 @@ let pp_error_i ppf = function
 
   | Tactic_type s ->
     Fmt.pf ppf "The tactic arguments could not be parsed: %s" s
-
-  | NotVar ->
-    Fmt.pf ppf "must be a variable" 
 
   | Assign_no_state s ->
     Fmt.pf ppf "Only mutables can be assigned values, and the \
@@ -1075,12 +1071,7 @@ and convert0
     let t = Term.subst subst t in
     
     Term.mk_lambda ~simpl:false evs t
-
-and conv_var state t ty = 
-  match convert state t ty with
-    | Term.Var x -> x
-    | _ -> conv_err (L.loc t) NotVar
-    
+   
 (* The term [tm] in argument is here for error messages. *)
 and conv_app 
     (state     : conv_state)
@@ -1177,63 +1168,53 @@ and conv_app
           match terms with
           | [] -> []
           | [{pl_desc = Tuple args}]
-          | args->
-            List.map (fun x ->
-                conv_var state x Type.tindex
-              ) args
+          | args ->
+            List.map (fun x -> conv Type.tindex x) args
         in
         check_arity ~mode:`Full f
           ~actual:(List.length indices) ~expected:arity;
 
-        let ms = Term.mk_isymb s ty_out indices in
-        Term.mk_macro ms [] (get_at ts_opt)
+        let ms = Term.mk_symb s ty_out in
+        Term.mk_macro ms indices (get_at ts_opt)
 
       | Input | Output | Frame ->
         check_arity ~mode:`Full  (L.mk_loc (L.loc f) "input")
           ~actual:(List.length terms) ~expected:0;
         (* FEATURE: subtypes *)
-        let ms = Term.mk_isymb s ty_out [] in
+        let ms = Term.mk_symb s ty_out in
         Term.mk_macro ms [] (get_at ts_opt)
 
       | Cond | Exec ->
         check_arity ~mode:`Full (L.mk_loc (L.loc f) "cond")
           ~actual:(List.length terms) ~expected:0;
-        let ms = Term.mk_isymb s ty_out [] in
+        let ms = Term.mk_symb s ty_out in
         Term.mk_macro ms [] (get_at ts_opt)
     end
 
 
   | Get ->
     let k = check_state state.env.table f (List.length terms) in
-    let is = List.map (fun i -> conv_var state i Type.tindex) terms in
+    let is = List.map (conv Type.tindex) terms in
     let f = get_macro state.env f in
     let ts =
       match ts_opt with
       | Some ts -> ts
       | None -> conv_err loc (Timestamp_expected tm)
     in
-    let ms = Term.mk_isymb f k is in
-    Term.mk_macro ms [] ts
+    let ms = Term.mk_symb f k in
+    Term.mk_macro ms is ts
 
   | Name ->
     let s_fty = check_name state.env.table f (List.length terms) in
     assert (s_fty.fty_vars = []);
-    let is = 
-      match List.map2 conv s_fty.fty_args terms, terms with
-      | [Tuple l], [{pl_desc = Tuple p_l}] -> 
-        List.map2 (fun t p_t ->
-            match t with
-            | Term.Var i -> i
-            | _ -> conv_err (L.loc p_t) NotVar
-          ) l p_l
-      | [Var i], _ -> [i]
-      | [], _ -> []
-      | _ -> 
-        let loc = L.mergeall (List.map L.loc terms) in
-        conv_err loc NotVar
+    let is =
+      match List.map2 conv s_fty.fty_args terms with
+      | [Term.Tuple is] -> is
+      | [] | [_] as l -> l
+      | _ -> assert false (* impossible, names have always arity 0 or 1 *)
     in
-    let ns = Term.mk_isymb (get_name state.env.table f) s_fty.fty_out is in
-    Term.mk_name ns
+    let ns = Term.mk_symb (get_name state.env.table f) s_fty.fty_out in
+    Term.mk_name ns is
 
   | Taction ->
     (* open-up tuples *)
@@ -1245,7 +1226,7 @@ and conv_app
     check_action state.env f (List.length terms) ;
     Term.mk_action
       (get_action state.env f)
-      (List.map (fun x -> conv_var state x Type.tindex) terms)
+      (List.map (conv Type.tindex) terms)
 
 (*------------------------------------------------------------------*)
 (** convert HO terms *)
@@ -1575,13 +1556,12 @@ let declare_state
       (Symbols.State (List.length typed_args,out_ty)) in
   table
 
-let get_init_states table : (Term.state * Term.term) list =
+let get_init_states table : (Symbols.macro * Vars.vars * Term.term) list =
   Symbols.Macro.fold (fun s def data acc ->
       match (def,data) with
       | ( Symbols.State (arity,kind), StateInit_data (l,t) ) ->
         assert (Type.equal kind (Term.ty t));
-        let state = Term.mk_isymb s kind l in
-        (state,t) :: acc
+        (s,l,t) :: acc
       | _ -> acc
     ) [] table
 

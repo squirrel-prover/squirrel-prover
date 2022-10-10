@@ -8,7 +8,6 @@ type lsymb = Theory.lsymb
 
 type decl_error_i =
   | BadEquivForm
-  | InvalidAbsType
   | InvalidCtySpace of string list
   | DuplicateCty of string
   | NotTSOrIndex

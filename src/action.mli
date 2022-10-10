@@ -42,14 +42,25 @@ type 'a item = {
 type 'a t = ('a item) list
 
 (** Actions are lists of items where infinite choices are represented
-  * by index lists. *)
-type action = (Vars.var list) t
+    by a list of term of type index. *)
+type action = Term.term list t
 
+(*------------------------------------------------------------------*)
+(** An [action_v] is a [action] statically known to be instantiated on 
+    variables. *)
+type action_v = Vars.var list t
+
+val to_action_v : action   -> action_v 
+val to_action   : action_v -> action 
+
+(*------------------------------------------------------------------*)
 (** Shapes represent classes of actions differing only in their indices:
   * they are obtained by replacing lists of indices by their lengths. *)
 type shape = int t
 
-val get_indices : action -> Vars.var list
+(*------------------------------------------------------------------*)
+val get_args   : action   -> Term.term list
+val get_args_v : action_v -> Vars.var  list
 
 val fv_action : action -> Vars.Sv.t
 
@@ -74,17 +85,18 @@ val mutex_common_vars : shape -> shape -> int
 val distance : 'a t -> 'a t -> int option
 
 (** [get_shape a] extracts the shape of an action *)
-val get_shape : action -> shape
+val get_shape   : action   -> shape
+val get_shape_v : action_v -> shape
 
 (** [same_shape a b] returns [Some subst] if [a] and [b] have the same action
     shapes. Return [None] otherwise.
     If [a] indices appear at most once in [a], then [subst] is the index
     substitution sending [a] to [b]. *)
-val same_shape : action -> action -> Term.subst option
+val same_shape : action_v -> action_v -> Term.subst option
 
 (** Convert [Action] parameters to an action. *)
 val of_term :
-  Symbols.action -> Vars.var list ->
+  Symbols.action -> Term.term list ->
   Symbols.table ->
   action
 
@@ -126,11 +138,11 @@ val arity : Symbols.action -> Symbols.table -> int
 (** Type of action descriptions. *)
 type descr = {
   name      : Symbols.action ;
-  action    : action ;
+  action    : action_v ;
   input     : Channel.t ;
   indices   : Vars.var list ;
   condition : Vars.var list * Term.term ;
-  updates   : (Term.state * Term.term) list ;
+  updates   : (Symbols.macro * Vars.vars * Term.term) list ;
     (** State updates, at most one per state symbol. *)
   output    : Channel.t * Term.term;
   globals   : Symbols.macro list;
@@ -194,7 +206,8 @@ val pp_actions : Format.formatter -> Symbols.table -> unit
 (** {2 Substitution} *)
 
 (** Apply a term substitution to an action's indices. *)
-val subst_action : Term.subst -> action -> action
+val subst_action   : Term.subst -> action   -> action
+val subst_action_v : Term.subst -> action_v -> action_v
 
 (** Apply a substitution to a description. *)
 val subst_descr : Term.subst -> descr -> descr

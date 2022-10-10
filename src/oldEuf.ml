@@ -32,7 +32,7 @@ class check_key
     | Term.Fun (fn, _, [k])
       when allow_functions fn && Term.diff_names k -> ()
 
-    | Term.Name n when n.s_symb = key_n -> raise Bad_ssc_
+    | Term.Name (n, _) when n.s_symb = key_n -> raise Bad_ssc_
 
     | Term.Var m -> 
       let ty = Vars.ty m in
@@ -106,9 +106,9 @@ let key_ssc
 
 type euf_schema = {
   action_name  : Symbols.action;
-  action       : Action.action;
+  action       : Action.action_v;
   message      : Term.term;
-  key_indices  : Vars.var list;
+  key_indices  : Term.terms;
   env          : Vars.env;
 }
 
@@ -122,28 +122,31 @@ let pp_euf_schema ppf case =
     [e] of type [euf_case] represents the fact that the message [e.m]
     has been hashed, and the key indices were [e.eindices]. *)
 type euf_direct = { 
-  d_key_indices : Vars.var list;
+  d_key_indices : Term.terms;
   d_message     : Term.term 
 }
 
 let pp_euf_direct ppf case =
   Fmt.pf ppf "@[<v>@[<hv 2>*key indices:@ @[<hov>%a@]@]@;\
               @[<hv 2>*message:@ @[<hov>%a@]@]"
-    Vars.pp_list case.d_key_indices
+    (Fmt.list ~sep:Fmt.comma Term.pp) case.d_key_indices
     Term.pp case.d_message
 
-type euf_rule = { hash : Term.fname;
-                  key : Term.name;
-                  case_schemata : euf_schema list;
-                  cases_direct : euf_direct list }
+type euf_rule = { 
+  hash : Symbols.fname;
+  key : Symbols.name * Term.terms ; (* k(t1, ..., tn) *)
+  case_schemata : euf_schema list;
+  cases_direct : euf_direct list 
+}
 
 let pp_euf_rule ppf rule =
   Fmt.pf ppf "@[<v>*hash: @[<hov>%a@]@;\
-              *key: @[<hov>%a@]@;\
+              *key: @[<hov>%a(%a)@]@;\
               *case schemata:@;<1;2>@[<v>%a@]@;\
               *direct cases:@;<1;2>@[<v>%a@]@]"
     Term.pp_fname rule.hash
-    Term.pp_name rule.key
+    Symbols.pp (fst rule.key) 
+    (Fmt.list ~sep:Fmt.comma Term.pp) (snd rule.key)
     (Fmt.list pp_euf_schema) rule.case_schemata
     (Fmt.list pp_euf_direct) rule.cases_direct
 
@@ -153,7 +156,7 @@ let pp_euf_rule ppf rule =
 let mk_rule ~elems ~drop_head ~fun_wrap_key
     ~allow_functions ~cntxt ~env ~mess ~sign ~head_fn ~key_n ~key_is =
 
-  let mk_of_hash action_descr (is,m) =
+  let mk_of_hash action_descr ((is,m) : Term.t list * Term.t) =
     (* Legacy refresh of variables, probably unnecessarily complex. *)
     let env = ref env in
 
@@ -174,7 +177,7 @@ let mk_rule ~elems ~drop_head ~fun_wrap_key
       let vars =
         List.fold_left (fun vars i ->
             if List.mem i vars then vars else i :: vars
-          ) vars is
+          ) vars (Vars.Sv.elements (Term.fvs is))
       in
       (* Remove already handled variables, create substitution. *)
       let index_not_seen i =
@@ -195,24 +198,17 @@ let mk_rule ~elems ~drop_head ~fun_wrap_key
     in
 
     let subst = subst_fresh @ subst_bv in
-    let action = Action.subst_action subst action_descr.action in
+    let action = Action.subst_action_v subst action_descr.action in
     { action_name = action_descr.name;     
       action;
       message = Term.subst subst m ;
-      key_indices = List.map (Term.subst_var subst) is ; 
+      key_indices = List.map (Term.subst subst) is ; 
       env = !env }
   in
   
   (* TODO: we are using the less precise version of [fold_macro_support] *)
   let hash_cases =
     Iter.fold_macro_support1 (fun descr t hash_cases ->
-        (* TODO: use get_f_messages_ext and use conditons to improve precision *)
-        (* let fv = Vars.Sv.of_list1 descr.Action.indices in
-         * let new_hashes =
-         *   Iter.get_f_messages_ext
-         *     ~fv ~fun_wrap_key ~drop_head ~cntxt head_fn key_n t
-         * in *)
-
         let iter =
           new deprecated_get_f_messages
             ~fun_wrap_key ~drop_head ~cntxt head_fn key_n
@@ -264,6 +260,6 @@ let mk_rule ~elems ~drop_head ~fun_wrap_key
   in
 
   { hash          = head_fn;
-    key           = key_n;
+    key           = (key_n, key_is);
     case_schemata;
     cases_direct; }

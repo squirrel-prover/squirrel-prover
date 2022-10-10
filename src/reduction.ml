@@ -86,9 +86,6 @@ let conv_var (st : cstate) (v1 : Vars.var) (v2 : Vars.var) : unit =
   if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then not_conv ();
   if not (Vars.equal (Term.subst_var st.subst v1) v2) then not_conv ()
 
-let conv_vars (st : cstate) (vs1 : Vars.vars) (vs2 : Vars.vars) : unit =
-  List.iter2 (conv_var st) vs1 vs2
-
 let conv_bnd (st : cstate) (v1 : Vars.var) (v2 : Vars.var) : cstate =
   if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then not_conv ();
   { st with subst = Term.ESubst (Term.mk_var v1, Term.mk_var v2) :: st.subst }
@@ -103,11 +100,12 @@ let rec conv (st : cstate) (t1 : Term.term) (t2 : Term.term) : unit =
     conv_ftype fty1 fty2;
     conv_l st l1 l2
 
-  | Term.Name ns1, Term.Name ns2 when ns1.s_symb = ns2.s_symb ->
-    conv_vars st ns1.s_indices ns2.s_indices
+  | Term.Name (ns1,l1), Term.Name (ns2,l2) when ns1.s_symb = ns2.s_symb ->
+    assert (ns1.Term.s_typ = ns2.Term.s_typ);
+    conv_l st l1 l2
 
   | Term.Action (a1, is1), Term.Action (a2, is2) when a1 = a2 ->
-    conv_vars st is1 is2
+    conv_l st is1 is2
 
   | Term.Diff (Explicit l1), Term.Diff (Explicit l2) ->
     List.iter2 (fun (p1, t1) (p2, t2) ->
@@ -117,7 +115,7 @@ let rec conv (st : cstate) (t1 : Term.term) (t2 : Term.term) : unit =
 
   | Term.Macro (ms1, terms1, ts1), Term.Macro (ms2, terms2, ts2)
     when ms1.s_symb = ms2.s_symb ->
-    conv_vars st ms1.s_indices ms2.s_indices;
+    assert (ms1.Term.s_typ = ms2.Term.s_typ);
     conv_l st (ts1 :: terms1) (ts2 :: terms2)
 
   | Term.Quant  (q, is1, t1), Term.Quant (q', is2, t2) when q = q' ->
@@ -284,15 +282,15 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       match red_funcs with
       | [] -> t, false
       | red_f :: red_funcs ->
-        let t, has_red = red_f st t in
+        let t, has_red = red_f t in
         if has_red then t, true
         else try_red red_funcs
     in
-    try_red [expand_head_once; 
-             rewrite_head_once;
-             reduce_beta;
-             reduce_proj;
-             reduce_constr; ]
+    try_red [expand_head_once st; 
+             rewrite_head_once st;
+             Match.reduce_beta;
+             Match.reduce_proj;
+             reduce_constr st; ]
 
   (* Try to show using [Constr] that [t] is [false] or [true] *)
   and reduce_constr (st : state) (t : Term.term) : Term.term * bool =
@@ -305,35 +303,6 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
         then Term.mk_true, true
         else t, false
       with NoExp -> t, false
-
-  (* projection reduction *)
-  and reduce_proj (st : state) (t : Term.term) : Term.term * bool =
-    match t with
-    | Term.Proj (i, t) ->
-      begin
-        match t with
-        | Term.Tuple ts -> List.nth ts (i - 1), true
-        | _ -> t, false
-      end
-
-    | _ -> t, false
-
-  (* β-reduction *)
-  and reduce_beta (st : state) (t : Term.term) : Term.term * bool =
-    match t with
-    | Term.App (t, arg :: args) -> 
-      begin
-        match t with
-        | Term.Quant (Term.Lambda, v :: evs, t0) ->
-          let evs, subst = Term.refresh_vars `Global evs in
-          let t0 = Term.subst (Term.ESubst (Term.mk_var v, arg) :: subst) t0 in
-
-          Term.mk_app (Term.mk_lambda evs t0) args, true
-
-        | _ -> Term.mk_app t (arg :: args), false
-      end 
-
-    | _ -> t, false
 
   (* Expand once at head position *)
   and expand_head_once (st : state) (t : Term.term) : Term.term * bool = 

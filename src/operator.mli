@@ -18,8 +18,8 @@ val mk :
 
 val ftype : operator -> Type.ftype
 
-val is_operator : Symbols.table -> Term.fsymb -> bool
+val is_operator : Symbols.table -> Symbols.fname -> bool
 
 val unfold : 
-  Symbols.table -> SE.arbitrary -> Term.fsymb -> Term.term list ->
+  Symbols.table -> SE.arbitrary -> Symbols.fname -> Term.term list ->
   [`FreeTyv | `Ok of Term.term]

@@ -6,7 +6,8 @@ module Args = TacticsArgs
 module L = Location
 module SE = SystemExpr
 module NO = NameOccs
-
+module Name = NO.Name
+                
 module TS = TraceSequent
 
 module Hyps = TS.LocalHyps
@@ -26,11 +27,11 @@ let soft_failure = Tactics.soft_failure
 let hard_failure = Tactics.hard_failure
 
 (* integrity occurrence *)
-type int_occ = ((term * nsymb), unit) NO.simple_occ
+type int_occ = ((term * Name.t), unit) NO.simple_occ
 type int_occs = int_occ list
 
 let mk_int_occ
-    (t:term) (tcoll:term) (k:nsymb) (kcoll:nsymb)
+    (t:term) (tcoll:term) (k:Name.t) (kcoll:Name.t)
     (cond:terms) (v:Vars.vars) (ot:NO.occ_type) (st:term) : int_occ =
   NO.mk_simple_occ (t,k) (tcoll,kcoll) () v cond ot st
 
@@ -41,9 +42,9 @@ let mk_int_occ
 (**  *)
 let get_bad_occs
     (m:term)
-    (k:nsymb)
-    (int_f:fsymb) (* function with integrity (hash, signature) *)
-    ?(pk_f:fsymb option=None) (* public key function. Must be None iff hash *)
+    (k:Name.t)
+    (int_f:Symbols.fname) (* function with integrity (hash, signature) *)
+    ?(pk_f:Symbols.fname option=None) (* public key function. Must be None iff hash *)
     (retry_on_subterms : (unit -> NO.n_occs * int_occs))
     (rec_call_on_subterms :
        (fv:Vars.vars ->
@@ -67,8 +68,8 @@ let get_bad_occs
     soft_failure
       (Tactics.Failure "can only be applied on ground terms")
 
-  | Name k' when k'.s_symb = k.s_symb ->
-    [NO.mk_nocc k' k fv cond (fst info) st],
+  | Name (ksymb', _) as k' when ksymb'.s_symb = k.symb.s_symb ->
+    [NO.mk_nocc (Name.of_term k') k fv cond (fst info) st],
     []
 
   | Fun (f, _, [tk']) when pk_f = Some f -> (* public key *)
@@ -81,15 +82,15 @@ let get_bad_occs
   (* hash verification oracle: test u = h(m', k).
      Search recursively in u, m', but do not record
      m' as a hash occurrence. *)
-  | Fun (f, _, [u; Fun (g, _, [Tuple [m'; Name k']])])
-    when f = f_eq && g = int_f && pk_f = None && k'.s_symb = k.s_symb ->
+  | Fun (f, _, [u; Fun (g, _, [Tuple [m'; Name (ksymb', _)]])])
+    when f = f_eq && g = int_f && pk_f = None && ksymb'.s_symb = k.symb.s_symb ->
     let (occs1, accs1) = rec_call_on_subterms ~fv ~cond ~p ~info ~st:t u in
     let (occs2, accs2) = rec_call_on_subterms ~fv ~cond ~p ~info ~st:t m' in
     occs1 @ occs2, accs1 @ accs2
 
   (* hash verification oracle (symmetric case). can we avoid duplication? *)
-  | Fun (f, _, [Fun (g, _, [Tuple [m'; Name k']]); u])
-    when f = f_eq && g = int_f && pk_f = None && k'.s_symb = k.s_symb ->
+  | Fun (f, _, [Fun (g, _, [Tuple [m'; Name (ksymb', _)]]); u])
+    when f = f_eq && g = int_f && pk_f = None && ksymb'.s_symb = k.symb.s_symb ->
     let (occs1, accs1) = rec_call_on_subterms ~fv ~cond ~p ~info ~st:t u in
     let (occs2, accs2) = rec_call_on_subterms ~fv ~cond ~p ~info ~st:t m' in
     occs1 @ occs2, accs1 @ accs2
@@ -101,10 +102,10 @@ let get_bad_occs
       (* record this hash occurrence, but allow the key *)
       (* todo: actually why don't we always do this,
                even if it's the wrong key? *)
-      | Name k' when k.s_symb = k'.s_symb  ->
+      | Name (ksymb', _) as k' when k.symb.s_symb = ksymb'.s_symb  ->
         let fvv, sigma = refresh_vars `Global fv in
         let m' = subst sigma m' in
-        let k' = subst_isymb sigma k' in
+        let k' = Name.subst sigma (Name.of_term k') in
         let cond = List.map (subst sigma) cond in
         let ot = NO.subst_occtype sigma (fst info) in
         let occs, acc = rec_call_on_subterms ~fv ~cond ~p ~info ~st m' in
@@ -123,25 +124,25 @@ let get_bad_occs
   | _ -> retry_on_subterms ()
 
 
-
 (* constructs the formula expressing that an integrity occurrence m',k'
    is indeed in collision with m, k *)
 let integrity_formula
     ~(negate : bool)
-    ((m', k') : term * nsymb)
-    ((m, k) : term * nsymb)
+    ((m', k') : term * Name.t)
+    ((m, k) : term * Name.t)
     ()
     : term =
-  assert (k.s_symb = k'.s_symb); (* every occurrence we generated
-                                    should satisfy this *)
+  (* every occurrence we generated should satisfy this *)
+  assert (k.symb.s_symb = k'.symb.s_symb); 
+
   if not negate then 
     mk_and ~simpl:true
       (mk_eq ~simpl:true m m')
-      (mk_indices_eq ~simpl:true k.s_indices k'.s_indices)
+      (mk_eqs ~simpl:true k.args k'.args)
   else
     mk_or ~simpl:true
       (mk_not ~simpl:true (mk_eq ~simpl:true m m'))
-      (mk_indices_neq ~simpl:true k.s_indices k'.s_indices)
+      (mk_neqs ~simpl:true k.args k'.args)
 
 
 
@@ -152,11 +153,11 @@ let integrity_formula
 (* parameters for the integrity occurrence: key, signed or hashed message,
    signature checked or compared w/ the hash, sign/hash function,
    pk function if any *) 
-type euf_param = {ep_key:nsymb;
+type euf_param = {ep_key:Name.t;
                   ep_intmsg:term;
                   ep_term:term;
-                  ep_int_f:fsymb;
-                  ep_pk_f:fsymb option;}
+                  ep_int_f:Symbols.fname;
+                  ep_pk_f:Symbols.fname option;}
 
 
 (** Finds the parameters of the integrity functions used in the hypothesis,
@@ -186,8 +187,8 @@ checksign(m, s, pk(k)), hash(m, k) = t, or the symmetric equality")
       | Fun (f, _, [Tuple [m; tk]]) ->
         begin
           match NO.expand_macro_check_all info tk with
-          | Name k when Symbols.is_ftype f Symbols.Hash table ->
-            Some {ep_key=k; ep_intmsg=m; ep_term=t'; ep_int_f=f; ep_pk_f=None}
+          | Name _ as k when Symbols.is_ftype f Symbols.Hash table ->
+            Some {ep_key=Name.of_term k; ep_intmsg=m; ep_term=t'; ep_int_f=f; ep_pk_f=None}
           | _ -> None
         end
       | _ -> None
@@ -207,10 +208,10 @@ checksign(m, s, pk(k)), hash(m, k) = t, or the symmetric equality")
         match NO.expand_macro_check_all info tpk with
         | Fun (g, _, [tk]) ->
           begin
-            match Theory.check_signature table f g,
+            match Theory.check_signature table f g, 
                   NO.expand_macro_check_all info tk with
-            | Some sg, Name k ->
-              {ep_key=k; ep_intmsg=m; ep_term=s; ep_int_f=sg; ep_pk_f=Some g}
+            | Some sg, (Name _ as k) ->
+              {ep_key= Name.of_term k; ep_intmsg=m; ep_term=s; ep_int_f=sg; ep_pk_f=Some g}
             | _ -> fail ()
           end
         | _ -> fail ()
@@ -234,11 +235,11 @@ let euf
   in
       
   
-  let pp_k ppf () = Fmt.pf ppf "%a" Term.pp_nsymb k in
+  let pp_k ppf () = Fmt.pf ppf "%a" Name.pp k in
 
   (* apply euf *)
-  let get_bad:((term*nsymb, unit) NO.f_fold_occs) =
-    get_bad_occs m k int_f ~pk_f
+  let get_bad : ((term * Name.t, unit) NO.f_fold_occs) = 
+    get_bad_occs m k int_f ~pk_f 
   in
   let phis_bad, phis_int =
     NO.occurrence_formulas ~pp_ns:(Some pp_k)
@@ -271,9 +272,13 @@ let euf
       in
 
       match Vars.ty uvarm,Vars.ty uvarkey with
-      | Type.(Message, Message) -> let f = Term.subst [
-          ESubst (Term.mk_var uvarm,m);
-          ESubst (Term.mk_var uvarkey,Term.mk_name k);] f in
+      | Type.(Message, Message) -> 
+        let f = 
+          Term.subst [
+            ESubst (Term.mk_var uvarm,m);
+            ESubst (Term.mk_var uvarkey, Term.mk_name k.symb k.args);]
+            f 
+        in
         [TS.set_goal
            (Term.mk_impl f (TS.goal s)) s]
 

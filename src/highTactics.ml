@@ -92,7 +92,7 @@ let () =
 let () = T.register_general "induction"
     ~tactic_help:{
       general_help = "Apply the induction scheme to the conclusion.";
-      detailed_help = "Only support induction over timestamps.";
+      detailed_help = "Only support induction over finite types.";
       usages_sorts = [Sort None];
       tactic_group = Logical}
     ~pq_sound:true

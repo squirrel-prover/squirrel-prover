@@ -212,7 +212,7 @@ val declare_state :
 (** [get_init_states] returns all the initial values of declared state symbols,
     used to register the init action *)
 val get_init_states :
-  Symbols.table -> (Term.state * Term.term) list
+  Symbols.table -> (Symbols.macro * Vars.vars * Term.term) list
 
 (** [declare_abstract n i m] declares a new function symbol
   * of type [index^i -> message^m -> message]. *)
@@ -257,7 +257,6 @@ type conversion_error_i =
   | String_expected      of term_i
   | Int_expected         of term_i
   | Tactic_type          of string
-  | NotVar
   | Assign_no_state      of string
   | BadNamespace         of string * Symbols.namespace
   | Freetyunivar
@@ -301,7 +300,7 @@ val check_state : Symbols.table -> lsymb -> int -> Type.ty
    checksign and pk functions, returns Some sign, where sign is the
    corresponding signature. Else, returnes None. *)
 val check_signature :
-  Symbols.table -> Term.fname -> Term.fname -> Term.fname option
+  Symbols.table -> Symbols.fname -> Symbols.fname -> Symbols.fname option
 
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)

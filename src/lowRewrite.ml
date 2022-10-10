@@ -58,7 +58,7 @@ let pat_to_rw_rule ?loc
 
   let e = match destr_eq f with
     | Some (t1, t2) -> t1,t2
-    | _ -> Tactics.hard_failure ?loc (Tactics.Failure "not an equality")
+    | _ -> f, Term.mk_true
   in
 
   let e = match dir with

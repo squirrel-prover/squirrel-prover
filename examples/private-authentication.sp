@@ -28,12 +28,6 @@ ACM, 2014
 
 ******************************************************************************
 *)
-(**
-When this option is set to `true`, Squirrel checks whether each tactic invoked
-for the proof is also sound for quantum attackers.
-*)
-set postQuantumSound=true.
-
 
 (**
 We first declare the communication channels, the function symbols for the public

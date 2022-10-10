@@ -73,18 +73,14 @@ module Pos = struct
       | Term.App (t1, l) ->
         sel_l fsel sp ~projs ~vars ~conds ~p (t1 :: l)
 
-      | Term.Name ns ->
-        let l = List.map Term.mk_var ns.s_indices in
+      | Term.Name (ns,l) ->
         sel_l fsel sp ~projs ~vars ~conds ~p l
 
       | Term.Macro (ms, terms, ts) ->
-        assert (terms = []);
-
-        let l = (List.map Term.mk_var ms.s_indices) @ [ts] in
+        let l = terms @ [ts] in
         sel_l fsel sp ~projs ~vars ~conds ~p l
 
-      | Term.Action (_, is) ->
-        let l = List.map Term.mk_var is in
+      | Term.Action (_, l) ->
         sel_l fsel sp ~projs ~vars ~conds ~p l
 
       | Term.Var _ -> sp
@@ -159,10 +155,6 @@ module Pos = struct
     
     sel_e Sp.empty ~projs:None ~vars:[] ~conds:[] ~p:[] t
 
-
-  (*------------------------------------------------------------------*)
-  let destr_vars (l : Term.term list) : Vars.var list =
-    List.map (fun x -> oget (Term.destr_var x)) l
 
   (*------------------------------------------------------------------*)
   type 'a f_map_fold =
@@ -283,35 +275,25 @@ module Pos = struct
         acc, found, if found then ti' else ti
         
 
-      | Term.Name ns ->
-        let l = List.map Term.mk_var ns.s_indices in
-
+      | Term.Name (ns,l) ->
         let acc, found, l = map_fold_l ~se ~p ~acc l in
-        let l = destr_vars l in
 
-        let ti' = Term.mk_name (Term.mk_isymb ns.s_symb ns.s_typ l) in
+        let ti' = Term.mk_name ns l in
         acc, found, if found then ti' else ti
 
       | Term.Macro (ms, terms, ts) ->
-        assert (terms = []);
-
-        let l = (List.map Term.mk_var ms.s_indices) @ [ts] in
+        let l = terms @ [ts] in
 
         let acc, found, l = map_fold_l ~se ~vars ~conds ~p ~acc l in
 
-        let l1, ts = List.takedrop (List.length ms.s_indices) l in
-        let l1 = destr_vars l1 in
+        let l1, ts = List.takedrop (List.length terms) l in
         let ts = as_seq1 ts in
 
-        let ti' = Term.mk_macro (Term.mk_isymb ms.s_symb ms.s_typ l1) [] ts in
+        let ti' = Term.mk_macro ms l1 ts in
         acc, found, if found then ti' else ti
 
-      | Term.Action (a, is) ->
-        let l = List.map Term.mk_var is in
-
+      | Term.Action (a, l) ->
         let acc, found, l = map_fold_l ~se ~vars ~conds ~p ~acc l in
-
-        let l = destr_vars l in
 
         let ti' = Term.mk_action a l in
         acc, found, if found then ti' else ti
@@ -800,10 +782,9 @@ let expand_head_once
     } in
   match t with
   | Term.Macro (ms, l, ts) ->
-    assert (l = []);
 
     if Constr.query ~precise:true (Lazy.force models) [`Pos, `Happens ts] then
-      match Macros.get_definition ~mode (cntxt ()) ms ts with
+      match Macros.get_definition ~mode (cntxt ()) ms ~args:l ~ts with
       | `Def mdef -> mdef, true
       | _ -> raise exn 
     else raise exn 
@@ -817,6 +798,36 @@ let expand_head_once
     end
 
   | _ -> raise exn
+
+
+(* projection reduction *)
+let reduce_proj (t : Term.term) : Term.term * bool =
+  match t with
+  | Term.Proj (i, t) ->
+    begin
+      match t with
+      | Term.Tuple ts -> List.nth ts (i - 1), true
+      | _ -> t, false
+    end
+
+  | _ -> t, false
+
+(* β-reduction *)
+let reduce_beta (t : Term.term) : Term.term * bool =
+  match t with
+  | Term.App (t, arg :: args) -> 
+    begin
+      match t with
+      | Term.Quant (Term.Lambda, v :: evs, t0) ->
+        let evs, subst = Term.refresh_vars `Global evs in
+        let t0 = Term.subst (Term.ESubst (Term.mk_var v, arg) :: subst) t0 in
+
+        Term.mk_app (Term.mk_lambda evs t0) args, true
+
+      | _ -> Term.mk_app t (arg :: args), false
+    end 
+
+  | _ -> t, false
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and unification internal states} *)
@@ -1050,17 +1061,18 @@ module T (* : S with type t = Term.term *) = struct
       if fn <> fn' then raise NoMgu;
       unif_l terms terms' st
 
-    | Name s, Name s' -> isymb_unif s s' st
+    | Name (s,l), Name (s',l') when s = s' -> 
+      unif_l l l' st
 
     | Macro (s, terms, ts),
-      Macro (s', terms', ts') ->
-      let mv = isymb_unif s s' st in
+      Macro (s', terms', ts') when s = s' ->
       assert (Type.equal s.s_typ s'.s_typ);
 
-      let mv = unif_l terms (terms') { st with mv } in
+      let mv = unif_l terms terms' st in
       unif ts ts' { st with mv }
 
-    | Action (s,is), Action (s',is') -> sunif (s,is) (s',is') st
+    | Action (s,is), Action (s',is') when s = s' -> 
+      unif_l is is' st
 
     | Diff (Explicit l), Diff (Explicit l') ->
       if List.length l <> List.length l' then raise NoMgu;
@@ -1164,27 +1176,6 @@ module T (* : S with type t = Term.term *) = struct
     List.fold_left2 (fun mv t1 t2 ->
         unif t1 t2 { st with mv }
       ) st.mv tl1 tl2
-
-  (** unif an [i_symb].
-      Note: types are not checked. *)
-  and isymb_unif : type a.
-    ((a Symbols.t) isymb) ->
-    ((a Symbols.t) isymb) ->
-    unif_state -> Mvar.t =
-    fun s s' st ->
-    sunif (s.s_symb,s.s_indices) (s'.s_symb, s'.s_indices) st
-
-  (** unif a symbol (with some indices) *)
-  and sunif : type a.
-    (a Symbols.t * Vars.var list) ->
-    (a Symbols.t * Vars.var list) ->
-    unif_state -> Mvar.t =
-    fun (fn, is) (fn', is') st ->
-    if fn <> fn' then raise NoMgu;
-
-    List.fold_left2 (fun mv i i' ->
-        vunif (mk_var i) i' { st with mv }
-      ) st.mv is is'
 
 
   (*------------------------------------------------------------------*)
@@ -1301,17 +1292,18 @@ module T (* : S with type t = Term.term *) = struct
       Fun (fn', fty', terms') when fn = fn' ->
       tmatch_l terms terms' st
 
-    | Name s, Name s' -> isymb_match s s' st
+    | Name (s,l), Name (s',l') when s = s' -> 
+      tmatch_l l l' st 
 
     | Macro (s, terms, ts),
       Macro (s', terms', ts') when s.s_symb = s'.s_symb ->
-      let mv = isymb_match s s' st in
       assert (Type.equal s.s_typ s'.s_typ);
 
-      let mv = tmatch_l terms terms' { st with mv } in
+      let mv = tmatch_l terms terms' st in
       tmatch ts ts' { st with mv }
 
-    | Action (s,is), Action (s',is') -> smatch (s,is) (s',is') st
+    | Action (s,is), Action (s',is') when s = s' -> 
+      tmatch_l is is' st
 
     | Diff (Explicit l), Diff (Explicit l') ->
       if List.length l <> List.length l' then no_match ();
@@ -1385,6 +1377,7 @@ module T (* : S with type t = Term.term *) = struct
      and resume matching *)
   and try_reduce_head1 (t : term) (pat : term) (st : match_state) : Mvar.t =
     match t, pat with
+    (* delta-reduction *)
     | (Macro _ | Fun _), (Macro _ | Fun _) ->      
       let t, t_red = m_expand_head_once st t in
 
@@ -1393,7 +1386,7 @@ module T (* : S with type t = Term.term *) = struct
         let pat, pat_red = m_expand_head_once st pat in
         if pat_red then tmatch t pat st
         else no_match ()
-
+      
     | Macro _, _ | Fun _, _ -> 
       let t, t_red = m_expand_head_once st t in
       if t_red then tmatch t pat st
@@ -1404,6 +1397,26 @@ module T (* : S with type t = Term.term *) = struct
       if pat_red then tmatch t pat st
       else no_match ()
 
+    (* projection reduction *)
+    | Proj _, Proj _ ->
+      let t, t_red = reduce_proj t in
+      if t_red then tmatch t pat st
+      else 
+        let pat, pat_red = reduce_proj pat in
+        if pat_red then tmatch t pat st
+        else no_match ()
+
+    | Proj _, _ ->
+      let t, t_red = reduce_proj t in
+      if t_red then tmatch t pat st
+      else no_match ()
+
+    | _, Proj _ ->
+      let pat, pat_red = reduce_proj pat in
+      if pat_red then tmatch t pat st
+      else no_match ()
+
+    (* other *)
     | Var _, _ -> no_match ()   (* FEATURE *)
     | _, Var v when not (Sv.mem v st.support) -> no_match () (* FEATURE *)
     | _ -> no_match ()
@@ -1442,28 +1455,6 @@ module T (* : S with type t = Term.term *) = struct
         tmatch t pat { st with mv }
       ) st.mv tl patl
  
-  (* match an [i_symb].
-     Note: types are not checked. *)
-  and isymb_match : type a.
-    ((a Symbols.t) isymb) ->
-    ((a Symbols.t) isymb) ->
-    match_state -> Mvar.t =
-    fun s s' st ->
-    smatch (s.s_symb,s.s_indices) (s'.s_symb, s'.s_indices) st
-
-  (* match a symbol (with some indices) *)
-  and smatch : type a.
-    (a Symbols.t * Vars.var list) ->
-    (a Symbols.t * Vars.var list) ->
-    match_state -> Mvar.t =
-    fun (fn, is) (fn', is') st ->
-    if fn <> fn' then no_match ();
-
-    List.fold_left2 (fun mv i i' ->
-        vmatch (mk_var i) i' { st with mv }
-      ) st.mv is is'
-
-
   (* Match a variable of the pattern with a term. *)
   and vmatch (t : term) (v : Vars.var) (st : match_state) : Mvar.t =
     if not (Sv.mem v st.support)
@@ -1568,20 +1559,23 @@ type known_sets = (term_head * known_set list) list
 module MCset : sig[@warning "-32"]
   (** Set of macros over some indices, with a conditional.
         [{ msymb   = m;
+           args    = args;
            indices = vars;
            cond_le = τ₀; }]
-      represents the set of terms [\{m@τ | ∀τ s.t. τ ≤ τ₀ and ∀ vars \}].
+      represents the set of terms [\{m(args)@τ | ∀τ s.t. τ ≤ τ₀ and ∀ vars \}].
 
       Remarks: [(fv τ₀) ∩ vars = ∅], and if [cond_le = None], then there
       is no trace model constraint. *)
   type t = private {
     msymb   : Term.msymb;
+    args    : Term.term list;
     indices : Vars.var list;
     cond_le : Term.term option;
   }
 
   val mk :
     env:Sv.t ->
+    args:Term.term list ->
     msymb:Term.msymb ->
     indices:(Vars.var list) ->
     cond_le:(Term.term option) ->
@@ -1594,11 +1588,12 @@ module MCset : sig[@warning "-32"]
 end = struct
   type t = {
     msymb   : Term.msymb;
+    args    : Term.term list;
     indices : Vars.var list;
     cond_le : Term.term option;
   }
 
-  let mk ~env ~msymb ~indices ~cond_le : t =
+  let mk ~env ~args ~msymb ~indices ~cond_le : t =
     assert (
       Sv.disjoint
         (Sv.of_list1 indices)
@@ -1606,7 +1601,7 @@ end = struct
 
     let indices = Sv.diff (Sv.of_list1 indices) env in
     let indices = Sv.elements indices in
-    { msymb; indices; cond_le; }
+    { msymb; args; indices; cond_le; }
 
   let _pp ~dbg fmt (mset : t) =
     (* when [dbg] is [false], we refresh variables in [mset.indices] *)
@@ -1617,12 +1612,13 @@ end = struct
           Sv.diff
             (Sv.union
                (omap_dflt Sv.empty Term.fv mset.cond_le)
-               (Sv.of_list1 mset.msymb.Term.s_indices))
+               (Term.fvs mset.args))
             (Sv.of_list1 mset.indices)
         in
         let env = Vars.of_set env_vars in
         let _, indices, s = Term.refresh_vars_env env mset.indices in
-        { msymb = Term.subst_isymb s mset.msymb;
+        { msymb = mset.msymb;
+          args = List.map (Term.subst s) mset.args;
           indices;
           cond_le = omap (Term.subst s) mset.cond_le; }
     in
@@ -1660,7 +1656,7 @@ end = struct
 end
 
 (** msets sorted in an association list *)
-type msets = (Term.mname * MCset.t list) list
+type msets = (Symbols.macro * MCset.t list) list
 
 let msets_to_list (msets : msets) : MCset.t list =
   List.concat_map (fun (_, l) -> l) msets
@@ -1806,7 +1802,7 @@ let known_set_of_mset
     (mset : MCset.t) : known_set
   =
   let t = Vars.make_fresh Type.Timestamp "t" in
-  let term = Term.mk_macro mset.msymb [] (Term.mk_var t) in
+  let term = Term.mk_macro mset.msymb mset.args (Term.mk_var t) in
   let cond =
     let cond_le = match mset.cond_le with
       | None -> Term.mk_true
@@ -1872,8 +1868,8 @@ let mset_incl
     (s1 : MCset.t) (s2 : MCset.t) : bool
   =
   let tv = Vars.make_fresh Type.Timestamp "t" in
-  let term1 = Term.mk_macro s1.msymb [] (Term.mk_var tv) in
-  let term2 = Term.mk_macro s2.msymb [] (Term.mk_var tv) in
+  let term1 = Term.mk_macro s1.msymb s1.args (Term.mk_var tv) in
+  let term2 = Term.mk_macro s2.msymb s2.args (Term.mk_var tv) in
 
   assert (s1.cond_le = s2.cond_le);
 
@@ -1934,25 +1930,25 @@ let mset_list_simplify
 let mset_refresh env (mset : MCset.t) : MCset.t =
   let indices, subst = Term.refresh_vars `Global mset.indices in
 
-  let msymb = Term.subst_isymb subst mset.msymb in
+  let args = List.map (Term.subst subst) mset.args in
   let cond_le = omap (Term.subst subst) mset.cond_le in
-  MCset.mk ~env ~msymb ~indices ~cond_le
+  MCset.mk ~env ~msymb:mset.msymb ~args ~indices ~cond_le
 
 (** applies a substitution `θ` to a mset, where `θ` can bind
     index variables which used to be universally quantified. *)
 let mset_subst env subst (mset : MCset.t) : MCset.t =
-  let msymb = Term.subst_isymb subst mset.msymb in
+  let args = List.map (Term.subst subst) mset.args in
   let indices = List.map (Term.subst_var subst) mset.indices in
   let cond_le = omap (Term.subst subst) mset.cond_le in
-  MCset.mk ~env ~msymb ~indices ~cond_le
+  MCset.mk ~env ~msymb:mset.msymb ~args ~indices ~cond_le
 
 (** Compute the intersection of two msets with the same condition. Exact. *)
 let mset_inter table env (s1 : MCset.t) (s2 : MCset.t) : MCset.t option =
   let s1, s2 = mset_refresh env s1, mset_refresh env s2 in
 
   let tv = Vars.make_fresh Type.Timestamp "t" in
-  let term1 = Term.mk_macro s1.msymb [] (Term.mk_var tv) in
-  let term2 = Term.mk_macro s2.msymb [] (Term.mk_var tv) in
+  let term1 = Term.mk_macro s1.msymb s1.args (Term.mk_var tv) in
+  let term2 = Term.mk_macro s2.msymb s2.args (Term.mk_var tv) in
 
   let pat1 = {
     pat_term = term1;
@@ -2207,11 +2203,10 @@ module E : S with type t = Equiv.form = struct
     (* special case for pure timestamps *)
     | _ as f when Term.is_pure_timestamp f -> [cand]
 
-    | Term.Macro (ms, l, a) ->
-      assert (l = []);
+    | Term.Macro (ms, l, ts) ->
       begin
         let cntxt = Constr.make_context ~system ~table in
-        match Macros.get_definition cntxt ms a with
+        match Macros.get_definition cntxt ms ~args:l ~ts with
         | `Undef | `MaybeDef -> []
         | `Def body ->
           deduce table system { cand with term = body } known_sets
@@ -2255,12 +2250,14 @@ module E : S with type t = Equiv.form = struct
       =
       (* we create the timestamp at which we are *)
       let i = Action.arity a table in
-      let is = List.init i (fun _ -> Vars.make_fresh Type.Index "i") in
-      let ts = Term.mk_action a is in
+      let is = 
+        List.init i (fun _ -> Vars.make_fresh Type.Index "i")
+      in
+      let ts = Term.mk_action a (List.map Term.mk_var is) in
 
       (* we unroll the definition of [cand] at time [ts] *)
       let cntxt = Constr.make_context ~system ~table in
-      match Macros.get_definition cntxt cand.msymb ts with
+      match Macros.get_definition cntxt cand.msymb ~args:cand.args ~ts with
       | `Undef | `MaybeDef -> []
 
       | `Def body ->
@@ -2287,9 +2284,12 @@ module E : S with type t = Equiv.form = struct
         let mset_l =
           List.fold_left (fun mset_l ded_set ->
               let subst = Mvar.to_subst ~mode:`Unif ded_set.subst in
-              let msymb = Term.subst_isymb subst cand.msymb in
+              let msymb = cand.msymb in
+              let args  = List.map (Term.subst subst) cand.args in
               let indices = List.map (Term.subst_var subst) cand.indices in
-              let mset = MCset.mk ~env ~msymb ~indices ~cond_le:cand.cond_le in
+              let mset = 
+                MCset.mk ~env ~msymb ~args ~indices ~cond_le:cand.cond_le 
+              in
 
               (* sanity check *)
               let () =
@@ -2382,8 +2382,11 @@ module E : S with type t = Equiv.form = struct
               | Symbols.Cond ->
                 Type.Boolean, []
             in
-            let ms = Term.mk_isymb mn ty indices in
-            let mset = MCset.mk ~env ~msymb:ms ~indices ~cond_le in
+            let ms = Term.mk_symb mn ty in
+            let mset = 
+              MCset.mk ~env
+                ~msymb:ms ~args:(Term.mk_vars indices) ~indices ~cond_le 
+            in
             msets_add mset msets
         ) [] table
     in

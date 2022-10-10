@@ -1,21 +1,23 @@
 open Utils
 
+module Name = NameOccs.Name
+                
 module SE = SystemExpr
 module Sv = Vars.Sv
 module Sp = Match.Pos.Sp
 
 (*------------------------------------------------------------------*)
 type prf_param = {
-  h_fn  : Term.fname; 
+  h_fn  : Symbols.fname; 
   h_fty : Type.ftype; 
   h_cnt : Term.term;  
-  h_key : Term.nsymb; 
+  h_key : Name.t; 
 }
 
 let prf_param hash : prf_param =
   match hash with
-  | Term.Fun (h_fn, h_fty, [Tuple [h_cnt; Name h_key]]) ->
-    { h_fn; h_cnt; h_fty; h_key }
+  | Term.Fun (h_fn, h_fty, [Tuple [h_cnt; Name (key, key_args)]]) ->
+    { h_fn; h_cnt; h_fty; h_key = { symb = key; args = key_args; }}
 
   | _ -> Tactics.soft_failure Tactics.Bad_SSC
 
@@ -30,7 +32,7 @@ let prf_mk_direct (param : prf_param) (occ : Iter.hash_occ) =
   let vars, subst = Term.refresh_vars `Global vars in
 
   let is, m = occ.occ_cnt in
-  let is = List.map (Term.subst_var subst) is in
+  let is = List.map (Term.subst subst) is in
   let m = Term.subst subst m in
   (* let cond = Term.subst subst occ.occ_cond in *)
   let cond = Term.mk_true in
@@ -39,12 +41,12 @@ let prf_mk_direct (param : prf_param) (occ : Iter.hash_occ) =
     (Term.mk_impl
        (Term.mk_and ~simpl:true
           cond
-          (Term.mk_indices_eq param.h_key.s_indices is))
+          (Term.mk_eqs param.h_key.args is))
        (Term.mk_atom `Neq param.h_cnt m))
 
 (*------------------------------------------------------------------*)
 (** triple of the action, the key indices and the term *)
-type prf_occ = (Action.action * Vars.var list * Term.term) Iter.occ
+type prf_occ = (Action.action * Term.terms * Term.term) Iter.occ
 
 (** check if all instances of [o1] are instances of [o2].
     [o1] and [o2] actions must have the same action name *)
@@ -61,7 +63,7 @@ let prf_occ_incl table sexpr (o1 : prf_occ) (o2 : prf_occ) : bool =
     let action = SE.action_to_term table sexpr a in
     Term.mk_ands ~simpl:false
       ((Term.mk_atom `Eq Term.init action) ::
-       (Term.mk_indices_eq ~simpl:false is is) ::
+       (Term.mk_eqs ~simpl:false is is) ::
        cond ::
        [Term.mk_atom `Eq t (Term.mk_witness (Term.ty t))])
   in
@@ -96,7 +98,7 @@ let prf_mk_indirect
     SE.action_to_term cntxt.table cntxt.system
       (Action.subst_action subst action)
   in
-  let hash_is = List.map (Term.subst_var subst) hash_is
+  let hash_is = List.map (Term.subst subst) hash_is
   and hash_m = Term.subst subst hash_m
   and hash_cond = List.map (Term.subst subst) hash_occ.Iter.occ_cond in
 
@@ -111,7 +113,7 @@ let prf_mk_indirect
     Term.mk_impl
       (Term.mk_and ~simpl:true
          hash_cond
-         (Term.mk_indices_eq param.h_key.s_indices hash_is))
+         (Term.mk_eqs param.h_key.args hash_is))
       (Term.mk_atom `Neq param.h_cnt hash_m)
   in
 
@@ -161,7 +163,7 @@ let mk_prf_phi_proj cntxt env param frame hash =
   let errors =
     OldEuf.key_ssc ~globals:true
       ~elems:frame ~allow_functions:(fun x -> false)
-      ~cntxt param.h_fn param.h_key.s_symb
+      ~cntxt param.h_fn param.h_key.symb.s_symb
   in
   if errors <> [] then
     Tactics.soft_failure (Tactics.BadSSCDetailed errors);
@@ -172,7 +174,7 @@ let mk_prf_phi_proj cntxt env param frame hash =
     List.fold_left (fun acc t ->
         Iter.get_f_messages_ext
           ~mode:(`Delta cntxt) (cntxt.system :> SE.arbitrary)
-          param.h_fn param.h_key.s_symb t @ acc
+          param.h_fn param.h_key.symb.s_symb t @ acc
       ) [] frame
   in
   let frame_hashes = List.sort_uniq Stdlib.compare frame_hashes in
@@ -196,7 +198,7 @@ let mk_prf_phi_proj cntxt env param frame hash =
         let new_cases =
           Iter.get_f_messages_ext 
             ~mode:(`Delta cntxt) (cntxt.system :> SE.arbitrary)
-            ~fv param.h_fn param.h_key.s_symb t
+            ~fv param.h_fn param.h_key.symb.s_symb t
         in
         let new_cases =
           List.map (fun occ ->

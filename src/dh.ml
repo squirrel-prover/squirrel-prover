@@ -1,5 +1,5 @@
-(* Computational Diffie-Hellman (CDH) and Gap Diffie-Hellman (GDH)
-   trace tactics *)
+(** Computational Diffie-Hellman (CDH) and Gap Diffie-Hellman (GDH)
+    trace tactics *)
 open Term
 open Utils
 
@@ -19,6 +19,8 @@ type lsymb = Theory.lsymb
 module MP = Match.Pos
 module Sp = MP.Sp
 
+module Name = NO.Name
+                
 open LowTactics
 
 (*------------------------------------------------------------------*)
@@ -28,12 +30,24 @@ let hard_failure = Tactics.hard_failure
 
 
 (*------------------------------------------------------------------*)
+(* utility functions for lists of nsymbs *)
+
+(** looks for a name with the same symbol in the list *)
+let exists_symb (n:nsymb) (ns:Name.t list) : bool =
+  List.exists (fun nn -> n.s_symb = nn.Name.symb.s_symb) ns
+
+(** finds all names with the same symbol in the list *)
+let find_symb (n:nsymb) (ns:Name.t list) : Name.t list =
+  List.filter (fun nn -> n.s_symb = nn.Name.symb.s_symb) ns
+
+
+(*------------------------------------------------------------------*)
 (* Utility functions to put a term in a sort of normal form *)
 
 (** Returns the list of factors of t for the given multiplication
     (if mult = none then t is its own only factor)
     (unfolds the macros when possible) *)
-let rec factors (mult:fsymb option) (info:NO.expand_info)
+let rec factors (mult:Symbols.fname option) (info:NO.expand_info)
     (t:term) : (term list) =
   match t with
   | Fun (f, _, [t1; t2]) when mult = Some f ->
@@ -50,7 +64,7 @@ let rec factors (mult:fsymb option) (info:NO.expand_info)
 (** Returns (m, [p1,…,pn]) such that t = m ^ (p1*…*pn)
     and m is not itself an exponential.
     (unfolds the macros when possible) *) 
-let rec powers (exp:fsymb) (mult:fsymb option)
+let rec powers (exp:Symbols.fname) (mult:Symbols.fname option)
     (info:NO.expand_info)
     (t:term) : term * (term list) =
   match t with
@@ -68,19 +82,20 @@ let rec powers (exp:fsymb) (mult:fsymb option)
 
 
 (** Separate pows between occs of elements in nab and the rest *)
-let partition_powers (nab:nsymb list) (pows:term list) : 
-  (term list) * (term list) =
+let partition_powers
+    (nab:Name.t list) (pows:term list) : (term list) * (term list) 
+  =
   List.partition
-    (fun tt ->
-       match tt with
-       | Name nn -> exists_symb nn nab
-       | _ -> false)
+    (function
+      | Term.Name (n,args) -> exists_symb n nab
+      | _ -> false)
     pows
 
 
 (*------------------------------------------------------------------*)
 (* future work: return a tree of and/or of name_occs and generate
    the goals accordingly *)
+
 (** A (unit,unit) NO.f_fold_occs function, for use with NO.occurrence_goals.
     Looks for occurrences of names in nab not allowed by CDH or GDH
     (depending on gdh_oracles).
@@ -93,8 +108,8 @@ let partition_powers (nab:nsymb list) (pows:term list) :
     Otherwise, gives up, and asks occurrence_goals to call it again on subterms.
    Does not use any accumulator, so returns an empty unit list. *)
 let get_bad_occs
-    (gdh_oracles:bool) (g:term) (exp:fsymb) (mult:fsymb option)
-    (nab:nsymb list) 
+    (gdh_oracles:bool) (g:term) (exp:Symbols.fname) (mult:Symbols.fname option)
+    (nab:Name.t list) 
     (retry_on_subterms : (unit -> NO.n_occs * NO.empty_occs))
     (rec_call_on_subterms :
        (fv:Vars.vars ->
@@ -110,13 +125,15 @@ let get_bad_occs
     ~(p:MP.pos)
     ~(st:term)
     (t:term) 
-  : NO.n_occs * NO.empty_occs =
+  : NO.n_occs * NO.empty_occs 
+  =
   (* get all bad occurrences in m ^ (p1 * … * pn) *)
   (* st is the current subterm, to be recorded in the occurrence *)
   let get_illegal_powers
       (m:term) (pows:terms)
       ~(fv:Vars.vars) ~(cond:terms) ~(p:MP.pos) ~(info:NO.expand_info)
-      ~(st:term) : NO.n_occs =
+      ~(st:term) : NO.n_occs 
+    =
     if m <> g then (* all occs in m, pows are bad *)
       (fst (rec_call_on_subterms m ~fv ~cond ~p ~info ~st)) @ 
       (List.concat_map
@@ -134,9 +151,9 @@ let get_bad_occs
         List.concat_map
           (fun tt -> 
              match tt with
-             | Name nn ->
+             | Name (nn,nn_args) ->
                List.map
-                 (fun nnn -> NO.mk_nocc nn nnn fv cond (fst info) st)
+                 (fun nnn -> NO.mk_nocc { symb = nn; args = nn_args; } nnn fv cond (fst info) st)
                  (find_symb nn nab)
              | _ -> assert false (* should always be a name *))
           (* pos is not set right here, could be bad if we wanted
@@ -156,9 +173,9 @@ let get_bad_occs
     soft_failure
       (Tactics.Failure "can only be applied on ground terms")
 
-  | Name n when exists_symb n nab ->
+  | Name (n, n_args) when exists_symb n nab ->
     (List.map
-      (fun nn -> NO.mk_nocc n nn fv cond (fst info) st)
+      (fun nn -> NO.mk_nocc { symb = n; args = n_args; } nn fv cond (fst info) st)
       (find_symb n nab),
      [])
 
@@ -219,7 +236,7 @@ let dh_param
     (hyp : term)
     (g : lsymb)
     (s : TS.sequent)
-  : term * fsymb * fsymb option * term * nsymb * nsymb
+  : term * Symbols.fname * Symbols.fname option * term * Name.t * Name.t
   =
 
   let info = NO.EI_direct, contx in
@@ -253,10 +270,10 @@ let dh_param
   let (v, qows) = powers exp_n mult_n info m2 in
 
   let (t, a, b) = match (u,pows,v,qows) with
-    | (_, _, _, [Name n1; Name n2]) when v = gen ->
-      (m1, n1, n2)
-    | (_, [Name n1; Name n2], _, _) when u = gen ->
-      (m2, n1, n2)
+    | (_, _, _, [Name _ as n1; Name _ as n2]) when v = gen ->
+      (m1, Name.of_term n1, Name.of_term n2)
+    | (_, [Name _ as n1; Name _ as n2], _, _) when u = gen ->
+      (m2, Name.of_term n1, Name.of_term n2)
     | _ ->
       soft_failure
         ~loc:hyp_loc
@@ -286,7 +303,7 @@ let cgdh
     dh_param ~hyp_loc:(L.loc m) gdh_oracles contx hyp g s
   in
   let pp_nab =
-    fun ppf () -> Fmt.pf ppf "%a and %a" Term.pp_nsymb na Term.pp_nsymb nb
+    fun ppf () -> Fmt.pf ppf "%a and %a" Name.pp na Name.pp nb
   in
   let get_bad:((unit,unit) NO.f_fold_occs) =
     get_bad_occs gdh_oracles gen exp_s mult_s [na; nb]

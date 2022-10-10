@@ -91,7 +91,7 @@ let convert_args env parser_args tactic_type conc =
       let f = 
         match Theory.convert conv_cntxt ~ty:Type.Index p with
         | Term.Var v, _ -> v
-        | _ -> Theory.conv_err (L.loc p) NotVar
+        | _ -> Theory.conv_err (L.loc p) (Failure "must be a variable of type index")
       in
       Arg (Index (f))
 

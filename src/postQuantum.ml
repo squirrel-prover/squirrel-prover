@@ -100,9 +100,8 @@ class check_att ~(cntxt:Constr.trace_cntxt) = object (self)
       ms = Term.frame_macro
     | Fun (sf, _, _) when sf = Symbols.fs_att -> false
     | Macro (ms,l,a) ->
-      assert (l = []);
       begin
-        match Macros.get_definition cntxt ms a with
+        match Macros.get_definition cntxt ms ~args:l ~ts:a with
         | `Undef | `MaybeDef -> true
         | `Def t -> super#fold_message aux t
       end

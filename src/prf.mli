@@ -1,8 +1,10 @@
+module Name = NameOccs.Name
+
 type prf_param = {
-  h_fn  : Term.fname;  (** function name *)
-  h_fty : Type.ftype;  (** hash function type *)
-  h_cnt : Term.term;   (** contents, i.e. hashed message *)
-  h_key : Term.nsymb;  (** key *)
+  h_fn  : Symbols.fname;            (** function name *)
+  h_fty : Type.ftype;               (** hash function type *)
+  h_cnt : Term.term;                (** contents, i.e. hashed message *)
+  h_key : Name.t;                   (** key *)
 }
 
 val prf_param : Term.term -> prf_param 

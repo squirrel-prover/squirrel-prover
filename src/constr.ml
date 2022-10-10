@@ -139,23 +139,19 @@ end = struct
     if u.cnt = UInit || u.cnt = UUndef then uundef
     else UPred u |> make
 
-  let rec uts ts = match ts with
+  (* TODO: allow to translate more terms *)
+  let rec uts (ts : Term.term) : ut = match ts with
     | Term.Var tv -> uvar tv
     | Term.Fun (fs, _, [ts]) when fs = Term.f_pred -> upred (uts ts)
     | Term.Action (s,_) when s = Symbols.init_action -> uinit
-    | Term.Action (s,l) -> uname s (List.map uvar l)
-    | _ -> raise Unsupported      
-
-  let ut_to_var (ut : ut) : Vars.var =
-    match ut.cnt with
-    | UVar v -> v
-    | _ -> assert false
+    | Term.Action (s,l) -> uname s (List.map uts l)
+    | _ -> raise Unsupported
 
   let rec ut_to_term (ut : ut) : Term.term =
     match ut.cnt with
     | UVar v -> Term.mk_var v
     | UName (a, is) ->
-      Term.mk_action a (List.map ut_to_var is)
+      Term.mk_action a (List.map ut_to_term is)
     | UPred ut -> Term.mk_pred (ut_to_term ut)
     | UInit  -> Term.init
     | UUndef -> assert false
@@ -1432,24 +1428,21 @@ let make_context ~table ~system =
 open Term
 
 let env = ref Vars.empty_env
-
-let mk_var v : Term.term =
-  let env', v = Vars.make `Approx !env Timestamp v in
-  env := env';
-  Term.mk_var v
   
 let mk_var_i v : Vars.var =
   let env', v = Vars.make `Approx !env Index v in
   env := env';
   v
 
+let mk_var v : Term.term = Term.mk_var (mk_var_i v)
+
 let tau   = mk_var "tau"
 and tau'  = mk_var "tau"
 and tau'' = mk_var "tau"
 and tau3  = mk_var "tau"
 and tau4  = mk_var "tau"
-and i     = mk_var_i "i"
-and i'    = mk_var_i "i"
+and i     = mk_var "i"
+and i'    = mk_var "i"
 
 let _, a = Symbols.Action.declare Symbols.builtins_table (L.mk_loc L._dummy "a") 1
 

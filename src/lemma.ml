@@ -95,16 +95,16 @@ let mk_depends_lemma
   : Goal.statement
   =
   assert (Action.depends
-            (Action.get_shape descr.action)
-            (Action.get_shape descr'.action));
+            (Action.get_shape_v descr.action)
+            (Action.get_shape_v descr'.action));
   
   let sys_expr = SystemExpr.of_system table system in
-  let a' = Term.mk_action descr'.name descr'.indices in
+  let a' = Term.mk_action descr'.name (Term.mk_vars descr'.indices) in
   let a =
     let indices =
       List.take (List.length descr.indices) descr'.indices
     in
-    Term.mk_action descr.name indices
+    Term.mk_action descr.name (Term.mk_vars indices)
   in
   let tvar = Vars.make_fresh Type.ttimestamp "t" in
   let tau = Term.mk_var tvar in
@@ -136,8 +136,8 @@ let mk_mutex_lemma
     (descr : Action.descr) (descr' : Action.descr)
   : Goal.statement
   =
-  let shape  = Action.get_shape  descr.action in
-  let shape' = Action.get_shape descr'.action in
+  let shape  = Action.get_shape_v  descr.action in
+  let shape' = Action.get_shape_v descr'.action in
   assert (Action.mutex shape shape');
 
   let sys_expr = SystemExpr.of_system table system in
@@ -149,8 +149,8 @@ let mk_mutex_lemma
   let is_common, is_rem  = List.takedrop i_common  descr.indices in
   let _        , is_rem' = List.takedrop i_common descr'.indices in
 
-  let a = Term.mk_action descr.name (is_common @ is_rem) in
-  let a' = Term.mk_action descr'.name (is_common @ is_rem') in
+  let a  = Term.mk_action descr.name  (Term.mk_vars (is_common @ is_rem))  in
+  let a' = Term.mk_action descr'.name (Term.mk_vars (is_common @ is_rem')) in
 
   let form =
     Term.mk_forall ~simpl:false (is_common @ is_rem @ is_rem')
@@ -197,5 +197,5 @@ let add_depends_mutex_lemmas table (system : Symbols.system) : Symbols.table =
         add_lemma `Axiom lem table
       ) table lems
   in
-  Printer.pr "@]";
+  Printer.pr "@;@]";
   table

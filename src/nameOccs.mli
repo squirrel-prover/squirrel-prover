@@ -12,6 +12,20 @@ module Sp = MP.Sp
 module SE = SystemExpr
 
 
+(*------------------------------------------------------------------*)
+
+module Name : sig
+  (** An applied named [symb(args)] *)
+  type t = { symb : Term.nsymb; args : Term.terms; }
+
+  val pp : Format.formatter -> t -> unit
+
+  val of_term : Term.t -> t
+
+  val to_term : t -> Term.t
+
+  val subst : Term.subst -> t -> t
+end
 
 (*------------------------------------------------------------------*)
 (** Generic types and functions to handle occurrences of anything,
@@ -59,20 +73,19 @@ val mk_simple_occ :
   'a -> 'a -> 'b -> Vars.vars -> terms -> occ_type ->
   term -> ('a, 'b) simple_occ
 
-
+(*------------------------------------------------------------------*)
 (** Type of a timestamp occurrence *)
 (* maybe does not need to be exposed *)
 type ts_occ = (term, unit) simple_occ
 type ts_occs = ts_occ list
 
-
+(*------------------------------------------------------------------*)
 (** Type of empty simple occurrences
     (used as dummy parameter when they are not needed) *)
 type empty_occ = (unit, unit) simple_occ
 type empty_occs = empty_occ list
 
-
-
+(*------------------------------------------------------------------*)
 (** Type of a function generating a formula meant to say
     "the occurrence is actually a collision" (or its negation) *)
 (** we also use this formula to compute occurrence subsumption
@@ -85,12 +98,12 @@ type ('a, 'b) occ_formula =
   term
 
 (** occ_formula for name occurrences *)
-val name_occ_formula : (nsymb, unit) occ_formula
+val name_occ_formula : (Name.t, unit) occ_formula
 
 (** Dummy occ_formula for empty occurrences *)
 val empty_occ_formula : (unit, unit) occ_formula
 
-
+(*------------------------------------------------------------------*)
 (** Extended occurrence, with additional info about where it was found *)
 type ('a, 'b) ext_occ =
   {eo_occ       : ('a, 'b) simple_occ;
@@ -98,7 +111,6 @@ type ('a, 'b) ext_occ =
    eo_source_ts : ts_occs } (* timestamps occurring in the source term *)
 
 type ('a, 'b) ext_occs = (('a, 'b) ext_occ) list
-
 
 
 (*------------------------------------------------------------------*)
@@ -136,20 +148,20 @@ val get_macro_actions : Constr.trace_cntxt -> term list -> ts_occs
 (*------------------------------------------------------------------*)
 (** Occurrence of a name *)
 
-type n_occ = (nsymb, unit) simple_occ
+type n_occ = (Name.t, unit) simple_occ
 type n_occs = n_occ list
 
-type name_occ = (nsymb, unit) ext_occ
+type name_occ = (Name.t, unit) ext_occ
 type name_occs = name_occ list
 
 (** Constructs a name occurrence *)
 val mk_nocc : 
-  nsymb -> (* name *)
-  nsymb -> (* name it collides with *)
+  Name.t ->      (* name *)
+  Name.t ->      (* name it collides with *)
   Vars.vars -> (* vars bound above *)
-  terms -> (* condition above *)
-  occ_type -> (* occurrence type *)
-  term -> (* subterm (for printing) *)
+  terms ->     (* condition above *)
+  occ_type ->  (* occurrence type *)
+  term ->      (* subterm (for printing) *)
   n_occ
 
 
@@ -208,9 +220,8 @@ val clear_trivial_equalities : term -> term
 (** where vi, tsi are the variables and content of the ts_occ *)
 val time_formula : term -> ts_occs -> term
 
-
 (*------------------------------------------------------------------*)
-(* Proof obligations for name occurrences *)
+(** Proof obligations for name occurrences *)
 
 (** given
    - a f_fold_occs function (see above)

@@ -47,7 +47,7 @@ let mk ~name ~ty_vars ~args ~out_ty ~body =
 let ftype (op : operator) : Type.ftype = 
   Type.mk_ftype op.ty_vars (List.map Vars.ty op.args) op.out_ty
 
-let is_operator (table : Symbols.table) (fsymb : Term.fsymb) : bool =
+let is_operator (table : Symbols.table) (fsymb : Symbols.fname) : bool =
   match Symbols.Function.get_data fsymb table with
   | Operator op -> true
   | _ -> false
@@ -55,7 +55,7 @@ let is_operator (table : Symbols.table) (fsymb : Term.fsymb) : bool =
 let unfold 
     (table  : Symbols.table)
     (se     : SE.arbitrary)
-    (opsymb : Term.fsymb)
+    (opsymb : Symbols.fname)
     (args   : Term.term list)
   : [`FreeTyv | `Ok of Term.term]
   =

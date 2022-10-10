@@ -1,5 +1,3 @@
-
-
 channel c
 
 abstract next : message -> message

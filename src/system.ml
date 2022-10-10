@@ -86,7 +86,7 @@ let add_action table system descr =
   (* Sanity check *)
   assert (Action.check_descr descr);
 
-  let shape = Action.get_shape descr.action in
+  let shape = Action.get_shape_v descr.action in
   let { actions } as data = get_data table system in
   assert (not (Msh.mem shape actions));
   let actions = Msh.add shape descr actions in
@@ -122,11 +122,11 @@ let find_shape table shape =
 (*------------------------------------------------------------------*)
 let register_action table system_symb (descr : Action.descr) =
   let Action.{ action; name = symb; indices } = descr in
-  let shape = Action.get_shape action in
+  let shape = Action.get_shape_v action in
   match find_shape table shape with
 
   | None ->
-    let table = Action.define_symbol table symb indices action in
+    let table = Action.define_symbol table symb indices (Action.to_action action) in
     let table = add_action table system_symb descr in
     table, symb, descr
 
@@ -137,18 +137,16 @@ let register_action table system_symb (descr : Action.descr) =
     assert (Action.check_descr descr);
 
     let subst_action =
-      [Term.ESubst (Term.mk_action symb indices, Term.mk_action symb2 is)]
-    in
-    (* Careful, the substitution does not substitute the action symbol
-       [symb] by [symb2], nor the indices. We must do it manually. *)
-    let descr = Action.subst_descr subst_action descr in
-
-    let subst_is =
       List.map2 (fun i i' -> Term.ESubst (Term.mk_var i,Term.mk_var i'))
         indices is
     in
-    let descr = Action.subst_descr subst_is descr in
-    assert (Action.check_descr descr);
+    let descr = Action.subst_descr subst_action descr in
+
+    (* substitute the action symbol *)
+    let s =
+      [Term.ESubst (Term.mk_action symb (Term.mk_vars is),
+                    Term.mk_action symb2 (Term.mk_vars is))] in
+    let descr = Action.subst_descr s descr in    
 
     let descr = { descr with name = symb2 } in
     let table = add_action table system_symb descr in
@@ -182,6 +180,7 @@ module Single = struct
 
   let descr_of_shape table {system;projection} shape =
     let multi_descr = descr_of_shape table system shape in
-    Action.project_descr projection multi_descr
-
+    let descr = Action.project_descr projection multi_descr in
+    assert (Action.check_descr descr);
+    descr
 end

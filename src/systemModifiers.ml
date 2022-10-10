@@ -1,5 +1,7 @@
 open Utils
 
+module Name = NameOccs.Name
+                
 module SE = SystemExpr
 module L  = Location
 
@@ -187,9 +189,10 @@ let global_rename
   let ns1, ns2, n1, n2 =
     match f with
     |  Atom
-         (Equiv ([Term.Diff (Explicit [_,Term.Name ns1; _,Term.Name ns2])]))
+        (Equiv ([Term.Diff (Explicit [_,(Term.Name _ as ns1);
+                                      _, (Term.Name _ as ns2)])]))
       ->
-      ns1, ns2, Term.mk_name ns1, Term.mk_name ns2
+      Name.of_term ns1, Name.of_term ns2, ns1, ns2
 
     | _ ->
       Tactics.hard_failure ~loc:(L.loc gf) (Failure "arguments ill-formed")
@@ -199,7 +202,7 @@ let global_rename
   let cntxt =
     Constr.make_context ~table ~system:(SE.singleton old_single_system)
   in
-  let iter = new OldFresh.deprecated_find_name ~cntxt true ns2.s_symb in
+  let iter = new OldFresh.deprecated_find_name ~cntxt true ns2.symb.s_symb in
   let () =
     try
       SystemExpr.iter_descrs
@@ -207,7 +210,7 @@ let global_rename
         (fun action_descr ->
            iter#visit_message (snd action_descr.output) ;
            iter#visit_message (snd action_descr.condition) ;
-           List.iter (fun (_,m) -> iter#visit_message m) action_descr.updates)
+           List.iter (fun (_,_,m) -> iter#visit_message m) action_descr.updates)
     with OldFresh.Deprecated_Name_found ->
       Tactics.hard_failure
         (Tactics.Failure "The name on the right-hand side already \
@@ -291,7 +294,7 @@ let global_prf
   let errors =
     OldEuf.key_ssc ~globals:true
       ~elems:[] ~allow_functions:(fun x -> false)
-      ~cntxt param.h_fn param.h_key.s_symb
+      ~cntxt param.h_fn param.h_key.symb.s_symb
   in
   if errors <> [] then
     soft_failure (Tactics.BadSSCDetailed errors);
@@ -299,9 +302,10 @@ let global_prf
   (* We first refresh globably the indices to create the left pattern *)
   let is1, left_subst = Term.refresh_vars `Global is in
 
-  let left_key =  Term.subst left_subst (Term.mk_name param.h_key) in
-  let left_key_ids = match left_key with
-    | Term.Name s -> s.s_indices
+  let left_key =  Term.subst left_subst (Name.to_term param.h_key) in
+  let left_key_ids =
+    match left_key with
+    | Term.Name (s,ids) -> ids
     | _ -> assert false
   in
   (* We create the pattern for the hash *)
@@ -322,12 +326,12 @@ let global_prf
   (* the hash h of a message m will be replaced by tryfind is s.t = fresh mess
      in fresh else h *)
   let mk_tryfind =
-    let ns = Term.mk_isymb n Message (is) in
+    let ns = Term.mk_symb n Message in
     Term.mk_find is Term.(
         mk_and
           (mk_atom `Eq (Term.mk_var fresh_x_var) param.h_cnt)
-          (mk_indices_eq left_key_ids param.h_key.s_indices)
-      ) (Term.mk_name ns) hash_pattern
+          (mk_eqs left_key_ids param.h_key.args)
+      ) (Term.mk_name ns (Term.mk_vars is)) hash_pattern
   in
   let rw_rule = Rewrite.{
       rw_tyvars = [];
@@ -359,8 +363,10 @@ let global_prf
       Equiv.Atom (
         Equiv [Term.mk_var fresh_x_var;
                Term.mk_diff
-                 [Term.left_proj, Term.mk_name param.h_key;
-                  Term.right_proj, Term.mk_name @@ Term.mk_isymb n Message (is)]])
+                 [Term.left_proj, Name.to_term param.h_key;
+                  Term.right_proj,
+                  Term.mk_name
+                    (Term.mk_symb n Message) (Term.mk_vars is)]])
     in
     let concl = 
       Equiv.mk_forall [fresh_x_var]
@@ -400,14 +406,14 @@ let global_cca
     Constr.make_context ~table ~system:(SE.singleton old_single_system)
   in
 
-  let enc_fn, enc_key, plaintext, enc_pk, enc_rnd =
+  let enc_fn, (enc_key : Name.t), plaintext, enc_pk, (enc_rnd : Name.t) =
     match enc with
     | Term.Fun (fnenc, _,
-                [Tuple [m; Term.Name r;
-                        Term.Fun (fnpk, _, [Term.Name sk])]])
+                [Tuple [m; Term.Name _ as r;
+                        Term.Fun (fnpk, _, [Term.Name _ as sk])]])
       when Symbols.is_ftype fnpk Symbols.PublicKey table &&
            Symbols.is_ftype fnenc Symbols.AEnc table ->
-      fnenc, sk, m, fnpk, r
+      fnenc, Name.of_term sk, m, fnpk, Name.of_term r
 
     | _ ->
       soft_failure ~loc:(L.loc p_enc)
@@ -424,7 +430,7 @@ let global_cca
       let errors =
         OldEuf.key_ssc ~globals:true
           ~messages:[enc] ~allow_functions:(fun x -> x = enc_pk)
-          ~cntxt fndec enc_key.s_symb
+          ~cntxt fndec enc_key.symb.s_symb
       in
       
       if errors <> [] then
@@ -448,13 +454,13 @@ let global_cca
   let fresh_x_var = Vars.make_fresh Type.Message "x" in
   let dec_pattern =
     Term.mk_fun_tuple table dec_fn [ Term.mk_var fresh_x_var;
-                                     Term.mk_name enc_key ]
+                                     Name.to_term enc_key ]
   in
   let dec_pattern = Term.subst left_subst dec_pattern in
 
   (* Instantiation of the fresh replacement *)
   let ndef =
-    let ty_args = List.map Vars.ty enc_rnd.s_indices in
+    let ty_args = List.map Term.ty enc_rnd.args in
     Symbols.{ n_fty = Type.mk_ftype_tuple [] ty_args Type.Message ; }
   in
   let table,n =
@@ -463,15 +469,15 @@ let global_cca
   
   let mess_replacement =
     if Term.is_name plaintext then
-      let ns = Term.mk_isymb n Message (enc_rnd.s_indices) in
-      Term.mk_name ns
+      let ns = Term.mk_symb n Message in
+      Term.mk_name ns enc_rnd.args
     else
       Term.mk_zeroes (Term.mk_len plaintext) in
 
   let new_enc =
-    let t_pk = Term.mk_fun table enc_pk [Term.mk_name enc_key]  in
+    let t_pk = Term.mk_fun table enc_pk [Name.to_term enc_key]  in
     Term.mk_fun_tuple table enc_fn [ mess_replacement;
-                                     Term.mk_name enc_rnd;
+                                     Name.to_term enc_rnd;
                                      t_pk ]
   in
 
@@ -536,12 +542,12 @@ let global_cca
    *       Equiv [ Term.mk_var fresh_x_var;
    *               
    *               Term.mk_diff
-   *                 [Term.left_proj, Term.mk_name enc_key;
-   *                  Term.right_proj, Term.mk_name @@ Term.mk_isymb n Message is];
+   *                 [Term.left_proj, Name.to_term enc_key;
+   *                  Term.right_proj, Name.to_term @@ Term.mk_symb n Message is];
    *               
    *              Term.mk_diff
-   *                [Term.left_proj, Term.mk_name enc_rnd;
-   *                 Term.right_proj, Term.mk_name @@ Term.mk_isymb r Message is] ])
+   *                [Term.left_proj, Name.to_term enc_rnd;
+   *                 Term.right_proj, Name.to_term @@ Term.mk_symb r Message is] ])
    *   in
    *   let concl = Equiv.Impl (Equiv.mk_forall is atom, equiv) in      
    *   Equiv.Global (Equiv.mk_forall [fresh_x_var] concl)
@@ -610,7 +616,7 @@ let subst_xocc (s : Term.subst) (o : x_hash_occ) : x_hash_occ =
   let x_occ = Iter.{ 
       occ with
       occ_vars = Term.subst_vars s occ.occ_vars;
-      occ_cnt = Term.subst_vars s is, Term.subst s t;
+      occ_cnt = List.map (Term.subst s) is, Term.subst s t;
       occ_cond = List.map (Term.subst s) o.x_occ.occ_cond;
     } 
   in
@@ -683,18 +689,20 @@ let xo_lt
     
     (* create a [msymb] with new (fresh) indices for [y] *)
     let ms_y =
-      Term.mk_isymb
+      Term.mk_symb
         y.x_msymb
         (Macros.ty_out table y.x_msymb)
-        (List.map (fun ty ->
-             Vars.make_fresh ty "a"
-           ) (Macros.ty_args table y.x_msymb))
     in
-    let a_y = Term.mk_action y.x_a y.x_a_is in
+    let ms_y_args =
+      List.map (fun ty ->
+          Term.mk_var (Vars.make_fresh ty "a")
+        ) (Macros.ty_args table y.x_msymb)
+    in
+    let a_y = Term.mk_action y.x_a (Term.mk_vars y.x_a_is) in
 
     let cntxt = Constr.{ table; system; models = None } in
     let t_y =
-      match Macros.get_definition cntxt ms_y a_y with
+      match Macros.get_definition cntxt ms_y ~args:ms_y_args ~ts:a_y with
       | `Def t -> t
       | _ -> assert false       (* must be defined here *)
     in
@@ -702,14 +710,14 @@ let xo_lt
     (* search if the macro [x.x_msymb] appears in [t_y] *)
     let rec search (t : Term.term) : bool =
       match t with
-      | Macro (ms, _, ts) ->
+      | Macro (ms, ms_args, ts) ->
         if ms.s_symb = x.x_msymb then
           match ts with
           | Term.Action (a, _) -> a = x.x_a
           | _ -> false
         else
           begin
-            match Macros.get_definition cntxt ms ts with
+            match Macros.get_definition cntxt ms ~args:ms_args ~ts with
             | `Def ty -> search ty
             | _ -> false
           end
@@ -818,7 +826,7 @@ let global_prf_t
   let errors =
     OldEuf.key_ssc ~globals:true
       ~elems:[] ~allow_functions:(fun x -> false)
-      ~cntxt param.h_fn param.h_key.s_symb
+      ~cntxt param.h_fn param.h_key.symb.s_symb
   in
   if errors <> [] then
     soft_failure (Tactics.BadSSCDetailed errors);
@@ -866,7 +874,7 @@ let global_prf_t
               Iter.get_f_messages_ext ~mode:`NoDelta
                 ~fv:descr.indices 
                 (old_system :> SE.arbitrary)
-                param.h_fn param.h_key.s_symb t
+                param.h_fn param.h_key.symb.s_symb t
             in
 
             (* extend new occurrences with additional information *)
@@ -902,8 +910,8 @@ let global_prf_t
   let tau_t = Term.mk_var tau in
 
   let is, subst = Term.refresh_vars `Global is in
-  let key = Term.subst subst (Term.mk_name param.h_key) in
-  let key_is = List.map (Term.subst_var subst) param.h_key.s_indices in
+  let key = Term.subst subst (Name.to_term param.h_key) in
+  let key_is = List.map (Term.subst subst) param.h_key.args in
 
   (* term to rewrite *)
   let to_rw =
@@ -912,12 +920,14 @@ let global_prf_t
 
   (* name term associated to a hash occurrence. *)
   let mk_occ_term (xocc : XO.t) : Term.term =
-    Term.mk_name (Term.mk_isymb xocc.cnt.x_nsymb m_ty xocc.cnt.x_occ.occ_vars)
+    Term.mk_name
+      (Term.mk_symb xocc.cnt.x_nsymb m_ty)
+      (Term.mk_vars xocc.cnt.x_occ.occ_vars)
   in
 
   (* action term at associated to a hash occurrence. *)
   let mk_occ_ts (xocc : XO.t) : Term.term =
-    Term.mk_action xocc.cnt.x_a xocc.cnt.x_a_is
+    Term.mk_action xocc.cnt.x_a (Term.mk_vars xocc.cnt.x_a_is)
   in
 
   (* compute the constraints maps between hash occurrences, resulting
@@ -1002,7 +1012,7 @@ let global_prf_t
       [ Term.mk_eq ~simpl:true tau_t (mk_occ_ts xocc1); (* timestamp equ. *)
         mk_xocc_lt tau1 xocc1 tau2 xocc2;               (* timestamp ord. *)
         Term.mk_eq ~simpl:true x_t occ_t;               (* hash content equ. *)
-        Term.mk_indices_eq ~simpl:true key_is occ_vars; (* hash key equ. *)
+        Term.mk_eqs ~simpl:true key_is occ_vars;        (* hash key equ. *)
       ] 
   in
 
@@ -1093,7 +1103,7 @@ let global_prf_t
          - if we rewrite in a global macro, we use the global macro
            dedicated timestamp variable. *)
       let tau0 = match arg with
-        | Macros.ADescr d  -> Term.mk_action d.name d.indices 
+        | Macros.ADescr d  -> Term.mk_action d.name (Term.mk_vars d.indices)
         | Macros.AGlobal a -> Term.mk_var a.ts 
       in
       
@@ -1234,7 +1244,7 @@ let global_rewrite
     let vars, ts, expand_context = match arg with
       | Macros.ADescr d -> 
          Vars.of_list d.indices, 
-         Term.mk_action d.name d.indices,
+         Term.mk_action d.name (Term.mk_vars d.indices),
          Macros.InSequent
         
       | Macros.AGlobal { is; ts; ac_descrs; inputs } ->
@@ -1260,7 +1270,7 @@ let global_rewrite
              (fun (acd:Action.descr) -> (* formula: exists indices. ts = ac(indices) *)
                let tts = Term.mk_var ts in
                let ind,_ = Term.refresh_vars `Global acd.indices in 
-               let tac = Action.(Term.mk_action acd.name ind) in
+               let tac = Action.(Term.mk_action acd.name (Term.mk_vars ind)) in
                let eq = Term.mk_eq ~simpl:true tts tac in
                let ex = Term.mk_exists ~simpl:true ind eq in
                ex)

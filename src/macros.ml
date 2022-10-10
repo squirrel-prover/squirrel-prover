@@ -50,6 +50,7 @@ type global_data = {
   indices : Vars.var list;
   (** Free indices of the macro, which corresponds to the prefix of
       the indices of the action defining the macro. *)
+  (* TODO: ast_gen : clarify documentation *)
 
   ts : Vars.var;
   (** Free timestamp variable of the macro, which can only be instantiated
@@ -159,8 +160,8 @@ let is_defined (name : Symbols.macro) (a : Term.term) table =
     Used for global rewriting, when rewriting in another global macro. *)
 let get_def_glob_internal
     (table : Symbols.table) (system : SE.fset) 
-    (symb : Term.msymb) 
-    (inputs : Vars.vars) (ts : Term.term)
+    (symb : Term.msymb)  ~(args : Term.term list)
+    ~(ts : Term.term) (inputs : Vars.vars)
   : Term.term 
   =
   assert (is_global table symb.s_symb);
@@ -175,24 +176,28 @@ let get_def_glob_internal
   let subst =
     List.map2
       (fun i i' -> Term.ESubst (Term.mk_var i, Term.mk_var i'))
-      (data.indices @ data.inputs)
-      (symb.s_indices @ prefix_inputs)
+      data.inputs prefix_inputs
+    @
+    List.map2
+      (fun i t' -> Term.ESubst (Term.mk_var i, t'))
+      data.indices args
   in
   let subst = Term.ESubst (Term.mk_var data.ts, ts) :: subst in
   Term.subst subst body
 
 (*------------------------------------------------------------------*)
-(** Give the definition of the global macro [symb] at timestamp [a]
-    corresponding to action [action].
+(** Give the definition of the global macro [symb(args)@ts]
+    where [action] is the action corresponding to [ts].
     All prefixes of [action] must be valid actions of the system, except if:
     - [allow_dummy] is true
-    - and for the full action, which may be dummy (we use [a] instead). *)
+    - and for the full action, which may be dummy (we use [ts] instead). *)
 let get_def_glob
    ~(allow_dummy : bool)
     (system : SE.fset)
     (table  : Symbols.table)
     (symb   : Term.msymb)
-    (a      : Term.term)
+    ~(args  : Term.term list)
+    ~(ts    : Term.term)
     (action : Action.action)
     (data   : global_data)
   : Term.term
@@ -200,11 +205,11 @@ let get_def_glob
   assert (List.length data.inputs <= List.length action) ;
   let idx_subst =
     List.map2
-      (fun i i' -> Term.ESubst (Term.mk_var i,Term.mk_var i'))
+      (fun i t -> Term.ESubst (Term.mk_var i, t))
       data.indices
-      symb.s_indices
+      args
   in
-  let ts_subst = Term.ESubst (Term.mk_var data.ts, a) in
+  let ts_subst = Term.ESubst (Term.mk_var data.ts, ts) in
   (* Compute the relevant part of the action, i.e. the
      prefix of length [length inputs], reversed. *)
   let rev_action =
@@ -217,7 +222,7 @@ let get_def_glob
          let a_ts =
            if List.length rev_action = List.length action_prefix &&
               allow_dummy
-           then a
+           then ts
            else SE.action_to_term table system (List.rev action_prefix)
          in
          let in_tm = Term.mk_macro Term.in_macro [] a_ts in
@@ -237,8 +242,9 @@ let get_definition_nocntxt
     (system : SE.fset)
     (table  : Symbols.table)
     (symb   : Term.msymb)
+    ~(args  : Term.term list)
     (asymb  : Symbols.action)
-    (aidx   : Vars.vars) : [ `Def of Term.term | `Undef ]
+    (aidx   : Term.term list) : [ `Def of Term.term | `Undef ]
   =
   let init_or_generic init_case f =
     `Def (if asymb = Symbols.init_action
@@ -281,48 +287,48 @@ let get_definition_nocntxt
         (* Look for an update of the state macro [name] in the updates
            of [action]; we rely on the fact that [action] can only contain
            a single update for each state macro symbol *)
-        let (ns, msg) : Term.state * Term.term =
-          List.find (fun (ns,_) ->
-              ns.Term.s_symb = symb.s_symb &&
-              List.length ns.Term.s_indices = List.length symb.s_indices
+        let (ns, ns_args, msg) : Symbols.macro * Vars.vars * Term.term =
+          List.find (fun (ns,ns_args,_) ->
+              ns = symb.s_symb &&
+              List.length ns_args = List.length args
             ) descr.Action.updates
         in
-        assert (ns.Term.s_typ = symb.s_typ);
 
         (* Init case: we substitute the indices by their definition. *)
         if asymb = Symbols.init_action then
           let s = List.map2 (fun i1 i2 ->
-              Term.ESubst (Term.mk_var i1, Term.mk_var i2)
-            ) ns.s_indices symb.s_indices
+              Term.ESubst (Term.mk_var i1, i2)
+            ) ns_args args
           in
           Term.subst s msg
 
         (* If indices [args] of the macro we want to expand
-           are equal to indices [is] corresponding to this macro
+           are equal to indices [ns_args] corresponding to this macro
            in the action description, then the macro is expanded as defined
            by the update term. *)
-        else if symb.s_indices = ns.s_indices then
+        else if args = Term.mk_vars ns_args then
           msg
 
         (* Otherwise, we need to take into account the possibility that
-           [arg] and [is] might be equal, and generate a conditional.  *)
+           [arg] and [ns_args] might be equal, and generate a conditional.  *)
         else
+          let ns_args : Term.terms = Term.mk_vars ns_args in
           let def =
             Term.mk_ite
-              (Term.mk_indices_eq symb.s_indices ns.s_indices)
+              (Term.mk_eqs ~simpl:true args ns_args)
               msg
-              (Term.mk_macro symb [] (Term.mk_pred (Term.mk_action asymb aidx)))
+              (Term.mk_macro symb args (Term.mk_pred (Term.mk_action asymb aidx))) 
           in
           def
       with Not_found ->
-        Term.mk_macro symb [] (Term.mk_pred (Term.mk_action asymb aidx))
+        Term.mk_macro symb args (Term.mk_pred (Term.mk_action asymb aidx))
     end
 
   | Symbols.Global _,
     Global_data ({action = (strict, glob_a)} as global_data ) ->
     if is_prefix strict glob_a (Action.get_shape action)
     then `Def (get_def_glob ~allow_dummy:false system table
-                 symb (Term.mk_action asymb aidx) action global_data)
+                 symb ~args ~ts:(Term.mk_action asymb aidx) action global_data)
     else `Undef
 
   |  _ -> assert false
@@ -337,7 +343,8 @@ type expand_context = InSequent | InGlobal of { inputs : Vars.vars }
 let get_definition_in_sequent
     (cntxt : Constr.trace_cntxt)
     (symb  : Term.msymb)
-    (ts    : Term.term)
+    ~(args : Term.term list)
+    ~(ts   : Term.term)
   : def_result
   =
   match SE.to_fset cntxt.system with
@@ -354,7 +361,7 @@ let get_definition_in_sequent
     in
     match ts_action with
     | Term.Action (asymb, idx) -> begin
-        match get_definition_nocntxt system cntxt.table symb asymb idx with
+        match get_definition_nocntxt system cntxt.table symb ~args asymb idx with
         | `Undef    -> `Undef
         | `Def mdef -> `Def (Term.subst [Term.ESubst (ts_action, ts)] mdef)
       end
@@ -366,15 +373,16 @@ let get_definition
     ?(mode : expand_context = InSequent)
     (cntxt : Constr.trace_cntxt)
     (symb  : Term.msymb)
-    (ts    : Term.term)
+    ~(args : Term.term list)
+    ~(ts   : Term.term)
   : def_result
   =
   (* first try to get the definition as in a sequent. *)
-  match get_definition_in_sequent cntxt symb ts, mode with 
+  match get_definition_in_sequent cntxt symb ~args ~ts, mode with 
   | `MaybeDef, InGlobal { inputs } 
     when is_global cntxt.table symb.Term.s_symb -> 
     (* if that fails, and if we are in [InGlobal] mode, get the internal def. *)
-    `Def (get_def_glob_internal cntxt.table cntxt.system symb inputs ts)
+    `Def (get_def_glob_internal cntxt.table cntxt.system symb ~args ~ts inputs)
   | res, _ -> res
 
 (** Exported *)
@@ -382,9 +390,10 @@ let get_definition_exn
     ?(mode : expand_context = InSequent)
     (cntxt : Constr.trace_cntxt)
     (symb  : Term.msymb)
-    (ts    : Term.term) : Term.term
+    ~(args : Term.term list)
+    ~(ts    : Term.term) : Term.term
   =
-  match get_definition ~mode cntxt symb ts with
+  match get_definition ~mode cntxt symb ~args ~ts with
   | `Undef ->
     soft_failure (Failure "cannot expand this macro: macro is undefined");
 
@@ -400,6 +409,7 @@ let get_dummy_definition
     (table  : Symbols.table)
     (system : SE.fset)
     (symb   : Term.msymb)
+    ~(args : Term.term list)
   : Term.term
   =
   match Symbols.Macro.get_all symb.s_symb table with
@@ -420,7 +430,8 @@ let get_dummy_definition
     let tvar = Vars.make_fresh Type.Timestamp "dummy" in
     let ts = Term.mk_var tvar in
 
-    get_def_glob ~allow_dummy:true system table symb ts dummy_action gdata
+    get_def_glob ~allow_dummy:true
+      system table symb ~args ~ts dummy_action gdata
 
   | _ -> assert false
 

@@ -8,77 +8,44 @@ module Mv = Vars.Mv
 (*------------------------------------------------------------------*)
 (** {2 Symbols} *)
 
-(** Ocaml type of a typed index symbol.
+(** A typed symbol.
     Invariant: [s_typ] do not contain tvar or univars *)
 type 'a isymb = {
   s_symb    : 'a;
-  s_indices : Vars.var list;
   s_typ     : Type.ty;
 }
 
-let mk_isymb (s : 'a) (t : Type.ty) (is : Vars.vars) =
+let mk_symb (s : 'a) (t : Type.ty) =
   let () = match t with
     | Type.TVar _ | Type.TUnivar _ -> assert false;
     | _ -> ()
   in
-  assert (
-    List.for_all (fun v ->
-        Type.equal (Vars.ty v) Type.tindex ||
-        Type.equal (Vars.ty v) Type.ttimestamp
-      ) is);
+  { s_symb = s;
+    s_typ  = t; }
 
-  { s_symb    = s;
-    s_typ     = t;
-    s_indices = is; }
+let hash_isymb s = Symbols.hash s.s_symb (* for now, type is not hashed *)
 
-
-type name = Symbols.name
-type nsymb = name isymb
-
-type fname = Symbols.fname
-type fsymb = fname
-
-type mname = Symbols.macro
-type msymb = mname isymb
-
-type state = msymb
+type nsymb = Symbols.name  isymb
+type msymb = Symbols.macro isymb
 
 (*------------------------------------------------------------------*)
-let pp_name ppf s = Printer.kws `GoalName ppf (Symbols.to_string s)
+let pp_nsymb ppf (ns : nsymb) =
+  Printer.kws `GoalName ppf (Symbols.to_string ns.s_symb)
 
-(*------------------------------------------------------------------*)
-let _pp_nsymb ~dbg ppf (ns : nsymb) =
-  if ns.s_indices <> []
-  then Fmt.pf ppf "%a(%a)" pp_name ns.s_symb (Vars._pp_list ~dbg) ns.s_indices
-  else Fmt.pf ppf "%a" pp_name ns.s_symb
-
-let _pp_nsymbs ~dbg ppf (l : nsymb list) =
+let pp_nsymbs ppf (l : nsymb list) =
   Fmt.pf ppf "@[<hov>%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ", ") (_pp_nsymb ~dbg)) l
-
-let pp_nsymb  = _pp_nsymb  ~dbg:false
-let pp_nsymbs = _pp_nsymbs ~dbg:false
+    (Fmt.list ~sep:(Fmt.any ", ") pp_nsymb) l
 
 (*------------------------------------------------------------------*)
-let pp_fname ppf s = Printer.kws `GoalFunction ppf (Symbols.to_string s)
-
-let _pp_fsymb ~dbg ppf (fn : fsymb) = 
-  Fmt.pf ppf "%a" pp_fname fn
-
-let pp_fsymb = _pp_fsymb ~dbg:false
+let pp_fname ppf (fn : Symbols.fname) = 
+  Printer.kws `GoalFunction ppf (Symbols.to_string fn)
 
 (*------------------------------------------------------------------*)
-let pp_mname_s ppf s = Printer.kws `GoalMacro ppf s
+let pp_msymb_s ppf (ms : Symbols.macro) =
+  Printer.kws `GoalMacro ppf (Symbols.to_string ms)
 
-let pp_mname ppf s =
-  pp_mname_s ppf (Symbols.to_string s)
-
-let _pp_msymb ~dbg ppf (ms : msymb) =
-  Fmt.pf ppf "%a%a"
-    pp_mname ms.s_symb
-    (Utils.pp_ne_list "(%a)" (Vars._pp_list ~dbg)) ms.s_indices
-
-let pp_msymb = _pp_msymb ~dbg:false
+let pp_msymb ppf (ms : msymb) =
+  pp_msymb_s ppf ms.s_symb
 
 (*------------------------------------------------------------------*)
 (** {2 Atoms and terms} *)
@@ -115,11 +82,11 @@ let pp_quant fmt = function
 (*------------------------------------------------------------------*)
 type term =
   | App    of term * term list
-  | Fun    of fsymb * Type.ftype * term list
-  | Name   of nsymb
+  | Fun    of Symbols.fname * Type.ftype * term list
+  | Name   of nsymb * term list
   | Macro  of msymb * term list * term
 
-  | Action of Symbols.action * Vars.var list 
+  | Action of Symbols.action * term list
 
   | Var of Vars.var
 
@@ -148,7 +115,7 @@ let rec hash : term -> int = function
     let h = hash f in
     hcombine (-1) (hash_l terms h)
 
-  | Name n -> hcombine 0 (hash_isymb n)
+  | Name (n,l) -> hcombine 0 (hash_l l (hash_isymb n))
 
   | Fun (f,_,terms) ->
     let h = Symbols.hash f in
@@ -177,17 +144,11 @@ let rec hash : term -> int = function
   | Var v -> hcombine 10 (Vars.hash v)
 
   | Action (s, is) ->
-    let h = hcombine_list Vars.hash (Symbols.hash s) is in
+    let h = hcombine_list hash (Symbols.hash s) is in
     hcombine 11 h
 
 and hash_l (l : term list) (h : int) : int = 
     hcombine_list hash h l
-
-(* ignore the type *)
-and hash_isymb : type a. a Symbols.t isymb -> int =
-  fun symb ->
-  let h = Symbols.hash symb.s_symb in
-  hcombine_list Vars.hash h symb.s_indices
 
 (*------------------------------------------------------------------*)
 (** {2 Higher-order terms} *)
@@ -197,72 +158,70 @@ type hterm = Lambda of Vars.vars * term
 (*------------------------------------------------------------------*)
 (** {2 Builtins function symbols} *)
 
-let mk f : fsymb = f
+let f_diff = Symbols.fs_diff
 
-let f_diff = mk Symbols.fs_diff
+let f_happens = Symbols.fs_happens
 
-let f_happens = mk Symbols.fs_happens
+let f_pred = Symbols.fs_pred
 
-let f_pred = mk Symbols.fs_pred
-
-let f_witness = mk Symbols.fs_witness
+let f_witness = Symbols.fs_witness
 
 (** Boolean connectives *)
 
-let f_false  = mk Symbols.fs_false
-let f_true   = mk Symbols.fs_true
-let f_and    = mk Symbols.fs_and
-let f_or     = mk Symbols.fs_or
-let f_impl   = mk Symbols.fs_impl
-let f_iff    = mk Symbols.fs_iff
-let f_not    = mk Symbols.fs_not
-let f_ite    = mk Symbols.fs_ite
+let f_false  = Symbols.fs_false
+let f_true   = Symbols.fs_true
+let f_and    = Symbols.fs_and
+let f_or     = Symbols.fs_or
+let f_impl   = Symbols.fs_impl
+let f_iff    = Symbols.fs_iff
+let f_not    = Symbols.fs_not
+let f_ite    = Symbols.fs_ite
 
 (** Comparisons *)
 
-let f_eq  = mk Symbols.fs_eq
-let f_neq = mk Symbols.fs_neq
-let f_leq = mk Symbols.fs_leq
-let f_lt  = mk Symbols.fs_lt
-let f_geq = mk Symbols.fs_geq
-let f_gt  = mk Symbols.fs_gt
+let f_eq  = Symbols.fs_eq
+let f_neq = Symbols.fs_neq
+let f_leq = Symbols.fs_leq
+let f_lt  = Symbols.fs_lt
+let f_geq = Symbols.fs_geq
+let f_gt  = Symbols.fs_gt
 
 (** Fail *)
 
-let f_fail   = mk Symbols.fs_fail
+let f_fail = Symbols.fs_fail
 
 (** Xor and its unit *)
 
-let f_xor    = mk Symbols.fs_xor
-let f_zero   = mk Symbols.fs_zero
+let f_xor  = Symbols.fs_xor
+let f_zero = Symbols.fs_zero
 
 (** Successor over natural numbers *)
 
-let f_succ   = mk Symbols.fs_succ
+let f_succ = Symbols.fs_succ
 
 (** Adversary function *)
 
-let f_att    = mk Symbols.fs_att
+let f_att = Symbols.fs_att
 
 (** Pairing *)
 
-let f_pair   = mk Symbols.fs_pair
-let f_fst    = mk Symbols.fs_fst
-let f_snd    = mk Symbols.fs_snd
+let f_pair = Symbols.fs_pair
+let f_fst  = Symbols.fs_fst
+let f_snd  = Symbols.fs_snd
 
 (** Boolean to Message *)
-let f_of_bool = mk Symbols.fs_of_bool
+let f_of_bool = Symbols.fs_of_bool
 
 (** Empty *)
 
 let empty =
   let fty = Symbols.ftype_builtin Symbols.fs_empty in
-  Fun (mk Symbols.fs_empty, fty, [])
+  Fun (Symbols.fs_empty, fty, [])
 
 (** Length *)
 
-let f_len    = mk Symbols.fs_len
-let f_zeroes = mk Symbols.fs_zeroes
+let f_len    = Symbols.fs_len
+let f_zeroes = Symbols.fs_zeroes
 
 (** Init action *)
 let init = Action(Symbols.init_action,[])
@@ -271,6 +230,8 @@ let init = Action(Symbols.init_action,[])
 (** {2 Smart constructors} *)
 
 let mk_var (v : Vars.var) : term = Var v
+
+let mk_vars (l : Vars.vars) : terms = List.map mk_var l
 
 let mk_action a is = Action (a,is)
 
@@ -295,7 +256,7 @@ let mk_app t l =
 
 let mk_proj i t = Proj (i,t)
 
-let mk_name n = Name n
+let mk_name n l = Name (n,l)
 
 let mk_macro ms l t = Macro (ms, l, t)
 
@@ -447,18 +408,11 @@ let mk_timestamp_leq t1 t2 = match t1,t2 with
   | _, Fun (f,_, [t2']) when f = f_pred -> mk_lt ~simpl:true t1 t2'
   | _ -> mk_leq t1 t2
 
-(** Operations on vectors of indices of the same length. *)
-let mk_indices_neq ?(simpl=false) (vect_i : Vars.var list) vect_j =
-  mk_ors ~simpl:true
-    (List.map2 (fun i j -> 
-         mk_neq ~simpl (mk_var i) (mk_var j)
-       ) vect_i vect_j)
+let mk_neqs ?(simpl=false) vect_i vect_j =
+  mk_ors ~simpl:true (List.map2 (mk_neq ~simpl) vect_i vect_j)
     
-let mk_indices_eq ?(simpl=true) vect_i vect_j =
-  mk_ands ~simpl:true
-    (List.map2 (fun i j -> 
-         mk_eq ~simpl (mk_var i) (mk_var j)
-       ) vect_i vect_j)
+let mk_eqs ?(simpl=true) vect_i vect_j =
+  mk_ands ~simpl:true (List.map2 (mk_eq ~simpl) vect_i vect_j)
 
 let mk_lambda evs ht = match ht with
   | Lambda (evs', t) -> Lambda (evs @ evs', t)
@@ -671,47 +625,33 @@ let subst_var (subst : subst) (var : Vars.var) : Vars.var =
 let subst_vars (subst : subst) (vs : Vars.vars) : Vars.vars =
   List.map (subst_var subst) vs
 
-let subst_isymb (s : subst) (symb : 'a isymb) : 'a isymb =
-  { symb with s_indices = subst_vars s symb.s_indices }
-
-
-let subst_macro (s : subst) isymb =
-  { isymb with s_indices = subst_vars s isymb.s_indices }
-
 (*------------------------------------------------------------------*)
+let rec fv (t : term) : Sv.t = 
+  match t with
+  | Var tv -> Sv.singleton tv
+  | Fun (_, _,lt) -> fvs lt
+  | App (t, l) -> fvs (t :: l)
 
-let fv (term : term) : Sv.t = 
-  let rec fv (t : term) : Sv.t = 
-    match t with
-    | Action (_,indices) -> Sv.of_list indices
-    | Var tv -> Sv.singleton tv
-    | Fun (_, _,lt) -> fvs lt
-    | App (t, l) -> fvs (t :: l)
+  | Macro (s, l, ts) ->
+    Sv.union (fv ts) (fvs l)
 
-    | Macro (s, l, ts) ->
-      Sv.union
-        (Sv.of_list s.s_indices)
-        (Sv.union (fv ts) (fvs l))
+  | Tuple l
+  | Name (_,l)
+  | Action (_,l) -> fvs l
 
-    | Name s -> Sv.of_list s.s_indices
+  | Proj (_, t) -> fv t
 
-    | Tuple ts -> fvs ts
-    | Proj (_, t) -> fv t
+  | Diff (Explicit l) -> fvs (List.map snd l)
 
-    | Diff (Explicit l) -> fvs (List.map snd l)
+  | Find (a, b, c, d) ->
+    Sv.union
+      (Sv.diff (fvs [b;c]) (Sv.of_list a))
+      (fv d)
 
-    | Find (a, b, c, d) ->
-      Sv.union
-        (Sv.diff (fvs [b;c]) (Sv.of_list a))
-        (fv d)
+  | Quant (_, a, b) -> Sv.diff (fv b) (Sv.of_list a)
 
-    | Quant (_, a, b) -> Sv.diff (fv b) (Sv.of_list a)
-
-  and fvs (terms : term list) : Sv.t = 
-    List.fold_left (fun sv x -> Sv.union (fv x) sv) Sv.empty terms
-  in
-
-  fv term
+and fvs (terms : term list) : Sv.t = 
+  List.fold_left (fun sv x -> Sv.union (fv x) sv) Sv.empty terms
 
 let get_vars t = fv t |> Sv.elements
 
@@ -840,15 +780,15 @@ let rec subst (s : subst) (t : term) : term =
 
       | App (t, l) -> App (subst s t, List.map (subst s) l)
 
-      | Name symb ->
-        Name { symb with s_indices = subst_vars s symb.s_indices}
+      | Name (symb,l) ->
+        Name (symb, List.map (subst s) l)
 
       | Macro (m, l, ts) ->
-        Macro (subst_macro s m, List.map (subst s) l, subst s ts)
+        Macro (m, List.map (subst s) l, subst s ts)
 
       | Var m -> Var m
 
-      | Action (a,indices) -> Action (a, subst_vars s indices)
+      | Action (a,indices) -> Action (a, List.map (subst s) indices)
 
       | Tuple ts -> Tuple (List.map (subst s) ts)
       | Proj (i, t) -> Proj (i, subst s t)
@@ -1128,13 +1068,13 @@ and _pp
 
   (* constant *)
   | Fun (f,_,[]) ->
-    Fmt.pf ppf "%a" pp_fsymb f
+    Fmt.pf ppf "%a" pp_fname f
 
   (* function symbol, general case *)
   | Fun (f,_,l) ->
     let pp ppf () =
       Fmt.pf ppf "@[<hov 2>%a %a@]"
-        (_pp_fsymb ~dbg:info.dbg) f
+        pp_fname f
         (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt "@ ")
            (pp (app_fixity, `Right)))
         l
@@ -1151,26 +1091,37 @@ and _pp
     in
     maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
 
-  | Name n ->
-    let pp ppf () = _pp_nsymb ~dbg:info.dbg ppf n in
+  | Name (n,l) ->
+    let pp ppf () =
+      if l = [] then
+        pp_nsymb ppf n 
+      else
+        Fmt.pf ppf "%a(%a)"
+          pp_nsymb n 
+          (Fmt.list ~sep:Fmt.comma (pp (tuple_fixity, `NonAssoc))) l
+    in
     maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
 
   | Macro (m, l, ts) ->
     let pp ppf () =
       Fmt.pf ppf "@[%a%a@%a@]"
-        (_pp_msymb ~dbg:info.dbg) m
+        pp_msymb m
         (Utils.pp_ne_list
            "(@[<hov>%a@])"
            (Fmt.list ~sep:Fmt.comma (pp (macro_fixity, `NonAssoc)))) l
         (pp (macro_fixity, `NonAssoc)) ts
     in
     maybe_paren ~outer ~side ~inner:macro_fixity pp ppf ()
-
+      
   | Action (symb,indices) ->
     let pp ppf () =
-      Printer.kw `GoalAction ppf "%s%a" 
-        (Symbols.to_string symb)
-        (_pp_indices ~dbg:info.dbg) indices
+      if indices = [] then
+        Printer.kw `GoalAction ppf "%s" 
+          (Symbols.to_string symb)
+      else
+        Printer.kw `GoalAction ppf "%s(%a)" 
+          (Symbols.to_string symb)
+          (Fmt.list ~sep:Fmt.comma (pp (tuple_fixity, `NonAssoc))) indices
     in
     maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
     
@@ -1294,7 +1245,7 @@ and pp_chained_find info ppf (t : term) =
 
 and pp_happens info ppf (ts : term list) =
   Fmt.pf ppf "@[<hv 2>%a(%a)@]"
-    pp_mname_s "happens"
+    (Printer.kws `GoalMacro) "happens"
     (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ")
        (pp info (happens_fixity, `NonAssoc))) ts
 
@@ -1363,7 +1314,7 @@ let ty ?ty_env (t : term) : Type.ty =
       check_tys l tys;
       t_out
 
-    | Name ns        -> ns.s_typ
+    | Name (ns, _) -> ns.s_typ
     | Macro (s,_,_)  -> s.s_typ
 
     | Tuple ts -> 
@@ -1516,7 +1467,7 @@ let f_triv = function
 (*------------------------------------------------------------------*)
 (** Declare input and output macros. *)
 
-let mk s k = { s_symb = s; s_typ = k; s_indices = []; }
+let mk s k = { s_symb = s; s_typ = k; }
 
 let in_macro    : msymb = mk Symbols.inp   Type.Message
 let out_macro   : msymb = mk Symbols.out   Type.Message
@@ -1752,7 +1703,7 @@ let is_pure_timestamp (t : term) =
 
     | Action _ -> true
 
-    | Var v -> let ty = Vars.ty v in ty = Type.Timestamp || ty = Type.Index
+    | Var v -> Type.is_finite (Vars.ty v)
 
     | Fun _ -> false            (* because of adversarial sumbols! *)
 
@@ -1801,9 +1752,6 @@ let alpha_var (s : subst) (v1 : Vars.var) (v2 : Vars.var) : unit =
   if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then raise AlphaFailed;
   if not (Vars.equal v1 (subst_var s v2)) then raise AlphaFailed
 
-let alpha_vars (s : subst) (vs1 : Vars.vars) (vs2 : Vars.vars) : unit =
-  List.iter2 (alpha_var s) vs1 vs2
-
 let alpha_bnd (s : subst) (v1 : Vars.var) (v2 : Vars.var) : subst =
   if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then
     raise AlphaFailed 
@@ -1832,15 +1780,16 @@ let alpha_conv ?(subst=[]) (t1 : term) (t2 : term) : bool =
       doit s f f';
       doits s l l'
 
-    | Name n, Name n' when n.s_symb = n'.s_symb ->
-      alpha_vars s n.s_indices n'.s_indices
+    | Name (n,l), Name (n',l') when n.s_symb = n'.s_symb ->
+      assert (List.length l = List.length l');
+      doits s l l'
 
     | Macro (m,l,ts), Macro (m',l',ts') when m.s_symb = m'.s_symb ->
-      alpha_vars s m.s_indices m'.s_indices;
+      assert (List.length l = List.length l');
       doits s (ts :: l) (ts' :: l')
 
     | Action (a,is), Action (a',is') when a = a' ->
-      alpha_vars s is is'
+      doits s is is'
 
     | Var x, Var x' ->
       alpha_var s x x'
@@ -1897,6 +1846,12 @@ let rec make_normal_biterm
   let t1 = head_pi_term left_proj t
   and t2 = head_pi_term right_proj t in
 
+  let check_alpha s l l' =
+    List.iter2 (fun t t' ->
+        if not (alpha_conv ~subst:s t t') then raise AlphaFailed 
+      ) l l'
+  in
+
   let doit () =
     (* TODO generalize to non-binary diff *)
     match t1, t2 with
@@ -1911,19 +1866,22 @@ let rec make_normal_biterm
     | App (f, l), App (f', l') when List.length l = List.length l' ->
       App (mdiff s f f', List.map2 (mdiff s) l l')
 
-    | Name n, Name n' when n.s_symb = n'.s_symb ->
-      alpha_vars s n.s_indices n'.s_indices;
-      Name n
+    | Name (n,l), Name (n',l') when n.s_symb = n'.s_symb ->
+      check_alpha s l l';
+      Name (n, l)
+      (* Name (n, List.map2 (mdiff s) l l' *)
 
     | Macro (m,l,ts), Macro (m',l',ts')
       when m.s_symb = m'.s_symb && ts = subst s ts' ->
-      assert (l = [] && l' = []);
-      alpha_vars s m.s_indices m'.s_indices;
-      Macro (m, List.map2 (mdiff s) l l', ts)
+      assert (List.length l = List.length l');
+      check_alpha s l l';
+      Macro (m, l, ts)
+      (* Macro (m, List.map2 (mdiff s) l l', ts) *)
 
     | Action (a,is), Action (a',is') when a = a' ->
-      alpha_vars s is is';
+      check_alpha s is is';
       Action (a,is)
+      (* Action (a,List.map2 (mdiff s) is is') *)
 
     | Var x, Var x' ->
       alpha_var s x x';
@@ -2054,7 +2012,7 @@ let get_head : term -> term_head = function
   | Fun (f,_,_)    -> HFun f
   | Find _         -> HFind
   | Macro (m1,_,_) -> HMacro m1.s_symb
-  | Name n1        -> HName n1.s_symb
+  | Name (n1, _)   -> HName n1.s_symb
   | Diff _         -> HDiff
   | Var _          -> HVar
   | Action _       -> HAction
@@ -2115,18 +2073,3 @@ let () =
         assert (head_normal_biterm t = mk_and (diff f f') (diff g g'))
     end ;
   ] 
-
-
-
-(*------------------------------------------------------------------*)
-(* Utility functions for lists of nsymbs *)
-
-(** looks for a name with the same symbol in the list *)
-let exists_symb (n:nsymb) (ns:nsymb list) : bool =
-  List.exists (fun nn -> n.s_symb = nn.s_symb) ns
-
-
-(** finds all names with the same symbol in the list *)
-let find_symb (n:nsymb) (ns:nsymb list) : nsymb list =
-  List.filter (fun nn -> n.s_symb = nn.s_symb) ns
-

@@ -107,7 +107,7 @@ val action_to_term :
 val actions :
   Symbols.table ->
   <symbols:unit;..> expr ->
-  (Action.action * Symbols.action * Vars.vars) list
+  (Action.action_v * Symbols.action * Vars.vars) list
 
 (*------------------------------------------------------------------*)
 (** {2 Action descriptions} *)

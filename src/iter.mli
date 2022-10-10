@@ -29,8 +29,8 @@ class deprecated_iter_approx_macros :
   exact:bool ->
   cntxt:Constr.trace_cntxt ->
   object
-    val mutable checked_macros : Term.mname list
-    method visit_macro : Term.msymb -> Term.term -> unit
+    val mutable checked_macros : Symbols.macro list
+    method visit_macro : Term.msymb -> Term.terms -> Term.term -> unit
     method visit_message : Term.term -> unit
   end
 
@@ -45,15 +45,15 @@ class deprecated_iter_approx_macros :
     Deprecated: use [get_f_messages_ext] *)
 class deprecated_get_f_messages :
   ?drop_head:bool ->
-  ?fun_wrap_key:(Term.fname -> bool) option ->
+  ?fun_wrap_key:(Symbols.fname -> bool) option ->
   cntxt:Constr.trace_cntxt ->
-  Term.fname ->
-  Term.name ->
+  Symbols.fname ->
+  Symbols.name ->
   object
-    val mutable checked_macros : Term.mname list
-    val mutable occurrences : (Vars.var list * Term.term) list
-    method get_occurrences : (Vars.var list * Term.term) list
-    method visit_macro : Term.msymb -> Term.term -> unit
+    val mutable checked_macros : Symbols.macro list
+    val mutable occurrences : (Term.term list * Term.term) list
+    method get_occurrences : (Term.term  list * Term.term) list
+    method visit_macro : Term.msymb -> Term.terms -> Term.term -> unit
     method visit_message : Term.term -> unit
   end
 
@@ -97,7 +97,7 @@ type mess_occ = Term.term occ
 
 type mess_occs = mess_occ list
 
-type fsymb_matcher = Type of Symbols.function_def | Symbol of Term.fsymb
+type fsymb_matcher = Type of Symbols.function_def | Symbol of Symbols.fname
 
 (** Looks for occurrences of subterms using a function symbol of the given kind
     (Hash, Dec, ...).
@@ -117,7 +117,7 @@ val get_fsymb :
   ?excludesymtype:Symbols.function_def ->
   ?allow_diff:bool -> 
   Symbols.table -> 
-  Term.fsymb -> 
+  Symbols.fname -> 
   Term.term -> 
   mess_occs
 
@@ -135,7 +135,7 @@ val get_diff : cntxt:Constr.trace_cntxt -> Term.term -> diff_occs
 (** {2 Find [Fun _] applications} *)
 
 (** pair of the key indices and the term *)
-type hash_occ = (Vars.var list * Term.term) occ
+type hash_occ = (Term.term list * Term.term) occ
 
 type hash_occs = hash_occ list
 
@@ -149,12 +149,12 @@ val pp_hash_occ : Format.formatter -> hash_occ -> unit
     timestamp that may not happen. *)
 val get_f_messages_ext :
   ?drop_head:bool ->
-  ?fun_wrap_key:(Term.fname -> bool) option ->
+  ?fun_wrap_key:(Symbols.fname -> bool) option ->
   ?fv:Vars.vars ->
   mode:[`Delta of Constr.trace_cntxt | `NoDelta] ->
   SE.arbitrary ->
-  Term.fname -> 
-  Term.name -> 
+  Symbols.fname -> 
+  Symbols.name -> 
   Term.term -> 
   hash_occs
 
@@ -162,7 +162,9 @@ val get_f_messages_ext :
 (** {2 Macros} *)
 
 (** occurrences of a macro [n(i,...,j)] *)
-type macro_occ = Term.msymb occ
+type macro_occ_cnt = { symb : Term.msymb; args : Term.term list} 
+
+type macro_occ = macro_occ_cnt occ
 
 type macro_occs = macro_occ list
 

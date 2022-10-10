@@ -76,7 +76,7 @@ let nilpotence_norm compare l =
   aux l
 
 (*------------------------------------------------------------------*)
-(** Generalized function symbols, for [Term.fsymb], [Term.msymb] and 
+(** Generalized function symbols, for [Symbols.fname], [Term.msymb] and 
     [Symbols.action]. *)
 type gfsymb = 
   | F of Symbols.fname           (* function symbol *)
@@ -276,7 +276,7 @@ let box_term (ct_memo : ct_memo) (t : Term.term) : cterm =
 
 (*------------------------------------------------------------------*)
 (** Translation from [term] to [cterm] with memoization *)
-let rec cterm_of_term (ct_memo : ct_memo) (c : Term.term) : cterm = 
+let cterm_of_term (ct_memo : ct_memo) (c : Term.term) : cterm = 
   let rec cterm_of_term (c : Term.term) : cterm = 
     match c with
     | Fun (f,_,terms) ->
@@ -291,17 +291,16 @@ let rec cterm_of_term (ct_memo : ct_memo) (c : Term.term) : cterm =
       cfun (P i) [cterm_of_term t]
 
     | Macro (ms,l,ts) -> 
-      assert (l = []); 
-      let is = List.map cterm_of_var ms.s_indices in
+      let is = List.map cterm_of_term l in
       cfun
         (M (ms.s_symb, ms.s_typ)) (is @ [cterm_of_term ts])
 
     | Term.Action (a,is) ->
-      let is = List.map cterm_of_var is in
+      let is = List.map cterm_of_term is in
       cfun (A a) is
 
-    | Name ns -> 
-      let is = List.map cterm_of_var ns.s_indices in
+    | Name (ns, is) -> 
+      let is = List.map cterm_of_term is in
       cfun (N (ns.s_symb,ns.s_typ)) is
 
     | Var m  -> ccst (Cst.Cmvar m)
@@ -317,20 +316,8 @@ let rec cterm_of_term (ct_memo : ct_memo) (c : Term.term) : cterm =
   in
   cterm_of_term c
 
-and cterm_of_var i = ccst (Cst.Cmvar i)
-
 
 (*------------------------------------------------------------------*)
-let i_or_ts_of_cterm i = 
-  match i.cnt with
-  | Ccst (Cst.Cmvar m) ->
-    assert (Type.equal (Vars.ty m) Type.tindex ||
-            Type.equal (Vars.ty m) Type.ttimestamp);
-    m
-  | _ -> assert false
-
-let i_or_ts_of_cterms cis = List.map i_or_ts_of_cterm cis
-
 let term_of_cterm (table : Symbols.table) (c : cterm) : Term.term =
   let rec term_of_cterm (c : cterm) : Term.term = 
     match c.cnt with 
@@ -351,17 +338,18 @@ let term_of_cterm (table : Symbols.table) (c : cterm) : Term.term =
     | Cfun (M (m,ek), cterms) -> 
       let cis, cts = List.takedrop (List.length cterms - 1) cterms in
       let cts = as_seq1 cts in
-      let m = Term.mk_isymb m ek (i_or_ts_of_cterms cis) in
-      Term.mk_macro m [] (term_of_cterm cts) 
+      let m = Term.mk_symb m ek in
+      let args = terms_of_cterms cis in
+      Term.mk_macro m args (term_of_cterm cts) 
 
-    | Cfun (A a, is) -> 
-      let is = i_or_ts_of_cterms is in
-      Term.mk_action a is
+    | Cfun (A a, args) -> 
+      let args = terms_of_cterms args in
+      Term.mk_action a args
 
     | Cfun (N (n,nty), is) -> 
-      let is = i_or_ts_of_cterms is in
-      let ns = Term.mk_isymb n nty is in
-      Term.mk_name ns
+      let is = terms_of_cterms is in
+      let ns = Term.mk_symb n nty in
+      Term.mk_name ns is
 
     | Ccst (Cst.Cmvar m) -> Term.mk_var m
 
@@ -372,8 +360,8 @@ let term_of_cterm (table : Symbols.table) (c : cterm) : Term.term =
       Term.mk_action a []
 
     | Ccst (Cst.Cgfuncst (`N (n,nty))) ->
-      let ns = Term.mk_isymb n nty [] in
-      Term.mk_name ns
+      let ns = Term.mk_symb n nty in
+      Term.mk_name ns []
 
     | Ccst (Cst.Cboxed t) -> t
 
@@ -1600,8 +1588,8 @@ let name_index_cnstrs table state l : Term.term list =
       else begin
         List.map2 (fun x y -> 
             Term.mk_atom `Eq 
-              (Term.mk_var (i_or_ts_of_cterm x))
-              (Term.mk_var (i_or_ts_of_cterm y))
+              (term_of_cterm table x)
+              (term_of_cterm table y)
           ) is is'
       end
 

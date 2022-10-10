@@ -231,7 +231,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
             (Tactics.Failure "nothing to expand: the system is too general")
       in
 
-      Macros.get_definition_exn ?mode (S.mk_trace_cntxt ~se s) ms a 
+      Macros.get_definition_exn ?mode (S.mk_trace_cntxt ~se s) ms ~args:l ~ts:a 
 
     | Fun (fs, _, ts)
       when Operator.is_operator (S.table s) fs ->
@@ -241,7 +241,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         | `FreeTyv ->
           let err_str =
             Fmt.str "cannot expand operator %a: free type variable remaining"
-              Term.pp_fsymb fs
+              Term.pp_fname fs
           in
           soft_failure (Tactics.Failure err_str)
       end
@@ -676,8 +676,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let table  = S.table s in
 
     let mk_case (action,symbol,indices) : Vars.var list * Term.term =
-      let env = ref (S.vars s) in
-      let indices, s = Term.refresh_vars (`InEnv env) indices in
+      let action = Action.to_action action in
+
+      let env = S.vars s in
+      let _, indices, s = Term.refresh_vars_env env indices in
 
       let name =
         SystemExpr.action_to_term table system
@@ -1652,7 +1654,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (s : S.t) : S.t list
     =
     match tn, tm with
-    | Name n, Name m ->
+    | (Name (n, _) as tn), (Name (m, _) as tm) ->
       let table = S.table s in
 
       (* FEATURE: subtypes *)
@@ -1664,9 +1666,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           (Failure "names are of a type that is not [name_fixed_length]");
 
       let f =
-        Term.mk_atom `Eq
-          (Term.mk_len (Term.mk_name n))
-          (Term.mk_len (Term.mk_name m))
+        Term.mk_atom `Eq (Term.mk_len tn) (Term.mk_len tm)
       in
       let f = Equiv.Babel.convert f ~src:Equiv.Local_t ~dst:S.conc_kind in
 
@@ -2236,7 +2236,7 @@ let () =
 (*------------------------------------------------------------------*)
 let () = T.register_general "dependent induction"
     ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
-                  detailed_help = "Only supports induction over timestamps.";
+                  detailed_help = "Only supports induction over finite types.";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
     (gentac_of_any_tac_arg

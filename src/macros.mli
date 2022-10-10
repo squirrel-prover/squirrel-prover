@@ -36,20 +36,21 @@ type def_result = [ `Def of Term.term | `Undef | `MaybeDef ]
 type expand_context = InSequent | InGlobal of { inputs : Vars.vars }
 
 (*------------------------------------------------------------------*)
-(** [get_definition context macro t] returns the expansion of [macro] at [t],
+(** [get_definition context macro ~args ts] returns the expansion of 
+    [macro(args)] at [ts],
     if the macro can be expanded.
     Does *not* check that the timestamp happens!
-    The [context] is only used to determine whether [t] is equal
+    The [context] is only used to determine whether [ts] is equal
     to some action in the trace model.
 
     Returns [`Def body] when the macro expands to [body],
-    [`Undef] if the macro has no meaning at [t],
+    [`Undef] if the macro has no meaning at [ts],
     and [`MaybeDef] if the status is unknown (typically
     because [t] is unknown). *)
 val get_definition :
   ?mode:expand_context ->
   Constr.trace_cntxt ->
-  Term.msymb -> Term.term ->
+  Term.msymb -> args:Term.term list -> ts:Term.term ->
   def_result
 
 (** Same as [get_definition] but raises a soft failure if the macro
@@ -57,7 +58,7 @@ val get_definition :
 val get_definition_exn :
   ?mode:expand_context ->
   Constr.trace_cntxt ->
-  Term.msymb -> Term.term ->
+  Term.msymb -> args:Term.term list -> ts:Term.term ->
   Term.term
 
 (** Variant of [get_definition] without dependency on [Constr] module,
@@ -67,7 +68,8 @@ val get_definition_exn :
     a given action. *)
 val get_definition_nocntxt :
   SE.fset -> Symbols.table ->
-  Term.msymb -> Symbols.action -> Vars.vars ->
+  Term.msymb -> args:Term.term list ->
+  Symbols.action -> Term.term list ->
   [ `Def of Term.term | `Undef ]
 
 (** When [m] is a global macro symbol,
@@ -75,7 +77,7 @@ val get_definition_nocntxt :
     would be obtained with [get_definition m li ts] for some [ts],
     except that it will feature meaningless action names in some places. *)
 val get_dummy_definition :
-  Symbols.table -> SE.fset -> Term.msymb -> Term.term
+  Symbols.table -> SE.fset -> Term.msymb -> args:Term.term list -> Term.term
 
 (*------------------------------------------------------------------*)
 type system_map_arg =
