@@ -417,9 +417,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let tbl = S.table s in
     match Args.convert_as_lsymb [Args.Theory arg] with
     | Some m ->
-      if Symbols.Macro.mem m tbl then
+      if Symbols.Macro.mem_lsymb m tbl then
         `Msymb (Symbols.Macro.of_lsymb m tbl)
-      else if Symbols.Function.mem m tbl then
+      else if Symbols.Function.mem_lsymb m tbl then
         `Fsymb (Symbols.Function.of_lsymb m tbl)
       else
         soft_failure ~loc:(L.loc arg) (Failure "not a macro or operator");

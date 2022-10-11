@@ -117,37 +117,96 @@ let same_shape (a : action_v) (b : action_v) : Term.subst option =
     else None in
   same [] a b
 
+(*------------------------------------------------------------------*)
 (** Action symbols *)
 
-type Symbols.data += ActionData of Vars.var list * action
+type data = 
+    | Decl of int
+    (** A declared but undefined action with its arity: no shape available yet.
+        Only used during process type-checking. *)
 
-let fresh_symbol table ~exact name =
-  if exact
+    | Def  of Vars.var list * action
+    (** A defined action, with an associated shape.
+        Actions in sequent must always be defined. *)
+
+(** Action data in the symbol table *)
+type Symbols.data += ActionData of data
+
+(*------------------------------------------------------------------*)
+let as_def : data -> Vars.var list * action = function
+  | Decl _    -> assert false
+  | Def (l,a) -> l, a
+
+(*------------------------------------------------------------------*)
+let data_of_lsymb (lsymb : Symbols.lsymb) table : data =
+  match Symbols.Action.data_of_lsymb lsymb table with
+    | ActionData data -> data
+    | _ -> assert false
+
+let get_data (s : Symbols.action) table : data =
+  match Symbols.Action.get_data s table with
+    | ActionData data -> data
+    | _ -> assert false
+
+(*------------------------------------------------------------------*)
+let def_of_lsymb (lsymb : Symbols.lsymb) table : Vars.var list * action =
+  as_def (data_of_lsymb lsymb table)
+
+let get_def (s : Symbols.action) table : Vars.var list * action =
+  as_def (get_data s table)
+
+(*------------------------------------------------------------------*)
+let of_lsymb lsymb table : Symbols.action = Symbols.Action.of_lsymb lsymb table 
+
+(*------------------------------------------------------------------*)
+let arity (s : Symbols.action) table =
+  match get_data s table with
+  | Def (l, _) -> List.length l
+  | Decl a     -> a
+
+(*------------------------------------------------------------------*)
+let is_decl (s : Symbols.action) table : bool =
+  if Symbols.Action.is_reserved s table then false
+  else
+    match get_data s table with Decl _ -> true | Def _ -> false
+    
+let is_decl_lsymb (lsymb : Symbols.lsymb) table : bool =
+  if Symbols.Action.mem_lsymb lsymb table then
+    match data_of_lsymb lsymb table with Decl _ -> true | Def _ -> false
+  else false
+
+let fresh_symbol
+    table ~exact (name : Symbols.lsymb) 
+  : Symbols.table * Symbols.action 
+  =
+  if is_decl_lsymb name table then
+    (* symbol is declared but not yet defined *)
+    table, Symbols.Action.of_lsymb name table 
+  else if exact 
   then Symbols.Action.reserve_exact table name
   else Symbols.Action.reserve       table name
 
-let define_symbol table symb args action =
-  let data = ActionData (args,action) in
-  Symbols.Action.define table symb ~data (List.length args)
+(*------------------------------------------------------------------*)
+let declare_symbol table (symb : Symbols.action) arity : Symbols.table =
+  let data = ActionData (Decl arity) in
+  Symbols.Action.define table symb ~data arity
 
-let find_symbol s table =
-  match Symbols.Action.data_of_lsymb s table with
-    | ActionData (x,y) -> x,y
-    | _ -> assert false
+let define_symbol table (symb : Symbols.action) args action : Symbols.table =
+  let data = ActionData (Def (args,action)) in
+  if not (Symbols.Action.is_reserved symb table) && is_decl symb table then
+    (* [symb] was declared but not yet defined, define it *)
+    Symbols.Action.redefine table symb ~data (List.length args)
+  else 
+    (* [symb] was reserved, define it *)
+    Symbols.Action.define   table symb ~data (List.length args)
 
-let of_symbol s table =
-  match Symbols.Action.get_data s table with
-    | ActionData (x,y) -> x,y
-    | _ -> assert false
-
-let arity s table =
-  let l,_ = of_symbol s table in
-  List.length l
-
-let iter_table f table =
+(*------------------------------------------------------------------*)
+(** Iters over defined action (ignored declared actions). *)
+let iter_def_table f table =
   Symbols.Action.iter
     (fun s _ -> function
-       | ActionData (args,action) -> f s args action
+       | ActionData (Def (args,action)) -> f s args action
+       | ActionData (Decl _) -> ()
        | _ -> assert false)
     table
 
@@ -224,7 +283,7 @@ let rec subst_action_v (s : Term.subst) (a : action_v) : action_v =
 
 (*------------------------------------------------------------------*)
 let of_term (s : Symbols.action) (l : Term.term list) table : action =
-  let l',a = of_symbol s table in
+  let l',a = get_def s table in
   let subst =
     List.map2 (fun x y -> Term.ESubst (Term.mk_var x, y)) l' l
   in
@@ -452,7 +511,7 @@ let debug = false
 let pp_actions ppf table =
   Fmt.pf ppf "@[<v 2>Available action shapes:@;@;@[" ;
   let comma = ref false in
-  iter_table
+  iter_def_table
     (fun symbol indices action ->
        if !comma then Fmt.pf ppf ",@;" ;
        comma := true ;

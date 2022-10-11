@@ -1,6 +1,4 @@
-
-
-channel c
+channel c.
 
 system S : !_i new n; out(c,n).
 

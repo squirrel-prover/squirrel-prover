@@ -110,23 +110,50 @@ val dummy : shape -> action
   * They are indexed and are associated to an action using the argument
   * indices. *)
 
+(*------------------------------------------------------------------*)
+(** Data associated to an action symbol *)
+type data = 
+    | Decl of int
+    (** A declared but undefined action with its arity: no shape available yet.
+        Only used during process type-checking. *)
+
+    | Def  of Vars.var list * action
+    (** A defined action, with an associated shape.
+        Actions in sequent must always be defined. *)
+
+(*------------------------------------------------------------------*)
 (** Get a fresh symbol whose name starts with the given prefix.
     If [exact] is true, the symbol must be exactly the argument. *)
 val fresh_symbol :
   Symbols.table -> exact:bool -> Symbols.lsymb ->
   Symbols.table * Symbols.action 
 
+(** Declare a symbol with a given arity. The symbol has no action 
+    associated to it yet. *)
+val declare_symbol : Symbols.table ->  Symbols.action -> int -> Symbols.table
+
+(** defined an action symbol, that is either Reserved or declared in
+    the symbol table. *)
 val define_symbol :
   Symbols.table ->
   Symbols.action -> Vars.var list -> action ->
   Symbols.table
 
-val find_symbol : Symbols.lsymb -> Symbols.table -> Vars.var list * action
+(*------------------------------------------------------------------*)
+val is_decl : Symbols.action -> Symbols.table -> bool 
 
-val of_symbol :
-  Symbols.action -> Symbols.table ->
-  Vars.var list * action
+(*------------------------------------------------------------------*)
+val data_of_lsymb : Symbols.lsymb  -> Symbols.table -> data
+val get_data      : Symbols.action -> Symbols.table -> data
 
+(*------------------------------------------------------------------*)
+val def_of_lsymb : Symbols.lsymb  -> Symbols.table -> Vars.var list * action
+val get_def      : Symbols.action -> Symbols.table -> Vars.var list * action 
+
+(*------------------------------------------------------------------*)
+val of_lsymb : Symbols.lsymb -> Symbols.table -> Symbols.action
+
+(*------------------------------------------------------------------*)
 val arity : Symbols.action -> Symbols.table -> int
 
 (*------------------------------------------------------------------*)

@@ -285,7 +285,10 @@ module type Namespace = sig
   val declare       : table -> lsymb -> ?data:data -> def -> table * ns t
   val declare_exact : table -> lsymb -> ?data:data -> def -> table * ns t
 
-  val mem : lsymb -> table -> bool
+  val is_reserved : ns t -> table -> bool
+
+  val mem       : ns t  -> table -> bool
+  val mem_lsymb : lsymb -> table -> bool
 
   val of_lsymb     : lsymb -> table -> ns t
   val of_lsymb_opt : lsymb -> table -> ns t option
@@ -380,7 +383,21 @@ module Make (N:S) : Namespace
 
   let cast_of_string name = {group;name}
 
-  let mem (name : lsymb) (table : table) : bool =
+  let is_reserved (name : ns t) (table : table) : bool =
+    match Msymb.find name table.cnt with
+    | Reserved n, _ -> n = N.namespace
+    | Exists _, _ -> false
+    | exception Not_found -> false
+
+  let mem (name : ns t) (table : table) : bool =
+    try
+      ignore (N.deconstruct ~loc:None (fst (Msymb.find name table.cnt))) ;
+      true
+    with
+    | SymbError (_,Incorrect_namespace _)
+    | Not_found -> false
+
+  let mem_lsymb (name : lsymb) (table : table) : bool =
     let symb = { group; name = L.unloc name } in
     try
       ignore (N.deconstruct

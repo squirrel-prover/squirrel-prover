@@ -33,6 +33,12 @@ type name_decl = {
 }
 
 (*------------------------------------------------------------------*)
+type action_decl = {
+  a_name : lsymb ;
+  a_arity : int;
+}
+
+(*------------------------------------------------------------------*)
 type bty_decl = {
   bty_name  : lsymb ;
   bty_infos : Symbols.bty_info list ;
@@ -109,6 +115,8 @@ type declaration_i =
   | Decl_senc_w_join_hash of lsymb * lsymb * lsymb
 
   | Decl_sign of lsymb * lsymb * lsymb * orcl_tag_info option * c_tys
+
+  | Decl_action   of action_decl
 
   | Decl_name     of lsymb * Theory.p_ty option * Theory.p_ty
   | Decl_state    of macro_decl

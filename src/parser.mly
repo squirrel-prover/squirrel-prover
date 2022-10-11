@@ -63,7 +63,7 @@
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token TILDE DIFF SEQ
 %token NEW OUT PARALLEL NULL
-%token CHANNEL PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT OP TYPE FUN
+%token CHANNEL PROCESS HASH AENC SENC SIGNATURE ACTION NAME ABSTRACT OP TYPE FUN
 %token MUTABLE SYSTEM SET
 %token INDEX MESSAGE BOOL BOOLEAN TIMESTAMP ARROW RARROW
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
@@ -531,6 +531,9 @@ declaration_i:
 
 | NAME e=lsymb COLON tout=p_base_ty
                           { Decl.Decl_name (e, None, tout) }
+
+| ACTION e=lsymb COLON a_arity=int
+                          { Decl.Decl_action { a_name = e; a_arity; } }
 
 | TYPE e=lsymb infos=bty_infos
                           { Decl.Decl_bty { bty_name = e; bty_infos = infos; } }

@@ -33,7 +33,7 @@ let find gname table : lemma =
   as_lemma (Symbols.Lemma.data_of_lsymb gname table) 
 
 let find_opt gname table : lemma option =
-  if not (Symbols.Lemma.mem gname table)
+  if not (Symbols.Lemma.mem_lsymb gname table)
   then None
   else Some (find gname table)
 
@@ -50,7 +50,7 @@ let find_kind gname table : [`Axiom | `Lemma] = (find gname table).kind
 
 (*------------------------------------------------------------------*)
 let mem gname table : bool =
-  Symbols.Lemma.mem gname table
+  Symbols.Lemma.mem_lsymb gname table
 
 let mem_reach gname table : bool =
   match find_opt gname table with

@@ -49,7 +49,7 @@ let empty_hint_db = { db_rewrite = empty_rewrite_db; db_smt = [] }
 (** Get the hint data-base from the table. 
     Use [default_hint_symb] if there are no hint database yet. *)
 let hint_db (table : Symbols.table) : hint_db =
-  if not (Symbols.HintDB.mem default_hint_symb table) then
+  if not (Symbols.HintDB.mem_lsymb default_hint_symb table) then
     empty_hint_db
   else
     match Symbols.HintDB.data_of_lsymb default_hint_symb table with

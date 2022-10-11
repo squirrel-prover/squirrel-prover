@@ -227,8 +227,11 @@ module type Namespace = sig
   val declare_exact :
     table -> lsymb -> ?data:data -> def -> table * ns t
 
+  val is_reserved : ns t -> table -> bool
+
   (** [mem s table] checks if [s] exists in this namespace. *)
-  val mem : lsymb -> table -> bool
+  val mem       : ns t -> table -> bool
+  val mem_lsymb : lsymb -> table -> bool
 
   (** [of_lsymb s] returns [s] as a symbol, if it exists in this namespace.
       @raise Unbound_identifier otherwise. *)

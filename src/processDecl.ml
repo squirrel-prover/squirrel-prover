@@ -173,7 +173,7 @@ let define_oracle_tag_formula table (h : lsymb) f =
 (*------------------------------------------------------------------*)
 (** {2 Declaration processing} *)
 
-let declare table decl = 
+let declare table decl : Symbols.table * Goal.t list = 
   match L.unloc decl with
   | Decl.Decl_channel s -> Channel.declare table s, []
 
@@ -186,6 +186,10 @@ let declare table decl =
     let projs = parse_projs projs in
     
     Process.declare table id args projs proc, []
+
+  | Decl.Decl_action a ->
+    let table, symb = Symbols.Action.reserve_exact table a.a_name in
+    Action.declare_symbol table symb a.a_arity, []
 
   | Decl.Decl_axiom pgoal ->
     let pgoal =

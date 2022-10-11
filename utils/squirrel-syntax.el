@@ -43,6 +43,7 @@
   "system"
   "type"
   "name"
+  "action"
   "channel"
   "mutable"
   "process"

@@ -98,6 +98,7 @@ rule token = parse
 | "such that"         { SUCHTHAT }
 | "process"           { PROCESS }
 | "abstract"          { ABSTRACT }
+| "action"            { ACTION }
 | "op"                { OP }
 | "fun"               { FUN }
 | "type"              { TYPE }

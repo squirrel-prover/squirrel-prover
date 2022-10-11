@@ -129,7 +129,7 @@ let is_prefix strict a b =
     | `Large -> true
     | `Strict -> i > 0
 
-(** Check is not done module equality.
+(** Check is not done modulo equality.
     Not exported. *)
 let is_defined (name : Symbols.macro) (a : Term.term) table =
   match Symbols.Macro.get_all name table with
@@ -149,7 +149,7 @@ let is_defined (name : Symbols.macro) (a : Term.term) table =
       if not (is_action a) then false
       else
         let asymb = get_action_symb a in
-        let _, action = Action.of_symbol asymb table in
+        let _, action = Action.get_def asymb table in
         is_prefix strict a0 (Action.get_shape action)
 
     | Symbols.Global _, _ -> assert false

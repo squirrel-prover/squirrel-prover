@@ -563,20 +563,30 @@ let check_name table (s : lsymb) n : Type.ftype =
   if arity <> n then conv_err (L.loc s) (Arity_error (L.unloc s,n,arity));
   fty
 
-let check_action (env : Env.t) (s : lsymb) (n : int) : unit =
-  let l,action = Action.find_symbol s env.table in
-  let arity = List.length l in
+let check_action type_checking in_proc (env : Env.t) (s : lsymb) (n : int) : unit =
+  let a = Action.of_lsymb s env.table in
+  let arity = Action.arity a env.table in 
 
   if arity <> n then conv_err (L.loc s) (Arity_error (L.unloc s,n,arity));
 
-  try
-    let system = SE.to_compatible env.system.set in
-    ignore (SE.action_to_term env.table system action : Term.term)
-  with
-  | Not_found
-  | SE.Error Expected_compatible ->
-    conv_err (L.loc s) (UndefInSystem env.system.set)
+  (* do not check that the system is compatible in:
+     - type-checking mode
+     - or if the action is declared (but not defined) and we are in a 
+       process declaration. *)
+  if type_checking || (in_proc && Action.is_decl a env.table) then () else
+    begin 
+      if Action.is_decl a env.table then
+        conv_err (L.loc s) (Failure "action is declared but un-defined");
 
+      let _, action = Action.get_def a env.table in
+      try
+        let system = SE.to_compatible env.system.set in
+        ignore (SE.action_to_term env.table system action : Term.term)
+      with
+      | Not_found
+      | SE.Error Expected_compatible ->
+        conv_err (L.loc s) (UndefInSystem env.system.set)
+    end
 
 (*------------------------------------------------------------------*)
 (** {2 Substitution} *)
@@ -633,15 +643,18 @@ type conv_env = {
     - a type unification environment
     - a variable substitution  *)
 type conv_state = {
-  env       : Env.t;
-  cntxt     : conv_cntxt;
-  allow_pat : bool;
+  env           : Env.t;
+  cntxt         : conv_cntxt;
+  allow_pat     : bool;
 
-  ty_env    : Type.Infer.env;
+  type_checking : bool;
+  (* if [true], we are only type-checking the term *)
+
+  ty_env        : Type.Infer.env;
 }
 
-let mk_state env cntxt allow_pat ty_env =
-  { cntxt; env; allow_pat; ty_env; }
+let mk_state ?(type_checking=false) env cntxt allow_pat ty_env =
+  { cntxt; env; allow_pat; ty_env; type_checking; }
 
 (*------------------------------------------------------------------*)
 (** {2 Types} *)
@@ -938,7 +951,11 @@ and convert0
     let f', terms = decompose_app tapp in
     assert (equal_i (Symb f) (L.unloc f'));
 
-    if is_in_proc state.cntxt then conv_err loc ExplicitTSInProc;
+    if is_in_proc state.cntxt then 
+      Printer.prt `Warning 
+        "potential well-foundness issue: \
+         a macro used an explicit timestamps in a procedure declaration";
+      (* conv_err loc ExplicitTSInProc; *)
 
     let app_cntxt = At (conv Type.Timestamp ts) in
     conv_app state app_cntxt tm
@@ -1223,7 +1240,8 @@ and conv_app
       | [{ pl_desc = Tuple terms }] -> terms
       | _ -> terms
     in
-    check_action state.env f (List.length terms) ;
+    let in_proc = match state.cntxt with InProc _ -> true | InGoal -> false in
+    check_action state.type_checking in_proc state.env f (List.length terms) ;
     Term.mk_action
       (get_action state.env f)
       (List.map (conv Type.tindex) terms)
@@ -1427,8 +1445,8 @@ let check
   in
   let cntxt = if local then InProc (projs, (dummy_var Type.Timestamp)) else InGoal in
   
-  let state = mk_state env cntxt pat ty_env in
-  ignore (convert state t s)
+  let state = mk_state ~type_checking:true env cntxt pat ty_env in
+  ignore (convert state t s : Term.term)
 
 (** exported outside Theory.ml *)
 let convert 
