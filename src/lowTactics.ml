@@ -75,9 +75,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let terms_of_conc = Equiv.Babel.get_terms S.conc_kind
     let terms_of_hyp = Equiv.Babel.get_terms S.hyp_kind
 
-    let pp_hyp = Equiv.Babel.pp S.hyp_kind
+    let pp_hyp  = Equiv.Babel.pp S.hyp_kind
     let pp_conc = Equiv.Babel.pp S.conc_kind
 
+    let[@warning "-32"] pp_hyp_dbg  = Equiv.Babel.pp_dbg S.hyp_kind
+    let[@warning "-32"] pp_conc_dbg = Equiv.Babel.pp_dbg S.conc_kind
   end
 
   (*------------------------------------------------------------------*)

@@ -114,9 +114,11 @@ let tmap (func : form -> form) (t : form) : form =
 
   let rec tmap = function
     | Quant (q, vs, b) -> Quant (q, vs, func b)
-    | Impl (f1, f2)    -> Impl (tmap f1, tmap f2)
-    | And (f1, f2)     -> And (tmap f1, tmap f2)
-    | Or (f1, f2)      -> Or (tmap f1, tmap f2)
+
+    | Impl (f1, f2) -> Impl (tmap f1, tmap f2)
+    | And  (f1, f2) -> And  (tmap f1, tmap f2)
+    | Or   (f1, f2) -> Or   (tmap f1, tmap f2)
+
     | Atom at          -> Atom at
   in
   tmap t

@@ -134,11 +134,17 @@ module Babel : sig
     call : 'a. 'a f_kind -> 'a -> 'a
   }
   val convert : ?loc:Location.t -> src:'a f_kind -> dst:'b f_kind -> 'a -> 'b
-  val subst  : 'a f_kind -> Term.subst -> 'a -> 'a
+
+  val subst  : 'a f_kind -> Term.subst  -> 'a -> 'a
   val tsubst : 'a f_kind -> Type.tsubst -> 'a -> 'a
+
   val fv     : 'a f_kind -> 'a -> Vars.Sv.t
+
   val get_terms : 'a f_kind -> 'a -> Term.term list
-  val pp : 'a f_kind -> Format.formatter -> 'a -> unit
+
+  val pp     : 'a f_kind -> Format.formatter -> 'a -> unit
+  val pp_dbg : 'a f_kind -> Format.formatter -> 'a -> unit
+
   val project : 'a f_kind -> Term.proj list -> 'a -> 'a
 end
 
