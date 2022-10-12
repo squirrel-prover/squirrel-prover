@@ -899,7 +899,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           in
 
           if List.length vs < len - 1 then
-            hard_failure (Tactics.PatNumError (len - 1, List.length vs));
+            soft_failure (Tactics.PatNumError (len - 1, List.length vs));
 
           let vs, vs' = List.takedrop (len - 1) vs in
 
@@ -924,7 +924,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       let handlers, s = do_and_pat hid (List.length s_ip) s in
 
       if List.length handlers <> List.length s_ip then
-        hard_failure (Tactics.PatNumError (List.length s_ip, List.length handlers));
+        soft_failure (Tactics.PatNumError (List.length s_ip, List.length handlers));
 
       (* Apply, for left to right, the simple patterns, and collect everything *)
       let ss = List.fold_left2 (fun ss handler ip ->
@@ -937,7 +937,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       let ss = hypothesis_case ~nb:(`Some (List.length s_ip)) hid s in
 
       if List.length ss <> List.length s_ip then
-        hard_failure (Tactics.PatNumError (List.length s_ip, List.length ss));
+        soft_failure (Tactics.PatNumError (List.length s_ip, List.length ss));
 
       (* For each case, apply the corresponding simple pattern *)
       List.map2 (fun (CHyp id, s) ip ->

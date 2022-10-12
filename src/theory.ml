@@ -343,7 +343,7 @@ type conversion_error_i =
   | BadInfixDecl
   | PatNotAllowed
   | ExplicitTSInProc
-  | UndefInSystem        of SE.t
+  | UndefInSystem        of string * SE.t
   | MissingSystem
   | BadProjInSubterm     of Term.projs * Term.projs
 
@@ -439,9 +439,9 @@ let pp_error_i ppf = function
     Fmt.pf ppf "macros cannot be written at explicit \
                 timestamps in procedure"
 
-  | UndefInSystem t ->
-    Fmt.pf ppf "action not defined in system @[%a@]"
-      SE.pp t
+  | UndefInSystem (s, t) ->
+    Fmt.pf ppf "action %s not defined in system @[%a@]"
+      s SE.pp t
 
   | MissingSystem ->
     Fmt.pf ppf "missing system annotation"
@@ -571,9 +571,9 @@ let check_action type_checking in_proc (env : Env.t) (s : lsymb) (n : int) : uni
 
   (* do not check that the system is compatible in:
      - type-checking mode
-     - or if the action is declared (but not defined) and we are in a 
-       process declaration. *)
-  if type_checking || (in_proc && Action.is_decl a env.table) then () else
+     - or if we are in a process declaration. *)
+  if type_checking || in_proc then () 
+  else
     begin 
       if Action.is_decl a env.table then
         conv_err (L.loc s) (Failure "action is declared but un-defined");
@@ -585,7 +585,8 @@ let check_action type_checking in_proc (env : Env.t) (s : lsymb) (n : int) : uni
       with
       | Not_found
       | SE.Error Expected_compatible ->
-        conv_err (L.loc s) (UndefInSystem env.system.set)
+        let loc = if in_proc then L._dummy else L.loc s in
+        conv_err loc (UndefInSystem (L.unloc s, env.system.set))
     end
 
 (*------------------------------------------------------------------*)

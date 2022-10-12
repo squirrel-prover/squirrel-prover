@@ -3,6 +3,7 @@
   * terms and formulas of the logic. *)
 
 module L = Location
+module SE = SystemExpr
 
 type lsymb = string L.located
 
@@ -272,7 +273,7 @@ type conversion_error_i =
   | BadInfixDecl
   | PatNotAllowed
   | ExplicitTSInProc 
-  | UndefInSystem        of SystemExpr.t
+  | UndefInSystem        of string * SE.t
   | MissingSystem
   | BadProjInSubterm     of Term.projs * Term.projs
                               
@@ -332,7 +333,7 @@ type conv_env = {
 }
 
 (** Converts and infers the type.
-    Only the [set] part of the [SystemExpr.context] inside the environment
+    Only the [set] part of the [SE.context] inside the environment
     is useful. *)
 val convert : 
   ?ty:Type.ty ->
@@ -354,7 +355,7 @@ val convert_ht :
   Type.hty * Term.hterm
 
 (** Converts and infers the type.
-    Each part of the [SystemExpr.context] inside the environment
+    Each part of the [SE.context] inside the environment
     is used when converting the corresponding kind of atom. *)
 val convert_global_formula : conv_env -> global_formula -> Equiv.form
 
