@@ -31,7 +31,11 @@ type s_item = s_item_body * named_args
 (*------------------------------------------------------------------*)
 (** {2 Parsed arguments for rewrite} *)
 
-type rw_count = [`Once | `Many | `Any ] (** ε | ! | ? *)
+type rw_count = 
+    | Once                   (** ε *)
+    | Many                   (** ! *)
+    | Any                    (** ? *)
+    | Exact of int           (** integer *)
 
 type rw_dir = [`LeftToRight | `RightToLeft ] L.located
 

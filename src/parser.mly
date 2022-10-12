@@ -606,9 +606,10 @@ tactic_params:
 
 (*------------------------------------------------------------------*)
 rw_mult:
-| BANGU  { `Many }
-| QMARK  { `Any }
-|        { `Once }
+| i=int      { TacticsArgs.Exact i }
+| BANGU      { TacticsArgs.Many }
+| QMARK      { TacticsArgs.Any }
+|            { TacticsArgs.Once }
 
 rw_dir:
 |       { `LeftToRight }
@@ -629,12 +630,12 @@ rw_item:
                                                      rw_type = t; } }
 
 rw_equiv_item:
-| d=loc(rw_dir) pt=p_pt  { TacticsArgs.{ rw_mult = `Once;
+| d=loc(rw_dir) pt=p_pt  { TacticsArgs.{ rw_mult = TacticsArgs.Once;
                                          rw_dir = d;
                                          rw_type = `Rw pt; } }
 
 expnd_item:
-| d=loc(rw_dir) t=expnd_type  { TacticsArgs.{ rw_mult = `Once;
+| d=loc(rw_dir) t=expnd_type  { TacticsArgs.{ rw_mult = TacticsArgs.Once;
                                               rw_dir = d;
                                               rw_type = t; } }
 

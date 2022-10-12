@@ -325,18 +325,27 @@ let do_rewrite
     in
 
     match mult, s.found_instance with
-    | `Any, `False -> f, []
+    | (Args.Any | Args.Exact 0), `False -> f, []
 
-    | (`Once | `Many), `False -> raise (Failed NothingToRewrite)
+    | (Args.Once | Args.Many | Args.Exact _), `False -> 
+      raise (Failed NothingToRewrite)
 
-    | (`Many | `Any), `Found inst  ->
-      let f, rsubs' = _rewrite `Any f in
+    | Args.Once, `Found inst -> f, inst.subgs
+
+    | Args.Exact i, `Found inst ->
+      if i = 1 then f, inst.subgs 
+      else
+        let f, rsubs' = _rewrite Args.(Exact (i - 1)) f in
+        f, List.rev_append inst.subgs rsubs'
+
+    | (Args.Many | Args.Any), `Found inst  ->
+      let f, rsubs' = _rewrite Args.Any f in
       f, List.rev_append inst.subgs rsubs'
-
-    | `Once, `Found inst -> f, inst.subgs
   in
 
-  let f, subs = _rewrite mult target in
+  let f, subs = 
+    if mult = Args.Exact 0 then (target, []) else _rewrite mult target 
+  in
   let subs = List.rev_map (fun (se, t) -> { system with set = se; }, t) subs in
   f, subs
 

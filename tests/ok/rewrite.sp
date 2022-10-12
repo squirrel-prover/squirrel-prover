@@ -498,3 +498,27 @@ Proof.
   rewrite H //. 
   by intro H1; apply H1.
 Qed.
+
+(*------------------------------------------------------------------*)
+(* rewrite n times *)
+
+goal [any] _ ['a] (f : 'a -> 'a, a,b,c,d,z : 'a, y : 'a) : 
+  (forall (x : 'a), f x = y) => 
+  (f a = z) =>
+  (f b = z) => 
+  (f c = z) =>
+  (f d = z) =>
+  (f a,f b,f c,f d) = (y,z,z,z) &&
+  (f a,f b,f c,f d) = (y,y,z,z) &&
+  (f a,f b,f c,f d) = (y,y,y,z) &&
+  (f a,f b,f c,f d) = (z,z,z,z).
+Proof.
+  intro H Ha Hb Hc Hd.
+  split; 2: split; 2:split.
+  + checkfail rewrite !H Hb Hc Hd; apply eq_refl exn NothingToRewrite.
+    rewrite H Hb Hc Hd; apply eq_refl.
+  + checkfail rewrite 2 H Hb Hc Hd; apply eq_refl exn NothingToRewrite.
+    rewrite 2 H Hc Hd; apply eq_refl.
+  + rewrite 3 H Hd; apply eq_refl.
+  + rewrite 0 H Ha Hb Hc Hd; apply eq_refl.
+Qed.

@@ -643,7 +643,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       if not (Sv.is_empty pat.pat_vars) then
         soft_failure (Failure "universally quantified variables remaining") ;
 
-      if rw_arg.rw_mult <> `Once then
+      if rw_arg.rw_mult <> Args.Once then
         hard_failure (Failure "multiplicity information not allowed for \
                                rewrite equiv") ;
 
@@ -978,7 +978,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       let pat = Term.pat_of_form f in
       let erule = pat_to_rw_rule s ~loc (S.system s).set (L.unloc dir) pat in
       let s, subgoals =
-        rewrite ~loc ~all:false [T_conc] (`Once, Some id, erule) s
+        rewrite ~loc ~all:false [T_conc] (Args.Once, Some id, erule) s
       in
       subgoals @ [s]
 

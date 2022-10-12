@@ -623,23 +623,27 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
       ((mult, loc, pat) : Args.rw_count * L.t * Term.term Term.pat)
     : ES.t 
     =
-    match fa_select_felems pat s with
-    | None -> 
-      if mult = `Any 
-      then s
-      else soft_failure ~loc (Failure "FA not applicable")
-    | Some i ->
-      (* useless loc, as we know [i] is in range *)
-      let i = L.mk_loc L._dummy i in
+    if mult = Args.Exact 0 then s else
+      match fa_select_felems pat s with
+      | None -> 
+        if mult = Args.Any 
+        then s
+        else soft_failure ~loc (Failure "FA not applicable")
+      | Some i ->
+        (* useless loc, as we know [i] is in range *)
+        let i = L.mk_loc L._dummy i in
 
-      let s =
-        try do_fa_felem i s with
-        | No_FA _ ->
-          soft_failure ~loc (Failure "bad FA pattern")
-      in
-      match mult with
-      | `Once -> s
-      | `Any | `Many -> do1 s (`Any, loc, pat)
+        let s =
+          try do_fa_felem i s with
+          | No_FA _ ->
+            soft_failure ~loc (Failure "bad FA pattern")
+        in
+        match mult with
+        | Args.Once | Args.Exact 1 -> s
+
+        | Args.Any | Args.Many -> do1 s (Args.Any, loc, pat)
+
+        | Args.Exact i -> do1 s (Args.Exact (i - 1), loc, pat)
   in
   [List.fold_left do1 s args]
 

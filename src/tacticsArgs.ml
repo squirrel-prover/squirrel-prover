@@ -49,7 +49,11 @@ let pp_s_item fmt (s, named_args) =
 (*------------------------------------------------------------------*)
 (** {2 Parsed arguments for rewrite} *)
 
-type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
+type rw_count = 
+    | Once                   (** ε *)
+    | Many                   (** ! *)
+    | Any                    (** ? *)
+    | Exact of int           (** integer *)
 
 type rw_dir = [`LeftToRight | `RightToLeft ] L.located
 
@@ -84,9 +88,10 @@ type rw_arg =
   | R_s_item of s_item
 
 let pp_rw_count ppf = function
-  | `Once -> ()
-  | `Many -> Fmt.pf ppf "!"
-  | `Any -> Fmt.pf ppf  "?"
+  | Once    -> ()
+  | Many    -> Fmt.pf ppf "!"
+  | Any     -> Fmt.pf ppf  "?"
+  | Exact n -> Fmt.pf ppf  "%d" n
 
 
 let pp_rw_dir ppf d = match L.unloc d with
