@@ -606,10 +606,10 @@ tactic_params:
 
 (*------------------------------------------------------------------*)
 rw_mult:
-| i=int      { TacticsArgs.Exact i }
-| BANGU      { TacticsArgs.Many }
-| QMARK      { TacticsArgs.Any }
-|            { TacticsArgs.Once }
+| i=int BANGU { TacticsArgs.Exact i }
+| BANGU       { TacticsArgs.Many }
+| QMARK       { TacticsArgs.Any }
+|             { TacticsArgs.Once }
 
 rw_dir:
 |       { `LeftToRight }

@@ -35,7 +35,7 @@ type rw_count =
     | Once                   (** ε *)
     | Many                   (** ! *)
     | Any                    (** ? *)
-    | Exact of int           (** integer *)
+    | Exact of int           (** i! where [i] is an integer *)
 
 type rw_dir = [`LeftToRight | `RightToLeft ] L.located
 

@@ -517,8 +517,8 @@ Proof.
   split; 2: split; 2:split.
   + checkfail rewrite !H Hb Hc Hd; apply eq_refl exn NothingToRewrite.
     rewrite H Hb Hc Hd; apply eq_refl.
-  + checkfail rewrite 2 H Hb Hc Hd; apply eq_refl exn NothingToRewrite.
-    rewrite 2 H Hc Hd; apply eq_refl.
-  + rewrite 3 H Hd; apply eq_refl.
-  + rewrite 0 H Ha Hb Hc Hd; apply eq_refl.
+  + checkfail rewrite 2!H Hb Hc Hd; apply eq_refl exn NothingToRewrite.
+    rewrite 2!H Hc Hd; apply eq_refl.
+  + rewrite 3!H Hd; apply eq_refl.
+  + rewrite 0!H Ha Hb Hc Hd; apply eq_refl.
 Qed.
