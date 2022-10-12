@@ -108,18 +108,17 @@ let mk_reach_atom f = Atom (Reach f)
 (*------------------------------------------------------------------*)
 (** {2 Map (does not recurse) } *)
 
-(** Does not recurse.
-    Applies to arguments of index atoms (see atom_map). *)
+(** Does not recurse. *)
 let tmap (func : form -> form) (t : form) : form =
 
-  let rec tmap = function
+  let tmap = function
     | Quant (q, vs, b) -> Quant (q, vs, func b)
 
-    | Impl (f1, f2) -> Impl (tmap f1, tmap f2)
-    | And  (f1, f2) -> And  (tmap f1, tmap f2)
-    | Or   (f1, f2) -> Or   (tmap f1, tmap f2)
+    | Impl (f1, f2) -> Impl (func f1, func f2)
+    | And  (f1, f2) -> And  (func f1, func f2)
+    | Or   (f1, f2) -> Or   (func f1, func f2)
 
-    | Atom at          -> Atom at
+    | Atom at       -> Atom at
   in
   tmap t
 
@@ -677,6 +676,11 @@ module Babel = struct
     | Local_t  -> Term.pp
     | Global_t -> pp
     | Any_t    -> PreAny.pp
+
+  let pp_dbg : type a. a f_kind -> Format.formatter -> a -> unit = function
+    | Local_t  -> Term.pp_dbg
+    | Global_t -> pp_dbg
+    | Any_t    -> PreAny.pp_dbg
 
   let project : type a. a f_kind -> Term.proj list -> a -> a = function
     | Local_t  -> Term.project
