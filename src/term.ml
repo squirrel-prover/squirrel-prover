@@ -134,6 +134,8 @@ type term =
 
 type t = term
 
+let compare = Stdlib.compare
+
 type terms = term list
 
 (*------------------------------------------------------------------*)

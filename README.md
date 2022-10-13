@@ -21,7 +21,7 @@ You can also just build the prover with `make squirrel`, test with `make test`.
 
 The documentation for developers may be built with `make doc`.
 
-### Installing the Proof General mode for Emacs (optional, recommanded)
+### Installing the Proof General mode for Emacs (optional, recommended)
 
 The required `.el` files are inside the `utils` folder. 
 We recommend installing Proof General from the git repository.
@@ -38,7 +38,9 @@ git clone https://github.com/ProofGeneral/PG
 mkdir -p ~/.emacs.d/lisp/PG/squirrel
 ```
 
-- Copy and paste this file, and `squirrel-syntax.el` inside it:
+- Copy and paste this file, and `squirrel-syntax.el` inside it (creating
+  symbolic links may be a better idea if you intend your config to follow
+  the repository changes):
 ```
 cp squirrel.el squirrel-syntax.el ~/.emacs.d/lisp/PG/squirrel
 ```
