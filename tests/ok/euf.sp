@@ -124,11 +124,9 @@ goal [ dupnames] _ (tau:timestamp):
 Proof.
   intro Hap Heq.
   nosimpl(euf Heq).
-  (* Here EUF should create two cases for action A(_).
-   * In each case a fresh index variable i should be created;
-   * there should not be a second index variable i1 in the
-   * second case. *)
-  by auto.
+  (* Here EUF should create two cases for action A(_). 
+     There should not be a variable i1 in the second case. *)
+  by intro [i [? H]]; fresh H.
   intro [i H].
   checkfail destruct H as [i1 [H HH]] exn Failure.
 Abort.

@@ -400,15 +400,6 @@ let rec is_ground_cterm t = match t.cnt with
   | Cvar _ -> false
   | Cxor ts | Cfun (_, ts) -> List.for_all is_ground_cterm ts
 
-let rec no_macros t = match t.cnt with
-  | Cfun (M _, ts) -> false
-
-  | Ccst _ | Cvar _ -> true
-
-  | Cxor ts -> List.for_all no_macros ts
-
-  | Cfun ((A _ | F _ | N _ | P _ | T _), ts) -> List.for_all no_macros ts
-
 let is_cst t = match t.cnt with
   | Ccst _ -> true
   | _      -> false
@@ -442,6 +433,7 @@ let get_cst t = match t.cnt with
   | Ccst c -> c
   | _ -> assert false
 
+(* FIXME: bad sub-term computation *)
 let subterms l =
   let rec subs acc = function
     | [] -> acc
@@ -1602,47 +1594,6 @@ let name_index_cnstrs table state l : Term.term list =
   in
 
   x_index_cnstrs state l (is_lname table) n_cnstr
-
-
-(** [name_indep_cnstrs state l] looks for all name equals to a term w.r.t. the
-    rewrite relation in [state], and adds the fact that the name must be equal
-    to one of the name appearing inside the term. 
-    Only applies to names with \[large\] types. *)
-let name_indep_cnstrs table state l =
-  let n_cnstr (a : cterm) (b : cterm) = 
-    if not (is_lname table a) && not (is_lname table b) then []
-    else
-      let name, t = if is_lname table a then a, b else b, a in
-      let nty = name_ty name in
-
-      (* We keep only the names in [t] that are of the correct type. *)
-      let sub_names = subterms [t]
-                      |> List.filter (is_lname ~of_ty:nty table)
-                      |> List.sort_uniq Stdlib.compare
-      in
-
-      let rec mk_disjunction l =
-        match l with
-        | [] -> Term.mk_false
-        | [p] -> 
-          Term.mk_atom `Eq
-            (term_of_cterm table p)
-            (term_of_cterm table name)
-        | p::q ->
-          Term.mk_or
-            (Term.mk_atom `Eq 
-               (term_of_cterm table p)
-               (term_of_cterm table name))
-            (mk_disjunction q)
-      in
-      [mk_disjunction sub_names]
-  in
-
-  x_index_cnstrs state l
-    (function f -> is_ground_cterm f && no_macros f)
-    n_cnstr
-  |>  List.filter (fun f -> not (Term.is_true f)) 
-  |>  List.sort_uniq Stdlib.compare
 
 
 (*------------------------------------------------------------------*)

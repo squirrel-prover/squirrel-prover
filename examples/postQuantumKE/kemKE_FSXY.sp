@@ -587,17 +587,48 @@ Proof.
   diffeq.
 
     + case try find il,jl,kl such that _ in kR(il,jl,kl) else _.
-      case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
-      by use H1 with il,jl,kl.
+      ++ case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
+         have U :
+          decap(encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(dkI(il))), dkI(il)) = 
+          decap(encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(dkI(il0))), dkI(il)).
+         rewrite tf in U.     
+         by fresh U.
+         by use H1 with il,jl,kl.
+      ++ case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
+         by use H1 with il,jl,kl.
+
     + case try find il,jl,kl such that _ in kR(il,jl,kl) else _.
-      case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
-      by use H1 with il,jl,kl.
+      ++ case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
+         have U :
+          decap(encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(dkI(il))), dkI(il)) = 
+          decap(encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(dkI(il0))), dkI(il)).
+         rewrite tf in U.     
+         by fresh U.
+         by use H1 with il,jl,kl.
+      ++ case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
+         by use H1 with il,jl,kl.
+
     + case try find il,jl,kl such that _ in kI(il,jl,kl) else _.
-      case try find il, jl, kl such that _ in kdf(s,kI(il,jl,kl)) else _.
-      by use H1 with il,jl,kl.
+      ++ case try find il, jl, kl such that _ in kdf(s,kI(il,jl,kl)) else _.
+         have U :
+          decap(encap (n_CCA1(il,jl,kl), rI(il,jl,kl), pk (dkR(jl))), dkR(jl)) = 
+          decap(encap (n_CCA1(il0,jl0,kl0), rI(il0,jl0,kl0), pk (dkR(jl0))), dkR(jl)).
+         rewrite tf in U.     
+         by fresh U.
+         by use H1 with il,jl,kl.
+      ++ case try find il, jl, kl such that _ in kdf(s,kI(il,jl,kl)) else _.
+         by use H1 with il,jl,kl.
+
     + case try find il,jl,kl such that _ in kI(il,jl,kl) else _.
-      case try find il, jl, kl such that _ in kdf(s,kI(il,jl,kl)) else _.
-      by use H1 with il,jl,kl.
+      ++ case try find il, jl, kl such that _ in kdf(s,kI(il,jl,kl)) else _.
+         have U :
+          decap(encap (n_CCA1(il,jl,kl), rI(il,jl,kl), pk (dkR(jl))), dkR(jl)) = 
+          decap(encap (n_CCA1(il0,jl0,kl0), rI(il0,jl0,kl0), pk (dkR(jl0))), dkR(jl)).
+         rewrite tf in U.     
+         by fresh U.
+         by use H1 with il,jl,kl.
+      ++ case try find il, jl, kl such that _ in kdf(s,kI(il,jl,kl)) else _.
+         by use H1 with il,jl,kl.
 Qed.
 
 equiv [idealized/left,idealized/left] reflex.

@@ -283,8 +283,14 @@ Proof.
     case try find il,jl,kl,ll such that _ in idealkeys(il,jl,kl,ll) else _.
     intro [il jl ? ? [[Meq1 [? ?]] Meq2]]. 
     rewrite Meq2.
+    case try find jf,kf such that _ in _ else fail.
     by collision.
-    
+ 
+    intro [[TFneg] TFeq].
+    use TFneg with j,i.
+    auto.
+
+
     intro [H2 ?].
     by use H2 with i,j,j,i.
   
@@ -297,7 +303,15 @@ Proof.
     
     intro [il jl ? ? [[Meq1 [? ?]] Meq2]]. 
     rewrite Meq2.
+    case try find jf,kf such that _ in _ else fail.
+
     by collision.
+
+
+    intro [[TFneg] TFeq].
+    use TFneg with l,l0.
+    auto.
+
     intro [H2 Meq1].
     
     expand input .

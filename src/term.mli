@@ -102,6 +102,9 @@ type term = private
              
 type t = term
 
+(** Structural comparison of terms. *)
+val compare : t -> t -> int
+
 type terms = term list
 
 val hash : term -> int
