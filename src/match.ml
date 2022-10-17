@@ -109,8 +109,8 @@ module Pos = struct
 
         let vars1 = List.rev_append is vars in
 
-        let conds_t = c :: conds in 
-        let conds_e =      conds in (* could be improved *)
+        let conds_t = c :: conds in
+        let conds_e = Term.mk_forall is (Term.mk_not c) :: conds in
 
         let sp = sel fsel sp ~projs ~vars:vars1 ~conds         ~p:(0 :: p) c in
         let sp = sel fsel sp ~projs ~vars:vars1 ~conds:conds_t ~p:(1 :: p) t in
@@ -337,7 +337,7 @@ module Pos = struct
         let vars1 = List.rev_append is vars in
 
         let conds_t = c :: conds in 
-        let conds_e =      conds in (* could be improved *)
+        let conds_e = Term.mk_forall is (Term.mk_not c) :: conds in
 
         let acc, foundc, c = 
           map_fold ~se ~vars:vars1 ~conds         ~p:(0 :: p) ~acc c 

@@ -429,7 +429,7 @@ Proof.
       destruct Abs as [Abs Meq2].
       rewrite Meq2 in EUF.
       euf EUF; try auto.
-      intro H; case H.
+      intro [H _]; case H.
        * by depends R(j,i), R2(j,i).
        * use mutex_Ideal2_R1_R2 with j,i,j,i as H2; by case H2.
 Qed.
@@ -542,7 +542,7 @@ Proof.
       euf Cond; try auto.
       * by depends R(j,i), R1(j,i).
       * by depends R(j,i), R1(j,i).
-      * intro H; case H.
+      * intro [H _]; case H.
         by depends R(j,i), R2(j,i). 
         use mutex_Ror_R2_R1 with j,i,j,i as HH; by case HH.             
 Qed.
