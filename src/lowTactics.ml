@@ -1211,8 +1211,22 @@ module MkCommonLowTac (S : Sequent.S) = struct
       with other tactics that would have to generate global sequents
       as premisses. *)
 
+  (** Checks that all arguments of [pat] have been inferred in [mv]. *)
+  let check_args_inferred (pat : S.conc_form Term.pat) (mv : Match.Mvar.t) : unit =
+    let vars_inf =               (* inferred variables *)
+      Sv.filter (fun v -> not (Match.Mvar.mem v mv)) pat.pat_vars
+    in
+    if not (Sv.is_empty vars_inf) then
+      begin
+        let err_msg = 
+          Fmt.str "apply: some arguments could not be inferred: %a"
+            (Fmt.list ~sep:Fmt.comma Vars.pp) (Sv.elements vars_inf)
+        in
+        soft_failure (Failure err_msg)
+      end
+
   (** Returns the sub-goals, and the substitution instantiating the
-     pattern variables. *)
+      pattern variables. *)
   let do_apply
       ~use_fadup (pat : S.conc_form Term.pat) (s : S.t) : S.t list * Term.subst
     =
@@ -1244,7 +1258,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
       | FreeTyv         -> soft_failure (ApplyMatchFailure None)
 
       (* match succeeded *)
-      | Match mv ->
+      | Match mv -> 
+        check_args_inferred pat mv;
+
         let subst = Match.Mvar.to_subst ~mode:`Match mv in
 
         let goals = List.map (S.subst_conc subst) (List.rev subs) in

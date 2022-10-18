@@ -85,3 +85,19 @@ Proof.
   have U := H _ (%G (<y,z>)).
   assumption U.
 Qed.
+
+(*------------------------------------------------------------------*)
+name a : message.
+name b : message.
+
+name c : message.
+name d : message.
+
+global goal _ :
+  (Forall (t : timestamp), [happens(t)] -> equiv(diff(a,b), t)) ->
+  equiv(diff(a,b)).
+Proof.
+  intro H.
+  checkfail by apply H exn Failure.
+  by apply H init. 
+Qed.

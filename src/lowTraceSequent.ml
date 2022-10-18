@@ -32,6 +32,10 @@ module S : sig
     (** The conclusion / right-hand side formula of the sequent. *)    
   }
 
+  val pp     :             Format.formatter -> t -> unit
+  val _pp    : dbg:bool -> Format.formatter -> t -> unit
+  val pp_dbg :             Format.formatter -> t -> unit
+
   val init_sequent :
     env:Env.t ->
     conclusion:Term.term ->
@@ -53,6 +57,30 @@ end = struct
     hyps       : H.hyps;
     conclusion : Term.term;
   }
+  
+let _pp ~dbg ppf s =
+    let open Fmt in
+    pf ppf "@[<v 0>" ;
+    pf ppf "@[System: %a@]@;"
+      SystemExpr.pp_context s.env.system;
+
+    if s.env.ty_vars <> [] then
+      pf ppf "@[Type variables: %a@]@;" 
+        (Fmt.list ~sep:Fmt.comma Type.pp_tvar) s.env.ty_vars ;
+
+    if s.env.vars <> Vars.empty_env then
+      pf ppf "@[Variables: %a@]@;" (Vars._pp_env ~dbg) s.env.vars ;
+
+    (* Print hypotheses *)
+    H._pp ~dbg ppf s.hyps ;
+
+    (* Print separation between hyps and conclusion *)
+    Printer.kws `Separation ppf (String.make 40 '-') ;
+    (* Print conclusion formula and close box. *)
+    pf ppf "@;%a@]" (Term._pp ~dbg) s.conclusion
+
+  let pp     = _pp ~dbg:false
+  let pp_dbg = _pp ~dbg:true
 
   let fv (s : t) : Vars.Sv.t = 
     let h_vars = 
@@ -86,30 +114,6 @@ include S
 
 type sequent = S.t
 type sequents = sequent list
-
-let _pp ~dbg ppf s =
-  let open Fmt in
-  pf ppf "@[<v 0>" ;
-  pf ppf "@[System: %a@]@;"
-    SystemExpr.pp_context s.env.system;
-
-  if s.env.ty_vars <> [] then
-    pf ppf "@[Type variables: %a@]@;" 
-      (Fmt.list ~sep:Fmt.comma Type.pp_tvar) s.env.ty_vars ;
-
-  if s.env.vars <> Vars.empty_env then
-    pf ppf "@[Variables: %a@]@;" (Vars._pp_env ~dbg) s.env.vars ;
-
-  (* Print hypotheses *)
-  H._pp ~dbg ppf s.hyps ;
-
-  (* Print separation between hyps and conclusion *)
-  Printer.kws `Separation ppf (String.make 40 '-') ;
-  (* Print conclusion formula and close box. *)
-  pf ppf "@;%a@]" (Term._pp ~dbg) s.conclusion
-
-let pp     = _pp ~dbg:false
-let pp_dbg = _pp ~dbg:true
 
 (*------------------------------------------------------------------*)
 let get_all_messages (s : sequent) =
