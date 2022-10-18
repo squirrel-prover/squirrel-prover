@@ -208,8 +208,7 @@ Proof.
     + intro Euf. destruct Euf as [H [_|[i x1 x2 H1]]]; 1: by auto.
       expand sidP1; destruct H1 as [_|[x3 H1]].
 
-        - collision => _; use HcFail with i.
-          by auto.
+        - collision => _; use HcFail with i => //.
 
         - by use hashnotfor with <<g^a1,input@P1>,input@P1^a1>, x3.
 
@@ -235,7 +234,7 @@ Proof.
     + intro Euf. destruct Euf as [[_|H1] H2]; 1: by auto.
       destruct H1 as [i x x1 [_|[x2 H1]]].
 
-       - use HcFail with i.
+       - use HcFail with i => //.
          by collision.
 
        - by use hashnotfor with <<input@S,g^b1>,input@S^b1>, x2.

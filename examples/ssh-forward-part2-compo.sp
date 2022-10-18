@@ -357,7 +357,7 @@ Proof.
           <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1> as HH.
      
         - use signnottag with sidPa@P2, kP.
-          use Hc with i1.
+          use Hc with i1 => //.
           destruct H2 as [m2 m3 H2]. 
           right; right.
           by collision.
@@ -365,12 +365,12 @@ Proof.
     + (* honest case SDIS *)
       intro [Euf Heq].
       use freshindex as [l _].
-      use Hc with l.
+      use Hc with l => //.
       by case Euf; expand sidSa; collision => _.
 
     + intro [Euf Heq].
       use freshindex as [l _].
-      use Hc with l.
+      use Hc with l => //.
       right.
       by case Euf; expand sidS3; collision => _.
 Qed.
@@ -392,7 +392,7 @@ Proof.
     intro Euf. destruct Euf as [[_|[i m m1 H1]] H2]=> //.
     destruct H1 as [H1| [i1 m2 m3 H1]].
       - (* sub case with wrong tag *)
-        use Hc with i.
+        use Hc with i => //.
         assert h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey) = h(<<g^a(i),m>,m1>,hKey) => //.
         by collision.
       - by use hashlengthnotpair with <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake1(i1),m2>,m3>.
@@ -431,7 +431,7 @@ Proof.
         1: by case Euf.
         use H2 with PDIS5; 2: by auto.
         expand exec, cond.
-        use Hc with i.
+        use Hc with i => //.
         right.
         expand pkSa, sidPa.
         assert (h(<<g^a1,input@PDIS4>,input@PDIS4^a1>,hKey) =

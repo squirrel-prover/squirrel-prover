@@ -85,56 +85,46 @@ system testiRenamed = [testiPrf] with rename Forall (i:index), equiv(diff(n_PRF1
 
 equiv [testiRenamed,testi2/right] test3.
 Proof.
-enrich seq(i:index => idn(i)).
-induction t.
-
-expandall.
-auto.
-
-expandall.
-fa 1. repeat fa 2.
-
-
-have ->:      try find j such that (msg(i) = msg(j) && i = j)
-     in idn(j) else h(msg(i),key(i)) =
-     idn(i).
-case      try find j such that (msg(i) = msg(j) && i = j)
-     in idn(j) else h(msg(i),key(i)).
-
-intro H2.
-destruct H2.
-destruct H0.
-destruct H0. auto.
-intro H2.
-destruct H2.
-use H0 with i.
-auto.
-
-have ->:  diff(idn(i),idn(i)) = idn(i).
-project; auto.
-by apply IH. 
-
-
-expandall.
-have ->:   try find j such that (msg(i) = msg(j) && i = j)
+  enrich seq(i:index => idn(i)).
+  induction t.
+  
+  + expandall.
+    auto.
+    
+  + expandall.
+    fa 1; repeat fa 2.
+    
+    have ->: try find j such that (msg(i) = msg(j) && i = j)
          in idn(j) else h(msg(i),key(i)) =
-         idn(i).
-case  try find j such that (msg(i) = msg(j) && i = j)
-         in idn(j) else h(msg(i),key(i)).
-
-intro H2.
-destruct H2.
-destruct H0.
-destruct H0. auto.
-intro H2.
-destruct H2.
-use H0 with i.
-auto.
-
-have ->:  diff(idn(i),idn(i)) = idn(i).
-project; auto.
-by apply IH.
-
+         idn(i). {
+      case try find j such that (msg(i) = msg(j) && i = j)
+           in idn(j) else h(msg(i),key(i)). 
+      - auto.    
+      - intro H2.
+      destruct H2.
+      by use H0 with i.
+    }.
+    
+    have ->:  diff(idn(i),idn(i)) = idn(i).
+    project; auto.
+    by apply IH. 
+    
+    
+  + expandall.
+    have ->:   try find j such that (msg(i) = msg(j) && i = j)
+             in idn(j) else h(msg(i),key(i)) =
+             idn(i). {
+      case  try find j such that (msg(i) = msg(j) && i = j)
+            in idn(j) else h(msg(i),key(i)).
+      - auto. 
+      - intro H2.
+        destruct H2.
+        by use H0 with i.
+    }.
+    
+    have ->:  diff(idn(i),idn(i)) = idn(i).
+    project; auto.
+    by apply IH.
 Qed.
 
 (*------------------------------------------------------------------*)

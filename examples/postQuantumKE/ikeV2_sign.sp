@@ -287,9 +287,7 @@ Proof.
     by collision.
  
     intro [[TFneg] TFeq].
-    use TFneg with j,i.
-    auto.
-
+    use TFneg with j,i => //.
 
     intro [H2 ?].
     by use H2 with i,j,j,i.
@@ -309,8 +307,7 @@ Proof.
 
 
     intro [[TFneg] TFeq].
-    use TFneg with l,l0.
-    auto.
+    by use TFneg with l,l0.
 
     intro [H2 Meq1].
     
@@ -318,7 +315,7 @@ Proof.
     rewrite Meq in H2.
     rewrite Meq0 in H2.
     
-    use H2 with l,l0,k ,l.
+    use H2 with l,l0,k ,l => //.
     
     by use ddhcommu with l,l0,k,l.
 Qed.

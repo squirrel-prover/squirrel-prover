@@ -491,9 +491,13 @@ module SmartDestructors = struct
 
   let destr_or   f = oas_seq2 (destr_fun ~fs:f_or   f)
   let destr_and  f = oas_seq2 (destr_fun ~fs:f_and  f)
-  let destr_impl f = oas_seq2 (destr_fun ~fs:f_impl f)
   let destr_iff  f = oas_seq2 (destr_fun ~fs:f_iff f)
   let destr_pair f = oas_seq2 (destr_fun ~fs:f_pair f)
+
+  let destr_impl f = 
+    match oas_seq2 (destr_fun ~fs:f_impl f) with
+    | Some _ as res -> res
+    | None -> omap (fun f -> (f, mk_false)) (destr_not f)
 
   (*------------------------------------------------------------------*)
   let destr_neq f = oas_seq2 (destr_fun ~fs:f_neq f)

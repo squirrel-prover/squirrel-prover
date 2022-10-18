@@ -56,7 +56,7 @@ Proof.
   + intro [U _].
     case phi t0 a0 => //= _.
     have A := U t0.
-    use A.
+    use A => //.
     by exists a0.
 Qed.
 

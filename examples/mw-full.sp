@@ -424,7 +424,7 @@ Proof.
       split; intro [_ H1]; simpl.
 
       (* Honest => Cond *)
-      - intro [r H2]; use H1.
+      - intro [r H2]; use H1 => //.
         case output@R1(r) => Meq1.
         * destruct Meq1 as [_ _ [Meq1 Meq2]].
           rewrite Meq2 in H2.
@@ -434,7 +434,7 @@ Proof.
 
       (* Cond => Honest *)
       - intro Meq.
-        use H1.
+        use H1 => //.
         assert input@T2(i,t) XOR diff(id(i),id'(i,t)) =
                H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t))); 1:auto.
         use tags_neq; project.

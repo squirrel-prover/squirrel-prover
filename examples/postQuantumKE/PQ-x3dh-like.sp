@@ -285,14 +285,12 @@ Proof.
               by fresh Meq.
 
             * intro [Abs _].
-              use Abs with il,jl,kl.
-              auto.
+              by use Abs with il,jl,kl.
 
         - case try find il,jl,kl such that _ in  exct(skex,K(il,jl,kl)) else _.
-          intro [il jl kl Ex] [Abs _].
-          use Abs with il,jl,kl.
-          auto.
-          auto.
+          * intro [il jl kl Ex] [Abs _].
+            use Abs with il,jl,kl => //. 
+          * auto.
 
     + intro *.
       case try find il,jl,kl such that _ in K(il,jl,kl) else _.
@@ -305,14 +303,12 @@ Proof.
               by fresh Meq.
 
             * intro [Abs _].
-              use Abs with il,jl,kl.
-              auto.
+              by use Abs with il,jl,kl.
 
         - case try find il,jl,kl such that _ in  exct(skex,K(il,jl,kl)) else _.
-          intro [il jl kl Ex] [Abs _].
-          use Abs with il,jl,kl.
-          auto.
-          auto.
+          * intro [il jl kl Ex] [Abs _].
+            by use Abs with il,jl,kl.
+          * auto.
 
     + intro *.
       case try find il,jl,kl such that _ in K(il,jl,kl) else _.
@@ -325,14 +321,13 @@ Proof.
               by fresh Meq.
 
             * intro [Abs _].
-              use Abs with il,jl,kl.
-              auto.
+              by use Abs with il,jl,kl.
 
           - case try find il,jl,kl such that _ in  exct(skex,K(il,jl,kl)) else _.
-            intro [il jl kl Ex] [Abs _].
-            use Abs with il,jl,kl.
-            auto.
-            auto.
+            * intro [il jl kl Ex] [Abs _].
+              by use Abs with il,jl,kl.
+            * auto.
+
     + intro *.
       case try find il,jl,kl such that _ in K(il,jl,kl) else _.
         - intro [il jl kl [Eq ->]].
@@ -344,12 +339,11 @@ Proof.
               by fresh Meq.
 
             * intro [Abs _].
-              use Abs with il,jl,kl.
-              auto.
+              by use Abs with il,jl,kl.
+
         - case try find il,jl,kl such that _ in  exct(skex,K(il,jl,kl)) else _.
           intro [il jl kl Ex] [Abs _].
-          use Abs with il,jl,kl.
-          auto.
+          by use Abs with il,jl,kl.
           auto.
 
     + intro *.
@@ -363,13 +357,11 @@ Proof.
               by fresh Meq.
               
             * intro [Abs _].
-              use Abs with il,jl,kl.
-              auto.
+              by use Abs with il,jl,kl.
 
         - case try find il,jl,kl such that _ in  exct(skex,K(il,jl,kl)) else _.
           intro [il jl kl Ex] [Abs _].
-          use Abs with il,jl,kl.
-          auto.
+          by use Abs with il,jl,kl.
           auto.
 
     + intro *.
@@ -383,13 +375,11 @@ Proof.
               by fresh Meq.
 
             * intro [Abs _].
-              use Abs with il,jl,kl.
-              auto.
+              by use Abs with il,jl,kl.
 
           - case try find il,jl,kl such that _ in  exct(skex,K(il,jl,kl)) else _.
             intro [il jl kl Ex] [Abs _].
-            use Abs with il,jl,kl.
-            auto.
+            by use Abs with il,jl,kl.
             auto.
 Qed.
 

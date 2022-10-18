@@ -228,20 +228,17 @@ Proof.
         ++ intro [Abs TFeq].
            case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
              +++ intro [?? [_ TFeq2]]. 
-                 use Abs with i,j.
-                 auto.
+                 by use Abs with i,j.
              +++ intro [Abs2 TFeq2].
                  case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
                    - intro [?? [_ _]]. 
-                     use Abs with i,j.
-                     auto.
+                     by use Abs with i,j.
                    - intro [Abs3 TFeq3].
                      case try find il,jl such that _ in IgarbR(il,jl) else _.
                        -- intro [?? [_ ->]]. 
                           auto.
                        -- intro [[Abs4] TFeq4].
-                          use Abs4 with i,j.
-                          auto.
+                          by use Abs4 with i,j.
 
     + intro *.
       case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
@@ -249,13 +246,11 @@ Proof.
            case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
              +++ auto. 
              +++ intro [Abs _]. 
-                 use Abs with i,j.
-                 auto.
+                 by use Abs with i,j.
         ++ case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
              +++ intro [?? [_ ->]]. 
                  intro [Abs _].
-                 use Abs with i,j.
-                 auto.
+                 by use Abs with i,j.
              +++ intro [Abs _].
                  intro [Abs2 _].
                  case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
@@ -800,11 +795,11 @@ Proof.
           case try find il0,jl0 such that _ in idealkeys(i,j) else _.
           auto.
           intro [Abs _].
-          by use Abs with i,j.
+          by by use Abs with i,j.
        - case try find il0,jl0 such that _ in  h(exp(fst(att(frame@pred(I1(i,j)))),a(i)),Ininr(j,i))
                   else _.
          intro Ex [Abs _].
-         use Abs with i,j.
+         use Abs with i,j => //.
          by rewrite ddhcommu2.
          intro [Abs _] [Abs2 _].
          by use Abs with i,j.

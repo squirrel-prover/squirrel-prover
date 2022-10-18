@@ -19,8 +19,8 @@ Proof.
   case (try find i such that _ in _ else a(m)).
   intro [i [H ->]] //.
 
-  intro [H _]. use H with i0.
-  auto.
+  intro [H _].
+  by use H with i0.
 Qed.
 
 goal foo : forall (tau, tau' : timestamp, i:index),
@@ -44,5 +44,4 @@ Proof.
   (* following command fails, but maybe there is no solution *)
   (* show (try find i such that _ in _ else _). *)
 
-  admit.
-Qed.
+Abort.
