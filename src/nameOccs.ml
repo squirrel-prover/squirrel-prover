@@ -504,14 +504,14 @@ let pp_internal (ppf:Format.formatter) (occ:name_occ) : unit =
   match o.so_occtype with
   | EI_indirect a ->
     Fmt.pf ppf
-      "%a @,(collision with %a)@ in action %a@ @[<hov 2>in term@ @[%a@]@]"
+      "@[%a@] @,(collision with @[%a@])@ in action @[%a@]@ @[<hov 2>in term@ @[%a@]@]"
       Name.pp o.so_cnt 
       Name.pp o.so_coll
       Term.pp a
       Term.pp o.so_subterm
   | EI_direct ->
     Fmt.pf ppf
-      "%a @,(collision with %a)@ @[<hov 2>in term@ @[%a@]@]"
+      "@[%a@] @,(collision with @[%a@])@ @[<hov 2>in term@ @[%a@]@]"
       Name.pp o.so_cnt
       Name.pp o.so_coll
       Term.pp o.so_subterm
@@ -642,7 +642,7 @@ let find_occurrences
   let table = contx.table in
 
   let ppp ppf () = match pp_ns with
-    | Some x -> Fmt.pf ppf "of %a " x ()
+    | Some x -> Fmt.pf ppf "of @[%a@] " x ()
     | None   -> Fmt.pf ppf ""
   in
 
@@ -654,7 +654,7 @@ let find_occurrences
     List.fold_left
       (fun (dir_occs, dir_acc) t -> (* find direct occurrences in t *)
          if pp_ns <> None then 
-           Printer.pr "@[<hv 2>Bad occurrences %afound@ directly in %a:@]@;"
+           Printer.pr "@[<hv 2>Bad occurrences %afound@ directly in @[%a@]:@]@;"
              ppp ()
              Term.pp t;
          (* timestamps occurring in t *)
@@ -716,7 +716,7 @@ let find_occurrences
   in
 
   (* printing *)
-  if pp_ns <> None then List.iter (Printer.pr "%a" pp) ind_occs;
+  if pp_ns <> None then List.iter (Printer.pr "@[%a@]" pp) ind_occs;
   if ind_occs = [] && pp_ns <> None then
     Printer.pr "  (no occurrences)@;";
 
