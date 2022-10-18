@@ -1134,9 +1134,9 @@ and _pp
       (List.map snd l) (* TODO labels *)
 
   | Tuple ts ->
-    Fmt.pf ppf "@[<hov 2>(%a)@]"
+    Fmt.pf ppf "@[<hov 1>(%a)@]"
       (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ")
-         (pp (tuple_fixity, `NonAssoc)))
+         (Fmt.box (pp (tuple_fixity, `NonAssoc))))
       ts
       
   | Proj (i, t) -> 
