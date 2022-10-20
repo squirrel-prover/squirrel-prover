@@ -382,7 +382,7 @@ Proof.
        rewrite Meq in Cond.
        destruct Cond as [EUF _].
        euf EUF; try auto.
-       intro [Ord E] //.
+       intro [Ord E] //. 
        use mutex_Ideal2_I1_I2 with i,j,j as H; by case H.
 Qed.
 
@@ -412,7 +412,7 @@ Proof.
       ++ intro [H _].
          case H.
          * by depends R(j,i), R2(j,i).
-         * use mutex_Ideal2_R1_R2 with j,i,j,i as H2; by case H2.
+         * use mutex_Ideal2_R1_R2 with j,i as H2; by case H2.
       ++ intro [OrdI Meq2 _].
          depends I(i), I1(i,j).
          case OrdI; auto. 
@@ -426,7 +426,7 @@ Proof.
       euf EUF; try auto.
       intro [H _]; case H.
        * by depends R(j,i), R2(j,i).
-       * use mutex_Ideal2_R1_R2 with j,i,j,i as H2; by case H2.
+       * use mutex_Ideal2_R1_R2 with j,i as H2; by case H2.
 Qed.
 
 
@@ -529,7 +529,7 @@ Proof.
       * by depends R(j,i), R1(j,i). 
       * intro [H _]; case H.
         by depends R(j,i), R2(j,i). 
-        use mutex_Ror_R2_R1 with j,i,j,i as HH; by case HH.             
+        use mutex_Ror_R2_R1 with j,i as HH; by case HH.             
       * intro [Ord1 Ord2 _]. 
       by use ddhnotuple with  fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>, fst(input@I1(i,j)),a(i).
     + intro [Abs Meq].
@@ -539,7 +539,7 @@ Proof.
       * by depends R(j,i), R1(j,i).
       * intro [H _]; case H.
         by depends R(j,i), R2(j,i). 
-        use mutex_Ror_R2_R1 with j,i,j,i as HH; by case HH.             
+        use mutex_Ror_R2_R1 with j,i as HH; by case HH.             
 Qed.
 
 

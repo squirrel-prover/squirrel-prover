@@ -18,22 +18,28 @@ system [foo] (
 print goal mutex_foo_C_D.
 
 goal [foo] _ (a,i,j,k : index) : 
-not (happens (C a i)) || not (happens(D a j k)).
+  not (happens (C a i)) || not (happens(D a j k)).
 Proof. by apply mutex_foo_C_D. Qed.
 
 goal [foo] _ (a,i,j,k : index) : 
-not (happens (C1 a i)) || not (happens(D a j k)).
+  not (happens (C1 a i)) || not (happens(D a j k)).
 Proof. by apply mutex_foo_C1_D. Qed.
 
+goal [foo] _ (a,a0,i,j,k : index) : 
+  not (happens (C a i)) || not (happens(D a0 j k)).
+Proof. 
+  checkfail (try apply mutex_foo_C_D); auto exn GoalNotClosed. 
+Abort.
+
 goal [foo] _ (a,i,j,k : index) : 
-not (happens (C1 a i)) || not (happens(C a j)).
+  not (happens (C1 a i)) || not (happens(C a j)).
 Proof. 
   checkfail (try apply mutex_foo_C_C1); auto exn GoalNotClosed.
   checkfail (try apply mutex_foo_C1_C); auto exn GoalNotClosed.
 Abort.
 
 goal [foo] _ (a,i,j,k : index) : 
-not (happens (C a i)) || not (happens(C a j)).
+  not (happens (C a i)) || not (happens(C a j)).
 Proof. 
   checkfail (try apply mutex_foo_C_C); auto exn GoalNotClosed.
   checkfail (try apply mutex_foo_C_C1); auto exn GoalNotClosed.

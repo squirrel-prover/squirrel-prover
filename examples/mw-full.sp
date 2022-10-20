@@ -355,7 +355,7 @@ Proof.
           assert (nt(i,t) = nt(i,t0)); [1:auto]. simpl.
           case Ctrace.
           by depends T(i,t), T2(i,t).
-          use mutex_default_T2_T1 with i, t, t as H1; by case H1.
+          use mutex_default_T2_T1 with i, t as H1; by case H1.
 
         (* Right *)
         - euf Meq0; [2:auto].
@@ -389,7 +389,7 @@ Proof.
 
           intro HH.
           case HH. by depends T(i,t), T2(i,t).
-          use mutex_default_T2_T1 with i,t,t as H3; by case H3.
+          use mutex_default_T2_T1 with i,t as H3; by case H3.
 
       (* Honest => Cond *)
       * intro [_ [r H1]]; simpl.
@@ -467,8 +467,8 @@ Proof.
 
          assert (nt(i,t)=nt(i,r)); [1:auto].
          case Ct. 
-         by depends T(i,t), T1(i,t).
-         use mutex_default_T1_T2 with i,t,t as HH; by case HH.
+         by depends T(i,t), T1(i,t). print goal mutex_default_T1_T2.
+         use mutex_default_T1_T2 with i,t as HH; by case HH.
 
          assert (nt(i,t)=nt(i,r)); [1:auto].
          case Ct;
@@ -505,7 +505,7 @@ Proof.
         
           intro H2. case H2.
           by depends T(i,t), T1(i,t).
-          use mutex_default_T1_T2 with i,t,t as HH; by case HH.
+          use mutex_default_T1_T2 with i,t as HH; by case HH.
 
           by depends T(i,t), T2(i,t).
 
