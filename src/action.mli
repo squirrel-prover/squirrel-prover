@@ -71,7 +71,7 @@ val depends : 'a t -> 'a t -> bool
 
 (** [mutex a b] test if [a] and [b] can never occur in the same trace, 
     as far as the control-flow is concerned. *)
-val mutex : 'a t -> 'a t -> bool
+val mutex : shape -> shape -> bool
 
 (** Compute the number of common variable choices between two
     mutually exclusive actions.

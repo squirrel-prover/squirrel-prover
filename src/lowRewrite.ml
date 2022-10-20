@@ -79,8 +79,6 @@ let pat_to_rw_rule ?loc
     rw_conds  = subs;
     rw_rw     = e;
   } in
-
-  Fmt.epr "rule: %a@." pp_rw_rule rule;
   
   (* We check that the rule is valid *)
   check_rule rule;
