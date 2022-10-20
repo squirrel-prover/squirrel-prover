@@ -1,5 +1,3 @@
-
-
 (*------------------------------------------------------------------*)
 (* equality *)
 
@@ -375,3 +373,8 @@ Proof.
   - by rewrite exec_not_init in Hexec.
   - by rewrite cond_init.
 Qed.
+
+(*------------------------------------------------------------------*)
+
+goal [any] f_apply ['a 'b] (f : 'a -> 'b) (x, y : 'a) : x = y => f x = f y.
+Proof. by intro ->. Qed.
