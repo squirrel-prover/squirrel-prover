@@ -121,7 +121,7 @@ let fresh_trace (m : lsymb) (s : TS.sequent) : TS.sequent list =
     Printer.pr "Freshness of %a:@; @[<v 0>" pp_n ();
     let phis  =
       NO.name_occurrence_formulas ~pp_ns:(Some pp_n)
-        get_bad contx env [t]
+        get_bad contx env (t :: n.args)
     in
     Printer.pr "@]@;";
 
