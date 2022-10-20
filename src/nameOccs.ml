@@ -452,8 +452,8 @@ let pp_internal (ppf:Format.formatter) (occ:name_occ) : unit =
       Term.pp o.so_subterm
 
 (** Prints a description of the occurrence *)
-let pp (ppf:Format.formatter) (occ:name_occ) : unit =
-  Printer.pr "  @[<hv 2>%a@]@;@;" pp_internal occ
+let pp_name_occ (ppf:Format.formatter) (occ:name_occ) : unit =
+  Printer.pr "@[<hv 2>%a@]" pp_internal occ
 
 
 
@@ -552,7 +552,7 @@ let find_occurrences
   let system = contx.system in
   let table = contx.table in
 
-  let ppp ppf () = match pp_ns with
+  let ppp ppf = match pp_ns with
     | Some x -> Fmt.pf ppf "of @[%a@] " x ()
     | None   -> Fmt.pf ppf ""
   in
@@ -565,8 +565,8 @@ let find_occurrences
     List.fold_left
       (fun (dir_occs, dir_acc) t -> (* find direct occurrences in t *)
          if pp_ns <> None then
-           Printer.pr "@[<hv 2>Bad occurrences %afound@ directly in @[%a@]:@]@;"
-             ppp ()
+           Printer.pr "@[<hv 2>Bad occurrences %tfound@ directly in @[%a@]:@]@;"
+             ppp 
              Term.pp t;
          (* timestamps occurring in t *)
          let ts = get_macro_actions contx [t] in
@@ -580,7 +580,7 @@ let find_occurrences
              (fun o -> {eo_occ=o; eo_source=[t]; eo_source_ts=ts}) acc
          in
          (* printing *)
-         if pp_ns <> None then List.iter (Printer.pr "%a" pp) occs;
+         if pp_ns <> None then List.iter (Printer.pr "%a" pp_name_occ) occs;
          if occs = [] && pp_ns <> None then
            Printer.pr "  (no occurrences)@;";
          dir_occs @ occs, dir_acc @ acc)
@@ -589,9 +589,6 @@ let find_occurrences
   in
 
   (* indirect occurrences *)
-  if pp_ns <> None then
-    Printer.pr "@;@[<hv 2>Bad occurrences %afound@ in other actions:@]@;"
-      ppp ();
   let ind_occs, ind_acc =
     Iter.fold_macro_support (fun iocc (ind_occs, ind_acc) ->
         (* todo: if fold_macro_support stored in iocc the fset
@@ -625,11 +622,17 @@ let find_occurrences
         ind_occs @ occs, ind_acc @ acc)
       contx env sources ([], [])
   in
-
+  
   (* printing *)
-  if pp_ns <> None then List.iter (Printer.pr "@[%a@]" pp) ind_occs;
-  if ind_occs = [] && pp_ns <> None then
-    Printer.pr "  (no occurrences)@;";
+  if pp_ns <> None then
+    Printer.pr "@;@[<hv 2>@[Bad occurrences@ @[%t@]found@ in other actions:@]@;%a@]@;"
+      ppp
+      (fun fmt ind_occs ->
+         if ind_occs = [] then
+           Fmt.pf fmt "(no occurrences)@;"
+         else
+           Fmt.list ~sep:(Fmt.any "@;@;") pp_name_occ fmt ind_occs)
+      ind_occs ;
 
   (* remove subsumed occs *)
   let occs = dir_occs @ ind_occs in
