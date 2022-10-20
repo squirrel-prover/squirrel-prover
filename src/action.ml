@@ -46,8 +46,8 @@ exception NotMutex
 (** Compute the number of common variable choices between two
     mutually exclusive actions.
     Raise [NotMutex] if actions are not mutually exclusives. *)
-let mutex_common_vars a b =
-  let rec aux a b =
+let mutex_common_vars (a : shape) (b : shape) : int =
+  let rec aux (a : shape) (b : shape) : int =
     match a, b with
     | hda :: tla, hdb :: tlb ->
       if hda = hdb then
@@ -59,11 +59,15 @@ let mutex_common_vars a b =
         then snd hda.par_choice
         else raise NotMutex
     | _ -> raise NotMutex
-  in aux a b
+  in
+  aux a b
 
 (** Mutually exclusive actions *)
-let mutex a b =
-  try ignore(mutex_common_vars a b : int); true with NotMutex -> false
+let mutex (a : shape) (b : shape) =
+  try
+    ignore(mutex_common_vars a b : int);
+    true
+  with NotMutex -> false
 
 (*------------------------------------------------------------------*)  
 (** Distance in control-flow graph. Return [None] when there is no
@@ -229,26 +233,25 @@ let pp_strings ppf l =
   let pp_list = Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") Fmt.string in
   if l <> [] then Fmt.pf ppf "(%a)" pp_list l
 
-(** [pp_par_choice_f f] formats [int*'a] as parallel choices,
-  * relying on [f] to format ['a]. *)
+(** [pp_par_choice_f f] formats [int * 'a] as parallel choices,
+    relying on [f] to format ['a]. *)
 let pp_par_choice_f f ppf (k,a) =
   Fmt.pf ppf "%d%a" k f a
 
-(** [pp_sum_choice_f f d] formats [int*'a] as sum choices,
-  * relying on [f] to format ['a]. It does not format
-  * the default choice [d]. *)
+(** [pp_sum_choice_f f d] formats [int * 'a] as sum choices,
+    relying on [f] to format ['a]. It does not format
+    the default choice [d]. *)
 let pp_sum_choice_f f d ppf (k,a) =
   if (k,a) <> d then Fmt.pf ppf "/%d%a" k f a
 
 (** [pp_action_f f d] is a formatter for ['a action],
-  * relying on the formatter [f] for ['a], and ignoring
-  * the default sum choice [d]. *)
+    relying on the formatter [f] for ['a], and ignoring
+    the default sum choice [d]. *)
 let pp_action_f f d ppf a =
   if a = [] then Fmt.pf ppf "ε" 
   else
-    Fmt.list
-      ~sep:(fun fmt () -> Fmt.pf fmt "_")
-      (fun ppf {par_choice;sum_choice} ->
+    Fmt.list ~sep:(Fmt.any "_")
+      (fun ppf { par_choice; sum_choice } ->
          Fmt.pf ppf "%a%a"
            (pp_par_choice_f f) par_choice
            (pp_sum_choice_f f d) sum_choice)
