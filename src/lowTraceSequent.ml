@@ -92,7 +92,12 @@ let _pp ~dbg ppf s =
 
   let sanity_check s : unit =
     Vars.sanity_check s.env.Env.vars;
-    assert (Vars.Sv.subset (fv s) (Vars.to_set s.env.Env.vars))
+    if not (Vars.Sv.subset (fv s) (Vars.to_set s.env.Env.vars)) then
+      let () =
+        Fmt.epr "Anomaly in LowTraceSequent.sanity_check:@.%a@.@."
+          pp_dbg s
+      in
+      assert false
 
   let init_sequent ~env ~conclusion =
     let s = {

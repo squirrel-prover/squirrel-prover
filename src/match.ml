@@ -1288,16 +1288,19 @@ module T (* : S with type t = Term.term *) = struct
         | _ -> tmatch_eta_expand st t (f', l')
       end
           
-    | Fun (fn , fty, terms), 
-      Fun (fn', fty', terms') when fn = fn' ->
-      tmatch_l terms terms' st
+    | Fun (fn , fty, terms), Fun (fn', fty', terms') when fn = fn' ->
+      if List.length terms = List.length terms' then 
+        tmatch_l terms terms' st
+      else no_match ()
 
-    | Name (s,l), Name (s',l') when s = s' -> 
+    | Name (s,l), Name (s',l') when s = s' ->
+      assert (List.length l = List.length l');
+      
       tmatch_l l l' st 
 
     | Macro (s, terms, ts),
       Macro (s', terms', ts') when s.s_symb = s'.s_symb ->
-      assert (Type.equal s.s_typ s'.s_typ);
+      assert (Type.equal s.s_typ s'.s_typ && List.length terms = List.length terms');
 
       let mv = tmatch_l terms terms' st in
       tmatch ts ts' { st with mv }
