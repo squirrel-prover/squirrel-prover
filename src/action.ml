@@ -51,12 +51,12 @@ let mutex_common_vars a b =
     match a, b with
     | hda :: tla, hdb :: tlb ->
       if hda = hdb then
-        fst hda.par_choice + fst hda.sum_choice + aux tla tlb
+        snd hda.par_choice + snd hda.sum_choice + aux tla tlb
       else
         if
           hda.par_choice = hdb.par_choice &&
           fst hda.sum_choice <> fst hdb.sum_choice
-        then fst hda.par_choice
+        then snd hda.par_choice
         else raise NotMutex
     | _ -> raise NotMutex
   in aux a b
