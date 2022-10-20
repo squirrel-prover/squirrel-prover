@@ -9,7 +9,9 @@ let convert_as_lsymb parser_args = match parser_args with
   | _ -> None
 
 (*------------------------------------------------------------------*)
-let convert_pat_arg sel conv_cntxt p (conc : Equiv.any_form) =
+let convert_pat_arg
+    (sel : int) conv_cntxt (p : Theory.term) (conc : Equiv.any_form)
+  =
   let t, ty = Theory.convert ~pat:true conv_cntxt p in
   let pat_vars =
     Vars.Sv.filter (fun v -> Vars.is_pat v) (Term.fv t)
@@ -26,6 +28,13 @@ let convert_pat_arg sel conv_cntxt p (conc : Equiv.any_form) =
     match conc with
     | Local  form -> Match.T.find ~option table system pat form
     | Global form -> Match.E.find ~option table system pat form
+  in
+  let res =
+    (* Clear terms whose free free variables are not a subset of the context free
+       variables (because the term appeared under a binder). *)
+    List.filter (fun t ->
+        Vars.Sv.subset (Term.fv t) (Vars.to_set conv_cntxt.env.vars)
+      ) res
   in
   let message = match List.nth_opt res (sel-1) with
     | Some et -> et
