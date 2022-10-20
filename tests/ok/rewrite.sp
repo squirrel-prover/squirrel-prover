@@ -522,3 +522,14 @@ Proof.
   + rewrite 3!H Hd; apply eq_refl.
   + rewrite 0!H Ha Hb Hc Hd; apply eq_refl.
 Qed.
+
+(*------------------------------------------------------------------*)
+(* rewrite a negation *)
+
+goal _ ['a] (x, y : 'a, p,q : bool) : not (x = y) => ((x = y) || p) => (false || p).
+Proof.
+  intro H H1.
+  checkfail (assumption H1) exn NotHypothesis.
+  rewrite H in H1.
+  assumption H1.
+Qed.

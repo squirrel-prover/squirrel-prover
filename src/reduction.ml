@@ -216,6 +216,9 @@ module type S = sig
   val destr_eq : 
     t -> 'a Equiv.f_kind -> 'a -> (Term.term * Term.term) option
 
+  val destr_not : 
+    t -> 'a Equiv.f_kind -> 'a -> (Term.term) option
+
   val destr_and : 
     t -> 'a Equiv.f_kind -> 'a -> ('a * 'a) option
 
@@ -554,6 +557,21 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       match x with
       | Local x  ->   destr_eq x
       | Global x -> e_destr_eq x
+
+  (* FEATURE: use [s] to reduce [x] if necessary *)
+  let destr_not (type a)
+      (s : S.t) (k : a Equiv.f_kind)
+      (x : a) : Term.term option
+    =
+    let e_destr_not x = obind Term.destr_not (Equiv.destr_reach x) in
+
+    match k with
+    | Local_t  -> Term.destr_not x
+    | Global_t ->    e_destr_not x
+    | Any_t ->
+      match x with
+      | Local x  -> Term.destr_not x
+      | Global x ->    e_destr_not x
 
   (* FEATURE: use [s] to reduce [x] if necessary *)
   let destr_and (type a)
