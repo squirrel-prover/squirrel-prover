@@ -48,7 +48,8 @@ let check_rule (rule : rw_rule) : unit =
 
 (** Make a rewrite rule from a formula *)
 let pat_to_rw_rule ?loc 
-    ~(destr_eq : Term.term -> (Term.term * Term.term) option)
+    ~(destr_eq  : Term.term -> (Term.term * Term.term) option)
+    ~(destr_not : Term.term -> (            Term.term) option)
     (system    : SE.arbitrary) 
     (dir       : [< `LeftToRight | `RightToLeft ])
     (p         : Term.term Term.pat) 
@@ -58,7 +59,10 @@ let pat_to_rw_rule ?loc
 
   let e = match destr_eq f with
     | Some (t1, t2) -> t1,t2
-    | _ -> f, Term.mk_true
+    | _ ->
+        match destr_not f with
+        | Some neg_f -> neg_f, Term.mk_false
+        | None       ->     f, Term.mk_true
   in
 
   let e = match dir with
@@ -76,6 +80,8 @@ let pat_to_rw_rule ?loc
     rw_rw     = e;
   } in
 
+  Fmt.epr "rule: %a@." pp_rw_rule rule;
+  
   (* We check that the rule is valid *)
   check_rule rule;
 

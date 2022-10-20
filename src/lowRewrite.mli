@@ -26,7 +26,8 @@ val check_rule : rw_rule -> unit
 
 val pat_to_rw_rule :
   ?loc:Location.t ->
-  destr_eq:(Term.term -> (Term.term * Term.term) option) ->
+  destr_eq  : (Term.term -> (Term.term * Term.term) option) ->
+  destr_not : (Term.term -> (            Term.term) option) ->
   SE.t ->
   [< `LeftToRight | `RightToLeft ] ->
   Term.term Term.pat ->
