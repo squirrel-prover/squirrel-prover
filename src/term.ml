@@ -697,7 +697,7 @@ let tmap (func : term -> term) (t : term) : term =
 
   | Fun (f,fty,terms) -> Fun (f, fty, List.map func terms)
   | Macro (m, l, ts)  -> Macro (m, List.map func l, func ts)
-  | App (t, l)  -> App (func t, List.map func l)
+  | App (t, l)  -> mk_app (func t) (List.map func l)
 
   | Tuple ts -> Tuple (List.map func ts)
   | Proj (i,t) -> Proj (i, func t)
