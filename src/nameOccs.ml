@@ -89,6 +89,8 @@ let name_occ_formula
     ()
   : term
   =
+  (* sanity check: only apply when same symbol *)
+  assert (n.symb = ncoll.symb);
   if not negate then
     mk_eqs ~simpl:true ncoll.args n.args
   else
@@ -692,7 +694,7 @@ let sat_subst (sigma:subst) : subst =
        match e with
        | ESubst (Var u, Var v) when u = v -> s (* useless mapping *)
 
-       | ESubst (Var u, Var _v) when
+       | ESubst (Var u, Var _) when
            subst_var s u <> u -> (* u is one of the ui, already mapped *)
          s
 
@@ -707,7 +709,7 @@ let sat_subst (sigma:subst) : subst =
        | ESubst (Var u, Var v) when (* u -> v is vj -> ui for some i <> j *)
            (List.exists
               (fun e -> match e with
-                 | ESubst (Var _u', Var v') -> u = v'
+                 | ESubst (Var _, Var v') -> u = v'
                  | _ -> assert false)
               s) &&
            (subst_var s v <> v) -> (* v already bound *)
@@ -727,7 +729,7 @@ let sat_subst (sigma:subst) : subst =
                                        and v <> ui for all i *)
            (List.exists
               (fun e -> match e with
-                 | ESubst (Var _u', Var v') -> u = v'
+                 | ESubst (Var _, Var v') -> u = v'
                  | _ -> assert false)
               s) ->
          (* replace any uj' -> vj' such that u = vj' with uj' -> v *)

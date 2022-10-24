@@ -31,6 +31,10 @@ module List : sig
       [included x y] iff x included in y, ie y subsumes x. *)
   val clear_subsumed : ('a -> 'a -> bool) -> 'a list -> 'a list
 
+  (** maps, splits, then flattens *)
+  val flattensplitmap :
+    ('a -> 'b list * 'c list) -> 'a list -> 'b list * 'c list
+
   val inclusion : 'a list -> 'a list -> bool
 
   (** [diff a b] is [a] minus [b]'s elements  *)

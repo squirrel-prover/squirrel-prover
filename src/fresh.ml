@@ -1,7 +1,8 @@
 (** Tactics exploiting a name's freshness. *)
 
 open Term
-
+open Utils
+    
 module NO = NameOccs
 module Name = NO.Name
                 
@@ -35,7 +36,7 @@ type lsymb = Theory.lsymb
 let get_bad_occs
     (n:Name.t) 
     (retry_on_subterms : unit -> NO.n_occs * NO.empty_occs)
-    (_rec_call_on_subterms : 
+    (rec_call_on_subterms : 
        (fv:Vars.vars ->
         cond:terms ->
         p:MP.pos ->
@@ -54,13 +55,19 @@ let get_bad_occs
 
   (* handles a few cases, using rec_call_on_subterm for rec calls,
      and calls retry_on_subterm for the rest *)
+  (* only use this rec_call shorthand if the parameters don't change! *)
+  let rec_call = (* rec call on a list *)
+    List.flattensplitmap (rec_call_on_subterms ~fv ~cond ~p ~info ~st)
+  in
+
   match t with
   | Var v when not (Type.is_finite (Vars.ty v)) ->
     soft_failure
       (Tactics.Failure "can only be applied on ground terms")
 
   | Name (nn, nn_args) when nn.s_symb = n.Name.symb.s_symb ->
-    [NO.mk_nocc Name.{ symb = nn; args = nn_args } n fv cond (fst info) st], []
+    let occs, _ = rec_call nn_args in    
+    (NO.mk_nocc (Name.of_term t) n fv cond (fst info) st) :: occs, []
 
   | _ -> retry_on_subterms ()
 

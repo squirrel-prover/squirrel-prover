@@ -179,6 +179,11 @@ module List = struct
     in
     rev ll
 
+  let flattensplitmap (f:'a -> 'b list * 'c list) (l:'a list)
+    : 'b list * 'c list =
+  let x,y = List.split (List.map f l) in
+  List.flatten x, List.flatten y
+
   (*------------------------------------------------------------------*)
   let mapi_fold 
       (f  : int -> 'a -> 'b -> 'a * 'c) 
