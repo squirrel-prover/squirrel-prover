@@ -784,7 +784,7 @@ let rec subst (s : subst) (t : term) : term =
       | Fun (fs, fty, lt) ->
         Fun (fs, fty, List.map (subst s) lt)
 
-      | App (t, l) -> App (subst s t, List.map (subst s) l)
+      | App (t, l) -> mk_app (subst s t) (List.map (subst s) l)
 
       | Name (symb,l) ->
         Name (symb, List.map (subst s) l)
@@ -1872,7 +1872,7 @@ let rec make_normal_biterm
       Tuple (List.map2 (mdiff s) l l')
 
     | App (f, l), App (f', l') when List.length l = List.length l' ->
-      App (mdiff s f f', List.map2 (mdiff s) l l')
+      mk_app (mdiff s f f') (List.map2 (mdiff s) l l')
 
     | Name (n,l), Name (n',l') when n.s_symb = n'.s_symb ->
       check_alpha s l l';
