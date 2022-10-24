@@ -132,20 +132,24 @@ class deprecated_get_f_messages ?(drop_head=true)
       end ;
       self#visit_message m ; self#visit_message k'
 
-    | Term.Fun (f', _,[Tuple [m;r;k']]) as m_full when f' = f ->
+    | Term.Fun (f', _,[Tuple [m;_r;k']]) as m_full when f' = f ->
       begin match k', fun_wrap_key with
         | Term.Name (s',args'), None when s'.s_symb = k ->
           let ret_m = if drop_head then m else m_full in
           occurrences <- (args', ret_m) :: occurrences
+
         |Term.Fun (f', _, [Term.Name (s',args')]), Some is_pk
           when is_pk f' && s'.s_symb = k ->
           let ret_m = if drop_head then m else m_full in
           occurrences <- (args', ret_m) :: occurrences
+
         | _ -> ()
       end ;
       self#visit_message m ; self#visit_message k'
+
     | Term.Var m when not (Type.is_finite (Vars.ty m)) ->
       assert false (* SSC must have been checked first *)
+
     | m -> super#visit_message m
 end
 
@@ -279,7 +283,7 @@ let get_f
     in
 
     match t with
-    | Term.Fun (fn,_,l)  ->
+    | Term.Fun (fn,_,_)  ->
       let head_occ =
         if matching table fn symtype
         then [{ occ_cnt  = t;
@@ -416,7 +420,7 @@ let get_f_messages_ext
         in
         occs' @ occs, `Continue
 
-      | Term.Fun (f', _, [Tuple [m;r;k']]) as m_full when f' = f ->
+      | Term.Fun (f', _, [Tuple [m;_r;k']]) as m_full when f' = f ->
         let occs' =
           match k', fun_wrap_key with
           | Term.Name (s', args'), None when s'.s_symb = k ->

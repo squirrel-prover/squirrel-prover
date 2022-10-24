@@ -56,7 +56,7 @@ let get_lexbuf (state : main_state) : string * Lexing.lexbuf =
        messages are not acurate afterward. I do not understand why exactly (the
        lexer buffer positions must not be properly updated somewhere). *)
 
-    | `File f -> state.file.f_lexbuf
+    | `File _ -> state.file.f_lexbuf
   in
   state.file.f_name ^ ".sp", lexbuf
 
@@ -189,7 +189,7 @@ let is_toplevel_error ~test interactive (e : exn) : bool =
   | Tactic_soft_failure     _
   | Tactic_hard_failure     _ -> not test
 
-  | e when interactive -> not test
+  | _e when interactive -> not test
 
   | _ -> false
 

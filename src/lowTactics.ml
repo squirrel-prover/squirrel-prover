@@ -383,7 +383,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let expand_inst : Match.Pos.f_map =
       fun (occ : Term.term) se _vars conds _p ->
         match occ with
-        | Term.Macro (ms, l, _) ->
+        | Term.Macro _ ->
           begin
             let s =             (* add [conds] in [s] *)
               List.fold_left (fun s cond ->
@@ -678,7 +678,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
     let table  = S.table s in
 
-    let mk_case (action,symbol,indices) : Vars.var list * Term.term =
+    let mk_case (action,_symbol,indices) : Vars.var list * Term.term =
       let action = Action.to_action action in
 
       let env = S.vars s in
@@ -1468,7 +1468,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let induction_args ~dependent args s =
     match args with
     | [] -> induction s
-    | [Args.Theory t] ->
+    | [Args.Theory _] ->
       begin
         match convert_args s args (Args.Sort Args.Message) with
         | Args.Arg (Args.Message (t, _)) -> induction_gen ~dependent t s
@@ -1673,7 +1673,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (s : S.t) : S.t list
     =
     match tn, tm with
-    | (Name (n, _) as tn), (Name (m, _) as tm) ->
+    | Name (n, _), Name _ ->
       let table = S.table s in
 
       (* FEATURE: subtypes *)
@@ -1949,15 +1949,15 @@ let do_s_item
   let red_param = Reduction.rp_default in
   let red_param = Reduction.parse_simpl_args red_param args in
   match s_item_body with
-  | Args.Simplify l ->
+  | Args.Simplify _loc ->
     let tac = simpl ~red_param ~strong:true ~close:false in
     Tactics.run tac s
 
-  | Args.Tryauto l ->
+  | Args.Tryauto _loc ->
     let tac = Tactics.try_tac (simpl ~red_param ~strong:true ~close:true) in
     Tactics.run tac s
 
-  | Args.Tryautosimpl l ->
+  | Args.Tryautosimpl _loc ->
     let tac =
       Tactics.andthen         (* FIXME: inneficient *)
         (Tactics.try_tac (simpl ~red_param ~strong:true ~close:true))
@@ -2057,7 +2057,7 @@ let rec do_intros_ip
     let ss = as_seq1 ss in (* we get exactly one new goal *)
     do_intros_ip simpl intros ss
 
-  | Args.StarV loc :: intros0 ->
+  | Args.StarV _loc :: intros0 ->
     let repeat, s =
       try
         let handler, s = do_intro_var s in

@@ -40,7 +40,7 @@ let pp_rw_rule fmt (rw : rw_rule) =
 (*------------------------------------------------------------------*)
 (** Check that the rule is correct. *)
 let check_rule (rule : rw_rule) : unit =
-  let l, r = rule.rw_rw in
+  let l, _r = rule.rw_rw in
 
   if not (Vars.Sv.subset rule.rw_vars (Term.fv l)) then
     Tactics.hard_failure Tactics.BadRewriteRule;
@@ -55,6 +55,8 @@ let pat_to_rw_rule ?loc
     (p         : Term.term Term.pat) 
   : rw_rule 
   =
+  let _ = loc in                (* unused *)
+
   let subs, f = Term.decompose_impls_last p.pat_term in
 
   let e = match destr_eq f with

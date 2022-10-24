@@ -18,7 +18,7 @@ module H = Hyps.Mk
       let _pp_hyp    = Equiv._pp
       let pp_hyp_dbg = Equiv.pp_dbg
 
-      let choose_name f = "H"
+      let choose_name _f = "H"
         
       let htrue = Equiv.Atom (Equiv.Equiv [])
     end)
@@ -195,33 +195,33 @@ let set_goal_in_context ?update_local system conc s =
 
   if system = s.env.system then { s with goal = conc } else
 
-  (* Update hypotheses.
-     We add back manually all formulas, to ensure that definitions are
-     unrolled. TODO really necessary? *)
-  let update_local,update_global =
-    LowSequent.setup_set_goal_in_context
-      ~table:s.env.table
-      ~old_context:s.env.system
-      ~new_context:system
-  in
-  let s =
-    H.fold
-      (fun id f s ->
-         match update_global f with
+    (* Update hypotheses.
+       We add back manually all formulas, to ensure that definitions are
+       unrolled. TODO really necessary? *)
+    let _update_local,update_global =
+      LowSequent.setup_set_goal_in_context
+        ~table:s.env.table
+        ~old_context:s.env.system
+        ~new_context:system
+    in
+    let s =
+      H.fold
+        (fun id f s ->
+           match update_global f with
            | Some f ->
-               let _,hyps = H._add ~force:true id f s.hyps in
-               { s with hyps }
+             let _,hyps = H._add ~force:true id f s.hyps in
+             { s with hyps }
            | None -> s)
-      s.hyps
-      { s with hyps = H.empty }
-  in
+        s.hyps
+        { s with hyps = H.empty }
+    in
 
-  (* Change the context in the sequent's environment. *)
-  let env = Env.update ~system s.env in
-  let s = { s with env } in
+    (* Change the context in the sequent's environment. *)
+    let env = Env.update ~system s.env in
+    let s = { s with env } in
 
-  (* Finally set the new conclusion. *)
-  { s with goal = conc }
+    (* Finally set the new conclusion. *)
+    { s with goal = conc }
 
 let table j = j.env.table
 let set_table table j = update ~table j
@@ -254,7 +254,7 @@ let rename (u:Vars.var) (v:Vars.var) (s:t) : t =
 
 (*------------------------------------------------------------------*)
 let goal_is_equiv s = match goal s with
-  | Atom (Equiv.Equiv e) -> true
+  | Atom (Equiv.Equiv _) -> true
   | _ -> false
 
 let goal_as_equiv s = match goal s with

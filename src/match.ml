@@ -2302,7 +2302,7 @@ module E : S with type t = Equiv.form = struct
                 assert (match ded_set.cond with
                     | Term.Fun (fs, _, [_; c]) when fs = Term.f_leq ->
                       Some c = cand.cond_le
-                    | Term.Fun (fs,_,_) -> None = cand.cond_le
+                    | Term.Fun (_fs,_,_) -> None = cand.cond_le
                     | _ -> false)
               in
 
@@ -2436,7 +2436,7 @@ module E : S with type t = Equiv.form = struct
         r
 
   (*------------------------------------------------------------------*)
-  let unify ?mv table t1 t2  = `NoMgu      (* TODO *)
+  let[@warning "-27"] unify ?mv table t1 t2  = `NoMgu      (* TODO *)
 
   let unify_opt ?mv table t1 t2 =
     match unify ?mv table t1 t2 with

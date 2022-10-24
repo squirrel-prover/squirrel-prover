@@ -269,9 +269,10 @@ let ciphertext_formula
     (ca:ctxt_aux)
     : term =
   let {ca_m = m'; ca_r = r'; ca_k1 = k1; ca_kcoll = k} = ca in
+
   let () = (* sanity check *)
     match c' with
-    | Fun (f, _, [Tuple [m''; Name _ as r''; Name _ as k1']])
+    | Fun (_f, _, [Tuple [m''; Name _ as r''; Name _ as k1']])
       when m'' = m' && 
            Name.of_term r'' = r' && 
            Name.of_term k1' = k1 && 
@@ -279,10 +280,12 @@ let ciphertext_formula
       ()
     | _ -> assert false
   in
+
   if not negate then 
     mk_and ~simpl:true
       (mk_eq ~simpl:true c c')
       (mk_eqs ~simpl:true k.args k1.args)
+
   else (* not used I think but still *)
     mk_or ~simpl:true
       (mk_not ~simpl:true (mk_eq ~simpl:true c c'))
@@ -422,7 +425,7 @@ let intctxt
   : sequent list
   =
   (* find parameters *)
-  let id, hyp = Hyps.by_name h s in
+  let _, hyp = Hyps.by_name h s in
   let contx = TS.mk_trace_cntxt s in
   let env = (TS.env s).vars in
   

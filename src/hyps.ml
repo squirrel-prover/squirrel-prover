@@ -138,7 +138,7 @@ module Mk (Hyp : Hyp) : S with type hyp = Hyp.t = struct
       (Hyp._pp_hyp ~dbg) hyp
 
   let _pp ~dbg ppf hyps =
-    let pp_sep fmt () = Fmt.pf ppf "" in
+    let pp_sep ppf () = Fmt.pf ppf "" in
     Fmt.pf ppf "@[<v 0>%a@]"
       (Fmt.list ~sep:pp_sep (pp_ldecl ~dbg)) (Mid.bindings hyps)
 

@@ -226,7 +226,7 @@ let euf
   : sequent list
   =
   (* find parameters *)
-  let id, hyp = Hyps.by_name h s in
+  let _, hyp = Hyps.by_name h s in
   let contx = TS.mk_trace_cntxt s in
   let env = (TS.env s).vars in
   

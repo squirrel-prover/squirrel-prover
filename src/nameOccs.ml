@@ -107,7 +107,7 @@ let ts_occ_formula
 
 
 (** Dummy occ_formula for empty occurrences *)
-let empty_occ_formula
+let[@warning "-27"] empty_occ_formula
     ~(negate : bool)
     ()
     ()
@@ -347,7 +347,7 @@ let get_actions_ext
     ?(fv:Vars.vars=[])
     (info:expand_info)
   : ts_occs =
-  let (typ, contx) = info in
+  let _typ, contx = info in
   let system = contx.system in
   let se = (SE.reachability_context system).set in
   let rec get (t : term)
@@ -688,7 +688,7 @@ let sat_subst (sigma:subst) : subst =
        match e with
        | ESubst (Var u, Var v) when u = v -> s (* useless mapping *)
 
-       | ESubst (Var u, Var v) when
+       | ESubst (Var u, Var _v) when
            subst_var s u <> u -> (* u is one of the ui, already mapped *)
          s
 
@@ -703,7 +703,7 @@ let sat_subst (sigma:subst) : subst =
        | ESubst (Var u, Var v) when (* u -> v is vj -> ui for some i <> j *)
            (List.exists
               (fun e -> match e with
-                 | ESubst (Var u', Var v') -> u = v'
+                 | ESubst (Var _u', Var v') -> u = v'
                  | _ -> assert false)
               s) &&
            (subst_var s v <> v) -> (* v already bound *)
@@ -723,7 +723,7 @@ let sat_subst (sigma:subst) : subst =
                                        and v <> ui for all i *)
            (List.exists
               (fun e -> match e with
-                 | ESubst (Var u', Var v') -> u = v'
+                 | ESubst (Var _u', Var v') -> u = v'
                  | _ -> assert false)
               s) ->
          (* replace any uj' -> vj' such that u = vj' with uj' -> v *)

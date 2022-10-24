@@ -344,7 +344,8 @@ let simpl_impl s =
 
 (*------------------------------------------------------------------*)
 (* Simplification function doing nothing. *)
-let simpl_ident : LT.f_simpl = fun ~red_param ~strong ~close s sk fk ->
+let[@warning "-27"] simpl_ident : LT.f_simpl = 
+  fun ~red_param ~strong ~close s sk fk ->
   if close then fk (None, GoalNotClosed) else sk [s] fk
 
 (*------------------------------------------------------------------*)
@@ -416,7 +417,7 @@ let induction Args.(Message (ts,_)) s =
     (* Introduce back generalized hypotheses. *)
     let induc_s = intro_back s in
     (* Introduce induction hypothesis. *)
-    let id_ind, induc_s = Hyps.add_i (Args.Named "IH") ind_hyp induc_s in
+    let _id_ind, induc_s = Hyps.add_i (Args.Named "IH") ind_hyp induc_s in
 
     let init_goal = Equiv.subst [Term.ESubst(ts,Term.init)] goal in
     let init_s = ES.set_goal init_goal s in
@@ -424,7 +425,7 @@ let induction Args.(Message (ts,_)) s =
 
     (* Creates the goal corresponding to the case
        where [t] is instantiated by [action]. *)
-    let case_of_action (action,symbol,indices) =
+    let case_of_action (action,_symbol,indices) =
       let env = ref @@ ES.vars induc_s in
       let subst =
         List.map
@@ -475,14 +476,14 @@ let old_or_new_induction args : etac =
     )
 
 (*------------------------------------------------------------------*)
-let enrich ty f l (s : ES.t) =
+let enrich _ty f _loc (s : ES.t) =
   ES.set_equiv_goal (f :: ES.goal_as_equiv s) s
 
 let enrich_a arg s =
   match 
     Args.convert_args (ES.env s) [arg] Args.(Sort Term) (Global (ES.goal s)) 
   with
-  | Args.Arg (Term (ty, t, l)) -> enrich ty t l s
+  | Args.Arg (Term (ty, t, loc)) -> enrich ty t loc s
   | _ -> bad_args ()
 
 let enrichs args s =
@@ -605,7 +606,7 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
     in
     let cntxt = Theory.{ env; cntxt = InGoal; } in
     List.map (fun (mult, tpat) ->
-        let t, ty = Theory.convert ~pat:true cntxt tpat in
+        let t, _ty = Theory.convert ~pat:true cntxt tpat in
         let pat_vars =
           Vars.Sv.filter (fun v -> Vars.is_pat v) (Term.fv t)
         in
@@ -866,7 +867,7 @@ let () =
 (** Fresh *)
 
 let deprecated_fresh_mk_direct
-    ((n, n_args) : Term.nsymb * Term.terms)
+    ((_n, n_args) : Term.nsymb * Term.terms)
     (occ : OldFresh.deprecated_name_occ) : Term.term
   =
   let bv, subst = Term.refresh_vars `Global occ.occ_vars in
@@ -881,7 +882,7 @@ let deprecated_fresh_mk_direct
 let deprecated_fresh_mk_indirect
     (cntxt : Constr.trace_cntxt)
     (env : Vars.env)
-    ((n, n_args) : Term.nsymb * Term.terms)
+    ((_n, n_args) : Term.nsymb * Term.terms)
     (frame_actions : OldFresh.deprecated_ts_occs)
     (occ : TraceTactics.deprecated_fresh_occ) : Term.term
   =  
@@ -1002,7 +1003,7 @@ let deprecated_fresh_cond (s : ES.t) t biframe : Term.term =
 let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
   match EquivLT.convert s term with
   (* we expect term to be a sequence *)
-  | (Quant (Seq, vs, t) as term_seq), ty ->
+  | (Quant (Seq, vs, t) as term_seq), _ty ->
     (* we parse the arguments ths, to create a substution for variables vs *)
     let subst = Theory.parse_subst (ES.env s) vs ths in
 
@@ -1030,7 +1031,7 @@ let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
         in
         Equiv.Equiv new_e
 
-      | Equiv.Reach f -> hyp
+      | Equiv.Reach _f -> hyp
     in
 
     let s = Hyps.map mk_hyp_f s in
@@ -1687,7 +1688,7 @@ let cca1 Args.(Int i) s =
   let e = Term.head_normal_biterm e in
 
   let get_subst_hide_enc
-      enc fnenc m fnpk (sk : Name.t) fndec (r : Name.t) is_top_level
+      enc fnenc m fnpk (sk : Name.t) _fndec (r : Name.t) is_top_level
     : Goal.t * Term.esubst
     =
     (* we check that the random is fresh, and the key satisfy the
@@ -1729,12 +1730,12 @@ let cca1 Args.(Int i) s =
   let is_top_level : bool =
     match e with
     | Term.Fun (fnenc, _,
-                [Tuple [m; Term.Name _(* r *) ; 
+                [Tuple [_m; Term.Name _(* r *) ; 
                         Term.Fun (fnpk, _, [Term.Name _ (* sk *)])]])
       when (Symbols.is_ftype fnpk Symbols.PublicKey cntxt.table
             && Symbols.is_ftype fnenc Symbols.AEnc table) -> true
 
-    | Term.Fun (fnenc, _, [Tuple [m; Term.Name _ (* r *); Term.Name _ (* sk *)]])
+    | Term.Fun (fnenc, _, [Tuple [_m; Term.Name _ (* r *); Term.Name _ (* sk *)]])
       when Symbols.is_ftype fnenc Symbols.SEnc table -> true
 
     | _ -> false
@@ -2006,7 +2007,7 @@ let enckp arg (s : ES.t) =
 
     | Some (Message (m1, _)), None ->
       begin match m1 with
-        | Term.Fun (f,_,[Tuple [_;_;_]]) -> Some m1, None
+        | Term.Fun (_f,_,[Tuple [_;_;_]]) -> Some m1, None
         | _ -> None, Some m1
       end
     | None, None -> None, None
@@ -2074,7 +2075,7 @@ let remove_name_occ (n,a) l = match l with
     Tactics.(soft_failure (Failure "name is not XORed on both sides"))
 
 let mk_xor_phi_base (s : ES.t) biframe
-    ((n_left, n_left_args), l_left, (n_right, n_right_args), l_right, term) =
+    ((n_left, n_left_args), l_left, (n_right, n_right_args), l_right, _term) =
   let cntxt = mk_pair_trace_cntxt s in
   let env = ES.vars s in
   let l_proj, r_proj = ES.get_system_pair_projs s in
@@ -2127,7 +2128,7 @@ let xor arg (s : ES.t) =
   let is_xored_diff t =
     match Term.project1 l_proj  t,
           Term.project1 r_proj t with
-    | (Fun (fl,_,ll),Fun (fr,_,lr))
+    | (Fun (fl,_,_ll),Fun (fr,_,_lr))
       when (fl = Term.f_xor && fr = Term.f_xor) -> true
     | _ -> false
   in
@@ -2256,7 +2257,7 @@ exception Not_context
 
 class ddh_context
     ~(cntxt:Constr.trace_cntxt) ~gen ~exp ~l_proj ~r_proj exact a b c
-  = object (self)
+  = object (_self)
 
  inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
 
@@ -2276,7 +2277,7 @@ class ddh_context
     (* left:  a b can occur as g^a^b 
        right: c can occur as g^c *)
     | Term.(Fun (f1,_, [(Fun (f2,_, [g1; Name (n1,_)])); Name (n2,_)])),
-      Term.(Fun (f, _, [g3; Name (n3,_)])) 
+      Term.(Fun (_f, _, [g3; Name (n3,_)])) 
       when f1 = exp && f2 = exp && g1 = gen && g3 = gen && n3.s_symb = c &&
            ((n1.s_symb = a && n2.s_symb = b) ||
             (n1.s_symb = b && n2.s_symb = a)) -> ()
@@ -2284,7 +2285,7 @@ class ddh_context
     | _ ->
       match t with
       (* any name n can occur as g^n *)
-      | Term.Fun (f, _, [g1; Name (n,_)]) when f = exp && g1 = gen -> ()
+      | Term.Fun (f, _, [g1; Name _]) when f = exp && g1 = gen -> ()
 
       (* if a name a, b, c appear anywhere else, fail *)
       | Term.Name (n,_) when List.mem n.s_symb [a; b; c] -> raise Not_context

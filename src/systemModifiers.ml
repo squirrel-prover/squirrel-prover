@@ -186,7 +186,7 @@ let global_rename
   Vars.check_type_vars vs [Type.Index]
     (fun () -> Tactics.hard_failure ~loc:(L.loc gf)
         (Tactics.Failure "Only index variables can be bound."));
-  let ns1, ns2, n1, n2 =
+  let _ns1, ns2, n1, n2 =
     match f with
     |  Atom
         (Equiv ([Term.Diff (Explicit [_,(Term.Name _ as ns1);
@@ -293,7 +293,7 @@ let global_prf
   (* Check syntactic side condition. *)
   let errors =
     OldEuf.key_ssc ~globals:true
-      ~elems:[] ~allow_functions:(fun x -> false)
+      ~elems:[] ~allow_functions:(fun _ -> false)
       ~cntxt param.h_fn param.h_key.symb.s_symb
   in
   if errors <> [] then
@@ -305,7 +305,7 @@ let global_prf
   let left_key =  Term.subst left_subst (Name.to_term param.h_key) in
   let left_key_ids =
     match left_key with
-    | Term.Name (s,ids) -> ids
+    | Term.Name (_,ids) -> ids
     | _ -> assert false
   in
   (* We create the pattern for the hash *)
@@ -515,7 +515,7 @@ let global_cca
     high_rewrite_norec table (old_system :> SE.t) dec_rw_rule
   in
 
-  let table, old_new_pair =
+  let table, _old_new_pair =
     clone_system_map table old_single_system sdecl.Decl.name fmap
   in
 
@@ -527,11 +527,11 @@ let global_cca
 
   (* we now create the lhs of the obtained conclusion *)
   (* let fresh_x_var = Vars.make_fresh Type.Message "mess" in *)
-  let rdef =
-    let ty_args = List.map Vars.ty is in
-    Symbols.{ n_fty = Type.mk_ftype_tuple [] ty_args Type.Message ; }
-  in
-  let table,r =
+  let table, _r =
+    let rdef =
+      let ty_args = List.map Vars.ty is in
+      Symbols.{ n_fty = Type.mk_ftype_tuple [] ty_args Type.Message ; }
+    in
     Symbols.Name.declare table (L.mk_loc L._dummy "r_CCA") rdef
   in
 
@@ -627,7 +627,7 @@ let refresh_xocc (o : x_hash_occ) : Term.subst * x_hash_occ =
   let occ = o.x_occ in
   assert (Sv.subset (Sv.of_list o.x_a_is) (Sv.of_list occ.occ_vars));
 
-  let occ_vars, subst = Term.refresh_vars `Global occ.occ_vars in
+  let _, subst = Term.refresh_vars `Global occ.occ_vars in
 
   subst, subst_xocc subst o
 
@@ -787,7 +787,7 @@ let rec linearize (map : xomap) : xomap =
   
 (*------------------------------------------------------------------*)
 (* check that at most one hash occurrence appears per macro *)
-let check_uniq table (map : XO.t list) = 
+let check_uniq _table (map : XO.t list) = 
   List.for_all (fun (x : XO.t) ->
       List.for_all (fun (y : XO.t) -> 
           x.tag = y.tag ||
@@ -825,7 +825,7 @@ let global_prf_t
      We iter over global macros too ! *)
   let errors =
     OldEuf.key_ssc ~globals:true
-      ~elems:[] ~allow_functions:(fun x -> false)
+      ~elems:[] ~allow_functions:(fun _ -> false)
       ~cntxt param.h_fn param.h_key.symb.s_symb
   in
   if errors <> [] then
@@ -867,7 +867,7 @@ let global_prf_t
 
   let (table, occs) : Symbols.table * XO.t list =
     SystemExpr.fold_descrs (fun descr (table,occs) ->
-        Iter.fold_descr ~globals:true (fun ms m_is mdef t (table,occs) ->
+        Iter.fold_descr ~globals:true (fun ms _m_is mdef t (table,occs) ->
             (* find new occurrences using NoDelta, as we also fold over 
                global macros. *)
             let new_occs =
@@ -1070,7 +1070,7 @@ let global_prf_t
           let found_descr = 
             match arg with
             | Macros.ADescr d -> xocc.cnt.x_a = d.name
-            | Macros.AGlobal a -> assert (Macros.is_global table ms); true
+            | Macros.AGlobal _ -> assert (Macros.is_global table ms); true
           in
           found_descr && 
           xocc.cnt.x_msymb = ms &&
@@ -1196,13 +1196,13 @@ let do_s_item
   : Term.term 
   =
   match s_item with
-  | Args.Simplify l, args -> 
+  | Args.Simplify _loc, args -> 
     let param = Reduction.rp_default in
     let param = Reduction.parse_simpl_args param args in
     TS.Reduce.reduce_term ~expand_context param s t 
 
-  | Args.Tryauto l, _ | Args.Tryautosimpl l, _ ->
-    soft_failure ~loc:l (Failure "cannot use // or //= in a global rewriting")
+  | Args.Tryauto loc, _ | Args.Tryautosimpl loc, _ ->
+    soft_failure ~loc (Failure "cannot use // or //= in a global rewriting")
 
 let do_rw_arg
     (expand_context : Macros.expand_context)
@@ -1238,7 +1238,7 @@ let global_rewrite
   
   let subgs = ref [] in
 
-  let fmap (arg : system_map_arg) (ms : Symbols.macro) (t : Term.term) 
+  let fmap (arg : system_map_arg) (_ms : Symbols.macro) (t : Term.term) 
       : Term.term 
     =
     let vars, ts, expand_context = match arg with
@@ -1247,7 +1247,7 @@ let global_rewrite
          Term.mk_action d.name (Term.mk_vars d.indices),
          Macros.InSequent
         
-      | Macros.AGlobal { is; ts; ac_descrs; inputs } ->
+      | Macros.AGlobal { is; ts; inputs } ->
          Vars.of_list (ts :: is @ inputs), 
          Term.mk_var ts,
          Macros.InGlobal { inputs }
@@ -1261,10 +1261,11 @@ let global_rewrite
     (* add hyp_hap as hypothesis, so it's available when do_rewrite tries to rewrite *)
     let (hyp_hap_id, s_hap) = TS.LocalHyps.add_i AnyName hyp_hap s in 
 
-    (* hypothesis for global macros: ts is one of the shapes where the action is defined *)
+    (* hypothesis for global macros: ts is one of the shapes where the action is 
+       defined *)
     let (hyp_hap2_oid, s_hap2) =
       match arg with
-      | Macros.AGlobal { is; ts; ac_descrs; inputs } ->
+      | Macros.AGlobal { is = _; ts; ac_descrs; inputs = _ } ->
          let lex =
            List.map
              (fun (acd:Action.descr) -> (* formula: exists indices. ts = ac(indices) *)
@@ -1298,7 +1299,7 @@ let global_rewrite
           (* rename the timestamp variable *)
           let gg = 
             match arg with
-            | Macros.AGlobal {is; ts; ac_descrs; inputs} ->
+            | Macros.AGlobal {is = _; ts; ac_descrs = _; inputs = _} ->
                let _, new_ts = Vars.make `Approx (TS.vars gg) Type.Timestamp "t" in 
                TS.rename ts new_ts gg
             | _ -> gg

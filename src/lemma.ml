@@ -20,8 +20,8 @@ let pp_kind fmt = function
   | `Lemma -> Printer.kw `Goal fmt "goal"
 
 let pp fmt lem =
-    Printer.prt `Default "@[<v 2>%a %a@]" 
-      pp_kind lem.kind Goal.pp_statement lem.stmt
+  Fmt.pf fmt "@[<v 2>%a %a@]" 
+    pp_kind lem.kind Goal.pp_statement lem.stmt
 
 (*------------------------------------------------------------------*)
 let as_lemma : Symbols.data -> lemma = function
