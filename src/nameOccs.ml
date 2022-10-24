@@ -452,10 +452,14 @@ let pp_internal (ppf:Format.formatter) (occ:name_occ) : unit =
       Term.pp o.so_subterm
 
 (** Prints a description of the occurrence *)
-let pp_name_occ (ppf:Format.formatter) (occ:name_occ) : unit =
-  Printer.pr "@[<hv 2>%a@]" pp_internal occ
+let pp_name_occ (fmt:Format.formatter) (occ:name_occ) : unit =
+  Fmt.pf fmt "@[<hv 2>%a@]" pp_internal occ
 
-
+let pp_name_occs (fmt:Format.formatter) (occs:name_occ list) : unit =
+  if occs = [] then
+    Fmt.pf fmt "(no occurrences)@;"
+  else
+    Fmt.list ~sep:(Fmt.any "@;@;") pp_name_occ fmt occs
 
 (*------------------------------------------------------------------*)
 (* Functions to look for illegal name occurrences in a term *)
@@ -564,10 +568,6 @@ let find_occurrences
   let dir_occs, dir_acc =
     List.fold_left
       (fun (dir_occs, dir_acc) t -> (* find direct occurrences in t *)
-         if pp_ns <> None then
-           Printer.pr "@[<hv 2>Bad occurrences %tfound@ directly in @[%a@]:@]@;"
-             ppp 
-             Term.pp t;
          (* timestamps occurring in t *)
          let ts = get_macro_actions contx [t] in
          (* name occurrences in t *)
@@ -579,10 +579,13 @@ let find_occurrences
          let acc = List.map
              (fun o -> {eo_occ=o; eo_source=[t]; eo_source_ts=ts}) acc
          in
+
          (* printing *)
-         if pp_ns <> None then List.iter (Printer.pr "%a" pp_name_occ) occs;
-         if occs = [] && pp_ns <> None then
-           Printer.pr "  (no occurrences)@;";
+         if pp_ns <> None then
+           Printer.pr "@[<hv 2>\
+                       @[<hov 0>Direct bad occurrences@ @[%t@]in@ @[%a@]:@]\
+                       @;@[%a@]@]@;@;"
+             ppp Term.pp t pp_name_occs occs;
          dir_occs @ occs, dir_acc @ acc)
       ([], [])
       sources
@@ -625,14 +628,9 @@ let find_occurrences
   
   (* printing *)
   if pp_ns <> None then
-    Printer.pr "@;@[<hv 2>@[Bad occurrences@ @[%t@]found@ in other actions:@]@;%a@]@;"
+    Printer.pr "@;@[<hv 2>@[Bad occurrences@ @[%t@]in other actions:@]@;%a@]@;"
       ppp
-      (fun fmt ind_occs ->
-         if ind_occs = [] then
-           Fmt.pf fmt "(no occurrences)@;"
-         else
-           Fmt.list ~sep:(Fmt.any "@;@;") pp_name_occ fmt ind_occs)
-      ind_occs ;
+      pp_name_occs ind_occs;
 
   (* remove subsumed occs *)
   let occs = dir_occs @ ind_occs in
