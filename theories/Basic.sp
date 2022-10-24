@@ -122,6 +122,26 @@ goal [any] or_true_r (b : boolean) : (b || true) = true.
 Proof. by rewrite or_comm or_true_l. Qed.
 hint rewrite or_true_r.
 
+(*------------------------------------------------------------------*)
+(* impl *)
+goal [any] impl_charac (b,b' : boolean) : (b => b') = ((not b) || b').
+Proof. 
+  rewrite eq_iff; split; case b; case b' => //=. 
+  intro ? ? H1. 
+  by apply H1.
+Qed.
+
+goal [any] impl_false_l (b : boolean) : (false => b) = true.
+Proof. by rewrite eq_iff; case b. Qed.
+hint rewrite impl_false_l.
+
+goal [any] impl_true_r (b : boolean) : (b => true) = true.
+Proof. auto. Qed.
+hint rewrite impl_true_r.
+
+goal [any] impl_true_false : (true => false) = false.
+Proof. by rewrite impl_charac. Qed.
+hint rewrite impl_true_false.
 
 (*------------------------------------------------------------------*)
 (* not: more lemmas *)
@@ -182,11 +202,7 @@ goal [any] if_then_implies ['a] (b,b' : boolean, x,y,z : 'a):
   if b then (if b' then x else y) else z =
   if b then (if b => b' then x else y) else z.
 Proof.
-  case b; intro H; case b'; intro H'; simpl; try auto.
-  + by rewrite if_true.
-  + rewrite if_false.
-    intro Habs; by use Habs.
-    auto.
+  case b; intro H; case b'; intro H'; simpl; try auto.  
 Qed.
 
 goal [any] if_same ['a] (b : boolean, x : 'a):
