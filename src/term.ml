@@ -691,9 +691,10 @@ let refresh_vars_env env vs =
 (** Does not recurse. *)
 let tmap (func : term -> term) (t : term) : term =
   match t with
-  | Action _ -> t
-  | Name _   -> t
   | Var _    -> t
+
+  | Action (a,is) -> Action (a, List.map func is)
+  | Name (n,is)   -> Name (n, List.map func is)
 
   | Fun (f,fty,terms) -> Fun (f, fty, List.map func terms)
   | Macro (m, l, ts)  -> Macro (m, List.map func l, func ts)

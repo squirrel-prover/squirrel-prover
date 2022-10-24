@@ -56,7 +56,11 @@ let check_no_macro_or_var t =
 
   let rec check t =
     match t with
-    | Term.Var _ | Term.Macro _ -> raise Failed
+    | Term.Var v -> 
+      (* TODO: det *)
+      if not (Type.is_finite (Vars.ty v)) then raise Failed
+
+    | Term.Macro _ -> raise Failed
     | _ -> Term.titer check t
   in
   try check t; true with Failed -> false
