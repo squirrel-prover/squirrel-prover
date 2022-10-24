@@ -2232,7 +2232,7 @@ module E : S with type t = Equiv.form = struct
           let t, l = List.takedrop 1 t_l in
           let t = as_seq1 t in
           Term.mk_app t l
-        ) [t]
+        ) (t :: l)
 
     | _ -> []
 
