@@ -24,7 +24,6 @@
 ;; We decide to ignore the following warnings:
 ;; 7:  method overriden
 ;; 9:  unbound label in record pattern
-;; 27: unused variable
 ;; 36: unused ancestor variable super
 (env
   (dev

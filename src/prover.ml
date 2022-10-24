@@ -198,9 +198,22 @@ let add_option ((opt_name,opt_val):option_def) =
   else
     option_defs := (opt_name,opt_val) :: (!option_defs)
 
-(** Tactic expressions and their evaluation *)
+(*------------------------------------------------------------------*)
+(** Error handling *)
 
-exception ParseError of string
+type error = L.t * string
+
+exception Error of error
+
+let error loc s = raise (Error (loc, s))
+
+let pp_error pp_loc_err fmt (loc,s) =
+  Fmt.pf fmt "%aError: %s"
+    pp_loc_err loc
+    s
+
+(*------------------------------------------------------------------*)
+(** Tactic expressions and their evaluation *)
 
 type tactic_groups =
   | Logical
@@ -544,7 +557,7 @@ let add_new_goal_i table parsed_goal =
     | Some s -> s
   in
   if Lemma.mem name table then
-    raise (ParseError "a goal or axiom with this name already exists");
+    error (L.loc name) "a goal or axiom with this name already exists";
 
   let parsed_goal = { parsed_goal with Goal.Parsed.name = Some name } in
   let statement,goal = Goal.make table parsed_goal in
@@ -553,7 +566,7 @@ let add_new_goal_i table parsed_goal =
 
 let add_new_goal table parsed_goal =
   if !goals <> [] then
-    raise (ParseError "cannot add new goal: proof obligations remaining");
+    error (L.loc parsed_goal) "cannot add new goal: proof obligations remaining";
 
   let parsed_goal = L.unloc parsed_goal in
   add_new_goal_i table parsed_goal

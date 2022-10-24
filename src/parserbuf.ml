@@ -242,7 +242,7 @@ let () =
            try
              ignore (parse_theory_test ~test "tests/alcotest/multiple.sp"
                      : Symbols.table )
-           with Symbols.SymbError (_, Multiple_declarations ("c",_,_)) ->
+           with Symbols.Error (_, Multiple_declarations ("c",_,_)) ->
              raise Ok)
     end ;
     "Let in actions", `Quick, begin fun () ->
@@ -291,8 +291,8 @@ let () =
            try ignore (parse_theory_test ~test "tests/alcotest/process_type.sp"
                        : Symbols.table )
            with
-             (Process.ProcError (_,
-                                 Arity_error ("C",1,0))) ->
+             (Process.Error (_,
+                             Arity_error ("C",1,0))) ->
              raise Ok)
     end ;
     "Apply Proc - 1", `Quick, begin fun () ->
@@ -300,14 +300,14 @@ let () =
         (fun () ->
            try ignore (parse_theory_test ~test "tests/alcotest/process_nodef.sp"
                        : Symbols.table )
-           with Symbols.SymbError (_, Symbols.Unbound_identifier "D") -> raise Ok)
+           with Symbols.Error (_, Symbols.Unbound_identifier "D") -> raise Ok)
     end ;
     "Apply Proc - 2", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try ignore (parse_theory_test ~test "tests/alcotest/process_mult.sp"
                        : Symbols.table )
-           with Symbols.SymbError (_,
+           with Symbols.Error (_,
                                    Symbols.Multiple_declarations ("C",_,_)) ->
              raise Ok)
     end ;
@@ -317,7 +317,7 @@ let () =
            try ignore (parse_theory_test ~test
                         "tests/alcotest/state_duplicated_update.sp"
                        : Symbols.table )
-           with Process.ProcError (_,
-                                   DuplicatedUpdate "s") -> raise Ok)
+           with Process.Error (_,
+                               DuplicatedUpdate "s") -> raise Ok)
     end ;
   ];;

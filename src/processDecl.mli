@@ -6,7 +6,7 @@ type lsymb = Theory.lsymb
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
-type decl_error_i =
+type error_i =
   | BadEquivForm
   | InvalidCtySpace of string list
   | DuplicateCty of string
@@ -15,13 +15,13 @@ type decl_error_i =
 
 type dkind = KDecl | KGoal
 
-type decl_error =  L.t * dkind * decl_error_i
+type error =  L.t * dkind * error_i
 
-exception Decl_error of decl_error
+exception Error of error
 
-val pp_decl_error :
+val pp_error :
   (Format.formatter -> L.t -> unit) ->
-  Format.formatter -> decl_error -> unit
+  Format.formatter -> error -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Declaration processing} *)

@@ -9,7 +9,7 @@ type lsymb = Theory.lsymb
 (*------------------------------------------------------------------*)
 (** {Error handling} *)
 
-type decl_error_i =
+type error_i =
   | BadEquivForm
   | InvalidCtySpace of string list
   | DuplicateCty of string
@@ -18,9 +18,9 @@ type decl_error_i =
 
 type dkind = KDecl | KGoal
 
-type decl_error =  L.t * dkind * decl_error_i
+type error =  L.t * dkind * error_i
 
-let pp_decl_error_i fmt = function
+let pp_error_i fmt = function
   | BadEquivForm ->
     Fmt.pf fmt "equivalence goal ill-formed"
 
@@ -36,7 +36,7 @@ let pp_decl_error_i fmt = function
   | NotTSOrIndex ->
     Fmt.pf fmt "must be an index or timestamp"
       
-let pp_decl_error pp_loc_err fmt (loc,k,e) =
+let pp_error pp_loc_err fmt (loc,k,e) =
   let pp_k fmt = function
     | KDecl -> Fmt.pf fmt "declaration"
     | KGoal -> Fmt.pf fmt "goal declaration" in
@@ -44,11 +44,11 @@ let pp_decl_error pp_loc_err fmt (loc,k,e) =
   Fmt.pf fmt "@[<v 2>%a%a failed: %a.@]"
     pp_loc_err loc
     pp_k k
-    pp_decl_error_i e
+    pp_error_i e
 
-exception Decl_error of decl_error
+exception Error of error
 
-let decl_error loc k e = raise (Decl_error (loc,k,e))
+let error loc k e = raise (Error (loc,k,e))
 
 (*------------------------------------------------------------------*)
 (** {2 Declaration parsing} *)
@@ -99,7 +99,7 @@ let parse_operator_decl table (decl : Decl.operator_decl) =
     let body = Term.subst subst body in
 
     if not (Term.is_deterministic body) then
-      decl_error (L.loc decl.op_body) KDecl NonDetOp;
+      error (L.loc decl.op_body) KDecl NonDetOp;
 
     let data = Operator.mk ~name ~ty_vars ~args ~out_ty ~body in
     let ftype = Operator.ftype data in
@@ -129,7 +129,7 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
   let _ : string list = List.fold_left (fun acc cty ->
       let sp = L.unloc cty.Decl.cty_space in
       if List.mem sp acc then
-        decl_error (L.loc cty.Decl.cty_space) KDecl (DuplicateCty sp);
+        error (L.loc cty.Decl.cty_space) KDecl (DuplicateCty sp);
       sp :: acc
     ) [] ctys in
 
@@ -139,7 +139,7 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
   List.map (fun cty ->
       let sp = L.unloc cty.Decl.cty_space in
       if not (List.mem sp kws) then
-        decl_error (L.loc cty.Decl.cty_space) KDecl (InvalidCtySpace kws);
+        error (L.loc cty.Decl.cty_space) KDecl (InvalidCtySpace kws);
 
       let ty = Theory.convert_ty env cty.Decl.cty_ty in
       (sp, ty)
@@ -152,10 +152,10 @@ let parse_projs (p_projs : lsymb list option) : Term.projs =
     p_projs
 
 (*------------------------------------------------------------------*)
-let define_oracle_tag_formula table (h : lsymb) f =
+let define_oracle_tag_formula table (h : lsymb) (fm : Theory.term) =
   let env = Env.init ~table () in
   let conv_env = Theory.{ env; cntxt = InGoal; } in
-  let form, _ = Theory.convert conv_env ~ty:Type.Boolean f in
+  let form, _ = Theory.convert conv_env ~ty:Type.Boolean fm in
     match form with
      | Term.Quant (ForAll, [uvarm; uvarkey], _) ->
        begin
@@ -163,12 +163,13 @@ let define_oracle_tag_formula table (h : lsymb) f =
          | Type.(Message, Message) ->
            Prover.add_option (Oracle_for_symbol (L.unloc h), Oracle_formula form)
          | _ ->
-           raise @@ Prover.ParseError "The tag formula must be of \
-                                       the form forall (m:message,sk:message)"
+           Prover.error (L.loc fm) 
+             "The tag formula must be of the form forall (m:message,sk:message)"
        end
 
-     | _ -> raise @@ Prover.ParseError "The tag formula must be of \
-                                        the form forall (m:message,sk:message)"
+     | _ -> 
+       Prover.error (L.loc fm)
+         "The tag formula must be of the form forall (m:message,sk:message)"
 
 
 (*------------------------------------------------------------------*)
@@ -268,7 +269,7 @@ let declare table decl : Symbols.table * Goal.t list =
     List.iter2 (fun ty pty ->
         if not (Type.equal ty Type.ttimestamp) &&
            not (Type.equal ty Type.tindex) then
-          decl_error (L.loc pty) KDecl NotTSOrIndex
+          error (L.loc pty) KDecl NotTSOrIndex
       ) args_tys p_args_tys;
     
     Theory.declare_name table s Symbols.{ n_fty }, []

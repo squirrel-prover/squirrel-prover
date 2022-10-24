@@ -213,14 +213,14 @@ let get_namespace ?(group=default_group) (table : table) s =
 (*------------------------------------------------------------------*)
 (** {2 Error Handling} *)
 
-type symb_err_i =
+type error_i =
   | Unbound_identifier    of string
   | Incorrect_namespace   of namespace * namespace (* expected, got *)
   | Multiple_declarations of string * namespace * group
 
-type symb_err = L.t * symb_err_i
+type error = L.t * error_i
 
-let pp_symb_error_i fmt = function
+let pp_error_i fmt = function
   | Unbound_identifier s -> Fmt.pf fmt "unknown symbol %s" s
   | Incorrect_namespace (n1, n2) ->
     Fmt.pf fmt "should be a %a but is a %a"
@@ -230,14 +230,14 @@ let pp_symb_error_i fmt = function
     Fmt.pf fmt "%a symbol %s already declared (%s group)"
       pp_namespace n s g
 
-let pp_symb_error pp_loc_err fmt (loc,e) =
+let pp_error pp_loc_err fmt (loc,e) =
   Fmt.pf fmt "%aError: %a"
     pp_loc_err loc
-    pp_symb_error_i e
+    pp_error_i e
 
-exception SymbError of symb_err
+exception Error of error
 
-let symb_err l e = raise (SymbError (l,e))
+let symb_err l e = raise (Error (l,e))
 
 (*------------------------------------------------------------------*)
 (** {2 Namespaces} *)
@@ -394,7 +394,7 @@ module Make (N:S) : Namespace
       ignore (N.deconstruct ~loc:None (fst (Msymb.find name table.cnt))) ;
       true
     with
-    | SymbError (_,Incorrect_namespace _)
+    | Error (_,Incorrect_namespace _)
     | Not_found -> false
 
   let mem_lsymb (name : lsymb) (table : table) : bool =
@@ -405,7 +405,7 @@ module Make (N:S) : Namespace
                 (fst (Msymb.find symb table.cnt))) ;
       true
     with
-    | SymbError (_,Incorrect_namespace _)
+    | Error (_,Incorrect_namespace _)
     | Not_found -> false
 
   let of_lsymb (name : lsymb) (table : table) =
@@ -448,7 +448,7 @@ module Make (N:S) : Namespace
     Msymb.iter
       (fun s (def,data) ->
          try f s (N.deconstruct ~loc:None def) data with
-           | SymbError (_,Incorrect_namespace _) -> ())
+           | Error (_,Incorrect_namespace _) -> ())
       table.cnt
 
   let fold f acc (table : table) =
@@ -457,7 +457,7 @@ module Make (N:S) : Namespace
          try
            let def = N.deconstruct ~loc:None def in
            f s def data acc
-         with SymbError (_,Incorrect_namespace _) -> acc)
+         with Error (_,Incorrect_namespace _) -> acc)
       table.cnt acc
 
   let map (f : ns t -> def -> data -> (def * data)) (table : table) : table =
@@ -468,7 +468,7 @@ module Make (N:S) : Namespace
              let def = N.deconstruct ~loc:None def in
              let def, data = f s def data in
              Exists (N.construct def), data
-           with SymbError (_,Incorrect_namespace _) -> (def,data)
+           with Error (_,Incorrect_namespace _) -> (def,data)
         ) table.cnt
     in
     mk table
