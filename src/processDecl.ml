@@ -152,10 +152,10 @@ let parse_projs (p_projs : lsymb list option) : Term.projs =
     p_projs
 
 (*------------------------------------------------------------------*)
-let define_oracle_tag_formula table (h : lsymb) f =
+let define_oracle_tag_formula table (h : lsymb) (fm : Theory.term) =
   let env = Env.init ~table () in
   let conv_env = Theory.{ env; cntxt = InGoal; } in
-  let form, _ = Theory.convert conv_env ~ty:Type.Boolean f in
+  let form, _ = Theory.convert conv_env ~ty:Type.Boolean fm in
     match form with
      | Term.Quant (ForAll, [uvarm; uvarkey], _) ->
        begin
@@ -163,12 +163,13 @@ let define_oracle_tag_formula table (h : lsymb) f =
          | Type.(Message, Message) ->
            Prover.add_option (Oracle_for_symbol (L.unloc h), Oracle_formula form)
          | _ ->
-           raise @@ Prover.ParseError "The tag formula must be of \
-                                       the form forall (m:message,sk:message)"
+           Prover.error (L.loc fm) 
+             "The tag formula must be of the form forall (m:message,sk:message)"
        end
 
-     | _ -> raise @@ Prover.ParseError "The tag formula must be of \
-                                        the form forall (m:message,sk:message)"
+     | _ -> 
+       Prover.error (L.loc fm)
+         "The tag formula must be of the form forall (m:message,sk:message)"
 
 
 (*------------------------------------------------------------------*)

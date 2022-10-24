@@ -178,7 +178,7 @@ open Tactics
 let is_toplevel_error ~test interactive (e : exn) : bool =
   match e with
   | Parserbuf.Error         _
-  | Prover.ParseError       _
+  | Prover.Error       _
   | Cmd_error               _
   | Process.ProcError       _
   | ProcessDecl.Decl_error  _
@@ -207,8 +207,8 @@ let pp_toplevel_error
   | Parserbuf.Error s ->
     Fmt.string fmt s
 
-  | Prover.ParseError s ->
-    Fmt.string fmt s
+  | Prover.Error e ->
+    Prover.pp_error pp_loc_error fmt e
 
   | Cmd_error e ->
     pp_cmd_error fmt e

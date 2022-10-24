@@ -163,11 +163,22 @@ type print_query =
   | Pr_statement of lsymb
 
 (*------------------------------------------------------------------*)
+(** Error handling *)
+
+type error = L.t * string
+
+exception Error of error
+
+val error : L.t -> string -> 'a
+
+val pp_error :
+  (Format.formatter -> Location.t -> unit) -> 
+  Format.formatter -> error -> unit
+
+(*------------------------------------------------------------------*)
 (** {2 Utilities for parsing} *)
 
 type include_param = { th_name : lsymb; params : lsymb list }
-
-exception ParseError of string
 
 (*------------------------------------------------------------------*)
 type parsed_input =
