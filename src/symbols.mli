@@ -286,18 +286,18 @@ module Name     : Namespace with type def = name_def with type ns = _name
 (*------------------------------------------------------------------*)
 (** {2 Error Handling} *)
 
-type symb_err_i = 
+type error_i = 
   | Unbound_identifier    of string
   | Incorrect_namespace   of namespace * namespace (* expected, got *)
   | Multiple_declarations of string * namespace * group
 
-type symb_err = Location.t * symb_err_i
+type error = Location.t * error_i
 
-val pp_symb_error :
+val pp_error :
   (Format.formatter -> Location.t -> unit) ->
-  Format.formatter -> symb_err -> unit
+  Format.formatter -> error -> unit
 
-exception SymbError of symb_err
+exception Error of error
 
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)

@@ -178,12 +178,12 @@ open Tactics
 let is_toplevel_error ~test interactive (e : exn) : bool =
   match e with
   | Parserbuf.Error         _
-  | Prover.Error       _
+  | Prover.Error            _
   | Cmd_error               _
-  | Process.ProcError       _
-  | ProcessDecl.Decl_error  _
+  | Process.Error           _
+  | ProcessDecl.Error       _
   | Theory.Conv             _
-  | Symbols.SymbError       _
+  | Symbols.Error           _
   | System.Error            _
   | SystemExpr.Error        _
   | Tactic_soft_failure     _
@@ -213,17 +213,17 @@ let pp_toplevel_error
   | Cmd_error e ->
     pp_cmd_error fmt e
 
-  | Process.ProcError e ->
-    (Process.pp_proc_error pp_loc_error) fmt e
+  | Process.Error e ->
+    (Process.pp_error pp_loc_error) fmt e
 
-  | ProcessDecl.Decl_error e when not test ->
-    (ProcessDecl.pp_decl_error pp_loc_error) fmt e
+  | ProcessDecl.Error e when not test ->
+    (ProcessDecl.pp_error pp_loc_error) fmt e
 
   | Theory.Conv e when not test ->
     (Theory.pp_error pp_loc_error) fmt e
 
-  | Symbols.SymbError e when not test ->
-    (Symbols.pp_symb_error pp_loc_error) fmt e
+  | Symbols.Error e when not test ->
+    (Symbols.pp_error pp_loc_error) fmt e
 
   | System.Error e when not test ->
     Format.fprintf fmt "System error: %a" System.pp_error e
@@ -668,7 +668,7 @@ let () =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/existsintro_fail.sp" with
-           | Symbols.(SymbError (_, Unbound_identifier "a1")) -> raise Ok)
+           | Symbols.(Error (_, Unbound_identifier "a1")) -> raise Ok)
     end ;
     "TS not leq", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
@@ -728,7 +728,7 @@ let () =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/axiom3.sp" with
-           | Symbols.SymbError (_, Symbols.Unbound_identifier "test") ->
+           | Symbols.Error (_, Symbols.Unbound_identifier "test") ->
              raise Ok)
     end ;
     "Substitution no capture", `Quick, begin fun () ->
@@ -857,14 +857,14 @@ let () =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/include-rebind.sp" with
-           | Symbols.(SymbError (_, Multiple_declarations _)) ->
+           | Symbols.(Error (_, Multiple_declarations _)) ->
              raise Ok)
     end ;
     "Re-define", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/include-rebind2.sp" with
-           | Symbols.(SymbError (_, Multiple_declarations _)) ->
+           | Symbols.(Error (_, Multiple_declarations _)) ->
              raise Ok)
     end ;
     "Undefined Action", `Quick, begin fun () ->

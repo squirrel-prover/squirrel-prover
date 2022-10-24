@@ -1653,7 +1653,7 @@ let () =
         "h cannot be defined twice" Ok
         (fun () ->
            try ignore (declare_hash table (mk "h") : Symbols.table) with
-           | Symbols.SymbError (_, Multiple_declarations ("h",_,_)) -> raise Ok
+           | Symbols.Error (_, Multiple_declarations ("h",_,_)) -> raise Ok
         ) ;
       let table = declare_hash Symbols.builtins_table (mk "h") in
       Alcotest.check_raises
@@ -1661,7 +1661,7 @@ let () =
         (fun () ->
            try ignore (declare_aenc table (mk "h") (mk "dec") (mk "pk")
                        : Symbols.table) with
-           | Symbols.SymbError (_, Multiple_declarations ("h",_,_)) -> raise Ok
+           | Symbols.Error (_, Multiple_declarations ("h",_,_)) -> raise Ok
         )
     end;
 

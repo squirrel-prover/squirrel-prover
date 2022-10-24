@@ -137,16 +137,16 @@ let is_out_i = function Out _ -> true | _ -> false
 let is_out p = is_out_i (L.unloc p)
 
 (*------------------------------------------------------------------*)
-type proc_error_i =
+type error_i =
   | Arity_error of string * int * int
   | StrictAliasError of string
   | DuplicatedUpdate of string
   | Freetyunivar
   | ProjsMismatch    of Term.projs * Term.projs
 
-type proc_error = L.t * proc_error_i
+type error = L.t * error_i
 
-let pp_proc_error_i fmt = function
+let pp_error_i fmt = function
   | StrictAliasError s -> Fmt.pf fmt "strict alias error: %s" s
 
   | Arity_error (s,i,j) -> 
@@ -164,14 +164,14 @@ let pp_proc_error_i fmt = function
       Term.pp_projs ps1
       Term.pp_projs ps2
 
-let pp_proc_error pp_loc_err fmt (loc,e) =
+let pp_error pp_loc_err fmt (loc,e) =
   Fmt.pf fmt "%aProcess error: @[%a@]."
     pp_loc_err loc
-    pp_proc_error_i e
+    pp_error_i e
 
-exception ProcError of proc_error
+exception Error of error
 
-let proc_err loc e = raise (ProcError (loc,e))
+let error loc e = raise (Error (loc,e))
 
 (*------------------------------------------------------------------*)
 (** We extend the symbols data with (bi)-processus descriptions and
@@ -223,7 +223,7 @@ let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
 
       (* raise an error if we are in strict alias mode *)
       if is_out proc && (Config.strict_alias_mode ())
-      then proc_err loc (StrictAliasError "missing alias")
+      then error loc (StrictAliasError "missing alias")
       else
         (* FEATURE: subtypes *)
         let () = 
@@ -274,10 +274,10 @@ let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
       let kind, projs', _ = find_process_lsymb env.table id in
 
       if projs <> projs' then
-        proc_err (L.loc proc) (ProjsMismatch (projs, projs'));
+        error (L.loc proc) (ProjsMismatch (projs, projs'));
 
       if List.length kind <> List.length ts then
-        proc_err loc (Arity_error (L.unloc id,
+        error loc (Arity_error (L.unloc id,
                                    List.length ts,
                                    List.length kind));
       List.iter2
@@ -290,7 +290,7 @@ let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
   check_p ty_env env p;
 
   if not (Type.Infer.is_closed ty_env) then
-    proc_err (L.loc p) Freetyunivar;
+    error (L.loc p) Freetyunivar;
 
   ()
 
@@ -589,7 +589,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       let proc_ty, projs', p = find_process_lsymb penv.env.table id in
 
       if penv.projs <> projs' then
-        proc_err (L.loc proc) (ProjsMismatch (penv.projs, projs'));
+        error (L.loc proc) (ProjsMismatch (penv.projs, projs'));
 
       let new_env, isubst', msubst' =
         (* TODO avoid or handle conflicts with variables already
@@ -686,7 +686,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
     (* We check that we could infer ty by parsing [t] *)
     let ty = match Type.Infer.norm penv.ty_env ty with
-      | Type.TUnivar _ -> proc_err (L.loc proc) Freetyunivar
+      | Type.TUnivar _ -> error (L.loc proc) Freetyunivar
       | _ as ty -> ty
     in
 
@@ -922,7 +922,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
            - either the value at the end of the current action,
            - either the value before the current action.
              There is no in-between value. *)
-        proc_err loc (DuplicatedUpdate (L.unloc s));
+        error loc (DuplicatedUpdate (L.unloc s));
 
       let t' = Theory.subst t (to_tsubst penv.isubst @ to_tsubst penv.msubst) in
       let l' =
@@ -1025,7 +1025,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
   (* I believe this test is not useful *)
   if not (Type.Infer.is_closed penv.ty_env) then 
-    proc_err (L.loc proc) Freetyunivar;
+    error (L.loc proc) Freetyunivar;
 
   (proc, table)
 

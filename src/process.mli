@@ -90,17 +90,17 @@ val declare_system :
 (*------------------------------------------------------------------*)
 (** {2 Error handling}*)
 
-type proc_error_i =
+type error_i =
   | Arity_error of string * int * int
   | StrictAliasError of string
   | DuplicatedUpdate of string
   | Freetyunivar
   | ProjsMismatch    of Term.projs * Term.projs
   
-type proc_error = Location.t * proc_error_i
+type error = Location.t * error_i
 
-val pp_proc_error :
+val pp_error :
   (Format.formatter -> Location.t -> unit) ->
-  Format.formatter -> proc_error -> unit
+  Format.formatter -> error -> unit
 
-exception ProcError of proc_error
+exception Error of error
