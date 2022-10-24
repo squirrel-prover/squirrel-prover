@@ -28,4 +28,4 @@
 ;; 36: unused ancestor variable super
 (env
   (dev
-    (flags (:standard -w -7-9-27-36))))
+    (flags (:standard -w -7-9-36))))
