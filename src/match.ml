@@ -2587,7 +2587,7 @@ module E : S with type t = Equiv.form = struct
 
       let c = { term = c; cond = cterm.cond; }
       and d = { term = d; cond = d_cond; }
-      and e = { term = c; cond = e_cond; } in
+      and e = { term = e; cond = e_cond; } in
 
 
       Some [(st1, c); (st1, d); (st, e)]
