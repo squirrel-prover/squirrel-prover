@@ -266,46 +266,7 @@ let set_table table s =
   S.update ~env s
 
 (*------------------------------------------------------------------*)
-
-(** Add to [s] equalities corresponding to the expansions of all macros
-  * occurring in [f], if [f] happened. *)
-let[@warning "-27"] rec add_macro_defs (s : sequent) f =
-  let macro_eqs : (Term.term * Term.term) list ref = ref [] in
-  match SystemExpr.to_fset s.env.system.set with
-  | exception (SE.Error Expected_fset) -> s
-  | system ->
-
-    List.fold_left (fun s (a,f) -> 
-        if query_happens ~precise:true s a 
-        then snd (add_form_aux None s f)
-        else s
-      ) s !macro_eqs
-
-and add_form_aux
-    ?(force=false) (id : Ident.t option) (s : sequent) (f : Term.term) =
-  let recurse =
-    (not (H.is_hyp (Local f) s.hyps)) && (Config.auto_intro ()) in
-
-  let id = match id with       
-    | None -> H.fresh_id "D" s.hyps
-    | Some id -> id in
-
-  let id, hyps = H._add ~force id (Local f) s.hyps in
-  let s = S.update ~hyps s in
-
-  (* [recurse] boolean to avoid looping *)
-  let s = if recurse then add_macro_defs s f else s in
-
-  id, s
-
-let set_goal a s =
-  let s = S.update ~conclusion:a s in
-    match Term.form_to_xatom a with
-      | Some at 
-        when Type.equal (Term.ty_xatom at) Type.tmessage && 
-             Config.auto_intro () -> 
-        add_macro_defs s a
-      | _ -> s
+let set_goal a s = S.update ~conclusion:a s 
 
 let set_goal_in_context ?update_local system conc s =
 
@@ -377,14 +338,11 @@ let goal s = s.conclusion
 let subst subst s =
   if subst = [] then s else
     let hyps = H.map (Equiv.Any.subst subst) s.hyps in
-    let s =
-      S.update
-        ~hyps:hyps
-        ~conclusion:(Term.subst subst s.conclusion)
-        s in
-
-    s
-
+    S.update
+      ~hyps:hyps
+      ~conclusion:(Term.subst subst s.conclusion)
+      s 
+      
 let rename (u:Vars.var) (v:Vars.var) (s:t) : t =
   assert (not (Vars.mem s.env.vars v));
   let s = subst [Term.ESubst (Term.mk_var u, Term.mk_var v)] s in
