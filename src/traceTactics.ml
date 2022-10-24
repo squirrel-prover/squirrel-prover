@@ -763,92 +763,6 @@ let () =
     Args.(Pair (Term, Term))
 
 
-(* let eqsubst arg s =
- *   let open Args in
- *   let subst,f = match arg with
- *   | Pair (ETerm (Type.Message, f1, _), ETerm (Type.Message, f2, _)) ->
- *     [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
- *
- *   | Pair (ETerm (Type.Timestamp, f1, _), ETerm (Type.Timestamp, f2, _)) ->
- *     [Term.ESubst (f1,f2)],   Term.mk_atom `Eq f1 f2
- *
- *   | Pair (ETerm (Type.Index, f1, _), ETerm (Type.Index, f2, _)) ->
- *     [Term.ESubst (f1,f2)],  Term.mk_atom `Eq f1 f2
- *
- *   | _ ->
- *     hard_failure
- *       (Tactics.Failure "expected a pair of messages, booleans or a pair of \
- *                         index variables")
- *   in
- *    TS.set_goal f s :: apply_substitute subst s
- *
- * let () =
- *   T.register_typed "substeq"
- *     ~general_help:"Given an equality i=t, substitute all occurences \
- *                    of i by t and remove i from the context variables,\
- *                    and asks to prove the equality."
- *     ~detailed_help:""
- *     ~tactic_group:Structural
- *     ~usages_sorts:[Args.(Sort (Pair (Index, Index)));
- *                    Args.(Sort (Pair (Timestamp, Timestamp)));
- *                    Args.(Sort (Pair (Message, Message)))]
- *     eqsubst Args.(Pair (ETerm, ETerm)) *)
-
-
-(* FIXME: use higher-level function to retrieve the equality *)
-let do_subst_eq (args : Args.parser_arg list) s : sequent list =
-  let subst, f =
-    match args with
-    | [arg] ->
-      begin
-        match Args.convert_as_lsymb args with
-        | Some str when Hyps.mem_name (L.unloc str) s ->
-          let id, at = Hyps.by_name str s in
-          begin match Term.destr_eq at with
-            | Some (t1, t2) ->
-              [Term.ESubst (t1,t2)],  Term.mk_eq t1 t2
-
-            | _ -> hard_failure
-                     (Tactics.Failure "expected an equality hypothesis")
-          end
-        | _ -> hard_failure
-                 (Tactics.Failure "expected an hypothesis name")
-      end
-
-    | _ ->
-      match TraceLT.convert_args s args Args.(Sort (Pair (Term, Term))) with
-      | Args.Arg Pair (Term (_, f1, _), Term (_, f2, _)) ->
-        [Term.ESubst (f1,f2)],  Term.mk_eq f1 f2
-
-      | _ ->
-        hard_failure
-          (Tactics.Failure "expected a pair of messages")
-  in
-  TS.set_goal f s :: apply_substitute subst s
-
-
-
-
-let subst_eq_tac args = wrap_fail (do_subst_eq args)
-
-let () =
-  T.register_general "substeq"
-    ~tactic_help:
-      {general_help = "Given an equality i=t, substitute all occurences \
-                   of i by t and remove i from the context variables,\
-                   and asks to prove the equality.";
-       detailed_help = "";
-       usages_sorts = [Args.(Sort (Pair (Index, Index)));
-                   Args.(Sort (Pair (Timestamp, Timestamp)));
-                       Args.(Sort (Pair (Message, Message)));
-                      Sort Args.String];
-       tactic_group = Logical}
-    ~pq_sound:true
-    (LowTactics.gentac_of_ttac_arg subst_eq_tac)
-
-
-
-
 (*------------------------------------------------------------------*)
 let autosubst s =
   let id, (x,y) = match
@@ -974,7 +888,7 @@ let fa s =
     in
 
     let env = ref (TS.vars s) in
-    let vars, subst = Term.refresh_vars (`InEnv env) vars in
+    let _, subst = Term.refresh_vars (`InEnv env) vars in
     let s = TS.set_vars !env s in
     let t = Term.subst subst t in
     let t' = Term.subst subst t' in
@@ -1026,7 +940,7 @@ let fa s =
     let t' = Term.subst subst' t' in
 
     (* Extract unused variables. *)
-    let used,unused =
+    let _used,unused =
       let occ_vars = Term.get_vars c @ Term.get_vars t in
       List.partition
         (fun v -> List.mem v occ_vars)
@@ -1299,7 +1213,7 @@ let mk_integrity_rule_param
 (** Unforgeability Axioms *)
 
 let euf_apply_schema
-    sequent (_, (key, key_args), m, s, _, _, _, _)
+    sequent (_, (_key, key_args), m, s, _, _, _, _)
     (case : OldEuf.euf_schema) 
   : sequent
   =
@@ -1352,7 +1266,7 @@ let euf_apply_schema
 
 let euf_apply_direct
     (s : sequent)
-    (_, (key, key_args), m, _, _, _, _, _) OldEuf.{d_key_indices;d_message} 
+    (_, (_key, key_args), m, _, _, _, _, _) OldEuf.{d_key_indices;d_message} 
   =
   (* The components of the direct case may feature variables that are
    * not in the current environment: this happens when the case is extracted
@@ -1438,7 +1352,7 @@ let euf_apply
     (s : TS.t)
   =
   let table = TS.table s in
-  let id, at = Hyps.by_name hyp_name s in
+  let _, at = Hyps.by_name hyp_name s in
 
   let (h,(key, key_args),m,_,_,extra_goals,drop_head,_) as p =
     mk_integrity_rule_param rule_kind table at
@@ -1482,7 +1396,7 @@ let euf_apply
 (*------------------------------------------------------------------*)
 let valid_hash (cntxt : Constr.trace_cntxt) (t : Term.term) =
   match t with
-  | Fun (hash, _, [Tuple [m; Name (key, _)]]) ->
+  | Fun (hash, _, [Tuple [_m; Name (_key, _)]]) ->
     Symbols.is_ftype hash Symbols.Hash cntxt.table
 
   | _ -> false
@@ -1625,7 +1539,7 @@ let rewrite_equiv_transform
      * happen, which is necessary to have input@ts =
      * att(frame@pred(ts)) and frame@pred(ts) a sublist
      * of frame@ts'. *)
-    | Macro (msymb,messages,ts) when msymb = Term.in_macro ->
+    | Macro (msymb,_,ts) when msymb = Term.in_macro ->
       let ok_frame = function
         | Macro (msymb',[],ts') ->
           msymb' = Term.frame_macro &&

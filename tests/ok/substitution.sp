@@ -21,8 +21,7 @@ goal unforgeable_1 (a : index, b : index, c : index):
   output@A(b) <> h(na(c),k).
 
 Proof.
- nosimpl(intro Hap [H G] Hneq). 
- subst a, c.
+ nosimpl(intro Hap [H G] Hneq). rewrite -G in *. 
  expand output.
  collision. 
  auto.
