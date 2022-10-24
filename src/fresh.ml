@@ -35,7 +35,7 @@ type lsymb = Theory.lsymb
 let get_bad_occs
     (n:Name.t) 
     (retry_on_subterms : unit -> NO.n_occs * NO.empty_occs)
-    (rec_call_on_subterms : 
+    (_rec_call_on_subterms : 
        (fv:Vars.vars ->
         cond:terms ->
         p:MP.pos ->
@@ -50,6 +50,8 @@ let get_bad_occs
     ~(st:term)
     (t:term) : NO.n_occs * NO.empty_occs
   =
+  let _ = p in (* unused for now *)
+
   (* handles a few cases, using rec_call_on_subterm for rec calls,
      and calls retry_on_subterm for the rest *)
   match t with
@@ -107,7 +109,7 @@ let fresh_trace_param
 (** Applies fresh to the trace sequent s and hypothesis m:
     returns the list of subgoals with the added hyp that there is a collision *)
 let fresh_trace (m : lsymb) (s : TS.sequent) : TS.sequent list =
-  let id, hyp = Hyps.by_name m s in
+  let _, hyp = Hyps.by_name m s in
   try
     let contx = TS.mk_trace_cntxt s in
     let env = (TS.env s).vars in

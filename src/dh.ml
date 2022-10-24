@@ -87,7 +87,7 @@ let partition_powers
   =
   List.partition
     (function
-      | Term.Name (n,args) -> exists_symb n nab
+      | Term.Name (n,_args) -> exists_symb n nab
       | _ -> false)
     pows
 
@@ -295,7 +295,7 @@ let cgdh
     (s : sequent)
   : sequent list
   =
-  let id, hyp = Hyps.by_name m s in
+  let _, hyp = Hyps.by_name m s in
   let contx = TS.mk_trace_cntxt s in
   let env = (TS.env s).vars in
 

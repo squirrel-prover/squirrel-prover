@@ -158,11 +158,11 @@ let add_prf_case
   List.assoc_up_dflt action_name [] (add_case c) assoc_cases
 
 (*------------------------------------------------------------------*)
-let mk_prf_phi_proj cntxt env param frame hash =
+let mk_prf_phi_proj cntxt env param frame _hash =
   (* Check syntactic side condition. *)
   let errors =
     OldEuf.key_ssc ~globals:true
-      ~elems:frame ~allow_functions:(fun x -> false)
+      ~elems:frame ~allow_functions:(fun _ -> false)
       ~cntxt param.h_fn param.h_key.symb.s_symb
   in
   if errors <> [] then
@@ -217,7 +217,7 @@ let mk_prf_phi_proj cntxt env param frame hash =
   let macro_cases = List.filter (fun (_, occs) -> occs <> []) macro_cases in
 
   let phi_indirect =
-    List.map (fun (action, hash_occs) ->
+    List.map (fun (_action, hash_occs) ->
         List.map (fun (hash_occ, srcs) ->
             let frame_actions = OldFresh.deprecated_get_macro_actions cntxt srcs in
             prf_mk_indirect cntxt param frame_actions hash_occ

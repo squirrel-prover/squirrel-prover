@@ -423,8 +423,8 @@ let mk_lambda evs ht = match ht with
 (** {2 Destructors} *)
 
 let destr_fun ?fs = function
-  | Fun (fs', _, l) when fs = None     -> Some l
-  | Fun (fs', _, l) when fs = Some fs' -> Some l
+  | Fun (_fs', _, l) when fs = None     -> Some l
+  | Fun ( fs', _, l) when fs = Some fs' -> Some l
   | _ -> None
 
 let destr_tuple = function
@@ -638,7 +638,7 @@ let rec fv (t : term) : Sv.t =
   | Fun (_, _,lt) -> fvs lt
   | App (t, l) -> fvs (t :: l)
 
-  | Macro (s, l, ts) ->
+  | Macro (_, l, ts) ->
     Sv.union (fv ts) (fvs l)
 
   | Tuple l
@@ -802,7 +802,7 @@ let rec subst (s : subst) (t : term) : term =
       | Diff (Explicit l) ->
         Diff (Explicit (List.map (fun (lbl,tm) -> lbl, subst s tm) l))
 
-      | Quant (q, [], f) -> subst s f
+      | Quant (_, [], f) -> subst s f
 
       | Quant (q, a :: vs, f) ->
         let a, s = subst_binding a s in
@@ -828,12 +828,12 @@ and subst_binding (var : Vars.var) (s : subst) : Vars.var * subst =
   let s = filter_subst var s in
 
   let right_fv =
-    List.fold_left (fun acc (ESubst (x, y)) ->
+    List.fold_left (fun acc (ESubst (_, y)) ->
         Sv.union acc (fv y)
       ) Sv.empty s in
 
   let all_vars =
-    List.fold_left (fun acc (ESubst (x, y)) ->
+    List.fold_left (fun acc (ESubst (x, _)) ->
         Sv.union acc (fv x)
       ) right_fv s in
 
@@ -928,7 +928,7 @@ let pp_ord ppf = function
   | `Gt -> Fmt.pf ppf ">"
 
 let rec is_and_happens = function
-  | Fun (f, _, [t]) when f = f_happens -> true
+  | Fun (f, _, [_]) when f = f_happens -> true
   | _ as f ->  match destr_and f with
     | Some (l,r) -> is_and_happens l && is_and_happens r
     | _ -> false
@@ -1266,7 +1266,9 @@ and pp_and_happens info ppf f =
   pp_happens info ppf (collect [] f)
 
 (*------------------------------------------------------------------*)
-let pp_toplevel ~dbg (info : pp_info) (fmt : Format.formatter) (t : term) : unit =
+let[@warning "-27"] pp_toplevel
+    ~dbg (info : pp_info) (fmt : Format.formatter) (t : term) : unit
+  =
   pp info ((toplevel_prec, `NoParens), `NonAssoc) fmt t
 
 (** Exported *)
@@ -1337,7 +1339,7 @@ let ty ?ty_env (t : term) : Type.ty =
     | Action _             -> Type.Timestamp
     | Diff (Explicit l)    -> ty (snd (List.hd l))
 
-    | Find (a, b, c, d)    -> ty c
+    | Find (_, _, c, _)    -> ty c
 
     | Quant (q, vs, t) ->
       match q with
@@ -1396,7 +1398,7 @@ let pp_literals fmt (l : literal list) =
   (Fmt.list ~sep pp_literal) fmt l
 
 let ty_xatom = function
-  | `Happens t -> Type.Timestamp
+  | `Happens _ -> Type.Timestamp
   | `Comp (_, t1, t2) ->
     let ty1 = ty t1 in
     assert (ty1 = ty t2);
@@ -1695,7 +1697,7 @@ let is_pure_timestamp (t : term) =
 
     | Fun (fs, _, [t]) when fs = f_not -> pure_ts t
 
-    | Fun (fs, _, []) -> true
+    | Fun (_, _, []) -> true
 
     | Proj(_,t) -> pure_ts t
 
@@ -1770,7 +1772,7 @@ let alpha_bnds (s : subst) (vs1 : Vars.vars) (vs2 : Vars.vars) : subst =
 let alpha_conv ?(subst=[]) (t1 : term) (t2 : term) : bool =
   let rec doit (s : subst) t1 t2 : unit =
     match t1, t2 with
-    | Fun (f, fty, l), Fun (f', fty', l') when f = f' ->
+    | Fun (f, _fty, l), Fun (f', _fty', l') when f = f' ->
       doits s l l'
 
     | Proj (i, t), Proj (i', t') -> 
@@ -1818,7 +1820,7 @@ let alpha_conv ?(subst=[]) (t1 : term) (t2 : term) : bool =
           doit s x x'
         ) l l'
 
-    | t1,t2 -> raise AlphaFailed
+    | _,_ -> raise AlphaFailed
 
   and doits s l l' = 
     List.iter2 (doit s) l l' 
@@ -1861,7 +1863,7 @@ let rec make_normal_biterm
   let doit () =
     (* TODO generalize to non-binary diff *)
     match t1, t2 with
-    | Fun (f, fty, l), Fun (f', fty', l') when f = f' ->
+    | Fun (f, fty, l), Fun (f', _fty', l') when f = f' ->
       Fun (f, fty, List.map2 (mdiff s) l l')
 
     | Proj (i, t), Proj (i', t') when i = i' -> Proj (i, mdiff s t t')

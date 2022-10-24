@@ -189,7 +189,7 @@ let rw_inst
               Match.T.try_match ~expand_context ~hyps table context occ inst.pat 
             with
             | NoMatch _ | FreeTyv -> s, `Continue
-            | Match mv -> 
+            | Match _mv -> 
               (* project the already found instance with the projections
                  applying to the current subterm *)
               s, `Map (Term.project_opt projs inst.right)
@@ -273,7 +273,6 @@ let do_rewrite
     (table  : Symbols.table)
     (system : SE.context)
     (expand_context : Macros.expand_context)
-    (env    : Vars.env)
     (hyps   : Hyps.TraceHyps.hyps)
     (mult   : Args.rw_count)
     (rule   : rw_rule)
@@ -355,7 +354,6 @@ let rewrite
     (table  : Symbols.table)
     (system : SE.context)
     (expand_context : Macros.expand_context)
-    (env    : Vars.env)
     (hyps   : Hyps.TraceHyps.hyps)
     (mult   : Args.rw_count)
     (rule   : rw_rule)
@@ -363,7 +361,7 @@ let rewrite
   =
   try
     let r =
-      do_rewrite table system expand_context env hyps mult rule target
+      do_rewrite table system expand_context hyps mult rule target
     in
     RW_Result r
   with
@@ -375,14 +373,13 @@ let rewrite_exn
     (table  : Symbols.table)
     (system : SE.context)
     (expand_context : Macros.expand_context)
-    (env    : Vars.env)
     (hyps   : Hyps.TraceHyps.hyps)
     (mult   : Args.rw_count)
     (rule   : rw_rule)
     (target : Equiv.any_form) : rw_res
   =
   try
-    do_rewrite table system expand_context env hyps mult rule target
+    do_rewrite table system expand_context hyps mult rule target
   with
   | Failed e -> recast_error ~loc e
 

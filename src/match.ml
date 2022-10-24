@@ -73,10 +73,10 @@ module Pos = struct
       | Term.App (t1, l) ->
         sel_l fsel sp ~projs ~vars ~conds ~p (t1 :: l)
 
-      | Term.Name (ns,l) ->
+      | Term.Name (_ns,l) ->
         sel_l fsel sp ~projs ~vars ~conds ~p l
 
-      | Term.Macro (ms, terms, ts) ->
+      | Term.Macro (_ms, terms, ts) ->
         let l = terms @ [ts] in
         sel_l fsel sp ~projs ~vars ~conds ~p l
 
@@ -131,7 +131,7 @@ module Pos = struct
     (* [p] is the current position *)
     let rec sel_e (sp : Sp.t) ~projs ~vars ~conds ~(p : pos) (t : Equiv.form) =  
       match t with
-      | Equiv.Quant (q, is, t0) ->
+      | Equiv.Quant (_q, is, t0) ->
         let is, subst = Term.refresh_vars `Global is in
         let t0 = Equiv.subst subst t0 in
         let vars = List.rev_append is vars in
@@ -689,7 +689,7 @@ let minfos_update new_v old_v =
     match new_v, old_v with
     | _, MR_failed | MR_failed, _ -> Some MR_failed
 
-    | MR_check_st t1, MR_check_st t2 ->
+    | MR_check_st t1, MR_check_st _t2 ->
       (* They may not be equal, but are alpha-equal *)
       (* assert (List.for_all2 (=) t1 t2); *)
       Some (MR_check_st t1)
@@ -1289,6 +1289,8 @@ module T (* : S with type t = Term.term *) = struct
       end
           
     | Fun (fn , fty, terms), Fun (fn', fty', terms') when fn = fn' ->
+      assert (fty = fty');
+      
       if List.length terms = List.length terms' then 
         tmatch_l terms terms' st
       else no_match ()
@@ -1489,7 +1491,8 @@ module T (* : S with type t = Term.term *) = struct
   (*------------------------------------------------------------------*)
   (** Exported 
       Remark: term matching ignores [mode]. *)
-  let try_match = try_match_gen Equiv.Local_t (fun ~mode -> tmatch)
+  let try_match =
+    try_match_gen Equiv.Local_t (fun[@warning "-27"] ~mode -> tmatch)
 
   (*------------------------------------------------------------------*)
   (** Exported *)

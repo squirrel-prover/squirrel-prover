@@ -48,7 +48,7 @@ let run_prover ?limit_opt task =
     | Some x -> x
   in
   let opam_prefix = Sys.getenv "OPAM_SWITCH_PREFIX" in
-  Utils.omap (fun (env, prover, driver) ->
+  Utils.omap (fun (_env, prover, driver) ->
       Why3.Call_provers.wait_on_call
         (Why3.Driver.prove_task
            ~libdir:(Filename.concat opam_prefix "/lib/why3")
@@ -522,7 +522,7 @@ let build_task_bis
       macro_axioms := ("expand_cond_" ^ name_str,
                        t_forall_close quantified_vars [] ax_cond) ::
                       !macro_axioms;
-      Symbols.Macro.iter (fun mn mdef mdata ->
+      Symbols.Macro.iter (fun mn mdef _mdata ->
           let m_str  = Symbols.to_string mn in
           let m_symb = Hashtbl.find macros_tbl m_str in
           let macro_wterm_eq is msg = t_equ (t_app_infer m_symb [is; ts]) msg in
@@ -560,7 +560,7 @@ let build_task_bis
                 let same_as_pred =
                   t_app_infer m_symb [ilist; t_app_infer pred_symb [ts]] in
                 try
-                  let (ns, ns_args, msg) =
+                  let (_ns, ns_args, msg) =
                     List.find (fun (ns,_,_) -> ns = mn)
                       descr.Action.updates
                   in

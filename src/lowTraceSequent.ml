@@ -269,7 +269,7 @@ let set_table table s =
 
 (** Add to [s] equalities corresponding to the expansions of all macros
   * occurring in [f], if [f] happened. *)
-let rec add_macro_defs (s : sequent) f =
+let[@warning "-27"] rec add_macro_defs (s : sequent) f =
   let macro_eqs : (Term.term * Term.term) list ref = ref [] in
   match SystemExpr.to_fset s.env.system.set with
   | exception (SE.Error Expected_fset) -> s
@@ -452,8 +452,8 @@ let get_trace_hyps s = s.hyps
 
 (*------------------------------------------------------------------*)
 let mem_felem _ _ = false
-let change_felem ?loc _ _ _ = assert false
-let get_felem ?loc _ _ = assert false
+let[@warning "-27"] change_felem ?loc _ _ _ = assert false
+let[@warning "-27"] get_felem ?loc _ _ = assert false
 
 (*------------------------------------------------------------------*)
 let map f s : sequent =
@@ -513,8 +513,8 @@ module LocalHyps
   let to_list s =
     List.filter_map
       (function
-         | l, Equiv.Local h -> Some (l,h)
-         | l, Equiv.Global _ -> None)
+         | l,  Equiv.Local h -> Some (l,h)
+         | _l, Equiv.Global _ -> None)
       (AnyHyps.to_list s)
 
   let find_opt f s =
@@ -563,7 +563,7 @@ module LocalHyps
     AnyHyps.mapi f s
 
   let filter f s =
-    let f i = function Equiv.Global h -> true | Equiv.Local h -> f i h in
+    let f i = function Equiv.Global _ -> true | Equiv.Local h -> f i h in
     AnyHyps.filter f s
     
   let remove = AnyHyps.remove

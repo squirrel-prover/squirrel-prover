@@ -111,7 +111,7 @@ let pp_rw_item ppf rw_item =
 
 let pp_rw_arg ppf rw_arg = match rw_arg with
   | R_s_item s -> pp_s_item ppf s
-  | R_item r -> Fmt.pf ppf "..."
+  | R_item _ -> Fmt.pf ppf "..."
 
 (*------------------------------------------------------------------*)
 (** Function application argument *)
@@ -244,7 +244,7 @@ let pp_parser_arg ppf = function
       (Fmt.list ~sep:Fmt.sp pp_rw_arg) rw_args
       pp_in_target in_opt
 
-  | RewriteEquiv rw_arg ->
+  | RewriteEquiv _rw_arg ->
     Fmt.pf ppf "..."
 
   | SystemAnnot _ ->
@@ -261,9 +261,9 @@ let pp_parser_arg ppf = function
     Fmt.pf ppf "(%a := ...)"
       (Fmt.option ~none:Fmt.nop pp_simpl_pat) ip
 
-  | ConstSeq (i, t) -> Fmt.pf ppf "%d: ..." (L.unloc i)
+  | ConstSeq (i, _t) -> Fmt.pf ppf "%d: ..." (L.unloc i)
 
-  | SplitSeq (i, ht) -> Fmt.pf ppf "%d ..." (L.unloc i)
+  | SplitSeq (i, _ht) -> Fmt.pf ppf "%d ..." (L.unloc i)
 
   | MemSeq (i, j) -> Fmt.pf ppf "%d %d" (L.unloc i) (L.unloc j)
 
@@ -340,8 +340,8 @@ let rec cast: type a b. a sort -> b arg -> a arg =
   fun kind t ->
   match kind, t with
   | Pair (a,b), Pair (c,d) -> Pair (cast a c, cast b d)
-  | Opt s, Opt (r, None)   -> Opt(s, None)
-  | Opt s, Opt (r, Some q) -> Opt(s, Some (cast s q))
+  | Opt s, Opt (_, None)   -> Opt(s, None)
+  | Opt s, Opt (_, Some q) -> Opt(s, Some (cast s q))
   | _ -> begin
       match kind, t with
       | Message  , Message _ -> t

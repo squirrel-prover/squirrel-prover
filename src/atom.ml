@@ -21,7 +21,7 @@ let rec tatsind acc : Term.xatom list -> Vars.vars = function
       
   | `Comp (_, _, _) :: l -> tatsind acc l
 
-  | `Happens ts :: l -> tatsind acc l
+  | `Happens _ts :: l -> tatsind acc l
 
 let trace_atoms_ind (at : Term.xatom list) =
   tatsind [] at |> List.sort_uniq Stdlib.compare

@@ -21,7 +21,7 @@ exception Deprecated_Not_name
 
 (*------------------------------------------------------------------*)
 (** Deprecated. *)
-class deprecated_find_name ~(cntxt:Constr.trace_cntxt) exact name = object (self)
+class deprecated_find_name ~(cntxt:Constr.trace_cntxt) exact name = object (_self)
   inherit Iter.deprecated_iter_approx_macros ~exact ~cntxt as super
 
   method visit_message t = match t with
@@ -33,7 +33,7 @@ class deprecated_find_name ~(cntxt:Constr.trace_cntxt) exact name = object (self
 end
 
 (** Deprecated, use [get_actions_ext]. *)
-class deprecated_get_actions ~(cntxt:Constr.trace_cntxt) = object (self)
+class deprecated_get_actions ~(cntxt:Constr.trace_cntxt) = object (_self)
   inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
 
   val mutable actions : Term.term list = []
@@ -112,7 +112,7 @@ let deprecated_pat_subsumes
   | Match mv -> Some mv
 
 (** Check if the term occurrence [occ2] subsumes [occ1], i.e. [occ1 ⊆ occ2]. *)
-let deprecated_term_occ_subsumes
+let[@warning "-27"] deprecated_term_occ_subsumes
     table (context : SE.context)
     ?(mv : Match.Mvar.t = Match.Mvar.empty)
     (occ1 : Term.term Iter.occ) (occ2 : Term.term Iter.occ) 

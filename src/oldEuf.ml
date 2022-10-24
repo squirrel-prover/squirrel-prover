@@ -46,7 +46,7 @@ end
     as in [Iter.deprecated_get_f_messages] but ignoring boolean terms,
     cf. Koutsos' PhD. *)
 class deprecated_get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n = 
-  object (self)
+  object (_self)
 
   inherit Iter.deprecated_get_f_messages
       ~fun_wrap_key ~drop_head ~cntxt head_fn key_n as super
@@ -153,7 +153,7 @@ let pp_euf_rule ppf rule =
 (*------------------------------------------------------------------*)
 (** {2 Build the Euf rule} *)
 
-let mk_rule ~elems ~drop_head ~fun_wrap_key
+let[@warning "-27"] mk_rule ~elems ~drop_head ~fun_wrap_key
     ~allow_functions ~cntxt ~env ~mess ~sign ~head_fn ~key_n ~key_is =
 
   let mk_of_hash action_descr ((is,m) : Term.t list * Term.t) =

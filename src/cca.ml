@@ -38,7 +38,7 @@ class check_rand ~cntxt enc_fn randoms = object (self)
     | Term.Fun (fn, _, [Tuple [m1;Term.Name _; m2]]) when fn = enc_fn ->
       self#visit_message m1; self#visit_message m2
 
-    | Term.Fun (fn, _, [Tuple [m1; _; m2]]) when fn = enc_fn ->
+    | Term.Fun (fn, _, [Tuple [_; _; _]]) when fn = enc_fn ->
       raise Bad_ssc
 
     | Term.Name (ns,_) when List.mem ns.s_symb randoms ->
@@ -106,7 +106,7 @@ let check_encryption_randomness
   (* we check that encrypted messages based on indices, do not depend on free
      indices instantiated by the action w.r.t the indices of the random. *)
   if List.exists (function
-      | Term.Fun (_, _, [Tuple [m; Name (n,n_args); _]]), 
+      | Term.Fun (_, _, [Tuple [m; Name (_n,n_args); _]]), 
         (actidx : Vars.var list) ->
         let vars = Term.get_vars m in
         let n_args_vars =
@@ -152,7 +152,7 @@ let symenc_rnd_ssc ~cntxt env head_fn ~key ~key_is elems =
     OldEuf.mk_rule
       ~fun_wrap_key:None
       ~elems ~drop_head:false
-      ~allow_functions:(fun x -> false)
+      ~allow_functions:(fun _ -> false)
       ~cntxt ~env ~mess:Term.empty ~sign:Term.empty
       ~head_fn ~key_n:key.Term.s_symb ~key_is
   in

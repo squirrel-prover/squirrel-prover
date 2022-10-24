@@ -704,8 +704,8 @@ let check_system_projs loc (state : conv_state) (projs : Term.projs) : unit =
 
 let proj_state (projs : Term.projs) (state : conv_state) : conv_state =
   match state.cntxt with 
-  | InProc (ps, ts) -> { state with cntxt = InProc ([Term.left_proj], ts) }
-  | InGoal -> { state with env = projs_set [Term.left_proj ] state.env }
+  | InProc (_, ts) -> { state with cntxt = InProc (projs, ts) }
+  | InGoal -> { state with env = projs_set projs state.env }
 
 
 (*------------------------------------------------------------------*)
@@ -767,7 +767,7 @@ let make_app_i (state : conv_state) cntxt (lsymb : lsymb) : app_i =
           conv_err loc (Timestamp_expected (mk_app (mk_symb lsymb) []));
         Macro
 
-      | Symbols.Action arity -> Taction
+      | Symbols.Action _ -> Taction
 
       | Symbols.Channel _
       | Symbols.BType _
@@ -1175,7 +1175,7 @@ and conv_app
 
     let s = Symbols.Macro.of_lsymb f state.env.table in
     let macro = Symbols.Macro.get_def s state.env.table in
-    let ty_args, ty_out =
+    let _, ty_out =
       match mfty with `Macro x -> x | _ -> assert false
     in
     begin match macro with
@@ -1374,13 +1374,13 @@ let declare_name table s ndef =
 (*------------------------------------------------------------------*)
 (** Sanity checks for a function symbol declaration. *)
 let check_fun_symb
-    table
+    _table
     (ty_args : Type.tvar list) (in_tys : Type.ty list) 
     (s : lsymb) (f_info : Symbols.symb_type) : unit
   =
   match f_info with
   | `Prefix -> ()
-  | `Infix side ->
+  | `Infix _side ->
     if not (List.length ty_args = 0) ||
        not (List.length in_tys = 2) then
       conv_err (L.loc s) BadInfixDecl
@@ -1578,7 +1578,7 @@ let declare_state
 let get_init_states table : (Symbols.macro * Vars.vars * Term.term) list =
   Symbols.Macro.fold (fun s def data acc ->
       match (def,data) with
-      | ( Symbols.State (arity,kind), StateInit_data (l,t) ) ->
+      | ( Symbols.State (_arity,kind), StateInit_data (l,t) ) ->
         assert (Type.equal kind (Term.ty t));
         (s,l,t) :: acc
       | _ -> acc
@@ -1692,7 +1692,7 @@ let () =
         "message is not a boolean" Ok
         (fun () ->
            try check env ty_env [] t Type.tboolean with
-           | Conv (_, Type_error (t_i, Type.Boolean, _)) -> raise Ok
+           | Conv (_, Type_error (_, Type.Boolean, _)) -> raise Ok
         )
     end
   ]

@@ -540,7 +540,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
  (*------------------------------------------------------------------*)
   (* FEATURE: use [s] to reduce [x] if necessary *)
   let destr_eq (type a)
-      (s : S.t) (k : a Equiv.f_kind)
+      (_ : S.t) (k : a Equiv.f_kind)
       (x : a) : (Term.term * Term.term) option
     =
     let destr_eq x =
@@ -560,7 +560,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
   (* FEATURE: use [s] to reduce [x] if necessary *)
   let destr_not (type a)
-      (s : S.t) (k : a Equiv.f_kind)
+      (_ : S.t) (k : a Equiv.f_kind)
       (x : a) : Term.term option
     =
     let e_destr_not x = obind Term.destr_not (Equiv.destr_reach x) in
@@ -575,7 +575,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
   (* FEATURE: use [s] to reduce [x] if necessary *)
   let destr_and (type a)
-      (s : S.t) (k : a Equiv.f_kind)
+      (_ : S.t) (k : a Equiv.f_kind)
       (x : a) : (a * a) option
     =
     let destr_and x =
@@ -637,7 +637,8 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       (s : S.t)
       (e1 : Equiv.form) (e2 : Equiv.form) : bool
     =
-    let state = cstate_of_seq expand_context (S.system s) param s in
+    let system = odflt (S.system s) system in
+    let state = cstate_of_seq expand_context system param s in
     conv_e state e1 e2
 
   (** We need type introspection there *)

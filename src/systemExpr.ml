@@ -145,7 +145,7 @@ let project_opt (projs : Term.projs option) t : fset =
 
     List (List.filter (fun (x,_) -> List.mem x projs) l)
 
-  | (Any | Any_compatible_with _), Some projs -> assert false
+  | (Any | Any_compatible_with _), Some _projs -> assert false
   (* should this be [List projs] ? *)
 
   | _, None -> t

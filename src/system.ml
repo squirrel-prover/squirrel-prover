@@ -107,7 +107,7 @@ let descr_of_shape table system shape =
 let find_shape table shape =
   let exception Found of Symbols.action * Vars.var list in
   try
-    Symbols.System.iter (fun system () data ->
+    Symbols.System.iter (fun _system () data ->
       let descrs = match data with
         | System_data {actions} -> actions
         | _ -> assert false
@@ -130,7 +130,7 @@ let register_action table system_symb (descr : Action.descr) =
     let table = add_action table system_symb descr in
     table, symb, descr
 
-  | Some (symb2, is) when List.length indices <> List.length is ->
+  | Some (_symb2, is) when List.length indices <> List.length is ->
     error Shape_error
 
   | Some (symb2, is) ->

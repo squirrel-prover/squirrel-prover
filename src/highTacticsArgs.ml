@@ -138,7 +138,7 @@ let convert_args env parser_args tactic_type conc =
 
     | [], _ -> raise Theory.(Conv (L._dummy, Tactic_type "more arguments expected"))
 
-    | p :: _, _  ->
+    | _ :: _, _  ->
       raise Theory.(Conv (L._dummy,
                           Tactic_type "tactic argument error \
                                        (maybe you gave too many arguments?)"))

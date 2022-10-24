@@ -279,7 +279,7 @@ module Form = struct
       | `Neg, `Happens t -> [Lit (`Eq,  uts t, uundef)]
       | `Pos, `Happens t -> [Lit (`Neq, uts t, uundef)]
 
-      | `Pos, (`Comp ((_, t, _) as atom)) -> _mk atom
+      | `Pos, (`Comp ((_, _, _) as atom)) -> _mk atom
 
       (* We rewrite the negative literal as a positive literal, and recurse. *)
       | `Neg, (`Comp (`Eq, t1, t2)) ->
@@ -416,7 +416,7 @@ let rec add_form ?(extend=true) (inst : constr_instance) (form : Form.form) =
   | Form.Conj l -> List.fold_left (add_form ~extend) inst l
 
 (** Add formulas to a constraint solving instance *)
-let add_forms ?(extend=true) inst forms =
+let add_forms inst forms =
   List.fold_left add_form inst forms
 
 (*------------------------------------------------------------------*)
@@ -546,8 +546,8 @@ let is_not_init uf neqs (u : ut) =
   ||
 
   List.exists (fun (ut1,ut2) ->
-      let uf,ut1 = mgu uf ut1
-      and _, ut2 = mgu uf ut2 in
+      let uf,ut1 = mgu uf ut1 in
+      let _, ut2 = mgu uf ut2 in
       (ut_equal ut2 uinit && ut_equal ut1 u) ||
       (ut_equal ut1 uinit && ut_equal ut2 u)
     ) neqs
@@ -564,8 +564,8 @@ let decomp u =
 (** [is_kpred uf ut] returns [true] if [u] is a k-predecessor of [v] in [uf]
     (for k > 0), i.e. [u = P^(v)]. *)
 let is_kpred uf u v =
-  let uf,u = mgu uf u
-  and _, v = mgu uf v in
+  let uf,u = mgu uf u in
+  let _, v = mgu uf v in
   match decomp u, decomp v with
   | (k,y), (k',y') ->
     ut_equal y y' && k > k'
@@ -1103,7 +1103,7 @@ let find_new_eqs inst graph =
   let new_eqs =
     (* we remove already known equalities *)
     List.filter (fun (t,t') ->
-      let uf, uts = mgus uf [t;t'] in
+      let _uf, uts = mgus uf [t;t'] in
       let t, t' = Utils.as_seq2 uts in
 
         not (ut_equal t t')
@@ -1189,7 +1189,7 @@ let rec split (instance : constr_instance) : model list =
             | Some (uf, new_eqs) -> (* found a new segment disjunction *)
               List.map (fun eq ->
                   log_segment_eq eq;
-                  split { instance with eqs = eq :: instance.eqs; }
+                  split { instance with eqs = eq :: instance.eqs; uf}
                 ) new_eqs
               |> List.flatten
 

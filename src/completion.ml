@@ -378,7 +378,7 @@ let pp_gsymb ppf = function
   | F x     -> Symbols.pp ppf x
   | M (x,t) -> Fmt.pf ppf "%a : %a" Symbols.pp x Type.pp t
   | A x     -> Symbols.pp ppf x
-  | N (x,t) -> Symbols.pp ppf x
+  | N (x,_) -> Symbols.pp ppf x
   | T i     -> Fmt.pf ppf "tuple%d" i
   | P i     -> Fmt.pf ppf "proj%d" i
 
@@ -934,7 +934,7 @@ end = struct
     (* We look for critical pairs, which are necessary of the form:
        c <- t -> c'
        because the rules are flat. For each such critical pair, we add c = c'. *)
-    Mct.fold (fun t s state ->
+    Mct.fold (fun _t s state ->
         if Scst.is_empty s then state 
         else
           let c = Scst.choose s in
@@ -1258,7 +1258,7 @@ let rec term_e_normalize state u = match u.cnt with
     in
     
     match find_map_erules find_unif state.e_rules with
-    | Some (l,r,sigma) ->
+    | Some (_l,r,sigma) ->
       (* assert (term_uf_normalize state.uf (Unify.subst_apply l sigma)
        *         = term_uf_normalize state.uf u); *)
       Unify.subst_apply r sigma

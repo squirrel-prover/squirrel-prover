@@ -320,7 +320,7 @@ let check_sel sel_tacs l =
 (*------------------------------------------------------------------*)
 (** Basic Tactics *)
 
-let fail sk (fk : fk) = fk (None, Failure "fail")
+let fail _sk (fk : fk) = fk (None, Failure "fail")
 
 let return x sk (fk : fk) = sk x fk
 
@@ -367,7 +367,7 @@ let orelse_list l j =
 let andthen ?(cut=true) tac1 tac2 judge sk (fk : fk) : a =
   let sk =
     if cut then
-      (fun l fk' -> map ~cut tac2 l sk fk)
+      (fun l _fk' -> map ~cut tac2 l sk fk)
     else
       (fun l fk' -> map ~cut tac2 l sk fk')
   in
@@ -395,7 +395,7 @@ let try_tac t j sk fk =
 
 let checkfail_tac (exc : string) t j (sk : 'a sk) (fk : fk) =
   try
-    let sk l fk = soft_failure DidNotFail in
+    let sk _l _fk = soft_failure DidNotFail in
     t j sk fk
   with
   | (Tactic_soft_failure (_,e) | Tactic_hard_failure (_,e)) when
@@ -423,7 +423,7 @@ let repeat ?(cut=true) t j sk fk =
       (fun l fk' ->
          let fk = if cut then fk else fk' in
          map ~cut aux l sk fk)
-      (fun e -> sk [j] fk)
+      (fun _ -> sk [j] fk)
   in aux j sk fk
 
 let eval_all (t : 'a tac) x =
@@ -672,7 +672,7 @@ module AST (M:S) = struct
 
     | AndThenSel (t,l) ->
       let pp_sel_tac fmt (sel,t) =
-        Fmt.pf ppf "@[%a: %a@]"
+        Fmt.pf fmt "@[%a: %a@]"
           (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") Fmt.int) sel
           pp t
       in

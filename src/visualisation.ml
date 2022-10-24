@@ -38,11 +38,11 @@ let get_classes_rep (models : Constr.models) (terms : Term.terms) : Term.terms =
   let rec best_candidate (var_candidate : Term.term option) (pred_candidate : Term.term option)
     (terms : Term.terms) : Term.term =
     match terms, var_candidate, pred_candidate with
-    | (Action _ as term) :: l, _, _ ->
+    | (Action _ as term) :: _l, _, _ ->
         term
     | (Var _ as term) :: l, _, _ ->
         best_candidate (Some term) pred_candidate l
-    | (Fun (fsymb, _, [t]) as term) :: l, _, _ when fsymb = Term.f_pred ->
+    | (Fun (fsymb, _, [_t]) as term) :: l, _, _ when fsymb = Term.f_pred ->
         best_candidate var_candidate (Some term) l
     | [], _, Some term ->
         term

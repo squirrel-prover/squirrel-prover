@@ -326,7 +326,7 @@ module Mk (Args : MkArgs) : S with
       in
 
       (* Open the lemma type variables. *)
-      let tvars, tsubst = Type.Infer.open_tvars ty_env lem.ty_vars in
+      let _tvars, tsubst = Type.Infer.open_tvars ty_env lem.ty_vars in
       let f = Equiv.Babel.tsubst f_kind tsubst lem.formula in
 
       let cenv = Theory.{ env = S.env s; cntxt = InGoal; } in
@@ -547,7 +547,7 @@ module Mk (Args : MkArgs) : S with
       (s : S.t)
     : ghyp * a list * a Term.pat
     =
-    let name, se, subgs, pat =
+    let name, _se, subgs, pat =
       convert_pt_gen ~check_compatibility:true ?close_pats pt f_kind s
     in
     name, subgs, pat

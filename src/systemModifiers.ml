@@ -1150,7 +1150,7 @@ let do_rewrite
   match
     Rewrite.rewrite_exn 
       ~loc (TS.table s) (TS.system s) expand_context
-      (TS.vars s) (TS.get_trace_hyps s)
+      (TS.get_trace_hyps s)
       mult rw_erule (Local t)
   with
   | Local t, subs ->

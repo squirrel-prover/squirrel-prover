@@ -20,12 +20,12 @@ let ty_out (table : Symbols.table) (ms : Symbols.macro) : Type.ty =
 
 let ty_args (table : Symbols.table) (ms : Symbols.macro) : Type.ty list =
   match Symbols.Macro.get_def ms table with
-    | Symbols.Global (arity, ty) ->
+    | Symbols.Global (arity, _) ->
       List.init arity (fun _ -> Type.tindex)
 
     | Input | Output | Frame | Cond | Exec -> []
 
-    | Symbols.State (arity,ty) ->
+    | Symbols.State (arity,_) ->
       List.init arity (fun _ -> Type.tindex)
 
 let is_global table (ms : Symbols.macro) : bool =
@@ -142,7 +142,7 @@ let is_defined (name : Symbols.macro) (a : Term.term) table =
     | Symbols.(Exec | Frame), _ ->
       is_action a
 
-    | Symbols.Global _, Global_data {action = (strict,a0); inputs } ->
+    | Symbols.Global _, Global_data {action = (strict,a0) } ->
       (* We can only expand a global macro when [a0] is a prefix of [a],
        * because a global macro m(...)@A refer to inputs of A and
        * its sequential predecessors. *)
@@ -195,7 +195,7 @@ let get_def_glob
    ~(allow_dummy : bool)
     (system : SE.fset)
     (table  : Symbols.table)
-    (symb   : Term.msymb)
+    (_symb  : Term.msymb)
     ~(args  : Term.term list)
     ~(ts    : Term.term)
     (action : Action.action)
@@ -287,7 +287,7 @@ let get_definition_nocntxt
         (* Look for an update of the state macro [name] in the updates
            of [action]; we rely on the fact that [action] can only contain
            a single update for each state macro symbol *)
-        let (ns, ns_args, msg) : Symbols.macro * Vars.vars * Term.term =
+        let (_ns, ns_args, msg) : Symbols.macro * Vars.vars * Term.term =
           List.find (fun (ns,ns_args,_) ->
               ns = symb.s_symb &&
               List.length ns_args = List.length args
@@ -414,7 +414,7 @@ let get_dummy_definition
   =
   match Symbols.Macro.get_all symb.s_symb table with
   | Symbols.Global _,
-    Global_data ({action = (strict,action); inputs} as gdata) ->
+    Global_data ({action = (strict,action)} as gdata) ->
     (* [dummy_action] is a dummy strict suffix of [action]. *)
     let dummy_action =
       let prefix = Action.dummy action in

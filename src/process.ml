@@ -455,7 +455,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
   (* Register an action, when we arrive at the end of a block
    * (input / condition / update / output). *)
-  let register_action loc a output (penv : p_env) =
+  let register_action _loc a output (penv : p_env) =
     (* In strict alias mode, we require that the alias T is available. *)
     let exact = Config.strict_alias_mode () in
     let table,a' = Action.fresh_symbol penv.env.table ~exact a in
@@ -512,7 +512,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     debug "condition = %a.@." Term.pp (snd condition);
 
     let updates =
-      List.map (fun (s,args,ty,t) ->
+      List.map (fun (s,args,_,t) ->
           let ms = Symbols.Macro.of_lsymb s penv.env.table in
           ms,
           args,
@@ -764,7 +764,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       let penv,p = p_common ~penv proc in
       p_in_i ~penv ~pos ~pos_indices p
 
-    | Let (x,t,ty,p) ->
+    | Let (x,_,ty,_) ->
       let x',t',penv,p = p_let ~penv proc in
       let p',pos',table = p_in ~penv ~pos ~pos_indices p in
       let x' = L.mk_loc (L.loc x) (Symbols.to_string x') in
@@ -817,7 +817,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       let penv,p = p_common ~penv proc in
       p_cond_i ~penv ~pos ~par_choice p
 
-    | Let (x,t,ty,p) ->
+    | Let (x,_,ty,_) ->
       let x',t',penv,p = p_let ~penv proc in
       let p',pos',table = p_cond ~penv ~pos ~par_choice p in
       let x' = L.mk_loc (L.loc x) (Symbols.to_string x') in
@@ -906,7 +906,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       let penv,p = p_common ~penv proc in
       p_update_i ~penv p
 
-    | Let (x,t,ty,p) ->
+    | Let (x,_,ty,_) ->
       let x',t',penv,p = p_let ~in_update:true ~penv proc in
       let p',pos',table = p_update ~penv p in
       let x' = L.mk_loc (L.loc x) (Symbols.to_string x') in

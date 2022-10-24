@@ -25,9 +25,11 @@ class collect_max_ts ~(cntxt:Constr.trace_cntxt) = object (self)
     List.fold_left
       (fun smaller_acc at ->
          match Term.form_to_xatom at with
-         | Some (`Comp (`Leq,tau_1,tau_2)) ->
+         | Some (`Comp (`Leq,tau_1,_tau_2)) ->
+           (* FIXME: [tau_2] unused, is it normal? *)
            Sts.add tau_1 smaller_acc
-         | Some (`Comp (`Lt,tau_1,tau_2)) ->
+         | Some (`Comp (`Lt,tau_1,_tau_2)) ->
+           (* FIXME: [tau_2] unused, is it normal? *)
            Sts.add tau_1 smaller_acc
         | _ -> smaller_acc)
       Sts.empty
@@ -38,10 +40,10 @@ class collect_max_ts ~(cntxt:Constr.trace_cntxt) = object (self)
   method fold_message (max_ts,ignore_ts) t = match t with
 
     (* We ignore timestamps explicitly smaller than others. *)
-    | Macro (ms,[],a) when Sts.mem a ignore_ts -> (max_ts,ignore_ts)
+    | Macro (_ms,[],a) when Sts.mem a ignore_ts -> (max_ts,ignore_ts)
 
     (* We don't care about input macros. *)
-    | Macro (ms,[],a) when ms = Term.in_macro -> (max_ts,ignore_ts)
+    | Macro (ms,[],_a) when ms = Term.in_macro -> (max_ts,ignore_ts)
 
     (* For other macros, we add the ts to the possible max_ts, but we don't
        unfold the macro, as it would only contain smaller timestamps. *)
@@ -70,20 +72,20 @@ class collect_max_ts ~(cntxt:Constr.trace_cntxt) = object (self)
 
 end
 
-class collect_macros ~(cntxt:Constr.trace_cntxt) = object (self)
+class collect_macros ~(cntxt:Constr.trace_cntxt) = object (_self)
 
   inherit [Stt.t] Iter.deprecated_fold ~cntxt as super
 
   (* We collect all the macros occurring inside terms, that are not under
      a diff. *)
   method fold_message acc t = match t with
-    | Macro (ms,[],a) as m -> Stt.add m acc
+    | Macro (_ms,[],_a) as m -> Stt.add m acc
     | Diff _ -> acc
     | _ -> super#fold_message acc t
 
 end
 
-class check_att ~(cntxt:Constr.trace_cntxt) = object (self)
+class check_att ~(cntxt:Constr.trace_cntxt) = object (_self)
 
   inherit [bool] Iter.deprecated_fold ~cntxt as super
 
@@ -133,7 +135,7 @@ let is_attacker_call_synchronized cntxt models biframe =
       List.fold_left (fun acc t-> iter#fold_message acc t)
         Stt.empty biframe
     in
-    let has_frame_or_input biframe tau =
+    let has_frame_or_input _biframe tau =
       let frame_at t =
         Term.mk_macro Term.frame_macro [] t
       in

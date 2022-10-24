@@ -33,7 +33,6 @@ val rewrite :
   Symbols.table ->
   SystemExpr.context ->
   Macros.expand_context ->
-  Vars.env ->
   Hyps.TraceHyps.hyps ->
   TacticsArgs.rw_count ->
   rw_rule ->
@@ -48,7 +47,6 @@ val rewrite_exn :
   Symbols.table ->
   SystemExpr.context ->
   Macros.expand_context ->
-  Vars.env ->
   Hyps.TraceHyps.hyps ->
   TacticsArgs.rw_count ->
   rw_rule ->

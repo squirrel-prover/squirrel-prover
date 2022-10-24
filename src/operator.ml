@@ -49,12 +49,12 @@ let ftype (op : operator) : Type.ftype =
 
 let is_operator (table : Symbols.table) (fsymb : Symbols.fname) : bool =
   match Symbols.Function.get_data fsymb table with
-  | Operator op -> true
+  | Operator _ -> true
   | _ -> false
 
 let unfold 
     (table  : Symbols.table)
-    (se     : SE.arbitrary)
+    (_se    : SE.arbitrary)
     (opsymb : Symbols.fname)
     (args   : Term.term list)
   : [`FreeTyv | `Ok of Term.term]
@@ -69,7 +69,7 @@ let unfold
   let ty_env = Type.Infer.mk_env () in
 
   (* refresh type variables *)
-  let ty_vars, ts = Type.Infer.open_tvars ty_env op.ty_vars in
+  let _, ts = Type.Infer.open_tvars ty_env op.ty_vars in
   let op_args = List.map (Vars.tsubst ts) op.args in
   let op_body = Term.tsubst ts op.body in
 

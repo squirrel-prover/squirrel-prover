@@ -157,8 +157,9 @@ let define_oracle_tag_formula table (h : lsymb) f =
   let conv_env = Theory.{ env; cntxt = InGoal; } in
   let form, _ = Theory.convert conv_env ~ty:Type.Boolean f in
     match form with
-     | Term.Quant (ForAll, [uvarm; uvarkey], f) ->
-       begin match Vars.ty uvarm,Vars.ty uvarkey with
+     | Term.Quant (ForAll, [uvarm; uvarkey], _) ->
+       begin
+         match Vars.ty uvarm,Vars.ty uvarkey with
          | Type.(Message, Message) ->
            Prover.add_option (Oracle_for_symbol (L.unloc h), Oracle_formula form)
          | _ ->
@@ -194,7 +195,7 @@ let declare table decl : Symbols.table * Goal.t list =
   | Decl.Decl_axiom pgoal ->
     let pgoal =
       match pgoal.Goal.Parsed.name with
-      | Some n -> pgoal
+      | Some _ -> pgoal
       | None ->
         { pgoal with Goal.Parsed.name = Some (Prover.unnamed_goal ()) }
     in

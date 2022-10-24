@@ -163,7 +163,7 @@ let reset_to_pt_history_head () =
   | [] ->
     reset ();
     (GoalMode, Symbols.builtins_table)
-  | p :: q -> reset_from_state p
+  | p :: _ -> reset_from_state p
 
 let push_pt_history () : unit =
   pt_history_stack := !pt_history :: !pt_history_stack;
@@ -397,7 +397,7 @@ module ProverTactics = struct
        cryptographic, that rely on some cryptographic assumption that must be \
        explicitly stated.\n";
     let filter_cat helps cat =
-      List.filter (fun (y,x) -> x.tactic_group = cat) helps
+      List.filter (fun (_,x) -> x.tactic_group = cat) helps
     in
     let str_cat = function
       | Logical -> "Logical"
@@ -415,11 +415,11 @@ module ProverTactics = struct
     [Logical; Structural; Cryptographic]
 
   let pp_list fmt () =
-   let helps =
+    let helps =
       Hashtbl.fold (fun name tac acc -> (name, tac.help)::acc) table []
       |> List.sort (fun (n1,_) (n2,_) -> compare n1 n2)
     in
-    let filter_cat helps cat = List.filter (fun (y,x) -> x.tactic_group = cat) helps in
+    let filter_cat helps cat = List.filter (fun (_,x) -> x.tactic_group = cat) helps in
     let str_cat = function
       | Logical -> "Logical"
       | Structural -> "Structural"
@@ -430,11 +430,11 @@ module ProverTactics = struct
           (str_cat cat^" tactics:\n");
         Fmt.pf fmt "%a"
           (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "; ")
-            (fun ppf (name,x) -> Printer.kw
-              `HelpFunction ppf "%s" name))
-        (filter_cat helps cat);
-    )
-    [Logical; Structural; Cryptographic]
+             (fun ppf (name,_) ->
+                Printer.kw `HelpFunction ppf "%s" name))
+          (filter_cat helps cat);
+      )
+      [Logical; Structural; Cryptographic]
 
 end
 
@@ -613,19 +613,24 @@ let eval_tactic_focus tac = match !subgoals with
       with Bullets.Error _ -> Tactics.(hard_failure (Failure "bullet error"))
     end
 
-let open_bullet bullet =
+(*------------------------------------------------------------------*)
+let open_bullet (bullet : string) =
   assert (bullet <> "");
   try bullets := Bullets.open_bullet bullet !bullets with
   | Bullets.Error _ -> Tactics.(hard_failure (Failure "invalid bullet"))
 
-let open_brace bullet =
+let invalid_brace () =
+  Tactics.hard_failure (Failure "invalid brace")
+
+let open_brace () =
   try bullets := Bullets.open_brace !bullets with
-  | Bullets.Error _ -> Tactics.(hard_failure (Failure "invalid brace"))
+  | Bullets.Error _ -> invalid_brace ()
 
-let close_brace bullet =
+let close_brace () =
   try bullets := Bullets.close_brace !bullets with
-  | Bullets.Error _ -> Tactics.(hard_failure (Failure "invalid brace"))
+  | Bullets.Error _ -> invalid_brace ()
 
+(*------------------------------------------------------------------*)
 let cycle i_l l =
   let i, loc = L.unloc i_l, L.loc i_l in
   let rec cyc acc i = function

@@ -280,30 +280,31 @@ module Smart : Term.SmartFO with type form = _form = struct
   let mk_true  = Atom (Reach Term.mk_true)
   let mk_false = Atom (Reach Term.mk_false)
 
-  let mk_not ?simpl f = todo ()
+  let[@warning "-27"] mk_not ?simpl f = todo ()
 
   (*------------------------------------------------------------------*)
-  let mk_and ?simpl f1 f2 = And (f1, f2)
+  let[@warning "-27"] mk_and ?simpl f1 f2 = And (f1, f2)
 
-  let rec mk_ands ?simpl forms =
+  let[@warning "-27"] rec mk_ands ?(simpl = false) forms =
     match forms with
     | [] -> mk_true
     | [f0] -> f0
-    | f0 :: forms -> And (f0, mk_ands forms)
+    | f0 :: forms -> 
+      And (f0, mk_ands forms)
 
   (*------------------------------------------------------------------*)
-  let mk_or ?simpl f1 f2 = Or (f1, f2)
+  let[@warning "-27"] mk_or ?simpl f1 f2 = Or (f1, f2)
 
-  let rec mk_ors ?simpl forms =
+  let[@warning "-27"] rec mk_ors ?simpl forms =
     match forms with
     | [] -> mk_false
     | [f0] -> f0
     | f0 :: forms -> Or (f0, mk_ors forms)
 
   (*------------------------------------------------------------------*)
-  let mk_impl ?simpl f1 f2 = Impl (f1, f2)
+  let[@warning "-27"] mk_impl ?simpl f1 f2 = Impl (f1, f2)
 
-  let rec mk_impls ?simpl l f =
+  let[@warning "-27"] rec mk_impls ?simpl l f =
     match l with
     | [] -> f
     | f0 :: impls -> Impl (f0, mk_impls impls f)
@@ -375,9 +376,9 @@ module Smart : Term.SmartFO with type form = _form = struct
   let destr_exists1 = destr_quant1 Exists
 
   (*------------------------------------------------------------------*)
-  let destr_false f = todo ()
-  let destr_true  f = todo ()
-  let destr_not   f = todo ()
+  let destr_false _f = todo ()
+  let destr_true  _f = todo ()
+  let destr_not   _f = todo ()
 
   let destr_and = function
     | And (f1, f2) -> Some (f1, f2)
@@ -465,10 +466,10 @@ module Smart : Term.SmartFO with type form = _form = struct
     | _ -> None
 
   (*------------------------------------------------------------------*)
-  let is_false f = todo ()
-  let is_true  f = todo ()
-  let is_zero  f = todo ()
-  let is_not   f = false
+  let is_false _f = todo ()
+  let is_true  _f = todo ()
+  let is_zero  _f = todo ()
+  let is_not   _f = false       (* FIXME *)
   let is_and   f = destr_and  f <> None
   let is_or    f = destr_or   f <> None
   let is_impl  f = destr_impl f <> None
@@ -505,8 +506,8 @@ module Smart : Term.SmartFO with type form = _form = struct
   let decompose_exists = decompose_quant Exists
 
   (*------------------------------------------------------------------*)
-  let decompose_ands  f = todo ()
-  let decompose_ors   f = todo ()
+  let decompose_ands _f = todo ()
+  let decompose_ors  _f = todo ()
 
   let decompose_impls f =
     let rec decompose f = match destr_impl f with

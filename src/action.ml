@@ -377,7 +377,7 @@ let pp_descr ~dbg ppf descr =
        (Fmt.list
           ~sep:(Fmt.any ";@ ")
           (fun ppf (s, args, t) ->
-             let _, vs, subst = (* rename quantified vars. to avoid name clashes *)
+             let _, _, subst = (* rename quantified vars. to avoid name clashes *)
                let fv_b = List.fold_left ((^~) Sv.remove) (Term.fv t) args in
                Term.refresh_vars_env (Vars.of_set fv_b) args
              in
