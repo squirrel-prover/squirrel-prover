@@ -26,6 +26,14 @@ module Name = struct
     | _ -> assert false
 
   let to_term { symb; args; } = Term.mk_name symb args
+
+  (** looks for a name with the same symbol in the list *)
+  let exists_symb (n:t) (ns:t list) : bool =
+    List.exists (fun nn -> n.symb.s_symb = nn.symb.s_symb) ns
+
+  (** finds all names with the same symbol in the list *)
+  let find_symb (n:t) (ns:t list) : t list =
+    List.filter (fun nn -> n.symb.s_symb = nn.symb.s_symb) ns
 end
 
 (*------------------------------------------------------------------*)

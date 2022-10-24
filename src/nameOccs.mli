@@ -136,6 +136,12 @@ module Name : sig
   val to_term : t -> Term.t
 
   val subst : Term.subst -> t -> t
+
+  (** looks for a name with the same symbol in the list *)
+  val exists_symb : t -> t list -> bool
+
+  (** finds all names with the same symbol in the list *)
+  val find_symb : t -> t list -> t list
 end
 
 type n_occ = (Name.t, unit) simple_occ

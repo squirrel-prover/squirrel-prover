@@ -29,17 +29,6 @@ let soft_failure = Tactics.soft_failure
 let hard_failure = Tactics.hard_failure
 
 
-(*------------------------------------------------------------------*)
-(* utility functions for lists of nsymbs *)
-
-(** looks for a name with the same symbol in the list *)
-let exists_symb (n:nsymb) (ns:Name.t list) : bool =
-  List.exists (fun nn -> n.s_symb = nn.Name.symb.s_symb) ns
-
-(** finds all names with the same symbol in the list *)
-let find_symb (n:nsymb) (ns:Name.t list) : Name.t list =
-  List.filter (fun nn -> n.s_symb = nn.Name.symb.s_symb) ns
-
 
 (*------------------------------------------------------------------*)
 (* Utility functions to put a term in a sort of normal form *)
@@ -83,13 +72,16 @@ let rec powers (exp:Symbols.fname) (mult:Symbols.fname option)
 
 (** Separate pows between occs of elements in nab and the rest *)
 let partition_powers
-    (nab:Name.t list) (pows:term list) : (term list) * (term list) 
+    (nab:Name.t list) (pows:term list) : (Name.t list) * (term list) 
   =
-  List.partition
-    (function
-      | Term.Name (n,_args) -> exists_symb n nab
-      | _ -> false)
-    pows
+  let l, r =
+    List.partition
+      (function
+        | Term.Name _ as n -> Name.exists_symb (Name.of_term n) nab
+        | _ -> false)
+      pows
+  in
+  (List.map Name.of_term l), r
 
 
 (*------------------------------------------------------------------*)
@@ -134,12 +126,13 @@ let get_bad_occs
       ~(fv:Vars.vars) ~(cond:terms) ~(p:MP.pos) ~(info:NO.expand_info)
       ~(st:term) : NO.n_occs 
     =
+    (* only use this rec_call shorthand if the parameters don't change! *)
+    let rec_call = (* rec call on a list *)
+      List.flattensplitmap (rec_call_on_subterms ~fv ~cond ~p ~info ~st)
+    in
     if m <> g then (* all occs in m, pows are bad *)
-      (fst (rec_call_on_subterms m ~fv ~cond ~p ~info ~st)) @ 
-      (List.concat_map
-         (fun tt -> fst (rec_call_on_subterms tt ~fv ~cond ~p ~info ~st))
-         pows)
-      (* p is not kept up to date. update if we decide to use it *) 
+      let occs1, _ = rec_call (m :: pows) in
+      occs1
 
     else (* 1 bad pi is allowed.
             bad occs = all bad pi except 1 + bad occs in other pis *)
@@ -147,37 +140,46 @@ let get_bad_occs
       let bad_pows_minus_1 = List.drop 1 bad_pows in
       (* allow the first one. arbitrary, would be better to generate
          a disjunction goal *)
+      (* the others are bad occs *)
       let bad_pows_occs =
         List.concat_map
-          (fun tt -> 
-             match tt with
-             | Name (nn,nn_args) ->
-               List.map
-                 (fun nnn -> NO.mk_nocc { symb = nn; args = nn_args; } nnn fv cond (fst info) st)
-                 (find_symb nn nab)
-             | _ -> assert false (* should always be a name *))
-          (* pos is not set right here, could be bad if we wanted
-             to use it later *)
+          (fun nn -> 
+             List.map
+               (fun nnn -> NO.mk_nocc nn nnn fv cond (fst info) st)
+               (Name.find_symb nn nab))
           bad_pows_minus_1
       in
-      bad_pows_occs @
-      List.concat_map
-        (fun tt -> fst (rec_call_on_subterms tt ~fv ~cond ~p ~info ~st))
-        other_pows
+      (* look recursively in the other pows,
+         and the arguments of all the bad_pows (incl. the one we dropped) *)
+      let occs1, _ =
+        rec_call
+          ((List.concat_map (fun (x:Name.t) -> x.args) bad_pows) @ other_pows)
+      in
+      bad_pows_occs @ occs1
   in 
 
   (* handle a few cases, using rec_call_on_subterm for rec calls,
      and calls retry_on_subterm for the rest *)
+  (* only use this rec_call shorthand if the parameters don't change! *)
+  let rec_call = (* rec call on a list *)
+    List.flattensplitmap (rec_call_on_subterms ~fv ~cond ~p ~info ~st)
+  in
+  
   match t with
   | Var v when not (Type.is_finite (Vars.ty v)) ->
     soft_failure
       (Tactics.Failure "can only be applied on ground terms")
-
-  | Name (n, n_args) when exists_symb n nab ->
-    (List.map
-      (fun nn -> NO.mk_nocc { symb = n; args = n_args; } nn fv cond (fst info) st)
-      (find_symb n nab),
-     [])
+      
+  | Name (_, nargs) as n when Name.exists_symb (Name.of_term n) nab ->
+    (* one of the nab: generate occs for all potential collisions *)
+    let occs1 =
+      List.map
+        (fun nn -> NO.mk_nocc (Name.of_term n) nn fv cond (fst info) st)
+        (Name.find_symb (Name.of_term n) nab)
+    in
+    (* rec call on the arguments *)
+    let occs2, _ = rec_call nargs in
+    occs1 @ occs2, []
 
   | Fun (f, _, _) when f = exp ->
     let (m, pows) = powers exp mult info t in
@@ -187,8 +189,9 @@ let get_bad_occs
   | Fun (f, _, [t1; t2]) when f = f_eq && gdh_oracles ->
     (* u^p1…pn = v^q1…qn *)
     (* one bad pow is allowed in u, and one in v.
-       The n we recurse on the rest, using illegal powers
-       so we don't need to reconstruct the term *)
+       Then we recurse on the rest, using illegal powers
+       so we don't need to reconstruct the term.
+       Also recurse on the args of the n that was dropped, if any *)
     let (u, pows) = powers exp mult info t1 in
     let (v, qows) = powers exp mult info t2 in
     let (bad_pows, other_pows) = partition_powers nab pows in
@@ -197,14 +200,26 @@ let get_bad_occs
     let bad_qows_minus_1 = List.drop_right 1 bad_qows in
     (* allow the last one on both sides of =. arbitrary, would be better
        to generate a disjunction goal. *)
-    ((get_illegal_powers
-        u (bad_pows_minus_1 @ other_pows)
+    let occs1 =
+      get_illegal_powers
+        u ((List.map Name.to_term bad_pows_minus_1) @ other_pows)
         ~fv ~cond ~p ~info ~st:t
       @ get_illegal_powers
-        v (bad_qows_minus_1 @ other_qows)
-        ~fv ~cond ~p ~info ~st:t),
-     [])
-
+        v ((List.map Name.to_term bad_qows_minus_1) @ other_qows)
+        ~fv ~cond ~p ~info ~st:t
+    in
+    let occs2, _ =
+      match bad_pows with
+      | [] -> [], []
+      | n :: _ -> rec_call n.args
+    in
+    let occs3, _ =
+      match bad_qows with
+      | [] -> [], []
+      | n :: _ -> rec_call n.args
+    in
+    occs1 @ occs2 @ occs3, []
+    
   | _ -> retry_on_subterms ()
 
 

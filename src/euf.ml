@@ -63,54 +63,64 @@ let get_bad_occs
   : NO.n_occs * int_occs =
   (* handles a few cases, using rec_call_on_subterm for rec calls,
      and calls retry_on_subterm for the rest *)
+  (* only use this rec_call shorthand if the parameters don't change! *)
+  let rec_call = (* rec call on a list *)
+    List.flattensplitmap (rec_call_on_subterms ~fv ~cond ~p ~info ~st)
+  in
+
   match t with
   | Var v when not (Type.is_finite (Vars.ty v)) ->
     soft_failure
       (Tactics.Failure "can only be applied on ground terms")
 
-  | Name (ksymb', _) as k' when ksymb'.s_symb = k.symb.s_symb ->
-    [NO.mk_nocc (Name.of_term k') k fv cond (fst info) st],
-    []
+  | Name (ksb', kargs') as k' when ksb'.s_symb = k.symb.s_symb ->
+    (* generate an occ, and also recurse on kargs' *)
+    let occs1, accs1 = rec_call kargs' in
+    (NO.mk_nocc (Name.of_term k') k fv cond (fst info) st) :: occs1,
+    accs1
 
   | Fun (f, _, [tk']) when pk_f = Some f -> (* public key *)
     begin
       match NO.expand_macro_check_all info tk' with
-      | Name _ -> [], [] (* pk(k'): no occ, even if k'=k *)
+      | Name (_, tkargs') -> rec_call tkargs'
+      (* pk(k'): no occ,
+         even if k'=k, just look in k' args *)
       | _ -> retry_on_subterms () (* otherwise look in tk' *)
     end
     
   (* hash verification oracle: test u = h(m', k).
-     Search recursively in u, m', but do not record
+     Search recursively in u, m', kargs', but do not record
      m' as a hash occurrence. *)
-  | Fun (f, _, [u; Fun (g, _, [Tuple [m'; Name (ksymb', _)]])])
-    when f = f_eq && g = int_f && pk_f = None && ksymb'.s_symb = k.symb.s_symb ->
-    let (occs1, accs1) = rec_call_on_subterms ~fv ~cond ~p ~info ~st:t u in
-    let (occs2, accs2) = rec_call_on_subterms ~fv ~cond ~p ~info ~st:t m' in
-    occs1 @ occs2, accs1 @ accs2
+  | Fun (f, _, [u; Fun (g, _, [Tuple [m'; Name (ksb', kargs')]])])
+    when f = f_eq && g = int_f && pk_f = None && ksb'.s_symb = k.symb.s_symb ->
+    List.flattensplitmap
+      (rec_call_on_subterms ~fv ~cond ~p ~info ~st:t) (* change st *)
+      (u :: m' :: kargs')
 
   (* hash verification oracle (symmetric case). can we avoid duplication? *)
-  | Fun (f, _, [Fun (g, _, [Tuple [m'; Name (ksymb', _)]]); u])
-    when f = f_eq && g = int_f && pk_f = None && ksymb'.s_symb = k.symb.s_symb ->
-    let (occs1, accs1) = rec_call_on_subterms ~fv ~cond ~p ~info ~st:t u in
-    let (occs2, accs2) = rec_call_on_subterms ~fv ~cond ~p ~info ~st:t m' in
-    occs1 @ occs2, accs1 @ accs2
+  | Fun (f, _, [Fun (g, _, [Tuple [m'; Name (ksb', kargs')]]); u])
+    when f = f_eq && g = int_f && pk_f = None && ksb'.s_symb = k.symb.s_symb ->
+    List.flattensplitmap
+      (rec_call_on_subterms ~fv ~cond ~p ~info ~st:t) (* change st *)
+      (u :: m' :: kargs')
 
   | Fun (f, _, [Tuple [m'; tk']]) when f = int_f ->
     begin
       match NO.expand_macro_check_all info tk' with
       (* hash/sign/etc w/ a name that could be the right key *) 
       (* record this hash occurrence, but allow the key *)
-      (* todo: actually why don't we always do this,
-               even if it's the wrong key? *)
-      | Name (ksymb', _) as k' when k.symb.s_symb = ksymb'.s_symb  ->
+      (* q: actually why don't we always do this,
+               even if it's the wrong key?
+         a: that would be sound but generate too many occs *)
+      | Name (ksb', kargs') as k' when k.symb.s_symb = ksb'.s_symb  ->
         let fvv, sigma = refresh_vars `Global fv in
         let m' = subst sigma m' in
         let k' = Name.subst sigma (Name.of_term k') in
         let cond = List.map (subst sigma) cond in
         let ot = NO.subst_occtype sigma (fst info) in
-        let occs, acc = rec_call_on_subterms ~fv ~cond ~p ~info ~st m' in
+        let occs, accs = rec_call (m' :: kargs') in
         occs,
-        acc @ [mk_int_occ m' m k' k  cond fvv ot st]
+        accs @ [mk_int_occ m' m k' k  cond fvv ot st]
 
       (* if we can't be sure it could be the key *)
       (* don't record the hash occ, but look for bad occurrences in m and tk *)
