@@ -372,8 +372,12 @@ let get_actions_ext
               so_occtype = EI_direct;
               so_subterm = mk_false} (* unused *)
           in
-          [occ] @ get ~fv ~cond ~p ~se ts
+          [occ] @ 
+          List.concat_map (fun t ->
+              get ~fv ~cond ~p ~se t
+            ) (ts :: l)
       end
+
     | _ ->
       MP.fold_shallow
         (fun t' se fv cond p occs ->
