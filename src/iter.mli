@@ -80,7 +80,9 @@ type 'a occs = 'a occ list
     bound variables and conditions.
     If [Mode = `Delta _], try to expand macros before calling [func].
     Over-approximation: we try to expand macros, even if they are at a timestamp
-    that may not happen. *)
+    that may not happen. 
+
+    **DEPRECATED**, use [Match.Pos.fold] instead. *)
 val tfold_occ :
   mode:[ `Delta of Constr.trace_cntxt | `NoDelta ] ->
   (fv:Vars.vars -> cond:Term.terms -> Term.term -> 'a -> 'a) ->
