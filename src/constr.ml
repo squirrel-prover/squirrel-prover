@@ -893,13 +893,16 @@ let max_pred uf g u x =
   else
     None
 
-(** [nu] must be normalized and [x] basic *)
-let no_case_disj uf nu x minj maxj =
+(** [nu] must be normalized and [base] basic *)
+let no_case_disj uf (nu : ut) (base : ut) (minj : int) (maxj : int) =
   let nu_i, nu_y = decomp nu in
-  ut_equal (snd (mgu uf x)) uinit  || (* ignore [init] as base-point *)
-  ut_equal (snd (mgu uf x)) uundef || (* ignore [⊥] as base-point *)
+  ut_equal (snd (mgu uf base)) uinit  || (* ignore [init] as base-point *)
+  ut_equal nu uinit ||                   (* idem for the point to split *)
+  
+  ut_equal (snd (mgu uf base)) uundef || (* ignore [⊥] as base-point *)
+  ut_equal nu uundef ||                  (* idem for the point to split *)
   minj = maxj ||                      (* ignore segments of width 1 *)
-  (nu_y = snd (mgu uf x)) && (maxj <= nu_i) && (nu_i <= minj)
+  (nu_y = snd (mgu uf base)) && (maxj <= nu_i) && (nu_i <= minj)
   (* ignore segments if [nu] is already of the form [P^nu_i(x)] and
      [P^minj(x) ≤ P^nu_i(x) ≤ P^maxj(x)] *)
 
@@ -912,15 +915,15 @@ let rec kpred x = function
 
 (** [g] must be transitive and [x] basic 
     Looks for [minj], [maxj] s.t. `u ∈ [P^minj(x); ...; P^maxj(x)]`. *)
-let add_disj (uf : Uuf.t) (g : UtG.t) (u : ut) (x : ut) =
+let add_disj (uf : Uuf.t) (g : UtG.t) (u : ut) (base : ut) =
   let uf, nu = mgu uf u in
   obind (fun (uf,minj) ->
       obind (fun (uf,maxj) ->
           assert (minj >= maxj);        (* And not the converse ! *)
-          if no_case_disj uf u x minj maxj then None
+          if no_case_disj uf u base minj maxj then None
           else
             let uf, l = List.init (minj - maxj + 1) (fun i ->
-                kpred x (maxj + i))
+                kpred base (maxj + i))
                         |> mgus uf in
 
             dbg "@[<v 2>Disjunction:@;\
@@ -929,10 +932,10 @@ let add_disj (uf : Uuf.t) (g : UtG.t) (u : ut) (x : ut) =
                  maxj:%d@;\
                  base:%a@]"
               pp_ut u
-              minj maxj pp_ut x;
+              minj maxj pp_ut base;
             Some (uf, List.map (fun x -> (nu,x)) l)
-        ) (max_pred uf g nu x)
-    ) (min_pred uf g nu x)
+        ) (max_pred uf g nu base)
+    ) (min_pred uf g nu base)
 
 
 let for_all (f : UtG.vertex -> UtG.vertex -> bool) g : bool =
