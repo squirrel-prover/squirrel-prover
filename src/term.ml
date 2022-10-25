@@ -1423,7 +1423,11 @@ let form_to_xatom (form : term) : xatom option =
   | Fun (fslt,  _, [a;b]) when fslt  = f_lt  -> Some (`Comp (`Lt,  a, b))
   | Fun (fsgeq, _, [a;b]) when fsgeq = f_geq -> Some (`Comp (`Geq, a, b))
   | Fun (fsgt,  _, [a;b]) when fsgt  = f_gt  -> Some (`Comp (`Gt,  a, b))
-  | _ -> None
+  | _ -> 
+    if Config.old_completion () then
+      None
+    else
+      Some (`Comp (`Eq, form, mk_true))
 
 let rec form_to_literal (form : term) : literal option =
   match form with
@@ -1457,8 +1461,6 @@ let form_to_literals
       ) [] (decompose_ands form)
   in
   if !partial then `Entails lits else `Equiv lits
-
-
 
 (*------------------------------------------------------------------*)
 let eq_triv f = match destr_eq f with

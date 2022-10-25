@@ -239,6 +239,8 @@ hint rewrite diff_refl.
 
 include Basic.
 
+set oldCompletion=true.
+
 goal dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
 Proof. auto. Qed.
 hint rewrite dec_enc.
@@ -742,18 +744,21 @@ Proof.
   assert (Server(pid,j) = Server(pid,j') ||
           Server(pid,j) < Server(pid,j') ||
           Server(pid,j) > Server(pid,j')) => //.
-  case H => //.
+  case H;1: auto. 
 
   + (* 1st case: Server(pid,j) < Server(pid,j') *)
     assert (Server(pid,j) = pred(Server(pid,j')) ||
             Server(pid,j) < pred(Server(pid,j'))) by constraints.
-    case H0 => //.
-
+    case H0. 
 
     - (* Server(pid,j) = pred(Server(pid,j') < Server(pid,j') *)
-      use counterIncreaseStrictly with pid, j' => //.
-      rewrite H0 in *.
-      by apply orderStrict in Meq.
+      use counterIncreaseStrictly with pid, j'; 2: auto.
+      * rewrite H0 in *.
+        by apply orderStrict in Meq.
+      * rewrite /cond.
+        destruct Hexec' as [H1 H2 H3 H4 H5].
+        split; 1:congruence. 
+        by rewrite H3 H4 H5. 
 
     - (* Server(pid,j) < pred(Server(pid,j'))  < Server(pid,j') *)
       use counterIncreaseStrictly with pid, j' => //.
@@ -772,12 +777,17 @@ Proof.
   + (* 2nd case: Server(pid,j) > Server(pid,j')  *)
     assert (pred(Server(pid,j)) = Server(pid,j')
           || pred(Server(pid,j)) > Server(pid,j')) by constraints.
-    case H0 => //.
+    case H0.
 
     - (* Server(pid,j) > pred(Server(pid,j)) = Server(pid,j') *)
-      use counterIncreaseStrictly with pid, j as H1 => //.
-      clear Eq Hexec' Mneq1 Mneq2 exec Hpid Hexecpred Hcpt Hap' Hap Ht H.
-      by apply orderStrict in H1.
+      use counterIncreaseStrictly with pid, j as H1; 2: auto.
+      * clear Eq Hexec' Mneq1 Mneq2 exec Hpid Hexecpred Hcpt Hap' Hap Ht H.
+        by apply orderStrict in H1.
+      * rewrite /cond. split; 1:congruence.
+        clear Hexec' exec Eq Eq2 Meq Ht Hexecpred.
+        split; 1: by rewrite Mneq2. 
+        split; 1: by rewrite Hcpt. 
+        by rewrite Hpid. 
 
     - (* Server(pid,j)  > pred(Server(pid,j)) >  Server(pid,j') *)
       use counterIncreaseStrictly with pid, j => //.

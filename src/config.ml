@@ -95,6 +95,9 @@ let v_auto_fadup = Param_bool true
 let s_new_ind = "newInduction"
 let v_new_ind = Param_bool false
 
+let s_old_completion = "oldCompletion"
+let v_old_completion = Param_bool false
+
 let s_post_quantum = "postQuantumSound"
 let v_post_quantum = Param_bool false
 
@@ -112,6 +115,7 @@ let default_params =
   |>  decl s_auto_intro PBool v_auto_intro
   |>  decl s_auto_fadup PBool v_auto_fadup
   |>  decl s_new_ind PBool v_new_ind
+  |>  decl s_old_completion PBool v_old_completion
   |>  decl s_post_quantum PBool v_post_quantum
 
 (*------------------------------------------------------------------*)
@@ -144,6 +148,8 @@ let auto_intro () = get_bool (M.find s_auto_intro !params)
 let auto_fadup () = get_bool (M.find s_auto_fadup !params)
 
 let new_ind () = get_bool (M.find s_new_ind !params)
+
+let old_completion () = get_bool (M.find s_old_completion !params)
 
 let post_quantum () = get_bool (M.find s_post_quantum !params)
 

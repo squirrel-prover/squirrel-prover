@@ -136,6 +136,8 @@ reasoning. *)
 
 include Basic.
 
+set oldCompletion=true.
+
 goal dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
 Proof. auto. Qed.
 hint rewrite dec_enc.
@@ -258,6 +260,7 @@ Proof.
           by left; apply orderTrans _ (SCpt(i)@pred(t)) _.
         * (* case H1 - 2/2 *)
           by case H3; [1: left | 2 : right].
+
        (** It remains to show that the premises of the induction hypothesis IH0
        were satisfied, relying on the fact that `exec@t => exec@pred(t)`. *)
      - simpl.
@@ -389,43 +392,52 @@ Proof.
   We therefore a case disjunction (the first case corresponds to what we want
   to prove, and we will show that the 2 other cases are impossible). *)
   assert (S(ii,i) = S(ii',i) || S(ii,i) < S(ii',i) || S(ii,i) > S(ii',i)) => //.
-  case H => //.
+  case H; 1:auto. 
 
     + (* 1st case: S(ii,i) < S(ii',i) *)
-      assert (S(ii,i) = pred(S(ii',i)) || S(ii,i) < pred(S(ii',i))) => //.
-      case H0 => //.
+      assert (S(ii,i) = pred(S(ii',i)) || S(ii,i) < pred(S(ii',i))) by auto. 
+      case H0.
 
         - (* S(ii,i) = pred(S(ii',i) < S(ii',i) *)
-          use counterIncreaseStrictly with ii',i => //.
-          subst  S(ii,i), pred(S(ii',i)) => //.
-          by use orderStrict with SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //.
+          use counterIncreaseStrictly with ii',i; 2: auto. 
+          * subst  S(ii,i), pred(S(ii',i)) => //.
+            by use orderStrict with SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //.
+          * rewrite /cond.
+            rewrite /exec /cond in Hexec1.
+            destruct Hexec1 as [H1 [H2 H22] H3]. 
+            clear Eq H H0 Mneq Meq M1 Ht Hexec' Hap Hap' Hexecpred.
+            auto.
 
         - (* S(ii,i) < pred(S(ii',i))  < S(ii',i) *)
-          use counterIncreaseStrictly with ii',i => //.
-          use counterIncreaseBis with pred(S(ii',i)), S(ii,i), i => //.
+          use counterIncreaseStrictly with ii',i; 2,3: auto. 
+          use counterIncreaseBis with pred(S(ii',i)), S(ii,i), i; 2,3:auto. 
           case H1.
-            * use orderTrans with SCpt(i)@S(ii,i), SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i) => //.
-              by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //.
+            * use orderTrans with
+                SCpt(i)@S(ii,i), SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii',i); 
+              2,3: auto. 
+              by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i). 
             * subst SCpt(i)@pred(S(ii',i)), SCpt(i)@S(ii,i).
-              by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i) => //.
+              by use orderStrict with SCpt(i)@S(ii,i), SCpt(i)@S(ii',i). 
 
     + (* 2nd case: S(ii,i) > S(ii',i) *)
-      assert (pred(S(ii,i)) = S(ii',i) || pred(S(ii,i)) > S(ii',i)) => //.
-      case H0 => //.
+      assert (pred(S(ii,i)) = S(ii',i) || pred(S(ii,i)) > S(ii',i)) by auto. 
+      case H0.
 
         - (* S(ii,i) > pred(S(ii,i)) = S(ii',i) *)
-          use counterIncreaseStrictly with ii,i => //.
+          use counterIncreaseStrictly with ii,i; 2,3:auto. 
           subst S(ii',i), pred(S(ii,i)).
-          by use orderStrict with SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //.
+          by use orderStrict with SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i).
 
         - (* S(ii,i) > pred(S(ii,i)) >  S(ii',i) *)
-          use counterIncreaseStrictly with ii,i => //.
-          use counterIncreaseBis with pred(S(ii,i)), S(ii',i), i => //.
+          use counterIncreaseStrictly with ii,i; 2,3: auto. 
+          use counterIncreaseBis with pred(S(ii,i)), S(ii',i), i; 2,3:auto. 
           case H1.
-            * use orderTrans with SCpt(i)@S(ii',i), SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i) => //.
-              by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //.
+            * use orderTrans
+                with SCpt(i)@S(ii',i), SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii,i); 
+              2,3:auto. 
+              by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i). 
             * subst SCpt(i)@pred(S(ii,i)), SCpt(i)@S(ii',i).
-              by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i) => //.
+              by use orderStrict with SCpt(i)@S(ii',i), SCpt(i)@S(ii,i).
 Qed.
 
 

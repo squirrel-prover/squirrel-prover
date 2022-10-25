@@ -68,6 +68,8 @@ set postQuantumSound = true.
 
 include Basic.
 
+set oldCompletion = true.
+
 hash exct
 
 hash expd

@@ -179,9 +179,10 @@ hint rewrite if_true0.
 
 goal [any] if_false ['a] (b : boolean, x,y : 'a):
  (not b) => if b then x else y = y.
-Proof.
+Proof. 
   intro *; case (if b then x else y).
-  + intro [HH _]. by use H.
+  + intro [H1 H2]. 
+    by rewrite H1 in H2. 
   + auto.
 Qed.
 

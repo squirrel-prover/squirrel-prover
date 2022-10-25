@@ -301,6 +301,7 @@ module TraceHyps = Mk(struct
       | Global _ -> "G"
       | Local f ->
         match Term.form_to_xatom f with
+        | Some (`Comp (`Eq, _, ftrue)) when ftrue = Term.mk_true -> "H"
         | None -> "H"
         | Some (`Happens _) -> "Hap"
         | Some at ->

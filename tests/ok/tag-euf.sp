@@ -1,5 +1,3 @@
-
-
 set processStrictAliasMode=true.
 
 abstract okSess0 : message
@@ -50,10 +48,10 @@ Proof.
  intro Hexec.
  depends Out, OutFalse; 1: auto.
  intro Hle.
- use Hexec with Out.
- nosimpl(expand exec@Out).
+ use Hexec with Out as Meq.
+ rewrite /exec in Meq. 
 
- destruct H as [Hexec0 Hcond].
+ destruct Meq as [Hexec0 Hcond].
 
  expand exec@OutFalse; expand cond@Out; expand cond@OutFalse.
  destruct He as [_ [He H1]].

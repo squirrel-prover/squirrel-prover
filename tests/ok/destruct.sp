@@ -4,10 +4,8 @@ axiom exists_idx : exists i:index, True.
 
 goal _ : False.
 Proof.
-  use exists_idx.
-  destruct H as [i HH].
-  admit.
-Qed.
+  have [i Meq] := exists_idx.
+Abort.  
 
 goal _ (x,y,a,b : message) : <x,y> = <a,b> => x = a && y = b.
 Proof.

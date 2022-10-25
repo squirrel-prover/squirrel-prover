@@ -496,7 +496,6 @@ goal [any] _ (b : boolean, x, y, z : message) :
 Proof.
   intro H.
   rewrite H //. 
-  by intro H1; apply H1.
 Qed.
 
 (*------------------------------------------------------------------*)

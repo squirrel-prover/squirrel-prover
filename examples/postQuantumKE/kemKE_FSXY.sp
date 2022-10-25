@@ -85,6 +85,7 @@ set postQuantumSound = true.
 
 include Basic.
 set autoIntro=true.
+set oldCompletion = true.
 
 hash F
 

@@ -289,8 +289,7 @@ Proof.
     case (i = i0) => ? //=; 2: by apply IH.
     rewrite /exec /cond /c in E. 
     apply le_trans _ (Rcpt(i)@pred(tau2)) => //.
-    - by apply IH.        
-    - by rewrite /(~~<); left. 
+    by apply IH.        
 
   (* R1(j,i0) *)
   + intro [j i0 Eq].

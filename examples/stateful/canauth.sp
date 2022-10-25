@@ -383,9 +383,9 @@ goal authA (i,j:index) :
 Proof.
   intro Hap @/exec @/cond [Hexecpred [H1 H2 H3]].
   euf H3.
-    + intro [j0 [H4 [H5 _]]]. rewrite H5 in H2.
-      use counterIncreaseStrictRA with i,j, SenderA(i,j0) as Hyp => //;
-      2: by rewrite /exec /cond /= H5.
+    + intro [j0 [H4 [H5 _]]].
+      rewrite H5 in H2.
+      use counterIncreaseStrictRA with i,j, SenderA(i,j0) as Hyp => //.
       expand cellA(i)@ReceiverA(i,j).
       by apply orderBetween in H2.
 
@@ -415,8 +415,7 @@ Proof.
 
   + intro [j0 [H4 [H5 _]]].
     rewrite H5 in H2.
-    use counterIncreaseStrictRB with i,j, SenderB(i,j0) as Hyp => //;
-    2: by rewrite /exec /cond /= H5.
+    use counterIncreaseStrictRB with i,j, SenderB(i,j0) as Hyp => //.
     expand cellB(i)@ReceiverB(i,j).
     by apply orderBetween in H2.
 Qed.

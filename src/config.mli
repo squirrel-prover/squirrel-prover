@@ -55,6 +55,9 @@ val auto_fadup : unit -> bool
 (** New equivalence induction principle. *)
 val new_ind : unit -> bool
 
+(** Old congruence closure. *)
+val old_completion : unit -> bool
+
 (** Post-quantum soundness. *)
 val post_quantum : unit -> bool
 

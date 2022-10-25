@@ -54,6 +54,8 @@ set postQuantumSound = true.
 
 include Basic.
 
+set oldCompletion = true.
+
 hash exct
 
 (* public random key for exct *)
@@ -326,7 +328,7 @@ Proof.
           - case try find il,jl,kl such that _ in  exct(skex,K(il,jl,kl)) else _.
             * intro [il jl kl Ex] [Abs _].
               by use Abs with il,jl,kl.
-            * auto.
+            * intro A B; clear A B; auto.
 
     + intro *.
       case try find il,jl,kl such that _ in K(il,jl,kl) else _.
@@ -570,9 +572,11 @@ Proof.
                (skex = skex && (il = iv && jl = jv && kl = kv))
              in n_PRF(iv,jv,kv) else exct(skex,K(il,jl,kl))
            else exct(skex,decap(fst(snd(att(frame@pred(I1(i,j,k))))),vkI(i))).
-       intro [il jl kl [_ ->]]. 
-       by use Abs with il,jl,kl.
-       auto.
+       ++ intro [il jl kl [_ ->]]. 
+          by use Abs with il,jl,kl.
+       ++ intro [A B]; clear A M Abs.
+          rewrite B. 
+          congruence. 
 Qed.
 
 
@@ -753,7 +757,7 @@ Proof.
          ++ intro [Abs _].
             by use Abs with il,jl,kl.
 
-     + intro [Abs _].
+     + intro [Abs M].
        case     try find il,jl,kl such that
              fst(snd(att(frame@pred(FI(i,j,k))))) =
              encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
@@ -762,9 +766,12 @@ Proof.
                (skex = skex && (il = iv && jl = jv && kl = kv))
              in n_PRF(iv,jv,kv) else exct(skex,K(il,jl,kl))
            else exct(skex,decap(fst(snd(att(frame@pred(FI(i,j,k))))),vkI(i))).
-       intro [il jl kl [_ ->]]. 
-       by use Abs with il,jl,kl.
-       auto.
+       ++ intro [il jl kl [_ ->]]. 
+          by use Abs with il,jl,kl.
+       ++ intro [A B]. 
+          rewrite B M. 
+          clear A B M Abs. 
+          congruence.
 Qed.
 
 

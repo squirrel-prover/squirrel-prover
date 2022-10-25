@@ -356,14 +356,14 @@ let rename (u:Vars.var) (v:Vars.var) (s:t) : t =
 (*------------------------------------------------------------------*)
 (** TRS *)
 
-let get_eqs_neqs s =
+let get_eqs_neqs (hyps : H.hyps) =
   List.fold_left (fun (eqs, neqs) (atom : Term.xatom) -> match atom with
       | `Comp (`Eq,  a, b) -> Term.ESubst (a,b) :: eqs, neqs
       | `Comp (`Neq, a, b) -> eqs, Term.ESubst (a,b) :: neqs
       | _ -> assert false
-    ) ([],[]) (Hyps.get_eq_atoms s)
+    ) ([],[]) (Hyps.get_eq_atoms hyps)
 
-let get_trs s = 
+let get_trs (s : sequent) = 
   let eqs,_ = get_eqs_neqs s.hyps in
   Completion.complete s.env.table eqs
 
