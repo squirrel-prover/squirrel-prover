@@ -14,9 +14,6 @@ module Cst = struct
     | Cflat of int
     (** Constant introduced when flattening *)
 
-    | Csucc of t
-    (** Flattening of the successor of a constant *)
-
     | Cgfuncst of [
         | `N of Symbols.name * Type.ty
         | `F of Symbols.fname
@@ -40,9 +37,8 @@ module Cst = struct
     | Cgfuncst (`N (n,_)) -> Hashtbl.hash n
     | _ as t -> Hashtbl.hash t
 
-  let rec print ppf = function
+  let print ppf = function
     | Cflat i   -> Fmt.pf ppf "_%d" i
-    | Csucc c   -> Fmt.pf ppf "suc(@[%a@])" print c
     | Cmvar m   -> Vars.pp ppf m
     | Cgfuncst (`F f) -> Symbols.pp ppf f
     | Cgfuncst (`N (n,_)) -> Symbols.pp ppf n
@@ -51,11 +47,7 @@ module Cst = struct
                      
   (* The successor function symbol is the second smallest in the precedence
       used for the LPO (0 is the smallest element).  *)
-  let rec compare c c' = match c,c' with
-    | Csucc a, Csucc a' -> compare a a'
-    | Csucc _, _ -> -1
-    | _, Csucc _ -> 1
-    | _,_ -> Stdlib.compare c c'
+  let compare c c' = Stdlib.compare c c'
 end
 
 (*------------------------------------------------------------------*)
@@ -209,11 +201,7 @@ end = struct
   let cvar v = make (Cvar v)
 
   let rec cfun (f : gfsymb) (ts : cterm list) : cterm = 
-    if f = F Symbols.fs_succ
-    then begin match List.map (fun x -> x.cnt) ts with
-      | [Ccst cst] -> make (Ccst (Cst.Csucc cst))
-      | _ -> assert false end
-    else if f = F Symbols.fs_xor
+    if f = F Symbols.fs_xor
     then cxor ts
     else if ts = []
     then 
@@ -365,7 +353,7 @@ let term_of_cterm (table : Symbols.table) (c : cterm) : Term.term =
 
     | Ccst (Cst.Cboxed t) -> t
 
-    | (Ccst (Cflat _|Csucc _)|Cvar _|Cxor _) -> assert false
+    | (Ccst (Cflat _)|Cvar _|Cxor _) -> assert false
 
   and terms_of_cterms (cterms : cterm list) : Term.term list =
     List.map term_of_cterm cterms
