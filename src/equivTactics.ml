@@ -94,10 +94,9 @@ let refl_tac (s : ES.t) =
 let () =
   T.register "refl"
     ~tactic_help:{general_help = "Closes a reflexive goal.";
-                  detailed_help = "A goal is reflexive when the left and right \
-                                   frame corresponding to the bi-terms are \
-                                   identical. This of course needs to be the \
-                                   case also for macros expansions.";
+                  detailed_help = "Closes the goal when the left and right \
+                                   terms identical. Requires to check that \
+                                   macros do not contain diffs.";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
     ~pq_sound:true

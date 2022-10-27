@@ -77,6 +77,8 @@ val project : Term.proj list -> form -> form
 val subst : Term.subst -> form -> form
 
 val tsubst : Type.tsubst -> form -> form
+
+val subst_projs : (Term.proj * Term.proj) list -> form -> form
   
 (** Free variables *)
 val fv : form -> Vars.Sv.t
@@ -137,6 +139,8 @@ module Babel : sig
 
   val subst  : 'a f_kind -> Term.subst  -> 'a -> 'a
   val tsubst : 'a f_kind -> Type.tsubst -> 'a -> 'a
+
+  val subst_projs : 'a f_kind -> (Term.proj * Term.proj) list -> 'a -> 'a
 
   val fv     : 'a f_kind -> 'a -> Vars.Sv.t
 

@@ -428,7 +428,7 @@ let rec do_include
   (* try to do the include *)
   try
     let final_state = do_all_commands ~test incl_state in
-    Printer.prt `Warning "loaded: %s.sp@;" final_state.file.f_name;
+    Printer.prt `Warning "loaded: %s.sp" final_state.file.f_name;
 
     Prover.pop_pt_history ();
 

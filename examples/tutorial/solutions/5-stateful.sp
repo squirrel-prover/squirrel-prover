@@ -397,8 +397,8 @@ Proof.
   clear H3 G1 H1 Hap.
   rewrite /(~~<) in B. 
   case B.
-  + rewrite -A in G3.
-    have U := order_trans _ _ _ B G3.
+  + rewrite -A in G3. 
+    have U := order_trans _ _ _ B G3. 
     by apply order_strict in U.
   + rewrite -A B in G3.
     by apply order_strict in G3.

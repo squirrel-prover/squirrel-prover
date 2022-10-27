@@ -590,6 +590,10 @@ module Mvar : sig[@warning "-32"]
 
   val filter : (Vars.var -> term -> bool) -> t -> t
 
+  val map : (Term.term -> Term.term) -> t -> t
+
+  val mapi : (Vars.var -> Term.term -> Term.term) -> t -> t
+    
   val fold : (Vars.var -> term -> 'b -> 'b) -> t -> 'b -> 'b
 
   val to_subst : mode:[`Match|`Unif] -> t -> subst
@@ -597,8 +601,10 @@ module Mvar : sig[@warning "-32"]
   val pp : Format.formatter -> t -> unit
 end = struct
   (** [id] is a unique identifier used to do memoisation. *)
-  type t = { id    : int;
-             subst : term Mv.t; }
+  type t = {
+    id    : int;
+    subst : term Mv.t;
+  }
 
   let cpt = ref 0
   let make subst = incr cpt; { id = !cpt; subst }
@@ -630,6 +636,10 @@ end = struct
 
   let filter f (m : t) : t = make (Mv.filter f m.subst)
 
+  let map f (m : t) : t = make (Mv.map f m.subst)
+
+  let mapi f (m : t) : t = make (Mv.mapi f m.subst)
+    
   let fold f (m : t) (init : 'b) : 'b = Mv.fold f m.subst init
 
   let to_subst ~(mode:[`Match|`Unif]) (mv : t) : subst =

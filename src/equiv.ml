@@ -156,22 +156,38 @@ let rec subst s (f : form) =
     match f with
     | Atom at -> Atom (subst_atom s at)
 
-    | And  (f0, f) -> And  (subst s f0, subst s f)
-    | Or   (f0, f) -> Or   (subst s f0, subst s f)
-    | Impl (f0, f) -> Impl (subst s f0, subst s f)
-
     | Quant (_, [], f) -> subst s f
     | Quant (q, v :: evs, b) ->
       let v, s = Term.subst_binding v s in
       let f = subst s (Quant (q, evs,b)) in
       mk_quant q [v] f
 
+    | _ -> tmap (subst s) f
+
+(*------------------------------------------------------------------*)
+(** Projection substitution *)
+
+let subst_projs_atom (s : (Term.proj * Term.proj) list) (at : atom) : atom =
+  match at with
+  | Reach t -> Reach (Term.subst_projs s t)
+  | Equiv e -> Equiv (List.map (Term.subst_projs s) e)
+
+let subst_projs (s : (Term.proj * Term.proj) list) (t : form) : form =
+  let rec doit = function
+    | Atom at -> Atom (subst_projs_atom s at)
+    | _ as term -> tmap doit term
+  in
+
+  doit t
+
+(*------------------------------------------------------------------*)
+(** Type substitutions *)
+
 let tsubst_atom (ts : Type.tsubst) (at : atom) =
   match at with
   | Reach t -> Reach (Term.tsubst ts t)
   | Equiv e -> Equiv (List.map (Term.tsubst ts) e)
 
-(** Type substitution *)
 let tsubst (ts : Type.tsubst) (t : form) =
   let rec tsubst = function
     | Quant (q, vs, f) -> Quant (q, List.map (Vars.tsubst ts) vs, tsubst f)
@@ -592,23 +608,27 @@ module PreAny = struct
     | Global f ->      pp_dbg fmt f
 
   let subst s = function
-    | Local f  -> Local  (Term.subst s f)
+    | Local  f -> Local  (Term.subst s f)
     | Global f -> Global (     subst s f)
 
   let tsubst s = function
-    | Local f  -> Local  (Term.tsubst s f)
+    | Local  f -> Local  (Term.tsubst s f)
     | Global f -> Global (     tsubst s f)
 
+  let subst_projs s = function
+    | Local  f -> Local  (Term.subst_projs s f)
+    | Global f -> Global (     subst_projs s f)
+
   let fv = function
-    | Local f  -> Term.fv f
+    | Local  f -> Term.fv f
     | Global f -> fv f
 
   let get_terms = function
-    | Local f  -> [f]
+    | Local  f -> [f]
     | Global f -> get_terms f
 
   let project p = function
-    | Local f  -> Local  (Term.project p f)
+    | Local  f -> Local  (Term.project p f)
     | Global f -> Global (     project p f)
 end
 
@@ -632,29 +652,37 @@ module Babel = struct
 
       (* Inverses of the injections. *)
       | Any_t, Local_t ->
-          begin match f with
-            | Local f -> f
-            | _ -> Tactics.soft_failure ?loc CannotConvert
-          end
+        begin match f with
+          | Global (Atom (Reach f)) -> f
+          | Local f -> f
+          | _ -> Tactics.soft_failure ?loc CannotConvert
+        end
 
       | Any_t, Global_t ->
-          begin match f with
-            | Global f -> f
-            | Local f -> Atom (Reach f)
-          end
+        begin match f with
+          | Global f -> f
+          | Local f -> Atom (Reach f)
+        end
 
       (* Conversions between local and global formulas. *)
       | Local_t,  Global_t -> Atom (Reach f)
       | Global_t, Local_t  ->
-         begin match f with
-           | Atom (Reach f) -> f
-           | _ -> Tactics.soft_failure ?loc CannotConvert
-         end
+        begin match f with
+          | Atom (Reach f) -> f
+          | _ -> Tactics.soft_failure ?loc CannotConvert
+        end
 
   let subst : type a. a f_kind -> Term.subst -> a -> a = function
     | Local_t  -> Term.subst
     | Global_t -> subst
     | Any_t    -> PreAny.subst
+
+  let subst_projs 
+    : type a. a f_kind -> (Term.proj * Term.proj) list -> a -> a 
+    = function
+      | Local_t  -> Term.subst_projs
+      | Global_t -> subst_projs
+      | Any_t    -> PreAny.subst_projs
 
   let tsubst : type a. a f_kind -> Type.tsubst -> a -> a = function
     | Local_t  -> Term.tsubst

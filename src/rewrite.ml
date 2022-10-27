@@ -64,56 +64,14 @@ exception Failed of error
     Raise [Failed `RuleBadSystems] if it failed  *)
 let mk_state
     (rule : rw_rule)
-    (systems : (Term.proj * System.Single.t) list option) 
+    (systems : SE.t) 
   : rw_state
   = 
   let left, right = rule.rw_rw in
 
-  (* substitution renaming the projections of [rule] using corresponding 
-     projections of systems, if any. *)
-  let psubst : (Term.proj * Term.proj) list option = 
-    match systems with
-    | None -> None
-    | Some systems ->
-      if not (SE.is_fset rule.rw_system) then
-        (* [rule] applies to all systems in [systems], nothing to do *)
-        let () = assert (SE.is_any_or_any_comp rule.rw_system) in
-        None
-
-      else begin
-        (* [rule] may not apply to all systems in [systems] *)
-        let rule_systems = SE.to_list (SE.to_fset rule.rw_system) in
-        if systems = rule_systems then None else
-          (* [l] contains tuples [(p,q), single] where:
-             - [p] is a projection of [rule.rw_system] for [single]
-             - [q] is a projection of [systems] for [single] *)
-          let l =
-            List.filter_map (fun (p, single) ->
-                List.find_map (fun (p_rule, rule_single) -> 
-                    if single = rule_single then
-                      Some ((p_rule,p), single)
-                    else None
-                  ) rule_systems
-              ) systems
-          in
-
-          (* If two projections of [rule.rw_system] applies to the
-             same element in [systems], there is an ambiguity
-             about which rewriting to apply.
-             In that case, we raise an error. *)
-          if List.exists (fun ((p_rule, p), single) ->
-              List.exists (fun ((p_rule', p'), single') ->
-                  p_rule <> p_rule' && p = p' && single = single'
-                ) l
-            ) l then
-            raise (Failed (RuleBadSystems "system projection ambiguity"));
-
-          Some (List.map fst l)
-      end
+  let projs, psubst = 
+    SE.mk_proj_subst ~strict:false ~src:rule.rw_system ~dst:systems 
   in
-
-  let projs = omap (List.map snd) psubst in
-  let psubst = odflt [] psubst in
 
   if projs = Some [] then
     raise (Failed (RuleBadSystems "no system of the rule applies"));
@@ -251,8 +209,7 @@ let rewrite_head
     (rule  : rw_rule)
     (t     : Term.term) : (Term.term * (SE.arbitrary * Term.term) list) option
   =
-  let systems = SE.to_list_any sexpr in
-  let s = mk_state rule systems in
+  let s = mk_state rule sexpr in
   match rw_inst expand_context table hyps t sexpr [] [] Pos.root s with
   | _, `Continue -> None
   | { found_instance = `Found inst }, `Map t -> Some (t, inst.subgs)
@@ -291,10 +248,10 @@ let do_rewrite
      This may require renaming projections in [rule], and removing some
      projections from [rule]. *)
   let s = 
-    let target_systems =
+    let target_systems : SE.t =
       match target with
-      | Global _ -> Some (SE.to_list (oget system.pair))
-      | Local _ -> SE.to_list_any system.set
+      | Global _ -> (oget system.pair :> SE.t)
+      | Local _ -> system.set
     in
     mk_state rule target_systems
   in
@@ -405,7 +362,7 @@ let high_rewrite
       | Some rule ->
         assert (rule.rw_conds = []);
         
-        let state = mk_state rule (SE.to_list_any se) in
+        let state = mk_state rule se in
         match rw_inst InSequent table hyps occ se vars conds p state with
         | _, `Continue -> assert (not strict); `Continue
         | _, `Map t -> `Map t

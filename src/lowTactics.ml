@@ -548,21 +548,54 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     s, subs
 
+  let bad_rw_pt loc () =
+    soft_failure ~loc
+      (Failure "cannot rewrite: this proof-term does not prove a local formula")
+
+  (** Convert a proof-term to a pattern + subgoals *)
+  let pt_to_pat (type a) 
+      ~failed (loc : L.t) 
+      (kind : a Equiv.f_kind) (tyvars : Type.tvars) 
+      (pt : Sequent.PT.t) : a list * a Term.pat
+    =
+    let pt = Sequent.pt_try_cast ~failed S.conc_kind pt in
+
+    (* convert to the appropriate kinds. Cannot fail thanks to [pt_try_cast]. *)
+    let convert =
+      Equiv.Babel.convert ~loc ~src:Equiv.Any_t ~dst:kind
+    in
+    let pat = Term.{
+        pat_tyvars = tyvars;
+        pat_vars = pt.args;
+        pat_term = convert pt.form; }
+    in
+    let subgs = List.map convert pt.subgs in
+    subgs, pat
+
   (** Parse rewrite tactic arguments as rewrite rules. *)
   let p_rw_item (rw_arg : Args.rw_item) (s : S.t) : rw_earg =
     let p_rw_rule
         dir (p_pt : Theory.p_pt) 
       : Term.term list * Rewrite.rw_rule * Ident.t option 
       =
-      let ghyp, pat_system, subgs, pat =
+      let ghyp, tyvars, pt (* pat_system, subgs, pat *) =
         S.convert_pt_gen
           ~check_compatibility:false
           ~close_pats:false
-          p_pt Equiv.Local_t s
+          p_pt s
       in
+      assert (pt.mv = Match.Mvar.empty);
+
+      (* TODO: allow equivalences as subgoals by changing [subgs] type 
+         to [Equiv.any_form] *)
+      let loc = p_pt.p_pt_loc in
+      let subgs, pat = 
+        pt_to_pat loc ~failed:(bad_rw_pt p_pt.p_pt_loc) Local_t tyvars pt 
+      in
+
       let id_opt = match ghyp with `Hyp id -> Some id | _ -> None in
 
-      subgs, pat_to_rw_rule s pat_system.set dir pat, id_opt
+      subgs, pat_to_rw_rule s pt.system.set dir pat, id_opt
     in
 
     let p_rw_item (rw_arg : Args.rw_item) : rw_earg =
@@ -628,37 +661,46 @@ module MkCommonLowTac (S : Sequent.S) = struct
     Equiv.global_form *
     [ `LeftToRight | `RightToLeft ]
 
+
+  let bad_rw_equiv_pt loc () =
+    soft_failure ~loc
+      (Failure "cannot rewrite an equivalence: this proof-term does not prove a \
+                global formula")
+
   (** Parse rewrite equiv arguments. *)
   let p_rw_equiv (rw_arg : Args.rw_equiv_item) (s : S.t) : rw_equiv =
     match rw_arg.rw_type with
-    | `Rw f ->
+    | `Rw p_pt ->
       let dir = L.unloc rw_arg.rw_dir in
 
-      let _, context, subgs, pat =
-        S.convert_pt_gen ~check_compatibility:false f Equiv.Global_t s
+      let _, tyvars, pt = S.convert_pt_gen ~check_compatibility:false p_pt s in
+      assert (pt.mv = Match.Mvar.empty);
+
+      let pt = 
+        Sequent.pt_try_cast ~failed:(bad_rw_equiv_pt p_pt.p_pt_loc) Global_t pt 
       in
 
-      if pat.pat_tyvars <> [] then
+      if tyvars <> [] then
         soft_failure (Failure "free type variables remaining") ;
 
-      if not (Sv.is_empty pat.pat_vars) then
+      if not (Sv.is_empty pt.args) then
         soft_failure (Failure "universally quantified variables remaining") ;
 
       if rw_arg.rw_mult <> Args.Once then
         hard_failure (Failure "multiplicity information not allowed for \
                                rewrite equiv") ;
 
-
       let subgs = 
         List.map (fun g -> 
-            let g = S.unwrap_conc (Equiv.Global g) in
+            (* cannot fail thanks to [pt_try_cast]. *)
+            let g = S.unwrap_conc g in
             S.set_goal g s
-          ) subgs
+          ) pt.subgs
       in
+      (* cannot fail thanks to [pt_try_cast]. *)
+      let form = match pt.form with Equiv.Global f -> f | _ -> assert false in
 
-      let f = pat.pat_term in
-
-      context, subgs, f, dir
+      pt.system, subgs, form, dir
 
   (*------------------------------------------------------------------*)
   (** {3 Case tactic} *)
@@ -1360,6 +1402,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
       hard_failure ~loc:(L.loc l) (Failure "unknown argument")
     | [] -> false
 
+  let bad_apply_pt loc () =
+    (* FIXME: error message *)
+    soft_failure ~loc
+      (Failure "cannot apply: this proof-term is not of the correct kind")
+
   (** Parse apply tactic arguments. *)
   let p_apply_args
       (args : Args.parser_arg list)
@@ -1367,8 +1414,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
     =
     let nargs, subgs, pat, in_opt =
       match args with
-      | [Args.ApplyIn (nargs, pt,in_opt)] ->
-        let _, subgs, pat = S.convert_pt ~close_pats:false pt S.conc_kind s in
+      | [Args.ApplyIn (nargs, p_pt,in_opt)] ->
+        let _, tyvars, pt = S.convert_pt ~close_pats:false p_pt s in
+        assert (pt.mv = Match.Mvar.empty);
+
+        let loc = p_pt.p_pt_loc in
+        let subgs, pat = 
+          pt_to_pat loc ~failed:(bad_apply_pt loc) S.conc_kind tyvars pt 
+        in
+
         nargs, subgs, pat, in_opt
 
       | _ -> bad_args ()
@@ -1518,12 +1572,18 @@ module MkCommonLowTac (S : Sequent.S) = struct
     * of the kind of conclusion formulas: for local sequents this means
     * that we cannot use a global hypothesis or lemma. *)
   let have_pt
-      ~(mode:[`IntroImpl | `None]) ip (pt : Theory.p_pt) (s : S.t) : S.t list 
+      ~(mode:[`IntroImpl | `None]) ip (p_pt : Theory.p_pt) (s : S.t) : S.t list 
     =
-    let _, pt_subgs, pat = S.convert_pt pt S.conc_kind s in
+    let _, tyvars, pt = S.convert_pt p_pt s in
+    assert (pt.mv = Match.Mvar.empty);
+
+    let loc = p_pt.p_pt_loc in
+    let subgs, pat = 
+      pt_to_pat loc ~failed:(bad_apply_pt loc) S.conc_kind tyvars pt 
+    in
 
     (* sub-goals resulting from the convertion of the proof term [pt] *)
-    let pt_subgs = List.map (fun g -> S.set_goal g s) pt_subgs in
+    let subgs = List.map (fun g -> S.set_goal g s) subgs in
 
     if pat.pat_tyvars <> [] then
       soft_failure (Failure "free type variables remaining") ;
@@ -1568,7 +1628,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         end
     in
 
-    pt_subgs @ (aux [] f)
+    subgs @ (aux [] f)
 
   (*------------------------------------------------------------------*)
   (** {3 Have tactic} *)

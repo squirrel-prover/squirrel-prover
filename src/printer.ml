@@ -268,11 +268,11 @@ type pp = [
 let pp_pref (ty : pp) =
   match ty with
   | `Prompt  -> pr "@[[> "
-  | `Start   -> pr "@[[start> "
+  | `Start   -> pr "@[[start>"
   | `Result  -> pr "@["
   | `Error   -> pr "@[<v 0>[error> " (* vertical box, for nice errors in Emacs mode *)
-  | `Dbg     -> pr "@[[dbg> "
-  | `Warning -> pr "@[[warning> "
+  | `Dbg     -> pr "@[[dbg>"
+  | `Warning -> pr "@[<v 0>[warning>"(* vertical box, for nice errors in Emacs mode *)
   | `Ignore  -> ()
   | `Goal    -> pr "@[[goal> "
   | `Default -> ()

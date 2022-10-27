@@ -265,6 +265,17 @@ val project_set     : Term.projs        -> context -> context
 val project_set_opt : Term.projs option -> context -> context
 
 (*------------------------------------------------------------------*)
+(** Make system projections compatible between two system expressions.
+    Build a substitution renaming the projections of [src] using corresponding 
+    projections of [dst], if any. 
+    - if [strict] is [true], ensure that all systems in [src] have a corresponding
+      system in [dst]. 
+    - if [strict] is [false], substitution can be partial. *)
+val mk_proj_subst : 
+  strict:bool -> src:t  -> dst:t ->
+  Term.projs option * (Term.proj * Term.proj) list
+
+(*------------------------------------------------------------------*)
 (** {2 Misc} *)
   
 (** Print the system to the user. *)

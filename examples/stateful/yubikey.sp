@@ -138,14 +138,14 @@ include Basic.
 
 set oldCompletion=true.
 
-goal dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
+goal [any] dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
 Proof. auto. Qed.
 hint rewrite dec_enc.
 
-goal fst_apply (x,y : message) : x = y => fst(x) = fst(y).
+goal [any]  fst_apply (x,y : message) : x = y => fst(x) = fst(y).
 Proof. auto. Qed.
 
-goal snd_apply (x,y : message) : x = y => snd(x) = snd(y).
+goal [any]  snd_apply (x,y : message) : x = y => snd(x) = snd(y).
 Proof. auto. Qed.
 
 goal dec_apply (x,y,x1,y1 : message) :

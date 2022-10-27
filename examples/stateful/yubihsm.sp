@@ -232,7 +232,6 @@ goal diff_refl (x:message) : diff(x,x) = x.
 Proof.
   by project.
 Qed.
-hint rewrite diff_refl.
 
 (*------------------------------------------------------------------*)
 (* LIBRAIRIES *)
@@ -241,34 +240,34 @@ include Basic.
 
 set oldCompletion=true.
 
-goal dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
+goal [any]  dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
 Proof. auto. Qed.
 hint rewrite dec_enc.
 
 (* instances of f_apply *)
-goal dec_apply (x,x',k : message): x = x' => dec(x,k) = dec(x',k).
+goal [any] dec_apply (x,x',k : message): x = x' => dec(x,k) = dec(x',k).
 Proof. auto. Qed.
 
 (* Others *)
 
-goal le_pred_lt (t, t' : timestamp): (t <= pred(t')) = (t < t').
+goal [any] le_pred_lt (t, t' : timestamp): (t <= pred(t')) = (t < t').
 Proof.
   by rewrite eq_iff.
 Qed.
 
-goal le_not_lt (t, t' : timestamp):
+goal [any] le_not_lt (t, t' : timestamp):
   t <= t' => not (t < t') => t = t'.
 Proof.
   by case t' = init.
 Qed.
 
-goal le_not_lt_charac (t, t' : timestamp):
+goal [any] le_not_lt_charac (t, t' : timestamp):
  (not (t < t') && t <= t') = (happens(t) && t = t').
 Proof.
  by rewrite eq_iff.
 Qed.
 
-goal lt_impl_le (t, t' : timestamp):
+goal [any] lt_impl_le (t, t' : timestamp):
   t < t' => t <= t'.
 Proof. auto. Qed.
 
@@ -572,6 +571,7 @@ Proof.
       rewrite !len_pair len_diff in 2.
       namelength k(pid), k_dummy(pid)=> -> /=.
       rewrite /* in 0.
+      rewrite diff_refl => /=.
       by apply Hind (pred(t)).
 
   + (* Decode(pid,j) *)
@@ -589,6 +589,7 @@ Proof.
     rewrite /aead /otp in 1,2.
     fa !(_ && _). fa 1.
     memseq 1 6; 1: by exists pid; rewrite if_true.
+    rewrite diff_refl => /=.
     by apply Hind (pred(t)).
 
   + (* Decode1(pid,j) *)

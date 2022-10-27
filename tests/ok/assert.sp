@@ -48,8 +48,9 @@ Qed.
 global goal _ (i:message) : equiv(diff(b,c)) -> equiv(diff(a,c)). 
 Proof.
   intro H.
-  have T: a = b; 
-    1: by apply ax.
+  have T: a = b. {
+    by apply ax.
+  }.
   rewrite T.
   by apply H.
 Qed.

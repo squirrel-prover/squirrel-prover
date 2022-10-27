@@ -1,5 +1,33 @@
 (** Extending sequents with functionalities based on proved goals. *)
 
+module Sv = Vars.Sv
+module Mvar = Match.Mvar
+module SE = SystemExpr
+
+(*------------------------------------------------------------------*) 
+module PT : sig
+  (** A proof-term conclusion.
+      For now, we do not keep the proof-term itself. *)
+  type t = {
+    system : SE.context;
+    args   : Sv.t;
+    mv     : Mvar.t;
+    subgs  : Equiv.any_form list;
+    form   : Equiv.any_form;
+  }
+
+  val pp : Format.formatter -> t -> unit
+end
+
+(*------------------------------------------------------------------*) 
+(** Try to cast [pt_f] as a [kind] proof-term conclusion. 
+    Raise [failed] in case of failure. *)
+val pt_try_cast :
+  failed:(unit -> PT.t) ->
+  'a Equiv.f_kind -> 
+  PT.t -> PT.t
+
+(*------------------------------------------------------------------*) 
 (** Generalized hypothesis: hypothesis or lemma/axiom identifier. *)
 type ghyp = [ `Hyp of Ident.t | `Lemma of string ]
 
@@ -26,8 +54,7 @@ module type S = sig
   val to_global_sequent : t -> LowEquivSequent.t
 
   (*------------------------------------------------------------------*) 
-  (** Convert a proof term into a pattern and the system it applies to.
-      The pattern is the conclusion of the proof term.
+  (** Convert a parsed proof term into a proof-term.
       If [close_pats] is [false], pattern variables that cannot be
       inferred remains (default to [true]).
       Also return the head of the proof term as a [ghyp], and
@@ -35,18 +62,17 @@ module type S = sig
   val convert_pt_gen :
     check_compatibility:bool ->
     ?close_pats:bool ->
-    Theory.p_pt ->
-    'a Equiv.f_kind -> t ->
-    ghyp * SystemExpr.context * 'a list * 'a Term.pat
+    Theory.p_pt -> 
+    t ->
+    ghyp * Type.tvars * PT.t
 
   (** Same as [convert_pt_gen], when the system is the current system of
       the sequent. *)
   val convert_pt :
     ?close_pats:bool ->
-    Theory.p_pt ->
-    'a Equiv.f_kind -> t ->
-    ghyp * 'a list * 'a Term.pat
-
+    Theory.p_pt -> 
+    t ->
+    ghyp * Type.tvars * PT.t
 end
 
 (*------------------------------------------------------------------*)

@@ -72,6 +72,7 @@ let pp fmt : 'a expr -> unit = function
         fmt
         l
 
+(*------------------------------------------------------------------*)
 let to_arbitrary : type a. a expr -> arbitrary expr = fun x -> x
 
 let to_compatible = function
@@ -86,6 +87,7 @@ let to_pair = function
   | List [_;_] as x -> x
   | _ -> error Expected_pair
 
+(*------------------------------------------------------------------*)
 let subset table e1 e2 = match e1,e2 with
   | Any_compatible_with s1, Any_compatible_with s2 ->
     System.compatible table s1 s2
@@ -99,8 +101,10 @@ let subset table e1 e2 = match e1,e2 with
   | _, Any -> true
   | _ -> false
 
+(*------------------------------------------------------------------*)
 let equal table s1 s2 = subset table s1 s2 && subset table s2 s1
 
+(*------------------------------------------------------------------*)
 (** Get system that is compatible with all systems of an expresion. *)
 let get_compatible_sys = function
   | Any -> None
@@ -137,7 +141,7 @@ let to_projs_any (t : _ expr) : Term.projs option =
   | Any | Any_compatible_with _ -> None
 
 (*------------------------------------------------------------------*)
-let project_opt (projs : Term.projs option) t : fset =
+let project_opt (projs : Term.projs option) (t : fset) : fset =
   match t, projs with
   | List l, Some projs ->
     (* we only project over a subset of [l]'s projs *)
@@ -370,6 +374,61 @@ let project_set (projs : Term.projs) (c : context) : context =
 
 let project_set_opt (projs : Term.projs option) (c : context) : context =
   { c with set = project_opt projs c.set }
+
+
+(*------------------------------------------------------------------*)
+(** Cf `.mli` *)
+let mk_proj_subst
+    ~strict
+    ~(src: t) ~(dst: t)
+  : Term.projs option * (Term.proj * Term.proj) list
+  =
+  let psubst : (Term.proj * Term.proj) list option = 
+    if is_any_or_any_comp dst || is_any_or_any_comp src then
+      None
+
+    else begin
+      let dst = to_list (to_fset dst) in
+      (* [src] may not apply to all systems in [dst] *)
+      let src_systems = to_list (to_fset src) in
+
+      if dst = src_systems then None else
+        (* [l] contains tuples [(p,q), single] where:
+           - [p] is a projection of [src] for [single]
+           - [q] is a projection of [dst] for [single] *)
+        let l =
+          List.filter_map (fun (p, single) ->
+              let res =
+                List.find_map (fun (p_src, src_single) -> 
+                    if single = src_single then
+                      Some ((p_src,p), single)
+                    else None
+                  ) src_systems
+              in
+              if strict then assert (res <> None);
+              res
+            ) dst
+        in
+
+        (* If two projections of [src] applies to the
+           same element in [dst], there is an ambiguity
+           about which rewriting to apply.
+           In that case, we raise an error. *)
+        if List.exists (fun ((p_src, p), single) ->
+            List.exists (fun ((p_src', p'), single') ->
+                p_src <> p_src' && p = p' && single = single'
+              ) l
+          ) l then
+          Printer.prt `Warning "system projection ambiguity";
+
+        Some (List.map Stdlib.fst l)
+    end
+  in
+
+  let projs = omap (List.map Stdlib.snd) psubst in
+  let psubst = odflt [] psubst in
+
+  projs, psubst
 
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)

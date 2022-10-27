@@ -111,7 +111,7 @@ let parse parser parser_name string =
     parser Lexer.token lexbuf
   with Parser.Error as e ->
     Format.printf
-      "Cannot parse %s before %S at position TODO.@."
+      "Cannot parse %s before %S at position TODO."
       parser_name (Lexing.lexeme lexbuf) ;
     raise e
 

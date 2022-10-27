@@ -315,7 +315,7 @@ let declare_list table decls =
 let add_hint_rewrite table (s : lsymb) db =
   let lem = Lemma.find_stmt_reach s table in
   
-  if not (SE.subset table lem.system.set SE.any) then
+  if not (SE.subset table SE.any lem.system.set) then
     Tactics.hard_failure ~loc:(L.loc s)
       (Failure "rewrite hints must apply to any system");
 
@@ -324,7 +324,7 @@ let add_hint_rewrite table (s : lsymb) db =
 let add_hint_smt table (s : lsymb) db =
   let lem = Lemma.find_stmt_reach s table in
 
-  if not (SE.subset table lem.system.set SE.any) then
+  if not (SE.subset table SE.any lem.system.set) then
     Tactics.hard_failure ~loc:(L.loc s)
       (Failure "rewrite hints must apply to any system");
 

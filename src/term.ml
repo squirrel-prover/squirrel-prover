@@ -893,19 +893,7 @@ let rec subst_ht s ht = match ht with
   | Lambda ([], t) -> Lambda ([], subst s t)
 
 (*------------------------------------------------------------------*)
-(* sanity check *)
-let check_projs_subst (s : (proj * proj) list) : unit = 
-  assert (
-    List.for_all (fun (p1, p2) -> 
-        List.for_all (fun (p1', p2') -> 
-            p1 = p1' && p2 = p2' ||
-            (p1 <> p1' && p2 <> p2')
-          ) s
-      ) s)
-
 let subst_projs (s : (proj * proj) list) (t : term) : term = 
-  check_projs_subst s;
-
   let rec do_subst : term -> term = function
     | Diff (Explicit l) ->
       Diff (Explicit (List.map (fun (p, t) -> List.assoc_dflt p p s, t) l))

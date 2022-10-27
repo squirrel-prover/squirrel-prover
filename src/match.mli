@@ -176,6 +176,10 @@ module Mvar : sig
 
   val filter : (Vars.var -> Term.term -> bool) -> t -> t
 
+  val map : (Term.term -> Term.term) -> t -> t
+    
+  val mapi : (Vars.var -> Term.term -> Term.term) -> t -> t
+    
   val fold : (Vars.var -> Term.term -> 'b -> 'b) -> t -> 'b -> 'b
 
   val to_subst : mode:[`Match | `Unif] -> t -> Term.subst
