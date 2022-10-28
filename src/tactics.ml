@@ -41,7 +41,7 @@ type tac_error_i =
   | Bad_SSC
   | BadSSCDetailed of ssc_error list
   | NoSSC
-  | NoAssumpSystem
+  | NoAssumpSystem of string
   | Rewrite_equiv_system_mismatch
   | Underspecified_system
   | NotDepends of string * string
@@ -88,7 +88,7 @@ let rec tac_error_to_string = function
   | NotEqualArguments  -> "NotEqualArguments"
   | Bad_SSC            -> "BadSSC"
   | NoSSC              -> "NoSSC"
-  | NoAssumpSystem     -> "NoAssumpSystem"
+  | NoAssumpSystem _   -> "NoAssumpSystem"
   | Rewrite_equiv_system_mismatch
                        -> "Rewrite_equiv_system_mismatch"
   | Underspecified_system
@@ -147,8 +147,8 @@ let pp_tac_error_i ppf = function
   | NotDepends (a, b) ->
       Fmt.pf ppf "action %s does not depend on action %s" a b
 
-  | NoAssumpSystem ->
-      Fmt.pf ppf "assumption does not apply to the current system"
+  | NoAssumpSystem s ->
+      Fmt.pf ppf "%s" s
 
   | Rewrite_equiv_system_mismatch ->
       Fmt.pf ppf "equivalence cannot be used to rewrite in current system"

@@ -15,7 +15,7 @@ axiom [s2/left] ax2l : a=b.
 axiom [s2/right] ax2r : a=b.
 
 goal [s1/right] _ : a=b.
-Proof.
+Proof. 
   checkfail use ax2 exn NoAssumpSystem.
   checkfail use ax1l exn NoAssumpSystem.
   use ax1r.

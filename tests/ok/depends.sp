@@ -11,7 +11,7 @@ Qed.
 (* same using generated lemmas *)
 goal _ (i:index): happens(A1(i)) => A(i) < A1(i).
 Proof.
-  intro Hap.
+  intro Hap. 
   by apply depends_default_A_A1 _ _ _ Hap.
 Qed.
 

@@ -54,14 +54,14 @@ module PT = struct
 end
 
 (*------------------------------------------------------------------*)
-let kind : Equiv.any_form -> [`Global | `Local] = function
-  | Local  _ -> `Local
-  | Global _ -> `Global
+(* let kind : Equiv.any_form -> [`Global | `Local] = function
+ *   | Local  _ -> `Local
+ *   | Global _ -> `Global *)
 
 (*------------------------------------------------------------------*)
-let is_local : Equiv.any_form -> bool = function
-  | Local  _ -> true
-  | Global _ -> false
+(* let is_local : Equiv.any_form -> bool = function
+ *   | Local  _ -> true
+ *   | Global _ -> false *)
 
 (*------------------------------------------------------------------*)
 (* let is_global : Equiv.any_form -> bool = function
@@ -69,12 +69,12 @@ let is_local : Equiv.any_form -> bool = function
  *   | Global _ -> false *)
 
 (*------------------------------------------------------------------*)
-(** Try to localize [pt_f] *)
-let pt_try_localize ~(failed : unit -> PT.t) (pt_f : PT.t) : PT.t =
-  let rec doit (pt_f : PT.t) : PT.t =
-    match pt_f.form with
+(** Try to localize [pt] *)
+let pt_try_localize ~(failed : unit -> PT.t) (pt : PT.t) : PT.t =
+  let rec doit (pt : PT.t) : PT.t =
+    match pt.form with
     | Local _ -> assert false
-    | Global (Atom (Reach f)) -> { pt_f with form = Local f; }
+    | Global (Atom (Reach f)) -> { pt with form = Local f; }
 
     (* [pf_t] is a [forall vs, f]: add [vs] as variables *)
     | Global (Equiv.Quant (Equiv.ForAll, vs, f)) ->
@@ -82,37 +82,23 @@ let pt_try_localize ~(failed : unit -> PT.t) (pt_f : PT.t) : PT.t =
       let vs, subst = Term.refresh_vars `Global vs in
       let f = Equiv.subst subst f in
 
-      doit { pt_f with
-             args = Sv.add_list pt_f.args vs;
+      doit { pt with
+             args = Sv.add_list pt.args vs;
              form = Global f; }
 
     (* [pf_t] is an implication [f1 -> f2]: add [f1] as hypothesis *)
     | Global (Equiv.Impl (f1, f2)) ->
-      doit { pt_f with
-             subgs = (Global f1) :: pt_f.subgs;
+      doit { pt with
+             subgs = (Global f1) :: pt.subgs;
              form = Global f2; }
 
     | Global _f -> failed ()
 
   in
-  doit pt_f
+  doit pt
 
 (*------------------------------------------------------------------*)
-(** Try to localize [pt_f] *)
-let pt_try_globalize ~(failed : unit -> 'a) (pt_f : PT.t) : PT.t =
-  assert (is_local pt_f.form);
-
-  match pt_f.form with
-  | Global _ -> assert false
-  | Local f ->
-    (* we fail if [pt_f] as any local hypothesis (indeed, a local sequent can 
-       be recast as a global sequent only when it has no local hypothesis). *)
-    if List.exists is_local pt_f.subgs then failed ()
-    else 
-      { pt_f with form = Global (Atom (Reach f)); }
-
-(*------------------------------------------------------------------*)
-(** Try to cast [pt_f] as a [kind] proof-term conclusion. 
+(** Try to cast [pt] as a [kind] proof-term conclusion. 
     Raise [failed] in case of failure. *)
 let pt_try_cast (type a)
     ~(failed : unit -> 'b)
@@ -123,21 +109,10 @@ let pt_try_cast (type a)
   | Equiv.Global_t, Global _ -> pt
 
   | Equiv.Local_t , Global _ -> pt_try_localize  ~failed pt
-  | Equiv.Global_t, Local  _ -> pt_try_globalize ~failed pt
+  | Equiv.Global_t, Local  _ -> failed ()
 
   | Equiv.Any_t, _ -> pt
 
-(** Same as [pt_try_cast], but without GADTs. *)
-let pt_try_cast0
-    ~(failed : unit -> 'b)
-    (kind : [`Local | `Global]) (pt : PT.t) : PT.t
-  =
-  match kind, pt.form with
-  | `Local , Local  _ -> pt
-  | `Global, Global _ -> pt
-
-  | `Local , Global _ -> pt_try_localize  ~failed pt
-  | `Global, Local  _ -> pt_try_globalize ~failed pt
 (*------------------------------------------------------------------*)
 (** Projects [pt] onto [system], projecting diffs in terms if necessary.
     Projection must be possible. *)
@@ -178,14 +153,24 @@ let pt_project_system_set (pt : PT.t) (system : SE.context) : PT.t =
     { pt with system }
 
 (*------------------------------------------------------------------*)
+let rec no_equiv (f : Equiv.form) : bool =
+  match f with
+  | Equiv.Atom (Equiv _) -> false
+  | Equiv.Atom (Reach _) -> true
+  | _ -> Equiv.tforall no_equiv f
+
+let no_equiv_any : Equiv.any_form -> bool = function
+  | Equiv.Local  _ -> true
+  | Equiv.Global f -> no_equiv f
+
 (** Check if [pt] is general enough for [system]. 
     Note that we do not use this function in [pt_unify_systems], 
     because it must do more complicated checks. *)
 let pt_compatible_with table (pt : PT.t) (system : SE.context) : bool =
   (* Check equivalence systems in [system.pair]. *)
   let comp_pair =
-    (* if [pt] has only local subgoals, it is compatible. *)
-    ( is_local pt.form && (List.for_all is_local pt.subgs) ) ||
+    (* if [pt] has no equivalences, it is compatible. *)
+    ( no_equiv_any pt.form && (List.for_all no_equiv_any pt.subgs) ) ||
 
     (* if the target system has no system pair, it is compatible. *)
     system.pair = None ||
@@ -199,7 +184,7 @@ let pt_compatible_with table (pt : PT.t) (system : SE.context) : bool =
   comp_pair && comp_set 
 
 (*------------------------------------------------------------------*)
-let pt_unify_warning ~(pt : PT.t) ~(arg : PT.t) : unit =
+let pt_unify_warning_systems ~(pt : PT.t) ~(arg : PT.t) : unit =
   Printer.prt `Warning
     "Proof-term argument@;  @[%a@]@;\
      has less general systems than the proof-term it is applied into@;  @[%a@]@;\
@@ -229,7 +214,7 @@ let pt_unify_systems
       pt, pt_project_system_set arg pt.system 
     else
     if SE.subset table arg_set pt_set then begin
-      pt_unify_warning ~pt ~arg;
+      pt_unify_warning_systems ~pt ~arg;
       pt_project_system_set pt arg.system, arg
     end
     else failed ()
@@ -312,7 +297,7 @@ module Mk (Args : MkArgs) : S with
     | Equiv.Global_t -> Equiv.Smart.is_impl f
     | Equiv.Any_t ->
       match f with
-      | Local f -> Term.Smart.is_impl f |
+      | Local f  ->  Term.Smart.is_impl f |
         Global f -> Equiv.Smart.is_impl f
 
   let destr_impl_k
@@ -413,18 +398,13 @@ module Mk (Args : MkArgs) : S with
   let error_pt_nomatch loc ~(prove : PT.t) ~(target : PT.t) =
     let err_str =
       Fmt.str "@[<v 0>the proof term proves:@;  \
-               concl  : @[%a@]@;  \
-               system : @[%a@]@;\
+               @[%a@]@;\
                but it must prove:@;  \
-               concl  : @[%a@]@;  \
-               system : @[%a@]@]"
-        Equiv.Any.pp prove.form
-        SE.pp_context prove.system
-        Equiv.Any.pp target.form
-        SE.pp_context target.system
+               @[%a@]@]"
+        PT.pp prove 
+        PT.pp target
     in
     soft_failure ~loc (Failure err_str)
-
 
   (*------------------------------------------------------------------*)
   (** Auxiliary function building a location for nice errors. *)
@@ -502,6 +482,19 @@ module Mk (Args : MkArgs) : S with
       let _, tsubst = Type.Infer.open_tvars ty_env lem.ty_vars in
       let form = Equiv.Babel.tsubst Equiv.Any_t tsubst lem.formula in
 
+      (* a local lemma or axiom is actually a global reachability formula *)
+      let form = 
+        match S.conc_kind, form with
+        (* we already downgrade it for local sequents *)
+        | Equiv.Local_t, _ -> form
+
+        (* in global sequent, we use it as a global formula  *)
+        | Equiv.Global_t, Equiv.Local f -> Equiv.Global (Atom (Reach f))
+        | Equiv.Global_t, Equiv.Global _ -> form
+          
+        | Equiv.Any_t, _ -> assert false (* impossible *)
+      in
+
       `Lemma lem.Goal.name,
       { system = lem.system;
         mv     = Mvar.empty;
@@ -510,14 +503,14 @@ module Mk (Args : MkArgs) : S with
         form; }
 
   (*------------------------------------------------------------------*)
-  (** Apply [pt_f] to [p_arg].
+  (** Apply [pt] to [p_arg].
       Pop the first universally quantified variable in [f] and
       instantiate it with [pt_arg]*)
   let pt_apply_var_forall
-      (pt_f : PT.t) (pt_arg : Term.term)
+      (pt : PT.t) (pt_arg : Term.term)
     : PT.t
     =
-    let f_arg, f = oget (destr_forall1_k Equiv.Any_t pt_f.form) in
+    let f_arg, f = oget (destr_forall1_k Equiv.Any_t pt.form) in
 
     (* refresh the variable *)
     let f_arg, fs = Term.refresh_vars `Global [f_arg] in
@@ -525,31 +518,68 @@ module Mk (Args : MkArgs) : S with
     let f_arg = as_seq1 f_arg in
 
     let new_p_vs = Sv.filter Vars.is_pat (Term.fv pt_arg) in
-    let args = Sv.union new_p_vs pt_f.args in
+    let args = Sv.union new_p_vs pt.args in
 
-    let mv = Mvar.add f_arg pt_arg pt_f.mv in
-    { subgs = pt_f.subgs; args; mv; form = f; system = pt_f.system }
+    let mv = Mvar.add f_arg pt_arg pt.mv in
+    { subgs = pt.subgs; args; mv; form = f; system = pt.system }
 
   (*------------------------------------------------------------------*)
-  (** Apply [pt_f] to [p_arg] when [pt_f] is an implication. 
-      Pop the first implication [f1] of [pt_f.form], instantiate (my matching) it
-      using [pt_impl_arg], and return the updated [pt_f].
+  let pt_downgrade_warning ~(pt : PT.t) ~(arg : PT.t) : unit =
+    Printer.prt `Warning
+      "Proof-term argument@;  @[%a@]@;\
+       is local, while the proof-term it is applied into is global@;  @[%a@]@;\
+       The latter proof-term has been downgraded to a local proof-term."
+      PT.pp arg
+      PT.pp pt
+
+  (*------------------------------------------------------------------*)
+  let error_pt_apply_bad_kind loc ~(pt : PT.t) ~(arg : PT.t) =
+    let err_str =
+      Fmt.str "@[<v 0>bad kind: the proof term proves:@;  @[%a@]@;\
+               it cannot be applied to:@;  @[%a@].@]"
+        PT.pp arg
+        PT.pp pt
+    in
+    soft_failure ~loc (Failure err_str)
+
+  (*------------------------------------------------------------------*)
+  (** Apply [pt] to [p_arg] when [pt] is an implication. 
+      Pop the first implication [f1] of [pt.form], instantiate (my matching) it
+      using [pt_impl_arg], and return the updated [pt].
 
       Remark: [pt_arg]'s substitution must be an extention of 
-      [pt_f]'s substitution. *)
-  let pt_apply_var_impl 
+      [pt]'s substitution. *)
+  let pt_apply_var_impl
       (* ~(loc : L.t)  *) ~(loc_arg : L.t)
       (ty_env : Type.Infer.env) (s : S.t)
       (pt : PT.t) (arg : PT.t)
     : PT.t
     =
     let table = S.table s in
-    let f1, f2 = oget (destr_impl_k Equiv.Any_t pt.form) in
 
-    let pt_apply_error arg () =
-      error_pt_nomatch loc_arg ~prove:arg ~target:{ pt with form = f1 }
+    let apply_kind_error () = error_pt_apply_bad_kind loc_arg ~pt ~arg in
+
+    (* Try to case [arg] to the appripriate kind (local or global), 
+       depending on [f1] kind. 
+       If the cast fails, we raise a user-level error. *)
+    let pt, arg =
+      match pt.form, arg.form with
+      | Equiv.Local  _, Equiv.Local  _ 
+      | Equiv.Global _, Equiv.Global _ -> pt, arg
+      | Equiv.Local  _, Equiv.Global _ ->
+        (* downgrade [arg] *)
+        let down_arg = pt_try_localize ~failed:apply_kind_error arg in
+        pt, down_arg
+
+      | Equiv.Global _, Equiv.Local  _ ->
+        (* downgrade [pt] *)
+        let down_pt = pt_try_localize ~failed:apply_kind_error pt in
+        pt_downgrade_warning ~pt ~arg;
+        down_pt, arg
+        
     in
 
+    let f1, f2 = oget (destr_impl_k Equiv.Any_t pt.form) in
     (* Specializing [pt.form] by an extention of [pt.mv] is always 
        safe. *)
     let sbst = Mvar.to_subst ~mode:`Unif arg.mv in
@@ -560,17 +590,14 @@ module Mk (Args : MkArgs) : S with
         pat_tyvars = [];
       } in
 
-    (* Try to case [arg] to the appripriate kind (local or global), 
-       depending on [f1] kind. 
-       If the cast fails, we raise a user-level error. *)
-    let arg =
-      pt_try_cast0 ~failed:(pt_apply_error arg) (kind f1) arg
+    let pt_apply_error arg () =
+      error_pt_nomatch loc_arg ~prove:arg ~target:{ pt with form = f1 }
     in
 
     (* Verify that the systems of the argument [arg] applies to the systems
        of [pt], projecting it if necessary. *)
     let pt, arg =
-      pt_unify_systems  ~failed:(pt_apply_error arg) table ~pt ~arg
+      pt_unify_systems ~failed:(pt_apply_error arg) table ~pt ~arg
     in
     
     (* FIXME: unify [f1] and [arg.form] instead of matching.
@@ -589,7 +616,7 @@ module Mk (Args : MkArgs) : S with
           ~ty_env ~mv:arg.mv
           table pt.system f_arg pat_f1
 
-      | _ -> assert false       (* impossible thanks to [pt_try_cast] *)
+      | _ -> assert false       (* impossible thanks to [pt_try_localize] *)
     in
     let mv = match match_res with
       | Match.FreeTyv   -> assert false
@@ -604,74 +631,83 @@ module Mk (Args : MkArgs) : S with
 
     { subgs; mv; args; form = f2; system = pt.system; }
 
+
+  (*------------------------------------------------------------------*)
+  let error_pt_cannot_apply loc (pt : PT.t) =
+    let err_str =
+      Fmt.str "@[<hov 2>too many argument, cannot apply:@;  @[%a@]@]"
+        PT.pp pt
+    in
+    soft_failure ~loc (Failure err_str)
+      
   (*------------------------------------------------------------------*)
   (** Parse a partially applied lemma or hypothesis as a pattern. *)
   let rec _convert_pt_gen 
       (ty_env : Type.Infer.env)
       (init_mv : Mvar.t)
-      (pt : Theory.p_pt)
+      (p_pt : Theory.p_pt)
       (s : S.t) : ghyp * PT.t
     =
     let table = S.table s in
 
-    let lem_name, init_pt_f =
-      pt_of_assumption ~table ty_env pt.p_pt_head s 
+    let lem_name, init_pt =
+      pt_of_assumption ~table ty_env p_pt.p_pt_head s 
     in
-    assert (init_pt_f.mv = Mvar.empty);
-    let init_pt_f = { init_pt_f with mv = init_mv; } in
+    assert (init_pt.mv = Mvar.empty);
+    let init_pt = { init_pt with mv = init_mv; } in
 
     let cenv = Theory.{ env = S.env s; cntxt = InGoal; } in
 
-    (** Apply [pt_f] to [p_arg] when [pt_f] is a forall. *)
-    let do_var (pt_f : PT.t) (p_arg : Theory.term) : PT.t =
-      match destr_forall1_k Equiv.Any_t pt_f.form with
+    (** Apply [pt] to [p_arg] when [pt] is a forall. *)
+    let do_var (pt : PT.t) (p_arg : Theory.term) : PT.t =
+      match destr_forall1_k Equiv.Any_t pt.form with
       | None ->
-        hard_failure ~loc:(L.loc pt.p_pt_head) (Failure "too many arguments");
+        error_pt_cannot_apply (L.loc p_pt.p_pt_head) pt
 
       | Some (f_arg, _) ->
         let ty = Vars.ty f_arg in
         let arg, _ = Theory.convert ~ty_env ~pat:true cenv ~ty p_arg in
 
-        pt_apply_var_forall pt_f arg
+        pt_apply_var_forall pt arg
     in
 
-    (** Apply [pt_f] to [p_arg] when [pt_f] is an implication. *)
+    (** Apply [pt] to [p_arg] when [pt] is an implication. *)
     let do_impl
-        (pt_f : PT.t) (pt_impl_arg : pt_impl_arg)
+        (pt : PT.t) (pt_impl_arg : pt_impl_arg)
       : PT.t
       =
-      match destr_impl_k Equiv.Any_t pt_f.form, pt_impl_arg with
+      match destr_impl_k Equiv.Any_t pt.form, pt_impl_arg with
       | None, _ ->
-        hard_failure ~loc:(L.loc pt.p_pt_head) (Failure "too many arguments")
-
+        error_pt_cannot_apply (L.loc p_pt.p_pt_head) pt
+          
       | Some (f1, f2), `Subgoal ->
-        { system = pt_f.system;
-          subgs  = f1 :: pt_f.subgs;
-          mv     = pt_f.mv;
-          args   = pt_f.args;
+        { system = pt.system;
+          subgs  = f1 :: pt.subgs;
+          mv     = pt.mv;
+          args   = pt.args;
           form   = f2; }
 
       | Some _, `Pt p_arg ->
-        let _, pt_arg = _convert_pt_gen ty_env pt_f.mv p_arg s in
+        let _, pt_arg = _convert_pt_gen ty_env pt.mv p_arg s in
         pt_apply_var_impl
           (* ~loc:(L.loc pt.p_pt_head) *) ~loc_arg:p_arg.p_pt_loc
           ty_env s
-          pt_f pt_arg
+          pt pt_arg
     in
 
     (* fold through the provided arguments and [f],
        instantiating [f] along the way, 
        and accumulating proof obligations. *)
-    let pt_f =
-      List.fold_left (fun (pt_f : PT.t) (p_arg : Theory.p_pt_arg) ->
-          if is_impl_k Equiv.Any_t pt_f.form then
-            do_impl pt_f (pt_arg_as_pt p_arg) 
+    let pt =
+      List.fold_left (fun (pt : PT.t) (p_arg : Theory.p_pt_arg) ->
+          if is_impl_k Equiv.Any_t pt.form then
+            do_impl pt (pt_arg_as_pt p_arg) 
           else
-            do_var pt_f (pt_arg_as_term p_arg) 
-        ) init_pt_f pt.p_pt_args
+            do_var pt (pt_arg_as_term p_arg) 
+        ) init_pt p_pt.p_pt_args
     in
 
-    lem_name, pt_f
+    lem_name, pt
 
   (*------------------------------------------------------------------*)
   (** Closes inferred variables from [pt.args] by [pt.mv]. *)
@@ -702,6 +738,15 @@ module Mk (Args : MkArgs) : S with
     { pt with mv = Mvar.empty; subgs; args; form; }
 
   (*------------------------------------------------------------------*)
+  let error_pt_bad_system loc (pt : PT.t) =
+    let err_str =
+      Fmt.str "@[<v 0>the proof term proves:@;  @[%a@]@;\
+               it does not apply to the current system.@]"
+        PT.pp pt
+    in
+    soft_failure ~loc (NoAssumpSystem err_str)
+
+  (*------------------------------------------------------------------*)
   (** Exported. *)
   let convert_pt_gen
       ~check_compatibility
@@ -725,8 +770,8 @@ module Mk (Args : MkArgs) : S with
         pt
       else if pt_compatible_with (S.table s) pt (S.system s) then
         pt_project_system_set pt (S.system s)
-      else
-        Tactics.hard_failure Tactics.NoAssumpSystem
+      else 
+        error_pt_bad_system p_pt.p_pt_loc pt 
     in
     
     (* close the proof-term by inferring as many pattern variables as possible *)

@@ -60,6 +60,8 @@ val mk_reach_atom : Term.term -> form
 (** Does not recurse. *)
 val tmap       : (form -> form) -> form -> form 
 val titer      : (form -> unit) -> form -> unit
+val tforall    : (form -> bool) -> form -> bool 
+val texists    : (form -> bool) -> form -> bool 
 val tfold      : (form -> 'a -> 'a) -> form -> 'a -> 'a
 val tmap_fold  : ('b -> form -> 'b * form) -> 'b -> form -> 'b * form 
 

@@ -137,6 +137,18 @@ let titer (f : form -> unit) (t : form) : unit =
   let g e = f e; e in
   ignore (tmap g t)
 
+let tforall (f : form -> bool) (t : form) : bool =
+  let x = ref true in
+  let g e = x := (!x && f e); e in
+  ignore (tmap g t);
+  !x
+
+let texists (f : form -> bool) (t : form) : bool =
+  let x = ref false in
+  let g e = x := (!x || f e); e in
+  ignore (tmap g t);
+  !x
+
 let tfold : (form -> 'b -> 'b) -> form -> 'b -> 'b =
   fun f t v ->
   let vref : 'b ref = ref v in

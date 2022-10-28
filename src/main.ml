@@ -722,7 +722,7 @@ let () =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/axiom2.sp" with
-           | Tactic_hard_failure (_,NoAssumpSystem) -> raise Ok)
+           | Tactic_soft_failure (_,NoAssumpSystem _) -> raise Ok)
     end ;
     "Axiom Systems - 1", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
