@@ -388,8 +388,8 @@ let mk_pair t0 t1 = mk_fbuiltin Symbols.fs_pair [t0;t1]
 
 let mk_ite ?(simpl=true) c t e =
   match c with
-  | t when t = mk_true  && simpl -> t
-  | t when t = mk_false && simpl -> e
+  | cc when cc = mk_true  && simpl -> t
+  | cc when cc = mk_false && simpl -> e
   | _ -> mk_fbuiltin Symbols.fs_ite [c;t;e]
 
 let mk_of_bool t = mk_fbuiltin Symbols.fs_of_bool [t]
