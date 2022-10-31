@@ -1416,7 +1416,7 @@ let global_diff_eq (s : ES.t) =
 
 let () =
   T.register "diffeq"
-        ~tactic_help:{general_help = "Closes a reflexive goal up to equalirt";
+        ~tactic_help:{general_help = "Closes a reflexive goal up to equality";
                       detailed_help = "A goal is reflexive when the left and \
                                        right frame corresponding to the bi-terms \
                                        are identical. For all diff(s1,s2), one \
