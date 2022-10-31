@@ -86,26 +86,6 @@ let () =
     ~pq_sound:true
     (LowTactics.genfun_of_pure_tfun goal_true_intro)
 
-
-(*------------------------------------------------------------------*)
-let left_not_intro (Args.String hyp_name) s =
-  let id, formula = Hyps.by_name hyp_name s in
-  let s = Hyps.remove id s in
-  match Term.destr_not formula with
-  | Some f ->
-    [Hyps.add (Args.Named (Ident.name id)) (Term.not_simpl f) s]
-
-  | None -> soft_failure (Tactics.Failure "cannot introduce negation")
-
-let () =
-  T.register_typed "notleft"
-    ~general_help:"Push a negation inside a formula."
-    ~detailed_help:"Normalize the formula according to the negation rules over \
-                    logical connectors."
-    ~tactic_group:Logical
-    ~pq_sound:true
-    (LowTactics.genfun_of_pure_tfun_arg left_not_intro) Args.String
-
 (*------------------------------------------------------------------*)
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
   * This can be used with [vars = []] if orig is an [if-then-else] term. *)

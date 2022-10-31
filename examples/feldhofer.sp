@@ -141,34 +141,26 @@ Proof.
   split.
 
   (* Direction => is the obvious one *)
-  + intro [_ H0] => /= [i j [H1 [_ _]]].
-    notleft H0.
-    use H0 with i,j as H2; case H2 => //.
-    clear H0.
-    expand output, cipher.
+  + intro [_ H0] => /= [i j [H1 [_ _]]]. 
+    apply H0; exists i,j => /=. 
     by use fail_not_pair with tagT, <input@Tag(i,j), nt(i,j)>.
 
   (* Direction <= *)
   + intro [_ H0] => /= [i j [H1 [_ _]]].
-    notleft H0.
+    apply H0. 
     use tags_neq.
     project.
 
     - intctxt H1; simpl.
       (* problem with randomness condition *) admit.
       auto.
-      intro [j0 _].
-      use H0 with i,j0 as C1.
-      clear H0.
-      by expand output, cipher; case C1.
-      
+      intro [j0 _]. 
+      by exists i, j0.       
 
     - intctxt H1; simpl.
       (* problem with randomness condition *) admit.
-      auto.
-      use H0 with i,j as C1.
-      clear H0.
-      by expand output, cipher; case C1.
+      auto. 
+      by intro ?; exists i, j.
 Qed.
 
 (** This lemma about unique outputs will be useful for both sides of our system.

@@ -1,5 +1,7 @@
 set processStrictAliasMode=true.
 
+include Basic.
+
 abstract okSess0 : message
 abstract okSessi : message
 abstract ko : message
@@ -58,7 +60,6 @@ Proof.
  euf Hcond.
  (* we prove the goal where the message satisfies the tag *)
  intro [Hneq | [i Heq]]. 
- nosimpl(notleft H1). 
  auto.
 
  by use He with i.  
