@@ -198,10 +198,16 @@ let transitivity_systems new_context s =
    u ~_{L,R} w -> 
    w ~_{R,R} v -> 
    u ~_{L,R} v *)
-let trans_terms (args : (int L.located * Theory.term) list) (s : ES.t) : Goal.t list = 
-  let cenv = 
+let trans_terms (args : (int L.located * Theory.term) list) (s : ES.t) : Goal.t list =
+  let _, r_sys = SE.snd (ES.get_system_pair s) in
+  let l_proj, r_proj = ES.get_system_pair_projs s in
+
+  let cenv =
+    (* fset with only the right system, once *)
+    let fset_r = SE.make_fset (ES.table s) ~labels:[Some r_proj] [r_sys] in
+    
     (* remove the pair when parsing, to prevent diffs *)
-    let system = { (ES.system s) with pair = None; } in
+    let system = SE.{ set = (fset_r :> SE.arbitrary); pair = None; } in
     let env = { (ES.env s) with system; } in
     Theory.{ env; cntxt = InGoal; } 
   in
@@ -209,7 +215,6 @@ let trans_terms (args : (int L.located * Theory.term) list) (s : ES.t) : Goal.t 
   let args = List.map (fun (i,t) -> i, fst (Theory.convert cenv t)) args in
 
   let equiv = ES.goal_as_equiv s in
-  let l_proj, r_proj = ES.get_system_pair_projs s in
 
   let context = ES.system s in
 
@@ -221,25 +226,32 @@ let trans_terms (args : (int L.located * Theory.term) list) (s : ES.t) : Goal.t 
   let pair1 = SE.make_pair l_system r_system in (* L/R *)
   let pair2 = SE.make_pair r_system r_system in (* R/R *)
 
+  (* fset with only the right system, twice *)
+  let fset_r2 =
+    SE.make_fset (ES.table s) ~labels:[Some l_proj;Some r_proj] [r_sys; r_sys]
+  in
+  
+  let context1 = { context with pair = Some pair1; } in
+  let context2 = SE.{ set = (fset_r2 :> SE.arbitrary); pair = Some pair2; } in
+  
   let equiv1, equiv2 = 
     List.mapi (fun i t ->
+        let t1 = Term.project1 l_proj t in
+        let t2 = Term.project1 r_proj t in
         match List.find_opt (fun (j,_) -> i = L.unloc j) args with
-        | None -> t, t
-        | Some (_,new_t) -> 
-          let t1 = Term.project1 l_proj t in
-          let t2 = Term.project1 r_proj t in
+        | None ->
+          t, 
+          Term.simple_bi_term (Term.mk_diff [(l_proj, t2); (r_proj,    t2)])
+            
+        | Some (_,new_t) ->
           Term.mk_diff [(l_proj,    t1); (r_proj, new_t) ],
           Term.mk_diff [(l_proj, new_t); (r_proj,    t2) ]
       ) equiv
     |> List.split
   in
-
-  let goal1 =
-    ES.set_goal_in_context { context with pair = Some pair1; } (Atom (Equiv equiv1)) s
-  in
-  let goal2 =
-    ES.set_goal_in_context { context with pair = Some pair2; } (Atom (Equiv equiv2)) s
-  in
+  
+  let goal1 = ES.set_goal_in_context context1 (Atom (Equiv equiv1)) s in
+  let goal2 = ES.set_goal_in_context context2 (Atom (Equiv equiv2)) s in
 
 
   [Goal.Equiv goal1; Goal.Equiv goal2 ]
