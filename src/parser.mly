@@ -724,6 +724,14 @@ constseq_arg:
 | LPAREN b=hterm RPAREN t=sterm { (b,t) }
 
 (*------------------------------------------------------------------*)
+trans_arg_item:
+| i=loc(int) COLON t=term %prec tac_prec { i,t }
+
+trans_arg:
+| annot=system_annot { TacticsArgs.TransSystem (`Global, annot) }
+| l=slist1(trans_arg_item, COMMA) { TacticsArgs.TransTerms l }
+
+(*------------------------------------------------------------------*)
 %inline generalize_dependent:
 | GENERALIZE DEPENDENT { }
 
@@ -870,8 +878,8 @@ tac:
     { mk_abstract l "have" [TacticsArgs.HavePt (pt, ip, `None)] }
 
   (*------------------------------------------------------------------*)
-  | l=lloc(TRANS) annot=system_annot
-    { mk_abstract l "trans" [TacticsArgs.SystemAnnot (`Global, annot)] }
+  | l=lloc(TRANS) arg=trans_arg
+    { mk_abstract l "trans" [TacticsArgs.Trans arg] }
 
   | l=lloc(REWRITE) p=rw_args w=in_target
     { mk_abstract l "rewrite" [TacticsArgs.RewriteIn (p, w)] }

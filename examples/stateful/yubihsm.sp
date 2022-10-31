@@ -540,7 +540,7 @@ Proof.
        by apply ~inductive Hind (pred(t)))).
 
   + (* init *)
-    rewrite /*.
+    rewrite /*. 
     by rewrite if_false in 1.
 
   + (* Setup(pid) *)

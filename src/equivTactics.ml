@@ -194,15 +194,74 @@ let transitivity_systems new_context s =
 
   [Goal.Equiv s1;Goal.Equiv s2;Goal.Equiv s3]
 
+(* Term transitivity, on the right:
+   u ~_{L,R} w -> 
+   w ~_{R,R} v -> 
+   u ~_{L,R} v *)
+let trans_terms (args : (int L.located * Theory.term) list) (s : ES.t) : Goal.t list = 
+  let cenv = 
+    (* remove the pair when parsing, to prevent diffs *)
+    let system = { (ES.system s) with pair = None; } in
+    let env = { (ES.env s) with system; } in
+    Theory.{ env; cntxt = InGoal; } 
+  in
+
+  let args = List.map (fun (i,t) -> i, fst (Theory.convert cenv t)) args in
+
+  let equiv = ES.goal_as_equiv s in
+  let l_proj, r_proj = ES.get_system_pair_projs s in
+
+  let context = ES.system s in
+
+  let l_system, r_system = 
+    let pair = Utils.oget context.pair in
+    snd (SE.fst pair), snd (SE.snd pair)
+  in
+
+  let pair1 = SE.make_pair l_system r_system in (* L/R *)
+  let pair2 = SE.make_pair r_system r_system in (* R/R *)
+
+  let equiv1, equiv2 = 
+    List.mapi (fun i t ->
+        match List.find_opt (fun (j,_) -> i = L.unloc j) args with
+        | None -> t, t
+        | Some (_,new_t) -> 
+          let t1 = Term.project1 l_proj t in
+          let t2 = Term.project1 r_proj t in
+          Term.mk_diff [(l_proj,    t1); (r_proj, new_t) ],
+          Term.mk_diff [(l_proj, new_t); (r_proj,    t2) ]
+      ) equiv
+    |> List.split
+  in
+
+  let goal1 =
+    ES.set_goal_in_context { context with pair = Some pair1; } (Atom (Equiv equiv1)) s
+  in
+  let goal2 =
+    ES.set_goal_in_context { context with pair = Some pair2; } (Atom (Equiv equiv2)) s
+  in
+
+
+  [Goal.Equiv goal1; Goal.Equiv goal2 ]
+          
+
 let trans_tac args s =
   match args with
-  | [TacticsArgs.SystemAnnot annot] ->
+  | [Args.Trans (Args.TransSystem annot)] ->
     let context = SE.Parse.parse_sys (ES.table s) annot in
     fun sk fk ->
       begin match transitivity_systems context s with
         | l -> sk l fk
         | exception Tactics.Tactic_soft_failure e -> fk e
       end
+
+  | [Args.Trans (Args.TransTerms l)] ->
+    fun sk fk -> 
+      begin match trans_terms l s with
+        | l -> sk l fk
+        | exception Tactics.Tactic_soft_failure e -> fk e
+      end
+
   | _ -> bad_args ()
 
 let () =
