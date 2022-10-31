@@ -359,19 +359,15 @@ Proof.
       fa 15.
       fa 15.
       fa 16.
-      expandseq  seq(i,j,k:index=> kT(i,j,k)), i,j,k.
-      expandseq  seq(i,j,k:index=> rTI(i,j,k)), i,j,k.
-      prf 18.
-      rewrite if_true // in 18.
-      xor 18, xor(F(rR(i,j,k),skR(j))) n_PRF, n_PRF.
-      rewrite if_true in 18.
+      prf 16.
+      rewrite if_true // in 16.
+      xor 16, xor(F(rR(i,j,k),skR(j))) n_PRF, n_PRF.
+      rewrite if_true in 16.
       use len_F with rR(i,j,k), skR(j).
       namelength n_PRF,s.
-      fa 18. fa 18.
-      fresh 19.
-      rewrite if_true // in 19.
-      expandseq  seq(i,j,k:index=> kR(i,j,k)), i,j,k.
-      expandseq  seq(i:index=> dkI(i)), i.
+      fa 16. fa 16.
+      fresh 17.
+      rewrite if_true // in 17.
       by apply IH.
 
     + (* Second output of R *)
@@ -386,9 +382,6 @@ Proof.
        admit 15. (* this is a dumb fadup weakness, as all the dkI(i) are in the frame, the forall is obviously ok. *)
        repeat fa 15.
        fa 17.
-       expandseq  seq(j,k:index=> DkR(j,k)), j,k.
-       expandseq  seq(j,k:index=> DrTI(j,k)), j,k.
-       expandseq  seq(j,k:index=> DkT(j,k)), j,k.
        prf 16; rewrite if_true // in 16.
        xor 16, n_PRF.
        rewrite if_true // in 16.
@@ -408,7 +401,6 @@ Proof.
       fa 15.
       fa 15.
       fa 16.
-      expandseq seq(i,j,k:index=> dkT(i,j,k)),i,j,k.
       prf 15.
       rewrite if_true // in 15.
       xor 15, xor(F(rI(i,j,k),skI(i))) n_PRF, n_PRF.
@@ -418,9 +410,6 @@ Proof.
       fa 15.
       fresh 16.
       rewrite if_true // in 16.
-      expandseq  seq(i,j,k:index=>kI(i,j,k)),i,j,k.
-      expandseq  seq(i,j,k:index=>dkT(i,j,k)),i,j,k.
-      expandseq  seq(i:index=>dkR(i)),j.
       by apply IH.
 
     + (* Second output of I *)
@@ -436,15 +425,13 @@ Proof.
       fa 15.
       fa 15.
       fa 15.
-      expandseq seq(i,j,k:index=> DdkT(i,j,k)),i,j,k.
-      prf 17.
-      rewrite if_true // in 17.
-      xor 17, xor(F(DrI(i,j,k),skI(i))) n_PRF, n_PRF.
-      rewrite if_true // in 17.
+      prf 16.
+      rewrite if_true // in 16.
+      xor 16, xor(F(DrI(i,j,k),skI(i))) n_PRF, n_PRF.
+      rewrite if_true // in 16.
       use len_F with DrI(i,j,k), skI(i).
       by namelength n_PRF,s.
-      fresh 17.
-      expandseq  seq(i,j,k:index=>DkI(i,j,k)),i,j,k.
+      fresh 16.
       by apply IH.
 
     + (* Second output of DI *)
