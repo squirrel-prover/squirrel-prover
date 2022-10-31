@@ -194,8 +194,18 @@ let transitivity_systems new_context s =
 
   [Goal.Equiv s1;Goal.Equiv s2;Goal.Equiv s3]
 
-let () =
+let trans_tac args s =
+  match args with
+  | [TacticsArgs.SystemAnnot annot] ->
+    let context = SE.parse_sys (ES.table s) annot in
+    fun sk fk ->
+      begin match transitivity_systems context s with
+        | l -> sk l fk
+        | exception Tactics.Tactic_soft_failure e -> fk e
+      end
+  | _ -> bad_args ()
 
+let () =
   let tactic_help = Prover.{
     general_help = "Prove an equivalence by transitivity.";
     detailed_help =
@@ -217,16 +227,7 @@ let () =
 
   T.register_general "trans"
     ~tactic_help ~pq_sound:true
-    (LT.genfun_of_efun_arg
-       (fun args s -> match args with
-          | [TacticsArgs.SystemAnnot annot] ->
-              let context = annot (ES.env s).table in
-                fun sk fk ->
-                  begin match transitivity_systems context s with
-                    | l -> sk l fk
-                    | exception Tactics.Tactic_soft_failure e -> fk e
-                  end
-          | _ -> Tactics.(hard_failure (Failure "invalid arguments"))))
+    (LT.genfun_of_efun_arg trans_tac)
 
 (*------------------------------------------------------------------*)
 let do_case_tac (args : Args.parser_arg list) s : ES.t list =
@@ -2057,9 +2058,10 @@ let enckp arg (s : ES.t) =
 
 let () =
   T.register_typed "enckp"
-    ~general_help:"Change the key in some encryption subterm."
-    ~detailed_help:"This captures the fact that an encryption key may hide the \
-                    key.  The term and new key can be passed as arguments, \
+    ~general_help:"Key-privacy changes the key in some encryption subterm."
+    ~detailed_help:"Key-privacy captures the property of an encryption to provide \
+                    confidentiality of the encryption key. \
+                    The term and new key can be passed as arguments, \
                     otherwise the tactic applies to the first subterm of the form \
                     enc(_,r,k) where r is a name and k features a diff operator."
     ~tactic_group:Cryptographic

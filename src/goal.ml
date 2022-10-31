@@ -110,7 +110,7 @@ module Parsed = struct
     name    : Theory.lsymb option;
     ty_vars : Theory.lsymb list;
     vars    : Theory.bnds;
-    system  : Symbols.table -> SE.context;
+    system  : SE.parsed_sys;
     formula : contents
   }
 
@@ -151,12 +151,12 @@ let make_obs_equiv ?(enrich=[]) table system =
 
 
 (*------------------------------------------------------------------*)
-let make table parsed_goal : statement * t =
-  let Parsed.{name; system; ty_vars; vars; formula} = parsed_goal in
+let make table (parsed_goal : Parsed.t) : statement * t =
+  let Parsed.{ name; system; ty_vars; vars; formula; } = parsed_goal in
 
+  let system = SE.parse_sys table system in
   let name = L.unloc (oget name) in
 
-  let system = system table in
   let ty_vars = List.map (fun ls -> Type.mk_tvar (L.unloc ls)) ty_vars in
   let env = Env.init ~system ~ty_vars ~table () in
 

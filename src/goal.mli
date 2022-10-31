@@ -1,3 +1,5 @@
+module SE = SystemExpr
+
 module TS = LowTraceSequent
 module ES = LowEquivSequent
 
@@ -12,7 +14,7 @@ val pp_init : Format.formatter -> t -> unit
 
 (*------------------------------------------------------------------*)
 val vars   : t -> Vars.env
-val system : t -> SystemExpr.context
+val system : t -> SE.context
 val table  : t -> Symbols.table
 
 (*------------------------------------------------------------------*)
@@ -28,7 +30,7 @@ val bind     : (TS.t -> 'a)        -> (ES.t -> 'a)        -> t -> 'a
 type ('a,'b) abstract_statement = {
   name    : 'a;
   ty_vars : Type.tvars;
-  system  : SystemExpr.context;
+  system  : SE.context;
   formula : 'b;
 }
 
@@ -61,11 +63,7 @@ module Parsed : sig
     name    : Theory.lsymb option;
     ty_vars : Theory.lsymb list;
     vars    : Theory.bnds;
-    system  : Symbols.table -> SystemExpr.context;
-      (** Function producing the context given the current table.
-          Setting SystemExpr.parsed_t would be too rigid, and asking
-          for a context directly is impossible because the parsed does
-          not have the table. *)
+    system  : SE.parsed_sys;
     formula : contents
   }
 
@@ -77,7 +75,7 @@ end
 val make_obs_equiv :
   ?enrich:Term.term list ->
   Symbols.table ->
-  SystemExpr.context ->
+  SE.context ->
   Equiv.any_form * t
 
 val make : Symbols.table -> Parsed.t -> statement * t

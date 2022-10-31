@@ -8,42 +8,6 @@
     L.mk_loc loc s
 
   let mk_abstract loc s args = T.Abstract (L.mk_loc loc s, args)
-
-  (** Parsing functions for system expressions. *)
-
-  let empty = Location.(mk_loc _dummy [])
-
-  type parsed_sys = [
-    | `None
-    | `Some of SE.parsed_t
-    | `Set_pair of SE.parsed_t * SE.parsed_t
-  ]
-
-  let local_context table : parsed_sys -> SE.context = function
-    | `None ->
-        SE.{ set = SE.parse table empty ; pair = None }
-    | `Some s ->
-        let set = SE.parse table s in
-        SE.{ set ; pair = None }
-    | `Set_pair (s,p) ->
-        let set = SE.parse table s in
-        let pair = Some (SE.to_pair (SE.parse table p)) in
-        SE.{ set ; pair }
-
-  let global_context table : parsed_sys -> SE.context = function
-    | `None ->
-        let set = SE.parse table empty in
-        let pair = SE.to_pair set in
-        SE.{ set ; pair = Some pair }
-    | `Some s ->
-        let set = SE.parse table s in
-        let pair = SE.to_pair set in
-        SE.{ set ; pair = Some pair }
-    | `Set_pair (s,p) ->
-        let set = SE.parse table s in
-        let pair = Some (SE.to_pair (SE.parse table p)) in
-        SE.{ set ; pair }
-
 %}
 
 %token <int> INT
@@ -907,8 +871,7 @@ tac:
 
   (*------------------------------------------------------------------*)
   | l=lloc(TRANS) annot=system_annot
-    { let annot table = global_context table annot in
-      mk_abstract l "trans" [TacticsArgs.SystemAnnot annot] }
+    { mk_abstract l "trans" [TacticsArgs.SystemAnnot (`Global, annot)] }
 
   | l=lloc(REWRITE) p=rw_args w=in_target
     { mk_abstract l "rewrite" [TacticsArgs.RewriteIn (p, w)] }
@@ -1038,12 +1001,12 @@ system_expr:
 | LBRACKET s=loc(system_item_list) RBRACKET   { s }
 
 system_annot:
-|                                             { `None }
-| LBRACKET l=loc(system_item_list) RBRACKET   { `Some l }
+|                                             { SE.NoSystem }
+| LBRACKET l=loc(system_item_list) RBRACKET   { SE.System l }
 | LBRACKET
     SET COLON s=loc(system_item_list) SEMICOLON
   EQUIV COLON p=loc(system_item_list)
-  RBRACKET                                    { `Set_pair (s,p) }
+  RBRACKET                                    { SE.Set_pair (s,p) }
 
 /* -----------------------------------------------------------------------
  * Statements and goals
@@ -1060,7 +1023,7 @@ statement_name:
 local_statement:
 | s=system_annot name=statement_name ty_vars=ty_args vars=args
   COLON f=term
-   { let system table = local_context table s in
+   { let system = `Local, s in
      let formula = Goal.Parsed.Local f in
      Goal.Parsed.{ name; ty_vars; vars; system; formula } }
 
@@ -1068,12 +1031,12 @@ global_statement:
 | s=system_annot name=statement_name ty_vars=ty_args vars=args
   COLON f=global_formula
    { let formula = Goal.Parsed.Global f in
-     let system table = global_context table s in
+     let system = `Global, s in
      Goal.Parsed.{ name; ty_vars; vars; system; formula } }
 
 obs_equiv_statement:
 | s=system_annot n=statement_name
-   { let system table = global_context table s in
+   { let system = `Global, s in
      Goal.Parsed.{ name = n; system; ty_vars = []; vars = [];
                    formula = Goal.Parsed.Obs_equiv } }
 
@@ -1084,7 +1047,7 @@ goal_i:
 | EQUIV  s=obs_equiv_statement   DOT { s }
 | EQUIV s=system_annot name=statement_name vars=args COLON b=loc(biframe) DOT
     { let f = L.mk_loc (L.loc b) (Theory.PEquiv (L.unloc b)) in
-      let system table = global_context table s in
+      let system = `Global, s in
       Goal.Parsed.{ name; system; ty_vars = []; vars; formula = Global f } }
 
 goal:

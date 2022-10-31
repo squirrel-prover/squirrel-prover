@@ -1,5 +1,7 @@
 module L = Location
 
+module SE = SystemExpr
+
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
@@ -216,7 +218,7 @@ type parser_arg =
   | SimplPat     of simpl_pat
   | RewriteIn    of rw_arg list * in_target
   | RewriteEquiv of rw_equiv_item
-  | SystemAnnot  of (Symbols.table -> SystemExpr.context)
+  | SystemAnnot  of SE.parsed_sys
   | ApplyIn      of named_args * Theory.p_pt * apply_in
   | Have         of simpl_pat option * Theory.any_term
   | HavePt       of Theory.p_pt * simpl_pat option * [`IntroImpl | `None]

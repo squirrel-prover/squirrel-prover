@@ -204,27 +204,6 @@ val fst : <pair:unit;..> expr -> Term.proj * System.Single.t
 val snd : <pair:unit;..> expr -> Term.proj * System.Single.t
 
 (*------------------------------------------------------------------*)
-(** {2 Parsing, printing, and conversions} *)
-
-(** This module defines several kinds of expressions, they are
-    all parsed from the same datatype.
-    A parse item may be a system symbol or the projection of a system
-    symbol and, when the item corresponds to a single system,
-    it may come with an alias identifying the single system as some
-    projection of the multisystem in construction. *)
-type parse_item = {
-  system     : Symbols.lsymb;
-  projection : Symbols.lsymb option;
-  alias      : Symbols.lsymb option
-}
-
-type parsed_t = parse_item list Location.located
-
-(** Parsing relies on [any], [any_compatible_with] and [make_fset]. *)
-val parse : Symbols.table -> parsed_t -> arbitrary
-
-
-(*------------------------------------------------------------------*)
 (** {2 Contexts} *)
 
 (** Context for interpreting global or local formulas.
@@ -280,3 +259,33 @@ val mk_proj_subst :
   
 (** Print the system to the user. *)
 val print_system : Symbols.table -> _ expr -> unit
+
+
+(*------------------------------------------------------------------*)
+(** {2 Parsing, printing, and conversions} *)
+
+(** This module defines several kinds of expressions, they are
+    all parsed from the same datatype.
+    A parse item may be a system symbol or the projection of a system
+    symbol and, when the item corresponds to a single system,
+    it may come with an alias identifying the single system as some
+    projection of the multisystem in construction. *)
+type parse_item = {
+  system     : Symbols.lsymb;
+  projection : Symbols.lsymb option;
+  alias      : Symbols.lsymb option
+}
+
+type parsed_t = parse_item list Location.located
+
+(** Parsing relies on [any], [any_compatible_with] and [make_fset]. *)
+val parse : Symbols.table -> parsed_t -> arbitrary
+
+type parsed_sys_cnt =
+  | NoSystem
+  | System   of parsed_t
+  | Set_pair of parsed_t * parsed_t
+
+type parsed_sys = [`Local | `Global] * parsed_sys_cnt
+
+val parse_sys : Symbols.table -> parsed_sys -> context
