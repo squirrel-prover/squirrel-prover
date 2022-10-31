@@ -1,3 +1,5 @@
+module L = Location
+
 (** A system expression is used to indicate to which systems a formula
     applies. Some formulas apply to any system, others apply to any number of
     systems, and equivalence formulas only make sense relative to
@@ -264,28 +266,30 @@ val print_system : Symbols.table -> _ expr -> unit
 (*------------------------------------------------------------------*)
 (** {2 Parsing, printing, and conversions} *)
 
-(** This module defines several kinds of expressions, they are
-    all parsed from the same datatype.
-    A parse item may be a system symbol or the projection of a system
-    symbol and, when the item corresponds to a single system,
-    it may come with an alias identifying the single system as some
-    projection of the multisystem in construction. *)
-type parse_item = {
-  system     : Symbols.lsymb;
-  projection : Symbols.lsymb option;
-  alias      : Symbols.lsymb option
-}
+module Parse : sig
+  (** This module defines several kinds of expressions, they are
+      all parsed from the same datatype.
+      A parse item may be a system symbol or the projection of a system
+      symbol and, when the item corresponds to a single system,
+      it may come with an alias identifying the single system as some
+      projection of the multisystem in construction. *)
+  type item = {
+    system     : Symbols.lsymb;
+    projection : Symbols.lsymb option;
+    alias      : Symbols.lsymb option
+  }
 
-type parsed_t = parse_item list Location.located
+  type t = item list L.located
 
-(** Parsing relies on [any], [any_compatible_with] and [make_fset]. *)
-val parse : Symbols.table -> parsed_t -> arbitrary
+  (** Parsing relies on [any], [any_compatible_with] and [make_fset]. *)
+  val parse : Symbols.table -> t -> arbitrary
 
-type parsed_sys_cnt =
-  | NoSystem
-  | System   of parsed_t
-  | Set_pair of parsed_t * parsed_t
+  type sys_cnt =
+    | NoSystem
+    | System   of t
+    | Set_pair of t * t
 
-type parsed_sys = [`Local | `Global] * parsed_sys_cnt
+  type sys = [`Local | `Global] * sys_cnt
 
-val parse_sys : Symbols.table -> parsed_sys -> context
+  val parse_sys : Symbols.table -> sys -> context
+end

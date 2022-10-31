@@ -517,7 +517,7 @@ let () =
 
 (** User printing query *)
 type print_query =
-  | Pr_system    of SE.parsed_t option (* [None] means current system *)
+  | Pr_system    of SE.Parse.t option (* [None] means current system *)
   | Pr_statement of lsymb
   
 (*------------------------------------------------------------------*)

@@ -197,7 +197,7 @@ let transitivity_systems new_context s =
 let trans_tac args s =
   match args with
   | [TacticsArgs.SystemAnnot annot] ->
-    let context = SE.parse_sys (ES.table s) annot in
+    let context = SE.Parse.parse_sys (ES.table s) annot in
     fun sk fk ->
       begin match transitivity_systems context s with
         | l -> sk l fk

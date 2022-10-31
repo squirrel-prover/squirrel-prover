@@ -300,7 +300,7 @@ let do_print (state : main_state) (q : Prover.print_query) : main_state =
           | None -> hard_failure (Failure "no default system");
         end
 
-      | Some s -> SystemExpr.parse state.table s
+      | Some s -> SystemExpr.Parse.parse state.table s
     in
     SystemExpr.print_system state.table system;
 

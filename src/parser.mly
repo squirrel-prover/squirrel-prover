@@ -990,8 +990,8 @@ global_formula:
  * ----------------------------------------------------------------------- */
 
 system_item:
-| i=lsymb               { SE.{ alias = None; system = i; projection = None   } }
-| i=lsymb SLASH p=lsymb { SE.{ alias = None; system = i; projection = Some p } }
+| i=lsymb               { SE.Parse.{ alias = None; system = i; projection = None   } }
+| i=lsymb SLASH p=lsymb { SE.Parse.{ alias = None; system = i; projection = Some p } }
 
 system_item_list:
 | i=system_item                          {  [i] }
@@ -1001,12 +1001,12 @@ system_expr:
 | LBRACKET s=loc(system_item_list) RBRACKET   { s }
 
 system_annot:
-|                                             { SE.NoSystem }
-| LBRACKET l=loc(system_item_list) RBRACKET   { SE.System l }
+|                                             { SE.Parse.NoSystem }
+| LBRACKET l=loc(system_item_list) RBRACKET   { SE.Parse.System l }
 | LBRACKET
     SET COLON s=loc(system_item_list) SEMICOLON
   EQUIV COLON p=loc(system_item_list)
-  RBRACKET                                    { SE.Set_pair (s,p) }
+  RBRACKET                                    { SE.Parse.Set_pair (s,p) }
 
 /* -----------------------------------------------------------------------
  * Statements and goals

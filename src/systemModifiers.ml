@@ -112,7 +112,7 @@ let clone_system_map
 
 (*------------------------------------------------------------------*)
 let parse_single_system_name table sdecl : SE.fset * System.Single.t =
-  let res = SE.parse table sdecl.Decl.from_sys in
+  let res = SE.Parse.parse table sdecl.Decl.from_sys in
   match SE.(to_list (to_fset res)) with
   | [_,s] -> SE.to_fset res, s
   | _ ->

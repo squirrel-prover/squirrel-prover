@@ -1,4 +1,6 @@
 module L = Location
+module SE = SystemExpr
+
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
@@ -68,7 +70,7 @@ type global_rule =
   | Rewrite of TacticsArgs.rw_arg list
 
 type system_modifier = { 
-  from_sys : SystemExpr.parsed_t;
+  from_sys : SE.Parse.t;
   modifier : global_rule;
   name     : Theory.lsymb
 }

@@ -1,4 +1,5 @@
 open Utils
+
 module L = Location
 
 type error =
@@ -395,91 +396,93 @@ let print_system (table : Symbols.table) (system : _ expr) : unit =
 (*------------------------------------------------------------------*)
 (** {2 Parsing} *)
 
-type parse_item = {
-  system     : Symbols.lsymb;
-  projection : Symbols.lsymb option;
-  alias      : Symbols.lsymb option
-}
+module Parse = struct
+  type item = {
+    system     : Symbols.lsymb;
+    projection : Symbols.lsymb option;
+    alias      : Symbols.lsymb option
+  }
 
-type parsed_t = parse_item list Location.located
+  type t = item list L.located
 
-let parse_single table item =
-  if item.alias <> None then
-    raise (Invalid_argument "SystemExpr.Single.parse");
-  let sys = System.of_lsymb table item.system in
-  match item.projection with
+  let parse_single table item =
+    if item.alias <> None then
+      raise (Invalid_argument "SystemExpr.Single.parse");
+    let sys = System.of_lsymb table item.system in
+    match item.projection with
     | None ->
-        begin match System.projections table sys with
-          | [p] -> System.Single.make table sys p
-          | _ -> error Missing_projection
-        end
+      begin match System.projections table sys with
+        | [p] -> System.Single.make table sys p
+        | _ -> error Missing_projection
+      end
     | Some p ->
-        System.Single.make table sys (Term.proj_from_string (L.unloc p))
+      System.Single.make table sys (Term.proj_from_string (L.unloc p))
 
-let parse table p = match Location.unloc p with
-  | [] ->
+  let parse table p = match L.unloc p with
+    | [] ->
       (* Default system annotation. We might make it mean "any" eventually
          but for now "default" avoids changing most files. *)
       of_system table
-        (System.of_lsymb table (Location.mk_loc Location._dummy "default"))
+        (System.of_lsymb table (L.mk_loc L._dummy "default"))
 
-  | [{ system = { pl_desc = "any" }; projection = None; alias = None}] ->
+    | [{ system = { pl_desc = "any" }; projection = None; alias = None}] ->
       any
 
-  | [{ system = { pl_desc = "any" }; projection = Some system}] ->
+    | [{ system = { pl_desc = "any" }; projection = Some system}] ->
       any_compatible_with (System.of_lsymb table system)
 
-  | [{ system; projection = None; alias = None}] ->
+    | [{ system; projection = None; alias = None}] ->
       of_system table (System.of_lsymb table system)
 
-  | l ->
-    let labels =
-      List.map (fun i ->
-          Utils.omap (Term.proj_from_string -| L.unloc) i.alias
-        ) l 
-    in
-    let l =
-      List.map (fun i -> parse_single table { i with alias = None }) l
-    in
-    make_fset table ~labels l
+    | l ->
+      let labels =
+        List.map (fun i ->
+            Utils.omap (Term.proj_from_string -| L.unloc) i.alias
+          ) l 
+      in
+      let l =
+        List.map (fun i -> parse_single table { i with alias = None }) l
+      in
+      make_fset table ~labels l
 
-(*------------------------------------------------------------------*)
-type parsed_sys_cnt =
-  | NoSystem
-  | System   of parsed_t
-  | Set_pair of parsed_t * parsed_t
+  (*------------------------------------------------------------------*)
+  type sys_cnt =
+    | NoSystem
+    | System   of t
+    | Set_pair of t * t
 
-type parsed_sys = [`Local | `Global] * parsed_sys_cnt
+  type sys = [`Local | `Global] * sys_cnt
 
-(*------------------------------------------------------------------*)
-let empty = Location.(mk_loc _dummy [])
+  (*------------------------------------------------------------------*)
+  let empty = L.(mk_loc _dummy [])
 
-let parse_local_context table : parsed_sys_cnt -> context = function
-  | NoSystem ->
-    { set = parse table empty ; pair = None }
-  | System s ->
-    let set = parse table s in
-    { set ; pair = None }
-  | Set_pair (s,p) ->
-    let set = parse table s in
-    let pair = Some (to_pair (parse table p)) in
-    { set ; pair }
+  let parse_local_context table : sys_cnt -> context = function
+    | NoSystem ->
+      { set = parse table empty ; pair = None }
+    | System s ->
+      let set = parse table s in
+      { set ; pair = None }
+    | Set_pair (s,p) ->
+      let set = parse table s in
+      let pair = Some (to_pair (parse table p)) in
+      { set ; pair }
 
-let parse_global_context table : parsed_sys_cnt -> context = function
-  | NoSystem ->
-    let set = parse table empty in
-    let pair = to_pair set in
-    { set ; pair = Some pair }
-  | System s ->
-    let set = parse table s in
-    let pair = to_pair set in
-    { set ; pair = Some pair }
-  | Set_pair (s,p) ->
-    let set = parse table s in
-    let pair = Some (to_pair (parse table p)) in
-    { set ; pair }
+  let parse_global_context table : sys_cnt -> context = function
+    | NoSystem ->
+      let set = parse table empty in
+      let pair = to_pair set in
+      { set ; pair = Some pair }
+    | System s ->
+      let set = parse table s in
+      let pair = to_pair set in
+      { set ; pair = Some pair }
+    | Set_pair (s,p) ->
+      let set = parse table s in
+      let pair = Some (to_pair (parse table p)) in
+      { set ; pair }
 
-let parse_sys table ((k,p_system) : parsed_sys) : context =
-  match k with
-  | `Local  -> parse_local_context  table p_system
-  | `Global -> parse_global_context table p_system
+  let parse_sys table ((k,p_system) : sys) : context =
+    match k with
+    | `Local  -> parse_local_context  table p_system
+    | `Global -> parse_global_context table p_system
+end

@@ -63,7 +63,7 @@ module Parsed : sig
     name    : Theory.lsymb option;
     ty_vars : Theory.lsymb list;
     vars    : Theory.bnds;
-    system  : SE.parsed_sys;
+    system  : SE.Parse.sys;
     formula : contents
   }
 

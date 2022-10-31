@@ -1,3 +1,6 @@
+module L = Location
+module SE = SystemExpr
+
 (** Syntax of declarations parsed by the prover. The processing of the
     declarations is done later, in the Prover module. *)
 
@@ -79,7 +82,7 @@ type global_rule =
     the original system, the global rule to apply, and the name of 
     the new system. *)
 type system_modifier = { 
-  from_sys : SystemExpr.parsed_t;
+  from_sys : SE.Parse.t;
   modifier : global_rule;
   name     : Theory.lsymb
 }
@@ -143,6 +146,6 @@ type declaration_i =
   | Decl_abstract of abstract_decl
   | Decl_bty      of bty_decl
 
-type declaration = declaration_i Location.located
+type declaration = declaration_i L.located
 
 type declarations = declaration list
