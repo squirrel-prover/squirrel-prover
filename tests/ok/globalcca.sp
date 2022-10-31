@@ -71,8 +71,23 @@ split => //.
 fadup 5.
 expand output@B.
 
-ifeq 5,fst(input@B), fst(output@A).
-intro _ => //.
+have -> :
+if (exec@pred (B) &&
+       A < B &&
+       fst (input@B) = fst (output@A) && snd (input@B) = snd (output@A)) then
+     diff(
+       h (ok,
+          try find  such that (fst (input@B) = enc (n_CCA, r, pk (kenc)))
+          in n
+          else dec (fst (input@B), kenc)), ideal) =
+if (exec@pred (B) &&
+       A < B &&
+       fst (input@B) = fst (output@A) && snd (input@B) = snd (output@A)) then
+     diff(
+       h (ok,
+          try find  such that (fst (output@A) = enc (n_CCA, r, pk (kenc)))
+          in n
+          else dec (fst (output@A), kenc)), ideal) by admit. 
 
 have ->: forall (b, b', b'' : boolean, x, y : message),
  if b && b' && b'' then diff(x,y) =

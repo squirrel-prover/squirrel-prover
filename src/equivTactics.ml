@@ -1145,53 +1145,6 @@ let () = T.register_general "expandseq"
 
 
 (*------------------------------------------------------------------*)
-(* TODO: remove this tactic *)
-let ifeq Args.(Pair (Int i, Pair (Message (t1,ty1), Message (t2,ty2)))) s =
-
-  (* check that types are equal *)
-  check_ty_eq ty1 ty2;
-
-  let before, e, after = split_equiv_goal i s in
-
-  let cond, positive_branch, negative_branch =
-    match e with
-    | Term.Fun (fs,_,[c;t;e]) when fs = Term.f_ite -> (c, t, e)
-    | _ -> soft_failure
-             (Tactics.Failure "Can only be applied to a conditional.")
-  in
-  let new_elem =
-    Term.mk_ite
-      cond
-      (Term.subst [Term.ESubst (t1,t2)] positive_branch)
-      negative_branch
-  in
-  let biframe = List.rev_append before (new_elem :: after) in
-
-  let trace_s =
-    ES.(to_trace_sequent
-          (set_reach_goal
-             (Term.mk_impl ~simpl:false cond (Term.mk_atom `Eq t1 t2))
-             s))
-  in
-
-  [ Goal.Trace trace_s;
-    Goal.Equiv (ES.set_equiv_goal biframe s) ]
-
-let () = T.register_typed "ifeq"
-    ~general_help:"If the given conditional implies the equality of the two \
-                   given terms, substitute the first one by the second one \
-                   inside the positive branch of the conditional."
-
-    ~detailed_help:"This asks to prove that the equality is indeed implied by \
-                    the condition, we can then replace any term by its equal \
-                    term (with over-whelming probability) in the positive \
-                    brannch."
-    ~tactic_group:Structural
-    ~pq_sound:true
-    (LT.genfun_of_efun_arg ifeq) Args.(Pair (Int, Pair (Message, Message)))
-
-
-(*------------------------------------------------------------------*)
 (** Automatic simplification *)
 
 let goal_is_reach s =
