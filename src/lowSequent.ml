@@ -125,10 +125,7 @@ let setup_set_goal_in_context ~old_context ~new_context ~table =
      - Other local hypotheses can be kept with a projection from the old
        to the new system, when it exists. *)
   let update_local f =
-    if Term.is_pure_timestamp f then
-      Some f
-    else
-      Utils.omap (fun project -> project f) set_projections
+    Utils.omap (fun project -> project f) set_projections
   in
 
   (* For global hypotheses:
