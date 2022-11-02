@@ -1398,7 +1398,7 @@ let () =
          \n\n\
          When applied, all occurrences of left elements of the biframe \
          are rewritten by their corresponding right elements. \
-         All macros in the goal must be rewritten, or the tactic fails.\
+         All macros in the goal must be rewritten, or the tactic fails. \
          Default direction is left-to-right (can be changed using `-`).";
       tactic_group = Structural;
       usages_sorts = [] }

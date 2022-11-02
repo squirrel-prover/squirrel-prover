@@ -118,12 +118,8 @@ let setup_set_goal_in_context ~old_context ~new_context ~table =
         None
   in
 
-  (* For local hypotheses, the following criteria are used:
-     - Pure trace formulas are kept.
-       These formulas cannot contain diff operators and thus don't need
-       to be projected.
-     - Other local hypotheses can be kept with a projection from the old
-       to the new system, when it exists. *)
+  (* A local hypothesis can be kept with a projection from the old to
+     the new system, when it exists. *)
   let update_local f =
     Utils.omap (fun project -> project f) set_projections
   in
@@ -140,11 +136,15 @@ let setup_set_goal_in_context ~old_context ~new_context ~table =
   let rec can_keep_global = function
     | Equiv.Quant (_,_,f) :: l ->
         can_keep_global (f::l)
+
     | Impl (f,g) :: l | Equiv.And (f,g) :: l | Or (f,g) :: l ->
         can_keep_global (f::g::l)
+
     | Atom (Equiv _) :: l -> pair_unchanged && can_keep_global l
+
     | Atom (Reach a) :: l ->
-        (Term.is_pure_timestamp a || set_unchanged) && can_keep_global l
+      (Term.is_pure_timestamp a || set_unchanged) && can_keep_global l
+        
     | [] -> true
   in
   let update_global f =
