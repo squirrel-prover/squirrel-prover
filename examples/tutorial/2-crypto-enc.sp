@@ -82,13 +82,12 @@ name r1 : message.
 global goal enc_0 : 
   equiv(
     pk(n), 
-    diff(enc(a, r0, pk(n)), (* *) enc(b, r0, pk(n)))
+    diff(enc(a, r0, pk(n)), enc(b, r0, pk(n)))
   ).
 Proof.
-  cca1 1.
+  cca1 1. simpl. (* TODO ~simpl in mk_ite does sth really weird *)
   rewrite len_diff len_a len_b.
   refl.
-  auto.
 Qed.
 
 (* Which of the following formulas can be proven using `cca1`?

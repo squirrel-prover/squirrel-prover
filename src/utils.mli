@@ -35,6 +35,11 @@ module List : sig
   val flattensplitmap :
     ('a -> 'b list * 'c list) -> 'a list -> 'b list * 'c list
 
+  (** Takes a list of n lists [a1;…;an], and assuming each ai has m elements,
+      returns [b1;…;bm] where bi = [a1i;…;ani].
+      Fails if all ai do not have the same length *)
+  val megacombine : 'a list list -> 'a list list
+     
   val inclusion : 'a list -> 'a list -> bool
 
   (** [diff a b] is [a] minus [b]'s elements  *)

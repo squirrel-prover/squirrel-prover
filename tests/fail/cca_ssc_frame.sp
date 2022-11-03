@@ -28,6 +28,6 @@ Proof.
  + auto.
  + rewrite /frame /output /exec /cond.
    fa 0; fa 1; fa 2.
-   nosimpl(enrich pk(sk)).
-   checkfail cca1 2 exn BadSSCDetailed.
+   (* cca1 does not conclude because of sk *)
+   checkfail (by cca1 1) exn GoalNotClosed.
 Abort.

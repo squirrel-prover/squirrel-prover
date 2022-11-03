@@ -517,6 +517,8 @@ Qed.
 
 set showStrengthenedHyp=true.
 
+name keyFresh : message.
+
 (*------------------------------------------------------------------*)
 global goal equiv_real_ideal_enrich (t : timestamp):
   [happens(t)] ->
@@ -557,22 +559,55 @@ Proof.
           * case U. by rewrite if_false. by destruct U as [_ _].
 
       - rewrite if_then_then in 3.
-        assert (forall(pid0 : index), (not (pid = pid0) && Setup(pid0) <= t) = (Setup(pid0) < t)) as H. 
-     { intro pid0; case pid = pid0 => _ /=.
-      by rewrite eq_iff.
-      by rewrite le_lt.}
+        assert (forall(pid0 : index), (not (pid = pid0) && Setup(pid0) <= t) = (Setup(pid0) < t)) as H. {
+          intro pid0; case pid = pid0 => _ /=.
+        by rewrite eq_iff.
+        by rewrite le_lt.
+      }.
 
       rewrite H -le_pred_lt in 3.
       rewrite /AEAD in 1.
       fa 1.
       rewrite /AEAD in 4.
       rewrite /* in 0.
-      cca1 2; 2:auto.
+      cca1 2. 
+      rewrite if_true // in 2. 
       rewrite !len_pair len_diff in 2.
       namelength k(pid), k_dummy(pid)=> -> /=.
-      rewrite /* in 0.
-      rewrite diff_refl => /=.
-      by apply Hind (pred(t)).
+      rewrite diff_refl in 2. 
+
+      remember zeroes (len (k_dummy(pid)) ++
+                (len (mpid pid) ++ len (sid(pid)) ++ c_pair) ++ c_pair) as tlen => Eq_len.
+      (* transitivity reasoning, to get rid of the key *)
+      trans 2 : enc (tlen, rinit(pid), keyFresh). 
+      * have ->:
+         diff(
+           enc (tlen, rinit(pid), mkey),
+           enc (tlen, rinit(pid), keyFresh)) 
+         =
+         enc (tlen, rinit(pid), diff(mkey,keyFresh))
+        by project. 
+        rewrite Eq_len; enckp 2, enc(_, rinit(pid), diff(mkey, keyFresh)), keyFresh; 1: auto. 
+        
+        fa 2; fa 2.
+        fresh 4. 
+        fresh 3; rewrite if_true // in 3.
+        rewrite /* in 0.
+        by apply Hind (pred t).
+        
+        (* rewrite (diff_apply enc) in 2. *) (* TODO: anomaly *)
+        (*  *)
+      * have ->:
+          diff(
+            enc (tlen, rinit(pid), keyFresh),
+            enc (tlen, rinit(pid), mkey)) 
+          =
+          enc (tlen, rinit(pid), diff(keyFresh, mkey)) by project. 
+        rewrite Eq_len; enckp 2; 1: auto. 
+        fa 2; fa 2.
+        fresh 4.  
+        fresh 3; rewrite if_true in 3; 1: auto.
+        refl.
 
   + (* Decode(pid,j) *)
     repeat destruct Eq as [_ Eq].

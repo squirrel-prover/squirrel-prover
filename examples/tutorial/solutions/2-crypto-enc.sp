@@ -82,13 +82,12 @@ name r1 : message.
 global goal enc_0 : 
   equiv(
     pk(n), 
-    diff(enc(a, r0, pk(n)), (* *) enc(b, r0, pk(n)))
+    diff(enc(a, r0, pk(n)), enc(b, r0, pk(n)))
   ).
 Proof.
-  cca1 1.
+  cca1 1; simpl.
   rewrite len_diff len_a len_b.
   refl.
-  auto.
 Qed.
 
 (* Which of the following formulas can be proven using `cca1`?
@@ -98,34 +97,29 @@ Qed.
 global goal enc_1 : 
   equiv(
     pk(n), 
-    diff(enc(a, r0, pk(n)), (* *) enc(b, r0, pk(n))),
-    diff(enc(a, r1, pk(n)), (* *) enc(a, r1, pk(n)))
+    diff(enc(a, r0, pk(n)), enc(b, r0, pk(n))),
+    diff(enc(a, r1, pk(n)), enc(a, r1, pk(n)))
   ).
 Proof.
   (* BEGIN EXO *)
-  nosimpl cca1 1.
-  nosimpl cca1 2.
+  cca1 1; simpl.
+  cca1 2; simpl.
   rewrite len_diff len_a len_b.
   refl.
-  auto.
-  auto.
   (* END EXO *)
 Qed.
 
 global goal enc_2 : 
   equiv(
     pk(n), 
-    diff(enc(a, r0, pk(n)), (* *) enc(b, r0, pk(n))),
-    diff(enc(a, r0, pk(n)), (* *) enc(a, r0, pk(n)))
+    diff(enc(a, r0, pk(n)), enc(b, r0, pk(n))),
+    diff(enc(a, r0, pk(n)), enc(a, r0, pk(n)))
   ).
 Proof.
   (* BEGIN EXO *)
-  cca1 1.
-  cca1 2.
-  rewrite len_diff len_a len_b.
-  refl.
-  admit.  (* goal false because of the encryption randomness. *)
-  admit.  (* goal false because of the encryption randomness. *)
+  cca1 1. (* does nothing, because of the encryption randomness *)
+  cca1 2. (* does nothing, because of the encryption randomness *)
+  admit.
   (* END EXO *)
 Qed.
 

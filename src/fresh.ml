@@ -244,3 +244,27 @@ let fresh_equiv (i : int L.located) (s : ES.sequent) : ES.sequents =
 let fresh_equiv_tac args = match args with
   | [Args.Int_parsed i] -> wrap_fail_equiv (fresh_equiv i)
   | _ -> bad_args ()
+
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "fresh"
+    ~tactic_help:{
+      general_help = "Exploit the freshness of a name.";
+      detailed_help =
+        "Local sequent:\n\
+         Given a message equality M of the form t=n, \
+         add an hypothesis expressing that n is a subterm of t.\
+         This condition checks that all occurences of the same name \
+         in other actions cannot have happened before this action.\n\
+         Global sequent:\n\
+         Removes a name if fresh: \
+         replace a name n by the term 'if fresh(n) then zero \
+         else n, where fresh(n) captures the fact that this specific \
+         instance of the name cannot have been produced by another \
+         action.";
+      usages_sorts = [Sort String; Sort Int];
+      tactic_group=Structural }
+    ~pq_sound:true
+    (LowTactics.gentac_of_any_tac_arg
+       fresh_trace_tac fresh_equiv_tac)

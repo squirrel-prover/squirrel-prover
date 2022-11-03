@@ -44,7 +44,8 @@ let get_bad_occs
     (m:term)
     (k:Name.t)
     (int_f:Symbols.fname) (* function with integrity (hash, signature) *)
-    ?(pk_f:Symbols.fname option=None) (* public key function. Must be None iff hash *)
+    ?(pk_f:Symbols.fname option=None) (* public key function.
+                                         Must be None iff hash *)
     (retry_on_subterms : (unit -> NO.n_occs * int_occs))
     (rec_call_on_subterms :
        (fv:Vars.vars ->
@@ -198,7 +199,8 @@ checksign(m, s, pk(k)), hash(m, k) = t, or the symmetric equality")
         begin
           match NO.expand_macro_check_all info tk with
           | Name _ as k when Symbols.is_ftype f Symbols.Hash table ->
-            Some {ep_key=Name.of_term k; ep_intmsg=m; ep_term=t'; ep_int_f=f; ep_pk_f=None}
+            Some {ep_key=Name.of_term k; ep_intmsg=m; ep_term=t';
+                  ep_int_f=f; ep_pk_f=None}
           | _ -> None
         end
       | _ -> None
@@ -221,7 +223,8 @@ checksign(m, s, pk(k)), hash(m, k) = t, or the symmetric equality")
             match Theory.check_signature table f g, 
                   NO.expand_macro_check_all info tk with
             | Some sg, (Name _ as k) ->
-              {ep_key= Name.of_term k; ep_intmsg=m; ep_term=s; ep_int_f=sg; ep_pk_f=Some g}
+              {ep_key= Name.of_term k; ep_intmsg=m; ep_term=s;
+               ep_int_f=sg; ep_pk_f=Some g}
             | _ -> fail ()
           end
         | _ -> fail ()

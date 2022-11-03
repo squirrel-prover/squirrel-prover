@@ -181,9 +181,25 @@ module List = struct
 
   let flattensplitmap (f:'a -> 'b list * 'c list) (l:'a list)
     : 'b list * 'c list =
-  let x,y = List.split (List.map f l) in
-  List.flatten x, List.flatten y
+  let x,y = split (map f l) in
+  flatten x, flatten y
 
+  (** Takes a list of n lists [a1;…;an], and assuming each ai has m elements,
+      returns [b1;…;bm] where bi = [a1i;…;ani].
+      Fails if all ai do not have the same length *)
+  let megacombine (l:'a list list) : 'a list list =
+    let rec aux l ll =
+      match l with
+      | [] -> ll
+      | a::t -> aux t (map2 cons a ll)
+    in
+    let ini =
+      match l with 
+      | [] -> []
+      | a::_ -> init (List.length a) (fun _ -> [])
+    in
+    aux (rev l) ini
+     
   (*------------------------------------------------------------------*)
   let mapi_fold 
       (f  : int -> 'a -> 'b -> 'a * 'c) 

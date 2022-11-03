@@ -77,7 +77,7 @@ let partition_powers
   let l, r =
     List.partition
       (function
-        | Term.Name _ as n -> Name.exists_symb (Name.of_term n) nab
+        | Term.Name _ as n -> Name.exists_name (Name.of_term n) nab
         | _ -> false)
       pows
   in
@@ -143,10 +143,7 @@ let get_bad_occs
       (* the others are bad occs *)
       let bad_pows_occs =
         List.concat_map
-          (fun nn -> 
-             List.map
-               (fun nnn -> NO.mk_nocc nn nnn fv cond (fst info) st)
-               (Name.find_symb nn nab))
+          (fun nn -> NO.find_name_occ nn nab fv cond (fst info) st)
           bad_pows_minus_1
       in
       (* look recursively in the other pows,
@@ -170,12 +167,10 @@ let get_bad_occs
     soft_failure
       (Tactics.Failure "can only be applied on ground terms")
       
-  | Name (_, nargs) as n when Name.exists_symb (Name.of_term n) nab ->
+  | Name (_, nargs) as n when Name.exists_name (Name.of_term n) nab ->
     (* one of the nab: generate occs for all potential collisions *)
     let occs1 =
-      List.map
-        (fun nn -> NO.mk_nocc (Name.of_term n) nn fv cond (fst info) st)
-        (Name.find_symb (Name.of_term n) nab)
+      NO.find_name_occ (Name.of_term n) nab fv cond (fst info) st
     in
     (* rec call on the arguments *)
     let occs2, _ = rec_call nargs in

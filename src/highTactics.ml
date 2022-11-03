@@ -67,26 +67,6 @@ let () =
     ~pq_sound:true
     (LT.gentac_of_any_tac_arg TraceTactics.fa_tac EquivTactics.fa_tac)
 
-(*------------------------------------------------------------------*)
-let () =
-  T.register_general "fresh"
-    ~tactic_help:{
-      general_help = "Exploit the freshness of a name.";
-      detailed_help = "Local sequent:\n\
-                       Given a message equality M of the form t=n, \
-                       add an hypothesis expressing that n is a subterm of t.\
-                       This condition checks that all occurences of the same name \
-                       in other actions cannot have happened before this action.\n\
-                       Global sequent:\n\
-                       Removes a name if fresh: \
-                       replace a name n by the term 'if fresh(n) then zero \
-                       else n, where fresh(n) captures the fact that this specific \
-                       instance of the name cannot have been produced by another \
-                       action.";
-      usages_sorts = [Sort String; Sort Int];
-      tactic_group=Structural }
-    ~pq_sound:true
-    (LT.gentac_of_any_tac_arg Fresh.fresh_trace_tac Fresh.fresh_equiv_tac)
 
 (*------------------------------------------------------------------*)
 let () = T.register_general "induction"

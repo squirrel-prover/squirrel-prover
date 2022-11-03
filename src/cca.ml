@@ -1,160 +1,455 @@
-(** Utilities for CCA-based tactics. *)
+(* IND-CCA1 equiv tactic *)
+open Term
+open Utils
 
-(* TODO: better error message, see [OldEuf] *)
-exception Bad_ssc
+module Args = TacticsArgs
+module L = Location
+module SE = SystemExpr
+module NO = NameOccs
+module ER = EncRandom
+module ES = EquivSequent
+module LT = LowTactics
+module T = Prover.ProverTactics
 
-class check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)
-  inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
-  method visit_message t = match t with
-    | Term.Fun (fn, _, [Tuple [m;r;k]]) when fn = enc_fn && Term.diff_names k ->
-      self#visit_message m; self#visit_message r
-    | Term.Fun (fn, _, [Tuple [m;k]]) when fn = dec_fn && Term.diff_names k ->
-      self#visit_message m
-    | Term.Name (ns,_) when ns.s_symb = key_n -> raise Bad_ssc
-    | Term.Var m ->
-      let ty = Vars.ty m in
-      if ty <> Type.tindex && ty <> Type.ttimestamp then
-        raise Bad_ssc
+module Name = NameOccs.Name
 
-    | _ -> super#visit_message t
-end
-
-let symenc_key_ssc ?(messages=[]) ?(elems=[]) ~cntxt enc_fn dec_fn key_n =
-  let ssc = new check_symenc_key ~cntxt enc_fn dec_fn key_n in
-  List.iter ssc#visit_message messages ;
-  List.iter ssc#visit_message elems ;
-  SystemExpr.iter_descrs cntxt.table cntxt.system
-    (fun action_descr ->
-       ssc#visit_message (snd action_descr.condition) ;
-       ssc#visit_message (snd action_descr.output) ;
-       List.iter (fun (_,_,t) -> ssc#visit_message t) action_descr.updates)
+type sequent = ES.sequent
 
 
-(* Iterator to check that the given randoms are only used in random seed
-   position for encryption. *)
-class check_rand ~cntxt enc_fn randoms = object (self)
-  inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
-  method visit_message t = match t with
-    | Term.Fun (fn, _, [Tuple [m1;Term.Name _; m2]]) when fn = enc_fn ->
-      self#visit_message m1; self#visit_message m2
-
-    | Term.Fun (fn, _, [Tuple [_; _; _]]) when fn = enc_fn ->
-      raise Bad_ssc
-
-    | Term.Name (ns,_) when List.mem ns.s_symb randoms ->
-      Tactics.soft_failure (Tactics.SEncRandomNotFresh)
-
-    | Term.Var m ->
-      let ty = Vars.ty m in
-      if ty <> Type.tindex && ty <> Type.ttimestamp then
-        Tactics.soft_failure
-          (Tactics.Failure "No universal quantification over \
-                            messages allowed")
-    | _ -> super#visit_message t
-end
-
-(* Check that the given randoms are only used in random seed position for
-   encryption. *)
-let random_ssc
-    ?(messages=[]) ?(elems=[])
-    ~cntxt enc_fn randoms =
-  let ssc = new check_rand ~cntxt enc_fn randoms in
-  List.iter ssc#visit_message messages;
-  List.iter ssc#visit_message elems;
-  SystemExpr.iter_descrs cntxt.table cntxt.system
-    (fun action_descr ->
-       ssc#visit_message (snd action_descr.condition) ;
-       ssc#visit_message (snd action_descr.output) ;
-       List.iter (fun (_,_,t) -> ssc#visit_message t) action_descr.updates)
+module MP = Match.Pos
+module Sp = MP.Sp
 
 
-  (* Given cases produced by an OldEuf.mk_rule for some symmetric encryption
-     scheme, check that all occurences of the encryption use a dedicated
-     randomness.
-     It checks that:
-      - a randomness is only used inside a randomness position
-      - there does not exists two messages from different place with the
-     same randomness
-      - if inside an action A[I], the encryption enc(m,r,sk) is produced,
-       the index variables appearing in both m and I should also appear in r.
+(*------------------------------------------------------------------*)
+let wrap_fail = LT.EquivLT.wrap_fail
+let soft_failure = Tactics.soft_failure
 
-     This could be refined into a tactic where we ask to prove that encryptions
-     that use the same randomness are done on the same plaintext. This is why we
-     based ourselves on messages produced by OldEuf.mk_rule, which should simplify
-     such extension if need. *)
-let check_encryption_randomness
-    ~cntxt case_schemata cases_direct enc_fn messages elems =
-  let encryptions : (Term.term * Vars.var list) list =
-    List.map (fun case ->
-        case.OldEuf.message,
-        Action.get_args_v case.OldEuf.action
-      ) case_schemata
-    @
-    List.map (fun case -> case.OldEuf.d_message, []) cases_direct
+
+(** Replaces any name with the same symbol as n with tsub in t.
+    Use at your own risks when n has arguments
+    (will not recursively look in them) *)
+let rec subst_name (n:Name.t) (tsub:Term.term) (t:Term.term) : term =
+  match t with
+  | Name (n', _) when n' = n.symb -> tsub
+  | _ -> Term.tmap (subst_name n tsub) t
+
+
+(** Checks that there is no diff or binder in t above any name
+    with the same symbol as n.
+    Does not unfold any macro (meant to be used after rewriting
+    in indcca_param, so we know that no occurrence of n can be
+    under a macro) *)
+let rec check_nodiffbind (n:Name.t) (t:term) : bool =
+  if not (ER.has_name n t) then true
+  else
+    match t with
+    | Diff (Explicit _) -> false
+    | _ when Term.is_binder t -> false
+    | _ -> Term.tforall (check_nodiffbind n) t
+
+
+(** returns true iff f is a symmetric or asymmetric encryption function *)
+let is_enc (table:Symbols.table) (f:Symbols.fname) =
+  Symbols.(is_ftype f AEnc table || is_ftype f SEnc table)
+
+(** Returns true iff t contains an encryption function.
+    does not unfold macros. *)
+let rec has_enc (table:Symbols.table) (t:term) : bool =
+  match t with
+  | Term.Fun (f, _, _) when is_enc table f -> true
+  | _ -> Term.texists (has_enc table) t
+
+(** Checks that each term ti in ts is f(argsi) for the same f,
+    if so returns f and the list [args1;…;argsn]. 
+    Does the same if each ti is Tuple(argsi). *)
+let same_head_function (ts:Term.terms) :
+  ((Symbols.fname * Type.ftype) option * Term.terms list) option =
+  let rec aux ts f =
+    match ts, f with
+    | [], _ -> f
+    | (Term.Fun (fs', ft', args))::ll, Some (Some (fs, ft), largs)
+      when fs = fs' && ft = ft' ->
+      aux ll (Some (Some (fs, ft), args::largs))
+    | (Term.Fun (fs, ft, args))::ll, None ->
+      aux ll (Some (Some (fs, ft), [args]))
+    | (Term.Tuple args)::ll, Some (None, largs) ->
+      aux ll (Some (None, args::largs))
+    | (Term.Tuple args)::ll, None ->
+      aux ll (Some (None, [args]))
+    | _ -> None
   in
-  let encryptions = List.sort_uniq Stdlib.compare encryptions in
+  aux (List.rev ts) None
 
-  let randoms = 
-    List.map (function
-        | Term.Fun (_, _, [Tuple [_; Name (r,_); _]]), _-> r.s_symb
-        | _ ->  Tactics.soft_failure Tactics.SEncNoRandom
-      ) encryptions
-  in
-  random_ssc ~elems ~messages ~cntxt enc_fn randoms;
-
-  (* TODO: AST: this test is insufficient. Crypto tactic rework ? *)
-  (* we check that encrypted messages based on indices, do not depend on free
-     indices instantiated by the action w.r.t the indices of the random. *)
-  if List.exists (function
-      | Term.Fun (_, _, [Tuple [m; Name (_n,n_args); _]]), 
-        (actidx : Vars.var list) ->
-        let vars = Term.get_vars m in
-        let n_args_vars =
-          (* keep only term in [n_args] which are top-level variables *)
-          List.filter_map (function
-              | Term.Var v -> Some v
-              | _ -> None       (* could allow [Tuple \[Var _; ...; Var _\]] *)
-            ) n_args
+(** Moves any diff that is above an encryption function down
+    as much as possible, stopping once it gets under the enc.
+    Also moves diffs under tuples. *)
+(* TODO this is very ad hoc, do we have a generic mechanism for this?
+   If not, do we want one? *)
+let rec move_diff (table:Symbols.table) (t:term) : term =
+  match t with
+  | Diff (Explicit l) ->
+    let (lp, lt) = List.split l in
+    begin
+      match same_head_function lt with
+      | Some (Some (fs, ft), largs) when has_enc table t ->
+        (* diff over a function -> move it under
+           (only if there is still an enc below) *)
+        let largs = List.megacombine largs in
+        let largs = List.map
+            (fun args -> Term.mk_diff (List.combine lp args))
+            largs
         in
+        let t = Term.mk_fun0 fs ft largs in
+        Term.tmap (move_diff table) t
 
-        List.exists (fun v ->
-            (* TODO: the test below is insufficient, and needs to check 
-               that this holds not only for [actidx], but for all bound 
-               variables (see issue #179). *)
-            (List.mem v actidx) && not (List.mem v n_args_vars)
-            (* we fail if there exists a variable appearing in the message,
-               which is an indice instantiated by the action description,
-               and it does not appear in the random. *)
-          ) vars
-      | _ -> assert false
-    ) encryptions
-  then
-    Tactics.soft_failure Tactics.SEncSharedRandom;
+      | Some (None, largs) ->
+        (* diff over a tuple -> move it under *)
+        let largs = List.megacombine largs in
+        let largs = List.map
+            (fun args -> Term.mk_diff (List.combine lp args))
+            largs
+        in
+        let t = Term.mk_tuple largs in
+        Term.tmap (move_diff table) t
 
-  (* we check that no encryption is shared between multiple encryptions *)
-  let enc_classes = Utils.classes (fun m1 m2 ->
-      match m1, m2 with
-      | (Term.Fun (_, _, [Tuple [m1; Name (r,_) ; k1]]),_),
-        (Term.Fun (_, _, [Tuple [m2; Name (r2,_); k2]]),_) ->
-        r.s_symb = r2.s_symb &&
-        (m1 <> m2 || k1 <> k2)
-      (* the patterns should match, if they match inside the declaration
-         of randoms *)
-      | _ -> assert false
-    ) encryptions in
+      | _ -> Term.tmap (move_diff table) t
+    end
+  | _ -> Term.tmap (move_diff table) t
+      
+  
 
-  if List.exists (fun l -> List.length l > 1) enc_classes then
-    Tactics.soft_failure Tactics.SEncSharedRandom
+(*------------------------------------------------------------------*)
+(** IND-CCA tactic *)
+
+(** parameters for the indcca tactic *)
+type indcca_param = {
+  ip_enc     : Symbols.fname;        (* encryption function *)
+  ip_dec     : Symbols.fname;        (* decryption function *)
+  ip_pk      : Symbols.fname option; (* associated public key function,
+                                        for the asymmetric case *)
+  ip_context : Term.term;            (* context around the ciphertext *)
+  ip_cname   : Name.t;               (* fresh name standing in for the
+                                        ciphertext in the context *)
+  ip_table   : Symbols.table;        (* updated table with an entry xc *)
+  ip_plain   : Term.term;            (* plaintext *)
+  ip_rand    : Term.term;            (* randomness *)
+  ip_key     : Term.term;            (* key. Note: we don't force the rand
+                                        and key to be names, as they may be
+                                        eg diffs. We check later (after
+                                        projection) that we get names. *)
+}
 
 
-let symenc_rnd_ssc ~cntxt env head_fn ~key ~key_is elems =
-  let rule =
-    OldEuf.mk_rule
-      ~fun_wrap_key:None
-      ~elems ~drop_head:false
-      ~allow_functions:(fun _ -> false)
-      ~cntxt ~env ~mess:Term.empty ~sign:Term.empty
-      ~head_fn ~key_n:key.Term.s_symb ~key_is
+(** Finds the parameters of the cca application *)
+let indcca_param
+    ~(loc:L.t)
+    (t:Term.term)    (* element in the goal where we want to apply cca *)
+    (s:sequent)    
+  : indcca_param
+  = 
+  let table = ES.table s in
+  let secontx = ES.system s in
+  let sys = ES.get_system_pair s in 
+  let hyps = ES.get_trace_hyps s in
+  let t = move_diff table t in (* move the diffs under the enc,
+                                            as much as possible *)
+
+  (* rw_rule trying to rewrite an instance of f(xm,xr,xk) into xc *)
+  (* use "Tuple [xm;xr;xk]" to retrieve the value of vars once instantiated *) 
+  let mk_rewrule
+      (f:Symbols.fname)
+      (cty:Type.ty) (mty:Type.ty) (rty:Type.ty) (kty:Type.ty) :
+    Rewrite.rw_rule * Symbols.table * Name.t =
+    let xcdef = Symbols.{n_fty = Type.mk_ftype [] [] cty} in
+    let table, xcs =
+      Symbols.Name.declare table (L.mk_loc L._dummy "X") xcdef
+    in
+    let xc = Name.{symb=Term.mk_symb xcs cty; args=[]} in
+    let xm = Vars.make_fresh mty "M" in
+    let xr = Vars.make_fresh rty "R" in
+    let xk = Vars.make_fresh kty "K" in
+    {rw_tyvars = [];
+     rw_system = SE.to_arbitrary sys;
+     rw_vars = Vars.Sv.of_list1 [xm; xr; xk];
+     rw_conds = [mk_eq ~simpl:false
+                   (mk_tuple [mk_var xm; mk_var xr; mk_var xk])
+                   mk_false];
+     rw_rw = (mk_fun_tuple table f [mk_var xm; mk_var xr; mk_var xk]),
+             (Name.to_term xc);},
+    table,
+    xc
   in
-  check_encryption_randomness ~cntxt
-    rule.OldEuf.case_schemata rule.OldEuf.cases_direct head_fn [] elems
+  
+  (* go through all encryption functions, try to find a ciphertext *)
+  let res = Symbols.Function.fold
+      (fun f _ _ x -> (* for all functions:*)
+         match x with
+         | None when is_enc table f ->
+           (* f is an encryption symbol: try to find a ctxt *)
+           let fty, _ = Symbols.Function.get_def f table in
+           let cty = fty.fty_out in
+           let mty, rty, kty =
+             match fty.fty_args with
+             | [Type.Tuple [x;y;z]] -> x,y,z
+             | _ -> assert false
+           in
+           
+           let rule, table, xc = mk_rewrule f cty mty rty kty in
+           let res =
+             Rewrite.rewrite
+               table secontx InSequent hyps TacticsArgs.Once
+               rule
+               Equiv.(Global (Atom (Equiv [t])))
+           in
+           begin
+             match res with
+             | Rewrite.RW_Result rr -> Some (f, rr, table, xc)
+             | _ -> None
+           end           
+         | _ -> x) (* already found, or f is another function *)
+      None
+      table
+  in
+
+  match res with
+  | None -> (* no ciphertext was rewritten *)
+    Printer.pr "lol  %a\n" Term.pp t;
+    soft_failure ~loc (Tactics.Failure "no ciphertext found")
+      
+  | Some (enc_f, (ccc, [(_, l)]), table, xc) -> (* a ciphertext was found *)
+    let dec_f, pk_f = (* get the associated dec and pk functions *)
+      match Symbols.Function.get_data enc_f table with
+      | Symbols.AssociatedFunctions [dec_f] -> (* sym enc *)
+        (* sanity checks *)
+        assert (Symbols.is_ftype enc_f Symbols.SEnc table);
+        assert (Symbols.is_ftype dec_f Symbols.SDec table);
+        dec_f, None
+      | Symbols.AssociatedFunctions [dec_f; pk_f] -> (* asym enc *)
+        (* sanity checks *)
+        assert (Symbols.is_ftype enc_f Symbols.AEnc table);
+        assert (Symbols.is_ftype dec_f Symbols.ADec table);
+        assert (Symbols.is_ftype pk_f Symbols.PublicKey table);
+        dec_f, (Some pk_f)
+      | _ -> assert false
+    in
+
+    (* get the context *)
+    let cc =
+      match (Equiv.any_to_equiv ccc) with
+      | Equiv.(Atom (Equiv [cc])) -> cc
+      | _ -> assert false
+    in
+                  
+    (* get the content of variables from the conditions *)
+    let m,r,k =
+      match l with
+      | Term.(Fun (ff, _, [Tuple [m; r; k]; fff])) when
+          ff = Term.f_eq && fff = Term.mk_false ->
+        m,r,k
+      | _ -> assert false
+    in
+
+    (* only thing left is checking there's no diff or binders
+       above xc in cc *)
+    if not (check_nodiffbind xc cc) then 
+      soft_failure ~loc
+        (Tactics.Failure 
+           "no diff or binder allowed above the ciphertext for cca");
+    (* return the parameters *)
+    {ip_enc=enc_f; ip_dec=dec_f; ip_pk=pk_f; ip_context=cc;
+     ip_cname=xc; ip_plain=m; ip_rand=r; ip_key=k; ip_table=table}
+
+  | _ -> assert false
+        
+        
+
+(** Constructs the formula expressing that in the proj
+    of (the biframe + the context cc
+       the plaintext m, the random r, the key k):
+   - no decryption with k is present above var xc in cc
+   - the proj of k is correctly used
+   - the proj of the randomness r does not occur elsewhere
+   - the other randoms are fresh.
+   Note that cc contains a name xc meant to be replaced with the ciphertext.
+   So we take subc the term to substitute xc with in the resulting formula.
+   IMPORTANT: this only works because we don't apply CCA under binders, so
+   subc contains no free vars and can just be substituted anywhere. *)
+let phi_proj
+    (loc:L.t)
+    (contx:Constr.trace_cntxt)
+    (env:Vars.env)
+    (enc_f:Symbols.fname)
+    (dec_f:Symbols.fname)
+    (pk_f:Symbols.fname option)
+    (biframe:terms)
+    (cc:term)   (* context above the ciphertext in the goal *)
+    (m:term)
+    (k:term)
+    (r:term)
+    (xc:Name.t) (* stand-in for the ciphertext in cc. *)
+    (subc:term) (* what to substitute xc with in the end *)
+    (proj:proj) :
+  terms
+  =
+  (* project everything *)
+  let system_p = SE.project [proj] contx.system in
+  let contx_p = { contx with system = system_p } in
+  let cc_p = Term.project1 proj cc in
+  let m_p = Term.project1 proj m in
+  let subc_p = Term.project1 proj subc in
+
+  (* check that the rand and key, once projected, are names. *)
+  let k_p, r_p = 
+    match pk_f, Term.project1 proj k, Term.project1 proj r with
+    | None, (Name _ as kp), (Name _ as rp) -> (* sym enc: key is a name *)
+      Name.of_term kp, Name.of_term rp
+    | (Some pk_f), (Term.(Fun (pk_f',_,[Name _ as kp]))), (Name _ as rp)
+        when pk_f = pk_f' -> (* asym enc: key is a pk *)
+      Name.of_term kp, Name.of_term rp        
+    | _ -> soft_failure ~loc
+             (Tactics.Failure "Can only be applied on an encryption\
+                               where the random and (secret) key are names")
+  in
+  let frame_p = List.map (Term.project1 proj) biframe in
+
+  let pp_kr ppf () = Fmt.pf ppf "%a and %a" Name.pp k_p Name.pp r_p in
+  let pp_rand ppf () = Fmt.pf ppf "randomness" in
+
+  (* get the bad key and randomness occs, and the ciphertexts,
+     in frame + m + kargs + rargs. There, decryption with k is allowed. *) 
+  let get_bad_krc =
+    ER.get_bad_occs_and_ciphertexts
+      k_p [r_p] mk_false enc_f dec_f ~hash_f:None ~pk_f
+  in
+  (* discard the formulas generated for the ciphertexts themselves,
+     we don't use them for cca *)
+  let phis_kr, _, _, ciphertexts =
+    NO.occurrence_formulas_with_occs ~negate:true ~pp_ns:(Some pp_kr)
+      ER.ciphertext_formula
+      (get_bad_krc ~dec_allowed:ER.Allowed) contx_p env
+      (m_p::k_p.args@r_p.args@frame_p)
+  in
+
+  (* also get bad key and rand occs, and ciphertexts in the context cc.
+     There, decryption with k is allowed ONLY on subterms that do not contain
+     the variable xc (which stands for the challenge) *)
+  let phis_kr_cc, _, _, ciphertexts_cc =
+    NO.occurrence_formulas_with_occs ~negate:true ~pp_ns:(Some pp_kr)
+      ER.ciphertext_formula
+      (get_bad_krc ~dec_allowed:(ER.NotAbove xc)) contx_p env [cc_p]
+  in
+
+  let phis_kr = phis_kr @ phis_kr_cc in
+  let ciphertexts = ciphertexts @ ciphertexts_cc in
+  
+  (* in addition, the edge case where k and r have the same symbol generates an
+     additional condition: they must have different arguments.
+     since the ciphertext can't contain binders, the formula is easy.
+     If it could, it would need to be updated. *)
+  let phis_kr =
+    if k_p.symb.s_symb = r_p.symb.s_symb then
+      (mk_neqs ~simpl:true k_p.args r_p.args) :: phis_kr
+    else
+      phis_kr
+  in
+
+  (* formulas for the random freshness ONLY for symmetric enc *)
+  let get_bad_randoms =
+    ER.get_bad_randoms k_p ciphertexts enc_f
+  in
+  let _, phis_random =
+    if pk_f <> None then
+      NO.occurrence_formulas ~negate:true ~pp_ns:(Some pp_rand)
+        ER.randomness_formula
+        get_bad_randoms contx_p env (cc_p::m_p::k_p.args@r_p.args@frame_p)
+    else
+      [], []
+  in
+
+  (* finally, apply the substitution to the variable in cc *)
+  (* IT ONLY WORKS if all vars in the ciphertext are bound in the env,
+     not in binders *)
+  let phi_p = List.map (subst_name xc subc_p) (phis_kr @ phis_random) in 
+  
+  (* not removing duplicates here, as we already do that on occurrences. *)
+  (* probably fine, but we'll need to remove duplicates between
+     phi_l and phi_r *)
+  phi_p
+
+
+
+
+let indcca1 (i:int L.located) (s:sequent) : sequent list =
+  let contx = ES.mk_pair_trace_cntxt s in
+  let table = contx.table in
+  let env = ES.vars s in
+  let loc = L.loc i in
+
+  let proj_l, proj_r = ES.get_system_pair_projs s in
+
+  let before, e, after = LT.split_equiv_goal i s in
+  let biframe = List.rev_append before after in
+  
+  
+  (* get the parameters, enforcing that
+     cc does not contain diffs or binders above xc.
+     (at least the diff part could maybe be relaxed?) *)
+  let {ip_enc=enc_f; ip_dec=dec_f; ip_pk=pk_f; ip_context=cc;
+       ip_cname=xc; ip_table=tablexc; ip_plain=m; ip_rand=r; ip_key=k} =
+    indcca_param ~loc e s
+  in
+  let contxxc = {contx with table=tablexc} in
+
+  (* the ciphertext encrypting its length instead of m *)
+  let c_len = Term.(mk_fun table enc_f [mk_tuple [mk_zeroes (mk_len m); r; k]]) in
+
+  let phi_proj =
+    phi_proj loc contxxc env enc_f dec_f pk_f biframe cc m k r xc c_len
+  in
+  
+  Printer.pr "@[<v 0>Checking for side conditions on the left@; @[<v 0>";
+  let phi_l = phi_proj proj_l in
+          
+  Printer.pr "@]@,Checking for side conditions on the right@; @[<v 0>";
+  let phi_r = phi_proj proj_r in
+  Printer.pr "@]@]@;";
+
+  (* Removing duplicates. We already did that for occurrences, but
+     only within phi_l and phi_r, not across both *)
+  let cstate = Reduction.mk_cstate contx.table in
+  let phis =
+    Utils.List.remove_duplicate
+      (Reduction.conv cstate) (phi_l @ phi_r)
+  in
+
+  let phi = Term.mk_ands ~simpl:true phis in
+  let new_m = Term.(mk_ite ~simpl:false phi (mk_zeroes(mk_len m)) m) in
+  let new_c = Term.(mk_fun table enc_f [mk_tuple [new_m; r; k]]) in
+  let new_t = subst_name xc new_c cc in
+  let new_biframe = List.rev_append before (new_t::after) in
+  [ES.set_equiv_goal new_biframe s]
+
+  
+
+(*------------------------------------------------------------------*)
+let indcca1_tac args =
+  match args with
+  | [Args.Int_parsed i] -> wrap_fail (indcca1 i)
+  | _ -> LT.bad_args ()
+
+
+let () =
+  T.register_general "cca1"
+    ~tactic_help:{
+      general_help =
+        "Apply the cca1 axiom on all instances of a ciphertext.";
+      detailed_help =
+        "Whenever an encryption does not occur under a decryption \
+         symbol and uses a valid fresh random, we can specify that it \
+         hides the message.\
+         Encryptions are replaced by the \
+         encryption of the length of the plaintexts.";
+      usages_sorts = [];
+      tactic_group = Cryptographic }
+   ~pq_sound:true
+   (LT.gentac_of_etac_arg indcca1_tac)

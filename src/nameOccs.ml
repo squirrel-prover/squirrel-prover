@@ -28,11 +28,11 @@ module Name = struct
   let to_term { symb; args; } = Term.mk_name symb args
 
   (** looks for a name with the same symbol in the list *)
-  let exists_symb (n:t) (ns:t list) : bool =
+  let exists_name (n:t) (ns:t list) : bool =
     List.exists (fun nn -> n.symb.s_symb = nn.symb.s_symb) ns
 
   (** finds all names with the same symbol in the list *)
-  let find_symb (n:t) (ns:t list) : t list =
+  let find_name (n:t) (ns:t list) : t list =
     List.filter (fun nn -> n.symb.s_symb = nn.symb.s_symb) ns
 end
 
@@ -438,6 +438,17 @@ let mk_nocc
   mk_simple_occ n ncoll () fv cond ot st
 
 
+(** Finds all names with the same symbol in the list, returns the
+    corresponding n_occs *)
+let find_name_occ
+    (n:Name.t) (ns:Name.t list)
+    (fv:Vars.vars) (cond:Term.terms) (ot:occ_type) (st:Term.term)
+  : n_occs =
+  List.map
+    (fun (nn:Name.t) -> mk_nocc n nn fv cond ot st)
+    (Name.find_name n ns)
+    
+
 (** Removes from occs all occurrences subsumed by another *)
 let clear_subsumed_nameoccs
     (table : Symbols.table)
@@ -595,10 +606,10 @@ let find_occurrences
          in
 
          (* printing *)
-         if pp_ns <> None then
+         if pp_ns <> None && occs <> [] then
            Printer.pr "@[<hv 2>\
                        @[<hov 0>Direct bad occurrences@ @[%t@]in@ @[%a@]:@]\
-                       @;@[%a@]@]@;@;"
+                       @;@[%a@]@]@;@;@;"
              ppp Term.pp t pp_name_occs occs;
          dir_occs @ occs, dir_acc @ acc)
       ([], [])
@@ -641,8 +652,8 @@ let find_occurrences
   in
   
   (* printing *)
-  if pp_ns <> None then
-    Printer.pr "@;@[<hv 2>@[Bad occurrences@ @[%t@]in other actions:@]@;%a@]@;"
+  if pp_ns <> None && ind_occs <> [] then
+    Printer.pr "@[<hv 2>@[Bad occurrences@ @[%t@]in other actions:@]@;%a@]@;@;"
       ppp
       pp_name_occs ind_occs;
 
@@ -657,16 +668,18 @@ let find_occurrences
   let loccs' = List.length occs in
   let lsub = loccs - loccs' in
 
-  if pp_ns <> None then
+  if pp_ns <> None && loccs <> 0 then
     (Printer.pr
-       "@;Total: @[<v 0>%d bad occurrence%s@;"
+       "Total: @[<v 0>%d bad occurrence%s@;"
        loccs (if loccs = 1 then "" else "s");
      Printer.pr
        "%d of them %s subsumed by another@;"
        lsub (if lsub = 1 then "is" else "are");
      Printer.pr
-       "%d bad occurrence%s remaining@;@]@]@;"
+       "%d bad occurrence%s remaining@;@]"
        loccs' (if loccs' = 1 then "" else "s"));
+  if pp_ns <> None then
+    Printer.pr "@]";
   occs, acc
 
 
@@ -911,8 +924,8 @@ let occurrence_formula
     if not negate then
       mk_ands ~simpl:true (cond @ [phi_cnt])
     else
-      mk_impl ~simpl:true (mk_ands ~simpl:true cond) phi_cnt
-  in
+      mk_impls ~simpl:true cond phi_cnt
+  in 
 
   (* get in phi_cond_cnt the equalities forcing
      certain vars of the occ to be equal *)

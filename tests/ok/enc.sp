@@ -1,4 +1,4 @@
-
+include Basic.
 
 channel c
 name sk : message
@@ -25,10 +25,11 @@ Proof.
   
   expandall.
   fa 2; fa 3; fa 3; fa 3.  
-  cca1 3.
+  cca1 3. fa 3.
+  fresh 4.  
+  rewrite !if_true in *; [1,2: auto].
   
   admit 3.
   auto.
   
-  auto.
 Qed.

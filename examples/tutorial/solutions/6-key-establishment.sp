@@ -143,11 +143,12 @@ Proof.
   + (* A *)
     expandall; fa !<_,_>.
     fa (if _ then _), <_,_>.
-    cca1 5.
-    - have Hlen : len(diff(sk,zeroes(eta))) = len(sk) by project.
-      rewrite Hlen in 5.
-      apply IH.
-    - auto.
+    cca1 5. rewrite if_true // in 5.
+    have Hlen : len(diff(sk,zeroes(eta))) = len(sk) by project.
+    rewrite Hlen in 5.
+    fa 5.
+    fresh 5.
+    apply IH.
   + (* Bout *)
     expandall; fa !<_,_>.
     rewrite correct_key //.
@@ -300,14 +301,13 @@ Proof.
   intro _.
   trans [default/right,default/right].
   * by apply idealize_key_exchange.
-  * cca1 1.
-    - have Hlen :
-        len(diff(input@Bout,zeroes(input@Bout))) = 
-        len(input@Bout) 
-      by project.
-      rewrite Hlen.
-      refl.
-    - auto.
+  * cca1 1. rewrite if_true // in 1.
+    have Hlen :
+      len(diff(input@Bout,zeroes(input@Bout))) = 
+      len(input@Bout) 
+    by project.
+    rewrite Hlen.
+    refl.
   * sym.
     by apply idealize_key_exchange.
   (* END EXO *)

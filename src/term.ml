@@ -661,6 +661,9 @@ and fvs (terms : term list) : Sv.t =
 
 let get_vars t = fv t |> Sv.elements
 
+let has_var (v:Vars.var) (t:term) : bool =
+  List.mem v (get_vars t)
+    
 (*------------------------------------------------------------------*)
 type refresh_arg = [`Global | `InEnv of Vars.env ref ]
 
@@ -738,7 +741,7 @@ let texists (f : term -> bool) (t : term) : bool =
   tfold (fun t b -> f t || b) t false
 
 let tforall (f : term -> bool) (t : term) : bool =
-  tfold (fun t b -> f t || b) t false
+  tfold (fun t b -> f t && b) t true
 
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)

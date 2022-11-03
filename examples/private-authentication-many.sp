@@ -99,12 +99,13 @@ Proof.
   fa 3; fa 4; fa 4.
   enckp 4; 1: auto.
   enrich pk(kA(A)).
-  cca1 5; 2:auto.
-
+  cca1 5.
+  rewrite if_true in 5.  auto.
   (* Pushing conditional underneath len(_) *)
   rewrite if_len !length_pair.
   rewrite (if_same_branch (len(nB(A,i)) ++ len(nB(A,i)))) //.
-  fa 5; fa 5.
+  fa 5; fa 5; fa 5; fa 5.
+  fresh 5; rewrite if_true //.
   fresh 5; rewrite if_true //.
   by apply IH.
 Qed.

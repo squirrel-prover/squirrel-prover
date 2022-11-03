@@ -676,6 +676,10 @@ let () =
            try run ~test "tests/alcotest/ts_leq_not_lt.sp" with
            | Unfinished -> raise Ok)
     end ;
+(* TODO: rework these tests.
+   They were checking that the tactics failed as expected in cases
+   where they were not supposed to apply. However, these tactics have been 
+   generalised and now actually apply in these cases. *)
 (*    "SEnc Bad SSC - INTCTXT 1", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
@@ -700,7 +704,7 @@ let () =
            try run ~test "tests/alcotest/intctxt_sharedrndind.sp" with
            | Tactic_soft_failure (_,SEncSharedRandom) -> raise Ok)
     end ;*)
-    "Senc Bad SSC - CCA 1", `Quick, begin fun () ->
+   (* "Senc Bad SSC - CCA 1", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/cca_sharedrnd.sp" with
@@ -717,7 +721,7 @@ let () =
         (fun () ->
            try run ~test "tests/alcotest/cca_nornd.sp" with
            | Tactic_soft_failure (_,SEncNoRandom) -> raise Ok)
-    end ;
+    end ;*)
     "Axiom Systems - 0", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->

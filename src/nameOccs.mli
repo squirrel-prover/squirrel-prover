@@ -138,10 +138,10 @@ module Name : sig
   val subst : Term.subst -> t -> t
 
   (** looks for a name with the same symbol in the list *)
-  val exists_symb : t -> t list -> bool
+  val exists_name : t -> t list -> bool
 
   (** finds all names with the same symbol in the list *)
-  val find_symb : t -> t list -> t list
+  val find_name : t -> t list -> t list
 end
 
 type n_occ = (Name.t, unit) simple_occ
@@ -160,6 +160,15 @@ val mk_nocc :
   term ->      (* subterm (for printing) *)
   n_occ
 
+
+(** Finds all names with the same symbol in the list, returns the
+    corresponding n_occs *)
+val find_name_occ :
+  Name.t -> Name.t list ->
+  Vars.vars -> Term.terms -> occ_type -> Term.term ->
+  n_occs
+
+  
 (** {2 Searching for illegal name occurrences} *)
 
 (** Type of a function that takes a term, and generates

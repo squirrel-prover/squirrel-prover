@@ -280,7 +280,7 @@ let () =
   let tactic_help = Prover.{
     general_help = "Prove an equivalence by transitivity.";
     detailed_help =
-      "When trying to prove an equivalence with respect to an initial \
+      "With a system: When trying to prove an equivalence with respect to an initial \
        pair of systems, the tactic `trans [new_annotation]` will reduce \
        the goal to three new subgoals. Each subgoal will have as conclusion \
        an equivalence, and by transitivity the three equivalences imply \
@@ -289,9 +289,13 @@ let () =
        identical to the initial one, but understood with respect to \
        the new system annotation.\
        \n\n\
-       The three subgoals will in general have different system annotations \
-       than the initial goal. This change might force the dropping \
-       of some hypotheses. Other than that, hypotheses are unchanged.";
+       With a terms: the tactic `trans i1: t1, ..., in : tn` uses transitivity \
+       reasoning w.r.t. the intermediate equivalence obtained by replacing the \
+       terms i1 to in on the right by the terms t1 to tn.\
+       \n\n\
+       In both cases, the subgoals will in general have different \
+       system annotations than the initial goal, which might force dropping \
+       some hypotheses.";
     usages_sorts = [];
     tactic_group = Logical }
   in
@@ -990,7 +994,7 @@ let deprecated_fresh_mk_indirect
   Term.mk_forall ~simpl:true bv (Term.mk_impl disj form)
 
 
-(* kept for cca, enckp and xor. *)
+(* kept for enckp and xor. *)
 (** Construct the formula expressing freshness for some projection. *)
 let deprecated_mk_phi_proj
     (cntxt : Constr.trace_cntxt)
@@ -1629,204 +1633,6 @@ let () =
                   tactic_group = Logical}
     (LT.genfun_of_efun_arg const_seq_tac)
 
-(*------------------------------------------------------------------*)
-(** Symmetric encryption **)
-
-
-(** CCA1 *)
-
-let cca1 Args.(Int i) s =
-  let before, e, after = split_equiv_goal i s in
-
-  let biframe = List.rev_append before after in
-  let cntxt = mk_pair_trace_cntxt s in
-  let table = cntxt.table in
-  let env = ES.vars s in
-
-  let e = Term.head_normal_biterm e in
-
-  let get_subst_hide_enc
-      enc fnenc m fnpk (sk : Name.t) _fndec (r : Name.t) is_top_level
-    : Goal.t * Term.esubst
-    =
-    (* we check that the random is fresh, and the key satisfy the
-       side condition. *)
-
-    let term_sk = Term.mk_name sk.symb sk.args in
-    let term_r = Term.mk_name r.symb r.args in
-
-    (* we create the fresh cond reachability goal *)
-    let fresh_goal : Goal.t =
-      let form = deprecated_fresh_cond s (term_r) biframe in
-      let seq = ES.to_trace_sequent (ES.set_reach_goal form s) in
-      Goal.Trace seq
-    in
-
-    let new_subst : Term.esubst =
-      if is_top_level then
-        Term.ESubst (enc, Term.mk_len m)
-      else
-        let new_m = Term.mk_zeroes (Term.mk_len m) in
-        let enc_sk =
-          match fnpk with
-          | Some fnpk ->
-            Term.mk_fun table fnpk [term_sk]
-
-          | None -> term_sk
-        in
-        let new_term =
-          Term.mk_fun_tuple table fnenc [new_m; term_r; enc_sk]
-        in
-        Term.ESubst (enc, new_term)
-    in
-    (fresh_goal, new_subst)
-  in
-
-  (* if the term is an encryption at top level:
-     - then, we will replace the encryption by the plaintext's length
-     - else, we will replace the plaintext by its length *)
-  let is_top_level : bool =
-    match e with
-    | Term.Fun (fnenc, _,
-                [Tuple [_m; Term.Name _(* r *) ; 
-                        Term.Fun (fnpk, _, [Term.Name _ (* sk *)])]])
-      when (Symbols.is_ftype fnpk Symbols.PublicKey cntxt.table
-            && Symbols.is_ftype fnenc Symbols.AEnc table) -> true
-
-    | Term.Fun (fnenc, _, [Tuple [_m; Term.Name _ (* r *); Term.Name _ (* sk *)]])
-      when Symbols.is_ftype fnenc Symbols.SEnc table -> true
-
-    | _ -> false
-  in
-
-  (* search for the first occurrence of an asymmetric encryption in [e], that
-     do not occur under a decryption symbol. *)
-  (* FIXME: Adrien: the description is not accurrate *)
-  let hide_all_encs (occ : Iter.mess_occ) : Goal.t * Term.esubst =
-    (* FIXME: check that this is what we want. *)
-    if not (occ.Iter.occ_vars = []) then
-      soft_failure (Tactics.Failure "cannot be applied in a under a binder");
-
-    match occ.Iter.occ_cnt with
-    | Term.Fun (fnenc, _, [arg]) as enc
-      when Symbols.is_ftype fnenc Symbols.AEnc table ->
-
-      let m, r, sk, fnpk, fndec =
-        match Term.head_normal_biterm arg with
-        | Tuple [m; Term.Name _ as r; Term.Fun (fnpk, _, [Term.Name _ as sk])] ->
-          (* we check that the encryption function is used with the associated
-             public key *)
-          let fndec = match Symbols.Function.get_data fnenc table with
-            | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk ->
-              assert (Symbols.is_ftype fnpk Symbols.PublicKey table);
-              fndec
-
-            | _ ->
-              soft_failure
-                (Failure "the first encryption does not use the corresponding \
-                          public key.")
-          in
-          m, Name.of_term r, Name.of_term sk, fnpk, fndec
-        | _ ->
-          soft_failure (Failure "cannot determine the arguments of the \
-                                 first encryptions")
-      in
-      let errors =
-        OldEuf.key_ssc ~globals:true ~elems:(ES.goal_as_equiv s)
-          ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
-          ~cntxt fndec sk.symb.s_symb
-      in
-      if errors <> [] then
-        soft_failure (Tactics.BadSSCDetailed errors);
-
-      if not (List.mem
-                (Term.mk_fun table fnpk [Term.mk_name sk.symb sk.args])
-                biframe) then
-        soft_failure
-          (Tactics.Failure
-             "The public key must be inside the frame in order to \
-              use CCA1");
-
-      get_subst_hide_enc
-        enc fnenc m (Some fnpk)
-        sk fndec r is_top_level
-
-    | Term.Fun (fnenc, _, [args]) as enc 
-      when Symbols.is_ftype fnenc Symbols.SEnc table ->
-      let m, r, sk =
-        match Term.head_normal_biterm args with
-        | Tuple [m; Term.Name _ as r; Term.Name _ as sk] ->
-          m, Name.of_term r, Name.of_term sk
-        | _ ->
-          soft_failure (Failure "cannot determine the arguments of the \
-                                 first encryptions")
-      in
-
-      let fndec =
-        match Symbols.Function.get_data fnenc table with
-        | Symbols.AssociatedFunctions [fndec] -> fndec
-        | _ -> assert false
-      in
-      begin
-        try
-          Cca.symenc_key_ssc ~elems:(ES.goal_as_equiv s) ~messages:[enc]
-            ~cntxt fnenc fndec sk.symb.s_symb;
-          (* we check that the randomness is ok in the system and the
-               biframe, except for the encryptions we are looking at, which
-               is checked by adding a fresh reachability goal. *)
-          Cca.symenc_rnd_ssc ~cntxt env fnenc ~key:sk.symb ~key_is:sk.args biframe;
-          get_subst_hide_enc enc fnenc m (None) sk fndec r is_top_level
-
-        with Cca.Bad_ssc -> soft_failure Tactics.Bad_SSC
-      end
-
-    | _ ->
-      soft_failure
-        (Tactics.Failure
-           "CCA1 can only be applied on a term with at least one occurrence \
-            of an encryption term enc(t,r,pk(k))")
-  in
-
-  let rec hide_all_encs_list
-      (occs : Iter.mess_occs) : Goal.t list * Term.subst
-    =
-    match occs with
-    | [] -> [], []
-    | occ :: occs ->
-      let fgoal,subst = hide_all_encs occ in
-      let fgoals, substs = hide_all_encs_list occs in
-      fgoal :: fgoals, subst :: substs
-  in
-
-  let fgoals, substs =
-    hide_all_encs_list
-      ((Iter.get_ftypes ~excludesymtype:Symbols.ADec table Symbols.AEnc e)
-       @ (Iter.get_ftypes ~excludesymtype:Symbols.SDec table Symbols.SEnc e))
-  in
-
-  if substs = [] then
-    soft_failure
-      (Tactics.Failure
-         "CCA1 can only be applied on a term with at least one occurrence \
-          of an encryption term enc(t,r,pk(k))");
-
-  let new_elem = Equiv.subst_equiv substs [e] in
-  let biframe = (List.rev_append before (new_elem @ after)) in
-  Goal.Equiv (ES.set_equiv_goal biframe s) :: fgoals
-
-
-let () =
-  T.register_typed "cca1"
-   ~general_help:"Apply the cca1 axiom on all encryptions of the given message."
-   ~detailed_help:"Whenever an encryption does not occur under a decryption \
-                   symbol and uses a valid fresh random, we can specify that it \
-                   hides the message.
-                   Encryption at toplevel are replaced by the length of the \
-                   plaintext. Encryption not at toplevel are replaced by the \
-                   encryption of the length of the plaintexts."
-   ~tactic_group:Cryptographic
-   ~pq_sound:true
-   (LT.genfun_of_efun_arg cca1) Args.Int
 
 (*------------------------------------------------------------------*)
 (** Encryption key privacy  *)
@@ -1868,10 +1674,10 @@ let enckp arg (s : ES.t) =
         | Symbols.AssociatedFunctions [fndec] ->
           (fun (sk,system) ->
              let cntxt = Constr.{ cntxt with system } in
-             Cca.symenc_key_ssc
+             Oldcca.deprecated_symenc_key_ssc
                ~cntxt fnenc fndec
                ~elems:(ES.goal_as_equiv s) sk.Name.symb.s_symb;
-             Cca.symenc_rnd_ssc
+             Oldcca.deprecated_symenc_rnd_ssc
                ~cntxt env fnenc ~key:sk.Name.symb ~key_is:sk.Name.args biframe),
           (fun x -> x),
           k
@@ -1940,7 +1746,7 @@ let enckp arg (s : ES.t) =
           Equiv.subst_equiv [Term.ESubst (enc,Term.empty)] [e]
         in
         deprecated_fresh_cond s (Term.mk_name r.symb r.args) (context@biframe)
-      with Cca.Bad_ssc -> soft_failure Tactics.Bad_SSC
+      with Oldcca.Bad_ssc -> soft_failure Tactics.Bad_SSC
     in
     let fresh_goal =
       s |> ES.set_reach_goal random_fresh_cond |> ES.to_trace_sequent in
