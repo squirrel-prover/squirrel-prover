@@ -328,13 +328,21 @@ let case_tac (args : Args.parser_args) : LT.etac =
   wrap_fail (do_case_tac args)
 
 (*------------------------------------------------------------------*)
-(** For each element of the biframe, checks that it is a member of the
-  * hypothesis biframe. If so, close the goal.
-    If [hyp = Some id], only checks for hypothesis [id].  *)
-let assumption ?hyp s =
+(** Apply the entailment (i.e. bi-frame inclusion) and left-false rule.
+   
+    Entailment is checked by verifying that there exists an hypothesis H 
+    such that each element of the biframe in conclusion appears in H.
+
+    If [hyp = Some id], only checks for hypothesis [id]. *)
+let assumption ?(hyp : Ident.t option) (s : ES.t) : ES.t list =
   let goal = ES.goal s in
 
-  let in_atom =
+  let is_false : Equiv.form -> bool = function
+    | Equiv.Atom (Equiv.Reach f) -> ES.Reduce.conv_term s f Term.mk_false
+    | _ -> false
+  in
+
+  let in_atom : Equiv.atom -> bool =
     (* For equivalence goals, we look for inclusion of the goal in
        an existing equivalence hypothesis *)
     if ES.goal_is_equiv s then
@@ -352,9 +360,10 @@ let assumption ?hyp s =
 
   let in_hyp id f = 
     (hyp = None || hyp = Some id) &&
-    match f with
-    | Equiv.Atom at -> in_atom at
-    | _ as f -> ES.Reduce.conv_equiv s f goal
+    ( is_false f ||
+      (match f with
+       | Equiv.Atom at -> in_atom at
+       | _ as f -> ES.Reduce.conv_equiv s f goal))
   in
 
   if Hyps.exists in_hyp s
