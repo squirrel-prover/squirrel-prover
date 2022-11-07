@@ -51,6 +51,21 @@ let () =
 
 (*------------------------------------------------------------------*)
 let () =
+  T.register_general "constraints"
+    ~tactic_help:{
+      general_help =  "Tries to derive false from the trace formulas.";
+      detailed_help = "From ordering constraints on the timestamps, \
+                       checks that we can build an acyclic graph on \
+                       them, i.e., if they are a possible trace.";
+      usages_sorts = [Sort None];
+      tactic_group = Structural}
+    ~pq_sound:true
+    (LT.gentac_of_any_tac_arg
+       TraceTactics.constraints_tac
+       EquivTactics.constraints_tac)
+
+(*------------------------------------------------------------------*)
+let () =
   T.register_general "fa"
     ~tactic_help:{
       general_help = "Apply the function application rule.";

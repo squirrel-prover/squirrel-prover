@@ -15,6 +15,8 @@ module Args = HighTacticsArgs
 module L    = Location
 module SE   = SystemExpr
 
+module LT = LowTactics
+
 module TS = TraceSequent
 
 module Hyps = TS.LocalHyps
@@ -360,7 +362,7 @@ let constraints (s : TS.t) =
     TS.constraints_valid s
 
 (** [constraints s] proves the sequent using its trace formulas. *)
-let constraints_tac (s : TS.t) =
+let constraints_ttac (s : TS.t) =
   let s = as_seq1 (TraceLT.intro_all s) in
   match constraints s with
   | true ->
@@ -371,16 +373,10 @@ let constraints_tac (s : TS.t) =
    let () = dbg "constraints failed" in
    soft_failure (Tactics.Failure "constraints satisfiable")
 
-let () = T.register "constraints"
-    ~tactic_help:
-      {general_help = "Tries to derive false from the trace formulas.";
-       detailed_help = "From ordering constraints on the timestamps, \
-                        checks that we can build an acyclic graph on \
-                        them, i.e., if they are a possible trace.";
-       usages_sorts = [Sort None];
-       tactic_group = Structural}
-    ~pq_sound:true
-    (LowTactics.genfun_of_pure_tfun constraints_tac)
+let constraints_tac args : LT.ttac = 
+  match args with
+  | [] -> wrap_fail constraints_ttac
+  | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)
 (* SMT-based combination of constraints and congruence *)
@@ -1027,7 +1023,7 @@ let _simpl ~red_param ~close ~strong =
 (* Attempt to close a goal. *)
 let do_conclude =
   Tactics.orelse_list [wrap_fail congruence_tac;
-                       wrap_fail constraints_tac;
+                       wrap_fail constraints_ttac;
                        wrap_fail assumption]
 
 

@@ -394,6 +394,18 @@ let () =
                   tactic_group = Logical}
     (LT.genfun_of_efun byequiv_tac)
 
+(*------------------------------------------------------------------*)
+let constraints (s : ES.t) : ES.t list =
+  let s = ES.set_goal (Equiv.Atom (Equiv.Reach (Term.mk_false))) s in
+  let trace_s = ES.to_trace_sequent s in
+  List.map (fun s_t -> 
+      ES.set_goal (Equiv.Atom (Equiv.Reach (TS.goal s_t))) s
+    ) (TraceTactics.constraints_ttac trace_s)
+
+let constraints_tac args : LT.etac = 
+  match args with
+  | [] -> wrap_fail constraints
+  | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)
 (** [tautology f s] tries to prove that [f] is always true in [s]. *)
