@@ -21,7 +21,10 @@ sanity
 *.fdb_latexmk
 *.fls
 _coverage/
+_opam/
 *.coverage
 /src/commit.ml
 .DS_Store
 \#*\#
+.nvimrc
+.vimrc
