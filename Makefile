@@ -44,11 +44,13 @@ okfail_end: $(PROVER_TESTS:.sp=.ok)
 # $(BENCHDIR)/prev/$(NOW).json and create a new $(BENCHDIR)/all/last.json
 # A save of this bench is made in $(BENCHDIR)/all/$(NOW).json
 bench_example:
+	@echo "${GRE}BENCH: ↓ For more stability in timing you can underclock your CPU ↓ ${NC}"
+	@echo "${GRE}BENCH: it is recommanded to set /sys/devices/system/cpu/intel_pstate/no_turbo to 1${NC}"
 	@mkdir -p $(BENCHDIR)/prev
 	@mkdir -p $(BENCHDIR)/all
 	@$(ECHO) "$(NOW)"
 	@$(ECHO) "Running bench on examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
-	@$(MAKE) -j1 $(BENCHDIR)/tmp.json
+	@$(MAKE) -j4 $(BENCHDIR)/tmp.json
 	@echo "Verify tmp.json in $(BENCHDIR)/$(NOW).json…"
 	@if python -m json.tool $(BENCHDIR)/tmp.json > $(BENCHDIR)/prev/$(NOW).json \
 	 ; then $(ECHO) "Done" ; \
@@ -60,11 +62,6 @@ bench_example:
 	 ; then $(ECHO) "Done" ; \
 	 else $(ECHO) "[FAIL] Json malformed"; fi
 
-# This shows you the last benchmark compared to previous one
-# Needs `matplotlib` (pip install)
-plot: $(BENCHDIR)/all/last.json
-	python3 ./plot.py $(BENCHDIR)/all/last.json
-
 # The following rule populate the tmp.json file
 # in $(BENCHDIR) running /usr/bin/time on each example.
 # README → /usr/bin/time is not always installed by default in your OS !
@@ -74,6 +71,7 @@ $(BENCHDIR)/tmp.json: $(PROVER_EXAMPLES)
 	@for ex in $(PROVER_EXAMPLES); do \
 		printf "\"%s\" : " $${ex} >> $@ ; \
 		/usr/bin/time -a -o $@ -f "%U" ./squirrel $${ex} >/dev/null 2>/dev/null ; \
+		$(ECHO) -n .; \
 		if [ $$ex != $(lastword $(PROVER_EXAMPLES)) ]; then \
 		printf "," >> $@; \
 		else \
@@ -92,6 +90,7 @@ $(BENCHDIR)/all/last.json: $(BENCH_JSON)
 		echo $$filename; \
 		printf "\"%s\" : " $$filename >> $@; \
 		cat $${stat} >> $@; \
+		$(ECHO) -n .; \
 		if [ $$stat != $(lastword $(BENCH_JSON)) ]; then \
 		printf "," >> $@; \
 		else \
@@ -168,5 +167,99 @@ doc:
 version:
 	rm -f src/commit.ml
 	sed 's/GITHASH/$(GITHASH)/' < src/commit.ml.in > src/commit.ml
+
+ORA=\033[0;33m
+RED=\033[0;31m
+GRE=\033[0;32m
+NC=\033[0m
+OUT="$(BENCHDIR)/tmp.json"
+GITCOMMIT:=$(shell git rev-parse --short HEAD~1)
+LAST=`/usr/bin/ls -1t $(BENCHDIR)/prev/*.json | head -1`
+LAST2=`/usr/bin/ls -1t $(BENCHDIR)/prev/*.json | head -2 | tail -1`
+LAST_COMMIT=`/usr/bin/ls -1t $(BENCHDIR)/commits/*.json | head -1`
+PLOT=./plot.py
+
+# This shows you the last benchmark compared to the mean of all previous ones
+# Needs `matplotlib` (pip install)
+plot: $(BENCHDIR)/all/last.json
+	python3 $(PLOT) $(BENCHDIR)/all/last.json
+
+# This shows you the last benchmark compared to previous one
+# Needs `matplotlib` (pip install)
+plot_diff_last:
+	@echo "Compare ${ORA}$(LAST2)${NC} with ${GRE}$(LAST)${NC}"
+	python3 $(PLOT) $(LAST2) $(LAST) 
+
+# This shows you the last benchmark compared to the most recent commit bench
+# Needs `matplotlib` (pip install)
+plot_diff_commit:
+	@echo "Compare ${ORA}$(LAST_COMMIT)${NC} with ${GRE}$(LAST)${NC}"
+	python3 $(PLOT) $(LAST_COMMIT) $(LAST)
+
+# compare bench of current work with a specified commit in GITCOMMIT
+# GITCOMMIT is by default to HEAD~1
+bench_compare: 
+	@echo "${GRE}BENCH: ↓ For more stability in timing you can underclock your CPU ↓ ${NC}"
+	@echo "${GRE}BENCH: It is recommanded to set /sys/devices/system/cpu/intel_pstate/no_turbo to 1${NC}"
+	@$(MAKE) -j4 $(BENCHDIR)/commits/$(GITCOMMIT).json
+	@echo "Building ${GRE}master with current work${NC}"
+	@make
+	@$(MAKE) -j4 $(BENCHDIR)/tmp.json
+	@echo "Verify tmp.json in $(BENCHDIR)/$(NOW).json…"
+	@mkdir -p $(BENCHDIR)/prev
+	@if python -m json.tool $(BENCHDIR)/tmp.json > $(BENCHDIR)/prev/$(NOW).json \
+	 ; then $(ECHO) "Done" ; \
+	 else $(ECHO) "[FAIL] Json malformed"; fi
+	@rm -f $(BENCHDIR)/tmp.json
+	python3 $(PLOT) $(BENCHDIR)/commits/$(GITCOMMIT).json $(BENCHDIR)/prev/$(NOW).json 
+
+# Populate commits/$(GITCOMMIT).json by checking out $(GITCOMMIT)
+# And running the bench on its version
+# The current work is stashed away before and stashed back after
+# IF INTERRUPTED DON'T PANIC xP
+# YOU HAVE TO STASH YOUR WORK BACK WITH git stash apply
+$(BENCHDIR)/commits/%.json:
+	set -e
+	@if git cat-file -e $(GITCOMMIT)^{commit}; then \
+		echo "Compare with ${ORA}$(GITCOMMIT)${NC}"; \
+	else \
+		echo "${ORA}$(GITCOMMIT)${NC} does not exist"; \
+		exit 0; \
+	fi
+	@mkdir -p $(BENCHDIR)/commits
+	@mkdir -p $(BENCHDIR)/all
+	@echo "${RED}/!\ DO NOT INTERRUPT /!\ ${NC}"
+	@echo "${RED}If something goes wrong: ${NC}"
+	@echo "${RED}- If you are in version $(GITCOMMIT): git switch - ${NC}"
+	@echo "${RED}- If you want your current work back: git stash apply ${NC}"
+	@echo "${ORA}Stashing current work…${NC}"
+	git stash
+	@echo "Checkout ${ORA}$(GITCOMMIT)${NC}"
+	git checkout $(GITCOMMIT) --quiet  
+	@echo "Building ${ORA}$(GITCOMMIT)"
+	# Call the actual commit make
+	@make
+	@echo "Populate bench in $(OUT)"
+	@printf "{" > $(OUT)
+	@for ex in $(PROVER_EXAMPLES); do \
+		printf "\"%s\" : " $${ex} >> $(OUT) ; \
+		/usr/bin/time -a -o $(OUT) -f "%U" ./squirrel $${ex} >/dev/null 2>/dev/null ; \
+		$(ECHO) -n .; \
+		if [ $$ex != $(lastword $(PROVER_EXAMPLES)) ]; then \
+		printf "," >> $(OUT); \
+		else \
+		printf "}" >> $(OUT); \
+		fi \
+	done
+	@echo
+	@echo "Verify tmp.json in $(BENCHDIR)/$(NOW).json…"
+	@if python -m json.tool $(BENCHDIR)/tmp.json > $(BENCHDIR)/commits/$(GITCOMMIT).json \
+	 ; then $(ECHO) "Done" ; \
+	 else $(ECHO) "[FAIL] Json malformed"; fi
+	@rm -f $(BENCHDIR)/tmp.json
+	@echo "${NC}Back to master…"
+	git switch -
+	@echo "${GRE}Stashing back current work…${NC}"
+	git stash apply --quiet
 
 .PHONY: version clean
