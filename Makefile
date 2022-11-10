@@ -129,9 +129,10 @@ clean:
 	@rm -f squirrel
 	rm -rf _coverage
 
-# Clean previous bench to compare with
+# Clean previous local bench
 clean_bench:
 	rm -f $(BENCHDIR)/*.json
+	rm -f $(BENCHDIR)/prev/*.json
 
 squirrel: version
 	dune build squirrel.exe
@@ -178,6 +179,7 @@ LAST=`/usr/bin/ls -1t $(BENCHDIR)/prev/*.json | head -1`
 LAST2=`/usr/bin/ls -1t $(BENCHDIR)/prev/*.json | head -2 | tail -1`
 LAST_COMMIT=`/usr/bin/ls -1t $(BENCHDIR)/commits/*.json | head -1`
 PLOT=./plot.py
+STASH_RAND:= $(shell bash -c 'echo $$RANDOM')
 
 # This shows you the last benchmark compared to the mean of all previous ones
 # Needs `matplotlib` (pip install)
@@ -231,9 +233,9 @@ $(BENCHDIR)/commits/%.json:
 	@echo "${RED}/!\ DO NOT INTERRUPT /!\ ${NC}"
 	@echo "${RED}If something goes wrong: ${NC}"
 	@echo "${RED}- If you are in version $(GITCOMMIT): git switch - ${NC}"
-	@echo "${RED}- If you want your current work back: git stash apply ${NC}"
-	@echo "${ORA}Stashing current work…${NC}"
-	git stash
+	@echo "${RED}- If you want your current work back: git stash pop --index $(STASH_RAND) ${NC}"
+	@echo "${ORA}Stashing current work as $(STASH_RAND)${NC}"
+	git stash -m "$(STASH_RAND)"
 	@echo "Checkout ${ORA}$(GITCOMMIT)${NC}"
 	git checkout $(GITCOMMIT) --quiet  
 	@echo "Building ${ORA}$(GITCOMMIT)"
@@ -259,7 +261,7 @@ $(BENCHDIR)/commits/%.json:
 	@rm -f $(BENCHDIR)/tmp.json
 	@echo "${NC}Back to master…"
 	git switch -
-	@echo "${GRE}Stashing back current work…${NC}"
-	git stash apply --quiet
+	@echo "${GRE}Stashing $(STASH_RAND) back current work…${NC}"
+	git stash list | grep "$(STASH_RAND)" && git stash pop --index --quiet
 
 .PHONY: version clean
