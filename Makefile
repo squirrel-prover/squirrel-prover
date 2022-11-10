@@ -10,15 +10,17 @@ all: squirrel test
 
 test: alcotest okfail example
 
-bench: bench_example 
+bench: bench_example
 
 .PHONY: okfail okfail_end example examples_end alcotest squirrel
 
 # Directory for logging test runs on "*.sp" files.
 RUNLOGDIR=_build/squirrel_log
-BENCHDIR=_build/squirrel_log/bench
+BENCHDIR=_build/bench
 
 NOW=`date +"%m_%d_%Y_%H_%M"`
+BENCH_OUT="$(BENCHDIR)/last.json"
+BENCH_COMMIT_OUT="$(BENCHDIR)/$(GITCOMMIT).json"
 
 # Make sure the "echo" commands in okfail below are updated
 # to reflect the content of these variables.
@@ -40,41 +42,17 @@ okfail_end: $(PROVER_TESTS:.sp=.ok)
     rm -f tests/tests.ko ; exit 1 ; \
 	 else $(ECHO) All tests passed successfully. ; fi
 
-# This rule run examples and record execution time into 
-# $(BENCHDIR)/prev/$(NOW).json and create a new $(BENCHDIR)/all/last.json
-# A save of this bench is made in $(BENCHDIR)/all/$(NOW).json
-bench_example:
+bench_preamble:
 	@echo "${GRE}BENCH: ↓ For more stability in timing you can underclock your CPU ↓ ${NC}"
 	@echo "${GRE}BENCH: it is recommanded to set /sys/devices/system/cpu/intel_pstate/no_turbo to 1${NC}"
 	@mkdir -p $(BENCHDIR)/prev
-	@mkdir -p $(BENCHDIR)/all
-	@$(ECHO) "$(NOW)"
-	@$(ECHO) "Running bench on examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
-	@$(MAKE) -j4 $(BENCHDIR)/tmp.json
-	@echo "Verify tmp.json and copy in $(BENCHDIR)/$(NOW).json…"
-	@if python3 -m json.tool $(BENCHDIR)/tmp.json > $(BENCHDIR)/prev/$(NOW).json \
-		; then \
-		echo "Done" ; \
-		rm -f $(BENCHDIR)/tmp.json ; \
-	 else \
-	 	rm -f $(BENCHDIR)/prev/$(NOW).json \
-		echo "${RED}[FAIL] Json malformed see $(BENCHDIR)/tmp.json${NC}"; \
-		false ;\
-	fi
-	@$(MAKE) $(BENCHDIR)/all/last.json
-	@echo "Verify last.json and copy in $(BENCHDIR)/all/$(NOW).json…"
-	@if python3 -m json.tool $(BENCHDIR)/all/last.json > $(BENCHDIR)/all/$(NOW).json\
-	 ; then $(ECHO) "Done" ; \
-	 else \
-	 	rm -f $(BENCHDIR)/all/$(NOW).json \
-		echo "${RED}[FAIL] Json malformed see $(BENCHDIR)/all/last.json${NC}"; \
-		false ;\
-	fi
+	@echo "$(NOW): current commit → ${GRE}$(HEAD)${NC}"
 
-# The following rule populate the tmp.json file
+# The following rule populate the $(BENCH_OUT) file
 # in $(BENCHDIR) running /usr/bin/time on each example.
 # README → /usr/bin/time is not always installed by default in your OS !
-$(BENCHDIR)/tmp.json: $(PROVER_EXAMPLES)
+$(BENCH_OUT): squirrel
+	@$(ECHO) "Running bench on examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 	@echo "Populate bench in $@"
 	@printf "{" > $@
 	@for ex in $(PROVER_EXAMPLES); do \
@@ -85,31 +63,43 @@ $(BENCHDIR)/tmp.json: $(PROVER_EXAMPLES)
 			$(ECHO) -n !; \
 		fi; \
 		if [ $$ex != $(lastword $(PROVER_EXAMPLES)) ]; then \
-		printf "," >> $@; \
-		else \
-		printf "}" >> $@; \
+			printf "," >> $@; \
 		fi \
 	done
+	@printf "}" >> $@
 	@echo
+
+# This rule run examples and record execution time into 
+# $(BENCHDIR)/prev/$(NOW).json and create a new $(BENCHDIR)/all/last.json
+# A save of this bench is made in $(BENCHDIR)/all/$(NOW).json
+bench_example: bench_preamble $(BENCH_OUT)
+	@echo "Verify $(BENCH_OUT) and copy in $(BENCHDIR)/$(NOW).json…"
+	@if python3 -m json.tool $(BENCH_OUT) > $(BENCHDIR)/prev/$(NOW).json \
+		; then \
+		echo "Done" ; \
+	 else \
+	 	rm -f $(BENCHDIR)/prev/$(NOW).json \
+		echo "${RED}[FAIL] Json malformed see $(BENCH_OUT)${NC}"; \
+		false ;\
+	fi
 
 # The following rule combine .json files from
 # $(BENCH_JSON) into $(BENCHDIR)/all/last.json
 # This directory aims to be an history of previous benchmarks
-$(BENCHDIR)/all/last.json: $(BENCH_JSON)
+$(BENCHDIR)/all/last.json:
+	@mkdir -p $(BENCHDIR)/all
 	@echo "Combining json files"
 	@printf "{" > $@
 	@for stat in $(BENCH_JSON); do \
 		filename=$$(basename $${stat} .json); \
-		echo $$filename; \
 		printf "\"%s\" : " $$filename >> $@; \
+		echo "$$filename OK"; \
 		cat $${stat} >> $@; \
-		$(ECHO) -n .; \
 		if [ $$stat != $(lastword $(BENCH_JSON)) ]; then \
-		printf "," >> $@; \
-		else \
-		printf "}" >> $@; \
-		fi; \
+			printf "," >> $@; \
+		fi \
 	done 
+	@printf "}" >> $@
 	@echo
 
 example: squirrel
@@ -146,7 +136,10 @@ clean:
 # Clean previous local bench
 clean_bench:
 	rm -f $(BENCHDIR)/*.json
-	rm -f $(BENCHDIR)/prev/*.json
+
+# Clean previous local bench
+clean_all_bench:
+	rm -rf $(BENCHDIR)
 
 squirrel: version
 	dune build squirrel.exe
@@ -154,7 +147,7 @@ squirrel: version
 
 # Run tests (forcing a re-run) with bisect_ppx instrumentation on
 # to get coverage files, and generate an HTML report from them.
-# TODO also generate coverage report when running squirrel on *.sp files,
+# TODO also generate coverage report when running squirrel on *.sp files,
 # with two options:
 # 1. The instrumentation option could be passed to dune exec squirrel,
 #    but the latter does not work (theories are not installed).
@@ -187,7 +180,7 @@ ORA=\033[0;33m
 RED=\033[0;31m
 GRE=\033[0;32m
 NC=\033[0m
-OUT="$(BENCHDIR)/tmp.json"
+HEAD:=$(shell git rev-parse --short HEAD)
 GITCOMMIT:=$(shell git rev-parse --short HEAD~1)
 LAST=`/usr/bin/ls -1t $(BENCHDIR)/prev/*.json | head -1`
 LAST2=`/usr/bin/ls -1t $(BENCHDIR)/prev/*.json | head -2 | tail -1`
@@ -197,7 +190,9 @@ STASH_RAND:= $(shell bash -c 'echo $$RANDOM')
 
 # This shows you the last benchmark compared to the mean of all previous ones
 # Needs `matplotlib` (pip install)
-plot: $(BENCHDIR)/all/last.json
+plot:
+	rm -f $(BENCHDIR)/all/last.json
+	$(MAKE) $(BENCHDIR)/all/last.json
 	python3 $(PLOT) $(BENCHDIR)/all/last.json
 
 # This shows you the last benchmark compared to previous one
@@ -214,24 +209,18 @@ plot_diff_commit:
 
 # compare bench of current work with a specified commit in GITCOMMIT
 # GITCOMMIT is by default to HEAD~1
-bench_compare: 
-	@echo "${GRE}BENCH: ↓ For more stability in timing you can underclock your CPU ↓ ${NC}"
-	@echo "${GRE}BENCH: It is recommanded to set /sys/devices/system/cpu/intel_pstate/no_turbo to 1${NC}"
-	@mkdir -p $(BENCHDIR)/prev
-	@echo "Building ${GRE}master with current work${NC}"
-	@make
-	@$(MAKE) -j4 $(BENCHDIR)/tmp.json
-	@echo "Verify tmp.json and copy in $(BENCHDIR)/prev/$(NOW).json…"
-	@if python3 -m json.tool $(BENCHDIR)/tmp.json > $(BENCHDIR)/prev/$(NOW).json \
+bench_compare: bench_preamble $(BENCH_OUT)
+	@echo "↑ Bench ${GRE}master with current work${NC} ↑"
+	@echo "Verify $(BENCH_OUT) and copy in $(BENCHDIR)/prev/$(NOW).json…"
+	@if python3 -m json.tool $(BENCH_OUT) > $(BENCHDIR)/prev/$(NOW).json \
 		; then \
 		echo "Done" ; \
-		rm -f $(BENCHDIR)/tmp.json ; \
 	 else \
 	 	rm -f $(BENCHDIR)/prev/$(NOW).json \
-		echo "${RED}[FAIL] Json malformed see $(BENCHDIR)/tmp.json${NC}"; \
+		echo "${RED}[FAIL] Json malformed see $(BENCH_OUT)${NC}"; \
 		false; \
 	fi
-	@$(MAKE) -j4 $(BENCHDIR)/commits/$(GITCOMMIT).json
+	@$(MAKE) $(BENCHDIR)/commits/$(GITCOMMIT).json
 	$(MAKE) plot_diff_commit
 
 # Populate commits/$(GITCOMMIT).json by checking out $(GITCOMMIT)
@@ -240,7 +229,6 @@ bench_compare:
 # IF INTERRUPTED DON'T PANIC xP
 # YOU HAVE TO STASH YOUR WORK BACK WITH git stash apply
 $(BENCHDIR)/commits/%.json:
-	set -e
 	@if git cat-file -e $(GITCOMMIT)^{commit}; then \
 		echo "Compare with ${ORA}$(GITCOMMIT)${NC}"; \
 	else \
@@ -248,7 +236,6 @@ $(BENCHDIR)/commits/%.json:
 		exit 0; \
 	fi
 	@mkdir -p $(BENCHDIR)/commits
-	@mkdir -p $(BENCHDIR)/all
 	@echo "${RED}/!\ DO NOT INTERRUPT /!\ ${NC}"
 	@echo "${RED}If something goes wrong: ${NC}"
 	@echo "${RED}- If you are in version $(GITCOMMIT): git switch - ${NC}"
@@ -260,30 +247,30 @@ $(BENCHDIR)/commits/%.json:
 	@echo "Building ${ORA}$(GITCOMMIT)"
 	# Call the actual commit make
 	@make
-	@echo "Populate bench in $(OUT)"
-	@printf "{" > $(OUT)
+	@echo "Populate bench in $(BENCH_COMMIT_OUT)"
+	@printf "{" > $(BENCH_COMMIT_OUT)
 	@for ex in $(PROVER_EXAMPLES); do \
-		printf "\"%s\" : " $${ex} >> $(OUT) ; \
-		if /usr/bin/time -q -a -o $(OUT) -f "%U" ./squirrel $${ex} >/dev/null 2>/dev/null; then \
+		printf "\"%s\" : " $${ex} >> $(BENCH_COMMIT_OUT) ; \
+		if /usr/bin/time -q -a -o $(BENCH_COMMIT_OUT) -f "%U" ./squirrel $${ex} >/dev/null 2>/dev/null; then \
 			$(ECHO) -n .; \
 		else \
 			$(ECHO) -n !; \
 		fi; \
 		if [ $$ex != $(lastword $(PROVER_EXAMPLES)) ]; then \
-		printf "," >> $(OUT); \
+		printf "," >> $(BENCH_COMMIT_OUT); \
 		else \
-		printf "}" >> $(OUT); \
+		printf "}" >> $(BENCH_COMMIT_OUT); \
 		fi \
 	done
 	@echo
-	@echo "Verify tmp.json and copy in $(BENCHDIR)/commits/$(GITCOMMIT).json…"
-	@if python3 -m json.tool $(BENCHDIR)/tmp.json > $(BENCHDIR)/commits/$(GITCOMMIT).json \
+	@echo "Verify $(BENCH_COMMIT_OUT) and copy in $(BENCHDIR)/commits/$(GITCOMMIT).json…"
+	@if python3 -m json.tool $(BENCH_COMMIT_OUT) > $(BENCHDIR)/commits/$(GITCOMMIT).json \
 		; then \
 		echo "Done" ; \
-		rm -f $(BENCHDIR)/tmp.json ; \
+		rm -f $(BENCH_COMMIT_OUT) ; \
 	 else \
 	 	rm -f $(BENCHDIR)/commits/$(GITCOMMIT).json \
-		echo "${RED}[FAIL] Json malformed: see $(BENCHDIR)/tmp.json${NC}"; \
+		echo "${RED}[FAIL] Json malformed: see $(BENCH_COMMIT_OUT)${NC}"; \
 		echo "${RED}[FAIL] The script wil ignore it and continue… ${NC}"; \
 	fi
 	@echo "${NC}Back to master…"
