@@ -275,7 +275,12 @@ $(BENCHDIR)/commits/%.json:
 	fi
 	@echo "${NC}Back to master…"
 	git switch -
-	@echo "${GRE}Stashing $(STASH_RAND) back current work…${NC}"
-	git stash list | grep "$(STASH_RAND)" && git stash pop --index --quiet
+	@echo "${GRE}Stashing $(STASH_RAND) back current work if it exists${NC}"
+	@if git stash list | grep "$(STASH_RAND)" && git stash pop --index --quiet \
+		; then \
+		echo "Done" ; \
+	else \
+		echo "No work pop back from stash"; \
+	fi
 
 .PHONY: version clean
