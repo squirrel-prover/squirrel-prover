@@ -1,10 +1,14 @@
-from sys import argv
+import sys
 import os
 import matplotlib.pyplot as plt
 import numpy as np
 import json
 
-IN_FILE = argv[1]
+IN_FILE = sys.argv[1]
+
+if not os.path.exists(IN_FILE):
+    print(IN_FILE + " was not generated, you may want to examinate tmp.json")
+    sys.exit()
 
 fig, ax = plt.subplots()
 plt.xticks(rotation=45, ha='right')
@@ -20,10 +24,12 @@ def bar(stat,col="red",label="unknown",left=True):
         ax.bar(x + width/2,yAxis,width,color=col,label=label)
     ax.set_xticks(x, xAxis)
 
-if len(argv)>2:
-    print(argv)
+if len(sys.argv)>2:
+    if not os.path.exists(sys.argv[2]):
+        print(sys.argv[2] + " was not generated, you may want to examinate tmp.json malformation")
+        sys.exit()
     first = json.load(open(IN_FILE, 'r'))
-    last = json.load(open(argv[2], 'r'))
+    last = json.load(open(sys.argv[2], 'r'))
     bar(first,col="grey",label=os.path.basename(IN_FILE))
     bar(last,col="red",label="last bench",left=False)
 
