@@ -1,5 +1,8 @@
 module SE = SystemExpr
 
+module Mt = Term.Mt
+module Mv = Vars.Mv
+              
 (*------------------------------------------------------------------*)
 (** - Huet's unification algorithm using union-find.
      See "Unification: A Multidisciplinary Survey" by Kevin Knight.
@@ -53,10 +56,20 @@ end = struct
     end)
 end
 
+(*------------------------------------------------------------------*)
+(** Stateful memoization for conversion of [Term.term] to [Vars.var],
+    which are then used to build a [ut] *)
+type memo = { 
+  mutable memo : Vars.var Mt.t;     (** Memoized results *)
+  mutable rev  : Term.term Mv.t     (** Reversed map *)
+}
 
+let mk_memo () : memo =
+  { memo = Mt.empty; rev = Mv.empty; }
+  
 (*------------------------------------------------------------------*)
 exception Unsupported
-  
+
 module Utv : sig
   type ut = { hash : int;
               cnt  : ut_cnt }
@@ -68,13 +81,13 @@ module Utv : sig
     | UInit
     | UUndef                    (* (x <> UUndef) iff. (Happens x) *)
 
-  val uts    : Term.term -> ut
   val uname  : Symbols.action -> ut list -> ut
   val upred  : ut -> ut
   val uinit  : ut
   val uundef : ut
 
-  val ut_to_term : ut -> Term.term
+  val term_to_ut : memo -> Term.term -> ut
+  val ut_to_term : memo -> ut -> Term.term
 
   module Ut : Hashtbl.HashedType with type t = ut
 
@@ -90,8 +103,8 @@ end = struct
     | UUndef
 
   (** Hash-consing.
-     In [hash] and [equal], we can assume that strit subterms
-     are properly hash-consed (but not the term itself). *)
+      In [hash] and [equal], we can assume that strit subterms
+      are properly hash-consed (but not the term itself). *)
   module Ut = struct
     type t = ut
 
@@ -139,22 +152,54 @@ end = struct
     if u.cnt = UInit || u.cnt = UUndef then uundef
     else UPred u |> make
 
-  (* TODO: allow to translate more terms *)
-  let rec uts (ts : Term.term) : ut = match ts with
-    | Term.Var tv -> uvar tv
-    | Term.Fun (fs, _, [ts]) when fs = Term.f_pred -> upred (uts ts)
-    | Term.Action (s,_) when s = Symbols.init_action -> uinit
-    | Term.Action (s,l) -> uname s (List.map uts l)
-    | _ -> raise Unsupported
+  (*------------------------------------------------------------------*)
+  (** Box a term. 
+      Uses memoization: convertible terms are boxed identically. *)
+  let box_term (memo : memo) (t : Term.term) : ut = 
+    let found = ref None in
+    Mt.iter (fun t' res ->
+        if Term.equal t t' then found := Some res
+      ) memo.memo;
+    match !found with
+    | None ->
+      let v = Vars.make_fresh (Term.ty t) "x" in
+      memo.memo <- Mt.add t v memo.memo;
+      memo.rev  <- Mv.add v t memo.rev;
 
-  let rec ut_to_term (ut : ut) : Term.term =
-    match ut.cnt with
-    | UVar v -> Term.mk_var v
-    | UName (a, is) ->
-      Term.mk_action a (List.map ut_to_term is)
-    | UPred ut -> Term.mk_pred (ut_to_term ut)
-    | UInit  -> Term.init
-    | UUndef -> assert false
+      uvar v
+    | Some v -> uvar v
+
+  (*------------------------------------------------------------------*)
+  let term_to_ut (memo : memo) (ts : Term.term) : ut =
+    let rec doit = function
+      | Term.Var tv -> uvar tv
+      | Term.Fun (fs, _, [ts]) when fs = Term.f_pred -> upred (doit ts)
+      | Term.Action (s,_) when s = Symbols.init_action -> uinit
+      | Term.Action (s,l) -> uname s (List.map doit l)
+
+      (* For arbitrary term, we use [box_term], which createa a fresh
+         variable and associate it to [t] (with memoisation).
+         We log this association to revert it later. *)
+      | t -> box_term memo t
+    in
+    doit ts
+      
+  let ut_to_term (memo : memo) (ut : ut) : Term.term =
+    let rec doit t =
+      match t.cnt with
+      | UVar v ->
+        (* revert the logged association if necessary *)
+        Mv.find_dflt (Term.mk_var v) v memo.rev
+
+      | UName (a, is) ->
+        Term.mk_action a (List.map doit is)
+
+      | UPred ut -> Term.mk_pred (doit ut)
+      | UInit  -> Term.init
+      | UUndef -> assert false
+    in
+    doit ut
+      
 end
 
 open Utv
@@ -267,17 +312,17 @@ module Form = struct
 
   (*------------------------------------------------------------------*)
   (** Builds a conjunction of clauses form a trace literal *)
-  let mk (lit : Term.literal) : conjunction =
+  let mk (memo : memo) (lit : Term.literal) : conjunction =
     let _mk atom =
       List.map (fun (od,t1,t2) ->
-          Lit (od, uts t1, uts t2)
+          Lit (od, term_to_ut memo t1, term_to_ut memo t2)
         ) (norm_atom atom)
     in
 
     (* Get a normalized trace literal. *)
     let rec doit (lit : Term.literal) : form list = match lit with
-      | `Neg, `Happens t -> [Lit (`Eq,  uts t, uundef)]
-      | `Pos, `Happens t -> [Lit (`Neq, uts t, uundef)]
+      | `Neg, `Happens t -> [Lit (`Eq,  term_to_ut memo t, uundef)]
+      | `Pos, `Happens t -> [Lit (`Neq, term_to_ut memo t, uundef)]
 
       | `Pos, (`Comp ((_, _, _) as atom)) -> _mk atom
 
@@ -300,8 +345,8 @@ module Form = struct
         let nord = not_ord ord in
         let form =
           disj (
-            Lit (`Eq, uts u, uundef) ::
-            Lit (`Eq, uts v, uundef) ::
+            Lit (`Eq, term_to_ut memo u, uundef) ::
+            Lit (`Eq, term_to_ut memo v, uundef) ::
             [conj (doit (`Pos, `Comp (nord, u, v)))]) in
 
         [form]
@@ -311,8 +356,8 @@ module Form = struct
     in
     doit lit
 
-  let mk_list l : conjunction =
-    List.concat_map (fun t -> try mk t with Unsupported -> []) l
+  let mk_list memo l : conjunction =
+    List.concat_map (fun t -> try mk memo t with Unsupported -> []) l
 end
 
 
@@ -323,6 +368,7 @@ type constr_instance = {
   leqs    : (ut * ut) list;
   clauses : Form.disjunction list;   (* clauses that have not yet been split *)
   uf      : Uuf.t;
+  memo    : memo;
 }
 
 (*------------------------------------------------------------------*)
@@ -421,11 +467,14 @@ let add_forms inst forms =
 
 (*------------------------------------------------------------------*)
 (** Make the initial constraint solving instance. *)
-let mk_instance (l : Form.form list) : constr_instance =
+let mk_instance memo (l : Form.form list) : constr_instance =
   let inst =
-    { uf = Uuf.create [];       (* dummy, real uf build after *)
-      eqs = []; leqs = []; neqs = [];
-      clauses = []; }
+    { uf      = Uuf.create [];       (* dummy, real uf build after *)
+      eqs     = [];
+      leqs    = [];
+      neqs    = [];
+      clauses = [];
+      memo; }
   in
   let l = Form.Lit (`Neq, uinit, uundef) :: l in
   let inst = List.fold_left (add_form ~extend:false) inst l in
@@ -1043,8 +1092,10 @@ let log_instr inst =
 (** Type of a model, which is a satisfiable and normalized instance, and the
     graph representing the inequalities of the instance (which is always
     transitive). *)
-type model = { inst     : constr_instance;
-               tr_graph : UtG.t }
+type model = {
+  inst     : constr_instance;
+  tr_graph : UtG.t;
+}
 
 let find_segment_disj instance g =
   let exception Found of Uuf.t * (ut * ut) list in
@@ -1203,7 +1254,7 @@ let rec split (instance : constr_instance) : model list =
               match instance.clauses with
               | [] ->             (* no clause left, we are done *)
                 log_done ();
-                [ { inst = instance; tr_graph = g } ]
+                [ { inst = instance; tr_graph = g; } ]
 
               | disj :: clauses -> (* we found a clause to split *)
                 log_split disj;
@@ -1230,13 +1281,14 @@ let split_models instance =
 
 (** The minimal models a of constraint.
     Here, minimanility means inclusion w.r.t. the predicates. *)
-type models = model list
+type models = memo * model list
 
 (*------------------------------------------------------------------*)
 let models_conjunct (l : Term.literals) : models =
-  let l = Form.mk_list l in
-  let instance = mk_instance l in
-  split_models instance
+  let memo = mk_memo () in
+  let l = Form.mk_list memo l in
+  let instance = mk_instance memo l in
+  (memo, split_models instance)
 
 (** Memoisation *)
 let models_conjunct =
@@ -1265,7 +1317,7 @@ let models_conjunct
 
 
 (*------------------------------------------------------------------*)
-let m_is_sat models = models <> []
+let m_is_sat (models : models) = (snd models) <> []
 
 
 (*------------------------------------------------------------------*)
@@ -1306,13 +1358,15 @@ let rec query_form model (form : Form.form) = match form with
   | Form.Disj forms -> List.exists  (query_form model) forms
   | Form.Conj forms -> List.for_all (query_form model) forms
 
-let query_one (model : model) (at : Term.literal) : bool =
+let query_one (memo : memo) (model : model) (at : Term.literal) : bool =
   try
-    let cnf = Form.mk at in
+    let cnf = Form.mk memo at in
     List.for_all (query_form model) cnf
   with Unsupported -> false
 
 let query ~precise (models : models) (ats : Term.literals) =
+  let memo, models = models in
+  
   try
     assert (List.for_all (fun lit ->
         let ty = Term.ty_lit lit in
@@ -1320,33 +1374,39 @@ let query ~precise (models : models) (ats : Term.literals) =
       ) ats);
 
     (* if the conjunction of trace literals is  *)
-    if List.for_all (fun model -> List.for_all (query_one model) ats) models
+    if
+      List.for_all (fun model ->
+          List.for_all (query_one memo model) ats
+        ) models
     then true
     else if not precise then false
     else
-      let forms = List.map (fun at -> Form.mk (Term.neg_lit at)) ats
-                  |> List.flatten in
+      let forms =
+        List.map (fun at -> Form.mk memo (Term.neg_lit at)) ats
+        |> List.flatten
+      in
       let insts = List.map (fun model ->
           add_forms model.inst forms
         ) models in
       List.for_all (fun inst -> split_models inst = []) insts
   with Unsupported -> false
-    
+
 (* adds debugging information *)
-let query ~precise models ats =
+let query ~precise (models : models) ats =
   dbg "%squery: %a"
     (if precise then "precise " else "") Term.pp_literals ats;
   let b = query ~precise models ats in
   dbg "query result: %a : %a" Term.pp_literals ats Fmt.bool b;
   b
-
+    
 (*------------------------------------------------------------------*)
 (** [max_elems_model model elems] returns the maximal elements of [elems]
     in [model], *with* redundancy modulo [model]'s equality relation. *)
 let max_elems_model (model : model) elems =
+  let memo = mk_memo () in
   (* We normalize to obtain the representant of each timestamp. *)
   let model, l = List.fold_left (fun (model, l) ts ->
-      let model, ut = ext_support model (uts ts) in
+      let model, ut = ext_support model (term_to_ut memo ts) in
       (model, (ts,ut) :: l)
     ) (model,[]) elems in
 
@@ -1360,42 +1420,51 @@ let max_elems_model (model : model) elems =
 
   model, melems
 
+(** Exported *)
 let maximal_elems ~precise (models : models) (elems : Term.term list) =
+  let memo, models_list = models in
+  
   (* Invariant: [maxs_acc] is sorted and without duplicates. *)
-  let rmodels, maxs = List.fold_left (fun (models, maxs_acc) m ->
-      let m, m_maxs = max_elems_model m elems in
-      (m :: models, List.merge_uniq Stdlib.compare maxs_acc m_maxs)
-    ) ([],[]) models in
-  let models = List.rev rmodels in
+  let models_list, maxs =
+    List.fold_left (fun (models_list, maxs_acc) m ->
+        let m, m_maxs = max_elems_model m elems in
+        (m :: models_list, List.merge_uniq Stdlib.compare maxs_acc m_maxs)
+      ) ([],[]) models_list
+  in
+  let models_list = List.rev models_list in
 
   (* Now, we try to remove duplicates, i.e. elements which are in [maxs]
      and are equal in every model of [models], by picking an arbitrary
      element in each equivalence class. *)
   Utils.classes (fun ts ts' ->
-      query ~precise models [`Pos, `Comp (`Eq,ts,ts')]
+      query ~precise (memo, models_list) [`Pos, `Comp (`Eq,ts,ts')]
     ) maxs
   |> List.map List.hd
 
+(** Exported *)
 let get_ts_equalities ~precise (models : models) ts =
   Utils.classes (fun ts ts' ->
       query ~precise models [`Pos, `Comp (`Eq,ts,ts')]
     ) ts
 
+(** Exported *)
 let get_ind_equalities ~precise (models : models) inds =
   Utils.classes (fun i j ->
-      query  ~precise models [`Pos, `Comp (`Eq,Term.mk_var i,Term.mk_var j)]
+      query ~precise models [`Pos, `Comp (`Eq,Term.mk_var i,Term.mk_var j)]
     ) inds
 
-
+(** Exported *)
 let find_eq_action (models : models) (t : Term.term) =
+  let memo, models_list = models in
+  
   (* [action_model model t] returns an action equal to [t] in [model] *)
   let action_model model =
-    let model, ut = ext_support model (uts t) in
+    let model, ut = ext_support model (term_to_ut memo t) in
     let uf = model.inst.uf in
     let classe = get_class uf ut in
     List.find_map (fun ut -> match ut.cnt with
         | UInit
-        | UName _ -> Some (ut_to_term ut)
+        | UName _ -> Some (ut_to_term memo ut)
         | _ -> None
       ) classe
   in
@@ -1404,7 +1473,7 @@ let find_eq_action (models : models) (t : Term.term) =
   | Term.Action _ -> Some t     (* already an action *)
   | _ ->
     (* compute an action equal to [t] in one model. *)
-    match List.find_map action_model models with
+    match List.find_map action_model models_list with
     | None -> None
     | Some term ->
       (* check that [t] = [term] in all models. *)
@@ -1499,12 +1568,12 @@ let () =
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("sat" ^ string_of_int i) Sat
-             (fun () -> test (models_conjunct (mk pb))))
+             (fun () -> test (snd @@ models_conjunct (mk pb))))
          successes;
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("unsat" ^ string_of_int i) Unsat
-             (fun () -> test (models_conjunct (mk pb))))
+             (fun () -> test (snd @@ models_conjunct (mk pb))))
          failures;);
 
     ("Graph", `Quick,
@@ -1536,11 +1605,11 @@ let () =
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("graph(sat) " ^ string_of_int i) Sat
-             (fun () -> test (models_conjunct (mk pb))))
+             (fun () -> test (snd @@ models_conjunct (mk pb))))
          successes;
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("graph(unsat) " ^ string_of_int i) Unsat
-             (fun () -> test (models_conjunct (mk pb))))
+             (fun () -> test (snd @@ models_conjunct (mk pb))))
          failures;)
   ]

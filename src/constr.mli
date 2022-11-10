@@ -3,8 +3,7 @@ module SE = SystemExpr
 (*------------------------------------------------------------------*)
 (** The minimal models a of constraint.
     Here, minimality means inclusion w.r.t. the predicates. *)
-type model
-type models = model list
+type models
 
 (*------------------------------------------------------------------*)
 (** [models_conunct ?exn l] returns the list of minimal models of 
