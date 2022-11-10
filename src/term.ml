@@ -152,6 +152,8 @@ let rec hash : term -> int = function
 and hash_l (l : term list) (h : int) : int = 
     hcombine_list hash h l
 
+let equal (t : term) (t' : term) : bool = t = t'
+                                          
 (*------------------------------------------------------------------*)
 (** {2 Higher-order terms} *)
 

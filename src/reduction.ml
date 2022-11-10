@@ -297,7 +297,11 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
   (* Try to show using [Constr] that [t] is [false] or [true] *)
   and reduce_constr (st : state) (t : Term.term) : Term.term * bool =
-    if not st.param.constr || Term.ty t <> Type.Boolean then t, false
+    if not st.param.constr ||
+       Term.ty t <> Type.Boolean ||
+       Term.equal t Term.mk_false ||
+       Term.equal t Term.mk_true
+    then t, false
     else
       try
         if not Constr.(m_is_sat (models_conjunct ~exn:NoExp [t]))

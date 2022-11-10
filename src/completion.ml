@@ -1456,16 +1456,15 @@ let complete table (l : Term.esubst list) : state =
   in
   complete_cterms table l 
 
-(* REM: restore memoisation *)
-(* (** With memoisation *)
- * let complete : Symbols.table -> Term.esubst list -> state =
- *   let memo = Memo.create 256 in
- *   fun table l ->
- *     try Memo.find memo (table,l) with
- *     | Not_found -> 
- *       let res = complete table l in
- *       Memo.add memo (table,l) res;
- *       res *)
+(** With memoisation *)
+let complete : Symbols.table -> Term.esubst list -> state =
+  let memo = Memo.create 256 in
+  fun table l ->
+    try Memo.find memo (table,l) with
+    | Not_found -> 
+      let res = complete table l in
+      Memo.add memo (table,l) res;
+      res
 
 let complete
     ?(exn = Tactics.Tactic_hard_failure (None, TacTimeout))

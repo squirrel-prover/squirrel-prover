@@ -109,6 +109,8 @@ type terms = term list
 
 val hash : term -> int
 
+val equal : term -> term -> bool
+
 (*------------------------------------------------------------------*)
 (** Does not recurse. *)
 val tmap       : (term -> term) -> term -> term

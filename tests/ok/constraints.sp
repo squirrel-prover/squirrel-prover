@@ -1,62 +1,100 @@
-
-
 system null.
 
 (*------------------------------------------------------------------*)
 goal _ (i:index): i = i.
 Proof.
- auto.
+  constraints.
 Qed.
+
+abstract I : index.
+
+goal _ : I = I.
+Proof.
+  constraints.
+Qed.
+
+(*------------------------------------------------------------------*)
+goal _ : I <> I.
+Proof.
+  checkfail constraints exn Failure.
+Abort.
 
 (*------------------------------------------------------------------*)
 goal _ (t:timestamp): t = t.
 Proof.
- auto.
+ constraints.
+Qed.
+
+abstract T : timestamp.
+
+goal _ : T = T.
+Proof.
+ constraints.
 Qed.
 
 (*------------------------------------------------------------------*)
 goal _ (i:index,j:index): i=j => j=i.
 Proof.
- auto.
+ constraints.
+Qed.
+
+abstract J : index.
+
+goal _: I=J => J=I.
+Proof.
+ constraints.
 Qed.
 
 (*------------------------------------------------------------------*)
 goal _ (i:index,j:index): i=j => not(j<>i).
 Proof.
- auto.
+ constraints.
+Qed.
+
+goal _ : I=J => not(J<>I).
+Proof.
+ constraints.
 Qed.
 
 (*------------------------------------------------------------------*)
 goal _ (x:timestamp,y:timestamp): x=y => y=x.
 Proof.
- auto.
+ constraints.
+Qed.
+
+abstract X : timestamp.
+abstract Y : timestamp.
+
+goal _ : X=Y => Y=X.
+Proof.
+ constraints.
 Qed.
 
 (*------------------------------------------------------------------*)
 goal _ (x:timestamp,y:timestamp): x<>y => y<>x.
 Proof.
- auto.
+  constraints.
 Qed.
 
 (*------------------------------------------------------------------*)
 goal _ (x:timestamp,y:timestamp,z:timestamp):
-  x=y => y=z => x<>z => False.
+  x=y => y=z => x<>z => false.
 Proof.
- auto.
+ constraints.
 Qed.
 
 (*------------------------------------------------------------------*)
 goal _ (x:timestamp,y:timestamp,z:timestamp):
   y=z => x<>z => x<>y.
 Proof.
- auto.
+ constraints.
 Qed.
 
 (*------------------------------------------------------------------*)
 goal _ (x:timestamp,y:timestamp,z:timestamp):
   y=z => x<>z => not(x=y).
 Proof.
- auto.
+ constraints.
 Qed.
 
 (*------------------------------------------------------------------*)
@@ -79,10 +117,18 @@ Proof. constraints. Qed.
 goal _ (tau : timestamp) : happens(pred(tau)) => happens(tau).
 Proof. constraints. Qed.
 
+goal _ : happens(pred(X)) => happens(X).
+Proof. constraints. Qed.
+
 (*------------------------------------------------------------------*)
 goal _ (t:timestamp): t < init => t = init.
 Proof.
- auto.
+ constraints.
+Qed.
+
+goal _: T < init => T = init.
+Proof.
+ constraints.
 Qed.
 
 (*------------------------------------------------------------------*)
@@ -90,6 +136,13 @@ Qed.
    constraints in reachability hypotheses. *)
 global goal _ (t:timestamp, x,y:message):
    [t < init] -> [t <> init] -> equiv (diff(x,y)).
+Proof.
+ intro H H1. 
+ constraints. 
+Qed.
+
+global goal _ (x,y:message):
+   [T < init] -> [T <> init] -> equiv (diff(x,y)).
 Proof.
  intro H H1. 
  constraints. 
