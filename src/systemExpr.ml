@@ -221,7 +221,7 @@ let descr_of_shape table expr shape =
        (fun (lbl,sys) -> lbl, System.Single.descr_of_shape table sys shape)
        expr)
 
-let descr_of_action table expr (a : Action.action) : Action.descr =
+let descr_of_action table expr (a : Action.action) : Action.descr * Term.subst =
   let descr = descr_of_shape table expr (Action.get_shape a) in
   assert (Action.check_descr descr);
   let d_indices = descr.indices in
@@ -231,9 +231,7 @@ let descr_of_action table expr (a : Action.action) : Action.descr =
       (fun v t' -> Term.ESubst (Term.mk_var v, t'))
       d_indices a_indices
   in
-  let descr = Action.subst_descr subst descr in
-  assert (Action.check_descr descr);
-  descr
+  descr, subst
 
 let descrs table (se:fset expr) : Action.descr System.Msh.t =
   let symbs = symbs table se in

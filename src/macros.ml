@@ -252,7 +252,12 @@ let get_definition_nocntxt
           else f (Term.mk_action asymb aidx))
   in
   let action = Action.of_term asymb aidx table in
-  let descr = SE.descr_of_action table system action in
+
+  (* we do not apply the substitution right away, as it may fail by
+     trying to substitute indices by non-variable terms. *)
+  let unapplied_descr, descr_subst =
+    SE.descr_of_action table system action
+  in
   match Symbols.Macro.get_all symb.s_symb table with
   | Symbols.Input, _ ->
     init_or_generic Term.empty (fun a ->
@@ -260,10 +265,10 @@ let get_definition_nocntxt
           [Term.mk_macro Term.frame_macro [] (Term.mk_pred a)])
 
   | Symbols.Output, _ ->
-    `Def (snd descr.output)
+    `Def (Term.subst descr_subst (snd unapplied_descr.output))
 
   | Symbols.Cond, _ ->
-    `Def (snd descr.condition)
+    `Def (Term.subst descr_subst (snd unapplied_descr.condition))
 
   | Symbols.Exec, _ ->
     init_or_generic Term.mk_true (fun a ->
@@ -283,7 +288,13 @@ let get_definition_nocntxt
                 Term.mk_zero)))
 
   | Symbols.State _, _ ->
-    `Def begin try
+    `Def begin
+      let descr_updates =
+        List.map (fun (ss,args,t) ->
+            ss, Term.subst_vars descr_subst args, Term.subst descr_subst t
+          ) unapplied_descr.updates
+      in
+      try
         (* Look for an update of the state macro [name] in the updates
            of [action]; we rely on the fact that [action] can only contain
            a single update for each state macro symbol *)
@@ -291,7 +302,7 @@ let get_definition_nocntxt
           List.find (fun (ns,ns_args,_) ->
               ns = symb.s_symb &&
               List.length ns_args = List.length args
-            ) descr.Action.updates
+            ) descr_updates
         in
 
         (* Init case: we substitute the indices by their definition. *)

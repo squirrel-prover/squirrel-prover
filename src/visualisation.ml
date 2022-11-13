@@ -203,7 +203,8 @@ let pp_node (cntxt : Constr.trace_cntxt) (dep : dependence) ppf (t : Term.term) 
   let (cond, state, output) = match t with
     | Term.Action (asymb, idx) ->
         let action = Action.of_term asymb idx cntxt.table in
-        let descr = SystemExpr.descr_of_action cntxt.table cntxt.system action in
+        let descr, subst = SystemExpr.descr_of_action cntxt.table cntxt.system action in
+        let descr = Action.subst_descr subst descr in
         (
           mk_option (not (Term.f_triv (snd descr.condition))) (snd descr.condition),
           mk_option (descr.updates <> []) descr.updates,
