@@ -28,20 +28,38 @@ def bar(stat,col="red",label="unknown",left=True):
     ax.bar(shift,yAxis,width,color=col,label=label)
     ax.set_xticks(x, xAxis)
 
+def bar2(stat1,stat2,col="red",label="unknown",left=True):
+    orderedStat1 = sorted(stat1.items(), key=lambda v: v[0])
+    orderedStat2 = sorted(stat2.items(), key=lambda v: v[0])
+    xAxis = [v[0] for v in orderedStat1]
+    # diff rate not really relevant for short time running examples…
+    # yAxis = [(v2[1]-v1[1])/v1[1] if v1[1] > 0 else 0 for v1,v2 in list(zip(orderedStat1,orderedStat2))]
+    yAxis = [(v2[1]-v1[1]) for v1,v2 in list(zip(orderedStat1,orderedStat2))]
+    total = 0
+    for diff in yAxis:
+        total += diff
+    mean = total/len(yAxis)
+    x = np.arange(len(xAxis))
+    ax.bar(x,yAxis,width,color=col,label=label)
+    plt.axhline(y=mean, color="green", label="mean diff = "+str(mean)[0:5]+"s")
+    ax.set_xticks(x, xAxis)
+
 if len(sys.argv)>2:
     if not os.path.exists(sys.argv[2]):
         print(sys.argv[2] + " was not generated, you may want to examinate last.json malformation")
         sys.exit()
     first = json.load(open(IN_FILE, 'r'))
     last = json.load(open(sys.argv[2], 'r'))
-    date = os.path.splitext(os.path.basename(IN_FILE))[0]
-    bar(first,col="grey",label=date)
+    date1 = os.path.splitext(os.path.basename(IN_FILE))[0]
+    bar(first,col="grey",label=date1)
     date = os.path.splitext(os.path.basename(sys.argv[2]))[0]
     if len(repo.head.commit.diff(None))==0:
         label = repo.head.object.hexsha[0:6]
     else:
         label = repo.head.object.hexsha[0:6]+"+"+date+"?"
     bar(last,col="red",label=label,left=False)
+    plt.title(date1+"…"+label)
+    bar2(first,last,col="blue",label="diff",left=False)
 
 else:
     dictionary = json.load(open(IN_FILE, 'r'))
