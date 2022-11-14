@@ -17,8 +17,9 @@ plt.xticks(rotation=45, ha='right')
 width = 0.35
 
 def bar(stat,col="red",label="unknown",left=True):
-    xAxis = [key for key, value in stat.items()]
-    yAxis = [value for key, value in stat.items()]
+    orderedStat = sorted(stat.items(), key=lambda v: v[0])
+    xAxis = [v[0] for v in orderedStat]
+    yAxis = [v[1] for v in orderedStat]
     x = np.arange(len(xAxis))
     if left:
         shift = x - width/2
@@ -33,7 +34,8 @@ if len(sys.argv)>2:
         sys.exit()
     first = json.load(open(IN_FILE, 'r'))
     last = json.load(open(sys.argv[2], 'r'))
-    bar(first,col="grey",label=os.path.basename(IN_FILE)[0:6])
+    date = os.path.splitext(os.path.basename(IN_FILE))[0]
+    bar(first,col="grey",label=date)
     date = os.path.splitext(os.path.basename(sys.argv[2]))[0]
     if len(repo.head.commit.diff(None))==0:
         label = repo.head.object.hexsha[0:6]
