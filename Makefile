@@ -137,6 +137,9 @@ clean:
 clean_bench:
 	rm -f $(BENCHDIR)/*.json
 
+clean_prev_bench:
+	rm -f $(BENCHDIR)/prev/*.json
+
 # Clean previous local bench
 clean_all_bench:
 	rm -rf $(BENCHDIR)
