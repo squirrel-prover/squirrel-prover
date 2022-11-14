@@ -1,4 +1,5 @@
 GITHASH := $(shell scripts/git-hash)
+CURHASH := $(shell cat src/commit.ml | grep -Eo '\".*\"' | sed 's/"//g')
 
 PREFIX = ~/.local
 
@@ -12,15 +13,16 @@ test: alcotest okfail example
 
 bench: bench_example
 
-.PHONY: okfail okfail_end example examples_end alcotest squirrel
+# squirrel is not PHONY here, it exists as executable
+.PHONY: okfail okfail_end example examples_end alcotest
 
 # Directory for logging test runs on "*.sp" files.
 RUNLOGDIR=_build/squirrel_log
 BENCHDIR=_build/bench
 
 NOW=`date +"%m_%d_%Y_%H_%M"`
-BENCH_OUT="$(BENCHDIR)/last.json"
-BENCH_COMMIT_OUT="$(BENCHDIR)/$(GITCOMMIT).json"
+BENCH_OUT=$(BENCHDIR)/last.json
+BENCH_COMMIT_OUT=$(BENCHDIR)/$(GITCOMMIT).json
 
 # Make sure the "echo" commands in okfail below are updated
 # to reflect the content of these variables.
@@ -133,20 +135,25 @@ clean:
 	@rm -f squirrel
 	rm -rf _coverage
 
-# Clean previous local bench
+# Clean last bench
 clean_bench:
 	rm -f $(BENCHDIR)/*.json
 
+# Clean previous local bench
 clean_prev_bench:
 	rm -f $(BENCHDIR)/prev/*.json
 
-# Clean previous local bench
+# Clean all local bench
 clean_all_bench:
 	rm -rf $(BENCHDIR)
 
-squirrel: version
+_build/default/squirrel.exe: version
 	dune build squirrel.exe
-	cp -f _build/default/squirrel.exe squirrel
+
+squirrel: _build/default/squirrel.exe
+	@if [ ! -f "squirrel" ]; then\
+		ln _build/default/squirrel.exe squirrel;\
+	fi
 
 # Run tests (forcing a re-run) with bisect_ppx instrumentation on
 # to get coverage files, and generate an HTML report from them.
@@ -175,9 +182,14 @@ doc:
 	dune build @doc
 	@$(ECHO) "Documentation available: _build/default/_doc/_html/squirrel/index.html"
 
+# If this touch commit.ml for inserting same hash dune will rebuild for nothing
 version:
-	rm -f src/commit.ml
-	sed 's/GITHASH/$(GITHASH)/' < src/commit.ml.in > src/commit.ml
+	@if [ $(CURHASH) = $(GITHASH) ]; then \
+		echo "Already $(CURHASH)"; \
+	else \
+		rm -f src/commit.ml; \
+		sed 's/GITHASH/$(GITHASH)/' < src/commit.ml.in > src/commit.ml; \
+	fi
 
 ORA=\033[0;33m
 RED=\033[0;31m
