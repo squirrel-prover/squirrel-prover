@@ -3,8 +3,10 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import json
+import git
 
 IN_FILE = sys.argv[1]
+repo = git.Repo(search_parent_directories=True)
 
 if not os.path.exists(IN_FILE):
     print(IN_FILE + " was not generated, you may want to examinate last.json")
@@ -31,8 +33,13 @@ if len(sys.argv)>2:
         sys.exit()
     first = json.load(open(IN_FILE, 'r'))
     last = json.load(open(sys.argv[2], 'r'))
-    bar(first,col="grey",label=os.path.basename(IN_FILE))
-    bar(last,col="red",label="last bench",left=False)
+    bar(first,col="grey",label=os.path.basename(IN_FILE)[0:6])
+    date = os.path.splitext(os.path.basename(sys.argv[2]))[0]
+    if len(repo.head.commit.diff(None))==0:
+        label = repo.head.object.hexsha[0:6]
+    else:
+        label = repo.head.object.hexsha[0:6]+"+"+date+"?"
+    bar(last,col="red",label=label,left=False)
 
 else:
     dictionary = json.load(open(IN_FILE, 'r'))
