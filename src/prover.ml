@@ -248,20 +248,31 @@ let pp_usage tacname fmt esort =
 (*------------------------------------------------------------------*)
 (** Basic tactic tables, without registration *)
 
+type count_table = (string, int) Hashtbl.t
+
 module Table : sig
   val table : Goal.t table
+  val tacount : count_table
 
   val get : L.t -> string -> TacticsArgs.parser_arg list -> Goal.t Tactics.tac
+  val add_tac : string -> Goal.t tac_infos -> unit
 
   val pp_goal_concl : Format.formatter -> Goal.t -> unit
 end = struct
   let table = Hashtbl.create 97
+  let tacount = Hashtbl.create 97
+
+  let add_tac (id:string) (tacinfo:Goal.t tac_infos) =
+    Hashtbl.add tacount id 0;
+    Hashtbl.add table id tacinfo
 
   let get loc id =
     try let tac = Hashtbl.find table id in
       if not(tac.pq_sound) && Config.post_quantum () then
         Tactics.hard_failure Tactics.TacticNotPQSound
       else
+        let count = Hashtbl.find tacount id in
+        Hashtbl.replace tacount id (count+1);
         tac.maker
     with
       | Not_found -> hard_failure ~loc
@@ -319,9 +330,9 @@ module ProverTactics = struct
       f args s sk fk
     in
 
-    Hashtbl.add table id { maker = f ;
-                           help = tactic_help;
-                           pq_sound}
+    add_tac id { maker = f ;
+                 help = tactic_help;
+                 pq_sound}
 
   let convert_args j parser_args tactic_type =
     let env, conc =
@@ -426,6 +437,21 @@ module ProverTactics = struct
           ) (filter_cat helps cat)
     )
     [Logical; Structural; Cryptographic]
+
+  let pp_list_count (file:string) : unit =
+    let oc = open_out file in
+    let counts =
+      Hashtbl.fold (fun name count acc -> (name, count)::acc) tacount []
+      |> List.sort (fun (n1,_) (n2,_) -> compare n1 n2)
+    in
+    Printf.fprintf oc "{\n";
+    List.iteri (fun i (name,count) ->
+      if i < (List.length counts)-1 then
+        Printf.fprintf oc "\"%s\" : %d, \n" name count
+      else
+        Printf.fprintf oc "\"%s\" : %d \n" name count
+    ) counts;
+    Printf.fprintf oc "}\n"
 
   let pp_list fmt () =
     let helps =

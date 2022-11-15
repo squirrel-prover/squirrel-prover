@@ -59,7 +59,7 @@ $(BENCH_OUT): squirrel
 	@printf "{" > $@
 	@for ex in $(PROVER_EXAMPLES); do \
 		printf "\"%s\" : " $${ex} >> $@ ; \
-		if /usr/bin/time -q -a -o $@ -f "%U" ./squirrel $${ex} >/dev/null 2>/dev/null; then \
+		if /usr/bin/time -q -a -o $@ -f "%U" ./squirrel $${ex} -v >/dev/null 2>/dev/null; then \
 			$(ECHO) -n .; \
 		else \
 			$(ECHO) -n !; \
@@ -202,9 +202,13 @@ LAST_COMMIT=`/usr/bin/ls -1t $(BENCHDIR)/commits/*.json | head -1`
 PLOT=./plot.py
 STASH_RAND:= $(shell bash -c 'echo $$RANDOM')
 
+# This plot tactics statistics
+plot:
+	python3 $(PLOT)
+
 # This shows you the last benchmark compared to the mean of all previous ones
 # Needs `matplotlib` (pip install)
-plot:
+plot_all:
 	rm -f $(BENCHDIR)/all/last.json
 	$(MAKE) $(BENCHDIR)/all/last.json
 	python3 $(PLOT) $(BENCHDIR)/all/last.json

@@ -150,6 +150,7 @@ module ProverTactics : sig
      string. *)
   val pps : Format.formatter -> unit -> unit
   val pp_list : Format.formatter -> unit -> unit
+  val pp_list_count : string -> unit
 end
 
 val pp_ast : Format.formatter -> TacticsArgs.parser_arg Tactics.ast -> unit

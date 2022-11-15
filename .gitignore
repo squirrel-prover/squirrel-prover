@@ -28,3 +28,4 @@ _opam/
 \#*\#
 .nvimrc
 .vimrc
+*.stat.json

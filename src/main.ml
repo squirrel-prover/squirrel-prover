@@ -36,12 +36,14 @@ type main_state = {
   check_mode : [`Check | `NoCheck];
 
   interactive : bool;
+  verbose: bool;
   html : bool;
 
   load_paths : load_paths;
   (** load paths *)
 
   file : file;
+  stat_file : string;
   (** current file *)
 
   file_stack : file list;
@@ -524,6 +526,8 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
   with
   (* exit prover *)
   | new_state, AllDone -> Printer.pr "Goodbye!@." ;
+    (if state.verbose then
+      Prover.ProverTactics.pp_list_count state.stat_file);
     if not test && not new_state.html then exit 0;
 
   (* loop *)
@@ -566,6 +570,7 @@ let mk_load_paths ~main_mode () : load_paths =
 let start_main_loop
     ?(test=false)
     ?(html=false)
+    ?(verbose=false)
     ~(main_mode : [`Stdin | `File of string])
     () : unit
   =
@@ -575,12 +580,15 @@ let start_main_loop
     | `File fname -> locate [LP_none] fname
   in
 
+  Printf.eprintf "Statistiques : _build/squirrel_log/%s.stat.json \n" file.f_name;
+
   Prover.reset ();
   let state = {
     mode = GoalMode;
     table = Symbols.builtins_table;
 
     interactive;
+    verbose;
     html;
 
     check_mode = `Check;
@@ -588,6 +596,7 @@ let start_main_loop
     load_paths = mk_load_paths ~main_mode ();
 
     file;
+    stat_file = Printf.sprintf "_build/squirrel_log/%s.stat.json" file.f_name;
 
     file_stack = []; }
   in
@@ -600,7 +609,7 @@ let generate_html (filename : string) (html_filename : string) =
     cmd_error (InvalidExtention filename);
   Html.init filename html_filename;
   let name = Filename.chop_extension filename in
-  start_main_loop ~test:false ~html:true ~main_mode:(`File name) ();
+  start_main_loop ~test:false ~html:true ~verbose:false ~main_mode:(`File name) ();
   Html.close html_filename
 
 
@@ -610,10 +619,10 @@ let interactive_prover () =
   Printer.prt `Start "Git commit: %s" Commit.hash_commit;
   Printer.init Printer.Interactive;
   Server.start ();
-  try start_main_loop ~html:false ~main_mode:`Stdin ()
+  try start_main_loop ~html:false ~verbose:false ~main_mode:`Stdin ()
   with End_of_file -> Printer.prt `Error "End of file, exiting."
 
-let run ?(test=false) (filename : string) : unit =
+let run ?(test=false) ?(verbose=false) (filename : string) : unit =
   if test then begin
     Printer.init Printer.Test;
     Format.eprintf "Running %S...@." filename
@@ -626,7 +635,7 @@ let run ?(test=false) (filename : string) : unit =
 
   let name = Filename.chop_extension filename in
 
-  start_main_loop ~test ~html:false ~main_mode:(`File name) ()
+  start_main_loop ~test ~html:false ~verbose ~main_mode:(`File name) ()
 
 
 let main () =
@@ -656,7 +665,7 @@ let main () =
     generate_html filename !html_filename
   else
     let filename = List.hd !args in
-    run filename
+    run ~verbose:!verbose filename
 
 
 (*------------------------------------------------------------------*)
