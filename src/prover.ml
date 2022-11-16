@@ -248,11 +248,9 @@ let pp_usage tacname fmt esort =
 (*------------------------------------------------------------------*)
 (** Basic tactic tables, without registration *)
 
-type count_table = (string, int) Hashtbl.t
-
 module Table : sig
   val table : Goal.t table
-  val tacount : count_table
+  val tac_count_table : (string, int) Hashtbl.t
 
   val get : L.t -> string -> TacticsArgs.parser_arg list -> Goal.t Tactics.tac
   val add_tac : string -> Goal.t tac_infos -> unit
@@ -260,10 +258,10 @@ module Table : sig
   val pp_goal_concl : Format.formatter -> Goal.t -> unit
 end = struct
   let table = Hashtbl.create 97
-  let tacount = Hashtbl.create 97
+  let tac_count_table = Hashtbl.create 97
 
   let add_tac (id:string) (tacinfo:Goal.t tac_infos) =
-    Hashtbl.add tacount id 0;
+    Hashtbl.add tac_count_table id 0;
     Hashtbl.add table id tacinfo
 
   let get loc id =
@@ -271,8 +269,8 @@ end = struct
       if not(tac.pq_sound) && Config.post_quantum () then
         Tactics.hard_failure Tactics.TacticNotPQSound
       else
-        let count = Hashtbl.find tacount id in
-        Hashtbl.replace tacount id (count+1);
+        let count = Hashtbl.find tac_count_table id in
+        Hashtbl.replace tac_count_table id (count+1);
         tac.maker
     with
       | Not_found -> hard_failure ~loc
@@ -441,7 +439,7 @@ module ProverTactics = struct
   let pp_list_count (file:string) : unit =
     let oc = open_out file in
     let counts =
-      Hashtbl.fold (fun name count acc -> (name, count)::acc) tacount []
+      Hashtbl.fold (fun name count acc -> (name, count)::acc) tac_count_table []
       |> List.sort (fun (n1,_) (n2,_) -> compare n1 n2)
     in
     Printf.fprintf oc "{\n";

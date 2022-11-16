@@ -43,7 +43,7 @@ type main_state = {
   (** load paths *)
 
   file : file;
-  stat_file : string;
+  stat_filename : string;
   (** current file *)
 
   file_stack : file list;
@@ -526,8 +526,8 @@ let rec main_loop ~test ?(save=true) (state : main_state) =
   with
   (* exit prover *)
   | new_state, AllDone -> Printer.pr "Goodbye!@." ;
-    (if state.verbose then
-      Prover.ProverTactics.pp_list_count state.stat_file);
+    (if state.stat_filename <> "" then
+      Prover.ProverTactics.pp_list_count state.stat_filename);
     if not test && not new_state.html then exit 0;
 
   (* loop *)
@@ -571,6 +571,7 @@ let start_main_loop
     ?(test=false)
     ?(html=false)
     ?(verbose=false)
+    ?(stat_filename="")
     ~(main_mode : [`Stdin | `File of string])
     () : unit
   =
@@ -579,8 +580,6 @@ let start_main_loop
     | `Stdin -> file_from_stdin ()
     | `File fname -> locate [LP_none] fname
   in
-
-  Printf.eprintf "Statistiques : _build/squirrel_log/%s.stat.json \n" file.f_name;
 
   Prover.reset ();
   let state = {
@@ -596,7 +595,7 @@ let start_main_loop
     load_paths = mk_load_paths ~main_mode ();
 
     file;
-    stat_file = Printf.sprintf "_build/squirrel_log/%s.stat.json" file.f_name;
+    stat_filename = stat_filename;
 
     file_stack = []; }
   in
@@ -622,7 +621,7 @@ let interactive_prover () =
   try start_main_loop ~html:false ~verbose:false ~main_mode:`Stdin ()
   with End_of_file -> Printer.prt `Error "End of file, exiting."
 
-let run ?(test=false) ?(verbose=false) (filename : string) : unit =
+let run ?(test=false) ?(verbose=false) ?(stat_filename="") (filename : string) : unit =
   if test then begin
     Printer.init Printer.Test;
     Format.eprintf "Running %S...@." filename
@@ -633,9 +632,12 @@ let run ?(test=false) ?(verbose=false) (filename : string) : unit =
   if Filename.extension filename <> ".sp" then
     cmd_error (InvalidExtention filename);
 
+  if (stat_filename <> "") && (Filename.extension stat_filename <> ".json") then
+    cmd_error (InvalidExtention stat_filename);
+
   let name = Filename.chop_extension filename in
 
-  start_main_loop ~test ~html:false ~verbose ~main_mode:(`File name) ()
+  start_main_loop ~test ~html:false ~verbose ~stat_filename ~main_mode:(`File name) ()
 
 
 let main () =
@@ -643,10 +645,13 @@ let main () =
   let verbose = ref false in
   let interactive = ref false in
   let html_filename = ref "" in
+  let stat_filename = ref "" in
   let speclist = [
     ("-i", Arg.Set interactive, "interactive mode (e.g, for proof general)");
     ("--html", Arg.Set_string html_filename, "<file.html> Output a html file; Incompatible with -i");
     ("-v", Arg.Set verbose, "display more informations");
+    ("--stat", Arg.Set_string stat_filename, "<stat.json> Output a json file
+    with statistics (tactic count)");
   ] in
 
   let collect arg = args := !args @ [arg] in
@@ -665,7 +670,7 @@ let main () =
     generate_html filename !html_filename
   else
     let filename = List.hd !args in
-    run ~verbose:!verbose filename
+    run ~verbose:!verbose ~stat_filename:!stat_filename filename
 
 
 (*------------------------------------------------------------------*)

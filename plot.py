@@ -5,7 +5,6 @@ import numpy as np
 import json
 import git
 
-
 fig, ax = plt.subplots()
 plt.xticks(rotation=45, ha='right')
 width = 0.35
@@ -92,11 +91,11 @@ if len(sys.argv) > 1:
             bar(means,col="grey",label="mean prev/*")
             bar(dictionary[dates[-1]],col="red",label=dates[-1],left=False)
 elif len(sys.argv) == 1:
-    print("Gathering statistics…")
+    print("Gathering statistics from _build/squirrel_log/*.json…")
     stats = {}
     for root, dirs, files in os.walk("_build/squirrel_log"):
         for file in files:
-            if file.endswith(".stat.json"):
+            if file.endswith(".json"):
                 data = json.load(open(os.path.join(root, file),'r'))
                 for k in data.keys():
                     if k in stats:
@@ -107,7 +106,6 @@ elif len(sys.argv) == 1:
     bar(stats,col="green",label="nb tactic use")
     plt.xlabel('tac')
     plt.ylabel('count')
-
 else:
     print("Too much arguments given…")
     sys.exit()

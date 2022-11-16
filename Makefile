@@ -50,21 +50,38 @@ bench_preamble:
 	@mkdir -p $(BENCHDIR)/prev
 	@echo "$(NOW): current commit → ${GRE}$(HEAD)${NC}"
 
+# Populates $(RUNLOGDIR)/$${example%.*}.json with count tactics
+tac_count_examples: squirrel
+	@$(ECHO) "Counting tactics in examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
+	@for example in $(PROVER_EXAMPLES); do \
+		stat_name=$(RUNLOGDIR)/$${example%.*}.json;\
+		mkdir -p `dirname $${stat_name}`;\
+		if ./squirrel $${example} --stat $${stat_name} >/dev/null 2>/dev/null; then \
+			echo "${GRE}$${stat_name} OK${NC}";\
+		else \
+			echo "${RED}$${stat_name} FAIL${NC}";\
+		fi; \
+	done
+	@echo
+
 # The following rule populate the $(BENCH_OUT) file
 # in $(BENCHDIR) running /usr/bin/time on each example.
 # README → /usr/bin/time is not always installed by default in your OS !
+# In the same time populates $(RUNLOGDIR)/$${example%.*}.json with count tactics
 $(BENCH_OUT): squirrel
 	@$(ECHO) "Running bench on examples/*.sp, examples/tutorial/*.sp, examples/stateful/*.sp and examples/postQuantumKE/*.sp."
 	@echo "Populate bench in $@"
 	@printf "{" > $@
-	@for ex in $(PROVER_EXAMPLES); do \
-		printf "\"%s\" : " $${ex} >> $@ ; \
-		if /usr/bin/time -q -a -o $@ -f "%U" ./squirrel $${ex} -v >/dev/null 2>/dev/null; then \
+	@for example in $(PROVER_EXAMPLES); do \
+		stat_name=$(RUNLOGDIR)/$${example%.*}.json;\
+		mkdir -p `dirname $${stat_name}`;\
+		printf "\"%s\" : " $${example} >> $@ ; \
+		if /usr/bin/time -q -a -o $@ -f "%U" ./squirrel $${example} --stat $${stat_name} >/dev/null 2>/dev/null; then \
 			$(ECHO) -n .; \
 		else \
 			$(ECHO) -n !; \
 		fi; \
-		if [ $$ex != $(lastword $(PROVER_EXAMPLES)) ]; then \
+		if [ $$example != $(lastword $(PROVER_EXAMPLES)) ]; then \
 			printf "," >> $@; \
 		fi \
 	done
@@ -80,8 +97,9 @@ bench_example: bench_preamble $(BENCH_OUT)
 		; then \
 		echo "Done" ; \
 	 else \
-	 	rm -f $(BENCHDIR)/prev/$(NOW).json \
+	 	rm -f $(BENCHDIR)/prev/$(NOW).json; \
 		echo "${RED}[FAIL] Json malformed see $(BENCH_OUT)${NC}"; \
+		echo "${RED}[FAIL] make clean_bench to remove $(BENCH_OUT)${NC}"; \
 		false ;\
 	fi
 
@@ -234,8 +252,9 @@ bench_compare: bench_preamble $(BENCH_OUT)
 		; then \
 		echo "Done" ; \
 	 else \
-	 	rm -f $(BENCHDIR)/prev/$(NOW).json \
+	 	rm -f $(BENCHDIR)/prev/$(NOW).json; \
 		echo "${RED}[FAIL] Json malformed see $(BENCH_OUT)${NC}"; \
+		echo "${RED}[FAIL] make clean_bench to remove $(BENCH_OUT)${NC}"; \
 		false; \
 	fi
 	@$(MAKE) $(BENCHDIR)/commits/$(GITCOMMIT).json
@@ -287,7 +306,7 @@ $(BENCHDIR)/commits/%.json:
 		echo "Done" ; \
 		rm -f $(BENCH_COMMIT_OUT) ; \
 	 else \
-	 	rm -f $(BENCHDIR)/commits/$(GITCOMMIT).json \
+	 	rm -f $(BENCHDIR)/commits/$(GITCOMMIT).json; \
 		echo "${RED}[FAIL] Json malformed: see $(BENCH_COMMIT_OUT)${NC}"; \
 		echo "${RED}[FAIL] The script wil ignore it and continue… ${NC}"; \
 	fi
