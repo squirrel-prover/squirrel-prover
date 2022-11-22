@@ -213,7 +213,6 @@ let indcca_param
 
   match res with
   | None -> (* no ciphertext was rewritten *)
-    Printer.pr "lol  %a\n" Term.pp t;
     soft_failure ~loc (Tactics.Failure "no ciphertext found")
       
   | Some (enc_f, (ccc, [(_, l)]), table, xc) -> (* a ciphertext was found *)
