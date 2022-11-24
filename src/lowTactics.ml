@@ -3,7 +3,7 @@ open Utils
 module Args = HighTacticsArgs
 module L = Location
 
-module T = Prover.ProverTactics
+module T = Proverlib.ProverTactics
 
 module SE = SystemExpr
 

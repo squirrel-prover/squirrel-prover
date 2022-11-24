@@ -88,8 +88,8 @@
 %type <Decl.declarations> declarations
 %type <Theory.term> top_formula
 %type <Process.process> top_process
-%type <Prover.parsed_input> interactive
-%type <Prover.parsed_input> top_proofmode
+%type <Proverlib.parsed_input> interactive
+%type <Proverlib.parsed_input> top_proofmode
 
 %%
 
@@ -1086,28 +1086,28 @@ include_params:
 
 p_include:
 | INCLUDE l=include_params th=lsymb DOT
-    { Prover.{ th_name = th; params = l; } }
+    { Proverlib.{ th_name = th; params = l; } }
 
 (*------------------------------------------------------------------*)
 /* print query */
 pr_query:
-| GOAL   l=lsymb  DOT { Prover.Pr_statement l }
-| SYSTEM l=system_expr DOT { Prover.Pr_system (Some l) }
-|                 DOT { Prover.Pr_system None }
+| GOAL   l=lsymb  DOT { Proverlib.Pr_statement l }
+| SYSTEM l=system_expr DOT { Proverlib.Pr_system (Some l) }
+|                 DOT { Proverlib.Pr_system None }
 
 
 (*------------------------------------------------------------------*)
 interactive:
-| set=set_option     { Prover.ParsedSetOption set }
-| decls=declarations { Prover.ParsedInputDescr decls }
-| u=undo             { Prover.ParsedUndo u }
-| PRINT q=pr_query   { Prover.ParsedPrint q }
-| PROOF              { Prover.ParsedProof }
-| i=p_include        { Prover.ParsedInclude i }
-| QED                { Prover.ParsedQed }
-| g=goal             { Prover.ParsedGoal g }
-| h=hint             { Prover.ParsedHint h }
-| EOF                { Prover.EOF }
+| set=set_option     { Proverlib.ParsedSetOption set }
+| decls=declarations { Proverlib.ParsedInputDescr decls }
+| u=undo             { Proverlib.ParsedUndo u }
+| PRINT q=pr_query   { Proverlib.ParsedPrint q }
+| PROOF              { Proverlib.ParsedProof }
+| i=p_include        { Proverlib.ParsedInclude i }
+| QED                { Proverlib.ParsedQed }
+| g=goal             { Proverlib.ParsedGoal g }
+| h=hint             { Proverlib.ParsedHint h }
+| EOF                { Proverlib.EOF }
 
 bullet:
 | MINUS              { "-" }
@@ -1127,9 +1127,9 @@ bulleted_tactic:
 | DOT                    { [] }
 
 top_proofmode:
-| PRINT q=pr_query   { Prover.ParsedPrint q }
-| bulleted_tactic    { Prover.ParsedTactic $1 }
-| u=undo             { Prover.ParsedUndo u }
-| ABORT              { Prover.ParsedAbort }
-| QED                { Prover.ParsedQed }
-| EOF                { Prover.EOF }
+| PRINT q=pr_query   { Proverlib.ParsedPrint q }
+| bulleted_tactic    { Proverlib.ParsedTactic $1 }
+| u=undo             { Proverlib.ParsedUndo u }
+| ABORT              { Proverlib.ParsedAbort }
+| QED                { Proverlib.ParsedQed }
+| EOF                { Proverlib.EOF }

@@ -46,7 +46,7 @@ val reset_from_state : proof_state -> prover_mode * Symbols.table
 (** {3 Stateful interface} *)
 
 (** Set the proof_state to its initial state. *)
-val reset : unit -> unit
+val init : unit -> unit
 
 (** Save the current prover state. *)
 val save_state : prover_mode -> Symbols.table -> unit

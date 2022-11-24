@@ -10,7 +10,7 @@
 open Term
 open Utils
 
-module T    = Prover.ProverTactics
+module T    = Proverlib.ProverTactics
 module Args = HighTacticsArgs
 module L    = Location
 module SE   = SystemExpr

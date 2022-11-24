@@ -58,15 +58,18 @@ let bullets : Bullets.path ref = ref Bullets.empty_path
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
 (*------------------------------------------------------------------*)
+(* OK *)
 let get_current_goal () = !current_goal
 
 (*------------------------------------------------------------------*)
+(* OK *)
 let get_current_system () =
   match get_current_goal () with
   | None -> None
   | Some (ProofObl g)
   | Some (UnprovedLemma (_, g)) -> Some (Goal.system g )
 
+(* OK *)
 (*------------------------------------------------------------------*)
 (** {2 Options}
 
@@ -84,9 +87,12 @@ type option_def = option_name * option_val
 
 let option_defs : option_def list ref = ref []
 
+(* FIXME table symbols is also present in main_state and never used 
+ * here, furthemore it's confusing with Table.table…
+ * prover_mode never used here ? Where is it needed ? *)
 type proof_state = {
   goals        : pending_proof list;
-  table        : Symbols.table;
+  table        : Symbols.table; 
   current_goal : pending_proof option;
   subgoals     : Goal.t list;
   bullets      : Bullets.path;
@@ -107,7 +113,7 @@ let abort () =
     bullets := Bullets.empty_path;
     subgoals := []
 
-let reset () =
+let init () =
     pt_history := [];
     goals := [];
     current_goal := None;
@@ -158,13 +164,15 @@ let rec reset_state n =
 
   | _ :: q, n -> pt_history := q; reset_state (n-1)
 
+(* XXX do we have to pass through all state to only init() state ? *)
 let reset_to_pt_history_head () =
   match !pt_history with
   | [] ->
-    reset ();
+    init ();
     (GoalMode, Symbols.builtins_table)
   | p :: _ -> reset_from_state p
 
+(* FIXME why not reset Config params for new pt_history ? *)
 let push_pt_history () : unit =
   pt_history_stack := !pt_history :: !pt_history_stack;
   pt_history := []
@@ -549,6 +557,7 @@ type print_query =
 
 type include_param = { th_name : lsymb; params : lsymb list }
 
+(* This should move somewhere else *)
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
   | ParsedSetOption  of Config.p_set_param
@@ -568,6 +577,7 @@ type parsed_input =
   | EOF
 
 (*------------------------------------------------------------------*)
+(* OK *)
 let unnamed_goal =
   let cpt = ref 0 in
   fun () ->
@@ -575,6 +585,7 @@ let unnamed_goal =
     L.mk_loc L._dummy ("unnamedgoal" ^ string_of_int !cpt)
 
 (*------------------------------------------------------------------*)
+(* OK *)
 let add_new_goal_i table parsed_goal =
   let name = match parsed_goal.Goal.Parsed.name with
     | None -> unnamed_goal ()
@@ -588,6 +599,8 @@ let add_new_goal_i table parsed_goal =
   goals :=  UnprovedLemma (statement,goal) :: !goals;
   L.unloc name, goal
 
+(* OK *)
+(* FIXME This return something only for printing purposes *)
 let add_new_goal table parsed_goal =
   if !goals <> [] then
     error (L.loc parsed_goal) "cannot add new goal: proof obligations remaining";
@@ -595,20 +608,24 @@ let add_new_goal table parsed_goal =
   let parsed_goal = L.unloc parsed_goal in
   add_new_goal_i table parsed_goal
 
+(* OK *)
 let add_proof_obl (goal : Goal.t) : unit = 
   goals :=  ProofObl (goal) :: !goals
 
 
+(* OK *)
 (*------------------------------------------------------------------*)
 let get_oracle_tag_formula h =
   match get_option (Oracle_for_symbol h) with
   | Some (Oracle_formula f) -> f
   | None -> Term.mk_false
 
-(** Check that all goals and braces have been closed. *)
+(* OK *)
+(** Check that all goals and braces have been closed. OK *)
 let is_proof_completed () =
   !subgoals = [] && Bullets.is_empty !bullets
 
+(* OK *)
 let complete_proof table : Symbols.table =
   assert (is_proof_completed ());
 
@@ -625,6 +642,7 @@ let complete_proof table : Symbols.table =
   subgoals := [];
   table
 
+(* OK *)
 let pp_goal ppf () = match !current_goal, !subgoals with
   | None,[] -> assert false
   | Some _, [] -> Fmt.pf ppf "@[<v 0>[goal> No subgoals remaining.@]@."
@@ -634,6 +652,7 @@ let pp_goal ppf () = match !current_goal, !subgoals with
       Goal.pp j
   | _ -> assert false
 
+(* OK *)
 (** [eval_tactic_focus tac] applies [tac] to the focused goal. *)
 let eval_tactic_focus tac = match !subgoals with
   | [] -> assert false
@@ -650,6 +669,7 @@ let eval_tactic_focus tac = match !subgoals with
       with Bullets.Error _ -> Tactics.(hard_failure (Failure "bullet error"))
     end
 
+(* OK *)
 (*------------------------------------------------------------------*)
 let open_bullet (bullet : string) =
   assert (bullet <> "");
@@ -667,6 +687,7 @@ let close_brace () =
   try bullets := Bullets.close_brace !bullets with
   | Bullets.Error _ -> invalid_brace ()
 
+(* OK *)
 (*------------------------------------------------------------------*)
 let cycle i_l l =
   let i, loc = L.unloc i_l, L.loc i_l in
@@ -679,6 +700,7 @@ let cycle i_l l =
   if i < 0 then cyc [] (List.length l + i) l
   else cyc [] i l
 
+(* OK *)
 let eval_tactic utac = match utac with
   | Tactics.Abstract (L.{ pl_desc = "cycle"}, [TacticsArgs.Int_parsed i]) ->
     (* TODO do something more for bullets?
@@ -690,6 +712,7 @@ let eval_tactic utac = match utac with
     subgoals := cycle i !subgoals
   | _ -> eval_tactic_focus utac
 
+(* OK *)
 let start_proof (check : [`NoCheck | `Check]) = 
   match !current_goal, !goals with
   | None, pending_proof :: remaining_goals ->
@@ -720,6 +743,7 @@ let start_proof (check : [`NoCheck | `Check]) =
   | _, [] ->
     Some "Cannot start a new proof (no goal remaining to prove)."
 
+(* OK *)
 let current_goal_name () =
   omap (function 
       | UnprovedLemma (stmt,_) -> stmt.Goal.name
