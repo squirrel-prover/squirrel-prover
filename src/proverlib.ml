@@ -171,7 +171,7 @@ type pending_proof =
 
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
-(*------------------------------------------------------------------*)(* {↓{ *)
+(*--------------- Options are still global refs --------------------*)(* {↓{ *)
 (** {2 Options}
 
     TODO [option_defs] is not directly related to
@@ -443,7 +443,7 @@ end
 module type Proveriable = sig
   (* TODO should not be static type here, just add getters setters to
    * what is needed in Toplevel (e.g get_table…) *)
-  type state = Prover.state
+  type state
   val init : unit -> state
   val add_proof_obl : Goal.t -> state -> state
   val get_current_system : state -> SystemExpr.context option
@@ -469,7 +469,7 @@ module Toplevel (Prover : Proveriable) = struct
   type state = {
     prover_state : Prover.state; (* prover state *)
     params       : Config.params; (* save global params… *)
-    option_defs  : option_def list;
+    option_defs  : option_def list; (* save global option_def *)
     prover_mode  : prover_mode;
   }
 
@@ -480,16 +480,16 @@ module Toplevel (Prover : Proveriable) = struct
     { st with prover_state = Prover.abort st.prover_state;
               prover_mode = GoalMode }
 
-  (* FIXME this should for sure create a copy *)
   let copy (st:state) : state = 
     { st with prover_state = Prover.copy st.prover_state }
 
-  let init ?(mode:prover_mode=GoalMode) () : state = 
+  (* GoalMode is always the initial prover_mode *)
+  let init () : state = 
     let _ = Config.reset_params () in 
     { prover_state= Prover.init ();
       params      = Config.get_params ();
       option_defs = [];
-      prover_mode = mode
+      prover_mode = GoalMode
     }
 
   let try_complete_proof (st:state) : state = 
@@ -507,7 +507,7 @@ module Toplevel (Prover : Proveriable) = struct
     { st with prover_state = Prover.tactic_handle st.prover_state l }
 
   (* TODO should use getter also in Prover *)
-  let get_table (st:state) : Symbols.table = st.prover_state.table
+  let get_table (st:state) : Symbols.table = Prover.get_table st.prover_state
 
   (*---------------- do_* commands handling ------------------*)(* {↓{ *)
   (* Since prover_mode is handled by the toplevel this has to be done
@@ -584,8 +584,8 @@ module Toplevel (Prover : Proveriable) = struct
               (Prover.get_table st.prover_state);
         st
     end
-
   (* }↑} *)
+
   (*---------------- Options handling -- FIXME ---------------*)(* {↓{ *)
   (* let get_option (opt_name:Option.option_name) (st:state) : *)
   (*   Option.option_val option = *)
@@ -622,118 +622,6 @@ module Toplevel (Prover : Proveriable) = struct
     { st with option_defs = optdefs }
 end
 (* }↑} *)
-
-module ToplevelProver = Toplevel(Prover)
-
-(*----------------- History ----------------------------------*)(* {↓{ *)
-(** {History Functor}
- * Historiable is the signature of the state that can be saved and
- * restored *)
-module type HistoriableToplevelProver = sig
-  type state
-  val init : ?mode:prover_mode -> unit -> state
-
-  (* TODO This is ugly ! Remove Config from globals ! Or only the
-   * params that are ``historiable'' (that can change during
-   * computation) *)
-  val get_params : state -> Config.params
-  val set_params : state -> Config.params -> state
-  val get_option_defs : state -> option_def list
-  val set_option_defs : state -> option_def list -> state
-end
-
-(* This module manage history with global configs *)
-module History (P : HistoriableToplevelProver) = struct
-  type state = P.state
-  (* could be a tree and managed with ref on current node *)
-  type history = state list
-
-  (* should rewrite ocaml module stack ? *)
-  type stack = history list
-
-  (* a state of global history is a current history and a stack of
-   * history, This could have been clearer with a tree with ref on
-   * current node ? FIXME *)
-  type history_state = {
-    pt_history : history;
-    pt_history_stack : stack
-  }
-
-  (*---------------------Manage History-----------------------*)(* {↓{ *)
-  let init_history : history = 
-    option_defs := [];
-    let _ = Config.reset_params () in [] 
-
-  let init_history_state : history_state = 
-    {pt_history=init_history;pt_history_stack=[]}
-
-  let save_state' (pt_history:history) (st: state) : history =
-    let st = P.set_params st (Config.get_params ()) in
-    let st = P.set_option_defs st !option_defs in
-    st::pt_history
-
-  let save_state (hs:history_state) (st: state) : history_state =
-    { hs with pt_history = save_state' hs.pt_history st }
-
-  (* TODO should be deprecated since we do not save in ref…
-   * Only Config and options params are to be reset globally here *)
-  let reset_from_state (st: state) : state =
-    option_defs := P.get_option_defs st;
-    let _ = Config.set_params (P.get_params st) in 
-    st
-
-  (* Since we still have Config and option params that are global 
-   * we have to do the following reset but in the future it will 
-   * just return the nth state that will managed by the prover as 
-   * his current state *)
-  let rec reset_state' (pt_history:history) (n: int) : (
-    history * state) =
-    if List.length pt_history <= n 
-    then init_history, P.init ()
-    else match pt_history, n with
-    | [], _ -> assert false (* should be managed above *)
-    | p::q, 0 -> q, reset_from_state p
-    | _::q, n -> (reset_state'[@tailrec]) q (n-1)
-
-  let reset_state (hs:history_state) (n: int) : 
-    (history_state * state) =
-    let npt_history, nstate  = reset_state' hs.pt_history n in
-    ({ hs with pt_history = npt_history }, nstate)
-
-  let reset_to_pt_history_head' (pt_history:history):
-  (history * state) =
-    reset_state' pt_history 0
-
-  let reset_to_pt_history_head (hs:history_state):
-    (history_state * state) =
-    reset_state hs 0
-  (* }↑} *)
-  (*---------------------Manage Stack History-----------------*)(* {↓{ *)
-  exception History_stack_empty
-
-  let push_pt_history (hstate:history_state) : history_state =
-    { pt_history = []; 
-      pt_history_stack = (hstate.pt_history::hstate.pt_history_stack) 
-    }
-
-  let pop_pt_history (hstate:history_state) : history_state =
-    match hstate.pt_history_stack with 
-    | [] -> raise History_stack_empty
-    | h::l -> { pt_history = h;
-                pt_history_stack = l
-              }
-
-  let pop_all_pt_history (hstate:history_state) : history_state =
-    match hstate.pt_history_stack with 
-    | [] -> raise History_stack_empty (* cannot be empty *)
-    | l -> { pt_history = Utils.List.last l;
-             pt_history_stack = []
-           }
-  (* }↑} *)
-end
-(* }↑} *)
-
-module HistoryTP = History(ToplevelProver)
 
 (*-------- ProverTactics --------------------------------------*)(* {↓{ *)
 let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
@@ -911,8 +799,9 @@ let get_help (tac_name : Theory.lsymb) =
   else
     Printer.prt `Result "%a" (ProverTactics.pp true) tac_name;
   Tactics.id
+(* }↑} *)
 
-
+(*-------- Declare Tactics here ! TOMOVE ! TODO ---------------*)(* {↓{ *)
 let () =
   ProverTactics.register_general "lemmas"
     ~tactic_help:{general_help = "Print all proved lemmas.";

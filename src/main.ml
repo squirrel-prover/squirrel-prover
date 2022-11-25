@@ -1,5 +1,4 @@
 open Utils
-open Proverlib
 
 module L = Location
 
@@ -35,14 +34,15 @@ type file = {
   f_lexbuf : Lexing.lexbuf;
 }
 
+module ToplevelProver = Proverlib.Toplevel(Proverlib.Prover)
+module HistoryTP = History.HistoryTopLevelProver(ToplevelProver)
+
 (** State of the main loop. *)
 (* TODO: include everything currently handled statefully in Prover.ml *)
 type driver_state = {
-  (* TODO Rename *)
-  prover_state : Proverlib.ToplevelProver.state;
+  prover_state : ToplevelProver.state;
 
-  (* TODO Rename *)
-  history_state : Proverlib.HistoryTP.history_state;
+  history_state : HistoryTP.history_state;
 
   (* The check_mode can be changed regarding to includes main.ml:426 *)
   check_mode : [`Check | `NoCheck];
@@ -243,12 +243,12 @@ Proverlib.parsed_input =
 (*---------------- Main --------------------------------------------*)
 let do_undo (state : driver_state) (nb_undo : int) : driver_state =
   let history_state, prover_state =
-  Proverlib.HistoryTP.reset_state state.history_state nb_undo in
+  HistoryTP.reset_state state.history_state nb_undo in
   let () = match prover_state.prover_mode with
-    | ProofMode -> Printer.pr "%a" (Proverlib.ToplevelProver.pp_goal
+    | ProofMode -> Printer.pr "%a" (ToplevelProver.pp_goal
                      prover_state) ()
     | GoalMode -> Printer.pr "%a" Action.pp_actions
-                    (Proverlib.ToplevelProver.get_table prover_state)
+                    (ToplevelProver.get_table prover_state)
     | WaitQed -> ()
     | AllDone -> assert false in
   { state with prover_state; history_state; }
@@ -271,14 +271,14 @@ let do_decls (state : driver_state) (decls : Decl.declarations) :
   let prover_state = { st with prover_mode = GoalMode; prover_state =
                                                          new_prover_state;
                      } in
-  (* let prover_state = Proverlib.ToplevelProver.do_decls *)
+  (* let prover_state = ToplevelProver.do_decls *)
     (* state.prover_state decls in *)
   { state with prover_state; }
 
 (*----------------- Prover can print out that --TODO CLEAN----------*)
 let do_print (state : driver_state) (q : Proverlib.print_query) 
   : driver_state =
-  let prover_state = Proverlib.ToplevelProver.do_print
+  let prover_state = ToplevelProver.do_print
       state.prover_state q in
   (* FIXME this should not change state anyway… *)
   { state with prover_state }
@@ -287,7 +287,7 @@ let do_print (state : driver_state) (q : Proverlib.print_query)
 type parsed_t = [`Brace of [`Close | `Open]
       | `Bullet of string
       | `Tactic of TacticsArgs.parser_arg Tactics.ast]
-(*----------Part can be done here and bullet handling in Prover ----*)
+(*----------Part can be done here and tactic handling in Prover ----*)
 (* TODO input and ouput only prover_state *)
 let do_tactic (state : driver_state) (l:parsed_t list) : driver_state =
   begin match state.check_mode with
@@ -311,24 +311,24 @@ let do_tactic (state : driver_state) (l:parsed_t list) : driver_state =
   match state.check_mode with
   | `NoCheck -> state
   | `Check   ->
-    let saved_ps = Proverlib.ToplevelProver.copy state.prover_state in
+    let saved_ps = ToplevelProver.copy state.prover_state in
     let prover_state = 
       begin 
         try List.fold_left 
-              Proverlib.ToplevelProver.tactic_handle state.prover_state l
+              ToplevelProver.tactic_handle state.prover_state l
         with
           | e -> 
-            (* will only reset Config params refs *)
-            ignore (Proverlib.HistoryTP.reset_from_state 
+            (* XXX ↓ impure ↓  XXX will only reset Config params refs *)
+            ignore (HistoryTP.reset_from_state 
                       saved_ps) ; raise e
       end in
     let prover_state = 
-      Proverlib.ToplevelProver.try_complete_proof prover_state
+      ToplevelProver.try_complete_proof prover_state
     in { state with prover_state }
 
 (*--------------TODO CLEAN -----------------------------------------*)
 let do_qed (state : driver_state) : driver_state =
-  let prover_state = Proverlib.ToplevelProver.do_qed
+  let prover_state = ToplevelProver.do_qed
       state.prover_state in
   { state with prover_state }
 
@@ -350,7 +350,7 @@ let do_add_hint (state : driver_state) (h : Hint.p_hint) : driver_state =
   (* TODO this is temporary, don't panic ↓ *)
   { state with prover_state = 
     { state.prover_state with prover_state = ps } }
-(* { state with prover_state = Proverlib.ToplevelProver.do_add_hint *)
+(* { state with prover_state = ToplevelProver.do_add_hint *)
 (*               state.prover_state h; } *)
 
 (*----------------- Driver -----------------------------------------*)
@@ -367,21 +367,21 @@ let do_add_goal
     (g : Goal.Parsed.t Location.located) 
   : driver_state 
   =
-  let prover_state = Proverlib.ToplevelProver.do_add_goal 
+  let prover_state = ToplevelProver.do_add_goal 
       state.prover_state g in
   { state with prover_state }
 
 (*-------- TODO CLEAN ----------------------------------------------*)
 let do_start_proof (state : driver_state) : driver_state =
   { state with 
-    prover_state = Proverlib.ToplevelProver.do_start_proof
+    prover_state = ToplevelProver.do_start_proof
       state.prover_state state.check_mode }
 
 (*--------- TODO CLEAN ---------------------------------------------*)
 let do_eof (state : driver_state) : driver_state =
   assert (state.file_stack = []);
   { state with prover_state = 
-                 Proverlib.ToplevelProver.do_eof state.prover_state }
+                 ToplevelProver.do_eof state.prover_state }
 
 (* TODO REWRITE and TOMOVE in Toplevel everything except History ---*)
 let rec do_include 
@@ -392,13 +392,13 @@ let rec do_include
   =
   (* save prover state, in case the include fails *)
   (* FIXME Just take back state.prover_state of given original state ? *)
-  let prover_state = Proverlib.ToplevelProver.copy state.prover_state in
+  let prover_state = ToplevelProver.copy state.prover_state in
 
   let file = include_get_file state i.th_name in
   let file_stack = state.file :: state.file_stack in
 
   let hstate = { state with 
-     history_state = Proverlib.HistoryTP.push_pt_history state.history_state }
+     history_state = HistoryTP.push_pt_history state.history_state }
   in
 
   (* XXX ? check_mode can change value here regarding to params !*)
@@ -414,18 +414,8 @@ let rec do_include
     let final_state = do_all_commands ~test incl_state in
     Printer.prt `Warning "loaded: %s.sp" final_state.file.f_name;
 
-    (* FIXME after pop : history should be the same as original state *)
-    let final_state = { final_state with
-        history_state = Proverlib.HistoryTP.pop_pt_history
-            final_state.history_state } in
+    { state with prover_state = final_state.prover_state }
 
-    (* FIXME this takes back original state.file* and check_mode ! *)
-    (* Finally from original state only prover_state has changed ? *)
-    { final_state with file       = state.file; 
-                       file_stack = state.file_stack; 
-                       check_mode = state.check_mode; }
-    (* TODO ↓ That means we can do that only ↓ *)
-    (* { state with prover_state = final_state.prover_state } *)
     (* XXX Does that mean that file, file_stack and check_mode are the
      * only values that are relevant in driver_state → do_include ? *)
 
@@ -438,14 +428,9 @@ let rec do_include
         (L.unloc i.th_name)
         (pp_toplevel_error ~test incl_state) e
     in
-    (* FIXME pop_pt_history is done in both cases and useless here
-     * since nothing is returned ! *)
-    let _ = { incl_state with
-        history_state = Proverlib.HistoryTP.pop_pt_history
-          incl_state.history_state } in
     (* XXX will only reset params that are globals TODO CLEAN *)
-    let _ : Proverlib.HistoryTP.state =
-      Proverlib.HistoryTP.reset_from_state prover_state
+    let _ : HistoryTP.state =
+      HistoryTP.reset_from_state prover_state
     in
     Command.cmd_error (IncludeFailed err_mess)
 
@@ -489,7 +474,7 @@ and do_command
       Printer.prt `Result
         "Exiting proof mode and aborting current proof.@.";
       { state with prover_state = 
-          Proverlib.ToplevelProver.abort state.prover_state }
+          ToplevelProver.abort state.prover_state }
 
     | _, ParsedQed ->
       if test then raise Unfinished;
@@ -497,6 +482,7 @@ and do_command
 
     | _, _ -> Command.cmd_error Unexpected_command
 
+(* FIXME why not using do_all_commands when not interactive ? *)
 (** Do all command from a file until EOF is reached *)
 and do_all_commands ~(test : bool) (state : driver_state) : driver_state =
   match next_input ~test state with
@@ -514,11 +500,12 @@ let rec main_loop ~test ?(save=true) (state : driver_state) =
 
   (* Save the state if instructed to do so.
    * In practice we save except after errors and the first call. *)
-  let state = begin 
-    if save then 
-      {state with 
-       history_state = 
-         Proverlib.HistoryTP.save_state state.history_state
+  let state = begin
+    if save then
+      {state with
+       history_state =
+        (* XXX ↓ impure ↓ XXX *)
+         HistoryTP.save_state state.history_state
          state.prover_state
       }
     else state
@@ -596,11 +583,11 @@ let start_main_loop
     (* mode = GoalMode; *)
     (* Duplicated in Prover *)
     (* table = Symbols.builtins_table; *)
-    (* TODO Rename *)
-    prover_state = Proverlib.ToplevelProver.init ~mode:GoalMode ();
+    (* TODO Rename XXX ↓ impure ↓ XXX Configs are reset here *)
+    prover_state = ToplevelProver.init ();
 
     (* TODO Rename *)
-    history_state = Proverlib.HistoryTP.init_history_state;
+    history_state = HistoryTP.init_history_state;
 
     (* The check_mode can be changed regarding to includes main.ml:426 *)
     check_mode = `Check;
