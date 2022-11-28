@@ -1,6 +1,6 @@
 module Args = HighTacticsArgs
 module L = Location
-module T = Proverlib.ProverTactics
+module T = ProverTactics
 module SE = SystemExpr
 module St = Term.St
 module Sv = Vars.Sv

@@ -2,7 +2,7 @@
 (** {History Functor}
  * Historiable is the signature of the state that can be saved and
  * restored *)
-module type HistoriableToplevelProver = sig
+module type TOPLEVELPROVER = sig
   type state
   val init : unit -> state
 
@@ -16,7 +16,7 @@ module type HistoriableToplevelProver = sig
 end
 
 (* This module manage history with global configs *)
-module HistoryTopLevelProver (P : HistoriableToplevelProver) = struct
+module HistoryTopLevelProver (P : TOPLEVELPROVER) = struct
   type state = P.state
   (* could be a tree and managed with ref on current node *)
   type history = state list
@@ -103,5 +103,3 @@ module HistoryTopLevelProver (P : HistoriableToplevelProver) = struct
   (* }↑} *)
 end
 (* }↑} *)
-
-

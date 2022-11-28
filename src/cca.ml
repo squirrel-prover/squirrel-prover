@@ -9,7 +9,7 @@ module NO = NameOccs
 module ER = EncRandom
 module ES = EquivSequent
 module LT = LowTactics
-module T = Proverlib.ProverTactics
+module T = ProverTactics
 
 module Name = NameOccs.Name
 

@@ -9,7 +9,7 @@
 
 open Utils
 
-module T    = Proverlib.ProverTactics
+module T    = ProverTactics
 module Args = HighTacticsArgs
 module L    = Location
 module SE   = SystemExpr
@@ -123,7 +123,7 @@ let sym_tac (s : ES.t) : Goal.t list =
          s) ]
 
 let () =
-  let tactic_help = Proverlib.{
+  let tactic_help = ProverTactics.{
       general_help = "Prove an equivalence by symmetry.";
       detailed_help =
         "Turn a goal whose conclusion is an equivalence \
@@ -277,7 +277,7 @@ let trans_tac args s =
   | _ -> bad_args ()
 
 let () =
-  let tactic_help = Proverlib.{
+  let tactic_help = ProverTactics.{
     general_help = "Prove an equivalence by transitivity.";
     detailed_help =
       "With a system: When trying to prove an equivalence with respect to an initial \
