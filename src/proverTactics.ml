@@ -24,9 +24,6 @@ type 'a tac_infos = {
 
 type 'a table = (string, 'a tac_infos) Hashtbl.t
 
-let pp_usage tacname fmt esort =
-  Fmt.pf fmt "%s %a" tacname TacticsArgs.pp_esort esort
-
 (*------------- Basic Tactic tables, without registration-----------*)(* {↓{ *)
 (** Basic tactic tables, without registration *)
 
@@ -174,6 +171,8 @@ let register_macro
          Tactics.hard_failure
            (Tactics.Failure "this tactic does not take arguments"))
 
+let pp_usage tacname fmt esort =
+  Fmt.pf fmt "%s %a" tacname TacticsArgs.pp_esort esort
 let pp details fmt (id : Theory.lsymb) =
   let id_u = Location.unloc id in
   let help =

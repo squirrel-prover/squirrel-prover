@@ -201,6 +201,7 @@ let eval_tactic (utac:TacticsArgs.parser_arg Tactics.ast) (ps:state) : state =
   | _ -> eval_tactic_focus utac ps
 (* }↑} *)
 (*----------------------- Bullets --------------------------*)(* {↓{ *)
+(** Insert a bullet in the proof script. *)
 let open_bullet (ps:state) (bullet : string) : state =
   assert (bullet <> "");
   try { ps with bullets = Bullets.open_bullet bullet ps.bullets } with
@@ -209,10 +210,12 @@ let open_bullet (ps:state) (bullet : string) : state =
 let invalid_brace () =
   Tactics.hard_failure (Failure "invalid brace")
 
+(** Open a brace in the proof script. *)
 let open_brace (ps:state) : state =
   try { ps with bullets = Bullets.open_brace ps.bullets } with
   | Bullets.Error _ -> invalid_brace ()
 
+(** Close a brace in the proof script. *)
 let close_brace (ps:state) : state =
   try { ps with bullets = Bullets.close_brace ps.bullets } with
   | Bullets.Error _ -> invalid_brace ()

@@ -40,8 +40,8 @@ module HistoryTP = History.HistoryTopLevelProver(ToplevelProver)
 (** State of the main loop. *)
 type driver_state = {
   toplvl_state : ToplevelProver.state;
-  (* toplvl_state = {
-      prover_state = {
+  (* toplvl_state : ToplevelProver.state = {
+      prover_state : Prover.state = {
         goals        : Proverlib.pending_proof list;
         table        : Symbols.table; 
         current_goal : Proverlib.pending_proof option;
