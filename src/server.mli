@@ -7,4 +7,4 @@ val start : unit -> unit
 
 (** Send an event [update] to the page.
     Indicates that the data in [dump.json] have changed. *)
-val update : unit -> unit
+val update : Prover.state -> unit

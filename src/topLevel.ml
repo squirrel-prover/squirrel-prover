@@ -24,6 +24,8 @@ module type PROVER = sig
   val add_new_goal : state -> Goal.Parsed.t Location.located -> state 
   val start_proof : state -> [`Check | `NoCheck] -> (string option * state) 
   val abort : state -> state
+  val first_goal : state -> Proverlib.pending_proof
+  val add_decls : state -> Decl.declarations -> state * Goal.t list
 end
 
 module Toplevel (Prover : PROVER) = struct
@@ -69,7 +71,6 @@ module Toplevel (Prover : PROVER) = struct
   let tactic_handle (st:state) l = 
     { st with prover_state = Prover.tactic_handle st.prover_state l }
 
-  (* TODO should use getter also in Prover *)
   let get_table (st:state) : Symbols.table = Prover.get_table st.prover_state
 
   (*---------------- do_* commands handling ------------------*)(* {↓{ *)
@@ -91,7 +92,15 @@ module Toplevel (Prover : PROVER) = struct
 
   let do_add_goal (st:state) (g:Goal.Parsed.t Location.located) :
     state =
-    { st with prover_state = Prover.add_new_goal st.prover_state g }
+    let new_ps = Prover.add_new_goal st.prover_state g in
+    (* for printing new goal ↓ *)
+    let goal,name = match Prover.first_goal new_ps with
+      | Proverlib.UnprovedLemma (stmt,g) -> g, stmt.Goal.name
+      | _ -> assert false (* should be only ↑ *)
+    in
+    Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@." name Goal.pp_init goal;
+    (* return toplevel state with new prover_state *)
+    { st with prover_state = new_ps }
 
   let do_add_hint (st:state) (h:Hint.p_hint) : state =
     { st with prover_state = Prover.add_hint st.prover_state h }
@@ -102,16 +111,11 @@ module Toplevel (Prover : PROVER) = struct
     { st with prover_state; prover_mode = GoalMode }
 
   let do_decls (st:state) (decls : Decl.declarations) : state =
-    let table, proof_obls = ProcessDecl.declare_list 
-        (Prover.get_table st.prover_state) decls in
+    let new_prover_state, proof_obls = 
+      Prover.add_decls st.prover_state decls in
     if proof_obls <> [] then
       Printer.pr "@[<v 2>proof obligations:@;%a@]"
         (Fmt.list ~sep:Fmt.cut Goal.pp_init) proof_obls;
-
-    let ps : Prover.state = List.fold_left (fun ps goal ->
-        Prover.add_proof_obl goal ps) st.prover_state proof_obls in
-
-    let new_prover_state : Prover.state = Prover.set_table ps table in
     { st with prover_mode = GoalMode; prover_state = new_prover_state; }
 
   let do_print (st:state) (q : Proverlib.print_query) 

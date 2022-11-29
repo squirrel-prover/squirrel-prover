@@ -20,8 +20,6 @@ type state = {
   bullets      : Bullets.path;
 }
 
-(* FIXME move everything that is only to be saved in history in
- * ProofHistory *)
 let init () : state = 
 { goals         = [];
   table         = Symbols.builtins_table;
@@ -42,7 +40,6 @@ let set_table (ps:state) (table: Symbols.table) : state =
 let add_hint (ps:state) (h: Hint.p_hint) : state =
   let table = 
     match h with
-    (* FIXME 2 same table in args ? *)
     | Hint.Hint_rewrite id -> 
         ProcessDecl.add_hint_rewrite ps.table id ps.table
     | Hint.Hint_smt     id -> 
@@ -114,7 +111,7 @@ let get_current_system (ps:state) : SystemExpr.context option =
   | Some (UnprovedLemma (_, g)) -> Some (Goal.system g )
 
 let add_new_goal_i (table:Symbols.table) (parsed_goal:Goal.Parsed.t) 
-    (ps:state) : (string * Goal.t) * state  =
+    (ps:state) : state  =
   let name = match parsed_goal.Goal.Parsed.name with
     | None -> Proverlib.unnamed_goal ()
     | Some s -> s
@@ -127,10 +124,8 @@ let add_new_goal_i (table:Symbols.table) (parsed_goal:Goal.Parsed.t)
     { parsed_goal with Goal.Parsed.name = Some name } in
   let statement,goal = Goal.make table parsed_goal in
   let goals =  Proverlib.UnprovedLemma (statement,goal) :: ps.goals in
-  ((Location.unloc name, goal), { ps with goals })
+  { ps with goals }
 
-(* XXX This return ( string , Goal.t ) only for printing purposes 
- * we may want to do it here and return only the state TODO *)
 let add_new_goal (ps:state)  
     (parsed_goal:Goal.Parsed.t Location.located) : state =
   if ps.goals <> [] then
@@ -138,14 +133,24 @@ let add_new_goal (ps:state)
       "cannot add new goal: proof obligations remaining";
 
   let parsed_goal = Location.unloc parsed_goal in
-  (* MOVE prints into toplevel *)
-  let (i,f),new_state =  add_new_goal_i ps.table parsed_goal ps in
-  Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@." i Goal.pp_init f;
-  new_state
+  add_new_goal_i ps.table parsed_goal ps
+
+let first_goal (ps:state) : Proverlib.pending_proof =
+  match ps.goals with
+  | [] -> assert false
+  | h :: _ -> h
 
 let add_proof_obl (goal : Goal.t) (ps:state) : state = 
   let goals =  Proverlib.ProofObl (goal) :: ps.goals in
   { ps with goals }
+
+let add_decls (st:state) (decls : Decl.declarations) 
+  : state * Goal.t list =
+  let table, proof_obls = ProcessDecl.declare_list 
+      (get_table st) decls in
+  let ps : state = List.fold_left (fun ps goal ->
+      add_proof_obl goal ps) st proof_obls in
+  set_table ps table, proof_obls
 
 let get_first_subgoal (ps:state) : Goal.t =
   match ps.current_goal, ps.subgoals with

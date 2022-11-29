@@ -325,8 +325,8 @@ let do_qed (state : driver_state) : driver_state =
   { state with toplvl_state }
 
 let do_add_hint (state : driver_state) (h : Hint.p_hint) : driver_state =
-{ state with toplvl_state = ToplevelProver.do_add_hint
-              state.toplvl_state h; }
+  { state with toplvl_state = ToplevelProver.do_add_hint
+                   state.toplvl_state h; }
 
 (*----------------- Driver -----------------------------------------*)
   (* XXX Touch global Config that has to be recorded in History *)
@@ -361,10 +361,6 @@ let rec do_include
     (i : Proverlib.include_param) 
   : driver_state 
   =
-  (* save prover state, in case the include fails *)
-  (* FIXME Just take back state.toplvl_state of given original state ? *)
-  let toplvl_state = ToplevelProver.copy state.toplvl_state in
-
   let file = include_get_file state i.th_name in
   let file_stack = state.file :: state.file_stack in
 
@@ -372,7 +368,6 @@ let rec do_include
      history_state = HistoryTP.push_pt_history state.history_state }
   in
 
-  (* XXX ? check_mode can change value here regarding to params !*)
   let check_mode = 
     if List.exists (fun x -> L.unloc x = "admit") i.Proverlib.params 
     then `NoCheck
@@ -400,8 +395,9 @@ let rec do_include
         (pp_toplevel_error ~test incl_state) e
     in
     (* XXX will only reset params and options that are globals *)
+    (* main_loop will return previous state anyway *)
     let _ : HistoryTP.state =
-      HistoryTP.reset_from_state toplvl_state
+      HistoryTP.reset_from_state state.toplvl_state
     in
     Command.cmd_error (IncludeFailed err_mess)
 
@@ -430,7 +426,7 @@ and do_command
     | GoalMode, ParsedGoal g           -> do_add_goal state g
                                        (* ↓ touch only toplvl_state ↓ *)
     | GoalMode, ParsedProof            -> do_start_proof state
-                        (* ↓ FIXME seems to touch only toplvl_state ↓ *)
+                              (* ↓ seems to touch only toplvl_state ↓ *)
     | GoalMode, ParsedInclude inc      -> do_include ~test state inc
                                   (* ↓ touch only toplvl_state mode ↓ *)
     | GoalMode, EOF                    -> do_eof state
@@ -486,7 +482,7 @@ let rec main_loop ~test ?(save=true) (state : driver_state) =
     let cmd = next_input ~test state in
     let new_state = do_command ~test state cmd
     in
-    Server.update ();
+    Server.update new_state.toplvl_state.prover_state;
     new_state, new_state.toplvl_state.prover_mode
   with
   (* exit prover *)
@@ -504,7 +500,6 @@ let rec main_loop ~test ?(save=true) (state : driver_state) =
   (* error handling *)
   | exception e when is_toplevel_error ~test e ->
     Printer.prt `Error "%a" (pp_toplevel_error ~test state) e;
-    (* FIXME original state with new history ? *)
     main_loop_error ~test state
 
 and main_loop_error ~test (state : driver_state) : unit =
@@ -532,24 +527,22 @@ let mk_load_paths ~main_mode () : load_paths =
   in
   [top_load_path; theory_load_path]
 
-(* `test arg should be global ? FIXME *)
 let start_main_loop
     ?(test=false)
     ~(main_mode : [`Stdin | `File of string])
     () : unit
   =
-  (* FIXME interactive is only set here *)
+  (* interactive is only set here *)
   interactive := main_mode = `Stdin;
   let file = match main_mode with
     | `Stdin -> file_from_stdin ()
     | `File fname -> locate [LP_none] fname
   in
 
-  (* FIXME the state is mainly composed by attributes only "config" 
-   * values that do not change in the program : that is global
-   * immutable values (possibly ref in Config) *)
+  (* XXX the state is mainly composed by attributes only "config"
+   * and "option_defs" values do not change in the program *)
   let state = {
-    (* XXX ↓ impure ↓ XXX Configs are reset here *)
+    (* XXX ↓ impure ↓ XXX Configs and option_defs are reset here *)
     toplvl_state = ToplevelProver.init ();
 
     history_state = HistoryTP.init_history_state;
