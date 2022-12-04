@@ -65,11 +65,8 @@ let mk_const_symb x ty_symb =
 exception Unsupported of Term.term
 exception InternalError
 
-(* this is called [build_task_bis] because there was another build_task
- * previously that just handled the theory of timestamps / actions
- * (i.e. "constraints" tactic + dependencies) *)
-
-let build_task_bis
+(* TODO evars: universally quantifier variables... e like env? *)
+let build_task
     (table       : Symbols.table)
     (system      : SystemExpr.fset)
     (evars       : Vars.vars)
@@ -78,6 +75,8 @@ let build_task_bis
     (given_axioms: Term.terms)
     (tm_theory   : Why3.Theory.theory)
   : Why3.Task.task =
+
+  (* {{{ Extract data from loaded theory *)
   let tm_export = tm_theory.Why3.Theory.th_export in
 
   let index_symb   = Why3.Theory.ns_find_ts tm_export ["index"] in
@@ -102,6 +101,15 @@ let build_task_bis
   let macro_cond_symb  = Why3.Theory.ns_find_ls tm_export ["macro_cond"] in
   let macro_exec_symb  = Why3.Theory.ns_find_ls tm_export ["macro_exec"] in
 
+  let msg_ty   = Why3.Ty.ty_app msg_symb   []
+  and ts_ty    = Why3.Ty.ty_app ts_symb    []
+  and index_ty = Why3.Ty.ty_app index_symb []
+  and ilist_ty = Why3.Ty.ty_app ilist_symb [] in
+
+  (* }}} *)
+
+  (* {{{ Add symbols from signature and protocol. *)
+
   let indices = filter_ty  Type.Index     evars
   and tsvars  = filter_ty  Type.Timestamp evars
   and msgvars = filter_msg                evars in
@@ -117,15 +125,17 @@ let build_task_bis
   and messages_tbl   = Hashtbl.create (List.length msgvars) in
   let action_iter = SystemExpr.iter_descrs table system in
   action_iter (fun descr ->
-      (* need to handle init as special case *)
-      if descr.name <> Symbols.init_action
-      then let str = Symbols.to_string descr.name in
+      (* need to handle init as special case:
+         it is declared in .why file *)
+      if descr.name <> Symbols.init_action then
+        let str = Symbols.to_string descr.name in
         Hashtbl.add actions_tbl str (mk_const_symb str action_symb)
     );
   (* use declaration for trace model theory + constant declarations for actions *)
   let task_header = ref (Why3.Task.use_export None tm_theory
                          |> Hashtbl.fold (fun _ symb task ->
                              Why3.Task.add_param_decl task symb) actions_tbl) in
+
   (* only add the init action now! so that it doesn't get declared twice *)
   Hashtbl.add actions_tbl Symbols.(to_string init_action) init_symb;
 
@@ -141,6 +151,51 @@ let build_task_bis
   List.iter (add_tbl_var indices_tbl    index_symb) indices;
   List.iter (add_tbl_var timestamps_tbl ts_symb)    tsvars;
   List.iter (add_tbl_var messages_tbl   msg_symb)   msgvars;
+  (* }}} *)
+
+  (* Create tuple symbols, convert types from Squirrel to Why3 {{{ *)
+  let tuple_data =
+    Array.init 10
+      (fun arity ->
+         let param_tvars =
+           List.init arity
+             (fun i -> Why3.Ty.tv_of_string ("a" ^ string_of_int i))
+         in
+         let tuple_symb =
+           Why3.Ty.create_tysymbol
+             (Why3.Ident.id_fresh ("tuple_" ^ string_of_int arity))
+             param_tvars
+             Why3.Ty.NoDef
+         in
+         let param_tys = List.map Why3.Ty.ty_var param_tvars in
+         let tuple_ty = Why3.Ty.ty_app tuple_symb param_tys in
+         let mk_tuple =
+           Why3.Term.create_fsymbol
+             (Why3.Ident.id_fresh ("mk_tuple_" ^ string_of_int arity))
+             param_tys
+             tuple_ty
+         in
+         task_header := Why3.Task.add_ty_decl !task_header tuple_symb;
+         task_header := Why3.Task.add_param_decl !task_header mk_tuple;
+         tuple_symb, mk_tuple)
+  in
+
+  let rec convert_type = function
+    | Type.Message -> msg_ty
+    | Type.Timestamp -> ts_ty
+    | Type.Boolean -> msg_ty (* TODO something more precise? *)
+    | Type.Tuple l ->
+      let tuple_symb,_ = tuple_data.(List.length l) in
+      Why3.Ty.ty_app tuple_symb (List.map convert_type l)
+    | ty ->
+      Format.printf
+        "smt: unsupported argument type %a@."
+        Type.pp ty;
+      raise InternalError
+  in
+  (* }}} *)
+
+  (* {{{ Trace model axioms on actions *)
 
   (* Next, say that all actions are distinct *)
   let distinct_actions_axioms = Hashtbl.fold (fun k a acc ->
@@ -201,48 +256,70 @@ let build_task_bis
             (Why3.Decl.create_prsymbol @@ Why3.Ident.id_fresh "axiom_depends")
             axiom;
       )));
+  (* }}} *)
+
+  (* {{{ Declaring function, macro and name symbols *)
   let task_header   = !task_header in
   let functions_tbl = Hashtbl.create 12
   and macros_tbl    = Hashtbl.create 12
   and names_tbl     = Hashtbl.create 12 in
-  let msg_ty   = Why3.Ty.ty_app msg_symb   []
-  and ts_ty    = Why3.Ty.ty_app ts_symb    []
-  and ilist_ty = Why3.Ty.ty_app ilist_symb [] in
   Symbols.Function.iter (fun fname (ftype, _) _ ->
-      if fname <> Symbols.fs_xor then
-        (* special treatment of xor for two reasons:
-         *   - id_fresh doesn't avoid the "xor" why3 keyword (why3 api bug?)
-         *   - allows us to declare the equations for xor in the .why file *)
-        let str = Symbols.to_string fname in
-        let symb = Why3.Term.create_fsymbol
-            (Why3.Ident.id_fresh str)
-            (ilist_ty :: List.map (fun _ -> msg_ty) ftype.fty_args)
-            (* the arguments of the function symbol are a list of indices
-             * + several messages (above), and it returns a message (below) *)
-            msg_ty in
-        (* Format.printf "registering function %s with %d index params and %d message params\n"
-         *   str ftype.fty_iarr (List.length ftype.fty_args); *)
-        Hashtbl.add functions_tbl str symb
+    let str = Symbols.to_string fname in
+    (* special treatment of xor for two reasons:
+     *   - id_fresh doesn't avoid the "xor" why3 keyword (why3 api bug?)
+     *   - allows us to declare the equations for xor in the .why file *)
+    if fname <> Symbols.fs_xor then
+    (* TODO can't declare polymorphic symbols... yet? *)
+    if ftype.Type.fty_vars <> [] then
+      Format.printf "Cannot declare %s : %a@." str Type.pp_ftype ftype
+    else
+      let symb =
+        Why3.Term.create_fsymbol
+          (Why3.Ident.id_fresh str)
+          (List.map convert_type ftype.fty_args)
+          msg_ty
+      in
+      Hashtbl.add functions_tbl str symb
     ) table;
-  Symbols.Macro.iter (fun mn _ _ ->
+  Symbols.Macro.iter (fun mn def _ ->
       let str = Symbols.to_string mn in
-      let symb = Why3.Term.create_fsymbol (Why3.Ident.id_fresh str)
-          [ilist_ty ; ts_ty] msg_ty in
+      let indices = match def with
+        | Input | Output | Cond | Exec | Frame -> 0
+        | State (i,Type.Message) -> i
+        | Global (i,Type.Message) -> i
+        | _ ->
+          Format.printf "smt: unsupported macro def@.";
+          raise InternalError
+      in
+      let indices = List.init indices (fun _ -> index_ty) in
+      let symb =
+        Why3.Term.create_fsymbol
+          (Why3.Ident.id_fresh str)
+          (indices @ [ts_ty])
+          msg_ty
+      in
       Hashtbl.add macros_tbl str symb
     ) table;
   Symbols.Name.iter (fun name _ _ ->
       let str = Symbols.to_string name in
-      let symb = Why3.Term.create_fsymbol (Why3.Ident.id_fresh str)
-          [ilist_ty] msg_ty in
+      let symb =
+        Why3.Term.create_fsymbol
+          (Why3.Ident.id_fresh str)
+          [ilist_ty] msg_ty
+      in
       Hashtbl.add names_tbl str symb
     ) table;
   let add_all_symbols tbl =
-    Hashtbl.fold (fun _ symb task -> Why3.Task.add_param_decl task symb) tbl
+    Hashtbl.fold (fun _ symb task ->
+        Why3.Task.add_param_decl task symb) tbl
   in
   let task_header = task_header
                     |> add_all_symbols functions_tbl
                     |> add_all_symbols macros_tbl
                     |> add_all_symbols names_tbl in
+  (* }}} *)
+
+  (* {{{ Convert terms of all sorts to Why3 *)
   let open Why3.Term in
   let index_to_wterm i = Hashtbl.find indices_tbl (Vars.name i) in
   let rec ilist_to_wterm = function
@@ -296,8 +373,7 @@ let build_task_bis
   and find_fn f = Hashtbl.find functions_tbl (Symbols.to_string f)
   (* in the function below I guess t_app_infer invokes the Why3 typechecker
    * to ensure that messages and timestamps are not mixed up
-   * but this is not reflected in our OCaml types
-   * the function subsumes timestamp_to_wterm from build_task (constraints) *)
+   * but this is not reflected in our OCaml types *)
   and msg_to_wterm : Term.term -> Why3.Term.term = fun c ->
     let open Term in
     let open Why3.Term in
@@ -320,10 +396,9 @@ let build_task_bis
     | Macro (ms,l,ts) ->
       t_app_infer
         (Hashtbl.find macros_tbl (Symbols.to_string ms.s_symb))
-
         (* FIXME: Adrien: oget can fail *)
-        [ilist_to_wterm (List.map (oget -| Term.destr_var) l);
-         timestamp_to_wterm ts]
+        (List.map (index_to_wterm -| oget -| Term.destr_var) l @
+         [timestamp_to_wterm ts])
 
     | Name (ns,args) ->
       t_app_infer
@@ -338,13 +413,17 @@ let build_task_bis
         (find_fn Symbols.fs_diff)
         [ilist_to_wterm []; msg_to_wterm c; msg_to_wterm d] *)
 
-    | Var v -> begin
-        try Hashtbl.find messages_tbl (Vars.name v)
-        with Not_found ->
-          print_endline ("ouch " ^ Vars.name v);
-          Format.printf "%a\n" Type.pp (Vars.ty v);
+    | Var v ->
+      begin try Hashtbl.find messages_tbl (Vars.name v) with
+        | Not_found ->
+          Format.printf "msg_to_wterm error: %a@." Vars.pp_typed_list [v];
           raise InternalError
       end
+
+    | Tuple l ->
+      let _,mk_tuple = tuple_data.(List.length l) in
+      t_app_infer mk_tuple (List.map msg_to_wterm l)
+
     | t -> raise (Unsupported t)
 
   and msg_to_fmla : Term.term -> Why3.Term.term = fun fmla ->
@@ -399,7 +478,9 @@ let build_task_bis
     List.iter (rem_var messages_tbl)   m_vs;
     quantifier quantified_vars [] subfmla
   in
+  (* }}} *)
 
+  (* {{{ Axioms for equational theory, macros, names *)
   let open Why3.Term in
   (* Axiom: forall x y. fst (x,y) = x /\ snd (x,y) = y *)
   let axiom_pair =
@@ -409,10 +490,12 @@ let build_task_bis
                      (Ty.ty_app msg_symb [])) in
     [(Symbols.fs_fst, vx); (Symbols.fs_snd, vy)]
     |> List.map (fun (proj, v) ->
-        t_equ (t_app_infer (find_fn proj)
-                 [ilist_to_wterm [];
-                  t_app_infer (find_fn Symbols.fs_pair)
-                    [ilist_to_wterm []; t_var vx; t_var vy]])
+        t_equ
+          (t_app_infer
+             (find_fn proj)
+             [t_app_infer
+                (find_fn Symbols.fs_pair)
+                [t_var vx; t_var vy]])
           (t_var v))
     |> t_and_l
     |> t_forall_close [vx; vy] [] in
@@ -525,16 +608,18 @@ let build_task_bis
       Symbols.Macro.iter (fun mn mdef _mdata ->
           let m_str  = Symbols.to_string mn in
           let m_symb = Hashtbl.find macros_tbl m_str in
-          let macro_wterm_eq is msg = t_equ (t_app_infer m_symb [is; ts]) msg in
+          let macro_wterm_eq indices msg = t_equ (t_app_infer m_symb (indices@[ts])) msg in
           let ax_option = try begin match mdef with
             (* cond@ already handled above; exec@ defined in .why file *)
             | Symbols.Cond | Symbols.Exec -> None
             | Symbols.Output ->
               (* output@A(i1,...) = output *)
               Some (macro_wterm_eq
-                      (ilist_to_wterm [])
+                      []
                       (msg_to_wterm (snd descr.Action.output)))
             | Symbols.Global (arity, gty) -> begin
+                (* TODO ruling out indices here for now *)
+                assert (arity = 0);
                 (* for now, handle only the case where the indices of the macro
                    coincide with those of the action *)
                 let m_idx = Utils.List.take arity descr.indices in
@@ -545,35 +630,39 @@ let build_task_bis
                 with
                 | `Undef   -> None
                 | `Def msg -> Some (macro_wterm_eq
-                                      (ilist_to_wterm m_idx)
+                                      [] (* TODO (ilist_to_wterm m_idx) *)
                                       (msg_to_wterm msg))
               end
-            | Symbols.State _ ->
+            | Symbols.State (indices,_) ->
+              assert (indices = 1); (* TODO generalize this! *)
               (* TODO: could probably be treated by calling
                  Macros.get_definition_nocntxt, instead of copying its code
                  (but it would be annoying to handle fresh index variables) *)
-              let quantified_ilist = Why3.(Term.create_vsymbol
-                                             (Ident.id_fresh "ii")
-                                             (Ty.ty_app ilist_symb [])) in
-              let ilist = t_var quantified_ilist in
+              let quantified_index =
+                Why3.(Term.create_vsymbol (Ident.id_fresh "i") index_ty) in
+              let index = t_var quantified_index in
               let expansion =
                 let same_as_pred =
-                  t_app_infer m_symb [ilist; t_app_infer pred_symb [ts]] in
+                  t_app_infer m_symb [index; t_app_infer pred_symb [ts]] in
                 try
                   let (_ns, ns_args, msg) =
-                    List.find (fun (ns,_,_) -> ns = mn)
+                    List.find
+                      (fun (ns,_,_) -> ns = mn)
                       descr.Action.updates
                   in
                   let expansion_ok = msg_to_wterm msg in
-                  if descr.Action.name = Symbols.init_action
-                  then expansion_ok
+                  if descr.Action.name = Symbols.init_action then
+                    expansion_ok
                   else
-                    t_if (t_equ ilist (ilist_to_wterm ns_args))
+                    let ns_args =
+                      match ns_args with [x] -> x | _ -> assert false in
+                    t_if
+                      (t_equ index (index_to_wterm ns_args))
                       expansion_ok
                       same_as_pred
                 with Not_found -> same_as_pred in
-              Some (t_forall_close [quantified_ilist] []
-                      (macro_wterm_eq ilist expansion))
+              Some (t_forall_close [quantified_index] []
+                      (macro_wterm_eq [index] expansion))
             | _ -> None (* input/frame, see earlier TODO *)
           end with Unsupported _ -> None
           in
@@ -609,7 +698,9 @@ let build_task_bis
                else ineq)
             :: acc2
         ) acc1 table) [] table in
+  (* }}} *)
 
+  (* {{{ Populate final Why3 task *)
   (* add distinct_actions_axioms here instead of at the end *)
   let task_header = List.fold_left (fun acc (id_ax, ax) ->
       Why3.Task.add_prop_decl acc Why3.Decl.Paxiom
@@ -618,22 +709,22 @@ let build_task_bis
                            (distinct_actions_axioms @ name_inj_axioms)
                          @ equational_axioms @ !macro_axioms) in
 
-
   Why3.Task.add_prop_decl task_header Why3.Decl.Pgoal
     (Why3.Decl.create_prsymbol @@ Why3.Ident.id_fresh "GOOOOAL")
     (List.map lit_to_fmla trace_lits
      @ List.map atom_to_fmla msg_atoms
      @ List.map msg_to_fmla given_axioms
      |> t_and_l |> t_not)
+  (* }}} *)
 
 let literals_unsat ~slow table system evars msg_atoms trace_lits axioms =
   (* List.iter (fun a -> Term.pp Format.std_formatter a; Format.printf "\n") axioms; *)
   try
     match get_smt_setup () with
-    | None -> print_endline "smt: setup issue"; false
+    | None -> Format.printf "smt: setup failed@."; false
     | Some (tm_theory, _, _) -> begin
         let task =
-          build_task_bis table system evars msg_atoms trace_lits axioms tm_theory in
+          build_task table system evars msg_atoms trace_lits axioms tm_theory in
         Format.printf "@[task is:@\n%a@]@." Why3.Pretty.print_task task;
         Utils.omap (fun x -> x.Why3.Call_provers.pr_answer)
           (if slow then run_prover ~limit_opt:60 task else run_prover task)
@@ -649,9 +740,8 @@ let literals_unsat ~slow table system evars msg_atoms trace_lits axioms =
       end
   with
   | Unsupported t ->
-    print_endline "smt: some feature is not supported by the translation in the following term";
-    Format.printf "%a\n" Term.pp t;
+    Format.printf "smt: cannot translate term %a@." Term.pp t;
     false
   | InternalError ->
-    print_endline "smt: internal error in tactic";
+    Format.printf "smt: internal error@.";
     false
