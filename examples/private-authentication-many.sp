@@ -100,8 +100,8 @@ Proof.
   enckp 4; 1: auto.
   enrich pk(kA(A)).
   cca1 5.
-  rewrite if_true in 5.  auto.
-  (* Pushing conditional underneath len(_) *)
+  + auto.
+  + (* Pushing conditional underneath len(_) *)
   rewrite if_len !length_pair.
   rewrite (if_same_branch (len(nB(A,i)) ++ len(nB(A,i)))) //.
   fa 5; fa 5; fa 5; fa 5.

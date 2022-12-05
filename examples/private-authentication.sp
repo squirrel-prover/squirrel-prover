@@ -202,7 +202,7 @@ Proof.
   which requires to show that the lengths of the plaintexts on both sides
   are equal.
   *)
-  cca1 4. rewrite if_true // in 4. 
+  cca1 4; [1:auto]. 
   fa 4; fa 4.
   fresh 5; rewrite if_true // in 5.  
   (** We use the lemma `if_len` to push the conditional under len(_). *)

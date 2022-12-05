@@ -12,6 +12,9 @@ aenc enc,dec,pk
 
 system !_i out(c,<diff(n,m), enc(n,r(i),pk(sk))>).
 
+abstract eta:message.
+axiom len_n: len(n) = eta.
+
 equiv test.
 Proof.
   enrich diff(n,m).
@@ -25,11 +28,10 @@ Proof.
   
   expandall.
   fa 2; fa 3; fa 3; fa 3.  
-  cca1 3. fa 3.
-  fresh 4.  
-  rewrite !if_true in *; [1,2: auto].
-  
-  admit 3.
-  auto.
-  
+  cca1 3. 
+   + auto. 
+   + fa 3.
+     fresh 4.  
+     rewrite len_n in 3.
+     rewrite if_true in 3; auto.
 Qed.

@@ -270,7 +270,9 @@ let indcca_param
    - the proj of the randomness r does not occur elsewhere
    - the other randoms are fresh.
    Note that cc contains a name xc meant to be replaced with the ciphertext.
-   So we take subc the term to substitute xc with in the resulting formula.
+   So we take subcs: a list of terms to substitute xc with in
+   the resulting formula (we generate a copy of the formula for each element
+   of subcs).
    IMPORTANT: this only works because we don't apply CCA under binders, so
    subc contains no free vars and can just be substituted anywhere. *)
 let phi_proj
@@ -286,7 +288,7 @@ let phi_proj
     (k:term)
     (r:term)
     (xc:Name.t) (* stand-in for the ciphertext in cc. *)
-    (subc:term) (* what to substitute xc with in the end *)
+    (subcs:terms) (* what to substitute xc with in the end *)
     (proj:proj) :
   terms
   =
@@ -295,7 +297,7 @@ let phi_proj
   let contx_p = { contx with system = system_p } in
   let cc_p = Term.project1 proj cc in
   let m_p = Term.project1 proj m in
-  let subc_p = Term.project1 proj subc in
+  let subcs_p = List.map (Term.project1 proj) subcs in
 
   (* check that the rand and key, once projected, are names. *)
   let k_p, r_p = 
@@ -368,11 +370,14 @@ let phi_proj
   (* finally, apply the substitution to the variable in cc *)
   (* IT ONLY WORKS if all vars in the ciphertext are bound in the env,
      not in binders *)
-  let phi_p = List.map (subst_name xc subc_p) (phis_kr @ phis_random) in 
+  let phi_p =
+    List.concat_map
+      (fun c -> List.map (subst_name xc c) (phis_kr @ phis_random))
+      subcs_p
+  in 
   
-  (* not removing duplicates here, as we already do that on occurrences. *)
-  (* probably fine, but we'll need to remove duplicates between
-     phi_l and phi_r *)
+  (* not removing duplicates here, we'll need to remove duplicates
+     between phi_l and phi_r later anyway *)
   phi_p
 
 
@@ -399,13 +404,15 @@ let indcca1 (i:int L.located) (s:sequent) : sequent list =
   in
   let contxxc = {contx with table=tablexc} in
 
-  (* the ciphertext encrypting its length instead of m *)
+  (* the ciphertext, and the ciphertext encrypting its length instead of m *)
+  let c = Term.(mk_fun table enc_f [mk_tuple [m; r; k]]) in
   let c_len = Term.(mk_fun table enc_f [mk_tuple [mk_zeroes (mk_len m); r; k]]) in
 
   let phi_proj =
-    phi_proj loc contxxc env enc_f dec_f pk_f biframe cc m k r xc c_len
+    phi_proj loc contxxc env enc_f dec_f pk_f biframe cc m k r xc [c; c_len]
   in
-  
+
+
   Printer.pr "@[<v 0>Checking for side conditions on the left@; @[<v 0>";
   let phi_l = phi_proj proj_l in
           
@@ -422,11 +429,9 @@ let indcca1 (i:int L.located) (s:sequent) : sequent list =
   in
 
   let phi = Term.mk_ands ~simpl:true phis in
-  let new_m = Term.(mk_ite ~simpl:false phi (mk_zeroes(mk_len m)) m) in
-  let new_c = Term.(mk_fun table enc_f [mk_tuple [new_m; r; k]]) in
-  let new_t = subst_name xc new_c cc in
+  let new_t = subst_name xc c_len cc in
   let new_biframe = List.rev_append before (new_t::after) in
-  [ES.set_equiv_goal new_biframe s]
+  [ES.set_reach_goal phi s; ES.set_equiv_goal new_biframe s]
 
   
 

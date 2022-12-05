@@ -85,9 +85,10 @@ global goal enc_0 :
     diff(enc(a, r0, pk(n)), enc(b, r0, pk(n)))
   ).
 Proof.
-  cca1 1; simpl.
-  rewrite len_diff len_a len_b.
-  refl.
+  cca1 1.
+  + auto.
+  + rewrite len_diff len_a len_b.
+    refl.
 Qed.
 
 (* Which of the following formulas can be proven using `cca1`?
@@ -102,8 +103,8 @@ global goal enc_1 :
   ).
 Proof.
   (* BEGIN EXO *)
-  cca1 1; simpl.
-  cca1 2; simpl.
+  cca1 1; [1:auto].
+  cca1 2; [1:auto].
   rewrite len_diff len_a len_b.
   refl.
   (* END EXO *)
@@ -117,8 +118,12 @@ global goal enc_2 :
   ).
 Proof.
   (* BEGIN EXO *)
-  cca1 1. (* does nothing, because of the encryption randomness *)
-  cca1 2. (* does nothing, because of the encryption randomness *)
+  cca1 1. (* generates an unprovable subgoal,
+             because of the encryption randomness *)
+  admit.
+  cca1 2. (* generates an unprovable subgoal,
+             because of the encryption randomness *)
+  admit.
   admit.
   (* END EXO *)
 Qed.

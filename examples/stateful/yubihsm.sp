@@ -570,8 +570,7 @@ Proof.
       fa 1.
       rewrite /AEAD in 4.
       rewrite /* in 0.
-      cca1 2. 
-      rewrite if_true // in 2. 
+      cca1 2; [1:auto]. 
       rewrite !len_pair len_diff in 2.
       namelength k(pid), k_dummy(pid)=> -> /=.
       rewrite diff_refl in 2. 
