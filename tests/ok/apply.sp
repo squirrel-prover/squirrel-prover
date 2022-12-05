@@ -1,5 +1,3 @@
-
-
 abstract a : message
 abstract b : message
 abstract c : message
@@ -27,7 +25,7 @@ goal _ (x, y : message, i : index) :
 Proof.
   intro H Hyp.
   apply Hyp.
-  assumption.
+  assumption H.
 Qed.
 
 (* same goal, but slightly changing the conclusion to prevent application  *)

@@ -4,6 +4,8 @@ open Term
 module Sv = Vars.Sv
 module Mv = Vars.Mv
 
+module TraceHyps = Hyps.TraceHyps
+                     
 module SE = SystemExpr
   
 let dbg ?(force=false) s =
@@ -634,6 +636,8 @@ end = struct
 
   let is_empty (m : t) = Mv.is_empty m.subst
 
+  (* FIXME: check that forgetting variables does not modify the variable 
+     assigment for the other variables. *)
   let filter f (m : t) : t = make (Mv.filter f m.subst)
 
   let map f (m : t) : t = make (Mv.map f m.subst)
@@ -2050,8 +2054,8 @@ module E : S with type t = Equiv.form = struct
       for now. *)
   let known_set_check_impl
       (table : Symbols.table)
-      (hyp : Term.term)
-      (cond : Term.term) : bool
+      (hyp   : Term.term)
+      (cond  : Term.term) : bool
     =
     let hyps = Term.decompose_ands hyp in
 
@@ -2087,6 +2091,7 @@ module E : S with type t = Equiv.form = struct
     in
     List.for_all check_one (Term.decompose_ands cond)
 
+  
   (** Return a specialization of [cand] that is a subset of [known]. *)
   let specialize
     (table : Symbols.table)
@@ -2494,6 +2499,16 @@ module E : S with type t = Equiv.form = struct
     let vars = Sv.of_list known.vars in
     let st = { st with support = Sv.union vars st.support; } in
 
+    (* adding [cterm.cond] as hypohtesis before matching *)
+    let st =
+      let hyps =
+        Lazy.map
+          (TraceHyps.add TacticsArgs.AnyName (Equiv.Local cterm.cond))
+          st.hyps
+      in
+      { st with hyps }
+    in
+
     try (* FIXME: use [try_match] *)
       let mv = T.tmatch cterm.term e_pat.pat_term st in
 
@@ -2558,14 +2573,15 @@ module E : S with type t = Equiv.form = struct
     (* function: if-then-else *)
     | Term.Fun (f, _, [b; t1; t2] ) when f = Term.f_ite ->
       let cond1 = Term.mk_and b cterm.cond
-      and cond2 = Term.mk_and b (Term.mk_not cterm.cond) in
+      and cond2 = Term.mk_and (Term.mk_not b) cterm.cond in
 
-      Some (List.map (fun t -> st, t) [{ term = t1; cond = cond1; };
+      Some (List.map (fun t -> st, t) [{ term = b ; cond = cterm.cond; };
+                                       { term = t1; cond = cond1; };
                                        { term = t2; cond = cond2; }])
 
     (* function: general case + tuples *)
     | Term.Tuple terms
-    | Term.Fun (_, _, terms) ->
+    | Term.Fun (_, _, terms) -> 
       Some (List.map (fun term -> st, { cterm with term } ) terms)
 
     | Term.Proj (_, t) ->
