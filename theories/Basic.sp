@@ -75,6 +75,21 @@ Proof.
  by case b.
 Qed.
 
+goal [any] not_impl (a, b:bool) : not (a => b) = (a && not b).
+Proof.
+  rewrite eq_iff; split; intro H.
+  + split. 
+    * rewrite -not_not.
+      intro Hna.
+      by apply H.
+    * intro Hb.
+      by apply H.
+  + intro Hi.
+    destruct H as [Ha Hnb].
+    apply Hnb.
+    by apply Hi.
+Qed.
+
 (*------------------------------------------------------------------*)
 (* disequality *)
 
@@ -406,11 +421,30 @@ Proof.
   + intro H [a Hp]. by use H with a.
 Qed.
 
+goal [any] not_exists_2 ['a 'b] (phi:'a -> 'b -> bool) :
+ not (exists (a:'a, b:'b), phi a b) = forall (a:'a, b:'b), not (phi a b).
+Proof.
+  rewrite eq_iff.
+  split.
+  + intro H a b Hp.
+    apply H. by exists a,b.
+  + intro H [a b Hp]. by use H with a, b.
+Qed.
+
 goal [any] not_forall_1 ['a] (phi:'a -> bool) :
  not (forall (a:'a), phi a) = exists (a:'a), not (phi a).
 Proof.
   rewrite -(not_not (phi _)).
   rewrite -not_exists_1.
+  simpl.
+  admit. (* TODO bug types *)
+Qed.
+
+goal [any] not_forall_2 ['a 'b] (phi:'a -> 'b -> bool) :
+ not (forall (a:'a, b:'b), phi a b) = exists (a:'a, b:'b), not (phi a b).
+Proof.
+  rewrite -(not_not (phi _ _)).
+  rewrite -not_exists_2.
   simpl.
   admit. (* TODO bug types *)
 Qed.
