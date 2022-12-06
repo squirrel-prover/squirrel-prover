@@ -395,3 +395,22 @@ Qed.
 
 goal [any] f_apply ['a 'b] (f : 'a -> 'b) (x, y : 'a) : x = y => f x = f y.
 Proof. by intro ->. Qed.
+
+goal [any] not_exists_1 ['a] (phi:'a -> bool) :
+ not (exists (a:'a), phi a) = forall (a:'a), not (phi a).
+Proof.
+  rewrite eq_iff.
+  split.
+  + intro H a Hp.
+    apply H. by exists a.
+  + intro H [a Hp]. by use H with a.
+Qed.
+
+goal [any] not_forall_1 ['a] (phi:'a -> bool) :
+ not (forall (a:'a), phi a) = exists (a:'a), not (phi a).
+Proof.
+  rewrite -(not_not (phi _)).
+  rewrite -not_exists_1.
+  simpl.
+  admit. (* TODO bug types *)
+Qed.
