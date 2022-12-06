@@ -26,7 +26,7 @@ sig
   val add_new_goal : state -> Goal.Parsed.t Location.located -> state
   val start_proof : state -> [ `Check | `NoCheck ] -> string option * state
   val abort : state -> state
-  val first_goal : state -> Proverlib.pending_proof
+  val first_goal : state -> ProverLib.pending_proof
   val add_decls : state -> Decl.declarations -> state * Goal.t list
 end
 
@@ -57,8 +57,8 @@ module Toplevel (Prover : PROVER) :
     type state = {
       prover_state : Prover.state; (* prover state *)
       params       : Config.params; (* save global params… *)
-      option_defs  : Proverlib.option_def list; (* save global option_def *)
-      prover_mode  : Proverlib.prover_mode;
+      option_defs  : ProverLib.option_def list; (* save global option_def *)
+      prover_mode  : ProverLib.prover_mode;
     }
 
     (** Print goal *)
@@ -109,7 +109,7 @@ module Toplevel (Prover : PROVER) :
     val do_decls : state -> Decl.declarations -> state
 
     (** Print current system *)
-    val do_print : state -> Proverlib.print_query -> unit
+    val do_print : state -> ProverLib.print_query -> unit
 
     (** ↓ TODO remove params and options from globals ↓ *)
     (** Gets saved Config params *)
@@ -119,8 +119,8 @@ module Toplevel (Prover : PROVER) :
     val set_params : state -> Config.params -> state
 
     (** Get saved option_defs  *)
-    val get_option_defs : state -> Proverlib.option_def list
+    val get_option_defs : state -> ProverLib.option_def list
 
     (** Saves option_defs *)
-    val set_option_defs : state -> Proverlib.option_def list -> state
+    val set_option_defs : state -> ProverLib.option_def list -> state
   end

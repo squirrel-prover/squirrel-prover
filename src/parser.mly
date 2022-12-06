@@ -88,8 +88,8 @@
 %type <Decl.declarations> declarations
 %type <Theory.term> top_formula
 %type <Process.process> top_process
-%type <Proverlib.parsed_input> interactive
-%type <Proverlib.parsed_input> top_proofmode
+%type <ProverLib.parsed_input> interactive
+%type <ProverLib.parsed_input> top_proofmode
 
 %%
 
@@ -1086,28 +1086,28 @@ include_params:
 
 p_include:
 | INCLUDE l=include_params th=lsymb DOT
-    { Proverlib.{ th_name = th; params = l; } }
+    { ProverLib.{ th_name = th; params = l; } }
 
 (*------------------------------------------------------------------*)
 /* print query */
 pr_query:
-| GOAL   l=lsymb  DOT { Proverlib.Pr_statement l }
-| SYSTEM l=system_expr DOT { Proverlib.Pr_system (Some l) }
-|                 DOT { Proverlib.Pr_system None }
+| GOAL   l=lsymb  DOT { ProverLib.Pr_statement l }
+| SYSTEM l=system_expr DOT { ProverLib.Pr_system (Some l) }
+|                 DOT { ProverLib.Pr_system None }
 
 
 (*------------------------------------------------------------------*)
 interactive:
-| set=set_option     { Proverlib.ParsedSetOption set }
-| decls=declarations { Proverlib.ParsedInputDescr decls }
-| u=undo             { Proverlib.ParsedUndo u }
-| PRINT q=pr_query   { Proverlib.ParsedPrint q }
-| PROOF              { Proverlib.ParsedProof }
-| i=p_include        { Proverlib.ParsedInclude i }
-| QED                { Proverlib.ParsedQed }
-| g=goal             { Proverlib.ParsedGoal g }
-| h=hint             { Proverlib.ParsedHint h }
-| EOF                { Proverlib.EOF }
+| set=set_option     { ProverLib.ParsedSetOption set }
+| decls=declarations { ProverLib.ParsedInputDescr decls }
+| u=undo             { ProverLib.ParsedUndo u }
+| PRINT q=pr_query   { ProverLib.ParsedPrint q }
+| PROOF              { ProverLib.ParsedProof }
+| i=p_include        { ProverLib.ParsedInclude i }
+| QED                { ProverLib.ParsedQed }
+| g=goal             { ProverLib.ParsedGoal g }
+| h=hint             { ProverLib.ParsedHint h }
+| EOF                { ProverLib.EOF }
 
 bullet:
 | MINUS              { "-" }
@@ -1127,9 +1127,9 @@ bulleted_tactic:
 | DOT                    { [] }
 
 top_proofmode:
-| PRINT q=pr_query   { Proverlib.ParsedPrint q }
-| bulleted_tactic    { Proverlib.ParsedTactic $1 }
-| u=undo             { Proverlib.ParsedUndo u }
-| ABORT              { Proverlib.ParsedAbort }
-| QED                { Proverlib.ParsedQed }
-| EOF                { Proverlib.EOF }
+| PRINT q=pr_query   { ProverLib.ParsedPrint q }
+| bulleted_tactic    { ProverLib.ParsedTactic $1 }
+| u=undo             { ProverLib.ParsedUndo u }
+| ABORT              { ProverLib.ParsedAbort }
+| QED                { ProverLib.ParsedQed }
+| EOF                { ProverLib.EOF }

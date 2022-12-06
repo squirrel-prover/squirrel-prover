@@ -1295,7 +1295,7 @@ let prf arg (s : ES.t) : ES.t list =
   (* XXX This get options refs from Prover 
    * → it depends on Prover state *)
   let oracle_formula =
-    Proverlib.get_oracle_tag_formula (Symbols.to_string fn)
+    ProverLib.get_oracle_tag_formula (Symbols.to_string fn)
   in
 
   let final_if_formula =

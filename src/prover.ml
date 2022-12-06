@@ -13,9 +13,9 @@
     For now we use the adjectives toplevel and inner to distinguish
     the two kinds of goals. *)
 type state = {
-  goals        : Proverlib.pending_proof list;
+  goals        : ProverLib.pending_proof list;
   table        : Symbols.table; 
-  current_goal : Proverlib.pending_proof option;
+  current_goal : ProverLib.pending_proof option;
   subgoals     : Goal.t list;
   bullets      : Bullets.path;
 }
@@ -102,7 +102,7 @@ let start_proof (ps:state) (check : [`NoCheck | `Check])
      ps)
 
 (*---------------------    Goals handling  -----------------*)(* {↓{ *)
-let get_current_goal (ps:state) : Proverlib.pending_proof option = ps.current_goal
+let get_current_goal (ps:state) : ProverLib.pending_proof option = ps.current_goal
 
 let get_current_system (ps:state) : SystemExpr.context option =
   match get_current_goal (ps) with
@@ -113,35 +113,35 @@ let get_current_system (ps:state) : SystemExpr.context option =
 let add_new_goal_i (table:Symbols.table) (parsed_goal:Goal.Parsed.t) 
     (ps:state) : state  =
   let name = match parsed_goal.Goal.Parsed.name with
-    | None -> Proverlib.unnamed_goal ()
+    | None -> ProverLib.unnamed_goal ()
     | Some s -> s
   in
   if Lemma.mem name table then
-    Proverlib.error (Location.loc name) 
+    ProverLib.error (Location.loc name) 
       "a goal or axiom with this name already exists";
 
   let parsed_goal = 
     { parsed_goal with Goal.Parsed.name = Some name } in
   let statement,goal = Goal.make table parsed_goal in
-  let goals =  Proverlib.UnprovedLemma (statement,goal) :: ps.goals in
+  let goals =  ProverLib.UnprovedLemma (statement,goal) :: ps.goals in
   { ps with goals }
 
 let add_new_goal (ps:state)  
     (parsed_goal:Goal.Parsed.t Location.located) : state =
   if ps.goals <> [] then
-    Proverlib.error (Location.loc parsed_goal) 
+    ProverLib.error (Location.loc parsed_goal) 
       "cannot add new goal: proof obligations remaining";
 
   let parsed_goal = Location.unloc parsed_goal in
   add_new_goal_i ps.table parsed_goal ps
 
-let first_goal (ps:state) : Proverlib.pending_proof =
+let first_goal (ps:state) : ProverLib.pending_proof =
   match ps.goals with
   | [] -> assert false
   | h :: _ -> h
 
 let add_proof_obl (goal : Goal.t) (ps:state) : state = 
-  let goals =  Proverlib.ProofObl (goal) :: ps.goals in
+  let goals =  ProverLib.ProofObl (goal) :: ps.goals in
   { ps with goals }
 
 let add_decls (st:state) (decls : Decl.declarations) 
@@ -159,7 +159,7 @@ let get_first_subgoal (ps:state) : Goal.t =
 
 let current_goal_name (ps:state) : string option =
   Utils.omap (function 
-      | Proverlib.UnprovedLemma (stmt,_) -> stmt.Goal.name
+      | ProverLib.UnprovedLemma (stmt,_) -> stmt.Goal.name
       | ProofObl _ -> "proof obligation" ) ps.current_goal
 (* }↑} *)
 (*--------------------- Tactics evaluation -----------------*)(* {↓{ *)

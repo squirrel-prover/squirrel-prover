@@ -24,7 +24,7 @@ module type PROVER = sig
   val add_new_goal : state -> Goal.Parsed.t Location.located -> state 
   val start_proof : state -> [`Check | `NoCheck] -> (string option * state) 
   val abort : state -> state
-  val first_goal : state -> Proverlib.pending_proof
+  val first_goal : state -> ProverLib.pending_proof
   val add_decls : state -> Decl.declarations -> state * Goal.t list
 end
 
@@ -34,8 +34,8 @@ module Toplevel (Prover : PROVER) = struct
   type state = {
     prover_state : Prover.state; (* prover state *)
     params       : Config.params; (* save global params… *)
-    option_defs  : Proverlib.option_def list; (* save global option_def *)
-    prover_mode  : Proverlib.prover_mode;
+    option_defs  : ProverLib.option_def list; (* save global option_def *)
+    prover_mode  : ProverLib.prover_mode;
   }
 
   let pp_goal (st:state) (fmt:Format.formatter) () : unit =
@@ -84,8 +84,8 @@ module Toplevel (Prover : PROVER) = struct
     | None, ps ->
       Printer.pr "%a" (Prover.pp_goal ps) ();
       let mode = match mode with
-        | `NoCheck -> Proverlib.WaitQed 
-        | `Check   -> Proverlib.ProofMode
+        | `NoCheck -> ProverLib.WaitQed 
+        | `Check   -> ProverLib.ProofMode
       in
       { st with prover_state = ps; prover_mode = mode }
     | Some es, _ -> Command.cmd_error (StartProofError es)
@@ -95,7 +95,7 @@ module Toplevel (Prover : PROVER) = struct
     let new_ps = Prover.add_new_goal st.prover_state g in
     (* for printing new goal ↓ *)
     let goal,name = match Prover.first_goal new_ps with
-      | Proverlib.UnprovedLemma (stmt,g) -> g, stmt.Goal.name
+      | ProverLib.UnprovedLemma (stmt,g) -> g, stmt.Goal.name
       | _ -> assert false (* should be only ↑ *)
     in
     Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@." name Goal.pp_init goal;
@@ -118,7 +118,7 @@ module Toplevel (Prover : PROVER) = struct
         (Fmt.list ~sep:Fmt.cut Goal.pp_init) proof_obls;
     { st with prover_mode = GoalMode; prover_state = new_prover_state; }
 
-  let do_print (st:state) (q : Proverlib.print_query) 
+  let do_print (st:state) (q : ProverLib.print_query) 
     : unit =
     begin match q with
     | Pr_statement l -> 
@@ -178,10 +178,10 @@ module Toplevel (Prover : PROVER) = struct
   let set_params (st:state) (params:Config.params) : state =
     { st with params = params }
 
-  let get_option_defs (st:state) : Proverlib.option_def list =
+  let get_option_defs (st:state) : ProverLib.option_def list =
     st.option_defs
 
-  let set_option_defs (st:state) (optdefs:Proverlib.option_def list) : state =
+  let set_option_defs (st:state) (optdefs:ProverLib.option_def list) : state =
     { st with option_defs = optdefs }
 end
 (* }↑} *)

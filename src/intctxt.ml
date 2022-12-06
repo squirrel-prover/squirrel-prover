@@ -182,7 +182,7 @@ let intctxt
   let tag_s =
     let f =
       (* XXX depends on Prover_state *)
-      Proverlib.get_oracle_tag_formula (Symbols.to_string enc_f)
+      ProverLib.get_oracle_tag_formula (Symbols.to_string enc_f)
     in
     (* if the hash is not tagged, the formula is False, and we don't create
        another goal. *)

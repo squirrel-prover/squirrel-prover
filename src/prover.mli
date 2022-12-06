@@ -24,12 +24,12 @@ type state
 (** Set the proof_state to its initial state. *)
 val init : unit -> state
 
+(** add proof obligation *)
 val add_proof_obl : Goal.t -> state -> state
 
 (** add declarations *)
 val add_decls : state -> Decl.declarations -> state * Goal.t list
 
-(** Return the name of the goal currently being proved, if any. *)
 val get_current_system : state -> SystemExpr.context option
 
 (** Return the the table of given state *)
@@ -70,7 +70,7 @@ val start_proof : state -> [`Check | `NoCheck] -> (string option * state)
 val abort : state -> state
 
 (** Return first pending_proof. *)
-val first_goal : state -> Proverlib.pending_proof
+val first_goal : state -> ProverLib.pending_proof
 
 (* ↓ for html ↓ *)
 

@@ -42,15 +42,15 @@ type driver_state = {
   toplvl_state : ToplevelProver.state;
   (* toplvl_state : ToplevelProver.state = {
       prover_state : Prover.state = {
-        goals        : Proverlib.pending_proof list;
+        goals        : ProverLib.pending_proof list;
         table        : Symbols.table; 
-        current_goal : Proverlib.pending_proof option;
+        current_goal : ProverLib.pending_proof option;
         subgoals     : Goal.t list;
         bullets      : Bullets.path;
       }
       params       : Config.params; (* save global params… *)
-      option_defs  : Proverlib.option_def list; (* save global option_def *)
-      prover_mode  : Proverlib.prover_mode;
+      option_defs  : ProverLib.option_def list; (* save global option_def *)
+      prover_mode  : ProverLib.prover_mode;
     }
   *)
 
@@ -169,7 +169,7 @@ let include_get_file (state : driver_state) (name : Theory.lsymb) : file =
 let is_toplevel_error ~test (e : exn) : bool =
   match e with
   | Parserbuf.Error                 _
-  | Proverlib.Error                 _
+  | ProverLib.Error                 _
   | Command.Cmd_error                       _
   | Process.Error                   _
   | ProcessDecl.Error               _
@@ -198,8 +198,8 @@ let pp_toplevel_error
   | Parserbuf.Error s ->
     Fmt.string fmt s
 
-  | Proverlib.Error e ->
-    Proverlib.pp_error pp_loc_error fmt e
+  | ProverLib.Error e ->
+    ProverLib.pp_error pp_loc_error fmt e
 
   | Command.Cmd_error e ->
     Command.pp_cmd_error fmt e
@@ -243,11 +243,11 @@ exception Unfinished
 
 (** Get the next input from the current file. Driver *)
 let next_input ~test (state : driver_state) :
-Proverlib.parsed_input =
+ProverLib.parsed_input =
   let filename, lexbuf = get_lexbuf state in
   Parserbuf.parse_from_buf
     ~test ~interactive:!interactive
-    (if state.toplvl_state.prover_mode = Proverlib.ProofMode then
+    (if state.toplvl_state.prover_mode = ProverLib.ProofMode then
        Parser.top_proofmode
      else
        Parser.interactive)
@@ -272,7 +272,7 @@ let do_decls (state : driver_state) (decls : Decl.declarations) :
     state.toplvl_state decls in
   { state with toplvl_state; }
 
-let do_print (state : driver_state) (q : Proverlib.print_query) 
+let do_print (state : driver_state) (q : ProverLib.print_query) 
   : driver_state =
   ToplevelProver.do_print state.toplvl_state q;
   state
@@ -286,7 +286,7 @@ let do_tactic (state : driver_state) (l:parsed_t list) : driver_state =
   begin match state.check_mode with
     | `NoCheck -> assert (state.toplvl_state.prover_mode = WaitQed)
     | `Check   -> 
-      if state.toplvl_state.prover_mode <> Proverlib.ProofMode then
+      if state.toplvl_state.prover_mode <> ProverLib.ProofMode then
         Command.cmd_error Unexpected_command;
   end;
 
@@ -358,7 +358,7 @@ let do_eof (state : driver_state) : driver_state =
 let rec do_include 
     ~test
     (state : driver_state)
-    (i : Proverlib.include_param) 
+    (i : ProverLib.include_param) 
   : driver_state 
   =
   let file = include_get_file state i.th_name in
@@ -369,7 +369,7 @@ let rec do_include
   in
 
   let check_mode = 
-    if List.exists (fun x -> L.unloc x = "admit") i.Proverlib.params 
+    if List.exists (fun x -> L.unloc x = "admit") i.ProverLib.params 
     then `NoCheck
     else `Check
   in
@@ -405,7 +405,7 @@ let rec do_include
 and do_command
     ~(test : bool)
     (state : driver_state)
-    (command : Proverlib.parsed_input) : driver_state
+    (command : ProverLib.parsed_input) : driver_state
   =
   match state.toplvl_state.prover_mode, command with
                           (* ↓ touch toplvl_state and history_state ↓ *)
