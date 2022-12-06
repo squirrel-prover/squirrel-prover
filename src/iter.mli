@@ -200,6 +200,38 @@ val fold_descr :
   'a
 
 (*------------------------------------------------------------------*)
+(** {2 Path conditions} *)
+
+module PathCond : sig
+  (** A path condition [φ] constraining a timestamp [τ] and a source 
+      timestamp [τ1] as follows: 
+        [φ τ τ1] iff. [∃ τ0 s.t. τ ≤ τ0 ≤ τ1] and *)
+  type t =
+    | Top                    
+    (** [τ0] is unconstrained *)
+
+    | Before of Action.descr list
+    (** [Before a_1,...,a_n] where [a_1,...,a_n] is a list of action descr
+        constrains [τ0] as follows:
+
+        [  (∃vec{i} s.t. τ0 = a_1(vec{i}))
+         ∨ …
+         ∨ (∃vec{i} s.t. τ0 = a_n(vec{i}))]
+
+        Note that this must be a globally fresh action description. *)
+
+
+  val join : t -> t -> t
+
+  val pp : Format.formatter -> t -> unit
+
+  val incl : t -> t -> bool
+
+  (** [apply path_cond t1 t2] computes [path_cond φ τ τ1]  *)
+  val apply : t -> Term.term -> Term.term -> Term.term
+end
+
+(*------------------------------------------------------------------*)
 (** {2 Folding over the macro supports of a list of terms} *)
 
 (** An indirect occurrence of a macro term, used as return type of
@@ -209,7 +241,8 @@ val fold_descr :
           iocc_vars = is;
           iocc_cnt = t;
           iocc_action = a;
-          iocc_sources = srcs; } ]
+          iocc_sources = srcs; 
+          iocc_path_info = path_cond; } ]
 
     states that, for all indices [is], [t] is the body of a macro of action [a],
     and that this macro may appear in the translation of any of the terms in [srcs]
@@ -218,11 +251,16 @@ val fold_descr :
     - [env ∩ is = ∅]
     - the free index variables of [t] and [a] are included in [env ∪ is]. *)
 type iocc = {
-  iocc_aname   : Symbols.action;
-  iocc_action  : Action.action;
-  iocc_vars    : Sv.t;
-  iocc_cnt     : Term.term;
-  iocc_sources : Term.term list;
+  iocc_aname    : Symbols.action;
+  iocc_action   : Action.action;
+  iocc_vars     : Sv.t;
+  iocc_cnt      : Term.term;
+  iocc_sources  : Term.term list;
+
+  iocc_path_cond : PathCond.t;
+  (** Path condition on the timestamps [τ] at which the occurrence can occur:
+      for any source timestamp [τ_src] (in [iocc_sources]),
+      [path_cond τ τ0] *)
 }
 
 val pp_iocc : Format.formatter -> iocc -> unit

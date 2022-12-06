@@ -4,6 +4,8 @@ open Utils
 module MP = Match.Pos
 module SE = SystemExpr
 
+module PathCond = Iter.PathCond
+
 (*------------------------------------------------------------------*)
 
 module Name = struct
@@ -126,11 +128,14 @@ let[@warning "-27"] empty_occ_formula
   mk_false
 
 
-(** Extended occurrence, with additional info about where it was found *)
-type ('a, 'b) ext_occ =
-  {eo_occ       : ('a, 'b) simple_occ;
-   eo_source    : terms; (* original term where the occ was found *)
-   eo_source_ts : ts_occs } (* timestamps occurring in the source term *)
+(** See `.mli` *)
+type ('a, 'b) ext_occ = {
+  eo_occ       : ('a, 'b) simple_occ;
+  eo_source    : terms; 
+  eo_source_ts : ts_occs;
+  
+  eo_path_cond : Iter.PathCond.t;
+}
 
 type ('a, 'b) ext_occs = (('a, 'b) ext_occ) list
 
@@ -274,15 +279,19 @@ let ext_occ_incl
     (system : SE.fset)
     (occ1 : ('a, 'b) ext_occ)
     (occ2 : ('a, 'b) ext_occ)
-  : bool =
+  : bool 
+  =
   let mv = aux_occ_incl conv table system occ1.eo_occ occ2.eo_occ in
   match mv with
   | None -> false
-  | Some mv -> (* still have to check occ_type and source_ts *)
+  | Some mv -> (* still have to check [eo_path_cond], [occ_type] and [source_ts] *)
+    let mv = ref mv in
+    (* path condition inclusion *)
+    PathCond.incl occ1.eo_path_cond occ2.eo_path_cond &&
+
+    (* source timestamps inclusion *)
     (* we ignore the source itself: it's fine if it's different,
        as long as the timestamps are the same *)
-    let mv = ref mv in
-
     List.for_all (fun ts1 ->
         List.exists (fun ts2 ->
             match
@@ -598,11 +607,15 @@ let find_occurrences
          (* name occurrences in t *)
          let noccs, acc = find_occs ~fv:[] (EI_direct, contx) t in
          (* add the info to the occurrences *)
-         let occs = List.map
-             (fun o -> {eo_occ=o; eo_source=[t]; eo_source_ts=ts}) noccs
+         let occs = 
+           List.map
+             (fun o -> {eo_occ=o; eo_source=[t]; eo_source_ts=ts; eo_path_cond = Iter.PathCond.Top; }) 
+             noccs
          in
-         let acc = List.map
-             (fun o -> {eo_occ=o; eo_source=[t]; eo_source_ts=ts}) acc
+         let acc = 
+           List.map
+             (fun o -> {eo_occ=o; eo_source=[t]; eo_source_ts=ts; eo_path_cond = Iter.PathCond.Top; }) 
+             acc
          in
 
          (* printing *)
@@ -641,11 +654,23 @@ let find_occurrences
           find_occs ~fv:(Vars.Sv.elements sfv) (EI_indirect a, contx) t
         in
         (* add the info *)
-        let occs = List.map
-            (fun o -> {eo_occ=o; eo_source=src; eo_source_ts=ts}) noccs
+        let occs = 
+          List.map
+            (fun o -> 
+               { eo_occ       = o; 
+                 eo_source    = src; 
+                 eo_source_ts = ts; 
+                 eo_path_cond = iocc.iocc_path_cond; }
+            ) noccs
         in
-        let acc = List.map
-            (fun o -> {eo_occ=o; eo_source=src; eo_source_ts=ts}) acc
+        let acc = 
+          List.map
+            (fun o -> 
+               {eo_occ       = o;
+                eo_source    = src; 
+                eo_source_ts = ts; 
+                eo_path_cond = iocc.iocc_path_cond; }
+            ) acc
         in
         ind_occs @ occs, ind_acc @ acc)
       contx env sources ([], [])
@@ -868,19 +893,23 @@ let clear_trivial_equalities (phi : term) : term =
   in
   mk_ands ~simpl:true phis
 
-
-(** Constructs the formula "exists v1. a <= ts1 \/ … \/ exists vn. a <= tsn" *)
-(** where vi, tsi are the variables and content of the ts_occ *)
-let time_formula (a:term) (ts:ts_occs) : term =
+(** See `.mli` *)
+let time_formula (a:term) ?(path_cond : PathCond.t = PathCond.Top) (ts:ts_occs) : term =
   let phis =
     List.map (fun (ti:ts_occ) ->
       (* refresh probably not necessary, but doesn't hurt *)
       let tivs, s = refresh_vars `Global ti.so_vars in
-      let ticnt = subst s ti.so_cnt in
-      let ticond = List.map (subst s) ti.so_cond in
+      let ticnt  = Term.subst s ti.so_cnt in
+      let ticond = List.map (Term.subst s) ti.so_cond in
+
       mk_exists ~simpl:true
         tivs
-        (mk_ands ~simpl:true ((mk_timestamp_leq a ticnt)::ticond))
+        (mk_ands ~simpl:true ( PathCond.apply path_cond a ticnt :: ticond))
+        (* in the simplest cases (when [path_cond = PathCond.Top]), 
+             [PathCond.apply path_cond a ticnt] 
+           is just
+             [Term.mk_timestamp_leq a ticnt] 
+        *)
     ) ts
   in
   mk_ors ~simpl:true phis
@@ -955,7 +984,7 @@ let occurrence_formula
        in ts not bound in the occ,
        but that's tricky, as it also means these vars can't be used
        to unify when subsuming timestamps *)
-    let phi_time = time_formula a ts in
+    let phi_time = time_formula ~path_cond:PathCond.Top (* ~path_cond:occ.eo_path_cond  *)a ts in
 
     if not negate then
       mk_exists ~simpl:true fv (mk_and ~simpl:true phi_time phi_cond_cnt)

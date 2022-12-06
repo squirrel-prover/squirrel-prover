@@ -1,3 +1,6 @@
+module PathCond = Iter.PathCond
+
+(*------------------------------------------------------------------*)
 (** Generic functions to search illegal occurrences of names,
     and generate the appropriate proof obligations,
     For use when writing tactics, e.g. gdh or fresh. *)
@@ -59,8 +62,13 @@ type empty_occs = empty_occ list
 (** Occurrence with additional info about where it was found. *)
 type ('a, 'b) ext_occ = {
   eo_occ       : ('a, 'b) simple_occ;
-  eo_source    : terms;    (** Original term where the occurrence was found. *)
-  eo_source_ts : ts_occs   (** Timestamps occurring in the source term. *)
+  eo_source    : terms;     (** Original terms where the occurrence was found. *)
+  eo_source_ts : ts_occs;   (** Timestamps occurring in the source terms. *)
+
+  eo_path_cond : Iter.PathCond.t;
+  (** Path condition on the timestamps [τ] at which the occurrence can occur:
+      for any source timestamp [τ_src] (in [eo_sources_ts]),
+      [path_cond τ τ_src] *)
 }
 
 type ('a, 'b) ext_occs = (('a, 'b) ext_occ) list
@@ -116,9 +124,13 @@ val get_macro_actions : Constr.trace_cntxt -> term list -> ts_occs
     and reconstructs it to simplify trivial equalities. *)
 val clear_trivial_equalities : term -> term
 
-(** Constructs the formula "exists v1. a <= ts1 \/ … \/ exists vn. a <= tsn"
-    where [vi], [tsi] are the variables and content of the [ts_occ]. *)
-val time_formula : term -> ts_occs -> term
+(** Constructs the formula
+    
+    [(∃ v1. path_cond τ ts1 ∨ … ∨ ∃ vn. path_cond τ tsn)]
+
+    where [vi], [tsi] are the variables and content of [ts_occ]. 
+    (for example, [path_cond x y] can be [x ≤ y]). *)
+val time_formula : term -> ?path_cond:PathCond.t -> ts_occs -> term
 
 
 (*------------------------------------------------------------------*)

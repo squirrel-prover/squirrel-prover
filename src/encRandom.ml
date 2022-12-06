@@ -401,7 +401,8 @@ let randomness_formula
   let phi_time = (* phi_time(r) *)
     match co.so_occtype with
     | EI_direct -> mk_true
-    | EI_indirect a -> NO.time_formula a eco.eo_source_ts
+    | EI_indirect a -> NO.time_formula (* ~path_cond:eco.eo_path_cond  *) a eco.eo_source_ts
+    (* TODO: path cond *)
   in 
   let phi_k = mk_eqs ~simpl:true k1.args k.args in
   let phi_r = mk_eqs ~simpl:true r'.args r.args in

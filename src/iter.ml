@@ -517,6 +517,54 @@ let get_macro_occs
   in
   get t ~fv:[] ~cond:[]
 
+
+(*------------------------------------------------------------------*)
+(** {2 Path conditions} *)
+
+module PathCond = struct
+  (** See `.mli` *)
+  type t =
+    | Top                    
+    | Before of Action.descr list
+
+  let join (cond1 : t) (cond2 : t) : t =
+    match cond1, cond2 with
+    | Top, _ | _, Top -> Top
+    | Before l1, Before l2 -> 
+      Before (List.remove_duplicate (fun d1 d2 -> d1.Action.name = d2.Action.name) (l1 @ l2))
+
+  let pp fmt : t -> unit = function
+    | Top -> ()
+    | Before l -> 
+      Fmt.pf fmt " s.t. τ ≤ [@[%a@]]" 
+        (Fmt.list ~sep:Fmt.comma Symbols.pp) (List.map (fun d -> d.Action.name) l)
+
+  let incl (p1 : t) (p2 : t) : bool =
+    match p1, p2 with
+    | _, Top -> true
+    | Top, _ -> false
+    | Before l1, Before l2 ->
+      List.for_all (fun d1 ->
+          List.exists (fun d2 -> 
+              d1.Action.name = d2.Action.name
+            ) l2
+        ) l1
+
+  let apply (p : t) (tau0 : Term.term) (tau2 : Term.term) : Term.term =
+    match p with
+    | Top -> Term.mk_timestamp_leq tau0 tau2
+    | Before l -> 
+      Term.mk_ors
+        (List.map (fun (d : Action.descr) -> 
+             let d = Action.refresh_descr d in
+             let tau1 = Term.mk_action d.name (List.map Term.mk_var d.indices) in
+             Term.mk_exists d.indices 
+               (Term.mk_ands [Term.mk_timestamp_leq tau0 tau1;
+                              Term.mk_timestamp_leq tau1 tau2;])
+           ) l
+        )
+end
+
 (*------------------------------------------------------------------*)
 (** {2 Folding over action descriptions} *)
 
@@ -586,16 +634,18 @@ let is_glob table ms =
 (*------------------------------------------------------------------*)
 module Mset : sig[@warning "-32"]
   (** Set of macros over some indices.
-        [{ msymb   = m;
+        [{ msymb     = m;
            args;
-           indices = vars; }]
-      represents the set of terms [\{m(args)@τ | ∀ vars, τ \}]. 
+           indices   = vars; 
+           path_cond = φ; }]
+      represents the set of terms [\{m(args)@τ | ∀ vars, τ s.t. (φ τ) \}]. 
 
       It is guaranteed that [vars ∩ env = ∅]. *)
   type t = private {
-    msymb   : Term.msymb;
-    args    : Vars.var list;
-    indices : Vars.var list;
+    msymb     : Term.msymb;
+    args      : Vars.var list;
+    indices   : Vars.var list;
+    path_cond : PathCond.t;
   }
 
   val mk :
@@ -603,6 +653,7 @@ module Mset : sig[@warning "-32"]
     msymb:Term.msymb ->
     args:Vars.var list ->
     indices:Vars.var list ->
+    path_cond:PathCond.t -> 
     t
 
   val pp   : Format.formatter -> t      -> unit
@@ -620,20 +671,22 @@ module Mset : sig[@warning "-32"]
   val mk_simple : Symbols.macro -> Type.ty -> t
 end = struct
   type t = {
-    msymb   : Term.msymb;
-    args    : Vars.var list;
-    indices : Vars.var list;
+    msymb     : Term.msymb;
+    args      : Vars.var list;
+    indices   : Vars.var list;
+    path_cond : PathCond.t;
   }
 
-  let mk ~env ~msymb ~args ~indices : t =
+  let mk ~env ~msymb ~args ~indices ~path_cond : t =
     let indices = Sv.diff (Sv.of_list1 indices) env in
     let indices = Sv.elements indices in
-    { msymb; args; indices }
+    { msymb; args; indices; path_cond; }
 
   let pp fmt (mset : t) =
-    Fmt.pf fmt "@[<hv 2>{ @[%a@]@@_ |@ %a}@]"
+    Fmt.pf fmt "@[<hv 2>{ @[%a@]@@_ |@ %a%a}@]"
       Term.pp_msymb mset.msymb
       (Fmt.list ~sep:Fmt.comma Vars.pp) mset.indices 
+      PathCond.pp mset.path_cond
 
   let pp_l fmt (mset_l : t list) =
     Fmt.pf fmt "@[<v 0>%a@]"
@@ -721,7 +774,9 @@ end = struct
 
     let join_is = Array.fold_right (fun a acc -> oget a :: acc) arr [] in
     let join_ms = Term.mk_symb a_ms.s_symb a_ms.s_typ in
-    mk ~env:Sv.empty ~msymb:join_ms ~args:join_is ~indices:(!indices_r)
+
+    let path_cond = PathCond.join a.path_cond b.path_cond in
+    mk ~env:Sv.empty ~msymb:join_ms ~args:join_is ~path_cond ~indices:(!indices_r)
 
   let incl table (sexpr : SE.fset) (s1 : t) (s2 : t) : bool =
     let tv = Vars.make_fresh Type.Timestamp "t" in
@@ -740,7 +795,7 @@ end = struct
 
   let mk_simple (m : Symbols.macro) ty : t =
     let msymb = Term.mk_symb m ty in
-    mk ~env:Sv.empty ~msymb ~args:[] ~indices:[]
+    mk ~env:Sv.empty ~msymb ~args:[] ~indices:[] ~path_cond:Top
 end
 
 module MsetAbs : sig[@warning "-32"]
@@ -810,7 +865,7 @@ end
     abstracts it:
     - over-approximations occur whenever the macro occurrence is indexed by 
       complex terms (i.e. not variables). *)
-let mset_of_macro_occ (env : Sv.t) (occ : macro_occ) : Mset.t =
+let mset_of_macro_occ (env : Sv.t) ~(path_cond : PathCond.t) (occ : macro_occ) : Mset.t =
   let indices = 
     List.map (function
         | Term.Var v -> v
@@ -819,12 +874,12 @@ let mset_of_macro_occ (env : Sv.t) (occ : macro_occ) : Mset.t =
         (* FEATURE: a more complex abstract domain could do more here *)
       ) occ.occ_cnt.args 
   in
-  Mset.mk ~env ~msymb:occ.occ_cnt.symb ~args:indices ~indices
+  Mset.mk ~env ~msymb:occ.occ_cnt.symb ~args:indices ~indices ~path_cond
 
 (*------------------------------------------------------------------*)
-(** Return an over-approximation of the the macros reachable from a term
+(** Return an over-approximation of the macros reachable from a term
     in any trace model. *)
-let macro_support 
+let macro_support
     ~(env  : Sv.t) 
     (cntxt : Constr.trace_cntxt)
     (term  : Term.term)
@@ -832,15 +887,21 @@ let macro_support
   =
   let get_msymbs
       ~(mode : [`Delta | `FullDelta ]) 
+      ~(path_cond : PathCond.t)
       (term  : Term.term) 
     : MsetAbs.t 
     =
     let occs = get_macro_occs ~mode cntxt term in
-    let msets = List.map (mset_of_macro_occ env) occs in
+    let msets = List.map (mset_of_macro_occ env ~path_cond) occs in
     List.fold_left (fun abs mset -> MsetAbs.join_single mset abs) [] msets
   in
 
-  let init = get_msymbs ~mode:`FullDelta term in
+  let init : MsetAbs.t = get_msymbs ~mode:`FullDelta ~path_cond:Top term in
+
+  (* all actions names of the system *)
+  let all_actions : Symbols.action list = 
+    SE.fold_descrs (fun d l -> d.name :: l) cntxt.table cntxt.system []
+  in
 
   let do1 (sm : MsetAbs.t) : MsetAbs.t =
     (* special cases for Input, Frame and Exec, since they do not appear in the
@@ -863,22 +924,37 @@ let macro_support
       else sm
     in
 
-    SE.fold_descrs (fun descr sm ->
-        fold_descr ~globals:true (fun msymb is _ t sm ->
-            if List.mem_assoc msymb sm then
-              (* we compute the substitution which we will use to instantiate
-                 [t] on the indices of the macro set in [sm]. *)
-              let subst =
-                let mset = List.assoc msymb sm in
-                List.map2 (fun i j ->
-                    Term.ESubst (Term.mk_var i, Term.mk_var j)
-                  ) is mset.Mset.args
-              in
-              let t = Term.subst subst t in
+    SE.fold_descrs (fun (descr : Action.descr) (sm : MsetAbs.t) ->
+        fold_descr ~globals:true
+          (fun (msymb : Symbols.macro) (is : Vars.vars) _ (t : Term.term) (sm : MsetAbs.t) ->
+             if List.mem_assoc msymb sm then
+               (* we compute the substitution which we will use to instantiate
+                  [t] on the indices of the macro set in [sm]. *)
+               let subst =
+                 let mset = List.assoc msymb sm in
+                 List.map2 (fun i j ->
+                     Term.ESubst (Term.mk_var i, Term.mk_var j)
+                   ) is mset.Mset.args
+               in
+               let t = Term.subst subst t in
 
-              MsetAbs.join (get_msymbs ~mode:`Delta t) sm
+               (* compute a valid path condition *)
+               let path_cond =
+                 match (List.assoc msymb sm).path_cond with
+                 | PathCond.Top -> PathCond.Before [descr]
+                 (* heuristic: use the first action name which is not [Top] *)
 
-            else sm
+                 | PathCond.Before l
+                   when List.for_all (fun a -> List.exists (fun d -> d.Action.name = a) l) all_actions -> 
+                   PathCond.Before [descr]
+                 (* same as previous cas *)
+
+                 | PathCond.Before _ as x -> x
+               in
+
+               MsetAbs.join (get_msymbs ~mode:`Delta ~path_cond t) sm
+                 
+             else sm
           ) cntxt.table cntxt.system descr sm
       ) cntxt.table cntxt.system sm
   in
@@ -910,27 +986,15 @@ let macro_support
 
 
 (*------------------------------------------------------------------*)
-(** An indirect occurrence of a macro term, used as return type of
-    [fold_macro_support]. The record:
-
-      [ { iocc_aname = n;
-          iocc_vars = is;
-          iocc_cnt = t;
-          iocc_action = a;
-          iocc_sources = srcs; } ]
-
-    states that, for all indices [is], [t] is the body of a macro of action [a],
-    and that this macro may appear in the translation of any of the terms in [srcs]
-    in some trace model.
-    Notes:
-    - [env ∩ is = ∅]
-    - the free index variables of [t] and [a] are included in [env ∪ is]. *)
+(** See `.mli` *)
 type iocc = {
-  iocc_aname   : Symbols.action;
-  iocc_action  : Action.action;
-  iocc_vars    : Sv.t;
-  iocc_cnt     : Term.term;
-  iocc_sources : Term.term list;
+  iocc_aname     : Symbols.action;
+  iocc_action    : Action.action;
+  iocc_vars      : Sv.t;
+  iocc_cnt       : Term.term;
+  iocc_sources   : Term.term list;
+
+  iocc_path_cond : PathCond.t;
 }
 
 let pp_iocc fmt (o : iocc) : unit =
@@ -1001,6 +1065,7 @@ let _fold_macro_support
               iocc_action;
               iocc_cnt;
               iocc_sources = srcs;
+              iocc_path_cond = mset.path_cond;
             } in
 
             let descr () = Action.subst_descr subst descr in
