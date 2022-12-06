@@ -1,2 +1,2 @@
 let start () = ()
-let update () = ()
+let update (_) = ()

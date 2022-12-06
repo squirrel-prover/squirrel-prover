@@ -24,7 +24,9 @@ let read_file filename =
 (* Function to send update events. It will be updated when creating
    the corresponding route in the server. *)
 
-let update = ref (fun () -> ())
+let update : (Prover.state -> unit) ref = ref (fun (_) -> ())
+
+let prover_state : Prover.state ref = ref (Prover.init ())
 
 (* Server setup and launching in a new thread *)
 
@@ -88,7 +90,7 @@ let start () =
     S.add_route_handler ~meth:`GET server
       S.Route.(exact "dump.json" @/ return)
       (fun _req ->
-         match Prover.get_first_subgoal () with
+         match Prover.get_first_subgoal !prover_state with
            | Trace j ->
                let json =
                  Format.asprintf "%a"
@@ -103,7 +105,7 @@ let start () =
       S.Route.(exact "goal" @/ return)
       (fun _req ->
          try
-           let goal = Prover.get_first_subgoal () in
+           let goal = Prover.get_first_subgoal !prover_state in
            S.Response.make_string (Ok (Format.asprintf "%a" Goal.pp goal))
          with _ ->
            S.Response.make_string (Ok "none"));
@@ -118,7 +120,8 @@ let start () =
       (fun _req (module EV : S.SERVER_SENT_GENERATOR) ->
          S._debug (fun k -> k "new connection");
          EV.set_headers extra_headers;
-         update := begin fun () ->
+         update := begin fun (ps:Prover.state) ->
+           prover_state := ps;
            S._debug (fun k -> k "update event %.2f" (Unix.gettimeofday ()));
            EV.send_event ~event:"update" ~data:"" ();
          end;
@@ -134,4 +137,4 @@ let start () =
     ignore (Thread.create run ())
   end
 
-let update () = !update ()
+let update (ps:Prover.state) : unit = !update (ps)

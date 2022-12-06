@@ -271,7 +271,8 @@ let euf
   (* copied from old euf, handles the composition goals *)
   let tag_s =
     let f =
-      Prover.get_oracle_tag_formula (Symbols.to_string int_f)
+      (* XXX depends on Prover_state *)
+      ProverLib.get_oracle_tag_formula (Symbols.to_string int_f)
     in
     (* if the hash is not tagged, the formula is False, and we don't create
        another goal. *)

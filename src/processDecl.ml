@@ -161,14 +161,14 @@ let define_oracle_tag_formula table (h : lsymb) (fm : Theory.term) =
        begin
          match Vars.ty uvarm,Vars.ty uvarkey with
          | Type.(Message, Message) ->
-           Prover.add_option (Oracle_for_symbol (L.unloc h), Oracle_formula form)
+           ProverLib.add_option (Oracle_for_symbol (L.unloc h), Oracle_formula form)
          | _ ->
-           Prover.error (L.loc fm) 
+           ProverLib.error (L.loc fm) 
              "The tag formula must be of the form forall (m:message,sk:message)"
        end
 
      | _ -> 
-       Prover.error (L.loc fm)
+       ProverLib.error (L.loc fm)
          "The tag formula must be of the form forall (m:message,sk:message)"
 
 
@@ -198,7 +198,8 @@ let declare table decl : Symbols.table * Goal.t list =
       match pgoal.Goal.Parsed.name with
       | Some _ -> pgoal
       | None ->
-        { pgoal with Goal.Parsed.name = Some (Prover.unnamed_goal ()) }
+        (* XXX is this dependence to ProverLib necessary ? *)
+        { pgoal with Goal.Parsed.name = Some (ProverLib.unnamed_goal ()) }
     in
     let loc = L.loc (oget pgoal.Goal.Parsed.name) in
     let gc,_ = Goal.make table pgoal in

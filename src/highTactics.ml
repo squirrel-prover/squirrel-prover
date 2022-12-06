@@ -3,7 +3,7 @@ open Utils
 module Args = TacticsArgs
 module L = Location
 
-module T = Prover.ProverTactics
+module T = ProverTactics
 
 module LT = LowTactics
 
