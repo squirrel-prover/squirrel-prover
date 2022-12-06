@@ -1,13 +1,12 @@
 %{
-  module L  = Location
   module T  = Tactics
   module SE = SystemExpr
 
   let sloc startpos endpos s =
-    let loc = L.make startpos endpos in
-    L.mk_loc loc s
+    let loc = Location.make startpos endpos in
+    Location.mk_loc loc s
 
-  let mk_abstract loc s args = T.Abstract (L.mk_loc loc s, args)
+  let mk_abstract loc s args = T.Abstract (Location.mk_loc loc s, args)
 %}
 
 %token <int> INT
@@ -81,11 +80,15 @@
 %nonassoc NOSIMPL
 
 %start declarations
+(* %start declaration_eof *)
 %start top_formula
 %start top_process
 %start interactive
 %start top_proofmode
+(* %start bulleted_tactic *)
 %type <Decl.declarations> declarations
+(* %type <Decl.declaration> declaration_eof *)
+(* %type <Decl.declaration> declaration *)
 %type <Theory.term> top_formula
 %type <Process.process> top_process
 %type <ProverLib.parsed_input> interactive
@@ -96,13 +99,13 @@
 (* Locations *)
 %inline loc(X):
 | x=X {
-    { L.pl_desc = x;
-      L.pl_loc  = L.make $startpos $endpos;
+    { Location.pl_desc = x;
+      Location.pl_loc  = Location.make $startpos $endpos;
     }
   }
 
 %inline lloc(X):
-| X { L.make $startpos $endpos }
+| X { Location.make $startpos $endpos }
 
 (*------------------------------------------------------------------*)
 (* Lists *)
@@ -158,16 +161,16 @@ sterm_i:
 | SEQ LPAREN vs=ext_arg_list DARROW t=term RPAREN { Theory.Quant (Seq,vs,t) }
 
 | l=loc(NOT) f=sterm
-    { let fsymb = L.mk_loc (L.loc l) "not" in
+    { let fsymb = Location.mk_loc (Location.loc l) "not" in
       Theory.mk_app_i (Theory.mk_symb fsymb) [f] }
 
-| l=lloc(FALSE)  { Theory.Symb (L.mk_loc l "false") }
+| l=lloc(FALSE)  { Theory.Symb (Location.mk_loc l "false") }
 
-| l=lloc(TRUE)   { Theory.Symb (L.mk_loc l "true") }
+| l=lloc(TRUE)   { Theory.Symb (Location.mk_loc l "true") }
 
 | l=paren(slist1(term,COMMA))
     { match l with
-      | [t] -> L.unloc t
+      | [t] -> Location.unloc t
       | _ -> Theory.Tuple l }
 
 /* ambiguous term */
@@ -214,9 +217,9 @@ term_i:
 
 /* non-ambiguous term */
 %inline else_term:
-| %prec empty_else   { let loc = L.make $startpos $endpos in
-                       let fsymb = L.mk_loc loc "zero" in
-                       L.mk_loc loc (Theory.Symb fsymb) }
+| %prec empty_else   { let loc = Location.make $startpos $endpos in
+                       let fsymb = Location.mk_loc loc "zero" in
+                       Location.mk_loc loc (Theory.Symb fsymb) }
 | ELSE t=term       { t }
 
 sterm:
@@ -318,7 +321,7 @@ process_i:
 | NEW id=lsymb ty=colon_ty? SEMICOLON p=process
     { let ty = match ty with
         | Some ty -> ty
-        | None -> L.mk_loc (L.loc id) Theory.P_message
+        | None -> Location.mk_loc (Location.loc id) Theory.P_message
       in
       Process.New (id,ty,p) }
 
@@ -338,9 +341,9 @@ process_i:
     { Process.Let (id,t,ty,p) }
 
 | id=lsymb terms=term_list COLONEQ t=term p=process_cont
-    { let to_idx t = match L.unloc t with
+    { let to_idx t = match Location.unloc t with
         | Theory.Symb x -> x
-        | _ -> raise @@ Theory.Conv (L.loc t, Theory.Failure "must be a variable")
+        | _ -> raise @@ Theory.Conv (Location.loc t, Theory.Failure "must be a variable")
       in
       let l = List.map to_idx terms in
       Process.Set (id,l,t,p) }
@@ -355,13 +358,13 @@ processes_i:
 | p=process PARALLEL ps=loc(processes_i)  { Process.Parallel (p,ps) }
 
 process_cont:
-|                                { let loc = L.make $startpos $endpos in
-                                   L.mk_loc loc Process.Null }
+|                                { let loc = Location.make $startpos $endpos in
+                                   Location.mk_loc loc Process.Null }
 | SEMICOLON p=process            { p }
 
 else_process:
-| %prec empty_else               { let loc = L.make $startpos $endpos in
-                                   L.mk_loc loc Process.Null }
+| %prec empty_else               { let loc = Location.make $startpos $endpos in
+                                   Location.mk_loc loc Process.Null }
 | ELSE p=process                 { p }
 
 indices:
@@ -552,6 +555,9 @@ declaration_i:
 declaration:
 | ldecl=loc(declaration_i)                  { ldecl }
 
+(* declaration_eof: *)
+(* | ldecl=loc(declaration_i) EOF              { ldecl } *)
+
 declaration_list:
 | decl=declaration                        { [decl] }
 | decl=declaration decls=declaration_list { decl :: decls }
@@ -613,7 +619,7 @@ rw_args:
 
 single_target:
 | id=lsymb { id }
-| i=loc(int)    { L.mk_loc (L.loc i) (string_of_int (L.unloc i)) }
+| i=loc(int)    { Location.mk_loc (Location.loc i) (string_of_int (Location.unloc i)) }
 
 in_target:
 |                                  { `Goal }
@@ -652,9 +658,9 @@ simpl_pat:
 | d=loc(ip_rw_dir) { TacticsArgs.Srewrite d }
 
 s_item_body:
-| l=loc(SLASHSLASH)      { TacticsArgs.Tryauto      (L.loc l)}
-| l=loc(SLASHEQUAL)      { TacticsArgs.Simplify     (L.loc l)}
-| l=loc(SLASHSLASHEQUAL) { TacticsArgs.Tryautosimpl (L.loc l)}
+| l=loc(SLASHSLASH)      { TacticsArgs.Tryauto      (Location.loc l)}
+| l=loc(SLASHEQUAL)      { TacticsArgs.Simplify     (Location.loc l)}
+| l=loc(SLASHSLASHEQUAL) { TacticsArgs.Tryautosimpl (Location.loc l)}
 
 %inline s_item:
 | s=s_item_body { s,[] }
@@ -662,8 +668,8 @@ s_item_body:
 
 intro_pat:
 | s=s_item      { TacticsArgs.SItem (s) }
-| l=loc(STAR)   { TacticsArgs.Star  (L.loc l)}
-| l=loc(RANGLE) { TacticsArgs.StarV (L.loc l)}
+| l=loc(STAR)   { TacticsArgs.Star  (Location.loc l)}
+| l=loc(RANGLE) { TacticsArgs.StarV (Location.loc l)}
 | pat=simpl_pat { TacticsArgs.Simpl pat }
 | e=expnd_item  { TacticsArgs.SExpnd e }
 
@@ -701,22 +707,22 @@ p_pt_arg:
 
 p_pt:
 | head=lsymb args=slist(p_pt_arg,empty)
-    { let p_pt_loc = L.make $startpos $endpos in
+    { let p_pt_loc = Location.make $startpos $endpos in
       Theory.{ p_pt_head = head; p_pt_args = args; p_pt_loc; } }
 
 /* legacy syntax for use tactic */
 pt_use_tac:
 | hid=lsymb
-    { Theory.{ p_pt_head = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
+    { Theory.{ p_pt_head = hid; p_pt_args = []; p_pt_loc = Location.loc hid; } }
 | hid=lsymb WITH args=slist1(tac_term,COMMA)
-    { let p_pt_loc = L.make $startpos $endpos in
+    { let p_pt_loc = Location.make $startpos $endpos in
       let args = List.map (fun x -> Theory.PT_term x) args in
       Theory.{ p_pt_head = hid; p_pt_args = args; p_pt_loc; } }
 
 /* non-ambiguous pt */
 spt:
 | hid=lsymb
-    { Theory.{ p_pt_head = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
+    { Theory.{ p_pt_head = hid; p_pt_args = []; p_pt_loc = Location.loc hid; } }
 | LPAREN pt=p_pt RPAREN
     { pt }
 
@@ -786,7 +792,7 @@ tac:
   | l=tac PLUS r=tac                   { T.OrElse [l;r] }
   | TRY l=tac                          { T.Try l }
   | REPEAT t=tac                       { T.Repeat t }
-  | id=lsymb t=tactic_params           { mk_abstract (L.loc id) (L.unloc id) t }
+  | id=lsymb t=tactic_params           { mk_abstract (Location.loc id) (Location.unloc id) t }
 
   (* Special cases for tactics whose names are not parsed as ID
    * because they are reserved. *)
@@ -839,7 +845,7 @@ tac:
     { mk_abstract l "cycle" [TacticsArgs.Int_parsed i] }
 
   | l=lloc(CYCLE) MINUS i=loc(INT)
-    { let im = L.mk_loc (L.loc i) (- (L.unloc i)) in
+    { let im = Location.mk_loc (Location.loc i) (- (Location.unloc i)) in
       mk_abstract l "cycle" [TacticsArgs.Int_parsed im] }
 
   | CHECKFAIL t=tac EXN ts=ID  { T.CheckFail (ts, t) }
@@ -1063,7 +1069,7 @@ goal_i:
 | GLOBAL GOAL s=global_statement DOT { s }
 | EQUIV  s=obs_equiv_statement   DOT { s }
 | EQUIV s=system_annot name=statement_name vars=args COLON b=loc(biframe) DOT
-    { let f = L.mk_loc (L.loc b) (Theory.PEquiv (L.unloc b)) in
+    { let f = Location.mk_loc (Location.loc b) (Theory.PEquiv (Location.unloc b)) in
       let system = `Global, s in
       Goal.Parsed.{ name; system; ty_vars = []; vars; formula = Global f } }
 
@@ -1130,9 +1136,9 @@ brace:
 | RBRACE             { `Close }
 
 bulleted_tactic:
-| bullet bulleted_tactic { `Bullet $1 :: $2 }
-| brace  bulleted_tactic { `Brace  $1 :: $2 }
-| tactic                 { [ `Tactic $1 ] }
+| bullet bulleted_tactic { (ProverLib.Bullet $1) :: $2 }
+| brace  bulleted_tactic { (ProverLib.Brace  $1) :: $2 }
+| tactic                 { [ ProverLib.Tactic $1 ] }
 | DOT                    { [] }
 
 top_proofmode:

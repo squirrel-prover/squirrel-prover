@@ -78,15 +78,18 @@ let unnamed_goal =
 type include_param = { th_name : Theory.lsymb; 
                        params : Theory.lsymb list }
 
+type bulleted_tactic =
+  | Bullet of string
+  | Brace of [`Open | `Close]
+  | Tactic of TacticsArgs.parser_arg Tactics.ast
+
+type bulleted_tactics = bulleted_tactic list
+
 (* This should move somewhere else *)
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
   | ParsedSetOption  of Config.p_set_param
-
-  | ParsedTactic of [ `Bullet of string 
-                    | `Brace of [`Open|`Close] 
-                    | `Tactic of TacticsArgs.parser_arg Tactics.ast ] list
-
+  | ParsedTactic of bulleted_tactics
   | ParsedPrint   of print_query
   | ParsedUndo    of int
   | ParsedGoal    of Goal.Parsed.t Location.located

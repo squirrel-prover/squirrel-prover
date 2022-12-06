@@ -38,6 +38,7 @@ val tag : table -> int
 
 (*------------------------------------------------------------------*)
 type _channel
+(* type _config *)
 type _name
 type _action
 type _fname
@@ -132,6 +133,7 @@ type macro_def =
 (** Information about symbol definitions, depending on the namespace.
     Integers refer to the index arity of symbols. *)
 type _ def =
+  (* | Config   : Config.p_param_val      -> _channel def *)
   | Channel  : unit      -> _channel def
   | Name     : name_def  -> _name    def
   | Action   : int       -> _action  def
@@ -269,6 +271,8 @@ module type Namespace = sig
   val map : (ns t -> def -> data -> (def * data)) -> table -> table
 end
 
+(* module Config   : Namespace with type def = Config.p_param_val *)                     
+(*                                                     with type ns = _config *)
 module Channel  : Namespace with type def = unit    with type ns = _channel
 module BType    : Namespace with type def = bty_def with type ns = _btype
 module Action   : Namespace with type def = int     with type ns = _action

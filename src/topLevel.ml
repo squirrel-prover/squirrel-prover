@@ -11,10 +11,7 @@ module type PROVER = sig
   val get_current_system : state -> SystemExpr.context option
   val get_table : state -> Symbols.table
   val set_table : state -> Symbols.table -> state
-  val tactic_handle : state -> [< `Brace of [< `Close | `Open ]
-      | `Bullet of string
-      | `Tactic of TacticsArgs.parser_arg Tactics.ast ] 
-    -> state
+  val tactic_handle : state -> ProverLib.bulleted_tactic -> state
   val copy : state -> state
   val is_proof_completed : state -> bool
   val current_goal_name : state -> string option

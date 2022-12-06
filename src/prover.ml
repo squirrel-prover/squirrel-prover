@@ -226,10 +226,10 @@ let close_brace (ps:state) : state =
   | Bullets.Error _ -> invalid_brace ()
 
 let tactic_handle (ps:state) = function
- | `Bullet bl    -> open_bullet ps bl
- | `Brace `Open  -> open_brace ps
- | `Brace `Close -> close_brace ps
- | `Tactic utac  -> eval_tactic utac ps
+ | ProverLib.Bullet bl    -> open_bullet ps bl
+ | ProverLib.Brace `Open  -> open_brace ps
+ | ProverLib.Brace `Close -> close_brace ps
+ | ProverLib.Tactic utac  -> eval_tactic utac ps
 (* }↑} *)
 (*--------------------- Printings         ------------------*)(* {↓{ *)
 let pp_goal (ps:state) ppf () = match ps.current_goal, ps.subgoals with

@@ -39,10 +39,7 @@ val get_table : state -> Symbols.table
 val set_table : state -> Symbols.table -> state
 
 (** Handler of parsed input *)
-val tactic_handle : state -> [< `Brace of [< `Close | `Open ]
-    | `Bullet of string
-    | `Tactic of TacticsArgs.parser_arg Tactics.ast ] 
-  -> state
+val tactic_handle : state -> ProverLib.bulleted_tactic -> state
 
 (** return a copy of the current prover state. *)
 val copy : state -> state

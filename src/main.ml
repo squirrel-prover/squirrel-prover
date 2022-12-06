@@ -277,12 +277,8 @@ let do_print (state : driver_state) (q : ProverLib.print_query)
   ToplevelProver.do_print state.toplvl_state q;
   state
 
-(*---------type of parsed element for tactics, braces and bullets---*)
-type parsed_t = [`Brace of [`Close | `Open]
-      | `Bullet of string
-      | `Tactic of TacticsArgs.parser_arg Tactics.ast]
 (*----------Part can be done here and tactic handling in Prover ----*)
-let do_tactic (state : driver_state) (l:parsed_t list) : driver_state =
+let do_tactic (state : driver_state) (l:ProverLib.bulleted_tactics) : driver_state =
   begin match state.check_mode with
     | `NoCheck -> assert (state.toplvl_state.prover_mode = WaitQed)
     | `Check   -> 
@@ -294,7 +290,7 @@ let do_tactic (state : driver_state) (l:parsed_t list) : driver_state =
   begin
     let lnum = state.file.f_lexbuf.lex_curr_p.pos_lnum in
     match List.filter_map 
-            (function `Tactic t -> Some t | _ -> None) l with
+            (function ProverLib.Tactic t -> Some t | _ -> None) l with
       | [utac] ->
           Printer.prt `Prompt "Line %d: %a" lnum ProverTactics.pp_ast utac
       | _ ->

@@ -55,6 +55,7 @@ val pp_error :
   Format.formatter -> error -> unit
 
 
+(* TOMOVE in prover.ml cpt in state TODO !*)
 val unnamed_goal : unit -> Theory.lsymb
 
 (*------------------------------------------------------------------*)
@@ -62,14 +63,19 @@ val unnamed_goal : unit -> Theory.lsymb
 
 type include_param = { th_name : Theory.lsymb; params : Theory.lsymb list }
 
+type bulleted_tactic =
+  | Bullet of string
+  | Brace of [`Open | `Close]
+  | Tactic of TacticsArgs.parser_arg Tactics.ast
+
+type bulleted_tactics = bulleted_tactic list
+
 (*------------------------------------------------------------------*)
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
   | ParsedSetOption  of Config.p_set_param
 
-  | ParsedTactic of [ `Bullet of string |
-                      `Brace of [`Open|`Close] |
-                      `Tactic of TacticsArgs.parser_arg Tactics.ast ] list
+  | ParsedTactic of bulleted_tactics
 
   | ParsedPrint   of print_query
   | ParsedUndo    of int
