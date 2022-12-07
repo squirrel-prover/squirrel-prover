@@ -40,7 +40,7 @@ end
  *
  * It mainly prints out results while calling PROVER functions.
  *)
-module Toplevel (Prover : PROVER) :
+module Make (Prover : PROVER) :
   sig
     (** {TopLevel state}
      * composed with:

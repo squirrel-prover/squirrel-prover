@@ -34,7 +34,7 @@ type file = {
   f_lexbuf : Lexing.lexbuf;
 }
 
-module ToplevelProver = TopLevel.Toplevel(Prover)
+module ToplevelProver = TopLevel.Make(Prover)
 module HistoryTP = History.HistoryTopLevelProver(ToplevelProver)
 
 (** State of the main loop. *)

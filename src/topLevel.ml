@@ -25,7 +25,7 @@ module type PROVER = sig
   val add_decls : state -> Decl.declarations -> state * Goal.t list
 end
 
-module Toplevel (Prover : PROVER) = struct
+module Make (Prover : PROVER) = struct
   (* proof state with params is what is managed by this module and
    * what we record in history *)
   type state = {
