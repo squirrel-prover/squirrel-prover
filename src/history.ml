@@ -16,7 +16,7 @@ module type TOPLEVELPROVER = sig
 end
 
 (* This module manage history with global configs *)
-module HistoryTopLevelProver (P : TOPLEVELPROVER) = struct
+module Make (P : TOPLEVELPROVER) = struct
   type state = P.state
   (* could be a tree and managed with ref on current node *)
   type history = state list

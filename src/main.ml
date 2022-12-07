@@ -35,7 +35,7 @@ type file = {
 }
 
 module ToplevelProver = TopLevel.Make(Prover)
-module HistoryTP = History.HistoryTopLevelProver(ToplevelProver)
+module HistoryTP = History.Make(ToplevelProver)
 
 (** State of the main loop. *)
 type driver_state = {
