@@ -98,7 +98,6 @@ val tsubst_ht : tsubst -> hty -> hty
 val tsubst_add_tvar   : tsubst -> tvar   -> ty -> tsubst
 val tsubst_add_univar : tsubst -> univar -> ty -> tsubst
 
-
 val tsubst_empty : tsubst
   
 (*------------------------------------------------------------------*)
@@ -107,6 +106,8 @@ val tsubst_empty : tsubst
 (** Stateful API *)
 module Infer : sig
   type env
+
+  val pp : Format.formatter -> env -> unit
 
   val mk_env : unit -> env
     

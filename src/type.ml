@@ -249,7 +249,6 @@ let rec tsubst (s : tsubst) (t : ty) : ty =
   | Tuple tys -> Tuple (List.map (tsubst s) tys)
   | Fun (t1, t2) -> Fun (tsubst s t1, tsubst s t2)
 
-
 let tsubst_ht (ts : tsubst) (ht : hty) : hty =
   match ht with
   | Lambda (vs, f) -> Lambda (List.map (tsubst ts) vs, tsubst ts f)
@@ -260,6 +259,8 @@ let tsubst_ht (ts : tsubst) (ht : hty) : hty =
 (** Stateful API *)
 module Infer : sig
   type env
+
+  val pp : Format.formatter -> env -> unit
 
   val mk_env : unit -> env
     
@@ -281,7 +282,14 @@ end = struct
                  
   (* an unification environment *)
   type env = ty Mid.t ref
- 
+
+  let pp fmt (e : env) =
+    Fmt.pf fmt "[@[<v 0>%a@]]"
+      (Fmt.list ~sep:Fmt.cut
+         (fun fmt (id, ty) ->
+            Fmt.pf fmt "@[<hv 2>@[%a@] →@ @[%a@]@]" Ident.pp id pp ty
+      )) (Mid.bindings !e)
+
   let mk_env () = ref Mid.empty 
 
   let mk_univar (env : env) =
