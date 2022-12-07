@@ -16,7 +16,7 @@
 %token <string> RIGHTINFIXSYMB   /* right infix function symbols */
 %token <string> BANG
 
-%token AT TRANS
+%token AT TRANS FRESH
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
 %token LBRACE RBRACE
@@ -732,6 +732,11 @@ trans_arg:
 | l=slist1(trans_arg_item, COMMA) { TacticsArgs.TransTerms l }
 
 (*------------------------------------------------------------------*)
+fresh_arg:
+| i=loc(int) { TacticsArgs.FreshInt i }
+| l=lsymb    { TacticsArgs.FreshHyp l }
+
+(*------------------------------------------------------------------*)
 %inline generalize_dependent:
 | GENERALIZE DEPENDENT { }
 
@@ -881,6 +886,9 @@ tac:
   | l=lloc(TRANS) arg=trans_arg
     { mk_abstract l "trans" [TacticsArgs.Trans arg] }
 
+  | l=lloc(FRESH) a=named_args arg=fresh_arg
+    { mk_abstract l "fresh" [TacticsArgs.Fresh (a,arg)] }
+
   | l=lloc(REWRITE) p=rw_args w=in_target
     { mk_abstract l "rewrite" [TacticsArgs.RewriteIn (p, w)] }
 
@@ -943,6 +951,7 @@ help_tac_i:
 | USE        { "use"}
 | REWRITE    { "rewrite"}
 | TRANS      { "trans"}
+| FRESH      { "fresh"}
 | APPLY      { "apply"}
 | SPLITSEQ   { "splitseq"}
 | CONSTSEQ   { "constseq"}

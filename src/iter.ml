@@ -6,6 +6,8 @@ module Sv = Vars.Sv
 module Sp = Pos.Sp
 
 module SE = SystemExpr
+
+let pp_dbg = false
   
 (*------------------------------------------------------------------*)
 class deprecated_iter ~(cntxt:Constr.trace_cntxt) = object (self)
@@ -521,8 +523,8 @@ let get_macro_occs
 (*------------------------------------------------------------------*)
 (** {2 Path conditions} *)
 
+(** See `.mli` *)
 module PathCond = struct
-  (** See `.mli` *)
   type t =
     | Top                    
     | Before of Action.descr list
@@ -549,6 +551,22 @@ module PathCond = struct
               d1.Action.name = d2.Action.name
             ) l2
         ) l1
+
+  (** Sound approximation of the concatenation of two path conditions. 
+      (path [p1] followed by path [p2]) *)
+  let concat
+      ?(all_actions : Symbols.action list = []) (p1 : t) (p2 : t) : t 
+    =
+    match p2 with
+    | Top -> p1
+    (* heuristic: use the last (i.e. right-most) action name which is not [Top] *)
+
+    | Before l
+      when List.for_all (fun a -> List.exists (fun d -> d.Action.name = a) l) all_actions -> 
+      p1
+    (* same as previous cas *)
+
+   | Before _ -> p2
 
   let apply (p : t) (tau0 : Term.term) (tau2 : Term.term) : Term.term =
     match p with
@@ -940,16 +958,8 @@ let macro_support
 
                (* compute a valid path condition *)
                let path_cond =
-                 match (List.assoc msymb sm).path_cond with
-                 | PathCond.Top -> PathCond.Before [descr]
-                 (* heuristic: use the first action name which is not [Top] *)
-
-                 | PathCond.Before l
-                   when List.for_all (fun a -> List.exists (fun d -> d.Action.name = a) l) all_actions -> 
-                   PathCond.Before [descr]
-                 (* same as previous cas *)
-
-                 | PathCond.Before _ as x -> x
+                 PathCond.concat ~all_actions
+                   (PathCond.Before [descr]) (List.assoc msymb sm).path_cond 
                in
 
                MsetAbs.join (get_msymbs ~mode:`Delta ~path_cond t) sm
@@ -1022,6 +1032,9 @@ let _fold_macro_support
   let sm : (Term.term * MsetAbs.t) list =
     List.map (fun src -> (src, macro_support ~env cntxt src)) terms
   in
+
+  if pp_dbg then                (* debug printing, turned-off  *)
+    List.iter (fun (_, mset_abs) -> Fmt.epr "macro_support:@.%a@." MsetAbs.pp mset_abs ) sm;
 
   (* reversing the association map: we want to map macros to
      pairs of possible sources and macro set *)

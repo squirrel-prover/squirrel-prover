@@ -276,6 +276,7 @@ let indcca_param
    IMPORTANT: this only works because we don't apply CCA under binders, so
    subc contains no free vars and can just be substituted anywhere. *)
 let phi_proj
+    ?use_path_cond
     (loc:L.t)
     (contx:Constr.trace_cntxt)
     (env:Vars.env)
@@ -360,8 +361,8 @@ let phi_proj
   in
   let _, phis_random =
     if pk_f <> None then
-      NO.occurrence_formulas ~negate:true ~pp_ns:(Some pp_rand)
-        ER.randomness_formula
+      NO.occurrence_formulas ?use_path_cond ~negate:true ~pp_ns:(Some pp_rand)
+        (ER.randomness_formula ?use_path_cond)
         get_bad_randoms contx_p env (cc_p::m_p::k_p.args@r_p.args@frame_p)
     else
       [], []
@@ -381,8 +382,8 @@ let phi_proj
   phi_p
 
 
-
-
+(*------------------------------------------------------------------*)
+(** The IND-CCA1 tactic  *)
 let indcca1 (i:int L.located) (s:sequent) : sequent list =
   let contx = ES.mk_pair_trace_cntxt s in
   let table = contx.table in
@@ -409,7 +410,8 @@ let indcca1 (i:int L.located) (s:sequent) : sequent list =
   let c_len = Term.(mk_fun table enc_f [mk_tuple [mk_zeroes (mk_len m); r; k]]) in
 
   let phi_proj =
-    phi_proj loc contxxc env enc_f dec_f pk_f biframe cc m k r xc [c; c_len]
+    phi_proj ~use_path_cond:false loc contxxc env enc_f dec_f pk_f biframe cc m k r xc [c; c_len]
+    (* FEATURE: allow the user to set [use_path_cond] to true *)
   in
 
 

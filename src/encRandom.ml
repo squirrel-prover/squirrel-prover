@@ -3,6 +3,8 @@
 open Term
 open Utils
 
+module PathCond = Iter.PathCond
+
 module Args = TacticsArgs
 module L = Location
 module SE = SystemExpr
@@ -380,29 +382,32 @@ let ciphertext_formula
     given that the key we're interested in is k:
     - if r' was found in enc(m',r',k'):
        phi_time(r) && k1 = k && r' = r && (k' <> k || m' <> m)
-     or the negative phi_time(r) => k1 = k => r' = r => k' = k && m' = m
+      or the negative phi_time(r) => k1 = k => r' = r => k' = k && m' = m
     - if r' was found directly:
        phi_time(r) && k1 = k && r' = r
-     or the negative phi_time(r) => k1 = k => r' = r => false.
- note that it does not include the phi_time for r',
-    as this is handled by NameOccs.
-    similarly, no need to worry about the conditions or vars,
-    as they were all added to the cond by mk_rand *)
+      or the negative phi_time(r) => k1 = k => r' = r => false.
+      note that it does not include the phi_time for r',
+      as this is handled by NameOccs.
+      similarly, no need to worry about the conditions or vars,
+      as they were all added to the cond by mk_rand *)
 let randomness_formula
+    ?(use_path_cond = false)
     ~(negate : bool)
     (r':Name.t)
     (r:Name.t)
     ((eco, omk): (ectxt_occ * (term * Name.t) option))
-      (* eco: occ where r was, omk = option (m',k') *)
-  : term =
+  (* eco: occ where r was, omk = option (m',k') *)
+  : term 
+  =
   let co = eco.eo_occ in
   let {ca_m=m; ca_r=rr; ca_k1=k1; ca_kcoll=k} = co.so_ad in
   assert (r = rr); (* sanity check *)
   let phi_time = (* phi_time(r) *)
     match co.so_occtype with
     | EI_direct -> mk_true
-    | EI_indirect a -> NO.time_formula (* ~path_cond:eco.eo_path_cond  *) a eco.eo_source_ts
-    (* TODO: path cond *)
+    | EI_indirect a -> 
+      let path_cond = if use_path_cond then eco.eo_path_cond else PathCond.Top in
+      NO.time_formula ~path_cond a eco.eo_source_ts
   in 
   let phi_k = mk_eqs ~simpl:true k1.args k.args in
   let phi_r = mk_eqs ~simpl:true r'.args r.args in

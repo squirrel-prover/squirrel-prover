@@ -203,8 +203,10 @@ val fold_descr :
 (** {2 Path conditions} *)
 
 module PathCond : sig
-  (** A path condition [φ] constraining a timestamp [τ] and a source 
-      timestamp [τ1] as follows: 
+  (** A path condition [φ] constraining the set of timestamp [τ] that can occur 
+      before some source timestamp [τ1].
+      
+      This precise abstraction works as follows: 
         [φ τ τ1] iff. [∃ τ0 s.t. τ ≤ τ0 ≤ τ1] and *)
   type t =
     | Top                    
@@ -220,12 +222,15 @@ module PathCond : sig
 
         Note that this must be a globally fresh action description. *)
 
-
   val join : t -> t -> t
 
   val pp : Format.formatter -> t -> unit
 
   val incl : t -> t -> bool
+
+  (** Sound approximation of the concatenation of two path conditions. 
+      (path [p1] followed by path [p2]) *)
+  val concat : ?all_actions:Symbols.action list -> t -> t -> t 
 
   (** [apply path_cond t1 t2] computes [path_cond φ τ τ1]  *)
   val apply : t -> Term.term -> Term.term -> Term.term

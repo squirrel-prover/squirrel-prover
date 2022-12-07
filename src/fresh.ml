@@ -17,13 +17,19 @@ module Sp = Match.Pos.Sp
 open LowTactics
 
 (*------------------------------------------------------------------*)
-let wrap_fail_trace = TraceLT.wrap_fail
-let wrap_fail_equiv = EquivLT.wrap_fail
-
 let soft_failure = Tactics.soft_failure
-(* let hard_failure = Tactics.hard_failure *)
+let hard_failure = Tactics.hard_failure
 
 type lsymb = Theory.lsymb
+
+(*------------------------------------------------------------------*)
+(** for now, `fresh` has only one named optional arguments *)
+let p_fresh_arg (nargs : Args.named_args) : bool =
+  match nargs with
+  | [Args.NArg L.{ pl_desc = "precise_ts" }] -> true
+  | (Args.NArg l) :: _ ->
+    hard_failure ~loc:(L.loc l) (Failure "unknown argument")
+  | [] -> false
 
 (*------------------------------------------------------------------*)
 (* Look for occurrences using NameOccs *)
@@ -72,10 +78,8 @@ let get_bad_occs
   | _ -> retry_on_subterms ()
 
 
-
-
 (*------------------------------------------------------------------*)
-(** Fresh trace tactic *)
+(** {2 Trace fresh tactic} *)
 
 (** Computes parameters for the fresh trace tactic:
     returns n, t such that hyp is n = t or t = n
@@ -115,7 +119,12 @@ let fresh_trace_param
 
 (** Applies fresh to the trace sequent s and hypothesis m:
     returns the list of subgoals with the added hyp that there is a collision *)
-let fresh_trace (m : lsymb) (s : TS.sequent) : TS.sequent list =
+let fresh_trace
+    (opt_args : Args.named_args) (m : lsymb) (s : TS.sequent) 
+  : TS.sequent list 
+  =
+  let use_path_cond = p_fresh_arg opt_args in
+
   let _, hyp = Hyps.by_name m s in
   try
     let contx = TS.mk_trace_cntxt s in
@@ -128,8 +137,8 @@ let fresh_trace (m : lsymb) (s : TS.sequent) : TS.sequent list =
     let get_bad = get_bad_occs n in
    
     Printer.pr "Freshness of %a:@; @[<v 0>" pp_n ();
-    let phis  =
-      NO.name_occurrence_formulas ~pp_ns:(Some pp_n)
+    let phis =
+      NO.name_occurrence_formulas ~use_path_cond ~pp_ns:(Some pp_n)
         get_bad contx env (t :: n.args)
     in
     Printer.pr "@]@;";
@@ -144,23 +153,23 @@ let fresh_trace (m : lsymb) (s : TS.sequent) : TS.sequent list =
     soft_failure Underspecified_system
 
 
-
 (** fresh trace tactic *)
-let fresh_trace_tac args s =
-  match TraceLT.convert_args s args (Args.Sort Args.String) with
-  | Args.Arg (Args.String str) -> wrap_fail_trace (fresh_trace str) s
+let fresh_trace_tac args =
+  match args with
+  | [Args.Fresh (opt_args, Args.FreshHyp hyp)] -> 
+    TraceLT.wrap_fail (fresh_trace opt_args hyp)
+
   | _ -> bad_args ()
 
 
-
-
-
 (*------------------------------------------------------------------*)
-(** Fresh equiv tactic *)
+(** {2 Fresh equiv tactic} *)
+
 (* Constructs the formula expressing the freshness
    of the proj of t in the proj of the biframe,
    provided it is a name member of a large type *)
 let phi_proj
+    ~(use_path_cond:bool)
     (loc:L.t)
     (contx:Constr.trace_cntxt)
     (env:Vars.env)
@@ -194,7 +203,7 @@ let phi_proj
   (* should env be projected? *)
   let phi_p =
     NO.name_occurrence_formulas
-      ~negate:true ~pp_ns:(Some pp_n_p)
+      ~use_path_cond ~negate:true ~pp_ns:(Some pp_n_p)
       get_bad_p contx_p env frame_p
   in
 
@@ -203,12 +212,17 @@ let phi_proj
      phi_l and phi_r *)
   phi_p
 
+(*------------------------------------------------------------------*)
+(** Constructs the sequent where goal [i], when of the form [diff(n_l, n_r)],
+    is replaced with [if phi then zero else diff(n_l, n_r)],
+    where [phi] expresses the freshness of [n_l] on the left, and [n_r] on 
+    the right *)
+let fresh_equiv
+    (opt_args : Args.named_args) (i : int L.located) (s : ES.sequent) 
+  : ES.sequents 
+  =
+  let use_path_cond = p_fresh_arg opt_args in
 
-
-(* Constructs the sequent where goal i, if of the form diff(n_l, n_r),
-   is replaced with if phi then zero else diff(n_l, n_r),
-   where phi expresses the freshness of n_l on the left, and n_r on the right *)
-let fresh_equiv (i : int L.located) (s : ES.sequent) : ES.sequents =
   let contx = ES.mk_pair_trace_cntxt s in
   let env = ES.vars s in
   let loc = L.loc i in
@@ -219,10 +233,12 @@ let fresh_equiv (i : int L.located) (s : ES.sequent) : ES.sequents =
   let biframe = List.rev_append before after in
   
   Printer.pr "@[<v 0>Freshness on the left side:@; @[<v 0>";
-  let phi_l = phi_proj loc contx env t biframe proj_l in
+
+  (* apply freshness *)
+  let phi_l = phi_proj ~use_path_cond loc contx env t biframe proj_l in
 
   Printer.pr "@]@,Freshness on the right side:@; @[<v 0>";
-  let phi_r = phi_proj loc contx env t biframe proj_r in
+  let phi_r = phi_proj ~use_path_cond  loc contx env t biframe proj_r in
   Printer.pr "@]@]@;";
 
   (* Removing duplicates. We already did that for occurrences, but
@@ -239,10 +255,12 @@ let fresh_equiv (i : int L.located) (s : ES.sequent) : ES.sequents =
   [ES.set_equiv_goal new_biframe s]
 
 
+(** fresh equiv tactic *)
+let fresh_equiv_tac args = 
+  match args with
+  | [Args.Fresh (opt_args, Args.FreshInt i)] -> 
+    EquivLT.wrap_fail (fresh_equiv opt_args i)
 
-(* fresh equiv tactic *)
-let fresh_equiv_tac args = match args with
-  | [Args.Int_parsed i] -> wrap_fail_equiv (fresh_equiv i)
   | _ -> bad_args ()
 
 
@@ -266,5 +284,4 @@ let () =
       usages_sorts = [Sort String; Sort Int];
       tactic_group=Structural }
     ~pq_sound:true
-    (LowTactics.gentac_of_any_tac_arg
-       fresh_trace_tac fresh_equiv_tac)
+    (LowTactics.gentac_of_any_tac_arg fresh_trace_tac fresh_equiv_tac)

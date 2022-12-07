@@ -286,7 +286,9 @@ let ext_occ_incl
   | None -> false
   | Some mv -> (* still have to check [eo_path_cond], [occ_type] and [source_ts] *)
     let mv = ref mv in
-    (* path condition inclusion *)
+    (* path condition inclusion:
+       path conditions have no free variables, hence we do not 
+       need to forward [mv] to it. *)
     PathCond.incl occ1.eo_path_cond occ2.eo_path_cond &&
 
     (* source timestamps inclusion *)
@@ -936,6 +938,7 @@ let time_formula (a:term) ?(path_cond : PathCond.t = PathCond.Top) (ts:ts_occs) 
     The free vars of ts should be all be bound in the sequent's env.
     If negate is set to true, returns instead the negation of that formula. *)
 let occurrence_formula
+    ?(use_path_cond = false)
     ~(negate : bool)
     (phiocc : ('a, 'b) occ_formula)
     (occ : ('a, 'b) ext_occ)
@@ -984,7 +987,11 @@ let occurrence_formula
        in ts not bound in the occ,
        but that's tricky, as it also means these vars can't be used
        to unify when subsuming timestamps *)
-    let phi_time = time_formula ~path_cond:PathCond.Top (* ~path_cond:occ.eo_path_cond  *)a ts in
+    let phi_time = 
+      Fmt.epr "PATHCOND:%a@." Fmt.bool use_path_cond; (* REM *)
+      let path_cond = if use_path_cond then occ.eo_path_cond else PathCond.Top in
+      time_formula ~path_cond a ts 
+    in
 
     if not negate then
       mk_exists ~simpl:true fv (mk_and ~simpl:true phi_time phi_cond_cnt)
@@ -999,13 +1006,15 @@ let occurrence_formula
 
 
 (** occurrence formula for names *)
-let name_occurrence_formula = occurrence_formula name_occ_formula
+let name_occurrence_formula ?use_path_cond = (occurrence_formula ?use_path_cond) name_occ_formula
 
 
 (*------------------------------------------------------------------*)
-(* Proof obligations for name occurrences *)
+(** {1 Proof obligations for name occurrences} *)
 
+(** Exported. *)
 let occurrence_formulas_with_occs
+    ?use_path_cond
     ?(negate : bool=false)
     ?(pp_ns: (unit Fmt.t) option=None)
     (phi_acc : ('a, 'b) occ_formula)
@@ -1015,15 +1024,20 @@ let occurrence_formulas_with_occs
     (sources : terms)
   : terms * terms * name_occs * ('a, 'b) ext_occs
   =
-  let conv = phi_acc in (* I leave the name conv to see when
-                           it's just used to compare *)
+  let conv = phi_acc in
+ (* I leave the name conv to see when it's just used to compare *)
+
   let occs, accs = find_all_occurrences ~pp_ns conv get_bad_occs contx env sources in
-  let foccs = List.map (name_occurrence_formula ~negate) occs in
-  let faccs = List.map (occurrence_formula ~negate phi_acc) accs in
+  let foccs = List.map (name_occurrence_formula ?use_path_cond ~negate) occs in
+  let faccs = List.map (occurrence_formula ?use_path_cond ~negate phi_acc) accs in
 
   (foccs, faccs, occs, accs)
 
+(*------------------------------------------------------------------*)
+(** Exported. 
+    Specialization of [occurrence_formulas_with_occs]. *)
 let occurrence_formulas
+    ?use_path_cond
     ?(negate : bool=false)
     ?(pp_ns: (unit Fmt.t) option=None)
     (phi_acc : ('a, 'b) occ_formula)
@@ -1035,22 +1049,27 @@ let occurrence_formulas
   =
   let (occs, accs, _, _) =
     occurrence_formulas_with_occs
-      ~negate ~pp_ns phi_acc
+      ?use_path_cond ~negate ~pp_ns phi_acc
       get_bad_occs contx env sources
   in
   (occs, accs)
 
+(*------------------------------------------------------------------*)
+(** Exported. 
+    Specialization of [occurrence_formulas_with_occs]. *)
 let name_occurrence_formulas
+    ?use_path_cond
     ?(negate : bool=false)
     ?(pp_ns: (unit Fmt.t) option=None)
     (get_bad_occs: (unit, unit) f_fold_occs)
     (contx : Constr.trace_cntxt)
     (env : Vars.env)
     (sources : terms)
-  : terms =
+  : terms 
+  =
   let (occs, _) =
     occurrence_formulas
-      ~negate ~pp_ns empty_occ_formula
+      ?use_path_cond ~negate ~pp_ns empty_occ_formula
       get_bad_occs contx env sources
   in
   occs

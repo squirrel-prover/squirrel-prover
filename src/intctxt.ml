@@ -101,8 +101,10 @@ dec(c,k) <> fail or dec(c,k) = t (or the symmetric equalities)")
 
 
 
-
+(*------------------------------------------------------------------*)
+(** The INT-CTXT tactic *)
 let intctxt
+    ?use_path_cond
     (h : lsymb)
     (s : sequent)
   : sequent list
@@ -111,7 +113,7 @@ let intctxt
   let _, hyp = Hyps.by_name h s in
   let contx = TS.mk_trace_cntxt s in
   let env = (TS.env s).vars in
-  
+
   let {ip_enc=enc_f; ip_dec=dec_f; ip_hash=hash_f;
        ip_c=c; ip_k=k; ip_t=t} = 
     intctxt_param ~hyp_loc:(L.loc h) contx hyp s
@@ -139,8 +141,9 @@ let intctxt
     ER.get_bad_randoms k ctxt_occs enc_f
   in
   let _, phis_bad_r =
-    NO.occurrence_formulas ~pp_ns:(Some pp_rand)
-      ER.randomness_formula
+    (* FEATURE: allow the user to set [use_path_cond] to true *)
+    NO.occurrence_formulas ?use_path_cond ~pp_ns:(Some pp_rand)
+      (ER.randomness_formula ?use_path_cond)
       get_bad contx env [c]
   in
 
@@ -219,6 +222,7 @@ let intctxt_tac args s =
   in
   match TraceLT.convert_args s [hyp] (Args.Sort Args.String) with
   | Args.Arg (Args.String hyp) -> wrap_fail (intctxt hyp) s
+
   | _ -> bad_args ()
 
 (*------------------------------------------------------------------*)

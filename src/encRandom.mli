@@ -164,9 +164,10 @@ val ciphertext_formula :
     similarly, no need to worry about the conditions or vars,
     as they were all added to the cond by mk_rand *)
 val randomness_formula :
-    negate : bool ->
-    Name.t ->
-    Name.t ->
-    ectxt_occ * (term * Name.t) option ->
-      (* eco: occ where r was, omk = option (m',k') *)
-    term
+  ?use_path_cond : bool ->
+  negate : bool ->
+  Name.t ->
+  Name.t ->
+  ectxt_occ * (term * Name.t) option ->
+  (* eco: occ where r was, omk = option (m',k') *)
+  term

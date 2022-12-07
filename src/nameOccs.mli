@@ -230,7 +230,6 @@ type ('a, 'b) f_fold_occs =
   n_occs * ('a, 'b) simple_occs
 
 (*------------------------------------------------------------------*)
-
 (** {1 Proof obligations for name occurrences} *)
 
 (** Given
@@ -249,6 +248,7 @@ type ('a, 'b) f_fold_occs =
     the conjunctions mean "no bad occurrence happens" and
     "no collision happens". *)
 val occurrence_formulas :
+  ?use_path_cond : bool ->
   ?negate : bool ->
   ?pp_ns: (unit Fmt.t) option ->
   ('a, 'b) occ_formula ->
@@ -261,6 +261,7 @@ val occurrence_formulas :
 (** Instance of {!occurrence_formulas} for when we only look for names.
     It is used for the [fresh] tactic. *)
 val name_occurrence_formulas :
+  ?use_path_cond : bool ->
   ?negate : bool ->
   ?pp_ns: (unit Fmt.t) option ->
   (unit, unit) f_fold_occs ->
@@ -273,6 +274,7 @@ val name_occurrence_formulas :
     for more complex use cases (eg. [intctxt]).
     {b TODO} clarify specification. *)
 val occurrence_formulas_with_occs :
+  ?use_path_cond : bool ->
   ?negate : bool ->
   ?pp_ns: (unit Fmt.t) option ->
   ('a, 'b) occ_formula ->

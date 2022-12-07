@@ -5,15 +5,15 @@
 set postQuantumSound=true.
 
 hash h
-name k : message
-name fresh : message
+name k : message.
+name nfresh : message.
 channel c
 system !_i in(c,x);out(c,h(x,k)).
 
 goal _ (t:timestamp): happens(t) => input@t <> k.
 Proof.
   intro _ _.
-  assert h(fresh,input@t) = h(fresh,k) as Heuf; 1: auto.
+  assert h(nfresh,input@t) = h(nfresh,k) as Heuf; 1: auto.
   euf Heuf.
   intro [i [_ H]]; by fresh H.
 Qed.

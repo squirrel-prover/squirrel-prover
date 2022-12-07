@@ -159,6 +159,7 @@ rule token = parse
 | "use"               { USE }
 | "rewrite"           { REWRITE }
 | "trans"             { TRANS }
+| "fresh"             { FRESH } 
 | "apply"             { APPLY }
 | "revert"            { REVERT }
 | "generalize"        { GENERALIZE }

@@ -204,6 +204,13 @@ type ip_handler = [
 ]
 
 (*------------------------------------------------------------------*)
+(** {2 Fresh tactic arguments} *)
+
+type fresh_arg =
+  | FreshInt of int L.located
+  | FreshHyp of lsymb
+
+(*------------------------------------------------------------------*)
 (** {2 Trans tactic arguments} *)
 
 type trans_arg =
@@ -218,10 +225,13 @@ type parser_arg =
   | String_name  of lsymb
   | Int_parsed   of int L.located
   | Theory       of Theory.term
+
   | NamingPat    of naming_pat
   | IntroPat     of intro_pattern list
   | AndOrPat     of and_or_pat
   | SimplPat     of simpl_pat
+
+  | Fresh        of named_args * fresh_arg
   | RewriteIn    of rw_arg list * in_target
   | RewriteEquiv of rw_equiv_item
   | Trans        of trans_arg
@@ -255,6 +265,7 @@ let pp_parser_arg ppf = function
   | RewriteEquiv _rw_arg ->
     Fmt.pf ppf "..."
 
+  | Fresh _ 
   | Trans _ ->
     Fmt.pf ppf "..."
 
