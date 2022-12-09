@@ -22,7 +22,7 @@ type state = {
 
 let init () : state = 
 { goals         = [];
-  table         = Symbols.builtins_table;
+  table         = TConfig.reset_params Symbols.builtins_table;
   current_goal  = None;
   bullets       = Bullets.empty_path;
   subgoals      = [];
@@ -36,6 +36,9 @@ let get_table (ps:state) : Symbols.table =
 
 let set_table (ps:state) (table: Symbols.table) : state =
   { ps with table }
+
+let set_param (ps:state) (sp: Config.p_set_param) : state =
+  { ps with table = TConfig.set_param sp ps.table }
 
 let add_hint (ps:state) (h: Hint.p_hint) : state =
   let table = 
@@ -171,7 +174,8 @@ let eval_tactic_focus (tac:ProverTactics.AST.t) (ps:state) : state =
     if not (Bullets.tactic_allowed ps.bullets) then
       Tactics.hard_failure (Failure "bullet needed before tactic");
     
-    let new_j = ProverTactics.AST.eval_judgment tac judge in
+    let post_quantum = TConfig.post_quantum (ps.table) in
+    let new_j = ProverTactics.AST.eval_judgment post_quantum tac judge in
     begin
       try
         let bullets = Bullets.expand_goal (List.length new_j)

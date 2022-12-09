@@ -1471,7 +1471,7 @@ let complete
     table l 
   : state 
   =
-  Utils.timeout exn (Config.solver_timeout ()) (complete table) l 
+  Utils.timeout exn (TConfig.solver_timeout (table)) (complete table) l 
         
 let print_init_trs fmt table =
   Fmt.pf fmt "@[<v 2>Rewriting rules:@;%a@]"

@@ -10,7 +10,7 @@ type models
     the conjunction of atoms.
     - [exn] is thrown if the tactic timeout.
       Default to [Tactics.Tactic_hard_failure TacTimeout]. *)
-val models_conjunct : ?exn:exn -> Term.terms -> models 
+val models_conjunct : int -> ?exn:exn -> Term.terms -> models 
 
 val m_is_sat : models -> bool
 

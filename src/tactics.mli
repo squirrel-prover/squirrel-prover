@@ -147,7 +147,7 @@ module type S = sig
 
   type judgment
 
-  val eval_abstract : string list -> lsymb -> arg list -> judgment tac
+  val eval_abstract : bool -> string list -> lsymb -> arg list -> judgment tac
 end
 
 type selector = int list
@@ -176,9 +176,9 @@ module type AST_sig = sig
   type judgment
   type t = arg ast
 
-  val eval : string list -> t -> judgment tac
+  val eval : bool -> string list -> t -> judgment tac
 
-  val eval_judgment : t -> judgment -> judgment list
+  val eval_judgment : bool -> t -> judgment -> judgment list
 
   val pp : Format.formatter -> t -> unit
 

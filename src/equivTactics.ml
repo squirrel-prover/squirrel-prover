@@ -559,6 +559,7 @@ let induction Args.(Message (ts,_)) s =
 (*------------------------------------------------------------------*)
 (** Induction *)
 
+(* FIXME never used ! *)
 let old_or_new_induction args : etac =
   if Config.new_ind () then
     (EquivLT.induction_tac ~dependent:false) args
@@ -1108,12 +1109,13 @@ let goal_is_reach s =
   | _ -> false
 
 let auto ~red_param ~strong ~close s sk (fk : Tactics.fk) =
+  let auto_intro = TConfig.auto_intro (Goal.table s) in
   let rec auto_rec s sk fk =
     let open Tactics in
     match s with
     | Goal.Trace t ->
       let sk l fk = sk (List.map (fun s -> Goal.Trace s) l) fk in
-      TraceTactics.simpl ~red_param ~close ~strong t sk fk
+      TraceTactics.simpl ~red_param ~close ~strong ~auto_intro t sk fk
 
     | Goal.Equiv s when goal_is_reach s ->
       auto_rec (byequiv s) sk fk
@@ -1128,15 +1130,15 @@ let auto ~red_param ~strong ~close s sk (fk : Tactics.fk) =
       in
 
       let wfadup s sk fk =
-        if strong || (Config.auto_fadup ()) then
+        if strong || (TConfig.auto_fadup (ES.table s)) then
           let fk _ = sk [s] fk in
           wrap_fail (fadup (Args.Opt (Args.Int, None))) s sk fk
         else sk [s] fk
       in
 
       let conclude s sk fk  =
-        if close || Config.auto_intro () then
-          let fk = if Config.auto_intro () then fun _ -> sk [s] fk else fk in
+        if close || auto_intro then
+          let fk = if auto_intro then fun _ -> sk [s] fk else fk in
           andthen_list ~cut:true
             [wrap_fail (EquivLT.expand_all_l `All);
              try_tac wfadup;

@@ -26,8 +26,8 @@ module AST : sig
   type arg = TacticsArgs.parser_arg
   type judgment = Goal.t
   type t = arg Tactics.ast
-  val eval : string list -> t -> judgment Tactics.tac
-  val eval_judgment : t -> judgment -> judgment list
+  val eval : bool -> string list -> t -> judgment Tactics.tac
+  val eval_judgment : bool -> t -> judgment -> judgment list
   val pp : Format.formatter -> t -> unit
 end
 
@@ -43,11 +43,11 @@ val register_general :
   ?pq_sound:bool ->
   (TacticsArgs.parser_arg list -> tac) -> unit
 
-(* Register a macro, built using the AST. *)
-val register_macro :
-  string -> ?modifiers:string list -> tactic_help:tactic_help ->
-      ?pq_sound:bool ->
-  TacticsArgs.parser_arg Tactics.ast -> unit
+(* Register a macro, built using the AST. FIXME never used ? *)
+(* val register_macro : *)
+(*   string -> ?modifiers:string list -> tactic_help:tactic_help -> *)
+(*       ?pq_sound:bool -> *)
+(*   TacticsArgs.parser_arg Tactics.ast -> unit *)
 
 (* The remaining functions allow to easily register a tactic,
    without having to manage type conversions, or worry about the
@@ -68,7 +68,7 @@ val register_typed :
   ('a TacticsArgs.arg -> judgment -> judgment list) ->
   'a TacticsArgs.sort  -> unit
 
-val get : Location.t -> string -> TacticsArgs.parser_arg list -> tac
+val get : bool -> Location.t -> string -> TacticsArgs.parser_arg list -> tac
 val pp : bool -> Format.formatter -> Theory.lsymb -> unit
 
 (* Print all tactics with their help. Do not print tactics without help

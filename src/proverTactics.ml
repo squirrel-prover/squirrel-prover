@@ -31,7 +31,7 @@ module TacTable : sig
   val table : Goal.t table
   val tac_count_table : (string, int) Hashtbl.t
 
-  val get : Location.t -> string -> TacticsArgs.parser_arg list -> Goal.t Tactics.tac
+  val get : bool -> Location.t -> string -> TacticsArgs.parser_arg list -> Goal.t Tactics.tac
   val add_tac : string -> Goal.t tac_infos -> unit
 
   val pp_goal_concl : Format.formatter -> Goal.t -> unit
@@ -43,9 +43,9 @@ end = struct
     Hashtbl.add tac_count_table id 0;
     Hashtbl.add table id tacinfo
 
-  let get loc id =
+  let get (post_quantum:bool) loc id =
     try let tac = Hashtbl.find table id in
-      if not(tac.pq_sound) && Config.post_quantum () then
+      if not(tac.pq_sound) && post_quantum then
         Tactics.hard_failure Tactics.TacticNotPQSound
       else
         let count = Hashtbl.find tac_count_table id in
@@ -74,7 +74,7 @@ module AST :
 
   let pp_arg = TacticsArgs.pp_parser_arg
 
-  let autosimpl () = TacTable.get Location._dummy "autosimpl" []
+  let autosimpl () = TacTable.get false Location._dummy "autosimpl" []
   let autosimpl = Lazy.from_fun autosimpl
 
   let re_raise_tac loc tac s sk fk : Tactics.a =
@@ -82,9 +82,9 @@ module AST :
     | Tactics.Tactic_hard_failure (None, e) -> Tactics.hard_failure ~loc e
     | Tactics.Tactic_soft_failure (None, e) -> Tactics.soft_failure ~loc e
 
-  let eval_abstract mods (id : Theory.lsymb) args : judgment Tactics.tac =
+  let eval_abstract post_quantum mods (id : Theory.lsymb) args : judgment Tactics.tac =
     let loc, id = Location.loc id, Location.unloc id in
-    let tac = re_raise_tac loc (TacTable.get loc id args) in
+    let tac = re_raise_tac loc (TacTable.get post_quantum loc id args) in
     match mods with
       | "nosimpl" :: _ -> tac
       | [] -> Tactics.andthen tac (Lazy.force autosimpl)
@@ -163,13 +163,14 @@ let register_typed id
          with TacticsArgs.Uncastable ->
            Tactics.hard_failure (Tactics.Failure "ill-formed arguments"))
 
-let register_macro
-      id ?(modifiers=["nosimpl"]) ~tactic_help ?(pq_sound=false) m =
-  register_general id ~tactic_help ~pq_sound
-    (fun args s sk fk ->
-       if args = [] then AST.eval modifiers m s sk fk else
-         Tactics.hard_failure
-           (Tactics.Failure "this tactic does not take arguments"))
+(* FIXME never used ? *)
+(* let register_macro *)
+(*       id ?(modifiers=["nosimpl"]) ~tactic_help ?(pq_sound=false) m = *)
+(*   register_general id ~tactic_help ~pq_sound *)
+(*     (fun args s sk fk -> *)
+(*        if args = [] then AST.eval false modifiers m s sk fk else *)
+(*          Tactics.hard_failure *)
+(*            (Tactics.Failure "this tactic does not take arguments")) *)
 
 let pp_usage tacname fmt esort =
   Fmt.pf fmt "%s %a" tacname TacticsArgs.pp_esort esort

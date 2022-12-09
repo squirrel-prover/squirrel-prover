@@ -57,6 +57,9 @@ val complete_proof : state -> state
 (** TODO processDecl ? *)
 val add_hint : state -> Hint.p_hint -> state
 
+(** set param : from config *)
+val set_param : state -> Config.p_set_param -> state
+
 (** Declare a new goal to the current goals, and returns it. *)
 val add_new_goal : state -> Goal.Parsed.t Location.located -> state 
 

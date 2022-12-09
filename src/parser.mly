@@ -26,7 +26,7 @@
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token TILDE DIFF SEQ
 %token NEW OUT PARALLEL NULL
-%token CHANNEL PROCESS HASH AENC SENC SIGNATURE ACTION NAME ABSTRACT OP TYPE FUN
+%token CHANNEL PROCESS TSET HASH AENC SENC SIGNATURE ACTION NAME ABSTRACT OP TYPE FUN
 %token MUTABLE SYSTEM SET
 %token INDEX MESSAGE BOOL BOOLEAN TIMESTAMP ARROW RARROW
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
@@ -528,6 +528,8 @@ declaration_i:
                           { Decl.Decl_state {name; args; out_ty; init_body; }}
 
 | CHANNEL e=lsymb         { Decl.Decl_channel e }
+
+| TSET n=lsymb EQ param=option_param DOT { Decl.Decl_config (n, param) }
 
 | PROCESS id=lsymb projs=projs args=opt_arg_list EQ proc=process
                           { Decl.Decl_process {id; projs; args; proc} }

@@ -100,7 +100,8 @@ let parse_theory_test ?(test=false) filename =
   let lexbuf = Lexing.from_channel (Stdlib.open_in filename) in
   let decls = parse_theory_buf ~test lexbuf filename in
   let table, subgs =
-    ProcessDecl.declare_list Symbols.builtins_table decls
+    ProcessDecl.declare_list (TConfig.reset_params
+                                Symbols.builtins_table) decls
   in
   assert (subgs = []);
   table

@@ -18,6 +18,7 @@ module type PROVER = sig
   val pp_goal : state -> Format.formatter -> unit -> unit
   val complete_proof : state -> state
   val add_hint : state -> Hint.p_hint -> state
+  val set_param : state -> Config.p_set_param -> state
   val add_new_goal : state -> Goal.Parsed.t Location.located -> state 
   val start_proof : state -> [`Check | `NoCheck] -> (string option * state) 
   val abort : state -> state
@@ -102,6 +103,9 @@ module Make (Prover : PROVER) = struct
   let do_add_hint (st:state) (h:Hint.p_hint) : state =
     { st with prover_state = Prover.add_hint st.prover_state h }
 
+  let do_set_option (st:state) (sp:Config.p_set_param) : state =
+    { st with prover_state = Prover.set_param st.prover_state sp }
+
   let do_qed (st : state) : state =
     let prover_state = Prover.complete_proof st.prover_state in
     Printer.prt `Result "Exiting proof mode.@.";
@@ -137,8 +141,8 @@ module Make (Prover : PROVER) = struct
         SystemExpr.print_system 
           (Prover.get_table st.prover_state) system;
 
-        (* TODO retirer de config *)
-        if Config.print_trs_equations ()
+        if TConfig.print_trs_equations 
+            (Prover.get_table st.prover_state)
         then
           Printer.prt `Result "@[<v>@;%a@;@]%!"
             Completion.print_init_trs 

@@ -12,6 +12,7 @@ type symb_type = [ `Prefix | `Infix of assoc ]
 (*------------------------------------------------------------------*)
 type namespace =
   | NChannel
+  | NConfig
   | NName
   | NAction
   | NFunction
@@ -24,6 +25,7 @@ type namespace =
 
 let pp_namespace fmt = function
   | NChannel  -> Fmt.pf fmt "channel"
+  | NConfig   -> Fmt.pf fmt "config"
   | NName     -> Fmt.pf fmt "name"
   | NAction   -> Fmt.pf fmt "action"
   | NFunction -> Fmt.pf fmt "function"
@@ -91,6 +93,7 @@ type name_def = {
 
 (*------------------------------------------------------------------*)
 type _channel
+type _config
 type _name
 type _action
 type _fname
@@ -102,6 +105,7 @@ type _hintdb
 type _lemma
 
 type channel = _channel t
+type config  = _config  t
 type name    = _name    t
 type action  = _action  t
 type fname   = _fname   t
@@ -111,10 +115,16 @@ type process = _process t
 type btype   = _btype   t
 type hintdb  = _hintdb  t
 type lemma   = _lemma   t
+
+type [@warning "-37"] param_kind =
+  | PBool
+  | PString
+  | PInt
     
 (*------------------------------------------------------------------*)
 type _ def =
   | Channel  : unit      -> _channel def
+  | Config   : param_kind -> _config def
   | Name     : name_def  -> _name    def
   | Action   : int       -> _action  def
   | Macro    : macro_def -> _macro   def
@@ -194,6 +204,7 @@ let fresh ?(group=default_group) prefix table =
 let edef_namespace : edef -> namespace = fun e ->
   match e with
   | Exists (Channel  _) -> NChannel
+  | Exists (Config  _)  -> NConfig
   | Exists (Name     _) -> NName
   | Exists (Action   _) -> NAction
   | Exists (Function _) -> NFunction
@@ -518,6 +529,19 @@ module Channel = Make (struct
   let construct d = Channel d
   let deconstruct ~loc s = match s with
     | Exists (Channel d) -> d
+    | _ as c -> namespace_err loc c namespace
+end)
+
+module Config = Make (struct
+  type ns = _config
+  type local_def = param_kind
+
+  let namespace = NConfig
+
+  let group = default_group
+  let construct d = Config d
+  let deconstruct ~loc s = match s with
+    | Exists (Config d) -> d
     | _ as c -> namespace_err loc c namespace
 end)
 

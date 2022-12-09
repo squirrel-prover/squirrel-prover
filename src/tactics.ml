@@ -588,7 +588,7 @@ module type S = sig
 
   type judgment
 
-  val eval_abstract : string list -> lsymb -> arg list -> judgment tac
+  val eval_abstract : bool -> string list -> lsymb -> arg list -> judgment tac
 end
 
 (** AST for tactics, with abstract leaves corresponding to prover-specific
@@ -615,9 +615,9 @@ module type AST_sig = sig
   type judgment
   type t = arg ast
 
-  val eval : string list -> t -> judgment tac
+  val eval : bool -> string list -> t -> judgment tac
 
-  val eval_judgment : t -> judgment -> judgment list
+  val eval_judgment : bool -> t -> judgment -> judgment list
 
   val pp : Format.formatter -> t -> unit
 
@@ -634,24 +634,24 @@ module AST (M:S) = struct
   type arg = M.arg
   type judgment = M.judgment
 
-  let rec eval modifiers = function
-    | Abstract (id,args)  -> eval_abstract modifiers id args
-    | AndThen tl          -> andthen_list (List.map (eval modifiers) tl)
+  let rec eval (post_quantum:bool) modifiers = function
+    | Abstract (id,args)  -> eval_abstract post_quantum modifiers id args
+    | AndThen tl          -> andthen_list (List.map (eval post_quantum modifiers) tl)
     | AndThenSel (t,tl)   ->
-      let tl = List.map (fun (s,t') -> s, (eval modifiers t')) tl in
-      andthen_sel (eval modifiers t) tl
+      let tl = List.map (fun (s,t') -> s, (eval post_quantum modifiers t')) tl in
+      andthen_sel (eval post_quantum modifiers t) tl
 
-    | OrElse tl           -> orelse_list (List.map (eval modifiers) tl)
-    | Try t               -> try_tac (eval modifiers t)
+    | OrElse tl           -> orelse_list (List.map (eval post_quantum modifiers) tl)
+    | Try t               -> try_tac (eval post_quantum modifiers t)
     | By (t,loc)                ->
-      andthen_list [eval modifiers t;
-                    eval modifiers (Abstract (L.mk_loc loc "auto",[]))]
+      andthen_list [eval post_quantum modifiers t;
+                    eval post_quantum modifiers (Abstract (L.mk_loc loc "auto",[]))]
 
-    | Repeat t            -> repeat (eval modifiers t)
+    | Repeat t            -> repeat (eval post_quantum modifiers t)
     | Ident               -> id
-    | Modifier (id,t)     -> eval (id::modifiers) t
-    | CheckFail (e,t)     -> checkfail_tac e (eval modifiers t)
-    | Time t              -> check_time (eval modifiers t)
+    | Modifier (id,t)     -> eval post_quantum (id::modifiers) t
+    | CheckFail (e,t)     -> checkfail_tac e (eval post_quantum modifiers t)
+    | Time t              -> check_time (eval post_quantum modifiers t)
 
   let pp_args fmt l =
     Fmt.list
@@ -710,8 +710,8 @@ module AST (M:S) = struct
     * [Tactic_Soft_Failure] exception.
     * A hard failure inside Tactic_hard_failure. Those exceptions are caught
     * inside the interactive loop. *)
-  let eval_judgment ast j =
-    let tac = eval [] ast in
+  let eval_judgment (post_quantum:bool) ast j =
+    let tac = eval post_quantum [] ast in
     (* The failure should raise the soft failure,
      * according to [pp_tac_error]. *)
     let fk (loc,tac_error) = soft_failure ?loc tac_error in

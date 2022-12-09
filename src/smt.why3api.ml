@@ -42,9 +42,9 @@ let get_smt_setup
           Format.printf "smt: error while loading SMT theory file\n"; None
       end
 
-let run_prover ?limit_opt task =
+let run_prover table ?limit_opt task =
   let limit = match limit_opt with
-    | None   -> Config.solver_timeout ()
+    | None   -> TConfig.solver_timeout (table)
     | Some x -> x
   in
   let opam_prefix = Sys.getenv "OPAM_SWITCH_PREFIX" in
@@ -727,7 +727,9 @@ let literals_unsat ~slow table system evars msg_atoms trace_lits axioms =
           build_task table system evars msg_atoms trace_lits axioms tm_theory in
         Format.printf "@[task is:@\n%a@]@." Why3.Pretty.print_task task;
         Utils.omap (fun x -> x.Why3.Call_provers.pr_answer)
-          (if slow then run_prover ~limit_opt:60 task else run_prover task)
+          (if slow 
+           then run_prover table ~limit_opt:60 task 
+           else run_prover table task)
         = Some Why3.Call_provers.Valid
         (* match if slow then run_prover ~limit_opt:60 task else run_prover task with
          * | None -> false

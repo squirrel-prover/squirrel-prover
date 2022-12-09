@@ -136,7 +136,7 @@ let get_all_messages (s : sequent) =
 (*------------------------------------------------------------------*)
 (** Prepare constraints or TRS query *)
 
-let _get_models (hyps : H.hyps) =
+let _get_models table (hyps : H.hyps) =
   let hyps = H.fold (fun _ f acc ->
       match f with
       | Local f
@@ -144,9 +144,9 @@ let _get_models (hyps : H.hyps) =
       | Global _ -> acc
     ) hyps [] 
   in
-  Constr.models_conjunct hyps
+  Constr.models_conjunct (TConfig.solver_timeout table) hyps
 
-let get_models (s : sequent) = _get_models s.hyps
+let get_models (s : sequent) = _get_models s.env.table s.hyps
 
 let query ~precise s q =
   let models = get_models s in

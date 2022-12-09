@@ -304,9 +304,10 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     then t, false
     else
       try
-        if not Constr.(m_is_sat (models_conjunct ~exn:NoExp [t]))
+        let timeout = TConfig.solver_timeout st.table in
+        if not Constr.(m_is_sat (models_conjunct timeout ~exn:NoExp [t]))
         then Term.mk_false, true
-        else if not Constr.(m_is_sat (models_conjunct ~exn:NoExp [Term.mk_not t]))
+        else if not Constr.(m_is_sat (models_conjunct timeout ~exn:NoExp [Term.mk_not t]))
         then Term.mk_true, true
         else t, false
       with NoExp -> t, false

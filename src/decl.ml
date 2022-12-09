@@ -100,6 +100,7 @@ type orcl_tag_info = Theory.term
 (*------------------------------------------------------------------*)
 type declaration_i =
   | Decl_channel of lsymb
+  | Decl_config  of lsymb * Config.p_param_val
   | Decl_process of proc_decl
   | Decl_axiom   of Goal.Parsed.t
   | Decl_system  of system_decl

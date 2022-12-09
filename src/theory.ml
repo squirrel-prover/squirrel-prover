@@ -770,6 +770,7 @@ let make_app_i (state : conv_state) cntxt (lsymb : lsymb) : app_i =
       | Symbols.Action _ -> Taction
 
       | Symbols.Channel _
+      | Symbols.Config _
       | Symbols.BType _
       | Symbols.HintDB _
       | Symbols.Lemma  _ 

@@ -178,6 +178,7 @@ let define_oracle_tag_formula table (h : lsymb) (fm : Theory.term) =
 let declare table decl : Symbols.table * Goal.t list = 
   match L.unloc decl with
   | Decl.Decl_channel s -> Channel.declare table s, []
+  | Decl.Decl_config (s,v) -> TConfig.declare table s v, []
 
   | Decl.Decl_process { id; projs; args; proc} ->
     let env = Env.init ~table () in

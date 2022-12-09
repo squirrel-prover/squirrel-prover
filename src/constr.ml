@@ -1303,6 +1303,7 @@ let models_conjunct =
 
 (** Time-out information *)
 let models_conjunct
+    (time_out : int)
     ?(exn = Tactics.Tactic_hard_failure (None, TacTimeout))
     (l : Term.terms) : models
   =
@@ -1313,7 +1314,7 @@ let models_conjunct
       ) [] l 
   in
   
-  Utils.timeout exn (Config.solver_timeout ()) models_conjunct lits
+  Utils.timeout exn time_out models_conjunct lits
 
 
 (*------------------------------------------------------------------*)
@@ -1568,12 +1569,14 @@ let () =
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("sat" ^ string_of_int i) Sat
-             (fun () -> test (snd @@ models_conjunct (mk pb))))
+             (fun () -> test (snd @@ models_conjunct
+                                TConfig.vint_timeout (mk pb))))
          successes;
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("unsat" ^ string_of_int i) Unsat
-             (fun () -> test (snd @@ models_conjunct (mk pb))))
+             (fun () -> test (snd @@ models_conjunct
+                                TConfig.vint_timeout (mk pb))))
          failures;);
 
     ("Graph", `Quick,
@@ -1605,11 +1608,13 @@ let () =
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("graph(sat) " ^ string_of_int i) Sat
-             (fun () -> test (snd @@ models_conjunct (mk pb))))
+             (fun () -> test (snd @@ models_conjunct 
+                                TConfig.vint_timeout (mk pb))))
          successes;
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("graph(unsat) " ^ string_of_int i) Unsat
-             (fun () -> test (snd @@ models_conjunct (mk pb))))
+             (fun () -> test (snd @@ models_conjunct
+                               TConfig.vint_timeout (mk pb))))
          failures;)
   ]

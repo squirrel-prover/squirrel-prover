@@ -329,7 +329,9 @@ let do_add_hint (state : driver_state) (h : Hint.p_hint) : driver_state =
 let do_set_option (state : driver_state) (sp : Config.p_set_param) :
   driver_state =
   match Config.set_param sp with
-  | `Failed s -> Command.cmd_error (InvalidSetOption s)
+  | `Failed _ -> (* TODO should be only ↓ *)
+    { state with toplvl_state = ToplevelProver.do_set_option
+                state.toplvl_state sp; }
   | `Success -> state
 
 let do_add_goal 
@@ -555,7 +557,6 @@ let start_main_loop
     (* file_stack can be changed regarding to includes main.ml:426 *)
     file_stack = []; }
   in
-
   main_loop ~test state
 
 let generate_html (filename : string) (html_filename : string) =

@@ -322,7 +322,7 @@ let check_pq_sound_sequent s =
 (*------------------------------------------------------------------*)
 let set_equiv_goal e j =
   let new_sequent = set_goal Equiv.(Atom (Equiv e)) j in
-  if Config.post_quantum () then
+  if TConfig.post_quantum (table j) then
    check_pq_sound_sequent new_sequent
   else new_sequent
 
@@ -337,7 +337,7 @@ let init ~env ?hyp goal =
   let new_sequent = { env; hyps; goal } in
   sanity_check new_sequent;
 
-  if Config.post_quantum () then
+  if TConfig.post_quantum (env.table) then
    check_pq_sound_sequent new_sequent
   else new_sequent
 

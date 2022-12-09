@@ -1,5 +1,8 @@
 (*------------------------------------------------------------------*)
-(* parser types *)
+type [@warning "-37"] param_kind =
+  | PBool
+  | PString
+  | PInt
 
 type p_param_val =
   | Param_bool   of bool
@@ -8,23 +11,9 @@ type p_param_val =
 
 type p_set_param = string * p_param_val
 
-(*------------------------------------------------------------------*)
-(* parameter type *)
-
 module M = Utils.Ms
 
-type [@warning "-37"] param_kind =
-  | PBool
-  | PString
-  | PInt
-
-let pp_kind fmt = function
-  | PBool -> Fmt.pf fmt "bool"
-  | PString -> Fmt.pf fmt "string"
-  | PInt -> Fmt.pf fmt "int"
-
-
-let get_int = function _,_, Param_int i -> i | _ -> assert false
+let [@warning "-32"] get_int = function _,_, Param_int i -> i | _ -> assert false
 
 let [@warning "-32"] get_string = function 
   | _,_, Param_string s -> s 
@@ -62,15 +51,6 @@ let decl name kind ?check default (params : params) =
 (** list of parameters strings (to be set in *.sp files) and
    default value. *)
 
-let s_timeout = "timeout"
-let v_timeout = Param_int 2
-let check_timeout = function
-  | Param_int 0 -> Printer.prt `Error "Timeout must strictly positive"; false
-  | _ -> true
-
-let s_print_equ = "printTRSEquations"
-let v_print_equ = Param_bool false
-
 let s_debug_constr = "debugConstr"
 let v_debug_constr = Param_bool false
 
@@ -80,78 +60,52 @@ let v_debug_completion = Param_bool false
 let s_debug_tactics = "debugTactics"
 let v_debug_tactics = Param_bool false
 
-let s_strict_alias_mode = "processStrictAliasMode"
-let v_strict_alias_mode = Param_bool false
-
-let s_show_strengthened_hyp = "showStrengthenedHyp"
-let v_show_strengthened_hyp = Param_bool false
-
-let s_auto_intro = "autoIntro"
-let v_auto_intro = Param_bool false
-
-let s_auto_fadup = "autoFADup"
-let v_auto_fadup = Param_bool true
-
 let s_new_ind = "newInduction"
 let v_new_ind = Param_bool false
 
 let s_old_completion = "oldCompletion"
 let v_old_completion = Param_bool false
 
-let s_post_quantum = "postQuantumSound"
-let v_post_quantum = Param_bool false
-
 (*------------------------------------------------------------------*)
 (** Default parameters values.
     Add one line for each new parameter. *)
 let default_params =
-      decl s_timeout ~check:check_timeout PInt v_timeout M.empty
-  |>  decl s_print_equ PBool v_print_equ
-  |>  decl s_debug_constr PBool v_debug_constr
+      decl s_debug_constr PBool v_debug_constr M.empty
   |>  decl s_debug_completion PBool v_debug_completion
   |>  decl s_debug_tactics PBool v_debug_tactics
-  |>  decl s_strict_alias_mode PBool v_strict_alias_mode
-  |>  decl s_show_strengthened_hyp PBool v_show_strengthened_hyp
-  |>  decl s_auto_intro PBool v_auto_intro
-  |>  decl s_auto_fadup PBool v_auto_fadup
   |>  decl s_new_ind PBool v_new_ind
   |>  decl s_old_completion PBool v_old_completion
-  |>  decl s_post_quantum PBool v_post_quantum
 
 (*------------------------------------------------------------------*)
 (** reference to the current parameters *)
 let params = ref default_params
 
+(* OK *)
 let reset_params () = params := default_params
 
+(* Deprecated when in table TOREMOVE *)
 let get_params () = !params
 
+(* Deprecated when in table TOREMOVE *)
 let set_params p = params := p
 
 (*------------------------------------------------------------------*)
 (** {2 look-up functions} *)
 
-let solver_timeout () = get_int (M.find s_timeout !params)
-
-let print_trs_equations () = get_bool (M.find s_print_equ !params)
-
 let debug_constr     () = get_bool (M.find s_debug_constr !params)
 let debug_completion () = get_bool (M.find s_debug_completion !params)
 let debug_tactics    () = get_bool (M.find s_debug_tactics !params)
 
-let strict_alias_mode () = get_bool (M.find s_strict_alias_mode !params)
-
-let show_strengthened_hyp () = get_bool (M.find s_show_strengthened_hyp !params)
-
-let auto_intro () = get_bool (M.find s_auto_intro !params)
-
-let auto_fadup () = get_bool (M.find s_auto_fadup !params)
-
+(* FIXME seems to be used once for a test … *)
 let new_ind () = get_bool (M.find s_new_ind !params)
 
+(* FIXME seems to be used once for a test … *)
 let old_completion () = get_bool (M.find s_old_completion !params)
 
-let post_quantum () = get_bool (M.find s_post_quantum !params)
+let pp_kind fmt = function
+  | PBool -> Fmt.pf fmt "bool"
+  | PString -> Fmt.pf fmt "string"
+  | PInt -> Fmt.pf fmt "int"
 
 (*------------------------------------------------------------------*)
 (** {2 set functions} *)

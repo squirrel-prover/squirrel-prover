@@ -18,6 +18,7 @@ sig
   val pp_goal : state -> Format.formatter -> unit -> unit
   val complete_proof : state -> state
   val add_hint : state -> Hint.p_hint -> state
+  val set_param : state -> Config.p_set_param -> state
   val add_new_goal : state -> Goal.Parsed.t Location.located -> state
   val start_proof : state -> [ `Check | `NoCheck ] -> string option * state
   val abort : state -> state
@@ -90,6 +91,9 @@ module Make (Prover : PROVER) :
 
     (** Add hint *)
     val do_add_hint : state -> Hint.p_hint -> state
+
+    (** set param/option from Config *)
+    val do_set_option : state -> Config.p_set_param -> state
 
     (** Complete the proofs, resetting the current goal to None and
      * print exiting proof *)

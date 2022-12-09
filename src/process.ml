@@ -222,7 +222,7 @@ let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
       check_channel env.table c;
 
       (* raise an error if we are in strict alias mode *)
-      if is_out proc && (Config.strict_alias_mode ())
+      if is_out proc && (TConfig.strict_alias_mode env.table)
       then error loc (StrictAliasError "missing alias")
       else
         (* FEATURE: subtypes *)
@@ -457,7 +457,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
    * (input / condition / update / output). *)
   let register_action _loc a output (penv : p_env) =
     (* In strict alias mode, we require that the alias T is available. *)
-    let exact = Config.strict_alias_mode () in
+    let exact = TConfig.strict_alias_mode (penv.env.table) in
     let table,a' = Action.fresh_symbol penv.env.table ~exact a in
 
     let action = List.rev penv.action in

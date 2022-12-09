@@ -786,7 +786,7 @@ let expand_head_once
           | Global _ -> acc
         ) (Lazy.force hyps) [] 
       in
-      Constr.models_conjunct ~exn lits)
+      Constr.models_conjunct (TConfig.solver_timeout table) ~exn lits)
   in 
   let cntxt () = 
     let se = try SE.to_fset sexpr with SE.Error _ -> raise exn in
@@ -2411,7 +2411,6 @@ module E : S with type t = Equiv.form = struct
             msets_add mset msets
         ) [] table
     in
-
     dbg "init_fixpoint:@.%a@." pp_msets init_fixpoint;
 
     (* initially known terms *)
@@ -2681,7 +2680,7 @@ module E : S with type t = Equiv.form = struct
     in
 
     if Sv.is_empty st.support && st.use_fadup &&
-       Config.show_strengthened_hyp () then
+       TConfig.show_strengthened_hyp st.table then
       (dbg ~force:true) "@[<v 2>strengthened hypothesis:@;%a@;@]" MCset.pp_l mset_l;
 
     let pat_terms =
