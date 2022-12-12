@@ -188,7 +188,8 @@ val get_macro_occs :
 val fold_descr :
   globals:bool ->
   ( Symbols.macro     -> (* macro symbol [ms] *)
-    Vars.var list     -> (* indices [is] of [ms] *)
+    Vars.var list     ->       (* action indices *)
+    Vars.var list     ->       (* additional indices [is] of [ms] *)
     Symbols.macro_def -> (* macro definition *)
     Term.term         -> (* term [t] defining [ms(is)] *)
     'a                -> (* folding accumulator *)

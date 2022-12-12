@@ -594,9 +594,10 @@ let is_state : Symbols.macro_def -> bool = function
     Also folds over global macros if [globals] is [true]. *)
 let fold_descr
     ~(globals:bool)
-    (f :
+    (func :
        Symbols.macro ->       (* macro symbol [ms] *)
-       Vars.var list ->       (* indices [is] of [ms] *)
+       Vars.var list ->       (* action indices *)
+       Vars.var list ->       (* additional indices [is] of [ms] *)
        Symbols.macro_def ->   (* macro definition *)
        Term.term ->           (* term [t] defining [ms(is)] *)
        'a ->                  (* folding argument *)
@@ -606,15 +607,15 @@ let fold_descr
     (descr  : Action.descr)
     (init   : 'a) : 'a
   =
-  let mval = f Symbols.out [] Symbols.Output (snd descr.output) init in
-  let mval = f Symbols.cond [] Symbols.Cond (snd descr.condition) mval in
+  let mval = func Symbols.out  descr.indices [] Symbols.Output (snd descr.output   ) init in
+  let mval = func Symbols.cond descr.indices [] Symbols.Cond   (snd descr.condition) mval in
 
   (* fold over state macros *)
   let mval =
     List.fold_left (fun mval (st, is, t) ->
         let mdef = Symbols.Macro.get_def st table in
         assert (is_state mdef);
-        f st is mdef t mval
+        func st descr.indices is mdef t mval
       ) mval descr.updates
   in
 
@@ -637,7 +638,7 @@ let fold_descr
           | `Def t -> t
           | _ -> assert false
         in
-        f mg is mdef t mval
+        func mg descr.indices is mdef t mval
       ) mval descr.globals
 
 (*------------------------------------------------------------------*)
@@ -944,7 +945,10 @@ let macro_support
 
     SE.fold_descrs (fun (descr : Action.descr) (sm : MsetAbs.t) ->
         fold_descr ~globals:true
-          (fun (msymb : Symbols.macro) (is : Vars.vars) _ (t : Term.term) (sm : MsetAbs.t) ->
+          (fun
+            (msymb : Symbols.macro) 
+            (_ : Vars.vars) (m_is : Vars.vars) 
+            _ (t : Term.term) (sm : MsetAbs.t) ->
              if List.mem_assoc msymb sm then
                (* we compute the substitution which we will use to instantiate
                   [t] on the indices of the macro set in [sm]. *)
@@ -952,7 +956,7 @@ let macro_support
                  let mset = List.assoc msymb sm in
                  List.map2 (fun i j ->
                      Term.ESubst (Term.mk_var i, Term.mk_var j)
-                   ) is mset.Mset.args
+                   ) m_is mset.Mset.args
                in
                let t = Term.subst subst t in
 
@@ -1052,7 +1056,7 @@ let _fold_macro_support
   in
 
   SE.fold_descrs (fun descr acc ->
-      fold_descr ~globals:true (fun msymb m_is _ t acc ->
+      fold_descr ~globals:true (fun msymb _ m_is _ t acc ->
           if Ms.mem msymb macro_occs then
             let srcs, mset = Ms.find msymb macro_occs in
 

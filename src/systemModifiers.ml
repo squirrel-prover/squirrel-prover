@@ -867,7 +867,7 @@ let global_prf_t
 
   let (table, occs) : Symbols.table * XO.t list =
     SystemExpr.fold_descrs (fun descr (table,occs) ->
-        Iter.fold_descr ~globals:true (fun ms _m_is mdef t (table,occs) ->
+        Iter.fold_descr ~globals:true (fun ms _a_is _m_is mdef t (table,occs) ->
             (* find new occurrences using NoDelta, as we also fold over 
                global macros. *)
             let new_occs =
