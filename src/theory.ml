@@ -235,7 +235,10 @@ let rec pp_term_i ppf t = match t with
         pp_term r
 
   | App (t1,l) ->
-    Fmt.pf ppf "(%a %a)" pp_term t1 (Fmt.list ~sep:Fmt.sp pp_term) l
+    if l = [] then
+      Fmt.pf ppf "%a" pp_term t1
+    else 
+      Fmt.pf ppf "(%a %a)" pp_term t1 (Fmt.list ~sep:Fmt.sp pp_term) l
 
   | Tuple l when List.length l = 1 -> pp_term ppf (as_seq1 l)
                                         
