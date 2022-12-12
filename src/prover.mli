@@ -27,6 +27,9 @@ val init : unit -> state
 (** Execute a command : see @ProverLib.prover_input *)
 val do_command : state -> ProverLib.prover_input -> state
 
+(** Execute a command from string *)
+val exec_command : string -> state -> state
+
 (** add proof obligation *)
 val add_proof_obl : Goal.t -> state -> state
 

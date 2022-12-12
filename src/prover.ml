@@ -284,3 +284,15 @@ let do_command (state:state) (command:ProverLib.prover_input) : state =
   | Proof            -> let _,st = start_proof state `Check in st
   | Abort            -> abort state
 
+let get_prover_command = function
+  | ProverLib.Prover c -> c
+  | _ -> assert false
+
+let command_from_string s = 
+  (* use top_proofmode if prover_mode = ProofMode *)
+  Parser.interactive Lexer.token (Lexing.from_string s)
+
+let exec_command s st : state  = 
+  let input = command_from_string s
+  in
+  do_command st (get_prover_command input)
