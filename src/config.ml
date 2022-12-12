@@ -60,9 +60,6 @@ let v_debug_completion = Param_bool false
 let s_debug_tactics = "debugTactics"
 let v_debug_tactics = Param_bool false
 
-let s_new_ind = "newInduction"
-let v_new_ind = Param_bool false
-
 let s_old_completion = "oldCompletion"
 let v_old_completion = Param_bool false
 
@@ -73,7 +70,6 @@ let default_params =
       decl s_debug_constr PBool v_debug_constr M.empty
   |>  decl s_debug_completion PBool v_debug_completion
   |>  decl s_debug_tactics PBool v_debug_tactics
-  |>  decl s_new_ind PBool v_new_ind
   |>  decl s_old_completion PBool v_old_completion
 
 (*------------------------------------------------------------------*)
@@ -96,8 +92,6 @@ let debug_constr     () = get_bool (M.find s_debug_constr !params)
 let debug_completion () = get_bool (M.find s_debug_completion !params)
 let debug_tactics    () = get_bool (M.find s_debug_tactics !params)
 
-(* FIXME seems to be used once for a test … *)
-let new_ind () = get_bool (M.find s_new_ind !params)
 
 (* FIXME seems to be used once for a test … *)
 let old_completion () = get_bool (M.find s_old_completion !params)

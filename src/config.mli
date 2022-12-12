@@ -33,9 +33,6 @@ val debug_completion : unit -> bool
 (** Debug information for tactics. *)
 val debug_tactics : unit -> bool
 
-(** New equivalence induction principle. *)
-val new_ind : unit -> bool
-
 (** Old congruence closure. *)
 val old_completion : unit -> bool
 

@@ -561,10 +561,10 @@ let induction Args.(Message (ts,_)) s =
 
 (* FIXME never used ! *)
 let old_or_new_induction args : etac =
-  if Config.new_ind () then
-    (EquivLT.induction_tac ~dependent:false) args
-  else
-    (fun s sk fk ->
+  (fun s sk fk ->
+     if TConfig.new_ind (LowEquivSequent.table s) then
+       (EquivLT.induction_tac ~dependent:false) args s sk fk
+     else
        match EquivLT.convert_args s args (Args.Sort Args.Message) with
        | Args.Arg (Args.Message (ts,ty)) ->
          if Type.equal ty Type.ttimestamp then
@@ -574,7 +574,7 @@ let old_or_new_induction args : etac =
            (* use the new induction principle over types different from timestamp. *)
            EquivLT.induction_tac ~dependent:false args s sk fk
        | _ -> hard_failure (Failure "ill-formed arguments")
-    )
+  )
 
 (*------------------------------------------------------------------*)
 let enrich _ty f _loc (s : ES.t) =
