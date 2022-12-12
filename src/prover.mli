@@ -24,6 +24,9 @@ type state
 (** Set the proof_state to its initial state. *)
 val init : unit -> state
 
+(** Execute a command : see @ProverLib.prover_input *)
+val do_command : state -> ProverLib.prover_input -> state
+
 (** add proof obligation *)
 val add_proof_obl : Goal.t -> state -> state
 
@@ -40,9 +43,6 @@ val set_table : state -> Symbols.table -> state
 
 (** Handler of parsed input *)
 val tactic_handle : state -> ProverLib.bulleted_tactic -> state
-
-(** return a copy of the current prover state. *)
-val copy : state -> state
 
 val is_proof_completed : state -> bool
 
@@ -71,6 +71,9 @@ val abort : state -> state
 
 (** Return first pending_proof. *)
 val first_goal : state -> ProverLib.pending_proof
+
+(** Manage print query *)
+val do_print : state -> ProverLib.print_query -> unit
 
 (* ↓ for html ↓ *)
 

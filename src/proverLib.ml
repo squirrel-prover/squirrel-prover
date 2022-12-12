@@ -81,21 +81,27 @@ type include_param = { th_name : Theory.lsymb;
 type bulleted_tactic =
   | Bullet of string
   | Brace of [`Open | `Close]
-  | Tactic of TacticsArgs.parser_arg Tactics.ast
+  | BTactic of TacticsArgs.parser_arg Tactics.ast
 
 type bulleted_tactics = bulleted_tactic list
 
 (* This should move somewhere else *)
-type parsed_input =
-  | ParsedInputDescr of Decl.declarations
-  | ParsedSetOption  of Config.p_set_param
-  | ParsedTactic of bulleted_tactics
-  | ParsedPrint   of print_query
-  | ParsedUndo    of int
-  | ParsedGoal    of Goal.Parsed.t Location.located
-  | ParsedInclude of include_param
-  | ParsedProof
-  | ParsedQed
-  | ParsedAbort
-  | ParsedHint of Hint.p_hint
+type toplevel_input =
+  | Undo    of int
+  | Include of include_param
   | EOF
+
+type prover_input = 
+  | InputDescr of Decl.declarations
+  | SetOption  of Config.p_set_param
+  | Tactic of bulleted_tactics
+  | Print   of print_query
+  | Goal    of Goal.Parsed.t Location.located
+  | Proof
+  | Qed
+  | Abort
+  | Hint of Hint.p_hint
+
+type input =
+  | Prover of prover_input
+  | Toplvl of toplevel_input

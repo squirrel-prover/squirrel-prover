@@ -12,7 +12,6 @@ sig
   val get_table : state -> Symbols.table
   val set_table : state -> Symbols.table -> state
   val tactic_handle : state -> ProverLib.bulleted_tactic -> state
-  val copy : state -> state
   val is_proof_completed : state -> bool
   val current_goal_name : state -> string option
   val pp_goal : state -> Format.formatter -> unit -> unit
@@ -24,6 +23,7 @@ sig
   val abort : state -> state
   val first_goal : state -> ProverLib.pending_proof
   val add_decls : state -> Decl.declarations -> state * Goal.t list
+  val do_print : state -> ProverLib.print_query -> unit
 end
 
 (** {2 Toplevel prover}
@@ -62,9 +62,6 @@ module Make (Prover : PROVER) :
 
     (** Abort the current proof *)
     val abort : state -> state
-
-    (** Return a copy of the record… *)
-    val copy : state -> state
 
     (** Return Toplevel.PROVER in init state *)
     val init : unit -> state

@@ -28,9 +28,6 @@ let init () : state =
   subgoals      = [];
 }
 
-let copy (ps:state) : state = 
-  { ps with goals = ps.goals }
-
 let get_table (ps:state) : Symbols.table =
   ps.table
 
@@ -233,7 +230,7 @@ let tactic_handle (ps:state) = function
  | ProverLib.Bullet bl    -> open_bullet ps bl
  | ProverLib.Brace `Open  -> open_brace ps
  | ProverLib.Brace `Close -> close_brace ps
- | ProverLib.Tactic utac  -> eval_tactic utac ps
+ | ProverLib.BTactic utac  -> eval_tactic utac ps
 (* }↑} *)
 (*--------------------- Printings         ------------------*)(* {↓{ *)
 let pp_goal (ps:state) ppf () = match ps.current_goal, ps.subgoals with
@@ -244,4 +241,46 @@ let pp_goal (ps:state) ppf () = match ps.current_goal, ps.subgoals with
       (List.length ps.subgoals)
       Goal.pp j
   | _ -> assert false
+
+let do_print (st:state) (q:ProverLib.print_query) : unit =
+    begin match q with
+    | Pr_statement l -> 
+        let lem = Lemma.find l (get_table st) in
+        Printer.prt `Default "%a" Lemma.pp lem
+    | Pr_system s_opt ->
+        let system = 
+          begin match s_opt with
+          | None   -> 
+            begin match get_current_system st with
+              | Some s -> s.set
+              | None -> Tactics.hard_failure 
+                          (Failure "no default system");
+            end
+          | Some s -> SystemExpr.Parse.parse 
+                        (get_table st) s
+          end
+        in
+        SystemExpr.print_system 
+          (get_table st) system;
+
+        if TConfig.print_trs_equations 
+            (get_table st)
+        then
+          Printer.prt `Result "@[<v>@;%a@;@]%!"
+            Completion.print_init_trs 
+              (get_table st)
+    end
   (* }↑} *)
+
+let do_command (state:state) (command:ProverLib.prover_input) : state =
+  match command with
+  | InputDescr decls -> let st,_ = add_decls state decls in st
+  | Tactic l         -> List.fold_left tactic_handle state l
+  | Print q          -> do_print state q; state
+  | Qed              -> complete_proof state
+  | Hint h           -> add_hint state h
+  | SetOption sp     -> set_param state sp
+  | Goal g           -> add_new_goal state g
+  | Proof            -> let _,st = start_proof state `Check in st
+  | Abort            -> abort state
+

@@ -91,8 +91,8 @@
 (* %type <Decl.declaration> declaration *)
 %type <Theory.term> top_formula
 %type <Process.process> top_process
-%type <ProverLib.parsed_input> interactive
-%type <ProverLib.parsed_input> top_proofmode
+%type <ProverLib.input> interactive
+%type <ProverLib.input> top_proofmode
 
 %%
 
@@ -1115,16 +1115,16 @@ pr_query:
 
 (*------------------------------------------------------------------*)
 interactive:
-| set=set_option     { ProverLib.ParsedSetOption set }
-| decls=declarations { ProverLib.ParsedInputDescr decls }
-| u=undo             { ProverLib.ParsedUndo u }
-| PRINT q=pr_query   { ProverLib.ParsedPrint q }
-| PROOF              { ProverLib.ParsedProof }
-| i=p_include        { ProverLib.ParsedInclude i }
-| QED                { ProverLib.ParsedQed }
-| g=goal             { ProverLib.ParsedGoal g }
-| h=hint             { ProverLib.ParsedHint h }
-| EOF                { ProverLib.EOF }
+| set=set_option     { ProverLib.Prover (SetOption set) }
+| decls=declarations { ProverLib.Prover (InputDescr decls) }
+| u=undo             { ProverLib.Toplvl (Undo u) }
+| PRINT q=pr_query   { ProverLib.Prover (Print q) }
+| PROOF              { ProverLib.Prover Proof }
+| i=p_include        { ProverLib.Toplvl (Include i) }
+| QED                { ProverLib.Prover Qed }
+| g=goal             { ProverLib.Prover (Goal g) }
+| h=hint             { ProverLib.Prover (Hint h) }
+| EOF                { ProverLib.Toplvl EOF }
 
 bullet:
 | MINUS              { "-" }
@@ -1140,13 +1140,13 @@ brace:
 bulleted_tactic:
 | bullet bulleted_tactic { (ProverLib.Bullet $1) :: $2 }
 | brace  bulleted_tactic { (ProverLib.Brace  $1) :: $2 }
-| tactic                 { [ ProverLib.Tactic $1 ] }
+| tactic                 { [ ProverLib.BTactic $1 ] }
 | DOT                    { [] }
 
 top_proofmode:
-| PRINT q=pr_query   { ProverLib.ParsedPrint q }
-| bulleted_tactic    { ProverLib.ParsedTactic $1 }
-| u=undo             { ProverLib.ParsedUndo u }
-| ABORT              { ProverLib.ParsedAbort }
-| QED                { ProverLib.ParsedQed }
-| EOF                { ProverLib.EOF }
+| PRINT q=pr_query   { ProverLib.Prover (Print q) }
+| bulleted_tactic    { ProverLib.Prover (Tactic $1) }
+| u=undo             { ProverLib.Toplvl (Undo u) }
+| ABORT              { ProverLib.Prover Abort }
+| QED                { ProverLib.Prover Qed }
+| EOF                { ProverLib.Toplvl EOF }

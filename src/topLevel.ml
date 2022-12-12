@@ -12,7 +12,6 @@ module type PROVER = sig
   val get_table : state -> Symbols.table
   val set_table : state -> Symbols.table -> state
   val tactic_handle : state -> ProverLib.bulleted_tactic -> state
-  val copy : state -> state
   val is_proof_completed : state -> bool
   val current_goal_name : state -> string option
   val pp_goal : state -> Format.formatter -> unit -> unit
@@ -24,6 +23,7 @@ module type PROVER = sig
   val abort : state -> state
   val first_goal : state -> ProverLib.pending_proof
   val add_decls : state -> Decl.declarations -> state * Goal.t list
+  val do_print : state -> ProverLib.print_query -> unit
 end
 
 module Make (Prover : PROVER) = struct
@@ -42,9 +42,6 @@ module Make (Prover : PROVER) = struct
   let abort (st:state) : state = 
     { st with prover_state = Prover.abort st.prover_state;
               prover_mode = GoalMode }
-
-  let copy (st:state) : state = 
-    { st with prover_state = Prover.copy st.prover_state }
 
   (* GoalMode is always the initial prover_mode *)
   let init () : state = 
@@ -121,33 +118,7 @@ module Make (Prover : PROVER) = struct
 
   let do_print (st:state) (q : ProverLib.print_query) 
     : unit =
-    begin match q with
-    | Pr_statement l -> 
-        let lem = Lemma.find l (Prover.get_table st.prover_state) in
-        Printer.prt `Default "%a" Lemma.pp lem
-    | Pr_system s_opt ->
-        let system = 
-          begin match s_opt with
-          | None   -> 
-            begin match Prover.get_current_system st.prover_state with
-              | Some s -> s.set
-              | None -> Tactics.hard_failure 
-                          (Failure "no default system");
-            end
-          | Some s -> SystemExpr.Parse.parse 
-                        (Prover.get_table st.prover_state) s
-          end
-        in
-        SystemExpr.print_system 
-          (Prover.get_table st.prover_state) system;
-
-        if TConfig.print_trs_equations 
-            (Prover.get_table st.prover_state)
-        then
-          Printer.prt `Result "@[<v>@;%a@;@]%!"
-            Completion.print_init_trs 
-              (Prover.get_table st.prover_state)
-    end
+    Prover.do_print st.prover_state q
   (* }↑} *)
 
   (*---------------- Options handling -- FIXME ---------------*)(* {↓{ *)

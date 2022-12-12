@@ -243,7 +243,7 @@ exception Unfinished
 
 (** Get the next input from the current file. Driver *)
 let next_input ~test (state : driver_state) :
-ProverLib.parsed_input =
+ProverLib.input =
   let filename, lexbuf = get_lexbuf state in
   Parserbuf.parse_from_buf
     ~test ~interactive:!interactive
@@ -289,8 +289,10 @@ let do_tactic (state : driver_state) (l:ProverLib.bulleted_tactics) : driver_sta
   if not !interactive then 
   begin
     let lnum = state.file.f_lexbuf.lex_curr_p.pos_lnum in
-    match List.filter_map 
-            (function ProverLib.Tactic t -> Some t | _ -> None) l with
+    let b_tacs = List.filter_map 
+      (function ProverLib.BTactic t -> Some t | _ -> None) l
+    in
+    match b_tacs with
       | [utac] ->
           Printer.prt `Prompt "Line %d: %a" lnum ProverTactics.pp_ast utac
       | _ ->
@@ -300,7 +302,7 @@ let do_tactic (state : driver_state) (l:ProverLib.bulleted_tactics) : driver_sta
   match state.check_mode with
   | `NoCheck -> state
   | `Check   ->
-    let saved_ps = ToplevelProver.copy state.toplvl_state in
+    let saved_ps = state.toplvl_state in
     let toplvl_state = 
       begin 
         try List.fold_left 
@@ -403,45 +405,45 @@ let rec do_include
 and do_command
     ~(test : bool)
     (state : driver_state)
-    (command : ProverLib.parsed_input) : driver_state
+    (command : ProverLib.input) : driver_state
   =
   match state.toplvl_state.prover_mode, command with
                           (* ↓ touch toplvl_state and history_state ↓ *)
-    | _, ParsedUndo nb_undo            -> do_undo state nb_undo
+    | _, Toplvl Undo nb_undo            -> do_undo state nb_undo
                                        (* ↓ touch only toplvl_state ↓ *)
-    | GoalMode, ParsedInputDescr decls -> do_decls state decls
+    | GoalMode, Prover InputDescr decls -> do_decls state decls
                                        (* ↓ touch only toplvl_state ↓ *)
-    | _,        ParsedTactic l         -> do_tactic state l
+    | _,        Prover Tactic l         -> do_tactic state l
                                             (* ↓ do not touch state ↓ *)
-    | _,        ParsedPrint q          -> do_print state q
+    | _,        Prover Print q          -> do_print state q
                                        (* ↓ touch only toplvl_state ↓ *)
-    | WaitQed,  ParsedQed              -> do_qed state
+    | WaitQed,  Prover Qed              -> do_qed state
                                    (* ↓ touch only the table in p_s ↓ *)
-    | GoalMode, ParsedHint h           -> do_add_hint state h
+    | GoalMode, Prover Hint h           -> do_add_hint state h
                         (* ↓ touch only Config params that are refs ↓ *)
-    | GoalMode, ParsedSetOption sp     -> do_set_option state sp
+    | GoalMode, Prover SetOption sp     -> do_set_option state sp
                                        (* ↓ touch only toplvl_state ↓ *)
-    | GoalMode, ParsedGoal g           -> do_add_goal state g
+    | GoalMode, Prover Goal g           -> do_add_goal state g
                                        (* ↓ touch only toplvl_state ↓ *)
-    | GoalMode, ParsedProof            -> do_start_proof state
+    | GoalMode, Prover Proof            -> do_start_proof state
                               (* ↓ seems to touch only toplvl_state ↓ *)
-    | GoalMode, ParsedInclude inc      -> do_include ~test state inc
+    | GoalMode, Toplvl Include inc      -> do_include ~test state inc
                                   (* ↓ touch only toplvl_state mode ↓ *)
-    | GoalMode, EOF                    -> do_eof state
+    | GoalMode, Toplvl EOF              -> do_eof state
 
-    | WaitQed, ParsedAbort ->
+    | WaitQed, Prover Abort ->
       if test then
         raise (Failure "Trying to abort a completed proof.");
       Command.cmd_error AbortIncompleteProof
 
                                       (* ↓ touch only toplvl_state ↓ *)
-    | ProofMode, ParsedAbort ->
+    | ProofMode, Prover Abort ->
       Printer.prt `Result
         "Exiting proof mode and aborting current proof.@.";
       { state with toplvl_state = 
           ToplevelProver.abort state.toplvl_state }
 
-    | _, ParsedQed ->
+    | _, Prover Qed ->
       if test then raise Unfinished;
       Command.cmd_error Unexpected_command
 
@@ -451,7 +453,7 @@ and do_command
 (** Do all command from a file until EOF is reached *)
 and do_all_commands ~(test : bool) (state : driver_state) : driver_state =
   match next_input ~test state with
-  | EOF -> state
+  | ProverLib.Toplvl EOF -> state
   | cmd -> do_all_commands ~test (do_command ~test state cmd)
 
 
