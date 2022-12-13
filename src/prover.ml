@@ -18,18 +18,27 @@ type state = {
   current_goal : ProverLib.pending_proof option;
   subgoals     : Goal.t list;
   bullets      : Bullets.path;
+  prover_mode  : ProverLib.prover_mode;
 }
 
+(* GoalMode is always the initial prover_mode *)
 let init () : state = 
 { goals         = [];
   table         = TConfig.reset_params Symbols.builtins_table;
   current_goal  = None;
   bullets       = Bullets.empty_path;
   subgoals      = [];
+  prover_mode   = GoalMode;
 }
 
 let get_table (ps:state) : Symbols.table =
   ps.table
+
+let get_mode (ps:state) : ProverLib.prover_mode =
+  ps.prover_mode
+
+let get_subgoals (ps:state) : Goal.t list =
+  ps.subgoals
 
 let set_table (ps:state) (table: Symbols.table) : state =
   { ps with table }
@@ -50,11 +59,18 @@ let add_hint (ps:state) (h: Hint.p_hint) : state =
 let abort (ps:state) : state = 
   { ps with current_goal  = None; 
             bullets       = Bullets.empty_path;
-            subgoals      = []
+            subgoals      = [];
+            prover_mode   = GoalMode;
   }
 
 let is_proof_completed (ps:state) : bool =
   ps.subgoals = [] && Bullets.is_empty ps.bullets
+
+let try_complete_proof (ps:state) : state =
+  if is_proof_completed ps then
+    { ps with prover_mode = WaitQed }
+  else
+    { ps with prover_mode = ProofMode}
 
 let complete_proof (ps:state) : state = 
   assert (is_proof_completed ps);
@@ -70,7 +86,9 @@ let complete_proof (ps:state) : state =
   { ps with current_goal = None;
             bullets = Bullets.empty_path;
             subgoals = [];
-            table = table }
+            table = table;
+            prover_mode = GoalMode
+  }
 
 let start_proof (ps:state) (check : [`NoCheck | `Check])
   : (string option * state) = 
@@ -84,15 +102,15 @@ let start_proof (ps:state) (check : [`NoCheck | `Check])
       | ProofObl goal
       | UnprovedLemma (_,goal) -> goal
     in
-
     let current_goal = Some pending_proof in
-    let subgoals, bullets = begin 
-      match check with
-      | `Check -> [goal], Bullets.initial_path
-      | `NoCheck -> [], Bullets.empty_path
-    end in
-    (None, { ps with goals; subgoals; bullets; current_goal })
 
+    let subgoals, bullets, mode = begin 
+      match check with
+      | `Check -> [goal], Bullets.initial_path, ProverLib.ProofMode
+      | `NoCheck -> [], Bullets.empty_path, ProverLib.WaitQed
+    end in
+      (None, { ps with goals; subgoals; bullets; current_goal;
+                            prover_mode = mode })
   | Some _,_ ->
     (Some "Cannot start a new proof (current proof is not done).",
      ps)
@@ -150,7 +168,8 @@ let add_decls (st:state) (decls : Decl.declarations)
       (get_table st) decls in
   let ps : state = List.fold_left (fun ps goal ->
       add_proof_obl goal ps) st proof_obls in
-  set_table ps table, proof_obls
+  let ps = set_table ps table in
+  { ps with prover_mode = GoalMode }, proof_obls
 
 let get_first_subgoal (ps:state) : Goal.t =
   match ps.current_goal, ps.subgoals with
@@ -272,6 +291,9 @@ let do_print (st:state) (q:ProverLib.print_query) : unit =
     end
   (* }↑} *)
 
+let do_eof (st:state) : state = 
+    { st with prover_mode = AllDone }
+
 let do_command (state:state) (command:ProverLib.prover_input) : state =
   match command with
   | InputDescr decls -> let st,_ = add_decls state decls in st
@@ -288,11 +310,13 @@ let get_prover_command = function
   | ProverLib.Prover c -> c
   | _ -> assert false
 
-let command_from_string s = 
-  (* use top_proofmode if prover_mode = ProofMode *)
-  Parser.interactive Lexer.token (Lexing.from_string s)
+let command_from_string (st:state) (s:string) = 
+  if st.prover_mode = ProverLib.ProofMode 
+  then
+    Parser.top_proofmode Lexer.token (Lexing.from_string s)
+  else
+    Parser.interactive Lexer.token (Lexing.from_string s)
 
 let exec_command s st : state  = 
-  let input = command_from_string s
-  in
+  let input = command_from_string st s in
   do_command st (get_prover_command input)

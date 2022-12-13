@@ -10,6 +10,7 @@ module type PROVER = sig
   val add_proof_obl : Goal.t -> state -> state
   val get_current_system : state -> SystemExpr.context option
   val get_table : state -> Symbols.table
+  val get_mode : state -> ProverLib.prover_mode
   val set_table : state -> Symbols.table -> state
   val tactic_handle : state -> ProverLib.bulleted_tactic -> state
   val is_proof_completed : state -> bool
@@ -24,6 +25,8 @@ module type PROVER = sig
   val first_goal : state -> ProverLib.pending_proof
   val add_decls : state -> Decl.declarations -> state * Goal.t list
   val do_print : state -> ProverLib.print_query -> unit
+  val try_complete_proof : state -> state
+  val do_eof : state -> state
 end
 
 module Make (Prover : PROVER) = struct
@@ -33,56 +36,50 @@ module Make (Prover : PROVER) = struct
     prover_state : Prover.state; (* prover state *)
     params       : Config.params; (* save global params… *)
     option_defs  : ProverLib.option_def list; (* save global option_def *)
-    prover_mode  : ProverLib.prover_mode;
   }
 
   let pp_goal (st:state) (fmt:Format.formatter) () : unit =
     Prover.pp_goal st.prover_state fmt ()
 
   let abort (st:state) : state = 
-    { st with prover_state = Prover.abort st.prover_state;
-              prover_mode = GoalMode }
+    { st with prover_state = Prover.abort st.prover_state;}
 
-  (* GoalMode is always the initial prover_mode *)
   let init () : state = 
     let _ = Config.reset_params () in 
     { prover_state= Prover.init ();
       params      = Config.get_params ();
       option_defs = [];
-      prover_mode = GoalMode
     }
 
   let try_complete_proof (st:state) : state = 
     if Prover.is_proof_completed st.prover_state then 
     begin
       Printer.prt `Goal "Goal %s is proved"
-        (Utils.oget (Prover.current_goal_name st.prover_state));
-      { st with prover_mode = WaitQed}
+        (Utils.oget (Prover.current_goal_name st.prover_state))
     end else begin
-      Printer.pr "%a" (Prover.pp_goal st.prover_state) ();
-      { st with prover_mode = ProofMode}
-    end
+      Printer.pr "%a" (Prover.pp_goal st.prover_state) ()
+    end;
+    { st with prover_state = Prover.try_complete_proof
+                      st.prover_state}
 
   let tactic_handle (st:state) l = 
-    { st with prover_state = Prover.tactic_handle st.prover_state l }
+    { st with prover_state = 
+                Prover.tactic_handle st.prover_state l }
 
-  let get_table (st:state) : Symbols.table = Prover.get_table st.prover_state
+  let get_table (st:state) : Symbols.table = 
+    Prover.get_table st.prover_state
 
   (*---------------- do_* commands handling ------------------*)(* {↓{ *)
   (* Since prover_mode is handled by the toplevel this has to be done
-   * here *)
+   * here FIXME not anymore ! *)
   let do_eof (st: state) : state = 
-    { st with prover_mode = AllDone }
+    { st with prover_state = Prover.do_eof st.prover_state}
 
   let do_start_proof (st: state) (mode: [`Check | `NoCheck]) : state =
     match Prover.start_proof st.prover_state mode with
     | None, ps ->
       Printer.pr "%a" (Prover.pp_goal ps) ();
-      let mode = match mode with
-        | `NoCheck -> ProverLib.WaitQed 
-        | `Check   -> ProverLib.ProofMode
-      in
-      { st with prover_state = ps; prover_mode = mode }
+      { st with prover_state = ps }
     | Some es, _ -> Command.cmd_error (StartProofError es)
 
   let do_add_goal (st:state) (g:Goal.Parsed.t Location.located) :
@@ -106,7 +103,7 @@ module Make (Prover : PROVER) = struct
   let do_qed (st : state) : state =
     let prover_state = Prover.complete_proof st.prover_state in
     Printer.prt `Result "Exiting proof mode.@.";
-    { st with prover_state; prover_mode = GoalMode }
+    { st with prover_state; }
 
   let do_decls (st:state) (decls : Decl.declarations) : state =
     let new_prover_state, proof_obls = 
@@ -114,7 +111,7 @@ module Make (Prover : PROVER) = struct
     if proof_obls <> [] then
       Printer.pr "@[<v 2>proof obligations:@;%a@]"
         (Fmt.list ~sep:Fmt.cut Goal.pp_init) proof_obls;
-    { st with prover_mode = GoalMode; prover_state = new_prover_state; }
+    { st with prover_state = new_prover_state; }
 
   let do_print (st:state) (q : ProverLib.print_query) 
     : unit =
@@ -155,5 +152,8 @@ module Make (Prover : PROVER) = struct
 
   let set_option_defs (st:state) (optdefs:ProverLib.option_def list) : state =
     { st with option_defs = optdefs }
+
+  let get_mode (st:state) : ProverLib.prover_mode = 
+    Prover.get_mode st.prover_state
 end
 (* }↑} *)

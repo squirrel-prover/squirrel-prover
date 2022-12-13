@@ -38,8 +38,14 @@ val add_decls : state -> Decl.declarations -> state * Goal.t list
 
 val get_current_system : state -> SystemExpr.context option
 
-(** Return the the table of given state *)
+(** Return the table of given state *)
 val get_table : state -> Symbols.table
+
+(** Return the subgoals of given state *)
+val get_subgoals : state -> Goal.t list
+
+(** Return the prover_mode *)
+val get_mode : state -> ProverLib.prover_mode
 
 (** Set the table of given state *)
 val set_table : state -> Symbols.table -> state
@@ -48,6 +54,13 @@ val set_table : state -> Symbols.table -> state
 val tactic_handle : state -> ProverLib.bulleted_tactic -> state
 
 val is_proof_completed : state -> bool
+
+(** If current proof is completed change prover_mode and 
+* printout informations *)
+val try_complete_proof : state -> state
+
+(** Only switch prover_mode to AllDone → to finish program *)
+val do_eof : state -> state
 
 (** Return the name of the goal currently being proved, if any. *)
 val current_goal_name : state -> string option

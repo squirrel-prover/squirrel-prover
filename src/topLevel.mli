@@ -10,6 +10,7 @@ sig
   val add_proof_obl : Goal.t -> state -> state
   val get_current_system : state -> SystemExpr.context option
   val get_table : state -> Symbols.table
+  val get_mode : state -> ProverLib.prover_mode
   val set_table : state -> Symbols.table -> state
   val tactic_handle : state -> ProverLib.bulleted_tactic -> state
   val is_proof_completed : state -> bool
@@ -24,6 +25,8 @@ sig
   val first_goal : state -> ProverLib.pending_proof
   val add_decls : state -> Decl.declarations -> state * Goal.t list
   val do_print : state -> ProverLib.print_query -> unit
+  val try_complete_proof : state -> state
+  val do_eof : state -> state
 end
 
 (** {2 Toplevel prover}
@@ -54,7 +57,6 @@ module Make (Prover : PROVER) :
       prover_state : Prover.state; (* prover state *)
       params       : Config.params; (* save global params… *)
       option_defs  : ProverLib.option_def list; (* save global option_def *)
-      prover_mode  : ProverLib.prover_mode;
     }
 
     (** Print goal *)
@@ -114,4 +116,7 @@ module Make (Prover : PROVER) :
 
     (** Saves option_defs *)
     val set_option_defs : state -> ProverLib.option_def list -> state
+
+    (** Get prover mode *)
+    val get_mode : state -> ProverLib.prover_mode
   end

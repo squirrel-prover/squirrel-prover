@@ -247,7 +247,7 @@ ProverLib.input =
   let filename, lexbuf = get_lexbuf state in
   Parserbuf.parse_from_buf
     ~test ~interactive:!interactive
-    (if state.toplvl_state.prover_mode = ProverLib.ProofMode then
+    (if ToplevelProver.get_mode state.toplvl_state = ProverLib.ProofMode then
        Parser.top_proofmode
      else
        Parser.interactive)
@@ -257,7 +257,7 @@ ProverLib.input =
 let do_undo (state : driver_state) (nb_undo : int) : driver_state =
   let history_state, toplvl_state =
   HistoryTP.reset_state state.history_state nb_undo in
-  let () = match toplvl_state.prover_mode with
+  let () = match ToplevelProver.get_mode state.toplvl_state with
     | ProofMode -> Printer.pr "%a" (ToplevelProver.pp_goal
                      toplvl_state) ()
     | GoalMode -> Printer.pr "%a" Action.pp_actions
@@ -280,9 +280,9 @@ let do_print (state : driver_state) (q : ProverLib.print_query)
 (*----------Part can be done here and tactic handling in Prover ----*)
 let do_tactic (state : driver_state) (l:ProverLib.bulleted_tactics) : driver_state =
   begin match state.check_mode with
-    | `NoCheck -> assert (state.toplvl_state.prover_mode = WaitQed)
+    | `NoCheck -> assert (ToplevelProver.get_mode state.toplvl_state = WaitQed)
     | `Check   -> 
-      if state.toplvl_state.prover_mode <> ProverLib.ProofMode then
+      if ToplevelProver.get_mode state.toplvl_state <> ProverLib.ProofMode then
         Command.cmd_error Unexpected_command;
   end;
 
@@ -407,7 +407,7 @@ and do_command
     (state : driver_state)
     (command : ProverLib.input) : driver_state
   =
-  match state.toplvl_state.prover_mode, command with
+  match ToplevelProver.get_mode state.toplvl_state, command with
                           (* ↓ touch toplvl_state and history_state ↓ *)
     | _, Toplvl Undo nb_undo            -> do_undo state nb_undo
                                        (* ↓ touch only toplvl_state ↓ *)
@@ -483,7 +483,7 @@ let rec main_loop ~test ?(save=true) (state : driver_state) =
     let new_state = do_command ~test state cmd
     in
     Server.update new_state.toplvl_state.prover_state;
-    new_state, new_state.toplvl_state.prover_mode
+    new_state, ToplevelProver.get_mode new_state.toplvl_state
   with
   (* exit prover *)
   | _, AllDone -> Printer.pr "Goodbye!@." ;
