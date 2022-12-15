@@ -1,5 +1,3 @@
-
-
 channel c
 
 system A : !_i new a; !_j new b; out(c,b).

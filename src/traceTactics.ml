@@ -339,27 +339,7 @@ let constraints (s : TS.t) =
   match simpl_left s with
   | None -> true
   | Some s ->
-    let conclusions =
-      Utils.odflt [] (Term.Lit.disjunction_to_literals (TS.goal s))
-    in
-    let trace_conclusions =
-      List.fold_left (fun acc conc -> 
-          let keep = match conc with 
-            | _, Term.Lit.Happens _ -> true
-            | _, Term.Lit.Comp (_, t, _) ->
-              Term.ty t = Type.Timestamp || Term.ty t = Type.Index
-            | _, Term.Lit.Atom _ -> false
-          in
-          if keep then
-            Term.Lit.lit_to_form (Term.Lit.neg conc) :: acc
-          else 
-            acc
-        ) [] conclusions
-    in
-    let s = List.fold_left (fun s f ->
-        Hyps.add Args.Unnamed f s
-      ) s trace_conclusions
-    in
+    let s = Hyps.add Args.Unnamed (Term.mk_not (TS.goal s)) (TS.set_goal Term.mk_false s) in
     TS.constraints_valid s
 
 (** [constraints s] proves the sequent using its trace formulas. *)

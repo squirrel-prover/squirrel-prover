@@ -122,7 +122,7 @@ type sequents = sequent list
 
 (*------------------------------------------------------------------*)
 let get_all_messages (s : sequent) =
-  let atoms = Hyps.get_message_atoms s.hyps in
+  let atoms = List.map snd (Hyps.get_atoms_of_hyps s.hyps) in
   let atoms =
     match Term.Lit.form_to_xatom s.conclusion with
       | Some at -> at :: atoms

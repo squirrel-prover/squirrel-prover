@@ -136,8 +136,6 @@ reasoning. *)
 
 include Basic.
 
-set oldCompletion=true.
-
 goal [any] dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
 Proof. auto. Qed.
 hint rewrite dec_enc.

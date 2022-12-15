@@ -367,6 +367,9 @@ let get_eq_atoms (hyps : TraceHyps.hyps) : Term.Lit.xatom list =
     | `Neg, (Comp (`Eq,  t1, t2)) -> Some (Comp (`Neq, t1, t2))
     | `Neg, (Comp (`Neq, t1, t2)) -> Some (Comp (`Eq,  t1, t2))
 
+    | `Pos, Atom f -> Some (Comp (`Eq,  f, Term.mk_true))
+    | `Neg, Atom f -> Some (Comp (`Neq, f, Term.mk_true))
+                        
     | _ -> None
   in
   List.filter_map do1 (get_atoms_of_hyps hyps)

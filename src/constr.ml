@@ -171,7 +171,7 @@ end
 
 open Utv
 
-let pp_uvar = Vars.pp
+let pp_uvar = Vars.pp_dbg
 
 let rec pp_ut_cnt ppf = function
   | UVar uv  -> pp_uvar ppf uv
@@ -287,11 +287,8 @@ module Form = struct
     in
 
     (* Get a normalized trace literal. *)
-    let rec doit (lit : Term.Lit.literal) : form list =
+    let rec doit (lit : Term.Lit.literal) : form list =     
       match lit with
-      | `Pos, Atom f -> doit (`Pos, Comp (`Eq,  f, Term.mk_true))
-      | `Neg, Atom f -> doit (`Pos, Comp (`Neq, f, Term.mk_true))
-        
       | `Neg, Happens t -> [Lit (`Eq,  term_to_ut memo t, uundef)]
       | `Pos, Happens t -> [Lit (`Neq, term_to_ut memo t, uundef)]
 
@@ -324,6 +321,45 @@ module Form = struct
 
       (* Type.Index *)
       | `Neg, Comp ((`Leq|`Lt|`Geq|`Gt), _, _) -> raise Unsupported
+
+      (* If we have an arbitrary atom, try to open-it up as a disjunction or 
+         conjunction etc.  *)
+      | `Pos, Atom f ->
+        if Term.is_and f then
+          let forms = Term.decompose_ands f in
+          [conj (List.map doit_form forms)]
+        else if Term.is_or f then
+          let forms = Term.decompose_ors f in
+          [disj (List.map doit_form forms)]
+        else if Term.is_impl f then
+          let f1, f2 = oget (Term.destr_impl f) in
+          [disj [doit_form (Term.mk_not f1); doit_form f2]]
+        else if Term.is_not f then
+          doit (`Neg, Atom (oget (Term.destr_not f)))
+        else
+          doit (`Pos, Comp (`Eq,  f, Term.mk_true))
+
+      (* Idem as in [`Pos, Atom f], negating everything. *)
+      | `Neg, Atom f ->
+        if Term.is_and f then
+          let forms = Term.decompose_ands f in
+          [disj (List.map (fun f -> doit_form (Term.mk_not f)) forms)]
+        else if Term.is_or f then
+          let forms = Term.decompose_ors f in
+          [conj (List.map (fun f -> doit_form (Term.mk_not f)) forms)]
+        else if Term.is_impl f then
+          let f1, f2 = oget (Term.destr_impl f) in
+          [conj [doit_form f1; doit_form (Term.mk_not f2)]]
+        else if Term.is_not f then
+          doit (`Pos, Atom (oget (Term.destr_not f)))
+        else 
+          doit (`Neg, Comp (`Eq,  f, Term.mk_true))
+
+    and doit_form (f : Term.term) : form =
+      conj
+        (match Term.Lit.form_to_literals f with
+         | `Equiv l | `Entails l -> List.concat (List.map doit l)
+        ) 
     in
     doit lit
 
@@ -335,7 +371,11 @@ module Form = struct
         ) l
     in
     List.concat_map (fun t ->       
-        try mk memo t with Unsupported -> []
+        try mk memo t with
+        | Unsupported ->
+          dbg "@[<v 2>Dropping unsupported literal:@, @[%a@]@]"
+            Term.Lit.pp t;
+          []
       ) l
 end
 
@@ -1501,20 +1541,20 @@ open Term.Lit
        
 let env = ref Vars.empty_env
   
-let mk_var_i v : Vars.var =
-  let env', v = Vars.make `Approx !env Index v in
+let mk_var ty v : Vars.var =
+  let env', v = Vars.make `Approx !env ty v in
   env := env';
   v
 
-let mk_var v : Term.term = Term.mk_var (mk_var_i v)
+let mk_var_term ty v : Term.term = Term.mk_var (mk_var ty v)
 
-let tau   = mk_var "tau"
-and tau'  = mk_var "tau"
-and tau'' = mk_var "tau"
-and tau3  = mk_var "tau"
-and tau4  = mk_var "tau"
-and i     = mk_var "i"
-and i'    = mk_var "i"
+let tau   = mk_var_term Type.ttimestamp "tau"
+and tau'  = mk_var_term Type.ttimestamp "tau"
+and tau'' = mk_var_term Type.ttimestamp "tau"
+and tau3  = mk_var_term Type.ttimestamp "tau"
+and tau4  = mk_var_term Type.ttimestamp "tau"
+and i     = mk_var_term Type.tindex "i"
+and i'    = mk_var_term Type.tindex "i"
 
 let _, a = Symbols.Action.declare Symbols.builtins_table (L.mk_loc L._dummy "a") 1
 
@@ -1555,7 +1595,9 @@ let () =
   let exception Sat in
   let test = function
     | [] -> raise Unsat
-    | _ -> raise Sat in
+    | _ -> raise Sat
+  in
+  
   let mk (l : Term.Lit.xatom list) =
     List.map (fun x -> lit_to_form (`Pos, x)) l
   in
@@ -1615,5 +1657,17 @@ let () =
            Alcotest.check_raises ("graph(unsat) " ^ string_of_int i) Unsat
              (fun () -> test (snd @@ models_conjunct
                                TConfig.vint_timeout (mk pb))))
-         failures;)
+         failures;);
+
+    ("Complex queries", `Quick,
+     fun () ->
+       let open Term in
+       let problems = [
+         [mk_not (mk_impl (mk_ands [mk_happens tau; mk_eq tau tau']) (mk_leq tau' tau))]
+       ] in
+       List.iteri (fun i pb ->       
+           Alcotest.check_raises ("complex query " ^ string_of_int i) Unsat
+             (fun () -> test (snd @@ models_conjunct TConfig.vint_timeout pb))
+         ) problems
+    );
   ]

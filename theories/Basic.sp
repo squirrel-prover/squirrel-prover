@@ -142,8 +142,6 @@ hint rewrite or_true_r.
 goal [any] impl_charac (b,b' : boolean) : (b => b') = ((not b) || b').
 Proof. 
   rewrite eq_iff; split; case b; case b' => //=. 
-  intro ? ? H1. 
-  by apply H1.
 Qed.
 
 goal [any] impl_false_l (b : boolean) : (false => b) = true.

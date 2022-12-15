@@ -238,8 +238,6 @@ Qed.
 
 include Basic.
 
-set oldCompletion=true.
-
 goal [any]  dec_enc (x,y,z:message) : dec(enc(x,z,y),y) = x.
 Proof. auto. Qed.
 hint rewrite dec_enc.
@@ -333,13 +331,8 @@ Proof.
           * (* case H1 - 1/2 *)
             case H3 => //.
             by left; apply orderTrans _ (SCtr(pid)@pred(t)) _.
-            (* case H1 - 2/2 *)
-           left.
-           by rewrite -H3 in H1.
-         * case H3 => //=.
-           left.
-           by rewrite H1 in H3.
-           by right.
+
+         * by case H3.
 
       - executable t => // H1.
         by apply H1.

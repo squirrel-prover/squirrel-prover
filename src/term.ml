@@ -1428,7 +1428,8 @@ module Lit = struct
       if Config.old_completion () then
         None
       else
-        Some (Comp (`Eq, form, mk_true))
+        Some (Atom form)
+        (* Some (Comp (`Eq, form, mk_true)) *)
 
   let rec form_to_literal (form : term) : literal option =
     match form with

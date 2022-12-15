@@ -134,7 +134,7 @@ module Lit : sig
   type xatom = 
     | Comp    of (ord,term) _atom
     | Happens of term
-    | Atom    of term
+    | Atom    of term           (* arbitrary atom, of type [Type.tboolean] *)
 
   type literal = [`Neg | `Pos] * xatom
 

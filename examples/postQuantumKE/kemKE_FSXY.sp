@@ -85,7 +85,6 @@ set postQuantumSound = true.
 
 include Basic.
 set autoIntro=true.
-set oldCompletion = true.
 
 hash F
 
@@ -632,6 +631,7 @@ axiom  [idealized/left,idealized/left]  len_xor (x1,x2:message) : len(x1) = len(
 (*** Strong Secrecy of the responder key ***)
 (*******************************************)
 
+set oldCompletion = true.
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
 global goal [idealized/left,idealized/left] resp_key (i,j,k:index):
