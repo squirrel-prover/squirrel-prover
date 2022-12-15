@@ -21,6 +21,8 @@ type option_val =
 
 type option_def = option_name * option_val
 
+val reset_option_defs : unit -> unit
+
 exception Option_already_defined
 
 val get_option : option_name -> option_val option

@@ -23,6 +23,8 @@ type option_def = option_name * option_val
 
 let option_defs : option_def list ref = ref []
 
+let reset_option_defs () = option_defs := []
+
 (*------------------------------------------------------------------*)
 (** Options Management **)
 

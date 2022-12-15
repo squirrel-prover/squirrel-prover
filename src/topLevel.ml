@@ -46,6 +46,7 @@ module Make (Prover : PROVER) = struct
 
   let init () : state = 
     let _ = Config.reset_params () in 
+    let _ = ProverLib.reset_option_defs () in
     { prover_state= Prover.init ();
       params      = Config.get_params ();
       option_defs = [];
