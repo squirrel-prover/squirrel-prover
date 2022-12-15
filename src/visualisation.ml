@@ -17,11 +17,11 @@
 (** Get the non-repeating list of timestamps appearing in hypotheses of sequent
     [j], plus init. *)
 let get_timstamps (j : LowTraceSequent.t) : Term.terms =
-  let load (set : Term.St.t) (lit : Term.literal) =
-    match Term.ty_lit lit, lit with
-    | Type.Timestamp, (_, `Comp(_, ts1, ts2)) ->
+  let load (set : Term.St.t) (lit : Term.Lit.literal) =
+    match Term.Lit.ty lit, lit with
+    | Type.Timestamp, (_, Comp(_, ts1, ts2)) ->
         (Term.St.add ts1) @@ (Term.St.add ts2) @@ set
-    | Type.Timestamp, (_, `Happens(ts)) ->
+    | Type.Timestamp, (_, Happens(ts)) ->
         Term.St.add ts set
     | _, _ -> set
   in
@@ -90,7 +90,7 @@ let build_dependence models (l : Term.terms) : dependence =
   let dep = List.fold_left 
     (fun dep1 t1 -> List.fold_left 
       (fun dep2 t2 ->
-        let query = [(`Pos,`Comp(`Leq, t1, t2))] in
+        let query = [(`Pos,Term.Lit.Comp(`Leq, t1, t2))] in
         if t1 <> t2 && Constr.query ~precise:true models query then
           add_edge t1 t2 dep2
         else

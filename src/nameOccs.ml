@@ -338,7 +338,7 @@ let expand_macro_check_once ((ot, c):expand_info) (t:term) : term option =
       | EI_direct ->
         begin
           match c.models with
-          | Some m -> Constr.query ~precise:true m [`Pos, `Happens ts]
+          | Some m -> Constr.query ~precise:true m [`Pos, Happens ts]
           | None -> false
         end
       | EI_indirect _ -> true

@@ -3,7 +3,7 @@ val literals_unsat :
   Symbols.table ->
   SystemExpr.fset ->
   Vars.var list ->
-  Term.xatom list ->
-  Term.literals ->
+  Term.Lit.xatom list ->
+  Term.Lit.literals ->
   Term.term list ->
   bool

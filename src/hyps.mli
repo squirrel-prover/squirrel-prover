@@ -123,7 +123,7 @@ module Mk (Hyp : Hyp) : S with type hyp = Hyp.t
 
 module TraceHyps : S with type hyp = Equiv.any_form
 
-val get_atoms_of_hyps  : TraceHyps.hyps -> Term.literals 
-val get_message_atoms  : TraceHyps.hyps -> Term.xatom list 
-val get_trace_literals : TraceHyps.hyps -> Term.literals 
-val get_eq_atoms       : TraceHyps.hyps -> Term.xatom list 
+val get_atoms_of_hyps  : TraceHyps.hyps -> Term.Lit.literals 
+val get_message_atoms  : TraceHyps.hyps -> Term.Lit.xatom list 
+val get_trace_literals : TraceHyps.hyps -> Term.Lit.literals 
+val get_eq_atoms       : TraceHyps.hyps -> Term.Lit.xatom list 

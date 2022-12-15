@@ -913,14 +913,6 @@ let subst_projs (s : (proj * proj) list) (t : term) : term =
 let _pp_indices ~dbg ppf l =
   if l <> [] then Fmt.pf ppf "(%a)" (Vars._pp_list ~dbg) l
 
-let pp_ord ppf = function
-  | `Eq -> Fmt.pf ppf "="
-  | `Neq -> Fmt.pf ppf "<>"
-  | `Leq -> Fmt.pf ppf "<="
-  | `Geq -> Fmt.pf ppf ">="
-  | `Lt -> Fmt.pf ppf "<"
-  | `Gt -> Fmt.pf ppf ">"
-
 let rec is_and_happens = function
   | Fun (f, _, [_]) when f = f_happens -> true
   | _ as f ->  match destr_and f with
@@ -1362,98 +1354,139 @@ let ty ?ty_env (t : term) : Type.ty =
 (*------------------------------------------------------------------*)
 (** Literals. *)
 
-type ord    = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
-type ord_eq = [ `Eq | `Neq ]
+module Lit = struct
+  type ord    = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
+  type ord_eq = [ `Eq | `Neq ]
 
-type ('a,'b) _atom = 'a * 'b * 'b
+  type ('a,'b) _atom = 'a * 'b * 'b
 
-type xatom = [
-  | `Comp    of (ord,term) _atom
-  | `Happens of term
-]
+  type xatom = 
+    | Comp    of (ord,term) _atom
+    | Happens of term
+    | Atom    of term
 
-type literal = [`Neg | `Pos] * xatom
+  type literal = [`Neg | `Pos] * xatom
 
-type literals = literal list
+  type literals = literal list
 
-let pp_xatom ppf = function
-  | `Comp (o,tl,tr) ->
-    Fmt.pf ppf "@[%a %a@ %a@]" pp tl pp_ord o pp tr
-  
-  | `Happens a -> pp_happens default_pp_info ppf [a]
+  (*------------------------------------------------------------------*)
+  let pp_ord ppf = function
+    | `Eq -> Fmt.pf ppf "="
+    | `Neq -> Fmt.pf ppf "<>"
+    | `Leq -> Fmt.pf ppf "<="
+    | `Geq -> Fmt.pf ppf ">="
+    | `Lt -> Fmt.pf ppf "<"
+    | `Gt -> Fmt.pf ppf ">"
 
-let pp_literal fmt ((pn,at) : literal) =
-  match pn with
-  | `Pos -> Fmt.pf fmt "%a"    pp_xatom at
-  | `Neg -> Fmt.pf fmt "¬(%a)" pp_xatom at
+  let pp_xatom ppf : xatom -> unit = function
+    | Comp (o,tl,tr) ->
+      Fmt.pf ppf "@[%a %a@ %a@]" pp tl pp_ord o pp tr
 
-let pp_literals fmt (l : literal list) =
-  let sep fmt () = Fmt.pf fmt " ∧ " in
-  (Fmt.list ~sep pp_literal) fmt l
+    | Happens a -> pp_happens default_pp_info ppf [a]
 
-let ty_xatom = function
-  | `Happens _ -> Type.Timestamp
-  | `Comp (_, t1, t2) ->
-    let ty1 = ty t1 in
-    assert (ty1 = ty t2);
-    ty1
+    | Atom t -> pp ppf t
 
-let ty_lit ((_, at) : literal) : Type.ty = ty_xatom at
+  let pp fmt ((pn,at) : literal) =
+    match pn with
+    | `Pos -> Fmt.pf fmt "%a"    pp_xatom at
+    | `Neg -> Fmt.pf fmt "¬(%a)" pp_xatom at
 
-let neg_lit ((pn, at) : literal) : literal =
-  let pn = match pn with
-    | `Pos -> `Neg
-    | `Neg -> `Pos in
-  (pn, at)
+  let pps fmt (l : literal list) =
+    let sep fmt () = Fmt.pf fmt " ∧ " in
+    (Fmt.list ~sep pp) fmt l
 
-let form_to_xatom (form : term) : xatom option =
-  match form with
-  | Fun (f, _, [a]) when f = f_happens -> Some (`Happens a)
+  (*------------------------------------------------------------------*)
+  let ty_xatom = function
+    | Happens _ -> Type.Timestamp
+    | Comp (_, t1, t2) ->
+      let ty1 = ty t1 in
+      assert (ty1 = ty t2);
+      ty1
+    | Atom _ -> Type.Boolean
 
-  | Fun (fseq,  _, [a;b]) when fseq  = f_eq  -> Some (`Comp (`Eq,  a, b))
-  | Fun (fsneq, _, [a;b]) when fsneq = f_neq -> Some (`Comp (`Neq, a, b))
-  | Fun (fsleq, _, [a;b]) when fsleq = f_leq -> Some (`Comp (`Leq, a, b))
-  | Fun (fslt,  _, [a;b]) when fslt  = f_lt  -> Some (`Comp (`Lt,  a, b))
-  | Fun (fsgeq, _, [a;b]) when fsgeq = f_geq -> Some (`Comp (`Geq, a, b))
-  | Fun (fsgt,  _, [a;b]) when fsgt  = f_gt  -> Some (`Comp (`Gt,  a, b))
-  | _ -> 
-    if Config.old_completion () then
-      None
-    else
-      Some (`Comp (`Eq, form, mk_true))
+  let ty ((_, at) : literal) : Type.ty = ty_xatom at
 
-let rec form_to_literal (form : term) : literal option =
-  match form with
-  | Fun (fnot, _, [f]) when fnot = f_not -> omap neg_lit (form_to_literal f)
-  | _ -> omap (fun at -> (`Pos, at)) (form_to_xatom form)
+  (*------------------------------------------------------------------*)
+  let neg ((pn, at) : literal) : literal =
+    let pn = match pn with
+      | `Pos -> `Neg
+      | `Neg -> `Pos in
+    (pn, at)
 
-let disjunction_to_literals f : literal list option =
-  let exception Not_a_disjunction in
+  (*------------------------------------------------------------------*)
+  let form_to_xatom (form : term) : xatom option =
+    match form with
+    | Fun (f, _, [a]) when f = f_happens -> Some (Happens a)
 
-  let rec aux_l = function
-    | tf when tf = mk_false -> []
-    | Fun (fsor,_, [a; b]) when fsor = f_or -> aux_l a @ aux_l b
-    | f -> match form_to_literal f with
+    | Fun (fseq,  _, [a;b]) when fseq  = f_eq  -> Some (Comp (`Eq,  a, b))
+    | Fun (fsneq, _, [a;b]) when fsneq = f_neq -> Some (Comp (`Neq, a, b))
+    | Fun (fsleq, _, [a;b]) when fsleq = f_leq -> Some (Comp (`Leq, a, b))
+    | Fun (fslt,  _, [a;b]) when fslt  = f_lt  -> Some (Comp (`Lt,  a, b))
+    | Fun (fsgeq, _, [a;b]) when fsgeq = f_geq -> Some (Comp (`Geq, a, b))
+    | Fun (fsgt,  _, [a;b]) when fsgt  = f_gt  -> Some (Comp (`Gt,  a, b))
+    | _ -> 
+      if Config.old_completion () then
+        None
+      else
+        Some (Comp (`Eq, form, mk_true))
+
+  let rec form_to_literal (form : term) : literal option =
+    match form with
+    | Fun (fnot, _, [f]) when fnot = f_not -> omap neg (form_to_literal f)
+    | _ -> omap (fun at -> (`Pos, at)) (form_to_xatom form)
+
+  (*------------------------------------------------------------------*)
+  let form_to_literals
+      (form : term) 
+    : [`Entails of literal list | `Equiv of literal list]
+    =
+    let partial = ref false in
+    let lits : literal list =
+      List.fold_left (fun acc f -> 
+          match form_to_literal f with
+          | Some at -> at :: acc
+          | None    -> partial := true; acc
+        ) [] (decompose_ands form)
+    in
+    if !partial then `Entails lits else `Equiv lits
+
+  (*------------------------------------------------------------------*)
+  let disjunction_to_literals f : literal list option =
+    let exception Not_a_disjunction in
+
+    let rec aux_l = function
+      | tf when tf = mk_false -> []
+      | Fun (fsor,_, [a; b]) when fsor = f_or -> aux_l a @ aux_l b
+      | f -> match form_to_literal f with
         | Some f -> [f] 
         | None   -> raise Not_a_disjunction
-  in
+    in
 
-  try Some (aux_l f) with Not_a_disjunction -> None
+    try Some (aux_l f) with Not_a_disjunction -> None
 
-(*------------------------------------------------------------------*)
-let form_to_literals
-    (form : term) 
-  : [`Entails of literal list | `Equiv of literal list]
-  =
-  let partial = ref false in
-  let lits : literal list =
-    List.fold_left (fun acc f -> 
-        match form_to_literal f with
-        | Some at -> at :: acc
-        | None    -> partial := true; acc
-      ) [] (decompose_ands form)
-  in
-  if !partial then `Entails lits else `Equiv lits
+  let mk_atom (o : ord) (t1 : term) (t2 : term) : term = 
+    match o with
+    | `Eq  -> mk_eq  t1 t2
+    | `Leq -> mk_leq t1 t2
+    | `Lt  -> mk_lt  t1 t2
+    | `Neq -> mk_neq t1 t2
+    | `Geq -> mk_geq t1 t2
+    | `Gt  -> mk_gt  t1 t2
+                
+  (*------------------------------------------------------------------*)
+  let xatom_to_form (l : xatom) : term = match l with
+    | Comp (ord, t1, t2) -> mk_atom ord t1 t2
+    | Happens l -> mk_happens l
+    | Atom f -> f
+
+  let lit_to_form (l : literal) : term = 
+    match l with
+    | `Pos, at -> xatom_to_form at
+    | `Neg, at -> mk_not (xatom_to_form at) 
+
+end
+
+let mk_atom = Lit.mk_atom
 
 (*------------------------------------------------------------------*)
 let eq_triv f = match destr_eq f with
@@ -1592,25 +1625,6 @@ module Smart : SmartFO with type form = term = struct
 end
 
 include Smart
-
-
-let mk_atom (o : ord) (t1 : term) (t2 : term) : term = 
-  match o with
-  | `Eq  -> mk_eq  t1 t2
-  | `Leq -> mk_leq t1 t2
-  | `Lt  -> mk_lt  t1 t2
-  | `Neq -> mk_neq t1 t2
-  | `Geq -> mk_geq t1 t2
-  | `Gt  -> mk_gt  t1 t2
-
-let xatom_to_form (l : xatom) : term = match l with
-  | `Comp (ord, t1, t2) -> mk_atom ord t1 t2
-  | `Happens l -> mk_happens l
-
-let lit_to_form (l : literal) : term = 
-  match l with
-  | `Pos, at -> xatom_to_form at
-  | `Neg, at -> mk_not (xatom_to_form at) 
 
 
 (*------------------------------------------------------------------*)

@@ -284,9 +284,11 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Trace Hyps} *)
 
-let get_ord (at : Term.xatom ) : Term.ord = match at with
-  | `Comp (ord,_,_) -> ord
-  | `Happens _      -> assert false
+let get_ord (at : Term.Lit.xatom ) : Term.Lit.ord =
+  match at with
+  | Comp (ord,_,_) -> ord
+  | Happens _      -> assert false
+  | Atom _ -> assert false
 
 (*------------------------------------------------------------------*)
 module TraceHyps = Mk(struct
@@ -300,12 +302,12 @@ module TraceHyps = Mk(struct
     let choose_name : Equiv.any_form -> string = function
       | Global _ -> "G"
       | Local f ->
-        match Term.form_to_xatom f with
-        | Some (`Comp (`Eq, _, ftrue)) when ftrue = Term.mk_true -> "H"
-        | None -> "H"
-        | Some (`Happens _) -> "Hap"
+        match Term.Lit.form_to_xatom f with
+        | Some (Term.Lit.Comp (`Eq, _, ftrue)) when ftrue = Term.mk_true -> "H"
+        | Some (Term.Lit.Atom _) | None -> "H"
+        | Some (Term.Lit.Happens _) -> "Hap"
         | Some at ->
-          let sort = match Term.ty_xatom at with
+          let sort = match Term.Lit.ty_xatom at with
             | Type.Timestamp -> "C"
             | Type.Index     -> "I"
             | _              -> "M" 
@@ -325,45 +327,45 @@ module TraceHyps = Mk(struct
 (*------------------------------------------------------------------*)
 (** Collect specific local hypotheses *)
   
-let get_atoms_of_hyps (hyps : TraceHyps.hyps) : Term.literals =
+let get_atoms_of_hyps (hyps : TraceHyps.hyps) : Term.Lit.literals =
   TraceHyps.fold (fun _ f acc ->
       match f with
       | Local f
       | Global Equiv.(Atom (Reach f)) ->
-        begin match Term.form_to_literals f with
+        begin match Term.Lit.form_to_literals f with
           | `Entails lits | `Equiv lits -> lits @ acc
         end
       | Global _ -> acc
     ) hyps [] 
 
-let get_message_atoms (hyps : TraceHyps.hyps) : Term.xatom list =
-  let do1 (at : Term.literal) : Term.xatom option =
-    match Term.ty_lit at with
+let get_message_atoms (hyps : TraceHyps.hyps) : Term.Lit.xatom list =
+  let do1 (at : Term.Lit.literal) : Term.Lit.xatom option =
+    match Term.Lit.ty at with
     | Type.Timestamp | Type.Index -> None
     | _ ->
       (* FIXME: move simplifications elsewhere *)
       match at with 
-      | `Pos, (`Comp _ as at)       -> Some at
-      | `Neg, (`Comp (`Eq, t1, t2)) -> Some (`Comp (`Neq, t1, t2))
+      | `Pos, (Comp _ as at)       -> Some at
+      | `Neg, (Comp (`Eq, t1, t2)) -> Some (Comp (`Neq, t1, t2))
       | _ -> None
   in
   List.filter_map do1 (get_atoms_of_hyps hyps)
 
-let get_trace_literals (hyps : TraceHyps.hyps) : Term.literals =
-  let do1 (lit : Term.literal) : Term.literal option =
-    match Term.ty_lit lit with 
+let get_trace_literals (hyps : TraceHyps.hyps) : Term.Lit.literals =
+  let do1 (lit : Term.Lit.literal) : Term.Lit.literal option =
+    match Term.Lit.ty lit with 
     | Type.Index | Type.Timestamp -> Some lit
     | _ -> None
   in
   List.filter_map do1 (get_atoms_of_hyps hyps)
 
-let get_eq_atoms (hyps : TraceHyps.hyps) : Term.xatom list =
-  let do1 (lit : Term.literal) : Term.xatom option =
+let get_eq_atoms (hyps : TraceHyps.hyps) : Term.Lit.xatom list =
+  let do1 (lit : Term.Lit.literal) : Term.Lit.xatom option =
     match lit with 
-    | `Pos, (`Comp ((`Eq | `Neq), _, _) as at) -> Some at
+    | `Pos, (Comp ((`Eq | `Neq), _, _) as at) -> Some at
 
-    | `Neg, (`Comp (`Eq,  t1, t2)) -> Some (`Comp (`Neq, t1, t2))
-    | `Neg, (`Comp (`Neq, t1, t2)) -> Some (`Comp (`Eq,  t1, t2))
+    | `Neg, (Comp (`Eq,  t1, t2)) -> Some (Comp (`Neq, t1, t2))
+    | `Neg, (Comp (`Neq, t1, t2)) -> Some (Comp (`Eq,  t1, t2))
 
     | _ -> None
   in

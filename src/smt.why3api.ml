@@ -70,8 +70,8 @@ let build_task
     (table       : Symbols.table)
     (system      : SystemExpr.fset)
     (evars       : Vars.vars)
-    (msg_atoms   : Term.xatom list)
-    (trace_lits  : Term.literals)
+    (msg_atoms   : Term.Lit.xatom list)
+    (trace_lits  : Term.Lit.literals)
     (given_axioms: Term.terms)
     (tm_theory   : Why3.Theory.theory)
   : Why3.Task.task =
@@ -340,15 +340,15 @@ let build_task
       failwith "diff of timestamps to why3 term not implemented"
     | _ -> assert false
   in
-  let rec atom_to_fmla : Term.xatom -> Why3.Term.term = fun atom ->
+  let rec atom_to_fmla : Term.Lit.xatom -> Why3.Term.term = fun atom ->
     let handle_eq_atom rec_call = match atom with
-      | `Comp (`Eq,  x, y) -> t_equ (rec_call x) (rec_call y)
-      | `Comp (`Neq, x, y) -> t_neq (rec_call x) (rec_call y)
+      | Comp (`Eq,  x, y) -> t_equ (rec_call x) (rec_call y)
+      | Comp (`Neq, x, y) -> t_neq (rec_call x) (rec_call y)
       | _ -> assert false
     in
-    match Term.ty_xatom atom with
+    match Term.Lit.ty_xatom atom with
     | Type.Timestamp -> begin match atom with
-        | `Comp (comp,ts1,ts2) ->
+        | Comp (comp,ts1,ts2) ->
           let listargs = List.map timestamp_to_wterm [ts1; ts2] in
           begin match comp with
             | `Eq  -> t_app_infer eqv_symb listargs
@@ -361,13 +361,14 @@ let build_task
               t_and (t_app_infer leq_symb listargs)
                 (t_not @@ t_app_infer eqv_symb listargs)
           end
-        | `Happens ts -> Why3.Term.t_app_infer happens_symb [timestamp_to_wterm ts]
+        | Happens ts -> Why3.Term.t_app_infer happens_symb [timestamp_to_wterm ts]
+        | Atom _ -> assert false (* cannot happen *)
       end
     | Type.Index -> handle_eq_atom (function
         | Term.Var i -> index_to_wterm i
         | _          -> assert false)
     | _          -> handle_eq_atom msg_to_wterm
-  and lit_to_fmla : Term.literal -> Why3.Term.term = function
+  and lit_to_fmla : Term.Lit.literal -> Why3.Term.term = function
     | (`Pos, x) ->        atom_to_fmla x
     | (`Neg, x) -> t_not (atom_to_fmla x)
   and find_fn f = Hashtbl.find functions_tbl (Symbols.to_string f)
@@ -444,7 +445,7 @@ let build_task
                 | Some (vs, f) -> msg_to_fmla_q t_forall_close vs f
                 | None -> match Term.destr_exists fmla with
                   | Some (vs, f) -> msg_to_fmla_q t_exists_close vs f
-                  | None -> match Term.form_to_xatom fmla with
+                  | None -> match Term.Lit.form_to_xatom fmla with
                     | Some at -> atom_to_fmla at
                     | None -> match fmla with
                       | Macro (ms,[],ts) when ms.s_symb = Symbols.cond ->

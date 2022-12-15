@@ -123,45 +123,47 @@ val tforall    : (term -> bool) -> term -> bool
 (*------------------------------------------------------------------*)
 (** {2 Literals} *)
 
-type ord = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
-type ord_eq = [ `Eq | `Neq ]
+module Lit : sig
+  type ord = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
+  type ord_eq = [ `Eq | `Neq ]
 
-val pp_ord : Format.formatter -> ord -> unit
+  val pp_ord : Format.formatter -> ord -> unit
 
-type ('a,'b) _atom = 'a * 'b * 'b
+  type ('a,'b) _atom = 'a * 'b * 'b
 
-type xatom = [
-  | `Comp    of (ord,term) _atom
-  | `Happens of term
-]
+  type xatom = 
+    | Comp    of (ord,term) _atom
+    | Happens of term
+    | Atom    of term
 
-type literal = [`Neg | `Pos] * xatom
+  type literal = [`Neg | `Pos] * xatom
 
-type literals = literal list
+  type literals = literal list
 
-(** Type of compared elements. *)
-val ty_xatom : xatom -> Type.ty
+  (** Type of compared elements. *)
+  val ty_xatom : xatom -> Type.ty
 
-(** Type of compared elements. *)
-val ty_lit  : literal -> Type.ty
+  (** Type of compared elements. *)
+  val ty  : literal -> Type.ty
 
-val pp_literal  : Format.formatter -> literal  -> unit
-val pp_literals : Format.formatter -> literals -> unit
+  val pp  : Format.formatter -> literal  -> unit
+  val pps : Format.formatter -> literals -> unit
 
-val neg_lit : literal -> literal
+  val neg : literal -> literal
 
-val disjunction_to_literals : term -> literal list option
+  val disjunction_to_literals : term -> literal list option
 
-val form_to_xatom   : term ->   xatom option
-val form_to_literal : term -> literal option
+  val form_to_xatom   : term ->   xatom option
+  val form_to_literal : term -> literal option
 
-(** Given a formula, return a list of literals which is either
-    entailed by the formula, or equivalent to the formula. *)
-val form_to_literals :
-  term -> [`Entails of literal list | `Equiv of literal list]
+  (** Given a formula, return a list of literals which is either
+      entailed by the formula, or equivalent to the formula. *)
+  val form_to_literals :
+    term -> [`Entails of literal list | `Equiv of literal list]
 
-val xatom_to_form : xatom   -> term
-val lit_to_form   : literal -> term
+  val xatom_to_form : xatom   -> term
+  val lit_to_form   : literal -> term
+end
 
 (*------------------------------------------------------------------*)
 (** {2 Higher-order terms} *)
@@ -446,7 +448,7 @@ val mk_timestamp_leq : term -> term -> term
 val mk_neqs : ?simpl:bool -> terms -> terms -> term
 val mk_eqs  : ?simpl:bool -> terms -> terms -> term
 
-val mk_atom : ord -> term -> term -> term
+val mk_atom : Lit.ord -> term -> term -> term
 val mk_happens : term -> term
 
 val mk_seq    : ?simpl:bool -> Vars.vars -> term -> term

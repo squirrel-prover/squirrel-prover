@@ -797,7 +797,7 @@ let expand_head_once
   match t with
   | Term.Macro (ms, l, ts) ->
 
-    if Constr.query ~precise:true (Lazy.force models) [`Pos, `Happens ts] then
+    if Constr.query ~precise:true (Lazy.force models) [`Pos, Happens ts] then
       match Macros.get_definition ~mode (cntxt ()) ms ~args:l ~ts with
       | `Def mdef -> mdef, true
       | _ -> raise exn 

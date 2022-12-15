@@ -297,12 +297,12 @@ let congruence (s : TS.t) : bool =
   | None -> true
   | Some s ->
     let conclusions =
-      Utils.odflt [] (Term.disjunction_to_literals (TS.goal s))
+      Utils.odflt [] (Term.Lit.disjunction_to_literals (TS.goal s))
     in
 
     let term_conclusions =
       List.fold_left (fun acc conc -> 
-          lit_to_form (neg_lit conc) :: acc
+          Term.Lit.lit_to_form (Term.Lit.neg conc) :: acc
         ) [] conclusions
     in
     let s = List.fold_left (fun s f ->
@@ -340,17 +340,18 @@ let constraints (s : TS.t) =
   | None -> true
   | Some s ->
     let conclusions =
-      Utils.odflt [] (Term.disjunction_to_literals (TS.goal s))
+      Utils.odflt [] (Term.Lit.disjunction_to_literals (TS.goal s))
     in
     let trace_conclusions =
       List.fold_left (fun acc conc -> 
           let keep = match conc with 
-            | _, `Happens _ -> true
-            | _, `Comp (_, t, _) ->
+            | _, Term.Lit.Happens _ -> true
+            | _, Term.Lit.Comp (_, t, _) ->
               Term.ty t = Type.Timestamp || Term.ty t = Type.Index
+            | _, Term.Lit.Atom _ -> false
           in
           if keep then
-            lit_to_form (neg_lit conc) :: acc
+            Term.Lit.lit_to_form (Term.Lit.neg conc) :: acc
           else 
             acc
         ) [] conclusions
@@ -682,7 +683,7 @@ let substitute_mess (m1, m2) s =
 let substitute_ts (ts1, ts2) s =
   let subst =
       let models = TS.get_models s in
-      if Constr.query ~precise:true models [(`Pos, `Comp (`Eq,ts1,ts2))] then
+      if Constr.query ~precise:true models [(`Pos, Comp (`Eq,ts1,ts2))] then
         [Term.ESubst (ts1,ts2)]
       else
         soft_failure Tactics.NotEqualArguments
@@ -701,7 +702,7 @@ let substitute_idx (i1 , i2 : Term.term * Term.term) s =
 
   let subst =
     let models = TS.get_models s in
-    if Constr.query ~precise:true models [(`Pos, `Comp (`Eq,i1,i2))] then
+    if Constr.query ~precise:true models [(`Pos, Comp (`Eq,i1,i2))] then
       [Term.ESubst (i1,i2)]
     else
       soft_failure Tactics.NotEqualArguments
@@ -952,17 +953,17 @@ let new_simpl ~red_param ~congr ~constr s =
   let s = TS.set_goal Term.mk_false s in
   let goals = List.filter_map (fun goal ->
       if Hyps.is_hyp goal s || Term.f_triv goal then None
-      else match form_to_xatom goal with
+      else match Term.Lit.form_to_xatom goal with
         | None -> Some goal
         | Some at ->
-          match at, Term.ty_xatom at with
+          match at, Term.Lit.ty_xatom at with
           | _, Type.Index | _, Type.Timestamp -> 
-            let lit = `Pos, (at :> xatom) in
+            let lit = `Pos, (at :> Term.Lit.xatom) in
             if constr && Constr.query ~precise:true (TS.get_models s) [lit]
             then None
             else Some goal
 
-          | `Comp (`Eq, t1, t2), _ ->
+          | Comp (`Eq, t1, t2), _ ->
             if congr &&
                Completion.check_equalities (TS.get_trs s) [(t1,t2)]
             then None
@@ -1287,7 +1288,7 @@ let rewrite_equiv_transform
         | Macro (msymb',[],ts') ->
           msymb' = Term.frame_macro &&
           TS.query ~precise:true s
-            [`Pos,`Comp (`Leq, mk_pred ts, ts')]
+            [`Pos,Comp (`Leq, mk_pred ts, ts')]
         | _ -> false
       in
       if List.exists ok_frame biframe then t else raise Invalid

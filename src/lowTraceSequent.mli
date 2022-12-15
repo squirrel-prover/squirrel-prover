@@ -41,7 +41,7 @@ val pi : Term.proj -> sequent -> sequent
 val get_trs : sequent -> Completion.state 
 
 (** See [Constr.query] *)
-val query : precise:bool -> t -> Term.literals -> bool
+val query : precise:bool -> t -> Term.Lit.literals -> bool
 
 val query_happens : precise:bool -> t -> Term.term -> bool
 

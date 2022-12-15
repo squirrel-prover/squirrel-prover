@@ -24,39 +24,6 @@ module L = Location
 let dbg s = Printer.prt (if Config.debug_constr () then `Dbg else `Ignore) s
 
 (*------------------------------------------------------------------*)
-module TraceLits : sig[@warning "-32"]
-  type t = Term.literal
-  val compare : t -> t -> int
-  val equal : t -> t -> bool
-  val hash : t -> int
-  val mk : Term.literals -> t array
-  module Memo : Ephemeron.S with type key = t array
-end = struct
-  type t = Term.literal
-
-  let mk l = Array.of_list (List.sort_uniq Stdlib.compare l)
-
-  let compare = Stdlib.compare
-
-  let equal t t' = t = t'
-
-  (* FIXME: term hashconsing *)
-  let hash ((l,t) : Term.literal) =
-    let h = match l with
-        | `Neg -> 0
-        | `Pos -> 1
-    in
-    hcombine h (Term.hash (Term.xatom_to_form t))
-
-  module Memo = Ephemeron.Kn.Make(struct
-      type _t = t
-      type t = _t
-      let equal = equal
-      let hash = hash
-    end)
-end
-
-(*------------------------------------------------------------------*)
 (** Stateful memoization for conversion of [Term.term] to [Vars.var],
     which are then used to build a [ut] *)
 type memo = { 
@@ -257,7 +224,7 @@ module Form = struct
 
   let pp_lit fmt (od, ut1, ut2 : lit) =
     Fmt.pf fmt "@[<hv 2>(%a %a %a)@]"
-      pp_ut ut1 Term.pp_ord (od :> Term.ord) pp_ut ut2
+      pp_ut ut1 Term.Lit.pp_ord (od :> Term.Lit.ord) pp_ut ut2
 
   let rec pp_form fmt = function
     | Lit l -> pp_lit fmt l
@@ -312,7 +279,7 @@ module Form = struct
 
   (*------------------------------------------------------------------*)
   (** Builds a conjunction of clauses form a trace literal *)
-  let mk (memo : memo) (lit : Term.literal) : conjunction =
+  let mk (memo : memo) (lit : Term.Lit.literal) : conjunction =
     let _mk atom =
       List.map (fun (od,t1,t2) ->
           Lit (od, term_to_ut memo t1, term_to_ut memo t2)
@@ -320,19 +287,23 @@ module Form = struct
     in
 
     (* Get a normalized trace literal. *)
-    let rec doit (lit : Term.literal) : form list = match lit with
-      | `Neg, `Happens t -> [Lit (`Eq,  term_to_ut memo t, uundef)]
-      | `Pos, `Happens t -> [Lit (`Neq, term_to_ut memo t, uundef)]
+    let rec doit (lit : Term.Lit.literal) : form list =
+      match lit with
+      | `Pos, Atom f -> doit (`Pos, Comp (`Eq,  f, Term.mk_true))
+      | `Neg, Atom f -> doit (`Pos, Comp (`Neq, f, Term.mk_true))
+        
+      | `Neg, Happens t -> [Lit (`Eq,  term_to_ut memo t, uundef)]
+      | `Pos, Happens t -> [Lit (`Neq, term_to_ut memo t, uundef)]
 
-      | `Pos, (`Comp ((_, _, _) as atom)) -> _mk atom
+      | `Pos, (Comp ((_, _, _) as atom)) -> _mk atom
 
       (* We rewrite the negative literal as a positive literal, and recurse. *)
-      | `Neg, (`Comp (`Eq, t1, t2)) ->
-        let lit = `Pos, `Comp (`Neq, t1, t2) in
+      | `Neg, (Comp (`Eq, t1, t2)) ->
+        let lit = `Pos, Term.Lit.Comp (`Neq, t1, t2) in
         doit lit
 
-      | `Neg, (`Comp (`Neq, t1, t2)) ->
-        let lit = `Pos, `Comp (`Eq, t1, t2) in
+      | `Neg, (Comp (`Neq, t1, t2)) ->
+        let lit = `Pos, Term.Lit.Comp (`Eq, t1, t2) in
         doit lit
 
       (* Here, we need to build a disjunction to account for potentially
@@ -340,24 +311,32 @@ module Form = struct
          Indeed, when ⋄ ∈ {≤, <, ≥, >}, we have:
          ¬ (x ⋄ y) ⇔ (undef(x) ∨ undef(y) ∨ (x □ y))
          where □ is the standard negation of ⋄ (e.g. if ⋄ = ≤, then □ = >) *)
-      | `Neg, `Comp ((`Leq|`Lt|`Geq|`Gt) as ord, u, v)
+      | `Neg, Comp ((`Leq|`Lt|`Geq|`Gt) as ord, u, v)
         when Term.ty u = Type.Timestamp ->
         let nord = not_ord ord in
         let form =
           disj (
             Lit (`Eq, term_to_ut memo u, uundef) ::
             Lit (`Eq, term_to_ut memo v, uundef) ::
-            [conj (doit (`Pos, `Comp (nord, u, v)))]) in
+            [conj (doit (`Pos, Comp (nord, u, v)))]) in
 
         [form]
 
       (* Type.Index *)
-      | `Neg, `Comp ((`Leq|`Lt|`Geq|`Gt), _, _) -> raise Unsupported
+      | `Neg, Comp ((`Leq|`Lt|`Geq|`Gt), _, _) -> raise Unsupported
     in
     doit lit
 
-  let mk_list memo l : conjunction =
-    List.concat_map (fun t -> try mk memo t with Unsupported -> []) l
+  let mk_list memo (l : Term.terms) : conjunction =
+    let l =
+      List.concat_map (fun t ->
+        match Term.Lit.form_to_literals t with
+          | `Equiv l | `Entails l -> l
+        ) l
+    in
+    List.concat_map (fun t ->       
+        try mk memo t with Unsupported -> []
+      ) l
 end
 
 
@@ -1284,40 +1263,59 @@ let split_models instance =
 type models = memo * model list
 
 (*------------------------------------------------------------------*)
-let models_conjunct (l : Term.literals) : models =
+let models_conjunct (terms : Term.terms) : models =
   let memo = mk_memo () in
-  let l = Form.mk_list memo l in
+  let l = Form.mk_list memo terms in
   let instance = mk_instance memo l in
   (memo, split_models instance)
 
+(*------------------------------------------------------------------*)
+(** Arrays of terms for memoisation *)
+module TermArray : sig
+  type t = Term.term
+  val mk : t list -> t array
+  module Memo : Ephemeron.S with type key = t array
+end = struct
+  type t = Term.term
+
+  let mk l = Array.of_list (List.sort_uniq Stdlib.compare l)
+
+  let equal t t' = Term.equal t t'
+
+  (* FIXME: term hashconsing *)
+  let hash = Term.hash
+
+  module Memo = Ephemeron.Kn.Make(struct
+      type _t = t
+      type t = _t
+      let equal = equal
+      let hash = hash
+    end)
+end
+
+(*------------------------------------------------------------------*)
 (** Memoisation *)
 let models_conjunct =
-  let memo = TraceLits.Memo.create 256 in
-  fun (l : Term.literals) ->
-    let lits = TraceLits.mk l in
-    try TraceLits.Memo.find memo lits with
+  let memo = TermArray.Memo.create 256 in
+  fun (terms : Term.terms) ->
+    let terms_array = TermArray.mk terms in
+    try TermArray.Memo.find memo terms_array with
     | Not_found ->
-      let res = models_conjunct l in
-      TraceLits.Memo.add memo lits res;
+      let res = models_conjunct terms in
+      TermArray.Memo.add memo terms_array res;
       res
 
-(** Time-out information *)
+(** Exported.
+    [models_conjunct] with time-out. *)
 let models_conjunct
     (time_out : int)
     ?(exn = Tactics.Tactic_hard_failure (None, TacTimeout))
-    (l : Term.terms) : models
-  =
-  let lits =
-    List.fold_left (fun acc f ->
-        match Term.form_to_literals f with
-        | `Entails lits | `Equiv lits -> lits @ acc
-      ) [] l 
-  in
-  
-  Utils.timeout exn time_out models_conjunct lits
-
+    (terms : Term.terms) : models
+  = 
+  Utils.timeout exn time_out models_conjunct terms
 
 (*------------------------------------------------------------------*)
+(** Exported. *)
 let m_is_sat (models : models) = (snd models) <> []
 
 
@@ -1359,18 +1357,18 @@ let rec query_form model (form : Form.form) = match form with
   | Form.Disj forms -> List.exists  (query_form model) forms
   | Form.Conj forms -> List.for_all (query_form model) forms
 
-let query_one (memo : memo) (model : model) (at : Term.literal) : bool =
+let query_one (memo : memo) (model : model) (at : Term.Lit.literal) : bool =
   try
     let cnf = Form.mk memo at in
     List.for_all (query_form model) cnf
   with Unsupported -> false
 
-let query ~precise (models : models) (ats : Term.literals) =
+let query ~precise (models : models) (ats : Term.Lit.literals) =
   let memo, models = models in
   
   try
     assert (List.for_all (fun lit ->
-        let ty = Term.ty_lit lit in
+        let ty = Term.Lit.ty lit in
         ty = Type.Index || ty = Type.Timestamp
       ) ats);
 
@@ -1383,7 +1381,7 @@ let query ~precise (models : models) (ats : Term.literals) =
     else if not precise then false
     else
       let forms =
-        List.map (fun at -> Form.mk memo (Term.neg_lit at)) ats
+        List.map (fun at -> Form.mk memo (Term.Lit.neg at)) ats
         |> List.flatten
       in
       let insts = List.map (fun model ->
@@ -1395,9 +1393,9 @@ let query ~precise (models : models) (ats : Term.literals) =
 (* adds debugging information *)
 let query ~precise (models : models) ats =
   dbg "%squery: %a"
-    (if precise then "precise " else "") Term.pp_literals ats;
+    (if precise then "precise " else "") Term.Lit.pps ats;
   let b = query ~precise models ats in
-  dbg "query result: %a : %a" Term.pp_literals ats Fmt.bool b;
+  dbg "query result: %a : %a" Term.Lit.pps ats Fmt.bool b;
   b
     
 (*------------------------------------------------------------------*)
@@ -1438,20 +1436,20 @@ let maximal_elems ~precise (models : models) (elems : Term.term list) =
      and are equal in every model of [models], by picking an arbitrary
      element in each equivalence class. *)
   Utils.classes (fun ts ts' ->
-      query ~precise (memo, models_list) [`Pos, `Comp (`Eq,ts,ts')]
+      query ~precise (memo, models_list) [`Pos, Comp (`Eq,ts,ts')]
     ) maxs
   |> List.map List.hd
 
 (** Exported *)
 let get_ts_equalities ~precise (models : models) ts =
   Utils.classes (fun ts ts' ->
-      query ~precise models [`Pos, `Comp (`Eq,ts,ts')]
+      query ~precise models [`Pos, Comp (`Eq,ts,ts')]
     ) ts
 
 (** Exported *)
 let get_ind_equalities ~precise (models : models) inds =
   Utils.classes (fun i j ->
-      query ~precise models [`Pos, `Comp (`Eq,Term.mk_var i,Term.mk_var j)]
+      query ~precise models [`Pos, Comp (`Eq,Term.mk_var i,Term.mk_var j)]
     ) inds
 
 (** Exported *)
@@ -1478,7 +1476,7 @@ let find_eq_action (models : models) (t : Term.term) =
     | None -> None
     | Some term ->
       (* check that [t] = [term] in all models. *)
-      if query ~precise:true models [`Pos, `Comp (`Eq,t,term)]
+      if query ~precise:true models [`Pos, Comp (`Eq,t,term)]
       then Some term
       else None
 
@@ -1499,7 +1497,8 @@ let make_context ~table ~system =
 (** Tests Suites *)
 
 open Term
-
+open Term.Lit
+       
 let env = ref Vars.empty_env
   
 let mk_var_i v : Vars.var =
@@ -1519,37 +1518,37 @@ and i'    = mk_var "i"
 
 let _, a = Symbols.Action.declare Symbols.builtins_table (L.mk_loc L._dummy "a") 1
 
-let pb_eq1 = (`Comp (`Eq,tau, mk_pred tau'))
-             :: (`Comp (`Eq,tau', mk_pred tau''))
-             :: (`Comp (`Eq,tau, mk_action a [i]))
-             :: [`Comp (`Eq,tau'', mk_action a [i'])]
-and pb_eq2 = [`Comp (`Eq,tau, mk_pred tau)]
-and pb_eq3 = (`Comp (`Eq,tau, mk_pred tau'))
-             :: (`Comp (`Eq,tau', mk_pred tau''))
-             :: [`Comp (`Eq,tau'', tau)]
-and pb_eq4 = (`Comp (`Eq,Term.init, mk_pred tau))
-             :: (`Comp (`Eq,tau, mk_pred tau'))
-             :: (`Comp (`Eq,tau', mk_pred tau''))
-             :: (`Comp (`Eq,tau, mk_action a [i]))
-             :: [`Comp (`Eq,tau'', mk_action a [i])]
-and pb_eq5 = (`Comp (`Eq,Term.init, mk_pred tau))
-             :: (`Comp (`Eq,tau, mk_pred tau'))
-             :: (`Comp (`Eq,tau', mk_action a [i']))
-             :: (`Comp (`Eq,tau, mk_action a [i]))
-             :: (`Comp (`Eq,tau'', mk_action a [i]))
-             :: [`Comp (`Eq,tau'', mk_action a [i'])]
-and pb_eq6 = (`Comp (`Eq,tau, mk_pred tau'))
-             :: (`Comp (`Eq,tau', mk_action a [i']))
-             :: (`Comp (`Eq,tau, mk_action a [i]))
-             :: (`Comp (`Eq,tau3, mk_action a [i]))
-             :: [`Comp (`Eq,tau'', mk_action a [i'])]
-and pb_eq7 = (`Comp (`Eq,tau, mk_pred tau'))
-             :: (`Comp (`Eq,tau', mk_pred tau''))
-             :: (`Comp (`Eq,tau, mk_action a [i]))
-             :: [`Comp (`Eq,tau'', mk_action a [i'])]
-and pb_eq8 = (`Comp (`Eq,tau, mk_pred tau'))
-             :: (`Comp (`Eq,tau', mk_pred tau''))
-             :: [`Comp (`Eq,tau'', tau3)]
+let pb_eq1 = (Comp (`Eq,tau, mk_pred tau'))
+             :: (Comp (`Eq,tau', mk_pred tau''))
+             :: (Comp (`Eq,tau, mk_action a [i]))
+             :: [Comp (`Eq,tau'', mk_action a [i'])]
+and pb_eq2 = [Comp (`Eq,tau, mk_pred tau)]
+and pb_eq3 = (Comp (`Eq,tau, mk_pred tau'))
+             :: (Comp (`Eq,tau', mk_pred tau''))
+             :: [Comp (`Eq,tau'', tau)]
+and pb_eq4 = (Comp (`Eq,Term.init, mk_pred tau))
+             :: (Comp (`Eq,tau, mk_pred tau'))
+             :: (Comp (`Eq,tau', mk_pred tau''))
+             :: (Comp (`Eq,tau, mk_action a [i]))
+             :: [Comp (`Eq,tau'', mk_action a [i])]
+and pb_eq5 = (Comp (`Eq,Term.init, mk_pred tau))
+             :: (Comp (`Eq,tau, mk_pred tau'))
+             :: (Comp (`Eq,tau', mk_action a [i']))
+             :: (Comp (`Eq,tau, mk_action a [i]))
+             :: (Comp (`Eq,tau'', mk_action a [i]))
+             :: [Comp (`Eq,tau'', mk_action a [i'])]
+and pb_eq6 = (Comp (`Eq,tau, mk_pred tau'))
+             :: (Comp (`Eq,tau', mk_action a [i']))
+             :: (Comp (`Eq,tau, mk_action a [i]))
+             :: (Comp (`Eq,tau3, mk_action a [i]))
+             :: [Comp (`Eq,tau'', mk_action a [i'])]
+and pb_eq7 = (Comp (`Eq,tau, mk_pred tau'))
+             :: (Comp (`Eq,tau', mk_pred tau''))
+             :: (Comp (`Eq,tau, mk_action a [i]))
+             :: [Comp (`Eq,tau'', mk_action a [i'])]
+and pb_eq8 = (Comp (`Eq,tau, mk_pred tau'))
+             :: (Comp (`Eq,tau', mk_pred tau''))
+             :: [Comp (`Eq,tau'', tau3)]
 
 let () =
   let exception Unsat in
@@ -1557,7 +1556,7 @@ let () =
   let test = function
     | [] -> raise Unsat
     | _ -> raise Sat in
-  let mk (l : Term.xatom list) =
+  let mk (l : Term.Lit.xatom list) =
     List.map (fun x -> lit_to_form (`Pos, x)) l
   in
 
@@ -1581,29 +1580,29 @@ let () =
 
     ("Graph", `Quick,
      fun () ->
-       let successes = [(`Comp (`Leq, tau, tau'')) :: pb_eq1;
+       let successes = [(Comp (`Leq, tau, tau'')) :: pb_eq1;
 
-                        (`Comp (`Neq, tau, tau3)) ::
-                        (`Comp (`Neq, tau3, tau'')) ::
-                        (`Comp (`Leq, tau, tau3)) ::
-                        (`Comp (`Leq, tau3, tau'')) ::
+                        (Comp (`Neq, tau, tau3)) ::
+                        (Comp (`Neq, tau3, tau'')) ::
+                        (Comp (`Leq, tau, tau3)) ::
+                        (Comp (`Leq, tau3, tau'')) ::
                         pb_eq1;
 
-                       (`Comp (`Neq, tau, tau3)) ::
-                       (`Comp (`Neq, tau4, tau'')) ::
-                       (`Comp (`Leq, tau, tau3)) ::
-                       (`Comp (`Leq, tau3, tau4)) ::
-                       (`Comp (`Leq, tau4, tau'')) ::
+                       (Comp (`Neq, tau, tau3)) ::
+                       (Comp (`Neq, tau4, tau'')) ::
+                       (Comp (`Leq, tau, tau3)) ::
+                       (Comp (`Leq, tau3, tau4)) ::
+                       (Comp (`Leq, tau4, tau'')) ::
                        pb_eq1]
-       and failures = [(`Comp (`Leq, tau'', tau)) :: pb_eq1;
+       and failures = [(Comp (`Leq, tau'', tau)) :: pb_eq1;
 
-                       (`Happens tau) ::
-                       (`Comp (`Neq, tau, tau3)) ::
-                       (`Comp (`Neq, tau3, tau4)) ::
-                       (`Comp (`Neq, tau4, tau'')) ::
-                       (`Comp (`Leq, tau, tau3)) ::
-                       (`Comp (`Leq, tau3, tau4)) ::
-                       (`Comp (`Leq, tau4, tau'')) ::
+                       (Happens tau) ::
+                       (Comp (`Neq, tau, tau3)) ::
+                       (Comp (`Neq, tau3, tau4)) ::
+                       (Comp (`Neq, tau4, tau'')) ::
+                       (Comp (`Leq, tau, tau3)) ::
+                       (Comp (`Leq, tau3, tau4)) ::
+                       (Comp (`Leq, tau4, tau'')) ::
                        pb_eq1] in
 
        List.iteri (fun i pb ->

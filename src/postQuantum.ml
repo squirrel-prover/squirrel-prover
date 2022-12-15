@@ -14,8 +14,8 @@ class collect_max_ts ~(cntxt:Constr.trace_cntxt) = object (self)
 
   method extract_ts_atoms phi =
     List.partition (fun t ->
-        match Term.form_to_xatom t with
-        | Some at when Term.ty_xatom at = Type.Timestamp -> true
+        match Term.Lit.form_to_xatom t with
+        | Some at when Term.Lit.ty_xatom at = Type.Timestamp -> true
         | _ -> false
       ) (Term.decompose_ands phi)
 
@@ -24,11 +24,11 @@ class collect_max_ts ~(cntxt:Constr.trace_cntxt) = object (self)
   method add_atoms atoms  =
     List.fold_left
       (fun smaller_acc at ->
-         match Term.form_to_xatom at with
-         | Some (`Comp (`Leq,tau_1,_tau_2)) ->
+         match Term.Lit.form_to_xatom at with
+         | Some (Comp (`Leq,tau_1,_tau_2)) ->
            (* FIXME: [tau_2] unused, is it normal? *)
            Sts.add tau_1 smaller_acc
-         | Some (`Comp (`Lt,tau_1,_tau_2)) ->
+         | Some (Comp (`Lt,tau_1,_tau_2)) ->
            (* FIXME: [tau_2] unused, is it normal? *)
            Sts.add tau_1 smaller_acc
         | _ -> smaller_acc)

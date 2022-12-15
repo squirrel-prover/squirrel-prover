@@ -124,13 +124,15 @@ type sequents = sequent list
 let get_all_messages (s : sequent) =
   let atoms = Hyps.get_message_atoms s.hyps in
   let atoms =
-    match Term.form_to_xatom s.conclusion with
+    match Term.Lit.form_to_xatom s.conclusion with
       | Some at -> at :: atoms
       | _ -> atoms
   in
-  List.fold_left (fun acc at -> match at with
-      | `Happens _ -> acc
-      | (`Comp (_,a,b)) -> a :: b :: acc
+  List.fold_left (fun acc at ->
+      match at with
+      | Term.Lit.Happens _ -> acc
+      | Term.Lit.Comp (_,a,b) -> a :: b :: acc
+      | Term.Lit.Atom a -> a :: acc
     ) [] atoms
 
 (*------------------------------------------------------------------*)
@@ -152,7 +154,7 @@ let query ~precise s q =
   let models = get_models s in
   Constr.query ~precise models q
 
-let query_happens ~precise s a = query ~precise s [`Pos, `Happens a]
+let query_happens ~precise s a = query ~precise s [`Pos, Happens a]
 
 let maximal_elems ~precise s tss =
   let models = get_models s in
@@ -357,9 +359,9 @@ let rename (u:Vars.var) (v:Vars.var) (s:t) : t =
 (** TRS *)
 
 let get_eqs_neqs (hyps : H.hyps) =
-  List.fold_left (fun (eqs, neqs) (atom : Term.xatom) -> match atom with
-      | `Comp (`Eq,  a, b) -> Term.ESubst (a,b) :: eqs, neqs
-      | `Comp (`Neq, a, b) -> eqs, Term.ESubst (a,b) :: neqs
+  List.fold_left (fun (eqs, neqs) (atom : Term.Lit.xatom) -> match atom with
+      | Comp (`Eq,  a, b) -> Term.ESubst (a,b) :: eqs, neqs
+      | Comp (`Neq, a, b) -> eqs, Term.ESubst (a,b) :: neqs
       | _ -> assert false
     ) ([],[]) (Hyps.get_eq_atoms hyps)
 

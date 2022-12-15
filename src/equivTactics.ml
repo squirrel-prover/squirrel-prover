@@ -822,19 +822,19 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
  
   method extract_ts_atoms phi =
     List.partition (fun t ->
-        match Term.form_to_xatom t with
-        | Some at when Term.ty_xatom at = Type.Timestamp -> true
+        match Term.Lit.form_to_xatom t with
+        | Some at when Term.Lit.ty_xatom at = Type.Timestamp -> true
         | _ -> false
       ) (Term.decompose_ands phi)
 
   method add_atoms atoms timestamps =
     List.fold_left (fun acc at -> 
-        match Term.form_to_xatom at with
-        | Some (`Comp (`Leq,tau_1,tau_2)) ->
+        match Term.Lit.form_to_xatom at with
+        | Some (Term.Lit.Comp (`Leq,tau_1,tau_2)) ->
           if List.mem tau_2 acc
           then tau_1 :: acc
           else acc
-        | Some (`Comp (`Lt,tau_1,tau_2)) ->
+        | Some (Term.Lit.Comp (`Lt,tau_1,tau_2)) ->
           if (List.mem (Term.mk_pred tau_2) acc || List.mem tau_2 acc)
           then tau_1 :: acc
           else acc
