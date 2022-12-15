@@ -36,7 +36,6 @@ let alcotests (path:string) : (string * [> `Quick] * (unit -> unit )) list =
       |> List.map (fun f -> Format.sprintf "%s/%s" s f) in
 
   let list_sp = get_sp_from_dir path in
-  (* List.iter (fun x -> Format.printf "%s\n" x) list_sp_ok; *)
 
   let okfails = List.map (fun f -> 
     Filename.basename f, `Quick, begin fun () -> Alcotest.check_raises "OK" Ok

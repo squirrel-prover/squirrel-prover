@@ -9,7 +9,7 @@ default: squirrel
 
 all: squirrel test
 
-test: alcotest okfail example
+test: alcotest example
 
 bench: bench_example
 
