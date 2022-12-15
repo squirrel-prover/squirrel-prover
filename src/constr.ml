@@ -1662,12 +1662,83 @@ let () =
     ("Complex queries", `Quick,
      fun () ->
        let open Term in
-       let problems = [
-         [mk_not (mk_impl (mk_ands [mk_happens tau; mk_eq tau tau']) (mk_leq tau' tau))]
+       let successes = [
+         (* happens(t) && t = t' => t' <= t *)
+         [mk_not (mk_impl (mk_ands [mk_happens tau; mk_eq tau tau']) (mk_leq tau' tau))];
+
+         (* happens(t') && t = t' => t' <= t *)
+         [mk_not (mk_impl (mk_ands [mk_happens tau'; mk_eq tau tau']) (mk_leq tau' tau))];
+
+         (* (happens(t') || happens(t)) && t = t' => t' <= t *)
+         [mk_not (mk_impl (mk_ands [mk_ors [mk_happens tau'; mk_happens tau]; mk_eq tau tau'])
+                    (mk_leq tau' tau))];
+
+         (* (happens(t) || happens(t')) && t = t' => t' <= t *)
+         [mk_not (mk_impl (mk_ands [mk_ors [mk_happens tau; mk_happens tau']; mk_eq tau tau'])
+                    (mk_leq tau' tau))];
+
+         (* happens(t) && t = t' => t' >= t *)
+         [mk_not (mk_impl (mk_ands [mk_happens tau; mk_eq tau tau']) (mk_geq tau' tau))];
+
+         (* happens(t) && t = t' => (t' < t || t' > t || t' = t) *)
+         [mk_not (mk_impl
+                    (mk_ands [mk_happens tau; mk_eq tau tau'])
+                    (mk_ors  [mk_lt tau' tau; mk_gt tau' tau; mk_eq tau' tau]))];
+
+         (* happens(t) => happens(t') => (t' < t || t' > t || t' = t) *)
+         [mk_not (mk_impl
+                    (mk_ands [mk_happens tau; mk_happens tau'])
+                    (mk_ors  [mk_lt tau' tau; mk_gt tau' tau; mk_eq tau' tau]))];
        ] in
+
+       let failures = [
+         (* t = t' => t' <= t *)
+         [mk_not (mk_impl (mk_ands [mk_eq tau tau']) (mk_leq tau' tau))];
+
+         (* t = t' => t' < t *)
+         [mk_not (mk_impl (mk_ands [mk_eq tau tau']) (mk_lt tau' tau))];
+
+         (* t = t' => t' >= t *)
+         [mk_not (mk_impl (mk_ands [mk_eq tau tau']) (mk_geq tau' tau))];
+
+         (* t = t' => t' > t *)
+         [mk_not (mk_impl (mk_ands [mk_eq tau tau']) (mk_gt tau' tau))];
+
+         (* happens(t) && t = t' => t' < t *)
+         [mk_not (mk_impl (mk_ands [mk_happens tau; mk_eq tau tau']) (mk_lt tau' tau))];
+
+         (* happens(t) && t = t' => t' < t *)
+         [mk_not (mk_impl (mk_ands [mk_happens tau; mk_eq tau tau']) (mk_gt tau' tau))];
+
+         (* happens(t) && t = t' => (t' < t || t' > t) *)
+         [mk_not (mk_impl
+                    (mk_ands [mk_happens tau; mk_eq tau tau'])
+                    (mk_ors  [mk_lt tau' tau; mk_gt tau' tau]))];
+
+         (* happens(t) => (t' < t || t' > t) *)
+         [mk_not (mk_impl
+                    (mk_ands [mk_happens tau])
+                    (mk_ors  [mk_lt tau' tau; mk_gt tau' tau]))];
+
+         (* happens(t) => (t' < t || t' = t) *)
+         [mk_not (mk_impl
+                    (mk_ands [mk_happens tau])
+                    (mk_ors  [mk_lt tau' tau; mk_eq tau' tau]))];
+
+         (* happens(t) => (t' > t || t' = t) *)
+         [mk_not (mk_impl
+                    (mk_ands [mk_happens tau])
+                    (mk_ors  [mk_gt tau' tau; mk_eq tau' tau]))];
+       ] in
+
        List.iteri (fun i pb ->       
            Alcotest.check_raises ("complex query " ^ string_of_int i) Unsat
              (fun () -> test (snd @@ models_conjunct TConfig.vint_timeout pb))
-         ) problems
+         ) successes;
+
+       List.iteri (fun i pb ->       
+           Alcotest.check_raises ("complex query " ^ string_of_int i) Sat
+             (fun () -> test (snd @@ models_conjunct TConfig.vint_timeout pb))
+         ) failures
     );
   ]
