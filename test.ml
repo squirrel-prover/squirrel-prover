@@ -11,20 +11,10 @@ open! Squirrellib.Completion
 open! Squirrellib.Parserbuf
 open! Squirrellib.Main
 
-
-(* module ToplevelProver = *)
-(*   Squirrellib.TopLevel.Toplevel(Squirrellib.Prover) *)
-
-module P = Squirrellib.Prover
-module L = Squirrellib.Location
-module D = Squirrellib.Decl
-module T = Squirrellib.Theory
-module C = Squirrellib.TConfig
-module Co = Squirrellib.Config
-module Pl = Squirrellib.ProverLib
-
-module Lexer = Squirrellib.Lexer
-
+let test_suites : unit Alcotest.test list =
+  [
+    ("Template", Squirreltests.Template.tests);
+  ]
 
 let alcotests (path:string) : (string * [> `Quick] * (unit -> unit )) list = 
   let exception Ok in
@@ -49,8 +39,9 @@ let alcotests (path:string) : (string * [> `Quick] * (unit -> unit )) list =
   okfails
 
 let () =
-  Squirrellib.Checks.add_suite "OK" (alcotests "tests/ok");
-  Squirrellib.Checks.add_suite "FAILS" (alcotests "tests/fail");
+  List.iter (fun (s,t) -> Squirrellib.Checks.add_suite s t) test_suites;
+  Squirrellib.Checks.add_suite "Ok" (alcotests "tests/ok");
+  Squirrellib.Checks.add_suite "Fail" (alcotests "tests/fail");
   Format.eprintf "Running Alcotests from :\n";
   List.iter (fun (n,_) -> 
     Format.eprintf "%s\n" n;
