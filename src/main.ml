@@ -257,7 +257,7 @@ ProverLib.input =
 let do_undo (state : driver_state) (nb_undo : int) : driver_state =
   let history_state, toplvl_state =
   HistoryTP.reset_state state.history_state nb_undo in
-  let () = match ToplevelProver.get_mode state.toplvl_state with
+  let () = match ToplevelProver.get_mode toplvl_state with
     | ProofMode -> Printer.pr "%a" (ToplevelProver.pp_goal
                      toplvl_state) ()
     | GoalMode -> Printer.pr "%a" Action.pp_actions
@@ -750,6 +750,12 @@ let () =
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try run ~test "tests/alcotest/undo.sp" with
+           | Unfinished -> raise Ok)
+    end ;
+    "Undo out of proof does not assert false", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
+           try run ~test "tests/alcotest/undo_proof.sp" with
            | Unfinished -> raise Ok)
     end ;
   ] ;
