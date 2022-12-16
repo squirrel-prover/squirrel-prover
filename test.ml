@@ -2,18 +2,20 @@
  *       in each opened module; we use "open!" instead of "open" to avoid
  *       an "unused open" warning *)
 
-open! Squirrellib.Channel
-open! Squirrellib.Process
+(* Cannot wrtie tests for Term since it has private type term *)
 open! Squirrellib.Term
 open! Squirrellib.Constr
-open! Squirrellib.Lexer
 open! Squirrellib.Completion
-open! Squirrellib.Parserbuf
-open! Squirrellib.Main
 
 let test_suites : unit Alcotest.test list =
   [
     ("Template", Squirreltests.Template.tests);
+    ("Include", Squirreltests.Main.includes);
+    ("Tactics", Squirreltests.Main.tactics);
+    ("Equivalence", Squirreltests.Main.equivalence);
+    ("Channel", Squirreltests.Channel.channels);
+    ("Models", Squirreltests.Parserbuf.models);
+    ("Process parsing", Squirreltests.Parserbuf.process_parsing);
   ]
 
 let alcotests (path:string) : (string * [> `Quick] * (unit -> unit )) list = 
@@ -42,9 +44,9 @@ let () =
   List.iter (fun (s,t) -> Squirrellib.Checks.add_suite s t) test_suites;
   Squirrellib.Checks.add_suite "Ok" (alcotests "tests/ok");
   Squirrellib.Checks.add_suite "Fail" (alcotests "tests/fail");
-  Format.eprintf "Running Alcotests from :\n";
+  Format.eprintf "Running Alcotests on test suites :\n";
   List.iter (fun (n,_) -> 
-    Format.eprintf "%s\n" n;
+    Format.eprintf "\t%s\n" n;
   ) (!Squirrellib.Checks.suites);
 
   Squirrellib.Checks.run ()
