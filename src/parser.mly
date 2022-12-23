@@ -43,7 +43,7 @@
 %token BY FA INTRO AS DESTRUCT REMEMBER INDUCTION
 %token PROOF QED UNDO ABORT HINT
 %token RENAME GPRF GCCA
-%token INCLUDE PRINT
+%token INCLUDE PRINT SEARCH
 %token SMT
 %token EOF
 
@@ -966,6 +966,7 @@ help_tac_i:
 | GDH        { "gdh"}
 | CDH        { "cdh"}
 | PRINT      { "print"}
+| SEARCH     { "search"}
 
 | DEPENDENT INDUCTION  { "dependent induction"}
 | GENERALIZE DEPENDENT { "generalize dependent"}
@@ -1110,6 +1111,9 @@ pr_query:
 | SYSTEM l=system_expr DOT { ProverLib.Pr_system (Some l) }
 |                 DOT { ProverLib.Pr_system None }
 
+s_query:
+| t=term   DOT { ProverLib.Search (t, None) }
+| t=term IN l=system_expr DOT { ProverLib.Search (t, Some l) }
 
 (*------------------------------------------------------------------*)
 interactive:
@@ -1117,6 +1121,7 @@ interactive:
 | decls=declarations { ProverLib.Prover (InputDescr decls) }
 | u=undo             { ProverLib.Toplvl (Undo u) }
 | PRINT q=pr_query   { ProverLib.Prover (Print q) }
+| SEARCH q=s_query   { ProverLib.Prover q }
 | PROOF              { ProverLib.Prover Proof }
 | i=p_include        { ProverLib.Toplvl (Include i) }
 | QED                { ProverLib.Prover Qed }
@@ -1143,6 +1148,7 @@ bulleted_tactic:
 
 top_proofmode:
 | PRINT q=pr_query   { ProverLib.Prover (Print q) }
+| SEARCH q=s_query   { ProverLib.Prover q }
 | bulleted_tactic    { ProverLib.Prover (Tactic $1) }
 | u=undo             { ProverLib.Toplvl (Undo u) }
 | ABORT              { ProverLib.Prover Abort }

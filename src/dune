@@ -16,7 +16,13 @@
       (tiny_httpd  -> server.real.ml)
       (!tiny_httpd -> server.stub.ml))))
 
-(ocamllex lexer htmlLexer)
+(ocamllex htmlLexer)
+;; Adding -ml option to ocamllex : have no limit size for automaton
+(rule
+ (target lexer.ml)
+ (deps   lexer.mll)
+ (action (chdir %{workspace_root}
+          (run %{bin:ocamllex} -ml -q -o %{target} %{deps}))))
 (menhir
   (modules parser htmlParser)
    (flags --table --explain))

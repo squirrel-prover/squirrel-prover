@@ -88,6 +88,9 @@ val abort : state -> state
 (** Return first pending_proof. *)
 val first_goal : state -> ProverLib.pending_proof
 
+(** Print out terms that match t pattern *)
+val search_about : state -> ( Theory.term  * SystemExpr.Parse.t option)-> unit
+
 (** Manage print query *)
 val do_print : state -> ProverLib.print_query -> unit
 

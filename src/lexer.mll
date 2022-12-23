@@ -177,6 +177,7 @@ rule token = parse
 | "include"           { INCLUDE }
 | "smt"               { SMT }
 | "print"             { PRINT }
+| "search"            { SEARCH }
 | name as n           { ID n }
 | eof                 { EOF }
 

@@ -7,6 +7,8 @@ type lemma = {
 
 val pp : Format.formatter -> lemma -> unit
 
+val as_lemma : Symbols.data -> lemma
+
 (*------------------------------------------------------------------*)
 val add_lemma :
   ?loc:Location.t ->

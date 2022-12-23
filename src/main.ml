@@ -47,10 +47,10 @@ type driver_state = {
         current_goal : ProverLib.pending_proof option;
         subgoals     : Goal.t list;
         bullets      : Bullets.path;
+        prover_mode  : ProverLib.prover_mode;
       }
       params       : Config.params; (* save global params… *)
       option_defs  : ProverLib.option_def list; (* save global option_def *)
-      prover_mode  : ProverLib.prover_mode;
     }
   *)
 
