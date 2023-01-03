@@ -32,8 +32,7 @@ let alcotests (path:string) : (string * [> `Quick] * (unit -> unit )) list =
   let okfails = List.map (fun f -> 
     f, `Quick, begin fun () -> Alcotest.check_raises "OK" Ok
       begin fun () ->
-        let _ = try Squirrellib.Main.run ~test:true f with 
-          | e -> raise e in
+        Squirrellib.Main.run ~test:true f;
         raise Ok
       end
     end
