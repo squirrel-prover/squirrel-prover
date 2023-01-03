@@ -30,7 +30,7 @@ let alcotests (path:string) : (string * [> `Quick] * (unit -> unit )) list =
   let list_sp = get_sp_from_dir path in
 
   let okfails = List.map (fun f -> 
-    Filename.basename f, `Quick, begin fun () -> Alcotest.check_raises "OK" Ok
+    f, `Quick, begin fun () -> Alcotest.check_raises "OK" Ok
       begin fun () ->
         let _ = try Squirrellib.Main.run ~test:true f with 
           | e -> raise e in

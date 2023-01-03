@@ -9,12 +9,12 @@ default: squirrel
 
 all: squirrel test
 
-test: alcotest example
+test: alcotest_quiet example
 
 bench: bench_example
 
 # squirrel is not PHONY here, it exists as executable
-.PHONY: okfail okfail_end example examples_end alcotest
+.PHONY: okfail okfail_end example examples_end alcotest alcotest_quiet
 
 # Directory for logging test runs on "*.sp" files.
 RUNLOGDIR=_build/squirrel_log
@@ -147,6 +147,9 @@ examples_end: $(PROVER_EXAMPLES:.sp=.ok)
 # relying on dune file to know (possibly runtime) dependencies.
 alcotest: version
 	dune runtest
+
+alcotest_quiet: version
+	./_build/default/test.exe | { grep -E "^[^│] \[FAIL\]" || true; }
 
 clean:
 	dune clean
