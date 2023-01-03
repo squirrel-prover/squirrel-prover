@@ -1111,9 +1111,8 @@ pr_query:
 | SYSTEM l=system_expr DOT { ProverLib.Pr_system (Some l) }
 |                 DOT { ProverLib.Pr_system None }
 
-s_query:
-| t=term   DOT { ProverLib.Search (t, None) }
-| t=term IN l=system_expr DOT { ProverLib.Search (t, Some l) }
+search_query:
+| SEARCH   t=term  DOT { t }
 
 (*------------------------------------------------------------------*)
 interactive:
@@ -1121,7 +1120,7 @@ interactive:
 | decls=declarations { ProverLib.Prover (InputDescr decls) }
 | u=undo             { ProverLib.Toplvl (Undo u) }
 | PRINT q=pr_query   { ProverLib.Prover (Print q) }
-| SEARCH q=s_query   { ProverLib.Prover q }
+| t=search_query     { ProverLib.Prover (Search t) }
 | PROOF              { ProverLib.Prover Proof }
 | i=p_include        { ProverLib.Toplvl (Include i) }
 | QED                { ProverLib.Prover Qed }
@@ -1148,7 +1147,7 @@ bulleted_tactic:
 
 top_proofmode:
 | PRINT q=pr_query   { ProverLib.Prover (Print q) }
-| SEARCH q=s_query   { ProverLib.Prover q }
+| t=search_query     { ProverLib.Prover (Search t) }
 | bulleted_tactic    { ProverLib.Prover (Tactic $1) }
 | u=undo             { ProverLib.Toplvl (Undo u) }
 | ABORT              { ProverLib.Prover Abort }

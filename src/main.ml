@@ -277,6 +277,11 @@ let do_print (state : driver_state) (q : ProverLib.print_query)
   ToplevelProver.do_print state.toplvl_state q;
   state
 
+let do_search (state : driver_state) (t : Theory.term) 
+  : driver_state =
+  ToplevelProver.do_search state.toplvl_state t;
+  state
+
 (*----------Part can be done here and tactic handling in Prover ----*)
 let do_tactic (state : driver_state) (l:ProverLib.bulleted_tactics) : driver_state =
   begin match state.check_mode with
@@ -416,6 +421,8 @@ and do_command
     | _,        Prover Tactic l         -> do_tactic state l
                                             (* ↓ do not touch state ↓ *)
     | _,        Prover Print q          -> do_print state q
+                                            (* ↓ do not touch state ↓ *)
+    | _,        Prover Search t         -> do_search state t
                                        (* ↓ touch only toplvl_state ↓ *)
     | WaitQed,  Prover Qed              -> do_qed state
                                    (* ↓ touch only the table in p_s ↓ *)

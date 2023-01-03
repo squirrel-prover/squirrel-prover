@@ -25,6 +25,7 @@ sig
   val first_goal : state -> ProverLib.pending_proof
   val add_decls : state -> Decl.declarations -> state * Goal.t list
   val do_print : state -> ProverLib.print_query -> unit
+  val do_search : state -> Theory.term -> unit
   val try_complete_proof : state -> state
   val do_eof : state -> state
 end
@@ -103,6 +104,9 @@ module Make (Prover : PROVER) :
 
     (** Print current system *)
     val do_print : state -> ProverLib.print_query -> unit
+  
+    (** Search a term and print matches *)
+    val do_search : state -> Theory.term -> unit
 
     (** ↓ TODO remove params and options from globals ↓ *)
     (** Gets saved Config params *)

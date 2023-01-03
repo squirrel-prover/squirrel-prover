@@ -39,7 +39,16 @@ let search_about_test () =
   |> Prover.exec_command "goal foo (i:index) : happens(S(i)) => output@S(i) = n(i)."
   |> Prover.exec_command "Proof."
   |> Prover.exec_command "search happens(_)."
-  |> Prover.exec_command "auto."
+  in
+  let matches = Prover.search_about st
+    (Parser.top_formula Lexer.token (Lexing.from_string "happens(_)"))
+  in
+  Alcotest.(check bool) "Found one lemma with happens(_)"
+    ((List.length matches)=1) true;
+
+  Alcotest.(check bool) "Found one pattern happens(_) in lemma"
+    ((List.length (snd (List.hd matches)))=1) true;
+  let st = Prover.exec_command "auto." st
   |> Prover.exec_command "Qed."
   in
   let pprint_option ppf = function 
@@ -48,11 +57,16 @@ let search_about_test () =
   let some_testable = Alcotest.testable pprint_option (=) in
   Alcotest.(check some_testable) "Goal name" 
     (Prover.current_goal_name st) (None);
-  let _ = Prover.exec_command "search foo (_)." st in ()
-  (* Prover.search_about st *) 
-  (*   (Parser.top_formula Lexer.token (Lexing.from_string "search foo _")); *)
+
+  let matches = Prover.search_about st
+    (Parser.top_formula Lexer.token (Lexing.from_string "n(_)"))
+  in
+  Alcotest.(check bool) "Found one lemma with n(_)"
+    ((List.length matches)=1) true;
+  Alcotest.(check bool) "Found one pattern n(_) in lemma"
+    ((List.length (snd (List.hd matches)))=1) true
 
 let tests = [ ("template", `Quick, template_test);
-              ("seach_about", `Quick, search_about_test)
+              ("search_about", `Quick, search_about_test)
             ]
 

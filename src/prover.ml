@@ -261,73 +261,56 @@ let pp_goal (ps:state) ppf () = match ps.current_goal, ps.subgoals with
       Goal.pp j
   | _ -> assert false
 
-let search_about (st:state) 
-    (t,_:Theory.term * SystemExpr.Parse.t option) : unit =
-  match st.prover_mode with
-  | ProofMode -> 
-    let system = match get_current_system st with
-      | Some s -> s
-      | None -> assert false in
-    (* get env from sequent if there is a current goal ? *)
-    let goal = match get_current_goal st with
-      | None -> assert false
-      | Some (ProofObl g)
-      | Some (UnprovedLemma (_, g)) -> g
-    in
-    let env = match goal with 
-      | Trace j -> LowTraceSequent.env j
-      | Equiv j -> LowEquivSequent.env j
-    in
-    let cntxt = Theory.{ env; cntxt = InGoal; } in
-    let t,_ = Theory.convert ~pat:true cntxt t in
-    let pat_vars =
-      Vars.Sv.filter Vars.is_pat (Term.fv t)
-    in
-    let pat = Term.{
-        pat_tyvars = [];
-        pat_vars;
-        pat_term = t; }
-    in
+let search_about (st:state) (t:Theory.term) : (Lemma.lemma * Term.t list) list =
+  let env = 
+    begin match st.prover_mode with
+    | ProofMode -> 
+      let goal = match get_current_goal st with
+        | None -> assert false
+        | Some (ProofObl g)
+        | Some (UnprovedLemma (_, g)) -> g
+      in
+      begin match goal with
+        | Trace j -> LowTraceSequent.env j
+        | Equiv j -> LowEquivSequent.env j
+      end
+    | _ -> 
+      Env.init ~table:st.table ()
+    end
+  in
+  let cntxt = Theory.{ env; cntxt = InGoal; } in
+  let t,_ = Theory.convert ~pat:true cntxt t in
+  let pat_vars =
+    Vars.Sv.filter Vars.is_pat (Term.fv t)
+  in
+  let pat = Term.{
+      pat_tyvars = [];
+      pat_vars;
+      pat_term = t; }
+  in
+  let system = cntxt.env.system in
+  Symbols.Lemma.fold (fun _ _ data acc -> 
+      let g = Lemma.as_lemma data in
+      let res = begin match g.stmt.formula with
+      | Global f -> Match.E.find st.table system pat f
+      | Local  f -> Match.T.find st.table system pat f
+      end in
+      begin match res with
+      | [] -> acc
+      | _ -> (g,res)::acc
+      end
+    ) [] st.table
+
+let do_search (st:state) (t:Theory.term) : unit =
+    let matches = search_about st t in
     Printer.prt `Default "Match :\n";
-    let print_all fmt table =
-      Symbols.Lemma.iter (fun _ _ data -> 
-          let g = Lemma.as_lemma data in
-          Fmt.pf fmt "%s: %a@;\n" g.stmt.name Equiv.Any.pp g.stmt.formula;
-          let res = match g.stmt.formula with
-          | Global f -> Match.E.find st.table system pat f
-          | Local  f -> Match.T.find st.table system pat f
-          in
-          List.iter (fun t -> Fmt.pf fmt "%a" Term.pp t) res
-        ) table in
-    Printer.prt `Result "%a" print_all st.table
-  | _ -> 
-    (* let system = match sys with *)
-    (*   | None -> Tactics.hard_failure (Failure "no default system"); *)
-    (*   | Some sys -> SystemExpr.Parse.parse_sys st.table sys in *)
-    (* let env = Env.init ~system ~table:st.table () in *)
-    (* let cntxt = Theory.{ env; cntxt = InGoal; } in *)
-    (* let t,_ = Theory.convert ~pat:true cntxt t in *)
-    (* let pat_vars = *)
-    (*   Vars.Sv.filter Vars.is_pat (Term.fv t) *)
-    (* in *)
-    (* let pat = Term.{ *)
-    (*     pat_tyvars = []; *)
-    (*     pat_vars; *)
-    (*     pat_term = t; } *)
-    (* in *)
-    (* Printer.prt `Default "Match :\n"; *)
-    (* let print_all fmt table = *)
-    (*   Symbols.Lemma.iter (fun _ _ data -> *) 
-    (*       let g = Lemma.as_lemma data in *)
-    (*       Fmt.pf fmt "%s: %a@;\n" g.stmt.name Equiv.Any.pp g.stmt.formula; *)
-    (*       let res = match g.stmt.formula with *)
-    (*       | Global f -> Match.E.find st.table system pat f *)
-    (*       | Local  f -> Match.T.find st.table system pat f *)
-    (*       in *)
-    (*       List.iter (fun t -> Fmt.pf fmt "%a" Term.pp t) res *)
-    (*     ) table in *)
-    (* Printer.prt `Result "%a" print_all st.table *)
-    Printer.prt `Result "TODO"
+    let print_all fmt matches =
+    List.iter (fun (lemma,res:Lemma.lemma * Term.t list) -> 
+        Fmt.pf fmt "- in lemma %s: %a@;\n" lemma.stmt.name 
+          Equiv.Any.pp lemma.stmt.formula;
+        List.iter (fun t -> Fmt.pf fmt "\t→ %a\n" Term.pp t) res
+      ) matches in
+  Printer.prt `Result "%a" print_all matches
 
 let do_print (st:state) (q:ProverLib.print_query) : unit =
     begin match q with
@@ -367,7 +350,7 @@ let do_command (state:state) (command:ProverLib.prover_input) : state =
   | InputDescr decls -> let st,_ = add_decls state decls in st
   | Tactic l         -> List.fold_left tactic_handle state l
   | Print q          -> do_print state q; state
-  | Search (t,s)     -> search_about state (t,s); state
+  | Search t         -> do_search state t; state
   | Qed              -> complete_proof state
   | Hint h           -> add_hint state h
   | SetOption sp     -> set_param state sp
