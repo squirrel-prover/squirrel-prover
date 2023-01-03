@@ -83,6 +83,7 @@ type prover_input =
   | SetOption  of Config.p_set_param
   | Tactic of bulleted_tactics
   | Print   of print_query
+  | Search of Theory.term
   | Goal    of Goal.Parsed.t Location.located
   | Proof
   | Qed

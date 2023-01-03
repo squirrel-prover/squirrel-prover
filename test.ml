@@ -20,7 +20,6 @@ let test_suites : unit Alcotest.test list =
 
 let alcotests (path:string) : (string * [> `Quick] * (unit -> unit )) list = 
   let exception Ok in
-
   let get_sp_from_dir s =
       Sys.readdir s
       |> Array.to_list
@@ -28,7 +27,6 @@ let alcotests (path:string) : (string * [> `Quick] * (unit -> unit )) list =
       |> List.map (fun f -> Format.sprintf "%s/%s" s f) in
 
   let list_sp = get_sp_from_dir path in
-
   let okfails = List.map (fun f -> 
     f, `Quick, begin fun () -> Alcotest.check_raises "OK" Ok
       begin fun () ->

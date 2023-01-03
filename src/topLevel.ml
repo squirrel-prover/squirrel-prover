@@ -25,6 +25,7 @@ module type PROVER = sig
   val first_goal : state -> ProverLib.pending_proof
   val add_decls : state -> Decl.declarations -> state * Goal.t list
   val do_print : state -> ProverLib.print_query -> unit
+  val do_search : state -> Theory.term -> unit
   val try_complete_proof : state -> state
   val do_eof : state -> state
 end
@@ -117,6 +118,10 @@ module Make (Prover : PROVER) = struct
   let do_print (st:state) (q : ProverLib.print_query) 
     : unit =
     Prover.do_print st.prover_state q
+
+  let do_search (st:state) (t : Theory.term) 
+    : unit =
+    Prover.do_search st.prover_state t
   (* }↑} *)
 
   (*---------------- Options handling -- FIXME ---------------*)(* {↓{ *)
