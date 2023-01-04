@@ -254,6 +254,7 @@ module type S = sig
      pattern. *)
   val find : 
     ?option:match_option ->
+    ?ty_env:Type.Infer.env ->
     Symbols.table ->
     SE.context ->
     Term.term Term.pat -> 

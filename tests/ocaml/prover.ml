@@ -81,9 +81,7 @@ let search_about_2 () =
     ((List.length matches)=1) true;
   (* works but no matches *)
   let _ = Prover.exec_command "search <_,_>." st in
-  (* let _ = Prover.exec_command "search (_,_)." st in FIXME
-   * polymorphism *)
-
+  let _ = Prover.exec_command "search (_,_)." st in
   let st = Prover.exec_all st
     "global goal [S] myeq : equiv(true).
     Proof.

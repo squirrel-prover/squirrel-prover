@@ -941,6 +941,7 @@ module type S = sig
 
   val find : 
     ?option:match_option ->
+    ?ty_env:Type.Infer.env ->
     Symbols.table ->
     SE.context ->
     (Term.term pat) -> 
@@ -1512,6 +1513,7 @@ module T (* : S with type t = Term.term *) = struct
   (** Exported *)
   let find
       ?option
+      ?ty_env
       (table  : Symbols.table) 
       (system : SE.context) 
       (pat    : term pat) 
@@ -1522,7 +1524,7 @@ module T (* : S with type t = Term.term *) = struct
       fun e se _vars _conds _p acc ->
         let subterm_system = SE.reachability_context se in
         match try_match ~expand_context:InSequent 
-                ?option table subterm_system e pat with
+                ?ty_env ?option table subterm_system e pat with
         | Match _ -> e :: acc, `Continue
         | _       -> acc, `Continue
     in
@@ -2764,6 +2766,7 @@ module E : S with type t = Equiv.form = struct
   (** Exported *)
   let find
       ?option
+      ?ty_env
       (table  : Symbols.table) 
       (system : SE.context) 
       (pat    : term pat) 
@@ -2775,7 +2778,7 @@ module E : S with type t = Equiv.form = struct
         let subterm_system = SE.reachability_context se in
         match 
           T.try_match ~expand_context:InSequent
-            ?option table subterm_system e pat 
+            ?ty_env ?option table subterm_system e pat 
         with
         | Match _ -> e :: acc, `Continue
         | _       ->      acc, `Continue

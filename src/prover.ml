@@ -293,18 +293,13 @@ let search_about (st:state) (q:ProverLib.search_query) :
     | ProverLib.Srch_inSys (t,_)
     | ProverLib.Srch_term t -> t in
   let cntxt = Theory.{ env; cntxt = InGoal; } in
-  (* ¿ What am I doing ¿ *)
-  (* let sty_env = Type.Infer.mk_env () in *)
-  (* let ty_env = Some sty_env in *)
-  (* let t,_ = Theory.convert ?ty_env ~pat:true cntxt t in *)
-  (* ? What am I doing ? *)
-  let t,_ = Theory.convert ~pat:true cntxt t in
+  let ty_env = Type.Infer.mk_env () in
+  let t,_ = Theory.convert ~ty_env ~pat:true cntxt t in
   let pat_vars =
     Vars.Sv.filter Vars.is_pat (Term.fv t)
   in
-  (* let _pat_tyvars, _ = Type.Infer.gen_and_close sty_env in *)
   let pat = Term.{
-      pat_tyvars = env.ty_vars;
+      pat_tyvars = [];
       pat_vars;
       pat_term = t; }
   in
@@ -312,8 +307,8 @@ let search_about (st:state) (q:ProverLib.search_query) :
       let g = Lemma.as_lemma data in
       let sys = g.stmt.system in 
       let res = begin match g.stmt.formula with
-      | Global f -> Match.E.find st.table sys pat f
-      | Local  f -> Match.T.find st.table sys pat f
+      | Global f -> Match.E.find ~ty_env st.table sys pat f
+      | Local  f -> Match.T.find ~ty_env st.table sys pat f
       end in
       begin match res with
       | [] -> acc
