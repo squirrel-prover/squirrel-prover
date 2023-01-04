@@ -27,8 +27,11 @@ val init : unit -> state
 (** Execute a command : see @ProverLib.prover_input *)
 val do_command : state -> ProverLib.prover_input -> state
 
-(** Execute a command from string *)
+(** Execute a single command from string *)
 val exec_command : string -> state -> state
+
+(** Execute a chunk of commands from string *)
+val exec_all : state -> string -> state
 
 (** add proof obligation *)
 val add_proof_obl : Goal.t -> state -> state
@@ -90,13 +93,13 @@ val first_goal : state -> ProverLib.pending_proof
 
 (** Returns terms that match t pattern in lemma *)
 val search_about : 
-  state -> Theory.term -> (Lemma.lemma * Term.t list) list
+  state -> ProverLib.search_query -> (Lemma.lemma * Term.t list) list
 
 (** Manage print query *)
 val do_print : state -> ProverLib.print_query -> unit
 
 (** Print out terms that match t pattern *)
-val do_search : state -> Theory.term -> unit
+val do_search : state -> ProverLib.search_query -> unit
 
 (* ↓ for html ↓ *)
 

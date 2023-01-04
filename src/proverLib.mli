@@ -36,12 +36,17 @@ val get_oracle_tag_formula : string -> Term.term
 val option_defs : option_def list ref
 
 (*------------------------------------------------------------------*)
-(** {2 User printing query} *)
+(** {2 Printing infos} *)
 
 (** User printing query *)
 type print_query =
   | Pr_system    of SystemExpr.Parse.t option (* [None] means current system *)
   | Pr_statement of Theory.lsymb
+
+(** User search query *)
+type search_query =
+  | Srch_term    of Theory.term
+  | Srch_inSys   of Theory.term * SystemExpr.Parse.t 
 
 (*------------------------------------------------------------------*)
 (** Error handling *)
@@ -83,7 +88,7 @@ type prover_input =
   | SetOption  of Config.p_set_param
   | Tactic of bulleted_tactics
   | Print   of print_query
-  | Search of Theory.term
+  | Search of search_query
   | Goal    of Goal.Parsed.t Location.located
   | Proof
   | Qed

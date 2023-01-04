@@ -277,7 +277,7 @@ let do_print (state : driver_state) (q : ProverLib.print_query)
   ToplevelProver.do_print state.toplvl_state q;
   state
 
-let do_search (state : driver_state) (t : Theory.term) 
+let do_search (state : driver_state) (t : ProverLib.search_query) 
   : driver_state =
   ToplevelProver.do_search state.toplvl_state t;
   state

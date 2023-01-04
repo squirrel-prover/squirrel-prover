@@ -52,6 +52,11 @@ type print_query = (* [None] means current system *)
   | Pr_system    of SystemExpr.Parse.t option 
   | Pr_statement of Theory.lsymb
 
+(** {2 User search query} *)
+type search_query = (* [None] means current system *)
+  | Srch_term    of Theory.term
+  | Srch_inSys   of Theory.term * SystemExpr.Parse.t 
+
 (*---------------- Errors in proverlib -----------------------*)(* {↓{ *)
 (** TOMOVE Error handling in prover *)
 type error = Location.t * string
@@ -98,7 +103,7 @@ type prover_input =
   | SetOption  of Config.p_set_param
   | Tactic of bulleted_tactics
   | Print   of print_query
-  | Search of Theory.term
+  | Search of search_query
   | Goal    of Goal.Parsed.t Location.located
   | Proof
   | Qed

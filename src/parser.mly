@@ -82,6 +82,7 @@
 %start declarations
 (* %start declaration_eof *)
 %start top_formula
+%start system_expr
 %start top_process
 %start interactive
 %start top_proofmode
@@ -90,6 +91,7 @@
 (* %type <Decl.declaration> declaration_eof *)
 (* %type <Decl.declaration> declaration *)
 %type <Theory.term> top_formula
+%type <SystemExpr.Parse.t> system_expr
 %type <Process.process> top_process
 %type <ProverLib.input> interactive
 %type <ProverLib.input> top_proofmode
@@ -1112,7 +1114,8 @@ pr_query:
 |                 DOT { ProverLib.Pr_system None }
 
 search_query:
-| SEARCH   t=term  DOT { t }
+| SEARCH   t=term IN s=system_expr  DOT { ProverLib.Srch_inSys (t,s) }
+| SEARCH   t=term DOT { ProverLib.Srch_term t }
 
 (*------------------------------------------------------------------*)
 interactive:

@@ -261,7 +261,8 @@ let pp_goal (ps:state) ppf () = match ps.current_goal, ps.subgoals with
       Goal.pp j
   | _ -> assert false
 
-let search_about (st:state) (t:Theory.term) : (Lemma.lemma * Term.t list) list =
+let search_about (st:state) (q:ProverLib.search_query) : 
+  (Lemma.lemma * Term.t list) list =
   let env = 
     begin match st.prover_mode with
     | ProofMode -> 
@@ -275,25 +276,44 @@ let search_about (st:state) (t:Theory.term) : (Lemma.lemma * Term.t list) list =
         | Equiv j -> LowEquivSequent.env j
       end
     | _ -> 
-      Env.init ~table:st.table ()
+      begin match q with 
+      | ProverLib.Srch_inSys (_,sysexpr) ->
+          let system: SystemExpr.context option = 
+            Some ({ set = SystemExpr.Parse.parse 
+                      (get_table st) sysexpr;
+                    pair = None
+                  })
+          in
+          Env.init ~table:st.table ?system () 
+      | _ -> Env.init ~table:st.table ()
+      end
     end
   in
+  let t = match q with
+    | ProverLib.Srch_inSys (t,_)
+    | ProverLib.Srch_term t -> t in
   let cntxt = Theory.{ env; cntxt = InGoal; } in
+  (* ¿ What am I doing ¿ *)
+  (* let sty_env = Type.Infer.mk_env () in *)
+  (* let ty_env = Some sty_env in *)
+  (* let t,_ = Theory.convert ?ty_env ~pat:true cntxt t in *)
+  (* ? What am I doing ? *)
   let t,_ = Theory.convert ~pat:true cntxt t in
   let pat_vars =
     Vars.Sv.filter Vars.is_pat (Term.fv t)
   in
+  (* let _pat_tyvars, _ = Type.Infer.gen_and_close sty_env in *)
   let pat = Term.{
-      pat_tyvars = [];
+      pat_tyvars = env.ty_vars;
       pat_vars;
       pat_term = t; }
   in
-  let system = cntxt.env.system in
   Symbols.Lemma.fold (fun _ _ data acc -> 
       let g = Lemma.as_lemma data in
+      let sys = g.stmt.system in 
       let res = begin match g.stmt.formula with
-      | Global f -> Match.E.find st.table system pat f
-      | Local  f -> Match.T.find st.table system pat f
+      | Global f -> Match.E.find st.table sys pat f
+      | Local  f -> Match.T.find st.table sys pat f
       end in
       begin match res with
       | [] -> acc
@@ -301,16 +321,19 @@ let search_about (st:state) (t:Theory.term) : (Lemma.lemma * Term.t list) list =
       end
     ) [] st.table
 
-let do_search (st:state) (t:Theory.term) : unit =
-    let matches = search_about st t in
-    Printer.prt `Default "Match :\n";
-    let print_all fmt matches =
-    List.iter (fun (lemma,res:Lemma.lemma * Term.t list) -> 
-        Fmt.pf fmt "- in lemma %s: %a@;\n" lemma.stmt.name 
-          Equiv.Any.pp lemma.stmt.formula;
-        List.iter (fun t -> Fmt.pf fmt "\t→ %a\n" Term.pp t) res
-      ) matches in
-  Printer.prt `Result "%a" print_all matches
+let do_search (st:state) (t:ProverLib.search_query) : unit =
+  let matches = search_about st t in
+  Printer.prt `Default "Match :\n";
+  let print_all fmt matches =
+  List.iter (fun (lemma,_:Lemma.lemma * Term.t list) -> 
+        Fmt.pf fmt "@[<v 0>[Found in> %s:@;%a@;@]@." lemma.stmt.name 
+        Equiv.Any.pp lemma.stmt.formula
+        (* ↓ all lemma ? ↓ *)
+        (* Lemma.pp lemma *)
+        (* ↓ see matches for debug ↓ *)
+      (* List.iter (fun t -> Fmt.pf fmt "\t→ %a\n" Term.pp t) res *)
+    ) matches in
+Printer.prt `Result "%a" print_all matches
 
 let do_print (st:state) (q:ProverLib.print_query) : unit =
     begin match q with
@@ -372,3 +395,10 @@ let command_from_string (st:state) (s:string) =
 let exec_command s st : state  = 
   let input = command_from_string st s in
   do_command st (get_prover_command input)
+
+let exec_all (st:state) (s:string) = 
+  let commands = List.filter 
+      (function | "" -> false | _ -> true) 
+      (String.split_on_char '.' s) in
+  List.fold_left (fun st s -> 
+      exec_command (s^".") st) st commands
