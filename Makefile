@@ -9,12 +9,12 @@ default: squirrel
 
 all: squirrel test
 
-test: alcotest_quiet example
+test: alcotest_full example
 
 bench: bench_example
 
 # squirrel is not PHONY here, it exists as executable
-.PHONY: okfail okfail_end example examples_end alcotest alcotest_quiet
+.PHONY: okfail okfail_end example examples_end alcotest alcotest_full
 
 # Directory for logging test runs on "*.sp" files.
 RUNLOGDIR=_build/squirrel_log
@@ -148,8 +148,14 @@ examples_end: $(PROVER_EXAMPLES:.sp=.ok)
 alcotest: version
 	dune runtest
 
-alcotest_quiet: version
-	./_build/default/test.exe | { grep -E "^[^│] \[FAIL\]" || true; }
+# Apparently needs to build everything for the test.exe
+_build/default/test.exe: version
+	dune build
+
+# Will print out only the FAILs tests as before
+alcotest_full: _build/default/test.exe version
+	@./_build/default/test.exe | { grep -E "^[^│] \[FAIL\]" || true; }
+	@$(ECHO) "Done"
 
 clean:
 	dune clean
