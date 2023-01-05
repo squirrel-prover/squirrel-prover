@@ -54,8 +54,8 @@ type print_query = (* [None] means current system *)
 
 (** {2 User search query} *)
 type search_query = (* [None] means current system *)
-  | Srch_term    of Theory.term
-  | Srch_inSys   of Theory.term * SystemExpr.Parse.t 
+  | Srch_term    of Theory.any_term
+  | Srch_inSys   of Theory.any_term * SystemExpr.Parse.t 
 
 (*---------------- Errors in proverlib -----------------------*)(* {↓{ *)
 (** TOMOVE Error handling in prover *)
@@ -96,7 +96,6 @@ type bulleted_tactics = bulleted_tactic list
 type toplevel_input =
   | Undo    of int
   | Include of include_param
-  | EOF
 
 type prover_input = 
   | InputDescr of Decl.declarations
@@ -109,6 +108,8 @@ type prover_input =
   | Qed
   | Abort
   | Hint of Hint.p_hint
+  | EOF
+  | Include of include_param
 
 type input =
   | Prover of prover_input

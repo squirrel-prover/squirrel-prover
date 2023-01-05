@@ -2,9 +2,10 @@ module Prover = Squirrellib.Prover
 module ProverLib = Squirrellib.ProverLib
 module Parser = Squirrellib.Parser
 module Lexer = Squirrellib.Lexer
+module Theory = Squirrellib.Theory
 
-let term_from_string (s:string) = (Parser.top_formula Lexer.token
-                                     (Lexing.from_string s))
+let term_from_string (s:string) = Theory.Local 
+    (Parser.top_formula Lexer.token (Lexing.from_string s))
 
 let sexpr_from_string (s:string) = (Parser.system_expr Lexer.token
                                      (Lexing.from_string s))
@@ -88,7 +89,7 @@ let search_about_2 () =
       admit.
     Qed."
   in
-  (* FIXME parser don't want to parse equiv → keyword ? *)
+  (* FIXME parser doesn't want to parse equiv → keyword ? *)
   (* let _ = Prover.exec_command "search equiv(_) in [S]." st in *)
   (* Prover.do_search st *)
   (*   (ProverLib.Srch_inSys ((term_from_string "equiv(_)"), *)

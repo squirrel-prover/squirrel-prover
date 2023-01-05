@@ -294,7 +294,10 @@ let search_about (st:state) (q:ProverLib.search_query) :
     | ProverLib.Srch_term t -> t in
   let cntxt = Theory.{ env; cntxt = InGoal; } in
   let ty_env = Type.Infer.mk_env () in
-  let t,_ = Theory.convert ~ty_env ~pat:true cntxt t in
+  let t = match t with
+    | Local p -> fst (Theory.convert ~ty_env ~pat:true cntxt p)
+    | Global _ -> assert false(*howto get pat from global_formula ?*)
+  in
   let pat_vars =
     Vars.Sv.filter Vars.is_pat (Term.fv t)
   in
@@ -363,6 +366,25 @@ let do_print (st:state) (q:ProverLib.print_query) : unit =
 let do_eof (st:state) : state = 
     { st with prover_mode = AllDone }
 
+(* utils TODO move *)(* {↓{ *)
+(* let read_whole_file filename : string = *)
+(*     let ch = open_in filename in *)
+(*     let s = really_input_string ch (in_channel_length ch) in *)
+(*     close_in ch; *)
+(*     s *)
+
+let get_prover_command = function
+  | ProverLib.Prover c -> c
+  | _ -> assert false
+
+let command_from_string (st:state) (s:string) = 
+  if st.prover_mode = ProverLib.ProofMode 
+  then
+    Parser.top_proofmode Lexer.token (Lexing.from_string s)
+  else
+    Parser.interactive Lexer.token (Lexing.from_string s)
+(* }↑} *)
+
 let do_command (state:state) (command:ProverLib.prover_input) : state =
   match command with
   | InputDescr decls -> let st,_ = add_decls state decls in st
@@ -375,17 +397,14 @@ let do_command (state:state) (command:ProverLib.prover_input) : state =
   | Goal g           -> add_new_goal state g
   | Proof            -> let _,st = start_proof state `Check in st
   | Abort            -> abort state
-
-let get_prover_command = function
-  | ProverLib.Prover c -> c
-  | _ -> assert false
-
-let command_from_string (st:state) (s:string) = 
-  if st.prover_mode = ProverLib.ProofMode 
-  then
-    Parser.top_proofmode Lexer.token (Lexing.from_string s)
-  else
-    Parser.interactive Lexer.token (Lexing.from_string s)
+  | Include _        -> state
+  | EOF              -> do_eof state
+(* and do_include (st:state) (i: ProverLib.include_param) : state = *)
+(*   let load_paths = mk_load_paths () in *)
+(*   let *) 
+(*   let file = locate state i.th_name in *)
+(*   let commands = read_whole_file file in *)
+(*   exec_all st commands *) 
 
 let exec_command s st : state  = 
   let input = command_from_string st s in

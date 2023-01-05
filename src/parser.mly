@@ -1114,8 +1114,8 @@ pr_query:
 |                 DOT { ProverLib.Pr_system None }
 
 search_query:
-| SEARCH   t=term IN s=system_expr  DOT { ProverLib.Srch_inSys (t,s) }
-| SEARCH   t=term DOT { ProverLib.Srch_term t }
+| SEARCH   t=any_term IN s=system_expr  DOT { ProverLib.Srch_inSys (t,s) }
+| SEARCH   t=any_term DOT { ProverLib.Srch_term t }
 
 (*------------------------------------------------------------------*)
 interactive:
@@ -1129,7 +1129,7 @@ interactive:
 | QED                { ProverLib.Prover Qed }
 | g=goal             { ProverLib.Prover (Goal g) }
 | h=hint             { ProverLib.Prover (Hint h) }
-| EOF                { ProverLib.Toplvl EOF }
+| EOF                { ProverLib.Prover EOF }
 
 bullet:
 | MINUS              { "-" }
@@ -1155,4 +1155,4 @@ top_proofmode:
 | u=undo             { ProverLib.Toplvl (Undo u) }
 | ABORT              { ProverLib.Prover Abort }
 | QED                { ProverLib.Prover Qed }
-| EOF                { ProverLib.Toplvl EOF }
+| EOF                { ProverLib.Prover EOF }
