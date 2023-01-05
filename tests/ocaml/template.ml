@@ -6,12 +6,12 @@ let template_test () =
   let st = Prover.init () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
   let st = 
-    Prover.exec_command 
+    Prover.exec_all st
         "channel c
-        system S : !_i new n; out(c,n)." st
-  |> Prover.exec_command "goal foo (i:index) : happens(S(i)) => output@S(i) = n(i)."
-  |> Prover.exec_command "Proof."
-  |> Prover.exec_command "auto."
+        system S : !_i new n; out(c,n).
+        goal foo (i:index) : happens(S(i)) => output@S(i) = n(i).
+        Proof.
+          auto."
   in
   let pprint_option ppf = function 
     | Some s -> Fmt.pf ppf "%s" s
