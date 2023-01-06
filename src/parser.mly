@@ -1125,7 +1125,7 @@ interactive:
 | PRINT q=pr_query   { ProverLib.Prover (Print q) }
 | t=search_query     { ProverLib.Prover (Search t) }
 | PROOF              { ProverLib.Prover Proof }
-| i=p_include        { ProverLib.Toplvl (Include i) }
+| i=p_include        { ProverLib.Prover (Include i) }
 | QED                { ProverLib.Prover Qed }
 | g=goal             { ProverLib.Prover (Goal g) }
 | h=hint             { ProverLib.Prover (Hint h) }

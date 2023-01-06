@@ -30,23 +30,7 @@ sig
   val do_eof : state -> state
 end
 
-(** {2 Toplevel prover}
- *
- * This is the module that manages a prover. 
- * It is a functor that takes a PROVER module.
- * The state contains option_defs (oracle), Configs params and
- * prover_mode (just a flag to know where we are in the proof, it can
- * be induced with prover_state).
- *
- * It does contains them but do not handle them yet… TODO
- * It only stores them for history purposes.
- * option_defs and Config.params are global refs (they have to be
- * managed statefully here)
- *
- * It mainly prints out results while calling PROVER functions.
- *)
-module Make (Prover : PROVER) :
-  sig
+module type S = sig
     (** {TopLevel state}
      * composed with:
      * - PROVER.state the prover state (see Prover)
@@ -54,8 +38,9 @@ module Make (Prover : PROVER) :
      * - option_defs (mainly used for oracles)
      * - prover_mode (keep trace of state of the current proof)
      *)
+    type prover_state_ty
     type state = {
-      prover_state : Prover.state; (* prover state *)
+      prover_state : prover_state_ty; (* prover state *)
       params       : Config.params; (* save global params… *)
       option_defs  : ProverLib.option_def list; (* save global option_def *)
     }
@@ -123,4 +108,22 @@ module Make (Prover : PROVER) :
 
     (** Get prover mode *)
     val get_mode : state -> ProverLib.prover_mode
-  end
+end
+
+(** {2 Toplevel prover}
+ *
+ * This is the module that manages a prover. 
+ * It is a functor that takes a PROVER module.
+ * The state contains option_defs (oracle), Configs params and
+ * prover_mode (just a flag to know where we are in the proof, it can
+ * be induced with prover_state).
+ *
+ * It does contains them but do not handle them yet… TODO
+ * It only stores them for history purposes.
+ * option_defs and Config.params are global refs (they have to be
+ * managed statefully here)
+ *
+ * It mainly prints out results while calling PROVER functions.
+ *)
+module Make (Prover : PROVER) : S with type prover_state_ty =
+                                         Prover.state

@@ -294,30 +294,42 @@ let search_about (st:state) (q:ProverLib.search_query) :
     | ProverLib.Srch_term t -> t in
   let cntxt = Theory.{ env; cntxt = InGoal; } in
   let ty_env = Type.Infer.mk_env () in
-  let t = match t with
-    | Local p -> fst (Theory.convert ~ty_env ~pat:true cntxt p)
-    | Global _ -> assert false(*howto get pat from global_formula ?*)
-  in
-  let pat_vars =
-    Vars.Sv.filter Vars.is_pat (Term.fv t)
-  in
-  let pat = Term.{
-      pat_tyvars = [];
-      pat_vars;
-      pat_term = t; }
-  in
-  Symbols.Lemma.fold (fun _ _ data acc -> 
-      let g = Lemma.as_lemma data in
-      let sys = g.stmt.system in 
-      let res = begin match g.stmt.formula with
-      | Global f -> Match.E.find ~ty_env st.table sys pat f
-      | Local  f -> Match.T.find ~ty_env st.table sys pat f
-      end in
-      begin match res with
-      | [] -> acc
-      | _ -> (g,res)::acc
-      end
-    ) [] st.table
+  let find pat =
+    Symbols.Lemma.fold (fun _ _ data acc -> 
+        let g = Lemma.as_lemma data in
+        let sys = g.stmt.system in 
+        let res = begin match g.stmt.formula with
+        | Global f -> Match.E.find ~ty_env st.table sys pat f
+        | Local  f -> Match.T.find ~ty_env st.table sys pat f
+        end in
+        begin match res with
+        | [] -> acc
+        | _ -> (g,res)::acc
+        end
+      ) [] st.table in
+  match t with
+  | Local p -> 
+    let t = fst (Theory.convert ~ty_env ~pat:true cntxt p) in
+    let pat_vars =
+      Vars.Sv.filter Vars.is_pat (Term.fv t)
+    in
+    let pat = Term.{
+        pat_tyvars = [];
+        pat_vars;
+        pat_term = t; } in
+    find pat
+  | Global _ ->
+    assert false (* TODO implement Match.E.find_glob finds Equiv.form
+                    in Equiv.form *)
+    (* let t = Theory.convert_global_formula cntxt f in *)
+    (* let pat_vars = *)
+    (*   Vars.Sv.filter Vars.is_pat (Equiv.fv t) *)
+    (* in *)
+    (* let pat = Term.{ *)
+    (*     pat_tyvars = []; *)
+    (*     pat_vars; *)
+    (*     pat_term = t; } in *) 
+    (* find pat *)
 
 let do_search (st:state) (t:ProverLib.search_query) : unit =
   let matches = search_about st t in
@@ -366,13 +378,6 @@ let do_print (st:state) (q:ProverLib.print_query) : unit =
 let do_eof (st:state) : state = 
     { st with prover_mode = AllDone }
 
-(* utils TODO move *)(* {↓{ *)
-(* let read_whole_file filename : string = *)
-(*     let ch = open_in filename in *)
-(*     let s = really_input_string ch (in_channel_length ch) in *)
-(*     close_in ch; *)
-(*     s *)
-
 let get_prover_command = function
   | ProverLib.Prover c -> c
   | _ -> assert false
@@ -383,9 +388,8 @@ let command_from_string (st:state) (s:string) =
     Parser.top_proofmode Lexer.token (Lexing.from_string s)
   else
     Parser.interactive Lexer.token (Lexing.from_string s)
-(* }↑} *)
 
-let do_command (state:state) (command:ProverLib.prover_input) : state =
+let rec do_command (state:state) (command:ProverLib.prover_input) : state =
   match command with
   | InputDescr decls -> let st,_ = add_decls state decls in st
   | Tactic l         -> List.fold_left tactic_handle state l
@@ -397,20 +401,22 @@ let do_command (state:state) (command:ProverLib.prover_input) : state =
   | Goal g           -> add_new_goal state g
   | Proof            -> let _,st = start_proof state `Check in st
   | Abort            -> abort state
-  | Include _        -> state
+  | Include i        -> do_include state i
   | EOF              -> do_eof state
-(* and do_include (st:state) (i: ProverLib.include_param) : state = *)
-(*   let load_paths = mk_load_paths () in *)
-(*   let *) 
-(*   let file = locate state i.th_name in *)
-(*   let commands = read_whole_file file in *)
-(*   exec_all st commands *) 
-
-let exec_command s st : state  = 
+and do_include (st:state) (i: ProverLib.include_param) : state =
+  (* `Stdin will take cwd in path *)
+  let load_paths = Driver.mk_load_paths ~main_mode:`Stdin () in
+  let file = Driver.locate load_paths (Location.unloc i.th_name) in
+  do_all_commands_in st file
+and do_all_commands_in (st:state) (file:Driver.file) : state =
+  match Driver.next_input ~test:false file st.prover_mode with
+  | ProverLib.Prover EOF -> do_eof st
+  | cmd -> do_all_commands_in 
+             (do_command st (get_prover_command cmd)) file
+and exec_command s st : state  = 
   let input = command_from_string st s in
   do_command st (get_prover_command input)
-
-let exec_all (st:state) (s:string) = 
+and exec_all (st:state) (s:string) = 
   let commands = List.filter 
       (function | "" -> false | _ -> true) 
       (String.split_on_char '.' s) in

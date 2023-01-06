@@ -30,11 +30,93 @@ module type PROVER = sig
   val do_eof : state -> state
 end
 
-module Make (Prover : PROVER) = struct
+module type S = sig
+    (** {TopLevel state}
+     * composed with:
+     * - PROVER.state the prover state (see Prover)
+     * - Configs.params 
+     * - option_defs (mainly used for oracles)
+     * - prover_mode (keep trace of state of the current proof)
+     *)
+    type prover_state_ty
+    type state = {
+      prover_state : prover_state_ty; (* prover state *)
+      params       : Config.params; (* save global params… *)
+      option_defs  : ProverLib.option_def list; (* save global option_def *)
+    }
+
+    (** Print goal *)
+    val pp_goal : state -> Format.formatter -> unit -> unit
+
+    (** Abort the current proof *)
+    val abort : state -> state
+
+    (** Return Toplevel.PROVER in init state *)
+    val init : unit -> state
+
+    (** If current proof is completed change prover_mode and printout
+     * informations *)
+    val try_complete_proof : state -> state
+
+    (** Handle different parsed elements including Tactics ! *)
+    val tactic_handle : state -> ProverLib.bulleted_tactic -> state
+
+    (** return the Symbols table *)
+    val get_table : state -> Symbols.table
+
+    (** Only switch prover_mode to AllDone → to finish program *)
+    val do_eof : state -> state
+
+    (** Start a proof : initialize the prover state and set
+     * prover_state regarding to a given `Check mode *)
+    val do_start_proof : state -> [ `Check | `NoCheck ] -> state
+
+    (** Add given parsed goal and print it out *)
+    val do_add_goal : state -> Goal.Parsed.t Location.located -> state
+
+    (** Add hint *)
+    val do_add_hint : state -> Hint.p_hint -> state
+
+    (** set param/option from Config *)
+    val do_set_option : state -> Config.p_set_param -> state
+
+    (** Complete the proofs, resetting the current goal to None and
+     * print exiting proof *)
+    val do_qed : state -> state
+
+    (** Add declarations to the table and print new proof obligations *)
+    val do_decls : state -> Decl.declarations -> state
+
+    (** Print current system *)
+    val do_print : state -> ProverLib.print_query -> unit
+  
+    (** Search a term and print matches *)
+    val do_search : state -> ProverLib.search_query -> unit
+
+    (** ↓ TODO remove params and options from globals ↓ *)
+    (** Gets saved Config params *)
+    val get_params : state -> Config.params
+
+    (** Saves Config params *)
+    val set_params : state -> Config.params -> state
+
+    (** Get saved option_defs  *)
+    val get_option_defs : state -> ProverLib.option_def list
+
+    (** Saves option_defs *)
+    val set_option_defs : state -> ProverLib.option_def list -> state
+
+    (** Get prover mode *)
+    val get_mode : state -> ProverLib.prover_mode
+end
+
+module Make (Prover : PROVER) : S with type prover_state_ty =
+                                         Prover.state = struct
   (* proof state with params is what is managed by this module and
    * what we record in history *)
+  type prover_state_ty = Prover.state
   type state = {
-    prover_state : Prover.state; (* prover state *)
+    prover_state : prover_state_ty; (* prover state *)
     params       : Config.params; (* save global params… *)
     option_defs  : ProverLib.option_def list; (* save global option_def *)
   }

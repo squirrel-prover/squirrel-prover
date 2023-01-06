@@ -14,6 +14,50 @@ end
 
 let usage = Fmt.str "Usage: %s filename" (Filename.basename Sys.argv.(0))
 
+module ToplevelProver = TopLevel.Make(Prover)
+module HistoryTP = History.Make(ToplevelProver)
+
+(** State of the main loop. *)
+type driver_state = {
+  toplvl_state : ToplevelProver.state;
+  (* toplvl_state : ToplevelProver.state = {
+      prover_state : Prover.state = {
+        goals        : ProverLib.pending_proof list;
+        table        : Symbols.table; 
+        current_goal : ProverLib.pending_proof option;
+        subgoals     : Goal.t list;
+        bullets      : Bullets.path;
+        prover_mode  : ProverLib.prover_mode;
+      }
+      params       : Config.params; (* save global params… *)
+      option_defs  : ProverLib.option_def list; (* save global option_def *)
+    }
+  *)
+
+  (* ↓ history of toplvl_state ↑ *)
+  history_state : HistoryTP.history_state;
+
+  (* The check_mode can be changed regarding to includes main.ml:426 *)
+  check_mode : [`Check | `NoCheck];
+
+  (* load_paths set once for all in start_main_loop *)
+  load_paths : load_paths;
+  (** load paths *)
+
+  (* current file can be changed regarding to do_include *)
+  file : file;
+  (** current file *)
+
+  (* file_stack can be changed regarding to do_include *)
+  file_stack : file list;
+  (** stack of nested opened files *)
+}
+
+(** Get the next input from the current file. Driver *)
+let next_input ~test (state : driver_state) : ProverLib.input =
+  Driver.next_input ~test state.file
+    (ToplevelProver.get_mode state.toplvl_state)
+
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
@@ -43,8 +87,8 @@ let pp_toplevel_error
     (fmt : Format.formatter)
     (e : exn) : unit
   =
-  let pp_loc_error     = pp_loc_error     state in
-  let pp_loc_error_opt = pp_loc_error_opt state in
+  let pp_loc_error     = pp_loc_error     state.file in
+  let pp_loc_error_opt = pp_loc_error_opt state.file in
 
   match e with
   | Parserbuf.Error s ->
@@ -205,7 +249,9 @@ let rec do_include
     (i : ProverLib.include_param) 
   : driver_state 
   =
-  let file = include_get_file state i.th_name in
+  let file = include_get_file state.file_stack
+                              state.load_paths
+                              i.th_name in
   let file_stack = state.file :: state.file_stack in
 
   let hstate = { state with 
@@ -273,7 +319,7 @@ and do_command
                                        (* ↓ touch only toplvl_state ↓ *)
     | GoalMode, Prover Proof            -> do_start_proof state
                               (* ↓ seems to touch only toplvl_state ↓ *)
-    | GoalMode, Toplvl Include inc      -> do_include ~test state inc
+    | GoalMode, Prover Include inc      -> do_include ~test state inc
                                   (* ↓ touch only toplvl_state mode ↓ *)
     | GoalMode, Prover EOF              -> do_eof state
 
@@ -301,7 +347,6 @@ and do_all_commands ~(test : bool) (state : driver_state) : driver_state =
   match next_input ~test state with
   | ProverLib.Prover EOF -> state
   | cmd -> do_all_commands ~test (do_command ~test state cmd)
-
 
 (** The main loop of the prover. The mode defines in what state the prover is,
     e.g is it waiting for a proof script, or a system description, etc.
@@ -370,7 +415,6 @@ let start_main_loop
     | `Stdin -> file_from_stdin ()
     | `File fname -> locate [LP_none] fname
   in
-
   (* XXX the state is mainly composed by attributes only "config"
    * and "option_defs" values do not change in the program *)
   let state = {

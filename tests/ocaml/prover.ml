@@ -23,11 +23,11 @@ let search_about_1 () =
   let matches = Prover.search_about st 
       (ProverLib.Srch_term (term_from_string "happens(_)"))
   in
-  Alcotest.(check bool) "Found one lemma with happens(_)"
-    ((List.length matches)=1) true;
+  Alcotest.(check int) "Found one lemma with happens(_)"
+    (List.length matches) 1;
 
-  Alcotest.(check bool) "Found one pattern happens(_) in lemma"
-    ((List.length (snd (List.hd matches)))=1) true;
+  Alcotest.(check int) "Found one pattern happens(_) in lemma"
+    (List.length (snd (List.hd matches))) 1;
   let st = Prover.exec_command "auto." st
   |> Prover.exec_command "Qed."
   in
@@ -41,10 +41,10 @@ let search_about_1 () =
   let matches = Prover.search_about st
     (ProverLib.Srch_term (term_from_string "n(_)"))
   in
-  Alcotest.(check bool) "Found one lemma with n(_)"
-    ((List.length matches)=1) true;
-  Alcotest.(check bool) "Found one pattern n(_) in lemma"
-    ((List.length (snd (List.hd matches)))=1) true;
+  Alcotest.(check int) "Found one lemma with n(_)"
+    (List.length matches) 1;
+  Alcotest.(check int) "Found one pattern n(_) in lemma"
+    (List.length (snd (List.hd matches))) 1;
 
   let _ =  Prover.exec_command "search n(_)." st in
   ()
@@ -99,12 +99,59 @@ let search_about_2 () =
     (ProverLib.Srch_inSys ((term_from_string "true"),
                            sexpr_from_string "[S]"))
   in
-  Alcotest.(check bool) "Found one lemma with true"
-    ((List.length matches)=1) true;
+  Alcotest.(check int) "Found one lemma with true"
+    (List.length matches) 1;
   (* Should print ↓ *)
   let _ = Prover.exec_command "print goal myeq." st in
   ()
 
+let include_search () =
+  let st = Prover.init () in
+  (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
+  let st = 
+    Prover.exec_command 
+        "include Basic." st
+    |> Prover.exec_command "channel c
+        system [T] (S : !_i new n; out(c,n))."
+    |> Prover.exec_command 
+        "goal [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i)."
+    |> Prover.exec_command "Proof."
+    |> Prover.exec_command "search happens(_)."
+  in
+  let matches = Prover.search_about st 
+      (ProverLib.Srch_term (term_from_string "happens(_)"))
+  in
+  Alcotest.(check int) "Found 2 lemmas with happens(_)"
+    (List.length matches) 2;
+
+  Alcotest.(check int) "Found one pattern happens(_) in lemma"
+    (List.length (snd (List.hd matches))) 1;
+  let st = Prover.exec_command "auto." st
+  |> Prover.exec_command "Qed."
+  in
+  let pprint_option ppf = function 
+    | Some s -> Fmt.pf ppf "%s" s
+    | None -> Fmt.pf ppf "" in
+  let some_testable = Alcotest.testable pprint_option (=) in
+  Alcotest.(check some_testable) "Goal name" 
+    (Prover.current_goal_name st) (None);
+
+  let matches = Prover.search_about st
+    (ProverLib.Srch_term (term_from_string "n(_)"))
+  in
+  Alcotest.(check int) "Found one lemma with n(_)"
+    (List.length matches) 1;
+  Alcotest.(check int) "Found one pattern n(_) in lemma"
+    (List.length (snd (List.hd matches))) 1;
+
+  let matches = Prover.search_about st
+    (ProverLib.Srch_term (term_from_string "<_,_>"))
+  in
+  Alcotest.(check int) "Found 2 lemmas with <_,_>"
+    (List.length matches) 2;
+  ()
+
 let tests = [ ("search_about1", `Quick, search_about_1);
               ("search_about2", `Quick, search_about_2);
+              ("include_search", `Quick, include_search);
             ]

@@ -95,7 +95,6 @@ type bulleted_tactics = bulleted_tactic list
 (* This should move somewhere else *)
 type toplevel_input =
   | Undo    of int
-  | Include of include_param
 
 type prover_input = 
   | InputDescr of Decl.declarations
