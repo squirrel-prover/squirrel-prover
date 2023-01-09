@@ -109,14 +109,12 @@ let include_search () =
   let st = Prover.init () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
   let st = 
-    Prover.exec_command 
-        "include Basic." st
-    |> Prover.exec_command "channel c
-        system [T] (S : !_i new n; out(c,n))."
-    |> Prover.exec_command 
-        "goal [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i)."
-    |> Prover.exec_command "Proof."
-    |> Prover.exec_command "search happens(_)."
+    Prover.exec_all st
+        "include Basic.
+        channel c
+        system [T] (S : !_i new n; out(c,n)).
+        goal [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i).   
+        Proof."
   in
   let matches = Prover.search_about st 
       (ProverLib.Srch_term (term_from_string "happens(_)"))

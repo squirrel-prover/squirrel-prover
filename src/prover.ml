@@ -279,11 +279,10 @@ let search_about (st:state) (q:ProverLib.search_query) :
       begin match q with 
       | ProverLib.Srch_inSys (_,sysexpr) ->
           let system: SystemExpr.context option = 
-            Some ({ set = SystemExpr.Parse.parse 
-                      (get_table st) sysexpr;
+            Some ({ set  = SystemExpr.Parse.parse 
+                            (get_table st) sysexpr;
                     pair = None
-                  })
-          in
+                  }) in
           Env.init ~table:st.table ?system () 
       | _ -> Env.init ~table:st.table ()
       end
@@ -338,10 +337,6 @@ let do_search (st:state) (t:ProverLib.search_query) : unit =
   List.iter (fun (lemma,_:Lemma.lemma * Term.t list) -> 
         Fmt.pf fmt "@[<v 0>[Found in> %s:@;%a@;@]@." lemma.stmt.name 
         Equiv.Any.pp lemma.stmt.formula
-        (* ↓ all lemma ? ↓ *)
-        (* Lemma.pp lemma *)
-        (* ↓ see matches for debug ↓ *)
-      (* List.iter (fun t -> Fmt.pf fmt "\t→ %a\n" Term.pp t) res *)
     ) matches in
 Printer.prt `Result "%a" print_all matches
 
@@ -389,9 +384,10 @@ let command_from_string (st:state) (s:string) =
   else
     Parser.interactive Lexer.token (Lexing.from_string s)
 
+(* Command handlers *)(* {↓{ *)
 let rec do_command (state:state) (command:ProverLib.prover_input) : state =
   match command with
-  | InputDescr decls -> let st,_ = add_decls state decls in st
+  | InputDescr decls -> fst (add_decls state decls)
   | Tactic l         -> List.fold_left tactic_handle state l
   | Print q          -> do_print state q; state
   | Search t         -> do_search state t; state
@@ -399,12 +395,12 @@ let rec do_command (state:state) (command:ProverLib.prover_input) : state =
   | Hint h           -> add_hint state h
   | SetOption sp     -> set_param state sp
   | Goal g           -> add_new_goal state g
-  | Proof            -> let _,st = start_proof state `Check in st
+  | Proof            -> snd (start_proof state `Check)
   | Abort            -> abort state
   | Include i        -> do_include state i
   | EOF              -> do_eof state
 and do_include (st:state) (i: ProverLib.include_param) : state =
-  (* `Stdin will take cwd in path *)
+  (* `Stdin will add cwd in path with theories *)
   let load_paths = Driver.mk_load_paths ~main_mode:`Stdin () in
   let file = Driver.locate load_paths (Location.unloc i.th_name) in
   do_all_commands_in st file
@@ -413,7 +409,7 @@ and do_all_commands_in (st:state) (file:Driver.file) : state =
   | ProverLib.Prover EOF -> do_eof st
   | cmd -> do_all_commands_in 
              (do_command st (get_prover_command cmd)) file
-and exec_command s st : state  = 
+and exec_command (s:string) (st:state) : state  = 
   let input = command_from_string st s in
   do_command st (get_prover_command input)
 and exec_all (st:state) (s:string) = 
@@ -422,3 +418,4 @@ and exec_all (st:state) (s:string) =
       (String.split_on_char '.' s) in
   List.fold_left (fun st s -> 
       exec_command (s^".") st) st commands
+(* }↑} *)
