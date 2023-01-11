@@ -165,6 +165,12 @@ module Pos = struct
     'a ->
     'a * [`Map of Term.term | `Continue]
 
+  type 'a f_map_fold_g =
+    Equiv.form ->
+    SE.arbitrary -> Vars.vars -> Term.term list -> pos ->
+    'a ->
+    'a * [`Map of Equiv.form | `Continue]
+
   type f_map =
     Term.term ->
     SE.arbitrary -> Vars.vars -> Term.term list -> pos -> 
@@ -549,6 +555,72 @@ module Pos = struct
     a 
 
   (*------------------------------------------------------------------*)
+  (** Internal *)
+  let rec map_fold_g
+      (func   : 'a f_map_fold_g) 
+      (mode   : [`TopDown of bool | `BottomUp])
+      (* - [`TopDown b]: apply [func] at top-level first, then recurse.
+           [b] tells if we recurse under successful maps.
+         - [`BottomUp _]: recurse, then apply [func] at top-level *)
+
+      ~(system : SE.context)    (* context applying the current pos. *)
+      ~(vars   : Vars.vars)     (* variable bound above the current position *)
+      ~(conds  : Term.terms)    (* conditions above the current position *)
+      ~(p      : pos)           (* current position *)
+      ~(acc    : 'a)            (* folding value *)
+      (ti      : Equiv.form)       
+    : 'a * bool * Equiv.form    (* folding value, `Map found, term *)
+    = 
+    let map_fold_g ?(system = system) ?(vars = vars) ?(conds = conds) = 
+      map_fold_g func mode ~system ~vars ~conds 
+    in
+    let map_fold_e_l ?(system = system) ?(vars = vars) ?(conds = conds) = 
+      map_fold_e_l func mode ~system ~vars ~conds 
+    in
+
+    match ti with
+    | Equiv.Quant (q, is, t0) ->
+      let is, subst = Term.refresh_vars `Global is in
+      let t0 = Equiv.subst subst t0 in
+      let vars = List.rev_append is vars in
+
+      let acc, found, t0 = map_fold_g ~vars ~p:(0 :: p) ~acc t0 in
+
+      let ti' = Equiv.mk_quant q is t0 in
+      acc, found, if found then ti' else ti
+    | Equiv.Atom (Reach _) (* FIXME can't go further in terms ? *)
+    | Equiv.Atom (Equiv _) -> 
+      begin match func ti system.set vars conds p acc with
+      | acc, `Map t -> acc, true, t
+      | acc, `Continue -> acc, false, ti
+      end
+    | Equiv.Impl (f1, f2)
+    | Equiv.And  (f1, f2)
+    | Equiv.Or   (f1, f2) -> 
+      let acc, found, l = map_fold_e_l ~vars ~conds ~p ~acc [f1; f2] in
+      let f1, f2 = as_seq2 l in
+      let ti' = 
+        match ti with
+        | Equiv.Impl _ -> Equiv.Impl (f1, f2)
+        | Equiv.And  _ -> Equiv.And  (f1, f2)
+        | Equiv.Or   _ -> Equiv.Or   (f1, f2)
+        | _ -> assert false
+      in
+      acc, found, if found then ti' else ti
+
+  and map_fold_e_l func mode ~system ~vars ~conds ~p ~acc (l : Equiv.form list) =
+    let (acc, found), l =
+      List.mapi_fold (fun i (acc, found) ti -> 
+          let acc, found', ti = 
+            map_fold_g func mode ~system ~vars ~conds ~p:(i :: p) ~acc ti
+          in
+          (acc, found || found'), ti
+        ) (acc, false) l 
+    in
+    acc, found, l
+
+
+  (*------------------------------------------------------------------*)
   (** Exported *)
   let map_fold
       ?(mode=`TopDown false) 
@@ -566,6 +638,14 @@ module Pos = struct
         (acc : 'a) (t : Equiv.form) 
     =
     map_fold_e func mode ~system ~vars:[] ~conds:[] ~p:[] ~acc t
+
+  let map_fold_g
+        ?(mode=`TopDown false) 
+        (func : 'a f_map_fold_g)
+        (system : SE.context) 
+        (acc : 'a) (t : Equiv.form) 
+    =
+    map_fold_g func mode ~system ~vars:[] ~conds:[] ~p:[] ~acc t
 end
 
 (*------------------------------------------------------------------*)
@@ -2026,7 +2106,7 @@ type cond_term = { term : Term.term; cond : Term.term }
 (** {3 Equiv matching and unification} *)
 
 
-module E : S with type t = Equiv.form = struct
+module E = struct
   (* We include Term.Match, and redefine any necessary function *)
   include T
 
@@ -2770,7 +2850,7 @@ module E : S with type t = Equiv.form = struct
       (table  : Symbols.table) 
       (system : SE.context) 
       (pat    : term pat) 
-      (t      : Equiv.form) 
+      (t      : t) 
     : Term.terms
     =
     let f_fold : Term.terms Pos.f_map_fold = 
@@ -2784,5 +2864,27 @@ module E : S with type t = Equiv.form = struct
         | _       ->      acc, `Continue
     in
     let acc, _, _ = Pos.map_fold_e f_fold system [] t in
+    acc
+
+  let find_glob
+      ?option
+      ?ty_env
+      (table  : Symbols.table) 
+      (system : SE.context) 
+      (pat    : t pat) 
+      (t      : t) 
+    : t list
+    =
+    let f_fold : (Equiv.form list) Pos.f_map_fold_g =
+      fun e se _vars _conds _p acc ->
+        let subterm_system = SE.reachability_context se in
+        match 
+          try_match ~expand_context:InSequent
+            ?ty_env ?option table subterm_system e pat 
+        with
+        | Match _ -> e :: acc, `Continue
+        | _       ->      acc, `Continue
+    in
+    let acc, _, _ = Pos.map_fold_g f_fold system [] t in
     acc
 end

@@ -89,11 +89,9 @@ let search_about_2 () =
       admit.
     Qed."
   in
-  (* FIXME parser doesn't want to parse equiv → keyword ? *)
+  (* FIXME parser doesn't want to parse pattern in global_form ↓ *)
   (* let _ = Prover.exec_command "search equiv(_) in [S]." st in *)
-  (* Prover.do_search st *)
-  (*   (ProverLib.Srch_inSys ((term_from_string "equiv(_)"), *)
-  (*                          sexpr_from_string "[S]")); *)
+  let _ = Prover.exec_command "search equiv(true) in [S]." st in
   let _ = Prover.exec_command "search true in [S]." st in
   let matches = Prover.search_about st
     (ProverLib.Srch_inSys ((term_from_string "true"),

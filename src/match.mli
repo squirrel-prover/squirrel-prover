@@ -260,6 +260,7 @@ module type S = sig
     Term.term Term.pat -> 
     t -> 
     Term.term list
+
 end
 
 (*------------------------------------------------------------------*)
@@ -284,4 +285,14 @@ val reduce_beta : Term.term -> Term.term * bool
 (** {2 Matching and unification} *)
 module T : S with type t = Term.term
 
-module E : S with type t = Equiv.form
+module E : sig
+  include S with type t = Equiv.form
+  val find_glob : 
+    ?option:match_option ->
+    ?ty_env:Type.Infer.env ->
+    Symbols.table ->
+    SE.context ->
+    t Term.pat -> 
+    t -> 
+    t list
+end

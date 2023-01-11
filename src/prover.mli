@@ -93,7 +93,8 @@ val first_goal : state -> ProverLib.pending_proof
 
 (** Returns terms that match t pattern in lemma *)
 val search_about : 
-  state -> ProverLib.search_query -> (Lemma.lemma * Term.t list) list
+  state -> ProverLib.search_query -> 
+    (Lemma.lemma * Equiv.any_form list) list
 
 (** Manage print query *)
 val do_print : state -> ProverLib.print_query -> unit
