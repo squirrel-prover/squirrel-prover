@@ -181,7 +181,7 @@ val find_name_occ :
   n_occs
 
   
-(** {2 Searching for illegal name occurrences} *)
+(** {2 Searching for illegal occurrences} *)
 
 (** Type of a function that takes a term, and generates
     a list of its name occurrences.
@@ -228,6 +228,15 @@ type ('a, 'b) f_fold_occs =
   st:term ->
   term ->
   n_occs * ('a, 'b) simple_occs
+
+val find_all_occurrences :
+    ?pp_ns:unit Fmt.t option ->
+    ('a, 'b) occ_formula ->
+    ('a, 'b) f_fold_occs ->
+    Constr.trace_cntxt ->
+    Vars.env ->
+    terms ->
+    name_occs * ('a, 'b) ext_occs
 
 (*------------------------------------------------------------------*)
 (** {1 Proof obligations for name occurrences} *)
