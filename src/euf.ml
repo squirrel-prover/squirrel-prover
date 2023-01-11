@@ -128,7 +128,7 @@ let get_bad_occs
       (* (worst case, it was actually the key,
           and we'll miss the assumption that 
          the message could be m in the goal for the key's occurrence) *)
-      (* IS THAT ACTUALLY SOUND?? *)
+      (* If needed, this can be made more precise in the future. *)
       | _ -> retry_on_subterms ()
     end
 
