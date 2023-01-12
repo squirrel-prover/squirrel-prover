@@ -89,7 +89,7 @@ let search_about_2 () =
       admit.
     Qed."
   in
-  (* FIXME parser doesn't want to parse pattern in global_form ↓ *)
+  (* FIXME Theory doesn't want patterns in global_form ↓ *)
   (* let _ = Prover.exec_command "search equiv(_) in [S]." st in *)
   let _ = Prover.exec_command "search equiv(true) in [S]." st in
   let _ = Prover.exec_command "search true in [S]." st in
