@@ -150,24 +150,9 @@ let do_undo (state : driver_state) (nb_undo : int) : driver_state =
     | AllDone -> assert false in
   { state with toplvl_state; history_state; }
 
-let do_decls (state : driver_state) (decls : Decl.declarations) :
-  driver_state =
-  let toplvl_state = ToplevelProver.do_decls
-    state.toplvl_state decls in
-  { state with toplvl_state; }
-
-let do_print (state : driver_state) (q : ProverLib.print_query) 
-  : driver_state =
-  ToplevelProver.do_print state.toplvl_state q;
-  state
-
-let do_search (state : driver_state) (t : ProverLib.search_query) 
-  : driver_state =
-  ToplevelProver.do_search state.toplvl_state t;
-  state
-
 (*----------Part can be done here and tactic handling in Prover ----*)
-let do_tactic (state : driver_state) (l:ProverLib.bulleted_tactics) : driver_state =
+let do_tactic (state : driver_state) (l:ProverLib.bulleted_tactics) :
+  ToplevelProver.state =
   begin match state.check_mode with
     | `NoCheck -> assert (ToplevelProver.get_mode state.toplvl_state = WaitQed)
     | `Check   -> 
@@ -189,7 +174,7 @@ let do_tactic (state : driver_state) (l:ProverLib.bulleted_tactics) : driver_sta
   end;
 
   match state.check_mode with
-  | `NoCheck -> state
+  | `NoCheck -> state.toplvl_state
   | `Check   ->
     let saved_ps = state.toplvl_state in
     let toplvl_state = 
@@ -202,52 +187,21 @@ let do_tactic (state : driver_state) (l:ProverLib.bulleted_tactics) : driver_sta
             ignore (HistoryTP.reset_from_state 
                       saved_ps) ; raise e
       end in
-    let toplvl_state = 
-      ToplevelProver.try_complete_proof toplvl_state
-    in { state with toplvl_state }
-
-let do_qed (state : driver_state) : driver_state =
-  let toplvl_state = ToplevelProver.do_qed
-      state.toplvl_state in
-  { state with toplvl_state }
-
-let do_add_hint (state : driver_state) (h : Hint.p_hint) : driver_state =
-  { state with toplvl_state = ToplevelProver.do_add_hint
-                   state.toplvl_state h; }
+    ToplevelProver.try_complete_proof toplvl_state
 
 (* XXX Touch global Config that has to be recorded in History *)
 let do_set_option (state : driver_state) (sp : Config.p_set_param) :
-  driver_state =
+  ToplevelProver.state =
   match Config.set_param sp with
   | `Failed _ -> (* TODO should be only ↓ *)
-    { state with toplvl_state = ToplevelProver.do_set_option
-                state.toplvl_state sp; }
-  | `Success -> state
-
-let do_add_goal 
-    (state : driver_state)
-    (g : Goal.Parsed.t Location.located) 
-  : driver_state 
-  =
-  let toplvl_state = ToplevelProver.do_add_goal 
-      state.toplvl_state g in
-  { state with toplvl_state }
-
-let do_start_proof (state : driver_state) : driver_state =
-  { state with 
-    toplvl_state = ToplevelProver.do_start_proof
-      state.toplvl_state state.check_mode }
-
-let do_eof (state : driver_state) : driver_state =
-  assert (state.file_stack = []);
-  { state with toplvl_state = 
-                 ToplevelProver.do_eof state.toplvl_state }
+                ToplevelProver.do_set_option state.toplvl_state sp
+  | `Success -> state.toplvl_state
 
 let rec do_include 
     ~test
     (state : driver_state)
     (i : ProverLib.include_param) 
-  : driver_state 
+  : ToplevelProver.state 
   =
   let file = include_get_file state.file_stack
                               state.load_paths
@@ -269,8 +223,7 @@ let rec do_include
   try
     let final_state = do_all_commands ~test incl_state in
     Printer.prt `Warning "loaded: %s.sp" final_state.file.f_name;
-
-    { state with toplvl_state = final_state.toplvl_state }
+    final_state.toplvl_state
 
     (* XXX Does that mean that file, file_stack and check_mode are the
      * only values that are relevant in driver_state → do_include ? *)
@@ -297,49 +250,40 @@ and do_command
     (state : driver_state)
     (command : ProverLib.input) : driver_state
   =
-  match ToplevelProver.get_mode state.toplvl_state, command with
-                          (* ↓ touch toplvl_state and history_state ↓ *)
-    | _, Toplvl Undo nb_undo            -> do_undo state nb_undo
-                                       (* ↓ touch only toplvl_state ↓ *)
-    | GoalMode, Prover InputDescr decls -> do_decls state decls
-                                       (* ↓ touch only toplvl_state ↓ *)
-    | _,        Prover Tactic l         -> do_tactic state l
-                                            (* ↓ do not touch state ↓ *)
-    | _,        Prover Print q          -> do_print state q
-                                            (* ↓ do not touch state ↓ *)
-    | _,        Prover Search t         -> do_search state t
-                                       (* ↓ touch only toplvl_state ↓ *)
-    | WaitQed,  Prover Qed              -> do_qed state
-                                   (* ↓ touch only the table in p_s ↓ *)
-    | GoalMode, Prover Hint h           -> do_add_hint state h
-                        (* ↓ touch only Config params that are refs ↓ *)
-    | GoalMode, Prover SetOption sp     -> do_set_option state sp
-                                       (* ↓ touch only toplvl_state ↓ *)
-    | GoalMode, Prover Goal g           -> do_add_goal state g
-                                       (* ↓ touch only toplvl_state ↓ *)
-    | GoalMode, Prover Proof            -> do_start_proof state
-                              (* ↓ seems to touch only toplvl_state ↓ *)
-    | GoalMode, Prover Include inc      -> do_include ~test state inc
-                                  (* ↓ touch only toplvl_state mode ↓ *)
-    | GoalMode, Prover EOF              -> do_eof state
-
-    | WaitQed, Prover Abort ->
-      if test then
-        raise (Failure "Trying to abort a completed proof.");
-      Command.cmd_error AbortIncompleteProof
-
-                                      (* ↓ touch only toplvl_state ↓ *)
-    | ProofMode, Prover Abort ->
+  match command with 
+    (* ↓ touch toplvl_state and history_state ↓ *)
+  | Toplvl Undo nb_undo          -> do_undo state nb_undo
+  | Prover c -> 
+    let st = state.toplvl_state in
+    let mode = ToplevelProver.get_mode st in
+    let toplvl_state = match mode, c with
+    | GoalMode, InputDescr decls -> ToplevelProver.do_decls st decls
+    | _, Tactic t                -> do_tactic state t
+    | _, Print q                 -> ToplevelProver.do_print st q; st
+    | _, Search t                -> ToplevelProver.do_search st t; st
+    | WaitQed, Qed               -> ToplevelProver.do_qed st
+    | GoalMode, Hint h           -> ToplevelProver.do_add_hint st h
+                                 (* ↓ touch global config ↓ *)
+    | GoalMode, SetOption sp     -> do_set_option state sp
+    | GoalMode, Goal g           -> ToplevelProver.do_add_goal st g
+    | GoalMode, Proof            -> ToplevelProver.do_start_proof st
+                                      state.check_mode
+    | GoalMode, Include inc      -> do_include ~test state inc
+    | GoalMode, EOF              -> assert (state.file_stack = []);
+                                    ToplevelProver.do_eof st
+    | WaitQed, Abort -> 
+        if test then
+          raise (Failure "Trying to abort a completed proof.");
+        Command.cmd_error AbortIncompleteProof
+    | ProofMode, Abort ->
       Printer.prt `Result
         "Exiting proof mode and aborting current proof.@.";
-      { state with toplvl_state = 
-          ToplevelProver.abort state.toplvl_state }
-
-    | _, Prover Qed ->
+          ToplevelProver.abort state.toplvl_state
+    | _, Qed ->
       if test then raise Unfinished;
       Command.cmd_error Unexpected_command
-
     | _, _ -> Command.cmd_error Unexpected_command
+    in { state with toplvl_state; }
 
 (* FIXME why not using do_all_commands when not interactive ? *)
 (** Do all command from a file until EOF is reached *)
