@@ -1487,14 +1487,20 @@ let convert
 (*------------------------------------------------------------------*)
 (** {2 Convert equiv formulas} *)
 
-let convert_equiv cenv (e : equiv) =
+let convert_equiv 
+    ?(ty_env : Type.Infer.env option) 
+    ?(pat    : bool = false)
+    cenv (e : equiv) =
   let convert_el el : Term.term =
-    let t, _ = convert cenv el in
+    let t, _ = convert ?ty_env ~pat cenv el in
     t
   in
   List.map convert_el e
 
-let convert_global_formula (cenv : conv_env) (p : global_formula) =
+let convert_global_formula 
+    ?(ty_env : Type.Infer.env option) 
+    ?(pat    : bool = false)
+    (cenv : conv_env) (p : global_formula) =
   let rec conve (cenv : conv_env) p =
     let conve ?(env=cenv.env) p = conve { cenv with env } p in
 
@@ -1509,13 +1515,13 @@ let convert_global_formula (cenv : conv_env) (p : global_formula) =
         let system = SE.{ set = (p :> SE.t) ; pair = None } in
         let env = Env.update ~system cenv.env in
         let cenv = { cenv with env } in
-        Equiv.Atom (Equiv.Equiv (convert_equiv cenv e))
+        Equiv.Atom (Equiv.Equiv (convert_equiv ?ty_env ~pat cenv e))
       | _ ->
         conv_err (L.loc p) MissingSystem
       end
 
     | PReach f ->
-      let f, _ = convert ~ty:Type.tboolean cenv f in
+      let f, _ = convert ?ty_env ~pat ~ty:Type.tboolean cenv f in
       Equiv.Atom (Equiv.Reach f)
 
 

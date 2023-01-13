@@ -322,7 +322,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
         pat_term = t; } in
     find pat
   | Global f ->
-    let t = Theory.convert_global_formula cntxt f in
+    let t = Theory.convert_global_formula ~ty_env ~pat:true cntxt f in
     let pat_vars =
       Vars.Sv.filter Vars.is_pat (Equiv.fv t)
     in

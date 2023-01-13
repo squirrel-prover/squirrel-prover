@@ -357,7 +357,7 @@ val convert_ht :
 (** Converts and infers the type.
     Each part of the [SE.context] inside the environment
     is used when converting the corresponding kind of atom. *)
-val convert_global_formula : conv_env -> global_formula -> Equiv.form
+val convert_global_formula : ?ty_env:Type.Infer.env -> ?pat:bool -> conv_env -> global_formula -> Equiv.form
 
 val convert_any : conv_env -> any_term -> Equiv.any_form
 

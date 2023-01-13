@@ -86,11 +86,13 @@
 %start top_process
 %start interactive
 %start top_proofmode
+%start top_global_formula
 (* %start bulleted_tactic *)
 %type <Decl.declarations> declarations
 (* %type <Decl.declaration> declaration_eof *)
 (* %type <Decl.declaration> declaration *)
 %type <Theory.term> top_formula
+%type <Theory.global_formula> top_global_formula
 %type <SystemExpr.Parse.t> system_expr
 %type <Process.process> top_process
 %type <ProverLib.input> interactive
@@ -1010,6 +1012,8 @@ global_formula_i:
 global_formula:
 | f=loc(global_formula_i) { f }
 
+top_global_formula:
+| f=global_formula EOF { f }
 
 /* -----------------------------------------------------------------------
  * Systems

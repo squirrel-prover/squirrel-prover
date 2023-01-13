@@ -7,6 +7,9 @@ module Theory = Squirrellib.Theory
 let term_from_string (s:string) = Theory.Local 
     (Parser.top_formula Lexer.token (Lexing.from_string s))
 
+let global_formula_from_string (s:string) = Theory.Global
+    (Parser.top_global_formula Lexer.token (Lexing.from_string s))
+
 let sexpr_from_string (s:string) = (Parser.system_expr Lexer.token
                                      (Lexing.from_string s))
 let search_about_1 () =
@@ -89,9 +92,12 @@ let search_about_2 () =
       admit.
     Qed."
   in
-  (* FIXME Theory doesn't want patterns in global_form ↓ *)
-  (* let _ = Prover.exec_command "search equiv(_) in [S]." st in *)
-  let _ = Prover.exec_command "search equiv(true) in [S]." st in
+  let matches = Prover.search_about st
+    (ProverLib.Srch_inSys ((global_formula_from_string "equiv(_)"),
+                           sexpr_from_string "[S]"))
+  in
+  Alcotest.(check int) "Found one lemma with equiv(_)"
+    (List.length matches) 1;
   let _ = Prover.exec_command "search true in [S]." st in
   let matches = Prover.search_about st
     (ProverLib.Srch_inSys ((term_from_string "true"),
