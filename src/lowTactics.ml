@@ -2334,6 +2334,16 @@ let () =
     (genfun_of_any_pure_fun (fun _ -> assert false) (fun _ -> assert false))
 
 (*------------------------------------------------------------------*)
+let () =
+  T.register "search"
+    ~tactic_help:{general_help = "Search lemmas containing a given pattern.";
+                  detailed_help = "search [pat] [in sys]";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    ~pq_sound:true
+    (genfun_of_any_pure_fun (fun _ -> assert false) (fun _ -> assert false))
+
+(*------------------------------------------------------------------*)
 let () = T.register_general "show"
     ~tactic_help:{
       general_help  = "Print the messages given as argument. Can be used to \
