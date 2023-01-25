@@ -988,7 +988,7 @@ let occurrence_formula
        but that's tricky, as it also means these vars can't be used
        to unify when subsuming timestamps *)
     let phi_time = 
-      Fmt.epr "PATHCOND:%a@." Fmt.bool use_path_cond; (* REM *)
+      (*      Fmt.epr "PATHCOND:%a@." Fmt.bool use_path_cond;*) (* REM *)
       let path_cond = if use_path_cond then occ.eo_path_cond else PathCond.Top in
       time_formula ~path_cond a ts 
     in
