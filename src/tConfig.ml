@@ -131,5 +131,4 @@ let old_completion = get_bool s_old_completion
 let post_quantum = get_bool s_post_quantum
 
 let set_param (s,p:string*p_param_val) table = 
-  Format.eprintf "set %s…\n" s;
   declare table (mk s) p
