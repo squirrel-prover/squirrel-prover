@@ -349,11 +349,13 @@ let search_about (st:state) (q:ProverLib.search_query) :
 
 let do_search (st:state) (t:ProverLib.search_query) : unit =
   let matches = search_about st t in
-  Printer.prt `Default "Match :\n";
+  Printer.prt `Default "Search result :\n";
   let print_all fmt matches =
   List.iter (fun (lemma,_:Lemma.lemma * Equiv.any_form list) -> 
-        Fmt.pf fmt "@[<v 0>[Found in> %s:@;%a@;@]@." lemma.stmt.name 
-        Equiv.Any.pp lemma.stmt.formula
+        SystemExpr.print_system 
+          (get_table st) lemma.stmt.system.set;
+        Fmt.pf fmt "%a"     
+          Lemma.pp lemma
     ) matches in
 Printer.prt `Result "%a" print_all matches
 
