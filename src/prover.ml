@@ -352,10 +352,10 @@ let do_search (st:state) (t:ProverLib.search_query) : unit =
   Printer.prt `Default "Search result :\n";
   let print_all fmt matches =
   List.iter (fun (lemma,_:Lemma.lemma * Equiv.any_form list) -> 
+        Fmt.pf fmt "%a\nIn system:\n"     
+          Lemma.pp lemma;
         SystemExpr.print_system 
-          (get_table st) lemma.stmt.system.set;
-        Fmt.pf fmt "%a"     
-          Lemma.pp lemma
+          (get_table st) lemma.stmt.system.set
     ) matches in
 Printer.prt `Result "%a" print_all matches
 
