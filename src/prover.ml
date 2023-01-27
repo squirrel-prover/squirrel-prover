@@ -289,38 +289,43 @@ let search_about (st:state) (q:ProverLib.search_query) :
       end
     end
   in
+  Printer.prt `Default "@[Search in context system [%a]%!@."
+    SystemExpr.pp env.system.set;
   let t = match q with
     | ProverLib.Srch_inSys (t,_)
     | ProverLib.Srch_term t -> t in
   let cntxt = Theory.{ env; cntxt = InGoal; } in
   let ty_env = Type.Infer.mk_env () in
-  let find pat =
-    Symbols.Lemma.fold (fun _ _ data acc -> 
-        let g = Lemma.as_lemma data in
-        let sys = g.stmt.system in 
-        let res = begin match g.stmt.formula with
-        | Global f -> Match.E.find ~ty_env st.table sys pat f
-        | Local  f -> Match.T.find ~ty_env st.table sys pat f
-        end in
-        begin match res with
-        | [] -> acc
-        | _ -> 
-          let any_res = 
-            List.map (fun x -> Equiv.Local x) res in
-          (g,any_res)::acc
-        end
-      ) [] st.table in
-  match t with
-  | Local p -> 
-    let t = fst (Theory.convert ~ty_env ~pat:true cntxt p) in
+
+  let find (t:Term.term) =
     let pat_vars =
       Vars.Sv.filter Vars.is_pat (Term.fv t)
     in
     let pat = Term.{
         pat_tyvars = [];
         pat_vars;
-        pat_term = t; } in
-    find pat
+        pat_term = t; } 
+    in
+    Symbols.Lemma.fold begin fun _ _ data acc -> 
+        let g = Lemma.as_lemma data in
+        let sys = g.stmt.system in 
+        let res = begin match g.stmt.formula with
+        | Global f -> Match.E.find st.table sys pat f
+        | Local  f -> Match.T.find st.table sys pat f
+        end in
+        begin match res with
+          | [] -> acc
+          | _ -> 
+            let any_res = 
+              List.map (fun x -> Equiv.Local x) res in
+            (g,any_res)::acc
+        end
+    end [] st.table in
+
+  match t with
+  | Local p -> 
+    let t = fst (Theory.convert ~ty_env ~pat:true cntxt p) in
+    find t
   | Global f ->
     let t = Theory.convert_global_formula ~ty_env ~pat:true cntxt f in
     let pat_vars =
@@ -334,7 +339,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
         let g = Lemma.as_lemma data in
         let sys = g.stmt.system in 
         let res = begin match g.stmt.formula with
-        | Global f -> Match.E.find_glob ~ty_env st.table sys pat f
+        | Global f -> Match.E.find_glob st.table sys pat f
         | Local  _ -> [] (* can't find Equiv.form in
                                       Term.term ? *)
         end in
@@ -352,12 +357,10 @@ let do_search (st:state) (t:ProverLib.search_query) : unit =
   Printer.prt `Default "Search result :\n";
   let print_all fmt matches =
   List.iter (fun (lemma,_:Lemma.lemma * Equiv.any_form list) -> 
-        Fmt.pf fmt "%a\nIn system:\n"     
-          Lemma.pp lemma;
-        SystemExpr.print_system 
-          (get_table st) lemma.stmt.system.set
+        Fmt.pf fmt "@[%a@]@."
+          Lemma.pp lemma
     ) matches in
-Printer.prt `Result "%a" print_all matches
+Printer.prt `Default "%a" print_all matches
 
 let do_print (st:state) (q:ProverLib.print_query) : unit =
     begin match q with

@@ -153,7 +153,33 @@ let include_search () =
     (List.length matches) 2;
   ()
 
+let include_ite () =
+  let st = Prover.init () in
+  (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
+  let st = 
+    Prover.exec_all st
+        "include Basic.
+        channel c
+        system [T] (S : !_i new n; out(c,n)).
+        goal [T] foo (i:index) : happens(S(i)) => output@S(i) = n(i).   
+        Proof.
+         admit.
+        Qed"
+  in
+  let matches = Prover.search_about st
+      (ProverLib.Srch_inSys ((term_from_string "happens(_)"),
+                           sexpr_from_string "[T]"))
+  in
+  Alcotest.(check int) "Found 3 lemmas with happens(_) in [T]"
+    (List.length matches) 3;
+  let matches = Prover.search_about st
+    (ProverLib.Srch_term (term_from_string "if _ then _ else _ "))
+  in
+  Alcotest.(check int) "Found one lemma with if _ then _ else _"
+    (List.length matches) 11 (* to update regarding to Basic.sp *)
+
 let tests = [ ("search_about1", `Quick, search_about_1);
               ("search_about2", `Quick, search_about_2);
               ("include_search", `Quick, include_search);
+              ("include_ite", `Quick, include_ite);
             ]
