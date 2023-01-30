@@ -1,6 +1,4 @@
 module Prover = Squirrellib.Prover
-(* module Parser = Squirrellib.Parser *)
-(* module Lexer = Squirrellib.Lexer *)
 
 let template_test () =
   let st = Prover.init () in
