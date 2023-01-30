@@ -289,7 +289,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
       end
     end
   in
-  Printer.prt `Default "@[Search in context system [%a]%!@."
+  Printer.prt `Default "@[<2>Search in context system@ [@[%a@]].@]@."
     SystemExpr.pp env.system.set;
   let t = match q with
     | ProverLib.Srch_inSys (t,_)
@@ -354,13 +354,13 @@ let search_about (st:state) (q:ProverLib.search_query) :
 
 let do_search (st:state) (t:ProverLib.search_query) : unit =
   let matches = search_about st t in
-  Printer.prt `Default "Search result :\n";
+  Printer.prt `Default "Search result(s):@.@.";
   let print_all fmt matches =
   List.iter (fun (lemma,_:Lemma.lemma * Equiv.any_form list) -> 
-        Fmt.pf fmt "@[%a@]@."
+        Fmt.pf fmt "%a@.@."
           Lemma.pp lemma
     ) matches in
-Printer.prt `Default "%a" print_all matches
+  Printer.prt `Default "%a" print_all matches
 
 let do_print (st:state) (q:ProverLib.print_query) : unit =
     begin match q with
