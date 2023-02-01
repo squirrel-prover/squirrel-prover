@@ -17,6 +17,7 @@ let test_suites : unit Alcotest.test list =
     ("Models", Squirreltests.Parserbuf.models);
     ("Process parsing", Squirreltests.Parserbuf.process_parsing);
     ("Prover", Squirreltests.Prover.tests);
+    ("NewTactics", Squirreltests.Tactics.tests);
   ]
 
 let alcotests (path:string) : (string * [> `Quick] * (unit -> unit )) list = 

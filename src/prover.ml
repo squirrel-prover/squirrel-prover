@@ -261,6 +261,15 @@ let pp_goal (ps:state) ppf () = match ps.current_goal, ps.subgoals with
       Goal.pp j
   | _ -> assert false
 
+let pp_subgoals (ps:state) ppf () = match ps.current_goal, ps.subgoals with
+  | None,[] -> assert false
+  | Some _, [] -> Fmt.pf ppf "@[<v 0>[goal> No subgoals remaining.@]@."
+  | Some _, subgoals ->
+    List.iteri (fun i sg -> 
+    Fmt.pf ppf "@[<v 0>[goal> (1/%d):@;%a@;@]@." i Goal.pp sg
+    ) subgoals
+  | _ -> assert false
+
 let search_about (st:state) (q:ProverLib.search_query) : 
   (Lemma.lemma * Equiv.any_form list) list =
   let env = 

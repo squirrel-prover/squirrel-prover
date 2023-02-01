@@ -40,7 +40,7 @@
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT HAVE USE
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY LOCALIZE
 %token SPLITSEQ CONSTSEQ MEMSEQ
-%token BY FA INTRO AS DESTRUCT REMEMBER INDUCTION
+%token BY FA CS INTRO AS DESTRUCT REMEMBER INDUCTION
 %token PROOF QED UNDO ABORT HINT
 %token RENAME GPRF GCCA
 %token INCLUDE PRINT SEARCH
@@ -800,6 +800,15 @@ tac:
 
   (* Special cases for tactics whose names are not parsed as ID
    * because they are reserved. *)
+
+  (* Case_Study, equiv tactic, patterns *)
+  | l=lloc(CS) t=tac_term
+    { mk_abstract l "cs" [TacticsArgs.Theory t] }
+
+  (* Case_Study, equiv tactic, patterns with element number *)
+  | l=lloc(CS) t=term IN i=loc(int)
+    { mk_abstract l "cs" [TacticsArgs.Theory t; 
+                          TacticsArgs.Int_parsed i] }
 
   (* FA, equiv tactic, patterns *)
   | l=lloc(FA) args=slist1(fa_arg, COMMA)

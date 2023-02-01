@@ -70,6 +70,8 @@ val current_goal_name : state -> string option
 
 val pp_goal : state -> Format.formatter -> unit -> unit
 
+val pp_subgoals : state -> Format.formatter -> unit -> unit
+
 (** Complete the proofs, resetting the current goal to None. *)
 val complete_proof : state -> state
 

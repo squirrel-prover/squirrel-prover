@@ -962,6 +962,54 @@ let () =
    ~pq_sound:true
    (LT.genfun_of_pure_efun_arg fadup) Args.(Opt Int)
 
+let rec cs_proj_left (b:Term.term) (t:Term.term) : Term.term = 
+  let head = Term.head_normal_biterm t in
+  match head with
+  | Term.Fun (sy,_,[phi;t1;_t2]) when phi = b
+    && sy = Symbols.fs_ite -> 
+    t1
+  | _ -> Term.tmap (cs_proj_left b) t
+
+let rec cs_proj_right (b:Term.term) (t:Term.term) : Term.term = 
+  let head = Term.head_normal_biterm t in
+  match head with
+  | Term.Fun (sy,_,[phi;_t1;t2]) when phi = b
+    && sy = Symbols.fs_ite -> 
+    t2
+  | _ -> Term.tmap (cs_proj_right b) t
+
+let case_study arg s : ES.sequents =
+  let li, b =
+    match arg with
+    | Args.(Pair ((Message (b,Type.Boolean)), Opt (Int, i))) ->
+      i, b
+    | _ -> assert false
+  in
+  match li with
+  | None -> 
+    let e1 = List.map (cs_proj_left b)
+        (ES.goal_as_equiv s) in
+    let e2 = List.map (cs_proj_right b)
+        (ES.goal_as_equiv s) in
+    [ES.set_equiv_goal (b::e1) s; ES.set_equiv_goal (b::e2) s]
+  | Some (Args.Int i) ->
+    let before, e, after = split_equiv_goal i s in
+    let e1 = cs_proj_left b e in
+    let e2 = cs_proj_right b e in
+    [ES.set_equiv_goal (b::before@[e1]@after) s; 
+     ES.set_equiv_goal (b::before@[e2]@after) s]
+
+let () =
+  T.register_typed "cs"
+    ~general_help:"Case Study cs [pat] [in i] with i the i^th sequent
+                    in the equiv to project"
+   ~detailed_help:"Example: in
+        global goal _ : equiv(if true then zero else empty, if true then n else m).
+        nosimpl cs true.
+   → two subgoals: equiv(true,zero,n) and equiv(true,empty,m)
+   "
+   ~tactic_group:Structural
+   (LT.genfun_of_pure_efun_arg case_study) Args.(Pair(Message,Opt Int))
 
 
 (*------------------------------------------------------------------*)
