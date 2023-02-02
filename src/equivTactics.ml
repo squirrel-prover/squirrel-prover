@@ -963,54 +963,63 @@ let () =
    (LT.genfun_of_pure_efun_arg fadup) Args.(Opt Int)
 
 (* recursive proj left if b then t1 else t2 → t1 *)
-let rec cs_proj_left (b:Term.term) (t:Term.term) : Term.term = 
+let rec cs_proj_left (b:Term.term) (found:bool) (t:Term.term) :
+  bool * Term.term = 
   let head = Term.head_normal_biterm t in
   match head with
   | Term.Fun (sy,_,[phi;t1;_t2]) when phi = b
     && sy = Symbols.fs_ite -> 
-    t1
-  | _ -> Term.tmap (cs_proj_left b) t
+    true,t1
+  | _ -> Term.tmap_fold (cs_proj_left b) found t
 
 (* recursive proj right if b then t1 else t2 → t2 *)
-let rec cs_proj_right (b:Term.term) (t:Term.term) : Term.term = 
+let rec cs_proj_right (b:Term.term) (found:bool) (t:Term.term) :
+  bool * Term.term = 
   let head = Term.head_normal_biterm t in
   match head with
   | Term.Fun (sy,_,[phi;_t1;t2]) when phi = b
     && sy = Symbols.fs_ite -> 
-    t2
-  | _ -> Term.tmap (cs_proj_right b) t
+    true,t2
+  | _ -> Term.tmap_fold (cs_proj_right b) found t
 
 let case_study arg s : ES.sequents =
   let li, b =
     match arg with
     | Args.(Pair ((Message (b,Type.Boolean)), Opt (Int, i))) ->
       i, b
-    | _ -> assert false (* TODO *)
+    | _ -> assert false
   in
   match li with
   | None -> 
     (* Project all *)
-    let e1 = List.map (cs_proj_left b)
-        (ES.goal_as_equiv s) in
-    let e2 = List.map (cs_proj_right b)
-        (ES.goal_as_equiv s) in
-    [ES.set_equiv_goal (e1@[b]) s; ES.set_equiv_goal (e2@[b]) s]
+    let founds,e1 = List.split (List.map (cs_proj_left b false)
+        (ES.goal_as_equiv s)) in
+    let _,e2 = List.split (List.map (cs_proj_right b false)
+        (ES.goal_as_equiv s)) in
+    
+    let found = List.exists (fun x -> x) founds in
+    if found then
+      [ES.set_equiv_goal (e1@[b]) s; ES.set_equiv_goal (e2@[b]) s]
+    else [s]
   | Some (Args.Int i) ->
     (* Project in ith term *)
     let before, e, after = split_equiv_goal i s in
-    let e1 = cs_proj_left b e in
-    let e2 = cs_proj_right b e in
+    let found,e1 = cs_proj_left b false e in
+    let _,e2 = cs_proj_right b false e in
+    if found then
     [ES.set_equiv_goal (before@b::[e1]@after) s; 
      ES.set_equiv_goal (before@b::[e2]@after) s]
+    else [s]
 
 let () =
   T.register_typed "cs"
     ~general_help:"Case Study cs [pat] [in i] with i the i^th sequent
                     in the equiv to project"
-   ~detailed_help:"Example: in
+   ~detailed_help:
+     "Example: in
         global goal _ : equiv(if true then zero else empty, if true then n else m).
         nosimpl cs true.
-   → two subgoals: equiv(true,zero,n) and equiv(true,empty,m)
+        → two subgoals: equiv(true,zero,n) and equiv(true,empty,m)
    "
    ~tactic_group:Structural
    (LT.genfun_of_pure_efun_arg case_study) Args.(Pair(Message,Opt Int))

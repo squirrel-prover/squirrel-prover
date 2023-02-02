@@ -14,7 +14,7 @@ let global_formula_from_string (s:string) = Theory.Global
 let sexpr_from_string (s:string) = (Parser.system_expr Lexer.token
                                      (Lexing.from_string s))
 
-let mk_term_from_string s st =
+let find_in_sys_from_string s st =
     let env = 
       begin match Prover.get_mode st with
       | ProofMode -> 
