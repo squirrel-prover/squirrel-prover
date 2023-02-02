@@ -117,6 +117,7 @@
   "left"
   "notleft"
   "print"
+  "search"
   "project"
   "right"
   "simpl"

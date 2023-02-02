@@ -115,6 +115,7 @@ rule token = parse
 | "intro"             { INTRO }
 | "destruct"          { DESTRUCT }
 | "fa"                { FA }
+| "cs"                { CS }
 | "as"                { AS }
 | "index"             { INDEX }
 | "message"           { MESSAGE }

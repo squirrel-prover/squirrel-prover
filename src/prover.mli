@@ -41,6 +41,9 @@ val add_decls : state -> Decl.declarations -> state * Goal.t list
 
 val get_current_system : state -> SystemExpr.context option
 
+(** Return current goal *)
+val get_current_goal : state -> ProverLib.pending_proof option
+
 (** Return the table of given state *)
 val get_table : state -> Symbols.table
 
@@ -69,6 +72,8 @@ val do_eof : state -> state
 val current_goal_name : state -> string option
 
 val pp_goal : state -> Format.formatter -> unit -> unit
+
+val pp_subgoals : state -> Format.formatter -> unit -> unit
 
 (** Complete the proofs, resetting the current goal to None. *)
 val complete_proof : state -> state

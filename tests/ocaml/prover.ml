@@ -1,17 +1,9 @@
 module Prover = Squirrellib.Prover
 module ProverLib = Squirrellib.ProverLib
-module Parser = Squirrellib.Parser
-module Lexer = Squirrellib.Lexer
 module Theory = Squirrellib.Theory
 
-let term_from_string (s:string) = Theory.Local 
-    (Parser.top_formula Lexer.token (Lexing.from_string s))
+open Util
 
-let global_formula_from_string (s:string) = Theory.Global
-    (Parser.top_global_formula Lexer.token (Lexing.from_string s))
-
-let sexpr_from_string (s:string) = (Parser.system_expr Lexer.token
-                                     (Lexing.from_string s))
 let search_about_1 () =
   let st = Prover.init () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
