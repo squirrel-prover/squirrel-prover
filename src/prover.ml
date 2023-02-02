@@ -266,7 +266,10 @@ let pp_subgoals (ps:state) ppf () = match ps.current_goal, ps.subgoals with
   | Some _, [] -> Fmt.pf ppf "@[<v 0>[goal> No subgoals remaining.@]@."
   | Some _, subgoals ->
     List.iteri (fun i sg -> 
-    Fmt.pf ppf "@[<v 0>[goal> (1/%d):@;%a@;@]@." i Goal.pp sg
+    Fmt.pf ppf "@[<v 0>[goal> (%d/%d):@;%a@;@]@." 
+      (i+1) 
+      (List.length subgoals) 
+      Goal.pp sg
     ) subgoals
   | _ -> assert false
 
