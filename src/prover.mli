@@ -41,6 +41,9 @@ val add_decls : state -> Decl.declarations -> state * Goal.t list
 
 val get_current_system : state -> SystemExpr.context option
 
+(** Return current goal *)
+val get_current_goal : state -> ProverLib.pending_proof option
+
 (** Return the table of given state *)
 val get_table : state -> Symbols.table
 

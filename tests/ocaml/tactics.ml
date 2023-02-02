@@ -1,4 +1,5 @@
 open Squirrellib
+open Util
 module ES = EquivSequent
 module L = Location
 (* module ProverLib = Squirrellib.ProverLib *)
@@ -20,7 +21,6 @@ let case_study () =
     | Equiv j -> ES.goal_as_equiv j
     | _ -> assert false
   in
-
 
   let mk c = L.mk_loc L._dummy c in      
 
@@ -44,23 +44,23 @@ let case_study () =
   Printer.pr "%a" (Prover.pp_subgoals st) ();
   let terms = get_nth_equiv_terms st 0 in
   Alcotest.(check term_testable) 
-    "if true then zero else empty → TRUE,zero"
-    (List.hd terms)
-    (Term.mk_true);
-  Alcotest.(check term_testable) 
     "if true then zero else empty → true,ZERO"
-    (List.nth terms 1)
+    (List.hd terms)
     (Term.mk_zero);
+  Alcotest.(check term_testable) 
+    "if true then zero else empty → TRUE,zero"
+    (List.nth terms 1)
+    (Term.mk_true);
 
   let terms = get_nth_equiv_terms st 1 in
   Alcotest.(check term_testable) 
-    "if true then zero else empty → TRUE,empty"
-    (List.hd terms)
-    (Term.mk_true);
-  Alcotest.(check term_testable) 
     "if true then zero else empty → true,EMPTY"
-    (List.nth terms 1)
+    (List.hd terms)
     (Term.empty);
+  Alcotest.(check term_testable) 
+    "if true then zero else empty → TRUE,empty"
+    (List.nth terms 1)
+    (Term.mk_true);
 
   (* deux sous-buts, l'un avec true,zero, l'autre true,empty *)
   let st = Prover.exec_all st
@@ -78,35 +78,35 @@ let case_study () =
   (* deux sous-buts, l'un avec equiv(true,zero,n) l'autre equiv(true,empty,m) *)
   let terms = get_nth_equiv_terms st 0 in
   Alcotest.(check term_testable) 
-    "equiv(if true then zero else empty, if true then n else m) → TRUE,zero,n"
-    (List.hd terms)
-    (Term.mk_true);
-  Alcotest.(check term_testable) 
     "equiv(if true then zero else empty, if true then n else m) → true,ZERO,n"
-    (List.nth terms 1)
+    (List.hd terms)
     (Term.mk_zero);
   let n = mk_message st "n" in
   Alcotest.(check term_testable) 
     "if true then zero else empty → true,zero,N"
-    (List.nth terms 2)
+    (List.nth terms 1)
     (n);
+  Alcotest.(check term_testable) 
+    "equiv(if true then zero else empty, if true then n else m) → TRUE,zero,n"
+    (List.nth terms 2)
+    (Term.mk_true);
 
   let terms = get_nth_equiv_terms st 1 in
   Alcotest.(check term_testable) 
     "equiv(if true then zero else empty, if true then n else m) →
-    TRUE,empty,m"
-    (List.hd terms)
-    (Term.mk_true);
-  Alcotest.(check term_testable) 
-    "equiv(if true then zero else empty, if true then n else m) →
     true,EMPTY,m"
-    (List.nth terms 1)
+    (List.hd terms)
     (Term.empty);
   let m = mk_message st "m" in
   Alcotest.(check term_testable) 
     "if true then zero else empty → true,empty,M"
-    (List.nth terms 2)
+    (List.nth terms 1)
     (m);
+  Alcotest.(check term_testable) 
+    "equiv(if true then zero else empty, if true then n else m) →
+    TRUE,empty,m"
+    (List.nth terms 2)
+    (Term.mk_true);
 
   let st = Prover.exec_all st
         "Abort.
@@ -125,18 +125,18 @@ let case_study () =
   let terms = get_nth_equiv_terms st 0 in
   Alcotest.(check term_testable) 
     "equiv(if true then zero else empty, if true then n else m) → 
-    TRUE,
-    if true then zero else empty,
-    n"
-    (List.hd terms)
-    (Term.mk_true);
-  Alcotest.(check term_testable) 
-    "equiv(if true then zero else empty, if true then n else m) → 
     true,
     IF TRUE THEN ZERO ELSE EMPTY,
     n"
-    (List.nth terms 1)
+    (List.hd terms)
     (Term.mk_ite ~simpl:false (Term.mk_true) (Term.mk_zero) (Term.empty));
+  Alcotest.(check term_testable) 
+    "equiv(if true then zero else empty, if true then n else m) → 
+    TRUE,
+    if true then zero else empty,
+    n"
+    (List.nth terms 1)
+    (Term.mk_true);
   Alcotest.(check term_testable) 
     "equiv(if true then zero else empty, if true then n else m) → 
     true,
@@ -148,18 +148,18 @@ let case_study () =
   let terms = get_nth_equiv_terms st 1 in
   Alcotest.(check term_testable) 
     "equiv(if true then zero else empty, if true then n else m) → 
-    TRUE,
-    if true then zero else empty,
-    m"
-    (List.hd terms)
-    (Term.mk_true);
-  Alcotest.(check term_testable) 
-    "equiv(if true then zero else empty, if true then n else m) → 
     true,
     IF TRUE THEN ZERO ELSE EMPTY,
     m"
-    (List.nth terms 1)
+    (List.hd terms)
     (Term.mk_ite ~simpl:false (Term.mk_true) (Term.mk_zero) (Term.empty));
+  Alcotest.(check term_testable) 
+    "equiv(if true then zero else empty, if true then n else m) → 
+    TRUE,
+    if true then zero else empty,
+    m"
+    (List.nth terms 1)
+    (Term.mk_true);
   Alcotest.(check term_testable) 
     "equiv(if true then zero else empty, if true then n else m) → 
     true,
@@ -180,35 +180,35 @@ let case_study () =
   Printer.pr "%a" (Prover.pp_subgoals st) ();
 
   let terms = get_nth_equiv_terms st 0 in
-  Alcotest.(check term_testable) 
-    "equiv(f(if true then diff(n,m) else empty)) →
-    TRUE,
-    f diff(n,m)"
-    (List.hd terms)
-    (Term.mk_true);
   let f = Symbols.Function.of_lsymb (mk "f") (Prover.get_table st) in
   Alcotest.(check term_testable) 
     "equiv(f(if true then diff(n,m) else empty)) →
     true,
     F DIFF(N,M)"
-    (List.nth terms 1)
+    (List.hd terms)
     (Term.mk_fun (Prover.get_table st) f  
        [Term.mk_diff [Term.left_proj,n;Term.right_proj,m]]);
+  Alcotest.(check term_testable) 
+    "equiv(f(if true then diff(n,m) else empty)) →
+    TRUE,
+    f diff(n,m)"
+    (List.nth terms 1)
+    (Term.mk_true);
 
   let terms = get_nth_equiv_terms st 1 in
   Alcotest.(check term_testable) 
     "equiv(f(if true then diff(n,m) else empty)) →
-    TRUE,
-    f empty"
-    (List.hd terms)
-    (Term.mk_true);
-  Alcotest.(check term_testable) 
-    "equiv(f(if true then diff(n,m) else empty)) →
     true,
     F EMPTY"
-    (List.nth terms 1)
+    (List.hd terms)
     (Term.mk_fun (Prover.get_table st) f  
        [Term.empty]);
+  Alcotest.(check term_testable) 
+    "equiv(f(if true then diff(n,m) else empty)) →
+    TRUE,
+    f empty"
+    (List.nth terms 1)
+    (Term.mk_true);
 
 
   let st = Prover.exec_all st
@@ -220,45 +220,49 @@ let case_study () =
   (* 2 sous-buts: equiv(true, f diff(n,m)) et equiv(true, f empty) *)
   Printer.pr "%a" (Prover.pp_subgoals st) ();
 
-  let terms = get_nth_equiv_terms st 0 in
-  Alcotest.(check term_testable) 
-    "equiv(f(diff(if true then n else empty,if true then m else empty)))
-    TRUE,
-    f diff(n,m)"
-    (List.hd terms)
-    (Term.mk_true);
   let f = Symbols.Function.of_lsymb (mk "f") (Prover.get_table st) in
+  let terms = get_nth_equiv_terms st 0 in
   Alcotest.(check term_testable) 
     "equiv(f(diff(if true then n else empty,if true then m else empty)))
     true,
     F DIFF(N,M)"
-    (List.nth terms 1)
+    (List.hd terms)
     (Term.mk_fun (Prover.get_table st) f  
        [Term.mk_diff [Term.left_proj,n;Term.right_proj,m]]);
+  Alcotest.(check term_testable) 
+    "equiv(f(diff(if true then n else empty,if true then m else empty)))
+    TRUE,
+    f diff(n,m)"
+    (List.nth terms 1)
+    (Term.mk_true);
 
   let terms = get_nth_equiv_terms st 1 in
   Alcotest.(check term_testable) 
     "equiv(f(diff(if true then n else empty,if true then m else empty)))
-    TRUE,
-    f empty"
-    (List.hd terms)
-    (Term.mk_true);
-  Alcotest.(check term_testable) 
-    "equiv(f(diff(if true then n else empty,if true then m else empty)))
     true,
     F EMPTY"
-    (List.nth terms 1)
+    (List.hd terms)
     (Term.mk_fun (Prover.get_table st) f  
        [Term.empty]);
+  Alcotest.(check term_testable) 
+    "equiv(f(diff(if true then n else empty,if true then m else empty)))
+    TRUE,
+    f empty"
+    (List.nth terms 1)
+    (Term.mk_true);
 
   let st = Prover.exec_all st
         "Abort.
 
-        name x : message.
-        name y : message.
+        abstract x : message.
+        abstract y : message.
 
-        global goal _ (tau,tau':timestamp) :
-          equiv(exec@tau, frame@tau, if exec@tau' then x else y, if exec@tau then x else y).
+        global goal _ (x,y:message,tau,tau':timestamp) :
+          equiv(
+            exec@tau, 
+            frame@tau, 
+            if exec@tau' then x else y, 
+            if exec@tau then x else y).
         Proof."
   in
   let st = Prover.exec_command "nosimpl cs exec@_." st in
@@ -267,10 +271,9 @@ let case_study () =
       1) exec@tau, exec@tau, frame@tau, if exec@tau' then x else y, x
       2) idem avec y à la fin au lieu de x *)
   Printer.pr "%a" (Prover.pp_subgoals st) ();
-  let x = mk_message st "x" in
-  let y = mk_message st "y" in
+  let x = mk_term_from_string "x" st in
+  let y = mk_term_from_string "y" st in
 
-  (* FIXME check if exec@tau' then x else y *)
   let terms = get_nth_equiv_terms st 0 in
   Alcotest.(check term_testable) 
     "global goal _ (tau,tau':timestamp) :
@@ -281,12 +284,11 @@ let case_study () =
     exec@tau,
     frame@tau,
     if exec@tau' then x else y,
-    x"
-    (List.nth terms 4)
+    X,
+    exec@tau"
+    (List.nth terms 3)
     (x);
-
-  (* FIXME check if exec@tau' then x else y *)
-  let terms = get_nth_equiv_terms st 1 in
+  let exectau' = mk_term_from_string "exec@tau'" st in
   Alcotest.(check term_testable) 
     "global goal _ (tau,tau':timestamp) :
     equiv(exec@tau, frame@tau, 
@@ -295,22 +297,39 @@ let case_study () =
     exec@tau,
     exec@tau,
     frame@tau,
+    IF EXEC@TAU' THEN X ELSE Y,
+    x,
+    exec@tau"
+    (List.nth terms 2)
+    (Term.mk_ite ~simpl:false (exectau') (x) (y));
+
+  let terms = get_nth_equiv_terms st 1 in
+  Alcotest.(check term_testable) 
+    "global goal _ (tau,tau':timestamp) :
+    equiv(exec@tau, frame@tau, 
+      if exec@tau' then x else y, 
+      if exec@tau then x else y).
+    exec@tau,
+    frame@tau,
     if exec@tau' then x else y,
-    y"
-    (List.nth terms 4)
+    Y,
+    exec@tau"
+    (List.nth terms 3)
     (y);
 
   let st = Prover.exec_all st
         "Abort.
 
-        global goal _ (tau,tau':timestamp) :
+        global goal _ (x,y:message,tau,tau':timestamp) :
           equiv(exec@tau, frame@tau, if exec@tau' then x else y, if exec@tau then x else y).
         Proof."
   in
   let st = Prover.exec_command "nosimpl cs exec@tau." st in
   Printer.pr "%a" (Prover.pp_subgoals st) ();
 
-  (* FIXME check if exec@tau' then x else y *)
+  let x = mk_term_from_string "x" st in
+  let y = mk_term_from_string "y" st in
+
   let terms = get_nth_equiv_terms st 0 in
   Alcotest.(check term_testable) 
     "global goal _ (tau,tau':timestamp) :
@@ -318,14 +337,26 @@ let case_study () =
       if exec@tau' then x else y, 
       if exec@tau then x else y).
     exec@tau,
-    exec@tau,
     frame@tau,
     if exec@tau' then x else y,
-    x"
-    (List.nth terms 4)
+    X,
+    exec@tau"
+    (List.nth terms 3)
     (x);
+  let exectau' = mk_term_from_string "exec@tau'" st in
+  Alcotest.(check term_testable) 
+    "global goal _ (tau,tau':timestamp) :
+    equiv(exec@tau, frame@tau, 
+      if exec@tau' then x else y, 
+      if exec@tau then x else y).
+    exec@tau,
+    frame@tau,
+    IF EXEC@TAU' THEN X ELSE Y,
+    x,
+    exec@tau"
+    (List.nth terms 2)
+    (Term.mk_ite ~simpl:false (exectau') (x) (y));
 
-  (* FIXME check if exec@tau' then x else y *)
   let terms = get_nth_equiv_terms st 1 in
   Alcotest.(check term_testable) 
     "global goal _ (tau,tau':timestamp) :
@@ -333,51 +364,65 @@ let case_study () =
       if exec@tau' then x else y, 
       if exec@tau then x else y).
     exec@tau,
+    frame@tau,
+    IF EXEC@TAU' THEN X ELSE Y,
+    Y,
+    exec@tau"
+    (List.nth terms 3)
+    (y);
+  let exectau' = mk_term_from_string "exec@tau'" st in
+  Alcotest.(check term_testable) 
+    "global goal _ (tau,tau':timestamp) :
+    equiv(exec@tau, frame@tau, 
+      if exec@tau' then x else y, 
+      if exec@tau then x else y).
     exec@tau,
     frame@tau,
-    if exec@tau' then x else y,
-    y"
-    (List.nth terms 4)
-    (y);
+    IF EXEC@TAU' THEN X ELSE Y,
+    y,
+    exec@tau"
+    (List.nth terms 2)
+    (Term.mk_ite ~simpl:false (exectau') (x) (y));
 
 
   let st = Prover.exec_all st
         "Abort.
 
-        global goal _ (tau,tau':timestamp) :
+        global goal _ (x,y:message,tau,tau':timestamp) :
           equiv(exec@tau, frame@tau, if exec@tau' then x else y, if exec@tau then x else y).
         Proof."
   in
   let st = Prover.exec_command "nosimpl cs exec@tau in 3." st in
   Printer.pr "%a" (Prover.pp_subgoals st) ();
 
-  (* FIXME check if exec@tau' then x else y *)
+  let x = mk_term_from_string "x" st in
+  let y = mk_term_from_string "y" st in
+
   let terms = get_nth_equiv_terms st 0 in
   Alcotest.(check term_testable) 
     "global goal _ (tau,tau':timestamp) :
     equiv(exec@tau, frame@tau, 
       if exec@tau' then x else y, 
       if exec@tau then x else y).
-    exec@tau,
-    exec@tau,
-    frame@tau,
     if exec@tau' then x else y,
-    x"
+    frame@tau,
+    exec@tau,
+    exec@tau,
+    X"
     (List.nth terms 4)
     (x);
 
-  (* FIXME check if exec@tau' then x else y *)
   let terms = get_nth_equiv_terms st 1 in
   Alcotest.(check term_testable) 
     "global goal _ (tau,tau':timestamp) :
     equiv(exec@tau, frame@tau, 
       if exec@tau' then x else y, 
       if exec@tau then x else y).
-    exec@tau,
-    exec@tau,
-    frame@tau,
     if exec@tau' then x else y,
-    y"
+    frame@tau,
+    exec@tau,
+    exec@tau,
+    Y"
     (List.nth terms 4)
     (y);
 
@@ -385,12 +430,15 @@ let case_study () =
   let st = Prover.exec_all st
         "Abort.
 
-        global goal _ (tau,tau':timestamp) :
+        global goal _ (x,y:message,tau,tau':timestamp) :
           equiv(exec@tau, frame@tau, if exec@tau' then x else y, if exec@tau then x else y).
         Proof."
   in
   let st = Prover.exec_command "nosimpl cs exec@_ in 3." st in
   Printer.pr "%a" (Prover.pp_subgoals st) ();
+
+  let x = mk_term_from_string "x" st in
+  let y = mk_term_from_string "y" st in
 
   (* FIXME check if exec@tau' then x else y *)
   let terms = get_nth_equiv_terms st 0 in
@@ -399,11 +447,11 @@ let case_study () =
     equiv(exec@tau, frame@tau, 
       if exec@tau' then x else y, 
       if exec@tau then x else y).
-    exec@tau,
-    exec@tau,
-    frame@tau,
     if exec@tau' then x else y,
-    x"
+    frame@tau,
+    exec@tau,
+    exec@tau,
+    X"
     (List.nth terms 4)
     (x);
 
@@ -414,11 +462,11 @@ let case_study () =
     equiv(exec@tau, frame@tau, 
       if exec@tau' then x else y, 
       if exec@tau then x else y).
-    exec@tau,
-    exec@tau,
-    frame@tau,
     if exec@tau' then x else y,
-    y"
+    frame@tau,
+    exec@tau,
+    exec@tau,
+    Y"
     (List.nth terms 4)
     (y);
 

@@ -962,6 +962,7 @@ let () =
    ~pq_sound:true
    (LT.genfun_of_pure_efun_arg fadup) Args.(Opt Int)
 
+(* recursive proj left if b then t1 else t2 → t1 *)
 let rec cs_proj_left (b:Term.term) (t:Term.term) : Term.term = 
   let head = Term.head_normal_biterm t in
   match head with
@@ -970,6 +971,7 @@ let rec cs_proj_left (b:Term.term) (t:Term.term) : Term.term =
     t1
   | _ -> Term.tmap (cs_proj_left b) t
 
+(* recursive proj right if b then t1 else t2 → t2 *)
 let rec cs_proj_right (b:Term.term) (t:Term.term) : Term.term = 
   let head = Term.head_normal_biterm t in
   match head with
@@ -983,21 +985,23 @@ let case_study arg s : ES.sequents =
     match arg with
     | Args.(Pair ((Message (b,Type.Boolean)), Opt (Int, i))) ->
       i, b
-    | _ -> assert false
+    | _ -> assert false (* TODO *)
   in
   match li with
   | None -> 
+    (* Project all *)
     let e1 = List.map (cs_proj_left b)
         (ES.goal_as_equiv s) in
     let e2 = List.map (cs_proj_right b)
         (ES.goal_as_equiv s) in
-    [ES.set_equiv_goal (b::e1) s; ES.set_equiv_goal (b::e2) s]
+    [ES.set_equiv_goal (e1@[b]) s; ES.set_equiv_goal (e2@[b]) s]
   | Some (Args.Int i) ->
+    (* Project in ith term *)
     let before, e, after = split_equiv_goal i s in
     let e1 = cs_proj_left b e in
     let e2 = cs_proj_right b e in
-    [ES.set_equiv_goal (b::before@[e1]@after) s; 
-     ES.set_equiv_goal (b::before@[e2]@after) s]
+    [ES.set_equiv_goal (before@b::[e1]@after) s; 
+     ES.set_equiv_goal (before@b::[e2]@after) s]
 
 let () =
   T.register_typed "cs"
