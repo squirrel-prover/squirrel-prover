@@ -956,6 +956,7 @@ tac:
  * because they are reserved. *)
 help_tac_i:
 | FA         { "fa"}
+| CS         { "cs"}
 | INTRO      { "intro"}
 | DESTRUCT   { "destruct"}
 | DEPENDS    { "depends"}

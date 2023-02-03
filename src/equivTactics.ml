@@ -1013,11 +1013,11 @@ let case_study arg s : ES.sequents =
 
 let () =
   T.register_typed "cs"
-    ~general_help:"Case Study cs [pat] [in i] with i the i^th sequent
-                    in the equiv to project"
-   ~detailed_help:
-     "Example: in
-        global goal _ : equiv(if true then zero else empty, if true then n else m).
+    ~general_help:"Case Study cs [pat] [in i] 
+                    with i the i^th equiv sequent to project"
+   ~detailed_help:"Example: in
+        global goal _ :
+        \tequiv(if true then zero else empty, if true then n else m).
         nosimpl cs true.
         → two subgoals: equiv(true,zero,n) and equiv(true,empty,m)
    "
