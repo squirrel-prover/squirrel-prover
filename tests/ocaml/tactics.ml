@@ -11,18 +11,68 @@ let string_testable = Alcotest.testable pprint_option (=)
 
 let term_testable = Alcotest.testable (Term.pp_dbg) (Term.equal)
 
-let case_study () =
-  let get_seq_in_nth_goal st i = 
-    let subgoals = Prover.get_subgoals st in
-    let g = List.nth subgoals i in
-    match g with
-    | Equiv j -> ES.goal_as_equiv j
-    | _ -> assert false
+let get_seq_in_nth_goal st i =
+  let subgoals = Prover.get_subgoals st in
+  let g = List.nth subgoals i in
+  match g with
+  | Equiv j -> ES.goal_as_equiv j
+  | _ -> assert false
+
+let mk c = L.mk_loc L._dummy c
+
+let mk_message st s =
+  let n = Symbols.Name.of_lsymb (mk s) (Prover.get_table st) in
+  Term.mk_name (Term.mk_symb n Message) []
+
+(** Check that case study fails when there is no conditional
+    with the target condition. *)
+let case_study_fail () =
+  let st = Prover.init () in
+  let st =
+    Prover.exec_all st
+      "name n : message.\n\
+       name m : message.\n\
+       system null.\n\
+       global goal _ : equiv(if true then diff(n,m)).\n\
+       Proof."
   in
-  let mk c = L.mk_loc L._dummy c in      
-  let mk_message st s = 
-    let n = Symbols.Name.of_lsymb (mk s) (Prover.get_table st) in
-    Term.mk_name (Term.mk_symb n Message) [] in
+  try
+    ignore (Prover.exec_command "nosimpl cs false." st) ;
+    Alcotest.failf "Tactic application should have failed."
+  with
+  | Tactics.(Tactic_soft_failure (_,Failure e)) ->
+      Alcotest.(check string)
+        "error message"
+        "did not find any conditional to analyze"
+        e
+
+(** Check that case study fails when there is no conditional
+    with the target condition in the target item. *)
+let case_study_fail' () =
+  let st = Prover.init () in
+  let st =
+    Prover.exec_all st
+      "name n : message.\n\
+       name m : message.\n\
+       system null.\n\
+       global goal _ :\n\
+         equiv(if true then diff(n,m), if n=m then diff(n,m)).\n\
+       Proof."
+  in
+  (* "cs true" works in 0 but not in 1 *)
+  ignore (Prover.exec_command "nosimpl cs true in 0." st) ;
+  try
+    ignore (Prover.exec_command "nosimpl cs true in 1." st) ;
+    Alcotest.failf "Tactic application should have failed."
+  with
+  | Tactics.(Tactic_soft_failure (_,Failure e)) ->
+      Alcotest.(check string)
+        "error message"
+        "did not find any conditional to analyze"
+        e
+
+(** Check that case study works as expected on several examples. *)
+let case_study () =
 
   let st = Prover.init () in
   let st = 
@@ -34,6 +84,7 @@ let case_study () =
         global goal _ : equiv(if true then zero else empty).
         Proof."
   in
+
   (* Attention, simpl va trivialiser ce but. *)
   let st = Prover.exec_command "nosimpl cs true." st in
   Printer.pr "%a" (Prover.pp_subgoals st) ();
@@ -376,7 +427,7 @@ let case_study () =
     ).
     exec@tau,
     frame@tau,
-    IF EXEC@TAU' THEN X ELSE Y,
+    if exec@tau' then x else y,
     Y,
     exec@tau"
     (List.nth terms 3)
@@ -502,50 +553,9 @@ let case_study () =
     exec@tau,
     Y"
     (List.nth terms 4)
-    (y);
+    (y)
 
-  let _st = Prover.exec_command "Abort." st in
-
-  let st = Prover.exec_all st
-        "Abort.
-
-        global goal _ (x,y:message,tau,tau':timestamp) :
-          equiv(
-            exec@tau, 
-            true, 
-            if exec@tau' then x else y, 
-            if exec@tau then x else y
-          ).
-        Proof."
-  in
-
-  let st = Prover.exec_command "nosimpl cs true." st in
-  (* Should not find any if true then _ else _ *)
-  Printer.pr "%a" (Prover.pp_subgoals st) ();
-
-  let exectau = find_in_sys_from_string "exec@tau" st in
-  let x = find_in_sys_from_string "x" st in
-  let y = find_in_sys_from_string "y" st in
-  let terms = get_seq_in_nth_goal st 0 in
-  Alcotest.(check term_testable) 
-    "global goal _ (tau,tau':timestamp) :
-    equiv(
-      exec@tau, 
-      true, 
-      if exec@tau' then x else y, 
-      if exec@tau then x else y
-    ).
-    exec@tau,
-    true,
-    if exec@tau' then x else y,
-    if exec@tau then x else y,
-    "
-    (List.nth terms 3)
-    (Term.mk_ite ~simpl:false (exectau) (x) (y));
-
-  Alcotest.(check int) "Only 4 subgoals here !"
-    (List.length terms) 4;
-  ()
-
-let tests = [ ("case_study", `Quick, case_study);
-            ]
+let tests =
+  [ ("case_study", `Quick, case_study) ;
+    ("case_study_fail", `Quick, case_study_fail) ;
+    ("case_study_fail'", `Quick, case_study_fail') ]

@@ -4,7 +4,7 @@ include Symbols.Channel
 module L = Location
 open Channel
 
-(** {2 Test Suit} *)
+(** {2 Test Suite} *)
 let channels =
   let mk c = L.mk_loc L._dummy c in      
   let table_c = declare Symbols.builtins_table (mk "c") in  
