@@ -1823,16 +1823,8 @@ let known_sets_union (s1 : known_sets) (s2 : known_sets) : known_sets =
 
 (*------------------------------------------------------------------*)
 let known_set_of_term (term : Term.term) : known_set =
-  let vars, term = match term with
-    | Quant (Seq, vars, term) ->
-      let vars, s = Term.refresh_vars `Global vars in
-      let term = Term.subst s term in
-      vars, term
-
-    | _ -> [], term
-  in
   { term = term;
-    vars;
+    vars = [];
     cond = Term.mk_true; }
 
 (** Special treatment of `frame`, to account for the fact
@@ -1884,17 +1876,23 @@ let rec known_set_decompose (k : known_set) : known_set list =
     let kl = List.map (fun a -> { k with term = a; } ) l in
     List.concat_map known_set_decompose kl
 
+  | Quant (Seq, vars, term) ->
+    let vars, s = Term.refresh_vars `Global vars in
+    let term = Term.subst s term in
+    [{ term; vars = k.vars @ vars; cond = k.cond }]
+
   | _ -> [k]
 
 (** Given a term, return some corresponding [known_sets].  *)
 let known_set_list_of_term (term : Term.term) : known_set list =
   let k = known_set_of_term term in
-  let k_seq = known_set_add_frame k in
-  List.concat_map known_set_decompose (k :: k_seq)
+  let k_dec = known_set_decompose k in
+  let k_dec_seq = List.concat_map known_set_add_frame k_dec in
+  k_dec @ k_dec_seq
 
 let known_sets_of_terms (terms : Term.term list) : known_sets =
   let ks_l = List.concat_map known_set_list_of_term terms in
-  List.fold_left (fun ks k -> known_sets_add k ks) [] ks_l
+  List.fold_left (fun ks k -> known_sets_add k ks) [] ks_l 
 
 (*------------------------------------------------------------------*)
 (** Assume that we know all terms in [mset]. If [extra_cond_le = Some ts'], add
