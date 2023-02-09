@@ -206,14 +206,14 @@ let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
 
     | New (x, ty, p) -> 
       let ty = Theory.convert_ty env ty in 
-      let vars, _ = Vars.make `Shadow env.vars ty (L.unloc x) in
+      let vars, _ = Vars.make_local `Shadow env.vars ty (L.unloc x) in
       check_p ty_env { env with vars } p
 
     | In (c,x,p) -> 
       check_channel env.table c;
 
       (* FEATURE: subtypes*)
-      let vars, _ = Vars.make `Shadow env.vars (Type.Message) (L.unloc x) in
+      let vars, _ = Vars.make_local `Shadow env.vars (Type.Message) (L.unloc x) in
       check_p ty_env { env with vars } p
 
     | Out (c,m,p)
@@ -251,18 +251,18 @@ let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
       in
       
       Theory.check env ~local:true ty_env projs t ty ;
-      let vars, _ = Vars.make `Shadow env.vars ty (L.unloc x) in
+      let vars, _ = Vars.make_local `Shadow env.vars ty (L.unloc x) in
       check_p ty_env { env with vars } p
 
     | Repl (x, p) -> 
-      let vars, _ = Vars.make `Shadow env.vars Type.Index (L.unloc x) in
+      let vars, _ = Vars.make_local `Shadow env.vars Type.Index (L.unloc x) in
       check_p ty_env { env with vars } p
 
     | Exists (vs, test, p, q) ->
       check_p ty_env  env q ;
       let vars =
         List.fold_left (fun vars x ->
-            let vars, _ = Vars.make `Shadow vars Type.Index (L.unloc x) in
+            let vars, _ = Vars.make_local `Shadow vars Type.Index (L.unloc x) in
             vars
           ) env.vars vs 
       in
@@ -302,7 +302,7 @@ let declare
   =
   let vars = 
     List.fold_left (fun vars (v, ty) ->
-        let vars, _ = Vars.make `Shadow vars ty v in
+        let vars, _ = Vars.make_local `Shadow vars ty v in
         vars
       ) Vars.empty_env args 
   in
@@ -399,28 +399,28 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
    * safety. *)
   let env_ts,ts,dummy_in =
     let env = Vars.empty_env in
-    let env,ts = Vars.make `Shadow env Type.Timestamp "$ts" in
-    let env,dummy_in = Vars.make `Shadow env Type.Message "$dummy" in
+    let env,ts = Vars.make_local `Shadow env Type.Timestamp "$ts" in
+    let env,dummy_in = Vars.make_local `Shadow env Type.Message "$dummy" in
     env,ts,dummy_in
   in
 
   (* Update env.vars_env with a new variable of sort [sort] computed from
    * [name] *)
   let make_fresh param (penv : p_env) sort name =
-    let vars,x = Vars.make param penv.env.vars sort name in
+    let vars,x = Vars.make_local param penv.env.vars sort name in
     { penv with env = { penv.env with vars }}, x
   in
 
   let create_subst (venv : Vars.env) isubst msubst =
     List.map (fun (x,_,tm) -> 
-        let v = as_seq1 (Vars.find venv x) in
+        let v, _ = as_seq1 (Vars.find venv x) in
         (* cannot have two variables with the same name since previous 
            definitions must have been shadowed *)
         Term.ESubst (Term.mk_var v, Term.mk_var tm)
       ) isubst
     @
     List.map (fun (x,_,tm) -> 
-        let v = as_seq1 (Vars.find venv x) in (* idem *)
+        let v, _ = as_seq1 (Vars.find venv x) in (* idem *)
         Term.ESubst (Term.mk_var v, tm)
       ) msubst
   in
@@ -644,7 +644,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     let n'_s = Term.mk_symb n' ty in
     let n'_tm = Term.mk_name n'_s (Term.mk_vars (List.rev penv.indices)) in
 
-    let vars, _ = Vars.make `Shadow penv.env.vars ty (L.unloc n) in
+    let vars, _ = Vars.make_local `Shadow penv.env.vars ty (L.unloc n) in
 
     let penv = { penv with env = { penv.env with vars; table };
                            msubst = (L.unloc n,n'_th,n'_tm) :: penv.msubst }
@@ -712,7 +712,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     let args = Term.mk_vars (List.rev penv.indices) in
     let x'_tm = Term.mk_macro n'_s args (Term.mk_var ts) in
 
-    let vars, _ = Vars.make `Shadow penv.env.vars ty (L.unloc x) in
+    let vars, _ = Vars.make_local `Shadow penv.env.vars ty (L.unloc x) in
     
     let penv =
       { penv with env = { penv.env with vars; table}; 

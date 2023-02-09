@@ -41,8 +41,8 @@ let alcotests (path:string) : (string * [> `Quick] * (unit -> unit )) list =
 
 let () =
   List.iter (fun (s,t) -> Squirrellib.Checks.add_suite s t) test_suites;
-  Squirrellib.Checks.add_suite "Ok" (alcotests "tests/ok");
-  Squirrellib.Checks.add_suite "Fail" (alcotests "tests/fail");
+  Squirrellib.Checks.add_suite "tests/ok/" (alcotests "tests/ok");
+  Squirrellib.Checks.add_suite "tests/fail/" (alcotests "tests/fail");
   Format.eprintf "Running Alcotests on test suites :\n";
   List.iter (fun (n,_) -> 
     Format.eprintf "\t%s\n" n;

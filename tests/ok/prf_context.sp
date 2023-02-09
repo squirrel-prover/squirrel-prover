@@ -23,6 +23,5 @@ Proof.
   xor 1,n_PRF.
   rewrite if_true in 1.
   by namelength m, n_PRF.
-  fresh 1.
-  auto.
+  by fresh 1.
 Qed.

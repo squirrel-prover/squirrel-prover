@@ -143,10 +143,10 @@ Proof.
 
   (* Finally, we have to prove that two completely fresh names are
   indistinguishable. This is done with the fresh tactic. *)
-  fresh 1.
+  fresh 1; 1:auto.
 
   (* We only have left to prove that before the computation of the key, the
   protocol was indistinguishable, which is trivial because it did not contain any
   diff operations. *)
-  diffeq.
+  diffeq => *.
 Qed.

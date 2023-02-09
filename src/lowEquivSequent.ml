@@ -35,6 +35,9 @@ type conc_form = Equiv.form
 let hyp_kind = Equiv.Global_t
 let conc_kind = Equiv.Global_t
 
+(* default variable information of the sequent *)
+let var_info = Vars.Tag.gtag
+    
 (** An equivalence sequent features:
   * - two frames given as a single [goal] containing bi-terms
   *   of sort boolean or message;
@@ -64,7 +67,7 @@ let fv (s : t) : Vars.Sv.t =
 
 let sanity_check (s : t) : unit =
   Vars.sanity_check s.env.Env.vars;
-  assert (Vars.Sv.subset (fv s) (Vars.to_set s.env.Env.vars))
+  assert (Vars.Sv.subset (fv s) (Vars.to_vars_set s.env.Env.vars))
 
 (*------------------------------------------------------------------*)
 let _pp_goal ~dbg fmt = function
@@ -201,6 +204,7 @@ let set_goal_in_context ?update_local system conc s =
     let _update_local,update_global =
       LowSequent.setup_set_goal_in_context
         ~table:s.env.table
+        ~vars:s.env.vars
         ~old_context:s.env.system
         ~new_context:system
     in
@@ -247,9 +251,10 @@ let subst subst s =
 let rename (u:Vars.var) (v:Vars.var) (s:t) : t =
   assert (not (Vars.mem s.env.vars v));
   let s = subst [Term.ESubst (Term.mk_var u, Term.mk_var v)] s in
+  let info = Vars.get_info u s.env.vars in
   {s with
     env = Env.update
-             ~vars:(Vars.add_var v (Vars.rm_var u s.env.vars))
+             ~vars:(Vars.add_var v info (Vars.rm_var u s.env.vars))
              s.env;}
 
 (*------------------------------------------------------------------*)

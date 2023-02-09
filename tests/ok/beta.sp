@@ -48,7 +48,7 @@ Proof. auto. Qed.
 goal [any] _ (z1,z2 : T): f2 z1 z2 = z1.
 Proof. auto. Qed.
 
-goal [any] _ (z1,z1 : T): f2 z1 z1 = z1.
+goal [any] _ (z1,z2 : T): f2 z1 z1 = z1.
 Proof. auto. Qed.
 
 goal [any] _ (z1,z2 : T): (f2 z1) z2 = z1.

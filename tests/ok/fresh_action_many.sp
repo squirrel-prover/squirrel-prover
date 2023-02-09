@@ -1,5 +1,3 @@
-
-
 (* Test that the fresh tactic creates the correct formula when
  * several instances of the name are found in an action. *)
 
@@ -10,7 +8,7 @@ system !_i !_j out(c,<n(i),n(j)>).
 
 include Basic.
 
-global goal test (k:index) : 
+global goal test (k:index[const]) : 
   [((exec@A(k,k) => k <> k) && 
     (forall (i,j:index), A(i,j)<A(k,k) => k<>i) &&
     (forall (i,j:index), A(i,j)<A(k,k) => k<>j)) = true] ->
@@ -20,7 +18,6 @@ global goal test (k:index) :
 Proof. 
   intro Heq Hap H. 
   fresh 1. 
-  rewrite Heq.
-  rewrite if_true; 1: assumption.
+  rewrite Heq; 1: assumption.
   expandall; assumption.
 Qed.

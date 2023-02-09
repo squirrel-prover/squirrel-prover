@@ -1,5 +1,3 @@
-
-
 include Basic.
 
 (* Test that the prf tactic creates the correct formula when
@@ -14,7 +12,7 @@ name m : index->message
 system !_i !_j out(c,h(<n(i),n(j)>,k)).
 
 (* only directy cases *)
-global goal _ (i:index) : 
+global goal _ (i:index[param]) : 
 [(diff(n(i),m(i)) <> <n(i),n(i)>) = true] ->
 [happens(A(i,i))] -> 
 equiv(output@A(i,i), h(diff(n(i),m(i)),k)).
@@ -27,7 +25,7 @@ Qed.
 
 
 (* This time with `frame`, which yields (only) indirect cases *)
-global goal _ (i:index) : 
+global goal _ (i:index[param]) : 
 [(diff(n(i),m(i)) <> <n(i),n(i)>) = true] ->
 [(forall (i0,j:index),
   diff(
@@ -42,6 +40,6 @@ Proof.
   prf 1.
   rewrite H1 H2.
   rewrite if_true in 1; 1: auto.
-  fresh 1. 
+  fresh 1; 1:auto.
   by apply E.
 Qed.

@@ -273,7 +273,7 @@ axiom [mainCCAkR,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,epk
 (* We prove that the original game, after transitivity to mainCCAkI, is equivalent to idealized. *)
 equiv [mainCCAkR,idealized/left] test.
 Proof.
-  diffeq => //.
+  diffeq => * //.
     + intro *.
       case try find il,jl,kl such that _ in K(il,jl,kl) else _.
         - intro [il jl kl [Eq ->]].
@@ -867,7 +867,7 @@ Qed.
 
 equiv [idealized3/left,idealized2] transitivity.
 Proof.
-  diffeq => //.
+  diffeq => * //.
   + intro *.
     by use trans_eqD with i,j,k.
 
@@ -1009,7 +1009,7 @@ global axiom [idealized3/left,idealized3/left]auth3 (i,j,l:index):
 
 equiv  [idealized3/left,idealized3/left] dummy.
 Proof.
-  diffeq.
+  diffeq => *.
 Qed.
 
 (*******************************************)
@@ -1026,7 +1026,7 @@ axiom  [idealized3/left,idealized3/left] multprf (i,j,k:index,m:message): F1(m,n
 axiom   [idealized3/left,idealized3/left] len_F (x1,x2:message) : len(F1(x1,x2)) = len(skex).
 
 (* In idealized, we prove that at the end of I, the derived key is strongly secret. *)
-global goal [idealized3/left,idealized3/left] resp_key (i,j,k:index):
+global goal [idealized3/left,idealized3/left] resp_key (i,j,k:index[param]):
  [happens(FI(i,j,k))] -> 
  [exec@FI(i,j,k)] -> 
  equiv(frame@FI(i,j,k), diff(sIR i j k@FI(i,j,k), ikIR(i,j,k))) .
@@ -1072,7 +1072,7 @@ Qed.
 
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
-global goal [idealized3/left,idealized3/left] init_key (i,j,k:index):
+global goal [idealized3/left,idealized3/left] init_key (i,j,k:index[param]):
  [happens(SR(j,k,i))] -> 
  [exec@SR(j,k,i)] -> 
  equiv(frame@SR(j,k,i), diff(sRI i j k@SR(j,k,i), ikIR(j,k,i))).
@@ -1088,6 +1088,5 @@ Proof.
   rewrite len_F.
   namelength skex,n_PRF1.
   auto.
-  fresh 1.
-  auto.
+  by fresh 1.
 Qed.

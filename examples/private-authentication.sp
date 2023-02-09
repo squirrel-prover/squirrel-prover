@@ -171,16 +171,16 @@ Proof.
   *)
   expandall.
   fa 3; fa 4; fa 4; fa 4; fa 4.
-  fresh 5; rewrite if_true //.
-  by fresh 4; rewrite if_true //.
+  fresh 5; 1:auto.
+  by fresh 4.
 
   (** **Case where t = Abis(ibis):**  
   Similar to the previous case.
   *)
   expandall.
   fa 3; fa 4; fa 4; fa 4; fa 4.
-  fresh 5; rewrite if_true //.
-  by fresh 4; rewrite if_true //.
+  fresh 5; 1:auto.
+  by fresh 4.
 
   (** **Case where t = B(j):**  
   We have to show that the output message does not give any information
@@ -204,7 +204,7 @@ Proof.
   *)
   cca1 4; [1:auto]. 
   fa 4; fa 4.
-  fresh 5; rewrite if_true // in 5.  
+  fresh 5; 1:auto.
   (** We use the lemma `if_len` to push the conditional under len(_). *)
   rewrite if_len.
 
@@ -217,5 +217,5 @@ Proof.
 
   (** We conclude using the fact that `n(j)` is fresh. *)
   fa 4; fa 4.
-  by fresh 4; rewrite if_true //.
+  by fresh 4.
 Qed.

@@ -23,7 +23,7 @@ goal _ :
 Proof.
   intro Ass y x.
   generalize x y.
-  assumption.
+  assumption Ass.
 Qed.
 
 goal _ :
@@ -32,7 +32,7 @@ goal _ :
 Proof.
   intro Ass y x.
   generalize x y as u v.
-  assumption.
+  assumption Ass.
 Qed.
 
 goal _ :
@@ -41,7 +41,7 @@ goal _ :
 Proof.
   intro Ass y x.
   generalize (f(x)) (f(y)) as x y.
-  assumption.
+  assumption Ass.
 Qed.
 
 goal _ (z : message) :
@@ -51,5 +51,25 @@ goal _ (z : message) :
 Proof.
   intro Hyp Ass x.
   generalize dependent x z as x z. 
-  assumption.
+  checkfail have A := Ass exn Failure. (* no goal named `Ass` *)
+  assumption Hyp.
 Qed.
+
+(*------------------------------------------------------------------*)
+abstract P : message -> bool.
+
+axiom foo (x : message[const]) : P x.
+
+global goal _ (z : message[const]) : [P z].
+Proof.
+  byequiv. 
+  apply foo.
+Qed.
+
+(* check that local sequent loose tags when generalizing a local quantifier  *)
+global goal _ (z : message[const]) : [P z].
+Proof.
+  byequiv. 
+  generalize z => z.
+  checkfail apply foo exn Failure.
+Abort.

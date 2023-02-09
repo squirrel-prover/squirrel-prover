@@ -28,16 +28,28 @@ val pp_p_ty : Format.formatter -> p_ty -> unit
 
 (*------------------------------------------------------------------*)
 (** Parsed binder *)
-type bnd  = lsymb * p_ty
+    
+type bnd = lsymb * p_ty
 
-type bnds = (lsymb * p_ty) list
+type bnds = bnd list
 
 (*------------------------------------------------------------------*)
-(** Extended binders.
+(** Parser type for variables tags *)
+type var_tags = lsymb list
+
+(*------------------------------------------------------------------*)
+(** Parsed binder with tags *)
+    
+type bnd_tagged = lsymb * p_ty * var_tags 
+
+type bnds_tagged = bnd_tagged list
+
+(*------------------------------------------------------------------*)
+(** Extended binders (with variable tags).
     Support binders with destruct, e.g. [(x,y) : bool * bool] *)
 type ext_bnd =
-  | Bnd_simpl of bnd
-  | Bnd_tuple of lsymb list * p_ty
+  | Bnd_simpl of bnd_tagged
+  | Bnd_tuple of lsymb list * p_ty * var_tags
 
 type ext_bnds = ext_bnd list
 
@@ -94,15 +106,6 @@ val equal   : term   -> term   -> bool
 val equal_i : term_i -> term_i -> bool
 
 (*------------------------------------------------------------------*)
-(** {2 Higher-order terms.} *)
-
-(** For now, we need (and allow) almost no higher-order terms. *)
-type hterm_i =
-  | Lambda of bnds * term
-
-type hterm = hterm_i L.located
-
-(*------------------------------------------------------------------*)
 (** {2 Equivalence formulas} *)
 
 type equiv = term list 
@@ -117,7 +120,7 @@ and global_formula_i =
   | PImpl   of global_formula * global_formula
   | PAnd    of global_formula * global_formula
   | POr     of global_formula * global_formula
-  | PQuant  of pquant * bnds * global_formula
+  | PQuant  of pquant * bnds_tagged * global_formula
 
 
 (*------------------------------------------------------------------*)
@@ -343,17 +346,19 @@ val convert :
   term ->
   Term.term * Type.ty
 
-val convert_bnds : Env.t -> bnds -> Env.t * Vars.var list
+(*------------------------------------------------------------------*)
+(** Convert binders. *)  
+val convert_bnds : Vars.Tag.t -> Env.t -> bnds -> Env.t * Vars.vars
 
-val convert_ext_bnds : Env.t -> ext_bnds -> Env.t * Term.subst * Vars.vars
+val convert_bnds_tagged :
+  Vars.Tag.t -> Env.t -> bnds_tagged -> Env.t * Vars.tagged_vars
 
-val convert_ht :
-  ?ty_env:Type.Infer.env -> 
-  ?pat:bool ->
-  conv_env -> 
-  hterm -> 
-  Type.hty * Term.hterm
+(** Convert extended binders.
+    Support binders with destruct, e.g. [(x,y) : bool * bool] *)
+val convert_ext_bnds :
+  Vars.Tag.t -> Env.t -> ext_bnds -> Env.t * Term.subst * Vars.vars
 
+(*------------------------------------------------------------------*)
 (** Converts and infers the type.
     Each part of the [SE.context] inside the environment
     is used when converting the corresponding kind of atom. *)

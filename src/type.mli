@@ -48,15 +48,6 @@ val pp : Format.formatter -> ty -> unit
 (*------------------------------------------------------------------*)
 val is_tuni : ty -> bool
 
-(** Is the type a finite type, e.g. [Index] or [Timestamp] *)
-val is_finite : ty -> bool 
-
-(*------------------------------------------------------------------*)
-(** Higher-order *)
-type hty = Lambda of ty list * ty
-
-val pp_ht : Format.formatter -> hty -> unit
-
 (*------------------------------------------------------------------*)
 val tboolean   : ty
 val tmessage   : ty
@@ -82,8 +73,6 @@ val decompose_funs : ty -> ty list * ty
 (*------------------------------------------------------------------*)
 (** Equality relation *)
 val equal : ty -> ty -> bool
-
-val ht_equal : hty -> hty -> bool
   
 (*------------------------------------------------------------------*)
 (** {2 Type substitution } *)
@@ -92,8 +81,6 @@ val ht_equal : hty -> hty -> bool
 type tsubst
 
 val tsubst : tsubst -> ty -> ty
-
-val tsubst_ht : tsubst -> hty -> hty
                                          
 val tsubst_add_tvar   : tsubst -> tvar   -> ty -> tsubst
 val tsubst_add_univar : tsubst -> univar -> ty -> tsubst
@@ -116,7 +103,6 @@ module Infer : sig
   val open_tvars : env -> tvars -> univars * tsubst
 
   val norm   : env -> ty  -> ty
-  val htnorm : env -> hty -> hty
       
   val unify_eq  : env -> ty -> ty -> [`Fail | `Ok]
   val unify_leq : env -> ty -> ty -> [`Fail | `Ok]

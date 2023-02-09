@@ -170,12 +170,14 @@ let indcca_param
     let xk = Vars.make_fresh kty "K" in
     {rw_tyvars = [];
      rw_system = SE.to_arbitrary sys;
-     rw_vars = Vars.Sv.of_list1 [xm; xr; xk];
-     rw_conds = [mk_eq ~simpl:false
+     rw_vars   = Vars.Tag.local_vars [xm; xr; xk];
+     (* local information, since we allow to match diff operators *)
+     
+     rw_conds  = [mk_eq ~simpl:false
                    (mk_tuple [mk_var xm; mk_var xr; mk_var xk])
                    mk_false];
-     rw_rw = (mk_fun_tuple table f [mk_var xm; mk_var xr; mk_var xk]),
-             (Name.to_term xc);},
+     rw_rw     = (mk_fun_tuple table f [mk_var xm; mk_var xr; mk_var xk]),
+                 (Name.to_term xc);},
     table,
     xc
   in
@@ -197,7 +199,11 @@ let indcca_param
            let rule, table, xc = mk_rewrule f cty mty rty kty in
            let res =
              Rewrite.rewrite
-               table secontx InSequent hyps TacticsArgs.Once
+               table
+               Vars.empty_env
+               (* only local variables, hence [env] is useless here *)
+
+               secontx InSequent hyps TacticsArgs.Once
                rule
                Equiv.(Global (Atom (Equiv [t])))
            in
@@ -240,6 +246,14 @@ let indcca_param
     in
                   
     (* get the content of variables from the conditions *)
+    (* extract the last thing in l, in case additional conditions
+       were collected *)
+    (* also remove universally quantified variables that may have been
+       introduced in the condition. Note that in that case, m,r,k will
+       contain free variables. This is not an issue: since there must 
+       be a quantifier above the ciphertext we found, the tactic will
+       fail anyway later on *)
+    let l = snd (decompose_impls_last (snd (decompose_forall l))) in
     let m,r,k =
       match l with
       | Term.(Fun (ff, _, [Tuple [m; r; k]; fff])) when
@@ -277,24 +291,25 @@ let indcca_param
    subc contains no free vars and can just be substituted anywhere. *)
 let phi_proj
     ?use_path_cond
-    (loc:L.t)
-    (contx:Constr.trace_cntxt)
-    (env:Vars.env)
-    (enc_f:Symbols.fname)
-    (dec_f:Symbols.fname)
-    (pk_f:Symbols.fname option)
-    (biframe:terms)
-    (cc:term)   (* context above the ciphertext in the goal *)
-    (m:term)
-    (k:term)
-    (r:term)
-    (xc:Name.t) (* stand-in for the ciphertext in cc. *)
-    (subcs:terms) (* what to substitute xc with in the end *)
-    (proj:proj) :
-  terms
+    (loc     : L.t)
+    (env     : Env.t)
+    (contx   : Constr.trace_cntxt)
+    (enc_f   : Symbols.fname)
+    (dec_f   : Symbols.fname)
+    (pk_f    : Symbols.fname option)
+    (biframe : terms)
+    (cc      : term)   (* context above the ciphertext in the goal *)
+    (m       : term)
+    (k       : term)
+    (r       : term)
+    (xc      : Name.t) (* stand-in for the ciphertext in cc. *)
+    (subcs   : terms) (* what to substitute xc with in the end *)
+    (proj    : proj)
+  : Term.terms
   =
   (* project everything *)
   let system_p = SE.project [proj] contx.system in
+  let env = Env.update ~system:{ env.system with set = (system_p :> SE.arbitrary); } env in
   let contx_p = { contx with system = system_p } in
   let cc_p = Term.project1 proj cc in
   let m_p = Term.project1 proj m in
@@ -320,23 +335,23 @@ let phi_proj
   (* get the bad key and randomness occs, and the ciphertexts,
      in frame + m + kargs + rargs. There, decryption with k is allowed. *) 
   let get_bad_krc =
-    ER.get_bad_occs_and_ciphertexts
+    ER.get_bad_occs_and_ciphertexts env
       k_p [r_p] mk_false enc_f dec_f ~hash_f:None ~pk_f
   in
   (* discard the formulas generated for the ciphertexts themselves,
      we don't use them for cca *)
   let phis_kr, _, _, ciphertexts =
-    NO.occurrence_formulas_with_occs ~negate:true ~pp_ns:(Some pp_kr)
+    NO.occurrence_formulas_with_occs ~mode:PTimeSI ~negate:true ~pp_ns:(Some pp_kr)
       ER.ciphertext_formula
       (get_bad_krc ~dec_allowed:ER.Allowed) contx_p env
-      (m_p::k_p.args@r_p.args@frame_p)
+      (m_p :: k_p.args @ r_p.args @ frame_p)
   in
 
   (* also get bad key and rand occs, and ciphertexts in the context cc.
      There, decryption with k is allowed ONLY on subterms that do not contain
      the variable xc (which stands for the challenge) *)
   let phis_kr_cc, _, _, ciphertexts_cc =
-    NO.occurrence_formulas_with_occs ~negate:true ~pp_ns:(Some pp_kr)
+    NO.occurrence_formulas_with_occs ~mode:PTimeSI ~negate:true ~pp_ns:(Some pp_kr)
       ER.ciphertext_formula
       (get_bad_krc ~dec_allowed:(ER.NotAbove xc)) contx_p env [cc_p]
   in
@@ -357,13 +372,13 @@ let phi_proj
 
   (* formulas for the random freshness ONLY for symmetric enc *)
   let get_bad_randoms =
-    ER.get_bad_randoms k_p ciphertexts enc_f
+    ER.get_bad_randoms env k_p ciphertexts enc_f
   in
   let _, phis_random =
     if pk_f <> None then
-      NO.occurrence_formulas ?use_path_cond ~negate:true ~pp_ns:(Some pp_rand)
+      NO.occurrence_formulas ~mode:PTimeSI ?use_path_cond ~negate:true ~pp_ns:(Some pp_rand)
         (ER.randomness_formula ?use_path_cond)
-        get_bad_randoms contx_p env (cc_p::m_p::k_p.args@r_p.args@frame_p)
+        get_bad_randoms contx_p env (cc_p :: m_p :: k_p.args @ r_p.args @ frame_p)
     else
       [], []
   in
@@ -387,7 +402,7 @@ let phi_proj
 let indcca1 (i:int L.located) (s:sequent) : sequent list =
   let contx = ES.mk_pair_trace_cntxt s in
   let table = contx.table in
-  let env = ES.vars s in
+  let env = ES.env s in
   let loc = L.loc i in
 
   let proj_l, proj_r = ES.get_system_pair_projs s in
@@ -410,7 +425,7 @@ let indcca1 (i:int L.located) (s:sequent) : sequent list =
   let c_len = Term.(mk_fun table enc_f [mk_tuple [mk_zeroes (mk_len m); r; k]]) in
 
   let phi_proj =
-    phi_proj ~use_path_cond:false loc contxxc env enc_f dec_f pk_f biframe cc m k r xc [c; c_len]
+    phi_proj ~use_path_cond:false loc env contxxc enc_f dec_f pk_f biframe cc m k r xc [c; c_len]
     (* FEATURE: allow the user to set [use_path_cond] to true *)
   in
 

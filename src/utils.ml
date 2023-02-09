@@ -658,6 +658,9 @@ let fst3 (a, _, _) = a
 let fst_map f (x,_) = f x
 let snd_map f (_,y) = f y
 
+let fst_bind f (x,y) = f x, y
+let snd_bind f (x,y) = x, f y
+
 (* -------------------------------------------------------------------- *)
 let as_seq0 = function [] -> ()                     | _ -> assert false
 let as_seq1 = function [x] -> x                     | _ -> assert false

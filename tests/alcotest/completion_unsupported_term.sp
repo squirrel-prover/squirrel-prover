@@ -1,5 +1,3 @@
-
-
 abstract ok : message
 abstract ko : message
 

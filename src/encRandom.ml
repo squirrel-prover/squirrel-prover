@@ -63,7 +63,7 @@ let mk_ctxt_occ
     (k1:Name.t) (kcoll:Name.t)
     (fv:Vars.vars) (cond:terms) (ot:NO.occ_type) (st:term) :
   ctxt_occ =
-  let fv, sigma = refresh_vars `Global fv in
+  let fv, sigma = refresh_vars fv in
   let cond = List.map (Term.subst sigma) cond in
   let ot = NO.subst_occtype sigma ot in
   let c = Term.subst sigma c in
@@ -91,7 +91,7 @@ let mk_rand_occ
     (r:Name.t) (co:ectxt_occ) (p:(term * Name.t) option)
     (cond:terms) (fv:Vars.vars) (ot:NO.occ_type) (st:term) : rand_occ 
   =
-  let fv, sigma = refresh_vars `Global fv in
+  let fv, sigma = refresh_vars fv in
   let r = Name.subst sigma r in
   let p = Option.map (fun (m,k) -> subst sigma m, Name.subst sigma k) p in
   let cond = List.map (subst sigma) cond in
@@ -134,6 +134,7 @@ let is_dec_allowed (da:dec_allowed) (ts:Term.terms) : bool =
     (for pub key encryption there is no integrity guarantee,
      so no need to collect the ciphertexts) *)
 let get_bad_occs_and_ciphertexts
+    (env : Env.t)            (* initial environment  *)
     (k:Name.t) (* key k to look for *)
     (rs:Name.t list) (* randoms to look for *)
     (c:term) (* ciphertext c in dec(c,k) <> fail *)
@@ -166,11 +167,15 @@ let get_bad_occs_and_ciphertexts
   let rec_call = (* rec call on a list *)
     List.flattensplitmap (rec_call_on_subterms ~fv ~cond ~p ~info ~st)
   in
+  let env =
+    Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
+  in
   match t with
-  | Var v when not (Type.is_finite (Vars.ty v)) ->
-    Printer.pr "\nVAR %a\n" Vars.pp v;
+  | _ when HighTerm.is_ptime_deducible ~const:`Exact ~si:false env t -> ([],[])
+                                                         
+  | Var v ->
     soft_failure
-      (Tactics.Failure "can only be applied on ground terms")
+      (Tactics.Failure (Fmt.str "terms contain a non-ptime variable: %a" Vars.pp v))
 
   (* a name with the same symbol as k or one of the rs *)
   | Name (_, nargs) as n when
@@ -256,6 +261,7 @@ let get_bad_occs_and_ciphertexts
     Only used for symmetric encryption: for asym enc, the adversary
     has the public key and can thus encrypt anything *)
 let get_bad_randoms
+    (env : Env.t)
     (k:Name.t)
     (cs:ectxt_occs)
     (enc_f:Symbols.fname) (* encryption function *)
@@ -281,10 +287,16 @@ let get_bad_randoms
   let rec_call = (* rec call on a list *)
     List.flattensplitmap (rec_call_on_subterms ~fv ~cond ~p ~info ~st)
   in
+
+  let env =
+    Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
+  in
   match t with
-  | Var v when not (Type.is_finite (Vars.ty v)) ->
+  | _ when HighTerm.is_ptime_deducible ~const:`Exact ~si:false env t -> ([],[])
+
+  | Var v ->
     soft_failure
-      (Tactics.Failure "can only be applied on ground terms")
+      (Tactics.Failure (Fmt.str "terms contain a non-ptime variable: %a" Vars.pp v))
 
   (* r' found on its own is a bad occ if it is one of the r in enc(m, r, k1) *)
   | Name (_, rargs') as r' ->

@@ -8,13 +8,13 @@ abstract b : message
 abstract c : message
 abstract d : message
 
-system A: if True then out(ch,ok).
+system A: if true then out(ch,ok).
 
-axiom fooa : a = b => False.
-axiom foob : b = c => False.
+axiom fooa : a = b => false.
+axiom foob : b = c => false.
 
 goal _ (i : index, l : index, j : index):
- (a = b || (b = c && c = d)) => False.
+ (a = b || (b = c && c = d)) => false.
 
 Proof.
  intro [H | [H G]]. 
@@ -23,20 +23,20 @@ Proof.
 Qed.
 
 goal _ (i : index, j: index, k : index) :
-  (exists (l : index), False) => False.
+  (exists (l : index), false) => false.
 Proof.
  intro [l _]; auto.
 Qed.
 
 goal _ (i : index, j: index, k : index) :
-  (exists (l : index), True) => False.
+  (exists (l : index), true) => false.
 Proof.
  intro [l _].
  admit.
 Qed.
 
 goal _ (i : index, j: index, k : index) :
-  (exists (i, l, l1, l2, l3 : index), True) => False.
+  (exists (i, l, l1, l2, l3 : index), true) => false.
 Proof.
  intro [l2 l3 l4 Hap]. 
  admit.
@@ -59,6 +59,4 @@ Proof.
  intro [_ _ _]; assumption.
  intro [_ _ _]; assumption.
 Qed.
-
-
 

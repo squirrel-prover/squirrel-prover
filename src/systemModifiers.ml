@@ -29,7 +29,11 @@ let high_rewrite_norec
   : Term.term 
   =
   let mk_rule = fun _ _ -> Some rule in
-  Rewrite.high_rewrite ~mode:(`TopDown false) ~strict:false table system mk_rule t
+
+  let env = Vars.empty_env in
+  (* only local variables, hence [env] should is useless here. *)
+  
+  Rewrite.high_rewrite ~mode:(`TopDown false) ~strict:false table env system mk_rule t
     
 
 (*------------------------------------------------------------------*)
@@ -84,7 +88,7 @@ let clone_system_map
     clone_system
       table (SE.singleton system) new_name
       (fun descr -> 
-         let _, s  = Term.refresh_vars `Global descr.indices in
+         let _, s  = Term.refresh_vars descr.indices in
          let descr = Action.subst_descr s descr in
 
          Action.descr_map (fun _ -> fmap (ADescr descr)) descr)
@@ -126,7 +130,7 @@ let conv_term ?pat table system ~bnds (term : Theory.term)
   : Vars.vars * Term.term
   =
   let env = Env.init ~table ~system:system () in
-  let env,is = Theory.convert_bnds env bnds in
+  let env,is = Theory.convert_bnds (Vars.Tag.make Vars.Local) env bnds in
 
   Vars.check_type_vars is [Type.Index]
     (fun () ->
@@ -219,12 +223,12 @@ let global_rename
 
   (* We now build the rewrite rule *)
   let evars = Term.get_vars n1 in
-  let vs, subs = Term.refresh_vars `Global evars in
+  let vs, subs = Term.refresh_vars evars in
   let n1', n2' = (Term.subst subs n1, Term.subst subs n2) in
   let rw_rule = Rewrite.{
       rw_tyvars = [];
       rw_system = SE.any;
-      rw_vars   = Vars.Sv.of_list vs;
+      rw_vars   = Vars.Tag.local_vars vs;
       rw_conds  = [];
       rw_rw     = n1', n2';
     }
@@ -250,12 +254,14 @@ let global_rename
   let make_conclusion equiv =
     let fimpl =
       Equiv.Impl(
-        Equiv.mk_forall evars
+        Equiv.Smart.mk_forall_tagged
+          (Vars.Tag.global_vars ~const:true evars)
+          (* FIXME: unclear what tags should be used here *)
           (Atom (Equiv [Term.mk_var fresh_x_var;
                         Term.mk_diff [Term.left_proj,n1;Term.right_proj,n2]])),
         equiv)
     in
-    Equiv.Global (Equiv.mk_forall [fresh_x_var] fimpl)
+    Equiv.Global (Equiv.Smart.mk_forall [fresh_x_var] fimpl)
   in
   let lemma =
     mk_equiv_statement
@@ -300,7 +306,7 @@ let global_prf
     soft_failure (Tactics.BadSSCDetailed errors);
 
   (* We first refresh globably the indices to create the left pattern *)
-  let is1, left_subst = Term.refresh_vars `Global is in
+  let is1, left_subst = Term.refresh_vars is in
 
   let left_key =  Term.subst left_subst (Name.to_term param.h_key) in
   let left_key_ids =
@@ -336,7 +342,7 @@ let global_prf
   let rw_rule = Rewrite.{
       rw_tyvars = [];
       rw_system = SE.any;
-      rw_vars   = Vars.Sv.of_list (fresh_x_var :: is1);
+      rw_vars   = Vars.Tag.local_vars (fresh_x_var :: is1);
       rw_conds  = [];
       rw_rw     = hash_pattern, mk_tryfind;
     }
@@ -369,8 +375,12 @@ let global_prf
                     (Term.mk_symb n Message) (Term.mk_vars is)]])
     in
     let concl = 
-      Equiv.mk_forall [fresh_x_var]
-        (Equiv.Smart.mk_impl ~simpl:false (Equiv.mk_forall is atom) equiv)
+      Equiv.Smart.mk_forall [fresh_x_var]
+        (Equiv.Smart.mk_impl ~simpl:false
+           (Equiv.Smart.mk_forall_tagged
+              (* FIXME: unclear what tags should be used here *)
+              (Vars.Tag.global_vars ~const:true is) atom)
+           equiv)
     in
     Equiv.Global concl
   in
@@ -448,7 +458,7 @@ let global_cca
   (* TODO: check randomness is used only once, and message is distinct. *)
 
   (* We first refresh globably the indices to create the left patterns *)
-  let is1, left_subst = Term.refresh_vars `Global is in
+  let is1, left_subst = Term.refresh_vars is in
 
   (* The dec must match all decryption with the corresponding secret key *)
   let fresh_x_var = Vars.make_fresh Type.Message "x" in
@@ -496,7 +506,7 @@ let global_cca
   let enc_rw_rule = Rewrite.{
       rw_tyvars = [];
       rw_system = SE.any;
-      rw_vars   = Vars.Sv.of_list is;
+      rw_vars   = Vars.Tag.local_vars is;
       rw_conds  = [];
       rw_rw     = enc, new_enc;
     }
@@ -504,7 +514,7 @@ let global_cca
   let dec_rw_rule = Rewrite.{
       rw_tyvars = [];
       rw_system = SE.any;
-      rw_vars   = Vars.Sv.of_list (fresh_x_var :: is1);
+      rw_vars   = Vars.Tag.local_vars (fresh_x_var :: is1);
       rw_conds  = [];
       rw_rw     = dec_pattern, tryfind_dec;
     }
@@ -627,7 +637,7 @@ let refresh_xocc (o : x_hash_occ) : Term.subst * x_hash_occ =
   let occ = o.x_occ in
   assert (Sv.subset (Sv.of_list o.x_a_is) (Sv.of_list occ.occ_vars));
 
-  let _, subst = Term.refresh_vars `Global occ.occ_vars in
+  let _, subst = Term.refresh_vars occ.occ_vars in
 
   subst, subst_xocc subst o
 
@@ -871,9 +881,9 @@ let global_prf_t
             (* find new occurrences using NoDelta, as we also fold over 
                global macros. *)
             let new_occs =
-              Iter.get_f_messages_ext ~mode:`NoDelta
+              Iter.deprecated_get_f_messages_ext ~mode:`NoDelta
                 ~fv:descr.indices 
-                (old_system :> SE.arbitrary)
+                (old_system :> SE.arbitrary) table
                 param.h_fn param.h_key.symb.s_symb t
             in
 
@@ -909,7 +919,7 @@ let global_prf_t
   let tau = Vars.make_fresh Type.ttimestamp "t" in
   let tau_t = Term.mk_var tau in
 
-  let is, subst = Term.refresh_vars `Global is in
+  let is, subst = Term.refresh_vars is in
   let key = Term.subst subst (Name.to_term param.h_key) in
   let key_is = List.map (Term.subst subst) param.h_key.args in
 
@@ -1110,7 +1120,7 @@ let global_prf_t
       let rule = Rewrite.{
           rw_tyvars = [];
           rw_system = SE.any;
-          rw_vars   = Sv.of_list (x :: is);
+          rw_vars   = Vars.Tag.local_vars (x :: is);
           rw_conds  = [];
           rw_rw     = (to_rw, rw_target tau0 xocc); }
       in
@@ -1120,6 +1130,9 @@ let global_prf_t
   let fmap (arg : system_map_arg) (ms : Symbols.macro) (t : Term.term) 
     : Term.term 
     =
+    let env = Vars.empty_env in
+    (* only local variables, hence [env] should be useless here. *)
+
     (* To keep meaningful positions, we need to do the rewriting bottom-up.
        Indeed, this ensures that a rewriting does not modify the positions
        of the sub-terms above the position the rewriting occurs at. 
@@ -1127,7 +1140,7 @@ let global_prf_t
        We set [strict] to true, to make sure that we indeed rewrite at
        all necessary positions. *)
     Rewrite.high_rewrite ~mode:`BottomUp ~strict:true
-      table (old_system :> SE.t) (mk_rw_rule arg ms) t
+      table env (old_system :> SE.t) (mk_rw_rule arg ms) t
   in
 
   let table, _new_system_e =
@@ -1149,7 +1162,7 @@ let do_rewrite
   let mult, rw_erule = rw in
   match
     Rewrite.rewrite_exn 
-      ~loc (TS.table s) (TS.system s) expand_context
+      ~loc (TS.table s) (TS.vars s) (TS.system s) expand_context
       (TS.get_trace_hyps s)
       mult rw_erule (Local t)
   with
@@ -1243,12 +1256,12 @@ let global_rewrite
     =
     let vars, ts, expand_context = match arg with
       | Macros.ADescr d -> 
-         Vars.of_list d.indices, 
+         Vars.of_list (Vars.Tag.local_vars d.indices), 
          Term.mk_action d.name (Term.mk_vars d.indices),
          Macros.InSequent
         
       | Macros.AGlobal { is; ts; inputs } ->
-         Vars.of_list (ts :: is @ inputs), 
+         Vars.of_list (Vars.Tag.local_vars (ts :: is @ inputs)), 
          Term.mk_var ts,
          Macros.InGlobal { inputs }
     in
@@ -1270,7 +1283,7 @@ let global_rewrite
            List.map
              (fun (acd:Action.descr) -> (* formula: exists indices. ts = ac(indices) *)
                let tts = Term.mk_var ts in
-               let ind,_ = Term.refresh_vars `Global acd.indices in 
+               let ind,_ = Term.refresh_vars acd.indices in 
                let tac = Action.(Term.mk_action acd.name (Term.mk_vars ind)) in
                let eq = Term.mk_eq ~simpl:true tts tac in
                let ex = Term.mk_exists ~simpl:true ind eq in
@@ -1300,8 +1313,10 @@ let global_rewrite
           let gg = 
             match arg with
             | Macros.AGlobal {is = _; ts; ac_descrs = _; inputs = _} ->
-               let _, new_ts = Vars.make `Approx (TS.vars gg) Type.Timestamp "t" in 
-               TS.rename ts new_ts gg
+              let _, new_ts =
+                Vars.make `Approx (TS.vars gg) Type.Timestamp "t" (Vars.Tag.make Vars.Local)
+              in 
+              TS.rename ts new_ts gg
             | _ -> gg
           in
           gg)

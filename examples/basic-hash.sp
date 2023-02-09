@@ -180,7 +180,7 @@ Proof.
         formula `cond@R(j)` by an equivalent formula expressing the fact that
         a tag `T(i,k)` has played before and that the output of this tag is
         the message inputted by the reader. *)
-    rewrite /cond (wa_R (R(j)) H).
+    rewrite /cond (wa_R (R j)) //.
     (** We are now able to remove this formula from the frame because
         the attacker is able to compute it using information obtained
         in the past. Indeed, each element of this formula is already available
@@ -190,7 +190,7 @@ Proof.
   (** **Case where t = R1(j):**  
       This case is similar to the previous one. *)
   + expand frame, exec, output. fa !<_,_>.
-    rewrite /cond (wa_R (R1(j)) H).
+    rewrite /cond (wa_R (R1 j)) //.
     by fadup 1.
 
   (** **Case where t = T(i,k):**  
@@ -224,9 +224,8 @@ Proof.
 
     (** We have now replaced the hash by a fresh name occurring nowhere else,
         so we can remove it using the `fresh` tactic. *)
-    fresh 2.
+    fresh 2; 1:auto.
     (** We can also remove the name `nT(i,k)`, and conclude by induction
         hypothesis. *)
-    fresh 1.
-    by rewrite if_true.
+    by fresh 1.
 Qed.

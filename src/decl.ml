@@ -43,7 +43,7 @@ type action_decl = {
 (*------------------------------------------------------------------*)
 type bty_decl = {
   bty_name  : lsymb ;
-  bty_infos : Symbols.bty_info list ;
+  bty_infos : lsymb list ;
 }
 
 (*------------------------------------------------------------------*)

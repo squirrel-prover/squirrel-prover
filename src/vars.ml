@@ -7,6 +7,63 @@ type var = {
 
 type vars = var list
 
+
+(*------------------------------------------------------------------*)
+(** {2 Variable scope} *)
+
+(** A variable can have a local or global scope. *)
+type scope = Local | Global
+
+(*------------------------------------------------------------------*)
+(** {2 Variable information} *)
+
+module Tag = struct
+
+  (** Variable information restricting its possible instanciations. *)
+  type t = {
+    const : bool;
+    (** var represents a constant computation *)
+
+    system_indep : bool;
+    (** var must be instantiated by a term representiang a
+        system-independent computation *)
+  }
+
+  (*------------------------------------------------------------------*)
+  let pp fmt { const; system_indep; } =
+    let l =
+      (if const then ["const"] else []) @
+      (if system_indep then ["glob"] else [])
+    in
+    if l = [] then ()
+    else
+      Fmt.pf fmt "@[<h>[%a]@]" (Fmt.list ~sep:Fmt.comma Fmt.string) l
+
+  (*------------------------------------------------------------------*)
+  let make ?(const = false) (sc : scope) : t =
+    match sc with
+    | Local  -> { const; system_indep = false; }
+    | Global -> { const; system_indep = true; }
+
+  (*------------------------------------------------------------------*)
+  (** default local tag *)               
+  let ltag = make Local
+
+  (** default global tag *)
+  let gtag = make Global
+
+  (*------------------------------------------------------------------*)
+  let local_vars ?(const = false) (vs : vars) : (var * t) list =
+    List.map (fun v -> v, make ~const Local) vs
+
+  let global_vars ?(const = false) (vs : vars) : (var * t) list =
+    List.map (fun v -> v, make ~const Global) vs
+end
+
+type tagged_var = var * Tag.t
+
+type tagged_vars = (var * Tag.t) list
+
 (*------------------------------------------------------------------*)
 let is_pat v = String.sub v.id.name 0 1 = "_"
 
@@ -32,32 +89,40 @@ let _pp ~dbg ppf v =
 
 let _pp_list ~dbg ppf l =
   Fmt.pf ppf "@[<hov>%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") (_pp ~dbg)) l
+    (Fmt.list ~sep:(Fmt.any ",") (_pp ~dbg)) l
 
-let _pp_typed_list ~dbg ppf (vars : var list) =
-  let rec aux cur_vars cur_type = function
-    | v::vs when v.ty = cur_type ->
-        aux (v :: cur_vars) cur_type vs
+let _pp_typed_list_w_info pp_info ~dbg ppf (vars : (var * 'a) list) =
+  let rec aux cur_vars cur_type cur_info = function
+    | (v, info)::vs when v.ty = cur_type && info = cur_info ->
+      aux (v :: cur_vars) cur_type cur_info vs 
     | vs ->
-        if cur_vars <> [] then begin
-          Fmt.list
-            ~sep:(fun fmt () -> Fmt.pf fmt ",")
-            (_pp ~dbg) ppf (List.rev cur_vars) ;
-          Fmt.pf ppf ":%a" Type.pp cur_type ;
-          if vs <> [] then Fmt.pf ppf ",@,"
-        end ;
-        match vs with
-          | [] -> ()
-          | v :: vs -> aux [v] v.ty vs
+      if cur_vars <> [] then begin
+        Fmt.list
+          ~sep:(Fmt.any ",")
+          (_pp ~dbg) ppf (List.rev cur_vars) ;
+        Fmt.pf ppf ":%a%a" Type.pp cur_type pp_info cur_info;
+        if vs <> [] then Fmt.pf ppf ",@,"
+      end ;
+      match vs with
+      | [] -> ()
+      | (v, info) :: vs -> aux [v] v.ty info vs
   in
-  aux [] Type.Message vars
+  match vars with
+  | [] -> ()
+  | (v, info) :: vars -> aux [v] v.ty info vars
 
+let _pp_typed_list ~dbg ppf (vars : 'a list) : unit =
+  _pp_typed_list_w_info (fun _ _ -> ()) ~dbg ppf (List.map (fun v -> (v, ())) vars)
+  
 (*------------------------------------------------------------------*)
 (** Exported *)
 let pp            = _pp            ~dbg:false
 let pp_list       = _pp_list       ~dbg:false
 let pp_typed_list = _pp_typed_list ~dbg:false
 
+let _pp_typed_tagged_list = _pp_typed_list_w_info Tag.pp 
+let pp_typed_tagged_list  = _pp_typed_list_w_info Tag.pp ~dbg:false
+    
 (*------------------------------------------------------------------*)
 (** {2 Debug printing} *)
 
@@ -66,7 +131,8 @@ let pp_dbg            = _pp            ~dbg:true
 let pp_list_dbg       = _pp_list       ~dbg:true
 let pp_typed_list_dbg = _pp_typed_list ~dbg:true
 
-
+let pp_typed_tagged_list_dbg = _pp_typed_list_w_info Tag.pp ~dbg:true
+    
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)
 
@@ -113,68 +179,110 @@ module Mv = struct
     end)
 end
 
+
 (*------------------------------------------------------------------*)
 (** {2 Environments} *)
 
-module M = Utils.Ms
-
-type env = var list M.t
-
-let hash_env (e : env) : int =
-  M.fold (fun s _ h -> hcombine (Hashtbl.hash s) h) e 0
-
-let to_list (env : env) : var list =
-  let _,r2 = M.bindings env |> List.split in
-  List.flatten r2
-
-let to_set (env : env) : Sv.t = Sv.of_list (to_list env)
-
-let sanity_check (e : env) = 
-  assert (M.for_all (fun _ l -> List.length l = 1) e)
+type 'a genv = (var * 'a) list Ms.t
 
 (*------------------------------------------------------------------*)
-let _pp_env ~dbg ppf e =
-  _pp_typed_list ~dbg ppf (to_list e)
+type simpl_env = unit genv
 
-let pp_env     = _pp_env ~dbg:false
-let pp_env_dbg = _pp_env ~dbg:true
+type env = Tag.t genv
 
 (*------------------------------------------------------------------*)
-let empty_env : env = M.empty
+let to_list (env : 'a genv) : (var * 'a) list =
+  List.concat_map (fun (_, l) -> l) (Ms.bindings env) 
 
-let mem (e : env) var : bool = 
-  let l = M.find_dflt [] (name var) e in
-  List.mem var l
+let to_vars_list (env : 'a genv) : var list =
+  List.map fst (to_list env)
 
-let mem_s (e : env) (s : string) : bool = M.mem s e
+let to_vars_set (env : 'a genv) : Sv.t = Sv.of_list (to_vars_list env)
 
-let find (e : env) (name : string) : var list = M.find name e 
+let to_map (env : 'a genv) : 'a Mv.t =
+  List.fold_left (fun m (x,a) -> Mv.add x a m) Mv.empty (to_list env)
 
-let add_var v (e : env) : env =
+(*------------------------------------------------------------------*)
+let sanity_check (e : 'a genv) = 
+  assert (Ms.for_all (fun _ l -> List.length l = 1) e)
+
+(*------------------------------------------------------------------*)
+let _pp_genv ~dbg pp_info ppf (e : 'a genv) =
+  _pp_typed_list_w_info pp_info ~dbg ppf (to_list e)
+
+let pp_genv     pp_info = _pp_genv ~dbg:false pp_info
+let pp_genv_dbg pp_info = _pp_genv ~dbg:true  pp_info
+
+(*------------------------------------------------------------------*)
+let _pp_env ~dbg = _pp_genv ~dbg Tag.pp
+let  pp_env      =  pp_genv      Tag.pp
+let  pp_env_dbg  =  pp_genv_dbg  Tag.pp
+
+(*------------------------------------------------------------------*)
+let empty_env : 'a genv = Ms.empty
+
+let mem (e : 'a genv) var : bool = 
+  let l = Ms.find_dflt [] (name var) e in
+  List.exists (fun (var',_) -> equal var var') l
+
+let mem_s (e : 'a genv) (s : string) : bool = Ms.mem s e
+
+let find (e : 'a genv) (name : string) : (var * 'a) list = Ms.find name e
+
+(*------------------------------------------------------------------*)
+let get_info (v : var) (env : 'a genv) : 'a =
+  let _, i = List.find (fun (v', _) -> equal v v') (find env (name v)) in
+  i
+
+(*------------------------------------------------------------------*)
+let add_var v (info : 'a) (e : 'a genv): 'a genv =
   let n = name v in
-  let l = M.find_dflt [] n e in
-  M.add n (v :: l) e
+  let l = Ms.find_dflt [] n e in
+  Ms.add n ((v,info) :: l) e
 
-let add_vars vs (e : env) : env =
-  List.fold_left (fun e v -> 
-      add_var v e
+let add_vars vs (e : 'a genv) : 'a genv =
+  List.fold_left (fun e (v,info) -> 
+      add_var v info e
     ) e vs
 
-let of_list vs : env = add_vars vs empty_env
+let add_var_simpl v (e : simpl_env) : simpl_env = add_var v () e
 
-let of_set s : env = 
+let add_vars_simpl vs (e : simpl_env) : simpl_env =
+  add_vars (List.map (fun x -> (x, ())) vs) e
+    
+(*------------------------------------------------------------------*)
+let of_list vs : 'a genv = add_vars vs empty_env
+
+let of_set s : simpl_env = 
   Sv.fold (fun v e -> 
-      add_var v e
+      add_var_simpl v e
     ) s empty_env 
 
-let rm_var v (e : env) : env = 
+let of_map (m : 'a Mv.t) : 'a genv = 
+  Mv.fold (fun v i e -> 
+      add_var v i e
+    ) m empty_env 
+
+(*------------------------------------------------------------------*)
+let to_simpl_env (env : 'a genv) : simpl_env =
+  Ms.map (fun l ->
+      List.map (fun (v, _) -> v, ()) l
+    ) env
+
+(*------------------------------------------------------------------*)
+let rm_var v (e : 'a genv) : 'a genv = 
   assert (mem e v);
   let v_name = name v in
-  let l = M.find_dflt [] v_name e in
-  let l = List.filter (fun v' -> not (Ident.equal v.id v'.id)) l in
-  if l <> [] then M.add v_name l e else M.remove v_name e
+  let l = Ms.find_dflt [] v_name e in
+  let l = List.filter (fun (v', _) -> not (Ident.equal v.id v'.id)) l in
+  if l <> [] then Ms.add v_name l e else Ms.remove v_name e
 
-let rm_vars vs (e : env) : env = List.fold_left (fun e v -> rm_var v e) e vs
+let rm_vars vs (e : 'a genv) : 'a genv =
+  List.fold_left (fun e v -> rm_var v e) e vs
+
+(*------------------------------------------------------------------*)
+let map_tag (f : var -> Tag.t -> Tag.t) (e : env) : env =
+  Ms.map (fun l -> List.map (fun (v,t) -> v, f v t) l) e
 
 (*------------------------------------------------------------------*)
 (** {2 Create variables} *)
@@ -208,11 +316,11 @@ let int_suffix_to_string (i : int) : string =
 
 (* Compute the suffix to add to [prefix] such that [prefix ^ suffix] 
    is fresh in [e]. *)
-let make_suffix (e : env) (prefix : string) : int option =
+let make_suffix (e : 'a genv) (prefix : string) : int option =
   assert (prefix <> "_");
 
-  M.fold (fun _ vars max ->
-      List.fold_left (fun max var ->
+  Ms.fold (fun _ vars max ->
+      List.fold_left (fun max (var, _info) ->
           let s_prefix, s_suffix = split_var_name var.id.name in
           if prefix = s_prefix then
             let i_suffix = int_of_string s_suffix in
@@ -227,13 +335,13 @@ let check_prefix ~allow_pat s =
   (s = "_" || String.sub s 0 1 <> "_") &&
   (if not allow_pat then String.sub s 0 1 <> "_" else true)
 
-let make_name ~allow_pat (env : env) (name : string) : string =
+let make_name ~allow_pat (env : 'a genv) (name : string) : string =
   let s_prefix, s_suffix = split_var_name name in
   assert (check_prefix ~allow_pat s_prefix);
 
   let i_suffix = int_of_string s_suffix in
 
-  if not (M.mem name env) then name (* [name] not in use *)
+  if not (Ms.mem name env) then name (* [name] not in use *)
   else (* [name] in use, find another name close to [name] *)
     let s_suffix =
       match make_suffix env s_prefix with
@@ -243,7 +351,10 @@ let make_name ~allow_pat (env : env) (name : string) : string =
     s_prefix ^ int_suffix_to_string s_suffix
 
 (*------------------------------------------------------------------*)
-let make ?(allow_pat=false) mode (e : env) ty name =
+let make
+    ?(allow_pat=false) mode (e : 'a genv) (ty : Type.ty) (name : string) (info : 'a)
+  : 'a genv * var
+  =
   assert (allow_pat || name <> "_");
 
   (* if mode is [`Shadow], shadow existing variables in [e] *)
@@ -252,7 +363,7 @@ let make ?(allow_pat=false) mode (e : env) ty name =
     | `Approx -> e
     | `Shadow ->
       assert (name <> "_");
-      M.filter (fun n _ -> n <> name) e
+      Ms.filter (fun n _ -> n <> name) e
   in
   let fresh_name =
     match mode with
@@ -260,24 +371,36 @@ let make ?(allow_pat=false) mode (e : env) ty name =
     | `Approx ->
       make_name ~allow_pat e name
   in
-  assert (not (M.mem fresh_name e));
+  assert (not (Ms.mem fresh_name e));
   
   let v = { id = Ident.create fresh_name; ty; } in
-  add_var v e, v
+  add_var v info e, v
+
+let make_local
+    ?allow_pat mode (e : env) (ty : Type.ty) (name : string) 
+  : env * var
+  =
+  make ?allow_pat mode e ty name (Tag.make Local)
+
+let make_global
+    ?allow_pat mode (e : env) (ty : Type.ty) (name : string) 
+  : env * var
+  =
+  make ?allow_pat mode e ty name (Tag.make Global)
 
 (*------------------------------------------------------------------*)
-let make_exact (e : env) ty name =
-  if M.mem name e then None
+let make_exact (e : 'a genv) ty name info =
+  if Ms.mem name e then None
   else
     let v = make_fresh ty name in
-    Some (add_var v e, v)
+    Some (add_var v info e, v)
 
 (*------------------------------------------------------------------*)
-let make_approx (e : env) v =
-  make `Approx e v.ty v.id.name 
+let make_approx (e : 'a genv) v (info : 'a) =
+  make `Approx e v.ty v.id.name info
 
-let make_approx_r (e : env ref) v =
-  let e', v' = make_approx !e v in
+let make_approx_r (e : 'a genv ref) v (info : 'a) =
+  let e', v' = make_approx !e v info in
   e := e';
   v'
                                           
@@ -288,9 +411,9 @@ let () =
   Checks.add_suite "Vars" [
     "Prefix extension", `Quick, begin fun () ->
       let  env = empty_env in
-      let  env,i  = make `Approx env Type.Index "i"  in
-      let  env,i0 = make `Approx env Type.Index "i"  in
-      let _env,i1 = make `Approx env Type.Index "i1" in
+      let  env,i  = make `Approx env Type.Index "i"  () in
+      let  env,i0 = make `Approx env Type.Index "i"  () in
+      let _env,i1 = make `Approx env Type.Index "i1" () in
       
       Alcotest.(check string)
         "proper name for i"

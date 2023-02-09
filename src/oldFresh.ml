@@ -27,8 +27,10 @@ class deprecated_find_name ~(cntxt:Constr.trace_cntxt) exact name = object (_sel
   method visit_message t = match t with
     | Term.Name (ns,_) -> if ns.s_symb = name then raise Deprecated_Name_found
     | Term.Var m
-        when Vars.ty m <> Type.Timestamp && Vars.ty m <> Type.Index -> 
-        raise Deprecated_Var_found
+      when Vars.ty m <> Type.Timestamp && Vars.ty m <> Type.Index ->
+      (* FEATURE: this function is only used in [SystemModifiers], where
+         variables are probabbly fine, regardless of their types. *)
+      raise Deprecated_Var_found
     | _ -> super#visit_message t
 end
 
@@ -63,17 +65,22 @@ let deprecated_pp_name_occ fmt (occ : deprecated_name_occ) : unit =
 
 (** Looks for indices at which a name occurs.
     @raise Var_found if a term variable occurs in the term. *)
-let deprecated_get_name_indices_ext 
+let deprecated_get_name_indices_ext
+    ~(env:Env.t)
     ?(fv=[])
     (constr : Constr.trace_cntxt)
     (nsymb : Symbols.name)
     (t : Term.term)
   : deprecated_name_occs
   =
+  let env fv =
+    Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
+  in
   let rec get (t : Term.term) ~(fv : Vars.vars) ~(cond : Term.terms) : deprecated_name_occs =
     match t with
-    | Term.Var v when not (Type.is_finite (Vars.ty v)) ->
-      raise Deprecated_Var_found
+    | _ when HighTerm.is_ptime_deducible ~const:`Exact ~si:false (env fv) t -> []
+
+    | Var _ -> raise Deprecated_Var_found
 
     | Term.Name (ns,args) when ns.s_symb = nsymb ->
       let occ = Iter.{
@@ -122,9 +129,9 @@ let[@warning "-27"] deprecated_term_occ_subsumes
   assert (Sp.is_empty occ1.occ_pos && Sp.is_empty occ2.occ_pos);
 
   let pat2 = Term.{
-      pat_term = occ2.occ_cnt;
+      pat_term   = occ2.occ_cnt;
       pat_tyvars = [];
-      pat_vars = Sv.of_list1 occ2.occ_vars; 
+      pat_vars   = Vars.Tag.local_vars occ2.occ_vars; 
     } in
   match deprecated_pat_subsumes table context occ1.occ_cnt pat2 with
   | None -> false
@@ -224,7 +231,7 @@ let deprecated_mk_le_ts_occ
     (occ : deprecated_ts_occ) : Term.term
   =
   let occ_vars = occ.Iter.occ_vars in
-  let occ_vars, occ_subst = Term.refresh_vars `Global occ_vars in
+  let occ_vars, occ_subst = Term.refresh_vars occ_vars in
   let subst = occ_subst in
   let ts   = Term.subst subst occ.occ_cnt  in
 

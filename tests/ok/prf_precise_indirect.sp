@@ -1,5 +1,3 @@
-
-
 include Basic.
 
 channel c.
@@ -14,7 +12,7 @@ process A(i : index) =
 
 system !_i A(i).
 
-global goal _ (j : index) :
+global goal _ (j : index[const]) :
 [(zero <> input@A(j)) = true] ->
 [(forall (i:index), (A(i) < A(j) => test(i) => zero <> input@A(i))) = true] ->
 [happens(A(j))] ->
@@ -27,6 +25,6 @@ Proof.
   prf 2.
   rewrite H1 H2.
   rewrite if_true in 2; 1: auto.
-  fresh 2.    
+  fresh 2; 1:auto.    
   apply E.
 Qed.

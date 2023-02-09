@@ -32,8 +32,14 @@ type int_occs = int_occ list
 
 let mk_int_occ
     (t:term) (tcoll:term) (k:Name.t) (kcoll:Name.t)
-    (cond:terms) (v:Vars.vars) (ot:NO.occ_type) (st:term) : int_occ =
-  NO.mk_simple_occ (t,k) (tcoll,kcoll) () v cond ot st
+    (cond:terms) (fv:Vars.vars) (ot:NO.occ_type) (st:term) : int_occ =
+  let fv, sigma = Term.refresh_vars fv in
+  let cond = List.map (Term.subst sigma) cond in
+  let ot = NO.subst_occtype sigma ot in
+  let t = Term.subst sigma t in
+  let k = Name.subst sigma k in
+  let st = subst sigma st in
+  NO.mk_simple_occ (t,k) (tcoll,kcoll) () fv cond ot st
 
 
 (*------------------------------------------------------------------*)
@@ -41,6 +47,7 @@ let mk_int_occ
 
 (**  *)
 let get_bad_occs
+    (env : Env.t)
     (m:term)
     (k:Name.t)
     (int_f:Symbols.fname) (* function with integrity (hash, signature) *)
@@ -65,21 +72,33 @@ let get_bad_occs
   (* handles a few cases, using rec_call_on_subterm for rec calls,
      and calls retry_on_subterm for the rest *)
   (* only use this rec_call shorthand if the parameters don't change! *)
-  let rec_call = (* rec call on a list *)
+  let rec_call ?(st = st) = (* rec call on a list *)
     List.flattensplitmap (rec_call_on_subterms ~fv ~cond ~p ~info ~st)
   in
 
+  (* variables quantified above the current point are considered deterministic,
+     so we add them to the env usd for "is_ptime_deducible" *)
+  let env =
+    Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
+  in
   match t with
-  | Var v when not (Type.is_finite (Vars.ty v)) ->
-    soft_failure
-      (Tactics.Failure "can only be applied on ground terms")
+  | _ when HighTerm.is_ptime_deducible ~const:`Exact ~si:false env t -> ([], [])
+  (* SI not needed here *)
 
+  (* non ptime deterministic variable -> forbidden *)
+  (* (this is where we used to check variables were only timestamps or indices) *)
+  | Var v ->
+    soft_failure
+      (Tactics.Failure (Fmt.str "terms contain a non-ptime variable: %a" Vars.pp v))
+
+  (* occurrence of the signing/hash key *)
   | Name (ksb', kargs') as k' when ksb'.s_symb = k.symb.s_symb ->
     (* generate an occ, and also recurse on kargs' *)
     let occs1, accs1 = rec_call kargs' in
     (NO.mk_nocc (Name.of_term k') k fv cond (fst info) st) :: occs1,
     accs1
 
+  (* occurrence of the public key (for the signature case only) *)
   | Fun (f, _, [tk']) when pk_f = Some f -> (* public key *)
     begin
       match NO.expand_macro_check_all info tk' with
@@ -89,49 +108,31 @@ let get_bad_occs
       | _ -> retry_on_subterms () (* otherwise look in tk' *)
     end
     
+
   (* hash verification oracle: test u = h(m', k).
      Search recursively in u, m', kargs', but do not record
      m' as a hash occurrence. *)
   | Fun (f, _, [u; Fun (g, _, [Tuple [m'; Name (ksb', kargs')]])])
     when f = f_eq && g = int_f && pk_f = None && ksb'.s_symb = k.symb.s_symb ->
-    List.flattensplitmap
-      (rec_call_on_subterms ~fv ~cond ~p ~info ~st:t) (* change st *)
-      (u :: m' :: kargs')
+    rec_call ~st:t (u :: m' :: kargs') (* change st *)
 
-  (* hash verification oracle (symmetric case). can we avoid duplication? *)
+
+  (* hash verification oracle (converse case h(m', k) = u). *)
   | Fun (f, _, [Fun (g, _, [Tuple [m'; Name (ksb', kargs')]]); u])
     when f = f_eq && g = int_f && pk_f = None && ksb'.s_symb = k.symb.s_symb ->
-    List.flattensplitmap
-      (rec_call_on_subterms ~fv ~cond ~p ~info ~st:t) (* change st *)
-      (u :: m' :: kargs')
+    rec_call ~st:t (u :: m' :: kargs') (* change st *)
 
-  | Fun (f, _, [Tuple [m'; tk']]) when f = int_f ->
-    begin
-      match NO.expand_macro_check_all info tk' with
-      (* hash/sign/etc w/ a name that could be the right key *) 
-      (* record this hash occurrence, but allow the key *)
-      (* q: actually why don't we always do this,
+  (* hash/sign/etc w/ a name that could be the right key *) 
+  (* record this hash occurrence, but allow the key *)
+  (* q: actually why don't we always do this,
                even if it's the wrong key?
-         a: that would be sound but generate too many occs *)
-      | Name (ksb', kargs') as k' when k.symb.s_symb = ksb'.s_symb  ->
-        let fvv, sigma = refresh_vars `Global fv in
-        let m' = subst sigma m' in
-        let k' = Name.subst sigma (Name.of_term k') in
-        let cond = List.map (subst sigma) cond in
-        let ot = NO.subst_occtype sigma (fst info) in
-        let occs, accs = rec_call (m' :: kargs') in
-        occs,
-        accs @ [mk_int_occ m' m k' k  cond fvv ot st]
-
-      (* if we can't be sure it could be the key *)
-      (* don't record the hash occ, but look for bad occurrences in m and tk *)
-      (* (worst case, it was actually the key,
-          and we'll miss the assumption that 
-         the message could be m in the goal for the key's occurrence) *)
-      (* If needed, this can be made more precise in the future. *)
-      | _ -> retry_on_subterms ()
-    end
-
+     a: that would be sound but generate too many occs *)
+  | Fun (f, _, [Tuple [m'; Name (ksb', kargs') as k']])
+    when f = int_f && k.symb.s_symb = ksb'.s_symb ->
+    let occs, accs = rec_call (m' :: kargs') in
+    occs,
+    accs @ [mk_int_occ m' m (Name.of_term k') k cond fv (fst info) st]
+             
   | _ -> retry_on_subterms ()
 
 
@@ -155,11 +156,8 @@ let integrity_formula
       (mk_not ~simpl:true (mk_eq ~simpl:true m m'))
       (mk_neqs ~simpl:true k.args k'.args)
 
-
-
-
 (*------------------------------------------------------------------*)
-(* EUF tactic *)
+(** {2 EUF tactic} *)
 
 (* parameters for the integrity occurrence: key, signed or hashed message,
    signature checked or compared w/ the hash, sign/hash function,
@@ -232,7 +230,7 @@ checksign(m, s, pk(k)), hash(m, k) = t, or the symmetric equality")
     | _ -> fail ()
                    
 
-
+(*------------------------------------------------------------------*)
 let euf
     (h : lsymb)
     (s : sequent)
@@ -241,7 +239,7 @@ let euf
   (* find parameters *)
   let _, hyp = Hyps.by_name h s in
   let contx = TS.mk_trace_cntxt s in
-  let env = (TS.env s).vars in
+  let env = TS.env s in
   
   let {ep_key=k; ep_intmsg=m; ep_term=t; ep_int_f=int_f; ep_pk_f=pk_f} =
     euf_param ~hyp_loc:(L.loc h) contx hyp s
@@ -252,12 +250,12 @@ let euf
 
   (* apply euf *)
   let get_bad : ((term * Name.t, unit) NO.f_fold_occs) = 
-    get_bad_occs m k int_f ~pk_f 
+    get_bad_occs env m k int_f ~pk_f 
   in
   let phis_bad, phis_int =
-    NO.occurrence_formulas ~pp_ns:(Some pp_k)
+    NO.occurrence_formulas ~mode:PTimeNoSI ~pp_ns:(Some pp_k)
       integrity_formula
-      get_bad contx env [t; m]
+      get_bad contx env (t :: m :: k.Name.args)
   in
   let phis = phis_bad @ phis_int in
 
@@ -300,8 +298,6 @@ let euf
   in
   
   tag_s @ integrity_goals
-
-
   
 
 (*------------------------------------------------------------------*)

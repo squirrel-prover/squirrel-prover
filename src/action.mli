@@ -241,7 +241,7 @@ val subst_descr : Term.subst -> descr -> descr
 
 (** Map a function over a descriptor. *)
 val descr_map :
-  (Vars.env -> Symbols.macro -> Term.term -> Term.term) ->
+  (Vars.vars -> Symbols.macro -> Term.term -> Term.term) ->
   descr ->
   descr
 

@@ -47,7 +47,7 @@ Abort.
 (* Failure when the key occurs inside an action condition. *)
 system [condSSC] in(c,x); if x=k then out(c,x).
 
-goal [condSSC] _ (tau:timestamp) :
+goal [condSSC] _ (tau:timestamp[param]) :
   happens(tau) =>
   (if cond@tau then ok else zero) <> h(ok,k).
 Proof.
@@ -94,7 +94,7 @@ Abort.
 
 system [boundvars] out(c,seq(i,j:index => h(n2(i,j),k1(i)))).
 
-goal [ boundvars] _ (tau:timestamp, j,j1,j2:index):
+goal [ boundvars] _ (tau:timestamp[param], j,j1,j2:index[param]):
   happens(tau) =>
   (if frame@tau = zero then ok else ok) = h(n2(j1,j2),k1(j)) => j1=j2.
 Proof.
@@ -105,7 +105,7 @@ Proof.
   *)
 Abort.
 
-goal _ (j,j1,j2:index):
+goal _ (j,j1,j2:index[param]):
   seq(i,j:index => h(n2(i,j),k1(i))) = h(n2(j1,j2),k1(j)) => j1=j2.
 Proof.
   intro Hseq.
@@ -119,7 +119,7 @@ Abort.
 
 system [dupnames] !_i out(c,<h(n,k),h(m,k)>).
 
-goal [ dupnames] _ (tau:timestamp): 
+goal [ dupnames] _ (tau:timestamp[param]): 
  happens(tau) => output@tau = h(u,k) => False.
 Proof.
   intro Hap Heq.

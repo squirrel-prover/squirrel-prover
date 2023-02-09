@@ -1,4 +1,4 @@
-module Pos  = Match.Pos
+module Pos = Match.Pos
 
 (*------------------------------------------------------------------*)
 include module type of LowRewrite
@@ -14,9 +14,10 @@ type error =
     Return: rewritten term, proof obligations *)
 val rewrite_head :
   Symbols.table ->
+  Vars.env ->
   Macros.expand_context ->
   Hyps.TraceHyps.hyps Lazy.t ->
-  SystemExpr.t ->
+  SE.t ->
   rw_rule ->
   Term.term ->
   (Term.term * (SE.arbitrary * Term.term) list) option
@@ -31,7 +32,8 @@ type rw_res_opt =
 (*------------------------------------------------------------------*)
 val rewrite :
   Symbols.table ->
-  SystemExpr.context ->
+  Vars.env ->                   (* used to get variable tags when matching *)
+  SE.context ->
   Macros.expand_context ->
   Hyps.TraceHyps.hyps ->
   TacticsArgs.rw_count ->
@@ -45,7 +47,8 @@ val rewrite :
 val rewrite_exn :
   loc:L.t ->
   Symbols.table ->
-  SystemExpr.context ->
+  Vars.env ->                   (* used to get variable tags when matching *)
+  SE.context ->
   Macros.expand_context ->
   Hyps.TraceHyps.hyps ->
   TacticsArgs.rw_count ->
@@ -67,6 +70,7 @@ val high_rewrite :
   mode : [`TopDown of bool | `BottomUp] ->
   strict : bool ->
   Symbols.table ->
+  Vars.env ->
   SE.t ->
   (Vars.vars -> Pos.pos -> rw_rule option) ->
   Term.term ->

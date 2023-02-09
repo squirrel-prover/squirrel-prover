@@ -42,7 +42,7 @@ class deprecated_iter_approx_macros :
     must be of the form [f(_,_,g(k(_)))] if allow_funs is defined and
     [allows_funs g] returns true.
 
-    Deprecated: use [get_f_messages_ext] *)
+    Deprecated *)
 class deprecated_get_f_messages :
   ?drop_head:bool ->
   ?fun_wrap_key:(Symbols.fname -> bool) option ->
@@ -144,41 +144,24 @@ type hash_occs = hash_occ list
 val pp_hash_occ : Format.formatter -> hash_occ -> unit
 
 (*------------------------------------------------------------------*)
-(** [get_f_messages_ext ~cntxt f k t] collects direct occurrences of
+(** [deprecated_get_f_messages_ext ~cntxt f k t] collects direct occurrences of
     [f(_,k(_))] or [f(_,_,k(_))] where [f] is a function name [f] and [k] 
     a name [k].
     Over-approximation: we try to expand macros, even if they are at a 
-    timestamp that may not happen. *)
-val get_f_messages_ext :
+    timestamp that may not happen.
+
+    Deprecated. *)
+val deprecated_get_f_messages_ext :
   ?drop_head:bool ->
   ?fun_wrap_key:(Symbols.fname -> bool) option ->
   ?fv:Vars.vars ->
   mode:[`Delta of Constr.trace_cntxt | `NoDelta] ->
   SE.arbitrary ->
+  Symbols.table ->
   Symbols.fname -> 
   Symbols.name -> 
   Term.term -> 
   hash_occs
-
-(*------------------------------------------------------------------*)
-(** {2 Macros} *)
-
-(** occurrences of a macro [n(i,...,j)] *)
-type macro_occ_cnt = { symb : Term.msymb; args : Term.term list} 
-
-type macro_occ = macro_occ_cnt occ
-
-type macro_occs = macro_occ list
-
-(** Looks for macro occurrences in a term.
-    - [mode = `FullDelta]: all macros that can be expanded are ignored.
-    - [mode = `Delta]: only Global macros are expanded (and ignored)
-    @raise Var_found if a message variable occurs in the term. *)
-val get_macro_occs :
-  mode:[ `Delta | `FullDelta ] ->
-  Constr.trace_cntxt -> 
-  Term.term -> 
-  macro_occs
 
 (*------------------------------------------------------------------*)
 (** {2 Folding over action descriptions} *)
@@ -240,6 +223,11 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Folding over the macro supports of a list of terms} *)
 
+(** Allowed constants in terms for cryptographic tactics:
+    - SI is for system-independent. *)
+type allowed_constants = Const | PTimeSI | PTimeNoSI
+
+(*------------------------------------------------------------------*)
 (** An indirect occurrence of a macro term, used as return type of
     [fold_macro_support]. The record:
 
@@ -296,9 +284,10 @@ val pp_iocc : Format.formatter -> iocc -> unit
 
      such that [s ≡ (s₀)^{Tσ}]. *)
 val fold_macro_support :
+  ?mode:allowed_constants ->   (* allowed sub-terms without further checks *)
   (iocc -> 'a -> 'a) ->
   Constr.trace_cntxt -> 
-  Vars.env -> 
+  Env.t -> 
   Term.term list -> 
   'a -> 
   'a
@@ -306,13 +295,14 @@ val fold_macro_support :
 (** Less precise version of [fold_macro_support], which does not track 
     sources. *)
 val fold_macro_support0 :
-  (Symbols.action -> (* action name *)
-   Action.action  -> (* action *)
-   Term.term      -> (* term *)
-   'a             -> (* folding accumulator *)
+  ?mode:allowed_constants ->   (* allowed sub-terms without further checks *)
+  (Symbols.action ->         (* action name *)
+   Action.action  ->         (* action *)
+   Term.term      ->         (* term *)
+   'a             ->         (* folding accumulator *)
    'a) ->
   Constr.trace_cntxt -> 
-  Vars.env -> 
+  Env.t -> 
   Term.term list -> 
   'a -> 
   'a
@@ -320,9 +310,10 @@ val fold_macro_support0 :
 (** Less precise version of [fold_macro_support], which does not track 
     sources. *)
 val fold_macro_support1 :
+  ?mode:allowed_constants ->   (* allowed sub-terms without further checks *)
   (Action.descr -> Term.term -> 'a -> 'a) ->
   Constr.trace_cntxt -> 
-  Vars.env -> 
+  Env.t -> 
   Term.term list -> 
   'a -> 
   'a

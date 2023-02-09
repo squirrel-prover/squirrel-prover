@@ -37,43 +37,6 @@ let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
-(** {2 Logical Tactics} *)
-
-(** Propositional connectives *)
-
-let goal_or_right_1 (s : TS.t) =
-  match Term.destr_or (TS.goal s) with
-  | Some (lformula, _) -> [TS.set_goal (lformula) s]
-  | None -> soft_failure (Tactics.Failure "not a disjunction")
-
-let goal_or_right_2 (s : TS.t) =
-  match Term.destr_or (TS.goal s) with
-  | Some (_, rformula) -> [TS.set_goal (rformula) s]
-  | None -> soft_failure (Tactics.Failure "not a disjunction")
-
-let () =
-  T.register "left"
-    ~tactic_help:{general_help = "Reduce a goal with a disjunction conclusion \
-                                  into the goal where the conclusion has been \
-                                  replaced with the first disjunct.";
-                  detailed_help = "G => A v B yields G => A";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
-    ~pq_sound:true
-    (LowTactics.genfun_of_pure_tfun goal_or_right_1)
-
-let () =
-  T.register "right"
-    ~tactic_help:{general_help = "Reduce a goal with a disjunction conclusion \
-                                  into the goal where the conclusion has been \
-                                  replace with the second disjunct.";
-                  detailed_help = "G => A v B yields G => B";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
-    ~pq_sound:true
-    (LowTactics.genfun_of_pure_tfun goal_or_right_2)
-
-(*------------------------------------------------------------------*)
 let goal_true_intro (s : TS.t) =
   match TS.goal s with
   | tt when tt = Term.mk_true -> []
@@ -92,7 +55,7 @@ let () =
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
   * This can be used with [vars = []] if orig is an [if-then-else] term. *)
 let case_cond orig vars c t e s : sequent list =
-  let vars, subst = Term.refresh_vars `Global vars in
+  let vars, subst = Term.refresh_vars vars in
   let then_c = Term.subst subst c in
   let else_c = Term.mk_forall vars (Term.mk_not then_c) in
 
@@ -196,14 +159,14 @@ let rec simpl_left s =
     match f with
     | tf when tf = Term.mk_false -> None
 
-    | Quant (Exists,vs,f) ->
+    | Term.Quant (Exists,vs,f) ->
       let s = Hyps.remove id s in
       let env = ref @@ TS.vars s in
       let subst =
         List.map
           (fun v ->
-             Term.ESubst  (Term.mk_var v,
-                           Term.mk_var (Vars.make_approx_r env v)))
+             Term.ESubst (Term.mk_var v,
+                          Term.mk_var (Vars.make_approx_r env v (Vars.Tag.make Vars.Local))))
           vs
       in
       let f = Term.subst subst f in
@@ -554,7 +517,7 @@ let deprecated_fresh_occ_incl
   in
   let pat2 = Term.{
       pat_tyvars = [];
-      pat_vars   = Sv.of_list o2.occ_vars;
+      pat_vars   = Vars.Tag.local_vars o2.occ_vars;
       pat_term   = mk_dum a2 is2 cond2;
     }
   in
@@ -592,7 +555,7 @@ let deprecated_add_fresh_cases
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
 let deprecated_mk_fresh_indirect_cases
     (cntxt : Constr.trace_cntxt)
-    (env : Vars.env)
+    (venv : Vars.env)
     (ns : Term.nsymb)
     (ns_args : Term.terms)
     (terms : Term.term list)
@@ -604,19 +567,21 @@ let deprecated_mk_fresh_indirect_cases
           Sv.union s (Term.fv t)
         ) (Term.fvs ns_args) terms
     in
-    Sv.subset all_fv (Vars.to_set env));
+    Sv.subset all_fv (Vars.to_vars_set venv));
+
+  let env = Env.init ~table:cntxt.table ~system:(SE.reachability_context cntxt.system) ~vars:venv () in
 
   let macro_cases =
     Iter.fold_macro_support0 (fun action_name a t macro_cases ->
         let fv =
           Sv.diff
             (Sv.union (Action.fv_action a) (Term.fv t))
-            (Vars.to_set env)
+            (Vars.to_vars_set venv)
         in
 
         let new_cases =
           let fv = List.rev (Sv.elements fv) in
-          OldFresh.deprecated_get_name_indices_ext ~fv cntxt ns.s_symb t
+          OldFresh.deprecated_get_name_indices_ext ~env:env ~fv cntxt ns.s_symb t
         in
         let new_cases =
           List.map (fun (case : OldFresh.deprecated_name_occ) ->
@@ -756,7 +721,7 @@ let autosubst s =
 (*------------------------------------------------------------------*)
 (* TODO: this should be an axiom in some library, not a rule *)
 let exec (Args.Message (a,_)) s =
-  let _,var = Vars.make `Approx (TS.vars s) Type.Timestamp "t" in
+  let _,var = Vars.make `Approx (TS.vars s) Type.Timestamp "t" TS.var_info in
   let formula =
     Term.mk_forall ~simpl:false
       [var]
@@ -790,6 +755,8 @@ let () =
   * [C] that congruence closure does not support: conditionals,
   * sequences, etc. *)
 let fa s =
+  let table = TS.table s in
+
   let unsupported () = soft_failure (Failure "equality expected") in
 
   let check_vars vars vars' =
@@ -831,9 +798,19 @@ let fa s =
 
   (* FIXME: allow ForAll and Exists? *)
   | Term.Quant (Seq, vars,t), Term.Quant (Seq, vars',t')
-    when List.for_all (Type.is_finite -| Vars.ty) vars -> 
+    when List.for_all (Symbols.TyInfo.is_finite table -| Vars.ty) vars -> 
     check_vars vars vars';
 
+    (* refresh variables *)
+    let vars, t =
+      let vars, subst = Term.refresh_vars vars in
+      vars, Term.subst subst t
+    in
+    let vars', t' =
+      let vars', subst = Term.refresh_vars vars' in
+      vars', Term.subst subst t'
+    in
+    
     (* have [t'] use the same variables names than [t] *)
     let t' = 
       let subst = 
@@ -844,9 +821,11 @@ let fa s =
       Term.subst subst t'
     in
 
-    let env = ref (TS.vars s) in
-    let _, subst = Term.refresh_vars (`InEnv env) vars in
-    let s = TS.set_vars !env s in
+    let env = TS.vars s in
+    let env, _, subst =         (* add variables as local vars. *)
+      Term.add_vars_env env (List.map (fun v -> v, TS.var_info) vars)
+    in 
+    let s = TS.set_vars env s in
     let t = Term.subst subst t in
     let t' = Term.subst subst t' in
     let subgoals =
@@ -856,7 +835,7 @@ let fa s =
 
   | Term.Find (vs,c,t,e),
     Term.Find (vars',c',t',e')
-    when List.for_all (Type.is_finite -| Vars.ty) vs &&
+    when List.for_all (Symbols.TyInfo.is_finite table -| Vars.ty) vs &&
          List.length vs = List.length vars' ->
     (* We verify that [e = e'],
      * and that [t = t'] and [c <=> c'] for fresh index variables.
@@ -874,9 +853,11 @@ let fa s =
      * except for the [unused] indices on the left, which does
      * not matter since they do not appear in [t]. *)
 
-    (* Refresh bound variables in c and t*)
-    let env = ref (TS.vars s) in
-    let vars, subst = Term.refresh_vars (`InEnv env) vs in
+    (* Refresh bound variables in c and t *)
+    let env = TS.vars s in
+    let env, vars, subst =    (* add variables as local vars. *)
+      Term.add_vars_env env (List.map (fun v -> v, TS.var_info) vs) 
+    in
     let c  = Term.subst subst c in
     let t  = Term.subst subst t in
 
@@ -890,7 +871,7 @@ let fa s =
     let subst' = List.map (function ESubst (x, y) ->
         Term.(ESubst (subst subst_aux x,y))) subst in
 
-    let s = TS.set_vars !env s in
+    let s = TS.set_vars env s in
 
     let c' = Term.subst subst' c' in
 
@@ -1238,7 +1219,10 @@ let rewrite_equiv_transform
   in
   let rec aux (t : term) : term = 
     match Term.ty t with
-    | Type.Timestamp | Type.Index -> t
+    | Type.Timestamp | Type.Index when
+        HighTerm.is_ptime_deducible ~const:`Exact ~si:true (TS.env s) t -> t
+    (* system-independence needed, so that we leave [t] unchanged when the system do *)
+      
     | _ ->
       match assoc t with
       | None -> aux_rec t
@@ -1246,7 +1230,8 @@ let rewrite_equiv_transform
 
   and aux_rec (t : Term.term) : Term.term = 
     match t with
-    | t when is_pure_timestamp t -> t
+    | t when HighTerm.is_ptime_deducible ~const:`Exact ~si:true (TS.env s) t -> t
+    (* system-independence needed, so that we leave [t] unchanged when the system do *)
 
     | Fun (fsymb,ftype,args) ->
       let args = List.map aux args in
@@ -1297,13 +1282,15 @@ let rewrite_equiv (ass_context,ass,dir) (s : TS.t) : TS.t list =
      the tactic to local formulas. These local formulas cannot be proved
      while keeping all local hypotheses: however, we can keep the pure trace
      formulas from the local hypotheses.
-     We already know that [ass_context.set] is compatible with the systems
+     We already know that [ass_context.set] is compatible with the systems
      used in the equivalence, hence we keep [s]'s context. *)
   let s' =
     s |>
     TS.Hyps.filter
       (fun _ -> function
-         | Local f -> Term.is_pure_timestamp f
+         | Local f -> 
+           HighTerm.is_constant `Exact (TS.env s) f &&
+           HighTerm.is_system_indep (TS.env s) f
          | Global  _ -> true)
   in
   let subgoals = List.map (fun f -> TS.set_goal f s') subgoals in

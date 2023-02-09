@@ -14,7 +14,15 @@
       takes care of renaming `x/1` into some variable `x1/???`).
     - internal intermediate terms (e.g. during matching) can safely have 
       several variables with the same string. This allows to easily 
-      refresh variables (to avoid capture issues). *)
+      refresh variables (to avoid capture issues). 
+
+    A variable can either represent:
+    - a single computation, in which can it can only be instanciated by 
+      system-independent terms. 
+      This is the case for global variables.
+    - many computations, in which can it can be instanciated by terms with
+      diff operators and multi-system macros.
+      This is the case for local variables. *)
 
 open Utils
 
@@ -27,16 +35,65 @@ type var
 type vars = var list
 
 (*------------------------------------------------------------------*)
+(** {2 Variable scope} *)
+
+(** A variable can have a local or global scope. *)
+type scope = Local | Global
+
+(*------------------------------------------------------------------*)
+(** {2 Variable information} *)
+    
+module Tag : sig
+  (** Variable information restricting its possible instanciations. *)
+  type t = {
+    const : bool;
+    (** var represents a constant computation *)
+
+    system_indep : bool;
+    (** var must be instantiated by a term representiang a
+        system-independent computation *)
+  }
+
+  (*------------------------------------------------------------------*)
+  val pp : Format.formatter -> t -> unit
+
+  (*------------------------------------------------------------------*)
+  (** Built variable information according to the scope of a variable *)
+  val make : ?const:bool -> scope -> t
+
+  (*------------------------------------------------------------------*)
+  (** default local tag *)               
+  val ltag : t
+
+  (** default global tag *)
+  val gtag : t
+
+  (*------------------------------------------------------------------*)
+  (** Attached local information to a variable *)
+  val local_vars : ?const:bool -> vars -> (var * t) list
+
+  (** Attached global information to a variable *)
+  val global_vars : ?const:bool -> vars -> (var * t) list
+end
+
+type tagged_var = var * Tag.t
+
+type tagged_vars = tagged_var list
+
+(*------------------------------------------------------------------*)
 (** {2 Pretty-printing} *)
 
 (** Print a variable, only showing its name. *)
 val pp : Format.formatter -> var -> unit
 
 (** Print a list of variables, only showing their names. *)
-val pp_list : Format.formatter -> var list -> unit
+val pp_list : Format.formatter -> vars -> unit
 
 (** Print a list of variables, showing their names and sorts. *)
-val pp_typed_list : Format.formatter -> var list -> unit
+val pp_typed_list : Format.formatter -> vars -> unit
+
+(** Print a list of tagged variables, showing their names and sorts. *)
+val pp_typed_tagged_list : Format.formatter -> tagged_vars -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Debug printing} *)
@@ -46,13 +103,16 @@ val _pp    : dbg:bool -> Format.formatter -> var -> unit
 val pp_dbg :             Format.formatter -> var -> unit
 
 (** Debug versions of [pp_list]: also print the identifier. *)
-val _pp_list    : dbg:bool -> Format.formatter -> var list -> unit
-val pp_list_dbg :             Format.formatter -> var list -> unit
+val _pp_list    : dbg:bool -> Format.formatter -> vars -> unit
+val pp_list_dbg :             Format.formatter -> vars -> unit
 
 (** Debug versions of [pp_typed_list_dbg]: also print the identifier. *)
-val _pp_typed_list    : dbg:bool -> Format.formatter -> var list -> unit
-val pp_typed_list_dbg :             Format.formatter -> var list -> unit
+val _pp_typed_list    : dbg:bool -> Format.formatter -> vars -> unit
+val pp_typed_list_dbg :             Format.formatter -> vars -> unit
 
+val _pp_typed_tagged_list    : dbg:bool -> Format.formatter -> tagged_vars -> unit
+val pp_typed_tagged_list_dbg :             Format.formatter -> tagged_vars -> unit
+  
 (*------------------------------------------------------------------*)
 (** {2 Functions on variables} *)
 
@@ -91,45 +151,85 @@ end
 
 module Mv : Map.S with type key = var
 
+
 (*------------------------------------------------------------------*)
 (** {2 Environments} *)
 
 (** Local environment containg a set of variables of arbitrary sorts. *)
-type env
+type 'a genv
 
+(*------------------------------------------------------------------*)
+type simpl_env = unit genv
+
+type env = Tag.t genv
+
+(*------------------------------------------------------------------*)
+val get_info : var -> 'a genv -> 'a
+
+(*------------------------------------------------------------------*)
 (** Well-formedness check for **toplevel** environment.
     Check that each string corresponds to at most one variable. *)
-val sanity_check : env -> unit
+val sanity_check : 'a genv -> unit
 
-val hash_env : env -> int
-
+(*------------------------------------------------------------------*)
 (** Print an environment, showing variables names and sorts. *)
-val  pp_env    :             Format.formatter -> env -> unit
-val _pp_env    : dbg:bool -> Format.formatter -> env -> unit
-val pp_env_dbg :             Format.formatter -> env -> unit
+val pp_genv    :
+  (Format.formatter -> 'a -> unit) ->
+  Format.formatter -> 'a genv -> unit
 
-val empty_env : env
+val _pp_genv    :
+  dbg:bool ->
+  (Format.formatter -> 'a -> unit) ->
+  Format.formatter -> 'a genv -> unit
 
-val to_list : env -> var list
-val to_set  : env -> Sv.t
+val pp_genv_dbg :
+  (Format.formatter -> 'a -> unit) ->
+  Format.formatter -> 'a genv -> unit
 
-val of_list : var list -> env
-val of_set  : Sv.t -> env
+(*------------------------------------------------------------------*)
+val  pp_env     :             Format.formatter -> env -> unit
+val _pp_env     : dbg:bool -> Format.formatter -> env -> unit
+val  pp_env_dbg :             Format.formatter -> env -> unit
 
-val mem   : env -> var -> bool
-val mem_s : env -> string -> bool
+(*------------------------------------------------------------------*)
+val empty_env : 'a genv
+
+(*------------------------------------------------------------------*)
+val to_list      : 'a genv -> (var * 'a) list 
+val to_vars_list : 'a genv -> var list 
+
+val to_vars_set : 'a genv -> Sv.t
+val to_map      : 'a genv -> 'a Mv.t 
+  
+(*------------------------------------------------------------------*)
+val of_list : (var * 'a) list -> 'a genv
+val of_map  : 'a Mv.t -> 'a genv 
+val of_set  : Sv.t -> simpl_env
+
+(*------------------------------------------------------------------*)
+val to_simpl_env : 'a genv -> simpl_env
+  
+(*------------------------------------------------------------------*)
+val mem   : 'a genv -> var -> bool
+val mem_s : 'a genv -> string -> bool
 
 (** Note: pattern variables are not uniquely characterized by a string *)
-val find : env -> string -> var list
+val find : 'a genv -> string -> (var * 'a) list
 
-val add_var  : var  -> env -> env
-val add_vars : vars -> env -> env
+val add_var  : var  -> 'a      -> 'a genv -> 'a genv
+val add_vars : (var * 'a) list -> 'a genv -> 'a genv
+
+val add_var_simpl  : var  -> simpl_env -> simpl_env
+val add_vars_simpl : vars -> simpl_env -> simpl_env
 
 (** [rm_var env v] returns [env] minus the variable [v].
   * returns the same [env] if no variable is found. *)
-val rm_var : var -> env -> env
+val rm_var : var -> 'a genv -> 'a genv
 
-val rm_vars : vars -> env ->  env
+val rm_vars : vars -> 'a genv -> 'a genv
+
+(*------------------------------------------------------------------*)
+val map_tag : (var -> Tag.t -> Tag.t) -> env -> env
 
 (*------------------------------------------------------------------*)
 (** {2 Create variables} *)
@@ -140,18 +240,28 @@ val rm_vars : vars -> env ->  env
     - [~opt = `Shadow], uses [name], and shadows any pre-existing definition. *)
 val make : 
   ?allow_pat:bool -> [`Approx | `Shadow] -> 
+  'a genv -> Type.ty -> string -> 'a -> 'a genv * var
+
+(** Make a local variable *)
+val make_local : 
+  ?allow_pat:bool -> [`Approx | `Shadow] -> 
+  env -> Type.ty -> string -> env * var
+
+(** Make a global variable *)
+val make_global : 
+  ?allow_pat:bool -> [`Approx | `Shadow] -> 
   env -> Type.ty -> string -> env * var
 
 (*------------------------------------------------------------------*)
 (** Same than [make], but uses the exact name *)
-val make_exact : env -> Type.ty -> string -> (env * var) option
+val make_exact : 'a genv -> Type.ty -> string -> 'a -> ('a genv * var) option
 
 (*------------------------------------------------------------------*)
-(** Create a new variable whose name resemble the one given in argument. *)
-val make_approx : env -> var -> env * var
+(** Create a new variable whose name resemble the one given in argument.  *)
+val make_approx : 'a genv -> var -> 'a -> 'a genv * var
 
 (** Stateful version of [make_approx]. *)
-val make_approx_r : env ref -> var -> var
+val make_approx_r : 'a genv ref -> var -> 'a -> var
 
 (*------------------------------------------------------------------*)
 (** [refresh v] generates a new variable of the same type as

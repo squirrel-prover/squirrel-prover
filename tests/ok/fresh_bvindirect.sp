@@ -1,5 +1,3 @@
-
-
 (* Checking the treatment of bound variables in indirect cases for fresh. *)
 
 name n : index->message
@@ -12,7 +10,7 @@ system !_i out(c,<n(i),seq(i:index => n(i))>).
 include Basic.
 
 (* The main test, with a non-empty list of bound variables. *)
-global goal nonempty (tau:timestamp,i:index) :
+global goal nonempty (tau:timestamp[const],i:index[const]) :
   [(forall (i1,i0:index), (A(i0) <= tau => i <> i1))
    = true ] ->
   equiv(output@tau) ->
@@ -21,7 +19,6 @@ Proof.
   intro H H1.
   fresh 1.
   (* Check that the right formula has been produced using H *)
-  rewrite H.
-  rewrite if_true in 1; 1: auto.
+  by rewrite H.
   auto.
 Qed.

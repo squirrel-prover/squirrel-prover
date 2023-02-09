@@ -392,6 +392,21 @@ let print_system (table : Symbols.table) (system : _ expr) : unit =
       pp system
 
 (*------------------------------------------------------------------*)
+let is_single_system (se : context) : bool =
+  if not (is_fset se.set) then false
+  else
+    let pair_fsets =
+      match se.pair with
+      | None -> []
+      | Some pair ->
+        [Stdlib.snd (fst pair); Stdlib.snd (snd pair)]
+    in
+    let set_fsets = List.map Stdlib.snd (to_list (to_fset se.set)) in
+    let fsets = pair_fsets @ set_fsets in
+    let single = List.hd fsets in
+    List.for_all (fun single' -> single = single') fsets
+
+(*------------------------------------------------------------------*)
 (** {2 Parsing} *)
 
 module Parse = struct

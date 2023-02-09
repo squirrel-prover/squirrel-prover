@@ -6,7 +6,7 @@ module SE = SystemExpr
 (** operator body *)
 type body = Term.term
 
-type op_body = body
+type op_body = Single of body
   
 type operator = {
   name    : string;
@@ -19,7 +19,7 @@ type operator = {
 type Symbols.data += Operator of operator
 
 (*------------------------------------------------------------------*)
-let pp_op_body fmt body = Fmt.pf fmt "%a" Term.pp body
+let pp_op_body fmt (Single body) = Fmt.pf fmt "%a" Term.pp body
 
 let pp_operator fmt op =
   let pp_tyvars fmt tyvars =
@@ -42,7 +42,7 @@ let pp_operator fmt op =
 
 (*------------------------------------------------------------------*)
 let mk ~name ~ty_vars ~args ~out_ty ~body = 
-  { name; ty_vars; args; out_ty; body }
+  { name; ty_vars; args; out_ty; body = Single body }
 
 let ftype (op : operator) : Type.ftype = 
   Type.mk_ftype op.ty_vars (List.map Vars.ty op.args) op.out_ty
@@ -52,6 +52,18 @@ let is_operator (table : Symbols.table) (fsymb : Symbols.fname) : bool =
   | Operator _ -> true
   | _ -> false
 
+(*------------------------------------------------------------------*)
+let is_system_indep (table : Symbols.table) (fsymb : Symbols.fname) : bool =
+  match Symbols.Function.get_data fsymb table with
+  | Operator op ->
+    (* for now, we only have system-independent operators so this check is 
+       superfluous. *)
+    begin
+      match op.body with Single _ -> true
+    end
+  | _ -> true
+
+(*------------------------------------------------------------------*)
 let unfold 
     (table  : Symbols.table)
     (_se    : SE.arbitrary)
@@ -71,7 +83,9 @@ let unfold
   (* refresh type variables *)
   let _, ts = Type.Infer.open_tvars ty_env op.ty_vars in
   let op_args = List.map (Vars.tsubst ts) op.args in
-  let op_body = Term.tsubst ts op.body in
+  let op_body =
+    match op.body with Single body -> Term.tsubst ts body
+  in
 
   let args1, args2 = List.takedrop (List.length op_args) args in
 

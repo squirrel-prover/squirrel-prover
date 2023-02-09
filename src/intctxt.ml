@@ -6,7 +6,6 @@ module Args = TacticsArgs
 module L = Location
 module SE = SystemExpr
 module NO = NameOccs
-module ER = EncRandom
 module TS = TraceSequent
 
 module Hyps = TS.LocalHyps
@@ -112,39 +111,38 @@ let intctxt
   (* find parameters *)
   let _, hyp = Hyps.by_name h s in
   let contx = TS.mk_trace_cntxt s in
-  let env = (TS.env s).vars in
+  let env = TS.env s in
 
   let {ip_enc=enc_f; ip_dec=dec_f; ip_hash=hash_f;
        ip_c=c; ip_k=k; ip_t=t} = 
     intctxt_param ~hyp_loc:(L.loc h) contx hyp s
   in
-      
   
   let pp_k ppf () = Fmt.pf ppf "%a" Name.pp k in
   let pp_rand ppf () = Fmt.pf ppf "randomness" in
 
   Printer.pr "@[<v 0>";
   (* get the key bad occs and the ciphertext occs *)
-  let get_bad:((term, ER.ctxt_aux) NO.f_fold_occs) =
-    ER.get_bad_occs_and_ciphertexts
-      k [] c enc_f dec_f ~hash_f ~pk_f:None
-      ~dec_allowed:ER.Allowed
+  let get_bad:((term, EncRandom.ctxt_aux) NO.f_fold_occs) =
+    EncRandom.get_bad_occs_and_ciphertexts
+      env k [] c enc_f dec_f ~hash_f ~pk_f:None
+      ~dec_allowed:EncRandom.Allowed
   in
   let phis_bad_k, phis_ctxt, _, ctxt_occs =
-    NO.occurrence_formulas_with_occs ~pp_ns:(Some pp_k)
-      ER.ciphertext_formula
-      get_bad contx env [c]
+    NO.occurrence_formulas_with_occs ~mode:PTimeNoSI ~pp_ns:(Some pp_k)
+      EncRandom.ciphertext_formula
+      get_bad contx env (c :: k.Name.args)
   in
 
   (* get the bad randomness occurrences *)
-  let get_bad: (Name.t, ER.ectxt_occ * ((term * Name.t) option)) NO.f_fold_occs =
-    ER.get_bad_randoms k ctxt_occs enc_f
+  let get_bad: (Name.t, EncRandom.ectxt_occ * ((term * Name.t) option)) NO.f_fold_occs =
+    EncRandom.get_bad_randoms env k ctxt_occs enc_f
   in
   let _, phis_bad_r =
     (* FEATURE: allow the user to set [use_path_cond] to true *)
-    NO.occurrence_formulas ?use_path_cond ~pp_ns:(Some pp_rand)
-      (ER.randomness_formula ?use_path_cond)
-      get_bad contx env [c]
+    NO.occurrence_formulas ~mode:PTimeNoSI ?use_path_cond ~pp_ns:(Some pp_rand)
+      (EncRandom.randomness_formula ?use_path_cond)
+      get_bad contx env (c :: k.Name.args)
   in
 
   let phi_t = match t with

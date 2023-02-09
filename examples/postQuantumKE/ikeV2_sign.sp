@@ -227,7 +227,7 @@ system core3 = [core2] with rename Forall (l,k,i,j:index), equiv(diff( n_PRF(l,k
 
 
 
-goal [core3,core/right] authR (i,j:index):
+goal [core3,core/right] authR (i,j:index[param]):
        happens(FR(i,j)) => exec@FR(i,j) =>
            exists (l:index), SI(j,l) < FR(i,j) &&
                       fst(input@R(i,j)) = exp(g,xi(j,l)) &&
@@ -247,7 +247,7 @@ Proof.
   by case H2; depends R(i,j),FR(i,j).
 Qed.
 
-goal [core3,core/right] authI (i,j:index):
+goal [core3,core/right] authI (i,j:index[param]):
        happens(FI(i,j)) => exec@FI(i,j) =>
                       SR(j,i) < FI(i,j) &&
                       fst(input@SI(i,j)) = exp(g,xr(j,i)) &&
@@ -279,7 +279,7 @@ Proof.
   diffeq.
   
   (* I part *)
-  + intro i j H0 H1 Hap Hap0.
+  + intro i j; intro H0 H1 Hap Hap0.
     use authI with i,j as [Clt Meq0 Meq]; 2,3: auto.
     
     case try find il,jl,kl,ll such that _ in idealkeys(il,jl,kl,ll) else _.
@@ -295,7 +295,7 @@ Proof.
     by use H2 with i,j,j,i.
   
   (* R part *)
-  + intro k l H0 H1 Hap Hap0.
+  + intro k l; intro H0 H1 Hap Hap0.
     use authR with k,l as [l0 [Clt Meq0 Meq]]; 2,3: auto.
     case try find il,jl,kl,ll such that _
      in  idealkeys(il,jl,kl,ll)

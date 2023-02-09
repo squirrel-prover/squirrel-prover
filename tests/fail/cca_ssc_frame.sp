@@ -20,7 +20,7 @@ system [S] P.
 
 include Basic.
 
-global goal [S] ideal (t:timestamp) :
+global goal [S] ideal (t:timestamp[const]) :
   [happens(t)] ->
   equiv(frame@t, sk, eta).
 Proof.

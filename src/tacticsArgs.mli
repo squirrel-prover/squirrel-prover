@@ -120,7 +120,7 @@ val pp_intro_pats : Format.formatter -> intro_pattern list -> unit
 (*------------------------------------------------------------------*)
 (** handler for intro pattern application *)
 type ip_handler = [
-  | `Var of Vars.var (* Careful, the variable is not added to the env  *)
+  | `Var of Vars.tagged_var (* Careful, the variable is not added to the env  *)
   | `Hyp of Ident.t
 ]
 
@@ -162,8 +162,8 @@ type parser_arg =
   | ApplyIn      of named_args * Theory.p_pt * apply_in
   | Have         of simpl_pat option * Theory.any_term
   | HavePt       of Theory.p_pt * simpl_pat option * [`IntroImpl | `None]
-  | SplitSeq     of int L.located * Theory.hterm
-  | ConstSeq     of int L.located * (Theory.hterm * Theory.term) list
+  | SplitSeq     of int L.located * Theory.term * Theory.term option
+  | ConstSeq     of int L.located * (Theory.term * Theory.term) list
   | MemSeq       of int L.located * int L.located
   | Remember     of Theory.term * lsymb
   | Generalize   of Theory.term list * naming_pat list option

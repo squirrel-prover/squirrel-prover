@@ -20,7 +20,7 @@ prf 1.
 
 rewrite if_true. 
 by project; auto.
-fresh 1.
+fresh 1 => //.
 
 prf 0.
 by rewrite if_true.

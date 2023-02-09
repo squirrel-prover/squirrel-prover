@@ -40,10 +40,6 @@ type ty =
   | Fun of ty * ty
 
 (*------------------------------------------------------------------*)
-(** Higher-order *)
-type hty = Lambda of ty list * ty
-
-(*------------------------------------------------------------------*)
 let tboolean   = Boolean
 let tmessage   = Message
 let ttimestamp = Timestamp
@@ -108,12 +104,6 @@ let rec equal (a : ty) (b : ty) : bool =
      
    | _ -> false
 
-let ht_equal ht ht' = match ht, ht' with
-  | Lambda (es1, t1), Lambda (es2, t2) ->
-    List.length es1 = List.length es2 &&
-    List.for_all2 equal es1 es2 &&
-    equal t1 t2
-
 (*------------------------------------------------------------------*)
 let rec pp (ppf : Format.formatter) : ty -> unit = function
   | Message   -> Fmt.pf ppf "message"
@@ -134,32 +124,9 @@ and pp_chain_left ppf (t : ty) : unit =
   | Fun (_, _) -> Fmt.pf ppf "(%a)" pp t
   | _          -> Fmt.pf ppf "%a"   pp t
 
-
-
 (*------------------------------------------------------------------*)
-let rec is_finite : ty -> bool = function
-  | Index | Timestamp -> true
-  | Tuple l -> List.for_all is_finite l
-  | Fun (t1, t2) -> is_finite t1 && is_finite t2
-  | _ -> false
-
 let is_tuni = function TUnivar _ -> true | _ -> false
   
-(*------------------------------------------------------------------*)
-let pp_ht fmt ht = 
-  let pp_seq fmt () = Fmt.pf fmt " * " in
-
-  let pp_ets fmt (ets : ty list) =
-    match ets with
-    | [] -> Fmt.pf fmt "()"
-    | [ety] -> pp fmt ety
-    | _ -> Fmt.pf fmt "@[<hv 2>(%a)@]" (Fmt.list ~sep:pp_seq pp) ets 
-  in
-  match ht with
-  | Lambda (ets, ty) -> 
-    Fmt.pf fmt "@[<hv 2>fun %a ->@ %a@]" pp_ets ets pp ty
-
-
 (*------------------------------------------------------------------*)
 (** {2 Function symbols type} *)
 
@@ -249,10 +216,6 @@ let rec tsubst (s : tsubst) (t : ty) : ty =
   | Tuple tys -> Tuple (List.map (tsubst s) tys)
   | Fun (t1, t2) -> Fun (tsubst s t1, tsubst s t2)
 
-let tsubst_ht (ts : tsubst) (ht : hty) : hty =
-  match ht with
-  | Lambda (vs, f) -> Lambda (List.map (tsubst ts) vs, tsubst ts f)
-
 (*------------------------------------------------------------------*)
 (** {2 Type inference } *)
 
@@ -269,7 +232,6 @@ module Infer : sig
   val open_tvars : env -> tvars -> univars * tsubst
 
   val norm   : env -> ty  -> ty
-  val htnorm : env -> hty -> hty
                          
   val unify_eq  : env -> ty -> ty -> [`Fail | `Ok]
   val unify_leq : env -> ty -> ty -> [`Fail | `Ok]
@@ -332,9 +294,6 @@ end = struct
     | Tuple l -> Tuple (List.map (norm env) l)
                    
     | Message | Boolean | Index | Timestamp | TBase _ | TVar _ -> t
-
-  let htnorm env ht = match ht with
-    | Lambda (evs, ty) -> Lambda (List.map (norm env) evs, norm env ty)
 
   let norm_env (env : env) : unit = 
     env := Mid.map (norm env) !env

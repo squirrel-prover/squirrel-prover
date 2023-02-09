@@ -13,7 +13,7 @@ global goal _ (t : timestamp) (j:index) :
   equiv(seq (i:index => <ok(i), input@A(i)>)).
 Proof.
   intro H.
-  nosimpl(splitseq 0: (fun (l:index) -> A(l) <= A(j) && A(l) <> t)).
+  nosimpl(splitseq 0: (fun (l:index) => A(l) <= A(j) && A(l) <> t)).
   auto.
 Qed.
 
@@ -25,7 +25,7 @@ global goal _ (t : timestamp) (j:index) :
   equiv(seq (i:index => <ok(i), input@A(i)>)).
 Proof.
   intro H.
-  nosimpl(splitseq 0: (fun (i:index) -> A(i) <= A(j) && A(i) <> t)).
+  nosimpl(splitseq 0: (fun (i:index) => A(i) <= A(j) && A(i) <> t)).
   auto.
 Qed.
 
@@ -38,6 +38,6 @@ global goal _ (t : timestamp) (i:index) :
   equiv(seq (i:index => <ok(i), input@A(i)>)).
 Proof.
   intro H.
-  nosimpl(splitseq 0: (fun (l:index) -> A(l) <= A(i) && A(l) <> t)).
+  nosimpl(splitseq 0: (fun (l:index) => A(l) <= A(i) && A(l) <> t)).
   auto.
 Qed.

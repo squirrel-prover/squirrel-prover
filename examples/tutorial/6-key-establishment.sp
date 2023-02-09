@@ -124,7 +124,7 @@ Qed.
    the left and right frames.
    Adding more things can make the proof simpler, and also results in
    a stronger lemma that will be useful in the rest of the file. *)
-global goal [default] idealize_key_exchange (t:timestamp) :
+global goal [default] idealize_key_exchange (t:timestamp[const]) :
   [happens(t)] ->
   equiv((* TODO: add something here... *)frame@t).
 Proof.
@@ -223,7 +223,7 @@ Qed.
    holds afterwards, but the proof would be more difficult.
    Proving this would be trivial for default/right... use rewrite
    equiv to show that this change is justified! *)
-local goal [default/left] _ (tau:timestamp) :
+goal [default/left] _ (tau:timestamp[glob,const]) :
   happens(pred(tau)) =>
   not(Bout < tau) =>
   not(input@tau = sk).

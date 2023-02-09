@@ -1,5 +1,3 @@
-
-
 senc enc,dec
 
 abstract accept : message
@@ -41,7 +39,7 @@ system !_i (U | !_j server(j)).
 set showStrengthenedHyp=true.
 
 (*------------------------------------------------------------------*)
-global goal _ (t : timestamp):
+global goal _ (t : timestamp[const]):
   [happens(t)] ->
   equiv(frame@t, seq(pid:index => k(pid))) ->
   equiv(
@@ -55,7 +53,23 @@ Proof.
  by apply ~inductive H.
 Qed.
 
+(* fails if `t` is non-det *)
 global goal _ (t : timestamp):
+  [happens(t)] ->
+  equiv(frame@t, seq(pid:index => k(pid))) ->
+  equiv(
+    frame@t,
+    seq(pid:index => k(pid)),
+    seq(pid:index => SCtr(pid)@t)).
+Proof.
+  intro Hap H.
+
+ checkfail (apply H) exn ApplyMatchFailure.
+ checkfail apply ~inductive H exn ApplyMatchFailure.
+Abort.
+
+(*------------------------------------------------------------------*)
+global goal _ (t : timestamp[const]):
   [happens(t)] -> 
   equiv(
     frame@t,
@@ -71,21 +85,21 @@ Proof.
        rewrite /*;
        by apply ~inductive Hind (pred(t))).
   
-  by rewrite /* in 1. 
+  + by rewrite /* in 1. 
 
   (* case `t = U(i)`, which cannot be proved because of `m(i)` *)
-  repeat destruct Eq as [i Eq].
-  rewrite /*.
-  fa 1. fa 2. fa 2.
-  (* check that `t = U(i)` *)
-  assert (t = U(i)) as _ by auto.
-  (* remove the undeducible term m(i) and check that we can conclude 
-     without it. *)
-  assert (m(i) = zero) as -> by admit.
-  by apply ~inductive Hind (pred(t)).
+  + repeat destruct Eq as [i Eq].
+    rewrite /*.
+    fa 1. fa 2. fa 2.
+    (* check that `t = U(i)` *)
+    assert (t = U(i)) as _ by auto.
+    (* remove the undeducible term m(i) and check that we can conclude 
+       without it. *)
+    assert (m(i) = zero) as -> by admit.
+    by apply ~inductive Hind (pred(t)).
 Qed.
 
-global goal _ (t : timestamp):
+global goal _ (t : timestamp[const]):
   [happens(t)] ->
   equiv(frame@t) ->
   equiv(

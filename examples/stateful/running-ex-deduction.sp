@@ -62,7 +62,8 @@ global axiom fresh_names :
 global goal fresh_names_k :
   equiv(k, seq(i:index=>diff(s0(i),s0b(i)))).
 Proof.
-  fresh 0. apply fresh_names.
+  fresh 0; 1:auto.
+  apply fresh_names.
 Qed.
 
 (* PROOFS *)
@@ -70,7 +71,7 @@ Qed.
 (* Observational equivalence with seeds and k as extra data:
    the proof would be the same without the extra data (except for the easy base case)
    which does not depend on t. *)
-global goal equiv_with_seed (t : timestamp):
+global goal equiv_with_seed (t : timestamp[const]):
   [happens(t)] ->
   equiv(frame@t, k, seq(i:index=>diff(s0(i),s0b(i)))).
 Proof.
@@ -78,7 +79,7 @@ Proof.
   induction t.
 
   (* Init *)
-  + fresh 1.
+  + fresh 1; 1:auto.
     expand frame; apply fresh_names.
 
   (* A: initialize sT *)
@@ -90,13 +91,13 @@ Proof.
       intro i0 j0 H Heq. use
       h_unique with i0, i, j0, j; 2: auto.
       by destruct H0.
-    fresh 1.
+    fresh 1; 1:auto.
     by apply IH.
 Qed.
 
 (* With apply ~inductive we easily obtain all the past values of sT
    from the seeds and k. *)
-global goal equiv_with_states_inductive (t : timestamp):
+global goal equiv_with_states_inductive (t : timestamp[const]):
   [happens(t)] ->
   equiv(frame@t, k, seq(i:index,t':timestamp => if t'<=t then sT(i)@t')).
 Proof.
@@ -113,7 +114,7 @@ Proof.
  by case t.
 Qed.
 
-global goal equiv_with_states_manual (t : timestamp):
+global goal equiv_with_states_manual (t : timestamp[const]):
   [happens(t)] ->
   equiv(frame@t, k, seq(i:index,t':timestamp => if t'<=t then sT(i)@t')).
 Proof.
@@ -144,19 +145,19 @@ Proof.
     split; 1: auto.
     intro i0 j0 H Heq. 
     by use h_unique with i0, i, j0, j.
-  fresh 1.
+  fresh 1; 1:auto.
   (* We now have to work on our sequence to remove the last element.
      This is done using splitseq to single out some elements,
      and then perform some rewriting inside the sequences. *)
-  splitseq 2: (fun (i0:index,t':timestamp) -> t'=T(i,j)).
-  rewrite !if_then_then.
-  rewrite neq_leq_lemma in 3.
+  splitseq 2: (fun (i0:index,t':timestamp) => t'=T(i,j)).
+  rewrite /= !if_then_then.
+
   (* We still can't conclude by IH. The sequence in position 2 is bi-deducible
      but to show it one needs to do a case analysis on i=i0 since the value
      of sT(i0)@T(i,j) depends on it. *)
   checkfail apply IH exn ApplyMatchFailure.
-  splitseq 2: (fun (i0:index,t':timestamp) -> i0=i).
-  rewrite !if_then_then.
+  splitseq 2: (fun (i0:index,t':timestamp) => i0=i).
+  rewrite /= !if_then_then.
   (* More rewriting inside sequences. *)
 
   have -> :
@@ -168,13 +169,13 @@ Proof.
 
   have -> :
     (seq(i0:index,t':timestamp=> 
-      if not(i0=i) && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@t')) =
+      if i0 <> i && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@t')) =
     (seq(i0:index,t':timestamp=>
-      if not(i0=i) && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@pred(t'))).
+      if i0 <> i && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@pred(t'))).
     + fa; fa => // [H1 [H2 H3]]. 
       by rewrite H2 /sT if_false. 
   (* At this point our automatic bi-deduction checker cannot verify that
      items 2 and 3 are bi-deducible. Its implementation could be improved
      to complete this tedious proof. *)
-    + admit.
+    + try apply ~inductive IH. admit.
 Qed.

@@ -365,8 +365,7 @@ Proof.
       use len_F with rR(i,j,k), skR(j).
       namelength n_PRF,s.
       fa 16. fa 16.
-      fresh 17.
-      rewrite if_true // in 17.
+      fresh 17; 1:auto.
       by apply IH.
 
     + (* Second output of R *)
@@ -386,7 +385,7 @@ Proof.
        rewrite if_true // in 16.
        use len_F with DrR(j,k), skR(j).
        namelength n_PRF,s.
-       fresh 16.
+       fresh 16; 1: auto.
        by apply IH.
 
     + (* Second output of R with dishonnest talker *)
@@ -407,8 +406,7 @@ Proof.
       use len_F with rI(i,j,k), skI(i).
       by namelength n_PRF,s.
       fa 15.
-      fresh 16.
-      rewrite if_true // in 16.
+      fresh 16; 1:auto.
       by apply IH.
 
     + (* Second output of I *)
@@ -430,7 +428,7 @@ Proof.
       rewrite if_true // in 16.
       use len_F with DrI(i,j,k), skI(i).
       by namelength n_PRF,s.
-      fresh 16.
+      fresh 16; 1:auto.
       by apply IH.
 
     + (* Second output of DI *)
@@ -571,7 +569,7 @@ axiom [mainCCAkI,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,pk(
 
 equiv [mainCCAkI,idealized/left] ideal.
 Proof.
-  diffeq.
+  diffeq => * //.
 
     + case try find il,jl,kl such that _ in kR(il,jl,kl) else _.
       ++ case try find il, jl, kl such that _ in kdf(s,kR(il,jl,kl)) else _.
@@ -620,7 +618,7 @@ Qed.
 
 equiv [idealized/left,idealized/left] reflex.
 Proof.
-  diffeq.
+  diffeq => *.
 Qed.
 
 axiom  [idealized/left,idealized/left]  len_G (x1,x2:message) : len(G(x1,x2)) = len(s).
@@ -634,11 +632,10 @@ axiom  [idealized/left,idealized/left]  len_xor (x1,x2:message) : len(x1) = len(
 set oldCompletion = true.
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
-global goal [idealized/left,idealized/left] resp_key (i,j,k:index):
+global goal [idealized/left,idealized/left] resp_key (i,j,k:index[const]):
  [happens(R2(i,j,k))] -> 
  equiv(frame@R2(i,j,k), diff(sRI i j k@R2(i,j,k), kIR(i,j,k))) .
 Proof.
-
   intro Hap .
   use reflex with R2(i,j,k) => //.
   expandall.
@@ -650,7 +647,7 @@ Proof.
   xor 1,  n_XOR; rewrite if_true // in 1.
   rewrite len_G.
   namelength s, n_XOR.
-  fresh 1.
+  by fresh 1.
 Qed.
 
 (*******************************************)
@@ -658,9 +655,11 @@ Qed.
 (*******************************************)
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
-global goal [idealized/left,idealized/left] right_key: Forall (i,j,k:index), [happens(I1(i,j,k))] -> equiv(frame@I1(i,j,k), diff(sIR i j k@I1(i,j,k), kIR(i,j,k))) .
+global goal [idealized/left,idealized/left] right_key (i,j,k:index[const]):
+  [happens(I1(i,j,k))] -> 
+  equiv(frame@I1(i,j,k), diff(sIR i j k@I1(i,j,k), kIR(i,j,k))) .
 Proof.
-  intro i j k Hap .
+  intro Hap .
   use reflex with I1(i,j,k) => //.
   expandall.
   prf 1, kdf(s,kI(i,j,k)); rewrite if_true // in 1.

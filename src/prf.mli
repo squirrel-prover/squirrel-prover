@@ -19,4 +19,4 @@ val prf_condition_side :
   Equiv.equiv ->
   Term.term ->
   Term.term ->
-  (Term.form * Term.form) option
+  (Term.term * Term.term) option

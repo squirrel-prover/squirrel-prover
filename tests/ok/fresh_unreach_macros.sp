@@ -17,7 +17,7 @@ process P (i : index) =
 system !_i P (i).
 
 (* starting from [frame], [n] is fresh *)
-global goal _ (t : timestamp) :
+global goal _ (t : timestamp[const]) :
  [happens(t)] -> equiv(frame@t) -> equiv(frame@t, diff(n,m)).
 Proof.
  intro Hap H.
@@ -26,7 +26,7 @@ Proof.
 Qed.
 
 (* starting from [s], [n] is *not* fresh *)
-global goal _ (t : timestamp) :
+global goal _ (t : timestamp[const]) :
  [happens(t)] -> equiv(s@t) -> equiv(s@t, diff(n,m)).
 Proof.
  intro Hap H. 
@@ -36,7 +36,7 @@ Abort.
 
 
 (* same as the first goal, but without any premise by induction *)
-global goal _ (t : timestamp) :
+global goal _ (t : timestamp[const]) :
  [happens(t)] -> equiv(frame@t, diff(n,m)).
 Proof.
  induction t.
@@ -46,7 +46,7 @@ Proof.
  
  by fresh 1.
 
- fresh 1.
+ fresh 1; 1:auto.
  destruct A as [_ _].
  expandall; fa 0.
  by apply Ind.
@@ -56,7 +56,7 @@ Qed.
 (* test reachability fresh *)
 
 (* starting from [frame], [n] is fresh *)
-goal _ (t : timestamp) :
+goal _ (t : timestamp[const]) :
  happens(t) => frame@t <> n.
 Proof.
  intro Hap M.
@@ -65,14 +65,13 @@ Proof.
 Qed.
 
 (* starting from [s], [n] is *not* fresh *)
-goal _ (t : timestamp) :
+goal _ (t : timestamp[const]) :
  happens(t) => s@t <> n.
 Proof.
  intro Hap M. 
 
  checkfail by fresh M exn GoalNotClosed.
 Abort.
-
 
 
 (*------------------------------------------------------------------*)
@@ -95,7 +94,7 @@ process R (i : index) =
 system [second] (!_i Q: Q (i) | !_i R: R (i)).
 
 (* starting from [frame, s3], [n] is fresh *)
-global goal [second] _ (t : timestamp) :
+global goal [second] _ (t : timestamp[const]) :
  [happens(t)] -> equiv(frame@t, s3@t) -> equiv(frame@t, s3@t, diff(n,m)).
 Proof.
  intro Hap H.
@@ -105,7 +104,7 @@ Qed.
 
 (* starting from [s2], [n] is *not* fresh because it can be reached through:
   s2 -> s1 -> s -> n *)
-global goal [second] _ (t : timestamp) :
+global goal [second] _ (t : timestamp[const]) :
  [happens(t)] -> equiv(s2@t) -> equiv(s2@t, diff(n,m)).
 Proof.
  intro Hap H. 
@@ -117,7 +116,7 @@ Abort.
 (* test reachability fresh *)
 
 (* starting from [frame], [n] is fresh *)
-goal [second] _ (t : timestamp) :
+goal [second] _ (t : timestamp[const]) :
  happens(t) => frame@t <> n.
 Proof.
  intro Hap M.
@@ -126,7 +125,7 @@ Proof.
 Qed.
 
 (* starting from [s2], [n] is *not* fresh *)
-goal [second] _ (t : timestamp) :
+goal [second] _ (t : timestamp[const]) :
  happens(t) => s2@t <> n.
 Proof.
  intro Hap M. 

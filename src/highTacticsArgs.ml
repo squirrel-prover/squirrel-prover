@@ -1,6 +1,6 @@
-(*------------------------------------------------------------------*)
 include TacticsArgs
 
+module Sv = Vars.Sv
 
 (*------------------------------------------------------------------*)
 let convert_as_lsymb parser_args = match parser_args with
@@ -13,13 +13,15 @@ let convert_pat_arg
     (sel : int) conv_cntxt (p : Theory.term) (conc : Equiv.any_form)
   =
   let t, ty = Theory.convert ~pat:true conv_cntxt p in
-  let pat_vars =
-    Vars.Sv.filter (fun v -> Vars.is_pat v) (Term.fv t)
+  let vars =
+    Sv.elements (Sv.filter (fun v -> Vars.is_pat v) (Term.fv t))
   in
   let pat = Term.{
       pat_tyvars = [];
-      pat_vars;
-      pat_term = t; }
+      pat_vars   = Vars.Tag.local_vars vars;
+      (* local information, since we allow to match diff operators *)
+      
+      pat_term   = t; }
   in
   let option = { Match.default_match_option with allow_capture = true; } in
   let table = conv_cntxt.env.table
@@ -33,7 +35,7 @@ let convert_pat_arg
     (* Clear terms whose free free variables are not a subset of the context free
        variables (because the term appeared under a binder). *)
     List.filter (fun t ->
-        Vars.Sv.subset (Term.fv t) (Vars.to_set conv_cntxt.env.vars)
+        Sv.subset (Term.fv t) (Vars.to_vars_set conv_cntxt.env.vars)
       ) res
   in
   let message = match List.nth_opt res (sel-1) with
@@ -69,6 +71,7 @@ let convert_args env parser_args tactic_type conc =
           let (m, ty) = convert_pat_arg 1 conv_cntxt p conc in
           Arg (Message (m, ty))
       end
+
     | [Theory p], Sort Boolean ->
       let f, _ = Theory.convert conv_cntxt ~ty:Type.Boolean p in
       Arg (Message (f, Type.Boolean))

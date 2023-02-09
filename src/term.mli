@@ -166,15 +166,6 @@ module Lit : sig
 end
 
 (*------------------------------------------------------------------*)
-(** {2 Higher-order terms} *)
-
-type hterm = Lambda of Vars.vars * term
-
-val pp_hterm     :             Format.formatter -> hterm -> unit
-val _pp_hterm    : dbg:bool -> Format.formatter -> hterm -> unit
-val pp_hterm_dbg :             Format.formatter -> hterm -> unit
-
-(*------------------------------------------------------------------*)
 (** {2 Pretty-printer and cast} *)
 
 (** Additional printing information *)
@@ -229,8 +220,6 @@ val subst : subst -> term -> term
 (** substitute type variables *)
 val tsubst : Type.tsubst -> term -> term
 
-val tsubst_ht : Type.tsubst -> hterm -> hterm
-
 (** [subst_var s v] returns [v'] if substitution [s] maps [v] to [Var v'],
     and [v] if the variable is not in the domain of the substitution. *)
 val subst_var : subst -> Vars.var -> Vars.var
@@ -244,15 +233,17 @@ val subst_macros_ts : Symbols.table -> string list -> term -> term -> term
 val subst_projs : (proj * proj) list -> term -> term 
 
 (*------------------------------------------------------------------*)
-type refresh_arg = [`Global | `InEnv of Vars.env ref ]
+val refresh_vars        : (Vars.var     ) list -> (Vars.var     ) list * subst
+val refresh_vars_w_info : (Vars.var * 'a) list -> (Vars.var * 'a) list * subst
 
-val refresh_vars : refresh_arg -> Vars.vars -> Vars.vars * esubst list
+(** Add variables in an existing environment, renaming them if necessary. *)
+val add_vars_env :
+  'a Vars.genv -> (Vars.var * 'a) list ->
+  'a Vars.genv * Vars.var list * esubst list
 
-val refresh_vars_env :
-  Vars.env -> Vars.var list -> Vars.env * Vars.var list * esubst list
-
-(*------------------------------------------------------------------*)
-val apply_ht : hterm -> term list -> hterm
+val add_vars_simpl_env :
+  Vars.simpl_env -> Vars.var list ->
+  Vars.simpl_env * Vars.var list * esubst list
 
 (*------------------------------------------------------------------*)
 (** {2 Builtins function symbols} *)
@@ -309,93 +300,105 @@ val f_zeroes : Symbols.fname
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructors} *)
 
-(** Module type for smart constructors and destructors on first-order formulas,
-    where the type is abstracted. Instantiated by both [Term] and [Equiv]. *)
-module type SmartFO = sig
-  type form
-
+module Smart : sig
   (** {3 Constructors} *)
-  val mk_true  : form
-  val mk_false : form
+  val mk_true  : term
+  val mk_false : term
 
-  val mk_eq  : ?simpl:bool -> term -> term -> form
-  val mk_neq : ?simpl:bool -> term -> term -> form
-  val mk_leq :                term -> term -> form
-  val mk_geq :                term -> term -> form
-  val mk_lt  : ?simpl:bool -> term -> term -> form
-  val mk_gt  : ?simpl:bool -> term -> term -> form
+  val mk_eq  : ?simpl:bool -> term -> term -> term
+  val mk_neq : ?simpl:bool -> term -> term -> term
+  val mk_leq :                term -> term -> term
+  val mk_geq :                term -> term -> term
+  val mk_lt  : ?simpl:bool -> term -> term -> term
+  val mk_gt  : ?simpl:bool -> term -> term -> term
 
-  val mk_not   : ?simpl:bool -> form              -> form
-  val mk_and   : ?simpl:bool -> form      -> form -> form
-  val mk_ands  : ?simpl:bool -> form list         -> form
-  val mk_or    : ?simpl:bool -> form      -> form -> form
-  val mk_ors   : ?simpl:bool -> form list         -> form
-  val mk_impl  : ?simpl:bool -> form      -> form -> form
-  val mk_impls : ?simpl:bool -> form list -> form -> form
+  val mk_not   : ?simpl:bool -> term              -> term
+  val mk_and   : ?simpl:bool -> term      -> term -> term
+  val mk_ands  : ?simpl:bool -> term list         -> term
+  val mk_or    : ?simpl:bool -> term      -> term -> term
+  val mk_ors   : ?simpl:bool -> term list         -> term
+  val mk_impl  : ?simpl:bool -> term      -> term -> term
+  val mk_impls : ?simpl:bool -> term list -> term -> term
 
-  val mk_forall : ?simpl:bool -> Vars.vars -> form -> form
-  val mk_exists : ?simpl:bool -> Vars.vars -> form -> form
+  val mk_forall : ?simpl:bool -> Vars.vars -> term -> term
+  val mk_exists : ?simpl:bool -> Vars.vars -> term -> term
+
+  (** Local terms do not take tags.
+      By convention, we require that the tag [Vars.Tag.ltag] is 
+      used for local terms. *)
+  val mk_forall_tagged : ?simpl:bool -> Vars.tagged_vars -> term -> term
+  val mk_exists_tagged : ?simpl:bool -> Vars.tagged_vars -> term -> term
 
   (*------------------------------------------------------------------*)
   (** {3 Destructors} *)
 
-  val destr_forall  : form -> (Vars.var list * form) option
-  val destr_forall1 : form -> (Vars.var      * form) option
-  val destr_exists  : form -> (Vars.var list * form) option
-  val destr_exists1 : form -> (Vars.var      * form) option
+  (*------------------------------------------------------------------*)
+  val destr_neq : term -> (term * term) option
+  val destr_eq  : term -> (term * term) option
+  val destr_leq : term -> (term * term) option
+  val destr_lt  : term -> (term * term) option
 
   (*------------------------------------------------------------------*)
-  val destr_neq : form -> (term * term) option
-  val destr_eq  : form -> (term * term) option
-  val destr_leq : form -> (term * term) option
-  val destr_lt  : form -> (term * term) option
+  val destr_false : term ->         unit  option
+  val destr_true  : term ->         unit  option
+  val destr_not   : term ->         term  option
+  val destr_and   : term -> (term * term) option
+  val destr_iff   : term -> (term * term) option
 
   (*------------------------------------------------------------------*)
-  val destr_false : form ->         unit  option
-  val destr_true  : form ->         unit  option
-  val destr_not   : form ->         form  option
-  val destr_and   : form -> (form * form) option
-  val destr_or    : form -> (form * form) option
-  val destr_impl  : form -> (form * form) option
-  val destr_iff   : form -> (form * form) option
+  val destr_or   : term -> (term * term) option
+  val destr_impl : term -> (term * term) option
 
   (*------------------------------------------------------------------*)
-  val is_false  : form -> bool
-  val is_true   : form -> bool
-  val is_not    : form -> bool
-  val is_zero   : form -> bool
-  val is_and    : form -> bool
-  val is_or     : form -> bool
-  val is_impl   : form -> bool
-  val is_iff    : form -> bool
-  val is_forall : form -> bool
-  val is_exists : form -> bool
+  val destr_forall_tagged  : term -> (Vars.tagged_vars * term) option
+  val destr_forall1_tagged : term -> (Vars.tagged_var  * term) option
+  val destr_exists_tagged  : term -> (Vars.tagged_vars * term) option
+  val destr_exists1_tagged : term -> (Vars.tagged_var  * term) option
+
+  val destr_forall  : term -> (Vars.vars * term) option
+  val destr_forall1 : term -> (Vars.var  * term) option
+  val destr_exists  : term -> (Vars.vars * term) option
+  val destr_exists1 : term -> (Vars.var  * term) option
 
   (*------------------------------------------------------------------*)
-  val is_neq : form -> bool
-  val is_eq  : form -> bool
-  val is_leq : form -> bool
-  val is_lt  : form -> bool
+  val is_false  : term -> bool
+  val is_true   : term -> bool
+  val is_not    : term -> bool
+  val is_zero   : term -> bool
+  val is_and    : term -> bool
+  val is_or     : term -> bool
+  val is_impl   : term -> bool
+  val is_iff    : term -> bool
+  val is_forall : term -> bool
+  val is_exists : term -> bool
+
+  (*------------------------------------------------------------------*)
+  val is_neq : term -> bool
+  val is_eq  : term -> bool
+  val is_leq : term -> bool
+  val is_lt  : term -> bool
 
   (*------------------------------------------------------------------*)
   (** left-associative *)
-  val destr_ands  : int -> form -> form list option
-  val destr_ors   : int -> form -> form list option
-  val destr_impls : int -> form -> form list option
+  val destr_ands  : int -> term -> term list option
+  val destr_ors   : int -> term -> term list option
+  val destr_impls : int -> term -> term list option
 
   (*------------------------------------------------------------------*)
-  val decompose_forall : form -> Vars.var list * form
-  val decompose_exists : form -> Vars.var list * form
+  val decompose_forall : term -> Vars.var list * term 
+  val decompose_exists : term -> Vars.var list * term
 
   (*------------------------------------------------------------------*)
-  val decompose_ands  : form -> form list
-  val decompose_ors   : form -> form list
-  val decompose_impls : form -> form list
+  val decompose_forall_tagged : term -> Vars.tagged_var list * term 
+  val decompose_exists_tagged : term -> Vars.tagged_var list * term
 
-  val decompose_impls_last : form -> form list * form
+  (*------------------------------------------------------------------*)
+  val decompose_ands  : term -> term list
+  val decompose_ors   : term -> term list
+  val decompose_impls : term -> term list
+
+  val decompose_impls_last : term -> term list * term
 end
-
-module Smart : SmartFO with type form = term
 
 include module type of Smart
 
@@ -415,9 +418,9 @@ val mk_diff    : (proj * term) list -> term
 
 val mk_find : ?simpl:bool -> Vars.var list -> term -> term -> term -> term
 
-val mk_quant : ?simpl:bool -> quant -> Vars.vars -> form -> form
+val mk_quant : ?simpl:bool -> quant -> Vars.vars -> term -> term
   
-val mk_iff   : ?simpl:bool -> form -> form -> form
+val mk_iff   : ?simpl:bool -> term -> term -> term
   
 (*------------------------------------------------------------------*)
 val mk_fun0 : Symbols.fname -> Type.ftype -> term list -> term
@@ -482,16 +485,6 @@ val destr_pair : term -> (term * term) option
 (** {2 Simplification} *)
 
 val not_simpl : term -> term
-
-(** Check if a formula represents a deterministic (i.e. 
-    non-probabilistic) computation. *)
-val is_deterministic : term -> bool
-
-(** Check if a formula [phi] is deterministic and does not depend
-    on system-specific aspects. More specifically, the aim is to
-    guarantee that [phi \/ not(phi)]_any holds, which means that
-    diff operators are forbidden in [phi]. *)
-val is_pure_timestamp : term -> bool
 
 (*------------------------------------------------------------------*)
 (** {2 Sets and Maps } *)
@@ -581,8 +574,8 @@ module Hm : Map.S with type key = term_head
     The free type variables must be inferred. *)
 type 'a pat = {
   pat_tyvars : Type.tvars;
-  pat_vars : Sv.t;
-  pat_term : 'a;
+  pat_vars   : (Vars.var * Vars.Tag.t) list;
+  pat_term   : 'a;
 }
 
 val project_tpat     : projs        -> term pat -> term pat

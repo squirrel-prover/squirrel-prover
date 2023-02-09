@@ -1,5 +1,3 @@
-
-
 (* Testing euf over signatures. *)
 
 senc enc,dec
@@ -18,6 +16,17 @@ goal _: happens(A1) => output@A1 <> fail => output@A1 = m.
 Proof.
   intro Hap Hneq.
   rewrite /output /y in Hneq.
-  nosimpl(intctxt Hneq).
-  by rewrite /output /y.
+  intctxt Hneq.
+  auto.
+Qed.
+
+(*------------------------------------------------------------------*)
+system [Bis] (out(c,diff(enc(m,r,k),empty)) | ( in(c,x); let y = dec(x,k) in out(c,y))).
+
+goal [Bis] _: happens(A1) => output@A1 <> fail => output@A1 = m.
+Proof.
+  intro Hap Hneq.
+  rewrite /output /y1 in Hneq.
+  intctxt Hneq.
+  auto.
 Qed.

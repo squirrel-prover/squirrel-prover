@@ -102,8 +102,6 @@ rule token = parse
 | "op"                { OP }
 | "fun"               { FUN }
 | "type"              { TYPE }
-| "name_fixed_length" { NAMEFIXEDLENGTH }
-| "large"             { LARGE }
 | "name"              { NAME }
 | "mutable"           { MUTABLE }
 | "system"            { SYSTEM }

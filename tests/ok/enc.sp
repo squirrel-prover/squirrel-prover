@@ -22,16 +22,15 @@ Proof.
   
   induction t.
   
-  expandall.
-  fresh 1.
-  auto.
+  * expandall.
+    by fresh 1.
   
-  expandall.
-  fa 2; fa 3; fa 3; fa 3.  
-  cca1 3. 
-   + auto. 
-   + fa 3.
-     fresh 4.  
-     rewrite len_n in 3.
-     rewrite if_true in 3; auto.
+  * expandall.
+    fa 2; fa 3; fa 3; fa 3.  
+    cca1 3. 
+     + auto. 
+     + fa 3.
+       fresh 4; 1:auto.
+       rewrite len_n in 3.
+       auto.
 Qed.

@@ -106,8 +106,8 @@ Proof.
   rewrite if_true // in 0. 
   prf 1.
   rewrite if_true // in 1. 
-  fresh 0; fresh 1.
-  refl.
+  fresh 0 => //.
+  by fresh 0.
 
   rewrite equiv H. 
   intro H1.

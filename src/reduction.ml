@@ -93,6 +93,9 @@ let conv_bnd (st : cstate) (v1 : Vars.var) (v2 : Vars.var) : cstate =
 let conv_bnds (st : cstate) (vs1 : Vars.vars) (vs2 : Vars.vars) : cstate =
   List.fold_left2 conv_bnd st vs1 vs2
 
+let conv_tagged_bnds (st : cstate) (vs1 : Vars.tagged_vars) (vs2 : Vars.tagged_vars) : cstate =
+  List.fold_left2 (fun st (v1, _) (v2, _) -> conv_bnd st v1 v2) st vs1 vs2
+
 let rec conv (st : cstate) (t1 : Term.term) (t2 : Term.term) : unit =
   match t1, t2 with
   | Term.Fun (fs1, fty1, l1), Term.Fun (fs2, fty2, l2)
@@ -151,7 +154,7 @@ let rec conv_e (st : cstate) (e1 : Equiv.form) (e2 : Equiv.form) : unit =
   match e1, e2 with
   | Equiv.Quant (q1, vs1, e1), Equiv.Quant (q2, vs2, e2) when q1 = q2 ->
     if List.length vs1 <> List.length vs2 then not_conv ();
-    let st = conv_bnds st vs1 vs2 in
+    let st = conv_tagged_bnds st vs1 vs2 in
     conv_e st e1 e2
 
   | Equiv.And  (el1, er1), Equiv.And  (el2, er2)
@@ -251,6 +254,7 @@ end
 module Mk (S : LowSequent.S) : S with type t := S.t = struct
   type state = { 
     table   : Symbols.table;
+    env     : Vars.env;         (* used to get variable tags *)
     sexpr   : SE.arbitrary;
     param   : red_param;
     hyps    : THyps.hyps;
@@ -330,7 +334,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     let rule = List.find_map (fun Hint.{ rule } ->
         match 
           Rewrite.rewrite_head
-            st.table st.expand_context (lazy st.hyps) st.sexpr 
+            st.table st.env st.expand_context (lazy st.hyps) st.sexpr 
             rule t 
         with
         | None -> None
@@ -354,9 +358,12 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
   and reduce_subterms (st : state) (t : Term.term) : Term.term * bool = 
     match t with
     | Term.Quant (q, evs, t0) -> 
-      let _, subst = Term.refresh_vars `Global evs in
+      let _, subst = Term.refresh_vars evs in
       let t0 = Term.subst subst t0 in
-      let red_t0, has_red = reduce st t0 in
+      let red_t0, has_red =
+        let env = Vars.add_vars (Vars.Tag.local_vars evs) st.env in
+        reduce { st with env } t0
+      in
 
       if not has_red then t, false
       else
@@ -409,9 +416,12 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       has_red1 || has_red2
 
     | Term.Find (is, c, t, e) -> 
-      let _, subst = Term.refresh_vars `Global is in
+      let _, subst = Term.refresh_vars is in
       let c, t = Term.subst subst c, Term.subst subst t in
-      let st1 = st in
+      let st1 =
+        let env = Vars.add_vars (Vars.Tag.local_vars is) st.env in
+        { st with env }
+      in
 
       let c, has_red0 = reduce st1 c in
 
@@ -458,11 +468,12 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
   (*------------------------------------------------------------------*)
   (** [se] is the system of the term being reduced. *)
   (* computation must be fast *)
-  let mk_state ~expand_context ~se (param : red_param) (s : S.t) : state = 
-    { table   = S.table s;
-      sexpr   = se;
+  let mk_state ~expand_context ~se (env : Vars.env) (param : red_param) (s : S.t) : state = 
+    { table = S.table s;
+      sexpr = se;
+      env;
       param;
-      hyps    = S.get_trace_hyps s; 
+      hyps = S.get_trace_hyps s; 
       expand_context; } 
 
   (*------------------------------------------------------------------*)
@@ -474,7 +485,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       (t : Term.term) : Term.term * bool 
     = 
     let se = odflt (S.system s).set se in
-    let state = mk_state ~expand_context ~se param s in
+    let state = mk_state ~expand_context ~se (S.vars s) param s in
     expand_head_once state t
       
   (*------------------------------------------------------------------*)
@@ -486,47 +497,55 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       (t : Term.term) : Term.term 
     = 
     let se = odflt (S.system s).set se in
-    let state = mk_state ~expand_context ~se param s in
+    let state = mk_state ~expand_context ~se (S.vars s) param s in
     let t, _ = reduce state t in
     t
 
   (** Exported. *)
-  let rec reduce_equiv
+  let reduce_equiv
       ?(expand_context : Macros.expand_context = InSequent)
       ?(system : SE.context option)
       (param : red_param) (s : S.t) (e : Equiv.form) : Equiv.form 
     =
-    let reduce_equiv = reduce_equiv ~expand_context in
-    match e with
-    | Equiv.Quant (q, vs, e) -> 
-      let _, subst = Term.refresh_vars `Global vs in
-      let e = Equiv.subst subst e in
-      let red_e = reduce_equiv param s e in
-
-      let r_subst = rev_subst subst in
-      let red_e = Equiv.subst r_subst red_e in
-      Equiv.Quant (q, vs, red_e)
-
-    | Equiv.And (e1, e2) ->
-      Equiv.And (reduce_equiv param s e1, reduce_equiv param s e2)
-
-    | Equiv.Or (e1, e2) ->
-      Equiv.Or (reduce_equiv param s e1, reduce_equiv param s e2)
-
-    | Equiv.Impl (e1, e2) ->
-      Equiv.Impl (reduce_equiv param s e1, reduce_equiv param s e2)
+    let system = odflt (S.system s) system in
     
-    | Equiv.Atom (Reach f) -> 
-      Equiv.Atom (Reach (reduce_term param s f))
+    let rec reduce_e (env : Vars.env) (e : Equiv.form) : Equiv.form =
+      match e with
+      | Equiv.Quant (q, vs, e) -> 
+        let _, subst = Term.refresh_vars_w_info vs in
+        let e = Equiv.subst subst e in
+        let red_e =
+          let env = Vars.add_vars vs env in
+          reduce_e env e
+        in
 
-    | Equiv.Atom (Equiv e) -> 
-      let system = odflt (S.system s) system in
-      let e_se = (oget system.pair :> SE.arbitrary) in
-      let state = mk_state ~expand_context ~se:e_se param s in
+        let r_subst = rev_subst subst in
+        let red_e = Equiv.subst r_subst red_e in
+        Equiv.Quant (q, vs, red_e)
 
-      let e = List.map (fst -| reduce state) e in
-      Equiv.Atom (Equiv.Equiv e)
+      | Equiv.And (e1, e2) ->
+        Equiv.And (reduce_e env e1, reduce_e env e2)
 
+      | Equiv.Or (e1, e2) ->
+        Equiv.Or (reduce_e env e1, reduce_e env e2)
+
+      | Equiv.Impl (e1, e2) ->
+        Equiv.Impl (reduce_e env e1, reduce_e env e2)
+
+      | Equiv.Atom (Reach f) ->
+        let state = mk_state ~expand_context ~se:system.set env param s in
+        let f, _ = reduce state f in
+        Equiv.Atom (Reach f)
+
+      | Equiv.Atom (Equiv e) ->
+        let e_se = (oget system.pair :> SE.arbitrary) in
+        let state = mk_state ~expand_context ~se:e_se env param s in
+
+        let e = List.map (fst -| reduce state) e in
+        Equiv.Atom (Equiv.Equiv e)
+    in
+    reduce_e (S.vars s) e
+      
   (** We need type introspection there *)
   let reduce (type a) 
       ?(expand_context : Macros.expand_context = InSequent)

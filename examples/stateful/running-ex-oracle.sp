@@ -68,20 +68,21 @@ Proof.
   case tau.
 
     + (* init *)
-      intro Eq; left; intro j HpA; by auto.
+      intro Eq; by left.
 
     + (* O(i) *)
-      intro [j Eq]; subst tau, O(j).
+      intro [j Eq]; rewrite Eq in *; clear Eq.
       use IH with pred(O(j)) => //.
       destruct H as [H1 | [j0 H2]].
         - left; intro j0 HpA; by use H1 with j0.
-        - right. destruct H2 as [_ _ H2].
+        - right.
+          destruct H2 as [_ _ H2].
           exists j0.
           intro /= jj Hyp.
           by apply H2.
 
     + (* A(i0,j) *)
-      intro [i0 j Eq]; subst tau, A(i0,j). 
+      intro [i0 j Eq]; rewrite Eq in *; clear Eq.
       case (i<>i0) => //.
        - (* 1st case: i<>i0 *)
           intro Neq.
@@ -93,8 +94,52 @@ Proof.
               by apply H2.
 
       - (* 2nd case: i<>i0 *)
-        intro Eq; subst i0, i.
+        intro Eq /=. 
         by right; exists j.
+Qed.
+
+global goal lastupdate_pure_glob :
+  Forall (i:index[const], tau:timestamp[const]),
+  [happens(tau)] -> (
+    [forall (j:index), happens(A(i,j)) => A(i,j)>tau] \/
+    (Exists (j:index[const]),
+      [happens(A(i,j)) && A(i,j) <= tau] /\
+      [forall (jj:index), happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j)])).
+Proof.
+  intro i.
+  dependent induction => tau IH Hp.
+  case tau.
+
+    + (* init *)
+      intro Eq; by left.
+
+    + (* O(i) *)
+      intro [j Eq]; rewrite Eq in *; clear Eq.
+      use IH with pred(O(j)) => //.
+      destruct H as [H1 | [j0 H2]].
+        - left; intro j0 HpA; by use H1 with j0.
+        - right.
+          destruct H2 as [[_ _] H2].
+          exists j0. 
+          split; 1: auto. 
+          intro /= jj Hyp.
+          by apply H2.
+
+    + (* A(i0,j) *)
+      intro [i0 j Eq]; rewrite Eq in *; clear Eq.
+      have [Neq | Eq] : [i <> i0 || i = i0]; 1:auto. 
+       - (* 1st case: i<>i0 *)
+          use IH with pred(A(i0,j)) => //.
+          destruct H as [H1 | [j0 H2]].
+            * left; intro j0 HpA; by use H1 with j0.
+            * right; destruct H2 as [[_ _] H2]; exists j0.
+              split; 1:auto.
+              intro /= jj Hyp.
+              by apply H2.
+
+      - (* 2nd case: i<>i0 *)
+        right; exists j. 
+        by split.
 Qed.
 
 goal lastupdate_init : forall (i:index,tau:timestamp), happens(tau) => (
@@ -239,21 +284,22 @@ Qed.
 name m : message.
 
 global goal [default/left,default/left]
-  strong_secrecy (tau:timestamp) : 
-  Forall (i':index,tau':timestamp),
+  strong_secrecy (tau:timestamp[const]) : 
+  Forall (i':index[const],tau':timestamp[const]),
     [happens(tau)] -> [happens(tau')] -> equiv(frame@tau, diff(s(i')@tau',m)).
 Proof.
   induction tau => i' tau' Htau Htau'.
 
   + (* Init *)
     expand frame@init.
-    use lastupdate_pure with i',tau' as [Hinit | [j HA]]; try auto.
+    have [Hinit | [j [HA1 HA2]]] := lastupdate_pure_glob i' tau' _; try auto.
 
     - use lastupdate_init with i',tau' as H; try auto.
-      rewrite H; expand s(i')@init; fresh 0; auto.
+      rewrite H //; expand s(i')@init. 
+      by fresh 0.
 
     - use lastupdate_A with i',j,tau' as H; try auto.
-      rewrite H in *; expand s(i')@A(i',j).
+      rewrite H // in *; expand s(i')@A(i',j).
       prf 0; rewrite if_true; [2: by fresh 0].
       simpl. intro j0 HAi0.
       use lastupdate with i',pred(A(i',j)) as [[H1 H2] | H1]; try auto.
@@ -266,35 +312,45 @@ Proof.
   + (* Oracle *)
      expand frame, exec, cond, output.
      fa !<_,_>, if _ then _, (_ && _), <_,_>.
-     prf 1; rewrite if_true; 2: fresh 1. {
-       simpl; split.
+     prf 1; rewrite if_true. {
+       simpl. 
+       split.
        * intro j0 H.
          by apply unique_queries.
        * intro i0 j0.
+         have -> : forall (x, y, b : bool), diff(x => b, y => b) = (diff(x,y) => b) by project.
+         intro H.
+         have ? : happens(pred (A(i0, j0))) by (project; try case H). 
+         rewrite equiv IH i0 (pred(A(i0,j0))) => //. 
          project.
-         ** intro H; destruct H as [H1|H2].
-            *** rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
-            *** rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
-         ** intro  H. rewrite equiv IH i0 (pred(A(i0,j0))) => // Hf; by fresh Hf.
+         ** destruct H as [H1|H2]; intro Hf; by fresh Hf.
+         ** intro Hf; by fresh Hf.
      }.
-     prf 1; rewrite if_true; 2: fresh 1; by apply IH.
-     simpl; split.
-       * intro j0 H.
-         apply unique_queries; auto.
-       * intro i0 j0 H.
-         rewrite equiv IH i0 (A(i0,j0)) => // Hf.
-         by fresh Hf.
+     fresh 1; 1:auto.
+     prf 1; rewrite if_true. {
+       simpl; split.
+         * intro j0 H.
+           apply unique_queries; auto.
+         * intro i0 j0 H.
+           rewrite equiv IH i0 (A(i0,j0)) => // Hf.
+           by fresh Hf.
+     }.
+     fresh 1; 1:auto.
+     by apply IH.
 
    + (* Tag *)
   expand frame@A(i,j). expand exec@A(i,j). expand cond@A(i,j). expand output@A(i,j).
   fa 0. fa 1. fa 1.
-  prf 1; rewrite if_true; 2: fresh 1; by apply IH.
-  simpl; split.
-    - intro j0 H.
-      rewrite equiv IH i (A(i,j)) => // Hf; by fresh Hf.
-    - intro i0 j0 H.
-      assert i=i0 || i<>i0; try auto.
-      case H0.
-        * by use monotonic_chain with A(i,j),A(i,j0),i,j => //.
-        * by use disjoint_chains with A(i,j),A(i0,j0),i,i0.
+  prf 1; rewrite if_true. {
+    simpl; split.
+      - intro j0 H.
+        rewrite equiv IH i (A(i,j)) => // Hf; by fresh Hf.
+      - intro i0 j0 H.
+        assert i=i0 || i<>i0; try auto.
+        case H0.
+          * by use monotonic_chain with A(i,j),A(i,j0),i,j => //.
+          * by use disjoint_chains with A(i,j),A(i0,j0),i,i0.
+  }.
+  fresh 1; 1:auto.
+  by apply IH.
 Qed.

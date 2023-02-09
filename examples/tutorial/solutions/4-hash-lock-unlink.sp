@@ -192,7 +192,7 @@ Qed.
    Recall that the `fadup` tactic can be useful to simplify 
    equivalence goals (syntax: `fadup i` where `i` is an integer indicating 
    the frame element you want to get rid of). *)
-global goal unlinkability (t : timestamp) :
+global goal unlinkability (t : timestamp[param]) :
   [happens(t)] -> equiv(frame@t).
 Proof.
   (* BEGIN EXO *)
@@ -205,7 +205,7 @@ Proof.
   (* Case R *)
   + expand frame, exec, cond, output.
     fa !<_,_>; fa 1.
-    fresh 1; rewrite if_true.
+    fresh 1.
     repeat split => j0 _ //.
     by depends R(j0), R1(j0).
     by depends R(j0), R2(j0).
@@ -231,7 +231,7 @@ Proof.
       project;
       repeat split => > _ _ [_ Meq0]; (try fresh Meq0); auto.
     }
-    fresh 2.
-    by fresh 1; rewrite if_true.
+    fresh 2; 1:auto.
+    by fresh 1.
   (* END EXO *)
 Qed.

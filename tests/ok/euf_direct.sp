@@ -12,6 +12,7 @@ Proof.
   auto.
 Qed.
 
+(*------------------------------------------------------------------*)
 name n1 : index -> message.
 abstract p : index -> bool.
 

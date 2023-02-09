@@ -80,11 +80,51 @@ type macro_def =
   | Global of int * Type.ty
 
 (*------------------------------------------------------------------*)
-type bty_info =
-  | Ty_large
-  | Ty_name_fixed_length
+(** {2 Error Handling} *)
 
-type bty_def = bty_info list
+type error_i =
+  | Unbound_identifier    of string
+  | Incorrect_namespace   of namespace * namespace (* expected, got *)
+  | Multiple_declarations of string * namespace * group
+  | Failure of string
+
+type error = L.t * error_i
+
+let pp_error_i fmt = function
+  | Unbound_identifier s -> Fmt.pf fmt "unknown symbol %s" s
+  | Incorrect_namespace (n1, n2) ->
+    Fmt.pf fmt "should be a %a but is a %a"
+      pp_namespace n1 pp_namespace n2
+
+  | Multiple_declarations (s, n, g) ->
+    Fmt.pf fmt "%a symbol %s already declared (%s group)"
+      pp_namespace n s g
+
+  | Failure s ->
+    Fmt.pf fmt "%s" s
+
+let pp_error pp_loc_err fmt (loc,e) =
+  Fmt.pf fmt "%aError: %a"
+    pp_loc_err loc
+    pp_error_i e
+
+exception Error of error
+
+let symb_err l e = raise (Error (l,e))
+
+(*------------------------------------------------------------------*)
+(** {2 Type information: Ocaml type declaration}  *)
+
+(** Type information associated to base types. 
+    Restrict the instantiation domain of a type. *)
+type bty_info =
+  | Large
+  | Name_fixed_length
+  | Finite
+  | Fix
+  | Well_founded
+
+type bty_infos = bty_info list
 
 (*------------------------------------------------------------------*)
 type name_def = {
@@ -130,7 +170,7 @@ type _ def =
   | Macro    : macro_def -> _macro   def
   | System   : unit      -> _system  def
   | Process  : unit      -> _process def
-  | BType    : bty_def   -> _btype   def
+  | BType    : bty_infos -> _btype   def
   | HintDB   : unit      -> _hintdb  def
   | Lemma    : unit      -> _lemma   def
         
@@ -220,35 +260,6 @@ let get_namespace ?(group=default_group) (table : table) s =
   let s = { group; name=s } in
   let f (x,_) = edef_namespace x in
   omap f (Msymb.find_opt s table.cnt)
-
-(*------------------------------------------------------------------*)
-(** {2 Error Handling} *)
-
-type error_i =
-  | Unbound_identifier    of string
-  | Incorrect_namespace   of namespace * namespace (* expected, got *)
-  | Multiple_declarations of string * namespace * group
-
-type error = L.t * error_i
-
-let pp_error_i fmt = function
-  | Unbound_identifier s -> Fmt.pf fmt "unknown symbol %s" s
-  | Incorrect_namespace (n1, n2) ->
-    Fmt.pf fmt "should be a %a but is a %a"
-      pp_namespace n1 pp_namespace n2
-
-  | Multiple_declarations (s, n, g) ->
-    Fmt.pf fmt "%a symbol %s already declared (%s group)"
-      pp_namespace n s g
-
-let pp_error pp_loc_err fmt (loc,e) =
-  Fmt.pf fmt "%aError: %a"
-    pp_loc_err loc
-    pp_error_i e
-
-exception Error of error
-
-let symb_err l e = raise (Error (l,e))
 
 (*------------------------------------------------------------------*)
 (** {2 Namespaces} *)
@@ -547,7 +558,7 @@ end)
 
 module BType = Make (struct
   type ns = _btype
-  type local_def = bty_def
+  type local_def = bty_infos
 
   let namespace = NBType
 
@@ -643,20 +654,69 @@ module Lemma = Make (struct
 end)
 
 (*------------------------------------------------------------------*)
-(** {2 Miscellaneous} *)
+(** {2 Type information} *)
 
-let get_bty_info table (ty : Type.ty) : bty_info list =
-  match ty with
+module TyInfo = struct
+  type t = bty_info
+
+  let parse (info : lsymb) : t =
+    match L.unloc info with
+    | "name_fixed_length" -> Name_fixed_length 
+    | "large"             -> Large 
+    | "well_founded"      -> Well_founded 
+    | "fix"               -> Fix
+    | "finite"            -> Finite
+    | _ -> symb_err (L.loc info) (Failure "unknown type information")
+
+(*------------------------------------------------------------------*)
+  let get_bty_infos table (ty : Type.ty) : bty_infos =
+    match ty with
     | Type.Boolean -> []
-    | Type.Message -> [Ty_large; Ty_name_fixed_length]
+    | Type.Message -> [Large; Name_fixed_length]
     | Type.TBase b -> BType.get_def (BType.cast_of_string b) table
     | _ -> []
 
-let check_bty_info table (ty : Type.ty) (info : bty_info) : bool =
-  let infos = get_bty_info table ty in
-  List.mem info infos
+  let check_bty_info table (ty : Type.ty) (info : t) : bool =
+    let infos = get_bty_infos table ty in
+    List.mem info infos
+
+  (*------------------------------------------------------------------*)
+  (** See `.mli` *)
+  let is_finite table ty : bool =
+    let rec check : Type.ty -> bool = function
+      | Boolean | Index | Timestamp -> true
+      | Tuple l -> List.for_all check l
+      | Fun (t1, t2) -> check t1 && check t2
+      | TBase _ as ty -> check_bty_info table ty Finite
+      | _ -> false
+    in 
+    check ty
+
+  (** See `.mli` *)
+  let is_fixed table ty : bool = 
+    let rec check : Type.ty -> bool = function
+      | Boolean | Message | Index | Timestamp -> true
+      | Tuple l -> List.for_all check  l
+      | Fun (t1, t2) -> check t1 && check t2
+      | TBase _ as ty -> check_bty_info table ty Fix
+      | _ -> false
+    in 
+    check ty
+
+  (** See `.mli` *)
+  let is_well_founded table ty : bool = 
+    let rec check : Type.ty -> bool = function
+      | Boolean | Index | Timestamp | Message -> true
+      | Tuple l -> List.for_all check l
+      | TBase _ as ty -> check_bty_info table ty Well_founded
+      | _ -> false
+    in 
+    check ty
+end
 
 (*------------------------------------------------------------------*)
+(** {2 Miscellaneous} *)
+
 let right_infix_fist_chars =  ['+'; '-'; '*'; '|'; '&'; '='; '>'; '<'; '~']
 let left_infix_fist_chars  =  ['^']
 let infix_fist_chars = left_infix_fist_chars @ right_infix_fist_chars
@@ -695,7 +755,6 @@ let is_global : macro_def -> bool = function Global _ -> true | _ -> false
 
 (*------------------------------------------------------------------*)
 (** {2 Builtins} *)
-
 
 (* reference used to build the table. Must not be exported in the .mli *)
 let builtin_ref = ref empty_table

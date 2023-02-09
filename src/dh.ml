@@ -25,10 +25,9 @@ open LowTactics
 
 (*------------------------------------------------------------------*)
 let wrap_fail = TraceLT.wrap_fail
+
 let soft_failure = Tactics.soft_failure
 let hard_failure = Tactics.hard_failure
-
-
 
 (*------------------------------------------------------------------*)
 (* Utility functions to put a term in a sort of normal form *)
@@ -100,6 +99,7 @@ let partition_powers
     Otherwise, gives up, and asks occurrence_goals to call it again on subterms.
    Does not use any accumulator, so returns an empty unit list. *)
 let get_bad_occs
+    (env : Env.t)            (* initial environment  *)
     (gdh_oracles:bool) (g:term) (exp:Symbols.fname) (mult:Symbols.fname option)
     (nab:Name.t list) 
     (retry_on_subterms : (unit -> NO.n_occs * NO.empty_occs))
@@ -161,11 +161,16 @@ let get_bad_occs
   let rec_call = (* rec call on a list *)
     List.flattensplitmap (rec_call_on_subterms ~fv ~cond ~p ~info ~st)
   in
-  
+
+  let env =
+    Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
+  in
   match t with
-  | Var v when not (Type.is_finite (Vars.ty v)) ->
+  | _ when HighTerm.is_ptime_deducible ~const:`Exact ~si:false env t -> ([],[])
+
+  | Var v ->
     soft_failure
-      (Tactics.Failure "can only be applied on ground terms")
+      (Tactics.Failure (Fmt.str "terms contain a non-ptime variable: %a" Vars.pp v))
       
   | Name (_, nargs) as n when Name.exists_name (Name.of_term n) nab ->
     (* one of the nab: generate occs for all potential collisions *)
@@ -220,7 +225,8 @@ let get_bad_occs
 
 
 (*------------------------------------------------------------------*)
-(* CDH/GDH tactic *)
+(** {2 CDH/GDH tactic} *)
+
 (** Checks whether g has an associated CDH/GDH assumption *)
 let has_cgdh (gdh_oracles : bool) (g : lsymb) (table : Symbols.table) : bool =
   let gen_n = Symbols.Function.of_lsymb g table in
@@ -293,10 +299,10 @@ let dh_param
   (gen, exp_n, mult_n, t, a, b)
 
 
-
+(*------------------------------------------------------------------*)
 (** Applies the CDH or GDH hypothesis (depending on 
     [gdh_oracles] = false/true) to hypothesis m in s, if possible, and 
-    returns the list of new proof obligations, ie with the added
+    returns the list of new proof obligations, i.e. with the added
     hyp that there is a collision. *) 
 let cgdh
     (gdh_oracles : bool)
@@ -307,7 +313,7 @@ let cgdh
   =
   let _, hyp = Hyps.by_name m s in
   let contx = TS.mk_trace_cntxt s in
-  let env = (TS.env s).vars in
+  let env = TS.env s in
 
   let (gen, exp_s, mult_s, t, na, nb) =
     dh_param ~hyp_loc:(L.loc m) gdh_oracles contx hyp g s
@@ -316,11 +322,11 @@ let cgdh
     fun ppf () -> Fmt.pf ppf "%a and %a" Name.pp na Name.pp nb
   in
   let get_bad:((unit,unit) NO.f_fold_occs) =
-    get_bad_occs gdh_oracles gen exp_s mult_s [na; nb]
+    get_bad_occs env gdh_oracles gen exp_s mult_s [na; nb]
   in
 
   let phis =
-    NO.name_occurrence_formulas ~pp_ns:(Some pp_nab)
+    NO.name_occurrence_formulas ~mode:PTimeNoSI ~pp_ns:(Some pp_nab)
       get_bad contx env [t]
   in
 

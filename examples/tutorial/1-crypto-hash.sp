@@ -99,8 +99,7 @@ Proof.
   print goal if_true.
   rewrite if_true in 0.
   auto.
-  fresh 0.
-  auto.
+  by fresh 0.
 Qed.
 
 global goal hash_6 :

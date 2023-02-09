@@ -148,6 +148,6 @@ Proof.
   rewrite if_true; simpl.
     + intro i0 j0 *.
       use stateInequalityHelpful with i,j,j0 => //.
-    + fresh 1.
-      rewrite if_true => //.
+    + fresh 1; 1:auto.
+      auto.
 Qed.

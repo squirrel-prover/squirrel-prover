@@ -110,10 +110,11 @@ Proof.
   (* Case R *)
   + expand frame, exec, cond, output.
     fa 0; fa 1; fa 1.
-    fresh 1; rewrite if_true.
-    repeat split => j0 _ //.
-    by depends R(j0), R1(j0).
-    by depends R(j0), R2(j0).
+    fresh 1. { 
+      repeat split => j0 _ //.
+      by depends R(j0), R1(j0).
+      by depends R(j0), R2(j0).
+    }.
     auto.
 
   (* Case R1 *)
@@ -136,8 +137,8 @@ Proof.
       project;
       repeat split => > _ _ [_ Meq0]; (try fresh Meq0); auto.
     }
-    fresh 2.
-    by fresh 1; rewrite if_true.
+    fresh 2; 1:auto.
+    by fresh 1.
 Qed.
 
 

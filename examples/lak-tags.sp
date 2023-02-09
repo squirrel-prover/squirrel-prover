@@ -192,7 +192,7 @@ Proof.
   (* Case R *)
   + expand frame, exec, cond, output.
     fa !<_,_>, if _ then _.
-    fresh 1; rewrite if_true. {
+    fresh 1. {
       repeat split => * //;
       [1: by depends R(k),R1(k)
       |2: by depends R(k),R2(k)]. 
@@ -227,6 +227,6 @@ Proof.
       use tags_neq.
       by project; repeat split; intro > _ _ [[_ Meq] _]; fresh Meq.
     }
-    fresh 2.
-    by fresh 1; rewrite if_true.
+    fresh 2; 1:auto.
+    by fresh 1.
 Qed.

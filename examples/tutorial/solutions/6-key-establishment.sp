@@ -134,7 +134,7 @@ Qed.
    the left and right frames.
    Adding more things can make the proof simpler, and also results in
    a stronger lemma that will be useful in the rest of the file. *)
-global goal [default] idealize_key_exchange (t:timestamp) :
+global goal [default] idealize_key_exchange (t:timestamp[const]) :
   [happens(t)] ->
   equiv((*<*)enc_pk(skB), sskA, sk, rr,(*>*)frame@t).
 Proof.
@@ -147,7 +147,7 @@ Proof.
     have Hlen : len(diff(sk,zeroes(eta))) = len(sk) by project.
     rewrite Hlen in 5.
     fa 5.
-    fresh 5.
+    fresh 5; 1:auto.
     apply IH.
   + (* Bout *)
     expandall; fa !<_,_>.
@@ -252,7 +252,8 @@ Proof.
   have E : equiv(diff(h(a,k),n1),diff(h(b,k),n2)). {
     prf 0; rewrite if_true // in 0. 
     prf 1; rewrite if_true // in 1. 
-    fresh 0; fresh 1.
+    fresh 0; 1:auto.
+    fresh 0; 1:auto.
     refl.
   }.
   rewrite equiv E.
@@ -269,7 +270,7 @@ Qed.
    holds afterwards, but the proof would be more difficult.
    Proving this would be trivial for default/right... use rewrite
    equiv to show that this change is justified! *)
-local goal [default/left] _ (tau:timestamp) :
+goal [default/left] _ (tau:timestamp[glob,const]) :
   happens(pred(tau)) =>
   not(Bout < tau) =>
   not(input@tau = sk).

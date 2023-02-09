@@ -360,7 +360,7 @@ let pp_descr_short ppf descr =
 
 (*------------------------------------------------------------------*)
 let pp_descr ~dbg ppf descr =
-  let _, s = Term.refresh_vars `Global descr.indices in
+  let _, s = Term.refresh_vars descr.indices in
   let descr = if dbg then descr else subst_descr s descr in
 
   Fmt.pf ppf "@[<v 0>action name: @[<hov>%a@]@;\
@@ -377,13 +377,15 @@ let pp_descr ~dbg ppf descr =
        (Fmt.list
           ~sep:(Fmt.any ";@ ")
           (fun ppf (s, args, t) ->
-             let _, _, subst = (* rename quantified vars. to avoid name clashes *)
+             let _, args, subst = (* rename quantified vars. to avoid name clashes *)
                let fv_b = List.fold_left ((^~) Sv.remove) (Term.fv t) args in
-               Term.refresh_vars_env (Vars.of_set fv_b) args
+               Term.add_vars_simpl_env (Vars.of_set fv_b) args
              in
              let t = Term.subst subst t in
              
-             Fmt.pf ppf "@[%a :=@ %a@]" Symbols.pp s (Term._pp ~dbg) t)))
+             Fmt.pf ppf "@[%a@[(%a)@] :=@ %a@]" 
+               Symbols.pp s (Vars._pp_typed_list ~dbg) args
+               (Term._pp ~dbg) t)))
     descr.updates
     (Utils.pp_ne_list "@[<hv 2>globals:@ @[<hv>%a@]@]@;"
        (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ";@ ") Symbols.pp))
@@ -392,12 +394,11 @@ let pp_descr ~dbg ppf descr =
 
 (*------------------------------------------------------------------*)
 let descr_map
-    (f : Vars.env -> Symbols.macro -> Term.term -> Term.term) 
+    (f : Vars.vars -> Symbols.macro -> Term.term -> Term.term) 
     (descr : descr)
   : descr
   =
-  let env = Vars.of_list descr.indices in
-  let f = f env in
+  let f = f descr.indices in
   
   let condition =
     fst descr.condition,
@@ -417,7 +418,7 @@ let descr_map
 
 (*------------------------------------------------------------------*)
 let refresh_descr descr =
-  let _, s = Term.refresh_vars `Global descr.indices in
+  let _, s = Term.refresh_vars descr.indices in
   let descr = subst_descr s descr in
   assert (check_descr descr);
 

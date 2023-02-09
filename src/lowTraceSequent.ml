@@ -11,6 +11,9 @@ type conc_form = Equiv.local_form
 let hyp_kind = Equiv.Any_t
 let conc_kind = Equiv.Local_t
 
+(* default variable information of the sequent *)
+let var_info = Vars.Tag.make Vars.Local
+
 (*------------------------------------------------------------------*)
 (* For debugging *)
 let dbg ?(force=false) s =
@@ -19,6 +22,19 @@ let dbg ?(force=false) s =
 
 (*------------------------------------------------------------------*)
 module H = Hyps.TraceHyps
+
+(*------------------------------------------------------------------*)
+(* for finite types which do not depend on the security
+   parameter η, we have
+   [∀ x, phi] ≡ ∀ x. const(x) → [phi]
+   (where the RHS quantification is a global quantification) *)
+let strengthen_vars table (vars : Vars.env) : Vars.env =
+  Vars.map_tag (fun v tag ->
+      if Symbols.TyInfo.is_finite table (Vars.ty v) && 
+         Symbols.TyInfo.is_fixed  table (Vars.ty v) then
+        { tag with const = true } 
+      else tag
+    ) vars
 
 (*------------------------------------------------------------------*)
 module S : sig
@@ -92,14 +108,15 @@ let _pp ~dbg ppf s =
 
   let sanity_check s : unit =
     Vars.sanity_check s.env.Env.vars;
-    if not (Vars.Sv.subset (fv s) (Vars.to_set s.env.Env.vars)) then
+    if not (Vars.Sv.subset (fv s) (Vars.to_vars_set s.env.Env.vars)) then
       let () =
         Fmt.epr "Anomaly in LowTraceSequent.sanity_check:@.%a@.@."
           pp_dbg s
       in
       assert false
 
-  let init_sequent ~env ~conclusion =
+  let init_sequent ~(env : Env.t) ~conclusion =
+    let env = Env.update ~vars:(strengthen_vars env.table env.vars) env in
     let s = {
       env ;
       hyps = H.empty;
@@ -257,9 +274,13 @@ let ty_vars s = s.env.ty_vars
 let system  s = s.env.system
 let table   s = s.env.table
 
-let set_env env s = S.update ~env s
+let set_env (env : Env.t) s = 
+  let env = Env.update ~vars:(strengthen_vars env.table env.vars) env in
+  S.update ~env s
 
+(*------------------------------------------------------------------*)
 let set_vars (vars : Vars.env) s = 
+  let vars = strengthen_vars s.env.table vars in
   let env = Env.update ~vars s.env in
   S.update ~env s
 
@@ -284,6 +305,7 @@ let set_goal_in_context ?update_local system conc s =
       ~table:s.env.table
       ~old_context:s.env.system
       ~new_context:system
+      ~vars:s.env.vars
   in
   let update_local = match update_local with
     | None -> default_update_local
@@ -331,6 +353,7 @@ let pi projection s =
     (Term.project1 projection s.conclusion)
     s
 
+(*------------------------------------------------------------------*)
 let init ~env conclusion =
   init_sequent ~env ~conclusion
 
@@ -348,12 +371,12 @@ let subst subst s =
 let rename (u:Vars.var) (v:Vars.var) (s:t) : t =
   assert (not (Vars.mem s.env.vars v));
   let s = subst [Term.ESubst (Term.mk_var u, Term.mk_var v)] s in
+  let info = Vars.get_info u s.env.vars in
   S.update
     ~env:(Env.update
-            ~vars:(Vars.add_var v (Vars.rm_var u s.env.vars))
+            ~vars:(Vars.add_var v info (Vars.rm_var u s.env.vars))
             s.env)
     s
-
 
 (*------------------------------------------------------------------*)
 (** TRS *)
@@ -388,7 +411,7 @@ let literals_unsat_smt ?(slow=false) s =
   Smt.literals_unsat ~slow
     s.env.table
     (SystemExpr.to_fset s.env.system.set) (* TODO handle failure *)
-    (Vars.to_list s.env.vars)
+    (Vars.to_vars_list s.env.vars)
     (Hyps.get_message_atoms s.hyps)
     (Hyps.get_trace_literals s.hyps)
     (* TODO: now that we can pass more general formulas than lists of atoms,
@@ -421,7 +444,7 @@ let map f s : sequent =
   set_goal (f.Equiv.Babel.call Equiv.Local_t (goal s)) (AnyHyps.map f' s)
 
 (*------------------------------------------------------------------*)
-module Conc = Term.Smart
+module Conc = HighTerm.Smart
 module Hyp  = Equiv.Any.Smart
 
 (*------------------------------------------------------------------*)

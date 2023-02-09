@@ -39,14 +39,6 @@ let check_ty_eq ?loc ty1 ty2 =
   ()
 
 (*------------------------------------------------------------------*)
-let check_hty_eq ?loc hty1 hty2 =
-  if not (Type.ht_equal hty1 hty2) then
-    soft_failure ?loc
-      (Failure (Fmt.str "types %a and %a are not compatible"
-                  Type.pp_ht hty1 Type.pp_ht hty2));
-  ()
-
-(*------------------------------------------------------------------*)
 (** {2 Functor building common tactics code from a Sequent module} *)
 
 module MkCommonLowTac (S : Sequent.S) = struct
@@ -97,8 +89,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Tactics.Tactic_soft_failure e -> fk e
 
   (*------------------------------------------------------------------*)
-  let make_exact_var ?loc env ty name =
-    match Vars.make_exact env ty name with
+  let make_exact_var ?loc (env : Vars.env) ty name info =
+    match Vars.make_exact env ty name info with
     | None ->
       hard_failure ?loc
         (Tactics.Failure ("variable name " ^ name ^ " already used"))
@@ -122,10 +114,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let convert_any (s : S.sequent) (term : Theory.any_term) =
     let cenv = Theory.{ env = S.env s; cntxt = InGoal; } in
     Theory.convert_any cenv term
-
-  let convert_ht (s : S.sequent)  ht =
-    let conv_env = Theory.{ env = S.env s; cntxt = InGoal; } in
-    Theory.convert_ht conv_env ht
 
   (*------------------------------------------------------------------*)
   (** {3 Targets} *)
@@ -529,7 +517,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       else
         match
           Rewrite.rewrite_exn
-            ~loc (S.table s) (S.system s) InSequent
+            ~loc (S.table s) (S.vars s) (S.system s) InSequent
             (S.get_trace_hyps s)
             mult rw_erule f
         with
@@ -566,8 +554,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
     let pat = Term.{
         pat_tyvars = tyvars;
-        pat_vars = pt.args;
-        pat_term = convert pt.form; }
+        pat_vars   = pt.args;
+        
+        pat_term   = convert pt.form; }
     in
     let subgs = List.map convert pt.subgs in
     subgs, pat
@@ -656,7 +645,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** C.f. [.mli] *)
   type rw_equiv =
-    SystemExpr.context * 
+    SE.context * 
     S.t list * 
     Equiv.global_form *
     [ `LeftToRight | `RightToLeft ]
@@ -683,7 +672,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       if tyvars <> [] then
         soft_failure (Failure "free type variables remaining") ;
 
-      if not (Sv.is_empty pt.args) then
+      if pt.args <> [] then
         soft_failure (Failure "universally quantified variables remaining") ;
 
       if rw_arg.rw_mult <> Args.Once then
@@ -712,31 +701,41 @@ module MkCommonLowTac (S : Sequent.S) = struct
   type c_res = c_handler * S.sequent
 
   (** Case analysis on a timestamp *)
-  let timestamp_case (ts : Term.term) s : S.sequent list =
+  let timestamp_case (ts : Term.term) (s : S.t) : S.t list =
     let system =
       match SE.get_compatible_expr (S.system s) with
         | Some e -> e
         | None -> soft_failure (Failure "underspecified systems")
     in
-    let table  = S.table s in
+    let table = S.table s in
 
-    let mk_case (action,_symbol,indices) : Vars.var list * Term.term =
+    let mk_case (action,_symbol,indices) : Vars.tagged_vars * Term.term =
       let action = Action.to_action action in
 
-      let env = S.vars s in
-      let _, indices, s = Term.refresh_vars_env env indices in
+      let env = Vars.to_simpl_env (S.vars s) in
+      let _, indices, sbst = Term.add_vars_simpl_env env indices in
 
       let name =
-        SystemExpr.action_to_term table system
-          (Action.subst_action s action)
+        SE.action_to_term table system
+          (Action.subst_action sbst action)
       in
       (* FIXME: is this second substitution useful ? *)
-      let name = Term.subst s name in
+      let name = Term.subst sbst name in
 
+      (* in a global sequent, flag introduce variables as constant
+         if [ts] is determinstic. *)
+      let const = HighTerm.is_constant `Exact (S.env s) ts in
+      
+      let indices =
+        match S.conc_kind with
+        | Equiv.Local_t  -> Vars.Tag.local_vars         indices
+        | Equiv.Global_t -> Vars.Tag.global_vars ~const indices
+        | Equiv.Any_t    -> assert false
+      in
       indices, name
     in
 
-    let cases = List.map mk_case (SystemExpr.actions table system) in
+    let cases = List.map mk_case (SE.actions table system) in
 
     List.map (fun (indices, ts_case) ->
         let ts_subst =
@@ -744,7 +743,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         in
         let goal = S.subst_conc ts_subst (S.goal s) in
         let prem =
-          S.Conc.mk_exists ~simpl:false indices
+          S.Conc.mk_exists_tagged ~simpl:false indices
             (S.unwrap_conc (Local (Term.mk_atom `Eq ts ts_case)))
         in
         S.set_goal (S.Conc.mk_impl ~simpl:false prem goal) s
@@ -756,7 +755,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let hypothesis_case ~nb id (s : S.sequent) : c_res list =
     let destr_err () = soft_failure (Failure "not a disjunction") in
 
-    let rec case acc form = match S.Hyp.destr_or form with
+    let rec case acc form = match S.Hyp.destr_or ~env:(S.env s) form with
       | Some (f,g) -> case (case acc g) f
       | None       -> form :: acc in
 
@@ -765,7 +764,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     let cases = match nb with
       | `Any -> case [] form
-      | `Some l -> match S.Hyp.destr_ors l form with
+      | `Some l -> match S.Hyp.destr_ors ~env:(S.env s) l form with
         | None -> destr_err ()
         | Some cases -> cases
     in
@@ -844,13 +843,16 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Intro patterns} *)
 
+  (** Internal *)
   let var_of_naming_pat
-      n_ip ~dflt_name (ty : Type.ty) env : Vars.env * Vars.var =
+      (n_ip : Args.naming_pat) ~(dflt_name : string) (ty : Type.ty) tag env
+    : Vars.env * Vars.var
+    =
     match n_ip with
     | Args.Unnamed
-    | Args.AnyName     -> Vars.make `Approx env ty dflt_name
-    | Args.Approx name -> Vars.make `Approx env ty name
-    | Args.Named name  -> make_exact_var env ty name
+    | Args.AnyName     -> Vars.make `Approx env ty dflt_name tag
+    | Args.Approx name -> Vars.make `Approx env ty      name tag
+    | Args.Named name  -> make_exact_var    env ty      name tag
 
   (*------------------------------------------------------------------*)
   (** Apply a naming pattern to a variable or hypothesis. *)
@@ -860,9 +862,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (s : S.t) : S.t
     =
     match ip_handler with
-    | `Var v ->
+    | `Var (v,tag) ->
       let env, v' =
-        var_of_naming_pat n_ip ~dflt_name:(Vars.name v) (Vars.ty v) (S.vars s)
+        var_of_naming_pat n_ip ~dflt_name:(Vars.name v) (Vars.ty v) tag (S.vars s)
       in
       let subst = [Term.ESubst (Term.mk_var v, Term.mk_var v')] in
 
@@ -878,16 +880,18 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** Apply a And pattern (this is a destruct) of length [l].
       Note that variables in handlers have not been added to the env yet. *)
-  let do_and_pat (hid : Ident.t) len s : Args.ip_handler list * S.t =
-    let destr_fail s =
-      soft_failure (Tactics.Failure ("cannot destruct: " ^ s))
+  let do_and_pat (hid : Ident.t) (len : int) s : Args.ip_handler list * S.t =
+    let destr_fail pp_err =
+      soft_failure
+        (Tactics.Failure (Fmt.str "@[<hv 2>cannot destruct:@ @[%t@]@]" pp_err))
     in
 
     let get_destr ~orig = function
       | Some x -> x
-      | None -> destr_fail (Fmt.str "%a" Equiv.Any.pp orig)
+      | None -> destr_fail (fun fmt -> Equiv.Any.pp fmt orig)
     in
 
+    let env = S.env s in
     assert (len > 0);
     if len = 1 then ([`Hyp hid], s) else
       let form = Hyps.by_id hid s in
@@ -909,7 +913,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
             let ids, s = Hyps.add_i_list forms s in
             List.map (fun id -> `Hyp id) ids, s
 
-          | _ -> destr_fail (Fmt.str "%a" S.pp_hyp form)
+          | _ -> destr_fail (fun fmt -> S.pp_hyp fmt form)
         end
 
       else if S.Hyp.is_and form then
@@ -924,7 +928,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       else if S.Hyp.is_iff form then
         begin 
-          if len <> 2 then destr_fail "expected 2 patterns";
+          if len <> 2 then destr_fail (fun fmt -> Fmt.pf fmt "expected 2 patterns");
 
           let f1, f2 =
             get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_iff form)
@@ -937,10 +941,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
           List.map (fun id -> `Hyp id) ids, s
         end
 
-      else if S.Hyp.is_exists form then
+      else if S.Hyp.is_exists ~env form then
         begin
           let vs, f =
-            get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_exists form)
+            get_destr ~orig:(S.wrap_hyp form) (S.Hyp.destr_exists_tagged ~env form)
           in
 
           if List.length vs < len - 1 then
@@ -948,9 +952,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
           let vs, vs' = List.takedrop (len - 1) vs in
 
-          let vs_fresh, subst = Term.refresh_vars `Global vs in
+          let vs_fresh, subst = Term.refresh_vars_w_info vs in
 
-          let f = S.Hyp.mk_exists vs' f in
+          let f = S.Hyp.mk_exists_tagged vs' f in
           let f = S.subst_hyp subst f in
 
           let idf, s = Hyps.add_i Args.Unnamed f s in
@@ -958,7 +962,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           ( (List.map (fun x -> `Var x) vs_fresh) @ [`Hyp idf], s )
         end
 
-      else destr_fail (Fmt.str "%a" S.pp_hyp form)
+      else destr_fail (fun fmt -> S.pp_hyp fmt form)
 
   (** Apply an And/Or pattern to an ident hypothesis handler. *)
   let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
@@ -1033,19 +1037,36 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** introduces the topmost variable of the goal. *)
   let rec do_intro_var (s : S.t) : Args.ip_handler * S.t =
     let form = S.goal s in
+    let table = S.table s in
 
     if S.Conc.is_forall form then
       begin
-        match S.Conc.decompose_forall form with
-        | x :: vs, f ->
+        match S.Conc.decompose_forall_tagged form with
+        | (x,tag) :: vs, f ->
           let x' = Vars.refresh x in
 
           let subst = [Term.ESubst (Term.mk_var x, Term.mk_var x')] in
 
-          let f = S.Conc.mk_forall ~simpl:false vs f in
+          let f = S.Conc.mk_forall_tagged ~simpl:false vs f in
 
           let new_formula = S.subst_conc subst f in
-          ( `Var x',
+
+          (* for finite types which do not depend on the security
+             parameter η, we have
+             [∀ x, phi] ≡ ∀ x. const(x) → [phi]
+             (where the RHS quantification is a global quantification) *)
+          let tag =
+            match S.conc_kind with
+            | Equiv.Local_t  -> 
+              if Symbols.TyInfo.is_finite table (Vars.ty x) && 
+                 Symbols.TyInfo.is_fixed  table (Vars.ty x) then
+                { tag with const = true } 
+              else tag
+            | Equiv.Global_t -> tag
+            | Equiv.Any_t    -> assert false
+          in
+
+          ( `Var (x',tag),
             S.set_goal new_formula s )
 
         | [], f ->
@@ -1058,6 +1079,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (** Introduce the topmost element of the goal. *)
   let rec do_intro (s : S.t) : Args.ip_handler * S.t =
     let form = S.goal s in
+    let env = S.env s in
+    
     if S.Conc.is_forall form then
       begin
         match S.Conc.decompose_forall form with
@@ -1068,9 +1091,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
         | _ -> do_intro_var s
       end
 
-    else if S.Conc.is_impl form then
+    else if S.Conc.is_impl ~env form then
       begin
-        let lhs, rhs = oget (S.Conc.destr_impl form) in
+        let lhs, rhs = oget (S.Conc.destr_impl ~env form) in
         let lhs = S.hyp_of_conc lhs in
         let id, s = Hyps.add_i Args.Unnamed lhs s in
         let s = S.set_goal rhs s in
@@ -1119,7 +1142,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
          do_naming_pat handler Args.AnyName s
        ) s handlers]
 
-  let destruct_tac_args args s =
+  let destruct_tac_args (args : Args.parser_arg list) (s : S.t) : S.t list =
     match args with
     | [Args.String_name h; Args.AndOrPat pat] ->
       let hid, _ = Hyps.by_name h s in
@@ -1134,6 +1157,32 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let destruct_tac args = wrap_fail (destruct_tac_args args)
 
   (*------------------------------------------------------------------*)
+  (** {3 Left/Right} *)
+
+  let goal_or_right_1 (s : S.t) =
+    match S.Conc.destr_or ~env:(S.env s) (S.goal s) with
+    | Some (lformula, _) -> [S.set_goal (lformula) s]
+    | None -> soft_failure (Tactics.Failure "not a disjunction")
+
+  let goal_or_right_2 (s : S.t) =
+    match S.Conc.destr_or ~env:(S.env s) (S.goal s) with
+    | Some (_, rformula) -> [S.set_goal (rformula) s]
+    | None -> soft_failure (Tactics.Failure "not a disjunction")
+
+  let goal_or_right_1_args args =
+    match args with
+    | [] -> goal_or_right_1
+    | _ -> bad_args ()
+
+  let goal_or_right_2_args args =
+    match args with
+    | [] -> goal_or_right_2
+    | _ -> bad_args ()
+
+  let left_tac  args = wrap_fail (goal_or_right_1_args args)
+  let right_tac args = wrap_fail (goal_or_right_2_args args)
+
+  (*------------------------------------------------------------------*)
   (** {3 Generalize} *)
 
   let try_clean_env vars s : S.t =
@@ -1142,7 +1191,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let env = Vars.rm_vars (Sv.elements clear) (S.vars s) in
     S.set_vars env s
 
-  let _generalize ~dependent t s : Vars.var * S.t =
+  let _generalize ~dependent (t : Term.term) (s : S.t) : Vars.tagged_var * S.t =
     let v = Vars.make_fresh (Term.ty t) "_x" in
 
     let subst = [Term.ESubst (t, Term.mk_var v)] in
@@ -1158,17 +1207,22 @@ module MkCommonLowTac (S : Sequent.S) = struct
       then [], s
       else
         Hyps.fold (fun id f (gen_hyps, s) ->
-            if Vars.Sv.mem v (S.fv_hyp f)
+            if Sv.mem v (S.fv_hyp f)
             then S.hyp_to_conc f :: gen_hyps, Hyps.remove id s
             else gen_hyps, s
           ) s ([], s)
     in
 
     let goal = S.Conc.mk_impls ~simpl:true gen_hyps (S.goal s) in
-    v, S.set_goal goal s
+
+    let tag =
+      let const = HighTerm.is_constant `Exact (S.env s) t in
+      { S.var_info with const }
+    in
+    (v,tag), S.set_goal goal s
 
   (** [terms] and [n_ips] must be of the same length *)
-  let generalize ~dependent terms n_ips s : S.t =
+  let generalize ~dependent (terms : Term.terms) n_ips (s : S.t) : S.t =
     let s, vars =
       List.fold_right (fun term (s, vars) ->
           let var, s = _generalize ~dependent term s in
@@ -1186,20 +1240,28 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     (* we rename generalized variables *)
     let _, new_vars, subst =
-      List.fold_left2 (fun (env, new_vars, subst) v n_ip ->
+      List.fold_left2 (fun (env, new_vars, subst) (v,tag) n_ip ->
           let env, v' =
-            var_of_naming_pat n_ip ~dflt_name:"x" (Vars.ty v) env
+            var_of_naming_pat n_ip ~dflt_name:"x" (Vars.ty v) tag env
           in
           env,
-          v' :: new_vars,
+          (v',tag) :: new_vars,
           Term.ESubst (Term.mk_var v, Term.mk_var v') :: subst
         ) (S.vars s, [], []) vars n_ips
     in
     let s = S.subst subst s in
 
+    (* in a local sequent, we throw away the tags *)
+    let new_vars = 
+      match S.conc_kind with
+      | Equiv.Local_t -> List.map (fun (v,_tag) -> v, Vars.Tag.ltag) new_vars
+      | Equiv.Global_t -> new_vars
+      | Equiv.Any_t -> assert false
+    in
+
     (* quantify universally *)
     let new_vars = List.rev new_vars in
-    let goal = S.Conc.mk_forall ~simpl:false new_vars (S.goal s) in
+    let goal = S.Conc.mk_forall_tagged ~simpl:false new_vars (S.goal s) in
     S.set_goal goal s
 
   let naming_pat_of_term t =
@@ -1244,9 +1306,6 @@ module MkCommonLowTac (S : Sequent.S) = struct
       The former corresponds to [apply] below and the latter corresponds
       to [apply_in].
 
-      TODO update [apply] and [apply_in] to make sure that they properly
-        handle global and local hypotheses, and system annotations
-
       We impose in both that the hypotheses involved here are of the same
       kind as conclusion formulas: this is immediate for global sequents
       and, in the case of local sequents, means that we only consider
@@ -1256,8 +1315,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** Checks that all arguments of [pat] have been inferred in [mv]. *)
   let check_args_inferred (pat : S.conc_form Term.pat) (mv : Match.Mvar.t) : unit =
+    let pat_vars = Sv.of_list (List.map fst pat.pat_vars) in
+    
     let vars_inf =               (* inferred variables *)
-      Sv.filter (fun v -> not (Match.Mvar.mem v mv)) pat.pat_vars
+      Sv.filter (fun v -> not (Match.Mvar.mem v mv)) pat_vars
     in
     if not (Sv.is_empty vars_inf) then
       begin
@@ -1279,13 +1340,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let table, system, goal = S.table s, S.system s, S.goal s in
 
     let rec _apply (subs : S.conc_form list) (pat : S.conc_form Term.pat) =
-      if not (Vars.Sv.subset pat.pat_vars (S.fv_conc pat.pat_term)) then
+      let pat_vars = Sv.of_list (List.map fst pat.pat_vars) in
+      if not (Sv.subset pat_vars (S.fv_conc pat.pat_term)) then
         soft_failure ApplyBadInst;
 
       let match_res =
         match S.conc_kind with
-        | Local_t  -> Match.T.try_match ~option table system goal pat
-        | Global_t -> Match.E.try_match ~option table system goal pat
+        | Local_t  -> Match.T.try_match ~option table ~env:(S.vars s) system goal pat
+        | Global_t -> Match.E.try_match ~option table ~env:(S.vars s) system goal pat
         | Any_t -> assert false (* cannot happen *)
       in
 
@@ -1293,7 +1355,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       match match_res with
       (* match failed by [pat] is a product: retry with the rhs *)
       | (NoMatch _ | FreeTyv) when S.Conc.is_impl pat.pat_term ->
-        let t1, t2 = oget (S.Conc.destr_impl pat.pat_term) in
+        let t1, t2 = oget (S.Conc.destr_impl ~env:(S.env s) pat.pat_term) in
         _apply (t1 :: subs) { pat with pat_term = t2 }
 
       (* match failed, [pat] is not a product: user-level error *)
@@ -1303,9 +1365,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
       (* match succeeded *)
       | Match mv -> 
         check_args_inferred pat mv;
-
-        let subst = Match.Mvar.to_subst ~mode:`Match mv in
-
+        let subst =
+          let pat_env = Vars.add_vars pat.pat_vars (S.vars s) in
+          match Match.Mvar.to_subst ~mode:`Match table pat_env mv with
+          | `Subst subst -> subst
+          | `BadInst pp_err ->
+            soft_failure (Failure (Fmt.str "@[<hv 2>apply failed:@ @[%t@]@]" pp_err))
+        in
+        
         let goals = List.map (S.subst_conc subst) (List.rev subs) in
         let subgs = List.map (fun g -> S.set_goal g s) goals in
         
@@ -1334,7 +1401,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let hprems, hconcl = S.Conc.decompose_impls_last h in
 
     let try1 (fprem : S.conc_form) =
-      if not (Vars.Sv.subset pat.pat_vars (S.fv_conc fprem)) then None
+      let pat_vars = Sv.of_list (List.map fst pat.pat_vars) in
+      if not (Sv.subset pat_vars (S.fv_conc fprem)) then None
       else
         let pat = { pat with pat_term = fprem } in
         let option =
@@ -1345,8 +1413,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
         let system = S.system s in
         let match_res =
           match S.conc_kind with
-          | Local_t  -> Match.T.try_match ~option table system hconcl pat
-          | Global_t -> Match.E.try_match ~option table system hconcl pat
+          | Local_t  -> Match.T.try_match ~option table ~env:(S.vars s) system hconcl pat
+          | Global_t -> Match.E.try_match ~option table ~env:(S.vars s) system hconcl pat
           | Any_t -> assert false (* cannot happen *)
         in
 
@@ -1371,8 +1439,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
     match find_match [] fprems with
     | None -> soft_failure (ApplyMatchFailure None)
     | Some (fsubgoals,mv) ->
-      let subst = Match.Mvar.to_subst ~mode:`Match mv in
+      let subst =
+        let pat_env = Vars.add_vars pat.pat_vars (S.vars s) in
+        match Match.Mvar.to_subst ~mode:`Match (S.table s) pat_env mv with
+        | `Subst subst -> subst
+        | `BadInst pp_err ->
+          soft_failure (Failure (Fmt.str "@[<hv 2>apply failed:@ @[%t@]@]" pp_err))
+      in
 
+      
       (* instantiate the inferred variables everywhere *)
       let fprems_other = List.map (S.subst_conc subst) fsubgoals in
       let fconcl = S.subst_conc subst fconcl in
@@ -1461,34 +1536,27 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
   (** Induction, for both global and local sequents.
       Global induction is sound only over finite types. *)
-  let induction s =
+  let induction (s : S.t) : S.t list =
     let goal = S.goal s in
-    let vs0, f = S.Conc.decompose_forall goal in
-    let v, vs = match vs0 with
-      | v :: vs -> v, vs
+
+    let vs0, f = S.Conc.decompose_forall_tagged goal in
+    let vs0, subst = Term.refresh_vars_w_info vs0 in
+    let f = S.subst_conc subst f in
+    
+    let (v, tag), vs =
+      match vs0 with
+      | vtag :: vs -> vtag, vs
       | _ ->
         soft_failure
           (Failure "conclusion must be an universal quantification.")
     in
 
-    let () =
-      match S.conc_kind with
-      | Equiv.Local_t ->
-        (* FEATURE: allow local induction over well-founded types, not 
-           just finite types.*)
-        if not (Type.is_finite (Vars.ty v)) then
-          soft_failure
-            (Failure "local induction supports only finite types")
-            
-      | Equiv.Global_t | Equiv.Any_t ->
-        if not (Type.is_finite (Vars.ty v)) then
-          soft_failure
-            (Failure "global induction supports only finite types")
-    in
+    if not (Symbols.TyInfo.is_well_founded (S.table s) (Vars.ty v)) then
+      soft_failure
+        (Failure "induction supports only well-founded types");
 
-    let env = Vars.of_list vs0 in
-    let _,v' = Vars.make_approx env v in
-
+    let v' = Vars.refresh v in
+    
     let ih =
       let atom_lt =
         Equiv.Babel.convert
@@ -1497,19 +1565,19 @@ module MkCommonLowTac (S : Sequent.S) = struct
           (Term.mk_atom `Lt (Term.mk_var v') (Term.mk_var v))
       in
 
-      S.Conc.mk_forall ~simpl:false
-        (v' :: vs)
+      S.Conc.mk_forall_tagged ~simpl:false
+        ((v',tag) :: vs)
         (S.Conc.mk_impl ~simpl:false
            (atom_lt)
            (S.subst_conc [Term.ESubst (Term.mk_var v,Term.mk_var v')] f))
     in
 
     let new_goal =
-      S.Conc.mk_forall ~simpl:false
-        [v]
+      S.Conc.mk_forall_tagged ~simpl:false
+        [v,tag]
         (S.Conc.mk_impl ~simpl:false
            ih
-           (S.Conc.mk_forall ~simpl:false vs f))
+           (S.Conc.mk_forall_tagged ~simpl:false vs f))
     in
 
     [S.set_goal new_goal s]
@@ -1589,8 +1657,9 @@ module MkCommonLowTac (S : Sequent.S) = struct
       soft_failure (Failure "free type variables remaining") ;
 
    (* rename cleanly the variables *)
-    let vars, subst =
-      Term.refresh_vars (`InEnv (ref (S.vars s))) (Sv.elements pat.pat_vars)
+    let _, vars, subst =
+      let pat_vars = List.map fst pat.pat_vars in
+      Term.add_vars_simpl_env (Vars.to_simpl_env (S.vars s)) pat_vars
     in
     let f = S.subst_conc subst pat.pat_term in
     let f =
@@ -1602,7 +1671,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let rec aux subgoals form : S.t list =
       if S.Conc.is_impl form && mode = `IntroImpl then
         begin
-          let h, c = oget (S.Conc.destr_impl form) in
+          let h, c = oget (S.Conc.destr_impl ~env:(S.env s) form) in
           let s' = S.set_goal h s in
           aux (s'::subgoals) c
         end
@@ -1740,7 +1809,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       if not (tyn = tym) then
         Tactics.soft_failure (Failure "names are not of the same types");
 
-      if not Symbols.(check_bty_info table n.s_typ Ty_name_fixed_length) then
+      if not Symbols.TyInfo.(check_bty_info table n.s_typ Symbols.Name_fixed_length) then
         Tactics.soft_failure
           (Failure "names are of a type that is not [name_fixed_length]");
 
@@ -1756,9 +1825,11 @@ module MkCommonLowTac (S : Sequent.S) = struct
   (*------------------------------------------------------------------*)
   (** {3 Remember} *)
 
-  let remember (id : Theory.lsymb) (term : Theory.term) s =
+  let remember (id : Theory.lsymb) (term : Theory.term) (s : S.t) =
     let t, ty = convert s term in
-    let env, x = make_exact_var ~loc:(L.loc id) (S.vars s) ty (L.unloc id) in
+    let env, x =
+      make_exact_var ~loc:(L.loc id) (S.vars s) ty (L.unloc id) S.var_info
+    in
     let subst = [Term.ESubst (t, Term.mk_var x)] in
 
     let s = S.subst subst (S.set_vars env s) in
@@ -2260,6 +2331,30 @@ let () =
       tactic_group = Logical}
     ~pq_sound:true
     (gentac_of_any_tac_arg TraceLT.destruct_tac EquivLT.destruct_tac)
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "left"
+    ~tactic_help:{general_help = "Reduce a goal with a disjunction conclusion \
+                                  into the goal where the conclusion has been \
+                                  replaced with the first disjunct.";
+                  detailed_help = "G => A v B yields G => A";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    ~pq_sound:true
+    (gentac_of_any_tac_arg TraceLT.left_tac EquivLT.left_tac)
+
+(*------------------------------------------------------------------*)
+let () =
+  T.register_general "right"
+    ~tactic_help:{general_help = "Reduce a goal with a disjunction conclusion \
+                                  into the goal where the conclusion has been \
+                                  replaced with the second disjunct.";
+                  detailed_help = "G => A v B yields G => B";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    ~pq_sound:true
+    (gentac_of_any_tac_arg TraceLT.right_tac EquivLT.right_tac)
 
 (*------------------------------------------------------------------*)
 let () =

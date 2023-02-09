@@ -223,6 +223,9 @@ val timeout : exn -> int -> ('a -> 'b) -> 'a -> 'b
 val fst_map : ('a -> 'c) -> 'a * 'b -> 'c
 val snd_map : ('b -> 'c) -> 'a * 'b -> 'c
 
+val fst_bind : ('a -> 'c) -> 'a * 'b -> 'c * 'b
+val snd_bind : ('b -> 'c) -> 'a * 'b -> 'a * 'c
+
 (*------------------------------------------------------------------*)
 (** composition *)
 val (-|) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b

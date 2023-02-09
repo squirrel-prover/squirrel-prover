@@ -19,7 +19,9 @@ include Sequent.Mk(struct
             match hyp with
             | Global f -> ES.Hyps.add (Args.Named (Ident.name id)) f es
             | Local f ->
-              if Term.is_pure_timestamp f then
+              if HighTerm.is_constant `Exact (env s) f &&
+                 HighTerm.is_system_indep (env s) f 
+              then
                 ES.Hyps.add
                   (Args.Named (Ident.name id)) (Equiv.mk_reach_atom f) es
               else es

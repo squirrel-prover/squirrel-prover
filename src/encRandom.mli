@@ -79,6 +79,7 @@ type dec_allowed = Allowed | NotAllowed | NotAbove of Name.t
     (for pub key encryption there is no integrity guarantee,
      so no need to collect the ciphertexts) *)
 val get_bad_occs_and_ciphertexts :
+  Env.t -> (* initial environment  *)
   Name.t -> (* key k to look for *)
   Name.t list -> (* randoms to look for *)
   term -> (* ciphertext c in dec(c,k) <> fail *)
@@ -115,6 +116,7 @@ val get_bad_occs_and_ciphertexts :
     Only used for symmetric encryption: for asym enc, the adversary
     has the public key and can thus encrypt anything *)
 val get_bad_randoms :
+  Env.t ->
   Name.t ->
   ectxt_occs ->
   Symbols.fname -> (* encryption function *)

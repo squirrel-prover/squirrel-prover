@@ -1,5 +1,3 @@
-
-
 channel c
 
 abstract ok : message
@@ -9,7 +7,7 @@ system [s1] in(c,x); let S=diff(ok,ko) in A : out(c,S).
 
 system [s2] in(c,x); let St=diff(ko, ok) in A : out(c,St).
 
-global goal [s1/left,s1/right] _ (t : timestamp) : 
+global goal [s1/left,s1/right] _ (t : timestamp[const]) : 
   [happens(t)] -> [ok = ko] -> equiv(frame@t).
 Proof. 
   intro H U.

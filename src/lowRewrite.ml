@@ -11,7 +11,7 @@ module Sv   = Vars.Sv
 type rw_rule = {
   rw_tyvars : Type.tvars;            (** type variables *)
   rw_system : SE.t;                  (** systems the rule applies to *)
-  rw_vars   : Vars.Sv.t;             (** term variables *)
+  rw_vars   : Vars.tagged_vars;      (** term variables *)
   rw_conds  : Term.term list;        (** premises *)
   rw_rw     : Term.term * Term.term; (** pair (source, destination) *)
 }
@@ -22,8 +22,8 @@ let pp_rw_rule fmt (rw : rw_rule) =
       Fmt.pf fmt "[%a] " (Fmt.list Type.pp_tvar) tys
   in
   let pp_vars fmt vars = 
-    if Vars.Sv.is_empty vars then () else
-      Fmt.pf fmt "%a " Vars.pp_typed_list (Vars.Sv.elements vars)
+    if vars = [] then () else
+      Fmt.pf fmt "%a " Vars.pp_typed_tagged_list vars
   in
   let pp_conds fmt conds =
     if conds = [] then () else
@@ -41,8 +41,9 @@ let pp_rw_rule fmt (rw : rw_rule) =
 (** Check that the rule is correct. *)
 let check_rule (rule : rw_rule) : unit =
   let l, _r = rule.rw_rw in
-
-  if not (Vars.Sv.subset rule.rw_vars (Term.fv l)) then
+  let rule_vars = Sv.of_list (List.map fst rule.rw_vars) in
+  
+  if not (Vars.Sv.subset rule_vars (Term.fv l)) then
     Tactics.hard_failure Tactics.BadRewriteRule;
   ()
 

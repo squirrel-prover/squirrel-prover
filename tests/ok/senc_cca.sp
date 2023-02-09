@@ -30,6 +30,5 @@ fa 1; fa 2; fa 2; fa 2.  cca1 2.
   + auto.
   + rewrite len_n in 2.
     fa 2.
-    fresh 2.
-    rewrite if_true in 2; [1: auto].
+    fresh 2; [1: auto].
     Abort. (* TODO would need enckp to conclude. *)

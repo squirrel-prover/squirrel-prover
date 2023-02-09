@@ -1,4 +1,3 @@
-open Term
 open Utils
 
 module MP = Match.Pos
@@ -42,12 +41,12 @@ end
 
 type occ_type =
   | EI_direct
-  | EI_indirect of term
+  | EI_indirect of Term.term
 
-let subst_occtype (sigma:subst) (ot:occ_type) : occ_type =
+let subst_occtype (sigma : Term.subst) (ot : occ_type) : occ_type =
   match ot with
   | EI_direct -> EI_direct
-  | EI_indirect a -> EI_indirect (subst sigma a)
+  | EI_indirect a -> EI_indirect (Term.subst sigma a)
 
 (* Remarks:
    - We could store a position in the term where the occ was, as in Iter.occ,
@@ -62,60 +61,63 @@ type ('a, 'b) simple_occ =
    so_coll    : 'a;
    so_ad      : 'b;
    so_vars    : Vars.vars;
-   so_cond    : terms;
+   so_cond    : Term.terms;
    so_occtype : occ_type;
-   so_subterm : term;
+   so_subterm : Term.term;
   }
 
 type ('a, 'b) simple_occs = (('a, 'b) simple_occ) list
 
 let mk_simple_occ
-    (cnt:'a) (coll:'a) (ad:'b)
-    (vars:Vars.vars) (cond:terms) (ot:occ_type) (st:term)
-  : ('a, 'b) simple_occ =
+    (cnt : 'a) (coll : 'a) (ad : 'b)
+    (vars : Vars.vars) (cond : Term.terms) (ot : occ_type) (st : Term.term)
+  : ('a, 'b) simple_occ 
+  =
   {so_cnt=cnt; so_coll=coll; so_ad=ad; so_vars=vars;
    so_cond=cond; so_occtype=ot; so_subterm=st}
 
-type ts_occ = (term, unit) simple_occ
+type ts_occ = (Term.term, unit) simple_occ
 type ts_occs = ts_occ list
 
 type empty_occ = (unit, unit) simple_occ
 type empty_occs = empty_occ list
 
 
-
+(*------------------------------------------------------------------*)
 (** Type of a function generating a formula meant to say
     "the occurrence is actually a collision" (or its negation) *)
 (** we also use this formula to compute occurrence subsumption
      (if o1 generates a particular case of o2 then it is subsumed) *)
 type ('a, 'b) occ_formula =
-  negate:bool -> 'a -> 'a -> 'b -> term
+  negate:bool -> 'a -> 'a -> 'b -> Term.term
 
-(** occ_formula for name occurrences *)
+(** [occ_formula] for name occurrences *)
 let name_occ_formula
     ~(negate : bool)
     (n       : Name.t)
     (ncoll   : Name.t)
     ()
-  : term
+  : Term.term
   =
   (* sanity check: only apply when same symbol *)
   assert (n.symb = ncoll.symb);
   if not negate then
-    mk_eqs ~simpl:true ncoll.args n.args
+    Term.mk_eqs ~simpl:true ncoll.args n.args
   else
-    mk_neqs ~simpl:false ncoll.args n.args
+    Term.mk_neqs ~simpl:false ncoll.args n.args
 
 (** occ_formula for timestamp occurrences *)
 let ts_occ_formula
     ~(negate : bool)
-    (ts : term)
-    (tss: term)
-    () : term =
+    (ts  : Term.term)
+    (tss : Term.term)
+    () 
+  : Term.term 
+  =
   if not negate then
-    mk_eq ~simpl:true ts tss
+    Term.mk_eq ~simpl:true ts tss
   else
-    mk_not ~simpl:false (mk_eq ~simpl:false ts tss)
+    Term.mk_not ~simpl:false (Term.mk_eq ~simpl:false ts tss)
 
 
 (** Dummy occ_formula for empty occurrences *)
@@ -124,14 +126,14 @@ let[@warning "-27"] empty_occ_formula
     ()
     ()
     ()
-  : term =
-  mk_false
+  : Term.term =
+  Term.mk_false
 
-
+(*------------------------------------------------------------------*)
 (** See `.mli` *)
 type ('a, 'b) ext_occ = {
   eo_occ       : ('a, 'b) simple_occ;
-  eo_source    : terms; 
+  eo_source    : Term.terms; 
   eo_source_ts : ts_occs;
   
   eo_path_cond : Iter.PathCond.t;
@@ -155,7 +157,7 @@ let pat_subsumes
     (table : Symbols.table)
     (system : SE.fset)
     ?(mv : Match.Mvar.t = Match.Mvar.empty)
-    (t1 : term) (pat2 : term pat)
+    (t1 : Term.term) (pat2 : Term.term Term.pat)
   : Match.Mvar.t option
   =
   let context = SE.reachability_context system in
@@ -190,19 +192,21 @@ let aux_occ_incl
      the two occurrences *)
   (* TODO: there's no real reason to use boolean formulas,
      rather than just terms *)
-  let mk_dummy (o:('a, 'b) simple_occ) : term =
+  let mk_dummy (o : ('a, 'b) simple_occ) : Term.term =
     let phi_f = conv ~negate:false o.so_cnt o.so_coll o.so_ad in
     (* usually when we use it there are no fv in coll,
        but it should still work *)
     let phi_ac = match o.so_occtype with
-        | EI_direct -> mk_eq ~simpl:false mk_false mk_false
-        | EI_indirect a -> mk_eq ~simpl:false a a
+        | EI_direct -> Term.mk_eq ~simpl:false Term.mk_false Term.mk_false
+        | EI_indirect a -> Term.mk_eq ~simpl:false a a
     in
     Term.mk_ands ~simpl:false [phi_f; phi_ac]
   in
   let pat2 = Term.{
       pat_tyvars = [];
-      pat_vars   = Vars.Sv.of_list o2.so_vars;
+      pat_vars   = Vars.Tag.local_vars o2.so_vars;
+      (* local information, since we allow to match diff operators *)
+      
       pat_term   = mk_dummy o2;
     }
   in
@@ -249,7 +253,7 @@ let aux_ts_occ_incl
   let f = aux_occ_incl ts_occ_formula table system in
   match f ~mv ts1 ts2 with
   | Some mv -> Some mv
-  | None -> f ~mv ts1 {ts2 with so_cnt = mk_pred ts2.so_cnt}
+  | None -> f ~mv ts1 {ts2 with so_cnt = Term.mk_pred ts2.so_cnt}
               (* if ts1 not incl in ts2, also try ts1 incl in pred(ts2) *)
               (* as "t <= pred(ts2) \/ t <= ts2" is the same as "t <= ts2" *)
               (* TODO read this carefully to make sure it does what we want *)
@@ -325,13 +329,14 @@ let clear_subsumed_occs
   List.clear_subsumed (ext_occ_incl conv table system) occs
 
 
-
 (*------------------------------------------------------------------*)
 (* Functions handling macro expansion in terms, when allowed *)
 
 type expand_info = occ_type * Constr.trace_cntxt
 
-let expand_macro_check_once ((ot, c):expand_info) (t:term) : term option =
+let expand_macro_check_once
+    ((ot, c):expand_info) (t : Term.term) : Term.term option 
+  =
   match t with
   | Macro (m, l, ts) ->
     if match ot with
@@ -354,7 +359,7 @@ let expand_macro_check_once ((ot, c):expand_info) (t:term) : term option =
       None
   | _ -> None
 
-let rec expand_macro_check_all (info:expand_info) (t:term) : term =
+let rec expand_macro_check_all (info:expand_info) (t:Term.term) : Term.term =
   match expand_macro_check_once info t with
   | Some t' -> expand_macro_check_all info t'
   | None -> t
@@ -371,7 +376,7 @@ let get_actions_ext
   let _typ, contx = info in
   let system = contx.system in
   let se = (SE.reachability_context system).set in
-  let rec get (t : term)
+  let rec get (t : Term.term)
       ~(fv:Vars.vars) ~(cond:Term.terms) ~(p:MP.pos) ~(se:SE.arbitrary)
     : ts_occs =
     match t with
@@ -386,12 +391,12 @@ let get_actions_ext
           in
           let occ = {
               so_cnt  = ts;
-              so_coll = mk_false; (* unused, so always set to false *)
+              so_coll = Term.mk_false; (* unused, so always set to false *)
               so_ad = (); (* unused *)
               so_vars = List.rev fv;
               so_cond = cond;
               so_occtype = EI_direct;
-              so_subterm = mk_false} (* unused *)
+              so_subterm = Term.mk_false} (* unused *)
           in
           [occ] @ 
           List.concat_map (fun t ->
@@ -408,13 +413,13 @@ let get_actions_ext
   get t ~fv ~cond:[] ~p:MP.root ~se
 
 
-
+(*------------------------------------------------------------------*)
 (** Returns all timestamps occuring in macros in a list of terms.
     Should only be used when sources are directly occurring,
     not themselves produced by unfolding macros *)
 let get_macro_actions
     (contx : Constr.trace_cntxt)
-    (sources : terms) : ts_occs
+    (sources : Term.terms) : ts_occs
   =
   let ei = (EI_direct, contx) in
   let actions =
@@ -425,10 +430,8 @@ let get_macro_actions
   clear_subsumed_ts table system actions
 
 
-
-
 (*------------------------------------------------------------------*)
-(* Occurrence of a name *)
+(** {2 Occurrence of a name} *)
 
 type n_occ = (Name.t, unit) simple_occ
 type n_occs = n_occ list
@@ -439,16 +442,16 @@ type name_occs = name_occ list
 (** Constructs a name occurrence. *)
 (** we do not refresh ncoll's variables, ie it's assumed to be at toplevel *)
 let mk_nocc
-    (n:Name.t) (ncoll:Name.t) (fv:Vars.vars) (cond:terms)
-    (ot:occ_type) (st:term) : n_occ
+    (n : Name.t) (ncoll : Name.t) (fv : Vars.vars) (cond : Term.terms)
+    (ot : occ_type) (st : Term.term) : n_occ
   =
-  let fv, sigma = refresh_vars `Global fv in
+  let fv, sigma = Term.refresh_vars fv in
   let n = Name.subst sigma n in
-  let cond = List.map (subst sigma) cond in
+  let cond = List.map (Term.subst sigma) cond in
   let ot = subst_occtype sigma ot in
   mk_simple_occ n ncoll () fv cond ot st
 
-
+(*------------------------------------------------------------------*)
 (** Finds all names with the same symbol in the list, returns the
     corresponding n_occs *)
 let find_name_occ
@@ -459,7 +462,7 @@ let find_name_occ
     (fun (nn:Name.t) -> mk_nocc n nn fv cond ot st)
     (Name.find_name n ns)
     
-
+(*------------------------------------------------------------------*)
 (** Removes from occs all occurrences subsumed by another *)
 let clear_subsumed_nameoccs
     (table : Symbols.table)
@@ -468,7 +471,7 @@ let clear_subsumed_nameoccs
   : name_occs =
   clear_subsumed_occs name_occ_formula table system occs
 
-
+(*------------------------------------------------------------------*)
 (** Internally used to print a description of the occurrence *)
 let pp_internal (ppf:Format.formatter) (occ:name_occ) : unit =
   let o = occ.eo_occ in
@@ -498,26 +501,27 @@ let pp_name_occs (fmt:Format.formatter) (occs:name_occ list) : unit =
     Fmt.list ~sep:(Fmt.any "@;@;") pp_name_occ fmt occs
 
 (*------------------------------------------------------------------*)
-(* Functions to look for illegal name occurrences in a term *)
+(** {2 Functions to look for illegal name occurrences in a term} *)
 
 type ('a, 'b) f_fold_occs =
   (unit -> n_occs * ('a, 'b) simple_occs) ->
   (fv:Vars.vars ->
-   cond:terms ->
+   cond:Term.terms ->
    p:MP.pos ->
    info:expand_info ->
-   st:term ->
-   term ->
+   st:Term.term ->
+   Term.term ->
    n_occs * ('a, 'b) simple_occs)->
   info:expand_info ->
   fv:Vars.vars ->
-  cond:terms ->
+  cond:Term.terms ->
   p:MP.pos ->
-  st:term ->
-  term ->
+  st:Term.term ->
+  Term.term ->
   n_occs * ('a, 'b) simple_occs
 
 
+(*------------------------------------------------------------------*)
 (** Given a [f_fold_occs] function [get_bad_occs],
     calls [get_bad_occs], is called again when [get_bad_occs] asks
     for recursive calls on subterms, and handles the case where
@@ -528,15 +532,16 @@ type ('a, 'b) f_fold_occs =
           for that)
        3) using [Match.Pos.fold_shallow], to recurse on subterms at depth 1. *)
 let fold_bad_occs
-    (get_bad_occs: ('a, 'b) f_fold_occs)
-    ~(fv:Vars.vars)
-    (info:expand_info)
-    (t:term) : n_occs * ('a, 'b) simple_occs
+    (get_bad_occs : ('a, 'b) f_fold_occs)
+    ~(fv          : Vars.vars)
+    (info         : expand_info)
+    (t            : Term.term) 
+  : n_occs * ('a, 'b) simple_occs
   =
   let rec get
       ~(fv:Vars.vars) ~(cond:Term.terms) ~(p:MP.pos) ~(info:expand_info)
       ~(st:Term.term)
-      (t:term) : n_occs * ('a, 'b) simple_occs
+      (t:Term.term) : n_occs * ('a, 'b) simple_occs
     =
     let typ, contx = info in
     let se = SE.to_arbitrary contx.system in
@@ -558,7 +563,7 @@ let fold_bad_occs
         MP.fold_shallow
           (fun t' se fv cond p (occs, acc) ->
              let info = (typ, {contx with system = SE.to_fset se}) in
-             let sst = if is_binder t then t' else st in
+             let sst = if Term.is_binder t then t' else st in
              let (newoccs, newacc) = get t' ~fv ~cond ~p ~info ~st:sst in
              (occs @ newoccs, acc @ newacc))
           ~se ~fv ~p ~cond ([], []) t
@@ -568,9 +573,9 @@ let fold_bad_occs
   get ~fv ~cond:[] ~p:MP.root ~info ~st:t t
 
 
-
 (*------------------------------------------------------------------*)
-(** Given a function find_occs that generates a list of occurrences
+(** Internal.
+    Given a function find_occs that generates a list of occurrences
     found in a term,
     expanding macros when possible according to expand_info but
     not otherwise (undef and maybedef macros will be handled by
@@ -578,16 +583,18 @@ let fold_bad_occs
     computes the list of all occurrences in the list of source terms.
     Relies on fold_macro_support to look through all macros in the term. *)
 let find_occurrences
-    ?(pp_ns: (unit Fmt.t) option=None)
-    (conv : ('a, 'b) occ_formula)
+    ~(mode : Iter.allowed_constants)   (* allowed sub-terms without further checks *)
+    ?(pp_ns    : unit Fmt.t option = None)
+    (conv      : ('a, 'b) occ_formula)
     (find_occs :
-       (fv:Vars.vars ->
-        expand_info ->
-        term ->
+       (fv : Vars.vars ->
+        expand_info    ->
+        Term.term      ->
         n_occs * ('a, 'b) simple_occs))
-    (contx : Constr.trace_cntxt)
-    (env : Vars.env)
-    (sources : terms) : name_occs * ('a, 'b) ext_occs
+    (contx     : Constr.trace_cntxt)
+    (env       : Env.t)
+    (sources   : Term.terms) 
+  : name_occs * ('a, 'b) ext_occs
   =
   let system = contx.system in
   let table = contx.table in
@@ -633,7 +640,7 @@ let find_occurrences
 
   (* indirect occurrences *)
   let ind_occs, ind_acc =
-    Iter.fold_macro_support (fun iocc (ind_occs, ind_acc) ->
+    Iter.fold_macro_support ~mode (fun iocc (ind_occs, ind_acc) ->
         (* todo: if fold_macro_support stored in iocc the fset
            for the place where the iocc was found, we could give it
            instead of contx to find_occs *)
@@ -643,12 +650,12 @@ let find_occurrences
         let sfv = iocc.iocc_vars in
         let src = iocc.iocc_sources in
         let a =
-          mk_action iocc.iocc_aname (Action.get_args iocc.iocc_action)
+          Term.mk_action iocc.iocc_aname (Action.get_args iocc.iocc_action)
         in
         (* a's free variables should always be in fv \cup env *)
         assert (Vars.Sv.subset
-                  (Vars.Sv.of_list (get_vars a))
-                  (Vars.Sv.union sfv (Vars.to_set env)));
+                  (Term.fv a)
+                  (Vars.Sv.union sfv (Vars.to_vars_set env.vars)));
         (* timestamps occurring in sources *)
         let ts = get_macro_actions contx src in
         (* indirect occurrences in iocc *)
@@ -709,47 +716,49 @@ let find_occurrences
     Printer.pr "@]";
   occs, acc
 
-
-
-
-(** Given a f_fold_occs,
-   computes the list of all occurrences in sources,
-   taking care of macro expansion and going through all terms,
-   using fold_macro_support and map_fold *)
+(*------------------------------------------------------------------*)
+(** Internal. 
+    Given a [f_fold_occs],
+    computes the list of all occurrences in sources,
+    taking care of macro expansion and going through all terms,
+    using [fold_macro_support] and [map_fold] *)
 let find_all_occurrences
-    ?(pp_ns: (unit Fmt.t) option=None)
-    (conv : ('a, 'b) occ_formula)
-    (get_bad_occs: ('a, 'b) f_fold_occs)
-    (contx : Constr.trace_cntxt)
-    (env : Vars.env)
-    (sources : terms) : name_occs * ('a, 'b) ext_occs
+    ~(mode : Iter.allowed_constants)   (* allowed sub-terms without further checks *)
+    ?(pp_ns       : (unit Fmt.t) option=None)
+    (conv         : ('a, 'b) occ_formula)
+    (get_bad_occs : ('a, 'b) f_fold_occs)
+    (contx        : Constr.trace_cntxt)
+    (env          : Env.t)
+    (sources      : Term.terms) 
+  : name_occs * ('a, 'b) ext_occs
   =
-  find_occurrences ~pp_ns conv (fold_bad_occs get_bad_occs) contx env sources
+  find_occurrences ~mode ~pp_ns conv (fold_bad_occs get_bad_occs) contx env sources
 
+(*------------------------------------------------------------------*)
+(** {2 Utilities to build the proof-obligations} *)
 
-
-
-(** saturates a substitution sigma *)
-(* ie returns sigma' = [u1 -> v1, …, un -> vn] such that
-   - forall i <> i'. ui <> ui'
-   - forall i, j. ui <> vj
-   - for all term t, t sigma is equal to t modulo the equalities ui = vi
-   - for all term t, if (t sigma^n) converges to t', then sigma'(t) = t'
+(** Internal.
+    Saturates a substitution sigma.
+    ie returns sigma' = [u1 -> v1, …, un -> vn] such that
+    - forall i <> i'. ui <> ui'
+    - forall i, j. ui <> vj
+    - for all term t, t sigma is equal to t modulo the equalities ui = vi
+    - for all term t, if (t sigma^n) converges to t', then sigma'(t) = t'
 *)
-let sat_subst (sigma:subst) : subst =
+let sat_subst (sigma:Term.subst) : Term.subst =
   List.fold_left
     (fun s e ->
        match e with
-       | ESubst (Var u, Var v) when u = v -> s (* useless mapping *)
+       | Term.ESubst (Var u, Var v) when u = v -> s (* useless mapping *)
 
        | ESubst (Var u, Var _) when
-           subst_var s u <> u -> (* u is one of the ui, already mapped *)
+           Term.subst_var s u <> u -> (* u is one of the ui, already mapped *)
          s
 
        | ESubst (Var u, Var v) when (* u -> v is vi -> ui for some i: useless *)
            (List.exists
               (fun e -> match e with
-                 | ESubst (Var u', Var v') -> u = v' && v = u'
+                 | Term.ESubst (Var u', Var v') -> u = v' && v = u'
                  | _ -> assert false)
               s) ->
          s
@@ -757,56 +766,55 @@ let sat_subst (sigma:subst) : subst =
        | ESubst (Var u, Var v) when (* u -> v is vj -> ui for some i <> j *)
            (List.exists
               (fun e -> match e with
-                 | ESubst (Var _, Var v') -> u = v'
+                 | Term.ESubst (Var _, Var v') -> u = v'
                  | _ -> assert false)
               s) &&
-           (subst_var s v <> v) -> (* v already bound *)
-         let w = subst_var s v in (* w is vi, from ui -> vi *)
+           (Term.subst_var s v <> v) -> (* v already bound *)
+         let w = Term.subst_var s v in (* w is vi, from ui -> vi *)
          (* replace any uj' -> vj' such that u = vj' with uj' -> vi *)
          let s' = List.map
              (fun e -> match e with
-                | ESubst (Var u', Var v') when u = v' ->
-                  ESubst (mk_var u', mk_var w)
+                | Term.ESubst (Var u', Var v') when u = v' ->
+                  Term.ESubst (Term.mk_var u', Term.mk_var w)
                 | _ -> e)
              s
          in
          (* add u -> vi *)
-         (ESubst (mk_var u, mk_var w)) :: s'
+         (Term.ESubst (Term.mk_var u, Term.mk_var w)) :: s'
 
        | ESubst (Var u, Var v) when (* u -> v is vj -> v for some j,
                                        and v <> ui for all i *)
            (List.exists
               (fun e -> match e with
-                 | ESubst (Var _, Var v') -> u = v'
+                 | Term.ESubst (Var _, Var v') -> u = v'
                  | _ -> assert false)
               s) ->
          (* replace any uj' -> vj' such that u = vj' with uj' -> v *)
          let s' = List.map
              (fun e -> match e with
-                | ESubst (Var u', Var v') when u = v' ->
-                  ESubst (mk_var u', mk_var v)
+                | Term.ESubst (Var u', Var v') when u = v' ->
+                  Term.ESubst (Term.mk_var u', Term.mk_var v)
                 | _ -> e)
              s
          in
          (* add u -> v *)
-         (ESubst (mk_var u, mk_var v)) :: s'
+         (ESubst (Term.mk_var u, Term.mk_var v)) :: s'
 
        | ESubst (Var u, Var v) when (* u -> v is u -> ui for some i,
                                        and u <> vj for all j *)
-           subst_var s v <> v -> (* v already bound *)
+           Term.subst_var s v <> v -> (* v already bound *)
          (* add u -> ui *)
-         (ESubst (mk_var u, mk_var (subst_var s v))) :: s
+         (ESubst (Term.mk_var u, Term.mk_var (Term.subst_var s v))) :: s
 
        | ESubst (Var u, Var v) -> (* u -> v with u <> vi, v <> ui for all i,j *)
          (* add u -> v *)
-         (ESubst (mk_var u, mk_var v)) :: s
+         (ESubst (Term.mk_var u, Term.mk_var v)) :: s
 
        | _ -> assert false)
     sigma []
 
 
-
-
+(*------------------------------------------------------------------*)
 (** Interprets phi as phi_1 /\ … /\ phi_n,
     keeps all phi_i of the form i = j where
     i is in fv (ie will be univ/ex quantified) and j is not (or conversely),
@@ -815,18 +823,19 @@ let sat_subst (sigma:subst) : subst =
     (after saturation) *)
 let find_equalities
   (fv : Vars.vars)
-  (phi : term)
-  : subst =
-  let phis = decompose_ands phi in
+  (phi : Term.term)
+  : Term.subst 
+  =
+  let phis = Term.decompose_ands phi in
   let sigma = (* first, equalities i = j with i free and not j or conversely *)
     List.filter_map (fun x -> x)
       (List.map
          (fun t ->
-            match destr_eq t with
+            match Term.destr_eq t with
             | Some (Var u, Var v) when List.mem u fv && not (List.mem v fv) ->
-              Some (ESubst (mk_var u, mk_var v))
+              Some (Term.ESubst (Term.mk_var u, Term.mk_var v))
             | Some (Var v, Var u) when List.mem u fv && not (List.mem v fv) ->
-              Some (ESubst (mk_var u, mk_var v))
+              Some (Term.ESubst (Term.mk_var u, Term.mk_var v))
             | _ -> None)
          phis)
   in
@@ -835,9 +844,9 @@ let find_equalities
     List.filter_map (fun x -> x)
       (List.map
          (fun t ->
-            match destr_eq t with
-            | Some (Var u, Var v) when List.mem u fv && List.mem v fv ->
-              Some (ESubst (mk_var u, mk_var v))
+            match Term.destr_eq t with
+            | Some (Term.Var u, Var v) when List.mem u fv && List.mem v fv ->
+              Some (Term.ESubst (Term.mk_var u, Term.mk_var v))
             | _ -> None)
          phis)
   in
@@ -856,57 +865,60 @@ let find_equalities
      (rather than only replacing u or v, and being left with u = w) *)
   let sigma' = List.map
       (fun e -> match e with
-         | ESubst (Var u, Var v) when subst_var sigma v <> v ->
-           ESubst (mk_var u, mk_var (subst_var sigma v))
-         | ESubst (Var u, Var v) when subst_var sigma u <> u ->
-           ESubst (mk_var v, mk_var (subst_var sigma u))
+         | Term.ESubst (Var u, Var v) when Term.subst_var sigma v <> v ->
+           Term.ESubst (Term.mk_var u, Term.mk_var (Term.subst_var sigma v))
+         | ESubst (Var u, Var v) when Term.subst_var sigma u <> u ->
+           Term.ESubst (Term.mk_var v, Term.mk_var (Term.subst_var sigma u))
          | _ -> e)
       sigma' in
   sigma' @ sigma
 
 
+(*------------------------------------------------------------------*)
 (** Interprets phi as phi_1 /\ … /\ phi_n,
     with each phi_i as phi'_1 \/ … \/ phi'_m
     and reconstructs it to simplify trivial equalities *)
 (* not pretty, very ad hoc… *)
-let clear_trivial_equalities (phi : term) : term =
-  let phis = decompose_ands phi in
+let clear_trivial_equalities (phi : Term.term) : Term.term =
+  let phis = Term.decompose_ands phi in
   let phis =
     List.filter_map (fun x -> x)
       (List.map
          (fun phi' ->
-            let phis' = decompose_ors phi' in
+            let phis' = Term.decompose_ors phi' in
             let phis' =
               List.filter_map (fun x -> x)
                 (List.map
                    (fun t ->
-                      match destr_neq t with
+                      match Term.destr_neq t with
                       | Some (u, v) when u = v -> None
-                      | None when t = mk_false -> None
+                      | None when t = Term.mk_false -> None
                       | _ -> Some t)
                    phis')
             in
-            let phi' = mk_ors ~simpl:true phis' in
-            match destr_eq phi' with
+            let phi' = Term.mk_ors ~simpl:true phis' in
+            match Term.destr_eq phi' with
             | Some (u, v) when u = v -> None
-            | None when phi' = mk_true -> None
+            | None when phi' = Term.mk_true -> None
             | _ -> Some phi')
          phis)
   in
-  mk_ands ~simpl:true phis
+  Term.mk_ands ~simpl:true phis
 
 (** See `.mli` *)
-let time_formula (a:term) ?(path_cond : PathCond.t = PathCond.Top) (ts:ts_occs) : term =
+let time_formula
+    (a : Term.term) ?(path_cond : PathCond.t = PathCond.Top) (ts:ts_occs) : Term.term 
+  =
   let phis =
     List.map (fun (ti:ts_occ) ->
       (* refresh probably not necessary, but doesn't hurt *)
-      let tivs, s = refresh_vars `Global ti.so_vars in
-      let ticnt  = Term.subst s ti.so_cnt in
-      let ticond = List.map (Term.subst s) ti.so_cond in
+      let tivs, s = Term.refresh_vars ti.so_vars in
+      let ticnt   = Term.subst s ti.so_cnt in
+      let ticond  = List.map (Term.subst s) ti.so_cond in
 
-      mk_exists ~simpl:true
+      Term.mk_exists ~simpl:true
         tivs
-        (mk_ands ~simpl:true ( PathCond.apply path_cond a ticnt :: ticond))
+        (Term.mk_ands ~simpl:true ( PathCond.apply path_cond a ticnt :: ticond))
         (* in the simplest cases (when [path_cond = PathCond.Top]), 
              [PathCond.apply path_cond a ticnt] 
            is just
@@ -914,39 +926,42 @@ let time_formula (a:term) ?(path_cond : PathCond.t = PathCond.Top) (ts:ts_occs) 
         *)
     ) ts
   in
-  mk_ors ~simpl:true phis
+  Term.mk_ors ~simpl:true phis
 
 (*------------------------------------------------------------------*)
-(* Proof obligations for a name occurrence *)
+(** {2 Proof obligations for a name occurrence} *)
 
 (** Constructs the formula
-    "exists free vars.
-      (exists t1.occ_vars. action ≤ t1.occ_cnt ||
-       … ||
-       exists tn.occ_vars. action ≤ tn.occ_cnt) &&
-      conditions of occ &&
-      the occ is a collision" (this last part produced by phiocc)
-    which will be the condition of the proof obligation
-    when finding the occurrence occ.
-    action is the action producing the occ (when indirect).
-    ts=[t1, …, tn] are the timestamp occurrences in t.
-    The free vars of occ.occ_cnt, action, and cond not bound
-    in the sequent's env should be in occ.occ_vars,
-    which is the case if occ was produced correctly
-    (ie by Match.fold given either empty (for direct occurrences)
-     or iocc_vars (for indirect occurrences).
-    The free vars of ts should be all be bound in the sequent's env.
-    If negate is set to true, returns instead the negation of that formula. *)
+      "exists free vars.
+        (exists t1.occ_vars. action ≤ t1.occ_cnt ||
+         … ||
+         exists tn.occ_vars. action ≤ tn.occ_cnt) &&
+        conditions of occ &&
+        the occ is a collision"
+    (this last part produced by [phiocc]) which will be the condition of the 
+    proof obligation when finding the occurrence [occ].
+
+    - [action] is the action producing the occurrence [occ] (for indirect 
+      occurrences).
+    - [ts = \[t1; …; tn\]] are the timestamp occurrences in [t].
+    - The free vars of [occ.occ_cnt], [action], and [cond] not bound
+      in the sequent's env should be in [occ.occ_vars],
+      which is the case if [occ] was produced correctly
+      (i.e. by [Match.fold] given either empty (for direct occurrences)
+       or [iocc_vars] (for indirect occurrences)).
+    - The free vars of [ts] should be all be bound in the sequent's env.
+
+    If [negate] is set to [true], returns instead the negation of that formula. *)
 let occurrence_formula
     ?(use_path_cond = false)
     ~(negate : bool)
-    (phiocc : ('a, 'b) occ_formula)
-    (occ : ('a, 'b) ext_occ)
-  : term
+    (phiocc  : ('a, 'b) occ_formula)
+    (occ     : ('a, 'b) ext_occ)
+  : Term.term
   =
-  let o = occ.eo_occ in
-  let fv = o.so_vars in
-  let ts = occ.eo_source_ts in
+  let o    = occ.eo_occ in
+  let fv   = o.so_vars in
+  let ts   = occ.eo_source_ts in
   let cond = o.so_cond in
 
   (* the formula "cnt is a collision" (or its negation) *)
@@ -954,20 +969,19 @@ let occurrence_formula
 
   let phi_cond_cnt =
     if not negate then
-      mk_ands ~simpl:true (cond @ [phi_cnt])
+      Term.mk_ands ~simpl:true (cond @ [phi_cnt])
     else
-      mk_impls ~simpl:true cond phi_cnt
+      Term.mk_impls ~simpl:true cond phi_cnt
   in 
 
   (* get in phi_cond_cnt the equalities forcing
      certain vars of the occ to be equal *)
   (* if negate, this will most likely do nothing, but that's fine *)
-  let sigma = find_equalities fv phi_cond_cnt in
+  let sigma : Term.subst = find_equalities fv phi_cond_cnt in
 
   (* we apply this substitution in the formula we generate.
      Produces logically equivalent, but simpler, formulas. *)
-  let sub t = subst sigma t in
-  let phi_cond_cnt = sub phi_cond_cnt in
+  let phi_cond_cnt = Term.subst sigma phi_cond_cnt in
   let phi_cond_cnt =
     (* remove trivial equalities, but not when generating the negation
        as it is confusing (or is it?) *)
@@ -977,7 +991,7 @@ let occurrence_formula
   match o.so_occtype with
   | EI_indirect a ->
     (* indirect occurrence: we also generate the timestamp inequalities *)
-    let a = sub a in
+    let a = Term.subst sigma a in
     (* no need to substitute ts. *)
     (* all variables in ts are quantified existentially,
        so they cannot be the renamed variables. *)
@@ -988,47 +1002,54 @@ let occurrence_formula
        but that's tricky, as it also means these vars can't be used
        to unify when subsuming timestamps *)
     let phi_time = 
-      (*      Fmt.epr "PATHCOND:%a@." Fmt.bool use_path_cond;*) (* REM *)
       let path_cond = if use_path_cond then occ.eo_path_cond else PathCond.Top in
-      time_formula ~path_cond a ts 
+      time_formula ~path_cond a ts
     in
 
     if not negate then
-      mk_exists ~simpl:true fv (mk_and ~simpl:true phi_time phi_cond_cnt)
+      Term.mk_exists ~simpl:true fv (Term.mk_and  ~simpl:true phi_time phi_cond_cnt)
     else
-      mk_forall ~simpl:true fv (mk_impl ~simpl:true phi_time phi_cond_cnt)
+      Term.mk_forall ~simpl:true fv (Term.mk_impl ~simpl:true phi_time phi_cond_cnt)
 
   | EI_direct -> (* direct occurrence *)
     if not negate then
-      mk_exists ~simpl:true fv phi_cond_cnt
+      Term.mk_exists ~simpl:true fv phi_cond_cnt
     else
-      mk_forall ~simpl:true fv phi_cond_cnt
+      Term.mk_forall ~simpl:true fv phi_cond_cnt
 
 
 (** occurrence formula for names *)
-let name_occurrence_formula ?use_path_cond = (occurrence_formula ?use_path_cond) name_occ_formula
-
+let name_occurrence_formula ?use_path_cond = 
+  (occurrence_formula ?use_path_cond) name_occ_formula
 
 (*------------------------------------------------------------------*)
 (** {1 Proof obligations for name occurrences} *)
 
 (** Exported. *)
 let occurrence_formulas_with_occs
+    ~(mode : Iter.allowed_constants)   (* allowed sub-terms without further checks *)
     ?use_path_cond
-    ?(negate : bool=false)
-    ?(pp_ns: (unit Fmt.t) option=None)
-    (phi_acc : ('a, 'b) occ_formula)
-    (get_bad_occs: ('a, 'b) f_fold_occs)
-    (contx : Constr.trace_cntxt)
-    (env : Vars.env)
-    (sources : terms)
-  : terms * terms * name_occs * ('a, 'b) ext_occs
+    ?(negate      : bool = false)
+    ?(pp_ns       : unit Fmt.t option = None)
+    (phi_acc      : ('a, 'b) occ_formula)
+    (get_bad_occs : ('a, 'b) f_fold_occs)
+    (contx        : Constr.trace_cntxt)
+    (env          : Env.t)
+    (sources      : Term.terms)
+  : Term.terms * Term.terms * name_occs * ('a, 'b) ext_occs
   =
   let conv = phi_acc in
- (* I leave the name conv to see when it's just used to compare *)
+ (* I leave the name [conv] to see when it's just used to compare *)
 
-  let occs, accs = find_all_occurrences ~pp_ns conv get_bad_occs contx env sources in
+  (* compute occurrences [occs] and [accs] *)
+  let occs, accs = 
+    find_all_occurrences ~mode ~pp_ns conv get_bad_occs contx env sources 
+  in
+
+  (* translate [occs] as formulas *)
   let foccs = List.map (name_occurrence_formula ?use_path_cond ~negate) occs in
+
+  (* translate [accs] as formulas *)
   let faccs = List.map (occurrence_formula ?use_path_cond ~negate phi_acc) accs in
 
   (foccs, faccs, occs, accs)
@@ -1037,19 +1058,20 @@ let occurrence_formulas_with_occs
 (** Exported. 
     Specialization of [occurrence_formulas_with_occs]. *)
 let occurrence_formulas
+    ~(mode : Iter.allowed_constants)   (* allowed sub-terms without further checks *)
     ?use_path_cond
-    ?(negate : bool=false)
-    ?(pp_ns: (unit Fmt.t) option=None)
-    (phi_acc : ('a, 'b) occ_formula)
-    (get_bad_occs: ('a, 'b) f_fold_occs)
-    (contx : Constr.trace_cntxt)
-    (env : Vars.env)
-    (sources : terms)
-  : terms * terms
+    ?(negate      : bool=false)
+    ?(pp_ns       : (unit Fmt.t) option=None)
+    (phi_acc      : ('a, 'b) occ_formula)
+    (get_bad_occs : ('a, 'b) f_fold_occs)
+    (contx        : Constr.trace_cntxt)
+    (env          : Env.t)
+    (sources      : Term.terms)
+  : Term.terms * Term.terms
   =
   let (occs, accs, _, _) =
     occurrence_formulas_with_occs
-      ?use_path_cond ~negate ~pp_ns phi_acc
+      ~mode ?use_path_cond ~negate ~pp_ns phi_acc
       get_bad_occs contx env sources
   in
   (occs, accs)
@@ -1058,18 +1080,19 @@ let occurrence_formulas
 (** Exported. 
     Specialization of [occurrence_formulas_with_occs]. *)
 let name_occurrence_formulas
+    ~(mode : Iter.allowed_constants)   (* allowed sub-terms without further checks *)
     ?use_path_cond
-    ?(negate : bool=false)
-    ?(pp_ns: (unit Fmt.t) option=None)
-    (get_bad_occs: (unit, unit) f_fold_occs)
-    (contx : Constr.trace_cntxt)
-    (env : Vars.env)
-    (sources : terms)
-  : terms 
+    ?(negate      : bool=false)
+    ?(pp_ns       : (unit Fmt.t) option=None)
+    (get_bad_occs : (unit, unit) f_fold_occs)
+    (contx        : Constr.trace_cntxt)
+    (env          : Env.t)
+    (sources      : Term.terms)
+  : Term.terms 
   =
   let (occs, _) =
     occurrence_formulas
-      ?use_path_cond ~negate ~pp_ns empty_occ_formula
+      ~mode ?use_path_cond ~negate ~pp_ns empty_occ_formula
       get_bad_occs contx env sources
   in
   occs

@@ -302,6 +302,9 @@ Proof.
      differently from the one use in local goals.
      Here `1` indicates where we want to remove fresh names. *)
   fresh 1.
+  (* `fresh` produces a sub-goal to establish freshness. 
+      In this example, this is trivial. here freshness is trivial. *)
+  auto.
   (* Conclude by reflexivity. *)
   refl.
   (* We could also have applied `fresh` again before
@@ -311,19 +314,19 @@ Qed.
 
 name n' : index -> message.
 
-(* When freshness is not guaranteed, `fresh` produces an `if-then-else`
-   term that must then be simplified. *)
-global goal eqnames_1 (i,j:index) :
+(* When freshness is not guaranteed, `fresh` produces an more complicated 
+   proof-obligation.
+   For the `fresh` tactic to apply, we must require that `i` and `j`
+   are constant values: otherwise, they could
+   themselves depend on the randomness whose freshness we are 
+   exploiting! *)
+global goal eqnames_1 (i,j:index[const]) :
   [j<>i] ->
   equiv(n'(i),diff(n'(j),m)).
 Proof.
   intro H.
   fresh 1.
 
-  (* Check what the standard library `if_true` does. *)
-  print goal if_true.
-
-  rewrite if_true in 1. 
   apply H.
   refl.
 Qed.
@@ -331,7 +334,7 @@ Qed.
 (* In this variant, note that the duplicate item in the equivalence
    is automatically simplified away, which allows to conclude as
    before by freshness. *)
-global goal eqnames_1b (i,j:index) :
+global goal eqnames_1b (i,j:index[const]) :
   [j<>i] ->
   equiv(n'(i),diff(n'(j),m),diff(n'(j),m)).
 Proof.
@@ -340,7 +343,7 @@ Proof.
      followed by `simpl` (which has the effect of removing the
      duplicate item). *)
   fresh 1.
-  rewrite if_true in 1.
+
   apply H.
   refl.
 Qed.

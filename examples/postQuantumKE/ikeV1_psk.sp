@@ -195,7 +195,7 @@ axiom  [Main6,Ideal1/right] tryfind : forall (i,j:index), pred(I1(i,j)) = pred(I
 equiv [Main6,Ideal1/right] test.
 Proof.
 
-  diffeq. 
+  diffeq => *. 
    (* From here, we need to prove that we indede get ideal keys everywhere. Mostly dumb manipulations of all the conditions introduced by the prf tactic, that are all contractory.
      *)
     + intro *. 
@@ -345,8 +345,7 @@ system [Ideal2] ((!_j R: ResponderI2(j)) | (!_i I: InitiatorI2(i))).
 
 (* We now prove the authentication on this ideal system. *)
 
-goal [Ideal2] wa_1 :
-  forall (i,j:index),
+goal [Ideal2] wa_1 (i,j:index[param]):
     happens(I1(i,j)) =>
     cond@I1(i,j) =>
     (exists (i0:index), happens(R(j,i0)) && R(j,i0) < I1(i,j) &&
@@ -357,7 +356,6 @@ goal [Ideal2] wa_1 :
      fst(input@R(j,i0)) = fst(output@I(i))
      ).
 Proof.
- intro i j.
  intro Hap Cond.
  expand cond.
 
@@ -388,8 +386,7 @@ Proof.
        use mutex_Ideal2_I1_I2 with i,j,j as H; by case H.
 Qed.
 
-goal [Ideal2] wa_2 :
-  forall (i,j:index),
+goal [Ideal2] wa_2 (i,j:index[param]):
     happens(R1(j,i)) =>
     exec@R1(j,i) =>
      happens(I(i)) &&
@@ -398,7 +395,7 @@ goal [Ideal2] wa_2 :
    snd(snd(input@R(j,i))) = snd(snd(output@I(i))).
 
 Proof.
-  intro i j Hap Ex.
+  intro Hap Ex.
   expand exec.
   expand cond.
   destruct Ex as [_ EUF].
@@ -507,8 +504,7 @@ axiom [Ror] ddhnotuple : forall (m1,m2,m3,m4:message), exp(m3,m4) <> <m1,m2>.
 
 (* we first prove two small authentication lemmas, so that if we reach the ideal key computation, we now we have the correct parameters. *)
 
-goal [Ror] helper_wa :
-  forall (i,j:index),
+goal [Ror] helper_wa (i,j:index[param]):
     happens(R1(j,i)) =>
     exec@R1(j,i) =>
     fst(snd(input@R(j,i))) = Ni(i) &&
@@ -516,7 +512,7 @@ goal [Ror] helper_wa :
 .
 
 Proof.
-  intro i j Hap Exec.
+  intro Hap Exec.
   expand exec.
   destruct Exec as [Pred Cond].
   expand cond.
@@ -547,8 +543,7 @@ Qed.
 
 
 
-goal [Ror] helper_wa2 :
-  forall (i,j:index),
+goal [Ror] helper_wa2 (i,j:index[param]):
     happens(I1(i,j)) =>
     exec@I1(i,j) =>
 
@@ -556,7 +551,7 @@ goal [Ror] helper_wa2 :
       exp(g,b(j)) = fst(input@I1(i,j))
      .
 Proof.
-  intro i j Hap Exec.
+  intro Hap Exec.
   expand exec.
   expand cond.
   destruct Exec as [_ [CondTF _]].
@@ -587,7 +582,7 @@ axiom  [Ror3, Ror/right] ddhnotuple1 : forall (m1,m2,m3,m4:message), exp(m3,m4) 
 
 
 (* By transitivity, we inherit the lemma on Ror to Ror2 *)
-global goal [Ror/left,Ror2] helper_wa_equiv (i, j:index):
+global goal [Ror/left,Ror2] helper_wa_equiv (i, j:index[param]):
   [happens(R1(j,i))] ->
   equiv(
     exec@R1(j,i) =>
@@ -612,15 +607,14 @@ Proof.
       by fresh 1.
 Qed.
 
-goal [Ror2] helper_wa_aux3 :
-  forall (i,j:index),
+goal [Ror2] helper_wa_aux3 (i,j:index[param]):
     happens(R1(j,i)) =>
     exec@R1(j,i) =>
     input@R1(j,i) = input@R1(j,i) &&
     (fst(snd(input@R(j,i))) = Ni(i) &&
     fst(input@R(j,i)) = exp(g,a(i))).
 Proof.
-  nosimpl(intro i j Hap).
+  intro Hap.
   rewrite equiv -helper_wa_equiv i j.
   auto.
   intro Ex.
@@ -629,7 +623,7 @@ Qed.
 
 
 
-global goal [Ror2,Ror3] helper_wa_equiv1 (i, j:index):
+global goal [Ror2,Ror3] helper_wa_equiv1 (i, j:index[param]):
   [happens(R1(j,i))] ->
    equiv(
   exec@R1(j,i) =>
@@ -638,7 +632,6 @@ input@R1(j,i) = input@R1(j,i) &&
     fst(input@R(j,i)) = exp(g,a(i)))
 ).
 Proof.
-
   intro H2.
   use rename_from_Ror2_to_Ror3 with <a(i),Ni(i)>.
     + use H with R(j,i) => //.
@@ -655,8 +648,7 @@ Proof.
 Qed.
 
 
-goal [Ror3] helper_wa_aux4 :
-  forall (i,j:index),
+goal [Ror3] helper_wa_aux4 (i,j:index[param]):
     happens(R1(j,i)) =>
     exec@R1(j,i) =>
      input@R1(j,i) = input@R1(j,i) &&
@@ -664,7 +656,7 @@ goal [Ror3] helper_wa_aux4 :
     fst(input@R(j,i)) = exp(g,a(i)))
 .
 Proof.
-  nosimpl(intro i j Hap).
+  intro Hap.
   rewrite equiv -helper_wa_equiv1  i j.
   auto.
   intro Exec.
@@ -672,15 +664,13 @@ Proof.
 Qed.
 
 
-goal [Ror3, Ror/right] helper_wa3 :
-  forall (i,j:index),
+goal [Ror3, Ror/right] helper_wa3 (i,j:index[param]):
     happens(R1(j,i)) =>
     exec@R1(j,i) =>
     fst(snd(input@R(j,i))) = Ni(i) &&
     fst(input@R(j,i)) = exp(g,a(i))
 .
 Proof.
-  intro i j.
   project.
   intro Hap Ex.
   use helper_wa_aux4 with i,j; auto.
@@ -691,7 +681,7 @@ Qed.
 
 (* We now export helper wa 2 all the way to Ror3 *)
 global goal [Ror/left,Ror2] helper_wa_equiv_2 :
-  Forall (i,j:index),
+  Forall (i,j:index[param]),
   [happens(I1(i,j))] ->
   equiv(
     exec@I1(i,j) =>
@@ -713,14 +703,13 @@ Proof.
 Qed.
 
 
-goal [Ror2] helper_wa_aux2 :
-  forall (i,j:index),
+goal [Ror2] helper_wa_aux2 (i,j:index[param]):
     happens(I1(i,j)) =>
     exec@I1(i,j) =>
       Nr(j) = fst(snd(input@I1(i,j))) &&
       exp(g,b(j)) = fst(input@I1(i,j)).
 Proof.
-  nosimpl(intro i j Hap).
+  intro Hap.
   rewrite equiv -helper_wa_equiv_2  i j.
   auto.
   intro Ex.
@@ -728,7 +717,7 @@ Proof.
 Qed.
 
 global goal [Ror2,Ror3] helper_wa_equiv_3 :
-  Forall (i,j:index),
+  Forall (i,j:index[param]),
     [happens(I1(i,j))] ->
     equiv(
       exec@I1(i,j) =>
@@ -749,8 +738,7 @@ Proof.
       by fresh 1.
 Qed.
 
-goal [Ror3] helper_wa_aux5 :
-  forall (i,j:index),
+goal [Ror3] helper_wa_aux5 (i,j:index[param]):
     happens(I1(i,j)) =>
     exec@I1(i,j) =>
 
@@ -758,7 +746,7 @@ goal [Ror3] helper_wa_aux5 :
       exp(g,b(j)) = fst(input@I1(i,j))
      .
 Proof.
-  nosimpl(intro i j Hap).
+  intro Hap.
   rewrite equiv -helper_wa_equiv_3  i j.
   auto.
   intro Ex.
@@ -766,14 +754,12 @@ Proof.
 Qed.
 
 
-goal [Ror3, Ror/right] helper_wa4 :
-  forall (i,j:index),
+goal [Ror3, Ror/right] helper_wa4 (i,j:index[param]):
     happens(I1(i,j)) =>
     exec@I1(i,j) =>
       Nr(j) = fst(snd(input@I1(i,j))) &&
       exp(g,b(j)) = fst(input@I1(i,j)).
 Proof.
-  intro i j.
   project.
   intro Hap Ex.
   by use helper_wa_aux5 with i,j.
@@ -783,7 +769,7 @@ Qed.
 
 equiv [Ror3,Ror/right] final.
 Proof.
-  diffeq.
+  diffeq => *.
     + intro *.
       case try find il,jl such that _ in idealkeys(il,jl) else _.
         - by use ddhnotuple1 with  fst(input@I2(i,j)),<exp(g,a(i)),IdR(j)>, exp(g,a(i)),b(j).
@@ -792,12 +778,12 @@ Proof.
 
     + intro *.
       use helper_wa4 with i,j; try auto.
-      case  try find il,jl such that _ in idealkeys(il,jl) else _.
+      case try find il,jl such that _ in idealkeys(il,jl) else _.
         - intro [?? [[Exp [_ _]] ->]].
           case try find il0,jl0 such that _ in idealkeys(i,j) else _.
           auto.
           intro [Abs _].
-          by by use Abs with i,j.
+          by use Abs with i,j.
        - case try find il0,jl0 such that _ in  h(exp(fst(att(frame@pred(I1(i,j)))),a(i)),Ininr(j,i))
                   else _.
          intro Ex [Abs _].

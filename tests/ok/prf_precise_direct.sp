@@ -1,5 +1,3 @@
-
-
 include Basic.
 
 channel c.
@@ -14,7 +12,7 @@ process A(i : index) =
 
 system !_i A(i).
 
-global goal _ (j : index) :
+global goal _ (j : index[param]) :
 [forall (i:index), (A(i) < A(j) => zero <> n(i))] ->
  equiv(h(zero,k), seq(i:index => if A(i) < A(j) then h(n(i),k))).
 Proof.

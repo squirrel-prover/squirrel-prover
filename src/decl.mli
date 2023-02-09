@@ -54,7 +54,7 @@ type action_decl = {
 (** Information for a base type declaration *)
 type bty_decl = {
   bty_name  : lsymb ;
-  bty_infos : Symbols.bty_info list ;
+  bty_infos : lsymb list ;
 }
 
 (*------------------------------------------------------------------*)

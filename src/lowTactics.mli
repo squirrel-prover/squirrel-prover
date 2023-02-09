@@ -13,7 +13,6 @@ val dbg : ?force:bool -> ('a, Format.formatter, unit) format -> 'a
 val bad_args : unit -> 'a
 
 val check_ty_eq  : ?loc:L.t -> Type.ty  -> Type.ty  -> unit
-val check_hty_eq : ?loc:L.t -> Type.hty -> Type.hty -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Functor building common tactics code from a Sequent module} *)
@@ -66,7 +65,6 @@ module MkCommonLowTac (S : Sequent.S) : sig
     S.t -> Args.parser_arg list -> Args.esort -> Args.earg
 
   val convert    : S.t -> Theory.term  -> Term.term * Type.ty
-  val convert_ht : S.t -> Theory.hterm -> Type.hty * Term.hterm
 
   (*------------------------------------------------------------------*)
   (** {3 Expantion} *)

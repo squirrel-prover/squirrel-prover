@@ -1,5 +1,3 @@
-
-
 system null.
 
 goal _ (b:boolean) : b = true || b = false.

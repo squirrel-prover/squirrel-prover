@@ -265,6 +265,7 @@ val mk_proj_subst :
 (** Print the system to the user. *)
 val print_system : Symbols.table -> _ expr -> unit
 
+val is_single_system : context -> bool
 
 (*------------------------------------------------------------------*)
 (** {2 Parsing, printing, and conversions} *)

@@ -10,8 +10,8 @@ type error_i =
   | BadEquivForm
   | InvalidCtySpace of string list
   | DuplicateCty of string
-  | NotTSOrIndex
   | NonDetOp
+  | Failure of string
 
 type dkind = KDecl | KGoal
 

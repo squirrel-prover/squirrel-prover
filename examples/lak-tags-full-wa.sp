@@ -43,8 +43,7 @@ system ((!_k R: reader) | (!_i !_j T: tag(i))).
 
 axiom tags_neq : tag1 <> tag2.
 
-goal wa_R:
-  forall (k:index, i:index),
+goal wa_R (k,i:index[param]):
   happens(R1(k,i)) =>
   cond@R1(k,i) =>
   exists (j:index),
@@ -54,8 +53,9 @@ goal wa_R:
   R(k) < T(i,j) &&
   output@R(k) = input@T(i,j).
 Proof.
-  intro k i _ Hc.
-  rewrite /cond in Hc. euf Hc => // [l [_ _]].
+  intro _ Hc.
+  rewrite /cond in Hc. 
+  euf Hc => // [l [_ _]].
   + by use tags_neq.
   + exists l.
     assert (nR(k) = input@T(i,l)) as Mfresh by auto.
@@ -87,9 +87,7 @@ Proof.
   by use He with R1(k,i).
 Qed.
 
-goal wa_T:
-
-  forall (i:index, j:index),
+goal wa_T (i,j:index[param]):
   happens(T1(i,j)) =>
   exec@T1(i,j) =>
 
@@ -103,7 +101,7 @@ goal wa_T:
   output@R(k) = input@T(i,j).
 
 Proof.
-  intro i j Hh He.
+  intro Hh He.
   assert cond@T1(i,j) as Hc by auto.
   use tags_neq as _.
   rewrite /cond in Hc; euf Hc => // [k [H1t H1m]]. 

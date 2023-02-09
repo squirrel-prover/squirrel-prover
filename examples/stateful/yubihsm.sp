@@ -513,7 +513,7 @@ set showStrengthenedHyp=true.
 name keyFresh : message.
 
 (*------------------------------------------------------------------*)
-global goal equiv_real_ideal_enrich (t : timestamp):
+global goal equiv_real_ideal_enrich (t : timestamp[const]):
   [happens(t)] ->
   equiv(
     frame@t,
@@ -540,10 +540,10 @@ Proof.
 
   + (* Setup(pid) *)
     repeat destruct Eq as [_ Eq].
-    splitseq 2: (fun (pid0 : index) -> pid = pid0).
+    splitseq 2: (fun (pid0 : index) => pid = pid0).
     constseq 2:
-      (fun (pid0 : index) -> pid = pid0 && Setup(pid0) <= t) (AEAD(pid)@t)
-      (fun (pid0 : index) -> pid <> pid0 ||
+      (fun (pid0 : index) => pid = pid0 && Setup(pid0) <= t) (AEAD(pid)@t)
+      (fun (pid0 : index) => pid <> pid0 ||
                           (pid = pid0 && not (Setup(pid0) <= t))) zero.
       - by intro pid0; case (pid=pid0).
       - split => pid0 /= U.
@@ -558,7 +558,7 @@ Proof.
         by rewrite le_lt.
       }.
 
-      rewrite H -le_pred_lt in 3.
+      rewrite /= H -le_pred_lt in 3.
       rewrite /AEAD in 1.
       fa 1.
       rewrite /AEAD in 4.
@@ -582,8 +582,8 @@ Proof.
         rewrite Eq_len; enckp 2, enc(_, rinit(pid), diff(mkey, keyFresh)), keyFresh; 1: auto. 
         
         fa 2; fa 2.
-        fresh 4. 
-        fresh 3; rewrite if_true // in 3.
+        fresh 4; 1:auto. 
+        fresh 3; 1:auto.
         rewrite /* in 0.
         by apply Hind (pred t).
         
@@ -597,8 +597,8 @@ Proof.
           enc (tlen, rinit(pid), diff(keyFresh, mkey)) by project. 
         rewrite Eq_len; enckp 2; 1: auto. 
         fa 2; fa 2.
-        fresh 4.  
-        fresh 3; rewrite if_true in 3; 1: auto.
+        fresh 4; 1:auto.  
+        fresh 3; 1:auto.
         refl.
 
   + (* Decode(pid,j) *)
@@ -635,24 +635,23 @@ Qed.
 
 
 (*------------------------------------------------------------------*)
+abstract tmax : timestamp.
+
 axiom max_ts :
-  exists (tmax : timestamp),
   happens(tmax) &&
   (forall (t : timestamp), happens(t) => t <= tmax).
 
 global goal equiv_real_ideal_enrich_tmax0 :
-  Exists (t : timestamp),
-  ([happens(t)] /\
-   [forall (t' : timestamp), happens(t') => t' <= t] /\
+  ([happens(tmax)] /\
+   [forall (t' : timestamp), happens(t') => t' <= tmax] /\
     equiv(
-     frame@t,
-     seq(t':timestamp => if t' <= t then exec@t' else false),
-     seq(i:index, t':timestamp => if t' <= t then YCtr(i)@t'),
-     seq(i:index, t':timestamp => if t' <= t then SCtr(i)@t')
+     frame@tmax,
+     seq(t':timestamp => if t' <= tmax then exec@t' else false),
+     seq(i:index, t':timestamp => if t' <= tmax then YCtr(i)@t'),
+     seq(i:index, t':timestamp => if t' <= tmax then SCtr(i)@t')
   )).
 Proof.
-  use max_ts as [tmax [_ U]].
-  exists tmax. 
+  use max_ts as [_ U].
   split; 1: auto.
   split.
     + by intro*; apply U.
@@ -672,18 +671,16 @@ axiom exec_nhap (t' : timestamp) :
    not (happens(t')) => exec@t' = exec_dflt.
 
 global goal equiv_real_ideal_enrich_tmax :
-  Exists (t : timestamp),
-  ([happens(t)] /\
-   [forall (t' : timestamp), happens(t') => t' <= t] /\
+  ([happens(tmax)] /\
+   [forall (t' : timestamp), happens(t') => t' <= tmax] /\
     equiv(
-      frame@t,
+      frame@tmax,
       seq(t':timestamp => exec@t'),
       seq(i:index, t':timestamp => YCtr(i)@t'),
       seq(i:index, t':timestamp => SCtr(i)@t')
   )).
 Proof.
-  use equiv_real_ideal_enrich_tmax0 as [tmax [Hap C U]].
-  exists tmax.
+  use equiv_real_ideal_enrich_tmax0 as [Hap C U].
   split; 1: auto. 
   split; 1: auto. 
   assert (forall (t' : timestamp), (t' <= tmax) = happens(t')) as Eq.
@@ -691,29 +688,30 @@ Proof.
     by split; 2: intro _; apply C.}
   rewrite !Eq in U.
 
-  splitseq 3: (fun (i : index, t' : timestamp) -> happens(t')).
-  splitseq 2: (fun (i : index, t' : timestamp) -> happens(t')).
-  splitseq 1: (fun (t' : timestamp) -> happens(t')).
+  splitseq 3: (fun (i : index, t' : timestamp) => happens(t')).
+  splitseq 2: (fun (i : index, t' : timestamp) => happens(t')).
+  splitseq 1: (fun (t' : timestamp) => happens(t')).
+  simpl.
 
   constseq 6 :
-    (fun (i : index, t' : timestamp) -> happens(t')) zero
-    (fun (i : index, t' : timestamp) -> not (happens(t'))) empty.
+    (fun (i : index, t' : timestamp) => happens(t')) zero
+    (fun (i : index, t' : timestamp) => not (happens(t'))) empty.
     +  auto.
     +   split; intro i t' _. 
        - by rewrite if_false.
        - by rewrite if_true // sctr_nhap.
 
     + constseq 4 :
-      (fun (i : index, t' : timestamp) -> happens(t')) zero
-      (fun (i : index, t' : timestamp) -> not (happens(t'))) empty.
+      (fun (i : index, t' : timestamp) => happens(t')) zero
+      (fun (i : index, t' : timestamp) => not (happens(t'))) empty.
         - auto.
         - split; intro i t' _.
             * by rewrite if_false.
             * by rewrite if_true // yctr_nhap.
 
        - constseq 2 :
-        (fun (t' : timestamp) -> happens(t')) false
-        (fun (t' : timestamp) -> not (happens(t'))) exec_dflt.
+        (fun (t' : timestamp) => happens(t')) false
+        (fun (t' : timestamp) => not (happens(t'))) exec_dflt.
           *  auto.
           * split; intro t' _.
              ** by rewrite if_false.
@@ -722,7 +720,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-global goal injective_correspondence_equiv (pid, j:index):
+global goal injective_correspondence_equiv (pid, j:index[const]):
    [happens(Server(pid,j))] ->
    equiv(
      exec@Server(pid,j) =>
@@ -735,13 +733,13 @@ global goal injective_correspondence_equiv (pid, j:index):
          j = j').
 Proof.
   intro Hap.
-  use equiv_real_ideal_enrich_tmax as [tmax [_ _ H]].
+  use equiv_real_ideal_enrich_tmax as [_ _ H].
   apply H.
 Qed.
 
 (*------------------------------------------------------------------*)
 (* The final proof of injective correspondence. *)
-goal [default/left] injective_correspondence (j, pid:index):
+goal [default/left] injective_correspondence (j, pid:index[glob]):
    happens(Server(pid,j)) =>
    exec@Server(pid,j) =>
      exists (i:index),
@@ -751,8 +749,8 @@ goal [default/left] injective_correspondence (j, pid:index):
          exec@Server(pid,j') =>
          YCtr(pid)@pred(Press(pid,i)) = SCtr(pid)@Server(pid,j') =>
          j = j'.
-Proof.
-  intro Hap.
+Proof. 
+  intro Hap. 
   rewrite equiv injective_correspondence_equiv pid j => // Hexec.
   executable Server(pid,j) => //.
   intro exec.

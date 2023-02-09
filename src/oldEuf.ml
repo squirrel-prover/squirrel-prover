@@ -38,6 +38,7 @@ class check_key
       let ty = Vars.ty m in
       if ty <> Type.tindex && ty <> Type.ttimestamp then
         raise Bad_ssc_;
+      (* TODO: DET: check for ptime_deducible *)
 
     | _ -> super#visit_message t
 end
@@ -153,18 +154,21 @@ let pp_euf_rule ppf rule =
 (*------------------------------------------------------------------*)
 (** {2 Build the Euf rule} *)
 
-let[@warning "-27"] mk_rule ~elems ~drop_head ~fun_wrap_key
-    ~allow_functions ~cntxt ~env ~mess ~sign ~head_fn ~key_n ~key_is =
+(** Exported *)
+let[@warning "-27"] mk_rule 
+    ~elems ~drop_head ~fun_wrap_key
+    ~allow_functions ~cntxt ~(env : Env.t) ~mess ~sign ~head_fn ~key_n ~key_is 
+  =
 
   let mk_of_hash action_descr ((is,m) : Term.t list * Term.t) =
     (* Legacy refresh of variables, probably unnecessarily complex. *)
-    let env = ref env in
+    let env = ref env.vars in
 
     (* Refresh action indices. *)
     let subst_fresh =
       List.map (fun i ->
           Term.(ESubst (mk_var i,
-                        mk_var (Vars.make_approx_r env i))))
+                        mk_var (Vars.make_approx_r env i (Vars.Tag.gtag)))))
         action_descr.Action.indices
     in
 
@@ -193,7 +197,7 @@ let[@warning "-27"] mk_rule ~elems ~drop_head ~fun_wrap_key
       List.map
         (fun v ->
            Term.(ESubst (mk_var v,
-                         mk_var (Vars.make_approx_r env v))))
+                         mk_var (Vars.make_approx_r env v (Vars.Tag.gtag)))))
         vars
     in
 

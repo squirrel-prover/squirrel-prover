@@ -1,5 +1,3 @@
-
-
 hash h
 name k : message
 name n : message
@@ -10,7 +8,7 @@ channel c
 
 system s:= h(n,k); out(c,s).
 
-goal collision_absurd (tau:timestamp):
+goal collision_absurd (tau:timestamp[param]):
  happens(tau) => output@tau <> h(m,k).
 
 Proof.

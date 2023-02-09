@@ -66,7 +66,7 @@ let is_toplevel_error ~test (e : exn) : bool =
   match e with
   | Parserbuf.Error                 _
   | ProverLib.Error                 _
-  | Command.Cmd_error                       _
+  | Command.Cmd_error               _
   | Process.Error                   _
   | ProcessDecl.Error               _
   | Theory.Conv                     _

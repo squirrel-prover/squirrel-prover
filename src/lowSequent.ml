@@ -24,6 +24,10 @@ module type S = sig
   val conc_kind : conc_form Equiv.f_kind
 
   (*------------------------------------------------------------------*)
+  (** default variable information of the sequent *)
+  val var_info : Vars.Tag.t
+
+  (*------------------------------------------------------------------*)
   module Hyps : Hyps.S1 with type hyp = hyp_form and type hyps := t
 
   (** {2 Access to sequent components} *)
@@ -40,7 +44,7 @@ module type S = sig
   val system : t -> SystemExpr.context
 
   val set_goal_in_context :
-    ?update_local:(Term.form -> Term.form option) ->
+    ?update_local:(Term.term -> Term.term option) ->
     SystemExpr.context -> conc_form -> t -> t
 
   val table : t -> Symbols.table
@@ -85,15 +89,15 @@ module type S = sig
 
   val map : Equiv.Babel.mapper -> t -> t
 
-  module Hyp : Term.SmartFO with type form = hyp_form
+  module Hyp : SmartFO.S with type form = hyp_form
 
-  module Conc : Term.SmartFO with type form = conc_form
+  module Conc : SmartFO.S with type form = conc_form
 end
 
 (*------------------------------------------------------------------*) 
 (** {2 Common utilities for sequent implementations} *)
 
-let setup_set_goal_in_context ~old_context ~new_context ~table =
+let setup_set_goal_in_context ~old_context ~new_context ~table ~vars =
 
   assert (SE.compatible table new_context.SE.set old_context.SE.set);
   assert (match new_context.SE.pair with
@@ -124,6 +128,8 @@ let setup_set_goal_in_context ~old_context ~new_context ~table =
     Utils.omap (fun project -> project f) set_projections
   in
 
+  let env = Env.init ~table ~vars ~system:{ new_context with pair = None; } () in
+  
   (* For global hypotheses:
     - Reachability atoms are handled as local hypotheses.
     - Other global hypotheses can be kept if their meaning is unchanged
@@ -143,7 +149,10 @@ let setup_set_goal_in_context ~old_context ~new_context ~table =
     | Atom (Equiv _) :: l -> pair_unchanged && can_keep_global l
 
     | Atom (Reach a) :: l ->
-      (Term.is_pure_timestamp a || set_unchanged) && can_keep_global l
+      ( ( HighTerm.is_constant `Exact env a &&
+          HighTerm.is_system_indep env a )
+        || set_unchanged )
+      && can_keep_global l
         
     | [] -> true
   in

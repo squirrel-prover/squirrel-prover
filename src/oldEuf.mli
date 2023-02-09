@@ -67,5 +67,5 @@ val mk_rule :
   fun_wrap_key:((Symbols.fname -> bool) option) ->
   allow_functions:(Symbols.fname -> bool) ->
   cntxt:Constr.trace_cntxt ->
-  env:Vars.env -> mess:Term.term -> sign:Term.term ->
+  env:Env.t -> mess:Term.term -> sign:Term.term ->
   head_fn:Symbols.fname -> key_n:Symbols.name -> key_is:Term.terms -> euf_rule

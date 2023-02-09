@@ -431,7 +431,7 @@ let is_lname ?of_ty table t =
   else
     let nty = name_ty t in    
     let of_ty = odflt nty of_ty in
-    Symbols.check_bty_info table nty Symbols.Ty_large &&
+    Symbols.TyInfo.check_bty_info table nty Symbols.Large &&
     nty = of_ty
 
 
@@ -1635,7 +1635,7 @@ let () =
                               mk_cst (), mk_cst (), mk_cst () in
 
        let v = ccst (Cst.Var ((snd (
-           Vars.make `Approx Vars.empty_env (Type.Message) "v"))))
+           Vars.make `Approx Vars.empty_env (Type.Message) "v" ()))))
        in
        let state0 = complete_cterms table [(a,b); (b,c);
                                            (b,d); (e,e'); 

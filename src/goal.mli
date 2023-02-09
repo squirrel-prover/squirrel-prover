@@ -62,7 +62,7 @@ module Parsed : sig
   type t = {
     name    : Theory.lsymb option;
     ty_vars : Theory.lsymb list;
-    vars    : Theory.bnds;
+    vars    : Theory.bnds_tagged;
     system  : SE.Parse.sys;
     formula : contents
   }

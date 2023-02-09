@@ -10,7 +10,9 @@ module PT : sig
       For now, we do not keep the proof-term itself. *)
   type t = {
     system : SE.context;
-    args   : Sv.t;
+    args   : (Vars.var * Vars.Tag.t) list;
+    (** in reversed order w.r.t. introduction *)
+
     mv     : Mvar.t;
     subgs  : Equiv.any_form list;
     form   : Equiv.any_form;

@@ -1,5 +1,3 @@
-
-
 include Basic.
 
 (* Checking the treatment of bound variables in direct cases for xor. *)
@@ -34,7 +32,7 @@ Qed.
 
 (* Secondary test, without any bound variable, just to check
    that an empty forall is not produced. *)
-equiv empty (i:index) : n(i), diff(n(i) XOR ok,m(i) XOR ko).
+equiv empty (i:index[const]) : n(i), diff(n(i) XOR ok,m(i) XOR ko).
 Proof.
   xor 1.
   (* Check that the right formula has been produced,

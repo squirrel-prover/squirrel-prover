@@ -1,5 +1,3 @@
-
-
 (* Similar to euf_let test but not at toplevel:
  * Testing that macros induced by a let definition
  * have the right number of parameters even in case of
@@ -14,7 +12,7 @@ channel c
 system in(c,x);out(c,x);
        let s = h(n,k) in out(c,s).
 
-goal collision_absurd (tau:timestamp):
+goal collision_absurd (tau:timestamp[param]):
   happens(tau) => output@tau <> h(m,k).
 
 Proof.

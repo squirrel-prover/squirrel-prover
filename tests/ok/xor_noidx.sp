@@ -23,6 +23,5 @@ Proof.
   rewrite if_true in 1.
   simpl.
   by use len_ok.
-  fresh 1.
-  auto.
+  by fresh 1.
 Qed.

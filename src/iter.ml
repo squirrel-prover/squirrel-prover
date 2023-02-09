@@ -34,13 +34,13 @@ class deprecated_iter ~(cntxt:Constr.trace_cntxt) = object (self)
       List.iter (fun (_,tm) -> self#visit_message tm) l
 
     | Find (a, b, c, d) ->
-      let _, subst = Term.refresh_vars `Global a in
+      let _, subst = Term.refresh_vars a in
       let b = Term.subst subst b in
       let c = Term.subst subst c in
       self#visit_message b; self#visit_message c; self#visit_message d
 
     | Quant (_,vs,l) ->
-      let _, subst = Term.refresh_vars `Global vs in
+      let _, subst = Term.refresh_vars vs in
       let l = Term.subst subst l in
       self#visit_message l
 
@@ -72,14 +72,14 @@ class ['a] deprecated_fold ~(cntxt:Constr.trace_cntxt) = object (self)
       List.fold_left (fun x (_,tm) -> self#fold_message x tm) x l
 
     | Find (a, b, c, d) ->
-      let _, s = Term.refresh_vars `Global a in
+      let _, s = Term.refresh_vars a in
       let b = Term.subst s b in
       let c = Term.subst s c in
       let d = Term.subst s d in
       self#fold_message (self#fold_message (self#fold_message x b) c) d
 
     | Quant (_,vs,l) ->
-      let _, s = Term.refresh_vars `Global vs in
+      let _, s = Term.refresh_vars vs in
       let l = Term.subst s l in
       self#fold_message x l
 
@@ -149,7 +149,8 @@ class deprecated_get_f_messages ?(drop_head=true)
       end ;
       self#visit_message m ; self#visit_message k'
 
-    | Term.Var m when not (Type.is_finite (Vars.ty m)) ->
+    | Term.Var m when not (Symbols.TyInfo.is_finite cntxt.table (Vars.ty m)) ->
+      (* TODO: DET: check for ptime_deducible *)
       assert false (* SSC must have been checked first *)
 
     | m -> super#visit_message m
@@ -196,7 +197,7 @@ let tfold_occ (type a)
   =
   match t with
   | Term.Quant (_, evs, t) ->
-    let evs, subst = Term.refresh_vars `Global evs in
+    let evs, subst = Term.refresh_vars evs in
     let t = Term.subst subst t in
     let fv = List.rev_append evs fv in
     func ~fv ~cond t acc
@@ -207,7 +208,7 @@ let tfold_occ (type a)
     func ~fv ~cond:(Term.mk_not c :: cond) e
 
   | Term.Find (is, c, t, e) ->
-    let is, subst = Term.refresh_vars `Global is in
+    let is, subst = Term.refresh_vars is in
     let c, t = Term.subst subst c, Term.subst subst t in
     let fv1 = List.rev_append is fv in
 
@@ -387,17 +388,14 @@ let pp_hash_occ fmt (x : hash_occ) =
         (Fmt.list ~sep:Fmt.sp Term.pp) kis) fmt x
 
 (*------------------------------------------------------------------*)
-(** [get_f_messages_ext ~cntxt f k t] collects direct occurrences of
-    [f(_,k(_))] or [f(_,_,k(_))] where [f] is a function name [f] and [k] 
-    a name [k].
-    Over-approximation: we try to expand macros, even if they are at a 
-    timestamp that may not happen. *)
-let get_f_messages_ext 
+(** See `.mli` *)
+let deprecated_get_f_messages_ext
     ?(drop_head    = true)
     ?(fun_wrap_key = None)
     ?(fv    : Vars.vars = [])
     ~(mode:[`Delta of Constr.trace_cntxt | `NoDelta])
     (sexpr  : SE.arbitrary)
+    (table  : Symbols.table)
     (f      : Symbols.fname)
     (k      : Symbols.name)
     (t      : Term.term)
@@ -444,8 +442,10 @@ let get_f_messages_ext
         in
         occs' @ occs, `Continue
 
-      | Term.Var m when not (Type.is_finite (Vars.ty m)) -> assert false
-      (* SSC must have been checked first *)
+      | Term.Var m when not (Symbols.TyInfo.is_finite table (Vars.ty m)) -> assert false
+      (* TODO: DET: check for ptime_deducible 
+         Note that this should not be a problem when this function is used in global 
+         tactics in [SystemModifiers]. *)
 
       | Term.Macro (m, l, ts) ->
         begin
@@ -464,10 +464,15 @@ let get_f_messages_ext
   in
   occs
 
-
+   
 (*------------------------------------------------------------------*)
 (** {2 Macros} *)
 
+(** Allowed constants in terms for cryptographic tactics:
+    - SI is for system-independent. *)
+type allowed_constants = Const | PTimeSI | PTimeNoSI
+
+(*------------------------------------------------------------------*)
 (** occurrences of a macro [n(i,...,j)] *)
 type macro_occ_cnt = { symb : Term.msymb; args : Term.term list} 
 
@@ -475,22 +480,39 @@ type macro_occ = macro_occ_cnt occ
 
 type macro_occs = macro_occ list
 
-exception Var_found
-
-(** Looks for macro occurrences in a term.
+(** Internal.
+    Looks for macro occurrences in a term.
     - [mode = `FullDelta]: all macros that can be expanded are ignored.
     - [mode = `Delta]: only Global macros are expanded (and ignored)
-    @raise Var_found if a term variable occurs in the term. *)
-let get_macro_occs  
-    ~(mode  : [`FullDelta | `Delta ])
+    @raise a user-level error if a non-ptime term variable occurs in the term. *)
+let get_macro_occs
+    ~(mode  : allowed_constants )   (* allowed sub-terms without further checks *)
+    ~(expand_mode : [`FullDelta | `Delta ])
+    ~(env   : Env.t)
+    ~(fv    : Vars.vars)  (* additional [fv] not in [env.vars] *)
     (constr : Constr.trace_cntxt)
     (t      : Term.term)
   : macro_occs
   =
+  let env fv =
+    Env.update ~vars:(Vars.add_vars (Vars.Tag.global_vars ~const:true fv) env.vars) env
+  in
   let rec get (t : Term.term) ~(fv:Vars.vars) ~(cond:Term.terms) : macro_occs =
+    let env = env fv in
+    assert (Sv.subset (Term.fv t) (Vars.to_vars_set env.vars));
+
     match t with
-    | Term.Var v when not (Type.is_finite (Vars.ty v)) ->
-      raise Var_found
+    | _ when mode = PTimeSI   && HighTerm.is_ptime_deducible ~const:`Exact ~si:true  env t -> []
+    | _ when mode = PTimeNoSI && HighTerm.is_ptime_deducible ~const:`Exact ~si:false env t -> []
+    | _ when mode = Const     && HighTerm.is_constant        `Exact                  env t -> []
+
+    | Term.Var v -> 
+      let err_str =
+        Fmt.str "terms contain a %s variable: @[%a@]" 
+          (match mode with Const -> "non-constant" | PTimeSI | PTimeNoSI -> "non-ptime")
+          Vars.pp v
+      in
+      Tactics.soft_failure (Tactics.Failure err_str)
 
     | Term.Macro (ms, l, ts) ->
       let default () =
@@ -501,7 +523,7 @@ let get_macro_occs
         rec_strict_subterms t ~fv ~cond
       in
 
-      if mode = `FullDelta || Macros.is_global constr.table ms.Term.s_symb then
+      if expand_mode = `FullDelta || Macros.is_global constr.table ms.Term.s_symb then
         match Macros.get_definition constr ms ~args:l ~ts with
         | `Def t -> get t ~fv ~cond
         | `Undef | `MaybeDef -> default ()
@@ -517,7 +539,7 @@ let get_macro_occs
          get t ~fv ~cond @ occs
       ) ~fv ~cond t []
   in
-  get t ~fv:[] ~cond:[]
+  get t ~fv ~cond:[]
 
 
 (*------------------------------------------------------------------*)
@@ -702,9 +724,10 @@ end = struct
     { msymb; args; indices; path_cond; }
 
   let pp fmt (mset : t) =
-    Fmt.pf fmt "@[<hv 2>{ @[%a@]@@_ |@ %a%a}@]"
+    Fmt.pf fmt "@[<hv 2>{ @[%a(%a)@]@@_ |@ %a%a}@]"
       Term.pp_msymb mset.msymb
-      (Fmt.list ~sep:Fmt.comma Vars.pp) mset.indices 
+      Vars.pp_list mset.args
+      Vars.pp_list mset.indices 
       PathCond.pp mset.path_cond
 
   let pp_l fmt (mset_l : t list) =
@@ -805,7 +828,7 @@ end = struct
     let pat2 = Term.{ 
         pat_term   = term2;
         pat_tyvars = [];
-        pat_vars   = Sv.of_list1 s2.indices;}
+        pat_vars   = Vars.Tag.local_vars s2.indices;}
     in
     let system = SE.reachability_context sexpr in
     match Match.T.try_match table system term1 pat2 with
@@ -899,23 +922,27 @@ let mset_of_macro_occ (env : Sv.t) ~(path_cond : PathCond.t) (occ : macro_occ) :
 (** Return an over-approximation of the macros reachable from a term
     in any trace model. *)
 let macro_support
-    ~(env  : Sv.t) 
+    ~(mode : allowed_constants)   (* allowed sub-terms without further checks *)
+    ~(env  : Env.t) 
     (cntxt : Constr.trace_cntxt)
     (term  : Term.term)
   : MsetAbs.t
   =
   let get_msymbs
-      ~(mode : [`Delta | `FullDelta ]) 
-      ~(path_cond : PathCond.t)
-      (term  : Term.term) 
+      ~(expand_mode : [`Delta | `FullDelta ]) 
+      ~(path_cond   : PathCond.t)
+      ~(fv          : Vars.vars)  (* additional [fv] not in [env.vars] *)
+      (term         : Term.term) 
     : MsetAbs.t 
     =
-    let occs = get_macro_occs ~mode cntxt term in
-    let msets = List.map (mset_of_macro_occ env ~path_cond) occs in
+    assert (Sv.subset (Term.fv term) (Sv.union (Vars.to_vars_set env.vars) (Sv.of_list fv)));
+
+    let occs = get_macro_occs ~expand_mode ~mode ~env ~fv cntxt term in
+    let msets = List.map (mset_of_macro_occ (Vars.to_vars_set env.vars) ~path_cond) occs in
     List.fold_left (fun abs mset -> MsetAbs.join_single mset abs) [] msets
   in
 
-  let init : MsetAbs.t = get_msymbs ~mode:`FullDelta ~path_cond:Top term in
+  let init : MsetAbs.t = get_msymbs ~expand_mode:`FullDelta ~path_cond:Top ~fv:[] term in
 
   (* all actions names of the system *)
   let all_actions : Symbols.action list = 
@@ -947,28 +974,32 @@ let macro_support
         fold_descr ~globals:true
           (fun
             (msymb : Symbols.macro) 
-            (_ : Vars.vars) (m_is : Vars.vars) 
+            (a_is : Vars.vars) (m_is : Vars.vars) 
             _ (t : Term.term) (sm : MsetAbs.t) ->
-             if List.mem_assoc msymb sm then
-               (* we compute the substitution which we will use to instantiate
-                  [t] on the indices of the macro set in [sm]. *)
-               let subst =
-                 let mset = List.assoc msymb sm in
-                 List.map2 (fun i j ->
-                     Term.ESubst (Term.mk_var i, Term.mk_var j)
-                   ) m_is mset.Mset.args
-               in
-               let t = Term.subst subst t in
+            if List.mem_assoc msymb sm then
+              (* we compute the substitution which we will use to instantiate
+                 [t] on the indices of the macro set in [sm]. *)
+              let subst =
+                let mset = List.assoc msymb sm in
+                List.map2 (fun i j ->
+                    Term.ESubst (Term.mk_var i, Term.mk_var j)
+                  ) m_is mset.Mset.args
+              in
+              let t = Term.subst subst t in
+              let m_is = Term.subst_vars subst m_is in
+              let a_is = Term.subst_vars subst a_is in
+              
+              (* Compute a valid path condition.
+                 Path conditions do not contain terms (hence nothing to substitute). *)
+              let path_cond =
+                PathCond.concat ~all_actions
+                  (PathCond.Before [descr]) (List.assoc msymb sm).path_cond 
+              in
 
-               (* compute a valid path condition *)
-               let path_cond =
-                 PathCond.concat ~all_actions
-                   (PathCond.Before [descr]) (List.assoc msymb sm).path_cond 
-               in
+              let sm' = get_msymbs ~expand_mode:`Delta ~path_cond ~fv:(a_is @ m_is) t in
+              MsetAbs.join sm' sm
 
-               MsetAbs.join (get_msymbs ~mode:`Delta ~path_cond t) sm
-                 
-             else sm
+            else sm
           ) cntxt.table cntxt.system descr sm
       ) cntxt.table cntxt.system sm
   in
@@ -1024,17 +1055,18 @@ let pp_iocc fmt (o : iocc) : unit =
     See the function [fold_macro_support] below for a more detailed 
     description. *)
 let _fold_macro_support
+    ?(mode : allowed_constants = PTimeSI)   (* allowed sub-terms without further checks *)
     (func  : ((unit -> Action.descr) -> iocc -> 'a -> 'a))
     (cntxt : Constr.trace_cntxt)
-    (env   : Vars.env)
+    (env   : Env.t)
     (terms : Term.term list)
     (init  : 'a) : 'a
   =
-  let env = Vars.to_set env in
+  let venv = Vars.to_vars_set env.vars in
 
   (* association list of terms and their macro support *)
   let sm : (Term.term * MsetAbs.t) list =
-    List.map (fun src -> (src, macro_support ~env cntxt src)) terms
+    List.map (fun src -> (src, macro_support ~mode ~env cntxt src)) terms
   in
 
   if pp_dbg then                (* debug printing, turned-off  *)
@@ -1056,7 +1088,7 @@ let _fold_macro_support
   in
 
   SE.fold_descrs (fun descr acc ->
-      fold_descr ~globals:true (fun msymb _ m_is _ t acc ->
+      fold_descr ~globals:true (fun msymb _a_is m_is _ t acc ->
           if Ms.mem msymb macro_occs then
             let srcs, mset = Ms.find msymb macro_occs in
 
@@ -1078,7 +1110,7 @@ let _fold_macro_support
             in
             let iocc = {
               iocc_aname   = descr.name;
-              iocc_vars    = Sv.diff iocc_fv env;
+              iocc_vars    = Sv.diff iocc_fv venv;
               iocc_action;
               iocc_cnt;
               iocc_sources = srcs;
@@ -1094,28 +1126,30 @@ let _fold_macro_support
 
 (** See `.mli` for a complete description *)
 let fold_macro_support
+    ?(mode : allowed_constants option)   (* allowed sub-terms without further checks *)
     (func  : (iocc -> 'a -> 'a))
     (cntxt : Constr.trace_cntxt)
-    (env   : Vars.env)
+    (env   : Env.t)
     (terms : Term.term list)
     (init  : 'a) : 'a
   =
-  _fold_macro_support (fun _ -> func) cntxt env terms init
+  _fold_macro_support ?mode (fun _ -> func) cntxt env terms init
 
 (** Less precise version of [fold_macro_support], which does not track 
     sources. *)
 let fold_macro_support0
+    ?(mode : allowed_constants option)   (* allowed sub-terms without further checks *)
     (func : (
         Symbols.action -> (* action name *)
         Action.action ->  (* action *)
         Term.term ->      (* term *)
         'a -> 'a))
     (cntxt : Constr.trace_cntxt)
-    (env   : Vars.env)
+    (env   : Env.t)
     (terms : Term.term list)
     (init  : 'a) : 'a
   =
-  _fold_macro_support (fun _ iocc acc ->
+  _fold_macro_support ?mode (fun _ iocc acc ->
       func iocc.iocc_aname iocc.iocc_action iocc.iocc_cnt acc
     ) cntxt env terms init
 
@@ -1123,12 +1157,13 @@ let fold_macro_support0
 (** Less precise version of [fold_macro_support], which does not track 
     sources. *)
 let fold_macro_support1
+    ?(mode : allowed_constants option)   (* allowed sub-terms without further checks *)
     (func  : (Action.descr -> Term.term -> 'a -> 'a))
     (cntxt : Constr.trace_cntxt)
-    (env   : Vars.env)
+    (env   : Env.t)
     (terms : Term.term list)
     (init  : 'a) : 'a
   =
-  _fold_macro_support (fun descr iocc acc ->
+  _fold_macro_support ?mode (fun descr iocc acc ->
       func (descr ()) iocc.iocc_cnt acc
     ) cntxt env terms init

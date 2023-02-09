@@ -7,6 +7,7 @@ module LS = LowSequent
 module Sv = Vars.Sv
 module Mvar = Match.Mvar
 
+module HTerm = HighTerm
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
@@ -19,7 +20,9 @@ module PT = struct
       For now, we do not keep the proof-term itself. *)
   type t = {
     system : SE.context;
-    args   : Sv.t;
+    args   : (Vars.var * Vars.Tag.t) list;
+    (** in reversed order w.r.t. introduction *)
+    
     mv     : Mvar.t;
     subgs  : Equiv.any_form list;
     form   : Equiv.any_form;
@@ -47,26 +50,13 @@ module PT = struct
 
   let pp fmt (pt : t) : unit =
     Fmt.pf fmt "@[<v 0>\
-                @[%a@]@;\
-                system : @[%a@]@]"
+                  @[%a@]@;\
+                system : @[%a@]@;\
+                vars: @[%a@]@]"
       Equiv.Any.pp pt.form
       SE.pp_context pt.system
+      Vars.pp_typed_tagged_list (List.rev pt.args)
 end
-
-(*------------------------------------------------------------------*)
-(* let kind : Equiv.any_form -> [`Global | `Local] = function
- *   | Local  _ -> `Local
- *   | Global _ -> `Global *)
-
-(*------------------------------------------------------------------*)
-(* let is_local : Equiv.any_form -> bool = function
- *   | Local  _ -> true
- *   | Global _ -> false *)
-
-(*------------------------------------------------------------------*)
-(* let is_global : Equiv.any_form -> bool = function
- *   | Local  _ -> true
- *   | Global _ -> false *)
 
 (*------------------------------------------------------------------*)
 (** Try to localize [pt] *)
@@ -79,11 +69,11 @@ let pt_try_localize ~(failed : unit -> PT.t) (pt : PT.t) : PT.t =
     (* [pf_t] is a [forall vs, f]: add [vs] as variables *)
     | Global (Equiv.Quant (Equiv.ForAll, vs, f)) ->
       (* refresh variables *)
-      let vs, subst = Term.refresh_vars `Global vs in
+      let vs, subst = Term.refresh_vars_w_info vs in
       let f = Equiv.subst subst f in
 
       doit { pt with
-             args = Sv.add_list pt.args vs;
+             args = List.rev_append vs pt.args;
              form = Global f; }
 
     (* [pf_t] is an implication [f1 -> f2]: add [f1] as hypothesis *)
@@ -290,68 +280,65 @@ module Mk (Args : MkArgs) : S with
     Lemma.mem_reach name (S.table s)
 
   (*------------------------------------------------------------------*)
-  let is_impl_k (type a) (f_kind : a Equiv.f_kind) (f : a) : bool
-    =
-    match f_kind with
-    | Equiv.Local_t  ->  Term.Smart.is_impl f
-    | Equiv.Global_t -> Equiv.Smart.is_impl f
-    | Equiv.Any_t ->
-      match f with
-      | Local f  ->  Term.Smart.is_impl f |
-        Global f -> Equiv.Smart.is_impl f
-
   let destr_impl_k
       (type a)
       (f_kind : a Equiv.f_kind)
-      (f      : a)
+      (env : Env.t)
+      (f   : a)
     : (a * a) option
     =
     match f_kind with
-    | Equiv.Local_t  ->  Term.Smart.destr_impl f
-    | Equiv.Global_t -> Equiv.Smart.destr_impl f
+    | Equiv.Local_t  -> HTerm.Smart.destr_impl ~env f
+    | Equiv.Global_t -> Equiv.Smart.destr_impl ~env f
     | Equiv.Any_t ->
       match f with
       | Local f ->
         omap
           (fun (v,f) -> Equiv.Local v, Equiv.Local f)
-          (Term.Smart.destr_impl f)
+          (HTerm.Smart.destr_impl ~env f)
           
       | Global f ->
         omap
           (fun (v,f) -> Equiv.Global v, Equiv.Global f)
-          (Equiv.Smart.destr_impl f)
+          (Equiv.Smart.destr_impl ~env f)
 
-  let destr_forall1_k
+  let destr_forall1_tagged_k
       (type a)
       (f_kind : a Equiv.f_kind)
       (f      : a)
-    : (Vars.var * a) option
+    : (Vars.tagged_var * a) option
     =
     match f_kind with
-    | Equiv.Local_t  ->  Term.Smart.destr_forall1 f
-    | Equiv.Global_t -> Equiv.Smart.destr_forall1 f
+    | Equiv.Local_t  -> HTerm.Smart.destr_forall1_tagged f
+    | Equiv.Global_t -> Equiv.Smart.destr_forall1_tagged f
+        
     | Equiv.Any_t ->
       match f with
       | Local f ->
-        omap (fun (v,f) -> v, Equiv.Local f) (Term.Smart.destr_forall1 f)
+        omap (fun (v,f) -> v, Equiv.Local f) (HTerm.Smart.destr_forall1_tagged f)
+          
       | Global f ->
-        omap (fun (v,f) -> v, Equiv.Global f) (Equiv.Smart.destr_forall1 f)
-
-  let decompose_forall_k
+        omap (fun (v,f) -> v, Equiv.Global f) (Equiv.Smart.destr_forall1_tagged f)
+          
+  let decompose_forall_tagged_k
       (type a)
       (f_kind : a Equiv.f_kind)
       (f      : a)
-    : Vars.vars * a
+    : Vars.tagged_vars * a
     =
     match f_kind with
-    | Equiv.Local_t  ->  Term.Smart.decompose_forall f
-    | Equiv.Global_t -> Equiv.Smart.decompose_forall f
+    | Equiv.Local_t  -> HTerm.Smart.decompose_forall_tagged f 
+    | Equiv.Global_t -> Equiv.Smart.decompose_forall_tagged f 
+      
     | Equiv.Any_t ->
       match f with
       | Local f ->
-        let vs,f = Term.Smart.decompose_forall f in vs, Local f
+        let vs,f = HTerm.Smart.decompose_forall_tagged f in
+        vs, Local f
+
       | Global f ->
-        let vs,f = Equiv.Smart.decompose_forall f in vs, Global f
+        let vs,f = Equiv.Smart.decompose_forall_tagged f in
+        vs, Global f
   
   (*------------------------------------------------------------------*)
   (** Return the location of a proof term argument. *)
@@ -468,7 +455,7 @@ module Mk (Args : MkArgs) : S with
       { system = S.system s;
         subgs  = [];
         mv     = Mvar.empty;
-        args   = Sv.empty;
+        args   = [];
         form   = f; }
 
     else if not (Lemma.mem name table) then
@@ -499,28 +486,76 @@ module Mk (Args : MkArgs) : S with
       { system = lem.system;
         mv     = Mvar.empty;
         subgs  = [];
-        args   = Sv.empty;
+        args   = [];
         form; }
+
+  (*------------------------------------------------------------------*)
+  (** Extend a variable environment with the variables of [pt] *)
+  let venv_of_pt (env : Vars.env) (pt : PT.t) : Vars.env =
+    Vars.add_vars pt.args env
+
+  (** Extend an environment with the variables of [pt] *)
+  let env_of_pt table system (env : Vars.env) (pt : PT.t) : Env.t =
+    Env.init ~table ~system ~vars:(venv_of_pt env pt) ()
+
+  (*------------------------------------------------------------------*)
+  let error_pt_apply_not_system_indep loc ~(pt : PT.t) ~(arg : Term.t) =
+    let err_str =
+      Fmt.str "@[<v 0>The term:@;  @[%a@]@;\
+               is not system-independent. It cannot be applied to:@;  @[%a@].@]"
+        Term.pp arg
+        PT.pp pt
+    in
+    soft_failure ~loc (Failure err_str)
+
+    (*------------------------------------------------------------------*)
+  let error_pt_apply_not_constant loc ~(pt : PT.t) ~(arg : Term.t) =
+    let err_str =
+      Fmt.str "@[<v 0>The term:@;  @[%a@]@;\
+               is not constant. It cannot be applied to:@;  @[%a@].@]"
+        Term.pp arg
+        PT.pp pt
+    in
+    soft_failure ~loc (Failure err_str)
 
   (*------------------------------------------------------------------*)
   (** Apply [pt] to [p_arg].
       Pop the first universally quantified variable in [f] and
       instantiate it with [pt_arg]*)
   let pt_apply_var_forall
+      ~(arg_loc:L.t) (table : Symbols.table) (env : Vars.env)
       (pt : PT.t) (pt_arg : Term.term)
     : PT.t
     =
-    let f_arg, f = oget (destr_forall1_k Equiv.Any_t pt.form) in
+    let (f_arg, f_arg_tag), f = oget (destr_forall1_tagged_k Equiv.Any_t pt.form) in
 
     (* refresh the variable *)
-    let f_arg, fs = Term.refresh_vars `Global [f_arg] in
+    let f_arg, fs = Term.refresh_vars [f_arg] in
     let f = Equiv.Any.subst fs f in
     let f_arg = as_seq1 f_arg in
 
+    (* collect hole vars in the argument [pt_arg] *)
     let new_p_vs = Sv.filter Vars.is_pat (Term.fv pt_arg) in
-    let args = Sv.union new_p_vs pt.args in
+    (* hole vars are global if [pt]'s conclusion is a global quant., i.e.
+       if [f_arg_kind] is [`Global]. *)
+    let args =
+      List.rev_append (List.map (fun x -> x, f_arg_tag) (Sv.elements new_p_vs)) pt.args
+    in
 
-    let mv = Mvar.add f_arg pt_arg pt.mv in
+    (* check system-independence, if applicable *)
+    let () =
+      let venv = Vars.add_vars args env in
+      let env = Env.init ~table ~system:pt.system ~vars:venv () in
+      if f_arg_tag.system_indep && not (HTerm.is_system_indep env pt_arg) then
+        error_pt_apply_not_system_indep arg_loc ~pt ~arg:pt_arg;
+
+      if f_arg_tag.const && not (HTerm.is_constant `Exact env pt_arg) then
+        error_pt_apply_not_constant arg_loc ~pt ~arg:pt_arg;
+    in
+
+    let mv =
+      Mvar.add (f_arg, f_arg_tag) pt.system.set pt_arg pt.mv
+    in
     { subgs = pt.subgs; args; mv; form = f; system = pt.system }
 
   (*------------------------------------------------------------------*)
@@ -541,13 +576,22 @@ module Mk (Args : MkArgs) : S with
         PT.pp pt
     in
     soft_failure ~loc (Failure err_str)
+  
+  (*------------------------------------------------------------------*)
+  let subst_of_pt ~loc table (vars : Vars.env) (pt : PT.t) : Term.subst = 
+    let pt_venv = venv_of_pt vars pt in
+    match Mvar.to_subst ~mode:`Unif table pt_venv pt.mv with
+    | `Subst sbst -> sbst
+    | `BadInst pp_err ->
+      soft_failure ~loc
+        (Failure (Fmt.str "@[<hv 2>proof-term failed:@ @[%t@]@]" pp_err))
 
   (*------------------------------------------------------------------*)
-  (** Apply [pt] to [p_arg] when [pt] is an implication. 
+  (** Apply [pt] to [arg] when [pt] is an implication. 
       Pop the first implication [f1] of [pt.form], instantiate (my matching) it
-      using [pt_impl_arg], and return the updated [pt].
+      using [arg], and return the updated [pt].
 
-      Remark: [pt_arg]'s substitution must be an extention of 
+      Remark: [arg]'s substitution must be an extention of 
       [pt]'s substitution. *)
   let pt_apply_var_impl
       (* ~(loc : L.t)  *) ~(loc_arg : L.t)
@@ -579,10 +623,13 @@ module Mk (Args : MkArgs) : S with
         
     in
 
-    let f1, f2 = oget (destr_impl_k Equiv.Any_t pt.form) in
-    (* Specializing [pt.form] by an extention of [pt.mv] is always 
-       safe. *)
-    let sbst = Mvar.to_subst ~mode:`Unif arg.mv in
+    let f1, f2 =
+      let pt_env = env_of_pt (S.table s) (S.system s) (S.vars s) pt in
+      oget (destr_impl_k Equiv.Any_t pt_env pt.form)
+    in
+    (* Specializing [pt.form] by an extention of [pt.mv]. *)
+    (* FIXME: correct location? *)
+    let sbst = subst_of_pt ~loc:loc_arg table (S.vars s) arg in
     let f1 = Equiv.Any.subst sbst f1 in
     let pat_f1 = Term.{
         pat_vars   = pt.args;
@@ -599,21 +646,22 @@ module Mk (Args : MkArgs) : S with
     let pt, arg =
       pt_unify_systems ~failed:(pt_apply_error arg) table ~pt ~arg
     in
-    
-    (* FIXME: unify [f1] and [arg.form] instead of matching.
-       This probably allows not to specialize [f1] above. *)
+
     let match_res =
+      (* variable environment with both [pt] and [arg] variables (with their tags). *)
+      let env = Vars.add_vars (arg.args @ pt.args) (S.vars s) in
+
       match f1, arg.form with
       | Local f1, Local f_arg ->
         let pat_f1 = { pat_f1 with pat_term = f1 } in
         Match.T.try_match
-          ~ty_env ~mv:arg.mv
+          ~ty_env ~mv:arg.mv ~env
           table pt.system f_arg pat_f1
 
       | Global f1, Global f_arg  ->
         let pat_f1 = { pat_f1 with pat_term = f1 } in
         Match.E.try_match
-          ~ty_env ~mv:arg.mv
+          ~ty_env ~mv:arg.mv ~env
           table pt.system f_arg pat_f1
 
       | _ -> assert false       (* impossible thanks to [pt_try_localize] *)
@@ -626,7 +674,7 @@ module Mk (Args : MkArgs) : S with
 
     (* Add to [pt.args] the new variables that must be instantiated in
        the proof term [p_arg]. *)
-    let args = Sv.union arg.args pt.args in
+    let args = List.rev_append arg.args pt.args in
     let subgs = arg.subgs @ pt.subgs in
 
     { subgs; mv; args; form = f2; system = pt.system; }
@@ -648,7 +696,7 @@ module Mk (Args : MkArgs) : S with
       (p_pt : Theory.p_pt)
       (s : S.t) : ghyp * PT.t
     =
-    let table = S.table s in
+    let table, env = S.table s, S.vars s in
 
     let lem_name, init_pt =
       pt_of_assumption ~table ty_env p_pt.p_pt_head s 
@@ -660,15 +708,15 @@ module Mk (Args : MkArgs) : S with
 
     (** Apply [pt] to [p_arg] when [pt] is a forall. *)
     let do_var (pt : PT.t) (p_arg : Theory.term) : PT.t =
-      match destr_forall1_k Equiv.Any_t pt.form with
+      match destr_forall1_tagged_k Equiv.Any_t pt.form with
       | None ->
         error_pt_cannot_apply (L.loc p_pt.p_pt_head) pt
 
-      | Some (f_arg, _) ->
+      | Some ((f_arg, _), _) ->
         let ty = Vars.ty f_arg in
         let arg, _ = Theory.convert ~ty_env ~pat:true cenv ~ty p_arg in
 
-        pt_apply_var_forall pt arg
+        pt_apply_var_forall ~arg_loc:(L.loc p_arg) table env pt arg
     in
 
     (** Apply [pt] to [p_arg] when [pt] is an implication. *)
@@ -676,21 +724,32 @@ module Mk (Args : MkArgs) : S with
         (pt : PT.t) (pt_impl_arg : pt_impl_arg)
       : PT.t
       =
-      match destr_impl_k Equiv.Any_t pt.form, pt_impl_arg with
-      | None, _ ->
-        error_pt_cannot_apply (L.loc p_pt.p_pt_head) pt
-          
-      | Some (f1, f2), `Subgoal ->
+      let pt_env = env_of_pt (S.table s) (S.system s) (S.vars s) pt in
+
+      (* try to destruct [pt.form] as an implication *)
+      let f1, f2 =
+        match destr_impl_k Equiv.Any_t pt_env pt.form with
+        | Some (f1, f2) -> f1, f2
+        | None -> (* destruct failed, applying the pending substitution and try to destruct again *)
+          let subst = subst_of_pt ~loc:p_pt.p_pt_loc table (S.vars s) pt in
+          match destr_impl_k Equiv.Any_t pt_env (Equiv.Any.subst subst pt.form) with
+          | Some (f1, f2) -> f1, f2
+          | None ->
+            error_pt_cannot_apply (L.loc p_pt.p_pt_head) pt
+      in
+
+      match pt_impl_arg with
+      | `Subgoal ->
         { system = pt.system;
           subgs  = f1 :: pt.subgs;
           mv     = pt.mv;
           args   = pt.args;
           form   = f2; }
 
-      | Some _, `Pt p_arg ->
+      | `Pt p_arg ->
         let _, pt_arg = _convert_pt_gen ty_env pt.mv p_arg s in
         pt_apply_var_impl
-          (* ~loc:(L.loc pt.p_pt_head) *) ~loc_arg:p_arg.p_pt_loc
+          ~loc_arg:p_arg.p_pt_loc
           ty_env s
           pt pt_arg
     in
@@ -700,7 +759,7 @@ module Mk (Args : MkArgs) : S with
        and accumulating proof obligations. *)
     let pt =
       List.fold_left (fun (pt : PT.t) (p_arg : Theory.p_pt_arg) ->
-          if is_impl_k Equiv.Any_t pt.form then
+          if destr_forall1_tagged_k Equiv.Any_t pt.form = None then
             do_impl pt (pt_arg_as_pt p_arg) 
           else
             do_var pt (pt_arg_as_term p_arg) 
@@ -711,26 +770,27 @@ module Mk (Args : MkArgs) : S with
 
   (*------------------------------------------------------------------*)
   (** Closes inferred variables from [pt.args] by [pt.mv]. *)
-  let close (pt : PT.t) : PT.t =
+  let close loc (table : Symbols.table) (env : Vars.env) (pt : PT.t) : PT.t =
     (* clear infered variables from [pat_vars] *)
     let args =
-      Sv.filter (fun v -> not (Mvar.mem v pt.mv)) pt.args
+      List.filter (fun (v, _) -> not (Mvar.mem v pt.mv)) pt.args
     in
     (* instantiate infered variables *)
-    let subst = Mvar.to_subst ~mode:`Unif pt.mv in
+    let subst = subst_of_pt ~loc table env pt in 
     let form = Equiv.Any.subst subst pt.form in
     let subgs = List.map (Equiv.Any.subst subst) pt.subgs in
 
     (* the only remaining variables are pattern holes '_' *)
-    assert (Sv.for_all Vars.is_pat args);
+    assert (List.for_all (fst_map Vars.is_pat) args);
 
     (* renamed remaining pattern variables,
        to avoir having variable named '_' in the rest of the prover. *)
     let subst, args =
-        Sv.map_fold (fun subst v ->
+      List.map_fold (fun subst (v, var_info) ->
           let new_v = Vars.make_fresh (Vars.ty v) "x" in
-          Term.ESubst (Term.mk_var v, Term.mk_var new_v) :: subst,
-          new_v
+          let subst = Term.ESubst (Term.mk_var v, Term.mk_var new_v) :: subst in
+          ( subst,
+            (new_v, var_info) )
           ) [] args
     in
     let form = Equiv.Any.subst subst form in
@@ -775,26 +835,25 @@ module Mk (Args : MkArgs) : S with
     in
     
     (* close the proof-term by inferring as many pattern variables as possible *)
-    let pt = close pt in
+    let pt = close p_pt.p_pt_loc (S.table s) (S.vars s) pt in
 
     (* pattern variable remaining, and not allowed *)
-    if close_pats && not (Sv.is_empty pt.args) then
+    if close_pats && not (pt.args = []) then
       Tactics.soft_failure Tactics.CannotInferPats;
 
     (* close the unienv and generalize remaining univars *)
     let pat_tyvars, tysubst = Type.Infer.gen_and_close ty_env in
     let form = Equiv.Babel.tsubst Equiv.Any_t tysubst pt.form in
     let subgs = List.map (Equiv.Babel.tsubst Equiv.Any_t tysubst) pt.subgs in
-    let args = Sv.map (Vars.tsubst tysubst) pt.args in
+    let args = List.map (fun (v, info) -> Vars.tsubst tysubst v, info) pt.args in
 
     (* generalize remaining universal variables in f *)
     (* FIXME: don't generalize in convert_pt_gen *)
-    let f_args, form = decompose_forall_k Equiv.Any_t form in
-    let f_args, subst = Term.refresh_vars `Global f_args in
+    let f_args, form = decompose_forall_tagged_k Equiv.Any_t form in
+    let f_args, subst = Term.refresh_vars_w_info f_args in
+   
     let form = Equiv.Any.subst subst form in
-    let args =
-      List.fold_left (fun args v -> Sv.add v args) args f_args
-    in
+    let args = List.rev_append f_args args in
 
     let pt = { pt with form; subgs; args; } in
 

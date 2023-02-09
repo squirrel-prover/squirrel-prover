@@ -12,7 +12,8 @@ name m : index->message
 system null.
 
 (* The main test, with a non-empty list of bound variables. *)
-equiv nonempty (i:index) : seq(i,y:index => h(n(i),k)), diff(h(n(i),k),h(m(i),k)).
+equiv nonempty (i:index[param]) : 
+  seq(i,y:index => h(n(i),k)), diff(h(n(i),k),h(m(i),k)).
 Proof.
   prf 1.
   (* Check that the right formula has been produced,
@@ -26,7 +27,8 @@ Qed.
 
 (* Secondary test, without any bound variable, just to check
    that an empty forall is not produced. *)
-equiv empty (i:index) : h(n(i),k), diff(h(n(i),k),h(m(i),k)).
+equiv empty (i:index[param]) : 
+  h(n(i),k), diff(h(n(i),k),h(m(i),k)).
 Proof.
   prf 1.
   (* Check that the right formula has been produced,

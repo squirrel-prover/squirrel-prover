@@ -155,11 +155,6 @@ and hash_l (l : term list) (h : int) : int =
 let equal (t : term) (t' : term) : bool = t = t'
                                           
 (*------------------------------------------------------------------*)
-(** {2 Higher-order terms} *)
-
-type hterm = Lambda of Vars.vars * term
-
-(*------------------------------------------------------------------*)
 (** {2 Builtins function symbols} *)
 
 let f_diff = Symbols.fs_diff
@@ -418,9 +413,6 @@ let mk_neqs ?(simpl=false) vect_i vect_j =
 let mk_eqs ?(simpl=true) vect_i vect_j =
   mk_ands ~simpl:true (List.map2 (mk_eq ~simpl) vect_i vect_j)
 
-let mk_lambda evs ht = match ht with
-  | Lambda (evs', t) -> Lambda (evs @ evs', t)
-
 (*------------------------------------------------------------------*)
 (** {2 Destructors} *)
 
@@ -453,12 +445,35 @@ let oas_seq2 = omap as_seq2
 module SmartDestructors = struct
 
   (*------------------------------------------------------------------*)
+  let destr_quant1_tagged q = function
+    | Quant (q', v :: vs, f) when q = q' ->
+      Some ((v, Vars.Tag.make Vars.Local), mk_quant_ns q vs f)
+    | _ -> None
+  
+  let destr_forall1_tagged = destr_quant1_tagged ForAll
+  let destr_exists1_tagged = destr_quant1_tagged Exists
+
+  (*------------------------------------------------------------------*)
   let destr_quant1 q = function
     | Quant (q', v :: vs, f) when q = q' -> Some (v, mk_quant_ns q vs f)
     | _ -> None
-  
+
   let destr_forall1 = destr_quant1 ForAll
   let destr_exists1 = destr_quant1 Exists
+
+  (*------------------------------------------------------------------*)
+  let rec destr_quant_tagged q = function
+    | Quant (q', vs, f) when q = q' ->
+      let vs_sc = Vars.Tag.local_vars vs in
+      begin
+        match destr_quant_tagged q f with
+        | Some (vs', f) -> Some (vs_sc @ vs', f)
+        | None -> Some (vs_sc, f)
+      end
+    | _ -> None
+
+  let destr_forall_tagged = destr_quant_tagged ForAll
+  let destr_exists_tagged = destr_quant_tagged Exists
 
   (*------------------------------------------------------------------*)
   let rec destr_quant q = function
@@ -484,6 +499,16 @@ module SmartDestructors = struct
   let decompose_exists = decompose_quant Exists
 
   (*------------------------------------------------------------------*)
+  let rec decompose_quant_tagged q = function
+    | Quant (q', vs, f) when q = q' ->
+      let vs', f0 = decompose_quant_tagged q f in
+      (Vars.Tag.local_vars vs) @ vs', f0
+    | _ as f -> [], f
+
+  let decompose_forall_tagged = decompose_quant_tagged ForAll
+  let decompose_exists_tagged = decompose_quant_tagged Exists
+
+  (*------------------------------------------------------------------*)
   let destr_false f = oas_seq0 (destr_fun ~fs:f_false f)
   let destr_true  f = oas_seq0 (destr_fun ~fs:f_true  f)
 
@@ -491,7 +516,8 @@ module SmartDestructors = struct
 
   let destr_not  f = oas_seq1 (destr_fun ~fs:f_not f)
 
-  let destr_or   f = oas_seq2 (destr_fun ~fs:f_or   f)
+  let destr_or f = oas_seq2 (destr_fun ~fs:f_or   f)
+      
   let destr_and  f = oas_seq2 (destr_fun ~fs:f_and  f)
   let destr_iff  f = oas_seq2 (destr_fun ~fs:f_iff f)
   let destr_pair f = oas_seq2 (destr_fun ~fs:f_pair f)
@@ -580,9 +606,6 @@ module SmartDestructors = struct
   let is_impl f = destr_impl f <> None
   let is_iff  f = destr_iff  f <> None
 
-  (* is_pair is unused but having it seems to make sense *)
-  let[@warning "-32"] is_pair f = destr_pair f <> None
-
   let is_exists f = destr_exists f <> None
   let is_forall f = destr_forall f <> None
 
@@ -667,28 +690,43 @@ let has_var (v:Vars.var) (t:term) : bool =
   List.mem v (get_vars t)
     
 (*------------------------------------------------------------------*)
-type refresh_arg = [`Global | `InEnv of Vars.env ref ]
-
-let refresh_var (arg : refresh_arg) v =
-  match arg with
-  | `Global    -> Vars.refresh v
-  | `InEnv env -> Vars.make_approx_r env v
-
-(* The substitution must be built reversed w.r.t. vars, to handle capture. *)
-let refresh_vars (arg : refresh_arg) evars =
+(** The substitution must be built reversed w.r.t. vars, to handle capture. *)
+let refresh_vars (vars : Vars.vars) : Vars.vars * subst =
   let l =
     List.rev_map (fun v ->
-        let v' = refresh_var arg v in
+        let v' = Vars.refresh v in
         v', ESubst (Var v, Var v')
-      ) evars
+      ) vars
   in
   let vars, subst = List.split l in
   List.rev vars, subst
 
-let refresh_vars_env env vs =
+let refresh_vars_w_info (vars_info : (Vars.var * 'a) list) : (Vars.var * 'a) list * subst =
+  let vars, vars_info = List.split vars_info in
+  let vars, subst = refresh_vars vars in
+  List.combine vars vars_info, subst
+
+(*------------------------------------------------------------------*)
+(** The substitution must be built reversed w.r.t. vars, to handle capture. *)
+let add_vars_env
+    (env : 'a Vars.genv) (vs : (Vars.var * 'a) list) 
+  : 'a Vars.genv * Vars.vars * subst 
+  =
   let env = ref env in
-  let vs, s = refresh_vars (`InEnv env) vs in
-  !env, vs, s
+  let l =
+    List.rev_map (fun (v,info) ->
+        let v' = Vars.make_approx_r env v info in
+        v', ESubst (Var v, Var v')
+      ) vs
+  in
+  let vars, subst = List.split l in
+  !env, List.rev vars, subst
+
+let add_vars_simpl_env
+    (env : Vars.simpl_env) (vs : Vars.var list) 
+  : Vars.simpl_env * Vars.vars * subst 
+  =
+  add_vars_env env (List.map (fun x -> x, ()) vs)
 
 (*------------------------------------------------------------------*)
 (** {2 Iterators} *)
@@ -843,18 +881,19 @@ and subst_binding (var : Vars.var) (s : subst) : Vars.var * subst =
         Sv.union acc (fv x)
       ) right_fv s in
 
-  let env = ref (Vars.of_list (Sv.elements all_vars)) in
+  let env = ref (Vars.of_set all_vars) in
 
   (* if [v] is appears in the RHS of [s], refresh [v] carefully *)
   let var, s =
     if Sv.mem var right_fv
     then
-      let new_v = Vars.make_approx_r env var in
+      let new_v = Vars.make_approx_r env var () in
       let s = (ESubst (Var var,Var new_v)) :: s in
       ( new_v, s)
     else ( var, s ) in
 
   var, s
+  
 (*------------------------------------------------------------------*)
 let subst_macros_ts table l ts t =
   let rec subst_term (t : term) : term = match t with
@@ -889,13 +928,6 @@ let subst_macros_ts table l ts t =
   in
 
   subst_term t
-
-(*------------------------------------------------------------------*)
-let rec subst_ht s ht = match ht with
-  | Lambda (ev :: evs, t) ->
-    let ev, s = subst_binding ev s in
-    mk_lambda [ev] (subst_ht s (Lambda (evs, t)))
-  | Lambda ([], t) -> Lambda ([], subst s t)
 
 (*------------------------------------------------------------------*)
 let subst_projs (s : (proj * proj) list) (t : term) : term = 
@@ -1088,7 +1120,7 @@ and _pp
       if l = [] then
         pp_nsymb ppf n 
       else
-        Fmt.pf ppf "%a(%a)"
+        Fmt.pf ppf "%a(@[%a@])"
           pp_nsymb n 
           (Fmt.list ~sep:Fmt.comma (pp (tuple_fixity, `NonAssoc))) l
     in
@@ -1139,7 +1171,7 @@ and _pp
   | Find (vs, c, d, Fun (f,_,[])) when f = f_zero ->
     let _, vs, s = (* rename quantified vars. to avoid name clashes *)
       let fv_cd = List.fold_left ((^~) Sv.remove) (Sv.union (fv c) (fv d)) vs in
-      refresh_vars_env (Vars.of_set fv_cd) vs
+      add_vars_simpl_env (Vars.of_set fv_cd) vs
     in
     let c, d = subst s c, subst s d in
 
@@ -1156,7 +1188,7 @@ and _pp
   | Find (vs, c, d, e) ->
     let _, vs, s = (* rename quantified vars. to avoid name clashes *)
       let fv_cd = List.fold_left ((^~) Sv.remove) (Sv.union (fv c) (fv d)) vs in
-      refresh_vars_env (Vars.of_set fv_cd) vs
+      add_vars_simpl_env (Vars.of_set fv_cd) vs
     in
     let c, d = subst s c, subst s d in
 
@@ -1176,7 +1208,7 @@ and _pp
   | Quant (q, vs, b) ->
     let _, vs, s = (* rename quantified vars. to avoid name clashes *)
       let fv_b = List.fold_left ((^~) Sv.remove) (fv b) vs in
-      refresh_vars_env (Vars.of_set fv_b) vs 
+      add_vars_simpl_env (Vars.of_set fv_b) vs 
     in
     let b = subst s b in
 
@@ -1220,7 +1252,7 @@ and pp_chained_find info ppf (t : term) =
   | Find (vs, c, d, e) ->
     let _, vs, s = (* rename quantified vars. to avoid name clashes *)
       let fv_cd = List.fold_left ((^~) Sv.remove) (Sv.union (fv c) (fv d)) vs in
-      refresh_vars_env (Vars.of_set fv_cd) vs
+      add_vars_simpl_env (Vars.of_set fv_cd) vs
     in
     let c, d = subst s c, subst s d in
 
@@ -1262,16 +1294,6 @@ let pp_with_info = pp_toplevel ~dbg:false
 let pp           = pp_toplevel ~dbg:false default_pp_info
 let _pp ~dbg     = pp_toplevel ~dbg:false { default_pp_info with dbg }
 let pp_dbg       = pp_toplevel ~dbg:false { default_pp_info with dbg = true }
-
-(*------------------------------------------------------------------*)
-
-let _pp_hterm ~dbg fmt = function
-  | Lambda (evs, t) ->
-    Fmt.pf fmt "@[<v 2>fun (@[%a@]) ->@ %a@]"
-      (Vars._pp_typed_list ~dbg) evs pp t
-
-let pp_hterm     = _pp_hterm ~dbg:false
-let pp_hterm_dbg = _pp_hterm ~dbg:true
 
 (*------------------------------------------------------------------*)
 let pp_esubst ppf (ESubst (t1,t2)) =
@@ -1517,90 +1539,6 @@ let exec_macro : msymb = mk Symbols.exec Type.Boolean
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructors -- Part 2} *)
 
-module type SmartFO = sig
-  type form
-
-  (** {3 Constructors} *)
-  val mk_true  : form
-  val mk_false : form
-
-  val mk_eq  : ?simpl:bool -> term -> term -> form
-  val mk_neq : ?simpl:bool -> term -> term -> form
-  val mk_leq :                term -> term -> form
-  val mk_geq :                term -> term -> form
-  val mk_lt  : ?simpl:bool -> term -> term -> form
-  val mk_gt  : ?simpl:bool -> term -> term -> form
-
-  val mk_not   : ?simpl:bool -> form              -> form
-  val mk_and   : ?simpl:bool -> form      -> form -> form
-  val mk_ands  : ?simpl:bool -> form list         -> form
-  val mk_or    : ?simpl:bool -> form      -> form -> form
-  val mk_ors   : ?simpl:bool -> form list         -> form
-  val mk_impl  : ?simpl:bool -> form      -> form -> form
-  val mk_impls : ?simpl:bool -> form list -> form -> form
-
-  val mk_forall : ?simpl:bool -> Vars.vars -> form -> form
-  val mk_exists : ?simpl:bool -> Vars.vars -> form -> form
-
-  (*------------------------------------------------------------------*)
-  (** {3 Destructors} *)
-
-  val destr_forall  : form -> (Vars.var list * form) option
-  val destr_forall1 : form -> (Vars.var      * form) option
-  val destr_exists  : form -> (Vars.var list * form) option
-  val destr_exists1 : form -> (Vars.var      * form) option
-
-  (*------------------------------------------------------------------*)
-  val destr_neq : form -> (term * term) option
-  val destr_eq  : form -> (term * term) option
-  val destr_leq : form -> (term * term) option
-  val destr_lt  : form -> (term * term) option
-
-  (*------------------------------------------------------------------*)
-  val destr_false : form ->         unit  option
-  val destr_true  : form ->         unit  option
-  val destr_not   : form ->         form  option
-  val destr_and   : form -> (form * form) option
-  val destr_or    : form -> (form * form) option
-  val destr_impl  : form -> (form * form) option
-  val destr_iff   : form -> (form * form) option
-
-  (*------------------------------------------------------------------*)
-  val is_false  : form -> bool
-  val is_true   : form -> bool
-  val is_not    : form -> bool
-  val is_zero   : form -> bool
-  val is_and    : form -> bool
-  val is_or     : form -> bool
-  val is_impl   : form -> bool
-  val is_iff    : form -> bool
-  val is_forall : form -> bool
-  val is_exists : form -> bool
-
-  (*------------------------------------------------------------------*)
-  val is_neq : form -> bool
-  val is_eq  : form -> bool
-  val is_leq : form -> bool
-  val is_lt  : form -> bool
-
-  (*------------------------------------------------------------------*)
-  (** left-associative *)
-  val destr_ands  : int -> form -> form list option
-  val destr_ors   : int -> form -> form list option
-  val destr_impls : int -> form -> form list option
-
-  (*------------------------------------------------------------------*)
-  val decompose_forall : form -> Vars.var list * form
-  val decompose_exists : form -> Vars.var list * form
-
-  (*------------------------------------------------------------------*)
-  val decompose_ands  : form -> form list
-  val decompose_ors   : form -> form list
-  val decompose_impls : form -> form list
-
-  val decompose_impls_last : form -> form list * form
-end
-
 (*------------------------------------------------------------------*)
 let mk_quant ?(simpl=false) q l f =
   let l =
@@ -1611,38 +1549,27 @@ let mk_quant ?(simpl=false) q l f =
   in
   mk_quant_ns q l f
 
-let mk_seq ?simpl = mk_quant ?simpl Seq
+let mk_seq    ?simpl = mk_quant ?simpl Seq
 let mk_lambda ?simpl = mk_quant ?simpl Lambda
     
 (*------------------------------------------------------------------*)
-module Smart : SmartFO with type form = term = struct
-  type form = term
-
+module Smart = struct
   include SmartConstructors
   include SmartDestructors
 
   let mk_forall ?simpl = mk_quant ?simpl ForAll
   let mk_exists ?simpl = mk_quant ?simpl Exists
+
+  let mk_forall_tagged ?simpl vs =
+    let vs = List.map (fun (v,t) -> assert (t = Vars.Tag.ltag); v) vs in
+    mk_quant ?simpl ForAll vs
+      
+  let mk_exists_tagged ?simpl vs =
+    let vs = List.map (fun (v,t) -> assert (t = Vars.Tag.ltag); v) vs in
+    mk_quant ?simpl Exists vs
 end
 
 include Smart
-
-
-(*------------------------------------------------------------------*)
-(** {2 Apply} *)
-
-let apply_ht (ht : hterm) (terms : term list) = match ht with
-  | Lambda (evs, t) ->
-    assert (List.length terms <= List.length evs);
-    let evs0, evs1 = List.takedrop (List.length terms) evs in
-
-    let evs0, s = refresh_vars `Global evs0 in
-    let ht = subst_ht s (Lambda (evs1, t)) in
-
-    let s_app =
-      List.map2 (fun v t -> ESubst (Var v, t)) evs0 terms
-    in
-    subst_ht s_app ht
 
 
 (*------------------------------------------------------------------*)
@@ -1662,10 +1589,6 @@ let tsubst (ts : Type.tsubst) (t : term) : term =
 
   tsubst t
 
-let tsubst_ht (ts : Type.tsubst) (ht : hterm) : hterm =
-  match ht with
-  | Lambda (vs, f) -> Lambda (List.map (Vars.tsubst ts) vs, tsubst ts f)
-
 (*------------------------------------------------------------------*)
 (** {2 Simplification} *)
 
@@ -1684,52 +1607,6 @@ let rec not_simpl = function
     | Fun (fs, _, [a;b]) when fs = f_neq  -> mk_eq a b
 
     | m -> mk_not m
-
-(*------------------------------------------------------------------*)
-let is_deterministic (t : term) : bool = 
-  let exception NonDet in
-
-  let rec is_det : term -> unit = function
-    | Name _ | Macro _ -> raise NonDet
-    | t -> titer is_det t
-  in
-  try is_det t; true with NonDet -> false
-
-
-let is_pure_timestamp (t : term) =
-  let rec pure_ts = function
-    | Fun (fs, _, [t]) when fs = f_happens || fs = f_pred -> pure_ts t
-
-    | Fun (fs, _, [t1; t2])
-      when fs = f_or || fs = f_and || fs = f_impl || 
-           fs = f_eq || fs = f_neq || fs = f_leq || fs = f_lt || 
-           fs = f_geq || fs = f_gt ->
-      pure_ts t1 && pure_ts t2
-
-    | Fun (fs, _, [t]) when fs = f_not -> pure_ts t
-
-    | Fun (_, _, []) -> true
-
-    | Proj(_,t) -> pure_ts t
-
-    | Tuple l -> List.for_all pure_ts l
-
-    | App (t, l) -> List.for_all pure_ts (t :: l)
-
-    | Find (_, a,b,c) -> pure_ts a && pure_ts b && pure_ts c
-
-    | Quant (_, _, t) -> pure_ts t
-
-    | Action _ -> true
-
-    | Var v -> Type.is_finite (Vars.ty v)
-
-    | Fun _ -> false            (* because of adversarial sumbols! *)
-
-    | Name _ | Diff _ | Macro _ -> false
-  in
-  pure_ts t
-
 
 (*------------------------------------------------------------------*)
 (** {2 Projection} *)
@@ -2049,17 +1926,17 @@ module Hm = Map.Make(struct
     The free type variables must be inferred. *)
 type 'a pat = {
   pat_tyvars : Type.tvars;
-  pat_vars   : Vars.Sv.t;
+  pat_vars   : (Vars.var * Vars.Tag.t) list;
   pat_term   : 'a;
 }
 
 let pat_of_form (t : term) =
-  let vs, t = decompose_forall t in
-  let vs, s = refresh_vars `Global vs in
+  let vs, t = decompose_forall_tagged t in
+  let vs, s = refresh_vars_w_info vs in
   let t = subst s t in
 
   { pat_tyvars = [];
-    pat_vars = Vars.Sv.of_list vs;
+    pat_vars = vs;
     pat_term = t; }
 
 let project_tpat (projs : projs) (pat : term pat) : term pat =
@@ -2073,7 +1950,7 @@ let project_tpat_opt (projs : projs option) (pat : term pat) : term pat
 (** {2 Tests} *)
 
 let () =
-  let mkvar x s = Var (snd (Vars.make `Approx Vars.empty_env s x)) in
+  let mkvar x s = Var (snd (Vars.make `Approx Vars.empty_env s x ())) in
   Checks.add_suite "Head normalization" [
     "Macro, different ts", `Quick, begin fun () ->
       let ts = mkvar "ts" Type.Timestamp in

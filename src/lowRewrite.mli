@@ -14,7 +14,7 @@ module SE  = SystemExpr
 type rw_rule = {
   rw_tyvars : Type.tvars;            (** type variables *)
   rw_system : SE.t;                  (** systems the rule applies to *)
-  rw_vars   : Vars.Sv.t;             (** term variables *)
+  rw_vars   : Vars.tagged_vars;      (** term variables *)
   rw_conds  : Term.term list;        (** premises *)
   rw_rw     : Term.term * Term.term; (** pair (source, destination) *)
 }

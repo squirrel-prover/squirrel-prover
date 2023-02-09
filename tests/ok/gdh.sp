@@ -74,7 +74,7 @@ axiom corruptleak (i,j:index) :
 axiom corruptleak2 (i,j:index) :
   happens(L(i,j)) => corrupted(j) = true.
 
-goal [default/left] test_gdh (t:timestamp) (i,j : index) :
+goal [default/left] test_gdh (t:timestamp[glob,const]) (i,j : index[glob,const]) :
   corrupted(i) = false =>
   corrupted(j) = false =>
   happens(I(i), R(j)) =>

@@ -13,7 +13,7 @@ name n : index->message
 
 system !_a out(c,h(n(a),k)).
 
-goal unforgeable (a:index, b:index):
+goal unforgeable (a,b:index[param]):
 b <> a => h(n(b),k) <> h(n(a),k).
 
 Proof.

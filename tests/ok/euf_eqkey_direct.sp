@@ -9,7 +9,7 @@ name k : index * index -> message
 
 system null.
 
-goal _ (a,b,i:index):
+goal _ (a,b,i:index[param]):
   h(n,k(i,i)) = h(n,k(a,b)) =>
   a = b.
 Proof.

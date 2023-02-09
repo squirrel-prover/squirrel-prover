@@ -17,7 +17,7 @@ prf 1.
 
 rewrite if_true in 1.
 by project.
-fresh 1.
+fresh 1; 1:auto.
 
 prf 0.
 by rewrite if_true in 0.

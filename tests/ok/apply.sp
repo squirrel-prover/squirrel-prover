@@ -152,7 +152,7 @@ global goal _ (y : message) :
  equiv(empty) ->
  equiv(seq (j:index => <ok(j), ok(j)>)).
 Proof.
- intro H; apply H.
+  intro H; apply H.
 Qed.
 
 (* From now one, we use a name `n1` to test the matching algorithm, since it 
@@ -271,7 +271,7 @@ Qed.
 set showStrengthenedHyp=true.
 
 (* cond can be deduce (hence exec), because it is trivial *)
-global goal _ (t : timestamp) : 
+global goal _ (t : timestamp[const]) : 
   [happens(t)] -> equiv(frame@pred(t)) -> equiv(exec@t).
 Proof.
  intro Hap H.

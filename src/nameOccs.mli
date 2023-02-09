@@ -124,9 +124,9 @@ val get_macro_actions : Constr.trace_cntxt -> term list -> ts_occs
     and reconstructs it to simplify trivial equalities. *)
 val clear_trivial_equalities : term -> term
 
-(** Constructs the formula
+(** [time_formula τ ts_occs] constructs the formula:
     
-    [(∃ v1. path_cond τ ts1 ∨ … ∨ ∃ vn. path_cond τ tsn)]
+      [(∃ v1. path_cond τ ts1 ∨ … ∨ ∃ vn. path_cond τ tsn)]
 
     where [vi], [tsi] are the variables and content of [ts_occ]. 
     (for example, [path_cond x y] can be [x ≤ y]). *)
@@ -230,13 +230,14 @@ type ('a, 'b) f_fold_occs =
   n_occs * ('a, 'b) simple_occs
 
 val find_all_occurrences :
-    ?pp_ns:unit Fmt.t option ->
-    ('a, 'b) occ_formula ->
-    ('a, 'b) f_fold_occs ->
-    Constr.trace_cntxt ->
-    Vars.env ->
-    terms ->
-    name_occs * ('a, 'b) ext_occs
+  mode:Iter.allowed_constants ->   (* allowed sub-terms without further checks *)
+  ?pp_ns:unit Fmt.t option ->
+  ('a, 'b) occ_formula ->
+  ('a, 'b) f_fold_occs ->
+  Constr.trace_cntxt ->
+  Env.t ->
+  terms ->
+  name_occs * ('a, 'b) ext_occs
 
 (*------------------------------------------------------------------*)
 (** {1 Proof obligations for name occurrences} *)
@@ -257,38 +258,41 @@ val find_all_occurrences :
     the conjunctions mean "no bad occurrence happens" and
     "no collision happens". *)
 val occurrence_formulas :
+  mode:Iter.allowed_constants ->   (* allowed sub-terms without further checks *)
   ?use_path_cond : bool ->
   ?negate : bool ->
   ?pp_ns: (unit Fmt.t) option ->
   ('a, 'b) occ_formula ->
   ('a, 'b) f_fold_occs ->
   Constr.trace_cntxt ->
-  Vars.env ->
+  Env.t ->
   terms ->
   terms * terms
 
 (** Instance of {!occurrence_formulas} for when we only look for names.
-    It is used for the [fresh] tactic. *)
+    It is used for the [fresh] and [dh] tactics. *)
 val name_occurrence_formulas :
+  mode:Iter.allowed_constants ->   (* allowed sub-terms without further checks *)
   ?use_path_cond : bool ->
   ?negate : bool ->
   ?pp_ns: (unit Fmt.t) option ->
   (unit, unit) f_fold_occs ->
   Constr.trace_cntxt ->
-  Vars.env ->
+  Env.t ->
   terms ->
   terms
 
 (** Returns all found occurrences as well as the formulas,
     for more complex use cases (eg. [intctxt]).
-    {b TODO} clarify specification. *)
+    {b TODO} clarify specification. *)
 val occurrence_formulas_with_occs :
+  mode:Iter.allowed_constants ->   (* allowed sub-terms without further checks *)
   ?use_path_cond : bool ->
   ?negate : bool ->
   ?pp_ns: (unit Fmt.t) option ->
   ('a, 'b) occ_formula ->
   ('a, 'b) f_fold_occs ->
   Constr.trace_cntxt ->
-  Vars.env ->
+  Env.t ->
   terms ->
   terms * terms * name_occs * ('a, 'b) ext_occs

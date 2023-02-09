@@ -7,6 +7,24 @@ let tactics =
   let test = true in
   (* Checks.add_suite "Tactics" [ *)
   [
+    "Name Finite 0", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
+           try run ~test "tests/alcotest/name-finite.sp" with
+           | ProcessDecl.(Error (_,_,Failure "name can only be index by finite types")) -> raise Ok)
+    end ;
+    "Name Finite 2", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
+           try run ~test "tests/alcotest/name-finite2.sp" with
+           | ProcessDecl.(Error (_,_,Failure "name can only be index by finite types")) -> raise Ok)
+    end ;
+    "Name Finite 3", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
+           try run ~test "tests/alcotest/name-finite3.sp" with
+           | ProcessDecl.(Error (_,_,Failure "name can only be index by finite types")) -> raise Ok)
+    end ;
     "Exists Intro", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
@@ -96,7 +114,7 @@ let tactics =
         (fun () ->
            try run ~test "tests/alcotest/fresh_reach_var.sp" with
            | Tactics.Tactic_soft_failure
-               (_, Tactics.Failure "can only be applied on ground terms") ->
+               (_, Tactics.Failure "terms contain a non-constant variable: x") ->
              raise Ok)
     end ;
     "Check equalities false if unsupported terms", `Quick, begin fun () ->
@@ -128,8 +146,8 @@ let tactics =
         (fun () ->
            try run ~test "tests/alcotest/undo_proof.sp" with
            | Unfinished -> raise Ok)
-    end
-  ]
+    end 
+  ] 
 
 (*------------------------------------------------------------------*)
 let equivalence =
@@ -194,12 +212,12 @@ let equivalence =
     end
   ]
 
-let includes = 
-  let exception Ok in
-  let test = true in
   (*------------------------------------------------------------------*)
+  let includes =
+    let exception Ok in
+    let test = true in
+    [
   (* Checks.add_suite "Include" [ *)
-   [
     "Cycle", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->

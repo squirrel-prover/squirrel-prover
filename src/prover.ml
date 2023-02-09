@@ -1,3 +1,5 @@
+module Sv = Vars.Sv
+
 (*------------------ Prover ----------------------------------*)
 (** {2 Prover state}
     The term "goal" refers to two things below:
@@ -311,7 +313,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
 
   let find (t:Term.term) =
     let pat_vars =
-      Vars.Sv.filter Vars.is_pat (Term.fv t)
+      Vars.Tag.local_vars ~const:true (Sv.elements (Vars.Sv.filter Vars.is_pat (Term.fv t)))
     in
     let pat = Term.{
         pat_tyvars = [];
@@ -341,7 +343,7 @@ let search_about (st:state) (q:ProverLib.search_query) :
   | Global f ->
     let t = Theory.convert_global_formula ~ty_env ~pat:true cntxt f in
     let pat_vars =
-      Vars.Sv.filter Vars.is_pat (Equiv.fv t)
+      Vars.Tag.local_vars ~const:true (Sv.elements (Sv.filter Vars.is_pat (Equiv.fv t)))
     in
     let pat = Term.{
         pat_tyvars = [];

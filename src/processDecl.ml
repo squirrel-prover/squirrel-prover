@@ -13,8 +13,8 @@ type error_i =
   | BadEquivForm
   | InvalidCtySpace of string list
   | DuplicateCty of string
-  | NotTSOrIndex
   | NonDetOp
+  | Failure of string
 
 type dkind = KDecl | KGoal
 
@@ -33,15 +33,15 @@ let pp_error_i fmt = function
   | NonDetOp ->
     Fmt.pf fmt "an operator body cannot contain probabilistic computations"
 
-  | NotTSOrIndex ->
-    Fmt.pf fmt "must be an index or timestamp"
+  | Failure s ->
+    Fmt.pf fmt "%s" s
       
 let pp_error pp_loc_err fmt (loc,k,e) =
   let pp_k fmt = function
     | KDecl -> Fmt.pf fmt "declaration"
     | KGoal -> Fmt.pf fmt "goal declaration" in
 
-  Fmt.pf fmt "@[<v 2>%a%a failed: %a.@]"
+  Fmt.pf fmt "%a@[<hov 2>%a failed: %a@]"
     pp_loc_err loc
     pp_k k
     pp_error_i e
@@ -89,7 +89,12 @@ let parse_operator_decl table (decl : Decl.operator_decl) =
     in
 
     let env = Env.init ~table ~ty_vars () in
-    let env, subst, args = Theory.convert_ext_bnds env decl.op_args in
+    let env, subst, args =
+      Theory.convert_ext_bnds (Vars.Tag.make ~const:true Vars.Global) env decl.op_args
+      (* assume global constant variables to properly check that the
+         body represents a deterministic computations later
+         (as constant => deterministic). *)
+    in
 
     let out_ty = omap (Theory.convert_ty env) decl.op_tyout in
 
@@ -98,7 +103,7 @@ let parse_operator_decl table (decl : Decl.operator_decl) =
     in
     let body = Term.subst subst body in
 
-    if not (Term.is_deterministic body) then
+    if not (HighTerm.is_deterministic env body) then
       error (L.loc decl.op_body) KDecl NonDetOp;
 
     let data = Operator.mk ~name ~ty_vars ~args ~out_ty ~body in
@@ -268,9 +273,11 @@ let declare table decl : Symbols.table * Goal.t list =
     let n_fty = Type.mk_ftype_tuple [] args_tys out_ty in
 
     List.iter2 (fun ty pty ->
-        if not (Type.equal ty Type.ttimestamp) &&
-           not (Type.equal ty Type.tindex) then
-          error (L.loc pty) KDecl NotTSOrIndex
+        (* necessary to ensure that a term semantics is always a random variables 
+           (indeed, this guarantees that the set of tapes is finite, and can be 
+           equipped with the discrete sigma-algebra and the uniform distribution) *)
+        if not (Symbols.TyInfo.is_finite table ty) then
+          error (L.loc pty) KDecl (Failure "name can only be index by finite types")
       ) args_tys p_args_tys;
     
     Theory.declare_name table s Symbols.{ n_fty }, []
@@ -302,7 +309,7 @@ let declare table decl : Symbols.table * Goal.t list =
       Symbols.BType.declare_exact
         table
         bty_decl.bty_name
-        bty_decl.bty_infos
+        (List.map Symbols.TyInfo.parse bty_decl.bty_infos)
     in
     table, []
 

@@ -183,7 +183,7 @@ system (
 
 (* prove that our protocol satisfies the following authentication 
    property *)
-goal authentication_R (j, i : index) :
+goal authentication_R (j, i : index[const]) :
   happens(R(j,i)) =>
   cond@R(j,i) <=>
   exists (k : index),
@@ -247,7 +247,7 @@ Qed.
 (* Show using the `intctxt` tactic that if two tags outputs are equal, 
    then they must have the same identities.
    Hint: you may use the `incr_ne_fail` axiom above *)
-goal tag_output_collision (i, i1, k, k1: index) :
+goal tag_output_collision (i, i1, k, k1: index[const]) :
   happens(T(i,k), T(i1,k1)) =>
   output@T(i1,k1) = output@T(i,k) =>
   i = i1.
@@ -260,7 +260,7 @@ Qed.
 
 (* [Advanced] Show that our protocol provides injective authentication using 
    the lemmas above. *)
-goal injective_authentication (j, i, j1, i1 : index) :
+goal injective_authentication (j, i, j1, i1 : index[const]) :
   R(j,i) < R(j1,i1) =>
   exec@R(j,i) =>
   exec@R(j1,i1) =>

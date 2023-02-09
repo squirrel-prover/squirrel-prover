@@ -279,14 +279,14 @@ let pp_pref (ty : pp) =
 
 let pp_suf fmt (ty : pp) =
   match ty with
-  | `Prompt  -> Fmt.pf fmt "@;@]@."
-  | `Start   -> Fmt.pf fmt "@;<]@]@."
-  | `Result  -> Fmt.pf fmt "@;@]@."
-  | `Error   -> Fmt.pf fmt "@;@]@."
-  | `Dbg     -> Fmt.pf fmt "@;<]@]@."
-  | `Warning -> Fmt.pf fmt "@;<]@]@."
+  | `Prompt  -> Fmt.pf fmt "@;@]@?"
+  | `Start   -> Fmt.pf fmt "@;<]@]@?"
+  | `Result  -> Fmt.pf fmt "@;@]@?"
+  | `Error   -> Fmt.pf fmt "@;@]@?"
+  | `Dbg     -> Fmt.pf fmt "@;<]@]@?"
+  | `Warning -> Fmt.pf fmt "@;<]@]@?"
   | `Ignore  -> ()
-  | `Goal    -> Fmt.pf fmt "@;@]@."
+  | `Goal    -> Fmt.pf fmt "@;@]@?"
   | `Default -> ()
 
 let prt ty fmt = 

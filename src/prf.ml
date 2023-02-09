@@ -29,7 +29,7 @@ let prf_mk_direct (param : prf_param) (occ : Iter.hash_occ) =
      to quantify universally over them *)
   let vars = occ.occ_vars in
 
-  let vars, subst = Term.refresh_vars `Global vars in
+  let vars, subst = Term.refresh_vars vars in
 
   let is, m = occ.occ_cnt in
   let is = List.map (Term.subst subst) is in
@@ -69,7 +69,9 @@ let prf_occ_incl table sexpr (o1 : prf_occ) (o2 : prf_occ) : bool =
   in
   let pat2 = Term.{
       pat_tyvars = [];
-      pat_vars   = Sv.of_list o2.occ_vars;
+      pat_vars   = Vars.Tag.local_vars o2.occ_vars;
+      (* local information, since we allow to match diff operators *)
+      
       pat_term   = mk_dum a2 is2 cond2 t2;
     }
   in
@@ -88,7 +90,7 @@ let prf_mk_indirect
     (hash_occ      : prf_occ) : Term.term
   =
   let vars = hash_occ.Iter.occ_vars in
-  let vars, subst = Term.refresh_vars `Global vars in
+  let vars, subst = Term.refresh_vars vars in
 
   let action, hash_is, hash_m = hash_occ.Iter.occ_cnt in
 
@@ -158,7 +160,7 @@ let add_prf_case
   List.assoc_up_dflt action_name [] (add_case c) assoc_cases
 
 (*------------------------------------------------------------------*)
-let mk_prf_phi_proj cntxt env param frame _hash =
+let mk_prf_phi_proj cntxt (env : Env.t) param frame _hash =
   (* Check syntactic side condition. *)
   let errors =
     OldEuf.key_ssc ~globals:true
@@ -172,8 +174,8 @@ let mk_prf_phi_proj cntxt env param frame _hash =
 
   let frame_hashes : Iter.hash_occs =
     List.fold_left (fun acc t ->
-        Iter.get_f_messages_ext
-          ~mode:(`Delta cntxt) (cntxt.system :> SE.arbitrary)
+        Iter.deprecated_get_f_messages_ext
+          ~mode:(`Delta cntxt) (cntxt.system :> SE.arbitrary) env.table
           param.h_fn param.h_key.symb.s_symb t @ acc
       ) [] frame
   in
@@ -193,11 +195,11 @@ let mk_prf_phi_proj cntxt env param frame _hash =
 
         assert (Sv.subset
                   (Term.fv iocc.iocc_cnt)
-                  (Sv.union iocc.iocc_vars (Vars.to_set env)));
+                  (Sv.union iocc.iocc_vars (Vars.to_vars_set env.vars)));
         
         let new_cases =
-          Iter.get_f_messages_ext 
-            ~mode:(`Delta cntxt) (cntxt.system :> SE.arbitrary)
+          Iter.deprecated_get_f_messages_ext 
+            ~mode:(`Delta cntxt) (cntxt.system :> SE.arbitrary) env.table
             ~fv param.h_fn param.h_key.symb.s_symb t
         in
         let new_cases =
@@ -238,12 +240,13 @@ let prf_condition_side
     (biframe : Equiv.equiv)
     (e       : Term.term)
     (hash    : Term.term)
-  : (Term.form * Term.form) option
+  : (Term.term * Term.term) option
   =
   let exception HashNoOcc in
   try
     let system = SE.project [proj] cntxt.system in
     let cntxt = { cntxt with system } in
+    let env = Env.init ~table:cntxt.table ~system:(SE.reachability_context system) ~vars:env () in
     let param = prf_param (Term.project1 proj hash) in
 
     (* Create the frame on which we will iterate to compute the PRF formulas *)

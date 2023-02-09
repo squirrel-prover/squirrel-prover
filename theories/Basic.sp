@@ -22,6 +22,10 @@ Proof.
   by rewrite eq_refl_e.
 Qed.
 
+goal [any] neq_irefl ['a] (x : 'a) : (x <> x) <=> false.
+Proof. by split. Qed.
+hint rewrite neq_irefl.
+
 (*------------------------------------------------------------------*)
 (* true/false *)
 
@@ -415,8 +419,10 @@ Proof.
   rewrite eq_iff.
   split.
   + intro H a Hp.
-    apply H. by exists a.
-  + intro H [a Hp]. by use H with a.
+    apply H. 
+    by exists a.
+  + intro H [a Hp]. 
+    by use H with a.
 Qed.
 
 goal [any] not_exists_2 ['a 'b] (phi:'a -> 'b -> bool) :
@@ -425,24 +431,14 @@ Proof.
   rewrite eq_iff.
   split.
   + intro H a b Hp.
-    apply H. by exists a,b.
-  + intro H [a b Hp]. by use H with a, b.
+    apply H. 
+    by exists a,b.
+  + intro H [a b Hp]. 
+    by use H with a, b.
 Qed.
 
-goal [any] not_forall_1 ['a] (phi:'a -> bool) :
+axiom [any] not_forall_1 ['a] (phi:'a -> bool) :
  not (forall (a:'a), phi a) = exists (a:'a), not (phi a).
-Proof.
-  rewrite -(not_not (phi _)).
-  rewrite -not_exists_1.
-  simpl.
-  admit. (* TODO bug types *)
-Qed.
 
-goal [any] not_forall_2 ['a 'b] (phi:'a -> 'b -> bool) :
+axiom [any] not_forall_2 ['a 'b] (phi:'a -> 'b -> bool) :
  not (forall (a:'a, b:'b), phi a b) = exists (a:'a, b:'b), not (phi a b).
-Proof.
-  rewrite -(not_not (phi _ _)).
-  rewrite -not_exists_2.
-  simpl.
-  admit. (* TODO bug types *)
-Qed.

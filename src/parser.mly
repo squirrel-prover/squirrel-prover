@@ -35,7 +35,6 @@
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH SLASHSLASHEQUAL ATSLASH
 %token SHARP
 %token TIME WHERE WITH ORACLE EXN
-%token LARGE NAMEFIXEDLENGTH
 %token PERCENT
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CDH GDH CHECKFAIL ASSERT HAVE USE
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDENT DEPENDS APPLY LOCALIZE
@@ -248,11 +247,18 @@ term_list:
 
 (*------------------------------------------------------------------*)
 arg:
-| is=ids COLON k=ty   { List.map (fun x -> x,k) is }
+| is=ids COLON k=ty                 { List.map (fun x -> x,k) is }
+
+arg_tagged:
+| is=ids COLON k=ty tags=var_tags   { List.map (fun x -> x,k,tags) is }
 
 arg_list:
 | args=slist(arg,COMMA) { List.flatten args }
 
+arg_list_tagged:
+| args=slist(arg_tagged,COMMA) { List.flatten args }
+
+(*------------------------------------------------------------------*)
 opt_arg_list:
 | LPAREN args=arg_list RPAREN    { args }
 |                                { [] }
@@ -262,11 +268,15 @@ opt_arg_list:
 | id=lsymb                              { `Simpl id }
 | LPAREN ids=slist1(lsymb,COMMA) RPAREN { `Tuple ids }
 
+var_tags:
+|                                            { []   }
+| LBRACKET tags=slist1(lsymb, COMMA) RBRACKET { tags }
+
 ext_arg:
-| is=slist1(ext_id,COMMA) COLON k=ty   
+| is=slist1(ext_id,COMMA) COLON k=ty tags=var_tags
     { List.map (function
-        | `Simpl id  -> Theory.Bnd_simpl (id,  k)
-        | `Tuple ids -> Theory.Bnd_tuple (ids, k)
+        | `Simpl id  -> Theory.Bnd_simpl (id,  k, tags)
+        | `Tuple ids -> Theory.Bnd_tuple (ids, k, tags)
       ) is 
     }
 
@@ -299,14 +309,6 @@ top_formula:
 %inline sep:
 |       {()}
 | COMMA {()}
-
-(* higher-order terms *)
-
-hterm_i:
-| FUN LPAREN args=arg_list RPAREN ARROW t=term { Theory.Lambda (args,t) }
-
-hterm:
-| t=loc(hterm_i) { t }
 
 (* Processes *)
 
@@ -432,8 +434,7 @@ ty_args:
 | LBRACKET ids=slist1(ty_var,empty) RBRACKET { ids }
 
 bty_info:
-| NAMEFIXEDLENGTH { Symbols.Ty_name_fixed_length }
-| LARGE           { Symbols.Ty_large }
+| info=lsymb { info }
 
 bty_infos:
 | LBRACKET l=slist(bty_info,COMMA) RBRACKET { l }
@@ -731,7 +732,7 @@ spt:
     { pt }
 
 constseq_arg:
-| LPAREN b=hterm RPAREN t=sterm { (b,t) }
+| LPAREN b=term RPAREN t=sterm { (b,t) }
 
 (*------------------------------------------------------------------*)
 trans_arg_item:
@@ -917,8 +918,8 @@ tac:
   | l=lloc(APPLY) a=named_args t=p_pt w=apply_in
     { mk_abstract l "apply" [TacticsArgs.ApplyIn (a, t, w)] }
 
-  | l=lloc(SPLITSEQ) i=loc(INT) COLON LPAREN ht=hterm RPAREN
-    { mk_abstract l "splitseq" [TacticsArgs.SplitSeq (i, ht)] }
+  | l=lloc(SPLITSEQ) i=loc(INT) COLON LPAREN ht=term RPAREN dflt=sterm?
+    { mk_abstract l "splitseq" [TacticsArgs.SplitSeq (i, ht, dflt)] }
 
   | l=lloc(CONSTSEQ) i=loc(INT) COLON terms=slist1(constseq_arg, empty)
     { mk_abstract l "constseq" [TacticsArgs.ConstSeq (i, terms)] }
@@ -1011,7 +1012,7 @@ global_formula_i:
 
 | f=global_formula ARROW f0=global_formula { Theory.PImpl (f,f0) }
 
-| q=quant LPAREN vs=arg_list RPAREN sep f=global_formula %prec QUANTIF
+| q=quant LPAREN vs=arg_list_tagged RPAREN sep f=global_formula %prec QUANTIF
                                    { Theory.PQuant (q,vs,f)  }
 
 | f1=global_formula GAND f2=global_formula
@@ -1052,23 +1053,23 @@ system_annot:
  * Statements and goals
  * ----------------------------------------------------------------------- */
 
-args:
+goal_args:
 |                                    { [] }
-| LPAREN vs0=arg_list RPAREN vs=args { vs0 @ vs }
+| LPAREN vs0=arg_list_tagged RPAREN vs=goal_args { vs0 @ vs }
 
 statement_name:
 | i=lsymb    { Some i }
 | UNDERSCORE { None }
 
 local_statement:
-| s=system_annot name=statement_name ty_vars=ty_args vars=args
+| s=system_annot name=statement_name ty_vars=ty_args vars=goal_args
   COLON f=term
    { let system = `Local, s in
      let formula = Goal.Parsed.Local f in
      Goal.Parsed.{ name; ty_vars; vars; system; formula } }
 
 global_statement:
-| s=system_annot name=statement_name ty_vars=ty_args vars=args
+| s=system_annot name=statement_name ty_vars=ty_args vars=goal_args
   COLON f=global_formula
    { let formula = Goal.Parsed.Global f in
      let system = `Global, s in
@@ -1085,7 +1086,7 @@ goal_i:
 |  LOCAL GOAL s=local_statement  DOT { s }
 | GLOBAL GOAL s=global_statement DOT { s }
 | EQUIV  s=obs_equiv_statement   DOT { s }
-| EQUIV s=system_annot name=statement_name vars=args COLON b=loc(biframe) DOT
+| EQUIV s=system_annot name=statement_name vars=goal_args COLON b=loc(biframe) DOT
     { let f = Location.mk_loc (Location.loc b) (Theory.PEquiv (Location.unloc b)) in
       let system = `Global, s in
       Goal.Parsed.{ name; system; ty_vars = []; vars; formula = Global f } }

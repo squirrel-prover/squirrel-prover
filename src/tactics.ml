@@ -137,7 +137,7 @@ let pp_tac_error_i ppf = function
   | BadSSCDetailed errors ->
     Fmt.pf ppf "the key does not satisfy the syntactic \
                 side conditions:@;\
-                %a"
+                @[%a@]"
       pp_ssc_errors errors
 
   | NoSSC ->
@@ -214,7 +214,7 @@ let pp_tac_error_i ppf = function
     Fmt.pf ppf "invalid number of patterns (%d given, %d needed)" give need
 
   | MustHappen t ->
-    Fmt.pf ppf "timestamp %a must happen" Term.pp t
+    Fmt.pf ppf "timestamp @[%a@] must happen" Term.pp t
 
   | NotHypothesis ->
     Fmt.pf ppf "the conclusion does not appear in the hypotheses"
@@ -276,7 +276,7 @@ type fk = tac_error -> a
 
 type 'a sk = 'a -> fk -> a
 
-type 'a tac = 'a -> 'a list sk -> fk -> a
+type 'a tac = 'a -> ('a list sk) -> fk -> a
 
 (*------------------------------------------------------------------*)
 let run : 'a tac -> 'a -> 'a list = fun tac a ->

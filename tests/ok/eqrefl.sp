@@ -20,12 +20,7 @@ Proof.
   refl.
 Qed.
 
-(* equiv _ : diff(ok,ok). *)
-(* Proof. *)
- (* checkfail try (enrich diff(diff(ok,ko),ok)) exn ConvertionFailed. *)
-(* Qed. *)
-
 equiv _ (x : message) : x.
 Proof.
-  checkfail refl exn NoReflMacroVar.
-Abort.
+  refl.
+Qed.

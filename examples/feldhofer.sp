@@ -167,7 +167,7 @@ Qed.
     Unfortunately the proof argument involves intctxt and thus requires a
     projection.
     The two subproofs are almost identical. *)
-goal unique_outputs (i,j,i0,j0:index):
+goal unique_outputs (i,j,i0,j0:index[const]):
   happens(Tag(i,j),Tag(i0,j0)) =>
      output@Tag(i,j) = output@Tag(i0,j0) => i = i0 && j = j0.
 Proof.
@@ -207,20 +207,17 @@ Proof.
   induction t.
 
   (* init *)
-
   + auto.
 
   (* Action 1/4: Reader *)
-
   + by expandall; apply IH.
 
   (* Action 2/4: Reader1 *)
-
   + expand frame.
     rewrite wa_Reader1; 1:auto. 
 
     expand output@Reader1(k).
-    fa 2. fa 3. fadup 3.
+    fa 2; fa 3; fadup 3.
 
     have ->:
       (if
@@ -257,7 +254,7 @@ Proof.
              input@Tag(i,j) = output@Reader(k))
           in
             enc(<tagR,<nt(i,j),nr(k)>>,rr(k),
-                diff(kE(i),kbE(i,j))))).
+                diff(kE(i),kbE(i,j))))). 
     {
       fa; try (intro *; auto).
       intro [_ [i j _]] /=.
@@ -269,33 +266,35 @@ Proof.
           intctxt Mneq; simpl.
           (* pb w/ randomness condition *) admit. 
            by use tags_neq.
-	   intro [j1 _]; by exists j1.
+          intro [j1 _]; by exists j1.
 
         (* find condB => condA *)
         - intro _.
-	  use unique_outputs with i,j,i0,j0 as [_ _]; 2,3: auto.
-	  use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
-	  by expand output, cipher.
+          use unique_outputs with i,j,i0,j0 as [_ _]; 2,3: auto.
+          use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
+          by expand output, cipher.
 
       * fa => //.
         (* find condA => condB *)
         - intro [Mneq _ _].
-	  intctxt Mneq; simpl.
+          intctxt Mneq; simpl.
           (* pb w/ randomness condition *) admit. 
           by use tags_neq.
           auto.
 
-	(* find condB => condA *)
-	- intro _.
-	  use unique_outputs with i,j,i0,j0 as [_ _]; 2,3: auto.
-	  use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
-	  by expand output, cipher.
-    }
+        (* find condB => condA *)
+        - intro _.
+          use unique_outputs with i,j,i0,j0 as [_ _]; 2,3: auto.
+            use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
+            by expand output, cipher.
+    }.
 
     fa 3; fadup 3.
     fa 3; fadup 3.
     enckp 3, k_fresh; 1: auto.
-    fa 3. fresh 4; rewrite if_true; 1: auto. fresh 4.
+    fa 3. 
+    fresh 4; 1: auto. 
+    fresh 4; 1:auto.
     apply IH.
 
   (* Action 3/4: Reader2 *)
@@ -315,7 +314,7 @@ Proof.
     enckp 3, k_fresh; 1: auto.
 
     fa 3.
-    fresh 5.
-    fresh 4; rewrite if_true; 1: auto.
+    fresh 5; 1:auto.
+    fresh 4; 1: auto.
     apply IH.
 Qed.

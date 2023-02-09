@@ -279,7 +279,7 @@ axiom [mainCCAkI,idealized/left] tf: forall (x,y,z:message), decap(encap(x,y,pk(
 equiv [mainCCAkI,idealized/left] test.
 Proof.
 
-  diffeq => //.
+  diffeq => * //.
 
     + intro *.
       case try find il,jl,kl such that _ in kR(il,jl,kl) else _.
@@ -359,7 +359,7 @@ Qed.
 
 equiv [idealized/left,idealized/left] reflex.
 Proof.
-  diffeq.
+  diffeq => *.
 Qed.
 
 axiom  [idealized/left,idealized/left] len_expd (x1,x2:message) : len(expd(x1,x2)) = len(skex).
@@ -371,9 +371,11 @@ axiom  [idealized/left,idealized/left] len_expd (x1,x2:message) : len(expd(x1,x2
 
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
-global goal [idealized/left,idealized/left] resp_key: Forall (i,j,k:index), [happens(R2(i,j,k))] -> equiv(frame@R2(i,j,k), diff(sRI i j k@R2(i,j,k), ikIR(i,j,k))) .
+global goal [idealized/left,idealized/left] resp_key (i,j,k:index[const]):
+  [happens(R2(i,j,k))] -> 
+  equiv(frame@R2(i,j,k), diff(sRI i j k@R2(i,j,k), ikIR(i,j,k))).
 Proof.
-  intro i j k Hap .
+  intro Hap .
   use reflex with R2(i,j,k) => //.
   expandall.
   prf 1, exct(skex,kR(k,i,j)); rewrite if_true in 1.
@@ -386,8 +388,7 @@ Proof.
   intro Len.
   rewrite if_true in 1.
   auto.
-  fresh 1.
-  auto.
+  by fresh 1.
 Qed.
 
 
@@ -398,9 +399,11 @@ Qed.
 
 
 (* In idealized, we prove that at the end of R, the derived key is strongly secret. *)
-global goal [idealized/left,idealized/left] right_key: Forall (i,j,k:index), [happens(I1(i,j,k))] -> equiv(frame@I1(i,j,k), diff(sIR i j k@I1(i,j,k), ikIR(i,j,k))) .
+global goal [idealized/left,idealized/left] right_key (i,j,k:index[const]):
+  [happens(I1(i,j,k))] ->
+  equiv(frame@I1(i,j,k), diff(sIR i j k@I1(i,j,k), ikIR(i,j,k))) .
 Proof.
-  intro i j k Hap .
+  intro Hap .
   use reflex with I1(i,j,k) => //.
   expandall.
   prf 1, exct(skex,kI(i,j,k)); rewrite if_true in 1.
@@ -415,8 +418,7 @@ Proof.
   intro Len.
   rewrite if_true in 1.
   auto.
-  fresh 1.
-  auto.
+  by fresh 1.
 Qed.
 
 

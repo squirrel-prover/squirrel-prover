@@ -186,11 +186,12 @@ Proof.
   (* Case R *)
   + expand frame, exec, cond, output.
     fa !<_,_>, if _ then _.
-    fresh 1.
-    rewrite if_true //.
-    repeat split => *;
-    try by depends R(r), R1(r);
-    try by depends R(r), R2(r).
+    fresh 1. {
+      repeat split => *;
+      try by depends R(r), R1(r);
+      try by depends R(r), R2(r).
+    }.
+    auto.
   (* Case R1 *)
   + expand frame, exec, output.
     fa !<_,_>.
@@ -226,8 +227,7 @@ Proof.
           repeat split => > _ [_ [_ Meq]];
           fresh Meq).
     }
-    fresh 1.
-    rewrite if_true //.
+    fresh 1 => //.
     xor 1, n_PRF.
     rewrite if_true.
     by use len_id with i; use len_id' with i,t; namelength n_PRF,dummy.

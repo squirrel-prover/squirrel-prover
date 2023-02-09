@@ -110,7 +110,7 @@ let mk_state
    the generated sub-goals. *)
 let rw_inst
     (expand_context : Macros.expand_context)
-    (table : Symbols.table) (hyps : Hyps.TraceHyps.hyps Lazy.t) 
+    (table : Symbols.table) (env : Vars.env) (hyps : Hyps.TraceHyps.hyps Lazy.t) 
   : rw_state Pos.f_map_fold 
   = 
   let doit
@@ -144,7 +144,7 @@ let rw_inst
           let context = SE.reachability_context se in
           begin
             match 
-              Match.T.try_match ~expand_context ~hyps table context occ inst.pat 
+              Match.T.try_match ~expand_context ~hyps ~env table context occ inst.pat 
             with
             | NoMatch _ | FreeTyv -> s, `Continue
             | Match _mv -> 
@@ -159,14 +159,27 @@ let rw_inst
 
         let context = SE.reachability_context se in
         match 
-          Match.T.try_match ~expand_context ~hyps table context occ pat_proj 
+          Match.T.try_match ~expand_context ~hyps ~env table context occ pat_proj 
         with
         | NoMatch _ | FreeTyv -> s, `Continue
 
         (* head matches *)
         | Match mv -> 
           (* we found the rewrite instance *)
-          let subst = Match.Mvar.to_subst ~mode:`Match mv in
+          let subst =
+            let pat_vars =
+              Vars.add_vars pat_proj.pat_vars env
+              (* vars in the pattern are restricted according to what the pattern specifies *)
+
+              |> Vars.add_vars (Vars.Tag.local_vars vars)
+              (* vars above the current position are unrestricted, i.e. local vars*)
+            in
+            match Match.Mvar.to_subst ~mode:`Match table pat_vars mv with
+            | `Subst subst -> subst
+            | `BadInst pp_err ->
+              soft_failure (Failure (Fmt.str "@[<hv 2>rewrite failed:@ @[%t@]@]" pp_err))
+          in
+          
           let left = Term.subst subst pat_proj.pat_term in
           let right = 
             let right_proj = Term.project_opt projs s.init_right in
@@ -184,7 +197,7 @@ let rw_inst
           let found_pat = Term.{ 
               pat_term   = left;
               pat_tyvars = [];
-              pat_vars   = Sv.empty; 
+              pat_vars   = []; 
             } in
 
           let found_instance = `Found {
@@ -203,6 +216,7 @@ let rw_inst
 
 let rewrite_head
     (table : Symbols.table)
+    (env : Vars.env)
     (expand_context : Macros.expand_context)
     (hyps  : Hyps.TraceHyps.hyps Lazy.t)
     (sexpr : SE.t)
@@ -210,7 +224,7 @@ let rewrite_head
     (t     : Term.term) : (Term.term * (SE.arbitrary * Term.term) list) option
   =
   let s = mk_state rule sexpr in
-  match rw_inst expand_context table hyps t sexpr [] [] Pos.root s with
+  match rw_inst expand_context table env hyps t sexpr [] [] Pos.root s with
   | _, `Continue -> None
   | { found_instance = `Found inst }, `Map t -> Some (t, inst.subgs)
   | _ -> assert false
@@ -228,6 +242,7 @@ type rw_res_opt =
 (** Internal *)
 let do_rewrite
     (table  : Symbols.table)
+    (env    : Vars.env)
     (system : SE.context)
     (expand_context : Macros.expand_context)
     (hyps   : Hyps.TraceHyps.hyps)
@@ -269,13 +284,13 @@ let do_rewrite
     let s, f = match f with
       | Global f ->
         let s, _, f = 
-          Pos.map_fold_e (rw_inst expand_context table hyps) system s f 
+          Pos.map_fold_e (rw_inst expand_context table env hyps) system s f 
         in
         s, Equiv.Global f
 
       | Local f ->
         let s, _, f = 
-          Pos.map_fold (rw_inst expand_context table hyps) system.set s f 
+          Pos.map_fold (rw_inst expand_context table env hyps) system.set s f 
         in
         s, Equiv.Local f
     in
@@ -309,6 +324,7 @@ let do_rewrite
 (** Exported *)
 let rewrite
     (table  : Symbols.table)
+    (env    : Vars.env)
     (system : SE.context)
     (expand_context : Macros.expand_context)
     (hyps   : Hyps.TraceHyps.hyps)
@@ -318,7 +334,7 @@ let rewrite
   =
   try
     let r =
-      do_rewrite table system expand_context hyps mult rule target
+      do_rewrite table env system expand_context hyps mult rule target
     in
     RW_Result r
   with
@@ -328,6 +344,7 @@ let rewrite
 let rewrite_exn   
     ~(loc   : L.t)
     (table  : Symbols.table)
+    (env    : Vars.env)
     (system : SE.context)
     (expand_context : Macros.expand_context)
     (hyps   : Hyps.TraceHyps.hyps)
@@ -336,7 +353,7 @@ let rewrite_exn
     (target : Equiv.any_form) : rw_res
   =
   try
-    do_rewrite table system expand_context hyps mult rule target
+    do_rewrite table env system expand_context hyps mult rule target
   with
   | Failed e -> recast_error ~loc e
 
@@ -347,6 +364,7 @@ let high_rewrite
     ~(mode   : [`TopDown of bool | `BottomUp])
     ~(strict : bool)
     (table   : Symbols.table)
+    (env     : Vars.env)
     (system  : SE.t)
     (mk_rule : Vars.vars -> Pos.pos -> rw_rule option) 
     (t       : Term.term)
@@ -363,7 +381,7 @@ let high_rewrite
         assert (rule.rw_conds = []);
         
         let state = mk_state rule se in
-        match rw_inst InSequent table hyps occ se vars conds p state with
+        match rw_inst InSequent table env hyps occ se vars conds p state with
         | _, `Continue -> assert (not strict); `Continue
         | _, `Map t -> `Map t
   in

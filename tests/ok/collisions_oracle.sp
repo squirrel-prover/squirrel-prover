@@ -33,7 +33,7 @@ Proof.
  auto.
 Qed.
 
-goal unforgeable_2 (a : index, b : index):
+goal unforgeable_2 (a, b : index[glob]):
    happens(B(b)) => output@B(b) <> h(na(a),k).
 
 Proof.
@@ -43,7 +43,7 @@ Proof.
 Qed.
 
 
-goal unforgeable_3 (a : index, b : index):
+goal unforgeable_3 (a, b : index[glob]):
  happens(C(b)) => output@C(b) <> h(na(a),k).
 
 Proof.

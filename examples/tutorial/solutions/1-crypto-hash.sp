@@ -116,8 +116,7 @@ Proof.
   print goal if_true.
   rewrite if_true in 0.
   auto.
-  fresh 0.
-  auto.
+  by fresh 0.
 Qed.
 
 global goal hash_6 :
@@ -128,7 +127,8 @@ Proof.
   intro H.
   prf 0; rewrite if_true // in 0. 
   prf 1; rewrite if_true // in 1. 
-  fresh 0; fresh 1.
+  fresh 0; 1:auto.
+  fresh 0; 1:auto.
   refl.
   (* END EXO *) 
 Qed.

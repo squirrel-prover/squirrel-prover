@@ -1542,7 +1542,7 @@ open Term.Lit
 let env = ref Vars.empty_env
   
 let mk_var ty v : Vars.var =
-  let env', v = Vars.make `Approx !env ty v in
+  let env', v = Vars.make `Approx !env ty v () in
   env := env';
   v
 

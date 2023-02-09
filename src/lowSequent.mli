@@ -45,6 +45,10 @@ module type S = sig
   val conc_kind : conc_form Equiv.f_kind
 
   (*------------------------------------------------------------------*)
+  (** default variable information of the sequent *)
+  val var_info : Vars.Tag.t
+
+  (*------------------------------------------------------------------*)
   module Hyps : Hyps.S1 with type hyp = hyp_form and type hyps := t
 
   (** {2 Access to sequent components}
@@ -77,7 +81,7 @@ module type S = sig
       treatment of local hypotheses, i.e. to determine when they can be
       kept (possibly with modifications) or if they should be dropped. *)
   val set_goal_in_context :
-    ?update_local:(Term.form -> Term.form option) ->
+    ?update_local:(Term.term -> Term.term option) ->
     SystemExpr.context -> conc_form -> t -> t
 
   val table : t -> Symbols.table
@@ -136,10 +140,10 @@ module type S = sig
   val map : Equiv.Babel.mapper -> t -> t
 
   (** Smart constructors and destructors for hypotheses. *)
-  module Hyp : Term.SmartFO with type form = hyp_form
+  module Hyp : SmartFO.S with type form = hyp_form
 
   (** Smart constructors and destructors for conclusions. *)
-  module Conc : Term.SmartFO with type form = conc_form
+  module Conc : SmartFO.S with type form = conc_form
 end
 
 (*------------------------------------------------------------------*)
@@ -155,5 +159,6 @@ val setup_set_goal_in_context :
   old_context:SE.context ->
   new_context:SE.context ->
   table:Symbols.table ->
+  vars:Vars.env ->
   ( Term.term ->  Term.term option) *
   (Equiv.form -> Equiv.form option)

@@ -41,7 +41,7 @@ val fv_atom : atom -> Vars.Sv.t
 type quant = ForAll | Exists
 
 type form = 
-  | Quant of quant * Vars.var list * form
+  | Quant of quant * Vars.tagged_vars * form
   | Atom  of atom
   | Impl  of form * form
   | And   of form * form
@@ -51,12 +51,12 @@ val pp     :             Format.formatter -> form -> unit
 val _pp    : dbg:bool -> Format.formatter -> form -> unit
 val pp_dbg :             Format.formatter -> form -> unit
 
-val mk_quant  : quant -> Vars.var list -> form -> form
-val mk_forall :          Vars.var list -> form -> form
-val mk_exists :          Vars.var list -> form -> form
+(*------------------------------------------------------------------*)
+val mk_quant_tagged : ?simpl:bool -> quant -> Vars.tagged_vars -> form -> form
 
 val mk_reach_atom : Term.term -> form
 
+(*------------------------------------------------------------------*)
 (** Does not recurse. *)
 val tmap       : (form -> form) -> form -> form 
 val titer      : (form -> unit) -> form -> unit
@@ -65,6 +65,7 @@ val texists    : (form -> bool) -> form -> bool
 val tfold      : (form -> 'a -> 'a) -> form -> 'a -> 'a
 val tmap_fold  : ('b -> form -> 'b * form) -> 'b -> form -> 'b * form 
 
+(*------------------------------------------------------------------*)
 (** Get (some) terms appearing in a formula.
   * For instance, terms occurring under binders may not be included. *)
 val get_terms : form -> Term.term list
@@ -128,7 +129,7 @@ module Any : sig
     * when the input formula is not of the right kind. *)
   val convert_to : ?loc:Location.t -> 'a f_kind -> any_form -> 'a
 
-  module Smart : Term.SmartFO with type form = any_form
+  module Smart : SmartFO.S with type form = any_form
 end
 
 (** Conversions between formula kinds and generic functionalities
@@ -156,7 +157,7 @@ end
 
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors and destructots} *)
-module Smart : Term.SmartFO with type form = global_form
+module Smart : SmartFO.S with type form = global_form
 
 val destr_reach : form -> Term.term option
 val destr_equiv : form -> equiv option

@@ -22,7 +22,7 @@ module Pos : sig
   (*------------------------------------------------------------------*)
   (** strict prefix comparison over positions *)
   val lt : pos -> pos -> bool
-    
+
   (*------------------------------------------------------------------*)
   (** [f] of type [f_sel] is a function that, given [t projs vars conds] where:
       - [t] is sub-term of the term we are mapping one
@@ -74,7 +74,6 @@ module Pos : sig
     SE.arbitrary -> Vars.vars -> Term.term list -> pos ->
     'a ->
     'a
-
 
   (*------------------------------------------------------------------*)
   (** [map_fold ?mode func env acc t] applies [func] at all position in [t].
@@ -157,32 +156,48 @@ end
 (** {2 Matching variable assignment} *)
 
 module Mvar : sig
-  (** Unification and matching variable assignment. *)
   type t
-
   val empty : t
 
-  (** Union of two [mv] with dijoint supports. *)
+  (** union of two [mv] with disjoint supports *)
   val union : t -> t -> t
 
   (** remove a variable assignment *)
   val remove : Vars.var -> t -> t
 
-  (** add a variable assignment *)
-  val add : Vars.var -> Term.term -> t -> t
+  (** Add a variable assignment. 
+      The system indicate how to interpret the assignment. *)
+  val add : Vars.tagged_var -> SE.t -> Term.term -> t -> t
 
   (** check if a variable is assigned *)
   val mem : Vars.var -> t -> bool
 
-  val filter : (Vars.var -> Term.term -> bool) -> t -> t
+  val find : Vars.var -> t -> Term.term
+
+  val is_empty : t -> bool
+
+  val filter : (Vars.var -> (Vars.Tag.t * SE.t * Term.term) -> bool) -> t -> t
 
   val map : (Term.term -> Term.term) -> t -> t
-    
-  val mapi : (Vars.var -> Term.term -> Term.term) -> t -> t
-    
-  val fold : (Vars.var -> Term.term -> 'b -> 'b) -> t -> 'b -> 'b
 
-  val to_subst : mode:[`Match | `Unif] -> t -> Term.subst
+  val mapi : (Vars.var -> SE.t -> Term.term -> Term.term) -> t -> t
+
+  val fold :
+    (Vars.var -> (Vars.Tag.t * SE.t * Term.term) -> 'b -> 'b) -> t -> 'b -> 'b
+
+  (** [table] and [env] are necessary to check that restrictions on 
+      variables instanciation have been respected. *)
+  val to_subst :
+    mode:[`Match|`Unif] ->
+    Symbols.table -> Vars.env ->
+    t ->
+    [`Subst of Term.subst | `BadInst of Format.formatter -> unit]
+
+  (** [to_subst] when all matched (or unified) variables are unrestricted 
+      variables (i.e. local variables).
+      Indeed, in that case the substitution resolution cannot fail. *)
+  val to_subst_locals :
+    mode:[`Match|`Unif] -> t -> Term.subst
 
   val pp : Format.formatter -> t -> unit
 end
@@ -219,18 +234,6 @@ module type S = sig
     (Format.formatter -> 'a -> unit) ->
     Format.formatter -> 'a Term.pat -> unit
 
-  val unify :
-    ?mv:Mvar.t ->
-    Symbols.table ->
-    t Term.pat -> t Term.pat ->
-    [`FreeTyv | `NoMgu | `Mgu of Mvar.t]
-
-  val unify_opt :
-    ?mv:Mvar.t ->
-    Symbols.table ->
-    t Term.pat -> t Term.pat ->
-    Mvar.t option
-
   (** [try_match ... t p] tries to match [p] with [t] (at head position).
       If it succeeds, it returns a map [θ] instantiating the variables
       [p.pat_vars] as subterms of [t], and:
@@ -241,6 +244,7 @@ module type S = sig
   val try_match :
     ?option:match_option ->
     ?mv:Mvar.t ->
+    ?env:Vars.env ->            (* used to get variables tags *)
     ?ty_env:Type.Infer.env ->
     ?hyps:Hyps.TraceHyps.hyps Lazy.t ->
     ?expand_context:Macros.expand_context ->
@@ -251,7 +255,7 @@ module type S = sig
     match_res
 
   (** [find pat t] returns the list of occurences in t that match the
-     pattern. *)
+      pattern. *)
   val find : 
     ?option:match_option ->
     ?ty_env:Type.Infer.env ->

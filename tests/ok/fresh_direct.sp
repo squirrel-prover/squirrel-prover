@@ -1,5 +1,3 @@
-
-
 abstract ok : message
 abstract ko : message
 
@@ -14,6 +12,6 @@ system null.
 equiv testFresh : diff(f(ok),f(ok)),diff(n,m),k.
 
 Proof.
-  fresh 2.
+  fresh 2; 1:auto.
   by fresh 0.
 Qed.

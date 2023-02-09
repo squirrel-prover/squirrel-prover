@@ -111,15 +111,22 @@ type function_def =
 val is_ftype : fname -> function_def -> table -> bool
 
 (*------------------------------------------------------------------*)
-type bty_info = 
-  | Ty_large
-  | Ty_name_fixed_length
+(** {2 Type information: Ocaml type declaration}  *)
 
-type bty_def = bty_info list
+(** Type information associated to base types. 
+    Restrict the instantiation domain of a type. *)
+type bty_info =
+  | Large               (** collision probabiliy between names is negligible *)
+  | Name_fixed_length   (** for any η, all names have the same length *)
+  | Finite              (** finite for all η *)
+  | Fix                 (** independent from η *)
+  | Well_founded        (** well-founded for all η *)
+    
+type bty_infos = bty_info list
 
 (*------------------------------------------------------------------*)
 type name_def = {
-  n_fty   : Type.ftype; (** restricted to: (Index | Timestamp)^* -> ty *)
+  n_fty : Type.ftype; (** restricted to: (Index | Timestamp)^* -> ty *)
 }
 
 (*------------------------------------------------------------------*)
@@ -148,7 +155,7 @@ type _ def =
   | Macro    : macro_def -> _macro   def
   | System   : unit      -> _system  def
   | Process  : unit      -> _process def
-  | BType    : bty_def   -> _btype   def
+  | BType    : bty_infos -> _btype   def
   | HintDB   : unit      -> _hintdb  def
   | Lemma    : unit      -> _lemma   def
         
@@ -279,15 +286,14 @@ module type Namespace = sig
   val map : (ns t -> def -> data -> (def * data)) -> table -> table
 end
 
-module Config   : Namespace with type def = param_kind                     
-                                                    with type ns = _config
-module Channel  : Namespace with type def = unit    with type ns = _channel
-module BType    : Namespace with type def = bty_def with type ns = _btype
-module Action   : Namespace with type def = int     with type ns = _action
-module System   : Namespace with type def = unit    with type ns = _system
-module Process  : Namespace with type def = unit    with type ns = _process
-module HintDB   : Namespace with type def = unit    with type ns = _hintdb
-module Lemma    : Namespace with type def = unit    with type ns = _lemma
+module Config   : Namespace with type def = param_kind with type ns = _config
+module Channel  : Namespace with type def = unit       with type ns = _channel
+module BType    : Namespace with type def = bty_infos  with type ns = _btype
+module Action   : Namespace with type def = int        with type ns = _action
+module System   : Namespace with type def = unit       with type ns = _system
+module Process  : Namespace with type def = unit       with type ns = _process
+module HintDB   : Namespace with type def = unit       with type ns = _hintdb
+module Lemma    : Namespace with type def = unit       with type ns = _lemma
                                                            
 module Function : Namespace
   with type def = Type.ftype * function_def with type ns = _fname
@@ -302,6 +308,7 @@ type error_i =
   | Unbound_identifier    of string
   | Incorrect_namespace   of namespace * namespace (* expected, got *)
   | Multiple_declarations of string * namespace * group
+  | Failure of string
 
 type error = Location.t * error_i
 
@@ -312,10 +319,33 @@ val pp_error :
 exception Error of error
 
 (*------------------------------------------------------------------*)
-(** {2 Miscellaneous} *)
+(** {2 Type information} *)
 
-val get_bty_info   : table -> Type.ty -> bty_info list
-val check_bty_info : table -> Type.ty -> bty_info -> bool
+module TyInfo : sig
+  type t = bty_info
+
+  val parse : lsymb -> t
+
+  (*------------------------------------------------------------------*)
+  val get_bty_infos  : table -> Type.ty -> t list 
+  val check_bty_info : table -> Type.ty -> t -> bool
+
+  (*------------------------------------------------------------------*)
+  (** Is the type a finite type, e.g. [Index] and [Timestamp] *)
+  val is_finite : table -> Type.ty -> bool 
+
+  (** Is the type is a fixed set (independent from the security 
+      parameter η.
+      (e.g. [Index], [Timestamp] and [Message]) *)
+  val is_fixed : table -> Type.ty -> bool 
+
+  (** Is the type well-founded for [Term.mk_lt], e.g. [Index], [Timestamp] 
+      or [Message]. *)
+  val is_well_founded : table -> Type.ty -> bool 
+end
+
+(*------------------------------------------------------------------*)
+(** {2 Miscellaneous} *)
 
 val is_infix     : fname -> bool 
 val is_infix_str : string  -> bool 
