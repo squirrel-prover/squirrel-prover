@@ -1848,12 +1848,15 @@ let rec known_set_decompose (k : known_set) : known_set list =
     let kl = List.map (fun a -> { k with term = a; } ) l in
     List.concat_map known_set_decompose kl
 
-  | Quant (Seq, vars, term) ->
+  | Quant ((Seq | Lambda), vars, term) ->
     let vars, s = Term.refresh_vars vars in
     let term = Term.subst s term in
-    [{ term;
-       vars = k.vars @ (Vars.Tag.global_vars ~const:true vars);
-       cond = k.cond }]
+    let k = 
+      { term;
+        vars = k.vars @ (Vars.Tag.global_vars ~const:true vars);
+        cond = k.cond }
+    in
+    known_set_decompose k
 
   | _ -> [k]
 

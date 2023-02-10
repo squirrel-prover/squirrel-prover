@@ -15,3 +15,11 @@ Proof.
   intro H.
   try apply H. (* fails *)
 Qed.
+
+global goal _ (i:index[const]) :
+  equiv(seq(i:index => (n(i),empty))) ->
+  equiv(n(i)).
+Proof.
+  intro H.
+  apply H.
+Qed.
