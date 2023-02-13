@@ -1,4 +1,4 @@
-(* NOTE: somehow these "open!" are necessary to perform the side effects
+(* NOTE: these "open!" are necessary to perform the side effects
  *       in each opened module; we use "open!" instead of "open" to avoid
  *       an "unused open" warning *)
 
@@ -18,6 +18,7 @@ let test_suites : unit Alcotest.test list =
     ("Process parsing", Squirreltests.Parserbuf.process_parsing);
     ("Prover", Squirreltests.Prover.tests);
     ("NewTactics", Squirreltests.Tactics.tests);
+    ("Term", Squirreltests.Term.tests)
   ]
 
 let alcotests (path:string) : (string * [> `Quick] * (unit -> unit )) list = 
