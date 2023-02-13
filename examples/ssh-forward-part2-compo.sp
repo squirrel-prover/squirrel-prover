@@ -406,8 +406,10 @@ Proof.
   + (* Honest case of signature produced by Fa.
     We need to prove that the sign req received by FA comes from PDIS. *)
     intro [i [Euf Meq]].
-    executable pred(Sok); 1,2: by auto => H2.
-
+    assert forall t:timestamp, t < Sok => exec@t as H2. {
+      intro t Ht.
+      by apply exec_le (pred(Sok)).
+    }.
     depends SDIS, Sok => // _.
     have _: happens(SDIS); 1: auto.
     have _: happens(P3(i)); 1: case Euf; auto.
@@ -462,8 +464,7 @@ Proof.
        intro Hfail.
        use S_charac; try auto.
        depends Sok, Sfail => // _.
-       executable Sfail; 1,2: auto.
-       by intro H0; use H0 with Sok.
+       by apply exec_le Sfail.
      }
      by rewrite if_false in 17.
 
@@ -474,8 +475,7 @@ Proof.
       intro Hfail.
       use P_charac; try auto.
       depends PDIS5, Pfail => // _.
-      executable Pfail; 1,2: auto.
-      by intro H0; use H0 with PDIS5.
+      by apply exec_le Pfail.
   }
   by rewrite if_false in 17.
 Qed.
