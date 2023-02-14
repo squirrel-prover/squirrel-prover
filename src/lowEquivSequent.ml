@@ -4,24 +4,14 @@ module L = Location
 module Args = TacticsArgs
 module T = Tactics
 
+module TopHyps = Hyps           (* alias, as we define another [Hyps] later *)
 module SE = SystemExpr
 module TS = LowTraceSequent
 
 (*------------------------------------------------------------------*)
 (** {2 Hypotheses for equivalence sequents} *)
 
-module H = Hyps.Mk
-    (struct
-      type t = Equiv.form
-
-      let pp_hyp     = Equiv.pp
-      let _pp_hyp    = Equiv._pp
-      let pp_hyp_dbg = Equiv.pp_dbg
-
-      let choose_name _f = "H"
-        
-      let htrue = Equiv.Atom (Equiv.Equiv [])
-    end)
+module H = Hyps.EquivHyps
 
 let subst_hyps (subst : Term.subst) (hyps : H.hyps) : H.hyps =
   H.map (Equiv.subst subst) hyps
@@ -198,31 +188,18 @@ let set_goal_in_context ?update_local system conc s =
 
   if system = s.env.system then { s with goal = conc } else
 
-    (* Update hypotheses.
-       We add back manually all formulas, to ensure that definitions are
-       unrolled. TODO really necessary? *)
-    let _update_local,update_global =
-      LowSequent.setup_set_goal_in_context
+    (* Update hypotheses. *)
+    let hyps =
+      TopHyps.change_equiv_hyps_context
         ~table:s.env.table
         ~vars:s.env.vars
         ~old_context:s.env.system
         ~new_context:system
-    in
-    let s =
-      H.fold
-        (fun id f s ->
-           match update_global f with
-           | Some f ->
-             let _,hyps = H._add ~force:true id f s.hyps in
-             { s with hyps }
-           | None -> s)
         s.hyps
-        { s with hyps = H.empty }
     in
-
     (* Change the context in the sequent's environment. *)
     let env = Env.update ~system s.env in
-    let s = { s with env } in
+    let s = { s with env; hyps } in
 
     (* Finally set the new conclusion. *)
     { s with goal = conc }

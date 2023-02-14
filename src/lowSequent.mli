@@ -17,6 +17,7 @@ module L = Location
 module SE = SystemExpr
 
 module TraceHyps = Hyps.TraceHyps
+module EquivHyps = Hyps.EquivHyps
 
 (*------------------------------------------------------------------*)
 (** {2 Module type for sequents} *)
@@ -146,19 +147,3 @@ module type S = sig
   module Conc : SmartFO.S with type form = conc_form
 end
 
-(*------------------------------------------------------------------*)
-(** {2 Common utilities for sequent implementations} *)
-
-(** Common setup for [set_goal_in_context].
-    For each kind of hypothesis we need an update function that
-    returns [None] if the hypothesis must be dropped, and [Some f]
-    if it must be changed to [f].
-    The [setup_set_goal_in_context] returns the pair of local and
-    global update functions. *)
-val setup_set_goal_in_context :
-  old_context:SE.context ->
-  new_context:SE.context ->
-  table:Symbols.table ->
-  vars:Vars.env ->
-  ( Term.term ->  Term.term option) *
-  (Equiv.form -> Equiv.form option)

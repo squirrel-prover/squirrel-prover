@@ -39,6 +39,9 @@ module PT = struct
     let do_proj : Equiv.any_form -> Equiv.any_form = function
       | Equiv.Local t -> Local (Term.project projs t)
       | Equiv.Global _ as a -> a
+      (* TODO: system: there is an issue here:
+         global hypotheses cannot be left unchanged, but cannot always
+         be projected (see comment above)... *)
     in
     let do_t_proj = Term.project projs in
 

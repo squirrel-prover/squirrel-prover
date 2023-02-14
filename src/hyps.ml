@@ -1,8 +1,13 @@
+open Utils
+
+(*------------------------------------------------------------------*)  
 module L = Location
 module T = Tactics
 
+module SE = SystemExpr
 module Args = TacticsArgs
   
+(*------------------------------------------------------------------*)  
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)  
@@ -282,6 +287,23 @@ module Mk (Hyp : Hyp) : S with type hyp = Hyp.t = struct
 end
 
 (*------------------------------------------------------------------*)
+(** {2 Equiv Hyps} *)
+
+module EquivHyps = Mk
+    (struct
+      type t = Equiv.form
+
+      let pp_hyp     = Equiv.pp
+      let _pp_hyp    = Equiv._pp
+      let pp_hyp_dbg = Equiv.pp_dbg
+
+      let choose_name _f = "H"
+
+      let htrue = Equiv.Atom (Equiv.Equiv [])
+    end)
+
+
+(*------------------------------------------------------------------*)
 (** {2 Trace Hyps} *)
 
 let get_ord (at : Term.Lit.xatom ) : Term.Lit.ord =
@@ -373,3 +395,150 @@ let get_eq_atoms (hyps : TraceHyps.hyps) : Term.Lit.xatom list =
     | _ -> None
   in
   List.filter_map do1 (get_atoms_of_hyps hyps)
+
+
+(*------------------------------------------------------------------*) 
+(** {2 Changing the context of a set of hypotheses} *)
+
+(** Internal.
+    
+    Common setup for to change hypotheses context.
+    For each kind of hypothesis we need an update function that
+    returns [None] if the hypothesis must be dropped, and [Some f]
+    if it must be changed to [f].
+    [setup_change_hyps_context] returns the pair of local and
+    global update functions. *)
+let setup_change_hyps_context 
+    ~(old_context : SE.context) 
+    ~(new_context : SE.context)
+    ~(table : Symbols.table)
+    ~(vars : Vars.env) 
+  : ( Term.term ->  Term.term option) *
+    (Equiv.form -> Equiv.form option)
+  =
+  assert (SE.compatible table new_context.SE.set old_context.SE.set);
+  assert (match new_context.SE.pair with
+            | Some p -> SE.compatible table new_context.SE.set p
+            | None -> true);
+  assert (match old_context.SE.pair with
+            | Some p -> SE.compatible table old_context.SE.set p
+            | None -> true);
+
+  (* Flags indicating which parts of the context are changed. *)
+  let set_unchanged = new_context.SE.set = old_context.SE.set in
+  let pair_unchanged = new_context.SE.pair = old_context.SE.pair in
+
+  (* Can we project formulas from the old to the new context? *)
+  let set_projections : (Term.term -> Term.term) option =
+    if SE.is_any_or_any_comp old_context.set then Some (fun f -> f) else
+      if SE.subset table new_context.set old_context.set then
+        match SE.(to_projs (to_fset new_context.set)) with
+          | projs -> Some (fun f -> Term.project projs f)
+          | exception SE.(Error Expected_fset) -> assert false
+      else
+        None
+  in
+
+  (* A local hypothesis can be kept with a projection from the old to
+     the new system, when it exists. *)
+  let update_local f =
+    Utils.omap (fun project -> project f) set_projections
+  in
+
+  let env = Env.init ~table ~vars ~system:{ new_context with pair = None; } () in
+  
+  (* For global hypotheses:
+    - Reachability atoms are handled as local hypotheses.
+    - Other global hypotheses can be kept if their meaning is unchanged
+      in the new annotation. This is ensured in [can_keep_global]
+      by checking the following conditions on atoms:
+      + Reachability atoms are unconstrained if the set annotation
+        has not changed. Otherwise they must be pure trace formulas.
+      + Equivalence atoms are only allowed if the trace annotation has
+        not changed. *)
+  let rec can_keep_global = function
+    | Equiv.Quant (_,_,f) :: l ->
+        can_keep_global (f::l)
+
+    | Impl (f,g) :: l | Equiv.And (f,g) :: l | Or (f,g) :: l ->
+        can_keep_global (f::g::l)
+
+    | Atom (Equiv _) :: l -> pair_unchanged && can_keep_global l
+
+    | Atom (Reach a) :: l ->
+      ( ( HighTerm.is_constant `Exact env a &&
+          HighTerm.is_system_indep env a )
+        || set_unchanged )
+      && can_keep_global l
+        
+    | [] -> true
+  in
+  let update_global f =
+    if can_keep_global [f] then Some f else
+      match f with
+        | Equiv.Atom (Reach f) ->
+            Utils.omap (fun f -> Equiv.Atom (Reach f)) (update_local f)
+        | _ -> None
+  in
+
+  update_local, update_global
+
+(*------------------------------------------------------------------*) 
+(** See `.mli` *)
+let change_trace_hyps_context 
+    ?update_local
+    ~(old_context : SE.context) 
+    ~(new_context : SE.context)
+    ~(table : Symbols.table)
+    ~(vars : Vars.env) 
+    (hyps : TraceHyps.hyps)
+  : TraceHyps.hyps
+  =
+  let default_update_local,update_global =
+    setup_change_hyps_context 
+      ~old_context ~new_context ~vars ~table
+  in
+  let update_local = odflt default_update_local update_local in
+
+  TraceHyps.fold
+    (fun id f hyps ->
+       match f with
+       | Local f ->
+         begin match update_local f with
+           | Some f ->
+             let _,hyps = TraceHyps._add ~force:true id (Local f) hyps in
+             hyps
+           | None -> hyps
+         end
+       | Global e ->
+         begin match update_global e with
+           | Some e ->
+             let _,hyps = TraceHyps._add ~force:true id (Global e) hyps in
+             hyps
+           | None -> hyps
+         end)
+    hyps TraceHyps.empty
+
+(*------------------------------------------------------------------*) 
+(** See `.mli` *)
+let change_equiv_hyps_context 
+    ~(old_context : SE.context) 
+    ~(new_context : SE.context)
+    ~(table : Symbols.table)
+    ~(vars : Vars.env) 
+    (hyps : EquivHyps.hyps)
+  : EquivHyps.hyps
+  =
+  let _update_local,update_global =
+    setup_change_hyps_context 
+      ~old_context ~new_context ~vars ~table
+  in
+  EquivHyps.fold
+    (fun id f hyps ->
+       begin match update_global f with
+         | Some f ->
+           let _,hyps = EquivHyps._add ~force:true id f hyps in
+           hyps
+         | None -> hyps
+       end)
+    hyps EquivHyps.empty

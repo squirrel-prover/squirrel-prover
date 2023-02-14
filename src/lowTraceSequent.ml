@@ -291,50 +291,25 @@ let set_table table s =
 (*------------------------------------------------------------------*)
 let set_goal a s = S.update ~conclusion:a s 
 
+(** See `.mli` *)
 let set_goal_in_context ?update_local system conc s =
-
   if system = s.env.system && update_local = None then
     set_goal conc s
   else
 
-  (* Update hypotheses.
-     We add back manually all formulas, to ensure that definitions are
-     unrolled. TODO really necessary? *)
-  let default_update_local,update_global =
-    LowSequent.setup_set_goal_in_context
+  (* Update hypotheses. *)
+  let hyps =
+    Hyps.change_trace_hyps_context
+      ?update_local
       ~table:s.env.table
       ~old_context:s.env.system
       ~new_context:system
       ~vars:s.env.vars
+      s.hyps
   in
-  let update_local = match update_local with
-    | None -> default_update_local
-    | Some f -> f
-  in
-  let s =
-    H.fold
-      (fun id f s ->
-         match f with
-           | Local f ->
-               begin match update_local f with
-                 | Some f ->
-                   let _,hyps = H._add ~force:true id (Local f) s.hyps in
-                   S.update ~hyps s
-                 | None -> s
-               end
-           | Global e ->
-               begin match update_global e with
-                 | Some e ->
-                     let _,hyps = H._add ~force:true id (Global e) s.hyps in
-                     S.update ~hyps s
-                 | None -> s
-               end)
-      s.hyps (S.update ~hyps:H.empty s)
-  in
-
   (* Change the context in the sequent's environment. *)
   let env = Env.update ~system s.env in
-  let s = S.update ~env s in
+  let s = S.update ~env ~hyps s in
 
   (* Finally set the new conclusion. *)
   set_goal conc s

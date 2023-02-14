@@ -1,8 +1,12 @@
+(* open Utils *)
+
+(*------------------------------------------------------------------*)
 module L = Location
 
 module SE = SystemExpr
 
 module TraceHyps = Hyps.TraceHyps
+module EquivHyps = Hyps.EquivHyps
 
 (*------------------------------------------------------------------*)
 module type S = sig
@@ -94,74 +98,3 @@ module type S = sig
   module Conc : SmartFO.S with type form = conc_form
 end
 
-(*------------------------------------------------------------------*) 
-(** {2 Common utilities for sequent implementations} *)
-
-let setup_set_goal_in_context ~old_context ~new_context ~table ~vars =
-
-  assert (SE.compatible table new_context.SE.set old_context.SE.set);
-  assert (match new_context.SE.pair with
-            | Some p -> SE.compatible table new_context.SE.set p
-            | None -> true);
-  assert (match old_context.SE.pair with
-            | Some p -> SE.compatible table old_context.SE.set p
-            | None -> true);
-
-  (* Flags indicating which parts of the context are changed. *)
-  let set_unchanged = new_context.SE.set = old_context.SE.set in
-  let pair_unchanged = new_context.SE.pair = old_context.SE.pair in
-
-  (* Can we project formulas from the old to the new context? *)
-  let set_projections =
-    if SE.is_any_or_any_comp old_context.set then Some (fun f -> f) else
-      if SE.subset table new_context.set old_context.set then
-        match SE.(to_projs (to_fset new_context.set)) with
-          | projs -> Some (fun f -> Term.project projs f)
-          | exception SE.(Error Expected_fset) -> assert false
-      else
-        None
-  in
-
-  (* A local hypothesis can be kept with a projection from the old to
-     the new system, when it exists. *)
-  let update_local f =
-    Utils.omap (fun project -> project f) set_projections
-  in
-
-  let env = Env.init ~table ~vars ~system:{ new_context with pair = None; } () in
-  
-  (* For global hypotheses:
-    - Reachability atoms are handled as local hypotheses.
-    - Other global hypotheses can be kept if their meaning is unchanged
-      in the new annotation. This is ensured in [can_keep_global]
-      by checking the following conditions on atoms:
-      + Reachability atoms are unconstrained if the set annotation
-        has not changed. Otherwise they must be pure trace formulas.
-      + Equivalence atoms are only allowed if the trace annotation has
-        not changed. *)
-  let rec can_keep_global = function
-    | Equiv.Quant (_,_,f) :: l ->
-        can_keep_global (f::l)
-
-    | Impl (f,g) :: l | Equiv.And (f,g) :: l | Or (f,g) :: l ->
-        can_keep_global (f::g::l)
-
-    | Atom (Equiv _) :: l -> pair_unchanged && can_keep_global l
-
-    | Atom (Reach a) :: l ->
-      ( ( HighTerm.is_constant `Exact env a &&
-          HighTerm.is_system_indep env a )
-        || set_unchanged )
-      && can_keep_global l
-        
-    | [] -> true
-  in
-  let update_global f =
-    if can_keep_global [f] then Some f else
-      match f with
-        | Equiv.Atom (Reach f) ->
-            Utils.omap (fun f -> Equiv.Atom (Reach f)) (update_local f)
-        | _ -> None
-  in
-
-  update_local, update_global

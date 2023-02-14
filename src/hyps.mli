@@ -1,6 +1,6 @@
 (** Generic hypotheses, used in all kinds of sequents. *)
 
-
+module SE = SystemExpr
 module Args = TacticsArgs
   
 (*------------------------------------------------------------------*) 
@@ -119,6 +119,11 @@ module Mk (Hyp : Hyp) : S with type hyp = Hyp.t
 
 
 (*------------------------------------------------------------------*)
+(** {2 Equiv Hyps} *)
+
+module EquivHyps : S with type hyp = Equiv.form
+
+(*------------------------------------------------------------------*)
 (** {2 Trace Hyps} *)
 
 module TraceHyps : S with type hyp = Equiv.any_form
@@ -127,3 +132,35 @@ val get_atoms_of_hyps  : TraceHyps.hyps -> Term.Lit.literals
 val get_message_atoms  : TraceHyps.hyps -> Term.Lit.xatom list 
 val get_trace_literals : TraceHyps.hyps -> Term.Lit.literals 
 val get_eq_atoms       : TraceHyps.hyps -> Term.Lit.xatom list 
+
+(*------------------------------------------------------------------*)
+(** {2 Changing the context of a set of hypotheses} *)
+
+(** Change the context interpreting some hypotheses.
+    The new hypotheses are understood in the new context.
+    The new context must be compatible with the old one.
+
+    Returned hypotheses (understood wrt the new context)
+    are logical consequences of the hypotheses given in argument
+    (understood wrt its own context): some hypotheses will thus be dropped
+    while others will be projected.
+
+    The optional [update_local] function can be used to override the
+    treatment of local hypotheses, i.e. to determine when they can be
+    kept (possibly with modifications) or if they should be dropped. *)
+val change_trace_hyps_context :
+  ?update_local:(Term.term -> Term.term option) ->
+  old_context:SE.context ->
+  new_context:SE.context ->
+  table:Symbols.table ->
+  vars:Vars.env ->
+  TraceHyps.hyps -> TraceHyps.hyps
+
+(** Same for equivalence hypotheses. *)
+val change_equiv_hyps_context :
+  old_context:SE.context ->
+  new_context:SE.context ->
+  table:Symbols.table ->
+  vars:Vars.env ->
+  EquivHyps.hyps -> EquivHyps.hyps
+
