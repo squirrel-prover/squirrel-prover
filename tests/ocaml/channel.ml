@@ -36,15 +36,15 @@ let channels =
            try ignore (declare table_c (mk "c")) with
            | Symbols.Error (_, Multiple_declarations ("c",_,_)) -> raise Ok) ;
 
-      Alcotest.(check bool) "same channels"
-        (of_lsymb (mk "c") table_cd = of_lsymb (mk "c") table_cd)
-        true ;
-      Alcotest.(check bool) "same channels"
-        (of_lsymb (mk "d") table_cd = of_lsymb (mk "d") table_cd)
-        true ;
-      Alcotest.(check bool)
-        "not the same channels"
-        (of_lsymb (mk "c") table_cd = of_lsymb (mk "d") table_cd)
-        false
+      Alcotest.(check' bool) ~msg:"same channels"
+        ~actual:(of_lsymb (mk "c") table_cd = of_lsymb (mk "c") table_cd)
+        ~expected:true ;
+      Alcotest.(check' bool) ~msg:"same channels"
+        ~actual:(of_lsymb (mk "d") table_cd = of_lsymb (mk "d") table_cd)
+        ~expected:true ;
+      Alcotest.(check' bool)
+        ~msg:"not the same channels"
+        ~actual:(of_lsymb (mk "c") table_cd = of_lsymb (mk "d") table_cd)
+        ~expected:false
   ]
 

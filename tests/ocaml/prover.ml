@@ -18,11 +18,11 @@ let search_about_1 () =
   let matches = Prover.search_about st 
       (ProverLib.Srch_term (term_from_string "happens(_)"))
   in
-  Alcotest.(check int) "Found one lemma with happens(_)"
-    (List.length matches) 1;
+  Alcotest.(check' int) ~msg:"Found one lemma with happens(_)" 
+    ~actual:(List.length matches) ~expected:1;
 
-  Alcotest.(check int) "Found one pattern happens(_) in lemma"
-    (List.length (snd (List.hd matches))) 1;
+  Alcotest.(check' int) ~msg:"Found one pattern happens(_) in lemma"
+    ~actual:(List.length (snd (List.hd matches))) ~expected:1;
   let st = Prover.exec_command "auto." st
   |> Prover.exec_command "Qed."
   in
@@ -30,16 +30,16 @@ let search_about_1 () =
     | Some s -> Fmt.pf ppf "%s" s
     | None -> Fmt.pf ppf "" in
   let some_testable = Alcotest.testable pprint_option (=) in
-  Alcotest.(check some_testable) "Goal name" 
-    (Prover.current_goal_name st) (None);
+  Alcotest.(check' some_testable) ~msg:"Goal name" 
+    ~actual:(Prover.current_goal_name st) ~expected:(None);
 
   let matches = Prover.search_about st
     (ProverLib.Srch_term (term_from_string "n(_)"))
   in
-  Alcotest.(check int) "Found one lemma with n(_)"
-    (List.length matches) 1;
-  Alcotest.(check int) "Found one pattern n(_) in lemma"
-    (List.length (snd (List.hd matches))) 1;
+  Alcotest.(check' int) ~msg:"Found one lemma with n(_)"
+    ~actual:(List.length matches) ~expected:1;
+  Alcotest.(check' int) ~msg:"Found one pattern n(_) in lemma"
+    ~actual:(List.length (snd (List.hd matches))) ~expected:1;
 
   let _ =  Prover.exec_command "search n(_)." st in
   ()
@@ -73,8 +73,8 @@ let search_about_2 () =
     (ProverLib.Srch_inSys ((term_from_string "output@A"),
                            sexpr_from_string "[S]"))
   in
-  Alcotest.(check bool) "Found one lemma with output@A"
-    ((List.length matches)=1) true;
+  Alcotest.(check int) "Found one lemma with output@A"
+    1 (List.length matches);
   (* works but no matches *)
   let _ = Prover.exec_command "search <_,_>." st in
   let _ = Prover.exec_command "search (_,_)." st in
@@ -88,15 +88,15 @@ let search_about_2 () =
     (ProverLib.Srch_inSys ((global_formula_from_string "equiv(_)"),
                            sexpr_from_string "[S]"))
   in
-  Alcotest.(check int) "Found one lemma with equiv(_)"
-    (List.length matches) 1;
+  Alcotest.(check' int) ~msg:"Found one lemma with equiv(_)"
+    ~expected:1 ~actual:(List.length matches);
   let _ = Prover.exec_command "search true in [S]." st in
   let matches = Prover.search_about st
     (ProverLib.Srch_inSys ((term_from_string "true"),
                            sexpr_from_string "[S]"))
   in
-  Alcotest.(check int) "Found one lemma with true"
-    (List.length matches) 1;
+  Alcotest.(check' int) ~msg:"Found one lemma with true"
+    ~expected:1 ~actual:(List.length matches);
   (* Should print ↓ *)
   let _ = Prover.exec_command "print goal myeq." st in
   ()
@@ -115,11 +115,11 @@ let include_search () =
   let matches = Prover.search_about st 
       (ProverLib.Srch_term (term_from_string "happens(_)"))
   in
-  Alcotest.(check int) "Found 2 lemmas with happens(_)"
-    (List.length matches) 2;
+  Alcotest.(check' int) ~msg:"Found 2 lemmas with happens(_)"
+    ~expected:2 ~actual:(List.length matches);
 
-  Alcotest.(check int) "Found one pattern happens(_) in lemma"
-    (List.length (snd (List.hd matches))) 1;
+  Alcotest.(check' int) ~msg:"Found one pattern happens(_) in lemma"
+    ~expected:1 ~actual:(List.length (snd (List.hd matches)));
   let st = Prover.exec_command "auto." st
   |> Prover.exec_command "Qed."
   in
@@ -127,22 +127,22 @@ let include_search () =
     | Some s -> Fmt.pf ppf "%s" s
     | None -> Fmt.pf ppf "" in
   let some_testable = Alcotest.testable pprint_option (=) in
-  Alcotest.(check some_testable) "Goal name" 
-    (Prover.current_goal_name st) (None);
+  Alcotest.(check' some_testable) ~msg:"Goal name" 
+    ~actual:(Prover.current_goal_name st) ~expected:(None);
 
   let matches = Prover.search_about st
     (ProverLib.Srch_term (term_from_string "n(_)"))
   in
-  Alcotest.(check int) "Found one lemma with n(_)"
-    (List.length matches) 1;
-  Alcotest.(check int) "Found one pattern n(_) in lemma"
-    (List.length (snd (List.hd matches))) 1;
+  Alcotest.(check' int) ~msg:"Found one lemma with n(_)"
+    ~actual:(List.length matches) ~expected:1;
+  Alcotest.(check' int) ~msg:"Found one pattern n(_) in lemma"
+    ~actual:(List.length (snd (List.hd matches))) ~expected:1;
 
   let matches = Prover.search_about st
     (ProverLib.Srch_term (term_from_string "<_,_>"))
   in
-  Alcotest.(check int) "Found 2 lemmas with <_,_>"
-    (List.length matches) 2;
+  Alcotest.(check' int) ~msg:"Found 2 lemmas with <_,_>"
+    ~actual:(List.length matches) ~expected:2;
   ()
 
 let include_ite () =
@@ -162,13 +162,13 @@ let include_ite () =
       (ProverLib.Srch_inSys ((term_from_string "happens(_)"),
                            sexpr_from_string "[T]"))
   in
-  Alcotest.(check int) "Found 3 lemmas with happens(_) in [T]"
-    (List.length matches) 3;
+  Alcotest.(check' int) ~msg:"Found 3 lemmas with happens(_) in [T]"
+    ~actual:(List.length matches) ~expected:3;
   let matches = Prover.search_about st
     (ProverLib.Srch_term (term_from_string "if _ then _ else _ "))
   in
-  Alcotest.(check int) "Found one lemma with if _ then _ else _"
-    (List.length matches) 11 (* to update regarding to Basic.sp *)
+  Alcotest.(check' int) ~msg:"Found one lemma with if _ then _ else _"
+    ~actual:(List.length matches) ~expected:11 (* to update regarding to Basic.sp *)
 
 let tests = [ ("search_about1", `Quick, search_about_1);
               ("search_about2", `Quick, search_about_2);
