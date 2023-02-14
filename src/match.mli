@@ -76,6 +76,16 @@ module Pos : sig
     'a
 
   (*------------------------------------------------------------------*)
+  (** Similar to [f_map_fold], but for over [Equiv.form] sub-terms. 
+      
+      - [SE.context] is the context applying to the current sub-term. *)
+  type 'a f_map_fold_g =
+    Equiv.form ->
+    SE.context -> Vars.vars -> pos ->
+    'a ->
+    'a * [`Map of Equiv.form | `Continue]
+
+  (*------------------------------------------------------------------*)
   (** [map_fold ?mode func env acc t] applies [func] at all position in [t].
 
       Tree traversal can be controlled using [mode]:
@@ -150,6 +160,12 @@ module Pos : sig
     'a ->                 (* folding value *)
     Term.term ->          (* current term *)
     'a                    (* new folding value *)
+
+  (*------------------------------------------------------------------*)
+  (** Same as [map_fold], but for [Equiv.form] sub-terms *)
+  val map_fold_g :
+    ?mode:[ `BottomUp | `TopDown of bool ] ->
+    'a f_map_fold_g -> SE.context -> 'a -> Equiv.form -> 'a * bool * Equiv.form
 end
 
 (*------------------------------------------------------------------*)
@@ -291,6 +307,8 @@ module T : S with type t = Term.term
 
 module E : sig
   include S with type t = Equiv.form
+
+  (** Same as [find], but over [Equiv.form] sub-terms. *)
   val find_glob : 
     ?option:match_option ->
     ?ty_env:Type.Infer.env ->
