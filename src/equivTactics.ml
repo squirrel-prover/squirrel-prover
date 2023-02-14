@@ -1043,7 +1043,8 @@ let case_study arg s : ES.sequents =
     match arg with
     | Args.(Pair ((Message (b,Type.Boolean)), Opt (Int, i))) ->
       i, b
-    | _ -> assert false
+    | _ -> Tactics.(soft_failure 
+                     (Failure "Argument of cs should match a boolean"))
   in
   match li with
   | None ->

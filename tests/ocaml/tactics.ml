@@ -44,6 +44,16 @@ let case_study_fail () =
       Alcotest.(check string)
         "error message"
         "did not find any conditional to analyze"
+        e;
+  try
+    ignore (Prover.exec_command "nosimpl cs (if true then _)." st) ;
+    Alcotest.failf "Tactic application should have failed with bad
+    arguments."
+  with
+  | Tactics.(Tactic_soft_failure (_,Failure e)) ->
+      Alcotest.(check string)
+        "error message"
+        "Argument of cs should match a boolean"
         e
 
 (** Check that case study fails when there is no conditional
