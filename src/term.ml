@@ -983,7 +983,8 @@ let and_fixity         = 25 , `Infix `Right
 let xor_fixity         = 26 , `Infix `Right
 let eq_fixity          = 27 , `Infix `NonAssoc
 let order_fixity       = 29 , `Infix `NonAssoc
-let ite_fixity         = 40 , `Infix `Left
+let ite_right_fixity   = 40 , `Infix `Left     (* for exterior (right-most) ite term *)
+let ite_inner_fixity   = 41 , `Infix `NonAssoc (* for inner ite terms  *)
 let other_infix_fixity = 50 , `Infix `Right
 
 let seq_fixity     = 1000 , `Prefix
@@ -1039,31 +1040,9 @@ and _pp
 
   | Fun (s,_,[a]) when s = f_happens -> pp_happens info ppf [a]
 
-  (* if-then-else, no else *)
-  | Fun (s,_,[b;c; Fun (f,_,[])])
-    when s = f_ite && f = f_zero ->
-    let pp ppf () =
-      Fmt.pf ppf "@[<hov 2>if %a@ then@ %a@]"
-        (pp (ite_fixity, `NonAssoc)) b
-        (pp (ite_fixity, `Right)) c
-    in
-    maybe_paren ~outer ~side ~inner:ite_fixity pp ppf ()
-
-  (* if-then-else, true/false *)
-  | Fun (s,_,[b;Fun (f1,_,[]);Fun (f2,_,[])])
-    when s = f_ite && f1 = f_true && f2 = f_false ->
-    Fmt.pf ppf "%a"
-      (pp (ite_fixity, `NonAssoc)) b
-
-  (* if-then-else, general case *)
-  | Fun (s,_,[a;b;c]) when s = f_ite ->
-    let pp ppf () =
-      Fmt.pf ppf "@[<hv 0>@[<hov 2>if %a@ then@ %a@]@ %a@]"
-        (pp (ite_fixity, `NonAssoc)) a
-        (pp (ite_fixity, `NonAssoc)) b
-        (pp_chained_ite info)        c (* prints the [else] *)
-    in
-    maybe_paren ~outer ~side ~inner:ite_fixity pp ppf ()
+  (* if-then-else,  *)
+  | Fun (s,_,[b;c;d]) when s = f_ite ->
+    Fmt.pf ppf "%a" (pp_ite info (outer, side)) (b,c,d)
 
   (* pair *)
   | Fun (s,_,terms) when s = f_pair ->
@@ -1235,16 +1214,51 @@ and _pp
         maybe_paren ~outer ~side ~inner:(fst quant_fixity, `Prefix) pp ppf ()
     end
 
+(* if-then-else pretty-printer *)
+and pp_ite
+    (info         : pp_info)
+    ((outer,side) : ('b * fixity) * assoc)
+    (ppf          : Format.formatter)
+    ((b,c,d)      : term * term * term) (* [if b then c else d] *)
+  : unit
+  =
+  match c,d with
+  (* no else *)
+  | c, Fun (f,_,[]) when f = f_zero ->
+    let pp ppf () =
+      Fmt.pf ppf "@[<hov 2>if %a@ then@ %a@]"
+        (pp info (ite_inner_fixity, `NonAssoc)) b
+        (pp info (ite_right_fixity, `Right   )) c 
+        (* no else, hence then branch uses `ite_e_fixity *)
+    in
+    maybe_paren ~outer ~side ~inner:ite_right_fixity pp ppf ()
+
+  (* general case *)
+  | _ ->
+    let pp ppf () =
+      Fmt.pf ppf "@[<hv 0>@[<hov 2>if %a@ then@ %a@]@ %a@]"
+        (pp info (ite_inner_fixity, `NonAssoc)) b
+        (pp info (ite_inner_fixity, `NonAssoc)) c
+        (pp_chained_ite info)             d (* prints the [else] *)
+    in
+    maybe_paren ~outer ~side ~inner:ite_right_fixity pp ppf ()
+
 (* Printing in a [hv] box. Print the trailing [else] of the caller. *)
 and pp_chained_ite info ppf (t : term) = 
   match t with
+  (* no else *)
+  | Fun (s,_,[a;b;Fun (f,_,[])]) when s = f_ite && f = f_zero ->
+    Fmt.pf ppf "@[<hov 2>else if %a@ then@ %a@]"
+      (pp info (ite_inner_fixity, `NonAssoc)) a
+      (pp info (ite_right_fixity, `Right)) b
+
   | Fun (s,_,[a;b;c]) when s = f_ite ->
     Fmt.pf ppf "@[<hov 2>else if %a@ then@ %a@]@ %a"
-      (pp info (ite_fixity, `NonAssoc)) a
-      (pp info (ite_fixity, `NonAssoc)) b
+      (pp info (ite_inner_fixity, `NonAssoc)) a
+      (pp info (ite_inner_fixity, `NonAssoc)) b
       (pp_chained_ite info)             c
 
-  | _ -> Fmt.pf ppf "@[<hov 2>else@ %a@]" (pp info (ite_fixity, `Right)) t
+  | _ -> Fmt.pf ppf "@[<hov 2>else@ %a@]" (pp info (ite_right_fixity, `Right)) t
 
 (* Printing in a [hv] box. Print the trailing [else] of the caller. *)
 and pp_chained_find info ppf (t : term) = 
