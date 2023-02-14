@@ -1033,6 +1033,19 @@ type unif_state = {
 }
 
 (*------------------------------------------------------------------*)
+let st_change_context (st : unif_state) (new_context : SE.context) : unif_state =
+  let change_hyps (hyps : TraceHyps.hyps) : TraceHyps.hyps =
+    Hyps.change_trace_hyps_context
+      ~old_context:st.system
+      ~new_context
+      ~vars:st.env
+      ~table:st.table
+      hyps
+  in
+  let hyps = Lazy.map change_hyps st.hyps in
+  { st with system = new_context; hyps; }
+
+(*------------------------------------------------------------------*)
 let env_of_unif_state (st : unif_state) : Env.t =
   let vars = Vars.add_vars st.bvs st.env in
   Env.init ~table:st.table ~vars ~system:st.system () 
@@ -1291,8 +1304,10 @@ module T (* : S with type t = Term.term *) = struct
 
       List.fold_left2 (fun mv (lt,t) (lpat, pat) ->
           if lt <> lpat then no_unif ();
-
-          tunif t pat { st with mv; system = SE.project_set [lt] st.system }
+          
+          let system : SE.context = SE.project_set [lt] st.system in
+          let st = st_change_context st system in
+          tunif t pat { st with mv; }
         ) st.mv l l'
 
     | Find (is, c, t, e), Find (is', pat_c, pat_t, pat_e) ->
@@ -2771,7 +2786,7 @@ module E = struct
        See explanation in [mset_mem_one]. *)
     let mset_l =
       if st.support = [] && st.use_fadup then
-        let system = SE.to_fset (oget st.system.pair) in
+        let system = SE.to_fset st.system.set in
         let msets = strengthen st.table system st.env pat_terms in
         msets_to_list msets
       else []
@@ -2841,9 +2856,14 @@ module E = struct
       e_unif ~mode t2 pat2 { st with mv }
 
     | Atom (Reach t), Atom (Reach pat) ->
+      (* no need to change the system, we already have the correct context *)
       term_unif t pat st
 
     | Atom (Equiv es), Atom (Equiv pat_es) ->
+      let system : SE.context = 
+        SE.{ set = ((oget st.system.pair) :> SE.t); pair = None; } 
+      in
+      let st = st_change_context st system in
       tunif_e ~mode es pat_es st
 
     | Quant (q,es,t), Quant (q',es',t') when q = q' ->
