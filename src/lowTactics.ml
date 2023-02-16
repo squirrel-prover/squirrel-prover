@@ -900,12 +900,22 @@ module MkCommonLowTac (S : Sequent.S) = struct
       if S.Hyp.is_eq form then
         begin
           match S.Reduce.destr_eq s S.hyp_kind form with
+          | Some (a,b) when Term.is_tuple a && Term.is_tuple b ->
+            let l1 = oget (Term.destr_tuple a) in
+            let l2 = oget (Term.destr_tuple b) in
+            let eqs = List.map2 Term.mk_eq l1 l2 in
+
+            let forms =
+              List.map (fun x -> Args.Unnamed, S.unwrap_hyp (Local x)) eqs
+            in
+            let ids, s = Hyps.add_i_list forms s in
+            List.map (fun id -> `Hyp id) ids, s
+
           | Some (a,b) ->
             let a1, a2 = get_destr ~orig:(Local a) (Term.destr_pair a)
             and b1, b2 = get_destr ~orig:(Local b) (Term.destr_pair b) in
-
-            let f1 = Term.mk_atom `Eq a1 b1
-            and f2 = Term.mk_atom `Eq a2 b2 in
+            let f1 = Term.mk_eq a1 b1
+            and f2 = Term.mk_eq a2 b2 in
 
             let forms =
               List.map (fun x -> Args.Unnamed, S.unwrap_hyp (Local x)) [f1;f2]

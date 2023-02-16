@@ -148,13 +148,13 @@ let integrity_formula
   assert (k.symb.s_symb = k'.symb.s_symb); 
 
   if not negate then 
-    mk_and ~simpl:true
+    mk_and
       (mk_eq ~simpl:true m m')
-      (mk_eqs ~simpl:true k.args k'.args)
+      (mk_eqs ~simpl:true ~simpl_tuples:true k.args k'.args)
   else
-    mk_or ~simpl:true
-      (mk_not ~simpl:true (mk_eq ~simpl:true m m'))
-      (mk_neqs ~simpl:true k.args k'.args)
+    mk_or 
+      (mk_not (mk_eq ~simpl:true m m'))
+      (mk_neqs ~simpl:true ~simpl_tuples:true k.args k'.args)
 
 (*------------------------------------------------------------------*)
 (** {2 EUF tactic} *)

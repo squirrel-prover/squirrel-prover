@@ -378,13 +378,13 @@ let ciphertext_formula
     | _ -> assert false
   in
   if not negate then 
-    mk_and ~simpl:true
-      (mk_eq ~simpl:true c c')
-      (mk_eqs ~simpl:true k.args k1.args)
+    mk_and 
+      (mk_eq  ~simpl:true c c')
+      (mk_eqs ~simpl:true ~simpl_tuples:true k.args k1.args)
   else
-    mk_or ~simpl:true
-      (mk_not ~simpl:true (mk_eq ~simpl:true c c'))
-      (mk_neqs ~simpl:true k.args k1.args)
+    mk_or 
+      (mk_not (mk_eq ~simpl:true c c'))
+      (mk_neqs ~simpl:true ~simpl_tuples:true k.args k1.args)
 
 
 
@@ -421,24 +421,24 @@ let randomness_formula
       let path_cond = if use_path_cond then eco.eo_path_cond else PathCond.Top in
       NO.time_formula ~path_cond a eco.eo_source_ts
   in 
-  let phi_k = mk_eqs ~simpl:true k1.args k.args in
-  let phi_r = mk_eqs ~simpl:true r'.args r.args in
+  let phi_k = mk_eqs ~simpl:true ~simpl_tuples:true k1.args k.args in
+  let phi_r = mk_eqs ~simpl:true ~simpl_tuples:true r'.args r.args in
   let phi_km' =
     match omk, negate with
     | None, false -> mk_true
     | None, true -> mk_false
     | Some (m', k'), false ->
-      mk_or ~simpl:true
-        (mk_neqs ~simpl:true k'.args k.args)
-        (mk_neq ~simpl:true  m' m)
+      mk_or 
+        (mk_neqs ~simpl:true ~simpl_tuples:true k'.args k.args)
+        (mk_neq  ~simpl:true  m' m)
     | Some (m', k'), true ->
-      mk_and ~simpl:true
-        (mk_eqs ~simpl:true k'.args k.args)
-        (mk_eq ~simpl:true m' m)
+      mk_and
+        (mk_eqs ~simpl:true ~simpl_tuples:true k'.args k.args)
+        (mk_eq  ~simpl:true m' m)
   in
   if not negate then
-    mk_ands ~simpl:true [phi_time; phi_k; phi_r; phi_km']
+    mk_ands [phi_time; phi_k; phi_r; phi_km']
   else
-    mk_impls ~simpl:true [phi_r; phi_k; phi_time] phi_km'
+    mk_impls [phi_r; phi_k; phi_time] phi_km'
 
 

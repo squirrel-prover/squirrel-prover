@@ -69,8 +69,8 @@ let pp_gfname fmt = function
   | N (n,_) -> Symbols.pp fmt n
   | A a     -> Symbols.pp fmt a 
   | M (m,_) -> Symbols.pp fmt m 
-  | P i     -> Fmt.pf fmt "tuple_%d" i
-  | T i     -> Fmt.pf fmt "proj_%d" i
+  | P i     -> Fmt.pf fmt "proj_%d" i
+  | T i     -> Fmt.pf fmt "tuple_%d" i
 
 (*------------------------------------------------------------------*)
 module Cst = struct
@@ -923,7 +923,7 @@ module Ground : sig
 end = struct
 
   (* Deduce trivial constants equalities from the ground rules. *)
-  let deduce_triv_eqs state =
+  let deduce_triv_eqs (state : state) : state =
     let r_trivial, r_other = 
       Mct.partition (fun a _ -> is_cst a) state.grnd_rules in
 
@@ -934,9 +934,33 @@ end = struct
   let deduce_triv_eqs = Prof.mk_unary "Ground.deduce_triv_eqs" deduce_triv_eqs
     
   (* Deduce constants equalities from the ground rules. *)
-  let deduce_eqs state =
+  let deduce_eqs (state : state) : state =
     (* We get all ground rules, normalized by constant equality rules. *)
     let grules = norm_grnd_rules state.uf state.grnd_rules in
+
+    (* Handle tuples and projections:
+       For every rule [t -> c] where [t = (x1,...,xn)], add the 
+       equality [pi_i t = xi]. *)
+    let state =
+      Mct.fold (fun t s state ->
+          match t.cnt with
+          | Cfun ({ cnt = Ccst (GFun (T n))}, x) ->
+            assert (List.length x = n);
+            Scst.fold (fun (c : Cst.t) state ->
+                List.foldi (fun i state (xi : cterm) ->
+                    (* [j]-th projection of [c] *)
+                    let proj_c = cfun (ccst (Cst.mk_proj i)) [ccst c] in
+                    let a = match xi.cnt with
+                      | Ccst a -> a
+                      | _ -> assert false
+                    in
+                    { state with grnd_rules = add_rule state.grnd_rules (proj_c, a) }
+                  ) state x
+              ) s state
+
+          | _ -> state
+        ) grules state
+    in
 
     (* We look for critical pairs, which are necessary of the form:
        c <- t -> c'

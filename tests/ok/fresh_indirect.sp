@@ -1,4 +1,4 @@
-channel c
+channel c.
 
 system A : !_i new a; !_j new b; out(c,b).
 
@@ -14,6 +14,8 @@ Proof.
   expand output@A(i,j).
   expand output@A(ii,jj).
   fresh 1.
-  auto.
-  assumption. (* Induction hypothesis.*)
+  * split. 
+    + intro *; auto.
+    + intro *; auto.
+  * assumption IH. 
 Qed.

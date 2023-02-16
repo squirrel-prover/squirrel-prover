@@ -365,7 +365,7 @@ let phi_proj
      If it could, it would need to be updated. *)
   let phis_kr =
     if k_p.symb.s_symb = r_p.symb.s_symb then
-      (mk_neqs ~simpl:true k_p.args r_p.args) :: phis_kr
+      (mk_neqs ~simpl:true ~simpl_tuples:true k_p.args r_p.args) :: phis_kr
     else
       phis_kr
   in

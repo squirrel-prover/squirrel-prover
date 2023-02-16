@@ -290,7 +290,7 @@ Proof.
     }.
 
     fa 3; fadup 3.
-    fa 3; fadup 3.
+    fa 3; fadup 3. 
     enckp 3, k_fresh; 1: auto.
     fa 3. 
     fresh 4; 1: auto. 

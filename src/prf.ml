@@ -39,9 +39,9 @@ let prf_mk_direct (param : prf_param) (occ : Iter.hash_occ) =
   Term.mk_forall ~simpl:true
     vars
     (Term.mk_impl
-       (Term.mk_and ~simpl:true
+       (Term.mk_and
           cond
-          (Term.mk_eqs param.h_key.args is))
+          (Term.mk_eqs ~simpl_tuples:true param.h_key.args is))
        (Term.mk_atom `Neq param.h_cnt m))
 
 (*------------------------------------------------------------------*)
@@ -63,7 +63,7 @@ let prf_occ_incl table sexpr (o1 : prf_occ) (o2 : prf_occ) : bool =
     let action = SE.action_to_term table sexpr a in
     Term.mk_ands ~simpl:false
       ((Term.mk_atom `Eq Term.init action) ::
-       (Term.mk_eqs ~simpl:false is is) ::
+       (Term.mk_eqs ~simpl:false ~simpl_tuples:true is is) ::
        cond ::
        [Term.mk_atom `Eq t (Term.mk_witness (Term.ty t))])
   in
@@ -115,7 +115,7 @@ let prf_mk_indirect
     Term.mk_impl
       (Term.mk_and ~simpl:true
          hash_cond
-         (Term.mk_eqs param.h_key.args hash_is))
+         (Term.mk_eqs ~simpl_tuples:true param.h_key.args hash_is))
       (Term.mk_atom `Neq param.h_cnt hash_m)
   in
 

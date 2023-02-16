@@ -687,13 +687,30 @@ let () =
 
 (*------------------------------------------------------------------*)
 let autosubst s =
-  let id, (x,y) = match
+  (* autosubst is only used for timestamp and index variables. *)
+  let check_type (x : Vars.var) : bool = 
+    Vars.ty x = Type.Timestamp || 
+    Vars.ty x = Type.Index
+  in
+  let id, l = match
       Hyps.find_map
-        (fun id f -> match Term.destr_eq f with
-           | Some (Term.Var x, Term.Var y) 
-             when Vars.ty x = Type.Timestamp || 
-                  Vars.ty x = Type.Index ->
-             Some (id, (x,y))
+        (fun id f -> 
+           match Term.destr_eq f with
+           | Some (Term.Var x, Term.Var y) when check_type x ->
+             Some (id, [x,y])
+
+           | Some (Term.Tuple l1, Term.Tuple l2) 
+             when List.exists (function Var x -> check_type x | _ -> false) l1 ->
+             let l = List.map2 (fun t1 t2 -> t1,t2) l1 l2 in
+             let l = 
+               List.filter_map (fun (t1,t2) ->
+                   match t1,t2 with
+                   | Var x, Var y -> Some (x,y)
+                   | _            -> None
+                 ) l
+             in
+             Some (id, l)
+
            | _ -> None)
         s
     with | Some (id,f) -> id, f
@@ -701,9 +718,11 @@ let autosubst s =
   in
   let s = Hyps.remove id s in
 
-  let process (x : Vars.var) (y : Vars.var) : TS.t =
-    (* Just remove the equality if x and y are the same variable. *)
-    if x = y then s else
+  let process1 s (x,y : Vars.var * Vars.var) : TS.t =
+    let vars = TS.vars s in
+    (* Just remove the equality if x and y are the same variable, or if 
+       one of them as already been removed. *)
+    if x = y || not (Vars.mem vars x) || not (Vars.mem vars y) then s else
       (* Otherwise substitute the newest variable by the oldest one,
        * and remove it from the environment. *)
       let x,y =
@@ -714,9 +733,11 @@ let autosubst s =
 
       let s = TS.subst [Term.ESubst (Term.mk_var x, Term.mk_var y)] s in
       TS.set_vars (Vars.rm_var x (TS.vars s)) s
-
   in
-  [process x y]
+  let process (l : (Vars.var * Vars.var) list) =
+    List.fold_left process1 s l
+  in
+  [process l]
 
 (*------------------------------------------------------------------*)
 (* TODO: this should be an axiom in some library, not a rule *)

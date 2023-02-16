@@ -336,8 +336,8 @@ let global_prf
     Term.mk_find is Term.(
         mk_and
           (mk_atom `Eq (Term.mk_var fresh_x_var) param.h_cnt)
-          (mk_eqs left_key_ids param.h_key.args)
-      ) (Term.mk_name ns (Term.mk_vars is)) hash_pattern
+          (mk_eqs ~simpl_tuples:true left_key_ids param.h_key.args)
+      ) (Term.mk_name_with_tuple_args ns (Term.mk_vars is)) hash_pattern
   in
   let rw_rule = Rewrite.{
       rw_tyvars = [];
@@ -371,7 +371,7 @@ let global_prf
                Term.mk_diff
                  [Term.left_proj, Name.to_term param.h_key;
                   Term.right_proj,
-                  Term.mk_name
+                  Term.mk_name_with_tuple_args
                     (Term.mk_symb n Message) (Term.mk_vars is)]])
     in
     let concl = 
@@ -480,7 +480,7 @@ let global_cca
   let mess_replacement =
     if Term.is_name plaintext then
       let ns = Term.mk_symb n Message in
-      Term.mk_name ns enc_rnd.args
+      Term.mk_name_with_tuple_args ns enc_rnd.args
     else
       Term.mk_zeroes (Term.mk_len plaintext) in
 
@@ -930,7 +930,7 @@ let global_prf_t
 
   (* name term associated to a hash occurrence. *)
   let mk_occ_term (xocc : XO.t) : Term.term =
-    Term.mk_name
+    Term.mk_name_with_tuple_args
       (Term.mk_symb xocc.cnt.x_nsymb m_ty)
       (Term.mk_vars xocc.cnt.x_occ.occ_vars)
   in
@@ -1019,10 +1019,16 @@ let global_prf_t
     (* condition stating that [x] is equal to a hash occurrence [xocc]. *)
     let occ_vars, occ_t = xocc1.cnt.x_occ.occ_cnt in
     Term.mk_ands ~simpl:true
-      [ Term.mk_eq ~simpl:true tau_t (mk_occ_ts xocc1); (* timestamp equ. *)
+      [ 
+        Term.mk_eq ~simpl:true tau_t (mk_occ_ts xocc1); (* timestamp equ. *)
+
         mk_xocc_lt tau1 xocc1 tau2 xocc2;               (* timestamp ord. *)
+
         Term.mk_eq ~simpl:true x_t occ_t;               (* hash content equ. *)
-        Term.mk_eqs ~simpl:true key_is occ_vars;        (* hash key equ. *)
+
+        Term.mk_eqs
+          ~simpl:true ~simpl_tuples:true
+          key_is occ_vars;                              (* hash key equ. *)
       ] 
   in
 

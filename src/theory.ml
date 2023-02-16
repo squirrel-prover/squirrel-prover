@@ -1287,12 +1287,8 @@ and conv_app
   | Name ->
     let s_fty = check_name state.env.table f (List.length terms) in
     assert (s_fty.fty_vars = []);
-    let is =
-      match List.map2 conv s_fty.fty_args terms with
-      | [Term.Tuple is] -> is
-      | [] | [_] as l -> l
-      | _ -> assert false (* impossible, names have always arity 0 or 1 *)
-    in
+    let is = List.map2 conv s_fty.fty_args terms in
+    (* names have always arity 0 or 1 *)
     let ns = Term.mk_symb (get_name state.env.table f) s_fty.fty_out in
     Term.mk_name ns is
 

@@ -642,7 +642,9 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
         (List.rev_map (fun i -> Theory.var dum (Vars.name i)) penv.indices)
     in    
     let n'_s = Term.mk_symb n' ty in
-    let n'_tm = Term.mk_name n'_s (Term.mk_vars (List.rev penv.indices)) in
+    let n'_tm = 
+      Term.mk_name_with_tuple_args n'_s (Term.mk_vars (List.rev penv.indices))
+    in
 
     let vars, _ = Vars.make_local `Shadow penv.env.vars ty (L.unloc n) in
 

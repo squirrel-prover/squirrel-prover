@@ -1101,7 +1101,7 @@ let deprecated_fresh_mk_direct
   
   let j = List.map (Term.subst subst) occ.occ_cnt in
   Term.mk_forall ~simpl:true bv
-    (Term.mk_impl cond (Term.mk_neqs n_args j))
+    (Term.mk_impl cond (Term.mk_neqs ~simpl_tuples:true n_args j))
 
 let deprecated_fresh_mk_indirect
     (cntxt : Constr.trace_cntxt)
@@ -1134,7 +1134,7 @@ let deprecated_fresh_mk_indirect
   let disj = Term.mk_ors (OldFresh.deprecated_mk_le_ts_occs action frame_actions) in
 
   (* condition stating that indices of name in [action] and [name] differ *)
-  let form = Term.mk_neqs occ n_args in
+  let form = Term.mk_neqs ~simpl_tuples:true occ n_args in
 
   Term.mk_forall ~simpl:true bv (Term.mk_impl disj form)
 

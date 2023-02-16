@@ -120,21 +120,13 @@ let hash_formula
   assert (k.symb.s_symb = k'.symb.s_symb); 
 
   if not negate then 
-    mk_and ~simpl:true
-      (mk_eqs ~simpl:true k.args k'.args)
+    mk_and
+      (mk_eqs ~simpl:true ~simpl_tuples:true k.args k'.args)
       (mk_eq ~simpl:true m m')
   else
-    mk_impl ~simpl:true
-      (mk_eqs ~simpl:true k.args k'.args)
+    mk_impl
+      (mk_eqs ~simpl:true ~simpl_tuples:true k.args k'.args)
       (mk_neq ~simpl:true m m')
-
-
-
-
-
-
-
-
 
 
 

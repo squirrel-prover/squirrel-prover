@@ -109,6 +109,11 @@ let deprecated_check_encryption_randomness
   if List.exists (function
       | Term.Fun (_, _, [Tuple [m; Name (_n,n_args); _]]), 
         (actidx : Vars.var list) ->
+        let n_args =
+          match n_args with
+          | [Tuple n_args] -> n_args
+          | _ -> n_args 
+        in
         let vars = Term.get_vars m in
         let n_args_vars =
           (* keep only term in [n_args] which are top-level variables *)

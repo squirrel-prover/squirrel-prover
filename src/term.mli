@@ -84,7 +84,7 @@ val pp_quant : Format.formatter -> quant -> unit
 type term = private
   | App    of term * term list
   | Fun    of Symbols.fname * Type.ftype * term list
-  | Name   of nsymb * term list
+  | Name   of nsymb * term list              (* [Name(s,l)] : [l] of length 0 or 1 *)
   | Macro  of msymb * term list * term
 
   | Action of Symbols.action * term list
@@ -412,7 +412,13 @@ val mk_action  : Symbols.action -> term list -> term
 val mk_tuple   : term list -> term
 val mk_app     : term -> term list -> term
 val mk_proj    : int -> term -> term
-val mk_name    : nsymb -> term list -> term
+
+(** [mk_name n l] create a name. The list [l] must be of length at most 1. *)
+val mk_name                 : nsymb -> term list -> term
+
+(** [mk_name n l] create a name applied to the tuple [l] (or nothing if [l = \[\]]). *)
+val mk_name_with_tuple_args : nsymb -> term list -> term
+
 val mk_macro   : msymb -> term list -> term -> term
 val mk_diff    : (proj * term) list -> term
 
@@ -448,8 +454,9 @@ val mk_ite : ?simpl:bool -> term -> term -> term -> term
 
 val mk_timestamp_leq : term -> term -> term
 
-val mk_neqs : ?simpl:bool -> terms -> terms -> term
-val mk_eqs  : ?simpl:bool -> terms -> terms -> term
+(** When [simpl_tuples] is [true], equality between tuples will be broken-down *)
+val mk_neqs : ?simpl:bool -> ?simpl_tuples:bool -> terms -> terms -> term
+val mk_eqs  : ?simpl:bool -> ?simpl_tuples:bool -> terms -> terms -> term
 
 val mk_atom : Lit.ord -> term -> term -> term
 val mk_happens : term -> term

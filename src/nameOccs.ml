@@ -102,9 +102,9 @@ let name_occ_formula
   (* sanity check: only apply when same symbol *)
   assert (n.symb = ncoll.symb);
   if not negate then
-    Term.mk_eqs ~simpl:true ncoll.args n.args
+    Term.mk_eqs  ~simpl:true  ~simpl_tuples:true ncoll.args n.args
   else
-    Term.mk_neqs ~simpl:false ncoll.args n.args
+    Term.mk_neqs ~simpl:false ~simpl_tuples:true ncoll.args n.args
 
 (** occ_formula for timestamp occurrences *)
 let ts_occ_formula

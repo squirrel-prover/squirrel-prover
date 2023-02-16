@@ -83,7 +83,7 @@ let pp_quant fmt = function
 type term =
   | App    of term * term list
   | Fun    of Symbols.fname * Type.ftype * term list
-  | Name   of nsymb * term list
+  | Name   of nsymb * term list              (* [Name(s,l)] : [l] of length 0 or 1 *)
   | Macro  of msymb * term list * term
 
   | Action of Symbols.action * term list
@@ -255,8 +255,18 @@ let mk_app t l =
 
 let mk_proj i t = Proj (i,t)
 
-let mk_name n l = Name (n,l)
+(*------------------------------------------------------------------*)
+let mk_name n l = 
+  (* invariant: names can take 0 or 1 argument *)
+  assert (List.length l <= 1);
+  Name (n,l)
 
+let mk_name_with_tuple_args n l = 
+  match l with
+  | [] -> mk_name n []
+  | _  -> mk_name n [mk_tuple l]
+
+(*------------------------------------------------------------------*)
 let mk_macro ms l t = Macro (ms, l, t)
 
 let mk_diff l =
@@ -407,11 +417,31 @@ let mk_timestamp_leq t1 t2 = match t1,t2 with
   | _, Fun (f,_, [t2']) when f = f_pred -> mk_lt ~simpl:true t1 t2'
   | _ -> mk_leq t1 t2
 
-let mk_neqs ?(simpl=false) vect_i vect_j =
-  mk_ors ~simpl:true (List.map2 (mk_neq ~simpl) vect_i vect_j)
-    
-let mk_eqs ?(simpl=true) vect_i vect_j =
-  mk_ands ~simpl:true (List.map2 (mk_eq ~simpl) vect_i vect_j)
+(*------------------------------------------------------------------*)
+let rec mk_eqs ?(simpl=true) ?(simpl_tuples=false) (vect_i : terms) (vect_j : terms) =
+  mk_ands ~simpl:true (List.map2 (mk_eq0 ~simpl ~simpl_tuples) vect_i vect_j)
+
+(** As [mk_eq], but also simplify tuple equalities if instructed *)
+and mk_eq0 ~simpl ~simpl_tuples (t1 : term) (t2 : term) : term =
+  if not simpl_tuples then 
+    mk_eq ~simpl t1 t2
+  else
+    match t1,t2 with
+    | Tuple l1, Tuple l2 -> mk_eqs ~simpl l1 l2
+    | _                  -> mk_eq  ~simpl t1 t2
+
+(*------------------------------------------------------------------*)
+let rec mk_neqs ?(simpl=false) ?(simpl_tuples=false) (vect_i : terms) (vect_j : terms) =
+  mk_ors ~simpl:true (List.map2 (mk_neq0 ~simpl ~simpl_tuples) vect_i vect_j)
+
+(** As [mk_neq], but also simplify tuple equalities if instructed *)
+and mk_neq0 ~simpl ~simpl_tuples (t1 : term) (t2 : term) : term =
+  if not simpl_tuples then 
+    mk_neq ~simpl t1 t2
+  else
+    match t1,t2 with
+    | Tuple l1, Tuple l2 -> mk_neqs ~simpl l1 l2
+    | _                  -> mk_neq  ~simpl t1 t2
 
 (*------------------------------------------------------------------*)
 (** {2 Destructors} *)
@@ -1099,9 +1129,10 @@ and _pp
       if l = [] then
         pp_nsymb ppf n 
       else
-        Fmt.pf ppf "%a(@[%a@])"
+        let a = as_seq1 l in    (* [l] of length at most 1. *)
+        Fmt.pf ppf "@[<hov 2>%a %a@]"
           pp_nsymb n 
-          (Fmt.list ~sep:Fmt.comma (pp (tuple_fixity, `NonAssoc))) l
+          (pp (app_fixity, `Right)) a
     in
     maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
 

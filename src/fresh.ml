@@ -1,6 +1,5 @@
 (** Tactics exploiting a name's freshness. *)
 
-open Term
 open Utils
     
 module NO = NameOccs
@@ -46,18 +45,18 @@ let get_bad_occs
     (retry_on_subterms : unit -> NO.n_occs * NO.empty_occs)
     (rec_call_on_subterms : 
        (fv   : Vars.vars ->
-        cond : terms ->
+        cond : Term.terms ->
         p    : MP.pos ->
         info : NO.expand_info ->
-        st   : term -> 
-        term ->
+        st   : Term.term -> 
+        Term.term ->
         NO.n_occs * NO.empty_occs))
     ~(info : NO.expand_info)
     ~(fv   : Vars.vars)
-    ~(cond : terms)
+    ~(cond : Term.terms)
     ~(p    : MP.pos)
-    ~(st   : term)
-    (t     : term) 
+    ~(st   : Term.term)
+    (t     : Term.term) 
   : NO.n_occs * NO.empty_occs
   =
   let _ = p in (* unused for now *)
@@ -95,9 +94,9 @@ let get_bad_occs
 let fresh_trace_param
     ~(hyp_loc : L.t) 
     (info     : NO.expand_info) 
-    (hyp      : term)
+    (hyp      : Term.term)
     (s        : TS.sequent)
-  : Name.t * term
+  : Name.t * Term.term
   =
   let _, contx = info in
   let table = contx.table in
@@ -154,7 +153,7 @@ let fresh_trace
     let g = TS.goal s in
     List.map
       (fun phi ->
-         TS.set_goal (mk_impl ~simpl:false phi g) s)
+         TS.set_goal (Term.mk_impl ~simpl:false phi g) s)
       phis
   with
   | SE.(Error Expected_fset) ->
@@ -259,7 +258,7 @@ let fresh_equiv
     List.remove_duplicate (Reduction.conv cstate) (phi_l @ phi_r)
   in
 
-  let phi = mk_ands ~simpl:true phis in
+  let phi = Term.mk_ands ~simpl:true phis in
   let new_biframe = List.rev_append before after in
   [ES.set_reach_goal phi s;
    ES.set_equiv_goal new_biframe s]
