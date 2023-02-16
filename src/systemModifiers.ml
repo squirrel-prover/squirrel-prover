@@ -321,13 +321,13 @@ let global_prf
   in
 
   (* Instantiation of the fresh name *)
-  let ndef =
-    let ty_args = List.map Vars.ty is in
-    Symbols.{ n_fty = Type.mk_ftype_tuple [] ty_args Type.Message ; }
-  in
+  let ty_args = List.map Vars.ty is in
+  let n_fty = Type.mk_ftype_tuple [] ty_args Type.Message in
+  let ndef = Symbols.{ n_fty } in
+  let s = (L.mk_loc L._dummy "n_PRF") in
   let table,n =
-    Symbols.Name.declare table (L.mk_loc L._dummy "n_PRF") ndef
-  in
+    Symbols.Name.declare table s ndef in
+  let table = Process.add_namelength_axiom table s n_fty in
   
   (* the hash h of a message m will be replaced by tryfind is s.t = fresh mess
      in fresh else h *)
@@ -469,13 +469,18 @@ let global_cca
   let dec_pattern = Term.subst left_subst dec_pattern in
 
   (* Instantiation of the fresh replacement *)
+  let ty_args = List.map Term.ty enc_rnd.args in
+  let n_fty = Type.mk_ftype_tuple [] ty_args Type.Message in
   let ndef =
-    let ty_args = List.map Term.ty enc_rnd.args in
-    Symbols.{ n_fty = Type.mk_ftype_tuple [] ty_args Type.Message ; }
+    Symbols.{ n_fty }
   in
+  let s = (L.mk_loc L._dummy "n_CCA") in
   let table,n =
-    Symbols.Name.declare table (L.mk_loc L._dummy "n_CCA") ndef
+    Symbols.Name.declare table s ndef
   in
+  let table = Process.add_namelength_axiom table s n_fty in
+  (*     Type.Message in *)
+  (* let table = Lemma.add_lemma `Axiom stmt table in *)
   
   let mess_replacement =
     if Term.is_name plaintext then
@@ -537,13 +542,15 @@ let global_cca
 
   (* we now create the lhs of the obtained conclusion *)
   (* let fresh_x_var = Vars.make_fresh Type.Message "mess" in *)
+  let s = (L.mk_loc L._dummy "r_CCA") in
+  let ty_args = List.map Vars.ty is in
+  let n_fty = Type.mk_ftype_tuple [] ty_args Type.Message in
   let table, _r =
-    let rdef =
-      let ty_args = List.map Vars.ty is in
-      Symbols.{ n_fty = Type.mk_ftype_tuple [] ty_args Type.Message ; }
+    let rdef = Symbols.{ n_fty }
     in
-    Symbols.Name.declare table (L.mk_loc L._dummy "r_CCA") rdef
+    Symbols.Name.declare table s rdef
   in
+  let table = Process.add_namelength_axiom table s n_fty in
 
   (* let enrich = [Term.mk_var fresh_x_var] in
    * let make_conclusion equiv =
@@ -868,11 +875,13 @@ let global_prf_t
       in
       table, x.cnt.x_nsymb 
     with Not_found ->
-      let ndef =
-        let ty_args = List.map Vars.ty occ.Iter.occ_vars in
-        Symbols.{ n_fty = Type.mk_ftype_tuple [] ty_args m_ty ; }
-      in
-      Symbols.Name.declare table (L.mk_loc L._dummy "n_PRF") ndef
+      let ty_args = List.map Vars.ty occ.Iter.occ_vars in
+      let n_fty = Type.mk_ftype_tuple [] ty_args m_ty in
+      let ndef = Symbols.{ n_fty } in
+      let s = (L.mk_loc L._dummy "n_PRF") in
+      let table, ns = Symbols.Name.declare table s ndef in
+      let table = Process.add_namelength_axiom table s n_fty in
+      table,ns
   in
 
   let (table, occs) : Symbols.table * XO.t list =

@@ -48,5 +48,6 @@ let () =
   List.iter (fun (n,_) -> 
     Format.eprintf "\t%s\n" n;
   ) (!Squirrellib.Checks.suites);
+  Format.eprintf "@.";
 
   Squirrellib.Checks.run ()

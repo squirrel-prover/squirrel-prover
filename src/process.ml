@@ -390,6 +390,69 @@ type p_env = {
 
 }
 
+(* Creates an axiom namelength_name with formula : 
+  len(s) = namelength_hashS with hashS depending on out type of name s *)
+let mk_namelength_axiom' 
+    (name:string) (* Statement name → could be namelength_s by default *)
+    (table:Symbols.table) (* the table *)
+    (s:lsymb) (* symbol of targeted name *)
+    (ftype:Type.ftype) (* type of name term *)
+  : Symbols.table * Goal.statement =
+
+  (* take name from table certainly just defined earlier *)
+  let n = Symbols.Name.of_lsymb s table in
+  let tyn = ftype.fty_out in
+
+  (* create fresh variables regarding to arity of n *)
+  let vars = List.map
+      (fun x -> Vars.make_fresh x "i") ftype.fty_args in
+
+  let tvars = Term.mk_vars vars in
+  (* build name term n *)
+  let tn = Term.mk_name (Term.mk_symb n tyn) tvars in
+  
+  (* cst hash is built from hash of output type of n : tyn *)
+  let cst_hash = "namelength_" ^ (string_of_int (Hashtbl.hash tyn)) in
+  let lsy = L.mk_loc L._dummy (cst_hash) in
+
+  (* find or build cst function namelength_hashS *)
+  let table, fname = match Symbols.Function.of_lsymb_opt lsy table with
+    | Some fn -> table, fn
+    | None -> 
+      let ft = Type.mk_ftype [] [] Message in
+      Symbols.Function.declare_exact table lsy (ft,Symbols.Abstract `Prefix)
+  in
+  let cst = Term.mk_fun table fname [] in
+  (* len(n) = cst *)
+  let eq = (Term.mk_atom `Eq (Term.mk_len tn) (cst)) in
+  (* if any variables in n → forall i_: len(n(i_)) = cst *)
+  let teq = match vars with
+    | [] -> eq
+    | _ -> Term.mk_forall vars eq in
+  let f = Equiv.Atom (Reach teq) in
+
+  (* build statement with name given in arg (often namelength_s with s the
+     symbol of the name) *)
+  let system = SystemExpr.context_any in
+  table, { name; 
+           system; 
+           ty_vars = ftype.fty_vars; 
+           formula = Equiv.Global f }
+
+(* Add namelength axiom of given name of symbol s with type ftype *)
+let add_namelength_axiom 
+    ?(loc = L._dummy)
+    (table:Symbols.table) (s:lsymb) (ftype:Type.ftype)
+    : Symbols.table =
+  let name = "namelength_" ^ (L.unloc s) in
+  (* if already defined just return actual table *)
+  if Symbols.Lemma.mem_lsymb (L.mk_loc loc name) table 
+  then table
+  else
+  let table, stmt = 
+    mk_namelength_axiom' name table s ftype in
+  Lemma.add_lemma `Axiom stmt table
+
 let parse_proc (system_name : System.t) init_table init_projs proc =
 
   (* Initial env with special variables registered.
@@ -635,6 +698,8 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     let ndef = Symbols.{ n_fty } in
 
     let table,n' = Symbols.Name.declare penv.env.table n ndef in
+    let table = add_namelength_axiom table n n_fty in
+
     let n'_th =
       let n' = L.mk_loc (L.loc n) (Symbols.to_string n') in
       Theory.mk_app_i

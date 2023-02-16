@@ -97,4 +97,3 @@ module type S = sig
 
   module Conc : SmartFO.S with type form = conc_form
 end
-

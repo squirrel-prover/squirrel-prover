@@ -180,6 +180,7 @@ let define_oracle_tag_formula table (h : lsymb) (fm : Theory.term) =
 (*------------------------------------------------------------------*)
 (** {2 Declaration processing} *)
 
+
 let declare table decl : Symbols.table * Goal.t list = 
   match L.unloc decl with
   | Decl.Decl_channel s -> Channel.declare table s, []
@@ -280,7 +281,8 @@ let declare table decl : Symbols.table * Goal.t list =
           error (L.loc pty) KDecl (Failure "name can only be index by finite types")
       ) args_tys p_args_tys;
     
-    Theory.declare_name table s Symbols.{ n_fty }, []
+    let table = Theory.declare_name table s Symbols.{ n_fty } in
+    Process.add_namelength_axiom table s n_fty, []
 
   | Decl.Decl_state { name; args; out_ty; init_body; } ->
     Theory.declare_state table name args out_ty init_body, []

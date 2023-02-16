@@ -160,10 +160,14 @@ let indcca_param
       (f:Symbols.fname)
       (cty:Type.ty) (mty:Type.ty) (rty:Type.ty) (kty:Type.ty) :
     Rewrite.rw_rule * Symbols.table * Name.t =
-    let xcdef = Symbols.{n_fty = Type.mk_ftype [] [] cty} in
+    let n_fty = Type.mk_ftype [] [] cty in
+    let xcdef = Symbols.{n_fty} in
+    let s = (L.mk_loc L._dummy "X") in
     let table, xcs =
-      Symbols.Name.declare table (L.mk_loc L._dummy "X") xcdef
+      Symbols.Name.declare table s xcdef
     in
+    let table = Process.add_namelength_axiom table s n_fty in
+
     let xc = Name.{symb=Term.mk_symb xcs cty; args=[]} in
     let xm = Vars.make_fresh mty "M" in
     let xr = Vars.make_fresh rty "R" in

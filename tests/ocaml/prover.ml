@@ -4,6 +4,25 @@ module Theory = Squirrellib.Theory
 
 open Util
 
+let search_unify () =
+  let exception Ok in
+  Alcotest.check_raises "unify Names with special arity when search" Ok
+    (fun () ->
+      let st = Prover.init () in
+      let _st = try Prover.exec_all st
+        "channel c
+        system [T] (S : !_i !_i new n; out(c,n)).
+        goal [T] foo (i:index) : happens(S(i,i)) => output@S(i,i) = n(i,i).
+        Proof.
+        admit.
+        Qed.
+        search len(_).
+        search n(_).
+        search n(_,_)."
+      with | e -> raise e in
+      raise Ok
+    )
+
 let search_about_1 () =
   let st = Prover.init () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
@@ -37,7 +56,7 @@ let search_about_1 () =
     (ProverLib.Srch_term (term_from_string "n(_)"))
   in
   Alcotest.(check' int) ~msg:"Found one lemma with n(_)"
-    ~actual:(List.length matches) ~expected:1;
+    ~actual:(List.length matches) ~expected:2;
   Alcotest.(check' int) ~msg:"Found one pattern n(_) in lemma"
     ~actual:(List.length (snd (List.hd matches))) ~expected:1;
 
@@ -134,7 +153,7 @@ let include_search () =
     (ProverLib.Srch_term (term_from_string "n(_)"))
   in
   Alcotest.(check' int) ~msg:"Found one lemma with n(_)"
-    ~actual:(List.length matches) ~expected:1;
+    ~actual:(List.length matches) ~expected:2;
   Alcotest.(check' int) ~msg:"Found one pattern n(_) in lemma"
     ~actual:(List.length (snd (List.hd matches))) ~expected:1;
 
@@ -174,4 +193,5 @@ let tests = [ ("search_about1", `Quick, search_about_1);
               ("search_about2", `Quick, search_about_2);
               ("include_search", `Quick, include_search);
               ("include_ite", `Quick, include_ite);
+              ("search_unify", `Quick, search_unify);
             ]

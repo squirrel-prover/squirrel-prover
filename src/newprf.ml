@@ -261,10 +261,13 @@ let prf_param_nopattern
       (f:Symbols.fname)
       (hty:Type.ty) (mty:Type.ty) (kty:Type.ty) :
     Rewrite.rw_rule * Symbols.table * Name.t =
-    let nprfdef = Symbols.{n_fty = Type.mk_ftype [] [] hty} in
+    let n_fty = Type.mk_ftype [] [] hty in
+    let nprfdef = Symbols.{n_fty} in
+    let sn_prf = (L.mk_loc L._dummy "n_PRF") in
     let table, nprfs =
-      Symbols.Name.declare table (L.mk_loc L._dummy "n_PRF") nprfdef
+      Symbols.Name.declare table sn_prf nprfdef
     in
+    let table = Process.add_namelength_axiom table sn_prf n_fty in
     let nprf = Name.{symb=Term.mk_symb nprfs hty; args=[]} in
     let xm = Vars.make_fresh mty "M" in
     let xk = Vars.make_fresh kty "K" in
@@ -385,10 +388,13 @@ let prf_param_withpattern
   in
 
   (* generate a new name n_PRF to replace the hash with *)
-  let nprfdef = Symbols.{n_fty = Type.mk_ftype [] [] hty} in
+  let n_fty = Type.mk_ftype [] [] hty in
+  let nprfdef = Symbols.{n_fty} in
+  let sn_prf = (L.mk_loc L._dummy "n_PRF") in
   let table, nprfs =
-    Symbols.Name.declare table (L.mk_loc L._dummy "n_PRF") nprfdef
+    Symbols.Name.declare table sn_prf nprfdef
   in
+  let table = Process.add_namelength_axiom table sn_prf n_fty in
   let nprf = Name.{symb=Term.mk_symb nprfs hty; args=[]} in
 
   (* rewrite rule trying to rewrite p into n_PRF *)

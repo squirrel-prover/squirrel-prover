@@ -29,3 +29,5 @@ _opam/
 .nvimrc
 .vimrc
 *.stat.json
+*.exrc
+*.\#*.sp

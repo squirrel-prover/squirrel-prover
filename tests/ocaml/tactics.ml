@@ -1,6 +1,7 @@
 open Squirrellib
 open Util
 module ES = EquivSequent
+module TS = TraceSequent
 module L = Location
 
 let pprint_option ppf = function 
@@ -10,6 +11,8 @@ let pprint_option ppf = function
 let string_testable = Alcotest.testable pprint_option (=)
 
 let term_testable = Alcotest.testable (Term.pp_dbg) (Term.equal)
+let sys_testable table = Alcotest.testable (SystemExpr.pp)
+    (SystemExpr.equal table)
 
 let get_seq_in_nth_goal st i =
   let subgoals = Prover.get_subgoals st in
@@ -565,7 +568,71 @@ let case_study () =
     ~actual:(List.nth terms 4)
     ~expected:(y)
 
+let namelength () =
+  let mk c = L.mk_loc L._dummy c in      
+  let st = Prover.exec_all (Prover.init ())
+        "
+        system null.
+        name n : message.
+        name m : message.
+
+        goal _ : True.
+        Proof.
+        " in
+  Printer.pr "%a@." (Prover.pp_subgoals st) ();
+  let tn = find_in_sys_from_string "n" st in
+  let _tm = find_in_sys_from_string "m" st in
+  let tyn = Term.ty tn in 
+  let table = Prover.get_table st in
+
+  let axiom_n = "namelength_n" in
+  let axiom_m = "namelength_m" in
+
+  let stmt_n = Lemma.find_stmt_reach (mk axiom_n) table in
+  let stmt_m = Lemma.find_stmt_reach (mk axiom_m) table in
+
+  let system = SystemExpr.context_any in
+
+  Alcotest.(check (sys_testable table)) 
+    "SystemExpr equals → context_any"
+    (system.set)
+    (stmt_n.system.set);
+  
+  (* Should be of same length ↓ *)
+  Printer.pr "Term n: %a@." Term.pp stmt_n.formula;
+  Printer.pr "Term m: %a@." Term.pp stmt_m.formula;
+
+  let n = Symbols.Name.of_lsymb (mk "n") table in
+  let tn = Term.mk_name (Term.mk_symb n tyn) [] in
+  
+  let name_hash = "namelength_" ^ (string_of_int (Hashtbl.hash tyn)) in
+  let lsy = L.mk_loc L._dummy (name_hash) in
+
+  let table, fname = match Symbols.Function.of_lsymb_opt lsy table with
+    | Some fn -> table, fn
+    | None -> assert false
+  in
+  let cst = Term.mk_fun table fname [] in
+  let f = Term.mk_atom `Eq (Term.mk_len tn) (cst) in
+
+  Alcotest.(check (term_testable)) 
+    "axiom namelength_n → len(n) = namelength_129913994"
+    (f)
+    (stmt_n.formula);
+
+  let _ = match stmt_m.formula, stmt_n.formula with
+  | Term.Fun (sy,_,[_t1;t2]),
+    Term.Fun (sy',_,[_t1';t2'])
+    when sy = Symbols.fs_eq && sy' = Symbols.fs_eq -> 
+    Alcotest.(check (term_testable)) 
+      "len(n) = namelength_129913994 = len(m) "
+      (t2)
+      (t2');
+  | _ -> assert false
+  in ()
+
 let tests =
   [ ("case_study", `Quick, case_study) ;
+    ("namelength", `Quick, namelength);
     ("case_study_fail", `Quick, case_study_fail) ;
     ("case_study_fail'", `Quick, case_study_fail') ]

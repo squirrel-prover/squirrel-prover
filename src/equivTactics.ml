@@ -1411,10 +1411,14 @@ let prf arg (s : ES.t) : ES.t list =
   assert (ftyp.fty_vars = []);
 
   let nty = ftyp.fty_out in
-  let ndef = Symbols.{ n_fty = Type.mk_ftype [] [] nty; } in
+  let n_fty = Type.mk_ftype [] [] nty in
+  let ndef = Symbols.{ n_fty } in
+  let prf_sy = (L.mk_loc L._dummy "n_PRF") in
   let table,n =
-    Symbols.Name.declare (ES.table s) (L.mk_loc L._dummy "n_PRF") ndef
+    Symbols.Name.declare (ES.table s) prf_sy ndef
   in
+  let table = Process.add_namelength_axiom table prf_sy n_fty in
+
   let ns = Term.mk_symb n nty in
   let s = ES.set_table table s in
 
@@ -2144,10 +2148,15 @@ let xor arg (s : ES.t) =
     mk_xor_phi_base s biframe
       ((n_left, n_left_args), l_left, (n_right, n_right_args), l_right, term)
   in
-  let ndef = Symbols.{ n_fty = Type.mk_ftype [] [] Message ; } in
+  let n_fty = Type.mk_ftype [] [] Message in
+  let ndef = Symbols.{ n_fty } in
+  let sym = (L.mk_loc L._dummy "n_XOR") in
   let table,n =
-    Symbols.Name.declare (ES.table s) (L.mk_loc L._dummy "n_XOR") ndef
+    Symbols.Name.declare (ES.table s) sym ndef
   in
+  let table = 
+    Process.add_namelength_axiom table sym n_fty in
+
   let ns = Term.mk_symb n Message in
   let s = ES.set_table table s in
 

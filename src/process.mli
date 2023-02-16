@@ -79,6 +79,10 @@ val declare :
   Symbols.table -> lsymb -> proc_ty -> Term.projs -> process ->
   Symbols.table
 
+val add_namelength_axiom : 
+  ?loc:Location.t -> Symbols.table -> lsymb -> Type.ftype ->
+  Symbols.table
+
 (*------------------------------------------------------------------*)
 (** Final declaration of the system under consideration,
   * which triggers the computation of its internal representation
