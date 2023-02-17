@@ -133,8 +133,8 @@ Proof.
 
   (* To conclude, we can use the `eq_refl` lemma, which is part of the
      standard library.
-     You can print the lemma's statement using `print goal`. *)
-  print goal eq_refl.
+     You can print the lemma's statement using `print`. *)
+  print eq_refl.
   apply eq_refl.
 Qed.
 

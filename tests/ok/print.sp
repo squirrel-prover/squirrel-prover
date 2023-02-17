@@ -19,13 +19,13 @@ goal trans2 (x,y,z : T) : x -- y => y -- z => x -- z.
 Proof. admit. Qed.
 
 (*------------------------------------------------------------------*)
-print goal mtrans.
-print goal trans2.
+print mtrans.
+print trans2.
 
 goal _ : false.
 Proof.
-  print goal mtrans.
-  print goal trans2.
+  print mtrans.
+  print trans2.
 Abort.
 
 (*------------------------------------------------------------------*)

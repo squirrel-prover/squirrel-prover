@@ -101,8 +101,8 @@ axiom [default] diff_refl (x:message) : diff(x,x) = x.
 (* ------------------------------------------------------------------- *)
 
 (* Useful lemmas for the next proof. *)
-print goal exec_le.
-print goal exec_cond.
+print exec_le.
+print exec_cond.
 
 (* In the real protocol, the key obtained after checking the signature
    is sk as expected. *)

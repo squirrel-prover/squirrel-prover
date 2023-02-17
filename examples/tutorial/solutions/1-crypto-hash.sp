@@ -113,7 +113,7 @@ Proof.
      In this exemple, this is trivially the case. We can therefore 
      simplify the `if-then-else` using the `if_true` lemma. 
      Check the lemma statements before applying it. *)
-  print goal if_true.
+  print if_true.
   rewrite if_true in 0.
   auto.
   by fresh 0.

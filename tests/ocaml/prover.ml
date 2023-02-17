@@ -138,7 +138,7 @@ let search_about_2 () =
   Alcotest.(check' int) ~msg:"Found one lemma with true"
     ~expected:1 ~actual:(List.length matches);
   (* Should print ↓ *)
-  let _ = Prover.exec_command "print goal myeq." st in
+  let _ = Prover.exec_command "print myeq." st in
   ()
 
 let include_search () =

@@ -3,7 +3,7 @@ type T.
 op fst_p = fun ((x,y) : T * T) => x.
 
 axiom [any] foo : forall ((x,y) : T * T), x = y.
-print goal foo.
+print foo.
 
 goal [any] _ (x, y : T) : x = y.
 Proof.
@@ -13,7 +13,7 @@ Proof.
 Qed.
 
 axiom [any] bar : exists ((x,y) : T * T), x = y.
-print goal bar.
+print bar.
 
 goal [any] _ (x, y : T) : exists (x,y : T), x = y.
 Proof.

@@ -1124,9 +1124,9 @@ p_include:
 (*------------------------------------------------------------------*)
 /* print query */
 pr_query:
-| GOAL   l=lsymb  DOT { ProverLib.Pr_statement l }
 | SYSTEM l=system_expr DOT { ProverLib.Pr_system (Some l) }
-|                 DOT { ProverLib.Pr_system None }
+| l=lsymb DOT { ProverLib.Pr_any l }
+|         DOT { ProverLib.Pr_system None }
 
 search_query:
 | SEARCH   t=any_term IN s=system_expr  DOT { ProverLib.Srch_inSys (t,s) }

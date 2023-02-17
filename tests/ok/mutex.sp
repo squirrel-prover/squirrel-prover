@@ -15,7 +15,7 @@ system [foo] (
   if x = x then !_i (C: out(c, empty); out(c, empty)) else !_i !_j D: out(c, empty)
 ).
 
-print goal mutex_foo_C_D.
+print mutex_foo_C_D.
 
 goal [foo] _ (a,i,j,k : index) : 
   not (happens (C a i)) || not (happens(D a j k)).

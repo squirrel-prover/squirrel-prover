@@ -468,7 +468,7 @@ Proof.
 
          assert (nt(i,t)=nt(i,r)); [1:auto].
          case Ct. 
-         by depends T(i,t), T1(i,t). print goal mutex_default_T1_T2.
+         by depends T(i,t), T1(i,t). print mutex_default_T1_T2.
          use mutex_default_T1_T2 with i,t as HH; by case HH.
 
          assert (nt(i,t)=nt(i,r)); [1:auto].

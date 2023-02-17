@@ -378,9 +378,40 @@ let do_search (st:state) (t:ProverLib.search_query) : unit =
 
 let do_print (st:state) (q:ProverLib.print_query) : unit =
     begin match q with
-    | Pr_statement l -> 
-        let lem = Lemma.find l (get_table st) in
-        Printer.prt `Default "%a" Lemma.pp lem
+    | Pr_any l -> 
+      begin
+        let table = (get_table st) in
+        let found = try (* first try printing lemmas *)
+          let lem = Lemma.find l table in
+          Printer.prt `Default "%a" Lemma.pp lem;
+          true
+        with _ -> false in
+        let found = found || 
+        try (* first try printing functions *)
+          let f = Symbols.Function.of_lsymb l table in
+          let ftype, fdef = Symbols.Function.get_def f table in
+          let func = Symbols.Function.get_data f table in
+          let _ = match fdef, func with
+          | Symbols.Operator, Operator.Operator op -> 
+              Printer.prt `Default "%a" Operator.pp_operator op
+          | Symbols.Abstract _, _ -> 
+            Printer.prt `Default "Abstract %s:%a" (Location.unloc l)
+              Type.pp_ftype ftype 
+          (* TODO ↓ create printer for all ad-hoc functions *)
+          | _,_ -> Printer.prt `Default "%s:%a" (Location.unloc l)
+              Type.pp_ftype ftype 
+          in
+          true
+        with _ -> false in
+        let found = found || 
+        try (* first try printing names *)
+          let fty = (Symbols.Name.def_of_lsymb l table).n_fty in
+          Printer.prt `Default "%s:%a" (Location.unloc l) Type.pp_ftype fty;
+          true
+        with _ -> false in
+        if not found then
+        Printer.prt `Default "%s not found" (Location.unloc l)
+      end
     | Pr_system s_opt ->
         let system = 
           begin match s_opt with
