@@ -9,7 +9,7 @@ let search_unify () =
   Alcotest.check_raises "unify Names with special arity when search" Ok
     (fun () ->
       let st = Prover.init () in
-      let _st = try Prover.exec_all st
+      let st = try Prover.exec_all st
         "channel c
         system [T] (S : !_i !_i new n; out(c,n)).
         goal [T] foo (i:index) : happens(S(i,i)) => output@S(i,i) = n(i,i).
@@ -18,8 +18,29 @@ let search_unify () =
         Qed.
         search len(_).
         search n(_).
-        search n(_,_)."
+        search n(_,_).
+        name yo:message."
       with | e -> raise e in
+      let matches = Prover.search_about st 
+          (ProverLib.Srch_term (term_from_string "len(_)"))
+      in
+      Alcotest.(check' int) ~msg:"Found one axiom with len(_)" 
+        ~actual:(List.length matches) ~expected:2;
+      let matches = Prover.search_about st 
+          (ProverLib.Srch_term (term_from_string "n(_)"))
+      in
+      Alcotest.(check' int) ~msg:"Found one axiom with n(_)" 
+        ~actual:(List.length matches) ~expected:2;
+      let matches = Prover.search_about st 
+          (ProverLib.Srch_term (term_from_string "n(_,_)"))
+      in
+      Alcotest.(check' int) ~msg:"Found one axiom with n(_,_)" 
+        ~actual:(List.length matches) ~expected:1;
+      let matches = Prover.search_about st 
+          (ProverLib.Srch_term (term_from_string "len(yo)"))
+      in
+      Alcotest.(check' int) ~msg:"Found one axiom with len(yo)" 
+        ~actual:(List.length matches) ~expected:1;
       raise Ok
     )
 
