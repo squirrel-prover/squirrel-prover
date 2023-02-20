@@ -74,6 +74,20 @@ type function_def =
   | Operator                    (* definition in associated data *)
 
 (*------------------------------------------------------------------*)
+let pp_function_def fmt = function
+  | Hash                  -> Fmt.pf fmt "Hash"
+  | DHgen _               -> Fmt.pf fmt "DHgen"
+  | AEnc                  -> Fmt.pf fmt "AEnc"
+  | ADec                  -> Fmt.pf fmt "ADec"
+  | SEnc                  -> Fmt.pf fmt "SEnc"
+  | SDec                  -> Fmt.pf fmt "SDec"
+  | Sign                  -> Fmt.pf fmt "Sign"
+  | CheckSign             -> Fmt.pf fmt "CheckSig"
+  | PublicKey             -> Fmt.pf fmt "PublicKey"
+  | Abstract _            -> Fmt.pf fmt "Abstract"
+  | Operator              -> Fmt.pf fmt "Operator"
+
+(*------------------------------------------------------------------*)
 type macro_def =
   | Input | Output | Cond | Exec | Frame
   | State  of int * Type.ty

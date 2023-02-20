@@ -376,65 +376,96 @@ let do_search (st:state) (t:ProverLib.search_query) : unit =
     ) matches in
   Printer.prt `Default "%a" print_all matches
 
+let print_system (st:state) (s_opt:SystemExpr.Parse.t option) 
+  : unit =
+  let system = 
+    begin match s_opt with
+      | None   -> 
+        begin match get_current_system st with
+          | Some s -> s.set
+          | None -> Tactics.hard_failure 
+                      (Failure "no default system");
+        end
+      | Some s -> SystemExpr.Parse.parse 
+                    (get_table st) s
+    end
+  in
+  SystemExpr.print_system 
+    (get_table st) system;
+
+  if TConfig.print_trs_equations 
+      (get_table st)
+  then
+    Printer.prt `Result "@[<v>@;%a@;@]%!"
+      Completion.print_init_trs 
+      (get_table st)
+
+let print_lemma table (l:Theory.lsymb) : bool = 
+  try
+    let lem = Lemma.find l table in
+    Printer.prt `Default "%a@." Lemma.pp lem;
+    true
+  with _ -> false
+
+let print_function table (l:Theory.lsymb) : bool =
+  try
+    let f = Symbols.Function.of_lsymb l table in
+    let ftype, fdef = Symbols.Function.get_def f table in
+    let _ = 
+      begin match fdef with
+        | Symbols.Operator -> 
+          let func = Symbols.Function.get_data f table in
+          begin match func with
+            | Operator.Operator op ->
+              Printer.prt `Default "%a@." Operator.pp_operator op
+            | _ -> assert false
+          end
+        | func_def -> 
+          Printer.prt `Default "fun %s : %a : %a@." 
+            (Location.unloc l)
+            Type.pp_ftype ftype 
+            Symbols.pp_function_def func_def 
+      end in
+    true
+  with _ -> false
+
+let print_name table (l:Theory.lsymb) : bool =
+  try
+    let fty = (Symbols.Name.def_of_lsymb l table).n_fty in
+    Printer.prt `Default "%s:%a@." (Location.unloc l) Type.pp_ftype
+      fty; 
+    true
+  with _ -> false
+
+let print_macro table (l:Theory.lsymb) : bool =
+  try
+    let m = (Symbols.Macro.of_lsymb l table) in
+    let macro = Symbols.Macro.get_data m table in
+    Printer.prt `Default "%a@." Macros.pp (Macros.as_macro macro);
+    true
+  with _ -> false
+
 let do_print (st:state) (q:ProverLib.print_query) : unit =
-    begin match q with
+    match q with
+    | Pr_system s_opt -> print_system st s_opt
     | Pr_any l -> 
       begin
         let table = (get_table st) in
-        let found = try (* first try printing lemmas *)
-          let lem = Lemma.find l table in
-          Printer.prt `Default "%a" Lemma.pp lem;
-          true
-        with _ -> false in
-        let found = found || 
-        try (* first try printing functions *)
-          let f = Symbols.Function.of_lsymb l table in
-          let ftype, fdef = Symbols.Function.get_def f table in
-          let func = Symbols.Function.get_data f table in
-          let _ = match fdef, func with
-          | Symbols.Operator, Operator.Operator op -> 
-              Printer.prt `Default "%a" Operator.pp_operator op
-          | Symbols.Abstract _, _ -> 
-            Printer.prt `Default "Abstract %s:%a" (Location.unloc l)
-              Type.pp_ftype ftype 
-          (* TODO ↓ create printer for all ad-hoc functions *)
-          | _,_ -> Printer.prt `Default "%s:%a" (Location.unloc l)
-              Type.pp_ftype ftype 
-          in
-          true
-        with _ -> false in
-        let found = found || 
-        try (* first try printing names *)
-          let fty = (Symbols.Name.def_of_lsymb l table).n_fty in
-          Printer.prt `Default "%s:%a" (Location.unloc l) Type.pp_ftype fty;
-          true
-        with _ -> false in
-        if not found then
-        Printer.prt `Default "%s not found" (Location.unloc l)
-      end
-    | Pr_system s_opt ->
-        let system = 
-          begin match s_opt with
-          | None   -> 
-            begin match get_current_system st with
-              | Some s -> s.set
-              | None -> Tactics.hard_failure 
-                          (Failure "no default system");
-            end
-          | Some s -> SystemExpr.Parse.parse 
-                        (get_table st) s
-          end
-        in
-        SystemExpr.print_system 
-          (get_table st) system;
+        let searchs_in = [
+          print_lemma;    (* first try printing lemma *)
+          print_function; (* then try printing function *)
+          print_name;     (* then try printing name *)
+          print_macro;    (* FIXME then try printing macro *)
+        ] in
+        
+        let found = List.fold_left 
+            (fun found f -> found || f table l) 
+            false
+            searchs_in in
 
-        if TConfig.print_trs_equations 
-            (get_table st)
-        then
-          Printer.prt `Result "@[<v>@;%a@;@]%!"
-            Completion.print_init_trs 
-              (get_table st)
-    end
+        if not found then
+        Printer.prt `Default "%s not found@." (Location.unloc l)
+      end
   (* }↑} *)
 
 let do_eof (st:state) : state = 

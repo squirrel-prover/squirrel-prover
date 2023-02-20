@@ -60,7 +60,14 @@ type global_data = {
   (** Definitions of macro body for single systems where it is defined. *)
 }
 
-let[@warning "-32"] pp fmt (g : global_data) : unit =
+(*------------------------------------------------------------------*)
+type Symbols.data += Global_data of global_data
+
+let as_macro : Symbols.data -> global_data = function
+  | Global_data s -> s
+  | _ -> assert false
+
+let pp fmt (g : global_data) : unit =
   let pp_strict fmt = function
     | `Strict -> Fmt.pf fmt "Strict"
     | `Large -> Fmt.pf fmt "Large"
@@ -78,9 +85,6 @@ let[@warning "-32"] pp fmt (g : global_data) : unit =
     (Fmt.list ~sep:Fmt.cut
        (Fmt.parens (Fmt.pair ~sep:Fmt.comma System.Single.pp Term.pp)))
     g.bodies
-
-(*------------------------------------------------------------------*)
-type Symbols.data += Global_data of global_data
 
 (*------------------------------------------------------------------*)
 (** Get body of a global macro for a single system. *)

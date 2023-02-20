@@ -101,6 +101,10 @@ val update_global_data :
   System.Single.t ->
   (system_map_arg -> Symbols.macro -> Term.term -> Term.term) -> 
   Symbols.table
+
+type global_data
+
+val as_macro : Symbols.data -> global_data
     
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
@@ -113,3 +117,4 @@ val ty_args : Symbols.table -> Symbols.macro -> Type.ty list
 
 val is_global : Symbols.table -> Symbols.macro -> bool
 
+val pp : Format.formatter -> global_data -> unit

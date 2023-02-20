@@ -106,6 +106,8 @@ type function_def =
   | Abstract of symb_type
   | Operator                    (* definition in associated data *)
 
+val pp_function_def : Format.formatter -> function_def -> unit
+
 (** Indicates if a function symbol has been defined with
     the specified definition. *)
 val is_ftype : fname -> function_def -> table -> bool

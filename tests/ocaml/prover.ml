@@ -4,6 +4,30 @@ module Theory = Squirrellib.Theory
 
 open Util
 
+let some_print () =
+  let exception Ok in
+  Alcotest.check_raises "print stuff" Ok
+    (fun () ->
+      let st = Prover.init () in
+      let _ = try Prover.exec_all st
+        "include Basic.
+        channel c
+        system [T] (S : !_i !_i new n; out(c,n)).
+        goal [T] foo (i:index) : happens(S(i,i)) => output@S(i,i) = n(i,i).
+        Proof.
+        admit.
+        Qed.
+        print n.
+        print cond.
+        print happens.
+        print coucou.
+        print foo.
+        name yo:message.
+        print yo."
+      with | e -> raise e in
+      raise Ok
+    )
+
 let search_unify () =
   let exception Ok in
   Alcotest.check_raises "unify Names with special arity when search" Ok
@@ -215,4 +239,5 @@ let tests = [ ("search_about1", `Quick, search_about_1);
               ("include_search", `Quick, include_search);
               ("include_ite", `Quick, include_ite);
               ("search_unify", `Quick, search_unify);
+              ("some_print", `Quick, some_print);
             ]
