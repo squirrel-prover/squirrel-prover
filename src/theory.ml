@@ -1415,14 +1415,13 @@ let declare_name table s ndef =
 (** Sanity checks for a function symbol declaration. *)
 let check_fun_symb
     _table
-    (ty_args : Type.tvar list) (in_tys : Type.ty list) 
+    (in_tys : Type.ty list) 
     (s : lsymb) (f_info : Symbols.symb_type) : unit
   =
   match f_info with
   | `Prefix -> ()
   | `Infix _side ->
-    if not (List.length ty_args = 0) ||
-       not (List.length in_tys = 2) then
+    if not (List.length in_tys = 2) then
       conv_err (L.loc s) BadInfixDecl
 
 let declare_abstract 
@@ -1430,7 +1429,7 @@ let declare_abstract
     (s : lsymb) (f_info : Symbols.symb_type) 
   =
   (* if we declare an infix symbol, run some sanity checks *)
-  check_fun_symb table ty_args in_tys s f_info;
+  check_fun_symb table in_tys s f_info;
 
   let ftype = Type.mk_ftype ty_args in_tys out_ty in
   fst (Symbols.Function.declare_exact table s (ftype, Symbols.Abstract f_info))

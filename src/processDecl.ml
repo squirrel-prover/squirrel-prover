@@ -112,7 +112,7 @@ let parse_operator_decl table (decl : Decl.operator_decl) =
     let in_tys = List.map Vars.ty args in
 
     (* sanity checks on infix symbols *)
-    Theory.check_fun_symb table ty_vars in_tys decl.op_name decl.op_symb_type;
+    Theory.check_fun_symb table in_tys decl.op_name decl.op_symb_type;
     
     let table, _ = 
       Symbols.Function.declare_exact 
