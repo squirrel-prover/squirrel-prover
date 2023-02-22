@@ -231,7 +231,7 @@ val declare_abstract :
 (** Sanity checks for a function symbol declaration. *)
 val check_fun_symb :
   Symbols.table ->
-  Type.tvar list -> Type.ty list -> 
+  Type.ty list -> 
   lsymb -> Symbols.symb_type -> unit
   
 (*------------------------------------------------------------------*)
