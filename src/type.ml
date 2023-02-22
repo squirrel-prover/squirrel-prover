@@ -249,7 +249,7 @@ end = struct
     Fmt.pf fmt "[@[<v 0>%a@]]"
       (Fmt.list ~sep:Fmt.cut
          (fun fmt (id, ty) ->
-            Fmt.pf fmt "@[<hv 2>@[%a@] →@ @[%a@]@]" Ident.pp id pp ty
+            Fmt.pf fmt "@[<hv 2>@[%a@] →@ @[%a@]@]" Ident.pp_full id pp ty
       )) (Mid.bindings !e)
 
   let mk_env () = ref Mid.empty 

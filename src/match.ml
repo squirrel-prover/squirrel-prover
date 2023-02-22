@@ -1271,9 +1271,8 @@ module T (* : S with type t = Term.term *) = struct
        co-domain of [mv]. *)
   let rec tunif (t : term) (pat : term) (st : unif_state) : Mvar.t =
     match t, pat with
-    | _, Var v' when st.mode = `Match -> vmatch t v' st
-
-    | Var v, t | t, Var v when st.mode = `Unif -> vunif t v st
+    (*      *) | _, Var v when st.mode = `Match -> vunif t v st
+    | Var v, t | t, Var v when st.mode = `Unif  -> vunif t v st
 
     | Tuple l, Tuple l' ->
       if List.length l <> List.length l' then no_unif ();
@@ -1511,7 +1510,7 @@ module T (* : S with type t = Term.term *) = struct
             no_unif ();
 
           (* When [st.allow_capture] is false (which is the default), check that we
-           are not trying to unify [v] with a term bound variables. *)
+             are not trying to unify [v] with a term bound variables. *)
           if not (Sv.disjoint (fv t) (Sv.of_list (List.map fst st.bvs))) &&
              not st.allow_capture then
             no_unif ();
@@ -1527,35 +1526,6 @@ module T (* : S with type t = Term.term *) = struct
               { st with subst_vs = Sv.add v st.subst_vs }
             in
             tunif t t' st
-
-  (* Match a variable of the pattern with a term. *)
-  and vmatch (t : term) (v : Vars.var) (st : unif_state) : Mvar.t =
-    match List.assoc_opt v st.support with
-    | None -> (* [v] not in the pattern *)
-      (* FEATURE: conversion *)
-      if t <> mk_var v then try_reduce_head1 t (mk_var v) st else st.mv
-
-    | Some tag -> (* [v] in the pattern, with tag [tag] *)
-      match Mvar.find v st.mv with
-      (* If this is the first time we see the variable, store the subterm
-         and add the type information. *)
-      | exception Not_found ->
-        if Type.Infer.unify_eq st.ty_env (ty t) (Vars.ty v) = `Fail then
-          no_unif ();
-
-        (* When [st.allow_capture] is false (which is the default), check that we
-           are not trying to match [v] with a term bound variables. *)
-        if not (Sv.disjoint (fv t) (Sv.of_list (List.map fst st.bvs))) &&
-           not st.allow_capture then 
-          no_unif ();
-
-        Mvar.add (v, tag) st.system.set t st.mv
-
-      (* If we already saw the variable, check that the subterms are
-         identical. *)
-      | t' -> 
-        (* FEATURE: conversion *)
-        if not (Term.alpha_conv t t') then no_unif () else st.mv
 
   (*------------------------------------------------------------------*)
   (** Exported.
