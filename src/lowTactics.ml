@@ -1313,7 +1313,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       In local and global sequents, we can apply an hypothesis
       to derive the goal or to derive the conclusion of an hypothesis.
-      The former corresponds to [apply] below and the latter corresponds
+v      The former corresponds to [apply] below and the latter corresponds
       to [apply_in].
 
       We impose in both that the hypotheses involved here are of the same
@@ -1348,16 +1348,17 @@ module MkCommonLowTac (S : Sequent.S) = struct
       { Match.default_match_option with mode = `EntailRL; use_fadup }
     in
     let table, system, goal = S.table s, S.system s, S.goal s in
-
+    let hyps = lazy (S.get_trace_hyps s) in
     let rec _apply (subs : S.conc_form list) (pat : S.conc_form Term.pat) =
       let pat_vars = Sv.of_list (List.map fst pat.pat_vars) in
       if not (Sv.subset pat_vars (S.fv_conc pat.pat_term)) then
         soft_failure ApplyBadInst;
 
+      let env = S.vars s in
       let match_res =
         match S.conc_kind with
-        | Local_t  -> Match.T.try_match ~option table ~env:(S.vars s) system goal pat
-        | Global_t -> Match.E.try_match ~option table ~env:(S.vars s) system goal pat
+        | Local_t  -> Match.T.try_match ~option ~hyps table ~env system goal pat
+        | Global_t -> Match.E.try_match ~option ~hyps table ~env system goal pat
         | Any_t -> assert false (* cannot happen *)
       in
 
@@ -1416,7 +1417,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       else
         let pat = { pat with pat_term = fprem } in
         let option =
-          Match.{ default_match_option with mode = `EntailLR; use_fadup; }
+          Match.{ default_match_option with mode = `EntailLR; use_fadup}
         in
 
         let table = S.table s in
@@ -1480,7 +1481,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
 
   (** for now, there is only one named optional arguments to `apply` *)
-  let p_apply_fadup_arg (nargs : Args.named_args) : bool =
+  let p_apply_faduparg (nargs : Args.named_args) : bool =
     match nargs with
     | [Args.NArg L.{ pl_desc = "inductive" }] -> true
     | (Args.NArg l) :: _ ->
@@ -1513,7 +1514,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       | _ -> bad_args ()
     in
 
-    let use_fadup = p_apply_fadup_arg nargs in
+    let use_fadup = p_apply_faduparg nargs in
 
     let target = match in_opt with
       | Some lsymb -> T_hyp (fst (Hyps.by_name lsymb s))

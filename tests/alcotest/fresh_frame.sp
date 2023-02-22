@@ -8,5 +8,5 @@ system null.
 equiv testFresh : diff(n,m),n.
 
 Proof.
-  fresh 1.
+ fresh 1.
 Qed.

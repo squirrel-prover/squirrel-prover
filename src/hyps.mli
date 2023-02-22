@@ -131,7 +131,8 @@ module TraceHyps : S with type hyp = Equiv.any_form
 val get_atoms_of_hyps  : TraceHyps.hyps -> Term.Lit.literals 
 val get_message_atoms  : TraceHyps.hyps -> Term.Lit.xatom list 
 val get_trace_literals : TraceHyps.hyps -> Term.Lit.literals 
-val get_eq_atoms       : TraceHyps.hyps -> Term.Lit.xatom list 
+val get_eq_atoms       : TraceHyps.hyps -> Term.Lit.xatom list
+val get_list_of_hyps   : TraceHyps.hyps lazy_t -> Term.term list
 
 (*------------------------------------------------------------------*)
 (** {2 Changing the context of a set of hypotheses} *)
@@ -163,4 +164,3 @@ val change_equiv_hyps_context :
   table:Symbols.table ->
   vars:Vars.env ->
   EquivHyps.hyps -> EquivHyps.hyps
-

@@ -17,6 +17,7 @@ Proof.
 
   auto.
 
+
   expandall.
   fa 0; fa 1; fa 1.
   xor 1.

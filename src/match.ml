@@ -421,7 +421,7 @@ module Pos = struct
       ~(p      : pos)           (* current position *)
       ~(acc    : 'a)            (* folding value *)
       (ti      : Equiv.form)       
-    : 'a * bool * Equiv.form    (* folding value, `Map found, term *)
+     : 'a * bool * Equiv.form    (* folding value, `Map found, term *)
     = 
     let map_fold_e ?(system = system) ?(vars = vars) ?(conds = conds) = 
       map_fold_e func mode ~system ~vars ~conds 
@@ -1657,7 +1657,8 @@ type cand_tuple_sets = cand_tuple_set list
       [{ term    = t;
          vars    = vars;
          cond    = ψ; }]
-    represents the set of terms [\{t | ∀ vars, s.t. ψ \}]. *)
+    represents the set of terms [\{t | ∀ vars, s.t. ψ \}].
+Invariant : Every condition [∀ vars, s.t. ψ] added to a term must be bi-deductible*)
 type known_set = {
   term : Term.term;
   vars : Vars.tagged_vars;            (* sort index or timestamp *)
@@ -1700,7 +1701,7 @@ module MCset : sig[@warning "-32"]
 end = struct
   type t = {
     msymb   : Term.msymb;
-    args    : Term.term list;
+     args    : Term.term list;
     indices : Vars.var list;
     cond_le : Term.term option;
   }
@@ -1847,6 +1848,7 @@ let known_set_add_frame (k : known_set) : known_set list =
     let term_frame = Term.mk_macro ms [] ts' in
     let term_exec  = Term.mk_macro Term.exec_macro [] ts' in
     let term_input = Term.mk_macro Term.in_macro [] ts' in
+    let term_output = Term.mk_macro Term.out_macro [] ts' in
 
     let mk_and = Term.mk_and ~simpl:true in
 
@@ -1856,6 +1858,9 @@ let known_set_add_frame (k : known_set) : known_set list =
     { term = term_exec;
       vars;
       cond = mk_and (Term.mk_atom `Leq ts' ts) k.cond; } ::
+    { term = term_output;
+      vars;
+      cond =mk_and ( mk_and (Term.mk_atom `Leq ts' ts)  term_exec) k.cond; }::
     [{ term = term_input;       (* input is know one step further *)
        vars;
        cond = mk_and (Term.mk_atom `Leq (Term.mk_pred ts') ts) k.cond; }]
@@ -1876,6 +1881,12 @@ let rec known_set_decompose (k : known_set) : known_set list =
     and kr = { k with term = b; } in
     List.concat_map known_set_decompose (kl :: [kr])
 
+(* FIXME : This rule is false, but something to decontruct ite could be added
+  | Term.Fun (f, _, [b;t1;t2]) when f = Term.f_ite ->
+    let kl  = { k with term = t1 ; cond = Term.mk_and k.cond b}
+    and kr =  { k with term = t2 ; cond = Term.mk_and k.cond (Term.mk_not b)}
+    in List.concat_map known_set_decompose (kl::[kr])
+*)
   (* Idem for tuples. *)
   | Term.Tuple l ->
     let kl = List.map (fun a -> { k with term = a; } ) l in
@@ -2129,6 +2140,26 @@ module E = struct
   type t = Equiv.form
 
   (*------------------------------------------------------------------*)
+  exception Fail
+  
+  (** Check that [hyp] implies [cond] by veryfing than [hyp => cond] is a tautology by 
+      satisfiability under the global hypothesis.
+      Return [true] if [hyp => cond] is a tautology and [false] when it fails to show it.
+      The function is_tautology is defined in the module [Constr]. *)
+  let known_set_check_impl_sat
+      (table : Symbols.table)
+      (full_hyps : Term.term list)
+      (cond : Term.term)
+    =
+    let timeout = TConfig.solver_timeout table in
+    let hyp = Term.mk_ands (full_hyps) in 
+    let t_impl = Term.mk_impl hyp cond in
+    try
+      Constr.(is_tautology ~exn:Fail timeout t_impl)
+    with
+    | Fail -> false
+   
+
   let leq_tauto table (t : Term.term) (t' : Term.term) : bool =
     let rec leq t t' =
       match t,t' with
@@ -2137,59 +2168,101 @@ module E = struct
         when f = f_pred && f' = f_pred ->
         leq t t'
       | Fun (f,_, [t]), t' when f = f_pred -> leq t t'
-
       | Action (n,is), Action (n',is') ->
         Action.depends
           (Action.of_term n is table)
           (Action.of_term n' is' table)
-
       | _ -> false
     in
     leq t t'
 
-  (** Check that [hyp] implies [cond].
-      We only support a restricted set of possible known sets conditions
-      for now. *)
+  
+  (** Check that [hyp] implies [cond] for the special case when [cond] is 
+      an inequalitie between function of time stamps or actions.
+      [cond] is reduced to [t1 ≤ t2] by removing the [pred] function and if 
+      there exists an inequalitie [ta  ≤ tb] in [hyp]
+      such that [ta  ≤ tb] implies [t1  ≤ t2] then [hyp] implies [cond] and [true] 
+      is returned. Otherwise [false] is returned. *)
+  let known_set_check_impl_auto
+      (table : Symbols.table)
+      (hyp : Term.term)
+      (cond:Term.term) : bool
+    =
+    let hyps = Term.decompose_ands hyp
+    in
+    match cond with
+    | Term.Fun (fs, _, [t1;t2]) 
+      when (fs = Term.f_lt || fs = Term.f_leq)
+        && Term.ty t1 = Type.Timestamp ->
+      let t2' =
+        if fs = Term.f_lt then Term.mk_pred t2 else t2
+      in
+      let check_direct = leq_tauto table t1 t2' in
+      let check_indirect =
+        List.exists (fun hyp ->
+            match hyp with
+            | Term.Fun (fs, _, [ta;tb]) 
+              when fs = Term.f_leq && Term.ty t1 = Type.Timestamp -> (* ≤ *)
+              (* checks whether [ta ≤ tb] implies [t1 ≤ t2'] *)
+              leq_tauto table t1 ta && leq_tauto table tb t2'
+            | Term.Fun (fs,_,_) when fs = Term.f_true -> false
+            | _ -> false
+          ) hyps
+      in
+      check_direct || check_indirect
+    | Term.Fun (fs,_,_) when fs = Term.f_true -> true
+    | _ -> false
+  
+
+  (** Check that [hyp] implies [cond] for the special case when [cond] is [exec@t]. 
+      Return [true] when it can proved [hyp => cond], and [false] otherwise. *)  
+  let known_set_check_exec_case
+      (table :Symbols.table) 
+      (global_hyps : Term.term list)
+      (cond : Term.term) : bool
+    =
+    let timeout = TConfig.solver_timeout table in
+    match cond with
+    | Term.Macro (ms', _ ,ts') when ms' = Term.exec_macro ->
+      let find_greater_exec hyp = match hyp with
+        | Term.Macro (ms, _, ts) when ms = Term.exec_macro ->
+          begin
+            let term_impl = Term.mk_impl (Term.mk_ands global_hyps) (Term.mk_atom `Leq ts' ts)
+            in
+            try
+              Constr.is_tautology ~exn:Fail timeout term_impl
+            with
+            | Fail -> false
+          end
+        | _ -> false 
+      in
+      List.exists find_greater_exec (List.concat_map Term.decompose_ands global_hyps)
+    | _ -> false
+  
+  
+  (** Check that [hyp] implies [cond], trying the folowing methods:
+   - satifiability
+   - ad hock reasonning for inequalities of time stamps
+   - ad hock reasonning for exec macro
+   FIXME: It could be possible to add the proven atoms of the conjuction [cond] 
+          as hypothesis. *)
   let known_set_check_impl
       (table : Symbols.table)
+      (global_hyps :Term.term list)
       (hyp   : Term.term)
       (cond  : Term.term) : bool
     =
-    let hyps = Term.decompose_ands hyp in
-
-    let check_one cond =
-      match cond with
-      | Term.Fun (fs, _, [t1;t2]) 
-        when (fs = Term.f_lt || fs = Term.f_leq)
-          && Term.ty t1 = Type.Timestamp ->
-        let t2' =
-          if fs = Term.f_lt then Term.mk_pred t2 else t2
-        in
-
-        let check_direct = leq_tauto table t1 t2' in
-        let check_indirect =
-          List.exists (fun hyp ->
-              match hyp with
-              | Term.Fun (fs, _, [ta;tb]) 
-                when fs = Term.f_leq && Term.ty t1 = Type.Timestamp -> (* ≤ *)
-
-                (* checks whether [ta ≤ tb] implies [t1 ≤ t2'] *)
-                leq_tauto table t1 ta && leq_tauto table tb t2'
-
-              | Term.Fun (fs,_,_) when fs = Term.f_true -> false
-
-              | _ -> false
-            ) hyps
-        in
-        check_direct || check_indirect
-
-      | Term.Fun (fs,_,_) when fs = Term.f_true -> true
-
-      | _ -> assert false
+    let check_one cond = 
+      let check1 =
+        known_set_check_impl_sat table global_hyps cond
+      and check2 =
+        known_set_check_impl_auto table hyp cond
+      and check3 = 
+          known_set_check_exec_case table global_hyps cond
+      in check1 || check2 || check3
     in
     List.for_all check_one (Term.decompose_ands cond)
-
-  
+    
   (** Return a specialization of [cand] that is a subset of [known]. *)
   let specialize
       (table  : Symbols.table)
@@ -2216,7 +2289,7 @@ module E = struct
       let known_cond = Term.subst subst known_cond
       and c_cond     = Term.subst subst c_cond in
 
-      if not (known_set_check_impl table c_cond known_cond) then None
+      if not (known_set_check_impl table [] c_cond known_cond) then None
       else
         let cand =
           { term = cand.term;
@@ -2620,9 +2693,9 @@ module E = struct
           no_unif ()
       in
       let known_cond = Term.subst subst known_cond in
-
+      let global_hyps = Hyps.get_list_of_hyps st.hyps in
       (* check that [cterm.cond] imples [known_cond θ] holds *)
-      if not (known_set_check_impl st.table cterm.cond known_cond) then None
+      if not (known_set_check_impl st.table global_hyps cterm.cond known_cond) then None
       else                      (* clear [known.var] from the binding *)
         Some (Mvar.filter (fun v _ -> not (List.mem_assoc v known.vars)) mv)
     with NoMatch _ -> None
@@ -2681,13 +2754,18 @@ module E = struct
     | t when HighTerm.is_ptime_deducible ~const:`Exact ~si:true env t -> Some []
   
     (* function: if-then-else *)
-    | Term.Fun (f, _, [b; t1; t2] ) when f = Term.f_ite ->
+    | Term.Fun (f, _, [b; t1; t2] ) when f = Term.f_ite -> 
       let cond1 = Term.mk_and b cterm.cond
       and cond2 = Term.mk_and (Term.mk_not b) cterm.cond in
 
       Some (List.map (fun t -> st, t) [{ term = b ; cond = cterm.cond; };
                                        { term = t1; cond = cond1; };
                                        { term = t2; cond = cond2; }])
+    (*function: and *)
+    | Term.Fun (f, _, [t1;t2] ) when f = Term.f_and -> 
+      let cond = Term.mk_and t1 cterm.cond in
+      Some (List.map (fun t -> st,t) [{ term = t1 ; cond=cterm.cond};
+                                      { term = t2 ; cond }])
 
     (* function: general case + tuples *)
     | Term.Tuple terms
@@ -2809,7 +2887,6 @@ module E = struct
         msets_to_list msets
       else []
     in
-
     if st.support = [] && st.use_fadup &&
        TConfig.show_strengthened_hyp st.table then
       (dbg ~force:true) "@[<v 2>strengthened hypothesis:@;%a@;@]" MCset.pp_l mset_l;
@@ -2819,7 +2896,6 @@ module E = struct
         (known_sets_of_mset_l mset_l)
         (known_sets_of_terms pat_terms)
     in
-
     let mv, minfos =
       List.fold_left (fun (mv, minfos) term ->
           let cterm = { term; cond = Term.mk_true; } in
@@ -2855,14 +2931,17 @@ module E = struct
       (st        : unif_state) : Mvar.t
     =
     match mode with
-    | `Eq        -> unif_equiv_eq terms pat_terms st
-    | `Contravar -> unif_equiv_eq terms pat_terms st
+    | `Eq        -> 
+      unif_equiv_eq terms pat_terms st
+    | `Contravar ->
+       unif_equiv_eq terms pat_terms st
     (* FIXME: in contravariant position, we cannot check for inclusion
        because, in the seq case, this requires to infer the seq
        variables for the *term* being matched. Consequently, this is no longer
        a matching problem, but is a unification problem. *)
 
-    | `Covar     -> match_equiv_incl terms pat_terms st
+    | `Covar     -> 
+      match_equiv_incl terms pat_terms st
 
   (*------------------------------------------------------------------*)
   (** Match two [Equiv.form] *)

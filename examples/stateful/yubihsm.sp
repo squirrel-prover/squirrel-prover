@@ -537,7 +537,6 @@ Proof.
   + (* init *)
     rewrite /*. 
     by rewrite if_false in 1.
-
   + (* Setup(pid) *)
     repeat destruct Eq as [_ Eq].
     splitseq 2: (fun (pid0 : index) => pid = pid0).
@@ -600,7 +599,6 @@ Proof.
         fresh 4; 1:auto.  
         fresh 3; 1:auto.
         refl.
-
   + (* Decode(pid,j) *)
     repeat destruct Eq as [_ Eq].
     rewrite /AEAD in 1.

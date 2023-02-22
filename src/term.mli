@@ -585,6 +585,7 @@ type 'a pat = {
   pat_term   : 'a;
 }
 
+val empty_pat : 'a -> 'a pat
 val project_tpat     : projs        -> term pat -> term pat
 val project_tpat_opt : projs option -> term pat -> term pat
 

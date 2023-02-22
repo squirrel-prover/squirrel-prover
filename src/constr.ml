@@ -1359,6 +1359,14 @@ let models_conjunct
 let m_is_sat (models : models) = (snd models) <> []
 
 
+(** Exported. *)
+let is_tautology
+    ?(exn = Tactics.Tactic_hard_failure (None,TacTimeout))
+    (timeout:int)
+    (t:Term.term)
+  =
+  not( m_is_sat (models_conjunct timeout ~exn:exn [Term.mk_not t] ))
+
 (*------------------------------------------------------------------*)
 (** [ext_support model ut] adds [ut] to the model union-find, if necessary, and
     return its normal form.
