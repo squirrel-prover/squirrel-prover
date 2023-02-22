@@ -9,17 +9,15 @@ system [s2] in(c,x); let St=diff(x,<x,ok>) in A : out(c,St).
 equiv [s1/left,s2/right] test.
 Proof.
   induction t.
-
-  + auto.
-
++ auto.
   + expand frame, exec, cond, output. 
     expandall.
     (* The output should simplify into <input@A,ok> or,
        equivalently, diff(<input@A,ok>,<input@A,ok>).
        The goal, where input macros expand to bi-terms,
        is correct: dup can be used. *)
-    fa 0; fa 1.
-    by fadup.
+fa 0.
+by apply IH.
 Qed.
 
 equiv [s1/left,s1/left] test2.
@@ -28,9 +26,10 @@ Proof.
   auto.
   
   expandall.
+
   fa 0; fa 1; fa 2; fa 3.
   (* The output should be <input@A,ok>. *)
-  by fadup.
+by apply IH.
 Qed.
 
 equiv [s2/right,s1/left] test3.
@@ -41,7 +40,7 @@ Proof.
   expandall.
   fa 0; fa 1; fa 2; fa 2; fa 3; fa 4.
   (* The output should be <input@A,ok>. *)
-  by fadup.
+by apply IH. 
 Qed.
   
 equiv [s1/right, s1/right] test4.

@@ -68,7 +68,6 @@ SK := G(ST,K1) XOR G(ST,K2) XOR G(ST,K3)
 
 # High level intuitions
 
-
 We model two agents that may initiate multiple sessions. See PQ-x3dh-like for a devellopment with multiple keys.
 
 We prove some weak authentication: if an agent obtained some honest parameter,
@@ -203,7 +202,6 @@ process Responder(j,k:index) =
      let K1 = kdf(s,decap(ctI,dkR(j)) ) in
      let K2 = kdf(s,kR(i,j,k)) in
      let K3 = kdf(s,kT(i,j,k)) in
-
      let ST = <pk(dkI(i)),<pk(dkR(j)),<ctI,<pk(ekT),<ctR,ctT>>>>> in
      sRI(j,k,i) := xor(G(ST,K1)) ( xor( G(ST,K2)) ( G(ST,K3)))
   else
@@ -376,8 +374,8 @@ Proof.
        expandall.
        fa 14.
        fa 15.
-       fa 16.
-       admit 15. (* this is a dumb fadup weakness, as all the dkI(i) are in the frame, the forall is obviously ok. *)
+       fa 16.    
+       deduce 15.
        repeat fa 15.
        fa 17.
        prf 16; rewrite if_true // in 16.

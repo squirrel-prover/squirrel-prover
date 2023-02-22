@@ -184,14 +184,14 @@ Proof.
     (** We are now able to remove this formula from the frame because
         the attacker is able to compute it using information obtained
         in the past. Indeed, each element of this formula is already available
-        in `frame@pred(R(j))`. This is done by the `fadup` tactic. *)
-    by fadup 1.
+        in `frame@pred(R(j))`. This is done by the `deduce` tactic. *)
+    by deduce 1.
     
   (** **Case where t = R1(j):**  
       This case is similar to the previous one. *)
   + expand frame, exec, output. fa !<_,_>.
     rewrite /cond (wa_R (R1 j)) //.
-    by fadup 1.
+    by deduce 1.
 
   (** **Case where t = T(i,k):**  
   We start by expanding the macros and splitting the pairs. *)

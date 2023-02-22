@@ -67,8 +67,7 @@ intro [ex [Eq Eq2 Ord]].
 expand exec,cond.
 split => //.
 
-
-fadup 5.
+deduce 5.
 expand output@B.
 
 have -> :
@@ -112,8 +111,8 @@ have -> : if exec@pred(B) && A < B then
 }
 simpl.
 (* FIXME: I do not know what we are trying to test here *)
-(* fa 5. fadup 5. *)
-(* fa 5. fadup 5. *)
+(* fa 5. deduce 5. *)
+(* fa 5. deduce 5. *)
 (* prf 5 *)
 
 admit.

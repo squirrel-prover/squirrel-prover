@@ -137,7 +137,7 @@
   "expandall"
   "fa"
   "show"
-  "fadup"
+  "deduce"
   "fresh"
   "prf"
   "trivialif"

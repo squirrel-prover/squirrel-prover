@@ -195,7 +195,7 @@ Proof.
     fa 4; fa 5. 
     rewrite wa_R1.
 
-    fadup 5.
+    deduce 5.
 
     have -> :
       (if
@@ -250,8 +250,8 @@ Proof.
         use wa_R1_right with i0,t0,r as [H1 H2].
         by use H1.
     }
-    fa 5; fadup 5.
-    fa 5; fadup 5.
+    fa 5; deduce 5.
+    fa 5; deduce 5.
     apply IH.
 
   (* Case R2 *)
@@ -267,7 +267,8 @@ Proof.
       (exists (i,t:index), T(i,t) < R2(r) &&
         snd(output@T(i,t)) = snd(input@R2(r)) &&
         fst(output@T(i,t)) = fst(input@R2(r)) &&
-        input@T(i,t) = output@R(r) &&   R(r) < T(i,t)).
+        R(r) < T(i,t) && 
+        input@T(i,t) = output@R(r)).
     {
       use tags_neq.
       split.
@@ -291,10 +292,9 @@ Proof.
           by depends R(r), R1(r).
 
       (* proof of lemma: WA => Cond *)
-      * by intro [i t _]; expand output; exists i,t.
+      * by intro [i t _] ;expand output; exists i,t.
     }
-
-    by fadup 5.
+   by deduce 5.
 
   (* Case T *)
   + expand frame, output, exec, cond; apply IH.
@@ -402,7 +402,7 @@ Proof.
           by use H0 with i,t.
     }
     fa 6.
-    by fadup 5.
+    by deduce 5.
 
   (* Case T2 *)
   + expand frame, exec, cond.
@@ -512,6 +512,6 @@ Proof.
 
     }
     fa 6.
-    by fadup 5.
+    by deduce 5.
 
 Qed.

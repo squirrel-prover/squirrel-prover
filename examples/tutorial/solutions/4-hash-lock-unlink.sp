@@ -77,7 +77,7 @@ system (
 (** ## preliminary: project *)
 
 (* The system defined above actually defines two protocols: 
-   - a left protocol `[default/left]` for the MANY-session scenario 
+   - a left protocol `[defaut/left]` for the MANY-session scenario 
    - a right protocol `[default/right]` for the SINGLE-session scenario 
 
    Therefore, a reachability property over this system actually state that
@@ -189,8 +189,8 @@ Qed.
 
 (* The SINGLE-session and MANY-session scenarios are indinstinguishable. 
 
-   Recall that the `fadup` tactic can be useful to simplify 
-   equivalence goals (syntax: `fadup i` where `i` is an integer indicating 
+   Recall that the `deduce` tactic can be useful to simplify 
+   equivalence goals (syntax: `deduce i` where `i` is an integer indicating 
    the frame element you want to get rid of). *)
 global goal unlinkability (t : timestamp[param]) :
   [happens(t)] -> equiv(frame@t).
@@ -215,13 +215,13 @@ Proof.
   + expand frame, exec, output.
     fa !<_,_>.
     rewrite /cond wa_R1_R2; 1: by depends R(j), R1(j).
-    by fadup 1.
+    by deduce 1.
 
   (* Case R2 *)
   + expand frame, exec, output.
     fa !<_,_>.
     rewrite /cond wa_R1_R2; 1: by depends R(j),R2(j).
-    by fadup 1.
+    by deduce 1.
 
   (* Case T *)
   + expand frame, exec, cond, output.
