@@ -31,3 +31,5 @@ _opam/
 *.stat.json
 *.exrc
 *.\#*.sp
+.venv/*
+documentation/sphinx/build/
