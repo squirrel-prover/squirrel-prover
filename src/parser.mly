@@ -407,6 +407,7 @@ ty_i:
 | ty=sty_i                          { ty }
 | t1=ty ARROW t2=ty                 { Theory.P_fun (t1, t2) }
 | t1=sty STAR tys=slist1(sty, STAR) { Theory.P_tuple (t1 :: tys) }
+| l=loc(UNDERSCORE)                 { Theory.P_ty_pat (Location.loc l) }
 
 sty_i:
 | t=p_base_ty_i                  { t }

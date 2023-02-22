@@ -165,6 +165,33 @@ let search_about_2 () =
   let _ = Prover.exec_command "print myeq." st in
   ()
 
+let search_about_type_holes () =
+  let exception Ok in
+  Alcotest.check_raises "unify Names with special arity when search" Ok
+    (fun () ->
+      let st = Prover.init () in
+      let st = try Prover.exec_all st
+        "axiom [any] bar1 ['a] : exists (x : 'a), true.
+         axiom [any] bar2 ['a] : exists (x : 'a -> 'a), true."
+      with | e -> raise e in
+
+      (* test 1 *)
+      let matches = Prover.search_about st 
+          (ProverLib.Srch_term (term_from_string "exists (x : _), _"))
+      in
+      Alcotest.(check' int) ~msg:"Found one axiom with exists (x : _), _" 
+        ~actual:(List.length matches) ~expected:2;
+
+      (* test 2 *)
+      let matches = Prover.search_about st 
+          (ProverLib.Srch_term (term_from_string "exists (x : _ -> _), _"))
+      in
+      Alcotest.(check' int) ~msg:"Found one axiom with exists (x : _), _" 
+        ~actual:(List.length matches) ~expected:1;
+
+      raise Ok
+    )
+
 let include_search () =
   let st = Prover.init () in
   (* let st = Prover.set_param st (C.s_post_quantum, (Co.Param_bool true)) in *)
@@ -234,10 +261,11 @@ let include_ite () =
   Alcotest.(check' int) ~msg:"Found one lemma with if _ then _ else _"
     ~actual:(List.length matches) ~expected:11 (* to update regarding to Basic.sp *)
 
-let tests = [ ("search_about1", `Quick, search_about_1);
-              ("search_about2", `Quick, search_about_2);
-              ("include_search", `Quick, include_search);
-              ("include_ite", `Quick, include_ite);
-              ("search_unify", `Quick, search_unify);
-              ("some_print", `Quick, some_print);
+let tests = [ ("search_about1",     `Quick, search_about_1);
+              ("search_about2",     `Quick, search_about_2);
+              ("search_type_holes", `Quick, search_about_type_holes);
+              ("include_search",    `Quick, include_search);
+              ("include_ite",       `Quick, include_ite);
+              ("search_unify",      `Quick, search_unify);
+              ("some_print",        `Quick, some_print);
             ]

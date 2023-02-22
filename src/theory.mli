@@ -15,14 +15,15 @@ type p_ty_i =
   | P_boolean
   | P_index  
   | P_timestamp
-  | P_tbase of lsymb
-  | P_tvar  of lsymb
-  | P_fun   of p_ty * p_ty
-  | P_tuple of p_ty list
+  | P_tbase  of lsymb
+  | P_tvar   of lsymb
+  | P_fun    of p_ty * p_ty
+  | P_tuple  of p_ty list
+  | P_ty_pat of L.t
              
 and p_ty = p_ty_i L.located
     
-val convert_ty : Env.t -> p_ty -> Type.ty 
+val convert_ty : ?ty_env:Type.Infer.env -> Env.t -> p_ty -> Type.ty 
 
 val pp_p_ty : Format.formatter -> p_ty -> unit
 
@@ -348,21 +349,28 @@ val convert :
 
 (*------------------------------------------------------------------*)
 (** Convert binders. *)  
-val convert_bnds : Vars.Tag.t -> Env.t -> bnds -> Env.t * Vars.vars
+val convert_bnds : 
+  ?ty_env:Type.Infer.env -> 
+  Vars.Tag.t -> Env.t -> bnds -> Env.t * Vars.vars
 
 val convert_bnds_tagged :
+  ?ty_env:Type.Infer.env -> 
   Vars.Tag.t -> Env.t -> bnds_tagged -> Env.t * Vars.tagged_vars
 
 (** Convert extended binders.
     Support binders with destruct, e.g. [(x,y) : bool * bool] *)
 val convert_ext_bnds :
+  ?ty_env:Type.Infer.env -> 
   Vars.Tag.t -> Env.t -> ext_bnds -> Env.t * Term.subst * Vars.vars
 
 (*------------------------------------------------------------------*)
 (** Converts and infers the type.
     Each part of the [SE.context] inside the environment
     is used when converting the corresponding kind of atom. *)
-val convert_global_formula : ?ty_env:Type.Infer.env -> ?pat:bool -> conv_env -> global_formula -> Equiv.form
+val convert_global_formula : 
+  ?ty_env:Type.Infer.env -> 
+  ?pat:bool -> 
+  conv_env -> global_formula -> Equiv.form
 
 val convert_any : conv_env -> any_term -> Equiv.any_form
 

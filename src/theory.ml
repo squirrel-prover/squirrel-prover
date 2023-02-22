@@ -13,10 +13,11 @@ type p_ty_i =
   | P_boolean
   | P_index
   | P_timestamp
-  | P_tbase of lsymb
-  | P_tvar  of lsymb
-  | P_fun   of p_ty * p_ty
-  | P_tuple of p_ty list
+  | P_tbase  of lsymb
+  | P_tvar   of lsymb
+  | P_fun    of p_ty * p_ty
+  | P_tuple  of p_ty list
+  | P_ty_pat of L.t
 
 and p_ty = p_ty_i L.located
 
@@ -27,6 +28,7 @@ let rec pp_p_ty_i fmt = function
   | P_timestamp -> Fmt.pf fmt "timestamp"
   | P_tbase s   -> Fmt.pf fmt "%s" (L.unloc s)
   | P_tvar s    -> Fmt.pf fmt "'%s" (L.unloc s)
+  | P_ty_pat _l -> Fmt.pf fmt "_"
 
   | P_tuple tys -> Fmt.list ~sep:(Fmt.any " * ") pp_p_ty fmt tys
   | P_fun (t1, t2) -> Fmt.pf fmt "(%a -> %a)" pp_p_ty t1 pp_p_ty t2
@@ -106,6 +108,8 @@ let rec equal_p_ty t t' = match L.unloc t, L.unloc t' with
   | P_boolean  , P_boolean
   | P_index    , P_index
   | P_timestamp, P_timestamp -> true
+
+  | P_ty_pat l, P_ty_pat l' -> l = l'
 
   | P_tbase b, P_tbase b' -> L.unloc b = L.unloc b'
   | P_tvar v, P_tvar v' -> L.unloc v = L.unloc v'
@@ -483,7 +487,9 @@ let pp_error pp_loc_err ppf (loc,e) =
 (*------------------------------------------------------------------*)
 (** {2 Parsing types } *)
 
-let rec convert_ty (env : Env.t) (pty : p_ty) : Type.ty =
+let rec convert_ty ?ty_env (env : Env.t) (pty : p_ty) : Type.ty =
+  let convert_ty = convert_ty ?ty_env in
+
   match L.unloc pty with
   | P_message        -> Type.tmessage  
   | P_boolean        -> Type.tboolean  
@@ -510,6 +516,12 @@ let rec convert_ty (env : Env.t) (pty : p_ty) : Type.ty =
 
   | P_fun (pty1, pty2) ->
     Type.Fun (convert_ty env pty1, convert_ty env pty2)
+
+  | P_ty_pat _l -> 
+    match ty_env with
+    | None -> assert false      (* TODO: types: error messages *)
+    | Some ty_env ->
+      Type.TUnivar (Type.Infer.mk_univar ty_env)
 
 (*------------------------------------------------------------------*)
 (** {2 Type checking} *)
@@ -844,39 +856,44 @@ let rec convert_tags ~(dflt_tag : Vars.Tag.t) (tags : var_tags) : Vars.Tag.t =
 
 (** Convert a tagged variable binding *)
 let convert_bnd_tagged
+    ?(ty_env : Type.Infer.env option)
     (dflt_tag: Vars.Tag.t) (env : Env.t) ((vsymb, p_ty, tags) : bnd_tagged)
   : Env.t * Vars.tagged_var
   =
   let tag = convert_tags ~dflt_tag tags in
-  let ty = convert_ty env p_ty in
+  let ty = convert_ty ?ty_env env p_ty in
   let vars, v = Vars.make `Shadow env.vars ty (L.unloc vsymb) tag in
   { env with vars }, (v,tag) 
 
 (** Convert a list of tagged variable bindings *)
 let convert_bnds_tagged
+    ?(ty_env : Type.Infer.env option)
     (tag : Vars.Tag.t) (env : Env.t) (bnds : bnds_tagged) : Env.t * Vars.tagged_vars
   =
-  let env, vars = List.map_fold (convert_bnd_tagged tag) env bnds in
+  let env, vars = List.map_fold (convert_bnd_tagged ?ty_env tag) env bnds in
   env, vars
 
 (** Convert a list of variable bindings *)
 let convert_bnds
+    ?(ty_env : Type.Infer.env option)
     (tag : Vars.Tag.t) (env : Env.t) (bnds : bnds) : Env.t * Vars.vars
   =
   (* add an empty list of tags and use [convert_bnds_tagged] *)
   let env, tagged_vars =
-    convert_bnds_tagged tag env (List.map (fun (v,ty) -> v, ty, []) bnds)
+    convert_bnds_tagged ?ty_env tag env (List.map (fun (v,ty) -> v, ty, []) bnds)
   in
   env, List.map fst tagged_vars
     
 (*------------------------------------------------------------------*)
+(** See [convert_ext_bnds] in `.mli` *)
 let convert_ext_bnd
+    ?(ty_env : Type.Infer.env option)
     (dflt_tag : Vars.Tag.t) (env : Env.t) (ebnd : ext_bnd)
   : (Env.t * Term.subst) * Vars.var
   =
   match ebnd with
   | Bnd_simpl bnd ->
-    let env, (var, _tag) = convert_bnd_tagged dflt_tag env bnd in
+    let env, (var, _tag) = convert_bnd_tagged ?ty_env dflt_tag env bnd in
     (env, []), var
 
   (* Corresponds to [(x1, ..., xn) : p_tuple_ty] where
@@ -884,7 +901,7 @@ let convert_ext_bnd
   | Bnd_tuple (p_vars, p_tuple_ty, tags) ->
      (* Decompose [p_tuple_ty] as [(ty1 * ... * tyn)]  *)
     let tys, tuple_ty =
-      match convert_ty env p_tuple_ty with
+      match convert_ty ?ty_env env p_tuple_ty with
       | Tuple tys as ty -> tys, ty
       | _ -> conv_err (L.loc p_tuple_ty) ExpectedTupleTy
     in
@@ -919,13 +936,15 @@ let convert_ext_bnd
     in
     (env, subst), tuple_v
 
+(** See `.mli` *)
 let convert_ext_bnds
+    ?(ty_env : Type.Infer.env option)
     (tag : Vars.Tag.t) (env : Env.t) (ebnds : ext_bnds)
   : Env.t * Term.subst * Vars.vars
   =
   let (env, subst), vars =
     List.map_fold (fun (env, subst) ebnd ->
-        let (env, subst'), var = convert_ext_bnd tag env ebnd in
+        let (env, subst'), var = convert_ext_bnd ?ty_env tag env ebnd in
         (env, subst @ subst'), var
       ) (env, []) ebnds
   in
@@ -1100,7 +1119,9 @@ and convert0
                   Term.right_proj, convert stater r ty; ] 
 
   | Find (vs,c,t,e) ->
-    let env, is = convert_bnds (Vars.Tag.make Vars.Local) state.env vs in
+    let env, is = 
+      convert_bnds ~ty_env:state.ty_env (Vars.Tag.make Vars.Local) state.env vs 
+    in
     let c = conv ~env Type.tboolean c in
     let t = conv ~env ty t in
     let e = conv ty e in
@@ -1108,7 +1129,7 @@ and convert0
 
   | Quant ((ForAll | Exists as q),vs,f) ->
     let env, subst, evs =
-      convert_ext_bnds (Vars.Tag.make Vars.Local) state.env vs
+      convert_ext_bnds ~ty_env:state.ty_env (Vars.Tag.make Vars.Local) state.env vs
     in
     let f = conv ~env Type.tboolean f in
     let f = Term.subst subst f in
@@ -1116,7 +1137,7 @@ and convert0
 
   | Quant (Seq,vs,t) ->
     let env, subst, evs =
-      convert_ext_bnds (Vars.Tag.make Vars.Local) state.env vs
+      convert_ext_bnds ~ty_env:state.ty_env (Vars.Tag.make Vars.Local) state.env vs
     in
 
     let t = 
@@ -1141,7 +1162,7 @@ and convert0
 
   | Quant (Lambda,vs,t) ->
     let env, subst, evs =
-      convert_ext_bnds (Vars.Tag.make Vars.Local) state.env vs
+      convert_ext_bnds ~ty_env:state.ty_env (Vars.Tag.make Vars.Local) state.env vs
     in
 
     let t = 
@@ -1535,7 +1556,9 @@ let convert_global_formula
 
 
     | PQuant (q, bnds, e) ->
-      let env, evs = convert_bnds_tagged Vars.Tag.gtag cenv.env bnds in
+      let env, evs = 
+        convert_bnds_tagged ?ty_env Vars.Tag.gtag cenv.env bnds 
+      in
       let e = conve ~env e in
       let q = match q with
         | PForAll -> Equiv.ForAll
