@@ -19,5 +19,5 @@ Proof.
   intro Heq Hap H. 
   fresh 1. 
   rewrite Heq; 1: assumption.
-  expandall; assumption.
+  apply H.
 Qed.

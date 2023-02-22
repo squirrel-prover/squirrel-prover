@@ -14,6 +14,9 @@ val models_conjunct : int -> ?exn:exn -> Term.terms -> models
 
 val m_is_sat : models -> bool
 
+(** [is_tautology t] check whether [t] is a tautology. *)
+val is_tautology : ?exn:exn -> int -> Term.term -> bool
+
 (** [query models at] returns [true] if the conjunction of the atoms in [ats]
     is always true in [models].
     This is an under-approximation (i.e. correct but not complete).

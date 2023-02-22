@@ -16,14 +16,12 @@ system (!_i ( out(c, diff((g ^ a(i)) ^ b(i),g ^ k(i))))
 equiv ddh_goal.
 Proof.
  nosimpl(induction t).
- fadup; expandall; refl + assumption.
- fadup; try (expandall; refl + assumption).
- fadup; try (expandall; refl + assumption).
+ expandall; refl + assumption.
+ try (expandall; refl + assumption).
+ try (expandall; refl + assumption).
  cycle 1.
- nosimpl(expandall).
-
- fadup; try (expandall; refl + assumption).
-
- fa 0; fa 1; fa 1.
+ expandall.
+ try (expandall; refl + assumption).
+ fa 0; fa 1; fa 1;fa 3.
  ddh g, a, b, k.
 Qed.

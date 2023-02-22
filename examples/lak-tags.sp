@@ -150,7 +150,7 @@ Proof.
 Qed.
 
 (** Equality used to rewrite the try-find in R1
-    so that its condition can be discharged using fadup. *)
+    so that its condition can be discharged using deduce. *)
 goal wa_R1_tryfind (k:index) : happens(R1(k)) =>
   (if exec@pred(R1(k)) && cond@R1(k) then
    try find i,j such that
@@ -204,8 +204,8 @@ Proof.
     fa !<_,_>.
     rewrite wa_R1_tryfind; 1: auto. 
     expand cond; rewrite wa_R1_R2; 1: auto. 
-    fa 2; fadup 1.
-    fa 1; fadup 1.
+    fa 2; deduce 1.
+    fa 1; deduce 1.
     prf 1.
     rewrite if_true.
     by use tags_neq; project.
@@ -215,7 +215,7 @@ Proof.
   + expand frame, exec, output.
     fa !<_,_>.
     expand cond; rewrite wa_R1_R2; 1: auto. 
-    by fadup 1.
+    by deduce 1.
 
   (* Case T *)
   + expand frame, exec, cond, output.

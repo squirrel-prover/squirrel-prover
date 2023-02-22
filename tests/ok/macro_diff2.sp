@@ -22,7 +22,7 @@ Proof.
        The goal, where input macros expand to bi-terms,
        is correct: dup can be used. *)
     fa 0; fa 1.
-    by fadup.
+   by apply IH.
 Qed.
 
 abstract f : message -> message.

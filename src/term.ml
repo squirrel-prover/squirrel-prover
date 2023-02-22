@@ -1975,6 +1975,11 @@ type 'a pat = {
   pat_term   : 'a;
 }
 
+let empty_pat (t : 'a) =
+  { pat_tyvars = [];
+    pat_vars   = [];
+    pat_term   = t; }
+
 let pat_of_form (t : term) =
   let vs, t = decompose_forall_tagged t in
   let vs, s = refresh_vars_w_info vs in

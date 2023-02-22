@@ -101,6 +101,7 @@ let mk_quant0_tagged q (evs : Vars.tagged_vars) f = match evs, f with
   | _, _ -> Quant (q, evs, f)
 
 let mk_reach_atom f = Atom (Reach f)
+let mk_equiv_atom f = Atom (Equiv f)
 
 (*------------------------------------------------------------------*)
 (** {2 Map (does not recurse) } *)

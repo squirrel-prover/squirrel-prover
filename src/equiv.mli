@@ -55,6 +55,7 @@ val pp_dbg :             Format.formatter -> form -> unit
 val mk_quant_tagged : ?simpl:bool -> quant -> Vars.tagged_vars -> form -> form
 
 val mk_reach_atom : Term.term -> form
+val mk_equiv_atom : Term.term list -> form
 
 (*------------------------------------------------------------------*)
 (** Does not recurse. *)

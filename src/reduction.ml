@@ -309,13 +309,13 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
     else
       try
         let timeout = TConfig.solver_timeout st.table in
-        if not Constr.(m_is_sat (models_conjunct timeout ~exn:NoExp [t]))
-        then Term.mk_false, true
-        else if not Constr.(m_is_sat (models_conjunct timeout ~exn:NoExp [Term.mk_not t]))
-        then Term.mk_true, true
-        else t, false
-      with NoExp -> t, false
-
+        if Constr.(is_tautology ~exn:NoExp timeout t )
+        then Term.mk_true,true
+        else if Constr.(is_tautology ~exn:NoExp timeout (Term.mk_not t))
+        then Term.mk_false,true
+        else t,false   
+      with NoExp -> (t,false)
+                    
   (* Expand once at head position *)
   and expand_head_once (st : state) (t : Term.term) : Term.term * bool = 
     if not st.param.delta then t, false 

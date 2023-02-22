@@ -159,8 +159,8 @@ Qed.
 
 (* The SINGLE-session and MANY-session scenarios are indinstinguishable. 
 
-   Recall that the `fadup` tactic can be useful to simplify 
-   equivalence goals (syntax: `fadup i` where `i` is an integer indicating 
+   Recall that the `deduce` tactic can be useful to simplify 
+   equivalence goals (syntax: `deduce i` where `i` is an integer indicating 
    the frame element you want to get rid of). *)
 global goal unlinkability (t : timestamp[param]) :
   [happens(t)] -> equiv(frame@t).

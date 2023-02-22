@@ -144,7 +144,7 @@ Proof.
 Qed.
 
 (** Equality used to rewrite the try-find in R1
-    so that its condition can be discharged using fadup:
+    so that its condition can be discharged using deduce:
     change condition to honest transcript formula,
     and insert exec conjunct. *)
 goal wa_R1_tryfind (r:index) : happens(R1(r)) =>
@@ -198,8 +198,8 @@ Proof.
 
     rewrite wa_R1_tryfind; 1:auto.
     rewrite /cond wa_R1_R2.
-    fa 2; fadup 1.
-    fa 1; fadup 1.
+    fa 2; deduce 1.
+    fa 1; deduce 1.
 
     prf 1.
     rewrite if_true.
@@ -213,7 +213,7 @@ Proof.
   + expand frame, exec, cond, output.
     fa !<_,_>.
     rewrite wa_R1_R2.
-    by fadup 1.
+    by deduce 1.
 
   (* Case T *)
   + expand frame, exec, cond, output.

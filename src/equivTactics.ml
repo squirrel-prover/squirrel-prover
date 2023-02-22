@@ -811,32 +811,33 @@ let fa_tac args = match args with
     replaced by the assumptions that appear as there subterms. 
 
     Used in automatic simplification with FA. *)
-let filter_fa_dup (s : ES.t) assump (elems : Equiv.equiv) =
+let filter_fa_dup (s : ES.t) (assump : Term.terms) (elems : Equiv.equiv) =
   let table = ES.table s in
 
-  let rec doit res (elems : Equiv.equiv) =
-    let rec is_fa_dup acc (elems : Term.terms) (e : Term.term) =
-      (* if an element is a duplicate wrt. elems, we remove it directly *)
-      if Action.is_dup ~eq:(ES.Reduce.conv_term s) table e elems then
-        (true,[])
-        (* if an element is an assumption, we succeed, but do not remove it *)
-      else if List.mem_cmp ~eq:(ES.Reduce.conv_term s) e assump then
-        (true,[e])
-        (* otherwise, we go recursively inside the sub-terms produced by function
-           application *)
-      else try
-          let new_els = fa_expand s e in
-          List.fold_left
-            (fun (aux1,aux2) e ->
-               let (fa_succ,fa_rem) = is_fa_dup acc elems e in
-               fa_succ && aux1, fa_rem @ aux2)
-            (true,[]) new_els
-        with No_FA _ -> (false,[])
-    in
+  let rec is_fa_dup (elems : Term.terms) (e : Term.term) =
+    (* if an element is a duplicate wrt. elems, we remove it directly *)
+    if Action.is_dup ~eq:(ES.Reduce.conv_term s) table e elems then
+      (true,[])
+      (* if an element is an assumption, we succeed, but do not remove it *)
+    else if List.mem_cmp ~eq:(ES.Reduce.conv_term s) e assump then
+      (true,[e])
+      (* otherwise, we go recursively inside the sub-terms produced by function
+         application *)
+    else try
+        let new_els = fa_expand s e in
+        List.fold_left
+          (fun (aux1,aux2) e ->
+             let (fa_succ,fa_rem) = is_fa_dup elems e in
+             fa_succ && aux1, fa_rem @ aux2)
+          (true,[]) new_els
+      with No_FA _ -> (false,[])
+  in
+
+  let rec doit (res : Term.terms) (elems : Equiv.equiv) =
     match elems with
     | [] -> res
     | e :: els ->
-      let fa_succ, fa_rem =  is_fa_dup [] (res @ els) e in
+      let fa_succ, fa_rem =  is_fa_dup (res @ els) e in
       if fa_succ then doit (fa_rem @ res) els
       else doit (e :: res) els
   in
@@ -848,183 +849,92 @@ let filter_fa_dup (s : ES.t) assump (elems : Equiv.equiv) =
     nor an assumption. *)
 let fa_dup (s : ES.t) : ES.t list =
   (* TODO: allow to choose the hypothesis through its id *)
-  let hyp = Hyps.find_map (fun _id hyp -> match hyp with
-      | Equiv.(Atom (Equiv e)) -> Some e
-      | _ -> None) s in
+  let hyp =
+    Hyps.find_map (fun _id hyp -> match hyp with
+        | Equiv.(Atom (Equiv e)) -> Some e
+        | _ -> None) s
+  in
 
   let hyp = Utils.odflt [] hyp in
 
-  let biframe = ES.goal_as_equiv s
-                |> List.rev
-                |> filter_fa_dup s hyp
+  let biframe =
+    ES.goal_as_equiv s
+    |> List.rev
+    |> filter_fa_dup s hyp
   in
   [ES.set_equiv_goal biframe s]
 
-exception Not_FADUP_formula
-exception Not_FADUP_iter
+(*------------------------------------------------------------------*)
+(** Deduce. 
+    FIXME : is considered pq-sound, since apply is, but this has not been checked.*)
 
-class check_fadup ~(env : Env.t) ~(cntxt:Constr.trace_cntxt) tau = object (self)
+(** Deduce recursively removed all elements of a biframe that are deducible from the other ones.*)
+let deduce_all (s:ES.t) =  
+    let table,system = ES.table s, ES.system s in
+    let hyps = lazy (ES.get_trace_hyps s) in
+    let option = { Match.default_match_option with mode = `EntailRL } in
+    let rec _deduce_all res goals =
+      match goals with
+      | [] -> res
+      | e::after ->
+        let biframe = List.rev_append res goals in
+        let biframe_without_e = List.rev_append res after in
+        let goal = (Equiv.mk_equiv_atom biframe)  in
+        let pat = Term.empty_pat (Equiv.mk_equiv_atom biframe_without_e) in
+        let match_result = 
+          Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system goal pat 
+        in
+        match match_result with
+        | FreeTyv  
+        | NoMatch _ -> _deduce_all (e::res) after 
+        | Match mv ->
+          assert (mv = Match.Mvar.empty);
+          _deduce_all res after
+    in
+    let new_goal = List.rev (_deduce_all [] (ES.goal_as_equiv s)) in
+    [ES.set_equiv_goal new_goal s]
 
-  inherit [Term.term list] Iter.deprecated_fold ~cntxt as super
-
-  method check_formula f = ignore (self#fold_message [Term.mk_pred tau] f)
- 
-  method extract_ts_atoms phi =
-    List.partition (fun t ->
-        match Term.Lit.form_to_xatom t with
-        | Some at when Term.Lit.ty_xatom at = Type.Timestamp -> true
-        | _ -> false
-      ) (Term.decompose_ands phi)
-
-  method add_atoms atoms timestamps =
-    List.fold_left (fun acc at -> 
-        match Term.Lit.form_to_xatom at with
-        | Some (Term.Lit.Comp (`Leq,tau_1,tau_2)) ->
-          if List.mem tau_2 acc
-          then tau_1 :: acc
-          else acc
-        | Some (Term.Lit.Comp (`Lt,tau_1,tau_2)) ->
-          if (List.mem (Term.mk_pred tau_2) acc || List.mem tau_2 acc)
-          then tau_1 :: acc
-          else acc
-        | _ -> raise Not_FADUP_iter)
-      timestamps
-      atoms
-
-  method fold_message (timestamps : Term.terms) (t : Term.term) : Term.terms = 
-    match t with
-    | Macro (ms,[],a)
-      when (ms = Term.in_macro && (a = tau || List.mem a timestamps)) ||
-           (ms = Term.out_macro && List.mem a timestamps) ->
-      timestamps
-
-    | Fun (f,_, [Macro (ms,[],a);then_branch; else_branch])
-      when f = Term.f_ite && ms = Term.exec_macro && List.mem a timestamps
-           && Term.Smart.is_zero else_branch ->
-      self#fold_message timestamps then_branch
-    (* Remark: the condition that the else_branch is zero is for the
-       post-quantum condition.
-       It could probably be removed if
-       needed, cf the issue of the CS rule in the PQ paper.*)
-    | Fun (f, _, [phi_1;phi_2]) when f = Term.f_impl ->
-      let atoms,l = self#extract_ts_atoms phi_1 in
-      let ts' = self#add_atoms atoms timestamps in
-      List.iter
-        (fun phi -> ignore (self#fold_message ts' phi))
-        (phi_2::l) ;
-      timestamps
-
-    | Fun (f, _, _) when f = Term.f_and ->
-      let atoms,l = self#extract_ts_atoms t in
-      let ts' = self#add_atoms atoms timestamps in
-      List.iter
-        (fun phi -> ignore (self#fold_message ts' phi))
-        l ;
-      timestamps
-
-    | Fun (f, _, [t1;_]) when
-        (f = Term.f_lt || f = Term.f_leq || f = Term.f_geq || f = Term.f_gt)
-        && HighTerm.is_ptime_deducible ~const:`Exact ~si:true env t1 ->
-      timestamps
-
-    | App _
-    | Tuple _ | Proj _
-    | Fun _ -> super#fold_message timestamps t
-                 
-    | Find (vs,_,_,_)
-    | Quant (_,vs,_) -> 
-      if List.for_all (fun v -> 
-          Symbols.TyInfo.is_finite env.table (Vars.ty v) && 
-          Symbols.TyInfo.is_fixed  env.table (Vars.ty v)
-        ) vs then
-        super#fold_message timestamps t
-      else raise Not_FADUP_iter
-
-    | Action _
-    | Macro _ | Name _ | Var _ | Diff _ -> raise Not_FADUP_iter
-end
-
-let fa_dup_int (i : int L.located) s =
-  let before, e, after = split_equiv_goal i s in
-
+(** Check whether the i^th element of the biframe is bideductible from the other ones, and 
+    remove it if its the case. *)
+let deduce_int (i : int L.located) s =
+  let before, _, after = split_equiv_goal i s in
   let biframe_without_e = List.rev_append before after in
-  let cntxt = mk_pair_trace_cntxt s in
-  let table = ES.table s in
-  try
-    (* we expect that e is of the form exec@pred(tau) && phi *)
-    let (tau,phi) =
-      let f,g = match e with
-        | Term.Fun (fs,_, [f;g]) when fs = Term.f_and -> f,g
+  let option = { Match.default_match_option with mode = `EntailRL } in
+  let hyps = lazy (ES.get_trace_hyps s) in 
+  let table, system = ES.table s, ES.system s in
+  let pat = Term.empty_pat (Equiv.mk_equiv_atom biframe_without_e) in
+  let goal = ES.goal s in
+  let match_result = 
+    Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system goal pat 
+  in
+  match match_result with
+  | FreeTyv -> assert false
+  | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos)
+  | Match mv ->
+    assert (mv = Match.Mvar.empty);
+    [ES.set_equiv_goal biframe_without_e s]
 
-        | Term.Quant (Seq, vars, Term.Fun (fs,_, [f;g]))
-          when fs = Term.f_and && 
-               List.for_all (fun v -> 
-                   Symbols.TyInfo.is_finite table (Vars.ty v) && 
-                   Symbols.TyInfo.is_fixed  table (Vars.ty v)
-                 ) vars
-          ->
-          let _, subst = Term.refresh_vars vars in
-          Term.subst subst f,
-          Term.subst subst g
-
-        | _ -> raise Not_FADUP_formula
-      in
-
-      match f,g with
-      | (Term.Macro (fm,[], Fun (fs, _, [tau])), phi) 
-        when fm = Term.exec_macro && fs = Term.f_pred -> 
-        (tau,phi)
-
-      | (phi, Term.Macro (fm,[], Fun (fs, _, [tau]))) 
-        when fm = Term.exec_macro && fs = Term.f_pred -> 
-        (tau,phi)
-
-      | _ -> raise Not_FADUP_formula
-    in
-
-    let frame_at_pred_tau =
-      Term.mk_macro Term.frame_macro [] (Term.mk_pred tau)
-    in
-    (* we first check that frame@pred(tau) is in the biframe *)
-    if not (List.mem frame_at_pred_tau biframe_without_e) then
-      raise Not_FADUP_formula;
-
-    (* we iterate over the formula phi to check if it contains only
-     * allowed subterms *)
-    let iter = new check_fadup ~env:(ES.env s) ~cntxt tau in
-    iter#check_formula phi ;
-    (* on success, we keep only exec@pred(tau) *)
-    let new_elem = Term.mk_macro Term.exec_macro [] (Term.mk_pred tau) in
-
-    [ES.set_equiv_goal (List.rev_append before (new_elem::after)) s]
-
-  with
-  | Not_FADUP_formula ->
-    soft_failure (Tactics.Failure "can only apply the tactic on \
-                                   a formula of the form (exec@pred(tau) && phi) \
-                                   with frame@pred(tau) in the biframe")
-
-  | Not_FADUP_iter ->
-    soft_failure (Tactics.Failure "the formula contains subterms \
-                                   that are not handled by the FADUP rule")
-
-
-let fadup Args.(Opt (Int, p)) s : ES.sequents =
+let deduce Args.(Opt (Int, p)) s : ES.sequents =
   match p with
-  | None -> fa_dup s
-  | Some (Args.Int i) -> fa_dup_int i s
+  | None -> deduce_all s
+  | Some (Args.Int i) -> deduce_int i s
+
 
 let () =
- T.register_typed "fadup"
-   ~general_help:"When applied without argument, tries to remove all terms that \
-                  are duplicates, or context of duplicates."
-   ~detailed_help: "When applied on a formula of the form (exec@pred(tau) && \
-                    phi), with frame@pred(tau) in the biframe, tries to remove \
-                    phi if it contains only subterms allowed by the FA-DUP rule."
+ T.register_typed "deduce"
+   ~general_help:"`deduce i` removes the ith element from the biframe when it can be \
+                  computed from the rest of the bi-frame.\n\
+                  `deduce` try to deduce the biframe with the first equivalence \
+                  in the hypotheses it finds."
+   ~detailed_help:"When applied on an the ith element u of the biframe, \
+                   `deduce i` removes u if the biframe without u allows to bi-deduce \
+                   the whole biframe."
    ~tactic_group:Structural
    ~pq_sound:true
-   (LT.genfun_of_pure_efun_arg fadup) Args.(Opt Int)
+   (LT.genfun_of_pure_efun_arg deduce) Args.(Opt Int)
 
+
+(*------------------------------------------------------------------*)
 (** Recursively project [if b then t1 else t2] to [f (t1,t2)].
     Does not project inside the branches of the projected conditionals.
     Returns the projected term, together with [found && p] where [p = true]
@@ -1252,11 +1162,18 @@ let auto ~red_param ~strong ~close s sk (fk : Tactics.fk) =
         then fk (None, GoalNotClosed)
         else sk [Equiv s] fk
       in
-
+      (* old school fadup, simplifying the goal *)
       let wfadup s sk fk =
         if strong || (TConfig.auto_fadup (ES.table s)) then
           let fk _ = sk [s] fk in
-          wrap_fail (fadup (Args.Opt (Args.Int, None))) s sk fk
+          wrap_fail fa_dup s sk fk
+        else sk [s] fk
+      in
+      (* more powerful bi-deduction, used to conclude proofs. *)
+      let wdeduce s sk fk =
+        if strong then
+          let fk _ = sk [s] fk in
+          wrap_fail deduce_all s sk fk
         else sk [s] fk
       in
 
@@ -1265,7 +1182,7 @@ let auto ~red_param ~strong ~close s sk (fk : Tactics.fk) =
           let fk = if auto_intro then fun _ -> sk [s] fk else fk in
           andthen_list ~cut:true
             [wrap_fail (EquivLT.expand_all_l `All);
-             try_tac wfadup;
+             try_tac wdeduce;
              orelse_list [wrap_fail refl_tac;
                           wrap_fail assumption]] s sk fk
         else sk [s] fk
@@ -1273,9 +1190,7 @@ let auto ~red_param ~strong ~close s sk (fk : Tactics.fk) =
 
       let reduce s sk fk =
         if strong
-        then sk
-            [EquivLT.reduce_sequent red_param s]
-            fk
+        then sk [EquivLT.reduce_sequent red_param s] fk
         else sk [s] fk
       in
 

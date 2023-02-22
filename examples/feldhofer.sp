@@ -217,7 +217,8 @@ Proof.
     rewrite wa_Reader1; 1:auto. 
 
     expand output@Reader1(k).
-    fa 2; fa 3; fadup 3.
+    fa 2; fa 3. 
+    deduce 3.
 
     have ->:
       (if
@@ -289,8 +290,8 @@ Proof.
             by expand output, cipher.
     }.
 
-    fa 3; fadup 3.
-    fa 3; fadup 3. 
+    fa 3; deduce 3.
+    fa 3; deduce 3.
     enckp 3, k_fresh; 1: auto.
     fa 3. 
     fresh 4; 1: auto. 
@@ -303,8 +304,8 @@ Proof.
     rewrite wa_Reader2; 1:auto.
 
     fa 2.
-    fa 3; fadup 3.
-    by fa 3; fadup 3.
+    fa 3; deduce 3.
+    by fa 3; deduce 3.
 
   (* Action 4/4: Tag *)
 

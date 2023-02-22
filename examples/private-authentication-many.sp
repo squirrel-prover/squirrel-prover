@@ -91,8 +91,7 @@ Proof.
   expandall.
   fa 3; fa 4; fa 4; fa 4; fa 4.
   fresh 6; 1:auto.
-  fresh 5; 1:auto.
-  by apply IH.
+  by fresh 5.
 
   (* Case B *)
   rewrite /frame /output /exec /cond /dmess /=.
@@ -106,6 +105,5 @@ Proof.
   rewrite (if_same_branch (len(nB(A,i)) ++ len(nB(A,i)))) //.
   fa 5; fa 5; fa 5; fa 5.
   fresh 5; 1:auto.
-  fresh 5; 1:auto.
-  by apply IH.
+  by fresh 5.
 Qed.

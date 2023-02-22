@@ -121,13 +121,13 @@ Proof.
   + expand frame, exec, output.
     fa 0; fa 1.
     rewrite /cond wa_R1_R2; 1: by depends R(j), R1(j).
-    by fadup 1.
+    by deduce 1.
 
   (* Case R2 *)
   + expand frame, exec, output.
     fa 0; fa 1.
     rewrite /cond wa_R1_R2; 1: by depends R(j),R2(j).
-    by fadup 1.
+    by deduce 1.
 
   (* Case T *)
   + expand frame, exec, cond, output.
