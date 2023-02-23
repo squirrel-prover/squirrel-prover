@@ -50,7 +50,9 @@ let get_oracle_tag_formula h =
 (** User printing query *)
 type print_query = (* [None] means current system *)
   | Pr_system    of SystemExpr.Parse.t option 
-  | Pr_any of Theory.lsymb
+  | Pr_any of Theory.lsymb (* print any lemma, function, name or macro
+                              with given lsymb *)
+
 
 (** {2 User search query} *)
 type search_query = (* [None] means current system *)
