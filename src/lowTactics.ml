@@ -2432,8 +2432,9 @@ let () = T.register_general "dependent induction"
 (* we are only registering the help here *)
 let () =
   T.register "print"
-    ~tactic_help:{general_help = "Shows the current system.";
-                  detailed_help = "";
+    ~tactic_help:{general_help = "Shows def of given symbol or system. \
+                                  By default shows current system.";
+                  detailed_help = "print [system] [symb]";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
     ~pq_sound:true

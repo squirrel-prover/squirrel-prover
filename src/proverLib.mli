@@ -41,7 +41,8 @@ val option_defs : option_def list ref
 (** User printing query *)
 type print_query =
   | Pr_system    of SystemExpr.Parse.t option (* [None] means current system *)
-  | Pr_any of Theory.lsymb
+  | Pr_any of Theory.lsymb (* print any lemma, function, name or macro
+                              with given lsymb *)
 
 (** User search query *)
 type search_query =
