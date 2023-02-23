@@ -1365,13 +1365,13 @@ let ty ?ty_env (t : term) : Type.ty =
       
       let ty_args, ty_out =
         let arrow_ty = Type.fun_l fty.fty_args fty.fty_out in
-        Type.destr_funs arrow_ty (List.length terms)
+        Type.destr_funs ~ty_env arrow_ty (List.length terms)
       in
       check_tys terms ty_args;
       ty_out
 
     | App (t1, l) ->
-      let tys, t_out = Type.destr_funs (ty t1) (List.length l) in      
+      let tys, t_out = Type.destr_funs ~ty_env (ty t1) (List.length l) in      
       check_tys l tys;
       t_out
 

@@ -510,7 +510,7 @@ let rec convert_ty ?ty_env (env : Env.t) (pty : p_ty) : Type.ty =
 
   | P_tbase tb_l ->
     let s = Symbols.BType.of_lsymb tb_l env.table in
-    Type.TBase (Symbols.to_string s) (* TODO: remove to_string *)
+    Type.TBase (Symbols.to_string s)
 
   | P_tuple ptys -> Type.Tuple (List.map (convert_ty env) ptys)
 
@@ -519,7 +519,9 @@ let rec convert_ty ?ty_env (env : Env.t) (pty : p_ty) : Type.ty =
 
   | P_ty_pat _l -> 
     match ty_env with
-    | None -> assert false      (* TODO: types: error messages *)
+    | None -> 
+      conv_err (L.loc pty) (Failure "type holes not allowed") 
+
     | Some ty_env ->
       Type.TUnivar (Type.Infer.mk_univar ty_env)
 
@@ -1221,7 +1223,7 @@ and conv_app
        [ty_args] is of length [List.length l]. *)
     let ty_args, ty_out =
       let arrow_ty = Type.fun_l fty_op.fty_args fty_op.fty_out in
-      match Type.destr_funs_opt arrow_ty (List.length terms) with
+      match Type.destr_funs_opt ~ty_env:state.ty_env arrow_ty (List.length terms) with
       | Some (ty_args, ty_out) -> ty_args, ty_out
       | None ->
         let tys, _ = Type.decompose_funs arrow_ty in

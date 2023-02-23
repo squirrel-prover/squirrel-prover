@@ -53,35 +53,8 @@ let rec fun_l tys tyout : ty =
   | ty :: tys -> Fun (ty, fun_l tys tyout)
 
 (*------------------------------------------------------------------*)
-(** Not exported *)
-exception DestrFailed
+(** {2 Misc} *)
 
-let rec destr_funs t i =
-  match t, i with
-  | _, 0 -> [], t
-  | Fun (t1, t2), _ -> 
-    let lty, tout = destr_funs t2 (i - 1) in
-    t1 :: lty, tout
-  | _ -> raise DestrFailed
-
-let destr_funs_opt t i =  
-  try Some (destr_funs t i) with DestrFailed -> None
-
-(*------------------------------------------------------------------*)
-let rec decompose_funs t =
-  match t with
-  | Fun (t1, t2) -> 
-    let lty, tout = decompose_funs t2 in
-    t1 :: lty, tout
-  | _ -> [], t
-
-(*------------------------------------------------------------------*)
-let tuple = function
-  | [] -> assert false
-  | [t] -> t
-  | l -> Tuple l
-           
-(*------------------------------------------------------------------*)
 (** Equality relation *)
 let rec equal (a : ty) (b : ty) : bool =
   match a,b with
@@ -126,60 +99,6 @@ and pp_chain_left ppf (t : ty) : unit =
 
 (*------------------------------------------------------------------*)
 let is_tuni = function TUnivar _ -> true | _ -> false
-  
-(*------------------------------------------------------------------*)
-(** {2 Function symbols type} *)
-
-(** Type of a function symbol: 
-    ∀'a₁ ... 'aₙ, τ₁ → ... → τₙ → τ 
-
-    Invariant: [fty_out] tvars and univars must be bounded by [fty_vars].
-*)
-type 'a ftype_g = {
-  fty_vars : 'a list; (** 'a₁ ... 'aₙ *)  
-  fty_args : ty list; (** τ₁, ... ,τₙ *)
-  fty_out  : ty;      (** τ *)
-}
-
-(** A [ftype] uses [tvar] for quantified type variables. *)
-type ftype = tvar ftype_g
-
-(** An opened [ftype], using [univar] for quantified type varibales *)
-type ftype_op = univar ftype_g
-
-(*------------------------------------------------------------------*)
-let pp_ftype_g pp_g fmt fty =
-  let pp_args fmt args =
-    if args = [] then () else
-      Fmt.pf fmt "%a -> "
-        (Fmt.list ~sep:(Fmt.any " ->@ ") pp) args
-  in
-  if fty.fty_vars = [] then
-    Fmt.pf fmt "@[<hov 2>%a%a@]"
-      pp_args fty.fty_args
-      pp fty.fty_out
-  else
-    Fmt.pf fmt "@[<hov 2>[%a] %a%a@]"
-      (Fmt.list ~sep:Fmt.comma pp_g) fty.fty_vars
-      pp_args fty.fty_args
-      pp fty.fty_out
-    
-let pp_ftype    = pp_ftype_g pp_univar
-let pp_ftype_op = pp_ftype_g pp_tvar
-
-(*------------------------------------------------------------------*)
-let mk_ftype vars args out : ftype = {
-  fty_vars = vars;
-  fty_args = args;
-  fty_out  = out;
-}
-
-let mk_ftype_tuple vars args out : ftype =
-  match args with
-  | [] | [_] -> mk_ftype vars args out
-         
-  (* arity ≥ 2 *)
-  | _ -> mk_ftype vars [tuple args] out
 
 (*------------------------------------------------------------------*)
 (** {2 Type substitution } *)
@@ -378,6 +297,107 @@ end = struct
     unify_eq env t t'
 end
 
+
+(*------------------------------------------------------------------*)
+(** {2 Type destructors and constructors} *)
+
+(** Exception not exported *)
+exception DestrFailed
+
+let rec destr_funs ?ty_env (t : ty) (i : int) : ty list * ty =
+  match t, i with
+  | _, 0 -> [], t
+
+  | Fun (t1, t2), _ -> 
+    let lty, tout = destr_funs t2 (i - 1) in
+    t1 :: lty, tout
+
+  | TUnivar _, _ when ty_env <> None -> 
+    let ty_env = oget ty_env in
+
+    let ty_args = List.init i (fun _ -> TUnivar (Infer.mk_univar ty_env)) in
+    let ty_out = TUnivar (Infer.mk_univar ty_env) in
+    let () =
+      match Infer.unify_eq ty_env t (fun_l ty_args ty_out) with
+      | `Fail -> raise DestrFailed
+      | `Ok   -> ()
+    in
+
+    ty_args, ty_out
+
+  | _ -> raise DestrFailed
+
+let destr_funs_opt ?ty_env t i =  
+  try Some (destr_funs ?ty_env t i) with DestrFailed -> None
+
+(*------------------------------------------------------------------*)
+let rec decompose_funs t =
+  match t with
+  | Fun (t1, t2) -> 
+    let lty, tout = decompose_funs t2 in
+    t1 :: lty, tout
+  | _ -> [], t
+
+(*------------------------------------------------------------------*)
+let tuple = function
+  | [] -> assert false
+  | [t] -> t
+  | l -> Tuple l
+           
+  
+(*------------------------------------------------------------------*)
+(** {2 Function symbols type} *)
+
+(** Type of a function symbol: 
+    ∀'a₁ ... 'aₙ, τ₁ → ... → τₙ → τ 
+
+    Invariant: [fty_out] tvars and univars must be bounded by [fty_vars].
+*)
+type 'a ftype_g = {
+  fty_vars : 'a list; (** 'a₁ ... 'aₙ *)  
+  fty_args : ty list; (** τ₁, ... ,τₙ *)
+  fty_out  : ty;      (** τ *)
+}
+
+(** A [ftype] uses [tvar] for quantified type variables. *)
+type ftype = tvar ftype_g
+
+(** An opened [ftype], using [univar] for quantified type varibales *)
+type ftype_op = univar ftype_g
+
+(*------------------------------------------------------------------*)
+let pp_ftype_g pp_g fmt fty =
+  let pp_args fmt args =
+    if args = [] then () else
+      Fmt.pf fmt "%a -> "
+        (Fmt.list ~sep:(Fmt.any " ->@ ") pp) args
+  in
+  if fty.fty_vars = [] then
+    Fmt.pf fmt "@[<hov 2>%a%a@]"
+      pp_args fty.fty_args
+      pp fty.fty_out
+  else
+    Fmt.pf fmt "@[<hov 2>[%a] %a%a@]"
+      (Fmt.list ~sep:Fmt.comma pp_g) fty.fty_vars
+      pp_args fty.fty_args
+      pp fty.fty_out
+    
+let pp_ftype    = pp_ftype_g pp_univar
+let pp_ftype_op = pp_ftype_g pp_tvar
+
+(*------------------------------------------------------------------*)
+let mk_ftype vars args out : ftype = {
+  fty_vars = vars;
+  fty_args = args;
+  fty_out  = out;
+}
+
+let mk_ftype_tuple vars args out : ftype =
+  match args with
+  | [] | [_] -> mk_ftype vars args out
+         
+  (* arity ≥ 2 *)
+  | _ -> mk_ftype vars [tuple args] out
 
 (*------------------------------------------------------------------*)
 (** {2 Freshen function types} *)

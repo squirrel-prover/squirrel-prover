@@ -88,20 +88,33 @@ let parse_operator_decl table (decl : Decl.operator_decl) =
       ) decl.op_tyargs
     in
 
+    (* open a typing environment *)
+    let ty_env = Type.Infer.mk_env () in
+
     let env = Env.init ~table ~ty_vars () in
     let env, subst, args =
-      Theory.convert_ext_bnds (Vars.Tag.make ~const:true Vars.Global) env decl.op_args
+      Theory.convert_ext_bnds ~ty_env (Vars.Tag.make ~const:true Vars.Global) env decl.op_args
       (* assume global constant variables to properly check that the
          body represents a deterministic computations later
          (as constant => deterministic). *)
     in
 
-    let out_ty = omap (Theory.convert_ty env) decl.op_tyout in
+    let out_ty = omap (Theory.convert_ty ~ty_env env) decl.op_tyout in
 
     let body, out_ty = 
-      Theory.convert ?ty:out_ty { env; cntxt = InGoal } decl.op_body 
+      Theory.convert ~ty_env ?ty:out_ty { env; cntxt = InGoal } decl.op_body 
     in
     let body = Term.subst subst body in
+
+    (* check that the typing environment is closed *)
+    if not (Type.Infer.is_closed ty_env) then 
+      error (L.loc decl.op_body) KDecl (Failure "some types could not be inferred");
+
+    (* close the typing environment and substitute *)
+    let tsubst = Type.Infer.close ty_env in
+    let args = List.map (Vars.tsubst tsubst) args in
+    let out_ty = Type.tsubst tsubst out_ty in
+    let body = Term.tsubst tsubst body in
 
     if not (HighTerm.is_deterministic env body) then
       error (L.loc decl.op_body) KDecl NonDetOp;
