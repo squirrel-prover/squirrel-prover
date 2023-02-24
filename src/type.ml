@@ -1,6 +1,10 @@
 open Utils
 
 (*------------------------------------------------------------------*)
+module Mid = Ident.Mid
+module Sid = Ident.Sid
+
+(*------------------------------------------------------------------*)
 (** Type variables *)
 
 type tvar = Ident.t
@@ -18,7 +22,9 @@ type univar  = Ident.t
 type univars = univar list
 
 let pp_univar fmt u = Fmt.pf fmt "'_%a" Ident.pp_full u
-  
+
+let to_univar u = u
+
 (*------------------------------------------------------------------*)
 (** Types of terms *)
 type ty =
@@ -101,11 +107,29 @@ and pp_chain_left ppf (t : ty) : unit =
 let is_tuni = function TUnivar _ -> true | _ -> false
 
 (*------------------------------------------------------------------*)
-(** {2 Type substitution } *)
+let free_univars (t : ty) : Sid.t = 
+  let rec fuvs acc t =
+    match t with
+    | Message
+    | Boolean
+    | Index  
+    | Timestamp
+    | TVar _ 
+    | TBase _  -> acc
+      
+    | TUnivar ui -> Sid.add ui acc
 
-module Mid = Ident.Mid
-module Sid = Ident.Sid
+    | Tuple tys -> List.fold_left fuvs acc tys
+    | Fun (t1, t2) -> fuvs (fuvs acc t1) t2
+  in
+  fuvs Sid.empty t
                
+let free_univars_list l =
+  List.fold_left (fun uvs v -> Sid.union uvs (free_univars v)) Sid.empty l
+
+(*------------------------------------------------------------------*)
+(** {2 Type substitution } *)
+              
 (** A type substitution*)
 type tsubst = {
   ts_univar : ty Ident.Mid.t;
@@ -379,6 +403,13 @@ let pp_ftype_g pp_g fmt fty =
 let pp_ftype    = pp_ftype_g pp_univar
 let pp_ftype_op = pp_ftype_g pp_tvar
 
+(*------------------------------------------------------------------*)
+let ftype_free_univars (f : ftype) : Ident.Sid.t =
+  (* [f.fty_vars] are not free in [f], and must not be added. *)
+  Sid.union
+    (free_univars_list f.fty_args)
+    (free_univars f.fty_out)
+    
 (*------------------------------------------------------------------*)
 let mk_ftype vars args out : ftype = {
   fty_vars = vars;

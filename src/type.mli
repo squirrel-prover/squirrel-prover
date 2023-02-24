@@ -14,11 +14,13 @@ val ident_of_tvar : tvar -> Ident.t
 (*------------------------------------------------------------------*)
 (** Variables for type inference *)
 
-type univar
+type univar = private Ident.t
 type univars = univar list
 
 val pp_univar : Format.formatter -> univar -> unit
   
+val to_univar : Ident.t -> univar
+
 (*------------------------------------------------------------------*)
 (** Types of terms *)
 type ty =
@@ -51,6 +53,9 @@ val pp : Format.formatter -> ty -> unit
 val equal : ty -> ty -> bool
 
 val is_tuni : ty -> bool
+
+(*------------------------------------------------------------------*)
+val free_univars : ty -> Ident.Sid.t 
 
 (*------------------------------------------------------------------*)
 val tboolean   : ty
@@ -136,7 +141,10 @@ type ftype_op = univar ftype_g
 (*------------------------------------------------------------------*)
 val pp_ftype    : Format.formatter -> ftype    -> unit
 val pp_ftype_op : Format.formatter -> ftype_op -> unit
-  
+
+(*------------------------------------------------------------------*)
+val ftype_free_univars : ftype -> Ident.Sid.t
+ 
 (*------------------------------------------------------------------*)
 val mk_ftype : tvar list -> ty list -> ty -> ftype
 

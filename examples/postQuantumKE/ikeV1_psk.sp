@@ -221,7 +221,7 @@ Proof.
            use Abs with i,j; auto.
 
     + intro *.
-      case try find il jl such that _ in Ininr(i,j) else IgarbR(i,j).
+      case try find (il,jl : index) such that _ in Ininr(i,j) else IgarbR(i,j).
         ++ intro [?? [[_ _ _] ->]]. 
            case try find il0 jl0 such that _  in Ininr(il0,jl0) else _.
              +++ auto. 
@@ -243,7 +243,7 @@ Proof.
                           by use Abs4 with i,j.
 
     + intro *.
-      case try find il jl such that _ in Ininr(i,j) else IgarbR(i,j).
+      case try find (il, jl : index) such that _ in Ininr(i,j) else IgarbR(i,j).
         ++ intro [?? [[_ _ _] ->]]. 
            case try find il0 jl0 such that _ in Ininr(il0,jl0) else _.
              +++ auto. 
@@ -267,7 +267,7 @@ Proof.
     + intro *.
       case try find il jl such that _ in IgarbR(il,jl) else _.
         ++ intro [?? [[_ _ _] ->]]. 
-           case try find il jl such that _ in Ininr(i,j) else IgarbR(i,j).
+           case try find (il, jl : index) such that _ in Ininr(i,j) else IgarbR(i,j).
              +++ intro [?? [[_ _ _] ->]]. 
                  case try find il0 jl0 such that _ in Ininr(il0,jl0) else _.
                    - auto. 
@@ -780,11 +780,11 @@ Proof.
       use helper_wa4 with i,j; try auto.
       case try find il jl such that _ in idealkeys(il,jl) else _.
         - intro [?? [[Exp [_ _]] ->]].
-          case try find il0 jl0 such that _ in idealkeys(i,j) else _.
+          case try find (il0, jl0 : index) such that _ in idealkeys(i,j) else _.
           auto.
           intro [Abs _].
           by use Abs with i,j.
-       - case try find il0 jl0 such that _ in  h(exp(fst(att(frame@pred(I1(i,j)))),a(i)),Ininr(j,i))
+       - case try find (il0, jl0 : index) such that _ in  h(exp(fst(att(frame@pred(I1(i,j)))),a(i)),Ininr(j,i))
                   else _.
          intro Ex [Abs _].
          use Abs with i,j => //.
@@ -829,7 +829,7 @@ Proof.
 
     + intro *.
       use helper_wa3 with i,j; try auto.
-      case try find il0 jl0 such that
+      case try find (il0, jl0 : index)  such that
          _
        in
          _

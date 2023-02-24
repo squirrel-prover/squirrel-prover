@@ -22,7 +22,7 @@ print system [PP].
 goal [PP] _ : 
   happens(P) => 
   x@P = 
-  try find t:timestamp such that
+  try find t such that
     (((t = Q) && (t < P) && (m = m)) || ((t = P) && (t < P) && (m = m)))
   in
     try find  such that ((t = Q) && (t < P) && (m = m))
@@ -40,7 +40,7 @@ print system [PP].
 goal [PP] _ (i : index): 
   happens(Q) => 
   x@Q = 
-  try find t:timestamp such that
+  try find t such that
     (((t = Q) && (t < Q) && (m = m)) || ((t = P) && (t < Q) && (m = m)))
   in
     try find  such that ((t = Q) && (t < Q) && (m = m))

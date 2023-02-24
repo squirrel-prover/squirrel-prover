@@ -126,6 +126,10 @@ val norm_ty : Type.Infer.env -> var -> var
 
 val tsubst  : Type.tsubst -> var -> var
 
+(** Free unification variables of a term *)
+val free_univars      : var  -> Ident.Sid.t 
+val free_univars_list : vars -> Ident.Sid.t 
+
 val equal : var -> var -> bool
 
 (** Time-consistent: if [v] was created before [v'], then [compare v v' ≤ 0]. *)
