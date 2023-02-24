@@ -114,7 +114,7 @@ goal [default/left] wa_R1_left (i,r:index):
   xor(id(i)) (snd(input@R1(r))) =
   H(<tag0,<nr(r),fst(input@R1(r))>>,key(i))
   <=>
-  exists t:index,
+  exists t,
   T(i,t) < R1(r) &&
   snd(output@T(i,t)) = snd(input@R1(r)) &&
   fst(output@T(i,t)) = fst(input@R1(r)) &&
@@ -307,7 +307,7 @@ Proof.
     (exec@pred(T1(i,t)) && cond@T1(i,t)) 
     <=>
     (exec@pred(T1(i,t)) &&
-     exists r:index,
+     exists r,
       R1(r) < T1(i,t) &&
       input@T1(i,t) = output@R1(r) &&
       T(i,t) < R1(r) &&
@@ -413,7 +413,7 @@ Proof.
            diff(id(i),id'(i,t)) XOR H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t)))))
       <=>
       (exec@pred(T2(i,t)) &&
-       not(exists r:index,
+       not(exists r,
           R1(r) < T2(i,t) &&
           input@T2(i,t) = output@R1(r) &&
           T(i,t) < R1(r) &&

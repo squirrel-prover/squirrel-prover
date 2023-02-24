@@ -86,9 +86,9 @@ form T(i,_) that happens before tau, in that case sT(i)@tau = sT(i)@T(i,j). *)
 
 goal lastupdate_pure_tag (i:index,tau:timestamp):
    happens(tau) => (
-    (forall j:index, happens(T(i,j)) => T(i,j)>tau) ||
-    (exists j:index, happens(T(i,j)) && T(i,j)<=tau &&
-      forall j':index, happens(T(i,j')) && T(i,j')<=tau => T(i,j')<=T(i,j))).
+    (forall j, happens(T(i,j)) => T(i,j)>tau) ||
+    (exists j, happens(T(i,j)) && T(i,j)<=tau &&
+      forall j', happens(T(i,j')) && T(i,j')<=tau => T(i,j')<=T(i,j))).
 Proof.
   induction tau => tau IH Hap.
   case tau.
@@ -136,9 +136,9 @@ Qed.
 
 goal lastupdate_pure_reader (ii:index,tau:timestamp):
   happens(tau) => (
-    (forall jj:index, happens(R(jj,ii)) => R(jj,ii)>tau) ||
-    (exists jj:index, happens(R(jj,ii)) && R(jj,ii)<=tau &&
-      forall jj':index,
+    (forall jj, happens(R(jj,ii)) => R(jj,ii)>tau) ||
+    (exists jj, happens(R(jj,ii)) && R(jj,ii)<=tau &&
+      forall jj',
         happens(R(jj',ii)) && R(jj',ii)<=tau => R(jj',ii)<=R(jj,ii))).
 Proof.
   induction tau => tau IH Hap.
@@ -188,7 +188,7 @@ Qed.
 
 goal lastupdate_init_tag (i:index,tau:timestamp):
   happens(tau) => (
-    (forall j:index, happens(T(i,j)) => T(i,j)>tau))
+    (forall j, happens(T(i,j)) => T(i,j)>tau))
       => sT(i)@tau = sT(i)@init.
 Proof.
   induction tau => tau IH Htau.
@@ -231,7 +231,7 @@ Qed.
 
 goal lastupdate_init_reader (ii:index,tau:timestamp):
   happens(tau) => (
-    (forall jj:index, happens(R(jj,ii)) => R(jj,ii)>tau))
+    (forall jj, happens(R(jj,ii)) => R(jj,ii)>tau))
       => sR(ii)@tau = sR(ii)@init.
 Proof.
   induction tau => tau IH Htau.
@@ -269,7 +269,7 @@ Qed.
 
 goal lastupdate_T (i:index, j:index, tau:timestamp):
     (happens(tau) && T(i,j)<=tau &&
-      forall j':index, happens(T(i,j')) && T(i,j')<=tau => T(i,j')<=T(i,j))
+      forall j', happens(T(i,j')) && T(i,j')<=tau => T(i,j')<=T(i,j))
     => sT(i)@tau = sT(i)@T(i,j).
 Proof.
   induction tau => tau IH [Hp Ord Hyp].
@@ -309,7 +309,7 @@ Qed.
 
 goal lastupdate_R (ii:index, jj:index, tau:timestamp):
     (happens(tau) && R(jj,ii)<=tau &&
-      forall jj':index,
+      forall jj',
         happens(R(jj',ii)) && R(jj',ii)<=tau => R(jj',ii)<=R(jj,ii))
     => sR(ii)@tau = sR(ii)@R(jj,ii).
 Proof.
@@ -350,10 +350,10 @@ Qed.
 
 goal lastupdateTag (i:index,tau:timestamp):
   happens(tau) => (
-    (sT(i)@tau = sT(i)@init && forall j:index, happens(T(i,j)) => T(i,j)>tau) ||
-    (exists j:index,
+    (sT(i)@tau = sT(i)@init && forall j, happens(T(i,j)) => T(i,j)>tau) ||
+    (exists j,
       sT(i)@tau = sT(i)@T(i,j) && T(i,j)<=tau &&
-        forall j':index, happens(T(i,j')) && T(i,j')<=tau => T(i,j')<=T(i,j))).
+        forall j', happens(T(i,j')) && T(i,j')<=tau => T(i,j')<=T(i,j))).
 Proof.
   intro Htau.
   use lastupdate_pure_tag with i, tau as [Hinit | [j [HTj1 HTj2 HTj3]]] => //.
@@ -369,10 +369,10 @@ Qed.
 goal lastupdateReader (ii:index,tau:timestamp):
   happens(tau) => (
     (sR(ii)@tau = sR(ii)@init &&
-      forall jj:index, happens(R(jj,ii)) => R(jj,ii)>tau) ||
-    (exists jj:index,
+      forall jj, happens(R(jj,ii)) => R(jj,ii)>tau) ||
+    (exists jj,
       sR(ii)@tau = sR(ii)@R(jj,ii) && R(jj,ii)<=tau &&
-        forall jj':index,
+        forall jj',
           happens(R(jj',ii)) && R(jj',ii)<=tau => R(jj',ii)<=R(jj,ii))).
 Proof.
   intro Htau.

@@ -1,5 +1,3 @@
-
-
 (* Checking the treatment of bound variables in direct cases for fresh. *)
 
 name n : index->message
@@ -15,7 +13,7 @@ Proof.
   fresh 1.
   (* Check that the right formula has been produced,
      using an incorrect formula that we admit. *)
-  + assert (forall i0:index, i<>i0) by admit.
+  + assert (forall i0, i<>i0) by admit.
     assumption.
   + refl.
 Qed.

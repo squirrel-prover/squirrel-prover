@@ -1,6 +1,6 @@
 system null.
 
-axiom exists_idx : exists i:index, True.
+axiom exists_idx : exists (i:index), True.
 
 goal _ : False.
 Proof.

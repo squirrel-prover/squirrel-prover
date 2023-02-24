@@ -58,7 +58,7 @@ axiom tags_neq : tag1 <> tag2.
 
 goal wa_R1_R2 (tau:timestamp,k:index):
   happens(tau) =>
-  (exists (i,j:index)
+  (exists (i,j:index),
      snd(input@tau) = h(<<nR(k),fst(input@tau)>,tag1>,diff(key(i),key'(i,j))))
   =
   (exists (i,j:index),
@@ -107,7 +107,7 @@ goal [default/left] wa_R1_left (i,k:index):
   happens(R1(k)) =>
   (snd(input@R1(k)) = h(<<nR(k),fst(input@R1(k))>,tag1>,key(i)))
   =
-  (exists j:index,
+  (exists j,
      T(i,j) < R1(k) && R(k) < T(i,j) &&
      snd(output@T(i,j)) = snd(input@R1(k)) &&
      fst(output@T(i,j)) = fst(input@R1(k)) &&

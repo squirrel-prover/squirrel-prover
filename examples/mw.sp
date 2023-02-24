@@ -109,7 +109,7 @@ goal [default/left] wa_R1_left (i,r:index):
   (xor(id(i)) (snd(input@R1(r))) =
    H(<tag0,<nr(r),fst(input@R1(r))>>,key(i)))
   =
-  (exists t:index,
+  (exists t,
    T(i,t) < R1(r) &&
    fst(output@T(i,t)) = fst(input@R1(r)) &&
    snd(output@T(i,t)) = snd(input@R1(r)) &&
