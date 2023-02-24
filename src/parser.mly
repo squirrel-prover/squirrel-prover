@@ -244,6 +244,11 @@ term_list:
 | RANGLE                         { ">" }
 
 (*------------------------------------------------------------------*)
+ids:
+| id=lsymb                             { [id] }
+| id=lsymb COMMA ids=ids               { id::ids }
+
+(*------------------------------------------------------------------*)
 /* Auxiliary:
    Many binders with the same types: `x1,...,xN : type` */
 %inline bnd_group(TY):
@@ -288,7 +293,7 @@ bnds_tagged:
 | LPAREN ids=slist1(lsymb,COMMA) RPAREN { `Tuple ids }
 
 var_tags:
-|                                            { []   }
+|                                             { []   }
 | LBRACKET tags=slist1(lsymb, COMMA) RBRACKET { tags }
 
 ext_arg:
@@ -307,10 +312,6 @@ opt_ext_arg_list:
 |                                    { [] }
 
 (*------------------------------------------------------------------*)
-ids:
-| id=lsymb                             { [id] }
-| id=lsymb COMMA ids=ids               { id::ids }
-
 top_formula:
 | f=term EOF                    { f }
 
@@ -381,14 +382,10 @@ else_process:
                                    Location.mk_loc loc Process.Null }
 | ELSE p=process                 { p }
 
-indices:
-| id=lsymb                          { [id] }
-| id=lsymb COMMA ids=indices        { id::ids }
-
 opt_indices:
 |                                   { [] }
 | id=lsymb                          { [id] }
-| id=lsymb COMMA ids=indices        { id::ids }
+| id=lsymb COMMA ids=opt_indices    { id::ids }
 
 ty_var:
 | TICK id=lsymb     { id }

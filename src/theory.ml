@@ -1584,30 +1584,40 @@ let declare_state
     (s          : lsymb) 
     (typed_args : bnds) 
     (out_pty    : p_ty option) 
-    (t          : term) 
+    (ti         : term) 
   =
   let ts_init = Term.mk_action Symbols.init_action [] in
+
+  (* open a typing environment *)
+  let ty_env = Type.Infer.mk_env () in
   
   let env = Env.init ~table () in
   let conv_env = { env; cntxt = InProc ([], ts_init); } in
 
-  let env, indices = convert_bnds (Vars.Tag.make Vars.Local) env typed_args in
+  let env, args = convert_bnds ~ty_env (Vars.Tag.make Vars.Local) env typed_args in
   let conv_env = { conv_env with env } in
 
-  List.iter2 (fun v (_, pty) ->
-      if not (Type.equal (Vars.ty v) Type.tindex) then
-        conv_err (L.loc pty) (BadPty [Type.tindex])
-    ) indices typed_args;
-
-  (* TODO: types: type inference *)
   (* parse the macro type *)
   let out_ty = omap (convert_ty env) out_pty in
 
-  let t, out_ty =
-    convert ?ty:out_ty conv_env t
-  in
+  let t, out_ty = convert ~ty_env ?ty:out_ty conv_env ti in
 
-  let data = StateInit_data (indices,t) in
+  (* check that the typing environment is closed *)
+  if not (Type.Infer.is_closed ty_env) then
+    conv_err (L.loc ti) Freetyunivar;
+
+  (* close the typing environment and substitute *)
+  let tsubst = Type.Infer.close ty_env in
+  let t = Term.tsubst tsubst t in
+  let args = List.map (Vars.tsubst tsubst) args in
+
+  (* FIXME: generalize allowed types *)
+  List.iter2 (fun v (_, pty) ->
+      if not (Type.equal (Vars.ty v) Type.tindex) then
+        conv_err (L.loc pty) (BadPty [Type.tindex])
+    ) args typed_args;
+
+  let data = StateInit_data (args,t) in
   let table, _ =
     Symbols.Macro.declare_exact table
       s
