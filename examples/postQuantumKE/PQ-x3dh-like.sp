@@ -206,7 +206,7 @@ process Initiator2(i,j,k:index) =
 
    let sid = < epk(vkI(i)), <epk(vkR(j)), <epk(dkt(i,j,k)) , <fst(snd(m)), fst(m)>>>> in
    let K1 =
-    try find il,jl,kl such that
+    try find il jl kl such that
      fst(snd(m)) =  encap(n_CCA(il,jl,kl), rk(il,jl,kl), epk(vkI(il)))
      in
        exct(skex,K(il,jl,kl))
@@ -253,7 +253,7 @@ process InitiatorToCompromised2(i,j,k:index) =
 
    let sid = < epk(vkI(i)), <epk(DvkR(j)), <epk(Ddkt(i,j,k)) , <fst(snd(m)), fst(m)>>>> in
    let K1 =
-    try find il,jl,kl such that
+    try find il jl kl such that
      fst(snd(m)) =  encap(n_CCA(il,jl,kl), rk(il,jl,kl), epk(vkI(il)))
      in
        exct(skex,K(il,jl,kl))
@@ -275,9 +275,9 @@ equiv [mainCCAkR,idealized/left] test.
 Proof.
   diffeq => * //.
     + intro *.
-      case try find il,jl,kl such that _ in K(il,jl,kl) else _.
+      case try find il jl kl such that _ in K(il,jl,kl) else _.
         - intro [il jl kl [Eq ->]].
-          case try find il,jl,kl such that _ in exct(skex, K(il,jl,kl)) else _.
+          case try find il jl kl such that _ in exct(skex, K(il,jl,kl)) else _.
             * intro [il0 jl0 kl0 [Eq2 ->]].
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
@@ -287,15 +287,15 @@ Proof.
             * intro [Abs _].
               by use Abs with il,jl,kl.
 
-        - case try find il,jl,kl such that _ in  exct(skex,K(il,jl,kl)) else _.
+        - case try find il jl kl such that _ in  exct(skex,K(il,jl,kl)) else _.
           * intro [il jl kl Ex] [Abs _].
             use Abs with il,jl,kl => //. 
           * auto.
 
     + intro *.
-      case try find il,jl,kl such that _ in K(il,jl,kl) else _.
+      case try find il jl kl such that _ in K(il,jl,kl) else _.
         - intro [il jl kl [Eq ->]].
-          case try find il,jl,kl such that _ in exct(skex, K(il,jl,kl)) else _.
+          case try find il jl kl such that _ in exct(skex, K(il,jl,kl)) else _.
             * intro [il0 jl0 kl0 [Eq2 ->]].
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
@@ -305,15 +305,15 @@ Proof.
             * intro [Abs _].
               by use Abs with il,jl,kl.
 
-        - case try find il,jl,kl such that _ in  exct(skex,K(il,jl,kl)) else _.
+        - case try find il jl kl such that _ in  exct(skex,K(il,jl,kl)) else _.
           * intro [il jl kl Ex] [Abs _].
             by use Abs with il,jl,kl.
           * auto.
 
     + intro *.
-      case try find il,jl,kl such that _ in K(il,jl,kl) else _.
+      case try find il jl kl such that _ in K(il,jl,kl) else _.
         - intro [il jl kl [Eq ->]].
-          case try find il,jl,kl such that _ in exct(skex, K(il,jl,kl)) else _.
+          case try find il jl kl such that _ in exct(skex, K(il,jl,kl)) else _.
             * intro [il0 jl0 kl0 [Eq2 ->]].
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
@@ -323,15 +323,15 @@ Proof.
             * intro [Abs _].
               by use Abs with il,jl,kl.
 
-          - case try find il,jl,kl such that _ in  exct(skex,K(il,jl,kl)) else _.
+          - case try find il jl kl such that _ in  exct(skex,K(il,jl,kl)) else _.
             * intro [il jl kl Ex] [Abs _].
               by use Abs with il,jl,kl.
             * intro A B; clear A B; auto.
 
     + intro *.
-      case try find il,jl,kl such that _ in K(il,jl,kl) else _.
+      case try find il jl kl such that _ in K(il,jl,kl) else _.
         - intro [il jl kl [Eq ->]].
-          case try find il,jl,kl such that _ in exct(skex, K(il,jl,kl)) else _.
+          case try find il jl kl such that _ in exct(skex, K(il,jl,kl)) else _.
             * intro [il0 jl0 kl0 [Eq2 ->]].
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
@@ -341,15 +341,15 @@ Proof.
             * intro [Abs _].
               by use Abs with il,jl,kl.
 
-        - case try find il,jl,kl such that _ in  exct(skex,K(il,jl,kl)) else _.
+        - case try find il jl kl such that _ in  exct(skex,K(il,jl,kl)) else _.
           intro [il jl kl Ex] [Abs _].
           by use Abs with il,jl,kl.
           auto.
 
     + intro *.
-      case try find il,jl,kl such that _ in K(il,jl,kl) else _.
+      case try find il jl kl such that _ in K(il,jl,kl) else _.
         - intro [il jl kl [Eq ->]].
-          case try find il,jl,kl such that _ in exct(skex, K(il,jl,kl)) else _.
+          case try find il jl kl such that _ in exct(skex, K(il,jl,kl)) else _.
             * intro [il0 jl0 kl0 [Eq2 ->]].
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
@@ -359,15 +359,15 @@ Proof.
             * intro [Abs _].
               by use Abs with il,jl,kl.
 
-        - case try find il,jl,kl such that _ in  exct(skex,K(il,jl,kl)) else _.
+        - case try find il jl kl such that _ in  exct(skex,K(il,jl,kl)) else _.
           intro [il jl kl Ex] [Abs _].
           by use Abs with il,jl,kl.
           auto.
 
     + intro *.
-      case try find il,jl,kl such that _ in K(il,jl,kl) else _.
+      case try find il jl kl such that _ in K(il,jl,kl) else _.
         - intro [il jl kl [Eq ->]].
-          case try find il,jl,kl such that _ in exct(skex, K(il,jl,kl)) else _.
+          case try find il jl kl such that _ in exct(skex, K(il,jl,kl)) else _.
             * intro [il0 jl0 kl0 [Eq2 ->]].
               assert decap(   encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))  , vkI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rk(il0,jl0,kl0),epk(vkI(il0))) , vkI(il)).
               auto.
@@ -377,7 +377,7 @@ Proof.
             * intro [Abs _].
               by use Abs with il,jl,kl.
 
-          - case try find il,jl,kl such that _ in  exct(skex,K(il,jl,kl)) else _.
+          - case try find il jl kl such that _ in  exct(skex,K(il,jl,kl)) else _.
             intro [il jl kl Ex] [Abs _].
             by use Abs with il,jl,kl.
             auto.
@@ -398,7 +398,7 @@ process Initiator3(i,j,k:index) =
 
    let sid = < epk(vkI(i)), <epk(vkR(j)), <epk(dkt(i,j,k)) , <fst(snd(m)), fst(m)>>>> in
    let FK1 =
-    try find il,jl,kl such that
+    try find il jl kl such that
      fst(snd(m)) =  encap(n_CCA(il,jl,kl), rk(il,jl,kl), epk(vkI(il)))
      in
        F1(sid,n_PRF(il,jl,kl))
@@ -406,7 +406,7 @@ process Initiator3(i,j,k:index) =
        F1(sid,exct(skex,decap( fst(snd(m)), vkI(i) )))
    in
    let FK2 =
-    try find il,jl,kl such that
+    try find il jl kl such that
      fst(snd(m)) =  encap(n_CCA(il,jl,kl), rk(il,jl,kl), epk(vkI(il)))
      in
        F2(sid,n_PRF(il,jl,kl))
@@ -456,7 +456,7 @@ process InitiatorToCompromised3(i,j,k:index) =
 
    let sid = < epk(vkI(i)), <epk(DvkR(j)), <epk(Ddkt(i,j,k)) , <fst(snd(m)), fst(m)>>>> in
    let FK1 =
-    try find il,jl,kl such that
+    try find il jl kl such that
      fst(snd(m)) =  encap(n_CCA(il,jl,kl), rk(il,jl,kl), epk(vkI(il)))
      in
        F1(sid,n_PRF(il,jl,kl))
@@ -464,7 +464,7 @@ process InitiatorToCompromised3(i,j,k:index) =
        F1(sid,exct(skex,decap( fst(snd(m)), vkI(i) )))
    in
    let FK2 =
-    try find il,jl,kl such that
+    try find il jl kl such that
      fst(snd(m)) =  encap(n_CCA(il,jl,kl), rk(il,jl,kl), epk(vkI(il)))
      in
        F2(sid,n_PRF(il,jl,kl))
@@ -487,7 +487,7 @@ axiom [idealized3/left,idealized2] ifteD (i,j,k:index): att(frame@pred(DFI(i,j,k
 
 
 goal  [idealized3/left,idealized2] trans_eq (i,j,k:index):
-xor(try find il,jl,kl such that
+xor(try find il jl kl such that
       fst(snd(att(frame@pred(I1(i,j,k))))) =
       encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
     in
@@ -513,11 +513,11 @@ xor(F2(<epk(vkI(i)),
          <epk(dkt(i,j,k)),
           <fst(snd(att(frame@pred(I1(i,j,k))))),
            fst(att(frame@pred(I1(i,j,k))))>>>>,
-    try find il,jl,kl such that
+    try find il jl kl such that
       fst(snd(att(frame@pred(I1(i,j,k))))) =
       encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
     in
-      try find iv,jv,kv such that
+      try find iv jv kv such that
         (skex = skex && (il = iv && jl = jv && kl = kv))
       in n_PRF(iv,jv,kv) else exct(skex,K(il,jl,kl))
     else exct(skex,decap(fst(snd(att(frame@pred(I1(i,j,k))))),vkI(i)))))
@@ -528,7 +528,7 @@ xor(F2(<epk(vkI(i)),
 exct(skex,decap(fst(att(frame@pred(I1(i,j,k)))),dkt(i,j,k))))).
 Proof.
 
-  case try find il,jl,kl such that
+  case try find il jl kl such that
         fst(snd(att(frame@pred(I1(i,j,k))))) =
         encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
       in
@@ -539,14 +539,14 @@ Proof.
                fst(att(frame@pred(I1(i,j,k))))>>>>,n_PRF(il,jl,kl))
       else _.
     + intro [il jl kl [U ->]]. 
-      case   try find il,jl,kl such that
+      case   try find il jl kl such that
             fst(snd(att(frame@pred(I1(i,j,k))))) =
             encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
           in
        _
           else exct(skex,decap(fst(snd(att(frame@pred(I1(i,j,k))))),vkI(i))).
         ++ intro [il0 jl0 kl0 [V ->]]. 
-           case  try find iv,jv,kv such that
+           case  try find iv jv kv such that
                  (skex = skex && (il0 = iv && jl0 = jv && kl0 = kv))
                  in n_PRF(iv,jv,kv) else exct(skex,K(il0,jl0,kl0)).
            +++ intro [??? [[_ [_ _ _]] ->]].
@@ -562,11 +562,11 @@ Proof.
            by use Abs with il,jl,kl.
 
      + intro [Abs M].
-       case   try find il,jl,kl such that
+       case   try find il jl kl such that
              fst(snd(att(frame@pred(I1(i,j,k))))) =
              encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
            in
-             try find iv,jv,kv such that
+             try find iv jv kv such that
                (skex = skex && (il = iv && jl = jv && kl = kv))
              in n_PRF(iv,jv,kv) else exct(skex,K(il,jl,kl))
            else exct(skex,decap(fst(snd(att(frame@pred(I1(i,j,k))))),vkI(i))).
@@ -579,7 +579,7 @@ Qed.
 
 
 goal  [idealized3/left,idealized2] trans_eqD (i,j,k:index):
-xor(try find il,jl,kl such that
+xor(try find il jl kl such that
       (fst(snd(att(frame@pred(DI1(i,j,k))))) =
        encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))))
     in
@@ -605,11 +605,11 @@ xor(F2(<epk(vkI(i)),
          <epk(Ddkt(i,j,k)),
           <fst(snd(att(frame@pred(DI1(i,j,k))))),
            fst(att(frame@pred(DI1(i,j,k))))>>>>,
-    try find il,jl,kl such that
+    try find il jl kl such that
       (fst(snd(att(frame@pred(DI1(i,j,k))))) =
        encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))))
     in
-      try find iv,jv,kv such that
+      try find iv jv kv such that
         ((skex = skex) && ((il = iv) && (jl = jv) && (kl = kv)))
       in n_PRF(iv,jv,kv) else exct(skex,K(il,jl,kl))
     else exct(skex,decap(fst(snd(att(frame@pred(DI1(i,j,k))))),vkI(i)))))
@@ -621,7 +621,7 @@ exct(skex,decap(fst(att(frame@pred(DI1(i,j,k)))),Ddkt(i,j,k))))).
 
 Proof.
 
-  case try find il,jl,kl such that
+  case try find il jl kl such that
         fst(snd(att(frame@pred(DI1(i,j,k))))) =
         encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
       in
@@ -632,14 +632,14 @@ Proof.
                fst(att(frame@pred(DI1(i,j,k))))>>>>,n_PRF(il,jl,kl))
       else _.
    + intro [il jl kl [_ ->]]. 
-     case   try find il,jl,kl such that
+     case   try find il jl kl such that
            fst(snd(att(frame@pred(DI1(i,j,k))))) =
            encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
          in
       _
          else exct(skex,decap(fst(snd(att(frame@pred(DI1(i,j,k))))),vkI(i))).
        ++ intro [il0 jl0 kl0 [_ ->]]. 
-          case   try find iv,jv,kv such that
+          case   try find iv jv kv such that
                 (skex = skex && (il0 = iv && jl0 = jv && kl0 = kv))
               in n_PRF(iv,jv,kv) else exct(skex,K(il0,jl0,kl0)).
             +++ intro [??? [Eq2 ->]].
@@ -654,7 +654,7 @@ Proof.
           by use Abs with il,jl,kl.
 
     + intro [Abs M].
-      case   try find il,jl,kl such that
+      case   try find il jl kl such that
             fst(snd(att(frame@pred(DI1(i,j,k))))) =
             encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
           in
@@ -672,7 +672,7 @@ axiom [idealized3/left,idealized2]  fasign :
 
 
 goal  [idealized3/left,idealized2] trans_eq2 (i,j,k:index):
-xor(try find il,jl,kl such that
+xor(try find il jl kl such that
       fst(snd(att(frame@pred(FI(i,j,k))))) =
       encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
     in
@@ -698,11 +698,11 @@ xor(F1(<epk(vkI(i)),
          <epk(dkt(i,j,k)),
           <fst(snd(att(frame@pred(FI(i,j,k))))),
            fst(att(frame@pred(FI(i,j,k))))>>>>,
-    try find il,jl,kl such that
+    try find il jl kl such that
       fst(snd(att(frame@pred(FI(i,j,k))))) =
       encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
     in
-      try find iv,jv,kv such that
+      try find iv jv kv such that
         (skex = skex && (il = iv && jl = jv && kl = kv))
       in n_PRF(iv,jv,kv) else exct(skex,K(il,jl,kl))
     else exct(skex,decap(fst(snd(att(frame@pred(FI(i,j,k))))),vkI(i)))))
@@ -713,7 +713,7 @@ xor(F1(<epk(vkI(i)),
 exct(skex,decap(fst(att(frame@pred(FI(i,j,k)))),dkt(i,j,k))))).
 Proof.
 
-  case try find il,jl,kl such that
+  case try find il jl kl such that
           fst(snd(att(frame@pred(FI(i,j,k))))) =
           encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
         in
@@ -730,16 +730,16 @@ Proof.
                  fst(att(frame@pred(FI(i,j,k))))>>>>,
           exct(skex,decap(fst(snd(att(frame@pred(FI(i,j,k))))),vkI(i)))).
     + intro [il jl kl [_ ->]]. 
-      case  try find il,jl,kl such that
+      case  try find il jl kl such that
           fst(snd(att(frame@pred(FI(i,j,k))))) =
           encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
              in
-             try find iv,jv,kv such that
+             try find iv jv kv such that
              (skex = skex && (il = iv && jl = jv && kl = kv))
                in n_PRF(iv,jv,kv) else exct(skex,K(il,jl,kl))
             else exct(skex,decap(fst(snd(att(frame@pred(FI(i,j,k))))),vkI(i))).
         ++ intro [il0 jl0 kl0 [_ ->]]. 
-           case  try find iv,jv,kv such that
+           case  try find iv jv kv such that
                  (skex = skex && (il0 = iv && jl0 = jv && kl0 = kv))
                in n_PRF(iv,jv,kv) else exct(skex,K(il0,jl0,kl0)).
              +++ intro [iv jv kv [_ ->]]. 
@@ -756,11 +756,11 @@ Proof.
             by use Abs with il,jl,kl.
 
      + intro [Abs M].
-       case     try find il,jl,kl such that
+       case     try find il jl kl such that
              fst(snd(att(frame@pred(FI(i,j,k))))) =
              encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
            in
-             try find iv,jv,kv such that
+             try find iv jv kv such that
                (skex = skex && (il = iv && jl = jv && kl = kv))
              in n_PRF(iv,jv,kv) else exct(skex,K(il,jl,kl))
            else exct(skex,decap(fst(snd(att(frame@pred(FI(i,j,k))))),vkI(i))).
@@ -775,7 +775,7 @@ Qed.
 
 
 goal  [idealized3/left,idealized2] trans_eq2D (i,j,k:index):
-xor(try find il,jl,kl such that
+xor(try find il jl kl such that
       (fst(snd(att(frame@pred(DFI(i,j,k))))) =
        encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))))
     in
@@ -801,11 +801,11 @@ xor(F1(<epk(vkI(i)),
          <epk(Ddkt(i,j,k)),
           <fst(snd(att(frame@pred(DFI(i,j,k))))),
            fst(att(frame@pred(DFI(i,j,k))))>>>>,
-    try find il,jl,kl such that
+    try find il jl kl such that
       (fst(snd(att(frame@pred(DFI(i,j,k))))) =
        encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il))))
     in
-      try find iv,jv,kv such that
+      try find iv jv kv such that
         ((skex = skex) && ((il = iv) && (jl = jv) && (kl = kv)))
       in n_PRF(iv,jv,kv) else exct(skex,K(il,jl,kl))
     else exct(skex,decap(fst(snd(att(frame@pred(DFI(i,j,k))))),vkI(i)))))
@@ -816,7 +816,7 @@ xor(F1(<epk(vkI(i)),
 exct(skex,decap(fst(att(frame@pred(DFI(i,j,k)))),Ddkt(i,j,k))))).
 Proof.
 
-  case try find il,jl,kl such that
+  case try find il jl kl such that
         fst(snd(att(frame@pred(DFI(i,j,k))))) =
         encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
       in
@@ -829,14 +829,14 @@ Proof.
                fst(att(frame@pred(DFI(i,j,k))))>>>>,
         exct(skex,decap(fst(snd(att(frame@pred(DFI(i,j,k))))),vkI(i)))).
     + intro [il jl kl [_ ->]].
-      case  try find il,jl,kl such that
+      case  try find il jl kl such that
             fst(snd(att(frame@pred(DFI(i,j,k))))) =
             encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
           in
          _
           else exct(skex,decap(fst(snd(att(frame@pred(DFI(i,j,k))))),vkI(i))).
         ++ intro [il0 jl0 kl0 [_ ->]].
-           case  try find iv,jv,kv such that
+           case  try find iv jv kv such that
                  (skex = skex && (il0 = iv && jl0 = jv && kl0 = kv))
                in n_PRF(iv,jv,kv) else exct(skex,K(il0,jl0,kl0)).
              +++ intro [iv jv kv [_ ->]].
@@ -853,7 +853,7 @@ Proof.
             by use Abs with il,jl,kl.
 
       + intro [Abs _].
-        case     try find il,jl,kl such that
+        case     try find il jl kl such that
               fst(snd(att(frame@pred(DFI(i,j,k))))) =
               encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
             in
@@ -895,7 +895,7 @@ Proof.
     auto.
 
   + intro *.
-    case  try find iv,jv,kv such that (skex = skex && (i = iv && j = jv && k = kv))
+    case  try find iv jv kv such that (skex = skex && (i = iv && j = jv && k = kv))
         in n_PRF(iv,jv,kv) else exct(skex,K(i,j,k)).
       ++ intro [iv jv kv [_ ->]].
          auto.
@@ -903,7 +903,7 @@ Proof.
          by use Abs with i,j,k.
 
   + intro *.
-    case    try find iv,jv,kv such that (skex = skex && (i = iv && j = jv && k = kv))
+    case    try find iv jv kv such that (skex = skex && (i = iv && j = jv && k = kv))
         in n_PRF(iv,jv,kv) else exct(skex,K(i,j,k)).
       ++ intro [iv jv kv [_ ->]].
          auto.
@@ -965,7 +965,7 @@ Proof.
            simpl.
            assert ktilde8(j,k,i)@SR(j,k,i)=ktilde10(i,j,l)@FI(i,j,l).
              +++ expand ktilde8, ktilde10, FK2.
-                 case  try find il,jl,kl such that
+                 case  try find il jl kl such that
                       _
                      in F2(sid10(i,j,l)@FI(i,j,l),n_PRF(il,jl,kl))
                      else
@@ -1038,7 +1038,7 @@ Proof.
   expand FK1.
   use auth3 with i,j,k => //.
   destruct H0 as [k0 H0'].
-  have ->: (try find il,jl,kl such that
+  have ->: (try find il jl kl such that
                fst(snd(input@FI(i,j,k))) =
                encap(n_CCA(il,jl,kl),rk(il,jl,kl),epk(vkI(il)))
              in F1(sid10(i,j,k)@FI(i,j,k),n_PRF(il,jl,kl))
@@ -1051,7 +1051,7 @@ Proof.
       rewrite ?snd_p in Meq0, Meq, Meq1.
       rewrite ?fst_p in  Meq0, Meq, Meq1.
       expand C4.
-      case try find il,jl,kl such that _ in  F1(sid10(i,j,k)@FI(i,j,k),n_PRF(il,jl,kl)) else _.
+      case try find il jl kl such that _ in  F1(sid10(i,j,k)@FI(i,j,k),n_PRF(il,jl,kl)) else _.
         ++ intro [i1 j1 k1 [I1 I2]].
            rewrite I2.
            have U :

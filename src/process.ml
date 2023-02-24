@@ -211,7 +211,6 @@ let check_proc
     | In (c,x,p) -> 
       check_channel env.table c;
 
-      (* FEATURE: subtypes*)
       let vars, _ = Vars.make_local `Shadow env.vars (Type.Message) (L.unloc x) in
       check_p ty_env { env with vars } p
 
@@ -224,7 +223,6 @@ let check_proc
       if is_out proc && (TConfig.strict_alias_mode env.table)
       then error loc (StrictAliasError "missing alias")
       else
-        (* FEATURE: subtypes *)
         let () = 
           Theory.check env ~local:true ty_env projs m Type.tmessage 
         in
@@ -299,8 +297,7 @@ let check_proc
   (* close the typing environment and substitute *)
   let tsubst = Type.Infer.close ty_env in
   let args = List.map (Vars.tsubst tsubst) args in
-  (* No need to substitute in the process itself, since it will be
-     type-checked again when a system is declared. *)
+  (* TODO: types: need to substitute in the process itself *)
 
   (* process are stored with an ad hoc type for variables *)
   let args : (string * Type.ty) list = 
@@ -319,7 +316,6 @@ let declare
 
   (* type-check and declare *)
   let args, _ = check_proc table ~args projs proc in
-
 
   let table, _ = declare_nocheck table id args projs proc in
   table
@@ -606,7 +602,6 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     let output = match output with
       | Some (c,t) ->
         let t = 
-          (* FEATURE: subtypes *)
           Term.subst (subst_ts @ subst_input)
             (conv_term penv action_term t Type.Message) 
         in
@@ -853,7 +848,6 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
     | In (c,x,p) ->
       let ch = Channel.of_lsymb c penv.env.table in
-      (* FEATURE: subtypes *)
       let penv,x' = make_fresh `Shadow penv Type.Message (L.unloc x) in
       let in_th = Theory.var_i dum (Vars.name x') in
       let in_tm = Term.mk_var x' in
@@ -1115,6 +1109,7 @@ let declare_system table system_name (projs : Term.projs) (proc : process) =
     "@[<v 2>System before processing:@;@;@[%a@]@]@.@."
     pp_process proc ;
 
+  (* type-check the processus *)
   let _ = check_proc table ~args:[] projs proc in
 
   (* FEATURE: allow user to define more than bi-system *)

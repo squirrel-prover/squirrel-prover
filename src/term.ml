@@ -1406,7 +1406,7 @@ let ty ?ty_env (t : term) : Type.ty =
 
   and check_tys (terms : term list) (tys : Type.ty list) =
     List.iter2 (fun term arg_ty ->
-        match Type.Infer.unify_leq ty_env (ty term) arg_ty with
+        match Type.Infer.unify_eq ty_env (ty term) arg_ty with
         | `Ok -> ()
         | `Fail -> assert false
       ) terms tys

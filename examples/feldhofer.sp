@@ -64,7 +64,7 @@ process Reader(k:index) =
       fst(snd(dec(mess, diff(kE(i),kbE(i,j))))) = nr(k)
   then
     out(cR,
-      try find i,j such that
+      try find i j such that
         dec(mess, diff(kE(i),kbE(i,j))) <> fail &&
         fst(dec(mess, diff(kE(i),kbE(i,j)))) = tagT &&
         fst(snd(dec(mess, diff(kE(i),kbE(i,j))))) = nr(k)
@@ -229,7 +229,7 @@ Proof.
            output@Tag(i,j) = input@Reader1(k) &&
            input@Tag(i,j) = output@Reader(k))
        then
-         (try find i,j such that
+         (try find i j such that
             dec(input@Reader1(k),diff(kE(i),kbE(i,j))) <> fail &&
             fst(dec(input@Reader1(k),diff(kE(i),kbE(i,j)))) = tagT &&
             fst(snd(dec(input@Reader1(k),diff(kE(i),kbE(i,j))))) = nr(k)
@@ -247,7 +247,7 @@ Proof.
            output@Tag(i,j) = input@Reader1(k) &&
            input@Tag(i,j) = output@Reader(k))
        then
-         (try find i,j such that
+         (try find i j such that
             exec@pred(Reader1(k)) &&
             (Tag(i,j) < Reader1(k) &&
              Reader(k) < Reader1(k) &&

@@ -43,7 +43,7 @@ process reader =
   if exists (i,k:index),
      snd(x) = h(<<nR,fst(x)>,tag1>,diff(key(i),key'(i,k)))
   then
-    out(cR, try find i,k such that
+    out(cR, try find i k such that
               snd(x) = h(<<nR,fst(x)>,tag1>,diff(key(i),key'(i,k)))
             in
               h(<<snd(x),nR>,tag2>,diff(key(i),key'(i,k))))
@@ -153,13 +153,13 @@ Qed.
     so that its condition can be discharged using deduce. *)
 goal wa_R1_tryfind (k:index) : happens(R1(k)) =>
   (if exec@pred(R1(k)) && cond@R1(k) then
-   try find i,j such that
+   try find i j such that
      snd(input@R1(k)) =
      h(<<nR(k),fst(input@R1(k))>,tag1>,diff(key(i),key'(i,j)))
    in h(<<snd(input@R1(k)),nR(k)>,tag2>,diff(key(i),key'(i,j))))
   =
   (if exec@pred(R1(k)) && cond@R1(k) then
-   try find i,j such that
+   try find i j such that
      exec@pred(R1(k)) &&
      (T(i,j) < R1(k) && R(k) < T(i,j) &&
       snd(output@T(i,j)) = snd(input@R1(k)) &&
