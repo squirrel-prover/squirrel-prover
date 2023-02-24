@@ -153,7 +153,6 @@ module Infer : sig
   val norm   : env -> ty  -> ty
                          
   val unify_eq  : env -> ty -> ty -> [`Fail | `Ok]
-  val unify_leq : env -> ty -> ty -> [`Fail | `Ok]
 
   val is_closed     : env -> bool
   val close         : env -> tsubst
@@ -290,11 +289,6 @@ end = struct
     and do_unifs l l' = List.for_all2 do_unif l l' in
     
     if do_unif t t' then `Ok else `Fail
-  
-  (* FEATURE: subtype: improve type inference by not handling
-     subtyping constraint as type equality constraints. *)
-  let unify_leq env (t : ty) (t' : ty) : [`Fail | `Ok] =
-    unify_eq env t t'
 end
 
 

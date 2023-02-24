@@ -30,20 +30,20 @@ goal [any] try_find_simpl
     (forall (t : timestamp, a : index), 
       phi t a => t = t0 && a = a0) =>
 
-    try find t : timestamp such that
+    try find (t : timestamp) such that
       exists (a : index), phi t a 
     in
-      try find a : index such that phi t a in
+      try find (a : index) such that phi t a in
         t_then t a
       else t_else1 else t_else2
     =
     if phi t0 a0 then t_then t0 a0 else t_else2. 
 Proof.
   intro Hphi.
-  case try find t0 : timestamp such that _ in _ else t_else2.
+  case try find (t0 : timestamp) such that _ in _ else t_else2.
   + intro [t1 [[_ G] ->]]. 
     repeat destruct G as [_ G]. 
-    case try find a: index such that _ in _ else t_else1.
+    case try find (a : index) such that _ in _ else t_else1.
     ++ intro [_ [G0 ->]]. 
        repeat destruct G0 as [_ G0]. 
        have [_ Eq ] := Hphi _ _ G; rewrite Eq in *; clear Eq.
@@ -73,7 +73,7 @@ system [Sys] !_A T: out(c,empty).
 
 (*------------------------------------------------------------------*)
 goal [Sys] _ (t : timestamp, A : index) :
-  (try find t0:timestamp such that
+  (try find (t0:timestamp) such that
      (exists (A0:index),
         t0 = T(A0) &&
         t0 < t &&
@@ -81,7 +81,7 @@ goal [Sys] _ (t : timestamp, A : index) :
         T(A0) < t &&
         Q (A0,t))
    in
-     try find A0:index such that
+     try find (A0:index) such that
        (t0 = T(A0) &&
         t0 < t &&
         A = A0 &&

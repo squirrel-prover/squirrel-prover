@@ -124,7 +124,7 @@ process InitiatorI(i:index) =
   try find j such that fst(snd(snd(m)))(*RIdR*) = IdR(j) in
     if  snd(snd(snd(m)))(*HashR*) =  h(<  fst(m)(*gB*), < exp(g,a(i))  , IdR(j)> > ,
         (* idealized key computation *)
-        try find il, jl such that <Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
+        try find il jl such that <Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
          il = i && jl = j in
              Ininr(i,j)
         else
@@ -132,7 +132,7 @@ process InitiatorI(i:index) =
           ) then
        let finalkey = h( exp( fst(m)(*gB*) ,a(i)),
         (* idealized key computation *)
-        try find il, jl such that <Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
+        try find il jl such that <Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
          il = i && jl = j in
              Ininr(i,j)
         else
@@ -140,7 +140,7 @@ process InitiatorI(i:index) =
        ) in
        out(cI,  h(<exp(g,a(i)), < fst(m)(*gB*) , IdI(i)> > ,
         (* idealized key computation *)
-        try find il, jl such that <Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
+        try find il jl such that <Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
          il = i && jl = j in
              Ininr(i,j)
         else
@@ -154,7 +154,7 @@ process ResponderI(j:index) =
   try find i such that snd(snd(m))(*RIdi*) = IdI(i) in
     out(cR, <exp(g,b(j)), <Nr(j), < IdR(j)  ,  h(<exp(g,b(j)), <fst(m)(*gA*), IdR(j)> > ,
         (* idealized key computation *)
-        try find il, jl such that < fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
+        try find il jl such that < fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
          il = i && jl = j in
              Ininr(i,j)
         else
@@ -164,7 +164,7 @@ process ResponderI(j:index) =
     in(cR, m2);
     if m2 =  h(<fst(m)(*gA*), <exp(g,b(j)), IdI(i)> > ,
         (* idealized key computation *)
-        try find il, jl such that < fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
+        try find il jl such that < fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
          il = i && jl = j in
              Ininr(i,j)
         else
@@ -199,7 +199,7 @@ Proof.
    (* From here, we need to prove that we indede get ideal keys everywhere. Mostly dumb manipulations of all the conditions introduced by the prf tactic, that are all contractory.
      *)
     + intro *. 
-      case  try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
+      case  try find il0 jl0 such that _ in IgarbI(il0,jl0) else _.
         ++ intro [?? [_ ->]].
            fa; auto. 
         ++ rewrite tryfind. 
@@ -207,79 +207,79 @@ Proof.
            use Abs with i,j; auto.
 
     + intro *.
-      case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
+      case try find il0 jl0 such that _ in IgarbI(il0,jl0) else _.
         ++ intro [?? [_ ->]]. 
            fa; auto.
         ++ intro [Abs TFeq].
            use Abs with i,j; auto.
 
     + intro *.
-      case  try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
+      case  try find il0 jl0 such that _ in IgarbI(il0,jl0) else _.
         ++ intro [?? [_ ->]]. 
            fa; auto.
         ++ intro [Abs TFeq].
            use Abs with i,j; auto.
 
     + intro *.
-      case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
+      case try find il jl such that _ in Ininr(i,j) else IgarbR(i,j).
         ++ intro [?? [[_ _ _] ->]]. 
-           case try find il0,jl0 such that _  in Ininr(il0,jl0) else _.
+           case try find il0 jl0 such that _  in Ininr(il0,jl0) else _.
              +++ auto. 
              +++ intro [Abs TFeq2].
                  use Abs with i,j; auto.
         ++ intro [Abs TFeq].
-           case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
+           case try find il0 jl0 such that _ in Ininr(il0,jl0) else _.
              +++ intro [?? [_ TFeq2]]. 
                  by use Abs with i,j.
              +++ intro [Abs2 TFeq2].
-                 case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
+                 case try find il0 jl0 such that _ in IgarbI(il0,jl0) else _.
                    - intro [?? [_ _]]. 
                      by use Abs with i,j.
                    - intro [Abs3 TFeq3].
-                     case try find il,jl such that _ in IgarbR(il,jl) else _.
+                     case try find il jl such that _ in IgarbR(il,jl) else _.
                        -- intro [?? [_ ->]]. 
                           auto.
                        -- intro [[Abs4] TFeq4].
                           by use Abs4 with i,j.
 
     + intro *.
-      case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
+      case try find il jl such that _ in Ininr(i,j) else IgarbR(i,j).
         ++ intro [?? [[_ _ _] ->]]. 
-           case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
+           case try find il0 jl0 such that _ in Ininr(il0,jl0) else _.
              +++ auto. 
              +++ intro [Abs _]. 
                  by use Abs with i,j.
-        ++ case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
+        ++ case try find il0 jl0 such that _ in Ininr(il0,jl0) else _.
              +++ intro [?? [_ ->]]. 
                  intro [Abs _].
                  by use Abs with i,j.
              +++ intro [Abs _].
                  intro [Abs2 _].
-                 case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
+                 case try find il0 jl0 such that _ in IgarbI(il0,jl0) else _.
                    - intro [?? [_ ->]]. 
                      use Abs with i,j; auto.
-                   - case try find il,jl such that _ in IgarbR(il,jl) else _.
+                   - case try find il jl such that _ in IgarbR(il,jl) else _.
                        -- intro [?? [_ ->]]. 
                           auto.
                        -- intro [Abs3 _].
                           use Abs3 with i,j; auto.
 
     + intro *.
-      case try find il,jl such that _ in IgarbR(il,jl) else _.
+      case try find il jl such that _ in IgarbR(il,jl) else _.
         ++ intro [?? [[_ _ _] ->]]. 
-           case try find il,jl such that _ in Ininr(i,j) else IgarbR(i,j).
+           case try find il jl such that _ in Ininr(i,j) else IgarbR(i,j).
              +++ intro [?? [[_ _ _] ->]]. 
-                 case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
+                 case try find il0 jl0 such that _ in Ininr(il0,jl0) else _.
                    - auto. 
                    - intro [Abs _].
                      use Abs with i,j; auto.
 
              +++ intro [Abs _].
-                 case try find il0,jl0 such that _ in Ininr(il0,jl0) else _.
+                 case try find il0 jl0 such that _ in Ininr(il0,jl0) else _.
                    - intro [?? [_ ->]]. 
                      use Abs with i,j; auto.
                    - intro [Abs2 _].
-                     case try find il0,jl0 such that _ in IgarbI(il0,jl0) else _.
+                     case try find il0 jl0 such that _ in IgarbI(il0,jl0) else _.
                        -- intro [?? [_ ->]]. 
                           use Abs2 with i,j; auto.
                        -- intro [Abs3 _]; auto.
@@ -301,7 +301,7 @@ process InitiatorI2(i:index) =
   try find j such that fst(snd(snd(m)))(*RIdR*) = IdR(j) in
     if  snd(snd(snd(m)))(*HashR*) =
         (* idealized key computation *)
-        try find jl, il such that <Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
+        try find jl il such that <Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
          il = i && jl = j in
          h(<  fst(m)(*gB*), < exp(g,a(i))  , IdR(j)> > ,    Ininr(j,i))
         else
@@ -309,7 +309,7 @@ process InitiatorI2(i:index) =
            then
        out(cI,
         (* idealized key computation *)
-        try find jl, il such that <Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
+        try find jl il such that <Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
          il = i && jl = j in
              h(<exp(g,a(i)), < fst(m)(*gB*) , IdI(i)> > ,Ininr(j,i))
         else
@@ -323,7 +323,7 @@ process ResponderI2(j:index) =
   try find i such that snd(snd(m))(*RIdi*) = IdI(i) in
     out(cR, <exp(g,b(j)), <Nr(j), < IdR(j)  ,
         (* idealized key computation *)
-        try find jl, il such that < fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
+        try find jl il such that < fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
          il = i && jl = j in
             h(<exp(g,b(j)), <fst(m)(*gA*), IdR(j)> > ,   Ininr(j,i))
         else
@@ -333,7 +333,7 @@ process ResponderI2(j:index) =
     in(cR, m2);
     if m2 =
         (* idealized key computation *)
-        try find jl, il such that < fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
+        try find jl il such that < fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
          il = i && jl = j in
             h(<fst(m)(*gA*), <exp(g,b(j)), IdI(i)> > ,  Ininr(j,i))
         else
@@ -359,7 +359,7 @@ Proof.
  intro Hap Cond.
  expand cond.
 
-  case  try find jl,il such that
+  case  try find jl il such that
          (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> &&
           (il = i && jl = j))
        in h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,Ininr(j,i))
@@ -401,7 +401,7 @@ Proof.
   destruct Ex as [_ EUF].
   depends R(j,i), R1(j,i) => //.
   intro OrdR.
-  case try find jl,il such that
+  case try find jl il such that
         <fst(snd(input@R(j,i))),Nr(j)> = <Ni(il),Nr(jl)> && il = i && jl = j
        in   h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i))
        else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i)).
@@ -444,7 +444,7 @@ process InitiatorRoR(i:index) =
   try find j such that fst(snd(snd(m)))(*RIdR*) = IdR(j) in
     if  snd(snd(snd(m)))(*HashR*) =
         (* idealized key computation *)
-        try find il, jl such that   (<Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
+        try find il jl such that   (<Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
          (il = i && jl = j)) in
          h(<  fst(m)(*gB*), < exp(g,a(i))  , IdR(j)> > ,    Ininr(j,i))
         else
@@ -452,13 +452,13 @@ process InitiatorRoR(i:index) =
            then
        out(cI,
         (* idealized key computation *)
-        try find il, jl such that   (<Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
+        try find il jl such that   (<Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
          (il = i && jl = j)) in
              h(<exp(g,a(i)), < fst(m)(*gB*) , IdI(i)> > ,Ininr(j,i))
         else
             h(<exp(g,a(i)), < fst(m)(*gB*) , IdI(i)> > , IgarbI(j,i)));
 
-       out(cI,diff(      try find il, jl such that   (<Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
+       out(cI,diff(      try find il jl such that   (<Ni(i),fst(snd(m))(*Nr*)> = <Ni(il),Nr(jl)> &&
          (il = i && jl = j)) in
              h( exp(fst(m),a(i)), Ininr(j,i))
         else
@@ -471,7 +471,7 @@ process ResponderRoR(j:index) =
   try find i such that snd(snd(m))(*RIdi*) = IdI(i) in
     out(cR, <exp(g,b(j)), <Nr(j), < IdR(j)  ,
         (* idealized key computation *)
-        try find il, jl such that   (< fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
+        try find il jl such that   (< fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
          (il = i && jl = j)) in
             h(<exp(g,b(j)), <fst(m)(*gA*), IdR(j)> > ,   Ininr(j,i))
         else
@@ -481,14 +481,14 @@ process ResponderRoR(j:index) =
     in(cR, m2);
     if m2 =
         (* idealized key computation *)
-        try find il, jl such that   (< fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
+        try find il jl such that   (< fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
          (il = i && jl = j)) in
             h(<fst(m)(*gA*), <exp(g,b(j)), IdI(i)> > ,  Ininr(j,i))
         else
             h(<fst(m)(*gA*), <exp(g,b(j)), IdI(i)> > ,  IgarbR(j,i))
          then
        out(cR,diff(
-        try find il, jl such that   (< fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
+        try find il jl such that   (< fst(snd(m)),Nr(j)> = <Ni(il),Nr(jl)> &&
          (il = i && jl = j)) in
               h( exp(fst(m),b(j)), Ininr(j,i))
         else
@@ -516,7 +516,7 @@ Proof.
   expand exec.
   destruct Exec as [Pred Cond].
   expand cond.
-  case try find il,jl such that
+  case try find il jl such that
        (<fst(snd(input@R(j,i))),Nr(j)> = <Ni(il),Nr(jl)> && (il = i && jl = j))
      in h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,Ininr(j,i))
      else h(<fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>>,IgarbR(j,i)).
@@ -555,7 +555,7 @@ Proof.
   expand exec.
   expand cond.
   destruct Exec as [_ [CondTF _]].
-  case    try find il,jl such that
+  case    try find il jl such that
         (<Ni(i),fst(snd(input@I1(i,j)))> = <Ni(il),Nr(jl)> &&
          (il = i && jl = j))
       in h(<fst(input@I1(i,j)),<exp(g,a(i)),IdR(j)>>,Ininr(j,i))
@@ -771,20 +771,20 @@ equiv [Ror3,Ror/right] final.
 Proof.
   diffeq => *.
     + intro *.
-      case try find il,jl such that _ in idealkeys(il,jl) else _.
+      case try find il jl such that _ in idealkeys(il,jl) else _.
         - by use ddhnotuple1 with  fst(input@I2(i,j)),<exp(g,a(i)),IdR(j)>, exp(g,a(i)),b(j).
         -  intro *.
            fa; try auto.
 
     + intro *.
       use helper_wa4 with i,j; try auto.
-      case try find il,jl such that _ in idealkeys(il,jl) else _.
+      case try find il jl such that _ in idealkeys(il,jl) else _.
         - intro [?? [[Exp [_ _]] ->]].
-          case try find il0,jl0 such that _ in idealkeys(i,j) else _.
+          case try find il0 jl0 such that _ in idealkeys(i,j) else _.
           auto.
           intro [Abs _].
           by use Abs with i,j.
-       - case try find il0,jl0 such that _ in  h(exp(fst(att(frame@pred(I1(i,j)))),a(i)),Ininr(j,i))
+       - case try find il0 jl0 such that _ in  h(exp(fst(att(frame@pred(I1(i,j)))),a(i)),Ininr(j,i))
                   else _.
          intro Ex [Abs _].
          use Abs with i,j => //.
@@ -794,7 +794,7 @@ Proof.
 
     + intro *.
       expand exec.
-      case try find il,jl such that _
+      case try find il jl such that _
          in idealkeys(il,jl)
          else _.
       intro [?? [[_ [_ _]] ->]].
@@ -803,7 +803,7 @@ Proof.
       by fa.
 
     + intro *.
-      case try find il,jl such that _
+      case try find il jl such that _
          in idealkeys(il,jl)
          else _.
       by use ddhnotuple1 with  exp(g,a(i)),<fst(input@I1(i,j)),IdI(i)>, exp(g,a(i)),b(j).
@@ -811,7 +811,7 @@ Proof.
       by fa.
 
     + intro *.
-      case try find il,jl such that
+      case try find il jl such that
        _
          in idealkeys(il,jl)
          else _.
@@ -820,7 +820,7 @@ Proof.
       by fa.
 
     + intro *.
-      case try find il,jl such that _
+      case try find il jl such that _
          in idealkeys(il,jl)
          else _.
       by use ddhnotuple1 with  fst(input@R(j,i)),<exp(g,b(j)),IdI(i)>, exp(g,a(i)),b(j).
@@ -829,13 +829,13 @@ Proof.
 
     + intro *.
       use helper_wa3 with i,j; try auto.
-      case try find il0,jl0 such that
+      case try find il0 jl0 such that
          _
        in
          _
        else  h(exp(fst(att(frame@pred(R(j,i)))),b(j)),IgarbR(j,i)).
         - intro [?? [[_ _ _] ->]].
-          case (try find il,jl such that _
+          case (try find il jl such that _
            in idealkeys(il,jl) else _).
           ** auto. 
           ** intro [Abs _].
@@ -844,7 +844,7 @@ Proof.
           by use Abs with i,j.
 
     + intro *.
-      case try find il,jl such that _
+      case try find il jl such that _
          in idealkeys(il,jl)
          else _.
       by use ddhnotuple1 with exp(g,b(j)),<fst(input@R(j,i)),IdR(j)>,exp(g,a(i)),b(j).

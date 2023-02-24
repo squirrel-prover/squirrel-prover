@@ -1816,7 +1816,6 @@ v      The former corresponds to [apply] below and the latter corresponds
     | Name (n, _), Name _ ->
       let table = S.table s in
 
-      (* FEATURE: subtypes *)
       if not (tyn = tym) then
         Tactics.soft_failure (Failure "names are not of the same types");
 

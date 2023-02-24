@@ -578,7 +578,6 @@ let function_kind table (f : lsymb) : mf_type =
       `Macro (arg_ty, ty)
 
     | Macro (Input|Output|Frame) ->
-      (* FEATURE: subtypes*)
       `Macro ([], Type.tmessage)
 
     | Macro (Cond|Exec) ->
@@ -702,19 +701,14 @@ let ty_error ty_env tm ~(got : Type.ty) ~(expected : Type.ty) =
   let expected = Type.Infer.norm ty_env expected in
   Conv (L.loc tm, Type_error (L.unloc tm, expected, got))
 
-let check_ty_leq state ~of_t (t_ty : Type.ty) (ty : Type.ty) : unit =
-  match Type.Infer.unify_leq state.ty_env t_ty ty with
+let check_ty_eq state ~of_t (t_ty : Type.ty) (ty : Type.ty) : unit =
+  match Type.Infer.unify_eq state.ty_env t_ty ty with
   | `Ok -> ()
   | `Fail ->
     raise (ty_error state.ty_env of_t ~got:t_ty ~expected:ty)
 
-(* let check_ty_eq state ~of_t (t_ty : Type.ty) (ty : 'b Type.ty) : unit =
- *   match Type.Infer.unify_eq state.ty_env t_ty ty with
- *   | `Ok -> ()
- *   | `Fail -> raise (ty_error state.ty_env of_t ty) *)
-
 let check_term_ty state ~of_t (t : Term.term) (ty : Type.ty) : unit =
-  check_ty_leq state ~of_t (Term.ty ~ty_env:state.ty_env t) ty
+  check_ty_eq state ~of_t (Term.ty ~ty_env:state.ty_env t) ty
 
 (*------------------------------------------------------------------*)
 (** {2 System projections} *)
@@ -836,7 +830,7 @@ let convert_var
 
     let of_t = var_of_lsymb st in
 
-    check_ty_leq state ~of_t (Vars.ty v) ty;
+    check_ty_eq state ~of_t (Vars.ty v) ty;
 
     Term.mk_var v
   with
@@ -1248,8 +1242,8 @@ and conv_app
 
     (* additional type check between the type of [t] and the output
        type [ty_out].
-       Note that [convert] checks that the type of [t] is a subtype
-       of [ty], hence we do not need to do it here. *)
+       Note that [convert] checks that the type of [t] equals
+       [ty], hence we do not need to do it here. *)
     check_term_ty state ~of_t:tm t ty_out;
 
     t
@@ -1285,7 +1279,6 @@ and conv_app
       | Input | Output | Frame ->
         check_arity ~mode:`Full  (L.mk_loc (L.loc f) "input")
           ~actual:(List.length terms) ~expected:0;
-        (* FEATURE: subtypes *)
         let ms = Term.mk_symb s ty_out in
         Term.mk_macro ms [] (get_at ts_opt)
 

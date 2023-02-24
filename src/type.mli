@@ -88,7 +88,6 @@ module Infer : sig
   val norm   : env -> ty  -> ty
       
   val unify_eq  : env -> ty -> ty -> [`Fail | `Ok]
-  val unify_leq : env -> ty -> ty -> [`Fail | `Ok]
 
   val is_closed     : env -> bool
   val close         : env -> tsubst

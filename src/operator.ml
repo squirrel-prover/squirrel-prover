@@ -92,7 +92,7 @@ let unfold
   let subst = 
     List.map2 (fun x t ->       (* add types information to [ty_env] *)
         let _ : [`Ok | `Fail] =
-          Type.Infer.unify_leq ty_env (Term.ty t) (Vars.ty x)
+          Type.Infer.unify_eq ty_env (Term.ty t) (Vars.ty x)
         in
         
         Term.ESubst (Term.mk_var x,t)

@@ -197,7 +197,7 @@ term_i:
     { let fsymb = sloc $startpos $endpos "if" in
       Theory.mk_app_i (Theory.mk_symb fsymb) [b;t;t0] }
 
-| FIND vs=tf_arg_list SUCHTHAT b=term IN t=term t0=else_term
+| FIND vs=bnds SUCHTHAT b=term IN t=term t0=else_term
                                  { Theory.Find (vs,b,t,t0) }
 
 | f=term o=loc(ord) f0=term                
