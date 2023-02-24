@@ -20,8 +20,8 @@ abstract mess : index -> message
 
 system [test] !_i (
 in(c,x);
-out(c, diff(try find j,j2 such that j=i && j=j2 in <mess(i),mess(j2)>, 
-            try find l,l2 such that l=i && l2=i in <mess(i), mess(l2)>))).
+out(c, diff(try find j j2 such that j=i && j=j2 in <mess(i),mess(j2)>, 
+            try find l l2 such that l=i && l2=i in <mess(i), mess(l2)>))).
 
 equiv [test] test.
 Proof.
@@ -30,17 +30,17 @@ Proof.
   expandall.
   fa 0; fa 1; fa 1.
   assert ->:
-    try find j,j2 such that (j = i && diff(j,j2) = diff(j2, i)) in 
+    try find j j2 such that (j = i && diff(j,j2) = diff(j2, i)) in 
      <mess(i),mess(j2)>
     =
-    try find j,j2 such that (j = i && j = j2) in <mess(i),mess(j2)>.
+    try find j j2 such that (j = i && j = j2) in <mess(i),mess(j2)>.
   by project; fa.
   
   assert ->:
-    try find j,j2 such that (j = i && j = j2) in <mess(i),mess(j2)> 
+    try find j j2 such that (j = i && j = j2) in <mess(i),mess(j2)> 
     = 
     <mess(i),mess(i)>. {
-    case  try find j,j2 such that (j = i && j = j2) in <mess(i),mess(j2)>.
+    case  try find j j2 such that (j = i && j = j2) in <mess(i),mess(j2)>.
     + auto.
   
     + intro [H0 _].
@@ -51,7 +51,7 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------------*)
-goal _ : zero = try find t,t' : timestamp such that t <= t' in zero else zero.
+goal _ : zero = try find (t,t' : timestamp) such that t <= t' in zero else zero.
 Proof. 
-  by case try find t,t' : timestamp such that _ in _.
+  by case try find (t,t' : timestamp) such that _ in _.
 Qed.

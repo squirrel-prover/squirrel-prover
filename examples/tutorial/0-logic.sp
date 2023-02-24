@@ -385,7 +385,7 @@ Proof.
   apply Hequiv.
 Qed.
 
-global axiom f_equiv : Forall (x:message) equiv(diff(f(x), cst)).
+global axiom f_equiv : Forall (x:message), equiv(diff(f(x), cst)).
 
 abstract cst' : message.
 

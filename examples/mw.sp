@@ -46,7 +46,7 @@ process reader =
      xor(diff(id(i),id'(i,t))) (snd(m)) =
      H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t)))
   then
-    out(c, try find i,t such that
+    out(c, try find i t such that
              xor(diff(id(i),id'(i,t))) (snd(m)) = H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t))) in
            xor(diff(id(i),id'(i,t))) (H(<tag1,<nr,fst(m)>>,diff(key(i),key'(i,t)))))
   else
@@ -149,13 +149,13 @@ Qed.
     and insert exec conjunct. *)
 goal wa_R1_tryfind (r:index) : happens(R1(r)) =>
   (if exec@pred(R1(r)) && cond@R1(r) then
-   try find i,t such that
+   try find i t such that
      xor(diff(id(i),id'(i,t))) (snd(input@R1(r))) =
      H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))) in
    xor(diff(id(i),id'(i,t))) (H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))))
   =
   (if exec@pred(R1(r)) && cond@R1(r) then
-   try find i,t such that
+   try find i t such that
      exec@pred(R1(r)) &&
      (T(i,t) < R1(r) &&
       fst(output@T(i,t)) = fst(input@R1(r)) &&

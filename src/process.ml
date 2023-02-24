@@ -11,10 +11,6 @@ let mk_dum (v : 'a) : 'a L.located = L.mk_loc dum v
 (*------------------------------------------------------------------*)
 type proc_ty = (string * Type.ty) list
 
-let pp_proc_ty =
-  let pp_el fmt (s,e) = Fmt.pf fmt "(%s : %a)" s Type.pp e in
-  (Fmt.list pp_el)
-
 (*------------------------------------------------------------------*)
 type lsymb = Theory.lsymb
 
@@ -178,8 +174,8 @@ let error loc e = raise (Error (loc,e))
     their types. *)
 type Symbols.data += Process_data of proc_ty * Term.projs * process
 
-let declare_nocheck table name (kind : proc_ty) projs proc =
-    let data = Process_data (kind,projs,proc) in
+let declare_nocheck table (name : Theory.lsymb) (args : proc_ty) (projs : Term.projs) proc =
+    let data = Process_data (args,projs,proc) in
     let def = () in
     Symbols.Process.declare_exact table name ~data def
 
@@ -198,21 +194,23 @@ let check_channel table (s : lsymb) =
 
 (*------------------------------------------------------------------*)
 (** Type checking for processes *)
-let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
+let check_proc
+    table ~(args:Theory.bnds) (projs : Term.projs) (process : process) 
+  : proc_ty * process
+  =
   let rec check_p (ty_env : Type.Infer.env) (env : Env.t) proc =
     let loc = L.loc proc in
     match L.unloc proc with
     | Null -> ()
 
     | New (x, ty, p) -> 
-      let ty = Theory.convert_ty env ty in 
+      let ty = Theory.convert_ty ~ty_env env ty in 
       let vars, _ = Vars.make_local `Shadow env.vars ty (L.unloc x) in
       check_p ty_env { env with vars } p
 
     | In (c,x,p) -> 
       check_channel env.table c;
 
-      (* FEATURE: subtypes*)
       let vars, _ = Vars.make_local `Shadow env.vars (Type.Message) (L.unloc x) in
       check_p ty_env { env with vars } p
 
@@ -225,7 +223,6 @@ let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
       if is_out proc && (TConfig.strict_alias_mode env.table)
       then error loc (StrictAliasError "missing alias")
       else
-        (* FEATURE: subtypes *)
         let () = 
           Theory.check env ~local:true ty_env projs m Type.tmessage 
         in
@@ -247,7 +244,7 @@ let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
     | Let (x, t, ptyo, p) ->
       let ty : Type.ty = match ptyo with
         | None -> TUnivar (Type.Infer.mk_univar ty_env)
-        | Some pty -> Theory.convert_ty env pty 
+        | Some pty -> Theory.convert_ty ~ty_env env pty 
       in
       
       Theory.check env ~local:true ty_env projs t ty ;
@@ -285,32 +282,42 @@ let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
         kind ts
   in
 
+  (* open a typing environment *)
   let ty_env = Type.Infer.mk_env () in
 
-  check_p ty_env env p;
+  let env = Env.init ~table () in
+  let env, args = Theory.convert_bnds ~ty_env Vars.Tag.ltag env args in
 
+  check_p ty_env env process;
+
+  (* check that the typing environment is closed *)
   if not (Type.Infer.is_closed ty_env) then
-    error (L.loc p) Freetyunivar;
+    error (L.loc process) Freetyunivar;
 
-  ()
+  (* close the typing environment and substitute *)
+  let tsubst = Type.Infer.close ty_env in
+  let args = List.map (Vars.tsubst tsubst) args in
+  (* no need to substitute in the process itself, as we retype it later *)
 
+  (* process are stored with an ad hoc type for variables *)
+  let args : (string * Type.ty) list = 
+    List.map (fun v -> Vars.name v, Vars.ty v) args 
+  in
 
+  args, process
+
+(*------------------------------------------------------------------*)
 let declare
     (table : Symbols.table)
-    (id : lsymb) (args : proc_ty) (projs : Term.projs)
+    ~(id : lsymb) ~(args : Theory.bnds) ~(projs : lsymb list option)
     (proc : process)
   =
-  let vars = 
-    List.fold_left (fun vars (v, ty) ->
-        let vars, _ = Vars.make_local `Shadow vars ty v in
-        vars
-      ) Vars.empty_env args 
-  in
-  let env = Env.init ~vars ~table () in
+  let projs = Theory.parse_projs projs in
 
   (* type-check and declare *)
-  check_proc env projs proc ;
-  let table, _ = declare_nocheck env.table id args projs proc in
+  let args, _ = check_proc table ~args projs proc in
+
+  let table, _ = declare_nocheck table id args projs proc in
   table
 
 (*------------------------------------------------------------------*)
@@ -390,6 +397,7 @@ type p_env = {
 
 }
 
+(*------------------------------------------------------------------*)
 (* Creates an axiom namelength_name with formula : 
   len(s) = namelength_hashS with hashS depending on out type of name s *)
 let mk_namelength_axiom' 
@@ -439,6 +447,7 @@ let mk_namelength_axiom'
            ty_vars = ftype.fty_vars; 
            formula = Equiv.Global f }
 
+(*------------------------------------------------------------------*)
 (* Add namelength axiom of given name of symbol s with type ftype *)
 let add_namelength_axiom 
     ?(loc = L._dummy)
@@ -453,13 +462,64 @@ let add_namelength_axiom
     mk_namelength_axiom' name table s ftype in
   Lemma.add_lemma `Axiom stmt table
 
+
+(*------------------------------------------------------------------*)
+(* Used to get the 2nd and 3rd component associated to the string [v] in
+ * the substitutions [isubst] or [msubst]. *)
+let list_assoc v l =
+  let _,th,tm = List.find (fun (x,_,_) -> x = v) l in
+  th,tm
+
+let to_tsubst subst = List.map (fun (x,y,_) -> x,y) subst 
+
+(*------------------------------------------------------------------*)
+(* Update env.vars_env with a new variable of sort [sort] computed from
+ * [name] *)
+let make_fresh param (penv : p_env) sort name =
+  let vars,x = Vars.make_local param penv.env.vars sort name in
+  { penv with env = { penv.env with vars }}, x
+
+(*------------------------------------------------------------------*)
+let create_subst (venv : Vars.env) isubst msubst =
+  List.map (fun (x,_,tm) -> 
+      let v, _ = as_seq1 (Vars.find venv x) in
+      (* cannot have two variables with the same name since previous 
+         definitions must have been shadowed *)
+      Term.ESubst (Term.mk_var v, Term.mk_var tm)
+    ) isubst
+  @
+  List.map (fun (x,_,tm) -> 
+      let v, _ = as_seq1 (Vars.find venv x) in (* idem *)
+      Term.ESubst (Term.mk_var v, tm)
+    ) msubst
+
+(*------------------------------------------------------------------*)
+(** Convert a [Theory.term] to [Term.term] using the special sort
+    of substitution ([isubst] and [msubst]) maintained by the
+    parsing function.
+    The special timestamp variable [ts] is used. *)
+let conv_term 
+    (penv  : p_env)
+    (ts    : Term.term) 
+    (t     : Theory.term)
+    (ty    : Type.ty) 
+  : Term.term 
+  =
+  let t, _ = 
+    Theory.convert ~ty_env:penv.ty_env 
+      { env = penv.env; cntxt = InProc (penv.projs,ts); } ~ty t 
+  in
+  let subst = create_subst penv.env.vars penv.isubst penv.msubst in
+  Term.subst subst t
+
+(*------------------------------------------------------------------*)
 let parse_proc (system_name : System.t) init_table init_projs proc =
 
   (* Initial env with special variables registered.
-   * The special variables should never be visible to the user,
-   * we prefix their names with $ to avoid conflicts with user names,
-   * and also register special variables in the environment for extra
-   * safety. *)
+     The special variables should never be visible to the user,
+     we prefix their names with $ to avoid conflicts with user names,
+     and also register special variables in the environment for extra
+     safety. *)
   let env_ts,ts,dummy_in =
     let env = Vars.empty_env in
     let env,ts = Vars.make_local `Shadow env Type.Timestamp "$ts" in
@@ -467,57 +527,38 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     env,ts,dummy_in
   in
 
-  (* Update env.vars_env with a new variable of sort [sort] computed from
-   * [name] *)
-  let make_fresh param (penv : p_env) sort name =
-    let vars,x = Vars.make_local param penv.env.vars sort name in
-    { penv with env = { penv.env with vars }}, x
+  (* TODO: types: move functions below *)
+  (* Close all type unification variables un [unis]. *)
+  let tsubst_of_unis ?loc ty_env (unis : Ident.Sid.t) : Type.tsubst =
+    Ident.Sid.fold (fun (u : Ident.t) tsubst ->
+        let ty = 
+          match Type.Infer.norm ty_env (Type.TUnivar (Type.to_univar u)) with
+          | Type.TUnivar _ -> 
+            let loc = odflt (L.loc proc) loc in
+            error loc Freetyunivar
+          | ty -> ty
+        in
+        Type.tsubst_add_univar tsubst (Type.to_univar u) ty
+      ) unis Type.tsubst_empty
   in
 
-  let create_subst (venv : Vars.env) isubst msubst =
-    List.map (fun (x,_,tm) -> 
-        let v, _ = as_seq1 (Vars.find venv x) in
-        (* cannot have two variables with the same name since previous 
-           definitions must have been shadowed *)
-        Term.ESubst (Term.mk_var v, Term.mk_var tm)
-      ) isubst
-    @
-    List.map (fun (x,_,tm) -> 
-        let v, _ = as_seq1 (Vars.find venv x) in (* idem *)
-        Term.ESubst (Term.mk_var v, tm)
-      ) msubst
+  (* Close all type unification variables in term [t]. *)
+  let term_close_univars ?loc ty_env (t : Term.term) : Term.term =
+    let free_unis = Term.free_univars t in
+    let tsubst = tsubst_of_unis ?loc ty_env free_unis in
+    Term.tsubst tsubst t
   in
 
-  (* Convert a Theory.term to Term.term using the special sort
-   * of substitution ([isubst] and [msubst]) maintained by the
-   * parsing function.
-   * The special timestamp variable [ts] is used. *)
-  let conv_term 
-      (penv  : p_env)
-      (ts    : Term.term) 
-      (t     : Theory.term)
-      (ty    : Type.ty) 
-    : Term.term 
-    =
-    let t, _ = 
-      Theory.convert ~ty_env:penv.ty_env 
-        { env = penv.env; cntxt = InProc (penv.projs,ts); } ~ty t 
-    in
-    let subst = create_subst penv.env.vars penv.isubst penv.msubst in
-    Term.subst subst t
-  in
-
-  (* Used to get the 2nd and 3rd component associated to the string [v] in
-   * the substitutions [isubst] or [msubst]. *)
-  let list_assoc v l =
-    let _,th,tm = List.find (fun (x,_,_) -> x = v) l in
-    th,tm
-  in
-
-  let to_tsubst subst = List.map (fun (x,y,_) -> x,y) subst in
-
+  (* Close all type unification variables in variables [vs]. *)
+  let vars_close_univars ?loc ty_env (vs : Vars.vars) : Vars.vars =
+    let free_unis = Vars.free_univars_list vs in
+    let tsubst = tsubst_of_unis ?loc ty_env free_unis in
+    List.map (Vars.tsubst tsubst) vs
+   in
+  
+  (*------------------------------------------------------------------*)
   (* Register an action, when we arrive at the end of a block
-   * (input / condition / update / output). *)
+     (input / condition / update / output). *)
   let register_action _loc a output (penv : p_env) =
     (* In strict alias mode, we require that the alias T is available. *)
     let exact = TConfig.strict_alias_mode (penv.env.table) in
@@ -552,7 +593,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
             penv.msubst in
         (x,in_th,in_tm) :: penv.msubst
       (* in case of Not_found, it means it is a dummy input,
-       * which cannot be used in the terms, so we don't need a substitution *)
+         which cannot be used in the terms, so we don't need a substitution *)
       with Not_found -> penv.msubst
     in
     let penv = { penv with msubst = msubst' } in
@@ -564,22 +605,34 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     print_msubst penv.msubst ;
 
     (* compute the condition, the updates, and the output of this action,
-     * using elements we have stored in [env] of type [p_env] while parsing
-     * the process *)
+       using elements we have stored in [env] of type [p_env] while parsing
+       the process *)
     let condition =
-      List.rev penv.evars,
-      Term.subst
-        (subst_ts @ subst_input)
-        (Term.mk_ands penv.facts) 
+      let vars = List.rev penv.evars in
+      let t = 
+        Term.subst
+          (subst_ts @ subst_input)
+          (Term.mk_ands penv.facts) 
+      in
+
+      (* close unification variables *)
+      let t = term_close_univars penv.ty_env t in
+      let vars = vars_close_univars penv.ty_env vars in
+
+      (vars,t)
     in
     debug "condition = %a.@." Term.pp (snd condition);
 
     let updates =
       List.map (fun (s,args,_,t) ->
           let ms = Symbols.Macro.of_lsymb s penv.env.table in
-          ms,
-          args,
-          Term.subst (subst_ts @ subst_input) t
+          let t = Term.subst (subst_ts @ subst_input) t in
+
+          (* close unification variables *)
+          let t = term_close_univars ~loc:(L.loc s) penv.ty_env t in
+          let args = vars_close_univars  ~loc:(L.loc s) penv.ty_env args in
+
+          ( ms, args, t)
         ) penv.updates
     in
 
@@ -592,15 +645,19 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
               Term.pp v))
       updates ;
 
-    let output = match output with
-      | Some (c,t) ->
+    let output : Symbols.channel * Term.term =
+      match output with
+      | Some (c,ti) ->
         let t = 
-          (* FEATURE: subtypes *)
           Term.subst (subst_ts @ subst_input)
-            (conv_term penv action_term t Type.Message) 
+            (conv_term penv action_term ti Type.Message) 
         in
-        c, t
-          
+
+        (* close unification variables *)
+        let t = term_close_univars ~loc:(L.loc ti) penv.ty_env t in
+
+        (c, t)
+
       | None -> Symbols.dummy_channel, Term.empty
     in
 
@@ -641,6 +698,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     ({ penv with env = { penv.env with table } }, new_a)
   in
 
+  (*------------------------------------------------------------------*)
   (* common treatment of Apply, Alias and New constructs *)
   let p_common ~(penv : p_env) proc =
     match L.unloc proc with
@@ -692,7 +750,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       (penv,p)
 
   | New (n, pty, p) ->
-    let ty = Theory.convert_ty penv.env pty in
+    let ty = Theory.convert_ty ~ty_env:penv.ty_env penv.env pty in
 
     let n_fty = Type.mk_ftype_tuple [] (List.map Vars.ty penv.indices) ty in
     let ndef = Symbols.{ n_fty } in
@@ -726,6 +784,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
   in
 
+  (*------------------------------------------------------------------*)
   (* treatment of Let(x,t,p) constructs
    * the boolean [in_update] indicates whether we are in the update phase:
    * In that case, we have to search in [t] if there are some get terms for 
@@ -735,7 +794,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
   | Let (x,t,ptyo,p) ->
     let ty : Type.ty = match ptyo with
       | None -> TUnivar (Type.Infer.mk_univar penv.ty_env)
-      | Some pty -> Theory.convert_ty penv.env pty 
+      | Some pty -> Theory.convert_ty ~ty_env:penv.ty_env penv.env pty 
     in
 
     let t' = Theory.subst t (to_tsubst penv.isubst @ to_tsubst penv.msubst) in
@@ -756,6 +815,9 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       | Type.TUnivar _ -> error (L.loc proc) Freetyunivar
       | _ as ty -> ty
     in
+
+  (* Close all type unification variables un [body]. *)
+    let body = term_close_univars ~loc:(L.loc t) penv.ty_env body in
 
     let invars = List.map snd penv.inputs in
     let shape = Action.get_shape_v (List.rev penv.action) in
@@ -842,7 +904,6 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
 
     | In (c,x,p) ->
       let ch = Channel.of_lsymb c penv.env.table in
-      (* FEATURE: subtypes *)
       let penv,x' = make_fresh `Shadow penv Type.Message (L.unloc x) in
       let in_th = Theory.var_i dum (Vars.name x') in
       let in_tm = Term.mk_var x' in
@@ -868,6 +929,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       let p',_,table = p_cond_i ~penv ~pos:0 ~par_choice proc in
       (p', pos+1,table)
 
+  (*------------------------------------------------------------------*)
   (* Similar to [p_in].
      The [par_choice] component of the action under construction
      has been determined by [p_in].
@@ -878,6 +940,7 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
     let p, pos, table = p_cond_i ~penv ~pos ~par_choice proc in
     (L.mk_loc (L.loc proc) p, pos, table)
 
+  (*------------------------------------------------------------------*)
   and p_cond_i ~penv ~pos ~par_choice proc =
     match L.unloc proc with
     | Apply _ | Alias _ | New _ ->
@@ -961,11 +1024,12 @@ let parse_proc (system_name : System.t) init_table init_projs proc =
       let p',_,table = p_update_i ~penv proc in
       (p', pos + 1,table)
 
-
+  (*------------------------------------------------------------------*)
   and p_update ~penv (proc : process) =
     let p, pos, table = p_update_i ~penv proc in
     (L.mk_loc (L.loc proc) p, pos, table)
 
+  (*------------------------------------------------------------------*)
   and p_update_i ~penv (proc : process) =
     let loc = L.loc proc in
     match L.unloc proc with
@@ -1104,8 +1168,8 @@ let declare_system table system_name (projs : Term.projs) (proc : process) =
     "@[<v 2>System before processing:@;@;@[%a@]@]@.@."
     pp_process proc ;
 
-  let env = Env.init ~table () in
-  check_proc env projs proc ;
+  (* type-check the processus *)
+  let _ = check_proc table ~args:[] projs proc in
 
   (* FEATURE: allow user to define more than bi-system *)
   let projections = [Term.left_proj; Term.right_proj] in

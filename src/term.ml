@@ -5,6 +5,8 @@ module L = Location
 module Sv = Vars.Sv
 module Mv = Vars.Mv
 
+module Sid = Ident.Sid
+
 (*------------------------------------------------------------------*)
 (** {2 Symbols} *)
 
@@ -814,6 +816,47 @@ let tforall (f : term -> bool) (t : term) : bool =
   tfold (fun t b -> f t && b) t true
 
 (*------------------------------------------------------------------*)
+let isymb_free_univars (s : 'a isymb) : Sid.t = 
+  Type.free_univars s.s_typ
+
+let free_univars (t : term) : Sid.t = 
+  let rec doit acc t =
+    match t with
+    | Var tv -> Sid.union (Vars.free_univars tv) acc
+    | Fun (_, fty, lt) -> 
+      let acc = Sid.union (Type.ftype_free_univars fty) acc in
+      doit_list acc lt
+
+    | App (t, l) -> doit_list acc (t :: l)
+
+    | Macro (s, l, ts) ->
+      let acc = Sid.union (isymb_free_univars s) acc in
+      doit_list acc (ts :: l)
+
+    | Name (s,l) ->
+      let acc = Sid.union (isymb_free_univars s) acc in
+      doit_list acc l
+
+    | Tuple l
+    | Action (_,l) -> doit_list acc l
+
+    | Proj (_, t) -> doit acc t
+
+    | Diff (Explicit l) -> doit_list acc (List.map snd l)
+
+    | Find (vs, a, b, c) ->
+      let acc = Sid.union acc (Vars.free_univars_list vs) in
+      doit_list acc [a; b; c]
+
+    | Quant (_, vs, b) -> 
+      let acc = Sid.union acc (Vars.free_univars_list vs) in
+      doit acc b
+        
+  and doit_list acc l = List.fold_left doit acc l in
+
+  doit Sid.empty t
+
+(*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
 
 (** given a variable [x] and a subst [s], remove from [s] all
@@ -1365,13 +1408,13 @@ let ty ?ty_env (t : term) : Type.ty =
       
       let ty_args, ty_out =
         let arrow_ty = Type.fun_l fty.fty_args fty.fty_out in
-        Type.destr_funs arrow_ty (List.length terms)
+        Type.destr_funs ~ty_env arrow_ty (List.length terms)
       in
       check_tys terms ty_args;
       ty_out
 
     | App (t1, l) ->
-      let tys, t_out = Type.destr_funs (ty t1) (List.length l) in      
+      let tys, t_out = Type.destr_funs ~ty_env (ty t1) (List.length l) in      
       check_tys l tys;
       t_out
 
@@ -1406,7 +1449,7 @@ let ty ?ty_env (t : term) : Type.ty =
 
   and check_tys (terms : term list) (tys : Type.ty list) =
     List.iter2 (fun term arg_ty ->
-        match Type.Infer.unify_leq ty_env (ty term) arg_ty with
+        match Type.Infer.unify_eq ty_env (ty term) arg_ty with
         | `Ok -> ()
         | `Fail -> assert false
       ) terms tys

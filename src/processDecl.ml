@@ -88,20 +88,33 @@ let parse_operator_decl table (decl : Decl.operator_decl) =
       ) decl.op_tyargs
     in
 
+    (* open a typing environment *)
+    let ty_env = Type.Infer.mk_env () in
+
     let env = Env.init ~table ~ty_vars () in
     let env, subst, args =
-      Theory.convert_ext_bnds (Vars.Tag.make ~const:true Vars.Global) env decl.op_args
+      Theory.convert_ext_bnds ~ty_env (Vars.Tag.make ~const:true Vars.Global) env decl.op_args
       (* assume global constant variables to properly check that the
          body represents a deterministic computations later
          (as constant => deterministic). *)
     in
 
-    let out_ty = omap (Theory.convert_ty env) decl.op_tyout in
+    let out_ty = omap (Theory.convert_ty ~ty_env env) decl.op_tyout in
 
     let body, out_ty = 
-      Theory.convert ?ty:out_ty { env; cntxt = InGoal } decl.op_body 
+      Theory.convert ~ty_env ?ty:out_ty { env; cntxt = InGoal } decl.op_body 
     in
     let body = Term.subst subst body in
+
+    (* check that the typing environment is closed *)
+    if not (Type.Infer.is_closed ty_env) then 
+      error (L.loc decl.op_body) KDecl (Failure "some types could not be inferred");
+
+    (* close the typing environment and substitute *)
+    let tsubst = Type.Infer.close ty_env in
+    let args = List.map (Vars.tsubst tsubst) args in
+    let out_ty = Type.tsubst tsubst out_ty in
+    let body = Term.tsubst tsubst body in
 
     if not (HighTerm.is_deterministic env body) then
       error (L.loc decl.op_body) KDecl NonDetOp;
@@ -150,12 +163,6 @@ let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
       (sp, ty)
     ) ctys
 
-let parse_projs (p_projs : lsymb list option) : Term.projs =
-  omap_dflt
-    [Term.left_proj; Term.right_proj]
-    (List.map (Term.proj_from_string -| L.unloc))
-    p_projs
-
 (*------------------------------------------------------------------*)
 let define_oracle_tag_formula table (h : lsymb) (fm : Theory.term) =
   let env = Env.init ~table () in
@@ -185,15 +192,8 @@ let declare table decl : Symbols.table * Goal.t list =
   match L.unloc decl with
   | Decl.Decl_channel s -> Channel.declare table s, []
 
-  | Decl.Decl_process { id; projs; args; proc} ->
-    let env = Env.init ~table () in
-    let args = List.map (fun (x,t) ->
-        L.unloc x, Theory.convert_ty env t
-      ) args
-    in
-    let projs = parse_projs projs in
-    
-    Process.declare table id args projs proc, []
+  | Decl.Decl_process { id; projs; args; proc} ->   
+    Process.declare table ~id ~args ~projs proc, []
 
   | Decl.Decl_action a ->
     let table, symb = Symbols.Action.reserve_exact table a.a_name in
@@ -212,7 +212,7 @@ let declare table decl : Symbols.table * Goal.t list =
     Lemma.add_lemma ~loc `Axiom gc table, []
 
   | Decl.Decl_system sdecl ->
-    let projs = parse_projs sdecl.sprojs in
+    let projs = Theory.parse_projs sdecl.sprojs in
     Process.declare_system table sdecl.sname projs sdecl.sprocess, []
 
   | Decl.Decl_system_modifier sdecl ->

@@ -7,6 +7,8 @@ abstract ko : message
 
 system null.
 
-goal _ : (try find i such that i=i in ok) = (try find i such that i=i in ko).
+goal _ :
+  (try find (i : index) such that i=i in ok) = 
+  (try find (i : index) such that i=i in ko).
 Proof.
   congruence.

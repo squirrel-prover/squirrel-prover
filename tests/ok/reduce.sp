@@ -29,14 +29,14 @@ Qed.
 axiom [any] exists_true1 ['a] : (exists (x : 'a), true) = true.
 
 goal [any] _ :
- try find i : index such that (exists (j : index), i = j && i <> j)
+ try find i such that (exists (j : index), i = j && i <> j)
  in zero else empty
  =
  empty.
 Proof. by rewrite [/= ~constr] exists_false1 /=. Qed.
 
 goal [any] _ :
- try find i : index such that not (exists (j : index), not (i = j && i <> j))
+ try find i such that not (exists (j : index), not (i = j && i <> j))
  in zero else empty
  =
  empty.

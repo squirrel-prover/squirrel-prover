@@ -71,7 +71,13 @@ let is_pat v = String.sub v.id.name 0 1 = "_"
 let name v = v.id.name
 let hash v = v.id.tag
 let ty   v = v.ty
+
+(*------------------------------------------------------------------*)
+let free_univars v = Type.free_univars v.ty
                
+let free_univars_list l =
+  List.fold_left (fun uvs v -> Ident.Sid.union uvs (free_univars v)) Ident.Sid.empty l
+
 (*------------------------------------------------------------------*)
 let norm_ty (env : Type.Infer.env) (v : var) : var =
   { v with ty = Type.Infer.norm env v.ty }

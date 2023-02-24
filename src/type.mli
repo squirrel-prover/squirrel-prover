@@ -14,11 +14,13 @@ val ident_of_tvar : tvar -> Ident.t
 (*------------------------------------------------------------------*)
 (** Variables for type inference *)
 
-type univar
+type univar = private Ident.t
 type univars = univar list
 
 val pp_univar : Format.formatter -> univar -> unit
   
+val to_univar : Ident.t -> univar
+
 (*------------------------------------------------------------------*)
 (** Types of terms *)
 type ty =
@@ -43,37 +45,23 @@ type ty =
   (** arrow type [t1 -> t2] *)
 
 (*------------------------------------------------------------------*)
+(** {2 Misc} *)
+
 val pp : Format.formatter -> ty -> unit
 
-(*------------------------------------------------------------------*)
+(** Equality relation *)
+val equal : ty -> ty -> bool
+
 val is_tuni : ty -> bool
+
+(*------------------------------------------------------------------*)
+val free_univars : ty -> Ident.Sid.t 
 
 (*------------------------------------------------------------------*)
 val tboolean   : ty
 val tmessage   : ty
 val ttimestamp : ty
 val tindex     : ty
-
-val base : string -> ty   
-
-val fun_l : ty list -> ty -> ty
-
-val tuple : ty list -> ty
-  
-(*------------------------------------------------------------------*)
-(** Destruct a given number of [Fun]. *)
-val destr_funs     : ty -> int -> ty list * ty
-val destr_funs_opt : ty -> int -> (ty list * ty) option
-
-(** If [decompose_funs t = (targs, tout)] then:
-    - [t = t1 -> ... -> tn -> tout] where [targs = \[t1; ...; tn\]]
-    - [tout] is not an arrow type *)
-val decompose_funs : ty -> ty list * ty
-                                  
-(*------------------------------------------------------------------*)
-(** Equality relation *)
-val equal : ty -> ty -> bool
-  
 (*------------------------------------------------------------------*)
 (** {2 Type substitution } *)
 
@@ -105,12 +93,30 @@ module Infer : sig
   val norm   : env -> ty  -> ty
       
   val unify_eq  : env -> ty -> ty -> [`Fail | `Ok]
-  val unify_leq : env -> ty -> ty -> [`Fail | `Ok]
 
   val is_closed     : env -> bool
   val close         : env -> tsubst
   val gen_and_close : env -> tvars * tsubst
 end
+
+(*------------------------------------------------------------------*)
+(** {2 Constructors and destructors} *)
+val base : string -> ty   
+
+val fun_l : ty list -> ty -> ty
+
+val tuple : ty list -> ty
+  
+(*------------------------------------------------------------------*)
+(** Destruct a given number of [Fun]. 
+    If [ty_env] is not [None], may add new type equalities to do so. *)
+val destr_funs     : ?ty_env:Infer.env -> ty -> int -> ty list * ty
+val destr_funs_opt : ?ty_env:Infer.env -> ty -> int -> (ty list * ty) option
+
+(** If [decompose_funs t = (targs, tout)] then:
+    - [t = t1 -> ... -> tn -> tout] where [targs = \[t1; ...; tn\]]
+    - [tout] is not an arrow type *)
+val decompose_funs : ty -> ty list * ty
 
 (*------------------------------------------------------------------*)
 (** {2 Function symbols type} *)
@@ -135,7 +141,10 @@ type ftype_op = univar ftype_g
 (*------------------------------------------------------------------*)
 val pp_ftype    : Format.formatter -> ftype    -> unit
 val pp_ftype_op : Format.formatter -> ftype_op -> unit
-  
+
+(*------------------------------------------------------------------*)
+val ftype_free_univars : ftype -> Ident.Sid.t
+ 
 (*------------------------------------------------------------------*)
 val mk_ftype : tvar list -> ty list -> ty -> ftype
 

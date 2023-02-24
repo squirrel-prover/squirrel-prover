@@ -11,12 +11,12 @@ system !_i out(c,<a(n(i)),a(m)>).
 
 (* The main test, with a non-empty list of bound variables. *)
 goal bar : forall (tau, tau' : timestamp, i:index),
-  output@tau = try find i such that true in output@tau else a(m).
+  output@tau = try find (i : index) such that true in output@tau else a(m).
 Proof.
   intro tau tau' i0.
   show a(_).
-  show (try find i such that _ in _ else a(m)).
-  case (try find i such that _ in _ else a(m)).
+  show (try find (i : index) such that _ in _ else a(m)).
+  case (try find (i : index) such that _ in _ else a(m)).
   intro [i [H ->]] //.
 
   intro [H _].
@@ -38,8 +38,8 @@ Proof.
 
 
  (* following command fails and should not*)
-  show try find i such that _ in _ else a(m).
-  show try find i0 such that _ in output@tau else a(m).
+  show try find (i : index) such that _ in _ else a(m).
+  show try find (i0 : index) such that _ in output@tau else a(m).
 
   (* following command fails, but maybe there is no solution *)
   (* show (try find i such that _ in _ else _). *)

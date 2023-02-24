@@ -13,10 +13,11 @@ type p_ty_i =
   | P_boolean
   | P_index
   | P_timestamp
-  | P_tbase of lsymb
-  | P_tvar  of lsymb
-  | P_fun   of p_ty * p_ty
-  | P_tuple of p_ty list
+  | P_tbase  of lsymb
+  | P_tvar   of lsymb
+  | P_fun    of p_ty * p_ty
+  | P_tuple  of p_ty list
+  | P_ty_pat
 
 and p_ty = p_ty_i L.located
 
@@ -27,6 +28,7 @@ let rec pp_p_ty_i fmt = function
   | P_timestamp -> Fmt.pf fmt "timestamp"
   | P_tbase s   -> Fmt.pf fmt "%s" (L.unloc s)
   | P_tvar s    -> Fmt.pf fmt "'%s" (L.unloc s)
+  | P_ty_pat    -> Fmt.pf fmt "_"
 
   | P_tuple tys -> Fmt.list ~sep:(Fmt.any " * ") pp_p_ty fmt tys
   | P_fun (t1, t2) -> Fmt.pf fmt "(%a -> %a)" pp_p_ty t1 pp_p_ty t2
@@ -47,7 +49,7 @@ type var_tags = lsymb list
 (*------------------------------------------------------------------*)
 (** Parsed binder with tags *)
     
-type bnd_tagged = lsymb * p_ty * var_tags 
+type bnd_tagged = lsymb * (p_ty * var_tags)
 
 type bnds_tagged = bnd_tagged list
 
@@ -107,6 +109,8 @@ let rec equal_p_ty t t' = match L.unloc t, L.unloc t' with
   | P_index    , P_index
   | P_timestamp, P_timestamp -> true
 
+  | P_ty_pat, P_ty_pat -> true
+
   | P_tbase b, P_tbase b' -> L.unloc b = L.unloc b'
   | P_tvar v, P_tvar v' -> L.unloc v = L.unloc v'
 
@@ -133,7 +137,7 @@ let[@warning "-32"] equal_bnds_tagged l l' =
 let equal_ext_bnds l l' =
   List.for_all2 (fun b1 b2 ->
       match b1, b2 with
-      | Bnd_simpl (s,k,sc), Bnd_simpl (s',k',sc') ->
+      | Bnd_simpl (s, (k,sc)), Bnd_simpl (s', (k',sc')) ->
         L.unloc s = L.unloc s' && equal_p_ty k k' && sc = sc'
                                                      
       | Bnd_tuple (l, ty, sc), Bnd_tuple (l', ty',sc') ->
@@ -200,7 +204,7 @@ let pp_var_tags ppf (l : var_tags) =
 (*------------------------------------------------------------------*)
 let pp_var_list ppf (l : bnds_tagged) =
   let rec aux cur_vars (cur_type_tags : p_ty_i * var_tags) = function
-    | (v,vty,tags) :: vs when (L.unloc vty, tags) = cur_type_tags ->
+    | (v, (vty,tags)) :: vs when (L.unloc vty, tags) = cur_type_tags ->
       aux ((L.unloc v) :: cur_vars) cur_type_tags vs
     | vs ->
       if cur_vars <> [] then begin
@@ -213,7 +217,7 @@ let pp_var_list ppf (l : bnds_tagged) =
       end ;
       match vs with
       | [] -> ()
-      | (v, vty,sc) :: vs -> aux [L.unloc v] (L.unloc vty, sc) vs
+      | (v, (vty,sc)) :: vs -> aux [L.unloc v] (L.unloc vty, sc) vs
   in
   aux [] (P_message, []) l
 
@@ -221,7 +225,7 @@ let pp_var_list ppf (l : bnds_tagged) =
    does not group variable with the same type together *)
 let pp_ext_bnd ppf (ebnd : ext_bnd) =
   match ebnd with
-  | Bnd_simpl (v,ty,tags) ->
+  | Bnd_simpl (v, (ty,tags)) ->
     Fmt.pf ppf "%s : %a%a" (L.unloc v) pp_p_ty ty pp_var_tags tags
 
   | Bnd_tuple (l,ty,tags) ->
@@ -246,7 +250,7 @@ let rec pp_term_i ppf t = match t with
       Fmt.pf ppf
         "@[%a@ %a@ %a@ %a@ %a@ %a@ %a@ %a@]"
         (Printer.kws `TermCondition) "try find"
-        pp_var_list (List.map (fun (v,ty) -> v, ty, []) vs)
+        pp_var_list (List.map (fun (v,ty) -> v, (ty, [])) vs)
         (* add empty tags beffore printing *)
         (Printer.kws `TermCondition) "such that"
         pp_term c
@@ -483,7 +487,9 @@ let pp_error pp_loc_err ppf (loc,e) =
 (*------------------------------------------------------------------*)
 (** {2 Parsing types } *)
 
-let rec convert_ty (env : Env.t) (pty : p_ty) : Type.ty =
+let rec convert_ty ?ty_env (env : Env.t) (pty : p_ty) : Type.ty =
+  let convert_ty = convert_ty ?ty_env in
+
   match L.unloc pty with
   | P_message        -> Type.tmessage  
   | P_boolean        -> Type.tboolean  
@@ -504,12 +510,22 @@ let rec convert_ty (env : Env.t) (pty : p_ty) : Type.ty =
 
   | P_tbase tb_l ->
     let s = Symbols.BType.of_lsymb tb_l env.table in
-    Type.TBase (Symbols.to_string s) (* TODO: remove to_string *)
+    Type.TBase (Symbols.to_string s)
 
   | P_tuple ptys -> Type.Tuple (List.map (convert_ty env) ptys)
 
   | P_fun (pty1, pty2) ->
     Type.Fun (convert_ty env pty1, convert_ty env pty2)
+
+  | P_ty_pat -> 
+    match ty_env with
+    | None -> 
+      (* REM *)
+      Printexc.print_raw_backtrace Stdlib.stderr (Printexc.get_callstack 1000);
+      conv_err (L.loc pty) (Failure "type holes not allowed") 
+
+    | Some ty_env ->
+      Type.TUnivar (Type.Infer.mk_univar ty_env)
 
 (*------------------------------------------------------------------*)
 (** {2 Type checking} *)
@@ -562,7 +578,6 @@ let function_kind table (f : lsymb) : mf_type =
       `Macro (arg_ty, ty)
 
     | Macro (Input|Output|Frame) ->
-      (* FEATURE: subtypes*)
       `Macro ([], Type.tmessage)
 
     | Macro (Cond|Exec) ->
@@ -686,19 +701,14 @@ let ty_error ty_env tm ~(got : Type.ty) ~(expected : Type.ty) =
   let expected = Type.Infer.norm ty_env expected in
   Conv (L.loc tm, Type_error (L.unloc tm, expected, got))
 
-let check_ty_leq state ~of_t (t_ty : Type.ty) (ty : Type.ty) : unit =
-  match Type.Infer.unify_leq state.ty_env t_ty ty with
+let check_ty_eq state ~of_t (t_ty : Type.ty) (ty : Type.ty) : unit =
+  match Type.Infer.unify_eq state.ty_env t_ty ty with
   | `Ok -> ()
   | `Fail ->
     raise (ty_error state.ty_env of_t ~got:t_ty ~expected:ty)
 
-(* let check_ty_eq state ~of_t (t_ty : Type.ty) (ty : 'b Type.ty) : unit =
- *   match Type.Infer.unify_eq state.ty_env t_ty ty with
- *   | `Ok -> ()
- *   | `Fail -> raise (ty_error state.ty_env of_t ty) *)
-
 let check_term_ty state ~of_t (t : Term.term) (ty : Type.ty) : unit =
-  check_ty_leq state ~of_t (Term.ty ~ty_env:state.ty_env t) ty
+  check_ty_eq state ~of_t (Term.ty ~ty_env:state.ty_env t) ty
 
 (*------------------------------------------------------------------*)
 (** {2 System projections} *)
@@ -820,7 +830,7 @@ let convert_var
 
     let of_t = var_of_lsymb st in
 
-    check_ty_leq state ~of_t (Vars.ty v) ty;
+    check_ty_eq state ~of_t (Vars.ty v) ty;
 
     Term.mk_var v
   with
@@ -844,39 +854,44 @@ let rec convert_tags ~(dflt_tag : Vars.Tag.t) (tags : var_tags) : Vars.Tag.t =
 
 (** Convert a tagged variable binding *)
 let convert_bnd_tagged
-    (dflt_tag: Vars.Tag.t) (env : Env.t) ((vsymb, p_ty, tags) : bnd_tagged)
+    ?(ty_env : Type.Infer.env option)
+    (dflt_tag: Vars.Tag.t) (env : Env.t) ((vsymb, (p_ty, tags)) : bnd_tagged)
   : Env.t * Vars.tagged_var
   =
   let tag = convert_tags ~dflt_tag tags in
-  let ty = convert_ty env p_ty in
+  let ty = convert_ty ?ty_env env p_ty in
   let vars, v = Vars.make `Shadow env.vars ty (L.unloc vsymb) tag in
   { env with vars }, (v,tag) 
 
 (** Convert a list of tagged variable bindings *)
 let convert_bnds_tagged
+    ?(ty_env : Type.Infer.env option)
     (tag : Vars.Tag.t) (env : Env.t) (bnds : bnds_tagged) : Env.t * Vars.tagged_vars
   =
-  let env, vars = List.map_fold (convert_bnd_tagged tag) env bnds in
+  let env, vars = List.map_fold (convert_bnd_tagged ?ty_env tag) env bnds in
   env, vars
 
 (** Convert a list of variable bindings *)
 let convert_bnds
+    ?(ty_env : Type.Infer.env option)
     (tag : Vars.Tag.t) (env : Env.t) (bnds : bnds) : Env.t * Vars.vars
   =
   (* add an empty list of tags and use [convert_bnds_tagged] *)
   let env, tagged_vars =
-    convert_bnds_tagged tag env (List.map (fun (v,ty) -> v, ty, []) bnds)
+    convert_bnds_tagged ?ty_env tag env (List.map (fun (v,ty) -> v, (ty, [])) bnds)
   in
   env, List.map fst tagged_vars
     
 (*------------------------------------------------------------------*)
+(** See [convert_ext_bnds] in `.mli` *)
 let convert_ext_bnd
+    ?(ty_env : Type.Infer.env option)
     (dflt_tag : Vars.Tag.t) (env : Env.t) (ebnd : ext_bnd)
   : (Env.t * Term.subst) * Vars.var
   =
   match ebnd with
   | Bnd_simpl bnd ->
-    let env, (var, _tag) = convert_bnd_tagged dflt_tag env bnd in
+    let env, (var, _tag) = convert_bnd_tagged ?ty_env dflt_tag env bnd in
     (env, []), var
 
   (* Corresponds to [(x1, ..., xn) : p_tuple_ty] where
@@ -884,7 +899,7 @@ let convert_ext_bnd
   | Bnd_tuple (p_vars, p_tuple_ty, tags) ->
      (* Decompose [p_tuple_ty] as [(ty1 * ... * tyn)]  *)
     let tys, tuple_ty =
-      match convert_ty env p_tuple_ty with
+      match convert_ty ?ty_env env p_tuple_ty with
       | Tuple tys as ty -> tys, ty
       | _ -> conv_err (L.loc p_tuple_ty) ExpectedTupleTy
     in
@@ -919,13 +934,15 @@ let convert_ext_bnd
     in
     (env, subst), tuple_v
 
+(** See `.mli` *)
 let convert_ext_bnds
+    ?(ty_env : Type.Infer.env option)
     (tag : Vars.Tag.t) (env : Env.t) (ebnds : ext_bnds)
   : Env.t * Term.subst * Vars.vars
   =
   let (env, subst), vars =
     List.map_fold (fun (env, subst) ebnd ->
-        let (env, subst'), var = convert_ext_bnd tag env ebnd in
+        let (env, subst'), var = convert_ext_bnd ?ty_env tag env ebnd in
         (env, subst @ subst'), var
       ) (env, []) ebnds
   in
@@ -1100,7 +1117,9 @@ and convert0
                   Term.right_proj, convert stater r ty; ] 
 
   | Find (vs,c,t,e) ->
-    let env, is = convert_bnds (Vars.Tag.make Vars.Local) state.env vs in
+    let env, is = 
+      convert_bnds ~ty_env:state.ty_env (Vars.Tag.make Vars.Local) state.env vs 
+    in
     let c = conv ~env Type.tboolean c in
     let t = conv ~env ty t in
     let e = conv ty e in
@@ -1108,7 +1127,7 @@ and convert0
 
   | Quant ((ForAll | Exists as q),vs,f) ->
     let env, subst, evs =
-      convert_ext_bnds (Vars.Tag.make Vars.Local) state.env vs
+      convert_ext_bnds ~ty_env:state.ty_env (Vars.Tag.make Vars.Local) state.env vs
     in
     let f = conv ~env Type.tboolean f in
     let f = Term.subst subst f in
@@ -1116,7 +1135,7 @@ and convert0
 
   | Quant (Seq,vs,t) ->
     let env, subst, evs =
-      convert_ext_bnds (Vars.Tag.make Vars.Local) state.env vs
+      convert_ext_bnds ~ty_env:state.ty_env (Vars.Tag.make Vars.Local) state.env vs
     in
 
     let t = 
@@ -1128,7 +1147,7 @@ and convert0
     (* seq are only over finite types *)
     List.iter2 (fun _ ebnd ->
         match ebnd with
-        | Bnd_simpl (p_v, _, tags) ->
+        | Bnd_simpl (p_v, (_, tags)) ->
           if tags <> [] then
             conv_err (L.loc p_v) (Failure "tag unsupported here");
 
@@ -1141,7 +1160,7 @@ and convert0
 
   | Quant (Lambda,vs,t) ->
     let env, subst, evs =
-      convert_ext_bnds (Vars.Tag.make Vars.Local) state.env vs
+      convert_ext_bnds ~ty_env:state.ty_env (Vars.Tag.make Vars.Local) state.env vs
     in
 
     let t = 
@@ -1200,7 +1219,7 @@ and conv_app
        [ty_args] is of length [List.length l]. *)
     let ty_args, ty_out =
       let arrow_ty = Type.fun_l fty_op.fty_args fty_op.fty_out in
-      match Type.destr_funs_opt arrow_ty (List.length terms) with
+      match Type.destr_funs_opt ~ty_env:state.ty_env arrow_ty (List.length terms) with
       | Some (ty_args, ty_out) -> ty_args, ty_out
       | None ->
         let tys, _ = Type.decompose_funs arrow_ty in
@@ -1223,8 +1242,8 @@ and conv_app
 
     (* additional type check between the type of [t] and the output
        type [ty_out].
-       Note that [convert] checks that the type of [t] is a subtype
-       of [ty], hence we do not need to do it here. *)
+       Note that [convert] checks that the type of [t] equals
+       [ty], hence we do not need to do it here. *)
     check_term_ty state ~of_t:tm t ty_out;
 
     t
@@ -1260,7 +1279,6 @@ and conv_app
       | Input | Output | Frame ->
         check_arity ~mode:`Full  (L.mk_loc (L.loc f) "input")
           ~actual:(List.length terms) ~expected:0;
-        (* FEATURE: subtypes *)
         let ms = Term.mk_symb s ty_out in
         Term.mk_macro ms [] (get_at ts_opt)
 
@@ -1535,7 +1553,9 @@ let convert_global_formula
 
 
     | PQuant (q, bnds, e) ->
-      let env, evs = convert_bnds_tagged Vars.Tag.gtag cenv.env bnds in
+      let env, evs = 
+        convert_bnds_tagged ?ty_env Vars.Tag.gtag cenv.env bnds 
+      in
       let e = conve ~env e in
       let q = match q with
         | PForAll -> Equiv.ForAll
@@ -1564,29 +1584,40 @@ let declare_state
     (s          : lsymb) 
     (typed_args : bnds) 
     (out_pty    : p_ty option) 
-    (t          : term) 
+    (ti         : term) 
   =
   let ts_init = Term.mk_action Symbols.init_action [] in
+
+  (* open a typing environment *)
+  let ty_env = Type.Infer.mk_env () in
   
   let env = Env.init ~table () in
   let conv_env = { env; cntxt = InProc ([], ts_init); } in
 
-  let env, indices = convert_bnds (Vars.Tag.make Vars.Local) env typed_args in
+  let env, args = convert_bnds ~ty_env (Vars.Tag.make Vars.Local) env typed_args in
   let conv_env = { conv_env with env } in
-
-  List.iter2 (fun v (_, pty) ->
-      if not (Type.equal (Vars.ty v) Type.tindex) then
-        conv_err (L.loc pty) (BadPty [Type.tindex])
-    ) indices typed_args;
 
   (* parse the macro type *)
   let out_ty = omap (convert_ty env) out_pty in
 
-  let t, out_ty =
-    convert ?ty:out_ty conv_env t
-  in
+  let t, out_ty = convert ~ty_env ?ty:out_ty conv_env ti in
 
-  let data = StateInit_data (indices,t) in
+  (* check that the typing environment is closed *)
+  if not (Type.Infer.is_closed ty_env) then
+    conv_err (L.loc ti) Freetyunivar;
+
+  (* close the typing environment and substitute *)
+  let tsubst = Type.Infer.close ty_env in
+  let t = Term.tsubst tsubst t in
+  let args = List.map (Vars.tsubst tsubst) args in
+
+  (* FIXME: generalize allowed types *)
+  List.iter2 (fun v (_, pty) ->
+      if not (Type.equal (Vars.ty v) Type.tindex) then
+        conv_err (L.loc pty) (BadPty [Type.tindex])
+    ) args typed_args;
+
+  let data = StateInit_data (args,t) in
   let table, _ =
     Symbols.Macro.declare_exact table
       s
@@ -1615,6 +1646,14 @@ let parse_subst (env : Env.t) (uvars : Vars.var list) (ts : term list)
   in
   List.map2 f ts uvars
 
+(*------------------------------------------------------------------*)
+let parse_projs (p_projs : lsymb list option) : Term.projs =
+  omap_dflt
+    [Term.left_proj; Term.right_proj]
+    (List.map (Term.proj_from_string -| L.unloc))
+    p_projs
+
+(*------------------------------------------------------------------*)
 let find_app_terms t (names : string list) =
   let rec aux (name : string) acc t = 
     match L.unloc t with

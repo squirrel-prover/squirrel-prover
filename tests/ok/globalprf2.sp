@@ -1,4 +1,3 @@
-
 (* set debugConstr=true. *)
 
 hash H
@@ -52,13 +51,13 @@ goal [t2] _ (i : index) :
   happens(U(i)) => 
   output@U(i) = 
     seq(j:index =>
-      (try find t:timestamp such that
+      (try find t such that
          (exists (i0,j0:index),
             (t = U(i0)) && 
             ((t < U(i)) || ((t = U(i)) && (j0 < j))) &&
             (n2(i,j) = n2(i0,j0)))
        in
-         try find i0,j0:index such that
+         try find i0 j0 such that
            (t = U(i0)) && 
            ((t < U(i)) || ((t = U(i)) && (j0 < j))) && 
            (n2(i,j) = n2(i0,j0))
@@ -90,10 +89,10 @@ print system [p2].
 goal [p2] _ (i : index) : 
   happens(U(i)) => 
   m1(i)@U(i) = 
-  (try find t:timestamp such that
+  (try find t such that
     (exists (i0:index), ((t = U(i0)) && (t < U(i)) && (n1p(i) = n1p(i0))))
      in
-     try find i0:index such that
+     try find i0 such that
     ((t = U(i0)) && (t < U(i)) && (n1p(i) = n1p(i0)))
      in n_PRF5(i0) else error4 else n_PRF5(i)).
 Proof. intro Hap @/m1. congruence. Qed.
@@ -110,16 +109,16 @@ print system [q2].
 goal [q2] _ (i : index) : 
   happens(U(i)) => 
   output@U(i) = 
-  (try find t:timestamp such that
+  (try find t such that
      ((exists (i0:index), ((t = U(i0)) && (t <= U(i)) && (n1(i) = n1p(i0)))) ||
       exists (i0:index),
         ((t = U(i0)) && (t < U(i)) && (n1(i) = n1(i0))))
    in
-     try find i0:index such that
+     try find i0 such that
        ((t = U(i0)) && (t <= U(i)) && (n1(i) = n1p(i0)))
      in n_PRF7(i0)
      else
-       try find i0:index such that
+       try find i0 such that
          ((t = U(i0)) && (t < U(i)) && (n1(i) = n1(i0)))
        in n_PRF6(i0) else error5 else n_PRF6(i)).
 Proof.
@@ -130,15 +129,15 @@ Qed.
 goal [q2] _ (i : index) : 
   happens(U(i)) => 
   mq(i)@U(i) = 
-  (try find t:timestamp such that
+  (try find t such that
      ((exists (i0:index), ((t = U(i0)) && (t < U(i)) && (n1p(i) = n1p(i0)))) ||
       exists (i0:index), ((t = U(i0)) && (t < U(i)) && (n1p(i) = n1(i0))))
    in
-     try find i0:index such that
+     try find i0 such that
        ((t = U(i0)) && (t < U(i)) && (n1p(i) = n1p(i0)))
      in n_PRF7(i0)
      else
-       try find i0:index such that
+       try find i0 such that
          ((t = U(i0)) && (t < U(i)) && (n1p(i) = n1(i0)))
        in n_PRF6(i0) else error5 else n_PRF7(i)).
 Proof.
