@@ -190,10 +190,16 @@ val get_vars : term -> Vars.var list
 (** [has_var v t] returns true iff [v] occurs as a free var in [t] *)
 val has_var : Vars.var -> term -> bool
   
+(*------------------------------------------------------------------*)
 (** Free variables of a term. *)
 val fv  : term -> Sv.t
 val fvs : terms -> Sv.t
 
+(*------------------------------------------------------------------*)
+(** Free unification variables of a term *)
+val free_univars : term -> Ident.Sid.t 
+
+(*------------------------------------------------------------------*)
 val f_triv : term -> bool
 
 (*------------------------------------------------------------------*)

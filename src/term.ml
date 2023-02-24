@@ -5,6 +5,8 @@ module L = Location
 module Sv = Vars.Sv
 module Mv = Vars.Mv
 
+module Sid = Ident.Sid
+
 (*------------------------------------------------------------------*)
 (** {2 Symbols} *)
 
@@ -812,6 +814,47 @@ let texists (f : term -> bool) (t : term) : bool =
 
 let tforall (f : term -> bool) (t : term) : bool =
   tfold (fun t b -> f t && b) t true
+
+(*------------------------------------------------------------------*)
+let isymb_free_univars (s : 'a isymb) : Sid.t = 
+  Type.free_univars s.s_typ
+
+let free_univars (t : term) : Sid.t = 
+  let rec doit acc t =
+    match t with
+    | Var tv -> Sid.union (Vars.free_univars tv) acc
+    | Fun (_, fty, lt) -> 
+      let acc = Sid.union (Type.ftype_free_univars fty) acc in
+      doit_list acc lt
+
+    | App (t, l) -> doit_list acc (t :: l)
+
+    | Macro (s, l, ts) ->
+      let acc = Sid.union (isymb_free_univars s) acc in
+      doit_list acc (ts :: l)
+
+    | Name (s,l) ->
+      let acc = Sid.union (isymb_free_univars s) acc in
+      doit_list acc l
+
+    | Tuple l
+    | Action (_,l) -> doit_list acc l
+
+    | Proj (_, t) -> doit acc t
+
+    | Diff (Explicit l) -> doit_list acc (List.map snd l)
+
+    | Find (vs, a, b, c) ->
+      let acc = Sid.union acc (Vars.free_univars_list vs) in
+      doit_list acc [a; b; c]
+
+    | Quant (_, vs, b) -> 
+      let acc = Sid.union acc (Vars.free_univars_list vs) in
+      doit acc b
+        
+  and doit_list acc l = List.fold_left doit acc l in
+
+  doit Sid.empty t
 
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)

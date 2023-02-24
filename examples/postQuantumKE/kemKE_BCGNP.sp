@@ -200,7 +200,7 @@ process Initiator2(i,j,k:index) =
  (* common derivations *)
  let kI2 = exct(skex,kI(i,j,k)) in
  let kR2 =
-     try find il,jl,kl such that
+     try find il jl kl such that
             ctR =  encap(n_CCA(il,jl,kl), rR(il,jl,kl), pk(skI(il))) in
              exct(skex,kR(il,jl,kl))
       else
@@ -221,7 +221,7 @@ process Responder2(j,k:index) =
 
    (* common derivations *)
      let kI2 =
-     try find il,jl,kl such that
+     try find il jl kl such that
             ctI =  encap(n_CCA1(il,jl,kl), rI(il,jl,kl), pk(skR(jl))) in
              exct(skex,kI(il,jl,kl))
       else
@@ -239,7 +239,7 @@ process Responder2(j,k:index) =
 
    (* common derivations *)
      let DkI2 =
-     try find il,jl,kl such that
+     try find il jl kl such that
             ctI =  encap(n_CCA1(il,jl,kl), rI(il,jl,kl), pk(skR(jl))) in
              exct(skex,kI(il,jl,kl))
       else
@@ -260,7 +260,7 @@ process InitiatorToCompromised2(i,j,k:index) =
  (* common derivations *)
  let kI2 = exct(skex,DkI(i,j,k)) in
  let kR2 =
-     try find il,jl,kl such that
+     try find il jl kl such that
             ctR =  encap(n_CCA(il,jl,kl), rR(il,jl,kl), pk(skI(il))) in
              exct(skex,kR(il,jl,kl))
       else
@@ -282,9 +282,9 @@ Proof.
   diffeq => * //.
 
     + intro *.
-      case try find il,jl,kl such that _ in kR(il,jl,kl) else _.
+      case try find il jl kl such that _ in kR(il,jl,kl) else _.
         ++ intro [il jl kl [A ->]].
-           case try find il,jl,kl such that _ in exct(skex, kR(il,jl,kl)) else _.
+           case try find il jl kl such that _ in exct(skex, kR(il,jl,kl)) else _.
              +++ intro [il0 jl0 kl0 [B ->]].
                  have U :
                  decap(encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(skI(il))), skI(il)) = 
@@ -296,15 +296,15 @@ Proof.
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
         ++ intro [H1 _].
-           case try find il,jl,kl such that _ in  exct(skex,kR(il,jl,kl)) else _.
+           case try find il jl kl such that _ in  exct(skex,kR(il,jl,kl)) else _.
            intro [il jl kl [A ->]].
            by use H1 with il,jl,kl.
            auto.
 
     + intro *.
-      case try find il,jl,kl such that _ in kR(il,jl,kl) else _.
+      case try find il jl kl such that _ in kR(il,jl,kl) else _.
         ++ intro [il jl kl [A ->]].
-           case try find il,jl,kl such that _ in exct(skex, kR(il,jl,kl)) else _.
+           case try find il jl kl such that _ in exct(skex, kR(il,jl,kl)) else _.
              +++ intro [il0 jl0 kl0 [B ->]].
                  have U : decap(   encap(n_CCA(il,jl,kl),rR(il,jl,kl),pk(skI(il)))  , skI(il)) = decap(   encap(n_CCA(il0,jl0,kl0),rR(il0,jl0,kl0),pk(skI(il0))) , skI(il)).
                  auto.
@@ -314,15 +314,15 @@ Proof.
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
         ++ intro [H1 _].
-           case try find il,jl,kl such that _ in  exct(skex,kR(il,jl,kl)) else _.
+           case try find il jl kl such that _ in  exct(skex,kR(il,jl,kl)) else _.
            intro [il jl kl [A ->]].
            by use H1 with il,jl,kl.
            auto.
 
     + intro *.
-      case try find il,jl,kl such that _ in  kI(il,jl,kl) else _.
+      case try find il jl kl such that _ in  kI(il,jl,kl) else _.
         ++ intro [il jl kl [A ->]].
-           case try find il,jl,kl such that _ in exct(skex, kI(il,jl,kl)) else _.
+           case try find il jl kl such that _ in exct(skex, kI(il,jl,kl)) else _.
              +++ intro [il0 jl0 kl0 [B ->]].
                  have U : decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))  , skR(jl)) = decap(   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(skR(jl0))) , skR(jl)).
                  auto.
@@ -332,15 +332,15 @@ Proof.
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
         ++ intro [H1 _].
-           case try find il,jl,kl such that _ in  exct(skex,kI(il,jl,kl)) else _.
+           case try find il jl kl such that _ in  exct(skex,kI(il,jl,kl)) else _.
            intro [il jl kl [A ->]].
            by use H1 with il,jl,kl.
            auto.
 
     + intro *.
-      case try find il,jl,kl such that _ in  kI(il,jl,kl) else _.
+      case try find il jl kl such that _ in  kI(il,jl,kl) else _.
         ++ intro [il jl kl [A ->]].
-           case try find il,jl,kl such that _ in exct(skex, kI(il,jl,kl)) else _.
+           case try find il jl kl such that _ in exct(skex, kI(il,jl,kl)) else _.
              +++ intro [il0 jl0 kl0 [B ->]].
                  have U : decap(   encap(n_CCA1(il,jl,kl),rI(il,jl,kl),pk(skR(jl)))  , skR(jl)) = decap                 (   encap(n_CCA1(il0,jl0,kl0),rI(il0,jl0,kl0),pk(skR(jl0))) , skR(jl)).
                  auto.
@@ -350,7 +350,7 @@ Proof.
              +++ intro [H1 _].
                  by use H1 with il,jl,kl.
          ++ intro [H1 _].
-            case try find il,jl,kl such that _ in  exct(skex,kI(il,jl,kl)) else _.
+            case try find il jl kl such that _ in  exct(skex,kI(il,jl,kl)) else _.
             intro [il jl kl [A ->]].
             by use H1 with il,jl,kl.
             auto.

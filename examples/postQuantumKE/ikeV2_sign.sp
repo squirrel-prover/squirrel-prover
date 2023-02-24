@@ -181,7 +181,7 @@ process InitiatorRoR(i,j:index) =
 
     FI :   out(cR,
     diff( prfd(hseed( < <Ni(i,j),snd(m)(*Nr*)>,   exp(fst(m),xi(i,j))>,seedpubkey)(* SKEYSEED *),psk(i,j)),
-       try find jf,kf such that  snd(m) = Nr(jf,kf) in
+       try find jf kf such that  snd(m) = Nr(jf,kf) in
 	 idealkeys(kf,jf,j,i)
        else fail)
        ).
@@ -211,7 +211,7 @@ process ResponderRor(i,j:index) =
 
 
  FR : out(cR, diff( prfd(  hseed(<  <snd(m)(*Ni*),Nr(i,j)>,  exp(fst(m),xr(i,j))>,seedpubkey)(* SKEYSEED *), psk(j,i))
-              ,        try find jf,kf such that  snd(m) = Ni(jf,kf) in
+              ,        try find jf kf such that  snd(m) = Ni(jf,kf) in
                     idealkeys(j,kf,i,jf)
                         else fail
 )).
@@ -282,10 +282,10 @@ Proof.
   + intro i j; intro H0 H1 Hap Hap0.
     use authI with i,j as [Clt Meq0 Meq]; 2,3: auto.
     
-    case try find il,jl,kl,ll such that _ in idealkeys(il,jl,kl,ll) else _.
+    case try find il jl kl ll such that _ in idealkeys(il,jl,kl,ll) else _.
     intro [il jl ? ? [[Meq1 [? ?]] Meq2]]. 
     rewrite Meq2.
-    case try find jf,kf such that _ in _ else fail.
+    case try find (jf, kf : index)  such that _ in _ else fail.
     by collision.
  
     intro [[TFneg] TFeq].
@@ -297,13 +297,13 @@ Proof.
   (* R part *)
   + intro k l; intro H0 H1 Hap Hap0.
     use authR with k,l as [l0 [Clt Meq0 Meq]]; 2,3: auto.
-    case try find il,jl,kl,ll such that _
+    case try find il jl kl ll such that _
      in  idealkeys(il,jl,kl,ll)
      else _.
     
     intro [il jl ? ? [[Meq1 [? ?]] Meq2]]. 
     rewrite Meq2.
-    case try find jf,kf such that _ in _ else fail.
+    case try find (jf, kf : index) such that _ in _ else fail.
 
     by collision.
 

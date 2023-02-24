@@ -46,8 +46,6 @@
 %token SMT
 %token EOF
 
-%right COMMA
-
 %nonassoc QUANTIF
 %right ARROW
 %right DARROW 
@@ -309,19 +307,8 @@ opt_ext_arg_list:
 |                                    { [] }
 
 (*------------------------------------------------------------------*)
-/* argument whose type defaults to Index */
-tf_arg:
-| is=ids COLON k=ty { List.map (fun x -> x,k) is }
-| is=ids
-  { List.map (fun x -> x,sloc $startpos $endpos Theory.P_index) is }
-
-tf_arg_list:
-| args=slist(tf_arg,COMMA) { List.flatten args }
-
-(*------------------------------------------------------------------*)
-/* precedent rule for COMMA favors shifting COMMAs */
 ids:
-| id=lsymb                %prec COMMA  { [id] }
+| id=lsymb                             { [id] }
 | id=lsymb COMMA ids=ids               { id::ids }
 
 top_formula:
