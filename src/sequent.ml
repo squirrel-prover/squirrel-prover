@@ -856,7 +856,7 @@ module Mk (Args : MkArgs) : S with
     let f_args, subst = Term.refresh_vars_w_info f_args in
    
     let form = Equiv.Any.subst subst form in
-    let args = List.rev_append f_args args in
+    let args = List.append f_args args in
 
     let pt = { pt with form; subgs; args; } in
 
