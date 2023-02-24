@@ -297,7 +297,7 @@ let check_proc
   (* close the typing environment and substitute *)
   let tsubst = Type.Infer.close ty_env in
   let args = List.map (Vars.tsubst tsubst) args in
-  (* TODO: types: need to substitute in the process itself *)
+  (* no need to substitute in the process itself, as we retype it later *)
 
   (* process are stored with an ad hoc type for variables *)
   let args : (string * Type.ty) list = 
