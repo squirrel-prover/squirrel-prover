@@ -246,22 +246,43 @@ term_list:
 | RANGLE                         { ">" }
 
 (*------------------------------------------------------------------*)
-arg:
-| is=ids COLON k=ty                 { List.map (fun x -> x,k) is }
+/* Auxiliary:
+   Many binders with the same types: `x1,...,xN : type` */
+%inline bnd_group(TY):
+| is=ids COLON k=TY { List.map (fun x -> x,k) is }
 
-arg_tagged:
-| is=ids COLON k=ty tags=var_tags   { List.map (fun x -> x,k,tags) is }
+/* Auxiliary:
+   many binder groups: `x1,...,xN1 : type1, ..., x1,...,xNL : typeL */
+%inline bnd_group_list(TY):
+| args=slist1(bnd_group(TY),COMMA) { List.flatten args }
 
-arg_list:
-| args=slist(arg,COMMA) { List.flatten args }
+/* Auxiliary: a single binder declarations */
+%inline bnd:
+| LPAREN l=bnd_group_list(ty) RPAREN    { l }
+/* many binders, grouped  */
+| x=lsymb                               { [x, Location.mk_loc (Location.loc x) Theory.P_ty_pat] }
+/* single binder `x`, no argument */
 
-arg_list_tagged:
-| args=slist(arg_tagged,COMMA) { List.flatten args }
+/* Binders. */
+bnds:
+| l=slist(bnd, empty) { List.flatten l }
 
 (*------------------------------------------------------------------*)
-opt_arg_list:
-| LPAREN args=arg_list RPAREN    { args }
-|                                { [] }
+ty_tagged:
+| k=ty tags=var_tags {k,tags}
+
+/* Auxiliary: a single binder declarations */
+%inline bnd_tagged:
+/* many binders, grouped  */
+| LPAREN l=bnd_group_list(ty_tagged) RPAREN    { l }
+
+/* single binder `x`, no argument */
+| x=lsymb
+  { [x, (Location.mk_loc (Location.loc x) Theory.P_ty_pat, [])] }
+
+/* Binders. */
+bnds_tagged:
+| l=slist(bnd_tagged, empty) { List.flatten l }
 
 (*------------------------------------------------------------------*)
 %inline ext_id:
@@ -275,7 +296,7 @@ var_tags:
 ext_arg:
 | is=slist1(ext_id,COMMA) COLON k=ty tags=var_tags
     { List.map (function
-        | `Simpl id  -> Theory.Bnd_simpl (id,  k, tags)
+        | `Simpl id  -> Theory.Bnd_simpl (id,  (k, tags))
         | `Tuple ids -> Theory.Bnd_tuple (ids, k, tags)
       ) is 
     }
@@ -411,7 +432,7 @@ ty_i:
 sty_i:
 | t=p_base_ty_i                  { t }
 | LPAREN ty=ty_i RPAREN          { ty }
-| l=loc(UNDERSCORE)              { Theory.P_ty_pat (Location.loc l) }
+| UNDERSCORE                     { Theory.P_ty_pat }
 
 sty:
 | ty=loc(sty_i) { ty }
@@ -454,13 +475,13 @@ system_modifier:
 | RENAME gf=global_formula
     { Decl.Rename gf }
 
-| GCCA args=opt_arg_list COMMA enc=term
+| GCCA args=bnds COMMA enc=term
     { Decl.CCA (args, enc) }
 
-| GPRF args=opt_arg_list COMMA hash=term
+| GPRF args=bnds COMMA hash=term
     { Decl.PRF (args, hash) }
 
-| GPRF TIME args=opt_arg_list COMMA hash=term
+| GPRF TIME args=bnds COMMA hash=term
     { Decl.PRFt (args, hash) }
 
 | REWRITE p=rw_args
@@ -530,12 +551,12 @@ declaration_i:
                 op_tyout     = tyo;
                 op_body      = t; }) }
 
-| MUTABLE name=lsymb args=opt_arg_list out_ty=colon_ty? EQ init_body=term
+| MUTABLE name=lsymb args=bnds out_ty=colon_ty? EQ init_body=term
                           { Decl.Decl_state {name; args; out_ty; init_body; }}
 
 | CHANNEL e=lsymb         { Decl.Decl_channel e }
 
-| PROCESS id=lsymb projs=projs args=opt_arg_list EQ proc=process
+| PROCESS id=lsymb projs=projs args=bnds EQ proc=process
                           { Decl.Decl_process {id; projs; args; proc} }
 
 |        AXIOM s=local_statement  { Decl.Decl_axiom s }
@@ -1013,8 +1034,13 @@ global_formula_i:
 
 | f=global_formula ARROW f0=global_formula { Theory.PImpl (f,f0) }
 
-| q=quant LPAREN vs=arg_list_tagged RPAREN sep f=global_formula %prec QUANTIF
+| q=quant vs=bnds_tagged COMMA f=global_formula %prec QUANTIF
                                    { Theory.PQuant (q,vs,f)  }
+
+/* rule for a single binder, with no COMMA separating it from the formula. 
+   Removed for now, it was used only once. */
+/* | q=quant vs=bnd_tagged f=global_formula %prec QUANTIF */
+/*                                    { Theory.PQuant (q,vs,f)  } */
 
 | f1=global_formula GAND f2=global_formula
                                    { Theory.PAnd (f1, f2) }
@@ -1054,23 +1080,19 @@ system_annot:
  * Statements and goals
  * ----------------------------------------------------------------------- */
 
-goal_args:
-|                                    { [] }
-| LPAREN vs0=arg_list_tagged RPAREN vs=goal_args { vs0 @ vs }
-
 statement_name:
 | i=lsymb    { Some i }
 | UNDERSCORE { None }
 
 local_statement:
-| s=system_annot name=statement_name ty_vars=ty_args vars=goal_args
+| s=system_annot name=statement_name ty_vars=ty_args vars=bnds_tagged
   COLON f=term
    { let system = `Local, s in
      let formula = Goal.Parsed.Local f in
      Goal.Parsed.{ name; ty_vars; vars; system; formula } }
 
 global_statement:
-| s=system_annot name=statement_name ty_vars=ty_args vars=goal_args
+| s=system_annot name=statement_name ty_vars=ty_args vars=bnds_tagged
   COLON f=global_formula
    { let formula = Goal.Parsed.Global f in
      let system = `Global, s in
@@ -1087,7 +1109,7 @@ goal_i:
 |  LOCAL GOAL s=local_statement  DOT { s }
 | GLOBAL GOAL s=global_statement DOT { s }
 | EQUIV  s=obs_equiv_statement   DOT { s }
-| EQUIV s=system_annot name=statement_name vars=goal_args COLON b=loc(biframe) DOT
+| EQUIV s=system_annot name=statement_name vars=bnds_tagged COLON b=loc(biframe) DOT
     { let f = Location.mk_loc (Location.loc b) (Theory.PEquiv (Location.unloc b)) in
       let system = `Global, s in
       Goal.Parsed.{ name; system; ty_vars = []; vars; formula = Global f } }

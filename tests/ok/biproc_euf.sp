@@ -1,14 +1,12 @@
-
-
 name ok : message
 name ko : message
 
 channel c
 name k : message
 
-hash h
+hash h.
 
-process A(res:message) = out(c,res)
+process A(res:message) = out(c,res).
 
 system (A(h(ok,k)) | in(c,x)).
 

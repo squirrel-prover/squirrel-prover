@@ -11,10 +11,6 @@ let mk_dum (v : 'a) : 'a L.located = L.mk_loc dum v
 (*------------------------------------------------------------------*)
 type proc_ty = (string * Type.ty) list
 
-let pp_proc_ty =
-  let pp_el fmt (s,e) = Fmt.pf fmt "(%s : %a)" s Type.pp e in
-  (Fmt.list pp_el)
-
 (*------------------------------------------------------------------*)
 type lsymb = Theory.lsymb
 
@@ -178,8 +174,8 @@ let error loc e = raise (Error (loc,e))
     their types. *)
 type Symbols.data += Process_data of proc_ty * Term.projs * process
 
-let declare_nocheck table name (kind : proc_ty) projs proc =
-    let data = Process_data (kind,projs,proc) in
+let declare_nocheck table (name : Theory.lsymb) (args : proc_ty) (projs : Term.projs) proc =
+    let data = Process_data (args,projs,proc) in
     let def = () in
     Symbols.Process.declare_exact table name ~data def
 
@@ -198,7 +194,10 @@ let check_channel table (s : lsymb) =
 
 (*------------------------------------------------------------------*)
 (** Type checking for processes *)
-let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
+let check_proc
+    table ~(args:Theory.bnds) (projs : Term.projs) (process : process) 
+  : proc_ty * process
+  =
   let rec check_p (ty_env : Type.Infer.env) (env : Env.t) proc =
     let loc = L.loc proc in
     match L.unloc proc with
@@ -285,32 +284,44 @@ let check_proc (env : Env.t) (projs : Term.projs) (p : process) =
         kind ts
   in
 
+  (* open a typing environment *)
   let ty_env = Type.Infer.mk_env () in
 
-  check_p ty_env env p;
+  let env = Env.init ~table () in
+  let env, args = Theory.convert_bnds ~ty_env Vars.Tag.ltag env args in
 
+  check_p ty_env env process;
+
+  (* check that the typing environment is closed *)
   if not (Type.Infer.is_closed ty_env) then
-    error (L.loc p) Freetyunivar;
+    error (L.loc process) Freetyunivar;
 
-  ()
+  (* close the typing environment and substitute *)
+  let tsubst = Type.Infer.close ty_env in
+  let args = List.map (Vars.tsubst tsubst) args in
+  (* No need to substitute in the process itself, since it will be
+     type-checked again when a system is declared. *)
 
+  (* process are stored with an ad hoc type for variables *)
+  let args : (string * Type.ty) list = 
+    List.map (fun v -> Vars.name v, Vars.ty v) args 
+  in
 
+  args, process
+
+(*------------------------------------------------------------------*)
 let declare
     (table : Symbols.table)
-    (id : lsymb) (args : proc_ty) (projs : Term.projs)
+    ~(id : lsymb) ~(args : Theory.bnds) ~(projs : lsymb list option)
     (proc : process)
   =
-  let vars = 
-    List.fold_left (fun vars (v, ty) ->
-        let vars, _ = Vars.make_local `Shadow vars ty v in
-        vars
-      ) Vars.empty_env args 
-  in
-  let env = Env.init ~vars ~table () in
+  let projs = Theory.parse_projs projs in
 
   (* type-check and declare *)
-  check_proc env projs proc ;
-  let table, _ = declare_nocheck env.table id args projs proc in
+  let args, _ = check_proc table ~args projs proc in
+
+
+  let table, _ = declare_nocheck table id args projs proc in
   table
 
 (*------------------------------------------------------------------*)
@@ -1104,8 +1115,7 @@ let declare_system table system_name (projs : Term.projs) (proc : process) =
     "@[<v 2>System before processing:@;@;@[%a@]@]@.@."
     pp_process proc ;
 
-  let env = Env.init ~table () in
-  check_proc env projs proc ;
+  let _ = check_proc table ~args:[] projs proc in
 
   (* FEATURE: allow user to define more than bi-system *)
   let projections = [Term.left_proj; Term.right_proj] in

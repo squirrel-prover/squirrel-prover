@@ -1,12 +1,10 @@
-
-
 abstract ok : message
 abstract ko : message
 abstract koo : message
 
 channel c
 
-process A(res:message) =  in(c,x);out(c,x); B: in(c,y); if y=ok then out(c,res)
+process A(res:message) =  in(c,x);out(c,x); B: in(c,y); if y=ok then out(c,res).
 
 system A(diff(ok,ko)).
 

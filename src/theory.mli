@@ -19,7 +19,7 @@ type p_ty_i =
   | P_tvar   of lsymb
   | P_fun    of p_ty * p_ty
   | P_tuple  of p_ty list
-  | P_ty_pat of L.t
+  | P_ty_pat 
              
 and p_ty = p_ty_i L.located
     
@@ -41,7 +41,7 @@ type var_tags = lsymb list
 (*------------------------------------------------------------------*)
 (** Parsed binder with tags *)
     
-type bnd_tagged = lsymb * p_ty * var_tags 
+type bnd_tagged = lsymb * (p_ty * var_tags)
 
 type bnds_tagged = bnd_tagged list
 
@@ -381,7 +381,9 @@ val convert_any : conv_env -> any_term -> Equiv.any_form
   * exists a subterm [Theory.App(name,_)] or [Theory.AppAt(name,_,_)] in the
   * term [t]. *)
 val find_app_terms : term -> string list -> string list
-  
+
+val parse_projs : lsymb list option -> Term.projs 
+
 (*------------------------------------------------------------------*)
 (** {2 Proof terms} *)
 

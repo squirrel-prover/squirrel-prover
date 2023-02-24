@@ -13,15 +13,7 @@ type term = Theory.term
 
 type lsymb = Theory.lsymb
 
-(** {2 Kinds}
-  * For messages, function, state and processes. For the latter,
-  * the name of variables is given together with their kinds. *)
-
-(** The kind of a process gives, for each of its input variables,
-  * the expected kind for that variable. *)
 type proc_ty = (string * Type.ty) list
-
-val pp_proc_ty : proc_ty Fmt.t
 
 (*------------------------------------------------------------------*)
 (** {2 Front-end processes}
@@ -71,12 +63,16 @@ and process = process_i Location.located
 val pp_process : Format.formatter -> process -> unit
 
 (*------------------------------------------------------------------*)
-(** Check that a process is well-typed in some environment. *)
-val check_proc : Env.t -> Term.projs -> process -> unit
+(** Check that a process is well-typed. *)
+val check_proc : 
+  Symbols.table ->
+  args:Theory.bnds -> Term.projs -> process -> proc_ty * process
+
 
 (** Declare a named process. The body of the definition is type-checked. *)
 val declare :
-  Symbols.table -> lsymb -> proc_ty -> Term.projs -> process ->
+  Symbols.table -> 
+  id:lsymb -> args:Theory.bnds -> projs:(lsymb list option) -> process ->
   Symbols.table
 
 val add_namelength_axiom : 

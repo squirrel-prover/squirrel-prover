@@ -1,5 +1,3 @@
-
-
 channel c
 system in(c,x) ; (in(c,x) | out(c,x)).
 

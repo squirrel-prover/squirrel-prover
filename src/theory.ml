@@ -17,7 +17,7 @@ type p_ty_i =
   | P_tvar   of lsymb
   | P_fun    of p_ty * p_ty
   | P_tuple  of p_ty list
-  | P_ty_pat of L.t
+  | P_ty_pat
 
 and p_ty = p_ty_i L.located
 
@@ -28,7 +28,7 @@ let rec pp_p_ty_i fmt = function
   | P_timestamp -> Fmt.pf fmt "timestamp"
   | P_tbase s   -> Fmt.pf fmt "%s" (L.unloc s)
   | P_tvar s    -> Fmt.pf fmt "'%s" (L.unloc s)
-  | P_ty_pat _l -> Fmt.pf fmt "_"
+  | P_ty_pat    -> Fmt.pf fmt "_"
 
   | P_tuple tys -> Fmt.list ~sep:(Fmt.any " * ") pp_p_ty fmt tys
   | P_fun (t1, t2) -> Fmt.pf fmt "(%a -> %a)" pp_p_ty t1 pp_p_ty t2
@@ -49,7 +49,7 @@ type var_tags = lsymb list
 (*------------------------------------------------------------------*)
 (** Parsed binder with tags *)
     
-type bnd_tagged = lsymb * p_ty * var_tags 
+type bnd_tagged = lsymb * (p_ty * var_tags)
 
 type bnds_tagged = bnd_tagged list
 
@@ -109,7 +109,7 @@ let rec equal_p_ty t t' = match L.unloc t, L.unloc t' with
   | P_index    , P_index
   | P_timestamp, P_timestamp -> true
 
-  | P_ty_pat l, P_ty_pat l' -> l = l'
+  | P_ty_pat, P_ty_pat -> true
 
   | P_tbase b, P_tbase b' -> L.unloc b = L.unloc b'
   | P_tvar v, P_tvar v' -> L.unloc v = L.unloc v'
@@ -137,7 +137,7 @@ let[@warning "-32"] equal_bnds_tagged l l' =
 let equal_ext_bnds l l' =
   List.for_all2 (fun b1 b2 ->
       match b1, b2 with
-      | Bnd_simpl (s,k,sc), Bnd_simpl (s',k',sc') ->
+      | Bnd_simpl (s, (k,sc)), Bnd_simpl (s', (k',sc')) ->
         L.unloc s = L.unloc s' && equal_p_ty k k' && sc = sc'
                                                      
       | Bnd_tuple (l, ty, sc), Bnd_tuple (l', ty',sc') ->
@@ -204,7 +204,7 @@ let pp_var_tags ppf (l : var_tags) =
 (*------------------------------------------------------------------*)
 let pp_var_list ppf (l : bnds_tagged) =
   let rec aux cur_vars (cur_type_tags : p_ty_i * var_tags) = function
-    | (v,vty,tags) :: vs when (L.unloc vty, tags) = cur_type_tags ->
+    | (v, (vty,tags)) :: vs when (L.unloc vty, tags) = cur_type_tags ->
       aux ((L.unloc v) :: cur_vars) cur_type_tags vs
     | vs ->
       if cur_vars <> [] then begin
@@ -217,7 +217,7 @@ let pp_var_list ppf (l : bnds_tagged) =
       end ;
       match vs with
       | [] -> ()
-      | (v, vty,sc) :: vs -> aux [L.unloc v] (L.unloc vty, sc) vs
+      | (v, (vty,sc)) :: vs -> aux [L.unloc v] (L.unloc vty, sc) vs
   in
   aux [] (P_message, []) l
 
@@ -225,7 +225,7 @@ let pp_var_list ppf (l : bnds_tagged) =
    does not group variable with the same type together *)
 let pp_ext_bnd ppf (ebnd : ext_bnd) =
   match ebnd with
-  | Bnd_simpl (v,ty,tags) ->
+  | Bnd_simpl (v, (ty,tags)) ->
     Fmt.pf ppf "%s : %a%a" (L.unloc v) pp_p_ty ty pp_var_tags tags
 
   | Bnd_tuple (l,ty,tags) ->
@@ -250,7 +250,7 @@ let rec pp_term_i ppf t = match t with
       Fmt.pf ppf
         "@[%a@ %a@ %a@ %a@ %a@ %a@ %a@ %a@]"
         (Printer.kws `TermCondition) "try find"
-        pp_var_list (List.map (fun (v,ty) -> v, ty, []) vs)
+        pp_var_list (List.map (fun (v,ty) -> v, (ty, [])) vs)
         (* add empty tags beffore printing *)
         (Printer.kws `TermCondition) "such that"
         pp_term c
@@ -517,9 +517,11 @@ let rec convert_ty ?ty_env (env : Env.t) (pty : p_ty) : Type.ty =
   | P_fun (pty1, pty2) ->
     Type.Fun (convert_ty env pty1, convert_ty env pty2)
 
-  | P_ty_pat _l -> 
+  | P_ty_pat -> 
     match ty_env with
     | None -> 
+      (* REM *)
+      Printexc.print_raw_backtrace Stdlib.stderr (Printexc.get_callstack 1000);
       conv_err (L.loc pty) (Failure "type holes not allowed") 
 
     | Some ty_env ->
@@ -859,7 +861,7 @@ let rec convert_tags ~(dflt_tag : Vars.Tag.t) (tags : var_tags) : Vars.Tag.t =
 (** Convert a tagged variable binding *)
 let convert_bnd_tagged
     ?(ty_env : Type.Infer.env option)
-    (dflt_tag: Vars.Tag.t) (env : Env.t) ((vsymb, p_ty, tags) : bnd_tagged)
+    (dflt_tag: Vars.Tag.t) (env : Env.t) ((vsymb, (p_ty, tags)) : bnd_tagged)
   : Env.t * Vars.tagged_var
   =
   let tag = convert_tags ~dflt_tag tags in
@@ -882,7 +884,7 @@ let convert_bnds
   =
   (* add an empty list of tags and use [convert_bnds_tagged] *)
   let env, tagged_vars =
-    convert_bnds_tagged ?ty_env tag env (List.map (fun (v,ty) -> v, ty, []) bnds)
+    convert_bnds_tagged ?ty_env tag env (List.map (fun (v,ty) -> v, (ty, [])) bnds)
   in
   env, List.map fst tagged_vars
     
@@ -1151,7 +1153,7 @@ and convert0
     (* seq are only over finite types *)
     List.iter2 (fun _ ebnd ->
         match ebnd with
-        | Bnd_simpl (p_v, _, tags) ->
+        | Bnd_simpl (p_v, (_, tags)) ->
           if tags <> [] then
             conv_err (L.loc p_v) (Failure "tag unsupported here");
 
@@ -1604,6 +1606,7 @@ let declare_state
         conv_err (L.loc pty) (BadPty [Type.tindex])
     ) indices typed_args;
 
+  (* TODO: types: type inference *)
   (* parse the macro type *)
   let out_ty = omap (convert_ty env) out_pty in
 
@@ -1640,6 +1643,14 @@ let parse_subst (env : Env.t) (uvars : Vars.var list) (ts : term list)
   in
   List.map2 f ts uvars
 
+(*------------------------------------------------------------------*)
+let parse_projs (p_projs : lsymb list option) : Term.projs =
+  omap_dflt
+    [Term.left_proj; Term.right_proj]
+    (List.map (Term.proj_from_string -| L.unloc))
+    p_projs
+
+(*------------------------------------------------------------------*)
 let find_app_terms t (names : string list) =
   let rec aux (name : string) acc t = 
     match L.unloc t with
