@@ -917,7 +917,7 @@ axiom [idealized3] uniqepk : forall (m1,m2:message), epk(m1) =epk(m2) => m1=m2.
 axiom [idealized3] sufcma :
 forall (m,s,sk:message), checksign(m,s,spk(sk)) => s = sign(m,sk).
 
-axiom [idealized3] xorconcel : forall (m1,m2,m3:message) m1=m2 => 
+axiom [idealized3] xorconcel : forall (m1,m2,m3:message), m1=m2 => 
   xor m1 (xor m2 m3) = m3.
 
 axiom [idealized3] rcheck :
@@ -1016,8 +1016,8 @@ Qed.
 (*** Strong Secrecy of the responder key ***)
 (*******************************************)
 
-axiom  [idealized3/left,idealized3/left]  fst_p: forall (x,y:message) fst(<x,y>)=x.
-axiom  [idealized3/left,idealized3/left]  snd_p: forall (x,y:message) snd(<x,y>)=y.
+axiom  [idealized3/left,idealized3/left]  fst_p: forall (x,y:message), fst(<x,y>)=x.
+axiom  [idealized3/left,idealized3/left]  snd_p: forall (x,y:message), snd(<x,y>)=y.
 
 name n_PRF2 : index * index * index -> message.
  (* multi PRF assumption, F1(_,n) and F2(_,n) can be seen as F1(_,n') and F2(_,n) *)

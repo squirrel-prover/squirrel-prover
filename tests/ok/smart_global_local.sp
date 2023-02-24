@@ -202,7 +202,7 @@ Qed.
 
 (*------------------------------------------------------------------*)
 (* Existential quantification cannot be made global if body is probabilistic. *)
-global goal _ : [exists (i:index) q(n,i) = true] -> [false].
+global goal _ : [exists (i:index), q(n,i) = true] -> [false].
 Proof. 
   (* Tactic failed: cannot destruct *)
   checkfail intro [i H] exn Failure.

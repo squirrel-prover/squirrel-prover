@@ -58,9 +58,9 @@ axiom unique_queries (i,j:index) : i <> j => input@O(i) <> input@O(j).
 (* See `running-ex.sp` for more details about lastupdate_XXX lemmas. *)
 
 goal lastupdate_pure : forall (i:index,tau:timestamp), happens(tau) => (
-  (forall j:index, happens(A(i,j)) => A(i,j)>tau) ||
-  (exists j:index, happens(A(i,j)) && A(i,j)<=tau
-    && forall jj:index, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))).
+  (forall j, happens(A(i,j)) => A(i,j)>tau) ||
+  (exists j, happens(A(i,j)) && A(i,j)<=tau
+    && forall jj, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))).
 
 Proof.
   intro i.
@@ -143,7 +143,7 @@ Proof.
 Qed.
 
 goal lastupdate_init : forall (i:index,tau:timestamp), happens(tau) => (
-  (forall j:index, happens(A(i,j)) => A(i,j)>tau))
+  (forall j, happens(A(i,j)) => A(i,j)>tau))
   => s(i)@tau = s(i)@init.
 
 Proof.
@@ -180,7 +180,7 @@ Qed.
 goal lastupdate_A: forall (i:index, j:index, tau:timestamp),
   (happens(tau) &&
    A(i,j)<=tau &&
-   forall jj:index, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))
+   forall jj, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))
   => s(i)@tau = s(i)@A(i,j).
 Proof.
   intro i j.
@@ -217,10 +217,10 @@ Qed.
 
 
 goal lastupdate : forall (i:index,tau:timestamp), happens(tau) => (
-  (s(i)@tau = s(i)@init && forall j:index, happens(A(i,j)) => A(i,j)>tau) ||
-  (exists j:index,
+  (s(i)@tau = s(i)@init && forall j, happens(A(i,j)) => A(i,j)>tau) ||
+  (exists j,
     s(i)@tau = s(i)@A(i,j) && A(i,j)<=tau
-    && forall jj:index, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))).
+    && forall jj, happens(A(i,jj)) && A(i,jj)<=tau => A(i,jj)<=A(i,j))).
 Proof.
   intro i tau Htau.
   use lastupdate_pure with i, tau as [Hinit | [j [HAj1 HAj2 HAj3]]] => //.

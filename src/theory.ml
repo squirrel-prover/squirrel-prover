@@ -54,12 +54,14 @@ type bnd_tagged = lsymb * (p_ty * var_tags)
 type bnds_tagged = bnd_tagged list
 
 (*------------------------------------------------------------------*)
-(** Extended binders (with variable tags).
+(** Left value.
     Support binders with destruct, e.g. [(x,y) : bool * bool] *)
-type ext_bnd =
-  | Bnd_simpl of bnd_tagged
-  | Bnd_tuple of lsymb list * p_ty * var_tags
+type lval =
+  | L_var   of lsymb
+  | L_tuple of lsymb list 
 
+(** Extended binders (with variable tags) *)
+type ext_bnd = lval * (p_ty * var_tags)
 type ext_bnds = ext_bnd list
 
 (*------------------------------------------------------------------*)
@@ -129,24 +131,27 @@ let equal_bnds l l' =
       L.unloc s = L.unloc s' && equal_p_ty k k'
     ) l l'
 
-let[@warning "-32"] equal_bnds_tagged l l' =
-  List.for_all2 (fun (s,k,sc) (s',k',sc') ->
-      L.unloc s = L.unloc s' && equal_p_ty k k' && sc = sc'
-    ) l l'
+let equal_p_tagged_ty
+    ((k ,sc ) : p_ty * var_tags) 
+    ((k',sc') : p_ty * var_tags) 
+  = 
+  equal_p_ty k k' && sc = sc'
 
-let equal_ext_bnds l l' =
-  List.for_all2 (fun b1 b2 ->
-      match b1, b2 with
-      | Bnd_simpl (s, (k,sc)), Bnd_simpl (s', (k',sc')) ->
-        L.unloc s = L.unloc s' && equal_p_ty k k' && sc = sc'
-                                                     
-      | Bnd_tuple (l, ty, sc), Bnd_tuple (l', ty',sc') ->
-        List.for_all2 (fun s s' ->
-            L.unloc s = L.unloc s'
-          ) l l' &&
-        equal_p_ty ty ty' &&
-        sc = sc'
-      | _ -> false 
+let equal_lval (lv1 : lval) (lv2 : lval) : bool =
+  match lv1,lv2 with
+  | L_var s, L_var s' ->
+    L.unloc s = L.unloc s' 
+
+  | L_tuple l, L_tuple l' ->
+    List.for_all2 (fun s s' ->
+        L.unloc s = L.unloc s'
+      ) l l' 
+  | _ -> false 
+
+let equal_ext_bnds (l : ext_bnds) (l' : ext_bnds) : bool =
+  List.for_all2 (fun (lv1,tty1) (lv2,tty2) ->
+      equal_lval lv1 lv2 && 
+      equal_p_tagged_ty tty1 tty2
     ) l l'
 
 (*------------------------------------------------------------------*)
@@ -225,10 +230,10 @@ let pp_var_list ppf (l : bnds_tagged) =
    does not group variable with the same type together *)
 let pp_ext_bnd ppf (ebnd : ext_bnd) =
   match ebnd with
-  | Bnd_simpl (v, (ty,tags)) ->
+  | L_var v, (ty,tags) ->
     Fmt.pf ppf "%s : %a%a" (L.unloc v) pp_p_ty ty pp_var_tags tags
 
-  | Bnd_tuple (l,ty,tags) ->
+  | L_tuple l, (ty,tags) ->
     Fmt.pf ppf "(%a) : %a%a"
       (Fmt.list ~sep:(Fmt.any ",") Fmt.string) (List.map L.unloc l) 
       pp_p_ty ty
@@ -890,13 +895,13 @@ let convert_ext_bnd
   : (Env.t * Term.subst) * Vars.var
   =
   match ebnd with
-  | Bnd_simpl bnd ->
-    let env, (var, _tag) = convert_bnd_tagged ?ty_env dflt_tag env bnd in
+  | L_var v, tagged_ty ->
+    let env, (var, _tag) = convert_bnd_tagged ?ty_env dflt_tag env (v,tagged_ty) in
     (env, []), var
 
   (* Corresponds to [(x1, ..., xn) : p_tuple_ty] where
      [p_tuple_ty] must be of the form [(ty1 * ... * tyn)] *)
-  | Bnd_tuple (p_vars, p_tuple_ty, tags) ->
+  | L_tuple p_vars, (p_tuple_ty, tags) ->
      (* Decompose [p_tuple_ty] as [(ty1 * ... * tyn)]  *)
     let tys, tuple_ty =
       match convert_ty ?ty_env env p_tuple_ty with
@@ -1147,11 +1152,11 @@ and convert0
     (* seq are only over finite types *)
     List.iter2 (fun _ ebnd ->
         match ebnd with
-        | Bnd_simpl (p_v, (_, tags)) ->
+        | L_var p_v, (_, tags) ->
           if tags <> [] then
             conv_err (L.loc p_v) (Failure "tag unsupported here");
 
-        | Bnd_tuple (l,_,_) ->
+        | L_tuple l,_ ->
           let loc = L.mergeall (List.map L.loc l) in
           conv_err loc (Failure "tuples unsupported in seq")
       ) evs vs;

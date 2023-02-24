@@ -92,18 +92,18 @@ hash h with oracle forall (m:message,sk:message), sk = hKey
 senc enc,dec with hash h.
 
 
-signature sign,checksign,pk with oracle forall (m:message,sk:message)
+signature sign,checksign,pk with oracle forall (m:message,sk:message),
 (sk <> kP
- || exists (i:index, m1:message, m2:message)
+ || exists (i:index, m1:message, m2:message),
       m = <forwarded, h(<<g^a(i),m1>,m2>, hKey)> (* O_FPS *)
- || exists (i:index, m1:message, m2:message)
+ || exists (i:index, m1:message, m2:message),
       m = h(<<g^ake1(i),m1>,m2>, hKey) (* O_KE1 *)
  )
   &&
 (sk <> kS
- || exists (i:index, m1:message, m2:message)
+ || exists (i:index, m1:message, m2:message),
       m = <forwarded, h(<<m1,g^b(i)>,m2>, hKey)> (* O_FPS *)
- || exists (i:index, m1:message, m2:message)
+ || exists (i:index, m1:message, m2:message),
       m = h(<<m1,g^bke1(i)>,m2>, hKey) (* O_KE1 *)
 )
 
@@ -408,7 +408,7 @@ Proof.
   + (* Honest case of signature produced by Fa.
     We need to prove that the sign req received by FA comes from PDIS. *)
     intro [i [Euf Meq]].
-    assert forall t:timestamp, t < Sok => exec@t as H2. {
+    assert forall t, t < Sok => exec@t as H2. {
       intro t Ht.
       by apply exec_le (pred(Sok)).
     }.

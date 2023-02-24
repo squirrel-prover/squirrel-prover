@@ -20,11 +20,11 @@ include Basic.
     from the part that involves message equalities. 
     The pure part is proven both as a local lemma and a global lemma. *)
 
-goal lastupdate_pure : forall tau:timestamp,
+goal lastupdate_pure : forall tau,
   happens(tau) => (
-    (forall j:index, happens(A(j)) => A(j)>tau) ||
-    (exists i:index, happens(A(i)) && A(i) <=tau &&
-     forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i))).
+    (forall j, happens(A(j)) => A(j)>tau) ||
+    (exists i, happens(A(i)) && A(i) <=tau &&
+     forall j, happens(A(j)) && A(j)<=tau => A(j)<=A(i))).
 Proof.
   induction.
   intro tau IH Hp.
@@ -88,9 +88,9 @@ Proof.
 Qed.
 
 goal lastupdate_init :
-  forall tau:timestamp,
+  forall tau,
   happens(tau) =>
-  (forall j:index, happens(A(j)) => A(j)>tau) =>
+  (forall j, happens(A(j)) => A(j)>tau) =>
   s@tau = s@init.
 Proof.
   induction => tau IH _ Htau.
@@ -109,7 +109,7 @@ Qed.
 goal lastupdate_A :
   forall (tau:timestamp,i:index),
   happens(A(i)) && A(i)<=tau &&
-  (forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i)) =>
+  (forall j, happens(A(j)) && A(j)<=tau => A(j)<=A(i)) =>
   s@tau = s@A(i).
 Proof.
   induction.
@@ -128,12 +128,12 @@ Proof.
 Qed.
 
 goal lastupdate :
-  forall tau:timestamp,
+  forall tau,
   happens(tau) =>
-    (s@tau = s@init && forall j:index, happens(A(j)) => A(j)>tau) ||
-    (exists i:index, s@tau = s@A(i) &&
+    (s@tau = s@init && forall j, happens(A(j)) => A(j)>tau) ||
+    (exists i, s@tau = s@A(i) &&
      happens(A(i)) && A(i)<=tau &&
-     forall j:index, happens(A(j)) && A(j)<=tau => A(j)<=A(i)).
+     forall j, happens(A(j)) && A(j)<=tau => A(j)<=A(i)).
 Proof.
   intro tau Htau.
   use lastupdate_pure with tau as [Hinit|[i HAi]] => //.
@@ -148,7 +148,7 @@ Qed.
 
 goal non_repeating :
   forall (beta,alpha:timestamp), happens(beta) =>
-  (exists i:index, alpha < A(i) && A(i) <= beta) =>
+  (exists i, alpha < A(i) && A(i) <= beta) =>
   s@alpha <> s@beta.
 Proof.
   induction => beta IH alpha _ [i [_ _]] Meq.

@@ -2,11 +2,13 @@
   module T  = Tactics
   module SE = SystemExpr
 
-  let sloc startpos endpos s =
-    let loc = Location.make startpos endpos in
-    Location.mk_loc loc s
+  module L = Location
 
-  let mk_abstract loc s args = T.Abstract (Location.mk_loc loc s, args)
+  let sloc startpos endpos s =
+    let loc = L.make startpos endpos in
+    L.mk_loc loc s
+
+  let mk_abstract loc s args = T.Abstract (L.mk_loc loc s, args)
 %}
 
 %token <int> INT
@@ -100,13 +102,13 @@
 (* Locations *)
 %inline loc(X):
 | x=X {
-    { Location.pl_desc = x;
-      Location.pl_loc  = Location.make $startpos $endpos;
+    { L.pl_desc = x;
+      L.pl_loc  = L.make $startpos $endpos;
     }
   }
 
 %inline lloc(X):
-| X { Location.make $startpos $endpos }
+| X { L.make $startpos $endpos }
 
 (*------------------------------------------------------------------*)
 (* Lists *)
@@ -159,20 +161,24 @@ sterm_i:
 
 | DIFF LPAREN t=term COMMA t0=term RPAREN { Theory.Diff (t,t0) }
 
-| SEQ LPAREN vs=ext_arg_list DARROW t=term RPAREN { Theory.Quant (Seq,vs,t) }
+| SEQ LPAREN vs=bnd_group_list(lval,ty_tagged) DARROW t=term RPAREN { Theory.Quant (Seq,vs,t) }
 
 | l=loc(NOT) f=sterm
-    { let fsymb = Location.mk_loc (Location.loc l) "not" in
+    { let fsymb = L.mk_loc (L.loc l) "not" in
       Theory.mk_app_i (Theory.mk_symb fsymb) [f] }
 
-| l=lloc(FALSE)  { Theory.Symb (Location.mk_loc l "false") }
+| l=lloc(FALSE)  { Theory.Symb (L.mk_loc l "false") }
 
-| l=lloc(TRUE)   { Theory.Symb (Location.mk_loc l "true") }
+| l=lloc(TRUE)   { Theory.Symb (L.mk_loc l "true") }
 
 | l=paren(slist1(term,COMMA))
     { match l with
-      | [t] -> Location.unloc t
+      | [t] -> L.unloc t
       | _ -> Theory.Tuple l }
+
+%inline quantif:
+| EXISTS { Term.Exists }
+| FORALL { Term.ForAll }
 
 /* ambiguous term */
 term_i:
@@ -201,26 +207,17 @@ term_i:
 | f=term o=loc(ord) f0=term                
     { Theory.mk_app_i (Theory.mk_symb o) [f;f0] }
 
-| FUN LPAREN vs=ext_arg_list RPAREN DARROW f=term
+| FUN vs=ext_bnds_tagged DARROW f=term
                                  { Theory.Quant (Lambda,vs,f)  }
 
-| EXISTS LPAREN vs=ext_arg_list RPAREN sep f=term %prec QUANTIF
-                                 { Theory.Quant (Exists,vs,f)  }
-
-| FORALL LPAREN vs=ext_arg_list RPAREN sep f=term %prec QUANTIF
-                                 { Theory.Quant (ForAll,vs,f)  }
-
-| EXISTS a=ext_arg COMMA f=term %prec QUANTIF
-                                 { Theory.Quant (Exists,a,f)  }
-
-| FORALL a=ext_arg COMMA f=term %prec QUANTIF
-                                 { Theory.Quant (ForAll,a,f)  }
+| q=quantif vs=ext_bnds_tagged COMMA f=term %prec QUANTIF
+                                 { Theory.Quant (q,vs,f)  }
 
 /* non-ambiguous term */
 %inline else_term:
-| %prec empty_else   { let loc = Location.make $startpos $endpos in
-                       let fsymb = Location.mk_loc loc "zero" in
-                       Location.mk_loc loc (Theory.Symb fsymb) }
+| %prec empty_else   { let loc = L.make $startpos $endpos in
+                       let fsymb = L.mk_loc loc "zero" in
+                       L.mk_loc loc (Theory.Symb fsymb) }
 | ELSE t=term       { t }
 
 sterm:
@@ -244,81 +241,81 @@ term_list:
 | RANGLE                         { ">" }
 
 (*------------------------------------------------------------------*)
-ids:
-| id=lsymb                             { [id] }
-| id=lsymb COMMA ids=ids               { id::ids }
+/* simple lvalues: only support variable declarations */
+simpl_lval:
+| l=loc(UNDERSCORE)  { L.mk_loc (L.loc l) "_x" }
+| l=lsymb            { l }
+
+/* full lvalues */
+%inline lval:
+| l=simpl_lval                          { Theory.L_var l }
+| LPAREN ids=slist1(lsymb,COMMA) RPAREN { Theory.L_tuple ids }
 
 (*------------------------------------------------------------------*)
 /* Auxiliary:
    Many binders with the same types: `x1,...,xN : type` */
-%inline bnd_group(TY):
-| is=ids COLON k=TY { List.map (fun x -> x,k) is }
+%inline bnd_group(LVAL,TY):
+| is=slist1(LVAL,COMMA) COLON k=TY { List.map (fun x -> x,k) is }
 
 /* Auxiliary:
    many binder groups: `x1,...,xN1 : type1, ..., x1,...,xNL : typeL */
-%inline bnd_group_list(TY):
-| args=slist1(bnd_group(TY),COMMA) { List.flatten args }
+%inline bnd_group_list(LVAL,TY):
+| args=slist1(bnd_group(LVAL,TY),COMMA) { List.flatten args }
 
+(*------------------------------------------------------------------*)
 /* Auxiliary: a single binder declarations */
 %inline bnd:
-| LPAREN l=bnd_group_list(ty) RPAREN    { l }
+| LPAREN l=bnd_group_list(simpl_lval,ty) RPAREN { l }
 /* many binders, grouped  */
-| x=lsymb                               { [x, Location.mk_loc (Location.loc x) Theory.P_ty_pat] }
+
+| x=simpl_lval    { [x, L.mk_loc (L.loc x) Theory.P_ty_pat] }
 /* single binder `x`, no argument */
 
-/* Binders. */
+/* Many binder declarations. */
 bnds:
 | l=slist(bnd, empty) { List.flatten l }
 
 (*------------------------------------------------------------------*)
-ty_tagged:
-| k=ty tags=var_tags {k,tags}
-
-/* Auxiliary: a single binder declarations */
-%inline bnd_tagged:
-/* many binders, grouped  */
-| LPAREN l=bnd_group_list(ty_tagged) RPAREN    { l }
-
-/* single binder `x`, no argument */
-| x=lsymb
-  { [x, (Location.mk_loc (Location.loc x) Theory.P_ty_pat, [])] }
-
-/* Binders. */
-bnds_tagged:
-| l=slist(bnd_tagged, empty) { List.flatten l }
-
-(*------------------------------------------------------------------*)
-%inline ext_id:
-| id=lsymb                              { `Simpl id }
-| LPAREN ids=slist1(lsymb,COMMA) RPAREN { `Tuple ids }
-
+/* variable tags */
 var_tags:
 |                                             { []   }
 | LBRACKET tags=slist1(lsymb, COMMA) RBRACKET { tags }
 
-ext_arg:
-| is=slist1(ext_id,COMMA) COLON k=ty tags=var_tags
-    { List.map (function
-        | `Simpl id  -> Theory.Bnd_simpl (id,  (k, tags))
-        | `Tuple ids -> Theory.Bnd_tuple (ids, k, tags)
-      ) is 
-    }
+/* type with tags */
+ty_tagged:
+| k=ty tags=var_tags {k,tags}
 
-ext_arg_list:
-| args=slist1(ext_arg, COMMA) { List.flatten args }
+(*------------------------------------------------------------------*)
+/* Auxiliary: a single binder declarations with tags */
+%inline bnd_tagged:
+/* many binders, grouped  */
+| LPAREN l=bnd_group_list(simpl_lval,ty_tagged) RPAREN { l }
 
-opt_ext_arg_list:
-| LPAREN args=ext_arg_list RPAREN    { args }
-|                                    { [] }
+/* single binder `x`, no argument */
+| x=simpl_lval    { [x, (L.mk_loc (L.loc x) Theory.P_ty_pat, [])] }
+
+/* Many binder declarations with tags. */
+bnds_tagged:
+| l=slist(bnd_tagged, empty) { List.flatten l }
+
+(*------------------------------------------------------------------*)
+/* Auxiliary: a single binder declarations with tags with full lvalues */
+%inline ext_bnd_tagged:
+/* many binders, grouped  */
+| LPAREN l=bnd_group_list(lval,ty_tagged) RPAREN { l }
+
+/* single binder `x`, no argument */
+| x=simpl_lval    { [Theory.L_var x, (L.mk_loc (L.loc x) Theory.P_ty_pat, [])] }
+
+/* Many binder declarations with tags. */
+ext_bnds_tagged:
+| l=slist(ext_bnd_tagged, empty) { List.flatten l }
 
 (*------------------------------------------------------------------*)
 top_formula:
 | f=term EOF                    { f }
 
-%inline sep:
-|       {()}
-| COMMA {()}
-
+(*------------------------------------------------------------------*)
 (* Processes *)
 
 top_process:
@@ -336,7 +333,7 @@ process_i:
 | NEW id=lsymb ty=colon_ty? SEMICOLON p=process
     { let ty = match ty with
         | Some ty -> ty
-        | None -> Location.mk_loc (Location.loc id) Theory.P_message
+        | None -> L.mk_loc (L.loc id) Theory.P_message
       in
       Process.New (id,ty,p) }
 
@@ -356,9 +353,9 @@ process_i:
     { Process.Let (id,t,ty,p) }
 
 | id=lsymb terms=term_list COLONEQ t=term p=process_cont
-    { let to_idx t = match Location.unloc t with
+    { let to_idx t = match L.unloc t with
         | Theory.Symb x -> x
-        | _ -> raise @@ Theory.Conv (Location.loc t, Theory.Failure "must be a variable")
+        | _ -> raise @@ Theory.Conv (L.loc t, Theory.Failure "must be a variable")
       in
       let l = List.map to_idx terms in
       Process.Set (id,l,t,p) }
@@ -373,13 +370,13 @@ processes_i:
 | p=process PARALLEL ps=loc(processes_i)  { Process.Parallel (p,ps) }
 
 process_cont:
-|                                { let loc = Location.make $startpos $endpos in
-                                   Location.mk_loc loc Process.Null }
+|                                { let loc = L.make $startpos $endpos in
+                                   L.mk_loc loc Process.Null }
 | SEMICOLON p=process            { p }
 
 else_process:
-| %prec empty_else               { let loc = Location.make $startpos $endpos in
-                                   Location.mk_loc loc Process.Null }
+| %prec empty_else               { let loc = L.make $startpos $endpos in
+                                   L.mk_loc loc Process.Null }
 | ELSE p=process                 { p }
 
 opt_indices:
@@ -525,7 +522,7 @@ declaration_i:
                 abs_tys   = t; }) }
 
 
-| OP e=lsymb_decl tyargs=ty_args args=opt_ext_arg_list tyo=colon_ty? EQ t=term
+| OP e=lsymb_decl tyargs=ty_args args=ext_bnds_tagged tyo=colon_ty? EQ t=term
     { let symb_type, name = e in
       Decl.(Decl_operator
               { op_name      = name;
@@ -630,7 +627,7 @@ rw_args:
 
 single_target:
 | id=lsymb { id }
-| i=loc(int)    { Location.mk_loc (Location.loc i) (string_of_int (Location.unloc i)) }
+| i=loc(int)    { L.mk_loc (L.loc i) (string_of_int (L.unloc i)) }
 
 in_target:
 |                                  { `Goal }
@@ -669,9 +666,9 @@ simpl_pat:
 | d=loc(ip_rw_dir) { TacticsArgs.Srewrite d }
 
 s_item_body:
-| l=loc(SLASHSLASH)      { TacticsArgs.Tryauto      (Location.loc l)}
-| l=loc(SLASHEQUAL)      { TacticsArgs.Simplify     (Location.loc l)}
-| l=loc(SLASHSLASHEQUAL) { TacticsArgs.Tryautosimpl (Location.loc l)}
+| l=loc(SLASHSLASH)      { TacticsArgs.Tryauto      (L.loc l)}
+| l=loc(SLASHEQUAL)      { TacticsArgs.Simplify     (L.loc l)}
+| l=loc(SLASHSLASHEQUAL) { TacticsArgs.Tryautosimpl (L.loc l)}
 
 %inline s_item:
 | s=s_item_body { s,[] }
@@ -679,8 +676,8 @@ s_item_body:
 
 intro_pat:
 | s=s_item      { TacticsArgs.SItem (s) }
-| l=loc(STAR)   { TacticsArgs.Star  (Location.loc l)}
-| l=loc(RANGLE) { TacticsArgs.StarV (Location.loc l)}
+| l=loc(STAR)   { TacticsArgs.Star  (L.loc l)}
+| l=loc(RANGLE) { TacticsArgs.StarV (L.loc l)}
 | pat=simpl_pat { TacticsArgs.Simpl pat }
 | e=expnd_item  { TacticsArgs.SExpnd e }
 
@@ -718,22 +715,22 @@ p_pt_arg:
 
 p_pt:
 | head=lsymb args=slist(p_pt_arg,empty)
-    { let p_pt_loc = Location.make $startpos $endpos in
+    { let p_pt_loc = L.make $startpos $endpos in
       Theory.{ p_pt_head = head; p_pt_args = args; p_pt_loc; } }
 
 /* legacy syntax for use tactic */
 pt_use_tac:
 | hid=lsymb
-    { Theory.{ p_pt_head = hid; p_pt_args = []; p_pt_loc = Location.loc hid; } }
+    { Theory.{ p_pt_head = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
 | hid=lsymb WITH args=slist1(tac_term,COMMA)
-    { let p_pt_loc = Location.make $startpos $endpos in
+    { let p_pt_loc = L.make $startpos $endpos in
       let args = List.map (fun x -> Theory.PT_term x) args in
       Theory.{ p_pt_head = hid; p_pt_args = args; p_pt_loc; } }
 
 /* non-ambiguous pt */
 spt:
 | hid=lsymb
-    { Theory.{ p_pt_head = hid; p_pt_args = []; p_pt_loc = Location.loc hid; } }
+    { Theory.{ p_pt_head = hid; p_pt_args = []; p_pt_loc = L.loc hid; } }
 | LPAREN pt=p_pt RPAREN
     { pt }
 
@@ -803,7 +800,7 @@ tac:
   | l=tac PLUS r=tac                   { T.OrElse [l;r] }
   | TRY l=tac                          { T.Try l }
   | REPEAT t=tac                       { T.Repeat t }
-  | id=lsymb t=tactic_params           { mk_abstract (Location.loc id) (Location.unloc id) t }
+  | id=lsymb t=tactic_params           { mk_abstract (L.loc id) (L.unloc id) t }
 
   (* Special cases for tactics whose names are not parsed as ID
    * because they are reserved. *)
@@ -865,7 +862,7 @@ tac:
     { mk_abstract l "cycle" [TacticsArgs.Int_parsed i] }
 
   | l=lloc(CYCLE) MINUS i=loc(INT)
-    { let im = Location.mk_loc (Location.loc i) (- (Location.unloc i)) in
+    { let im = L.mk_loc (L.loc i) (- (L.unloc i)) in
       mk_abstract l "cycle" [TacticsArgs.Int_parsed im] }
 
   | CHECKFAIL t=tac EXN ts=ID  { T.CheckFail (ts, t) }
@@ -1094,7 +1091,7 @@ goal_i:
 | GLOBAL GOAL s=global_statement DOT { s }
 | EQUIV  s=obs_equiv_statement   DOT { s }
 | EQUIV s=system_annot name=statement_name vars=bnds_tagged COLON b=loc(biframe) DOT
-    { let f = Location.mk_loc (Location.loc b) (Theory.PEquiv (Location.unloc b)) in
+    { let f = L.mk_loc (L.loc b) (Theory.PEquiv (L.unloc b)) in
       let system = `Global, s in
       Goal.Parsed.{ name; system; ty_vars = []; vars; formula = Global f } }
 
