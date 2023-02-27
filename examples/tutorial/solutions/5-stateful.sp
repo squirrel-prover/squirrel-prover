@@ -207,7 +207,8 @@ Proof.
     rewrite /cI in H1.
     intctxt H1.
     (* ciphertext *)
-    * intro [k [_ Eq]]. rewrite /cI /c Eq dec_enc in H2. 
+    intro [k [_ Eq]]. 
+    rewrite /cI /c Eq dec_enc in H2. 
     by exists k. 
 
   + intro [k [Ht Eq Hc]].
@@ -348,7 +349,7 @@ Proof.
   rewrite /output in H2.
   have V:
     cpt(i)@T(i,k) =
-    dec(enc(cpt(i1)@T(i1,k1),n(i1,k1),key(i1)), key(i)) by auto.
+    dec(enc(cpt(i1)@T(i1,k1),n(i1,k1),key(i1)), key(i)) by auto. 
   intctxt V => //.
   intro @/cpt U. 
   by apply incr_ne_fail in U.
@@ -360,7 +361,7 @@ Qed.
 
 (* [Advanced] Show that our protocol provides injective authentication using 
    the lemmas above. *)
-goal injective_authentication (j, i, j1, i1 : index[param]) :
+goal injective_authentication (j, i, j1, i1 : index[const]) :
   R(j,i) < R(j1,i1) =>
   exec@R(j,i) =>
   exec@R(j1,i1) =>
