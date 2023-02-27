@@ -224,11 +224,10 @@ Qed.
  (* The tag counter is not decreasing *)
 goal counter_increaseT (i : index, tau1, tau2 : timestamp):
   tau1 <= tau2 => 
-  exec@tau2 =>
   cpt(i)@tau1 ~~< cpt(i)@tau2.
 Proof. 
   (* BEGIN EXO *)
-  induction tau2 => tau2 IH Le E.
+  induction tau2 => tau2 IH E.
   case tau2 => //. 
 
   (* R(j,i0) *)
@@ -256,16 +255,14 @@ Qed.
 
 (* the tag counter is strictly increasing when a tag session occurs. *)
 goal counter_increaseT_strict (tau1, tau2 : timestamp, i,k : index):
-  exec@tau2 =>
   tau1 < T(i,k) => 
   T(i,k) <= tau2 =>
   cpt(i)@tau1 ~< cpt(i)@tau2.
 Proof.
   (* BEGIN EXO *)
-  intro H1 H2 H3.
+  intro H2 H3. 
   apply le_lt_trans _ (cpt(i)@pred(T(i,k))). 
-  + apply counter_increaseT => //.
-    by apply exec_le tau2.
+  + by apply counter_increaseT.
   + apply lt_le_trans _ (cpt(i)@T(i,k)). 
     - rewrite /cpt.
       by apply order_incr.
@@ -318,18 +315,16 @@ Qed.
 goal tag_cpt_strict (i, k, k1: index) :
   happens(T(i,k1), T(i,k)) =>
   cpt(i)@T(i,k) = cpt(i)@T(i,k1) =>
-  exec@T(i,k) =>
-  exec@T(i,k1) =>
   k = k1.
 Proof.
   (* BEGIN EXO *)
-   intro *.
+   intro *. 
    have A : T(i,k) < T(i,k1) || T(i,k) > T(i,k1) || k = k1 by auto.
    case A => //.
    - have Xa := counter_increaseT_strict (T(i,k)) (T(i,k1)) i k1. 
-     by apply order_strict in Xa => //. 
+     by apply order_strict in Xa.
    - have Xa := counter_increaseT_strict (T(i,k1)) (T(i,k)) i k. 
-     by apply order_strict in Xa => //. 
+     by apply order_strict in Xa.
   (* END EXO *)
 Qed.
 
@@ -373,7 +368,7 @@ Proof.
   intro S1 S2.
   have H1 : cond@R(j,i) by auto.
   have H2 : cond@R(j1,i1) by auto.
-  revert H2 H1.
+  revert H2 H1. 
   rewrite !authentication_R //=.
   intro [k [H1 H2 H3]] [k1 [G1 G2 G3]] U.
   rewrite U -G2 /output in H2.
@@ -385,10 +380,8 @@ Proof.
 
   (* consequence of `counter_increaseT` *)
   have ?: cpt(i)@T(i,k) = cpt(i)@T(i,k1) by auto.
-  have ?: k = k1. {
-    apply tag_cpt_strict i k k1 => //. 
-    + by apply exec_le (R(j,i)).
-    + by apply exec_le (R(j1,i)).
+  have ?: k = k1. {. 
+    by apply tag_cpt_strict i k k1.
   }.
 
   have B := counter_increaseR i (R(j,i)) (pred(R(j1,i))) _ _; 1,2:auto.

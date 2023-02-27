@@ -200,7 +200,6 @@ Qed.
  (* The tag counter is not decreasing *)
 goal counter_increaseT (i : index, tau1, tau2 : timestamp):
   tau1 <= tau2 => 
-  exec@tau2 =>
   cpt(i)@tau1 ~~< cpt(i)@tau2.
 Proof. 
   admit. (* TODO *)
@@ -208,7 +207,6 @@ Qed.
 
 (* the tag counter is strictly increasing when a tag session occurs. *)
 goal counter_increaseT_strict (tau1, tau2 : timestamp, i,k : index):
-  exec@tau2 =>
   tau1 < T(i,k) => 
   T(i,k) <= tau2 =>
   cpt(i)@tau1 ~< cpt(i)@tau2.
@@ -234,8 +232,6 @@ Qed.
 goal tag_cpt_strict (i, k, k1: index) :
   happens(T(i,k1), T(i,k)) =>
   cpt(i)@T(i,k) = cpt(i)@T(i,k1) =>
-  exec@T(i,k) =>
-  exec@T(i,k1) =>
   k = k1.
 Proof.
   admit. (* TODO *)
