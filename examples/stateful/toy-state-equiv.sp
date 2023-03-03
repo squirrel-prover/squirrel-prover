@@ -40,10 +40,10 @@ include Basic.
 (* HELPING LEMMAS *)
 
 (* kT(i)@t = kT(i)@t' where t' is init or the previous update of kT(i) *)
-goal lastUpdate : forall (t:timestamp) forall (i:index)
+goal lastUpdate : forall (t:timestamp) (i:index),
   happens(t) =>
   ((kT(i)@t = kT(i)@init && forall (j':index), happens(T(i,j')) => t < T(i,j')) ||
-    (exists j:index,
+    (exists j,
      kT(i)@t = kT(i)@T(i,j) &&
      T(i,j) <= t &&
      (forall (j':index), happens(T(i,j')) => (T(i,j')<=T(i,j) || t<T(i,j'))))).
@@ -87,7 +87,7 @@ Qed.
 
 goal stateInequality :
   forall (t:timestamp),
-  (forall (t':timestamp), forall (i,j,i':index)
+  (forall (t':timestamp) (i,j,i':index),
      happens(t) =>
      (t = T(i,j) && t' < t => kT(i)@t <> kT(i')@t')).
 Proof.

@@ -23,7 +23,7 @@ Proof.
   (* Check that the right formula has been produced,
      using an incorrect equivalence that we admit. *)
   have ->:
-    (forall i0:index, i<>i0) = true.
+    (forall i0, i<>i0) = true.
   admit.
   nosimpl(rewrite if_true in 1).
   by use len_ok_ko with i; use len_ko_ok with i.

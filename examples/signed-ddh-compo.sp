@@ -51,10 +51,11 @@ name b : index -> message
 
 ddh g, (^) where group:message exponents:message.
 
-signature sign,checksign,pk with oracle forall (m:message,sk:message)
- (sk <> kP || exists (i:index, x1:message, x2:message) m=<<x1,g^a(i)>,x2> )
-  &&
- (sk <> kS || exists (i:index, x1:message, x2:message) m=<<x1,g^b(i)>,x2>)
+signature sign,checksign,pk with oracle 
+ forall (m:message,sk:message),
+   (sk <> kP || exists (i:index, x1:message, x2:message), m=<<x1,g^a(i)>,x2> )
+    &&
+   (sk <> kS || exists (i:index, x1:message, x2:message), m=<<x1,g^b(i)>,x2>)
 
 hash h
 

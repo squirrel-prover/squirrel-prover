@@ -75,14 +75,14 @@ name hKey : message
 hash h with oracle forall (m:message,sk:message), sk = hKey
 
 
-signature sign,checksign,pk with oracle forall (m:message,sk:message)
+signature sign,checksign,pk with oracle forall (m:message,sk:message),
 (sk <> kP
- || exists (i:index, x1:message, x2:message) m=h(<<g^a(i),x1>,x2>, hKey) (* O_PS *)
- || exists (x:message) m=<forwarded,x> )  (* O_forward *)
+ || exists (i:index, x1:message, x2:message), m=h(<<g^a(i),x1>,x2>, hKey) (* O_PS *)
+ || exists (x:message), m=<forwarded,x> )  (* O_forward *)
   &&
 (sk <> kS
- || exists (i:index, x1:message, x2:message) m=h(<<x1,g^b(i)>,x2>, hKey) (* O_PS *)
- || exists (x:message) m=<forwarded,x> ) (* O_forward) *)
+ || exists (i:index, x1:message, x2:message), m=h(<<x1,g^b(i)>,x2>, hKey) (* O_PS *)
+ || exists (x:message), m=<forwarded,x> ) (* O_forward) *)
 
 
 (** We first present the general ssh process. *)

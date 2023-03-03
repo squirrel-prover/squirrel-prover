@@ -46,12 +46,14 @@ type bnd_tagged = lsymb * (p_ty * var_tags)
 type bnds_tagged = bnd_tagged list
 
 (*------------------------------------------------------------------*)
-(** Extended binders (with variable tags).
+(** Left value.
     Support binders with destruct, e.g. [(x,y) : bool * bool] *)
-type ext_bnd =
-  | Bnd_simpl of bnd_tagged
-  | Bnd_tuple of lsymb list * p_ty * var_tags
+type lval =
+  | L_var   of lsymb
+  | L_tuple of lsymb list 
 
+(** Extended binders (with variable tags) *)
+type ext_bnd = lval * (p_ty * var_tags)
 type ext_bnds = ext_bnd list
 
 (*------------------------------------------------------------------*)

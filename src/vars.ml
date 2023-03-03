@@ -65,7 +65,7 @@ type tagged_var = var * Tag.t
 type tagged_vars = (var * Tag.t) list
 
 (*------------------------------------------------------------------*)
-let is_pat v = String.sub v.id.name 0 1 = "_"
+let is_pat v = v.id.name = "_"
 
 (*------------------------------------------------------------------*)
 let name v = v.id.name
@@ -338,8 +338,7 @@ let make_suffix (e : 'a genv) (prefix : string) : int option =
     ) e None
 
 let check_prefix ~allow_pat s =
-  (s = "_" || String.sub s 0 1 <> "_") &&
-  (if not allow_pat then String.sub s 0 1 <> "_" else true)
+  (if not allow_pat then s <> "_" else true)
 
 let make_name ~allow_pat (env : 'a genv) (name : string) : string =
   let s_prefix, s_suffix = split_var_name name in
