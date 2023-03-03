@@ -42,20 +42,20 @@ Qed.
 (* ================ IMPLICATION ================ *)
 
 (* Cannot move local implication to global level if left subformula isn't 
-   deterministic. *)
+   constant. *)
 global goal _ (tau:timestamp) : [p(n)=true => happens(tau)].
 Proof.
   checkfail intro H exn NothingToIntroduce.
 Abort.
 
-(* Cannot move local implication to global level if left subformula is not 
-   deterministic. *)
+(* Cannot move local implication to global level if left subformula 
+   isn't constant. *)
 global goal _ (tau:timestamp) : [happens(tau) => p(n)=true].
 Proof.
   checkfail intro H exn NothingToIntroduce.
 Abort.
 
-(* Can move local implication to global level if left subformula is deterministic
+(* Can move local implication to global level if left subformula is constant
    and system-independent. *)
 global goal _ (tau:timestamp[const]) : [happens(tau) => p(n)=true].
 Proof.
@@ -69,7 +69,7 @@ Proof.
   intro H1 H2.
 Abort.
 
-(* Ternary variant, all formulas det + si. *)
+(* Ternary variant, all formulas constant + si. *)
 global goal _ : [false => false => false].
 Proof.
   intro H1 H2.
@@ -77,7 +77,7 @@ Abort.
 
 (* ================ DISJUNCTION ================ *)
 
-(* Local disjunction can be made global when one of its terms are deterministic. *)
+(* Local disjunction can be made global when one of its terms are constant. *)
 
 global goal _ (tau:timestamp) :
   [happens(tau) || p(n)=true] -> [false].
@@ -215,13 +215,13 @@ Proof.
 Abort.
 
 (*------------------------------------------------------------------*)
-(* Existential quantification can be made global if body is deterministic + SI. *)
+(* Existential quantification can be made global if body is constant + SI. *)
 global goal _ : [exists (i:index), false] -> [false].
 Proof.
   intro [i H].
 Abort.
 
-(* here, the body is deterministic, and is SI because there is only one system being 
+(* here, the body is constant, and is SI because there is only one system being 
    considered *)
 global goal [set:default/left; equiv:default/left,default/left] 
   _ (t0 : timestamp[const]): 
@@ -230,7 +230,7 @@ Proof.
   intro [i H].
 Abort.
 
-(* the body is deterministic, but not SI (because several systems are considered in 
+(* the body is constant, but not SI (because several systems are considered in 
    the set and equiv part) *)
 global goal [set:default/left, default/right; equiv:default] 
   _ (t0 : timestamp[const]): 
@@ -255,7 +255,7 @@ Proof.
   checkfail intro H; destruct H as [i H] exn Failure. 
 Abort.
 
-(* the body is deterministic, but not SI (because several systems are considered 
+(* the body is constant, but not SI (because several systems are considered 
    in the set part) *)
 global goal [set:default/left, default/right; equiv:default/left,default/left] 
   _ (t0 : timestamp[const]): 
@@ -265,7 +265,7 @@ Proof.
   checkfail intro [i H] exn Failure.
 Abort.
 
-(* the body is deterministic, but not SI (because several systems are considered in 
+(* the body is constant, but not SI (because several systems are considered in 
    the equiv part) *)
 global goal [set:default/left; equiv:default/left,default/right] 
   _ (t0 : timestamp[const]): 
