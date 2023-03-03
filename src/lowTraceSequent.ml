@@ -342,7 +342,19 @@ let subst subst s =
       ~hyps:hyps
       ~conclusion:(Term.subst subst s.conclusion)
       s 
-      
+
+(*------------------------------------------------------------------*)
+let tsubst (tsubst : Type.tsubst) s =
+  if tsubst == Type.tsubst_empty then s else
+    let vars = Vars.map (fun v t -> Vars.tsubst tsubst v, t) s.env.vars in
+    let hyps = H.map (Equiv.Any.tsubst tsubst) s.hyps in
+    S.update
+      ~env:(Env.update ~vars s.env)
+      ~hyps:hyps
+      ~conclusion:(Term.tsubst tsubst s.conclusion)
+      s 
+
+(*------------------------------------------------------------------*)      
 let rename (u:Vars.var) (v:Vars.var) (s:t) : t =
   assert (not (Vars.mem s.env.vars v));
   let s = subst [Term.ESubst (Term.mk_var u, Term.mk_var v)] s in

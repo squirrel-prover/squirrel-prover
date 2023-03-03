@@ -6,7 +6,8 @@
 type tvar
 type tvars = tvar list
 
-val pp_tvar : Format.formatter -> tvar -> unit
+val pp_tvar     : Format.formatter -> tvar -> unit
+val pp_tvar_dbg : Format.formatter -> tvar -> unit
 
 val mk_tvar : string -> tvar
 val ident_of_tvar : tvar -> Ident.t
@@ -55,7 +56,8 @@ val equal : ty -> ty -> bool
 val is_tuni : ty -> bool
 
 (*------------------------------------------------------------------*)
-val free_univars : ty -> Ident.Sid.t 
+val free_univars      : ty      -> Ident.Sid.t 
+val free_univars_list : ty list -> Ident.Sid.t 
 
 (*------------------------------------------------------------------*)
 val tboolean   : ty
@@ -67,6 +69,8 @@ val tindex     : ty
 
 (** A substitution from unification variables to (existential) types. *)
 type tsubst
+
+val pp_tsubst : Format.formatter -> tsubst -> unit
 
 val tsubst : tsubst -> ty -> ty
                                          
@@ -85,6 +89,9 @@ module Infer : sig
   val pp : Format.formatter -> env -> unit
 
   val mk_env : unit -> env
+
+  val copy : env -> env
+  val set : tgt:env -> value:env -> unit
     
   val mk_univar : env -> univar
 
@@ -122,10 +129,7 @@ val decompose_funs : ty -> ty list * ty
 (** {2 Function symbols type} *)
 
 (** Type of a function symbol: 
-    ∀'a₁ ... 'aₙ, τ₁ → ... → τₙ → τ 
-
-    Invariant: [fty_out] tvars and univars must be bounded by [fty_vars].
-*)
+    ∀'a₁ ... 'aₙ, τ₁ → ... → τₙ → τ *)
 type 'a ftype_g = private {
   fty_vars : 'a list; (** 'a₁ ... 'aₙ *)  
   fty_args : ty list; (** τ₁, ... ,τₙ *)
@@ -145,6 +149,8 @@ val pp_ftype_op : Format.formatter -> ftype_op -> unit
 (*------------------------------------------------------------------*)
 val ftype_free_univars : ftype -> Ident.Sid.t
  
+val tsubst_ftype : tsubst -> ftype -> ftype 
+
 (*------------------------------------------------------------------*)
 val mk_ftype : tvar list -> ty list -> ty -> ftype
 

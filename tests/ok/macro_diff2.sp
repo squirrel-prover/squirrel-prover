@@ -48,7 +48,8 @@ goal [s3/right, s3/left] _ (t : timestamp) :
   happens(A) => X1@A = diff(g(ko),f(ok)).
 Proof.
   intro H.
-  rewrite /X1; rewrite /X; congruence.
+  rewrite /X1; rewrite /X.
+  project; congruence.
 Qed.
 
 (* same swapping systems *)
@@ -56,5 +57,5 @@ goal [s3/left, s3/right] _ (t : timestamp) :
   happens(A) => X1@A = diff(f(ok),g(ko)).
 Proof.
   intro H.
-  rewrite /X1; rewrite /X; congruence.
+  rewrite /X1; rewrite /X; project; congruence.
 Qed.

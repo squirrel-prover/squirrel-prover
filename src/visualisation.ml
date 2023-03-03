@@ -42,7 +42,7 @@ let get_classes_rep (models : Constr.models) (terms : Term.terms) : Term.terms =
         term
     | (Var _ as term) :: l, _, _ ->
         best_candidate (Some term) pred_candidate l
-    | (Fun (fsymb, _, [_t]) as term) :: l, _, _ when fsymb = Term.f_pred ->
+    | (App (Fun (fsymb, _), [_t]) as term) :: l, _, _ when fsymb = Term.f_pred ->
         best_candidate var_candidate (Some term) l
     | [], _, Some term ->
         term

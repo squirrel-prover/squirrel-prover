@@ -65,7 +65,7 @@ global goal _ :
   equiv(f(a), g(f(a), f(b)), g(f(a), b), diff(a,b)).
 Proof.
   intro H.
-  fa f (_). help. 
+  fa f (_).
   fa g (_,_).
   fa g (_,_). 
   fa f _, f (_), f (_).

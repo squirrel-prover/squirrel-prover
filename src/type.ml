@@ -10,7 +10,14 @@ module Sid = Ident.Sid
 type tvar = Ident.t
 type tvars = tvar list
 
-let pp_tvar fmt id = Fmt.pf fmt "'%a" Ident.pp id
+let _pp_tvar ~dbg fmt id = 
+  if dbg then
+    Fmt.pf fmt "'%a" Ident.pp_full id
+  else 
+    Fmt.pf fmt "'%a" Ident.pp id
+
+let pp_tvar     = _pp_tvar ~dbg:false
+let pp_tvar_dbg = _pp_tvar ~dbg:true
 
 let mk_tvar s = Ident.create s
 let ident_of_tvar id = id
@@ -21,6 +28,7 @@ let ident_of_tvar id = id
 type univar  = Ident.t
 type univars = univar list
 
+(* always debug printing *)
 let pp_univar fmt u = Fmt.pf fmt "'_%a" Ident.pp_full u
 
 let to_univar u = u
@@ -136,6 +144,15 @@ type tsubst = {
   ts_tvar   : ty Ident.Mid.t;
 }
 
+let pp_tsubst fmt ts =
+  let pp_bd fmt (id,ty) = 
+    Fmt.pf fmt "@[%a → %a@]" Ident.pp_full id pp ty
+  in
+  Fmt.pf fmt "@[<v 0>@[<hov 2>univars:@ %a@]@;@[<hov 2>tvars:@ %a@]@]" 
+    (Fmt.list ~sep:Fmt.comma pp_bd) (Mid.bindings ts.ts_univar)
+    (Fmt.list ~sep:Fmt.comma pp_bd) (Mid.bindings ts.ts_tvar)
+
+
 let tsubst_empty =
   { ts_univar = Mid.empty;
     ts_tvar   = Mid.empty; }
@@ -169,6 +186,9 @@ module Infer : sig
   val pp : Format.formatter -> env -> unit
 
   val mk_env : unit -> env
+
+  val copy : env -> env
+  val set : tgt:env -> value:env -> unit
     
   val mk_univar : env -> univar
 
@@ -195,6 +215,10 @@ end = struct
       )) (Mid.bindings !e)
 
   let mk_env () = ref Mid.empty 
+
+  let copy env = ref (!env) 
+
+  let set ~tgt ~value = tgt := !value
 
   let mk_univar (env : env) =
     let uv = Ident.create "u" in
@@ -240,11 +264,12 @@ end = struct
   let norm_env (env : env) : unit = 
     env := Mid.map (norm env) !env
 
-  (** An type inference environment is closed if every unification variable
-       normal form is a univar-free type. *)
+  (** An type inference environment [ty_env] is closed if every unification 
+      variable normal form is a type that do not use univars in [ty_env]
+      (but may use other univars). *)
   let is_closed (env : env) : bool =
     let rec check = function
-      | TUnivar _ -> false
+      | TUnivar uv -> not (Mid.mem uv !env)
       | Message | Boolean | Index | Timestamp | TBase _ | TVar _ -> true
       | Fun (t1, t2) -> check t1 && check t2
       | Tuple l -> List.for_all check l
@@ -406,9 +431,18 @@ let pp_ftype_op = pp_ftype_g pp_tvar
 (*------------------------------------------------------------------*)
 let ftype_free_univars (f : ftype) : Ident.Sid.t =
   (* [f.fty_vars] are not free in [f], and must not be added. *)
-  Sid.union
-    (free_univars_list f.fty_args)
-    (free_univars f.fty_out)
+  Sid.diff
+    (Sid.union
+       (free_univars_list f.fty_args)
+       (free_univars f.fty_out)) 
+    (Sid.of_list f.fty_vars)
+
+(*------------------------------------------------------------------*)
+let tsubst_ftype (ts : tsubst) (fty : ftype) : ftype = { 
+  fty_vars = fty.fty_vars;              (* bound type variable *)
+  fty_args = List.map (tsubst ts) fty.fty_args;
+  fty_out  = tsubst ts fty.fty_out;
+  }
     
 (*------------------------------------------------------------------*)
 let mk_ftype vars args out : ftype = {

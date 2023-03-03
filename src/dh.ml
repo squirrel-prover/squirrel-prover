@@ -38,7 +38,7 @@ let hard_failure = Tactics.hard_failure
 let rec factors (mult:Symbols.fname option) (info:NO.expand_info)
     (t:term) : (term list) =
   match t with
-  | Fun (f, _, [t1; t2]) when mult = Some f ->
+  | App (Fun (f, _), [t1; t2]) when mult = Some f ->
     factors mult info t1 @ factors mult info t2
   | Macro _ ->
     begin
@@ -56,7 +56,7 @@ let rec powers (exp:Symbols.fname) (mult:Symbols.fname option)
     (info:NO.expand_info)
     (t:term) : term * (term list) =
   match t with
-  | Fun (f, _, [t1; t2]) when f = exp ->
+  | App (Fun (f, _), [t1; t2]) when f = exp ->
     let (m, ps) = powers exp mult info t1 in
     let fs = factors mult info t2 in
     (m, ps@fs)
@@ -181,12 +181,12 @@ let get_bad_occs
     let occs2, _ = rec_call nargs in
     occs1 @ occs2, []
 
-  | Fun (f, _, _) when f = exp ->
+  | App (Fun (f, _), _) when f = exp ->
     let (m, pows) = powers exp mult info t in
     (* we're sure pows isn't empty, so no risk of looping in illegal powers *)
     get_illegal_powers m pows ~fv ~cond ~p ~info ~st, []
 
-  | Fun (f, _, [t1; t2]) when f = f_eq && gdh_oracles ->
+  | App (Fun (f, _), [t1; t2]) when f = f_eq && gdh_oracles ->
     (* u^p1…pn = v^q1…qn *)
     (* one bad pow is allowed in u, and one in v.
        Then we recurse on the rest, using illegal powers

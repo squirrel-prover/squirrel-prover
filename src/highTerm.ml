@@ -34,7 +34,7 @@ let is_deterministic (env : Env.t) (t : Term.term) : bool =
       end
 
     | Name _ | Macro _ -> false
-    | Fun (f, _, _) when f = Symbols.fs_att -> false
+    | Fun (f, _) when f = Symbols.fs_att -> false
 
     | Find (vs, _, _, _) 
     | Quant (_,vs,_) as t ->
@@ -47,7 +47,8 @@ let is_deterministic (env : Env.t) (t : Term.term) : bool =
 
 (*------------------------------------------------------------------*)
 let is_constant
-    (mode : [`Exact | `Approx]) (env : Env.t) (t : Term.term) : bool
+    (mode : [`Exact | `Approx]) ?(allow_adv_rand = false)
+    (env : Env.t) (t : Term.term) : bool
   =
   let rec is_const (venv : Vars.env): Term.term -> bool = function
     | Var v ->
@@ -61,7 +62,9 @@ let is_constant
       end
 
     | Name _ | Macro _ -> false
-    | Fun (f, _, _) when f = Symbols.fs_att -> false
+
+    | Fun (f, _) -> 
+      if f = Symbols.fs_att then allow_adv_rand else true
 
     | Find (vs, _, _, _) 
     | Quant (_,vs,_) as t when
@@ -98,7 +101,7 @@ let is_system_indep (env : Env.t) (t : Term.term) : bool =
     (* FEATURE: this could be made more precise in case we
        are considering a single system (or if the diff is spurious) *)
 
-    | Fun (fs, _, _) as t ->
+    | Fun (fs, _) as t ->
       Operator.is_system_indep env.table fs &&
       Term.tforall (is_si env) t
 
@@ -122,6 +125,6 @@ let is_system_indep (env : Env.t) (t : Term.term) : bool =
 let is_ptime_deducible
     ~(const : [`Exact | `Approx]) ~(si:bool) (env : Env.t) (t : Term.term) : bool
   =
-  is_constant const env t &&
+  is_constant ~allow_adv_rand:true const env t &&
   (not si || is_system_indep env t) &&
   true                          (* TODO: det: ptime: check PTIME *)

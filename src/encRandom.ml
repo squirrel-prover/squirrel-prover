@@ -52,7 +52,7 @@ type ctxt_occs = ctxt_occ list
 type ectxt_occ = (term, ctxt_aux) NO.ext_occ
 type ectxt_occs = ectxt_occ list
     
-
+(*------------------------------------------------------------------*)
 (** Occurrence for c = enc(m, r, k1), colliding with ccoll which uses kcoll. 
     c is meant to syntactically be a ciphertext,
     ccoll not necessarily (which is why it's useful
@@ -76,7 +76,7 @@ let mk_ctxt_occ
     {ca_m=m; ca_r=r; ca_k1=k1; ca_kcoll=kcoll}
     fv cond ot st
 
-
+(*------------------------------------------------------------------*)
 (** Randomness occurrence.
     'a is Name.t, for the name r' which is the occurrence
     'b contains a ectxt_occ, which is the occ enc(m,r,k1) where
@@ -195,7 +195,7 @@ let get_bad_occs_and_ciphertexts
      - the randomness doesn't have to be a name,
      - we don't record the ciphertext,
      so just recursing works. *)
-  | Fun (f, _, [Tuple [m; Name _ as r; Name (ksb', kargs') as k']]) 
+  | App (Fun (f, _), [Tuple [m; Name _ as r; Name (ksb', kargs') as k']]) 
     when pk_f = None && enc_f = f && k.symb.s_symb = ksb'.s_symb -> 
     (* look in m and in r (this automatically includes the args of r) *)
     (* also look in the args of k' *)
@@ -214,7 +214,7 @@ let get_bad_occs_and_ciphertexts
      an oracle to check dec ≠ fail, but since when dec ≠ fail the attacker
      can compute the decryption himself, allowing a full dec oracle
      is the same *)
-  | Fun (f, _, [Tuple [c; Name (ksb',kargs') as k']]) 
+  | App (Fun (f, _), [Tuple [c; Name (ksb',kargs') as k']]) 
     when dec_f = f && k.symb.s_symb = ksb'.s_symb && is_dec_allowed dec_allowed (c::kargs') ->
     (* look in c and the args of k' *)
     let occs1, accs1 = rec_call (c :: kargs') in
@@ -223,7 +223,7 @@ let get_bad_occs_and_ciphertexts
     occs1@occs2, accs1
 
   (* when a pk is defined: k may appear under pk (but rs may not) *)
-  | Fun (f, _, [Name (_,kargs') as k'])
+  | App (Fun (f, _), [Name (_,kargs') as k'])
     when pk_f = Some f  ->
     (* rec call on the args of k' *)
     let occs1, accs1 = rec_call kargs' in
@@ -235,7 +235,7 @@ let get_bad_occs_and_ciphertexts
   (* hash oracle: when enc has an associated hash function,
      we discard bad occurrences of k under any hash with any key
      (but keep the ciphertexts) *)
-  | Fun (f, _, [Tuple [m; Name _ as k']])
+  | App (Fun (f, _), [Tuple [m; Name _ as k']])
     when hash_f = Some f  ->
     (* look in m and k' (k is not a hash key, it should not be used as k') *)
     let occs1, accs1 = rec_call [m] in
@@ -249,9 +249,7 @@ let get_bad_occs_and_ciphertexts
 
   | _ -> retry_on_subterms ()
 
-
-
-
+(*------------------------------------------------------------------*)
 (** Look for bad uses of the randoms r from the list of
     ciphertexts occurrences enc(m,r,k1). 
     ie - if r occurs somewhere not as r' in enc(m',r', k'):
@@ -324,7 +322,7 @@ let get_bad_randoms
 
   (* r' found in enc(m',r',k') when k' potential collision with k *)
   (* (if k, k' have different symbols the previous case will apply) *)
-  | Fun (f, _, [Tuple [m'; Name (_, rargs') as r'; Name (ksb',_) as k']])
+  | App (Fun (f, _), [Tuple [m'; Name (_, rargs') as r'; Name (ksb',_) as k']])
     when enc_f = f && ksb'.s_symb = k.symb.s_symb ->
     let rn' = Name.of_term r' in
     let kn' = Name.of_term k' in
@@ -351,9 +349,7 @@ let get_bad_randoms
     
   | _ -> retry_on_subterms ()
 
-
-
-
+(*------------------------------------------------------------------*)
 (** Constructs the formula expressing that a ciphertext occurrence
     c'=enc(m',r',k1) is indeed in collision with c, and k1 with k.
     used for integrity: if dec(c, k) succeeds, then c must be
@@ -362,14 +358,14 @@ let get_bad_randoms
     so c = c' is not sufficient: it doesn't necessarily mean that k = k1) *)
 let ciphertext_formula
     ~(negate : bool)
-    (c':term)
-    (c:term)
-    (ca:ctxt_aux)
+    (c' : term)
+    (c  : term)
+    (ca : ctxt_aux)
     : term =
   let {ca_m = m'; ca_r = r'; ca_k1 = k1; ca_kcoll = k} = ca in
   let () = (* sanity check: the r', m', k' in ca match those in c' *)
     match c' with
-    | Fun (_, _, [Tuple [m''; Name _ as r''; Name _ as k1']])
+    | App (Fun (_, _), [Tuple [m''; Name _ as r''; Name _ as k1']])
       when m'' = m' && 
            Name.of_term r'' = r' && 
            Name.of_term k1' = k1 && 
@@ -386,9 +382,7 @@ let ciphertext_formula
       (mk_not (mk_eq ~simpl:true c c'))
       (mk_neqs ~simpl:true ~simpl_tuples:true k.args k1.args)
 
-
-
-                                          
+(*------------------------------------------------------------------*)                                          
 (** Constructs the formula expressing that an occurrence of a random r'
     is indeed a bad occurrence of the r from the ctxt_occ enc(m,r,k1),
     given that the key we're interested in is k:

@@ -110,13 +110,14 @@ let deprecated_pp_ts_occ fmt (occ : deprecated_ts_occ) : unit = Iter.pp_occ Term
 let deprecated_pat_subsumes
     table (context : SE.context)
     ?(mv : Match.Mvar.t = Match.Mvar.empty)
-    (t1 : Term.term) (pat2 : Term.term Term.pat) 
+    (t1 : Term.term) (pat2 : Term.term Term.pat_op) 
   : Match.Mvar.t option
   =
+  assert (pat2.pat_op_tyvars = []);
   match Match.T.try_match ~mv table context t1 pat2
   with
-  | FreeTyv | NoMatch _ -> None
-  | Match mv -> Some mv
+  | NoMatch _ -> None
+  | Match mv -> Some mv 
 
 (** Check if the term occurrence [occ2] subsumes [occ1], i.e. [occ1 ⊆ occ2]. *)
 let[@warning "-27"] deprecated_term_occ_subsumes
@@ -129,9 +130,9 @@ let[@warning "-27"] deprecated_term_occ_subsumes
   assert (Sp.is_empty occ1.occ_pos && Sp.is_empty occ2.occ_pos);
 
   let pat2 = Term.{
-      pat_term   = occ2.occ_cnt;
-      pat_tyvars = [];
-      pat_vars   = Vars.Tag.local_vars occ2.occ_vars; 
+      pat_op_term   = occ2.occ_cnt;
+      pat_op_tyvars = [];
+      pat_op_vars   = Vars.Tag.local_vars occ2.occ_vars; 
     } in
   match deprecated_pat_subsumes table context occ1.occ_cnt pat2 with
   | None -> false
@@ -141,7 +142,7 @@ let[@warning "-27"] deprecated_term_occ_subsumes
        [pat2.occ_conds], updating [mv] along the way if successful. *)
     let mv = ref mv in
 
-    let mk_cond2 cond2 = Term.{ pat2 with pat_term = cond2; } in
+    let mk_cond2 cond2 = Term.{ pat2 with pat_op_term = cond2; } in
     List.for_all (fun cond1 ->
         List.exists (fun cond2 ->
             match 

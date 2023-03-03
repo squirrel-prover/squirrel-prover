@@ -30,7 +30,7 @@ goal key_in_mess:
   h(k,k) = k => False.
 Proof.
   intro Heq.
-  euf Heq.
+  euf Heq. 
   checkfail by auto exn GoalNotClosed.
 Abort.
 (** END TEST **)

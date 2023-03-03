@@ -79,7 +79,8 @@ module type S = sig
   (*------------------------------------------------------------------*) 
   (** {2 Substitution} *)
 
-  val subst : Term.subst -> t -> t
+  val subst  : Term.subst  -> t -> t
+  val tsubst : Type.tsubst -> t -> t
 
   val rename : Vars.var -> Vars.var -> t -> t
 

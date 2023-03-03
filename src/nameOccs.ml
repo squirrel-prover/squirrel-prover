@@ -157,20 +157,23 @@ let pat_subsumes
     (table : Symbols.table)
     (system : SE.fset)
     ?(mv : Match.Mvar.t = Match.Mvar.empty)
-    (t1 : Term.term) (pat2 : Term.term Term.pat)
+    (t1 : Term.term) (pat2 : Term.term Term.pat_op)
   : Match.Mvar.t option
   =
+  assert (pat2.pat_op_tyvars = []);
   let context = SE.reachability_context system in
   match Match.T.try_match ~mv table context t1 pat2
   with
-  | FreeTyv | NoMatch _ -> None
+  | NoMatch _ -> None
   | Match mv -> Some mv
+  (* no type substitution since [pat_tyvars = \[\]]. *)
 
-
+(*------------------------------------------------------------------*)
 (** Auxiliary function to check if all instances of [o1]
-    are instances of [o2]. *)
-(** Returns the matching function, so that it can be reused for ext_occ_incl *)
-(** we use the occ_formula to turn 'a, 'b into a term.
+    are instances of [o2]. 
+    Returns the matching substitution, so that it can be reused for 
+    [ext_occ_incl].
+    We use the occ_formula to turn 'a, 'b into a term.
     this means we subsume occurrences that are not actually equal
     as long as they produce the same formula in the end.
     In principle it should be fine, if not just give
@@ -203,11 +206,11 @@ let aux_occ_incl
     Term.mk_ands ~simpl:false [phi_f; phi_ac]
   in
   let pat2 = Term.{
-      pat_tyvars = [];
-      pat_vars   = Vars.Tag.local_vars o2.so_vars;
+      pat_op_tyvars = [];
+      pat_op_vars   = Vars.Tag.local_vars o2.so_vars;
       (* local information, since we allow to match diff operators *)
       
-      pat_term   = mk_dummy o2;
+      pat_op_term   = mk_dummy o2;
     }
   in
 
@@ -221,7 +224,7 @@ let aux_occ_incl
        [o2.so_conds], updating [mv] along the way if successful. *)
     let mv = ref mv in
 
-    let mk_cond2 cond2 = { pat2 with pat_term = cond2; } in
+    let mk_cond2 cond2 = { pat2 with pat_op_term = cond2; } in
     let b = (* construct the inst. of cond2 on the fly,
                so maybe we get the wrong one and
                conclude it's not included.
@@ -238,10 +241,10 @@ let aux_occ_incl
     in
     if b then Some !mv else None
 
-
+(*------------------------------------------------------------------*)
 (** Auxiliary function for timestamps inclusion:
     checks if all instances of [ts1] are instances of [ts2] (ie [ts2] subsumes [ts1]).
-    Also returns the matching function. *)
+    Returns the matching substitution. *)
 (* not trivial, since for timestamps there is the case of predecessors *)
 let aux_ts_occ_incl
     (table : Symbols.table)
@@ -258,7 +261,7 @@ let aux_ts_occ_incl
               (* as "t <= pred(ts2) \/ t <= ts2" is the same as "t <= ts2" *)
               (* TODO read this carefully to make sure it does what we want *)
 
-
+(*------------------------------------------------------------------*)
 (** Inclusion for timestamp occurrences:
     Checks if all instances of [ts1] are instances of [ts2]
     (ie [ts2] subsumes [ts1]). *)
@@ -272,8 +275,7 @@ let ts_occ_incl
   | Some _ -> true
   | None -> false
 
-
-
+(*------------------------------------------------------------------*)
 (** Inclusion for extended occurrences:
     Checks if all instances of [occ1] are instances of [occ2]
     (ie [occ2] subsumes [occ1]). *)
@@ -391,7 +393,9 @@ let get_actions_ext
           in
           let occ = {
               so_cnt  = ts;
-              so_coll = Term.mk_false; (* unused, so always set to false *)
+              so_coll = Term.mk_witness ~ty_arg:Type.ttimestamp; 
+              (* unused, so always set to some arbitrary value *)
+
               so_ad = (); (* unused *)
               so_vars = List.rev fv;
               so_cond = cond;

@@ -234,6 +234,7 @@ val rm_vars : vars -> 'a genv -> 'a genv
 
 (*------------------------------------------------------------------*)
 val map_tag : (var -> Tag.t -> Tag.t) -> env -> env
+val map     : (var -> Tag.t -> var * Tag.t) -> env -> env
 
 (*------------------------------------------------------------------*)
 (** {2 Create variables} *)

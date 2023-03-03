@@ -312,13 +312,14 @@ let search_about (st:state) (q:ProverLib.search_query) :
   let ty_env = Type.Infer.mk_env () in
 
   let find (t:Term.term) =
-    let pat_vars =
-      Vars.Tag.local_vars ~const:true (Sv.elements (Vars.Sv.filter Vars.is_pat (Term.fv t)))
+    let pat_op_vars =
+      Vars.Tag.local_vars ~const:true
+        (Sv.elements (Vars.Sv.filter Vars.is_pat (Term.fv t)))
     in
     let pat = Term.{
-        pat_tyvars = [];
-        pat_vars;
-        pat_term = t; } 
+        pat_op_tyvars = [];
+        pat_op_vars;
+        pat_op_term = t; } 
     in
     Symbols.Lemma.fold begin fun _ _ data acc -> 
         let g = Lemma.as_lemma data in
@@ -342,13 +343,14 @@ let search_about (st:state) (q:ProverLib.search_query) :
     find t
   | Global f ->
     let t = Theory.convert_global_formula ~ty_env ~pat:true cntxt f in
-    let pat_vars =
-      Vars.Tag.local_vars ~const:true (Sv.elements (Sv.filter Vars.is_pat (Equiv.fv t)))
+    let pat_op_vars =
+      Vars.Tag.local_vars ~const:true
+        (Sv.elements (Sv.filter Vars.is_pat (Equiv.fv t)))
     in
     let pat = Term.{
-        pat_tyvars = [];
-        pat_vars;
-        pat_term = t; } in 
+        pat_op_tyvars = [];
+        pat_op_vars;
+        pat_op_term = t; } in 
     Symbols.Lemma.fold (fun _ _ data acc -> 
         let g = Lemma.as_lemma data in
         let sys = g.stmt.system in 

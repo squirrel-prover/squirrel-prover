@@ -59,13 +59,15 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let hyp_of_conc = Equiv.Babel.convert ~dst:S.hyp_kind ~src:S.conc_kind
 
     let fv_conc = Equiv.Babel.fv S.conc_kind
-    let fv_hyp = Equiv.Babel.fv S.hyp_kind
+    let fv_hyp  = Equiv.Babel.fv S.hyp_kind
 
     let subst_conc = Equiv.Babel.subst S.conc_kind
-    let subst_hyp = Equiv.Babel.subst S.hyp_kind
+    let subst_hyp  = Equiv.Babel.subst S.hyp_kind
+
+    let tsubst_conc = Equiv.Babel.tsubst S.conc_kind
 
     let terms_of_conc = Equiv.Babel.get_terms S.conc_kind
-    let terms_of_hyp = Equiv.Babel.get_terms S.hyp_kind
+    let terms_of_hyp  = Equiv.Babel.get_terms S.hyp_kind
 
     let pp_hyp  = Equiv.Babel.pp S.hyp_kind
     let pp_conc = Equiv.Babel.pp S.conc_kind
@@ -224,15 +226,17 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       Macros.get_definition_exn ?mode (S.mk_trace_cntxt ~se s) ms ~args:l ~ts:a 
 
-    | Fun (fs, _, ts)
+    | Fun (fs, _)
+    | App (Fun (fs, _), _)
       when Operator.is_operator (S.table s) fs ->
+      let args = match t with App (_,args) -> args | _ -> [] in
       begin
-        match Operator.unfold (S.table s) se fs ts with
+        match Operator.unfold (S.table s) se fs args with
         | `Ok t -> t
         | `FreeTyv ->
           let err_str =
             Fmt.str "cannot expand operator %a: free type variable remaining"
-              Term.pp_fname fs
+              Symbols.pp fs
           in
           soft_failure (Tactics.Failure err_str)
       end
@@ -311,7 +315,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
           else
             `Continue
 
-        | Term.Fun (f, _, _) ->
+        | Term.Fun (f, _) 
+        | Term.App (Fun (f, _), _) ->
           if found_occ_fun target f then
             unfold se occ s
           else
@@ -1313,7 +1318,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       In local and global sequents, we can apply an hypothesis
       to derive the goal or to derive the conclusion of an hypothesis.
-v      The former corresponds to [apply] below and the latter corresponds
+      The former corresponds to [apply] below and the latter corresponds
       to [apply_in].
 
       We impose in both that the hypotheses involved here are of the same
@@ -1324,8 +1329,8 @@ v      The former corresponds to [apply] below and the latter corresponds
       as premisses. *)
 
   (** Checks that all arguments of [pat] have been inferred in [mv]. *)
-  let check_args_inferred (pat : S.conc_form Term.pat) (mv : Match.Mvar.t) : unit =
-    let pat_vars = Sv.of_list (List.map fst pat.pat_vars) in
+  let check_args_inferred (pat : S.conc_form Term.pat_op) (mv : Match.Mvar.t) : unit =
+    let pat_vars = Sv.of_list (List.map fst pat.pat_op_vars) in
     
     let vars_inf =               (* inferred variables *)
       Sv.filter (fun v -> not (Match.Mvar.mem v mv)) pat_vars
@@ -1342,54 +1347,69 @@ v      The former corresponds to [apply] below and the latter corresponds
   (** Returns the sub-goals, and the substitution instantiating the
       pattern variables. *)
   let do_apply
-      ~use_fadup (pat : S.conc_form Term.pat) (s : S.t) : S.t list * Term.subst
+      ~use_fadup (pat : S.conc_form Term.pat) (s : S.t) : S.t list * Term.subst * Type.tsubst
     =
     let option =
       { Match.default_match_option with mode = `EntailRL; use_fadup }
     in
     let table, system, goal = S.table s, S.system s, S.goal s in
     let hyps = lazy (S.get_trace_hyps s) in
-    let rec _apply (subs : S.conc_form list) (pat : S.conc_form Term.pat) =
-      let pat_vars = Sv.of_list (List.map fst pat.pat_vars) in
-      if not (Sv.subset pat_vars (S.fv_conc pat.pat_term)) then
+
+    (* open an type unification environment *)
+    let ty_env = Type.Infer.mk_env () in
+    let opat = Pattern.open_pat S.conc_kind ty_env pat in
+
+    (* Try to apply [pat] to [goal] by matching [pat] with [goal].
+       In case of failure, try to destruct [pat] into a product [lhs -> rhs], and 
+       recursively try to apply [rhs] to [goal] ([lhs] is accumulated as a sub-goal). *)
+    let rec try_apply (subs : S.conc_form list) (pat : S.conc_form Term.pat_op) =
+      if 
+        let pat_vars = Sv.of_list (List.map fst pat.pat_op_vars) in
+        not (Sv.subset pat_vars (S.fv_conc pat.pat_op_term)) 
+      then
         soft_failure ApplyBadInst;
 
       let env = S.vars s in
       let match_res =
         match S.conc_kind with
-        | Local_t  -> Match.T.try_match ~option ~hyps table ~env system goal pat
-        | Global_t -> Match.E.try_match ~option ~hyps table ~env system goal pat
+        | Local_t  -> Match.T.try_match ~option ~ty_env ~hyps table ~env system goal pat
+        | Global_t -> Match.E.try_match ~option ~ty_env ~hyps table ~env system goal pat
         | Any_t -> assert false (* cannot happen *)
       in
 
       (* Check that [pat] entails [S.goal s]. *)
       match match_res with
-      (* match failed by [pat] is a product: retry with the rhs *)
-      | (NoMatch _ | FreeTyv) when S.Conc.is_impl pat.pat_term ->
-        let t1, t2 = oget (S.Conc.destr_impl ~env:(S.env s) pat.pat_term) in
-        _apply (t1 :: subs) { pat with pat_term = t2 }
+      (* match failed but [pat] is a product: retry with the rhs *)
+      | NoMatch _ when S.Conc.is_impl pat.pat_op_term ->
+        let t1, t2 = oget (S.Conc.destr_impl ~env:(S.env s) pat.pat_op_term) in
+        try_apply (t1 :: subs) { pat with pat_op_term = t2 }
 
       (* match failed, [pat] is not a product: user-level error *)
-      | NoMatch minfos  -> soft_failure (ApplyMatchFailure minfos)
-      | FreeTyv         -> soft_failure (ApplyMatchFailure None)
-
+      | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos)
+      | Match _ when not (Type.Infer.is_closed ty_env) -> 
+        soft_failure (Failure "all type variables could not be inferred")
+          
       (* match succeeded *)
       | Match mv -> 
         check_args_inferred pat mv;
+        
+        let tsubst = Type.Infer.close ty_env in
         let subst =
-          let pat_env = Vars.add_vars pat.pat_vars (S.vars s) in
+          let pat_env = Vars.add_vars pat.pat_op_vars (S.vars s) in
           match Match.Mvar.to_subst ~mode:`Match table pat_env mv with
           | `Subst subst -> subst
           | `BadInst pp_err ->
             soft_failure (Failure (Fmt.str "@[<hv 2>apply failed:@ @[%t@]@]" pp_err))
         in
         
-        let goals = List.map (S.subst_conc subst) (List.rev subs) in
+        let goals =
+          List.map (S.tsubst_conc tsubst -| S.subst_conc subst) (List.rev subs) 
+        in
         let subgs = List.map (fun g -> S.set_goal g s) goals in
         
-        subgs, subst
+        subgs, subst, tsubst
     in
-    _apply [] pat
+    try_apply [] opat
 
   (** [apply_in f hyp s] tries to match a premise of [f] with the conclusion of
       [hyp], and replaces [hyp] by the conclusion of [f].
@@ -1403,19 +1423,23 @@ v      The former corresponds to [apply] below and the latter corresponds
       ~use_fadup
       (pat : S.conc_form Term.pat)
       (hyp : Ident.t)
-      (s : S.t) : S.t list * Term.subst
+      (s : S.t) : S.t list * Term.subst * Type.tsubst
     =
-    let fprems, fconcl = S.Conc.decompose_impls_last pat.pat_term in
+    (* open an type unification environment *)
+    let ty_env = Type.Infer.mk_env () in
+    let pat = Pattern.open_pat S.conc_kind ty_env pat in
+
+    let fprems, fconcl = S.Conc.decompose_impls_last pat.pat_op_term in
 
     let h = Hyps.by_id hyp s in
     let h = S.hyp_to_conc h in
     let hprems, hconcl = S.Conc.decompose_impls_last h in
 
-    let try1 (fprem : S.conc_form) =
-      let pat_vars = Sv.of_list (List.map fst pat.pat_vars) in
+    let try1 (fprem : S.conc_form) : (Match.Mvar.t * Type.tsubst) option =
+      let pat_vars = Sv.of_list (List.map fst pat.pat_op_vars) in
       if not (Sv.subset pat_vars (S.fv_conc fprem)) then None
       else
-        let pat = { pat with pat_term = fprem } in
+        let pat = { pat with pat_op_term = fprem } in
         let option =
           Match.{ default_match_option with mode = `EntailLR; use_fadup}
         in
@@ -1424,19 +1448,21 @@ v      The former corresponds to [apply] below and the latter corresponds
         let system = S.system s in
         let match_res =
           match S.conc_kind with
-          | Local_t  -> Match.T.try_match ~option table ~env:(S.vars s) system hconcl pat
-          | Global_t -> Match.E.try_match ~option table ~env:(S.vars s) system hconcl pat
+          | Local_t  -> Match.T.try_match ~option ~ty_env table ~env:(S.vars s) system hconcl pat
+          | Global_t -> Match.E.try_match ~option ~ty_env table ~env:(S.vars s) system hconcl pat
           | Any_t -> assert false (* cannot happen *)
         in
 
         (* Check that [hconcl] entails [pat]. *)
         match match_res with
-        | NoMatch _ | FreeTyv -> None
-        | Match mv -> Some mv
+        | NoMatch _ -> None
+        | Match _ when not (Type.Infer.is_closed ty_env) -> None
+        | Match mv -> Some (mv, Type.Infer.close ty_env)
     in
 
     (* try to match a premise of [form] with [hconcl] *)
-    let rec find_match acc fprems = match fprems with
+    let rec find_match acc fprems = 
+      match fprems with
       | [] -> None
       | fprem :: fprems ->
         match try1 fprem with
@@ -1449,19 +1475,19 @@ v      The former corresponds to [apply] below and the latter corresponds
 
     match find_match [] fprems with
     | None -> soft_failure (ApplyMatchFailure None)
-    | Some (fsubgoals,mv) ->
+
+    | Some (fsubgoals, (mv, tsubst)) ->
       let subst =
-        let pat_env = Vars.add_vars pat.pat_vars (S.vars s) in
+        let pat_env = Vars.add_vars pat.pat_op_vars (S.vars s) in
         match Match.Mvar.to_subst ~mode:`Match (S.table s) pat_env mv with
         | `Subst subst -> subst
         | `BadInst pp_err ->
           soft_failure (Failure (Fmt.str "@[<hv 2>apply failed:@ @[%t@]@]" pp_err))
       in
-
       
       (* instantiate the inferred variables everywhere *)
-      let fprems_other = List.map (S.subst_conc subst) fsubgoals in
-      let fconcl = S.subst_conc subst fconcl in
+      let fprems_other = List.map (S.tsubst_conc tsubst -| S.subst_conc subst) fsubgoals in
+      let fconcl = S.tsubst_conc tsubst (S.subst_conc subst fconcl) in
 
       let goal1 =
         let s = Hyps.remove hyp s in
@@ -1477,7 +1503,7 @@ v      The former corresponds to [apply] below and the latter corresponds
         @
         [goal1]
       in
-      subgs, subst
+      subgs, subst, tsubst
 
 
   (** for now, there is only one named optional arguments to `apply` *)
@@ -1531,14 +1557,14 @@ v      The former corresponds to [apply] below and the latter corresponds
     let subgs = List.map (fun g -> S.set_goal g s) subgs in
 
     (* subg-goals from the application itself *)
-    let subgs', subst = 
+    let subgs', subst, tsubst = 
       match target with
       | T_conc    -> do_apply    ~use_fadup pat s
       | T_hyp id  -> do_apply_in ~use_fadup pat id s
       | T_felem _ -> assert false
     in
 
-    (List.map (S.subst subst) subgs) @ subgs'
+    (List.map (S.tsubst tsubst -| S.subst subst) subgs) @ subgs'
 
   let apply_tac args = wrap_fail (apply_tac_args args)
 

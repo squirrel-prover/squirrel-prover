@@ -566,10 +566,10 @@ let is_dup_match
       | Some st -> Some st
       | None ->
         match t,t' with
-        | Fun (f,_, [t]), Fun (f',_, [t']) 
+        | App (Fun (f,_), [t]), App (Fun (f',_), [t']) 
           when f = Term.f_pred && f' = Term.f_pred ->
           leq t t'
-        | Fun (f,_, [t]), t' when f = Term.f_pred -> leq t t'
+        | App (Fun (f,_), [t]), t' when f = Term.f_pred -> leq t t'
 
         | Action (n,is), Action (n',is') ->
           (* FIXME: allow to match [is] with (a prefix of) [is'] *)

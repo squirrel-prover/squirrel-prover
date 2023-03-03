@@ -75,12 +75,18 @@ let conv_ty (ty1 : Type.ty) (ty2 : Type.ty) : unit =
 let conv_tys (tys1 : Type.ty list) (tys2 : Type.ty list) : unit =
   List.iter2 conv_ty tys1 tys2
 
-let conv_ftype (ft1 : Type.ftype) (ft2 : Type.ftype) : unit =
-  conv_ty  ft1.fty_out  ft2.fty_out;
-  conv_tys ft1.fty_args ft2.fty_args;
+let conv_applied_ftype
+    (ft1 : Term.applied_ftype) (ft2 : Term.applied_ftype) 
+  : unit 
+  =
+  conv_ty  ft1.fty.fty_out  ft2.fty.fty_out;
+  conv_tys ft1.fty.fty_args ft2.fty.fty_args;
+
   List.iter2 (fun tv1 tv2 ->
-      if not (tv1 = tv2) then not_conv ()
-    ) ft1.fty_vars ft2.fty_vars
+      if not (tv1 = tv2) then not_conv () (* FIXME: necessary? *)
+    ) ft1.fty.fty_vars ft2.fty.fty_vars;
+
+  conv_tys ft1.ty_args ft2.ty_args
 
 let conv_var (st : cstate) (v1 : Vars.var) (v2 : Vars.var) : unit =
   if not (Type.equal (Vars.ty v1) (Vars.ty v2)) then not_conv ();
@@ -98,10 +104,9 @@ let conv_tagged_bnds (st : cstate) (vs1 : Vars.tagged_vars) (vs2 : Vars.tagged_v
 
 let rec conv (st : cstate) (t1 : Term.term) (t2 : Term.term) : unit =
   match t1, t2 with
-  | Term.Fun (fs1, fty1, l1), Term.Fun (fs2, fty2, l2)
+  | Term.Fun (fs1, app_fty1), Term.Fun (fs2, app_fty2)
     when fs1 = fs2 ->
-    conv_ftype fty1 fty2;
-    conv_l st l1 l2
+    conv_applied_ftype app_fty1 app_fty2
 
   | Term.Name (ns1,l1), Term.Name (ns2,l2) when ns1.s_symb = ns2.s_symb ->
     assert (ns1.Term.s_typ = ns2.Term.s_typ);
@@ -373,7 +378,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
         red_t, true
 
     (* if-then-else *)
-    | Term.Fun (fs, fty, [c;t;e]) when fs = Term.f_ite -> 
+    | Term.App (Fun (fs, fty), [c;t;e]) when fs = Term.f_ite -> 
       let c, has_red0 = reduce st c in
 
       let hyps_t = add_hyp c st.hyps in
@@ -386,7 +391,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       has_red0 || has_red1 || has_red2
 
     (* [φ => ψ] *)
-    | Term.Fun (fs, fty, [f1;f2]) when fs = Term.f_impl -> 
+    | Term.App (Fun (fs, fty), [f1;f2]) when fs = Term.f_impl -> 
       let hyps2 = add_hyp f1 st.hyps in
 
       let f1, has_red1 = reduce st f1 in
@@ -396,7 +401,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       has_red1 || has_red2
 
     (* [φ && ψ] is handled as [φ && (φ => ψ)] *)
-    | Term.Fun (fs, fty, [f1;f2]) when fs = Term.f_and -> 
+    | Term.App (Fun (fs, fty), [f1;f2]) when fs = Term.f_and -> 
       let hyps2 = add_hyp f1 st.hyps in
 
       let f1, has_red1 = reduce st f1 in
@@ -406,7 +411,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       has_red1 || has_red2
 
     (* [φ || ψ] is handled as [φ || (¬ φ => ψ)] *)
-    | Term.Fun (fs, fty, [f1;f2]) when fs = Term.f_or -> 
+    | Term.App (Fun (fs, fty), [f1;f2]) when fs = Term.f_or -> 
       let hyps2 = add_hyp (Term.mk_not f1) st.hyps in
 
       let f1, has_red1 = reduce st f1 in

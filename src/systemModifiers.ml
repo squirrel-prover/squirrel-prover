@@ -418,9 +418,9 @@ let global_cca
 
   let enc_fn, (enc_key : Name.t), plaintext, enc_pk, (enc_rnd : Name.t) =
     match enc with
-    | Term.Fun (fnenc, _,
+    | Term.App (Fun (fnenc, _),
                 [Tuple [m; Term.Name _ as r;
-                        Term.Fun (fnpk, _, [Term.Name _ as sk])]])
+                        Term.App (Fun (fnpk, _), [Term.Name _ as sk])]])
       when Symbols.is_ftype fnpk Symbols.PublicKey table &&
            Symbols.is_ftype fnenc Symbols.AEnc table ->
       fnenc, Name.of_term sk, m, fnpk, Name.of_term r

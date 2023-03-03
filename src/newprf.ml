@@ -100,7 +100,7 @@ let get_bad_occs
     accs1
 
   (* hash occurrence: no key occ but record the message hashed *)
-  | Fun (f, _, [Tuple [m'; Name (ksb',kargs') as k']])
+  | App (Fun (f, _), [Tuple [m'; Name (ksb',kargs') as k']])
     when f = hash_f && ksb'.s_symb = k.symb.s_symb ->
     let occs, accs = rec_call (m' :: kargs') in
     occs, accs @ [mk_hash_occ m' m (Name.of_term k') k  cond fv (fst info) st]
@@ -156,7 +156,7 @@ let is_hash (table:Symbols.table) (f:Symbols.fname) =
     does not unfold macros. *)
 let rec has_hash (table:Symbols.table) (t:term) : bool =
   match t with
-  | Term.Fun (f, _, _) when is_hash table f -> true
+  | Term.App (Fun (f, _), _) when is_hash table f -> true
   | _ -> Term.texists (has_hash table) t
 
 
@@ -170,15 +170,16 @@ let rec has_name (n:Name.t) (t:term) : bool =
 (** Checks that each term ti in ts is f(argsi) for the same f,
     if so returns f and the list [args1;…;argsn]. 
     Does the same if each ti is Tuple(argsi). *)
+(* TODO: duplicated with function in `cca.ml` *)
 let same_head_function (ts:Term.terms) :
-  ((Symbols.fname * Type.ftype) option * Term.terms list) option =
+  ((Symbols.fname * applied_ftype) option * Term.terms list) option =
   let rec aux ts f =
     match ts, f with
     | [], _ -> f
-    | (Term.Fun (fs', ft', args))::ll, Some (Some (fs, ft), largs)
+    | (Term.App (Fun (fs', ft'), args))::ll, Some (Some (fs, ft), largs)
       when fs = fs' && ft = ft' ->
       aux ll (Some (Some (fs, ft), args::largs))
-    | (Term.Fun (fs, ft, args))::ll, None ->
+    | (Term.App (Fun (fs, ft), args))::ll, None ->
       aux ll (Some (Some (fs, ft), [args]))
     | (Term.Tuple args)::ll, Some (None, largs) ->
       aux ll (Some (None, args::largs))
@@ -335,7 +336,7 @@ let prf_param_nopattern
     (* get the content of variables from the conditions *)
     let m, k =
       match l with
-      | Term.(Fun (ff, _, [Tuple [m; k]; fff])) when
+      | Term.(App (Fun (ff, _), [Tuple [m; k]; fff])) when
           ff = Term.f_eq && fff = Term.mk_false ->
         m, k
       | _ -> assert false
@@ -380,9 +381,9 @@ let prf_param_withpattern
   (* check that the pattern p is indeed a hash, extract the msg and key *)
   let hash_f, hty, m, k =
     match p with
-    | Term.Fun (hash_f, hty, [Tuple [m; k]])
+    | Term.App (Fun (hash_f, hty), [Tuple [m; k]])
       when is_hash table hash_f ->
-      hash_f, hty.fty_out, m, k
+      hash_f, hty.fty.fty_out, m, k
     | _ -> soft_failure ~loc
              (Tactics.Failure "the pattern given to prf is not a hash")
   in

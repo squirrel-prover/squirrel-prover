@@ -87,7 +87,11 @@ let unfold
     match op.body with Single body -> Term.tsubst ts body
   in
 
-  let args1, args2 = List.takedrop (List.length op_args) args in
+  let i = min (List.length op_args) (List.length args) in
+
+  (* take the [i] first arguments of [args] and [op_args] *)
+  let args1   ,    args2 = List.takedrop i args    in
+  let op_args1, op_args2 = List.takedrop i op_args in
 
   let subst = 
     List.map2 (fun x t ->       (* add types information to [ty_env] *)
@@ -96,10 +100,14 @@ let unfold
         in
         
         Term.ESubst (Term.mk_var x,t)
-      ) op_args args1
+      ) op_args1 args1
   in
-  let term = Term.mk_app (Term.subst subst op_body) args2 in
-  
+  let term = 
+    Term.mk_app 
+      (Term.subst subst
+         (Term.mk_lambda ~simpl:false op_args2 op_body))
+      args2 
+  in
   
   if not (Type.Infer.is_closed ty_env) then `FreeTyv
   else

@@ -126,6 +126,9 @@ module type S = sig
       It removes trivial equalities (e.g x=x). *)
   val subst : Term.subst -> t -> t
 
+  (** Same but for a type substitution. *)
+  val tsubst : Type.tsubst -> t -> t
+
   (** [rename u v s] returns the sequent [s] where
       free variable u is replaced with v *)
   val rename : Vars.var -> Vars.var -> t -> t

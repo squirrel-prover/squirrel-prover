@@ -524,11 +524,7 @@ let rec convert_ty ?ty_env (env : Env.t) (pty : p_ty) : Type.ty =
 
   | P_ty_pat -> 
     match ty_env with
-    | None -> 
-      (* REM *)
-      Printexc.print_raw_backtrace Stdlib.stderr (Printexc.get_callstack 1000);
-      conv_err (L.loc pty) (Failure "type holes not allowed") 
-
+    | None -> conv_err (L.loc pty) (Failure "type holes not allowed") 
     | Some ty_env ->
       Type.TUnivar (Type.Infer.mk_univar ty_env)
 
@@ -1240,9 +1236,19 @@ and conv_app
     in
     let messages = List.rev rmessages in
 
+    (* build the applied function type *)
+    let applied_fty : Term.applied_ftype =
+      let ty_args = 
+        List.map (fun u -> 
+            Type.Infer.norm state.ty_env (Type.TUnivar u)
+          ) fty_op.fty_vars 
+      in
+      Term.{ fty; ty_args; }
+    in
+
     let t =
       Term.mk_fun0
-        (Symbols.Function.of_lsymb f state.env.table) fty messages
+        (Symbols.Function.of_lsymb f state.env.table) applied_fty messages
     in
 
     (* additional type check between the type of [t] and the output

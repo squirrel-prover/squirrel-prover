@@ -24,7 +24,7 @@ enrich seq(i:index => h(ok,k(i))).
 
  destruct H as [i H].
  expandall. 
- fa 1.
+ fa 1. 
  fa 2. 
  rewrite if_false in 2; 1: auto.
  by apply Hind.

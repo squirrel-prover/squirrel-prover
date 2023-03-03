@@ -50,8 +50,9 @@ let intctxt_param
   =
   let fail () =
     soft_failure ~loc:hyp_loc
-      (Tactics.Failure "can only be applied on an hypothesis of the form \
-dec(c,k) <> fail or dec(c,k) = t (or the symmetric equalities)")
+      (Tactics.Failure 
+         "can only be applied on an hypothesis of the form \
+          dec(c,k) <> fail or dec(c,k) = t (or the symmetric equalities)")
   in
   let info = NO.EI_direct, contx in
   let table = contx.table in
@@ -60,7 +61,7 @@ dec(c,k) <> fail or dec(c,k) = t (or the symmetric equalities)")
   let try_t (t:term) : intctxt_param option =
     let t = NO.expand_macro_check_all info t in
     match t with
-    | Fun (dec, _, [Tuple [m; tk]]) ->
+    | App (Fun (dec, _), [Tuple [m; tk]]) ->
       begin
         match NO.expand_macro_check_all info tk with
         | Name _ as k when Symbols.is_ftype dec Symbols.SDec table ->

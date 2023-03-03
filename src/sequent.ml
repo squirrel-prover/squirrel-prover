@@ -591,7 +591,7 @@ module Mk (Args : MkArgs) : S with
 
   (*------------------------------------------------------------------*)
   (** Apply [pt] to [arg] when [pt] is an implication. 
-      Pop the first implication [f1] of [pt.form], instantiate (my matching) it
+      Pop the first implication [f1] of [pt.form], instantiate (by matching) it
       using [arg], and return the updated [pt].
 
       Remark: [arg]'s substitution must be an extention of 
@@ -635,9 +635,9 @@ module Mk (Args : MkArgs) : S with
     let sbst = subst_of_pt ~loc:loc_arg table (S.vars s) arg in
     let f1 = Equiv.Any.subst sbst f1 in
     let pat_f1 = Term.{
-        pat_vars   = pt.args;
-        pat_term   = f1;
-        pat_tyvars = [];
+        pat_op_vars   = pt.args;
+        pat_op_term   = f1;
+        pat_op_tyvars = [];
       } in
 
     let pt_apply_error arg () =
@@ -656,13 +656,13 @@ module Mk (Args : MkArgs) : S with
 
       match f1, arg.form with
       | Local f1, Local f_arg ->
-        let pat_f1 = { pat_f1 with pat_term = f1 } in
+        let pat_f1 = { pat_f1 with pat_op_term = f1 } in
         Match.T.try_match
           ~ty_env ~mv:arg.mv ~env
           table pt.system f_arg pat_f1
 
       | Global f1, Global f_arg  ->
-        let pat_f1 = { pat_f1 with pat_term = f1 } in
+        let pat_f1 = { pat_f1 with pat_op_term = f1 } in
         Match.E.try_match
           ~ty_env ~mv:arg.mv ~env
           table pt.system f_arg pat_f1
@@ -670,9 +670,8 @@ module Mk (Args : MkArgs) : S with
       | _ -> assert false       (* impossible thanks to [pt_try_localize] *)
     in
     let mv = match match_res with
-      | Match.FreeTyv   -> assert false
-      | Match.NoMatch _ -> pt_apply_error arg ()
-      | Match.Match mv  -> mv
+      | Match.NoMatch _  -> pt_apply_error arg ()     
+      | Match.Match   mv -> mv
     in
 
     (* Add to [pt.args] the new variables that must be instantiated in
@@ -733,7 +732,9 @@ module Mk (Args : MkArgs) : S with
       let f1, f2 =
         match destr_impl_k Equiv.Any_t pt_env pt.form with
         | Some (f1, f2) -> f1, f2
-        | None -> (* destruct failed, applying the pending substitution and try to destruct again *)
+        | None ->
+          (* destruct failed, applying the pending substitution and try to 
+             destruct again *)
           let subst = subst_of_pt ~loc:p_pt.p_pt_loc table (S.vars s) pt in
           match destr_impl_k Equiv.Any_t pt_env (Equiv.Any.subst subst pt.form) with
           | Some (f1, f2) -> f1, f2
