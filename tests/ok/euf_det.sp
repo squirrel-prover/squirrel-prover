@@ -9,7 +9,7 @@ system !_i out(c,h(n,k(i,i))).
 (* various sanity checks on parameters *)
 
 (*------------------------------------------------------------------*)
-(* fails if [tau] is not deterministic *)
+(* fails if [x] is not constant *)
 goal _ (tau:timestamp, x : message, a,b:index[const]):
   happens(tau) => <x,output@tau> = h(n,k(a,b)) =>
   a = b.
