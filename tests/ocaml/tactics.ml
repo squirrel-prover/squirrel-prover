@@ -621,8 +621,8 @@ let namelength () =
     (stmt_n.formula);
 
   let _ = match stmt_m.formula, stmt_n.formula with
-  | Term.Fun (sy,_,[_t1;t2]),
-    Term.Fun (sy',_,[_t1';t2'])
+  | Term.App (Fun (sy ,_),[_t1;t2]),
+    Term.App (Fun (sy',_),[_t1';t2'])
     when sy = Symbols.fs_eq && sy' = Symbols.fs_eq -> 
     Alcotest.(check (term_testable)) 
       "len(n) = namelength_129913994 = len(m) "

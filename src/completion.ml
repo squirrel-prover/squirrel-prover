@@ -31,12 +31,12 @@ end
 (*------------------------------------------------------------------*)
 (**generalized function name *)
 type gfname =
-  | N of Symbols.name * Type.ty  (** name *)
-  | F of Symbols.fname           (** function symbol *)
-  | A of Symbols.action          (** action *)
-  | M of Symbols.macro * Type.ty (** macro *)
-  | T of int                     (** constructor of `i` tuple *)
-  | P of int                     (** i-th projection *)
+  | N of Symbols.name * Type.ty             (** name *)
+  | F of Symbols.fname * Term.applied_ftype (** function symbol *)
+  | A of Symbols.action                     (** action *)
+  | M of Symbols.macro * Type.ty            (** macro *)
+  | T of int                                (** constructor of `i` tuple *)
+  | P of int                                (** i-th projection *)
 
 
 (*------------------------------------------------------------------*)
@@ -45,27 +45,8 @@ let hash_gfname : gfname -> int = function
   | N (n, _) -> Hashtbl.hash n
   | _ as gf -> Hashtbl.hash gf
 
-let[@warning "-32"] equal_gfname (f1 : gfname) (f2 : gfname) : bool =
-  match f1, f2 with
-  | F f1, F f2 -> f1 = f2
-
-  | M (m1, t1), M (m2, t2) -> 
-    m1 = m2 &&
-    (assert (t1 = t2); true)
-
-  | N (n1, t1), N (n2, t2) -> 
-    n1 = n2 && 
-    (assert (t1 = t2); true)
-
-  | A a1, A a2 -> a1 = a2
-
-  | P i1, P i2
-  | T i1, T i2 -> i1 = i2
-
-  | _ -> false
-
 let pp_gfname fmt = function
-  | F f     -> Symbols.pp fmt f
+  | F (f,_) -> Symbols.pp fmt f
   | N (n,_) -> Symbols.pp fmt n
   | A a     -> Symbols.pp fmt a 
   | M (m,_) -> Symbols.pp fmt m 
@@ -88,10 +69,10 @@ module Cst = struct
   
   let mk_flat () = Flat (Flat.mk ())
 
-  let of_fname  (f : Symbols.fname)    : t = GFun (F f)
-  let of_name   (f : Symbols.name ) ty : t = GFun (N (f, ty))
-  let of_macro  (f : Symbols.macro) ty : t = GFun (M (f, ty))
-  let of_action (f : Symbols.action)   : t = GFun (A f)
+  let of_fname  (f : Symbols.fname) fty_app : t = GFun (F (f,fty_app))
+  let of_name   (f : Symbols.name ) ty      : t = GFun (N (f, ty))
+  let of_macro  (f : Symbols.macro) ty      : t = GFun (M (f, ty))
+  let of_action (f : Symbols.action)        : t = GFun (A f)
 
   let mk_tuple (i : int) : t = GFun (T i)
   let mk_proj  (i : int) : t = GFun (P i)
@@ -210,22 +191,25 @@ let c_compare t t' = Stdlib.compare t.hash t'.hash
 
 let ccst (c : Cst.t) = make (Ccst c)
 
-let ct_xor : cterm = ccst (Cst.of_fname Symbols.fs_xor)
+(** For monomorphique functions (hence no type variable to instantiate). 
+    Must provide a symbol table if the function is not a built-in. *)
+let ct_monomorph_fname ?(table = Symbols.builtins_table) fs =
+  let fty = Symbols.ftype table fs in
+  ccst (Cst.of_fname fs { fty; ty_args = []} )
 
-let[@warning "-32"] ct_fname  (f : Symbols.fname )    : cterm = ccst (Cst.of_fname  f   )
-let[@warning "-32"] ct_action (a : Symbols.action)    : cterm = ccst (Cst.of_action a   )
-let[@warning "-32"] ct_macro  (m : Symbols.macro ) ty : cterm = ccst (Cst.of_macro  m ty)
-let[@warning "-32"] ct_name   (n : Symbols.name  ) ty : cterm = ccst (Cst.of_name   n ty)
+let ct_xor  : cterm = ct_monomorph_fname Symbols.fs_xor
+let ct_zero : cterm = ct_monomorph_fname Symbols.fs_zero
+let ct_diff : cterm = ct_monomorph_fname Symbols.fs_diff
+let ct_true : cterm = ct_monomorph_fname Symbols.fs_true
 
 let ct_tuple (i : int) : cterm = ccst (Cst.mk_tuple i)
-let[@warning "-32"] ct_proj  (i : int) : cterm = ccst (Cst.mk_proj i)
 
 (*------------------------------------------------------------------*)
 let cvar (v : varname) = make (Cvar v)
 
 let simplify_set (t : cterm_cnt) = 
   match t with
-  | Cxor [] -> make (Cfun (ccst (Cst.of_fname Symbols.fs_zero), []))
+  | Cxor [] -> make (Cfun (ct_zero, []))
   | Cxor [t] -> t
   | _ -> make t
 
@@ -287,9 +271,7 @@ let box_term (ct_memo : ct_memo) (t : Term.term) : cterm =
 let cterm_of_term (ct_memo : ct_memo) (c : Term.term) : cterm = 
   let rec cterm_of_term (c : Term.term) : cterm = 
     match c with
-    | Fun (f,_,terms) ->
-      let terms = List.map cterm_of_term terms in
-      cfun (ccst (Cst.of_fname f)) terms
+    | Fun (f,fty_app) -> ccst (Cst.of_fname f fty_app)
 
     | App (f,terms) -> 
       cfun (cterm_of_term f) (List.map cterm_of_term terms)
@@ -320,7 +302,7 @@ let cterm_of_term (ct_memo : ct_memo) (c : Term.term) : cterm =
     | Diff (Explicit l) ->
       let l = List.sort (fun (l1,_) (l2,_) -> Stdlib.compare l1 l2) l in
       let l = List.map (fun (_,tm) -> cterm_of_term tm) l in
-      cfun (ccst (Cst.of_fname Symbols.fs_diff)) l
+      cfun (ct_diff) l
       
     (* default case *)
     | Quant _ | Find _ as t -> box_term ct_memo t
@@ -329,13 +311,13 @@ let cterm_of_term (ct_memo : ct_memo) (c : Term.term) : cterm =
 
 
 (*------------------------------------------------------------------*)
-let term_of_cterm (table : Symbols.table) (c : cterm) : Term.term =
+let term_of_cterm (_table : Symbols.table) (c : cterm) : Term.term =
   let term_of_cst (c : Cst.t) (args : Term.terms) : Term.term =
     match c with
     | Cst.GFun gf ->
       begin
         match gf with
-        | F f -> Term.mk_fun table f args
+        | F (f,fty_app) -> Term.mk_fun0 f fty_app args
 
         | T i -> 
           assert (List.length args = i);
@@ -481,7 +463,7 @@ module Theories = struct
     let m, r, k = mk_var (),  mk_var (), mk_var () in
     ( cfun_tuple dec [cfun_tuple enc [m; r; k]; k], m )
 
-  let t_true  = cfun_tuple (ct_fname Symbols.fs_true) []
+  let t_true = ct_true
 
   (** Signature.
       mcheck(m, sign(m,k), pk(k)) -> true *)
@@ -1391,25 +1373,33 @@ let init_erules table =
         let dec, pk = dec_pk table f1 f2 in
         add_erule
           erules 
-          (Theories.mk_aenc (ct_fname fname) (ct_fname dec) (ct_fname pk)) 
+          (Theories.mk_aenc
+             (ct_monomorph_fname ~table fname)
+             (ct_monomorph_fname ~table dec)
+             (ct_monomorph_fname ~table pk)) 
 
       | (_, Symbols.SEnc), Symbols.AssociatedFunctions [sdec] ->
         is_sdec table sdec;
-        add_erule erules (Theories.mk_senc (ct_fname fname) (ct_fname sdec)) 
+        add_erule erules 
+          (Theories.mk_senc (ct_monomorph_fname ~table fname) (ct_monomorph_fname ~table sdec)) 
 
       | (_, Symbols.CheckSign), Symbols.AssociatedFunctions [f1; f2] ->
         let msig, pk = sig_pk table f1 f2 in
         add_erule 
           erules
-          (Theories.mk_sig (ct_fname msig) (ct_fname fname) (ct_fname pk)) 
+          (Theories.mk_sig 
+             (ct_monomorph_fname ~table msig) 
+             (ct_monomorph_fname ~table fname) 
+             (ct_monomorph_fname ~table pk)) 
 
       | _ -> erules
     ) 
     (add_erules
        Mct.empty 
        (Theories.mk_pair 2 
-          (ct_fname Symbols.fs_pair) [ct_fname Symbols.fs_fst; 
-                                      ct_fname Symbols.fs_snd]))
+          (ct_monomorph_fname Symbols.fs_pair) 
+          [ct_monomorph_fname Symbols.fs_fst; 
+           ct_monomorph_fname Symbols.fs_snd]))
     table
 
 let state_id = ref 0
@@ -1651,7 +1641,7 @@ let () =
          Symbols.Function.declare_exact Symbols.builtins_table (mk "f") fi in
        let table,hfs =
          Symbols.Function.declare_exact table (mk "h") fi in
-       let ffs,hfs = ct_fname ffs, ct_fname hfs in
+       let ffs,hfs = ct_monomorph_fname ~table ffs, ct_monomorph_fname ~table hfs in
        let f a b = cfun ffs [a;b] in
        let h a b = cfun hfs [a;b] in
 

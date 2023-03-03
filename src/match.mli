@@ -222,7 +222,6 @@ end
 (** {2 Module signature of matching} *)
 
 type match_res =
-  | FreeTyv
   | NoMatch of (Term.terms * Term.match_infos) option
   | Match   of Mvar.t
 
@@ -250,13 +249,21 @@ module type S = sig
     (Format.formatter -> 'a -> unit) ->
     Format.formatter -> 'a Term.pat -> unit
 
-  (** [try_match ... t p] tries to match [p] with [t] (at head position).
-      If it succeeds, it returns a map [θ] instantiating the variables
-      [p.pat_vars] as subterms of [t], and:
+  val pp_pat_op :
+    (Format.formatter -> 'a -> unit) ->
+    Format.formatter -> 'a Term.pat_op -> unit
 
+  (** [try_match ... t p] tries to match [p] with [t] (at head position).
+      If it succeeds, it returns a map [θ] instantiating the variables 
+      [p.pat_op_vars] as subterms of [t].
+
+      The property satisfied by [θ] depends on the mode:
       - if [mode = `Eq] then [t = pθ] (default mode);
       - if [mode = `EntailLR] then [t = pθ] or [t ⇒ pθ] (boolean case).
-      - if [mode = `EntailRL] then [t = pθ] or [pθ ⇒ t] (boolean case). *)
+      - if [mode = `EntailRL] then [t = pθ] or [pθ ⇒ t] (boolean case). 
+
+      In case of failure, the typing environment [ty_env] is left 
+      unchanged (it is reset). *)
   val try_match :
     ?option:match_option ->
     ?mv:Mvar.t ->
@@ -267,7 +274,7 @@ module type S = sig
     Symbols.table ->
     SE.context -> 
     t -> 
-    t Term.pat ->
+    t Term.pat_op ->
     match_res
 
   (** [find pat t] returns the list of occurences in t that match the
@@ -277,7 +284,7 @@ module type S = sig
     ?ty_env:Type.Infer.env ->
     Symbols.table ->
     SE.context ->
-    Term.term Term.pat -> 
+    Term.term Term.pat_op -> 
     t -> 
     Term.term list
 
@@ -314,7 +321,7 @@ module E : sig
     ?ty_env:Type.Infer.env ->
     Symbols.table ->
     SE.context ->
-    t Term.pat -> 
+    t Term.pat_op -> 
     t -> 
     t list
 end

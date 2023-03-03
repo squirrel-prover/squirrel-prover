@@ -18,6 +18,7 @@ system A: !_i in(ch,x); new l; out(ch,<ok(i),<x,l>>).
 
 system [bis] !_i in(ch,x); new l; if x = a then out(ch,<ok(i),<x,l>>).
 
+(*------------------------------------------------------------------*)
 goal _ (x, y : message, i : index) : 
   f0(<x,y>) = ok(i) =>
   (forall (x,y : message), x = ok(i) => gg(f(x),y) = f0(x)) =>

@@ -1,5 +1,3 @@
-
-
 system null.
 
 type E.

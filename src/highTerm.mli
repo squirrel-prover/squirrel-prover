@@ -21,8 +21,11 @@ val is_deterministic : Env.t -> Term.term -> bool
 (** Check if a term represents a constant (i.e. 
     non-probabilistic and η-independent) computation:
     - [`Exact] always
-    - [`Approx] overwhelmingly *)
-val is_constant : [`Exact | `Approx] -> Env.t -> Term.term -> bool
+    - [`Approx] overwhelmingly 
+
+    If [allow_adv_rand] is [true], adversary randomness is allowed. *)
+val is_constant : 
+  [`Exact | `Approx] -> ?allow_adv_rand:bool -> Env.t -> Term.term -> bool
 
 (** Check if a term is deducible in ptime by an adversary with no direct 
     access to the protocol randomness.

@@ -16,6 +16,9 @@ module H = Hyps.EquivHyps
 let subst_hyps (subst : Term.subst) (hyps : H.hyps) : H.hyps =
   H.map (Equiv.subst subst) hyps
 
+let tsubst_hyps (tsubst : Type.tsubst) (hyps : H.hyps) : H.hyps =
+  H.map (Equiv.tsubst tsubst) hyps
+
 (*------------------------------------------------------------------*)
 (** {2 Equivalence sequent} *)
 
@@ -220,11 +223,20 @@ let get_frame proj j = match j.goal with
     Some (List.map (Term.project1 proj) e)
   | _ -> None
 
+(*------------------------------------------------------------------*)
 let subst subst s =
   { s with goal = Equiv.subst subst s.goal;
            hyps = subst_hyps subst s.hyps; }
 
+(*------------------------------------------------------------------*)
+let tsubst (tsubst : Type.tsubst) s =
+  if tsubst == Type.tsubst_empty then s else
+    let vars = Vars.map (fun v t -> Vars.tsubst tsubst v, t) s.env.vars in
+    { env  = Env.update ~vars s.env;
+      goal = Equiv.tsubst tsubst s.goal;
+      hyps = tsubst_hyps tsubst s.hyps; }
 
+(*------------------------------------------------------------------*)
 let rename (u:Vars.var) (v:Vars.var) (s:t) : t =
   assert (not (Vars.mem s.env.vars v));
   let s = subst [Term.ESubst (Term.mk_var u, Term.mk_var v)] s in

@@ -140,7 +140,7 @@ end = struct
   let term_to_ut (memo : memo) (ts : Term.term) : ut =
     let rec doit = function
       | Term.Var tv -> uvar tv
-      | Term.Fun (fs, _, [ts]) when fs = Term.f_pred -> upred (doit ts)
+      | Term.App (Fun (fs, _), [ts]) when fs = Term.f_pred -> upred (doit ts)
       | Term.Action (s,_) when s = Symbols.init_action -> uinit
       | Term.Action (s,l) -> uname s (List.map doit l)
 

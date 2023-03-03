@@ -639,7 +639,7 @@ let () =
 (** Function application *)
 
 (** Select a frame element matching a pattern. *)
-let fa_select_felems (pat : Term.term Term.pat) (s : ES.t) : int option =
+let fa_select_felems (pat : Term.term Term.pat_op) (s : ES.t) : int option =
   let option = { Match.default_match_option with allow_capture = true; } in
   let system = match (ES.system s).pair with
     | None -> soft_failure (Failure "underspecified system")
@@ -647,16 +647,16 @@ let fa_select_felems (pat : Term.term Term.pat) (s : ES.t) : int option =
   in
   List.find_mapi (fun i e ->
       match Match.T.try_match ~option ~env:(ES.vars s) (ES.table s) system e pat with
-      | NoMatch _ | FreeTyv -> None
-      | Match _             -> Some i
+      | NoMatch _ -> None
+      | Match _   -> Some i
     ) (ES.goal_as_equiv s)
 
-
+(*------------------------------------------------------------------*)
 exception No_FA of [`HeadDiff | `HeadNoFun]
 
 let fa_expand (s : ES.t) (t : Term.t) : Term.terms =
   let env = ES.env s in
-  let is_deducible_vars l =
+  let is_deducible_vars (l : Term.terms) : bool =
     List.for_all (fun t ->
         Term.is_var t &&
         HighTerm.is_ptime_deducible ~const:`Exact ~si:true env t
@@ -664,10 +664,18 @@ let fa_expand (s : ES.t) (t : Term.t) : Term.terms =
   in
   let l =
     match Term.head_normal_biterm t with
-    | Tuple l
-    | Fun (_,_,[Tuple l]) 
-    | Fun (_,_,l) ->
+    | Tuple l ->
       if is_deducible_vars l then [] else l
+
+    (* use [tf] to check that the function symbol is pptime computable. *)
+    | Fun _ as tf -> 
+      if HighTerm.is_ptime_deducible ~const:`Exact ~si:true env tf then [] else raise (No_FA `HeadNoFun)
+
+    | App (Fun _ as tf, [Tuple l]) 
+    | App (Fun _ as tf, l) -> 
+      let l = if is_deducible_vars l then [] else l in
+      let tf = if HighTerm.is_ptime_deducible ~const:`Exact ~si:true env tf then [] else [tf] in
+      tf @ l
 
     | Proj (_,t) -> if is_deducible_vars [t] then [] else [t]
 
@@ -678,10 +686,11 @@ let fa_expand (s : ES.t) (t : Term.t) : Term.terms =
   in
   (* Remove of_bool(b) coming from expansion of frame macro. *)
   List.map (function
-      | Term.Fun (f,_,[c]) when f = Term.f_of_bool -> c
+      | Term.App (Term.Fun (f,_),[c]) when f = Term.f_of_bool -> c
       | x -> x
     ) l
 
+(*------------------------------------------------------------------*)
 let fa_check_vars_fixed_and_finite ~loc table (vs : Vars.vars) : unit =
   let bad_vars = 
     List.filter (fun v -> 
@@ -759,11 +768,11 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
           Sv.elements (Sv.filter (fun v -> Vars.is_pat v) (Term.fv t))
         in
         let pat = Term.{
-            pat_tyvars = [];
-            pat_vars   = Vars.Tag.local_vars vars;
+            pat_op_tyvars = [];
+            pat_op_vars   = Vars.Tag.local_vars vars;
             (* local inforation, since we allow to match diff operators *)
             
-            pat_term   = t; }
+            pat_op_term   = t; }
         in
         (mult, L.loc tpat, pat)
       ) args 
@@ -771,7 +780,7 @@ let do_fa_tac (args : Args.fa_arg list) (s : ES.t) : ES.t list =
 
   let rec do1 
       (s : ES.t) 
-      ((mult, loc, pat) : Args.rw_count * L.t * Term.term Term.pat)
+      ((mult, loc, pat) : Args.rw_count * L.t * Term.term Term.pat_op)
     : ES.t 
     =
     if mult = Args.Exact 0 then s else
@@ -880,15 +889,18 @@ let deduce_all (s:ES.t) =
         let biframe = List.rev_append res goals in
         let biframe_without_e = List.rev_append res after in
         let goal = (Equiv.mk_equiv_atom biframe)  in
-        let pat = Term.empty_pat (Equiv.mk_equiv_atom biframe_without_e) in
+        let pat = Term.{
+          pat_op_vars   = [];
+          pat_op_tyvars = [];
+          pat_op_term   = Equiv.mk_equiv_atom biframe_without_e;
+        } in
         let match_result = 
           Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system goal pat 
         in
         match match_result with
-        | FreeTyv  
         | NoMatch _ -> _deduce_all (e::res) after 
-        | Match mv ->
-          assert (mv = Match.Mvar.empty);
+        | Match mv -> 
+          assert (Match.Mvar.is_empty mv);
           _deduce_all res after
     in
     let new_goal = List.rev (_deduce_all [] (ES.goal_as_equiv s)) in
@@ -902,16 +914,19 @@ let deduce_int (i : int L.located) s =
   let option = { Match.default_match_option with mode = `EntailRL } in
   let hyps = lazy (ES.get_trace_hyps s) in 
   let table, system = ES.table s, ES.system s in
-  let pat = Term.empty_pat (Equiv.mk_equiv_atom biframe_without_e) in
+  let pat = Term.{
+      pat_op_vars   = [];
+      pat_op_tyvars = [];
+      pat_op_term   = Equiv.mk_equiv_atom biframe_without_e;
+    } in
   let goal = ES.goal s in
   let match_result = 
     Match.E.try_match ~option ~hyps ~env:(ES.vars s) table system goal pat 
   in
   match match_result with
-  | FreeTyv -> assert false
   | NoMatch minfos -> soft_failure (ApplyMatchFailure minfos)
   | Match mv ->
-    assert (mv = Match.Mvar.empty);
+    assert (Match.Mvar.is_empty mv);
     [ES.set_equiv_goal biframe_without_e s]
 
 let deduce Args.(Opt (Int, p)) s : ES.sequents =
@@ -943,7 +958,7 @@ let rec cs_proj f (b:Term.term) (found:bool) (t:Term.term) :
   bool * Term.term =
   let head = Term.head_normal_biterm t in
   match head with
-  | Term.Fun (sy,_,[phi;t1;t2]) when phi = b
+  | Term.App (Term.Fun (sy,_),[phi;t1;t2]) when phi = b
     && sy = Symbols.fs_ite ->
     true, f (t1,t2)
   | _ -> Term.tmap_fold (cs_proj f b) found t
@@ -1291,7 +1306,7 @@ let prf arg (s : ES.t) : ES.t list =
   in
   let fn, ftyp, m, key, hash =
     match hash_occ.Iter.occ_cnt with
-    | Term.Fun (fn, ftyp, [tuple]) as hash ->
+    | Term.App (Term.Fun (fn, ftyp), [tuple]) as hash ->
       begin
         match Term.head_normal_biterm tuple with
         | Tuple [m; key] -> fn, ftyp, m, key, hash
@@ -1323,9 +1338,9 @@ let prf arg (s : ES.t) : ES.t list =
   in
 
   (* Check that there are no type variables. *)
-  assert (ftyp.fty_vars = []);
+  assert (ftyp.fty.fty_vars = []);
 
-  let nty = ftyp.fty_out in
+  let nty = ftyp.fty.fty_out in
   let n_fty = Type.mk_ftype [] [] nty in
   let ndef = Symbols.{ n_fty } in
   let prf_sy = (L.mk_loc L._dummy "n_PRF") in
@@ -1433,7 +1448,7 @@ let global_diff_eq (s : ES.t) =
         let ts_list = 
           (List.map (fun v -> Term.mk_action v is) vs)
           @ List.map (function
-              | Term.Fun (fs, _, [tau]) when fs = Term.f_pred -> tau
+              | Term.App (Term.Fun (fs, _), [tau]) when fs = Term.f_pred -> tau
               | t -> t
             ) pred_ts_list 
         in
@@ -1548,7 +1563,7 @@ let split_seq (li : int L.located) (htcond : Theory.term) ~else_branch s : ES.se
       match Term.ty ti with
       | Type.Message -> Term.mk_zero
       | Type.Boolean -> Term.mk_false
-      | ty           -> Term.mk_witness ty
+      | ty           -> Term.mk_witness ~ty_arg:ty
   in
 
   let ti_t = Term.mk_ite cond               ti else_branch in
@@ -1773,9 +1788,9 @@ let enckp arg (s : ES.t) =
                soft_failure (Tactics.BadSSCDetailed errors)),
           (fun x -> Term.mk_fun table fnpk [x]),
           begin match k with
-            | Term.Fun (fnpk', _, [sk])
+            | Term.App (Term.Fun (fnpk', _), [sk])
               when fnpk = fnpk' -> sk
-            | Term.Fun (fnpk', _, [sk])
+            | Term.App (Term.Fun (fnpk', _), [sk])
               when fnpk = fnpk' -> sk
             | _ ->
               soft_failure
@@ -1846,7 +1861,7 @@ let enckp arg (s : ES.t) =
 
     | Some (Message (m1, _)), None ->
       begin match m1 with
-        | Term.Fun (_f,_,[Tuple [_;_;_]]) -> Some m1, None
+        | Term.App (Fun (_f,_),[Tuple [_;_;_]]) -> Some m1, None
         | _ -> None, Some m1
       end
     | None, None -> None, None
@@ -1854,7 +1869,7 @@ let enckp arg (s : ES.t) =
   in
 
   match target with
-  | Some (Term.Fun (fnenc, _, [Tuple [m; Term.Name _ as r; k]]) as enc) ->
+  | Some (Term.App (Term.Fun (fnenc, _), [Tuple [m; Term.Name _ as r; k]]) as enc) ->
     apply_kp ~enc ~new_key ~fnenc ~m ~r:(Name.of_term r) ~k
   | Some _ ->
     soft_failure
@@ -1869,7 +1884,7 @@ let enckp arg (s : ES.t) =
      * and has a diff in its key.
      * We could also backtrack in case of failure. *)
     let diff_key = function
-      | Term.Diff _ | Term.Fun (_, _, [Term.Diff _]) -> true
+      | Term.Diff _ | Term.App (Term.Fun (_, _), [Term.Diff _]) -> true
       | _ -> false
     in
 
@@ -1878,7 +1893,7 @@ let enckp arg (s : ES.t) =
         if not (occ.Iter.occ_vars = []) then find occs
         else
         begin match occ.Iter.occ_cnt with
-          | Term.Fun (fnenc, _, [Tuple [m; Term.Name _ as r; k]]) as enc
+          | Term.App (Term.Fun (fnenc, _), [Tuple [m; Term.Name _ as r; k]]) as enc
             when diff_key k ->
             apply_kp ~enc ~new_key ~fnenc ~m ~r:(Name.of_term r) ~k
 
@@ -1968,7 +1983,7 @@ let xor arg (s : ES.t) =
   let is_xored_diff t =
     match Term.project1 l_proj  t,
           Term.project1 r_proj t with
-    | (Fun (fl,_,_ll),Fun (fr,_,_lr))
+    | (Term.App (Fun (fl,_),_ll), App (Fun (fr,_),_lr))
       when (fl = Term.f_xor && fr = Term.f_xor) -> true
     | _ -> false
   in
@@ -2035,8 +2050,8 @@ let xor arg (s : ES.t) =
       begin
         match Term.project1 l_proj  t,
               Term.project1 r_proj t with
-        | (Fun (fl, _, [Term.Name (nl, al);ll]),
-           Fun (fr, _, [Term.Name (nr, ar);lr]))
+        | (App (Fun (fl, _), [Term.Name (nl, al);ll]),
+           App (Fun (fr, _), [Term.Name (nr, ar);lr]))
           when (fl = Term.f_xor && fr = Term.f_xor) ->
           ((nl,al),ll,(nr,ar),lr,t)
 
@@ -2049,7 +2064,7 @@ let xor arg (s : ES.t) =
         | Name (nl,al), Name (nr,ar) ->
           begin match Term.project1 l_proj t,
                       Term.project1 r_proj t with
-            | (Fun (fl,_,ll),Fun (fr,_,lr))
+            | (App (Fun (fl,_),ll), App (Fun (fr,_),lr))
               when (fl = Term.f_xor && fr = Term.f_xor) ->
               ((nl,al),remove_name_occ (nl,al) ll,
                (nr,ar),remove_name_occ (nr,ar) lr,
@@ -2121,8 +2136,8 @@ class ddh_context
           Term.project1 r_proj t with
     (* left:  a b can occur as g^a^b 
        right: c can occur as g^c *)
-    | Term.(Fun (f1,_, [(Fun (f2,_, [g1; Name (n1,_)])); Name (n2,_)])),
-      Term.(Fun (_f, _, [g3; Name (n3,_)])) 
+    | Term.(App (Fun (f1,_), [(App (Fun (f2,_), [g1; Name (n1,_)])); Name (n2,_)])),
+      Term.(App (Fun (_f, _), [g3; Name (n3,_)])) 
       when f1 = exp && f2 = exp && g1 = gen && g3 = gen && n3.s_symb = c &&
            ((n1.s_symb = a && n2.s_symb = b) ||
             (n1.s_symb = b && n2.s_symb = a)) -> ()
@@ -2130,7 +2145,7 @@ class ddh_context
     | _ ->
       match t with
       (* any name n can occur as g^n *)
-      | Term.Fun (f, _, [g1; Name _]) when f = exp && g1 = gen -> ()
+      | Term.App (Term.Fun (f, _), [g1; Name _]) when f = exp && g1 = gen -> ()
 
       (* if a name a, b, c appear anywhere else, fail *)
       | Term.Name (n,_) when List.mem n.s_symb [a; b; c] -> raise Not_context

@@ -61,7 +61,7 @@ module Pos = struct
     | `Select -> Sp.add p sp
     | `Continue -> 
       match t with
-      | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite ->
+      | Term.App (Fun (fs, _), [c;t;e]) when fs = Term.f_ite ->
         let conds_t =             c :: conds in
         let conds_e = Term.mk_not c :: conds in
 
@@ -69,8 +69,9 @@ module Pos = struct
         let sp = sel fsel sp ~projs ~vars ~conds:conds_t ~p:(1 :: p) t in
         (*    *) sel fsel sp ~projs ~vars ~conds:conds_e ~p:(2 :: p) e 
 
-      | Term.Fun (_, _, l) ->
-        sel_l fsel sp ~projs ~vars ~conds ~p l
+      (* FIXME: add missing cases for &&, ||, => *)
+
+      | Term.Fun (_, _) -> sp
 
       | Term.App (t1, l) ->
         sel_l fsel sp ~projs ~vars ~conds ~p (t1 :: l)
@@ -214,7 +215,7 @@ module Pos = struct
     (* recurse strictly one level below *)
     let rec_strict_subterm ti acc =
       match ti with
-      | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite ->
+      | Term.App (Fun (fs, _), [c;t;e]) when fs = Term.f_ite ->
         let conds_t =             c :: conds in
         let conds_e = Term.mk_not c :: conds in
 
@@ -227,7 +228,7 @@ module Pos = struct
         acc, found, if found then ti' else ti
 
       (* [φ => ψ] *)
-      | Term.Fun (fs, fty, [t1; t2]) when fs = Symbols.fs_impl ->
+      | Term.App (Fun (fs, fty), [t1; t2]) when fs = Symbols.fs_impl ->
         let conds2 = t1 :: conds in
         let acc, found1, t1 = 
           map_fold ~se ~conds        ~p:(0 :: p) ~acc t1
@@ -241,7 +242,7 @@ module Pos = struct
         acc, found, if found then ti' else ti
 
       (* [φ && ψ] is handled as [φ && (φ => ψ)] *)
-      | Term.Fun (fs, fty, [t1; t2]) when fs = Symbols.fs_and ->
+      | Term.App (Fun (fs, fty), [t1; t2]) when fs = Symbols.fs_and ->
         let conds2 = t1 :: conds in
         let acc, found1, t1 = 
           map_fold ~se ~conds        ~p:(0 :: p) ~acc t1
@@ -255,7 +256,7 @@ module Pos = struct
         acc, found, if found then ti' else ti
 
       (* [φ || ψ] is handled as [φ || (¬ φ => ψ)] *)
-      | Term.Fun (fs, fty, [t1; t2]) when fs = Symbols.fs_or ->
+      | Term.App (Fun (fs, fty), [t1; t2]) when fs = Symbols.fs_or ->
         let conds2 = (Term.mk_not t1) :: conds in
 
         let acc, found1, t1 = 
@@ -270,11 +271,7 @@ module Pos = struct
         acc, found, if found then ti' else ti
 
       (* [Fun _], general case *)
-      | Term.Fun (fs, fty, l) ->
-        let acc, found, l = map_fold_l ~se ~p ~acc l in
-
-        let ti' = Term.mk_fun0 fs fty l in
-        acc, found, if found then ti' else ti
+      | Fun _ -> acc, false, ti
 
       | Term.App (t1, l) ->
         let acc, found, t1_l = map_fold_l ~se ~p ~acc (t1 :: l) in
@@ -981,10 +978,11 @@ let expand_head_once
       | _ -> raise exn 
     else raise exn 
 
-  | Fun (fs, _, ts) 
-    when Operator.is_operator table fs -> 
+  | Fun (fs, _)
+  | App (Fun (fs, _), _) when Operator.is_operator table fs -> 
+    let args = match t with App (_, args) -> args | _ -> [] in
     begin
-      match Operator.unfold table sexpr fs ts with
+      match Operator.unfold table sexpr fs args with
       | `Ok t -> t, true
       | `FreeTyv -> raise exn
     end
@@ -1072,7 +1070,6 @@ let env_of_unif_state (st : unif_state) : Env.t =
 (** {2 Module signature of matching} *)
 
 type match_res =
-  | FreeTyv
   | NoMatch of (terms * match_infos) option
   | Match   of Mvar.t
 
@@ -1101,6 +1098,10 @@ module type S = sig
     (Format.formatter -> 'a -> unit) ->
     Format.formatter -> 'a pat -> unit
 
+  val pp_pat_op :
+    (Format.formatter -> 'a -> unit) ->
+    Format.formatter -> 'a pat_op -> unit
+
   val try_match :
     ?option:match_option ->
     ?mv:Mvar.t ->
@@ -1111,7 +1112,7 @@ module type S = sig
     Symbols.table ->
     SE.context ->
     t -> 
-    t pat ->
+    t pat_op ->
     match_res
 
   val find : 
@@ -1119,7 +1120,7 @@ module type S = sig
     ?ty_env:Type.Infer.env ->
     Symbols.table ->
     SE.context ->
-    (Term.term pat) -> 
+    (Term.term pat_op) -> 
     t -> 
     Term.term list
 end
@@ -1143,37 +1144,21 @@ let unif_gen (type a)
     ?(expand_context : Macros.expand_context = InSequent)
     (table   : Symbols.table)
     (system  : SE.context)
-    (t1      : a pat)
-    (t2      : a pat) 
+    (t1      : a pat_op)
+    (t2      : a pat_op) 
   : match_res
   =
-  (* [must_close] state if [ty_env] must be closed at the end of 
-     the matching *)
-  let must_close, ty_env = match ty_env with
-    | Some e -> false, e
-    | None   -> true,  Type.Infer.mk_env () 
+  let init_ty_env, ty_env =     (* copy [ty_env], to reset it if necessary *)
+    match ty_env with
+    | None -> 
+      let e = Type.Infer.mk_env () in 
+      e, e (* [init_ty_env] does not matter in that case *)
+
+    | Some ty_env ->
+      ty_env, Type.Infer.copy ty_env
   in
 
-  let univars1, ty_subst1 = Type.Infer.open_tvars ty_env t1.pat_tyvars in
-  let term1 = Equiv.Babel.tsubst f_kind ty_subst1 t1.pat_term in
-
-  let univars2, ty_subst2 = Type.Infer.open_tvars ty_env t2.pat_tyvars in
-  let term2 = Equiv.Babel.tsubst f_kind ty_subst2 t2.pat_term in
-
-  (* substitute back the univars by the corresponding tvars *)
-  let ty_subst_rev : Type.tsubst =
-    let tysubst =
-      List.fold_left2 (fun s tv tu ->
-          Type.tsubst_add_univar s tu (Type.TVar tv)
-        ) Type.tsubst_empty t1.pat_tyvars univars1
-    in
-    List.fold_left2 (fun s tv tu ->
-        Type.tsubst_add_univar s tu (Type.TVar tv)
-      ) tysubst t2.pat_tyvars univars2
-  in
-
-  let supp1 = List.map (fun (v,t) -> Vars.tsubst ty_subst1 v, t) t1.pat_vars in
-  let supp2 = List.map (fun (v,t) -> Vars.tsubst ty_subst2 v, t) t2.pat_vars in
+  let supp1, supp2 = t1.pat_op_vars, t2.pat_op_vars in
 
   assert (
     Sv.disjoint
@@ -1189,7 +1174,9 @@ let unif_gen (type a)
       Vars.of_list @@
       Vars.Tag.global_vars @@
       Sv.elements @@
-      (Sv.union (Equiv.Babel.fv f_kind term1) (Equiv.Babel.fv f_kind term2))
+      (Sv.union
+         (Equiv.Babel.fv f_kind t1.pat_op_term) 
+         (Equiv.Babel.fv f_kind t2.pat_op_term))
       
     | Some env -> env
   in
@@ -1227,22 +1214,10 @@ let unif_gen (type a)
   in
 
   try
-    let mv = fmatch ~mode term1 term2 st_init in
-
-    if not must_close then 
-      Match mv 
-    else if not (Type.Infer.is_closed ty_env) then 
-      FreeTyv
-    else
-      (* FIXME: shouldn't we substitute type variables in Mv co-domain ? *)
-      let mv =
-        Mvar.fold (fun v (tag,system,t) mv ->
-            let v = Vars.tsubst ty_subst_rev v in
-            Mvar.add (v,tag) system t mv
-          ) mv Mvar.empty
-      in
-      Match mv
-
+    let mv = fmatch ~mode t1.pat_op_term t2.pat_op_term st_init in
+    (* save the type env, as we found a match *)
+    Type.Infer.set ~tgt:init_ty_env ~value:ty_env; 
+    Match mv
   with
   | NoMatch minfos -> NoMatch minfos
 
@@ -1258,17 +1233,34 @@ module T (* : S with type t = Term.term *) = struct
       (Fmt.list ~sep:Fmt.sp Type.pp_tvar) p.pat_tyvars
       Vars.pp_typed_tagged_list p.pat_vars
 
+  let pp_pat_op pp_t fmt p =
+    Fmt.pf fmt "@[<hov 0>{term = @[%a@];@ tyvars = @[%a@];@ vars = @[%a@]}@]"
+      pp_t p.pat_op_term
+      (Fmt.list ~sep:Fmt.sp Type.pp_univar) p.pat_op_tyvars
+      Vars.pp_typed_tagged_list p.pat_op_vars
+
   (*------------------------------------------------------------------*)
   let is_bvs (st : unif_state) = function
     | Var v0' -> List.mem_assoc v0' st.bvs
     | _ -> false
 
   (*------------------------------------------------------------------*)
+  let unif_ty (st : unif_state) (ty1 : Type.ty) (ty2 : Type.ty) : unit =
+    if Type.Infer.unify_eq st.ty_env ty1 ty2 = `Fail then
+      no_unif () 
+    else ()
+
+  let unif_tys (st : unif_state) (tys1 : Type.ty list) (tys2 : Type.ty list) : unit =
+    List.iter2 (unif_ty st) tys1 tys2
+
+  (*------------------------------------------------------------------*)
   (* Invariants:
      - [st.mv] supports in included in [p.pat_vars].
      - [st.bvs] is the set of variables bound above [t].
      - [st.bvs] must be disjoint from the free variables of the terms in the
-       co-domain of [mv]. *)
+       co-domain of [mv]. 
+
+     Remark: [st] handles the unification environment statefully. *)
   let rec tunif (t : term) (pat : term) (st : unif_state) : Mvar.t =
     match t, pat with
     (*      *) | _, Var v when st.mode = `Match -> vunif t v st
@@ -1294,12 +1286,11 @@ module T (* : S with type t = Term.term *) = struct
         | _ -> tunif_eta_expand st t (f', l')
       end
 
-    | Fun (fn , fty, terms), Fun (fn', fty', terms') when fn = fn' ->
+    | Fun (fn , { fty = fty ; ty_args = args ;}), 
+      Fun (fn', { fty = fty'; ty_args = args';}) when fn = fn' ->
       assert (fty = fty');
-
-      if List.length terms = List.length terms' then 
-        tunif_l terms terms' st
-      else no_unif ()
+      unif_tys st args args';
+      st.mv
 
     | Name (s,l), Name (s',l') when s = s' ->
       assert (List.length l = List.length l');
@@ -1391,7 +1382,8 @@ module T (* : S with type t = Term.term *) = struct
   and try_reduce_head1 (t : term) (pat : term) (st : unif_state) : Mvar.t =
     match t, pat with
     (* delta-reduction *)
-    | (Macro _ | Fun _), (Macro _ | Fun _) ->      
+    | (Macro _ | Fun _ | App (Fun _, _)), 
+      (Macro _ | Fun _ | App (Fun _, _)) ->
       let t, t_red = m_expand_head_once st t in
 
       if t_red then tunif t pat st 
@@ -1400,12 +1392,12 @@ module T (* : S with type t = Term.term *) = struct
         if pat_red then tunif t pat st
         else no_unif ()
 
-    | Macro _, _ | Fun _, _ -> 
+    | (Macro _ | Fun _ | App (Fun _, _)), _ -> 
       let t, t_red = m_expand_head_once st t in
       if t_red then tunif t pat st
       else no_unif ()
 
-    | _, Macro _ | _, Fun _ -> 
+    | _, (Macro _ | Fun _ | App (Fun _, _)) -> 
       let pat, pat_red = m_expand_head_once st pat in
       if pat_red then tunif t pat st
       else no_unif ()
@@ -1494,7 +1486,7 @@ module T (* : S with type t = Term.term *) = struct
 
       | _ -> v, t
     in
-    if t = mk_var v then
+    if Term.equal t (mk_var v) then
       st.mv
 
     else match List.assoc_opt v st.support with
@@ -1535,7 +1527,7 @@ module T (* : S with type t = Term.term *) = struct
       (table   : Symbols.table)
       (system  : SE.context)
       (t1      : Term.term)
-      (t2      : Term.term pat) 
+      (t2      : Term.term pat_op) 
     =
     unif_gen
       Equiv.Local_t `Match
@@ -1544,7 +1536,7 @@ module T (* : S with type t = Term.term *) = struct
       (* repeat arguments, wrapping [t1] in a pattern *)
       ?option ?mv ?env ?ty_env ?hyps ?expand_context
       table system
-      Term.{ pat_term = t1; pat_vars = []; pat_tyvars = []}
+      Term.{ pat_op_term = t1; pat_op_vars = []; pat_op_tyvars = []}
       t2
 
   (*------------------------------------------------------------------*)
@@ -1560,12 +1552,12 @@ module T (* : S with type t = Term.term *) = struct
       ?mv
       (table : Symbols.table)
       (system  : SE.context)
-      (t1    : term pat)
-      (t2    : term pat) 
+      (t1    : term pat_op)
+      (t2    : term pat_op) 
     : Mvar.t option
     =
     match unify ?mv table system t1 t2 with
-    | FreeTyv | NoMatch _ -> None
+    | NoMatch _ -> None
     | Match mv -> Some mv
 
   (*------------------------------------------------------------------*)
@@ -1575,7 +1567,7 @@ module T (* : S with type t = Term.term *) = struct
       ?ty_env
       (table  : Symbols.table) 
       (system : SE.context) 
-      (pat    : term pat) 
+      (pat    : term pat_op) 
       (t      : t) 
     : Term.term list
     =
@@ -1846,7 +1838,7 @@ let rec known_set_decompose (k : known_set) : known_set list =
   (* Exploit the pair symbol injectivity.
       If [k] is a pair, we can replace [k] by its left and right
       composants w.l.o.g. *)
-  | Term.Fun (fs, _, [a;b]) when fs = Term.f_pair ->
+  | Term.App (Fun (fs, _), [a;b]) when fs = Term.f_pair ->
     let kl = { k with term = a; }
     and kr = { k with term = b; } in
     List.concat_map known_set_decompose (kl :: [kr])
@@ -1923,20 +1915,20 @@ let known_sets_of_mset_l
 (*------------------------------------------------------------------*)
 (* return: substitution, condition, pattern *)
 let pat_of_cand_set
-    (cand : cand_set) : Mvar.t * Term.term * Term.term pat
+    (cand : cand_set) : Mvar.t * Term.term * Term.term pat_op
   =
   cand.subst,
   cand.cond,
-  { pat_term   = cand.term;
-    pat_vars   = Vars.Tag.local_vars cand.vars;
-    pat_tyvars = []; }
+  { pat_op_term   = cand.term;
+    pat_op_vars   = Vars.Tag.local_vars cand.vars;
+    pat_op_tyvars = []; }
 
 (* return: condition, pattern *)
-let pat_of_known_set (known : known_set) : Term.term * Term.term pat =
+let pat_of_known_set (known : known_set) : Term.term * Term.term pat_op =
   known.cond,
-  { pat_term   = known.term;
-    pat_vars   = known.vars;
-    pat_tyvars = []; }
+  { pat_op_term   = known.term;
+    pat_op_vars   = known.vars;
+    pat_op_tyvars = []; }
 
 (*------------------------------------------------------------------*)
 let refresh_known_set (known : known_set) : known_set =
@@ -1965,9 +1957,9 @@ let mset_incl
   assert (s1.cond_le = s2.cond_le);
 
   let pat2 = {
-    pat_term = term2;
-    pat_tyvars = [];
-    pat_vars = Vars.Tag.local_vars s2.indices;
+    pat_op_term = term2;
+    pat_op_tyvars = [];
+    pat_op_vars = Vars.Tag.local_vars s2.indices;
     (* local inforation, since we allow to match diff operators *)
   } in
 
@@ -1977,7 +1969,7 @@ let mset_incl
   match 
     T.try_match ~expand_context:InSequent table context term1 pat2
   with
-  | FreeTyv | NoMatch _ -> false
+  | NoMatch _ -> false
   | Match _ -> true
 
 
@@ -2047,15 +2039,15 @@ let mset_inter
   let term2 = Term.mk_macro s2.msymb s2.args (Term.mk_var tv) in
 
   let pat1 = {
-    pat_term   = term1;
-    pat_tyvars = [];
-    pat_vars   = Vars.Tag.local_vars s1.indices;}
+    pat_op_term   = term1;
+    pat_op_tyvars = [];
+    pat_op_vars   = Vars.Tag.local_vars s1.indices;}
   (* local inforation, since we allow to match diff operators *)
   in
   let pat2 = {
-    pat_term   = term2;
-    pat_tyvars = [];
-    pat_vars   = Vars.Tag.local_vars s2.indices;}
+    pat_op_term   = term2;
+    pat_op_tyvars = [];
+    pat_op_vars   = Vars.Tag.local_vars s2.indices;}
   (* local inforation, since we allow to match diff operators *)
   in
   (* FIXME: cleanup with unification of list of terms *)
@@ -2134,10 +2126,10 @@ module E = struct
     let rec leq t t' =
       match t,t' with
       | _ when t = t' -> true
-      | Fun (f,_, [t]), Fun (f',_, [t']) 
+      | App (Fun (f,_), [t]), App (Fun (f',_), [t']) 
         when f = f_pred && f' = f_pred ->
         leq t t'
-      | Fun (f,_, [t]), t' when f = f_pred -> leq t t'
+      | App (Fun (f,_), [t]), t' when f = f_pred -> leq t t'
       | Action (n,is), Action (n',is') ->
         Action.depends
           (Action.of_term n is table)
@@ -2161,7 +2153,7 @@ module E = struct
     let hyps = Term.decompose_ands hyp
     in
     match cond with
-    | Term.Fun (fs, _, [t1;t2]) 
+    | Term.App (Fun (fs, _), [t1;t2]) 
       when (fs = Term.f_lt || fs = Term.f_leq)
         && Term.ty t1 = Type.Timestamp ->
       let t2' =
@@ -2171,16 +2163,16 @@ module E = struct
       let check_indirect =
         List.exists (fun hyp ->
             match hyp with
-            | Term.Fun (fs, _, [ta;tb]) 
+            | Term.App (Fun (fs, _), [ta;tb]) 
               when fs = Term.f_leq && Term.ty t1 = Type.Timestamp -> (* ≤ *)
               (* checks whether [ta ≤ tb] implies [t1 ≤ t2'] *)
               leq_tauto table t1 ta && leq_tauto table tb t2'
-            | Term.Fun (fs,_,_) when fs = Term.f_true -> false
+            | Term.Fun (fs,_) when fs = Term.f_true -> false
             | _ -> false
           ) hyps
       in
       check_direct || check_indirect
-    | Term.Fun (fs,_,_) when fs = Term.f_true -> true
+    | Term.Fun (fs,_) when fs = Term.f_true -> true
     | _ -> false
   
 
@@ -2396,7 +2388,7 @@ module E = struct
     | Term.Tuple f_terms -> 
       comp_deds (fun f_terms -> Term.mk_tuple f_terms) f_terms
 
-    | Term.Fun (fs, fty, f_terms) ->
+    | Term.App (Fun (fs, fty), f_terms) ->
       comp_deds (fun f_terms -> Term.mk_fun0 fs fty f_terms) f_terms
 
     | Term.App (t, l) -> 
@@ -2472,9 +2464,12 @@ module E = struct
               (* sanity check *)
               let () =
                 assert (match ded_set.cond with
-                    | Term.Fun (fs, _, [_; c]) when fs = Term.f_leq ->
+                    | Term.App (Fun (fs, _), [_; c]) when fs = Term.f_leq ->
                       Some c = cand.cond_le
-                    | Term.Fun (_fs,_,_) -> None = cand.cond_le
+
+                    | Term.Fun (_fs,_)
+                    | Term.App (Term.Fun (_fs,_),_) -> None = cand.cond_le
+
                     | _ -> false)
               in
 
@@ -2616,6 +2611,7 @@ module E = struct
   (*------------------------------------------------------------------*)
   (** [term_match ?vars term pat st] match [term] with [pat] w.r.t.
       variables [vars]. *)
+  (* FIXME: remove *)
   let term_unif term pat st : Mvar.t =
     try T.tunif term pat st with
     | NoMatch _ -> no_unif ()  (* FIXME: why throw away match info? *)
@@ -2653,7 +2649,7 @@ module E = struct
     in
 
     try
-      let mv = T.tunif cterm.term e_pat.pat_term st in
+      let mv = T.tunif cterm.term e_pat.pat_op_term st in
 
       let subst =
         match Mvar.to_subst ~mode:`Unif st.table st.env mv with
@@ -2724,22 +2720,23 @@ module E = struct
     | t when HighTerm.is_ptime_deducible ~const:`Exact ~si:true env t -> Some []
   
     (* function: if-then-else *)
-    | Term.Fun (f, _, [b; t1; t2] ) when f = Term.f_ite -> 
+    | Term.App (Fun (f, _), [b; t1; t2] ) when f = Term.f_ite -> 
       let cond1 = Term.mk_and b cterm.cond
       and cond2 = Term.mk_and (Term.mk_not b) cterm.cond in
 
       Some (List.map (fun t -> st, t) [{ term = b ; cond = cterm.cond; };
                                        { term = t1; cond = cond1; };
                                        { term = t2; cond = cond2; }])
-    (*function: and *)
-    | Term.Fun (f, _, [t1;t2] ) when f = Term.f_and -> 
+    (* function: and *)
+    | Term.App (Fun (f, _), [t1;t2] ) when f = Term.f_and -> 
       let cond = Term.mk_and t1 cterm.cond in
       Some (List.map (fun t -> st,t) [{ term = t1 ; cond=cterm.cond};
                                       { term = t2 ; cond }])
 
-    (* function: general case + tuples *)
-    | Term.Tuple terms
-    | Term.Fun (_, _, terms) -> 
+    (* general case for function is handled by [HighTerm.is_ptime_deducible] *)
+
+    (* tuples *)
+    | Term.Tuple terms ->
       Some (List.map (fun term -> st, { cterm with term } ) terms)
 
     | Term.Proj (_, t) ->
@@ -2948,7 +2945,7 @@ module E = struct
       (table   : Symbols.table)
       (system  : SE.context)
       (t1      : Equiv.form)
-      (t2      : Equiv.form pat) 
+      (t2      : Equiv.form pat_op) 
     =
     unif_gen
        Equiv.Global_t `Match
@@ -2956,7 +2953,7 @@ module E = struct
 
       (* repeat arguments, wrapping [t1] in a pattern *)
       ?option ?mv ?env ?ty_env ?hyps ?expand_context table system
-      Term.{ pat_term = t1; pat_vars = []; pat_tyvars = []}
+      Term.{ pat_op_term = t1; pat_op_vars = []; pat_op_tyvars = []}
       t2
   
   (*------------------------------------------------------------------*)
@@ -2966,7 +2963,7 @@ module E = struct
       ?ty_env
       (table  : Symbols.table) 
       (system : SE.context) 
-      (pat    : term pat) 
+      (pat    : term pat_op) 
       (t      : t) 
     : Term.terms
     =
@@ -2990,7 +2987,7 @@ module E = struct
       ?ty_env
       (table  : Symbols.table) 
       (system : SE.context) 
-      (pat    : t pat) 
+      (pat    : t pat_op) 
       (t      : t) 
     : t list
     =
@@ -2998,7 +2995,7 @@ module E = struct
       fun e se _vars _p acc ->
         match 
           try_match ~expand_context:InSequent
-            ?ty_env ?option table se e pat 
+            ?ty_env ?option table se e pat
         with
         | Match _ -> e :: acc, `Continue
         | _       ->      acc, `Continue

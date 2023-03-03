@@ -20,8 +20,8 @@ module Sv = Vars.Sv
 (** A typed symbol.
     Invariant: [s_typ] do not contain tvar or univars. *)
 type 'a isymb = private {
-  s_symb    : 'a;
-  s_typ     : Type.ty;
+  s_symb : 'a;
+  s_typ  : Type.ty;
 }
 
 val mk_symb : 'a -> Type.ty -> 'a isymb
@@ -35,6 +35,16 @@ type nsymb = Symbols.name isymb
 type msymb = Symbols.macro isymb
 
 (*------------------------------------------------------------------*)
+(** An applied function type.
+    Invariant: [List.length fty.fty_vars = List.length ty_args] *)
+type applied_ftype = { 
+  fty     : Type.ftype; 
+  ty_args : Type.ty list; 
+}
+
+val pp_applied_ftype : Format.formatter -> applied_ftype -> unit
+
+(*------------------------------------------------------------------*)
 (** {3 Pretty printing} *)
 
 val pp_nsymb  : Format.formatter -> nsymb      -> unit
@@ -42,8 +52,6 @@ val pp_nsymbs : Format.formatter -> nsymb list -> unit
 
 val pp_msymb_s : Format.formatter -> Symbols.macro -> unit
 val pp_msymb   : Format.formatter -> msymb         -> unit
-
-val pp_fname : Format.formatter -> Symbols.fname -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Terms}
@@ -83,8 +91,11 @@ val pp_quant : Format.formatter -> quant -> unit
 (*------------------------------------------------------------------*)
 type term = private
   | App    of term * term list
-  | Fun    of Symbols.fname * Type.ftype * term list
-  | Name   of nsymb * term list              (* [Name(s,l)] : [l] of length 0 or 1 *)
+  | Fun    of Symbols.fname * applied_ftype
+  (** An applied function type, instanciating type variable when [f] 
+      is polymorphique. *)
+
+  | Name   of nsymb * term list             (** [Name(s,l)] : [l] of length 0 or 1 *)
   | Macro  of msymb * term list * term
 
   | Action of Symbols.action * term list
@@ -411,37 +422,54 @@ include module type of Smart
 (*------------------------------------------------------------------*)
 (** {3 Smart constructors: terms} *)
 
-val mk_pred    : term -> term
-val mk_var     : Vars.var -> term
-val mk_vars    : Vars.var list -> term list
-val mk_action  : Symbols.action -> term list -> term
-val mk_tuple   : term list -> term
-val mk_app     : term -> term list -> term
-val mk_proj    : int -> term -> term
+val mk_pred   : term -> term
+val mk_var    : Vars.var -> term
+val mk_vars   : Vars.var list -> term list
+val mk_action : Symbols.action -> term list -> term
+val mk_tuple  : term list -> term
+val mk_app    : term -> term list -> term
+val mk_proj   : int -> term -> term
 
 (** [mk_name n l] create a name. The list [l] must be of length at most 1. *)
-val mk_name                 : nsymb -> term list -> term
+val mk_name : nsymb -> term list -> term
 
 (** [mk_name n l] create a name applied to the tuple [l] (or nothing if [l = \[\]]). *)
 val mk_name_with_tuple_args : nsymb -> term list -> term
 
-val mk_macro   : msymb -> term list -> term -> term
-val mk_diff    : (proj * term) list -> term
+val mk_macro : msymb -> term list -> term -> term
+val mk_diff  : (proj * term) list -> term
 
 val mk_find : ?simpl:bool -> Vars.var list -> term -> term -> term -> term
 
 val mk_quant : ?simpl:bool -> quant -> Vars.vars -> term -> term
   
-val mk_iff   : ?simpl:bool -> term -> term -> term
+val mk_iff : ?simpl:bool -> term -> term -> term
   
 (*------------------------------------------------------------------*)
-val mk_fun0 : Symbols.fname -> Type.ftype -> term list -> term
+(** Low-level smart constructor for application of a function symbol. *)
+val mk_fun0 : Symbols.fname -> applied_ftype -> term list -> term
 
-val mk_fun : Symbols.table -> Symbols.fname -> term list -> term
+(** [mk_fun table f ~ty_args terms] create the term [(f' terms)] 
+    where [f'] is [f] applied to the type variables [ty_args]. *)
+val mk_fun : 
+  Symbols.table -> 
+  Symbols.fname -> ?ty_args:Type.ty list -> term list -> 
+  term
 
-(** Declare a function of arity one (all arguments are grouped 
-    into a tuple). *)
-val mk_fun_tuple : Symbols.table -> Symbols.fname -> term list -> term
+(** As [mk_fun], but groups all arguments into a tuple. *)
+val mk_fun_tuple : 
+  Symbols.table -> 
+  Symbols.fname -> ?ty_args:Type.ty list -> term list -> 
+  term
+
+(** High-level smart constructor for application of a function symbols.
+    Type variables of the function symbols must all be instanciated using 
+    the types of the arguments. 
+
+    For example, comparison is polymorphique, and has type [< : 'a -> 'a -> bool].
+    Then, in [t1 < t2], the type variable ['a] can be automatically infered to 
+    instanciate [<] on [ty t1]. *)
+val mk_fun_infer_tyargs : Symbols.table -> Symbols.fname -> term list -> term
 
 (*------------------------------------------------------------------*)
 val mk_zero    : term
@@ -451,7 +479,7 @@ val mk_zeroes  : term -> term
 val mk_of_bool : term -> term
 val mk_pair    : term -> term -> term
 
-val mk_witness : Type.ty -> term
+val mk_witness : ty_arg:Type.ty -> term
 
 (*------------------------------------------------------------------*)
 (** {3 Smart constructors: messages} *)
@@ -582,18 +610,26 @@ module Hm : Map.S with type key = term_head
 (*------------------------------------------------------------------*)
 (** {2 Patterns} *)
 
-(** A pattern is a list of free type variables, a term [t] and a subset
-    of [t]'s free variables that must be matched.
-    The free type variables must be inferred. *)
+(** A pattern is a list of free type variables to be instantiated, a
+    term [t] and a subset of [t]'s free variables that must be
+    infered. *)
 type 'a pat = {
   pat_tyvars : Type.tvars;
   pat_vars   : (Vars.var * Vars.Tag.t) list;
   pat_term   : 'a;
 }
 
-val empty_pat : 'a -> 'a pat
-val project_tpat     : projs        -> term pat -> term pat
-val project_tpat_opt : projs option -> term pat -> term pat
+(** An opened pattern, i.e. a pattern where type variables are
+    type unification variables. *)
+type 'a pat_op = {
+  pat_op_tyvars : Type.univars;
+  pat_op_vars   : (Vars.var * Vars.Tag.t) list;
+  pat_op_term   : 'a;
+}
+
+val project_tpat        : projs        -> term pat -> term pat
+val project_tpat_opt    : projs option -> term pat -> term pat
+val project_tpat_op_opt : projs option -> term pat_op -> term pat_op
 
 (** Make a pattern out of a formula: all universally quantified variables
     are added to [pat_vars]. *)

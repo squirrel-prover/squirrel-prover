@@ -1,6 +1,5 @@
 (* test apply argument inference *)
 
-
 system null.
 
 abstract nt ['a] : 'a -> 'a.

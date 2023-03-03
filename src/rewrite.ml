@@ -12,12 +12,14 @@ let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
-(** as an instance been found:
+(** An instance been found:
     - [pat]: pattern of the instance found (no free variables left)
     - [right]: right term instantiated with the instance found
-    - [system]: systems applying to the instance found *) 
+    - [system]: systems applying to the instance found 
+
+    Type unification environments has already been closed. *) 
 type found = { 
-  pat    : Term.term Term.pat; 
+  pat    : Term.term Term.pat_op; 
   right  : Term.term;
   system : SE.t; 
   subgs  : (SE.t * Term.term) list;
@@ -25,9 +27,11 @@ type found = {
 
 type rw_state = { 
   rl_system  : SE.t;
-  init_pat   : Term.term Term.pat;
+  init_pat   : Term.term Term.pat_op;
   init_subs  : Term.term list;
   init_right : Term.term;
+  
+  ty_env : Type.Infer.env;
 
   found_instance : [ `False | `Found of found ];
 }
@@ -89,25 +93,42 @@ let mk_state
         ) projs
   in
 
+  (* open an type unification environment *)
+  let ty_env = Type.Infer.mk_env () in
+  let univars, tsubst = Type.Infer.open_tvars ty_env rule.rw_tyvars in
+
   let mk_form f =
-    Term.project_opt projs (Term.subst_projs psubst f)
+    Term.project_opt projs (Term.subst_projs psubst f) |>
+    Term.tsubst tsubst
   in
+
+  let init_pat : Term.term Term.pat_op = { 
+    pat_op_tyvars = univars; 
+    pat_op_vars   = 
+      List.map (fun (v,tag) -> (Vars.tsubst tsubst v, tag)) rule.rw_vars; 
+    pat_op_term   = mk_form left;
+  } in
+  
   { rl_system = rule.rw_system;
-    init_pat = Term.{ 
-        pat_tyvars = rule.rw_tyvars; 
-        pat_vars   = rule.rw_vars; 
-        pat_term   = mk_form left;
-      };
-    init_right     = mk_form right;
-    init_subs      = List.map mk_form rule.rw_conds;
+    init_pat;
+    init_right = mk_form right;
+    init_subs  = List.map mk_form rule.rw_conds;
+    ty_env;
     found_instance = `False; } 
 
+(*------------------------------------------------------------------*)
+let hyps_add_conds hyps (conds : Term.terms) =
+  Lazy.map (fun hyps ->
+      List.fold_left (fun hyps cond ->
+          Hyps.TraceHyps.add AnyName (Local cond) hyps
+        ) hyps conds
+    ) hyps
 
 (*------------------------------------------------------------------*)
-(* If there is a match (with [mv]), substitute [occ] by [right] where
-   free variables are instantiated according to [mv], and variables
-   bound above the matched occurrences are universally quantified in
-   the generated sub-goals. *)
+(** If there is a match (with [mv]), substitute [occ] by [right] where
+    free variables are instantiated according to [mv], and variables
+    bound above the matched occurrences are universally quantified in
+    the generated sub-goals. *)
 let rw_inst
     (expand_context : Macros.expand_context)
     (table : Symbols.table) (env : Vars.env) (hyps : Hyps.TraceHyps.hyps Lazy.t) 
@@ -118,14 +139,9 @@ let rw_inst
       (se : SE.t) (vars : Vars.vars) (conds : Term.terms) _p
       (s : rw_state) 
     =
-    let hyps =                 (* adds [conds] in [hyps] *)
-      Lazy.map (fun hyps ->
-          List.fold_left (fun hyps cond ->
-              Hyps.TraceHyps.add AnyName (Local cond) hyps
-            ) hyps conds
-        ) hyps
-    in
-
+    (* adds [conds] in [hyps] *)
+    let hyps = hyps_add_conds hyps conds in
+    let ty_env = s.ty_env in
     let projs : Term.projs option = 
       if SE.is_fset se then Some (SE.to_projs (SE.to_fset se)) else None
     in
@@ -137,6 +153,8 @@ let rw_inst
       | `Found inst -> 
         (* we already found the rewrite instance earlier *)
 
+        (* TODO: types: need to do something about conds, that may not be
+           the same than for the first instance found ... *)
         (* check if the same system apply to the subterm *)
         if not (SE.subset table se inst.system) then 
           s, `Continue 
@@ -144,9 +162,10 @@ let rw_inst
           let context = SE.reachability_context se in
           begin
             match 
-              Match.T.try_match ~expand_context ~hyps ~env table context occ inst.pat 
+              Match.T.try_match
+                ~expand_context ~ty_env ~hyps ~env table context occ inst.pat 
             with
-            | NoMatch _ | FreeTyv -> s, `Continue
+            | NoMatch _ -> s, `Continue
             | Match _mv -> 
               (* project the already found instance with the projections
                  applying to the current subterm *)
@@ -155,21 +174,27 @@ let rw_inst
 
       | `False ->
         (* project the pattern *)
-        let pat_proj = Term.project_tpat_opt projs s.init_pat in
+        let pat_proj = Term.project_tpat_op_opt projs s.init_pat in
 
         let context = SE.reachability_context se in
         match 
-          Match.T.try_match ~expand_context ~hyps ~env table context occ pat_proj 
+          Match.T.try_match
+            ~expand_context ~ty_env ~hyps ~env table context occ pat_proj 
         with
-        | NoMatch _ | FreeTyv -> s, `Continue
+        | NoMatch _ -> s, `Continue
+
+        (* Check that all type variables have been infered.
+           Remark: type unification environments are stateful *)
+        | Match _ when not (Type.Infer.is_closed ty_env) -> s, `Continue
 
         (* head matches *)
         | Match mv -> 
           (* we found the rewrite instance *)
           let subst =
             let pat_vars =
-              Vars.add_vars pat_proj.pat_vars env
-              (* vars in the pattern are restricted according to what the pattern specifies *)
+              Vars.add_vars pat_proj.pat_op_vars env
+              (* vars in the pattern are restricted according to what the pattern 
+                 specifies *)
 
               |> Vars.add_vars (Vars.Tag.local_vars vars)
               (* vars above the current position are unrestricted, i.e. local vars*)
@@ -180,24 +205,29 @@ let rw_inst
               soft_failure (Failure (Fmt.str "@[<hv 2>rewrite failed:@ @[%t@]@]" pp_err))
           in
           
-          let left = Term.subst subst pat_proj.pat_term in
+          let tsubst = Type.Infer.close s.ty_env in
+
+          (* Substitute [mv] and [tsubst] *)
+          let do_subst t = Term.tsubst tsubst (Term.subst subst t) in
+          
+          let left = do_subst pat_proj.pat_op_term in
           let right = 
             let right_proj = Term.project_opt projs s.init_right in
-            Term.subst subst right_proj
+            do_subst right_proj
           in
           let found_subs =
             List.map (fun rsub ->
                 let rsub = Term.project_opt projs rsub in
                 se, 
                 Term.mk_forall ~simpl:true vars
-                  (Term.mk_impls ~simpl:true conds (Term.subst subst rsub))
+                  (Term.mk_impls ~simpl:true conds (do_subst rsub))
               ) s.init_subs
           in
 
           let found_pat = Term.{ 
-              pat_term   = left;
-              pat_tyvars = [];
-              pat_vars   = []; 
+              pat_op_term   = left;
+              pat_op_tyvars = [];
+              pat_op_vars   = []; 
             } in
 
           let found_instance = `Found {
@@ -214,6 +244,7 @@ let rw_inst
 (*------------------------------------------------------------------*)
 (** {2 Rewrite at head position} *)
 
+(** Exported *)
 let rewrite_head
     (table : Symbols.table)
     (env : Vars.env)
@@ -226,7 +257,8 @@ let rewrite_head
   let s = mk_state rule sexpr in
   match rw_inst expand_context table env hyps t sexpr [] [] Pos.root s with
   | _, `Continue -> None
-  | { found_instance = `Found inst }, `Map t -> Some (t, inst.subgs)
+  | { found_instance = `Found inst }, `Map t ->
+    Some (t, inst.subgs)
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
@@ -258,19 +290,6 @@ let do_rewrite
       incr cpt_occ;
   in
 
-  (* Build the rewrite state corresponding to the rewrite rule [rule] and the 
-     systems applying to [target].
-     This may require renaming projections in [rule], and removing some
-     projections from [rule]. *)
-  let s = 
-    let target_systems : SE.t =
-      match target with
-      | Global _ -> (oget system.pair :> SE.t)
-      | Local _ -> system.set
-    in
-    mk_state rule target_systems
-  in
-
   let hyps = lazy hyps in
 
   (* Attempt to find an instance of [left], and rewrites all occurrences of
@@ -280,6 +299,22 @@ let do_rewrite
     : Equiv.any_form * (SE.t * Term.term) list
     =
     check_max_rewriting ();
+
+    (* Build the rewrite state corresponding to the rewrite rule [rule] and the 
+       systems applying to [target].
+       This may require renaming projections in [rule], and removing some
+       projections from [rule]. 
+
+       Rebuild at each application of [_rewrite], to have a new 
+       ty_env. *)
+    let s = 
+      let target_systems : SE.t =
+        match target with
+        | Global _ -> (oget system.pair :> SE.t)
+        | Local _ -> system.set
+      in
+      mk_state rule target_systems
+    in
 
     let s, f = match f with
       | Global f ->

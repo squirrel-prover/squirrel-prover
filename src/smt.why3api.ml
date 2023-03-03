@@ -327,7 +327,7 @@ let build_task
     | i::is -> t_app_infer cons_symb [index_to_wterm i; ilist_to_wterm is]
   in
   let rec timestamp_to_wterm = function
-    | Term.Fun (fs, _, [ts]) when fs = Term.f_pred ->
+    | Term.App (Fun (fs, _), [ts]) when fs = Term.f_pred ->
       t_app_infer pred_symb [timestamp_to_wterm ts]
     | Term.Action (a, indices) -> t_app_infer act_symb [
         t_app_infer (Hashtbl.find actions_tbl (Symbols.to_string a)) [];
@@ -381,7 +381,9 @@ let build_task
     (* TODO lots of t_app_infer + Hashtbl.find + Symbols.to_string
      *      -> factor into common utility function *)
     match c with (* cases taken from Completion.cterm_of_term *)
-    | Fun (f,_,terms) ->
+    | Fun (f,_) -> t_app_infer (find_fn f) []
+
+    | App (Fun (f,_),terms) ->
       begin match terms with
         | [t1; t2] when f = Symbols.fs_xor ->
           t_app_infer xor_symb [msg_to_wterm t1; msg_to_wterm t2]

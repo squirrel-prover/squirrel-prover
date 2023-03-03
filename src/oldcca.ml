@@ -7,9 +7,9 @@ exception Bad_ssc
 class deprecated_check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)
   inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
   method visit_message t = match t with
-    | Term.Fun (fn, _, [Tuple [m;r;k]]) when fn = enc_fn && Term.diff_names k ->
+    | Term.App (Fun (fn, _), [Tuple [m;r;k]]) when fn = enc_fn && Term.diff_names k ->
       self#visit_message m; self#visit_message r
-    | Term.Fun (fn, _, [Tuple [m;k]]) when fn = dec_fn && Term.diff_names k ->
+    | Term.App (Fun (fn, _), [Tuple [m;k]]) when fn = dec_fn && Term.diff_names k ->
       self#visit_message m
     | Term.Name (ns,_) when ns.s_symb = key_n -> raise Bad_ssc
     | Term.Var m ->
@@ -36,10 +36,10 @@ let deprecated_symenc_key_ssc ?(messages=[]) ?(elems=[]) ~cntxt enc_fn dec_fn ke
 class deprecated_check_rand ~cntxt enc_fn randoms = object (self)
   inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
   method visit_message t = match t with
-    | Term.Fun (fn, _, [Tuple [m1;Term.Name _; m2]]) when fn = enc_fn ->
+    | Term.App (Fun (fn, _), [Tuple [m1;Term.Name _; m2]]) when fn = enc_fn ->
       self#visit_message m1; self#visit_message m2
 
-    | Term.Fun (fn, _, [Tuple [_; _; _]]) when fn = enc_fn ->
+    | Term.App (Fun (fn, _), [Tuple [_; _; _]]) when fn = enc_fn ->
       raise Bad_ssc
 
     | Term.Name (ns,_) when List.mem ns.s_symb randoms ->
@@ -97,7 +97,7 @@ let deprecated_check_encryption_randomness
 
   let randoms = 
     List.map (function
-        | Term.Fun (_, _, [Tuple [_; Name (r,_); _]]), _-> r.s_symb
+        | Term.App (Term.Fun (_, _), [Tuple [_; Name (r,_); _]]), _-> r.s_symb
         | _ ->  Tactics.soft_failure Tactics.SEncNoRandom
       ) encryptions
   in
@@ -107,7 +107,7 @@ let deprecated_check_encryption_randomness
   (* we check that encrypted messages based on indices, do not depend on free
      indices instantiated by the action w.r.t the indices of the random. *)
   if List.exists (function
-      | Term.Fun (_, _, [Tuple [m; Name (_n,n_args); _]]), 
+      | Term.App (Term.Fun (_, _), [Tuple [m; Name (_n,n_args); _]]), 
         (actidx : Vars.var list) ->
         let n_args =
           match n_args with
@@ -140,8 +140,8 @@ let deprecated_check_encryption_randomness
   (* we check that no encryption is shared between multiple encryptions *)
   let enc_classes = Utils.classes (fun m1 m2 ->
       match m1, m2 with
-      | (Term.Fun (_, _, [Tuple [m1; Name (r,_) ; k1]]),_),
-        (Term.Fun (_, _, [Tuple [m2; Name (r2,_); k2]]),_) ->
+      | (Term.App (Term.Fun (_, _), [Tuple [m1; Name (r,_) ; k1]]),_),
+        (Term.App (Term.Fun (_, _), [Tuple [m2; Name (r2,_); k2]]),_) ->
         r.s_symb = r2.s_symb &&
         (m1 <> m2 || k1 <> k2)
       (* the patterns should match, if they match inside the declaration

@@ -117,7 +117,9 @@ module Any : sig
   val _pp    : dbg:bool -> Format.formatter -> t -> unit
   val pp_dbg :             Format.formatter -> t -> unit
 
-  val subst : Term.subst -> t -> t
+  val subst  : Term.subst  -> t -> t
+  val tsubst : Type.tsubst -> t -> t
+
   val fv : t -> Vars.Sv.t
 
   val project : Term.proj list -> t -> t

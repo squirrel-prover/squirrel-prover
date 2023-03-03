@@ -13,8 +13,9 @@ let pp_dbg = false
 class deprecated_iter ~(cntxt:Constr.trace_cntxt) = object (self)
   method visit_message (t : Term.term) = 
     match t with
-    | Tuple l
-    | Fun (_, _,l) -> List.iter self#visit_message l
+    | Fun _ -> ()
+
+    | Tuple l -> List.iter self#visit_message l
 
     | App (t, l) -> List.iter self#visit_message (t :: l)
 
@@ -51,8 +52,7 @@ end
 class ['a] deprecated_fold ~(cntxt:Constr.trace_cntxt) = object (self)
   method fold_message (x : 'a) (t : Term.term) : 'a = 
     match t with
-    | Tuple l
-    | Fun (_, _,l) -> List.fold_left self#fold_message x l
+    | Tuple l -> List.fold_left self#fold_message x l
 
     | App (t, l) -> List.fold_left self#fold_message x (t :: l)
 
@@ -83,6 +83,7 @@ class ['a] deprecated_fold ~(cntxt:Constr.trace_cntxt) = object (self)
       let l = Term.subst s l in
       self#fold_message x l
 
+    | Term.Fun _
     | Term.Action _ -> x
 
 end
@@ -125,7 +126,7 @@ class deprecated_get_f_messages ?(drop_head=true)
   val mutable occurrences : (Term.term list * Term.term) list = []
   method get_occurrences = occurrences
   method visit_message = function
-    | Term.Fun (f',_, [Tuple [m;k']]) as m_full when f' = f ->
+    | Term.App (Fun (f',_), [Tuple [m;k']]) as m_full when f' = f ->
       begin match k' with
         | Term.Name (s', args') when s'.s_symb = k ->
           let ret_m = if drop_head then m else m_full in
@@ -134,13 +135,13 @@ class deprecated_get_f_messages ?(drop_head=true)
       end ;
       self#visit_message m ; self#visit_message k'
 
-    | Term.Fun (f', _,[Tuple [m;_r;k']]) as m_full when f' = f ->
+    | Term.App (Fun (f', _), [Tuple [m;_r;k']]) as m_full when f' = f ->
       begin match k', fun_wrap_key with
         | Term.Name (s',args'), None when s'.s_symb = k ->
           let ret_m = if drop_head then m else m_full in
           occurrences <- (args', ret_m) :: occurrences
 
-        |Term.Fun (f', _, [Term.Name (s',args')]), Some is_pk
+        | Term.App (Fun (f', _), [Term.Name (s',args')]), Some is_pk
           when is_pk f' && s'.s_symb = k ->
           let ret_m = if drop_head then m else m_full in
           occurrences <- (args', ret_m) :: occurrences
@@ -202,7 +203,7 @@ let tfold_occ (type a)
     let fv = List.rev_append evs fv in
     func ~fv ~cond t acc
 
-  | Term.Fun (fs, _, [c;t;e]) when fs = Term.f_ite ->
+  | Term.App (Fun (fs, _), [c;t;e]) when fs = Term.f_ite ->
     func ~fv ~cond c acc |>
     func ~fv ~cond:(c :: cond) t |>
     func ~fv ~cond:(Term.mk_not c :: cond) e
@@ -287,7 +288,7 @@ let get_f
     in
 
     match t with
-    | Term.Fun (fn,_,_)  ->
+    | Term.App (Term.Fun (fn,_),_)  ->
       let head_occ =
         if matching table fn symtype
         then [{ occ_cnt  = t;
@@ -308,7 +309,7 @@ let get_f
       let head_occ =
         if List.for_all
              (function
-                | (_, Term.Fun (f,_,_)) -> matching table f symtype
+                | (_, Term.App (Fun (f,_),_)) -> matching table f symtype
                 | _ -> false)
              l
         then [{ occ_cnt  = t;
@@ -408,7 +409,7 @@ let deprecated_get_f_messages_ext
     (se : SE.arbitrary) (fv : Vars.vars) (cond : Term.terms) pos
     (occs : hash_occs) ->
     match t with
-      | Term.Fun (f',_, [Tuple [m;k']]) as m_full when f' = f ->
+      | Term.App (Fun (f',_), [Tuple [m;k']]) as m_full when f' = f ->
         let occs' =
           match k' with
           | Term.Name (s', args') when s'.s_symb = k ->
@@ -421,7 +422,7 @@ let deprecated_get_f_messages_ext
         in
         occs' @ occs, `Continue
 
-      | Term.Fun (f', _, [Tuple [m;_r;k']]) as m_full when f' = f ->
+      | Term.App (Fun (f',_), [Tuple [m;_r;k']]) as m_full when f' = f ->
         let occs' =
           match k', fun_wrap_key with
           | Term.Name (s', args'), None when s'.s_symb = k ->
@@ -431,7 +432,7 @@ let deprecated_get_f_messages_ext
                occ_cond = cond;
                occ_pos  = Sp.singleton pos; }]
 
-          |Term.Fun (f', _, [Term.Name (s', args')]), Some is_pk
+          | Term.App (Term.Fun (f', _), [Term.Name (s', args')]), Some is_pk
             when is_pk f' && s'.s_symb = k ->
             let ret_m = if drop_head then m else m_full in
             [{ occ_cnt  = args', ret_m;
@@ -826,14 +827,14 @@ end = struct
     let term2 = Term.mk_macro s2.msymb (Term.mk_vars s2.args) (Term.mk_var tv) in
 
     let pat2 = Term.{ 
-        pat_term   = term2;
-        pat_tyvars = [];
-        pat_vars   = Vars.Tag.local_vars s2.indices;}
+        pat_op_term   = term2;
+        pat_op_tyvars = [];
+        pat_op_vars   = Vars.Tag.local_vars s2.indices;}
     in
     let system = SE.reachability_context sexpr in
     match Match.T.try_match table system term1 pat2 with
     | Match _ -> true
-    | FreeTyv | NoMatch _ -> false
+    | NoMatch _ -> false
 
   let mk_simple (m : Symbols.macro) ty : t =
     let msymb = Term.mk_symb m ty in

@@ -56,21 +56,21 @@ let is_enc (table:Symbols.table) (f:Symbols.fname) =
     does not unfold macros. *)
 let rec has_enc (table:Symbols.table) (t:term) : bool =
   match t with
-  | Term.Fun (f, _, _) when is_enc table f -> true
+  | Term.Fun (f, _) when is_enc table f -> true
   | _ -> Term.texists (has_enc table) t
 
 (** Checks that each term ti in ts is f(argsi) for the same f,
     if so returns f and the list [args1;…;argsn]. 
     Does the same if each ti is Tuple(argsi). *)
 let same_head_function (ts:Term.terms) :
-  ((Symbols.fname * Type.ftype) option * Term.terms list) option =
+  ((Symbols.fname * applied_ftype) option * Term.terms list) option =
   let rec aux ts f =
     match ts, f with
     | [], _ -> f
-    | (Term.Fun (fs', ft', args))::ll, Some (Some (fs, ft), largs)
+    | (Term.App (Fun (fs', ft'), args))::ll, Some (Some (fs, ft), largs)
       when fs = fs' && ft = ft' ->
       aux ll (Some (Some (fs, ft), args::largs))
-    | (Term.Fun (fs, ft, args))::ll, None ->
+    | (Term.App (Fun (fs, ft), args))::ll, None ->
       aux ll (Some (Some (fs, ft), [args]))
     | (Term.Tuple args)::ll, Some (None, largs) ->
       aux ll (Some (None, args::largs))
@@ -139,7 +139,7 @@ type indcca_param = {
                                         projection) that we get names. *)
 }
 
-
+(*------------------------------------------------------------------*)
 (** Finds the parameters of the cca application *)
 let indcca_param
     ~(loc:L.t)
@@ -179,7 +179,7 @@ let indcca_param
      
      rw_conds  = [mk_eq ~simpl:false
                    (mk_tuple [mk_var xm; mk_var xr; mk_var xk])
-                   mk_false];
+                   (mk_witness ~ty_arg:(Type.tuple [mty; rty; kty]))];
      rw_rw     = (mk_fun_tuple table f [mk_var xm; mk_var xr; mk_var xk]),
                  (Name.to_term xc);},
     table,
@@ -260,8 +260,8 @@ let indcca_param
     let l = snd (decompose_impls_last (snd (decompose_forall l))) in
     let m,r,k =
       match l with
-      | Term.(Fun (ff, _, [Tuple [m; r; k]; fff])) when
-          ff = Term.f_eq && fff = Term.mk_false ->
+      | Term.(App (Fun (ff, _), [Tuple [m; r; k]; _])) when
+          ff = Term.f_eq ->
         m,r,k
       | _ -> assert false
     in
@@ -279,7 +279,7 @@ let indcca_param
   | _ -> assert false
         
         
-
+(*------------------------------------------------------------------*)
 (** Constructs the formula expressing that in the proj
     of (the biframe + the context cc
        the plaintext m, the random r, the key k):
@@ -324,7 +324,7 @@ let phi_proj
     match pk_f, Term.project1 proj k, Term.project1 proj r with
     | None, (Name _ as kp), (Name _ as rp) -> (* sym enc: key is a name *)
       Name.of_term kp, Name.of_term rp
-    | (Some pk_f), (Term.(Fun (pk_f',_,[Name _ as kp]))), (Name _ as rp)
+    | (Some pk_f), (Term.(App (Fun (pk_f',_),[Name _ as kp]))), (Name _ as rp)
         when pk_f = pk_f' -> (* asym enc: key is a pk *)
       Name.of_term kp, Name.of_term rp        
     | _ -> soft_failure ~loc
@@ -336,11 +336,14 @@ let phi_proj
   let pp_kr ppf () = Fmt.pf ppf "%a and %a" Name.pp k_p Name.pp r_p in
   let pp_rand ppf () = Fmt.pf ppf "randomness" in
 
+  let dummy_cipher =              (* dummy ciphertext, needed by [EncRandom] *)
+    mk_witness ~ty_arg:(Symbols.ftype env.table enc_f).Type.fty_out
+  in
   (* get the bad key and randomness occs, and the ciphertexts,
      in frame + m + kargs + rargs. There, decryption with k is allowed. *) 
-  let get_bad_krc =
+  let get_bad_krc = 
     ER.get_bad_occs_and_ciphertexts env
-      k_p [r_p] mk_false enc_f dec_f ~hash_f:None ~pk_f
+      k_p [r_p] dummy_cipher enc_f dec_f ~hash_f:None ~pk_f
   in
   (* discard the formulas generated for the ciphertexts themselves,
      we don't use them for cca *)

@@ -77,7 +77,7 @@ class collect_max_ts ~(cntxt:Constr.trace_cntxt) = object (self)
 
     (* If we consider an implication, we can collect from the lhs which ts we
        can ignore in the rhs. *)
-    | Fun (f, _, [phi_1;phi_2]) when f = Term.f_impl ->
+    | App (Fun (f, _), [phi_1;phi_2]) when f = Term.f_impl ->
       let atoms,l = self#extract_ts_atoms phi_1 in
       let ignore_ts' = Sts.union (self#add_atoms atoms) ignore_ts  in
       List.fold_left
@@ -86,7 +86,7 @@ class collect_max_ts ~(cntxt:Constr.trace_cntxt) = object (self)
         (phi_2::l)
 
     (* We proceed similarly for conjunctions. *)
-    | Fun (f, _, _) when f = Term.f_and ->
+    | App (Fun (f, _), _) when f = Term.f_and ->
       let atoms,l = self#extract_ts_atoms t in
       let ignore_ts' = Sts.union (self#add_atoms atoms) ignore_ts  in
       List.fold_left
@@ -120,10 +120,10 @@ class check_att ~(cntxt:Constr.trace_cntxt) = object (self)
   inherit [bool] Iter.deprecated_fold ~cntxt as super
 
   method fold_message aux t = match t with
-    | Fun (sf, _, [Macro (ms,_,_)]) when sf = Symbols.fs_att ->
+    | App (Fun (sf, _), [Macro (ms,_,_)]) when sf = Symbols.fs_att ->
       ms = Term.frame_macro && aux
     (* we accept att(frame@t) *)
-    | Fun (sf, _, _) when sf = Symbols.fs_att -> false
+    | App (Fun (sf, _), _) when sf = Symbols.fs_att -> false
     (* we reject any other att(x) *)
     | Macro (ms,l,a) ->
       begin
@@ -154,7 +154,7 @@ let is_attacker_call_synchronized cntxt models biframe =
     in
     let maximal_elems =
       Sts.filter (function
-        | Term.Fun (fs, _, [ts]) when fs = Term.f_pred ->
+        | App (Term.Fun (fs, _), [ts]) when fs = Term.f_pred ->
           (* Directly remove pred(t) with t in the set. *)
           (* TODO: This is probably useless, check if improves perfs? *)
           not (Sts.mem ts max_ts)
@@ -183,7 +183,7 @@ let is_attacker_call_synchronized cntxt models biframe =
         [frame_at tau; frame_at_pred tau; input_at tau]
         @
         match tau with
-        | Term.Fun (fs, _, [tau']) when fs = Term.f_pred ->
+        | Term.App (Fun (fs, _), [tau']) when fs = Term.f_pred ->
           [frame_at tau'; frame_at_pred tau'; input_at tau']
         | _ -> []
       in

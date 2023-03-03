@@ -99,7 +99,7 @@ let get_bad_occs
     accs1
 
   (* occurrence of the public key (for the signature case only) *)
-  | Fun (f, _, [tk']) when pk_f = Some f -> (* public key *)
+  | App (Fun (f, _), [tk']) when pk_f = Some f -> (* public key *)
     begin
       match NO.expand_macro_check_all info tk' with
       | Name (_, tkargs') -> rec_call tkargs'
@@ -112,13 +112,13 @@ let get_bad_occs
   (* hash verification oracle: test u = h(m', k).
      Search recursively in u, m', kargs', but do not record
      m' as a hash occurrence. *)
-  | Fun (f, _, [u; Fun (g, _, [Tuple [m'; Name (ksb', kargs')]])])
+  | App (Fun (f, _), [u; App (Fun (g, _), [Tuple [m'; Name (ksb', kargs')]])])
     when f = f_eq && g = int_f && pk_f = None && ksb'.s_symb = k.symb.s_symb ->
     rec_call ~st:t (u :: m' :: kargs') (* change st *)
 
 
   (* hash verification oracle (converse case h(m', k) = u). *)
-  | Fun (f, _, [Fun (g, _, [Tuple [m'; Name (ksb', kargs')]]); u])
+  | App (Fun (f, _), [App (Fun (g, _), [Tuple [m'; Name (ksb', kargs')]]); u])
     when f = f_eq && g = int_f && pk_f = None && ksb'.s_symb = k.symb.s_symb ->
     rec_call ~st:t (u :: m' :: kargs') (* change st *)
 
@@ -127,7 +127,7 @@ let get_bad_occs
   (* q: actually why don't we always do this,
                even if it's the wrong key?
      a: that would be sound but generate too many occs *)
-  | Fun (f, _, [Tuple [m'; Name (ksb', kargs') as k']])
+  | App (Fun (f, _), [Tuple [m'; Name (ksb', kargs') as k']])
     when f = int_f && k.symb.s_symb = ksb'.s_symb ->
     let occs, accs = rec_call (m' :: kargs') in
     occs,
@@ -159,15 +159,16 @@ let integrity_formula
 (*------------------------------------------------------------------*)
 (** {2 EUF tactic} *)
 
-(* parameters for the integrity occurrence: key, signed or hashed message,
-   signature checked or compared w/ the hash, sign/hash function,
-   pk function if any *) 
-type euf_param = {ep_key:Name.t;
-                  ep_intmsg:term;
-                  ep_term:term;
-                  ep_int_f:Symbols.fname;
-                  ep_pk_f:Symbols.fname option;}
-
+(** parameters for the integrity occurrence: key, signed or hashed message,
+    signature checked or compared w/ the hash, sign/hash function,
+    pk function if any *) 
+type euf_param = {
+  ep_key    : Name.t;
+  ep_intmsg : term;
+  ep_term   : term;
+  ep_int_f  : Symbols.fname;
+  ep_pk_f   : Symbols.fname option;
+}
 
 (** Finds the parameters of the integrity functions used in the hypothesis,
     if any *)
@@ -181,7 +182,7 @@ let euf_param
   let fail () =
     soft_failure ~loc:hyp_loc
       (Tactics.Failure "can only be applied on an hypothesis of the form \
-checksign(m, s, pk(k)), hash(m, k) = t, or the symmetric equality")
+                        checksign(m, s, pk(k)), hash(m, k) = t, or the symmetric equality")
   in
   let info = NO.EI_direct, contx in
   let table = contx.table in
@@ -193,7 +194,7 @@ checksign(m, s, pk(k)), hash(m, k) = t, or the symmetric equality")
     let v = NO.expand_macro_check_all info v in
     let try_t (t:term) (t':term) : euf_param option =
       match t with
-      | Fun (f, _, [Tuple [m; tk]]) ->
+      | App (Fun (f, _), [Tuple [m; tk]]) ->
         begin
           match NO.expand_macro_check_all info tk with
           | Name _ as k when Symbols.is_ftype f Symbols.Hash table ->
@@ -213,10 +214,10 @@ checksign(m, s, pk(k)), hash(m, k) = t, or the symmetric equality")
     end
   | None -> (* not an equality: try to see if it's checksign(m,s,pk) *)
     match NO.expand_macro_check_all info hyp with
-    | Fun (f, _, [Tuple [m; s; tpk]]) ->
+    | App (Fun (f, _), [Tuple [m; s; tpk]]) ->
       begin
         match NO.expand_macro_check_all info tpk with
-        | Fun (g, _, [tk]) ->
+        | App (Fun (g, _), [tk]) ->
           begin
             match Theory.check_signature table f g, 
                   NO.expand_macro_check_all info tk with
@@ -244,7 +245,6 @@ let euf
   let {ep_key=k; ep_intmsg=m; ep_term=t; ep_int_f=int_f; ep_pk_f=pk_f} =
     euf_param ~hyp_loc:(L.loc h) contx hyp s
   in
-      
   
   let pp_k ppf () = Fmt.pf ppf "%a" Name.pp k in
 

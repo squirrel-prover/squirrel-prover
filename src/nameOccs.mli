@@ -229,6 +229,7 @@ type ('a, 'b) f_fold_occs =
   term ->
   n_occs * ('a, 'b) simple_occs
 
+
 val find_all_occurrences :
   mode:Iter.allowed_constants ->   (* allowed sub-terms without further checks *)
   ?pp_ns:unit Fmt.t option ->

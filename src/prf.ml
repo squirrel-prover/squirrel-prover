@@ -16,8 +16,11 @@ type prf_param = {
 
 let prf_param hash : prf_param =
   match hash with
-  | Term.Fun (h_fn, h_fty, [Tuple [h_cnt; Name (key, key_args)]]) ->
-    { h_fn; h_cnt; h_fty; h_key = { symb = key; args = key_args; }}
+  | Term.App (Fun (h_fn, applied_fty), [Tuple [h_cnt; Name (key, key_args)]]) ->
+    (* crypto function cannot use polymorphism *)
+    assert (applied_fty.ty_args = []);
+
+    { h_fn; h_cnt; h_fty = applied_fty.fty; h_key = { symb = key; args = key_args; }}
 
   | _ -> Tactics.soft_failure Tactics.Bad_SSC
 
@@ -65,20 +68,20 @@ let prf_occ_incl table sexpr (o1 : prf_occ) (o2 : prf_occ) : bool =
       ((Term.mk_atom `Eq Term.init action) ::
        (Term.mk_eqs ~simpl:false ~simpl_tuples:true is is) ::
        cond ::
-       [Term.mk_atom `Eq t (Term.mk_witness (Term.ty t))])
+       [Term.mk_eq t (Term.mk_witness ~ty_arg:(Term.ty t))])
   in
   let pat2 = Term.{
-      pat_tyvars = [];
-      pat_vars   = Vars.Tag.local_vars o2.occ_vars;
+      pat_op_tyvars = [];
+      pat_op_vars   = Vars.Tag.local_vars o2.occ_vars;
       (* local information, since we allow to match diff operators *)
       
-      pat_term   = mk_dum a2 is2 cond2 t2;
+      pat_op_term   = mk_dum a2 is2 cond2 t2;
     }
   in
 
   let system = SE.reachability_context sexpr in
   match Match.T.try_match table system (mk_dum a1 is1 cond1 t1) pat2 with
-  | Match.FreeTyv | Match.NoMatch _ -> false
+  | Match.NoMatch _ -> false
   | Match.Match _ -> true
 
 (** Compute conjunct of PRF condition for an indirect case,
@@ -264,7 +267,7 @@ let prf_condition_side
 
     let e_without_hash =
       Term.subst
-        [Term.ESubst (Term.mk_var v, Term.mk_witness hash_ty)]
+        [Term.ESubst (Term.mk_var v, Term.mk_witness ~ty_arg:hash_ty)]
         e_without_hash
     in
 

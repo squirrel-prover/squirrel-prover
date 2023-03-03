@@ -20,16 +20,16 @@ class check_key
   inherit Iter.deprecated_iter_approx_macros ~exact:false ~cntxt as super
 
   method visit_message t = match t with
-    | Term.Fun (fn, _, [Tuple [m;Term.Name _]]) when fn = head_fn ->
+    | Term.App (Fun (fn, _), [Tuple [m;Term.Name _]]) when fn = head_fn ->
       self#visit_message m
 
-    | Term.Fun (fn, _, [Tuple [m1;m2;Term.Name _]]) when fn = head_fn ->
+    | Term.App (Fun (fn, _), [Tuple [m1;m2;Term.Name _]]) when fn = head_fn ->
       self#visit_message m1; self#visit_message m2
 
-    | Term.Fun (fn, _, [Tuple [_;k]])
+    | Term.App (Fun (fn, _), [Tuple [_;k]])
       when allow_functions fn && Term.diff_names k -> ()
                                                       
-    | Term.Fun (fn, _, [k])
+    | Term.App (Fun (fn, _), [k])
       when allow_functions fn && Term.diff_names k -> ()
 
     | Term.Name (n, _) when n.s_symb = key_n -> raise Bad_ssc_
@@ -145,7 +145,7 @@ let pp_euf_rule ppf rule =
               *key: @[<hov>%a(%a)@]@;\
               *case schemata:@;<1;2>@[<v>%a@]@;\
               *direct cases:@;<1;2>@[<v>%a@]@]"
-    Term.pp_fname rule.hash
+    Symbols.pp rule.hash
     Symbols.pp (fst rule.key) 
     (Fmt.list ~sep:Fmt.comma Term.pp) (snd rule.key)
     (Fmt.list pp_euf_schema) rule.case_schemata

@@ -89,7 +89,7 @@ let case_cond orig vars c t e s : sequent list =
 let conditional_case (m : Term.term) s : sequent list =
   match m with
   | Term.Find (vars,c,t,e) -> case_cond m vars c t e s
-  | Term.Fun (f,_,[c;t;e]) when f = Term.f_ite ->
+  | Term.App (Term.Fun (f,_),[c;t;e]) when f = Term.f_ite ->
     case_cond m [] c t e s
 
   | Term.Macro (ms,args,ts) ->
@@ -100,7 +100,8 @@ let conditional_case (m : Term.term) s : sequent list =
     begin
       match Macros.get_definition_exn (TS.mk_trace_cntxt s) ms ~args ~ts with
       | Term.Find (vars,c,t,e) -> case_cond m vars c t e s
-      | Term.Fun (f,_,[c;t;e]) when f = Term.f_ite -> case_cond m [] c t e s
+      | Term.App (Term.Fun (f,_),[c;t;e]) when f = Term.f_ite ->
+        case_cond m [] c t e s
       | _ -> Tactics.(soft_failure (Failure "message is not a conditional"))
     end
 
@@ -148,7 +149,7 @@ let case_tac args = wrap_fail (do_case_tac args)
 
 let rec simpl_left s =
   let func _ f = match f with
-    | Fun (fs, _,_) when fs = Term.f_false || fs = Term.f_and -> true
+    | Fun (fs, _) when fs = Term.f_false || fs = Term.f_and -> true
     | Term.Quant (Exists, _, _) -> true
     | _ -> false
   in
@@ -516,16 +517,16 @@ let deprecated_fresh_occ_incl
        [cond])
   in
   let pat2 = Term.{
-      pat_tyvars = [];
-      pat_vars   = Vars.Tag.local_vars o2.occ_vars;
-      pat_term   = mk_dum a2 is2 cond2;
+      pat_op_tyvars = [];
+      pat_op_vars   = Vars.Tag.local_vars o2.occ_vars;
+      pat_op_term   = mk_dum a2 is2 cond2;
     }
   in
 
   let context = SE.reachability_context system in
   match Match.T.try_match table context (mk_dum a1 is1 cond1) pat2 with
-  | Match.FreeTyv | Match.NoMatch _ -> false
-  | Match.Match _ -> true
+  | Match.NoMatch _ -> false
+  | Match.Match   _ -> true
 
 (** Add a new fresh rule case, if it is not redundant. *)
 let deprecated_add_fresh_case
@@ -798,7 +799,7 @@ let fa s =
     | None -> unsupported ()
   in
   match u,v with
-  | Term.Fun (f,_,[c;t;e]), Term.Fun (f',_,[c';t';e'])
+  | Term.App (Term.Fun (f,_),[c;t;e]), Term.App (Term.Fun (f',_),[c';t';e'])
     when f = Term.f_ite && f' = Term.f_ite ->
     let subgoals =
       let open TraceSequent in
@@ -1122,7 +1123,7 @@ let () =
 (*------------------------------------------------------------------*)
 let valid_hash (cntxt : Constr.trace_cntxt) (t : Term.term) =
   match t with
-  | Fun (hash, _, [Tuple [_m; Name (_key, _)]]) ->
+  | Term.App (Fun (hash, _), [Tuple [_m; Name (_key, _)]]) ->
     Symbols.is_ftype hash Symbols.Hash cntxt.table
 
   | _ -> false
@@ -1146,8 +1147,8 @@ let top_level_hashes s =
       List.fold_left
         (fun acc h2 ->
            match h1, h2 with
-           | Fun (hash1, _, [Tuple [_; Name (key1,args1)]]),
-             Fun (hash2, _, [Tuple [_; Name (key2,args2)]])
+           | Term.App (Fun (hash1, _), [Tuple [_; Name (key1,args1)]]),
+             Term.App (Fun (hash2, _), [Tuple [_; Name (key2,args2)]])
              when hash1 = hash2 && (key1,args1) = (key2,args2) -> (h1, h2) :: acc
            | _ -> acc)
         (make_eq acc q) q
@@ -1186,8 +1187,8 @@ let collision_resistance TacticsArgs.(Opt (String, i)) (s : TS.t) =
     List.fold_left
       (fun acc (h1,h2) ->
          match h1, h2 with
-         | Fun (hash1, _, [Tuple [m1; Name (key1,args1)]]),
-           Fun (hash2, _, [Tuple [m2; Name (key2,args2)]])
+         | Term.App (Fun (hash1, _), [Tuple [m1; Name (key1,args1)]]),
+           Term.App (Fun (hash2, _), [Tuple [m2; Name (key2,args2)]])
            when hash1 = hash2 && (key1,args1) = (key2,args2) ->
            Term.mk_atom `Eq m1 m2 :: acc
          | _ -> acc)
@@ -1254,9 +1255,7 @@ let rewrite_equiv_transform
     | t when HighTerm.is_ptime_deducible ~const:`Exact ~si:true (TS.env s) t -> t
     (* system-independence needed, so that we leave [t] unchanged when the system do *)
 
-    | Fun (fsymb,ftype,args) ->
-      let args = List.map aux args in
-      Term.mk_fun0 fsymb ftype args
+    | Term.App (f,args) -> Term.mk_app (aux f) (List.map aux args)
 
     | Diff (Explicit l) ->
       Term.mk_diff (List.map (fun (p,t) -> p, aux t) l)

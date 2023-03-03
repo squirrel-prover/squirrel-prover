@@ -158,24 +158,11 @@ Proof.
   checkfail apply IH exn ApplyMatchFailure.
   splitseq 2: (fun (i0:index,t':timestamp) => i0=i).
   rewrite /= !if_then_then.
+
   (* More rewriting inside sequences. *)
-
-  have -> :
-    (seq(i0:index,t':timestamp=> 
-      if i0=i && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@t')) =
-    (seq(i0:index,t':timestamp=> 
-      if i0=i && (t'=T(i,j) && t'<=T(i,j)) then H(sT(i0)@pred(t'),k)));
-  1: by fa; fa.
-
-  have -> :
-    (seq(i0:index,t':timestamp=> 
-      if i0 <> i && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@t')) =
-    (seq(i0:index,t':timestamp=>
-      if i0 <> i && (t'=T(i,j) && t'<=T(i,j)) then sT(i0)@pred(t'))).
-    + fa; fa => // [H1 [H2 H3]]. 
-      by rewrite H2 /sT if_false. 
+  rewrite /sT.
   (* At this point our automatic bi-deduction checker cannot verify that
      items 2 and 3 are bi-deducible. Its implementation could be improved
      to complete this tedious proof. *)
-    + try apply ~inductive IH. admit.
+  try apply ~inductive IH. admit.
 Qed.

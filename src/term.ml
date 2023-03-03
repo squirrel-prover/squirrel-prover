@@ -39,8 +39,26 @@ let pp_nsymbs ppf (l : nsymb list) =
     (Fmt.list ~sep:(Fmt.any ", ") pp_nsymb) l
 
 (*------------------------------------------------------------------*)
-let pp_fname ppf (fn : Symbols.fname) = 
-  Printer.kws `GoalFunction ppf (Symbols.to_string fn)
+(** See `.mli` *)
+type applied_ftype = { 
+  fty     : Type.ftype; 
+  ty_args : Type.ty list; 
+}
+
+let pp_applied_ftype pf { fty; ty_args; } =
+  Fmt.pf pf "@[<hov 2>( (%a) %a)@]"
+    Type.pp_ftype fty
+    (Fmt.list ~sep:Fmt.sp Type.pp) ty_args
+
+(*------------------------------------------------------------------*)
+let pp_funname ~dbg ppf ((fn,fty_app) : Symbols.fname * applied_ftype) = 
+  if not dbg || fty_app.ty_args = [] then
+    Fmt.pf ppf "%a"
+      (Printer.kws `GoalFunction) (Symbols.to_string fn)
+  else 
+    Fmt.pf ppf "@[<hov 2>%a<%a>)@]"
+      (Printer.kws `GoalFunction) (Symbols.to_string fn)
+      (Fmt.list ~sep:Fmt.sp Type.pp) fty_app.ty_args
 
 (*------------------------------------------------------------------*)
 let pp_msymb_s ppf (ms : Symbols.macro) =
@@ -81,10 +99,11 @@ let pp_quant fmt = function
   | Seq    -> Fmt.pf fmt "seq"
   | Lambda -> Fmt.pf fmt "fun"                
 
+
 (*------------------------------------------------------------------*)
 type term =
   | App    of term * term list
-  | Fun    of Symbols.fname * Type.ftype * term list
+  | Fun    of Symbols.fname * applied_ftype
   | Name   of nsymb * term list              (* [Name(s,l)] : [l] of length 0 or 1 *)
   | Macro  of msymb * term list * term
 
@@ -121,9 +140,8 @@ let rec hash : term -> int = function
 
   | Name (n,l) -> hcombine 0 (hash_l l (hash_isymb n))
 
-  | Fun (f,_,terms) ->
-    let h = Symbols.hash f in
-    hcombine 1 (hash_l terms h)
+  | Fun (f,fty) -> 
+    hcombine 1 (hcombine (Symbols.hash f) (Hashtbl.hash fty))
 
   | Macro (m, l, ts)  ->
     let h = hcombine_list hash (hash_isymb m) l in
@@ -155,6 +173,73 @@ and hash_l (l : term list) (h : int) : int =
     hcombine_list hash h l
 
 let equal (t : term) (t' : term) : bool = t = t'
+
+(*------------------------------------------------------------------*)
+(** {2 Typing} *)
+
+(*------------------------------------------------------------------*)
+let ty ?ty_env (t : term) : Type.ty =
+  let must_close, ty_env = match ty_env with
+    | None        -> true, Type.Infer.mk_env ()
+    | Some ty_env -> false, ty_env
+  in
+
+  let rec ty (t : term) : Type.ty =
+    match t with
+    | Fun (_, { fty; ty_args; }) ->
+      (* substitute pending type variables by the type arguments *)
+      let tsubst = 
+        List.fold_left2 Type.tsubst_add_tvar Type.tsubst_empty fty.fty_vars ty_args 
+      in
+      Type.tsubst tsubst (Type.fun_l fty.fty_args fty.fty_out)
+
+    | App (t1, l) ->
+      let tys, t_out = Type.destr_funs ~ty_env (ty t1) (List.length l) in      
+      check_tys l tys;
+      t_out
+
+    | Name (ns, _) -> ns.s_typ
+    | Macro (s,_,_)  -> s.s_typ
+
+    | Tuple ts -> 
+      Type.Tuple (List.map ty ts)
+
+    | Proj (i,t) -> 
+      begin
+        match ty t with
+        | Type.Tuple tys -> List.nth tys (i - 1)
+        | _ -> assert false
+      end
+
+    | Var v                -> Vars.ty v
+    | Action _             -> Type.Timestamp
+    | Diff (Explicit l)    -> ty (snd (List.hd l))
+
+    | Find (_, _, c, _)    -> ty c
+
+    | Quant (q, vs, t) ->
+      match q with
+      | ForAll | Exists -> Type.Boolean
+      | Seq             -> Type.Message
+      | Lambda          -> 
+        let tys = List.map Vars.ty vs in
+        let ty_out = ty t in
+        Type.fun_l tys ty_out
+
+
+  and check_tys (terms : term list) (tys : Type.ty list) =
+    List.iter2 (fun term arg_ty ->
+        match Type.Infer.unify_eq ty_env (ty term) arg_ty with
+        | `Ok -> ()
+        | `Fail -> assert false
+      ) terms tys
+  in
+
+  let tty = ty t in
+
+  if must_close
+  then Type.tsubst (Type.Infer.close ty_env) tty (* [ty_env] should be closed *)
+  else tty
                                           
 (*------------------------------------------------------------------*)
 (** {2 Builtins function symbols} *)
@@ -217,7 +302,7 @@ let f_of_bool = Symbols.fs_of_bool
 
 let empty =
   let fty = Symbols.ftype_builtin Symbols.fs_empty in
-  Fun (Symbols.fs_empty, fty, [])
+  Fun (Symbols.fs_empty, { fty; ty_args = []; })
 
 (** Length *)
 
@@ -244,14 +329,6 @@ let mk_tuple l = match l with
 let mk_app t l =
   if l = [] then t else
     match t with
-    | Fun (f, fty, l') ->
-      let l1, l2 = List.takedrop (List.length fty.fty_args) (l' @ l) in
-      assert (l1 @ l2 = l' @ l);
-      if l2 = [] then
-        Fun (f, fty, l1)
-      else
-        App(Fun (f, fty, l1), l2)
-      
     | App (t, l') -> App (t, l' @ l)
     | _ -> App (t, l)
 
@@ -282,15 +359,52 @@ let mk_diff l =
   | _      -> Diff (Explicit l)
 
 (*------------------------------------------------------------------*)
-let mk_fun0 fs fty terms = Fun (fs, fty, terms)
+(** {2 Smart constructors for function applications.} *)
 
-let mk_fun table fname terms =
+let mk_fun0 fname (app_fty : applied_ftype) terms = 
+  mk_app (Fun (fname, app_fty)) terms
+
+let mk_fun table fname ?(ty_args = []) terms =
   let fty = Symbols.ftype table fname in
-  Fun (fname, fty, terms)
+  assert (List.length ty_args = List.length fty.fty_vars);
+  mk_app (Fun (fname, { fty; ty_args; })) terms
 
-let mk_fun_tuple table fname terms = mk_fun table fname [mk_tuple terms]
-    
-let mk_fbuiltin = mk_fun Symbols.builtins_table
+let mk_fun_tuple table fname ?ty_args terms =
+  mk_fun table fname ?ty_args [mk_tuple terms]
+
+(*------------------------------------------------------------------*)
+(** See `.mli` *)
+let mk_fun_infer_tyargs table (fname : Symbols.fname) (terms : terms) =
+  let ty_env = Type.Infer.mk_env () in
+
+  let fty = Symbols.ftype table fname in
+  let opened_fty = Type.open_ftype ty_env fty in 
+
+  (* decompose [fty]'s type  *)
+  let terms_tys, _ =
+    let arrow_ty = Type.fun_l opened_fty.fty_args opened_fty.fty_out in
+    Type.destr_funs ~ty_env arrow_ty (List.length terms)
+  in
+  (* unify types [ty_args] with [terms] *)
+  List.iter2 (fun term arg_ty ->
+      match Type.Infer.unify_eq ty_env (ty term) arg_ty with
+      | `Ok -> ()
+      | `Fail -> assert false
+    ) terms terms_tys;
+
+  (* [ty_env] should be closed thanks to types in [terms]. *)
+  assert (Type.Infer.is_closed ty_env);
+
+  let ty_args = 
+    List.map (fun uv -> 
+        Type.Infer.norm ty_env (Type.TUnivar uv) 
+      ) opened_fty.fty_vars
+  in
+  mk_fun0 fname { fty; ty_args; } terms
+
+(*------------------------------------------------------------------*)
+let mk_fbuiltin (fname : Symbols.fname) (args : terms) : term = 
+  mk_fun_infer_tyargs Symbols.builtins_table fname args
 
 (*------------------------------------------------------------------*)
 (** {3 For first-order formulas} *)
@@ -302,7 +416,7 @@ module SmartConstructors = struct
   let mk_false = mk_fbuiltin Symbols.fs_false [] 
   (** Some smart constructors are redefined later, after substitutions. *)
 
-  let mk_not_ns term  = mk_fbuiltin Symbols.fs_not [term]
+  let mk_not_ns term = mk_fbuiltin Symbols.fs_not [term]
 
   let mk_and_ns  t0 t1 = mk_fbuiltin Symbols.fs_and  [t0;t1]
   let mk_or_ns   t0 t1 = mk_fbuiltin Symbols.fs_or   [t0;t1]
@@ -317,7 +431,7 @@ module SmartConstructors = struct
   let mk_gt_ns  t0 t1 = mk_fbuiltin Symbols.fs_gt  [t0;t1]
 
   let mk_not ?(simpl=true) t1 = match t1 with
-    | Fun (fs,_,[t]) when fs = f_not && simpl -> t
+    | App (Fun (fs,_), [t]) when fs = f_not && simpl -> t
     | t -> mk_not_ns t
 
   let mk_eq ?(simpl=false) t1 t2 : term = 
@@ -403,9 +517,9 @@ let mk_ite ?(simpl=true) c t e =
 
 let mk_of_bool t = mk_fbuiltin Symbols.fs_of_bool [t]
 
-let mk_witness ty =
-  let fty = Type.mk_ftype [] [] ty in
-  Fun (f_witness, fty, [])
+let mk_witness ~ty_arg =
+  (* type argument must be manually provided here. *)
+  mk_fun Symbols.builtins_table f_witness ~ty_args:[ty_arg] []
 
 let mk_find ?(simpl=false) is c t e =
   if not simpl then Find (is, c, t, e)
@@ -416,7 +530,7 @@ let mk_find ?(simpl=false) is c t e =
 (** {3 For formulas} *)
 
 let mk_timestamp_leq t1 t2 = match t1,t2 with
-  | _, Fun (f,_, [t2']) when f = f_pred -> mk_lt ~simpl:true t1 t2'
+  | _, App (Fun (f,_), [t2']) when f = f_pred -> mk_lt ~simpl:true t1 t2'
   | _ -> mk_leq t1 t2
 
 (*------------------------------------------------------------------*)
@@ -448,9 +562,10 @@ and mk_neq0 ~simpl ~simpl_tuples (t1 : term) (t2 : term) : term =
 (*------------------------------------------------------------------*)
 (** {2 Destructors} *)
 
-let destr_fun ?fs = function
-  | Fun (_fs', _, l) when fs = None     -> Some l
-  | Fun ( fs', _, l) when fs = Some fs' -> Some l
+let destr_app ?fs = function
+  | App (_, l) when fs = None     -> Some l
+  | App (Fun (fs', _), l) when fs = Some fs' -> Some l
+  | Fun (fs', _) when fs = Some fs' -> Some []
   | _ -> None
 
 let destr_tuple = function
@@ -541,29 +656,29 @@ module SmartDestructors = struct
   let decompose_exists_tagged = decompose_quant_tagged Exists
 
   (*------------------------------------------------------------------*)
-  let destr_false f = oas_seq0 (destr_fun ~fs:f_false f)
-  let destr_true  f = oas_seq0 (destr_fun ~fs:f_true  f)
+  let destr_false f = oas_seq0 (destr_app ~fs:f_false f)
+  let destr_true  f = oas_seq0 (destr_app ~fs:f_true  f)
 
-  let destr_zero f = oas_seq0 (destr_fun ~fs:f_zero f)
+  let destr_zero f = oas_seq0 (destr_app ~fs:f_zero f)
 
-  let destr_not  f = oas_seq1 (destr_fun ~fs:f_not f)
+  let destr_not  f = oas_seq1 (destr_app ~fs:f_not f)
 
-  let destr_or f = oas_seq2 (destr_fun ~fs:f_or   f)
+  let destr_or f = oas_seq2 (destr_app ~fs:f_or   f)
       
-  let destr_and  f = oas_seq2 (destr_fun ~fs:f_and  f)
-  let destr_iff  f = oas_seq2 (destr_fun ~fs:f_iff f)
-  let destr_pair f = oas_seq2 (destr_fun ~fs:f_pair f)
+  let destr_and  f = oas_seq2 (destr_app ~fs:f_and  f)
+  let destr_iff  f = oas_seq2 (destr_app ~fs:f_iff f)
+  let destr_pair f = oas_seq2 (destr_app ~fs:f_pair f)
 
   let destr_impl f = 
-    match oas_seq2 (destr_fun ~fs:f_impl f) with
+    match oas_seq2 (destr_app ~fs:f_impl f) with
     | Some _ as res -> res
     | None -> omap (fun f -> (f, mk_false)) (destr_not f)
 
   (*------------------------------------------------------------------*)
-  let destr_neq f = oas_seq2 (destr_fun ~fs:f_neq f)
-  let destr_eq  f = oas_seq2 (destr_fun ~fs:f_eq  f)
-  let destr_leq f = oas_seq2 (destr_fun ~fs:f_leq f)
-  let destr_lt  f = oas_seq2 (destr_fun ~fs:f_leq f)
+  let destr_neq f = oas_seq2 (destr_app ~fs:f_neq f)
+  let destr_eq  f = oas_seq2 (destr_app ~fs:f_eq  f)
+  let destr_leq f = oas_seq2 (destr_app ~fs:f_leq f)
+  let destr_lt  f = oas_seq2 (destr_app ~fs:f_leq f)
 
   (*------------------------------------------------------------------*)
   (** for [fs] of arity 2, left associative *)
@@ -571,7 +686,7 @@ module SmartDestructors = struct
     let rec destr l f =
       if l < 0 then assert false;
       if l = 1 then Some [f]
-      else match destr_fun ~fs f with
+      else match destr_app ~fs f with
         | None -> None
         | Some [f;g] -> omap (fun l -> l @ [g]) (destr (l-1) f)
         | _ -> assert false
@@ -583,7 +698,7 @@ module SmartDestructors = struct
     let rec destr l f =
       assert (l > 0);
       if l = 1 then Some [f]
-      else match destr_fun ~fs f with
+      else match destr_app ~fs f with
         | None -> None
         | Some [f;g] -> omap (fun l -> f :: l) (destr (l-1) g)
         | _ -> assert false
@@ -597,7 +712,7 @@ module SmartDestructors = struct
   (*------------------------------------------------------------------*)
   (** for any associative [fs] *)
   let mk_decompose fs =
-    let rec decompose f = match destr_fun ~fs f with
+    let rec decompose f = match destr_app ~fs f with
       | None -> [f]
       | Some l -> List.concat_map decompose l
     in
@@ -607,7 +722,7 @@ module SmartDestructors = struct
   let decompose_ands  = mk_decompose f_and
 
   let decompose_impls f =
-    let rec decompose f = match destr_fun ~fs:f_impl f with
+    let rec decompose f = match destr_app ~fs:f_impl f with
       | None -> [f]
       | Some [f;g] -> f :: decompose g
       | _ -> assert false
@@ -692,7 +807,7 @@ let subst_vars (subst : subst) (vs : Vars.vars) : Vars.vars =
 let rec fv (t : term) : Sv.t = 
   match t with
   | Var tv -> Sv.singleton tv
-  | Fun (_, _,lt) -> fvs lt
+  | Fun (_, _) -> Sv.empty
   | App (t, l) -> fvs (t :: l)
 
   | Macro (_, l, ts) ->
@@ -771,7 +886,7 @@ let tmap (func : term -> term) (t : term) : term =
   | Action (a,is) -> Action (a, List.map func is)
   | Name (n,is)   -> Name (n, List.map func is)
 
-  | Fun (f,fty,terms) -> Fun (f, fty, List.map func terms)
+  | Fun (f,fty) -> Fun (f, fty)
   | Macro (m, l, ts)  -> Macro (m, List.map func l, func ts)
   | App (t, l)  -> mk_app (func t) (List.map func l)
 
@@ -823,9 +938,9 @@ let free_univars (t : term) : Sid.t =
   let rec doit acc t =
     match t with
     | Var tv -> Sid.union (Vars.free_univars tv) acc
-    | Fun (_, fty, lt) -> 
+    | Fun (_, { fty; ty_args; }) -> 
       let acc = Sid.union (Type.ftype_free_univars fty) acc in
-      doit_list acc lt
+      Sid.union (Type.free_univars_list ty_args) acc 
 
     | App (t, l) -> doit_list acc (t :: l)
 
@@ -898,8 +1013,7 @@ let rec subst (s : subst) (t : term) : term =
   else
     let new_term =
       match t with
-      | Fun (fs, fty, lt) ->
-        Fun (fs, fty, List.map (subst s) lt)
+      | Fun (fs, fty) -> Fun (fs, fty)
 
       | App (t, l) -> mk_app (subst s t) (List.map (subst s) l)
 
@@ -984,8 +1098,7 @@ let subst_macros_ts table l ts t =
     | Diff (Explicit l) ->
       Diff (Explicit (List.map (fun (lbl,tm) -> lbl, subst_term tm) l))
 
-    | Fun (f,fty,terms) ->
-      Fun (f, fty, List.map subst_term terms)
+    | Fun (f,fty) -> Fun (f, fty)
 
     | Find (vs, b, t, e) ->
       Find (vs, subst_term b, subst_term t, subst_term e)
@@ -1019,7 +1132,7 @@ let _pp_indices ~dbg ppf l =
   if l <> [] then Fmt.pf ppf "(%a)" (Vars._pp_list ~dbg) l
 
 let rec is_and_happens = function
-  | Fun (f, _, [_]) when f = f_happens -> true
+  | App (Fun (f, _), [_]) when f = f_happens -> true
   | _ as f ->  match destr_and f with
     | Some (l,r) -> is_and_happens l && is_and_happens r
     | _ -> false
@@ -1111,14 +1224,14 @@ and _pp
   match t with
   | Var m -> Fmt.pf ppf "%a" (Vars._pp ~dbg:info.dbg) m
 
-  | Fun (s,_,[a]) when s = f_happens -> pp_happens info ppf [a]
+  | App (Fun (s,_),[a]) when s = f_happens -> pp_happens info ppf [a]
 
   (* if-then-else,  *)
-  | Fun (s,_,[b;c;d]) when s = f_ite ->
+  | App (Fun (s,_),[b;c;d]) when s = f_ite ->
     Fmt.pf ppf "%a" (pp_ite info (outer, side)) (b,c,d)
 
   (* pair *)
-  | Fun (s,_,terms) when s = f_pair ->
+  | App (Fun (s,_),terms) when s = f_pair ->
     Fmt.pf ppf "%a"
       (Utils.pp_ne_list
          "<@[<hov>%a@]>"
@@ -1127,35 +1240,24 @@ and _pp
       terms
 
   (* happens *)
-  | Fun _ as f when is_and_happens f ->
+  | _ as f when is_and_happens f ->
     pp_and_happens info ppf f
 
   (* infix *)
-  | Fun (s,_,[bl;br]) when Symbols.is_infix s ->
+  | App (Fun (s,fty_app),[bl;br]) when Symbols.is_infix s ->
     let assoc = Symbols.infix_assoc s in
     let prec = get_infix_prec s in
     let pp ppf () =
-      Fmt.pf ppf "@[<0>%a %s@ %a@]"
+      Fmt.pf ppf "@[<0>%a %a@ %a@]"
         (pp ((prec, `Infix assoc), `Left)) bl
-        (Symbols.to_string s)
+        (pp_funname ~dbg:info.dbg) (s,fty_app)
         (pp ((prec, `Infix assoc), `Right)) br
     in
     maybe_paren ~outer ~side ~inner:(prec, `Infix assoc) pp ppf ()
 
-  (* constant *)
-  | Fun (f,_,[]) ->
-    Fmt.pf ppf "%a" pp_fname f
-
   (* function symbol, general case *)
-  | Fun (f,_,l) ->
-    let pp ppf () =
-      Fmt.pf ppf "@[<hov 2>%a %a@]"
-        pp_fname f
-        (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt "@ ")
-           (pp (app_fixity, `Right)))
-        l
-    in
-    maybe_paren ~outer ~side ~inner:app_fixity pp ppf ()
+  | Fun (f, fty_app) ->
+    Fmt.pf ppf "@[<hov 2>%a@]" (pp_funname ~dbg:info.dbg) (f,fty_app)
 
   | App (t, l) ->
     let pp ppf () =
@@ -1221,7 +1323,7 @@ and _pp
     in
     maybe_paren ~outer ~side ~inner:proj_fixity pp ppf ()
 
-  | Find (vs, c, d, Fun (f,_,[])) when f = f_zero ->
+  | Find (vs, c, d, Fun (f,_)) when f = f_zero ->
     let _, vs, s = (* rename quantified vars. to avoid name clashes *)
       let fv_cd = List.fold_left ((^~) Sv.remove) (Sv.union (fv c) (fv d)) vs in
       add_vars_simpl_env (Vars.of_set fv_cd) vs
@@ -1298,7 +1400,7 @@ and pp_ite
   =
   match c,d with
   (* no else *)
-  | c, Fun (f,_,[]) when f = f_zero ->
+  | c, Fun (f,_) when f = f_zero ->
     let pp ppf () =
       Fmt.pf ppf "@[<hov 2>if %a@ then@ %a@]"
         (pp info (ite_inner_fixity, `NonAssoc)) b
@@ -1321,12 +1423,12 @@ and pp_ite
 and pp_chained_ite info ppf (t : term) = 
   match t with
   (* no else *)
-  | Fun (s,_,[a;b;Fun (f,_,[])]) when s = f_ite && f = f_zero ->
+  | App (Fun (s,_),[a;b;Fun (f,_)]) when s = f_ite && f = f_zero ->
     Fmt.pf ppf "@[<hov 2>else if %a@ then@ %a@]"
       (pp info (ite_inner_fixity, `NonAssoc)) a
       (pp info (ite_right_fixity, `Right)) b
 
-  | Fun (s,_,[a;b;c]) when s = f_ite ->
+  | App (Fun (s,_),[a;b;c]) when s = f_ite ->
     Fmt.pf ppf "@[<hov 2>else if %a@ then@ %a@]@ %a"
       (pp info (ite_inner_fixity, `NonAssoc)) a
       (pp info (ite_inner_fixity, `NonAssoc)) b
@@ -1363,7 +1465,7 @@ and pp_happens info ppf (ts : term list) =
 
 and pp_and_happens info ppf f =
   let rec collect acc = function
-    | Fun (s, _, [ts]) when s = f_happens -> ts :: acc
+    | App (Fun (s, _), [ts]) when s = f_happens -> ts :: acc
     | _ as f ->
       let l, r = oget (destr_and f) in
       collect (collect acc l) r
@@ -1392,77 +1494,7 @@ let pp_subst ppf s =
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_esubst) s
 
 (*------------------------------------------------------------------*)
-(** {2 Typing} *)
-
-(*------------------------------------------------------------------*)
-let ty ?ty_env (t : term) : Type.ty =
-  let must_close, ty_env = match ty_env with
-    | None        -> true, Type.Infer.mk_env ()
-    | Some ty_env -> false, ty_env
-  in
-
-  let rec ty (t : term) : Type.ty =
-    match t with
-    | Fun (_,fty,terms) ->
-      let fty = Type.open_ftype ty_env fty in
-      
-      let ty_args, ty_out =
-        let arrow_ty = Type.fun_l fty.fty_args fty.fty_out in
-        Type.destr_funs ~ty_env arrow_ty (List.length terms)
-      in
-      check_tys terms ty_args;
-      ty_out
-
-    | App (t1, l) ->
-      let tys, t_out = Type.destr_funs ~ty_env (ty t1) (List.length l) in      
-      check_tys l tys;
-      t_out
-
-    | Name (ns, _) -> ns.s_typ
-    | Macro (s,_,_)  -> s.s_typ
-
-    | Tuple ts -> 
-      Type.Tuple (List.map ty ts)
-
-    | Proj (i,t) -> 
-      begin
-        match ty t with
-        | Type.Tuple tys -> List.nth tys (i - 1)
-        | _ -> assert false
-      end
-
-    | Var v                -> Vars.ty v
-    | Action _             -> Type.Timestamp
-    | Diff (Explicit l)    -> ty (snd (List.hd l))
-
-    | Find (_, _, c, _)    -> ty c
-
-    | Quant (q, vs, t) ->
-      match q with
-      | ForAll | Exists -> Type.Boolean
-      | Seq             -> Type.Message
-      | Lambda          -> 
-        let tys = List.map Vars.ty vs in
-        let ty_out = ty t in
-        Type.fun_l tys ty_out
-
-
-  and check_tys (terms : term list) (tys : Type.ty list) =
-    List.iter2 (fun term arg_ty ->
-        match Type.Infer.unify_eq ty_env (ty term) arg_ty with
-        | `Ok -> ()
-        | `Fail -> assert false
-      ) terms tys
-  in
-
-  let tty = ty t in
-
-  if must_close
-  then Type.tsubst (Type.Infer.close ty_env) tty (* ty_env should be closed *)
-  else tty
-
-(*------------------------------------------------------------------*)
-(** Literals. *)
+(** {2 Literals.} *)
 
 module Lit = struct
   type ord    = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
@@ -1526,24 +1558,23 @@ module Lit = struct
   (*------------------------------------------------------------------*)
   let form_to_xatom (form : term) : xatom option =
     match form with
-    | Fun (f, _, [a]) when f = f_happens -> Some (Happens a)
+    | App (Fun (f, _), [a]) when f = f_happens -> Some (Happens a)
 
-    | Fun (fseq,  _, [a;b]) when fseq  = f_eq  -> Some (Comp (`Eq,  a, b))
-    | Fun (fsneq, _, [a;b]) when fsneq = f_neq -> Some (Comp (`Neq, a, b))
-    | Fun (fsleq, _, [a;b]) when fsleq = f_leq -> Some (Comp (`Leq, a, b))
-    | Fun (fslt,  _, [a;b]) when fslt  = f_lt  -> Some (Comp (`Lt,  a, b))
-    | Fun (fsgeq, _, [a;b]) when fsgeq = f_geq -> Some (Comp (`Geq, a, b))
-    | Fun (fsgt,  _, [a;b]) when fsgt  = f_gt  -> Some (Comp (`Gt,  a, b))
+    | App (Fun (fseq,  _), [a;b]) when fseq  = f_eq  -> Some (Comp (`Eq,  a, b))
+    | App (Fun (fsneq, _), [a;b]) when fsneq = f_neq -> Some (Comp (`Neq, a, b))
+    | App (Fun (fsleq, _), [a;b]) when fsleq = f_leq -> Some (Comp (`Leq, a, b))
+    | App (Fun (fslt,  _), [a;b]) when fslt  = f_lt  -> Some (Comp (`Lt,  a, b))
+    | App (Fun (fsgeq, _), [a;b]) when fsgeq = f_geq -> Some (Comp (`Geq, a, b))
+    | App (Fun (fsgt,  _), [a;b]) when fsgt  = f_gt  -> Some (Comp (`Gt,  a, b))
     | _ -> 
       if Config.old_completion () then
         None
       else
         Some (Atom form)
-        (* Some (Comp (`Eq, form, mk_true)) *)
 
   let rec form_to_literal (form : term) : literal option =
     match form with
-    | Fun (fnot, _, [f]) when fnot = f_not -> omap neg (form_to_literal f)
+    | App (Fun (fnot, _), [f]) when fnot = f_not -> omap neg (form_to_literal f)
     | _ -> omap (fun at -> (`Pos, at)) (form_to_xatom form)
 
   (*------------------------------------------------------------------*)
@@ -1567,7 +1598,7 @@ module Lit = struct
 
     let rec aux_l = function
       | tf when tf = mk_false -> []
-      | Fun (fsor,_, [a; b]) when fsor = f_or -> aux_l a @ aux_l b
+      | App (Fun (fsor,_), [a; b]) when fsor = f_or -> aux_l a @ aux_l b
       | f -> match form_to_literal f with
         | Some f -> [f] 
         | None   -> raise Not_a_disjunction
@@ -1663,10 +1694,19 @@ include Smart
 (*------------------------------------------------------------------*)
 (** {2 Type substitution} *)
 
+let tsubst_applied_ftype (ts : Type.tsubst) { fty; ty_args;} =
+  { fty     = Type.tsubst_ftype ts fty; 
+    ty_args = List.map (Type.tsubst ts) ty_args; }
+
 let tsubst (ts : Type.tsubst) (t : term) : term =
-  (* no need to substitute in the types of [Name], [Macro], [Fun] *)
   let rec tsubst : term -> term = function
     | Var v -> Var (Vars.tsubst ts v)
+
+    | Fun (fn, fty_app) -> 
+      Fun (fn, tsubst_applied_ftype ts fty_app)
+
+    (* TODO: types: substitute in Name and Macro *)
+
     | Quant (q, vs, f) -> Quant (q, List.map (Vars.tsubst ts) vs, tsubst f)
 
     | Find (vs, a,b,c) ->
@@ -1685,14 +1725,14 @@ let rec not_simpl = function
     | Quant (ForAll, vs, f) -> Quant (Exists, vs, not_simpl f)
     | tt when tt = mk_true  -> mk_false
     | tf when tf = mk_false -> mk_true
-    | Fun (fs, _, [a;b]) when fs = f_and  -> mk_or  (not_simpl a) (not_simpl b)
-    | Fun (fs, _, [a;b]) when fs = f_or   -> mk_and (not_simpl a) (not_simpl b)
-    | Fun (fs, _, [a;b]) when fs = f_impl -> mk_and a (not_simpl b)
+    | App (Fun (fs, _), [a;b]) when fs = f_and  -> mk_or  (not_simpl a) (not_simpl b)
+    | App (Fun (fs, _), [a;b]) when fs = f_or   -> mk_and (not_simpl a) (not_simpl b)
+    | App (Fun (fs, _), [a;b]) when fs = f_impl -> mk_and a (not_simpl b)
 
-    | Fun (fs, _, [f]) when fs = f_not -> f
+    | App (Fun (fs, _), [f]) when fs = f_not -> f
 
-    | Fun (fs, _, [a;b]) when fs = f_eq   -> mk_neq a b
-    | Fun (fs, _, [a;b]) when fs = f_neq  -> mk_eq a b
+    | App (Fun (fs, _), [a;b]) when fs = f_eq   -> mk_neq a b
+    | App (Fun (fs, _), [a;b]) when fs = f_neq  -> mk_eq a b
 
     | m -> mk_not m
 
@@ -1748,8 +1788,8 @@ let alpha_bnds (s : subst) (vs1 : Vars.vars) (vs2 : Vars.vars) : subst =
 let alpha_conv ?(subst=[]) (t1 : term) (t2 : term) : bool =
   let rec doit (s : subst) t1 t2 : unit =
     match t1, t2 with
-    | Fun (f, _fty, l), Fun (f', _fty', l') when f = f' ->
-      doits s l l'
+    | Fun (f, { ty_args = l; }), Fun (f', { ty_args = l'; }) when f = f' ->
+      if not (List.for_all2 Type.equal l l') then raise AlphaFailed;
 
     | Proj (i, t), Proj (i', t') -> 
       if i <> i' then raise AlphaFailed;
@@ -1839,8 +1879,14 @@ let rec make_normal_biterm
   let doit () =
     (* TODO generalize to non-binary diff *)
     match t1, t2 with
-    | Fun (f, fty, l), Fun (f', _fty', l') when f = f' ->
-      Fun (f, fty, List.map2 (mdiff s) l l')
+    (* FIXME: if the head function symb. could be not SI, then this would not work *)
+    | App (Fun _ as t, l), App (Fun _ as t', l') ->
+      if alpha_conv t t' then
+        App (t, List.map2 (mdiff s) l l')
+      else 
+        diff t1 (subst s t2)
+
+    | Fun _ as t, (Fun _ as t') when alpha_conv t t' -> t
 
     | Proj (i, t), Proj (i', t') when i = i' -> Proj (i, mdiff s t t')
 
@@ -1993,7 +2039,7 @@ let get_head : term -> term_head = function
 
   | Tuple _        -> HTuple
   | Proj _         -> HProj
-  | Fun (f,_,_)    -> HFun f
+  | Fun (f,_)      -> HFun f
   | Find _         -> HFind
   | Macro (m1,_,_) -> HMacro m1.s_symb
   | Name (n1, _)   -> HName n1.s_symb
@@ -2009,19 +2055,22 @@ module Hm = Map.Make(struct
 (*------------------------------------------------------------------*)
 (** {2 Patterns} *)
 
-(** A pattern is a list of free type variables, a term [t] and a subset
-    of [t]'s free variables that must be matched.
-    The free type variables must be inferred. *)
+(** A pattern is a list of free type variables to be instantiated, a
+    term [t] and a subset of [t]'s free variables that must be
+    infered. *)
 type 'a pat = {
   pat_tyvars : Type.tvars;
   pat_vars   : (Vars.var * Vars.Tag.t) list;
   pat_term   : 'a;
 }
 
-let empty_pat (t : 'a) =
-  { pat_tyvars = [];
-    pat_vars   = [];
-    pat_term   = t; }
+(** An opened pattern, i.e. a pattern where type variables are
+    type unification variables. *)
+type 'a pat_op = {
+  pat_op_tyvars : Type.univars;
+  pat_op_vars   : (Vars.var * Vars.Tag.t) list;
+  pat_op_term   : 'a;
+}
 
 let pat_of_form (t : term) =
   let vs, t = decompose_forall_tagged t in
@@ -2035,9 +2084,16 @@ let pat_of_form (t : term) =
 let project_tpat (projs : projs) (pat : term pat) : term pat =
   { pat with pat_term = project projs pat.pat_term; }
 
+let project_tpat_op (projs : projs) (pat : term pat_op) : term pat_op =
+  { pat with pat_op_term = project projs pat.pat_op_term; }
+
 let project_tpat_opt (projs : projs option) (pat : term pat) : term pat 
   =
   omap_dflt pat (project_tpat ^~ pat) projs
+
+let project_tpat_op_opt (projs : projs option) (pat : term pat_op) : term pat_op
+  =
+  omap_dflt pat (project_tpat_op ^~ pat) projs
 
 (*------------------------------------------------------------------*)
 (** {2 Tests} *)

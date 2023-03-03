@@ -1,5 +1,3 @@
-
-
 system null.
 
 goal _ (x:message,y:message,z:message) :

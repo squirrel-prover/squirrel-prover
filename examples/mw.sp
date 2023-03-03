@@ -99,7 +99,8 @@ Proof.
         ** by depends R(r),R2(r).
 
   (* WA => Cond *)
-  + by intro [i t _]; expand output; exists i,t.
+  + intro [i t _]; expand output; exists i,t. 
+    by project.
 Qed.
 
 (** Same as before, but more precise wrt i, for the left process.
@@ -167,8 +168,7 @@ goal wa_R1_tryfind (r:index) : happens(R1(r)) =>
 Proof.
   intro Hap.
   case exec@pred(R1(r)) => // Hexec.
-  case cond@R1(r) => // Hcond.
-  simpl.
+  case cond@R1(r) => // Hcond /=.
   (* Projection must be performed before fa
      so that useless indices are handled smartly. *)
   project.

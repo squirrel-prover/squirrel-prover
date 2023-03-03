@@ -62,7 +62,7 @@ type rand_occs = rand_occ list
 
 type dec_allowed = Allowed | NotAllowed | NotAbove of Name.t
 
-
+(*------------------------------------------------------------------*)
 (** Finds occs of k, except those that are
     - in enc key position (if pkf = None)
     - in pub key position (if pkf <> None)
@@ -106,7 +106,7 @@ val get_bad_occs_and_ciphertexts :
   term ->
   NO.n_occs * ctxt_occs
 
-
+(*------------------------------------------------------------------*)
 (** Look for bad uses of the randoms r from the list of
     ciphertexts occurrences enc(m,r,k1). 
     ie - if r occurs somewhere not as r' in enc(m',r', k'):
@@ -136,7 +136,7 @@ val get_bad_randoms :
   term -> 
   NO.n_occs * rand_occs 
 
-
+(*------------------------------------------------------------------*)
 (** Constructs the formula expressing that a ciphertext occurrence
     c'=enc(m',r',k1) is indeed in collision with c, and k1 with k.
     used for integrity: if dec(c, k) succeeds, then c must be
@@ -150,8 +150,7 @@ val ciphertext_formula :
     ctxt_aux ->
     term
 
-
-                                          
+(*------------------------------------------------------------------*)                                         
 (** Constructs the formula expressing that an occurrence of a random r'
     is indeed a bad occurrence of the r from the ctxt_occ enc(m,r,k1),
     given that the key we're interested in is k:
