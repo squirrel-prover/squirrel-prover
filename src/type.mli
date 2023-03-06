@@ -49,6 +49,7 @@ type ty =
 (** {2 Misc} *)
 
 val pp : Format.formatter -> ty -> unit
+val _pp : Format.formatter -> ty -> unit
 
 (** Equality relation *)
 val equal : ty -> ty -> bool

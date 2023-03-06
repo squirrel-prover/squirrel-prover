@@ -605,7 +605,8 @@ let namelength () =
   let n = Symbols.Name.of_lsymb (mk "n") table in
   let tn = Term.mk_name (Term.mk_symb n tyn) [] in
   
-  let name_hash = "namelength_" ^ (string_of_int (Hashtbl.hash tyn)) in
+  let cst = Format.flush_str_formatter (Type.pp Format.str_formatter tyn) in
+  let name_hash = "namelength_" ^ cst in
   let lsy = L.mk_loc L._dummy (name_hash) in
 
   let table, fname = match Symbols.Function.of_lsymb_opt lsy table with
@@ -616,7 +617,7 @@ let namelength () =
   let f = Term.mk_atom `Eq (Term.mk_len tn) (cst) in
 
   Alcotest.(check (term_testable)) 
-    "axiom namelength_n → len(n) = namelength_129913994"
+    "axiom namelength_n → len(n) = namelength_message"
     (f)
     (stmt_n.formula);
 

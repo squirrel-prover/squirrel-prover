@@ -111,6 +111,26 @@ and pp_chain_left ppf (t : ty) : unit =
   | Fun (_, _) -> Fmt.pf ppf "(%a)" pp t
   | _          -> Fmt.pf ppf "%a"   pp t
 
+(* for constant name we need string without discontinuity nor
+ * parenthesis *)
+and _pp (ppf : Format.formatter) : ty -> unit = function
+  | Message   -> Fmt.pf ppf "message"
+  | Index     -> Fmt.pf ppf "index"
+  | Timestamp -> Fmt.pf ppf "timestamp"
+  | Boolean   -> Fmt.pf ppf "bool"
+  | TBase s   -> Fmt.pf ppf "%s" s
+  | TVar id   -> pp_tvar ppf id
+  | TUnivar u -> pp_univar ppf u
+
+  | Tuple tys -> Fmt.list ~sep:(Fmt.any "•") pp ppf tys
+
+  | Fun (t1, t2) ->
+    Fmt.pf ppf "%a→%a" _pp_chain_left t1 pp t2
+and _pp_chain_left ppf (t : ty) : unit =
+  match t with
+  | Fun (_, _) -> Fmt.pf ppf "_%a_" pp t
+  | _          -> Fmt.pf ppf "%a"   pp t
+
 (*------------------------------------------------------------------*)
 let is_tuni = function TUnivar _ -> true | _ -> false
 
