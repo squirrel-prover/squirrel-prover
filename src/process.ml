@@ -400,7 +400,7 @@ type p_env = {
 (*------------------------------------------------------------------*)
 (* Creates an axiom namelength_name with formula : 
   len(s) = namelength_hashS with hashS depending on out type of name s *)
-let mk_namelength_axiom' 
+let mk_namelength_statement 
     (name:string) (* Statement name → could be namelength_s by default *)
     (table:Symbols.table) (* the table *)
     (s:lsymb) (* symbol of targeted name *)
@@ -420,7 +420,8 @@ let mk_namelength_axiom'
   let tn = Term.mk_name (Term.mk_symb n tyn) tvars in
   
   (* cst hash is built from hash of output type of n : tyn *)
-  let cst_hash = "namelength_" ^ (string_of_int (Hashtbl.hash tyn)) in
+  let cst = Format.flush_str_formatter (Type.pp Format.str_formatter tyn) in
+  let cst_hash = "namelength_" ^ cst in
   let lsy = L.mk_loc L._dummy (cst_hash) in
 
   (* find or build cst function namelength_hashS *)
@@ -459,7 +460,7 @@ let add_namelength_axiom
   then table
   else
   let table, stmt = 
-    mk_namelength_axiom' name table s ftype in
+    mk_namelength_statement name table s ftype in
   Lemma.add_lemma `Axiom stmt table
 
 
