@@ -294,13 +294,20 @@ let global_prf
     Constr.make_context ~table ~system:(SE.singleton old_single_system)
   in
 
-  let param = Prf.prf_param hash in
+  let (h_fn, h_cnt, h_key) =
+    match hash with
+    | Term.App (Fun (h_fn, applied_fty), [Tuple [h_cnt; Name (key, key_args)]]) ->
+      (* crypto function cannot use polymorphism *)
+      assert (applied_fty.ty_args = []);
+      (h_fn, h_cnt, NameOccs.Name.{ symb = key; args = key_args; })      
+    | _ -> Tactics.soft_failure Tactics.Bad_SSC
+  in
 
   (* Check syntactic side condition. *)
   let errors =
     OldEuf.key_ssc ~globals:true
       ~elems:[] ~allow_functions:(fun _ -> false)
-      ~cntxt param.h_fn param.h_key.symb.s_symb
+      ~cntxt h_fn h_key.symb.s_symb
   in
   if errors <> [] then
     soft_failure (Tactics.BadSSCDetailed errors);
@@ -308,7 +315,7 @@ let global_prf
   (* We first refresh globably the indices to create the left pattern *)
   let is1, left_subst = Term.refresh_vars is in
 
-  let left_key =  Term.subst left_subst (Name.to_term param.h_key) in
+  let left_key =  Term.subst left_subst (Name.to_term h_key) in
   let left_key_ids =
     match left_key with
     | Term.Name (_,ids) -> ids
@@ -317,7 +324,7 @@ let global_prf
   (* We create the pattern for the hash *)
   let fresh_x_var = Vars.make_fresh Type.Message "x" in
   let hash_pattern =
-    Term.mk_fun_tuple table param.h_fn [Term.mk_var fresh_x_var; left_key ]
+    Term.mk_fun_tuple table h_fn [Term.mk_var fresh_x_var; left_key ]
   in
 
   (* Instantiation of the fresh name *)
@@ -335,8 +342,8 @@ let global_prf
     let ns = Term.mk_symb n Message in
     Term.mk_find is Term.(
         mk_and
-          (mk_atom `Eq (Term.mk_var fresh_x_var) param.h_cnt)
-          (mk_eqs ~simpl_tuples:true left_key_ids param.h_key.args)
+          (mk_atom `Eq (Term.mk_var fresh_x_var) h_cnt)
+          (mk_eqs ~simpl_tuples:true left_key_ids h_key.args)
       ) (Term.mk_name_with_tuple_args ns (Term.mk_vars is)) hash_pattern
   in
   let rw_rule = Rewrite.{
@@ -369,7 +376,7 @@ let global_prf
       Equiv.Atom (
         Equiv [Term.mk_var fresh_x_var;
                Term.mk_diff
-                 [Term.left_proj, Name.to_term param.h_key;
+                 [Term.left_proj, Name.to_term h_key;
                   Term.right_proj,
                   Term.mk_name_with_tuple_args
                     (Term.mk_symb n Message) (Term.mk_vars is)]])
@@ -836,20 +843,28 @@ let global_prf_t
       models = None}
   in
 
-  let param = Prf.prf_param hash in
+  let (h_fn, h_fty, h_key) =
+    match hash with
+    | Term.App (Fun (h_fn, applied_fty), [Tuple [_; Name (key, key_args)]]) ->
+      (* crypto function cannot use polymorphism *)
+      assert (applied_fty.ty_args = []);
+      (h_fn, applied_fty.fty, NameOccs.Name.{ symb = key; args = key_args; })      
+    | _ -> Tactics.soft_failure Tactics.Bad_SSC
+  in
 
+  
   (* Check syntactic side condition.
      We iter over global macros too ! *)
   let errors =
     OldEuf.key_ssc ~globals:true
       ~elems:[] ~allow_functions:(fun _ -> false)
-      ~cntxt param.h_fn param.h_key.symb.s_symb
+      ~cntxt h_fn h_key.symb.s_symb
   in
   if errors <> [] then
     soft_failure (Tactics.BadSSCDetailed errors);
 
   (* type of the hash function input *)
-  let m_ty = match param.h_fty.fty_args with
+  let m_ty = match h_fty.Type.fty_args with
     | [Type.Tuple [m_ty; _]] -> m_ty
     | _ -> assert false
   in
@@ -893,7 +908,7 @@ let global_prf_t
               Iter.deprecated_get_f_messages_ext ~mode:`NoDelta
                 ~fv:descr.indices 
                 (old_system :> SE.arbitrary) table
-                param.h_fn param.h_key.symb.s_symb t
+                h_fn h_key.symb.s_symb t
             in
 
             (* extend new occurrences with additional information *)
@@ -929,12 +944,12 @@ let global_prf_t
   let tau_t = Term.mk_var tau in
 
   let is, subst = Term.refresh_vars is in
-  let key = Term.subst subst (Name.to_term param.h_key) in
-  let key_is = List.map (Term.subst subst) param.h_key.args in
+  let key = Term.subst subst (Name.to_term h_key) in
+  let key_is = List.map (Term.subst subst) h_key.args in
 
   (* term to rewrite *)
   let to_rw =
-    Term.mk_fun_tuple table param.h_fn [x_t; key ]
+    Term.mk_fun_tuple table h_fn [x_t; key ]
   in
 
   (* name term associated to a hash occurrence. *)
