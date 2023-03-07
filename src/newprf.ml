@@ -238,7 +238,7 @@ let project_conditions
    (not under binders, does not unfold macros) *)
 let rec find_hash (table:Symbols.table) (t:Term.term) : Term.term option =
   match t with
-  | Fun (f,_,[Tuple [_; _]]) when is_hash table f -> Some t
+  | App (Fun (f,_), [Tuple [_; _]]) when is_hash table f -> Some t
   | _ when is_binder t -> None
   |_ -> Term.tfold
           (fun t' op -> if op = None then find_hash table t' else op)
