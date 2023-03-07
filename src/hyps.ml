@@ -438,7 +438,10 @@ let setup_change_hyps_context
             | None -> true);
 
   (* Flags indicating which parts of the context are changed. *)
-  let set_unchanged = new_context.SE.set = old_context.SE.set in
+  (* For the set, use SE.equal, which ignores the labels of the systems
+     and compares the sets as sets (i.e. double inclusion) *)
+  (* For the pair, the labels must be the same, so use equality *)
+  let set_unchanged = SE.equal table new_context.SE.set old_context.SE.set in
   let pair_unchanged = new_context.SE.pair = old_context.SE.pair in
 
   (* Can we project formulas from the old to the new context? *)
